@@ -2,12 +2,13 @@ import * as THREE from "three";
 import { ACTOR_DETAIL } from "./Data_Tuning_Ai.mjs";
 import { BakeMissionBody } from "./Script_FirstLevelMissionAftermath.mjs";
 import { CloneShadedMaterial } from "./Script_Materials.mjs";
+import { MergeBodyParts } from "./Script_PartAtlasMerge.mjs";
 import { MissionTrainLifePose } from "./Script_FirstLevelMissionTrainLife.mjs";
 import { MISSION_PEOPLE_TUNING as C } from "./Data_Tuning_FirstLevel.mjs";
 
 // Visible people share the production character rig; two-bone IK corrects hands onto the actual rails.
 export class MissionPeople {
-  constructor({root,actorFactory,battlefield}){Object.assign(this,{root,actorFactory,battlefield});this.people=new Map();this.time=0;this.patients=new Map();this.patientMatrix=new THREE.Matrix4();this.patientRotation=new THREE.Quaternion();}
+  constructor({root,actorFactory,battlefield}){Object.assign(this,{root,actorFactory,battlefield});this.people=new Map();this.time=0;this.patients=new Map();this.patientMerge=new Map();this.patientOwned={materials:[],geometries:[],textures:[]};this.patientMatrix=new THREE.Matrix4();this.patientRotation=new THREE.Quaternion();}
   Begin(time,focus=null){this.focus=focus;this.dt=Math.max(0,Math.min(.05,time-this.time));this.time=time;for(const entry of this.people.values())entry.used=false;for(const parts of this.patients.values())for(const mesh of parts)mesh.count=0;}
   Person(id,x,z,yaw,{alive=true,moving=false,crouch=false,kind="bearer",carryTarget=null,role=null}={}){
     let entry=this.people.get(id);
@@ -105,7 +106,10 @@ export class MissionPeople {
     if(!parts){
       const materials=new Map(),baked=BakeMissionBody(this.actorFactory,{side:"nra",pose:variant,patient:true},materials);
       // Own material per instanced table: sharing the skinned actors' material makes three re-derive the program every draw.
-      parts=baked.map(part=>{const mesh=new THREE.InstancedMesh(part.geometry,CloneShadedMaterial(materials.get(part.key)),64);
+      // 分件按着色签名合成图集网格（与尸体层同一路），七只网格降到四五只。
+      const merged=MergeBodyParts(baked.map(part=>({key:part.key,source:materials.get(part.key),tiers:[part.geometry]})),
+        {clone:CloneShadedMaterial,cache:this.patientMerge,owned:this.patientOwned});
+      parts=merged.map(entry=>{const mesh=new THREE.InstancedMesh(entry.tiers[0],entry.material,64);
         mesh.name="MissionLitterPatient";mesh.castShadow=true;mesh.receiveShadow=true;mesh.frustumCulled=false;mesh.count=0;
         this.root.add(mesh);return mesh;});this.patients.set(variant,parts);
     }
@@ -113,11 +117,14 @@ export class MissionPeople {
     this.patientMatrix.compose(new THREE.Vector3(x,y+.01+Math.sin(time*1.7+id.length)*.003,z),this.patientRotation,new THREE.Vector3(.94,.94,.94));
     for(const mesh of parts){mesh.setMatrixAt(mesh.count++,this.patientMatrix);mesh.instanceMatrix.needsUpdate=true;}
   }
-  End(){for(const entry of this.people.values())if(!entry.used)entry.actor.root.visible=false;}
+  End(){for(const entry of this.people.values())if(!entry.used)entry.actor.root.visible=false;
+    // 空桶照样走一整趟 setProgram（three 的 primcount 早退在那后面），摘出渲染列表。
+    for(const parts of this.patients.values())for(const mesh of parts)mesh.visible=mesh.count>0;}
   State(){return {count:this.people.size,visible:[...this.people.values()].filter(e=>e.used).length,
     maxGripError:Math.max(0,...[...this.people.values()].filter(e=>e.used).flatMap(e=>e.gripErrors||[]))};}
   Dispose(){for(const entry of this.people.values())entry.actor.Dispose();this.people.clear();
-    for(const parts of this.patients.values())for(const mesh of parts){mesh.removeFromParent();mesh.geometry.dispose();mesh.material.dispose();}this.patients.clear();}
+    for(const parts of this.patients.values())for(const mesh of parts){mesh.removeFromParent();mesh.geometry.dispose();mesh.material.dispose();}this.patients.clear();
+    for(const texture of this.patientOwned.textures)texture.dispose();this.patientOwned.textures.length=0;this.patientMerge.clear();}
 }
 
 // Idle observation layers onto existing animation; it releases immediately on fire,

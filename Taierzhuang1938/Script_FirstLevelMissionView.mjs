@@ -364,6 +364,10 @@ export class FirstLevelMissionView {
     for (const mesh of Object.values(this.parts)) {
       mesh.instanceMatrix.needsUpdate = true;
       if(mesh.instanceColor)mesh.instanceColor.needsUpdate=true;
+      // 空桶也要一次完整提交：three 的 `primcount === 0` 早退在 renderInstances 里，
+      // 而 setProgram（材质状态 / uniform / 属性绑定）已经跑完了。这一关同时最多
+      // 用到其中八只，剩下的按 visible 摘出渲染列表（口径同 docs/Data_ActorCrowdLod §4.1）。
+      mesh.visible = mesh.count > 0;
     }
     if (tank) {
       this.tank.visible = tank.present || tank.active;

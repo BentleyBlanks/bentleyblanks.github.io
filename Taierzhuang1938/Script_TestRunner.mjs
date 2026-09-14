@@ -537,6 +537,11 @@ const changedDomainRules = [
   { domain: "combat", pattern: /Gore|Dismember|Blood|CharacterWounds|SurfaceDecals/i },
   {domain:"combat",pattern:/BallisticSuppression/},
   {domain:'firstLevel',pattern:/MissionReturn|FirstLevelMeal|BaconHandoff|FirstLevelOpening|FirstLevelMachineGun|FirstLevelFrontPresence|FirstLevelMission|FirstLevelTrain|FirstLevelCarriage|CarriageSoundscape|FirstLevelVoiceAlign|SeedAudioFirstLevel|SeedAudioCarriage|Audio\/FirstLevel|Audio\/Amb\/AudioAmb_Carriage/},
+  // 静态分件的图集合批：第一关尸体层与担架伤员用它（firstLevel 那一串里的
+  // 尸体 / 演出门禁），而它动的是材质与提交量，所以 render 域的开机 / 采样器 /
+  // 材质门禁也要跟着跑。
+  { domain: "firstLevel", pattern: /Script_PartAtlasMerge/ },
+  { domain: "render", pattern: /Script_PartAtlasMerge/ },
   { domain: "menu", pattern: /FirstLevelP012Debug/i },
   { domain: "text", pattern: /(Script_Text|Data_Text_|Data_Locale_|Data_Tuning_|Data_Mission|Data_Cutscene|Data_History|Data_Voice|Data_Weapons|TengxianScript)/i },
   { domain: "ai", pattern: /Data_Setpieces_|Data_Companions|Data_Flares|Data_AircraftStrafe|Data_Telegraph|Data_Emplacements|Data_Carry/i },

@@ -5,6 +5,7 @@ import { BLOOD_DRESSING as BLOOD } from "./Data_Tuning_Blood.mjs";
 import { MISSION_PEOPLE_TUNING as C, MISSION_BODY_SUPPORT } from "./Data_Tuning_FirstLevel.mjs";
 import { MissionTrainLifePose } from "./Script_FirstLevelMissionTrainLife.mjs";
 import { CloneShadedMaterial } from "./Script_Materials.mjs";
+import { MergeBodyParts } from "./Script_PartAtlasMerge.mjs";
 
 import { MISSION_AFTERMATH } from "./Data_FirstLevelMissionFront.mjs";
 import { MISSION_CIVILIAN_AFTERMATH } from "./Data_FirstLevelMissionCivilianAftermath.mjs";
@@ -34,9 +35,13 @@ import { CreateBodyContactShape, MissionBodySupport } from "./Script_FirstLevelM
 // = 56 只网格：**每多开一档就多 56 只网格 ≈ 110 个 draw call**，而这一帧的瓶颈是提交
 // （20 ms / 1000 draw ≈ 每个 20 µs），不是三角形。所以档表保持三档。
 //
-// 真要把尸体的提交量压下来，得先把那 7 张贴图合成一张图集、7 个材质并成一个 ——
-// 那时候一档只要 8 只网格，加档才重新变得便宜。人群远景层（每档也是 7 个材质桶）
-// 是同一笔账，见 docs/Data_ActorCrowdLod.md §4.1。
+// 【2026-09-15 已经合过一轮】上面那笔账的前提改了：分件现在走
+// `Script_PartAtlasMerge.MergeBodyParts` —— **着色签名相同**的分件把各自的贴图拼成
+// 一张图集、UV 重映射之后合成一份几何，一档距离只提交这一只。军人一具 7 只 → 4—5 只
+// （皮肤那份带 `USE_MATERIAL_SKIN`，合进去就是肉眼看得见的着色变化，所以留在外面），
+// 平民一具 23—24 只 → 2 只（其中 17—18 个分件本来就共用一份材质，纯几何合并）。
+// 档表仍保持三档：加档的代价降了，但收益没验过，别顺手加。
+// 人群远景层（每档也是 7 个材质桶）是同一笔账，见 docs/Data_ActorCrowdLod.md §4.1。
 const TIERS = C.aftermathTiers.length;
 const _frustum = new THREE.Frustum();
 const _matrix = new THREE.Matrix4();
@@ -47,6 +52,10 @@ export class MissionAftermath {
   constructor({root,battlefield,actorFactory,vfx,bodies=[...MISSION_AFTERMATH,...MISSION_CIVILIAN_AFTERMATH]}) {
     this.root=new THREE.Group();this.root.name="MissionBattlefieldAftermath";root.add(this.root);
     this.materials=new Map();this.clones=[];
+    // 图集与合并后的材质按「着色签名 + 源材质集合」缓存：nra0 / nra1 / nra3 用的是
+    // 同一套源材质，只烘一张图集、共用一份材质（少一份程序，也少一次预热）。
+    this.mergeCache=new Map();
+    this.owned={materials:this.clones,geometries:[],textures:[]};
     this.bloodLayer=vfx?.CreateBloodDecalLayer(this.root,bodies.length);
     this.prototypes=new Map();
     this.instances=[];
@@ -59,12 +68,15 @@ export class MissionAftermath {
       const key=spec.side+(spec.variant||"")+spec.pose;
       let prototype=this.prototypes.get(key);
       if(!prototype){
-        const parts=BakeMissionBody(actorFactory,spec,this.materials).map(part=>{
-          const source=this.materials.get(part.key);
-          const material=CloneShadedMaterial(source);this.clones.push(material);
-          const tiers=C.aftermathTiers.map(t=>t.cellM>0?CreateDistantBodyGeometry(part.geometry,t.cellM):part.geometry);
-          return {material,tiers,triangles:tiers.map(Triangles)};
-        });
+        // 先逐分件合点（每档的减面结果与合并前逐字相同），再按着色签名合成图集网格。
+        const staged=BakeMissionBody(actorFactory,spec,this.materials).map(part=>({
+          key:part.key,source:this.materials.get(part.key),
+          tiers:C.aftermathTiers.map(t=>t.cellM>0?CreateDistantBodyGeometry(part.geometry,t.cellM):part.geometry),
+        }));
+        const parts=MergeBodyParts(staged,{clone:CloneShadedMaterial,cache:this.mergeCache,owned:this.owned});
+        // 合并前那几份中间几何没人再用了（没上过 GPU，dispose 只是卫生）。
+        const kept=new Set(parts.flatMap(part=>part.tiers));
+        for(const part of staged)for(const geometry of part.tiers)if(!kept.has(geometry))geometry.dispose();
         prototype={key,parts,members:[],meshes:[]};
         this.prototypes.set(key,prototype);
         contactShapes.set(key,CreateBodyContactShape(parts));
@@ -93,6 +105,9 @@ export class MissionAftermath {
           const mesh=new THREE.InstancedMesh(geometry,part.material,Math.max(1,prototype.members.length));
           mesh.name=`MissionAftermath_${prototype.key}_${tier}`;
           mesh.frustumCulled=false;mesh.count=0;
+          // 最远那一档合点之后有的分件一个三角都不剩（眼睛、帽徽），
+          // 但空几何照样走一整趟提交 —— 直接钉死不画。
+          mesh.userData.emptyGeometry=!(part.triangles[tier]>0);
           // 只有最近那一档投阴影（`ACTOR_DETAIL.shadowM` 以外的尸体在阴影图里看不见）。
           mesh.castShadow=tier===0;mesh.receiveShadow=true;
           mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -153,7 +168,7 @@ export class MissionAftermath {
         for(const part of prototype.parts){const mesh=part.meshes[tier];mesh.setMatrixAt(mesh.count++,instance.matrix);}
         visible[TierName(tier)]++;
       }
-      for(const part of prototype.parts)for(const mesh of part.meshes){mesh.instanceMatrix.needsUpdate=true;mesh.visible=mesh.count>0;}
+      for(const part of prototype.parts)for(const mesh of part.meshes){mesh.instanceMatrix.needsUpdate=true;mesh.visible=mesh.count>0&&!mesh.userData.emptyGeometry;}
     }
   }
   Bake(factory,spec){return BakeMissionBody(factory,spec,this.materials);}
@@ -162,10 +177,12 @@ export class MissionAftermath {
     for(const prototype of this.prototypes.values())for(const part of prototype.parts){for(const g of part.tiers)g.dispose();for(const m of part.meshes)m.dispose?.();}
     this.bloodLayer?.Dispose();
     for(const material of this.clones)material.dispose();
+    // 图集是这一层自己烘的，材质 dispose 不会带走它们。
+    for(const texture of this.owned.textures)texture.dispose();
+    this.owned.textures.length=0;this.mergeCache.clear();
   }
 }
 
-function Triangles(geometry){return (geometry.index?.count||geometry.attributes.position.count)/3;}
 /** 档位名（预算报表与 `FirstLevelMissionPresentationTest` 用的就是这三个名字）。 */
 function TierName(tier){return ["detail","distant","far"][tier]??`tier${tier}`;}
 
