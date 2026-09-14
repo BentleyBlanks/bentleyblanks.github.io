@@ -130,6 +130,7 @@ export const TEXT = Object.freeze({
   "hud.hint.meleeTestDown": "本轮阵亡 · 在白刃实验面板开始／重开",
   "hud.hint.noBipod": "这支枪没有两脚架",
   "hud.hint.bipodNeedsRest": "得先趴下，或者靠着能搭枪的东西",
+  "hud.hint.proneSlopeBlocked": "俯卧角度过大被阻挡",
   "hud.hint.bipodOn": "两脚架架好了",
   "hud.hint.bipodOff": "收了两脚架",
   "hud.hint.singleFireMode": "这支枪只有一种发射方式",

@@ -16,13 +16,16 @@
  * 姿态参数。眼高按真人来：站 1.62，蹲 1.05，卧 0.42（趴下之后视线只比枪高一点）。
  *
  * eye/radius 与 `Script_Ai.CAPSULE` 是同一套「人有多高多粗」，改一边要对另一边；
- * sway/spread 是手感倍率（架枪多稳、散布多大），乘在武器自己的基数上。
+ * sway/spread 是手感倍率（架枪多稳、散布多大），乘在武器自己的基数上；
+ * maxGroundSlopeDeg 是进入该姿态时脚下支撑面允许的最大坡度。只有卧姿需要这条限制：
+ * 人可以站着或蹲着穿过陡坡，但不能把横卧碰撞体硬塞进接近墙面的地形。
  * labelKey 是姿态名的文本键，句子在 Data_Text_Gameplay 的 `gameplay.stance.*`。
  */
 export const STANCE = Object.freeze({
   stand: Object.freeze({ eye: 1.62, speed: 3.05, radius: 0.34, sway: 1.0, spread: 1.0, labelKey: "gameplay.stance.stand" }),
   crouch: Object.freeze({ eye: 1.05, speed: 1.62, radius: 0.34, sway: 0.62, spread: 0.66, labelKey: "gameplay.stance.crouch" }),
-  prone: Object.freeze({ eye: 0.42, speed: 0.72, radius: 0.42, sway: 0.30, spread: 0.34, labelKey: "gameplay.stance.prone" }),
+  prone: Object.freeze({ eye: 0.42, speed: 0.72, radius: 0.42, sway: 0.30, spread: 0.34,
+    maxGroundSlopeDeg: 30, labelKey: "gameplay.stance.prone" }),
 });
 
 /**

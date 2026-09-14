@@ -383,10 +383,37 @@ export class PlayerController {
 
   /** 键盘与 HUD 共用的姿态入口；换姿态收起两脚架，不能在翻越中途改身体。 */
   SetStance(stance) {
+    this.stanceBlockReason = null;
     if (!Object.hasOwn(STANCE, stance) || !this.alive || this.vault.active) return false;
+    if (stance === "prone" && this.stance !== "prone" && this.grounded
+      && this.GroundSlopeDeg() > STANCE.prone.maxGroundSlopeDeg) {
+      this.stanceBlockReason = "proneSlope";
+      return false;
+    }
     if (this.stance !== stance) this.bipod = false;
     this.stance = stance;
     return true;
+  }
+
+  /**
+   * 当前脚下支撑面的坡度。优先读物理探针，才能认出斜坡碰撞体；物理尚未接入时
+   * 用同一份 GroundHeight 做中心差分。0° 是平地，90° 是竖直面。
+   */
+  GroundSlopeDeg() {
+    const support = this.physics?.GroundProbe?.(
+      this.position.x, this.position.z, this.position.y);
+    const normal = support?.normal;
+    if (normal && Number.isFinite(normal[1])) {
+      return Math.acos(Clamp(normal[1], -1, 1)) * 180 / Math.PI;
+    }
+    const ground = this.world?.GroundHeight;
+    if (typeof ground !== "function") return 0;
+    const e = 0.5;
+    const dx = (ground(this.position.x + e, this.position.z)
+      - ground(this.position.x - e, this.position.z)) / (2 * e);
+    const dz = (ground(this.position.x, this.position.z + e)
+      - ground(this.position.x, this.position.z - e)) / (2 * e);
+    return Math.atan(Math.hypot(dx, dz)) * 180 / Math.PI;
   }
 
   /**
@@ -674,9 +701,16 @@ export class PlayerController {
     this.pitch = Clamp(this.pitch, -FREE_AIM.pitchLimitRad, FREE_AIM.pitchLimitRad);
 
     // --- 姿态 ---------------------------------------------------------------
-    if (input.stanceRequested) this.SetStance(input.stanceRequested);
-    else if (input.pronePressed) this.SetStance(this.stance === "prone" ? "stand" : "prone");
-    else if (input.crouchPressed) this.SetStance(this.stance === "crouch" ? "stand" : "crouch");
+    let stanceBlockReason = null;
+    if (input.stanceRequested) {
+      this.SetStance(input.stanceRequested); stanceBlockReason = this.stanceBlockReason;
+    } else if (input.pronePressed) {
+      this.SetStance(this.stance === "prone" ? "stand" : "prone");
+      stanceBlockReason = this.stanceBlockReason;
+    } else if (input.crouchPressed) {
+      this.SetStance(this.stance === "crouch" ? "stand" : "crouch");
+      stanceBlockReason = this.stanceBlockReason;
+    }
     // 压制到一定程度会被逼得趴下 —— 这是 ER2 式压制最有说服力的一笔
     // 压制**不再偷偷改玩家的姿态**。
     // 原来是 suppression > 0.85 就把 stance 直接改成 crouch：玩家没按任何键，
@@ -868,7 +902,7 @@ export class PlayerController {
     this.suppression = Math.max(0, this.suppression - dt * SUPPRESSION.decayPerS);
 
     this.SyncCamera(dt);
-    return { planarSpeed: planar };
+    return { planarSpeed: planar, stanceBlockReason };
   }
 
   LegPenalty() {

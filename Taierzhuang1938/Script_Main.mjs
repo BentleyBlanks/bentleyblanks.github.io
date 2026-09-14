@@ -7908,12 +7908,15 @@ function Frame(dt, render = true) {
   input.diveSpeedMps = p012Runtime?.DiveSpeed(strafe?.View());
   player.meleePose = meleeCombat?.ViewPose();
   missionRuntime?.BeforePlayer(dt,input);
-  player.Update(dt, input, WEAPONS[currentWeapon], {
+  const playerFrame = player.Update(dt, input, WEAPONS[currentWeapon], {
     allowUndeployedAds: WEAPON_RANGE && WEAPON_RANGE_PHASE.whitebox.allowUndeployedAds,
     blockLean: !!emplacement?.Mounted || !!carry?.Blocking || !!missionRuntime?.EmptyHands
       || !!state.cooking || !!meleeCombat?.Blocking
       || ["reload", "melee", "meleeWind", "fixBayonet", "throw"].includes(viewmodel.action?.kind),
   });
+  if (playerFrame?.stanceBlockReason === "proneSlope") {
+    hud.Hint(T("hud.hint.proneSlopeBlocked"), 2);
+  }
   player.UpdateGunClearance(emplacement?.Mounted || carry?.Blocking || missionRuntime?.EmptyHands ? null : WEAPONS[currentWeapon]);
   SyncJumpSound();
   movementRange?.Update(dt);

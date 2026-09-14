@@ -5,6 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
+import { STANCE } from "./Data_Tuning_Player.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const server = await ServeRoot(path.resolve(projectDir, ".."), 0);
@@ -68,6 +69,32 @@ try {
     return { bipodReleased, stance: T.player.stance, invalid: T.player.SetStance("unknown") };
   });
   assert.deepEqual(guarded, { bipodReleased: true, stance: "stand", invalid: false });
+  const steepSlope = await page.evaluate((maxGroundSlopeDeg) => {
+    const T = window.Taierzhuang;
+    T.player.SetStance("stand"); T.player.grounded = true;
+    const original = T.player.physics.GroundProbe;
+    const radians = (maxGroundSlopeDeg + 5) * Math.PI / 180;
+    T.player.physics.GroundProbe = () => ({
+      y: T.player.position.y, normal: [Math.sin(radians), Math.cos(radians), 0], tag: "terrain",
+    });
+    T.Debug.Key("KeyZ"); T.StepFrames(2);
+    const hint = document.querySelector(".hudHint");
+    const result = {
+      stance: T.player.stance,
+      slopeDeg: T.player.GroundSlopeDeg(),
+      hint: hint.textContent,
+      hintVisible: hint.classList.contains("on"),
+    };
+    T.player.physics.GroundProbe = original;
+    return result;
+  }, STANCE.prone.maxGroundSlopeDeg);
+  assert.equal(steepSlope.stance, "stand", "超过卧姿坡度上限时必须阻挡俯卧");
+  assert.ok(steepSlope.slopeDeg > STANCE.prone.maxGroundSlopeDeg,
+    `测试坡度应越过上限: ${steepSlope.slopeDeg}`);
+  assert.deepEqual({ text: steepSlope.hint, visible: steepSlope.hintVisible },
+    { text: "俯卧角度过大被阻挡", visible: true }, "阻挡反馈复用现有 HUD 一次性提示");
+  assert.equal((await Press("z")).stance, "prone", "回到可俯卧地面后按键应立即恢复正常");
+  assert.equal((await Press("z")).stance, "stand");
   for (const width of [1280, 390]) {
     await page.setViewportSize({ width, height: 720 });
     const layout = await page.locator(".hudCombat").evaluate((element) => {
@@ -82,7 +109,7 @@ try {
     await page.screenshot({ path: path.join(outDir, `StanceHud${width}.png`) });
   }
   assert.deepEqual(errors, []);
-  console.log(`StanceTest PASS: 六向切换、站起不跳、长按、HUD 无姿态、视线/碰撞/移速、暂停隔离、桌面/窄屏；速度 ${speeds.map((v) => v.toFixed(2)).join(" / ")}`);
+  console.log(`StanceTest PASS: 六向切换、陡坡俯卧阻挡与 HUD 提示、站起不跳、长按、HUD 无姿态、视线/碰撞/移速、暂停隔离、桌面/窄屏；速度 ${speeds.map((v) => v.toFixed(2)).join(" / ")}`);
 } finally {
   await page.close(); await browser.close(); await new Promise((resolve) => server.close(resolve));
 }
