@@ -1,3 +1,4 @@
+import { MISSION_GUIDE_DIALOGUE } from "./Data_FirstLevelGuideDialogue.mjs";
 // One continuous exchange = one Seed Audio generation and one retained cue.
 // Latest Notion amendments override archived P0/P1/P2 and older chapter recordings.
 export const MISSION_VOICE_CAST = Object.freeze({
@@ -339,6 +340,7 @@ export const MISSION_DIALOGUE = Object.freeze([
     ["soldier", "伤员往里！拿枪的去东关！"],
     ["luo", "跟上！"],
   ]),
+  ...MISSION_GUIDE_DIALOGUE,
 ]);
 export function MissionVoicePrompt(cue) {
   const cast = [...new Set(cue.lines.map((line) => line.who))]

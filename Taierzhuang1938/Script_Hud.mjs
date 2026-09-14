@@ -10,6 +10,7 @@
 // 孙连仲的命令原话就是「士兵打完了，你自己填上去。你填过了，我来填」。
 
 import { T, Localize } from "./Script_Text.mjs";
+import { MISSION_GUIDE_TUNING as GUIDE } from "./Data_Tuning_MissionGuide.mjs";
 import { HUD_WEAPON_ICONS } from "./Data_HudWeaponIcons.mjs";
 import { LevelBriefId, LevelFieldId } from "./Script_TextIds.mjs";
 import { HIT_FEEDBACK } from "./Data_Tuning_Player.mjs";
@@ -507,6 +508,11 @@ export class Hud {
     this.el.mqAssist = this.el.meleeQte.querySelector(".mqAssist");
     this.el.note = mk("hudNote");
     this.el.markers = mk("hudMarkers");
+    this.el.missionGuide = mk("hudMissionGuide");
+    this.el.missionGuide.innerHTML = '<span class="guideAction"></span><i class="guideDiamond" aria-hidden="true"></i><b class="guideArrow" aria-hidden="true"></b><span class="guideDetail"></span>';
+    this.el.missionGuide.hidden = true;
+    this.el.guideAction = this.el.missionGuide.querySelector(".guideAction");
+    this.el.guideDetail = this.el.missionGuide.querySelector(".guideDetail");
     this.el.grenadeWarnings = mk("hudGrenadeWarnings");
     for (let i = 0; i < GRENADE_WARNING.maxIcons; i += 1) {
       const warning = mk("hudGrenadeWarning", this.el.grenadeWarnings);
@@ -1631,7 +1637,33 @@ export class Hud {
     this.el.fps.classList.toggle("low", fps < FPS.lowFps);
   }
 
+  SetMissionGuide(view, context=null) {
+    this.missionGuide = view ? {view,context} : null;
+    if(!view&&!this.el.missionGuide.hidden)this.el.missionGuide.hidden = true;
+  }
+
+  RenderMissionGuide() {
+    const guide=this.missionGuide,el=this.el.missionGuide;
+    if(!guide){if(!el.hidden)el.hidden=true;return;}
+    const {view,context}=guide,projected=context.Project(view.target);
+    if(!Number.isFinite(projected.x)||!Number.isFinite(projected.y)){if(!el.hidden)el.hidden=true;return;}
+    const width=window.innerWidth,height=window.innerHeight;
+    const point=GrenadeWarningScreenPoint(projected,{position:view.target},context.player,width,height,{liftPx:0});
+    const x=Math.max(100,Math.min(width-100,point.x)),y=Math.max(72,Math.min(height-110,point.y));
+    if(el.hidden)el.hidden=false;
+    SetClass(el,"leader",view.leaderTarget);
+    SetClass(el,"offscreen",point.offscreen);
+    SetClass(el,"near",view.distance<GUIDE.nearMarkerM);
+    SetAttr(el,"data-mode",view.label);
+    SetAttr(el,"aria-label",`${view.action} ${view.name} ${T("firstLevel.leader.distance",{distance:Math.ceil(view.distance)})}`);
+    SetText(this.el.guideAction,view.action);
+    SetText(this.el.guideDetail,`${view.leaderTarget?view.name+" · ":""}${T("firstLevel.leader.distance",{distance:Math.ceil(view.distance)})}`);
+    SetStyle(el,"transform",`translate(${x.toFixed(1)}px,${y.toFixed(1)}px)`);
+    SetVar(el,"--guide-angle",`${Math.atan2(point.y-height*.5,point.x-width*.5)*180/Math.PI+90}deg`);
+  }
+
   Update(dt) {
+    this.RenderMissionGuide();
     this.UpdateFps(dt);
     // 闲置自隐：倒数归零就收；钉住（空膛 / 低弹）的那一块由 SetState 每帧重新点亮。
     for (const channel of ["combat", "state"]) {

@@ -41,6 +41,8 @@ export class FirstLevelMissionVoice {
   }
   Enqueue(id, { urgent = false } = {}) {
     if (!id || this.played.has(id) || this.queue.includes(id)) return false;
+    // Narrative events preempt optional reminders, never the other way round.
+    if(!MISSION_DIALOGUE.find(cue=>cue.id===id)?.guidance)this.CancelGuidance();
     if (urgent) {
       this.StopParallel();
       this.audio.StopStoryVoice();
@@ -49,6 +51,18 @@ export class FirstLevelMissionVoice {
     }
     this.queue.push(id);
     return true;
+  }
+  Guidance(id) {
+    if(this.paused || this.current || this.queue.length || !MISSION_DIALOGUE.find(cue=>cue.id===id)?.guidance)return false;
+    this.queue.push(id);
+    return true;
+  }
+  CancelGuidance() {
+    this.queue=this.queue.filter(id=>!MISSION_DIALOGUE.find(cue=>cue.id===id)?.guidance);
+    if(!this.current?.cue.guidance)return;
+    this.audio.StopStoryVoice();
+    this.current=null;
+    this.hud.Say?.(null,"",0);
   }
   Finish() {
     if (!this.current) return;

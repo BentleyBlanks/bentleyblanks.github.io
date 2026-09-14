@@ -1,0 +1,36 @@
+// Independent situational orders. Each row is one complete, retained performance.
+// The mission director may repeat an order after a cooldown; story exchanges stay intact.
+const lines = [
+  ["Follow", "顺子，跟到我！贴到掩体走，莫往空地头蹿！"],
+  ["Wait", "顺子！这边！你龟儿磨蹭啥子，跟上！"],
+  ["Trench", "顺子！沿沟清过去！拐角那几个打掉，进后头掩蔽处！"],
+  ["Shelter", "卡住折角！让伤兵先进来，莫堵到路！"],
+  ["Support", "顺子！跟到我往前！压住鬼子的火，接前头弟兄下来！"],
+  ["Gun", "顺子，上机枪！打那个冒火的墙口！外头还有自己人，莫松！"],
+  ["GunSupply", "弹匣打光了就下来拿！箱子在枪后头，老子掩护你！"],
+  ["Bundle", "顺子，侧沟这边！拿上集束手榴弹，把那龟儿车弄停！"],
+  ["Throw", "沿侧沟上去，照履带甩！甩完缩回来，炮还在！"],
+  ["Orders", "顺子，撤回沟里！到老子这儿接令，准备送伤兵！"],
+  ["South", "顺子、幺娃，前头看路！文财盯后头，莫掉人！跟到后送队往南走！"],
+  ["Kitchen", "右手灶屋！顺子，穿过去！把窗口那挺机枪端了，担架还等到的！"],
+  ["Melee", "拔刀！把刺刀拨开！莫让狗日的堵住门！"],
+  ["Gate", "机枪打哑了就开院门！顺子，手脚麻利点，伤兵等不起！"],
+  ["CourtCover", "担架先过！顺子，看住门外！后头还有人，莫忙到走！"],
+  ["Transfer", "顺子，棚子东头墙口！把追兵压回去，让伤兵装车！莫追出去！"],
+  ["SouthFlank", "南边绕过来了！调枪口！莫让龟儿些封住车路！"],
+  ["NorthRear", "北边！后头又来一伙！顺子，守住装车口！"],
+  ["Carry", "顺子，接老周担架后头！跟前头那个人走，往西边下沟！"],
+  ["Rescue", "顺子，拿枪断后！让幺娃把老周拖回来！"],
+  ["RetreatFirst", "顺子，守住沟里这个折角！担架从背后过，莫让追兵咬上来！"],
+  ["RetreatWall", "撤到院墙豁口！压住北边那挺机枪，担架过完再走！"],
+  ["RetreatYard", "跟最后一副往后退！后院的追兵打回去，接收院就在前头！"],
+  ["Reception", "顺子，院口右手窗口！把外头那几个压回去，让伤兵进院！"],
+  ["Place", "顺子，搭一把！抬周哥进屋，放卫生兵跟前！慢点，莫磕到他！"],
+  ["RearDefense", "顺子，到后门外头！压住西边追兵，后头还有活人要出来！"],
+  ["Exit", "人出来了！顺子，跟到老子退！走后门，莫恋战！"],
+];
+export const MISSION_GUIDE_DIALOGUE = Object.freeze(lines.map(([name, text]) => Object.freeze({
+  id: `Guide${name}`, file: `AudioVoice_FirstLevelGuide${name}.mp3`, guidance: true,
+  lines: [Object.freeze({who: "luo", text})],
+  delivery: "只演罗班长一人，三十二岁四川老兵，低沉沙哑的中低男声，厚实、有胸腔共鸣，和既有罗班长一致。战场上隔着几步喊给顺子听，短促、带喘息，四川口音自然，莫、到、龟儿保留方言读法。有火气但始终在照应弟兄，不是相声，不拖腔，不尖叫，不加词。整段一句完整说完，开头结尾不要长空白。",
+})));

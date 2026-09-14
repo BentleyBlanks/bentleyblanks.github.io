@@ -2,6 +2,18 @@
 export const TEXT = Object.freeze({
   "firstLevel.guide.front": "击退前方日军",
   "firstLevel.hint.crawlPassage": "趴下，匍匐穿过低矮通道",
+  "firstLevel.leader.follow": "跟随",
+  "firstLevel.leader.rally": "集合",
+  "firstLevel.leader.cover": "掩护",
+  "firstLevel.leader.use": "接手机枪",
+  "firstLevel.leader.collect": "领取集束弹",
+  "firstLevel.leader.throw": "炸停战车",
+  "firstLevel.leader.move": "前往",
+  "firstLevel.leader.clear": "清除敌军",
+  "firstLevel.leader.open": "打开院门",
+  "firstLevel.leader.carry": "接过担架",
+  "firstLevel.leader.place": "放下担架",
+  "firstLevel.leader.distance": "{distance} 米",
   "firstLevel.return.rejoin": "返回行动路线",
   "firstLevel.return.person": "你已远离伤员，立即返回接应。",
   "firstLevel.return.wounded": "返回老周身边",
@@ -61,5 +73,5 @@ export const TEXT = Object.freeze({
   "firstLevel.hint.transferWindow": "这股敌人已被打退，装载可以继续。留意车辆和老周的担架",
   "firstLevel.guide.loading": "转运车辆与老周的担架",
 });
-export const DYNAMIC_PREFIXES = ["firstLevel.return.", "firstLevel.interaction.", "firstLevel.guide.", "firstLevel.hint."];
-export const GATED_MODULES = ["Script_FirstLevelMissionRuntime.mjs", "Script_FirstLevelMissionVoice.mjs", "Script_FirstLevelOpening.mjs"];
+export const DYNAMIC_PREFIXES = ["firstLevel.return.", "firstLevel.interaction.", "firstLevel.guide.", "firstLevel.hint.", "firstLevel.leader."];
+export const GATED_MODULES = ["Script_FirstLevelMissionRuntime.mjs", "Script_FirstLevelMissionVoice.mjs", "Script_FirstLevelOpening.mjs", "Script_FirstLevelLeaderGuide.mjs"];

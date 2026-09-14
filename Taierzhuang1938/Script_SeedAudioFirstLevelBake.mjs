@@ -17,6 +17,17 @@ const dry = process.argv.includes("--dry"),
   force = process.argv.includes("--force");
 const model = "seed-audio-1.0",
   endpoint = "https://openspeech.bytedance.com/api/v3/tts/create";
+function WriteGuideAlignment(manifest) {
+  const entries = MISSION_DIALOGUE.filter(cue => cue.guidance && manifest.cues[cue.id]);
+  if (!entries.length) return;
+  const alignment = Object.fromEntries(entries.map(cue => {
+    const entry = manifest.cues[cue.id];
+    return [cue.id, {sha256: entry.sha256, lines: [[0, entry.seconds]]}];
+  }));
+  fs.writeFileSync(path.join(here, "Data_FirstLevelGuideVoiceAlignment.mjs"),
+    "// Single-speaker whole-cue intervals; no dialogue cuts or synthetic word alignment.\n"
+    + "export const GUIDE_VOICE_ALIGNMENT = Object.freeze(" + JSON.stringify(alignment, null, 2) + ");\n");
+}
 function Probe(file) {
   const result = spawnSync(
     process.env.FFPROBE || "ffprobe",
@@ -47,6 +58,7 @@ async function Main() {
     }
     if (!force && manifest.cues[cue.id]?.promptHash === hash && (manifest.cues[cue.id]?.speechRate??0)===(cue.speechRate??0) && fs.existsSync(output)) {
       Probe(output);
+      if (cue.guidance) WriteGuideAlignment(manifest);
       console.log(`${cue.id}: verified existing whole cue`);
       continue;
     }
@@ -142,6 +154,7 @@ async function Main() {
     };
     manifest.updatedAt = new Date().toISOString();
     fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
+    if (cue.guidance) WriteGuideAlignment(manifest);
     console.log(`${cue.id}: ${seconds.toFixed(2)} seconds, continuous cue saved`);
   }
 }

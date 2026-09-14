@@ -1,6 +1,8 @@
+import { GUIDE_VOICE_ALIGNMENT } from "./Data_FirstLevelGuideVoiceAlignment.mjs";
 // Complete Seed Audio takes, source-relative forced alignment; model recorded per cue.
 // Audio and script hashes prevent reuse after a Notion dialogue change.
 export const MISSION_VOICE_ALIGNMENT = Object.freeze({
+  ...GUIDE_VOICE_ALIGNMENT,
   "TrainMeal": {
     "sha256": "8fe5a4f72f2f36980b48a2a9e67f07f20db26f28a03ded8cad612c89cef3ddf7",
     "scriptSha256": "5e8deb7f0f6c0df1cf2b0761f36602fcc5b289587351c7e620dd5058f1aebae1",

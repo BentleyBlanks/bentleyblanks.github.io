@@ -1,6 +1,9 @@
 import { FirstLevelTransition } from "./Script_FirstLevelTransition.mjs";
 import { FRONT_SORTIE as Sortie, SOUTH_TRANSITION, SortieCrawlBlocked } from "./Data_FirstLevelFrontRoute.mjs";
 import { MISSION_REARGUARD_POCKETS } from "./Data_FirstLevelMissionTopology.mjs";
+import { FirstLevelLeaderGuide } from "./Script_FirstLevelLeaderGuide.mjs";
+import { CompactGuideRoute } from "./Script_NpcMissionGuide.mjs";
+import { MISSION_GUIDE_TUNING as GUIDE } from "./Data_Tuning_MissionGuide.mjs";
 import { MissionReturn } from "./Script_MissionReturn.mjs";
 import { MISSION_RETURN } from "./Data_Tuning_FirstLevel.mjs";
 import { MISSION_RETURN_ROUTES, MISSION_RETURN_PERSON_STAGES, MISSION_RETURN_SQUAD_STAGES, MISSION_RETURN_DISABLED_STAGES } from "./Data_FirstLevelMissionReturn.mjs";
@@ -121,6 +124,7 @@ export class FirstLevelMissionRuntime {
     this.musicInitializing = true;
     this.view.interact = this.interact;
     this.meal = new FirstLevelMeal(this);
+    this.leaderGuide = new FirstLevelLeaderGuide(this);
     this.Register();
     this.flow.Start();
     this.voiceReady = this.voice.Load().then(()=>{
@@ -195,9 +199,9 @@ export class FirstLevelMissionRuntime {
   get ReceivingFood() {
     return this.flow.stage.id === "Train" && !this.Has("trainFoodReceived");
   }
-  /** 正片平时不弹目标通知（目标在暂停页看）；只有这类无需按键的开场提示走左上角。 */
+  /** COD campaign: a brief objective update; the leader remains the travelling destination. */
   ObjectiveNotice() {
-    return this.ReceivingFood ? T("firstLevel.hint.receiveFood") : "";
+    return this.ReceivingFood ? T("firstLevel.hint.receiveFood") : this.leaderGuide?.Objective() || "";
   }
   OpeningPrompt() {
     if(this.flow.stage.id==='Tank' && this.player.stance!=='prone' && Sortie.crawl.some(c=>this.Near(c,c.d/2+2)))
@@ -543,7 +547,9 @@ export class FirstLevelMissionRuntime {
       const personalRoute = naturalMarch ? MissionSquadRoute(route,this.squad.indexOf(actor)) : route;
       actor.missionNaturalMarch = naturalMarch;
       actor.missionWatch=null;
-      const queued = MissionGuideRoute(actor.position,this.squadRoutes.get(actor.id),route,personalRoute,fromStart,resumeAfter);
+      // Optional guide detours belong to one route, not the next stage's approach.
+      const previousRoute=this.squadRoutes.get(actor.id)?.filter(point=>point.guideCheckpoint==null);
+      const queued = MissionGuideRoute(actor.position,previousRoute,route,personalRoute,fromStart,resumeAfter);
       if(resumeAfter){
         const rally=OPENING.trenchCoverPosts[this.squad.indexOf(actor)];
         const pending=queued.findIndex(p=>Distance(p,rally)<.1);
@@ -562,16 +568,19 @@ export class FirstLevelMissionRuntime {
         const post={x:end.x+dz/d*lateral-dx/d*back,z:end.z-dx/d*lateral-dz/d*back};
         if(!this.BlocksSight(this.Point(end,.7),this.Point(post,.7)))queued.push(post);
       }
-      for(const point of queued)delete point.coverBound; // previous route keeps its geometry, not its obsolete gate
-      const covered=stations?SquadCoverRoute(queued,stations,this.squad.indexOf(actor),TC):queued;
+      for(const point of queued){delete point.coverBound;delete point.guideCheckpoint;} // keep geometry, not obsolete gates
+      const covered=CompactGuideRoute(stations?SquadCoverRoute(queued,stations,this.squad.indexOf(actor),TC):queued,GUIDE.collinearEpsilonM);
       actor.missionCoverBounds=covered.filter(p=>Number.isInteger(p.coverBound));
       actor.missionCoverPassed=-1;actor.missionCoverWaiting=false;
       this.squadRoutes.set(actor.id, covered);
     }
+    const leaderRoute=this.squadRoutes.get(this.squad[GUIDE.leaderIndex]?.id);
+    if(leaderRoute)this.leaderGuide?.Plan(leaderRoute);
     // Role is supplied by the mission roster; the shared controller knows no cast names.
     this.squadMarch=new SquadMarchAi(this.ai,this.squad,{
       route,leaderIndex:0,seed:`FirstLevel:${this.flow.stage.id}`,
-      tuning:{speedMps:R.squadSpeedMps,catchupScale:R.squadCatchupMps/R.squadSpeedMps,arrivalM:.45},
+      tuning:{speedMps:R.squadSpeedMps,catchupScale:R.squadCatchupMps/R.squadSpeedMps,arrivalM:GUIDE.arrivalM,
+        waitDistanceM:GUIDE.waitDistanceM,resumeDistanceM:GUIDE.resumeDistanceM},
       members:this.squad.map(actor=>({route:this.squadRoutes.get(actor.id)})),
     },{Move:(actor,point,speed)=>this.MoveActor(actor,point,speed)});
   }
@@ -597,6 +606,7 @@ export class FirstLevelMissionRuntime {
   }
   UpdateSquad() {
     const stage = this.flow.stage.id;
+    this.leaderGuide?.BeginSquad();
     const marchSpeeds = new Map();
     this.squadCoverBounds?.Update(this.player.position,this.squad.map(actor=>({
       alive:actor.alive,position:actor.position,bounds:actor.missionCoverBounds||[],
@@ -653,8 +663,9 @@ export class FirstLevelMissionRuntime {
       // use the mover's actual arrival radius or men stop in the walking lane.
       while(route?.length){
         const point=route[0],bound=Number.isInteger(point.coverBound);
-        const arrival=point.coverTransit?CB.transitArrivalM:bound?CB.arrivalM:(route.length===1&&Number.isFinite(actor.scriptArrivalRadius)?actor.scriptArrivalRadius:1.1);
+        const arrival=point.coverTransit?CB.transitArrivalM:bound?CB.arrivalM:point.guideCheckpoint!=null?GUIDE.arrivalM:(route.length===1&&Number.isFinite(actor.scriptArrivalRadius)?actor.scriptArrivalRadius:1.1);
         if(Distance(actor.position,point)>arrival)break;
+        if(this.leaderGuide?.Hold(actor,point))break;
         if(bound&&!this.squadCoverBounds?.CanLeave(point.coverBound)){
           actor.missionCoverWaiting=true;
           this.squadMarch?.Release(actor);
@@ -670,7 +681,7 @@ export class FirstLevelMissionRuntime {
         if(bound)actor.missionCoverPassed=point.coverBound+1;
         route.shift();
       }
-      if(actor.missionCoverWaiting)continue;
+      if(actor.missionCoverWaiting || actor.missionGuideWaiting)continue;
       if(Number.isInteger(route?.[0]?.coverBound)){
         // The shared march may round ordinary corners. A shelter slot needs
         // precise physical arrival so the torso is actually behind its face.
@@ -690,7 +701,8 @@ export class FirstLevelMissionRuntime {
             (previous.position.z - actor.position.z) * (route[0].z - actor.position.z) >
             0;
         const yielding = ahead && Distance(previous.position, actor.position) < R.squadSpacingM;
-        let speed=this.squadCoverBounds&&route.some(p=>Number.isInteger(p.coverBound))?R.squadSpeedMps:MissionGuideSpeed(actor.position,this.player.position,route[0],actor.missionNaturalMarch?false:yielding,route);
+        let speed=(this.squadCoverBounds&&route.some(p=>Number.isInteger(p.coverBound)))
+          || (actor===this.leaderGuide?.Leader&&route.some(p=>p.guideCheckpoint!=null))?R.squadSpeedMps:MissionGuideSpeed(actor.position,this.player.position,route[0],actor.missionNaturalMarch?false:yielding,route);
         // Shared cadence owns its own acceleration and spacing. Keep the unfiltered
         // host limit; the legacy pace below remains available when combat takes over.
         marchSpeeds.set(actor.id,speed);
@@ -707,6 +719,7 @@ export class FirstLevelMissionRuntime {
           actor.missionMarchSpeed=speed;
         }
         this.MoveActor(actor,route[0],speed);
+        if(route[0].guideCheckpoint!=null)actor.scriptArrivalRadius=GUIDE.arrivalM*.5;
       } else if (["TrenchEntry","Shelter"].includes(stage)) {
         this.Defend(actor,actor.holdZone||actor.position,R.contactRadiusM,R.companionCoverSlackM);
         if(!actor.cover && this.time>=(actor.missionDangerUntil||0))this.ai.SetStance(actor,1,.5);
@@ -719,7 +732,7 @@ export class FirstLevelMissionRuntime {
         // Nearby shelter remains on this side of the blast traverse.
         this.Defend(actor,actor.holdZone||actor.position,R.contactRadiusM,R.companionCoverSlackM);
       } else if (!["Rescue", "Death"].includes(stage)) {
-        if(!this.WaitWatch(actor,stage))this.Defend(actor, actor.holdZone||actor.position);
+        if(!this.leaderGuide?.AtPost(actor)&&!this.WaitWatch(actor,stage))this.Defend(actor, actor.holdZone||actor.position);
         if(["Support","MachineGun","Tank"].includes(stage))this.ai.SetStance(actor,1,2);
       }
       if (!Number.isFinite(actor.scriptEscapeStance) && actor.suppression > R.companionProneSuppression && stage !== "Train") this.ai.SetStance(actor, 2, R.companionDangerHoldS, true);
@@ -733,6 +746,7 @@ export class FirstLevelMissionRuntime {
           &&!actor.missionContactPost
           &&!actor.missionGrenadeEvade
           &&!actor.missionCoverWaiting
+          &&!actor.missionGuideWaiting
           &&!actor.missionCoverApproach
           &&!(actor===this.bedGuide?.actor&&["FinalCarry","Death"].includes(stage)),
         noPause:!!this.squadCoverBounds,
@@ -1122,6 +1136,7 @@ export class FirstLevelMissionRuntime {
     return T(`firstLevel.interaction.${key}`);
   }
   Enter(stage) {
+    this.leaderGuide?.Enter(stage);
     // Narrative companions survive incidental combat from the very first stage.
     for(const actor of this.squad||[])actor.scriptEssential=OPENING.requiredSquadCast.includes(actor.castId);
     this.opening.Enter(stage.id);
@@ -2308,6 +2323,7 @@ export class FirstLevelMissionRuntime {
     this.meal.Update();
     this.view.Update(this.time, { tank: this.tank,player:this.player,camera:this.camera||null });
     this.flow.Update(dt);
+    this.leaderGuide?.Update();
     this.hud.SetMissionReturn?.(this.UpdateReturnWarning(dt));
     prof?.E("story/mission/other");
   }
@@ -2325,6 +2341,8 @@ export class FirstLevelMissionRuntime {
   OnPlayerDown() {
     this.ClearReturnWarning();
     this.failed = true;
+    this.hud.SetMissionGuide?.(null);
+    this.voice.CancelGuidance?.();
     this.retryPoint =
       this.carry.Active || this.controls
         ? {
@@ -2432,6 +2450,7 @@ export class FirstLevelMissionRuntime {
       train: this.train?.State(),
       relief: this.relief?.map(entry=>({id:entry.actor.id,alive:entry.actor.alive,arrived:entry.arrived,distance:entry.distance,index:entry.index,x:entry.actor.position.x,z:entry.actor.position.z})) || [],
       voice: this.voice.State(),
+      leaderGuide: this.leaderGuide?.State(),
       music: this.music.State(),
       battleSound: this.battleSound.State(),
       enemies: [...this.enemies].map(([id, actor]) => ({
@@ -2465,6 +2484,7 @@ export class FirstLevelMissionRuntime {
     };
   }
   Dispose() {
+    this.leaderGuide?.Dispose();
     this.ClearReturnWarning();
     this.speakingFace?.Reset();
     if(this.ai.ctx.onSoldierDeath===this.soldierDeath)this.ai.ctx.onSoldierDeath=this.oldSoldierDeath;

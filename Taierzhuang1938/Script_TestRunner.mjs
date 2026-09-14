@@ -48,6 +48,8 @@ const browserLockWriteGraceMs = 10 * 1000;
 
 export const testDefs = {
   FirstLevelFrontRouteBrowserTest:{file:"Script_FirstLevelFrontRouteBrowserTest.mjs",timeoutMs:300000,desc:"Optional gun, crawl route, supplier, track damage and escort fade"},
+  FirstLevelLeaderGuideTest: {file:"Script_FirstLevelLeaderGuideTest.mjs",desc:"Leader rendezvous, route progress, stage cues and story-first reminder scheduling"},
+  FirstLevelLeaderGuideBrowserTest: {file:"Script_FirstLevelLeaderGuideBrowserTest.mjs",timeoutMs:600000,desc:"Real leader waiting/resuming, reachable stops, physical gesture and single COD-style marker"},
   FirstLevelMissionTopologyTest: {file:"Script_FirstLevelMissionTopologyTest.mjs",desc:"Notion September 14 phase gates, west-to-south topology, sight breaks and reception adjacency"},
   FirstLevelMissionTopologyBrowserTest: {file:"Script_FirstLevelMissionTopologyBrowserTest.mjs",timeoutMs:300000,desc:"Physical rear/medic routes, bridge replay, kitchen prerequisite and 720p whitebox views"},
   CarriagePropVelocityTest: {file:'Script_CarriagePropVelocityTest.mjs',timeoutMs:300000,desc:'Real pork/pack GPU velocities with moving camera, stop and reappearance; high-quality opening'},
@@ -313,6 +315,7 @@ export const testDefs = {
 
 export const browserTests = new Set([
   "FirstLevelFrontRouteBrowserTest",
+  "FirstLevelLeaderGuideBrowserTest",
   "FirstLevelMissionTopologyBrowserTest",
   "FirstLevelMissionReturnBrowserTest",
   "MuzzleFlashTest", "HeadshotTest",
@@ -416,6 +419,7 @@ export const tier2 = [
 ];
 
 export const domains = {
+  missionGuide: {label:"Physical mission leader and HUD",tests:["FirstLevelLeaderGuideTest","FirstLevelLeaderGuideBrowserTest","FirstLevelMissionTest","FirstLevelMissionBrowserTest"]},
   characterSpeech: {label:"班长面部对白",tests:["CharacterSpeechTest","CharacterSpeechBrowserTest"]},
   motionVector: {label:'统一运动矢量接入契约',tests:['MotionVectorContractTest']},
   propVelocity: {label:'近景刚体道具速度与移动清晰度',tests:['CarriagePropVelocityTest']},
@@ -523,6 +527,7 @@ const changedDomainRules = [
   { domain: "render", pattern: /Script_Profile(Cli|r?Report)|Script_FrameProbeViews/i },
   { domain: "perf", pattern: /Script_ProfileCli/i },
   {domain:"firstLevel",pattern:/FirstLevelFrontRoute|FirstLevelTransition/},
+  {domain:"missionGuide",pattern:/FirstLevelLeaderGuide|FirstLevelGuideDialogue|FirstLevelGuideVoiceAlignment|FirstLevelMissionRuntime|Script_FirstLevelMissionVoice|NpcMissionGuide|NpcGuideGesture|Tuning_MissionGuide/},
   { domain: "combat", pattern: /FirearmHandling|MuzzleFlash|Headshot/i },
   {domain:"firstLevel",pattern:/Type89Damage/},
   {domain:"characterSpeech",pattern:/CharacterSpeech|CharacterFacial|SpeechEnvelope|NraFacial|Nra05Facial|Script_FirstLevelMissionVoice|Script_Audio\.mjs|Script_CharacterModel/},
