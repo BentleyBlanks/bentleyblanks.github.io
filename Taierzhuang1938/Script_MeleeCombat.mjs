@@ -49,7 +49,7 @@ export class MeleeCombatDirector {
       weapon: this.Weapon(entity), actionSerial: 0, nextThink: this.time + 0.65,
       lastParry: -99, lastHit: -99, move: 0, target: null, pressureBy: null,
       attack: null, hit: false, parryUsed: false, buffer: null, qteCount: 0,
-      qteUntil: -99, beatUntil: -99, pushUntil: -99, interruptUntil: -99,
+      qteUntil: -99, recoveryUntil: -99, beatUntil: -99, pushUntil: -99, interruptUntil: -99,
     });
     return this.fighters.get(entity);
   }
@@ -251,6 +251,8 @@ export class MeleeCombatDirector {
   }
   Stagger(entity, from, clip, duration, poise = 0) {
     const f = this.Fighter(entity);
+    // Damage is already applied; repeated hits must not restart falling or rising.
+    if (entity === this.Player() && (["fall", "down", "rise", "qte"].includes(f.state) || this.time < f.recoveryUntil)) return;
     f.poise = Math.max(0, f.poise - poise); f.lastHit = this.time; f.pressureBy = from;
     if (f.poise <= 0) { this.SetState(f, "fall", R.knockdownS, "Fall"); this.Log("knockdown", entity, from); }
     else this.SetState(f, "stagger", duration, clip);
@@ -258,7 +260,7 @@ export class MeleeCombatDirector {
   }
   KnockDown(entity = this.Player(), attacker = null, reason = "impact") {
     const f = this.Fighter(entity);
-    if (!Alive(entity) || !f?.weapon || this.Active || ["fall","down","rise"].includes(f.state)) return false;
+    if (!Alive(entity) || !f?.weapon || this.Active || (entity === this.Player() && this.time < f.recoveryUntil) || ["fall","down","rise"].includes(f.state)) return false;
     f.poise = 0; f.pressureBy = attacker; f.lastHit = this.time;
     this.SetState(f,"fall",R.knockdownS,"Fall");this.Log("knockdown",entity,attacker,{reason});return true;
   }
@@ -301,9 +303,16 @@ export class MeleeCombatDirector {
     this.Log(a.success ? "qteSuccess" : "qteFailure", this.Player(), a.attacker, { qteKind: a.kind });
     if (!a.success) this.Damage(this.Player(), a.attacker, a.kind === "ground" ? Q.groundFailureDamage : Q.standingFailureDamage, "qte");
   }
+  ReleaseQteRecovery(pf, kind) {
+    const recoveryS = kind === "ground" ? R.riseS : R.staggerS;
+    pf.qteUntil = Math.max(pf.qteUntil, this.time + recoveryS + Q.cooldownS);
+    pf.recoveryUntil = Math.max(pf.recoveryUntil, this.time + recoveryS + Q.controlRecoveryS);
+    pf.poise = Math.max(pf.poise, Q.recoveryPoise);
+  }
   FinishQte(a) {
     const p = this.Player(), pf = this.Fighter(p), of = this.Fighter(a.attacker);
     if (!Alive(p)) { if (of) this.SetState(of, "idle"); return; }
+    this.ReleaseQteRecovery(pf, a.kind);
     if (a.success) {
       this.Repel(a.attacker, p, W[pf.weapon].pushDistance);
       this.SetState(of, "stagger", (a.kind==='ground'?R.riseS:0)+Q.recoveryAdvantageS, "Pushed");
@@ -328,6 +337,7 @@ export class MeleeCombatDirector {
     const a=this.qte.active;if(!a)return;
     const p=this.Player(),pf=this.Fighter(p),of=this.Fighter(a.attacker);
     this.qte.Cancel();this.held.clear();
+    this.ReleaseQteRecovery(pf, a.kind);
     this.SetState(pf,a.kind==='ground'?'rise':'idle',a.kind==='ground'?R.riseS:0,a.kind==='ground'?'Rise':'Guard');
     this.SetState(of,'idle');of.nextThink=this.time+R.npcTellS;
     // No victory, damage, teleport or partner stagger; a fresh visible tell follows release.
@@ -558,7 +568,12 @@ export class MeleeCombatDirector {
     if (f.state === "fall" && f.t >= f.duration) {
       this.SetState(f, "down", 1.7, "Ground"); return;
     }
-    if (f.state === "down" && f.t >= f.duration) { this.SetState(f, "rise", R.riseS, "Rise"); f.poise = 50; return; }
+    if (f.state === "down" && f.t >= f.duration) {
+      this.SetState(f, "rise", R.riseS, "Rise");
+      f.poise = e === this.Player() ? Q.recoveryPoise : 50;
+      if (e === this.Player()) f.recoveryUntil = this.time + R.riseS + Q.controlRecoveryS;
+      return;
+    }
     if (!["idle", "charge", "down"].includes(f.state) && f.t >= f.duration) this.SetState(f, "idle");
   }
   ResolveContact(f) {

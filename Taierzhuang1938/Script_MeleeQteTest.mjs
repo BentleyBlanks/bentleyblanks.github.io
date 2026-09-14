@@ -9,7 +9,7 @@ import { FPS_ARM_LIMITS } from './Data_FpsArmPoses.mjs';
 const project=path.dirname(fileURLToPath(import.meta.url));
 const server=await ServeRoot(path.resolve(project,'..'),0);
 const browser=await LaunchBrowser();
-const page=await browser.newPage({viewport:{width:1440,height:900}});
+const page=await browser.newPage({viewport:{width:1280,height:720}});
 const errors=[];
 const posesOnly=process.argv.includes('--poses');
 page.on('pageerror',e=>errors.push(String(e)));
@@ -204,11 +204,16 @@ try {
       const first=Begin(weapon+kind),beforeY=T.player.camera.position.y-T.player.position.y;
       const lowBodyVisible=T.viewmodel.body?.root.visible;
       if(first.active?.phase!=='input')throw new Error('No real QTE trigger '+weapon+kind+JSON.stringify(first));
+      const key=document.querySelector('.hudMeleeQte.input kbd.expected');
+      if(key?.textContent!=='F'||getComputedStyle(key).animationName!=='mqUrgentKey')throw new Error('QTE requires a flashing F prompt');
       for(let i=0;i<40 && lab.State().active?.phase==='input';i++) {
         if(success){T.Debug.Key('KeyF',true);T.Debug.Key('KeyF',false);}
         Step(.2);
       }
-      const resolution=lab.State();Step(1.8);
+      const resolution=lab.State();
+      if(document.querySelector('.mqKeys kbd.expected'))throw new Error('Resolved QTE must stop prompting input');
+      Step(1.8);
+      if(document.querySelector('.hudMeleeQte').getAttribute('aria-hidden')!=='true')throw new Error('Completed QTE must hide its HUD');
       const end=lab.State();
       report.push({weapon,kind,success,resolved:resolution.active?.success,health:end.health,enemy:end.targets[0].health,active:end.active,states:end.player.state,beforeY,afterY:T.player.camera.position.y-T.player.position.y,lowBodyVisible,gripMax,wristMax,markerError,stats:end.stats});
     }
@@ -218,6 +223,22 @@ try {
   for(const q of qtes){assert.equal(q.resolved,q.success,`${q.weapon} ${q.kind}`);assert.equal(q.enemy,100);assert.equal(q.active,null);assert(q.success?q.health===100:q.health<100);if(q.kind==='Ground'){assert(q.beforeY<.7);assert(q.afterY>1.2);assert.equal(q.lowBodyVisible,false,'Standing torso must not occlude a supine camera');}}
   for(const q of qtes){assert(q.gripMax<=FPS_ARM_LIMITS.positionResidualM,`${q.weapon}${q.kind}: QTE grip drift ${q.gripMax}`);assert(q.wristMax<=FPS_ARM_LIMITS.wristBendDeg+.01,`${q.weapon}${q.kind}: QTE wrist ${q.wristMax}`);}
   for(const q of qtes)assert(q.markerError<=.501,'Control marker must move toward our side on the left');
+  const surrounded=await page.evaluate(()=>{
+    const T=Taierzhuang,L=T.Debug.MeleeCombat,C=T.meleeCombat;
+    L.Select('DadaoTwo');T.player.debug.invincible=true;
+    C.KnockDown(T.player,T.ai.soldiers[0]);
+    let blockedS=0,maxBlockedS=0,freeFrames=0;
+    for(let i=0;i<1800;i++) {
+      T.StepFrames(1,1/60,false);
+      if(C.Blocking)blockedS+=1/60;else {blockedS=0;freeFrames++;}
+      maxBlockedS=Math.max(maxBlockedS,blockedS);
+    }
+    const report={maxBlockedS,freeFrames,health:T.player.health,hits:C.stats.hits};
+    T.player.debug.invincible=false;return report;
+  });
+  assert(surrounded.maxBlockedS<9 && surrounded.freeFrames>60 && surrounded.health===100 && surrounded.hits>0,
+    `two live attackers must allow invincible player to get up: ${JSON.stringify(surrounded)}`);
+  console.log('PASS invincible 1v2 get-up',JSON.stringify(surrounded));
   const pressure=await page.evaluate(()=>{
     const T=Taierzhuang,L=T.Debug.MeleeCombat,C=T.meleeCombat,out=[];
     for(const id of ['DadaoBind','BayonetGround']){

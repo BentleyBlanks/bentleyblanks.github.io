@@ -614,7 +614,7 @@ export class Hud {
       this.el.mqKeys.dataset.signature = signature;
       this.el.mqKeys.innerHTML = (view.keys || []).map((key, index) => {
         const done = view.input === "sequence" && index < view.index;
-        const expected = String(key) === String(view.expected)
+        const expected = view.phase === "input" && String(key) === String(view.expected)
           && (view.input !== "sequence" || index === view.index);
         return `<kbd class="${done ? "done" : expected ? "expected" : ""}">${key}</kbd>`;
       }).join(`<span>›</span>`);

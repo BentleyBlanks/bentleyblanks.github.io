@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { MeleeCombatDirector } from './Script_MeleeCombat.mjs';
 import { MeleeQteDirector } from './Script_MeleeQte.mjs';
-import { MELEE_RULES as R, MELEE_WEAPONS as W, MELEE_SCENARIOS as S, MELEE_SQUAD as G } from './Data_MeleeCombat.mjs';
+import { MELEE_RULES as R, MELEE_WEAPONS as W, MELEE_SCENARIOS as S, MELEE_SQUAD as G, MELEE_QTE_RULES as Q } from './Data_MeleeCombat.mjs';
 const Make = (weapon='Dadao', distance=1.4) => {
   const p = { id:'Player', alive:true, side:'nra', health:100, yaw:0, position:{x:0,y:0,z:0}, meleeWeapon:weapon };
   const e = { id:'Enemy', alive:true, side:'ija', health:100, yaw:Math.PI, position:{x:0,y:0,z:-distance}, meleeWeapon:'Bayonet', meleeTraining:{ passive:true } };
@@ -223,6 +223,42 @@ Test('successful parry keeps monotonic video time and an interruptible visual re
   Step(c,.14);assert.equal(c.Fighter(p).state,'idle');
   const recovery=c.Pose(c.Fighter(p));assert(recovery.visualRecovery);assert(recovery.animationNormalized>before.animationNormalized);
   assert(c.AttackDown());assert.equal(c.Fighter(p).state,'charge');assert(!c.Pose(c.Fighter(p)).visualRecovery);
+});
+Test('QTE has a hard deadline even when resistance keeps progress above zero',()=>{
+  for(const kind of ['standing','ground']) {
+    const q=new MeleeQteDirector();q.Begin(kind,{});
+    for(let t=0;t<Q.windowS+.1;t+=.01){if(q.active?.phase==='input')q.active.progress=.5;q.Update(.01);}
+    assert.equal(q.View().phase,'resolve');assert.equal(q.View().success,false);
+    q.Update(Q.resolveS+.01);assert.equal(q.View(),null);
+  }
+});
+Test('repeated hits from two enemies cannot restart knockdown or get-up in invincible mode',()=>{
+  const {p,e,c}=Make('Dadao',1);const other={...e,id:'Other',position:{x:1,y:0,z:0}};
+  c.host.Soldiers=()=>[e,other];let damage=0;c.host.Damage=()=>damage++;
+  assert(c.KnockDown(p,e));
+  let regained=false;
+  for(let i=0;i<420;i++) {
+    const attacker=i%2?e:other;
+    c.Damage(p,attacker,50,'light');c.Stagger(p,attacker,'Hit',.32,31);
+    Step(c,1/90);
+    if(c.Fighter(p).state==='idle'){regained=true;break;}
+  }
+  assert(regained,'surviving player must finish getting up despite continued hits');assert(damage>100);
+  assert(c.AttackDown(),'control is usable after getting up');
+  assert(!c.KnockDown(p,other),'immediate knockdown cannot consume the control window');
+});
+Test('ground QTE failure and escape preserve get-up and restart the global cooldown',()=>{
+  for(const escape of [false,true]) {
+    const {p,e,c}=Make('Dadao',1);const other={...e,id:'Other',position:{x:1,y:0,z:0}};
+    c.host.Soldiers=()=>[e,other];c.host.Damage=()=>{};
+    c.Fighter(p).state='down';assert(c.BeginGround(e));
+    if(escape)c.EscapeQte(other);else {c.qte.Resolve(false);Step(c,Q.resolveS+.02);}
+    assert.equal(c.Fighter(p).state,'rise');
+    assert(c.Fighter(p).qteUntil>=c.time+Q.cooldownS);
+    for(let i=0;i<110;i++){c.Stagger(p,i%2?e:other,'Hit',.32,65);Step(c,1/90);}
+    assert.equal(c.Fighter(p).state,'idle');assert(c.AttackDown());
+    c.SetState(c.Fighter(p),'down');assert(!c.BeginGround(other),'second attacker shares the post-QTE cooldown');
+  }
 });
 console.log(`${count} melee rule tests passed`);
 

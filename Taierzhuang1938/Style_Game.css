@@ -959,3 +959,14 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 .missionReturnArrow {font-size:25px;line-height:1;width:28px;color:#e5bd80;}
 .missionReturnTarget {font-size:15px;line-height:1.5;}
 @media (prefers-reduced-motion:reduce) {.hudMissionReturn {transition:none;}}
+
+/* Keep the required QTE key inside the combat sightline, clear of the crosshair. */
+.hudMeleeQte,.hudMeleeQte.on { left:50%; bottom:17%; top:auto; transform:translateX(-50%); width:min(280px,calc(100vw - 24px)); }
+.hudMeleeQte .mqKeys { min-height:60px; margin:8px 0; }
+.hudMeleeQte .mqKeys kbd { width:54px; height:54px; font-size:30px; line-height:1; }
+.hudMeleeQte.input .mqKeys kbd.expected { animation:mqUrgentKey .65s ease-in-out infinite; }
+@keyframes mqUrgentKey {
+  0%,100% { background:rgba(224,176,98,.12); box-shadow:0 0 8px rgba(224,176,98,.25); }
+  50% { transform:scale(1.12); color:#fff; background:rgba(224,176,98,.48); box-shadow:0 0 24px rgba(224,176,98,.65); }
+}
+@media(prefers-reduced-motion:reduce) { .hudMeleeQte.input .mqKeys kbd.expected { animation:none; background:rgba(224,176,98,.4); } }

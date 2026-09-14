@@ -41,6 +41,8 @@ export const MELEE_QTE_RULES = Object.freeze({
   standingStart: 0.5, groundStart: 0.28, resolveS: 0.6,
   standingFailureDamage: 12, groundFailureDamage: 72,
   successStaggerS: 1.15,
+  // Guarantee a completed get-up and a short actionable window; incoming damage still applies.
+  controlRecoveryS: 1, recoveryPoise: 65,
   recoveryAdvantageS: 0.65, cooldownS: 14, perOpponentLimit: 1, contactHoldS: 0.14,
 });
 export const MELEE_ANIMATION_ACTIONS = Object.freeze([
