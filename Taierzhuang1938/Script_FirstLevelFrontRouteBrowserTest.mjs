@@ -233,7 +233,28 @@ try{
  assert.equal(end.stage,'Village');assert.equal(end.control,null);assert.equal(end.hidden,'none');
  assert.ok(Math.hypot(end.position[0]-55,end.position[2]+20)<1);assert.deepEqual(end.health,arrival.health);
  assert.ok(end.facts.includes('southTransitionComplete') && !end.facts.includes('deathSceneComplete'));
- await fs.writeFile(path.join(out,'Data_RuntimeFixtures.json'),JSON.stringify({optional,sortie,medicine,fireWindows,arrival,end},null,2));
+ await page.evaluate(()=>window.Tengxian.Debug.FirstLevelJump(12));
+ const supplyReach=await page.evaluate(()=>{
+  const g=window.Tengxian,point=g.interact.points.get('MissionSupplyTransfer');
+  g.player.SetStance('crouch');
+  const Put=(x,z)=>{g.player.body.Teleport(x,g.battlefield.GroundHeight(x,z)+.02,z);g.player.position.copy(g.player.body.position);};
+  Put(95.7126067485884,110.05628916683018);
+  const failedReach=g.interact.Reach(point,g.player);
+  // The new endpoint plus the unchanged 0.8 m route tolerance stays in range
+  // even when approached from the far side of the actual crate.
+  Put(94.5+.799,110);
+  const correctedReach=g.interact.Reach(point,g.player),query=g.interact.Query(g.player);
+  const before={count:point.count,bandages:g.player.bandages};
+  g.Debug.Key('KeyF',true);g.StepFrames(90,1/60,false);g.Debug.Key('KeyF',false);
+  return {failedReach,correctedReach,kind:query?.kind,id:query?.point?.id,before,
+    after:{count:point.count,bandages:g.player.bandages}};
+ });
+ assert.equal(supplyReach.failedReach,null,'the observed failed stop is outside the real crate reach');
+ assert.ok(supplyReach.correctedReach<2.5);
+ assert.equal(supplyReach.kind,'supply');assert.equal(supplyReach.id,'MissionSupplyTransfer');
+ assert.deepEqual(supplyReach.after,{count:supplyReach.before.count+1,bandages:supplyReach.before.bandages+1},
+  'F completes the real transfer supply from the corrected worst-case route stop');
+ await fs.writeFile(path.join(out,'Data_RuntimeFixtures.json'),JSON.stringify({optional,sortie,medicine,fireWindows,arrival,end,supplyReach},null,2));
  assert.deepEqual(errors,[]);
  console.log('PASS physical sortie, optional weapon, route facts, supply NPC and escort fade with preserved casualties');
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}

@@ -1090,8 +1090,11 @@ try {
     }
     if(stageFrom<=12) {
     await JumpStage(12);
-    await Route([{ x: 95, z: 110 }], "TransferSupply", { fight: true });
-    await Interact();
+    // The crate is at x=93 and has a 2.5 m reach. Route may stop 0.8 m
+    // before its endpoint: x=95 can leave the player outside interaction range.
+    await Route([{ x: 94.5, z: 110 }], "TransferSupply", { fight: true });
+    const transferSupply=await Interact();
+    assert.equal(transferSupply.kind,"supply","the transfer crate is actually within reach");
     await Route([{ x: 95, z: 103 }], "TransferPosition", { fight: true });
     await WaitStage("AirFirst", 300, { fight: true, cover: true });
     const transferPacing=await page.evaluate(()=>{const m=window.Tengxian.Debug.FirstLevelMission();return {beats:m.transferBeats,events:m.log.filter(e=>/AttackStarted|AttackCleared|vehiclesDeparted|zhouNext/.test(e.id)),entered:m.log.find(e=>e.kind==="stage" && e.id==="Transfer")?.time,ended:m.time};});
@@ -1101,9 +1104,20 @@ try {
     console.log("transfer pacing",JSON.stringify(transferPacing));
     // Dress the wounds from the complete defense before carrying Zhou away.
     // The same field box is available again after its real 15-second cooldown.
-    await Route([{x:95,z:110}],"TransferDepartureSupply",{fight:true,stance:"crouch"});
+    await Route([{x:94.5,z:110}],"TransferDepartureSupply",{fight:true,stance:"crouch"});
+    const departureBefore=await page.evaluate(()=>{
+      const g=window.Tengxian;
+      return {count:g.interact.points.get("MissionSupplyTransfer").count,bandages:g.player.bandages};
+    });
     const departureSupply=await Interact();
     assert.equal(departureSupply.kind,"supply");
+    const departureAfter=await page.evaluate(()=>{
+      const g=window.Tengxian;
+      return {count:g.interact.points.get("MissionSupplyTransfer").count,bandages:g.player.bandages};
+    });
+    assert.deepEqual(departureAfter,{count:departureBefore.count+1,bandages:departureBefore.bandages+1},
+      "departure uses the actual transfer crate and receives one dressing");
+    await fs.writeFile(path.join(output,"Data_DepartureSupplyReceipt.json"),JSON.stringify({before:departureBefore,after:departureAfter},null,2));
     await page.evaluate(()=>window.Tengxian.Debug.Key("KeyB"));
     await JumpStage(13);
     // The aircraft warning arrives while live infantry can still lob grenades
