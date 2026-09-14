@@ -13,7 +13,7 @@
 import * as THREE from "three";
 import { ApplyNraUniform } from "./Script_UniformColors.mjs";
 import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
-import { clone as CloneSkeleton } from "./vendor/three/examples/jsm/utils/SkeletonUtils.js";
+import { CloneSkinnedRig } from "./Script_SkinnedClone.mjs";
 import { FpsArmPose, FpsArmStateRotation, FPS_ARM_LIMITS, FPS_BAYONET_SUPPORT } from "./Data_FpsArmPoses.mjs";
 import { CaptureAnatomy, ApplyAnatomicalFingers, AimAnatomicalBone } from "./Script_FpsAnatomy.mjs";
 import { LoadFpsSkeletalAnimations } from "./Script_FpsSkeletalAnimation.mjs";
@@ -125,7 +125,7 @@ export class FpsArmRig {
   constructor(gltf, materialLibrary = null) {
     this.gltf = gltf;
     this.materialLibrary = materialLibrary;
-    this.root = CloneSkeleton(gltf.scene);
+    this.root = CloneSkinnedRig(gltf.scene);
     this.fixedRestLengths=false;
     this.root.traverse(object=>{if(object.userData.fpsFixedRestLengths)this.fixedRestLengths=true;});
     this.root.name = "RiggedFpsArmsNra01";

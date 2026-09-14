@@ -7,6 +7,7 @@ import { MISSION_TUNING } from "./Data_Tuning_FirstLevel.mjs";
 import { CreateP012StretcherGeometry } from "./Script_FirstLevelP012CarryView.mjs";
 import { BuildSink } from "./Script_World.mjs";
 import { PlaceGeometry } from "./Script_Geo.mjs";
+import { ApplyShadowDepth, AttachShadowDepth } from "./Script_ShadowDepth.mjs";
 import { MISSION_PLACEMENT, MISSION_SUPPLIES } from "./Data_FirstLevelMissionLayout.mjs";
 import { Type89Damage } from "./Script_Type89Damage.mjs";
 export class FirstLevelMissionView {
@@ -60,6 +61,7 @@ export class FirstLevelMissionView {
       mesh.count = 0;
       mesh.castShadow = true;
       mesh.receiveShadow = true;
+      AttachShadowDepth(mesh);
       mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       mesh.frustumCulled = false;
       this.parts[key] = mesh;
@@ -85,6 +87,9 @@ export class FirstLevelMissionView {
     this.zhouRoot.visible = false;
     this.people=new MissionPeople({root:this.root,actorFactory,battlefield});
     this.aftermath=new MissionAftermath({root:this.root,actorFactory,battlefield,vfx});
+    // 尸体层的实例桶在它自己的构造里建齐；挂共用深度材质的事在这里做，
+    // 那个文件的桶结构归另一路（见 docs/Data_TechRenderPipeline.md §17.11）。
+    ApplyShadowDepth(this.aftermath.root);
     this.BuildTank();
     this.BuildSupplies();
 

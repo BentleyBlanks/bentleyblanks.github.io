@@ -6,6 +6,7 @@
 
 import * as THREE from "three";
 import { Mulberry32, HashString } from "./Script_Noise.mjs";
+import { AttachShadowDepth } from "./Script_ShadowDepth.mjs";
 
 /** 每格贴图代表多少米。砖墙一格 = 1.2 米（约 12 皮砖），地面一格 = 2.4 米。 */
 export const TILE_METERS = {
@@ -405,6 +406,7 @@ export function MakeInstanced(geometry, material, matrices, { castShadow = true,
   mesh.instanceMatrix.needsUpdate = true;
   mesh.castShadow = castShadow;
   mesh.receiveShadow = receiveShadow;
+  if (castShadow) AttachShadowDepth(mesh);
   mesh.frustumCulled = true;
   return mesh;
 }

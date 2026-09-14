@@ -1439,6 +1439,8 @@ export class Actor {
     this.modelId = this.characterRig ? this.characterRig.modelId : null;
     this.riggedWeaponMount = null;
     this.riggedBackMount = null;
+    // `_AdoptRiggedCharacter` 从场景图上摘下来的程序化身体网格，连它们原来的父节点。
+    this.detachedBodyMeshes = [];
     if (this.characterRig) this._AdoptRiggedCharacter();
 
     // --- 动画内部状态（全部确定性）---
@@ -1487,8 +1489,28 @@ export class Actor {
     // 重新挂 rig 会另建一只 SocketAttachment_WeaponR，断肢层那份还原凭据指着的
     // 是上一只，留着就是往一个已经摘掉的挂点上还枪。
     this.goreWeaponHold = null;
-    // 先藏旧人体，再挂新人体；顺序反过来会把刚挂上的 SkinnedMesh 一起藏掉。
-    this.body.traverse((object) => { if (object.isMesh) object.visible = false; });
+    // 先摘旧人体，再挂新人体；顺序反过来会把刚挂上的 SkinnedMesh 一起摘掉。
+    //
+    // **摘下来而不是 visible = false。** `projectObject` 与阴影的 `renderObject`
+    // 确实会在 visible === false 上早退，但 `updateMatrixWorld` 不看这一位：
+    // 车厢里 22 个人每人二十来件永不出画的程序化身体，仍旧每帧跟着父链把矩阵
+    // 算一遍，而每个人每帧要走好几趟全量更新。骨骼那一层的 Group 一个不动 ——
+    // 挂点、IK、倒地姿态、程序化命中体读的都是它们。
+    //
+    // 枪和背刀这时已经挂在胸口骨骼下面了，随后要挪到 GLB 的插槽上再显示出来，
+    // 所以它们只藏不摘（摘了就再也挂不回去）。
+    const mounted = new Set();
+    for (const group of [this.weaponGroup, this.backDadao]) {
+      group?.traverse((object) => mounted.add(object));
+    }
+    const bodyMeshes = [];
+    this.body.traverse((object) => { if (object.isMesh) bodyMeshes.push(object); });
+    for (const mesh of bodyMeshes) {
+      if (mounted.has(mesh)) { mesh.visible = false; continue; }
+      const parent = mesh.parent;
+      this.detachedBodyMeshes.push({ mesh, parent });
+      parent.remove(mesh);
+    }
     this.characterRig.Attach(this);
     this.meshSource = `glb:${this.characterRig.modelId}`;
     this.usingModel = true;
@@ -1910,6 +1932,16 @@ export class Actor {
     this.grenadeGroup = group;
     this.partsRevision += 1;
     return group;
+  }
+
+  /**
+   * 把 `_AdoptRiggedCharacter` 摘下的程序化身体挂回场景图。
+   * 今天没有「换回程序化人体」的路径，这一条是那条路径的入口，不是每帧的路。
+   */
+  RestoreProceduralBody() {
+    for (const { mesh, parent } of this.detachedBodyMeshes) parent.add(mesh);
+    this.detachedBodyMeshes.length = 0;
+    return this;
   }
 
   /** 敢死队白毛巾（缠头 + 缠左上臂）。 */

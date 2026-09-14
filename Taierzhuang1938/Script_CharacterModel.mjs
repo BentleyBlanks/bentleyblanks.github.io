@@ -15,6 +15,8 @@ import { ACTOR_LOCOMOTION } from "./Data_Tuning_ActorLocomotion.mjs";
 import { CharacterFacialAnimation } from "./Script_CharacterFacialAnimation.mjs";
 import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
 import { clone as CloneSkeleton } from "./vendor/three/examples/jsm/utils/SkeletonUtils.js";
+import { CloneSkinnedRig } from "./Script_SkinnedClone.mjs";
+import { AttachShadowDepth } from "./Script_ShadowDepth.mjs";
 
 // 中弹踉跄（_ApplyHurtTilt）的临时量。只在 hurt > 0 的那几帧用到。
 const HURT_ROOT_Q = new THREE.Quaternion();
@@ -557,7 +559,8 @@ export class LugouCharacterRig {
     this.kind = kind;
     this.variantIndex = variantIndex;
     this.modelId = asset.record.id;
-    this.root = CloneSkeleton(asset.gltf.scene);
+    // 一具人七个分件共用一份 Skeleton（见 Script_SkinnedClone 的抬头）。
+    this.root = CloneSkinnedRig(asset.gltf.scene);
     this.facial = asset.gltf.userData?.facialRig
       ? new CharacterFacialAnimation(this.root, asset.gltf.userData.facialRig) : null;
     this.root.name = `Rigged_${this.modelId}`;
@@ -672,6 +675,9 @@ export class LugouCharacterRig {
       object.castShadow = true;
       object.receiveShadow = true;
       object.userData.actorOriginalCastShadow = true;
+      // 阴影趟：蒙皮分件吃自己那份共用深度材质，别让 three 的 _depthMaterial
+      // 在蒙皮件与静态件之间来回翻（见 Script_ShadowDepth 的抬头）。
+      AttachShadowDepth(object);
       if (object.isSkinnedMesh) {
         const indices = object.geometry.attributes.skinIndex, weights = object.geometry.attributes.skinWeight;
         const vertices = [];

@@ -527,6 +527,9 @@ const changedDomainRules = [
   {domain:"combat",pattern:/HitDisorientation/},
   {domain:'motionVector',pattern:/MotionVector|PostPrepass|Script_Post\.mjs|Actor|Skinn|Skeleton|Viewmodel|FpsArm|BackRifle|Binoculars|Data_Tuning_Graphics/},
   { domain: "render", pattern: /UniformColors/ },
+  // 蒙皮克隆共用骨骼 / 阴影趟按对象种类共用深度材质：两条都改渲染提交。
+  // Script_SkinnedClone 还被 /Skinn/ 那条拉进 motionVector（骨骼历史按 Skeleton 记）。
+  { domain: "render", pattern: /Script_SkinnedClone|Script_ShadowDepth/ },
   {domain:'propVelocity',pattern:/CarriagePropVelocity|PostPrepass|FirstLevelMissionView|FirstLevelMeal/},
   { domain: "render", pattern: /DeathPose|Data_Tuning_ActorDeath/ },
   {domain:"hud",pattern:/IncomingFire/},

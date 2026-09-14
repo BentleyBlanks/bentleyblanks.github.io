@@ -2,11 +2,11 @@
 // World-space body follows feet/yaw, never camera pitch or weapon FOV compression.
 import * as THREE from "three";
 import { ApplyNraUniform } from "./Script_UniformColors.mjs";
-import { clone as CloneSkeleton } from "./vendor/three/examples/jsm/utils/SkeletonUtils.js";
+import { CloneSkinnedRig } from "./Script_SkinnedClone.mjs";
 
 export class FirstPersonBody {
   constructor(gltf, library) {
-    this.root = CloneSkeleton(gltf.scene);
+    this.root = CloneSkinnedRig(gltf.scene);
     this.root.name = "FirstPersonBody";
     this.root.scale.setScalar(1.68 / 1.814391);
     this.root.visible = false;

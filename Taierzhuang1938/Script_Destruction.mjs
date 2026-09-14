@@ -24,6 +24,7 @@ import {
 // NearbyColliders 永远找不到它们。它们的「被炸中」走这张纯规则登记表 ——
 // 由头与分工写在 Script_BlastTargets.mjs 的头注里。
 import { BLAST_TARGETS } from "./Script_BlastTargets.mjs";
+import { AttachShadowDepth } from "./Script_ShadowDepth.mjs";
 
 export const MAX_DAMAGE_VOLUMES = 24;
 const MIN_FRAGMENT_HALF = 0.055;
@@ -551,6 +552,7 @@ export class DestructionSystem {
     this.fragments.name = "Destruction_FlyingPrefracturedFragments";
     this.fragments.castShadow = true;
     this.fragments.receiveShadow = true;
+    AttachShadowDepth(this.fragments);
     this.fragments.frustumCulled = false;
     this.fragments.userData.prefracturedTemplateCount = FRACTURE_PATTERNS.reduce(
       (sum, pattern) => sum + pattern.fragments.length, 0);

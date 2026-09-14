@@ -38,6 +38,7 @@
 // 并标脏，每帧末 Flush() 一次性重写脏桶（live 只有几十件，微秒级）。
 
 import * as THREE from "three";
+import { AttachShadowDepth } from "./Script_ShadowDepth.mjs";
 
 export class PropBatcher {
   /** @param {THREE.Object3D} root 批次网格挂在这个组下（ExternalProps 的 liveRoot） */
@@ -148,6 +149,7 @@ export class PropBatcher {
     // 与 CloneLoadedAsset 给每个克隆子网格定的口径一致（所以不必进桶 key）。
     mesh.castShadow = true;
     mesh.receiveShadow = true;
+    AttachShadowDepth(mesh);
     mesh.frustumCulled = true;
     mesh.count = 0;
     this.root.add(mesh);

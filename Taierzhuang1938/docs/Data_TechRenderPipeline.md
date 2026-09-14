@@ -5142,6 +5142,54 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs --tiers       # phase=2 的 dra
 名字，帧图里新加的 pass 哪怕吃了 3.7 ms 也一行都看不到）。显示名一律是
 `PostPipeline.passes` 里的**英文原名**，中文解释只进 `title` / 末列备注。
 
+### 17.12 车厢机位：一具人一份 Skeleton、阴影趟按对象种类分深度材质、备用件摘出场景图（2026-09-15）
+
+§17.10 的「还欠着的」第 1 条（人物节点数）与三笔按具重复的每帧开销，这一轮做掉了三件。
+三件都**不改任何一个像素**，改的是每帧算多少、传多少、重走多少次 `getProgram`。
+
+| 改动 | 文件 | 车厢机位每帧（改前 → 改后） |
+|---|---|---|
+| 一副骨架只留一份 `Skeleton` | `Script_SkinnedClone.mjs`，接在 `Script_CharacterModel` / `Script_RiggedModel` / `Script_FirstPersonBody` 的克隆点 | 场上 Skeleton 185 → **29**；`Skeleton.update` 实算 182 → **28**；骨纹理 texSubImage2D 182 → **28**（1.49 MB → 0.23 MB）；`Matrix4.toArray` 10515 → **2285** |
+| 蒙皮件 / 实例件 / BatchedMesh 各一份共用 `customDepthMaterial` | `Script_ShadowDepth.mjs`，挂在建 rig / 建桶处 | `getParameters` 117 → **23**；其中阴影趟那 96 次（`MeshDepthMaterial` 在四种对象之间翻 96 次）归零 |
+| 永久隐藏的程序化人体从场景图摘下（不是 `visible = false`） | `Script_Actor._AdoptRiggedCharacter` | 每个 `Actor_nra_*` 节点 135 → **111**、网格 34 → **10**、隐藏节点 26 → **2**；全场节点 4545 → **3921**、网格 1671 → **1047**；`updateMatrixWorld` 节点访问 16529 → **13988** |
+
+三条要点，下一个人别踩：
+
+* **`SkeletonUtils.clone()` 是逐 SkinnedMesh `skeleton.clone()` 的。** 一具士兵按材质
+  拆七个分件就有七份 Skeleton 指着同一批 53 根骨头，而 three 是按 Skeleton 算骨矩阵、
+  按 Skeleton 传骨纹理的。合并的前置校验是 `bones[0]` 同一个对象 + `boneInverses` 逐元素
+  相同（`Skeleton.clone()` 把 boneInverses 数组按引用带过去，所以同源克隆走的是引用相等
+  那条捷径）；不相同就不合并并 `console.warn` 一次。骨骼历史（§1.6）按 Skeleton 记，
+  共用之后升一次、快照一次，`history.skeleton === object.skeleton` 的判据不受影响。
+* **`visible = false` 省不掉矩阵。** `projectObject` 与阴影的 `renderObject` 确实在
+  `visible === false` 上早退，但 `updateMatrixWorld` 不看这一位 —— 那二十来件永不出画的
+  程序化身体照样每帧跟着父链算一遍，而每个人每帧要走好几趟全量更新。骨骼那一层的
+  Group 必须留着（挂点、IK、倒地姿态、程序化命中体读的都是它们），摘的只有 Mesh 叶子；
+  枪与背刀这时已经挂在胸口骨骼下面、随后要挪到 GLB 插槽再显示，所以它们只藏不摘。
+* **三方的 `getDepthMaterial` 对没挂 `customDepthMaterial` 的对象一律返回同一只
+  `_depthMaterial`**，而 `setProgram` 是按 `object.isSkinnedMesh / isInstancedMesh /
+  isBatchedMesh` 比材质上记着的那一位的：阴影趟每换一次对象种类就整个重走
+  `getProgram`。给这三类各一份，那一位就不再翻。画面不变的道理是：three 仍旧在每次
+  draw 之前把对象自己材质的 map / alphaMap / alphaTest / side / displacementMap 抄到
+  返回的那只深度材质上，多只共用一份就是「最后写的赢」—— 那正是今天共用
+  `_depthMaterial` 的行为。程序也不会变多（program 缓存按参数键找，这三份深度程序本来
+  就各有一个）。`BuildSink` 的可破坏静态件继续吃 `library.StaticDepth()`，它同样只被
+  普通 Mesh 用，不冲突。
+
+**验收**：逐 pass 的 draw 与三角一个不差（main 535 / prepass 414 / shadow 332，三角
+3.76 M）；三机位定帧逐像素比对与**同一棵树自比的噪声底逐格一致**（车厢 meanAbs 2.456
+对 2.447、朝北 3.793 对 3.861、朝东 1.960 对 1.959）。门禁：MotionVectorContract、
+CarriagePropVelocity、ActorDepth、Csm、ActorPose、FirstLevelTrainAnimation、
+FirstLevelP012Animation、SamplerBudget、RespawnShaderWarm（`programs 199→199`，换人一个
+program 都不新建）、Visibility、ActorBatch、ActorCrowd、CharacterWounds、CharacterModel、
+Dismemberment 全绿。
+
+**量测口径的一个坑**：诊断探针那种「一整块同步 `page.evaluate` 里连推若干帧」的取样循环，
+遇上 `Script_TerrainDeformationView` 靠 `queueMicrotask` 退场的着色器预热代理会对不上账 ——
+开机变快之后那 3 只代理还没退场就进了取样窗口，账上凭空多 12 个 draw（0 三角）。真跑一帧
+并放行微任务它们立刻归零，`Script_ProfileCli` 的 draw 列改前改后都是 1345。**比 draw 之前
+先确认预热代理已经退场。**
+
 ---
 
 

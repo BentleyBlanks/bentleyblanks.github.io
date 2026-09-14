@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { ACTOR_DETAIL } from "./Data_Tuning_Ai.mjs";
 import { BakeMissionBody } from "./Script_FirstLevelMissionAftermath.mjs";
 import { CloneShadedMaterial } from "./Script_Materials.mjs";
+import { AttachShadowDepth } from "./Script_ShadowDepth.mjs";
 import { MissionTrainLifePose } from "./Script_FirstLevelMissionTrainLife.mjs";
 import { MISSION_PEOPLE_TUNING as C } from "./Data_Tuning_FirstLevel.mjs";
 
@@ -106,7 +107,7 @@ export class MissionPeople {
       const materials=new Map(),baked=BakeMissionBody(this.actorFactory,{side:"nra",pose:variant,patient:true},materials);
       // Own material per instanced table: sharing the skinned actors' material makes three re-derive the program every draw.
       parts=baked.map(part=>{const mesh=new THREE.InstancedMesh(part.geometry,CloneShadedMaterial(materials.get(part.key)),64);
-        mesh.name="MissionLitterPatient";mesh.castShadow=true;mesh.receiveShadow=true;mesh.frustumCulled=false;mesh.count=0;
+        mesh.name="MissionLitterPatient";mesh.castShadow=true;mesh.receiveShadow=true;AttachShadowDepth(mesh);mesh.frustumCulled=false;mesh.count=0;
         this.root.add(mesh);return mesh;});this.patients.set(variant,parts);
     }
     this.patientRotation.setFromEuler(new THREE.Euler(0,yaw,0));

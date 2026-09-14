@@ -31,6 +31,7 @@
 //      才写进实例表。这是原来逐网格剔除结果的超集 —— 多写的那些在屏幕外，
 //      光栅化阶段一个像素都不落。
 import * as THREE from "three";
+import { AttachShadowDepth } from "./Script_ShadowDepth.mjs";
 
 /** 原网格挪去的图层：相机与灯的 layers 掩码都只有第 0 位，挪过去就等于不提交。 */
 const BATCH_LAYER = 30;
@@ -227,6 +228,7 @@ export class ActorBatcher {
     mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     mesh.castShadow = kind === "cast";
     mesh.receiveShadow = true;
+    if (mesh.castShadow) AttachShadowDepth(mesh);
     // 实例是全场人物，包围盒每帧都在动；逐实例剔除已经在 Update 里按人做过了。
     mesh.frustumCulled = false;
     mesh.matrixAutoUpdate = false;
