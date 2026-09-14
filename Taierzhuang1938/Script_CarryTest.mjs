@@ -19,7 +19,7 @@
 import assert from "node:assert/strict";
 import { CarrySystem, CARRY_KINDS } from "./Script_Carry.mjs";
 import {
-  InteractSystem, INTERACT,
+  InteractSystem, INTERACT, ScavengeAmmoPlan,
   BleedControlInteraction, GiveSupplyInteraction, CheckWoundedInteraction,
   DoorPlankInteraction, WireInteractions, CutWireInteraction,
   LeafletPickupInteraction, LeafletBurnInteraction, TearShirtInteraction,
@@ -508,8 +508,8 @@ console.log("ok  拾枪/分弹药两条内建分支迁进框架后无回归");
     const system = new InteractSystem({ ai: { soldiers: [] } }, {
       HasWeapon: () => !!kit.primary,
       SameWeapon: (id) => kit.primary === id,
-      AmmoGain: (clips, ammo) => clips + (ammo == null || ammo >= 5 ? 1 : 0),
-      TakeAmmo: (id, clips, ammo) => { const n = clips + (ammo == null || ammo >= 5 ? 1 : 0); kit.clips += n; return n; },
+      AmmoGain: (clips, ammo, id) => ScavengeAmmoPlan(id, clips, ammo, kit.ammo).rounds,
+      TakeAmmo: (id, clips, ammo) => { const plan = ScavengeAmmoPlan(id, clips, ammo, kit.ammo); kit.clips += plan.clips; kit.ammo += plan.loaded; return plan; },
       DropPoint: (s) => s.gun,
       DropTaken: (s) => kit.hidden.push(s),
       GroundWeaponRemoved: (item) => kit.drops.push(item.id),
@@ -562,6 +562,15 @@ console.log("ok  拾枪/分弹药两条内建分支迁进框架后无回归");
     system.Press(player);
     Check(kit.primary === "HanYang" && kit.ammo === 3 && kit.clips === 7, "同型只加桥夹（2 个 + 满仓那一个），弹仓不清零");
     Check(system.Query(player) === null, "拿空了就不再提示同型的空枪");
+    const loose = system.DropGroundWeapon({ weaponId: "HanYang", ammo: 4, clips: 0, position: { x: 0, y: 0, z: -1 } });
+    Check(/补充.*\+2 发/.test(system.Query(player).label), "散弹提示真实能补充的发数");
+    system.Press(player);
+    Check(kit.ammo === 5 && kit.clips === 7 && loose.ammo === 2, "散弹填入弹仓，多余的留在原枪，不生成或丢弃弹药");
+    Check(system.Query(player) === null, "满仓不反复提示无法装下的散弹");
+    kit.ammo = 0;
+    system.Press(player);
+    Check(kit.ammo === 2 && loose.ammo === 0 && kit.clips === 7, "之后仍可取走剩余两发");
+    system.RemoveGroundWeapon(loose);
     kit.primary = "Type38";
     Check(/^换上 汉阳造/.test(system.Query(player).label), "换成别的枪之后，那把空枪照样能捡");
   }
@@ -822,3 +831,15 @@ console.log("ok  八个救护预制 + 抬起负重的接缝");
 
 console.log(`ok  F 键位契约（holdAction + 操作说明）`);
 console.log(`ok  担架/搬运/救护交互 ${checks} 条通过`);
+
+for (const id of ["HanYang", "Type38", "Type11"]) {
+  const full = ScavengeAmmoPlan(id, 0, null).rounds;
+  for (let current = 0; current <= full; current++) {
+    for (let source = 0; source <= full; source++) {
+      const plan = ScavengeAmmoPlan(id, 2, source, current);
+      assert.equal(plan.rounds + plan.remainingAmmo, 2 * full + source);
+      assert.ok(current + plan.loaded <= full);
+    }
+  }
+}
+console.log("ok  同枪补弹：各枪容量下弹药守恒，空仓、满仓与散弹不丢失");

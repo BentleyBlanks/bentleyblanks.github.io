@@ -48,6 +48,18 @@ function AnchorOf(point) {
   return point.position || null;
 }
 
+/** Keep whole clips in reserve; loose rounds top up the held gun without discarding leftovers. */
+export function ScavengeAmmoPlan(weaponId, clips, ammo, currentAmmo = 0) {
+  const weapon = WEAPONS[weaponId];
+  if (!weapon || weapon.kind === "melee") return { rounds: 0, clips: 0, loaded: 0, remainingAmmo: ammo ?? 0 };
+  const capacity = weapon.magazine ?? 5;
+  const sourceAmmo = ammo == null ? capacity : Math.max(0, Math.floor(Number(ammo) || 0));
+  const reserveClips = Math.max(0, Math.floor(Number(clips) || 0)) + Math.floor(sourceAmmo / capacity);
+  const loose = sourceAmmo % capacity;
+  const loaded = Math.min(loose, Math.max(0, capacity - currentAmmo));
+  return { rounds: reserveClips * capacity + loaded, clips: reserveClips, loaded, remainingAmmo: loose - loaded };
+}
+
 export class InteractSystem {
   /**
    * @param {object} ctx { ai, audio, hud }
@@ -57,8 +69,8 @@ export class InteractSystem {
    *       ammo 枪里剩几发（缺省 = 满仓）；at/yaw 换下来的那把放回哪儿。
    *   HasWeapon(weaponId) -> boolean                    玩家是否已有同类槽位（决定“拾起/换上”）
    *   SameWeapon(weaponId) -> boolean                   槽位里就是这一型（决定“换上/拿弹药”）
-   *   TakeAmmo(weaponId, clips, ammo) -> number         同型只拿弹药，返回拿到几个桥夹
-   *   AmmoGain(clips, ammo, weaponId) -> number         不改状态，只算能拿到几个（0 = 这把没东西可拿）
+   *   TakeAmmo(weaponId, clips, ammo) -> object         { rounds, remainingAmmo }; 旧 number 返回值按桥夹兼容
+   *   AmmoGain(clips, ammo, weaponId) -> number         不改状态，只算能拿到几发（0 = 这把没东西可拿）
    *   DropPoint(soldier) -> {x,y,z}|null                尸体那把枪现在实际躺在哪
    *   CanReachActor(actor, player, point) -> boolean    视线遮挡；point 是枪的位置
    *   CanReachPoint(point, player) -> boolean           地上那把枪的视线遮挡
@@ -193,13 +205,14 @@ export class InteractSystem {
     const name = WeaponName(source.weaponId) || T("interact.pickup.unknownWeapon");
     const melee = WEAPONS[source.weaponId]?.kind === "melee";
     const ammoOnly = !melee && !!this.hooks.SameWeapon?.(source.weaponId);
-    if (ammoOnly && !(this.hooks.AmmoGain?.(source.clips, source.ammo, source.weaponId) > 0)) return null;
+    const rounds = ammoOnly ? this.hooks.AmmoGain?.(source.clips, source.ammo, source.weaponId) : 0;
+    if (ammoOnly && !(rounds > 0)) return null;
     // HasPrimary 是早期测试/嵌入方的兼容口；主程序提供 HasWeapon，
     // 才能让大刀按大刀槽而不是拿长枪槽判断“拾起/换上”。
     const hasWeapon = this.hooks.HasWeapon
       ? this.hooks.HasWeapon(source.weaponId) : this.hooks.HasPrimary?.();
     // 「拾起 / 换上 / 拿弹药」是三句不同的话，各有各的键 —— 不在这里拼动词。
-    const label = ammoOnly ? T("interact.pickup.ammo", { name })
+    const label = ammoOnly ? T("interact.pickup.ammo", { name, rounds })
       : hasWeapon ? T("interact.pickup.swap", { name })
         : T("interact.pickup.take", { name });
     return {
@@ -417,14 +430,14 @@ export class InteractSystem {
       if (drop.taken) return false;
       const name = WeaponName(drop.weaponId) || T("interact.pickup.unknownWeapon");
       if (candidate.ammoOnly) {
-        // 同型的枪：换了等于把自己的弹仓清掉，所以只拿弹药。枪是空的了但还躺在原地 ——
-        // 以后手里换成别的枪，它照样能捡（空枪，零发）。
-        const gained = this.hooks.TakeAmmo?.(drop.weaponId, drop.clips, drop.ammo) || 0;
-        if (gained <= 0) return false;
-        drop.clips = 0; drop.ammo = 0;
+        // Keep the gun in place; any loose rounds that do not fit remain available later.
+        const result = this.hooks.TakeAmmo?.(drop.weaponId, drop.clips, drop.ammo);
+        const gained = typeof result === "number" ? result * (WEAPONS[drop.weaponId]?.magazine ?? 5) : result?.rounds;
+        if (!(gained > 0)) return false;
+        drop.clips = 0; drop.ammo = result?.remainingAmmo ?? 0;
         this.pickups += 1;
         this.ctx?.audio?.Play("stripperLoad", { volume: 0.55 });
-        this.ctx?.hud?.Hint(T("interact.pickup.ammoTaken", { name, clips: gained }), INTERACT.pickupClipsHintS);
+        this.ctx?.hud?.Hint(T("interact.pickup.ammoTaken", { name, rounds: gained }), INTERACT.pickupClipsHintS);
         return true;
       }
       // 先记下「已拿走」再交给装配层：TakeWeapon 会把换下来的那把放到同一个位置，

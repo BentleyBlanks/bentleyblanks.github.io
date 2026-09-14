@@ -27,8 +27,8 @@ export const TEXT = Object.freeze({
   // 自己换下来丢在地上的那把：弹数是换下时枪里剩的，不是缴获的「五发」。
   "interact.pickup.rounds": "拾起{name}，枪里还有 {ammo} 发",
   // 地上那把跟手里的是同一型：不换枪，只把能用的弹药拿走。
-  "interact.pickup.ammo": "拿走 {name} 的弹药",
-  "interact.pickup.ammoTaken": "从{name}上拿了 {clips} 个桥夹",
+  "interact.pickup.ammo": "补充 {name} 弹药（+{rounds} 发）",
+  "interact.pickup.ammoTaken": "已补充{name}弹药 +{rounds} 发",
 
   // --- 分弹药 ---------------------------------------------------------------
   "interact.ammo.give": "分一个桥夹给 {name}",

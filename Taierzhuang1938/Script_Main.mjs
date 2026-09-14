@@ -106,7 +106,7 @@ import { MELEE_SCENARIOS, MELEE_ENCOUNTERS } from "./Data_MeleeCombat.mjs";
 import { MeleeLab } from "./Script_MeleeLab.mjs";
 import { LoadMeleeAnimations, MeleeAnimationsLoaded } from "./Script_MeleeAnimationData.mjs";
 import { RadialWheel } from "./Script_Wheel.mjs";
-import { InteractSystem } from "./Script_Interact.mjs";
+import { InteractSystem, ScavengeAmmoPlan } from "./Script_Interact.mjs";
 import { CarrySystem } from "./Script_Carry.mjs";
 import { PlayerHitboxes, RaycastPlayerHitboxes } from "./Script_PlayerHitbox.mjs";
 import { EmplacementSystem } from "./Script_Emplacement.mjs";
@@ -1647,7 +1647,7 @@ async function Boot() {
       return !!state.slots[slot];
     },
     SameWeapon: (weaponId) => WEAPONS[weaponId]?.kind !== "melee" && state.slots.primary === weaponId,
-    AmmoGain: (clips, ammo, weaponId) => ScavengeClipCount(weaponId, clips, ammo),
+    AmmoGain: (clips, ammo, weaponId) => CurrentScavengePlan(weaponId, clips, ammo).rounds,
     TakeAmmo: (weaponId, clips, ammo) => ScavengeAmmo(weaponId, clips, ammo),
     SpareClips: () => state.clips,
     DropPoint: (soldier) => CorpseWeaponPoint(soldier),
@@ -6819,26 +6819,26 @@ function PickUpWeapon(weaponId, clips, variant = 0, extra = {}) {
   return true;
 }
 
-/**
- * 同型的枪能拿到几个桥夹：身上带的桥夹，加上枪里那一整仓（满仓才算一个，
- * 打过几发的零头不折算 —— 不然走一圈空尸体就能凑出弹药来）。尸体身上的枪 ammo 为空 = 满仓。
- */
-function ScavengeClipCount(weaponId, clips, ammo) {
-  const weapon = WEAPONS[weaponId];
-  if (!weapon || weapon.kind === "melee") return 0;
-  const full = weapon.magazine ?? 5;
-  return Math.max(0, clips | 0) + ((ammo == null || ammo >= full) ? 1 : 0);
+/** Preview and completion share the primary slot's current ammunition account. */
+function CurrentScavengePlan(weaponId, clips, ammo) {
+  const currentAmmo = state.activeSlot === "primary" ? state.ammo : state.mags.primary?.ammo ?? 0;
+  return ScavengeAmmoPlan(weaponId, clips, ammo, currentAmmo);
 }
 
-/** 同型的枪只拿弹药：桥夹加进 1 号槽的弹仓账，枪不换。返回拿到几个。 */
 function ScavengeAmmo(weaponId, clips, ammo) {
-  if (!player?.Alive || state.slots.primary !== weaponId) return 0;
-  const gained = ScavengeClipCount(weaponId, clips, ammo);
-  if (gained <= 0) return 0;
-  if (state.activeSlot === "primary") state.clips += gained;
-  else if (state.mags.primary) state.mags.primary.clips += gained;
-  else state.mags.primary = { ammo: 0, clips: gained };
-  return gained;
+  if (!player?.Alive || state.slots.primary !== weaponId) return null;
+  const plan = CurrentScavengePlan(weaponId, clips, ammo);
+  if (plan.rounds <= 0) return null;
+  if (state.activeSlot === "primary") {
+    state.ammo += plan.loaded;
+    state.clips += plan.clips;
+    state.mags.primary = { ammo: state.ammo, clips: state.clips };
+  } else {
+    const mag = state.mags.primary ||= { ammo: 0, clips: 0 };
+    mag.ammo += plan.loaded;
+    mag.clips += plan.clips;
+  }
+  return plan;
 }
 
 const _dropBox = new THREE.Box3();
