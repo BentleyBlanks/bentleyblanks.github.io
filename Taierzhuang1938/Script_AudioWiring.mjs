@@ -925,12 +925,16 @@ export class AudioWiring {
     return Math.hypot(position.x - L.x, position.y - L.y, position.z - L.z);
   }
 
-  /** AI 开完一枪之后手上那一下（栓动才有；自动武器自己上膛）。 */
+  /**
+   * AI 开完一枪之后手上那一下（栓动才有；自动武器自己上膛）。
+   * 武器表写了 boltCue（汉阳造的实录枪机）就播那条，音量档不变 ——
+   * 那条的混音系数本来就是按玩家拉栓那一档配的，AI 与玩家的比例与通用 bolt 相同。
+   */
   AiBolt(soldier, boltAction = true) {
     const audio = this.Audio;
     if (!audio || !soldier || !boltAction) return false;
     if (this.DistanceToListener(soldier.position) > AI_FOLEY.boltWithinM) return false;
-    audio.Play("bolt", {
+    audio.Play(soldier.weapon?.boltCue || "bolt", {
       position: { x: soldier.position.x, y: soldier.position.y + 1.2, z: soldier.position.z },
       volume: AI_FOLEY.boltVolume, delay: AI_FOLEY.boltDelayS,
     });

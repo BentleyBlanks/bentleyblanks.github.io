@@ -1270,6 +1270,7 @@ async function Boot() {
     grenadeAsset,
   });
   camera.add(viewmodel.root);
+  viewmodel.onBoltStart = PlayRecordedBoltCycle;
   scene.add(camera);
   // 视图模型按“前景”口径进深度法线预通道（真法线 + 常数近景深度标签）。
   // Equip() 末尾会自己调一次，这里再调一次纯属兜底（构造期的抛壳池与弹夹道具）。
@@ -6933,6 +6934,23 @@ function CallMortar() {
 let fireCooldown = 0;
 let fireEdge = false;                 // 这一帧是不是"刚按下"（单发模式与投掷物槽要用）
 const _muzzle = new THREE.Vector3();
+const _boltAt = new THREE.Vector3();
+// 玩家拉栓声的音量：通用合成 bolt 与实录枪机共用这一档，AI 那边是 AI_FOLEY.boltVolume。
+// 实录枪机的 SAMPLE_MIX 按这一档配平，两边改一个就要改另一个。
+const PLAYER_BOLT_VOLUME = 0.42;
+
+/**
+ * 实录枪机声（Data_Weapons.boltCue）：Viewmodel.onBoltStart 在拉栓动作真正开始时回调。
+ * 不在开火那一刻按固定延迟排 —— 拉栓会被装填取消、被白刃推迟，那样声音就与手对不上。
+ * 录音头 0.23 s 是手去够枪机，冲头与动作节点的对位见 Data_Weapons.HanYang。
+ */
+function PlayRecordedBoltCycle(weapon) {
+  if (!weapon?.boltCue) return;
+  viewmodel.MuzzleWorld(_boltAt);
+  audio.Play(weapon.boltCue, {
+    position: _boltAt.clone(), volume: PLAYER_BOLT_VOLUME, priority: true, firstPerson: true,
+  });
+}
 const _hitPoint = new THREE.Vector3();
 const _bulletPos = new THREE.Vector3();
 const _bulletVel = new THREE.Vector3();
@@ -7318,8 +7336,9 @@ function TryFire(dt, returningGrenade = false) {
   // 0.24 s 是枪响之后手真的去够枪机的时间；0.62 s 是弹壳落地。
   // 判据是 kind === "boltRifle"（Data_Weapons 里每支枪都有），
   // 不是"有没有 rpm" —— 手枪与捷克式自己上膛，没有手拉的那一下。
-  if (weapon.kind === "boltRifle" && !weapon.embeddedCycleAudio) {
-    audio.Play("bolt", { position: _muzzle.clone(), volume: 0.42, delay: 0.24 });
+  // 带实录枪机（boltCue）的枪不在这里排：那条跟着拉栓动作起播（PlayRecordedBoltCycle）。
+  if (weapon.kind === "boltRifle" && !weapon.boltCue) {
+    audio.Play("bolt", { position: _muzzle.clone(), volume: PLAYER_BOLT_VOLUME, delay: 0.24 });
   }
   // 弹壳落地。
   //
@@ -7332,8 +7351,8 @@ function TryFire(dt, returningGrenade = false) {
   // pan 0.35 —— 中正式与三八式都是**向右抛壳**。
   // 栓动是拉栓那一下才把壳抛出去（0.24 s），落地再晚 0.4 s；
   // 捷克式自己抛壳，出膛就飞，落得早。
-  // 汉阳造专用实录已经包含抽壳、推弹与闭锁；再叠通用 bolt / shellDrop 会变成两套枪机。
-  if (!weapon.embeddedCycleAudio) {
+  // 汉阳造的实录枪机已经包含抽壳、推弹与闭锁；再叠通用 bolt / shellDrop 会变成两套枪机。
+  if (!weapon.boltCue) {
     audio.Play("shellDrop", {
       volume: 0.55, pan: 0.35, delay: weapon.kind === "boltRifle" ? 0.62 : 0.38,
     });

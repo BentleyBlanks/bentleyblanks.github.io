@@ -88,10 +88,12 @@ export const WEAPONS = {
     lengthM: 1.250, barrelM: 0.740, massKg: 4.06,
     magazine: 5, reloadKind: "stripper",
     damage: 74, headMultiplier: 2.6, effectiveRangeM: 400,
-    // 专用实录把枪响与随后一整套枪机动作录在同一条里。第一段机械声在 1.88 s，
-    // 所以动作 1.65 s 才起手；0.82 s 的动作时钟让抬柄/后拉/推回/闭锁节点落在实录冲头上。
-    shotCue: "rifleHanYang", embeddedCycleAudio: true,
-    boltDelayS: 1.65, boltTimeS: 0.82, fireIntervalS: 2.50, reloadTimeS: 3.8,
+    // 专用实录拆成枪声 shotCue 与枪机 boltCue 两条（Data_SfxSources）。枪机那条随拉栓动作
+    // 起播：头 0.23 s 是手去够枪机，0.82 s 的动作时钟让抬柄/后拉/推回/闭锁节点落在实录冲头上。
+    // 拉栓延迟与其他步枪同为默认 0.20 s；射击间隔 = 延迟 + 拉栓，与中正式、三八式同一口径。
+    // 2026-09-13 那版是一整条录音，动作要硬等 1.65 s、间隔 2.50 s —— 玩家嫌开完枪「有个延迟」。
+    shotCue: "rifleHanYang", boltCue: "boltHanYang",
+    boltTimeS: 0.82, fireIntervalS: 1.05, reloadTimeS: 3.8,
     recoil: { pitch: 3.1, yaw: 0.62, kick: 0.06, recoverS: 0.26, recoverFrac: 1.0 },
     swayScale: 1.12, adsTimeS: 0.32, adsFovScale: 0.74,
     spreadHipDeg: 3.0, spreadAdsDeg: 0.26,

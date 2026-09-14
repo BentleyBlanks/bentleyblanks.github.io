@@ -3940,8 +3940,8 @@ export class AiDirector {
     // 每发之后的拉栓。玩家自己那一支早就有了（Script_Main.TryFire），
     // 而**满场几十个兵一条 foley 都没有** —— 于是敌人开枪只是一记枪声，
     // 听不出他是栓动还是自动、也听不出他打完了这一发正在低头拉栓。
-    // 只有栓动才有：捷克式、歪把子、九二式自己上膛。
-    this.ctx.audioWiring?.AiBolt(s, s.weapon.kind === "boltRifle" && !s.weapon.embeddedCycleAudio);
+    // 只有栓动才有：捷克式、歪把子、九二式自己上膛。带实录枪机的枪（boltCue）由 AiBolt 换那条播。
+    this.ctx.audioWiring?.AiBolt(s, s.weapon.kind === "boltRifle");
 
     // Threat feedback is tied to this bullet's unobstructed segment, independent
     // of audio being enabled and of whom the enemy intended to shoot.

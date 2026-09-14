@@ -1566,6 +1566,7 @@ export class Viewmodel {
     this.onEject = null;
     this.onThrowRelease = null;
     this.onActionEnd = null;
+    this.onBoltStart = null;
 
     // --- 手 -----------------------------------------------------------------
     this.handRight = MakeHand(this.materials, 1, "hr");
@@ -2125,8 +2126,8 @@ export class Viewmodel {
 
     if (this.weapon.kind === "boltRifle" && this.autoBolt) {
       // 打完这一发自动上膛。最后一发（lowAmmo）时栓停在后面不推回 —— 玩家一眼看见"没子弹了"
-      // 汉阳造的专用连续实录把拉栓录在枪响后 1.88 s，延迟由武器数据给；
-      // 其余步枪仍沿用 0.20 s 的旧手感。
+      // 延迟可由武器数据覆盖，没写的一律 0.20 s。实录枪机声不靠这个延迟对位，
+      // 它跟着 onBoltStart 在动作真正开始时起播。
       this.pendingBoltAt = this.weapon.boltDelayS ?? 0.20;
     }
 
@@ -2142,8 +2143,17 @@ export class Viewmodel {
     if (this.weapon.kind !== "boltRifle") return false;
     if (this.IsBusy()) return false;
     this.pendingBoltAt = -1;
-    this._StartAction("bolt", this.weapon.boltTimeS || 1.05);
+    this._StartBolt();
     return true;
+  }
+
+  /**
+   * 拉栓动作开始（开火后自动排的与手动触发的走同一处）。onBoltStart 在这一刻回调，
+   * 调用方拿去播实录枪机声：排在开火那一刻的声音会被装填打断、被白刃推迟，与手对不上。
+   */
+  _StartBolt() {
+    this._StartAction("bolt", this.weapon.boltTimeS || 1.05);
+    if (this.onBoltStart) this.onBoltStart(this.weapon);
   }
 
   /** 装填。按 reloadKind 分支：桥夹 / 上插弹匣 / 漏斗。 */
@@ -2646,7 +2656,7 @@ export class Viewmodel {
       if (this.pendingBoltAt <= 0 && !this.IsBusy() && this.weapon) {
         this.pendingBoltAt = -1;
         this.pendingHoldOpen = lowAmmo;
-        this._StartAction("bolt", this.weapon.boltTimeS || 1.05);
+        this._StartBolt();
       }
     }
 

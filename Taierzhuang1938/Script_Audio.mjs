@@ -897,8 +897,8 @@ const RECIPES = {
       tailDur: 0.9, tailLevel: 0.10, wet: 0.42,
     });
   },
-  // 汉阳造专用连续实录的采样回落：参数与同口径中方步枪一致；正常运行时由
-  // AudioSfx_RifleHanYang_01.mp3 覆盖，并把枪响后的完整枪机循环一并带上。
+  // 汉阳造专用实录枪声的采样回落：参数与同口径中方步枪一致；正常运行时由
+  // AudioSfx_RifleHanYang_01.mp3 覆盖。枪机那一段拆成了 boltHanYang，跟着拉栓动作播。
   rifleHanYang(A, v) {
     GunNear(A, v, {
       thumpHi: 128, thumpLo: 52, thumpDur: 0.11, thumpLevel: 0.85,
@@ -986,6 +986,8 @@ const RECIPES = {
     v.wetGain.gain.value = 0.14;
     v.Live(0.6);
   },
+  // 汉阳造实录枪机的合成回落：借通用拉栓。正常运行时由 AudioSfx_BoltHanYang_01.mp3 覆盖。
+  boltHanYang(A, v) { RECIPES.bolt(A, v); },
 
   // 桥夹压弹：黄铜弹壳互相磕碰，五发一串的碎响 + 拇指压下去的一记闷。
   stripperLoad(A, v) {
@@ -2579,7 +2581,7 @@ function WetFalloff(distance) {
  * 配方改了要重新量；宁可写大不写小。
  */
 const NODE_COST = {
-  zb26: 19, bolt: 19, stripperLoad: 19, shellImpact: 19, bodyFall: 19,
+  zb26: 19, bolt: 19, boltHanYang: 19, stripperLoad: 19, shellImpact: 19, bodyFall: 19,
   type92: 18, explosionNear: 18,
   rifleNra: 16, rifleHanYang: 16, rifleIja: 16, type11: 16, bayonetHit: 16, magIn: 15,
   rifleNraFar: 14, rifleIjaFar: 14, impactMetal: 14,
@@ -2642,7 +2644,7 @@ const DEFAULT_COST = 19;
  */
 const MIX_GAIN = {
   zb26: 0.71, type11: 0.70, type92: 0.67,
-  bolt: 3.9, grenadePin: 3.9, hurt: 3.6, dadaoSwing: 3.0,
+  bolt: 3.9, boltHanYang: 3.9, grenadePin: 3.9, hurt: 3.6, dadaoSwing: 3.0,
   rifleNraFar: 2.2, rifleIjaFar: 2.2,
   impactMetal: 1.75, grenadeThrow: 1.5, impactBrick: 1.5,
   bayonetHit: 1.4, explosionNear: 1.25,
@@ -2706,7 +2708,8 @@ export const MUSIC_BASE = "Audio/Music/";
 // 而 LoadSfxPack 盖不上去是静默的 —— 表现只是「断肢还是合成音」。
 // （同一天 Codex 那边把戳改成了日期式，合并后取带两件事的同一个新戳。）
 // 2026-09-13：汉阳造 01 专用连续枪响＋枪机实录进入清单。
-export const SFX_PACK_VERSION = "20260913hanyangshot01";
+// 2026-09-15：那一条拆成枪声 rifleHanYang（同文件名、内容变了）与枪机 boltHanYang。
+export const SFX_PACK_VERSION = "20260915hanyangboltsplit";
 export const AMB_PACK_VERSION = "20260912trainonly";
 export const MUSIC_PACK_VERSION = "5";
 
@@ -2827,9 +2830,15 @@ const SAMPLE_BURST = {
  */
 const SAMPLE_MIX = {
   explosionNear: 1.0, shellImpact: 0.95, launcherPop: 0.72,
-  rifleNra: 0.88, rifleHanYang: 0.88, rifleIja: 0.86, type92: 0.8, zb26: 0.76, type11: 0.72,
+  rifleNra: 0.88, rifleIja: 0.86, type92: 0.8, zb26: 0.76, type11: 0.72,
   explosionFar: 0.5, rifleNraFar: 0.42, rifleIjaFar: 0.46, shellIncoming: 0.62,
   bolt: 0.95, stripperLoad: 1.0, magIn: 1.0, grenadePin: 0.7, grenadeThrow: 0.5,
+  // 汉阳造两条是 2026-09-13 用户试听确认过的一整条（混音 0.88、枪机段 +8.83 dB）拆出来的，
+  // 拆开后各自归一化到 −25 dBFS，电平由这两个数复原：对照旧成品与原片量增益，
+  // 枪声 ×1.2045、枪机 ×0.5401（旧成品枪机/枪声实测差 8.87 dB，与设计值 8.83 相符）。
+  // 枪声：0.88 × 1.2045；枪机：0.88 × 0.5401 ÷ 0.42 —— 除的是 Script_Main.PLAYER_BOLT_VOLUME，
+  // 玩家按那一档播时恰好还原试听时的响度，AI 按 AI_FOLEY.boltVolume 与通用拉栓同比例。
+  rifleHanYang: 1.06, boltHanYang: 1.13,
   dadaoSwing: 0.5, dadaoHit: 0.78, bayonetHit: 0.8,
   // 断肢两条：sever 与 dadaoHit 同一档（同样是「一段身体被切下来」这件事，
   // 而且十有八九与那一发枪声同时响，站低了就被枪盖掉）；落地那一记按 bodyFall
@@ -2886,7 +2895,8 @@ const SAMPLE_MIX = {
 
 /** 混响 send。远的、开阔的给多，贴身的小动作几乎不给。 */
 const SAMPLE_WET = {
-  rifleNra: 0.42, rifleHanYang: 0.42, rifleIja: 0.38, rifleNraFar: 0.55, rifleIjaFar: 0.55,
+  // boltHanYang 不按操作音那一档（0.08）给：试听确认的是它在枪声那条里、吃 0.42 的样子。
+  rifleNra: 0.42, rifleHanYang: 0.42, boltHanYang: 0.42, rifleIja: 0.38, rifleNraFar: 0.55, rifleIjaFar: 0.55,
   zb26: 0.36, type11: 0.32, type92: 0.42,
   explosionNear: 0.45, explosionFar: 0.55, shellImpact: 0.45, shellIncoming: 0.3,
   launcherPop: 0.35, bugleCharge: 0.55, whistle: 0.45,
@@ -2989,7 +2999,8 @@ const AMB_AIR = {   // → Play 的 airCut
  * 一梭子下来必然连出两次同一条 —— 那恰恰是切四条想避开的事。轮播两样都不占。
  */
 const SAMPLE_CYCLE = new Set(["dadaoSwing", "dadaoHit", "bayonetHit", "telegraphKey",
-  "rifleHanYang", // 单条连续实录带动作节点，禁止 ±3% 变调把枪机声与动画时钟拧开。
+  // 汉阳造两条：人工挑定的单条实录原样播；枪机那条的冲头还驱动动作节点，±3% 变调会把它与动画时钟拧开。
+  "rifleHanYang", "boltHanYang",
   "breathInjured", // Preserve the reviewed voice and full duration without pitch jitter.
   "bulletCrack", "bulletWhizz",
   // 断肢两条与白刃同理由：变体是一条条量过挑出来的（`Script_SeedAudioGoreBake`

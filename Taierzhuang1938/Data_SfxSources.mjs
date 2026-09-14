@@ -1464,12 +1464,19 @@ export const SFX_SOURCES = [
     credit: "汉阳造 88 式步枪第一发连续实录（枪响、开栓、抽壳、推弹、闭锁）· 参考视频实录",
     license: "refvideo",
     bitrate: BITRATE_TRANSIENT,
-    // 第一发不是只截枪口爆音：保留到枪机闭锁结束，作为汉阳造专用 cue。
-    // 起音前只留 5 ms，让第一人称枪口焰与爆音贴齐。原片枪机的两段机械声从
-    // 起音后约 1.88 / 2.17 s 开始；用户确认枪声电平不动，只把 1.65 s 后的机械段
-    // 先抬 8 dB、试听后再大 10%（合计 +8.82785 dB）。动作时钟见 Data_Weapons.HanYang。
-    cuts: [{ cue: "rifleHanYang", exactAtS: 2.970, tail: 2.56, preRollS: 0.005, gain: 0.94,
-      gainSections: [{ startS: 1.65, gainDb: 8.82785 }], alignDbfs: -25 }],
+    // 第一发连同后面的整套枪机动作都取，但**切成两条**：
+    //   · rifleHanYang：枪响＋回声（原片 0.84 / 1.20 s 两记回声都留着），1.40 s 收尾。
+    //     起音前只留 5 ms，让第一人称枪口焰与爆音贴齐。
+    //   · boltHanYang：原片起音后 1.65 s 起到闭锁结束。开头 0.23 s 是手去够枪机的空当，
+    //     然后才是 1.88 s 开栓、2.17—2.44 s 推回闭锁 —— 拉栓动作开始时播，节点对位不变。
+    // 2026-09-13 的版本是一整条 2.56 s，动画只能硬等 1.65 s 才起手，玩家嫌开完枪「有个延迟」；
+    // 拆开以后拉栓延迟回到 0.20 s（Data_Weapons.HanYang），枪声尾巴与拉栓叠着放。
+    // 两条各自对齐 −25 dBFS，用户确认过的「枪声电平不动、机械段 +8.82785 dB」这个
+    // 相对关系改由 Script_Audio 的 SAMPLE_MIX 复原（两个系数是对照旧成品量出来的）。
+    cuts: [
+      { cue: "rifleHanYang", exactAtS: 2.970, tail: 1.40, preRollS: 0.005, gain: 0.94, alignDbfs: -25 },
+      { cue: "boltHanYang", exactAtS: 4.620, tail: 0.91, preRollS: 0.005, gain: 0.94, alignDbfs: -25 },
+    ],
   },
   {
     id: "RifleIjaType38Live",

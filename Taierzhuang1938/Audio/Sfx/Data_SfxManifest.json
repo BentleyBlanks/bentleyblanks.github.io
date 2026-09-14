@@ -790,12 +790,20 @@
       "files": [
         "AudioSfx_RifleHanYang_01.mp3"
       ],
-      "seconds": 2.56,
+      "seconds": 1.4,
+      "credit": "汉阳造 88 式步枪第一发连续实录（枪响、开栓、抽壳、推弹、闭锁）· 参考视频实录",
+      "license": "refvideo"
+    },
+    "boltHanYang": {
+      "files": [
+        "AudioSfx_BoltHanYang_01.mp3"
+      ],
+      "seconds": 0.91,
       "credit": "汉阳造 88 式步枪第一发连续实录（枪响、开栓、抽壳、推弹、闭锁）· 参考视频实录",
       "license": "refvideo"
     }
   },
-  "bakedAt": "2026-09-13",
+  "bakedAt": "2026-09-14",
   "normalization": {
     "normalizedAt": "2026-09-08",
     "tool": "Script_AudioNormalize.mjs",
