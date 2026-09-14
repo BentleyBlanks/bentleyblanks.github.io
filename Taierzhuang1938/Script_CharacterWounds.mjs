@@ -132,9 +132,10 @@ export class CharacterWounds {
       mesh.skeleton.update();
       const regions=Regions(mesh), active=mesh.geometry.index;
       // Respect severed geometry: removed vertices must never win nearest-surface selection.
-      const ids=active ? new Set(active.array) : regions.keys();
-      for(const i of ids) {
-        if(!Matches(regions[i],part,shapeId))continue;
+      const ids=[...(active ? new Set(active.array) : regions.keys())].filter(i=>Matches(regions[i],part,shapeId));
+      const stride=Math.max(1,Math.ceil(ids.length/C.maxSurfaceSamples));
+      for(let sample=0;sample<ids.length;sample+=stride) {
+        const i=ids[sample];
         mesh.getVertexPosition(i,posed).applyMatrix4(mesh.matrixWorld);
         const distance=posed.distanceToSquared(target);
         if(distance<best){best=distance;selected={mesh,index:i};}
@@ -147,6 +148,9 @@ export class CharacterWounds {
     raycaster.near=0;raycaster.far=0.8;
     let surface=null, surfaceDistance=Infinity;
     for(const candidate of meshes) {
+      // The subdivided first-person hand has >76k vertices. Keep injury work bounded;
+      // its nearest-surface sample is enough, while the outer cloth remains ray-exact.
+      if(candidate.geometry.attributes.position.count>C.maxRayVertices)continue;
       candidate.computeBoundingSphere();
       const regions=Regions(candidate);
       for(const hit of raycaster.intersectObject(candidate,false)) {
