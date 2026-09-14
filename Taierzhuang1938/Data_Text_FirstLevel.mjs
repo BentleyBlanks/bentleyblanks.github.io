@@ -1,5 +1,7 @@
 // Interaction strings for the September first-level replacement.
 export const TEXT = Object.freeze({
+  "firstLevel.guide.front": "击退前方日军",
+  "firstLevel.hint.crawlPassage": "趴下，匍匐穿过低矮通道",
   "firstLevel.return.rejoin": "返回行动路线",
   "firstLevel.return.person": "你已远离伤员，立即返回接应。",
   "firstLevel.return.wounded": "返回老周身边",

@@ -106,7 +106,8 @@ export const OPENING = Object.freeze({
   zhouRest: {x:2.1,z:-124.6},
   zhouWoundThreshold:95,
   zhouExitRadiusM:.65,
-  zhouShell: {from:{x:18,z:-210},height:30,flight:1.8,radius:3,damage:55,offsetX:1.1},
+  zhouShell: {from:{x:18,z:-210},height:30,flight:1.8,radius:3,damage:55,offsetX:1.1,
+    retryAfterS:12,retryFromOffset:{x:8,z:-12}},
   // Finite attacking sections on both sides of the march, staggered by local contact.
   surface: [
     {id:"FlankLockGunner",x:-35,z:58,weapon:"Type11",hold:true,team:"Flank"},

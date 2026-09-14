@@ -7,13 +7,13 @@ import {MISSION_RETURN_ROUTES} from './Data_FirstLevelMissionReturn.mjs';
 import {FirstLevelMissionFlow} from './Script_FirstLevelMissionFlow.mjs';
 import {MissionRouteLength,MissionRouteProjection,MissionRouteNextIndex} from './Script_FirstLevelMissionColumn.mjs';
 import {SampleMissionTerrain} from './Data_FirstLevelMissionTerrain.mjs';
-// Independent transcription of the 2026.09.14 Notion table; image shorthand is superseded by it.
+// Notion rear stages plus the user's later September 14 front-sortie revision.
 const expected=[
  ['trainShelling'],
  ['trainStopped','trainDerailed','luoRescueComplete','unloadOrdersHeard','unloaded'],
  ['trenchEntered','trenchCleared','shelterReached','escapeWhisperHeard','woundedSeen','supportOrdersHeard','frontReached','frontContact','frontRifleDefense','rifleWithdrawalResolved','zhouGunWounded'],
- ['gunUsed','guardWithdrawalResolved'],['bundleTaken','tankImmobilized'],['ordersReached','volunteerHeard','zhouOnLitter'],
- ['southTraversed','southHopeHeard'],['innerCourtReached'],['meleeResolved'],['villageGunSilent','courtyardGateOpen','courtyardPassed'],
+ ['frontAttackRepelled','guardWithdrawalResolved'],['bundleRouteTraversed','bundleDirectionsHeard','bundleTaken','tankImmobilized'],['ordersReached','volunteerHeard','zhouOnLitter'],
+ ['southTransitionComplete','southTraversed'],['innerCourtReached'],['meleeResolved'],['villageGunSilent','courtyardGateOpen','courtyardPassed'],
  ['transferApproachReached','transferHopeHeard'],['transferArrived','vehiclesDeparted','transferAttacksResolved','zhouNext','followVehicleHeard'],
  ['firstAirPassComplete','firstAirOrdersHeard','zhouCarried','atDitchMouth','carryOrdersHeard'],
  ['diveComplete','zhouRecovered','rescuePassageClear'],['retreatFirstPassed','retreatWallPassed','retreatYardPassed'],
@@ -29,7 +29,7 @@ for(const [i,phase] of Phases.entries()){
   flow.Update(10000);assert.equal(flow.stage.id,step.id,`${step.id} cannot skip ${missing}`);
  }
 }
-for(const [id,seconds] of [['South',75],['TransferApproach',45],['Transfer',150]])
+for(const [id,seconds] of [['TransferApproach',45],['Transfer',150]])
  assert.equal(Steps.find(step=>step.id===id).minimumSeconds,seconds);
 const Distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 assert.ok(Distance(A.gun,A.throw)<45,'gun and tank are one front');
@@ -71,4 +71,4 @@ const gate=Layout.gates.find(g=>g.id==='MissionBridgeWreck');
 assert.equal(gate.appearSignal,'MissionBridgeDestroyed');
 assert.ok(gate.h>3&&gate.w>=8,'destroyed road has visible structural obstruction');
 for(const id of ['retreatWall','retreatYard','reception','final'])assert.ok(Enemies[id].length>=3,'all local encounters retained');
-console.log('ok Notion 2026.09.14: all 18 phase conditions, independent missing-fact gates, 75/45/150 seconds, west-to-south pockets, broken sightlines and one reception compound');
+console.log('ok Notion 2026.09.14: all 18 phase conditions, independent missing-fact gates, escort transition and 45/150 seconds, west-to-south pockets, broken sightlines and one reception compound');

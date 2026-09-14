@@ -119,6 +119,10 @@ export const MISSION_DIALOGUE = Object.freeze([
   Cue("FrontCrossing", [["soldier", "不响了！走！"],["luo", "快下来！这边！"]]),
   Cue("FrontPursuit", [["heyoutian", "右边！莫让那几个撵上来！"]]),
   Cue("FrontReceived", [["yaowa", "脚底下！慢点，接到的！"],["soldier", "后头还有人！"]]),
+  Cue("FrontWeaponChoice", [["luo","机枪就在旁边，顺手就接！先把前头那队鬼子打退！"]]),
+  Cue("BundleSortieOrder", [["luo","何有田、文财，守住阵地！顺子跟我走！北边屋里有集束手榴弹，伏低，沿弯沟过去！"]]),
+  Cue("BundleSupplyDirections", [["soldier","集束手榴弹在屋里木箱上！拿稳了，回去贴近侧沟，炸它履带！"],
+    ["luo","拿上跟我回去！车停了也莫露头，炮还打得响！"]]),
   Cue("TakeMachineGun", [
     ["zhou", "弹匣！妈的……"],
     ["luo", "周哥，莫逞！"],

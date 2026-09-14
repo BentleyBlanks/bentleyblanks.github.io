@@ -9,10 +9,10 @@ export const FIRST_LEVEL_STAGES = Object.freeze([
   Phase(1, "Train", "军列上的人味", ["Train"], A.train),
   Phase(2, "Unloading", "接近卸载点，遭遇炮击", ["Unloading"], A.train),
   Phase(3, "Support", "清沟、喘息与支援外围阵地", ["TrenchEntry","Shelter","Support"], A.unload),
-  Phase(4, "MachineGun", "接手机枪", ["MachineGun"], {x:0,z:-127.4}),
+  Phase(4, "MachineGun", "击退前方日军（机枪可选）", ["MachineGun"], {x:0,z:-127.4}),
   Phase(5, "Tank", "集束手榴弹炸停战车", ["Tank"], Routes.bundle[0]),
   Phase(6, "Orders", "后送命令", ["Orders"], A.orders),
-  Phase(7, "South", "真正往南——第一次松口气", ["South"], A.orders),
+  Phase(7, "South", "护送转场，抵达村口", ["South"], A.orders),
   Phase(8, "Village", "村口截击", ["Village"], Routes.village[0]),
   Phase(9, "Melee", "第一次大刀／刺刀近战", ["Melee"], A.melee),
   Phase(10, "Courtyard", "夺下院子并掩护伤员通过", ["Courtyard"], A.melee),
@@ -26,7 +26,7 @@ export const FIRST_LEVEL_STAGES = Object.freeze([
   Phase(18, "FinalDefense", "接收院被逼退，战斗收尾", ["FinalDefense","Exit"], MISSION_RECEPTION_SPACE.deathView),
 ]);
 export const FIRST_LEVEL_ENCOUNTER_STARTS = Object.freeze({
-  surface:2, intrusion:2, front:3, machineGun:4, approach:3, tank:3, village:3, melee:3, courtyard:10,
+  bundleApproach:5, surface:2, intrusion:2, front:3, machineGun:4, approach:3, tank:3, village:3, melee:3, courtyard:10,
   transfer:12, transferFlank:12, transferLast:12, transferRear:12, air:13, retreat:15,
   retreatWall:15,retreatYard:15,reception:16, final:17,
 });
@@ -46,7 +46,7 @@ export const FIRST_LEVEL_STAGE_ENCOUNTERS = Object.freeze([
   [], [],
   ["surface","intrusion"],
   ["front","machineGun","approach","tank","village","melee"],
-  ["front","machineGun","approach","tank","village","melee"],
+  ["front","machineGun","approach","tank","village","melee","bundleApproach"],
   ["village","melee"], ["village","melee"], ["village","melee"], ["village","melee"],
   ["village","courtyard"], [], ["transfer"], ["air"], ["air"],
   ["retreat"], ["reception"], ["final"], ["final"],

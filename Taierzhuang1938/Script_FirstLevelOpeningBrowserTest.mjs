@@ -10,7 +10,7 @@ import {ServeRoot} from "./Script_DevServer.mjs";
 import {OPENING} from "./Data_FirstLevelOpening.mjs";
 import {SampleOpeningPerception} from "./Script_FirstLevelOpening.mjs";
 const here=path.dirname(fileURLToPath(import.meta.url));
-export async function PlayFirstLevelOpening(page,{out=path.join(here,"_shots/FirstLevelOpening/InputRun"),realtime=false,audioClock=false,from="Train",through="Handover",mount=true,regroup=false}={}){
+export async function PlayFirstLevelOpening(page,{out=path.join(here,"_shots/FirstLevelOpening/InputRun"),realtime=false,audioClock=false,from="Train",through="Handover",mount=true,regroup=false,retryCheckpoint=null}={}){
 await fs.mkdir(out,{recursive:true});
 const errors=[],trace=[],combatTrace=[],openingShots=new Set();let whisperCaptured=false;
 page.on("pageerror",error=>{errors.push(String(error));console.log("PAGEERROR",String(error));});
@@ -96,6 +96,18 @@ async function Drive(label,points,{fight=false,until=null,seconds=120}={}){
       await Capture("EscapeWhisperPlaying");
     }
     if(secondsDone%10===0||result.ready||!result.alive)console.log(label,JSON.stringify(result));
+    if(!result.alive&&retryCheckpoint){
+      await Capture(`${label}BeforeRetry`);
+      if(await retryCheckpoint()){
+        // The parent owns the bounded retry budget and validates the shipped
+        // checkpoint's facts/casualties. Rewalk this leg with ordinary inputs.
+        await page.evaluate(points=>{
+          const b=window.OpeningInput;b.points=points;b.index=0;b.evading=false;b.supplyHeld=null;
+        },points);
+        secondsDone=-(realtime?.25:2);
+        continue;
+      }
+    }
     if(result.ready||!result.alive)break;
     if(audioClock&&result.voicePlaying)await page.waitForTimeout(2000);
   }

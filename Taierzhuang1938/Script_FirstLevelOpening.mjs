@@ -336,10 +336,14 @@ export class FirstLevelOpening {
       if(!shelter)r.Defend(a,C.zhouGunSeat,0,R.companionCoverSlackM);
     }
     if(a.health>=C.zhouWoundThreshold&&(!r.Has("frontRifleDefense")||!r.Has("rifleWithdrawalResolved")))return;
-    if(!this.zhouShellSent&&a.health>=C.zhouWoundThreshold){
-      this.zhouShellSent=true;
+    if(a.health>=C.zhouWoundThreshold&&(!this.zhouShellSent||r.time-this.zhouShellAt>=C.zhouShell.retryAfterS)){
+      const correcting=!!this.zhouShellSent;
+      this.zhouShellSent=true;this.zhouShellAt=r.time;
       const spec=C.zhouShell,target=r.Point({x:a.position.x+spec.offsetX,z:a.position.z},.65);
-      r.combat.FireShell(r.Point(spec.from,spec.height),target,{...spec,kind:"Shell75",
+      // A real dodge or parapet can defeat the first round. Re-range from a
+      // steeper trajectory; only observed injury releases the handover gate.
+      const from=correcting?{x:target.x+spec.retryFromOffset.x,z:target.z+spec.retryFromOffset.z}:spec.from;
+      r.combat.FireShell(r.Point(from,spec.height),target,{...spec,kind:"Shell75",
         OnImpact:()=>r.Record("zhouGunBlast",{x:target.x,z:target.z})});
     }
     if(a.health>=C.zhouWoundThreshold)return;

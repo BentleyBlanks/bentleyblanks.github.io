@@ -631,7 +631,43 @@
       "requests": 1,
       "continuous": true,
       "mastering": "MonoBeforeLoudnessTruePeakMinus3"
+    },
+    "FrontWeaponChoice": {
+      "file": "AudioVoice_FirstLevelFrontWeaponChoice.mp3",
+      "seconds": 6.844,
+      "bytes": 82800,
+      "promptHash": "77e275770cfa956f00715a16ff82db0bbfe3d4c2e778128cca4aa22be9f058b1",
+      "sha256": "aea487da36652597a34615c6c4f639edcc09d52dd61552291dd01547fe9cfc54",
+      "lineCount": 1,
+      "requests": 1,
+      "speechRate": 0,
+      "continuous": true,
+      "mastering": "MonoBeforeLoudnessTruePeakMinus3"
+    },
+    "BundleSortieOrder": {
+      "file": "AudioVoice_FirstLevelBundleSortieOrder.mp3",
+      "seconds": 9.143,
+      "bytes": 110386,
+      "promptHash": "8262c66e42c00b4ff8f3676be269b3b553e61b8b471fb1da339c191137c753d4",
+      "sha256": "89dbf2e85ed11d7ffa94e0c152ff9dde0a3ba5112849efae7a21952c53b8b26a",
+      "lineCount": 1,
+      "requests": 1,
+      "speechRate": 0,
+      "continuous": true,
+      "mastering": "MonoBeforeLoudnessTruePeakMinus3"
+    },
+    "BundleSupplyDirections": {
+      "file": "AudioVoice_FirstLevelBundleSupplyDirections.mp3",
+      "seconds": 10.841,
+      "bytes": 130761,
+      "promptHash": "f40fcbd015234ca418c34a27aaf832ccb0c38142db22a4add1d69d899e8b661d",
+      "sha256": "895b3875072d0d4d1612f9001fb9199a0c934e4ea95139b3f6effb3e04db269e",
+      "lineCount": 2,
+      "requests": 1,
+      "speechRate": 0,
+      "continuous": true,
+      "mastering": "MonoBeforeLoudnessTruePeakMinus3"
     }
   },
-  "updatedAt": "2026-09-14T15:36:00.481Z"
+  "updatedAt": "2026-09-14T17:50:17.937Z"
 }

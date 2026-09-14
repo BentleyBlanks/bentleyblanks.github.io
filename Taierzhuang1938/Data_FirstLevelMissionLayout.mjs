@@ -1,3 +1,4 @@
+import { FRONT_SORTIE as Sortie } from "./Data_FirstLevelFrontRoute.mjs";
 import { MISSION_REAR_ANCHORS, MISSION_REAR_ROUTES, MISSION_RECEPTION_SPACE, MISSION_SOUTH_BRIDGE } from "./Data_FirstLevelMissionTopology.mjs";
 import { MISSION_TRENCH_COVER as TC } from "./Data_FirstLevelMissionTrenchCover.mjs";
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
@@ -217,7 +218,18 @@ for (const x of [-25, 0, 15]) {
   Wall(`FrontParapet${x}`, x, -131, 6, 0.55, 0.9);
   Wall(`FrontTraverseCover${x}`, x + 3.6, -119.4, 0.8, 0.65, 2);
 }
-Block("BundleCrate", 13, -118, 1.2, 0.5, 0.8, "missionRoute");
+Room("BundleSupplyHouse",Sortie.house.x,Sortie.house.z,9,10,{northDoor:false});
+Block("BundleCrate",Sortie.bundle.x,Sortie.bundle.z,1.2,.5,.8,"missionRoute");
+for(const crawl of Sortie.crawl){
+  const ground=SampleMissionTerrain(crawl.x,crawl.z);
+  Block(`BundleCrawl${crawl.id}Roof`,crawl.x,crawl.z,crawl.w,Sortie.crawlRoofM,crawl.d,"timber",
+    {y:ground+Sortie.crawlClearanceM+Sortie.crawlRoofM/2});
+  for(const side of [-1,1])GroundedWall(`BundleCrawl${crawl.id}Side${side}`,crawl.x+side*crawl.w/2,
+    crawl.z,.4,2.4,crawl.d+2);
+}
+// Traverse walls face the tank road and interrupt long fire lanes. Open ends lead around each bend.
+for(const [i,x,z,d] of [[0,45,-131,9],[1,53,-143,8],[2,45,-161,9],[3,51.5,-177,8]])
+  GroundedWall(`BundleTankScreen${i}`,x,z,.7,2.6,d);
 // A traverse stops the tank from firing lengthwise down the full front trench.
 GroundedWall("FrontTraverseBlastScreen",25.1,-124.5,.7,3.75,5.5);
 GroundedWall("BundleParapet",13,-118.9,5.2,1.65,.7);
@@ -453,6 +465,7 @@ function FieldCover(id, x, z, w, h, d) {
       // straight through the row behind it. Columns cannot help there - the lane runs down the
       // column - so the bank gives way instead of the route gate failing on it.
       if (Taken(x, row.z, row.w, row.d) || FrontAssaultLaneCuts(x, row.z, row.w, row.d)) continue;
+      if(MissionPathDistance({x,z:row.z},Sortie.route)<row.w/2+1.0)continue;
       FieldCover(`FrontCover${row.id}${column.id}${i}`, x, row.z, row.w, row.h, row.d);
     }
   }
@@ -461,9 +474,9 @@ export const MISSION_ANCHORS = Object.freeze({
   train: MISSION_TRAIN.player,
   unload: { x: -66, z: 66 },
   front: { x: 0, z: -124 },
-  orders: { x: -8, z: -102 },
+  orders: Sortie.orders,
   gun: { x: 0, z: -128 },
-  bundle: { x: 13, z: -118 },
+  bundle: Sortie.bundle,
   throw: { x: 30, z: -117 },
   village: { x: 55, z: -20 },
   melee: { x: 58, z: 6 },
@@ -482,7 +495,9 @@ export const MISSION_ROUTES = Object.freeze({
   ],
   opening: OPENING.approachRoute,
   support: OPENING.supportRoute,
-  bundle: MISSION_TERRAIN.trenches[2].points,
+  bundle: Sortie.route,
+  bundleReturn: Sortie.route.slice(3).reverse(),
+  orders: [Sortie.throw,{x:25,z:-110},Sortie.orders],
   south: [
     { x: -36, z: -124 },
     { x: 0, z: -124 },
@@ -557,7 +572,7 @@ export const MISSION_PLACEMENT = Object.freeze({
 export const MISSION_SUPPLIES = Object.freeze([
   {id:"Unloading",x:-68.5,z:66,supportHeight:.85},
   {id:"Front",x:-2.2,z:-124,supportHeight:null},
-  {id:"Orders",x:-9.5,z:-102,supportHeight:null},
+  {id:"Orders",x:Sortie.orders.x-1.5,z:Sortie.orders.z,supportHeight:null},
   {id:"Courtyard",x:50,z:33.05,supportHeight:null},
   {id:"Transfer",x:93,z:110,supportHeight:1.15},
   {id:"Retreat",x:53.8,z:184,supportHeight:null},
@@ -568,6 +583,10 @@ for (let i = blocks.length - 1; i >= 0; i--) {
   const block = blocks[i];
   if (!block.id.includes('Revetment')) continue;
   const c = Math.cos(block.ry||0), s = Math.sin(block.ry||0);
+  if(block.id.startsWith('BundleApproachRevetment') && FrontAssaultLaneCuts(block.x,block.z,
+    Math.abs(c)*block.w+Math.abs(s)*block.d,Math.abs(s)*block.w+Math.abs(c)*block.d,.8)){
+    blocks.splice(i,1);continue;
+  }
   const crosses = [...Object.values(MISSION_ROUTES), MISSION_PLACEMENT.reliefApproach, ...MISSION_PLACEMENT.guardWithdrawalRoutes, ...MISSION_TERRAIN.trenches.map(t=>t.points)].some(route => route.slice(1).some((b,index) => {
     const a=route[index], length=Math.hypot(b.x-a.x,b.z-a.z);
     for(let d=0;d<=length;d+=.5) {
@@ -586,7 +605,7 @@ export const MISSION_LAYOUT = Object.freeze({
   terrainSpec: MISSION_TERRAIN,
   SampleGroundColor: SampleMissionGroundColor,
   bounds: { minX: -205, maxX: 137, minZ: -258, maxZ: MISSION_TRAIN.approachEndZ },
-  ground: { x: -34, z: (MISSION_TRAIN.approachEndZ-202)/2, w: 342, d: MISSION_TRAIN.approachEndZ+202, h: 1, y: -0.5, semantic: "ground" },
+  ground: { x: -34, z: (MISSION_TRAIN.approachEndZ-258)/2, w: 342, d: MISSION_TRAIN.approachEndZ+258, h: 1, y: -0.5, semantic: "ground" },
   semanticColors: {
     foliage: 0x68715f,
     timber: 0x746956,

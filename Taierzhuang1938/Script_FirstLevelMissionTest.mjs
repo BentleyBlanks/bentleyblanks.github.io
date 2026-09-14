@@ -156,7 +156,7 @@ if(process.argv.includes("--opening-audio"))process.exit(0);
     const flow=new FirstLevelMissionFlow();flow.index=MISSION_STAGES.findIndex(s=>s.id==="MachineGun");flow.started=true;
     const guards=Array.from({length:4},(_,i)=>({actor:{id:i,alive:i<survivors},safe:true,progress:1,route:[{}]}));
     const r={flow,guards,time:0,Has:id=>flow.Has(id),Record:(id,d)=>flow.Record(id,d)};
-    flow.Record("gunUsed");
+    flow.Record("frontAttackRepelled");
     FirstLevelMissionRuntime.prototype.UpdateGuards.call(r,1/60);
     assert.equal(flow.log.find(e=>e.id==="guardWithdrawalResolved").detail.survived,survivors,
       "withdrawal counts only living survivors, including casualties after reaching cover");
@@ -178,7 +178,7 @@ if(process.argv.includes("--opening-audio"))process.exit(0);
   const StanceRequest=(stage,facts)=>{
     const input={stanceRequested:"stand",crouchPressed:true,pronePressed:true};
     FirstLevelMissionRuntime.prototype.BeforePlayer.call({flow:{stage:{id:stage}},
-      Has:id=>facts.has(id),meal:{Restore(){}},ReceivingFood:false,controls:null},1/60,input);
+      Has:id=>facts.has(id),meal:{Restore(){}},ReceivingFood:false,controls:null,player:{stance:"stand",position:{x:0,z:0},yaw:0,velocity:{x:0,z:0}}},1/60,input);
     return input;
   };
   const freeStance={stanceRequested:"stand",crouchPressed:true,pronePressed:true};
@@ -693,6 +693,21 @@ console.log("ok all mission gates require recorded gameplay facts and restore ex
   opening.UpdateZhou();
   assert.ok(facts.has("zhouGunKilled")&&!facts.has("zhouGunWounded")&&calls.includes("fail"),"actual death fails the mission instead of becoming a living litter");
 }
+{
+  const facts=new Set(['frontRifleDefense','rifleWithdrawalResolved']),shells=[];
+  const r={time:100,Has:id=>facts.has(id),Record:id=>facts.add(id),Point:(p,y=0)=>({...p,y}),
+    RespondToGrenade:()=>false,RespondToContact:()=>false,Defend(){},
+    combat:{FireShell:(from,to,options)=>shells.push({from,to,options})}};
+  const opening=new FirstLevelOpening(r);
+  opening.zhou={id:54,alive:true,health:100,lastFire:5,position:{...OPENING.zhouGunSeat},yaw:0};
+  opening.UpdateZhou();shells[0].options.OnImpact();
+  assert.ok(facts.has('zhouGunBlast')&&!facts.has('zhouGunWounded'),'a harmless physical impact cannot grant the wound');
+  r.time+=OPENING.zhouShell.retryAfterS-.01;opening.UpdateZhou();assert.equal(shells.length,1);
+  r.time+=.02;opening.zhou.position.x+=1;opening.UpdateZhou();assert.equal(shells.length,2);
+  assert.notDeepEqual(shells[1].from,shells[0].from,'a missed round is corrected to a steeper source');
+  assert.equal(shells[1].to.x,opening.zhou.position.x+OPENING.zhouShell.offsetX,'correction observes the moving gunner');
+  assert.equal(opening.zhou.health,100);assert.ok(!facts.has('zhouGunWounded'),'retry neither injects damage nor bypasses the gate');
+}
 for(const [index,step] of MISSION_STAGES.filter(s=>!["TrenchEntry","Shelter"].includes(s.id)).entries()){
   const legacy={version:1,index,time:42,stageTime:2,facts:[],log:[]};
   const restored=new FirstLevelMissionFlow();restored.Restore(legacy);
@@ -748,7 +763,7 @@ for (const [name, route] of Object.entries({ ...MISSION_ROUTES, ...Object.fromEn
           Math.abs(dx*cosine-dz*sine) < box.w / 2 + 0.35 &&
           Math.abs(dx*sine+dz*cosine) < box.d / 2 + 0.35 &&
           box.y + box.h / 2 > y + 0.3 &&
-          box.y - box.h / 2 < y + 1.7;
+          box.y - box.h / 2 < y + ((name==="bundle"||name==="bundleReturn") && box.id.startsWith("BundleCrawl") ? .88 : 1.7);
         assert.equal(
           blocked,
           false,
