@@ -173,6 +173,27 @@ try{
  assert.ok(leader.wait.speed===0&&leader.wait.distance<.1,'leader waits for the trailing player');
  assert.ok(leader.catchup.speed>0&&leader.catchup.distance>.5,'leader resumes when the player advances');
  assert.ok(leader.constraintReleased,'clearance constraint is released outside the passage');
+ const medicine=await page.evaluate(async()=>{
+  const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime(),{MISSION_TUNING:R}=await import('./Data_FirstLevelMission.mjs');
+  const supply=g.interact.points.get('MissionBundle');
+  // Isolate the real supply callback from combat to test inventory contracts;
+  // the normal campaign separately exercises F at this exact physical crate.
+  g.player.bandages=0;g.player.health=50;g.player.bleeding=1;g.state.bundles=0;
+  const enabled=supply.Enabled();supply.OnComplete();
+  const first={health:g.player.health,bleeding:g.player.bleeding,bandages:g.player.bandages,bundles:g.state.bundles};
+  supply.OnComplete();const repeated={bandages:g.player.bandages,bundles:g.state.bundles};
+  const bandaged=g.player.Bandage(),afterBandage={bleeding:g.player.bleeding,bandages:g.player.bandages,health:g.player.health};
+  r.ContinueCheckpoint();const afterRetry={bandages:g.player.bandages,bundles:g.state.bundles};
+  supply.OnComplete();const restocked={bandages:g.player.bandages,bundles:g.state.bundles};
+  return {enabled,reserve:R.bundleSupplyBandages,bundleReserve:R.bundleSupplyCount,first,repeated,bandaged,afterBandage,afterRetry,restocked};
+ });
+ assert.equal(medicine.enabled,true);
+ assert.deepEqual(medicine.first,{health:50,bleeding:1,bandages:medicine.reserve,bundles:medicine.bundleReserve},'pickup supplies dressings without healing or stopping blood loss');
+ assert.deepEqual(medicine.repeated,{bandages:medicine.reserve,bundles:medicine.bundleReserve},'repeated pickup cannot stack supplies past the reserve');
+ assert.equal(medicine.bandaged,true);
+ assert.deepEqual(medicine.afterBandage,{health:50,bleeding:0,bandages:medicine.reserve-1},'the player still spends a dressing to stop bleeding');
+ assert.deepEqual(medicine.afterRetry,{bandages:medicine.reserve-1,bundles:medicine.bundleReserve},'checkpoint retry does not grant medicine');
+ assert.deepEqual(medicine.restocked,{bandages:medicine.reserve,bundles:medicine.bundleReserve},'using the actual depot after a retry replenishes missing dressings');
  const fireWindows=await page.evaluate(()=>{
   const r=window.Tengxian.Debug.FirstLevelMissionRuntime();
   return ['moving','halted','immobilized'].map(mode=>{
@@ -212,7 +233,7 @@ try{
  assert.equal(end.stage,'Village');assert.equal(end.control,null);assert.equal(end.hidden,'none');
  assert.ok(Math.hypot(end.position[0]-55,end.position[2]+20)<1);assert.deepEqual(end.health,arrival.health);
  assert.ok(end.facts.includes('southTransitionComplete') && !end.facts.includes('deathSceneComplete'));
- await fs.writeFile(path.join(out,'Data_RuntimeFixtures.json'),JSON.stringify({optional,sortie,fireWindows,arrival,end},null,2));
+ await fs.writeFile(path.join(out,'Data_RuntimeFixtures.json'),JSON.stringify({optional,sortie,medicine,fireWindows,arrival,end},null,2));
  assert.deepEqual(errors,[]);
  console.log('PASS physical sortie, optional weapon, route facts, supply NPC and escort fade with preserved casualties');
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}

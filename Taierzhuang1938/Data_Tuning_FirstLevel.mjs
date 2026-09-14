@@ -174,6 +174,9 @@ export const MISSION_TUNING = Object.freeze({
   tankAdvanceSeconds: 11,
   tankFiringHaltSeconds: 5,
   bundleSupplyCount: 2,
+  // September 15 stability fix: the northern depot supports the return leg's
+  // wound budget. Actual pickup caps dressings; checkpoint retry grants none.
+  bundleSupplyBandages: 3,
   tankStopZ: -123,
   tankShellIntervalS: 13,
   tankShellScatterM: 2.6,

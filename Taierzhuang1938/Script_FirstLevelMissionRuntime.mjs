@@ -1041,7 +1041,8 @@ export class FirstLevelMissionRuntime {
       () => this.flow.stage.id === "Tank" && this.Has("bundleRouteTraversed") && (!this.tank.immobilized || !this.Has("bundleTaken")),
       () => {
         const missing = Math.max(0, R.bundleSupplyCount - this.Inventory().bundles);
-        if (missing) this.GiveSupply({ bundles: missing });
+        const bandages = Math.max(0, R.bundleSupplyBandages - this.player.bandages);
+        if (missing || bandages) this.GiveSupply({ bundles: missing, bandages });
         this.Record("bundleTaken");
         this.SaveCheckpoint();
         this.GuideSortie(MISSION_ROUTES.bundleReturn);

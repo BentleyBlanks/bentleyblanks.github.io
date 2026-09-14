@@ -100,6 +100,8 @@ async function Capture(name) {
         mission: window.Tengxian.Debug.FirstLevelMission(),
         position: { ...window.Tengxian.player.position },
         health: window.Tengxian.player.health,
+        medical:{bleeding:window.Tengxian.player.bleeding,bandages:window.Tengxian.player.bandages,
+          regenTo:window.Tengxian.player.bandageRegenTo},
         damage:window.missionDamage?.slice(-12),
         cast: window.Tengxian.ai.soldiers
           .filter((a) => a.castId)
@@ -216,6 +218,7 @@ async function Route(points, label, { fight = false, stance = "stand", sprint = 
         position: { ...g.player.position },
         alive: g.player.alive,
         health: g.player.health,
+        medical:{bleeding:g.player.bleeding,bandages:g.player.bandages,regenTo:g.player.bandageRegenTo},
         stage: g.Debug.FirstLevelMissionRuntime().flow.stage.id,
         stalled: b.stalled,
         shots: g.state.playerShots,
@@ -273,6 +276,13 @@ async function Route(points, label, { fight = false, stance = "stand", sprint = 
       campaignRetries.push({kind:'route',label,stage:retry.before.stage,time:retry.before.time,
         beforePosition:retry.before.position,afterPosition:retry.after.position,
         factsPreserved:true,casualtiesPreserved:true});
+      // A player recovering at the depot can use its real crate before setting
+      // out again. Do not grant supplies from the checkpoint or from the driver.
+      const depot=await page.evaluate(()=>{
+        const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime();
+        return r.flow.stage.id==='Tank'&&g.player.bandages===0&&g.interact.Query(g.player)?.point?.id==='MissionBundle';
+      });
+      if(depot){await Interact();assert.equal(await page.evaluate(()=>window.Tengxian.player.bandages),R.bundleSupplyBandages,'depot retry physically replenishes dressings');}
       if(carriedKind==='stretcher' && await page.evaluate(()=>window.Tengxian.carry.KindId!=='stretcher')){
         // Death really drops the patient. Retry restores the player, so walk
         // back and use F before continuing; an empty-handed arrival is not a carry.
@@ -798,6 +808,7 @@ try {
     console.log("bundle interaction", await Interact());
     const fullBundleCount=await page.evaluate(()=>window.Tengxian.state.bundles);
     assert.equal(fullBundleCount,R.bundleSupplyCount,"actual crate interaction grants the authored bundle reserve");
+    assert.ok(await page.evaluate(minimum=>window.Tengxian.player.bandages>=minimum,R.bundleSupplyBandages),'actual depot pickup supplies the return-leg dressings');
     await Interact();
     assert.equal(await page.evaluate(()=>window.Tengxian.state.bundles),fullBundleCount,"repeated pickup never adds beyond the crate reserve");
     for(let attempt=0;attempt<2;attempt++){
@@ -1223,7 +1234,6 @@ try {
     );
     }
     assert.deepEqual(errors, []);
-    await fs.writeFile(path.join(output,"Data_NormalCheckpointRetries.json"),JSON.stringify(campaignRetries,null,2));
     if (stageJumps) {
       assert.deepEqual(jumpReceipts.map(receipt=>receipt.number),Array.from({length:19-stageFrom},(_,i)=>i+stageFrom));
       await fs.writeFile(path.join(output,"Data_JumpContinuation.json"),JSON.stringify(jumpReceipts,null,2));
@@ -1231,7 +1241,6 @@ try {
     } else console.log("ok entire first level completed with real player input and physical mission events");
   }
 } catch (error) {
-  await fs.writeFile(path.join(output,"Data_NormalCheckpointRetries.json"),JSON.stringify(campaignRetries,null,2));
   await page.evaluate(()=>window.Tengxian?.Debug.FirstLevelMission()).then(state=>fs.writeFile(path.join(output,"Data_Failure.json"),JSON.stringify(state,null,2))).catch(()=>{});
   await page.screenshot({ path: path.join(output, "Scene_Failure.png") }).catch(() => {});
   console.error(
@@ -1244,6 +1253,9 @@ try {
   );
   throw error;
 } finally {
+  // Partial-route fixtures and failed runs need the same recovery receipts as
+  // complete campaigns; a stage-only success must never masquerade as Complete.
+  await fs.writeFile(path.join(output,"Data_NormalCheckpointRetries.json"),JSON.stringify(campaignRetries,null,2));
   await browser.close();
   await new Promise((resolve) => server.close(resolve));
 }
