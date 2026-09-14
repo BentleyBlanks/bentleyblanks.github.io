@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { NpcMissionGuide,GuideProjection,CompactGuideRoute } from "./Script_NpcMissionGuide.mjs";
 import { MISSION_ROUTES } from "./Data_FirstLevelMissionLayout.mjs";
+import { MISSION_SUPPLIES } from "./Data_FirstLevelMissionLayout.mjs";
 import { MissionSquadRoute } from "./Script_FirstLevelMissionColumn.mjs";
 import { MISSION_GUIDE_TUNING as G } from "./Data_Tuning_MissionGuide.mjs";
 import { MISSION_LEADER_STAGES,MISSION_GUIDE_TRANSFERS } from "./Data_FirstLevelLeaderGuide.mjs";
@@ -17,6 +18,16 @@ const dense=MissionSquadRoute(MISSION_ROUTES.south,0),compact=CompactGuideRoute(
 assert.ok(compact.length<100&&compact.length<dense.length);
 assert.deepEqual(compact.at(-1),dense.at(-1));
 for(const p of dense)assert.ok(GuideProjection(compact,p).distance<.00001,"every original point stays on the compact physical path");
+for(const activeCover of [false,true]){
+ const route=[{x:0,z:-20},{x:0,z:-40,coverBound:1},{x:0,z:-60}];
+ const authored=structuredClone(route),actor={position:{x:0,y:0,z:0}};
+ const host={squad:[actor],squadCoverBounds:activeCover?{}:null,flow:{stage:{id:"Support"}},
+  battlefield:{GroundHeight:()=>0},BlocksSight:()=>false,Point:p=>p,
+  physics:{Overlaps:()=>false},ai:{ctx:{nav:{Walkable:()=>true}}}};
+ const guide=new FirstLevelLeaderGuide(host);guide.Plan(route);
+ if(activeCover){assert.deepEqual(route,authored);assert.equal(guide.rule.Snapshot().stops.length,0);}
+ else assert.ok(guide.rule.Snapshot().stops.length>0,"ordinary routes retain leader checkpoints");
+}
 for(const blocked of [false,true]){
  const route=[{x:6,z:-124},{x:-8,z:-112},{x:-8,z:-102},{x:-8,z:-78},{x:-24,z:-60}];
  const actor={position:{x:-6.46,y:0,z:-87.34},body:{ProbeMove:(x,y,z)=>blocked?{x:0,z:0}:{x,z}}};
@@ -63,6 +74,17 @@ r.voice.queue=[];guide.Update();assert.equal(r.voice.queue.length,0,"no repeat e
 r.time=57;guide.Update();assert.deepEqual(r.voice.queue,["GuideSouth"]);
 r.voice.queue=["SouthOrders"];r.time=200;guide.Update();assert.deepEqual(r.voice.queue,["SouthOrders"]);
 r.voice.queue=[];r.time=201;guide.Update();assert.equal(r.voice.queue.length,0,"quiet gap after story");
+r.flow.stage={id:"MachineGun",objective:"gun"};
+const gun={rounds:12,belts:0};r.emplacement={Mounted:true,Emplacement:()=>gun};
+assert.equal(guide.View().cue,null,"the loaded final magazine is still usable ammunition");
+gun.rounds=0;
+let supplyView=guide.View();
+assert.equal(supplyView.cue,"GuideGunSupply");assert.equal(supplyView.label,"collect");
+const supply=MISSION_SUPPLIES.find(point=>point.id==="Front");
+assert.equal(supplyView.target.x,supply.x);assert.equal(supplyView.target.z,supply.z);
+r.emplacement.Mounted=false;supplyView=guide.View();
+assert.equal(supplyView.cue,"GuideGunSupply","dismounting keeps the actual ammunition crate as the destination");
+gun.belts=3;assert.equal(guide.View().cue,"GuideGun","resupply returns guidance to the gun");
 r.flow.stage={id:"Death",objective:""};guide.Enter(r.flow.stage);assert.equal(guide.View(),null);
 const player={position:{x:0,z:0},yaw:0};
 const rear=GrenadeWarningScreenPoint({behind:true,visible:false,x:640,y:360},{position:{x:0,z:10}},player,1280,720,{liftPx:0});

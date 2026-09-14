@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { NpcMissionGuide,GuideProjection } from "./Script_NpcMissionGuide.mjs";
 import { MISSION_GUIDE_TUNING as G } from "./Data_Tuning_MissionGuide.mjs";
 import { MISSION_LEADER_STAGES, MISSION_GUIDE_TRANSFERS } from "./Data_FirstLevelLeaderGuide.mjs";
-import { MISSION_ANCHORS as A } from "./Data_FirstLevelMissionLayout.mjs";
+import { MISSION_ANCHORS as A, MISSION_SUPPLIES } from "./Data_FirstLevelMissionLayout.mjs";
 import { Localize, T } from "./Script_Text.mjs";
 import { FirstLevelStageTextId } from "./Script_TextIds.mjs";
 import { InstallNpcGuideGesture } from "./Script_NpcGuideGesture.mjs";
@@ -31,6 +31,12 @@ export class FirstLevelLeaderGuide {
   Plan(route) {
     const actor = this.Leader, r = this.r;
     if (!actor || !MISSION_LEADER_STAGES[r.flow.stage.id]) return;
+    // Alternating cover already defines every rendezvous and its pair-release
+    // dependency. An extra wait between two shelters would deadlock that gate.
+    if(r.squadCoverBounds){
+      this.rule.Reset([{x:actor.position.x,z:actor.position.z},...route]);
+      this.waitSince=null;return;
+    }
     if(MISSION_LEADER_STAGES[r.flow.stage.id].rejoinRoute&&!r.squadCoverBounds){
       const join=GuideProjection(route,actor.position),point=join.point;
       if(point&&join.nextIndex>0&&join.distance<=G.routeJoinM
@@ -103,9 +109,12 @@ export class FirstLevelLeaderGuide {
     let {mode,cue,target}=spec, label=mode, variant=r.flow.stage.id;
     if(variant==="Support"&&r.Has("frontReached"))mode=label="cover";
     if(variant==="Tank"&&r.Inventory().bundles>0){target=A.throw;cue="GuideThrow";mode=label="throw";variant+="Throw";}
-    if(variant==="MachineGun"&&r.emplacement.Mounted){
-      mode=label="cover";cue=null;
-      if(r.emplacement.Emplacement(r.gunId)?.belts===0){cue="GuideGunSupply";variant+="Supply";}
+    if(variant==="MachineGun"){
+      const gun=r.emplacement.Emplacement(r.gunId);
+      if(gun?.rounds===0&&gun.belts===0){
+        target=MISSION_SUPPLIES.find(supply=>supply.id==="Front");
+        mode=label="collect";cue="GuideGunSupply";variant+="Supply";
+      }else if(r.emplacement.Mounted){mode=label="cover";cue=null;}
     }
     if(variant==="Courtyard") {
       if(r.Has("villageGunSilent")){target=A.gate;mode=label="open";}
