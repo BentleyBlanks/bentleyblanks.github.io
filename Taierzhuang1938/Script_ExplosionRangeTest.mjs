@@ -202,6 +202,27 @@ try {
   assert.equal(result.return.after.inventory, result.return.before.inventory, "return does not mint inventory");
   assert.ok(result.return.after.fuse < result.return.before.fuse - 0.45, "return never resets the live fuse");
   console.log("PASS real F grenade return / continuing fuse");
+  // 外壳池不许轮转抢壳：原来 12 个壳轮着发，在途弹一超过 12 颗，新弹就和旧弹共用一个壳，
+  // 旧弹一炸把壳摘了，新弹整段飞行都看不见。一口气扔 16 颗，超出预建数；清场不炸，不动地形。
+  result.shellPool = await page.evaluate(() => {
+    const t = window.Taierzhuang, combat = t.combat;
+    combat.ClearProjectiles();
+    const eye = t.player.EyePosition.clone(), dir = t.player.AimDirection(eye.clone()).clone();
+    const thrown = Array.from({ length: 16 }, (_, i) => combat.Throw(i % 4 === 3 ? "GrenadeBundle" : "Grenade", 0.5, eye.clone(), dir.clone(), 0));
+    t.StepFrames(2);
+    const meshes = thrown.map((p) => p.mesh);
+    const shown = thrown.filter((p) => p.mesh.parent === t.scene && p.mesh.visible
+      && p.mesh.userData.visuals[p.kind === "GrenadeBundle" ? "bundle" : "regular"].visible).length;
+    combat.ClearProjectiles();
+    return { distinct: new Set(meshes).size, shown, pool: combat.pool.length, free: new Set(combat.freeShells).size,
+      freeEntries: combat.freeShells.length, leftInScene: combat.pool.filter((m) => m.parent).length };
+  });
+  assert.deepEqual({ distinct: result.shellPool.distinct, shown: result.shellPool.shown }, { distinct: 16, shown: 16 },
+    `every live grenade owns a visible shell: ${JSON.stringify(result.shellPool)}`);
+  assert.ok(result.shellPool.pool >= 16 && result.shellPool.free === result.shellPool.pool
+    && result.shellPool.freeEntries === result.shellPool.pool && result.shellPool.leftInScene === 0,
+    `cleared shells return to the free list once and leave the scene graph: ${JSON.stringify(result.shellPool)}`);
+  console.log("PASS grenade shell pool covers 16 live grenades");
   await page.evaluate(() => {
     const t = window.Taierzhuang; t.Debug.Explosions.GoTo("barrage"); t.StepFrames(5); t.Debug.Key("KeyF");
     t.player.Spawn(2603, 2690, 0); t.player.pitch = 0.5; t.StepFrames(88);

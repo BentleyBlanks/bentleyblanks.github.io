@@ -103,47 +103,58 @@ export class CombatSystem {
 
     // 投掷物的视觉：普通弹与七枚一束的集束弹共用池化外壳。投弹是最常用的动作，
     // 每次 new Mesh 会在半个小时的战斗里攒出上千个几何体。
-    this.pool = [];
-    this.poolIndex = 0;
-    const geometry = new THREE.CylinderGeometry(0.028, 0.030, 0.22, 6);
-    geometry.rotateX(Math.PI / 2);
-    const head = new THREE.CylinderGeometry(0.029, 0.029, 0.09, 8);
-    head.rotateX(Math.PI / 2);
-    head.translate(0, 0, -0.12);
-    for (let i = 0; i < 12; i += 1) {
-      const group = new THREE.Group();
-      const regular = new THREE.Group();
-      const importedGrenade = CloneGrenadeAsset(this.grenadeAsset);
-      if (importedGrenade) regular.add(importedGrenade);
-      else regular.add(new THREE.Mesh(geometry, host.library.Get("WoodStock")), new THREE.Mesh(head, host.library.Get("Steel")));
-      const bundle = new THREE.Group();
-      bundle.add(new THREE.Mesh(geometry, host.library.Get("WoodStock")), new THREE.Mesh(head, host.library.Get("Steel")));
-      // 一根带柄弹 + 六枚去柄弹，正是 Data_Weapons 记录的七枚集束外观。
-      for (let j = 0; j < 6; j += 1) {
-        const a = (j / 6) * Math.PI * 2;
-        const body = new THREE.Mesh(head, host.library.Get("Steel"));
-        body.position.set(Math.cos(a) * 0.057, Math.sin(a) * 0.057, 0);
-        bundle.add(body);
-      }
-      for (const z of [-0.080, -0.030]) {
-        const rope = new THREE.Mesh(new THREE.TorusGeometry(0.088, 0.005, 6, 14), host.library.Get("WoodStock"));
-        rope.position.z = z;
-        bundle.add(rope);
-      }
-      bundle.visible = false;
-      group.add(regular, bundle);
-      group.userData.visuals = { regular, bundle };
-      group.visible = false;
-      group.castShadow = false;
-      // 池里的弹**不挂进场景图**，取用时才挂、藏起时摘（见 TakeMesh / HideMesh）：
-      // 十二枚 × 十五个节点，挂着不显示也要被矩阵更新与三趟场景遍历每帧走一遍。
-      this.pool.push(group);
+    // 池子是「空闲表 + 不够就现建」，**不是**定长轮转：原来 12 个壳按序轮着发，
+    // 在途弹一超过 12 颗（连扔、日军齐投一次就是 14 颗），新弹拿到的是旧弹还在用的壳 ——
+    // 壳停在旧弹那儿，新弹看着像没扔出去；旧弹一炸把壳摘了，新弹整段飞行都看不见。
+    this.pool = [];                   // 建过的全部外壳（ExplosionRange 读 pool[0] 当展示件源）
+    this.freeShells = [];             // 其中眼下没挂在弹上的，先藏起来的先复用
+    this.shellGeometry = {
+      stick: new THREE.CylinderGeometry(0.028, 0.030, 0.22, 6).rotateX(Math.PI / 2),
+      head: new THREE.CylinderGeometry(0.029, 0.029, 0.09, 8).rotateX(Math.PI / 2).translate(0, 0, -0.12),
+      rope: new THREE.TorusGeometry(0.088, 0.005, 6, 14),
+    };
+    for (let i = 0; i < 12; i += 1) this.freeShells.push(this.BuildShell());
+  }
+
+  BuildShell() {
+    const { stick, head, rope } = this.shellGeometry;
+    const library = this.host.library;
+    const group = new THREE.Group();
+    const regular = new THREE.Group();
+    const importedGrenade = CloneGrenadeAsset(this.grenadeAsset);
+    if (importedGrenade) regular.add(importedGrenade);
+    else regular.add(new THREE.Mesh(stick, library.Get("WoodStock")), new THREE.Mesh(head, library.Get("Steel")));
+    const bundle = new THREE.Group();
+    bundle.add(new THREE.Mesh(stick, library.Get("WoodStock")), new THREE.Mesh(head, library.Get("Steel")));
+    // 一根带柄弹 + 六枚去柄弹，正是 Data_Weapons 记录的七枚集束外观。
+    for (let j = 0; j < 6; j += 1) {
+      const a = (j / 6) * Math.PI * 2;
+      const body = new THREE.Mesh(head, library.Get("Steel"));
+      body.position.set(Math.cos(a) * 0.057, Math.sin(a) * 0.057, 0);
+      bundle.add(body);
     }
+    for (const z of [-0.080, -0.030]) {
+      const ring = new THREE.Mesh(rope, library.Get("WoodStock"));
+      ring.position.z = z;
+      bundle.add(ring);
+    }
+    bundle.visible = false;
+    group.add(regular, bundle);
+    group.userData.visuals = { regular, bundle };
+    group.userData.inUse = false;
+    group.visible = false;
+    group.castShadow = false;
+    // 池里的弹**不挂进场景图**，取用时才挂、藏起时摘（见 TakeMesh / HideMesh）：
+    // 十二枚 × 十五个节点，挂着不显示也要被矩阵更新与三趟场景遍历每帧走一遍。
+    this.pool.push(group);
+    return group;
   }
 
   TakeMesh(kind) {
-    const m = this.pool[this.poolIndex % this.pool.length];
-    this.poolIndex += 1;
+    // 从表头取：刚藏起来的壳排在表尾，同一帧炸一颗扔一颗时不会把爆点的旧矩阵
+    // 接成新弹的上一帧（预通道的运动矢量只认连续两帧都画过的对象）。
+    const m = this.freeShells.shift() || this.BuildShell();
+    m.userData.inUse = true;
     const isBundle = kind === "GrenadeBundle";
     m.userData.visuals.regular.visible = !isBundle;
     m.userData.visuals.bundle.visible = isBundle;
@@ -152,11 +163,14 @@ export class CombatSystem {
     return m;
   }
 
-  /** 与 TakeMesh 成对：藏起来的同时从场景图摘下，池化的壳不再参与每帧遍历。 */
+  /** 与 TakeMesh 成对：藏起来的同时从场景图摘下，池化的壳不再参与每帧遍历，并还回空闲表。 */
   HideMesh(m) {
     if (!m) return;
     m.visible = false;
     if (m.parent) m.parent.remove(m);
+    if (!m.userData.inUse) return;
+    m.userData.inUse = false;
+    this.freeShells.push(m);
   }
 
   /**
@@ -805,6 +819,7 @@ export class CombatSystem {
       m.traverse((child) => child.geometry?.dispose());
     }
     this.pool.length = 0;
+    this.freeShells.length = 0;
     this.incoming.length = 0;
     this.shellVisuals.Dispose();
   }
