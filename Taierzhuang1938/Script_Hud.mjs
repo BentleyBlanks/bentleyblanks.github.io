@@ -46,6 +46,28 @@ function SetClass(el, name, on) {
 }
 
 /**
+ * 来弹弧的轮廓：朝 12 点、圆心就是准心 (0,0)。外沿 = 中线 + 半厚 + 正中小尖，
+ * 内沿 = 中线 − 半厚，逐角度采样，所以任意 rotate 之后都还绕着准心。
+ * @param {typeof HITDIR} g
+ */
+export function HitDirArcPath(g) {
+  const half = g.spanDeg / 2;
+  const angles = new Set([0, half, -half, g.tipHalfDeg, -g.tipHalfDeg]);
+  for (let i = 0; i <= 48; i += 1) angles.add(-half + g.spanDeg * i / 48);
+  for (let i = 1; i < 6; i += 1) { angles.add(g.tipHalfDeg * i / 6); angles.add(-g.tipHalfDeg * i / 6); }
+  const sorted = [...angles].filter((a) => Math.abs(a) <= half).sort((a, b) => a - b);
+  const Point = (deg, r) => {
+    const t = deg * Math.PI / 180;
+    return `${(r * Math.sin(t)).toFixed(2)},${(-r * Math.cos(t)).toFixed(2)}`;
+  };
+  const Width = (deg) => g.halfWidth * Math.pow(Math.max(0, 1 - (deg / half) ** 2), g.taperPower);
+  const Tip = (deg) => g.tipHeight * Math.pow(Math.max(0, 1 - Math.abs(deg) / g.tipHalfDeg), 1.6);
+  const outer = sorted.map((deg) => Point(deg, g.radius + Width(deg) + Tip(deg)));
+  const inner = sorted.slice().reverse().map((deg) => Point(deg, g.radius - Width(deg)));
+  return `M${outer.join("L")}L${inner.join("L")}Z`;
+}
+
+/**
  * 两个目标标签在纵向上至少要隔开多少像素（同时横向要近到 MARKER_SEP_X 才算撞）。
  * 一个 marker 是「▲ + 名字 + 进度条」三行，实测占 38 px 高。
  * 线性关卡里所有路标几乎在同一个方位角上 —— 实测第五关「十字街口 62m /
@@ -830,26 +852,57 @@ export class Hud {
    * 为什么非要有：这一版之前玩家挨枪只有两件事会发生 —— 血掉了、暗角亮一点点
    *（而暗角是 health<70 才开始的，70 到 0 只隔两发）。也就是说在"还有得救"的
    * 那段血量里，屏幕上**什么都没发生**，玩家既不知道自己在挨打，更不知道朝哪边躲。
-   * 五个方位共用一张透明血色纹理；SVG 只负责旋转，不重新绘制素材。
+   * 五个方位共用同一条以准心为圆心的弧（HitDirArcPath）；转身只改 rotate。
+   * 颜色走两套渐变：实际命中血红、近失弹白色，两头都沿弧长渐隐。
    */
   BuildHitDirs() {
     const svg = document.createElementNS(NS, "svg");
     svg.setAttribute("class", "hudHitDirs");
     svg.setAttribute("viewBox", "-100 -100 200 200");
     svg.setAttribute("aria-hidden", "true");
+    const defs = document.createElementNS(NS, "defs");
+    const edge = HITDIR.radius * Math.sin(HITDIR.spanDeg * Math.PI / 360);
+    const Gradient = (id, stops) => {
+      const grad = document.createElementNS(NS, "linearGradient");
+      grad.setAttribute("id", id);
+      grad.setAttribute("gradientUnits", "userSpaceOnUse");
+      grad.setAttribute("x1", (-edge).toFixed(2)); grad.setAttribute("x2", edge.toFixed(2));
+      grad.setAttribute("y1", "0"); grad.setAttribute("y2", "0");
+      for (const [offset, color, alpha] of stops) {
+        const stop = document.createElementNS(NS, "stop");
+        stop.setAttribute("offset", offset);
+        stop.setAttribute("stop-color", color);
+        stop.setAttribute("stop-opacity", alpha);
+        grad.appendChild(stop);
+      }
+      defs.appendChild(grad);
+    };
+    Gradient("hudHitFillHit", [[0, "#7a0906", 0], [0.2, "#a8120d", 0.7], [0.5, "#ef2a1c", 1], [0.8, "#a8120d", 0.7], [1, "#7a0906", 0]]);
+    Gradient("hudHitFillNear", [[0, "#ffffff", 0], [0.2, "#f2eee6", 0.65], [0.5, "#ffffff", 1], [0.8, "#f2eee6", 0.65], [1, "#ffffff", 0]]);
+    Gradient("hudHitShade", [[0, "#000000", 0], [0.5, "#000000", 1], [1, "#000000", 0]]);
+    const blur = document.createElementNS(NS, "filter");
+    blur.setAttribute("id", "hudHitGlowBlur");
+    blur.setAttribute("x", "-50%"); blur.setAttribute("y", "-50%");
+    blur.setAttribute("width", "200%"); blur.setAttribute("height", "200%");
+    const gaussian = document.createElementNS(NS, "feGaussianBlur");
+    gaussian.setAttribute("stdDeviation", HITDIR.glowBlur);
+    blur.appendChild(gaussian);
+    defs.appendChild(blur);
+    svg.appendChild(defs);
+    const d = HitDirArcPath(HITDIR);
     this.hitDirNodes = [];
     for (let i = 0; i < HIT_FEEDBACK.markMax; i += 1) {
       const node = document.createElementNS(NS, "g");
       node.setAttribute("class", "hudHitDir");
       node.style.opacity = "0";
-      const texture = document.createElementNS(NS, "image");
-      texture.setAttribute("class", "hudHitTexture");
-      texture.setAttribute("href", HITDIR.texture);
-      texture.setAttribute("x", HITDIR.textureBox.x);
-      texture.setAttribute("y", HITDIR.textureBox.y);
-      texture.setAttribute("width", HITDIR.textureBox.size);
-      texture.setAttribute("height", HITDIR.textureBox.size);
-      node.append(texture);
+      const glow = document.createElementNS(NS, "path");
+      glow.setAttribute("class", "hudHitGlow");
+      glow.setAttribute("d", d);
+      glow.setAttribute("filter", "url(#hudHitGlowBlur)");
+      const arc = document.createElementNS(NS, "path");
+      arc.setAttribute("class", "hudHitArc");
+      arc.setAttribute("d", d);
+      node.append(glow, arc);
       svg.appendChild(node);
       this.hitDirNodes.push(node);
     }

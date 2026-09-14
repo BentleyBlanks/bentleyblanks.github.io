@@ -79,19 +79,19 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
   72%      { opacity: 0.62; }
 }
 
-/* 来弹指示：五个方位复用同一条带中心尖刺的纹理，转身只旋转 SVG 容器。
-   实际撞上玩家碰撞体的来弹保留血红色；只有从身边掠过的近失弹转成白色。 */
+/* 来弹指示（对标 COD）：以准心为圆心的一段收尖红弧，正中朝来弹方向一个小尖。
+   几何在 Script_Hud.HitDirArcPath，转身只旋转。实际撞上玩家碰撞体的来弹为红色；
+   只有从身边掠过的近失弹为白色，背后压一层暗影保证在沙地和天空上都读得出。 */
 .hudHitDirs {
   position: absolute; left: 50%; top: 50%;
   width: clamp(180px, 46vmin, 500px); aspect-ratio: 1;
   transform: translate(-50%, -50%);
   pointer-events: none; overflow: visible; z-index: 6;
 }
-.hudHitTexture { filter: drop-shadow(0 1px 1px rgba(19,2,3,0.5)); }
-.hudHitDir.near .hudHitTexture {
-  opacity: 0.72;
-  filter: brightness(0) invert(1) drop-shadow(0 1px 1px rgba(0,0,0,0.82));
-}
+.hudHitArc { fill: url(#hudHitFillHit); }
+.hudHitGlow { fill: url(#hudHitFillHit); opacity: 0.7; }
+.hudHitDir.near .hudHitArc { fill: url(#hudHitFillNear); }
+.hudHitDir.near .hudHitGlow { fill: url(#hudHitShade); opacity: 0.45; }
 @media (prefers-reduced-motion: reduce) {
   .hudDamage.low::before { animation: none; opacity: 1; }
   .hudMeleeKillBlood { transform: none !important; }

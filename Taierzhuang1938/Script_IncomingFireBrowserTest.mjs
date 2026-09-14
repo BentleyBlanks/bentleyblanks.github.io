@@ -5,6 +5,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
+import { HITDIR } from "./Data_Tuning_Hud.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const output = path.join(root, "Taierzhuang1938/_shots/IncomingFire");
@@ -20,12 +21,11 @@ try {
   await page.goto(`${base}/Taierzhuang1938/?whitebox=p012&shot=1&manual=1&quality=low`,
     {waitUntil:"domcontentloaded",timeout:240000});
   await page.waitForFunction(() => window.Tengxian?.state?.ready, null, {timeout:300000});
-  // Decode the actual production images: a CSS URL alone does not prove pixels render.
+  // Decode the actual production blood image: a CSS URL alone does not prove pixels render.
   const textures = await page.evaluate(async () => {
-    const arc = document.querySelector(".hudHitTexture").getAttribute("href");
     const blood = getComputedStyle(document.querySelector(".hudDamage"), "::before")
       .backgroundImage.match(/url\(["']?([^"')]+)/)[1];
-    return await Promise.all([arc, blood].map(async src => {
+    return await Promise.all([blood].map(async src => {
       const image = new Image(); image.src = src; await image.decode();
       const canvas = document.createElement("canvas");
       canvas.width = image.width; canvas.height = image.height;
@@ -47,6 +47,23 @@ try {
     assert.ok(texture.clear > texture.width * texture.height * .5, "Clear sight area");
     assert.ok(texture.centerMax <= 2, "Alpha center does not cover aiming");
   }
+  // The incoming-fire arc must stay concentric with the sight at every bearing (the old
+  // generated texture's arc centre was off the image centre, so rotation swept it across aim).
+  const arcShape = await page.evaluate(() => {
+    const path = document.querySelector(".hudHitArc"), len = path.getTotalLength();
+    const radii = [], angles = [];
+    for (let i = 0; i < 400; i++) {
+      const p = path.getPointAtLength(len * i / 400);
+      radii.push(Math.hypot(p.x, p.y)); angles.push(Math.atan2(p.x, -p.y) * 180 / Math.PI);
+    }
+    return {paths:document.querySelector(".hudHitDir").querySelectorAll("path").length,
+      minR:Math.min(...radii),maxR:Math.max(...radii),minDeg:Math.min(...angles),maxDeg:Math.max(...angles)};
+  });
+  assert.equal(arcShape.paths,2,"one glow and one arc per bearing");
+  assert.ok(arcShape.minR >= HITDIR.radius - HITDIR.halfWidth - .05, "arc inner edge stays on the sight-centred ring");
+  assert.ok(arcShape.maxR <= HITDIR.radius + HITDIR.halfWidth + HITDIR.tipHeight + .05, "only the central tip rises outward");
+  assert.ok(Math.abs(arcShape.maxDeg + arcShape.minDeg) < .5 && arcShape.maxDeg <= HITDIR.spanDeg/2 + .05,
+    "arc is symmetric about 12 o'clock and bounded by its span");
   await page.evaluate(async () => {
     const T = window.Tengxian;
     await T.Debug.FirstLevelJump(4);
@@ -68,19 +85,14 @@ try {
   });
   const near = await page.evaluate(() => {
     const T = window.Tengxian, el = document.querySelector(".hudHitDir.near");
-    const texture = el?.querySelector(".hudHitTexture");
+    const arc = el?.querySelector(".hudHitArc");
     return {hp:T.player.health,flash:T.player.hitFlash,kind:T.player.hitMarks[0]?.kind,
       angle:el?.getAttribute("transform"),opacity:el && +getComputedStyle(el).opacity,
-      textureOpacity:texture && +getComputedStyle(texture).opacity,
-      filter:texture && getComputedStyle(texture).filter,
-      extraPaths:el?.querySelectorAll("path").length ?? -1};
+      fill:arc && getComputedStyle(arc).fill};
   });
   assert.equal(near.hp,100); assert.equal(near.flash,0); assert.equal(near.kind,"near");
   assert.equal(near.angle,"rotate(90.0)"); assert.ok(near.opacity>.7);
-  assert.ok(near.textureOpacity > .6 && near.textureOpacity < .8);
-  assert.ok(near.filter.includes("brightness(0)") && near.filter.includes("invert(1)"),
-    "non-damaging incoming fire maps every visible texture pixel to white");
-  assert.equal(near.extraPaths,0,"the Imagegen central spike replaces the legacy SVG crest");
+  assert.ok(near.fill.includes("hudHitFillNear"),"non-damaging incoming fire draws the white arc");
   await page.screenshot({path:path.join(output,"NearRight.png")});
   const hit = await page.evaluate(() => {
     const T = window.Tengxian, p = T.player;
@@ -91,13 +103,11 @@ try {
     const el = document.querySelector(".hudHitDir.hit");
     return {hp:p.health,flash:p.hitFlash,marks:p.hitMarks.map(m=>({...m})),
       opacity:+getComputedStyle(el).opacity,
-      textureOpacity:+getComputedStyle(el.querySelector(".hudHitTexture")).opacity,
-      filter:getComputedStyle(el.querySelector(".hudHitTexture")).filter};
+      fill:getComputedStyle(el.querySelector(".hudHitArc")).fill};
   });
   assert.ok(hit.hp<100 && hit.flash>.5); assert.equal(hit.marks.length,1);
   assert.equal(hit.marks[0].kind,"hit"); assert.ok(hit.opacity>.8);
-  assert.equal(hit.textureOpacity,1);
-  assert.ok(!hit.filter.includes("grayscale"),"geometric hits keep the generated blood-red artwork");
+  assert.ok(hit.fill.includes("hudHitFillHit"),"geometric hits draw the blood-red arc");
   await page.waitForTimeout(150); // Let the existing damage-vignette CSS transition settle.
   await page.screenshot({path:path.join(output,"HitRight.png")});
   // Debug invincibility protects health but must not turn a geometric hit into a white near miss.
@@ -109,17 +119,17 @@ try {
     const before = p.hitMarks[0]?.kind;
     p.TakeHit(24,"torso",null,{bullet:true,from});
     T.hud.SetHurt({health:p.health,flash:p.hitFlash,marks:p.hitMarks,yaw:p.yaw});
-    const el = document.querySelector(".hudHitDir.hit"), texture = el?.querySelector(".hudHitTexture");
+    const el = document.querySelector(".hudHitDir.hit"), arc = el?.querySelector(".hudHitArc");
     return {before,hp:p.health,bleeding:p.bleeding,flash:p.hitFlash,disorientation:p.HitDisorientation,
       events:p.hitEvents.length,marks:p.hitMarks.map(m=>m.kind),className:el?.getAttribute("class"),
-      opacity:el && +getComputedStyle(el).opacity,filter:texture && getComputedStyle(texture).filter};
+      opacity:el && +getComputedStyle(el).opacity,fill:arc && getComputedStyle(arc).fill};
   });
-  const {opacity:invincibleOpacity,filter:invincibleFilter,...invincibleState}=invincibleHit;
+  const {opacity:invincibleOpacity,fill:invincibleFill,...invincibleState}=invincibleHit;
   assert.deepEqual(invincibleState,{before:"near",hp:100,bleeding:0,flash:0,disorientation:0,
     events:0,marks:["hit"],className:"hudHitDir hit"});
   assert.ok(invincibleOpacity>.8,"invincible geometric hit remains visible");
-  assert.ok(!invincibleFilter.includes("brightness(0)") && !invincibleFilter.includes("invert(1)"),
-    "invincible geometric hit keeps the blood-red texture instead of the white near-miss filter");
+  assert.ok(invincibleFill.includes("hudHitFillHit"),
+    "invincible geometric hit keeps the blood-red arc instead of the white near-miss fill");
   await page.waitForTimeout(150);
   await page.screenshot({path:path.join(output,"InvincibleHitRight.png")});
   await page.evaluate(() => {
@@ -259,7 +269,7 @@ try {
   });
   assert.equal(hitmarkColor,"rgb(239, 83, 70)");
   assert.deepEqual(errors,[]);
-  const report={textures,near,hit,rotation,sectors,lifecycle,healthStates,protection,hitmarkColor};
+  const report={textures,arcShape,near,hit,rotation,sectors,lifecycle,healthStates,protection,hitmarkColor};
   await fs.writeFile(path.join(output,"Report.json"),JSON.stringify(report,null,2));
   console.log("IncomingFireBrowserTest OK",JSON.stringify(report));
 } finally {

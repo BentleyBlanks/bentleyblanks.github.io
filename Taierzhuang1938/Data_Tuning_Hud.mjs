@@ -87,12 +87,28 @@ export const MELEE_KILL_BLOOD = Object.freeze({
   endScale: 1.0,
 });
 
-/** 来弹指示器（外圈那一段弧）的淡出。 */
+/**
+ * 来弹指示器（外圈那一段弧）的形状与淡出。对标 COD：以准心为圆心的一段红弧，
+ * 中间最厚、两头收尖渐隐，正中一个朝来弹方向的小尖。
+ * 单位是 HUD 的 -100..100 viewBox（.hudHitDirs 宽 46vmin，封顶 500px）。
+ *
+ * 2026-09-15 起改为程序生成：之前那张生成图的弧心不在图中心（弧顶离准心 55、
+ * 两端 67，跨 110°），旋转后像一根弯棍斜扫过准心，而不是绕着准心的一圈。
+ */
 export const HITDIR = Object.freeze({
-  /** Built-in Imagegen: thin distressed arc with a central spike; shared by every bearing. */
-  texture: "./Texture/Hud/Texture_HudDamageArc.png?v=20260913a",
-  /** Registration in the -100..100 HUD viewBox; keep the sight center clear. */
-  textureBox: Object.freeze({ x: -70, y: -85, size: 140 }),
+  /** 弧的中线半径。离准心太近会压住瞄准，太远余光看不到。 */
+  radius: 60,
+  /** 弧的总张角（度）。 */
+  spanDeg: 62,
+  /** 弧最厚处（正中）的半厚度，往两头按幂次收成针尖。 */
+  halfWidth: 2.9,
+  /** 收尖的幂次：越小中段越饱满、两头越突然。 */
+  taperPower: 0.7,
+  /** 正中朝外小尖的高度与半张角（度）。 */
+  tipHeight: 5.2,
+  tipHalfDeg: 6.5,
+  /** 背后那层同形柔光的模糊半径。 */
+  glowBlur: 2.2,
   /** A trajectory near miss is white; a geometric hit stays blood red even when invincibility blocks injury. */
   nearOpacity: 0.78,
   /** 剩余寿命乘这个数再夹到 1：前四分之一寿命满亮，之后才开始淡。 */
