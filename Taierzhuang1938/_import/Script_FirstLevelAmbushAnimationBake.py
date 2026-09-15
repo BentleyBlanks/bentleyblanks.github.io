@@ -1,7 +1,8 @@
 """Author the room-ambush clips on the production rigs and bake original-rig tracks.
 
-Six clips:
-  IJA (LugouIja01/02/03)  AmbushRise, BayonetStabStanding, BayonetStabDown
+Eight clips:
+  IJA (LugouIja01/02/03)  AmbushRise, BayonetStabStanding, BayonetStabDown,
+                          RifleButtStrike, PressureStabbed
   NRA (LugouNra02/05)     BearerStabbed, PatientStabbed, PatientWoundedIdle
 
 Poses are authored as bone-space curves on the original 53-bone rig, exactly the way
@@ -38,18 +39,21 @@ output = project / 'Animation/FirstLevelAmbush'
 output.mkdir(parents=True, exist_ok=True)
 private.mkdir(parents=True, exist_ok=True)
 fps = 24
-VERSION = '20260915AmbushV1'
+VERSION = '20260916AmbushV2'
 
 # (duration seconds, loop)
 definitions = {
     'AmbushRise': (0.7, False),
     'BayonetStabStanding': (1.2, False),
     'BayonetStabDown': (1.4, False),
+    'RifleButtStrike': (1.0, False),
+    'PressureStabbed': (1.3, False),
     'BearerStabbed': (2.2, False),
     'PatientStabbed': (2.6, False),
     'PatientWoundedIdle': (3.0, True),
 }
-IJA_CLIPS = ['AmbushRise', 'BayonetStabStanding', 'BayonetStabDown']
+IJA_CLIPS = ['AmbushRise', 'BayonetStabStanding', 'BayonetStabDown',
+             'RifleButtStrike', 'PressureStabbed']
 NRA_CLIPS = ['BearerStabbed', 'PatientStabbed', 'PatientWoundedIdle']
 modelClips = {
     'LugouIja01': IJA_CLIPS, 'LugouIja02': IJA_CLIPS, 'LugouIja03': IJA_CLIPS,
@@ -64,6 +68,24 @@ modelClips = {
 GRIP_SPAN = 0.4432
 GRIP_TO_TIP = 1.4201
 TIP_RISE = 0.0511
+# The butt plate is the other end of the same line: Model_Type38's stock reaches z = +0.255
+# behind the weapon origin (= the right grip).  RifleButtStrike is authored by this point
+# because the butt is the end that does the hitting.
+BUTT_BACK = 0.255
+BUTT_TO_TIP = GRIP_TO_TIP + BUTT_BACK
+
+# PressureStabbed starts on the melee library's own pose so the hand-over from the ground
+# QTE is seamless: Animation/Melee/Data_MeleeIjaAnimations.json `BayonetPressure` frame 0
+# is the frame the QTE ends on (Script_MeleeAnimation maps a Pressure QTE's progress to
+# `1 - progress`, so a win lands on frame 0).  Those tracks are world-space rotation
+# deltas from the bind pose in glTF axes, with the pelvis travel scaled by the variant's
+# own bind pelvis height (MeleeAnimationPlayer.heightScale).
+MELEE_LIBRARY = 'Animation/Melee/Data_MeleeIjaAnimations.json'
+MELEE_START_CLIP = 'BayonetPressure'
+MELEE_IJA_PELVIS = 0.876513
+# How long the authored performance takes over from that imported pose.  Frame 0 is the
+# melee pose to the last decimal; the blend is over before the stab lands.
+PRESSURE_BLEND_S = 0.16
 
 convert = Matrix(((1, 0, 0, 0), (0, 0, -1, 0), (0, 1, 0, 0), (0, 0, 0, 1)))
 convertInv = convert.inverted()
@@ -124,6 +146,12 @@ IJA_GUARD = dict(pz=.948, px=0, py=-.006, pitch=.07, roll=0, yaw=0, bend=.04,
                  lfx=.18, lfy=-.17, lfLift=0, rfx=-.18, rfy=.18, rfLift=0,
                  tipX=.264, tipY=-1.306, tipZ=1.255, ax=.30, ay=-.945, az=.13, twist=0)
 
+# The same guard, written from the butt end instead of the blade tip (butt = tip - axis *
+# BUTT_TO_TIP - up * TIP_RISE, solved once from IJA_GUARD).  A clip must use one or the
+# other for all of its keys; `Keyed` interpolates whatever names its two keys carry.
+IJA_BUTT_GUARD = dict({k: v for k, v in IJA_GUARD.items() if not k.startswith('tip')},
+                      buttX=-.2365, buttY=.2707, buttZ=.9866)
+
 IJA_KEYS = {
     'AmbushRise': [
         # Hiding: deep crouch, rifle carried diagonally across the body with the muzzle
@@ -176,7 +204,151 @@ IJA_KEYS = {
                     tipX=.22, tipY=-1.26, tipZ=1.21, ax=.28, ay=-.944, az=.14, twist=.20)),
         (1.40, dict(IJA_GUARD, lfy=-.20, rfy=.20)),
     ],
+    # Butt stroke.  The rifle turns end for end about the hands: at the apex the butt
+    # leads (1.0 m in front of the pelvis, 1.5 m up, i.e. the head of a man standing
+    # 1.0-1.2 m away) and the blade trails behind the man's own right shoulder.  The
+    # muzzle sweeps through the actor's right-hand side on the way round, so the staging
+    # needs about 1.6 m of clearance there — see the doc.
+    'RifleButtStrike': [
+        (0.00, dict(IJA_BUTT_GUARD)),
+        # Cocked: rifle lifted, butt up behind the right shoulder, muzzle steeply down and
+        # forward.  The rifle turns over in a near-vertical plane, not a flat one: the
+        # mount puts the left hand a fixed 0.44 m down the barrel from the right, and on a
+        # flat swing that lands 0.7 m across the body, out of the left arm's reach — the
+        # rendered rifle aims at the left palm, so an arm that cannot get there is a rifle
+        # pointing somewhere else entirely.
+        (0.16, dict(IJA_BUTT_GUARD, pz=.942, py=.04, pitch=.02, bend=.02, yaw=-.28,
+                    lfx=.18, lfy=-.14, lfLift=.02, rfx=-.18, rfy=.20, headPitch=-.05,
+                    buttX=-.326, buttY=.258, buttZ=1.519, ax=.26, ay=-.62, az=-.74)),
+        # The left foot lands and the hips open; the muzzle is swinging down past his
+        # own knees, 0.2 m short of where the man's shins are.
+        # Rifle vertical, muzzle down, held out over his LEFT side.  Two things decide
+        # that side: on the mid-line the barrel goes through his own helmet, and out on
+        # his right the left hand — a fixed 0.48 m down the barrel — has to cross 0.45 m
+        # of chest and cannot reach.  Over the left, the right arm crosses instead (it
+        # has the shorter way to go) and the helmet is 0.17 m clear.
+        # `headPitch` goes negative from here on: the torso is thrown 45 degrees forward,
+        # and a head that only follows it is a man diving at the floor instead of looking
+        # at what he is hitting — and it puts his own face inside the barrel's path.
+        (0.30, dict(IJA_BUTT_GUARD, pz=.930, py=-.18, pitch=.30, bend=.18, yaw=.10,
+                    lfx=.18, lfy=-.42, rfx=-.19, rfy=.14, rfLift=.02, headPitch=-.12,
+                    headYaw=-.08,
+                    buttX=.213, buttY=-.349, buttZ=1.875, ax=-.05, ay=-.28, az=-.96)),
+        # Impact.  Hips, spine, arm and rifle are stacked along one line to the butt: this
+        # man is 1.62 m in game and the butt has to reach a standing man's jaw a metre
+        # away, which is the whole reach budget (0.54 pelvis-to-shoulder + 0.50 arm +
+        # 0.26 grip-to-butt) end to end.  That is why he stays tall on the hips and is
+        # thrown forward from the waist instead of crouching into it, and why the rear
+        # foot is in the air here — planted 0.45 m back it would cap the pelvis 6 cm lower
+        # and take the butt below the man's chin.
+        (0.42, dict(IJA_BUTT_GUARD, pz=.980, py=-.28, pitch=.58, bend=.34, yaw=.40,
+                    lfx=.18, lfy=-.42, rfx=-.20, rfy=.06, rfLift=.09, headPitch=-.75,
+                    headYaw=-.28,
+                    buttX=-.040, buttY=-1.286, buttZ=1.653, ax=-.18, ay=.70, az=-.69)),
+        # Follow-through: the butt carries on down and across to his left, rear foot down.
+        (0.56, dict(IJA_BUTT_GUARD, pz=.950, py=-.26, pitch=.46, bend=.28, yaw=.40,
+                    lfx=.18, lfy=-.42, rfx=-.20, rfy=.00, rfLift=.01, headPitch=-.50,
+                    headYaw=-.26,
+                    buttX=.046, buttY=-1.185, buttZ=1.596, ax=-.18, ay=.80, az=-.56)),
+        # Recovery rolls the rifle back the way it came.  The muzzle passes through
+        # vertical twice in this clip, and the rifle does NOT shrink with the man: the
+        # rig is scaled to 1.62 m but Actor cancels that on the weapon, so the blade
+        # reaches 1.42 m from the right hand in real metres — 11 cm further than the same
+        # number measured in the authoring rig.  Both vertical passes need the right hand
+        # above 1.63 m (authoring scale) or the bayonet goes through the floor.
+        (0.70, dict(IJA_BUTT_GUARD, pz=.945, py=-.20, pitch=.30, bend=.16, yaw=.16,
+                    lfx=.18, lfy=-.42, rfx=-.19, rfy=.00, headPitch=-.10,
+                    buttX=.193, buttY=-.289, buttZ=1.900, ax=-.05, ay=-.20, az=-.98)),
+        # Back through the cocked attitude: right hand behind the shoulder, muzzle down
+        # and forward.  With the rifle at 45 degrees the two hands are 0.34 m apart fore
+        # and aft, and only this way round does each hand land inside its own shoulder's
+        # reach — with the right hand in front of the shoulder instead, the left is left
+        # holding air 0.6 m out.
+        (0.85, dict(IJA_BUTT_GUARD, pz=.948, py=-.14, pitch=.12, bend=.06, yaw=0,
+                    lfx=.18, lfy=-.42, rfx=-.18, rfy=.02, headPitch=0,
+                    buttX=-.306, buttY=.138, buttZ=1.519, ax=.26, ay=-.62, az=-.74)),
+        # Guard again, one pace further in than he started.
+        (1.00, dict(IJA_BUTT_GUARD, py=-.16, lfx=.18, lfy=-.42, rfx=-.18, rfy=.02,
+                    buttX=-.2365, buttY=.1107, buttZ=.9866)),
+    ],
 }
+
+# PressureStabbed is authored the way the NRA clips are (pelvis lift + body frame + IK
+# hands and feet), not by the rifle line: from the moment the player wrenches the rifle
+# away the man has nothing in his hands.  Frame 0 is the imported BayonetPressure pose,
+# and this table's first key reproduces it closely enough that the 0.16 s cross-fade
+# between them is invisible.
+PRESSURE_STAND = dict(lift=.7965, px=0, py=-.006, pitch=.12, roll=0, yaw=0, bend=.13,
+                      headPitch=.25, headYaw=0, headRoll=0, feetWorld=1,
+                      lax=.18, lay=-.17, laz=.092, rax=-.18, ray=.18, raz=.092,
+                      lpx=.26, lpy=-1.0, lpz=.50, rpx=-.26, rpy=-1.0, rpz=.50,
+                      footSplay=0, footPitch=0,
+                      hlx=-.091, hly=-.337, hlz=.108, hrx=-.037, hry=.077, hrz=.765,
+                      apx=.72, apy=-.02, apz=-.30, palmBelly=0, curl=.95, supine=0)
+
+PRESSURE_KEYS = [
+    (0.00, dict(PRESSURE_STAND)),
+    # The rifle is driven up and back into him; he is still holding on.
+    (0.12, dict(PRESSURE_STAND, lift=.815, pitch=.02, bend=.04, headPitch=.10,
+                hlx=-.02, hly=-.20, hlz=.42, hrx=-.10, hry=.16, hrz=.88, curl=.9)),
+    # Both hands are off it, thrown up and open, chest wide: the frame before the blade
+    # turns round.
+    (0.24, dict(PRESSURE_STAND, lift=.845, pitch=-.10, bend=-.06, headPitch=-.14,
+                hlx=.20, hly=-.06, hlz=.80, hrx=-.26, hry=.20, hrz=.90, curl=.25)),
+    # Impact.  Belly takes it: head snaps back, arms fly out, knees start to give.
+    (0.36, dict(PRESSURE_STAND, lift=.790, pitch=.18, bend=.12, headPitch=-.30,
+                hlx=.30, hly=-.10, hlz=.46, hrx=-.32, hry=-.06, hrz=.50, curl=.35)),
+    # Doubled over the wound, both hands pressed on it.
+    (0.50, dict(PRESSURE_STAND, lift=.735, pitch=.46, bend=.28, headPitch=.30,
+                lay=-.15, ray=.20,
+                hlx=.10, hly=-.20, hlz=.10, hrx=-.10, hry=-.21, hrz=.10,
+                apx=.62, apy=.10, apz=-.30, palmBelly=1, curl=1.15)),
+    # Knees buckle and he starts to go over to his right, off the man under him.  The
+    # legs follow BearerStabbed's collapse: heels come up over the toes first, then the
+    # shins fold flat on the floor.  Anything else drives a knee through the floor,
+    # because the runtime lifts the whole body by the sole probe, not by the lowest point.
+    (0.68, dict(PRESSURE_STAND, lift=.630, px=-.05, py=-.10, pitch=.62, roll=-.20,
+                bend=.26, headPitch=.30, headRoll=-.08,
+                lax=.145, lay=.20, laz=.150, rax=-.145, ray=.22, raz=.150,
+                lpx=.18, lpy=-1.30, lpz=-.10, rpx=-.18, rpy=-1.30, rpz=-.10,
+                footSplay=.08, footPitch=.55,
+                hlx=.10, hly=-.20, hlz=.10, hrx=-.10, hry=-.21, hrz=.10,
+                apx=.62, apy=.10, apz=-.30, palmBelly=1, curl=1.2)),
+    # Heels roll up over the toes on the way down; the ankle has to rise with the foot
+    # pitch or the shoe is dragged through the floor and the runtime's sole solve lifts
+    # the whole body back out of it.
+    (0.78, dict(PRESSURE_STAND, lift=.585, px=-.08, py=-.115, pitch=.58, roll=-.26,
+                bend=.25, headPitch=.30, headRoll=-.13,
+                lax=.145, lay=.32, laz=.250, rax=-.145, ray=.34, raz=.250,
+                lpx=.145, lpy=-1.30, lpz=-.50, rpx=-.145, rpy=-1.30, rpz=-.50,
+                footSplay=.15, footPitch=1.30,
+                hlx=.10, hly=-.19, hlz=.09, hrx=-.10, hry=-.20, hrz=.09,
+                apx=.62, apy=.10, apz=-.30, palmBelly=1, curl=1.2)),
+    (0.88, dict(PRESSURE_STAND, lift=.545, px=-.11, py=-.13, pitch=.54, roll=-.32,
+                bend=.24, headPitch=.30, headRoll=-.18,
+                lax=.145, lay=.45, laz=.095, rax=-.145, ray=.47, raz=.095,
+                lpx=.145, lpy=-1.30, lpz=-.35, rpx=-.145, rpy=-1.30, rpz=-.35,
+                footSplay=.25, footPitch=2.45,
+                hlx=.10, hly=-.19, hlz=.09, hrx=-.10, hry=-.20, hrz=.09,
+                apx=.62, apy=.10, apz=-.30, palmBelly=1, curl=1.2)),
+    (1.08, dict(PRESSURE_STAND, lift=.430, px=-.23, py=-.15, pitch=.96, roll=-.62,
+                bend=.22, headPitch=.16, headRoll=-.28,
+                lax=.175, lay=.50, laz=.090, rax=-.115, ray=.54, raz=.090,
+                lpx=.145, lpy=-1.10, lpz=-.45, rpx=-.145, rpy=-1.10, rpz=-.45,
+                footSplay=.25, footPitch=2.45,
+                hlx=.10, hly=-.18, hlz=.08, hrx=-.11, hry=-.16, hrz=.04,
+                apx=.62, apy=.10, apz=-.30, palmBelly=1, curl=1.18)),
+    # Corpse rest pose: down on his right side over his own folded legs, both hands still
+    # under the belly.  Package D may hand this over to the death-pose system; either way
+    # the last frame is a settled pose.
+    (1.30, dict(PRESSURE_STAND, lift=.290, px=-.34, py=-.16, pitch=1.24, roll=-.92,
+                bend=.18, headPitch=.02, headRoll=-.36,
+                lax=.215, lay=.54, laz=.085, rax=-.065, ray=.58, raz=.085,
+                lpx=.145, lpy=-1.10, lpz=-.45, rpx=-.145, rpy=-1.10, rpz=-.45,
+                footSplay=.25, footPitch=2.45,
+                hlx=.11, hly=-.17, hlz=.07, hrx=-.12, hry=-.13, hrz=.02,
+                apx=.62, apy=.10, apz=-.30, palmBelly=1, curl=1.15)),
+]
 
 # NRA tables.
 #   * hands are body-local offsets from the pelvis, so they follow the torso through the
@@ -295,6 +467,8 @@ NRA_IDLE_BASE = dict(NRA_SUPINE, bend=.03, headPitch=.05,
 
 
 def NraSpec(clip, time):
+    if clip == 'PressureStabbed':
+        return Keyed(PRESSURE_KEYS, time)
     if clip == 'PatientWoundedIdle':
         duration = definitions[clip][0]
         phase = 2 * math.pi * time / duration
@@ -450,11 +624,28 @@ def Bake(modelId, render):
         return total / 4
 
     def ReachGrip(side, target, pole, rounds=4):
-        """Drive the finger-root centroid (BuildHandGrip's weapon grip) onto a target."""
+        """Drive the finger-root centroid (BuildHandGrip's weapon grip) onto a target.
+
+        Each pass aims the arm at `target` minus the wrist-to-centroid offset measured
+        from the previous pass, and aiming the forearm turns the wrist, which moves that
+        offset again.  The loop usually walks in, but in some poses it circles instead,
+        and then the answer depends on which pass you happen to stop on — which is how a
+        clip ends up with one hand 14 cm off the barrel.  Keep the best pass instead.
+        """
+        arms = [Bone(side + ' UpperArm'), Bone(side + ' Forearm'), Bone(side + ' Hand')]
+        target = Vector(target)
+        best, bestError = None, None
         for _ in range(rounds):
-            offset = GripPoint(side) - Point(Bone(side + ' Hand'))
-            Chain(Bone(side + ' UpperArm'), Bone(side + ' Forearm'), Bone(side + ' Hand'),
-                  Vector(target) - offset, pole)
+            offset = GripPoint(side) - Point(arms[2])
+            Chain(arms[0], arms[1], arms[2], target - offset, pole)
+            error = (GripPoint(side) - target).length
+            if bestError is None or error < bestError - 1e-6:
+                bestError, best = error, [pb.matrix_basis.copy() for pb in arms]
+            if error < 1e-4:
+                return
+        for pb, matrix in zip(arms, best):
+            pb.matrix_basis = matrix
+        Update()
 
     footQuats = {side: BWorld(Bone(side + ' Foot')).to_quaternion() for side in ['L', 'R']}
     ankleZ = {side: Point(Bone(side + ' Foot')).z for side in ['L', 'R']}
@@ -503,6 +694,52 @@ def Bake(modelId, render):
             pb.matrix_basis = rest[pb.name]
         Update()
 
+    # --- the melee library's own pose, imported bone for bone -------------------------
+    # Only the rotations are imported.  The melee tracks also carry a world offset per
+    # bone (the retarget's residual), but every bone except the pelvis must keep its
+    # source local translation or the shipped asset stretches the skeleton; the offsets
+    # are at most 1.2 cm and only on the right hand, so FK from the rotations is the same
+    # pose.  Rotations are glTF-space deltas on the left of the bind rotation, and Blender
+    # is the glTF frame rotated -90 degrees about X, so the delta is conjugated by that.
+    Reset()
+    restWorld = {name: BWorld(arm.pose.bones[name]).copy() for name in names}
+    meleeStart = None
+    if prefix == 'Bip001':
+        meleeDocument = json.loads((project / MELEE_LIBRARY).read_text(encoding='utf-8'))
+        meleeParts = meleeDocument['parts']
+        meleeFrame = meleeDocument['clips'][MELEE_START_CLIP]['frames'][0]
+        meleePelvisScale = restPelvis / MELEE_IJA_PELVIS
+
+        def BoneDepth(name):
+            depth, bone = 0, arm.data.bones[name].parent
+            while bone:
+                depth, bone = depth + 1, bone.parent
+            return depth
+        meleeOrder = sorted((part for part in meleeParts if prefix + ' ' + part in names),
+                            key=lambda part: BoneDepth(prefix + ' ' + part))
+        assert len(meleeOrder) == len(meleeParts), meleeOrder
+        meleeStart = {}
+        for part in meleeOrder:
+            at = meleeParts.index(part) * 7
+            x, y, z, w = meleeFrame[at + 3:at + 7]
+            meleeStart[part] = (Quaternion((w, x, -z, y)), Vector(meleeFrame[at:at + 3]))
+
+    def ApplyMeleeStart():
+        """Frame 0 of PressureStabbed: BayonetPressure, on this rig, to the last decimal."""
+        Reset()
+        for part in meleeOrder:
+            name = prefix + ' ' + part
+            pb = arm.pose.bones[name]
+            delta, offset = meleeStart[part]
+            matrix = BWorld(pb)
+            location, _, scale = matrix.decompose()
+            if part == 'Pelvis':
+                location = restWorld[name].translation + Vector(
+                    (offset.x, -offset.z, offset.y)) * meleePelvisScale
+                location.z += shift['feet']
+            Put(pb, Matrix.LocRotScale(location, delta @ restWorld[name].to_quaternion(), scale))
+        return {'meleeStart': MELEE_START_CLIP}
+
     def AuthorIja(clip, time):
         Reset()
         s = Keyed(IJA_KEYS[clip], time)
@@ -528,7 +765,10 @@ def Bake(modelId, render):
         if up.length < 1e-5:
             up = Vector((0, 1, 0))
         up.normalize()
-        tip = Vector((s['tipX'], s['tipY'], s['tipZ']))
+        # A clip is written either from the blade tip (thrusts) or from the butt plate
+        # (the butt stroke, where the butt is the end that has to land somewhere exact).
+        tip = (Vector((s['buttX'], s['buttY'], s['buttZ'])) + axis * BUTT_TO_TIP + up * TIP_RISE
+               if 'buttX' in s else Vector((s['tipX'], s['tipY'], s['tipZ'])))
         gripR = tip - axis * GRIP_TO_TIP - up * TIP_RISE
         gripL = gripR + axis * span
         chest = Point(Bone('Spine2'))
@@ -545,18 +785,25 @@ def Bake(modelId, render):
         Trace(clip, time, 'reach')
         roll = Quaternion(axis, s['twist'])
         # Both palms wrap the same barrel: fingers point across it, the palm faces it.
-        normalR = TurnPalm('R', roll @ (axis * .55 - up * .84), roll @ (up * .30 + across * .94))
-        normalL = TurnPalm('L', roll @ (axis * .45 - up * .89), roll @ (up * .28 - across * .96))
-        Trace(clip, time, 'palms')
-        ReachGrip('R', gripR, poleR, rounds=6)
-        ReachGrip('L', gripL, poleL, rounds=6)
+        # Palm and arm have to be settled together, not one after the other: turning the
+        # palm drags the finger-root centroid off the barrel, and putting the centroid
+        # back turns the forearm, which turns the palm again.  Two passes is enough to
+        # come out with the grip on the barrel AND the palm still facing it; one pass
+        # leaves whichever of the two was done last, and on the butt stroke's near-
+        # vertical frames that was a hand 6 cm off the stock.
+        for _ in range(2):
+            normalR = TurnPalm('R', roll @ (axis * .55 - up * .84), roll @ (up * .30 + across * .94))
+            normalL = TurnPalm('L', roll @ (axis * .45 - up * .89), roll @ (up * .28 - across * .96))
+            Trace(clip, time, 'palms')
+            ReachGrip('R', gripR, poleR, rounds=8)
+            ReachGrip('L', gripL, poleL, rounds=8)
         Trace(clip, time, 'reach2')
         CurlFingers('R', normalR, 1.05, indexAmount=.55)
         CurlFingers('L', normalL, 1.05, indexAmount=.75)
         Update()
         Trace(clip, time, 'fingers')
-        return {'tip': tip[:], 'axis': axis[:], 'gripR': gripR[:], 'gripL': gripL[:],
-                'chestZ': round(chest.z, 4)}
+        return {'tip': tip[:], 'butt': (gripR - axis * BUTT_BACK)[:], 'axis': axis[:],
+                'gripRTarget': gripR[:], 'gripLTarget': gripL[:], 'chestZ': round(chest.z, 4)}
 
     def AuthorNra(clip, time):
         Reset()
@@ -620,7 +867,27 @@ def Bake(modelId, render):
             evaluated.to_mesh_clear()
         return lowest
 
-    RawAuthor = AuthorIja if prefix == 'Bip001' else AuthorNra
+    def AuthorPressure(clip, time):
+        """Imported start pose, cross-faded into the authored collapse over PRESSURE_BLEND_S."""
+        weight = Smooth(time / PRESSURE_BLEND_S) if PRESSURE_BLEND_S > 0 else 1
+        info = ApplyMeleeStart()
+        if weight <= 0:
+            return info
+        imported = {pb.name: pb.matrix_basis.copy() for pb in arm.pose.bones}
+        info = dict(AuthorNra(clip, time), meleeBlend=round(weight, 4))
+        if weight < 1:
+            for pb in arm.pose.bones:
+                p0, q0, s0 = imported[pb.name].decompose()
+                p1, q1, s1 = pb.matrix_basis.decompose()
+                pb.matrix_basis = Matrix.LocRotScale(p0.lerp(p1, weight), q0.slerp(q1, weight),
+                                                     s0.lerp(s1, weight))
+            Update()
+        return info
+
+    def RawAuthor(clip, time):
+        if clip == 'PressureStabbed':
+            return AuthorPressure(clip, time)
+        return AuthorIja(clip, time) if prefix == 'Bip001' else AuthorNra(clip, time)
 
     def Author(clip, time):
         shift['feet'] = 0.0
@@ -685,7 +952,7 @@ def Bake(modelId, render):
         arm.animation_data.action = action
         values = []
         samples = []
-        probeFrames = sorted(set(range(0, count, 3)) | {count - 1})
+        probeFrames = sorted(set(range(0, count, 2)) | {count - 1})
         for frame in range(count):
             arm.animation_data.action = None
             time = frame * step
@@ -698,8 +965,11 @@ def Bake(modelId, render):
                 sample = {'time': round(time, 4), 'frame': frame,
                           'headZ': round(Point(Bone('Head')).z, 4),
                           'pelvisZ': round(Point(Bone('Pelvis')).z, 4),
+                          'pelvis': [round(v, 4) for v in Point(Bone('Pelvis'))],
                           'gripR': [round(v, 4) for v in GripPoint('R')],
                           'gripL': [round(v, 4) for v in GripPoint('L')],
+                          'armL': [round(v, 4) for v in Point(Bone('L UpperArm'))],
+                          'armR': [round(v, 4) for v in Point(Bone('R UpperArm'))],
                           'kneeL': [round(v, 4) for v in Point(Bone('L Calf'))],
                           'kneeR': [round(v, 4) for v in Point(Bone('R Calf'))],
                           'ankleL': [round(v, 4) for v in Point(Bone('L Foot'))],
@@ -714,6 +984,19 @@ def Bake(modelId, render):
                     up = (up - axis * up.dot(axis)).normalized()
                     actual = GripPoint('R') + axis * GRIP_TO_TIP + up * TIP_RISE
                     sample['tipActual'] = [round(v, 4) for v in actual]
+                    sample['buttActual'] = [round(v, 4) for v in (GripPoint('R') - axis * BUTT_BACK)]
+                    if clip == 'PressureStabbed' and frame == 0:
+                        # The imported frame has to survive Put/Update and come back out
+                        # of the pose bones unchanged; the browser test then measures the
+                        # same thing end to end, through the shipped asset.
+                        worst = 0.0
+                        for part in meleeOrder:
+                            name = prefix + ' ' + part
+                            want = meleeStart[part][0] @ restWorld[name].to_quaternion()
+                            got = BWorld(arm.pose.bones[name]).to_quaternion()
+                            worst = max(worst, math.degrees(
+                                2 * math.acos(min(1.0, abs(want.dot(got))))))
+                        sample['meleeStartWorstDeg'] = round(worst, 4)
                 samples.append(sample)
             arm.animation_data.action = action
             for name in names:

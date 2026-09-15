@@ -10,7 +10,7 @@
 //      调用方按「没有伏击动作」处理，不抛错。
 import { FirstLevelCarriageAnimation } from "./Script_FirstLevelCarriageAnimation.mjs";
 
-export const FIRST_LEVEL_AMBUSH_VERSION = "20260915AmbushV1";
+export const FIRST_LEVEL_AMBUSH_VERSION = "20260916AmbushV2";
 
 // Node 侧测试与 Package A 的编排都读这张表，不必先 fetch 清单。
 // 它必须与 Animation/FirstLevelAmbush/Data_FirstLevelAmbushAnimation.json 的 clips 一致。
@@ -18,6 +18,11 @@ export const FIRST_LEVEL_AMBUSH_CLIPS = Object.freeze({
   AmbushRise: Object.freeze({ duration: 0.7, loop: false }),
   BayonetStabStanding: Object.freeze({ duration: 1.2, loop: false }),
   BayonetStabDown: Object.freeze({ duration: 1.4, loop: false }),
+  // 枪托横扫：起手与收势都是白刃预备，顶点在 0.42 s（枪托到 1.52 m、身前 0.93 m）。
+  RifleButtStrike: Object.freeze({ duration: 1, loop: false }),
+  // 压制反杀：首帧就是白刃库 IJA `BayonetPressure` 的第 0 帧（QTE 玩家赢下的那一帧），
+  // 末帧是可以直接当尸体停住的姿势。0.30 s 之后他手里没有枪了 —— 见文档「交接」一节。
+  PressureStabbed: Object.freeze({ duration: 1.3, loop: false }),
   BearerStabbed: Object.freeze({ duration: 2.2, loop: false }),
   PatientStabbed: Object.freeze({ duration: 2.6, loop: false }),
   PatientWoundedIdle: Object.freeze({ duration: 3, loop: true }),

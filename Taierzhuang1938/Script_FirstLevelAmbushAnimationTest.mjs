@@ -1,9 +1,14 @@
 // 屋内伏击动画库的保真闸门：清单/哈希/帧数/骨骼名/四元数（纯 Node），
-// 再用真实 GLB + 生产骨架在真浏览器里把六条 clip 都播一遍，量脚底、朝向、
-// 刺刀尖高度、伤员手够不够得着肚子，并给每条 clip 出一张 1280x720 截图。
+// 再用真实 GLB + 生产骨架在真浏览器里把八条 clip 都播一遍，量脚底、朝向、
+// 刺刀尖高度、枪托顶点、伤员手够不够得着肚子，并给每条 clip 出一张 1280x720 截图。
 //
 // 截图不是装饰：数值全绿但四肢穿过躯干、枪口朝后、伤员浮在担架上方的 clip 不算通过，
 // 所以每条 clip 的接触表都要人看过。证据留在 _shots/RoomAmbush/C/（已忽略目录）。
+//
+// 两条 2026-09-16 新增的 clip 各带一条专属判据：`RifleButtStrike` 要枪托（不是刺刀）
+// 在顶点打到身前一米、头那么高的地方，刺刀全程留在枪托后面、不扫过挨打的人；
+// `PressureStabbed` 的首帧要与白刃库 IJA `BayonetPressure` 的第 0 帧是同一个姿势
+// （逐骨世界旋转夹角），末帧要是躺在地上的尸姿。
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import assert from 'node:assert/strict';
@@ -42,7 +47,8 @@ assert.deepEqual(config.actorForward, [0, 0, -1]);
 assert.equal(config.floorClearanceM, 0.003);
 assert.deepEqual(Object.keys(config.clips).sort(), [
   'AmbushRise', 'BayonetStabDown', 'BayonetStabStanding',
-  'BearerStabbed', 'PatientStabbed', 'PatientWoundedIdle']);
+  'BearerStabbed', 'PatientStabbed', 'PatientWoundedIdle',
+  'PressureStabbed', 'RifleButtStrike']);
 assert.equal(config.clips.PatientWoundedIdle.loop, true);
 for (const [id, clip] of Object.entries(config.clips)) {
   if (id !== 'PatientWoundedIdle') assert.equal(clip.loop, false, id + ' must hold its last pose');
@@ -147,7 +153,26 @@ const IJA_TIMES = {
   AmbushRise: [0, .18, .35, .52, .7],
   BayonetStabStanding: [0, .22, .36, .5, .62, .94, 1.2],
   BayonetStabDown: [0, .26, .44, .62, .8, 1.08, 1.4],
+  // 枪托横扫逐帧全查（25 帧），外加四个帧与帧之间的插值抽查。整支枪在 0.12 s 内翻
+  // 180 度 ≈ 每帧 30 度，逐骨插出来的中间帧握距会短一点点 —— 那是采样率的账，
+  // 不是姿势的账，所以两种时刻的判据分开（见下面的 holdsRifle 那一段）。
+  RifleButtStrike: [...Array.from({ length: 25 }, (_, frame) => +(frame / 24).toFixed(6)),
+    .3, .35, .45, .62].sort((a, b) => a - b),
+  PressureStabbed: [0, .12, .24, .36, .5, .68, .78, .88, 1.08, 1.3],
 };
+// 枪托横扫的顶点窗口，以及「被打的人」占的体积（站在骨盆正前方 1.05 m，躯干+头
+// 0.9-1.7 m，半径 0.22 m）。挥到一半的刺刀必须在这个胶囊外面。
+const BUTT_APEX = [.38, .5];
+const TARGET_FORWARD = 1.05;
+const TARGET_LOW = 0.9;
+const TARGET_HIGH = 1.7;
+const TARGET_RADIUS = 0.22;
+// 主要骨头：首帧要与 BayonetPressure 第 0 帧对齐的就是这 20 根（手指不算）。
+const MELEE_MAJOR = [
+  'Pelvis', 'Spine', 'Spine1', 'Spine2', 'Neck', 'Head', 'L Clavicle', 'R Clavicle',
+  'L UpperArm', 'L Forearm', 'L Hand', 'R UpperArm', 'R Forearm', 'R Hand',
+  'L Thigh', 'L Calf', 'L Foot', 'R Thigh', 'R Calf', 'R Foot'];
+const MELEE_START_TOLERANCE_DEG = 12;
 const NRA_TIMES = {
   BearerStabbed: [0, .16, .42, .78, 1.12, 1.52, 1.86, 2.2],
   PatientStabbed: [0, .22, .6, 1.1, 1.65, 2.15, 2.6],
@@ -166,12 +191,24 @@ const NRA_HEIGHT_M = 1.66;
 // 「刀穿过大腿」这种错误在 416 px 宽的格子里看不出来。
 const DETAIL_TIME = {
   AmbushRise: .70, BayonetStabStanding: .50, BayonetStabDown: .62,
+  RifleButtStrike: .42, PressureStabbed: 1.30,
   BearerStabbed: 1.60, PatientStabbed: .90, PatientWoundedIdle: 1.00,
+};
+// 枪什么时候不在他手上了。运行时的 `Actor._UpdateRiggedWeaponMount` 只认两个握点，
+// 手一空它照样把三八式架在两只手之间 —— 那会在尸体身上插一根 1.7 m 的棍子。
+// 接管这条 clip 的一方必须在这个时刻把枪摘掉（见文档「交接」一节）；本测试的代理枪
+// 也照这个时刻消失，接触表看的才是游戏里会出现的画面。
+const RIFLE_DROPPED_AT = { PressureStabbed: .30 };
+// 躺在地上的 clip：定格机位要压低、跟着尸体走，不然只看得见一双靴子。
+const GROUND_DETAIL = {
+  PressureStabbed: { camera: [1.95, 1.02, -1.55], focus: [.30, .22, -.18], fov: 34 },
 };
 const SHEET_TIMES = {
   AmbushRise: [0, .16, .3, .44, .58, .7],
   BayonetStabStanding: [0, .24, .38, .5, .66, 1.05],
   BayonetStabDown: [0, .26, .44, .62, .8, 1.15],
+  RifleButtStrike: [0, .16, .3, .42, .56, .85],
+  PressureStabbed: [0, .24, .36, .55, .9, 1.3],
   BearerStabbed: [0, .2, .5, 1.1, 1.6, 2.2],
   PatientStabbed: [0, .22, .5, .9, 1.6, 2.6],
   PatientWoundedIdle: [0, .5, 1, 1.5, 2, 2.6],
@@ -192,8 +229,12 @@ import { GLTFLoader } from '../../../vendor/three/examples/jsm/loaders/GLTFLoade
 import { LugouCharacterRig } from '../../../Script_CharacterModel.mjs';
 import { FirstLevelAmbushAnimation, FIRST_LEVEL_AMBUSH_CLIPS, FIRST_LEVEL_AMBUSH_VERSION }
   from '../../../Script_FirstLevelAmbushAnimation.mjs';
+// PressureStabbed 接在白刃 QTE 后面，所以对照组就是白刃库本身：把 IJA 那份灌进
+// Data_MeleeAnimationSets 的表头，直接驱动 rig.meleeAnimation 摆出 BayonetPressure。
+import { MELEE_IJA_ANIMATIONS } from '../../../Data_MeleeAnimationSets.mjs';
+import { InstallMeleeAnimations } from '../../../Script_MeleeAnimationData.mjs';
 window.AmbushCheck = { T, loader: new GLTFLoader(), LugouCharacterRig, FirstLevelAmbushAnimation,
-  FIRST_LEVEL_AMBUSH_CLIPS, FIRST_LEVEL_AMBUSH_VERSION };
+  FIRST_LEVEL_AMBUSH_CLIPS, FIRST_LEVEL_AMBUSH_VERSION, MELEE_IJA_ANIMATIONS, InstallMeleeAnimations };
 </script>`);
 
 const server = await ServeRoot(path.dirname(project), 0);
@@ -219,7 +260,7 @@ try {
 
   for (const record of config.models) {
     const ija = record.id.startsWith('LugouIja');
-    const result = await page.evaluate(async ({ record, config, assetRecord, times, rifle, deckY, ija, targetHeight }) => {
+    const result = await page.evaluate(async ({ record, config, assetRecord, times, rifle, deckY, ija, targetHeight, major }) => {
       const { T, loader, LugouCharacterRig, FirstLevelAmbushAnimation } = AmbushCheck;
       const [gltf, data] = await Promise.all([
         loader.loadAsync('../../../Model/Character/Model_' + record.id + '.glb'),
@@ -340,6 +381,14 @@ try {
             sample.gripSpan = frame.span;
             sample.tip = TipOf(frame).toArray();
             sample.muzzle = new T.Vector3(...rifle.muzzle).applyQuaternion(frame.quaternion).add(frame.gripR).toArray();
+            // 枪托端（枪身 +z 那一头，与刺刀相反）：与刀尖同一套基，符号反过来。
+            sample.butt = new T.Vector3(0, 0, rifle.butt).applyQuaternion(frame.quaternion).add(frame.gripR).toArray();
+            sample.buttForward = -(sample.butt[2] - pelvis.z);
+            sample.buttSide = sample.butt[0] - pelvis.x;
+            sample.tipForwardPelvis = -(sample.tip[2] - pelvis.z);
+            sample.tipSide = sample.tip[0] - pelvis.x;
+            sample.muzzleForwardPelvis = -(sample.muzzle[2] - pelvis.z);
+            sample.muzzleSide = sample.muzzle[0] - pelvis.x;
             // 枪口必须在人前面（局部 -Z），不能反着指。
             sample.tipForward = -(sample.tip[2] - Point(rig.bones.chest).z);
             sample.gripR = frame.gripR.toArray();
@@ -372,14 +421,62 @@ try {
         clips.push({ id, duration: clip.duration, loop: clip.loop, maxMotion, loopSeam, samples });
       }
       sampler.Restore();
+
+      // PressureStabbed 的首帧 vs 白刃库 BayonetPressure 的第 0 帧：同一具真骨架上
+      // 逐骨比世界旋转。白刃那一版是「绑定姿态左乘世界增量」，本库是烘进骨骼局部轨道，
+      // 两条路径完全不同，所以只有世界旋转才是可比的量。
+      let meleeStart = null;
+      if (ija) {
+        const library = await fetch('../../../Animation/Melee/Data_MeleeIjaAnimations.json').then(r => r.json());
+        AmbushCheck.InstallMeleeAnimations(AmbushCheck.MELEE_IJA_ANIMATIONS, library);
+        const parts = new Map();
+        rig.root.traverse(node => {
+          if (!node.isBone) return;
+          const name = node.name.replace(/_/g, ' ');
+          for (const part of major) if (name.endsWith(' ' + part)) parts.set(part, node);
+        });
+        const Read = () => {
+          rig.root.updateMatrixWorld(true);
+          return major.map(part => parts.get(part).getWorldQuaternion(new T.Quaternion()).toArray());
+        };
+        sampler.Restore();
+        rig.Update(0, { reach: 1 });
+        // clip.loop 为真且 state 不是 charge/qte 时，t=0 就是第 0 帧、mix 0。
+        rig.meleeAnimation.Apply({ clip: 'BayonetPressure', state: 'idle', t: 0, normalized: 0 });
+        const reference = Read();
+        const referenceGrip = Point(rig.grips.weaponL).distanceTo(Point(rig.grips.weaponR));
+        rig.meleeAnimation.Restore();
+        sampler.Restore();
+        rig.Update(0, { reach: 1 });
+        sampler.Sample('PressureStabbed', 0, { loop: false, deckY: 0, transitionSeconds: 0 });
+        const authored = Read();
+        sampler.Restore();
+        meleeStart = {
+          referenceGrip,
+          missing: major.filter(part => !parts.has(part)),
+          bones: major.map((part, index) => {
+            const a = reference[index], b = authored[index];
+            const dot = Math.min(1, Math.abs(a[0] * b[0] + a[1] * b[1] + a[2] * b[2] + a[3] * b[3]));
+            return { part, degrees: 2 * Math.acos(dot) * 180 / Math.PI };
+          }),
+        };
+      }
       window.AmbushStage = { T, actor, rig, sampler, data, scene, WeaponFrame, ija, deckY };
-      return { modelId: record.id, maxRestoreError, maxRootDrift, clips };
+      return { modelId: record.id, maxRestoreError, maxRootDrift, clips, meleeStart };
     }, {
       record, config, assetRecord: characters.models.find(m => m.id === record.id),
       times: ija ? IJA_TIMES : NRA_TIMES, rifle: RIFLE, deckY: ija ? 0 : DECK_Y, ija,
-      targetHeight: ija ? IJA_HEIGHT_M : NRA_HEIGHT_M,
+      targetHeight: ija ? IJA_HEIGHT_M : NRA_HEIGHT_M, major: MELEE_MAJOR,
     });
     results.push(result);
+    if (result.meleeStart) {
+      const ranked = [...result.meleeStart.bones].sort((a, b) => b.degrees - a.degrees);
+      console.log('MELEE START', result.modelId, JSON.stringify({
+        worstDeg: +ranked[0].degrees.toFixed(3), worstBone: ranked[0].part,
+        medianDeg: +ranked[Math.floor(ranked.length / 2)].degrees.toFixed(3),
+        referenceGrip: +result.meleeStart.referenceGrip.toFixed(4),
+      }));
+    }
     console.log('MODEL', result.modelId, JSON.stringify({
       restore: result.maxRestoreError, rootDrift: result.maxRootDrift,
       clips: result.clips.map(c => ({
@@ -418,7 +515,8 @@ try {
           + ' — original bone-frame conversion is off');
         // 脚尖朝向只在脚还踩在地上的那段成立：跪下去之后脚背贴地、脚尖朝后，
         // 躺在担架上的人脚尖朝天，拿它当朝向判据会把正确的姿势判红。
-        const planted = ija || sample.time <= 1.2;
+        // PressureStabbed 后半段是同一回事：他倒下去之后脚是侧着的。
+        const planted = ija ? (clip.id !== 'PressureStabbed' || sample.time <= .36) : sample.time <= 1.2;
         if (!supine && planted && sample.front) {
           assert.ok(sample.front[2] < -.45, where + ' faces ' + JSON.stringify(sample.front) + ' not -Z');
         }
@@ -426,14 +524,34 @@ try {
     }
     if (ija) {
       // 上刀的三八式：两手必须落在真实握距上，枪口朝前，不是反着背在身后。
+      // 这两条判据按 clip 分：枪托横扫的顶点刀尖本来就该在身后（枪托在前），
+      // PressureStabbed 一开始两手是白刃库那副 0.72 m 的握距、0.3 s 之后枪就被夺走了。
+      const holdsRifle = new Set(['AmbushRise', 'BayonetStabStanding', 'BayonetStabDown', 'RifleButtStrike']);
+      const bladeLeads = new Set(['AmbushRise', 'BayonetStabStanding', 'BayonetStabDown']);
       for (const clip of result.clips) {
         for (const sample of clip.samples) {
           const where = result.modelId + ' ' + clip.id + ' t=' + sample.time;
           // 在游戏尺度上量：人物被缩到 1.62 m，枪没有跟着缩，所以两手的实际间距
           // 必须是步枪护木挂点的真实距离 0.4432 m，不是烘焙时的那个数。
-          assert.ok(Math.abs(sample.gripSpan - .4432) < .022,
-            where + ' grip span ' + sample.gripSpan + ' m does not fit the fore-end (0.4432 m)');
-          assert.ok(sample.tipForward > .55, where + ' bayonet points backwards (' + sample.tipForward + ')');
+          if (holdsRifle.has(clip.id)) {
+            // 烘出来的那一帧必须正好合护木。帧与帧之间是逐骨插值：整支枪 0.12 s 翻
+            // 90 度 ≈ 每帧 30 度，两帧之间插出来的胳膊肘不在任何一个真姿势上，两手
+            // 会差出几厘米（实测最差 0.056 m，出现在翻枪那两帧中间）。那是采样率的
+            // 账，不是姿势的账 —— 枪的朝向只由两个握点的连线决定，差 5 cm 折合 6 度。
+            const authored = Math.abs(sample.time * 24 - Math.round(sample.time * 24)) < 1e-6;
+            const tolerance = authored ? .022 : .07;
+            assert.ok(Math.abs(sample.gripSpan - .4432) < tolerance,
+              where + ' grip span ' + sample.gripSpan + ' m does not fit the fore-end (0.4432 m)');
+          }
+          if (bladeLeads.has(clip.id)) {
+            assert.ok(sample.tipForward > .55, where + ' bayonet points backwards (' + sample.tipForward + ')');
+          }
+          // 枪不跟着人缩：刺刀尖离右手 1.42 m 是真米，比在创作骨架里量到的同一个数
+          // 远 11 cm。翻枪那两帧的刀尖差一点就戳进地板 —— 这条闸门守的就是它。
+          if (holdsRifle.has(clip.id)) {
+            assert.ok(sample.tip[1] > .02, where + ' blade tip is in the floor at ' + sample.tip[1]);
+            assert.ok(sample.muzzle[1] > .02, where + ' muzzle is in the floor at ' + sample.muzzle[1]);
+          }
         }
       }
       const standing = result.clips.find(c => c.id === 'BayonetStabStanding');
@@ -455,6 +573,68 @@ try {
       const start = rise.samples[0], end = rise.samples.at(-1);
       assert.ok(end.head - start.head > .35, result.modelId + ' AmbushRise does not actually stand up');
       assert.ok(end.tip[1] > 1.08, result.modelId + ' AmbushRise ends with the blade too low');
+
+      // --- 枪托横扫 -----------------------------------------------------------------
+      const butt = result.clips.find(c => c.id === 'RifleButtStrike');
+      const buttApex = butt.samples.filter(s => s.time >= BUTT_APEX[0] && s.time <= BUTT_APEX[1]);
+      assert.ok(buttApex.length >= 2, result.modelId + ' RifleButtStrike has no apex window');
+      const landed = buttApex.reduce((best, s) => (s.buttForward > best.buttForward ? s : best));
+      assert.ok(landed.butt[1] > 1.45 && landed.butt[1] < 1.75,
+        result.modelId + ' butt stroke apex lands at ' + landed.butt[1].toFixed(3) + ' m, want a head at 1.45-1.75');
+      assert.ok(landed.buttForward > .9 && landed.buttForward < 1.3,
+        result.modelId + ' butt stroke apex reaches ' + landed.buttForward.toFixed(3)
+        + ' m in front of the pelvis, want 0.9-1.3');
+      // 枪托是打人的那一头：驱动段里刀尖必须一直落在枪托后面。整支枪 1.68 m，
+      // 但挥的时候枪身是斜的、还往他右侧偏，投影到前后轴上只剩 0.7-1.2 m（实测最小
+      // 0.69，在刚进驱动段那一帧）—— 阈值按投影给。
+      const driving = butt.samples.filter(s => s.buttForward > .5);
+      assert.ok(driving.length >= 3, result.modelId + ' butt stroke never drives forward');
+      for (const sample of driving) {
+        const where = result.modelId + ' RifleButtStrike t=' + sample.time;
+        assert.ok(sample.buttForward - sample.tipForwardPelvis > .6,
+          where + ' butt ' + sample.buttForward.toFixed(3) + ' m vs blade tip '
+          + sample.tipForwardPelvis.toFixed(3) + ' m — the blade end is leading');
+        assert.ok(sample.tipForwardPelvis < sample.buttForward,
+          where + ' blade tip is in front of the butt');
+      }
+      // 挥到一半的刺刀不许扫过挨打的人（骨盆正前方 1.05 m 站着的躯干+头）。
+      // 只看驱动段：起手/收势的预备姿势本来就是把枪指着对方，那是瞄不是扫。
+      // 现在这版的刀尖在这一段一直低于 0.6 m（从对方小腿前扫过去），所以这条判据
+      // 目前一次都不会真的去比距离 —— 它守的是以后有人改时序/改挥法。
+      for (const sample of butt.samples.filter(s => s.time >= .2 && s.time <= .7)) {
+        for (const [what, forward, side, height] of [
+          ['blade tip', sample.tipForwardPelvis, sample.tipSide, sample.tip[1]],
+          ['muzzle', sample.muzzleForwardPelvis, sample.muzzleSide, sample.muzzle[1]]]) {
+          if (height < TARGET_LOW || height > TARGET_HIGH) continue;
+          const distance = Math.hypot(forward - TARGET_FORWARD, side);
+          assert.ok(distance > TARGET_RADIUS, result.modelId + ' RifleButtStrike t=' + sample.time
+            + ' sweeps the ' + what + ' ' + distance.toFixed(3) + ' m from the struck man\'s centre line');
+        }
+      }
+
+      // --- 压制反杀 -----------------------------------------------------------------
+      const pressure = result.clips.find(c => c.id === 'PressureStabbed');
+      const worst = result.meleeStart.bones.reduce((a, b) => (a.degrees > b.degrees ? a : b));
+      assert.deepEqual(result.meleeStart.missing, [], result.modelId + ' melee parts missing from the rig');
+      assert.ok(worst.degrees < MELEE_START_TOLERANCE_DEG, result.modelId
+        + ' PressureStabbed does not start on BayonetPressure: ' + worst.part + ' is off by '
+        + worst.degrees.toFixed(2) + ' deg');
+      // 首帧连握距都该是白刃那副（那副握距不合护木，正是为什么上面的判据跳过它）。
+      assert.ok(Math.abs(pressure.samples[0].gripSpan - result.meleeStart.referenceGrip) < .01,
+        result.modelId + ' PressureStabbed first frame grip span ' + pressure.samples[0].gripSpan
+        + ' vs BayonetPressure ' + result.meleeStart.referenceGrip);
+      // 枪被夺走之后两只手是空的，会贴到肚子上：握距必然塌下来。
+      const off = pressure.samples.filter(s => s.time >= .5);
+      for (const sample of off) {
+        assert.ok(sample.gripSpan < .32, result.modelId + ' PressureStabbed t=' + sample.time
+          + ' still holds the rifle at ' + sample.gripSpan.toFixed(3) + ' m');
+      }
+      const dead = pressure.samples.at(-1);
+      assert.ok(dead.pelvisY < .35, result.modelId + ' PressureStabbed corpse pelvis floats at ' + dead.pelvisY);
+      assert.ok(dead.head > .02, result.modelId + ' PressureStabbed corpse head is under the floor: ' + dead.head);
+      assert.ok(dead.head < .45, result.modelId + ' PressureStabbed corpse head is still up at ' + dead.head);
+      assert.ok(pressure.samples[0].head - dead.head > .8,
+        result.modelId + ' PressureStabbed never goes down');
     } else {
       // 被捅的人：手要抓到肚子上。
       for (const clip of result.clips) {
@@ -492,7 +672,7 @@ try {
 
     // 接触表：每条 clip 一张 1280x720，用真骨架实拍。
     for (const id of record.clipIds) {
-      await page.evaluate(async ({ id, times, label }) => {
+      await page.evaluate(async ({ id, times, label, dropped }) => {
         const { T, actor, rig, sampler, scene, WeaponFrame, ija, deckY } = window.AmbushStage;
         const sheet = document.querySelector('#sheet');
         document.querySelector('#title').textContent = label;
@@ -541,7 +721,6 @@ try {
         const renderer = window.AmbushRenderer;
         const { rifle, bed } = window.AmbushProps;
         const supine = id.startsWith('Patient');
-        rifle.visible = ija;
         if (bed) bed.visible = supine;
         // 三分之一侧前方，看得见枪线与两只手的握点；仰卧那两条从担架斜上方看。
         const camera = new T.PerspectiveCamera(30, 416 / 316, .05, 40);
@@ -549,7 +728,8 @@ try {
           sampler.Restore();
           rig.Update(0, { reach: 1 });
           sampler.Sample(id, time, { loop: false, deckY: supine ? deckY : 0, transitionSeconds: 0 });
-          if (ija) {
+          rifle.visible = ija && time < dropped;
+          if (rifle.visible) {
             const frame = WeaponFrame();
             rifle.position.copy(frame.gripR);
             rifle.quaternion.copy(frame.quaternion);
@@ -570,12 +750,14 @@ try {
         }
         sampler.Restore();
         await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-      }, { id, times: SHEET_TIMES[id], label: record.id + ' — ' + id });
+      // Infinity 过不了 page.evaluate 的序列化（会变成 null），用一个大数。
+      }, { id, times: SHEET_TIMES[id], label: record.id + ' — ' + id,
+        dropped: RIFLE_DROPPED_AT[id] ?? 999 });
       const file = path.join(out, 'Texture_Ambush_' + record.id + '_' + id + '.png');
       await page.screenshot({ path: file });
       shots.push(file);
       if (record.id === 'LugouIja01' || record.id === 'LugouNra02') {
-        await page.evaluate(async ({ id, time, label }) => {
+        await page.evaluate(async ({ id, time, label, dropped, ground }) => {
           const { T, rig, sampler, scene, WeaponFrame, ija, deckY } = window.AmbushStage;
           const sheet = document.querySelector('#sheet');
           document.querySelector('#title').textContent = label;
@@ -583,23 +765,25 @@ try {
           sheet.style.gridTemplateColumns = '1264px';
           const renderer = window.AmbushRenderer;
           renderer.setSize(1264, 690);
-          const camera = new T.PerspectiveCamera(26, 1264 / 690, .05, 40);
+          const camera = new T.PerspectiveCamera(ground ? ground.fov : 26, 1264 / 690, .05, 40);
           const supine = id.startsWith('Patient');
           sampler.Restore();
           rig.Update(0, { reach: 1 });
           const supineDetail = id.startsWith('Patient');
           if (window.AmbushProps.bed) window.AmbushProps.bed.visible = supineDetail;
-          window.AmbushProps.rifle.visible = ija;
           sampler.Sample(id, time, { loop: false, deckY: supineDetail ? deckY : 0, transitionSeconds: 0 });
-          if (ija) {
+          window.AmbushProps.rifle.visible = ija && time < dropped;
+          if (window.AmbushProps.rifle.visible) {
             const frame = WeaponFrame();
             window.AmbushProps.rifle.position.copy(frame.gripR);
             window.AmbushProps.rifle.quaternion.copy(frame.quaternion);
           }
-          const focus = supine ? new T.Vector3(0, deckY + .12, 0) : new T.Vector3(0, .92, -.55);
+          const focus = ground ? new T.Vector3(...ground.focus)
+            : supine ? new T.Vector3(0, deckY + .12, 0) : new T.Vector3(0, .92, -.55);
           // 仰卧那两条用贴近床面的低机位：头、脖子和手放在肚子上的位置，
-          // 从上往下看是看不出接缝的。
-          if (supine) camera.position.set(2.70, deckY + .70, -.05);
+          // 从上往下看是看不出接缝的。躺在地上的尸姿同理。
+          if (ground) camera.position.set(...ground.camera);
+          else if (supine) camera.position.set(2.70, deckY + .70, -.05);
           else camera.position.set(2.95, 1.38, -2.25);
           camera.lookAt(focus);
           renderer.render(scene, camera);
@@ -616,7 +800,8 @@ try {
           sheet.style.gridTemplateColumns = 'repeat(3,416px)';
           sampler.Restore();
           await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-        }, { id, time: DETAIL_TIME[id], label: record.id + ' — ' + id + ' (detail)' });
+        }, { id, time: DETAIL_TIME[id], label: record.id + ' — ' + id + ' (detail)',
+          dropped: RIFLE_DROPPED_AT[id] ?? 999, ground: GROUND_DETAIL[id] ?? null });
         const detail = path.join(out, 'Texture_AmbushDetail_' + record.id + '_' + id + '.png');
         await page.screenshot({ path: detail });
         shots.push(detail);
