@@ -1343,7 +1343,7 @@ console.log("ok individual trench lanes, rounded corners, safe spacing and varia
 console.log("ok receiving-food release follows the source clock and survives pause/resume");
 
 {
-  assert.equal(MISSION_ENCOUNTERS.front.length+MISSION_ENCOUNTERS.machineGun.length+MISSION_ENCOUNTERS.approach.length+MISSION_ENCOUNTERS.surface.length+MISSION_ENCOUNTERS.intrusion.length+MISSION_ENCOUNTERS.tank.length,R.openingEnemyBudget,
+  assert.equal(MISSION_ENCOUNTERS.front.length+MISSION_ENCOUNTERS.machineGun.length+MISSION_ENCOUNTERS.approach.length+MISSION_ENCOUNTERS.surface.length+MISSION_ENCOUNTERS.intrusion.length+MISSION_ENCOUNTERS.shelterPursuit.length+MISSION_ENCOUNTERS.tank.length,R.openingEnemyBudget,
     "finite opening/front roster agrees with budget; no replacement waves");
   assert.equal(MISSION_ENCOUNTERS.machineGun.length,12,"the gun handover owns a separate finite attack");
   assert.ok(MISSION_ENCOUNTERS.machineGun.every(actor=>FrontAssaultLane(actor.x,actor.z).length>=3),"machine-gun attackers cross multiple physical bounds");
@@ -1364,6 +1364,20 @@ console.log("ok receiving-food release follows the source clock and survives pau
     const h=SampleMissionTerrain(point.x,point.z);
     assert.ok(h> -2 && h<-.8,"the breached sap remains a walkable excavated passage below surface fire: "+h);
   }
+  // User 2026-09-15: the "hold the corner" step has a real attack to hold against.
+  assert.equal(MISSION_STAGES.find(s=>s.id==="Shelter").requirements[0],"shelterCornerHeld","the breather waits for the corner to be held");
+  const cornerLane=[{x:-24,z:-23},{x:-24,z:-60}],mainTrench=MISSION_TERRAIN.trenches.find(t=>t.id==="FrontCommunication");
+  assert.ok(MISSION_ENCOUNTERS.shelterPursuit.length>=4&&OPENING.shelterPursuerGrenades>0);
+  for(const spec of MISSION_ENCOUNTERS.shelterPursuit){
+    assert.ok(spec.z<OPENING.woundedRoute[0].z,`${spec.id} follows the wounded man from the front, never from behind the player`);
+    assert.ok(SampleMissionTerrain(spec.x,spec.z)<-1.2,`${spec.id} starts on the excavated trench floor`);
+    const plan=MISSION_TACTICS[spec.id];
+    assert.ok(plan?.points.length>=3,`${spec.id} bounds physically toward the corner`);
+    for(const point of plan.points)assert.ok(SampleMissionTerrain(point.x,point.z)<-1.2,`${spec.id} stays in the trench at ${point.x},${point.z}`);
+    assert.ok(MissionPathDistance(plan.points.at(-1),cornerLane)<=mainTrench.bottom/2,`${spec.id} ends in the straight trench visible from the corner`);
+  }
+  assert.ok(MissionPathDistance(OPENING.shelterCorner,[OPENING.supportRoute[1],OPENING.supportRoute[2],OPENING.supportRoute[3]])<=mainTrench.bottom/2,
+    "the corner post stands on the trench floor");
   const corner=[{x:0,z:0},{x:0,z:5},{x:5,z:5}],step=1.4/60;
   let before=MissionCarryRoutePoint(corner,3);
   for(let d=3+step;d<7;d+=step){

@@ -836,7 +836,7 @@ export class FirstLevelMissionRuntime {
       actor.holdZone = { id: `Mission_${spec.id}`, x: spec.x, z: spec.z, radius: spec.hold ? 0.4 : 2 };
       if(!spec.hold && !WEAPONS[spec.weapon || "Type38"]?.emplaced){
         actor.tacticalRadiusM = id === "surface" ? R.surfaceTacticalRadiusM
-          : id === "intrusion" ? R.intrusionTacticalRadiusM : id === "approach" ? R.approachTacticalRadiusM : R.infantryTacticalRadiusM;
+          : ["intrusion","shelterPursuit"].includes(id) ? R.intrusionTacticalRadiusM : id === "approach" ? R.approachTacticalRadiusM : R.infantryTacticalRadiusM;
       }
       // Emplaced gunners keep their firing position: the hide/peek side step is all they may do.
       // Everyone else may take cover inside their zone plus the ordinary slack.
@@ -851,6 +851,7 @@ export class FirstLevelMissionRuntime {
       // gunners on an emplacement never throw, they are married to the gun.
       if (!spec.hold && !WEAPONS[spec.weapon || "Type38"]?.emplaced) actor.grenades = R.enemyGrenades;
       if(id==="intrusion")actor.grenades=OPENING.intruderGrenades;
+      if(id==="shelterPursuit")actor.grenades=OPENING.shelterPursuerGrenades;
       if(id==="surface"&&!spec.hold)actor.grenades=R.openingSurfaceGrenades;
       if (spec.hold) {actor.scriptDefensive=true;actor.scriptSuppressible=true;}
       if (["front","machineGun"].includes(id) && !spec.hold) actor.missionAssault = this.MakeAssault(spec.x, spec.z);
@@ -2432,6 +2433,9 @@ export class FirstLevelMissionRuntime {
     if(stage.id==='TrenchEntry'&&!this.Has('trenchCleared')) {
       target=MissionRouteLookahead(OPENING.trenchContactRoute,this.player.position);
       label='trenchContact';status=T('firstLevel.hint.trenchContact');
+    }
+    if(stage.id==='Shelter'&&!this.Has('shelterCornerHeld')) {
+      target=OPENING.shelterCorner;label='shelterCorner';status=T('firstLevel.hint.shelterCorner');
     }
     if(stage.id==="MachineGun"&&this.emplacement.Mounted)status=T("firstLevel.hint.guards",{safe:this.guards.filter(g=>g.safe).length,remaining:this.guards.filter(g=>g.actor.alive&&!g.safe).length});
     if(["Courtyard","TransferApproach","Transfer"].includes(stage.id))status=T("firstLevel.hint.queue",{passed:this.column.litters.filter(l=>l.passedGate).length,total:this.column.litters.filter(l=>l.health>0||l.passedGate).length,loaded:this.column.loadEvents.length});

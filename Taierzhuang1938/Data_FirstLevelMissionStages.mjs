@@ -26,13 +26,13 @@ export const FIRST_LEVEL_STAGES = Object.freeze([
   Phase(18, "FinalDefense", "接收院被逼退，战斗收尾", ["FinalDefense","Exit"], MISSION_RECEPTION_SPACE.deathView),
 ]);
 export const FIRST_LEVEL_ENCOUNTER_STARTS = Object.freeze({
-  bundleApproach:5, surface:2, intrusion:2, front:3, machineGun:4, approach:3, tank:3, village:3, melee:3, courtyard:10,
+  bundleApproach:5, surface:2, intrusion:2, shelterPursuit:3, front:3, machineGun:4, approach:3, tank:3, village:3, melee:3, courtyard:10,
   transfer:12, transferFlank:12, transferLast:12, transferRear:12, air:13, retreat:15,
   retreatWall:15,retreatYard:15,reception:16, final:17,
 });
 // These belong to the current public phase but arrive after its entry encounter.
 export const FIRST_LEVEL_DEFERRED_ENCOUNTERS=Object.freeze({
-  3:Object.freeze(["front","approach","tank","village","melee"]),
+  3:Object.freeze(["shelterPursuit","front","approach","tank","village","melee"]),
   12:Object.freeze(["transferFlank","transferLast","transferRear"]),
   15:Object.freeze(["retreatWall","retreatYard"]),
 });

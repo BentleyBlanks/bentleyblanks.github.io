@@ -20,7 +20,7 @@ export const MISSION_STAGES = Object.freeze([
     "WreckImpact",
   ),
   Stage("TrenchEntry", "侧沟有日军！清出折角，跟班长进掩蔽处。", OPENING.shelter, ["trenchEntered", "trenchCleared", "shelterReached"], null),
-  Stage("Shelter", "守住折角，照看从前方撤下来的伤兵。", OPENING.shelter, ["escapeWhisperHeard", "woundedSeen", "supportOrdersHeard"], "EscapeWhisper"),
+  Stage("Shelter", "守住折角，照看从前方撤下来的伤兵。", OPENING.shelter, ["shelterCornerHeld", "escapeWhisperHeard", "woundedSeen", "supportOrdersHeard"], "EscapeWhisper"),
   Stage(
     "Support",
     "沿交通壕支援前沿守军，掩护他们撤回。",
@@ -140,6 +140,7 @@ export const MISSION_STAGES = Object.freeze([
 export const MISSION_ENCOUNTERS = Object.freeze({
   surface: OPENING.surface,
   intrusion: OPENING.intruders,
+  shelterPursuit: OPENING.shelterPursuers,
   approach: FRONT_APPROACH_ENEMIES,
   // The roster itself lives in Data_FirstLevelMissionFront: the assault lanes and the cover rows
   // are derived from it, and a list split across two files drifts.
@@ -245,6 +246,7 @@ export const MISSION_GUIDANCE = Object.freeze({
 export const MISSION_TACTICS = Object.freeze({
   ...APPROACH_TACTICS,
   ...Object.fromEntries(Object.entries(OPENING.intruderRoutes).map(([id,points],i)=>[id,{delay:i*2,points}])),
+  ...OPENING.shelterPursuerRoutes,
   CourtyardPursuerA: { delay: 1, points: [{x:86,z:37},{x:62,z:40},{x:53,z:38}] },
   CourtyardPursuerB: { delay: 12, points: [{x:89,z:39},{x:66,z:43},{x:59,z:40}] },
   CourtyardPursuerC: { delay: 25, points: [{x:91,z:41},{x:70,z:44},{x:64,z:40}] },

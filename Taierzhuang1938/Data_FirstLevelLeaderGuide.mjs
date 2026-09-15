@@ -6,7 +6,9 @@ const Entry = (mode, cue, target = null, extra = {}) => Object.freeze({mode, cue
 export const MISSION_LEADER_STAGES = Object.freeze({
   Unloading: Entry("follow", "Follow", null, {story: true}),
   TrenchEntry: Entry("cover", "Trench", OPENING.shelter),
-  Shelter: Entry("rally", "Shelter", OPENING.shelter, {story: true}),
+  // "Hold the corner" points at the corner until its attack is resolved; the
+  // order is not repeated over the breather that follows.
+  Shelter: Entry("rally", "Shelter", OPENING.shelter, {story: true, holdTarget: OPENING.shelterCorner, holdUntil: "shelterCornerHeld"}),
   Support: Entry("follow", "Support", A.front),
   MachineGun: Entry("cover", "Gun", A.front, {story: true}),
   Tank: Entry("collect", "Bundle", A.bundle, {story: true}),

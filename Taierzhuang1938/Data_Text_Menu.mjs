@@ -34,6 +34,7 @@ export const TEXT = Object.freeze({
   "menu.condition.trenchEntered": "进入交通壕",
   "menu.condition.trenchCleared": "清除交通壕折角的日军",
   "menu.condition.shelterReached": "到达掩蔽处",
+  "menu.condition.shelterCornerHeld": "打退跟着伤兵摸到折角的日军",
   "menu.condition.escapeWhisperHeard": "听完同伴在掩蔽处的交谈",
   "menu.condition.woundedSeen": "看到撤入掩蔽处的伤兵",
   "menu.condition.supportOrdersHeard": "听完支援前沿的命令",

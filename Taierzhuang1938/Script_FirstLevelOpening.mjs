@@ -135,7 +135,9 @@ export class FirstLevelOpening {
       }
       this.wounded=this.SpawnMessenger("OpeningWounded",C.woundedRoute,"HanYang");
       if(this.wounded){this.wounded.actor.health=35;this.wounded.actor.scriptedNoncombatant=true;}
-      this.runner=this.SpawnMessenger("OpeningRunner",C.runnerRoute,"HanYang");
+      // The wounded man walks ahead of the section that followed him down the trench.
+      // The runner only sets out once that trench is clear (see Update).
+      r.SpawnEncounter("shelterPursuit");
     }
     if(stage==="Support"){
       r.rifleStartShots=r.Inventory().shots;
@@ -281,14 +283,20 @@ export class FirstLevelOpening {
       if(r.Has("trenchCleared")&&r.Near(C.shelter,C.shelterRadiusM)&&this.ShelterProtected())r.Record("shelterReached",{health:r.player.health});
     }
     if(stage==="Shelter"){
+      const pursuers=C.shelterPursuers.map(s=>r.enemies.get(s.id));
+      if(pursuers.every(a=>a&&!a.alive))r.Record("shelterCornerHeld",{count:pursuers.length});
+      const held=r.Has("shelterCornerHeld");
       const yaowa=r.companion.Handle("yaowa"),luo=r.companion.Handle("luo");
-      if(r.Near(C.shelter,C.shelterRadiusM)&&yaowa?.alive&&Distance(yaowa.position,r.player.position)<5&&
+      // The breather starts after the corner is held, never under fire.
+      if(held&&r.Near(C.shelter,C.shelterRadiusM)&&yaowa?.alive&&Distance(yaowa.position,r.player.position)<5&&
         luo?.alive&&Distance(luo.position,C.shelter)<12&&!r.BlocksSight(r.player.EyePosition,r.Point(yaowa.position,1)))r.Say("ShelterAid");
       this.Messenger(this.wounded,R.walkSpeedMps);
       // The physical casualty appears before the runner reaches the exchange.
       if(this.wounded&&Distance(r.player.position,this.wounded.actor.position)<C.shelterWitnessM&&
         !r.BlocksSight(r.player.EyePosition,r.Point(this.wounded.actor.position,1)))r.Record("woundedSeen");
-      if(r.Has("woundedSeen"))this.Messenger(this.runner,R.squadSpeedMps);
+      // A failed physical spawn retries on a later frame.
+      if(held&&!this.runner)this.runner=this.SpawnMessenger("OpeningRunner",C.runnerRoute,"HanYang");
+      if(held&&r.Has("woundedSeen"))this.Messenger(this.runner,R.squadSpeedMps);
       if(r.Has("escapeWhisperHeard")&&r.Has("woundedSeen"))r.Say("WoundedArrival");
       if(r.Has("escapeWhisperHeard")&&r.Has("woundedSeen")&&this.runner&&
         r.voice.finished.has("WoundedArrival")&&Distance(this.runner.actor.position,C.shelter)<5)r.Say("SupportOrder");

@@ -149,7 +149,8 @@ export const MISSION_TUNING = Object.freeze({
   // User 2026-09-11: sustained multi-direction contact during the approach.
   // Twelve surface + four intruders + eighteen approach + twelve rifle-front +
   // twelve machine-gun attackers + four escorts; each roster commits once, no respawn.
-  openingEnemyBudget:62,
+  // User 2026-09-15: + five pursuers who follow the wounded man to the shelter corner.
+  openingEnemyBudget:67,
   // Route attackers cover the approach; the separate front force owns the gun line.
   approachFireSector:{minX:-80,maxX:35,minZ:-118,maxZ:-18,selfDefenseM:3},
   approachAccuracyScale:.35,

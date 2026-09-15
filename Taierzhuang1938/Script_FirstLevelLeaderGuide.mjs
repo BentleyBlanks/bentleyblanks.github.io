@@ -26,7 +26,9 @@ export class FirstLevelLeaderGuide {
   get Leader() { return this.r.squad?.[G.leaderIndex]; }
   Enter(stage) {
     this.stage = stage.id; this.variant = null; this.firstOrder = true;
-    this.nextVoiceAt = this.r.time + (MISSION_LEADER_STAGES[stage.id]?.story ? G.storyOrderDelayS : G.initialOrderS);
+    // A story step that opens with a fight to hold gets its order at once.
+    const spec = MISSION_LEADER_STAGES[stage.id], holding = spec?.holdUntil && !this.r.Has(spec.holdUntil);
+    this.nextVoiceAt = this.r.time + (spec?.story && !holding ? G.storyOrderDelayS : G.initialOrderS);
     this.r.voice.CancelGuidance(); this.waitSince = null;
     if(this.Leader) { this.Leader.missionGuideWaiting = false; this.Leader.missionGuideGesture = 0; }
   }
@@ -110,6 +112,10 @@ export class FirstLevelLeaderGuide {
       || (r.flow.stage.id==="Unloading"&&!r.Has("luoRescueComplete")))return null;
     let {mode,cue,target}=spec, label=mode, variant=r.flow.stage.id;
     if(variant==="Support"&&r.Has("frontReached"))mode=label="cover";
+    if(spec.holdUntil){
+      if(!r.Has(spec.holdUntil)){target=spec.holdTarget;mode=label="cover";variant+="Hold";}
+      else cue=null;
+    }
     if(variant==="Tank"){
       const returning=r.Has("bundleTaken")&&r.Inventory().bundles>0;
       target=returning?MissionRouteLookahead(MISSION_ROUTES.bundleReturn,r.player.position):

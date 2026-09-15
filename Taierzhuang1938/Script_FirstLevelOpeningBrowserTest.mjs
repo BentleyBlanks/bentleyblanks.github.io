@@ -393,6 +393,18 @@ try{
     await Capture("ClearedTrenchRegroup");
   }
   await Drive("TrenchContact",remainingApproach,{fight:true,until:"shelterReached",seconds:180});
+  // The pursuers who followed the wounded man down the north trench are fought
+  // from the corner with ordinary inputs before the breather can begin.
+  const cornerFight=await Drive("ShelterCorner",[OPENING.supportRoute[1],OPENING.shelterCorner],{fight:true,until:"shelterCornerHeld",seconds:150});
+  const corner=await page.evaluate(ids=>{
+    const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime();
+    return {aidStarted:r.voice.played.has("ShelterAid")||r.voice.queue.includes("ShelterAid"),
+      fired:ids.filter(id=>(r.enemies.get(id)?.fireSequence||0)>0).length,
+      nearest:Math.min(...ids.map(id=>r.enemies.get(id)).map(a=>Math.hypot(a.position.x+24,a.position.z+23)))};
+  },OPENING.shelterPursuers.map(s=>s.id));
+  await fs.writeFile(path.join(out,"Data_ShelterCorner.json"),JSON.stringify({...corner,time:cornerFight.t,health:cornerFight.health},null,2));
+  assert.ok(corner.fired>=2,"the corner attack actually shoots at the shelter");
+  assert.ok(!corner.aidStarted,"the breather does not start while the corner is under attack");
   // The unchanged physical regroup deadline is separate from the current complete
   // recordings. A late-arriving medic must not consume the dialogue's listen time.
   await Drive("ShelterRegroup",[OPENING.shelter],{untilVoice:"ShelterAid",seconds:100});

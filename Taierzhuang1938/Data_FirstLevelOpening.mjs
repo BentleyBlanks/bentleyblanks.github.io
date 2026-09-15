@@ -136,6 +136,30 @@ export const OPENING = Object.freeze({
     TrenchIntruderC:[{x:-32,z:8},{x:-37,z:8}],
     TrenchIntruderD:[{x:-27,z:8},{x:-32,z:8}],
   },
+  // User 2026-09-15: the Shelter step said "hold the corner" while nobody came
+  // near it. A finite section follows the wounded man down the northern
+  // communication trench and must be stopped at the bend before the breather.
+  // They start beyond the (-24,-60) bend, out of sight of the roofed recess and
+  // entirely in front of the player; nothing refills behind the cleared breach.
+  shelterCorner: {x:-25.4,z:-24.6},
+  shelterPursuers: [
+    {id:"CornerPursuerA",x:-20.7,z:-63.7,weapon:"Type38",bayonet:true},
+    {id:"CornerPursuerB",x:-18.7,z:-66,weapon:"Type38",bayonet:true},
+    {id:"CornerPursuerC",x:-16.7,z:-68.2,weapon:"Type38",bayonet:true},
+    {id:"CornerPursuerD",x:-14.7,z:-70.5,weapon:"Type38",bayonet:true},
+    {id:"CornerPursuerE",x:-12.7,z:-72.7,weapon:"Type38",bayonet:true},
+  ],
+  shelterPursuerGrenades:1,
+  // Three come straight down the main trench; two use the short north loop and
+  // rejoin it at (-24,-44). Every route ends in the main trench, visible from the corner.
+  shelterPursuerRoutes: {
+    CornerPursuerA:{delay:0,points:[{x:-24,z:-58},{x:-23.6,z:-53},{x:-23.4,z:-39},{x:-24,z:-31}]},
+    CornerPursuerB:{delay:2,points:[{x:-23,z:-60.5},{x:-23.2,z:-54.5},{x:-24.4,z:-44},{x:-24.4,z:-34}]},
+    CornerPursuerC:{delay:4,points:[{x:-24.2,z:-59},{x:-24,z:-56},{x:-23.8,z:-47}]},
+    CornerPursuerD:{delay:5,points:[{x:-26,z:-58.9},{x:-31,z:-55},{x:-31,z:-49.5},{x:-26,z:-45.1}]},
+    // The loop's sandbag line (CommunicationBendDefense, x -29) stays on the east hand.
+    CornerPursuerE:{delay:8,points:[{x:-27,z:-58.6},{x:-31.2,z:-56},{x:-31.2,z:-51},{x:-30.5,z:-48},{x:-25.2,z:-44.6}]},
+  },
   surfaceBurstSeconds: 3.6,
   // These teams seal the unloading apron. They do not all turn north to chase
   // closer friendlies already deep in the communication trench.

@@ -42,6 +42,8 @@ export const TEXT = Object.freeze({
   "firstLevel.guide.support": "沿交通壕进入阵地",
   "firstLevel.guide.trenchContact": "清出侧沟日军",
   "firstLevel.hint.trenchContact": "沿沟清出前方折角，班长在沟边掩护。",
+  "firstLevel.guide.shelterCorner": "守住掩蔽处北侧折角",
+  "firstLevel.hint.shelterCorner": "日军跟着伤兵从北边交通壕摸下来了，守在折角把他们打退。",
   "firstLevel.guide.orders": "撤回交通壕接令",
   "firstLevel.guide.gun": "接管机枪",
   "firstLevel.guide.bundle": "集束手榴弹",
