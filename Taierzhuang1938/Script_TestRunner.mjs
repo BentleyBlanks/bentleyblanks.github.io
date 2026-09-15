@@ -517,7 +517,7 @@ export const domains = {
     //（UpdateFire / MoveSmokeSource），所以碰灯光或粒子的改动也要连着 FlareTest 跑。
     // 换人 / 某个人物模型号第一次进画面不许现编着色器：碰人物材质、着色器预热或
     // 远景人群层的改动要连着 RespawnShaderWarmTest 一起跑（真浏览器，约两分钟）。
-    tests: ["MuzzleFlashTest", "CharacterWoundsTest", "BloodEffectsTest", "BulletDecalPbrTest", "TestSceneLightingTest", "PostTest", "AutoQualityTest", "PostFrameGraphTest", "GtaoTest", "CsmTest", "MaterialUpgradeTest", "SamplerBudgetTest", "SsrTest", "ClusteredLightsTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ActorDepthTest", "ActorBatchTest", "ActorCrowdTest", "PropInstancingTest", "PropPcgTest", "ProfilerTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest", "FlareTest", "RespawnShaderWarmTest"],
+    tests: ["MuzzleFlashTest", "CharacterWoundsTest", "BloodEffectsTest", "BulletDecalPbrTest", "TestSceneLightingTest", "PostTest", "AutoQualityTest", "PostFrameGraphTest", "GtaoTest", "CsmTest", "ShadowSkipTest", "MaterialUpgradeTest", "SamplerBudgetTest", "SsrTest", "ClusteredLightsTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ActorDepthTest", "ActorBatchTest", "ActorCrowdTest", "PropInstancingTest", "PropPcgTest", "ProfilerTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest", "FlareTest", "RespawnShaderWarmTest"],
     tier2Tests: ["GiTest", "DeathViewTest", "ShotTest"],
   },
   perf: {
@@ -553,7 +553,8 @@ const changedDomainRules = [
   { domain: "render", pattern: /UniformColors/ },
   // 蒙皮克隆共用骨骼 / 阴影趟按对象种类共用深度材质：两条都改渲染提交。
   // Script_SkinnedClone 还被 /Skinn/ 那条拉进 motionVector（骨骼历史按 Skeleton 记）。
-  { domain: "render", pattern: /Script_SkinnedClone|Script_ShadowDepth/ },
+  // Script_ShadowSkip 是阴影烘焙那一趟的子树跳过包装（ShadowSkipTest 是它的纯 Node 门禁）。
+  { domain: "render", pattern: /Script_SkinnedClone|Script_ShadowDepth|Script_ShadowSkip/ },
   {domain:'propVelocity',pattern:/CarriagePropVelocity|PostPrepass|FirstLevelMissionView|FirstLevelMeal/},
   { domain: "render", pattern: /DeathPose|Data_Tuning_ActorDeath/ },
   { domain: "animation", pattern: /DeathCollapse|DeathPose|ActorDeath|MotionDeath/ },
