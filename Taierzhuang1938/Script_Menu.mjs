@@ -937,6 +937,8 @@ export class MainMenu {
       const panel = this.root.classList.contains("panelOn");
       switch (event.key) {
         case "Escape":
+          // 按住不放的自动重复不再往回退：一路退过暂停层就成了「继续」。
+          if (event.repeat) { event.preventDefault(); return; }
           if (panel) { this.Show(this.panelReturnMode); event.preventDefault(); }
           else if (this.mode === "pause") { this.host.Resume?.(); event.preventDefault(); }
           return;
