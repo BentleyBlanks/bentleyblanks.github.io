@@ -316,6 +316,15 @@ def Bake(modelId):
             CurlFingers(side, normal, curl, indexAmount=indexCurl)
         Update()
 
+    def AimFrom(pitch, yaw):
+        """枪口方向：pitch 是矢状面仰角（0 = 水平朝前 −Y，正 = 抬头，可以过 ±90° 一直转），
+        yaw 是朝角色左手边（+X）偏多少度。**别直接插值方向向量** —— 枪托抡过头顶那一下
+        方向要转 172°，线性插两个反向向量会在中途缩到近零，归一化后整支枪甩到侧面去
+        （实测刺刀尖从地下 −0.06 m 扫到 1.77 m）。按角度插就是一条干净的矢状面圆弧。"""
+        p = math.radians(pitch)
+        y = math.radians(yaw)
+        return Vector((math.sin(y) * math.cos(p), -math.cos(y) * math.cos(p), math.sin(p))).normalized()
+
     def GripPalms(axis, curl=.85):
         """Both hands wrapped around a rifle whose muzzle points along `axis`."""
         axis = Vector(axis).normalized()
@@ -631,33 +640,55 @@ def Bake(modelId):
             }
 
         elif clip == 'IjaRifleButtStrike':
-            # Anchored on the LEFT hand: it is the reach-limited one (0.51 m of arm),
-            # and the right hand then follows the rifle line back to the grip. Anchoring
-            # on the right hand pushed the left 0.63 m from its shoulder in the guard pose.
+            # Anchored on the **butt** (the striking end), because that is what the shot has
+            # to sell: the wind-up puts it above and behind the head, the smash drives it
+            # down in front to a kneeling man's head-and-shoulder height. The right hand
+            # follows 0.255 m up the stock (weapon origin = gripR) and the left another
+            # `span` along the barrel, so the two hands always sit fore-and-aft on the rifle
+            # instead of both crowding in front of the face (the 2026-09-15 first cut did).
+            # pitch 一路单调减到 −216.9°（= +143.1°），也就是枪托**从后上方翻过头顶砸到身前**
+            # 那条弧；写成 +143 会让插值走反方向（枪托先往下绕）。
             strike = [
-                (0.00, {'ra': (.12, -.902, -.414), 'lx': hipHalf - .055, 'ly': -.275,
-                        'lz': shoulder['L'].z - .320, 'px': 0, 'py': .015, 'pz': restPelvis - .055,
+                (0.00, {'pitch': -24.5, 'yaw': 7.6, 'bx': hipHalf - .130, 'by': .284,
+                        'bz': shoulder['L'].z - .063, 'px': 0, 'py': .015, 'pz': restPelvis - .055,
                         'tilt': .07, 'bend': .13, 'head': .09, 'fy': -.115, 'span': .365}),
-                (0.38, {'ra': (.30, -.62, -.72), 'lx': hipHalf + .020, 'ly': -.245,
-                        'lz': shoulder['L'].z - .100, 'px': -.02, 'py': .055, 'pz': restPelvis - .045,
-                        'tilt': -.13, 'bend': -.08, 'head': -.06, 'fy': -.100, 'span': .365}),
-                (0.62, {'ra': (.09, .585, .806), 'lx': hipHalf - .035, 'ly': -.176,
-                        'lz': shoulder['L'].z + .035, 'px': .01, 'py': -.055, 'pz': restPelvis - .120,
-                        'tilt': .44, 'bend': .30, 'head': .30, 'fy': -.215, 'span': .300}),
-                (0.80, {'ra': (.09, .570, .817), 'lx': hipHalf - .040, 'ly': -.196,
-                        'lz': shoulder['L'].z + .020, 'px': .01, 'py': -.060, 'pz': restPelvis - .130,
-                        'tilt': .48, 'bend': .32, 'head': .32, 'fy': -.225, 'span': .300}),
-                (1.14, {'ra': (.14, -.86, -.49), 'lx': hipHalf - .045, 'ly': -.255,
-                        'lz': shoulder['L'].z - .300, 'px': 0, 'py': .020, 'pz': restPelvis - .070,
-                        'tilt': .12, 'bend': .16, 'head': .12, 'fy': -.130, 'span': .365}),
-                (1.40, {'ra': (.12, -.902, -.414), 'lx': hipHalf - .055, 'ly': -.275,
-                        'lz': shoulder['L'].z - .320, 'px': 0, 'py': .015, 'pz': restPelvis - .055,
+                (0.28, {'pitch': -36.9, 'yaw': 11.6, 'bx': hipHalf - .175, 'by': .325,
+                        'bz': shoulder['L'].z + .130, 'px': -.01, 'py': .045, 'pz': restPelvis - .050,
+                        'tilt': -.06, 'bend': .02, 'head': -.02, 'fy': -.100, 'span': .360}),
+                # 蓄力（0.50）：枪托甩到头顶后上方（离地约 1.80 m、身后 0.30 m），枪口朝前下 45°；
+                # 右手在右耳上方、左手在胸前，一后一前握着枪身。
+                (0.50, {'pitch': -45.3, 'yaw': 8.0, 'bx': hipHalf - .315, 'by': .300,
+                        'bz': shoulder['L'].z + .390, 'px': -.02, 'py': .055, 'pz': restPelvis - .045,
+                        'tilt': -.13, 'bend': -.08, 'head': -.10, 'fy': -.095, 'span': .350}),
+                # 过顶：枪身竖起来、枪托在身前上方，重心开始压到前脚。枪托这一路必须**保持高**——
+                # 枪连刺刀 1.66 m，握把一低，枪口扫过竖直位时刺刀尖就插进地里（实测 −0.22 m）。
+                (0.68, {'pitch': -131.0, 'yaw': -2.0, 'bx': hipHalf - .150, 'by': -.420,
+                        'bz': shoulder['L'].z + .375, 'px': 0, 'py': -.090, 'pz': restPelvis - .090,
+                        'tilt': .15, 'bend': .05, 'head': .10, 'fy': -.200, 'span': .340}),
+                # 砸击（0.85）：枪托落到身前约 0.78 m、高约 0.66 m（跪着的人的头肩高度），
+                # 躯干前倾、右臂打直、骨盆压到前脚上方。
+                (0.85, {'pitch': -216.9, 'yaw': -3.6, 'bx': hipHalf - .125, 'by': -.875,
+                        'bz': .655, 'px': .02, 'py': -.290, 'pz': restPelvis - .150,
+                        'tilt': .40, 'bend': .12, 'head': .26, 'fy': -.410, 'span': .300}),
+                (1.02, {'pitch': -221.0, 'yaw': -3.6, 'bx': hipHalf - .120, 'by': -.855,
+                        'bz': .620, 'px': .02, 'py': -.318, 'pz': restPelvis - .155,
+                        'tilt': .42, 'bend': .13, 'head': .27, 'fy': -.420, 'span': .300}),
+                # 收回也把枪先带回高位再落到持枪式：枪口转回来必然要扫过「竖直朝下」，
+                # 那一瞬握把低于 1.5 m 刺刀尖就进地（第一版实测 −0.19 m）。
+                (1.16, {'pitch': -150.0, 'yaw': -2.0, 'bx': hipHalf - .150, 'by': -.470,
+                        'bz': shoulder['L'].z + .300, 'px': .01, 'py': -.130, 'pz': restPelvis - .115,
+                        'tilt': .30, 'bend': .16, 'head': .20, 'fy': -.300, 'span': .330}),
+                (1.28, {'pitch': -100.0, 'yaw': 3.0, 'bx': hipHalf - .150, 'by': -.180,
+                        'bz': shoulder['L'].z + .470, 'px': .005, 'py': -.060, 'pz': restPelvis - .090,
+                        'tilt': .18, 'bend': .15, 'head': .14, 'fy': -.220, 'span': .330}),
+                (1.40, {'pitch': -24.5, 'yaw': 7.6, 'bx': hipHalf - .130, 'by': .284,
+                        'bz': shoulder['L'].z - .063, 'px': 0, 'py': .015, 'pz': restPelvis - .055,
                         'tilt': .07, 'bend': .13, 'head': .09, 'fy': -.115, 'span': .365}),
             ]
             k = Track(strike, t)
-            aim = Vector(k['ra']).normalized()
-            left = Vector((k['lx'], k['ly'], k['lz']))
-            right = left - aim * k['span']
+            aim = AimFrom(k['pitch'], k['yaw'])
+            right = Vector((k['bx'], k['by'], k['bz'])) + aim * .255
+            left = right + aim * k['span']
             p = {
                 'pelvis': (k['px'], k['py'], k['pz']),
                 'pelvisTilt': (k['tilt'], 0, -.12),

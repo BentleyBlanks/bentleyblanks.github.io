@@ -92,7 +92,7 @@
     {
       "id": "LugouIja01",
       "file": "Animation_LugouIja01MachineGunCaptives.json",
-      "sha256": "a92df69c0c05341925492e8abb982901bf29fcaa896dd575653dfcccb2ba1fac",
+      "sha256": "5d14a3a77e293ff18944d413d61cb91646cb6675d7ad24cbe5cc0cdb062e130e",
       "clipIds": [
         "IjaBayonetGuard",
         "IjaTauntGesture",
@@ -105,7 +105,7 @@
     {
       "id": "LugouIja02",
       "file": "Animation_LugouIja02MachineGunCaptives.json",
-      "sha256": "3557f38d1a3808d52dea3f63a59f335fa9ce30a7b4a5e9d3e72d220ae164f15b",
+      "sha256": "6c6ea3e972c21f1eb228ff1d8951326b6a62a09f176dfbfaa6c6a408ddb38c92",
       "clipIds": [
         "IjaBayonetGuard",
         "IjaTauntGesture",
@@ -118,7 +118,7 @@
     {
       "id": "LugouIja03",
       "file": "Animation_LugouIja03MachineGunCaptives.json",
-      "sha256": "a75b9b438536e3b7fb7864da0968c5793c45f81724e73d0d6e9d5e210e923540",
+      "sha256": "15732155629d7f538ac21955f6b59e0bdd25ce31431397513af50ed95e51d8da",
       "clipIds": [
         "IjaBayonetGuard",
         "IjaTauntGesture",

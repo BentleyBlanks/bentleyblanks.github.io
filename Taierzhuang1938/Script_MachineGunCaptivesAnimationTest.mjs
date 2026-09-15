@@ -200,7 +200,7 @@ try {
         // 一次性动作另加各自的关键时刻（蓄力 / 命中 / 抽回），否则均匀取样会正好
         // 跨过最用力的那一帧。
         const EXTRA = {
-          IjaBayonetDownThrust: [0.40, 0.76, 1.06], IjaRifleButtStrike: [0.38, 0.72],
+          IjaBayonetDownThrust: [0.40, 0.76, 1.06], IjaRifleButtStrike: [0.28, 0.50, 0.68, 0.85, 1.02, 1.16],
           IjaKickPrisoner: [0.50], CaptiveStruckDown: [0.16, 0.70], CaptiveStabbedCollapse: [0.22, 0.92],
         };
         const times = (loop
@@ -225,6 +225,10 @@ try {
           const hipLeft = point(rig.bones.thighL).sub(point(rig.bones.thighR)).normalize();
           const bodyUp = point(rig.bones.head).sub(point(rig.bones.pelvis)).normalize();
           const facing = hipLeft.clone().cross(bodyUp).normalize().toArray();
+          const pelvisAt = point(rig.bones.pelvis);
+          const torsoPitch = Math.acos(Math.min(1, Math.max(-1,
+            point(rig.bones.chest).sub(pelvisAt).normalize().y))) * 180 / Math.PI;
+          const armSpanR = point(rig.bones.handR).distanceTo(point(rig.bones.upperArmR));
           samples.push({
             t: at,
             head: point(rig.bones.head).y,
@@ -235,7 +239,10 @@ try {
             toeR: toe.R ? point(toe.R).y : null,
             wristL: point(rig.bones.handL).y,
             wristR: point(rig.bones.handR).y,
-            bounds, facing,
+            bounds, facing, torsoPitch, armSpanR,
+            pelvisZ: pelvisAt.z,
+            footLz: point(rig.bones.footL).z,
+            footRz: point(rig.bones.footR).z,
             rifle: RifleLine(C.MachineGunCaptivesLibrary().config.clips[clipId].weaponHold),
           });
           const matrix = actorRoot.matrixWorld.elements;
@@ -403,9 +410,11 @@ try {
         const tipY = clip.samples.map((s) => s.rifle.tip[1]);
         const tipZ = clip.samples.map((s) => s.rifle.tip[2]);
         const buttZ = clip.samples.map((s) => s.rifle.butt[2]);
+        const hit = clip.samples.reduce((best, s) => (s.rifle.butt[2] < best.rifle.butt[2] ? s : best));
         console.log(`    tip y ${Math.min(...tipY).toFixed(3)}..${Math.max(...tipY).toFixed(3)}`
           + ` z ${Math.min(...tipZ).toFixed(3)}..${Math.max(...tipZ).toFixed(3)}`
-          + ` butt z ${Math.min(...buttZ).toFixed(3)}`);
+          + ` butt(z ${Math.min(...buttZ).toFixed(3)} y ${hit.rifle.butt[1].toFixed(3)} @t=${hit.t.toFixed(2)})`
+          + ` torso ${hit.torsoPitch.toFixed(1)}° armR ${hit.armSpanR.toFixed(3)}`);
       }
       if (clip.clipId === "IjaBayonetGuard") {
         const tip = clip.samples.map((s) => s.rifle.tip);
@@ -425,12 +434,36 @@ try {
         assert.ok(At(clip.duration).rifle.tip[2] - apex.rifle.tip[2] > 0.20, `${record.id} 刺完要抽回`);
       }
       if (clip.clipId === "IjaRifleButtStrike") {
+        // 蓄力（约 0.5 s）：枪托甩到头顶后上方、枪口朝前下，两手一后一前分开握在枪身上。
+        const wind = At(0.50);
+        assert.ok(wind.rifle.butt[1] - wind.head > 0.15,
+          `${record.id} 蓄力：枪托要高过头顶（比头骨高 ${(wind.rifle.butt[1] - wind.head).toFixed(3)} m）`);
+        assert.ok(wind.rifle.butt[2] > 0.08,
+          `${record.id} 蓄力：枪托要甩到身后（${wind.rifle.butt[2].toFixed(3)} m）`);
+        assert.ok(wind.rifle.axis[1] < -0.35, `${record.id} 蓄力：枪口朝前下`);
+        assert.ok(wind.wristR - wind.head > 0.05 && wind.wristL - wind.head < 0.02,
+          `${record.id} 蓄力：右手在头上方、左手在胸前，不能两手都挤在脸前`
+          + `（右 ${(wind.wristR - wind.head).toFixed(3)} / 左 ${(wind.wristL - wind.head).toFixed(3)}）`);
+        // 砸击（约 0.85 s）：枪托落到跪着的人的头肩高度，躯干前倾，右臂伸出，重心到前脚。
         const hit = clip.samples.reduce((best, s) => (s.rifle.butt[2] < best.rifle.butt[2] ? s : best));
-        assert.ok(hit.rifle.butt[2] < -0.34, `${record.id} 枪托必须真的砸出去（${hit.rifle.butt[2].toFixed(3)} m）`);
-        assert.ok(hit.rifle.butt[1] > 0.70 && hit.rifle.butt[1] < 1.20,
-          `${record.id} 枪托落点高度 ${hit.rifle.butt[1].toFixed(3)} m`);
+        assert.ok(hit.rifle.butt[2] < -0.75 && hit.rifle.butt[2] > -0.95,
+          `${record.id} 砸击：枪托落点前伸 ${(-hit.rifle.butt[2]).toFixed(3)} m（要 0.75–0.95）`);
+        assert.ok(hit.rifle.butt[1] > 0.55 && hit.rifle.butt[1] < 0.75,
+          `${record.id} 砸击：枪托落点高度 ${hit.rifle.butt[1].toFixed(3)} m（要 0.55–0.75）`);
         assert.ok(hit.rifle.axis[1] > 0.35, `${record.id} 反握：砸的时候枪口朝上后方`);
-        assert.ok(At(0).rifle.axis[1] < 0, `${record.id} 起手与收尾是正常持枪`);
+        assert.ok(hit.torsoPitch > 20 && hit.torsoPitch < 30,
+          `${record.id} 砸击：躯干前倾 ${hit.torsoPitch.toFixed(1)}°（要 20–30）`);
+        assert.ok(hit.armSpanR > 0.40, `${record.id} 砸击：右臂要伸出去（肩到腕 ${hit.armSpanR.toFixed(3)} m）`);
+        assert.ok(At(0).pelvisZ - hit.pelvisZ > 0.15,
+          `${record.id} 砸击：重心要压到前脚（骨盆前移 ${(At(0).pelvisZ - hit.pelvisZ).toFixed(3)} m）`);
+        assert.ok(hit.footLz < hit.pelvisZ && hit.footRz > hit.pelvisZ,
+          `${record.id} 砸击：骨盆要落在前后脚之间、偏前脚`);
+        // 收回（1.4 s）：回到正常持枪式（枪口朝前下、枪托在手后方）。
+        const back = At(clip.duration);
+        assert.ok(At(0).rifle.axis[1] < 0 && back.rifle.axis[1] < 0, `${record.id} 起手与收尾是正常持枪`);
+        assert.ok(back.rifle.butt[2] > 0.15, `${record.id} 收尾：枪托回到手后方（${back.rifle.butt[2].toFixed(3)} m）`);
+        assert.ok(Math.abs(back.rifle.butt[1] - At(0).rifle.butt[1]) < 0.02
+          && Math.abs(back.torsoPitch - At(0).torsoPitch) < 1.5, `${record.id} 收尾必须回到起手那一式`);
       }
       if (clip.clipId === "IjaKickPrisoner") {
         const toeLift = Math.max(...clip.samples.map((s) => s.toeR));
