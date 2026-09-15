@@ -22,7 +22,8 @@ import { FIRST_LEVEL_STAGES, ResolveFirstLevelStage, FirstLevelStageForStep } fr
 import { BuildFirstLevelCheckpoint } from "./Script_FirstLevelMissionCheckpoint.mjs";
 import { FirstLevelMissionColumn, MissionRouteNextIndex, MissionCarryRoutePoint, MissionGuideSpeed, MissionGuideRoute, MissionSquadRoute, MissionSquadPace } from "./Script_FirstLevelMissionColumn.mjs";
 import { MISSION_STAGES, MISSION_TUNING as R, FIRST_LEVEL_MISSION_PHASE, MISSION_TACTICS, MISSION_ENCOUNTERS, MISSION_PURSUIT_ROUTE } from "./Data_FirstLevelMission.mjs";
-import { MISSION_LAYOUT, MISSION_ROUTES, MISSION_ANCHORS as A, MISSION_PLACEMENT as P } from "./Data_FirstLevelMissionLayout.mjs";
+import { MISSION_LAYOUT, MISSION_ROUTES, MISSION_ANCHORS as A, MISSION_PLACEMENT as P, MISSION_RAILWAY } from "./Data_FirstLevelMissionLayout.mjs";
+import { MakeRailwayProfile } from "./Script_RoadPath.mjs";
 import { MISSION_TERRAIN, SampleMissionTerrain, MissionPathDistance } from "./Data_FirstLevelMissionTerrain.mjs";
 import { CreateP012Terrain } from "./Data_FirstLevelP012Terrain.mjs";
 import { MISSION_DIALOGUE, MissionVoicePrompt } from "./Data_FirstLevelMissionDialogue.mjs";
@@ -731,6 +732,23 @@ assert.equal(FIRST_LEVEL_MISSION_PHASE.whitebox.fullMission, true);
 assert.ok(SampleMissionTerrain(135,90)>2.8 && SampleMissionTerrain(-204,90)>3.8,
   "Peripheral earth banks frame the plain through the same physical heightfield");
 console.log("ok shared terrain, excavated trenches, structural floors only");
+// The railway is a PCG spec on the shared heightfield, not boxes at an absolute height
+// (the old rails sat at y=0.76 over ~0 m soil and floated 0.7 m above their sleepers).
+{
+  assert.equal(MISSION_LAYOUT.railway, MISSION_RAILWAY, "the whitebox field builds the layout's railway spec");
+  assert.ok(!MISSION_LAYOUT.blocks.some(block => /^Rail(?:Sleeper)?-?\d/.test(block.id)), "no hand-placed rail or sleeper boxes");
+  const railway = MakeRailwayProfile(MISSION_RAILWAY, (x, z) => terrain.SampleHeight(x, z));
+  for (let s = 0; s <= railway.path.length; s += 1) {
+    const p = railway.path.At(s), soil = terrain.SampleHeight(p.x, p.z);
+    const railTop = railway.RailTopAt(s) - soil;
+    assert.ok(railTop > 0.2 && railTop < 0.42, `rail top stays low on the soil at z=${p.z.toFixed(1)}: ${railTop.toFixed(3)}`);
+  }
+  const wheels = MISSION_LAYOUT.blocks.filter(block => /^Station(?:Car\dWheel|EngineWheel)/.test(block.id));
+  assert.equal(wheels.length, 3 * 8 + 8, "every car and engine wheel is seated");
+  for (const wheel of wheels)
+    assert.ok(Math.abs(wheel.y - wheel.h / 2 - railway.RailTopNear(wheel.x, wheel.z)) < 0.01, `${wheel.id} stands on the rail top`);
+  console.log("ok railway is a low PCG track and the parked train stands on it");
+}
 const tacticalRoutes = Object.fromEntries(Object.entries(MISSION_TACTICS).map(([id, plan]) => [id,
   [Object.values(MISSION_ENCOUNTERS).flat().find(spec => spec.id === id), ...plan.points]]));
 for(const spec of [...MISSION_ENCOUNTERS.retreat,...MISSION_ENCOUNTERS.air])

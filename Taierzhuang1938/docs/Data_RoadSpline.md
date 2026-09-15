@@ -13,7 +13,9 @@
       BuildRoadRibbon                   路面（顶面 + 两侧裙边 + 可选路基碰撞）
       BuildRailBed                      道砟堤（梯形断面扫掠，台阶/低隆两种碰撞）
       BuildRailTrack                    枕木 + 双轨（钢轨按弦分节，道口连续）
+      BuildRailwayFromSpec              纯数据 spec 一次铺完道砟 + 枕木双轨
       MakeCrownProfile                  轨面高程（平滑 + 对地面夹持）
+      MakeRailwayProfile（Script_RoadPath，纯 Node）  spec → 中心线 + 道砟顶 + 轨顶
 ```
 
 ## 谁在用（调用点清单）
@@ -28,6 +30,15 @@
 | L0/L1 大车路 | `OUTFIELD_SCENES[*].roads.points` | `TengxianOutfield.BuildRoads` |
 | 铁路（野外 1.35 m 堤） | `OUTFIELD_SCENES[*].railway` | `TengxianOutfield.BuildRailway` |
 | 铁路（车站 0.46 m 低基） | `WEST_SUBURB.railway` | `Script_Landmark_Station.BuildRailway` |
+| 铁路（第一关白盒，轨顶离土 ~0.3 m） | `Data_FirstLevelMissionLayout.MISSION_RAILWAY`（= `MISSION_LAYOUT.railway`） | `FirstLevelWhiteboxField.BuildWhiteBoxes` → `BuildRailwayFromSpec` |
+
+第一关那条是**整份断面都写在 spec 里**的铁路（crown / bed / sleeper / rail）：
+白盒场景与编辑器预览调同一个 `BuildRailwayFromSpec`，布局里的车轮用同一份
+`MakeRailwayProfile` 把轮底落到轨顶（火车高度不跟着猜）。不登记路基碰撞：
+道砟顶只高出土面 0.1 m，弹坑把土挖下去以后静态路基盒会悬成隐形台子。
+2026-09-15 之前这里是手摆的枕木盒 + 写死 `y=0.76` 的钢轨盒，而地形里的
+0.62 m 路基被战壕的 `min` 夹没了，整条轨悬空 0.7 m 还带碰撞。回归：
+`Script_FirstLevelMissionTest`（轨顶离土 0.2–0.42 m、32 只车轮落轨）。
 
 数据故意**没有**集中成一张新路表：STREETS 的轴对齐格式被多个纯 Node 测试锁死，
 outfield 的 points 折线本来就是控制点。样条层只负责解释这些数据。
@@ -60,7 +71,7 @@ outfield 的 points 折线本来就是控制点。样条层只负责解释这些
 
 设置面板（` 键）→「编辑器」→「**场景样条PCG**」（`Script_EditorSplines.mjs`，
 原「道路样条」2026-08-27 扩围墙后改名；围墙侧的账在 `Data_WallSpline.md`）：
-按当前关卡列出全部路线（路 + 墙），中心线 + 控制点 + **真几何预览**（调的就是
+按当前关卡列出全部路线（路 + 墙；第一关白盒另列布局 `railway` spec 那条铁路），中心线 + 控制点 + **真几何预览**（调的就是
 上面那份生成代码 + 宿主 groundAt，预览抬高盖在现物上）。选点/移动/插入/删除、
 调宽/调墙高、导出 JSON（`routes` + `presets` 两节，各带 source 说明誊回哪个
 文件哪个字段）。改动只存 localStorage（`tz1938.sceneSplines.v1`，预设改动在

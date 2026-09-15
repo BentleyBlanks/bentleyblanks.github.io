@@ -6,6 +6,32 @@ import { MISSION_TRAIN } from "./Data_FirstLevelMissionTrain.mjs";
 import { MISSION_DEFENSE_POSTS } from "./Data_FirstLevelMissionFortifications.mjs";
 import { P012_STATION_BLOCKS } from "./Data_FirstLevelP012Station.mjs";
 import { MISSION_TERRAIN, SampleMissionTerrain, MissionPathDistance, SampleMissionGroundColor } from "./Data_FirstLevelMissionTerrain.mjs";
+import { MakeRailwayProfile } from "./Script_RoadPath.mjs";
+// A low field line through the halt: two rails on sleepers on a shallow ballast
+// bed that follows the shared heightfield. Script_RoadSpline builds it from this
+// spec (whitebox field and the scene-spline editor preview alike); there are no
+// rail boxes at an absolute height. Rail top is ~0.3 m above the soil.
+export const MISSION_RAILWAY = Object.freeze({
+  id: "MissionRailway",
+  // North end stops at the foot of the 3 m field bank (z < -184) instead of climbing it.
+  points: Object.freeze([[-77, -186], [-77, MISSION_TRAIN.approachEndZ]]),
+  gauge: 1.435,
+  // Ballast top: soil smoothed over +/-24 m, then kept 0.06-0.18 m above the local soil.
+  crown: Object.freeze({ step: 4, smooth: 6, lift: 0.1, clampLo: 0.06, clampHi: 0.18 }),
+  bed: Object.freeze({ material: "railBallast", topHalf: 1.7, slope: 1.6, embed: 0.25, step: 4, chunkLen: 48 }),
+  sleeper: Object.freeze({ material: "timber", along: 0.22, h: 0.14, length: 2.5, lift: 0.02,
+    spacing: 0.75, jitter: 0.03, ryJitter: 0.02 }),
+  // Rail foot rests on the sleeper top (crown + 0.09).
+  rail: Object.freeze({ material: "metal", w: 0.08, h: 0.13, lift: 0.155, segLen: 12 }),
+});
+const railProfile = MakeRailwayProfile(MISSION_RAILWAY, SampleMissionTerrain);
+// Box wheels keep their authored top inside the underframe; the bottom stands on the rail top.
+function SeatOnRail(block) {
+  const top = block.y + block.h / 2, rail = railProfile.RailTopNear(block.x, block.z);
+  block.h = top - rail;
+  block.y = (top + rail) / 2;
+  return block;
+}
 const blocks = [],
   gates = [],
   surfaces = [];
@@ -82,7 +108,7 @@ for (let i = 0; i < 3; i++) {
   );
   surfaces.push(floor);
   for (const part of sourceCarParts) {
-    Block(
+    const block = Block(
       part.id.replace("StationCar0", id),
       -77 + part.x - sourceCarFloor.x,
       z + (part.z - sourceCarFloor.z) * lengthScale,
@@ -92,6 +118,7 @@ for (let i = 0; i < 3; i++) {
       part.semantic,
       { y: part.y - 0.08 },
     );
+    if (part.id.includes("Wheel")) SeatOnRail(block);
   }
   for (const side of [-1, 1]) {
     Block(
@@ -170,7 +197,7 @@ const sourceEngineFrame = P012_STATION_BLOCKS.find(
 for (const part of P012_STATION_BLOCKS.filter((block) =>
   block.id.startsWith("StationEngine"),
 )) {
-  Block(
+  const block = Block(
     part.id,
     -77 + part.x - sourceEngineFrame.x,
     58 + part.z - sourceEngineFrame.z,
@@ -180,11 +207,9 @@ for (const part of P012_STATION_BLOCKS.filter((block) =>
     part.semantic,
     { y: part.y },
   );
+  if (part.id.startsWith("StationEngineWheel")) SeatOnRail(block);
 }
-for (let z = -196; z < MISSION_TRAIN.approachEndZ; z += 3)
-  Block("RailSleeper" + z, -77, z, 4.5, 0.12, 0.3, "structure");
-for (const x of [-77.75, -76.25])
-  Block("Rail" + x, x, (MISSION_TRAIN.approachEndZ-197)/2, 0.1, 0.14, MISSION_TRAIN.approachEndZ+197, "structure", { y: 0.76 });
+// Sleepers and rails are not layout blocks: see MISSION_RAILWAY above.
 Block("SupplyTable", -68.5, 66, 2, 0.85, 1, "missionRoute");
 Room("UnloadingShed", -58, 85, 9, 9);
 Wall("BrokenStationWall", -68, 55, 9, 1.1, 0.65);
@@ -606,7 +631,9 @@ export const MISSION_LAYOUT = Object.freeze({
   SampleGroundColor: SampleMissionGroundColor,
   bounds: { minX: -205, maxX: 137, minZ: -258, maxZ: MISSION_TRAIN.approachEndZ },
   ground: { x: -34, z: (MISSION_TRAIN.approachEndZ-258)/2, w: 342, d: MISSION_TRAIN.approachEndZ+258, h: 1, y: -0.5, semantic: "ground" },
+  railway: MISSION_RAILWAY,
   semanticColors: {
+    railBallast: 0x5a5750,
     foliage: 0x68715f,
     timber: 0x746956,
     metal: 0x535b57,

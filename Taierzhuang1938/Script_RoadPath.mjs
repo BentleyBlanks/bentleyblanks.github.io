@@ -254,6 +254,26 @@ export function MakeCrownProfile(path, {
   };
 }
 
+/**
+ * 数据驱动铁路的纵断面：中心线 + 道砟顶（上面那份 MakeCrownProfile）+ 轨顶。
+ * spec 是 Data_* 里的纯数据（形状见 Data_FirstLevelMissionLayout.MISSION_RAILWAY）。
+ * 建几何的 Script_RoadSpline.BuildRailwayFromSpec 与布局里「车轮落在轨顶上」
+ * 读的是同一份剖面 —— 轮子和钢轨不许各算各的高度（第一关旧白盒把钢轨写死在
+ * y=0.76，地面其实在 0 附近，整条轨悬空 0.7 m）。
+ */
+export function MakeRailwayProfile(spec, groundAt) {
+  const path = MakeRoadPath(spec.points);
+  const crown = MakeCrownProfile(path, { groundAt, ...spec.crown });
+  const railTopLift = spec.rail.lift + spec.rail.h / 2;
+  return {
+    path,
+    CrownAt: crown.At,
+    LocalAt: crown.LocalAt,
+    RailTopAt: (s) => crown.At(s) + railTopLift,
+    RailTopNear: (x, z) => crown.At(path.ClosestS(x, z)) + railTopLift,
+  };
+}
+
 /** 点到折线（[[x,z],...]）的最近距离。原散落四份的实现收拢到这里。 */
 export function DistanceToPolyline(x, z, points) {
   let best = 1e9;

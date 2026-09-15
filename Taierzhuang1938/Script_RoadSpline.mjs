@@ -12,6 +12,7 @@
 //   BuildRoadRibbon  路面条带（顶面 + 两侧裙边 + 可选路基碰撞）——街、土路
 //   BuildRailBed     道砟路基（梯形断面扫掠 + 台阶/低隆两种碰撞）
 //   BuildRailTrack   枕木 + 双轨（沿样条摆，钢轨按弦分节）
+//   BuildRailwayFromSpec  纯数据 spec 一次铺完上面两件（第一关白盒 / 编辑器预览）
 // 以及 MakeCrownProfile：轨面高程剖面（平滑 + 夹持，车站那条 0.46 m 低路基用）。
 //
 // ## 约定
@@ -28,10 +29,10 @@ import * as THREE from "three";
 import { MakeBox, PlaceGeometry, TILE_METERS } from "./Script_Geo.mjs";
 import { Mulberry32, HashString } from "./Script_Noise.mjs";
 import {
-  MakeRoadPath, GapsToRuns, SampleRun, PredicateGaps, MakeCrownProfile,
+  MakeRoadPath, GapsToRuns, SampleRun, PredicateGaps, MakeCrownProfile, MakeRailwayProfile,
 } from "./Script_RoadPath.mjs";
 
-export { MakeRoadPath, GapsToRuns, SampleRun, PredicateGaps, MakeCrownProfile };
+export { MakeRoadPath, GapsToRuns, SampleRun, PredicateGaps, MakeCrownProfile, MakeRailwayProfile };
 
 // ---------------------------------------------------------------------------
 // 条带累加器
@@ -299,6 +300,33 @@ export function BuildRailBed(sink, {
     }
   }
   return stats;
+}
+
+// ---------------------------------------------------------------------------
+// 数据驱动的整条铁路
+// ---------------------------------------------------------------------------
+
+/**
+ * 纯数据 spec → 纵断面 → 道砟堤 → 枕木双轨，一次调用。第一关白盒与
+ * 「场景样条PCG」编辑器预览共用这一条，断面与间距只写在 spec 里。
+ *
+ * spec: { id, points, gauge, crown:{MakeCrownProfile 参数},
+ *         bed:{BuildRailBed 参数（material/topHalf/slope/embed/step/chunkLen/colliders）},
+ *         sleeper:{BuildRailTrack.sleeper，含 spacing}, rail:{BuildRailTrack.rail} }
+ * groundAt 必须是宿主那一份（与玩家、AI 踩的是同一个地面）。
+ */
+export function BuildRailwayFromSpec(sink, spec, { groundAt, sinkFor = null, colliderSink = null, profile = null }) {
+  const railway = profile || MakeRailwayProfile(spec, groundAt);
+  const bed = BuildRailBed(sink, {
+    path: railway.path, groundAt, crownAt: railway.CrownAt,
+    ...spec.bed, sinkFor, colliderSink,
+  });
+  const track = BuildRailTrack({
+    path: railway.path, crownAt: railway.CrownAt, gauge: spec.gauge ?? 1.435,
+    sinkFor: sinkFor || (() => sink), seed: spec.id || "railway",
+    sleeper: spec.sleeper || {}, rail: spec.rail || {},
+  });
+  return { profile: railway, bed, track };
 }
 
 // ---------------------------------------------------------------------------
