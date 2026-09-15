@@ -437,6 +437,11 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
   `trigger` 三种写法：`beforeLevel:` / `afterLevel:` / `duringLevel:`（关中，格式由
   `ValidateCutscene` 硬查）。就地演在正片战场上的场写 `groundSnap: true`，演员的 y 是
   离地高度，真实地面由 `groundAt` 钩子问共享采样器要。
+- `Script_CutscenePerformance.mjs` —— 过场演员的**作者动作层**：cast 轨道关键帧写 `perform:"<ClipId>"`
+  就从该关键帧起播 Blender 烘的原骨架动作（`Animation/MachineGunCaptives/`，机枪点位那场川军被俘十条）。
+  采样按「过场时间 − t0」定位，拖时间轴/跳过/补卡都确定性一致；未知 id 警告一次后退回 POSE_CLIPS。
+  口径在 `docs/Data_CutsceneRedo.md` §1.3，烘焙脚本 `_import/Script_MachineGunCaptivesBake.py`，
+  门禁 `Script_MachineGunCaptivesAnimationTest.mjs`，资产说明 `Animation/MachineGunCaptives/Data_MachineGunCaptivesAnimation.md`。
 - 第一关 04 机枪点位的关中过场 `CS_MachineGunCaptives`（`Data_CutsceneMachineGunCaptives.mjs`）：
   触发在 `Script_FirstLevelMissionRuntime.UpdateCaptivesCutscene`，半径在
   `Data_Tuning_FirstLevel.captivesCutsceneRadiusM`，回归口 `Script_FirstLevelMachineGunCutsceneTest.mjs`；

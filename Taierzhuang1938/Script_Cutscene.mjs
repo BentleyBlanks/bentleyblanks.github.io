@@ -191,6 +191,10 @@ import {
 } from "./Script_CutsceneCheck.mjs";
 export { ValidateCutscene, ValidateAllCutscenes, ResolveHeadLookConfig, ClampHeadLook };
 
+// 作者动作层（state.perform）。契约与实现都在这个模块里，这里只有 _ApplyActors 末尾
+// 那一个挂点；没有 perform 时它只是原样调一次 actor.Update。
+import { PerformCutsceneActor } from "./Script_CutscenePerformance.mjs";
+
 // ---------------------------------------------------------------------------
 // 关键帧采样
 // ---------------------------------------------------------------------------
@@ -223,6 +227,11 @@ function SampleTrack(track, t) {
     const va = stateA[key];
     const vb = stateB[key];
     if (typeof va === "boolean" || typeof vb === "boolean") { state[key] = !!va; continue; }
+    // 字符串（作者动作的 perform clip id）和布尔一样是段内不变的：取 a 不插值。
+    // 插它会得到 NaN —— 那个 NaN 会一路流进 Actor.Update 的 state 里。
+    if (typeof va === "string" || typeof vb === "string") {
+      state[key] = typeof va === "string" ? va : null; continue;
+    }
     state[key] = Lerp(va ?? 0, vb ?? 0, k);
   }
   return {
@@ -1689,7 +1698,7 @@ export class CutsceneDirector {
         // 因此仍可满幅叠上去（导演写死的朝向则只留抖动，不许被改朝向）。
         state.lookAuto = true;
       }
-      item.actor.Update(dt, state);
+      PerformCutsceneActor(item, dt, now, () => item.actor.Update(dt, state));
     }
   }
 

@@ -90,6 +90,32 @@ export const CS_X = {
   躺着的人在门板担架（面高 0.33）上，头顶也只有 0.6 m 上下，视线给到 0.7 以上
   就只剩站着的人的背了（Ch4 救护所镜 2/3/4 踩过这个坑）。
 
+#### 作者动作：`state.perform`（2026-09-15 加）
+
+POSE_CLIPS 那十六条是**导入动作**，里面没有投降、跪地、踢人、砸枪托、刺杀。需要这些的
+镜头在 cast 轨道的关键帧 state 里写一条 `perform: "<ClipId>"`，引擎就改播 Blender 作者动作：
+
+```js
+{ t: 12.0, pos:[3,0,-2], ry: 0.4, state:{ perform:"CaptiveKneelHandsHead" } },
+{ t: 18.4, pos:[3,0,-2], ry: 0.4, state:{ perform:"CaptiveStabbedCollapse" } },
+{ t: 20.4, pos:[3,0,-2], ry: 0.4, state:{ perform:null } },
+```
+
+- **t0 = 出现（或换成新 id）的那个关键帧的 t**，采样位置是 `过场时间 − t0`，**不是累计 dt**。
+  时间轴拖到任何一秒、Esc 跳过后补卡、出图脚本从中间抓帧，拿到的姿势逐比特相同。
+- `loop` 的 clip 整周回环；`once` 的播完**保持末帧**。哪条是哪种见资产清单的 `clips[].loop`。
+- `perform:null` 或不写 → 走原来的 POSE_CLIPS 路径；同一段里连写同一个 id 不会重新起播。
+- 换 clip 时与上一段做一次 0.12 s 的交叉淡入，混合量只由 `时间 − t0` 决定（同样确定性）。
+  从 POSE_CLIPS 切进 perform 是**硬切**：要顺就把 perform 放在切镜那一帧。
+- 未知 clip id、或这具骨架没有这条 clip：`console.warn` 一次并回退 POSE_CLIPS，不抛错卡死。
+- 表演期间 `pos` / `ry` 仍由轨道决定（表演层只写骨头，从不写 Actor 世界根），
+  `hidden` / `dead` 等布尔语义不变；`perform` 与 `crouch/prone/dead` 同时出现时以 `perform` 为准。
+- 贴地是**烘焙时**做的：每一帧整体平移到最低那个蒙皮顶点离地 3 mm，所以运行时没有脚底探针，
+  跪姿/趴姿也不会被按「鞋底」抬起来。演员脚下平面就是轨道给的 `pos[1]`。
+- 现有的十条（机枪点位「川军被俘」那场）与实测数值见
+  [`Animation/MachineGunCaptives/Data_MachineGunCaptivesAnimation.md`](../Animation/MachineGunCaptives/Data_MachineGunCaptivesAnimation.md)；
+  实现在 `Script_CutscenePerformance.mjs`，门禁 `Script_MachineGunCaptivesAnimationTest.mjs`。
+
 ### 1.4 shots（镜头）
 
 ```js

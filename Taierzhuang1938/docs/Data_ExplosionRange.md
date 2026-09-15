@@ -59,11 +59,14 @@
   准星旁的 F 提示对 `kind: "grenade"` 的交互把「拾起并掷回 · N秒」整句上屏
   （`ContextualActionPrompts` 的 `text`，其余交互仍只给按键框 + 图标）；近弹警告
   （`CombatSystem.GrenadeThreats` → `Hud.UpdateGrenadeWarnings`）对同一颗返掷候选标
-  `returnable`，文字换成 `hud.grenade.returnable`（「手榴弹 2m · F 拾起掷回」）。
+  `returnable`。2026-09-14 改版（3f10a4a87）后屏上只画手雷图标 + 方向箭头，`returnable`
+  那颗在图标下亮「[F] 拾起掷回」（`hud.grenade.throwBack`），够不着的弹不亮；种类与米数
+  （`hud.grenade.warning` / `hud.grenade.returnable`）只进 `aria-label`。
   图标位置由 `GrenadeWarningScreenPoint` 决定：投影弹体本身、只在屏幕空间上提固定像素
   （以前抬 0.45 m 再投影，脚边一米的弹会被透视放大成飘在屏幕边上）；弹在镜头前但出了
   视野就沿屏幕方向贴边（脚边 → 下沿），只有身后的弹才按 yaw 算方位。
-  验收：`Script_HudPromptTest.mjs`（纯函数）与 `Script_ExplosionRangeTest.mjs` 的返掷段。
+  验收：`Script_HudPromptTest.mjs`（纯函数）、`Script_ExplosionRangeTest.mjs` 的返掷段、
+  `Script_DamageTest.mjs` 第 5 段（图标 / 读屏文字 / 够不着不亮 F / 指向 / 变红 / 消失）。
 - `TerrainDeformation` 存稀疏的有符号高度差：正值挖土，负值是坑外的堆积土沿。
   基础高度仍由关卡提供；界河仍来自
   `SampleJieheHeight`，没有第二套地形公式。基础节点缓存随 Reset / 换关清除。

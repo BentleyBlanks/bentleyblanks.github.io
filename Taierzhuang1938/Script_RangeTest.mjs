@@ -38,6 +38,16 @@ const result = await page.evaluate((expected) => {
   const T = window.Taierzhuang;
   const R = T.Debug.Range;
   const out = {};
+  // 等手上的动作真做完再按下一个键：拉栓排队（pendingBoltAt）和动作本身（IsBusy）期间，
+  // X 上刺刀、数字键换槽都会被正常吃掉。拉栓多久是武器数据（Data_Weapons 的
+  // boltDelayS / boltTimeS），这里不能写死帧数——09-14 汉阳造实录版把延迟拉到 1.65 s，
+  // 写死的 110 帧落在拉栓中间，X 被吃，后面长刺／大刀／复位跟着连锁红了四条。
+  const Settle = (cap = 600) => {
+    let frames = 0;
+    while (frames < cap && (T.viewmodel.pendingBoltAt > 0 || T.viewmodel.IsBusy()
+      || !T.meleeCombat.CanChangeWeapon())) { T.StepFrames(1); frames += 1; }
+    return frames;
+  };
   T.StepFrames(30);
 
   // --- 1) 沙盒装配：关是 Range、钉住、场上只有木桩兵 -----------------------
@@ -90,7 +100,7 @@ const result = await page.evaluate((expected) => {
   out.rifleHit = out.shots.some((s) => s.hit === "soldier");
   out.rifleDamaged = !r10After.alive || r10After.health < 100;
   out.ammoSpent = (T.state.ammo + T.state.clips * 100) < ammoBefore;
-  T.StepFrames(110);                         // 让拉栓动画播完：IsBusy 期间 X 上刺刀会被吃掉
+  out.boltSettleFrames = Settle();           // 让拉栓动画播完（见 Settle）
 
   // --- 4) 刺刀：X 装上可见，蓄力劈刺放倒木桩 -------------------------------
   out.bayonetBefore = T.state.bayonetFixed;
@@ -122,6 +132,7 @@ const result = await page.evaluate((expected) => {
   T.StepFrames(80);
 
   // --- 5) 大刀：按大刀槽的数字键，左键劈倒木桩 ------------------------------
+  out.meleeSettleFrames = Settle();          // 长刺收招没完也不许换手
   T.Debug.Key(T.Debug.SlotKey("melee"));
   T.StepFrames(20);
   out.meleeSlot = T.state.activeSlot;

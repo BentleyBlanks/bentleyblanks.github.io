@@ -36,7 +36,7 @@ WaW 的 HUD 元素与 COD4 同源，引擎里管「闲置淡出」的是 `hud_fa
 | 罗盘 / 地图 | 无罗盘；小地图默认收起，M 键开合 | **没照做** —— 罗盘不在本次范围 |
 | 血量 | Imagegen 透明边缘血污 + 克制暗角；濒死时子层双拍搏动，中央视野清楚（`VIGNETTE`） | 按此反馈层级制作本作原创素材 |
 | 来弹方向 | `.hudHitDir`：以准心为圆心的收尖弧 + 正中朝外小尖（`HitDirArcPath`，数在 `HITDIR`）；实际命中红、擦身弹白，转身同步方位 | 对标 COD 形状（2026-09-15）；见 [玩家挨打这条链](Data_PlayerDamage.md) |
-| 近弹指示 | `.hudGrenadeWarning`：钉在弹上 / 贴边指向 | 照做 |
+| 近弹指示 | `.hudGrenadeWarning`：钉在弹上 / 贴边指向；屏上只有手雷图标 + 方向箭头，够得着能掷回的那颗图标下亮「[F] 拾起掷回」，种类与米数只写进 `aria-label`（`Script_DamageTest` 第 5 段） | 照做 |
 | 交互提示 | `.hudActions`：对标 COD WWII（2026-09-13 用户给图定）——准心正下方居中，跟着散布让开；一行「实心键帽 + 一句动作」，米白字柔和黑影、无底板；字体是 logo 同款思源宋体 Black（`--ui-story-font` → `Font/Font_TitleText.woff2`，剧情字幕同一款），字号 `clamp(9.6px, 1.44vh, 16.32px)`（用户先定为上一版的 40%，再放大 20%）；按住型写成「[F] 长按……」；拾起 / 换上武器是按住型（COD 的「Hold F to swap」，2026-09-15 起，时长 `INTERACT.weaponPickupHoldS`），只拿同型弹药是点按；身上两支枪也不常驻「1 / 2 切换」；换枪 / 拾枪下面画那把枪的剪影（`Script_HudWeaponSilhouette.mjs` 从台架真模型生成 → `Data_HudWeaponIcons.mjs`，模型改了重跑）；空膛且有备弹时出红色「R 装弹」；识别卡排在提示下面 | 照做 |
 | 命中记号 | `.hudHitmark` 四道短撇 | WaW 单人没有；保留（见 docs/Data_DesignFirstPass.md §385 的账） |
 | 帧率读数 | `.hudFps` 右上小字 | 调试读数，不算 HUD |
