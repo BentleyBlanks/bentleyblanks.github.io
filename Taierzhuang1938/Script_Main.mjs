@@ -64,6 +64,7 @@ import { FirstLevelMissionRuntime } from "./Script_FirstLevelMissionRuntime.mjs"
 import { FIRST_LEVEL_STAGES, ResolveFirstLevelStage } from "./Data_FirstLevelMissionStages.mjs";
 import { LoadFirstLevelCarriageAnimation } from "./Script_FirstLevelCarriageAnimation.mjs";
 import { LoadFirstLevelMeal } from "./Script_FirstLevelMeal.mjs";
+import { LoadMachineGunCaptivesAnimation } from "./Script_CutscenePerformance.mjs";
 import { FirstLevelWhiteboxField } from "./Script_FirstLevelWhiteboxField.mjs";
 import { FirstLevelP012Debug } from "./Script_FirstLevelP012Debug.mjs";
 import { FirstLevelP012Director } from "./Script_FirstLevelP012Flow.mjs";
@@ -3993,6 +3994,9 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT, stageJump
   if (p012Flow) state.storyObjective = p012Flow.CurrentObjective().text;
   missionRuntime?.Dispose();
   if(phase.whitebox?.fullMission)await Promise.all([LoadFirstLevelCarriageAnimation(),LoadFirstLevelMeal()]);
+  // 机枪点位那场关中过场的作者动作库：不 await，开机不等它；到得了那个拍子的时候
+  // 它早就在缓存里了，真没到位的那几帧过场演员照常走 POSE_CLIPS。
+  if(phase.whitebox?.fullMission)LoadMachineGunCaptivesAnimation().catch(error=>console.warn("[Main] captives animation",String(error).slice(0,160)));
   missionRuntime = phase.whitebox?.fullMission ? new FirstLevelMissionRuntime({
     scene,camera,battlefield,physics,player,ai,hud,audio,combat,interact,emplacement,carry,companion,aircraft,vfx,meleeCombat,actorFactory,library,stageJump,viewmodel,
     // 只用来打 story/mission/* 子桶标记；没有它就静默不记（测试夹具不传也照跑）。

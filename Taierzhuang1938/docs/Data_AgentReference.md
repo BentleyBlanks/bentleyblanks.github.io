@@ -434,6 +434,11 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
 ### 过场 / 剧情
 - `Script_Cutscene.mjs` —— 实机演出；只有用户点名的几场夺控制权，战斗内演出不夺。
   分镜数据在 `Data_Cutscene*.mjs`，纯 Node 自检 `Script_CutsceneCheck.mjs`。
+- `Script_CutscenePerformance.mjs` —— 过场演员的**作者动作层**：cast 轨道关键帧写 `perform:"<ClipId>"`
+  就从该关键帧起播 Blender 烘的原骨架动作（`Animation/MachineGunCaptives/`，机枪点位那场川军被俘十条）。
+  采样按「过场时间 − t0」定位，拖时间轴/跳过/补卡都确定性一致；未知 id 警告一次后退回 POSE_CLIPS。
+  口径在 `docs/Data_CutsceneRedo.md` §1.3，烘焙脚本 `_import/Script_MachineGunCaptivesBake.py`，
+  门禁 `Script_MachineGunCaptivesAnimationTest.mjs`，资产说明 `Animation/MachineGunCaptives/Data_MachineGunCaptivesAnimation.md`。
 - `Script_Story.mjs` —— 保留章节目标、台词和分镜的派发接口；当前第一关任务由 `FirstLevelMission` 系列推进，旧章节与归档 P012 按各自入口保留共享组件回归。史实注记卡 `Data_History.mjs`，
   编剧红线在 `Data_Script.mjs` 头注与 `docs/Data_HistoryQuotes.md`。先读 `docs/Data_CutsceneRedo.md`。
 

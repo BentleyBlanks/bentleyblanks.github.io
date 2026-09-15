@@ -71,6 +71,7 @@ export const testDefs = {
   FirstLevelOpeningBrowserTest:{file:"Script_FirstLevelOpeningBrowserTest.mjs",timeoutMs:900000,desc:"Normal inputs from train impact through finite trench contact to gun handover"},
   FirstLevelOpeningSequenceBrowserTest:{file:"Script_FirstLevelOpeningSequenceBrowserTest.mjs",timeoutMs:600000,desc:"Uninterrupted overlapping dialogue, all carriage idles, barrage crouch and leader recovery before help-up"},
   FirstLevelCarriageAnimationTest:{file:"Script_FirstLevelCarriageAnimationTest.mjs",timeoutMs:180000,desc:"BlenderMCP opening clips, original rig bindings and sampled support contacts"},
+  MachineGunCaptivesAnimationTest:{file:"Script_MachineGunCaptivesAnimationTest.mjs",timeoutMs:300000,desc:"Captives cutscene clips on five original rigs, authored grounding and the state.perform contract"},
   FirstLevelOpeningContactTest:{file:"Script_FirstLevelOpeningBrowserTest.mjs",args:["--contact"],timeoutMs:600000,desc:"Normal disembarkation, reciprocal NPC fire and contact interrupting march"},
   FirstLevelGuideQueueTest:{file:"Script_FirstLevelOpeningBrowserTest.mjs",args:["--regroup"],timeoutMs:900000,desc:"Normal start, wait for the squad at the trench entrance, pass its clear lane and continue to the gun without guide reversal"},
   FirstLevelMissionStageJumpTest: {file:"Script_FirstLevelMissionStageJumpTest.mjs",timeoutMs:900000,desc:"18 stage starts, backward jumps and resumed mission gates"},
@@ -341,6 +342,7 @@ export const browserTests = new Set([
   "FirstLevelOpeningBrowserTest",
   "FirstLevelOpeningSequenceBrowserTest",
   "FirstLevelCarriageAnimationTest",
+  "MachineGunCaptivesAnimationTest",
   "FirstLevelOpeningContactTest",
   "FirstLevelGuideQueueTest",
   "FirstLevelTrainAnimationTest",
@@ -494,7 +496,7 @@ export const domains = {
     label: "过场/剧本派发/车厢生活动作",
     // 关中过场 beat 与 LEVEL_CUES 的构建都在 Script_Story 与组装层里，
     // 碰过场或剧本的改动要连着 MissionHooksTest 一起跑（毫秒级，白搭一条不亏）。
-    tests: ["FirstLevelP012ShellShotTest", "CutsceneControlTest", "ActorPoseTest", "CutscenePoseTest", "MissionHooksTest", "MissionSetpiecesTest"],
+    tests: ["FirstLevelP012ShellShotTest", "CutsceneControlTest", "ActorPoseTest", "CutscenePoseTest", "MissionHooksTest", "MissionSetpiecesTest", "MachineGunCaptivesAnimationTest"],
   },
   render: {
     label: "渲染与合批自动契约",
@@ -571,6 +573,8 @@ const changedDomainRules = [
   { domain: 'ai', pattern: /ActorStandIdle|Data_Tuning_ActorIdle/i },
   { domain: "hud", pattern: /FirstLevelP012Guidance/i },
   { domain: "cutscene", pattern: /FirstLevelP012ShellShot/i },
+  // 关中过场的作者动作库、它的运行时表演层与烘焙脚本：都归 cutscene 域。
+  { domain: "cutscene", pattern: /MachineGunCaptives|CutscenePerformance|Animation\/MachineGunCaptives/i },
   { domain: "ai", pattern: /FirstLevelP012(ShellShot|BackRifle|TrainColumn|March|Family|Resting|Arrival|VillageLife|StageZero|Cast)/i },
   { domain: "explosives", pattern: /(Explosion|Explosives|CraterSurface|CraterDebris|CraterScorched|BakeCraterSoil|GrenadeReturn|TerrainDeformation|ShellVisual|Script_Combat|Script_Physics|Script_Vfx)/i },
   { domain: "terrain", pattern: /(Heightmap|JieheHeight|JieheField|TengxianField|FarLand|Terrain|Battlefield|Outfield|Ground|Water|WestSuburbBlocks|Whitebox|P012|Data_Levels)/i },

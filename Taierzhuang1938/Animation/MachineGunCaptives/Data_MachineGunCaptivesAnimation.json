@@ -1,0 +1,132 @@
+{
+  "schema": 1,
+  "version": "20260915MachineGunCaptivesV1",
+  "authoringTool": "Blender 5.1 background python (same bpy path BlenderMCP executes)",
+  "actorForward": [
+    0,
+    0,
+    -1
+  ],
+  "floorClearanceM": 0.003,
+  "blendSeconds": 0.12,
+  "scope": "Machine-gun stage captives cutscene only",
+  "clips": {
+    "CaptiveHandsUpStand": {
+      "duration": 4.0,
+      "loop": true,
+      "weaponHold": "free"
+    },
+    "CaptiveKneelHandsHead": {
+      "duration": 4.0,
+      "loop": true,
+      "weaponHold": "free"
+    },
+    "CaptiveKneelPlead": {
+      "duration": 4.0,
+      "loop": true,
+      "weaponHold": "free"
+    },
+    "CaptiveStruckDown": {
+      "duration": 1.6,
+      "loop": false,
+      "weaponHold": "free"
+    },
+    "CaptiveStabbedCollapse": {
+      "duration": 2.0,
+      "loop": false,
+      "weaponHold": "free"
+    },
+    "IjaBayonetGuard": {
+      "duration": 4.0,
+      "loop": true,
+      "weaponHold": "twoHand"
+    },
+    "IjaTauntGesture": {
+      "duration": 4.0,
+      "loop": true,
+      "weaponHold": "oneHandRight"
+    },
+    "IjaKickPrisoner": {
+      "duration": 1.2,
+      "loop": false,
+      "weaponHold": "twoHand"
+    },
+    "IjaRifleButtStrike": {
+      "duration": 1.4,
+      "loop": false,
+      "weaponHold": "twoHand"
+    },
+    "IjaBayonetDownThrust": {
+      "duration": 1.6,
+      "loop": false,
+      "weaponHold": "twoHand"
+    }
+  },
+  "models": [
+    {
+      "id": "LugouNra02",
+      "file": "Animation_LugouNra02MachineGunCaptives.json",
+      "sha256": "f14f5033e6ad1b7c6739a4028217bb3420fa23177a9ac27752a035a63479d4a4",
+      "clipIds": [
+        "CaptiveHandsUpStand",
+        "CaptiveKneelHandsHead",
+        "CaptiveKneelPlead",
+        "CaptiveStruckDown",
+        "CaptiveStabbedCollapse"
+      ],
+      "originalModelSha256": "39c08ca82148e140ee2952caffdd0dee99750fb734038a5263d216c9a7345225"
+    },
+    {
+      "id": "LugouNra05",
+      "file": "Animation_LugouNra05MachineGunCaptives.json",
+      "sha256": "1e82e6d707ebf64fd54e3d912b0977037006af21b26540c0e6a8684de16ccbd2",
+      "clipIds": [
+        "CaptiveHandsUpStand",
+        "CaptiveKneelHandsHead",
+        "CaptiveKneelPlead",
+        "CaptiveStruckDown",
+        "CaptiveStabbedCollapse"
+      ],
+      "originalModelSha256": "acbc9184da059bdf6c3c18d051f3eba77d1dd3acba469e8dbc876b092f174250"
+    },
+    {
+      "id": "LugouIja01",
+      "file": "Animation_LugouIja01MachineGunCaptives.json",
+      "sha256": "a92df69c0c05341925492e8abb982901bf29fcaa896dd575653dfcccb2ba1fac",
+      "clipIds": [
+        "IjaBayonetGuard",
+        "IjaTauntGesture",
+        "IjaKickPrisoner",
+        "IjaRifleButtStrike",
+        "IjaBayonetDownThrust"
+      ],
+      "originalModelSha256": "23fa4ef88891bd14d49dfb9a3e61b9f0dcaf45b8956a720aab24d9c4c23eb9c7"
+    },
+    {
+      "id": "LugouIja02",
+      "file": "Animation_LugouIja02MachineGunCaptives.json",
+      "sha256": "3557f38d1a3808d52dea3f63a59f335fa9ce30a7b4a5e9d3e72d220ae164f15b",
+      "clipIds": [
+        "IjaBayonetGuard",
+        "IjaTauntGesture",
+        "IjaKickPrisoner",
+        "IjaRifleButtStrike",
+        "IjaBayonetDownThrust"
+      ],
+      "originalModelSha256": "8c4860ec2d4dd3076b06ff7e593e5dcfd4d23aefe2fedf6f9fdec3b0e12cc9aa"
+    },
+    {
+      "id": "LugouIja03",
+      "file": "Animation_LugouIja03MachineGunCaptives.json",
+      "sha256": "a75b9b438536e3b7fb7864da0968c5793c45f81724e73d0d6e9d5e210e923540",
+      "clipIds": [
+        "IjaBayonetGuard",
+        "IjaTauntGesture",
+        "IjaKickPrisoner",
+        "IjaRifleButtStrike",
+        "IjaBayonetDownThrust"
+      ],
+      "originalModelSha256": "6d97c801f7ea62430e5397fde980ad0964ab5081fa5f15249434bce4cbf3f89d"
+    }
+  ]
+}
