@@ -1621,6 +1621,9 @@ async function Boot() {
       if (viewmodel && viewmodel.root) viewmodel.root.visible = !carry?.Blocking;
       if (state.running && !state.menu) RequestPointerLock();
     },
+    // 就地演的关中过场按 `cut.groundSnap` 问这一只钩子要真实地面（跨系统契约 5：
+    // 地面只由共享采样器决定）。独立布景的场不走它，数据里的 y 原样生效。
+    groundAt: (x, z) => battlefield?.GroundHeight(x, z) ?? 0,
     // 过场自带的天空：出川是阴天、长官部是夜里 —— 不能沿用上一关的拂晓。
     // 套预设 = 天空着色器 + Global SH 强度 + 平行光三件一起换，少一件就是
     // 「天是夜的、地是白天的」。RenderScene 的后期参数按 cutsceneSky 走。
@@ -4004,6 +4007,9 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT, stageJump
     GiveSupply:({clips=0,grenades=0,bundles=0,bandages=0})=>{AddSupplyClips(clips);state.grenades+=grenades;state.bundles+=bundles;player.bandages+=bandages;},
     RestoreRifle:()=>{if(!IsGunSlot(state.activeSlot))SwitchSlot(LastGunSlot());SyncMissionHands();viewmodel.root.visible=!carry?.Blocking;},
     Control:active=>{state.missionControl=active;state.cooking=null;state.cook=0;input.fire=false;input.ads=false;},
+    // 关中过场：与关首/关末走同一条 RunCutscene（夺控制权、掐输入、Esc 跳过、
+    // 播完还回来）。任务层只报「该播了」，不自己当导演。
+    PlayMidCutscene:id=>PlayMidCutscene(id),
     Complete:()=>{Progress.MarkCleared(FIRST_LEVEL_P012_WHITEBOX_LEVEL_ID,0);ShowPauseMenu();menu.OpenSandboxComplete();},
     MissionFailure:castId=>{ShowPauseMenu();menu.OpenSandboxFailure(false,{castId,restartOnly:true});},
   }) : null;

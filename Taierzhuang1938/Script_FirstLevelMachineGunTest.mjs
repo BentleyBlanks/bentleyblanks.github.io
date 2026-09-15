@@ -36,6 +36,12 @@ try{
   r.opening.zhou.TakeHit(50,"torso",null);r.PlaceActor(r.opening.zhou,OPENING.zhouRest);r.opening.UpdateZhou();
   for(const [i,a] of r.squad.entries()){r.PlaceActor(a,OPENING.frontPosts[i]);r.squadRoutes.set(a.id,[]);}
   const p=r.Point({x:0,z:-127.4});g.player.position.copy(p);g.player.body.Teleport(p.x,p.y,p.z);g.player.yaw=0;g.player.pitch=0;g.player.stance="crouch";g.player.SyncCamera(0);
+  // This fixture drops the player straight onto the seat, which is exactly the
+  // trigger circle of the 04 mid-level cutscene. Mark it seen so the director
+  // never takes the camera here; the cutscene has its own regression
+  // (Script_FirstLevelMachineGunCutsceneTest) and none of the assertions below
+  // are relaxed by this line.
+  r.Record("captivesWitnessed",{fixture:"MachineGunRegression"});
  });
  const before=await Receipt("RifleForceExhausted");
  assert.ok(!before.soldiers.some(a=>a.encounter==="machineGun"),"rifle stage cannot spend the machine-gun attack early");

@@ -121,6 +121,9 @@
 //     text: "这些人都没枪了……" }
 import { VOICE_LINES as CH0_LINES } from "./Data_MissionCh0.mjs";
 import { VOICE_LINES as CH1_LINES } from "./Data_MissionCh1.mjs";
+// 第一关的**关中过场**自带台词（行本体与分镜同住一个文件，改一句词与改它出现的
+// 那一秒是同一次编辑）。走的仍是 ch1_* 章节语音通道，所以在这里并进第一章。
+import { VOICE_LINES as CS_MACHINE_GUN_CAPTIVES_LINES } from "./Data_CutsceneMachineGunCaptives.mjs";
 // 第二到终章（2026-09-06 暂时废弃）：VOICE_LINES 已清空、vo_ch2_*–AudioVoice_Ch6*.mp3 已删，
 // 这里不再拼接它们。第一章的行仍在 —— P0/P1/P2 白盒按 contentId = CH1_NanLu 播它们。
 
@@ -148,7 +151,13 @@ export const STORY_CAST_IDS = [
   "shunzi", "luo", "yaowa", "heyoutian", "liuwencai", "xiaoqin", "zhaodegui",
   "paizhang", "junyi", "s124", "danjiayuan", "shangbing", "junguan", "canmou",
   "wangmingzhang", "ija_gunso",
+  // 第一关关中过场《空地上的三个人》新增的三个人（Data_CutsceneMachineGunCaptives）。
+  // `ija_` 打头的一律走日语分支：text 必须是纯假名（见下面的拼表体检）。
+  "captive_old", "captive_young", "ija_hei",
 ];
+
+/** 日方角色：台词走日语分支，录音文本必须是纯假名。id 前缀就是判据。 */
+export const IsIjaCast = (who) => /^ija(_|$)/.test(String(who || ""));
 
 /**
  * 交付档（delivery）：**同一套后期参数不能同时伺候急喊和耳语。**
@@ -366,7 +375,7 @@ function MergeChapter(lines, chapter, seen, out) {
     }
     // 日方角色的 text 必须是纯假名：seed-audio 从文本判断语言，
     // 写成汉字的「突撃！」会被当中文读（见上面日方那一批的头注）。
-    if (line.who === "ija_gunso" && /[一-鿿]/.test(line.text)) {
+    if (IsIjaCast(line.who) && /[一-鿿]/.test(line.text)) {
       VOICE_MERGE_WARNINGS.push(`${line.key}: 日方台词含汉字，必须写成纯假名`);
       continue;
     }
@@ -382,7 +391,7 @@ function MergeChapter(lines, chapter, seen, out) {
 const CHAPTER_LINES = [];
 {
   const seen = new Set(BATTLE_LINES.map((l) => l.key));
-  const chapters = [CH0_LINES, CH1_LINES];
+  const chapters = [CH0_LINES, [...CH1_LINES, ...CS_MACHINE_GUN_CAPTIVES_LINES]];
   for (let i = 0; i < chapters.length; i += 1) MergeChapter(chapters[i], i, seen, CHAPTER_LINES);
 }
 

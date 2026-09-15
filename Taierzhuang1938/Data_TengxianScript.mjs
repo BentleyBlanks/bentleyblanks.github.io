@@ -382,9 +382,21 @@ import { CS_LiZongrenTang } from "./Data_CutsceneLiZongrenTang.mjs";
 import { CS_LastWire } from "./Data_CutsceneLastWire.mjs";
 import { CS_WangMingzhang } from "./Data_CutsceneWangMingzhang.mjs";
 import { CS_BeimenBreakout } from "./Data_CutsceneBeimenBreakout.mjs";
+import { CS_MachineGunCaptives } from "./Data_CutsceneMachineGunCaptives.mjs";
 
 /** 正片的过场：只剩序章的 CS_Chuchuan（Data_CutsceneChuchuan.mjs）。 */
 export const CHAPTER_CUTSCENES = [CS_Chuchuan];
+
+/**
+ * 新第一关（?whitebox=p012）的**关中**过场。
+ *
+ * 它们不挂在 LEVELS 的 cutsceneIn/Out/Mid 上 —— 第一关走的是
+ * `Script_FirstLevelMissionRuntime` 自己的阶段机，条件由那一层判定，播放仍然经
+ * 装配层的 PlayMidCutscene（与关首/关末同一条 RunCutscene）。这里只负责注册：
+ * `PlayMidCutscene` 认 CUTSCENES 的键，没注册就只在控制台留一行警告，画面上
+ * 什么都不发生。trigger 写 `duringLevel:<关卡 id>`（Script_CutsceneCheck 硬查格式）。
+ */
+export const MISSION_CUTSCENES = [CS_MachineGunCaptives];
 
 /** 旧战役五场：从正片流程脱钩，仅留预览入口与留档。 */
 export const LEGACY_CUTSCENES = [
@@ -392,7 +404,7 @@ export const LEGACY_CUTSCENES = [
 ];
 
 export const CUTSCENES = Object.fromEntries(
-  [...CHAPTER_CUTSCENES, ...LEGACY_CUTSCENES].map((cut) => [cut.id, cut]));
+  [...CHAPTER_CUTSCENES, ...MISSION_CUTSCENES, ...LEGACY_CUTSCENES].map((cut) => [cut.id, cut]));
 
 // 章表引用的过场必须真的注册过 —— 打错一个字的后果是「关末什么都不播」，
 // 静默且只在真跑到那一关时才看得见。
@@ -434,9 +446,10 @@ export function FindLevel(id) {
   return LEVELS.find((l) => l.id === id) || null;
 }
 
-/** 过场的播放顺序（给预览页与编辑器时间轴用）：先正片（序章），后旧五场。 */
+/** 过场的播放顺序（给预览页与编辑器时间轴用）：先正片（序章）、再第一关关中、后旧五场。 */
 export const CUTSCENE_ORDER = [
   ...CHAPTER_CUTSCENES.map((cut) => cut.id),
+  ...MISSION_CUTSCENES.map((cut) => cut.id),
   ...LEGACY_CUTSCENES.map((cut) => cut.id),
 ];
 

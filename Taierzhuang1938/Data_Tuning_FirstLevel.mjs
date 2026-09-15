@@ -101,6 +101,11 @@ export const MISSION_TUNING = Object.freeze({
   // player is still crossing the long communication trench behind the line.
   frontEngageDistanceM:26,
   frontRifleDefenseSeconds:40,
+  // 04 机枪点位的关中过场《空地上的三个人》（CS_MachineGunCaptives）的触发半径：
+  // 玩家第一次走进机枪座 (0,-127.4) 这么近就播一次。4 m 是「已经站在枪位上」而不是
+  // 「路过阵地」—— 机枪的交互半径是 3 m（EmplacementInteraction.reachM），
+  // 半径比它大一点，玩家还没按 F 就已经看见了，接枪那一下不被打断。
+  captivesCutsceneRadiusM:4,
   frontAccuracyScale:.28,
   frontFireIntervalScale:.95,
   defenderAccuracyScale:.3,

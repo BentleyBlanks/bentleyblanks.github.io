@@ -434,6 +434,14 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
 ### 过场 / 剧情
 - `Script_Cutscene.mjs` —— 实机演出；只有用户点名的几场夺控制权，战斗内演出不夺。
   分镜数据在 `Data_Cutscene*.mjs`，纯 Node 自检 `Script_CutsceneCheck.mjs`。
+  `trigger` 三种写法：`beforeLevel:` / `afterLevel:` / `duringLevel:`（关中，格式由
+  `ValidateCutscene` 硬查）。就地演在正片战场上的场写 `groundSnap: true`，演员的 y 是
+  离地高度，真实地面由 `groundAt` 钩子问共享采样器要。
+- 第一关 04 机枪点位的关中过场 `CS_MachineGunCaptives`（`Data_CutsceneMachineGunCaptives.mjs`）：
+  触发在 `Script_FirstLevelMissionRuntime.UpdateCaptivesCutscene`，半径在
+  `Data_Tuning_FirstLevel.captivesCutsceneRadiusM`，回归口 `Script_FirstLevelMachineGunCutsceneTest.mjs`；
+  口径 [docs/Data_MachineGunCaptivesCutscene.md](Data_MachineGunCaptivesCutscene.md)。
+  出图白盒关的过场用 `Script_CutsceneShot.mjs --whitebox=p012`（或数据里的 `shotWhitebox`）。
 - `Script_Story.mjs` —— 保留章节目标、台词和分镜的派发接口；当前第一关任务由 `FirstLevelMission` 系列推进，旧章节与归档 P012 按各自入口保留共享组件回归。史实注记卡 `Data_History.mjs`，
   编剧红线在 `Data_Script.mjs` 头注与 `docs/Data_HistoryQuotes.md`。先读 `docs/Data_CutsceneRedo.md`。
 

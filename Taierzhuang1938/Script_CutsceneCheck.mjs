@@ -11,6 +11,18 @@
 //             命令行打印出来，Play() 不管。
 
 import { CUTSCENES, CAST } from "./Data_TengxianScript.mjs";
+import { CHARACTER_MODEL_VARIANTS_BY_KIND } from "./Data_CharacterSelection.mjs";
+
+/**
+ * trigger 的三种合法写法（Script_CutsceneShot 的 DefaultPhase、正片的关首/关末入口
+ * 与关中入口都按它认场）：
+ *   beforeLevel:<levelId>   关首，脚下是上一关的场
+ *   afterLevel:<levelId>    关末，脚下是这一关打完的场
+ *   duringLevel:<levelId>   **关中**：由关卡运行时在某个条件上调 PlayMidCutscene，
+ *                           脚下就是这一关正在跑的那张场（不建独立布景）
+ * 写错一个字的后果是静默的（出图选错关、正片里什么都不播），所以硬查格式。
+ */
+export const CUTSCENE_TRIGGER_RE = /^(beforeLevel|afterLevel|duringLevel):[A-Za-z0-9_]+$/;
 
 /** 字幕/台词的最短可读时长：每个汉字 0.22 s + 1.2 s（docs/Data_CutsceneRedo.md §1.4）。 */
 export function MinReadSeconds(text) {
@@ -62,6 +74,12 @@ export function ValidateCutscene(cut, cast = CAST) {
   if (cut.sensitivityScale !== undefined && (!Number.isFinite(Number(cut.sensitivityScale)) || Number(cut.sensitivityScale) < 0)) {
     problems.push(`${cut.id}: sensitivityScale 必须是非负数字`);
   }
+  if (cut.trigger !== undefined && !CUTSCENE_TRIGGER_RE.test(String(cut.trigger))) {
+    problems.push(`${cut.id}: trigger「${cut.trigger}」不是 beforeLevel/afterLevel/duringLevel:<关卡 id>`);
+  }
+  // 就地演（groundSnap）只对非独立布景有意义：独立布景自带地面，去问正片地形
+  // 采样器只会把人埋进两千米外的真地形里。
+  if (cut.groundSnap && cut.standalone) problems.push(`${cut.id}: standalone 的布景不能用 groundSnap`);
   const sum = shots.reduce((a, s) => a + (s.seconds || 0), 0);
   if (Math.abs(sum - cut.seconds) > 0.005) {
     problems.push(`${cut.id}: 分镜秒数之和 ${sum.toFixed(2)} ≠ 声明时长 ${cut.seconds}`);
@@ -127,6 +145,17 @@ export function ValidateCutscene(cut, cast = CAST) {
     }
   }
   for (const actor of cut.cast || []) {
+    // 钉死的外观号必须是用户确认过的那几张皮（Data_CharacterSelection）。写一个
+    // 没批准的号，ActorFactory 会悄悄换回随机皮 —— 而作者动作库是按骨架分号烘的，
+    // 换了号就等于整场表演回退成普通姿态，画面上只表现为「动作没生效」。
+    if (actor.modelVariant !== undefined) {
+      const allowed = CHARACTER_MODEL_VARIANTS_BY_KIND[actor.kind || "nra"];
+      if (!Number.isInteger(actor.modelVariant)) {
+        problems.push(`${cut.id}: ${actor.id} 的 modelVariant 必须是整数`);
+      } else if (allowed && !allowed.includes(actor.modelVariant)) {
+        problems.push(`${cut.id}: ${actor.id} 的 modelVariant ${actor.modelVariant} 不在 ${actor.kind || "nra"} 的选模清单 [${allowed.join(",")}] 里`);
+      }
+    }
     if (!actor.track || !actor.track.length) { problems.push(`${cut.id}: ${actor.id} 没有轨道`); continue; }
     const attachments = Array.isArray(actor.attachments) ? actor.attachments
       : (Array.isArray(actor.mounts) ? actor.mounts : []);

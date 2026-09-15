@@ -507,13 +507,17 @@ export class CutsceneDirector {
    *   root          DOM 容器，默认 document.body
    *   onCapture/onRelease  夺走 / 交还玩家控制权的回调（正片接进来时必给）
    *   includeProbeProps    预览页专用：把 probeOnly 的道具也建出来
+   *   groundAt      可选。(x,z) → 世界地面高度。**只有 `cut.groundSnap` 的场用它**：
+   *                 就地演的关中过场（演员站在正片战场上）不许硬编码绝对 y，
+   *                 数据里的 pos[1] 改成「离地多高」，真实地面由这只钩子问共享采样器。
    */
   constructor({
     camera, scene, hud = null, audio = null, actorFactory = null, library = null,
     root = null, onCapture = null, onRelease = null, includeProbeProps = false,
-    applySky = null, restoreSky = null,
+    applySky = null, restoreSky = null, groundAt = null,
     table = CUTSCENES,
   } = {}) {
+    this.groundAt = typeof groundAt === "function" ? groundAt : null;
     this.camera = camera;
     this.scene = scene;
     this.hud = hud;
@@ -1002,7 +1006,10 @@ export class CutsceneDirector {
             // 第一人称演员就是玩家在过场里可低头看见的主人公身体，固定国军 01；
             // 其余国军/日军照 ActorFactory 的稳定种子随机五种外观。
             protagonist: spec.firstPerson === true,
-            modelVariant: spec.firstPerson === true ? 1 : undefined,
+            // 分镜可以把外观钉死在某一号皮上（作者动作库按骨架分号烘的，
+            // 换一号皮就换一套骨架）。不给就照 ActorFactory 的稳定种子随机。
+            modelVariant: spec.firstPerson === true ? 1
+              : (Number.isInteger(spec.modelVariant) ? spec.modelVariant : undefined),
             uniformHex: spec.uniformHex,
             trouserHex: spec.trouserHex,
             accessoryHex: spec.accessoryHex,
@@ -1569,9 +1576,19 @@ export class CutsceneDirector {
     const byId = this._actorFrameById || (this._actorFrameById = new Map());
     byId.clear();
 
+    // 就地演的关中过场：pos[1] 是「离地多高」，真正的地面由共享采样器给
+    //（跨系统契约 5：不许另写高度公式、不许硬编码绝对 y）。没接钩子就退回原行为。
+    const snapGround = !!(cut.groundSnap && this.groundAt);
     for (const { actor, spec } of this.actors.values()) {
-      const sample = SampleTrack(spec.track, now);
+      let sample = SampleTrack(spec.track, now);
       if (sample.hidden || !sample.pos) { actor.root.visible = false; continue; }
+      if (snapGround) {
+        const o = this.origin;
+        const ground = this.groundAt(o.x + sample.pos[0], o.z + sample.pos[2]);
+        if (Number.isFinite(ground)) {
+          sample = { ...sample, pos: [sample.pos[0], ground - o.y + sample.pos[1], sample.pos[2]] };
+        }
+      }
       actor.root.visible = true;
       actor.root.position.set(sample.pos[0], sample.pos[1], sample.pos[2]);
       actor.root.rotation.y = sample.ry;

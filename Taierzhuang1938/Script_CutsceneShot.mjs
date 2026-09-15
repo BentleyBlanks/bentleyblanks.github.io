@@ -15,6 +15,8 @@
 //   --phase   先进哪一关再播（决定脚下是哪一块战场 / 哪一种天空）。
 //             不给就按过场的 trigger 推：beforeLevel:Li → 第 i-1 关（i=0 时第 0 关），
 //             afterLevel:Li → 第 i 关 —— 与正片里真正播它时脚下的场一致。
+//   --whitebox 白盒关卡的场不由 ?phase=N 建：`--whitebox=p012` 用 ?whitebox=p012 起场。
+//             关中过场就地演在白盒战场上，数据里写 `shotWhitebox` 就不用每次敲这个。
 //   --out     输出目录，默认 Taierzhuang1938/_shots/cutscene/（已 gitignore）
 //
 // 每张图落盘后，顺带把 director 到那一刻为止的字幕/台词日志打印出来，
@@ -50,11 +52,26 @@ const lookOverride = {
 
 /** 过场在正片里播的时候脚下是哪一关的场。 */
 function DefaultPhase(cut) {
-  const m = /^(beforeLevel|afterLevel):(\w+)$/.exec(cut.trigger || "");
+  const m = /^(beforeLevel|afterLevel|duringLevel):(\w+)$/.exec(cut.trigger || "");
   if (!m) return 0;
   const index = LEVELS.findIndex((l) => l.id === m[2]);
   if (index < 0) return 0;
   return m[1] === "beforeLevel" ? Math.max(0, index - 1) : index;
+}
+
+/**
+ * 白盒关卡的场不由 `?phase=N` 建（那是七章切片），要走它自己的入口参数。
+ * 关中过场就地演在白盒的战场上，所以数据里写 `shotWhitebox: "p012"`；
+ * 命令行 `--whitebox=p012` 可以覆盖。不写就照旧用 `?phase=N`。
+ */
+function SceneQuery(cut) {
+  const whitebox = args.whitebox || cut.shotWhitebox || null;
+  // menu=0 不是可选项：白盒关无条件建主菜单（Script_Main 的 `MENU_ON ||
+  // FIRST_LEVEL_P012_WHITEBOX`），而菜单开着时 StepFrames 推的是**菜单帧**，
+  // 过场的时间轴一帧都不会走 —— 症状是每张图都停在第 0 秒。
+  if (whitebox) return `whitebox=${whitebox}&menu=0`;
+  const phase = args.phase !== undefined ? parseInt(args.phase, 10) : DefaultPhase(cut);
+  return `phase=${phase}`;
 }
 
 /** 没给 --times 时的默认采样：每镜开头 +0.4 s 与镜中各一张。 */
@@ -91,15 +108,15 @@ page.on("console", (message) => {
 let allOk = true;
 for (const id of cutIds) {
   const cut = CUTSCENES[id];
-  const phase = args.phase !== undefined ? parseInt(args.phase, 10) : DefaultPhase(cut);
+  const scene = SceneQuery(cut);
   const times = (args.times ? args.times.split(",").map(Number).filter((n) => Number.isFinite(n)) : DefaultTimes(cut))
     .map((t) => Math.max(0, Math.min(cut.seconds - 0.02, t)))
     .sort((a, b) => a - b);
   problems.length = 0;
   // manual=1 把过场时钟交给 StepFrames；否则页面自己的 rAF 会在批量落图的
   // evaluate / screenshot 间偷偷推进，长到 t94 时就会提前结束。
-  const url = `http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&manual=1&phase=${phase}&quality=${quality}&scale=medium`;
-  console.log(`\n== ${id}「${cut.title}」 ${cut.seconds}s · ${cut.shots.length} 镜 · 第 ${phase} 关的场 · ${times.length} 张`);
+  const url = `http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&manual=1&${scene}&quality=${quality}&scale=medium`;
+  console.log(`\n== ${id}「${cut.title}」 ${cut.seconds}s · ${cut.shots.length} 镜 · ${scene} 的场 · ${times.length} 张`);
   // 先过一遍数据自检：硬错 Play() 会直接抛，软错（字幕读不完、滑步）在这里提醒
   const hard = ValidateCutscene(cut);
   for (const p of hard) console.log(`  ✗ ${p}`);
@@ -113,7 +130,14 @@ for (const id of cutIds) {
     await page.waitForTimeout(400);
     // manual=1 已经在页面 Loop 里停掉实时推进；这里再把 running 置 false，
     // 让取证明确保持「只由 StepFrames 走逻辑」的状态。
-    await page.evaluate(() => { window.Taierzhuang.state.running = false; });
+    //
+    // **白盒关不能这么做**：Frame() 开头有一条「missionRuntime 在场且 !running
+    // 就只渲染不推进」的终局守卫（P012 的通关/阵亡画面靠它冻住整个世界钟），
+    // 它排在过场分支之前 —— 置了 false 之后过场的时间轴一帧都不走，
+    // 每张图都停在第 0 秒。manual=1 本来就已经接管了时钟，这里不需要再加一道。
+    if (!scene.startsWith("whitebox=")) {
+      await page.evaluate(() => { window.Taierzhuang.state.running = false; });
+    }
     // afterLevel 的过场在正片里播的时候这一关已经打完：路标全到了（常驻烟柱不再挂在
     // 未到达的路标上）、场上的 AI 不会正好冻在开局的集结点。出图照这个状态摆：
     // 路标标成 reached、AI 藏起来 —— 不然十字街口那根黑烟柱会横在每一镜里。

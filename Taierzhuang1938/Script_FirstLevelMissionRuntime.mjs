@@ -59,6 +59,10 @@ import { FirstLevelStageTextId } from "./Script_TextIds.mjs";
 import { WEAPONS } from "./Data_Weapons.mjs";
 const Distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 const Clamp = (x, a, b) => Math.max(a, Math.min(b, x));
+/** 机枪座的座位点。CreateEmplacement 与 04 关中过场的触发圈共用这一个坐标。 */
+const GUN_SEAT = Object.freeze({ x: 0, z: -127.4 });
+/** 04 机枪点位的关中过场（Data_CutsceneMachineGunCaptives，注册在 CUTSCENES 里）。 */
+const CAPTIVES_CUTSCENE_ID = "CS_MachineGunCaptives";
 export class FirstLevelMissionRuntime {
   constructor(host) {
     Object.assign(this, host);
@@ -1108,7 +1112,7 @@ export class FirstLevelMissionRuntime {
       tag: "FirstLevelMission",
       kindId: "Zb26Nest",
       position: this.Point(A.gun, 1.45),
-      seat: this.Point({ x: 0, z: -127.4 }),
+      seat: this.Point(GUN_SEAT),
       baseYaw: 0,
       arcYawDeg: 62,
       belts: 4,
@@ -2156,6 +2160,7 @@ export class FirstLevelMissionRuntime {
         this.Record("frontContact");
     }
     if (stage === "MachineGun") {
+      this.UpdateCaptivesCutscene();
       if (this.emplacement.stats.shots > 0) this.Record("gunUsed");
       const gun = this.emplacement.Emplacement(this.gunId);
       if (gun?.belts === 3) this.Say("ThreeMagazines");
@@ -2329,6 +2334,37 @@ export class FirstLevelMissionRuntime {
     this.leaderGuide?.Update();
     this.hud.SetMissionReturn?.(this.UpdateReturnWarning(dt));
     prof?.E("story/mission/other");
+  }
+  /**
+   * 04 机枪点位的关中过场《空地上的三个人》。
+   *
+   * 触发：阶段是 MachineGun，且玩家**第一次**走进机枪座
+   * （GUN_SEAT，半径 R.captivesCutsceneRadiusM）。阶段切进来时玩家已经在圈里
+   * （从检查点或调试跳转进来就是这样）也立刻算数 —— 这一条逐帧查，不挂在 Enter 上。
+   *
+   * 只播一次：事实 `captivesWitnessed` 记在 flow.facts 里，随检查点快照一起存取
+   * （FirstLevelMissionFlow.Snapshot/Restore），所以死亡回到本阶段检查点不会重播。
+   * **事实先记再播**：宿主那边回 null 的三种情形（没有过场系统、已经在播一场、
+   * 正在换关）都是正常状态，不许因此每帧重试，也不许报错。
+   *
+   * 播放期间世界整个停摆：装配层的 Frame() 在 `cutscene.Playing` 时只推过场与画面，
+   * 玩法（玩家、AI、战车、任务运行时的 Update）一律不跑 —— 所以玩家不会在看戏的
+   * 时候被打死，机枪进攻队与战车也不会推进。这里不需要再冻一遍谁。
+   *
+   * 与班长提醒的顺序：Enter("MachineGun") 先 Say 了 FrontWeaponChoice（「机枪就在
+   * 旁边，顺手就接」）。玩家走到枪位时那条多半正在播，所以进场先 Pause、还权后
+   * Resume（OnPlayerDown/Retry 用的是同一对），整段提醒一个字不丢、也不会和过场
+   * 里的台词压在一起。
+   */
+  UpdateCaptivesCutscene() {
+    if (this.Has("captivesWitnessed") || this.controls) return;
+    if (!this.Near(GUN_SEAT, R.captivesCutsceneRadiusM)) return;
+    this.Record("captivesWitnessed", { x: this.player.position.x, z: this.player.position.z });
+    const pending = this.PlayMidCutscene?.(CAPTIVES_CUTSCENE_ID);
+    if (!pending || typeof pending.then !== "function") return;
+    this.voice.Pause();
+    const Resume = () => this.voice.Resume();
+    pending.then(Resume, Resume);
   }
   SaveCheckpoint() {
     this.safePoint = {
