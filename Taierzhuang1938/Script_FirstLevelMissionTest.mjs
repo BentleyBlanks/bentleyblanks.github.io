@@ -22,7 +22,7 @@ import { FIRST_LEVEL_STAGES, ResolveFirstLevelStage, FirstLevelStageForStep } fr
 import { BuildFirstLevelCheckpoint } from "./Script_FirstLevelMissionCheckpoint.mjs";
 import { FirstLevelMissionColumn, MissionRouteNextIndex, MissionCarryRoutePoint, MissionGuideSpeed, MissionGuideRoute, MissionSquadRoute, MissionSquadPace } from "./Script_FirstLevelMissionColumn.mjs";
 import { MISSION_STAGES, MISSION_TUNING as R, FIRST_LEVEL_MISSION_PHASE, MISSION_TACTICS, MISSION_ENCOUNTERS, MISSION_PURSUIT_ROUTE } from "./Data_FirstLevelMission.mjs";
-import { MISSION_LAYOUT, MISSION_ROUTES, MISSION_ANCHORS as A, MISSION_PLACEMENT as P, MISSION_RAILWAY } from "./Data_FirstLevelMissionLayout.mjs";
+import { MISSION_LAYOUT, MISSION_ROUTES, MISSION_ANCHORS as A, MISSION_PLACEMENT as P, MISSION_RAILWAY, MISSION_SUPPLIES } from "./Data_FirstLevelMissionLayout.mjs";
 import { MakeRailwayProfile } from "./Script_RoadPath.mjs";
 import { MISSION_TERRAIN, SampleMissionTerrain, MissionPathDistance } from "./Data_FirstLevelMissionTerrain.mjs";
 import { CreateP012Terrain } from "./Data_FirstLevelP012Terrain.mjs";
@@ -1378,6 +1378,12 @@ console.log("ok receiving-food release follows the source clock and survives pau
   }
   assert.ok(MissionPathDistance(OPENING.shelterCorner,[OPENING.supportRoute[1],OPENING.supportRoute[2],OPENING.supportRoute[3]])<=mainTrench.bottom/2,
     "the corner post stands on the trench floor");
+  // The extra fight sits between the unloading and front crates, so the recess carries its own.
+  const shelterCrate=MISSION_SUPPLIES.find(s=>s.id==="Shelter");
+  assert.ok(shelterCrate&&SampleMissionTerrain(shelterCrate.x,shelterCrate.z)<-1.2,"the shelter crate stands on the recess floor");
+  assert.ok(Math.hypot(shelterCrate.x-OPENING.shelter.x,shelterCrate.z-OPENING.shelter.z)>R.interactionRangeM,"standing at the exchange does not put the crate under F");
+  for(const post of [...OPENING.shelterPosts,OPENING.woundedRoute.at(-1),OPENING.runnerRoute.at(-1)])
+    assert.ok(Math.hypot(shelterCrate.x-post.x,shelterCrate.z-post.z)>1.5,"the crate keeps clear of shelter posts and arrival points");
   const corner=[{x:0,z:0},{x:0,z:5},{x:5,z:5}],step=1.4/60;
   let before=MissionCarryRoutePoint(corner,3);
   for(let d=3+step;d<7;d+=step){

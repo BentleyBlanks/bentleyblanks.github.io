@@ -8,6 +8,7 @@ import {fileURLToPath} from "node:url";
 import {LaunchBrowser} from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import {ServeRoot} from "./Script_DevServer.mjs";
 import {OPENING} from "./Data_FirstLevelOpening.mjs";
+import {MISSION_SUPPLIES} from "./Data_FirstLevelMissionLayout.mjs";
 import {SampleOpeningPerception} from "./Script_FirstLevelOpening.mjs";
 const here=path.dirname(fileURLToPath(import.meta.url));
 export async function PlayFirstLevelOpening(page,{out=path.join(here,"_shots/FirstLevelOpening/InputRun"),realtime=false,audioClock=false,from="Train",through="Handover",mount=true,regroup=false,retryCheckpoint=null}={}){
@@ -231,7 +232,7 @@ try{
         // Take an offered field dressing on the normal trench approach. These
         // are shipped proximity interactions; no inventory is injected.
         const supply=g.interact.Query(p);
-        if(p.bandages<2 && supply?.point?.id?.startsWith("MissionSupply") && !this.usedSupplies?.has(supply.point.id)){
+        if((p.bandages<2||g.state.clips<=2) && supply?.point?.id?.startsWith("MissionSupply") && !this.usedSupplies?.has(supply.point.id)){
           g.Debug.Key("KeyW",false);g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);
           g.Debug.Key("KeyF",true);
           if(!this.supplyHeld || this.supplyHeld.id!==supply.point.id)this.supplyHeld={id:supply.point.id,frames:0,before:p.bandages};
@@ -394,8 +395,10 @@ try{
   }
   await Drive("TrenchContact",remainingApproach,{fight:true,until:"shelterReached",seconds:180});
   // The pursuers who followed the wounded man down the north trench are fought
-  // from the corner with ordinary inputs before the breather can begin.
-  const cornerFight=await Drive("ShelterCorner",[OPENING.supportRoute[1],OPENING.shelterCorner],{fight:true,until:"shelterCornerHeld",seconds:150});
+  // from the corner with ordinary inputs before the breather can begin. Pass the
+  // recess crate first: the ordinary supply rule tops up a rifle emptied in the trench.
+  const shelterCrate=MISSION_SUPPLIES.find(s=>s.id==="Shelter");
+  const cornerFight=await Drive("ShelterCorner",[{x:shelterCrate.x+.6,z:shelterCrate.z-1.1},OPENING.supportRoute[1],OPENING.shelterCorner],{fight:true,until:"shelterCornerHeld",seconds:150});
   const corner=await page.evaluate(ids=>{
     const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime();
     return {aidStarted:r.voice.played.has("ShelterAid")||r.voice.queue.includes("ShelterAid"),

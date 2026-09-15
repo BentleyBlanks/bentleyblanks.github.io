@@ -619,6 +619,9 @@ export const MISSION_PLACEMENT = Object.freeze({
 });
 export const MISSION_SUPPLIES = Object.freeze([
   {id:"Unloading",x:-68.5,z:66,supportHeight:.85},
+  // 2026-09-15: the shelter corner is now a fight of its own, between the trench
+  // and the front crates. Kept on the recess floor, clear of its entry lane and posts.
+  {id:"Shelter",x:-34.2,z:-18.3,supportHeight:null},
   {id:"Front",x:-2.2,z:-124,supportHeight:null},
   {id:"Orders",x:Sortie.orders.x-1.5,z:Sortie.orders.z,supportHeight:null},
   {id:"Courtyard",x:50,z:33.05,supportHeight:null},
