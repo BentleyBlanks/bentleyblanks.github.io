@@ -28,6 +28,17 @@ try{
   const v=T.viewmodel,r=v.riggedArms,bones=[];r.root.traverse(o=>{if(o.isBone)bones.push(o);});
   const result={clips:[],boneNames:bones.map(b=>b.name),sourceFrames:[]};
   if(r!==v.armRigs.Dadao||!r.fixedRestLengths)throw Error('Dadao must use the repaired fixed-length hands');
+  const model=v.rig.group.getObjectByName('Model_DadaoEdgeMount');
+  if(!model)throw Error('Missing measured Dadao edge mount');
+  model.updateWorldMatrix(true,true);
+  const band=[];
+  model.traverse(o=>{if(!o.isMesh)return;const p=o.geometry.attributes.position;
+   for(let i=0;i<p.count;i++){const point=model.worldToLocal(o.localToWorld(new THREE.Vector3().fromBufferAttribute(p,i)));
+    if(Math.abs(point.z+.3)<.025)band.push(point);}});
+  const low=Math.min(...band.map(p=>p.y)),high=Math.max(...band.map(p=>p.y));
+  const Thickness=y=>{const xs=band.filter(p=>Math.abs(p.y-y)<.008).map(p=>p.x);return Math.max(...xs)-Math.min(...xs);};
+  if(!(Thickness(high)<Thickness(low)*.5))throw Error('Measured thin edge must be the source model +Y side');
+  result.edgeThickness={positiveY:Thickness(high),negativeY:Thickness(low)};
   const guard=new THREE.Quaternion().setFromEuler(new THREE.Euler(...poses.Dadao.hip.weapon.rotation,'YXZ'));
   const normals=stroke.frames
    .map(row=>new THREE.Vector3(1,0,0).applyQuaternion(guard).applyQuaternion(new THREE.Quaternion().fromArray(row,3)));
@@ -41,9 +52,10 @@ try{
     const inverse=v.armAnchor.matrixWorld.clone().invert();
     const P=o=>o.getWorldPosition(new THREE.Vector3()).applyMatrix4(inverse).toArray();
     const matrix=new THREE.Matrix4().multiplyMatrices(inverse,v.rig.group.matrixWorld);
-    const tip=new THREE.Vector3(0,-.012074,-.626).applyMatrix4(matrix);
-    const edge=new THREE.Vector3(0,-1,0).transformDirection(matrix);
-    frames.push({t:i/120,tip:tip.toArray(),edge:edge.toArray(),normal:new THREE.Vector3(1,0,0).transformDirection(matrix).toArray(),grip:Math.max(r.gripError.r,r.gripError.l),
+    const modelMatrix=new THREE.Matrix4().multiplyMatrices(inverse,model.matrixWorld);
+    const tip=new THREE.Vector3(0,-.012074,-.626).applyMatrix4(modelMatrix);
+    const edge=new THREE.Vector3(0,1,0).transformDirection(modelMatrix);
+    frames.push({t:i/120,tip:tip.toArray(),edge:edge.toArray(),normal:new THREE.Vector3(1,0,0).transformDirection(modelMatrix).toArray(),grip:Math.max(r.gripError.r,r.gripError.l),
      wrist:Math.max(r.wristBend.r,r.wristBend.l),wristPair:{...r.wristBend},right:P(r.bones.r.hand),left:P(r.bones.l.hand),
      upper:P(r.bones.r.upperArm),elbow:P(r.bones.r.forearm),leftElbow:P(r.bones.l.forearm),weapon:matrix.toArray()});
     if(exportSource&&action==='Light')result.sourceFrames.push({bones:bones.map(b=>Matrix(b,T.camera)),weapon:Matrix(v.rig.group,T.camera)});
@@ -74,6 +86,7 @@ try{
  assert(data.cutPlaneDriftDeg<.1,`Blade twists during downstroke/follow-through: ${data.cutPlaneDriftDeg} degrees`);
  const metrics=[];
  for(const clip of data.clips){
+  assert(clip.frames[0].edge[2]<-.8,`${clip.action}: real cutting edge must face forward in guard`);
   for(const f of clip.frames){
    const dot=f.normal.reduce((sum,n,i)=>sum+n*clip.frames[0].normal[i],0);
    assert(Math.acos(Math.min(1,Math.max(-1,dot)))*180/Math.PI<.1,`${clip.action} ${f.t}: blade rolls out of its cutting plane`);
@@ -128,7 +141,7 @@ try{
  await page.setViewportSize({width:1280,height:720});
  fs.writeFileSync(path.join(out,'Data_DadaoSwingAcceptance.json'),JSON.stringify({metrics,visibility,cutPlaneDriftDeg:data.cutPlaneDriftDeg,interruptionError:data.interruptionError,recoverySeekError:data.recoverySeekError},null,2));
  if(data.sourceFrames.length)fs.writeFileSync(path.join(out,'Data_DadaoSourceBake.json'),JSON.stringify({boneNames:data.boneNames,frames:data.sourceFrames}));
- for(const phase of [.24,.34,.4,.55,.85]){
+ for(const phase of [0,.24,.34,.4,.55,.85]){
   await page.evaluate(phase=>{Taierzhuang.Debug.MeleeCombat.Preview('Light',phase);Taierzhuang.StepFrames(1,1/60,true);},phase);
   await page.screenshot({path:path.join(out,`Scene_Dadao_${Math.round(phase*100)}.png`)});
  }

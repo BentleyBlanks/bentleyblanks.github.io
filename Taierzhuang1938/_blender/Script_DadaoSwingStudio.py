@@ -42,6 +42,10 @@ if weapon is None:
         mesh=bpy.data.meshes.new('Model_DadaoBlade');mesh.from_pydata(vertices,[],[indices[i:i+3] for i in range(0,len(indices),3)]);mesh.update()
         SetMeleeMeshSurface(mesh,uvs,normals);mesh.materials.append(MeleeDadaoMaterial(root))
         obj=bpy.data.objects.new(mesh.name,mesh);scene.collection.objects.link(obj);obj.parent=weapon
+# The TZM's measured thin edge is +Y, opposite the control rig's -Y edge.
+# Rotate mesh children only; the grip controls and replay bones stay fixed.
+for obj in weapon.children:
+    if obj.type=='MESH':obj.rotation_euler=(0,0,math.pi)
 # Keep inspectable grip frames with the repaired hand replay in the source.
 for side,z,angles in [('Right',.03,(.05208,-1.93229,-1.75862)),('Left',.155,(.20553,-2.61358,-.42501))]:
     name='Animation_Dadao'+side+'Grip'

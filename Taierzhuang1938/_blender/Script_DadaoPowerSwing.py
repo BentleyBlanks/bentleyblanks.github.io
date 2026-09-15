@@ -34,7 +34,8 @@ def Control(name):
 
 def Rotation(pitch, yaw=0, roll=0):
     theta = math.radians(pitch)
-    # -Z is the blade, -Y its cutting edge. The edge stays in the swing plane.
+    # -Z is the blade. The raw TZM's thin edge is +Y, corrected to -Y by
+    # modelRotation on the mesh only. The hands retain this authored basis.
     down = Vector((.30, .953939, 0)).normalized()
     blade = down * math.sin(theta) + Vector((0, 0, -math.cos(theta)))
     y = down * math.cos(theta) + Vector((0, 0, math.sin(theta)))
@@ -104,7 +105,11 @@ for frame in range(1,122):
     frames.append([round(x,7) for x in [*d,q.x,q.y,q.z,q.w,*right.location,*left.location,*rightPole.location,*leftPole.location]])
 for key,value in [('defensiveVideoRotationScale',.15),('defensivePoseRotationScale',0.0)]:
     if not exportOnly or key not in scene:scene[key]=value
+scene['modelRotation']=[0.0,0.0,math.pi]
+scene['sourceEdgeDirection']=[0.0,1.0,0.0]
 data={'schema':1,'source':'BlenderDadaoPowerSwing','sourceArmLength':.57233826,
+      'modelRotation':list(scene['modelRotation']),
+      'sourceEdgeDirection':list(scene['sourceEdgeDirection']),
       'defensiveVideoRotationScale':scene['defensiveVideoRotationScale'],
       'defensivePoseRotationScale':scene['defensivePoseRotationScale'],
       'frameCount':121,'cutStart':.26,'cutEnd':.46,'frames':frames}

@@ -41,6 +41,7 @@ import { InstantiateModel } from "./Script_MeshLoad.mjs";
 import { WEAPON_MESH_BY_ID, WeaponMeshId, BAYONET_MESH_BY_WEAPON } from "./Data_Meshes.mjs";
 import { FpsArmRig } from "./Script_RiggedModel.mjs";
 import { FpsArmPose, FPS_HAND_SHAPES } from "./Data_FpsArmPoses.mjs";
+import { FPS_DADAO_SWING } from "./Data_FpsDadaoSwing.mjs";
 import { FirstPersonBody } from "./Script_FirstPersonBody.mjs";
 import { FrameQuaternion } from "./Script_FpsAnatomy.mjs";
 import { FpsSkeletalAnimation } from "./Script_FpsSkeletalAnimation.mjs";
@@ -1780,6 +1781,15 @@ export class Viewmodel {
     const meshId = MODEL_FP.has(weaponId) ? WeaponMeshId(weaponId, this.weaponVariant) : null;
     const doc = meshId && this.meshDocs ? this.meshDocs.get(meshId) : null;
     this.rig = doc ? BuildFromModel(this.materials, this.weapon, weaponId, doc) : null;
+    if (this.rig && weaponId === "Dadao") {
+      // Measured TZM thin edge is +Y; the authored grip expects it along -Y.
+      // Correct only the private model mount, before attaching either hand.
+      const mount = new THREE.Group();
+      mount.name = "Model_DadaoEdgeMount";
+      mount.rotation.fromArray(FPS_DADAO_SWING.modelRotation);
+      for (const child of [...this.rig.group.children]) mount.add(child);
+      this.rig.group.add(mount);
+    }
     if (!this.rig) {
       const builder = BUILDERS[weaponId] || BuildBoltRifle;
       this.rig = builder(this.materials, this.weapon, weaponId, this.grenadeAsset);
