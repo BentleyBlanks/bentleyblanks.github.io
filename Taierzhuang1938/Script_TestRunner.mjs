@@ -83,6 +83,7 @@ export const testDefs = {
   FirstLevelMissionFortificationsTest: {file:"Script_FirstLevelMissionFortificationsTest.mjs",timeoutMs:600000,desc:"Loaded field defenses, route clearance and merged scene screenshots"},
   FirstLevelMachineGunTest: {file:"Script_FirstLevelMachineGunTest.mjs",timeoutMs:240000,desc:"Finite gun-stage enemies, live NPC movement/fire, casualty continuation and retry"},
   FirstLevelMachineGunCutsceneTest: {file:"Script_FirstLevelMachineGunCutsceneTest.mjs",timeoutMs:600000,desc:"04 gun-position mid-level cutscene: walked-in trigger, plays once, frozen world, control returned and the gun still usable"},
+  MachineGunCutsceneAudioTest: {file:"Script_MachineGunCutsceneAudioTest.mjs",timeoutMs:600000,desc:"04 关中过场听得见没有：九条 cue 在声库里、Play 建起播放头、AudioContext 输出端逐条量 RMS（对照组为 03 阶段既有对白）"},
   FirstLevelFrontPresenceTest: {file:"Script_FirstLevelFrontPresenceTest.mjs",timeoutMs:600000,desc:"Finite approach fire, delayed front commitment and no respawning after a slow approach"},
   FirstLevelCasualtyBrowserTest:{file:"Script_FirstLevelCasualtyBrowserTest.mjs",timeoutMs:360000,desc:"Ordinary squad death uses real damage, retains the mission and reports local casualties"},
   MissionReturnTest: {file:"Script_MissionReturnTest.mjs",desc:"Soft return boundaries, escort separation, hysteresis and stage corridors"},
@@ -329,6 +330,7 @@ export const browserTests = new Set([
   "FirstLevelFrontPresenceTest",
   "FirstLevelMachineGunTest",
   "FirstLevelMachineGunCutsceneTest",
+  "MachineGunCutsceneAudioTest",
   "FirstLevelMissionAftermathTest",
   "SquadMarchEditorTest",
   "FirstLevelSquadMarchTest",
@@ -429,7 +431,7 @@ export const domains = {
   propVelocity: {label:'近景刚体道具速度与移动清晰度',tests:['CarriagePropVelocityTest']},
   squadMarch: {label:"通用小队行进",tests:["SquadMarchCoverTest","SquadMarchCoverBrowserTest","SquadMarchTest","SquadMarchAiTest","SquadMarchEditorTest","SquadMarchNavigationTest","FirstLevelSquadMarchTest","EditorLauncherTest"]},
   firstLevelTail: {label:"第一关接收院至结尾定向续接",tests:["FirstLevelMissionStageTailTest"]},
-  firstLevel: {label:'新版第一关完整任务',tests:['Type89DamageTest','FirstLevelFrontRouteBrowserTest','FirstLevelMissionTopologyTest','FirstLevelMissionTopologyBrowserTest','MissionReturnTest','FirstLevelMissionReturnBrowserTest','FirstLevelCasualtyBrowserTest','FirstLevelOpeningSequenceBrowserTest','FirstLevelCarriageAnimationTest','FirstLevelMealTest','FirstLevelMissionTest','FirstLevelFrontPresenceTest','FirstLevelMachineGunTest','FirstLevelMachineGunCutsceneTest','FirstLevelMissionAftermathTest','FirstLevelOpeningBrowserTest','FirstLevelOpeningContactTest','FirstLevelGuideQueueTest','FirstLevelMissionFortificationsTest','FirstLevelMissionBrowserTest','FirstLevelMissionStageJumpTest','FirstLevelMissionStageContinueTest','FirstLevelMissionPresentationTest','FirstLevelTrainAnimationTest']},
+  firstLevel: {label:'新版第一关完整任务',tests:['MachineGunCutsceneAudioTest','Type89DamageTest','FirstLevelFrontRouteBrowserTest','FirstLevelMissionTopologyTest','FirstLevelMissionTopologyBrowserTest','MissionReturnTest','FirstLevelMissionReturnBrowserTest','FirstLevelCasualtyBrowserTest','FirstLevelOpeningSequenceBrowserTest','FirstLevelCarriageAnimationTest','FirstLevelMealTest','FirstLevelMissionTest','FirstLevelFrontPresenceTest','FirstLevelMachineGunTest','FirstLevelMachineGunCutsceneTest','FirstLevelMissionAftermathTest','FirstLevelOpeningBrowserTest','FirstLevelOpeningContactTest','FirstLevelGuideQueueTest','FirstLevelMissionFortificationsTest','FirstLevelMissionBrowserTest','FirstLevelMissionStageJumpTest','FirstLevelMissionStageContinueTest','FirstLevelMissionPresentationTest','FirstLevelTrainAnimationTest']},
   text: { label: "玩家文本 / 数值表（数据驱动闸门）", tests: ["TextTest", "TextGatherCheck"] },
   animation: { label: '独立动画资产验收', tests: ['ActorLocomotionTest','BackRifleRunTest','MeleeAnimationTest','DadaoSwingTest','InfantryAnimationTest'] },
   explosives: { label: "爆炸白盒与通用地形形变/返掷", tests: ["ExplosionRulesTest", "ExplosionRangeTest", "CraterSurfaceTest"] },
@@ -490,15 +492,17 @@ export const domains = {
     // 所以也挂在这个域下。
     tests: ["CarryTest", "EmplacementTest", "HudPromptTest", "HudPromptBrowserTest", "WeaponPickupTest", "TelegraphTest", "MissionHooksTest", "MissionSetpiecesTest"],
   },
-  audio: { label: "音效/音乐/环境声", tests: ["FirstLevelMissionMusicTest", "FirstLevelMissionMusicBrowserTest", "AudioTest", "AudioWiringTest"] },
-  voice: { label: "语音", tests: ["VoiceTest"] },
+  audio: { label: "音效/音乐/环境声", tests: ["FirstLevelMissionMusicTest", "FirstLevelMissionMusicBrowserTest", "AudioTest", "AudioWiringTest", "MachineGunCutsceneAudioTest"] },
+  // 「声库装没装进去」与「输出端有没有电平」是两件事，后者只有 MachineGunCutsceneAudioTest
+  // 在真入口上量：VoiceTest 验的是资产与交付档，量不到 AudioEngine 的装载分叉。
+  voice: { label: "语音", tests: ["VoiceTest", "MachineGunCutsceneAudioTest"] },
   menu: { label: "主菜单/开机陈设", tests: ["FirstLevelP012DebugTest", "MenuTest", "DeathMenuTest", "BootPropTest"] },
   editor: { label: "场景编辑器/第一人称检查/PCG/资产规范/可破坏编辑器/采样点", tests: ["WorldInfoEditorTest", "AiEditorTest", "TuningWriterTest", "AssetStandardsTest", "EditorTest", "FpsGripEditorTest", "PropPcgTest", "PropPcgEditorTest", "DestructionEditorTest", "SamplePointTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "CharacterModelTest"] },
   cutscene: {
     label: "过场/剧本派发/车厢生活动作",
     // 关中过场 beat 与 LEVEL_CUES 的构建都在 Script_Story 与组装层里，
     // 碰过场或剧本的改动要连着 MissionHooksTest 一起跑（毫秒级，白搭一条不亏）。
-    tests: ["FirstLevelP012ShellShotTest", "CutsceneControlTest", "ActorPoseTest", "CutscenePoseTest", "MissionHooksTest", "MissionSetpiecesTest", "MachineGunCaptivesAnimationTest"],
+    tests: ["FirstLevelP012ShellShotTest", "CutsceneControlTest", "ActorPoseTest", "CutscenePoseTest", "MissionHooksTest", "MissionSetpiecesTest", "MachineGunCaptivesAnimationTest", "MachineGunCutsceneAudioTest"],
   },
   render: {
     label: "渲染与合批自动契约",
@@ -556,6 +560,11 @@ const changedDomainRules = [
   // 播放走装配层的 PlayMidCutscene —— 三处都要拉上第一关域与过场域。
   {domain:'firstLevel',pattern:/CutsceneMachineGunCaptives|MachineGunCutscene/},
   {domain:'cutscene',pattern:/CutsceneMachineGunCaptives|MachineGunCutscene/},
+  // 【2026-09-16】音频引擎与声库表本来只落在 characterSpeech（那条规则里顺手带了
+  // Script_Audio.mjs），于是「改了 AudioEngine 的装载分叉」选不中 audio / voice
+  // 两个域 —— 04 关中过场整条语音通道静音那次就是这么推上去的。
+  { domain: "audio", pattern: /Script_Audio\.mjs|Script_AudioWiring|Data_Voice|Data_SfxSources|Data_AmbSources|Data_Tuning_Audio/ },
+  { domain: "voice", pattern: /Script_Audio\.mjs|Data_Voice|Script_VoiceBake|Script_FirstLevelMissionVoice/ },
   {domain:'firstLevel',pattern:/MissionReturn|FirstLevelMeal|BaconHandoff|FirstLevelOpening|FirstLevelMachineGun|FirstLevelFrontPresence|FirstLevelMission|FirstLevelTrain|FirstLevelCarriage|CarriageSoundscape|FirstLevelVoiceAlign|SeedAudioFirstLevel|SeedAudioCarriage|Audio\/FirstLevel|Audio\/Amb\/AudioAmb_Carriage/},
   // 静态分件的图集合批：第一关尸体层与担架伤员用它（firstLevel 那一串里的
   // 尸体 / 演出门禁），而它动的是材质与提交量，所以 render 域的开机 / 采样器 /

@@ -3627,7 +3627,13 @@ export class AudioEngine {
     this.nodeBudget = NODE_BUDGET;
     // --- 外部人声采样（战场口令）。加载失败不影响任何其他功能 ---
     this.voiceBank = new Map();      // key -> {key, text, kind, file, duration}
-    this.voicesReady = false;
+    this.voicesReady = false;        // 声库里有没有能播的东西（Bark 读它）
+    /**
+     * `Data_Voice.VOICE_LINES` 这一包**载过没有**。与 voicesReady 是两件事：
+     * 声库是共享的（第一关的整段录音走 Script_FirstLevelMissionVoice 装进同一个 Map），
+     * 拿「库里有没有东西」当加载闸会让这一包被别人挡在门外（见 LoadPacks）。
+     */
+    this.voicePackReady = false;
     this.voiceErrors = [];
     // 剧情语音**单槽**：同一时刻只许有一条对白在响（见 PlayStoryVoice）。
     this.storyVoice = null;          // 正在响的那条的 Voice 句柄
@@ -3948,10 +3954,18 @@ export class AudioEngine {
     // 一次都不再试的话，开局那一下网络抖动就永久把整局摁在合成音上。
     this.packAttempts = this.packAttempts || { voice: 0, sfx: 0, amb: 0, music: 0 };
     const a = this.packAttempts;
-    if (!this.voicesReady && !this.voiceLoading && a.voice < PACK_ATTEMPTS) {
+    // 闸判的是 **voicePackReady（这一包载过没有）**，不是 voicesReady（声库里有没有东西）。
+    // 【2026-09-16】两者混用造成过一次整条通道静音：`Script_FirstLevelMissionVoice.Load()`
+    // 也走 LoadVoices 往同一个声库里塞第一关的整段录音，而建关时
+    // `Script_Main` 是 `await missionRuntime.voiceReady` 的 —— 也就是说进 ?whitebox=p012
+    // 的玩家按下「开始」之前，voicesReady 一定已经是 true 了，这道闸于是永远关着：
+    // VOICE_LINES 那 166 条（战场口令 + ch0/ch1 章节台词，含 04 关中过场那 9 条）
+    // 一条都不载，`Play("voice.ch1_*")` 在 `RECIPES` 那一行静默返回 null。
+    // 症状是「过场只有字幕没有声音」「整关一句喊话都没有」，而日志、voiceErrors 全是干净的。
+    if (!this.voicePackReady && !this.voiceLoading && a.voice < PACK_ATTEMPTS) {
       this.voiceLoading = true;
       a.voice += 1;
-      this.LoadVoices(VOICE_BASE, VOICE_LINES).catch(() => {}).then(() => { this.voiceLoading = false; });
+      this.LoadVoicePack().catch(() => {}).then(() => { this.voiceLoading = false; });
     }
     // 实录音效同理：解锁之后才有 ctx 可以 decode。约 350 KB，与人声并行拉。
     if (!this.sfxReady && !this.sfxLoading && a.sfx < PACK_ATTEMPTS) {
@@ -3988,6 +4002,7 @@ export class AudioEngine {
    */
   ReloadPacks() {
     this.packAttempts = { voice: 0, sfx: 0, amb: 0, music: 0 };
+    this.voicePackReady = false;
     this.voiceErrors = [];
     this.sfxErrors = [];
     this.ambErrors = [];
@@ -4107,7 +4122,11 @@ export class AudioEngine {
    */
   async LoadVoices(base, entries) {
     if (!this.ctx || this.disposed || !Array.isArray(entries)) return 0;
-    this.voiceErrors = [];
+    // **错误表只追加、不清空**：这个方法有两路调用方往同一个声库里装
+    // （`LoadVoicePack` 的战场口令 + 章节台词，`Script_FirstLevelMissionVoice` 的
+    // 第一关整段录音），后跑的那一路清表就等于把前一路的失败擦掉。
+    // 想要「这一轮从头算」的，在调用前自己清（见 LoadVoicePack / ReloadPacks）。
+    const errors = [];
     let ok = 0;
     await Promise.all(entries.map(async (e) => {
       try {
@@ -4138,10 +4157,28 @@ export class AudioEngine {
           speechEnvelope: e.analyzeSpeech ? BuildSpeechEnvelope(buf) : null });
         ok += 1;
       } catch (err) {
-        this.voiceErrors.push({ file: e.file, message: err && err.message });
+        errors.push({ file: e.file, message: err && err.message });
       }
     }));
-    this.voicesReady = ok > 0;
+    if (errors.length) this.voiceErrors = this.voiceErrors.concat(errors);
+    // 「声库里有没有能播的东西」= 看库，不看这一轮载进去几条。
+    // Bark 读的是这一位；「VOICE_LINES 那一包载过没有」是另一位（voicePackReady）。
+    this.voicesReady = this.voiceBank.size > 0;
+    return ok;
+  }
+
+  /**
+   * 装 `Data_Voice.VOICE_LINES`：战场口令（中方 31 + 日方 28）与 ch0/ch1 章节台词
+   * （含 04 关中过场《空地上的三个人》那 9 条）。
+   *
+   * 与 `LoadVoices` 分开是因为**它是「一包」，要有自己的"载过没有"**：
+   * 声库是共享的，第一关的整段录音（`Script_FirstLevelMissionVoice`）也往里装，
+   * 用「库里有没有东西」当闸会让这一包永远排在别人后面进不来（见 LoadPacks 那段）。
+   */
+  async LoadVoicePack(base = VOICE_BASE, entries = VOICE_LINES) {
+    this.voiceErrors = this.voiceErrors.filter((e) => !entries.some((line) => line.file === e.file));
+    const ok = await this.LoadVoices(base, entries);
+    this.voicePackReady = ok > 0;
     return ok;
   }
 

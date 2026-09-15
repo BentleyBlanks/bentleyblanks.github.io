@@ -341,6 +341,37 @@ cue、距离、遮挡值、低通、干声节点、总线路由。四条假设�
 
 ---
 
+## 2.7 声库是两路共用的：`voicesReady` ≠ 「这一包载过没有」（2026-09-16）
+
+`voiceBank` 有**两路**往里装，而它们走的是同一个 `LoadVoices`：
+
+| 路 | 装什么 | 谁发起 |
+|---|---|---|
+| A | 第一关的整段录音（键名 `Mission*`） | `Script_FirstLevelMissionVoice.Load()`，建关时由装配层 `await` |
+| B | `Data_Voice.VOICE_LINES`（战场口令 + ch0/ch1 章节台词） | `Unlock()` → `LoadPacks()` |
+
+**两位旗标必须分开**，这是契约的一部分：
+
+- `voicesReady` = 「声库里有没有能播的东西」（`Bark` / 编辑器面板读它），
+  取值就是 `voiceBank.size > 0`；
+- `voicePackReady` = 「B 这一包载过没有」，只由 `LoadVoicePack()` 置位，
+  **`LoadPacks` 的闸判的是它**。
+
+混用的后果实测过一次：建关 `await missionRuntime.voiceReady` 保证 A 先落地，
+于是玩家第一次手势时 `voicesReady` 已经是 true，B 一次都没试过
+（`packAttempts.voice === 0`）—— `?whitebox=p012` 整关**一句战场喊话都没有**，
+ch0/ch1 那 107 条章节台词与 04 关中过场那 9 条只剩字幕。
+没有 404、没有异常、`voiceErrors` 是空的：`Play` 只是在 `RECIPES[name]` 那一行
+返回 `null`。取证与数字见
+[`Data_MachineGunCaptivesCutscene.md` §5.2](Data_MachineGunCaptivesCutscene.md)。
+
+`LoadVoices` 的 `voiceErrors` 同理**只追加不清空** —— 后跑的那一路清表
+等于把前一路的失败擦掉。要「从头算」的在调用前自己清（`LoadVoicePack` / `ReloadPacks`）。
+
+回归口：`node Taierzhuang1938/Script_MachineGunCutsceneAudioTest.mjs`
+（真入口 `?whitebox=p012`，在 `softClip` 上挂 analyser 逐条量输出端 RMS，
+对照组是 03 阶段那条既有对白）。
+
 ## 3. 分区混响（四档 IR）
 
 IR 仍然是**现场程序生成**、种子确定（`HashString("ir:" + kind)`），一个外部文件都不用。
