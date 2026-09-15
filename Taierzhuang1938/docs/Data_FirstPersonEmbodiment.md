@@ -130,3 +130,18 @@ BlenderMCP 在上述独立工程执行 `_import/Script_FpsAnimationStudio.py` �
 - [Epic：First Person Rendering](https://dev.epicgames.com/documentation/unreal-engine/first-person-rendering?lang=en-US)：第一人称物体独立 FOV 与近景缩放。
 - [Epic：Two Bone IK](https://dev.epicgames.com/documentation/unreal-engine/animation-blueprint-two-bone-ik-in-unreal-engine)：接触目标和肘部目标分离。
 - [Epic：Virtual Bones](https://dev.epicgames.com/documentation/en-us/unreal-engine/virtual-bones-in-unreal-engine)：通过目标空间和 IK 保持附加动作中的接触关系。
+
+### 三八式握姿修复（2026-09-16）
+
+参照汉阳造已校准握姿，三八式改用相同掌面方向、右拇指沿枪托前伸及左手托握轮廓。
+右掌按三八式扳机相对汉阳造右移 1 mm、下移 2 mm、前移 45 mm；左掌前移 45.58 mm，
+左中指、无名指、小指的掌指关节独立微调以贴合较窄护木。保留原肩肘挂点和拉栓、换弹时序。
+运行时只修改 `Data_FpsArmPoses` 的三八式条目，共用网格与汉阳造条目保持原样。
+独立 BlenderMCP 工程：`C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\Type38Grip_20260916\Animation_Type38Hands.blend`。
+同目录保留手指校准数据及实际运行时骨骼快照；无新增动画片段。
+
+验收：三八式 `FpsArmTest --only=Type38` 86/86；`FpsHandContactTest --only=Type38`
+覆盖腰射、开镜、开火及 281 帧拉栓/换弹；右食指到扳机约 1.1 mm，左手五指均通过 4 mm 门限。
+已查看游戏腰射/开镜/开火/拉栓图与 Blender 握姿图。`MotionVectorContractTest` 通过。
+`FirstPersonEmbodimentTest` 在“Stand look-down shows the actual body mesh”失败；
+在同一工作区换回修改前的 `Data_FpsArmPoses.mjs` 后复现相同失败，属本次修改前已有问题。
