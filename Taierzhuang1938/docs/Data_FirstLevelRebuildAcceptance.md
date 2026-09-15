@@ -15,6 +15,10 @@
 实机取证（临时目录，不进仓库）：
 - 正常输入驱动从第三阶段起点走到机枪接管全程通过；折角交火中 5 人均实际开火，打退后才出现包扎与私语，随后 `WoundedArrival`、`SupportOrder`、前沿步枪掩护、机枪接管照常。测试驱动是自动瞄准，不代表真人难度。
 - `--regroup` 正常开局（同一场景多轮）：修正前驱动站着打、队员停在后面，玩家在折角阵亡；放行队员并蹲姿后通过，但最后一人躲了 132 秒；直线冲锋时一人翻上沟沿、驱动打光子弹超时；两人沿沟冲锋时 34 秒打完但玩家流血，后来死在前沿；改为单人沿沟冲锋后 31 秒打完，玩家剩 80 血、用掉 2 条绷带。驱动随后在掩蔽处补给箱补上绷带和弹夹，打到接机枪全程通过。另一轮普通开局同样通过。
+- 测试驱动配合：掩蔽处交火时蹲姿（与清沟、支援同一规则）；打完折角后绷带不到 2 条或弹夹少于 8 个，就走到补给箱按住 F 补一次。折角大约花掉 4 个弹夹，原来只在弹夹剩 2 个时才补，整关实测进前沿时弹药只有改动前的一半，最后在机枪位打空、流血死亡。任务断言没有放宽。
+- 最终代码测试（rebase 到 `90a57f76a` 之后）：quick 52 项全过；浏览器 `FirstLevelOpeningBrowserTest`、`FirstLevelGuideQueueTest`、`FirstLevelMissionStageJumpTest`、`FirstLevelLeaderGuideBrowserTest`、`FirstLevelSquadMarchTest`、`FirstLevelMissionTopologyBrowserTest`、`FirstLevelFrontPresenceTest`、`FirstLevelMachineGunTest`、`FirstLevelFrontRouteBrowserTest`、`MotionVectorContractTest` 通过。
+- 未通过且与本次无关（均有基线对照或本次代码走不到）：`FirstLevelOpeningContactTest` 在干净 `90a57f76a` 上连跑两次都在同一交火段阵亡；`FirstLevelMissionFortificationsTest` 在改动前的 `520c115d9` 上同样报 `10 !== 0`（集束弹路线旁的铁丝网）；`FirstLevelMissionStageContinueTest` 在 `520c115d9` 上同样死在第 5 阶段取集束弹。
+- 整关正常通关没有拿到 `Complete`。不带重试的三次：第一次折角 0 发（加补给箱前），第二次机枪位打空流血（驱动补给门槛修正前），第三次折角零伤害，但清沟时就用光绷带，前沿流血死亡。带 `--allow-checkpoint-retry` 的一次：车厢到接机枪整段通过，第 5 阶段取集束弹用掉两次重试，最后红在第 9 阶段连屋埋伏「两个担架员已倒」。从第 8 阶段起的定向续跑中第 8–13 阶段通过，红在第 14 阶段 Rescue 未转入 RetreatFirst；该跑法跳过第 3 阶段，本次代码不参与。另一会话已在 `90a57f76a` 记录干净 master 整关两跑一红。
 - 玩家站在折角无敌、不开枪 60 秒（改为单人冲锋之前的取证）：第 29 秒开始挨打，第 41 秒第一人贴到 2 米内。这次取证用调试手段清沟并传送了队员，队员沿原路线往回跑没有帮忙，只说明「不打就会被压上来」，不是正常难度数据。
 
 ## 2026-09-14 前沿出击后续修订
