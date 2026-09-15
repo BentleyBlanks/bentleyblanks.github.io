@@ -160,10 +160,11 @@ export const OPENING = Object.freeze({
     // The loop's sandbag line (CommunicationBendDefense, x -29) stays on the east hand.
     CornerPursuerE:{delay:8,points:[{x:-27,z:-58.6},{x:-31.2,z:-56},{x:-31.2,z:-51},{x:-30.5,z:-48},{x:-25.2,z:-44.6}]},
   },
-  // Last men rush the corner instead of hiding in the loop or behind a bay wall:
-  // a live run left one unseen for 90 s. Once this many remain, or after afterS,
-  // the survivors drop their bounds and close on an open point short of the bend.
-  shelterPush: {remaining:2, afterS:40, point:{x:-24.5,z:-28}, radiusM:1.5, coverSlackM:1},
+  // The last man rushes the corner instead of hiding in the loop or behind a bay
+  // wall: a live run left one unseen for 90 s. Once this many remain, or after
+  // afterS, survivors finish their own trench route to an open point short of the
+  // bend. Two at once reached point-blank together and bled out a crouched player.
+  shelterPush: {remaining:1, afterS:55, point:{x:-24.5,z:-28}, radiusM:1.5, coverSlackM:1, arrivalM:1.2, speedMps:2.8},
   surfaceBurstSeconds: 3.6,
   // These teams seal the unloading apron. They do not all turn north to chase
   // closer friendlies already deep in the communication trench.

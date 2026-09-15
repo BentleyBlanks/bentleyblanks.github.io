@@ -57,7 +57,7 @@ async function Drive(label,points,{fight=false,until=null,untilVoice=null,second
       }
       if(!realtime)g.StepFrames(1,1/60,true);
       const r=g.Debug.FirstLevelMissionRuntime();
-      return {t:r.time,stage:r.flow.stage.id,index:b.index,points:b.points.length,position:g.player.position.toArray(),health:g.player.health,alive:g.player.alive&&!r.failed,
+      return {t:r.time,stage:r.flow.stage.id,index:b.index,points:b.points.length,position:g.player.position.toArray(),health:g.player.health,medical:{bleeding:g.player.bleeding,bandages:g.player.bandages,clips:g.state.clips},alive:g.player.alive&&!r.failed,
         cutscene:g.state.cutscene,cutsceneFrames,
         ready:Ready(),shots:g.state.playerShots,ammo:g.state.ammo,remaining:r.flow.State().remaining,foe:b.foe,
         damage:window.missionDamage?.slice(-8),
@@ -75,7 +75,7 @@ async function Drive(label,points,{fight=false,until=null,untilVoice=null,second
     trace.push({label,...result});
     combatTrace.push(await page.evaluate(()=>{
       const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime();
-      return {time:r.time,combat:{...g.ai.stats},actors:g.ai.soldiers.filter(a=>a.alive&&(a.side==='nra'||['surface','intrusion','approach'].includes(a.missionEncounter)))
+      return {time:r.time,combat:{...g.ai.stats},actors:g.ai.soldiers.filter(a=>a.alive&&(a.side==='nra'||['surface','intrusion','shelterPursuit','approach'].includes(a.missionEncounter)))
         .map(a=>({id:a.id,missionId:a.missionId,side:a.side,encounter:a.missionEncounter,
           p:a.position.toArray(),state:a.state,health:a.health,stance:a.stance,ready:a.missionTrainReady,
           grenades:a.grenades,tactic:a.missionTactic?{...a.missionTactic}:null,
@@ -411,6 +411,23 @@ try{
   assert.ok(!corner.aidStarted,"the breather does not start while the corner is under attack");
   // The unchanged physical regroup deadline is separate from the current complete
   // recordings. A late-arriving medic must not consume the dialogue's listen time.
+  // Restock at the same crate after the fight: dressings spent at the corner are
+  // otherwise missing on the front approach. Ordinary walk and held F; the crate's
+  // own cooldown still applies. The recess voice may already start meanwhile.
+  const restock=await page.evaluate(()=>{const g=window.Tengxian;return g.player.bandages<2||g.state.clips<=2;});
+  if(restock){
+    await Drive("ShelterRestock",[{x:shelterCrate.x+.6,z:shelterCrate.z-1.1}],{seconds:30});
+    const taken=await page.evaluate(async realtime=>{
+      const g=window.Tengxian,before={bandages:g.player.bandages,clips:g.state.clips};
+      for(let i=0;i<150&&g.player.bandages<=before.bandages&&g.state.clips<=before.clips;i++){
+        g.Debug.Key("KeyF",true);
+        if(realtime)await new Promise(resolve=>requestAnimationFrame(resolve));else g.StepFrames(1,1/60,false);
+      }
+      g.Debug.Key("KeyF",false);
+      return {before,after:{bandages:g.player.bandages,clips:g.state.clips}};
+    },realtime);
+    console.log("SHELTER_RESTOCK",JSON.stringify(taken));
+  }
   await Drive("ShelterRegroup",[OPENING.shelter],{untilVoice:"ShelterAid",seconds:100});
   const shelterSpeechSeconds=await page.evaluate(async()=>{
     const {MISSION_DIALOGUE}=await import("./Data_FirstLevelMissionDialogue.mjs");

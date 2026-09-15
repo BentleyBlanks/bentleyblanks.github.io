@@ -291,9 +291,24 @@ export class FirstLevelOpening {
       const pursuers=C.shelterPursuers.map(s=>r.enemies.get(s.id));
       if(pursuers.every(a=>a&&!a.alive))r.Record("shelterCornerHeld",{count:pursuers.length});
       const held=r.Has("shelterCornerHeld"),push=C.shelterPush,alive=pursuers.filter(a=>a?.alive);
-      if(!held&&!r.Has("shelterCornerRushed")&&pursuers.every(Boolean)&&(alive.length<=push.remaining||r.flow.stageTime>=push.afterS)){
+      if(!held&&!this.cornerRush&&pursuers.every(Boolean)&&(alive.length<=push.remaining||r.flow.stageTime>=push.afterS)){
         r.Record("shelterCornerRushed",{alive:alive.length});
-        for(const a of alive){a.missionTactic=null;r.Defend(a,push.point,push.radiusM,push.coverSlackM);r.ai.SetStance(a,0,1,true);}
+        // Follow the rest of each man's own trench route: a straight goal climbs
+        // the bank out of the north loop and parks him on the lip above the corner.
+        this.cornerRush=alive.map(a=>{
+          const points=C.shelterPursuerRoutes[a.missionId].points,from=a.missionTactic?.index??points.length;
+          a.missionTactic=null;
+          return {actor:a,route:[...points.slice(from),push.point]};
+        });
+      }
+      if(!held)for(const entry of this.cornerRush||[]){
+        const a=entry.actor;
+        if(!a.alive||a.meleeCombat)continue;
+        while(entry.route.length>1&&Distance(a.position,entry.route[0])<push.arrivalM)entry.route.shift();
+        const target=entry.route[0];
+        if(entry.route.length>1||Distance(a.position,target)>push.radiusM){
+          entry.settled=false;r.MoveActor(a,target,push.speedMps);r.ai.SetStance(a,0,.4,true);
+        }else if(!entry.settled){entry.settled=true;r.Defend(a,target,push.radiusM,push.coverSlackM);}
       }
       const yaowa=r.companion.Handle("yaowa"),luo=r.companion.Handle("luo");
       // The breather starts after the corner is held, never under fire.
