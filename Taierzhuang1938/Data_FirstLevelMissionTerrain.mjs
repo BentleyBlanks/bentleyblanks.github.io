@@ -25,6 +25,9 @@ export function MissionPathDistance(point, route) {
 }
 export const MISSION_TERRAIN = Object.freeze({
   cellM: 0.75,
+  textureTileM: 2,
+  // Full-cover trench floor below natural soil; firing steps and mouths remain raised.
+  // Historical basis and exceptions: docs/Data_TrenchTerrainPbr.md.
   roads: [
     {
       points: [
@@ -75,7 +78,7 @@ export const MISSION_TERRAIN = Object.freeze({
     {
       id: "FrontCommunication",
       points: [...OPENING.approachRoute.slice(1),...OPENING.supportRoute.slice(1)],
-      depth: 1.5,
+      depth: 2,
       bottom: 4.2,
       bank: 1.5,
     },
@@ -86,29 +89,29 @@ export const MISSION_TERRAIN = Object.freeze({
         { x: 0, z: -124 },
         { x: 24, z: -124 },
       ],
-      depth: 1.5,
+      depth: 2,
       bottom: 4.2,
       bank: 1.5,
     },
     {
       id: "BundleApproach",
       points: Sortie.route,
-      depth: 1.45,
-      bottom: 3.6,
-      bank: 1.3,
+      depth: Sortie.trenchDepthM,
+      bottom: Sortie.trenchBottomM,
+      bank: Sortie.trenchBankM,
     },
     {
       id: "WestEvacuation",
       points: MISSION_REAR_ROUTES.evacuation,
-      depth: 1.1,
+      depth: 2,
       bottom: 5.2,
       bank: 2.2,
     },
     // Two short choices return to the same northbound main trench.
-    {id:"EntryCoverLoop",role:"localLoop",points:[{x:-45,z:41},{x:-52,z:35},{x:-52,z:27},{x:-45,z:24}],depth:1.5,bottom:3.6,bank:1.5},
-    {id:"NorthCoverLoop",role:"localLoop",points:[{x:-24,z:-44},{x:-31,z:-48},{x:-31,z:-56},{x:-24,z:-60}],depth:1.5,bottom:3.6,bank:1.5},
+    {id:"EntryCoverLoop",role:"localLoop",points:[{x:-45,z:41},{x:-52,z:35},{x:-52,z:27},{x:-45,z:24}],depth:2,bottom:3.6,bank:1.5},
+    {id:"NorthCoverLoop",role:"localLoop",points:[{x:-24,z:-44},{x:-31,z:-48},{x:-31,z:-56},{x:-24,z:-60}],depth:2,bottom:3.6,bank:1.5},
     // A short breached enemy sap explains intruders; it never rejoins behind the player.
-    {id:"FlankBreachSap",role:"enemyEntry",points:[{x:-22,z:8},{x:-28,z:8},{x:-37,z:8}],depth:1.5,bottom:3.2,bank:1.5},
+    {id:"FlankBreachSap",role:"enemyEntry",points:[{x:-22,z:8},{x:-28,z:8},{x:-37,z:8}],depth:2,bottom:3.2,bank:1.5},
 
   ],
   steps: [
@@ -176,7 +179,7 @@ export function SampleMissionTerrain(x, z, spec = MISSION_TERRAIN) {
   return height;
 }
 
-// Greybox surface identity uses the same authored road and trench corridors.
+// PBR surface tint uses the same authored road and trench corridors.
 //
 // This is sampled per lattice vertex whenever a crater tile is built, so it is a
 // blast-frame cost, not a load-time one: the array-allocating version below
@@ -226,13 +229,13 @@ function RouteDistanceWithin(x, z, route, reach) {
 }
 export function SampleMissionGroundColor(x, z, out = [0, 0, 0]) {
   const variation=.94+.06*Math.sin(x*.37)*Math.sin(z*.29);
-  // field [.48,.50,.43], dust [.64,.60,.51], soil [.40,.36,.29]
-  let r=.48*variation, g=.50*variation, b=.43*variation;
+  // Mild albedo multipliers: preserve generated soil detail without double-darkening.
+  let r=.91*variation, g=.94*variation, b=.87*variation;
   for(const road of MISSION_TERRAIN.roads) {
     const d=RouteDistanceWithin(x,z,road.points,road.width/2+1.8);
     if(d===Infinity)continue;
     const t=1-Smooth((d-road.width/2)/1.8);
-    r+=(.64-r)*t; g+=(.60-g)*t; b+=(.51-b)*t;
+    r+=(1-r)*t; g+=(.97-g)*t; b+=(.90-b)*t;
   }
   for(const pad of MISSION_TERRAIN.pads) {
     const ex=Math.abs(x-pad.x)-pad.w/2, ez=Math.abs(z-pad.z)-pad.d/2;
@@ -240,13 +243,13 @@ export function SampleMissionGroundColor(x, z, out = [0, 0, 0]) {
     const dx=ex>0?ex:0, dz=ez>0?ez:0, d=Math.sqrt(dx*dx+dz*dz);
     const t=.75*(1-Smooth(d/3));
     if(t<=0)continue;
-    r+=(.64-r)*t; g+=(.60-g)*t; b+=(.51-b)*t;
+    r+=(1-r)*t; g+=(.97-g)*t; b+=(.90-b)*t;
   }
   for(const trench of MISSION_TERRAIN.trenches) {
     const d=RouteDistanceWithin(x,z,trench.points,trench.bottom/2+trench.bank);
     if(d===Infinity)continue;
     const t=1-Smooth((d-trench.bottom/2)/trench.bank);
-    r+=(.40-r)*t; g+=(.36-g)*t; b+=(.29-b)*t;
+    r+=(.83-r)*t; g+=(.80-g)*t; b+=(.75-b)*t;
   }
   const rail=Math.abs(x+77);
   const railT=1-Smooth((rail-2.4)/1.5);

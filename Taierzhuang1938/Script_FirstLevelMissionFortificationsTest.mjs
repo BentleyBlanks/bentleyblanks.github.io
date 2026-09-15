@@ -14,6 +14,14 @@ try {
   await page.waitForFunction(()=>window.Tengxian?.state.ready,null,{timeout:240000});
   const report=await page.evaluate(async()=>{
     const g=window.Tengxian,field=g.battlefield;
+    const groundMeshes=field.meshes.filter(mesh=>mesh.name==='FirstLevelWhitebox_Ground');
+    const soil=groundMeshes[0]?.material;
+    const terrainPbr={chunks:groundMeshes.length,name:soil?.name,base:soil?.map?.image?.src,
+      normal:soil?.normalMap?.image?.src,orm:soil?.roughnessMap?.image?.src,
+      baseColorSpace:soil?.map?.colorSpace,normalColorSpace:soil?.normalMap?.colorSpace,
+      ormColorSpace:soil?.roughnessMap?.colorSpace,normalScale:soil?.normalScale?.toArray(),
+      depths:await (async()=>{const {SampleMissionNaturalHeight}=await import('./Data_FirstLevelMissionTerrain.mjs');
+        return [[-24,-53],[-45,30],[-10,-124]].map(([x,z])=>({x,z,depth:SampleMissionNaturalHeight(x,z)-field.TerrainHeight(x,z)}));})()};
     const {MISSION_ROUTES,MISSION_PLACEMENT}=await import("./Data_FirstLevelMissionLayout.mjs");
     const {MissionRouteNextIndex}=await import("./Script_FirstLevelMissionColumn.mjs");
     const {MISSION_TERRAIN}=await import("./Data_FirstLevelMissionTerrain.mjs");
@@ -61,19 +69,32 @@ try {
       }
     const assets=Object.fromEntries([...field.fortificationModels].map(([id,m])=>[id,{size:m.size.toArray(),triangles:(()=>{let n=0;m.root.traverse(o=>{if(o.isMesh)n+=(o.geometry.index?.count||o.geometry.attributes.position.count)/3;});return n;})()}]));
     const bounds=meshes.map(m=>({name:m.name,size:new Box3().setFromObject(m).getSize(new Vector3()).toArray()}));
-    return {count:field.fortificationPlacements.length,blocks:blocks.length,missing,envelopeErrors,wireGaps,cuts:cuts.slice(0,10),assets,
+    return {terrainPbr,count:field.fortificationPlacements.length,blocks:blocks.length,missing,envelopeErrors,wireGaps,cuts:cuts.slice(0,10),assets,
       objectCount:MISSION_DEFENSE_OBJECTS.length,obstacles:obstacles.length,meshCount:meshes.length,
       triangles:meshes.reduce((n,m)=>n+(m.geometry.index?.count||m.geometry.attributes.position.count)/3,0),bounds};
   });
   await fs.writeFile(path.join(out,"Data_Verification.json"),JSON.stringify(report,null,2));
   console.log(JSON.stringify({count:report.count,blocks:report.blocks,obstacles:report.obstacles,meshCount:report.meshCount,triangles:report.triangles,missing:report.missing,envelopeErrors:report.envelopeErrors,cuts:report.cuts}));
+  assert.ok(report.terrainPbr.chunks>0);
+  assert.ok(report.terrainPbr.base.includes('Texture_MissionSoilBase.webp'));
+  assert.ok(report.terrainPbr.normal.includes('Texture_MissionSoilNormal.webp'));
+  assert.ok(report.terrainPbr.orm.includes('Texture_MissionSoilOrm.png'));
+  assert.equal(report.terrainPbr.baseColorSpace,'srgb');
+  assert.equal(report.terrainPbr.normalColorSpace,'');assert.equal(report.terrainPbr.ormColorSpace,'');
+  assert.deepEqual(report.terrainPbr.normalScale,[.5,.5]);
+  assert.ok(report.terrainPbr.depths.every(p=>p.depth>=1.83),'actual heightfield provides full standing cover');
   // Physical capsule traversal is local geometry evidence, separate from the campaign input gate.
   const trenchWalks=await page.evaluate(async()=>{
     const g=window.Tengxian,{MISSION_TERRAIN}=await import("./Data_FirstLevelMissionTerrain.mjs"),results=[];
     const body=g.physics.MakeCharacter();
     try {
-      for(const trench of MISSION_TERRAIN.trenches.filter(t=>t.role))for(const reverse of [false,true]){
-        const points=reverse?[...trench.points].reverse():trench.points;
+      for(const trench of MISSION_TERRAIN.trenches.filter(t=>t.id!=="BundleApproach"))for(const reverse of [false,true]){
+        // The live supply crate occupies the centreline; retain its solid collision and walk beside it.
+        const {MISSION_SUPPLIES}=await import("./Data_FirstLevelMissionLayout.mjs");
+        const supply=MISSION_SUPPLIES.find(s=>s.id==="Front");
+        const route=trench.id==="FrontTraverse"?[trench.points[0],
+          {x:supply.x-1.5,z:supply.z+1.2},{x:supply.x+1.5,z:supply.z+1.2},...trench.points.slice(1)]:trench.points;
+        const points=reverse?[...route].reverse():route;
         body.Teleport(points[0].x,g.physics.groundAt(points[0].x,points[0].z)+.03,points[0].z);
         let reached=1;
         for(let index=1;index<points.length;index++){
@@ -86,13 +107,14 @@ try {
           }
           if(reached!==index+1)break;
         }
-        results.push({id:trench.id,reverse,reached,expected:points.length,position:body.position.toArray()});
+        results.push({id:trench.id,reverse,reached,expected:points.length,position:body.position.toArray(),
+          blockers:reached===points.length?[]:g.battlefield.colliders.filter(c=>Math.abs(c.c[0]-body.position.x)<c.h[0]+1&&Math.abs(c.c[2]-body.position.z)<c.h[2]+1)});
       }
     }finally{body.Remove();}
     return results;
   });
   await fs.writeFile(path.join(out,"Data_TrenchWalks.json"),JSON.stringify(trenchWalks,null,2));
-  assert.ok(trenchWalks.every(r=>r.reached===r.expected),"every added trench walks in both directions: "+JSON.stringify(trenchWalks.filter(r=>r.reached!==r.expected)));
+  assert.ok(trenchWalks.every(r=>r.reached===r.expected),"every full-height trench walks in both directions: "+JSON.stringify(trenchWalks.filter(r=>r.reached!==r.expected)));
   for(const shot of [
     {id:"Front",x:-10,z:-121,yaw:0,pitch:-.03},
     {id:"FrontWest",x:-33,z:-133,yaw:.9,pitch:-.08},
@@ -133,6 +155,19 @@ try {
   await fs.writeFile(path.join(out,"Data_Rebuild.json"),JSON.stringify(rebuild,null,2));
   assert.equal(rebuild.transferCount,report.count);assert.equal(rebuild.frontCount,report.count);
   assert.equal(rebuild.staleMeshes,0);assert.equal(rebuild.disposedShared,0);
+  const gpu=await page.evaluate(()=>{
+    const renderer=window.Tengxian.renderer,gl=renderer.getContext();
+    const kinds=new Set([gl.SAMPLER_2D,gl.SAMPLER_3D,gl.SAMPLER_CUBE,gl.SAMPLER_2D_SHADOW,gl.SAMPLER_2D_ARRAY,
+      gl.SAMPLER_2D_ARRAY_SHADOW,gl.SAMPLER_CUBE_SHADOW,gl.INT_SAMPLER_2D,gl.INT_SAMPLER_3D,gl.INT_SAMPLER_CUBE,
+      gl.INT_SAMPLER_2D_ARRAY,gl.UNSIGNED_INT_SAMPLER_2D,gl.UNSIGNED_INT_SAMPLER_3D,gl.UNSIGNED_INT_SAMPLER_CUBE,gl.UNSIGNED_INT_SAMPLER_2D_ARRAY]);
+    const programs=renderer.info.programs.map(entry=>{const p=entry.program,linked=gl.getProgramParameter(p,gl.LINK_STATUS);let samplers=0;
+      if(linked)for(let i=0;i<gl.getProgramParameter(p,gl.ACTIVE_UNIFORMS);i++){const u=gl.getActiveUniform(p,i);if(kinds.has(u.type))samplers+=u.size;}
+      return {name:entry.name,linked,samplers};});
+    return {maxUnits:gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS),error:gl.getError(),programs};
+  });
+  await fs.writeFile(path.join(out,"Data_TerrainGpu.json"),JSON.stringify(gpu,null,2));
+  assert.ok(gpu.programs.length>0&&gpu.programs.every(p=>p.linked&&p.samplers<=gpu.maxUnits),"mission soil and crater programs fit the actual GPU");
+  assert.equal(gpu.error,0,"mission terrain renders without GL errors");
   assert.deepEqual(errors,[]);
-  console.log("ok mission fortifications, physical route clearance, merged geometry and five rendered views");
+  console.log("ok mission fortifications, physical route clearance, merged geometry and rendered views");
 } finally {await browser.close();await new Promise(resolve=>server.close(resolve));}
