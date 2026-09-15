@@ -572,9 +572,12 @@ const changedDomainRules = [
   // 播放走装配层的 PlayMidCutscene —— 三处都要拉上第一关域与过场域。
   {domain:'firstLevel',pattern:/CutsceneMachineGunCaptives|MachineGunCutscene/},
   {domain:'cutscene',pattern:/CutsceneMachineGunCaptives|MachineGunCutscene/},
-  // 【2026-09-16】音频引擎与声库表本来只落在 characterSpeech（那条规则里顺手带了
-  // Script_Audio.mjs），于是「改了 AudioEngine 的装载分叉」选不中 audio / voice
-  // 两个域 —— 04 关中过场整条语音通道静音那次就是这么推上去的。
+  // 【2026-09-16】audio / voice 两个域下面各有一条按**文件名关键词**兜底的规则
+  // （`/(Audio|Sfx|Music|Amb|Sound)/i` 与 `/(Voice|Dialogue|Speech)/i`），
+  // 而这两类文件的名字各自只含对方那半边：实测 `Script_Audio.mjs` 选得中 audio、
+  // **选不中 voice**，`Data_Voice.mjs` 选得中 voice、**选不中 audio**。
+  // 「改了 AudioEngine 的声库装载分叉却不跑 VoiceTest」就是这么漏过去的
+  //（04 关中过场整条语音通道静音那一次）。这两条把交叉的一半补上。
   { domain: "audio", pattern: /Script_Audio\.mjs|Script_AudioWiring|Data_Voice|Data_SfxSources|Data_AmbSources|Data_Tuning_Audio/ },
   { domain: "voice", pattern: /Script_Audio\.mjs|Data_Voice|Script_VoiceBake|Script_FirstLevelMissionVoice/ },
   {domain:'firstLevel',pattern:/MissionReturn|FirstLevelMeal|BaconHandoff|FirstLevelOpening|FirstLevelMachineGun|FirstLevelFrontPresence|FirstLevelMission|FirstLevelTrain|FirstLevelCarriage|CarriageSoundscape|FirstLevelVoiceAlign|SeedAudioFirstLevel|SeedAudioCarriage|Audio\/FirstLevel|Audio\/Amb\/AudioAmb_Carriage/},

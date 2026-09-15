@@ -375,8 +375,11 @@ South，守军才走到第 4 个折点就被冻住。过场不消耗任务时钟
 - **这一路远不止这一场**。修前第一关整关的 `voiceBank` 里战场口令是 0 条，
   也就是说**整关一句喊话都没有**（`Bark` 按 `kind` 挑池子，池子是空的），
   ch0/ch1 那 107 条章节台词同样只剩字幕。修好之后这些一起回来了。
-- `Script_TestRunner` 的 `changedDomainRules` 里，`Script_Audio.mjs` 原先只落在
-  `characterSpeech` 域，改音频引擎选不中 `audio` / `voice` —— 补了两条规则。
+- `Script_TestRunner` 的 `changedDomainRules` 里，`audio` 与 `voice` 两个域各自只有
+  一条按**文件名关键词**兜底的规则（`/(Audio|Sfx|Music|Amb|Sound)/i` 与
+  `/(Voice|Dialogue|Speech)/i`），而这两类文件的名字各自只含对方那半边：
+  实测 `Script_Audio.mjs` 选得中 `audio`、**选不中 `voice`**（也就不跑 `VoiceTest`），
+  `Data_Voice.mjs` 选得中 `voice`、**选不中 `audio`**。补了两条规则把交叉的一半接上。
 
 ### 为什么现有的门禁一条都没红
 
