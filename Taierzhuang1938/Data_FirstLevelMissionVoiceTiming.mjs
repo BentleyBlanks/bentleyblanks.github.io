@@ -32,5 +32,8 @@ export function MissionVoiceTimeline(cue,total) {
   if(cue.id==="WreckExit")segment.gate="luoRescueComplete";
   if(cue.id==="EscapeWhisper"){segment.wait=1;tail=2;}
   if(cue.id==="AircraftReturn")segment.events=[{at:lines[2][0],id:"AircraftDiveOrder"}];
+  // Room ambush: the litter stab lands on 老周's own line, the squad orders on the last 罗班长 sentence.
+  if(cue.id==="RoomAmbush")segment.events=[{at:lines[2][0],id:"AmbushZhouLine"}];
+  if(cue.id==="RoomAmbushCleared")segment.events=[{at:lines[3][0],id:"AmbushLuoOrders"}];
   return {lines,segments:[segment],tail,...(parallel?{parallel}:{})};
 }
