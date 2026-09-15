@@ -129,6 +129,11 @@ export class FirstLevelOpening {
       }
     }
     if(stage==="Shelter"){
+      // The approach bounds only pace the walk to this recess, and release by the
+      // player's progress along that route. Holding the corner takes him off it;
+      // the pairs still behind must come up instead of waiting for him to return.
+      const bounds=r.squadCoverBounds;
+      if(bounds)for(let i=0;i<bounds.stations.length;i++)bounds.released.add(i);
       for(const [i,a] of r.squad.entries()){
         const route=r.squadRoutes.get(a.id)||[];
         r.squadRoutes.set(a.id,[...route,C.shelterPosts[i]]);
@@ -285,7 +290,11 @@ export class FirstLevelOpening {
     if(stage==="Shelter"){
       const pursuers=C.shelterPursuers.map(s=>r.enemies.get(s.id));
       if(pursuers.every(a=>a&&!a.alive))r.Record("shelterCornerHeld",{count:pursuers.length});
-      const held=r.Has("shelterCornerHeld");
+      const held=r.Has("shelterCornerHeld"),push=C.shelterPush,alive=pursuers.filter(a=>a?.alive);
+      if(!held&&!r.Has("shelterCornerRushed")&&pursuers.every(Boolean)&&(alive.length<=push.remaining||r.flow.stageTime>=push.afterS)){
+        r.Record("shelterCornerRushed",{alive:alive.length});
+        for(const a of alive){a.missionTactic=null;r.Defend(a,push.point,push.radiusM,push.coverSlackM);r.ai.SetStance(a,0,1,true);}
+      }
       const yaowa=r.companion.Handle("yaowa"),luo=r.companion.Handle("luo");
       // The breather starts after the corner is held, never under fire.
       if(held&&r.Near(C.shelter,C.shelterRadiusM)&&yaowa?.alive&&Distance(yaowa.position,r.player.position)<5&&

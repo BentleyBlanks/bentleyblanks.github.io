@@ -829,6 +829,8 @@ export class FirstLevelMissionRuntime {
       if(standby)this.ai.SetStance(actor,1,4+actor.id%3,true);
       actor.scriptAccuracyScale = actor.missionAccuracyScale = ["front","machineGun","approach"].includes(id)?R.frontAccuracyScale:.5;
       if(spec.reserve)actor.scriptAccuracyScale=actor.missionAccuracyScale=R.frontReserveAccuracyScale;
+      // They shoot while bounding down a long straight trench, like the approach screen.
+      if(id==="shelterPursuit")actor.scriptAccuracyScale=actor.missionAccuracyScale=R.approachAccuracyScale;
       actor.scriptFireIntervalScale = actor.missionFireIntervalScale = ["front","machineGun","approach"].includes(id)?R.frontFireIntervalScale:1.45;
       actor.scriptArrivalRadius = 0.7;
       actor.manualGoalUntil = Infinity;

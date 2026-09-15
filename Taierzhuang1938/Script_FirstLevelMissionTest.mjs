@@ -1378,6 +1378,9 @@ console.log("ok receiving-food release follows the source clock and survives pau
   }
   assert.ok(MissionPathDistance(OPENING.shelterCorner,[OPENING.supportRoute[1],OPENING.supportRoute[2],OPENING.supportRoute[3]])<=mainTrench.bottom/2,
     "the corner post stands on the trench floor");
+  const push=OPENING.shelterPush;
+  assert.ok(push.remaining<MISSION_ENCOUNTERS.shelterPursuit.length&&push.afterS>0,"the last men rush the corner before the attack can stall out of sight");
+  assert.ok(SampleMissionTerrain(push.point.x,push.point.z)<-1.2&&MissionPathDistance(push.point,cornerLane)<=mainTrench.bottom/2,"the rush point is open trench floor in view of the corner");
   // The extra fight sits between the unloading and front crates, so the recess carries its own.
   const shelterCrate=MISSION_SUPPLIES.find(s=>s.id==="Shelter");
   assert.ok(shelterCrate&&SampleMissionTerrain(shelterCrate.x,shelterCrate.z)<-1.2,"the shelter crate stands on the recess floor");

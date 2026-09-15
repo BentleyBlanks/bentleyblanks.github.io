@@ -246,7 +246,8 @@ try{
         const foe=fight?this.Target():null;this.foe=foe?.missionId||null;
         // Use the ordinary crouch key while clearing the trench. Companions
         // now survive behind cover instead of absorbing the driver's exposure.
-        const crouch=(fight||this.cautiousTransit)&&["TrenchEntry","Support"].includes(runtime.flow.stage.id);
+        // Holding the shelter corner is the same kind of trench fight.
+        const crouch=(fight||this.cautiousTransit)&&["TrenchEntry","Shelter","Support"].includes(runtime.flow.stage.id);
         if((p.stance==="crouch")!==crouch)g.Debug.Key("KeyC");
         g.Debug.Mouse(0,false);
         if(foe){
