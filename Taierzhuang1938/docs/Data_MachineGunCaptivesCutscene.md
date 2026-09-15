@@ -333,12 +333,16 @@ South，守军才走到第 4 个折点就被冻住。过场不消耗任务时钟
 | | 修前 | 修后 |
 |---|---|---|
 | `packAttempts.voice` | **0**（一次都没试过） | 1 |
-| `voiceBank` 条数 | 87（全是 `Mission*`；ch0 0 / ch1 0 / 战场口令 0） | 253（`Mission*` 87 + ch0 31 + ch1 76 + 战场口令 59） |
+| `voiceBank` 条数 | 87（全是 `Mission*`；ch0 0 / ch1 0 / 战场口令 0） | 253（`Mission*` 87 + ch0 31 + ch1 76 + 战场口令 59）|
 | 九条 cue 在库里 | **一条都不在** | 九条全在 |
 | 每条 `Play` 的返回值 | `null`，0 个采样源 | 非 null，各 1 个 buffer 源 |
 | 台词窗内输出端峰值 RMS | 0.0164 – 0.0336（= 静场地板 0.012，**台词本身 0**） | 0.226 – 0.404（比修前高 **23–28 dB**）|
 | 对照组（03 阶段 `voice.MissionSupportOrder`，同一只探针、同一条 `Play`） | 0.382 | 0.382 |
 | 音效 17 条 | 全部正常起播（音效包走的是另一个旗标 `sfxReady`） | 同 |
+
+表里的条数是修复当天（`f1ec7d0bb`）量的。`Mission*` 那一路会随内容批增长 ——
+合入 master 的房间伏击三条之后是 `Mission*` 90 / 总数 256，门禁按「> 0」断言，
+不钉死条数。
 
 增益链在每条台词起播那一刻逐项读过，全部是 1.0：
 `master / sfxBus / sfxUser / duck / storyDuck / hitGain / outGain`，
