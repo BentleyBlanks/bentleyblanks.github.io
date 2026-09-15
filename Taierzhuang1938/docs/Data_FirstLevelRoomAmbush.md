@@ -224,9 +224,11 @@ node Taierzhuang1938/Script_FirstLevelMissionBrowserTest.mjs --campaign --stage-
 | A 包 2026-09-15 两次 | 本分支 | `BundleSupply` 死三回超预算 / 带 41 血走到 Orders 之后流血致死 |
 | 集成轮第 1 次 | 本分支 | `BundleSupply` 第 17 航点死一次（重试 1/2）→ 带 16 血 0 绷带到村口 → `VillageKitchen` 流血致死 → 再重试弹药归零走不动 |
 | 集成轮第 2 次 | 本分支 | 卡在 `Tank` 那一步没推进到 `Orders`（离集束弹还有 108 m），零重试 |
-| 集成轮基线 | 干净 `origin/master` `62cf16926` | 通关（途中两次检查点重试） |
+| 集成轮基线 1 | 干净 `origin/master` `62cf16926` | 通关（途中两次检查点重试） |
+| 集成轮基线 2 | 同上，同一条命令 | `BundleSupply` 第 0 航点死一次，之后红在「living withdrawn guards finish their physical rear route」 |
 
-判断依据不是「基线也红」，而是**这一拍够不到阶段 1–6**：屋内伏击最早介入的代码是阶段 7 的
+**干净基线自己两跑一红**，所以这是 master 上就有的不稳，不是这一拍带进来的。
+另一条判断依据是**这一拍够不到阶段 1–6**：屋内伏击最早介入的代码是阶段 7 的
 `PlaceSouthArrival` 与阶段 8 的 `Enter("Village")`；跨阶段共用的三处改动
 （`Guide` 抽出 `RebuildSquadMarch`、`BeginControl`/`BeforePlayer` 的 `lookFrom` 视线段、
 `MeleeCombat` 新增的两个 `ScriptedHold` 入口）对非 `ambush` 的路径逐字等价 ——
