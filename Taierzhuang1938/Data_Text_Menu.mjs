@@ -111,6 +111,15 @@ export const TEXT = Object.freeze({
   "menu.hint.title": "放弃这一局，回到主菜单",
   "menu.hint.exitSandbox": "重载回正片，回到主菜单",
 
+  // --- 退出确认（暂停里的「退出第一关 / 退出靶场 / 主菜单」与阵亡页的「返回主菜单」） ---
+  // {action} 是被点的那一项本身的名字：「退出第一关」→「退出第一关？」。
+  "menu.confirm.leaveTitle": "{action}？",
+  "menu.confirm.toTitleTitle": "返回主菜单？",
+  "menu.confirm.text": "离开后当前进度不会保存。",
+  "menu.confirm.accept": "确认退出",
+  "menu.confirm.cancel": "取消",
+  "menu.confirm.keys": "↑ ↓ 选择　/　Enter 确认　/　Esc 取消",
+
   // --- 沙盒（key 与 Script_Main 的 ?range=1 / ?melee=1 / ?jiehe=1 一一对应） ---
   "menu.sandbox.movement.where": "操作交互测试场",
   "menu.sandbox.movement.exit": "退出操作测试场",

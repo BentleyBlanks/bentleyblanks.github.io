@@ -22,7 +22,7 @@
 - `Home`：本区复位，使用正式 Spawn 恢复生命、体力并中止未完成测量。
 - `PageUp / PageDown`：上／下一区。
 - 面板提供工位按钮、复位与清空成绩；按住 Alt 可点击，指针锁定时可用快捷键。
-- `Esc`：暂停菜单，选择“退出操作测试场”返回正式菜单。
+- `Esc`：暂停菜单，选择“退出操作测试场”，在确认框里选“确认退出”后返回正式菜单。
 
 `Debug.MovementRange` 提供 `State / Fixtures / Stations / GoTo / Reset / Clear`。`GoTo` 支持工位或障碍 id，便于后续定向自动化；它只摆测试起点，不替代正式动作判定。
 
