@@ -1,0 +1,95 @@
+{
+  "schema": 1,
+  "version": "20260915AmbushV1",
+  "authoringTool": "Blender 5.1 headless (blender --background --python)",
+  "actorForward": [
+    0,
+    0,
+    -1
+  ],
+  "floorClearanceM": 0.003,
+  "scope": "First level room ambush (public phase 9 Melee) only",
+  "clips": {
+    "AmbushRise": {
+      "duration": 0.7,
+      "loop": false
+    },
+    "BayonetStabStanding": {
+      "duration": 1.2,
+      "loop": false
+    },
+    "BayonetStabDown": {
+      "duration": 1.4,
+      "loop": false
+    },
+    "BearerStabbed": {
+      "duration": 2.2,
+      "loop": false
+    },
+    "PatientStabbed": {
+      "duration": 2.6,
+      "loop": false
+    },
+    "PatientWoundedIdle": {
+      "duration": 3.0,
+      "loop": true
+    }
+  },
+  "models": [
+    {
+      "id": "LugouIja01",
+      "file": "Animation_LugouIja01Ambush.json",
+      "sha256": "392374df39cdc6637f910c92769c2140168c4edb0e6e3d464b70f79a7358feb5",
+      "clipIds": [
+        "AmbushRise",
+        "BayonetStabStanding",
+        "BayonetStabDown"
+      ],
+      "originalModelSha256": "23fa4ef88891bd14d49dfb9a3e61b9f0dcaf45b8956a720aab24d9c4c23eb9c7"
+    },
+    {
+      "id": "LugouIja02",
+      "file": "Animation_LugouIja02Ambush.json",
+      "sha256": "3251e0d2598ed81c26c56ac61af23635f101c7eb95e6eff613c8cee25fb3b60d",
+      "clipIds": [
+        "AmbushRise",
+        "BayonetStabStanding",
+        "BayonetStabDown"
+      ],
+      "originalModelSha256": "8c4860ec2d4dd3076b06ff7e593e5dcfd4d23aefe2fedf6f9fdec3b0e12cc9aa"
+    },
+    {
+      "id": "LugouIja03",
+      "file": "Animation_LugouIja03Ambush.json",
+      "sha256": "40ad1df566304b26b2d33698947349144e379991c40bd3b02a4743271e496b6c",
+      "clipIds": [
+        "AmbushRise",
+        "BayonetStabStanding",
+        "BayonetStabDown"
+      ],
+      "originalModelSha256": "6d97c801f7ea62430e5397fde980ad0964ab5081fa5f15249434bce4cbf3f89d"
+    },
+    {
+      "id": "LugouNra02",
+      "file": "Animation_LugouNra02Ambush.json",
+      "sha256": "b449f31a6209c53bbe87f4f3c4a4decc080a5c467f805da099afcb2aa65ad85a",
+      "clipIds": [
+        "BearerStabbed",
+        "PatientStabbed",
+        "PatientWoundedIdle"
+      ],
+      "originalModelSha256": "39c08ca82148e140ee2952caffdd0dee99750fb734038a5263d216c9a7345225"
+    },
+    {
+      "id": "LugouNra05",
+      "file": "Animation_LugouNra05Ambush.json",
+      "sha256": "f71256f9fe9c6ddde37b6ff8b950d8d7106fa6c477ccf83c7bc668b9ea63e61d",
+      "clipIds": [
+        "BearerStabbed",
+        "PatientStabbed",
+        "PatientWoundedIdle"
+      ],
+      "originalModelSha256": "acbc9184da059bdf6c3c18d051f3eba77d1dd3acba469e8dbc876b092f174250"
+    }
+  ]
+}
