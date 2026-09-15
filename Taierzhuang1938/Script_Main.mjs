@@ -3466,6 +3466,8 @@ function ClearRuntime() {
   state.firewalls.length = 0;
   scriptInvulnUntil = 0;
   hud?.SetMeleeQte(null);
+  hud?.SetCinematicPrompt(null);
+  hud?.SetCinematicBeat(false);
   // 负重与交互点都是**按关摆的**：不清的话上一关抬着的担架会跟到下一关，
   // 上一关的交互点会在新切片的同一坐标上悄悄复活。
   carry?.Reset("levelChange");
@@ -5015,6 +5017,8 @@ function StartMeleeScenario(id) {
   player.meleeCameraDrop = 0; player.meleePose = null;
   viewmodel.root.visible = true; hud.HideDeathCard(); hud.Hint("", 0);
   hud?.SetMeleeQte(null);
+  hud?.SetCinematicPrompt(null);
+  hud?.SetCinematicBeat(false);
 }
 function MeleePreviewPose(entity, pose) {
   const normalized = meleePreviewFrame ?? (state.elapsed % 2) / 2;
@@ -6439,6 +6443,9 @@ const router = new InputRouter({
   Capture: (_event, detail) => {
     if(detail.code==='Blur')return !!meleeCombat?.HandleInput('Blur',false);
     if(!state.ready || !state.running || state.menu || state.cutscene || editor?.Capturing)return false;
+    // 剧本提示环（第一关屋内伏击的抓枪与反捅）先于共用白刃层与 KEYMAP：
+    // 那两下发生在共用 QTE 还没开／已经结算完的时候，不接管的话 F 会去拾弹药、左键会开枪。
+    if(missionRuntime?.AmbushInput?.(detail.code,detail.down,detail.repeat))return true;
     const encounter=MELEE_TEST && detail.code==='KeyF' && detail.down && !detail.repeat ? NearbyMeleeEncounter() : null;
     if(encounter?.trigger==='interact')return TriggerMeleeEncounter(encounter);
     return !!meleeCombat?.HandleInput(detail.code,detail.down,detail.repeat);
@@ -8584,7 +8591,11 @@ function Frame(dt, render = true) {
     spreadDeg,
   }), phase.hud);
   hud.SetSuppression(player.suppression);
-  hud.SetMeleeQte(meleeCombat?.View() || null);
+  // 屋内伏击那一拍自带一个提示环，共用的底部僵持进度卡这时候让位（其余场合照旧）。
+  const cinematicPrompt = missionRuntime?.AmbushPromptView?.() || null;
+  hud.SetCinematicBeat(missionRuntime?.AmbushCinematic === true);
+  hud.SetCinematicPrompt(cinematicPrompt);
+  hud.SetMeleeQte(missionRuntime?.AmbushCinematic ? null : (meleeCombat?.View() || null));
   if (MELEE_TEST && state.frame % 6 === 0) meleeLab?.Update(MeleeSnapshot());
   // 按住型交互的进度环 + 负重条。两者都只读脱敏快照，HUD 不认识规则层的结构。
   hud.SetInteractProgress(interact?.View() || null);
@@ -8841,8 +8852,9 @@ function RenderScene(dt) {
     saturation: preset.saturation * (1 - suppression * 0.35),
     contrast: preset.contrast,
     grain: (skyName === "night" ? 0.020 : 0.014) * graphics.grain,
-    eyeClosure: missionRuntime?.opening.eyeClosure || 0,
-    concussion: missionRuntime?.opening.concussion,
+    // 眼皮与恍惚：开场出轨与屋内伏击共用同一组通道，由运行时合成成一份。
+    eyeClosure: missionRuntime?.Perception().eyeClosure || 0,
+    concussion: missionRuntime?.Perception().concussion,
     vignette: (0.42 + suppression * 0.22) * graphics.vignette,
     damage: Clamp01(1 - health / 62) * 0.55,
     hitDisorientation,

@@ -2144,8 +2144,10 @@ export class Actor {
       // 否则握姿常量会把整支步枪钉在担架杆的位置上。旗一清就还原。
       // 枪交给断肢层的那一段时间里这一条要让开：显隐归 GoreSystem 管
       // （肢块回收时枪跟着消失，ReleaseSoldier 时才还原成 true）。
+      // hideWeapon 是演出层的同一条闸：某一段烘焙动作里枪被别人夺走了（第一关屋内伏击的
+      // PressureStabbed），手一空这两个握点就会把整支枪架在肚子上插穿尸体。
       if (this.weaponGroup && !this.goreWeaponHold) {
-        this.weaponGroup.visible = !(s.carryRole || (s.woundedWalk || 0) > 0.5);
+        this.weaponGroup.visible = !(s.carryRole || s.hideWeapon || (s.woundedWalk || 0) > 0.5);
       }
     }
     const weapon = this.weaponData;

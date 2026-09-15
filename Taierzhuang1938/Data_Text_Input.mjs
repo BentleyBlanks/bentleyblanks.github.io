@@ -7,6 +7,12 @@
 //
 // 分组与行的 id 在 Script_Input 的 GUIDE 里，改说明的顺序改那张表，不改这里的键名。
 export const TEXT = Object.freeze({
+  // --- 鼠标键的键面字（Script_Input.ActionKeyGlyph）。HUD 的按键提示读它，
+  //     不在界面代码里写死「左键」两个字。
+  "input.mouse.left": "左键",
+  "input.mouse.middle": "中键",
+  "input.mouse.right": "右键",
+
   // --- 移动与观察 -----------------------------------------------------------
   "input.guide.move.title": "移动与观察",
   "input.guide.move.wasd.keys": "W A S D",
@@ -74,7 +80,11 @@ export const GATED_MODULES = Object.freeze([
   "Script_Input.mjs",
 ]);
 
-/** 操作说明按「组 id / 行 id」拼键，两份 id 都在 Script_Input.GUIDE 那张表里。 */
+/**
+ * 操作说明按「组 id / 行 id」拼键，两份 id 都在 Script_Input.GUIDE 那张表里；
+ * 鼠标键面字按按钮号拼（ActionKeyGlyph）。
+ */
 export const DYNAMIC_PREFIXES = Object.freeze([
   "input.guide.",
+  "input.mouse.",
 ]);

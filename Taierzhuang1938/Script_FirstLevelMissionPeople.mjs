@@ -196,6 +196,12 @@ export class MissionPeople {
  * @param {object} soldier 目标士兵
  * @param {(soldier:object)=>object|null} Prepare 采样器工厂（运行时注入）
  */
+// 枪什么时候不在他手上了。PressureStabbed 里 0.30 s 玩家把枪夺过去，之后他两只手空着
+// 摁在肚子上 —— 共用的 Actor._UpdateRiggedWeaponMount 只认两个握点，手一空它照样把
+// 1.68 m 的三八式架在两手之间，插穿尸体（Package C2 的交接说明，口径见
+// docs/Data_FirstLevelAmbushAnimation.md）。掉了就一直藏着：他接下来是具尸体。
+const AMBUSH_RIFLE_DROPPED_AT = Object.freeze({ PressureStabbed: .30 });
+
 export function InstallAmbushPerformance(soldier,Prepare){
   const rig=soldier?.actor?.characterRig;
   if(!rig||typeof rig.Update!=="function"||rig.missionAmbushPose)return false;
@@ -205,7 +211,10 @@ export function InstallAmbushPerformance(soldier,Prepare){
     rig.missionAmbushAnimation?.Restore?.();
     const result=original.call(this,dt,state);
     const performance=soldier.missionAmbushClip;
+    if(soldier.missionAmbushWeaponDropped)state.hideWeapon=true;
     if(!performance||soldier.alive===false||state.dead)return result;
+    const dropAt=AMBUSH_RIFLE_DROPPED_AT[performance.clipId];
+    if(dropAt!=null&&performance.seconds>=dropAt){soldier.missionAmbushWeaponDropped=true;state.hideWeapon=true;}
     // 库可能还在下载：拿不到就下一帧再试，别缓存成「这个人永远没有动作」。
     const animation=rig.missionAmbushAnimation||(rig.missionAmbushAnimation=Prepare?.(soldier)||null);
     if(!animation){soldier.missionAmbushPending=true;return result;}

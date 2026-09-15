@@ -5,11 +5,15 @@ import { CLOSE_RANGE } from "./Data_Tuning_AiShooting.mjs";
 import { FirstLevelOpeningBarrage } from "./Script_FirstLevelOpeningBarrage.mjs";
 const Distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const Smooth=t=>{t=Math.max(0,Math.min(1,t));return t*t*(3-2*t)};
-const Curve=(rows,t)=>{
+// 一条 [[秒, 值], ...] 曲线在 t 处的取样：段内 smoothstep，两端夹住。
+// 屋内伏击的晕厥／恍惚（Script_FirstLevelMissionRuntime）读的就是这一条，
+// 所以「挨一下 → 眼前发黑 → 慢慢回来」在全关是同一条曲线，不是两套手感。
+export const SamplePerceptionCurve=(rows,t)=>{
   const next=rows.findIndex(([at])=>at>t);
   if(next<0)return rows.at(-1)[1];if(next===0)return rows[0][1];
   const [a,x]=rows[next-1],[b,y]=rows[next];return x+(y-x)*Smooth((t-a)/(b-a));
 };
+const Curve=SamplePerceptionCurve;
 // Keep the impact onset at its authored time; stretch only recovery after the peak.
 export const OpeningRecoveryTime=(elapsed,onset)=>elapsed<=onset?elapsed:onset+(elapsed-onset)/R.openingRecoveryScale;
 

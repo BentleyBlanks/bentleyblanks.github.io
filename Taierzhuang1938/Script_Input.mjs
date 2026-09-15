@@ -123,6 +123,22 @@ export const MOUSEMAP = [
   { button: 2, action: "ads", mode: "hold" },
 ];
 
+/** 鼠标键的键面字。三个按钮的文案登记在 Data_Text_Input 的 input.mouse.* 上。 */
+const MOUSE_TEXT = ["input.mouse.left", "input.mouse.middle", "input.mouse.right"];
+
+/**
+ * 一个动作**当前**绑在哪个键上，取它的键面字（"KeyF" → "F"，fire → 「左键」）。
+ * HUD 的按键提示一律走这条，不许在界面代码里写死字母 —— 改了 KEYMAP 就得跟着改提示，
+ * 而那正是最容易忘的一处。查不到就返回空串（提示照画，只是环里没字）。
+ */
+export function ActionKeyGlyph(action) {
+  const mouse = MOUSEMAP.find((entry) => entry.action === action);
+  if (mouse) return T(MOUSE_TEXT[mouse.button] || MOUSE_TEXT[0]);
+  const entry = KEYMAP.find((row) => row.code && row.action === action);
+  if (!entry) return "";
+  return entry.code.replace(/^(?:Key|Digit)/, "");
+}
+
 export class InputRouter {
   /**
    * @param {object} hooks
