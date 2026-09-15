@@ -12,6 +12,7 @@ import * as THREE from "three";
 import { Clamp } from "./Script_Noise.mjs";
 import { RayAabb, MakeBox, PlaceGeometry } from "./Script_Geo.mjs";
 import { BuildSink } from "./Script_World.mjs";
+import { BuildRailwayFromSpec } from "./Script_RoadSpline.mjs";
 import { MarkDynamicPrepass } from "./Script_Post.mjs";
 import { T } from "./Script_Text.mjs";
 import { CreateP012Terrain } from "./Data_FirstLevelP012Terrain.mjs";
@@ -214,6 +215,12 @@ export class FirstLevelWhiteboxField {
       }
       this.stats.whiteBoxes += 1;
       this.stats.structures += 1;
+    }
+    // 铁路走共享样条PCG（道砟堤 + 枕木双轨逐点贴地形），断面只在布局的 railway spec 里。
+    // 不登记碰撞：道砟顶只高出土面 0.1 m，弹坑挖下去时一块静态路基盒会悬成隐形台子。
+    if (this.layout.railway) {
+      const railway = BuildRailwayFromSpec(sink, this.layout.railway, { groundAt: (x, z) => this.TerrainHeight(x, z) });
+      this.stats.railway = { bedChunks: railway.bed.chunks, ties: railway.track.ties, railSegs: railway.track.railSegs };
     }
 
     for (const mesh of sink.Flush(this.scene, { Get: (key) => this.materials.get(key) || this.whiteMaterial })) {

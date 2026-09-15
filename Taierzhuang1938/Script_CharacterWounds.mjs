@@ -157,9 +157,15 @@ export class CharacterWounds {
       // The subdivided first-person hand has >76k vertices. Keep injury work bounded;
       // its nearest-surface sample is enough, while the outer cloth remains ray-exact.
       if(candidate.geometry.attributes.position.count>C.maxRayVertices)continue;
+      // The ray early-out needs the posed sphere, but culling keeps the rig's shared
+      // pose-independent one (Script_CharacterModel.ShareSkinnedCullSphere): put it back.
+      const cullSphere=candidate.boundingSphere;
+      candidate.boundingSphere=null;
       candidate.computeBoundingSphere();
+      const hits=raycaster.intersectObject(candidate,false);
+      if(cullSphere)candidate.boundingSphere=cullSphere;
       const regions=Regions(candidate);
-      for(const hit of raycaster.intersectObject(candidate,false)) {
+      for(const hit of hits) {
         if(!hit.face || ![hit.face.a,hit.face.b,hit.face.c].some(i=>Matches(regions[i],part,shapeId)))continue;
         const distance=point ? hit.point.distanceToSquared(target) : hit.distance;
         if(distance<surfaceDistance) {surface=hit;surfaceDistance=distance;}

@@ -34,6 +34,7 @@ export const TEXT = Object.freeze({
   "menu.condition.trenchEntered": "进入交通壕",
   "menu.condition.trenchCleared": "清除交通壕折角的日军",
   "menu.condition.shelterReached": "到达掩蔽处",
+  "menu.condition.shelterCornerHeld": "打退跟着伤兵摸到折角的日军",
   "menu.condition.escapeWhisperHeard": "听完同伴在掩蔽处的交谈",
   "menu.condition.woundedSeen": "看到撤入掩蔽处的伤兵",
   "menu.condition.supportOrdersHeard": "听完支援前沿的命令",
@@ -56,7 +57,7 @@ export const TEXT = Object.freeze({
   "menu.condition.southTraversed": "沿南行道路到达村口",
   "menu.condition.southHopeHeard": "听完南行途中同伴的交谈",
   "menu.condition.innerCourtReached": "从右侧灶屋绕到内院",
-  "menu.condition.meleeResolved": "清除伤员通道上的近身日军",
+  "menu.condition.meleeResolved": "挣脱刺刀，清掉屋内伏击的日军",
   "menu.condition.villageGunSilent": "清除窗口机枪手",
   "menu.condition.courtyardGateOpen": "打开院门",
   "menu.condition.courtyardPassed": "掩护担架队通过院门",
@@ -110,6 +111,15 @@ export const TEXT = Object.freeze({
   "menu.hint.levelsFromPause": "换一关打（这一局的进度会丢）",
   "menu.hint.title": "放弃这一局，回到主菜单",
   "menu.hint.exitSandbox": "重载回正片，回到主菜单",
+
+  // --- 退出确认（暂停里的「退出第一关 / 退出靶场 / 主菜单」与阵亡页的「返回主菜单」） ---
+  // {action} 是被点的那一项本身的名字：「退出第一关」→「退出第一关？」。
+  "menu.confirm.leaveTitle": "{action}？",
+  "menu.confirm.toTitleTitle": "返回主菜单？",
+  "menu.confirm.text": "离开后当前进度不会保存。",
+  "menu.confirm.accept": "确认退出",
+  "menu.confirm.cancel": "取消",
+  "menu.confirm.keys": "↑ ↓ 选择　/　Enter 确认　/　Esc 取消",
 
   // --- 沙盒（key 与 Script_Main 的 ?range=1 / ?melee=1 / ?jiehe=1 一一对应） ---
   "menu.sandbox.movement.where": "操作交互测试场",

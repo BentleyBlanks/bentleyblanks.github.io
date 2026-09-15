@@ -25,6 +25,7 @@ import {
 import { SkyDome, SKY_PRESETS } from "./Script_Sky.mjs";
 import { NormalizeGraphicsDetails } from "./Script_EditorSettings.mjs";
 import { LightRig } from "./Script_Light.mjs";
+import { InstallShadowSkip, ShadowSkipCount, SetShadowSkipEnabled } from "./Script_ShadowSkip.mjs";
 import { ProbeVolume, MakeGiUniforms, GI_QUALITY } from "./Script_Gi.mjs";
 import { PostPipeline } from "./Script_Post.mjs";
 import { MakeAoUniforms, SyncAoUniforms } from "./Script_PostGtao.mjs";
@@ -411,6 +412,10 @@ renderer.setSize(window.innerWidth, window.innerHeight, false);
 // 不是快；玩家那条路要的是快，编译真出错在别处也看得见（画面直接不对）。
 renderer.debug.checkShaderErrors = !!SHOT;
 renderer.shadowMap.enabled = true;
+// 烘阴影时跳过「没有投影体」的子树（24 m 外的人物骨架）：三方的 renderObject 对每张图
+// 都从场景根递归走完全部节点，castShadow=false 只省 draw 不省遍历。**必须排在 Script_Csm 的
+// BakeMeter 与 Script_Profiler 的分段包装之前装**，它们各自再包一层，本模块在最里层。
+InstallShadowSkip(renderer);
 // r185 的 shadowMapTypeDefines 里只有 PCFShadowMap 与 VSMShadowMap；
 // 写 PCFSoftShadowMap 会掉进 SHADOWMAP_TYPE_BASIC（硬阴影 + 最近邻）。
 // 2026-09：真正的口径由 LightRig -> Script_Csm.ApplyRendererShadowSettings 定
@@ -1771,6 +1776,13 @@ async function Boot() {
     Time: () => state.elapsed,
     LevelTime: () => state.phaseTime,
     PlayerPos: () => (player ? { x: player.position.x, y: player.position.y, z: player.position.z } : null),
+    // 抬着的担架顶住墙时把玩家水平挪回去（不动高度、不清竖直速度）。
+    ConstrainPlayer: (x, z) => {
+      if (!player) return;
+      player.position.x = x; player.position.z = z;
+      player.velocity.x = 0; player.velocity.z = 0;
+      player.body?.Teleport(player.position.x, player.position.y, player.position.z);
+    },
     // 玩家此刻在哪个路标圈里。与 story 的 ctx.zone 同一条判据，不另写一份。
     PlayerZone: () => {
       if (!battlefield || !player) return null;
@@ -2051,6 +2063,8 @@ async function Boot() {
     // gi 是取值器：探针体默认不构造，运行时打开（ApplyGraphics）才补建，
     // 拷值出去的话冒烟与剖析脚本拿到的永远是 boot 时那个 null
     renderer, scene, camera, post, sky, lights, library, profiler,
+    // 阴影烘焙子树跳过（Script_ShadowSkip）：取证脚本读登记数、同页 A/B 开关
+    shadowSkip: { Count: ShadowSkipCount, SetEnabled: SetShadowSkipEnabled },
     // 材质着色升级那一包（POM / 细节法线 / 微阴影 / 地平线 / 皮肤）：
     // Debug Rendering 面板按它设假彩色编号，MaterialUpgradeTest 按它做 A/B。
     materialShading: shadingUniforms, RecompileAllMaterials,
@@ -5732,6 +5746,33 @@ let altMouseFree = false;
 // 自己主动交还指针锁（过场、菜单、失焦）不等于玩家按 Esc。
 // 真浏览器会吞掉锁内的 Esc 键，只留下 pointerlockchange，所以必须记住解锁来源。
 let intentionalPointerUnlock = false;
+// Chromium 对 Esc 的**按下和松开**都会跑一遍「用户按 Esc 退出指针锁」
+//（ExclusiveAccessManager::HandleUserKeyEvent 不分事件类型），锁着就解锁并记 1.25 s 冷却。
+// 事故（2026-09-15）：暂停菜单里按 Esc，按下那一刻「继续」并抢到锁，松开时浏览器又把锁
+// 收走 —— 页面只看到一次非主动解锁，暂停菜单立刻又弹出来；第二次按落在冷却里抢不到锁，
+// 才关得掉。过场按 Esc 跳过是同一条路。所以 Esc 按着期间的抢锁一律压到松开之后再发。
+let escapeHeld = false;
+let lockAfterEscape = false;
+window.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") escapeHeld = true;
+}, true);
+window.addEventListener("keyup", (event) => {
+  if (event.key !== "Escape") return;
+  escapeHeld = false;
+  // 假后端补上浏览器那一半：锁着时松 Esc = 玩家退出锁，页面收不到这次 keyup。
+  // 不补的话冒烟里「按下就抢锁」永远是绿的，正好漏掉上面那条事故。
+  //（按下那一半不补：游戏中按 Esc 走 keydown 与走解锁事件结果相同，DropPointerLock 已锁住那条。）
+  if (FAKE_POINTER_LOCK && fakeLocked) {
+    lockAfterEscape = false;
+    fakeLocked = false;
+    OnPointerLockChange();
+    event.stopImmediatePropagation();
+    return;
+  }
+  if (!lockAfterEscape) return;
+  lockAfterEscape = false;
+  if (state.running && !state.menu && !state.cutscene) RequestPointerLock();
+}, true);
 
 /** 现在锁在我们的画布上没有（两条后端统一的读法，全文件只认这一个）。 */
 function PointerLocked() {
@@ -5753,6 +5794,7 @@ let rawInputActive = false;
  */
 function RequestPointerLock() {
   if (SHOT || altMouseFree || (editor && editor.Capturing)) return;
+  if (escapeHeld) { lockAfterEscape = true; return; }
   if (FAKE_POINTER_LOCK) {
     if (!fakeLocked) { fakeLocked = true; OnPointerLockChange(); }
     return;
@@ -5837,6 +5879,8 @@ function ResetLookSpikeHistory() {
  * Esc（用户主动退）。exitPointerLock 在没有锁的时候调是无害的。
  */
 function ReleasePointerLock() {
+  // 等着 Esc 松开再抢的那一下也作废：松开之前又暂停 / 进过场了。
+  lockAfterEscape = false;
   if (FAKE_POINTER_LOCK) {
     if (fakeLocked) {
       intentionalPointerUnlock = true;
@@ -5864,6 +5908,9 @@ function OnPointerLockChange() {
   rawInputActive = false;
   const intentional = intentionalPointerUnlock;
   intentionalPointerUnlock = false;
+  // 浏览器自己收走的锁（多半是 Esc）：这次按键余下的事件不会再送到页面，
+  // 别让 escapeHeld 卡在 true，把之后每一次抢锁都压住。
+  if (!intentional) escapeHeld = false;
   input.fire = false; input.ads = false;
   input.forward = 0; input.strafe = 0; input.sprint = false;
   if (state.ordersOpen) { state.ordersOpen = false; hud.SetOrdersVisible(false); wheel.Close(); }
@@ -8861,6 +8908,7 @@ function StepFrames(count = 1, dt = 1 / 60, render = true) {
 document.addEventListener("pointerlockchange", OnPointerLockChange);
 window.addEventListener("blur", () => {
   altMouseFree = false;
+  escapeHeld = false;   // 失焦时按着的 Esc 收不到 keyup
   interact?.CancelHold("blur");
   ReleasePointerLock();
   // 预览没有玩家控制权；失焦时直接走一次与 Esc 相同的收口路径，避免
@@ -8878,7 +8926,8 @@ document.addEventListener("visibilitychange", () => {
   if (document.hidden) { interact?.CancelHold("hidden"); ReleasePointerLock(); }
 });
 document.addEventListener("keydown", (event) => {
-  if (event.key !== "Escape") return;
+  // 按住不放的自动重复不算再按一次：否则暂停 / 继续会跟着重复频率来回翻。
+  if (event.key !== "Escape" || event.repeat) return;
   // 过场里 Esc 是"跳过"，交给 CutsceneDirector 自己的监听；这里只管游戏中的退出
   if (state.cutscene) return;
   // 有菜单时 Esc 是「暂停」：ER2 也是这个键。菜单自己那份 Esc 管的是面板返回，

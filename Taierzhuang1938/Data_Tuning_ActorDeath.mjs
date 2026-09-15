@@ -1,5 +1,5 @@
 // Shared NRA/IJA contact fit in the corpse's terrain plane. Metres and radians.
-// Relax the ankle before fitting: a standing toe angle otherwise props up a prone body.
+// Ankle-roll values remain for the single-pose fallback; Kimodo clips author the feet.
 export const DEATH_CONTACT = Object.freeze({
   clearanceM: .008,
   footOutward: .85,

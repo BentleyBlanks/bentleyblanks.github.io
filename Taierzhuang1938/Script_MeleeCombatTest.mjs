@@ -260,6 +260,34 @@ Test('ground QTE failure and escape preserve get-up and restart the global coold
     c.SetState(c.Fighter(p),'down');assert(!c.BeginGround(other),'second attacker shares the post-QTE cooldown');
   }
 });
+// 剧本僵持的两段入口（第一关屋内伏击：先顶住、再给连按窗口）。
+// 顶住那一段 F 不算数，也不许把玩家永远钉在僵持姿势里。
+Test('scripted hold pins without a QTE, then the scripted bind opens the mash window',()=>{
+  const {p,e,c}=Make('Bayonet',1);
+  assert(c.HoldScriptedBind(p,e,2.4));
+  assert(!c.Active,'the hold is not a QTE: nothing to mash yet');
+  assert.equal(c.Fighter(p).state,'qte');assert.equal(c.Fighter(p).clip,'Bind');
+  assert.equal(c.Fighter(e).clip,'Bind');
+  assert(!c.AttackDown(),'a pinned player cannot swing');
+  assert(!c.CanChangeWeapon(),'nor change weapons while he is held');
+  Step(c,3);assert.equal(c.Fighter(p).state,'qte','the hold never times out on its own');
+  assert(c.BeginScriptedBind(p,e,{windowS:3.2,strength:.75,reason:'missionAmbush',label:'ambush'}));
+  assert.equal(c.qte.active.windowS,3.2);
+  assert.equal(c.View().label,'被刺刀顶住');
+  c.SetAssist('auto');Step(c,Q.windowS+Q.resolveS+.1);
+  assert(!c.Active);assert.equal(c.Fighter(p).state,'idle','the QTE owns the exit once it starts');
+  assert.equal(e.health,100,'breaking free never kills the man holding him');
+});
+Test('a scripted hold that never becomes a QTE still releases both fighters',()=>{
+  const {p,e,c}=Make('Bayonet',1);
+  assert(c.HoldScriptedBind(p,e,2.4));
+  assert(c.EndScriptedHold(p,e));
+  assert.equal(c.Fighter(p).state,'idle');assert.equal(c.Fighter(e).state,'idle');
+  assert(c.AttackDown(),'control comes back with the pose');
+  c.HoldScriptedBind(p,e,2.4);c.BeginScriptedBind(p,e,{windowS:3.2});
+  assert(!c.EndScriptedHold(p,e),'an active QTE keeps its own exit');
+  assert.equal(c.Fighter(p).state,'qte');
+});
 console.log(`${count} melee rule tests passed`);
 
 assert.deepEqual(failures,[]);

@@ -4,16 +4,16 @@ evaluation of the shared curve; no new runtime clip is created.
 """
 from pathlib import Path
 import bpy, json, base64, struct, math
-from mathutils import Matrix, Vector
+from mathutils import Matrix, Vector, Quaternion
 root=Path(globals()['DADAO_PROJECT_ROOT'])
-assert Path(bpy.data.filepath).parent.name=='DadaoCleanChop_20260913'
+assert Path(bpy.data.filepath).parent.name=='DadaoGripChop_20260916'
 scene=bpy.context.scene
 data=json.loads((root/'_shots/DadaoPower/Acceptance/Data_DadaoSourceBake.json').read_text())
 convert=Matrix(((1,0,0,0),(0,0,-1,0),(0,1,0,0),(0,0,0,1)))
 arm=bpy.data.objects.get('Model_DadaoSwingArms')
 if arm is None:
     before=set(bpy.data.objects)
-    bpy.ops.import_scene.gltf(filepath=str(root/'Model/Model_FpsArmsNraSkeletal01.glb'))
+    bpy.ops.import_scene.gltf(filepath=str(root/'Model/Model_FpsHanYangHands.glb'))
     imported=set(bpy.data.objects)-before
     arm=next(o for o in imported if o.type=='ARMATURE')
     arm.name='Model_DadaoSwingArms'
@@ -42,6 +42,19 @@ if weapon is None:
         mesh=bpy.data.meshes.new('Model_DadaoBlade');mesh.from_pydata(vertices,[],[indices[i:i+3] for i in range(0,len(indices),3)]);mesh.update()
         SetMeleeMeshSurface(mesh,uvs,normals);mesh.materials.append(MeleeDadaoMaterial(root))
         obj=bpy.data.objects.new(mesh.name,mesh);scene.collection.objects.link(obj);obj.parent=weapon
+# The TZM's measured thin edge is +Y, opposite the control rig's -Y edge.
+# Rotate mesh children only; the grip controls and replay bones stay fixed.
+for obj in weapon.children:
+    if obj.type=='MESH':obj.rotation_euler=(0,0,math.pi)
+# Keep inspectable grip frames with the repaired hand replay in the source.
+for side,z,angles in [('Right',.03,(.05208,-1.93229,-1.75862)),('Left',.155,(.20553,-2.61358,-.42501))]:
+    name='Animation_Dadao'+side+'Grip'
+    obj=bpy.data.objects.get(name)
+    if obj is None:obj=bpy.data.objects.new(name,None);scene.collection.objects.link(obj)
+    obj.parent=weapon;obj.location=(0,0,z);obj.rotation_mode='QUATERNION'
+    x,y,zr=angles;obj.rotation_quaternion=Quaternion((0,1,0),y)@Quaternion((1,0,0),x)@Quaternion((0,0,1),zr)
+    obj.empty_display_type='ARROWS';obj.empty_display_size=.04
+    obj['fingerCurlDegrees']=[56,74,46];obj['indexCurlDegrees']=[56,74,46];obj['thumbDirection']=[0,-.7,1]
 weapon.animation_data_clear();weapon.rotation_mode='QUATERNION'
 for action in list(bpy.data.actions):
     if action.name.startswith('Animation_DadaoEvaluatedWeapon') and action.users==0:bpy.data.actions.remove(action)

@@ -28,7 +28,7 @@ debug.FirstLevelMission(); // phaseNumber / phaseId / phaseTitle / phaseCount
 | 6 后送命令 | Orders | Orders |
 | 7 护送转场抵达村口 | South | South |
 | 8 村口截击 | Village | Village |
-| 9 第一次大刀／刺刀近战 | Melee | Melee |
+| 9 屋内伏击：刺刀顶上来 | Melee | Melee |
 | 10 夺院并掩护伤员通过 | Courtyard | Courtyard |
 | 11 转运区抵达 | TransferApproach | TransferApproach |
 | 12 完整转运区防御 | Transfer | Transfer |
@@ -39,9 +39,12 @@ debug.FirstLevelMission(); // phaseNumber / phaseId / phaseTitle / phaseCount
 | 17 老周牺牲 | Death | Death |
 | 18 接收院撤离 | FinalDefense | FinalDefense → Exit |
 
+阶段 9 的内容 2026-09-15 换成了屋内伏击（顺子带着老周的担架进屋被刺刀顶住），id 与通过条件都没变，
+拍表与三段跳转点（8「队首在村口」/ 9「担架在门口、四个人藏着」/ 10「伏击已打完」）见 [屋内伏击](Data_FirstLevelRoomAmbush.md)。
+
 跳转是可重复的阶段起点：重建本轮关卡和此前完成事实，保留当前阶段的任务条件。原先本轮的弹药、伤亡、破坏与未来事实不沿用；这避免后退时门已打开、敌人消失、QTE 或担架状态残留。调试开关沿用菜单设置。普通“从当前检查点继续”仍恢复原现场，两者含义不同。
 
-`Script_FirstLevelMissionCheckpoint` 用原后送系统离线推进队列、装载、车辆离开、空袭损坏和接收院进度，缓存独立副本。`Script_FirstLevelMissionStageJump` 装配实际演员、机枪、车门、战车、未完成遭遇、对白回执与持担架状态。第二阶段读取当前配音清单，按对白及停顿时长还原已行驶距离，再由真实炮击触发翻车与刹车；第三阶段从车外进沟口起步，仍须清理四名突入者、进入遮蔽点听完私语与命令、步枪掩护友军。第四阶段起不重新生成已清理的沟内敌人；重试点保存在车厢局部坐标。当前阶段之后继续使用正常 Runtime.Update 和真实交互。
+`Script_FirstLevelMissionCheckpoint` 用原后送系统离线推进队列、装载、车辆离开、空袭损坏和接收院进度，缓存独立副本。`Script_FirstLevelMissionStageJump` 装配实际演员、机枪、车门、战车、未完成遭遇、对白回执与持担架状态。第二阶段读取当前配音清单，按对白及停顿时长还原已行驶距离，再由真实炮击触发翻车与刹车；第三阶段从车外进沟口起步，仍须清理四名突入者、进入遮蔽点后打退跟着伤兵摸到折角的五名日军（进掩蔽处时才生成，跳到第四阶段及以后视为已打退）、听完私语与命令、步枪掩护友军。第四阶段起不重新生成已清理的沟内敌人；重试点保存在车厢局部坐标。当前阶段之后继续使用正常 Runtime.Update 和真实交互。
 
 验收入口：`Script_FirstLevelMissionTest.mjs` 检查目录、事实边界、列队状态及副本隔离；`Script_FirstLevelMissionStageJumpTest.mjs` 检查 18 个真实浏览器起点、菜单操作、反向/重复跳转及空袭/临终续接；`Script_FirstLevelMissionBrowserTest.mjs --campaign --stage-jumps` 从每个阶段起点分别用真实输入推进到下一阶段，最后通关；不带 `--stage-jumps` 单独验证正常通关。调试跳转验收不能当作正常通关证据。截图和日志保存在本地 `_shots/FirstLevelStageJump`、`_shots/FirstLevelStageContinue` 和 `_shots/FirstLevelMission`。
 

@@ -30,6 +30,7 @@ import { MakeBox, MergeGeometries, PlaceGeometry, TILE_METERS } from "./Script_G
 import { WEAPONS } from "./Data_Weapons.mjs";
 import { LoadDocument, InstantiateModel } from "./Script_MeshLoad.mjs";
 import { LoadRiggedAssets } from "./Script_RiggedModel.mjs";
+import { SetShadowSkip } from "./Script_ShadowSkip.mjs";
 import {
   CreateLugouCharacterRig,
   LoadLugouCharacterAssets,
@@ -2033,7 +2034,7 @@ export class Actor {
       this.tmpQuat.setFromRotationMatrix(this.root.matrixWorld).invert();
       local.applyQuaternion(this.tmpQuat).normalize();
     }
-    this.characterRig?.BeginDeathPose();
+    const deathDuration = this.characterRig?.BeginDeathPose() || .8;
     const random = Mulberry32(HashString(`${this.seed}|death-weapon`));
     this.ragdollState = {
       weaponSide: random() < .5 ? -1 : 1,
@@ -2041,6 +2042,10 @@ export class Actor {
       weaponForward: (random() - .5) * .55,
       weaponYaw: (random() - .5) * 1.3 + (random() < .5 ? 0 : Math.PI),
       t: 0,
+      duration: deathDuration,
+      riggedDeath: !!this.characterRig?.deathClipState,
+      rigBodyOffset: this.characterRig
+        ? this.body.position.y - (this.characterRig.attachBodyY ?? this.body.position.y) : 0,
       // 子弹朝人物正面（-Z）飞 = 打在背上 = 往前扑
       forward: local.z < 0 ? 1 : -1,
       side: Clamp(local.x, -1, 1),
@@ -2114,7 +2119,7 @@ export class Actor {
 
     if (s.dead && !this.ragdollState) this.Ragdoll(null);
     if (this.ragdollState) {
-      this.ragdollState.t = Math.min(1, this.ragdollState.t + dt / 0.8);
+      this.ragdollState.t = Math.min(1, this.ragdollState.t + dt / (this.ragdollState.duration || .8));
       this.PoseRagdoll(this.ragdollState, dying);
       return;
     }
@@ -3377,6 +3382,19 @@ export class Actor {
         .008 - box.min.y, rag.weaponForward - center.z);
       group.position.copy(rag.weaponStart); group.quaternion.copy(rag.weaponStartQ);
     }
+    if (rag.riggedDeath) {
+      const baseY = this.characterRig.attachBodyY ?? d.hipY;
+      const offsetBlend = SmoothStep(0, .28, t);
+      this.body.position.set(0, baseY + (rag.rigBodyOffset || 0) * (1 - offsetBlend), 0);
+      this.body.quaternion.identity();
+      this.characterRig.PoseDeath(t);
+      if (rag.weaponStart && this.weaponGroup && !this.goreWeaponHold) {
+        const drop = SmoothStep(.05, .85, t);
+        this.weaponGroup.position.lerpVectors(rag.weaponStart, rag.weaponEnd, drop);
+        this.weaponGroup.quaternion.slerpQuaternions(rag.weaponStartQ, rag.weaponEndQ, drop);
+      }
+      return;
+    }
     const knee = SmoothStep(0, 0.30, t);
     const fall = SmoothStep(0.12, 0.78, t);
     const settle = SmoothStep(0.62, 1, t);
@@ -3433,6 +3451,9 @@ export class Actor {
       }
       object.castShadow = next && object.userData.actorOriginalCastShadow;
     });
+    // 关掉之后整棵子树一个投影体都没有（枪挂在手骨下，也在上面那趟里关了），
+    // 登记给 Script_ShadowSkip：烘阴影那一刻连递归都省掉，不只是省 draw。
+    SetShadowSkip(this.root, !next);
   }
 
   /**
@@ -3445,6 +3466,7 @@ export class Actor {
     if (this.factory && this.factory.batcher) this.factory.batcher.Remove(this);
     if (this.characterRig) this.characterRig.Dispose();
     if (this.root.parent) this.root.parent.remove(this.root);
+    SetShadowSkip(this.root, false);
     this.root.clear();
     this.weaponGroup = null;
     this.goreWeaponHold = null;

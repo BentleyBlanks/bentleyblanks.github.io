@@ -439,7 +439,7 @@ async function Boot(query = "") {
   // 不是文案，所以替身不削弱任何断言 —— 文案由 Script_TextTest 的闸门另外守。
   await page.evaluate(methods=>{
     const T=(key)=>key;
-    const menu={...new Function("T",`return ({${methods}})`)(T),root:document.querySelector("#menu"),el:{titleSub:document.querySelector(".mnTitleSub")},OpenPause(){this.ClearSandboxComplete();this.root.classList.add("pause");},SetItems(items){this.items=items;}};
+    const menu={...new Function("T",`return ({${methods}})`)(T),root:document.querySelector("#menu"),el:{titleSub:document.querySelector(".mnTitleSub"),foot:document.createElement("div")},OpenPause(){this.ClearSandboxComplete();this.root.classList.add("pause");},SetItems(items){this.items=items;}};
     window.completionTest=menu;menu.OpenSandboxComplete();
   },methods);
   Check("白盒完成淡黑期间不显示操作",await page.locator(".mnList").evaluate(el=>getComputedStyle(el).visibility==="hidden"));
@@ -927,7 +927,50 @@ async function CheckMissionList() {
     pauseItems.items.join(",") === "resume,settings,debug,exitSandbox" && pauseItems.labels.includes("退出第一关")
       && !pauseItems.labels.some((text) => /P0\/P1\/P2/.test(text)),
     pauseItems.labels.join(" / "));
-  await page.evaluate(() => window.Taierzhuang.Debug.MenuAct("exitSandbox"));
+  // 「退出第一关」先弹确认框：默认落在「取消」，Esc 收起后仍停在暂停；确认了才真退。
+  const ConfirmState = () => page.evaluate(() => {
+    const layer = document.querySelector("#menu .mnConfirm");
+    const box = layer?.querySelector(".mnConfirmBox")?.getBoundingClientRect();
+    const middle = box ? (box.top + box.bottom) / 2 : 0;
+    return {
+      visible: !!layer && !layer.hidden && getComputedStyle(layer).display !== "none",
+      title: layer?.querySelector(".mnConfirmTitle")?.textContent || "",
+      buttons: [...(layer?.querySelectorAll(".mnConfirmItem") || [])].map((b) => b.textContent),
+      focus: document.activeElement?.dataset?.confirm || document.activeElement?.dataset?.act || null,
+      highlighted: layer?.querySelector(".mnConfirmItem.on")?.dataset.confirm || null,
+      onTop: !!box && document.elementFromPoint(innerWidth / 2, middle)?.closest(".mnConfirm") === layer,
+      centered: !!box && Math.abs(middle - innerHeight / 2) < innerHeight * 0.1,
+      mode: window.Taierzhuang.Debug.Menu().mode,
+      whitebox: new URL(location.href).searchParams.get("whitebox"),
+    };
+  });
+  await page.click('#menu .mnItem[data-act="exitSandbox"]');
+  const asked = await ConfirmState();
+  Check("点「退出第一关」先弹「退出第一关？」确认框，压在暂停层之上、默认选中「取消」",
+    asked.visible && asked.title === "退出第一关？" && asked.buttons.join(",") === "确认退出,取消"
+      && asked.focus === "cancel" && asked.highlighted === "cancel" && asked.onTop && asked.centered
+      && asked.mode === "pause" && asked.whitebox === "p012",
+    JSON.stringify(asked));
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: path.join(outDir, "Menu_ExitConfirm.png") });
+  await page.keyboard.press("Enter");
+  await page.evaluate(() => window.Taierzhuang.StepFrames(5));
+  const cancelled = await ConfirmState();
+  Check("确认框里直接 Enter＝「取消」：框收起、仍在暂停、焦点回到「退出第一关」",
+    !cancelled.visible && cancelled.mode === "pause" && cancelled.whitebox === "p012" && cancelled.focus === "exitSandbox",
+    JSON.stringify(cancelled));
+  await page.keyboard.press("Enter");
+  const reopened = await ConfirmState();
+  await page.keyboard.press("Escape");
+  const escaped = await ConfirmState();
+  Check("键盘 Enter 同样先弹确认框；Esc 只收框，不顺带「继续游戏」",
+    reopened.visible && reopened.focus === "cancel"
+      && !escaped.visible && escaped.mode === "pause" && escaped.whitebox === "p012"
+      && await page.evaluate(() => !window.Taierzhuang.state.running),
+    JSON.stringify({ reopened, escaped }));
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("ArrowUp");
+  await page.keyboard.press("Enter");
   await page.waitForFunction(() => window.Taierzhuang?.Debug?.Menu?.()?.mode === "title"
     && !new URL(location.href).searchParams.has("whitebox"), null, { timeout: 240000 });
   await page.evaluate(() => window.Taierzhuang.StepFrames(20));
@@ -1218,12 +1261,31 @@ async function CheckMissionList() {
   Check("浏览器吞掉 Esc、只解除指针锁时也会暂停",
     unlockPause.menu.open && unlockPause.menu.mode === "pause" && !unlockPause.running,
     JSON.stringify(unlockPause));
-  await page.evaluate(() => window.Taierzhuang.Debug.MenuAct("resume"));
+  // 暂停里按一次 Esc 就得回到战斗。Chromium 松开 Esc 时也会收走指针锁：「继续」要是在按下
+  // 那一刻就抢锁，松键立刻被解锁、暂停层又弹回来，玩家得按第二次（假后端补了松键这一半）。
+  await page.keyboard.press("Escape");
+  await page.evaluate(() => window.Taierzhuang.StepFrames(4));
+  const escResume = await page.evaluate(() => ({
+    menu: window.Taierzhuang.Debug.Menu(),
+    running: window.Taierzhuang.state.running,
+    locked: window.Taierzhuang.Debug.PointerLock().locked,
+  }));
+  Check("暂停里按一次 Esc 就回到游戏，松开 Esc 后指针锁仍在、暂停层不回弹",
+    !escResume.menu.open && escResume.running && escResume.locked === true,
+    `open=${escResume.menu.open} mode=${escResume.menu.mode} running=${escResume.running} locked=${escResume.locked}`);
 
-  await page.evaluate(() => {
+  const titleConfirm = await page.evaluate(() => {
     window.Taierzhuang.Debug.Pause();
     window.Taierzhuang.Debug.MenuAct("title");
+    const layer = document.querySelector("#menu .mnConfirm");
+    const asked = { visible: !layer.hidden, title: layer.querySelector(".mnConfirmTitle").textContent,
+      mode: window.Taierzhuang.Debug.Menu().mode };
+    layer.querySelector('[data-confirm="accept"]').click();
+    return asked;
   });
+  Check("暂停里的「主菜单」先问「返回主菜单？」，确认后才走",
+    titleConfirm.visible && titleConfirm.title === "返回主菜单？" && titleConfirm.mode === "pause",
+    JSON.stringify(titleConfirm));
   await page.evaluate(() => window.Taierzhuang.StepFrames(30));
   const back = await page.evaluate(() => window.Taierzhuang.Debug.Menu());
   Check("从暂停能回主菜单，并且换成当前切片的机位",
@@ -1396,7 +1458,14 @@ async function CheckMissionList() {
       && paused.labels.includes("退出靶场"),
     paused.items.join(" / "));
 
-  await page.evaluate(() => window.Taierzhuang.Debug.MenuAct("exitSandbox"));
+  const rangeConfirm = await page.evaluate(() => {
+    window.Taierzhuang.Debug.MenuAct("exitSandbox");
+    const layer = document.querySelector("#menu .mnConfirm");
+    const title = layer.hidden ? "" : layer.querySelector(".mnConfirmTitle").textContent;
+    layer.querySelector('[data-confirm="accept"]').click();
+    return title;
+  });
+  Check("「退出靶场」同样先问「退出靶场？」", rangeConfirm === "退出靶场？", rangeConfirm);
   await page.waitForFunction(
     () => window.Taierzhuang?.Debug?.Menu !== undefined
       && window.Taierzhuang.Debug.Range === undefined,

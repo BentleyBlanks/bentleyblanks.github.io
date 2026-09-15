@@ -67,6 +67,13 @@ function SandboxText(mode) {
   return { where: T(`menu.sandbox.${id}.where`), exit: T(`menu.sandbox.${id}.exit`) };
 }
 
+/**
+ * 菜单项上的 `confirm`：点了先弹确认框，确认后才真的执行。
+ * 只挂在「离开正在进行的这一局」的项上（暂停里的退出 / 主菜单、阵亡页的返回主菜单）；
+ * 通关页的「返回主菜单」不挂 —— 那时已经没有进度可丢。
+ */
+function LeaveConfirm(title) { return { title, text: T("menu.confirm.text") }; }
+
 /** 缓动：进出都软的推轨。ER2 的菜单运镜没有一处是匀速的。 */
 function EaseInOutSine(k) { return 0.5 - 0.5 * Math.cos(Math.PI * Clamp01(k)); }
 function Lerp(a, b, k) { return a + (b - a) * k; }
@@ -280,6 +287,107 @@ export class MainMenu {
     this.BuildLevels();
     this.el.text = document.createElement("div");
     this.el.text.className = "mnText";
+    // 最后建：确认框必须压在列表、目标栏与面板之上。
+    this.BuildConfirm();
+  }
+
+  /**
+   * 退出确认框：盖在暂停 / 阵亡页上面的模态层。版式沿用阵亡页的居中列表
+   *（冷灰字、旧金选择条），外面是一条贯穿全宽的黑栏，与标题栏、选章页脚同一种黑。
+   * 默认高亮「取消」—— 连按两下 Enter 不会把人直接踢回主菜单。
+   */
+  BuildConfirm() {
+    const mk = (cls, parent, tag = "div") => {
+      const e = document.createElement(tag);
+      e.className = cls;
+      parent.appendChild(e);
+      return e;
+    };
+    const layer = mk("mnConfirm", this.root);
+    layer.hidden = true;
+    const box = mk("mnConfirmBox", layer, "section");
+    box.setAttribute("role", "alertdialog");
+    box.setAttribute("aria-modal", "true");
+    box.setAttribute("aria-labelledby", "MenuConfirmTitle");
+    box.setAttribute("aria-describedby", "MenuConfirmText");
+    this.el.confirmTitle = mk("mnConfirmTitle", box, "h2");
+    this.el.confirmTitle.id = "MenuConfirmTitle";
+    this.el.confirmText = mk("mnConfirmText", box, "p");
+    this.el.confirmText.id = "MenuConfirmText";
+    const list = mk("mnConfirmList", box);
+    const choices = [
+      { id: "accept", label: T("menu.confirm.accept") },
+      { id: "cancel", label: T("menu.confirm.cancel") },
+    ];
+    // 类名刻意不复用 .mnItem：各处（与测试）按 `#menu .mnItem` 数的是菜单列表本身。
+    this.confirmEls = choices.map((choice, i) => {
+      const b = mk("mnConfirmItem", list, "button");
+      b.type = "button";
+      b.dataset.confirm = choice.id;
+      mk("mnConfirmLabel", b, "span").textContent = choice.label;
+      b.addEventListener("mouseenter", () => this.HighlightConfirm(i));
+      b.addEventListener("focus", () => this.HighlightConfirm(i));
+      b.addEventListener("click", () => this.CloseConfirm(choice.id === "accept"));
+      return b;
+    });
+    mk("mnConfirmKeys", box).textContent = T("menu.confirm.keys");
+    // 点黑栏外面的暗处＝取消，与 Esc 同义。
+    layer.addEventListener("click", (event) => { if (event.target === layer) this.CloseConfirm(false); });
+    this.el.confirm = layer;
+    this.confirmItem = null;
+    this.confirmIndex = 1;
+  }
+
+  HighlightConfirm(i) {
+    const count = this.confirmEls.length;
+    this.confirmIndex = ((i % count) + count) % count;
+    this.confirmEls.forEach((el, k) => el.classList.toggle("on", k === this.confirmIndex));
+  }
+
+  OpenConfirm(item) {
+    this.confirmItem = item;
+    this.el.confirmTitle.textContent = item.confirm.title;
+    this.el.confirmText.textContent = item.confirm.text;
+    this.el.confirm.hidden = false;
+    this.root.classList.add("confirmOn");
+    this.HighlightConfirm(1);
+    this.confirmEls[1].focus({ preventScroll: true });
+  }
+
+  /** 关确认框：accept 才执行那一项；取消就把焦点还给原来那一项。 */
+  CloseConfirm(accept) {
+    const item = this.confirmItem;
+    if (!item) return;
+    this.DismissConfirm();
+    if (accept) { this.Activate(item.id, { confirmed: true }); return; }
+    const index = this.items.indexOf(item);
+    if (index >= 0) {
+      this.Highlight(index);
+      this.itemEls[index]?.focus({ preventScroll: true });
+    }
+  }
+
+  /** 只收起、不执行：菜单换层或关掉时顺手清掉，免得框挂到下一层上。 */
+  DismissConfirm() {
+    this.confirmItem = null;
+    this.el.confirm.hidden = true;
+    this.root.classList.remove("confirmOn");
+  }
+
+  ConfirmKey(event) {
+    switch (event.key) {
+      case "Escape": this.CloseConfirm(false); break;
+      case "ArrowUp": case "ArrowDown": case "ArrowLeft": case "ArrowRight":
+        this.HighlightConfirm(this.confirmIndex + (event.key === "ArrowDown" || event.key === "ArrowRight" ? 1 : -1));
+        this.confirmEls[this.confirmIndex].focus({ preventScroll: true });
+        break;
+      case "Enter": case " ":
+        // 按住 Enter 的连发不许一路穿过确认框。
+        if (!event.repeat) this.CloseConfirm(this.confirmIndex === 0);
+        break;
+      default: return;
+    }
+    event.preventDefault();
   }
 
   /** 主列表。战役文案在 Data_TengxianScript.MENU 里，调试项只在这一层额外出现。 */
@@ -316,7 +424,8 @@ export class MainMenu {
         { id: "resume", label: T("menu.item.resumeGame"), hint: T("menu.hint.resumeSandbox", { where: here.where }) },
         { id: "settings", label: T("menu.item.settings"), hint: T("menu.hint.settings") },
         { id: "debug", label: T("menu.item.debug"), hint: T("menu.hint.debug") },
-        { id: "exitSandbox", label: here.exit, hint: T("menu.hint.exitSandbox") },
+        { id: "exitSandbox", label: here.exit, hint: T("menu.hint.exitSandbox"),
+          confirm: LeaveConfirm(T("menu.confirm.leaveTitle", { action: here.exit })) },
       ];
     }
     return [
@@ -324,7 +433,8 @@ export class MainMenu {
       { id: "settings", label: T("menu.item.settings"), hint: T("menu.hint.settings") },
       { id: "debug", label: T("menu.item.debug"), hint: T("menu.hint.debug") },
       { id: "levels", label: Localize(MenuTextId("chapters"), MENU.chapters), hint: T("menu.hint.levelsFromPause") },
-      { id: "title", label: T("menu.item.title"), hint: T("menu.hint.title") },
+      { id: "title", label: T("menu.item.title"), hint: T("menu.hint.title"),
+        confirm: LeaveConfirm(T("menu.confirm.toTitleTitle")) },
     ];
   }
 
@@ -441,6 +551,7 @@ export class MainMenu {
   /** 开机进菜单：接管相机，跑运镜。 */
   Open() {
     this.ClearSandboxComplete();
+    this.DismissConfirm();
     this.open = true;
     this.live = true;
     this.time = 0;
@@ -463,6 +574,7 @@ export class MainMenu {
   /** 游戏中按 Esc：只挂一层暂停，**不碰相机**（世界冻在原地就是暂停该有的样子）。 */
   OpenPause() {
     this.ClearSandboxComplete();
+    this.DismissConfirm();
     this.open = true;
     this.live = false;
     this.mode = "pause";
@@ -493,6 +605,7 @@ export class MainMenu {
   }
   OpenSandboxFailure(atLoad = false, {castId="shunzi",restartOnly=false} = {}) {
     this.ClearSandboxComplete();
+    this.DismissConfirm();
     this.open = true;
     this.live = false;
     this.Show("failure");
@@ -510,7 +623,8 @@ export class MainMenu {
       ...(atLoad && !restartOnly ? [{ id: "retrySandbox", label: T("menu.item.retryAtLoad"),
         hint: T("menu.hint.retrySandbox", { name: who }) }] : []),
       { id: "restartSandbox", label: T("menu.death.restart"), hint: T("menu.hint.restartSandbox") },
-      { id: "exitSandbox", label: T("menu.item.exitToTitle"), hint: T("menu.hint.exitSandboxFail") },
+      { id: "exitSandbox", label: T("menu.item.exitToTitle"), hint: T("menu.hint.exitSandboxFail"),
+        confirm: LeaveConfirm(T("menu.confirm.toTitleTitle")) },
     ]);
     this.itemEls.find(el => !el.disabled)?.focus({ preventScroll: true });
   }
@@ -525,6 +639,7 @@ export class MainMenu {
 
   Close() {
     this.ClearSandboxComplete();
+    this.DismissConfirm();
     this.open = false;
     this.live = false;
     this.root.classList.add("off");
@@ -536,6 +651,7 @@ export class MainMenu {
   /** 从暂停回到主菜单：这时候才接管相机并起运镜。 */
   ToTitle() {
     this.ClearSandboxComplete();
+    this.DismissConfirm();
     this.live = true;
     this.SetItems(this.TitleItems());
     this.PickShots(true);
@@ -863,9 +979,13 @@ export class MainMenu {
   // -------------------------------------------------------------------------
   // 动作
   // -------------------------------------------------------------------------
-  Activate(id) {
+  Activate(id, { confirmed = false } = {}) {
+    // 确认框开着时是模态的：背后的列表一概不响应（键盘、鼠标、Debug.MenuAct 都一样）。
+    if (this.confirmItem) return;
     // Terminal screens accept only their own visible, enabled actions.
     if (this.mode === "failure" && !this.items.some(item => item.id === id && !item.disabled)) return;
+    const item = this.items.find(entry => entry.id === id);
+    if (item?.confirm && !confirmed) { this.OpenConfirm(item); return; }
     switch (id) {
       case "start": {
         const progress = Progress.Read();
@@ -931,12 +1051,16 @@ export class MainMenu {
     this.onKey = (event) => {
       // 设置窗口接管键盘时，不让 Enter / 方向键穿透到背后的菜单。
       if (!this.open || document.querySelector("body.edToolsOpen #edRoot:not(.off)")) return;
+      // 确认框在阵亡页之上时，Esc 也是「取消」，所以排在阵亡页吞 Esc 之前。
+      if (this.confirmItem) { this.ConfirmKey(event); return; }
       if (this.mode === "failure" && (event.repeat || event.key === "Escape")) {
         event.preventDefault(); return;
       }
       const panel = this.root.classList.contains("panelOn");
       switch (event.key) {
         case "Escape":
+          // 按住不放的自动重复不再往回退：一路退过暂停层就成了「继续」。
+          if (event.repeat) { event.preventDefault(); return; }
           if (panel) { this.Show(this.panelReturnMode); event.preventDefault(); }
           else if (this.mode === "pause") { this.host.Resume?.(); event.preventDefault(); }
           return;
@@ -969,15 +1093,23 @@ export class MainMenu {
     // 第一次点击解锁音频：没有用户手势时 AudioContext 是 suspended 的
     this.onClick = () => { if (this.open) this.host.Unlock?.(); };
     this.onNativeKey = event => {
+      // 确认框的按钮也交给 onKey：它要挡住 Enter 连发，原生 click 挡不住。
       if ((event.key === " " || event.key === "Enter") && event.target.closest?.("button, input, select, textarea")
-        && !event.target.closest(".mnItem, .mnLevel")) event.stopPropagation();
+        && !event.target.closest(".mnItem, .mnLevel, .mnConfirmItem")) event.stopPropagation();
     };
     this.onResize = () => {
       if (this.open && this.root.contains(document.activeElement)) document.activeElement.scrollIntoView({ block: "nearest" });
     };
     this.root.addEventListener("keydown", this.onNativeKey);
     this.onTab = event => {
-      if (event.key === "Tab" && this.open && !document.querySelector("body.edToolsOpen #edRoot:not(.off)")) event.stopPropagation();
+      if (event.key !== "Tab" || !this.open || document.querySelector("body.edToolsOpen #edRoot:not(.off)")) return;
+      event.stopPropagation();
+      // 确认框开着：Tab 只在它的两颗按钮之间转，不落回背后的列表。
+      if (this.confirmItem) {
+        event.preventDefault();
+        this.HighlightConfirm(this.confirmIndex + (event.shiftKey ? -1 : 1));
+        this.confirmEls[this.confirmIndex].focus({ preventScroll: true });
+      }
     };
     document.addEventListener("keydown", this.onTab, true);
     window.addEventListener("resize", this.onResize);

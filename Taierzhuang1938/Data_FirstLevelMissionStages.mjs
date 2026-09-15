@@ -14,7 +14,7 @@ export const FIRST_LEVEL_STAGES = Object.freeze([
   Phase(6, "Orders", "后送命令", ["Orders"], A.orders),
   Phase(7, "South", "护送转场，抵达村口", ["South"], A.orders),
   Phase(8, "Village", "村口截击", ["Village"], Routes.village[0]),
-  Phase(9, "Melee", "第一次大刀／刺刀近战", ["Melee"], A.melee),
+  Phase(9, "Melee", "屋内伏击：刺刀顶上来", ["Melee"], A.melee),
   Phase(10, "Courtyard", "夺下院子并掩护伤员通过", ["Courtyard"], A.melee),
   Phase(11, "TransferApproach", "转运区抵达", ["TransferApproach"], {x:53,z:40}),
   Phase(12, "Transfer", "完整转运区防御", ["Transfer"], {x:94,z:101}),
@@ -26,13 +26,13 @@ export const FIRST_LEVEL_STAGES = Object.freeze([
   Phase(18, "FinalDefense", "接收院被逼退，战斗收尾", ["FinalDefense","Exit"], MISSION_RECEPTION_SPACE.deathView),
 ]);
 export const FIRST_LEVEL_ENCOUNTER_STARTS = Object.freeze({
-  bundleApproach:5, surface:2, intrusion:2, front:3, machineGun:4, approach:3, tank:3, village:3, melee:3, courtyard:10,
+  bundleApproach:5, surface:2, intrusion:2, shelterPursuit:3, front:3, machineGun:4, approach:3, tank:3, village:3, melee:3, courtyard:10,
   transfer:12, transferFlank:12, transferLast:12, transferRear:12, air:13, retreat:15,
   retreatWall:15,retreatYard:15,reception:16, final:17,
 });
 // These belong to the current public phase but arrive after its entry encounter.
 export const FIRST_LEVEL_DEFERRED_ENCOUNTERS=Object.freeze({
-  3:Object.freeze(["front","approach","tank","village","melee"]),
+  3:Object.freeze(["shelterPursuit","front","approach","tank","village","melee"]),
   12:Object.freeze(["transferFlank","transferLast","transferRear"]),
   15:Object.freeze(["retreatWall","retreatYard"]),
 });

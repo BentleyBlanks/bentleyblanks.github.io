@@ -9,7 +9,7 @@
 
 import assert from "node:assert/strict";
 import {
-  MakeRoadPath, GapsToRuns, SampleRun, DistanceToPolyline, PredicateGaps,
+  MakeRoadPath, GapsToRuns, SampleRun, DistanceToPolyline, PredicateGaps, MakeRailwayProfile,
 } from "./Script_RoadPath.mjs";
 
 // --- 直线（两点）：逐位退化 ---
@@ -132,6 +132,24 @@ import {
       assert.ok(Number.isFinite(s.x) && Number.isFinite(s.z)
         && Number.isFinite(s.tx) && Number.isFinite(s.tz), "采样不许出 NaN");
     }
+  }
+}
+
+// --- 数据驱动铁路剖面：轨顶 = 道砟顶 + rail.lift + rail.h/2，按世界坐标也能查 ---
+{
+  const spec = {
+    points: [[-77, -100], [-77, 300]],
+    crown: { step: 4, smooth: 3, lift: 0.1, clampLo: 0.06, clampHi: 0.18 },
+    rail: { lift: 0.155, h: 0.13 },
+  };
+  const groundAt = (x, z) => 0.05 * Math.sin(z / 9);
+  const railway = MakeRailwayProfile(spec, groundAt);
+  for (let s = 0; s <= railway.path.length; s += 2) {
+    const p = railway.path.At(s);
+    const clearance = railway.CrownAt(s) - railway.LocalAt(s);
+    assert.ok(clearance >= 0.06 - 1e-9 && clearance <= 0.18 + 1e-9, "道砟顶夹在本地地面 +0.06..+0.18");
+    assert.ok(Math.abs(railway.RailTopAt(s) - railway.CrownAt(s) - 0.22) < 1e-9, "轨顶 = 道砟顶 + 0.22");
+    assert.ok(Math.abs(railway.RailTopNear(p.x + 0.7, p.z) - railway.RailTopAt(s)) < 1e-9, "世界坐标查到同一个轨顶");
   }
 }
 

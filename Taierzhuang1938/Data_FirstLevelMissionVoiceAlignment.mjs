@@ -476,6 +476,74 @@ export const MISSION_VOICE_ALIGNMENT = Object.freeze({
     ],
     "model": "faster-whisper small CPU int8"
   },
+  "RoomAmbush": {
+    "sha256": "eb00cf1f028a95f3dcbbe7d8728655dd698fddf851884869fad4a42b66021c67",
+    "scriptSha256": "5eb5e6c21a52fd54449aa7ab19de3cb6bd9d2f4b851684ac7c4e94001886e719",
+    "groupsSha256": "7460488a1490a53db2a68ee2002dd851d35e1f113e88e06aec8a73e4ac9997e1",
+    "lines": [
+      [
+        0.0,
+        2.72
+      ],
+      [
+        3.8,
+        6.48
+      ],
+      [
+        7.5,
+        10.32
+      ],
+      [
+        12.02,
+        13.58
+      ]
+    ],
+    "model": "faster-whisper medium CPU int8"
+  },
+  "RoomAmbushBreak": {
+    "sha256": "a089c6a0e8119a9f756fd9b76733db9aa79a3639acd43da4492d8b9c517cf7d2",
+    "scriptSha256": "970a0d1636c48335404eda235d6904c30397a74437097f8283e21cfb39549955",
+    "groupsSha256": "4a56d0201780659f04a2a2567ed819da0a89b34f403dd814f8c4980ec15f66d1",
+    "lines": [
+      [
+        0.0,
+        2.26
+      ],
+      [
+        2.9,
+        5.4
+      ],
+      [
+        5.54,
+        9.12
+      ]
+    ],
+    "model": "faster-whisper medium CPU int8"
+  },
+  "RoomAmbushCleared": {
+    "sha256": "e2cdfaf6ae818920f76e5bc53805aa8d47256996236312489acc43995fb74e32",
+    "scriptSha256": "a5764be9fd917a1266ea12d5dd6a2cc4e63bf10b98204bd865b54c5fdd3fd41b",
+    "groupsSha256": "b46ac797d076171b034d237e9da4ffe12c7770176ffdbd3dcc032e59ac2733e4",
+    "lines": [
+      [
+        0.0,
+        4.94
+      ],
+      [
+        5.2,
+        8.38
+      ],
+      [
+        8.44,
+        11.68
+      ],
+      [
+        12.22,
+        19.52
+      ]
+    ],
+    "model": "faster-whisper medium CPU int8"
+  },
   "CourtyardOpen": {
     "sha256": "9312d13468e648f68c6e10a4f0b61412c386e293c1c8c4d224bafb7c617e26f0",
     "scriptSha256": "6bbfa4badd5121563f228bd3bcaa114fb101ce3b1fb4627f1baa9ab7dc8f992f",

@@ -491,6 +491,7 @@ try {
       && seatedArmed.gripL.distanceTo(leftGripCenter) > 0.025,
     "seated weapon palms no longer clear the gun centerline");
     const deathPositions = new Set();
+    const deathVariants = new Set();
     const deathCases = ["ija", "nra"].flatMap(kind => Array.from({ length: 4 }, (_, variant) => ({ kind, variant })))
       .concat([{ kind: "nraDare", variant: 0 }, { kind: "nraOfficer", variant: 4 }]);
     for (const { kind, variant } of deathCases) for (const direction of [-1, 1]) {
@@ -499,8 +500,12 @@ try {
       dead.Update(.1, { aim: 1, crouch: variant === 2 ? 1 : 0, moveSpeed: variant === 3 ? 1 : 0 });
       const scale = dead.weaponGroup.getWorldScale(new THREE.Vector3()).length();
       dead.Ragdoll(new THREE.Vector3(.12, 0, direction));
-      check(dead.characterRig.deathPose?.length > 30, `${kind}/${variant}: death must animate the visible soldier skeleton`);
-      for (let frame = 0; frame < 60; frame++) dead.Update(1 / 60, { dead: true, dying: Math.min(1, (frame + 1) / 54) });
+      check(dead.characterRig.deathClipState && dead.characterRig.deathClipById.size === 4,
+        `${kind}/${variant}: four imported death candidates must animate the visible soldier skeleton`);
+      deathVariants.add(`${kind.startsWith("ija") ? "ija" : "nra"}:${dead.characterRig.deathVariantId}`);
+      const deathFrames = Math.ceil((dead.ragdollState.duration + .25) * 60);
+      for (let frame = 0; frame < deathFrames; frame++) dead.Update(1 / 60,
+        { dead: true, dying: Math.min(1, (frame + 1) / 54) });
       dead.root.updateMatrixWorld(true);
       check(dead.weaponGroup.parent === dead.root, "dead rifle still follows the hand socket");
       check(Math.abs(dead.weaponGroup.getWorldScale(new THREE.Vector3()).length() - scale) < 1e-5,
@@ -512,7 +517,11 @@ try {
       for (const tag of ["L", "R"]) {
         const hand = rig.bones[`hand${tag}`].getWorldPosition(new THREE.Vector3());
         const hip = rig.bones.pelvis.getWorldPosition(new THREE.Vector3());
-        check(hand.distanceTo(hip) < .55, `${kind}/${variant}: relaxed hand remained in the raised firing pose`);
+        // Kimodo's authored collapse may extend a hand sideways to protect the
+        // head. Audit vertical relaxation, not distance to the pelvis: a valid
+        // ground-level protective arm can be more than 55 cm away horizontally.
+        check(hand.y - hip.y < .35,
+          `${kind}/${variant}: relaxed hand remained in the raised firing pose: handY=${hand.y}, hipY=${hip.y}`);
       }
       let floor = Infinity, legFloor = Infinity, torsoFloor = Infinity;
       rig.root.traverse(mesh => {
@@ -534,8 +543,13 @@ try {
         }
       });
       check(Math.abs(floor - .008) < .003, "settled visible skin does not meet the ground");
+      const deathAction = rig.deathClipState?.action;
       check(legFloor < .08 && torsoFloor < .08,
-        `${kind}/${variant}/${direction}: body balanced on toes or equipment: legs=${legFloor}, torso=${torsoFloor}`);
+        `${kind}/${variant}/${direction}: body balanced on toes or equipment: legs=${legFloor}, torso=${torsoFloor}, `
+        + `clip=${rig.deathVariantId}, t=${dead.ragdollState.t}, actionTime=${deathAction?.time}, `
+        + `clipDuration=${deathAction?.getClip().duration}, weight=${deathAction?.getEffectiveWeight()}, `
+        + `enabled=${deathAction?.enabled}, paused=${deathAction?.paused}, bodyY=${dead.body.position.y}, `
+        + `pelvisY=${rig.bones.pelvis.getWorldPosition(new THREE.Vector3()).y}, floorLift=${rig.deathFloorLift}`);
       const position = dead.weaponGroup.position.clone(), quaternion = dead.weaponGroup.quaternion.clone();
       const bodyPosition = dead.body.position.clone(), bodyQuaternion = dead.body.quaternion.clone();
       // Gameplay changes the corpse terrain plane independently of its settled
@@ -553,11 +567,16 @@ try {
       dead.Dispose();
     }
     check(deathPositions.size >= 4, "corpse rifles have no per-soldier variation");
+    check([...deathVariants].some(value => value.startsWith("nra:"))
+      && [...deathVariants].some(value => value.startsWith("ija:")),
+    "both factions must select from the shared death candidates");
     const severed = factory.Create("ija", { seed: 8199, weapon: "Type38" });
     severed.Update(.1, { aim: 1 }); severed.Ragdoll(null);
     const limb = new THREE.Group();
     check(severed.DetachWeaponForGore(limb), "gore handoff failed before death step");
-    for (let frame = 0; frame < 60; frame++) severed.Update(1 / 60, { dead: true });
+    for (let frame = 0; frame < Math.ceil((severed.ragdollState.duration + .25) * 60); frame++) {
+      severed.Update(1 / 60, { dead: true });
+    }
     check(severed.weaponGroup.parent === limb && !severed.ragdollState.weaponStart,
       "death drop stole the rifle from a severed arm");
     severed.RestoreWeaponFromGore(); severed.Dispose();

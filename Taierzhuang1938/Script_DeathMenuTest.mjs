@@ -130,6 +130,17 @@ try {
   assert.deepEqual(companionFailure.items,["restartSandbox","exitSandbox"]);
   await page.waitForFunction(() => document.getAnimations().every(animation => animation.playState !== "running"));
   await page.screenshot({path:path.join(out,"Scene_CompanionFailure.png")});
+  // 阵亡页的「返回主菜单」同样先问一句；Esc 只收起确认框，仍停在失败页、不退关。
+  await page.locator('#menu .mnItem[data-act="exitSandbox"]').click();
+  const deathConfirm = await page.evaluate(() => ({ visible: !document.querySelector("#menu .mnConfirm").hidden,
+    title: document.querySelector("#menu .mnConfirmTitle").textContent, focus: document.activeElement?.dataset.confirm }));
+  assert.ok(deathConfirm.visible && deathConfirm.title === "返回主菜单？" && deathConfirm.focus === "cancel", JSON.stringify(deathConfirm));
+  await page.waitForFunction(() => document.getAnimations().every(animation => animation.playState !== "running"));
+  await page.screenshot({path:path.join(out,"Scene_FailureExitConfirm.png")});
+  await page.keyboard.press("Escape");
+  const deathCancelled = await page.evaluate(() => ({ hidden: document.querySelector("#menu .mnConfirm").hidden,
+    mode: window.Tengxian.menu.mode, whitebox: new URL(location.href).searchParams.get("whitebox") }));
+  assert.ok(deathCancelled.hidden && deathCancelled.mode === "failure" && deathCancelled.whitebox === "p012", JSON.stringify(deathCancelled));
   // Explicit UI fixture: real runtime + pause adapter, not campaign completion evidence.
   await page.evaluate(async () => {
     const g = window.Tengxian;

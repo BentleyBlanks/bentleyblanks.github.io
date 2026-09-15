@@ -8,6 +8,10 @@ import { MISSION_LAYOUT, MISSION_ANCHORS as A, MISSION_ROUTES } from "./Data_Fir
 export const MISSION_VERSION = MISSION_TOPOLOGY_VERSION;
 import { MISSION_TUNING } from "./Data_Tuning_FirstLevel.mjs";
 export { MISSION_TUNING } from "./Data_Tuning_FirstLevel.mjs";
+// Both air passes. Ki-30 (Army Type 97 light bomber) entered combat in China in spring 1938; the Ki-43 flew
+// only in 1939 and has no texture. The documented aircraft near Tengxian were Type 88 reconnaissance biplanes,
+// for which there is no model yet. See docs/Data_AircraftAssets.md.
+export const MISSION_AIRCRAFT_ID = "MitsubishiKi30";
 const Stage = (id, objective, target, requirements, cue, extra = {}) =>
   Object.freeze({ id, objective, target, requirements, cue, ...extra });
 export const MISSION_STAGES = Object.freeze([
@@ -20,7 +24,7 @@ export const MISSION_STAGES = Object.freeze([
     "WreckImpact",
   ),
   Stage("TrenchEntry", "侧沟有日军！清出折角，跟班长进掩蔽处。", OPENING.shelter, ["trenchEntered", "trenchCleared", "shelterReached"], null),
-  Stage("Shelter", "守住折角，照看从前方撤下来的伤兵。", OPENING.shelter, ["escapeWhisperHeard", "woundedSeen", "supportOrdersHeard"], "EscapeWhisper"),
+  Stage("Shelter", "守住折角，照看从前方撤下来的伤兵。", OPENING.shelter, ["shelterCornerHeld", "escapeWhisperHeard", "woundedSeen", "supportOrdersHeard"], "EscapeWhisper"),
   Stage(
     "Support",
     "沿交通壕支援前沿守军，掩护他们撤回。",
@@ -57,7 +61,7 @@ export const MISSION_STAGES = Object.freeze([
     null,
   ),
   Stage("Village", "从右侧灶屋绕进内院，夺取伤员通道。", A.melee, ["innerCourtReached"], "VillageAmbush"),
-  Stage("Melee", "清除近身日军，夺取伤员通道。", A.melee, ["meleeResolved"], null),
+  Stage("Melee", "屋里有埋伏！挣脱刺刀，清掉屋内日军。", A.melee, ["meleeResolved"], null),
   Stage(
     "Courtyard",
     "清理窗口机枪，打开院门，掩护担架分批通过。",
@@ -140,6 +144,7 @@ export const MISSION_STAGES = Object.freeze([
 export const MISSION_ENCOUNTERS = Object.freeze({
   surface: OPENING.surface,
   intrusion: OPENING.intruders,
+  shelterPursuit: OPENING.shelterPursuers,
   approach: FRONT_APPROACH_ENEMIES,
   // The roster itself lives in Data_FirstLevelMissionFront: the assault lanes and the cover rows
   // are derived from it, and a list split across two files drifts.
@@ -159,7 +164,15 @@ export const MISSION_ENCOUNTERS = Object.freeze({
     { id: "RearWindow", x: 66, z: 16 },
     { id: "SideYard", x: 40, z: 27 },
   ],
-  melee: [{ id: "MeleeTutor", x: 61, z: 4, weapon: "Type38", bayonet: true }],
+  // 屋内伏击（docs/Data_FirstLevelRoomAmbush.md）。四个人都上着刺刀，藏在屋里三处死角：
+  // 领头的扑玩家并顶出站立僵持，后面两个捅担架上的老周和两个抬担架的，
+  // 侧翼那个压到挣脱之后才动。
+  melee: [
+    { id: "AmbushLead", x: 61, z: 4, weapon: "Type38", bayonet: true },
+    { id: "AmbushRearA", x: 53.6, z: 2.4, weapon: "Type38", bayonet: true },
+    { id: "AmbushRearB", x: 53.6, z: 4.6, weapon: "Type38", bayonet: true },
+    { id: "AmbushFlank", x: 62.4, z: 14.3, weapon: "Type38", bayonet: true },
+  ],
   courtyard: [
     { id: "CourtyardPursuerA", x: 91, z: 24 },
     { id: "CourtyardPursuerB", x: 97, z: 21 },
@@ -226,7 +239,7 @@ export const MISSION_PURSUIT_ROUTE=Object.freeze([
 ]);
 export const MISSION_GUIDANCE = Object.freeze({
   Unloading: {label:'unload'}, TrenchEntry:{label:'support',route:'opening'}, Shelter:{label:'support'}, Support:{label:'support',route:'support'},
-  MachineGun:{label:'front'},Tank:{label:'bundle',route:'bundle'},Orders:{label:'orders',route:'orders'},
+  MachineGun:{label:'front'},Tank:{label:'bundle',route:'bundle'},Orders:{label:'orders',route:'ordersRejoin'},
   South:{label:'south',route:'south'},Village:{label:'village',route:'village'},
   Courtyard:{label:'gate'},TransferApproach:{label:'transfer',route:'village'},Transfer:{label:'transfer'},AirFirst:{label:'transfer'},
   Carry:{label:'carry'},Rescue:{label:'ditch'},
@@ -237,6 +250,7 @@ export const MISSION_GUIDANCE = Object.freeze({
 export const MISSION_TACTICS = Object.freeze({
   ...APPROACH_TACTICS,
   ...Object.fromEntries(Object.entries(OPENING.intruderRoutes).map(([id,points],i)=>[id,{delay:i*2,points}])),
+  ...OPENING.shelterPursuerRoutes,
   CourtyardPursuerA: { delay: 1, points: [{x:86,z:37},{x:62,z:40},{x:53,z:38}] },
   CourtyardPursuerB: { delay: 12, points: [{x:89,z:39},{x:66,z:43},{x:59,z:40}] },
   CourtyardPursuerC: { delay: 25, points: [{x:91,z:41},{x:70,z:44},{x:64,z:40}] },

@@ -9,10 +9,13 @@ parser.add_argument('--root', type=Path, required=True)
 parser.add_argument('--faction', choices=['Nra','Ija'], required=True)
 parser.add_argument('--clip',default='DeathCollapse')
 parser.add_argument('--group',default='DeathCollapseV1')
+parser.add_argument('--asset-out',type=Path)
+parser.add_argument('--blend-out',type=Path)
+parser.add_argument('--revision',default='V1')
 args = parser.parse_args(sys.argv[sys.argv.index('--')+1:])
 root, faction, clip = args.root, args.faction, args.clip
-out = root/'Models'/args.group
-blendOut = root/'Blender'/args.group
+out = args.asset_out or root/'Models'/args.group
+blendOut = args.blend_out or root/'Blender'/args.group
 out.mkdir(parents=True,exist_ok=True)
 blendOut.mkdir(parents=True,exist_ok=True)
 motion = json.loads((root/'Models/_Cache'/args.group/f'Data_{clip}Motion.json').read_text(encoding='utf-8'))
@@ -179,7 +182,7 @@ def RelaxLimbs(index,positions,rotations):
             flat=(targetBasis@source.transposed()).to_quaternion()
             handRotation=handRotation.to_quaternion().slerp(flat,weight).to_matrix().to_4x4()
         Put(side+' Hand',target,handRotation)
-animationName = 'Animation_'+faction+'_'+clip+'_V1'
+animationName = 'Animation_'+faction+'_'+clip+'_'+args.revision
 action = bpy.data.actions.new(animationName)
 action.use_fake_user = True
 arm.animation_data_create()
@@ -255,13 +258,16 @@ exec(compile(Path(__file__).with_name('Script_InfantryExport.py').read_text(enco
 ExportInfantry(path,animationName)
 for img in bpy.data.images:
     if img.source == 'FILE' and img.has_data and not img.packed_file: img.pack()
-blendPath = blendOut/('Scene_'+faction+'_'+clip+'_V1.blend')
+blendPath = blendOut/('Scene_'+faction+'_'+clip+'_'+args.revision+'.blend')
 bpy.ops.wm.save_as_mainfile(filepath=str(blendPath),compress=True)
-report = {'status':'requires_visual_review','faction':faction,'clip':animationName,'path':path.relative_to(root).as_posix(),
-    'blend':blendPath.relative_to(root).as_posix(),'loop':motion['loop'],'samples':samples,'settleFrame':motion['settleFrame'],
+def ReportPath(value):
+    try:return value.relative_to(root).as_posix()
+    except ValueError:return value.as_posix()
+report = {'status':'requires_visual_review','faction':faction,'clip':animationName,'path':ReportPath(path),
+    'blend':ReportPath(blendPath),'loop':motion['loop'],'samples':samples,'settleFrame':motion['settleFrame'],
     'sourceRangeSeconds':[0,motion['durationSeconds']],'corrections':scene['corrections'],
-    'retargetScale':ratio,'variants':[{'id':clip,'faction':faction,'path':path.relative_to(root).as_posix(),'clip':animationName,
-        'blend':blendPath.relative_to(root).as_posix(),'sourceFrames':motion['range'],'loop':motion['loop']}],
+    'retargetScale':ratio,'variants':[{'id':clip,'faction':faction,'path':ReportPath(path),'clip':animationName,
+        'blend':ReportPath(blendPath),'sourceFrames':motion['range'],'loop':motion['loop']}],
     'maxVerticalCorrectionStep':float(np.max(np.abs(np.diff([s['verticalCorrection'] for s in samples]))))}
 (out/('Data_'+faction+'_'+clip+'_Validation.json')).write_text(json.dumps(report,indent=2),encoding='utf-8')
 print('DONE',faction,animationName,flush=True)

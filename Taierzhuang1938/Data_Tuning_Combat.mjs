@@ -36,6 +36,14 @@ export const GRENADE_BODY = Object.freeze({
   bundleMassKg: 3.2,
   restitution: 0.24,
   friction: 0.68,
+  // 落地刹车（Script_Physics.SettleThrown）。2026-09-15 玩家反馈「丢出去的手榴弹跟溜冰
+  // 一样」：旧值落地后还要滑 6–15 m、碰撞盒地面上引信烧完都没停。现值按 14–26 m/s 出手
+  // 实测：泥地落地后走 1.0–3.7 m、碰撞盒地面 0.5–2.1 m，约 1 s 内停住。
+  groundRestitution: 0.25,     // 砸在解析地表上反弹的法向比例
+  groundImpactFriction: 0.4,   // 砸土那一下保留的切向速度
+  solidImpactFriction: 0.75,   // 砸在楼板/街面碰撞盒上保留的切向速度（引擎碰撞已先吃一截）
+  groundRollDragPerS: 6,       // 贴地后每秒的切向与角速度衰减
+  groundStopSpeedMps: 0.6,     // 贴地低于这个速度就停住
   // 没有物理世界时的兜底（编辑器在切片重建的空档里也会跑这条路）。
   fallbackBounce: 0.34,
   fallbackGroundBounce: 0.26,

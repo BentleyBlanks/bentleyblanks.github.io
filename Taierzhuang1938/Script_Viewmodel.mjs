@@ -32,6 +32,7 @@
 import * as THREE from "three";
 import { CharacterWounds } from "./Script_CharacterWounds.mjs";
 import { SampleMeleeFirstPerson, SampleMeleeVideo } from "./Script_MeleeAnimation.mjs";
+import { FPS_GRENADE_THROW } from "./Data_FpsGrenadeThrow.mjs";
 import { CloneGrenadeAsset } from "./Script_GrenadeAsset.mjs";
 import { WEAPONS, GUN_MELEE } from "./Data_Weapons.mjs";
 import { Mulberry32, HashString, Clamp, Clamp01, Mix } from "./Script_Noise.mjs";
@@ -41,6 +42,7 @@ import { InstantiateModel } from "./Script_MeshLoad.mjs";
 import { WEAPON_MESH_BY_ID, WeaponMeshId, BAYONET_MESH_BY_WEAPON } from "./Data_Meshes.mjs";
 import { FpsArmRig } from "./Script_RiggedModel.mjs";
 import { FpsArmPose, FPS_HAND_SHAPES } from "./Data_FpsArmPoses.mjs";
+import { FPS_DADAO_SWING } from "./Data_FpsDadaoSwing.mjs";
 import { FirstPersonBody } from "./Script_FirstPersonBody.mjs";
 import { FrameQuaternion } from "./Script_FpsAnatomy.mjs";
 import { FpsSkeletalAnimation } from "./Script_FpsSkeletalAnimation.mjs";
@@ -1585,6 +1587,8 @@ export class Viewmodel {
           this.armRigs.ZhongZheng=new FpsArmRig(riggedAssets.fpsHanYang,library);
           this.armRigs.HanYang=new FpsArmRig(riggedAssets.fpsHanYang,library);
           this.armRigs.Type38=new FpsArmRig(riggedAssets.fpsHanYang,library);
+          this.armRigs.Grenade=new FpsArmRig(riggedAssets.fpsHanYang,library);
+          this.armRigs.Dadao=new FpsArmRig(riggedAssets.fpsHanYang,library);
         }
       } catch (error) {
         console.warn(`[Viewmodel] FPS 手臂实例化失败，退回旧手模：${String(error).slice(0, 180)}`);
@@ -1779,6 +1783,15 @@ export class Viewmodel {
     const meshId = MODEL_FP.has(weaponId) ? WeaponMeshId(weaponId, this.weaponVariant) : null;
     const doc = meshId && this.meshDocs ? this.meshDocs.get(meshId) : null;
     this.rig = doc ? BuildFromModel(this.materials, this.weapon, weaponId, doc) : null;
+    if (this.rig && weaponId === "Dadao") {
+      // Measured TZM thin edge is +Y; the authored grip expects it along -Y.
+      // Correct only the private model mount, before attaching either hand.
+      const mount = new THREE.Group();
+      mount.name = "Model_DadaoEdgeMount";
+      mount.rotation.fromArray(FPS_DADAO_SWING.modelRotation);
+      for (const child of [...this.rig.group.children]) mount.add(child);
+      this.rig.group.add(mount);
+    }
     if (!this.rig) {
       const builder = BUILDERS[weaponId] || BuildBoltRifle;
       this.rig = builder(this.materials, this.weapon, weaponId, this.grenadeAsset);
@@ -2522,7 +2535,9 @@ export class Viewmodel {
         reload: this.action?.kind === "reload", reloadBlend: this.reloadBlend, melee: !!input.meleeCombat,
         fire: 1-Ease.InOut(Ease.Seg(this.flashTime,0.055,0.18)) });
       if (this.meleeVideoFrame) this._ApplyMeleeVideo();
+      if(this.weaponId === "Grenade" && this.action?.kind === "throw" && !this.action.offhand) this._ApplyGrenadeThrow();
       if (!this.skeletalAnimation?.Update(step,input)) this.riggedArms.Update(step);
+      if(this.weaponId === "Grenade" && this.action?.kind === "throw" && !this.action.offhand) this._ReleaseThrow(this.action.t,this.action.power,false);
     }
     if (!this.weapon && !this.riggedArms) this._UpdateUnarmedHands(gait, sprint, grounded ? 1 : 0);
     this.body?.Update(step, input.carryBodyVisible ? { ...input, playerYaw: input.carryBodyYaw ?? input.playerYaw,
@@ -3260,7 +3275,7 @@ export class Viewmodel {
         this.handBaseRot.left.x + swing * 0.8,
         this.handBaseRot.left.y - swing * 0.4,
         this.handBaseRot.left.z, "YXZ");
-    } else {
+    } else if(this.weaponId !== "Grenade" || !this.riggedArms) {
       const swing = (cock * -1 + whip * 2.4 - follow * 1.2) * amp;
       this.actionPivot.position.set(
         -0.04 * cock + 0.06 * whip,
@@ -3269,13 +3284,36 @@ export class Viewmodel {
       this.actionPivot.rotation.set(swing * 0.9, -0.35 * cock + 0.30 * whip, 0.25 * cock, "YXZ");
     }
 
-    // 出手：0.48 那一帧脱手
+    if(offhand || this.weaponId !== "Grenade" || !this.riggedArms) this._ReleaseThrow(t,power,offhand);
+  }
+
+  _ApplyGrenadeThrow() {
+    const t=Clamp01(this.action.t),frames=FPS_GRENADE_THROW.frames,cursor=t*(frames.length-1);
+    const a=frames[Math.floor(cursor)],b=frames[Math.min(frames.length-1,Math.floor(cursor)+1)],mix=cursor%1;
+    const values=a.map((n,i)=>Mix(n,b[i],mix));
+    this.weaponMount.position.fromArray(values);
+    this.weaponMount.quaternion.fromArray(a,3).slerp(new THREE.Quaternion().fromArray(b,3),mix);
+    const rig=this.riggedArms;
+    rig.videoBody={...this.armPose.hip.body,elbowPoles:{...this.armPose.hip.body.elbowPoles},authoredElbows:true};
+    const withdraw=Ease.InOut(Ease.Seg(t,0,.18))*(1-Ease.InOut(Ease.Seg(t,.76,1)));
+    rig.SetContactWeight("l",1-withdraw);
+    const hand=this.handLeft.group;
+    const target=this.armAnchor.localToWorld(new THREE.Vector3().fromArray(values,7));
+    hand.position.lerp(hand.parent.worldToLocal(target),withdraw);
+    const opening=Ease.InOut(Ease.Seg(t,.44,.52))*(1-Ease.InOut(Ease.Seg(t,.76,.92)));
+    rig.SetContactWeight("r",1-opening);
+    rig.operationPose.r={shape:"open",nextShape:"open",shapeMix:0};
+  }
+
+  _ReleaseThrow(t,power,offhand) {
+    // Release after the current frame's hand targets and bones are evaluated.
     if (t >= 0.48 && this.action && !this.action.released) {
       this.action.released = true;
       if (offhand) this.offhandGrenade.visible = false;
       else if (this.rig.parts.grenade) this.rig.parts.grenade.visible = false;
       if (this.onThrowRelease) {
         const out = new THREE.Vector3();
+        this.root.updateWorldMatrix(true,true);
         (offhand ? this.handLeft.group : this.weaponMount).getWorldPosition(out);
         this.root.worldToLocal(out);
         out.divide(this.compensation);

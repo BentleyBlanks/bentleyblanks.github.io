@@ -287,7 +287,11 @@ export class FirstLevelMissionView {
       } else {
         this.Instance("bed", litter.x, ground + height, litter.z, yaw);
       }
-      this.people.Patient(litter.id,litter.x,ground+height+.07,litter.z,yaw,time);
+      // 挨过刀的老周走带骨架的伤员（PatientStabbed → 循环的 PatientWoundedIdle）；
+      // 没有动作库、不是他、或者他已经断气，都退回实例化的烘焙姿势 ——
+      // 死人不能继续喘（第 17 阶段的告别戏用的就是那条既有姿势）。
+      if(!(litter.health>0&&this.people.RiggedPatient(litter.id,litter.x,ground,litter.z,yaw,ground+height)))
+        this.people.Patient(litter.id,litter.x,ground+height+.07,litter.z,yaw,time);
       const SetGrip=(side,end)=>new THREE.Vector3(litter.x+Math.cos(yaw)*side*.29-Math.sin(yaw)*end,
         ground+height+.12,litter.z-Math.sin(yaw)*side*.29-Math.cos(yaw)*end);
       if (!litter.loaded && litter.state !== "placed")

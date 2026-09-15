@@ -92,6 +92,26 @@ assert.deepEqual(manifest.models.map((model) => model.id), [
 assert.equal(manifest.models.filter((model) => model.faction === "nra").length, 5);
 assert.equal(manifest.models.filter((model) => model.faction === "ija").length, 5);
 
+const expectedDeathClips = ["DeathCollapseA", "DeathCollapseB", "DeathCollapseC", "DeathCollapseD"];
+for (const faction of ["Nra", "Ija"]) {
+  const deathPath = path.join(characterDir, `Animation_Lugou${faction}DeathCollapse.glb`);
+  const bytes = fs.statSync(deathPath).size;
+  assert.ok(bytes > 300_000 && bytes < 800_000,
+    `${faction} death library contains animation data without duplicate character textures`);
+  const gltf = ReadGlbJson(deathPath);
+  assert.equal((gltf.meshes || []).length, 0, `${faction} death library is animation-only`);
+  assert.equal((gltf.images || []).length, 0, `${faction} death library embeds no duplicate textures`);
+  assert.equal((gltf.skins || []).length, 1, `${faction} death library retains its canonical skeleton`);
+  assert.deepEqual(gltf.animations.map(animation => animation.name), expectedDeathClips.map(id =>
+    `Animation_${faction}_${id}_V1`), `${faction} has four ordered collapse candidates`);
+  const durations = gltf.animations.map(animation => Math.max(...animation.samplers.map(sampler =>
+    gltf.accessors[sampler.input].max?.[0] || 0)));
+  assert.ok(durations.every(duration => duration >= 2.6 && duration <= 3.2),
+    `${faction} collapse clips keep their authored fall and settle timing`);
+  assert.ok(gltf.animations.every(animation => animation.channels.length >= 150),
+    `${faction} collapse candidates animate the complete body`);
+}
+
 for (const model of manifest.models) {
   const factionStem = model.faction === "ija" ? "Ija" : "Nra";
   assert.equal(model.animationSource, `Lugou${factionStem}Canonical`,
@@ -256,6 +276,18 @@ const bakePowerShell = fs.readFileSync(path.join(here, "_import", "Script_BakeLu
 assert.match(runtime, /options\.protagonist\s*&&\s*faction\s*===\s*"nra"[\s\S]*?\?\s*CHARACTER_PROTAGONIST_VARIANT/,
   "protagonist selects the approved default");
 assert.match(runtime, /HashString\(`\$\{faction\}:\$\{options\.seed/, "stable faction variant selection");
+assert.match(runtime, /DEATH_COLLAPSE_CLIP_IDS = Object\.freeze\(\[[\s\S]*?DeathCollapseA[\s\S]*?DeathCollapseD/,
+  "runtime exposes exactly four shared death candidates");
+assert.match(runtime, /HashString\(`\$\{seed\}\|death-collapse`\) % DEATH_COLLAPSE_CLIP_IDS\.length/,
+  "death candidate selection is random-looking but replay-stable per actor seed");
+assert.match(runtime, /Animation_Lugou\$\{name\}DeathCollapse\.glb/,
+  "NRA and IJA load their matching canonical death library");
+assert.match(runtime, /clampWhenFinished = true;[\s\S]*?action\.setLoop\(THREE\.LoopOnce, 1\)/,
+  "collapse candidates play once and retain their settled terminal pose");
+assert.match(actor, /dt \/ \(this\.ragdollState\.duration \|\| \.8\)/,
+  "actor death timing follows the selected imported clip");
+assert.match(actor, /if \(rag\.riggedDeath\)[\s\S]*?this\.characterRig\.PoseDeath\(t\)/,
+  "rigged soldiers use the imported collapse instead of the procedural fall");
 assert.match(runtime, /Raycast\(origin, direction, maxDistance\)/, "bone hitbox raycast exists");
 assert.match(runtime, /CHARACTER_HITBOX_PROFILE/, "model-calibrated character hitbox profile exists");
 assert.match(hitboxProfile, /export const CHARACTER_HITBOX_PROFILE = Object\.freeze\(\[/,
@@ -308,6 +340,15 @@ assert.match(actor, /CreateLugouCharacterRig\([\s\S]*?this\.library/,
   "actor factory passes the shared material library to imported characters");
 assert.match(runtime, /normalDepthMaxDistance\s*=\s*NORMAL_DEPTH_DETAIL_MAX_DISTANCE/,
   "only small distant skinned parts use a NormalDepth distance LOD");
+// 2026-09-16：three 的 SkinnedMesh 包围球只按首次剔除时的姿势算一次；坐着的人
+// 眼球（半径 4 cm）的球还在站姿位置，贴近脸时整块被视锥剔掉。
+assert.match(runtime, /this\.mixer\.setTime\([^\n]*\n\s*ShareSkinnedCullSphere\(this\.root, skinnedParts/,
+  "every skinned part shares one padded, pose-independent culling sphere set after the spawn pose");
+assert.match(runtime, /union\.radius \+= SKINNED_CULL_MARGIN_METERS[\s\S]*?mesh\.boundingSphere = union\.clone\(\)/,
+  "the shared culling sphere is padded for crouched, seated and fallen poses");
+assert.match(fs.readFileSync(path.join(here, "Script_CharacterWounds.mjs"), "utf8"),
+  /const cullSphere=candidate\.boundingSphere;[\s\S]*?candidate\.boundingSphere=cullSphere/,
+  "wound raycasts restore the shared culling sphere instead of freezing the hit pose");
 assert.match(editor, /GetLugouAnimationEntries/, "editor reads role-filtered imported clips");
 assert.match(editor, /IsLugouAnimationAllowed\(actor\.kind, this\.clipId\)/,
   "editor rechecks every lineup actor before playing an imported clip");

@@ -8,6 +8,7 @@
 //   · 东关巷路     Data_Tengxian.EAST_SUBURB.mapLanes
 //   · 西关/北关大街 Data_Tengxian.WEST_SUBURB.westStreet / NORTH_SUBURB.street
 //   · 津浦铁路     Data_Tengxian.WEST_SUBURB.railway 与 OUTFIELD_SCENES[*].railway
+//   · 第一关铁路   Data_FirstLevelMissionLayout.MISSION_RAILWAY（当前白盒布局的 railway spec）
 //   · 城外大车路   Script_TengxianOutfield.OUTFIELD_SCENES[*].roads.points
 //   · 东关寨墙     Data_Tengxian.EAST_SUBURB.zhaiWall（x/fromZ/toZ —— 轴对齐格式）
 //   · 北关坝墙     Data_Tengxian.NORTH_SUBURB.stockade（z/fromX/toX —— 轴对齐格式）
@@ -45,7 +46,7 @@ import {
 } from "./Data_Tengxian.mjs";
 import { OutfieldSpec } from "./Script_TengxianOutfield.mjs";
 import { MakeRoadPath } from "./Script_RoadPath.mjs";
-import { BuildRoadRibbon, BuildRailBed, MakeCrownProfile } from "./Script_RoadSpline.mjs";
+import { BuildRoadRibbon, BuildRailBed, BuildRailwayFromSpec, MakeCrownProfile } from "./Script_RoadSpline.mjs";
 import {
   BuildWallSpline, WALL_PRESETS, WallPreset, SetWallPresetOverride, MakeWallAssetSet,
 } from "./Script_WallSpline.mjs";
@@ -95,9 +96,22 @@ const PARAM_DEFAULTS = {
   collapseChance: 0, edgeCollapseChance: 0, coverEvery: 3, colliderMerge: 0,
 };
 
-/** 出厂路线表：把散在各处的道路/围墙数据统一读成控制点。 */
-export function CollectSceneSplineRoutes(levelId = null) {
+/**
+ * 出厂路线表：把散在各处的道路/围墙数据统一读成控制点。
+ * layout：当前白盒布局（第一关）。带 railway spec 的就列出那条铁路，预览走同一份 spec。
+ */
+export function CollectSceneSplineRoutes(levelId = null, layout = null) {
   const routes = [];
+  const lr = layout?.railway;
+  if (lr) {
+    routes.push({
+      key: `whitebox:${layout.id}:railway`, id: lr.id, label: "第一关铁路（白盒）", kind: "railway",
+      source: "Data_FirstLevelMissionLayout.MISSION_RAILWAY（points；断面 crown/bed/sleeper/rail）",
+      seed: lr.id, width: lr.bed.topHalf * 2, lift: lr.crown.lift,
+      points: lr.points.map((p) => [p[0], p[1]]), axisLocked: false,
+      railway: lr,
+    });
+  }
   for (const s of STREETS) {
     routes.push({
       key: `city:${s.id}`, id: s.id, label: s.label || s.id, kind: "street",
@@ -279,7 +293,7 @@ export class SplineEditor {
   }
 
   Collect() {
-    const routes = CollectSceneSplineRoutes(this.levelId);
+    const routes = CollectSceneSplineRoutes(this.levelId, this.host.game.battlefield?.layout);
     for (const route of routes) {
       const o = this.overrides[route.key];
       if (!o) continue;
@@ -904,7 +918,10 @@ style=${preset.style}`,
     // 抬 0.04 盖在现路上；深度上的错开靠 polygonOffset，不靠这点高差
     const groundAt = (x, z) => this.GroundAt(x, z) + 0.04;
     try {
-      if (route.kind === "railway") {
+      if (route.railway) {
+        // 数据驱动的铁路：与建关同一条 BuildRailwayFromSpec，只把控制点换成面板里拖过的
+        BuildRailwayFromSpec(collector, { ...route.railway, points: route.points }, { groundAt });
+      } else if (route.kind === "railway") {
         const crown = MakeCrownProfile(path, {
           groundAt, step: 4, smooth: route.lift < 1 ? 4 : 0, lift: route.lift ?? 1.35,
         });

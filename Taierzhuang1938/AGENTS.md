@@ -12,6 +12,7 @@
 - 当前空间拓扑按 Notion `2026.09.14` 章节实现，入口见 [空间与流程重构](docs/Data_FirstLevelTopologySeptember14.md)。后半关坐标、折线路径、接收院区域集中在 `Data_FirstLevelMissionTopology.mjs`；转弯路段进度按路线投影判断，不能用单一 X/Z 坐标比较替代。空间变化追加拓扑规则与真实物理通行检查。
 - 2026-09-14 后续用户修订：04 机枪可选，以击退日军和守军撤回为条件；05 北侧曲折匍匐沟、补给屋及返回断履带；06 接令后经黑屏文字直接抵达 07 村口，替代旧 75 秒南行。数据与验收见 [前沿出击与护送转场](docs/Data_FirstLevelFrontSortie.md)，此前 Notion 表格及验收记录不覆盖这次修订。
 - 04 机枪点位有一场关中过场《空地上的三个人》：玩家第一次走进枪位时播一次，事实 `captivesWitnessed` 随检查点持久化，走装配层的 `PlayMidCutscene`（与关首过场同一条 RunCutscene）。分镜、触发、配音清单与验证入口见 [04 关中过场](docs/Data_MachineGunCaptivesCutscene.md)；改它的台词按上一条同步整段录音。
+- 第一关公开阶段 9（内部步骤 `Melee`）是屋内伏击：顺子带着老周的担架进屋被刺刀顶住 → 顶住的那几秒里两个抬担架的阵亡 → 连按 F → 还锁着的时候老周挨一刀（活下来）→ 才还控制权，罗班长随后带人进屋。四条事实的顺序（`ambushBroken` 必须排在 `zhouStabbed` 之后）、`ambush*` 数值出处、与配音／动作两包的接口和验收命令见 [屋内伏击](docs/Data_FirstLevelRoomAmbush.md)；这一步不新增阶段，通过条件仍只有 `meleeResolved`。
 - 第一关罗班长负责实体带路与停点等候，HUD 按 COD WWII / WaW 单人战役约定显示唯一跟随或任务标记；新增可重复短命令不能抢断剧情对白。编排、台词与验收见[罗班长任务引导](docs/Data_FirstLevelLeaderGuide.md)；原有战壕掩护门与搬运职责优先。
 - 正式菜单以 `Data_Menu.CAMPAIGN_ENTRIES` 为准：第一关可玩，第二关到终章为标注“未完成”的占位，点击提示“敬请期待”。旧序章及旧章节不恢复进菜单；`?phase=N` / `Debug.StartLevel` 只建原切片，不装旧剧本、摆点或换关。每次只建当前切片，换章拆除重建。
 - `?whitebox=p012-archive` 是旧 P0–P2 的开发回归夹具，旧资产与组件契约继续保留。旧任务表、旧 Notion 摘录和旧通关结果不能替代新版需求与验收；任务涉及哪条入口，就核对对应运行时及测试。新需求在当前任务授权范围内同步数据、消费方和文档，不按旧提案自行恢复已废弃内容。

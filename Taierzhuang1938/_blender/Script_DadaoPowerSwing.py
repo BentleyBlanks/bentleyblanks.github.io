@@ -1,7 +1,7 @@
 """Author one first-person Dadao downstroke through BlenderMCP.
 
-Only the existing Dadao attacks consume this curve. No third-person or rifle
-actions are generated. DADAO_PROJECT_ROOT points at the task checkout.
+One stroke plus guard compatibility for existing first-person Dadao actions.
+No third-person or rifle actions are generated. DADAO_PROJECT_ROOT is the task checkout.
 """
 from pathlib import Path
 import bpy, json, math
@@ -10,7 +10,7 @@ from mathutils import Vector, Matrix, Quaternion
 root = Path(globals()['DADAO_PROJECT_ROOT'])
 exportOnly = bool(globals().get('DADAO_EXPORT_ONLY', False))
 source = Path(bpy.data.filepath)
-assert source.parent.name == 'DadaoCleanChop_20260913'
+assert source.parent.name == 'DadaoGripChop_20260916'
 scene = bpy.context.scene
 scene.name = 'Scene_DadaoPowerSwing'
 scene.render.fps = 120
@@ -34,7 +34,8 @@ def Control(name):
 
 def Rotation(pitch, yaw=0, roll=0):
     theta = math.radians(pitch)
-    # -Z is the blade, -Y its cutting edge. The edge stays in the swing plane.
+    # -Z is the blade. The raw TZM's thin edge is +Y, corrected to -Y by
+    # modelRotation on the mesh only. The hands retain this authored basis.
     down = Vector((.30, .953939, 0)).normalized()
     blade = down * math.sin(theta) + Vector((0, 0, -math.cos(theta)))
     y = down * math.cos(theta) + Vector((0, 0, math.sin(theta)))
@@ -42,8 +43,8 @@ def Rotation(pitch, yaw=0, roll=0):
     x = y.cross(z).normalized()
     return Quaternion((0,1,0),math.radians(yaw)) @ Matrix((x, y, z)).transposed().to_quaternion() @ Quaternion((0,0,1),math.radians(roll))
 
-# Exact production YXZ resting basis, measured before FOV/depth compensation.
-baseRotation = Quaternion((0,1,0),-.62) @ Quaternion((1,0,0),.72) @ Quaternion((0,0,1),1.54)
+# Guard and the complete stroke share one cutting plane; no axial blade roll.
+baseRotation = Rotation(58)
 baseGrip = Vector((.235,-.195,-.520)) + baseRotation @ Vector((0,0,.030))
 grip = Control('Animation_DadaoGrip')
 blade = Control('Animation_DadaoBlade')
@@ -55,17 +56,17 @@ grip.rotation_mode = blade.rotation_mode = 'QUATERNION'
 
 # Grip first accelerates out of the shoulder; blade rotation catches up later.
 # Finish the downstroke in one plane, including its deceleration. Do not
-# yaw/roll the blade during contact or follow-through. Turn only on recovery.
+# yaw/roll the blade at any point, including guard, windup and recovery.
 keys = [
     (0.00, tuple(baseGrip), None, (0,0,0), (0,0,0)),
-    (0.14, (.220,-.110,-.450), 58, (.015,.040,.015), (.035,.040,.010)),
+    (0.14, (.220,-.110,-.450), 85, (.015,.040,.015), (.035,.040,.010)),
     (0.26, (.200,.005,-.415), 112, (.020,.070,.015), (.050,.075,.005)),
     (0.30, (.220,-.015,-.425), 76, (.005,.050,-.030), (.055,.060,-.025)),
     (0.36, (.105,-.185,-.545), 12, (-.015,.010,-.065), (.040,.020,-.060)),
     (0.43, (-.130,-.235,-.630), -35, (-.035,.010,-.045), (.015,.025,-.040)),
     (0.52, (-.170,-.240,-.620), -35, (-.030,.010,-.035), (.010,.030,-.030)),
-    (0.65, (-.100,-.220,-.590), (15,-25,-30), (-.025,.010,-.030), (.010,.030,-.030)),
-    (0.80, (.040,-.210,-.525), (35,-20,-15), (-.010,0,-.010), (.010,.010,-.010)),
+    (0.65, (-.100,-.220,-.590), 15, (-.025,.010,-.030), (.010,.030,-.030)),
+    (0.80, (.040,-.210,-.525), 35, (-.010,0,-.010), (.010,.010,-.010)),
     (1.00, tuple(baseGrip), None, (0,0,0), (0,0,0)),
 ]
 previousRotation = baseRotation.copy()
@@ -102,7 +103,15 @@ for frame in range(1,122):
     q=blade.rotation_quaternion.normalized() @ baseRotation.inverted()
     d=grip.location-baseGrip
     frames.append([round(x,7) for x in [*d,q.x,q.y,q.z,q.w,*right.location,*left.location,*rightPole.location,*leftPole.location]])
+for key,value in [('defensiveVideoRotationScale',.15),('defensivePoseRotationScale',0.0)]:
+    if not exportOnly or key not in scene:scene[key]=value
+scene['modelRotation']=[0.0,0.0,math.pi]
+scene['sourceEdgeDirection']=[0.0,1.0,0.0]
 data={'schema':1,'source':'BlenderDadaoPowerSwing','sourceArmLength':.57233826,
+      'modelRotation':list(scene['modelRotation']),
+      'sourceEdgeDirection':list(scene['sourceEdgeDirection']),
+      'defensiveVideoRotationScale':scene['defensiveVideoRotationScale'],
+      'defensivePoseRotationScale':scene['defensivePoseRotationScale'],
       'frameCount':121,'cutStart':.26,'cutEnd':.46,'frames':frames}
 (root/'Data_FpsDadaoSwing.mjs').write_text('// One Blender-authored Dadao stroke; see _blender/Script_DadaoPowerSwing.py.\nexport const FPS_DADAO_SWING = '+json.dumps(data,separators=(',',':'))+';\n',encoding='utf-8')
 for name,t in [('Guard',0),('Loaded',.26),('Contact',.36),('FollowThrough',.55),('Recovered',1)]:

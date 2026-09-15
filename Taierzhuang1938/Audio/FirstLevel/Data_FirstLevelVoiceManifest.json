@@ -991,7 +991,43 @@
       "speechRate": 0,
       "continuous": true,
       "mastering": "MonoBeforeLoudnessTruePeakMinus3"
+    },
+    "RoomAmbush": {
+      "file": "AudioVoice_FirstLevelRoomAmbush.mp3",
+      "seconds": 14.028,
+      "bytes": 169005,
+      "promptHash": "e02c571227fa29233989e00091be14ab162e664bd65b947f39d3408046006468",
+      "sha256": "eb00cf1f028a95f3dcbbe7d8728655dd698fddf851884869fad4a42b66021c67",
+      "lineCount": 4,
+      "requests": 1,
+      "speechRate": 0,
+      "continuous": true,
+      "mastering": "MonoBeforeLoudnessTruePeakMinus3"
+    },
+    "RoomAmbushBreak": {
+      "file": "AudioVoice_FirstLevelRoomAmbushBreak.mp3",
+      "seconds": 9.143,
+      "bytes": 110386,
+      "promptHash": "904a821c5b98b5662dcef308e10af223c6bac0c0278c226d93e03041585ee2f1",
+      "sha256": "a089c6a0e8119a9f756fd9b76733db9aa79a3639acd43da4492d8b9c517cf7d2",
+      "lineCount": 3,
+      "requests": 1,
+      "speechRate": 0,
+      "continuous": true,
+      "mastering": "MonoBeforeLoudnessTruePeakMinus3"
+    },
+    "RoomAmbushCleared": {
+      "file": "AudioVoice_FirstLevelRoomAmbushCleared.mp3",
+      "seconds": 19.54,
+      "bytes": 235147,
+      "promptHash": "f7d32a1876566daea9bd8034a5a23a591516e98bf28032209926d3378addb93a",
+      "sha256": "e2cdfaf6ae818920f76e5bc53805aa8d47256996236312489acc43995fb74e32",
+      "lineCount": 4,
+      "requests": 1,
+      "speechRate": 0,
+      "continuous": true,
+      "mastering": "MonoBeforeLoudnessTruePeakMinus3"
     }
   },
-  "updatedAt": "2026-09-14T20:41:24.086Z"
+  "updatedAt": "2026-09-15T03:05:52.317Z"
 }

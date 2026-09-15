@@ -7,11 +7,12 @@ import {MISSION_RETURN_ROUTES} from './Data_FirstLevelMissionReturn.mjs';
 import {FirstLevelMissionFlow} from './Script_FirstLevelMissionFlow.mjs';
 import {MissionRouteLength,MissionRouteProjection,MissionRouteNextIndex,MissionRouteBetween} from './Script_FirstLevelMissionColumn.mjs';
 import {SampleMissionTerrain} from './Data_FirstLevelMissionTerrain.mjs';
-// Notion rear stages plus the user's later September 14 front-sortie revision.
+// Notion rear stages plus the user's later September 14 front-sortie revision
+// and the September 15 corner attack at the shelter.
 const expected=[
  ['trainShelling'],
  ['trainStopped','trainDerailed','luoRescueComplete','unloadOrdersHeard','unloaded'],
- ['trenchEntered','trenchCleared','shelterReached','escapeWhisperHeard','woundedSeen','supportOrdersHeard','frontReached','frontContact','frontRifleDefense','rifleWithdrawalResolved','zhouGunWounded'],
+ ['trenchEntered','trenchCleared','shelterReached','shelterCornerHeld','escapeWhisperHeard','woundedSeen','supportOrdersHeard','frontReached','frontContact','frontRifleDefense','rifleWithdrawalResolved','zhouGunWounded'],
  ['frontAttackRepelled','guardWithdrawalResolved'],['bundleRouteTraversed','bundleTaken','tankImmobilized'],['ordersReached','volunteerHeard','zhouOnLitter'],
  ['southTransitionComplete','southTraversed'],['innerCourtReached'],['meleeResolved'],['villageGunSilent','courtyardGateOpen','courtyardPassed'],
  ['transferApproachReached','transferHopeHeard'],['transferArrived','vehiclesDeparted','transferAttacksResolved','zhouNext','followVehicleHeard'],

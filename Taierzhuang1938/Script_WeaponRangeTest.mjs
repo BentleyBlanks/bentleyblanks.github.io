@@ -434,6 +434,9 @@ try {
     else await route.continue();
   });
   await menuPage.locator('#menu .mnItem[data-act="exitSandbox"]').click({ noWaitAfter: true });
+  const exitConfirm = await menuPage.locator("#menu .mnConfirmTitle").textContent();
+  Check("Exit asks for confirmation before leaving the range", exitConfirm === "退出枪械靶场？" && exitUrl === null, { exitConfirm, exitUrl });
+  await menuPage.locator('#menu .mnConfirmItem[data-confirm="accept"]').click({ noWaitAfter: true });
   for (let attempt = 0; attempt < 20 && !exitUrl; attempt += 1) await menuPage.waitForTimeout(50);
   Check("Exit requests a clean main-menu URL", !!exitUrl && !new URL(exitUrl).searchParams.has("weapons") && !new URL(exitUrl).searchParams.has("range") && !new URL(exitUrl).searchParams.has("melee"), exitUrl);
   Check("Menu entry and exit preserve campaign progress", await page.evaluate(({ key, value }) => localStorage.getItem(key) === value, { key: progressKey, value: progressSeed }));

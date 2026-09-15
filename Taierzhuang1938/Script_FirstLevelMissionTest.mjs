@@ -22,7 +22,8 @@ import { FIRST_LEVEL_STAGES, ResolveFirstLevelStage, FirstLevelStageForStep } fr
 import { BuildFirstLevelCheckpoint } from "./Script_FirstLevelMissionCheckpoint.mjs";
 import { FirstLevelMissionColumn, MissionRouteNextIndex, MissionCarryRoutePoint, MissionGuideSpeed, MissionGuideRoute, MissionSquadRoute, MissionSquadPace } from "./Script_FirstLevelMissionColumn.mjs";
 import { MISSION_STAGES, MISSION_TUNING as R, FIRST_LEVEL_MISSION_PHASE, MISSION_TACTICS, MISSION_ENCOUNTERS, MISSION_PURSUIT_ROUTE } from "./Data_FirstLevelMission.mjs";
-import { MISSION_LAYOUT, MISSION_ROUTES, MISSION_ANCHORS as A, MISSION_PLACEMENT as P } from "./Data_FirstLevelMissionLayout.mjs";
+import { MISSION_LAYOUT, MISSION_ROUTES, MISSION_ANCHORS as A, MISSION_PLACEMENT as P, MISSION_RAILWAY, MISSION_SUPPLIES } from "./Data_FirstLevelMissionLayout.mjs";
+import { MakeRailwayProfile } from "./Script_RoadPath.mjs";
 import { MISSION_TERRAIN, SampleMissionTerrain, MissionPathDistance } from "./Data_FirstLevelMissionTerrain.mjs";
 import { CreateP012Terrain } from "./Data_FirstLevelP012Terrain.mjs";
 import { MISSION_DIALOGUE, MissionVoicePrompt } from "./Data_FirstLevelMissionDialogue.mjs";
@@ -731,6 +732,23 @@ assert.equal(FIRST_LEVEL_MISSION_PHASE.whitebox.fullMission, true);
 assert.ok(SampleMissionTerrain(135,90)>2.8 && SampleMissionTerrain(-204,90)>3.8,
   "Peripheral earth banks frame the plain through the same physical heightfield");
 console.log("ok shared terrain, excavated trenches, structural floors only");
+// The railway is a PCG spec on the shared heightfield, not boxes at an absolute height
+// (the old rails sat at y=0.76 over ~0 m soil and floated 0.7 m above their sleepers).
+{
+  assert.equal(MISSION_LAYOUT.railway, MISSION_RAILWAY, "the whitebox field builds the layout's railway spec");
+  assert.ok(!MISSION_LAYOUT.blocks.some(block => /^Rail(?:Sleeper)?-?\d/.test(block.id)), "no hand-placed rail or sleeper boxes");
+  const railway = MakeRailwayProfile(MISSION_RAILWAY, (x, z) => terrain.SampleHeight(x, z));
+  for (let s = 0; s <= railway.path.length; s += 1) {
+    const p = railway.path.At(s), soil = terrain.SampleHeight(p.x, p.z);
+    const railTop = railway.RailTopAt(s) - soil;
+    assert.ok(railTop > 0.2 && railTop < 0.42, `rail top stays low on the soil at z=${p.z.toFixed(1)}: ${railTop.toFixed(3)}`);
+  }
+  const wheels = MISSION_LAYOUT.blocks.filter(block => /^Station(?:Car\dWheel|EngineWheel)/.test(block.id));
+  assert.equal(wheels.length, 3 * 8 + 8, "every car and engine wheel is seated");
+  for (const wheel of wheels)
+    assert.ok(Math.abs(wheel.y - wheel.h / 2 - railway.RailTopNear(wheel.x, wheel.z)) < 0.01, `${wheel.id} stands on the rail top`);
+  console.log("ok railway is a low PCG track and the parked train stands on it");
+}
 const tacticalRoutes = Object.fromEntries(Object.entries(MISSION_TACTICS).map(([id, plan]) => [id,
   [Object.values(MISSION_ENCOUNTERS).flat().find(spec => spec.id === id), ...plan.points]]));
 for(const spec of [...MISSION_ENCOUNTERS.retreat,...MISSION_ENCOUNTERS.air])
@@ -763,7 +781,7 @@ for (const [name, route] of Object.entries({ ...MISSION_ROUTES, ...Object.fromEn
           Math.abs(dx*cosine-dz*sine) < box.w / 2 + 0.35 &&
           Math.abs(dx*sine+dz*cosine) < box.d / 2 + 0.35 &&
           box.y + box.h / 2 > y + 0.3 &&
-          box.y - box.h / 2 < y + ((name==="bundle"||name==="bundleReturn") && box.id.startsWith("BundleCrawl") ? .88 : 1.7);
+          box.y - box.h / 2 < y + (["bundle","bundleReturn","ordersRejoin"].includes(name) && box.id.startsWith("BundleCrawl") ? .88 : 1.7);
         assert.equal(
           blocked,
           false,
@@ -1325,7 +1343,7 @@ console.log("ok individual trench lanes, rounded corners, safe spacing and varia
 console.log("ok receiving-food release follows the source clock and survives pause/resume");
 
 {
-  assert.equal(MISSION_ENCOUNTERS.front.length+MISSION_ENCOUNTERS.machineGun.length+MISSION_ENCOUNTERS.approach.length+MISSION_ENCOUNTERS.surface.length+MISSION_ENCOUNTERS.intrusion.length+MISSION_ENCOUNTERS.tank.length,R.openingEnemyBudget,
+  assert.equal(MISSION_ENCOUNTERS.front.length+MISSION_ENCOUNTERS.machineGun.length+MISSION_ENCOUNTERS.approach.length+MISSION_ENCOUNTERS.surface.length+MISSION_ENCOUNTERS.intrusion.length+MISSION_ENCOUNTERS.shelterPursuit.length+MISSION_ENCOUNTERS.tank.length,R.openingEnemyBudget,
     "finite opening/front roster agrees with budget; no replacement waves");
   assert.equal(MISSION_ENCOUNTERS.machineGun.length,12,"the gun handover owns a separate finite attack");
   assert.ok(MISSION_ENCOUNTERS.machineGun.every(actor=>FrontAssaultLane(actor.x,actor.z).length>=3),"machine-gun attackers cross multiple physical bounds");
@@ -1346,6 +1364,29 @@ console.log("ok receiving-food release follows the source clock and survives pau
     const h=SampleMissionTerrain(point.x,point.z);
     assert.ok(h> -2 && h<-.8,"the breached sap remains a walkable excavated passage below surface fire: "+h);
   }
+  // User 2026-09-15: the "hold the corner" step has a real attack to hold against.
+  assert.equal(MISSION_STAGES.find(s=>s.id==="Shelter").requirements[0],"shelterCornerHeld","the breather waits for the corner to be held");
+  const cornerLane=[{x:-24,z:-23},{x:-24,z:-60}],mainTrench=MISSION_TERRAIN.trenches.find(t=>t.id==="FrontCommunication");
+  assert.ok(MISSION_ENCOUNTERS.shelterPursuit.length>=4&&OPENING.shelterPursuerGrenades>0);
+  for(const spec of MISSION_ENCOUNTERS.shelterPursuit){
+    assert.ok(spec.z<OPENING.woundedRoute[0].z,`${spec.id} follows the wounded man from the front, never from behind the player`);
+    assert.ok(SampleMissionTerrain(spec.x,spec.z)<-1.2,`${spec.id} starts on the excavated trench floor`);
+    const plan=MISSION_TACTICS[spec.id];
+    assert.ok(plan?.points.length>=3,`${spec.id} bounds physically toward the corner`);
+    for(const point of plan.points)assert.ok(SampleMissionTerrain(point.x,point.z)<-1.2,`${spec.id} stays in the trench at ${point.x},${point.z}`);
+    assert.ok(MissionPathDistance(plan.points.at(-1),cornerLane)<=mainTrench.bottom/2,`${spec.id} ends in the straight trench visible from the corner`);
+  }
+  assert.ok(MissionPathDistance(OPENING.shelterCorner,[OPENING.supportRoute[1],OPENING.supportRoute[2],OPENING.supportRoute[3]])<=mainTrench.bottom/2,
+    "the corner post stands on the trench floor");
+  const push=OPENING.shelterPush;
+  assert.ok(push.remaining<MISSION_ENCOUNTERS.shelterPursuit.length&&push.afterS>0,"the last men rush the corner before the attack can stall out of sight");
+  assert.ok(SampleMissionTerrain(push.point.x,push.point.z)<-1.2&&MissionPathDistance(push.point,cornerLane)<=mainTrench.bottom/2,"the rush point is open trench floor in view of the corner");
+  // The extra fight sits between the unloading and front crates, so the recess carries its own.
+  const shelterCrate=MISSION_SUPPLIES.find(s=>s.id==="Shelter");
+  assert.ok(shelterCrate&&SampleMissionTerrain(shelterCrate.x,shelterCrate.z)<-1.2,"the shelter crate stands on the recess floor");
+  assert.ok(Math.hypot(shelterCrate.x-OPENING.shelter.x,shelterCrate.z-OPENING.shelter.z)>R.interactionRangeM,"standing at the exchange does not put the crate under F");
+  for(const post of [...OPENING.shelterPosts,OPENING.woundedRoute.at(-1),OPENING.runnerRoute.at(-1)])
+    assert.ok(Math.hypot(shelterCrate.x-post.x,shelterCrate.z-post.z)>1.5,"the crate keeps clear of shelter posts and arrival points");
   const corner=[{x:0,z:0},{x:0,z:5},{x:5,z:5}],step=1.4/60;
   let before=MissionCarryRoutePoint(corner,3);
   for(let d=3+step;d<7;d+=step){
@@ -1356,6 +1397,335 @@ console.log("ok receiving-food release follows the source clock and survives pau
     before=at;
   }
   assert.deepEqual(MissionCarryRoutePoint(corner,10),{x:5,z:5,yaw:-Math.PI/2},"arrival position and hidden passage distance stay stable");
+}
+
+// ---------------------------------------------------------------------------
+// 屋内伏击（内部步骤 Melee）。编排是纯规则，这里逐拍驱动成功 / 失败两条路、
+// 配音事件驱动的老周那一刀、重放幂等与重试。口径：docs/Data_FirstLevelRoomAmbush.md
+// ---------------------------------------------------------------------------
+{
+  const {FirstLevelAmbush,AMBUSH_PHASES}=await import("./Script_FirstLevelMissionAmbush.mjs");
+  const {MISSION_ANCHORS,MISSION_PLACEMENT}=await import("./Data_FirstLevelMissionLayout.mjs");
+  const ids=MISSION_ENCOUNTERS.melee.map(spec=>spec.id);
+  assert.deepEqual(ids,["AmbushLead","AmbushRearA","AmbushRearB","AmbushFlank"],
+    "the room ambush replaces the old single tutor with the authored four");
+  assert.ok(MISSION_ENCOUNTERS.melee.every(spec=>spec.bayonet&&spec.weapon==="Type38"),
+    "every ambusher actually carries a fixed bayonet");
+  assert.ok(!Object.values(MISSION_ENCOUNTERS).flat().some(spec=>spec.id==="MeleeTutor"),
+    "no reference to the removed tutor remains in the roster");
+  // 三处死角都在屋里，并且真的被新加的遮挡挡住北门与触发点两条视线。
+  const room=MISSION_PLACEMENT.roomInterior;
+  for(const spec of MISSION_ENCOUNTERS.melee)
+    assert.ok(spec.x>room.minX&&spec.x<room.maxX&&spec.z>room.minZ&&spec.z<room.maxZ,"hide spot inside the room: "+spec.id);
+  const solids=MISSION_LAYOUT.blocks.filter(box=>box.solid!==false&&["AmbushWestScreen","AmbushCornerCrates","MeleeAlcoveScreen"].includes(box.id));
+  assert.equal(solids.length,3,"both new hide pieces are real solids");
+  const Blocked=(from,to)=>solids.some(box=>{
+    const steps=Math.ceil(Math.hypot(to.x-from.x,to.z-from.z)*8);
+    for(let i=0;i<=steps;i++){
+      const t=i/steps,x=from.x+(to.x-from.x)*t,z=from.z+(to.z-from.z)*t;
+      if(Math.abs(x-box.x)<box.w/2&&Math.abs(z-box.z)<box.d/2)return true;
+    }
+    return false;
+  });
+  const door={x:58,z:.5};
+  for(const id of ["AmbushRearA","AmbushRearB","AmbushFlank"]){
+    const spec=MISSION_ENCOUNTERS.melee.find(entry=>entry.id===id);
+    assert.ok(Blocked(door,spec),id+" is hidden from the north door");
+    assert.ok(Blocked(MISSION_ANCHORS.melee,spec),id+" is hidden from the trigger point");
+  }
+  assert.ok(Blocked(door,MISSION_ENCOUNTERS.melee[0]),"the lead is hidden from the north door by the existing alcove screen");
+  // 新加的两块不许堵住 x=58 的担架通道，也不许堵住两扇门的开口（56.1–59.9）。
+  for(const box of solids.filter(entry=>entry.id.startsWith("Ambush")))
+    assert.ok(box.x-box.w/2>59.9||box.x+box.w/2<56.1,"new cover clears both door openings and the stretcher lane: "+box.id);
+
+  const Fixture=(overrides={})=>{
+    const log=[],said=[],facts=new Set(),clips=[],victims=[];
+    const hooks={
+      Record:(id,detail)=>{if(facts.has(id))return false;facts.add(id);log.push({id,detail});return true;},
+      Has:id=>facts.has(id),
+      Say:(id,options)=>said.push({id,...options}),
+      Lock:seconds=>log.push({id:"lock",seconds}),
+      Unlock:()=>log.push({id:"unlock"}),
+      Wake:id=>log.push({id:"wake",who:id}),
+      PlayClip:(who,clipId)=>clips.push({who,clipId}),
+      Stab:()=>log.push({id:"stab"}),
+      HoldBind:seconds=>log.push({id:"hold",seconds}),
+      BeginQte:()=>{log.push({id:"qte"});return overrides.qte!==false;},
+      EndBind:()=>log.push({id:"endHold"}),
+      LookLitter:()=>log.push({id:"lookLitter"}),
+      ColumnCasualty:victim=>{victims.push(victim);return true;},
+      KnockDown:who=>log.push({id:"knockdown",who}),
+      Release:()=>log.push({id:"release"}),
+      SquadIn:()=>log.push({id:"squadIn"}),
+      Finish:()=>log.push({id:"finish"}),
+    };
+    return {ambush:new FirstLevelAmbush(hooks,R),log,said,facts,clips,victims};
+  };
+  const Step=(fixture,seconds,world)=>{
+    for(let t=0;t<seconds-1e-9;t+=1/60){
+      fixture.ambush.Update(1/60,{playerAlive:true,...world});
+      assert.ok(AMBUSH_PHASES.includes(fixture.ambush.Phase),"the beat never leaves its declared phases");
+    }
+  };
+  // 跑到某一拍为止（用来把「挣脱那一瞬」和它之后的秒表分开看）。
+  const StepUntil=(fixture,phase,world,limit=20)=>{
+    let seconds=0;
+    while(fixture.ambush.Phase!==phase&&seconds<limit){fixture.ambush.Update(1/60,{playerAlive:true,...world});seconds+=1/60;}
+    assert.equal(fixture.ambush.Phase,phase,"the beat reached "+phase+" within "+limit+"s");
+    return seconds;
+  };
+  const World=(over={})=>({litterAtDoor:true,leadAlive:true,leadDistanceM:3.6,qteActive:false,
+    qteSuccess:null,aliveCount:4,squadInside:false,playerAlive:true,...over});
+
+  // 0) 出生保护还在（刚重生 / 检查点重试 / 调试跳转）时绝不起这一拍：这一刀必须真的落上。
+  {
+    const f=Fixture();
+    Step(f,R.ambushProtectedWaitS-.2,World({playerProtected:true}));
+    assert.equal(f.ambush.Phase,"waiting","an invulnerable player is never stabbed by the script");
+    assert.equal(f.ambush.waited,0,"the litter wait does not tick away under spawn grace");
+    f.ambush.Update(1/60,World());
+    assert.equal(f.ambush.Phase,"lunge","the beat springs as soon as the grace is gone");
+  }
+  // 0b) 保护不许把任务卡死：超过上限照样起。
+  {
+    const f=Fixture();
+    Step(f,R.ambushProtectedWaitS+.4,World({playerProtected:true}));
+    assert.ok(f.ambush.Started,"an unbounded protection cannot deadlock the step");
+  }
+
+  // 1) 担架没到门口时最多等 ambushLitterWaitS，之后照样触发。
+  {
+    const f=Fixture();
+    Step(f,R.ambushLitterWaitS-.2,World({litterAtDoor:false}));
+    assert.equal(f.ambush.Phase,"waiting","the beat waits for the litter before springing");
+    Step(f,.4,World({litterAtDoor:false}));
+    assert.equal(f.ambush.Phase,"lunge","a late litter cannot stall the ambush forever");
+    assert.equal(f.facts.has("ambushTriggered"),true);
+  }
+
+  // 2) 成功那条路：触发 → 顶住 → 连按挣脱 → 班里人进屋 → 全部打死。
+  {
+    const f=Fixture();
+    f.ambush.Update(1/60,World());
+    assert.equal(f.ambush.Phase,"lunge");
+    assert.deepEqual(f.said.map(entry=>entry.id),["RoomAmbush"]);
+    assert.equal(f.said[0].urgent,true,"the ambush shout jumps the queue");
+    assert.deepEqual(f.log.filter(e=>e.id==="wake").map(e=>e.who),["AmbushLead","AmbushRearA","AmbushRearB"],
+      "the flanker stays hidden until the player breaks free");
+    assert.ok(f.clips.filter(c=>c.clipId==="AmbushRise").length===3);
+    // 扑到刺刀接触距离就捅，不等 ambushLungeMaxS。
+    Step(f,.5,World({leadDistanceM:3}));
+    assert.equal(f.ambush.Phase,"lunge");
+    f.ambush.Update(1/60,World({leadDistanceM:R.ambushBindReachM-.01}));
+    assert.equal(f.ambush.Phase,"pinned","the stab pins the player; the mash window has not opened yet");
+    assert.equal(f.facts.has("ambushStabbed"),true);
+    assert.ok(!f.log.some(e=>e.id==="qte"),"pressing F cannot count while he is only being held");
+    assert.ok(f.log.findIndex(e=>e.id==="stab")<f.log.findIndex(e=>e.id==="hold"),"the wound lands, then the hold");
+    assert.deepEqual(f.log.filter(e=>e.id==="hold").map(e=>e.seconds),[R.ambushPinHoldS]);
+    // 顶住那一段：连按窗口还没开，背景拍表在这里把两个抬担架的与幺娃放倒。
+    Step(f,R.ambushPinHoldS-.2,World());
+    assert.equal(f.ambush.Phase,"pinned","the hold really lasts ambushPinHoldS");
+    Step(f,.3,World());
+    assert.equal(f.ambush.Phase,"bind","the mash window opens once the hold is over");
+    assert.ok(f.log.findIndex(e=>e.id==="hold")<f.log.findIndex(e=>e.id==="qte"),"held first, then asked to mash");
+    Step(f,R.ambushRearBearerStabAtS,World({qteActive:true}));
+    assert.deepEqual(f.victims,["frontBearer","rearBearer"]);
+    assert.ok(f.log.some(e=>e.id==="knockdown"&&e.who==="yaowa"));
+    assert.equal(f.ambush.Phase,"bind","the beat is still inside the struggle window");
+    assert.ok(R.ambushRearBearerStabAtS<=R.ambushLungeMaxS+R.ambushPinHoldS
+      &&R.ambushYaowaDownAtS<=R.ambushLungeMaxS+R.ambushPinHoldS,
+      "both bearers and Yaowa go down while the player is pinned, before he is asked to mash");
+    // 结算：成功。连按到此为止，但控制权还不还 —— 老周那一刀还没落。
+    f.ambush.Update(1/60,World({qteActive:true,qteSuccess:true}));
+    f.ambush.Update(1/60,World({qteActive:false}));
+    assert.equal(f.ambush.Phase,"witness","the lock outlives the struggle until the litter is stabbed");
+    assert.equal(f.facts.has("ambushBroken"),false,"control cannot come back before Zhou takes the bayonet");
+    assert.ok(f.log.some(e=>e.id==="endHold"),"the bind pose ends with the struggle");
+    assert.ok(f.log.some(e=>e.id==="lookLitter"),"the locked look is pulled onto the litter for that blade");
+    assert.ok(!f.log.some(e=>e.id==="squadIn"),"Luo is not sent while the player is still held");
+    // 老周那一刀按兜底期限落下（没有配音事件时），落完才挣脱。
+    const lockedS=StepUntil(f,"broken",World({aliveCount:4}));
+    assert.ok(f.ambush.story<=R.ambushLockMaxS,"the whole locked take fits the control-lock fallback: "+f.ambush.story);
+    assert.ok(lockedS>1,"the wait for the blade is real, not a same-frame release");
+    assert.deepEqual(f.victims,["frontBearer","rearBearer","zhou"]);
+    assert.equal(f.facts.has("zhouStabbed"),true);
+    assert.equal(f.log.find(e=>e.id==="zhouStabbed").detail.health,R.ambushZhouHealthAfter);
+    assert.equal(f.ambush.Phase,"broken");
+    assert.ok(f.log.findIndex(e=>e.id==="zhouStabbed")<f.log.findIndex(e=>e.id==="ambushBroken"),
+      "the player watches Zhou take the bayonet, and only then breaks free");
+    assert.equal(f.log.filter(e=>e.id==="unlock").length,1,"control comes back exactly once");
+    assert.deepEqual(f.log.find(e=>e.id==="ambushBroken").detail,{qte:"success"});
+    assert.deepEqual(f.said.map(entry=>entry.id),["RoomAmbush","RoomAmbushBreak"]);
+    assert.ok(f.log.some(e=>e.id==="release"));
+    // 班里人按 ambushSquadDelayS 进来（从挣脱那一刻起算）。
+    Step(f,R.ambushSquadDelayS-.3,World({aliveCount:4}));
+    assert.ok(!f.log.some(e=>e.id==="squadIn"),"the squad does not teleport in instantly");
+    Step(f,.5,World({aliveCount:4}));
+    assert.ok(f.log.some(e=>e.id==="squadIn"));
+    assert.equal(f.facts.has("ambushSquadArrived"),false,"arrival is recorded by a body in the room, not by a timer");
+    f.ambush.Update(1/60,World({aliveCount:4,squadInside:true}));
+    assert.equal(f.facts.has("ambushSquadArrived"),true);
+    // 还有活人就绝不结算。
+    f.ambush.Update(1/60,World({aliveCount:1,squadInside:true}));
+    assert.equal(f.facts.has("meleeResolved"),false,"one surviving ambusher still blocks the step");
+    f.ambush.Update(1/60,World({aliveCount:0,squadInside:true}));
+    assert.equal(f.ambush.Phase,"resolved");
+    assert.equal(f.log.find(e=>e.id==="meleeResolved").detail.sharedCombat,true,"the existing shared-combat detail survives");
+    assert.deepEqual(f.said.map(entry=>entry.id),["RoomAmbush","RoomAmbushBreak","RoomAmbushCleared"]);
+    assert.ok(f.log.some(e=>e.id==="finish"));
+    // 重放幂等：再跑十秒不许多记一条事实、多喊一句。
+    const before={log:f.log.length,said:f.said.length,victims:f.victims.length};
+    Step(f,10,World({aliveCount:0,squadInside:true}));
+    assert.deepEqual({log:f.log.length,said:f.said.length,victims:f.victims.length},before,"a resolved beat replays nothing");
+  }
+
+  // 3) 失败那条路：连按没顶住也照样挣脱，控制权照样还回来 —— 但同样等老周那一刀落完。
+  {
+    const f=Fixture();
+    f.ambush.Update(1/60,World());
+    f.ambush.Update(1/60,World({leadDistanceM:1}));
+    assert.equal(f.ambush.Phase,"pinned");
+    Step(f,R.ambushPinHoldS+.1,World());
+    assert.equal(f.ambush.Phase,"bind");
+    Step(f,R.ambushQteWindowS,World({qteActive:true}));
+    f.ambush.Update(1/60,World({qteActive:true,qteSuccess:false}));
+    f.ambush.Update(1/60,World({qteActive:false}));
+    assert.equal(f.ambush.Phase,"witness","a failed struggle waits for the blade just the same");
+    Step(f,R.ambushZhouStabAtS,World());
+    assert.equal(f.ambush.Phase,"broken","the player always breaks free");
+    assert.ok(f.log.findIndex(e=>e.id==="zhouStabbed")<f.log.findIndex(e=>e.id==="ambushBroken"));
+    assert.deepEqual(f.log.find(e=>e.id==="ambushBroken").detail,{qte:"failure"});
+    assert.equal(f.log.filter(e=>e.id==="unlock").length,1);
+  }
+
+  // 4) 连按窗口至少要看得见：QTE 没能开起来也不许同一帧松开。
+  {
+    const f=Fixture({qte:false});
+    f.ambush.Update(1/60,World({leadDistanceM:1}));
+    f.ambush.Update(1/60,World({leadDistanceM:1}));
+    assert.equal(f.ambush.Phase,"pinned");
+    Step(f,R.ambushPinHoldS-.2,World());
+    assert.equal(f.ambush.Phase,"pinned");
+    Step(f,.3,World());
+    assert.equal(f.ambush.Phase,"bind","the window still opens even when the shared QTE refuses");
+    Step(f,R.ambushBindMinS-.2,World());
+    assert.equal(f.ambush.Phase,"bind");
+    Step(f,.3,World());
+    assert.equal(f.ambush.Phase,"witness");
+    Step(f,R.ambushZhouStabAtS,World());
+    assert.equal(f.ambush.Phase,"broken");
+    assert.deepEqual(f.log.find(e=>e.id==="ambushBroken").detail,{qte:"none"});
+  }
+
+  // 5) 配音事件驱动老周那一刀：早于兜底期限到达时按事件走，只落一次；
+  //    早到的那一刀也就是早一点的挣脱 —— 连按一结束就还控制权，不再干等兜底期限。
+  {
+    const f=Fixture();
+    f.ambush.Update(1/60,World());
+    f.ambush.Update(1/60,World({leadDistanceM:1}));
+    Step(f,1,World({qteActive:true}));
+    assert.equal(f.ambush.ZhouPending,true,"the man who stabs Zhou is still performing");
+    assert.equal(f.ambush.CueZhouStab(),true);
+    assert.ok(f.victims.includes("zhou"));
+    assert.equal(f.log.find(e=>e.id==="zhouStabbed").detail.cue,true);
+    assert.equal(f.ambush.ZhouPending,false);
+    assert.equal(f.ambush.CueZhouStab(),false,"the cue can only land the blade once");
+    const victims=f.victims.length;
+    Step(f,R.ambushPinHoldS+R.ambushBindMinS+.4,World({qteActive:false}));
+    assert.equal(f.ambush.Phase,"broken","an early blade means an early release, not an extra wait");
+    Step(f,R.ambushZhouStabAtS+1,World({qteActive:false}));
+    assert.equal(f.victims.filter(v=>v==="zhou").length,1,"the fallback deadline never repeats the cue-driven stab");
+    assert.ok(f.victims.length>=victims);
+  }
+
+  // 6) 领头那个被打死：不管是在扑过来的路上还是在顶住的时候，都直接还控制权。
+  {
+    const f=Fixture();
+    f.ambush.Update(1/60,World());
+    f.ambush.Update(1/60,World({leadAlive:false}));
+    assert.equal(f.ambush.Phase,"broken");
+    assert.equal(f.facts.has("ambushStabbed"),false);
+    assert.equal(f.log.filter(e=>e.id==="unlock").length,1,"a dead lead still returns control");
+    const held=Fixture();
+    held.ambush.Update(1/60,World());
+    held.ambush.Update(1/60,World({leadDistanceM:1}));
+    assert.equal(held.ambush.Phase,"pinned");
+    held.ambush.Update(1/60,World({leadAlive:false}));
+    assert.equal(held.ambush.Phase,"broken","nobody is left holding him");
+    assert.ok(held.log.some(e=>e.id==="endHold"),"the bind pose is dropped with the lock");
+    assert.equal(held.log.filter(e=>e.id==="unlock").length,1);
+  }
+
+  // 7) 重试：挣脱之后死掉的那次接着跑，不重放背景拍表。
+  {
+    const f=Fixture();
+    f.ambush.Update(1/60,World());
+    f.ambush.Update(1/60,World({leadDistanceM:1}));
+    Step(f,R.ambushPinHoldS+.2,World());
+    Step(f,R.ambushRearBearerStabAtS,World({qteActive:true}));
+    f.ambush.Update(1/60,World({qteActive:true,qteSuccess:true}));
+    f.ambush.Update(1/60,World({qteActive:false}));
+    Step(f,R.ambushZhouStabAtS,World());
+    assert.equal(f.ambush.Phase,"broken");
+    const victims=f.victims.length,knocks=f.log.filter(e=>e.id==="knockdown").length;
+    f.ambush.ResumeBroken();
+    Step(f,20,World({aliveCount:2}));
+    assert.equal(f.victims.length,victims,"a checkpoint retry does not kill the bearers twice");
+    assert.equal(f.log.filter(e=>e.id==="knockdown").length,knocks,"nor knock Yaowa down again");
+    assert.ok(f.log.filter(e=>e.id==="squadIn").length>=1);
+    // 全新一次（还没挣脱就死了）：整拍从头来。
+    f.ambush.Reset();
+    assert.equal(f.ambush.Phase,"waiting");
+    f.ambush.Update(1/60,World());
+    assert.equal(f.ambush.Phase,"lunge","a full reset can trigger the beat again");
+  }
+  // 8) 担架队这一侧：伤亡、快照/还原、替补，以及检查点重建带得动新状态。
+  {
+    const column=new FirstLevelMissionColumn();
+    column.Activate();
+    const before=column.Snapshot();
+    const zhou=column.zhou;
+    assert.ok(zhou.bearers.every(h=>h>0)&&!zhou.stabbed);
+    assert.equal(column.AmbushCasualty("frontBearer"),true);
+    assert.equal(column.AmbushCasualty("rearBearer"),true);
+    assert.equal(column.AmbushCasualty("frontBearer"),false,"a dead bearer cannot die twice");
+    assert.equal(column.AmbushCasualty("zhou",{zhouHealth:R.ambushZhouHealthAfter}),true);
+    assert.equal(column.zhou.health,R.ambushZhouHealthAfter);
+    assert.equal(column.zhou.stabbed,true);
+    assert.equal(column.zhou.state,"fallen");
+    assert.equal(column.bearerCasualties.length,2,"both corpses land at their own grip positions");
+    assert.equal(new Set(column.bearerCasualties.map(body=>body.slot)).size,2);
+    // 快照/还原带得动新字段 —— 检查点重试就是靠这一条把担架队摆回门口的。
+    const wounded=column.Snapshot();
+    const replay=new FirstLevelMissionColumn();replay.Restore(wounded);
+    assert.equal(replay.zhou.stabbed,true);
+    assert.equal(replay.zhou.health,R.ambushZhouHealthAfter);
+    assert.deepEqual(replay.bearerCasualties,column.bearerCasualties);
+    column.Restore(before);
+    assert.ok(column.zhou.bearers.every(h=>h>0)&&!column.zhou.stabbed,"restoring the pre-ambush snapshot un-does the whole beat");
+    // 清完屋子之后叫替补：后队真的走过来接手，不是凭空补血。
+    column.Restore(wounded);
+    column.AmbushRecover();
+    assert.equal(column.zhou.state,"waiting");
+    for(let i=0;i<4000&&column.zhou.bearers.some(h=>h<=0);i++)column.Update(.1);
+    assert.ok(column.zhou.bearers.every(h=>h>0),"two replacement bearers physically reach the litter");
+    assert.equal(column.replacements,2);
+  }
+  // 9) 数值自洽：老周这一刀之后仍然活着，并且高于后面几级台阶。
+  assert.ok(R.ambushZhouHealthAfter>12&&R.ambushZhouHealthAfter<65,
+    "Zhou survives the belly wound but is worse off than at the orders post");
+  assert.ok(R.ambushStabDamage+R.ambushFailureExtraDamage+12<100,
+    "even a failed struggle leaves a full-health player alive");
+  // 这一拍的编排闸：连按窗口必须在老周那一声之前收尾，整段锁住时间必须放得进控制锁兜底。
+  const {MELEE_QTE_RULES:QTE}=await import("./Data_MeleeCombat.mjs");
+  assert.ok(R.ambushQteWindowS>=2&&R.ambushQteWindowS<=QTE.windowS,"the scripted window fits the shared QTE rule");
+  assert.ok(R.ambushLungeMaxS+R.ambushPinHoldS+R.ambushQteWindowS+QTE.resolveS<=R.ambushZhouStabAtS,
+    "the mash window ends at or before Zhou's cry — his stab has to land inside the lock");
+  assert.ok(R.ambushZhouStabAtS+R.ambushWitnessTailS<=R.ambushLockMaxS&&R.ambushLockMaxS<=9.5,
+    "the whole locked take fits inside the control-lock fallback and stays under ten seconds");
+  assert.ok(R.ambushWitnessTailS>=R.ambushClipLeadS,
+    "the blade is actually pulled back out before control returns");
+  console.log("ok room ambush: trigger gate, scripted stab, pinned hold, success/failure struggle, cue-driven litter stab before the release, squad entry, replay and retry");
 }
 
 {

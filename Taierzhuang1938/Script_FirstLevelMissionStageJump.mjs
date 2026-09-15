@@ -71,7 +71,11 @@ export function ApplyFirstLevelStageJump(runtime, value) {
   r.player.pitch = 0;
   if (n > 3) for (const [i,actor] of r.squad.entries()) {
     // Spread the squad at the checkpoint; do not leave them aboard the old train.
+    // 屋内伏击（阶段 9）：三个人在灶屋北门外掩护，只有幺娃跟着担架在屋门口。
+    const ambushPost = actor.castId === "yaowa" ? P.ambushYaowaPost
+      : P.ambushSquadPosts[["luo","heyoutian","liuwencai"].indexOf(actor.castId)];
     const point = n === 4 ? OPENING.frontPosts[i] : n <= 6 ? P.squadFrontPositions[i]
+      : n === 9 && ambushPost ? ambushPost
       : {x:spawn.x+(i%2?2.4:-2.4),z:spawn.z+3+Math.floor(i/2)*2.4};
     r.PlaceActor(actor,point); r.Defend(actor,point);
   }
@@ -79,7 +83,9 @@ export function ApplyFirstLevelStageJump(runtime, value) {
     r.tank.present = true; r.tank.active = true;
     r.tank.z = n >= 5 ? R.tankStopZ : R.tankFirstFireZ;
     r.tank.immobilized = n >= 6; r.tank.shots = 1;
-    r.column.zhou.health = n >= 15 ? saved.column.litters.find(l=>l.zhou).health : 65;
+    // 屋内伏击之后老周带着肚子上那一刀继续往南（阶段 10 起 ambushZhouHealthAfter）。
+    r.column.zhou.health = n >= 15 ? saved.column.litters.find(l=>l.zhou).health
+      : n >= 10 ? R.ambushZhouHealthAfter : 65;
   }
   // Spawn only live encounters at this checkpoint. Completed finite groups stay
   // in the ledger so later Enter callbacks cannot recreate defeated enemies.
@@ -99,12 +105,14 @@ export function ApplyFirstLevelStageJump(runtime, value) {
     }
   }
   if (n >= 8 && n <= 10) {
-    for (const actor of r.enemies.values()) {actor.missionDormant=false;actor.scriptedNoncombatant=false;}
-    r.tutor = r.enemies.get("MeleeTutor");
-    if (r.tutor) {
-      r.tutor.meleeTraining = {passive:false,strength:R.meleeStrength};
-      r.tutor.bayonetFixed = true; r.tutor.scriptedNoncombatant = n === 8;
+    // 村口那批照常醒；屋里伏击那一组保持藏着，等顺子真的进屋（阶段 10 里他们已经死光，
+    // FIRST_LEVEL_STAGE_ENCOUNTERS 根本不建这一组）。
+    for (const actor of r.enemies.values()) if (actor.missionEncounter !== "melee") {
+      actor.missionDormant=false;actor.scriptedNoncombatant=false;
     }
+    r.HideAmbushers();
+    if (n === 9) r.PostAmbushSquad();
+    if (n === 10) r.ambush.MarkResolved();
   }
   if (n >= 11) r.battlefield.OpenGate("MissionCourtyardGate");
   if (n >= 14) {

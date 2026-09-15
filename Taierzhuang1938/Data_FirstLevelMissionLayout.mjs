@@ -6,6 +6,32 @@ import { MISSION_TRAIN } from "./Data_FirstLevelMissionTrain.mjs";
 import { MISSION_DEFENSE_POSTS } from "./Data_FirstLevelMissionFortifications.mjs";
 import { P012_STATION_BLOCKS } from "./Data_FirstLevelP012Station.mjs";
 import { MISSION_TERRAIN, SampleMissionTerrain, MissionPathDistance, SampleMissionGroundColor } from "./Data_FirstLevelMissionTerrain.mjs";
+import { MakeRailwayProfile } from "./Script_RoadPath.mjs";
+// A low field line through the halt: two rails on sleepers on a shallow ballast
+// bed that follows the shared heightfield. Script_RoadSpline builds it from this
+// spec (whitebox field and the scene-spline editor preview alike); there are no
+// rail boxes at an absolute height. Rail top is ~0.3 m above the soil.
+export const MISSION_RAILWAY = Object.freeze({
+  id: "MissionRailway",
+  // North end stops at the foot of the 3 m field bank (z < -184) instead of climbing it.
+  points: Object.freeze([[-77, -186], [-77, MISSION_TRAIN.approachEndZ]]),
+  gauge: 1.435,
+  // Ballast top: soil smoothed over +/-24 m, then kept 0.06-0.18 m above the local soil.
+  crown: Object.freeze({ step: 4, smooth: 6, lift: 0.1, clampLo: 0.06, clampHi: 0.18 }),
+  bed: Object.freeze({ material: "railBallast", topHalf: 1.7, slope: 1.6, embed: 0.25, step: 4, chunkLen: 48 }),
+  sleeper: Object.freeze({ material: "timber", along: 0.22, h: 0.14, length: 2.5, lift: 0.02,
+    spacing: 0.75, jitter: 0.03, ryJitter: 0.02 }),
+  // Rail foot rests on the sleeper top (crown + 0.09).
+  rail: Object.freeze({ material: "metal", w: 0.08, h: 0.13, lift: 0.155, segLen: 12 }),
+});
+const railProfile = MakeRailwayProfile(MISSION_RAILWAY, SampleMissionTerrain);
+// Box wheels keep their authored top inside the underframe; the bottom stands on the rail top.
+function SeatOnRail(block) {
+  const top = block.y + block.h / 2, rail = railProfile.RailTopNear(block.x, block.z);
+  block.h = top - rail;
+  block.y = (top + rail) / 2;
+  return block;
+}
 const blocks = [],
   gates = [],
   surfaces = [];
@@ -82,7 +108,7 @@ for (let i = 0; i < 3; i++) {
   );
   surfaces.push(floor);
   for (const part of sourceCarParts) {
-    Block(
+    const block = Block(
       part.id.replace("StationCar0", id),
       -77 + part.x - sourceCarFloor.x,
       z + (part.z - sourceCarFloor.z) * lengthScale,
@@ -92,6 +118,7 @@ for (let i = 0; i < 3; i++) {
       part.semantic,
       { y: part.y - 0.08 },
     );
+    if (part.id.includes("Wheel")) SeatOnRail(block);
   }
   for (const side of [-1, 1]) {
     Block(
@@ -170,7 +197,7 @@ const sourceEngineFrame = P012_STATION_BLOCKS.find(
 for (const part of P012_STATION_BLOCKS.filter((block) =>
   block.id.startsWith("StationEngine"),
 )) {
-  Block(
+  const block = Block(
     part.id,
     -77 + part.x - sourceEngineFrame.x,
     58 + part.z - sourceEngineFrame.z,
@@ -180,11 +207,9 @@ for (const part of P012_STATION_BLOCKS.filter((block) =>
     part.semantic,
     { y: part.y },
   );
+  if (part.id.startsWith("StationEngineWheel")) SeatOnRail(block);
 }
-for (let z = -196; z < MISSION_TRAIN.approachEndZ; z += 3)
-  Block("RailSleeper" + z, -77, z, 4.5, 0.12, 0.3, "structure");
-for (const x of [-77.75, -76.25])
-  Block("Rail" + x, x, (MISSION_TRAIN.approachEndZ-197)/2, 0.1, 0.14, MISSION_TRAIN.approachEndZ+197, "structure", { y: 0.76 });
+// Sleepers and rails are not layout blocks: see MISSION_RAILWAY above.
 Block("SupplyTable", -68.5, 66, 2, 0.85, 1, "missionRoute");
 Room("UnloadingShed", -58, 85, 9, 9);
 Wall("BrokenStationWall", -68, 55, 9, 1.1, 0.65);
@@ -269,6 +294,15 @@ Room("ConnectedHouse", 58, 8, 12, 15, { northDoor: true, southDoor: true, eastWi
 // A real cupboard wall hides the bayonet soldier from the kitchen approach.
 // The passage at x=58 remains open, and a player who flanks can still shoot him early.
 Wall("MeleeAlcoveScreen", 61, 2.2, 4, 1.9, 0.35);
+// Two more hide spots for the room ambush (docs/Data_FirstLevelRoomAmbush.md).
+// The west screen runs north-south beside the west wall, so (53.6, 2.4) and (53.6, 4.6)
+// are behind it both from the north door (58, 0.5) and from the trigger point (58, 6).
+// The south-east crate stack covers (62.4, 14.3) from the same two eyes. Neither piece
+// touches the x=58 stretcher lane, the north door or the south door opening.
+Wall("AmbushWestScreen", 54.6, 3.5, 0.35, 1.9, 4.2);
+// 货箱堆要留得出一个人真的站得下的角落：南面到墙内侧 1.8 m，东面到墙内侧 0.3 m。
+// 留窄了出生点会被物理挤出屋外（实拍把侧翼那个顶到了 (60.5,16.5)）。
+Block("AmbushCornerCrates", 61.9, 12.6, 3, 1.7, 1.6, "cover");
 Room("MachineGunHouse", 43, 8, 12, 15, { northDoor: true, southDoor: true, eastWindow: true });
 Wall("CourtyardWest", 33, 25, 0.7, 2.5, 19);
 Wall("CourtyardEast", 72, 20, 0.7, 2.5, 28);
@@ -498,6 +532,9 @@ export const MISSION_ROUTES = Object.freeze({
   bundle: Sortie.route,
   bundleReturn: Sortie.route.slice(3).reverse(),
   orders: [Sortie.throw,{x:25,z:-110},Sortie.orders],
+  // The tank can be immobilized anywhere along the return trench, so the rally
+  // leg starts wherever the bundle run is; the squad already walks it this way.
+  ordersRejoin: [...Sortie.route.slice(3).reverse(),{x:25,z:-110},Sortie.orders],
   south: [
     { x: -36, z: -124 },
     { x: 0, z: -124 },
@@ -555,6 +592,20 @@ export const MISSION_PLACEMENT = Object.freeze({
     {x:-8+(i%2?1:-1),z:-92-Math.floor(i/2)*2.8},
   ]),
   kitchenInterior: {minX:53,maxX:63,minZ:-15,maxZ:-2},
+  // ConnectedHouse（58,8，12×15）的可站区域：墙心 x 52/64、z 0.5/15.5，墙厚 0.6。
+  // 伏击那一拍用它判断「班里人进屋了没有」。
+  roomInterior: {minX:52.6,maxX:63.4,minZ:1,maxZ:15},
+  // 罗班长、何有田、刘文财在灶屋北门内侧的掩护位（北墙 z=-16.5），让开 x=58 的担架通道。
+  // 贴着门口而不是门外十米：挣脱之后他们要在顺子被四个人围死之前跑进屋（实拍量过）。
+  ambushSquadPosts: [{x:55,z:-14.2},{x:61,z:-14.2},{x:58,z:-15.4}],
+  // 幺娃跟着担架，停在屋门口西侧。
+  ambushYaowaPost: {x:56.4,z:0.6},
+  // 挣脱之后三个人从灶屋穿进屋里的落点（都在 roomInterior 里，让开 x=58 的担架）。
+  ambushSquadEntry: [{x:56.4,z:4.6},{x:60.2,z:4.2},{x:57.4,z:8.6}],
+  // 从灶屋门口穿屋门进屋的折线；两道门都在 x 56.1–59.9 的开口上。
+  // 每个人再按 ambushSquadLanesM 错开一点，免得三个人在门口挤成一堆。
+  ambushSquadRoute: [{x:58,z:-8},{x:58,z:-3},{x:58,z:-0.4}],
+  ambushSquadLanesM: [-0.7,0.7,0],
   wardInterior: MISSION_RECEPTION_SPACE.ward,
   tankStart: { x: 36, z: -173 },
   tankTargets: [
@@ -571,6 +622,9 @@ export const MISSION_PLACEMENT = Object.freeze({
 });
 export const MISSION_SUPPLIES = Object.freeze([
   {id:"Unloading",x:-68.5,z:66,supportHeight:.85},
+  // 2026-09-15: the shelter corner is now a fight of its own, between the trench
+  // and the front crates. Kept on the recess floor, clear of its entry lane and posts.
+  {id:"Shelter",x:-34.2,z:-18.3,supportHeight:null},
   {id:"Front",x:-2.2,z:-124,supportHeight:null},
   {id:"Orders",x:Sortie.orders.x-1.5,z:Sortie.orders.z,supportHeight:null},
   {id:"Courtyard",x:50,z:33.05,supportHeight:null},
@@ -606,7 +660,9 @@ export const MISSION_LAYOUT = Object.freeze({
   SampleGroundColor: SampleMissionGroundColor,
   bounds: { minX: -205, maxX: 137, minZ: -258, maxZ: MISSION_TRAIN.approachEndZ },
   ground: { x: -34, z: (MISSION_TRAIN.approachEndZ-258)/2, w: 342, d: MISSION_TRAIN.approachEndZ+258, h: 1, y: -0.5, semantic: "ground" },
+  railway: MISSION_RAILWAY,
   semanticColors: {
+    railBallast: 0x5a5750,
     foliage: 0x68715f,
     timber: 0x746956,
     metal: 0x535b57,

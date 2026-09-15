@@ -137,6 +137,9 @@ try {
     else await route.continue();
   });
   await menuPage.locator('#menu [data-act="exitSandbox"]').click({ noWaitAfter: true });
+  assert.equal(await menuPage.locator('#menu .mnConfirmTitle').textContent(), '退出操作测试场？');
+  assert.equal(exitUrl, undefined, 'exit waits for the confirmation dialog');
+  await menuPage.locator('#menu .mnConfirmItem[data-confirm="accept"]').click({ noWaitAfter: true });
   for (let i = 0; i < 20 && !exitUrl; i++) await menuPage.waitForTimeout(50);
   assert.ok(exitUrl && !new URL(exitUrl).searchParams.has('movement'));
   evidence.menu = { entry, exitUrl, panelClickable: true, pauseHidesPanel: true };
