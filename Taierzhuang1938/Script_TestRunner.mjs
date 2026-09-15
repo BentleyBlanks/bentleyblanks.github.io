@@ -301,6 +301,8 @@ export const testDefs = {
     desc: "采样器预算：四档×gi 八轮正片，每个程序都链接成功且 sampler uniform ≤ MAX_TEXTURE_IMAGE_UNITS" },
   CsmTest: { file: "Script_CsmTest.mjs", timeoutMs: 15 * 60 * 1000,
     desc: "级联阴影 / PCSS / 接触阴影：逐级图与分割 / 纹素吸附 / 级间重叠 / 节流排班 / 痤疮比例 / 三张调试图" },
+  ShadowSkipTest: { file: "Script_ShadowSkipTest.mjs",
+    desc: "阴影烘焙子树跳过（纯 Node）：登记根只在烘那一刻藏、烘完/抛错都还原、三方早退不翻位、幂等、与外层包装叠加" },
   MaterialUpgradeTest: { file: "Script_MaterialUpgradeTest.mjs", timeoutMs: 15 * 60 * 1000,
     desc: "材质着色升级：视差位移随视角反号 / 距离淡出 / 微阴影压直射 / 细节法线淡入 / 布绒光与金属各向异性 / 皮肤散射红移 / 程序数稳态" },
   ExposureTest: { file: "Script_ExposureTest.mjs", timeoutMs: 30 * 60 * 1000,

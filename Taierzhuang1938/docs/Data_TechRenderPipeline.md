@@ -5108,6 +5108,20 @@ node Taierzhuang1938/Script_FrameProfileTest.mjs --tiers       # phase=2 的 dra
 4. **远级级联要不要剔近景人物**。§1S.10 第 1 条已核实 r185 的层剔除对阴影相机
    无效；可行的替代是烘远级那一帧临时改 `castShadow`，但它与 `Actor.SetShadowEnabled`
    每帧按距离改的那一位会打架，收益（约 51 个 draw）不值这个风险，先记在这儿。
+5. **阴影烘焙跳过「没有投影体」的子树**（2026-09-16，`Script_ShadowSkip.mjs`）。第 1 条说
+   「藏骨骼根会连手上的枪一起藏」，那是针对**还在投影**的近景人物；而 24 m 外
+   （`ACTOR_DETAIL.shadowM`）的人物已经被 `Actor.SetShadowEnabled(false)` 把子树里
+   每个网格（含枪）的 `castShadow` 关掉，整棵子树一个投影体都没有，却仍被阴影 pass
+   每帧递归两遍。现在 `SetShadowEnabled(false)` 顺手把根登记进 `SetShadowSkip`，
+   `InstallShadowSkip(renderer)`（Script_Main 在 renderer 建好后立刻装）在
+   `shadowMap.render` 那一刻把登记的可见根临时 `visible = false`，烘完立刻还原；
+   打开投影或 Dispose 时注销。别的 pass 与玩法代码看到的 visible 一个字不变。
+   转运点实测（`?whitebox=p012&missionStage=Transfer` 推进 60 s，三十来具任务骨架、
+   4241 个节点、登记 19 棵；同页开/关交替 6 轮×40 帧取中位，1920×1080 high，无头）：
+   阴影提交 CPU 8.09 → 4.43 ms（c0 4.15 → 2.36，c1/c2 各减半），draw 190 与三角
+   1.04 M 两边一字不差（烘的东西没变，只是不再走空子树）。纯 Node 回归
+   `Script_ShadowSkipTest.mjs`。**同页 A/B** 用 `Taierzhuang.shadowSkip.SetEnabled(false)`，
+   别拿两次开机的墙钟比（这台机器同一场景两次开机能差一倍）。
 
 ### 17.11 逐 pass 的 draw / 三角两列，与「GPU 读数是提交影子」的读法（2026-09-15）
 
