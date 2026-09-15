@@ -138,6 +138,28 @@ async function CaptureFocus(name,point) {
 // you the level got harder, not that the dice went badly.
 const ROUTE_RETRY_BUDGET = 2;
 
+/**
+ * 等一场关中过场播完（不按 Esc：这条测试要的就是「玩家坐着看完」的时序）。
+ * Route 的内循环自己会等；这一只给循环之外的按键动作用（上机枪、补弹、交互）。
+ */
+async function WaitOutCutscene(label) {
+  if (!(await page.evaluate(() => !!window.Tengxian.state.cutscene))) return false;
+  const id = await page.evaluate(() => window.Tengxian.state.cutscene);
+  console.log("CUTSCENE_WAIT", label, id);
+  for (let i = 0; i < 60; i += 1) {
+    await page.evaluate(() => {
+      const g = window.Tengxian;
+      g.Debug.Key("KeyW", false); g.Debug.Mouse(0, false); g.Debug.Mouse(2, false);
+      g.StepFrames(120, 1 / 60, false);
+    });
+    if (!(await page.evaluate(() => !!window.Tengxian.state.cutscene))) {
+      console.log("CUTSCENE_DONE", label, id);
+      return true;
+    }
+  }
+  throw new Error(`关中过场 ${id} 在 ${label} 处两分钟都没播完`);
+}
+
 async function Route(points, label, { fight = false, stance = "stand", sprint = false, crawl = false, rejoinRoute = null } = {}) {
   const rejoinTarget=points.at(-1);
   await page.evaluate(
@@ -177,6 +199,20 @@ async function Route(points, label, { fight = false, stance = "stand", sprint = 
           b.index++;
           continue;
         }
+        // 关中过场（04 机枪点位那一场）：玩家这时候没有控制权，什么键都递不进去。
+        // 像玩家一样等它播完 —— 松手、照常推帧、这一段不算进停滞计数
+        // （44 s 不动的话，下面那条「三个 chunk 没挪窝就算走不通」会把整条路判死）。
+        if (g.state.cutscene) {
+          g.Debug.Key("KeyW", false);
+          g.Debug.Mouse(0, false);
+          g.Debug.Mouse(2, false);
+          b.cutsceneFrames = (b.cutsceneFrames || 0) + 1;
+          b.cutscenes = b.cutscenes || {};
+          b.cutscenes[g.state.cutscene] = (b.cutscenes[g.state.cutscene] || 0) + 1;
+          g.StepFrames(1, 1 / 60, false);
+          b.frames++;
+          continue;
+        }
         const evading=crawl&&fight&&window.MissionInputDriver.EvadeGrenade();
         const foe = fight&&!evading ? window.MissionInputDriver.Target(crawl?28:90) : null;
         if(crawl&&!evading){
@@ -205,8 +241,10 @@ async function Route(points, label, { fight = false, stance = "stand", sprint = 
       g.Debug.Key("KeyW", false);
       g.Debug.Mouse(0, false);
       g.Debug.Mouse(2, false);
-      b.stalled =
-        Math.hypot(g.player.position.x - b.last.x, g.player.position.z - b.last.z) < 0.2 ? b.stalled + 1 : 0;
+      const chunkCutscene = b.cutsceneFrames || 0;
+      b.cutsceneFrames = 0;
+      b.stalled = chunkCutscene > 0 ? 0
+        : (Math.hypot(g.player.position.x - b.last.x, g.player.position.z - b.last.z) < 0.2 ? b.stalled + 1 : 0);
       b.last = { ...g.player.position };
       return {
         done:
@@ -221,6 +259,9 @@ async function Route(points, label, { fight = false, stance = "stand", sprint = 
         medical:{bleeding:g.player.bleeding,bandages:g.player.bandages,regenTo:g.player.bandageRegenTo},
         stage: g.Debug.FirstLevelMissionRuntime().flow.stage.id,
         stalled: b.stalled,
+        cutscene: g.state.cutscene,
+        cutsceneFrames: chunkCutscene,
+        cutscenesSeen: b.cutscenes || null,
         shots: g.state.playerShots,
         ammo: g.state.ammo,
         clips: g.state.clips,
@@ -308,6 +349,8 @@ async function Route(points, label, { fight = false, stance = "stand", sprint = 
   return result;
 }
 async function Interact() {
+  // 交互键在过场期间递不进去（见 WaitOutCutscene）。
+  await WaitOutCutscene("Interact");
   return page.evaluate(() => {
     const g = window.Tengxian,
       query = g.Debug.Interact();
@@ -633,6 +676,10 @@ try {
     }
     if(process.argv.includes("--march-only")){console.log("PASS shared squad march on the normal rebuilt opening");break campaignRun;}
     await JumpStage(4);
+    // 04 一进来玩家就站在机枪座上，也就是关中过场的触发圈里。等它播完再按 F ——
+    // 过场期间 InputRouter 是掐着的，这一下按下去会被整段吞掉，
+    // 症状是「F 没能占住机枪」而不是「过场出了问题」。
+    await WaitOutCutscene("MachineGunMount");
     await page.evaluate(() => {
       const g = window.Tengxian;
       g.Debug.Key("KeyF", true);
