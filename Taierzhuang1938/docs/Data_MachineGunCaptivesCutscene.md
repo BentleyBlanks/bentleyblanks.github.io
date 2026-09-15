@@ -128,6 +128,11 @@ IJA02(1) / IJA03(2)，全部取自 `Data_CharacterSelection` 的选模清单，`
   死亡回退到本阶段检查点不会重播。
 - **事实先记再播**：宿主 `PlayMidCutscene` 回 `null` 的三种情形（过场系统还没建起来、
   已经在播一场、正在换关）都是正常状态，记了事实就不会每帧重试，也不报错。
+- **调试跳转不播**：`ApplyFirstLevelStageJump` 跳到 04 或更后面时直接把
+  `captivesWitnessed` 记上。04 的起点就在机枪座上，也就是这一场的触发圈里，而跳转是
+  「把人放过去」不是「走过去」—— 与 `?phase=N` 只建场不装剧本同一口径。正常游玩
+  不受影响：走到枪位照样播。`Script_FirstLevelMissionBrowserTest --campaign` 的
+  `JumpStage` 在没有 `--stage-jumps` 时是空操作，所以那条整关回归走的仍然是正常触发。
 - **走宿主口**：`host.PlayMidCutscene(id)`（`Script_Main` 的 `PlayMidCutscene` →
   `RunCutscene`），与关首 / 关末过场同一条路：夺控制权、掐战斗输入、放指针锁、
   收枪、Esc 跳过并以卡片补出字幕、播完还回来。任务层只报「该播了」，不自己当导演。

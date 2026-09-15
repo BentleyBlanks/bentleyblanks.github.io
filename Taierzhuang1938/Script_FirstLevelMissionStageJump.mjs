@@ -19,6 +19,14 @@ export function ApplyFirstLevelStageJump(runtime, value) {
     r.voice.played.add(step.cue); r.voice.finished.add(step.cue);
   }
   r.flow.facts = new Set(saved.facts);
+  // Debug starts never play a mid-level cutscene. Phase 4 begins on the machine-gun
+  // seat, which is the trigger circle of CS_MachineGunCaptives, and a jump puts the
+  // player there instead of walking him in - the same rule as ?phase=N building the
+  // scene without installing the script. Normal play is untouched: walking into the
+  // circle still plays it (Script_FirstLevelMissionRuntime.UpdateCaptivesCutscene).
+  if (saved.index >= MISSION_STAGES.findIndex((step) => step.id === "MachineGun")) {
+    r.flow.facts.add("captivesWitnessed");
+  }
   r.flow.log = [{kind:"debugJump",id:saved.phase.id,number:n,time:0}];
   r.column.Restore(saved.column);
   if (n === 2) {
