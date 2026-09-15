@@ -409,12 +409,11 @@ try{
   await fs.writeFile(path.join(out,"Data_ShelterCorner.json"),JSON.stringify({...corner,time:cornerFight.t,health:cornerFight.health},null,2));
   assert.ok(corner.fired>=2,"the corner attack actually shoots at the shelter");
   assert.ok(!corner.aidStarted,"the breather does not start while the corner is under attack");
-  // The unchanged physical regroup deadline is separate from the current complete
-  // recordings. A late-arriving medic must not consume the dialogue's listen time.
   // Restock at the same crate after the fight: dressings spent at the corner are
   // otherwise missing on the front approach. Ordinary walk and held F; the crate's
   // own cooldown still applies. The recess voice may already start meanwhile.
-  const restock=await page.evaluate(()=>{const g=window.Tengxian;return g.player.bandages<2||g.state.clips<=2;});
+  // The corner costs about four clips; top back up to the count carried out of the trench.
+  const restock=await page.evaluate(()=>{const g=window.Tengxian;return g.player.bandages<2||g.state.clips<8;});
   if(restock){
     await Drive("ShelterRestock",[{x:shelterCrate.x+.6,z:shelterCrate.z-1.1}],{seconds:30});
     const taken=await page.evaluate(async realtime=>{
@@ -428,6 +427,8 @@ try{
     },realtime);
     console.log("SHELTER_RESTOCK",JSON.stringify(taken));
   }
+  // The unchanged physical regroup deadline is separate from the current complete
+  // recordings. A late-arriving medic must not consume the dialogue's listen time.
   await Drive("ShelterRegroup",[OPENING.shelter],{untilVoice:"ShelterAid",seconds:100});
   const shelterSpeechSeconds=await page.evaluate(async()=>{
     const {MISSION_DIALOGUE}=await import("./Data_FirstLevelMissionDialogue.mjs");
