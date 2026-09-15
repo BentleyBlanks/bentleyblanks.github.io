@@ -1,5 +1,33 @@
 # 第一人称大刀劈砍修订
 
+## 2026-09-16：固定刃向与灰白袖双手
+
+按用户要求，完整动作改为右上蓄势、大幅斜劈到身体左下，再沿同一切面回架。
+待机与动作控制器共用 `Rotation(58)` 的基准，不再在起手和回架额外翻刃。
+大刀独立实例化已修好的 `Model_FpsHanYangHands.glb` 灰白袖裸手，保持固定骨段，
+左右食指均使用握柄闭合姿势；原刀模、PBR、伤害和战斗时序保持不变。
+旧拨挡保留原位移、缩小继承的转腕量；推架和僵持保留推送位移并固定握刀角度，
+避免旧蓝袖侧转架势的旋转量叠到新握姿后产生超过 90° 的腕部折转。
+适配值由 Blender 场景属性导出到同一曲线表，没有新增动作片段。
+
+当前 BlenderMCP 工程：
+`C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\DadaoGripChop_20260916\Animation_DadaoGripChopStudio.blend`。
+控制轨及 121 帧实际灰白袖双臂回放均在此工程；以下重建步骤继续适用。
+专项同时检查完整动作的实际刀身切面、向左下的位移、灰白袖固定骨长模型接线，
+以及原有握点、腕角、回架与中断断言。
+
+实测轻斩刀尖有效段路径约 2.06 m，横向向左约 0.65 m、下落约 1.19 m；
+完整曲线切面偏转小于 0.00001°，最大腕角约 64.21°。
+游戏关键帧与 Blender 相机渲染均已查看；下文为历史记录，不代表当前仍采用旧蓝袖。
+
+本轮验证：42 项 quick、DadaoSwingTest、SprintMeleeTest、MotionVectorContractTest、
+MeleeQteTest 通过；MeleeAnimationTest 中全部 27 个大刀状态的屏内、握点和腕角
+均通过，最大腕角约 64.23°。全武器该项仍在 BayonetLight 的 0.02236 m 既有握点
+误差处失败，与本文下方历史基线一致；未放宽断言，也不报告全武器通过。
+本地 `_check_DadaoPower.html` 的正常播放、暂停和拖帧已实测。
+
+## 历史记录
+
 2026-09-13 使用 BlenderMCP 修正下劈中刀刃反复转向：删除原曲线 0.43／0.52
 关键姿势中的 yaw／roll，0.26–0.52 的下劈及减速随势保持同一切面；到回架段才
 转腕，回架的侧转幅度也减小。重新编排左肘连续轨迹以适配刀向，保留握点、骨长、
@@ -30,7 +58,7 @@
 
 ## 源工程与重建
 
-当前源工程为 `C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\DadaoCleanChop_20260913\Animation_DadaoCleanChop.blend`；9 月 12 日工程保留作历史备份。
+2026-09-13 源工程为 `C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\DadaoCleanChop_20260913\Animation_DadaoCleanChop.blend`；9 月 12 日工程保留作历史备份。
 它包含六条编辑控制轨（刀身、握点、双肩、双肘）、实际生产双臂的 53 根骨骼与大刀，贴图已打包。
 六条控制轨共同定义同一段劈砍，不代表六段动作。
 `_blender/Data_DadaoElbowPoles.json` 保存同一动作的连续肘向关键帧，重建脚本将其写入

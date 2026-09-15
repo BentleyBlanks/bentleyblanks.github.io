@@ -30,7 +30,11 @@ export function SampleMeleeFirstPerson(pose) {
   if(!pose)return null;
   const pair=Samples(MELEE_NRA_ANIMATIONS,pose);if(!pair)return null;
   const start=MELEE_NRA_ANIMATIONS.parts.length*7;
-  return Array.from({length:9},(_,i)=>THREE.MathUtils.lerp(pair.a[start+i],pair.b[start+i],pair.mix));
+  // Ground holds must retain their camera-facing lift; standing responses
+  // move the new guard with the arms instead of reusing the old wrist roll.
+  const fixedGuard=pose.clip.startsWith('Dadao') && !/^Dadao(Ground|GroundLose|Pressure)$/.test(pose.clip);
+  return Array.from({length:9},(_,i)=>THREE.MathUtils.lerp(pair.a[start+i],pair.b[start+i],pair.mix)
+    * (fixedGuard && i>=3 ? FPS_DADAO_SWING.defensivePoseRotationScale : 1));
 }
 /** Actual recovered wrist/shoulder/elbow tracks, sampled at gameplay phase time. */
 export function SampleMeleeVideo(pose, transition = true) {
@@ -62,7 +66,10 @@ export function SampleMeleeVideo(pose, transition = true) {
     // amplitude after a transition would also rescale its outgoing pose.
     if(!authored) {
       for(let j=0;j<3;j++)values[j]*=.45;
-      new THREE.Quaternion().slerp(rotation,.65).toArray(values,3);
+      // The old defensive wrist rotations were authored around the rolled
+      // blue-sleeve guard. Retain their travel with the new fixed-blade grip.
+      const rotationScale=pose.clip.startsWith('Dadao') ? FPS_DADAO_SWING.defensiveVideoRotationScale : 1;
+      new THREE.Quaternion().slerp(rotation,.65*rotationScale).toArray(values,3);
       for(let j=7;j<13;j++)values[j]*=.5;
       if(clip.source==='StaffThrustsV1') {values[1]*=.12/.45;values[2]*=.30/.45;}
     }

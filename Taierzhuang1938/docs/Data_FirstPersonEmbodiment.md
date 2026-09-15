@@ -49,7 +49,8 @@ MCP 使用独立实例与端口，不能在其他任务正在制作的场景中�
 
 ### 汉阳造手部与动作定位
 
-汉阳造与三八式共用 `Model/Model_FpsHanYangHands.glb`，按武器实例化独立骨架；其余武器继续使用原双臂。
+汉阳造、三八式、中正式与大刀共用 `Model/Model_FpsHanYangHands.glb`，按武器实例化独立骨架；其余武器继续使用原双臂。
+大刀的固定刃向与双手握柄工程见 [大刀劈砍修订](Data_DadaoPowerSwing.md)。
 该资产保持 bind pose 的前臂与手部骨段长度，不再将关节静止位移乘以 1.60。
 手部工程位于 `C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\HanYangHands_20260910\Animation_HanYangHands.blend`。
 本次接触微调的独立工程位于 `C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\HanYangHandContact_20260911\Animation_HanYangHands.blend`，

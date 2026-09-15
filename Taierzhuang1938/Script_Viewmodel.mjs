@@ -1585,6 +1585,7 @@ export class Viewmodel {
           this.armRigs.ZhongZheng=new FpsArmRig(riggedAssets.fpsHanYang,library);
           this.armRigs.HanYang=new FpsArmRig(riggedAssets.fpsHanYang,library);
           this.armRigs.Type38=new FpsArmRig(riggedAssets.fpsHanYang,library);
+          this.armRigs.Dadao=new FpsArmRig(riggedAssets.fpsHanYang,library);
         }
       } catch (error) {
         console.warn(`[Viewmodel] FPS 手臂实例化失败，退回旧手模：${String(error).slice(0, 180)}`);

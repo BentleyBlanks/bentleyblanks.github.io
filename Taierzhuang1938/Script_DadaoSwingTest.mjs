@@ -23,11 +23,13 @@ try{
   const {MELEE_WEAPONS}=await import('./Data_MeleeCombat.mjs');
   const {SampleMeleeVideo}=await import('./Script_MeleeAnimation.mjs');
   const {FPS_DADAO_SWING:stroke}=await import('./Data_FpsDadaoSwing.mjs');
+  const {FPS_ARM_POSES:poses}=await import('./Data_FpsArmPoses.mjs');
   const T=Taierzhuang,L=T.Debug.MeleeCombat;L.Select('DadaoOne');L.Pause(true);T.StepFrames(90,1/60,false);
   const v=T.viewmodel,r=v.riggedArms,bones=[];r.root.traverse(o=>{if(o.isBone)bones.push(o);});
   const result={clips:[],boneNames:bones.map(b=>b.name),sourceFrames:[]};
-  const guard=new THREE.Quaternion().setFromEuler(new THREE.Euler(.72,-.62,1.54,'YXZ'));
-  const normals=stroke.frames.slice(Math.ceil(stroke.cutStart*120),Math.floor(.52*120)+1)
+  if(r!==v.armRigs.Dadao||!r.fixedRestLengths)throw Error('Dadao must use the repaired fixed-length hands');
+  const guard=new THREE.Quaternion().setFromEuler(new THREE.Euler(...poses.Dadao.hip.weapon.rotation,'YXZ'));
+  const normals=stroke.frames
    .map(row=>new THREE.Vector3(1,0,0).applyQuaternion(guard).applyQuaternion(new THREE.Quaternion().fromArray(row,3)));
   result.cutPlaneDriftDeg=Math.max(...normals.map(normal=>THREE.MathUtils.radToDeg(normal.angleTo(normals[0]))));
   const Matrix=(o,relative)=>new THREE.Matrix4().multiplyMatrices(relative.matrixWorld.clone().invert(),o.matrixWorld).toArray();
@@ -41,7 +43,7 @@ try{
     const matrix=new THREE.Matrix4().multiplyMatrices(inverse,v.rig.group.matrixWorld);
     const tip=new THREE.Vector3(0,-.012074,-.626).applyMatrix4(matrix);
     const edge=new THREE.Vector3(0,-1,0).transformDirection(matrix);
-    frames.push({t:i/120,tip:tip.toArray(),edge:edge.toArray(),grip:Math.max(r.gripError.r,r.gripError.l),
+    frames.push({t:i/120,tip:tip.toArray(),edge:edge.toArray(),normal:new THREE.Vector3(1,0,0).transformDirection(matrix).toArray(),grip:Math.max(r.gripError.r,r.gripError.l),
      wrist:Math.max(r.wristBend.r,r.wristBend.l),wristPair:{...r.wristBend},right:P(r.bones.r.hand),left:P(r.bones.l.hand),
      upper:P(r.bones.r.upperArm),elbow:P(r.bones.r.forearm),leftElbow:P(r.bones.l.forearm),weapon:matrix.toArray()});
     if(exportSource&&action==='Light')result.sourceFrames.push({bones:bones.map(b=>Matrix(b,T.camera)),weapon:Matrix(v.rig.group,T.camera)});
@@ -73,6 +75,8 @@ try{
  const metrics=[];
  for(const clip of data.clips){
   for(const f of clip.frames){
+   const dot=f.normal.reduce((sum,n,i)=>sum+n*clip.frames[0].normal[i],0);
+   assert(Math.acos(Math.min(1,Math.max(-1,dot)))*180/Math.PI<.1,`${clip.action} ${f.t}: blade rolls out of its cutting plane`);
    assert(f.grip<=FPS_ARM_LIMITS.positionResidualM,`${clip.action}: grip ${f.grip}`);
    assert(f.wrist<=FPS_ARM_LIMITS.wristBendDeg+.01,`${clip.action} ${f.t}: wrist ${f.wrist} ${JSON.stringify(f.wristPair)}`);
   }
@@ -94,12 +98,14 @@ try{
   }
   alignment/=end-start;
   const vertical=clip.frames[start].tip[1]-clip.frames[end].tip[1];
+  const horizontal=clip.frames[start].tip[0]-clip.frames[end].tip[0];
+  assert(horizontal>.45,`${clip.action}: cut must travel from right to left ${horizontal}`);
   assert(travel>1.6,`${clip.action}: insufficient cut travel ${travel}`);
   assert(vertical>.85,`${clip.action}: not a descending cut ${vertical}`);
   assert(alignment>.75,`${clip.action}: cutting with the flat/spine ${alignment}`);
   assert(peak<35,`${clip.action}: excessive blade speed ${peak}`);
   assert(Dist(clip.frames[0].tip,clip.frames[120].tip)<.012,`${clip.action}: recovery does not return to guard`);
-  metrics.push({action:clip.action,travel,vertical,alignment,peak,wrist:Math.max(...clip.frames.map(f=>f.wrist))});
+  metrics.push({action:clip.action,travel,vertical,horizontal,alignment,peak,wrist:Math.max(...clip.frames.map(f=>f.wrist))});
  }
  assert(data.interruptionError<1e-6,'Interrupted cut changes amplitude');assert.deepEqual(errors,[]);
  assert(data.recoverySeekError<.001,`Recovery elbow changes with playback history: ${data.recoverySeekError} m`);
