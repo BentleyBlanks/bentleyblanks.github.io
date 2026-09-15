@@ -10,6 +10,8 @@
 //   node Taierzhuang1938/Script_ProfileCli.mjs --view=front --live --seconds=8
 //   node Taierzhuang1938/Script_ProfileCli.mjs --stage=14 --view=front --cpuprofile
 //   node Taierzhuang1938/Script_ProfileCli.mjs --print=Taierzhuang1938/_shots/Profile/Profile_x.json
+//   node Taierzhuang1938/Script_ProfileCli.mjs --view=front --live --seconds=8 --record --label=front
+//   node Taierzhuang1938/Script_ProfileCli.mjs --print=Taierzhuang1938/_shots/Profile/Profile_front.rec.json --frame=worst
 //
 //   --view=train|front|frontEast|x,y,z,yaw,pitch   机位（三个预设与 Script_FirstLevelFrameProbe 共用）
 //   --stage=<编号或 id>    第一关阶段跳转（docs/Data_FirstLevelStageJump.md 的 missionStage）
@@ -19,6 +21,9 @@
 //   --quality=high --width=3394 --height=1348    用户那台机器的窗口与画质
 //   --label=名字 --json=路径                      落盘（默认 _shots/Profile/Profile_<label>.json）
 //   --print=路径           只读回一份 JSON 打表，不起浏览器（面板的「导出快照 JSON」也能读）
+//   --record               另存整条逐帧录制 Profile_<label>.rec.json（面板「加载录制」能读回来逐帧翻）
+//   --frame=<帧号|worst>   与 --print=<录制文件> 连用：只看这一帧的表 + 时间轴（最长的 B/E 实例与 GPU 分段）
+//   --range=<a-b>          与 --print=<录制文件> 连用：只汇总帧号 a 到 b（面板「拖选一段」同一口径）
 //   --cpuprofile           CDP 采样剖析，另打「自身耗时前 40」
 //
 // ## 读数注意
@@ -32,7 +37,8 @@ import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
 import { MISSION_ANCHORS, PoseView, ParseCustomView, FoldProfile } from "./Script_FrameProbeViews.mjs";
-import { FormatSnapshot } from "./Script_ProfilerReport.mjs";
+import { FormatSnapshot, FormatFrameTimeline } from "./Script_ProfilerReport.mjs";
+import { RECORDING_FORMAT, FramesFromRecording, SummarizeFrames } from "./Script_Profiler.mjs";
 
 const project = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(project, "..");
@@ -45,6 +51,7 @@ const Arg = (key, fallback) => {
 const PRINT = Arg("print", "");
 if (PRINT) {
   const snapshot = JSON.parse(await fs.readFile(path.resolve(PRINT), "utf8"));
+  if (snapshot.format === RECORDING_FORMAT) { PrintRecording(snapshot); process.exit(0); }
   console.log(FormatSnapshot(snapshot));
   if (snapshot.cpuProfile) PrintCpuProfile(snapshot.cpuProfile);
   process.exit(0);
@@ -61,6 +68,7 @@ const quality = Arg("quality", "high");
 const width = Number(Arg("width", "3394"));
 const height = Number(Arg("height", "1348"));
 const CPU_PROFILE = argv.includes("--cpuprofile");
+const RECORD = argv.includes("--record");
 const custom = ["train", "front", "frontEast"].includes(viewArg) ? null : ParseCustomView(viewArg);
 if (!custom && !["train", "front", "frontEast"].includes(viewArg)) {
   console.error(`--view 只认 train / front / frontEast 或 "x,y,z,yaw,pitch"，收到：${viewArg}`);
@@ -68,6 +76,7 @@ if (!custom && !["train", "front", "frontEast"].includes(viewArg)) {
 }
 const outDir = path.join(project, "_shots", "Profile");
 const jsonPath = path.resolve(Arg("json", path.join(outDir, `Profile_${label}.json`)));
+const recordPath = jsonPath.replace(/\.json$/i, "") + ".rec.json";
 
 await fs.mkdir(path.dirname(jsonPath), { recursive: true });
 // ServeRoot(root, 0) 自己会避开 Chromium 拒连的受限端口（见它的 UNSAFE_PORTS 表），
@@ -121,8 +130,8 @@ try {
     await cdp.send("Profiler.start");
   }
   const run = LIVE
-    ? await page.evaluate(RunLive, { seconds })
-    : await page.evaluate(RunFrames, { frames });
+    ? await page.evaluate(RunLive, { seconds, record: RECORD })
+    : await page.evaluate(RunFrames, { frames, record: RECORD });
   if (cdp) {
     const { profile } = await cdp.send("Profiler.stop");
     cpuProfile = FoldProfile(profile, LIVE ? Math.max(1, run.summary.frames) : frames);
@@ -142,6 +151,9 @@ try {
     cpuProfile,
     errors,
   };
+  if (run.recording) {
+    await fs.writeFile(recordPath, JSON.stringify({ ...run.recording, label, view: viewArg, mode: snapshot.mode, ...meta }));
+  }
 } finally {
   await browser.close();
   server.close();
@@ -156,6 +168,7 @@ console.log(`机位 ${snapshot.view} ｜ ${snapshot.mode} ｜ 开机 ${(snapshot
 if (snapshot.cpuProfile) PrintCpuProfile(snapshot.cpuProfile);
 for (const error of errors) console.log(error);
 console.log(`saved ${jsonPath}`);
+if (RECORD) console.log(`saved ${recordPath}（逐帧录制：--print=<它> --frame=worst 看单帧时间轴，或面板「加载录制」）`);
 process.exit(errors.length ? 1 : 0);
 
 // ---------------------------------------------------------------------------
@@ -163,7 +176,7 @@ process.exit(errors.length ? 1 : 0);
 // ---------------------------------------------------------------------------
 
 /** StepFrames 推 N 帧；每帧让出一个 event-loop turn，GPU 的 TIME_ELAPSED 才收得回来。 */
-async function RunFrames({ frames }) {
+async function RunFrames({ frames, record }) {
   const g = window.Tengxian;
   g.state.menu = false;
   const prof = g.profiler;
@@ -181,12 +194,13 @@ async function RunFrames({ frames }) {
   }
   const summary = prof.Summary(3600);
   const census = prof.Census(g.scene);
+  const recording = record ? prof.ExportRecording() : null;
   prof.Disable();
-  return { summary, census, wallMs };
+  return { summary, census, wallMs, recording };
 }
 
 /** 真实 rAF：帧率与「浏览器侧」那一行只有这条路可信。 */
-async function RunLive({ seconds }) {
+async function RunLive({ seconds, record }) {
   const g = window.Tengxian;
   g.state.menu = false;
   const prof = g.profiler;
@@ -194,13 +208,60 @@ async function RunLive({ seconds }) {
   await new Promise((resolve) => setTimeout(resolve, seconds * 1000));
   const summary = prof.Summary(seconds);
   const census = prof.Census(g.scene);
+  const recording = record ? prof.ExportRecording() : null;
   prof.Disable();
-  return { summary, census, wallMs: seconds * 1000 };
+  return { summary, census, wallMs: seconds * 1000, recording };
 }
 
 // ---------------------------------------------------------------------------
 // Node 侧排版
 // ---------------------------------------------------------------------------
+
+/**
+ * 读回一份逐帧录制：默认汇总整条；--range=a-b 只汇总这一段；--frame=<帧号|worst> 只看一帧，
+ * 另打这一帧的时间轴（面板选中一帧看到的就是这些）。
+ */
+function PrintRecording(data) {
+  const frames = FramesFromRecording(data);
+  const flags = { timerAvailable: !!data.timerAvailable, loafAvailable: !!data.loafAvailable };
+  const frameArg = Arg("frame", "");
+  const rangeArg = Arg("range", "");
+  let rows = frames;
+  let record = null;
+  if (frameArg) {
+    if (frameArg === "worst") {
+      record = SummarizeFrames(frames, { ...flags, buckets: false }).worst;
+    } else {
+      record = frames.find((row) => row.id === Number(frameArg)) || null;
+    }
+    if (!record) {
+      const ids = frames.length ? `#${frames[0].id}–#${frames[frames.length - 1].id}` : "（空）";
+      console.error(`录制里没有这一帧：--frame=${frameArg}；录制帧号范围 ${ids}`);
+      process.exit(2);
+    }
+    rows = [record];
+  } else if (rangeArg) {
+    const match = /^(\d+)\s*-\s*(\d+)$/.exec(rangeArg);
+    if (!match) { console.error(`--range 写成 a-b（帧号），收到：${rangeArg}`); process.exit(2); }
+    const lo = Math.min(Number(match[1]), Number(match[2]));
+    const hi = Math.max(Number(match[1]), Number(match[2]));
+    rows = frames.filter((row) => row.id >= lo && row.id <= hi);
+  }
+  const summary = SummarizeFrames(rows, flags);
+  console.log(FormatSnapshot({
+    label: `${data.label || "录制"}${record ? ` · 第 #${record.id} 帧` : (rangeArg ? ` · 帧 ${rangeArg}` : "")}`,
+    rendererName: data.rendererName, canvas: data.canvas, postTarget: data.postTarget, when: data.when,
+    summary,
+  }));
+  if (record) {
+    console.log("");
+    console.log(FormatFrameTimeline(record, data.names || [], { top: Number(Arg("top", "25")) }));
+  } else {
+    console.log("");
+    console.log(`录制共 ${frames.length} 帧（#${frames[0]?.id ?? "—"}–#${frames[frames.length - 1]?.id ?? "—"}）；`
+      + "加 --frame=<帧号|worst> 看单帧时间轴，--range=a-b 只汇总一段。");
+  }
+}
 
 function PrintCpuProfile(cpuProfile) {
   console.log("");

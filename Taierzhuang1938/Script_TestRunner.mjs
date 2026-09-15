@@ -273,6 +273,7 @@ export const testDefs = {
     desc: "远景人群姿势层：站/跪/卧/跑步翻页/尸体各归各桶 + 像素级剪影变矮 + 提交量增量" },
   PropInstancingTest: { file: "Script_PropInstancingTest.mjs", desc: "外部布设实例化：逐像素无损 + 真省 draw call + 流送自洽" },
   ProfilerTest: { file: "Script_ProfilerTest.mjs", desc: "运行时性能剖析器：开关接线、CPU 子桶、GPU 分段与提交量、矩阵计数与钩子还原" },
+  ProfilerRecordingTest: { file: "Script_ProfilerRecordingTest.mjs", desc: "剖析器录制与回放：逐实例时间轴、暂停/接缝帧、按帧号汇总与尖峰、录制存读往返、命令行读录制（纯 Node）" },
   // 命令行剖析要真起一次浏览器把第一关建起来（与面板同一份汇总口径），
   // 墙钟受同机其他浏览器测试影响很大 —— 归 tier 2 的 perf 档，不进自动门禁。
   ProfileCliTest: { file: "Script_ProfileCliTest.mjs", timeoutMs: 25 * 60 * 1000,
@@ -517,7 +518,7 @@ export const domains = {
     //（UpdateFire / MoveSmokeSource），所以碰灯光或粒子的改动也要连着 FlareTest 跑。
     // 换人 / 某个人物模型号第一次进画面不许现编着色器：碰人物材质、着色器预热或
     // 远景人群层的改动要连着 RespawnShaderWarmTest 一起跑（真浏览器，约两分钟）。
-    tests: ["MuzzleFlashTest", "CharacterWoundsTest", "BloodEffectsTest", "BulletDecalPbrTest", "TestSceneLightingTest", "PostTest", "AutoQualityTest", "PostFrameGraphTest", "GtaoTest", "CsmTest", "ShadowSkipTest", "MaterialUpgradeTest", "SamplerBudgetTest", "SsrTest", "ClusteredLightsTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ActorDepthTest", "ActorBatchTest", "ActorCrowdTest", "PropInstancingTest", "PropPcgTest", "ProfilerTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest", "FlareTest", "RespawnShaderWarmTest"],
+    tests: ["MuzzleFlashTest", "CharacterWoundsTest", "BloodEffectsTest", "BulletDecalPbrTest", "TestSceneLightingTest", "PostTest", "AutoQualityTest", "PostFrameGraphTest", "GtaoTest", "CsmTest", "ShadowSkipTest", "MaterialUpgradeTest", "SamplerBudgetTest", "SsrTest", "ClusteredLightsTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ActorDepthTest", "ActorBatchTest", "ActorCrowdTest", "PropInstancingTest", "PropPcgTest", "ProfilerTest", "ProfilerRecordingTest", "ExternalPropAssetTest", "TownDressingTest", "EastSuburbBlocksTest", "EastSuburbNavTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "WestStationTest", "DressingProbeTest", "FlareTest", "RespawnShaderWarmTest"],
     tier2Tests: ["GiTest", "DeathViewTest", "ShotTest"],
   },
   perf: {
