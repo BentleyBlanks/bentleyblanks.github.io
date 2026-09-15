@@ -654,21 +654,28 @@ st ? `n=${st.n} 中位=${st.med.toFixed(3)} m 最低=${st.min.toFixed(3)} 最高
     if (!g) return { thrown: false };
     const start = { x: g.position.x, y: g.position.y, z: g.position.z };
     let landed = null, path = 0, prev = { ...start };
-    for (let i = 0; i < 90 && T.combat.projectiles.length; i += 1) {
+    // 引信 4.2 s，一直跟到炸或拆掉：溜冰的弹要到后半程才看得出滑了多远。
+    for (let i = 0; i < 270 && T.combat.projectiles.includes(g); i += 1) {
       T.StepFrames(1);
-      if (!g.alive && landed === null) break;
       const q = g.position;
       path += Math.hypot(q.x - prev.x, q.y - prev.y, q.z - prev.z);
       prev = { x: q.x, y: q.y, z: q.z };
       const ground = T.battlefield.GroundHeight(q.x, q.z);
-      if (landed === null && q.y - ground < 0.12) landed = { ...prev };
+      // 贴地 = 离解析地表不到 0.12 m，或正下方 0.12 m 内有静态实体顶面（街面、楼板）
+      const onSolid = T.physics.Raycast(q, { x: 0, y: -1, z: 0 }, 0.12);
+      if (landed === null && i > 3 && (q.y - ground < 0.12 || onSolid)) landed = { ...prev };
       // 不许穿到地面以下
       if (q.y < ground - 0.3) return { sank: true, y: q.y, ground };
     }
-    return { thrown: true, path, landed, dist: Math.hypot(prev.x - start.x, prev.z - start.z) };
+    const slide = landed ? Math.hypot(prev.x - landed.x, prev.z - landed.z) : null;
+    return { thrown: true, path, landed, slide, dist: Math.hypot(prev.x - start.x, prev.z - start.z) };
   });
   Check("手雷飞出去且不陷进地里", r.thrown && !r.sank && r.dist > 3,
     r.thrown ? `飞了 ${r.dist.toFixed(1)} m，轨迹长 ${r.path.toFixed(1)} m` : "没扔出去（玩家活着吗？）");
+  // 2026-09-15「丢出去的手榴弹跟溜冰一样」：旧版在本机位落地后还要走 4.35 m（开阔处满力
+  // 7–15 m），修后 1.23 m（Script_Physics.SettleThrown，数在 Data_Tuning_Combat.GRENADE_BODY）。
+  Check("手雷落地后不溜冰", r.thrown && r.landed && r.slide < 3,
+    r.landed ? `落地后又走了 ${r.slide.toFixed(2)} m` : "没记到落地");
 }
 
 // --- 6. 换关之后物理世界跟着换（旧世界不许留着）-----------------------------

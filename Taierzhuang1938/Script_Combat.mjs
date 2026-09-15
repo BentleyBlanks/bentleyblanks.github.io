@@ -526,9 +526,18 @@ export class CombatSystem {
       if (p.returning) {
         this.StepReturn(p, dt);
       } else if (p.body) {
-        // 刚体版：飞行、撞墙、弹跳、滚动全归引擎。这里只补一件引擎不知道的事 ——
-        // 地表是解析式的（不在物理世界里），落到土地上那一下要手写。
-        physics.ClampToGround(p.body, dt);
+        // 刚体版：飞行、撞墙、弹跳归引擎。这里补两件引擎不知道的事 ——
+        // 地表是解析式的（不在物理世界里），落到土地上那一下要手写；
+        // 球没有滚动阻力，贴地之后要手动刹住，不然在地上溜冰（见 SettleThrown）。
+        p.groundContact ||= { airS: 1 };
+        physics.SettleThrown(p.body, dt, p.groundContact, {
+          radius: GRENADE_BODY.radiusM,
+          restitution: GRENADE_BODY.groundRestitution,
+          impactFriction: GRENADE_BODY.groundImpactFriction,
+          solidImpactFriction: GRENADE_BODY.solidImpactFriction,
+          rollDrag: GRENADE_BODY.groundRollDragPerS,
+          stopSpeed: GRENADE_BODY.groundStopSpeedMps,
+        });
         const t = p.body.translation();
         p.position.set(t.x, t.y, t.z);
         // 弹跳与滚动的声音。刚体不发接触事件，所以按速度的突变判 ——

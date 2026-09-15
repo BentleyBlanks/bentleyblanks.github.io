@@ -664,6 +664,49 @@ export class PhysicsWorld {
     return true;
   }
 
+  /**
+   * 投掷物落地后的刹车。返回此刻是否贴着地（解析地表或静态实体顶面）。
+   *
+   * 球形刚体自己**没有滚动阻力**：落在楼板、街面这些碰撞盒上，摩擦只会把滑动
+   * 变成滚动，然后带着落地速度的 5/7 一直滚到引信烧完（2026-09-15 实测最远扔出
+   * 落地后还要走 15 m）；解析地表那条 ClampToGround 按默认值每秒只衰减 1.9，
+   * 也要滑 6–11 m。木柄弹落地是磕一下、翻两下、刨进土里，不是滚珠。
+   *
+   * 所以贴地时：刚落地那一帧切向速度乘 impactFriction（静态实体用
+   * solidImpactFriction —— Rapier 的碰撞本身已经吃掉了一截），之后按 rollDrag
+   * 衰减、低于 stopSpeed 直接停住；角速度同步衰减，不然摩擦又会把转速还给平动。
+   *
+   * @param {object} contact 调用方每枚弹各存一份 { airS }，记它离地多久了
+   */
+  SettleThrown(body, dt, contact, { radius = 0.05, restitution = 0.25, impactFriction = 0.4,
+    solidImpactFriction = 0.75, rollDrag = 6, stopSpeed = 0.6, probeM = 0.04, landedAfterAirS = 0.08 } = {}) {
+    let touching = this.ClampToGround(body, dt, { restitution, impactFriction, rollDrag, stopSpeed });
+    if (!touching && !this.disposed) {
+      const p = body.translation();
+      this._ray.origin.x = p.x; this._ray.origin.y = p.y; this._ray.origin.z = p.z;
+      this._ray.dir.x = 0; this._ray.dir.y = -1; this._ray.dir.z = 0;
+      const hit = this.world.castRayAndGetNormal(this._ray, radius + probeM, true, undefined, IG_RAY_WORLD);
+      if (hit && hit.normal.y > 0.6) {
+        touching = true;
+        const n = hit.normal, v = body.linvel();
+        const vn = v.x * n.x + v.y * n.y + v.z * n.z;
+        const landed = contact.airS > landedAfterAirS;
+        const k = landed ? solidImpactFriction : Math.max(0, 1 - rollDrag * dt);
+        let tx = (v.x - vn * n.x) * k, ty = (v.y - vn * n.y) * k, tz = (v.z - vn * n.z) * k;
+        if (!landed && Math.hypot(tx, ty, tz) < stopSpeed) { tx = 0; ty = 0; tz = 0; }
+        body.setLinvel({ x: tx + vn * n.x, y: ty + vn * n.y, z: tz + vn * n.z }, true);
+      }
+    }
+    if (touching) {
+      const w = body.angvel(), k = Math.max(0, 1 - rollDrag * dt);
+      body.setAngvel({ x: w.x * k, y: w.y * k, z: w.z * k }, true);
+      contact.airS = 0;
+    } else {
+      contact.airS += dt;
+    }
+    return touching;
+  }
+
   Stats() {
     return {
       solids: this.recordByHandle.size,

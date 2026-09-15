@@ -16,7 +16,7 @@ vendor 在 `vendor/rapier/build/rapier.module.mjs`（2.8 MB，wasm 用 base64 �
 | 缸／篮／板凳／条案／晾衣架／梯子／木箱 | 同上 | `Script_LivedInProps`；矮件不进导航图 |
 | 地表 | `GroundHeight(x,z)`；爆炸脏块同时生成 Rapier heightfield | 见下面「地表与爆炸形变」 |
 | 玩家、AI 士兵 | Rapier 运动学角色控制器（胶囊） | 两边同一套解算、同一套尺寸 |
-| 手雷、集束手榴弹 | 动态刚体（球） | 会撞墙弹回、会在地上滚 |
+| 手雷、集束手榴弹 | 动态刚体（球） | 会撞墙弹回；落地磕一下、刨一截就停（`PhysicsWorld.SettleThrown`） |
 | 尸体 | 锁旋转的动态胶囊 | 姿势归动画、位移归物理 |
 | 子弹、视线 | Rapier 射线 | 返回形状与老的 `RayAabb` 一样 |
 
@@ -193,6 +193,11 @@ xz 缩放为块边长、y 缩放 1。地表薄覆盖层也随网格细分下降�
 - 角色解算完与 `groundAt` 取高者（`CharacterBody.Move` 末尾）；
 - 射线另外解析求交（`PhysicsWorld.RaycastTerrain`：沿射线找符号变化再二分）；
 - 刚体落地手写（`PhysicsWorld.ClampToGround`，区分「砸下来」与「贴着地滚」）。
+- 投掷物再套一层落地刹车（`PhysicsWorld.SettleThrown`）：球没有滚动阻力，在碰撞盒地面上会带着
+  落地速度一直滚，解析地表按默认衰减也要滑 6–11 m（2026-09-15「手榴弹溜冰」）。贴地判据是
+  `ClampToGround` 或正下方一条短射线命中静态实体顶面；砸地一帧按 `groundImpactFriction` /
+  `solidImpactFriction` 砍切向速度，之后按 `groundRollDragPerS` 连同角速度一起衰减，数在
+  `Data_Tuning_Combat.GRENADE_BODY`。
 
 **射线的 `terrain` 选项默认关**。子弹与抛掷物打开（子弹要打得中土坎与河堤），
 **AI 视线判据一律不开** —— 那会一次性改掉整套交战节奏，是另一件事。
@@ -283,7 +288,7 @@ xz 缩放为块边长、y 缩放 1。地表薄覆盖层也随网格细分下降�
 - 高处中弹的尸体会掉下来；
 - 台顶的尸体滑到地上并落定、滑越台缘途中悬空的手脚垂过、落到平地后躯干放平；
 - 对照：平地上的尸体不滑、不歪、不垂（贴合与滑落只对「落点不平」起反应）；
-- 手雷飞得出去、不陷进地里；
+- 手雷飞得出去、不陷进地里；落地后不溜冰（落地后位移 < 3 m，旧版本机位 4.35 m）；
 - **下载来的 .glb 布景每一件都落在地面上（容差 0.15 m）、且各有各的碰撞盒**
   （按中心点认领，不许拿"旁边有院墙"蒙混过去）。
 
