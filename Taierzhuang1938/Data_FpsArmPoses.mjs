@@ -155,8 +155,8 @@ export const FPS_ARM_POSES = Freeze({
   }),
   Grenade: WeaponPose({
     family: "throwable", hip: FixedPose(V(0.100, -0.140, -0.420), V(0.150, -0.250, 0.100)), ads: FixedPose(V(0.080, -0.100, -0.350), V(0.28, -0.10, 0.05)), sprint: ThrowableSprint,
-    right: Contact(V(0, 0, 0), V(0.40576, -2.33420, -2.38987), CLOSED), left: Contact(V(-0.090, -0.035, 0.080), V(-0.85212, 2.76034, -2.50878), SUPPORT),
-    bodyHip: ThrowableBody(), bodyAds: ThrowableBody(), bodySprint: ThrowableBody(), actions: { throw: { family: "stickGrenade", release: 0.48 } },
+    right: Contact(V(0, 0, 0), V(0.10, 3.141592654, 1.570796327), CLOSED), left: Contact(V(-0.090, -0.035, 0.080), V(-0.85212, 2.76034, -2.50878), SUPPORT),
+    bodyHip: Body(V(.19,-.38,.02),V(-.19,-.40,.04),V(1,0,0),V(-.4,-.8,.15)), bodyAds: Body(V(.19,-.38,.02),V(-.19,-.40,.04),V(1,0,0),V(-.4,-.8,.15)), bodySprint: Body(V(.19,-.38,.02),V(-.19,-.40,.04),V(1,0,0),V(-.4,-.8,.15)), actions: { throw: { family: "stickGrenade", release: 0.48 } },
   }),
   GrenadeBundle: WeaponPose({
     family: "throwable", hip: FixedPose(V(0.100, -0.140, -0.420), V(0.150, -0.250, 0.100)), ads: FixedPose(V(0.080, -0.100, -0.350), V(0.28, -0.10, 0.05)), sprint: FixedPose(V(0.130, -0.090, -0.250), V(-0.48, 0.34, 0.24)),
