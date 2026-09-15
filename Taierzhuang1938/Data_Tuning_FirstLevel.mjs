@@ -85,11 +85,17 @@ export const MISSION_TUNING = Object.freeze({
   bearerReachM: 0.05,
   // User 2026-09-09: one squad escorts at most ten litters, with two bearers per litter.
   // Only four unarmed support people remain for triage and casualty replacement.
-  litterCount: 10,
+  // User 2026-09-16: cut three more litter teams (10 → 7) and drop every uniformed escort
+  // other than the squad — the two medics walking beside the column go; the two rescue
+  // civilians stay (they are the bearer replacements, and they are not soldiers).
+  // Death-stage care and final-defence medic checks already fall back to the squad / vacuous truth.
+  litterCount: 7,
   walkingWoundedCount: 0,
-  medicCount: 2,
+  medicCount: 0,
   civilianCount: 2,
   litterSpeedMps: 1.4,
+  // 少一个抬架员又没有替补时，剩下那个人拖着担架走的步速比例（见 Column.BearerShort）。
+  litterDragScale: 0.55,
   litterBearerOffsetM: 1.28,
   walkSpeedMps: 1.7,
   squadSpeedMps: 3.05,

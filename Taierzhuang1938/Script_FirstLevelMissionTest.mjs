@@ -869,9 +869,10 @@ const bad=[];for(const a of areas)for(const [kind,points] of [['litter',a.pocket
 assert.deepEqual(bad,[],"all staging routes clear real walls and furniture, including both bearers");
 assert.ok(areas.every(a=>a.walkerPockets.length===R.walkingWoundedCount+R.medicCount+R.civilianCount));
 const c = new FirstLevelMissionColumn();
-assert.equal(c.litters.length,10,"one squad escorts ten litters");
+assert.equal(c.litters.length,R.litterCount,"one squad escorts the tuned litter count (seven since 2026-09-16)");
+assert.equal(c.walkers.filter(w=>w.kind==="medic").length,0,"no uniformed escort besides the squad walks with the column");
 assert.ok(c.litters.every(l=>l.bearers.length===2),"each litter has exactly two bearer slots");
-assert.deepEqual(c.walkers.map(w=>w.kind),["medic","medic","civilian","civilian"],"only essential unarmed support accompanies the litters");
+assert.deepEqual(c.walkers.map(w=>w.kind),["civilian","civilian"],"only the two rescue civilians accompany the litters (2026-09-16: medics cut)");
 function CheckStagingClearance(column){
   const teams=column.litters.filter(l=>l.staging);
   for(let i=0;i<teams.length;i++)for(let j=i+1;j<teams.length;j++)
@@ -893,7 +894,10 @@ assert.equal(c.State().gatePassed, R.litterCount);
 c.loading = true;
 let transferReadyAt=null;
 for (let i = 0; i < 6000; i++){c.Update(0.1);if(transferReadyAt===null&&c.TransferReady())transferReadyAt=(i+1)*.1;}
-assert.ok(transferReadyAt>=120&&transferReadyAt<=240,"physical staging and loading fit the planned two-to-four-minute transfer");
+// 2026-09-16: with the medics cut there is no triage walk to the loading crew any more, so the
+// physical load lands at ~118 s instead of ~132 s; the stage clock (transferSeconds) still holds
+// the planned two-to-four-minute pacing, this only guards the column against stalling or racing.
+assert.ok(transferReadyAt>=110&&transferReadyAt<=240,"physical staging and loading fit the planned roughly two-to-four-minute transfer");
 assert.equal(c.State().loaded, R.zhouQueueIndex);
 assert.equal(c.departed, 2);
 assert.equal(c.QueueAhead(), 0);
@@ -915,8 +919,11 @@ copy.Restore(saved);
 assert.deepEqual(copy.State(), c.State());
 c.AirDamage();
 const originalBearerBodies=structuredClone(c.bearerCasualties);
-assert.equal(originalBearerBodies.length,3,"three raid casualties are recorded where they fell");
-assert.equal(c.litters.filter((l) => l.state === "fallen").length, 2);
+// The raid fells up to two of the litters still waiting behind Zhou plus Zhou's own rear bearer;
+// with seven litters and five loaded ahead of him only one litter is left to fell (2026-09-16).
+const raidLitters=Math.min(2,R.litterCount-R.zhouQueueIndex-1);
+assert.equal(originalBearerBodies.length,raidLitters+1,"every raid casualty is recorded where they fell");
+assert.equal(c.litters.filter((l) => l.state === "fallen").length, raidLitters);
 assert.ok(c.vehicles.some((cart) => cart.overturned));
 c.zhou.state = "waiting";
 c.zhou.bearers = [75, 75];
@@ -941,8 +948,25 @@ for (let i = 0; i < 4000; i++) c.Update(0.1);
 assert.ok(c.walkers.filter((w) => w.kind === "medic" && w.health > 0).every((w) => w.escaped));
 assert.deepEqual(c.bearerCasualties.slice(0,originalBearerBodies.length),originalBearerBodies,"fallen bearers stay at the original position after rescue and departure");
 console.log(
-  "ok 10 litters, closed gate, physical load queue, 2 departing carts, interrupted transfer, three passages, reception and actual rear exit",
+  "ok tuned litter count, closed gate, physical load queue, 2 departing carts, interrupted transfer, three passages, reception and actual rear exit",
 );
+// 2026-09-16: no medics ride along any more, so a litter that loses a bearer with nobody left to
+// replace him is dragged on by the surviving bearer instead of parking the whole retreat.
+{
+  const short = new FirstLevelMissionColumn();
+  short.Activate(); short.gateOpen = true;
+  for (const walker of short.walkers) walker.health = 0;
+  const litter = short.litters.at(-1);
+  litter.bearers[1] = 0;
+  const before = litter.progress;
+  for (let i = 0; i < 300; i++) short.Update(.1, { moving: true, routeSafe: true });
+  assert.ok(litter.dragging, "a bearer-short litter with no helper left is dragged, not parked");
+  assert.ok(litter.progress > before + 5, "the dragged litter still advances");
+  assert.ok(short.litters.slice(0, -1).every(l => !l.dragging), "full crews are never flagged as dragging");
+  litter.bearers[1] = 100;
+  short.Update(.1, { moving: true, routeSafe: true });
+  assert.ok(!litter.dragging, "a refilled crew stops dragging");
+}
 // Survivor counts change the number of useful loads; missing people cannot fill a cart.
 for (const lost of Array.from({length:R.zhouQueueIndex+1},(_,i)=>i)) {
   const reduced = new FirstLevelMissionColumn();
@@ -1006,6 +1030,11 @@ for(const mode of ['reception','exit']) {
 }
 console.log('ok bearer casualties recover during reception and the final exit');
 const localThreatColumn=new FirstLevelMissionColumn();localThreatColumn.Restore(saved);
+// 2026-09-16: with seven litters only one unloaded patient waits behind Zhou before the raid, so
+// take the raid first (it unloads the third cart) to get the two lanes this check needs, as in play.
+localThreatColumn.AirDamage();
+localThreatColumn.zhou.state="waiting";localThreatColumn.zhou.bearers=[75,75];
+for(const litter of localThreatColumn.litters)if(litter.state==="fallen")litter.state="waiting";
 localThreatColumn.StartRetreat();for(let i=0;i<6000;i++)localThreatColumn.Update(.1);
 localThreatColumn.StartReception();for(let i=0;i<6000;i++)localThreatColumn.Update(.1);
 localThreatColumn.StartFinalExit();

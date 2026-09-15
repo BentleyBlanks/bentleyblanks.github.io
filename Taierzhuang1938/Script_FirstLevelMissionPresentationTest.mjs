@@ -5,6 +5,7 @@ import path from "node:path";
 import {fileURLToPath} from "node:url";
 import {LaunchBrowser} from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import {ServeRoot} from "./Script_DevServer.mjs";
+import {MISSION_TUNING as R} from "./Data_Tuning_FirstLevel.mjs";
 const here=path.dirname(fileURLToPath(import.meta.url));
 // Read-only comparison against a clean checkout; evidence stays in this worktree.
 const baselineRoot=process.argv.find(arg=>arg.startsWith("--baseline-root="))?.slice(16);
@@ -105,9 +106,9 @@ for(let i=0;i<120;i++)window.UpdateCrowdProbe(i/60);g.StepFrames(1,1/60,true);re
       walkers:column.walkers.map(w=>({x:w.x,z:w.z,area:w.staging?.area})),people:view.people.State(),updateMs,aftermath:view.aftermath.triangles};
   });
   assert.ok(crowd.aftermath.distant<crowd.aftermath.detail*.6,"distant bodies preserve silhouettes within a substantially smaller geometry budget");
-   assert.equal(crowd.litters.filter(l=>l.area==="courtyard").length,10);
+   assert.equal(crowd.litters.filter(l=>l.area==="courtyard").length,R.litterCount);
   assert.ok(Math.max(...crowd.litters.map(l=>l.x))-Math.min(...crowd.litters.map(l=>l.x))>25);
-  assert.equal(crowd.walkers.filter(w=>w.area==="courtyard").length,4);
+  assert.equal(crowd.walkers.filter(w=>w.area==="courtyard").length,R.walkingWoundedCount+R.medicCount+R.civilianCount);
   await page.screenshot({path:path.join(out,"Scene_CourtyardGroups.png")});
   await fs.writeFile(path.join(out,"Data_Crowd.json"),JSON.stringify(crowd,null,2));
  await page.goto(("http://127.0.0.1:"+server.address().port)+"/Taierzhuang1938/?phase=1&shot=1&manual=1&quality=low&scale=small");
