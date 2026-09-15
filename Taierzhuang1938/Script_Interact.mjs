@@ -99,6 +99,7 @@ export class InteractSystem {
     this.groundWeapons = [];
     this.groundAutoId = 0;
     this.handouts = 0;          // 分了几次弹
+    this.mateClipShare = INTERACT.mateClipShare; // 分弹分支开关（暂时关闭，见调参表）
     /** 注册的交互点：id -> spec。摆点是集成批的事，引擎只读这张表。 */
     this.points = new Map();
     this.autoId = 0;
@@ -343,7 +344,7 @@ export class InteractSystem {
       const d = rootD;
       if (d > INTERACT.mateReachM || this.hooks.CanReachActor?.(s, player) === false) continue;
       // 活着的自己人：弹打光了就分一个桥夹过去
-      if (s.side !== "nra") continue;
+      if (!this.mateClipShare || s.side !== "nra") continue;
       if (s.ammo > 0) continue;
       // 自己只剩一个就不给了
       if ((this.hooks.SpareClips?.() ?? 0) < INTERACT.spareClipsMin) continue;

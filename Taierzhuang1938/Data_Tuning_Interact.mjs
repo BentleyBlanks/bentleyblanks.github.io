@@ -42,6 +42,11 @@ export const INTERACT = Object.freeze({
   /** 完成提示与「F — …」提示条各显示多久。 */
   hintSeconds: 2.6,
   promptSeconds: 1.6,
+  /**
+   * 「分一个桥夹给弟兄」这条内建分支的总开关。2026-09-15 起暂时关闭：
+   * F 提示条不出、按 F 也分不出去。代码与判据都留着，改回 true 即恢复。
+   */
+  mateClipShare: false,
   /** 自己只剩这么多桥夹就不再分给弟兄。 */
   spareClipsMin: 2,
   /**
