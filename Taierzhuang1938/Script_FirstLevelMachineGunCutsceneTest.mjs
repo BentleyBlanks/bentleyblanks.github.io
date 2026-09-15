@@ -150,6 +150,44 @@ try {
   await Render(2);
   await page.screenshot({ path: path.join(out, "Scene_CutsceneMid.png") });
 
+  // --- 作者动作真的在 p012 入口生效了 ---------------------------------------
+  // `Script_Main` 进第一关时**不 await** 地预取动作库（`LoadMachineGunCaptivesAnimation`）。
+  // 没预取上的后果是静默的：过场照播，演员照走 POSE_CLIPS，画面上只是「动作没做」。
+  // 所以推到跪姿那一段（≈17 s）直接读表演层在播的 clip id 与实机骨头高度 ——
+  // 「visible≠看得见」那条老教训的同一手法：量涂色，不看旗标。
+  await Step(Math.round((17.0 - 4.0) * 60));
+  const pose = await page.evaluate(() => {
+    const g = window.Tengxian, out = {};
+    for (const [id, entry] of g.cutscene.actors) {
+      const a = entry.actor, rig = a.characterRig;
+      if (!rig) continue;
+      a.root.updateWorldMatrix(true, true);
+      const Y = (role) => (rig.bones[role]
+        ? +(rig.bones[role].matrixWorld.elements[13] - a.root.position.y).toFixed(3) : null);
+      out[id] = { performClip: rig.cutscenePerformance?.state?.clipId || null,
+        head: Y("head"), pelvis: Y("pelvis") };
+    }
+    return { time: g.Debug.Cutscene().time, actors: out };
+  });
+  receipts.push({ label: "AuthoredMotion", ...pose });
+  console.log("AuthoredMotion", JSON.stringify(pose));
+  const want = {
+    captive_old: { clip: "CaptiveStruckDown", head: [0.15, 0.34] },
+    captive_young: { clip: "CaptiveKneelPlead", head: [0.90, 1.10] },
+    captive_third: { clip: "CaptiveKneelHandsHead", head: [0.90, 1.10] },
+    ija_hei: { clip: "IjaBayonetGuard", head: [1.24, 1.49] },
+  };
+  for (const [id, expect] of Object.entries(want)) {
+    const got = pose.actors[id];
+    assert.ok(got, `过场里有 ${id}`);
+    assert.equal(got.performClip, expect.clip,
+      `${id} 在 p012 入口播的是作者动作 ${expect.clip}，不是 POSE_CLIPS 回退（实际 ${got.performClip}）`);
+    assert.ok(got.head >= expect.head[0] && got.head <= expect.head[1],
+      `${id} 头骨离脚下平面 ${got.head} m，要求 ${expect.head[0]}–${expect.head[1]}（动作真的改到了骨头上）`);
+  }
+  await Render(2);
+  await page.screenshot({ path: path.join(out, "Scene_AuthoredMotion.png") });
+
   // --- 自然播完（不按 Esc）：这一场是 44 s，手动时钟推到底 -------------------
   let finished = false;
   for (let i = 0; i < 40 && !finished; i += 1) {

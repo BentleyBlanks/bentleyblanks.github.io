@@ -92,6 +92,56 @@ const CLIP_BANDS = {
  */
 const CUTSCENE_CASES = [
   {
+    // 04 机枪点位那场关中过场用的是**作者动作**（Script_CutscenePerformance），
+    // 不是 POSE_CLIPS。所以这几条用 `performClip` 点名，量的是实机蒙皮上的骨头高度：
+    // 跪姿头 ≈0.98–1.03、趴伏头 ≈0.21–0.27、举手站姿 ≈1.37（资产实测见
+    // Animation/MachineGunCaptives/Data_MachineGunCaptivesAnimation.md 的实测列，量在
+    // targetHeight 1.66 m 上）。带子各留 ±3%：场上七个人的 sizeScale 本来就散在 ±4%，
+    // 实测同一条 clip 三个人量到 1.368 / 1.384 / 1.419。**POSE_CLIPS 那张 CLIP_BANDS 一个数没动。**
+    // **「动作库真的生效了」这件事由 `performClip` 钉死**（直接读表演层在播的 clip id，
+    // 它是 null 就说明这一帧根本没在播作者动作）；高度带是数值上的兜底，带宽按
+    // 演员 sizeScale 的实际散布给：同一条站姿 clip 在 p012 场上四个日军量到
+    // 1.283 / 1.318 / 1.339 / 1.397（±4% 的 sizeScale），所以带宽取资产实测值的 ±7%，
+    // 不拿它单独当「有没有生效」的判据。
+    cut: "CS_MachineGunCaptives",
+    preloadPerformance: true,
+    samples: [
+      {
+        t: 9.0,
+        actors: {
+          captive_old: { performClip: "CaptiveHandsUpStand", head: [1.24, 1.49], why: "站定举手过头" },
+          captive_young: { performClip: "CaptiveHandsUpStand", head: [1.24, 1.49], why: "站定举手过头" },
+          captive_third: { performClip: "CaptiveHandsUpStand", head: [1.24, 1.49], why: "站定举手过头" },
+        },
+      },
+      {
+        t: 17.0,
+        actors: {
+          captive_old: { performClip: "CaptiveStruckDown", head: [0.15, 0.34], why: "挨一脚前扑趴稳（末帧保持）" },
+          captive_young: { performClip: "CaptiveKneelPlead", head: [0.90, 1.10], why: "跪着求饶" },
+          captive_third: { performClip: "CaptiveKneelHandsHead", head: [0.90, 1.10], why: "跪着抱头" },
+          ija_hei: { performClip: "IjaBayonetGuard", head: [1.24, 1.49], why: "踢完收回持枪式" },
+        },
+      },
+      {
+        t: 31.0,
+        actors: {
+          captive_old: { performClip: "CaptiveStruckDown", head: [0.15, 0.34], why: "还趴着" },
+          captive_young: { performClip: "CaptiveKneelHandsHead", head: [0.90, 1.10], why: "挨枪托之后收手抱头，仍是跪着的" },
+          ija_gunso: { performClip: "IjaTauntGesture", head: [1.24, 1.49], why: "抬手下令" },
+        },
+      },
+      {
+        t: 41.0,
+        actors: {
+          captive_old: { performClip: "CaptiveStruckDown", head: [0.15, 0.34], why: "收场：三个都伏在地上" },
+          captive_young: { performClip: "CaptiveStabbedCollapse", head: [0.15, 0.34], why: "中刀瘫倒（末帧保持）" },
+          captive_third: { performClip: "CaptiveStabbedCollapse", head: [0.15, 0.34], why: "中刀瘫倒（末帧保持）" },
+        },
+      },
+    ],
+  },
+  {
     cut: "CS_LastWire",
     samples: [
       {
@@ -207,6 +257,14 @@ try {
   await page.evaluate(() => { window.Taierzhuang.state.running = false; });
 
   for (const testCase of CUTSCENE_CASES) {
+    if (testCase.preloadPerformance) {
+      // 作者动作库是 fetch 来的：正片在进第一关时不 await 地预取，这里必须等到，
+      // 不然量到的是「库还没到位的那几帧」——也就是 POSE_CLIPS 的回退姿势。
+      await page.evaluate(async () => {
+        const mod = await import("/Taierzhuang1938/Script_CutscenePerformance.mjs");
+        await mod.LoadMachineGunCaptivesAnimation();
+      });
+    }
     const started = await page.evaluate(async (id) => {
       const D = window.Taierzhuang;
       D.Debug.PlayCutscene(id).catch(() => null);
@@ -228,7 +286,8 @@ try {
           if (!rig) continue;
           const Y = (role) => (rig.bones[role]
             ? +(rig.bones[role].matrixWorld.elements[13] - a.root.position.y).toFixed(3) : null);
-          out[id] = { clip: rig.currentId, head: Y("head"), pelvis: Y("pelvis"), rootY: +a.root.position.y.toFixed(3) };
+          out[id] = { clip: rig.currentId, performClip: rig.cutscenePerformance?.state?.clipId || null,
+            head: Y("head"), pelvis: Y("pelvis"), rootY: +a.root.position.y.toFixed(3) };
         }
         return out;
       });
@@ -237,14 +296,23 @@ try {
       for (const [id, want] of Object.entries(sample.actors)) {
         const got = measured[id];
         if (!got) { failures.push(`${testCase.cut} t=${sample.t}：找不到演员 ${id}`); continue; }
-        rows.push(`${id.padEnd(14)} clip=${String(got.clip).padEnd(17)} 头 ${String(got.head).padStart(6)} `
+        rows.push(`${id.padEnd(14)} clip=${String(want.performClip ? got.performClip : got.clip).padEnd(24)} 头 ${String(got.head).padStart(6)} `
           + `（root ${got.rootY}）  期望 ${want.head[0]}–${want.head[1]}   ${want.why}`);
-        const wantClip = await page.evaluate(async (pose) => {
-          const { LUGOU_POSE_CLIPS } = await import("/Taierzhuang1938/Script_CharacterModel.mjs");
-          return LUGOU_POSE_CLIPS[pose];
-        }, want.clip);
-        if (got.clip !== wantClip) {
-          failures.push(`${testCase.cut} t=${sample.t} ${id}：应取 ${want.clip}(${wantClip})，实际 ${got.clip}（${want.why}）`);
+        if (want.performClip) {
+          // 作者动作：直接读表演层当前在播的 clip id。它是 null 就说明这一帧
+          // 根本没在播作者动作（库没到位 / 绑定失败 / 数据写错 id），而那种情形
+          // 画面上只是「动作没生效」，不报错 —— 所以必须在这儿钉住。
+          if (got.performClip !== want.performClip) {
+            failures.push(`${testCase.cut} t=${sample.t} ${id}：作者动作应是 ${want.performClip}，实际 ${got.performClip}（${want.why}）`);
+          }
+        } else {
+          const wantClip = await page.evaluate(async (pose) => {
+            const { LUGOU_POSE_CLIPS } = await import("/Taierzhuang1938/Script_CharacterModel.mjs");
+            return LUGOU_POSE_CLIPS[pose];
+          }, want.clip);
+          if (got.clip !== wantClip) {
+            failures.push(`${testCase.cut} t=${sample.t} ${id}：应取 ${want.clip}(${wantClip})，实际 ${got.clip}（${want.why}）`);
+          }
         }
         if (got.head < want.head[0] || got.head > want.head[1]) {
           failures.push(`${testCase.cut} t=${sample.t} ${id}：头骨离脚下平面 ${got.head} m，`

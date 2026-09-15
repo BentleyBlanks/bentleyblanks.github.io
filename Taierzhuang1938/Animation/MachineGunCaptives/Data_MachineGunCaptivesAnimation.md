@@ -76,6 +76,8 @@ $env:CAPTIVES_PROJECT="<repo>/Taierzhuang1938"
 
 ## 运行时用法
 
+唯一的消费者是关中过场 `CS_MachineGunCaptives`（`Data_CutsceneMachineGunCaptives.mjs`）：哪一秒换哪一条、受击者换 clip 的时刻怎么与接触帧对齐、三种打击的触及距离反推出的站位与俰视误差，全在 [docs/Data_MachineGunCaptivesCutscene.md](../../docs/Data_MachineGunCaptivesCutscene.md) §2。改这十条 clip 的秒数或触及距离，那边的站位表要一起重算。
+
 过场数据侧只写一条 `state.perform`，语义与边界见
 [`docs/Data_CutsceneRedo.md` §1.3](../../docs/Data_CutsceneRedo.md)。实现在
 `Script_CutscenePerformance.mjs`，唯一挂点在 `Script_Cutscene._ApplyActors` 末尾。
