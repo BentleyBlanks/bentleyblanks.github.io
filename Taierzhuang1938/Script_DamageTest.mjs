@@ -202,6 +202,10 @@ await page.evaluate(() => {
       // 拆引信：把装配层排队的那次换人取消掉。
       T.state.deathTimer = 0;
       T.state.pendingRespawn = false;
+      // 死亡卡也要收：它在的时候 `#hud.deathCardOn` 把功能 HUD 全压成 opacity 0。
+      // 不收的话第 5 节的手雷警告是在一张没摘的死亡卡底下量的 —— 节点 display 正常、
+      // 文字也在，玩家却一个像素都看不见（2026-09-15 改验图标可见性时才露出来）。
+      T.hud.HideDeathCard();
     },
 
     /**
@@ -519,17 +523,29 @@ const grenadeWarning = await page.evaluate(() => {
   const el = document.querySelector(".hudGrenadeWarning");
   const shown = getComputedStyle(el).display !== "none";
   const x = Number.parseFloat(el.style.left || "0");
-  const text = el.textContent.trim();
+  // 3f10a4a87 起警告是「手雷图标 + 方向箭头」（docs/Data_HudLinearLevel.md 近弹指示），
+  // 看得见的字只剩够得着时的「F 拾起掷回」；弹种与距离挪进了 aria-label。
+  // 所以验图标真画出来了（有尺寸、真挂着手雷遮罩、没被透明/隐藏），再验描述里点了名。
+  const icon = el.querySelector(".ico i");
+  const iconBox = icon?.getBoundingClientRect();
+  const iconStyle = icon ? getComputedStyle(icon) : null;
+  const iconMask = iconStyle ? (iconStyle.maskImage || iconStyle.webkitMaskImage || "") : "";
+  const iconDrawn = !!icon && iconBox.width > 0 && iconBox.height > 0
+    && /Icon_GrenadeWarning/.test(iconMask)
+    && icon.checkVisibility({ opacityProperty: true, visibilityProperty: true });
+  const text = el.getAttribute("aria-label") || "";
   grenade.fuse = 1.0;
   T.StepFrames(1);
   const urgent = el.classList.contains("urgent");
   combat.ClearProjectiles();
   T.StepFrames(1);
   const hidden = getComputedStyle(el).display === "none";
-  return { shown, x, text, urgent, hidden };
+  return { shown, x, iconDrawn, iconMask, text, urgent, hidden };
 });
-Check("附近活手榴弹会亮警告", grenadeWarning.shown && /手榴弹/.test(grenadeWarning.text),
-  `${grenadeWarning.text || "没有文字"}`);
+Check("附近活手榴弹会亮警告",
+  grenadeWarning.shown && grenadeWarning.iconDrawn && /手榴弹/.test(grenadeWarning.text),
+  `图标${grenadeWarning.iconDrawn ? "已画" : `没画出来（mask=${grenadeWarning.iconMask || "无"}）`}；`
+  + `描述「${grenadeWarning.text || "无"}」`);
 Check("手榴弹在右侧，警告也指向右侧", grenadeWarning.x > 640, `x=${grenadeWarning.x}`);
 Check("引信将尽时警告变红脉冲", grenadeWarning.urgent);
 Check("手榴弹清除后警告同帧消失", grenadeWarning.hidden);
