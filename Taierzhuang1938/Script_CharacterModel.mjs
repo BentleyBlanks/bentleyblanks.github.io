@@ -362,17 +362,41 @@ function LoadDeathLibrary(faction) {
   return deathLibraryPromises.get(faction);
 }
 
+// 死亡动画库是在另一个场景里烘的：骨架容器的偏移和人物模型不一样（NRA 库的
+// Rig 偏 X=-4.731，Model_LugouNra02 是 Rig -2.384 再套一层 Character +2.384）。
+// 只按骨头自己的静止位置做差，最顶上那节动画骨头会把容器差值一起带进来——
+// 2026-09-16 实测倒地时骨盆 0.1 s 横移 2–4 m，而命中体和尸体刚体留在原地（「爆头后瞬移」）。
+// 所以动画层级的顶层（父节点不在这条 clip 里）按「源场景坐标 → 目标父节点坐标」整体换算，
+// 下面各节骨头仍各自相对父骨头，沿用静止差值。
 function RetargetAnimationLibrary(library, targetRoot) {
   if (!library) return null;
   const q = new THREE.Quaternion(), deltaQ = new THREE.Quaternion();
+  const point = new THREE.Vector3(), sourceParentQ = new THREE.Quaternion(), targetParentQ = new THREE.Quaternion();
+  library.scene.updateMatrixWorld(true);
+  targetRoot.updateMatrixWorld(true);
   return { ...library, animations: library.animations.map(sourceClip => {
     const clip = sourceClip.clone();
+    const animated = new Set(clip.tracks.map(track => track.name.slice(0, track.name.lastIndexOf("."))));
     clip.tracks = clip.tracks.filter(track => {
       const split = track.name.lastIndexOf("."), name = track.name.slice(0, split);
       const source = library.scene.getObjectByName(name), target = targetRoot.getObjectByName(name);
       if (!source || !target) return false;
       const property = track.name.slice(split + 1);
-      if (property === "position") {
+      const topLevel = source.parent && target.parent && !animated.has(source.parent.name);
+      if (topLevel && (property === "position" || property === "quaternion")) {
+        const toTarget = target.parent.matrixWorld.clone().invert().multiply(source.parent.matrixWorld);
+        if (property === "position") {
+          for (let i = 0; i < track.values.length; i += 3) {
+            point.fromArray(track.values, i).applyMatrix4(toTarget).toArray(track.values, i);
+          }
+        } else {
+          source.parent.getWorldQuaternion(sourceParentQ);
+          deltaQ.copy(target.parent.getWorldQuaternion(targetParentQ).invert()).multiply(sourceParentQ);
+          for (let i = 0; i < track.values.length; i += 4) {
+            q.fromArray(track.values, i).premultiply(deltaQ).normalize().toArray(track.values, i);
+          }
+        }
+      } else if (property === "position") {
         const delta = target.position.clone().sub(source.position);
         for (let i = 0; i < track.values.length; i += 3) {
           track.values[i] += delta.x; track.values[i + 1] += delta.y; track.values[i + 2] += delta.z;

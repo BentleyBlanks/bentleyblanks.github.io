@@ -78,6 +78,7 @@ try {
             kind, id, selected: rig.deathVariantId, clips: rig.deathClipById.size,
             action: rig.deathClipState?.clip?.name, duration,
             pelvisDrop: start.y - end.y,
+            pelvisTravel: Math.hypot(end.x - start.x, end.z - start.z),
             repeatedDelta: repeatedEnd.distanceTo(end),
             floorLift: rig.deathFloorLift,
             skinFloor, legFloor, torsoFloor,
@@ -102,6 +103,12 @@ try {
     assert.match(row.action, new RegExp(`${row.kind === "nra" ? "Nra" : "Ija"}_${row.id}_V1$`));
     assert.ok(row.duration >= 1.65 && row.duration <= 2.0, `${row.kind}/${row.id} gameplay duration`);
     assert.ok(row.pelvisDrop > 0.45, `${row.kind}/${row.id} reaches a collapsed pelvis height`);
+    // The library is baked under a differently offset rig container. Retargeting only by the
+    // pelvis rest delta carried that 2.4-4.7 m container gap into the clip, so a killed soldier's
+    // body slid metres away from his hitboxes and corpse body in the 0.1 s crossfade (2026-09-16).
+    // The authored forward collapse moves the pelvis about 0.7-1.3 m.
+    assert.ok(row.pelvisTravel < 1.5,
+      `${row.kind}/${row.id} pelvis slid ${row.pelvisTravel.toFixed(2)} m sideways: rig container offset leaked into the clip`);
     assert.ok(row.repeatedDelta < 1e-5,
       `${row.kind}/${row.id} terminal pose changed on a corpse tick: ${row.repeatedDelta}`);
     assert.ok(Number.isFinite(row.floorLift), `${row.kind}/${row.id} final visible skin is grounded`);
