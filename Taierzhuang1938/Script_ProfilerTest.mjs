@@ -142,6 +142,58 @@ try {
     Check("GPU 表用英文原名", gpuRows.some((row) => row.key === "main" && row.label === "main"));
     Check("文本排版可用", report.FormatSnapshot({ label: "test", summary }).includes("CPU · 主线程"));
 
+    // --- 录制与回放（独立窗口面板）---
+    const panel = T.editor.overlays.get("profiler");
+    Check("独立窗口面板开着", !!(panel && panel.ui && panel.win && !panel.win.closed));
+    const newest = T.profiler.history[T.profiler.history.length - 1];
+    Check("记录里有逐实例时间轴样本", !!newest.samples && newest.samples.length > 0
+      && T.profiler.names.includes("ai/act"), `samples=${newest.samples?.length}`);
+    Check("记录里有 GPU 分段时间轴", !!newest.gpuSegs && newest.gpuSegs.length > 0);
+    Check("记录里有逐桶调用次数", (newest.cpuCalls?.["ai/act"] || 0) > 0, `ai/act=${newest.cpuCalls?.["ai/act"]}`);
+    panel.TogglePause();
+    Check("录制键暂停：钩子还在、不再记录", T.profiler.on && !T.profiler.recording
+      && proto.updateMatrixWorld.name === "ProfiledUpdateMatrixWorld");
+    const pausedLength = T.profiler.history.length;
+    T.StepFrames(5);
+    Check("暂停后推帧不进账", T.profiler.history.length === pausedLength, `len=${T.profiler.history.length}`);
+    const pick = T.profiler.history[Math.max(1, pausedLength - 10)];
+    panel.SelectFrame(pick.id);
+    Check("选中一帧：CPU 表切到单帧列", panel.ui.cpuTable.classList.contains("single")
+      && panel.ui.cpuTitle.textContent.includes(`#${pick.id}`), panel.ui.cpuTitle.textContent);
+    Check("选中一帧：时间轴出现", panel.ui.timeline.style.display === "block" && !!panel.tl.layout);
+    const PaintedPixels = (canvas) => {
+      const data = canvas.getContext("2d").getImageData(0, 0, canvas.width, canvas.height).data;
+      let lit = 0;
+      for (let i = 0; i < data.length; i += 4) if (data[i] + data[i + 1] + data[i + 2] > 120) lit += 1;
+      return lit;
+    };
+    const timelinePixels = PaintedPixels(panel.ui.timeline);
+    Check("时间轴真画出了样本条", timelinePixels > 500, `lit=${timelinePixels}`);
+    const chartPixels = PaintedPixels(panel.ui.chart);
+    Check("帧图真画出了堆叠柱", chartPixels > 500, `lit=${chartPixels}`);
+    panel.Step(-1);
+    Check("← 逐帧回退一帧", panel.sel && panel.sel.first === pick.id - 1, JSON.stringify(panel.sel));
+    const rangeFirst = T.profiler.history[0].id;
+    panel.SelectRange(rangeFirst, rangeFirst + 9);
+    Check("选中一段：表回到 avg/p95/max", !panel.ui.cpuTable.classList.contains("single")
+      && panel._selSummary?.frames === 10, `frames=${panel._selSummary?.frames}`);
+    Check("选中一段：时间轴收起", panel.ui.timeline.style.display === "none");
+    const recording = JSON.parse(JSON.stringify(T.profiler.ExportRecording()));
+    const loaded = panel.LoadRecording(recording, "roundtrip.json");
+    Check("加载录制：帧数一致、标了来源", loaded === pausedLength && T.profiler.source?.label === "roundtrip.json",
+      `loaded=${loaded}`);
+    panel.SelectFrame(pick.id);
+    const replayRow = T.profiler.FrameById(pick.id);
+    Check("加载后仍能选帧回放（样本还原成 typed array）", replayRow?.samples instanceof Float32Array
+      && panel.ui.timeline.style.display === "block");
+    Check("导出文本带单帧时间轴", panel.SnapshotText().includes(`时间轴 · 第 #${pick.id} 帧`));
+    panel.win.confirm = () => true;   // 「继续录制会清掉加载的录制」那一问
+    panel.TogglePause();
+    Check("继续录制：先清掉加载的帧、回到跟随", T.profiler.recording && !T.profiler.source
+      && T.profiler.history.length === 0 && panel.sel === null && panel.view.follow);
+    T.StepFrames(3);
+    Check("继续录制后照常记帧", T.profiler.history.length === 3, `len=${T.profiler.history.length}`);
+
     // --- 关：钩子必须一件不剩地还原 ---
     T.editor.Toggle("profiler");
     Check("Disable 生效", !T.profiler.on);

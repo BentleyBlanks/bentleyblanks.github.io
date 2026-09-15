@@ -168,16 +168,19 @@ function Tail(key) {
   return cut < 0 ? key : key.slice(cut + 1);
 }
 
-/** CPU 表的完整行（含矩阵访问与堆分配两列，以及尾部的合计/浏览器侧两行）。 */
+/** CPU 表的完整行（含调用次数、矩阵访问与堆分配三列，以及尾部的合计/浏览器侧两行）。 */
 export function CpuRows(summary) {
   const bag = CpuBag(summary);
   if (summary.other && (summary.other.avg > 0 || summary.other.max > 0)) bag.other = summary.other;
   const rows = TreeRows(bag);
   const visits = summary.cpuVisits || {};
   const alloc = summary.cpuAlloc || {};
+  const calls = summary.cpuCalls || {};
   return rows.map((row) => ({
     ...row,
     label: CpuLabel(row),
+    // B/E 对数（Unity 的 Calls 列）：`ai/act` 一个兵一次，桶的毫秒数除以它就是单次成本。
+    calls: row.selfRow ? null : (calls[row.key] ? calls[row.key].avg : null),
     visits: row.selfRow ? null : (visits[row.key] ? visits[row.key].avg : null),
     allocKb: row.selfRow ? null : (alloc[row.key] ? alloc[row.key].avg : null),
   }));
@@ -259,7 +262,9 @@ export function FormatSnapshot(snapshot) {
   if (snapshot.postTarget) head.push(`合成靶 ${snapshot.postTarget}`);
   if (snapshot.when) head.push(snapshot.when);
   if (head.length) out.push(head.join(" ｜ "));
-  out.push(`采样 ${summary.frames} 帧 / ${summary.seconds} s ｜ fps ${F(summary.fps)} ｜ 低帧率 ${F(summary.lowFps)}`);
+  const range = summary.firstId != null && summary.lastId != null
+    ? ` ｜ 帧号 #${summary.firstId}${summary.lastId !== summary.firstId ? `–#${summary.lastId}` : ""}` : "";
+  out.push(`采样 ${summary.frames} 帧 / ${summary.seconds} s${range} ｜ fps ${F(summary.fps)} ｜ 低帧率 ${F(summary.lowFps)}`);
   out.push(`整帧 avg ${F(summary.frame.avg)} / p95 ${F(summary.frame.p95)} / max ${F(summary.frame.max)} ms`
     + ` ｜ 主线程 avg ${F(summary.cpuTotal.avg)} ms`
     + ` ｜ GPU avg ${summary.gpuFrames ? F(summary.gpuTotal.avg) : "—"} ms`
@@ -272,6 +277,7 @@ export function FormatSnapshot(snapshot) {
     { head: "avg", width: 8, align: "right" },
     { head: "p95", width: 8, align: "right" },
     { head: "max", width: 8, align: "right" },
+    { head: "调用/帧", width: 8, align: "right" },
     { head: "矩阵访问", width: 10, align: "right" },
     { head: "分配KB", width: 8, align: "right" },
   ];
@@ -280,12 +286,13 @@ export function FormatSnapshot(snapshot) {
     row.selfRow ? F(row.self) : F(row.stat.avg),
     row.selfRow ? "" : F(row.stat.p95),
     row.selfRow ? "" : F(row.stat.max),
+    row.selfRow || row.calls == null ? "" : F(row.calls, 1),
     row.selfRow ? "" : Int(row.visits),
     row.selfRow ? "" : F(row.allocKb, 1),
   ]);
-  cpuRows.push(["主线程合计", F(summary.cpuTotal.avg), F(summary.cpuTotal.p95), F(summary.cpuTotal.max), "", ""]);
+  cpuRows.push(["主线程合计", F(summary.cpuTotal.avg), F(summary.cpuTotal.p95), F(summary.cpuTotal.max), "", "", ""]);
   if (summary.browser) {
-    cpuRows.push([CPU_LABELS.browser, F(summary.browser.avg), F(summary.browser.p95), F(summary.browser.max), "", ""]);
+    cpuRows.push([CPU_LABELS.browser, F(summary.browser.avg), F(summary.browser.p95), F(summary.browser.max), "", "", ""]);
   }
   out.push(...Table(cpuColumns, cpuRows));
   if (Object.keys(summary.cpuAlloc || {}).length === 0) {
@@ -355,12 +362,12 @@ export function FormatSnapshot(snapshot) {
 export function WorstLine(summary) {
   const worst = summary.worst;
   if (!worst) return "—";
-  const parts = [`${F(worst.interval)} ms · 主线程 ${F(worst.cpuMs)} ms · draw ${worst.calls}`];
+  const parts = [`${worst.id != null ? `#${worst.id} · ` : ""}${F(worst.interval)} ms · 主线程 ${F(worst.cpuMs)} ms · draw ${worst.calls}`];
   const buckets = Object.entries(worst.cpu)
     .filter(([key]) => key.indexOf("/") < 0)
     .sort((a, b) => b[1] - a[1]).slice(0, 8)
     .map(([key, value]) => `${CPU_LABELS[key] || key} ${F(value)}`);
-  parts.push(`CPU：${buckets.join("，")}，其他 ${F(worst.other)}`);
+  parts.push(buckets.length ? `CPU：${buckets.join("，")}，其他 ${F(worst.other)}` : `CPU：没有打标记的工作，其他 ${F(worst.other)}`);
   if (worst.gpu) {
     const gpu = Object.entries(worst.gpu)
       .sort((a, b) => b[1] - a[1]).slice(0, 5)
@@ -395,4 +402,91 @@ export function EventsLine(summary) {
   return parts.join(" ｜ ");
 }
 
-export default { CpuRows, GpuRows, FormatSnapshot, WorstLine, EventsLine, CPU_LABELS, GPU_NOTES, SHADOW_NOTE };
+// ---------------------------------------------------------------------------
+// 单帧时间轴（Unity 的 Timeline 视图的文本版：命令行 --frame 与面板「导出文本表格」）
+// ---------------------------------------------------------------------------
+
+/** 桶名的根（`ai/act/anim` → `ai`），时间轴按根上色、帧图按根堆叠。 */
+export function RootOf(key) {
+  const cut = key.indexOf("/");
+  return cut < 0 ? key : key.slice(0, cut);
+}
+
+/**
+ * 把一帧记录里的逐实例样本解成对象数组（Script_Profiler 的 SAMPLE_STRIDE / GPU_SEG_STRIDE 布局）。
+ * 名字号查 names；查不到（录制文件被手改过）就显示 `#号`。
+ */
+export function DecodeSamples(record, names) {
+  const out = [];
+  const samples = record && record.samples;
+  if (!samples) return out;
+  for (let i = 0; i + 3 < samples.length; i += 4) {
+    const id = samples[i];
+    out.push({ key: names[id] ?? `#${id}`, depth: samples[i + 1], start: samples[i + 2], duration: samples[i + 3] });
+  }
+  return out;
+}
+
+export function DecodeGpuSegments(record, names) {
+  const out = [];
+  const segs = record && record.gpuSegs;
+  if (!segs) return out;
+  for (let i = 0, slot = 0; i + 4 < segs.length; i += 5, slot += 1) {
+    const id = segs[i];
+    out.push({
+      key: names[id] ?? `#${id}`, start: segs[i + 1], cpuMs: segs[i + 2], calls: segs[i + 3], tris: segs[i + 4],
+      gpuMs: record.gpuSegMs && slot < record.gpuSegMs.length ? record.gpuSegMs[slot] : null,
+    });
+  }
+  return out;
+}
+
+/**
+ * 一帧的时间轴文本：最长的 top 条 B/E 实例（带起点，看得出是哪一个兵、第几次调用）
+ * + 按 GPU 耗时排的分段。表是「单帧汇总」的补充，不重复打桶合计。
+ */
+export function FormatFrameTimeline(record, names, { top = 25 } = {}) {
+  if (!record) return "（这一帧不在录制里）";
+  const out = [];
+  out.push(`时间轴 · 第 #${record.id} 帧 ｜ 整帧 ${F(record.interval)} ms${record.gap ? "（接缝帧：间隔是暂停时长）" : ""}`
+    + ` ｜ 主线程 ${F(record.cpuMs)} ms ｜ GPU ${record.gpuTotal == null ? "—" : F(record.gpuTotal)} ms`);
+  const samples = DecodeSamples(record, names).sort((a, b) => b.duration - a.duration);
+  if (!samples.length) {
+    out.push("（这一帧没有逐实例样本：旧版录制或建关帧）");
+  } else {
+    out.push(`主线程 B/E 实例 ${samples.length} 条，最长的 ${Math.min(top, samples.length)} 条（ms，起点相对帧起点）：`);
+    const columns = [
+      { head: "桶", width: 44, align: "left" },
+      { head: "时长", width: 8, align: "right" },
+      { head: "起点", width: 8, align: "right" },
+      { head: "深度", width: 4, align: "right" },
+    ];
+    out.push(...Table(columns, samples.slice(0, top).map((row) => [
+      CPU_LABELS[row.key] ? `${row.key} · ${CPU_LABELS[row.key]}` : row.key,
+      F(row.duration, 3), F(row.start, 2), String(row.depth),
+    ])));
+  }
+  const segs = DecodeGpuSegments(record, names);
+  if (segs.length) {
+    const sorted = segs.filter((row) => row.cpuMs > 0.005 || (row.gpuMs || 0) > 0.005 || row.calls > 0)
+      .sort((a, b) => ((b.gpuMs ?? b.cpuMs) - (a.gpuMs ?? a.cpuMs)));
+    out.push("");
+    out.push(`GPU 分段 ${segs.length} 段（按提交顺序记录，这里按 GPU 耗时排，前 ${Math.min(top, sorted.length)} 段）：`);
+    const columns = [
+      { head: "pass", width: 26, align: "left" },
+      { head: "GPU", width: 8, align: "right" },
+      { head: "提交CPU", width: 8, align: "right" },
+      { head: "起点", width: 8, align: "right" },
+      { head: "draw", width: 6, align: "right" },
+      { head: "三角", width: 8, align: "right" },
+    ];
+    out.push(...Table(columns, sorted.slice(0, top).map((row) => [
+      row.key, row.gpuMs == null ? "—" : F(row.gpuMs, 3), F(row.cpuMs, 3), F(row.start, 2),
+      Int(row.calls), Millions(row.tris),
+    ])));
+  }
+  return out.join("\n");
+}
+
+export default { CpuRows, GpuRows, FormatSnapshot, FormatFrameTimeline, WorstLine, EventsLine, RootOf,
+  DecodeSamples, DecodeGpuSegments, CPU_LABELS, GPU_NOTES, SHADOW_NOTE };
