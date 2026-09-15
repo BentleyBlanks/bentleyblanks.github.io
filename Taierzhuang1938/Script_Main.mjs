@@ -1771,6 +1771,13 @@ async function Boot() {
     Time: () => state.elapsed,
     LevelTime: () => state.phaseTime,
     PlayerPos: () => (player ? { x: player.position.x, y: player.position.y, z: player.position.z } : null),
+    // 抬着的担架顶住墙时把玩家水平挪回去（不动高度、不清竖直速度）。
+    ConstrainPlayer: (x, z) => {
+      if (!player) return;
+      player.position.x = x; player.position.z = z;
+      player.velocity.x = 0; player.velocity.z = 0;
+      player.body?.Teleport(player.position.x, player.position.y, player.position.z);
+    },
     // 玩家此刻在哪个路标圈里。与 story 的 ctx.zone 同一条判据，不另写一份。
     PlayerZone: () => {
       if (!battlefield || !player) return null;

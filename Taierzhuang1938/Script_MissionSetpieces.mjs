@@ -78,15 +78,47 @@ export function StepP012AirCivilian(s) {
   return true;
 }
 
+// The litter is a prop between the two bearers, so the rails themselves have
+// no body. While carried, the player may only stand where the rails between
+// front bearer and player clear the whitebox blocks and the span stays sane;
+// otherwise the player slides back along the blocked axis. If the front bearer
+// itself swung the rails into a wall, the player is never pinned.
+const LITTER_RAIL_HALF_WIDTH_M=.32,LITTER_END_INSET_M=.3,LITTER_SPAN_SLACK_M=.9;
+function P012LitterClear(blocks,at,rear,span){
+  const dx=rear.x-at.x,dz=rear.z-at.z,length=Math.hypot(dx,dz);
+  if(length>span+LITTER_SPAN_SLACK_M)return false;
+  if(length<=LITTER_END_INSET_M*2)return true;
+  const ux=dx/length,uz=dz/length,y=Math.min(at.y||0,rear.y||0);
+  return P012SegmentClear(blocks,
+    {x:at.x+ux*LITTER_END_INSET_M,y,z:at.z+uz*LITTER_END_INSET_M},
+    {x:rear.x-ux*LITTER_END_INSET_M,y,z:rear.z-uz*LITTER_END_INSET_M},LITTER_RAIL_HALF_WIDTH_M);
+}
+export function ConstrainP012LitterRear(s,at,rear,span){
+  const blocks=s.phase.whitebox?.layout?.blocks;
+  const safe=s.mem.p012LitterSafeRear;
+  if(!blocks||P012LitterClear(blocks,at,rear,span)||!safe||!P012LitterClear(blocks,at,safe,span)
+    ||Math.hypot(rear.x-safe.x,rear.z-safe.z)>1.5){
+    s.mem.p012LitterSafeRear={...rear};
+    return rear;
+  }
+  const fixed=[{...rear,z:safe.z},{...rear,x:safe.x},{...safe,y:rear.y}]
+    .find(point=>P012LitterClear(blocks,at,point,span));
+  s.d.host.ConstrainPlayer?.(fixed.x,fixed.z);
+  s.mem.p012LitterSafeRear={...fixed};
+  return fixed;
+}
+
 // The surviving front holder walks the same physical route as the player.
 // Camera turns never drag an actor around, and rendering reads both real ends.
 export function StepP012PlayerLitter(s) {
   const litter=s.mem.p012CarriedLitter,load=s.carry?.load;
   if(!litter||s.carry?.KindId!=="stretcher")return false;
-  const front=litter.front?.handle,at=front&&s.d.host.PositionOf?.(front),rear=s.PlayerPos();
+  const front=litter.front?.handle,at=front&&s.d.host.PositionOf?.(front);
+  let rear=s.PlayerPos();
   if(!front?.alive||!at||!rear)return false;
   const activity=s.phase.whitebox.activities,pose=activity.stretcherCarryPose||{};
   const span=pose.bearerSpanM||CARRY_KINDS.stretcher.spanM;
+  rear=ConstrainP012LitterRear(s,at,rear,span);
   if(s.mem.p012CarrySerial!==load?.serial||!s.mem.p012PlayerCarryPath){
     const final=s.d.host.Story?.()?.Signalled("P012Regripped");
     const path=[{...rear},...(final?[s.phase.whitebox.anchors.shelter]:activity.stretcherCarryRoute)];
