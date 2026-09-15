@@ -340,6 +340,15 @@ assert.match(actor, /CreateLugouCharacterRig\([\s\S]*?this\.library/,
   "actor factory passes the shared material library to imported characters");
 assert.match(runtime, /normalDepthMaxDistance\s*=\s*NORMAL_DEPTH_DETAIL_MAX_DISTANCE/,
   "only small distant skinned parts use a NormalDepth distance LOD");
+// 2026-09-16：three 的 SkinnedMesh 包围球只按首次剔除时的姿势算一次；坐着的人
+// 眼球（半径 4 cm）的球还在站姿位置，贴近脸时整块被视锥剔掉。
+assert.match(runtime, /this\.mixer\.setTime\([^\n]*\n\s*ShareSkinnedCullSphere\(this\.root, skinnedParts/,
+  "every skinned part shares one padded, pose-independent culling sphere set after the spawn pose");
+assert.match(runtime, /union\.radius \+= SKINNED_CULL_MARGIN_METERS[\s\S]*?mesh\.boundingSphere = union\.clone\(\)/,
+  "the shared culling sphere is padded for crouched, seated and fallen poses");
+assert.match(fs.readFileSync(path.join(here, "Script_CharacterWounds.mjs"), "utf8"),
+  /const cullSphere=candidate\.boundingSphere;[\s\S]*?candidate\.boundingSphere=cullSphere/,
+  "wound raycasts restore the shared culling sphere instead of freezing the hit pose");
 assert.match(editor, /GetLugouAnimationEntries/, "editor reads role-filtered imported clips");
 assert.match(editor, /IsLugouAnimationAllowed\(actor\.kind, this\.clipId\)/,
   "editor rechecks every lineup actor before playing an imported clip");

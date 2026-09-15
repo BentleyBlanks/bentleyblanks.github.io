@@ -272,9 +272,40 @@ const DEATH_COLLAPSE_BLEND_SECONDS = 0.1;
 // 完整蒙皮轮廓必须进入 NormalDepth；但远处占屏很小的头、手和零碎附件不值得
 // 再为预通道提交一遍。每套模型三角最多的主分件始终保留，近景/编辑器则全部保留。
 const NORMAL_DEPTH_DETAIL_MAX_DISTANCE = 4;
+// 视锥剔除用的包围球：three 的 SkinnedMesh 只在第一次被剔除时按**当时的姿势**算一次，
+// 之后换姿势永不更新。眼球、帽徽这类小分件的球半径只有 4 cm，站姿算出来的球
+// 在坐姿/跪姿里离真眼睛 0.4 m，相机一贴近脸，球掉出视锥，眼睛和帽徽就整块不画了
+// （2026-09-16 车厢里的幺娃/顺子）。改成整个人共用一个与姿势无关的球：
+// 出厂站姿的全身包围球再放宽这么多米，躺倒、前扑、骨盆位移轨道都还在球里。
+const SKINNED_CULL_MARGIN_METERS = 1.2;
 const LOADER = new GLTFLoader();
 let loadPromise = null;
 const deathLibraryPromises = new Map();
+
+/**
+ * 给一个人的全部蒙皮分件装同一个包围球（各自换回自己的局部坐标）。
+ * 在出厂站姿上逐分件算蒙皮后的包围球（three 首次剔除本来也做这一步），换到 rig 根的
+ * 父空间（米）里合并，再加 SKINNED_CULL_MARGIN_METERS。几何体自带的 boundingSphere
+ * 不能用：这批 GLB 的逆绑定矩阵带缩放，未蒙皮顶点只有厘米大小。
+ * 预先填好 boundingSphere，three 就不会在某个临时姿势上自己算一个再冻住。
+ */
+function ShareSkinnedCullSphere(root, meshes) {
+  if (!meshes.length) return;
+  root.updateMatrixWorld(true);
+  const parentInverse = root.parent
+    ? new THREE.Matrix4().copy(root.parent.matrixWorld).invert() : new THREE.Matrix4();
+  const toRig = (mesh) => new THREE.Matrix4().multiplyMatrices(parentInverse, mesh.matrixWorld);
+  const union = new THREE.Sphere(new THREE.Vector3(), -1);
+  for (const mesh of meshes) {
+    mesh.boundingSphere = null;
+    mesh.computeBoundingSphere();
+    union.union(mesh.boundingSphere.clone().applyMatrix4(toRig(mesh)));
+  }
+  union.radius += SKINNED_CULL_MARGIN_METERS;
+  for (const mesh of meshes) {
+    mesh.boundingSphere = union.clone().applyMatrix4(toRig(mesh).invert());
+  }
+}
 
 function NormalizeName(value) {
   return String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -768,6 +799,7 @@ export class LugouCharacterRig {
     // （这个相位以前还要在 Attach 里存下来再放回去，因为那时的贴地标定会临时
     // 拨动 mixer；离线贴地之后 Attach 不再碰时间轴，存不存都一样，就不存了。）
     this.mixer.setTime((HashString(`${seed}|phase`) % 1000) / 1000);
+    ShareSkinnedCullSphere(this.root, skinnedParts.map((part) => part.object));
   }
 
   Attach(actor) {
