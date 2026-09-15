@@ -71,13 +71,15 @@ export function CreateP012Terrain(layout) {
     const a=NodeHeight(ix,iz),b=NodeHeight(ix+1,iz),c=NodeHeight(ix,iz+1),e=NodeHeight(ix+1,iz+1);
     return u+v<=1 ? a+(b-a)*u+(c-a)*v : e+(c-e)*(1-u)+(b-e)*(1-v);
   };
+  const textureTileM = layout.terrainSpec?.textureTileM || 8;
+  const textureZSign = layout.terrainSpec?.textureTileM ? -1 : 1;
   function* Chunks() {
     for(let z0=0;z0<rows;z0+=chunkCells)for(let x0=0;x0<cols;x0+=chunkCells){
       const nx=Math.min(chunkCells,cols-x0),nz=Math.min(chunkCells,rows-z0),stride=nx+1;
       const positions=new Float32Array(stride*(nz+1)*3),normals=new Float32Array(positions.length),uvs=new Float32Array(stride*(nz+1)*2),indices=[];
       for(let j=0;j<=nz;j++)for(let i=0;i<=nx;i++){
         const ix=x0+i,iz=z0+j,at=j*stride+i,px=minX+ix*stepX,pz=minZ+iz*stepZ;
-        positions.set([px,NodeHeight(ix,iz),pz],at*3);uvs.set([px/8,pz/8],at*2);
+        positions.set([px,NodeHeight(ix,iz),pz],at*3);uvs.set([px/textureTileM,textureZSign*pz/textureTileM],at*2);
         // Global neighbours give identical lighting at adjacent chunk edges.
         const dx=(NodeHeight(ix+1,iz)-NodeHeight(ix-1,iz))/(2*stepX),dz=(NodeHeight(ix,iz+1)-NodeHeight(ix,iz-1))/(2*stepZ),len=Math.hypot(dx,1,dz);
         normals.set([-dx/len,1/len,-dz/len],at*3);

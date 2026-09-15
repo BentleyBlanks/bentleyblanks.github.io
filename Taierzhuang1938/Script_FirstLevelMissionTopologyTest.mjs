@@ -63,10 +63,15 @@ for(const pocket of Pockets){
  const n=MissionRouteNextIndex(Routes.evacuation,pocket.anchor);
  assert.ok(Distance(Routes.evacuation[n],pocket.anchor)<.01,'pursuit never selects an unrelated point by east/west coordinate');
 }
-// A standing eye must lose the next pocket behind actual geometry.
+// A standing eye must lose the next pocket behind walls or excavated soil.
+// The browser counterpart raycasts both; a deeper trench can put the ray below a wall foundation.
 function SolidBetween(a,b){
  const from={...a,y:SampleMissionTerrain(a.x,a.z)+1.6},to={...b,y:SampleMissionTerrain(b.x,b.z)+1.6};
  const distance=Distance(a,b);
+ for(let d=.1;d<distance-.1;d+=.1){
+  const t=d/distance,x=from.x+(to.x-from.x)*t,z=from.z+(to.z-from.z)*t,y=from.y+(to.y-from.y)*t;
+  if(SampleMissionTerrain(x,z)>y+.05)return true;
+ }
  return Layout.blocks.some(box=>box.solid!==false&&Array.from({length:Math.ceil(distance*4)},(_,i)=>i/(distance*4)).some(t=>{
   const x=from.x+(to.x-from.x)*t-box.x,z=from.z+(to.z-from.z)*t-box.z,y=from.y+(to.y-from.y)*t;
   return Math.abs(x)<box.w/2&&Math.abs(z)<box.d/2&&y>box.y-box.h/2&&y<box.y+box.h/2;

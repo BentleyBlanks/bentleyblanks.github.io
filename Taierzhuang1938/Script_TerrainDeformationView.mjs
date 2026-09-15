@@ -647,8 +647,9 @@ export class TerrainDeformationView {
         geometry.setAttribute("terrainDelta", new THREE.BufferAttribute(new Float32Array(width * width * 2), 2).setUsage(THREE.DynamicDrawUsage));
         geometry.setAttribute("terrainBlast", new THREE.BufferAttribute(new Float32Array(width * width * 2), 2).setUsage(THREE.DynamicDrawUsage));
         const uv = new Float32Array(width * width * 2);
+        const tileM = this.field.layout?.terrainSpec?.textureTileM || 3.4;
         for (let z = 0; z <= n; z++) for (let x = 0; x <= n; x++) {
-          const at = z * width + x; uv[at * 2] = (x0 + x * s) / 3.4; uv[at * 2 + 1] = -(z0 + z * s) / 3.4;
+          const at = z * width + x; uv[at * 2] = (x0 + x * s) / tileM; uv[at * 2 + 1] = -(z0 + z * s) / tileM;
         }
         geometry.setAttribute("uv", new THREE.BufferAttribute(uv, 2));
         geometry.setIndex(new THREE.BufferAttribute(TileIndexArray(n), 1));

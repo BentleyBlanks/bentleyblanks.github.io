@@ -719,6 +719,11 @@ for(const [index,step] of MISSION_STAGES.filter(s=>!["TrenchEntry","Shelter"].in
 const stable=new FirstLevelMissionFlow();stable.Restore({version:2,stageId:"Shelter",index:0,time:1,stageTime:0,facts:["trenchCleared"],log:[]});
 assert.equal(stable.stage.id,"Shelter","v2 stable stage id overrides positional index");
 const terrain = CreateP012Terrain(MISSION_LAYOUT);
+for (const trench of MISSION_TERRAIN.trenches) assert.ok(trench.depth >= 1.83, trench.id + " full-cover excavation depth");
+for (const [x,z] of [[-24,-53],[-45,30],[-10,-124]]) {
+  assert.ok(terrain.SampleHeight(x,z) < -1.8, "rendered/physical full-cover floor at " + x + "," + z);
+}
+assert.equal(MISSION_TERRAIN.trenches.find(t=>t.id==='BundleApproach').depth, MISSION_TERRAIN.steps[0].depth, 'supply house floor remains level with trench');
 for (const [x, z] of [
   [-24, -53],
   [-8, -106],

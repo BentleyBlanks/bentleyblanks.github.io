@@ -146,6 +146,14 @@ export class FirstLevelWhiteboxField {
   StaticGroundHeight(x,z){return SampleWhiteboxSurface(this.staticWalkableSurfaces,x,z,this.terrain?.SampleHeight(x,z)??0);}
 
   async PrepareAssets() {
+    if (this.layout.ground?.pbr) {
+      const { CloneShadedMaterial } = await import("./Script_Materials.mjs");
+      const semantic = this.layout.ground.semantic;
+      this.materials.get(semantic)?.dispose();
+      const material = CloneShadedMaterial(this.library.Get(this.layout.ground.pbr, this.layout.ground.pbrOptions));
+      material.name = "FirstLevelMissionSoil";
+      this.materials.set(semantic, material);
+    }
     if(this.layout.fortifications)this.fortificationModels=await LoadMissionFortifications(this.library);
   }
 

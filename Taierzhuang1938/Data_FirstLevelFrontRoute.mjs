@@ -11,7 +11,7 @@ export const FRONT_SORTIE=Object.freeze({
   crawl:[{id:'First',x:49,z:-127,w:4.6,d:5},{id:'Second',x:55,z:-177,w:4.6,d:5}],
   crawlClearanceM:.96, crawlRoofM:1.1, crawlRadiusM:3.8,crawlEntryMarginM:.75,
   checkpointRadiusM:3.2, supplierRangeM:7, leaderArrivalM:4,leaderWaitM:12,leaderCrawlMps:1.1,
-  trenchBottomM:3.6,trenchDepthM:1.45,trenchBankM:1.3,
+  trenchBottomM:3.6,trenchDepthM:2,trenchBankM:1.3,
   // Finite defenders hold two bends, separate from the frontal attack at 04.
   enemies:[{id:'BundleBendA',x:61,z:-155,hold:true},{id:'BundleBendB',x:62,z:-188,hold:true},
     {id:'BundleHouseGuard',x:34,z:-204,hold:true}],
