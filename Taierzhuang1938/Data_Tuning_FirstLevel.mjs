@@ -455,6 +455,32 @@ export const MISSION_PEOPLE_TUNING=Object.freeze({aftermathTiers:Object.freeze([
   Object.freeze({cellM:.14}),
 ]),aftermathRefreshM:.35,aftermathRefreshDot:.00012,closeAnimationM:8,nearAnimationM:45,farAnimationM:90,nearAnimationS:1/20,idleAnimationS:1/10,midAnimationS:1/15,farAnimationS:1/8,walkThresholdMps:.08,gaitSpeedMps:3.6,carrySourceMps:1.4,loadSinkM:.08,loadLeanRad:.045,breathRate:1.7,watchYawRad:.18});
 
+// 老周身上的血（用户 2026-09-16：「应该是伤痕累累，血迹斑斑」）。担架上的两条画法共用这一张表：
+// 带骨架的伤员走 CharacterWounds.Add（沿世界竖直向下投到外层表面），实例化的烘焙姿势直接在烘焙空间摆球。
+// 他躺平、脸朝天，所以「正面」就是世界 +Y：
+//   from/to/t  锚点 = 两根语义骨（boneRoles 的键）之间的插值；to 为空就是 from 本身
+//   liftM      从骨轴往正面抬多少米（烘焙路径的球心就在这里；骨架路径只当投射起点，落点由射线定）
+//   part       CharacterWounds 的区域过滤（torso / head / arm / leg），挡在上面的手不会抢走肚子上的血
+//              脸上不放：低模脸上一团深色读出来是胡子/脏块，不是伤口（2026-09-16 实拍）
+//   radiusM    渗开的半径；ageS 是开局时已经淌了多久（BLOOD_WOUND.drySeconds=48：几十秒偏湿亮，几百秒干成褐黑）
+//   stabbed    true 的几处只在屋内伏击那一刀（litter.stabbed）之后才有；骨架版从挨刀那一刻起算年龄（会渗开、慢慢变干），
+//              ageS 只给烘焙版用（它不走时间，挨刀后、牺牲后看到的都是半干的）
+// 原本是腿伤（Data_FirstLevelMissionDialogue 的 zhou 人设），裤腿泡透、顺小腿往下淌；
+// 其余是一路上抬过来的擦伤和别人的血。一个网格 BLOOD_WOUND.slots(12) 个槽，这里 11 处。
+export const ZHOU_WOUNDS=Object.freeze([
+  Object.freeze({id:"thighR",from:"thighR",to:"calfR",t:.45,liftM:.07,part:"leg",radiusM:.19,ageS:24}),
+  Object.freeze({id:"shinR",from:"calfR",to:"footR",t:.3,liftM:.05,part:"leg",radiusM:.11,ageS:70}),
+  Object.freeze({id:"kneeL",from:"thighL",to:"calfL",t:.92,liftM:.06,part:"leg",radiusM:.075,ageS:220}),
+  Object.freeze({id:"forearmR",from:"forearmR",to:"handR",t:.55,liftM:.04,part:"arm",radiusM:.085,ageS:140}),
+  Object.freeze({id:"upperArmL",from:"upperArmL",to:"forearmL",t:.45,liftM:.05,part:"arm",radiusM:.07,ageS:420}),
+  Object.freeze({id:"chestL",from:"chest",to:"upperArmL",t:.55,liftM:.1,part:"torso",radiusM:.1,ageS:300}),
+  Object.freeze({id:"ribsR",from:"chest",to:"upperArmR",t:.3,liftM:.1,part:"torso",radiusM:.065,ageS:160}),
+  Object.freeze({id:"collar",from:"chest",to:"neck",t:.75,liftM:.08,part:"torso",radiusM:.06,ageS:260}),
+  Object.freeze({id:"belly",from:"pelvis",to:"chest",t:.5,liftM:.12,part:"torso",radiusM:.2,ageS:36,stabbed:true}),
+  Object.freeze({id:"handL",from:"handL",to:null,t:0,liftM:.03,part:"arm",radiusM:.07,ageS:36,stabbed:true}),
+  Object.freeze({id:"handR",from:"handR",to:null,t:0,liftM:.03,part:"arm",radiusM:.07,ageS:36,stabbed:true}),
+]);
+
 // User 2026-09-14: authored soft return warning, with room for combat detours.
 // Values are local design choices, not claimed COD engine constants.
 export const MISSION_RETURN = Object.freeze({

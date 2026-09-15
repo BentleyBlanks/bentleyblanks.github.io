@@ -291,7 +291,7 @@ export class FirstLevelMissionView {
       // 没有动作库、不是他、或者他已经断气，都退回实例化的烘焙姿势 ——
       // 死人不能继续喘（第 17 阶段的告别戏用的就是那条既有姿势）。
       if(!(litter.health>0&&this.people.RiggedPatient(litter.id,litter.x,ground,litter.z,yaw,ground+height)))
-        this.people.Patient(litter.id,litter.x,ground+height+.07,litter.z,yaw,time);
+        this.people.Patient(litter.id,litter.x,ground+height+.07,litter.z,yaw,time,litter.zhou?{stabbed:!!litter.stabbed}:null);
       const SetGrip=(side,end)=>new THREE.Vector3(litter.x+Math.cos(yaw)*side*.29-Math.sin(yaw)*end,
         ground+height+.12,litter.z-Math.sin(yaw)*side*.29-Math.cos(yaw)*end);
       if (!litter.loaded && litter.state !== "placed")

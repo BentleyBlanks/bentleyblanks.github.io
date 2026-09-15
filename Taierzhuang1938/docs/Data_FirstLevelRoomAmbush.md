@@ -257,6 +257,10 @@ ambushBladeLanded / ambushFinisher / zhouStabbed`，并且还原担架队快照�
   播不了动作；挨刀那一瞬 `view.people.SetAmbushClip(zhou.id, "PatientStabbed", "PatientWoundedIdle")`
   一置上，`MissionPeople.RiggedPatient()` 就改用真的 Person（LugouNra02）并按担架床面 `deckY` 采样，
   放完 2.6 s 的挨刀段自动接上 3.0 s 的循环喘息段，一直演到第 17 阶段他断气为止。
+- **老周身上的血**（2026-09-16）：两条画法共用 `Data_Tuning_FirstLevel.ZHOU_WOUNDS`（腿伤、擦伤、别人的血，
+  `stabbed:true` 的肚子和双手只在 `litter.stabbed` 之后出现）。骨架版挂 `actor.woundBlood`（`CharacterWounds.Add`
+  带 `radiusM` / `ageS`，从挨刀那一刻起渗开变干）；实例化版单独一张 `"zhou"` 表（外观同 modelVariant 1，
+  材质不与别的伤员共用），`PaintBakedWounds` 在烘焙空间摆球。脸上不放血——低模上读成胡子。
 
 ## 6. 验收
 

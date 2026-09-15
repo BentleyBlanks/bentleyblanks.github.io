@@ -81,6 +81,16 @@ function WoundMaterial(source,uniforms) {
   for(const m of Array.isArray(material)?material:[material])ApplyPatches(m,[...(PatchesOf(m)||[]),patch]);
   return material;
 }
+// Static stains on already-baked geometry (instanced litter patients): the baked position is the
+// rest space, so the same patch reads it directly. `material` must be private to this mesh.
+// Returns the uniforms; callers fill uClothWounds (xyz centre, w radius in metres; w=0 hides a slot).
+export function PaintBakedWounds(mesh,uniforms=WoundUniforms()) {
+  mesh.geometry.setAttribute("woundRestPosition",mesh.geometry.attributes.position);
+  const patch=WoundPatch(uniforms);
+  for(const m of Array.isArray(mesh.material)?mesh.material:[mesh.material])ApplyPatches(m,[...(PatchesOf(m)||[]),patch]);
+  return uniforms;
+}
+export function CreateWoundUniforms(){return WoundUniforms();}
 const warmMaterials=new WeakMap();
 // Keep a zero-wound variant alive with the source material so first injury reuses
 // a linked program. Restore the original materials after the loading-screen pass.
@@ -108,7 +118,9 @@ export function PrepareWoundVariants(root) {
 // Private materials isolate each wearer; no decals, transparent shells or per-frame vertex uploads.
 export class CharacterWounds {
   constructor(root) { this.root=root; this.records=new Map(); this.time=0; this.count=0; }
-  Add({part="torso",shapeId=null,point=null,direction=null,preferCloth=false}={}) {
+  // radiusM / ageS default to a fresh bullet wound; scripted casualties (Lao Zhou's litter)
+  // pass larger, already-dried stains.
+  Add({part="torso",shapeId=null,point=null,direction=null,preferCloth=false,radiusM=C.radiusM,ageS=0}={}) {
     if (!this.root) return false;
     this.root.updateWorldMatrix(true,true);
     const meshes=[];
@@ -202,10 +214,10 @@ export class CharacterWounds {
       mesh.applyBoneTransform(index,basis);basis.applyMatrix4(mesh.matrixWorld);
       stretch+=basis.distanceTo(origin);
     }
-    const radius=C.radiusM/Math.max(.0001,stretch/3);
-    const slot=record.cursor++%C.slots;
+    const radius=radiusM/Math.max(.0001,stretch/3);
+    const slot=record.cursor++%C.slots, age=Math.max(0,ageS);
     record.uniforms.uClothWounds.value[slot].set(rest.x,rest.y,rest.z,radius);
-    record.born[slot]=this.time;record.uniforms.uClothWoundAge.value[slot].set(0,0);
+    record.born[slot]=this.time-age;record.uniforms.uClothWoundAge.value[slot].set(age,0);
     this.count++;return true;
   }
   Update(dt) {
