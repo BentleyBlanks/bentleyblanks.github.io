@@ -389,6 +389,24 @@ export const MISSION_TUNING = Object.freeze({
   bridgeBombAtS: 3,
   cartBombAtS: 3.3,
   zhouStrafeAtS: 2.6,
+  // Air passes (2026-09-16): the Ki-30 flies at a low-level attack speed instead of 25 m/s (below its stall speed).
+  // Event times above stay put; each pass is anchored so the aircraft is where the old path had it at that moment:
+  // first pass at bridgeBombAtS over airFirstAnchorZ, second pass at zhouStrafeAtS over airSecondAnchorZ.
+  airSpeedMps: 60,
+  // The first pass enters this early (≈290 m out) so it does not pop in 140 m from the player; events keep their times.
+  firstAirLeadS: 2.5,
+  airFirstAnchorZ: 140,
+  airSecondAnchorZ: 130,
+  // Gun impacts run airStrafeLeadM ahead of the aircraft (30 m up / 45 m ≈ 34° dive) and only inside this road band.
+  airStrafeLeadM: 45,
+  airStrafeFromZ: 80,
+  airStrafeToZ: 160,
+  airShotIntervalS: 0.1,
+  // Pull up once the aircraft is airPullUpAfterM past its anchor.
+  airPullUpAfterM: 30,
+  airPullUpRad: 0.14,
+  // The recorded dive pass peaks 3.5 s in; start it that long before the anchor.
+  airDiveSoundLeadS: 3.5,
 });
 
 // Aftermath tiers (2026-09-08 frame probe: 87 full bodies inside 30 m cost 0.9 M triangles per pass): full mesh only to
