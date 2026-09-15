@@ -43,7 +43,13 @@ async function Drive(label,points,{fight=false,until=null,untilVoice=null,second
         return untilVoice?r.voice.finished.has(untilVoice)||!!(r.voice.current?.cue.id===untilVoice&&r.voice.current.sourceTime>0):
           until?[until].flat().every(id=>r.Has(id)):b.index===b.points.length;
       };
+      let cutsceneFrames=0;
       for(let i=0;!realtime&&i<120&&g.player.alive&&!g.Debug.FirstLevelMissionRuntime().failed;i++){
+        // 关中过场（04 机枪点位那一场）期间玩家没有控制权，输入递不进去。
+        // 像玩家一样坐着等它播完：不喂输入、照常推帧，这一段也不吃这条腿的秒数预算
+        // （见下面 secondsDone 那一行）—— 不扣的话 44 s 的过场会把 40 s 的预算吃光，
+        // 症状是「MachineGunApproach: failed to progress」而玩家其实好端端站在枪位上。
+        if(g.state.cutscene){cutsceneFrames++;g.StepFrames(1,1/60,false);continue;}
         b.Step(fight);
         g.StepFrames(1,1/60,false);
         if((until||untilVoice)&&Ready())break;
@@ -51,6 +57,7 @@ async function Drive(label,points,{fight=false,until=null,untilVoice=null,second
       if(!realtime)g.StepFrames(1,1/60,true);
       const r=g.Debug.FirstLevelMissionRuntime();
       return {t:r.time,stage:r.flow.stage.id,index:b.index,points:b.points.length,position:g.player.position.toArray(),health:g.player.health,alive:g.player.alive&&!r.failed,
+        cutscene:g.state.cutscene,cutsceneFrames,
         ready:Ready(),shots:g.state.playerShots,ammo:g.state.ammo,remaining:r.flow.State().remaining,foe:b.foe,
         damage:window.missionDamage?.slice(-8),
         camera:{position:g.camera.position.toArray(),rotation:g.camera.rotation.toArray()},control:r.controls?.kind,
@@ -62,6 +69,8 @@ async function Drive(label,points,{fight=false,until=null,untilVoice=null,second
           stance:a.stance,suppression:a.suppression,cover:a.cover?.id,coverPhase:a.coverPhase,
           contact:!!a.missionContactPost,incoming:a.incomingFire,move:a.moveOrder,evade:!!a.missionGrenadeEvade,grenade:a.grenadeThreat?{p:a.grenadeThreat.position.toArray(),fuse:a.grenadeThreat.fuse}:null})),voicePlaying:!!r.voice.current,voiceCue:r.voice.current?.cue?.id,opening:r.opening.State()};
     },{fight,until,untilVoice,realtime});
+    // 过场帧不计入这条腿的预算（上面那段注释）。
+    if(result.cutsceneFrames)secondsDone-=(realtime?.25:2)*Math.min(1,result.cutsceneFrames/120);
     trace.push({label,...result});
     combatTrace.push(await page.evaluate(()=>{
       const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime();
