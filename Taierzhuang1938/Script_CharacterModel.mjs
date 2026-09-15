@@ -266,11 +266,15 @@ const MODEL_FORWARD_YAW = Math.PI;
 // NRA eye maps and shoulder silhouettes: keep the manifest and GLBs on one revision.
 const MANIFEST_URL = "./Model/Character/Data_LugouCharacterManifest.json?v=202609061026";
 const ASSET_VERSION = "202609061026";
+const DEATH_COLLAPSE_ASSET_VERSION = "202609151352";
+const DEATH_COLLAPSE_PLAYBACK_RATE = 1.6;
+const DEATH_COLLAPSE_BLEND_SECONDS = 0.1;
 // 完整蒙皮轮廓必须进入 NormalDepth；但远处占屏很小的头、手和零碎附件不值得
 // 再为预通道提交一遍。每套模型三角最多的主分件始终保留，近景/编辑器则全部保留。
 const NORMAL_DEPTH_DETAIL_MAX_DISTANCE = 4;
 const LOADER = new GLTFLoader();
 let loadPromise = null;
+const deathLibraryPromises = new Map();
 
 function NormalizeName(value) {
   return String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
@@ -284,6 +288,16 @@ function HashString(value) {
     hash = Math.imul(hash, 16777619);
   }
   return hash >>> 0;
+}
+
+export const DEATH_COLLAPSE_CLIP_IDS = Object.freeze([
+  "DeathCollapseA", "DeathCollapseB", "DeathCollapseC", "DeathCollapseD",
+]);
+
+export function SelectDeathCollapseClipId(seed) {
+  return DEATH_COLLAPSE_CLIP_IDS[
+    HashString(`${seed}|death-collapse`) % DEATH_COLLAPSE_CLIP_IDS.length
+  ];
 }
 
 function FindNode(root, name) {
@@ -305,9 +319,49 @@ function VersionedUrl(url) {
   return `${url}${url.includes("?") ? "&" : "?"}v=${ASSET_VERSION}`;
 }
 
+function LoadDeathLibrary(faction) {
+  if (!deathLibraryPromises.has(faction)) {
+    const name = faction === "ija" ? "Ija" : "Nra";
+    const url = `./Model/Character/Animation_Lugou${name}DeathCollapse.glb?v=${DEATH_COLLAPSE_ASSET_VERSION}`;
+    deathLibraryPromises.set(faction, LOADER.loadAsync(url).catch(error => {
+      console.warn("[DeathCollapse] optional library unavailable", faction, String(error));
+      return null;
+    }));
+  }
+  return deathLibraryPromises.get(faction);
+}
+
+function RetargetAnimationLibrary(library, targetRoot) {
+  if (!library) return null;
+  const q = new THREE.Quaternion(), deltaQ = new THREE.Quaternion();
+  return { ...library, animations: library.animations.map(sourceClip => {
+    const clip = sourceClip.clone();
+    clip.tracks = clip.tracks.filter(track => {
+      const split = track.name.lastIndexOf("."), name = track.name.slice(0, split);
+      const source = library.scene.getObjectByName(name), target = targetRoot.getObjectByName(name);
+      if (!source || !target) return false;
+      const property = track.name.slice(split + 1);
+      if (property === "position") {
+        const delta = target.position.clone().sub(source.position);
+        for (let i = 0; i < track.values.length; i += 3) {
+          track.values[i] += delta.x; track.values[i + 1] += delta.y; track.values[i + 2] += delta.z;
+        }
+      } else if (property === "quaternion") {
+        deltaQ.copy(target.quaternion).multiply(source.quaternion.clone().invert());
+        for (let i = 0; i < track.values.length; i += 4) {
+          q.fromArray(track.values, i).premultiply(deltaQ).normalize().toArray(track.values, i);
+        }
+      }
+      return true;
+    });
+    return clip;
+  }) };
+}
+
 async function LoadAsset(record) {
   try {
     const gltf = await LOADER.loadAsync(VersionedUrl(record.url));
+    const death = RetargetAnimationLibrary(await LoadDeathLibrary(record.faction), gltf.scene);
     let infantry = null;
     const infantrySource = CHARACTER_INFANTRY_SOURCE_BY_MODEL[record.id] || record.id;
     if (!infantrySource.endsWith("05")) {
@@ -345,7 +399,7 @@ async function LoadAsset(record) {
       try { facial = await LOADER.loadAsync(`${record.facialUrl}?v=${record.facialVersion}`); }
       catch (error) { console.warn("[CharacterModel] facial model unavailable", record.id, String(error)); }
     }
-    return { record, gltf, infantry, facial, error: null };
+    return { record, gltf, infantry, death, facial, error: null };
   } catch (error) {
     console.warn(`[CharacterModel] ${record.id} 读取失败：${String(error).slice(0, 180)}`);
     return { record, gltf: null, error: String(error) };
@@ -589,6 +643,10 @@ export class LugouCharacterRig {
       }
     }
     this.infantry = new InfantryAnimationController(this);
+    this.deathClipById = new Map(DEATH_COLLAPSE_CLIP_IDS.map(id => [id,
+      (asset.death?.animations || []).find(clip => NormalizeName(clip.name).includes(NormalizeName(id))),
+    ]).filter(([, clip]) => clip));
+    this.deathVariantId = SelectDeathCollapseClipId(seed);
     this.clipById = new Map();
     for (const clip of [...(asset.gltf.animations || []), ...(asset.infantry?.animations || [])]) {
       const normalized = NormalizeName(clip.name);
@@ -715,6 +773,7 @@ export class LugouCharacterRig {
   Attach(actor) {
     this.actor = actor;
     actor.body.add(this.root);
+    this.attachBodyY = actor.body.position.y;
     // The offline bake recentres the complete skinned model and grounds every
     // animation frame against the actual deformed mesh.  A Biped Foot node is an
     // ankle pivot, not a sole marker; aligning that bone to Y=0 buried both boots.
@@ -736,8 +795,34 @@ export class LugouCharacterRig {
   }
 
   BeginDeathPose() {
-    if (this.deathPose) return;
+    if (this.deathClipState || this.deathPose) return this.deathDuration || .8;
     this.locomotion.Restore(); this.locomotion.ResetContacts();
+    this.infantry.Cancel(); this.meleeAnimation?.Restore();
+    this.root.position.y -= this.infantryFloorOffset || 0;
+    this.infantryFloorOffset = 0;
+    this.deathFloorLift = undefined; this.deathContactRotation = null;
+    this.deathGroundProbes = [];
+    this.root.traverse(mesh => {
+      if (mesh.isMesh && mesh.userData.characterPbrSurface) this.deathGroundProbes.push(mesh);
+    });
+    const deathClip = this.deathClipById.get(this.deathVariantId);
+    if (deathClip) {
+      const previous = this.currentAction;
+      const action = this.mixer.clipAction(deathClip);
+      action.enabled = true;
+      action.reset().setEffectiveWeight(1).setEffectiveTimeScale(DEATH_COLLAPSE_PLAYBACK_RATE);
+      action.clampWhenFinished = true;
+      action.setLoop(THREE.LoopOnce, 1).play();
+      if (previous && previous !== action && previous.isScheduled()) {
+        previous.crossFadeTo(action, DEATH_COLLAPSE_BLEND_SECONDS, false);
+      } else if (previous && previous !== action) previous.stop();
+      this.currentAction = action;
+      this.currentId = this.deathVariantId;
+      this.currentPlaybackId = this.deathVariantId;
+      this.deathDuration = deathClip.duration / DEATH_COLLAPSE_PLAYBACK_RATE;
+      this.deathClipState = { action, clip: deathClip, lastSample: 0 };
+      return this.deathDuration;
+    }
     const nodes = [];
     this.root.traverse(node => {
       if (node.isBone) nodes.push({ node, startPosition: node.position.clone(),
@@ -770,40 +855,53 @@ export class LugouCharacterRig {
       item.node.scale.copy(item.startScale);
     }
     this.deathPose = nodes;
-    this.deathGroundProbes = [];
-    this.root.traverse(mesh => {
-      if (!mesh.isMesh || !mesh.userData.characterPbrSurface) return;
-      // Fixed vertex sample keeps the short transition bounded; final frame checks every vertex.
-      this.deathGroundProbes.push(mesh);
-    });
+    this.deathDuration = .8;
+    return this.deathDuration;
   }
 
   PoseDeath(t) {
-    if (!this.deathPose) return;
-    const blend = THREE.MathUtils.smoothstep(t, 0, .85);
-    for (const item of this.deathPose) {
-      item.node.position.lerpVectors(item.startPosition, item.position, blend);
-      item.node.quaternion.slerpQuaternions(item.startQuaternion, item.quaternion, blend);
-      item.node.scale.lerpVectors(item.startScale, item.scale, blend);
+    if (!this.deathClipState && !this.deathPose) return;
+    if (this.deathClipState) {
+      // Drive the mixer forward by the normalized delta. AnimationMixer.setTime
+      // is not idempotent for an action whose scheduled start has already fired:
+      // repeating setTime at t=1 can evaluate that action back at time zero.
+      // Staying just inside LoopOnce's end and applying only forward deltas makes
+      // every later corpse tick a true zero-delta held terminal pose.
+      const sample = Math.min(t, 1 - 1e-6);
+      const previousSample = this.deathClipState.lastSample;
+      if (sample >= previousSample) this.mixer.update((sample - previousSample) * this.deathDuration);
+      else {
+        this.deathClipState.action.time = sample * this.deathClipState.clip.duration;
+        this.mixer.update(0);
+      }
+      this.deathClipState.lastSample = sample;
+    } else {
+      const blend = THREE.MathUtils.smoothstep(t, 0, .85);
+      for (const item of this.deathPose) {
+        item.node.position.lerpVectors(item.startPosition, item.position, blend);
+        item.node.quaternion.slerpQuaternions(item.startQuaternion, item.quaternion, blend);
+        item.node.scale.lerpVectors(item.startScale, item.scale, blend);
+      }
     }
-    // Let the feet roll onto their sides as muscle tension releases. Preserve limb
-    // lengths and the authored pose; only swing the ankle, in the fitted ground plane.
     const rootQ = this.actor.root.getWorldQuaternion(new THREE.Quaternion());
     const point = new THREE.Vector3(), start = new THREE.Vector3();
     const parentQ = new THREE.Quaternion(), swing = new THREE.Quaternion();
-    const ankleBlend = THREE.MathUtils.smoothstep(t, DEATH_CONTACT.ankleStart, DEATH_CONTACT.poseEnd);
-    for (const [side, sign] of [["L", -1], ["R", 1]]) {
-      const foot = this.bones[`foot${side}`];
-      const toe = foot?.children.find(node => /Toe0$/.test(node.name));
-      if (!toe) continue;
-      foot.getWorldPosition(start); toe.getWorldPosition(point).sub(start).normalize();
-      const target = new THREE.Vector3(sign * DEATH_CONTACT.footOutward, 0,
-        this.actor.ragdollState.forward * DEATH_CONTACT.footAlongBody).normalize().applyQuaternion(rootQ);
-      swing.setFromUnitVectors(point, target);
-      foot.parent.getWorldQuaternion(parentQ);
-      swing.premultiply(parentQ.clone().invert()).multiply(parentQ);
-      swing.slerpQuaternions(new THREE.Quaternion(), swing.clone(), ankleBlend);
-      foot.quaternion.premultiply(swing);
+    if (!this.deathClipState) {
+      // The legacy fallback has one endpoint, so add a small relaxed ankle roll.
+      const ankleBlend = THREE.MathUtils.smoothstep(t, DEATH_CONTACT.ankleStart, DEATH_CONTACT.poseEnd);
+      for (const [side, sign] of [["L", -1], ["R", 1]]) {
+        const foot = this.bones[`foot${side}`];
+        const toe = foot?.children.find(node => /Toe0$/.test(node.name));
+        if (!toe) continue;
+        foot.getWorldPosition(start); toe.getWorldPosition(point).sub(start).normalize();
+        const target = new THREE.Vector3(sign * DEATH_CONTACT.footOutward, 0,
+          this.actor.ragdollState.forward * DEATH_CONTACT.footAlongBody).normalize().applyQuaternion(rootQ);
+        swing.setFromUnitVectors(point, target);
+        foot.parent.getWorldQuaternion(parentQ);
+        swing.premultiply(parentQ.clone().invert()).multiply(parentQ);
+        swing.slerpQuaternions(new THREE.Quaternion(), swing.clone(), ankleBlend);
+        foot.quaternion.premultiply(swing);
+      }
     }
     const settle = THREE.MathUtils.smoothstep(t, DEATH_CONTACT.poseEnd, 1);
     if (t === 1 && this.deathFloorLift !== undefined) {

@@ -2033,7 +2033,7 @@ export class Actor {
       this.tmpQuat.setFromRotationMatrix(this.root.matrixWorld).invert();
       local.applyQuaternion(this.tmpQuat).normalize();
     }
-    this.characterRig?.BeginDeathPose();
+    const deathDuration = this.characterRig?.BeginDeathPose() || .8;
     const random = Mulberry32(HashString(`${this.seed}|death-weapon`));
     this.ragdollState = {
       weaponSide: random() < .5 ? -1 : 1,
@@ -2041,6 +2041,10 @@ export class Actor {
       weaponForward: (random() - .5) * .55,
       weaponYaw: (random() - .5) * 1.3 + (random() < .5 ? 0 : Math.PI),
       t: 0,
+      duration: deathDuration,
+      riggedDeath: !!this.characterRig?.deathClipState,
+      rigBodyOffset: this.characterRig
+        ? this.body.position.y - (this.characterRig.attachBodyY ?? this.body.position.y) : 0,
       // 子弹朝人物正面（-Z）飞 = 打在背上 = 往前扑
       forward: local.z < 0 ? 1 : -1,
       side: Clamp(local.x, -1, 1),
@@ -2114,7 +2118,7 @@ export class Actor {
 
     if (s.dead && !this.ragdollState) this.Ragdoll(null);
     if (this.ragdollState) {
-      this.ragdollState.t = Math.min(1, this.ragdollState.t + dt / 0.8);
+      this.ragdollState.t = Math.min(1, this.ragdollState.t + dt / (this.ragdollState.duration || .8));
       this.PoseRagdoll(this.ragdollState, dying);
       return;
     }
@@ -3376,6 +3380,19 @@ export class Actor {
       rag.weaponEnd = new THREE.Vector3(rag.weaponSide * (rag.weaponOffset + (box.max.x - box.min.x) / 2) - center.x,
         .008 - box.min.y, rag.weaponForward - center.z);
       group.position.copy(rag.weaponStart); group.quaternion.copy(rag.weaponStartQ);
+    }
+    if (rag.riggedDeath) {
+      const baseY = this.characterRig.attachBodyY ?? d.hipY;
+      const offsetBlend = SmoothStep(0, .28, t);
+      this.body.position.set(0, baseY + (rag.rigBodyOffset || 0) * (1 - offsetBlend), 0);
+      this.body.quaternion.identity();
+      this.characterRig.PoseDeath(t);
+      if (rag.weaponStart && this.weaponGroup && !this.goreWeaponHold) {
+        const drop = SmoothStep(.05, .85, t);
+        this.weaponGroup.position.lerpVectors(rag.weaponStart, rag.weaponEnd, drop);
+        this.weaponGroup.quaternion.slerpQuaternions(rag.weaponStartQ, rag.weaponEndQ, drop);
+      }
+      return;
     }
     const knee = SmoothStep(0, 0.30, t);
     const fall = SmoothStep(0.12, 0.78, t);
