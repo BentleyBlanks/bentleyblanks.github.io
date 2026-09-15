@@ -240,8 +240,20 @@ node Taierzhuang1938/Script_CutsceneCheck.mjs CS_MachineGunCaptives      # 纯�
 node Taierzhuang1938/Script_CutsceneShot.mjs --cut=CS_MachineGunCaptives # 出图（自带 whitebox=p012&menu=0）
 node Taierzhuang1938/Script_FirstLevelMachineGunCutsceneTest.mjs         # 本场专项（浏览器）
 node Taierzhuang1938/Script_FirstLevelMachineGunTest.mjs                 # 04 既有专项，必须仍绿
+node Taierzhuang1938/Script_CutscenePoseTest.mjs                         # 逐人量骨头高度 + performClip
+node Taierzhuang1938/Script_MachineGunCaptivesAnimationTest.mjs           # 动作库与 perform 契约
 node Taierzhuang1938/Script_VoiceTest.mjs                                # 声库与交付档
 ```
+
+两条「动作真的生效了」的门禁（`visible ≠ 看得见` 那条老教训的同一手法：量涂色，不看旗标）：
+
+- `Script_CutscenePoseTest` 的 `CUTSCENE_CASES` 里本场有四个时刻逐人量，判据是
+  **`rig.cutscenePerformance.state.clipId`**（表演层当前在播的 clip id）+ 骨头世界高度。
+  clipId 是 null 就说明这一帧根本没在播作者动作 —— 而那种情形画面上只是「动作没做」，
+  不报错、不红脸。
+- `Script_FirstLevelMachineGunCutsceneTest` 在 **p012 正片入口**推到 17 s 读同样两样东西，
+  证明 `Script_Main` 那条**不 await** 的预取（`LoadMachineGunCaptivesAnimation`）
+  真的在到达这个拍子之前把库放进了缓存。
 
 出图脚本本轮补了两件事（白盒关的过场以前没法出图）：
 
@@ -259,6 +271,31 @@ flow 快照往返都不重播）、播放期间玩家不掉血且机枪进攻队
 
 `Script_FirstLevelMachineGunTest` 的跳转夹具直接把玩家放到座位上 —— 那正是本场的触发
 圈。夹具里补了一行 `r.Record("captivesWitnessed")`，它**不削弱那条测试原有的任何断言**。
+
+### 5.1 本轮结果（2026-09-15，合入作者动作库之后）
+
+全绿：`CutsceneCheck`（硬错 0 / 软错 0）、`MachineGunCaptivesAnimationTest`
+（5 骨架 × 25 绑定、`rootDrift=0`/`restoreError=0`/`scrub=0`）、`CutscenePoseTest`
+（本场四个时刻逐人 `performClip` + 高度全中）、`MissionHooksTest`、`TextTest`
+（0 失败 / 1 既有动态键警告）、`ModuleGraphTest`、`TestRunnerTest`、`VoiceTest`（31/31）、
+`FirstLevelMachineGunCutsceneTest`、`FirstLevelMachineGunTest`、
+`FirstLevelMissionStageJumpTest`。
+
+`FirstLevelMissionBrowserTest --campaign --through-south --allow-checkpoint-retry`
+跑了两趟：第二趟通过（1 次检查点重试），第一趟停在
+`living withdrawn guards finish their physical rear route`。那一条与本场无关，是
+**跑得太快**的时序敏感：撤回守军的七段后撤路只在 Support/MachineGun/Tank/Orders
+四个阶段里走（`UpdateGuards` 的阶段白名单），第一趟玩家零重试、血剩 80 一路推到
+South，守军才走到第 4 个折点就被冻住。过场不消耗任务时钟（`Frame()` 在
+`cutscene.Playing` 时整个玩法停摆），两趟日志里都能看到
+`"cutscene":"CS_MachineGunCaptives"` 正常播完。
+
+`TestRunner --changed=origin/master --profile=quick --fail-fast` 通过 59、失败 1：
+`FirstLevelWhiteboxSurfaceTest` 是**既有红**（`FirstLevelP012FlowTest` 同根因）——
+仓库 `package.json` 是 `"type":"commonjs"`，`Script_ExternalProps` / `Script_GrenadeAsset`
+以 ESM 方式 import `vendor/three/examples/jsm/loaders/GLTFLoader.js`（`.js` 扩展名）必然
+链接失败。在干净的 `origin/master` worktree 上复现出同一条报错，且失败链上六个文件与
+`origin/master` 逐字节相同。
 
 ## 6 未完成 / 妥协
 
