@@ -28,7 +28,7 @@ debug.FirstLevelMission(); // phaseNumber / phaseId / phaseTitle / phaseCount
 | 6 后送命令 | Orders | Orders |
 | 7 护送转场抵达村口 | South | South |
 | 8 村口截击 | Village | Village |
-| 9 第一次大刀／刺刀近战 | Melee | Melee |
+| 9 屋内伏击：刺刀顶上来 | Melee | Melee |
 | 10 夺院并掩护伤员通过 | Courtyard | Courtyard |
 | 11 转运区抵达 | TransferApproach | TransferApproach |
 | 12 完整转运区防御 | Transfer | Transfer |
@@ -38,6 +38,9 @@ debug.FirstLevelMission(); // phaseNumber / phaseId / phaseTitle / phaseCount
 | 16 接收院战斗 | Reception | Reception → FinalCarry |
 | 17 老周牺牲 | Death | Death |
 | 18 接收院撤离 | FinalDefense | FinalDefense → Exit |
+
+阶段 9 的内容 2026-09-15 换成了屋内伏击（顺子带着老周的担架进屋被刺刀顶住），id 与通过条件都没变，
+拍表与三段跳转点（8「队首在村口」/ 9「担架在门口、四个人藏着」/ 10「伏击已打完」）见 [屋内伏击](Data_FirstLevelRoomAmbush.md)。
 
 跳转是可重复的阶段起点：重建本轮关卡和此前完成事实，保留当前阶段的任务条件。原先本轮的弹药、伤亡、破坏与未来事实不沿用；这避免后退时门已打开、敌人消失、QTE 或担架状态残留。调试开关沿用菜单设置。普通“从当前检查点继续”仍恢复原现场，两者含义不同。
 

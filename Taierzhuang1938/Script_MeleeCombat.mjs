@@ -287,6 +287,69 @@ export class MeleeCombatDirector {
     of.qteCount++; pf.qteUntil=this.time+Q.cooldownS;
     this.stats.standing++; this.Log("standingQte", player, opponent, { reason }); return true;
   }
+  /**
+   * 顶住，但还不给连按。刺刀已经捅进来了，两个人摆成僵持姿势（Bind），
+   * 玩家这会儿既挥不了也换不了手里的家伙，按 F 也不算数 —— 因为 QTE 根本还没开。
+   *
+   * 屋内伏击用它把「被顶住」这一段撑到背景里那几刀落完，再调 BeginScriptedBind
+   * 开真正的连按窗口（docs/Data_FirstLevelRoomAmbush.md）。只摆姿势与朝向，
+   * 不动 qteCount / qteUntil，也不碰 QTE 本体；出口是 BeginScriptedBind 或 EndScriptedHold。
+   */
+  HoldScriptedBind(player, opponent, seconds = 0) {
+    if (!Alive(player) || !Alive(opponent) || this.Active) return false;
+    const pf = this.Fighter(player), of = this.Fighter(opponent);
+    opponent.yaw = Math.atan2(opponent.position.x - player.position.x, opponent.position.z - player.position.z);
+    this.SetState(pf, "qte", seconds, "Bind");
+    this.SetState(of, "qte", seconds, "Bind");
+    this.Log("scriptedHold", player, opponent, { seconds });
+    return true;
+  }
+  /**
+   * 收掉上面那一段顶住。QTE 已经接管（或还开着）时什么都不做 —— 那时候出口归它。
+   * "qte" 这个状态不会自己超时（StepFighter 直接 return），所以没开成 QTE 的那几条
+   * 旁路必须显式走这里，否则两个人会一直保持顶住的姿势。
+   */
+  EndScriptedHold(player, opponent = null) {
+    if (this.Active) return false;
+    const pf = this.Fighter(player), of = opponent ? this.Fighter(opponent) : null;
+    if (pf?.state === "qte") this.SetState(pf, "idle", 0, "Guard");
+    if (of?.state === "qte") this.SetState(of, "idle");
+    return true;
+  }
+  /**
+   * 剧本僵持：由任务编排强制开一次站立 QTE。
+   *
+   * 与 BeginBind 的唯一区别在**入口**：不查武器接触几何、不查 bindReachM、不看
+   * qteCount / qteUntil，也不要求玩家手里正握着白刃武器 —— 顶上来的是对方的刺刀，
+   * 任务负责保证这一刻确实贴上了（第一关屋内伏击，docs/Data_FirstLevelRoomAmbush.md）。
+   * 窗口、力度、连按进度与成败结算仍然走共用规则，成功不自动杀敌。
+   */
+  BeginScriptedBind(player, opponent, { windowS = null, strength = 1, reason = "scripted", label = null } = {}) {
+    if (!Alive(player) || !Alive(opponent) || this.Active) return false;
+    const pf = this.Fighter(player), of = this.Fighter(opponent);
+    // 正面顶住：两个人先互相转正，不然 Pose 的 focusYaw 会把镜头带到背后去。
+    opponent.yaw = Math.atan2(opponent.position.x - player.position.x, opponent.position.z - player.position.z);
+    of.qteCount = 0; pf.qteUntil = -99;
+    if (!this.qte.Begin("standing", opponent, { stamina: pf.stamina / 100, reason, strength, windowS, label })) return false;
+    const seconds = this.qte.active.windowS;
+    this.SetState(pf, "qte", seconds, "Bind");
+    this.SetState(of, "qte", seconds, "Bind");
+    of.qteCount++; pf.qteUntil = this.time + Q.cooldownS;
+    this.stats.standing++; this.Log("scriptedQte", player, opponent, { reason });
+    return true;
+  }
+  /**
+   * 清掉剧本僵持留下的配额与冷却：接下来这一场里，真实几何撞出来的僵持照常可以发生。
+   * 只动预算，不改任何人的状态。
+   */
+  ClearQteBudget(opponents = []) {
+    const pf = this.Fighter(this.Player());
+    if (pf) pf.qteUntil = -99;
+    for (const opponent of opponents) {
+      const f = this.fighters.get(opponent);
+      if (f) f.qteCount = 0;
+    }
+  }
   BeginGround(opponent) {
     const p = this.Player(), pf = this.Fighter(p);
     if (pf.state !== "down" || !Alive(p) || !Alive(opponent) || !this.CanUse() || this.Active || Distance(p, opponent) > R.bindReachM + 0.3 || !this.Visible(p, opponent)) return false;
@@ -314,7 +377,9 @@ export class MeleeCombatDirector {
     if (!Alive(p)) { if (of) this.SetState(of, "idle"); return; }
     this.ReleaseQteRecovery(pf, a.kind);
     if (a.success) {
-      this.Repel(a.attacker, p, W[pf.weapon].pushDistance);
+      // 剧本僵持里玩家手上可能根本不是白刃武器（刺刀是对方顶上来的）：
+      // 顶开的距离退回共用默认值，不要读一个不存在的武器表。
+      this.Repel(a.attacker, p, W[pf.weapon]?.pushDistance ?? R.pushDistanceM);
       this.SetState(of, "stagger", (a.kind==='ground'?R.riseS:0)+Q.recoveryAdvantageS, "Pushed");
       pf.poise = 65;
       this.SetState(pf, a.kind === "ground" ? "rise" : "idle", a.kind === "ground" ? R.riseS : 0, a.kind === "ground" ? "Rise" : "Guard");

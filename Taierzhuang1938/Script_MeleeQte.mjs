@@ -18,6 +18,8 @@ export class MeleeQteDirector {
       decay: Q.decayPerS * Clamp(context.strength ?? 1, 0.8, 1.25),
       lastPress: -1, credit: 1, held: false, accepted: 0, rejected: 0, pulse: 0, success: null,
       reason: context.reason || "contact", advantage: !!context.parried,
+      // 任务编排可以换一张标题（剧本僵持不是「两支武器架住」）。只认登记过的那几个。
+      label: context.label === "ambush" ? "ambush" : null,
       windowS: Number.isFinite(context.windowS) ? Clamp(context.windowS, 1, Q.windowS) : Q.windowS,
     };
     if (context.parried) this.active.progress += 0.06;
@@ -66,7 +68,8 @@ export class MeleeQteDirector {
     const a = this.active;
     if (!a) return null;
     return { kind: a.kind, serial: a.serial, phase: a.phase, success: a.success,
-      label: a.kind === "ground" ? T("gameplay.melee.qte.ground") : T("gameplay.melee.qte.standing"),
+      label: a.label === "ambush" ? T("gameplay.melee.qte.ambush")
+        : a.kind === "ground" ? T("gameplay.melee.qte.ground") : T("gameplay.melee.qte.standing"),
       prompt: T("gameplay.melee.qte.prompt"),
       keys: ["F"], expected: "F", input: "mash", index: a.accepted,
       progress: a.progress, timeT: a.t / a.windowS, timeLeft: Math.max(0, a.windowS - a.t),

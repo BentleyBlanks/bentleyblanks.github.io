@@ -57,7 +57,7 @@ export const MISSION_STAGES = Object.freeze([
     null,
   ),
   Stage("Village", "从右侧灶屋绕进内院，夺取伤员通道。", A.melee, ["innerCourtReached"], "VillageAmbush"),
-  Stage("Melee", "清除近身日军，夺取伤员通道。", A.melee, ["meleeResolved"], null),
+  Stage("Melee", "屋里有埋伏！挣脱刺刀，清掉屋内日军。", A.melee, ["meleeResolved"], null),
   Stage(
     "Courtyard",
     "清理窗口机枪，打开院门，掩护担架分批通过。",
@@ -159,7 +159,15 @@ export const MISSION_ENCOUNTERS = Object.freeze({
     { id: "RearWindow", x: 66, z: 16 },
     { id: "SideYard", x: 40, z: 27 },
   ],
-  melee: [{ id: "MeleeTutor", x: 61, z: 4, weapon: "Type38", bayonet: true }],
+  // 屋内伏击（docs/Data_FirstLevelRoomAmbush.md）。四个人都上着刺刀，藏在屋里三处死角：
+  // 领头的扑玩家并顶出站立僵持，后面两个捅担架上的老周和两个抬担架的，
+  // 侧翼那个压到挣脱之后才动。
+  melee: [
+    { id: "AmbushLead", x: 61, z: 4, weapon: "Type38", bayonet: true },
+    { id: "AmbushRearA", x: 53.6, z: 2.4, weapon: "Type38", bayonet: true },
+    { id: "AmbushRearB", x: 53.6, z: 4.6, weapon: "Type38", bayonet: true },
+    { id: "AmbushFlank", x: 62.4, z: 14.3, weapon: "Type38", bayonet: true },
+  ],
   courtyard: [
     { id: "CourtyardPursuerA", x: 91, z: 24 },
     { id: "CourtyardPursuerB", x: 97, z: 21 },

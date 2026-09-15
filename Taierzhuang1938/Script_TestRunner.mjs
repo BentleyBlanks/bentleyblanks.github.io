@@ -72,6 +72,7 @@ export const testDefs = {
   FirstLevelOpeningSequenceBrowserTest:{file:"Script_FirstLevelOpeningSequenceBrowserTest.mjs",timeoutMs:600000,desc:"Uninterrupted overlapping dialogue, all carriage idles, barrage crouch and leader recovery before help-up"},
   FirstLevelCarriageAnimationTest:{file:"Script_FirstLevelCarriageAnimationTest.mjs",timeoutMs:180000,desc:"BlenderMCP opening clips, original rig bindings and sampled support contacts"},
   MachineGunCaptivesAnimationTest:{file:"Script_MachineGunCaptivesAnimationTest.mjs",timeoutMs:300000,desc:"Captives cutscene clips on five original rigs, authored grounding and the state.perform contract"},
+  FirstLevelAmbushAnimationTest:{file:"Script_FirstLevelAmbushAnimationTest.mjs",timeoutMs:300000,desc:"Room-ambush clips on the original rigs, bayonet tips, litter contacts and loop seams"},
   FirstLevelOpeningContactTest:{file:"Script_FirstLevelOpeningBrowserTest.mjs",args:["--contact"],timeoutMs:600000,desc:"Normal disembarkation, reciprocal NPC fire and contact interrupting march"},
   FirstLevelGuideQueueTest:{file:"Script_FirstLevelOpeningBrowserTest.mjs",args:["--regroup"],timeoutMs:900000,desc:"Normal start, wait for the squad at the trench entrance, pass its clear lane and continue to the gun without guide reversal"},
   FirstLevelMissionStageJumpTest: {file:"Script_FirstLevelMissionStageJumpTest.mjs",timeoutMs:900000,desc:"18 stage starts, backward jumps and resumed mission gates"},
@@ -347,6 +348,7 @@ export const browserTests = new Set([
   "FirstLevelOpeningSequenceBrowserTest",
   "FirstLevelCarriageAnimationTest",
   "MachineGunCaptivesAnimationTest",
+  "FirstLevelAmbushAnimationTest",
   "FirstLevelOpeningContactTest",
   "FirstLevelGuideQueueTest",
   "FirstLevelTrainAnimationTest",
@@ -431,7 +433,7 @@ export const domains = {
   propVelocity: {label:'近景刚体道具速度与移动清晰度',tests:['CarriagePropVelocityTest']},
   squadMarch: {label:"通用小队行进",tests:["SquadMarchCoverTest","SquadMarchCoverBrowserTest","SquadMarchTest","SquadMarchAiTest","SquadMarchEditorTest","SquadMarchNavigationTest","FirstLevelSquadMarchTest","EditorLauncherTest"]},
   firstLevelTail: {label:"第一关接收院至结尾定向续接",tests:["FirstLevelMissionStageTailTest"]},
-  firstLevel: {label:'新版第一关完整任务',tests:['Type89DamageTest','FirstLevelFrontRouteBrowserTest','FirstLevelMissionTopologyTest','FirstLevelMissionTopologyBrowserTest','MissionReturnTest','FirstLevelMissionReturnBrowserTest','FirstLevelCasualtyBrowserTest','FirstLevelOpeningSequenceBrowserTest','FirstLevelCarriageAnimationTest','FirstLevelMealTest','FirstLevelMissionTest','FirstLevelFrontPresenceTest','FirstLevelMachineGunTest','FirstLevelMachineGunCutsceneTest','FirstLevelMissionAftermathTest','FirstLevelOpeningBrowserTest','FirstLevelOpeningContactTest','FirstLevelGuideQueueTest','FirstLevelMissionFortificationsTest','FirstLevelMissionBrowserTest','FirstLevelMissionStageJumpTest','FirstLevelMissionStageContinueTest','FirstLevelMissionPresentationTest','FirstLevelTrainAnimationTest']},
+  firstLevel: {label:'新版第一关完整任务',tests:['Type89DamageTest','FirstLevelFrontRouteBrowserTest','FirstLevelMissionTopologyTest','FirstLevelMissionTopologyBrowserTest','MissionReturnTest','FirstLevelMissionReturnBrowserTest','FirstLevelCasualtyBrowserTest','FirstLevelOpeningSequenceBrowserTest','FirstLevelCarriageAnimationTest','FirstLevelAmbushAnimationTest','FirstLevelMealTest','FirstLevelMissionTest','FirstLevelFrontPresenceTest','FirstLevelMachineGunTest','FirstLevelMachineGunCutsceneTest','FirstLevelMissionAftermathTest','FirstLevelOpeningBrowserTest','FirstLevelOpeningContactTest','FirstLevelGuideQueueTest','FirstLevelMissionFortificationsTest','FirstLevelMissionBrowserTest','FirstLevelMissionStageJumpTest','FirstLevelMissionStageContinueTest','FirstLevelMissionPresentationTest','FirstLevelTrainAnimationTest']},
   text: { label: "玩家文本 / 数值表（数据驱动闸门）", tests: ["TextTest", "TextGatherCheck"] },
   animation: { label: '独立动画资产验收', tests: ['ActorLocomotionTest','BackRifleRunTest','MeleeAnimationTest','DadaoSwingTest','InfantryAnimationTest','DeathCollapseTest'] },
   explosives: { label: "爆炸白盒与通用地形形变/返掷", tests: ["ExplosionRulesTest", "ExplosionRangeTest", "CraterSurfaceTest"] },
@@ -550,6 +552,10 @@ const changedDomainRules = [
   { domain: "animation", pattern: /DeathCollapse|DeathPose|ActorDeath|MotionDeath/ },
   {domain:"hud",pattern:/IncomingFire/},
   {domain:"squadMarch",pattern:/SquadMarch/},
+  // 屋内伏击的动作库：运行时采样器、烘焙脚本与 Animation/FirstLevelAmbush/ 的 JSON。
+  // 既是第一关那一拍的演出（firstLevel），也是一份独立动画资产（animation）。
+  {domain:"firstLevel",pattern:/FirstLevelAmbush|Animation\/FirstLevelAmbush/},
+  {domain:"animation",pattern:/FirstLevelAmbush|Animation\/FirstLevelAmbush/},
   {domain:"combat",pattern:/FpsSkeleton|FpsSkeletal|FpsAnimation|Animation\/FirstPerson\/Data_Fps/},
   { domain: "combat", pattern: /CoverLean/i },
   // 断肢：规则/数值/视觉三层与测试场都归 combat（它挂在 TakeHit/Kill 那条链上）。

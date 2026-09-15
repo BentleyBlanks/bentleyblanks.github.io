@@ -228,11 +228,101 @@ export const MISSION_TUNING = Object.freeze({
   guardSpeedMps: 2.7,
   finalEvacSpeedMps: 1.5,
   finalHandoffRouteIndex:5,
-  meleeWindowS: 2.7,
-  meleeStrength: 0.6,
-  meleeApproachMps: 2.3,
+  // 走到这个半径里就算「进了内院」（innerCourtReached），伏击紧跟着起。
+  // 旧的近战教学（MeleeTutor）那四条数值随 2026-09-15 的屋内伏击一起删掉了。
   meleeTriggerRadiusM: 2.7,
-  meleeBindRadiusM: 1.7,
+  // —— 屋内伏击（内部步骤 Melee，公开阶段 9）。
+  // 用户 2026-09-15：顺子刚进右手那间屋，屋里藏着的日军一刺刀顶上来，连按 F 挣脱；
+  // 背景里老周和两个抬担架的挨刀。拍表、每一条的出处与验收见 docs/Data_FirstLevelRoomAmbush.md。
+  // 冲上来的速度取跃进冲刺同一档（assaultRushMps 3.4）：屋里三米的距离约 0.9 秒到位。
+  ambushLungeMps: 3.4,
+  // 这一刀按 kind "qte" 结算（绕开 COMBAT.player.meleeScale），控制锁期间必须真的掉血。
+  // 契约的起始建议是 30；实拍下调到 24：挣脱之后屋里是三个上刺刀的，一记轻刺 21、
+  // 重刺 46（MELEE_WEAPONS.Bayonet × COMBAT.player.meleeScale 0.42），
+  // 从 70 血开打在班里人赶到之前必死。24 让顺子带着 76 血进这一场。
+  // 挣脱失败仍然活得下来：24 + 12（共用 standingFailureDamage）+ 18 = 54。
+  ambushStabDamage: 24,
+  // 顶住但还不给连按的那一段：刺刀已经进去了，两个人摆成僵持姿势，F 这会儿不算数。
+  // 这几秒是留给背景的 —— 前抬者(1.5)、幺娃(2.4)、后抬者(3.2) 都落在这里面，
+  // 玩家在锁住的视锥里看着他们倒下，手上没有该按的键。连按窗口随后才开。
+  // 取 2.4：顶住 + 窗口 + 结算（1.2 + 2.4 + 3.2 + 0.6 = 7.4 秒）必须在老周那一声
+  // （对齐表 7.50 秒 / 兜底 ambushZhouStabAtS 7.6）之前收尾，Script_FirstLevelMissionTest 守着这条。
+  ambushPinHoldS: 2.4,
+  // 比共用 MELEE_QTE_RULES.windowS(4.8) 短：这是被顶住的一瞬，不是久持。
+  // 运行时按 min(MELEE_QTE_RULES.windowS, 本值) 传给共用规则 —— 共用上限只会更宽，不改它。
+  ambushQteWindowS: 3.2,
+  // 对手力度，进 MeleeQte 的 decay 乘子（0.8–1.25 夹取）；比旧近战教学那一场（0.6）狠。
+  ambushQteStrength: 0.75,
+  // 视线甩到刺刀上的时间。与 deathLookSeconds(.65) 同一条曲线，短一半：这是被撞的一下。
+  ambushLookSeconds: 0.35,
+  // 罗班长他们从灶屋冲进来的延迟与速度（squadCatchupMps 4.5 之下，比行军 3.05 快）。
+  // 契约建议 2.5；实拍下调到 1.5：晚一秒他们就赶不上第二个伏击兵放出来的时刻。
+  ambushSquadDelayS: 1.5,
+  ambushSquadSpeedMps: 3.6,
+  // 老周挨这一刀之后的血量。他必须活到第 17 阶段才死：Orders 给 65，这里降到 45，
+  // 后面 RetreatWall 12 / RetreatYard 6 / 空袭 18 的既有台阶不变。
+  ambushZhouHealthAfter: 45,
+  // 挣脱失败的额外伤害，叠在共用 standingFailureDamage(12) 之上。
+  ambushFailureExtraDamage: 18,
+  // 担架跟进：目标 = 玩家的路线进度减这个间距；南行转场时把老周这副提到队首前一个车距。
+  ambushLitterFollowGapM: 4,
+  ambushLitterLeadM: 3.4,
+  // 抬着人小跑（litterSpeedMps 1.4 是行军速度）。触发前那几秒再快一档把担架拉进门。
+  ambushLitterLeadMps: 3.2,
+  ambushLitterRushMps: 4.2,
+  // 担架停在屋子北门口（ConnectedHouse 北墙 z=0.5），不进屋。
+  ambushLitterDoorZ: 1.4,
+  ambushLitterWaitS: 3,
+  // 刚重生／检查点重试／调试跳转都会给 3.2 秒出生保护（Data_Tuning_Player.SPAWN.graceS）。
+  // 这一拍要等它过去再起，不然那一刀会被无敌吃掉；这里是等待上限。
+  ambushProtectedWaitS: 4,
+  // 控制锁的兜底上限。正常路径由挣脱那一拍显式还控制权，不靠这个计时器。
+  // 整段锁住 ≈ ambushZhouStabAtS(7.6) + ambushWitnessTailS(0.9) = 8.5 秒，留 1 秒余量。
+  ambushLockMaxS: 9.5,
+  // 扑上来的最长时间：超时也照样捅，不许因为卡住就没有这一刀。
+  ambushLungeMaxS: 1.2,
+  // 到这个距离就算顶上了；与共用 MELEE_RULES.bindReachM 同一个数。
+  ambushBindReachM: 1.15,
+  // 顶住的最短可见时间：QTE 没能开起来时也不许同一帧就松开。
+  ambushBindMinS: 0.4,
+  // 背景拍表（相对触发）：前抬者 → 幺娃被撞倒 → 后抬者，全部落在顶住那一段
+  //（约 1.1–3.5 秒）里，玩家在锁住的视锥里看得到、手上没有该按的键。
+  // 老周挨的那一刀由配音事件 AmbushZhouLine 触发（RoomAmbush 第三句「啊！肚子……」
+  // 起播的那一瞬，见 Data_FirstLevelMissionVoiceTiming），下面这个 7.6 秒是**没有配音时的
+  // 兜底期限**，取自该句的对齐时刻 7.50 s。所以刀与那一声永远是对上的。
+  // 这一刀**落在控制锁里面**：连按结算完之后 witness 那一段把视线拉到担架上继续锁着，
+  // 刀落下才记 ambushBroken 还控制权（口径见 docs/Data_FirstLevelRoomAmbush.md §拍表）。
+  ambushRiseSeconds: 0.7,
+  ambushBearerStabAtS: 1.5,
+  ambushZhouStabAtS: 7.6,
+  ambushYaowaDownAtS: 2.4,
+  ambushRearBearerStabAtS: 3.2,
+  // 刺击动作的前摇：伤害落点之前这么久起播 clip（BayonetStabStanding 全长 1.2 s）。
+  ambushClipLeadS: 0.55,
+  ambushYaowaDownS: 6,
+  // 锁住的视线落在刺刀那个人的胸口高度上。
+  ambushLookHeightM: 1.4,
+  // 连按结算完到挣脱之间的那一段（witness），视线从刺刀拉到担架上：
+  // 老周挨的那一刀必须真的被看见。担架床面 0.86 m，落地之后更低，取 0.7 m 对着肚子。
+  ambushLitterLookHeightM: .7,
+  // 那一刀落下之后再锁这么久才还控制权：BayonetStabDown 全长 1.4 s、在刀落之前
+  // ambushClipLeadS(0.55) 起播，所以刀落之后还有 0.85 s 的拧刀与拔刀。取 0.9 s：
+  // 挣脱那一瞬玩家看见的是刀已经拔出来、老周捂着肚子，而不是刀还插在人身上就还权。
+  ambushWitnessTailS: .9,
+  // 演这一拍的人身上挂的「空射界」：InFireSector 对任何候选都返回 false，
+  // 所以他们能走位、能演，但一枪都不开。挣脱之后这条就摘掉。
+  ambushSilentSector: Object.freeze({ minX: 0, maxX: 0, minZ: 0, maxZ: 0, selfDefenseM: 0 }),
+  // 担架算不算「已经到门口」。
+  ambushLitterDoorRadiusM: 2.5,
+  // 挣脱之后四个人的守点半径（以 A.melee 为心，正好罩住整间屋）。
+  ambushRoomHoldRadiusM: 8,
+  ambushBreakHintS: 4,
+  // 挣脱之后四个人不是同一瞬间一起扑上来：顶住玩家那个就在眼前（0），
+  // 刚从第二个抬担架的身上把刺刀拔出来的那个晚 ambushReleaseDelayS，
+  // 东南角那个还要绕过货箱堆（ambushFlankReleaseS），捅老周的那个等自己那一刀落完。
+  // 这是这一拍能不能打的关键：实拍里三个人同时压上来，70 血的顺子在班里人赶到之前必死。
+  ambushReleaseDelayS: 4.5,
+  ambushFlankReleaseS: 7,
   squadWatchStages: ["Courtyard","Transfer","Reception","FinalDefense"],
   squadWatchRadiusM: .85,
   squadWatchSpeedMps: .9,

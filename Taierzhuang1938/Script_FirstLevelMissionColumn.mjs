@@ -155,6 +155,71 @@ export class FirstLevelMissionColumn {
     this.zhouBoardingStart = { x: this.zhou.x, z: this.zhou.z };
     return true;
   }
+  /**
+   * 南行转场（黑屏里）把老周这一副担架提到队首前一个车距。
+   *
+   * 罗班长的命令是「担架从里头过」，所以跟着顺子进屋的就是这一副；其余九副留在村口。
+   * 只改 progress，不动数组次序 —— `zhouQueueIndex` 决定转运区的装车配额，那个次序
+   * 后面还要用。院子里的集结区（Data_FirstLevelMissionCrowd）按到达先后各占一个口袋、
+   * 按数组次序依次出发，所以先到的老周会在院里等前五副过完再走，队形自己重新成形。
+   */
+  PromoteZhouLead(gapM) {
+    const zhou = this.zhou;
+    if (!zhou) return false;
+    const lead = Math.max(...this.litters.filter(litter => litter !== zhou).map(litter => litter.progress));
+    if (zhou.progress >= lead + gapM) return false;
+    zhou.progress = lead + gapM;
+    Object.assign(zhou, MissionCarryRoutePoint(this.route, zhou.progress));
+    return true;
+  }
+  /**
+   * 村口 → 灶屋 → 屋门口：只推老周这一副，其余九副原地等。
+   * limit 由运行时按玩家在同一条路线上的投影给，所以担架永远跟在身后，不会越过玩家。
+   */
+  UpdateLead(dt, { limit = 0, speed = R.litterSpeedMps, safe = true } = {}) {
+    const litter = this.zhou;
+    if (!this.active || !litter || litter.health <= 0 || litter.staging || litter.joinRoute) return false;
+    if (litter.bearers.some(health => health <= 0)) { litter.state = "waiting"; this.RequestBearer(litter); return false; }
+    const target = Math.min(limit, this.length);
+    const moving = safe && litter.progress < target - .05;
+    if (moving) litter.progress = Math.min(target, litter.progress + speed * Math.max(0, dt));
+    Object.assign(litter, MissionCarryRoutePoint(this.route, litter.progress),
+      { state: moving ? "moving" : "waiting" });
+    if (litter.progress > this.GateProgress()) litter.passedGate = true;
+    return moving;
+  }
+  /**
+   * 屋内伏击的伤亡（docs/Data_FirstLevelRoomAmbush.md）。
+   * 两个抬担架的先后倒下（尸体落在各自的握杆位置，走既有的 bearerCasualties 那一路），
+   * 老周被捅穿肚子但活着 —— 他要撑到第 17 阶段才死。
+   * @param {"frontBearer"|"rearBearer"|"zhou"} victim
+   */
+  AmbushCasualty(victim, { zhouHealth = 45 } = {}) {
+    const litter = this.zhou;
+    if (!litter) return false;
+    if (victim === "zhou") {
+      litter.health = Math.min(litter.health, zhouHealth);
+      litter.stabbed = true;
+      litter.state = "fallen";
+      return true;
+    }
+    // 抬担架的两个人：slot 1 是前（view 里 side=+1 那一头），slot 0 是后。
+    const slot = victim === "frontBearer" ? 1 : 0;
+    if (litter.bearers[slot] <= 0) return false;
+    litter.bearers[slot] = 0;
+    litter.state = "fallen";
+    this.CaptureBearerLosses();
+    return true;
+  }
+  /** 挣脱、清完屋子之后：叫两个替补来抬，担架重新站起来。 */
+  AmbushRecover() {
+    const litter = this.zhou;
+    if (!litter) return false;
+    if (litter.bearers.every(health => health > 0)) { litter.state = "waiting"; return false; }
+    litter.state = "waiting";
+    this.RequestBearer(litter);
+    return true;
+  }
   RetreatLimit(point) {
     const index = this.route.findIndex((p) => Math.hypot(p.x - point.x, p.z - point.z) < 0.1);
     return index < 0

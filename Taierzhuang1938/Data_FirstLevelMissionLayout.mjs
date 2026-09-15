@@ -294,6 +294,15 @@ Room("ConnectedHouse", 58, 8, 12, 15, { northDoor: true, southDoor: true, eastWi
 // A real cupboard wall hides the bayonet soldier from the kitchen approach.
 // The passage at x=58 remains open, and a player who flanks can still shoot him early.
 Wall("MeleeAlcoveScreen", 61, 2.2, 4, 1.9, 0.35);
+// Two more hide spots for the room ambush (docs/Data_FirstLevelRoomAmbush.md).
+// The west screen runs north-south beside the west wall, so (53.6, 2.4) and (53.6, 4.6)
+// are behind it both from the north door (58, 0.5) and from the trigger point (58, 6).
+// The south-east crate stack covers (62.4, 14.3) from the same two eyes. Neither piece
+// touches the x=58 stretcher lane, the north door or the south door opening.
+Wall("AmbushWestScreen", 54.6, 3.5, 0.35, 1.9, 4.2);
+// 货箱堆要留得出一个人真的站得下的角落：南面到墙内侧 1.8 m，东面到墙内侧 0.3 m。
+// 留窄了出生点会被物理挤出屋外（实拍把侧翼那个顶到了 (60.5,16.5)）。
+Block("AmbushCornerCrates", 61.9, 12.6, 3, 1.7, 1.6, "cover");
 Room("MachineGunHouse", 43, 8, 12, 15, { northDoor: true, southDoor: true, eastWindow: true });
 Wall("CourtyardWest", 33, 25, 0.7, 2.5, 19);
 Wall("CourtyardEast", 72, 20, 0.7, 2.5, 28);
@@ -580,6 +589,20 @@ export const MISSION_PLACEMENT = Object.freeze({
     {x:-8+(i%2?1:-1),z:-92-Math.floor(i/2)*2.8},
   ]),
   kitchenInterior: {minX:53,maxX:63,minZ:-15,maxZ:-2},
+  // ConnectedHouse（58,8，12×15）的可站区域：墙心 x 52/64、z 0.5/15.5，墙厚 0.6。
+  // 伏击那一拍用它判断「班里人进屋了没有」。
+  roomInterior: {minX:52.6,maxX:63.4,minZ:1,maxZ:15},
+  // 罗班长、何有田、刘文财在灶屋北门内侧的掩护位（北墙 z=-16.5），让开 x=58 的担架通道。
+  // 贴着门口而不是门外十米：挣脱之后他们要在顺子被四个人围死之前跑进屋（实拍量过）。
+  ambushSquadPosts: [{x:55,z:-14.2},{x:61,z:-14.2},{x:58,z:-15.4}],
+  // 幺娃跟着担架，停在屋门口西侧。
+  ambushYaowaPost: {x:56.4,z:0.6},
+  // 挣脱之后三个人从灶屋穿进屋里的落点（都在 roomInterior 里，让开 x=58 的担架）。
+  ambushSquadEntry: [{x:56.4,z:4.6},{x:60.2,z:4.2},{x:57.4,z:8.6}],
+  // 从灶屋门口穿屋门进屋的折线；两道门都在 x 56.1–59.9 的开口上。
+  // 每个人再按 ambushSquadLanesM 错开一点，免得三个人在门口挤成一堆。
+  ambushSquadRoute: [{x:58,z:-8},{x:58,z:-3},{x:58,z:-0.4}],
+  ambushSquadLanesM: [-0.7,0.7,0],
   wardInterior: MISSION_RECEPTION_SPACE.ward,
   tankStart: { x: 36, z: -173 },
   tankTargets: [

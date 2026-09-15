@@ -118,6 +118,8 @@ export const TEXT = Object.freeze({
   // --- Script_MeleeQte --------------------------------------------------------
   "gameplay.melee.qte.ground": "倒地抵抗",
   "gameplay.melee.qte.standing": "武器僵持",
+  // 剧本僵持（第一关屋内伏击）：刺刀已经顶进来了，不是两支武器架住。
+  "gameplay.melee.qte.ambush": "被刺刀顶住",
   "gameplay.melee.qte.prompt": "快速连按 F · 抵抗",
 
   // --- Script_Combat ----------------------------------------------------------

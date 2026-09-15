@@ -56,7 +56,7 @@ export const TEXT = Object.freeze({
   "menu.condition.southTraversed": "沿南行道路到达村口",
   "menu.condition.southHopeHeard": "听完南行途中同伴的交谈",
   "menu.condition.innerCourtReached": "从右侧灶屋绕到内院",
-  "menu.condition.meleeResolved": "清除伤员通道上的近身日军",
+  "menu.condition.meleeResolved": "挣脱刺刀，清掉屋内伏击的日军",
   "menu.condition.villageGunSilent": "清除窗口机枪手",
   "menu.condition.courtyardGateOpen": "打开院门",
   "menu.condition.courtyardPassed": "掩护担架队通过院门",

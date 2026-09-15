@@ -44,7 +44,10 @@ import {
   MissionRouteLength, MissionRouteProjection, MissionRouteNextIndex,
   MissionGuideSpeed, MissionGuideRoute, MissionSquadRoute, MissionSquadPace, MissionRouteLookahead,
 } from "./Script_FirstLevelMissionColumn.mjs";
-import { InstallMissionSentry } from "./Script_FirstLevelMissionPeople.mjs";
+import { MELEE_QTE_RULES as Q } from "./Data_MeleeCombat.mjs";
+import { InstallMissionSentry, InstallAmbushPerformance } from "./Script_FirstLevelMissionPeople.mjs";
+import { FirstLevelAmbush } from "./Script_FirstLevelMissionAmbush.mjs";
+import { LoadFirstLevelAmbushAnimation, PrepareFirstLevelAmbushAnimation, FIRST_LEVEL_AMBUSH_CLIPS } from "./Script_FirstLevelAmbushAnimation.mjs";
 import { SquadMarchAi } from "./Script_SquadMarchAi.mjs";
 import { FirstLevelMissionView } from "./Script_FirstLevelMissionView.mjs";
 import { FirstLevelMeal } from "./Script_FirstLevelMeal.mjs";
@@ -79,6 +82,8 @@ export class FirstLevelMissionRuntime {
     this.failed = false;
     this.squadRoutes = new Map();
     this.column = new FirstLevelMissionColumn();
+    // 屋内伏击的编排（纯规则在 Script_FirstLevelMissionAmbush，副作用全在下面这组钩子）。
+    this.ambush = new FirstLevelAmbush(this.AmbushHooks(), R);
     this.southTransition = new FirstLevelTransition();
     this.tank = {
       active: false,
@@ -111,6 +116,8 @@ export class FirstLevelMissionRuntime {
       column: this.column,
       actorFactory:this.actorFactory,library:this.library,hud:this.hud,vfx:this.vfx,
     });
+    // 抬担架的两个人挨刀那一段走同一个采样器；库没交付时这条返回 null，自动让路。
+    this.view.people.PrepareAmbush = host => this.PrepareAmbushAnimation(host);
     this.oldBlast = this.combat.host.onBlast;
     this.oldSoldierDeath = this.ai.ctx.onSoldierDeath;
     this.soldierDeath = (side, actor) => {
@@ -228,6 +235,10 @@ export class FirstLevelMissionRuntime {
       if(clipId)this.train?.SetDialogueAction(detail.who,clipId,0,{loop:true,duration:detail.end-detail.start});
       return;
     }
+    // 屋内伏击：老周那一声就是刀进去的那一瞬（Package B 在 RoomAmbush 第三句上打的点）。
+    if(id==="AmbushZhouLine"){this.ambush.CueZhouStab();return;}
+    // 罗班长「后头喊两个人上来抬！」：替补抬担架的从后队上来（幂等，Finish 里也会调）。
+    if(id==="AmbushLuoOrders"){this.column.AmbushRecover();return;}
     if(id==="TrainIncomingFire"){this.opening.barrage.Begin();return;}
     if(this.carriageSound.Handle(id))return;
     if(id==="TrainRescue"){this.Record("luoRescueRequested");return;}
@@ -580,6 +591,15 @@ export class FirstLevelMissionRuntime {
     }
     const leaderRoute=this.squadRoutes.get(this.squad[GUIDE.leaderIndex]?.id);
     if(leaderRoute)this.leaderGuide?.Plan(leaderRoute);
+    this.RebuildSquadMarch(route);
+  }
+  /**
+   * 重建共用行进节奏（AGENTS §13 的 SquadMarchAi）。
+   * 构造时会把每个人当时的路线数组捕获进 members，所以任何一次「换掉某人的
+   * squadRoutes」之后都必须重建一次，否则共用层还在按旧数组算前后与间距。
+   */
+  RebuildSquadMarch(route) {
+    this.squadMarch?.Dispose();
     // Role is supplied by the mission roster; the shared controller knows no cast names.
     this.squadMarch=new SquadMarchAi(this.ai,this.squad,{
       route,leaderIndex:0,seed:`FirstLevel:${this.flow.stage.id}`,
@@ -647,8 +667,19 @@ export class FirstLevelMissionRuntime {
         this.ai.ReleaseCover(actor);
         this.ai.SetStance(actor,2,.5,true);
       }
+      // 幺娃在屋门口被撞倒：趴着不动，直到 ambushYaowaDownS 过去。
+      if(this.time<(actor.missionAmbushDownUntil||0)){
+        this.squadMarch?.Release(actor);
+        this.MoveActor(actor,actor.position,0);
+        this.ai.SetStance(actor,2,.5,true);
+        continue;
+      }
       if(this.RespondToGrenade(actor))continue;
-      if(!crawl&&R.openingContactStages.includes(stage)&&this.RespondToContact(actor))continue;
+      // 冲进屋救人的那一段不许被「看见敌人就停下来打」拦住：顺子正被三个上刺刀的围着，
+      // 隔着灶屋门口对射帮不上忙。进了屋之后照常走共用的接触规则。
+      const ambushEntry=stage==="Melee"&&actor.missionAmbushEntry&&!this.InRoom(actor.position);
+      if(ambushEntry)actor.missionContactPost=null;
+      if(!ambushEntry&&!crawl&&R.openingContactStages.includes(stage)&&this.RespondToContact(actor))continue;
       if(!R.openingContactStages.includes(stage))actor.missionContactPost=null;
       const route = this.squadRoutes.get(actor.id);
       if(stage==='Tank' && actor.missionSortie){
@@ -1219,25 +1250,27 @@ export class FirstLevelMissionRuntime {
         this.southTransition.Update(0);
         break;
       case "Village":
-        for (const actor of this.enemies.values()) if (actor.alive && actor.missionDormant) actor.scriptedNoncombatant = false;
+        // 屋里伏击那一组不跟着村口的日军一起醒：他们要等顺子真的进屋。
+        for (const actor of this.enemies.values())
+          if (actor.alive && actor.missionDormant && actor.missionEncounter !== "melee") actor.scriptedNoncombatant = false;
         this.audio.Ambience("firstLevelFront");
         this.Guide(MISSION_ROUTES.village.slice(0, 3));
         this.SpawnEncounter("village");
         this.SpawnEncounter("melee");
-        this.tutor = this.enemies.get("MeleeTutor");
-        if (this.tutor) {
-          this.tutor.meleeTraining = { passive: false, strength: R.meleeStrength };
-          this.tutor.bayonetFixed = true;
-          this.tutor.scriptedNoncombatant = true;
-        }
+        this.HideAmbushers();
+        this.PostAmbushSquad();
+        // Package C 的动作库还没交付时这一拍退回既有姿态，不阻断任务。
+        LoadFirstLevelAmbushAnimation().catch(error => { this.ambushAnimationError = String(error); });
         this.column.active = true;
         break;
       case "Melee":
-        if (this.tutor) {
-          this.tutor.scriptedNoncombatant = false;
-          // The noncombatant AI stows its bayonet while waiting behind cover.
-          this.tutor.bayonetFixed = true;
-        }
+        // 调试跳转直接落在这一步时 Village 那一趟没跑过；加载是幂等的。
+        LoadFirstLevelAmbushAnimation().catch(error => { this.ambushAnimationError = String(error); });
+        this.ambush.Reset();
+        this.ambushQteSerial = null;
+        this.ambushQteResult = null;
+        this.ambushColumn = this.column.Snapshot();
+        this.HideAmbushers();
         break;
       case "Courtyard":
         this.Guide(MISSION_ROUTES.village.slice(2, 6));
@@ -1560,7 +1593,7 @@ export class FirstLevelMissionRuntime {
     }
   }
   UpdateFront() {
-    for(const actor of this.enemies.values())if(this.flow.stage.id==="Village" && actor.missionId!=="MeleeTutor" && actor.missionDormant && Distance(actor.position,this.player.position)<55){
+    for(const actor of this.enemies.values())if(this.flow.stage.id==="Village" && actor.missionEncounter!=="melee" && actor.missionDormant && Distance(actor.position,this.player.position)<55){
       actor.missionDormant=false;actor.scriptedNoncombatant=false;
     }
     if(!["Support","MachineGun","Tank","Orders"].includes(this.flow.stage.id))return;
@@ -1651,6 +1684,9 @@ export class FirstLevelMissionRuntime {
       Object.assign(entry,MissionRoutePoint(this.column.route,entry.progress));
       delete entry.staging;
     }
+    // 黑屏里把老周这一副提到队首前一个车距：罗班长的命令是「担架从里头过」，
+    // 跟着顺子进屋的就是这一副。数组次序不动（转运区的装车配额还要用）。
+    this.column.PromoteZhouLead(R.ambushLitterLeadM);
     for(const [i,actor] of this.squad.entries()){
       actor.missionSortie=false;
       this.PlaceActor(actor,{x:point.x+(i%2?2:-2),z:point.z-SOUTH_TRANSITION.squadBehindM-Math.floor(i/2)*2});
@@ -1787,7 +1823,381 @@ export class FirstLevelMissionRuntime {
     zhou.yaw = yaw;
     if (this.flow.stage.id === "Carry" && this.Near(A.ditchMouth, 2)) this.Record("atDitchMouth");
   }
-  BeginControl(kind, seconds) {
+  // ---------------------------------------------------------------------------
+  // 屋内伏击（内部步骤 Melee）。编排在 Script_FirstLevelMissionAmbush，这里只做副作用。
+  // 口径与拍表见 docs/Data_FirstLevelRoomAmbush.md。
+  // ---------------------------------------------------------------------------
+  get Ambushers() {
+    return MISSION_ENCOUNTERS.melee.map(spec => this.enemies.get(spec.id)).filter(Boolean);
+  }
+  get AmbushSquad() {
+    return ["luo", "heyoutian", "liuwencai"].map(id => this.companion.Handle(id)).filter(Boolean);
+  }
+  AmbushActor(id) { return this.enemies.get(id) || null; }
+  InRoom(point) {
+    const room = P.roomInterior;
+    return point.x > room.minX && point.x < room.maxX && point.z > room.minZ && point.z < room.maxZ;
+  }
+  LitterAtDoor() {
+    const zhou = this.column.zhou;
+    return !!zhou && Math.hypot(zhou.x - A.melee.x, zhou.z - R.ambushLitterDoorZ) <= R.ambushLitterDoorRadiusM;
+  }
+  AmbushHooks() {
+    return {
+      Record: (id, detail) => this.Record(id, detail),
+      Has: id => this.Has(id),
+      Say: (id, options) => this.Say(id, options),
+      Lock: seconds => {
+        const lead = this.AmbushActor("AmbushLead");
+        this.BeginControl("ambush", seconds,
+          { lookAt: lead ? this.Point(lead.position, R.ambushLookHeightM) : null, lookSeconds: R.ambushLookSeconds });
+      },
+      Unlock: () => this.ReleaseAmbushControl(),
+      Wake: id => this.WakeAmbusher(this.AmbushActor(id)),
+      PlayClip: (id, clipId) => this.PlayAmbushClip(this.AmbushActor(id), clipId),
+      Stab: () => this.AmbushStab(),
+      HoldBind: seconds => this.HoldAmbushBind(seconds),
+      BeginQte: () => this.BeginAmbushQte(),
+      EndBind: () => this.EndAmbushBind(),
+      LookLitter: () => this.LookAtLitter(),
+      ColumnCasualty: victim => this.AmbushCasualty(victim),
+      KnockDown: who => this.AmbushKnockDown(who),
+      Release: () => this.ReleaseAmbushers(),
+      SquadIn: () => this.SendAmbushSquad(),
+      Finish: () => this.FinishAmbush(),
+    };
+  }
+  /** 屋里三处死角：趴下、不打、不进共用白刃配对。 */
+  HideAmbushers() {
+    for (const actor of this.Ambushers) {
+      if (!actor.alive) continue;
+      actor.missionDormant = true;
+      actor.scriptedNoncombatant = true;
+      actor.meleeDormant = true;
+      actor.meleeTraining = { passive: true, strength: R.ambushQteStrength };
+      actor.missionAmbushClip = null;
+      actor.missionAmbushReleaseAt = null;
+      actor.order = "hold";
+      actor.manualGoalUntil = Infinity;
+      actor.goal.set(actor.position.x, 0, actor.position.z);
+      this.ai.SetStance(actor, 2, Infinity, true);
+    }
+  }
+  /**
+   * 起身：能走位、能演，但挂着空射界（ambushSilentSector），一枪都不开。
+   * 四个人这会儿全部 meleeDormant —— **领头那个也是**。挂着 meleeTraining 又不 dormant 的人
+   * 会被共用白刃层认领（`MeleeCombat.Step` 的 managed），`Script_Ai.Act` 见到 `meleeCombat`
+   * 就把整帧交给 `StepMeleeCombat`，那条路不走导航：他会站在藏身点一步不动，
+   * 「扑上来顶住」变成三米外凭空掉 24 点血。顶住那一瞬（HoldAmbushBind）再把他交回白刃层摆姿势。
+   * 其余三个整段留在 meleeDormant 里，免得 ImmediateThreat 把玩家从僵持里拽出来。
+   */
+  WakeAmbusher(actor) {
+    if (!actor?.alive) return;
+    actor.missionDormant = false;
+    actor.scriptedNoncombatant = false;
+    actor.scriptFireSector = R.ambushSilentSector;
+    actor.bayonetFixed = true;
+    actor.meleeDormant = true;
+    actor.meleeTraining = { passive: true, strength: R.ambushQteStrength };
+    this.ai.SetStance(actor, 0, R.ambushLockMaxS, true);
+    InstallAmbushPerformance(actor, target => this.PrepareAmbushAnimation(target));
+    this.PlayAmbushClip(actor, "AmbushRise");
+  }
+  PrepareAmbushAnimation(host) {
+    try {
+      return PrepareFirstLevelAmbushAnimation(host, (x, z) => this.battlefield.GroundHeight(x, z));
+    } catch (error) {
+      this.ambushAnimationError = String(error);
+      return null;
+    }
+  }
+  PlayAmbushClip(actor, clipId) {
+    if (!actor) return;
+    actor.missionAmbushClip = { clipId, seconds: 0, loop: !!FIRST_LEVEL_AMBUSH_CLIPS[clipId]?.loop };
+  }
+  UpdateAmbushClips(dt) {
+    for (const actor of this.Ambushers) {
+      const clip = actor.missionAmbushClip;
+      if (!clip) continue;
+      clip.seconds += dt;
+      const spec = FIRST_LEVEL_AMBUSH_CLIPS[clip.clipId];
+      if (!clip.loop && spec && clip.seconds >= spec.duration) actor.missionAmbushClip = null;
+    }
+  }
+  DriveAmbusher(actor, point, speed) {
+    if (!actor?.alive) return;
+    this.MoveActor(actor, point, speed);
+    // 演这一拍的时候不许去找掩体：屋里正好有新加的西侧隔断，实拍里捅抬担架的那个
+    // 走到一半拐去躲在它后面，刀就落了个空。
+    this.ai.ReleaseCover(actor);
+    actor.scriptFireSector = R.ambushSilentSector;
+    actor.bayonetFixed = true;
+  }
+  /**
+   * 剧本期间的走位：领头那个扑向玩家（lunge 段），顶住之后原地不动；后面两个走到担架旁边。
+   * 捅老周的那个（AmbushRearB）会站在担架西侧等到配音里那一声为止；那一刀落在锁住的
+   * witness 段里，挣脱之后他才转普通敌兵，所以他的走位要越过 Scripted 那一段继续驱动。
+   */
+  DriveAmbushPerformers() {
+    const zhou = this.column.zhou, lead = this.AmbushActor("AmbushLead");
+    if (this.ambush.Scripted && lead?.alive) {
+      if (this.ambush.Phase === "lunge") this.DriveAmbusher(lead, this.player.position, R.ambushLungeMps);
+      else this.DriveAmbusher(lead, lead.position, 0);
+      lead.yaw = Math.atan2(lead.position.x - this.player.position.x, lead.position.z - this.player.position.z);
+    }
+    if (!zhou) return;
+    const yaw = zhou.yaw || 0;
+    const Grip = side => ({ x: zhou.x - Math.sin(yaw) * side * R.litterBearerOffsetM,
+      z: zhou.z - Math.cos(yaw) * side * R.litterBearerOffsetM });
+    const rearA = this.AmbushActor("AmbushRearA");
+    if (this.ambush.Scripted && rearA?.alive) {
+      const victim = zhou.bearers[1] > 0 ? Grip(1) : Grip(-1);
+      this.DriveAmbusher(rearA, { x: victim.x - R.ambushBindReachM, z: victim.z }, R.ambushLungeMps);
+      rearA.yaw = Math.atan2(rearA.position.x - victim.x, rearA.position.z - victim.z);
+    }
+    const rearB = this.AmbushActor("AmbushRearB");
+    if (this.ambush.ZhouPending && rearB?.alive) {
+      this.DriveAmbusher(rearB, { x: zhou.x - R.ambushBindReachM, z: zhou.z }, R.ambushLungeMps);
+      rearB.yaw = Math.atan2(rearB.position.x - zhou.x, rearB.position.z - zhou.z);
+    }
+  }
+  /** 刺刀真的捅进来。kind "qte" 绕开 meleeScale，控制锁期间也必须真的掉血。 */
+  AmbushStab() {
+    const lead = this.AmbushActor("AmbushLead");
+    if (!lead || !this.player.alive) return false;
+    this.meleeCombat.Damage(this.player, lead, R.ambushStabDamage, "qte",
+      { yaw: lead.yaw, reach: R.ambushBindReachM });
+    return true;
+  }
+  /**
+   * 顶住但还不给连按（ambushPinHoldS）。这几秒里不上 QTE 卡也不给「连按 F」的提示 ——
+   * 背景里正在倒下的是两个抬担架的，玩家该看的是他们，不是一张按了不算数的进度卡。
+   */
+  HoldAmbushBind(seconds) {
+    const lead = this.AmbushActor("AmbushLead");
+    if (!lead?.alive || !this.player.alive) return false;
+    // 扑完了才把他交给共用白刃层：从这一刻起他的整帧走 StepMeleeCombat，摆的是僵持姿势。
+    lead.meleeDormant = false;
+    return this.meleeCombat.HoldScriptedBind(this.player, lead, seconds);
+  }
+  EndAmbushBind() {
+    return this.meleeCombat.EndScriptedHold(this.player, this.AmbushActor("AmbushLead"));
+  }
+  BeginAmbushQte() {
+    const lead = this.AmbushActor("AmbushLead");
+    if (!lead?.alive || !this.player.alive) return false;
+    // 窗口取共用上限与本拍值里小的那个：MELEE_QTE_RULES.windowS 是全项目的僵持手感，
+    // 这一拍只会更短 —— 连按必须在老周那一声（对齐表 7.50 s）之前结算完。
+    const windowS = Math.min(Q.windowS, R.ambushQteWindowS);
+    const started = this.meleeCombat.BeginScriptedBind(this.player, lead, {
+      windowS, strength: R.ambushQteStrength,
+      reason: "missionAmbush", label: "ambush",
+    });
+    if (started) {
+      this.ambushQteSerial = this.meleeCombat.qte.active.serial;
+      this.hud.Hint?.(T("firstLevel.hint.ambush"), windowS);
+    }
+    return started;
+  }
+  /** 连按结算完、还没挣脱的那一段：把锁着的视线从刺刀拉到担架上。 */
+  LookAtLitter() {
+    const zhou = this.column.zhou;
+    if (!zhou) return false;
+    return this.AimControl("ambush", this.Point({ x: zhou.x, z: zhou.z }, R.ambushLitterLookHeightM), R.ambushLookSeconds);
+  }
+  AmbushCasualty(victim) {
+    const applied = this.column.AmbushCasualty(victim, { zhouHealth: R.ambushZhouHealthAfter });
+    if (victim === "zhou") {
+      // 这一刀落完，捅他的那个才回到普通战斗。
+      if (this.Has("ambushBroken")) this.ReleaseAmbusher(this.AmbushActor("AmbushRearB"));
+      this.view.people?.SetAmbushClip?.(this.column.zhou?.id, "PatientStabbed", "PatientWoundedIdle");
+    } else if (applied) {
+      this.view.people?.SetAmbushClip?.(`BearerCasualty${victim === "frontBearer" ? 1 : 0}`, "BearerStabbed", null);
+    }
+    return applied;
+  }
+  AmbushKnockDown(who) {
+    const actor = this.companion.Handle(who);
+    if (!actor?.alive) return false;
+    // 共用倒地规则只认手里有白刃武器的人；幺娃背的是汉阳造，所以按倒地姿态演，
+    // 先照样调一次共用接口，它拒绝也不影响这一拍。
+    this.meleeCombat.KnockDown(actor, this.AmbushActor("AmbushLead"), "missionAmbush");
+    actor.missionAmbushDownUntil = this.time + R.ambushYaowaDownS;
+    this.ai.SetStance(actor, 2, R.ambushYaowaDownS, true);
+    this.MoveActor(actor, actor.position, 0);
+    return true;
+  }
+  ReleaseAmbusher(actor) {
+    if (!actor?.alive) return null;
+    actor.missionDormant = false;
+    actor.meleeDormant = false;
+    actor.meleeTraining = null;
+    actor.missionAmbushClip = null;
+    // 射界**不摘**：这一场从头到尾是屋里两三米的白刃。三八式一枪 72 点，
+    // 挨过一刀（剩 76 血）的顺子被点名就是一枪死，而且贴着脸端枪瞄准本来就不合理 ——
+    // 罗班长自己的命令就是「进！上刺刀！看准了打，里头有自己人！」。
+    // 走位与出手交给共用白刃规则（Script_MeleeCombat 的 NpcThink），伤害是刺刀的 50/110。
+    actor.tacticalRadiusM = R.infantryTacticalRadiusM;
+    this.Defend(actor, A.melee, R.ambushRoomHoldRadiusM);
+    actor.scriptFireSector = R.ambushSilentSector;
+    actor.bayonetFixed = true;
+    this.ai.SetStance(actor, 0, 1.5, true);
+    return actor;
+  }
+  /**
+   * 挣脱：四个人排着队转成普通敌兵，不是同一瞬间一起压上来。
+   * 顶住玩家那个就在眼前（0 秒），刚从抬担架的身上拔出刺刀那个晚 ambushReleaseDelayS，
+   * 东南角那个还要绕过货箱堆，捅老周的那个要等自己那一刀落完。
+   */
+  ReleaseAmbushers() {
+    for (const actor of this.Ambushers) {
+      if (!actor.alive) continue;
+      actor.missionAmbushReleaseAt = this.time + (actor.missionId === "AmbushLead" ? 0
+        : actor.missionId === "AmbushFlank" ? R.ambushFlankReleaseS : R.ambushReleaseDelayS);
+    }
+    this.UpdateAmbushRelease();
+    this.hud.Hint?.(T("firstLevel.hint.melee"), R.ambushBreakHintS);
+  }
+  UpdateAmbushRelease() {
+    const released = [];
+    for (const actor of this.Ambushers) {
+      if (!actor.alive || actor.missionAmbushReleaseAt == null || this.time < actor.missionAmbushReleaseAt) continue;
+      if (actor.missionId === "AmbushRearB" && this.ambush.ZhouPending) continue;
+      actor.missionAmbushReleaseAt = null;
+      const entry = this.ReleaseAmbusher(actor);
+      if (entry) released.push(entry);
+    }
+    if (released.length) this.meleeCombat.ClearQteBudget(released);
+  }
+  /** 罗班长、何有田、刘文财穿灶屋进屋。走既有的 squadRoutes 与共用行进节奏。 */
+  SendAmbushSquad() {
+    for (const [index, actor] of this.AmbushSquad.entries()) {
+      const entry = P.ambushSquadEntry[index] || P.ambushSquadEntry.at(-1);
+      const lane = P.ambushSquadLanesM[index] ?? 0;
+      actor.missionAmbushEntry = { ...entry };
+      actor.missionAmbushPost = null;
+      this.squadRoutes.set(actor.id,
+        [...P.ambushSquadRoute.map((point, step) => ({ x: point.x + lane * step / 2, z: point.z })), { ...entry }]);
+    }
+    this.RebuildSquadMarch(MISSION_ROUTES.village.slice(1, 4));
+  }
+  FinishAmbush() {
+    this.column.AmbushRecover();
+    const yaowa = this.companion.Handle("yaowa");
+    if (yaowa) yaowa.missionAmbushDownUntil = 0;
+    this.SaveCheckpoint();
+  }
+  ReleaseAmbushControl() {
+    if (this.controls?.kind !== "ambush") return;
+    const kind = this.controls.kind;
+    this.controls = null;
+    this.Control?.(false, kind);
+  }
+  /**
+   * 罗班长他们在灶屋北门口掩护；幺娃跟着担架到屋门口（罗班长的命令：幺娃跟他）。
+   * 村口这一段一路向南（+Z），所以已经走过的折点要丢掉 —— 调试跳转把人直接放在
+   * 站位上时，留着它们会让整队先往回走六米。
+   */
+  PostAmbushSquad() {
+    const kitchen = P.kitchenInterior, room = P.roomInterior;
+    const Inside = at => (at.x > kitchen.minX && at.x < kitchen.maxX && at.z > kitchen.minZ - 1.5 && at.z < kitchen.maxZ)
+      || this.InRoom(at);
+    const Ahead = (actor, points) => {
+      // 只有已经站在灶屋／屋里的人（调试跳转直接摆到站位上）才裁前面的折点。
+      // 从村口过来的人必须先走 (58,-20) 那个门口，不然直线过去会撞上灶屋西墙。
+      if (!Inside(actor.position)) return points.map(point => ({ ...point }));
+      const kept = points.filter(point => point.z > actor.position.z - 1).map(point => ({ ...point }));
+      return kept.length ? kept : [{ ...points.at(-1) }];
+    };
+    for (const [index, actor] of this.AmbushSquad.entries()) {
+      actor.missionAmbushPost = { ...(P.ambushSquadPosts[index] || P.ambushSquadPosts.at(-1)) };
+      actor.missionAmbushEntry = null;
+      this.squadRoutes.set(actor.id, Ahead(actor, [{ x: 58, z: -20 }, actor.missionAmbushPost]));
+    }
+    const yaowa = this.companion.Handle("yaowa");
+    if (yaowa) {
+      yaowa.missionAmbushDownUntil = 0;
+      this.squadRoutes.set(yaowa.id,
+        Ahead(yaowa, [{ x: 58, z: -20 }, { x: 58, z: -9 }, { x: 58, z: -2 }, P.ambushYaowaPost]));
+    }
+    this.RebuildSquadMarch(MISSION_ROUTES.village.slice(0, 3));
+    const luo = this.companion.Handle("luo");
+    if (luo) this.leaderGuide?.Plan(this.squadRoutes.get(luo.id));
+  }
+  /** 老周这一副担架跟着顺子进屋，停在屋子北门口；其余九副留在村口。 */
+  UpdateLeadLitter(dt) {
+    const route = this.column.route;
+    const door = MissionRouteProjection(route, { x: A.melee.x, z: R.ambushLitterDoorZ }).progress;
+    const follow = MissionRouteProjection(route, this.player.position).progress - R.ambushLitterFollowGapM;
+    const rushing = this.flow.stage.id === "Melee";
+    this.column.UpdateLead(dt, {
+      limit: Math.min(door, follow),
+      speed: rushing ? R.ambushLitterRushMps : R.ambushLitterLeadMps,
+      safe: rushing || !this.Threatens(this.column.zhou, null, .9),
+    });
+  }
+  UpdateAmbush(dt) {
+    const lead = this.AmbushActor("AmbushLead");
+    const living = this.Ambushers.filter(actor => actor.alive);
+    // 屋里全程上着刺刀、不开枪：剧本旗每帧补一次，共用 AI 的守点/冲锋分支会清掉它们。
+    if (this.ambush.Started) for (const actor of living) {
+      actor.bayonetFixed = true;
+      actor.scriptFireSector = R.ambushSilentSector;
+    }
+    // 捅老周的那个在递刀途中被打死：这一拍照常落地。刀已经推出去了，而且
+    // RoomAmbushCleared 的台词（「肚子……遭捅穿了……」）与老周后面几级血量台阶
+    // 都建立在他挨了这一刀上 —— 让玩家在这两秒里把他打死就取消整条线，是更糟的结果。
+    const rearB = this.AmbushActor("AmbushRearB");
+    if (this.ambush.ZhouPending && this.Has("ambushStabbed") && rearB && !rearB.alive) this.ambush.CueZhouStab();
+    if (this.Has("ambushBroken")) this.UpdateAmbushRelease();
+    this.UpdateAmbushClips(dt);
+    if (this.ambush.Started) this.DriveAmbushPerformers();
+    const qte = this.meleeCombat.qte.active;
+    const mine = !!qte && qte.serial === this.ambushQteSerial;
+    let qteSuccess = null;
+    if (mine && qte.phase === "resolve" && this.ambushQteResult == null) {
+      this.ambushQteResult = qteSuccess = !!qte.success;
+      // 失败的额外代价叠在共用 standingFailureDamage 之上；顺子仍然挣脱得开。
+      if (!qteSuccess && this.player.alive)
+        this.player.TakeHit(R.ambushFailureExtraDamage, "torso", null,
+          { melee: true, from: lead?.position?.clone?.() });
+    }
+    this.ambush.Update(dt, {
+      litterAtDoor: this.LitterAtDoor(),
+      leadAlive: !!lead?.alive,
+      leadDistanceM: lead ? Distance(lead.position, this.player.position) : Infinity,
+      qteActive: mine,
+      qteSuccess,
+      aliveCount: living.length,
+      killed: this.Ambushers.length - living.length,
+      squadInside: this.AmbushSquad.some(actor => actor.alive && this.InRoom(actor.position)),
+      playerAlive: this.player.alive,
+      playerProtected: this.player.Protected === true,
+    });
+  }
+  /**
+   * 检查点重试落在这一步上。已经挣脱过的保留战果（死掉的不复活、担架队不回滚），
+   * 只把锁与僵持清干净；还没挣脱就死了的，整拍重来。
+   */
+  ResetAmbush() {
+    this.meleeCombat.Cancel("missionAmbushRetry");
+    this.ambushQteSerial = null;
+    this.ambushQteResult = null;
+    const yaowa = this.companion.Handle("yaowa");
+    if (yaowa) yaowa.missionAmbushDownUntil = 0;
+    if (this.Has("ambushBroken")) {
+      if (this.ambush.Phase !== "broken" && this.ambush.Phase !== "resolved") this.ambush.ResumeBroken();
+      return;
+    }
+    const rolled = ["ambushTriggered", "ambushStabbed", "zhouStabbed"];
+    for (const id of rolled) this.flow.facts.delete(id);
+    this.flow.log = this.flow.log.filter(entry => !(entry.kind === "fact" && rolled.includes(entry.id)));
+    if (this.ambushColumn) this.column.Restore(this.ambushColumn);
+    this.ambush.Reset();
+    this.HideAmbushers();
+    this.PostAmbushSquad();
+  }
+  BeginControl(kind, seconds, { lookAt = null, lookSeconds = 0 } = {}) {
     this.controls = {
       kind,
       seconds,
@@ -1797,16 +2207,38 @@ export class FirstLevelMissionRuntime {
       pitch: this.player.pitch,
     };
     if(kind==="death") {
-      const zhou=this.column.zhou,eye=this.player.EyePosition;
-      const target=this.Point({x:zhou.x-Math.sin(zhou.yaw)*.7,z:zhou.z-Math.cos(zhou.yaw)*.7},R.deathLookHeightM);
+      const zhou=this.column.zhou;
+      lookAt=this.Point({x:zhou.x-Math.sin(zhou.yaw)*.7,z:zhou.z-Math.cos(zhou.yaw)*.7},R.deathLookHeightM);
+      lookSeconds=R.deathLookSeconds;
+    }
+    // 把视线甩到指定的点上（老周的担架 / 顶上来的那把刺刀）。lookSeconds 之内是
+    // 平滑转头，之后交回 BeforePlayer 的 ±limitedLookRadians 夹取。
+    if(lookAt) {
+      const eye=this.player.EyePosition;
       this.controls.startYaw=this.player.yaw;this.controls.startPitch=this.player.pitch;
-      this.controls.yaw=Math.atan2(eye.x-target.x,eye.z-target.z);
-      this.controls.pitch=Math.atan2(target.y-eye.y,Math.hypot(target.x-eye.x,target.z-eye.z));
+      this.controls.yaw=Math.atan2(eye.x-lookAt.x,eye.z-lookAt.z);
+      this.controls.pitch=Math.atan2(lookAt.y-eye.y,Math.hypot(lookAt.x-eye.x,lookAt.z-eye.z));
+      this.controls.lookSeconds=lookSeconds;
     }
     // A restricted short take (dive / death) locks the player's hands and view: nobody may
     // target or wound him meanwhile. Reuses spawn grace so AI and TakeHit read one flag.
     if(kind==="death"||kind==="dive"||kind==="southTransition")this.player.spawnGrace = Math.max(this.player.spawnGrace || 0, seconds + .5);
     this.Control?.(true, kind);
+  }
+  /**
+   * 锁还在，只换看的地方（屋内伏击：连按结算完把视线从刺刀拉到担架上）。
+   * 转头这一段从**当前**时刻起算，所以 lookSeconds 记的是绝对截止时刻，配 lookFrom 起点。
+   */
+  AimControl(kind, lookAt, lookSeconds) {
+    const control = this.controls;
+    if (!control || control.kind !== kind || !lookAt) return false;
+    const eye = this.player.EyePosition;
+    control.startYaw = this.player.yaw; control.startPitch = this.player.pitch;
+    control.yaw = Math.atan2(eye.x - lookAt.x, eye.z - lookAt.z);
+    control.pitch = Math.atan2(lookAt.y - eye.y, Math.hypot(lookAt.x - eye.x, lookAt.z - eye.z));
+    control.lookFrom = control.time;
+    control.lookSeconds = control.time + Math.max(0, lookSeconds);
+    return true;
   }
   BeforePlayer(dt, input) {
     this.meal.Restore();
@@ -1841,8 +2273,11 @@ export class FirstLevelMissionRuntime {
     input.crouchPressed = false;
     input.pronePressed = false;
     input.stanceRequested = null;
-    if(control.kind==="death" && control.time<R.deathLookSeconds) {
-      const t=Clamp(control.time/R.deathLookSeconds,0,1),smooth=t*t*(3-2*t);
+    if(control.lookSeconds>0 && control.time<control.lookSeconds) {
+      // lookFrom 是这一段转头的起点（BeginControl 给的那一次是 0；AimControl 中途改向时
+      // 是改向那一刻）。对所有既有 kind 来说 lookFrom 恒为 0，行为逐字不变。
+      const from=control.lookFrom||0;
+      const t=Clamp((control.time-from)/Math.max(1e-6,control.lookSeconds-from),0,1),smooth=t*t*(3-2*t);
       const yaw=Math.atan2(Math.sin(control.yaw-control.startYaw),Math.cos(control.yaw-control.startYaw));
       this.player.yaw=control.startYaw+yaw*smooth;
       this.player.pitch=control.startPitch+(control.pitch-control.startPitch)*smooth;
@@ -2112,6 +2547,8 @@ export class FirstLevelMissionRuntime {
         }
         else if (kind === "dive") this.Record("diveComplete");
         else if (kind === "derail") { /* Rescue cue owns release. */ }
+        // 兜底：僵持没能按时收尾时也照样还控制权，由编排记 ambushBroken。
+        else if (kind === "ambush") this.ambush.Break();
         else {
           this.column.zhou.health = 0;
           if(this.deathMedic){this.deathMedic.treating=false;this.deathMedic.crouch=false;}
@@ -2176,23 +2613,7 @@ export class FirstLevelMissionRuntime {
       if(this.Has("kitchenTraversed") && this.Near(A.melee,R.meleeTriggerRadiusM))
         this.Record("innerCourtReached",{viaKitchen:true,x:p.x,z:p.z});
     }
-    if (stage === "Melee" && this.tutor) {
-      if (!this.tutor.alive) this.Record("meleeResolved", { sharedCombat: true });
-      else {
-        this.MoveActor(this.tutor, this.player.position, R.meleeApproachMps);
-        // The existing weapon-contact query still decides whether a bind is real.
-        if (
-          this.meleeCombat.Weapon(this.player) &&
-          Distance(this.tutor.position, this.player.position) < R.meleeBindRadiusM &&
-          !this.Has("meleeBindAttempted")
-        ) {
-          if (this.meleeCombat.BeginBind(this.player, this.tutor, "missionCloseContact")) {
-            this.Record("meleeBindAttempted");
-            this.meleeCombat.qte.active.windowS = R.meleeWindowS;
-          }
-        }
-      }
-    }
+    if (stage === "Melee") this.UpdateAmbush(dt);
     let moving = [
         "Courtyard",
         "TransferApproach",
@@ -2328,6 +2749,8 @@ export class FirstLevelMissionRuntime {
     }
     if (stage === "Exit" && this.Near(A.end, 5)) this.Record("playerAtHandoff");
     this.column.Update(dt, { moving, routeSafe: safe, maxProgress, player: this.player.position, ...(safeAt ? {SafeAt:safeAt} : {}) });
+    // 老周这一副担架跟着顺子进屋，停在屋门口；伏击一响就停在原地挨刀。
+    if (stage === "Village" || (stage === "Melee" && !this.Has("ambushTriggered"))) this.UpdateLeadLitter(dt);
     this.meal.Update();
     this.view.Update(this.time, { tank: this.tank,player:this.player,camera:this.camera||null });
     this.flow.Update(dt);
@@ -2425,6 +2848,9 @@ export class FirstLevelMissionRuntime {
       this.flow.facts.delete('southTransitionPlaced');
       this.BeginControl('southTransition',SOUTH_TRANSITION.fadeOutS+SOUTH_TRANSITION.holdS+SOUTH_TRANSITION.fadeInS);
       this.voice.Resume();
+    } else if(stage==="Melee"){
+      this.ResetAmbush();
+      this.voice.Resume();
     } else this.voice.Resume();
     this.UpdateMusic();
     return true;
@@ -2473,6 +2899,13 @@ export class FirstLevelMissionRuntime {
       missionVersion: MISSION_VERSION,
       returnWarning: this.missionReturn.result,
       transferBeats:this.transferBeats || null,
+      ambush:{...this.ambush.State(),animationError:this.ambushAnimationError||null,
+        litterAtDoor:this.LitterAtDoor(),
+        actors:MISSION_ENCOUNTERS.melee.map(spec=>{
+          const actor=this.enemies.get(spec.id);
+          return {id:spec.id,alive:!!actor?.alive,x:actor?.position.x??null,z:actor?.position.z??null,
+            clip:actor?.missionAmbushClip?.clipId||null};
+        })},
       debugStart: this.debugStart || null,
       time: this.time,
       control: this.controls?.kind || null,

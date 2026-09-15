@@ -36,6 +36,7 @@ export const TEXT = Object.freeze({
   "firstLevel.hint.standAndUnload": "起身，借车体掩护跟上班长",
   "firstLevel.hint.leaveTrain": "借车体掩护，跟罗班长进入交通壕",
   "firstLevel.hint.melee": "V 拔刀 · F 拨推 · 左键挥刀",
+  "firstLevel.hint.ambush": "连按 F · 挣脱",
   "firstLevel.guide.distance": "{label} · {distance} 米",
   "firstLevel.guide.unload": "借掩体进入交通壕",
   "firstLevel.guide.support": "沿交通壕进入阵地",
