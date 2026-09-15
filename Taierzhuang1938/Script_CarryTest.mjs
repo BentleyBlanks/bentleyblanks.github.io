@@ -524,6 +524,9 @@ console.log(`ok  交互框架：注册/清理、三种手势、距离朝向、�
     { SpareClips: () => 4, GiveClip: () => true },
   );
   const player = MakePlayer();
+  Check(system.Query(player) === null, "分弹药分支默认关闭：不出提示");
+  Check(system.Press(player) === null && mate.ammo === 0, "分弹药分支默认关闭：按 F 分不出去");
+  system.mateClipShare = true;
   Check(/分一个桥夹给 邱茂才/.test(system.Query(player).label), "分弹药分支还在");
   Check(system.Press(player).kind === "ammo", "分得出去");
   Check(mate.ammo === 5 && system.handouts === 1, "弟兄的弹装回去了");
