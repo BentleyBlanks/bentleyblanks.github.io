@@ -658,8 +658,10 @@ export class FirstLevelMissionRuntime {
       actor.missionCoverWaiting=false;actor.missionCoverApproach=false;
       actor.scriptedNoncombatant = stage === "South";
       actor.scriptEscapeStance=null;
-      const crawl=stage==='Tank' && actor.missionSortie
-        && Sortie.crawl.some(c=>Distance(actor.position,c)<c.d/2+3);
+      // The low roofs are geometry, not a Tank-step rule: the tracks can be cut
+      // while Luo is still inside the side ditch, and Orders walks him back
+      // under the same roofs. A standing capsule stops dead at the slab.
+      const crawl=Sortie.crawl.some(c=>Distance(actor.position,c)<c.d/2+3);
       actor.scriptTraversalStance=crawl?2:null;
       if(crawl){
         // Finish the narrow passage before choosing a firing/cover post.

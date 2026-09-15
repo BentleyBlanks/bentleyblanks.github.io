@@ -212,6 +212,33 @@ try{
  });
  assert.deepEqual(fireWindows,[{mode:'moving',moving:true,cannon:0,mg:1},{mode:'halted',moving:false,cannon:1,mg:0},
    {mode:'immobilized',moving:false,cannon:1,mg:1}],'sortie fire alternates while mobile and retains both weapons after track loss');
+ // User 2026-09-16: the tracks can be cut while Luo is still in the side ditch.
+ // Orders then walks him back under the first low roof; he used to stand and
+ // run into the slab at z -129.9 for good.
+ await page.evaluate(()=>window.Tengxian.Debug.FirstLevelJump(6));
+ const ordersCrawl=await page.evaluate(async()=>{
+  const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime(),s=r.squad.find(a=>a.castId==='luo');
+  const {FRONT_SORTIE:R}=await import('./Data_FirstLevelFrontRoute.mjs'),{MISSION_ROUTES}=await import('./Data_FirstLevelMissionLayout.mjs');
+  for(const actor of r.enemies.values())actor.scriptedNoncombatant=true;
+  const back=MISSION_ROUTES.bundleReturn,from=back.findIndex(p=>p.x===55&&p.z===-135),passage=R.crawl.find(c=>c.id==='First');
+  r.PlaceActor(s,{x:52,z:-135});r.squadRoutes.set(s.id,back.slice(from+1).map(p=>({...p})));
+  r.Guide(MISSION_ROUTES.orders);g.player.Spawn(54,-135,0);
+  const trail=[{x:54,z:-135}],inside=[];let frame=0;
+  for(;frame<60*45&&r.flow.stage.id==='Orders'&&s.position.z<passage.z+passage.d/2+3.5;frame++){
+   if(Math.hypot(trail.at(-1).x-s.position.x,trail.at(-1).z-s.position.z)>.3)trail.push({x:s.position.x,z:s.position.z});
+   const behind=trail[Math.max(0,trail.length-14)];
+   if(frame%20===0&&Math.hypot(g.player.position.x-behind.x,g.player.position.z-behind.z)>1.5)g.player.body.Teleport(behind.x,g.battlefield.GroundHeight(behind.x,behind.z)+.02,behind.z);
+   g.StepFrames(1,1/60,false);
+   if(Math.abs(s.position.x-passage.x)<passage.w/2&&Math.abs(s.position.z-passage.z)<passage.d/2-.5)inside.push({stance:s.stance,height:s.body.height});
+  }
+  return {stage:r.flow.stage.id,seconds:frame/60,position:s.position.toArray(),inside:inside.length,
+   standing:inside.filter(p=>p.stance!==2||p.height>.6).length,released:s.scriptTraversalStance==null};
+ });
+ console.log('ORDERS_CRAWL',JSON.stringify(ordersCrawl));
+ assert.ok(ordersCrawl.position[2]>=-127+5/2+3.5,'Orders walks Luo back through the low roof: '+JSON.stringify(ordersCrawl));
+ assert.ok(ordersCrawl.inside>0&&ordersCrawl.standing===0,'Luo crawls under the roof outside the Tank step: '+JSON.stringify(ordersCrawl));
+ assert.equal(ordersCrawl.stage,'Orders');
+ assert.ok(ordersCrawl.released,'the clearance constraint is released after the passage');
  await page.evaluate(()=>window.Tengxian.Debug.FirstLevelJump(6));
  const arrival=await page.evaluate(()=>{
   const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime();g.audio.voiceMute=true;
@@ -254,7 +281,7 @@ try{
  assert.equal(supplyReach.kind,'supply');assert.equal(supplyReach.id,'MissionSupplyTransfer');
  assert.deepEqual(supplyReach.after,{count:supplyReach.before.count+1,bandages:supplyReach.before.bandages+1},
   'F completes the real transfer supply from the corrected worst-case route stop');
- await fs.writeFile(path.join(out,'Data_RuntimeFixtures.json'),JSON.stringify({optional,sortie,medicine,fireWindows,arrival,end,supplyReach},null,2));
+ await fs.writeFile(path.join(out,'Data_RuntimeFixtures.json'),JSON.stringify({optional,sortie,medicine,fireWindows,ordersCrawl,arrival,end,supplyReach},null,2));
  assert.deepEqual(errors,[]);
  console.log('PASS physical sortie, optional weapon, route facts, supply NPC and escort fade with preserved casualties');
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}
