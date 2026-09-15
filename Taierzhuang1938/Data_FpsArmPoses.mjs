@@ -155,8 +155,8 @@ export const FPS_ARM_POSES = Freeze({
   }),
   Grenade: WeaponPose({
     family: "throwable", hip: FixedPose(V(0.100, -0.140, -0.420), V(0.150, -0.250, 0.100)), ads: FixedPose(V(0.080, -0.100, -0.350), V(0.28, -0.10, 0.05)), sprint: ThrowableSprint,
-    right: Contact(V(0, 0, 0), V(0.40576, -2.33420, -2.38987), CLOSED), left: Contact(V(-0.090, -0.035, 0.080), V(-0.85212, 2.76034, -2.50878), SUPPORT),
-    bodyHip: ThrowableBody(), bodyAds: ThrowableBody(), bodySprint: ThrowableBody(), actions: { throw: { family: "stickGrenade", release: 0.48 } },
+    right: Contact(V(0, 0, 0), V(0.10, 3.141592654, 1.570796327), CLOSED), left: Contact(V(-0.090, -0.035, 0.080), V(-0.85212, 2.76034, -2.50878), SUPPORT),
+    bodyHip: Body(V(.19,-.38,.02),V(-.19,-.40,.04),V(1,0,0),V(-.4,-.8,.15)), bodyAds: Body(V(.19,-.38,.02),V(-.19,-.40,.04),V(1,0,0),V(-.4,-.8,.15)), bodySprint: Body(V(.19,-.38,.02),V(-.19,-.40,.04),V(1,0,0),V(-.4,-.8,.15)), actions: { throw: { family: "stickGrenade", release: 0.48 } },
   }),
   GrenadeBundle: WeaponPose({
     family: "throwable", hip: FixedPose(V(0.100, -0.140, -0.420), V(0.150, -0.250, 0.100)), ads: FixedPose(V(0.080, -0.100, -0.350), V(0.28, -0.10, 0.05)), sprint: FixedPose(V(0.130, -0.090, -0.250), V(-0.48, 0.34, 0.24)),
@@ -164,8 +164,8 @@ export const FPS_ARM_POSES = Freeze({
     bodyHip: ThrowableBody(), bodyAds: ThrowableBody(), bodySprint: ThrowableBody(), actions: { throw: { family: "bundleGrenade", release: 0.50 } },
   }),
   Dadao: WeaponPose({
-    family: "melee", hip: FixedPose(V(0.235, -0.195, -0.520), V(0.720, -0.620, 1.540)), ads: FixedPose(V(0.175, -0.170, -0.470), V(0.900, -0.540, -1.500)), sprint: FixedPose(V(0.255, -0.225, -0.500), V(-0.130, -0.520, 1.890)),
-    right: Contact(V(0, 0, 0.030), V(0.05208, -1.93229, -1.75862), CLOSED, TRIGGER, {thumbDirection:[0,-.7,1],thumbRoll:0}), left: Contact(V(0, 0, 0.155), V(0.20553, -2.61358, -0.42501), CLOSED, TRIGGER, {thumbDirection:[0,-.7,1],thumbRoll:0}),
+    family: "melee", hip: FixedPose(V(0.235, -0.195, -0.520), V(0.942425592, -0.447601613, -0.535596284)), ads: FixedPose(V(0.175, -0.170, -0.470), V(0.900, -0.540, -1.500)), sprint: FixedPose(V(0.255, -0.225, -0.500), V(-0.130, -0.520, 1.890)),
+    right: Contact(V(0, 0, 0.030), V(0.05208, -1.93229, -1.75862), CLOSED, CLOSED, {thumbDirection:[0,-.7,1],thumbRoll:0}), left: Contact(V(0, 0, 0.155), V(0.20553, -2.61358, -0.42501), CLOSED, CLOSED, {thumbDirection:[0,-.7,1],thumbRoll:0}),
     bodyHip: BladeBody(-0.500, -0.175), bodyAds: BladeBody(-0.470, -0.175), bodySprint: BladeBody(-0.440, -0.165), actions: { melee: { family: "dadao", release: 0.18 } },
   }),
   OfficerSwordSet: WeaponPose({

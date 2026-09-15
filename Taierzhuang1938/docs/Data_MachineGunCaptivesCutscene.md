@@ -159,7 +159,7 @@ z=-146.25 的 x∈(−1.05,4.05) 与 z=-150 的 x∈(3.9,5.1) 两个豁口里 �
 **每换一次 clip 就是新的一段**，所以每一段的起播帧都要带上自己那一份。
 
 **老兵没有 `CaptiveStabbedCollapse`**：那条 clip 从跪姿起手，给已经趴着的人用会把他
-先弹回跪姿再倒一次。他从 14.62 s 起一直保持 `CaptiveStruckDown` 的末帧（趴伏），
+先弹回跪姿再倒一次。他从 14.66 s 起一直保持 `CaptiveStruckDown` 的末帧（趴伏），
 末帧与「死了」在画面上是同一件事；36.36 s 那一刀只出声。
 
 每一帧 `perform` 旁边仍然写着等效的普通姿态（`kneel` / `prone` / `melee`），
@@ -268,6 +268,7 @@ cue，不拼接），走 `ch1_*` 章节语音通道并入 `Data_Voice` 总表；
 node Taierzhuang1938/Script_CutsceneCheck.mjs CS_MachineGunCaptives      # 纯数据自检
 node Taierzhuang1938/Script_CutsceneShot.mjs --cut=CS_MachineGunCaptives # 出图（自带 whitebox=p012&menu=0）
 node Taierzhuang1938/Script_FirstLevelMachineGunCutsceneTest.mjs         # 本场专项（浏览器）
+node Taierzhuang1938/Script_MachineGunCutsceneAudioTest.mjs             # 本场听得见没有（输出端逐条量 RMS，见 §5.2）
 node Taierzhuang1938/Script_FirstLevelMachineGunTest.mjs                 # 04 既有专项，必须仍绿
 node Taierzhuang1938/Script_CutscenePoseTest.mjs                         # 逐人量骨头高度 + performClip
 node Taierzhuang1938/Script_MachineGunCaptivesAnimationTest.mjs           # 动作库与 perform 契约
@@ -355,6 +356,111 @@ South，守军才走到第 4 个折点就被冻住。过场不消耗任务时钟
 以 ESM 方式 import `vendor/three/examples/jsm/loaders/GLTFLoader.js`（`.js` 扩展名）必然
 链接失败。在干净的 `origin/master` worktree 上复现出同一条报错，且失败链上六个文件与
 `origin/master` 逐字节相同。
+
+### 5.2 音频取证与修复（2026-09-16）
+
+用户实机反馈：**这一场「声音完全听不见」**，并问是不是距离太远。不是距离 ——
+这一场的九条台词与十七条音效**全部是非空间化的**（`lines[].voiceCue` 不带位置，
+`sfx[].position` 一律 `null`），一米和四十米听起来一样响。真正的原因是
+**这九条 cue 在这个入口下根本没被装进声库**。
+
+### 根因：两路装载共用了一个「载过没有」的旗标
+
+第一关的声库是两路往同一个 `AudioEngine.voiceBank` 里装的：
+
+| 路 | 装什么 | 入口 |
+|---|---|---|
+| A | 第一关的整段录音（键名 `Mission*`，87 条） | `Script_FirstLevelMissionVoice.Load()` → `audio.LoadVoices(Audio/FirstLevel/, …)` |
+| B | `Data_Voice.VOICE_LINES` 166 条：战场口令（中方 31 + 日方 28）与 ch0/ch1 章节台词，**本场那 9 条在里面** | `AudioEngine.Unlock()` → `LoadPacks()` → `LoadVoices(Audio/, VOICE_LINES)` |
+
+两路都走同一个 `LoadVoices`，而它结尾写的是 `this.voicesReady = ok > 0`；
+`LoadPacks` 的闸判的又正好是 `if (!this.voicesReady …)`。建关时装配层
+`await missionRuntime.voiceReady`（`Script_Main` 那一行）**保证了 A 一定先落地**，
+所以玩家按下「开始」触发 `Unlock()` 时这道闸已经关死了 —— B 一次都没试过。
+
+失败是彻底静默的：没有 404、没有异常、`voiceErrors` 是空的、控制台干净，
+`audio.Play("voice.ch1_luo_28")` 只是在 `RECIPES[name]` 那一行返回 `null`，
+过场照播、字幕照出。「visible ≠ 看得见」的同一条老教训换了个媒介：
+**`Play` 被调用了 ≠ 听得见**。
+
+### 证据（`Script_MachineGunCutsceneAudioTest.mjs`，真入口 `?whitebox=p012`）
+
+探针挂在 `audio.softClip`（`ctx.destination` 前最后一环）上，逐帧量输出端 RMS；
+时钟按**真实经过的时间**推（`manual=1` 下一口气 StepFrames 会把 44 s 压进半秒，
+九条台词全叠在一起，量出来没有意义）。
+
+| | 修前 | 修后 |
+|---|---|---|
+| `packAttempts.voice` | **0**（一次都没试过） | 1 |
+| `voiceBank` 条数 | 87（全是 `Mission*`；ch0 0 / ch1 0 / 战场口令 0） | 253（`Mission*` 87 + ch0 31 + ch1 76 + 战场口令 59）|
+| 九条 cue 在库里 | **一条都不在** | 九条全在 |
+| 每条 `Play` 的返回值 | `null`，0 个采样源 | 非 null，各 1 个 buffer 源 |
+| 台词窗内输出端峰值 RMS | 0.0164 – 0.0336（= 静场地板 0.012，**台词本身 0**） | 0.226 – 0.404（比修前高 **23–28 dB**）|
+| 对照组（03 阶段 `voice.MissionSupportOrder`，同一只探针、同一条 `Play`） | 0.382 | 0.382 |
+| 音效 17 条 | 全部正常起播（音效包走的是另一个旗标 `sfxReady`） | 同 |
+
+表里的条数是修复当天（`f1ec7d0bb`）量的。`Mission*` 那一路会随内容批增长 ——
+合入 master 的房间伏击三条之后是 `Mission*` 90 / 总数 256，门禁按「> 0」断言，
+不钉死条数。
+
+增益链在每条台词起播那一刻逐项读过，全部是 1.0：
+`master / sfxBus / sfxUser / duck / storyDuck / hitGain / outGain`，
+三只滤波器都在 20 kHz。`AudioContext.state = "running"`，听者与过场相机的距离恒为 0 m。
+
+逐条排掉的候选因：
+
+1. **声库没装** —— 成立，见上。
+2. 进场 `voice.Pause()` 把总线静音了 —— **不成立**。`Pause()` 只做 `StopParallel()`
+   + `audio.StopStoryVoice()`，后者动的是 `storyDuck`（只串着音乐与环境床），
+   过场对白走 `sfxBus → sfxUser → masterGain`，两条路不相交；实测起播时 `storyDuck = 1`。
+3. 距离衰减 —— **不成立**。九条台词与十七条音效全都不带 `position`，`voice.distance` 恒 0。
+4. 过场期间 AudioEngine 的每帧 Update 没被推进 —— **不存在这个 Update**。
+   音量全是静态节点值，实测逐项为 1.0。
+5. `AudioContext` suspended / `voiceReady` 没到位就开播 —— **不成立**，
+   `ctx.state = "running"`，且对照组在同一时刻同一只探针下量到 0.382。
+6. 台词文件电平过低 —— **不成立**。离线 `astats` 实测这九条 RMS −18.2…−25.5 dBFS、
+   峰值 −1.1…−8.1 dBFS，与同章其它对白（`Ch1Luo_20` −19.5 / `Ch1Luo_25` −21.1 /
+   `Ch1Shunzi_03` −18.7）同一档。`VOICE_DELIVERY_MIX` **一个数都没动**，
+   耳语与虚弱句仍然比常态轻。
+
+### 修法（`Script_Audio.mjs`）
+
+把「声库里有没有东西」与「`VOICE_LINES` 这一包载过没有」拆成两位：
+
+- `voicesReady`（`Bark` 读的那位）改成 `this.voiceBank.size > 0`；
+- 新增 `voicePackReady`，只由新的 `LoadVoicePack()` 置位，`LoadPacks` 的闸改判它，
+  `ReloadPacks` 一并清掉；
+- `LoadVoices` 的 `voiceErrors` 改成**只追加不清空** —— 两路共用一张错误表，
+  后跑的那一路清表等于把前一路的失败擦掉。
+
+顺带修掉的两处：
+
+- **这一路远不止这一场**。修前第一关整关的 `voiceBank` 里战场口令是 0 条，
+  也就是说**整关一句喊话都没有**（`Bark` 按 `kind` 挑池子，池子是空的），
+  ch0/ch1 那 107 条章节台词同样只剩字幕。修好之后这些一起回来了。
+- `Script_TestRunner` 的 `changedDomainRules` 里，`audio` 与 `voice` 两个域各自只有
+  一条按**文件名关键词**兜底的规则（`/(Audio|Sfx|Music|Amb|Sound)/i` 与
+  `/(Voice|Dialogue|Speech)/i`），而这两类文件的名字各自只含对方那半边：
+  实测 `Script_Audio.mjs` 选得中 `audio`、**选不中 `voice`**（也就不跑 `VoiceTest`），
+  `Data_Voice.mjs` 选得中 `voice`、**选不中 `audio`**。补了两条规则把交叉的一半接上。
+
+### 为什么现有的门禁一条都没红
+
+`Script_FirstLevelP012BrowserTest` 的 `VerifyAudioPlayback` 确实断言过
+「story 的 voice 键都在 `voiceBank` 里」，但它走的是 `?whitebox=p012-archive` ——
+那个入口不建 `fullMission`，没有 A 路，闸自然是开的。
+`Script_FirstLevelMachineGunCutsceneTest` 守的是触发 / 只播一次 / 世界冻结 / 还权，
+**从头到尾没有问过输出端有没有电平**。新门禁补的就是这一问：
+
+```powershell
+node Taierzhuang1938/Script_MachineGunCutsceneAudioTest.mjs
+```
+
+判据（`VOICE_RMS_FLOOR = 0.002`）取的是对照组实测值的约十分之一：既远高于静场
+地板（0.012 那个数是**过场里的**地板，含环境床与音效尾巴；纯底噪实测 3.6e-4），
+又给 `weak` 档留足余量。取窗到**整条录音**为止而不是头 0.6 s ——
+`ch1_captive_old_01`（「龟儿子……」起手）前 0.6 s 实测只有 −53…−31 dB，
+重音落在 1.2–1.8 s，只量头 0.6 s 会把「起手轻」误判成「听不见」。
 
 ## 6 未完成 / 妥协
 

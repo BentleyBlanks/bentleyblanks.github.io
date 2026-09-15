@@ -19,6 +19,7 @@ import { FRONT_DEFENDERS, FRONT_GUARD_POSTS, FRONT_SHELLS, FRONT_ASSAULT, FrontA
 import {
   MISSION_STAGES,
   MISSION_TUNING as R,
+  MISSION_AIRCRAFT_ID,
   MISSION_ENCOUNTERS,
   MISSION_TACTICS,
   MISSION_GUIDANCE,
@@ -657,8 +658,10 @@ export class FirstLevelMissionRuntime {
       actor.missionCoverWaiting=false;actor.missionCoverApproach=false;
       actor.scriptedNoncombatant = stage === "South";
       actor.scriptEscapeStance=null;
-      const crawl=stage==='Tank' && actor.missionSortie
-        && Sortie.crawl.some(c=>Distance(actor.position,c)<c.d/2+3);
+      // The low roofs are geometry, not a Tank-step rule: the tracks can be cut
+      // while Luo is still inside the side ditch, and Orders walks him back
+      // under the same roofs. A standing capsule stops dead at the slab.
+      const crawl=Sortie.crawl.some(c=>Distance(actor.position,c)<c.d/2+3);
       actor.scriptTraversalStance=crawl?2:null;
       if(crawl){
         // Finish the narrow passage before choosing a firing/cover post.
@@ -1289,7 +1292,7 @@ export class FirstLevelMissionRuntime {
         break;
       case "AirFirst":
         this.guideRoute = null;
-        this.StartAir(1);
+        this.StartAir(1, R.firstAirLeadS);
         this.SpawnEncounter("air");
         break;
       case "Carry":
@@ -2313,26 +2316,57 @@ export class FirstLevelMissionRuntime {
     }
   }
   StartAir(pass, lead = 0) {
-    this.air = { pass, time: -lead, shots: 0, lastShot: 0 };
+    this.StopAirSound();
+    this.air = { pass, time: -lead, shots: 0, lastShot: -Infinity };
+  }
+  // Straight run north at airSpeedMps, anchored so the aircraft is over the old event positions at the event times.
+  AirPose(air) {
+    const first = air.pass === 1,
+      anchorS = first ? R.bridgeBombAtS : R.zhouStrafeAtS,
+      along = (air.time - anchorS) * R.airSpeedMps,
+      pastM = Math.max(0, along - R.airPullUpAfterM);
+    return {
+      x: first ? 78 : 56,
+      y: (first ? 30 : 21) + pastM * Math.tan(R.airPullUpRad),
+      z: (first ? R.airFirstAnchorZ : R.airSecondAnchorZ) + along,
+      dirX: 0, dirZ: 1,
+      climb: R.airPullUpRad * Math.min(1, pastM / 20),
+      anchorS,
+    };
+  }
+  // Engine: a looping drone that follows the airframe with Doppler, plus the recorded dive pass near the anchor.
+  UpdateAirSound(air, pose) {
+    const sound = (this.airSound ||= { drone: null, dive: null });
+    const at = { x: pose.x, y: pose.y, z: pose.z };
+    if (!sound.drone) sound.drone = this.audio.Play("planeDrone", { position: new THREE.Vector3(at.x, at.y, at.z), volume: 0.9, priority: true }) || false;
+    else this.audio.MoveVoice?.(sound.drone, at, { velocity: { x: 0, y: pose.climb * R.airSpeedMps, z: R.airSpeedMps } });
+    if (sound.dive === null && air.time >= pose.anchorS - R.airDiveSoundLeadS)
+      sound.dive = this.audio.Play("planeDive", { position: new THREE.Vector3(at.x, at.y, at.z), volume: 0.95 }) || false;
+    else if (sound.dive) this.audio.MoveVoice?.(sound.dive, at);
+  }
+  StopAirSound() {
+    if (this.airSound?.drone) this.audio.StopVoice?.(this.airSound.drone, 0.9);
+    this.airSound = null;
   }
   UpdateAir(dt) {
     const air = this.air;
     if (!air) return;
     air.time += dt;
     const pass = air.pass,
-      z = 65 + air.time * 25,
-      x = pass === 1 ? 78 : 56,
-      y = pass === 1 ? 30 : 21;
-    this.aircraft.SetManualPose("NakajimaKi43", { x, y, z, dirX: 0, dirZ: 1 });
-    if (air.time > 1.5 && air.time < 4.9 && air.time - air.lastShot > 0.16) {
+      pose = this.AirPose(air),
+      { x, y, z } = pose;
+    this.aircraft.SetManualPose(MISSION_AIRCRAFT_ID, pose);
+    this.UpdateAirSound(air, pose);
+    const aimZ = z + R.airStrafeLeadM;
+    if (aimZ >= R.airStrafeFromZ && aimZ <= R.airStrafeToZ && air.time - air.lastShot >= R.airShotIntervalS) {
       air.lastShot = air.time;
       air.shots++;
-      const target = { x: x + ((air.shots % 3) - 1) * 2, z: 95 + (air.time - 1.5) * 17 };
+      const target = { x: x + ((air.shots % 3) - 1) * 2, z: aimZ };
       const from = new THREE.Vector3(x, y, z),
         to = this.Point(target);
       this.vfx.Tracer(from, to, { kind: "ija" });
       this.audio.Play("type92", { position: from, volume: 0.7 });
-      if (air.shots % 5 === 0)
+      if (air.shots % 4 === 0)
         this.combat.FireShell(from, to, { flight: 0.18, kind: "AircraftStrafe", radius: 2, damage: 45 });
       if (Distance(this.player.position, target) < 3 && this.player.stance !== "prone")
         this.player.TakeHit(8, "torso", null, { from, projectile: true });
@@ -2381,7 +2415,8 @@ export class FirstLevelMissionRuntime {
       });
     }
     if (air.time > R.airPassSeconds) {
-      this.aircraft.SetManualPose("NakajimaKi43", null);
+      this.aircraft.SetManualPose(MISSION_AIRCRAFT_ID, null);
+      this.StopAirSound();
       this.air = null;
       if (pass === 1) this.Record("firstAirPassComplete");
       else this.Record("secondAirPassComplete");
@@ -2979,7 +3014,8 @@ export class FirstLevelMissionRuntime {
     this.interact.Clear("FirstLevelMission");
     this.emplacement.Clear("FirstLevelMission");
     this.combat.host.onBlast = this.oldBlast;
-    this.aircraft.SetManualPose("NakajimaKi43", null);
+    this.aircraft.SetManualPose(MISSION_AIRCRAFT_ID, null);
+    this.StopAirSound();
     this.Control?.(false);
   }
 }

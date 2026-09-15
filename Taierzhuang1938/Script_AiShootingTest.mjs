@@ -92,6 +92,31 @@ const Near = (a, b, eps = 1e-9) => Math.abs(a - b) <= eps;
   assert.equal(model.ShotPathClear(from,exposure.aimPoint),false,"mission terrain/vehicle blockers also hold the trigger");
 }
 
+// 贴墙持枪：枪管伸进 z = 0.4 的墙里，真枪口 (z = 0.7) 在墙那一面。
+// 从真枪口打射线碰不到墙（旧病根：子弹穿墙）；BarrelOrigin 把出发点拉回墙这一面。
+{
+  const host = MakeHost({wall:{z:.4,top:3}}), model = new ShootingModel(host);
+  const body = {x:0,y:0,z:0}, muzzle = {x:0,y:1.35,z:.7}, target = {x:0,y:1.35,z:12};
+  assert.equal(model.ShotPathClear(muzzle,target),true,"precondition: the raw muzzle is already past the wall");
+  const origin = model.BarrelOrigin(body,muzzle,{x:0,y:0,z:1});
+  assert.equal(origin.clipped,true,"barrel through the wall is detected");
+  assert.ok(Near(origin.z,.4-SHOOTING.barrelStandoffM,1e-9)&&Near(origin.y,1.35),"origin sits on the shooter's side of the wall");
+  assert.equal(model.ShotPathClear(origin,target),false,"the wall now stops the shot");
+  const soldier = MakeSoldier();
+  assert.equal(model.Exposure(soldier,origin,model.SoldierSamples({x:0,y:0,z:12},0),{targetId:3}).fraction,0,
+    "target behind the wall is not exposed from the corrected origin");
+  // 无枪管方向（隐藏 LOD）也按中轴同高回溯。
+  assert.equal(model.BarrelOrigin(body,muzzle).clipped,true,"fallback rear point also catches the wall");
+  // 枪管在墙这一面：枪口原样返回。
+  host.state.wall.z = 2;
+  const free = model.BarrelOrigin(body,muzzle,{x:0,y:0,z:1});
+  assert.equal(free.clipped,false);
+  assert.ok(Near(free.x,muzzle.x)&&Near(free.y,muzzle.y)&&Near(free.z,muzzle.z),"clear barrel keeps the real muzzle");
+  // 枪管从矮墙沿上方伸出去（据枪架在墙头上）不算挡。
+  host.state.wall = {z:.4,top:1.2};
+  assert.equal(model.BarrelOrigin(body,muzzle,{x:0,y:0,z:1}).clipped,false,"rifle resting over a low parapet still fires");
+}
+
 // --------------------------------------------------------------------------
 // 1. 两条曲线的端点与单调性 —— 这是整套契约的地基
 // --------------------------------------------------------------------------

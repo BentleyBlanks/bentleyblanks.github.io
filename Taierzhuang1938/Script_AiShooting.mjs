@@ -163,6 +163,8 @@ export class ShootingModel {
     this._dir = { x: 0, y: 0, z: 0 };        // 射线方向
     this._center = { x: 0, y: 0, z: 0 };     // 躯干中心（选瞄点用）
     this._muzzle = { x: 0, y: 0, z: 0 };
+    this._barrel = { x: 0, y: 0, z: 0, clipped: false };
+    this._barrelRear = { x: 0, y: 0, z: 0 };
     this._suppress = { x: 0, y: 0, z: 0 };
     this._passPoint = { x: 0, y: 0, z: 0 };
     this._burst = { shots: 1, intervalS: 1, pauseS: 0 };
@@ -798,6 +800,57 @@ export class ShootingModel {
     out.x = Finite(pos?.x) ? pos.x : 0;
     out.y = (Finite(pos?.y) ? pos.y : 0) + (Finite(eye) ? eye : SHOOTING.stanceEyeM[stance]) - SHOOTING.muzzleDropM;
     out.z = Finite(pos?.z) ? pos.z : 0;
+    return out;
+  }
+
+  /**
+   * 枪管伸进墙里时，子弹从墙这一面出来。
+   *
+   * 贴墙持枪的人，枪管有半截在墙里，真枪口落在墙的另一面 —— 从那儿往外打射线，
+   * 暴露、`ShotPathClear`、弹着全都碰不到这堵墙，于是子弹穿墙。这里沿枪管往回退到
+   * 人体中轴（`bodyPos` 的竖轴），再从那一点往枪口打一条线：中间有东西就把出发点
+   * 放在碰撞点前 `barrelStandoffM`。之后所有射线都从墙这一面起步，墙自然挡得住。
+   *
+   * 没有枪管方向（隐藏 LOD、测试）时，回溯点取中轴上与枪口同高的点。
+   *
+   * @param {{x,y,z}} bodyPos 人的位置（脚底，只用 x / z）
+   * @param {{x,y,z}} muzzle 真枪口
+   * @param {{x,y,z}|null} [barrelDir] 枪管朝向（单位向量，指向枪口外）
+   * @param {object} [out] 复用点；`out.clipped` 表示这一发的枪管被挡了
+   */
+  BarrelOrigin(bodyPos, muzzle, barrelDir = null, out = this._barrel) {
+    out.x = muzzle.x; out.y = muzzle.y; out.z = muzzle.z; out.clipped = false;
+    if (!FinitePoint(muzzle) || !Finite(bodyPos?.x) || !Finite(bodyPos?.z)) return out;
+    const hx = muzzle.x - bodyPos.x, hz = muzzle.z - bodyPos.z;
+    const reach = Math.sqrt(hx * hx + hz * hz);
+    const rear = this._barrelRear;
+    if (FinitePoint(barrelDir)) {
+      const flat = Math.sqrt(barrelDir.x * barrelDir.x + barrelDir.z * barrelDir.z);
+      const back = Clamp(flat > 1e-3 ? reach / flat : 0, 0, SHOOTING.barrelRearMaxM);
+      rear.x = muzzle.x - barrelDir.x * back;
+      rear.y = muzzle.y - barrelDir.y * back;
+      rear.z = muzzle.z - barrelDir.z * back;
+    } else {
+      rear.x = bodyPos.x; rear.y = muzzle.y; rear.z = bodyPos.z;
+    }
+    const dx = muzzle.x - rear.x, dy = muzzle.y - rear.y, dz = muzzle.z - rear.z;
+    const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    if (!(dist > 1e-4)) return out;
+    const host = this.host;
+    let t = Infinity;
+    if (typeof host.Raycast === "function") {
+      const dir = this._dir;
+      dir.x = dx / dist; dir.y = dy / dist; dir.z = dz / dist;
+      this.rayCount += 1;
+      const hit = host.Raycast(rear, dir, dist);
+      if (hit && Finite(hit.t) && hit.t < dist) t = hit.t;
+    }
+    // BlocksSight 只回答挡没挡、不给距离：挡了就退回中轴。
+    if (!(t < Infinity) && typeof host.BlocksSight === "function" && host.BlocksSight(rear, muzzle)) t = 0;
+    if (!(t < Infinity)) return out;
+    const k = Math.max(0, t - SHOOTING.barrelStandoffM) / dist;
+    out.x = rear.x + dx * k; out.y = rear.y + dy * k; out.z = rear.z + dz * k;
+    out.clipped = true;
     return out;
   }
 

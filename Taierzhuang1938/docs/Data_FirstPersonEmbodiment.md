@@ -49,7 +49,8 @@ MCP 使用独立实例与端口，不能在其他任务正在制作的场景中�
 
 ### 汉阳造手部与动作定位
 
-汉阳造与三八式共用 `Model/Model_FpsHanYangHands.glb`，按武器实例化独立骨架；其余武器继续使用原双臂。
+汉阳造、三八式、中正式与大刀共用 `Model/Model_FpsHanYangHands.glb`，按武器实例化独立骨架；其余武器继续使用原双臂。
+大刀的固定刃向与双手握柄工程见 [大刀劈砍修订](Data_DadaoPowerSwing.md)。
 该资产保持 bind pose 的前臂与手部骨段长度，不再将关节静止位移乘以 1.60。
 手部工程位于 `C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\HanYangHands_20260910\Animation_HanYangHands.blend`。
 本次接触微调的独立工程位于 `C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\HanYangHandContact_20260911\Animation_HanYangHands.blend`，
@@ -145,3 +146,29 @@ BlenderMCP 在上述独立工程执行 `_import/Script_FpsAnimationStudio.py` �
 已查看游戏腰射/开镜/开火/拉栓图与 Blender 握姿图。`MotionVectorContractTest` 通过。
 `FirstPersonEmbodimentTest` 在“Stand look-down shows the actual body mesh”失败；
 在同一工作区换回修改前的 `Data_FpsArmPoses.mjs` 后复现相同失败，属本次修改前已有问题。
+
+
+### 普通手榴弹修复（2026-09-16）
+
+普通 `Grenade` 使用同一份 `Model_FpsHanYangHands.glb` 修复裸手与灰白袖口，独立实例化骨架。
+`Data_FpsGrenadeThrow.mjs` 是 BlenderMCP 制作的一段投掷轨迹：肩侧蓄力、向前脱手、下收回位；
+左手退出后留在画面下方，右手随脱手逐渐松指。肩肘使用 `Data_FpsArmPoses` 中的普通手雷标定，
+固定骨段，不再绕相机大幅旋转整个动作支架。脱手回调在当前帧握点和骨骼更新后执行，
+保留原 0.82 秒动作和 0.48 归一化释放时刻、库存与弹道链路。
+
+源工程：`C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/GrenadeThrow_20260916/Animation_GrenadeThrow.blend`。
+`_blender/Script_GrenadeThrowStudio.py` 生成这一段可编辑控制曲线，
+`_blender/Script_GrenadeThrowRigBake.py` 将实测的修复手臂骨架与手雷装入同一工程。
+两者在独立后台 Blender 实例执行，通过 `GRENADE_PROJECT_ROOT` 指定本任务项目目录；不改当前交互场景。
+工程及截图只留本地。此修改只针对普通手持手雷，不扩展到集束弹或其他武器动作。
+
+验收：`node Taierzhuang1938/Script_GrenadeThrowTest.mjs` 采样完整 121 帧，检查握点、腕角、
+肘部连续性、骨段长度、单次释放，以及连续推进后的动作结束和回位；
+`node Taierzhuang1938/Script_FpsArmTest.mjs --only=Grenade` 检查普通手雷的现有状态契约。
+截图和骨骼回放数据位于忽略目录 `_shots/GrenadeThrow/`，必须查看真实渲染后交付。
+
+本次实测：完整投掷握点误差为零，腕角最大约 64°，相邻采样肘部位移最大约 12 mm；
+两档力度连续播放均只释放一次且完成回位。普通手雷状态检查 41/41 通过；
+MotionVectorContract、ExplosionRules、ExplosionRange 通过。通用 BootTest 在 240 秒超时前
+报告第一关 `readableIjaMaterials=0`；在未修改主检出上复测同一条件仍为 0，
+这是本次之外的材质接入问题。七切片完整开机回归未完成，不能称为全量通过。

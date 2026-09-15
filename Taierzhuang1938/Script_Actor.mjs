@@ -30,6 +30,7 @@ import { MakeBox, MergeGeometries, PlaceGeometry, TILE_METERS } from "./Script_G
 import { WEAPONS } from "./Data_Weapons.mjs";
 import { LoadDocument, InstantiateModel } from "./Script_MeshLoad.mjs";
 import { LoadRiggedAssets } from "./Script_RiggedModel.mjs";
+import { SetShadowSkip } from "./Script_ShadowSkip.mjs";
 import {
   CreateLugouCharacterRig,
   LoadLugouCharacterAssets,
@@ -3450,6 +3451,9 @@ export class Actor {
       }
       object.castShadow = next && object.userData.actorOriginalCastShadow;
     });
+    // 关掉之后整棵子树一个投影体都没有（枪挂在手骨下，也在上面那趟里关了），
+    // 登记给 Script_ShadowSkip：烘阴影那一刻连递归都省掉，不只是省 draw。
+    SetShadowSkip(this.root, !next);
   }
 
   /**
@@ -3462,6 +3466,7 @@ export class Actor {
     if (this.factory && this.factory.batcher) this.factory.batcher.Remove(this);
     if (this.characterRig) this.characterRig.Dispose();
     if (this.root.parent) this.root.parent.remove(this.root);
+    SetShadowSkip(this.root, false);
     this.root.clear();
     this.weaponGroup = null;
     this.goreWeaponHold = null;

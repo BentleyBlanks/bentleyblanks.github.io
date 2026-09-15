@@ -85,11 +85,17 @@ export const MISSION_TUNING = Object.freeze({
   bearerReachM: 0.05,
   // User 2026-09-09: one squad escorts at most ten litters, with two bearers per litter.
   // Only four unarmed support people remain for triage and casualty replacement.
-  litterCount: 10,
+  // User 2026-09-16: cut three more litter teams (10 → 7) and drop every uniformed escort
+  // other than the squad — the two medics walking beside the column go; the two rescue
+  // civilians stay (they are the bearer replacements, and they are not soldiers).
+  // Death-stage care and final-defence medic checks already fall back to the squad / vacuous truth.
+  litterCount: 7,
   walkingWoundedCount: 0,
-  medicCount: 2,
+  medicCount: 0,
   civilianCount: 2,
   litterSpeedMps: 1.4,
+  // 少一个抬架员又没有替补时，剩下那个人拖着担架走的步速比例（见 Column.BearerShort）。
+  litterDragScale: 0.55,
   litterBearerOffsetM: 1.28,
   walkSpeedMps: 1.7,
   squadSpeedMps: 3.05,
@@ -389,6 +395,24 @@ export const MISSION_TUNING = Object.freeze({
   bridgeBombAtS: 3,
   cartBombAtS: 3.3,
   zhouStrafeAtS: 2.6,
+  // Air passes (2026-09-16): the Ki-30 flies at a low-level attack speed instead of 25 m/s (below its stall speed).
+  // Event times above stay put; each pass is anchored so the aircraft is where the old path had it at that moment:
+  // first pass at bridgeBombAtS over airFirstAnchorZ, second pass at zhouStrafeAtS over airSecondAnchorZ.
+  airSpeedMps: 60,
+  // The first pass enters this early (≈290 m out) so it does not pop in 140 m from the player; events keep their times.
+  firstAirLeadS: 2.5,
+  airFirstAnchorZ: 140,
+  airSecondAnchorZ: 130,
+  // Gun impacts run airStrafeLeadM ahead of the aircraft (30 m up / 45 m ≈ 34° dive) and only inside this road band.
+  airStrafeLeadM: 45,
+  airStrafeFromZ: 80,
+  airStrafeToZ: 160,
+  airShotIntervalS: 0.1,
+  // Pull up once the aircraft is airPullUpAfterM past its anchor.
+  airPullUpAfterM: 30,
+  airPullUpRad: 0.14,
+  // The recorded dive pass peaks 3.5 s in; start it that long before the anchor.
+  airDiveSoundLeadS: 3.5,
 });
 
 // Aftermath tiers (2026-09-08 frame probe: 87 full bodies inside 30 m cost 0.9 M triangles per pass): full mesh only to

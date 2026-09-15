@@ -151,7 +151,13 @@ export const AIM = Freeze({
  *                  15 cm（照门高度 + 贴腮），所以枪口比眼睛低这么多。
  *                  **只是兜底**：`soldier.muzzleWorld` 有值时一律用真枪口
  *                  （`Actor.MuzzleWorld`），曳光才会从枪管里出来而不是从胸口。
- * stanceEyeM       姿态眼高兜底（站 / 蹲 / 卧），与 `AiDirector.StanceEye` 同值。
+ * barrelRearMaxM / barrelStandoffM
+ *                  贴墙持枪时枪管会伸进墙里，真枪口落在墙的另一面，从那儿打的射线
+ *                  根本碰不到这堵墙 —— 子弹穿墙。`BarrelOrigin` 沿枪管从人体中轴量到枪口，
+ *                  中间有墙就把出发点拉回墙面前 `barrelStandoffM`（0.05 m）。
+ *                  回溯长度最多 `barrelRearMaxM`（1.2 m，一支三八式全长 1.28 m）：
+ *                  枪口朝下很陡时沿枪管退到中轴会退得很远，夹住免得量到脚底下的地面。
+ * stanceEyeM      姿态眼高兜底（站 / 蹲 / 卧），与 `AiDirector.StanceEye` 同值。
  *                  宿主注入 `host.StanceEye` 时优先用宿主的（它带身高缩放）。
  * lookPitchMinRad / lookPitchMaxRad
  *                  `LookPitch` 的夹取范围，与 `Script_Actor` 里 `Clamp(s.lookPitch, -1.0, 0.9)`
@@ -176,6 +182,8 @@ export const SHOOTING = Freeze({
   suppressVerticalScatterM: 0.10,
   suppressLkpChestM: 1.10,
   muzzleDropM: 0.15,
+  barrelRearMaxM: 1.2,
+  barrelStandoffM: 0.05,
   stanceEyeM: Freeze([1.5, 1.0, 0.5]),
   lookPitchMinRad: -1.0,
   lookPitchMaxRad: 0.9,

@@ -179,10 +179,10 @@ export class FirstLevelMissionColumn {
   UpdateLead(dt, { limit = 0, speed = R.litterSpeedMps, safe = true } = {}) {
     const litter = this.zhou;
     if (!this.active || !litter || litter.health <= 0 || litter.staging || litter.joinRoute) return false;
-    if (litter.bearers.some(health => health <= 0)) { litter.state = "waiting"; this.RequestBearer(litter); return false; }
+    if (this.BearerShort(litter)) return false;
     const target = Math.min(limit, this.length);
     const moving = safe && litter.progress < target - .05;
-    if (moving) litter.progress = Math.min(target, litter.progress + speed * Math.max(0, dt));
+    if (moving) litter.progress = Math.min(target, litter.progress + this.LitterPace(litter, speed) * Math.max(0, dt));
     Object.assign(litter, MissionCarryRoutePoint(this.route, litter.progress),
       { state: moving ? "moving" : "waiting" });
     if (litter.progress > this.GateProgress()) litter.passedGate = true;
@@ -416,13 +416,11 @@ export class FirstLevelMissionColumn {
       for (const entry of [...this.litters, ...this.walkers].filter(
         (entry) => entry.receiveRoute && !entry.received && !entry.treating && !entry.assigned,
       )) {
-        if(entry.bearers && entry.health>0 && entry.bearers.some(health=>health<=0)) {
-          entry.state="waiting";this.RequestBearer(entry);continue;
-        }
+        if(entry.bearers && entry.health>0 && this.BearerShort(entry))continue;
         if (SafeAt(entry))
           entry.receiveProgress = Math.min(
             entry.receiveLength,
-            entry.receiveProgress + (entry.bearers ? R.litterSpeedMps : R.walkSpeedMps) * dt,
+            entry.receiveProgress + (entry.bearers ? this.LitterPace(entry, R.litterSpeedMps) : R.walkSpeedMps) * dt,
           );
         Object.assign(entry, MissionCarryRoutePoint(entry.receiveRoute, entry.receiveProgress));
         entry.state = "moving";
@@ -438,13 +436,11 @@ export class FirstLevelMissionColumn {
       for (const entry of [...this.litters, ...this.walkers].filter(
         (entry) => entry.exitRoute && !entry.escaped && !entry.assigned,
       )) {
-        if(entry.bearers && entry.health>0 && entry.bearers.some(health=>health<=0)) {
-          entry.state="waiting";this.RequestBearer(entry);continue;
-        }
+        if(entry.bearers && entry.health>0 && this.BearerShort(entry))continue;
         if (SafeAt(entry))
           entry.exitProgress = Math.min(
             entry.exitLength,
-            entry.exitProgress + (entry.bearers ? R.litterSpeedMps : R.finalEvacSpeedMps) * dt,
+            entry.exitProgress + (entry.bearers ? this.LitterPace(entry, R.litterSpeedMps) : R.finalEvacSpeedMps) * dt,
           );
         Object.assign(entry, MissionCarryRoutePoint(entry.exitRoute, entry.exitProgress));
         entry.rearCleared=entry.exitProgress>=entry.exitSafeProgress;
@@ -466,11 +462,7 @@ export class FirstLevelMissionColumn {
       if (["carried", "fallen", "critical", "placed", "loading", "unloading"].includes(litter.state))
         continue;
       if (litter.unloadedFromCart && this.mode !== "retreat") continue;
-      if (litter.bearers.some(health => health <= 0)) {
-        litter.state = "waiting";
-        this.RequestBearer(litter);
-        continue;
-      }
+      if (this.BearerShort(litter)) continue;
       if(this.UpdateStaging(litter,this.litters.indexOf(litter),dt,moving,SafeAt))continue;
       const ownRoute = litter.joinRoute || this.route,
         ownLength = litter.joinLength || this.length;
@@ -485,7 +477,7 @@ export class FirstLevelMissionColumn {
       if(!litter.joinRoute && this.mode==="south")for(const area of this.stagingAreas)
         if(!litter.stagedAreas?.includes(area.id))limit=Math.min(limit,area.progress);
       const canMove = moving && SafeAt(litter) && litter[progressKey] < limit - 0.05;
-      const pace=R.litterSpeedMps*(.94+(i%4)*.025);
+      const pace=this.LitterPace(litter, R.litterSpeedMps*(.94+(i%4)*.025));
       if (canMove) litter[progressKey] = Math.min(limit, litter[progressKey] + pace * dt);
       const at = MissionCarryRoutePoint(ownRoute, litter[progressKey]);
       Object.assign(litter, at, { state: canMove ? "moving" : "waiting" });
@@ -576,6 +568,26 @@ export class FirstLevelMissionColumn {
       }
     }
   }
+  /**
+   * 少了一个抬架员的担架该不该停下等替补。
+   *
+   * 有替补可派（或已经在路上）就停下等；一个替补都没有、但还剩一个活着的抬架员时，
+   * 不再干等 —— 剩下那个人拖着走（`litter.dragging = true`，步速乘 `R.litterDragScale`），
+   * 替补池以后再有人空出来照样会被派过来接手。
+   * 2026-09-16 用户把随队医护全撤了，替补池只剩两名民夫，伏击 + 空袭一共要补四五个
+   * 抬架位，一定不够；老规则会让最后一副担架永远停在转运点，撤退段就永远走不完。
+   */
+  BearerShort(litter) {
+    if (!litter.bearers.some(health => health <= 0)) { litter.dragging = false; return false; }
+    this.RequestBearer(litter);
+    const pending = this.walkers.some(w => w.rescueTarget?.litter === litter.id);
+    const alone = !pending && litter.bearers.some(health => health > 0);
+    litter.dragging = alone;
+    if (alone) return false;
+    litter.state = "waiting";
+    return true;
+  }
+  LitterPace(litter, base) { return litter.dragging ? base * R.litterDragScale : base; }
   RequestBearer(litter) {
     const slot=litter.bearers.findIndex(health=>health<=0);
     if(slot<0 || this.walkers.some(w=>w.rescueTarget?.litter===litter.id))return;

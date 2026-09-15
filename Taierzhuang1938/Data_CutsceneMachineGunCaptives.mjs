@@ -302,7 +302,7 @@ export const CS_MachineGunCaptives = {
         NraHold(28.45, SPOT.captiveYoung, "CaptiveKneelFlinch", { kneel: 1, reach: 0, lookPitch: -0.45 }),
         // 收手抱头、不再出声。这里不换成趴姿 —— 后面那一刀要他跪着。
         NraHold(29.25, SPOT.captiveYoung, "CaptiveKneelHandsHead", { kneel: 1, reach: 0, lookPitch: -0.35 }),
-        // 34.16 中刀（刺刀尖前 1.41 / 高 0.79，跪姿上半身）：CaptiveStabbedCollapse
+        // 34.16 中刀（刺刀尖前 1.393 / 高 0.78，刺入体表 0.12，跪姿上半身）：CaptiveStabbedCollapse
         // 从跪姿起，2.0 s 后末帧趴稳（头 1.02 → 0.26）。这是全片唯一看得见的一刀。
         NraHold(34.16, SPOT.captiveYoung, "CaptiveStabbedCollapse", { kneel: 1, prone: 1, dying: 1, lookPitch: -0.3 }),
         NraHold(44.0, SPOT.captiveYoung, "CaptiveStabbedCollapse", { prone: 1, dying: 1, lookPitch: -0.3 }),
@@ -382,7 +382,7 @@ export const CS_MachineGunCaptives = {
       ],
     },
 
-    // ── 日兵乙：小兵背后。枪托砸要 0.8 m、下刺要 1.41 m，所以他砸完退半步再刺 ────
+    // ── 日兵乙：小兵背后。枪托砸要 0.98 m、下刺要 1.43 m，所以他砸完退半步再刺 ───
     {
       id: "ija_bing", kind: "ija", weapon: "Type38", seed: "ijaBing", modelVariant: 2,
       track: [
@@ -485,7 +485,7 @@ export const CS_MachineGunCaptives = {
     },
     {
       n: 3, seconds: 10, focalMm: 200,
-      note: "日兵站在趴着的老兵旁边指着骂（IjaTauntGesture）；老兵从地上顶回去一句；另一个日兵 27.6 s 把枪托翻过头顶，28.45 s 砸在跪着的小兵头肩上（落点前伸 0.799 / 高 0.620），小兵头猛一低、上身缩起来（CaptiveKneelFlinch，0.8 s），29.25 s 收回抱头、不再出声。刺刀这一镜就在枪上了，剪影里看得见那一截直线。",
+      note: "日兵站在趴着的老兵旁边指着骂（IjaTauntGesture）；老兵从地上顶回去一句；另一个日兵 27.6 s 把枪托翻过头顶，28.45 s 砸在跪着的小兵后背肩上（落点前伸 0.799 / 高 0.620），小兵头猛一低、上身缩起来（CaptiveKneelFlinch，0.8 s），29.25 s 收回抱头、不再出声。刺刀这一镜就在枪上了，剪影里看得见那一截直线。",
       camera: {
         from: STAGE.camera,
         lookActor: "captive_old", look: [0.4, 0.85, -0.9],

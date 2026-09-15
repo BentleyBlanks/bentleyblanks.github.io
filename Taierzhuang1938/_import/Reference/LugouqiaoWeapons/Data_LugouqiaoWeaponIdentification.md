@@ -2,6 +2,14 @@
 
 来源：用户提供的 `武器.max`。原集合按 12 个根节点拆分；每个拆分 Blend 都保留原 UV、材质槽和外部贴图引用。`Texture_Source/` 保存 16 个原始 DDS/TGA/JPEG 文件的逐文件副本，游戏使用的 JPG/PNG 是从这些原图生成的浏览器兼容版本。
 
+## 2026-09-16 十一年式背面缺面修复
+
+重新读取原始 `武器.max` 的 `QEDQD`：10 个网格与存档拆分 Blend 的顶点（小数点后六位）、polygon 顶点顺序及世界变换逐对象 SHA-256 一致。源模型没有游戏截图中的大片反面；缺面由运行时导入器对开放薄壳执行 `recalc_face_normals` 引起，枪托、机匣、弹斗的一部分面被翻反。
+
+`ImportLugouqiaoWeapons.SOURCES.Type11.preserveSourceWinding` 保留源绕序，继续执行退化几何清理和 42° 光滑处理；不改其他武器。重新导出的 8,252 个三角形中，1,303 个恢复朝向，全部三角形位置及材质分组、包围盒、节点挂点与修复前一致。不得对本模型的开放片无条件重算法线，也不以双面材质掩盖错误。
+
+本次实测：原始/旧导出 Blender 背面剔除对照；`Script_WeaponShot.mjs --only=Type11 --fp` 腰射、开镜、开火、拉栓截图；`Script_WeaponRangeTest.mjs --only=Type11 --shot`；AssetStandardsTest、ModelFacingTest、ModuleGraphTest、MotionVectorContractTest。原始对照、截图、诊断 JSON 仅留本地。可编辑修复工程和本次重新导入的源工程位于 `C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\Type11Backface_20260916`。
+
 | 源根节点 | 游戏模型 id | 识别结论 | 处理 |
 |---|---|---|---|
 | `2#` | `WaltherP38` | 套筒铭文可辨识为 Walther P38 | 新增 → **2026-09-05 移除**（1939 年才交付德军） |

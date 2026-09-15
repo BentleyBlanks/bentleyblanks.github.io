@@ -8,6 +8,10 @@ import { MISSION_LAYOUT, MISSION_ANCHORS as A, MISSION_ROUTES } from "./Data_Fir
 export const MISSION_VERSION = MISSION_TOPOLOGY_VERSION;
 import { MISSION_TUNING } from "./Data_Tuning_FirstLevel.mjs";
 export { MISSION_TUNING } from "./Data_Tuning_FirstLevel.mjs";
+// Both air passes. Ki-30 (Army Type 97 light bomber) entered combat in China in spring 1938; the Ki-43 flew
+// only in 1939 and has no texture. The documented aircraft near Tengxian were Type 88 reconnaissance biplanes,
+// for which there is no model yet. See docs/Data_AircraftAssets.md.
+export const MISSION_AIRCRAFT_ID = "MitsubishiKi30";
 const Stage = (id, objective, target, requirements, cue, extra = {}) =>
   Object.freeze({ id, objective, target, requirements, cue, ...extra });
 export const MISSION_STAGES = Object.freeze([

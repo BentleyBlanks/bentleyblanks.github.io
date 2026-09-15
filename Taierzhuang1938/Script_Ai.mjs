@@ -3594,9 +3594,14 @@ export class AiDirector {
    * （伤害靶场、AiBehaviorTest 的过热对账）人被瞬移过，而 actor.root 还停在出生点 ——
    * 拿那个枪口去打射线就是从几十米外开枪。所以先对一次账，对不上就**不写**，
    * 让 MuzzleOrigin 走它自己的姿态高兜底（眼高 − muzzleDropM）。
+   *
+   * `checkBarrel`（开火那一刻给 true）：贴墙持枪时枪管伸进墙里、真枪口在墙那一面，
+   * 从那儿打的射线碰不到这堵墙 —— 子弹穿墙。`ShootingModel.BarrelOrigin` 沿枪管
+   * 量一次，有墙就把出发点拉回墙这一面。抬枪角那一路（Act）不需要，省掉这条射线。
    */
-  UpdateMuzzle(s) {
+  UpdateMuzzle(s, checkBarrel = false) {
     s.muzzleWorld = null;
+    s.muzzleClipped = false;
     const root = s.actor && s.actor.root;
     if (!root) return;
     // **骨架没在更新的人，枪口是假的**：`Act` 只在 `root.visible` 时调 `actor.Update`，
@@ -3613,6 +3618,12 @@ export class AiDirector {
     const out = s.muzzleStore || (s.muzzleStore = { x: 0, y: 0, z: 0 });
     out.x = m.x; out.y = m.y; out.z = m.z;
     s.muzzleWorld = out;
+    if (!checkBarrel) return;
+    const barrelDir = typeof s.actor.MuzzleDirection === "function"
+      ? s.actor.MuzzleDirection(this.tmpMuzzle) : null;
+    const origin = this.shooting.BarrelOrigin(s.position, out, barrelDir);
+    out.x = origin.x; out.y = origin.y; out.z = origin.z;
+    s.muzzleClipped = origin.clipped;
   }
 
   /**
@@ -3770,7 +3781,7 @@ export class AiDirector {
     // --- 这一发是瞄准射击还是压制射击 -------------------------------------
     // 三道闸，任何一道不过就尝试压制：看不见 / 没抢到攻击令牌 / 暴露采样全被挡。
     // 压制射击**不占令牌**（否则「没令牌→去压制→压制又要令牌」是死循环）。
-    this.UpdateMuzzle(s);
+    this.UpdateMuzzle(s, true);
     const from = this.shooting.MuzzleOrigin(s);
     const toPlayer = s.target.isPlayer && !!player;
     const targetId = s.target.isPlayer ? PLAYER_TRACK_ID : s.target.id;

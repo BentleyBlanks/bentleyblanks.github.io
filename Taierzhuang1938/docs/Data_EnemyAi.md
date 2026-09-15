@@ -258,6 +258,7 @@ export class ShootingModel {
   BurstPlan(weapon, rnd) → { shots, intervalS, pauseS };   // 消费 aiBurstMin/Max；步枪 1 发；机枪 4–14 发 + 停顿
   SuppressPoint(lkp, cover) → {x,y,z};   // 目标藏起来后向哪儿打：LKP 或掩体沿上方 0.3 m
   MuzzleOrigin(soldier) → {x,y,z};       // soldier.actor?.weaponMuzzleWorld 若有，否则姿态高兜底
+  BarrelOrigin(bodyPos, muzzle, barrelDir) → {x,y,z,clipped};  // 枪管伸进墙里时出发点拉回墙这一面
   LookPitch(from, to) → rad;             // 给 Actor 的 lookPitch
 }
 ```
@@ -266,6 +267,10 @@ export class ShootingModel {
 
 - **射线验证的是瞄点**：`Exposure` 的射线从 `MuzzleOrigin` 到各采样点；`fraction=0` 时**不许结算命中**，只能压制射击（打 `SuppressPoint`）。
   这一条同时修「隔墙打中玩家躯干」与「AI 只露头却按全身挨打」。
+- **枪口不许在墙那一面**：贴墙持枪时枪管会伸进墙里，真枪口落在墙后，从那儿打的射线碰不到这堵墙（子弹穿墙）。
+  `TryFire` 里 `UpdateMuzzle(s, true)` 调 `BarrelOrigin`：沿枪管从人体中轴量到枪口，中间有碰撞体就把出发点放在墙面前
+  `SHOOTING.barrelStandoffM`，暴露、`ShotPathClear`、曳光与弹着都从这一点起算，`s.muzzleClipped` 记这一发是否被挡。
+  矮墙沿上方架枪不算挡。回归：`Script_AiShootingTest.mjs` 的贴墙持枪段。
 - 命中率 = `baseAccuracy × ExposureCurve(fraction) × AimErrorCurve(err)`；两条曲线在满暴露 / 零误差时都是 1。
 - 压制射击：目标不可见但 LKP 置信度 > 阈值 → 以 `suppressIntervalScale` 的节奏向 `SuppressPoint` 打，
   命中永远为 false，但近失弹压制照旧（这就是「藏起来也有子弹擦过」）。**攻击令牌只限瞄准射击**：
