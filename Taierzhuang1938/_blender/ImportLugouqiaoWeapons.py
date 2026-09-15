@@ -34,6 +34,10 @@ SOURCES = {
                    "note": "源节点 Group146；九八式军刀与刀鞘（按形制认领）。"},
     "Type11": {"lengthM": 1.100, "kind": "rifle", "side": "ija",
                    "excludeObjects": {"4"},
+                   # Authored open shells have intentional face directions.
+                   # Recalculating each disconnected patch reverses receiver,
+                   # stock and hopper panels, making them disappear in-game.
+                   "preserveSourceWinding": True,
                    # This source has no material bucket whose name contains
                    # "Wood", so the generic stock-direction heuristic treats
                    # the barrel end as the stock.  The resulting mesh points
@@ -90,12 +94,12 @@ def _tile_for(material):
     return "sourceUv"
 
 
-def _prepare_export_normals(bms):
+def _prepare_export_normals(bms, preserveSourceWinding=False):
     """清退坏拓扑，并让本批声明的 42° 光滑组真正成为导出法线来源。"""
     for mesh in bms:
         if mesh.edges:
             bmesh.ops.dissolve_degenerate(mesh, dist=1e-7, edges=mesh.edges[:])
-        if mesh.faces:
+        if mesh.faces and not preserveSourceWinding:
             bmesh.ops.recalc_face_normals(mesh, faces=mesh.faces[:])
         authored = mesh.loops.layers.float_vector.get(AUTHORED_NORMAL_LAYER)
         if authored is not None:
@@ -223,7 +227,7 @@ def BuildImported(name):
             ratio_bias=spec.get("decimateBias", 1.005))
         if reduced is not None:
             bms = reduced
-    _prepare_export_normals(bms)
+    _prepare_export_normals(bms, spec.get("preserveSourceWinding", False))
     lo, hi = _Aabb(bms)
     root = Node("root")
     body = root.Child("body")
