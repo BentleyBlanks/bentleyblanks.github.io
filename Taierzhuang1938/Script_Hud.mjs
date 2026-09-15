@@ -1030,6 +1030,7 @@ export class Hud {
   }
 
   Say(speaker, text, seconds = TIMING.subtitleS, variant = "") {
+    this.guideSubtitleBounds=null;
     this.el.subtitle.innerHTML = speaker
       ? `<span class="who">${speaker}</span><span class="txt">${text}</span>`
       : `<span class="txt narr">${text}</span>`;
@@ -1047,6 +1048,7 @@ export class Hud {
   // speaker beyond SUBTITLE_DEPTH.farM is dimmed further, so overlapping talk
   // reads as foreground and background instead of two equal lines.
   SayLines(lines, seconds = TIMING.subtitleS) {
+    this.guideSubtitleBounds=null;
     const subtitle = this.el.subtitle;
     subtitle.replaceChildren();
     const ordered = [...lines].sort((a, b) => (a.emphasis === "aside" ? 0 : 1) - (b.emphasis === "aside" ? 0 : 1));
@@ -1649,7 +1651,21 @@ export class Hud {
     if(!Number.isFinite(projected.x)||!Number.isFinite(projected.y)){if(!el.hidden)el.hidden=true;return;}
     const width=window.innerWidth,height=window.innerHeight;
     const point=GrenadeWarningScreenPoint(projected,{position:view.target},context.player,width,height,{liftPx:0});
-    const x=Math.max(100,Math.min(width-100,point.x)),y=Math.max(72,Math.min(height-110,point.y));
+    const x=Math.max(100,Math.min(width-100,point.x));
+    let y=Math.max(72,Math.min(height-110,point.y));
+    // Reserve the real subtitle footprint, including multi-speaker rows. Keep
+    // it through fades so the marker cannot jump underneath disappearing text.
+    // Text updates invalidate the bounds; camera motion alone never remeasures.
+    if(this.el.subtitle.textContent){
+      const sizeKey=`${width}/${height}/${document.fonts?.status}`;
+      if(!this.guideSubtitleBounds||this.guideSubtitleSize!==sizeKey){
+        this.guideSubtitleBounds=this.el.subtitle.getBoundingClientRect();
+        this.guideSubtitleSize=sizeKey;
+      }
+      const box=this.guideSubtitleBounds;
+      if(x+GUIDE.markerHalfWidthPx>box.left&&x-GUIDE.markerHalfWidthPx<box.right)
+        y=Math.max(72,Math.min(y,box.top-GUIDE.markerDetailBottomPx-GUIDE.subtitleGapPx));
+    }
     if(el.hidden)el.hidden=false;
     SetClass(el,"leader",view.leaderTarget);
     SetClass(el,"offscreen",point.offscreen);

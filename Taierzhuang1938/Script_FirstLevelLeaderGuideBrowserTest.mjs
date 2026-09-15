@@ -70,6 +70,38 @@ try{
  await page.evaluate(()=>{const g=window.Tengxian;g.player.yaw+=Math.PI;g.StepFrames(2,1/60,true);});
  assert.ok(await page.locator(".hudMissionGuide").evaluate(el=>el.classList.contains("offscreen")));
  await page.screenshot({path:path.join(out,"Scene_LeaderBehind.png")});
+ const subtitleClearance=await page.evaluate(async()=>{
+  const g=window.Tengxian,h=g.hud;
+  const {MISSION_DIALOGUE,MISSION_VOICE_CAST}=await import('./Data_FirstLevelMissionDialogue.mjs');
+  const cue=MISSION_DIALOGUE.find(c=>c.id==='ReceptionWithdrawal'),lead=cue.lines.at(-1),aside=cue.lines[1];
+  const original=h.missionGuide,angle=h.el.missionGuide.style.getPropertyValue('--guide-angle');
+  const Measure=()=>{
+    h.RenderMissionGuide();
+    const subtitle=h.el.subtitle.getBoundingClientRect();
+    const pieces=[...h.el.missionGuide.children].filter(e=>getComputedStyle(e).display!=='none'&&Number(getComputedStyle(e).opacity)>0)
+      .map(e=>e.getBoundingClientRect());
+    return {markerBottom:Math.max(...pieces.map(r=>r.bottom)),subtitleTop:subtitle.top,
+      angle:h.el.missionGuide.style.getPropertyValue('--guide-angle')};
+  };
+  h.Say(MISSION_VOICE_CAST[lead.who][0],lead.text,30);const single=Measure();
+  h.SayLines([aside,lead].map((line,i)=>({speaker:MISSION_VOICE_CAST[line.who][0],text:line.text,emphasis:i?'lead':'aside'})),30);
+  const stacked=Measure();
+  h.SetMissionGuide({...original.view,distance:1},original.context);const near=Measure();
+  let reads=0;const bounds=h.el.subtitle.getBoundingClientRect;
+  h.el.subtitle.getBoundingClientRect=function(){reads++;return bounds.call(this);};
+  h.guideSubtitleBounds=null;for(let i=0;i<30;i++)h.RenderMissionGuide();
+  h.el.subtitle.getBoundingClientRect=bounds;
+  return {single,stacked,near,reads,angle};
+ });
+ for(const sample of [subtitleClearance.single,subtitleClearance.stacked,subtitleClearance.near]){
+  assert.ok(sample.markerBottom+10<=sample.subtitleTop,'all marker text clears the real subtitle footprint');
+  assert.equal(sample.angle,subtitleClearance.angle,'subtitle avoidance retains the true target bearing');
+ }
+ assert.equal(subtitleClearance.reads,1,'stationary subtitle bounds are not measured every frame');
+ await page.waitForTimeout(350);
+ await page.screenshot({path:path.join(out,"Scene_LeaderSubtitleClearance.png")});
+ await page.evaluate(()=>window.Tengxian.hud.SayLines([],0));
+ await fs.writeFile(path.join(out,'Data_SubtitleClearance.json'),JSON.stringify(subtitleClearance,null,2));
  await page.waitForTimeout(6800);
  assert.ok(await page.locator(".hudObjective").evaluate(el=>Number(getComputedStyle(el).opacity)<.01),"brief objective fades without removing the world marker");
  const rejoin=await page.evaluate(()=>{

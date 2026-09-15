@@ -9,6 +9,7 @@ export const MISSION_GUIDE_TUNING = Object.freeze({
   reminderS: 36, repeatS: 55, waitReminderS: 9, voiceRangeM: 55,
   gesturePeriodS: 7, gestureSeconds: 1.7, gestureBlendS: .3,
   watchHoldS: .6, threatSuppression: .35, nearMarkerM: 3.5,
+  markerHalfWidthPx:95, markerDetailBottomPx:32, subtitleGapPx:12,
   gestureHand: {x:-.46,y:1.55,z:-.34}, gesturePullM:.22, gestureHz:1.5,
   gesturePole: {x:-.72,y:1.1,z:-.18}, gestureMoveThreshold:.08,
 });
