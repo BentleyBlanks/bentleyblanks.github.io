@@ -6,6 +6,13 @@
 //     拖时间轴、Esc 跳过、出图脚本从任意时刻抓帧，拿到的姿势逐比特相同。
 //   · `perform: null`（或没写）→ 走原来的 POSE_CLIPS 路径。
 //   · 未知 clip id / 这具骨架没有这条 clip → console.warn 一次并回退，不抛错卡死过场。
+//   · clip 带 `referenceSpeedMps`（走路那一条）时，播放速率按起播关键帧的
+//     `state.moveSpeed × 4.2 ÷ (referenceSpeedMps × 演员缩放)` 缩放 —— 适配器没有根
+//     位移，位移全由轨道给，所以支撑脚的后移速度必须等于轨道速度，否则就是滑步。
+//     不带这个字段的 clip 一律 1 倍速，旧数据一个字不用改。
+//   · 起播关键帧可以写 `state.performPhase: <秒>`，从 clip 的那一秒起算 —— 四个日军
+//     共用一条 4 s 站姿循环，错相位比复制四条近似的 clip 便宜。淡入的混合量仍按
+//     `时间 − t0` 算，不受相位影响。
 //   · 表演期间 pos / ry 仍由过场轨道决定：**这里只写骨头，从不写 Soldier / Actor 世界根**。
 //     唯一动到 rig.root 的是抵掉 CharacterModel 自己加的 infantryFloorOffset（那是按
 //     POSE_CLIPS 的脚底算的，对作者动作没有意义），退出时逐比特还原。
@@ -17,7 +24,9 @@ import { Vector3, Quaternion } from "three";
 
 const MANIFEST = "Data_MachineGunCaptivesAnimation.json";
 const DEFAULT_BASE = "./Animation/MachineGunCaptives/";
-const LIBRARY_VERSION = "20260915MachineGunCaptivesV1";
+const LIBRARY_VERSION = "20260916MachineGunCaptivesV2";
+/** `state.moveSpeed` → m/s，与 Script_CutsceneCheck 的滑步判据同一个常数。 */
+const MOVE_SPEED_TO_MPS = 4.2;
 
 const Clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 const Smooth = (value) => { const x = Clamp(value, 0, 1); return x * x * (3 - 2 * x); };
@@ -60,11 +69,28 @@ const PerformOf = (key) => {
   const value = key && key.state ? key.state.perform : null;
   return typeof value === "string" && value ? value : null;
 };
+/** 起播关键帧上的数值字段（取那一帧的写法，不插值 —— 插了就不确定了）。 */
+const NumberOf = (key, field) => {
+  const value = key && key.state ? key.state[field] : null;
+  return Number.isFinite(value) ? value : 0;
+};
+const SegmentOf = (track, index, clipId) => {
+  let start = index;
+  while (start > 0 && PerformOf(track[start - 1]) === clipId) start -= 1;
+  return {
+    clipId,
+    t0: track[start].t,
+    // 速率与相位只看**起播那一帧**：轨道里的 moveSpeed 是会插值的，按当前值算速率
+    // 就得对时间积分，拖时间轴与逐帧推进会得到两个答案。段内取常数才确定性。
+    speed: NumberOf(track[start], "moveSpeed"),
+    phase: NumberOf(track[start], "performPhase"),
+  };
+};
 
 /**
  * 在一条 cast 轨道上解出此刻该播哪条 clip、从哪个**过场全局秒**起播。
- * 返回 `{ clipId, t0, previous }`；previous 是上一段表演（给确定性交叉淡入用），
- * 上一段不是表演（perform:null / 第一段）时为 null。
+ * 返回 `{ clipId, t0, speed, phase, previous }`；previous 是上一段表演（给确定性交叉
+ * 淡入用），上一段不是表演（perform:null / 第一段）时为 null。
  *
  * 纯函数：只读轨道与时间，不看上一帧。时间轴拖到哪儿都给同一个答案。
  */
@@ -77,16 +103,13 @@ export function ResolvePerform(track, time) {
   }
   const clipId = PerformOf(track[index]);
   if (!clipId) return null;
+  const resolved = SegmentOf(track, index, clipId);
+  resolved.previous = null;
   let start = index;
   while (start > 0 && PerformOf(track[start - 1]) === clipId) start -= 1;
-  const resolved = { clipId, t0: track[start].t, previous: null };
   if (start > 0) {
     const previousId = PerformOf(track[start - 1]);
-    if (previousId) {
-      let from = start - 1;
-      while (from > 0 && PerformOf(track[from - 1]) === previousId) from -= 1;
-      resolved.previous = { clipId: previousId, t0: track[from].t };
-    }
+    if (previousId) resolved.previous = SegmentOf(track, start - 1, previousId);
   }
   return resolved;
 }
@@ -156,6 +179,34 @@ export class CutscenePerformer {
   }
 
   /**
+   * 这一段表演的播放速率。带 `referenceSpeedMps` 的 clip（走路）按轨道速度缩放，
+   * 其余一律 1 倍。夹在 0.25–4 之间：轨道速度写错时宁可步子不对，也不要把 clip 抽成
+   * 一帧或者钉死不动。
+   *
+   * `referenceSpeedMps` 是**源尺度**下的地面速度（人高 1.76–1.82 m 的那具骨架，烘焙
+   * 就在那个尺度上做）。运行时演员被缩到 targetHeight 再乘各自的 sizeScale，同一条
+   * clip 的步子跟着缩，所以要先把参考速度乘上演员的实际缩放再比。忘了这一步，
+   * 1.66 m 的兵会按 0.91 倍的步子走 1.0 倍的路 —— 每步滑 9 cm。
+   */
+  static RateOf(clip, speed, scale = 1) {
+    const reference = (Number(clip && clip.referenceSpeedMps) || 0) * (Number(scale) || 1);
+    if (!(reference > 0)) return 1;
+    const world = Math.abs(Number(speed) || 0) * MOVE_SPEED_TO_MPS;
+    if (!(world > 0)) return 1;
+    return Clamp(world / reference, 0.25, 4);
+  }
+
+  /**
+   * 源尺度 → 世界的缩放。逐级乘本地 scale，不问 matrixWorld：这一步发生在写骨头
+   * **之前**，此刻演员的世界矩阵还是上一帧的。
+   */
+  SourceScale() {
+    let scale = 1;
+    for (let node = this.rig.root; node; node = node.parent) scale *= node.scale.y || 1;
+    return scale || 1;
+  }
+
+  /**
    * 把 `resolved` 这一段表演在 `time`（过场全局秒）上的姿势写到蒙皮上。
    * 换 clip 时与上一段做一次**确定性**交叉淡入：两段都按各自的 t0 取样，混合量只由
    * `time − t0` 决定，所以拖时间轴与逐帧推进得到同一张图。
@@ -167,15 +218,21 @@ export class CutscenePerformer {
         `[CutscenePerformance] ${this.record.modelId} has no clip "${resolved.clipId}"; falling back to POSE_CLIPS`);
       return false;
     }
-    const elapsed = time - resolved.t0;
+    // since 是这一段演了多久（淡入用），elapsed 是 clip 自己的播放头（速率与相位之后）。
+    const since = time - resolved.t0;
+    const scale = this.SourceScale();
+    const rate = CutscenePerformer.RateOf(clip, resolved.speed, scale);
+    const elapsed = since * rate + (Number(resolved.phase) || 0);
     this._SampleInto(clip, elapsed, this.pose);
     const blendSeconds = Number(this.config.blendSeconds) || 0;
     const previous = resolved.previous;
-    if (previous && blendSeconds > 0 && elapsed < blendSeconds) {
+    if (previous && blendSeconds > 0 && since < blendSeconds) {
       const previousClip = this.record.clips[previous.clipId];
       if (previousClip) {
-        this._SampleInto(previousClip, time - previous.t0, this.blendPose);
-        const mix = Smooth(elapsed / blendSeconds);
+        this._SampleInto(previousClip,
+          (time - previous.t0) * CutscenePerformer.RateOf(previousClip, previous.speed, scale)
+          + (Number(previous.phase) || 0), this.blendPose);
+        const mix = Smooth(since / blendSeconds);
         for (let i = 0; i < this.bones.length; i += 1) {
           const offset = i * 7;
           this.v.fromArray(this.blendPose, offset)
@@ -203,7 +260,8 @@ export class CutscenePerformer {
     if (rig.root.parent) rig.root.parent.updateWorldMatrix(true, false);
     rig.root.updateMatrixWorld(true);
     this._AimWeapon(clip.weaponHold);
-    this.state = { clipId: resolved.clipId, t0: resolved.t0, seconds: elapsed, loop: !!clip.loop };
+    this.state = { clipId: resolved.clipId, t0: resolved.t0, seconds: elapsed, rate,
+                   loop: !!clip.loop };
     return true;
   }
 

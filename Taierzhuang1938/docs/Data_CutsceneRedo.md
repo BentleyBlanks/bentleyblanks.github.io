@@ -112,7 +112,16 @@ POSE_CLIPS 那十六条是**导入动作**，里面没有投降、跪地、踢�
   `hidden` / `dead` 等布尔语义不变；`perform` 与 `crouch/prone/dead` 同时出现时以 `perform` 为准。
 - 贴地是**烘焙时**做的：每一帧整体平移到最低那个蒙皮顶点离地 3 mm，所以运行时没有脚底探针，
   跪姿/趴姿也不会被按「鞋底」抬起来。演员脚下平面就是轨道给的 `pos[1]`。
-- 现有的十条（机枪点位「川军被俘」那场）与实测数值见
+- **走路 clip 按轨道速度改播放速率（2026-09-16 加）**：clip 自报 `referenceSpeedMps`
+  （它被烘在什么地面速度上，**源尺度**的 m/s）时，表演层按
+  `起播帧的 state.moveSpeed × 4.2 ÷ (referenceSpeedMps × 演员缩放)` 缩放播放速率，
+  于是支撑脚的后移速度等于轨道速度，不滑步。速率取**起播那一帧**的 `moveSpeed`
+  （段内常数）：按当前插值出来的值算就得对时间积分，拖时间轴与逐帧推进会给两个答案。
+  夹在 0.25–4 倍之间。不带 `referenceSpeedMps` 的 clip 一律 1 倍速，旧数据不用改。
+- **`state.performPhase`（秒，2026-09-16 加）**：起播帧上可以写一个相位偏移，从 clip 的
+  那一秒起算。几个人共用同一条循环时用它错开，比复制几条近似的 clip 便宜。淡入的混合量
+  仍按 `时间 − t0` 算，不受相位影响；换一次 clip 就是新的一段，每段的起播帧各写各的。
+- 现有的十三条（机枪点位「川军被俘」那场）与实测数值见
   [`Animation/MachineGunCaptives/Data_MachineGunCaptivesAnimation.md`](../Animation/MachineGunCaptives/Data_MachineGunCaptivesAnimation.md)；
   实现在 `Script_CutscenePerformance.mjs`，门禁 `Script_MachineGunCaptivesAnimationTest.mjs`。
 

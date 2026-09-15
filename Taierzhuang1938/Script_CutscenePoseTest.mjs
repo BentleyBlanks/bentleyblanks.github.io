@@ -107,11 +107,31 @@ const CUTSCENE_CASES = [
     preloadPerformance: true,
     samples: [
       {
+        // 押解进场：举着手走（2026-09-16 加）。走姿比站姿低一截（含胸缩肩，
+        // 实测头 1.288–1.319），带宽仍按演员 sizeScale 的 ±7% 给。
+        t: 4.0,
+        actors: {
+          captive_old: { performClip: "CaptiveHandsUpWalk", head: [1.19, 1.42], why: "举着手被押进来" },
+          captive_young: { performClip: "CaptiveHandsUpWalk", head: [1.19, 1.42], why: "举着手被押进来" },
+          captive_third: { performClip: "CaptiveHandsUpWalk", head: [1.19, 1.42], why: "举着手被押进来" },
+        },
+      },
+      {
         t: 9.0,
         actors: {
           captive_old: { performClip: "CaptiveHandsUpStand", head: [1.24, 1.49], why: "站定举手过头" },
           captive_young: { performClip: "CaptiveHandsUpStand", head: [1.24, 1.49], why: "站定举手过头" },
           captive_third: { performClip: "CaptiveHandsUpStand", head: [1.24, 1.49], why: "站定举手过头" },
+        },
+      },
+      {
+        // 跪下那一秒：两个已经在往下坐，老兵还站着（他慢半拍，挨脚的理由）。
+        // 过渡中的头高横跨站姿到跪姿，所以这一条主要钉 clip id，高度带给整段行程。
+        t: 12.9,
+        actors: {
+          captive_young: { performClip: "CaptiveStandToKneel", head: [0.85, 1.45], why: "正在跪下去" },
+          captive_third: { performClip: "CaptiveStandToKneel", head: [0.85, 1.45], why: "正在跪下去" },
+          captive_old: { performClip: "CaptiveHandsUpStand", head: [1.24, 1.49], why: "还没跪" },
         },
       },
       {
@@ -121,6 +141,14 @@ const CUTSCENE_CASES = [
           captive_young: { performClip: "CaptiveKneelPlead", head: [0.90, 1.10], why: "跪着求饶" },
           captive_third: { performClip: "CaptiveKneelHandsHead", head: [0.90, 1.10], why: "跪着抱头" },
           ija_hei: { performClip: "IjaBayonetGuard", head: [1.24, 1.49], why: "踢完收回持枪式" },
+        },
+      },
+      {
+        // 挨枪托那一下的反应（2026-09-16 加）：28.45 起 0.8 s 的 CaptiveKneelFlinch，
+        // 头被砸低 9 cm 再回来。实测头 0.886–0.994，带宽同上。
+        t: 28.8,
+        actors: {
+          captive_young: { performClip: "CaptiveKneelFlinch", head: [0.80, 1.09], why: "挨枪托，头颈猛一偏、上身缩起来" },
         },
       },
       {

@@ -1,7 +1,7 @@
 {
   "schema": 1,
-  "version": "20260915MachineGunCaptivesV1",
-  "authoringTool": "Blender 5.1 background python (same bpy path BlenderMCP executes)",
+  "version": "20260916MachineGunCaptivesV2",
+  "authoringTool": "Blender 5.1 driven over BlenderMCP (execute_code), same bpy path as --background",
   "actorForward": [
     0,
     0,
@@ -11,9 +11,20 @@
   "blendSeconds": 0.12,
   "scope": "Machine-gun stage captives cutscene only",
   "clips": {
+    "CaptiveHandsUpWalk": {
+      "duration": 1.8,
+      "loop": true,
+      "weaponHold": "free",
+      "referenceSpeedMps": 1.1
+    },
     "CaptiveHandsUpStand": {
       "duration": 4.0,
       "loop": true,
+      "weaponHold": "free"
+    },
+    "CaptiveStandToKneel": {
+      "duration": 1.0,
+      "loop": false,
       "weaponHold": "free"
     },
     "CaptiveKneelHandsHead": {
@@ -24,6 +35,11 @@
     "CaptiveKneelPlead": {
       "duration": 4.0,
       "loop": true,
+      "weaponHold": "free"
+    },
+    "CaptiveKneelFlinch": {
+      "duration": 0.8,
+      "loop": false,
       "weaponHold": "free"
     },
     "CaptiveStruckDown": {
@@ -66,11 +82,14 @@
     {
       "id": "LugouNra02",
       "file": "Animation_LugouNra02MachineGunCaptives.json",
-      "sha256": "f14f5033e6ad1b7c6739a4028217bb3420fa23177a9ac27752a035a63479d4a4",
+      "sha256": "f89290c53c532de812a8c7032f38feb76094af312f68ea5704cc091a441307b2",
       "clipIds": [
+        "CaptiveHandsUpWalk",
         "CaptiveHandsUpStand",
+        "CaptiveStandToKneel",
         "CaptiveKneelHandsHead",
         "CaptiveKneelPlead",
+        "CaptiveKneelFlinch",
         "CaptiveStruckDown",
         "CaptiveStabbedCollapse"
       ],
@@ -79,11 +98,14 @@
     {
       "id": "LugouNra05",
       "file": "Animation_LugouNra05MachineGunCaptives.json",
-      "sha256": "1e82e6d707ebf64fd54e3d912b0977037006af21b26540c0e6a8684de16ccbd2",
+      "sha256": "f997c50e468f9232bda100d07b69cbae5fce0cdc040e375868b3b2ad3a5fca67",
       "clipIds": [
+        "CaptiveHandsUpWalk",
         "CaptiveHandsUpStand",
+        "CaptiveStandToKneel",
         "CaptiveKneelHandsHead",
         "CaptiveKneelPlead",
+        "CaptiveKneelFlinch",
         "CaptiveStruckDown",
         "CaptiveStabbedCollapse"
       ],
@@ -92,7 +114,7 @@
     {
       "id": "LugouIja01",
       "file": "Animation_LugouIja01MachineGunCaptives.json",
-      "sha256": "5d14a3a77e293ff18944d413d61cb91646cb6675d7ad24cbe5cc0cdb062e130e",
+      "sha256": "440e549cadefaf8057c65a5223770ae9a6811282f29c7e082a5d6ad121d89575",
       "clipIds": [
         "IjaBayonetGuard",
         "IjaTauntGesture",
@@ -105,7 +127,7 @@
     {
       "id": "LugouIja02",
       "file": "Animation_LugouIja02MachineGunCaptives.json",
-      "sha256": "6c6ea3e972c21f1eb228ff1d8951326b6a62a09f176dfbfaa6c6a408ddb38c92",
+      "sha256": "3911af1629abaf6e9ddb7b198072194ff406030d79ae208f686a76e519aed2eb",
       "clipIds": [
         "IjaBayonetGuard",
         "IjaTauntGesture",
@@ -118,7 +140,7 @@
     {
       "id": "LugouIja03",
       "file": "Animation_LugouIja03MachineGunCaptives.json",
-      "sha256": "15732155629d7f538ac21955f6b59e0bdd25ce31431397513af50ed95e51d8da",
+      "sha256": "4e4840911f2a5bb2b7e813161039f5c5396bd80d2dd1ec8294aa95f649502d3c",
       "clipIds": [
         "IjaBayonetGuard",
         "IjaTauntGesture",

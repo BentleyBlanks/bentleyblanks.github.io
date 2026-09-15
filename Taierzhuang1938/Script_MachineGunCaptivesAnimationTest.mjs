@@ -13,6 +13,7 @@ import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { ServeRoot } from "./Script_DevServer.mjs";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
+import { CS_MachineGunCaptives } from "./Data_CutsceneMachineGunCaptives.mjs";
 
 const project = path.dirname(fileURLToPath(import.meta.url));
 const out = path.join(project, "_shots", "MachineGunCaptives");
@@ -23,7 +24,8 @@ const manifest = JSON.parse(await fs.readFile(path.join(project, "Model", "Chara
 // ---------------------------------------------------------------------------
 // 1. 清单与资产（纯 Node）
 // ---------------------------------------------------------------------------
-const CAPTIVE_CLIPS = ["CaptiveHandsUpStand", "CaptiveKneelHandsHead", "CaptiveKneelPlead",
+const CAPTIVE_CLIPS = ["CaptiveHandsUpWalk", "CaptiveHandsUpStand", "CaptiveStandToKneel",
+  "CaptiveKneelHandsHead", "CaptiveKneelPlead", "CaptiveKneelFlinch",
   "CaptiveStruckDown", "CaptiveStabbedCollapse"];
 const GUARD_CLIPS = ["IjaBayonetGuard", "IjaTauntGesture", "IjaKickPrisoner",
   "IjaRifleButtStrike", "IjaBayonetDownThrust"];
@@ -32,7 +34,9 @@ const COVERAGE = {
   LugouIja01: GUARD_CLIPS, LugouIja02: GUARD_CLIPS, LugouIja03: GUARD_CLIPS,
 };
 const DURATIONS = {
-  CaptiveHandsUpStand: [4, true], CaptiveKneelHandsHead: [4, true], CaptiveKneelPlead: [4, true],
+  CaptiveHandsUpWalk: [1.8, true],
+  CaptiveHandsUpStand: [4, true], CaptiveStandToKneel: [1, false],
+  CaptiveKneelHandsHead: [4, true], CaptiveKneelPlead: [4, true], CaptiveKneelFlinch: [0.8, false],
   CaptiveStruckDown: [1.6, false], CaptiveStabbedCollapse: [2, false],
   IjaBayonetGuard: [4, true], IjaTauntGesture: [4, true], IjaKickPrisoner: [1.2, false],
   IjaRifleButtStrike: [1.4, false], IjaBayonetDownThrust: [1.6, false],
@@ -65,8 +69,125 @@ for (const model of config.models) {
     assert.ok(clip.values.every(Number.isFinite), `${model.id} ${id} finite samples`);
     assert.equal(clip.duration, config.clips[id].duration);
     assert.equal(clip.weaponHold, config.clips[id].weaponHold);
+    assert.equal(clip.referenceSpeedMps ?? null, config.clips[id].referenceSpeedMps ?? null,
+      `${model.id} ${id} referenceSpeedMps`);
+    // 循环接缝：loop clip 的**烘出来的**首尾两帧必须逐比特相同。运行时取样按
+    // `at % duration` 回绕，所以一条非整数倍谐波的抖动永远不会让那个回绕测试翻红 ——
+    // 它只是每个周期在画面上顿一下。这一条是量烘焙产物本身。
+    if (clip.loop) {
+      const stride = data.bones.length * 7;
+      const tail = clip.values.length - stride;
+      let seam = 0;
+      for (let i = 0; i < stride; i += 1) seam = Math.max(seam, Math.abs(clip.values[i] - clip.values[tail + i]));
+      assert.ok(seam === 0, `${model.id} ${id} 循环接缝 ${seam}（首尾帧必须相同，抖动项要用整数倍谐波）`);
+    }
+  }
+  // 过渡 clip 的交接帧：末帧（或首末两帧）必须就是它交给的那条循环的第 0 帧，
+  // 0.12 s 淡入才会是一次空操作。这两条是「跪下没有过程 / 挨打没反应」那两项
+  // 改动的接缝，写错了就是原地一跳。
+  if (model.id.startsWith("LugouNra")) {
+    const Frame = (id, index) => {
+      const clip = data.clips[id];
+      const stride = data.bones.length * 7;
+      return clip.values.slice(index * stride, (index + 1) * stride);
+    };
+    const Diff = (a, b) => Math.max(...a.map((v, i) => Math.abs(v - b[i])));
+    const kneelStart = Frame("CaptiveKneelHandsHead", 0);
+    const standStart = Frame("CaptiveHandsUpStand", 0);
+    const toKneel = data.clips.CaptiveStandToKneel;
+    assert.ok(Diff(Frame("CaptiveStandToKneel", 0), standStart) === 0,
+      `${model.id} CaptiveStandToKneel 首帧必须是举手站姿的第 0 帧`);
+    assert.ok(Diff(Frame("CaptiveStandToKneel", toKneel.frameCount - 1), kneelStart) === 0,
+      `${model.id} CaptiveStandToKneel 末帧必须是抱头跪姿的第 0 帧`);
+    const flinch = data.clips.CaptiveKneelFlinch;
+    assert.ok(Diff(Frame("CaptiveKneelFlinch", 0), kneelStart) === 0,
+      `${model.id} CaptiveKneelFlinch 首帧必须是抱头跪姿的第 0 帧`);
+    assert.ok(Diff(Frame("CaptiveKneelFlinch", flinch.frameCount - 1), kneelStart) === 0,
+      `${model.id} CaptiveKneelFlinch 末帧必须回到抱头跪姿的第 0 帧`);
   }
 }
+
+// ---------------------------------------------------------------------------
+// 1b. 三次打击的接触几何（从过场数据反推，实测在浏览器里对）
+//
+// 站位对不对，不能靠「俯视误差在触及之内」这种话 —— 受击者不是一个点，跪着的人在
+// 打击那个方位上的皮离他自己的原点 0.14–0.19 m。这里从 Data_CutsceneMachineGunCaptives
+// 的轨道取接触那一刻两个人的实际坐标，算出距离与**受击者本地坐标下的来袭方位**，
+// 浏览器那边按同一个方位量真皮的伸出距离，最后核对刺入深度。
+// ---------------------------------------------------------------------------
+const CastTrack = (id) => {
+  const actor = CS_MachineGunCaptives.cast.find((entry) => entry.id === id);
+  assert.ok(actor, `过场里没有 ${id}`);
+  return actor.track;
+};
+const TrackAt = (id, time) => {
+  const track = CastTrack(id);
+  let index = track.length - 1;
+  for (let k = 0; k < track.length - 1; k += 1) if (time < track[k + 1].t) { index = k; break; }
+  const a = track[index];
+  const b = track[index + 1] || a;
+  const span = Math.max(1e-6, b.t - a.t);
+  const k = Math.max(0, Math.min(1, (time - a.t) / span));
+  return {
+    x: a.pos[0] + (b.pos[0] - a.pos[0]) * k,
+    z: a.pos[2] + (b.pos[2] - a.pos[2]) * k,
+    ry: (a.ry || 0) + ((b.ry || 0) - (a.ry || 0)) * k,
+    state: a.state || {},
+  };
+};
+const CONTACTS = [
+  { name: "踢", attacker: "ija_hei", victim: "captive_old", at: 14.66, clipTime: 0.46,
+    attackClip: "IjaKickPrisoner", victimClip: "CaptiveKneelHandsHead", band: [0.58, 0.68],
+    reach: "boot", depth: [-0.03, 0.05] },
+  { name: "枪托砸", attacker: "ija_bing", victim: "captive_young", at: 28.45, clipTime: 0.85,
+    attackClip: "IjaRifleButtStrike", victimClip: "CaptiveKneelPlead", band: [0.60, 0.70],
+    reach: "butt", depth: [-0.03, 0.05] },
+  { name: "下刺可见", attacker: "ija_bing", victim: "captive_young", at: 34.16, clipTime: 0.76,
+    attackClip: "IjaBayonetDownThrust", victimClip: "CaptiveKneelHandsHead", band: [0.74, 0.84],
+    reach: "tip", depth: [0.08, 0.16] },
+  { name: "下刺黑场", attacker: "ija_ding", victim: "captive_third", at: 35.36, clipTime: 0.74,
+    attackClip: "IjaBayonetDownThrust", victimClip: "CaptiveKneelHandsHead", band: [0.74, 0.84],
+    reach: "tip", depth: [0.08, 0.16] },
+];
+const BEARINGS = {};
+for (const contact of CONTACTS) {
+  const a = TrackAt(contact.attacker, contact.at);
+  const v = TrackAt(contact.victim, contact.at);
+  contact.distance = Math.hypot(a.x - v.x, a.z - v.z);
+  // 世界 delta → 受击者本地（local = Ry(−ry)·world；本地 −Z 是正面，+Z 是背后）
+  const cos = Math.cos(v.ry);
+  const sin = Math.sin(v.ry);
+  const dx = a.x - v.x;
+  const dz = a.z - v.z;
+  const lx = dx * cos - dz * sin;
+  const lz = dx * sin + dz * cos;
+  const length = Math.hypot(lx, lz) || 1;
+  contact.ux = lx / length;
+  contact.uz = lz / length;
+  assert.ok(contact.uz > 0.4,
+    `${contact.name}：施动者必须在受击者的身后半边（本地 z ${contact.uz.toFixed(3)}）`);
+  // 受击者那一刻真的在播这条 clip 吗（拍表与站位表是两处，写岔了就白算）
+  const playing = TrackAt(contact.victim, contact.at - 0.001).state.perform;
+  assert.equal(playing, contact.victimClip,
+    `${contact.name}：接触前一帧 ${contact.victim} 在播 ${playing}，不是 ${contact.victimClip}`);
+  (BEARINGS[contact.victimClip] ||= []).push([contact.band[0], contact.band[1], contact.ux, contact.uz]);
+  contact.bearingIndex = BEARINGS[contact.victimClip].length - 1;
+}
+// 押解进场：三名俘虏必须走同一段距离（同一条 clip 只带一个 referenceSpeedMps），
+// 而且那三帧上真的写着 CaptiveHandsUpWalk。
+const marchSpeeds = ["captive_old", "captive_young", "captive_third"].map((id) => {
+  const track = CastTrack(id);
+  assert.equal(track[0].state.perform, "CaptiveHandsUpWalk", `${id} 进场必须播举手走`);
+  const travel = Math.hypot(track[2].pos[0] - track[0].pos[0], track[2].pos[2] - track[0].pos[2]);
+  return { id, track: travel / track[2].t, move: track[0].state.moveSpeed * 4.2 };
+});
+for (const row of marchSpeeds) {
+  assert.ok(Math.abs(row.track - row.move) < 0.03,
+    `${row.id} 进场轨道 ${row.track.toFixed(3)} m/s 与 moveSpeed×4.2 ${row.move.toFixed(3)} 对不上`);
+}
+assert.ok(Math.max(...marchSpeeds.map((r) => r.track)) - Math.min(...marchSpeeds.map((r) => r.track)) < 0.01,
+  "三名俘虏的进场速度必须一致（同一条走路 clip，速率按起播帧的 moveSpeed 定）");
+const MARCH_SPEED = marchSpeeds[0].track;
 
 // 引擎接线：过场逐帧更新必须真的走这一层，SampleTrack 必须把字符串当段内常量。
 const cutsceneSource = await fs.readFile(path.join(project, "Script_Cutscene.mjs"), "utf8");
@@ -97,7 +218,7 @@ try {
   await page.evaluate(() => window.CaptivesCheck.LoadMachineGunCaptivesAnimation("../../Animation/MachineGunCaptives/"));
 
   for (const record of config.models) {
-    const result = await page.evaluate(async ({ record, assetRecord, bayonetTipM }) => {
+    const result = await page.evaluate(async ({ record, assetRecord, bayonetTipM, BEARINGS }) => {
       const C = window.CaptivesCheck;
       const T = C.T;
       const gltf = await C.loader.loadAsync(`../../Model/Character/Model_${record.id}.glb`);
@@ -146,18 +267,55 @@ try {
         rig.root.traverse((node) => values.push(...node.position, ...node.quaternion, ...node.scale));
         return values;
       };
-      const Bounds = () => {
+      // 一次遍历量四件事（顶点是真蒙皮顶点，不是骨头）：整皮包围盒、手/脚的最低点
+      // （趴姿贴地）、右靴的最远前伸（踢的触及 —— 趾**骨**的高度不是它的前伸，
+      // 2026-09-15 那版就是把这两个数搞混了），以及跪着的人在若干打击方位上的体表
+      // 距离（站位 = 触及 + 这一段）。
+      const CORRIDOR = 0.09;
+      const Measure = (bearings = []) => {
         const min = new T.Vector3(Infinity, Infinity, Infinity);
         const max = new T.Vector3(-Infinity, -Infinity, -Infinity);
+        const low = { hand: Infinity, foot: Infinity };
+        let bootFront = -Infinity;
+        const support = bearings.map(() => -Infinity);
         const v = new T.Vector3();
         rig.root.traverse((mesh) => {
           if (!mesh.isSkinnedMesh) return;
+          const names = mesh.skeleton.bones.map((bone) => bone.name || "");
+          const skinIndex = mesh.geometry.attributes.skinIndex;
+          const skinWeight = mesh.geometry.attributes.skinWeight;
           for (let i = 0; i < mesh.geometry.attributes.position.count; i += 1) {
             mesh.getVertexPosition(i, v).applyMatrix4(mesh.matrixWorld);
             min.min(v); max.max(v);
+            let best = 0;
+            let bestWeight = -1;
+            for (let k = 0; k < 4; k += 1) {
+              const weight = skinWeight.getComponent(i, k);
+              if (weight > bestWeight) { bestWeight = weight; best = skinIndex.getComponent(i, k); }
+            }
+            const name = names[best] || "";
+            if (/(Hand|Finger)/.test(name)) low.hand = Math.min(low.hand, v.y);
+            if (/(Foot|Toe)/.test(name)) {
+              low.foot = Math.min(low.foot, v.y);
+              // GLTFLoader 用 PropertyBinding.sanitizeNodeName 把空格换成下划线，
+              // 所以运行时的骨名是 Bip002_R_Foot，不是源 GLB 里的「Bip002 R Foot」。
+              if (/[_ ]R[_ ](Foot|Toe)/.test(name)) bootFront = Math.max(bootFront, -v.z);
+            }
+            for (let b = 0; b < bearings.length; b += 1) {
+              const [lo, hi, ux, uz] = bearings[b];
+              if (v.y < lo || v.y > hi) continue;
+              if (Math.abs(v.x * uz - v.z * ux) > CORRIDOR) continue;
+              support[b] = Math.max(support[b], v.x * ux + v.z * uz);
+            }
           }
         });
-        return { min: min.toArray(), max: max.toArray() };
+        return {
+          bounds: { min: min.toArray(), max: max.toArray() },
+          low: { hand: Number.isFinite(low.hand) ? low.hand : null,
+                 foot: Number.isFinite(low.foot) ? low.foot : null },
+          bootFront: Number.isFinite(bootFront) ? bootFront : null,
+          support: support.map((value) => (value > -1e8 ? value : null)),
+        };
       };
       const toe = { L: null, R: null };
       rig.root.traverse((node) => {
@@ -200,8 +358,9 @@ try {
         // 一次性动作另加各自的关键时刻（蓄力 / 命中 / 抽回），否则均匀取样会正好
         // 跨过最用力的那一帧。
         const EXTRA = {
-          IjaBayonetDownThrust: [0.40, 0.76, 1.06], IjaRifleButtStrike: [0.28, 0.50, 0.68, 0.85, 1.02, 1.16],
-          IjaKickPrisoner: [0.50], CaptiveStruckDown: [0.16, 0.70], CaptiveStabbedCollapse: [0.22, 0.92],
+          IjaBayonetDownThrust: [0.40, 0.74, 0.76, 1.06], IjaRifleButtStrike: [0.28, 0.50, 0.68, 0.85, 1.02, 1.16],
+          IjaKickPrisoner: [0.46, 0.50], CaptiveStruckDown: [0.16, 0.70], CaptiveStabbedCollapse: [0.22, 0.92],
+          CaptiveStandToKneel: [0.5], CaptiveKneelFlinch: [0.09, 0.2],
         };
         const times = (loop
           ? [0, duration * 0.17, duration * 0.33, duration * 0.5, duration * 0.66, duration * 0.83, duration]
@@ -218,7 +377,10 @@ try {
           const pose = Snapshot();
           if (!first) first = pose;
           for (let i = 0; i < pose.length; i += 1) motion = Math.max(motion, Math.abs(pose[i] - first[i]));
-          const bounds = Bounds();
+          // 跪着的循环姿要额外量三个打击方位上的体表距离（bearings 由过场站位反推，
+          // 见 Node 侧的 CONTACTS），其余 clip 只量包围盒与手脚贴地。
+          const measured = Measure(BEARINGS[clipId] || []);
+          const bounds = measured.bounds;
           // 朝向从骨盆的横轴与躯干轴算，不看脚尖：跪姿的脚是往后折的，趾骨方向
           // 恰好指着背面。立着的人 facing.z < 0（局部 -Z 正面），趴下的人 facing.y < 0
           // （胸口朝地），同一条式子把「有没有背对着镜头」和「是不是脸朝下倒的」一起量了。
@@ -240,6 +402,7 @@ try {
             wristL: point(rig.bones.handL).y,
             wristR: point(rig.bones.handR).y,
             bounds, facing, torsoPitch, armSpanR,
+            low: measured.low, bootFront: measured.bootFront, support: measured.support,
             pelvisZ: pelvisAt.z,
             footLz: point(rig.bones.footL).z,
             footRz: point(rig.bones.footR).z,
@@ -282,7 +445,11 @@ try {
       }
 
       // ---- perform 契约 -----------------------------------------------------
-      const loopClip = record.clipIds.find((id) => C.MachineGunCaptivesLibrary().config.clips[id].loop);
+      // 整秒时长的那条循环：`At(3 + duration)` 要能精确落回第 0 帧，而 3 + 1.8 − 3
+      // 在双精度里是 1.7999999999999998，取样就插到倒数第二帧上去了（误差 3.5e-7）。
+      // 走路那条的循环接缝由烘焙产物的首尾帧逐比特断言守着，不靠这一条。
+      const loopClip = record.clipIds.find((id) => C.MachineGunCaptivesLibrary().config.clips[id].loop
+        && Number.isInteger(C.MachineGunCaptivesLibrary().config.clips[id].duration));
       const onceClip = record.clipIds.find((id) => !C.MachineGunCaptivesLibrary().config.clips[id].loop);
       const loopDuration = C.MachineGunCaptivesLibrary().config.clips[loopClip].duration;
       const onceDuration = C.MachineGunCaptivesLibrary().config.clips[onceClip].duration;
@@ -343,16 +510,63 @@ try {
       const released = Snapshot();
       contract.releaseDrift = Math.max(...baseline.map((v, i) => Math.abs(v - released[i])));
 
+      // ---- 押解走的滑步量 -----------------------------------------------
+      // 支撑脚相对根的后移速度必须等于 clip 自报的 referenceSpeedMps × 演员缩放。
+      // 逐 1/24 s 密取样（clips 那边七个点是 0.3 s 一跳，正好会跨过抬脚那一帧）。
+      let walk = null;
+      if (record.clipIds.includes("CaptiveHandsUpWalk")) {
+        const info = C.MachineGunCaptivesLibrary().config.clips.CaptiveHandsUpWalk;
+        const entry = { actor, spec: { track: [
+          { t: 0, pos: [0, 0, 0], state: {} },
+          { t: 5, pos: [0, 0, 0], state: { perform: "CaptiveHandsUpWalk" } },
+          { t: 20, pos: [0, 0, 0], state: { perform: null } },
+        ] } };
+        let scale = 1;
+        for (let node = rig.root; node; node = node.parent) scale *= node.scale.y || 1;
+        const step = 1 / 24;
+        const feet = [];
+        for (let at = 0; at <= info.duration + 1e-9; at += step) {
+          C.PerformCutsceneActor(entry, step, 5 + at, () => rig.Update(0, {}));
+          actorRoot.updateMatrixWorld(true);
+          feet.push([point(rig.bones.footL).z, point(rig.bones.footR).z]);
+        }
+        C.ReleaseCutscenePerformer(actor);
+        // 演员正面是局部 −Z，所以站着不动的脚相对根往 +Z 走。两只脚里走得快的那只
+        // 就是踩在地上的那只（另一只在往前甩，是负的）。
+        const speeds = [];
+        for (let i = 1; i < feet.length; i += 1) {
+          speeds.push(Math.max(feet[i][0] - feet[i - 1][0], feet[i][1] - feet[i - 1][1]) / step);
+        }
+        walk = { scale, reference: info.referenceSpeedMps,
+                 min: Math.min(...speeds), max: Math.max(...speeds) };
+      }
+
       C.ReleaseCutscenePerformer(actor);
       renderer.dispose();
-      return { modelId: record.id, maxRootDrift, maxRestoreError, clips, contract };
-    }, { record, assetRecord: manifest.models.find((m) => m.id === record.id), bayonetTipM: 1.663 - 0.255 });
+      return { modelId: record.id, maxRootDrift, maxRestoreError, clips, contract, walk };
+    }, { record, assetRecord: manifest.models.find((m) => m.id === record.id),
+      bayonetTipM: 1.663 - 0.255, BEARINGS });
 
     results.push(result);
     const faction = record.id.startsWith("LugouIja") ? "ija" : "nra";
     console.log(`MODEL ${result.modelId} rootDrift=${result.maxRootDrift} restore=${result.maxRestoreError.toExponential(2)}`);
     assert.equal(result.maxRootDrift, 0, `${record.id} 表演层不许动 Actor 世界根`);
     assert.ok(result.maxRestoreError < 1e-12, `${record.id} 还原漂移 ${result.maxRestoreError}`);
+
+    // 押解走的滑步量。支撑脚相对根的后移速度 = clip 自报的 referenceSpeedMps × 演员
+    // 缩放；运行时再按 moveSpeed×4.2 与它的比值调播放速率，于是脚与轨道同速。
+    if (result.walk) {
+      const want = result.walk.reference * result.walk.scale;
+      const error = Math.max(Math.abs(result.walk.max - want), Math.abs(result.walk.min - want));
+      const rate = MARCH_SPEED / want;
+      console.log(`  walk 支撑脚 ${result.walk.min.toFixed(4)}..${result.walk.max.toFixed(4)} m/s`
+        + ` 参考 ${want.toFixed(4)}（缩放 ${result.walk.scale.toFixed(4)}）`
+        + ` 误差 ${(error / want * 100).toFixed(2)}% 速率 ${rate.toFixed(3)}`);
+      assert.ok(error < want * 0.02,
+        `${record.id} 举手走滑步 ${(error * 1000).toFixed(1)} mm/s（支撑脚要按 ${want.toFixed(3)} m/s 后移）`);
+      assert.ok(rate > 0.25 && rate < 4,
+        `${record.id} 进场速率 ${rate.toFixed(3)} 出了表演层 0.25–4 的夹取范围`);
+    }
 
     for (const clip of result.clips) {
       const heads = clip.samples.map((s) => s.head);
@@ -396,6 +610,16 @@ try {
       if (clip.clipId === "CaptiveKneelHandsHead") {
         const wrist = Math.min(...clip.samples.map((s) => Math.min(s.wristL, s.wristR) - s.head));
         assert.ok(wrist > -0.10, `${record.id} 抱后脑：手腕要在头骨附近（${wrist.toFixed(3)} m）`);
+      }
+      if (clip.clipId === "CaptiveStruckDown" || clip.clipId === "CaptiveStabbedCollapse") {
+        // 趴姿末帧：手掌与脚背要贴在地上（±1 cm），躯干仍以大腿前面当最低接触点。
+        const end = At(clip.duration);
+        console.log(`    趴稳末帧 手 ${end.low.hand.toFixed(4)} 脚 ${end.low.foot.toFixed(4)}`
+          + ` 整皮 ${end.bounds.min[1].toFixed(4)}`);
+        assert.ok(end.low.hand > -0.004 && end.low.hand < 0.014,
+          `${record.id} ${clip.clipId} 末帧手掌离地 ${(end.low.hand * 1000).toFixed(1)} mm（要 0–14）`);
+        assert.ok(end.low.foot > -0.004 && end.low.foot < 0.014,
+          `${record.id} ${clip.clipId} 末帧脚背离地 ${(end.low.foot * 1000).toFixed(1)} mm（要 0–14）`);
       }
       if (clip.clipId === "CaptiveStruckDown" || clip.clipId === "CaptiveStabbedCollapse") {
         const start = At(0), end = At(clip.duration);
@@ -496,6 +720,40 @@ try {
     assert.equal(c.unknownWarnings, 1, `${record.id} 未知 clip id 只警告一次（实测 ${c.unknownWarnings}）`);
     assert.ok(c.unknownDrift < 1e-12, `${record.id} 未知 clip id 不许改骨头`);
     assert.ok(c.releaseDrift < 1e-12, `${record.id} 退出表演必须精确还原（${c.releaseDrift}）`);
+  }
+
+  // ---- 三次打击的接触几何（跨骨架对） ----------------------------------------
+  // 受击者的皮在 NRA 那两具上量，打击的最远伸展在 IJA 那三具上量，站位在过场数据里。
+  // 刺入深度 = 触及 + 体表 − 站位距离。三个数分别来自三个地方，对不上就是有一处改了
+  // 没同步 —— 这正是 2026-09-15 那版踢穿胸口的形状。
+  const Support = (clipId, index) => Math.max(...results.flatMap((model) => model.clips
+    .filter((clip) => clip.clipId === clipId)
+    .map((clip) => clip.samples[0].support[index])).filter(Number.isFinite));
+  const Reach = (clipId, kind, clipTime) => {
+    const values = results.flatMap((model) => model.clips
+      .filter((clip) => clip.clipId === clipId)
+      .map((clip) => {
+        const sample = clip.samples.reduce((best, s) =>
+          (Math.abs(s.t - clipTime) < Math.abs(best.t - clipTime) ? s : best));
+        if (kind === "boot") return sample.bootFront;
+        return -sample.rifle[kind === "butt" ? "butt" : "tip"][2];
+      }));
+    return { min: Math.min(...values), max: Math.max(...values) };
+  };
+  console.log("接触几何（触及 + 体表 − 站位 = 刺入深度，米）：");
+  for (const contact of CONTACTS) {
+    const support = Support(contact.victimClip, contact.bearingIndex);
+    const reach = Reach(contact.attackClip, contact.reach, contact.clipTime);
+    const deep = { min: reach.min + support - contact.distance, max: reach.max + support - contact.distance };
+    console.log(`  ${contact.name.padEnd(6)} 站位 ${contact.distance.toFixed(3)}`
+      + ` 触及 ${reach.min.toFixed(3)}–${reach.max.toFixed(3)} 体表 ${support.toFixed(3)}`
+      + ` → 刺入 ${deep.min.toFixed(3)}–${deep.max.toFixed(3)}`);
+    assert.ok(Number.isFinite(support) && support > 0.08 && support < 0.30,
+      `${contact.name} 体表距离 ${support} 不合理`);
+    assert.ok(deep.min >= contact.depth[0],
+      `${contact.name} 够不着：刺入 ${deep.min.toFixed(3)} m < ${contact.depth[0]}`);
+    assert.ok(deep.max <= contact.depth[1],
+      `${contact.name} 陷体：刺入 ${deep.max.toFixed(3)} m > ${contact.depth[1]}`);
   }
 
   assert.deepEqual(errors, []);

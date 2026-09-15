@@ -23,6 +23,7 @@ floor probe. The exporter converts each Blender bone frame back to the source GL
 local frame, so the runtime never imports a new rig.
 """
 import bpy, json, math, struct, hashlib, os, time
+from contextlib import contextmanager
 from pathlib import Path
 from mathutils import Matrix, Vector, Quaternion
 
@@ -36,14 +37,17 @@ if not os.environ.get('CAPTIVES_SKIP_BLEND'):
 
 fps = 24
 CLEARANCE = 0.003
-VERSION = '20260915MachineGunCaptivesV1'
-TOOL = 'Blender 5.1 background python (same bpy path BlenderMCP executes)'
+VERSION = '20260916MachineGunCaptivesV2'
+TOOL = 'Blender 5.1 driven over BlenderMCP (execute_code), same bpy path as --background'
 
 # clip -> (seconds, loop, weaponHold)
 DEFINITIONS = {
+    'CaptiveHandsUpWalk':    (1.8, True,  'free'),
     'CaptiveHandsUpStand':   (4.0, True,  'free'),
+    'CaptiveStandToKneel':   (1.0, False, 'free'),
     'CaptiveKneelHandsHead': (4.0, True,  'free'),
     'CaptiveKneelPlead':     (4.0, True,  'free'),
+    'CaptiveKneelFlinch':    (0.8, False, 'free'),
     'CaptiveStruckDown':     (1.6, False, 'free'),
     'CaptiveStabbedCollapse': (2.0, False, 'free'),
     'IjaBayonetGuard':       (4.0, True,  'twoHand'),
@@ -52,10 +56,42 @@ DEFINITIONS = {
     'IjaRifleButtStrike':    (1.4, False, 'twoHand'),
     'IjaBayonetDownThrust':  (1.6, False, 'twoHand'),
 }
-CAPTIVE_CLIPS = ['CaptiveHandsUpStand', 'CaptiveKneelHandsHead', 'CaptiveKneelPlead',
+CAPTIVE_CLIPS = ['CaptiveHandsUpWalk', 'CaptiveHandsUpStand', 'CaptiveStandToKneel',
+                 'CaptiveKneelHandsHead', 'CaptiveKneelPlead', 'CaptiveKneelFlinch',
                  'CaptiveStruckDown', 'CaptiveStabbedCollapse']
 GUARD_CLIPS = ['IjaBayonetGuard', 'IjaTauntGesture', 'IjaKickPrisoner',
                'IjaRifleButtStrike', 'IjaBayonetDownThrust']
+
+# The marched-in gait. The adapter has no root motion, so the clip carries the ground
+# speed it was authored at and the runtime rescales playback to the cutscene track
+# (`state.moveSpeed * 4.2 / referenceSpeedMps`). WALK_AMP is derived, not chosen: a foot
+# planted for WALK_STANCE of a WALK_CYCLE-long cycle at WALK_SPEED slides back exactly
+# this far, and that is what "no skating" means. Half of it (0.287 m) has to stay inside
+# the leg's horizontal reach at the authored crouch — measured 0.347 m at WALK_CROUCH.
+WALK_CYCLE = 0.9
+WALK_STANCE = 0.58
+WALK_SPEED = 1.10
+WALK_AMP = WALK_SPEED * WALK_STANCE * WALK_CYCLE
+WALK_LIFT = 0.085
+WALK_CROUCH = 0.105
+REFERENCE_SPEED = {'CaptiveHandsUpWalk': WALK_SPEED}
+
+# Where each strike lands on the kneeling man, as (name, height band, approach angle).
+# The angle is measured from straight-behind him toward his own left (+X, degrees) and is
+# read off the stage table — every attacker keeps his bearing and only the distance is
+# retuned, so these do not move. What the baker reports is the **support distance**: how
+# far his skin reaches from his own origin along that bearing. The stage distance the
+# cutscene needs is then `strikeReach + support`, both in runtime metres.
+#
+# This is the number the 2026-09-15 pass did not have. It used the toe *bone height*
+# (0.63) as the kick's reach and put the guard 0.78 m away; the boot actually reaches
+# 0.80 m and his chest starts 0.15 m out, so the kick went a sixth of a metre through him.
+CONTACT_TARGETS = [('kick', 0.58, 0.68, -39.8), ('butt', 0.60, 0.70, 53.7),
+                   ('thrustYoung', 0.74, 0.84, 38.4), ('thrustThird', 0.74, 0.84, 19.7)]
+CONTACT_BAND_CLIPS = ('CaptiveKneelHandsHead', 'CaptiveKneelPlead', 'CaptiveKneelFlinch')
+# Half-width of the corridor the striking end sweeps, in runtime metres (a boot sole, a
+# rifle butt plate and a bayonet blade are all well inside 18 cm across).
+CONTACT_CORRIDOR = 0.09
 MODEL_CLIPS = {
     'LugouNra02': CAPTIVE_CLIPS,
     'LugouNra05': CAPTIVE_CLIPS,
@@ -73,6 +109,53 @@ Clamp = lambda x, a=0, b=1: max(a, min(b, x))
 Smooth = lambda x: Clamp(x) * Clamp(x) * (3 - 2 * Clamp(x))
 Mix = lambda a, b, x: a + (b - a) * x
 Tau = math.pi * 2
+
+
+@contextmanager
+def GuiContext():
+    """Give operators a real window/area to run in.
+
+    Under `blender --background` there is nothing to override and this is a no-op.
+    Under BlenderMCP the script runs inside a `bpy.app.timers` callback, and right
+    after `read_factory_settings` that callback's context has lost `object` /
+    `collection` — the glTF importer dereferences `bpy.context.object` and dies with
+    `'Context' object has no attribute 'object'`. Re-fetching the window from
+    `bpy.data` (not from the stale `bpy.context`) and overriding fixes every
+    operator below, and changes nothing about the product.
+    """
+    managers = list(bpy.data.window_managers)
+    windows = list(managers[0].windows) if managers else []
+    if bpy.app.background or not windows:
+        yield
+        return
+    window = windows[0]
+    override = {'window': window, 'screen': window.screen,
+                'scene': window.scene, 'view_layer': window.view_layer}
+    area = next((a for a in window.screen.areas if a.type == 'VIEW_3D'), None)
+    if area is not None:
+        override['area'] = area
+        region = next((r for r in area.regions if r.type == 'WINDOW'), None)
+        if region is not None:
+            override['region'] = region
+    with bpy.context.temp_override(**override):
+        yield
+
+
+def Op(operator, **kwargs):
+    """Run one bpy operator inside GuiContext()."""
+    with GuiContext():
+        return operator(**kwargs)
+
+
+def Add(operator, **kwargs):
+    """Run an object-creating operator and hand back the object it made.
+
+    `bpy.context.object` has to be read inside the same override the operator ran
+    in; outside it, the post-reset timer context does not have that attribute.
+    """
+    with GuiContext():
+        operator(**kwargs)
+        return bpy.context.object
 
 
 def ReadGlb(path):
@@ -110,7 +193,16 @@ def Track(keys, time):
     return dict(keys[-1][1])
 
 
-def Bake(modelId):
+def Bake(modelId, probe=None):
+    """Author every clip of one rig and write its JSON.
+
+    `probe` is the BlenderMCP hook: pass a callable and the rig is built, measured
+    and calibrated as usual, then the callable is handed every local helper
+    (`Author`, `ApplyPose`, `Point`, `RegionLows`, `LowestVertex`, the rest
+    measurements …) and its return value replaces the bake. Nothing is written.
+    That is how the 2026-09-16 pass posed and measured interactively inside a live
+    Blender without a second copy of the rig setup drifting away from this one.
+    """
     started = time.time()
     bpy.ops.wm.read_factory_settings(use_empty=True)
     scene = bpy.context.scene
@@ -129,7 +221,7 @@ def Bake(modelId):
 
     for i in range(len(nodes)):
         WorldOf(i)
-    bpy.ops.import_scene.gltf(filepath=str(source))
+    Op(bpy.ops.import_scene.gltf, filepath=str(source))
     arm = next(o for o in scene.objects if o.type == 'ARMATURE')
     arm.animation_data_clear()
     for pb in arm.pose.bones:
@@ -159,6 +251,19 @@ def Bake(modelId):
     BWorld = lambda pb: arm.matrix_world @ pb.matrix
     Point = lambda pb: BWorld(pb).translation.copy()
     Update = lambda: bpy.context.view_layer.update()
+
+    def GripPoint(side):
+        """Where the runtime actually mounts the rifle.
+
+        `Script_CharacterModel.BuildHandGrip` does NOT use the hand bone: a Max Biped hand
+        tail sits 8-10 cm out of the palm, so the runtime grip is the centroid of the four
+        finger roots. Measuring the hand bone here instead put every reported bayonet tip
+        and butt about 3.5 cm off the number the gate reads, which is a third of the
+        margin the stage distances are tuned to."""
+        total = Vector((0, 0, 0))
+        for finger in range(1, 5):
+            total += Point(Bone(side + ' Finger' + str(finger)))
+        return total / 4
 
     def Put(pb, matrix):
         pb.matrix = armInv @ matrix
@@ -356,69 +461,243 @@ def Bake(modelId):
             'toeDirs': {'L': kneelToe, 'R': kneelToe},
         }
 
+    # ---- shared captive poses --------------------------------------------
+    # The two transition clips (CaptiveStandToKneel / CaptiveKneelFlinch) have to end on
+    # **exactly** the frame the loop clip they hand over to starts on, or the 0.12 s
+    # cross-fade shows as a twitch. So the loop poses are functions, and the transitions
+    # call them with every wobble set to zero instead of retyping their numbers.
+    #
+    # Every wobble is an INTEGER harmonic of the clip period. A term like sin(phase*0.9)
+    # samples fine (the runtime wraps on `at % duration`) but the authored last frame no
+    # longer equals the authored first frame, so the loop pops once a cycle. The baker
+    # prints LOOPSEAM for every loop clip and the gate asserts it.
+    def HandsUpStandPose(sway=.0, sway2=.0, breath=.0, nod=.0, tremble=.0, crouch=.040):
+        p = StandBase(0.0, sway)
+        reachZ = shoulder['L'].z - crouch + .440
+        p['pelvis'] = (.020 * sway, .02 + .010 * breath, restPelvis - crouch + .008 * breath)
+        p['pelvisTilt'] = (.05, .045 * sway, 0)
+        p['bend'] = .12 - .012 * breath
+        p['lean'] = .03 * sway2
+        p['shrug'] = .26 + .022 * breath
+        p['neck'] = (.06, 0, 0)
+        p['head'] = (.16 + .03 * nod, 0, .10 * sway)
+        p['hands'] = {
+            'L': (hipHalf + .175 + .020 * sway + .005 * tremble, -.10,
+                  reachZ + .012 * breath + .006 * tremble),
+            'R': (-(hipHalf + .175) - .020 * sway + .005 * tremble, -.10,
+                  reachZ - .012 * breath - .006 * tremble),
+        }
+        p['armPoles'] = {'L': (hipHalf + .95, .15, reachZ - .55), 'R': (-(hipHalf + .95), .15, reachZ - .55)}
+        p['palms'] = {
+            'L': ((-.18, -.10, .98), (0, -1, .1), .12),
+            'R': ((.18, -.10, .98), (0, -1, .1), .12),
+        }
+        return p
+
+    def KneelHandsHeadPose(breath=.0, tremble=.0, slow=.0, turn=.0):
+        p = KneelBase(sink=.005 * breath)
+        crown = kneelPelvisZ + (restHead - restPelvis) * .90
+        p['pelvisTilt'] = (.10, .012 * tremble, 0)
+        p['bend'] = .20 + .010 * tremble - .014 * breath
+        p['lean'] = .018 * slow
+        p['shrug'] = .34 + .024 * breath
+        p['neck'] = (.12, 0, 0)
+        p['head'] = (.24, 0, .07 * turn)
+        handZ = crown + .070 - .005 * breath
+        p['hands'] = {'L': (hipHalf - .020 + .004 * tremble, .105, handZ),
+                      'R': (-(hipHalf - .020) + .004 * tremble, .105, handZ)}
+        p['armPoles'] = {'L': (hipHalf + 1.0, -.62, crown - .30), 'R': (-(hipHalf + 1.0), -.62, crown - .30)}
+        p['palms'] = {
+            'L': ((-.86, .22, .46), (0, -1, .12), .55),
+            'R': ((.86, .22, .46), (0, -1, .12), .55),
+        }
+        return p
+
+    def ToeArc(pitch):
+        """Toe direction as one sagittal angle: 0 = level and forward, 90 = straight down,
+        149 = the kneel's instep-down-and-back. **Never lerp the two end vectors** — they
+        are 118 deg apart and the straight line between them passes within 0.05 of the
+        origin, which after normalisation flips the foot inside out midway (the same trap
+        AimFrom() documents for the rifle)."""
+        a = math.radians(pitch)
+        return (.03, -math.cos(a), -math.sin(a))
+
+    # The rest foot and the kneel foot expressed in that one angle.
+    toeStandPitch = math.degrees(math.atan2(-sourceFacing['L'][2], -sourceFacing['L'][1]))
+    toeKneelPitch = math.degrees(math.atan2(-kneelToe[2], -kneelToe[1]))
+
+    def BlendPose(a, b, w, toe):
+        """Field-wise blend of two finished pose dicts; `toe` replaces toeDirs."""
+        out = {'toeDirs': {'L': toe, 'R': toe}}
+        for key in ('bend', 'lean', 'twist', 'shrug'):
+            out[key] = Mix(a.get(key, .0), b.get(key, .0), w)
+        for key in ('pelvis', 'pelvisTilt', 'neck', 'head'):
+            va, vb = a.get(key, (0, 0, 0)), b.get(key, (0, 0, 0))
+            out[key] = tuple(Mix(va[i], vb[i], w) for i in range(3))
+        for key in ('ankles', 'legPoles', 'hands', 'armPoles'):
+            out[key] = {side: tuple(Mix(a[key][side][i], b[key][side][i], w) for i in range(3))
+                        for side in ('L', 'R')}
+        out['palms'] = {side: (tuple(Mix(a['palms'][side][0][i], b['palms'][side][0][i], w) for i in range(3)),
+                               tuple(Mix(a['palms'][side][1][i], b['palms'][side][1][i], w) for i in range(3)),
+                               Mix(a['palms'][side][2], b['palms'][side][2], w))
+                        for side in ('L', 'R')}
+        return out
+
+    def WalkFoot(t, offset):
+        """One foot of the marched-in gait: (ankleY, lift, planted).
+
+        Stance slides the ankle straight back at exactly WALK_SPEED. That is the whole
+        contract with the cutscene track: the adapter has no root motion, so the runtime
+        scales playback by `state.moveSpeed * 4.2 / referenceSpeedMps` and the planted
+        foot then matches the track metre for metre. Easing this would skate.
+        """
+        u = ((t / WALK_CYCLE) - offset) % 1.0
+        half = WALK_AMP / 2
+        if u < WALK_STANCE:
+            return (-half + WALK_AMP * (u / WALK_STANCE), .0, True)
+        w = (u - WALK_STANCE) / (1 - WALK_STANCE)
+        return (half - WALK_AMP * Smooth(w), WALK_LIFT * math.sin(math.pi * w), False)
+
     def Author(clip, t, lift):
         for pb in arm.pose.bones:
             pb.matrix_basis = rest[pb.name]
         Update()
         duration = DEFINITIONS[clip][0]
         phase = Tau * t / duration
-        sway = math.sin(phase)
-        sway2 = math.sin(phase * 1.7 + 1.1)
-        breath = math.sin(phase * 2)
-        tremble = math.sin(t * 13.0)
+        # Integer harmonics only, and every one of them **zero at t = 0** — sines, never
+        # cosines, never a phase offset. Two reasons: a loop clip's authored last frame
+        # then equals its authored first frame (no pop), and the loop's frame 0 is the
+        # neutral pose, which is what the transition clips start and end on.
+        # Breathing is the slowest one: 1 cycle per 4 s = 0.25 Hz, about 15 a minute.
+        breath = math.sin(phase)
+        sway = math.sin(phase * 2)
+        sway2 = math.sin(phase * 3)
+        nod = math.sin(phase * 5)
+        tremble = math.sin(phase * 13)
         p = None
 
         if clip == 'CaptiveHandsUpStand':
-            p = StandBase(phase, sway)
-            p['pelvis'] = (.020 * sway, .02 + .010 * breath, restPelvis - .040 + .008 * breath)
-            p['pelvisTilt'] = (.05, .045 * sway, 0)
-            p['bend'] = .12
-            p['lean'] = .03 * sway2
-            p['shrug'] = .26
-            p['neck'] = (.06, 0, 0)
-            p['head'] = (.16 + .03 * math.sin(phase * 2.3), 0, .10 * sway)
-            reachZ = shoulder['L'].z - .040 + .440
-            p['hands'] = {
-                'L': (hipHalf + .175 + .020 * sway, -.10, reachZ + .012 * breath),
-                'R': (-(hipHalf + .175) - .020 * sway, -.10, reachZ - .012 * breath),
-            }
-            p['armPoles'] = {'L': (hipHalf + .95, .15, reachZ - .55), 'R': (-(hipHalf + .95), .15, reachZ - .55)}
-            p['palms'] = {
-                'L': ((-.18, -.10, .98), (0, -1, .1), .12),
-                'R': ((.18, -.10, .98), (0, -1, .1), .12),
+            p = HandsUpStandPose(sway=sway, sway2=sway2, breath=breath, nod=nod, tremble=tremble)
+
+        elif clip == 'CaptiveHandsUpWalk':
+            # Marched in with the hands up. No root motion: the cutscene track does the
+            # travelling, this only has to set the planted foot down at the speed the
+            # track is moving (WalkFoot's note). Two gait cycles per clip, so the upper
+            # body can lurch on one of them without desyncing the feet.
+            gait = Tau * t / WALK_CYCLE
+            lurch = math.sin(phase)                       # one per clip (two cycles)
+            bob = math.cos(2 * (gait - Tau * WALK_STANCE / 2))
+            reachZ = shoulder['L'].z - WALK_CROUCH + .415
+            feet = {'L': WalkFoot(t, .0), 'R': WalkFoot(t, .5)}
+            walkTremble = math.sin(phase * 11)
+            p = {
+                'pelvis': (.028 * math.cos(gait - Tau * WALK_STANCE / 2) + .010 * lurch,
+                           .015 + .012 * lurch,
+                           restPelvis - WALK_CROUCH + .016 * bob - .012 * max(.0, lurch)),
+                'pelvisTilt': (.11, .05 * math.sin(gait - Tau * WALK_STANCE / 2), .06 * lurch),
+                'bend': .23 + .03 * lurch,
+                'lean': .05 * lurch,
+                'twist': .05 * math.sin(gait),
+                'shrug': .31,
+                'neck': (.10, 0, 0),
+                'head': (.19 + .04 * bob, 0, .13 * lurch),
+                'ankles': {side: (sign * (hipHalf + .020), feet[side][0], ankleZ + feet[side][1])
+                           for side, sign in [('L', 1), ('R', -1)]},
+                'legPoles': {'L': (hipHalf + .26, -.95, .42), 'R': (-(hipHalf + .26), -.95, .42)},
+                'toeDirs': {'L': None, 'R': None},
+                'hands': {
+                    'L': (hipHalf + .165 + .018 * math.sin(gait) + .006 * walkTremble, -.115,
+                          reachZ + .014 * bob + .007 * walkTremble),
+                    'R': (-(hipHalf + .165) + .018 * math.sin(gait) + .006 * walkTremble, -.115,
+                          reachZ - .014 * bob - .007 * walkTremble),
+                },
+                'armPoles': {'L': (hipHalf + .95, .15, reachZ - .55), 'R': (-(hipHalf + .95), .15, reachZ - .55)},
+                'palms': {
+                    'L': ((-.20, -.12, .97), (0, -1, .1), .16),
+                    'R': ((.20, -.12, .97), (0, -1, .1), .16),
+                },
             }
 
+        elif clip == 'CaptiveStandToKneel':
+            # Hands-up stand -> both knees on the ground, hands to the back of the head.
+            # First and last frames are the neighbouring loop clips' neutral frames, so
+            # the 0.12 s cross-fade in and out is a no-op.
+            if t <= 1e-9:
+                p = HandsUpStandPose()
+            elif t >= duration - 1e-9:
+                p = KneelHandsHeadPose()
+            else:
+                w = Clamp(t / duration)
+                bell = math.sin(math.pi * w)
+                standPose, kneelPose = HandsUpStandPose(), KneelHandsHeadPose()
+                # The hips drop first, the feet stay planted, and only once the knees are
+                # down do the feet swing back and the shins lie over. Doing all of it on
+                # one ramp slid both boots backwards along the ground for a whole second.
+                wBody = Smooth(Clamp(w * 1.18))
+                wPelvis = Smooth(Clamp(w * 1.30))
+                wFoot = Smooth(Clamp((w - .45) / .55))
+                wToe = Smooth(Clamp((w - .38) / .62))
+                wHand = Smooth(Clamp(w * 1.12))
+                p = BlendPose(standPose, kneelPose, wBody,
+                              ToeArc(Mix(toeStandPitch, toeKneelPitch, wToe)))
+                p['pelvis'] = (Mix(standPose['pelvis'][0], kneelPose['pelvis'][0], wPelvis),
+                               Mix(standPose['pelvis'][1], kneelPose['pelvis'][1], wPelvis) + .13 * bell,
+                               Mix(standPose['pelvis'][2], kneelPose['pelvis'][2], wPelvis) - .025 * bell)
+                dragLift = WALK_LIFT * .75 * math.sin(math.pi * Clamp((w - .45) / .55))
+                for side, sign in [('L', 1), ('R', -1)]:
+                    a, b = standPose['ankles'][side], kneelPose['ankles'][side]
+                    p['ankles'][side] = (Mix(a[0], b[0], wFoot), Mix(a[1], b[1], wFoot),
+                                         Mix(a[2], b[2], wFoot) + dragLift)
+                    ha, hb = standPose['hands'][side], kneelPose['hands'][side]
+                    p['hands'][side] = (Mix(ha[0], hb[0], wHand) + sign * .055 * bell,
+                                        Mix(ha[1], hb[1], wHand) - .045 * bell,
+                                        Mix(ha[2], hb[2], wHand))
+                p['bend'] = Mix(standPose['bend'], kneelPose['bend'], wBody) + .16 * bell
+                p['pelvisTilt'] = (p['pelvisTilt'][0] + .14 * bell, p['pelvisTilt'][1], p['pelvisTilt'][2])
+
         elif clip == 'CaptiveKneelHandsHead':
-            p = KneelBase(sink=.004 * breath)
-            p['pelvisTilt'] = (.10, .012 * tremble, 0)
-            p['bend'] = .20 + .010 * tremble
-            p['lean'] = .018 * math.sin(phase * .9)
-            p['shrug'] = .34
-            p['neck'] = (.12, 0, 0)
-            p['head'] = (.24, 0, .07 * math.sin(phase * .8))
+            p = KneelHandsHeadPose(breath=breath, tremble=tremble,
+                                   slow=sway, turn=math.sin(phase * 2))
+
+        elif clip == 'CaptiveKneelFlinch':
+            # A rifle butt across the head and shoulder from behind-left: the head snaps
+            # down and to his right, the shoulders clamp, then he settles back into the
+            # hands-on-head loop. Both ends are that loop's neutral frame.
+            hit = Track([(0.00, {'k': .0}), (0.09, {'k': 1.0}), (0.20, {'k': .74}),
+                         (0.36, {'k': .44}), (0.60, {'k': .16}), (0.80, {'k': .0})], t)['k']
+            shudder = .006 * math.sin(t * 92) * max(.0, 1 - t / .34)
+            p = KneelHandsHeadPose()
             crown = kneelPelvisZ + (restHead - restPelvis) * .90
-            p['hands'] = {
-                'L': (hipHalf - .020, .105, crown + .070),
-                'R': (-(hipHalf - .020), .105, crown + .070),
-            }
-            p['armPoles'] = {'L': (hipHalf + 1.0, -.62, crown - .30), 'R': (-(hipHalf + 1.0), -.62, crown - .30)}
-            p['palms'] = {
-                'L': ((-.86, .22, .46), (0, -1, .12), .55),
-                'R': ((.86, .22, .46), (0, -1, .12), .55),
-            }
+            p['pelvis'] = (p['pelvis'][0] - .020 * hit, p['pelvis'][1] + .012 * hit,
+                           p['pelvis'][2] - .032 * hit + shudder)
+            p['pelvisTilt'] = (.10 + .17 * hit, -.10 * hit, -.06 * hit)
+            p['bend'] = .20 + .29 * hit
+            p['lean'] = -.17 * hit
+            p['twist'] = -.11 * hit
+            p['neck'] = (.12 + .30 * hit, 0, -.25 * hit)
+            p['head'] = (.24 + .34 * hit, 0, -.40 * hit)
+            p['shrug'] = .34 + .30 * hit
+            handZ = crown + .070 - .058 * hit + shudder
+            p['hands'] = {'L': (hipHalf - .020 - .028 * hit, .105 - .050 * hit, handZ),
+                          'R': (-(hipHalf - .020) + .028 * hit, .105 - .050 * hit, handZ)}
+            p['armPoles'] = {'L': (hipHalf + 1.0 - .30 * hit, -.62, crown - .30),
+                             'R': (-(hipHalf + 1.0 - .30 * hit), -.62, crown - .30)}
 
         elif clip == 'CaptiveKneelPlead':
             beg = (1 - math.cos(phase)) / 2
+            plead = math.sin(phase * 2)
             p = KneelBase(sink=.006 * breath)
             p['pelvisTilt'] = (.06, .010 * tremble, 0)
-            p['bend'] = .14 + .05 * math.sin(phase * 2.4)
-            p['shrug'] = .16
+            p['bend'] = .14 + .05 * plead - .014 * breath
+            p['shrug'] = .16 + .022 * breath
             p['neck'] = (-.14, 0, 0)
-            p['head'] = (-.22 + .05 * math.sin(phase * 2.4), 0, .05 * sway)
+            p['head'] = (-.22 + .05 * plead, 0, .05 * sway)
             chest = kneelPelvisZ + (restChest - restPelvis) * .94
             p['hands'] = {
-                'L': (hipHalf - .015 + .02 * beg, -.235 - .085 * beg, chest - .095 + .050 * beg),
-                'R': (-(hipHalf - .015) - .02 * beg, -.235 - .085 * beg, chest - .105 + .050 * beg),
+                'L': (hipHalf - .015 + .02 * beg + .006 * tremble, -.235 - .085 * beg,
+                      chest - .095 + .050 * beg + .008 * tremble),
+                'R': (-(hipHalf - .015) - .02 * beg + .006 * tremble, -.235 - .085 * beg,
+                      chest - .105 + .050 * beg + .008 * tremble),
             }
             p['armPoles'] = {'L': (hipHalf + .80, -.05, chest - .42), 'R': (-(hipHalf + .80), -.05, chest - .42)}
             p['palms'] = {
@@ -468,20 +747,20 @@ def Bake(modelId):
                     # a metre; the face turns sideways instead of lifting the chin.
                     (0.88, {'px': .02, 'py': -.285, 'pz': hipThick, 'tilt': 1.48, 'bend': .01,
                             'neck': -.04, 'head': -.09, 'roll': .09, 'turn': .75,
-                            'dAy': legOut, 'az': .078, 'toe': (0, .94, -.35),
-                            'hx': hipHalf + .175, 'dHy': -.735, 'hz': .014,
+                            'dAy': legOut, 'az': .0515, 'toe': (0, .94, -.35),
+                            'hx': hipHalf + .175, 'dHy': -.735, 'hz': -.0125,
                             'poleDy': .22, 'poleDz': .34,
                             'legPoleX': 1.20, 'legPoleDy': .42, 'legPoleZ': .12, 'shrug': .10}),
                     (1.16, {'px': .02, 'py': -.315, 'pz': hipThick, 'tilt': 1.53, 'bend': .02,
                             'neck': -.05, 'head': -.10, 'roll': .09, 'turn': .84,
-                            'dAy': legOut, 'az': .074, 'toe': (0, .94, -.35),
-                            'hx': hipHalf + .170, 'dHy': -.725, 'hz': .004,
+                            'dAy': legOut, 'az': .0475, 'toe': (0, .94, -.35),
+                            'hx': hipHalf + .170, 'dHy': -.725, 'hz': -.0225,
                             'poleDy': .22, 'poleDz': .34,
                             'legPoleX': 1.20, 'legPoleDy': .42, 'legPoleZ': .12, 'shrug': .08}),
                     (1.60, {'px': .02, 'py': -.320, 'pz': hipThick - .004, 'tilt': 1.54, 'bend': .02,
                             'neck': -.05, 'head': -.10, 'roll': .09, 'turn': .86,
-                            'dAy': legOut, 'az': .072, 'toe': (0, .94, -.35),
-                            'hx': hipHalf + .168, 'dHy': -.720, 'hz': .002,
+                            'dAy': legOut, 'az': .0455, 'toe': (0, .94, -.35),
+                            'hx': hipHalf + .168, 'dHy': -.720, 'hz': -.0245,
                             'poleDy': .22, 'poleDz': .34,
                             'legPoleX': 1.20, 'legPoleDy': .42, 'legPoleZ': .12, 'shrug': .08}),
                 ],
@@ -512,14 +791,14 @@ def Bake(modelId):
                             'legPoleX': .45, 'legPoleDy': -.60, 'legPoleZ': -.10, 'shrug': .14}),
                     (1.45, {'px': .02, 'py': -.255, 'pz': hipThick + .012, 'tilt': 1.40, 'bend': .03,
                             'neck': -.03, 'head': -.08, 'roll': .16, 'turn': .74,
-                            'dAy': legOut * .955, 'az': .100, 'toe': (0, .90, -.43),
-                            'hx': hipHalf + .055, 'dHy': -.545, 'hz': .038,
+                            'dAy': legOut * .955, 'az': .0785, 'toe': (0, .90, -.43),
+                            'hx': hipHalf + .055, 'dHy': -.545, 'hz': -.0045,
                             'poleDy': .22, 'poleDz': .32,
                             'legPoleX': 1.20, 'legPoleDy': .42, 'legPoleZ': .12, 'shrug': .10}),
                     (2.00, {'px': .02, 'py': -.270, 'pz': hipThick + .008, 'tilt': 1.44, 'bend': .03,
                             'neck': -.04, 'head': -.09, 'roll': .16, 'turn': .80,
-                            'dAy': legOut * .955, 'az': .096, 'toe': (0, .90, -.43),
-                            'hx': hipHalf + .050, 'dHy': -.535, 'hz': .030,
+                            'dAy': legOut * .955, 'az': .0745, 'toe': (0, .90, -.43),
+                            'hx': hipHalf + .050, 'dHy': -.535, 'hz': -.0125,
                             'poleDy': .22, 'poleDz': .32,
                             'legPoleX': 1.20, 'legPoleDy': .42, 'legPoleZ': .12, 'shrug': .10}),
                 ],
@@ -551,18 +830,23 @@ def Bake(modelId):
             }
 
         elif clip == 'IjaBayonetGuard':
-            shift = .012 * sway
+            # Standing guard is not standing still: the weight rolls between the feet once
+            # a loop, the hips drop a little onto the loaded leg, and the head keeps
+            # scanning the line of prisoners. Four guards share this clip, so the cutscene
+            # data offsets them with state.performPhase instead of four near-identical
+            # copies (docs/Data_CutsceneRedo.md §1.3).
+            shift = .030 * sway
             aim = Vector((.12, -.902, -.414)).normalized()
             left = Vector((hipHalf - .055, -.275 - .010 * breath, shoulder['L'].z - .32 + .012 * breath))
             right = left - aim * .365
             p = StandBase(phase, sway)
             p['ankles'] = {'L': (hipHalf + .02, -.115, ankleZ), 'R': (-(hipHalf + .02), .085, ankleZ)}
-            p['pelvis'] = (shift, .015, restPelvis - .055 + .006 * breath)
-            p['pelvisTilt'] = (.07, .020 * sway, -.16)
-            p['bend'] = .13
-            p['neck'] = (.05, 0, .05)
-            p['head'] = (.09, 0, .10 + .035 * sway)
-            p['shrug'] = .05
+            p['pelvis'] = (shift, .015 + .008 * sway2, restPelvis - .055 + .006 * breath - .009 * abs(sway))
+            p['pelvisTilt'] = (.07 + .012 * breath, .045 * sway, -.16)
+            p['bend'] = .13 - .012 * breath
+            p['neck'] = (.05, 0, .05 + .06 * math.sin(phase * 2))
+            p['head'] = (.09 + .035 * nod, 0, .10 + .130 * sway)
+            p['shrug'] = .05 + .020 * breath
             p['hands'] = {'L': tuple(left), 'R': tuple(right)}
             p['armPoles'] = {'L': (hipHalf + .80, -.25, left.z - .45), 'R': (-(hipHalf + .75), .10, right.z - .45)}
             p['palms'] = GripPalms(aim)
@@ -571,11 +855,11 @@ def Bake(modelId):
             jab = Smooth(math.sin(phase * 2) * .5 + .5)
             p = StandBase(phase, sway)
             p['ankles'] = {'L': (hipHalf + .02, -.10, ankleZ), 'R': (-(hipHalf + .02), .075, ankleZ)}
-            p['pelvis'] = (.014 * sway, .01 - .02 * jab, restPelvis - .048)
-            p['pelvisTilt'] = (.10, .02 * sway, -.10)
+            p['pelvis'] = (.026 * sway, .01 - .02 * jab, restPelvis - .048 - .008 * abs(sway))
+            p['pelvisTilt'] = (.10, .040 * sway, -.10)
             p['bend'] = .17 + .04 * jab
-            p['neck'] = (.17, 0, .04)
-            p['head'] = (.10 + .05 * jab, 0, .12)
+            p['neck'] = (.17, 0, .04 + .05 * sway)
+            p['head'] = (.10 + .05 * jab, 0, .12 + .100 * sway)
             p['shrug'] = .03
             # The rifle is carried at the hip in the right hand only, and the engine aims a
             # one-handed weapon along the forearm: an arm hanging straight down would drive
@@ -790,12 +1074,15 @@ def Bake(modelId):
 
     footVertices = GroupSets(lambda n: 'Foot' in n or 'Toe' in n)
     shinVertices = GroupSets(lambda n: 'Calf' in n)
+    handVertices = GroupSets(lambda n: 'Hand' in n or 'Finger' in n)
+    kickVertices = GroupSets(lambda n: 'R Foot' in n or 'R Toe' in n)
     regionVertices = {
         'foot': footVertices, 'shin': shinVertices,
         'thigh': GroupSets(lambda n: 'Thigh' in n),
         'hip': GroupSets(lambda n: 'Pelvis' in n),
         'torso': GroupSets(lambda n: 'Spine' in n),
         'head': GroupSets(lambda n: 'Head' in n or 'Neck' in n),
+        'hand': handVertices,
         'arm': GroupSets(lambda n: 'Arm' in n or 'Hand' in n or 'Finger' in n),
     }
 
@@ -832,6 +1119,60 @@ def Bake(modelId):
             ev.to_mesh_clear()
         return low
 
+    def Forward(sets):
+        """How far in front of the root (actor -Y) the furthest vertex of `sets` is,
+        in RUNTIME metres, plus its height. The kick lands with a boot, not with the toe
+        bone: the 2026-09-15 stage table read the toe bone's *height* (0.63) as if it were
+        its reach and put the guard 0.16 m too close, so the boot went through the chest."""
+        dg = depsgraph()
+        best = 1e9
+        height = .0
+        for o, indices in zip(meshes, sets):
+            if not indices:
+                continue
+            ev = o.evaluated_get(dg)
+            geometry = ev.to_mesh()
+            matrix = ev.matrix_world
+            for index in indices:
+                point = matrix @ geometry.vertices[index].co
+                if point.y < best:
+                    best, height = point.y, point.z
+            ev.to_mesh_clear()
+        return -best * nominalScale, height * nominalScale
+
+    def BodyBack():
+        """Support distance of the skin along each strike bearing, in RUNTIME metres.
+
+        This is the other half of every contact distance: the striker has to stop at the
+        victim's *skin*, and on a kneeling man the skin starts 0.13-0.17 m out from his
+        origin depending on the bearing. One pass over every vertex, so it only runs on
+        the frames that matter."""
+        dg = depsgraph()
+        bearings = [(name, low, high, math.sin(math.radians(a)), math.cos(math.radians(a)))
+                    for name, low, high, a in CONTACT_TARGETS]
+        best = {name: -1e9 for name, _, _, _ in CONTACT_TARGETS}
+        for o in meshes:
+            ev = o.evaluated_get(dg)
+            geometry = ev.to_mesh()
+            matrix = ev.matrix_world
+            for v in geometry.vertices:
+                point = matrix @ v.co
+                z = point.z * nominalScale
+                for name, low, high, ux, uy in bearings:
+                    if low <= z <= high:
+                        # Only skin inside the corridor the striking end actually sweeps.
+                        # A plain support function answers "is anything of him this far out
+                        # along that bearing", and on a man with his hands behind his head
+                        # the answer at 0.79 m is his elbow, a quarter of a metre off to
+                        # the side of where the blade goes.
+                        if abs(point.x * uy - point.y * ux) > CONTACT_CORRIDOR:
+                            continue
+                        reach = point.x * ux + point.y * uy
+                        if reach > best[name]:
+                            best[name] = reach
+            ev.to_mesh_clear()
+        return {name: round(value * nominalScale, 4) for name, value in best.items() if value > -1e8}
+
     # Calibrate the folded foot: the kneel rests on shin and boot top at once, and the
     # distance from the toe bone to the boot's upper surface differs per rig. Solve it
     # from the deformed mesh instead of guessing a constant.
@@ -840,19 +1181,23 @@ def Bake(modelId):
         for pb in arm.pose.bones:
             pb.matrix_basis = rest[pb.name]
         Update()
-        probe = KneelBase()
+        kneelProbe = KneelBase()
         chestProbe = kneelPelvisZ + (restChest - restPelvis) * .94
-        probe.update({'pelvisTilt': (.10, 0, 0), 'bend': .20, 'neck': (.12, 0, 0), 'head': (.24, 0, 0), 'shrug': .30,
+        kneelProbe.update({'pelvisTilt': (.10, 0, 0), 'bend': .20, 'neck': (.12, 0, 0), 'head': (.24, 0, 0), 'shrug': .30,
                       'hands': {'L': (hipHalf + .10, -.10, chestProbe - .30),
                                 'R': (-(hipHalf + .10), -.10, chestProbe - .30)},
                       'armPoles': {'L': (hipHalf + .9, .10, chestProbe - .50),
                                    'R': (-(hipHalf + .9), .10, chestProbe - .50)}})
-        ApplyPose(probe, 0.0)
+        ApplyPose(kneelProbe, 0.0)
         shinLow = LowestOf(shinVertices)
         footLow = LowestOf(footVertices)
         calibration.append((round(shinLow, 4), round(footLow, 4), round(kneelAnkleZ, 4)))
         kneelAnkleZ += shinLow - footLow
     print('KNEEL_CALIBRATION %s %s -> ankleZ %.4f' % (modelId, calibration, kneelAnkleZ), flush=True)
+
+    # BlenderMCP hook: hand the live rig to the caller instead of baking it.
+    if probe is not None:
+        return probe(dict(locals()))
 
     # Fast authoring-loop preview (CAPTIVES_RENDER=<directory>). Workbench, a few frames
     # per clip; these renders are review-only and never leave the local machine.
@@ -860,8 +1205,7 @@ def Bake(modelId):
     previewCamera = None
     if renderDir:
         Path(renderDir).mkdir(parents=True, exist_ok=True)
-        bpy.ops.object.camera_add(location=(-2.4, -2.9, 1.25))
-        previewCamera = bpy.context.object
+        previewCamera = Add(bpy.ops.object.camera_add, location=(-2.4, -2.9, 1.25))
         previewCamera.rotation_euler = (Vector((0, 0, .70)) - previewCamera.location).to_track_quat('-Z', 'Y').to_euler()
         previewCamera.data.type = 'ORTHO'
         previewCamera.data.ortho_scale = 2.4
@@ -871,8 +1215,7 @@ def Bake(modelId):
         scene.render.resolution_y = 460
         scene.display.shading.light = 'STUDIO'
         scene.display.shading.show_shadows = True
-        bpy.ops.mesh.primitive_plane_add(size=6, location=(0, 0, 0))
-        bpy.context.object.name = 'Prop_PreviewGround'
+        Add(bpy.ops.mesh.primitive_plane_add, size=6, location=(0, 0, 0)).name = 'Prop_PreviewGround'
 
     rifleProxy = None
 
@@ -880,14 +1223,13 @@ def Bake(modelId):
         nonlocal rifleProxy
         if hold != 'free':
             if rifleProxy is None:
-                bpy.ops.mesh.primitive_cube_add(size=1)
-                rifleProxy = bpy.context.object
+                rifleProxy = Add(bpy.ops.mesh.primitive_cube_add, size=1)
                 rifleProxy.name = 'Prop_PreviewRifle'
-            grip = Point(Bone('R Hand'))
+            grip = GripPoint('R')
             if hold == 'oneHandRight':
                 axis = (grip - Point(Bone('R Forearm'))).normalized()
             else:
-                axis = (Point(Bone('L Hand')) - grip).normalized()
+                axis = (GripPoint('L') - grip).normalized()
             butt = grip - axis * .255
             tip = grip + axis * (BAYONET_TIP_M / nominalScale)
             rifleProxy.location = (butt + tip) / 2
@@ -897,7 +1239,7 @@ def Bake(modelId):
         elif rifleProxy is not None:
             rifleProxy.hide_render = True
         scene.render.filepath = str(Path(renderDir) / ('%s_%s_%s.png' % (modelId, clip, ('%.2f' % t).replace('.', 'p'))))
-        bpy.ops.render.render(write_still=True)
+        Op(bpy.ops.render.render, write_still=True)
 
     framesByClip = {}
     clipReports = []
@@ -921,8 +1263,8 @@ def Bake(modelId):
             Author(clip, t, lift)
             lifts.append(lift)
             values.extend(SourcePose())
-            gripR = Point(Bone('R Hand'))
-            gripL = Point(Bone('L Hand'))
+            gripR = GripPoint('R')
+            gripL = GripPoint('L')
             # Match Actor._UpdateRiggedWeaponMount: a two-handed rifle aims along the
             # grip line, a one-handed one along the forearm's extension past the wrist.
             axis = (gripR - Point(Bone('R Forearm'))) if weaponHold == 'oneHandRight' else (gripL - gripR)
@@ -930,6 +1272,8 @@ def Bake(modelId):
             # The rifle keeps its real size while the actor is scaled to 1.66 m, so the
             # tip is a scaled hand plus an unscaled weapon length, exactly as at runtime.
             tip = gripR * nominalScale + axis * BAYONET_TIP_M
+            kickY, kickZ = Forward(kickVertices) if clip == 'IjaKickPrisoner' else (0.0, 0.0)
+            back = BodyBack() if (clip in CONTACT_BAND_CLIPS and frame == 0) else None
             samples.append({
                 't': round(t, 4),
                 'head': round(Point(Bone('Head')).z, 4),
@@ -939,11 +1283,15 @@ def Bake(modelId):
                 'kneeR': round(Point(Bone('R Calf')).z, 4),
                 'toeL': round(Point(Bone('L Toe0')).z, 4),
                 'toeR': round(Point(Bone('R Toe0')).z, 4),
+                'ankleL': round(Point(Bone('L Foot')).y, 4),
+                'ankleR': round(Point(Bone('R Foot')).y, 4),
                 'wristL': round(gripL.z, 4),
                 'wristR': round(gripR.z, 4),
                 'handSpan': round((gripL - gripR).length, 4),
                 'tip': [round(tip.x, 4), round(tip.y, 4), round(tip.z, 4)],
                 'butt': [round(v, 4) for v in (gripR * nominalScale - axis * .255)],
+                'bootReach': round(kickY, 4), 'bootZ': round(kickZ, 4),
+                'back': back,
                 'lift': round(lift, 5),
                 'lowAt': lowAt,
                 'regions': regions,
@@ -958,6 +1306,8 @@ def Bake(modelId):
                 pb.keyframe_insert('rotation_quaternion', frame=frame)
         framesByClip[clip] = {'duration': duration, 'loop': loop, 'weaponHold': weaponHold,
                               'frameCount': count, 'values': values}
+        if clip in REFERENCE_SPEED:
+            framesByClip[clip]['referenceSpeedMps'] = REFERENCE_SPEED[clip]
         action.use_fake_user = True
         arm.animation_data.action = None
         track = arm.animation_data.nla_tracks.new()
@@ -968,11 +1318,45 @@ def Bake(modelId):
                            for s in samples for label, ratio in s['overreach']})
         headLo = min(s['head'] for s in samples)
         headHi = max(s['head'] for s in samples)
+        # The loop seam: a loop clip's authored last frame has to equal its authored first
+        # frame. Sampling wraps on `at % duration`, so a non-periodic wobble term never
+        # trips the runtime wrap test — it just pops once a cycle on screen.
+        stride = len(names) * 7
+        seam = max(abs(values[i] - values[len(values) - stride + i]) for i in range(stride)) if loop else .0
+        # The planted foot's backward speed, which is the whole no-skating contract.
+        # Per interval the planted foot is whichever ankle is travelling backwards (+Y)
+        # fastest; the swinging one is going forwards, so max() picks the planted one.
+        stanceSpeed = None
+        if clip in REFERENCE_SPEED:
+            speeds = [max((b['ankleL'] - a['ankleL']) / (b['t'] - a['t']),
+                          (b['ankleR'] - a['ankleR']) / (b['t'] - a['t']))
+                      for a, b in zip(samples, samples[1:])]
+            stanceSpeed = [round(min(speeds), 4), round(max(speeds), 4)]
         clipReports.append({'clip': clip, 'duration': duration, 'loop': loop, 'weaponHold': weaponHold,
                             'frameCount': count, 'samples': samples,
                             'headRange': [round(headLo, 4), round(headHi, 4)],
                             'liftRange': [round(min(lifts), 5), round(max(lifts), 5)],
+                            'referenceSpeedMps': REFERENCE_SPEED.get(clip),
+                            'stanceSpeed': stanceSpeed,
+                            'loopSeam': round(seam, 9),
                             'overreach': problems})
+        if loop:
+            print('   LOOPSEAM %-24s %.3e %s' % (clip, seam, 'OK' if seam < 1e-9 else '**POPS**'), flush=True)
+        if stanceSpeed:
+            print('   STANCE   %-24s planted foot %.4f..%.4f m/s (reference %.3f)'
+                  % (clip, stanceSpeed[0], stanceSpeed[1], REFERENCE_SPEED[clip]), flush=True)
+        # The contact window, frame by frame, in runtime metres: this is what the stage
+        # distances in Data_CutsceneMachineGunCaptives are derived from.
+        window = {'IjaKickPrisoner': (0.34, 0.56), 'IjaRifleButtStrike': (0.76, 0.96),
+                  'IjaBayonetDownThrust': (0.66, 1.12)}.get(clip)
+        if window:
+            for s in samples:
+                if window[0] <= s['t'] <= window[1]:
+                    print('     REACH %-22s t=%.3f boot %.3f/%.3f  butt %.3f/%.3f  tip %.3f/%.3f'
+                          % (clip, s['t'], s['bootReach'], s['bootZ'],
+                             -s['butt'][1], s['butt'][2], -s['tip'][1], s['tip'][2]), flush=True)
+        if samples[0]['back']:
+            print('   BACK     %-24s %s' % (clip, json.dumps(samples[0]['back'])), flush=True)
         print('CLIP %-24s %-11s head %.3f-%.3f lift %.3f..%.3f toeMax %.3f kneeMin %.3f wristTop %.3f %s'
               % (clip, modelId, headLo, headHi, min(lifts), max(lifts),
                  max(max(s['toeL'], s['toeR']) for s in samples),
@@ -1016,24 +1400,21 @@ def Bake(modelId):
             return material
 
         def Box(name, location, scale, material):
-            bpy.ops.mesh.primitive_cube_add(size=1, location=location)
-            o = bpy.context.object
+            o = Add(bpy.ops.mesh.primitive_cube_add, size=1, location=location)
             o.name = name
             o.scale = scale
             o.data.materials.append(material)
             return o
 
         Box('Prop_ProofGround', (0, 0, -.04), (4, 4, .08), Material('Material_CaptivesProofGround', (.20, .19, .16)))
-        bpy.ops.object.camera_add(location=(-2.55, -3.15, 1.55))
-        camera = bpy.context.object
+        camera = Add(bpy.ops.object.camera_add, location=(-2.55, -3.15, 1.55))
         camera.name = 'Camera_CaptivesPoseReview'
         camera.rotation_euler = (Vector((0, 0, .75)) - camera.location).to_track_quat('-Z', 'Y').to_euler()
         camera.data.type = 'ORTHO'
         camera.data.ortho_scale = 2.6
         scene.camera = camera
         for name, point, power, size in [('Light_Key', (-2.4, -3.2, 4), 620, 4), ('Light_Fill', (3, -1.4, 3), 380, 3)]:
-            bpy.ops.object.light_add(type='AREA', location=point)
-            lamp = bpy.context.object
+            lamp = Add(bpy.ops.object.light_add, type='AREA', location=point)
             lamp.name = name
             lamp.data.energy = power
             lamp.data.shape = 'DISK'
@@ -1051,9 +1432,9 @@ def Bake(modelId):
                                             'yaw PI -> actor -Z; every frame grounded at bake time; no Actor world-root tracks')
         scene['originalSourceSha256'] = asset['originalModelSha256']
         scene['reviewActions'] = 'Select an action on the original armature; NLA copies are muted for reference'
-        bpy.ops.file.pack_all()
+        Op(bpy.ops.file.pack_all)
         blend = private / ('Scene_' + modelId + 'MachineGunCaptives.blend')
-        bpy.ops.wm.save_as_mainfile(filepath=str(blend), compress=True)
+        Op(bpy.ops.wm.save_as_mainfile, filepath=str(blend), compress=True)
     else:
         blend = private / ('Scene_' + modelId + 'MachineGunCaptives.blend')
 
@@ -1072,26 +1453,31 @@ def Bake(modelId):
     return validation
 
 
-selected = os.environ.get('CAPTIVES_MODEL')
-wanted = set(selected.split(',')) if selected else None
-results = [Bake(modelId) for modelId in MODEL_CLIPS if not wanted or modelId in wanted]
-manifest = {'schema': 1, 'version': VERSION, 'authoringTool': TOOL, 'actorForward': [0, 0, -1],
-            'floorClearanceM': CLEARANCE, 'blendSeconds': 0.12,
-            'scope': 'Machine-gun stage captives cutscene only',
-            'clips': {name: {'duration': duration, 'loop': loop, 'weaponHold': hold}
-                      for name, (duration, loop, hold) in DEFINITIONS.items()},
-            'models': []}
-for modelId, clips in MODEL_CLIPS.items():
-    file = output / ('Animation_Lugou' + modelId[len('Lugou'):] + 'MachineGunCaptives.json')
-    if file.exists():
-        manifest['models'].append({
-            'id': modelId, 'file': file.name,
-            'sha256': hashlib.sha256(file.read_bytes()).hexdigest(),
-            'clipIds': clips,
-            'originalModelSha256': hashlib.sha256(
-                (project / 'Model/Character' / ('Model_' + modelId + '.glb')).read_bytes()).hexdigest()})
-manifestFile = output / 'Data_MachineGunCaptivesAnimation.json'
-temporary = manifestFile.with_suffix('.json.tmp')
-temporary.write_text(json.dumps(manifest, indent=2), encoding='utf-8')
-temporary.replace(manifestFile)
-print('MANIFEST', manifestFile, len(manifest['models']), 'models', flush=True)
+# Driver. Guarded so BlenderMCP (and any other caller) can exec this file as a
+# module and reach Bake()/its probe hook without baking all five rigs first.
+if __name__ == '__main__':
+    selected = os.environ.get('CAPTIVES_MODEL')
+    wanted = set(selected.split(',')) if selected else None
+    results = [Bake(modelId) for modelId in MODEL_CLIPS if not wanted or modelId in wanted]
+    manifest = {'schema': 1, 'version': VERSION, 'authoringTool': TOOL, 'actorForward': [0, 0, -1],
+                'floorClearanceM': CLEARANCE, 'blendSeconds': 0.12,
+                'scope': 'Machine-gun stage captives cutscene only',
+                'clips': {name: ({'duration': duration, 'loop': loop, 'weaponHold': hold,
+                                  'referenceSpeedMps': REFERENCE_SPEED[name]} if name in REFERENCE_SPEED
+                                 else {'duration': duration, 'loop': loop, 'weaponHold': hold})
+                          for name, (duration, loop, hold) in DEFINITIONS.items()},
+                'models': []}
+    for modelId, clips in MODEL_CLIPS.items():
+        file = output / ('Animation_Lugou' + modelId[len('Lugou'):] + 'MachineGunCaptives.json')
+        if file.exists():
+            manifest['models'].append({
+                'id': modelId, 'file': file.name,
+                'sha256': hashlib.sha256(file.read_bytes()).hexdigest(),
+                'clipIds': clips,
+                'originalModelSha256': hashlib.sha256(
+                    (project / 'Model/Character' / ('Model_' + modelId + '.glb')).read_bytes()).hexdigest()})
+    manifestFile = output / 'Data_MachineGunCaptivesAnimation.json'
+    temporary = manifestFile.with_suffix('.json.tmp')
+    temporary.write_text(json.dumps(manifest, indent=2), encoding='utf-8')
+    temporary.replace(manifestFile)
+    print('MANIFEST', manifestFile, len(manifest['models']), 'models', flush=True)
