@@ -8,7 +8,7 @@ const overrides={
   TrenchEntry:Routes.opening,
   Support:Routes.support,
   Tank:[A.gun,...Routes.bundle,A.bundle],
-  Orders:Routes.orders,
+  Orders:Routes.ordersRejoin,
   South:[A.orders,...Routes.south],
   Village:Routes.village.slice(0,5),
   TransferApproach:Routes.village.slice(4),

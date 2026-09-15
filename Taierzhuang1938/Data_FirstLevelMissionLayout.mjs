@@ -532,6 +532,9 @@ export const MISSION_ROUTES = Object.freeze({
   bundle: Sortie.route,
   bundleReturn: Sortie.route.slice(3).reverse(),
   orders: [Sortie.throw,{x:25,z:-110},Sortie.orders],
+  // The tank can be immobilized anywhere along the return trench, so the rally
+  // leg starts wherever the bundle run is; the squad already walks it this way.
+  ordersRejoin: [...Sortie.route.slice(3).reverse(),{x:25,z:-110},Sortie.orders],
   south: [
     { x: -36, z: -124 },
     { x: 0, z: -124 },

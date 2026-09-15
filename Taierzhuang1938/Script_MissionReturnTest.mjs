@@ -3,6 +3,7 @@ import {MissionReturn,NearestMissionRoutePoint} from "./Script_MissionReturn.mjs
 import {MISSION_RETURN as r} from "./Data_Tuning_FirstLevel.mjs";
 import {MISSION_RETURN_ROUTES} from "./Data_FirstLevelMissionReturn.mjs";
 import {MISSION_STAGES} from "./Data_FirstLevelMission.mjs";
+import {FRONT_SORTIE} from "./Data_FirstLevelFrontRoute.mjs";
 const gate=new MissionReturn(r),base={stage:"test",position:{x:0,z:0},route:[{x:0,z:0},{x:0,z:-200}],target:{x:0,z:-200},yaw:0};
 const At=(x,z,extra={})=>({...base,position:{x,z},...extra});
 assert.equal(gate.Update(4,base),null,"a distant objective is reachable along its approach without false warning");
@@ -28,5 +29,10 @@ for(const stage of MISSION_STAGES){
  const route=MISSION_RETURN_ROUTES[stage.id];
  assert.ok(route.length && route.every(p=>Number.isFinite(p.x)&&Number.isFinite(p.z)),stage.id);
  for(const point of route){gate.Reset();assert.equal(gate.Update(5,{...base,stage:stage.id,position:point,route,target:stage.target}),null,stage.id+" route allowed");}
+}
+// The tank can die while the player is still deep in the bundle trench beside Luo.
+for(const point of FRONT_SORTIE.route.slice(3)){
+ gate.Reset();
+ assert.equal(gate.Update(5,{...base,stage:"Orders",position:point,route:MISSION_RETURN_ROUTES.Orders,target:FRONT_SORTIE.orders}),null,`Orders rally from bundle trench ${point.x},${point.z}`);
 }
 console.log("PASS mission return: detours, grace, hysteresis, squad, target arrival, bounds, lifecycle, bearings and all stage routes");

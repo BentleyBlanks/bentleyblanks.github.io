@@ -235,7 +235,7 @@ export const MISSION_PURSUIT_ROUTE=Object.freeze([
 ]);
 export const MISSION_GUIDANCE = Object.freeze({
   Unloading: {label:'unload'}, TrenchEntry:{label:'support',route:'opening'}, Shelter:{label:'support'}, Support:{label:'support',route:'support'},
-  MachineGun:{label:'front'},Tank:{label:'bundle',route:'bundle'},Orders:{label:'orders',route:'orders'},
+  MachineGun:{label:'front'},Tank:{label:'bundle',route:'bundle'},Orders:{label:'orders',route:'ordersRejoin'},
   South:{label:'south',route:'south'},Village:{label:'village',route:'village'},
   Courtyard:{label:'gate'},TransferApproach:{label:'transfer',route:'village'},Transfer:{label:'transfer'},AirFirst:{label:'transfer'},
   Carry:{label:'carry'},Rescue:{label:'ditch'},

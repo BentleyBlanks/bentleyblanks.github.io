@@ -781,7 +781,7 @@ for (const [name, route] of Object.entries({ ...MISSION_ROUTES, ...Object.fromEn
           Math.abs(dx*cosine-dz*sine) < box.w / 2 + 0.35 &&
           Math.abs(dx*sine+dz*cosine) < box.d / 2 + 0.35 &&
           box.y + box.h / 2 > y + 0.3 &&
-          box.y - box.h / 2 < y + ((name==="bundle"||name==="bundleReturn") && box.id.startsWith("BundleCrawl") ? .88 : 1.7);
+          box.y - box.h / 2 < y + (["bundle","bundleReturn","ordersRejoin"].includes(name) && box.id.startsWith("BundleCrawl") ? .88 : 1.7);
         assert.equal(
           blocked,
           false,
