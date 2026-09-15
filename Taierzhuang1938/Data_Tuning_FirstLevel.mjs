@@ -324,8 +324,35 @@ export const MISSION_TUNING = Object.freeze({
   ambushRiseSeconds: 0.7,
   // 锁住的视线落在扑上来那个人的胸口高度上。
   ambushLookHeightM: 1.4,
+  // 抡枪托砸下来那一下看的是**脸**，不是胸口：参考图①那一帧他的脸与肩膀撑满画面。
+  // 这一段（lunge/butt）每帧重新瞄一次他的头骨世界位置，所以这个高度只是取不到骨头时的兜底。
+  ambushButtLookHeightM: 1.52,
+  // 砸中之后镜头往后仰、躺在地上看屋梁（参考图②）。落点取在自己正前方
+  // ambushDazeLookAheadM 处、ambushDazeLookRiseM 高的地方：只抬头不转头，
+  // 抬起来正好是这间屋的檩条与望板（墙顶 2.9 m，见 §3.2 Rafters）。
+  // 这一段跟着倒地那半秒一起走完（ambushDazeLookS），4.6 s 再从屋梁摇到北门口的担架。
+  // 不写这一条会怎样：镜头停在「瞄着他胸口 ± limitedLookRadians」那条带子上，
+  // 躺下之后读到的是地板（2026-09-16 出图实拍）。
+  ambushDazeLookAheadM: 2.2,
+  ambushDazeLookRiseM: 2.3,
+  ambushDazeLookS: 1.1,
   // 躺在地上看北门口那副担架：担架床面 0.86 m，落地之后更低，取 0.7 m 对着肚子。
   ambushLitterLookHeightM: .7,
+  // 捅老周的那个站在担架西侧多远。原来沿用 ambushBindReachM(1.15)，而且共用走位的到达
+  // 半径（0.45 m）还要在这上面再加一截 —— 实拍逐帧量刀尖：它落在担架北边 1.3 m 的地板上。
+  // BayonetStabDown 的刀尖在他身前约 1.3 m（刀线下倾 7°、俯身进 0.24 m），所以站位取 1.25 m，
+  // 并且走位改走 DriveAmbusherOnto（把到达半径那一截先扣掉），刀尖才真的落在老周肚子上。
+  ambushZhouStabStandM: 1.25,
+  // 同一件事的第二个数：站位沿担架**长边**往脚端错开多少。BayonetStabDown 的刀尖
+  // 在他身前 1.25 m、又偏左手边 0.79 m（clip 自带的侧身），不错开的话那一刀正好扎在
+  // 老周的脖子外侧、担架头端的空气里。0.7 m 让刀尖落在床面正中略偏头端 —— 肚子。
+  ambushZhouStabLateralM: 0.7,
+  // 倒地较劲那几拍（grab/mash/finish）把第一人称那把枪连同两只手整体挪开多少米。
+  // 镜头就架在胸口上方，共用地面姿势把枪与右小臂摆在视线正中，压上来那个人的脸
+  // 与他那把上了刺刀的三八式全被挡死。往下 0.28、往前 0.38 之后：他的脸与那把刺刀
+  // 在上半屏、一点不挡，手里这把枪连同两只手落到下半屏（推远了小臂在画面里也细一圈）——
+  // 就是参考图④⑤的读法（2026-09-16 十档对比出图选的值）。
+  ambushGrappleHandM: Object.freeze({ x: 0.03, y: -0.28, z: -0.38 }),
   // —— 晕厥与恍惚。曲线的读法与开场出轨那一段完全一样（Curve 线性 + smoothstep），
   // 横轴是**枪托砸中那一瞬**起算的秒数，纵轴 0–1。开场那一套的形状照搬过来，
   // 只把「一次重击 → 黑 → 慢慢回来」压缩到这一拍的长度上（OPENING_PERCEPTION）。

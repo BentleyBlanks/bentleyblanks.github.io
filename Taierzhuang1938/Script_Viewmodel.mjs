@@ -1543,6 +1543,9 @@ export class Viewmodel {
     // 这条曲线不许过冲，过冲会让枪在装完那一下往回甩一眼可见的一下。
     this.bayonetCarry = 0;
     this.carryOverride = null;   // 装/卸动画期间由 _AnimFixBayonet 每帧写
+    // 剧本近景把手上那把枪整体挪开的偏移（米，视模型局部空间；-Z 向前）。
+    // 只在共用白刃姿势（_AnimMeleeBaked）之上叠加，共用姿势数据一个字不改。见 SetScriptedHandOffset。
+    this.scriptedHandOffset = null;
     this.adsSuppress = 1;      // 拉栓/装填时枪离开瞄准线的程度，相机 FOV 也读它
     this.bobPhase = 0;
     this.elapsed = 0;
@@ -3223,7 +3226,32 @@ export class Viewmodel {
       this.actionPivot.position.z += struggle * 0.12;
       this.actionPivot.position.y += Math.sin(this.elapsed * 43) * (0.003 + struggle * 0.008);
     }
+    // 剧本近景的手位偏移（屋内伏击那一段地面较劲）。加在共用姿势之上，最后一个动作 ——
+    // 双手是 IK 追着这把枪的握点走的，所以挪枪就是挪手，不必另写一套手位。
+    const scripted = this.scriptedHandOffset;
+    if (scripted) {
+      this.actionPivot.position.x += scripted.x;
+      this.actionPivot.position.y += scripted.y;
+      this.actionPivot.position.z += scripted.z;
+    }
     this.lastMeleeClip = pose.clip;
+  }
+
+  /**
+   * 剧本近景把手上那把枪（连带扣在它上面的两只手）整体挪开。
+   *
+   * 为什么需要：倒地较劲这一段镜头就架在胸口上方，共用姿势把枪与右小臂正好摆在
+   * 视线中央 —— 压上来那个人的脸、他那把上了刺刀的三八式全被挡死，屏幕上只剩
+   * 一段放大的小臂和一块枪托（2026-09-16 分层出图逐帧确认）。挪的是**枪**不是手：
+   * FpsArmRig 的双手是 IK 追 gripContact 的，枪一走手跟着走，姿势数据一个字不用改。
+   *
+   * @param {{x:number,y:number,z:number}|null} offset 传 null 收回（演完必须收）
+   */
+  SetScriptedHandOffset(offset) {
+    this.scriptedHandOffset = offset
+      ? { x: offset.x || 0, y: offset.y || 0, z: offset.z || 0 }
+      : null;
+    return this;
   }
 
   _ApplyMeleeVideo() {

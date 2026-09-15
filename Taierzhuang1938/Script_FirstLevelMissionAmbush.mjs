@@ -61,6 +61,11 @@ export class FirstLevelAmbush {
   get Done() { return this.phase === "resolved"; }
   /** 被砸倒之后的秒数；还没被砸就是 null。恍惚曲线与地面镜头都按它取样。 */
   get DazeSeconds() { return this.sinceButt >= 0 ? this.sinceButt : null; }
+  /**
+   * 躺在地上仰头看屋梁的那几秒（砸倒 → 视线拉到北门口的担架之前）。
+   * 运行时按它每帧把落点重算一次：眼位正从 1.6 m 掉到地板上，落点算一次就成了「看地板」。
+   */
+  get RoofView() { return this.phase === "daze" && !this.beats.has("lookLitter"); }
   get Prompt() { return this.prompt; }
 
   Beat(id, at, Run) {
@@ -96,7 +101,9 @@ export class FirstLevelAmbush {
     this.Enter("butt");
     // 视线跟着他走：触发那一下瞄的是他起身的位置，这会儿他已经贴到脸前了。
     // 不重新瞄，玩家看到的是一面墙挨了一下。
-    this.hooks.LookAt?.("lead");
+    // "face"：瞄**脸**而不是胸口，而且这一段转头正好在枪托砸中那一瞬走完 ——
+    // 参考图①那一帧要的是他的脸与肩膀撑满画面（运行时按 ambushButtImpactS 铺这一段）。
+    this.hooks.LookAt?.("face");
     this.Clip("AmbushLead", "RifleButtStrike");
     return true;
   }
@@ -111,6 +118,9 @@ export class FirstLevelAmbush {
     this.Enter("daze");
     this.sinceButt = 0;
     this.hooks.KnockDown?.();
+    // 往后仰、躺下去看屋梁（参考图②）。不写这一条镜头会停在「瞄着他」那条带子上，
+    // 人躺到地板上之后读到的就是地板。
+    this.hooks.LookAt?.("roof");
     this.hooks.Daze?.(true);
     this.hooks.Record?.("ambushStabbed", { damage: this.R.ambushButtDamage, butt: true });
     return true;

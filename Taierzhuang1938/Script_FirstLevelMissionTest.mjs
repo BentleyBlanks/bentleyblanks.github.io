@@ -1586,8 +1586,8 @@ console.log("ok receiving-food release follows the source clock and survives pau
     assert.equal(f.ambush.Prompt,null,"nothing to press while he is only lying there");
     // 视线在 ambushLookLitterAtS 拉到北门口的担架上，背景拍表把担架队一个个放倒。
     StepUntil(f,"grab",World({leadDistanceM:1}));
-    assert.deepEqual(f.looks,["lead","litter","lead"],
-      "the locked look goes: the man swinging the butt → the litter party → back to the man coming down on him");
+    assert.deepEqual(f.looks,["face","roof","litter","lead"],
+      "the locked look goes: the swinging man's face → the rafters overhead → the litter party → back to the man coming down on him");
     assert.deepEqual(f.victims,["frontBearer","zhou","rearBearer"],
       "both bearers and Zhou are bayoneted while he is on the floor");
     assert.ok(f.log.findIndex(e=>e.id==="zhouStabbed")>=0);
@@ -1777,9 +1777,17 @@ console.log("ok receiving-food release follows the source clock and survives pau
     const zhou=column.zhou;
     assert.ok(zhou.bearers.every(h=>h>0)&&!zhou.stabbed);
     assert.equal(column.AmbushCasualty("frontBearer"),true);
-    assert.equal(column.AmbushCasualty("rearBearer"),true);
-    assert.equal(column.AmbushCasualty("frontBearer"),false,"a dead bearer cannot die twice");
+    // 担架落地＝两头都没人攥着了。前抬者倒下时床面必须还举着 —— 捅老周那一刀
+    // （BayonetStabDown）是按 0.86 m 的床面烘的，床面提前摔到地上，那一刀就扎在
+    // 他上方大半米的空气里（docs/Data_FirstLevelRoomAmbush.md §3.5）。
+    assert.notEqual(column.zhou.state,"fallen",
+      "one dead bearer does not drop the litter: the other man is still holding it");
     assert.equal(column.AmbushCasualty("zhou",{zhouHealth:R.ambushZhouHealthAfter}),true);
+    assert.notEqual(column.zhou.state,"fallen",
+      "nor does the stab itself: the blade has to land on a litter that is still up");
+    assert.equal(column.AmbushCasualty("rearBearer"),true);
+    assert.equal(column.zhou.state,"fallen","both bearers down: now it hits the floor");
+    assert.equal(column.AmbushCasualty("frontBearer"),false,"a dead bearer cannot die twice");
     assert.equal(column.zhou.health,R.ambushZhouHealthAfter);
     assert.equal(column.zhou.stabbed,true);
     assert.equal(column.zhou.state,"fallen");
@@ -1801,6 +1809,19 @@ console.log("ok receiving-food release follows the source clock and survives pau
     assert.ok(column.zhou.bearers.every(h=>h>0),"two replacement bearers physically reach the litter");
     assert.equal(column.replacements,2);
   }
+  // 10b) 屋里还在白刃的时候不许叫替补：那两个民夫走进去就是送死
+  //（实拍里替补在挣脱之后三秒就走到担架边上了）。挡的是 ambushHold，清完屋子由 AmbushRecover 放开。
+  {
+    const held=new FirstLevelMissionColumn();
+    held.Activate();
+    held.AmbushCasualty("frontBearer");
+    for(let i=0;i<600;i++)held.Update(.1);
+    assert.equal(held.replacements,0,"no replacement bearer walks into the room while the beat is still running");
+    assert.ok(held.zhou.bearers.some(h=>h<=0));
+    held.AmbushRecover();
+    for(let i=0;i<4000&&held.zhou.bearers.some(h=>h<=0);i++)held.Update(.1);
+    assert.ok(held.zhou.bearers.every(h=>h>0),"once the room is cleared the replacement does come");
+  }
   // 11) 数值自洽：老周这一刀之后仍然活着，并且高于后面几级台阶。
   assert.ok(R.ambushZhouHealthAfter>12&&R.ambushZhouHealthAfter<65,
     "Zhou survives the belly wound but is worse off than at the orders post");
@@ -1819,6 +1840,28 @@ console.log("ok receiving-food release follows the source clock and survives pau
       "the litter party is cut down before the lead comes down on the player");
     assert.ok(R.ambushLookLitterAtS<R.ambushBearerStabAtS,
       "the dazed look reaches the litter before the first bearer falls");
+    // —— 2026-09-16 打磨轮加的四条镜头/站位数（口径见 docs/Data_FirstLevelRoomAmbush.md §4.3）。
+    // 枪托砸下来那一下瞄的是脸，比胸口高；这一段转头正好在砸中那一瞬走完。
+    assert.ok(R.ambushButtLookHeightM>R.ambushLookHeightM&&R.ambushButtLookHeightM<1.8,
+      "the butt strike aims at his face, not his chest");
+    // 躺下之后仰头看屋梁：落点必须在墙顶（2.9 m）以下、人躺着的眼位以上，转头要在
+    // 视线拉到担架之前走完。
+    assert.ok(R.ambushDazeLookRiseM>1.5&&R.ambushDazeLookRiseM<2.9,
+      "the dazed look lands on the rafters, not on the sky or the floor");
+    assert.ok(R.ambushDazeLookAheadM>1&&R.ambushDazeLookS>0
+      &&R.ambushDazeLookS<R.ambushLookLitterAtS,
+      "the roll-back onto the rafters finishes before the look swings to the litter");
+    // 捅老周那个的站位：刺刀够得着（BayonetStabDown 的刀尖在他身前约 1.25 m、
+    // 偏左手边 0.79 m），而且他不许站在担架里头。
+    assert.ok(R.ambushZhouStabStandM>0.9&&R.ambushZhouStabStandM<1.6,
+      "the man stabbing Zhou stands a bayonet's reach from the litter");
+    assert.ok(R.ambushZhouStabLateralM>0.3&&R.ambushZhouStabLateralM<1.2,
+      "and offset along the litter so the blade lands on the belly, not past his head");
+    // 倒地较劲那几拍的手位偏移：往下、往前，不许是零（零＝那把枪又糊在脸上）。
+    const hand=R.ambushGrappleHandM;
+    assert.ok(hand&&Object.isFrozen(hand),"the scripted hand offset is a frozen tuning vector");
+    assert.ok(hand.y<-0.1&&hand.z<-0.1&&Math.abs(hand.x)<0.2&&Math.hypot(hand.x,hand.y,hand.z)<0.8,
+      "the grapple pushes the gun down and forward, out of his face: "+JSON.stringify(hand));
     // 整段锁住放得进控制锁兜底：扑 + 砸 + 躺着 + 抓枪 + 连按 + 结算 + 反捅 + 演完。
     const longest=R.ambushLungeMaxS+R.ambushButtImpactS+R.ambushPounceAtS+R.ambushGrabWindowS
       +Math.min(QTE.windowS,R.ambushQteWindowS)+QTE.resolveS+R.ambushFinisherWindowS+R.ambushFinisherHoldS;

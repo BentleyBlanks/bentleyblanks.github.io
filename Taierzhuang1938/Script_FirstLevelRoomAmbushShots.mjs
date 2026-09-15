@@ -9,7 +9,7 @@
 // 这一条只出图，跑在**玩家的默认画质**上（不带 quality= / scale=），1280×720。
 //
 // 用法（worktree 根）：node Taierzhuang1938/Script_FirstLevelRoomAmbushShots.mjs
-// 图落在 Taierzhuang1938/_shots/RoomAmbush/D/（忽略目录）。
+// 图落在 Taierzhuang1938/_shots/RoomAmbush/E/（忽略目录）。上一轮（打磨前）留在 D/。
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -18,7 +18,7 @@ import { ServeRoot } from "./Script_DevServer.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..");
-const output = path.join(here, "_shots", "RoomAmbush", "D");
+const output = path.join(here, "_shots", "RoomAmbush", "E");
 await fs.mkdir(output, { recursive: true });
 
 const server = await ServeRoot(root, 0);
@@ -120,7 +120,9 @@ await page.evaluate(() => {
   const g = window.Tengxian;
   const Mission = () => g.Debug.FirstLevelMission();
   for (let i = 0; i < 12 * 60 && Mission().ambush.phase !== "grab"; i += 1) g.StepFrames(1, 1 / 60, false);
-  g.StepFrames(8, 1 / 60, false);
+  // 视线从北门口的担架转回他身上要 ambushLookSeconds(0.35)：转完再拍，
+  // 不然拍到的是转头转到一半的地板（抓枪窗口 ambushGrabWindowS 1.2 s，来得及）。
+  g.StepFrames(26, 1 / 60, false);
 });
 await Shot("Ref4_Pounce");
 

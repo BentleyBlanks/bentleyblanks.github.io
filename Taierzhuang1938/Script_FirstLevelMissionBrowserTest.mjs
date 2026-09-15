@@ -1200,13 +1200,21 @@ try {
       }
       const mission=Mission();
       const zhou=mission.column.litters.find(l=>l.zhou);
+      const rearB=g.ai.soldiers.find(a=>a.missionId==="AmbushRearB");
+      const bed=g.scene.getObjectByName("MissionOriginalZhouStretcher");
       return {seconds:frames/60,maxEyeClosure,maxBlur,bearerAt,
         phase:mission.ambush.phase,control:mission.control,
         stabbed:mission.facts.includes("zhouStabbed"),
         broken:mission.facts.includes("ambushBroken"),
         fighter:g.meleeCombat.Fighter(g.player).state,
         daze:mission.ambush.daze,
-        zhou:{x:zhou.x,z:zhou.z,health:zhou.health,stabbed:!!zhou.stabbed},
+        zhou:{x:zhou.x,z:zhou.z,health:zhou.health,stabbed:!!zhou.stabbed,state:zhou.state},
+        // 床面高度（屋里地面高度 0）：担架落地之前 0.76 m，落地之后 0.22 m。
+        bedY:bed?+bed.position.y.toFixed(2):null,
+        // 捅他的那个真的站到担架边上了（走位扣掉了共用到达半径）
+        rearB:rearB?{x:+rearB.position.x.toFixed(2),z:+rearB.position.z.toFixed(2),
+          gapM:+Math.hypot(rearB.position.x-zhou.x,rearB.position.z-zhou.z).toFixed(2),
+          clip:rearB.missionAmbushClip?.clipId||null}:null,
         bearerCasualties:mission.column.bearerCasualties.length,
         alive:g.player.Alive};
     });
@@ -1219,6 +1227,15 @@ try {
     assert.ok(dazed.bearerCasualties>=1,"a bearer falls before Zhou does: "+JSON.stringify(dazed));
     assert.ok((dazed.daze?.focus ?? 1)<=.5,
       "the blur has cleared enough to recognise the man doing it: "+JSON.stringify(dazed));
+    // 那一刀必须落在**还举着的**担架上：BayonetStabDown 是按 0.86 m 的床面烘的，
+    // 床面一提前摔到地上（0.22 m），刀尖就停在老周上方大半米的空气里。
+    assert.notEqual(dazed.zhou.state,"fallen",
+      "the litter is still held up at the moment the blade goes in: "+JSON.stringify(dazed.zhou));
+    assert.ok(dazed.bedY>.5,"the stretcher deck is still at carry height: "+JSON.stringify(dazed));
+    // 捅他的那个真的站到了担架边上（站位 ambushZhouStabStandM + 沿长边错开，
+    // 走位走 DriveAmbusherOnto 把共用到达半径 0.45 m 先扣掉）。
+    assert.ok(dazed.rearB&&dazed.rearB.gapM<=Math.hypot(R.ambushZhouStabStandM,R.ambushZhouStabLateralM)+.35,
+      "the man stabbing Zhou is at bayonet reach of the litter, not stopped short: "+JSON.stringify(dazed.rearB));
     await Capture("AmbushZhouStab");
     // 他扑上来压刺刀：屏幕上只有一个环，带着绑定表里的那个键面字。
     const grab=await page.evaluate(()=>{
@@ -1232,11 +1249,29 @@ try {
       const lead=g.ai.soldiers.find(a=>a.missionId==="AmbushLead");
       const ring=document.querySelector(".hudCinematicPrompt");
       const box=ring?.getBoundingClientRect?.();
+      // 近景那把枪与那两只手（2026-09-16 打磨轮加的三条，见 docs §4.3）：
+      //   detail   压住玩家那个按 high 档建武器（低画质下刺刀才不是一根黑方块）
+      //   arms     第一人称是导入的骨骼双臂，不是兜底的旧手模
+      //   handOff  共用地面姿势之上叠的那份手位偏移（把枪与手从他脸上挪开）
+      const actor=lead?g.ai.soldiers.find(a=>a.missionId==="AmbushLead")?.actor:null;
+      const weapons=g.actorFactory?.MeshStatus?.()?.weapons||{};
+      const detailKeys=Object.keys(weapons).filter(key=>key.endsWith("|detail"));
+      const vm=g.viewmodel;
       return {seconds:frames/60,phase:mission.ambush.phase,control:mission.control,
         prompt:mission.ambush.promptView,
         fighter:g.meleeCombat.Fighter(g.player).state,
         leadClip:lead?g.meleeCombat.Fighter(lead).clip:null,
         leadState:lead?g.meleeCombat.Fighter(lead).state:null,
+        leadWeapon:actor?actor.weaponId:null,
+        leadWeaponDetail:actor?actor.weaponDetail===true:null,
+        detailKeys,
+        // 上着刀的那一份必须走模型（低画质默认是一根方块刀片）
+        detailBayonet:weapons[`${actor?.weaponId}|${actor?.weaponVariant??0}|${g.actorFactory.quality}|bayonet|detail`]||null,
+        leadBayonetFixed:actor?.bayonetFixed===true,
+        arms:!!vm?.riggedArms&&vm.riggedArms.root?.visible!==false,
+        rigSource:vm?.rigSource||null,
+        gunVisible:vm?.root?.visible===true,
+        handOffset:vm?.scriptedHandOffset?{...vm.scriptedHandOffset}:null,
         ring:ring?.className||null,
         ringKey:ring?.querySelector(".cpKey")?.textContent||null,
         onScreen:!!box&&box.left>=0&&box.top>=0&&box.right<=window.innerWidth&&box.bottom<=window.innerHeight,
@@ -1258,6 +1293,22 @@ try {
     assert.equal(grab.leadState,"qte");
     assert.ok(grab.hidden.every(opacity=>Number(opacity)===0),
       "crosshair, ammo, objective, hint and markers are all gone: "+JSON.stringify(grab.hidden));
+    // 半米外怼着脸的那把枪必须是真枪：低画质（本测试就是 quality=low）默认把刺刀
+    // 画成一根方块，所以这一拍给压住玩家那个单独挂近景档（Actor.SetWeaponDetail）。
+    assert.equal(grab.leadWeapon,"Type38");
+    assert.equal(grab.leadWeaponDetail,true,
+      "the lead carries the detailed weapon while he is in the player's face: "+JSON.stringify(grab));
+    assert.equal(grab.leadBayonetFixed,true,"he is holding a fixed bayonet, not a bare rifle");
+    assert.ok(grab.detailKeys.some(key=>key.includes("bayonet")),
+      "the close-up build includes the bayoneted rifle: "+JSON.stringify(grab.detailKeys));
+    assert.equal(grab.detailBayonet,"model",
+      "and that blade comes from the bayonet model, not the low-tier box: "+JSON.stringify(grab));
+    // 第一人称这一侧：手是导入的骨骼双臂，而且整套被挪开了他的脸。
+    assert.ok(grab.gunVisible,"the first-person hands are back for the grapple");
+    assert.ok(grab.arms&&/riggedArms/.test(grab.rigSource||""),
+      "the grapple shows the production first-person arms: "+JSON.stringify(grab.rigSource));
+    assert.ok(grab.handOffset&&grab.handOffset.y<-.1&&grab.handOffset.z<-.1,
+      "the scripted hand offset is applied while he is pinned: "+JSON.stringify(grab.handOffset));
     await Capture("AmbushPounce");
     // 抓住枪：一下 F 进共用地面 QTE，同一个环变成连按表。
     const mash=await page.evaluate(()=>{
@@ -1331,6 +1382,7 @@ try {
         cinematic:document.querySelector("#hud")?.classList.contains("cinematicBeat")===true,
         ring:document.querySelector(".hudCinematicPrompt")?.className||null,
         facts:mission.facts.filter(id=>id.startsWith("ambush")||id==="zhouStabbed"),
+        handOffset:g.viewmodel?.scriptedHandOffset||null,
         health:g.player.health,alive:g.player.Alive};
     });
     console.log("ambush finisher",JSON.stringify(finisher));
@@ -1341,6 +1393,8 @@ try {
     assert.ok(!finisher.cinematic,"the HUD comes back with the hands");
     assert.ok(!finisher.ring||!finisher.ring.includes("on"),"no stale ring is left on screen");
     assert.ok(finisher.cameraDrop<.35,"the camera is off the floor again");
+    assert.equal(finisher.handOffset,null,
+      "the scripted hand offset is handed back with the controls — it must not follow him into normal play");
     const broke={control:finisher.control,alive:finisher.alive,health:finisher.health,facts:finisher.facts};
     await Capture("AmbushBreak");
     // 挣脱之后是屋里两三米的白刃：三个上刺刀的围着一个人。用真实输入打 ——

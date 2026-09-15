@@ -55,15 +55,15 @@
 | 村口→屋门口 | 只推老周这一副：目标＝玩家在同一条路线上的投影减 `ambushLitterFollowGapM`(4)，速度 `ambushLitterLeadMps`(3.2)，上限是屋子北门口 `ambushLitterDoorZ`(1.4)。其余九副原地等 | — |
 | 进入 `Melee` | 担架没到门口就再等，最多 `ambushLitterWaitS`(3) 秒，期间提速到 `ambushLitterRushMps`(4.2)，到点照样触发 | — |
 | 0.00 | 触发。锁控制（kind `"ambush"`，**不给 spawnGrace**）、视线在 `ambushLookSeconds`(0.35) 内甩到领头那个胸口（`ambushLookHeightM` 1.4）；`Say("RoomAmbush",{urgent:true})`；领头的和后面两个起身（`AmbushRise`），侧翼那个不动 | `ambushTriggered` |
-| ≈0.7 | 领头那个扑到接触距离（`ambushBindReachM` 1.15，速度 `ambushLungeMps` 3.4，超过 `ambushLungeMaxS`(1.2) 也照样抡）→ 抡起 `RifleButtStrike` | — |
-| ≈1.15 | `ambushButtImpactS`(0.45) 之后**砸中**：伤害 `ambushButtDamage`(20)，kind `"qte"`；共用 `ScriptedKnockDown` 把玩家放进 `down`（按住 `ambushLockMaxS`），第一人称镜头落到地板上；恍惚曲线从这一瞬起算 | `ambushStabbed` |
+| ≈0.7 | 领头那个扑到接触距离（`ambushBindReachM` 1.15，速度 `ambushLungeMps` 3.4，超过 `ambushLungeMaxS`(1.2) 也照样抡）→ 抡起 `RifleButtStrike`；视线改瞄他的**脸**（`LookAt("face")`，高度兜底 `ambushButtLookHeightM` 1.52），这一段转头按 `ambushButtImpactS` 铺，正好在砸中那一瞬走完 | — |
+| ≈1.15 | `ambushButtImpactS`(0.45) 之后**砸中**：伤害 `ambushButtDamage`(20)，kind `"qte"`；共用 `ScriptedKnockDown` 把玩家放进 `down`（按住 `ambushLockMaxS`），第一人称镜头落到地板上；同一瞬 `LookAt("roof")` 把视线往后仰到屋梁上（`ambushDazeLookAheadM` 2.2 / `ambushDazeLookRiseM` 2.3 / `ambushDazeLookS` 1.1）；恍惚曲线从这一瞬起算 | `ambushStabbed` |
 | ≈1.2–4.5 | 眼皮 0.45 s 合死、按住 0.7 s、3.3 s 前全睁开（`ambushDazeEyelids`）；模糊／去色／耳鸣按 `ambushDazeIntensity` / `ambushDazeFocus` / `ambushDazeHearing` 铺开 | — |
 | 4.60 | 视线从压着自己的那个人拉到北门口的担架（`ambushLookLitterAtS`，高度 `ambushLitterLookHeightM` 0.7） | — |
 | 5.40 | `AmbushRearA` `BayonetStabStanding` → **前抬者**倒（`ambushBearerStabAtS`） | — |
-| 7.50 | **老周挨刀**。由 Package B 在 `RoomAmbush` 第三句「啊！肚子……狗日的……」上打的事件 `AmbushZhouLine` 触发；`AmbushRearB` 的 `BayonetStabDown` 在此前 `ambushClipLeadS`(0.55) 起播。老周血量降到 `ambushZhouHealthAfter`(45)，担架落地。兜底期限 `ambushZhouStabAtS`(7.6) | `zhouStabbed` |
-| 8.30 | `AmbushRearA` 第二刀 → **后抬者**倒（`ambushRearBearerStabAtS`） | — |
+| 7.50 | **老周挨刀**。由 Package B 在 `RoomAmbush` 第三句「啊！肚子……狗日的……」上打的事件 `AmbushZhouLine` 触发；`AmbushRearB` 站在担架西侧 `ambushZhouStabStandM`(1.25)、沿长边错开 `ambushZhouStabLateralM`(0.7) 的地方，`BayonetStabDown` 在此前 `ambushClipLeadS`(0.55) 起播。老周血量降到 `ambushZhouHealthAfter`(45)。**担架这时候还举着**（落地见 8.30）。兜底期限 `ambushZhouStabAtS`(7.6) | `zhouStabbed` |
+| 8.30 | `AmbushRearA` 第二刀 → **后抬者**倒（`ambushRearBearerStabAtS`）；两头都没人攥着了，担架这时候才落地 | — |
 | 8.70 | 幺娃被撞倒，趴 `ambushYaowaDownS`(6) 秒（`ambushYaowaDownAtS`） | — |
-| 8.80 | `ambushPounceAtS`：领头那个扑上来压刺刀（共用白刃层 `HoldScriptedGround`，摆 `Pressure`）；视线拉回他身上；**提示环出现**：`press` 模式，键面字读 `ActionKeyGlyph("interact")`＝F，弧在 `ambushGrabWindowS`(1.2) 里漏完 | — |
+| 8.80 | `ambushPounceAtS`：领头那个扑上来压刺刀（共用白刃层 `HoldScriptedGround`，摆 `Pressure`）；视线拉回他身上；第一人称那把枪连同两只手按 `ambushGrappleHandM` 整体挪开（让出他的脸与刺刀，见 §4.3）；**提示环出现**：`press` 模式，键面字读 `ActionKeyGlyph("interact")`＝F，钉在他握枪的那一点上，弧在 `ambushGrabWindowS`(1.2) 里漏完 | — |
 | 按下 F | 抓住枪：共用地面 QTE（`BeginScriptedGround`，窗口 `min(MELEE_QTE_RULES.windowS 4.8, ambushQteWindowS 3.6)`、力度 `ambushQteStrength` 0.75）。同一个环换成 `mash`：环随「我方控制」涨，每次有效按键脉冲一下 | `ambushGrabbed` |
 | 推赢 | 环换成 `finisher`（键面字读 `ActionKeyGlyph("fire")`＝左键），窗口 `ambushFinisherWindowS`(2.4)。没按也会在窗口末尾自动补上 —— 共用 QTE 已经判赢，这一下只是把胜负演出来 | — |
 | 按下左键 | 反捅：`PressureStabbed` 落在 `AmbushLead` 上，伤害 `ambushFinisherDamage`(140) 走共用伤害链（出血、断肢、尸体、白刃音效照常），他**真的死** | `ambushFinisher` |
@@ -237,6 +237,57 @@ ambushBladeLanded / ambushFinisher / zhouStabbed`，并且还原担架队快照�
    步枪架在两手之间插穿尸体。`InstallAmbushPerformance` 到点置 `state.hideWeapon`
    （`Script_Actor` 那一条与「抬担架时藏枪」共用同一个闸），重放这一拍时 `HideAmbushers` 还原。
 
+### 4.3 2026-09-16 打磨轮：五张定帧逐张改出来的
+
+D 那一轮的五张图（`_shots/RoomAmbush/D/`）拿去跟参考图对，四处读不出来。
+每一条都是**分层出图**（把第一人称那棵树、把压住玩家那个人分别藏掉各拍一张）
+或者**把刀尖投到屏幕上量**定位的，不是照着感觉调的：
+
+1. **近景那把枪不许是方块。** 玩家默认画质是 high，压上来那个人手里本来就是
+   `Model_Type38` + `Model_BayonetType38`；但**低画质（浏览器验收就是 quality=low）
+   的刺刀退回一根 16×24 mm 的方块**，半米外怼着脸就是一块黑砖。
+   `Actor.SetWeaponDetail(true)` 给**这一个人**单挂近景档（`ActorFactory.WeaponGeometry`
+   的 `detail` 选项，缓存键多一截 `|detail`），整场画质一个字不动；材质桶与 high 档共用，
+   不新增采样器。`WakeAmbusher` 给领头那个挂上，收尾（`FinishAmbush` / `HideAmbushers`）还回去。
+2. **第一人称那把枪与那条胳膊别挡着他。** 镜头就架在胸口上方，共用地面姿势
+   （`BayonetGround`）把枪与右小臂摆在视线正中 —— 分层出图确认：那块「黑盒子」是
+   **玩家自己的汉阳造枪托**，那条「灰管子」是**玩家自己的小臂**（导入的骨骼双臂
+   `Rig_FpsArmsNraSkeletal01`，手指是有的，只是被怼到镜头上放大了）。
+   `Viewmodel.SetScriptedHandOffset` 在共用姿势之上叠一份偏移（`ambushGrappleHandM`
+   x 0.03 / y −0.28 / z −0.38），**挪的是枪**，双手是 IK 追着枪的握点走的，姿势数据一个字不改。
+   只在 `grab`/`mash`/`finish` 三拍挂着，起身/重试/收尾都收回去（浏览器验收断言它变回 null）。
+3. **枪托砸下来那一下要看见他的脸。** 原来在 `Swing()` 一次性瞄他的胸口，而他还在扑、
+   烘焙 clip 又带位移 —— 砸中那一帧他偏在画面右边缘（量到 ndc 0.23，实际更远）。
+   改成 `LookAt("face")`：瞄**头骨的世界位置**（`AmbushFacePoint`，取不到骨头才回落
+   `ambushButtLookHeightM`），转头按 `ambushButtImpactS` 铺，并且 `lunge`/`butt` 两拍
+   每帧用 `TrackControl` 把落点更新一次（`AimControl` 每帧调会把转头段重置成「现在」，
+   相机等于钉死，所以专门分了这一条只改终点、不重开转头段的口子）。
+4. **躺下之后要看见屋梁。** 砸中那一瞬补 `LookAt("roof")`：落点在自己正前方
+   `ambushDazeLookAheadM` 处、`ambushDazeLookRiseM` 高，只抬头不转头；
+   眼位正从 1.6 m 掉到 `groundEyeM`，所以这一段也要每帧重算落点
+   （`FirstLevelAmbush.RoofView` 那几秒），算一次会少掉四十来度的抬头量。
+   不写这一条时镜头停在「瞄着他 ± `limitedLookRadians`」那条带子上，人躺下之后读到的是地板。
+5. **老周那一刀要真的扎在他身上。** 三处都错，逐帧量刀尖量出来的：
+   - 站位：原来沿用 `ambushBindReachM`(1.15)，而共用走位的到达半径还要再加 0.45 m。
+     现在 `ambushZhouStabStandM`(1.25) + `ambushZhouStabLateralM`(0.7)，走位走
+     `DriveAmbusherOnto`（把到达半径那一截先扣掉）。`BayonetStabDown` 的刀尖在他身前
+     约 1.25 m、又偏左手边 0.79 m，两个数就是照这个配的。
+   - 朝向：`ZhouPending` 在刀落那一瞬就翻掉，而下扎（0.62 s）、拧刀（0.80）、拔出（1.08）
+     还没演完 —— 一松手共用 AI 就按「站住了就面向目标」把他转走，刀在半空划一道弧扫到门口。
+     现在朝向锁到**这一段 clip 演完**为止。
+   - 床面：`BayonetStabDown` 是按 0.86 m 的床面烘的，而原来**前抬者一死（5.4 s）担架就落地**
+     （0.22 m），刀尖停在老周上方 0.6 m 的空气里（投到屏幕上差 128 px）。
+     现在担架落地＝**两头都没人攥着了**（8.3 s 后抬者挨刀那一下），中间这三秒由剩下那个人举着。
+     落地那一下的前倾也从 0.45 rad 压到 0.1 rad：26° 的斜坡会把担架读成一道白板，
+     而躺在上面的人（实例化的也好、带骨架的老周也好）是平的，人浮在坡面上方。
+   - 帆布：`0xd1d0be` 在门口那片天光下顶成一块发光的白板，压到 `0xb6ae99`（全场担架同一份材质）。
+   - 替补：担架一旦少人，共用的 `BearerShort` 就会派民夫过来接手 —— 实拍里他在挣脱之后
+     三秒就走进这间还在白刃的屋子。`AmbushCasualty` 给这副担架挂 `ambushHold`，
+     `RequestBearer` 见到它直接返回；清完屋子由 `AmbushRecover` 放开（拍表末两行本来就是这么写的）。
+6. **提示环钉在他握枪的那一点上**（`Actor.WeaponWorldPoint`，模型规范系的原点就是右手握点）。
+   拿不到（枪被藏起来、还没挂上挂点）才回落胸口高度，再拿不到才回落屏幕中心偏下 ——
+   §6.2 里那条「等演出层把骨骼位置暴露出来」就是这一条。
+
 ## 5. 与另外两个包的接口
 
 - **配音（Package B，已交付；口径见 [屋内伏击配音同步](Data_FirstLevelVoiceSyncRoomAmbush.md)）**：
@@ -266,9 +317,13 @@ ambushBladeLanded / ambushFinisher / zhouStabbed`，并且还原担架队快照�
 
 命令从 worktree 根执行。
 
-| 命令 | 结果（2026-09-16 重做轮） |
+下表是 2026-09-16 **打磨轮**（§4.3）重新跑过的一遍；重做轮那一列的结论一致，不再重复列。
+
+| 命令 | 结果（2026-09-16 打磨轮） |
 | --- | --- |
-| `node Taierzhuang1938/Script_ModuleGraphTest.mjs` | 过（入口 `v=20260916020000` + 398 个模块） |
+| `node Taierzhuang1938/Script_ModuleGraphTest.mjs` | 过（400 个模块全部登记；这一轮改的七个浏览器模块戳抬到 `v=20260916210000`） |
+| `node Taierzhuang1938/Script_SamplerBudgetTest.mjs` | 过（近景档只多一把刺刀的三角形，材质桶与 high 档共用，采样器数不变） |
+| `node Taierzhuang1938/Script_FpsArmTest.mjs` | 过（585 条；手位偏移只叠在共用白刃姿势之上，不碰逐枪姿势数据） |
 | `node Taierzhuang1938/Script_TestRunnerTest.mjs` | 过（405 条 / 202 个测试文件） |
 | `node Taierzhuang1938/Script_TextTest.mjs` | 0 失败 1 警告（警告是既有的四个未引用键） |
 | `node Taierzhuang1938/Script_TextGather.mjs --check` | 过 |
@@ -281,7 +336,7 @@ ambushBladeLanded / ambushFinisher / zhouStabbed`，并且还原担架队快照�
 | `node Taierzhuang1938/Script_FirstLevelMissionTopologyBrowserTest.mjs` | 过 |
 | `node Taierzhuang1938/Script_BrowserBundleTest.mjs` | 过 |
 | `node Taierzhuang1938/Script_FirstLevelMissionBrowserTest.mjs --campaign --stage-jumps --stage-from=8` | 过（真实输入从阶段 8 跑到 `Complete`） |
-| `node Taierzhuang1938/Script_FirstLevelRoomAmbushShots.mjs` | 出五张参考帧（默认画质、1280×720） |
+| `node Taierzhuang1938/Script_FirstLevelRoomAmbushShots.mjs` | 出五张参考帧（默认画质、1280×720）→ `_shots/RoomAmbush/E/` |
 
 定向浏览器入口（只跑公开阶段 8 → 12，约六分钟）逐拍驱动并断言：
 
@@ -292,6 +347,12 @@ ambushBladeLanded / ambushFinisher / zhouStabbed`，并且还原担架队快照�
 - 眼皮真的闭上过（`eyeClosure > 0.9`），老周挨刀时模糊已经退到 `focus <= 0.5`；
 - `zhouStabbed` 落在控制锁里、排在 `ambushBroken` 前面，老周血量落到 `ambushZhouHealthAfter`；
 - 提示环真的在屏幕上、键面字是 `F`、位置夹在安全区内；领头那个摆的是 `Pressure`；
+- **（打磨轮加的）** 压住玩家那个挂着近景档（`weaponDetail`），而且 `Type38|…|bayonet|detail`
+  这一份走的是**模型**不是方块刀片（本测试跑在 quality=low 上，这一条才有意义）；
+- **（打磨轮加的）** 第一人称是导入的骨骼双臂（`rigSource` 带 `riggedArms`）、那把枪显示着，
+  并且挂着 `ambushGrappleHandM` 那份手位偏移；起身之后偏移必须变回 `null`；
+- **（打磨轮加的）** 老周挨刀那一瞬担架**还举着**（`state !== "fallen"`、床面 > 0.5 m），
+  捅他那个真的站到了担架边上（与担架的水平距离 ≈ `hypot(1.25, 0.7)`）；
 - 一下 F 进共用**地面** QTE（`kind==="ground"`，窗口 ≤ 4.8 且 ≤ `ambushQteWindowS`）；
 - 连按推赢之后领头那个**还活着**（共用 QTE 赢了不杀人），左键那一下才把他打死；
 - 起身之后控制锁解开、HUD 回来、没有留下的提示环；
@@ -303,8 +364,8 @@ ambushBladeLanded / ambushFinisher / zhouStabbed`，并且还原担架队快照�
 截图：定向入口的场景帧留在忽略目录 `_shots/FirstLevelStageVillage/`
 （`Scene_AmbushTrigger` / `AmbushButtStrike` / `AmbushZhouStab` / `AmbushPounce` /
 `AmbushGrapple` / `AmbushBreak` / `AmbushSquadEntry` / `AmbushCleared`）；
-对标参考图的五张定帧在 `_shots/RoomAmbush/D/`（`Ref1_ButtStrike` … `Ref5_Grapple`，
-由 `Script_FirstLevelRoomAmbushShots.mjs` 按**玩家默认画质**出）。
+对标参考图的五张定帧在 `_shots/RoomAmbush/E/`（`Ref1_ButtStrike` … `Ref5_Grapple`，
+由 `Script_FirstLevelRoomAmbushShots.mjs` 按**玩家默认画质**出；上一轮打磨前的那五张留在 `D/`）。
 
 ### 6.1 已知的基线红（不是这一拍改出来的，别去「修」）
 
@@ -328,5 +389,7 @@ ambushBladeLanded / ambushFinisher / zhouStabbed`，并且还原担架队快照�
 - `?whitebox=p012&missionStage=9` 这条 URL 起点不建屋子的几何（只建当前切片），
   所以直接开这个地址取证只能看到空地上的四个人；视觉验收要走
   `Debug.FirstLevelJump(9)`（定向浏览器入口与出图脚本都是这么做的）。
-- 提示环现在钉在领头那个的胸口高度上。真正对齐「刺刀／枪托握把」要等演出层把那两个骨骼
-  的世界位置暴露出来；现在这一版在实拍里落点已经压在两个人之间，但不是刀尖。
+- 提示环已经钉在他的**握枪点**上（`Actor.WeaponWorldPoint`，2026-09-16）。刀尖本身还没单独
+  暴露出来；要把环挪到刀尖上，得由演出层再报一个「刀尖」挂点。
+- 少一个抬架员的那三秒（5.4 → 8.3）担架是**一个人举着**的：没人的那一头就那么平着悬在空中。
+  下一轮要么给单人抬的担架补一个「一头拖在地上」的姿态，要么让替补在这三秒里就顶上来。
