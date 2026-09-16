@@ -555,22 +555,23 @@ const melee = await page.evaluate(() => {
 });
 const borrowed = Object.entries(melee).filter(([, v]) => v.license !== "volcengine");
 if (borrowed.length) Fail(`白刃音又变回顶包：${borrowed.map(([k, v]) => `${k}=${v.license || "缺"}`).join(" ")}`);
-else if (melee.swing.variants < 3) Fail(`dadaoSwing 只有 ${melee.swing.variants} 个变体（白刃是连续动作，连砍会复读）`);
+// 2026-09-17 起挥空是用户指定的**一条**（见 Script_SeedAudioMeleeBake 的挥空注释），不再要求三变体；
+// 这里只防「清单里没挥空」与「被悄悄凑回别的变体」。
+else if (melee.swing.variants !== 1) Fail(`dadaoSwing 有 ${melee.swing.variants} 个变体 —— 用户只选定了一条，别凑回多条`);
 else if (melee.swing.seconds > 0.8) Fail(`dadaoSwing 长达 ${melee.swing.seconds}s —— 挥空音没有那么长，多半是切点跑了`);
-else Ok(`白刃三音走 SeedAudio（挥空 ${melee.swing.variants} 变体 / ${melee.swing.seconds}s、`
+else Ok(`白刃三音走 SeedAudio（挥空 ${melee.swing.variants} 条 / ${melee.swing.seconds}s、`
   + `砍中 ${melee.dadao.seconds}s、刺中 ${melee.bayonet.seconds}s）`);
 
-// 挥空必须**按顺序轮**、且**不许变调**：三条是人工一条条选定的，随机挑会连出两次
-// 同一条，±3% 变调会把选中的音色拧走（0.2 秒的破风声听得出来）。两者都是静默回归 ——
-// 上面那条「3 变体」的断言拦不住，它只看清单不看真正播了哪一条。
+// 挥空**不许变调**：那条是人工选定的，±3% 变调会把选中的音色拧走（0.4 秒的破风声
+// 听得出来）。这是静默回归 —— 上面那条只看清单，不看真正播了哪一条。
+//（2026-09-17 之前挥空是三条按顺序轮，这段还兼测轮播顺序；现在只剩一条，只测原样播。）
 //
 // **认源要按 dadaoSwing 自己的 buffer 认，不能数「全部一次性源」。**
 // 上一版就是数一次性源，于是「播六次抓到 8 个 / 9 个」随机翻红：这 360 ms 的窗口
 // 里场上的 AI 随时会喊一句，而 `voice.*` 也是一次性 BufferSource（LoadVoices 里那条
 // 配方），采样版的枪声、脚步、弹着同理 —— 它们全都不是循环源，`!s.loop` 一条都挡不住。
-// 现在先把清单里那三个挥空文件自己解一份、算出指纹（长度 + 64 点抽样和），
-// 抓到的源逐个比对指纹：**只有真的是这三条 buffer 的才算数**，别人喊多少句都无所谓。
-// 指纹能比长度可靠：三条变体的时长将来完全可能撞在同一个毫秒上（清单里写的都是 0.55 s）。
+// 现在先把清单里的挥空文件自己解一份、算出指纹（长度 + 64 点抽样和），
+// 抓到的源逐个比对指纹：**只有真的是挥空 buffer 的才算数**，别人喊多少句都无所谓。
 const cycle = await page.evaluate(async () => {
   const a = window.Taierzhuang.audio;
   const mod = await import("./Script_Audio.mjs");
@@ -615,12 +616,8 @@ else {
     Fail(`播六次挥空只认到 ${cycle.picked.length} 个 dadaoSwing 源`
       + `（同期另有 ${cycle.others} 个别人的一次性源）—— 这条断言本身没测到东西`);
   } else if (rates.some((r) => r !== 1)) Fail(`挥空被逐发变调了：${rates.join(" ")}（选定的三条要原样播）`);
-  else if (cycle.variants !== 3) Fail(`清单里挥空只有 ${cycle.variants} 条变体（白刃是连续动作，连砍会复读）`);
-  else if (unique.length !== 3) Fail(`播六次只用到 ${unique.length} 条变体：变体号 ${seq.join(" ")}`);
-  else if (seq[0] !== seq[3] || seq[1] !== seq[4] || seq[2] !== seq[5]) {
-    Fail(`挥空不是按顺序轮的：变体号 ${seq.join(" ")}（随机挑会连出两次同一条）`);
-  } else Ok(`挥空按顺序轮播且不变调（变体 ${seq.slice(0, 3).join(" → ")}，`
-    + `${durs.slice(0, 3).join(" / ")} ms，rate 恒为 1；同期滤掉别人的 ${cycle.others} 个一次性源）`);
+  else if (cycle.variants !== 1 || unique.length !== 1) Fail(`挥空应只有用户选定的一条：清单 ${cycle.variants} 条、播出变体号 ${seq.join(" ")}`);
+  else Ok(`挥空原样播、不变调（${durs[0]} ms，rate 恒为 1；同期滤掉别人的 ${cycle.others} 个一次性源）`);
 }
 
 // ---------------------------------------------------------------------------

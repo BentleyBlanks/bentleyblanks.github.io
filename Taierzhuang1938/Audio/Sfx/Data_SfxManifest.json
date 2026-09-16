@@ -180,12 +180,10 @@
     },
     "dadaoSwing": {
       "files": [
-        "AudioSfx_DadaoSwing_01.mp3",
-        "AudioSfx_DadaoSwing_02.mp3",
-        "AudioSfx_DadaoSwing_03.mp3"
+        "AudioSfx_DadaoSwing_01.mp3"
       ],
-      "seconds": 0.55,
-      "credit": "Volcengine SeedAudio 1.0 · 大刀挥空（三变体：木质厚实 / 长嘶 / 刃嘶明亮）",
+      "seconds": 0.47,
+      "credit": "Volcengine SeedAudio 1.0 · 大刀挥空（铁锹划过空气的低沉唿声）",
       "license": "volcengine"
     },
     "dadaoHit": {
@@ -803,7 +801,7 @@
       "license": "refvideo"
     }
   },
-  "bakedAt": "2026-09-14",
+  "bakedAt": "2026-09-16",
   "normalization": {
     "normalizedAt": "2026-09-08",
     "tool": "Script_AudioNormalize.mjs",
