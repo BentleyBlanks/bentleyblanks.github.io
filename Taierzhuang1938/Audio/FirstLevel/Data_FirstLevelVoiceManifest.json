@@ -1027,7 +1027,19 @@
       "speechRate": 0,
       "continuous": true,
       "mastering": "MonoBeforeLoudnessTruePeakMinus3"
+    },
+    "GuideHold": {
+      "file": "AudioVoice_FirstLevelGuideHold.mp3",
+      "seconds": 3.109,
+      "bytes": 37974,
+      "promptHash": "3d01712801f82eaa98b68f93bea47fbb1676ad8a1f06a87af1488bf9afb3e348",
+      "sha256": "6c7094f441c29fc80905afc654d15588beb6c9908d6284e56215028d7fe312a5",
+      "lineCount": 1,
+      "requests": 1,
+      "speechRate": 0,
+      "continuous": true,
+      "mastering": "MonoBeforeLoudnessTruePeakMinus3"
     }
   },
-  "updatedAt": "2026-09-15T03:05:52.317Z"
+  "updatedAt": "2026-09-16T15:49:45.357Z"
 }

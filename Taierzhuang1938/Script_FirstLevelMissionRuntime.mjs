@@ -8,7 +8,7 @@ import { MissionReturn } from "./Script_MissionReturn.mjs";
 import { MISSION_RETURN } from "./Data_Tuning_FirstLevel.mjs";
 import { MISSION_RETURN_ROUTES, MISSION_RETURN_PERSON_STAGES, MISSION_RETURN_SQUAD_STAGES, MISSION_RETURN_DISABLED_STAGES } from "./Data_FirstLevelMissionReturn.mjs";
 import { MISSION_TRENCH_COVER as TC } from "./Data_FirstLevelMissionTrenchCover.mjs";
-import { SquadCoverRoute, SquadCoverBounds } from "./Script_SquadMarchCover.mjs";
+import { SquadCoverRoute, SquadCoverBounds, SquadCoverThreat } from "./Script_SquadMarchCover.mjs";
 import { SQUAD_COVER_BOUNDS as CB } from "./Data_Tuning_SquadMarch.mjs";
 import * as THREE from "three";
 import { SelectP012RecruitCast } from "./Data_FirstLevelP012Cast.mjs";
@@ -588,7 +588,7 @@ export class FirstLevelMissionRuntime {
         const post={x:end.x+dz/d*lateral-dx/d*back,z:end.z-dx/d*lateral-dz/d*back};
         if(!this.BlocksSight(this.Point(end,.7),this.Point(post,.7)))queued.push(post);
       }
-      for(const point of queued){delete point.coverBound;delete point.guideCheckpoint;} // keep geometry, not obsolete gates
+      for(const point of queued){delete point.coverBound;delete point.coverStation;delete point.guideCheckpoint;} // keep geometry, not obsolete gates
       const covered=CompactGuideRoute(stations?SquadCoverRoute(queued,stations,this.squad.indexOf(actor),TC):queued,GUIDE.collinearEpsilonM);
       actor.missionCoverBounds=covered.filter(p=>Number.isInteger(p.coverBound));
       actor.missionCoverPassed=-1;actor.missionCoverWaiting=false;
@@ -641,6 +641,13 @@ export class FirstLevelMissionRuntime {
       alive:actor.alive,position:actor.position,bounds:actor.missionCoverBounds||[],
       passed:actor.missionCoverPassed??-1,evading:!!actor.missionGrenadeEvade,
     })));
+    // Alternating cover only while there is contact; otherwise the posts are skipped.
+    this.squadCoverThreat??=new SquadCoverThreat();
+    const coverCalm=!!this.squadCoverBounds&&!this.squadCoverThreat.Update(this.ai.time,
+      this.squad.map(actor=>({alive:actor.alive,position:actor.position,targetVisible:!!actor.targetVisible,
+        incomingAt:actor.incomingFire?.at,suppression:actor.suppression})),
+      [...this.enemies.values()].filter(e=>e.alive&&!e.scriptedNoncombatant&&!e.missionDormant&&!e.missionSurfaceRest&&!e.missionFrontStandby).map(e=>e.position));
+    this.squadCoverCalm=coverCalm;
     if (["Train", "Unloading"].includes(stage) && !this.Has("trainStopped")) return;
     for (const actor of [...this.squad, this.trainWounded].filter(Boolean)) {
       InstallMissionSentry(actor);
@@ -702,6 +709,12 @@ export class FirstLevelMissionRuntime {
         }else {this.Defend(actor,actor.position,0,0);actor.missionGuideWaiting=true;}
         if(actor.missionGuideWaiting&&!crawl)this.leaderGuide?.Watch(actor);
         continue;
+      }
+      // Calm trench: drop the detour into each shelter and walk straight on.
+      // Marking the bound passed keeps the pair gate consistent if contact resumes.
+      if(coverCalm)while(route?.length&&Number.isInteger(route[0].coverStation)){
+        if(Number.isInteger(route[0].coverBound))actor.missionCoverPassed=Math.max(actor.missionCoverPassed??-1,route[0].coverBound+1);
+        route.shift();
       }
       // Intermediate bends allow a smooth pass. The final defensive post must
       // use the mover's actual arrival radius or men stop in the walking lane.
@@ -782,7 +795,7 @@ export class FirstLevelMissionRuntime {
       if (!Number.isFinite(actor.scriptEscapeStance) && actor.suppression > R.companionProneSuppression && stage !== "Train") this.ai.SetStance(actor, 2, R.companionDangerHoldS, true);
     }
     this.squadMarch?.Update(this.delta,{
-      player:this.squadCoverBounds?null:this.player.position,
+      player:this.squadCoverBounds&&!coverCalm?null:this.player.position,
       Observe:actor=>({
         route:this.squadRoutes.get(actor.id)||[],
         active:!!actor.missionTrainReady&&!!this.squadRoutes.get(actor.id)?.length

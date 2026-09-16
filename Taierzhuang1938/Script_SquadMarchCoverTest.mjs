@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import {SquadCoverRoute,SquadCoverBounds} from './Script_SquadMarchCover.mjs';
+import {SquadCoverRoute,SquadCoverBounds,SquadCoverThreat} from './Script_SquadMarchCover.mjs';
+import {SQUAD_COVER_THREAT as TH} from './Data_Tuning_SquadMarch.mjs';
 import {MISSION_TRENCH_COVER as C} from './Data_FirstLevelMissionTrenchCover.mjs';
 import {OPENING} from './Data_FirstLevelOpening.mjs';
 import {MISSION_LAYOUT} from './Data_FirstLevelMissionLayout.mjs';
@@ -36,5 +37,18 @@ for(const [name,route] of [['approach',OPENING.approachRoute],['support',OPENING
  const dead=new SquadCoverBounds(stations,route);members.forEach(m=>m.alive=false);members[0].alive=true;members[0].position={...members[0].bounds[0]};members[0].passed=-1;
  dead.Update(stations[0],members);assert.ok(dead.CanLeave(0),'dead members never block surviving teammates');
 }
+{
+ const threat=new SquadCoverThreat(),m=[{alive:true,position:{x:0,z:0}}];
+ assert.equal(threat.Update(0,m,[]),false,'no contact: walk, no bounds');
+ assert.equal(threat.Update(1,m,[{x:0,z:TH.nearEnemyM+1}]),false,'a distant unseen enemy is not contact');
+ assert.equal(threat.Update(2,m,[{x:0,z:TH.nearEnemyM-1}]),true,'a close enemy starts the drill');
+ assert.equal(threat.Update(2+TH.calmAfterS-.1,m,[]),true,'a quiet moment does not end it');
+ assert.equal(threat.Update(2+TH.calmAfterS+.1,m,[]),false);
+ assert.equal(threat.Update(10,[{...m[0],incomingAt:9}],[]),true,'incoming fire counts');
+ assert.equal(threat.Update(20,[{...m[0],targetVisible:true,alive:false}],[]),false,'the dead report nothing');
+ threat.forced=true;assert.equal(threat.Update(40,m,[]),true);
+ const path=SquadCoverRoute(OPENING.approachRoute,C.approach,0,C);
+ assert.ok(path.filter(p=>p.coverTransit||Number.isInteger(p.coverBound)).every(p=>Number.isInteger(p.coverStation)),'every bound detour point is marked skippable');
+}
 assert.equal(MISSION_LAYOUT.blocks.filter(b=>b.id.startsWith('TrenchBound')).length,18,'all nine two-arm shelters survive layout cleanup');
-console.log('ok trench cover capsule routes, player gate, staggered pairs, grenade interruption, final release and casualty handling');
+console.log('ok trench cover capsule routes, player gate, staggered pairs, grenade interruption, final release, casualty handling and contact-only drill');

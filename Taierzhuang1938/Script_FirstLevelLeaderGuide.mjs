@@ -29,7 +29,7 @@ export class FirstLevelLeaderGuide {
     // A story step that opens with a fight to hold gets its order at once.
     const spec = MISSION_LEADER_STAGES[stage.id], holding = spec?.holdUntil && !this.r.Has(spec.holdUntil);
     this.nextVoiceAt = this.r.time + (spec?.story && !holding ? G.storyOrderDelayS : G.initialOrderS);
-    this.r.voice.CancelGuidance(); this.waitSince = null;
+    this.r.voice.CancelGuidance(); this.waitSince = null; this.aheadSince = null;
     if(this.Leader) { this.Leader.missionGuideWaiting = false; this.Leader.missionGuideGesture = 0; }
   }
   Plan(route) {
@@ -149,7 +149,9 @@ export class FirstLevelLeaderGuide {
     }
     target??=actor.position;
     const leaderTarget=target===actor.position;
-    return {mode,label,variant,cue,leaderTarget,waiting:!!(actor.missionGuideWaiting||actor.missionCoverWaiting),
+    // Only a march the player is meant to follow can be run ahead of.
+    const lead=(mode==="follow"||mode==="rally"||(spec.leadAfter&&r.Has(spec.leadAfter)))&&!!r.squadRoutes?.get(actor.id)?.length;
+    return {mode,label,variant,cue,leaderTarget,lead,waiting:!!(actor.missionGuideWaiting||actor.missionCoverWaiting),
       target:{x:target.x,y:(leaderTarget?actor.position.y:r.battlefield.GroundHeight(target.x,target.z))+(leaderTarget?G.markerHeightM:1.15),z:target.z},
       name:leaderTarget?T("gameplay.cast.luo"):T(`firstLevel.leader.${label}`),
       action:T(`firstLevel.leader.${label}`),distance:Distance(r.player.position,target),
@@ -162,13 +164,23 @@ export class FirstLevelLeaderGuide {
     const busy=r.voice.current&&!r.voice.current.cue.guidance || r.voice.queue.some(id=>!id.startsWith("Guide"));
     if(busy)this.lastStoryAt=r.time;
     if(view.waiting)this.waitSince??=r.time;else this.waitSince=null;
+    if(view.lead&&this.rule.PlayerLead(this.Leader.position,r.player.position)>=G.aheadM)this.aheadSince??=r.time;else this.aheadSince=null;
     if(this.variant!==view.variant){
       if(this.variant!=null){r.voice.CancelGuidance();this.nextVoiceAt=Math.min(this.nextVoiceAt,r.time+G.initialOrderS);this.firstOrder=true;}
       this.variant=view.variant;
     }
     if(busy||r.voice.current||r.time-this.lastStoryAt<G.quietAfterStoryS)return;
     const waiting=view.leaderTarget&&this.waitSince!=null&&r.time-this.waitSince>=G.waitReminderS;
-    if(r.time<this.nextVoiceAt || Distance(this.Leader.position,r.player.position)>G.voiceRangeM)return;
+    if(Distance(this.Leader.position,r.player.position)>G.voiceRangeM)return;
+    // Running ahead is answered at once on its own cooldown, not after the order timer.
+    if(this.aheadSince!=null&&r.time-this.aheadSince>=G.aheadHoldS&&r.time>=(this.nextAheadAt??0)){
+      if(r.voice.Guidance("GuideHold")){
+        this.orders.push({cue:"GuideHold",stage:this.stage,time:r.time});if(this.orders.length>96)this.orders.shift();
+        this.nextAheadAt=r.time+G.aheadRepeatS;this.nextVoiceAt=Math.max(this.nextVoiceAt,r.time+G.initialOrderS);
+      }
+      return;
+    }
+    if(r.time<this.nextVoiceAt)return;
     const cue=waiting&&!this.firstOrder?"GuideWait":view.cue;
     if(r.voice.Guidance(cue)) {
       this.orders.push({cue,stage:this.stage,time:r.time});if(this.orders.length>96)this.orders.shift();

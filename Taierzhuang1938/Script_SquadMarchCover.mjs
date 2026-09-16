@@ -1,5 +1,5 @@
 // Reusable two-team bounds. The host retains collision, combat and route ownership.
-import { SQUAD_COVER_BOUNDS as C } from './Data_Tuning_SquadMarch.mjs';
+import { SQUAD_COVER_BOUNDS as C, SQUAD_COVER_THREAT as TH } from './Data_Tuning_SquadMarch.mjs';
 const Distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 export function SquadCoverRoute(route,stations,slot,config){
   const result=[];
@@ -11,9 +11,10 @@ export function SquadCoverRoute(route,stations,slot,config){
       if(index%2!==slot%2 || Math.abs(a.x-station.x)>.01 || Math.abs(b.x-station.x)>.01
         || a.z<station.z+config.postRearM.at(-1) || b.z>station.z)continue;
       const z=station.z+config.postRearM[Math.floor(slot/2)%config.postRearM.length];
-      result.push({x:station.x,z,coverTransit:true},
-        {x:station.x+station.side*config.postOffsetM,z,coverBound:index},
-        {x:station.x,z,coverTransit:true});
+      // coverStation marks the detour as optional: a calm squad skips all three.
+      result.push({x:station.x,z,coverTransit:true,coverStation:index},
+        {x:station.x+station.side*config.postOffsetM,z,coverBound:index,coverStation:index},
+        {x:station.x,z,coverTransit:true,coverStation:index});
     }
     result.push({...b});
   }
@@ -48,4 +49,17 @@ export class SquadCoverBounds {
     }
   }
   CanLeave(index){return this.released.has(index);}
+}
+// Whether the bounds drill applies right now. Members report their own perception
+// (visible target, last incoming shot, suppression); enemies are active hostiles only.
+// `forced` lets a fixture exercise the drill without staging a firefight.
+export class SquadCoverThreat {
+  constructor(){this.until=-Infinity;this.forced=null;}
+  Update(time,members,enemies){
+    const living=members.filter(m=>m.alive!==false);
+    const now=living.some(m=>m.targetVisible || time-(m.incomingAt??-Infinity)<TH.incomingMemoryS || (m.suppression||0)>=TH.suppression
+      || enemies.some(e=>Distance(e,m.position)<=TH.nearEnemyM));
+    if(now)this.until=time+TH.calmAfterS;
+    return this.forced??time<this.until;
+  }
 }

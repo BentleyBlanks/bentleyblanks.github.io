@@ -20,6 +20,8 @@ try{
   r.enemies.clear();r.spawnQueue=[];
   r.Update=function(dt){this.delta=dt;this.time+=dt;this.UpdateSquad();};
   r.squad.forEach((s,i)=>{r.PlaceActor(s,{x:-24+(i%2?.45:-.45),z:-25+Math.floor(i/2)*2});s.target=null;s.suppression=0;s.incomingFire=null;s.missionDangerUntil=0;});
+  // No enemies in this fixture: hold the drill on, then test the calm walk last.
+  const {SquadCoverThreat}=await import('./Script_SquadMarchCover.mjs');r.squadCoverThreat=new SquadCoverThreat();r.squadCoverThreat.forced=true;
   g.player.Spawn(-24,-28,0);r.Guide(MISSION_ROUTES.support);
   const {OPENING}=await import('./Data_FirstLevelOpening.mjs');
   r.squad.forEach((s,i)=>{const end=r.squadRoutes.get(s.id).at(-1),post=OPENING.frontPosts[i];
@@ -57,6 +59,16 @@ try{
   assert.ok(state.released.includes(index),'last shelters release without waiting for a nonexistent next team');
  }
  await page.evaluate(async()=>{const r=window.Tengxian.Debug.FirstLevelMissionRuntime(),{MISSION_ROUTES}=await import('./Data_FirstLevelMissionLayout.mjs');
+  // Calm: no contact means no shelter detours and no player gate, even with the player behind.
+  // Single file: side by side 0.9 m apart in a trench is a crowd deadlock of its own.
+  r.squad.forEach((s,i)=>r.PlaceActor(s,{x:-24,z:-31+i*1.9}));
+  window.Tengxian.player.Spawn(-24,-22,0);r.squadCoverThreat.forced=null;r.squadRoutes.clear();r.Guide(MISSION_ROUTES.support);
+  if(!r.squad.every(s=>r.squadRoutes.get(s.id).some(p=>Number.isInteger(p.coverBound))))throw new Error('Support route should still carry optional posts');
+  let waited=false;
+  for(let i=0;i<40&&!r.squad.every(s=>s.position.z<-52);i++){window.Tengxian.StepFrames(60,1/60,false);waited||=r.squad.some(s=>s.missionCoverWaiting);}
+  if(!r.squadCoverCalm)throw new Error('Fixture without enemies should be calm');
+  if(waited)throw new Error('Calm squad must not wait at shelters');
+  if(!r.squad.every(s=>s.position.z<-52))throw new Error('Calm squad walks past both first shelters: '+JSON.stringify({march:r.squadMarch?.Snapshot?.().waiting,m:r.squad.map(s=>({p:s.position,r:r.squadRoutes.get(s.id).slice(0,3),cmd:s.squadMarchCommand,cp:s.missionContactPost,st:s.state,goal:s.goal,sp:s.moveSpeed,sup:s.suppression}))}));
   r.Guide(MISSION_ROUTES.south);
   if([...r.squadRoutes.values()].flat().some(p=>Number.isInteger(p.coverBound)))throw new Error('A stage change must remove obsolete cover gates');
  });

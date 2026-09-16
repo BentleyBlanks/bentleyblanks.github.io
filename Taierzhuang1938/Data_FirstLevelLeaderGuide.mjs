@@ -5,7 +5,9 @@ const Entry = (mode, cue, target = null, extra = {}) => Object.freeze({mode, cue
 // switch to the thing the leader ordered, so a player on the gun is not told to leave it.
 export const MISSION_LEADER_STAGES = Object.freeze({
   Unloading: Entry("follow", "Follow", null, {story: true}),
-  TrenchEntry: Entry("cover", "Trench", OPENING.shelter),
+  // leadAfter: a non-follow step whose squad march still says "stay behind me"
+  // once this fact holds (before it, the player is sent ahead to clear the corner).
+  TrenchEntry: Entry("cover", "Trench", OPENING.shelter, {leadAfter: "trenchCleared"}),
   // "Hold the corner" points at the corner until its attack is resolved; the
   // order is not repeated over the breather that follows.
   Shelter: Entry("rally", "Shelter", OPENING.shelter, {story: true, holdTarget: OPENING.shelterCorner, holdUntil: "shelterCornerHeld"}),

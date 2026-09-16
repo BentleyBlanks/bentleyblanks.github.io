@@ -49,7 +49,13 @@ assert.equal(rule.CanLeave(route[1],{x:15,z:-16},false),true,"a player already p
 assert.equal(rule.CanLeave(route[3],{x:80,z:4},true),false,"far off the route is not progress");
 assert.equal(GuideProjection(route,{x:20,z:3}).progress,55);
 assert.deepEqual(rule.Snapshot().released,[0]);
-assert.equal(new Set(MISSION_GUIDE_DIALOGUE.map(c=>c.id)).size,27);
+assert.equal(GuideProjection(route,{x:20,z:3}).progress,55);
+rule.Reset(route);
+assert.equal(rule.PlayerLead({x:0,z:0},{x:0,z:-14}),14,"player up the route counts as lead");
+assert.equal(rule.PlayerLead({x:0,z:-14},{x:0,z:0}),0,"behind the leader is not lead");
+assert.equal(rule.PlayerLead({x:0,z:0},{x:30,z:-14}),0,"off the route is not lead");
+assert.equal(new Set(MISSION_GUIDE_DIALOGUE.map(c=>c.id)).size,28);
+assert.ok(MISSION_GUIDE_DIALOGUE.some(c=>c.id==="GuideHold"));
 for(const spec of [...Object.values(MISSION_LEADER_STAGES),...Object.values(MISSION_GUIDE_TRANSFERS)]){
  assert.ok(MISSION_GUIDE_DIALOGUE.some(c=>c.id===spec.cue));
  if(spec.mode)assert.notEqual(T("firstLevel.leader."+spec.mode),"firstLevel.leader."+spec.mode);
@@ -109,6 +115,19 @@ assert.equal(shelterView.mode,"cover");assert.equal(shelterView.cue,"GuideShelte
 assert.equal(shelterView.target.x,OPENING.shelterCorner.x);assert.equal(shelterView.target.z,OPENING.shelterCorner.z);
 r.Has=id=>id==="shelterCornerHeld";shelterView=guide.View();
 assert.equal(shelterView.cue,null,"'hold the corner' is not repeated over the breather");
+// Running ahead of a marching leader: one "等到" after a short hold, then a cooldown.
+r.flow.stage={id:"TrenchEntry",objective:"trench"};r.Has=()=>false;r.voice.queue=[];r.voice.current=null;
+r.squadRoutes=new Map([[actor.id,[{x:0,z:-40}]]]);actor.position={x:0,y:0,z:0};
+guide.Enter(r.flow.stage);guide.rule.Reset([{x:0,z:0},{x:0,z:-40}]);r.player.position={x:0,y:0,z:-20};
+assert.equal(guide.View().lead,false,"before the corner is cleared the player is sent ahead");
+r.Has=id=>id==="trenchCleared";r.time=300;guide.nextVoiceAt=Infinity;guide.Update();
+assert.equal(r.voice.queue.length,0,"a brief dash is not answered");
+r.time=302;guide.Update();assert.deepEqual(r.voice.queue,["GuideHold"],"ahead bark ignores the order timer");
+r.voice.queue=[];r.time=310;guide.Update();assert.equal(r.voice.queue.length,0,"ahead bark has its own cooldown");
+r.time=323;guide.Update();assert.deepEqual(r.voice.queue,["GuideHold"]);
+r.voice.queue=[];r.squadRoutes=new Map([[actor.id,[]]]);r.time=400;guide.Update();guide.Update();r.time=402;guide.Update();
+assert.equal(r.voice.queue.length,0,"a leader who has arrived is not run ahead of");
+delete r.squadRoutes;
 r.flow.stage={id:"South",objective:"transition"};assert.equal(guide.View(),null,"black-screen transition has no travelling guide");
 r.flow.stage={id:"Death",objective:""};guide.Enter(r.flow.stage);assert.equal(guide.View(),null);
 const player={position:{x:0,z:0},yaw:0};
@@ -116,4 +135,4 @@ const rear=GrenadeWarningScreenPoint({behind:true,visible:false,x:640,y:360},{po
 assert.ok(rear.offscreen&&rear.y>360,"rear target points down rather than mirroring to the front");
 const front=GrenadeWarningScreenPoint({behind:false,visible:true,x:600,y:300},{position:{x:0,z:-10}},player,1280,720,{liftPx:0});
 assert.deepEqual(front,{x:600,y:300,offscreen:false});
-console.log("ok leader rendezvous/LOS/corners, monotonic release, 27 cue contracts, story priority, cooldown, pause and marker bearings");
+console.log("ok leader rendezvous/LOS/corners, monotonic release, 28 cue contracts, run-ahead bark, story priority, cooldown, pause and marker bearings");
