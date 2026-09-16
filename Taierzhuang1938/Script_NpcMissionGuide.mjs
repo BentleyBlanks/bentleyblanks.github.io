@@ -42,6 +42,14 @@ export class NpcMissionGuide {
     if(this.waiting !== id) { this.waiting = id; this.Log("wait",id); }
     return false;
   }
+  // How far the player has run ahead of the leader along the planned route.
+  // Off the route (a side bay, the far bank) counts as nothing, not as lead.
+  PlayerLead(leader, player) {
+    if (this.route.length < 2) return 0;
+    const ahead = GuideProjection(this.route,player), own = GuideProjection(this.route,leader);
+    if (ahead.distance > this.tuning.passedCorridorM) return 0;
+    return Math.max(0, Math.min(ahead.progress-own.progress, Math.hypot(player.x-leader.x,player.z-leader.z)));
+  }
   Log(kind,id) { this.events.push({kind,id}); if(this.events.length>64)this.events.shift(); }
   Snapshot() { return {waiting:this.waiting,released:[...this.released],events:[...this.events],stops:this.route.filter(p=>p.guideCheckpoint!=null)}; }
 }

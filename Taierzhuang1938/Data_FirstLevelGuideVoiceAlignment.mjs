@@ -20,6 +20,16 @@ export const GUIDE_VOICE_ALIGNMENT = Object.freeze({
       ]
     ]
   },
+  "GuideHold": {
+    "sha256": "6c7094f441c29fc80905afc654d15588beb6c9908d6284e56215028d7fe312a5",
+    "scriptSha256": "1210ce1846268bc802d9362e2eb1fb9e081d74901092aa95debc0f592d78871e",
+    "lines": [
+      [
+        0,
+        3.109
+      ]
+    ]
+  },
   "GuideTrench": {
     "sha256": "48df1badef50e66f296ad83fca2df63b6806d1864fe46611770a566d454a341a",
     "scriptSha256": "46ba4a3c41f6f250b74a73bc73bccbab27486bfdb8d782b5d19f80a308d899f0",

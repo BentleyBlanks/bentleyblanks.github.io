@@ -129,6 +129,7 @@ export const testDefs = {
   FirstLevelP012LayoutTest: { file: "Script_FirstLevelP012LayoutTest.mjs",
     desc: "P012节点、担架扫掠、三态枢纽与敌军遮挡来向（纯 Node）" },
   FirstLevelP012TerrainTest: { file: "Script_FirstLevelP012TerrainTest.mjs", desc: "P012连续地形、道路基底和渲染三角形共享高度（纯 Node）" },
+  TerrainLayersTest: { file: "Script_TerrainLayersTest.mjs", desc: "分层地形材质：图层贴图存在/尺寸/体积红线、远近平铺非整数倍、烘焙脚本同步、第一关 splat 权重（纯 Node）" },
   FirstLevelP012TerrainBrowserTest: { file: "Script_FirstLevelP012TerrainBrowserTest.mjs", timeoutMs:240000, desc: "P012实际地形渲染、人物胶囊坡地、弹坑碰撞与预算" },
   FirstLevelP012DebugTest: { file: "Script_FirstLevelP012DebugTest.mjs", timeoutMs: 300000, desc: "P012真实调试菜单逐段跳转与NPC剧情衔接" },
   FirstLevelP012FlowTest: { file: "Script_FirstLevelP012FlowTest.mjs",
@@ -196,6 +197,7 @@ export const testDefs = {
   // 敌军 AI 基建四件（docs/Data_EnemyAi.md §4）：纯 Node 规则层，毫秒级，进 tier0Fast。
   AiPerceptionTest: { file: "Script_AiPerceptionTest.mjs", desc: "感知：视锥/觉察迟滞/听觉 LKP/目标锁" },
   AiCoverTest: { file: "Script_AiCoverTest.mjs", desc: "掩体注册表：归一/散列/验证射线/侧翼/占用/探头" },
+  AiCrowdTest: { file: "Script_AiCrowdTest.mjs", desc: "同阵营软分离：叠人推开/钉住豁免/队友占用的隐蔽位" },
   AiShootingTest: { file: "Script_AiShootingTest.mjs", desc: "射击模型：误差收敛/暴露采样/走廊/点射/压制点" },
   AiCloseRangeTest: { file: "Script_AiCloseRangeTest.mjs", desc: "近距离实弹：命中/伤害/遮挡/攻击名额" },
   AiTacticsTest: { file: "Script_AiTacticsTest.mjs", desc: "班组战术：令牌/侧翼点/跃进配对/投弹/撤退" },
@@ -270,6 +272,7 @@ export const testDefs = {
   EditorTest: { file: "Script_EditorTest.mjs", timeoutMs: 16 * 60 * 1000,
     desc: "编辑器套件（phase=5 十字街）160 项" },
   WorldInfoEditorTest: { file: "Script_WorldInfoEditorTest.mjs", desc: "WorldInfo：角色 Transform 实时浮窗与开关生命周期" },
+  PlayerStateEditorTest: { file: "Script_PlayerStateEditorTest.mjs", desc: "玩家状态：隐藏状态实时浮窗、冻结与开关生命周期" },
   DestructionEditorTest: { file: "Script_DestructionEditorTest.mjs", desc: "可破坏预览编辑器：真实七关 + 承重白名单" },
   ActorBatchTest: { file: "Script_ActorBatchTest.mjs", desc: "人物合批：逐像素无损 + 真省 draw call" },
   ActorCrowdTest: { file: "Script_ActorCrowdTest.mjs", timeoutMs: 10 * 60 * 1000,
@@ -374,7 +377,7 @@ export const browserTests = new Set([
   "AiCombatBrowserTest", "AiCloseRangeTest", "AiEditorTest", "AiInitiativeBrowserTest",
   "AudioTest", "AudioWiringTest", "BayonetTest", "BootPropTest", "BootStallTest", "BootTest", "ColliderTest",
   "CutscenePoseTest", "DamageTest", "DeathViewTest", "DestructionEditorTest", "DestructionTest",
-  "DressingProbeTest", "EastSuburbNavTest", "EditorTest", "WorldInfoEditorTest", "FixedCenterAimTest", "FpsArmTest", "FpsHandContactTest", "FpsGripEditorTest",
+  "DressingProbeTest", "EastSuburbNavTest", "EditorTest", "WorldInfoEditorTest", "PlayerStateEditorTest", "FixedCenterAimTest", "FpsArmTest", "FpsHandContactTest", "FpsGripEditorTest",
   "FrameProfileTest", "GeoTest", "GiTest", "GodRaysPerformanceTest", "GtaoTest", "GunFeelTest",
   "SamplerBudgetTest", "CharacterWoundsTest", "BloodEffectsTest", "BulletDecalPbrTest",
   "HitDisorientationTest", "IncomingFireBrowserTest", "HudPromptBrowserTest", "WeaponPickupTest", "JieheTerrainTest", "JumpTest", "StanceTest", "MeleeQteTest", "MeleeKillBloodTest", "GoreRangeTest", "MenuTest", "DeathMenuTest",
@@ -397,6 +400,7 @@ export const tier0Fast = [
   "TextTest",
   "AiPerceptionTest",
   "AiCoverTest",
+  "AiCrowdTest",
   "AiShootingTest",
   "AiTacticsTest",
   "AiBrainGraphTest",
@@ -404,6 +408,7 @@ export const tier0Fast = [
   "AutoQualityTest",
   "TextGatherCheck",
   "BootPayloadTest",
+  "TerrainLayersTest",
   "AssetStandardsTest",
   "ModelFacingTest",
   "TestRunnerTest",
@@ -449,7 +454,7 @@ export const domains = {
   explosives: { label: "爆炸白盒与通用地形形变/返掷", tests: ["ExplosionRulesTest", "ExplosionRangeTest", "CraterSurfaceTest"] },
   terrain: {
     label: "高度图/地形（共享底座，下游成串跑）",
-    tests: ["HeightmapVerify", "JieheTerrainTest", "TengxianLayoutTest", "TengxianZoneTest", "SamplePointTest", "RoadPathTest", "FirstLevelWhiteboxTest", "FirstLevelWhiteboxSurfaceTest", "FirstLevelWhiteboxBrowserTest", "FirstLevelP012LayoutTest", "FirstLevelP012TerrainTest", "FirstLevelP012TerrainBrowserTest", "FirstLevelP012FlowTest", "FirstLevelP012RuntimeTest", "FirstLevelP012ActorTest", "FirstLevelP012VisibilityTest", "FirstLevelP012BrowserTest", "WallPlanTest", "TrenchPlanTest", "PhysicsTest", "JumpTest", "DestructionTest"],
+    tests: ["HeightmapVerify", "JieheTerrainTest", "TengxianLayoutTest", "TengxianZoneTest", "SamplePointTest", "RoadPathTest", "FirstLevelWhiteboxTest", "FirstLevelWhiteboxSurfaceTest", "FirstLevelWhiteboxBrowserTest", "FirstLevelP012LayoutTest", "FirstLevelP012TerrainTest", "TerrainLayersTest", "FirstLevelP012TerrainBrowserTest", "FirstLevelP012FlowTest", "FirstLevelP012RuntimeTest", "FirstLevelP012ActorTest", "FirstLevelP012VisibilityTest", "FirstLevelP012BrowserTest", "WallPlanTest", "TrenchPlanTest", "PhysicsTest", "JumpTest", "DestructionTest"],
   },
   physics: {
     label: "物理/移动/破坏（共享底座，下游成串跑）",
@@ -487,7 +492,7 @@ export const domains = {
     label: "AI 与战场内容预算",
     // 具名同伴（罗班长、幺娃…）是从 nra 名额里出的人，goal 直接写进 AiDirector，
     // 所以碰 AI 或撒兵的改动要连着 MissionHooksTest 一起跑。
-    tests: ["AiBehaviorTest", "AiBrainGraphTest", "AiEditorTest", "AiCombatBrowserTest", "AiCloseRangeTest", "AiInitiativeBrowserTest", "AiPerceptionTest", "AiCoverTest", "AiShootingTest", "AiTacticsTest",
+    tests: ["AiBehaviorTest", "AiBrainGraphTest", "AiEditorTest", "AiCombatBrowserTest", "AiCloseRangeTest", "AiInitiativeBrowserTest", "AiPerceptionTest", "AiCoverTest", "AiCrowdTest", "AiShootingTest", "AiTacticsTest",
       "VisibilityTest", "ActorCrowdTest", "EmplacementTest", "FlareTest", "MissionHooksTest", "MissionSetpiecesTest",
       "FirstLevelP012OpeningTest", "FirstLevelP012FamilyTest", "FirstLevelP012RestingTest", "FirstLevelP012AnimationTest", "FirstLevelP012MarchTest", "FirstLevelP012TrainColumnTest", "FirstLevelP012ArrivalTest", "FirstLevelP012VillageLifeTest", "FirstLevelP012CastTest"],
   },
@@ -509,7 +514,7 @@ export const domains = {
   // 在真入口上量：VoiceTest 验的是资产与交付档，量不到 AudioEngine 的装载分叉。
   voice: { label: "语音", tests: ["VoiceTest", "MachineGunCutsceneAudioTest"] },
   menu: { label: "主菜单/开机陈设", tests: ["FirstLevelP012DebugTest", "MenuTest", "DeathMenuTest", "BootPropTest"] },
-  editor: { label: "场景编辑器/第一人称检查/PCG/资产规范/可破坏编辑器/采样点", tests: ["WorldInfoEditorTest", "AiEditorTest", "TuningWriterTest", "AssetStandardsTest", "EditorTest", "FpsGripEditorTest", "PropPcgTest", "PropPcgEditorTest", "DestructionEditorTest", "TrenchEditorTest", "SamplePointTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "CharacterModelTest"] },
+  editor: { label: "场景编辑器/第一人称检查/PCG/资产规范/可破坏编辑器/采样点", tests: ["WorldInfoEditorTest", "PlayerStateEditorTest", "AiEditorTest", "TuningWriterTest", "AssetStandardsTest", "EditorTest", "FpsGripEditorTest", "PropPcgTest", "PropPcgEditorTest", "DestructionEditorTest", "TrenchEditorTest", "SamplePointTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "CharacterModelTest"] },
   cutscene: {
     label: "过场/剧本派发/车厢生活动作",
     // 关中过场 beat 与 LEVEL_CUES 的构建都在 Script_Story 与组装层里，
@@ -603,6 +608,7 @@ const changedDomainRules = [
   // 调参表改写器只被本地预览的保存口与编辑器测试用：改了跑 editor 域（TuningWriterTest）。
   { domain: "editor", pattern: /Script_TuningWriter/i },
   { domain: "editor", pattern: /Script_EditorWorldInfo|Script_WorldInfoEditorTest/i },
+  { domain: "editor", pattern: /Script_EditorPlayerState|Script_PlayerStateEditorTest/i },
   // 壕沟规划层与预览几何没有 Editor 字样，但「场景样条PCG」面板读的就是它们
   // （滑杆推 SetTrenchPresetOverride、预览调 CompileTrenchNetwork）——
   // 改 TRENCH_PRESETS 不跑 TrenchEditorTest，面板那一路会静默过期。
@@ -645,7 +651,7 @@ const changedDomainRules = [
   // 同理：Data_Tuning_Volumetrics 是 froxel 体积雾的时段参数与网格分档；
   // Data_Tuning_Shadows 是级联阴影的分割 / 图尺寸 / PCSS 抽样数；
   // Data_Tuning_Gtao 是 GTAO / SSIL 的数值表。
-  { domain: "render", pattern: /Data_Tuning_(Volumetrics|Shadows|Gtao)|Volumetric/i },
+  { domain: "render", pattern: /Data_Tuning_(Volumetrics|Shadows|Gtao|Terrain)|Volumetric/i },
   // 级联阴影 / 接触阴影：Csm 与 ContactShadows 被上面 render 那条的 Light/Post
   // 覆盖不到（文件名里没有那两个词），单独补一条。
   { domain: "render", pattern: /(Script_Csm|ContactShadows)/i },

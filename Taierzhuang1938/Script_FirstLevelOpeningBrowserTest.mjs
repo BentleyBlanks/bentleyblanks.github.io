@@ -394,7 +394,12 @@ try{
     }
     await Capture("ClearedTrenchRegroup");
   }
+  await page.evaluate(()=>{const r=window.Tengxian.Debug.FirstLevelMissionRuntime(),probe=window.RegroupProbe={frames:0,calm:0};
+    const base=r.UpdateSquad.bind(r);r.UpdateSquad=function(){base();if(!this.Has("trenchCleared"))return;
+      probe.clearedAt??=this.time;probe.frames++;if(this.squadCoverCalm)probe.calm++;
+      const luo=this.companion.Handle("luo");if(luo&&probe.luoAt==null&&Math.hypot(luo.position.x+32,luo.position.z+20)<12)probe.luoAt=this.time;};});
   await Drive("TrenchContact",remainingApproach,{fight:true,until:"shelterReached",seconds:180});
+  const shelterReachedAt=await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMissionRuntime().time);
   // The pursuers who followed the wounded man down the north trench are fought
   // from the corner with ordinary inputs before the breather can begin. Pass the
   // recess crate first: the ordinary supply rule tops up a rifle emptied in the trench.
@@ -430,6 +435,9 @@ try{
   // The unchanged physical regroup deadline is separate from the current complete
   // recordings. A late-arriving medic must not consume the dialogue's listen time.
   await Drive("ShelterRegroup",[OPENING.shelter],{untilVoice:"ShelterAid",seconds:100});
+  // How long the player stood in the shelter waiting for the squad (user 2026-09-16).
+  console.log("SHELTER_REGROUP",JSON.stringify(await page.evaluate(at=>{const r=window.Tengxian.Debug.FirstLevelMissionRuntime();
+    const p=window.RegroupProbe;return {waitS:+(r.time-at).toFixed(1),luoAfterClearS:p.luoAt==null?null:+(p.luoAt-p.clearedAt).toFixed(1),playerAfterClearS:+(at-p.clearedAt).toFixed(1),calmShare:+(p.calm/Math.max(1,p.frames)).toFixed(2),orders:r.leaderGuide?.orders.map(o=>`${o.stage}:${o.cue}@${o.time.toFixed(0)}`)};},shelterReachedAt)));
   const shelterSpeechSeconds=await page.evaluate(async()=>{
     const {MISSION_DIALOGUE}=await import("./Data_FirstLevelMissionDialogue.mjs");
     const {MissionVoiceTimeline}=await import("./Data_FirstLevelMissionVoiceTiming.mjs");

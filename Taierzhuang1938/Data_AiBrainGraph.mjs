@@ -462,6 +462,7 @@ export const BRAIN_GRAPH = Object.freeze({
     HURT_FLINCH: "Data_Tuning_Ai",
     BRAIN: "Data_Tuning_Ai",
     WATCH: "Data_Tuning_Ai",
+    CROWD: "Data_Tuning_Ai",
 
     COVER_WEIGHTS: "Data_Tuning_AiCover",
     COVER: "Data_Tuning_AiCover",

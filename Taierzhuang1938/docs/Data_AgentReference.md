@@ -111,6 +111,7 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
 | GTAO + 弯曲法线 + SSIL | `Script_PostGtao.mjs`、`Data_Tuning_Gtao.mjs` | §5 | `Script_GtaoTest.mjs` |
 | 级联阴影 + PCSS + 接触阴影 | `Script_Csm.mjs`、`Script_ContactShadows.mjs`、`Data_Tuning_Shadows.mjs` | §6 | `Script_CsmTest.mjs` ＋ `Script_BootTest.mjs`（三角红线）；出图 `Script_CsmShot.mjs` |
 | 主场景 / 材质烘焙 / 材质着色升级 | `Script_Materials.mjs`、`Script_TexBake.mjs`、`Script_MaterialShading.mjs`、`Data_Tuning_Materials.mjs` | §7 | `Script_MaterialUpgradeTest.mjs`（`--shot`） |
+| 分层地形材质（splat / 纹理数组 / 远近平铺 / 去重复 / 陡坡侧投影） | `Script_TerrainMaterial.mjs`、`Data_Tuning_Terrain.mjs`、`_import/Script_BakeTerrainLayers.py` | [Data_TerrainLayers.md](Data_TerrainLayers.md) | `Script_TerrainLayersTest.mjs`、`Script_SamplerBudgetTest.mjs`、`Script_FirstLevelMissionFortificationsTest.mjs` |
 | froxel 体积雾 / 体积光 | `Script_PostVolumetrics.mjs`、`Data_Tuning_Volumetrics.mjs` | §8 | `Script_VolumetricsTest.mjs` |
 | TAA / TAAU / FXAA / CAS | `Script_PostTaa.mjs`、`Script_PostFxaa.mjs`、`Data_Tuning_TemporalDof.mjs` | §9 | `Script_TaauTest.mjs` |
 | 直方图自动曝光 | `Script_PostExposure.mjs`、`Data_Tuning_Camera.mjs` | §10 | `Script_ExposureTest.mjs` |
@@ -183,6 +184,8 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
 ### 地形 / 高度
 - `Script_FarLand.mjs` —— 远景连续高度函数；网格、数据、道具落地**三边必须问同一个函数**
   （前身是「手抄高度表悄悄过期、道具整片浮空」）。
+- 第一关地面着色：`Script_TerrainMaterial.mjs` 分层地形材质（权重来自 `SampleMissionGroundSurface`），
+  口径与远处马赛克的实测在 `docs/Data_TerrainLayers.md`。
 - `Script_JieheHeight.mjs`（界河地面采样器，纯算术）、`Script_HeightmapCli.mjs`
   （SRTM 高程下载 / 采样 / 布设贴地 CLI，数据在 `Heightmap/`）。
 - 先读：`docs/Data_TaierzhuangHeightmap.md`（运行时契约）。
@@ -579,14 +582,15 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
 
 ### 编辑器与调试工具
 - `Script_Editor.mjs` —— 外壳与调度；**一次只开一个**（要接管相机的同开必抖）。
-- `Script_Editor{Scene,FullScene,Actor,Weapon,FirstPerson,Audio,Timeline,Vfx,Destruction,PropLibrary,PropPcg,SamplePoints,Terrain,Splines,Settings,Stage,Ui,DebugRendering,Profiler,WorldInfo}.mjs`
+- `Script_Editor{Scene,FullScene,Actor,Weapon,FirstPerson,Audio,Timeline,Vfx,Destruction,PropLibrary,PropPcg,SamplePoints,Terrain,Splines,Settings,Stage,Ui,DebugRendering,Profiler,WorldInfo,PlayerState}.mjs`
   （另含 AssetStandards = 资产规范只读总表；Splines = 场景样条PCG：道路 + 围墙的中心线编辑 + 拼接资产台与 WALL_PRESETS 滑杆）。
   PropPcg = 生活用具 / 工事支援的规则 volume、真实模型预览与正片 GPU 实例桶取证；
   FullScene = 完整县城与四门外 / 出川军列车厢静态布景的只读巡场、种子、Spline 与环境取证；
   FirstPerson = 正片 Viewmodel 的装备切换、玩家/外部检查视角、武器挂点/IK 目标/真实掌心与骨骼残差可视化，只读不写姿态表；
   车厢不播放 CS_Chuchuan 时间轴、不加载演员/对白/字幕，不读写 Scene 的关卡文档。
-  DebugRendering、Profiler 与 WorldInfo 位于「调试」组，可叠加且不接管相机、不暂停玩法。
+  DebugRendering、Profiler、WorldInfo 与玩家状态位于「调试」组，可叠加且不接管相机、不暂停玩法。
   WorldInfo 独立浮窗显示当前角色 Transform 与高度；回归口 `Script_WorldInfoEditorTest.mjs`。
+  玩家状态（PlayerState）独立浮窗显示血量失血、压制晕眩、体力、后坐散布、弹药动作等隐藏状态；回归口 `Script_PlayerStateEditorTest.mjs`。
   出图模式（`?shot=1`）下整棵编辑器 DOM 是 display:none，进不了截图。
 - 先读：`docs/Data_EditorSuite.md`。
 

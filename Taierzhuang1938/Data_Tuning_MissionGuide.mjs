@@ -7,6 +7,9 @@ export const MISSION_GUIDE_TUNING = Object.freeze({
   waitDistanceM: 36, resumeDistanceM: 9, markerHeightM: 2.15,
   initialOrderS: 2, storyOrderDelayS: 18, quietAfterStoryS: 3,
   reminderS: 36, repeatS: 55, waitReminderS: 9, voiceRangeM: 55,
+  // Player out in front of a still-moving leader: "等到！莫往前冲". aheadM is the
+  // lead along the route (and in a straight line); aheadHoldS ignores a brief dash.
+  aheadM: 12, aheadHoldS: 1.5, aheadRepeatS: 20,
   gesturePeriodS: 7, gestureSeconds: 1.7, gestureBlendS: .3,
   watchHoldS: .6, threatSuppression: .35, nearMarkerM: 3.5,
   markerHalfWidthPx:95, markerDetailBottomPx:32, subtitleGapPx:12,

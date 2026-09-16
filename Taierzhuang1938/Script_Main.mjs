@@ -2916,6 +2916,19 @@ async function Boot() {
       get nav() { return ai?.ctx?.nav ?? null; },
       get currentWeapon() { return currentWeapon; },
       get currentWeaponVariant() { return SlotWeaponVariant(state.activeSlot); },
+      // 玩家状态浮窗（Script_EditorPlayerState）读的装配层状态：不在 PlayerController 身上的那几样。
+      // 只读快照，每 0.1 秒调一次；编辑器不去摸这里的模块变量。
+      PlayerRuntime: () => ({
+        weapon: WEAPONS[currentWeapon] ?? null,
+        fireCooldown: Math.max(0, fireCooldown),   // 计数器会减过零，零以下就是「可以开火」
+        scriptInvulnS: Math.max(0, scriptInvulnUntil - state.elapsed),
+        infiniteAmmo: EffectiveInfiniteAmmo(),
+        infiniteGrenades: EffectiveInfiniteGrenades(),
+        carry: carry?.KindId ?? null,
+        carryBlocking: !!carry?.Blocking,
+        mounted: emplacement?.MountedId ?? null,
+        viewmodelAction: viewmodel?.action?.kind ?? null,
+      }),
     },
   });
   window.Taierzhuang.editor = editor;
@@ -4600,6 +4613,10 @@ async function WarmLevel(phase) {
     proxy.name = "ShaderWarm_Level";
     const grenade = CloneGrenadeAsset(combat?.grenadeAsset || null);
     if (grenade) proxy.add(grenade);
+    // 炮弹（弹体 + 拖尾）：第一关的炮击、战车主炮、空袭扫射都走 combat.FireShell，
+    // 两份材质全场共用。没有这一件的话第一发炮弹出现那一帧现编弹体（实测 839 ms）。
+    const shellProxy = combat?.shellVisuals?.CreateWarmProxy?.() || null;
+    if (shellProxy) proxy.add(shellProxy);
     // 人物 GLB 材质的**非蒙皮**变体：背枪 / 担架伤员 / 遗体这类刚体网格复用同一份材质，
     // program 缓存键不同（无 skinning）。实测车厢里第一次出现背枪时一个物理材质 program
     // 链接等了 2.8 s；这里用小盒子把每份材质的刚体变体先逼出来（含投影深度变体）。
@@ -4759,6 +4776,7 @@ async function WarmLevel(phase) {
       Lap("settle");
     } finally {
       scene.remove(proxy);
+      if (shellProxy) combat.shellVisuals.DisposeWarmProxy(shellProxy);
     }
   } finally {
     state.warming = wasWarming; state.menu = wasMenu;
@@ -5556,7 +5574,9 @@ function SwitchSlot(slot) {
   if (meleeCombat && !meleeCombat.CanChangeWeapon()) return false;
   if (!player?.Alive || !SlotWeaponId(slot)) return false;
   if (slot === state.activeSlot) return false;
-  if (viewmodel.IsBusy?.()) return false;          // 拉栓/压弹播到一半不许换手
+  // 拉栓/压弹播到一半不许换手 —— 唯一例外是换弹时拔大刀：贴脸的敌人等不到压完弹，
+  // 拔刀就是取消换弹（CancelReload 把没压完的弹退回去）。
+  if (viewmodel.IsBusy?.() && !(slot === "melee" && CancelReload())) return false;
   StashActiveSlot();
   ActivateSlot(slot);
   return true;
@@ -6618,6 +6638,8 @@ function Reload() {
   if (meleeCombat && !meleeCombat.CanChangeWeapon()) return false;
   if (!player.Alive || viewmodel.IsBusy?.()) return false;
   const w = WEAPONS[currentWeapon];
+  // 弹药在按下 R 那一刻就入账了；记下按之前的账，换弹中途拔刀时退回去。
+  state.reloadUndo = { slot: state.activeSlot, ammo: state.ammo, clips: state.clips };
   if (typeof weaponRange !== "undefined" && weaponRange && w?.magazine) {
     state.ammo = w.magazine; state.clips = 999;
     if (state.mags[state.activeSlot]) state.mags[state.activeSlot] = { ammo: state.ammo, clips: state.clips };
@@ -6642,6 +6664,23 @@ function Reload() {
     SyncP012ActiveMagazine(state);
   }
   audio.Play(w.reloadKind === "topMag" ? "magIn" : "stripperLoad", { volume: 0.75 });
+  return true;
+}
+
+/**
+ * 取消正在播的换弹（换弹中拔刀）。没压完就不算装上：弹仓与备弹回到按 R 之前，
+ * 第一关「手动装填」的完成记录也不记。不在换弹里返回 false，调用方照旧挡住。
+ */
+function CancelReload() {
+  if (viewmodel.action?.kind !== "reload") return false;
+  const undo = state.reloadUndo;
+  state.reloadUndo = null;
+  if (undo && undo.slot === state.activeSlot) {
+    state.ammo = undo.ammo; state.clips = undo.clips;
+    if (state.mags[undo.slot]) state.mags[undo.slot] = { ammo: undo.ammo, clips: undo.clips };
+  }
+  if (p012Runtime) { p012Runtime.weaponActionPending = false; p012Runtime.manualReloadPending = false; }
+  viewmodel.action = null;
   return true;
 }
 

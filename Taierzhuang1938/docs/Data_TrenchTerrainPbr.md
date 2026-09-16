@@ -15,6 +15,10 @@
 
 ## 图像来源与运行时
 
+> **2026-09-17 起第一关地面不再用这套单张土壤图**：远处平铺成横纹（马赛克），换成四层纹理数组的分层地形材质，
+> 见 [分层地形材质](Data_TerrainLayers.md)。本节的 `Texture_MissionSoil*` 仍是 Ground / GroundRubble 配方的外部图，
+> 也是分层地形下载失败时的退路；下面记录保留为这套图的来源说明。
+
 使用内置 image_gen__imagegen，单次生成土壤 PBR 四象限图集（请求 2048×2048，实际输出 1254×1254，每象限 627×627）。源图与拆出的高度图保留在本任务本地 `_shots/TrenchTerrain/`；高度图没有接入几何位移，避免改变已验证的碰撞表面。游戏使用 `Texture/Texture_MissionSoilBase.webp`、`Texture_MissionSoilNormal.webp`、`Texture_MissionSoilOrm.png`，均为 512×512。
 
 Base/Normal 以 WebP quality 0.88 打包。ORM 保留无损 PNG，R 为 AO（下限 190），G 为粗糙度（下限 209），B 强制为零金属度。生成地图是近似材质输入，并非实测扫描。Albedo 使用 sRGB，normal/ORM 不做颜色空间转换，沿用材质库的法线与打包 ORM 管线。

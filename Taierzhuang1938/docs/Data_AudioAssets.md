@@ -399,7 +399,7 @@ Sonniss 的许可不要求署名，但 `Data_SfxSources.mjs` 仍然逐条记着�
 | `shellIncoming` | 1 | 2.00 s | 16.2 KB | Bluezone Corporation · 炮弹飞行啸声 · Sonniss GDC 2020 |
 | `shellImpact` | 1 | 2.80 s | 39.3 KB | **2026-09-09 换过**：Bluezone · 榴弹炮弹着与碎砖 · Game Audio Monthly #1（这条 cue 目前没有玩法代码在播）|
 | `launcherPop` | 1 | 0.90 s | 7.6 KB | Bluezone Corporation · 榴弹发射 · Sonniss GDC 2023 |
-| `dadaoSwing` | 3 | 0.55 s | 11.1 KB | Volcengine SeedAudio 1.0 · 大刀挥空（木质厚实 / 长嘶 / 刃嘶明亮）|
+| `dadaoSwing` | 1 | 0.47 s | 3.9 KB | **2026-09-17 换成一条**：Volcengine SeedAudio 1.0 · 大刀挥空（铁锹划过空气的低沉唿声，用户三轮试听选定）|
 | `dadaoHit` | 1 | 0.67 s | 5.8 KB | Volcengine SeedAudio 1.0 · 大刀砍入人体 |
 | `bayonetHit` | 1 | 1.37 s | 11.3 KB | Volcengine SeedAudio 1.0 · 刺刀刺入拔出 |
 | `goreSever` | 2 | 0.43—0.54 s | 8.7 KB | Volcengine SeedAudio 1.0 · 断肢（重 / 撕裂）|
@@ -463,9 +463,14 @@ Sonniss 的许可不要求署名，但 `Data_SfxSources.mjs` 仍然逐条记着�
 再补三句硬约束：点名中频、给时长、给包络（「由弱迅速涨到最强再立刻消失」）。
 验收看两个数：`120 Hz–2 kHz 能量占比 ≥ 60 %`，包络是**一道弓形**（只有一个峰）。
 
-挥空给三个变体是因为它是**连续动作**：连砍两下用同一个样本立刻露馅。三条**按顺序
-轮**着出（`SAMPLE_CYCLE`），不是随机挑 —— 随机会连出两次同一条。砍中与刺中各一条，
-就是人工选定的那条，原样播。这三个 cue 一律**不参与 ±3% 逐发变调**。
+挥空 2026-09-17 从三条换成**一条**。原来三条（木质厚实 / 长嘶 / 刃嘶明亮）听着不像
+刀锋破风，重做了三轮：第一轮薄钢片 / 藤条 / 钢丝鞭（平均频率 1.6—4.3 kHz）被判太尖；
+第二轮往暗处找，挑中「铁锹划过空气」的风格；第三轮照这个风格再生成 12 条，选定一条
+（平均频率约 480 Hz，从开头到最响约 175 ms，正好落在轻砍抬刀 0.17 s 之后刀刃划过那段）。
+候选与说明归档在 `OneDrive\Sync\饮河\FPS\音频提取\刀具相关\空挥破风\`。
+**一条是用户的选择，不是缺变体**，别为了防复读再凑回三条。砍中与刺中也各一条。
+这三个 cue 都原样播（`SAMPLE_CYCLE`），一律**不参与 ±3% 逐发变调**。
+只重烘挥空用 `Script_SeedAudioMeleeBake.mjs --only dadaoSwing`（砍中 / 刺中的 take 不在手边也能跑）。
 
 音量对齐的是**响度不是峰值**。这几条 take 从模型出来就比库里其它音「实」得多
 （波峰因数 13—17 dB，实录冲击音是 19—27），按峰值归一会比 Sonniss 那批**响 13 dB**，
@@ -1125,7 +1130,7 @@ node Taierzhuang1938/Script_SfxBake.mjs --recut \
 （20 ms 帧、门限取最响帧的 10%）对齐到 −25 dBFS，环境床与音乐按整段 RMS 对齐到
 −27 dBFS，峰值一律不许过 −1 dBFS。
 
-白刃那五条（`AudioSfx_DadaoSwing_01/02/03`、`AudioSfx_DadaoHit_01`、
+白刃那几条（`AudioSfx_DadaoSwing_01`，2026-09-17 前还有 02/03、`AudioSfx_DadaoHit_01`、
 `AudioSfx_BayonetHit_01`）**从来不在这条线上**，所以 SFX 组长期恒红。
 2026-08-29 的处置是**给它们一条显式豁免，而不是把它们拉平**：
 

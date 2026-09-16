@@ -374,12 +374,11 @@ export const SFX_SOURCES = [
     credit: "Volcengine SeedAudio 1.0 · 白刃三音",
     license: "volcengine",
     cuts: [
-      // 挥空给三个变体：白刃是连续动作，一个样本反复响两下就露馅。
-      // 三条性格不同（木质厚实 / 长嘶 / 刃嘶明亮），随机轮着出。
+      // 挥空 2026-09-17 换成用户三轮试听选定的一条（原来三条听着不像刀锋破风）。
       {
-        cue: "dadaoSwing", durS: 0.55,
-        files: ["AudioSfx_DadaoSwing_01.mp3", "AudioSfx_DadaoSwing_02.mp3", "AudioSfx_DadaoSwing_03.mp3"],
-        credit: "Volcengine SeedAudio 1.0 · 大刀挥空（三变体：木质厚实 / 长嘶 / 刃嘶明亮）",
+        cue: "dadaoSwing", durS: 0.47,
+        files: ["AudioSfx_DadaoSwing_01.mp3"],
+        credit: "Volcengine SeedAudio 1.0 · 大刀挥空（铁锹划过空气的低沉唿声）",
       },
       { cue: "dadaoHit", durS: 0.669, file: "AudioSfx_DadaoHit_01.mp3",
         credit: "Volcengine SeedAudio 1.0 · 大刀砍入人体" },

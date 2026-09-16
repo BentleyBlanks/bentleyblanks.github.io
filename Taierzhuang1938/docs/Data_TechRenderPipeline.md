@@ -467,7 +467,9 @@ ApplyPatches(material, [...IndirectLightingPatches({ ssao, gi, destruction }), s
   `onBeforeCompile` / `customProgramCacheKey` 抄过去：`Material.clone()` 会把 `defines`
   重置成 STANDARD / PHYSICAL、`userData` 走一遍 JSON（函数 key 全丢），抄来的 SyncDefines
   闭包又只认源材质 —— 克隆体第一次 getProgram 的键里少补丁位，照样孪生。
-* 现役顺序固定 **ORM → AO → GI → CSM → SSR → 簇光 → 材质着色 → 破口**（AO 那一路 2026-09 起是 GTAO 补丁，见 §5.4）：
+* 现役顺序固定 **表面 / ORM → AO → GI → CSM → SSR → 簇光 → 材质着色 → 破口**（AO 那一路 2026-09 起是 GTAO 补丁，见 §5.4；
+  「表面」槽 2026-09-17 加，接管反照率/法线/粗糙度/材质 AO 的那一路，现役只有分层地形，与 ORM 互斥，
+  口径与砸坑地表的 `SurfacePatchEnd` 标记见 [分层地形材质](Data_TerrainLayers.md) §3）：
   ORM 三合一排最前（它把材质自带的遮蔽乘进 `indirectDiffuse`，等价于三方 `aomap_fragment`
   chunk 原来的位置）；`<aomap_fragment>` 上同时挂着 AO 的乘法与 GI 的
   光照分量取证，AO 先压、取证后抓，面板读到的才是正式画面的值。
@@ -504,6 +506,7 @@ ApplyPatches(material, [...IndirectLightingPatches({ ssao, gi, destruction }), s
 |---|---:|---:|---|
 | 静态墙 / 地（`MaterialLibrary.Get`） | 19 | **14** | map / normalMap / roughnessMap(=ORM) / envMap / dfgLUT / 阴影×3 / uSsaoMap / uSsilMap / uGi×2 / uClusterData / uMatDetailNormalMap |
 | 砸坑地面（+ `CraterSoilV4`） | 21 | **16** | 上面那一排 + uCraterSoil + uCraterNormal |
+| 分层地形（第一关地面，2026-09-17） | — | **12** | 静态地面那一排去掉 map / normalMap / roughnessMap / uMatDetailNormalMap，加 uTerrainAlbedo + uTerrainSurface 两张 `sampler2DArray`；砸坑变体再 +2 |
 | 人物 GLB・皮肤（+ 预积分 LUT） | 20 | **16** | boneTexture / specularIntensityMap / map / roughnessMap / envMap / dfgLUT / 阴影×3 / uSsaoMap / uSsilMap / uGi×2 / uSsrMap / uClusterData / uMatSkinLut |
 | 人物 GLB・布（sheen） | 19 | **15** | 同上去掉皮肤 LUT（外部 GLB 一律不吃细节法线，atlas UV） |
 | 第一人称视模 | 19 | **15** | 同上，把 uSsrMap 换成 uFirstPersonShadowMap（视模不挂 SSR，见坑表） |
@@ -5583,6 +5586,21 @@ program 都没新建。涨出来的全是**卢沟桥人物 GLB 的材质**：`Jo
 —— 连死三次，落地那一帧 program 不涨、整帧 CPU < 50 ms；再把两个阵营四个模型号各配
 本阵营的枪摆到镜头前、镜头转一圈，仍一个 program 不新建。头一条只能证明「这次没撞上」，
 第二条才证明预热覆盖了全部模型号。
+
+### 18.4 炮弹：每发重编拖尾、第一发现编弹体（2026-09-17）
+
+**取证**：第一关第 4 阶段（`?whitebox=p012&missionStage=4`）逐帧比对 `renderer.info.programs`
+的对象身份。第一发炮弹出现那一帧现编弹体 `ShellCore`（透明 MeshStandardMaterial，本机 839 ms）；
+之后**每一发**都新建一个拖尾 program，缓存键前两位（着色器源码编号）49,50 → 51,52 → 53,54 一路涨。
+
+**机制**：`Script_ShellVisual` 原来给每发炮弹 `trailMaterial.clone()`，落地后淡出 45 ms 就
+`material.dispose()`。场上没有别的拖尾时，这一释放让 program 的引用数归零，three 连同源码缓存
+一起删掉，下一发只能从头编译。炮击、战车主炮、空袭扫射都走 `combat.FireShell`。
+
+**做法**：拖尾材质全场一份，每发的淡出改成顶点属性 `fade`（淡出期间逐帧写，18 个顶点），
+释放时只丢这一发的条带几何；`ShellVisuals.CreateWarmProxy()` 给 `WarmLevel` 第三段的代理组
+摆一件弹体 + 一段拖尾（共用真材质），第一发炮弹不再现编。只覆盖走 `WarmLevel` 的第一关；
+测试场第一发照旧现编一次，之后不再重编。
 
 ---
 

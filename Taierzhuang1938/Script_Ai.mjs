@@ -18,7 +18,7 @@ import { BLAST } from "./Data_Tuning_Combat.mjs";
 import { TRAVERSAL, TraversalPlan, TraversalCurve, TraversalLanding } from "./Data_Traversal.mjs";
 import { ActorCrowd } from "./Script_ActorCrowd.mjs";
 import {
-  SIGHT_BY_STANCE, SIGHT_SCALE_RANGE, SQUAD, ENGAGE, ACTOR_DETAIL, HURT_FLINCH, BRAIN, WATCH,
+  SIGHT_BY_STANCE, SIGHT_SCALE_RANGE, SQUAD, ENGAGE, ACTOR_DETAIL, HURT_FLINCH, BRAIN, WATCH, CROWD,
 } from "./Data_Tuning_Ai.mjs";
 import { PlayerHitboxes, PlayerAimPoint, RaycastPlayerHitboxes, GaussianPair } from "./Script_PlayerHitbox.mjs";
 // 敌军 AI 的四件基建（docs/Data_EnemyAi.md §4）。四个模块都不 import three，
@@ -1244,6 +1244,10 @@ export class AiDirector {
     this.UpdateGrenadeThreats();
     profiler?.E("ai/grenade");
 
+    profiler?.B("ai/crowd");
+    this.SeparateSoldiers(dt);
+    profiler?.E("ai/crowd");
+
     for (let i = 0; i < this.soldiers.length; i += 1) {
       const s = this.soldiers[i];
       // 状态切换记一条。放在循环最前面而不是 Think 里：`s.state` 有二十多个赋值点
@@ -1287,6 +1291,59 @@ export class AiDirector {
     profiler?.B("ai/cull");
     this.CullActors(camera);
     profiler?.E("ai/cull");
+  }
+
+  /** 剧本或别的系统钉住位置的人：软分离不挪他（见 `CROWD`）。 */
+  CrowdPinned(s) {
+    return !!(s.meleeCombat || s.weaponRangeTargetId || s.p012CarriedCasualty || s.p012OnMovingTrain
+      || s.missionCarriageAction || s.missionAmbushClip || s.missionDormant || s.carryRole || s.crowdPinned
+      || (s.missionTrainPassenger && !s.missionTrainReady)
+      || s.actor?.pendingGrenadeThrow || s.vaultT >= 0);
+  }
+
+  /**
+   * 同阵营活人的软分离（`CROWD` 的头注）。只算出这一帧的推开位移，写进
+   * `s.crowdPushX/Z`，由本帧的 `StepBody` 连同自己的步子一起交给角色控制器。
+   */
+  SeparateSoldiers(dt) {
+    const list = this.soldiers, n = list.length;
+    const spacing = CROWD.spacingM, spacing2 = spacing * spacing, maxStep = CROWD.pushMps * dt;
+    for (let i = 0; i < n; i += 1) { list[i].crowdPushX = 0; list[i].crowdPushZ = 0; }
+    if (!(maxStep > 0)) return;
+    for (let i = 0; i < n; i += 1) {
+      const a = list[i];
+      if (!a.alive) continue;
+      for (let j = i + 1; j < n; j += 1) {
+        const b = list[j];
+        if (!b.alive || b.side !== a.side) continue;
+        const dx = b.position.x - a.position.x, dz = b.position.z - a.position.z;
+        const d2 = dx * dx + dz * dz;
+        if (d2 >= spacing2 || Math.abs(b.position.y - a.position.y) > CROWD.maxDyM) continue;
+        const pinA = this.CrowdPinned(a), pinB = this.CrowdPinned(b);
+        if (pinA && pinB) continue;
+        const d = Math.sqrt(d2);
+        // 正好重合时没有方向：按 id 取一个固定方向，两人各往一边让。
+        let ux, uz;
+        if (d > 1e-4) { ux = dx / d; uz = dz / d; }
+        else { const angle = (a.id * 2.399 + b.id * 0.618) % (Math.PI * 2); ux = Math.cos(angle); uz = Math.sin(angle); }
+        const push = Math.min(spacing - d, maxStep);
+        const shareA = pinA ? 0 : pinB ? 1 : 0.5, shareB = 1 - shareA;
+        a.crowdPushX -= ux * push * shareA; a.crowdPushZ -= uz * push * shareA;
+        b.crowdPushX += ux * push * shareB; b.crowdPushZ += uz * push * shareB;
+      }
+    }
+  }
+
+  /** 这个隐蔽位是不是已经被同阵营的另一个活人占着（`COVER.claimedHideClearanceM`）。 */
+  CoverHideTaken(s, hidePos) {
+    const clearance = COVER.claimedHideClearanceM, c2 = clearance * clearance;
+    for (let i = 0; i < this.soldiers.length; i += 1) {
+      const o = this.soldiers[i];
+      if (o === s || !o.alive || o.side !== s.side || !o.cover) continue;
+      const dx = o.cover.hidePos.x - hidePos.x, dz = o.cover.hidePos.z - hidePos.z;
+      if (dx * dx + dz * dz < c2) return true;
+    }
+    return false;
   }
 
   /**
@@ -2465,6 +2522,7 @@ export class AiDirector {
       const cand = found[i];
       if (cand.cover.id === s.failedCoverId && now < s.failedCoverUntil) continue;
       if (!this.CoverAllowed(s, cand)) continue;
+      if (this.CoverHideTaken(s, cand.hidePos)) continue;
       // Query only ray-tests its first few scores. Never accept an untested
       // runner-up just because the tested candidates failed their protection check.
       if (!cand.validated && typeof this.covers.host.Raycast === "function") {
@@ -3011,7 +3069,7 @@ export class AiDirector {
       s.idleStepDt += dt;
       const cadence = !s.grounded ? 1
         : (s.renderLod === "detail" ? 2 : 4);
-      if (cadence === 1 || (this.tickIndex + s.id) % cadence === 0) {
+      if (cadence === 1 || s.crowdPushX || s.crowdPushZ || (this.tickIndex + s.id) % cadence === 0) {
         this.StepBody(s, 0, 0, Math.min(s.idleStepDt, 0.1));
         s.idleStepDt = 0;
       }
@@ -3400,6 +3458,8 @@ export class AiDirector {
     const cap = capsules[s.stance] || capsules[0];
     body.SetSize(cap.radius, cap.height);
     s.velocityY = s.grounded ? -0.6 : s.velocityY - 19.6 * dt;   // 贴地那一点向下的力保证 grounded 稳定
+    // 同阵营软分离的推开量（SeparateSoldiers）随这一步一起走控制器，推不进墙。
+    if (s.crowdPushX || s.crowdPushZ) { dx += s.crowdPushX; dz += s.crowdPushZ; s.crowdPushX = 0; s.crowdPushZ = 0; }
     const r = body.Move(dx, s.velocityY * dt, dz);
     s.position.set(r.x, r.y, r.z);
     s.grounded = r.grounded;

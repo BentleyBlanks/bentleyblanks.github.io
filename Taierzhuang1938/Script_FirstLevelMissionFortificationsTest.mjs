@@ -16,10 +16,15 @@ try {
     const g=window.Tengxian,field=g.battlefield;
     const groundMeshes=field.meshes.filter(mesh=>mesh.name==='FirstLevelWhitebox_Ground');
     const soil=groundMeshes[0]?.material;
-    const terrainPbr={chunks:groundMeshes.length,name:soil?.name,base:soil?.map?.image?.src,
-      normal:soil?.normalMap?.image?.src,orm:soil?.roughnessMap?.image?.src,
-      baseColorSpace:soil?.map?.colorSpace,normalColorSpace:soil?.normalMap?.colorSpace,
-      ormColorSpace:soil?.roughnessMap?.colorSpace,normalScale:soil?.normalScale?.toArray(),
+    // Layered terrain contract (docs/Data_TerrainLayers.md): two texture arrays replace map/normal/ORM.
+    const {PatchesOf}=await import('./Script_MaterialPatches.mjs');
+    const terrainUniforms=(PatchesOf(soil)||[]).find(p=>p.terrainUniforms)?.terrainUniforms;
+    const albedoArray=terrainUniforms?.uTerrainAlbedo.value,surfaceArray=terrainUniforms?.uTerrainSurface.value;
+    const terrainPbr={chunks:groundMeshes.length,name:soil?.name,set:soil?.userData.terrainLayers?.set,
+      legacyMaps:[soil?.map,soil?.normalMap,soil?.roughnessMap].filter(Boolean).length,
+      albedo:albedoArray&&{array:!!albedoArray.isDataArrayTexture,size:[albedoArray.image.width,albedoArray.image.height,albedoArray.image.depth],colorSpace:albedoArray.colorSpace},
+      surface:surfaceArray&&{array:!!surfaceArray.isDataArrayTexture,size:[surfaceArray.image.width,surfaceArray.image.height,surfaceArray.image.depth],colorSpace:surfaceArray.colorSpace},
+      layerAttributes:groundMeshes.every(m=>m.geometry.attributes.terrainLayers?.itemSize===3&&m.geometry.attributes.color),
       depths:await (async()=>{const {SampleMissionNaturalHeight}=await import('./Data_FirstLevelMissionTerrain.mjs');
         return [[-24,-53],[-45,30],[-10,-124]].map(([x,z])=>({x,z,depth:SampleMissionNaturalHeight(x,z)-field.TerrainHeight(x,z)}));})()};
     const {MISSION_ROUTES,MISSION_PLACEMENT}=await import("./Data_FirstLevelMissionLayout.mjs");
@@ -84,12 +89,12 @@ try {
   await fs.writeFile(path.join(out,"Data_Verification.json"),JSON.stringify(report,null,2));
   console.log(JSON.stringify({count:report.count,blocks:report.blocks,obstacles:report.obstacles,meshCount:report.meshCount,triangles:report.triangles,missing:report.missing,envelopeErrors:report.envelopeErrors,cuts:report.cuts}));
   assert.ok(report.terrainPbr.chunks>0);
-  assert.ok(report.terrainPbr.base.includes('Texture_MissionSoilBase.webp'));
-  assert.ok(report.terrainPbr.normal.includes('Texture_MissionSoilNormal.webp'));
-  assert.ok(report.terrainPbr.orm.includes('Texture_MissionSoilOrm.png'));
-  assert.equal(report.terrainPbr.baseColorSpace,'srgb');
-  assert.equal(report.terrainPbr.normalColorSpace,'');assert.equal(report.terrainPbr.ormColorSpace,'');
-  assert.deepEqual(report.terrainPbr.normalScale,[.5,.5]);
+  assert.equal(report.terrainPbr.name,'FirstLevelMissionTerrainLayers');
+  assert.equal(report.terrainPbr.set,'MissionPlain');
+  assert.equal(report.terrainPbr.legacyMaps,0,'layered terrain must not also bind map/normalMap/roughnessMap samplers');
+  assert.deepEqual(report.terrainPbr.albedo,{array:true,size:[1024,1024,4],colorSpace:'srgb'});
+  assert.deepEqual(report.terrainPbr.surface,{array:true,size:[512,512,4],colorSpace:''});
+  assert.ok(report.terrainPbr.layerAttributes,'every ground chunk carries splat weights and tint');
   assert.ok(report.terrainPbr.depths.every(p=>p.depth>=1.83),'actual heightfield provides full standing cover');
   // Physical capsule traversal is local geometry evidence, separate from the campaign input gate.
   const trenchWalks=await page.evaluate(async()=>{

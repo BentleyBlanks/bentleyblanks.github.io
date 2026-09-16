@@ -45,3 +45,7 @@ export const SQUAD_MARCH_GUARDS = Object.freeze({
 
 // User 2026-09-13: physical two-team shelters release when the player catches up.
 export const SQUAD_COVER_BOUNDS = Object.freeze({arrivalM:.18,postArrivalM:.1,transitArrivalM:.5,playerArrivalM:4,playerCorridorM:3,stanceHoldS:.5});
+// User 2026-09-16: bounding by pairs is a contact drill. With nobody shooting,
+// seen or close, the squad walks the trench and skips the shelter posts.
+// calmAfterS keeps one quiet second from collapsing the drill mid-firefight.
+export const SQUAD_COVER_THREAT = Object.freeze({incomingMemoryS:3,suppression:.2,nearEnemyM:18,calmAfterS:4});

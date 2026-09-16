@@ -55,7 +55,7 @@ const TARGETS = Object.freeze({
 const EXEMPT_DBFS_MELEE = -28.5;
 const MELEE_EXEMPT_WHY = "人工选定的白刃 take：整段 RMS −28.5 dBFS（Script_SeedAudioMeleeBake 的口径）";
 const EXEMPTIONS = new Map([
-  "AudioSfx_DadaoSwing_01.mp3", "AudioSfx_DadaoSwing_02.mp3", "AudioSfx_DadaoSwing_03.mp3",
+  "AudioSfx_DadaoSwing_01.mp3",
   "AudioSfx_DadaoHit_01.mp3", "AudioSfx_BayonetHit_01.mp3",
 ].map((file) => [file, { metric: "rmsDbfs", targetDbfs: EXEMPT_DBFS_MELEE, why: MELEE_EXEMPT_WHY }]));
 EXEMPTIONS.set("AudioSfx_ExplosionNearHeavyEarth.mp3", {

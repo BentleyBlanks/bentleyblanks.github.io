@@ -1067,6 +1067,8 @@ export class ProfilerEditor {
     if (row.newPrograms > 0) marks.push(`新编译着色器 ${row.newPrograms}`);
     if (row.longtaskMs > 0) marks.push(`长任务 ${row.longtaskMs.toFixed(0)} ms`);
     lines.push(marks.join(" ｜ "));
+    // 编的是谁：一个程序一行，悬停在金色标记那一帧上就能指名道姓。
+    if (row.newProgramNames) for (const name of row.newProgramNames) lines.push(`  现编：${name}`);
     return lines.join("\n");
   }
 

@@ -9,6 +9,7 @@ import { TerrainDeformation } from "./Script_TerrainDeformation.mjs";
 import { CraterDebris } from "./Script_CraterDebris.mjs";
 import { TERRAIN_DEFORMATION } from "./Data_Explosives.mjs";
 import { ValueNoise2 } from "./Script_Noise.mjs";
+import { InsertAfterSurfacePatch } from "./Script_MaterialPatches.mjs";
 
 // How many renders a crater warm-up proxy may wait for its first shadow pass
 // before it retires anyway. Only a leak guard: on a level whose cascades bake
@@ -241,9 +242,8 @@ function ConfigureCraterSurface(material, source, soil) {
         return mix(mix(CraterHash(cell).x, CraterHash(cell + vec2(1.0, 0.0)).x, f.x),
           mix(CraterHash(cell + vec2(0.0, 1.0)).x, CraterHash(cell + 1.0).x, f.x), f.y);
       }
-`)
-      .replace("#include <color_fragment>", `#include <color_fragment>
-        vec2 soilMeters = vSoilUv * 1.6;
+`);
+    shader.fragmentShader = InsertAfterSurfacePatch(shader.fragmentShader, "#include <color_fragment>", `        vec2 soilMeters = vSoilUv * 1.6;
         float macro = CraterNoise(soilMeters * 0.73);
         float breakup = CraterNoise(soilMeters * 8.0 + 13.2);
         vec2 secondUv = mat2(0.8, 0.6, -0.6, 0.8) * vSoilUv * 1.91 + 0.37;
@@ -275,13 +275,10 @@ function ConfigureCraterSurface(material, source, soil) {
         float dust = smoothstep(0.005, 0.08, vTerrainBlast.y) * (1.0 - exposed) * 0.38;
         diffuseColor.rgb = mix(diffuseColor.rgb, diffuseColor.rgb * vec3(0.57, 0.49, 0.4), dust);
         diffuseColor.rgb = mix(diffuseColor.rgb, earth, exposed);
-        float soilRelief = (grain * 0.003 + breakup * 0.001) * exposed * (1.0 - ash * 0.75);`)
-      .replace("#include <roughnessmap_fragment>", `#include <roughnessmap_fragment>
-        roughnessFactor = mix(roughnessFactor, mix(0.99, 0.94, cavity), exposed);`)
-      .replace("#include <metalnessmap_fragment>", `#include <metalnessmap_fragment>
-        metalnessFactor = mix(metalnessFactor, 0.0, exposed);`)
-      .replace("#include <normal_fragment_maps>", `#include <normal_fragment_maps>
-        // Screen derivatives turn the same clod relief into a surface gradient;
+        float soilRelief = (grain * 0.003 + breakup * 0.001) * exposed * (1.0 - ash * 0.75);`);
+    shader.fragmentShader = InsertAfterSurfacePatch(shader.fragmentShader, "#include <roughnessmap_fragment>", `        roughnessFactor = mix(roughnessFactor, mix(0.99, 0.94, cavity), exposed);`);
+    shader.fragmentShader = InsertAfterSurfacePatch(shader.fragmentShader, "#include <metalnessmap_fragment>", `        metalnessFactor = mix(metalnessFactor, 0.0, exposed);`);
+    shader.fragmentShader = InsertAfterSurfacePatch(shader.fragmentShader, "#include <normal_fragment_maps>", `        // Screen derivatives turn the same clod relief into a surface gradient;
         // unlike an added up-vector this follows the actual inclined pit wall.
         normal = normalize(mix(normal, nonPerturbedNormal, exposed));
         vec3 soilDx = dFdx(-vViewPosition), soilDy = dFdy(-vViewPosition);
@@ -290,9 +287,8 @@ function ConfigureCraterSurface(material, source, soil) {
         vec3 soilGradient = sign(soilDet) * (dFdx(soilRelief) * soilR1 + dFdy(soilRelief) * soilR2);
         normal = normalize(max(abs(soilDet), 1e-8) * normal - soilGradient);
         vec2 soilSlope = texture2D(uCraterNormal, vSoilUv).xy * 2.0 - 1.0;
-        normal = normalize(normal + mat3(viewMatrix) * vec3(soilSlope.x, 0.0, soilSlope.y) * exposed * 0.52 * (1.0 - ash * 0.7));`)
-      .replace("#include <aomap_fragment>", `#include <aomap_fragment>
-        float earthOcclusion = mix(1.0, (1.0 - fissure * 0.36) * mix(1.0, 0.76, cavity), exposed);
+        normal = normalize(normal + mat3(viewMatrix) * vec3(soilSlope.x, 0.0, soilSlope.y) * exposed * 0.52 * (1.0 - ash * 0.7));`);
+    shader.fragmentShader = InsertAfterSurfacePatch(shader.fragmentShader, "#include <aomap_fragment>", `        float earthOcclusion = mix(1.0, (1.0 - fissure * 0.36) * mix(1.0, 0.76, cavity), exposed);
         reflectedLight.indirectDiffuse *= earthOcclusion;
         reflectedLight.indirectSpecular *= earthOcclusion;`);
   };
@@ -310,6 +306,9 @@ export class TerrainDeformationView {
     // Scratch target for field colour samplers that accept one (SampleMissionGroundColor
     // does); samplers that ignore it still return their own array.
     this.colorOut = [0, 0, 0];
+    // Splat weights for the layered terrain material (Script_TerrainMaterial). Only
+    // fields that render with it expose SampleGroundSurface; others keep the colour path.
+    this.layersOut = [0, 0, 0];
     this.originalGeometry = new Map(); this.tileMeshes = new Map(); this.sourceBounds = new Map();
     this.overlayTiles = new Map(); this.overlayMaterials = new Map();
     this.blastPages = new Map();
@@ -646,6 +645,9 @@ export class TerrainDeformationView {
         geometry.setAttribute("color", new THREE.BufferAttribute(new Float32Array(width * width * 3), 3).setUsage(THREE.DynamicDrawUsage));
         geometry.setAttribute("terrainDelta", new THREE.BufferAttribute(new Float32Array(width * width * 2), 2).setUsage(THREE.DynamicDrawUsage));
         geometry.setAttribute("terrainBlast", new THREE.BufferAttribute(new Float32Array(width * width * 2), 2).setUsage(THREE.DynamicDrawUsage));
+        if (this.field.SampleGroundSurface) {
+          geometry.setAttribute("terrainLayers", new THREE.BufferAttribute(new Float32Array(width * width * 3), 3));
+        }
         const uv = new Float32Array(width * width * 2);
         const tileM = this.field.layout?.terrainSpec?.textureTileM || 3.4;
         for (let z = 0; z <= n; z++) for (let x = 0; x <= n; x++) {
@@ -675,6 +677,7 @@ export class TerrainDeformationView {
       this.model.FillTile(tx, tz, 1, heights, deltas, box);
       const geo = mesh.geometry, attributes = geo.attributes;
       const pos = attributes.position.array, nrm = attributes.normal.array, col = attributes.color.array, del = attributes.terrainDelta.array;
+      const layerArray = attributes.terrainLayers?.array || null;
       // The heightfield and the soil-wear lattice keep their own copy per tile:
       // Rapier and the debris pass read the whole tile, but a partial rebuild
       // only rewrites the part that moved.
@@ -697,7 +700,12 @@ export class TerrainDeformationView {
           const nx = heights[local - 1] - heights[local + 1], nz = heights[local - w] - heights[local + w];
           const norm = Math.hypot(nx, 2 * s, nz);
           nrm[at * 3] = nx / norm; nrm[at * 3 + 1] = 2 * s / norm; nrm[at * 3 + 2] = nz / norm;
-          if (paint) {
+          if (paint && layerArray) {
+            // Layered terrain: the same corridor walk yields both the tint and the splat weights.
+            const rgb = this.field.SampleGroundSurface(pos[at * 3], pos[at * 3 + 2], this.colorOut, this.layersOut);
+            this.groundColor.setRGB(rgb[0], rgb[1], rgb[2], THREE.SRGBColorSpace).toArray(col, at * 3);
+            layerArray[at * 3] = this.layersOut[0]; layerArray[at * 3 + 1] = this.layersOut[1]; layerArray[at * 3 + 2] = this.layersOut[2];
+          } else if (paint) {
             // Rebuilt soil inherits the field's base albedo before blast wear is applied.
             const rgb = this.field.SampleGroundColor?.(pos[at * 3], pos[at * 3 + 2], this.colorOut);
             if (rgb) this.groundColor.setRGB(rgb[0], rgb[1], rgb[2], THREE.SRGBColorSpace).toArray(col, at * 3);
@@ -719,6 +727,7 @@ export class TerrainDeformationView {
       }
       attributes.position.needsUpdate = true; attributes.normal.needsUpdate = true;
       if (paint) attributes.color.needsUpdate = true;
+      if (paint && attributes.terrainLayers) attributes.terrainLayers.needsUpdate = true;
       attributes.terrainDelta.needsUpdate = true;
       attributes.terrainBlast.needsUpdate = true;
       // The tile's footprint is fixed and only y moves, so the bounds come from

@@ -2,6 +2,7 @@
 //
 //   node Taierzhuang1938/Script_SeedAudioMeleeBake.mjs          # 用已有 take 重烘
 //   node Taierzhuang1938/Script_SeedAudioMeleeBake.mjs --dry    # 只看要写哪些文件
+//   node Taierzhuang1938/Script_SeedAudioMeleeBake.mjs --only dadaoSwing   # 只重烘挥空
 //   node Taierzhuang1938/Script_SeedAudioMeleeBake.mjs --force  # 重新调接口（会换掉已验收的音！）
 //
 // 密钥只读 VOLCENGINE_API_KEY。原始 take 落在 Audio/Sfx/_raw/（.gitignore 挡着，不进仓库），
@@ -15,7 +16,7 @@
 //   · take 缺失时**拒绝覆盖**已经烘好的成品，避免一次手滑把选好的音洗掉。
 //
 // ## 切点是怎么定的
-// 模型常在一段里给两三下、或者前面一长段低噪真正的那一下在末尾。挥空三条的切点是
+// 模型常在一段里给两三下、或者前面一长段低噪真正的那一下在末尾。挥空的切点是
 // 按包络找峰、往两边退到 6% 峰值量出来的（`--force` 之后要重新量，见 header 注释）；
 // 砍中与刺中两条整段就是一次动作，用 silenceremove 掐头尾即可。
 //
@@ -42,6 +43,9 @@ const rawDir = path.join(sfxDir, "_raw");
 const sfxManifest = path.join(sfxDir, "Data_SfxManifest.json");
 const force = process.argv.includes("--force");
 const dry = process.argv.includes("--dry");
+/** `--only dadaoSwing`：只烘列出的几条（其余 take 不在手边时用），清单里别的 cue 不动。 */
+const onlyAt = process.argv.indexOf("--only");
+const only = onlyAt >= 0 ? new Set(String(process.argv[onlyAt + 1] || "").split(",")) : null;
 
 const TARGET_RMS_DB = -28.5;               // 全库中位响度（实测 8 条 −26.8—−31.8）
 const PEAK_CEIL_DB = -6.0;                 // 峰值保险：留够 mp3 编码对瞬态的 1—3 dB 过冲
@@ -58,32 +62,26 @@ const DRY = "单声道近距离干录，只有这一下，前后是安静的。"
 
 // 挥空提示词里一律不提「大刀」：直接说大刀，模型两次都塌成两个极端 ——
 // 要么全是 7 kHz 的嘶嘶（像喷气罐），要么全是 300 Hz 以下的低吼（像一阵闷风）。
-// 描述拟音师真会做的事（竹竿 / 木棍抽过空气）才出得来一记挥击的包络。
+// 描述拟音师真会做的事（竹竿 / 木棍 / 铁锹抽过空气）才出得来一记挥击的包络。
+//
+// 2026-09-17 挥空从三条换成**一条**：原来那三条（木质厚实 / 长嘶 / 刃嘶明亮）
+// 听着不像刀锋破风。重做三轮 —— 第一轮薄钢片 / 藤条 / 钢丝鞭（平均频率 1.6—4.3 kHz）
+// 被判「太尖」；第二轮往暗处找，用户挑中「铁锹划过空气」的风格；第三轮照这个风格
+// 再掷 12 条，用户选定下面这条（第三轮 2 号，平均频率约 480 Hz）。候选、切点与
+// 提示词归档在 OneDrive\Sync\饮河\FPS\音频提取\刀具相关\空挥破风\。
+// 一条是用户的选择，不是缺变体 —— 别为了「防复读」再凑回三条。
+// 切点：包络峰往两边退到 6% 峰值是 0.370—0.960，尾巴 0.59 s 太长，收在 0.800
+// 并补 90 ms 淡出。成品从开头到最响约 175 ms，落在轻砍「抬刀 0.17 s → 刀刃划过」那一段。
 const assets = [
   {
-    id: "dadaoSwingA",
+    id: "dadaoSwing",
     file: "AudioSfx_DadaoSwing_01.mp3",
-    raw: "SeedAudioMelee_dadaoSwingA.mp3",
-    label: "挥空·木质厚实",
-    prompt: `生成一声干净、孤立的破风音效：一根结实的木棍被人全力挥过空气。纯粹的风声，完全没有金属味，中低频为主但收得很快，整体约 0.35 秒。${DRY}${NEG}`,
-    filter: Span(0.09, 0.31),
-  },
-  {
-    id: "dadaoSwingB",
-    file: "AudioSfx_DadaoSwing_02.mp3",
-    raw: "SeedAudioMelee_dadaoSwingB.mp3",
-    label: "挥空·长嘶",
-    prompt: `生成一声干净、孤立的挥空破风音效：一把厚背的中国大刀由上向下全力劈空。中频的风声为主体，最响的那一瞬带一丝薄钢刃口切开空气的细微嘶鸣，随后干净收住，整体约 0.45 秒，起音有分量。${DRY}${NEG}`,
-    filter: Span(0.03, 0.45),
-  },
-  {
-    id: "dadaoSwingC",
-    file: "AudioSfx_DadaoSwing_03.mp3",
-    raw: "SeedAudioMelee_dadaoSwingC.mp3",
-    label: "挥空·刃嘶明亮",
-    // 这一条 take 里有两下，取的是第二下（前面那下低频重、没有刃）。
-    prompt: `生成一声干净、孤立的破风音效：一把薄钢长刀高速划过空气，刃口切风带出明显的金属嘶鸣，明亮锐利但仍有中频的风体托着，整体约 0.35 秒，收尾干净。${DRY}${NEG}`,
-    filter: Span(1.03, 1.58),
+    raw: "SeedAudioMelee_dadaoSwing.mp3",
+    label: "挥空·铁锹唿声",
+    prompt: "生成一声干净、孤立的破风音效：一把沉重宽大的铁锹平面快速划过空气，低沉有分量的「唿」声，"
+      + "带一点点金属板扇动空气的质感，但音色温暖柔和，不尖、不嘶、不亮。由弱迅速涨到最强再立刻消失，整体约 0.4 秒。"
+      + `${DRY}不要命中声或入肉声、不要兵器碰撞、不要人声呼喝、不要脚步、不要衣料摩擦、不要音乐、不要回声或混响尾巴。`,
+    filter: `${Span(0.370, 0.800)},areverse,afade=t=in:st=0:d=0.09,areverse`,
   },
   {
     id: "dadaoHit",
@@ -103,11 +101,11 @@ const assets = [
   },
 ];
 
-/** 这一轮之后 dadaoSwing 有三个变体；旧的第二个砍中变体（Sonniss 双手斧）要清掉。 */
-const ORPHANS = ["AudioSfx_DadaoHit_02.mp3"];
+/** 已被替换的旧文件：Sonniss 双手斧那条砍中变体，以及挥空原来的第二、三条。 */
+const ORPHANS = ["AudioSfx_DadaoHit_02.mp3", "AudioSfx_DadaoSwing_02.mp3", "AudioSfx_DadaoSwing_03.mp3"];
 
 const CREDITS = {
-  dadaoSwing: "Volcengine SeedAudio 1.0 · 大刀挥空（三变体：木质厚实 / 长嘶 / 刃嘶明亮）",
+  dadaoSwing: "Volcengine SeedAudio 1.0 · 大刀挥空（铁锹划过空气的低沉唿声）",
   dadaoHit: "Volcengine SeedAudio 1.0 · 大刀砍入人体",
   bayonetHit: "Volcengine SeedAudio 1.0 · 刺刀刺入拔出",
 };
@@ -196,13 +194,8 @@ function encode(asset, rawFile) {
 function writeManifest(results) {
   const sfx = JSON.parse(fs.readFileSync(sfxManifest, "utf8"));
   sfx.licenses.volcengine = SFX_LICENSES.volcengine;
-  const swing = ["dadaoSwingA", "dadaoSwingB", "dadaoSwingC"];
-  sfx.cues.dadaoSwing = {
-    files: swing.map((id) => assets.find((a) => a.id === id).file),
-    seconds: Number(Math.max(...swing.map((id) => results[id].seconds)).toFixed(3)),
-    credit: CREDITS.dadaoSwing, license: "volcengine",
-  };
-  for (const id of ["dadaoHit", "bayonetHit"]) {
+  for (const id of ["dadaoSwing", "dadaoHit", "bayonetHit"]) {
+    if (!results[id]) continue;          // --only 没烘的 cue 原样留着
     sfx.cues[id] = {
       files: [assets.find((a) => a.id === id).file],
       seconds: results[id].seconds, credit: CREDITS[id], license: "volcengine",
@@ -218,7 +211,7 @@ async function main() {
     return;
   }
   const results = {};
-  for (const asset of assets) {
+  for (const asset of assets.filter((a) => !only || only.has(a.id))) {
     const rawFile = path.join(rawDir, asset.raw);
     if (force) {
       console.log(`[重新生成] ${asset.id} —— 已验收的那条会被换掉`);
@@ -226,7 +219,7 @@ async function main() {
     } else if (!fs.existsSync(rawFile)) {
       // 拒绝在没有 take 的情况下动成品：宁可这一条不烘，也不能把选好的音洗掉。
       throw new Error(`${asset.id} 缺少 take：${path.relative(here, rawFile)}\n`
-        + "  从 OneDrive\\Sync\\饮河\\FPS\\音频提取\\刀具相关\\ 取回，或用 --force 重新生成（音会变）。");
+        + "  从 OneDrive\\Sync\\饮河\\FPS\\音频提取\\刀具相关\\（挥空在 空挥破风\\_原始返回未切\\）取回，或用 --force 重新生成（音会变）。");
     }
     results[asset.id] = encode(asset, rawFile);
     const r = results[asset.id];

@@ -377,13 +377,24 @@ export function WorstLine(summary) {
   const marks = [];
   if (worst.gcMb > 0) marks.push(`GC 释放 ${worst.gcMb.toFixed(1)} MB`);
   if (worst.longtaskMs > 0) marks.push(`长任务 ${F(worst.longtaskMs)} ms`);
-  if (worst.newPrograms > 0) marks.push(`这一帧新编译了 ${worst.newPrograms} 个着色器程序`);
+  if (worst.newPrograms > 0) {
+    marks.push(`这一帧新编译了 ${worst.newPrograms} 个着色器程序`
+      + (worst.newProgramNames?.length ? `：${worst.newProgramNames.join("；")}` : ""));
+  }
   if (worst.loaf) {
     marks.push(`浏览器侧 ${F(worst.loaf.durationMs)} ms（样式布局 ${F(worst.loaf.styleMs)} ms，`
       + `阻塞 ${F(worst.loaf.blockingMs)} ms）`);
   }
   if (marks.length) parts.push(marks.join("，"));
   return parts.join(" ｜ ");
+}
+
+/** 事件栏里新编译程序的主人（最多列 6 个，同名多次写 ×N）。 */
+function ProgramNamesText(names) {
+  if (!names || !names.length) return "";
+  const shown = names.slice(0, 6).map(({ name, count }) => (count > 1 ? `${name} ×${count}` : name));
+  const rest = names.length > 6 ? `；另 ${names.length - 6} 种` : "";
+  return `（${shown.join("；")}${rest}）`;
 }
 
 /** 事件栏的一行（GC / 长任务 / 分配速率 / 新编译程序 / 浏览器侧长帧）。 */
@@ -393,7 +404,7 @@ export function EventsLine(summary) {
     `GC ${events.gcCount} 次（共释放 ${events.gcMb.toFixed(1)} MB）`,
     `长任务 ${events.longtaskMs.toFixed(0)} ms`,
     `堆分配 ≈ ${events.allocKbPerFrame.toFixed(0)} KB/帧`,
-    `新编译着色器程序 ${events.newPrograms} 个`,
+    `新编译着色器程序 ${events.newPrograms} 个${ProgramNamesText(events.newProgramNames)}`,
   ];
   if (events.loafCount > 0) {
     parts.push(`浏览器侧长帧 ${events.loafCount} 次（样式布局共 ${events.loafStyleMs.toFixed(0)} ms，`
