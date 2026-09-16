@@ -22,3 +22,17 @@ node scripts/Script_LocalPreview.mjs --no-open
   （注释与格式一个字不动）。线上（Pages）没有这个口，编辑器自动退化成「复制 mjs 片段」。
 - Claude Code 的 `preview_start({ name: "preview" })` 使用 `.claude/launch.json`，同样核对端口与服务根目录。
 - 页面变化先本地验收，再推送；纯说明修改按根入口做静态检查。
+
+## Blender
+
+不常驻。要动模型时从本任务 worktree 根起，干完就关：
+
+```powershell
+node scripts/Script_BlenderMcp.mjs start "<工程>.blend" --task <TaskName>
+node scripts/Script_BlenderMcp.mjs exec --file <脚本.py>
+node scripts/Script_BlenderMcp.mjs stop
+```
+
+- 不把 blender 之类的本地 stdio MCP 服务器写进 `.mcp.json` 或 user scope —— 本机几十个会话会各拉一条空转进程链。需要 MCP 工具接口时当次 `claude mcp add blender -s local -- blender-mcp`，用完 `claude mcp remove`。
+- `.claude/settings.json` 的 Stop / SessionEnd 钩子会兜底 `stop`，但那是保险不是替代：Esc 打断不触发 Stop。报告里附 `status --scan` 的无残留证据。
+- 命令细节、pid 文件、钩子与排查见 [生成工具操作参考](docs/Data_AssetGeneration.md)。

@@ -1,0 +1,48 @@
+{
+  "$comment": [
+    "项目级钩子：Blender 只在真干活的时候开着，收工就关。规范见 AGENTS.md「Blender 源工程」与 docs/Data_AssetGeneration.md。",
+    "Stop = 主代理结束一次回复（用户按 Esc 打断时不触发）；SessionEnd = 会话终止（/clear、交互式 /resume 切换、登出、退出）。",
+    "刻意不挂 SubagentStop：实测子代理与主代理共用同一个 session_id，一个顺手派去查资料的子代理收尾会把主代理正在用的 Blender 关掉。",
+    "两处都调 scripts/Script_BlenderMcp.mjs stop，它只处理本棵树 tmp/BlenderMcp 里记在案的实例，并核对 pid 仍是 blender.exe，不碰别的会话或用户手开的 Blender。",
+    "${CLAUDE_PROJECT_DIR} 在 worktree 会话里指向 worktree 本身（2026-09-16 实测），所以 worktree 里也能找到正确的脚本。"
+  ],
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/scripts/Script_BlenderMcp.mjs",
+              "stop",
+              "--hook",
+              "--quiet",
+              "--save",
+              "--skip-if-busy"
+            ],
+            "timeout": 60,
+            "statusMessage": "收工：关掉本轮起的 Blender"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node",
+            "args": [
+              "${CLAUDE_PROJECT_DIR}/scripts/Script_BlenderMcp.mjs",
+              "stop",
+              "--hook",
+              "--quiet"
+            ],
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  }
+}
