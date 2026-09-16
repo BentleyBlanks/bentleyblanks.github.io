@@ -575,14 +575,15 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
 
 ### 编辑器与调试工具
 - `Script_Editor.mjs` —— 外壳与调度；**一次只开一个**（要接管相机的同开必抖）。
-- `Script_Editor{Scene,FullScene,Actor,Weapon,FirstPerson,Audio,Timeline,Vfx,Destruction,PropLibrary,PropPcg,SamplePoints,Terrain,Splines,Settings,Stage,Ui,DebugRendering,Profiler,WorldInfo}.mjs`
+- `Script_Editor{Scene,FullScene,Actor,Weapon,FirstPerson,Audio,Timeline,Vfx,Destruction,PropLibrary,PropPcg,SamplePoints,Terrain,Splines,Settings,Stage,Ui,DebugRendering,Profiler,WorldInfo,PlayerState}.mjs`
   （另含 AssetStandards = 资产规范只读总表；Splines = 场景样条PCG：道路 + 围墙的中心线编辑 + 拼接资产台与 WALL_PRESETS 滑杆）。
   PropPcg = 生活用具 / 工事支援的规则 volume、真实模型预览与正片 GPU 实例桶取证；
   FullScene = 完整县城与四门外 / 出川军列车厢静态布景的只读巡场、种子、Spline 与环境取证；
   FirstPerson = 正片 Viewmodel 的装备切换、玩家/外部检查视角、武器挂点/IK 目标/真实掌心与骨骼残差可视化，只读不写姿态表；
   车厢不播放 CS_Chuchuan 时间轴、不加载演员/对白/字幕，不读写 Scene 的关卡文档。
-  DebugRendering、Profiler 与 WorldInfo 位于「调试」组，可叠加且不接管相机、不暂停玩法。
+  DebugRendering、Profiler、WorldInfo 与玩家状态位于「调试」组，可叠加且不接管相机、不暂停玩法。
   WorldInfo 独立浮窗显示当前角色 Transform 与高度；回归口 `Script_WorldInfoEditorTest.mjs`。
+  玩家状态（PlayerState）独立浮窗显示血量失血、压制晕眩、体力、后坐散布、弹药动作等隐藏状态；回归口 `Script_PlayerStateEditorTest.mjs`。
   出图模式（`?shot=1`）下整棵编辑器 DOM 是 display:none，进不了截图。
 - 先读：`docs/Data_EditorSuite.md`。
 

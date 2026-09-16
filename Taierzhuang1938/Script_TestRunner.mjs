@@ -267,6 +267,7 @@ export const testDefs = {
   EditorTest: { file: "Script_EditorTest.mjs", timeoutMs: 16 * 60 * 1000,
     desc: "编辑器套件（phase=5 十字街）160 项" },
   WorldInfoEditorTest: { file: "Script_WorldInfoEditorTest.mjs", desc: "WorldInfo：角色 Transform 实时浮窗与开关生命周期" },
+  PlayerStateEditorTest: { file: "Script_PlayerStateEditorTest.mjs", desc: "玩家状态：隐藏状态实时浮窗、冻结与开关生命周期" },
   DestructionEditorTest: { file: "Script_DestructionEditorTest.mjs", desc: "可破坏预览编辑器：真实七关 + 承重白名单" },
   ActorBatchTest: { file: "Script_ActorBatchTest.mjs", desc: "人物合批：逐像素无损 + 真省 draw call" },
   ActorCrowdTest: { file: "Script_ActorCrowdTest.mjs", timeoutMs: 10 * 60 * 1000,
@@ -371,7 +372,7 @@ export const browserTests = new Set([
   "AiCombatBrowserTest", "AiCloseRangeTest", "AiEditorTest", "AiInitiativeBrowserTest",
   "AudioTest", "AudioWiringTest", "BayonetTest", "BootPropTest", "BootStallTest", "BootTest", "ColliderTest",
   "CutscenePoseTest", "DamageTest", "DeathViewTest", "DestructionEditorTest", "DestructionTest",
-  "DressingProbeTest", "EastSuburbNavTest", "EditorTest", "WorldInfoEditorTest", "FixedCenterAimTest", "FpsArmTest", "FpsHandContactTest", "FpsGripEditorTest",
+  "DressingProbeTest", "EastSuburbNavTest", "EditorTest", "WorldInfoEditorTest", "PlayerStateEditorTest", "FixedCenterAimTest", "FpsArmTest", "FpsHandContactTest", "FpsGripEditorTest",
   "FrameProfileTest", "GeoTest", "GiTest", "GodRaysPerformanceTest", "GtaoTest", "GunFeelTest",
   "SamplerBudgetTest", "CharacterWoundsTest", "BloodEffectsTest", "BulletDecalPbrTest",
   "HitDisorientationTest", "IncomingFireBrowserTest", "HudPromptBrowserTest", "WeaponPickupTest", "JieheTerrainTest", "JumpTest", "StanceTest", "MeleeQteTest", "MeleeKillBloodTest", "GoreRangeTest", "MenuTest", "DeathMenuTest",
@@ -505,7 +506,7 @@ export const domains = {
   // 在真入口上量：VoiceTest 验的是资产与交付档，量不到 AudioEngine 的装载分叉。
   voice: { label: "语音", tests: ["VoiceTest", "MachineGunCutsceneAudioTest"] },
   menu: { label: "主菜单/开机陈设", tests: ["FirstLevelP012DebugTest", "MenuTest", "DeathMenuTest", "BootPropTest"] },
-  editor: { label: "场景编辑器/第一人称检查/PCG/资产规范/可破坏编辑器/采样点", tests: ["WorldInfoEditorTest", "AiEditorTest", "TuningWriterTest", "AssetStandardsTest", "EditorTest", "FpsGripEditorTest", "PropPcgTest", "PropPcgEditorTest", "DestructionEditorTest", "SamplePointTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "CharacterModelTest"] },
+  editor: { label: "场景编辑器/第一人称检查/PCG/资产规范/可破坏编辑器/采样点", tests: ["WorldInfoEditorTest", "PlayerStateEditorTest", "AiEditorTest", "TuningWriterTest", "AssetStandardsTest", "EditorTest", "FpsGripEditorTest", "PropPcgTest", "PropPcgEditorTest", "DestructionEditorTest", "SamplePointTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "CharacterModelTest"] },
   cutscene: {
     label: "过场/剧本派发/车厢生活动作",
     // 关中过场 beat 与 LEVEL_CUES 的构建都在 Script_Story 与组装层里，
@@ -599,6 +600,7 @@ const changedDomainRules = [
   // 调参表改写器只被本地预览的保存口与编辑器测试用：改了跑 editor 域（TuningWriterTest）。
   { domain: "editor", pattern: /Script_TuningWriter/i },
   { domain: "editor", pattern: /Script_EditorWorldInfo|Script_WorldInfoEditorTest/i },
+  { domain: "editor", pattern: /Script_EditorPlayerState|Script_PlayerStateEditorTest/i },
   { domain: "trainAssets", pattern: /TrainReference|TrainLibrary|Script_ExternalProps|Script_EditorPropLibrary/i },
   { domain: 'animation', pattern: /BackRifleRun|Melee.*Animation|MeleeAnimation|Infantry/i },
   // 站立待机叠加层与它的旋钮表：装在第一关每个兵身上，验收在 FirstLevelP012AnimationTest（ai 域）。

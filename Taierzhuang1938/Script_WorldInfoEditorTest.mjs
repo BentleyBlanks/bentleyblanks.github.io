@@ -22,10 +22,10 @@ try {
   await page.click(".edGear");
   assert.equal(await page.locator(".edPanel.launcher .edSection")
     .filter({ has: page.locator('[data-editor="worldInfo"]') }).locator(":scope > .h").textContent(), "调试");
-  // 三个设置 + 四个可叠加（渲染调试/性能剖析/WorldInfo/敌军 AI）+ 十五个编辑器
+  // 三个设置 + 五个可叠加（渲染调试/性能剖析/WorldInfo/玩家状态/敌军 AI）+ 十六个编辑器
   // + 一个「全部关掉」（data-editor 是空串，也被这个选择器数进来）。
   // 与 Script_EditorTest 那条同源，加编辑器时两处一起改。
-  assert.equal(await page.locator(".edPanel.launcher [data-editor]").count(), 23);
+  assert.equal(await page.locator(".edPanel.launcher [data-editor]").count(), 25);
   const popupEvent = page.waitForEvent("popup");
   await page.click('[data-editor="worldInfo"]');
   const popup = await popupEvent;

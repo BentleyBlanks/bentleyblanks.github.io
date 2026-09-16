@@ -2916,6 +2916,19 @@ async function Boot() {
       get nav() { return ai?.ctx?.nav ?? null; },
       get currentWeapon() { return currentWeapon; },
       get currentWeaponVariant() { return SlotWeaponVariant(state.activeSlot); },
+      // 玩家状态浮窗（Script_EditorPlayerState）读的装配层状态：不在 PlayerController 身上的那几样。
+      // 只读快照，每 0.1 秒调一次；编辑器不去摸这里的模块变量。
+      PlayerRuntime: () => ({
+        weapon: WEAPONS[currentWeapon] ?? null,
+        fireCooldown: Math.max(0, fireCooldown),   // 计数器会减过零，零以下就是「可以开火」
+        scriptInvulnS: Math.max(0, scriptInvulnUntil - state.elapsed),
+        infiniteAmmo: EffectiveInfiniteAmmo(),
+        infiniteGrenades: EffectiveInfiniteGrenades(),
+        carry: carry?.KindId ?? null,
+        carryBlocking: !!carry?.Blocking,
+        mounted: emplacement?.MountedId ?? null,
+        viewmodelAction: viewmodel?.action?.kind ?? null,
+      }),
     },
   });
   window.Taierzhuang.editor = editor;
