@@ -36,16 +36,24 @@ $env:CAPTIVES_PROJECT="<repo>/Taierzhuang1938"
 & "C:/Program Files/Blender Foundation/Blender 5.1/blender.exe" --background --python-exit-code 1 `
   --python "<repo>/Taierzhuang1938/_import/Script_MachineGunCaptivesBake.py"
 
-# B. BlenderMCP（本轮用的）：带窗口起 Blender，把同一个文件当 __main__ exec 进去
-& "C:/Program Files/Blender Foundation/Blender 5.1/blender.exe" --python <bootstrap.py>
-# bootstrap 里 addon_enable("blender_mcp") + blendermcp.start_server()，再用任意
-# socket 客户端发 {"type":"execute_code","params":{"code":"…"}}
+# B. BlenderMCP（调姿势用）：带窗口起 Blender，把同一个文件当模块 exec 进去
+node scripts/Script_BlenderMcp.mjs start
+node scripts/Script_BlenderMcp.mjs exec <一段 python>
+node scripts/Script_BlenderMcp.mjs stop
 ```
 
-**坑**：`read_factory_settings` 会重载偏好设置，于是 `blender_mcp` 被禁用、
-`unregister()` 把服务连同所有在连客户端一起关掉 —— 每烘一具骨架断一次线。
-bootstrap 里挂一个 `persistent=True` 的看门狗定时器，掉了一秒内自己起回来；
-客户端把「连接被关掉」当成「命令已收下」，日志写文件，重连后再读。
+**起 Blender 走 `scripts/Script_BlenderMcp.mjs`，别手工敲 `blender.exe --python`**
+（根 AGENTS.md「Blender 与 MCP 服务器不常驻」那一条）。9-16 前两轮那个脚本还不存在，
+当时是自己写 bootstrap + socket 客户端起的；下面这几条坑对两条路都成立。
+
+**坑一**：`read_factory_settings` / `read_homefile` 会重载偏好设置，于是 `blender_mcp`
+被禁用、`unregister()` 把服务连同所有在连客户端一起关掉 —— 每建一具骨架断一次线。
+所以要么挂一个 `persistent=True` 的看门狗定时器（掉了一秒内自己起回来），要么每次
+重连；客户端得把「连接被关掉」当成「命令已收下」，日志写文件，重连后再读。
+
+**坑二**：GUI 下别用 `read_factory_settings`，见上面 `ResetScene()` 那一条 ——
+它会让 Blender 在那一刻整个退出，症状是命令发出去之后再也连不上，而 Blender 的
+stdout 最后两行是「Preferences saved」和「Blender quit」。
 
 其它开关（都只影响迭代速度，不影响产物）：`CAPTIVES_MODEL=LugouIja01[,…]` 只烘一具、
 `CAPTIVES_SKIP_BLEND=1` 不存 `.blend`、`CAPTIVES_RENDER=<目录>` 出 Workbench 预览图、
