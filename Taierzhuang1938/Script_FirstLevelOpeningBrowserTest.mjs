@@ -68,7 +68,9 @@ async function Drive(label,points,{fight=false,until=null,untilVoice=null,second
         trainOffset:r.battlefield.trainOffsetM,
         npc:r.squad.map(a=>({id:a.castId,health:a.health,essential:!!a.scriptEssential,p:a.position.toArray(),goal:a.goal.toArray(),
           stance:a.stance,suppression:a.suppression,cover:a.cover?.id,coverPhase:a.coverPhase,
-          contact:!!a.missionContactPost,incoming:a.incomingFire,move:a.moveOrder,evade:!!a.missionGrenadeEvade,grenade:a.grenadeThreat?{p:a.grenadeThreat.position.toArray(),fuse:a.grenadeThreat.fuse}:null})),voicePlaying:!!r.voice.current,voiceCue:r.voice.current?.cue?.id,opening:r.opening.State()};
+          contact:!!a.missionContactPost,incoming:a.incomingFire,move:a.moveOrder,state:a.state,order:a.order,speed:a.moveSpeed,guided:!!a.p012Guided,
+          route:(r.squadRoutes.get(a.id)||[]).slice(0,3),march:a.squadMarchCommand?{goal:a.squadMarchCommand.goal,speed:a.squadMarchCommand.speedMps}:null,
+          waiting:{cover:!!a.missionCoverWaiting,guide:!!a.missionGuideWaiting,approach:!!a.missionCoverApproach},hold:a.holdZone,stuck:a.stuckTime,evade:!!a.missionGrenadeEvade,grenade:a.grenadeThreat?{p:a.grenadeThreat.position.toArray(),fuse:a.grenadeThreat.fuse}:null})),voicePlaying:!!r.voice.current,voiceCue:r.voice.current?.cue?.id,opening:r.opening.State()};
     },{fight,until,untilVoice,realtime});
     // 过场帧不计入这条腿的预算（上面那段注释）。
     if(result.cutsceneFrames)secondsDone-=(realtime?.25:2)*Math.min(1,result.cutsceneFrames/120);

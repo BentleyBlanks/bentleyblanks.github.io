@@ -23,8 +23,8 @@
 // ===========================================================================
 
 import assert from "node:assert/strict";
-import { CoverRegistry, NormalizeCover, CoverId } from "./Script_AiCover.mjs";
-import { COVER, COVER_WEIGHTS } from "./Data_Tuning_AiCover.mjs";
+import { CoverRegistry, NormalizeCover, CoverId, DeriveCoversFromColliders } from "./Script_AiCover.mjs";
+import { COVER, COVER_WEIGHTS, DERIVED_COVER } from "./Data_Tuning_AiCover.mjs";
 
 let checks = 0;
 function Check(condition, message) {
@@ -488,5 +488,45 @@ console.log("ok  无朝向掩体：选得上、不吃朝向分、隐蔽位正背
   Check(stats.covers === 2 && stats.rays > 0 && stats.revision >= 1, "取证口给得出表况");
 }
 console.log("ok  「掩体在我与威胁之间」硬条件；返回值复用契约；取证口");
+
+// ---------------------------------------------------------------- 从碰撞盒派生
+
+{
+  const D = DERIVED_COVER;
+  const Box = (cx, cz, hx, hy, hz, ry = 0, baseY = 0) => ({
+    c: [cx, baseY + hy, cz], h: [hx, hy, hz], ry,
+    min: [cx - Math.max(hx, hz), baseY, cz - Math.max(hx, hz)], max: [cx + Math.max(hx, hz), baseY + 2 * hy, cz + Math.max(hx, hz)],
+  });
+  const ground = { groundAt: () => 0 };
+  const low = DeriveCoversFromColliders([Box(0, 0, 3, 0.6, 0.2)], ground);
+  Check(low.length === Math.floor(6 / D.lowSpacingM) && low.every(c => !c.oneSided && Math.abs(c.faceZ) === 1),
+    "矮墙沿长边等距登记，墙面轴垂直于长边");
+  const tall = DeriveCoversFromColliders([Box(0, 0, 0.2, 1.4, 4, Math.PI / 6)], ground);
+  Check(tall.length === 2, "高墙只在两个墙头登记");
+  const along = { x: Math.sin(Math.PI / 6), z: Math.cos(Math.PI / 6) };
+  Check(tall.every(c => Math.abs(Math.abs(c.x * along.x + c.z * along.z) - (4 - D.tallEndInsetM)) < 1e-9
+    && Math.abs(c.faceX * along.x + c.faceZ * along.z) < 1e-9), "旋转的高墙：墙头点在长轴上、法线垂直于长轴");
+  const joined = DeriveCoversFromColliders([Box(0, 0, 2, 1.4, 0.2), Box(4, 0, 2, 1.4, 0.2)], ground);
+  Check(joined.length === 2, "两段高墙接成一堵，接缝处不算墙角");
+  Check(DeriveCoversFromColliders([Box(0, 0, 2, 0.3, 0.2)], ground).length === 0, "矮于 minHeightM 的沿子不登记");
+  Check(DeriveCoversFromColliders([Box(0, 0, 2, 0.6, 0.2, 0, 2.4)], ground).length === 0, "离地的门楣不登记");
+  Check(DeriveCoversFromColliders([Box(0, 0, 2, 0.3, 0.2), Box(0, 0, 2, 0.3, 0.2, 0, 0.6)], ground).length > 0,
+    "两层叠起来的沙袋按整垛高度算");
+  const crate = DeriveCoversFromColliders([Box(0, 0, 1, 0.55, 1.5)], ground);
+  Check(crate.length === 4 && crate.every(c => c.oneSided), "厚箱垛四面各登记一个单面点");
+
+  // 单面点：威胁在法线那一侧（点所在的那一面）时不参选。
+  const host = MakeHost();
+  const reg = new CoverRegistry([{ x: 0.75, z: 0, height: 1.1, faceX: 1, faceZ: 0, oneSided: true }], host);
+  Check(reg.Query({ x: 3, z: 0 }, [{ x: -20, y: 0, z: 0, stance: 0 }], { radiusM: 10, allowRetreat: true }).length === 1,
+    "威胁在实体背面：单面点可用");
+  Check(reg.Query({ x: 3, z: 0 }, [{ x: 20, y: 0, z: 0, stance: 0 }], { radiusM: 10, allowRetreat: true }).length === 0,
+    "威胁在点所在的那一面：单面点被跳过");
+  const derivedReg = new CoverRegistry([{ x: 5, z: 0, height: LOW_H, faceX: 1, faceZ: 0, derived: true }], host);
+  Check(derivedReg.Query({ x: 0, z: 0 }, [{ x: 30, y: 0, z: 0, stance: 0 }], { radiusM: 30 }).length === 1
+    && derivedReg.Query({ x: 0, z: 0 }, [{ x: 30, y: 0, z: 0, stance: 0 }], { radiusM: 30, skipDerived: true }).length === 0,
+    "skipDerived 只挡派生点（DERIVED_COVER.usableBy 以外的阵营不用）");
+}
+console.log("ok  碰撞盒派生掩体：矮墙等距、高墙墙头、叠垛、厚垛单面点");
 
 console.log(`\nAiCoverTest 通过：${checks} 条断言`);

@@ -42,6 +42,21 @@ export const MISSION_TUNING = Object.freeze({
   contactResumeS:4.5,
   contactRadiusM:.5,
   contactCoverSlackM:.9,
+  // User 2026-09-16: 敌人一出现，队友该先就地找掩体节节抗击，而不是顺着任务路线往前走。
+  // 上面那组「12 m / 停 3.5 s 就走」只留给开场冲过开阔地、进沟到遮蔽点集合、村口到屋内伏击（contactEscapeStages：遮蔽点对白要全班到位才触发；伏击开拍前三人要在灶屋埋伏位、幺娃要跟着担架，开拍后全班要站在屋里）；
+  // 其余阶段走交战规则：看见（或刚看见过）50 m 内的敌人就停下，10 m 内找掩体还击；
+  // 身边的弟兄已经在打、他也知道敌人在哪，就一起停。要继续前进时一次最多两人跃进一段、
+  // 其余人原地掩护（跃进前至少在接敌点打满 contactBoundAfterS），不再整队沿路线走。
+  contactEscapeStages:["Unloading","TrenchEntry","Shelter","Village","Melee"],
+  contactEngageRangeM:50,
+  contactMemoryS:6,
+  contactSquadShareM:18,
+  contactEngageCoverSlackM:10,
+  contactBoundAfterS:6,
+  contactBoundM:7,
+  contactBoundMaxS:4.5,
+  contactBoundStaggerS:1.2,
+  contactBoundersMax:2,
   // Incoming fire overrides the short contact/resume timer. Shelter is local,
   // physically reachable and no higher than the protected trench floor.
   companionDangerSuppression:.18,

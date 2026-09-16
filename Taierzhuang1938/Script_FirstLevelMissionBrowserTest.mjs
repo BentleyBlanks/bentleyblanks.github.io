@@ -1479,7 +1479,9 @@ try {
         alive:g.player.Alive,health:g.player.health,
         arrived:Mission().facts.includes("ambushSquadArrived"),
         squad:g.ai.soldiers.filter(a=>["luo","heyoutian","liuwencai"].includes(a.castId))
-          .map(a=>({id:a.castId,alive:a.alive,x:a.position.x,z:a.position.z}))};
+          .map(a=>({id:a.castId,alive:a.alive,x:a.position.x,z:a.position.z,state:a.state,melee:!!a.meleeCombat,speed:a.moveSpeed,guided:!!a.p012Guided,
+            contact:!!a.missionContactPost,entry:!!a.missionAmbushEntry,route:(g.Debug.FirstLevelMissionRuntime().squadRoutes.get(a.id)||[]).slice(0,2),cover:a.cover?.id??null,march:a.squadMarchCommand?.status??null,marchSpeed:a.squadMarchCommand?.speedMps??null})),
+        ambushers:g.ai.soldiers.filter(a=>String(a.missionId||"").startsWith("Ambush")).map(a=>({id:a.missionId,alive:a.alive,x:+a.position.x.toFixed(2),z:+a.position.z.toFixed(2),state:a.state,melee:!!a.meleeCombat,cover:a.cover?.id??null,phase:a.coverPhase}))};
     });
     console.log("ambush squad",JSON.stringify(squadEntry));
     const entered=squadEntry.squad.filter(a=>a.alive).sort((a,b)=>b.z-a.z)[0];

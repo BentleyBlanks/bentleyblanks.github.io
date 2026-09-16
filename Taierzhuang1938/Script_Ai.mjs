@@ -25,7 +25,7 @@ import { PlayerHitboxes, PlayerAimPoint, RaycastPlayerHitboxes, GaussianPair } f
 // 只吃普通对象 `{x,y,z}` 与本文件组装的 host 回调 —— Script_Ai 仍是唯一的 three 适配层。
 import { PerceptionModel, PLAYER_TRACK_ID, ALERT_ORDER } from "./Script_AiPerception.mjs";
 import { CoverRegistry } from "./Script_AiCover.mjs";
-import { COVER, COVER_CYCLE } from "./Data_Tuning_AiCover.mjs";
+import { COVER, COVER_CYCLE, DERIVED_COVER } from "./Data_Tuning_AiCover.mjs";
 import { ShootingModel, CloseRangeWeight } from "./Script_AiShooting.mjs";
 import { CLOSE_RANGE } from "./Data_Tuning_AiShooting.mjs";
 import { TacticsDirector, TASK, IsManeuverTask, CanManeuver, ManeuverAllowed, ChargeOpportunity } from "./Script_AiTactics.mjs";
@@ -1632,6 +1632,8 @@ export class AiDirector {
     s.coverMove = null;
     s.coverPhase = "none";
     s.coverPhaseUntil = -99;
+    s.blindPeeks = 0;
+    s.coverFlankedAt = NaN;
   }
 
   /**
@@ -2486,14 +2488,23 @@ export class AiDirector {
     //  52 个人就是每秒五百次 Query、上千条验证射线 —— 直接把 §7 的预算烧穿。
     let urgent = false;
     if (cover) {
+      // 保护侧按隐蔽位定，不按人此刻站在墙哪一边定：还在接近路上的人站在墙的另一侧，
+      // 用他的位置判会把刚选的点当场判成「被抄侧翼」，下一拍又选回来（接收院来回换点的病根）。
+      // 目标在两个方向的敌人之间来回切时，单拍的侧翼判定会跟着翻；持续 flankGraceS 才算数。
+      // 只对 COVER_CYCLE.refinedSides 里的阵营生效；其余阵营保持原判定（按人此刻的位置、单拍即换）。
+      const refined = COVER_CYCLE.refinedSides.includes(s.side);
+      if (this.covers.IsFlanked(cover, threat, refined ? cover.hidePos : s.position)) {
+        if (!Number.isFinite(s.coverFlankedAt)) s.coverFlankedAt = refined ? now : -Infinity;
+      } else s.coverFlankedAt = NaN;
       if (!this.covers.index.has(cover.id)) urgent = true;                       // 掩体被炸没了
-      else if (this.covers.IsFlanked(cover, threat, s.position)) urgent = true;
+      else if (now - s.coverFlankedAt >= COVER_CYCLE.flankGraceS) urgent = true;
       else if (s.suppression > COVER.suppressionProneAt) urgent = true;          // 压得抬不起头
       else if (now - s.grenadeThreatAt < COVER_CYCLE.reselectMinS) urgent = true;
     }
     // ② 常规重选：威胁挪远了才值得重算（他还在原地的话上一次的账仍然成立）。
+    const refinedFlank = COVER_CYCLE.refinedSides.includes(s.side);
     let want = urgent || bounding || !cover;
-    if (!want && cover
+    if (!want && cover && !(refinedFlank && Number.isFinite(s.coverFlankedAt))
       && Math.sqrt((threat.x - s.coverThreatX) ** 2 + (threat.z - s.coverThreatZ) ** 2) > BRAIN.threatMoveM) {
       want = true;
     }
@@ -2521,6 +2532,8 @@ export class AiDirector {
     opts.soldierId = s.id;
     opts.suppression = s.suppression;
     opts.allowRetreat = Number.isFinite(s.scriptCoverMaxRiseM);
+    // 派生掩体点只给 DERIVED_COVER.usableBy 里的阵营用（见表注）。
+    opts.skipDerived = !DERIVED_COVER.usableBy.includes(s.side);
     opts.allies = this.CoverAllies(s);
     if (bounding && (task.towardX || task.towardZ)) {
       // Tactics 只给方向（跃进往哪儿压），`Query` 要的是一个点：往前推一个 towardCapM。
@@ -2541,6 +2554,8 @@ export class AiDirector {
       if (cand.cover.id === s.failedCoverId && now < s.failedCoverUntil) continue;
       if (!this.CoverAllowed(s, cand)) continue;
       if (this.CoverHideTaken(s, cand.hidePos)) continue;
+      // 与上面的紧急重选同一把尺子：墙面顺着威胁方向的点选上也会立刻被判侧翼。
+      if (refinedFlank && this.covers.IsFlanked(cand.cover, threat, cand.hidePos)) continue;
       // Query only ray-tests its first few scores. Never accept an untested
       // runner-up just because the tested candidates failed their protection check.
       if (!cand.validated && typeof this.covers.host.Raycast === "function") {
@@ -2632,6 +2647,14 @@ export class AiDirector {
         + COVER_CYCLE.hideDwellMinS + s.rnd() * (COVER_CYCLE.hideDwellMaxS - COVER_CYCLE.hideDwellMinS);
     } else if (this.time >= s.coverPhaseUntil) {
       if (s.coverPhase === "peek") {
+        // 探出去也看不见目标的掩体只是个藏身处：连着几次都这样就记失败、换点
+        //（2026-09-16 接收院取证：队友在「挡得住、打不着」的墙后缩头探头一整场）。
+        s.blindPeeks = s.target && !s.peekSaw && COVER_CYCLE.refinedSides.includes(s.side) ? (s.blindPeeks || 0) + 1 : 0;
+        if (s.blindPeeks >= COVER_CYCLE.blindPeeksBeforeMove) {
+          s.failedCoverId = c.id; s.failedCoverUntil = this.time + COVER_CYCLE.failedRetryS;
+          this.ReleaseCover(s); s.coverPickAt = -99;
+          return;
+        }
         s.coverPhase = "hide";
         s.coverPhaseUntil = this.time
           + COVER_CYCLE.hideDwellMinS + s.rnd() * (COVER_CYCLE.hideDwellMaxS - COVER_CYCLE.hideDwellMinS);
@@ -2640,12 +2663,14 @@ export class AiDirector {
         s.coverPhaseUntil = this.time
           + COVER_CYCLE.peekMinS + s.rnd() * (COVER_CYCLE.peekMaxS - COVER_CYCLE.peekMinS);
         s.peekCount += 1;
+        s.peekSaw = false;
         this.stats.peeks += 1;
         // 每次探头都是重新举枪：误差回到初值，探头本身有代价（§4.3）。
         if (s.target) this.shooting.BeginAim(s, s.target.id, { force: true });
       }
     }
     const peeking = s.coverPhase === "peek";
+    if (peeking && s.targetVisible) s.peekSaw = true;
     const at = peeking ? c.firePos : c.hidePos;
     move.x = at.x; move.z = at.z; move.speed = BRAIN.coverMoveMps;
     s.moveOrder = move;

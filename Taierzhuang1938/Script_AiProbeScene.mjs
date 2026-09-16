@@ -58,7 +58,9 @@ function Unseen(T, from, to) { return Blocked(T, from, to) || T.ai.aiHost.Blocks
  *   「玩家该站哪儿、什么姿势、朝哪边」是**场地**的属性，不该让每个调用方各猜一份。
  */
 export function PickSite(T, cx, cz, {nearest=false}={}) {
-  const list = T.ai.covers.Nearby(cx, cz, 110).filter((c) => c.height >= 1.5);
+  // 只挑手工登记的墙：派生点（DeriveCoversFromColliders）在高墙上只登记墙头，
+  // 站点就会落在墙角 —— 朝墙角边的最后目击点压制射击是正常行为，量不出「实墙挡住就停火」。
+  const list = T.ai.covers.Nearby(cx, cz, 110).filter((c) => c.height >= 1.5 && !c.derived);
   if(nearest)list.sort((a,b)=>Math.hypot(a.x-cx,a.z-cz)-Math.hypot(b.x-cx,b.z-cz));
   for (const c of list) {
     for (const sign of [1, -1]) {

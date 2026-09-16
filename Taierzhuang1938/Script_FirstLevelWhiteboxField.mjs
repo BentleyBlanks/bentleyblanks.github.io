@@ -12,6 +12,7 @@ import * as THREE from "three";
 import { Clamp } from "./Script_Noise.mjs";
 import { RayAabb, MakeBox, PlaceGeometry } from "./Script_Geo.mjs";
 import { BuildSink } from "./Script_World.mjs";
+import { DeriveCoversFromColliders } from "./Script_AiCover.mjs";
 import { BuildRailwayFromSpec } from "./Script_RoadSpline.mjs";
 import { MarkDynamicPrepass } from "./Script_Post.mjs";
 import { T } from "./Script_Text.mjs";
@@ -287,6 +288,9 @@ export class FirstLevelWhiteboxField {
     this.trainColliders = [...trainSink.colliders,...this.derailColliders];
     this.colliders = [...sink.colliders, ...this.trainColliders];
     this.covers = sink.covers.slice();
+    // 手工 cover 只标了少数沙袋与土墙；村里的院墙、矮墙、垛子要从实体盒派生，
+    // 否则两边的兵在这些地方身边都「没有掩体」（Data_Tuning_AiCover.DERIVED_COVER）。
+    this.covers.push(...DeriveCoversFromColliders(sink.colliders,{groundAt:(x,z)=>this.TerrainHeight(x,z),existing:this.covers}));
   }
 
   // Authored kinematic roll of a single carriage. The transient collider is a

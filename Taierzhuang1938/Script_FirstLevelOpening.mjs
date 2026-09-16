@@ -138,9 +138,18 @@ export class FirstLevelOpening {
       // the pairs still behind must come up instead of waiting for him to return.
       const bounds=r.squadCoverBounds;
       if(bounds)for(let i=0;i<bounds.stations.length;i++)bounds.released.add(i);
-      for(const [i,a] of r.squad.entries()){
+      // Posts go by who is already nearer the recess, not by roster slot: a slot
+      // order sends the leading man back past the others in the one-man trench,
+      // and the roster-order yield rule then locks all four in place.
+      // Yaowa keeps the post beside the player (ShelterAid needs him within reach).
+      const posts=C.shelterPosts.map((p,i)=>({p,i})).sort((a,b)=>Distance(a.p,C.shelter)-Distance(b.p,C.shelter));
+      const yaowaPost=posts.find(post=>post.i===C.shelterYaowaPost);
+      const others=posts.filter(post=>post!==yaowaPost);
+      const byNearness=[...r.squad].sort((a,b)=>Distance(a.position,C.shelter)-Distance(b.position,C.shelter));
+      for(const a of byNearness){
         const route=r.squadRoutes.get(a.id)||[];
-        r.squadRoutes.set(a.id,[...route,C.shelterPosts[i]]);
+        const post=a.castId==="yaowa"&&yaowaPost?yaowaPost:others.shift()||yaowaPost;
+        r.squadRoutes.set(a.id,[...route,post.p]);
       }
       this.wounded=this.SpawnMessenger("OpeningWounded",C.woundedRoute,"HanYang");
       if(this.wounded){this.wounded.actor.health=35;this.wounded.actor.scriptedNoncombatant=true;}

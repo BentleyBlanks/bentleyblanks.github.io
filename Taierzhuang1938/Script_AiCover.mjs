@@ -67,7 +67,7 @@
 // 不是每帧每人都跑。
 // ===========================================================================
 
-import { COVER } from "./Data_Tuning_AiCover.mjs";
+import { COVER, DERIVED_COVER } from "./Data_Tuning_AiCover.mjs";
 
 const W = COVER.weights;
 
@@ -137,7 +137,118 @@ export function NormalizeCover(raw) {
   const len = Len2(nx, nz);
   let hasNormal = false;
   if (len > 1e-6) { nx /= len; nz /= len; hasNormal = true; } else { nx = 0; nz = 0; }
-  return { id: CoverId(x, z), x, z, height, nx, nz, hasNormal, tall: height >= COVER.tallM };
+  // oneSided：法线是**有向**的，只有法线指向的那一面站得了人（厚实体的某一个面，
+  // 另一面是实体内部）。威胁在法线那一侧时这个点没用，Query 直接跳过。
+  const oneSided = hasNormal && raw.oneSided === true;
+  return { id: CoverId(x, z), x, z, height, nx, nz, hasNormal, tall: height >= COVER.tallM, oneSided,
+    derived: raw.derived === true };
+}
+
+/**
+ * 从实体碰撞盒派生掩体点（形状同 `Script_World.Cover`：墙体自己的中线点 + 无符号墙面轴）。
+ *
+ * 碰撞盒是 `Script_World.Solid` 的形状 `{min,max,c,h,ry}`（ry 绕 Y，局部 x 轴 = (cos ry, -sin ry)）。
+ * 只派生**贴地、够高、够长**的盒子（数见 `DERIVED_COVER`）；厚盒子四面各登记单面点（`oneSided`）；叠起来的盒子
+ * （两层沙袋、土坯垛）按整垛的顶算高度。矮墙沿墙等距登记，高墙只登记真正的墙头 ——
+ * 墙中段贴墙站着看不见敌人，探头周期起不来。
+ *
+ * @param {Array} colliders 静态碰撞盒
+ * @param {{groundAt:(x:number,z:number)=>number, existing?:Array}} opts
+ * @return {Array<{x:number,z:number,height:number,faceX:number,faceZ:number,oneSided?:true,derived:true}>}
+ */
+export function DeriveCoversFromColliders(colliders, opts) {
+  const D = DERIVED_COVER, out = [];
+  const groundAt = opts && opts.groundAt;
+  if (!colliders || typeof groundAt !== "function") return out;
+  const existing = (opts.existing || []).map(NormalizeCover).filter(Boolean);
+  const boxes = [];
+  for (const c of colliders) {
+    if (!c || !c.c || !c.h || !c.min || !c.max) continue;
+    boxes.push(c);
+  }
+  // 局部坐标里 (px,pz) 是否落在盒子的水平投影内（带 pad 余量）。
+  const Contains = (b, px, pz, pad) => {
+    const ry = b.ry || 0, cos = Math.cos(ry), sin = Math.sin(ry);
+    const dx = px - b.c[0], dz = pz - b.c[2];
+    const lx = dx * cos - dz * sin, lz = dx * sin + dz * cos;
+    return Math.abs(lx) <= b.h[0] + pad && Math.abs(lz) <= b.h[2] + pad;
+  };
+  const Near = (x, z, list, r) => {
+    for (const e of list) if (Len2(e.x - x, e.z - z) < r) return true;
+    return false;
+  };
+  for (const b of boxes) {
+    const ground = groundAt(b.c[0], b.c[2]);
+    if (!Number.isFinite(ground) || b.min[1] - ground > D.maxBaseRiseM) continue;
+    // 整垛的顶：压在这只盒子上、且覆盖它中心的盒子一层层往上找。
+    let top = b.max[1];
+    for (let pass = 0; pass < 4; pass += 1) {
+      let raised = false;
+      for (const o of boxes) {
+        if (o === b || o.max[1] <= top || Math.abs(o.min[1] - top) > D.stackGapM) continue;
+        if (!Contains(o, b.c[0], b.c[2], 0)) continue;
+        top = o.max[1]; raised = true;
+      }
+      if (!raised) break;
+    }
+    const height = top - ground;
+    if (height < D.minHeightM) continue;
+    const alongX = b.h[0] >= b.h[2];
+    const half = alongX ? b.h[0] : b.h[2], thick = 2 * (alongX ? b.h[2] : b.h[0]);
+    if (2 * half < D.minLengthM) continue;
+    const ry = b.ry || 0, cos = Math.cos(ry), sin = Math.sin(ry);
+    if (thick > D.maxThicknessM) {
+      // 厚实体（箱垛、土坯垛）：四个面各自登记单面点，点放在面内 faceInsetM 处，
+      // 与薄墙「点在墙体中线」的隐蔽位距离一致。太大的块不是垛子，是地形或建筑体。
+      if (2 * Math.max(b.h[0], b.h[2]) > D.maxBlockM) continue;
+      for (const [ax, faceHalf, spanHalf] of [[0, b.h[0], b.h[2]], [1, b.h[2], b.h[0]]]) {
+        if (2 * spanHalf < D.minLengthM) continue;
+        // ax 0：面垂直于局部 x；ax 1：面垂直于局部 z。
+        const ox = ax === 0 ? cos : sin, oz = ax === 0 ? -sin : cos;   // 面法线（世界）
+        const tx = -oz, tz = ox;                                           // 面内切线
+        const along = [];
+        if (height < COVER.tallM) {
+          const count = Math.max(1, Math.floor((2 * spanHalf) / D.lowSpacingM));
+          for (let i = 0; i < count; i += 1) along.push(-spanHalf + (2 * spanHalf) * (i + 0.5) / count);
+        } else {
+          along.push(-Math.max(0, spanHalf - D.tallEndInsetM), Math.max(0, spanHalf - D.tallEndInsetM));
+        }
+        for (const side of [-1, 1]) {
+          const depth = Math.max(0, faceHalf - D.faceInsetM) * side;
+          for (const s of along) {
+            const x = b.c[0] + ox * depth + tx * s, z = b.c[2] + oz * depth + tz * s;
+            if (Near(x, z, existing, D.dedupeM) || Near(x, z, out, D.dedupeM * 0.5)) continue;
+            out.push({ x, z, height, faceX: ox * side, faceZ: oz * side, oneSided: true, derived: true });
+          }
+        }
+      }
+      continue;
+    }
+    // 长轴方向 t 与墙面轴 n（世界坐标）。
+    const tx = alongX ? cos : sin, tz = alongX ? -sin : cos;
+    const nx = -tz, nz = tx;
+    const offsets = [];
+    if (height < COVER.tallM) {
+      const count = Math.max(1, Math.floor((2 * half) / D.lowSpacingM));
+      for (let i = 0; i < count; i += 1) offsets.push(-half + (2 * half) * (i + 0.5) / count);
+    } else {
+      for (const end of [-1, 1]) {
+        const ex = b.c[0] + tx * end * (half + D.endProbeM), ez = b.c[2] + tz * end * (half + D.endProbeM);
+        let continued = false;
+        for (const o of boxes) {
+          if (o === b || o.min[1] - ground > D.maxBaseRiseM || o.max[1] - ground < COVER.tallM) continue;
+          if (Contains(o, ex, ez, 0)) { continued = true; break; }
+        }
+        if (!continued) offsets.push(end * Math.max(0, half - D.tallEndInsetM));
+      }
+    }
+    for (const s of offsets) {
+      const x = b.c[0] + tx * s, z = b.c[2] + tz * s;
+      if (Near(x, z, existing, D.dedupeM) || Near(x, z, out, D.dedupeM * 0.5)) continue;
+      out.push({ x, z, height, faceX: nx, faceZ: nz, derived: true });
+    }
+  }
+  return out;
 }
 
 /** 每个掩体槽的可变状态：验证缓存 + 保护侧记忆。与 `registry.covers` 同下标。 */
@@ -688,6 +799,7 @@ export class CoverRegistry {
     const t = PrimaryThreat(threat);
     const hasThreat = !!t;
     const tx = hasThreat ? PosX(t) : 0, tz = hasThreat ? PosZ(t) : 0;
+    if (hasThreat && c.oneSided && c.nx * (tx - c.x) + c.nz * (tz - c.z) > 0) return -Infinity;
     const soldierId = opts && opts.soldierId !== undefined ? opts.soldierId
       : (soldier && soldier.id !== undefined ? soldier.id : null);
     const slot = this.poseScratch;
@@ -733,6 +845,8 @@ export class CoverRegistry {
     for (let i = 0; i < nearCount; i += 1) {
       const c = list[i];
       if (hasThreat && !opts?.allowRetreat && !this._Between(c, sx, sz, tx, tz)) continue;
+      if (hasThreat && c.oneSided && c.nx * (tx - c.x) + c.nz * (tz - c.z) > 0) continue;
+      if (c.derived && opts && opts.skipDerived) continue;
       const base = this._Cheap(c, sx, sz, tx, tz, hasThreat);
       let pos;
       if (k < maxCand) { pos = k; k += 1; }

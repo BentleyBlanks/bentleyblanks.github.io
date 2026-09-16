@@ -185,6 +185,14 @@ export const COVER_CYCLE = Freeze({
   urgentReselectS: 0.4,
   stalledApproachS: 2.5,
   failedRetryS: 7,
+  /** 连续这么多次探头都没看见目标，这个掩体就按失败处理（failedRetryS 内不再选）、换点。 */
+  blindPeeksBeforeMove: 3,
+  /** 当前掩体被判侧翼要**持续**这么久才紧急换点：目标在两侧敌人间来回切时单拍判定会翻。 */
+  flankGraceS: 1.5,
+  /** blindPeeksBeforeMove / flankGraceS / 按隐蔽位判侧翼这三条只对这些阵营生效。
+   *  2026-09-16 只给国军：日军的屋内伏击、开场追兵按原掩体周期调过节奏，
+   *  三条一起对日军生效时 `--stage-from=8` 的伏击拍失序（改回原判定即通过）。 */
+  refinedSides: ["nra"],
   progressM: 0.35,
   /** 两次重选掩体的最小间隔（秒）。紧急失效改用 urgentReselectS，避免每次思考都重查。 */
   reselectMinS: 2.5,
@@ -202,4 +210,41 @@ export const COVER_CYCLE = Freeze({
 
   /** 隔多久重查一次「有没有被抄侧翼」（秒）。比 reselectMinS 短：先知道，再决定换不换。 */
   flankRecheckS: 1.0,
+});
+
+/**
+ * 从实体碰撞盒派生掩体点（`Script_AiCover.DeriveCoversFromColliders`）。
+ *
+ * 2026-09-16 取证（`_shots/SquadContact`）：第一关全关只有 351 个手工登记点，村口、转运区、
+ * 撤退路上的院墙与土墙一个都没登记 —— 转运区队友 15 m 内 0 个点、撤退段 14 m 外才 1 个，
+ * 「看见敌人不找掩体」一半是规则、一半是这张表空着。派生只认**真的挡得住人**的薄实体：
+ * 贴地、够高、够长、不太厚（厚块的中线点算出来的隐蔽位会落进实体里）。
+ */
+export const DERIVED_COVER = Freeze({
+  /** 离地高度下限。蹲姿眼高 1.0 m，验证要求「蹲着挡得住」，再矮的点只会白烧验证名额。 */
+  minHeightM: 0.95,
+  /** 盒底离地超过它就不是墙（门楣、屋檐、平台）。 */
+  maxBaseRiseM: 0.35,
+  /** 长边下限：柱子、栅栏桩藏不住人。 */
+  minLengthM: 0.9,
+  /** 薄墙厚度上限。隐蔽位离登记点 standoffM（0.65），半厚 0.35 时离墙面还有 0.3 m。
+   *  更厚的盒子（箱垛、土坯垛）改成四面各登记一个**单面**点（`oneSided`）。 */
+  maxThicknessM: 0.7,
+  /** 厚盒子的单面点放在面内这么深：与薄墙「点在中线、离面 0.2–0.35 m」一致。 */
+  faceInsetM: 0.25,
+  /** 厚盒子最长边上限：再大就不是垛子，是地形块或整栋房子。 */
+  maxBlockM: 8,
+  /** 矮墙（< COVER.tallM）沿墙每隔多少米一个点。 */
+  lowSpacingM: 2.5,
+  /** 高墙只在墙头登记：离端点这么远，侧步 sideStepM 正好探出墙角。 */
+  tallEndInsetM: 0.35,
+  /** 端点外这么远处若还有同高的实体（墙接着墙），这一头不是墙角。 */
+  endProbeM: 0.45,
+  /** 离手工登记点这么近就不再派生（手工点的法线与位置优先）。 */
+  dedupeM: 1.2,
+  /** 叠起来的沙袋/土坯：底盒顶面与上盒底面差在这个量以内算同一垛。 */
+  stackGapM: 0.08,
+  /** 哪些阵营的人会用派生点。只给国军：日军的开场追兵、屋内伏击等剧本拍按手工点调过，
+   *  让他们也躲进派生点会把人藏到玩家找不到的地方（合入样条交通壕后开场卡在遮蔽点折角）。 */
+  usableBy: ["nra"],
 });

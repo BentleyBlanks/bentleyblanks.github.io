@@ -467,6 +467,7 @@ export const BRAIN_GRAPH = Object.freeze({
     COVER_WEIGHTS: "Data_Tuning_AiCover",
     COVER: "Data_Tuning_AiCover",
     COVER_CYCLE: "Data_Tuning_AiCover",
+    DERIVED_COVER: "Data_Tuning_AiCover",
 
     FOV: "Data_Tuning_AiPerception",
     AWARENESS: "Data_Tuning_AiPerception",

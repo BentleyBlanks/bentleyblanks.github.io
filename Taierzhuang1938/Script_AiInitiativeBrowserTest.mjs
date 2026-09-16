@@ -108,6 +108,38 @@ try{
    ai.Dispose();
   }
   {
+   // User 2026-09-16: outside the opening escape, contact beyond the short escape
+   // radius still halts the squad into nearby cover, and advance is a staggered bound.
+   const {FirstLevelMissionRuntime}=await import('./Script_FirstLevelMissionRuntime.mjs');
+   const {MISSION_TUNING:R}=await import('./Data_Tuning_FirstLevel.mjs');
+   const {ai,Spawn}=Harness(),s=Spawn('nra',0,0),mate=Spawn('nra',3,0),enemy=Spawn('ija',0,-30);
+   enemy.dummy=true;Know(s,enemy);s.castId='yaowa';mate.castId='liuwencai';
+   const shelter=Candidate('engage-shelter',0,-4);
+   ai.covers.Query=()=>[shelter];ai.covers.index.set(shelter.cover.id,shelter.cover);
+   const route=[{x:0,z:-20}];
+   const runtime=Object.assign(Object.create(FirstLevelMissionRuntime.prototype),{ai,time:1,trainWounded:null,
+    squad:[s,mate],squadRoutes:new Map([[s.id,route],[mate.id,[{x:3,z:-20}]]])});
+   for(const a of [s,mate]){runtime.MoveActor(a,{x:a.position.x,z:-20});a.scriptedNoncombatant=false;}
+   const escape=runtime.RespondToContact(s);
+   s.missionContactPost=null;s.missionContactResumeAt=0;runtime.MoveActor(s,{x:0,z:-20});
+   const engaged=runtime.RespondToContact(s,{engage:true});
+   // A squadmate who knows the enemy but cannot see him joins the halt.
+   mate.target={id:enemy.id,ref:enemy,position:enemy.position,isPlayer:false,stance:0};
+   mate.targetVisible=false;mate.targetFromMemory=true;mate.targetLostTime=99;
+   const joined=runtime.RespondToContact(mate,{engage:true});
+   rows.engageContact={escape,engaged,post:!!s.missionContactPost,cover:s.cover?.id===shelter.cover.id,joined};
+   runtime.time+=R.contactMaxHoldS+.1;ai.time+=R.contactMaxHoldS+.1;
+   rows.engageContact.heldPastEscapeLimit=runtime.RespondToContact(s,{engage:true})&&!!s.missionContactPost;
+   runtime.time+=R.contactBoundAfterS;ai.time+=R.contactBoundAfterS;
+   Know(mate,enemy);mate.missionContactAt=runtime.time;
+   rows.engageContact.bounds=!runtime.RespondToContact(s,{engage:true})&&!!s.missionContactBound&&!s.missionContactPost;
+   rows.engageContact.mateCovers=runtime.RespondToContact(mate,{engage:true})&&!mate.missionContactBound;
+   s.TakeHit(5,'arm');
+   runtime.RespondToContact(s,{engage:true});
+   rows.engageContact.hitStopsBound=!s.missionContactBound&&!!s.missionContactPost;
+   ai.Dispose();
+  }
+  {
    const {FirstLevelMissionRuntime}=await import('./Script_FirstLevelMissionRuntime.mjs');
    const {MISSION_TUNING:R}=await import('./Data_Tuning_FirstLevel.mjs');
    const {ai,Spawn}=Harness(),s=Spawn('nra',0,0),enemy=Spawn('ija',0,-50);Know(s,enemy);
@@ -305,6 +337,8 @@ try{
  assert.equal(crouch.shots,0,'crouching under sustained heavy fire still holds fire');
  await fs.writeFile(path.join(project,'_shots','AiInitiative','Data_Initiative.json'),JSON.stringify({result,errors},null,2));
  console.log(JSON.stringify(result));
+ {const {escape,...engage}=result.engageContact;
+  assert.ok(escape===false&&Object.values(engage).every(Boolean),'outside the opening escape, 30 m contact halts into cover, holds past the escape timer, and advances by a staggered bound that a real hit cancels: '+JSON.stringify(result.engageContact));}
  assert.ok(Object.values(result.guideContact).every(Boolean),'visible close contact yields the guide route to combat, then releases it on the real finite timer');
  assert.ok(result.companionShelter.held&&result.companionShelter.moved>1&&!result.companionShelter.guided,
   'named escort leaves the route and physically reaches cover under distant fire, beyond the old forced-resume timer');

@@ -1229,3 +1229,45 @@ draw，SRP Batcher 是 Unity 的东西，这两条这里都用不上；能省的
 
 两人胶囊半径之和 0.68 m。验收：`Script_PlayerActorBlockTest.mjs`（正面挡、贴边滑过去、比身体窄的缝过不去且不陷进任何一个、被挤出限速、已在身体里只许往外走、各类豁免、楼层、卧姿半径、接线）；`Script_AiCrowdTest.mjs` 增加友军让路、玩家不被推、敌人与钉住的人不让。
 
+## 18. 2026-09-16：队友接敌先找掩体、节节抗击
+
+用户反馈：敌人出现时国军队友更倾向于沿任务路线往前走，而不是先就地抗击，也不去找附近的掩体。
+
+### 18.1 取证（改前）
+
+`_shots/SquadContact/Probe.mjs`（本地、不提交）从阶段跳转入口起跑，玩家跟在班长身后，逐帧记四名具名队友。改前的三条原因：
+
+- **规则**：`RespondToContact` 只认 12 m 内看得见的敌人；停满 `contactMaxHoldS` 就强制归队，之后 `contactResumeS` 内无视敌人。接敌点的掩体余量只有 `contactCoverSlackM` 0.9 m —— 罗班长 2.4 m、7 m 处有挡得住的掩体，被判超范围。只挨枪（危险分支）时才找 6 m 内掩体，找不到就沿路线走开。
+- **数据**：第一关全关只有 351 个手工掩体点，村里的院墙、矮墙、垛子都没登记。转运区队友 15 m 内 0 个点，撤退段只有 14 m 外 1 个。
+- **掩体周期**：选点时只看射线挡没挡住，紧急重选却按「人此刻站在墙哪一侧」判侧翼 —— 人还在接近路上就被判失效，下一拍又选回来。选中的点探头也看不见敌人时，没有换点的出口。
+
+### 18.2 改法
+
+- **交战规则**（`Script_FirstLevelMissionRuntime.EngageContact` / `UpdateContactBound`，数值 `Data_Tuning_FirstLevel.contactEngage*` / `contactBound*`）：`contactEscapeStages` 以外的阶段，队友看见（或 `contactMemoryS` 内看见过）`contactEngageRangeM` 内的活敌人就原地设接敌点，在 `contactEngageCoverSlackM` 内找掩体还击，没有掩体就跪姿还击。`contactSquadShareM` 内的弟兄已经在打、自己也知道这个敌人，就一起停。挨枪时没有掩体也不沿路线走开。
+- **跃进令牌**：在接敌点打满 `contactBoundAfterS`、压制不重、还有路线要走的人，按「谁先停下谁先走」领一段 `contactBoundM` 的跃进；同时最多 `contactBoundersMax` 人，两次放行至少间隔 `contactBoundStaggerS`，其余人原地掩护。跃进中真挨枪就中止，就地找掩体。
+- 开场冲过开阔地、进沟到遮蔽点集合（`contactEscapeStages = ["Unloading","TrenchEntry","Shelter","Village","Melee"]`；第 8–9 阶段村口到屋内伏击同理：开拍前三人要到灶屋门内埋伏位、幺娃要跟着担架，开拍后全班要站在屋里 —— 交战规则下三人晚到 1.2 s、幺娃被留在 11 m 外、罗班长出北门找掩体，`--stage-from=8` 依次红在这三条上；遮蔽点私语与命令要全班到位才触发，交战规则会让人停在沟里、流程卡在 Shelter —— 首版只排除 Unloading，`FirstLevelOpeningBrowserTest` 与 `--campaign` 均卡在 ShelterRegroup，基线通过）、第 5 阶段罗班长领玩家爬沟出击（`missionSortie`）与机枪手周的独立脚本保留原口径（§17 后的避险修正、2026-09-11 的「远处交火不打断逃离开阔地」）。
+- **派生掩体**（`Script_AiCover.DeriveCoversFromColliders`，数值 `Data_Tuning_AiCover.DERIVED_COVER`）：`FirstLevelWhiteboxField` 建场时，从贴地、够高、够长的静态碰撞盒派生掩体点：矮墙沿墙等距，高墙只在真正的墙头（墙接墙的接缝不算），叠起来的沙袋按整垛高度算。厚盒子（箱垛、土坯垛）四面各登记一个单面点（`oneSided`，有向法线；威胁在点所在的那一面时 `Query` 跳过）。表从 351 个点增至 623 个。**只给国军用**（`DERIVED_COVER.usableBy`，`Query` 的 `skipDerived` 在打分前就跳过，不占日军的验证名额）：合入 master 的样条交通壕之后，开场追兵日军躲进壕边派生点，玩家找不到人，流程卡在遮蔽点折角（关掉派生即通过）；日军的剧本拍都是按手工点调的。
+- **掩体周期**（`Script_Ai`，数值 `COVER_CYCLE.blindPeeksBeforeMove` / `flankGraceS`）：侧翼判定在选点和紧急重选时统一按隐蔽位定保护侧，选点时直接排除墙面顺着威胁方向的点；被判侧翼要持续 `flankGraceS` 才紧急换点（目标在两侧敌人间来回切时单拍判定会翻）；连续 `blindPeeksBeforeMove` 次探头都没看见目标，这个点记失败并换点。**这三条只对国军生效**（`COVER_CYCLE.refinedSides`）：合入新 master 后三条一起对日军生效时，`--stage-from=8` 的屋内伏击拍失序（班里人晚到约 2 s，屋里日军已被清光）；把 `Script_Ai` 换回 master 版即通过。日军侧判定与 master 逐字等价。
+
+### 18.3 改前 / 改后（同一探针，各阶段 40 s，四人合计，占「看见敌人」帧的比例；交付版实测）
+
+| 阶段 | 顺着路线走 | 站在空地不动 | 在掩体里 | 开枪次数 |
+|---|---|---|---|---|
+| 12 转运区防御 | 10% → 4% | 27% → 6% | 0% → 3% | 31 → 27 |
+| 15 撤向接收院 | 17% → 3% | 83% → 1% | 0% → 0% | 13 → 13 |
+| 16 接收院战斗 | 10% → 7% | 26% → 0% | 0% → 7% | 35 → 26 |
+
+转运区和撤退段本身是开阔地（转运棚与路面，最近的矮墙在 17–23 m 外），改后主要表现是跪姿还击加轮流跃进，而不是进掩体。接收院开枪次数略降，因为人会缩回掩体。第 8 阶段村口首版的数据（掩体帧 1% → 23%）不再适用，交付版这一段退回原规则，见 18.2。
+
+### 18.4 验收
+
+- `AiCoverTest`：派生规则（矮墙等距、旋转高墙的墙头、接缝、门楣、叠垛、厚垛单面点）与单面点的 `Query` 跳过。
+- `AiInitiativeBrowserTest` 的 `engageContact`：30 m 接敌在交战阶段停下进掩体，开场规则下不停；越过旧的 3.5 s 上限仍守着；知道敌人的弟兄一起停；打满时长后领跃进令牌、另一人留下掩护；跃进中挨枪立即中止。原 `guideContact`（开场规则）不变。
+- `AiCombatBrowserTest`：受控场地 `PickSite` 只从手工登记的墙里挑（`!c.derived`）。派生点在高墙上只登记墙头，站点会落在墙角，朝墙角边的最后目击点压制射击是正常行为，量不出「实墙挡住就停火」。断言本身未改。
+
+### 18.5 顺带修掉的开场集合死锁
+
+prepush 时 `FirstLevelOpeningBrowserTest` 卡在 ShelterRegroup，基线通过。原因不是交战规则：遮蔽点岗位原先按名册顺序硬分配（`shelterPosts[i]`），而 `UpdateSquad` 的让行也按名册顺序（后一个人给前一个人让路）。这次日军掩体行为变了，壕沟交火后四人的到达顺序跟着变：何有田走在最前面，却被派到最外侧的 −40 岗位，要掉头往回走。单人宽的交通壕里四人循环互让，行进层给四人的速度全是 0，卡满 110 秒。基线那局是班长先到，所以没触发。
+
+现在进入 Shelter 时按各人离遮蔽点的远近分配岗位：近的人拿里面的岗位，远的人拿外侧岗位，谁都不用走回头路。幺娃仍固定在玩家身边的岗位（`OPENING.shelterYaowaPost`，`ShelterAid` 要求他在玩家 5 m 内）。修后该测试通过。
+

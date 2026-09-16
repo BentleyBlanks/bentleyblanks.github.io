@@ -445,8 +445,16 @@ export class FirstLevelMissionRuntime {
     this.ai.SetStance(actor,0,R.companionGrenadeReplanS,true);
     return true;
   }
-  RespondToContact(actor) {
-    if(!actor?.alive || actor.unarmed || actor.scriptedNoncombatant || actor.carryRole || actor.meleeCombat)return false;
+  /**
+   * @param {{engage?:boolean}} [options] engage=false 是开场冲过开阔地的旧规则（近接敌短停、
+   *   无掩体就沿路线冲过去）；engage=true 是交战阶段的规则（Data_Tuning_FirstLevel 的
+   *   contactEngage* / contactBound*）。独立脚本（机枪手周）不传，保持原口径。
+   */
+  RespondToContact(actor, { engage = false } = {}) {
+    if(!actor?.alive || actor.unarmed || actor.scriptedNoncombatant || actor.carryRole || actor.meleeCombat){
+      if(actor)actor.missionContactBound=null;
+      return false;
+    }
     actor.scriptEscapeStance=null;
     // Damage still matters at the narrative health floor: another hit must
     // trigger shelter even though the protected actor cannot lose more health.
@@ -462,6 +470,8 @@ export class FirstLevelMissionRuntime {
     const exposedWounded=wounded && (actor.targetVisible || this.ai.time-(incoming?.at??-Infinity)<R.companionDangerHoldS);
     if(hit || newIncoming || exposedWounded || actor.suppression>=R.companionDangerSuppression)
       actor.missionDangerUntil=this.time+R.companionDangerHoldS;
+    // 跃进中的人照常走路线；真挨了枪才中止，就地重新找掩体。
+    if(engage && this.UpdateContactBound(actor,hit))return false;
     const danger=this.time<(actor.missionDangerUntil||0);
     if(danger){
       const hiding=this.ai.time<(actor.scriptShelterUntil||0);
@@ -470,8 +480,10 @@ export class FirstLevelMissionRuntime {
         actor.scriptShelterUntil=this.ai.time+R.companionShelterHoldS;
       // Never let a march timer pull a man out of shelter while bullets are
       // still passing him. Without a reachable shelter, keep escaping low.
+      if(!actor.missionContactPost)actor.missionContactAt=this.time;
       actor.missionContactPost??={x:actor.position.x,z:actor.position.z};
-      this.Defend(actor,actor.missionContactPost,R.contactRadiusM,R.companionCoverSlackM);
+      this.Defend(actor,actor.missionContactPost,R.contactRadiusM,
+        engage?Math.max(R.companionCoverSlackM,R.contactEngageCoverSlackM):R.companionCoverSlackM);
       actor.scriptCoverMaxRiseM=R.companionCoverMaxRiseM;
       this.ai.UpdateCover(actor);
       if(hit || wounded || actor.suppression>=R.companionProneSuppression
@@ -482,6 +494,12 @@ export class FirstLevelMissionRuntime {
       if(actor.cover){
         actor.missionContactUntil=actor.missionDangerUntil;
         actor.missionContactAt=this.time;
+        this.squadMarch?.Release(actor);
+        return true;
+      }
+      if(engage){
+        // 交战阶段没有掩体也不沿路线走开：就地放低姿态还击，前进交给跃进令牌。
+        actor.missionContactUntil=Math.max(actor.missionContactUntil||0,this.time+R.contactHoldS);
         this.squadMarch?.Release(actor);
         return true;
       }
@@ -502,6 +520,7 @@ export class FirstLevelMissionRuntime {
       }
       return false;
     }
+    if(engage)return this.EngageContact(actor);
     // A moving escort answers the threat in short bounds. Continuous visibility
     // must not pin the leader forever to the first enemy beside the route.
     if(actor.missionContactPost && (this.time>=actor.missionContactUntil || this.time-actor.missionContactAt>=R.contactMaxHoldS)){
@@ -524,6 +543,64 @@ export class FirstLevelMissionRuntime {
     }
     actor.missionContactPost=null;
     return false;
+  }
+  /**
+   * 交战阶段的接敌：看见（或 contactMemoryS 内看见过）contactEngageRangeM 内的活敌人，
+   * 或 contactSquadShareM 内的弟兄正在打、自己也知道这个敌人 —— 就地设接敌点，
+   * contactEngageCoverSlackM 内找掩体还击；没有掩体就跪下打。敌人消失 contactHoldS 后归队。
+   */
+  EngageContact(actor) {
+    const target=actor.target,live=!!target&&target.ref?.alive!==false;
+    const inRange=live&&Distance(actor.position,target.position)<=R.contactEngageRangeM;
+    const seen=inRange&&((actor.targetVisible&&!actor.targetFromMemory)||(actor.targetLostTime??Infinity)<R.contactMemoryS);
+    const mate=inRange&&!seen&&(this.squad||[]).some(o=>o!==actor&&o.alive&&o.missionContactPost
+      &&Distance(o.position,actor.position)<=R.contactSquadShareM);
+    if(seen||mate){
+      if(!actor.missionContactPost)actor.missionContactAt=this.time;
+      actor.missionContactUntil=this.time+R.contactHoldS;
+      actor.missionContactPost??={x:actor.position.x,z:actor.position.z};
+    }
+    if(!actor.missionContactPost || this.time>=actor.missionContactUntil){
+      actor.missionContactPost=null;
+      return false;
+    }
+    this.squadMarch?.Release(actor);
+    this.Defend(actor,actor.missionContactPost,R.contactRadiusM,R.contactEngageCoverSlackM);
+    actor.scriptCoverMaxRiseM=R.companionCoverMaxRiseM;
+    this.ai.UpdateCover(actor);
+    if(!actor.cover)this.ai.SetStance(actor,1,R.contactHoldS,true);
+    return true;
+  }
+  /**
+   * 跃进令牌：在接敌点打满 contactBoundAfterS、压制不重、还有路线要走的人，按「谁先停下谁先走」
+   * 领一段 contactBoundM（最长 contactBoundMaxS）的跃进；同时最多 contactBoundersMax 人，
+   * 两次放行至少隔 contactBoundStaggerS —— 其余人留在原地掩护。
+   * @returns {boolean} 这个人此刻正在跃进（调用方放行路线移动）
+   */
+  UpdateContactBound(actor, hit) {
+    const route=this.squadRoutes?.get(actor.id);
+    const bound=actor.missionContactBound;
+    if(bound){
+      if(hit || !route?.length || this.time>=bound.until || Distance(actor.position,bound.from)>=R.contactBoundM){
+        actor.missionContactBound=null;
+        this.contactBoundNextAt=Math.max(this.contactBoundNextAt||0,this.time+R.contactBoundStaggerS);
+        return false;
+      }
+      return true;
+    }
+    if(!actor.missionContactPost || !route?.length || this.time-(actor.missionContactAt??this.time)<R.contactBoundAfterS)return false;
+    if(this.time<(this.contactBoundNextAt||0) || actor.suppression>=R.companionHideSuppression
+      || this.ai.time<(actor.scriptShelterUntil||0))return false;
+    const squad=(this.squad||[]).filter(o=>o.alive);
+    if(squad.filter(o=>o.missionContactBound).length>=R.contactBoundersMax)return false;
+    // 谁先停下谁先走：比他停得早、同样能走的人还在等，就轮不到他。
+    if(squad.some(o=>o!==actor&&o.missionContactPost&&!o.missionContactBound&&this.squadRoutes?.get(o.id)?.length
+      &&o.suppression<R.companionHideSuppression&&(o.missionContactAt??Infinity)<actor.missionContactAt))return false;
+    actor.missionContactBound={until:this.time+R.contactBoundMaxS,from:{x:actor.position.x,z:actor.position.z}};
+    this.contactBoundNextAt=this.time+R.contactBoundStaggerS;
+    actor.missionContactPost=null;
+    this.ai.ReleaseCover(actor);
+    return true;
   }
   /**
    * Hold this spot and fight from it.
@@ -693,8 +770,11 @@ export class FirstLevelMissionRuntime {
       // 隔着灶屋门口对射帮不上忙。进了屋之后照常走共用的接触规则。
       const ambushEntry=stage==="Melee"&&actor.missionAmbushEntry&&!this.InRoom(actor.position);
       if(ambushEntry)actor.missionContactPost=null;
-      if(!ambushEntry&&!crawl&&R.openingContactStages.includes(stage)&&this.RespondToContact(actor))continue;
-      if(!R.openingContactStages.includes(stage))actor.missionContactPost=null;
+      if(ambushEntry||crawl)actor.missionContactBound=null;
+      if(!ambushEntry&&!crawl&&R.openingContactStages.includes(stage)
+        // 出击带路（Tank 的 missionSortie）是领着玩家爬沟，照旧短停就走。
+        &&this.RespondToContact(actor,{engage:!R.contactEscapeStages.includes(stage)&&!(stage==="Tank"&&actor.missionSortie)}))continue;
+      if(!R.openingContactStages.includes(stage)){actor.missionContactPost=null;actor.missionContactBound=null;}
       const route = this.squadRoutes.get(actor.id);
       if(stage==='Tank' && actor.missionSortie){
         while(route?.length && Distance(actor.position,route[0])<.8)route.shift();
