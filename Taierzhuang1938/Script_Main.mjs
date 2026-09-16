@@ -85,7 +85,7 @@ import {
 } from "./Script_FirstLevelWhiteboxFlow.mjs";
 import { NavGrid } from "./Script_Navigation.mjs";
 import { PlayerController } from "./Script_Player.mjs";
-import { AiDirector, MakeSoldierIdentity, STATE as AI_STATE } from "./Script_Ai.mjs";
+import { AiDirector, MakeSoldierIdentity, STATE as AI_STATE, CAPSULE as AI_CAPSULE } from "./Script_Ai.mjs";
 import { ActorFactory } from "./Script_Actor.mjs";
 import { GetLugouCharacterVariantEntries } from "./Script_CharacterModel.mjs";
 import { ActorBatcher } from "./Script_ActorBatch.mjs";
@@ -1299,6 +1299,9 @@ async function Boot() {
     // 地形在 Script_Battlefield，装配层只负责把这条查询接上
     WaterDepth: (x, z, y) => battlefield.WaterDepth(x, z, y),
     bounds: battlefield.bounds,
+    // 活人的身体挡玩家（Script_PlayerActorBlock）。ai 在下面才建，闭包按当时的值取。
+    ActorBlockers: () => ai?.soldiers,
+    ActorRadius: (s) => (s.childCapsules?.[s.stance] || AI_CAPSULE[s.stance] || AI_CAPSULE[0]).radius,
   }, { seed: 1938 });
   // 胶囊挂进物理世界。BuildField 已经把这一关的静态几何灌好了，
   // 这里补的是「玩家」这一具 —— 换关时由 EnterLevel 再挂一次新的。

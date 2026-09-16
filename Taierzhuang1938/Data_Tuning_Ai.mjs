@@ -227,6 +227,7 @@ export const HURT_FLINCH = Freeze({ base: 0.45, damageDiv: 90, decayS: 0.45 });
  * 这里每帧把水平距离小于 spacingM 的两个人沿连线各推开一半，位移照样走
  * `CharacterBody.Move`，推不进墙里；钉住的人（白刃、车厢表演、担架、剧本摆位）
  * 不挪，由另一个人承担全部推开量。敌我之间不推 —— 白刃与伏击本来就要贴身。
+ * 国军也给玩家让路（同样的距离与速度；玩家本人由 Script_PlayerActorBlock 挡住，不被推）。
  *
  * spacingM   两人水平间距低于它就开始推（站/蹲胶囊半径 0.34 × 2 = 0.68，加一点肩宽）
  * pushMps    推开速度上限（米/秒）；比走路慢得多，看起来是侧身让一步而不是被弹开

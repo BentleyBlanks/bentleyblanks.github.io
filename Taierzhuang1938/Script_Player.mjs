@@ -28,6 +28,7 @@ import { CoverLean, LeanClearance } from "./Script_CoverLean.mjs";
 import { AUTOMATIC_RECOIL } from "./Data_Tuning_FirearmHandling.mjs";
 import { FirearmHandling, GunClearance } from "./Script_FirearmHandling.mjs";
 import { CameraShake } from "./Script_CameraShake.mjs";
+import { BlockPlayerStep } from "./Script_PlayerActorBlock.mjs";
 import { MELEE_RULES } from "./Data_MeleeCombat.mjs";
 
 const UP = new THREE.Vector3(0, 1, 0);
@@ -984,6 +985,15 @@ export class PlayerController {
       this.ApplyWorldConstraint();
       body.Teleport(this.position.x, this.position.y, this.position.z);
       return;
+    }
+    // 人物的胶囊在物理里不挡玩家（见 Script_PlayerActorBlock 头注）：这一步先对
+    // 周围活人裁一次，走不进别人身体、贴边滑开；被人挤进身体时往外让。墙仍归控制器。
+    const actors = this.world.ActorBlockers?.();
+    if (actors?.length) {
+      const r = BlockPlayerStep(this.position, step.x, step.z, this.radius, actors,
+        this.world.ActorRadius, dt, this._actorBlock || (this._actorBlock = {}));
+      if (r.blocked && dt > 0) { this.velocity.x = r.slideX / dt; this.velocity.z = r.slideZ / dt; }
+      step.x = r.dx; step.z = r.dz;
     }
     const yBefore = this.position.y;
     const moved = body.Move(step.x, step.y, step.z);

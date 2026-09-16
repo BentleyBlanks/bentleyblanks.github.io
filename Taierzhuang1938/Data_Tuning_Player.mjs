@@ -355,3 +355,24 @@ export const HIT_DISORIENTATION = Object.freeze({
   minGain: 0.60,
   audioSmoothS: 0.018,
 });
+
+/**
+ * 玩家与人物的身体挡位（`Script_PlayerActorBlock`，2026-09-17）。人物胶囊在物理里不挡玩家，
+ * 车厢里能走进罗班长身体；这张表给那层裁剪用。
+ *
+ * maxDyM      高差超过它不算挡（楼上楼下、壕底与壕沿）
+ * pushOutMps  被人挤进身体时往外让的速度上限（米/秒）
+ * skinM       贴边判定容差：沿身体边沿滑动的数值误差不算侵入
+ * passes      一步里对周围的人结算几轮（夹在两人之间要两轮才收敛）
+ */
+export const PLAYER_ACTOR_BLOCK = Object.freeze({
+  /** 高差超过它不算挡（楼上楼下、壕底与壕沿、车厢地板与路基）。 */
+  maxDyM: 1.2,
+  /** 被人挤进身体时往外让的速度上限（米/秒）。 */
+  pushOutMps: 2.2,
+  /** 贴边判定的容差（米）：沿圆周滑动的数值误差不算侵入。 */
+  skinM: 0.002,
+  /** 同一步里最多和几个人各结算一轮（夹在两人之间时要两轮才能收敛）。 */
+  passes: 3,
+});
+

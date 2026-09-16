@@ -175,6 +175,7 @@ export const testDefs = {
     desc: "Kimodo受击倒下：两军四候选、稳定随机、全身贴地与终帧保持" },
   CharacterHitboxMathTest: { file: "Script_CharacterHitboxMathTest.mjs", desc: "人物子弹代理：精确球/胶囊首交点（纯 Node）" },
   PlayerHitboxTest: { file: "Script_PlayerHitboxTest.mjs", desc: "玩家命中几何：三姿态分段 / 正面部位次序 / 卧倒藏躯干 / 瞄点 / 散点部位分布（纯 Node，毫秒级）" },
+  PlayerActorBlockTest: { file: "Script_PlayerActorBlockTest.mjs", desc: "玩家走不进人物身体：正面挡/贴边滑/窄缝/被挤出/豁免（纯 Node）" },
   CoverLeanTest: { file: "Script_CoverLeanTest.mjs", desc: "墙角自动探身规则、侧向稳定性和头部扫掠（纯 Node）" },
   CoverLeanBrowserTest: { file: "Script_CoverLeanBrowserTest.mjs", timeoutMs: 240000, desc: "真实右键墙角探身、射击遮挡、手动控制和退出还原" },
   CameraShakeTest: { file: "Script_CameraShakeTest.mjs", desc: "相机震动：创伤漏光 / 弹簧回位 / 幅度封顶 / 距离与遮挡衰减 / 扑沟栽向下 / 确定性（纯 Node，毫秒级）" },
@@ -418,6 +419,7 @@ export const tier0Fast = [
   "CharacterModelTest",
   "CharacterHitboxMathTest",
   "PlayerHitboxTest",
+  "PlayerActorBlockTest",
   "CameraShakeTest",
   "FractureBakeTest",
   "CutsceneControlTest",
@@ -458,7 +460,7 @@ export const domains = {
   },
   physics: {
     label: "物理/移动/破坏（共享底座，下游成串跑）",
-    tests: ["MovementRangeTest", "PhysicsTest", "ColliderTest", "JumpTest", "DestructionTest", "FractureBakeTest"],
+    tests: ["MovementRangeTest", "PhysicsTest", "ColliderTest", "JumpTest", "DestructionTest", "FractureBakeTest", "PlayerActorBlockTest"],
   },
   combat: {
     label: "武器/伤害/枪感/瞄准（共享底座，碰弹道或输入要跑全串）",

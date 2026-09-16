@@ -1332,6 +1332,24 @@ export class AiDirector {
         b.crowdPushX += ux * push * shareB; b.crowdPushZ += uz * push * shareB;
       }
     }
+    // 友军给玩家让路（玩家这边的挡位在 Script_PlayerActorBlock：他走不进人身体里）。
+    // 不让的话窄壕里蹲在掩体位上的队友会把玩家堵死。玩家不被推，钉住的人不让，敌人不让。
+    const player = this.ctx?.player;
+    if (!player?.position || player.Alive === false) return;
+    const px = player.position.x, pz = player.position.z;
+    for (let i = 0; i < n; i += 1) {
+      const s = list[i];
+      if (!s.alive || s.side !== "nra" || this.CrowdPinned(s)) continue;
+      const dx = s.position.x - px, dz = s.position.z - pz;
+      const d2 = dx * dx + dz * dz;
+      if (d2 >= spacing2 || Math.abs(s.position.y - player.position.y) > CROWD.maxDyM) continue;
+      const d = Math.sqrt(d2);
+      let ux, uz;
+      if (d > 1e-4) { ux = dx / d; uz = dz / d; }
+      else { const angle = (s.id * 2.399) % (Math.PI * 2); ux = Math.cos(angle); uz = Math.sin(angle); }
+      const push = Math.min(spacing - d, maxStep);
+      s.crowdPushX += ux * push; s.crowdPushZ += uz * push;
+    }
   }
 
   /** 这个隐蔽位是不是已经被同阵营的另一个活人占着（`COVER.claimedHideClearanceM`）。 */

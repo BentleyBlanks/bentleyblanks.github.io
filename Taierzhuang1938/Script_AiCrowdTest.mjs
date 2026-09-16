@@ -86,6 +86,20 @@ Ok(!Host([]).CrowdPinned(Man(0, 0, { missionTrainPassenger: true, missionTrainRe
   host.SeparateSoldiers(1 / 60);
   Ok(b.crowdPushX === first, "unconsumed pushes are replaced, not accumulated");
 }
+// ⑥b 友军给玩家让路；玩家不动，敌人与钉住的人不让。
+{
+  const player = { Alive: true, position: { x: 0, y: 0, z: 0 } };
+  const mate = Man(0.3, 0), foe = Man(-0.3, 0, { side: "ija" }), pinned = Man(0, 0.3, { missionCarriageAction: {} });
+  const host = Object.assign(Host([mate, foe, pinned]), { ctx: { player } });
+  Run(host, 120);
+  Ok(Math.hypot(mate.position.x, mate.position.z) >= CROWD.spacingM - 1e-6, "an ally steps out of the player's way");
+  Ok(player.position.x === 0 && player.position.z === 0, "the player is never pushed by the crowd pass");
+  Ok(foe.position.x === -0.3, "enemies do not yield to the player");
+  Ok(pinned.position.z === 0.3, "pinned performers do not yield to the player");
+  const dead = Object.assign(Host([Man(0.3, 0)]), { ctx: { player: { Alive: false, position: { x: 0, y: 0, z: 0 } } } });
+  Run(dead, 30);
+  Ok(dead.soldiers[0].position.x === 0.3, "a dead player moves nobody");
+}
 // ⑦ 队友占着的隐蔽位不能再选；自己的、敌人的、死人的不算。
 {
   const me = Man(0, 0), mate = Man(3, 0, { cover: { hidePos: { x: 1, z: 1 } } });
