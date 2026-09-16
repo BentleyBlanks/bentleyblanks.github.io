@@ -303,6 +303,7 @@ id 是 `<段名>TrenchBay<n>`，段名在前。
 | `MISSION_TERRAIN.trenches` | 改成 getter → `TrenchPlanFor(this).trenches`（兼容视图：`id/role/points/depth/bottom/bank`，`bottom` = 标称 `floorW`） |
 | `SampleMissionTerrain` | 旧 `for (trench)` 循环换成一次 `plan.Apply(x,z,height,natural)`，位置不变（rail 之后、breach 之前）；抬起来的那部分乘 berm 掩码 |
 | `SampleMissionGroundColor` | 一次 `Apply(x,z,0,0)` 同时给两个答案：负数是开挖深度，正数是沟沿抛土高度，空地上是 0。比旧的逐条走 7 条折线还省 |
+| `SampleMissionGroundSurface`（分层地形，`docs/Data_TerrainLayers.md`） | 翻土层权重按 `Corridor(x,z)` 的实际 halfFloor / bank 铺（沿沟沿再多 0.8 m），麦茬的 3.5 m 退让带仍按标称折线量；第一关开了 `terrainLayers` 时走的是这条，上一行只剩弹坑重建等回退路 |
 | `Data_FirstLevelMissionLayout` | 删掉手写护壁循环；`MISSION_TRENCH_PLACEMENTS` 出件，`layout.trenchPlacements` 带出去 |
 | `Script_FirstLevelMissionFortifications` | `MISSION_DEFENSE_OBJECTS` 之后再吃 `layout.trenchPlacements` |
 
@@ -362,7 +363,7 @@ id 是 `<段名>TrenchBay<n>`，段名在前。
 - legacy 逐点等价：5000 点 ×2 编译，最差偏差 **1.55e-15 m**。
 - 热路径：`Apply` 10 万次 **29–110 ms**（随机器负载）。
 - junction：全网 **6 个**，(6,-124) 那个三岔口 **3 个成员**。
-- 布设（细尺度通道加入前）：护壁 **263 组** / 踏板 **46** / 射击位 **14** / 杂物 **10**。
+- 布设（含沟沿毛边与坡面粗糙度两路细尺度通道）：护壁 **261 组** / 踏板 **48** / 射击位 **14** / 杂物 **10**。
 
 **断面**（floorW / bankW，米）
 
