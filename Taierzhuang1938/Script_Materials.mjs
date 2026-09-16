@@ -118,7 +118,7 @@ function SsrEligible(minRoughness) {
  *   破口 —— 主材质 / 静态克隆 / 阴影深度三条链共用同一份 OBB。
  */
 export function InjectIndirectLighting(material,
-  { ssao = null, gi = null, ssr = null, destruction = null, shading = null } = {}) {
+  { ssao = null, gi = null, ssr = null, destruction = null, shading = null, surface = null } = {}) {
   // 半透明材质一律不挂 SSR：补丁要占用 gl_FragColor.a。这里再兜一次底，
   // 调用点漏判也不会把混合搞坏。
   const ssrUniforms = material.transparent ? null : ssr;
@@ -131,7 +131,7 @@ export function InjectIndirectLighting(material,
   material.userData.ssrUniforms = ssrUniforms;
   material.userData.destructionUniforms = destruction;
   ApplyPatches(material, IndirectLightingPatches({
-    orm, ssao, gi, ssr: ssrUniforms, destruction, shading,
+    orm, ssao, gi, ssr: ssrUniforms, destruction, shading, surface,
   }));
   // 布尔标记只给运行时取证与幂等接入用。不要把 uniforms 包塞进新标记：
   // 里面有 Texture，material.clone()/toJSON 会为每个人刷一屏“Unable to serialize”。
@@ -651,19 +651,29 @@ export class MaterialLibrary {
    * `ssr` 不传就用库里那一包；传 null 表示这份材质**不编 SSR**
    * （粗糙度下界超过 SSR 上限，见 `SsrEligible`）。
    */
-  _Inject(material, { destruction = null, ssr = undefined } = {}) {
+  _Inject(material, { destruction = null, ssr = undefined, surface = null } = {}) {
     // ORM 三合一先做：它决定材质自带的遮蔽还在不在 `aoMap` 上（摘掉之后
     // 微阴影要改读补丁声明的 gMaterialAo），而着色特性里那一位要跟着走。
     // 幂等 —— 二次注入取回同一份描述子。
     const orm = FoldOrmMaps(material);
     const spec = material.userData.materialShadingSurface;
-    if (spec) spec.hasAoMap = !!(orm && (orm.ao || material.aoMap));
+    // 表面补丁（分层地形）自己声明并写 gMaterialAo，材质上没有 aoMap 也照样有遮蔽。
+    if (spec) spec.hasAoMap = !!(orm && (orm.ao || material.aoMap)) || !!surface?.providesMaterialAo;
     const shading = this._ShadingPatch(material);
     const ssrPack = ssr === undefined ? this.ssr : ssr;
-    if (!this.ssao && !this.gi && !ssrPack && !shading && !destruction) return material;
+    if (!this.ssao && !this.gi && !ssrPack && !shading && !destruction && !surface) return material;
     return InjectIndirectLighting(material, {
-      ssao: this.ssao, gi: this.gi, ssr: ssrPack, destruction, shading,
+      ssao: this.ssao, gi: this.gi, ssr: ssrPack, destruction, shading, surface,
     });
+  }
+
+  /**
+   * 给一份自建材质挂「表面补丁」（反照率/法线/粗糙度/材质 AO 由补丁接管，见
+   * Script_TerrainMaterial），其余 AO / GI / 簇光 / 着色升级照库里的口径接。
+   * 这类材质表面粗糙度下界都在 SSR 上限之上，一律不编 SSR。
+   */
+  InjectSurface(material, surface) {
+    return this._Inject(material, { ssr: null, surface });
   }
 
   /** 无贴图的纯色 PBR（玻璃、水、旗面这类）。也吃 SSAO。 */

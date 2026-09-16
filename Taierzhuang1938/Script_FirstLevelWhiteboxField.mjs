@@ -86,9 +86,13 @@ function ColliderRecord(spec) {
 }
 
 export class FirstLevelWhiteboxField {
-  constructor(scene, _library, { bounds = null, zones = [], levelId = null, whiteboxLayout = null } = {}) {
+  constructor(scene, _library, { bounds = null, zones = [], levelId = null, whiteboxLayout = null, quality = "high" } = {}) {
     this.scene = scene;
     this.library = _library;
+    this.quality = quality;
+    // Layered terrain (Script_TerrainMaterial) once PrepareAssets loads it; null keeps the single-PBR path.
+    this.terrainLayers = null;
+    this.SampleGroundSurface = null;
     this.fortificationModels = null;
     this.fortificationPlacements = [];
     this.sharedFortificationMaterials = new Set();
@@ -146,7 +150,25 @@ export class FirstLevelWhiteboxField {
   StaticGroundHeight(x,z){return SampleWhiteboxSurface(this.staticWalkableSurfaces,x,z,this.terrain?.SampleHeight(x,z)??0);}
 
   async PrepareAssets() {
-    if (this.layout.ground?.pbr) {
+    if (this.layout.ground?.terrainLayers && this.layout.SampleGroundSurface && typeof document !== "undefined") {
+      // Splat-weighted texture-array terrain (docs/Data_TerrainLayers.md). A failed
+      // download falls back to the single tiled soil below; the level still builds.
+      try {
+        const { LoadTerrainLayers, CreateTerrainMaterial } = await import("./Script_TerrainMaterial.mjs");
+        this.terrainLayers = await LoadTerrainLayers(this.layout.ground.terrainLayers, { anisotropy: this.library.anisotropy });
+        const semantic = this.layout.ground.semantic;
+        this.materials.get(semantic)?.dispose();
+        this.materials.set(semantic, CreateTerrainMaterial(this.library, this.terrainLayers,
+          { quality: this.quality, name: "FirstLevelMissionTerrainLayers" }));
+        const scratch = [0, 0, 0];
+        this.SampleGroundSurface = this.layout.SampleGroundSurface;
+        this.SampleGroundColor = (x, z, out) => this.layout.SampleGroundSurface(x, z, out, scratch);
+      } catch (error) {
+        console.warn("[FirstLevelWhiteboxField] terrain layers unavailable, using tiled soil", error);
+        this.terrainLayers = null;
+      }
+    }
+    if (this.layout.ground?.pbr && !this.terrainLayers) {
       const { CloneShadedMaterial } = await import("./Script_Materials.mjs");
       const semantic = this.layout.ground.semantic;
       this.materials.get(semantic)?.dispose();
@@ -181,7 +203,21 @@ export class FirstLevelWhiteboxField {
     // adapter can replace its surface without touching walls or elevated floors.
     for (const mesh of sink.Flush(this.scene, { Get: (key) => this.materials.get(key) || this.whiteMaterial })) {
       mesh.name = "FirstLevelWhitebox_Ground"; mesh.userData.deformableTerrain = true;
-      if (this.layout.SampleGroundColor) {
+      if (this.SampleGroundSurface) {
+        // One corridor walk per vertex yields the layered tint and the splat weights.
+        const positions=mesh.geometry.attributes.position, colors=new Float32Array(positions.count*3);
+        const layers=new Float32Array(positions.count*3), rgb=[0,0,0], weights=[0,0,0];
+        const color=new THREE.Color();
+        for(let i=0;i<positions.count;i++) {
+          this.SampleGroundSurface(positions.getX(i),positions.getZ(i),rgb,weights);
+          color.setRGB(rgb[0],rgb[1],rgb[2],THREE.SRGBColorSpace).toArray(colors,i*3);
+          layers[i*3]=weights[0]; layers[i*3+1]=weights[1]; layers[i*3+2]=weights[2];
+        }
+        mesh.geometry.setAttribute('color',new THREE.BufferAttribute(colors,3));
+        // Float32 on purpose: the crater cutter copies every attribute into Float32 arrays.
+        mesh.geometry.setAttribute('terrainLayers',new THREE.BufferAttribute(layers,3));
+        mesh.material.vertexColors=true; mesh.material.color.setHex(0xffffff);
+      } else if (this.layout.SampleGroundColor) {
         const positions=mesh.geometry.attributes.position, colors=new Float32Array(positions.count*3);
         const color=new THREE.Color();
         for(let i=0;i<positions.count;i++) {
@@ -669,6 +705,10 @@ export class FirstLevelWhiteboxField {
     }
     this.meshes.length = 0;
     this.fortificationModels=null;this.fortificationPlacements=[];this.sharedFortificationMaterials.clear();
+    if (this.terrainLayers) {
+      this.terrainLayers.albedo.dispose(); this.terrainLayers.surface.dispose();
+      this.terrainLayers = null; this.SampleGroundSurface = null;
+    }
     this.colliders = [];
     this.covers = [];
     this.grid.clear();

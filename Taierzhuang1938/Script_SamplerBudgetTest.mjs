@@ -23,6 +23,9 @@
 // low / medium / high / ultra × `gi=0|1` 共八次装载，跑的是**正片**
 // （`?shot=1&phase=2`）—— 只有正片同时有静态墙材质、人物 GLB 材质、第一人称视模
 // 材质、水面与破口材质；探针页缺后三样，而最挤的那份恰恰是视模。
+// 另加三次**第一关**装载（`?whitebox=p012`）：地面是分层地形材质（两张 sampler2DArray 的
+// 表面补丁，docs/Data_TerrainLayers.md），只有这一关有；low|gi=0 / medium|gi=1 / ultra|gi=1
+// 覆盖地形的三种编译分档，并断言地形程序与它的砸坑变体真的编出来了。
 // 每一档都会把「cacheKey → 采样器数」整张表打出来：调参的人要能一眼看到
 // 当前最挤的是哪一只、离 16 还有多远。
 //
@@ -51,6 +54,9 @@ for (const quality of ["low", "medium", "high", "ultra"]) {
   for (const gi of [0, 1]) {
     CASES.push({ name: `${quality}|gi=${gi}`, quality, gi });
   }
+}
+for (const [quality, gi] of [["low", 0], ["medium", 1], ["ultra", 1]]) {
+  CASES.push({ name: `firstLevel ${quality}|gi=${gi}`, quality, gi, firstLevel: true });
 }
 const cases = ONLY ? CASES.filter((c) => c.name.includes(ONLY)) : CASES;
 
@@ -125,7 +131,7 @@ try {
       errors.push(`CONSOLE ${message.text().slice(0, 240)}`);
     });
     try {
-      const url = `http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&phase=2&manual=1`
+      const url = `http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&${item.firstLevel ? "whitebox=p012" : "phase=2"}&manual=1`
         + `&quality=${item.quality}&scale=small&gi=${item.gi}`;
       await page.goto(url, { waitUntil: "load", timeout: 180000 });
       await page.waitForFunction(() => window.Taierzhuang?.state?.ready, null, { timeout: 240000 });
@@ -170,6 +176,13 @@ try {
           ? over.slice(0, 4).map((r) => `${r.name} ${r.samplers}: ${r.names.join(",")}`).join(" / ")
           : `最挤的是 ${worst ? `${worst.name} ${worst.samplers}` : "(无程序)"}`);
       Report(rows.length > 0, `${item.name} 真的编出了程序`, `${rows.length} 个`);
+      if (item.firstLevel) {
+        // 砸坑变体由 TerrainDeformationView.Warm() 在进关时预编，不必真炸一次。
+        const terrain = rows.filter((row) => /terrain\d/.test(row.cacheKey));
+        const crater = terrain.filter((row) => /CraterSoilV4/.test(row.cacheKey));
+        Report(terrain.length > crater.length && crater.length > 0, `${item.name} 分层地形与砸坑变体都编出来了`,
+          terrain.map((row) => `${row.samplers}:${row.cacheKey.split(",").pop()}`).join(" / ") || "(没有地形程序)");
+      }
       Report(glError === 0, `${item.name} ${FRAMES} 帧无 GL 错误`, `getError=${glError}`);
       Report(errors.length === 0, `${item.name} 页面无控制台报错`, errors.slice(0, 3).join(" | "));
     } finally {

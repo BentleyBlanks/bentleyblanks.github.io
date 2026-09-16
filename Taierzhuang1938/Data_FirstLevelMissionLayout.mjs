@@ -5,7 +5,7 @@ import { OPENING } from "./Data_FirstLevelOpening.mjs";
 import { MISSION_TRAIN } from "./Data_FirstLevelMissionTrain.mjs";
 import { MISSION_DEFENSE_POSTS } from "./Data_FirstLevelMissionFortifications.mjs";
 import { P012_STATION_BLOCKS } from "./Data_FirstLevelP012Station.mjs";
-import { MISSION_TERRAIN, SampleMissionTerrain, MissionPathDistance, SampleMissionGroundColor } from "./Data_FirstLevelMissionTerrain.mjs";
+import { MISSION_TERRAIN, SampleMissionTerrain, MissionPathDistance, SampleMissionGroundColor, SampleMissionGroundSurface } from "./Data_FirstLevelMissionTerrain.mjs";
 import { MakeRailwayProfile } from "./Script_RoadPath.mjs";
 // A low field line through the halt: two rails on sleepers on a shallow ballast
 // bed that follows the shared heightfield. Script_RoadSpline builds it from this
@@ -680,8 +680,10 @@ export const MISSION_LAYOUT = Object.freeze({
   terrain: "P012Heightfield",
   terrainSpec: MISSION_TERRAIN,
   SampleGroundColor: SampleMissionGroundColor,
+  // Layered terrain palette + splat weights; used only when ground.terrainLayers loads.
+  SampleGroundSurface: SampleMissionGroundSurface,
   bounds: { minX: -205, maxX: 137, minZ: -258, maxZ: MISSION_TRAIN.approachEndZ },
-  ground: { x: -34, z: (MISSION_TRAIN.approachEndZ-258)/2, w: 342, d: MISSION_TRAIN.approachEndZ+258, h: 1, y: -0.5, semantic: "ground", pbr: "Ground", pbrOptions: { normalScale: .5, metalness: 0 } },
+  ground: { x: -34, z: (MISSION_TRAIN.approachEndZ-258)/2, w: 342, d: MISSION_TRAIN.approachEndZ+258, h: 1, y: -0.5, semantic: "ground", pbr: "Ground", pbrOptions: { normalScale: .5, metalness: 0 }, terrainLayers: "MissionPlain" },
   railway: MISSION_RAILWAY,
   semanticColors: {
     railBallast: 0x5a5750,

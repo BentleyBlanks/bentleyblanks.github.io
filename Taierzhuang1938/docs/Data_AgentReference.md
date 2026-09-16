@@ -111,6 +111,7 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
 | GTAO + 弯曲法线 + SSIL | `Script_PostGtao.mjs`、`Data_Tuning_Gtao.mjs` | §5 | `Script_GtaoTest.mjs` |
 | 级联阴影 + PCSS + 接触阴影 | `Script_Csm.mjs`、`Script_ContactShadows.mjs`、`Data_Tuning_Shadows.mjs` | §6 | `Script_CsmTest.mjs` ＋ `Script_BootTest.mjs`（三角红线）；出图 `Script_CsmShot.mjs` |
 | 主场景 / 材质烘焙 / 材质着色升级 | `Script_Materials.mjs`、`Script_TexBake.mjs`、`Script_MaterialShading.mjs`、`Data_Tuning_Materials.mjs` | §7 | `Script_MaterialUpgradeTest.mjs`（`--shot`） |
+| 分层地形材质（splat / 纹理数组 / 远近平铺 / 去重复 / 陡坡侧投影） | `Script_TerrainMaterial.mjs`、`Data_Tuning_Terrain.mjs`、`_import/Script_BakeTerrainLayers.py` | [Data_TerrainLayers.md](Data_TerrainLayers.md) | `Script_TerrainLayersTest.mjs`、`Script_SamplerBudgetTest.mjs`、`Script_FirstLevelMissionFortificationsTest.mjs` |
 | froxel 体积雾 / 体积光 | `Script_PostVolumetrics.mjs`、`Data_Tuning_Volumetrics.mjs` | §8 | `Script_VolumetricsTest.mjs` |
 | TAA / TAAU / FXAA / CAS | `Script_PostTaa.mjs`、`Script_PostFxaa.mjs`、`Data_Tuning_TemporalDof.mjs` | §9 | `Script_TaauTest.mjs` |
 | 直方图自动曝光 | `Script_PostExposure.mjs`、`Data_Tuning_Camera.mjs` | §10 | `Script_ExposureTest.mjs` |
@@ -179,6 +180,8 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
 ### 地形 / 高度
 - `Script_FarLand.mjs` —— 远景连续高度函数；网格、数据、道具落地**三边必须问同一个函数**
   （前身是「手抄高度表悄悄过期、道具整片浮空」）。
+- 第一关地面着色：`Script_TerrainMaterial.mjs` 分层地形材质（权重来自 `SampleMissionGroundSurface`），
+  口径与远处马赛克的实测在 `docs/Data_TerrainLayers.md`。
 - `Script_JieheHeight.mjs`（界河地面采样器，纯算术）、`Script_HeightmapCli.mjs`
   （SRTM 高程下载 / 采样 / 布设贴地 CLI，数据在 `Heightmap/`）。
 - 先读：`docs/Data_TaierzhuangHeightmap.md`（运行时契约）。

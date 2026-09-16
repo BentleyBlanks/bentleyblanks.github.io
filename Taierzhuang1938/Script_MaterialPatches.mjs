@@ -5,7 +5,9 @@
 // 加一个补丁的流程在 §1.11）。跨系统契约见项目 AGENTS.md 第 11 条。
 //
 // 三条硬线，改这个文件之前先看：
-//   · **现役顺序固定 ORM → AO → GI → CSM → SSR → 簇光 → 材质着色 → 破口**
+//   · **现役顺序固定 表面 / ORM → AO → GI → CSM → SSR → 簇光 → 材质着色 → 破口**
+//     （「表面」是接管反照率/法线/粗糙度的那一路，现役只有分层地形
+//     `Script_TerrainMaterial`；它与 ORM 互斥：地形材质上不挂 roughnessMap）
 //     （见本文件末尾的 `IndirectLightingPatches`，每一条为什么排在那儿都写了）。
 //   · **采样器有硬预算**：ANGLE-D3D11 上 `MAX_TEXTURE_IMAGE_UNITS = 16`，超了程序
 //     不链接、只有一行日志，而 three 每帧照样 `useProgram` —— 那只材质整个不画 +
@@ -70,6 +72,32 @@ import {
   CLUSTER_COMMON_GLSL, ClusterLoopGlsl, BindClusterUniforms, GetActiveClusteredLights,
 } from "./Script_ClusteredLights.mjs";
 import { MakeCsmPatch } from "./Script_Csm.mjs";
+
+/**
+ * 表面补丁在每个锚点后面留的收尾标记（一行 GLSL 注释）。
+ *
+ * 为什么要有：砸坑地表（`Script_TerrainDeformationView.ConfigureCraterSurface`）不走注册表，
+ * 它在源材质的钩子跑完之后自己做 `replace("#include <x>", "#include <x>
+坑的代码")`，
+ * 于是坑的代码总是紧贴在 chunk 后面、排在全部补丁**之前**。对普通材质这正是想要的
+ * 顺序；可表面补丁是在同一个锚点上**整值写** `roughnessFactor` / `normal` 的 ——
+ * 坑先把粗糙度与法线改好，紧接着被表面补丁盖回去。有标记时坑的代码插在标记之后
+ * （`InsertAfterSurfacePatch`），没有表面补丁的材质行为逐字节不变。
+ */
+export function SurfacePatchEnd(anchor) {
+  return `// @surface-patch-end ${anchor}`;
+}
+
+/** 把一段 GLSL 插在表面补丁之后；这份着色器没有表面补丁时退回紧贴锚点。 */
+export function InsertAfterSurfacePatch(source, anchor, glsl) {
+  const marker = SurfacePatchEnd(anchor);
+  const at = source.indexOf(marker);
+  if (at < 0) return source.replace(anchor, `${anchor}
+${glsl}`);
+  const end = at + marker.length;
+  return `${source.slice(0, end)}
+${glsl}${source.slice(end)}`;
+}
 
 /**
  * 造一个补丁。字段全是可选的（只加 uniform 不改代码也合法）。
@@ -797,9 +825,12 @@ export function MakeClusteredLightsPatch() {
  *     接屏幕空间接触阴影那张全屏图，以及把调试视图 9 改读级联可见度。
  */
 export function IndirectLightingPatches({
-  orm = null, ssao = null, gi = null, ssr = null, destruction = null, shading = null,
+  orm = null, ssao = null, gi = null, ssr = null, destruction = null, shading = null, surface = null,
 } = {}) {
   return [
+    // 表面补丁（分层地形）占 ORM 的位置：材质自带的反照率/法线/粗糙度/遮蔽由它写，
+    // 必须早于 AO（材质遮蔽先压、屏幕空间再压）与着色升级（微阴影读它写的 gMaterialAo）。
+    surface,
     MakeOrmPatch(orm), MakeSsaoPatch(ssao), MakeGiPatch(gi),
     // contact 的开关是**档位级**的（`Script_ContactShadows` 构造时告诉 Script_Csm），
     // 不从这里传：MaterialLibrary 的构造参数不该为了一个编译期布尔多一项。

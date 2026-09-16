@@ -467,7 +467,9 @@ ApplyPatches(material, [...IndirectLightingPatches({ ssao, gi, destruction }), s
   `onBeforeCompile` / `customProgramCacheKey` 抄过去：`Material.clone()` 会把 `defines`
   重置成 STANDARD / PHYSICAL、`userData` 走一遍 JSON（函数 key 全丢），抄来的 SyncDefines
   闭包又只认源材质 —— 克隆体第一次 getProgram 的键里少补丁位，照样孪生。
-* 现役顺序固定 **ORM → AO → GI → CSM → SSR → 簇光 → 材质着色 → 破口**（AO 那一路 2026-09 起是 GTAO 补丁，见 §5.4）：
+* 现役顺序固定 **表面 / ORM → AO → GI → CSM → SSR → 簇光 → 材质着色 → 破口**（AO 那一路 2026-09 起是 GTAO 补丁，见 §5.4；
+  「表面」槽 2026-09-17 加，接管反照率/法线/粗糙度/材质 AO 的那一路，现役只有分层地形，与 ORM 互斥，
+  口径与砸坑地表的 `SurfacePatchEnd` 标记见 [分层地形材质](Data_TerrainLayers.md) §3）：
   ORM 三合一排最前（它把材质自带的遮蔽乘进 `indirectDiffuse`，等价于三方 `aomap_fragment`
   chunk 原来的位置）；`<aomap_fragment>` 上同时挂着 AO 的乘法与 GI 的
   光照分量取证，AO 先压、取证后抓，面板读到的才是正式画面的值。
@@ -504,6 +506,7 @@ ApplyPatches(material, [...IndirectLightingPatches({ ssao, gi, destruction }), s
 |---|---:|---:|---|
 | 静态墙 / 地（`MaterialLibrary.Get`） | 19 | **14** | map / normalMap / roughnessMap(=ORM) / envMap / dfgLUT / 阴影×3 / uSsaoMap / uSsilMap / uGi×2 / uClusterData / uMatDetailNormalMap |
 | 砸坑地面（+ `CraterSoilV4`） | 21 | **16** | 上面那一排 + uCraterSoil + uCraterNormal |
+| 分层地形（第一关地面，2026-09-17） | — | **12** | 静态地面那一排去掉 map / normalMap / roughnessMap / uMatDetailNormalMap，加 uTerrainAlbedo + uTerrainSurface 两张 `sampler2DArray`；砸坑变体再 +2 |
 | 人物 GLB・皮肤（+ 预积分 LUT） | 20 | **16** | boneTexture / specularIntensityMap / map / roughnessMap / envMap / dfgLUT / 阴影×3 / uSsaoMap / uSsilMap / uGi×2 / uSsrMap / uClusterData / uMatSkinLut |
 | 人物 GLB・布（sheen） | 19 | **15** | 同上去掉皮肤 LUT（外部 GLB 一律不吃细节法线，atlas UV） |
 | 第一人称视模 | 19 | **15** | 同上，把 uSsrMap 换成 uFirstPersonShadowMap（视模不挂 SSR，见坑表） |

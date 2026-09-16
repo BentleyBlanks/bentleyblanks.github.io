@@ -257,3 +257,49 @@ export function SampleMissionGroundColor(x, z, out = [0, 0, 0]) {
   out[0]=r; out[1]=g; out[2]=b;
   return out;
 }
+
+// Layered terrain (Script_TerrainMaterial): the corridor tints above move into
+// real texture layers, so the vertex colour only keeps the rail-ballast spill.
+// `layers` = [track, spoil, open]: cart track (roads + pads), trench spoil, and
+// how much dry stubble the shader may grow here. Stubble keeps a clear margin
+// around every worked surface; the shader's macro noise decides the rest.
+const STUBBLE_CLEAR_M = 3.5;
+export function SampleMissionGroundSurface(x, z, color = [0, 0, 0], layers = [0, 0, 0]) {
+  let track = 0, spoil = 0, worked = 0;
+  for (const road of MISSION_TERRAIN.roads) {
+    const d = RouteDistanceWithin(x, z, road.points, road.width / 2 + STUBBLE_CLEAR_M);
+    if (d === Infinity) continue;
+    const t = 1 - Smooth((d - road.width / 2) / 1.8);
+    if (t > track) track = t;
+    const w = 1 - Smooth((d - road.width / 2) / STUBBLE_CLEAR_M);
+    if (w > worked) worked = w;
+  }
+  for (const pad of MISSION_TERRAIN.pads) {
+    const ex = Math.abs(x - pad.x) - pad.w / 2, ez = Math.abs(z - pad.z) - pad.d / 2;
+    if (ex >= STUBBLE_CLEAR_M || ez >= STUBBLE_CLEAR_M) continue;
+    const dx = ex > 0 ? ex : 0, dz = ez > 0 ? ez : 0, d = Math.sqrt(dx * dx + dz * dz);
+    const t = 1 - Smooth(d / 3);
+    if (t > track) track = t;
+    const w = 1 - Smooth(d / STUBBLE_CLEAR_M);
+    if (w > worked) worked = w;
+  }
+  for (const trench of MISSION_TERRAIN.trenches) {
+    // Spoil runs a little past the bank: the dug earth is heaped on the lip.
+    const reach = trench.bottom / 2 + trench.bank + 0.8;
+    const d = RouteDistanceWithin(x, z, trench.points, reach + STUBBLE_CLEAR_M);
+    if (d === Infinity) continue;
+    const t = 1 - Smooth((d - trench.bottom / 2 - trench.bank * 0.5) / (trench.bank * 0.5 + 0.8));
+    if (t > spoil) spoil = t;
+    const w = 1 - Smooth((d - trench.bottom / 2) / (trench.bank + STUBBLE_CLEAR_M));
+    if (w > worked) worked = w;
+  }
+  const rail = Math.abs(x + 77);
+  const railT = 1 - Smooth((rail - 2.4) / 1.5);
+  const railNear = 1 - Smooth((rail - 2.4) / STUBBLE_CLEAR_M);
+  if (railNear > worked) worked = railNear;
+  let r = 1, g = 1, b = 1;
+  if (railT > 0) { r += (.43 - r) * railT; g += (.44 - g) * railT; b += (.41 - b) * railT; }
+  color[0] = r; color[1] = g; color[2] = b;
+  layers[0] = track; layers[1] = spoil; layers[2] = 1 - worked;
+  return color;
+}
