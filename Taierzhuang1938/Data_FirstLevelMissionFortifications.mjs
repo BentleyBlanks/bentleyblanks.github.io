@@ -11,6 +11,9 @@ export const MISSION_DEFENSE_POSTS = Object.freeze([
 // Existing human-scale solid envelopes become layered bags, retaining their cover/route contract.
 export function IsMissionSandbagBlock(id) {
   if(id.includes("BagSeam"))return false;
+  // 沟沿上的射击位是 PCG 摆的（Script_TrenchPlan 的 bays 通道），id 是
+  // `<段名>TrenchBay<n>` —— 段名在前，所以这条不能锚在开头。
+  if(/TrenchBay\d+$/.test(id))return true;
   return /^(FrontParapet|FrontTraverseCover|MachineGunSideCover|MachineGunRest$|BundleParapet$|FlankParapet$|WithdrawCover|GuardWaitingCover|GuardWaitingWing|VillageRoadBlock$|VillageApproachCover$|TransferEastCover$|TransferCorner$|TransferWestCover$|DrainCorner$|RearExitCover$|FinalAlleyCover$)/.test(id)
     || MISSION_DEFENSE_POSTS.some(post=>post.id===id);
 }

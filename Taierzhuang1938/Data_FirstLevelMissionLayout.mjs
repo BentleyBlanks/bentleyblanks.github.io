@@ -5,7 +5,8 @@ import { OPENING } from "./Data_FirstLevelOpening.mjs";
 import { MISSION_TRAIN } from "./Data_FirstLevelMissionTrain.mjs";
 import { MISSION_DEFENSE_POSTS } from "./Data_FirstLevelMissionFortifications.mjs";
 import { P012_STATION_BLOCKS } from "./Data_FirstLevelP012Station.mjs";
-import { MISSION_TERRAIN, SampleMissionTerrain, MissionPathDistance, SampleMissionGroundColor } from "./Data_FirstLevelMissionTerrain.mjs";
+import { MISSION_TERRAIN, SampleMissionTerrain, MissionPathDistance, SampleMissionGroundColor, TrenchPlanFor } from "./Data_FirstLevelMissionTerrain.mjs";
+import { PlanTrenchDressing } from "./Script_TrenchPlan.mjs";
 import { MakeRailwayProfile } from "./Script_RoadPath.mjs";
 // A low field line through the halt: two rails on sleepers on a shallow ballast
 // bed that follows the shared heightfield. Script_RoadSpline builds it from this
@@ -393,25 +394,8 @@ function SupplyStack(id, x, z, rows = 2) {
 for (const [id,x,z,rows] of [["StationSupply",-54,64,3],["StationMedical",-60,82,2],
   ["KitchenStores",61,-12,2],["CourtStores",37,22,2],["TransferStores",66,124,3],
   ["ReceptionStores",-35,221,2]]) SupplyStack(id,x,z,rows);
-// Slatted revetment follows the real excavated bank, with a clear middle corridor.
-for (const trench of MISSION_TERRAIN.trenches) {
-  for (let segment = 1; segment < trench.points.length; segment++) {
-    const a = trench.points[segment-1], b = trench.points[segment], dx = b.x-a.x, dz = b.z-a.z;
-    const length = Math.hypot(dx,dz), yaw = Math.atan2(dx,dz);
-    for (let distance = 4; distance < length-3; distance += 5) {
-      for (const side of [-1,1]) {
-        const x=a.x+dx*distance/length+dz/length*side*(trench.bottom/2+.18);
-        const z=a.z+dz*distance/length-dx/length*side*(trench.bottom/2+.18);
-        if (MISSION_TERRAIN.trenches.some(other => other !== trench &&
-          MissionPathDistance({x,z},other.points) < other.bottom/2+2)) continue;
-        const id=trench.id+'Revetment'+segment+'_'+distance+'_'+side;
-        Detail(id+'Post',x,z,.13,.96,.17,"timber",{ry:yaw});
-        for (const level of [0,1,2]) Detail(id+'Slat'+level,x,z,.07,.16,3.5,"timber",
-          {ry:yaw,y:SampleMissionTerrain(x,z)+.15+level*.29});
-      }
-    }
-  }
-}
+// 护壁 / 踏板 / 射击位 / 杂物不再在这里手写：见文件末尾 MISSION_TRENCH_PLACEMENTS
+// 那一段（沿编译好的中心线 PCG，要等 MISSION_ROUTES / MISSION_PLACEMENT 定义完）。
 // Repeated sandbag seams provide scale without changing the proven solid envelope.
 for (const wall of blocks.filter(b=>b.semantic==='cover' && b.h<1.21 && b.w>2 && b.d<1)) {
   for (let x=wall.x-wall.w/2+.25,i=0;x<wall.x+wall.w/2-.2;x+=.65,i++)
@@ -654,6 +638,69 @@ export const MISSION_SUPPLIES = Object.freeze([
   {id:"Retreat",x:53.8,z:184,supportHeight:null},
   {id:"Reception",x:-7.8,z:231,supportHeight:null},
 ]);
+// 在沟里走、但线写在**别的文件**里的那几条。本文件不能 import
+// Data_FirstLevelMission（它 import 本文件，反过来读就是一个求值期的环），
+// 所以只能照抄那一小段。看守是 Script_FirstLevelMissionTest 的路线净空断言：
+// 那边改了线、这边没跟，它会指名道姓地红。
+const TRENCH_TRAFFIC_LANES = [
+  // 增援班从交通壕口沿 z=-123 散开到各自的射击位（测试里的 Relief<i> 路线）。
+  // 这条腿整段躺在 FrontTraverse 的沟里，偏中线 1 m 左右。
+  ...MISSION_PLACEMENT.reliefPositions.map((point) => [
+    MISSION_PLACEMENT.reliefApproach.at(-1), { x: point.x, z: -123 }, point]),
+  // 后院那三个追兵贴着撤离壕 (26,215) 的拐角外侧下来
+  //（Data_FirstLevelMission.MISSION_TACTICS.YardPursuerA/B/C，三条同线）。
+  [{ x: 27, z: 224 }, MISSION_REAR_ROUTES.evacuation[7], MISSION_REAR_ANCHORS.retreatC],
+];
+// 壕沟布设：沿编译好的中心线自动摆护壁、踏板、射击位沙袋和杂物
+// （Script_TrenchPlan.PlanTrenchDressing，参数在 TRENCH_PRESETS）。
+// 旧写法是「每 5 m 两侧各一根桩 + 3 条横板」的双重循环，间距、根数、倾斜全是
+// 常数 —— 那正是这一轮要去掉的「工业化」。
+// 为什么在这里而不是在上面那些 Detail() 旁边：它要吃 MISSION_ROUTES /
+// MISSION_PLACEMENT（就定义在上面几十行）和**当时已经摆好的全部实心体块**。
+// 下面那张老清理网留着当第二道保险（它只认 id 里的 `Revetment`）。
+//
+// 布设跑两遍：**沟里的路线就是沟的中心线**。opening/support 是 FrontCommunication、
+// bundle 是 BundleApproach、evacuation 是 WestEvacuation，连担架、通信兵、追兵那几条
+// 也都顺着沟底走。护壁摆在沟壁上（离中线 1.4 m 开外），只有横穿的路线才碰得到它，
+// 所以第一遍照常吃全部路线；踏板和杂物摆在沟底中线附近，吃同一套路线的结果是
+// **一件都不剩** —— 而踏板本来就是给人踩的，杂物是不带碰撞的箱子。
+// 两遍用同一个种子，件的位置逐位相同，差的只是筛掉了哪些。
+export const MISSION_TRENCH_PLACEMENTS = (() => {
+  const shared = { groundAt: SampleMissionTerrain, laneCuts: FrontAssaultLaneCuts };
+  const handPlaced = blocks.filter((block) => block.solid !== false)
+    .map((block) => ({ x: block.x, z: block.z, w: block.w, d: block.d, ry: block.ry || 0 }));
+  // 手挖的凹地也算占了地：机枪踏步、补给屋的地板。件摆在它们的过渡带上，中心与
+  // 端点会差半米高 —— 症状是沙袋一头埋进土里、踏板一头翘在半空。
+  // 半径乘几：PlanTrenchDressing 自己还要按件的尺寸再外扩（3.5 m 长的护壁是
+  // 2.25 m，2.4 m 的踏板是 1.7 m）。护壁贴在沟壁上、离踏步还有一堵墙，写 ×1 就够；
+  // 踏板躺在沟底，和踏步的斜面是同一片地，要 ×2 才躲得开。照直径给护壁写，整条
+  // 射击壕的护壁会被清光。
+  const StepBoxes = (scale) => MISSION_TERRAIN.steps.map((step) => ({
+    x: step.x, z: step.z, w: step.radius * scale, d: step.radius * scale, ry: 0 }));
+  const guarded = PlanTrenchDressing(TrenchPlanFor(MISSION_TERRAIN), {
+    ...shared,
+    keepOut: [...handPlaced, ...StepBoxes(1)],
+    avoidRoutes: [
+      ...Object.values(MISSION_ROUTES),
+      MISSION_PLACEMENT.reliefApproach,
+      ...MISSION_PLACEMENT.guardWithdrawalRoutes,
+      // 沟里活动的那几条：担架、通信兵、缺口进来的敌人、追到拐角的那一股
+      OPENING.woundedRoute, OPENING.runnerRoute, OPENING.trenchContactRoute,
+      ...Object.values(OPENING.intruderRoutes),
+      ...Object.values(OPENING.shelterPursuerRoutes).map((route) => route.points),
+      ...TRENCH_TRAFFIC_LANES,
+    ],
+  });
+  const floor = PlanTrenchDressing(TrenchPlanFor(MISSION_TERRAIN), {
+    ...shared, keepOut: [...handPlaced, ...StepBoxes(2)] });
+  const OnFloor = (id) => /Duckboard\d+$/.test(id);
+  for (const piece of [...guarded.blocks.filter((b) => !OnFloor(b.id)),
+    ...floor.blocks.filter((b) => OnFloor(b.id))]) {
+    const { id, x, z, w, h, d, semantic, ...extra } = piece;
+    (piece.solid === false ? Detail : Block)(id, x, z, w, h, d, semantic, extra);
+  }
+  return Object.freeze(floor.placements);
+})();
 // Leave continuous openings wherever a return route or stretcher corridor crosses a revetment.
 for (let i = blocks.length - 1; i >= 0; i--) {
   const block = blocks[i];
@@ -706,6 +753,10 @@ export const MISSION_LAYOUT = Object.freeze({
   },
   blocks,
   gates,
+  // 壕沟里的外部模型件（箱/板条箱/帆布）。放在 layout 上而不是并进
+  // MISSION_DEFENSE_OBJECTS：那张表在 Data_FirstLevelMissionFortifications 里，
+  // 而这份布设要吃本文件的体块做 keepOut —— 反过来 import 就是一个求值期的环。
+  trenchPlacements: MISSION_TRENCH_PLACEMENTS,
   walkableSurfaces: surfaces,
   zones: Object.entries(MISSION_ANCHORS).map(([id, p]) => ({ id, ...p, radius: 8 })),
 });

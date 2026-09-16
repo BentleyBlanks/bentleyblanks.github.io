@@ -1,5 +1,5 @@
 // 场景样条PCG编辑器（原「道路样条编辑器」，2026-08-27 扩围墙后改名）：
-// 把全城**沿线生成的场景元素** —— 铁路/道路/大街 + 寨墙/坝墙/石墙村 ——
+// 把全城**沿线生成的场景元素** —— 铁路/道路/大街 + 寨墙/坝墙/石墙村 + 第一关壕沟 ——
 // 按「中心线控制点」列出来，现场预览、拖点、加减点、调参，再导出誊回数据文件。
 //
 // ## 它编辑的是谁的数
@@ -13,6 +13,8 @@
 //   · 东关寨墙     Data_Tengxian.EAST_SUBURB.zhaiWall（x/fromZ/toZ —— 轴对齐格式）
 //   · 北关坝墙     Data_Tengxian.NORTH_SUBURB.stockade（z/fromX/toX —— 轴对齐格式）
 //   · 石墙村圩墙   Script_TengxianOutfield.OUTFIELD_SCENES[*].villages[*]（矩形 + 外扩 8 m）
+//   · 第一关壕沟   Data_FirstLevelMissionTrenches.MISSION_TRENCH_NETWORK.segments
+//                  （routeBound 的段点子来自任务/AI 路线，誊回那边，不是壕沟表）
 // 本面板把它们统一读成 [[x,z],...] 的控制点做预览编辑；导出的 JSON 里
 // 每条路线都带着 source，说明这串点该誊回哪个文件的哪个字段。
 // **轴对齐/矩形的数据誊回去时仍要保持原格式** —— 面板会在导出里对拖弯的条目标警告。
@@ -38,7 +40,7 @@
 
 import * as THREE from "three";
 import {
-  Panel, Section, ButtonRow, Chips, Slider, ListBox, Facts, Note, TextArea, Toggle,
+  El, Panel, Section, ButtonRow, Chips, Slider, ListBox, Facts, Note, TextArea, Toggle,
 } from "./Script_EditorUi.mjs";
 import { PHASES } from "./Data_Battle.mjs";
 import {
@@ -52,6 +54,16 @@ import {
 } from "./Script_WallSpline.mjs";
 import { MakeInstanced, MakeBox, TILE_METERS } from "./Script_Geo.mjs";
 import { ResolveTengxianMaterial } from "./Script_TengxianCity.mjs";
+import {
+  TRENCH_PRESETS, TrenchPreset, SetTrenchPresetOverride, ClearTrenchPresetOverrides,
+  SetTrenchSegmentOverride, ClearTrenchSegmentOverrides, TrenchRevision,
+  CompileTrenchNetwork, PlanTrenchDressing,
+} from "./Script_TrenchPlan.mjs";
+import {
+  BuildTrenchPreview, BuildTrenchDressingPreview, TRENCH_PREVIEW_COLORS,
+} from "./Script_TrenchSpline.mjs";
+import { MISSION_TRENCH_NETWORK } from "./Data_FirstLevelMissionTrenches.mjs";
+import { SampleMissionNaturalHeight } from "./Data_FirstLevelMissionTerrain.mjs";
 
 const STORE_KEY = "tz1938.sceneSplines.v1";
 const LEGACY_STORE_KEY = "tz1938.roadRoutes.v1";   // 改名前的道路面板存档，读得懂就迁
@@ -59,8 +71,12 @@ const LEGACY_STORE_KEY = "tz1938.roadRoutes.v1";   // 改名前的道路面板�
 /** 资产台离地高度：城内院墙 2 m 上下，抬到这里背景就只剩天。 */
 const ASSET_STAGE_LIFT = 13;
 
+/** 壕沟预设在同一张存档表里的键前缀 —— 与墙预设撞名（loop/fire 这种短名太容易撞）。 */
+const TRENCH_PRESET_PREFIX = "trench:";
+
 const KIND_COLOR = {
   street: 0xd9b45a, road: 0xc9a06a, railway: 0x8fa3b8, wall: 0x9c8a68,
+  trench: TRENCH_PREVIEW_COLORS.trench,
 };
 
 /**
@@ -97,7 +113,105 @@ const PARAM_DEFAULTS = {
 };
 
 /**
- * 出厂路线表：把散在各处的道路/围墙数据统一读成控制点。
+ * 壕沟版的「布设参数」滑杆表 —— Script_TrenchPlan.TRENCH_PRESETS 的直接映射。
+ *
+ * 分三组，理由与墙那张表同构但不是同一回事：
+ *   · 断面 —— 这条沟长什么样（沟底多宽、坡多缓、抛土堆多高）。玩法下限住在这一组：
+ *     担架过不过得去、两个人能不能并排、AI 胶囊卡不卡，都是断面的事。
+ *   · 随机 —— 「这不是挖掘机挖的」。全部是**位置噪声**，所以拐角和三岔口天然连续；
+ *     noiseCellM 是噪声格边长（调大 = 起伏变缓变长），不是抖动幅度。
+ *   · 布设 —— 沿沟摆的那些木护壁、射击位。间隔与跳过概率决定"有多齐整"。
+ *
+ * 带点号的键是嵌套字段（revetment.spacingM ⇒ TRENCH_PRESETS[x].revetment.spacingM）。
+ * 面板里一律按扁平点号键存改动，推给规划层前再展开成嵌套 patch（见 ExpandTrenchPatch）——
+ * 存档和导出里一眼看得出改的是哪一行，不用在嵌套 JSON 里找。
+ */
+const TRENCH_PARAMS = [
+  { key: "floorW", label: "沟底宽", min: 2.0, max: 6.0, step: 0.05, unit: "m", group: "断面" },
+  { key: "bankW", label: "坡宽", min: 0.8, max: 3.0, step: 0.05, unit: "m", group: "断面" },
+  { key: "bermH", label: "抛土堆高", min: 0, max: 0.8, step: 0.01, unit: "m", group: "断面" },
+  { key: "bermW", label: "抛土堆宽", min: 0.6, max: 3.2, step: 0.05, unit: "m", group: "断面" },
+  { key: "floorJitter", label: "沟底宽抖动", min: 0, max: 0.4, step: 0.01, unit: "×", group: "随机" },
+  { key: "bankJitter", label: "坡宽抖动", min: 0, max: 0.5, step: 0.01, unit: "×", group: "随机" },
+  { key: "depthJitter", label: "深度抖动", min: 0, max: 0.15, step: 0.005, unit: "×", group: "随机" },
+  { key: "noiseCellM", label: "噪声格边长", min: 3, max: 24, step: 0.5, unit: "m", group: "随机" },
+  { key: "cornerRadiusM", label: "拐角圆角", min: 0, max: 2, step: 0.05, unit: "m", group: "随机" },
+  { key: "revetment.spacingM", label: "护壁间隔", min: 2, max: 9, step: 0.1, unit: "m", group: "布设" },
+  { key: "revetment.skipChance", label: "护壁跳过率", min: 0, max: 0.6, step: 0.01, unit: "", group: "布设" },
+  { key: "bays.everyM", label: "射击位间隔", min: 12, max: 60, step: 1, unit: "m", group: "布设" },
+  { key: "bays.maxCount", label: "射击位上限", min: 0, max: 10, step: 1, unit: "个", group: "布设" },
+];
+
+const TRENCH_PARAM_DEFAULTS = {
+  floorW: 3.2, bankW: 1.5, bermH: 0.25, bermW: 1.6,
+  floorJitter: 0.16, bankJitter: 0.22, depthJitter: 0.04,
+  noiseCellM: 9, cornerRadiusM: 0.6,
+  "revetment.spacingM": 4.5, "revetment.skipChance": 0.12,
+  "bays.everyM": 34, "bays.maxCount": 6,
+};
+
+/** 段 role → 列表上的后缀，别让「回环」和「敌军坑道」只活在源码注释里。 */
+const TRENCH_ROLE_LABEL = { localLoop: "（回环）", enemyEntry: "（敌军坑道）" };
+
+function IsTrenchPresetKey(key) {
+  return typeof key === "string" && key.startsWith(TRENCH_PRESET_PREFIX);
+}
+
+function TrenchPresetName(key) {
+  return IsTrenchPresetKey(key) ? key.slice(TRENCH_PRESET_PREFIX.length) : null;
+}
+
+/** TrenchPreset 的防弹版：预设名写错时给出厂表里的第一项，不把整张路线表带崩。 */
+function SafeTrenchPreset(name) {
+  try {
+    const preset = TrenchPreset(name);
+    if (preset) return preset;
+  } catch (error) { /* 落到下面 */ }
+  return TRENCH_PRESETS[name] || TRENCH_PRESETS.communication || {};
+}
+
+/** 点号键取值：GetPath(preset, "revetment.spacingM")。 */
+function GetPath(object, path) {
+  let node = object;
+  for (const part of String(path).split(".")) {
+    if (node == null) return undefined;
+    node = node[part];
+  }
+  return node;
+}
+
+/**
+ * 扁平点号改动 → 嵌套 patch。
+ *
+ * 嵌套那一层**整只带过去**（出厂值打底 + 改过的字段覆盖），这样规划层不管是
+ * 浅合并还是深合并都得到同一个结果 —— 面板不该去猜别人的合并语义。
+ */
+function ExpandTrenchPatch(name, edits) {
+  const base = TRENCH_PRESETS[name] || {};
+  const patch = {};
+  for (const [key, value] of Object.entries(edits || {})) {
+    const dot = key.indexOf(".");
+    if (dot < 0) { patch[key] = value; continue; }
+    const head = key.slice(0, dot);
+    const tail = key.slice(dot + 1);
+    if (!patch[head]) patch[head] = { ...(base[head] || {}) };
+    patch[head][tail] = value;
+  }
+  return patch;
+}
+
+/**
+ * 第一关的壕沟网络：优先读布局挂上来的那一份（集成包接好之后就是它），
+ * 读不到再退回源码里的常量 —— 但**只对第一关白盒**退回，别让县城几关凭空多出七条沟。
+ */
+function TrenchNetworkFor(layout) {
+  const attached = layout?.terrainSpec?.trenchNetwork ?? null;
+  if (attached) return attached;
+  return layout?.terrain === "P012Heightfield" ? MISSION_TRENCH_NETWORK : null;
+}
+
+/**
+ * 出厂路线表：把散在各处的道路/围墙/壕沟数据统一读成控制点。
  * layout：当前白盒布局（第一关）。带 railway spec 的就列出那条铁路，预览走同一份 spec。
  */
 export function CollectSceneSplineRoutes(levelId = null, layout = null) {
@@ -249,6 +363,29 @@ export function CollectSceneSplineRoutes(levelId = null, layout = null) {
       });
     }
   }
+  // --- 第一关壕沟（样条壕沟管线 Script_TrenchPlan 的调用点） ---
+  // 摆在最后：这张表的第一条是「打开面板默认选中的那条」，
+  // 别让加一路壕沟顺手改掉所有人打开面板时看到的东西。
+  const network = TrenchNetworkFor(layout);
+  for (const seg of network?.segments || []) {
+    const preset = SafeTrenchPreset(seg.preset);
+    routes.push({
+      key: `whitebox:${layout?.id || "p012"}:trench:${seg.id}`,
+      id: seg.id,
+      label: `壕沟 · ${seg.id}${TRENCH_ROLE_LABEL[seg.role] || ""}`,
+      kind: "trench",
+      source: seg.source || "Data_FirstLevelMissionTrenches.MISSION_TRENCH_NETWORK.segments",
+      points: seg.points.map((p) => [p.x, p.z]),
+      trench: {
+        preset: seg.preset,
+        depth: seg.depth ?? preset?.depth ?? 2.0,
+        widthScale: seg.widthScale ?? 1,
+        role: seg.role || null,
+        routeBound: !!seg.routeBound,
+      },
+      axisLocked: false,
+    });
+  }
   return routes;
 }
 
@@ -281,6 +418,10 @@ export class SplineEditor {
     this.assetHeight = 2;
     this.ownedAssets = [];        // 资产台自己烘的几何，退出时 dispose
     this.ownedAssetMaterials = [];
+    this.trenchPlanCache = null;  // { revision, network, plan }
+    this.trenchDressingCache = null;  // { plan, dressing }
+    this.trenchPushed = new Set();    // 已经推给规划层的段覆盖（撤销时要清回去）
+    this.trenchStats = null;      // 最近一次壕沟预览的取证读数
     this.Restore();
     this.ApplyPresetEdits();
     this.routes = this.Collect();
@@ -299,10 +440,80 @@ export class SplineEditor {
       if (!o) continue;
       if (o.width) route.width = o.width;
       if (o.height) route.height = o.height;
+      if (o.trench && route.trench) route.trench = { ...route.trench, ...o.trench };
       if (Array.isArray(o.points) && o.points.length >= 2) route.points = o.points;
       route.edited = true;
     }
+    this.routes = routes;
+    this.SyncTrenchOverrides(routes);
     return routes;
+  }
+
+  // -------------------------------------------------------------------------
+  // 壕沟：覆盖推送 / 编译缓存
+  // -------------------------------------------------------------------------
+
+  /**
+   * 把面板里的壕沟改动推给 Script_TrenchPlan。
+   *
+   * 与围墙 SetWallPresetOverride 同一条纪律：**面板和建关读的是同一份覆盖**，
+   * 所以退出面板重建关卡时，集成层按 TrenchRevision() 做的编译缓存会自动失效重编。
+   * 只推「真有改动」的段，并记住推过谁 —— 「还原所选」之后要显式推一个 null 回去，
+   * 否则规划层里会留着一份没人再认领的覆盖（刷新才消失，那是最难查的一类残留）。
+   */
+  SyncTrenchOverrides(routes = this.routes) {
+    const wanted = new Map();
+    for (const route of routes || []) {
+      if (route.kind !== "trench" || !this.overrides[route.key]) continue;
+      wanted.set(route.id, {
+        points: route.points.map((p) => ({ x: p[0], z: p[1] })),
+        depth: route.trench?.depth,
+        widthScale: route.trench?.widthScale,
+      });
+    }
+    for (const id of this.trenchPushed) {
+      if (!wanted.has(id)) SetTrenchSegmentOverride(id, null);
+    }
+    for (const [id, patch] of wanted) SetTrenchSegmentOverride(id, patch);
+    this.trenchPushed = new Set(wanted.keys());
+  }
+
+  TrenchNetwork() {
+    return TrenchNetworkFor(this.host.game.battlefield?.layout);
+  }
+
+  /** 编译（带面板覆盖）后的壕沟网络；revision 没变就复用，拖一个点不该重编七条沟。 */
+  TrenchPlan() {
+    const network = this.TrenchNetwork();
+    if (!network) return null;
+    const revision = TrenchRevision();
+    const cache = this.trenchPlanCache;
+    if (cache && cache.revision === revision && cache.network === network) return cache.plan;
+    let plan = null;
+    try {
+      plan = CompileTrenchNetwork(network, { natural: SampleMissionNaturalHeight });
+    } catch (error) {
+      console.warn("[SplineEditor] 壕沟编译失败：", error);
+      return null;
+    }
+    this.trenchPlanCache = { revision, network, plan };
+    this.trenchDressingCache = null;
+    return plan;
+  }
+
+  /** 布设预览的账：跟着 plan 走，plan 没换就不重算（它要遍历全网所有站点）。 */
+  TrenchDressing(plan) {
+    if (!plan) return null;
+    if (this.trenchDressingCache?.plan === plan) return this.trenchDressingCache.dressing;
+    let dressing = null;
+    try {
+      dressing = PlanTrenchDressing(plan, { groundAt: (x, z) => this.GroundAt(x, z) });
+    } catch (error) {
+      console.warn("[SplineEditor] 壕沟布设预览失败：", error);
+      return null;
+    }
+    this.trenchDressingCache = { plan, dressing };
+    return dressing;
   }
 
   // -------------------------------------------------------------------------
@@ -358,6 +569,7 @@ export class SplineEditor {
       { value: "road", label: "土路" },
       { value: "railway", label: "铁路" },
       { value: "wall", label: "围墙" },
+      { value: "trench", label: "壕沟" },
     ], this.kindFilter, (value) => { this.kindFilter = value; this.FillList(); });
     this.list = ListBox(list, { height: 180, onPick: (key) => this.Select(key) });
     Toggle(list, "叠加显示全部路线", this.showAll, (on) => {
@@ -384,6 +596,18 @@ export class SplineEditor {
       format: (v) => `${v.toFixed(2)} m`,
       onInput: (v) => this.PatchSelected((r) => { r.height = +v.toFixed(2); }),
     });
+    // 壕沟的两根：**段级**覆盖（这一条沟自己的事），与「布设参数」那一档的
+    // 预设滑杆不是一回事 —— 预设改的是「所有交通壕」，这两根只改选中的这一条。
+    this.trenchWidthSlider = Slider(edit, {
+      label: "沟底宽比例", min: 0.6, max: 1.6, step: 0.05, value: 1,
+      format: (v) => `${v.toFixed(2)} ×`,
+      onInput: (v) => this.PatchTrench("widthScale", +v.toFixed(2)),
+    });
+    this.trenchDepthSlider = Slider(edit, {
+      label: "设计深度", min: 1.5, max: 2.6, step: 0.05, value: 2,
+      format: (v) => `${v.toFixed(2)} m`,
+      onInput: (v) => this.PatchTrench("depth", +v.toFixed(2)),
+    });
     ButtonRow(edit, [
       { label: "飞到该路线", onClick: () => this.FlyToSelected() },
       { label: "还原所选", onClick: () => this.RevertSelected() },
@@ -396,7 +620,7 @@ export class SplineEditor {
     this.presetList = ListBox(pcg, {
       height: 132, onPick: (key) => this.SelectPreset(key),
     });
-    this.assetFacts = Facts(pcg, ["有效步距 / 露缝", "改动"]);
+    this.assetFacts = Facts(pcg, ["有效步距 / 露缝", "改动", "断面 底/坡/深", "射击位"]);
     Toggle(pcg, "在场里摆出拼接资产台", this.showAssets, (on) => {
       this.showAssets = on;
       this.BuildAssets();
@@ -406,15 +630,17 @@ export class SplineEditor {
       { label: "资产台搬到眼前", onClick: () => { this.assetAnchor = null; this.BuildAssets(); this.FlyToAssets(); } },
       { label: "还原该预设", onClick: () => this.RevertPreset() },
     ]);
+    this.assetNote = Note(pcg, "");
+    this.assetNote.style.display = "none";
 
+    // 两张滑杆表活在两只盒子里，按当前预设整只显隐。
+    // 为什么不共用一排滑杆按需改 min/max：墙和沟的字段根本不是同一组东西，
+    // 复用会让「护壁间隔」这根滑杆在切到墙之后继续显示一个壕沟的数。
     this.paramSliders = {};
-    let lastGroup = "";
+    this.wallParamBox = El("div");
+    pcg.appendChild(this.wallParamBox);
     for (const row of WALL_PARAMS) {
-      if (row.group !== lastGroup) {
-        lastGroup = row.group;
-
-      }
-      this.paramSliders[row.key] = Slider(pcg, {
+      this.paramSliders[row.key] = Slider(this.wallParamBox, {
         label: row.label, min: row.min, max: row.max, step: row.step,
         value: PARAM_DEFAULTS[row.key],
         format: (v) => `${row.step >= 1 ? v.toFixed(0) : v.toFixed(3)}${row.unit}`,
@@ -422,8 +648,27 @@ export class SplineEditor {
       });
     }
 
+    this.trenchParamSliders = {};
+    this.trenchParamBox = El("div");
+    pcg.appendChild(this.trenchParamBox);
+    let lastGroup = "";
+    for (const row of TRENCH_PARAMS) {
+      if (row.group !== lastGroup) {
+        lastGroup = row.group;
+        this.trenchParamBox.appendChild(El("div", "edNote", row.group));
+      }
+      this.trenchParamSliders[row.key] = Slider(this.trenchParamBox, {
+        label: row.label, min: row.min, max: row.max, step: row.step,
+        value: TRENCH_PARAM_DEFAULTS[row.key] ?? row.min,
+        format: (v) => `${row.step >= 1 ? v.toFixed(0) : v.toFixed(3)}${row.unit}`,
+        onInput: (v) => this.PatchTrenchPreset(row.key, +v.toFixed(4)),
+      });
+    }
+    this.trenchParamBox.style.display = "none";
+
     const evidence = Section(body, "取证");
-    this.facts = Facts(evidence, ["长度 / 控制点", "选中点"]);
+    this.facts = Facts(evidence, ["长度 / 控制点", "选中点",
+      "壕沟 站/三角/接口", "布设件 / 编译版本", "实测深度 最浅/最深"]);
     this.status = Note(evidence, "", true);
 
     const io = Section(body, "导出 / 导入");
@@ -445,37 +690,84 @@ export class SplineEditor {
   FillPresetList() {
     if (!this.presetList) return;
     const used = new Set(this.routes.filter((r) => r.wall?.preset).map((r) => r.wall.preset));
-    this.presetList.Fill(Object.entries(WALL_PRESETS).map(([key, preset]) => ({
+    const trenchUsed = new Set(this.routes.filter((r) => r.trench?.preset).map((r) => r.trench.preset));
+    const items = Object.entries(WALL_PRESETS).map(([key, preset]) => ({
       id: key,
       name: `${this.presetEdits[key] ? "✎ " : ""}${preset.label || key}`,
       tail: used.has(key) ? "本关" : "",
       title: `${key}
 style=${preset.style}`,
-    })));
+    }));
+    for (const [name, preset] of Object.entries(TRENCH_PRESETS)) {
+      const key = TRENCH_PRESET_PREFIX + name;
+      items.push({
+        id: key,
+        name: `${this.presetEdits[key] ? "✎ " : ""}壕沟 · ${preset.label || name}`,
+        tail: trenchUsed.has(name) ? "本关" : "",
+        title: `${key}
+Script_TrenchPlan.TRENCH_PRESETS.${name}`,
+      });
+    }
+    this.presetList.Fill(items);
     this.presetList.Select(this.presetKey);
   }
 
   SelectPreset(key) {
-    if (!WALL_PRESETS[key]) return;
+    const trenchName = TrenchPresetName(key);
+    if (trenchName ? !TRENCH_PRESETS[trenchName] : !WALL_PRESETS[key]) return;
     this.presetKey = key;
     this.presetList.Select(key);
     this.SyncPresetUi();
     this.BuildAssets();
   }
 
-  /** 滑杆读数跟上当前预设。 */
+  /** 滑杆读数跟上当前预设；墙/沟两张表整只显隐。 */
   SyncPresetUi() {
     if (!this.paramSliders) return;
-    const values = this.PresetValues();
-    for (const row of WALL_PARAMS) {
-      this.paramSliders[row.key]?.Set(values[row.key]);
+    const trenchName = TrenchPresetName(this.presetKey);
+    if (this.wallParamBox) this.wallParamBox.style.display = trenchName ? "none" : "";
+    if (this.trenchParamBox) this.trenchParamBox.style.display = trenchName ? "" : "none";
+    if (trenchName) {
+      const values = this.TrenchPresetValues(trenchName);
+      for (const row of TRENCH_PARAMS) this.trenchParamSliders[row.key]?.Set(values[row.key]);
+    } else {
+      const values = this.PresetValues();
+      for (const row of WALL_PARAMS) this.paramSliders[row.key]?.Set(values[row.key]);
     }
     this.RefreshAssetFacts();
+  }
+
+  /** 当前壕沟预设的完整参数（出厂值 + 面板改动），键是扁平点号。 */
+  TrenchPresetValues(name = TrenchPresetName(this.presetKey)) {
+    const preset = SafeTrenchPreset(name);
+    const out = {};
+    for (const row of TRENCH_PARAMS) {
+      const value = GetPath(preset, row.key);
+      out[row.key] = Number.isFinite(value) ? value : (TRENCH_PARAM_DEFAULTS[row.key] ?? row.min);
+    }
+    return out;
   }
 
   RefreshAssetFacts() {
     if (!this.assetFacts) return;
     const key = this.presetKey;
+    const trenchName = TrenchPresetName(key);
+    if (trenchName) {
+      const preset = SafeTrenchPreset(trenchName);
+      const v = this.TrenchPresetValues(trenchName);
+      this.assetFacts.Set("预设 / 风格", `壕沟 · ${preset.label || trenchName}`);
+      this.assetFacts.Set("断面 底/坡/深",
+        `${v.floorW.toFixed(2)} / ${v.bankW.toFixed(2)} / ${(preset.depth ?? 2).toFixed(2)} m`);
+      this.assetFacts.Set("有效步距 / 露缝",
+        `护壁 ${v["revetment.spacingM"].toFixed(1)} m / 跳过 ${(v["revetment.skipChance"] * 100).toFixed(0)}%`);
+      this.assetFacts.Set("抛土堆 高×宽",
+        `${v.bermH.toFixed(2)} × ${v.bermW.toFixed(2)} m · ${preset.bermSide || "both"}`);
+      this.assetFacts.Set("射击位", `每 ${v["bays.everyM"].toFixed(0)} m，上限 ${v["bays.maxCount"].toFixed(0)} 个`);
+      const editedTrench = this.presetEdits[key];
+      this.assetFacts.Set("改动", editedTrench ? Object.keys(editedTrench).join("、") : "无（出厂值）",
+        editedTrench ? "warn" : "");
+      return;
+    }
     const preset = WallPreset(key);
     const v = this.PresetValues();
     this.assetFacts.Set("预设 / 风格", `${preset.label || key} · ${preset.style}`);
@@ -574,6 +866,17 @@ style=${preset.style}`,
   BuildAssets() {
     this.ClearAssets();
     this.RefreshAssetFacts();
+    // 壕沟没有「拼接件」：沟是挖出来的，护壁/踏板/沙袋是沿线撒的布设件，
+    // 摆一台原始几何出来什么也说明不了。说清楚，而不是抛一个烘焙失败的 warn。
+    const trenchName = TrenchPresetName(this.presetKey);
+    if (this.assetNote) {
+      this.assetNote.style.display = trenchName ? "" : "none";
+      if (trenchName) {
+        this.assetNote.textContent = "壕沟预设没有拼接资产台 —— 沟是挖出来的不是摆出来的。"
+          + "护壁/踏板/射击位在选中壕沟路线时的布设预览里看（半透明盒子）。";
+      }
+    }
+    if (trenchName) return;
     if (!this.showAssets) return;
     const a = this.AssetAnchor();
     let set = null;
@@ -679,7 +982,7 @@ style=${preset.style}`,
     this.list.Fill(this.Visible().map((route) => ({
       id: route.key,
       name: `${route.edited ? "✎ " : ""}${route.label}`,
-      tail: { street: "街", road: "路", railway: "铁", wall: "墙" }[route.kind] || "",
+      tail: { street: "街", road: "路", railway: "铁", wall: "墙", trench: "沟" }[route.kind] || "",
       title: `${route.key}\n${route.source}`,
     })));
     this.list.Select(this.selectedKey);
@@ -692,16 +995,26 @@ style=${preset.style}`,
     this.selectedPoint = -1;
     this.list.Select(key);
     const isWall = route.kind === "wall";
+    const isTrench = route.kind === "trench";
     if (this.widthSlider) {
-      this.widthSlider.root.style.display = isWall ? "none" : "";
-      if (!isWall && route.width) this.widthSlider.Set(route.width);
+      this.widthSlider.root.style.display = (isWall || isTrench) ? "none" : "";
+      if (!isWall && !isTrench && route.width) this.widthSlider.Set(route.width);
     }
     if (this.heightSlider) {
       this.heightSlider.root.style.display = isWall ? "" : "none";
       if (isWall && route.height) this.heightSlider.Set(route.height);
     }
-    if (isWall && route.wall?.preset && route.wall.preset !== this.presetKey) {
-      this.presetKey = route.wall.preset;
+    for (const slider of [this.trenchWidthSlider, this.trenchDepthSlider]) {
+      if (slider) slider.root.style.display = isTrench ? "" : "none";
+    }
+    if (isTrench) {
+      this.trenchWidthSlider?.Set(route.trench?.widthScale ?? 1);
+      this.trenchDepthSlider?.Set(route.trench?.depth ?? 2);
+    }
+    const wantPreset = isWall ? route.wall?.preset
+      : (isTrench && route.trench?.preset ? TRENCH_PRESET_PREFIX + route.trench.preset : null);
+    if (wantPreset && wantPreset !== this.presetKey) {
+      this.presetKey = wantPreset;
       if (this.presetList) this.presetList.Select(this.presetKey);
       this.SyncPresetUi();
       this.BuildAssets();
@@ -712,7 +1025,10 @@ style=${preset.style}`,
 
   RoutePath(route) {
     const pts = route.closed ? [...route.points, route.points[0]] : route.points;
-    return MakeRoadPath(pts, route.kind === "wall" ? { subdivisions: 1 } : {});
+    // 墙要直角；壕沟的圆角由规划层的 cornerRadiusM 管，中心线这里按折线画，
+    // 免得面板上的线跟规划层算出来的路径是两条。
+    const polyline = route.kind === "wall" || route.kind === "trench";
+    return MakeRoadPath(pts, polyline ? { subdivisions: 1 } : {});
   }
 
   FlyToSelected() {
@@ -830,11 +1146,22 @@ style=${preset.style}`,
     this.overrides[route.key] = {
       width: route.width, height: route.height,
       points: route.points.map((p) => [p[0], p[1]]),
+      ...(route.trench ? {
+        trench: { depth: route.trench.depth, widthScale: route.trench.widthScale },
+      } : {}),
     };
     this.dirty = true;
     this.Save();
+    this.SyncTrenchOverrides();
     this.FillList();
     this.BuildOverlay();
+  }
+
+  /** 壕沟的段级参数（沟底宽比例 / 设计深度）。走同一条覆盖通道，存同一个键。 */
+  PatchTrench(key, value) {
+    const route = this.selected;
+    if (!route || route.kind !== "trench") return;
+    this.PatchSelected((r) => { r.trench = { ...r.trench, [key]: value }; });
   }
 
   // -------------------------------------------------------------------------
@@ -895,17 +1222,81 @@ style=${preset.style}`,
     // 真几何预览
     if (this.showPreview) {
       if (route.kind === "wall") this.BuildWallPreview(route);
+      else if (route.kind === "trench") this.BuildTrenchOverlay(route);
       else this.BuildRoadPreview(route);
     }
   }
 
   /** 预览与现物几乎共面：polygonOffset 防互咬，深度不回写（预览是叠加层）。 */
-  PreviewMaterial(kind) {
+  PreviewMaterial(kind, { color = null, opacity = 0.85 } = {}) {
     return new THREE.MeshStandardMaterial({
-      color: KIND_COLOR[kind] || 0xd8c49a, roughness: 1.0,
-      transparent: true, opacity: 0.85, depthWrite: false,
+      color: color ?? KIND_COLOR[kind] ?? TRENCH_PREVIEW_COLORS[kind] ?? 0xd8c49a,
+      roughness: 1.0,
+      transparent: true, opacity, depthWrite: false,
       polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4,
     });
+  }
+
+  /**
+   * 壕沟预览：横断面带 + 三岔口标记 + 布设件盒子。
+   *
+   * 三件都从**同一个编译结果**来。这一点是这个面板存在的理由：改一根滑杆之后，
+   * 沟变宽、护壁跟着往外挪、三岔口附近那几根跟着消失 —— 三者同时变，
+   * 才看得出「让开三岔口」这条规则到底让开了多少。分三次算就对不上了。
+   */
+  BuildTrenchOverlay(route) {
+    const plan = this.TrenchPlan();
+    if (!plan) {
+      this.trenchStats = null;
+      return;
+    }
+    const byMaterial = new Map();
+    const collector = {
+      Add: (material, geometry) => {
+        if (!byMaterial.has(material)) byMaterial.set(material, []);
+        byMaterial.get(material).push(geometry);
+      },
+      Solid: () => {}, SetSector: () => {},
+    };
+    let stats = null;
+    try {
+      stats = BuildTrenchPreview(collector, plan, route.id, {
+        natural: SampleMissionNaturalHeight, lift: 0.04,
+      });
+    } catch (error) {
+      console.warn("[SplineEditor] 壕沟预览生成失败：", error);
+    }
+    let dressed = { blocks: 0, placements: 0 };
+    const dressing = this.TrenchDressing(plan);
+    if (dressing) {
+      try {
+        // 只画选中段的布设件：全网一千多只盒子会把面板拖成幻灯片，
+        // 而且看的人分不清哪一根护壁属于哪条沟。
+        dressed = BuildTrenchDressingPreview(collector, dressing, {
+          groundAt: (x, z) => this.GroundAt(x, z),
+          filter: (item) => String(item.id || "").startsWith(route.id),
+        });
+      } catch (error) {
+        console.warn("[SplineEditor] 壕沟布设预览生成失败：", error);
+      }
+    }
+    for (const [name, geometries] of byMaterial) {
+      const material = this.PreviewMaterial(name, {
+        color: TRENCH_PREVIEW_COLORS[name],
+        opacity: name === "trench" ? 0.86 : 0.55,
+      });
+      for (const geometry of geometries) {
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.renderOrder = name === "trench" ? 899 : 900;
+        this.group.add(mesh);
+      }
+    }
+    this.trenchStats = stats ? {
+      ...stats, ...dressed,
+      revision: TrenchRevision(),
+      segments: plan.segments?.length ?? 0,
+      networkJunctions: plan.junctions?.length ?? 0,
+    } : null;
   }
 
   BuildRoadPreview(route) {
@@ -1001,6 +1392,12 @@ style=${preset.style}`,
   RevertAll() {
     this.overrides = {};
     this.presetEdits = {};
+    // 段覆盖与预设覆盖住在规划层里，不在这张表里 —— 「全部还原出厂」要把那边也清掉，
+    // 否则面板上显示的是出厂值、建关时吃的还是上一轮拖出来的数。
+    ClearTrenchSegmentOverrides();
+    this.trenchPushed = new Set();
+    this.trenchPlanCache = null;
+    this.trenchDressingCache = null;
     this.ApplyPresetEdits();
     this.SyncPresetUi();
     this.dirty = false;
@@ -1043,11 +1440,18 @@ style=${preset.style}`,
   // 布设参数（WALL_PRESETS 的改动）
   // -------------------------------------------------------------------------
 
-  /** 把面板里的预设改动推给 Script_WallSpline —— 预览与建城读的是同一份。 */
+  /** 把面板里的预设改动推给 Script_WallSpline / Script_TrenchPlan —— 预览与建关读的是同一份。 */
   ApplyPresetEdits() {
     for (const name of Object.keys(WALL_PRESETS)) {
       SetWallPresetOverride(name, this.presetEdits[name] || null);
     }
+    ClearTrenchPresetOverrides();
+    for (const name of Object.keys(TRENCH_PRESETS)) {
+      const edits = this.presetEdits[TRENCH_PRESET_PREFIX + name];
+      if (edits) SetTrenchPresetOverride(name, ExpandTrenchPatch(name, edits));
+    }
+    this.trenchPlanCache = null;
+    this.trenchDressingCache = null;
   }
 
   /** 当前预设的完整参数（出厂值 + 面板改动）。 */
@@ -1068,15 +1472,34 @@ style=${preset.style}`,
     this.BuildOverlay();
   }
 
+  /** 壕沟预设的一根滑杆。存扁平点号键，推之前展开成嵌套 patch。 */
+  PatchTrenchPreset(key, value) {
+    const name = TrenchPresetName(this.presetKey);
+    if (!name) return;
+    const edits = { ...(this.presetEdits[this.presetKey] || {}), [key]: value };
+    this.presetEdits[this.presetKey] = edits;
+    SetTrenchPresetOverride(name, ExpandTrenchPatch(name, edits));
+    this.dirty = true;
+    this.Save();
+    this.RefreshAssetFacts();
+    this.FillPresetList();
+    this.BuildOverlay();
+  }
+
   RevertPreset() {
+    const trenchName = TrenchPresetName(this.presetKey);
+    const label = trenchName
+      ? `壕沟 · ${TRENCH_PRESETS[trenchName]?.label || trenchName}`
+      : (WALL_PRESETS[this.presetKey]?.label || this.presetKey);
     delete this.presetEdits[this.presetKey];
-    SetWallPresetOverride(this.presetKey, null);
+    if (trenchName) SetTrenchPresetOverride(trenchName, null);
+    else SetWallPresetOverride(this.presetKey, null);
     this.dirty = true;
     this.Save();
     this.SyncPresetUi();
     this.FillPresetList();
     this.BuildOverlay();
-    this.host.SetHint(`已还原预设 ${WALL_PRESETS[this.presetKey]?.label || this.presetKey}`);
+    this.host.SetHint(`已还原预设 ${label}`);
   }
 
   IsAxisAligned(points) {
@@ -1096,6 +1519,13 @@ style=${preset.style}`,
   }
 
   ExportWarning(route) {
+    // 壕沟里有四条段的点子**不是壕沟自己的**：它们直接引用任务/AI 路线
+    // （approachRoute、FRONT_SORTIE.route、evacuation）。在面板里把这种段拖弯了，
+    // 誊回壕沟表是没用的 —— 下次建关还是从路线那边读。必须誊回 source 指的那个文件。
+    if (route.kind === "trench") {
+      return route.trench?.routeBound
+        ? "点来自路线数据（source），誊回那边而不是壕沟表" : null;
+    }
     if (!route.axisLocked) return null;
     if (route.closed) {
       return this.IsAxisRect(route.points) ? null
@@ -1112,19 +1542,28 @@ style=${preset.style}`,
       this.io.value = "（没有改动 —— 面板里改过的路线/预设才会出现在导出里）";
       return;
     }
+    const Size = (r) => {
+      if (r.kind === "wall") return { height: r.height };
+      if (r.kind === "trench") {
+        return { trench: { depth: r.trench?.depth, widthScale: r.trench?.widthScale } };
+      }
+      return { width: r.width };
+    };
     const payload = {
       routes: edited.map((r) => {
         const warning = this.ExportWarning(r);
         return {
           key: r.key, id: r.id, source: r.source,
-          ...(r.kind === "wall" ? { height: r.height } : { width: r.width }),
+          ...Size(r),
           points: r.points,
           ...(warning ? { warning } : {}),
         };
       }),
-      // 布设参数：誊回 Script_WallSpline.WALL_PRESETS 对应的那一项
+      // 布设参数：墙誊回 WALL_PRESETS，壕沟誊回 TRENCH_PRESETS。
+      // 两套住在同一张 edits 表里，靠 `trench:` 前缀分（预设名 loop/fire 两边都有）。
       presets: presets.length ? {
         source: "Script_WallSpline.mjs → WALL_PRESETS",
+        trenchSource: "Script_TrenchPlan.mjs → TRENCH_PRESETS（键名前缀 trench:，点号键 = 嵌套字段）",
         edits: this.presetEdits,
       } : undefined,
     };
@@ -1150,12 +1589,15 @@ style=${preset.style}`,
       if (!item.key || !Array.isArray(item.points) || item.points.length < 2) continue;
       this.overrides[item.key] = {
         width: item.width, height: item.height, points: item.points,
+        ...(item.trench ? { trench: item.trench } : {}),
       };
       count += 1;
     }
     let presetCount = 0;
     for (const [name, patch] of Object.entries(presetEdits || {})) {
-      if (!WALL_PRESETS[name] || !patch || typeof patch !== "object") continue;
+      if (!patch || typeof patch !== "object") continue;
+      const trenchName = TrenchPresetName(name);
+      if (trenchName ? !TRENCH_PRESETS[trenchName] : !WALL_PRESETS[name]) continue;
       this.presetEdits[name] = patch;
       presetCount += 1;
     }
@@ -1185,19 +1627,33 @@ style=${preset.style}`,
     const route = this.selected;
     if (route) {
       const path = this.RoutePath(route);
-      const size = route.kind === "wall"
-        ? `${(route.height ?? 0).toFixed(2)} m 高` : `${(route.width ?? 0).toFixed(1)} m 宽`;
+      let size = `${(route.width ?? 0).toFixed(1)} m 宽`;
+      if (route.kind === "wall") size = `${(route.height ?? 0).toFixed(2)} m 高`;
+      if (route.kind === "trench") {
+        size = `${(route.trench?.depth ?? 0).toFixed(2)} m 深 × ${(route.trench?.widthScale ?? 1).toFixed(2)}`;
+      }
       this.facts.Set("路线", `${route.label} · ${size}`);
       this.facts.Set("长度 / 控制点",
         `${path.length.toFixed(0)} m / ${route.points.length} 点${route.closed ? "（闭环）" : ""}`);
       this.facts.Set("选中点", this.selectedPoint >= 0
         ? `#${this.selectedPoint} (${route.points[this.selectedPoint][0]}, ${route.points[this.selectedPoint][1]})`
         : "无");
+      if (route.kind === "trench" && this.trenchStats) {
+        const t = this.trenchStats;
+        this.facts.Set("壕沟 站/三角/接口",
+          `${t.stations} / ${t.triangles} / ${t.junctions}（全网 ${t.networkJunctions}）`);
+        this.facts.Set("布设件 / 编译版本", `${t.blocks} 块 + ${t.placements} 件 · rev ${t.revision}`);
+        this.facts.Set("实测深度 最浅/最深",
+          `${t.minDepth.toFixed(2)} / ${t.maxDepth.toFixed(2)} m`);
+      }
     }
     const messages = [];
     if (this.dirty) messages.push("有未导出的改动 —— 基线在源码里，记得誊回去");
     const sel = this.selected;
-    const warning = sel ? this.ExportWarning(sel) : null;
+    // routeBound 的壕沟段**永远**带着那句誊回警告。只有真拖过点才提 ——
+    // 否则状态栏一进面板就黄着，读的人两天就学会无视它。
+    const mute = sel?.kind === "trench" && !this.overrides[sel.key];
+    const warning = sel && !mute ? this.ExportWarning(sel) : null;
     if (warning) messages.push(warning);
     this.status.textContent = messages.join(" · ");
     this.status.classList.toggle("warn", messages.length > 0);

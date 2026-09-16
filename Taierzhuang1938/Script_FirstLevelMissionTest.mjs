@@ -1408,7 +1408,11 @@ console.log("ok receiving-food release follows the source clock and survives pau
     const plan=MISSION_TACTICS[spec.id];
     assert.ok(plan?.points.length>=3,`${spec.id} bounds physically toward the corner`);
     for(const point of plan.points)assert.ok(SampleMissionTerrain(point.x,point.z)<-1.2,`${spec.id} stays in the trench at ${point.x},${point.z}`);
-    assert.ok(MissionPathDistance(plan.points.at(-1),cornerLane)<=mainTrench.bottom/2,`${spec.id} ends in the straight trench visible from the corner`);
+    // 走廊＝沟底 + 一侧坡。样条化之后 `bottom` 只是**沟底**宽（旧的 4.2 是连坡
+    // 一起算的那个「宽度」，新表是 3.4 + 1.1）。CornerPursuerD/E 从北回环汇入主沟，
+    // 终点落在汇口上、离主沟中线 2.0 m —— 在沟底之外、走廊之内，仍是挖开的地面
+    // （上一行 SampleMissionTerrain < -1.2 是那条硬断言，没有放松）。
+    assert.ok(MissionPathDistance(plan.points.at(-1),cornerLane)<=mainTrench.bottom/2+mainTrench.bank,`${spec.id} ends in the straight trench visible from the corner`);
   }
   assert.ok(MissionPathDistance(OPENING.shelterCorner,[OPENING.supportRoute[1],OPENING.supportRoute[2],OPENING.supportRoute[3]])<=mainTrench.bottom/2,
     "the corner post stands on the trench floor");

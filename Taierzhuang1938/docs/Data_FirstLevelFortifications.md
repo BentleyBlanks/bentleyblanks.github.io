@@ -44,6 +44,8 @@
 
 专项测试双向走完每条新增沟段，另查原主线、友军增援、警戒哨撤离与敌军行军净空。局部胶囊验证与完整战役真实输入验收分别记录。
 
+2026-09-17 起，护壁、踏板与沟沿射击位改为沿样条 PCG 布设：中心线在 `Data_FirstLevelMissionTrenches.mjs`，布设参数在 `Script_TrenchPlan.TRENCH_PRESETS`，Layout 里那段「每 5 m 两侧各一根桩」的手写循环已删。沟底宽与坡宽也不再是每条一个常量，改为按位置噪声逐点变化（标称值见预设表）。射击位沙袋的 id 是 `<段名>TrenchBay<n>`，走 `IsMissionSandbagBlock` 换成真沙袋模型。口径与史料来源见 [Data_TrenchSpline.md](Data_TrenchSpline.md)。
+
 ## 本次验收（2026-09-10）
 
 - 合入最新主分支后：相关 quick 套件 66 项通过，0 基线失败、0 新失败；七关 BootTest 与 BrowserBundleTest 通过。

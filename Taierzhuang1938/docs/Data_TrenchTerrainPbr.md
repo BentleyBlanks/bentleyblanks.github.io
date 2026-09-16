@@ -11,6 +11,8 @@
 
 补给屋凹地深度与补给沟共用 FRONT_SORTIE.trenchDepthM。匍匐顶盖相对共享沟底布设，保持原净空。东侧铁丝网一节向外移动 1.8 米，为补给沟转角留出真实碰撞净空。
 
+2026-09-17 起，壕沟的中心线、沟底宽、坡宽、抛土堆以及沿沟的护壁／踏板／射击位／杂物布设全部改为样条 PCG，口径迁到 [Data_TrenchSpline.md](Data_TrenchSpline.md)（含史料来源表与本次取值的理由）。本页只保留土壤 PBR 那一层：贴图生成、打包与接入。上面这一节的 2 米设计深度仍然成立（新管线的 `depth` 全部是 2.0），但「宽度」不再是一个常量 —— 逐点由位置噪声算，标称值在 `Script_TrenchPlan.TRENCH_PRESETS`。
+
 ## 图像来源与运行时
 
 使用内置 image_gen__imagegen，单次生成土壤 PBR 四象限图集（请求 2048×2048，实际输出 1254×1254，每象限 627×627）。源图与拆出的高度图保留在本任务本地 `_shots/TrenchTerrain/`；高度图没有接入几何位移，避免改变已验证的碰撞表面。游戏使用 `Texture/Texture_MissionSoilBase.webp`、`Texture_MissionSoilNormal.webp`、`Texture_MissionSoilOrm.png`，均为 512×512。

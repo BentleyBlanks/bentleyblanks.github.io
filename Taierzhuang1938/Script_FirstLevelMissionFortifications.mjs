@@ -51,7 +51,9 @@ export function AddMissionFortifications(sink,layout,models,groundAt,materials) 
     }
     replaced.add(block.id);
   }
-  for(const spec of MISSION_DEFENSE_OBJECTS) {
+  // layout.trenchPlacements 是壕沟布设 PCG 发的杂物（Data_FirstLevelMissionLayout
+  // 的 MISSION_TRENCH_PLACEMENTS），资产名同样只来自 MISSION_DEFENSE_ASSETS。
+  for(const spec of [...MISSION_DEFENSE_OBJECTS,...(layout.trenchPlacements||[])]) {
     const model=models.get(spec.asset),scale=spec.scale,cos=Math.cos(spec.ry),sin=Math.sin(spec.ry);
     const hx=model.size.x*scale/2,hz=model.size.z*scale/2;
     // Sample the footprint, not a hardcoded Y: embed downhill ends without floating feet.

@@ -152,6 +152,9 @@ export const testDefs = {
   FirstLevelP012BrowserTest: { file: "Script_FirstLevelP012BrowserTest.mjs", args: ["--prelude", "--geometry", "--presentation"], timeoutMs: 8 * 60 * 1000,
     desc: "P012独立入口、真实行走交互与画面取证" },
   WallPlanTest: { file: "Script_WallPlanTest.mjs", desc: "样条围墙规划契约：贴地/缺口/闭环角搭/塌段/确定性（纯 Node，毫秒级）" },
+  TrenchPlanTest: { file: "Script_TrenchPlanTest.mjs", desc: "壕沟样条规划契约：legacy 逐点等价/热路径/三岔口/并集抛土/宽深有界/布设/圆角（纯 Node，秒级）" },
+  TrenchEditorTest: { file: "Script_TrenchEditorTest.mjs", timeoutMs: 300000,
+    desc: "壕沟编辑器：七条路线、编译断面预览、段/预设覆盖热改、导出导入、还原不留残渣" },
   TestRunnerTest: { file: "Script_TestRunnerTest.mjs", desc: "分级选择、基线和登记完整性（纯 Node）" },
   BrowserBundleTest: { file: "Script_BrowserBundleTest.mjs", desc: "Pages 合并产物：白盒普通入口与正式菜单真实启动、脚本请求数门禁" },
   ModuleGraphTest: { file: "Script_ModuleGraphTest.mjs", desc: "index.html import map 盖满浏览器模块图、禁源码自写 ?v=（纯 Node，秒级）" },
@@ -379,7 +382,7 @@ export const browserTests = new Set([
   "PerformanceTest", "PhysicsTest", "PostTest", "PostFrameGraphTest", "CsmTest", "SsrTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ProfilerTest", "PropInstancingTest",
   "PropPcgEditorTest",
   "TestSceneLightingTest", "RangeTest", "WeaponRangeTest", "ReticleCalibrationTest", "ShotTest", "SprintCrosshairTest", "SprintMeleeTest",
-  "FirstPersonEmbodimentTest", "SprintViewmodelTest", "TargetInfoTest", "VisibilityTest", "VoiceTest",
+  "FirstPersonEmbodimentTest", "SprintViewmodelTest", "TargetInfoTest", "TrenchEditorTest", "VisibilityTest", "VoiceTest",
   "RespawnShaderWarmTest",
   "FirstLevelWhiteboxBrowserTest",
   "FirstLevelP012DebugTest",
@@ -415,6 +418,7 @@ export const tier0Fast = [
   "CutsceneControlTest",
   "RoadPathTest",
   "WallPlanTest",
+  "TrenchPlanTest",
 ];
 
 export const tier0Browser = ["BootTest", "BootStallTest", "GeoTest"];
@@ -445,7 +449,7 @@ export const domains = {
   explosives: { label: "爆炸白盒与通用地形形变/返掷", tests: ["ExplosionRulesTest", "ExplosionRangeTest", "CraterSurfaceTest"] },
   terrain: {
     label: "高度图/地形（共享底座，下游成串跑）",
-    tests: ["HeightmapVerify", "JieheTerrainTest", "TengxianLayoutTest", "TengxianZoneTest", "SamplePointTest", "RoadPathTest", "FirstLevelWhiteboxTest", "FirstLevelWhiteboxSurfaceTest", "FirstLevelWhiteboxBrowserTest", "FirstLevelP012LayoutTest", "FirstLevelP012TerrainTest", "FirstLevelP012TerrainBrowserTest", "FirstLevelP012FlowTest", "FirstLevelP012RuntimeTest", "FirstLevelP012ActorTest", "FirstLevelP012VisibilityTest", "FirstLevelP012BrowserTest", "WallPlanTest", "PhysicsTest", "JumpTest", "DestructionTest"],
+    tests: ["HeightmapVerify", "JieheTerrainTest", "TengxianLayoutTest", "TengxianZoneTest", "SamplePointTest", "RoadPathTest", "FirstLevelWhiteboxTest", "FirstLevelWhiteboxSurfaceTest", "FirstLevelWhiteboxBrowserTest", "FirstLevelP012LayoutTest", "FirstLevelP012TerrainTest", "FirstLevelP012TerrainBrowserTest", "FirstLevelP012FlowTest", "FirstLevelP012RuntimeTest", "FirstLevelP012ActorTest", "FirstLevelP012VisibilityTest", "FirstLevelP012BrowserTest", "WallPlanTest", "TrenchPlanTest", "PhysicsTest", "JumpTest", "DestructionTest"],
   },
   physics: {
     label: "物理/移动/破坏（共享底座，下游成串跑）",
@@ -505,7 +509,7 @@ export const domains = {
   // 在真入口上量：VoiceTest 验的是资产与交付档，量不到 AudioEngine 的装载分叉。
   voice: { label: "语音", tests: ["VoiceTest", "MachineGunCutsceneAudioTest"] },
   menu: { label: "主菜单/开机陈设", tests: ["FirstLevelP012DebugTest", "MenuTest", "DeathMenuTest", "BootPropTest"] },
-  editor: { label: "场景编辑器/第一人称检查/PCG/资产规范/可破坏编辑器/采样点", tests: ["WorldInfoEditorTest", "AiEditorTest", "TuningWriterTest", "AssetStandardsTest", "EditorTest", "FpsGripEditorTest", "PropPcgTest", "PropPcgEditorTest", "DestructionEditorTest", "SamplePointTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "CharacterModelTest"] },
+  editor: { label: "场景编辑器/第一人称检查/PCG/资产规范/可破坏编辑器/采样点", tests: ["WorldInfoEditorTest", "AiEditorTest", "TuningWriterTest", "AssetStandardsTest", "EditorTest", "FpsGripEditorTest", "PropPcgTest", "PropPcgEditorTest", "DestructionEditorTest", "TrenchEditorTest", "SamplePointTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "CharacterModelTest"] },
   cutscene: {
     label: "过场/剧本派发/车厢生活动作",
     // 关中过场 beat 与 LEVEL_CUES 的构建都在 Script_Story 与组装层里，
@@ -599,6 +603,10 @@ const changedDomainRules = [
   // 调参表改写器只被本地预览的保存口与编辑器测试用：改了跑 editor 域（TuningWriterTest）。
   { domain: "editor", pattern: /Script_TuningWriter/i },
   { domain: "editor", pattern: /Script_EditorWorldInfo|Script_WorldInfoEditorTest/i },
+  // 壕沟规划层与预览几何没有 Editor 字样，但「场景样条PCG」面板读的就是它们
+  // （滑杆推 SetTrenchPresetOverride、预览调 CompileTrenchNetwork）——
+  // 改 TRENCH_PRESETS 不跑 TrenchEditorTest，面板那一路会静默过期。
+  { domain: "editor", pattern: /Trench(es|Plan|Spline|Editor)/i },
   { domain: "trainAssets", pattern: /TrainReference|TrainLibrary|Script_ExternalProps|Script_EditorPropLibrary/i },
   { domain: 'animation', pattern: /BackRifleRun|Melee.*Animation|MeleeAnimation|Infantry/i },
   // 站立待机叠加层与它的旋钮表：装在第一关每个兵身上，验收在 FirstLevelP012AnimationTest（ai 域）。
@@ -609,7 +617,10 @@ const changedDomainRules = [
   { domain: "cutscene", pattern: /MachineGunCaptives|CutscenePerformance|Animation\/MachineGunCaptives/i },
   { domain: "ai", pattern: /FirstLevelP012(ShellShot|BackRifle|TrainColumn|March|Family|Resting|Arrival|VillageLife|StageZero|Cast)/i },
   { domain: "explosives", pattern: /(Explosion|Explosives|CraterSurface|CraterDebris|CraterScorched|BakeCraterSoil|GrenadeReturn|TerrainDeformation|ShellVisual|Script_Combat|Script_Physics|Script_Vfx)/i },
-  { domain: "terrain", pattern: /(Heightmap|JieheHeight|JieheField|TengxianField|FarLand|Terrain|Battlefield|Outfield|Ground|Water|WestSuburbBlocks|Whitebox|P012|Data_Levels)/i },
+  // Trench：壕沟样条管线（Script_TrenchPlan / Script_TrenchSpline /
+  // Data_FirstLevelMissionTrenches）改的是烘进共享高度场的那张开挖场，
+  // 文件名里没有 Terrain，上面那些词一个都盖不到。
+  { domain: "terrain", pattern: /(Heightmap|JieheHeight|JieheField|TengxianField|FarLand|Terrain|Trench|Battlefield|Outfield|Ground|Water|WestSuburbBlocks|Whitebox|P012|Data_Levels)/i },
   { domain: "physics", pattern: /(Physics|Collider|Player|Navigation|Movement|Jump|Traversal|Destruction|Fracture|Battlefield|Outfield|World|CityBlockKit|Landmark)/i },
   // Aircraft 挂 combat：绕圈那一层是纯视觉，但同一个文件里的扫射航线打得倒玩家。
   // Hitbox 也挂 combat：人物子弹代理改了就是改了打中哪儿。

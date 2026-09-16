@@ -173,8 +173,12 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
   （**全项目布墙的唯一口径**，逐模块贴地 + InstancedMesh）。Plan/Path 层纯 Node 可测；
   布设参数集中在 `Script_WallSpline.WALL_PRESETS` 一张表 ——
   **调用点不许再自己写间隔/重叠/抖动**，那正是收拢前的病根。
+- `Script_TrenchPlan.mjs` + `Script_TrenchSpline.mjs` —— 样条壕沟管线（第一关壕沟的唯一口径）：
+  中心线在 `Data_FirstLevelMissionTrenches.mjs`，逐点宽/深/抛土由位置噪声算，一次烘进共享高度场；
+  护壁/踏板/射击位/杂物沿沟 PCG 布设，参数在 `TRENCH_PRESETS`。Plan 层纯 Node 可测。
+  **先读 `docs/Data_TrenchSpline.md`**（含史料来源表、宽度取值的理由与遗留）。
 - 先读：`docs/Data_HistoryMaterial.md`（尺寸出处）、`docs/Data_RoadSpline.md`、
-  `docs/Data_WallSpline.md`（含没迁进样条的那几类墙的清单）。
+  `docs/Data_WallSpline.md`（含没迁进样条的那几类墙的清单）、`docs/Data_TrenchSpline.md`。
 
 ### 地形 / 高度
 - `Script_FarLand.mjs` —— 远景连续高度函数；网格、数据、道具落地**三边必须问同一个函数**

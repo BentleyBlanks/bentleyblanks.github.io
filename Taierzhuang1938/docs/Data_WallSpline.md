@@ -193,6 +193,10 @@ polygonOffset 盖在现墙上。
 子键，认旧道路键迁移）；**基线在源码里**，导出 JSON 分 `routes` 与 `presets`
 两节，各带 source 说明誊回哪里。轴对齐/矩形来源拖弯会带警告。
 
+面板现在还列第一关的壕沟（kind `trench`）：七条段的中心线 + 编译出来的真横断面预览，
+布设参数那一档选中壕沟预设时换成 `TRENCH_PARAMS` 滑杆（存档键带 `trench:` 前缀，
+因为预设名 `loop` / `fire` 与墙这张表会撞）。口径在 `Data_TrenchSpline.md`。
+
 ## 回归
 
 - `node Taierzhuang1938/Script_WallPlanTest.mjs`（纯 Node，tier0）：

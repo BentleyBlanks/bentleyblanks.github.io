@@ -19,7 +19,10 @@ try{
   const {MISSION_RECEPTION_SPACE:reception}=await import('./Data_FirstLevelMissionTopology.mjs');
   const column=new FirstLevelMissionColumn();column.mode='exit';column.route=routes.evacuation;
   const litter=column.litters[0];Object.assign(litter,reception.litterOrigin,{yaw:0,bearers:[0,100]});
-  const helper=column.walkers.find(w=>w.kind==='medic');Object.assign(helper,reception.walkerOrigin,{visible:true});
+  // 救援 helper 的选人口径在 Script_FirstLevelMissionColumn 里是 medic **或** civilian；
+  // 2026-09-16 的 e4fe8b315 把 medicCount 调成 0（担架队边上不再走军医），夹具还在
+  // 只找 medic，于是 Object.assign 拿到 undefined。跟上运行时那条口径。
+  const helper=column.walkers.find(w=>['medic','civilian'].includes(w.kind));Object.assign(helper,reception.walkerOrigin,{visible:true});
   column.RequestBearer(litter);
   const walkRoutes={...routes,wardRelief:helper.rescueRoute};
   const {Vector3}=await import('three'),walks=[],body=g.physics.MakeCharacter();

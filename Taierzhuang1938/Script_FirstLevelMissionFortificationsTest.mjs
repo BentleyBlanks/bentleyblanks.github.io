@@ -31,15 +31,23 @@ try {
     const blocks=field.layout.blocks.filter(b=>IsMissionSandbagBlock(b.id));
     const missing=blocks.filter(b=>!field.fortificationPlacements.some(p=>p.sourceBlock===b.id)).map(b=>b.id);
     const envelopeErrors=[];
+    // 包围盒要在**体块自己的坐标系**里量。沟沿上的射击位（`<段名>TrenchBay<n>`）
+    // 跟着壕沟走，带 ry；对斜块取世界 AABB 必然偏大，量到的是外接盒不是外壳。
+    // 逐件取 8 个角、转回体块的 ry 再求盒：ry=0 的块（原来那 56 个全是）结果与
+    // 旧写法逐位相同，容差也还是 0.025。
     for(const block of blocks){
-      const union=new Box3();
+      const cos=Math.cos(block.ry||0),sin=Math.sin(block.ry||0),local=new Box3();
       for(const p of field.fortificationPlacements.filter(p=>p.sourceBlock===block.id)){
         const matrix=new Matrix4().compose(new Vector3(p.x,p.y,p.z),new Quaternion().setFromAxisAngle(new Vector3(0,1,0),p.ry),new Vector3(...p.scale));
-        union.union(field.fortificationModels.get(p.asset).box.clone().applyMatrix4(matrix));
+        const box=field.fortificationModels.get(p.asset).box;
+        for(const cx of [box.min.x,box.max.x])for(const cy of [box.min.y,box.max.y])for(const cz of [box.min.z,box.max.z]){
+          const v=new Vector3(cx,cy,cz).applyMatrix4(matrix),dx=v.x-block.x,dz=v.z-block.z;
+          local.expandByPoint(new Vector3(dx*cos-dz*sin,v.y-block.y,dx*sin+dz*cos));
+        }
       }
-      const dimensions=union.getSize(new Vector3()),center=union.getCenter(new Vector3());
+      const dimensions=local.getSize(new Vector3()),center=local.getCenter(new Vector3());
       if(Math.abs(dimensions.x-block.w)>.025||Math.abs(dimensions.y-block.h)>.025||Math.abs(dimensions.z-block.d)>.025||
-        Math.abs(center.x-block.x)>.025||Math.abs(center.y-block.y)>.025||Math.abs(center.z-block.z)>.025)envelopeErrors.push(block.id);
+        Math.abs(center.x)>.025||Math.abs(center.y)>.025||Math.abs(center.z)>.025)envelopeErrors.push(block.id);
     }
     const meshes=field.meshes.filter(m=>m.name.includes("MissionDefense_"));
     const obstacles=field.colliders.filter(c=>["fence","barricade"].includes(c.tag));

@@ -71,7 +71,9 @@ outfield 的 points 折线本来就是控制点。样条层只负责解释这些
 
 设置面板（` 键）→「编辑器」→「**场景样条PCG**」（`Script_EditorSplines.mjs`，
 原「道路样条」2026-08-27 扩围墙后改名；围墙侧的账在 `Data_WallSpline.md`）：
-按当前关卡列出全部路线（路 + 墙；第一关白盒另列布局 `railway` spec 那条铁路），中心线 + 控制点 + **真几何预览**（调的就是
+按当前关卡列出全部路线（路 + 墙；第一关白盒另列布局 `railway` spec 那条铁路）。
+面板现在还列第一关的壕沟（kind `trench`，七条段 + 断面预览 + 布设参数一档），
+口径在 `Data_TrenchSpline.md`。中心线 + 控制点 + **真几何预览**（调的就是
 上面那份生成代码 + 宿主 groundAt，预览抬高盖在现物上）。选点/移动/插入/删除、
 调宽/调墙高、导出 JSON（`routes` + `presets` 两节，各带 source 说明誊回哪个
 文件哪个字段）。改动只存 localStorage（`tz1938.sceneSplines.v1`，预设改动在

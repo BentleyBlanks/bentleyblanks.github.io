@@ -1,9 +1,10 @@
 import { FRONT_SORTIE as Sortie } from "./Data_FirstLevelFrontRoute.mjs";
-import { MISSION_REAR_ROUTES, MISSION_RECEPTION_SPACE } from "./Data_FirstLevelMissionTopology.mjs";
-import { OPENING } from "./Data_FirstLevelOpening.mjs";
+import { MISSION_RECEPTION_SPACE } from "./Data_FirstLevelMissionTopology.mjs";
 // Authored soil, metres: natural ground, roads, rail berm and excavated trenches.
 // This function is baked once into the shared rendered/physical heightfield.
 import { FRONT_BREACHES } from "./Data_FirstLevelMissionFront.mjs";
+import { MISSION_TRENCH_NETWORK } from "./Data_FirstLevelMissionTrenches.mjs";
+import { CompileTrenchNetwork, TrenchRevision } from "./Script_TrenchPlan.mjs";
 const Smooth = (value) => {
   const t = Math.max(0, Math.min(1, value));
   return t * t * (3 - 2 * t);
@@ -74,46 +75,13 @@ export const MISSION_TERRAIN = Object.freeze({
       width: 7,
     },
   ],
-  trenches: [
-    {
-      id: "FrontCommunication",
-      points: [...OPENING.approachRoute.slice(1),...OPENING.supportRoute.slice(1)],
-      depth: 2,
-      bottom: 4.2,
-      bank: 1.5,
-    },
-    {
-      id: "FrontTraverse",
-      points: [
-        { x: -32, z: -124 },
-        { x: 0, z: -124 },
-        { x: 24, z: -124 },
-      ],
-      depth: 2,
-      bottom: 4.2,
-      bank: 1.5,
-    },
-    {
-      id: "BundleApproach",
-      points: Sortie.route,
-      depth: Sortie.trenchDepthM,
-      bottom: Sortie.trenchBottomM,
-      bank: Sortie.trenchBankM,
-    },
-    {
-      id: "WestEvacuation",
-      points: MISSION_REAR_ROUTES.evacuation,
-      depth: 2,
-      bottom: 5.2,
-      bank: 2.2,
-    },
-    // Two short choices return to the same northbound main trench.
-    {id:"EntryCoverLoop",role:"localLoop",points:[{x:-45,z:41},{x:-52,z:35},{x:-52,z:27},{x:-45,z:24}],depth:2,bottom:3.6,bank:1.5},
-    {id:"NorthCoverLoop",role:"localLoop",points:[{x:-24,z:-44},{x:-31,z:-48},{x:-31,z:-56},{x:-24,z:-60}],depth:2,bottom:3.6,bank:1.5},
-    // A short breached enemy sap explains intruders; it never rejoins behind the player.
-    {id:"FlankBreachSap",role:"enemyEntry",points:[{x:-22,z:8},{x:-28,z:8},{x:-37,z:8}],depth:2,bottom:3.2,bank:1.5},
-
-  ],
+  // 壕沟不再是一张折线表：中心线与段级参数在 Data_FirstLevelMissionTrenches，
+  // 逐点的宽/深/抛土由 Script_TrenchPlan 的位置噪声算（docs/Data_TrenchSpline.md）。
+  trenchNetwork: MISSION_TRENCH_NETWORK,
+  // 兼容视图：旧消费者（Layout 的清理网、任务/布设回归）只读 id/role/points/
+  // depth/bottom/bank，这里照编译结果现算。getter 而不是字段，是因为编辑器改过
+  // 参数之后 revision 一抬，下一次读就得是新的那份。
+  get trenches() { return TrenchPlanFor(this).trenches; },
   steps: [
     {x:Sortie.house.x,z:Sortie.house.z,radius:6,depth:Sortie.trenchDepthM},
     { x: 0, z: -127.5, radius: 3.6, depth: 0.88 },
@@ -127,6 +95,20 @@ export const MISSION_TERRAIN = Object.freeze({
     { x: -20, z: 235, w: 48, d: 40 },
   ],
 });
+// 编译一次壕沟网络，按 (spec, TrenchRevision()) 缓存。编译要走一遍圆角、分桶
+// 网格和每米一站，几十毫秒量级 —— 高度场烘焙每格点调 SampleMissionTerrain，
+// 没有这层缓存就是每格点重编译一次整张网。
+// 编辑器改参数只抬 revision（覆盖不落盘），下一次「重建关卡」自然拿到新的。
+const trenchPlans = new WeakMap();
+export function TrenchPlanFor(spec = MISSION_TERRAIN) {
+  const network = spec.trenchNetwork || MISSION_TRENCH_NETWORK;
+  const revision = TrenchRevision();
+  const cached = trenchPlans.get(network);
+  if (cached && cached.revision === revision) return cached.plan;
+  const plan = CompileTrenchNetwork(network, { natural: SampleMissionNaturalHeight });
+  trenchPlans.set(network, { revision, plan });
+  return plan;
+}
 export function SampleMissionNaturalHeight(x, z) {
   const field = 0.12 * Math.sin(x / 22) * Math.cos(z / 28) + 0.07 * Math.sin((x + z) / 12);
   // Low field banks enclose the playable plain; authored roads and trench floors stay shared.
@@ -138,24 +120,31 @@ export function SampleMissionNaturalHeight(x, z) {
 export function SampleMissionTerrain(x, z, spec = MISSION_TERRAIN) {
   const natural = SampleMissionNaturalHeight(x, z);
   let height = natural;
+  // 道路与场坪的压平因子同时是抛土堆的掩码：挖出来的土堆在沟沿上是对的，堆到
+  // 碾平的路面或场坪上就成了一道谁也解释不了的坎（担架队和大车正从那儿过）。
+  let bermMask = 1;
   for (const pad of spec.pads) {
     const d = Math.hypot(
       Math.max(0, Math.abs(x - pad.x) - pad.w / 2),
       Math.max(0, Math.abs(z - pad.z) - pad.d / 2),
     );
-    height *= Smooth(d / 5);
+    const factor = Smooth(d / 5);
+    height *= factor;
+    if (factor < bermMask) bermMask = factor;
   }
   for (const road of spec.roads) {
     const d = MissionPathDistance({ x, z }, road.points);
-    height = height * (0.15 + 0.85 * Smooth((d - road.width / 2) / 3));
+    const factor = 0.15 + 0.85 * Smooth((d - road.width / 2) / 3);
+    height = height * factor;
+    if (factor < bermMask) bermMask = factor;
   }
   // A continuous rail embankment, never a box pretending to be soil.
   const rail = Math.abs(x + 77);
   height += 0.62 * (1 - Smooth((rail - 2.4) / 4));
-  for (const trench of spec.trenches) {
-    const d = MissionPathDistance({ x, z }, trench.points);
-    height = Math.min(height, natural - trench.depth * (1 - Smooth((d - trench.bottom / 2) / trench.bank)));
-  }
+  // 开挖并集 + 沟沿抛土：旧的 `for (trench)` 循环搬进了 Script_TrenchPlan.Apply。
+  // 挖下去的部分照旧取 min；抬起来的那部分（抛土）乘上面那张掩码。
+  const applied = TrenchPlanFor(spec).Apply(x, z, height, natural);
+  height = applied > height ? height + (applied - height) * bermMask : applied;
   for (const breach of FRONT_BREACHES) {
     const blend=1-Smooth(Math.hypot(x-breach.x,z-breach.z)/breach.radius);
     if(blend>0)height=Math.max(height,height+(natural-breach.depth-height)*blend);
@@ -245,11 +234,17 @@ export function SampleMissionGroundColor(x, z, out = [0, 0, 0]) {
     if(t<=0)continue;
     r+=(1-r)*t; g+=(.97-g)*t; b+=(.90-b)*t;
   }
-  for(const trench of MISSION_TERRAIN.trenches) {
-    const d=RouteDistanceWithin(x,z,trench.points,trench.bottom/2+trench.bank);
-    if(d===Infinity)continue;
-    const t=1-Smooth((d-trench.bottom/2)/trench.bank);
+  // 壕沟走廊：一次 Apply(x,z,0,0) 同时给两个答案 —— 负数是开挖深度，正数是沟沿
+  // 抛土高度，空地上是 0（分桶网格里那一格没有边，直接返回）。旧写法是逐条走 7
+  // 条折线，这里只碰落在同一格里的几条边，比旧的还省。
+  const soil=TrenchPlanFor(MISSION_TERRAIN).Apply(x,z,0,0);
+  if(soil<0) {
+    const t=-soil/2;
     r+=(.83-r)*t; g+=(.80-g)*t; b+=(.75-b)*t;
+  } else if(soil>0) {
+    // 新翻出来的土比原地皮干一点、浅一点；抛土堆最高 0.42 m，别调过头。
+    const t=.5*(soil<.4?soil/.4:1);
+    r+=(.98-r)*t; g+=(.96-g)*t; b+=(.88-b)*t;
   }
   const rail=Math.abs(x+77);
   const railT=1-Smooth((rail-2.4)/1.5);
