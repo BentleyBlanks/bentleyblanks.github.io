@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "version": "20260916MachineGunCaptivesV2",
+  "version": "20260916MachineGunCaptivesV3",
   "authoringTool": "Blender 5.1 driven over BlenderMCP (execute_code), same bpy path as --background",
   "actorForward": [
     0,
@@ -16,6 +16,11 @@
       "loop": true,
       "weaponHold": "free",
       "referenceSpeedMps": 1.1
+    },
+    "CaptiveShovedStumble": {
+      "duration": 0.7,
+      "loop": false,
+      "weaponHold": "free"
     },
     "CaptiveHandsUpStand": {
       "duration": 4.0,
@@ -62,6 +67,11 @@
       "loop": true,
       "weaponHold": "oneHandRight"
     },
+    "IjaShoveForward": {
+      "duration": 0.9,
+      "loop": false,
+      "weaponHold": "oneHandRight"
+    },
     "IjaKickPrisoner": {
       "duration": 1.2,
       "loop": false,
@@ -82,9 +92,10 @@
     {
       "id": "LugouNra02",
       "file": "Animation_LugouNra02MachineGunCaptives.json",
-      "sha256": "f89290c53c532de812a8c7032f38feb76094af312f68ea5704cc091a441307b2",
+      "sha256": "33100d7f8672122ad285250959b364ea65853c8d8c7354714972c26927df526c",
       "clipIds": [
         "CaptiveHandsUpWalk",
+        "CaptiveShovedStumble",
         "CaptiveHandsUpStand",
         "CaptiveStandToKneel",
         "CaptiveKneelHandsHead",
@@ -98,9 +109,10 @@
     {
       "id": "LugouNra05",
       "file": "Animation_LugouNra05MachineGunCaptives.json",
-      "sha256": "f997c50e468f9232bda100d07b69cbae5fce0cdc040e375868b3b2ad3a5fca67",
+      "sha256": "e5407c7f8d80fc68f81a9e9e65225b2915e2da654f4dec21c28cb58bcde338e9",
       "clipIds": [
         "CaptiveHandsUpWalk",
+        "CaptiveShovedStumble",
         "CaptiveHandsUpStand",
         "CaptiveStandToKneel",
         "CaptiveKneelHandsHead",
@@ -114,10 +126,11 @@
     {
       "id": "LugouIja01",
       "file": "Animation_LugouIja01MachineGunCaptives.json",
-      "sha256": "440e549cadefaf8057c65a5223770ae9a6811282f29c7e082a5d6ad121d89575",
+      "sha256": "966fb4d6766cca4cfb6bdb7669a3a8efb94999e769b15ae36649ddffe48ba6a6",
       "clipIds": [
         "IjaBayonetGuard",
         "IjaTauntGesture",
+        "IjaShoveForward",
         "IjaKickPrisoner",
         "IjaRifleButtStrike",
         "IjaBayonetDownThrust"
@@ -127,10 +140,11 @@
     {
       "id": "LugouIja02",
       "file": "Animation_LugouIja02MachineGunCaptives.json",
-      "sha256": "3911af1629abaf6e9ddb7b198072194ff406030d79ae208f686a76e519aed2eb",
+      "sha256": "8b92c88a70a7312e1bd80a3df33d02582d886188600b53408b063a69b7b1c45f",
       "clipIds": [
         "IjaBayonetGuard",
         "IjaTauntGesture",
+        "IjaShoveForward",
         "IjaKickPrisoner",
         "IjaRifleButtStrike",
         "IjaBayonetDownThrust"
@@ -140,10 +154,11 @@
     {
       "id": "LugouIja03",
       "file": "Animation_LugouIja03MachineGunCaptives.json",
-      "sha256": "4e4840911f2a5bb2b7e813161039f5c5396bd80d2dd1ec8294aa95f649502d3c",
+      "sha256": "057627a8f57e27c2228d9983489c3fc5302d7bfba2b9b5371b65de8518b3670c",
       "clipIds": [
         "IjaBayonetGuard",
         "IjaTauntGesture",
+        "IjaShoveForward",
         "IjaKickPrisoner",
         "IjaRifleButtStrike",
         "IjaBayonetDownThrust"

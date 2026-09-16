@@ -37,12 +37,13 @@ if not os.environ.get('CAPTIVES_SKIP_BLEND'):
 
 fps = 24
 CLEARANCE = 0.003
-VERSION = '20260916MachineGunCaptivesV2'
+VERSION = '20260916MachineGunCaptivesV3'
 TOOL = 'Blender 5.1 driven over BlenderMCP (execute_code), same bpy path as --background'
 
 # clip -> (seconds, loop, weaponHold)
 DEFINITIONS = {
     'CaptiveHandsUpWalk':    (1.8, True,  'free'),
+    'CaptiveShovedStumble':  (0.7, False, 'free'),
     'CaptiveHandsUpStand':   (4.0, True,  'free'),
     'CaptiveStandToKneel':   (1.0, False, 'free'),
     'CaptiveKneelHandsHead': (4.0, True,  'free'),
@@ -52,14 +53,15 @@ DEFINITIONS = {
     'CaptiveStabbedCollapse': (2.0, False, 'free'),
     'IjaBayonetGuard':       (4.0, True,  'twoHand'),
     'IjaTauntGesture':       (4.0, True,  'oneHandRight'),
+    'IjaShoveForward':       (0.9, False, 'oneHandRight'),
     'IjaKickPrisoner':       (1.2, False, 'twoHand'),
     'IjaRifleButtStrike':    (1.4, False, 'twoHand'),
     'IjaBayonetDownThrust':  (1.6, False, 'twoHand'),
 }
-CAPTIVE_CLIPS = ['CaptiveHandsUpWalk', 'CaptiveHandsUpStand', 'CaptiveStandToKneel',
-                 'CaptiveKneelHandsHead', 'CaptiveKneelPlead', 'CaptiveKneelFlinch',
-                 'CaptiveStruckDown', 'CaptiveStabbedCollapse']
-GUARD_CLIPS = ['IjaBayonetGuard', 'IjaTauntGesture', 'IjaKickPrisoner',
+CAPTIVE_CLIPS = ['CaptiveHandsUpWalk', 'CaptiveShovedStumble', 'CaptiveHandsUpStand',
+                 'CaptiveStandToKneel', 'CaptiveKneelHandsHead', 'CaptiveKneelPlead',
+                 'CaptiveKneelFlinch', 'CaptiveStruckDown', 'CaptiveStabbedCollapse']
+GUARD_CLIPS = ['IjaBayonetGuard', 'IjaTauntGesture', 'IjaShoveForward', 'IjaKickPrisoner',
                'IjaRifleButtStrike', 'IjaBayonetDownThrust']
 
 # The marched-in gait. The adapter has no root motion, so the clip carries the ground
@@ -86,9 +88,11 @@ REFERENCE_SPEED = {'CaptiveHandsUpWalk': WALK_SPEED}
 # This is the number the 2026-09-15 pass did not have. It used the toe *bone height*
 # (0.63) as the kick's reach and put the guard 0.78 m away; the boot actually reaches
 # 0.80 m and his chest starts 0.15 m out, so the kick went a sixth of a metre through him.
-CONTACT_TARGETS = [('kick', 0.58, 0.68, -39.8), ('butt', 0.60, 0.70, 53.7),
+CONTACT_TARGETS = [('shove', 0.95, 1.05, -45.0), ('kick', 0.58, 0.68, -39.8),
+                   ('butt', 0.92, 1.02, 53.7),
                    ('thrustYoung', 0.74, 0.84, 38.4), ('thrustThird', 0.74, 0.84, 19.7)]
-CONTACT_BAND_CLIPS = ('CaptiveKneelHandsHead', 'CaptiveKneelPlead', 'CaptiveKneelFlinch')
+CONTACT_BAND_CLIPS = ('CaptiveHandsUpWalk', 'CaptiveKneelHandsHead', 'CaptiveKneelPlead',
+                      'CaptiveKneelFlinch')
 # Half-width of the corridor the striking end sweeps, in runtime metres (a boot sole, a
 # rifle butt plate and a bayonet blade are all well inside 18 cm across).
 CONTACT_CORRIDOR = 0.09
@@ -102,6 +106,10 @@ MODEL_CLIPS = {
 # Type38 with a fixed bayonet, measured from the right-hand grip mount
 # (_blender/BuildWeapons.py BUTT_Z 0.255, Data_Weapons bayonetTotalM 1.663).
 BAYONET_TIP_M = 1.663 - 0.255
+# Script_Actor KIND_SPEC heights, i.e. what CharacterModel scales each rig to. Every
+# runtime-metre number this script prints is source metres times targetHeight/restTop,
+# so getting the guards wrong (they are NOT 1.66) biases every reach it reports.
+TARGET_HEIGHT = {'nra': 1.66, 'ija': 1.62}
 
 convert = Matrix(((1, 0, 0, 0), (0, 0, -1, 0), (0, 1, 0, 0), (0, 0, 0, 1)))
 convertInv = convert.inverted()
@@ -145,6 +153,25 @@ def Op(operator, **kwargs):
     """Run one bpy operator inside GuiContext()."""
     with GuiContext():
         return operator(**kwargs)
+
+
+def ResetScene():
+    """Empty factory scene to bake into. Same data both ways; only the UI differs.
+
+    `--background` uses `read_factory_settings`, which is what it has always been.
+    Under BlenderMCP the very same call **quits Blender**: it runs inside a
+    `bpy.app.timers` callback, replaces the window manager, and the new factory file
+    has no window attached to that callback's context, so the main loop finds zero
+    windows and exits ("Blender quit" one line after "Preferences saved").
+    `read_homefile(load_ui=False)` loads the same empty factory scene and leaves the
+    existing window alone. It still reloads preferences -- the add-on is disabled and
+    the socket server stops, which is what the bootstrap's watchdog is for.
+    """
+    if bpy.app.background:
+        bpy.ops.wm.read_factory_settings(use_empty=True)
+        return
+    with GuiContext():
+        bpy.ops.wm.read_homefile(use_empty=True, use_factory_startup=True, load_ui=False)
 
 
 def Add(operator, **kwargs):
@@ -204,7 +231,7 @@ def Bake(modelId, probe=None):
     Blender without a second copy of the rig setup drifting away from this one.
     """
     started = time.time()
-    bpy.ops.wm.read_factory_settings(use_empty=True)
+    ResetScene()
     scene = bpy.context.scene
     scene.render.fps = fps
     source = project / 'Model/Character' / ('Model_' + modelId + '.glb')
@@ -356,7 +383,11 @@ def Bake(modelId, probe=None):
                     for side in ['L', 'R']}
     assert sum(v[1] for v in sourceFacing.values()) < -1, sourceFacing
     restTop = max((o.matrix_world @ v.co).z for o in meshes for v in o.data.vertices)
-    nominalScale = 1.66 / restTop            # CharacterModel's targetHeight for infantry
+    # CharacterModel's targetHeight, and it is **not the same for both sides**
+    # (Script_Actor KIND_SPEC: nra 1.66, ija 1.62). Reporting the guards at 1.66 made
+    # every IJA reach in this file 2.4 % long -- about 2 cm on the butt and the bayonet,
+    # which is four times the tolerance the stage distances are tuned to.
+    nominalScale = TARGET_HEIGHT['ija' if modelId.startswith('LugouIja') else 'nra'] / restTop
     print('REST %s pelvis %.3f chest %.3f head %.3f ankle %.3f femur %.3f shin %.3f arm %.3f'
           % (modelId, restPelvis, restChest, restHead, ankleZ, femur, shin, armLen), flush=True)
 
@@ -558,6 +589,50 @@ def Bake(modelId, probe=None):
         w = (u - WALK_STANCE) / (1 - WALK_STANCE)
         return (half - WALK_AMP * Smooth(w), WALK_LIFT * math.sin(math.pi * w), False)
 
+    def HandsUpWalkPose(t):
+        """Marched in with the hands up.
+
+        No root motion: the cutscene track does the travelling, this only has to set the
+        planted foot down at the speed the track is moving (WalkFoot's note). Two gait
+        cycles per clip, so the upper body can lurch on one of them without desyncing
+        the feet. A function, not an inline branch, because `CaptiveShovedStumble` has
+        to start on **exactly** this pose at t = 0.
+        """
+        phase = Tau * t / DEFINITIONS['CaptiveHandsUpWalk'][0]
+        gait = Tau * t / WALK_CYCLE
+        lurch = math.sin(phase)                       # one per clip (two cycles)
+        bob = math.cos(2 * (gait - Tau * WALK_STANCE / 2))
+        reachZ = shoulder['L'].z - WALK_CROUCH + .415
+        feet = {'L': WalkFoot(t, .0), 'R': WalkFoot(t, .5)}
+        walkTremble = math.sin(phase * 11)
+        return {
+            'pelvis': (.028 * math.cos(gait - Tau * WALK_STANCE / 2) + .010 * lurch,
+                       .015 + .012 * lurch,
+                       restPelvis - WALK_CROUCH + .016 * bob - .012 * max(.0, lurch)),
+            'pelvisTilt': (.11, .05 * math.sin(gait - Tau * WALK_STANCE / 2), .06 * lurch),
+            'bend': .23 + .03 * lurch,
+            'lean': .05 * lurch,
+            'twist': .05 * math.sin(gait),
+            'shrug': .31,
+            'neck': (.10, 0, 0),
+            'head': (.19 + .04 * bob, 0, .13 * lurch),
+            'ankles': {side: (sign * (hipHalf + .020), feet[side][0], ankleZ + feet[side][1])
+                       for side, sign in [('L', 1), ('R', -1)]},
+            'legPoles': {'L': (hipHalf + .26, -.95, .42), 'R': (-(hipHalf + .26), -.95, .42)},
+            'toeDirs': {'L': None, 'R': None},
+            'hands': {
+                'L': (hipHalf + .165 + .018 * math.sin(gait) + .006 * walkTremble, -.115,
+                      reachZ + .014 * bob + .007 * walkTremble),
+                'R': (-(hipHalf + .165) + .018 * math.sin(gait) + .006 * walkTremble, -.115,
+                      reachZ - .014 * bob - .007 * walkTremble),
+            },
+            'armPoles': {'L': (hipHalf + .95, .15, reachZ - .55), 'R': (-(hipHalf + .95), .15, reachZ - .55)},
+            'palms': {
+                'L': ((-.20, -.12, .97), (0, -1, .1), .16),
+                'R': ((.20, -.12, .97), (0, -1, .1), .16),
+            },
+        }
+
     def Author(clip, t, lift):
         for pb in arm.pose.bones:
             pb.matrix_basis = rest[pb.name]
@@ -580,43 +655,76 @@ def Bake(modelId, probe=None):
             p = HandsUpStandPose(sway=sway, sway2=sway2, breath=breath, nod=nod, tremble=tremble)
 
         elif clip == 'CaptiveHandsUpWalk':
-            # Marched in with the hands up. No root motion: the cutscene track does the
-            # travelling, this only has to set the planted foot down at the speed the
-            # track is moving (WalkFoot's note). Two gait cycles per clip, so the upper
-            # body can lurch on one of them without desyncing the feet.
-            gait = Tau * t / WALK_CYCLE
-            lurch = math.sin(phase)                       # one per clip (two cycles)
-            bob = math.cos(2 * (gait - Tau * WALK_STANCE / 2))
-            reachZ = shoulder['L'].z - WALK_CROUCH + .415
-            feet = {'L': WalkFoot(t, .0), 'R': WalkFoot(t, .5)}
-            walkTremble = math.sin(phase * 11)
-            p = {
-                'pelvis': (.028 * math.cos(gait - Tau * WALK_STANCE / 2) + .010 * lurch,
-                           .015 + .012 * lurch,
-                           restPelvis - WALK_CROUCH + .016 * bob - .012 * max(.0, lurch)),
-                'pelvisTilt': (.11, .05 * math.sin(gait - Tau * WALK_STANCE / 2), .06 * lurch),
-                'bend': .23 + .03 * lurch,
-                'lean': .05 * lurch,
-                'twist': .05 * math.sin(gait),
-                'shrug': .31,
-                'neck': (.10, 0, 0),
-                'head': (.19 + .04 * bob, 0, .13 * lurch),
-                'ankles': {side: (sign * (hipHalf + .020), feet[side][0], ankleZ + feet[side][1])
-                           for side, sign in [('L', 1), ('R', -1)]},
-                'legPoles': {'L': (hipHalf + .26, -.95, .42), 'R': (-(hipHalf + .26), -.95, .42)},
-                'toeDirs': {'L': None, 'R': None},
-                'hands': {
-                    'L': (hipHalf + .165 + .018 * math.sin(gait) + .006 * walkTremble, -.115,
-                          reachZ + .014 * bob + .007 * walkTremble),
-                    'R': (-(hipHalf + .165) + .018 * math.sin(gait) + .006 * walkTremble, -.115,
-                          reachZ - .014 * bob - .007 * walkTremble),
-                },
-                'armPoles': {'L': (hipHalf + .95, .15, reachZ - .55), 'R': (-(hipHalf + .95), .15, reachZ - .55)},
-                'palms': {
-                    'L': ((-.20, -.12, .97), (0, -1, .1), .16),
-                    'R': ((.20, -.12, .97), (0, -1, .1), .16),
-                },
-            }
+            p = HandsUpWalkPose(t)
+
+        elif clip == 'CaptiveShovedStumble':
+            # Shoved in the back while being marched in: one lurching catch-step and then
+            # the hands-up stand. First frame is **exactly** the walk clip's frame 0 and
+            # the last is **exactly** the stand clip's frame 0, so both cross-fades are
+            # no-ops (same contract as CaptiveStandToKneel).
+            #
+            # The clip has no root motion; the cutscene track carries him the 0.30 m the
+            # shove costs him. That number is not free: the planted left foot travels
+            # from -0.287 (walk frame 0) to +0.010 (stand frame 0) relative to the root,
+            # which is 0.297 m of ground - author more travel than that and the plant
+            # skates. The right foot swings through, lands ahead at -0.185, and drifts
+            # back to the stand stance as the root catches up.
+            if t <= 1e-9:
+                p = HandsUpWalkPose(.0)
+            elif t >= duration - 1e-9:
+                p = HandsUpStandPose()
+            else:
+                walkPose, standPose = HandsUpWalkPose(.0), HandsUpStandPose()
+                # The push itself: a hard impulse that decays. Everything the blow does
+                # rides on this one curve so the recovery cannot outlast the hit.
+                push = Track([(0.00, {'k': .0}), (0.08, {'k': 1.0}), (0.20, {'k': .78}),
+                              (0.34, {'k': .50}), (0.50, {'k': .22}), (0.70, {'k': .0})], t)['k']
+                wBody = Smooth(Clamp((t - .20) / .50))
+                p = BlendPose(walkPose, standPose, wBody, None)
+                p['toeDirs'] = {'L': None, 'R': None}
+                # Torso thrown forward over the feet, hips driven the same way.
+                p['bend'] = Mix(walkPose['bend'], standPose['bend'], wBody) + .30 * push
+                p['lean'] = Mix(walkPose['lean'], standPose['lean'], wBody) - .10 * push
+                p['twist'] = Mix(walkPose.get('twist', .0), .0, wBody) - .13 * push
+                p['shrug'] = Mix(walkPose['shrug'], standPose['shrug'], wBody) + .12 * push
+                p['pelvisTilt'] = (p['pelvisTilt'][0] + .20 * push, p['pelvisTilt'][1] - .06 * push,
+                                   p['pelvisTilt'][2] - .05 * push)
+                # 颈与头只跟一点：加满的话（+.24/+.30）脸整个扎到胸口里，从正面看
+                # 头会缩进两肩之间不见了。被推的人是**身子**被顶出去，头是跟着走的。
+                p['neck'] = (p['neck'][0] + .15 * push, 0, -.14 * push)
+                p['head'] = (p['head'][0] + .17 * push, 0, -.18 * push)
+                base = Mix(walkPose['pelvis'][2], standPose['pelvis'][2], wBody)
+                p['pelvis'] = (Mix(walkPose['pelvis'][0], standPose['pelvis'][0], wBody) - .022 * push,
+                               Mix(walkPose['pelvis'][1], standPose['pelvis'][1], wBody) - .105 * push,
+                               base - .055 * push)
+                # Feet: left stays planted and slides back exactly as far as the track
+                # carries him; right swings through and catches the fall.
+                # Linear, because the track that carries him is linear: a planted foot
+                # that eases has to make the difference up by sliding.
+                stanceY = Mix(walkPose['ankles']['L'][1], standPose['ankles']['L'][1], t / duration)
+                swing = Track([(0.00, {'y': walkPose['ankles']['R'][1], 'lift': .0}),
+                               (0.10, {'y': .130, 'lift': .030}),
+                               (0.22, {'y': -.060, 'lift': .092}),
+                               (0.34, {'y': -.185, 'lift': .004}),
+                               (0.70, {'y': standPose['ankles']['R'][1], 'lift': .0})], t)
+                p['ankles'] = {
+                    'L': (Mix(walkPose['ankles']['L'][0], standPose['ankles']['L'][0], wBody),
+                          stanceY, ankleZ),
+                    'R': (Mix(walkPose['ankles']['R'][0], standPose['ankles']['R'][0], wBody),
+                          swing['y'], ankleZ + swing['lift']),
+                }
+                p['legPoles'] = {'L': (hipHalf + .26, -.95, .42), 'R': (-(hipHalf + .26), -1.02, .48)}
+                # Hands stay up (they are not his to lower) but get flung forward.
+                # They have to travel with the shoulders and then some: the push drives
+                # the pelvis 0.105 m forward and bends the spine another 0.30 rad, which
+                # carries the shoulder about 0.27 m ahead of where it was. Leaving the
+                # overhead hand targets where they were asks the arm for 15 % more than
+                # it has, the IK clamps, and both elbows lock straight (OVERREACH armL
+                # 1.152 on the first cut).
+                for side, sign in [('L', 1), ('R', -1)]:
+                    hand = p['hands'][side]
+                    p['hands'][side] = (hand[0] + sign * .045 * push, hand[1] - .310 * push,
+                                        hand[2] - .070 * push)
 
         elif clip == 'CaptiveStandToKneel':
             # Hands-up stand -> both knees on the ground, hands to the back of the head.
@@ -660,28 +768,38 @@ def Bake(modelId, probe=None):
                                    slow=sway, turn=math.sin(phase * 2))
 
         elif clip == 'CaptiveKneelFlinch':
-            # A rifle butt across the head and shoulder from behind-left: the head snaps
-            # down and to his right, the shoulders clamp, then he settles back into the
+            # A rifle butt across the **head and back of the neck** from behind-left
+            # (2026-09-16 second pass; the first version was a strike to the shoulder
+            # blades and the body curled up under it). A blow on the skull does not make
+            # a man crouch, it turns his head: the neck whips forward-right and rolls
+            # over, the torso follows late and far less, then he pulls back into the
             # hands-on-head loop. Both ends are that loop's neutral frame.
-            hit = Track([(0.00, {'k': .0}), (0.09, {'k': 1.0}), (0.20, {'k': .74}),
-                         (0.36, {'k': .44}), (0.60, {'k': .16}), (0.80, {'k': .0})], t)['k']
-            shudder = .006 * math.sin(t * 92) * max(.0, 1 - t / .34)
+            hit = Track([(0.00, {'k': .0}), (0.07, {'k': 1.0}), (0.16, {'k': .86}),
+                         (0.30, {'k': .52}), (0.52, {'k': .20}), (0.80, {'k': .0})], t)['k']
+            # The torso lags the head by about 50 ms - that lag is the whole difference
+            # between "his head was hit" and "he ducked".
+            drag = Track([(0.00, {'k': .0}), (0.13, {'k': .78}), (0.26, {'k': 1.0}),
+                          (0.44, {'k': .56}), (0.64, {'k': .18}), (0.80, {'k': .0})], t)['k']
+            shudder = .005 * math.sin(t * 92) * max(.0, 1 - t / .30)
             p = KneelHandsHeadPose()
             crown = kneelPelvisZ + (restHead - restPelvis) * .90
-            p['pelvis'] = (p['pelvis'][0] - .020 * hit, p['pelvis'][1] + .012 * hit,
-                           p['pelvis'][2] - .032 * hit + shudder)
-            p['pelvisTilt'] = (.10 + .17 * hit, -.10 * hit, -.06 * hit)
-            p['bend'] = .20 + .29 * hit
-            p['lean'] = -.17 * hit
-            p['twist'] = -.11 * hit
-            p['neck'] = (.12 + .30 * hit, 0, -.25 * hit)
-            p['head'] = (.24 + .34 * hit, 0, -.40 * hit)
-            p['shrug'] = .34 + .30 * hit
-            handZ = crown + .070 - .058 * hit + shudder
-            p['hands'] = {'L': (hipHalf - .020 - .028 * hit, .105 - .050 * hit, handZ),
-                          'R': (-(hipHalf - .020) + .028 * hit, .105 - .050 * hit, handZ)}
-            p['armPoles'] = {'L': (hipHalf + 1.0 - .30 * hit, -.62, crown - .30),
-                             'R': (-(hipHalf + 1.0 - .30 * hit), -.62, crown - .30)}
+            p['pelvis'] = (p['pelvis'][0] - .016 * drag, p['pelvis'][1] + .010 * drag,
+                           p['pelvis'][2] - .014 * drag + shudder)
+            p['pelvisTilt'] = (.10 + .09 * drag, -.07 * drag, -.05 * drag)
+            p['bend'] = .20 + .15 * drag
+            p['lean'] = -.20 * drag
+            p['twist'] = -.17 * drag
+            # Neck and head carry the blow: pitched forward, yawed away from the swing,
+            # and rolled over onto his own right shoulder.
+            p['neck'] = (.12 + .46 * hit, -.26 * hit, -.36 * hit)
+            p['head'] = (.24 + .40 * hit, -.30 * hit, -.52 * hit)
+            p['shrug'] = .34 + .18 * drag
+            # The hands are still laced behind the head, so they go with it.
+            handZ = crown + .070 - .030 * hit + shudder
+            p['hands'] = {'L': (hipHalf - .020 - .075 * hit, .105 - .060 * hit, handZ - .020 * hit),
+                          'R': (-(hipHalf - .020) - .020 * hit, .105 - .040 * hit, handZ + .010 * hit)}
+            p['armPoles'] = {'L': (hipHalf + 1.0 - .34 * hit, -.62, crown - .30),
+                             'R': (-(hipHalf + 1.0 - .12 * hit), -.62, crown - .30)}
 
         elif clip == 'CaptiveKneelPlead':
             beg = (1 - math.cos(phase)) / 2
@@ -876,6 +994,60 @@ def Bake(modelId, probe=None):
                 'R': ((0, -.30, -.95), (-.95, -.25, 0), .90),
             }
 
+        elif clip == 'IjaShoveForward':
+            # 押解路上的一记推搡：左手掌推在俘虏的后背上，重心前送再收回。
+            # 接触在 0.40 s，最远伸展在 0.52 s（与踢同一条口径：接触之后还往前推
+            # 5 cm，那时人已经在往前趔趄，所以看不出陷体）。
+            #
+            # **枪必须竖起来。** 喝令那一条（IjaTauntGesture）把单手枪的前臂指向前方，
+            # 于是刺刀尖落在身前 1.52 m、高 0.33–0.45 —— 对着趴在地上的人没事，对着
+            # 0.79 m 外**站着**的人就是一刀捅穿大腿。所以这一条把右前臂立起来
+            # （肘低、腕高过肩），枪口朝上偏后 26°，刺刀尖在头顶 2.5 m 处，
+            # 身前那条线上一寸钢都没有。
+            shove = [
+                (0.00, {'lx': hipHalf - .010, 'ly': -.235, 'lz': shoulder['L'].z - .330,
+                        'px': 0, 'py': .015, 'pz': restPelvis - .055, 'tilt': .07, 'bend': .13,
+                        'twist': .0, 'head': .09, 'fy': -.100, 'by': .075, 'curl': .40}),
+                (0.18, {'lx': hipHalf + .055, 'ly': -.035, 'lz': shoulder['L'].z - .215,
+                        'px': -.025, 'py': .075, 'pz': restPelvis - .080, 'tilt': -.04, 'bend': .02,
+                        'twist': .13, 'head': .02, 'fy': -.060, 'by': .105, 'curl': .28}),
+                (0.40, {'lx': hipHalf - .005, 'ly': -.560, 'lz': shoulder['L'].z - .390,
+                        'px': .020, 'py': -.120, 'pz': restPelvis - .105, 'tilt': .26, 'bend': .23,
+                        'twist': -.06, 'head': .16, 'fy': -.330, 'by': .075, 'curl': .14}),
+                (0.52, {'lx': hipHalf - .010, 'ly': -.620, 'lz': shoulder['L'].z - .400,
+                        'px': .024, 'py': -.150, 'pz': restPelvis - .112, 'tilt': .29, 'bend': .25,
+                        'twist': -.08, 'head': .18, 'fy': -.360, 'by': .070, 'curl': .12}),
+                (0.70, {'lx': hipHalf - .010, 'ly': -.380, 'lz': shoulder['L'].z - .330,
+                        'px': .010, 'py': -.040, 'pz': restPelvis - .075, 'tilt': .14, 'bend': .17,
+                        'twist': -.02, 'head': .12, 'fy': -.190, 'by': .080, 'curl': .26}),
+                (0.90, {'lx': hipHalf - .010, 'ly': -.235, 'lz': shoulder['L'].z - .330,
+                        'px': 0, 'py': .015, 'pz': restPelvis - .055, 'tilt': .07, 'bend': .13,
+                        'twist': .0, 'head': .09, 'fy': -.100, 'by': .075, 'curl': .40}),
+            ]
+            k = Track(shove, t)
+            p = {
+                'pelvis': (k['px'], k['py'], k['pz']),
+                'pelvisTilt': (k['tilt'], 0, -.10 + k['twist']),
+                'bend': k['bend'],
+                'twist': k['twist'] * .5,
+                'neck': (.06, 0, .04),
+                'head': (k['head'], 0, .08),
+                'shrug': .05,
+                'ankles': {'L': (hipHalf + .02, k['fy'], ankleZ), 'R': (-(hipHalf + .02), k['by'], ankleZ)},
+                'legPoles': {'L': (hipHalf + .30, -.95, .45), 'R': (-(hipHalf + .30), -.95, .45)},
+                'toeDirs': {'L': None, 'R': None},
+                # 右手与肘跟着骨盆走（枪不会在弓步前送时被留在原地）。
+                'hands': {'L': (k['lx'], k['ly'], k['lz']),
+                          'R': (-(hipHalf + .150), k['py'] + .210, shoulder['R'].z + .040)},
+                'armPoles': {'L': (hipHalf + .95, .10, k['lz'] - .52),
+                             'R': (-(hipHalf + .10), k['py'] - .220, shoulder['R'].z - .86)},
+                'palms': {
+                    # 左手张开、掌心朝前推；右手握在枪身上（枪竖着，掌心朝身体内侧）。
+                    'L': ((-.22, -.30, .93), (0, -1, .12), k['curl']),
+                    'R': ((0, .30, .95), (-.95, .25, 0), .90),
+                },
+            }
+
         elif clip == 'IjaKickPrisoner':
             aim = Vector((.12, -.88, -.46)).normalized()
             kick = [
@@ -926,7 +1098,7 @@ def Bake(modelId, probe=None):
         elif clip == 'IjaRifleButtStrike':
             # Anchored on the **butt** (the striking end), because that is what the shot has
             # to sell: the wind-up puts it above and behind the head, the smash drives it
-            # down in front to a kneeling man's head-and-shoulder height. The right hand
+            # down in front onto the **head and back of the neck** of the kneeling man. The right hand
             # follows 0.255 m up the stock (weapon origin = gripR) and the left another
             # `span` along the barrel, so the two hands always sit fore-and-aft on the rifle
             # instead of both crowding in front of the face (the 2026-09-15 first cut did).
@@ -946,17 +1118,19 @@ def Bake(modelId, probe=None):
                         'tilt': -.13, 'bend': -.08, 'head': -.10, 'fy': -.095, 'span': .350}),
                 # 过顶：枪身竖起来、枪托在身前上方，重心开始压到前脚。枪托这一路必须**保持高**——
                 # 枪连刺刀 1.66 m，握把一低，枪口扫过竖直位时刺刀尖就插进地里（实测 −0.22 m）。
-                (0.68, {'pitch': -131.0, 'yaw': -2.0, 'bx': hipHalf - .150, 'by': -.420,
-                        'bz': shoulder['L'].z + .375, 'px': 0, 'py': -.090, 'pz': restPelvis - .090,
-                        'tilt': .15, 'bend': .05, 'head': .10, 'fy': -.200, 'span': .340}),
-                # 砸击（0.85）：枪托落到身前约 0.78 m、高约 0.66 m（跪着的人的头肩高度），
-                # 躯干前倾、右臂打直、骨盆压到前脚上方。
-                (0.85, {'pitch': -216.9, 'yaw': -3.6, 'bx': hipHalf - .125, 'by': -.875,
-                        'bz': .655, 'px': .02, 'py': -.290, 'pz': restPelvis - .150,
-                        'tilt': .40, 'bend': .12, 'head': .26, 'fy': -.410, 'span': .300}),
-                (1.02, {'pitch': -221.0, 'yaw': -3.6, 'bx': hipHalf - .120, 'by': -.855,
-                        'bz': .620, 'px': .02, 'py': -.318, 'pz': restPelvis - .155,
-                        'tilt': .42, 'bend': .13, 'head': .27, 'fy': -.420, 'span': .300}),
+                (0.68, {'pitch': -136.0, 'yaw': -2.0, 'bx': hipHalf - .150, 'by': -.400,
+                        'bz': shoulder['L'].z + .385, 'px': 0, 'py': -.075, 'pz': restPelvis - .085,
+                        'tilt': .12, 'bend': .04, 'head': .08, 'fy': -.180, 'span': .345}),
+                # 砸击（0.85）：**落在跪着的人的头与后颈上**，不是肩胛（2026-09-16 第二轮改；
+                # 第一版落点高 0.62 m，对跪着的人是后背）。枪托停在身前约 0.72 m、
+                # 高约 0.93 m —— 跪姿头骨 0.98 / 颈 0.96 那一带。抡得更早停就意味着
+                # 躯干前倾少一截、骨盆前移少一截，那两条断言的带子跟着实测改。
+                (0.85, {'pitch': -210.0, 'yaw': -3.6, 'bx': hipHalf - .128, 'by': -.890,
+                        'bz': 1.045, 'px': .015, 'py': -.170, 'pz': restPelvis - .110,
+                        'tilt': .28, 'bend': .10, 'head': .22, 'fy': -.300, 'span': .305}),
+                (1.02, {'pitch': -214.0, 'yaw': -3.6, 'bx': hipHalf - .124, 'by': -.880,
+                        'bz': 1.005, 'px': .015, 'py': -.190, 'pz': restPelvis - .116,
+                        'tilt': .30, 'bend': .11, 'head': .23, 'fy': -.315, 'span': .305}),
                 # 收回也把枪先带回高位再落到持枪式：枪口转回来必然要扫过「竖直朝下」，
                 # 那一瞬握把低于 1.5 m 刺刀尖就进地（第一版实测 −0.19 m）。
                 (1.16, {'pitch': -150.0, 'yaw': -2.0, 'bx': hipHalf - .150, 'by': -.470,
@@ -1076,6 +1250,9 @@ def Bake(modelId, probe=None):
     shinVertices = GroupSets(lambda n: 'Calf' in n)
     handVertices = GroupSets(lambda n: 'Hand' in n or 'Finger' in n)
     kickVertices = GroupSets(lambda n: 'R Foot' in n or 'R Toe' in n)
+    # The shoving hand, for the same reason the kick measures the boot and not the toe
+    # bone: what stops on the prisoner's back is the palm, 7 cm past the wrist joint.
+    shoveVertices = GroupSets(lambda n: 'L Hand' in n or 'L Finger' in n)
     regionVertices = {
         'foot': footVertices, 'shin': shinVertices,
         'thigh': GroupSets(lambda n: 'Thigh' in n),
@@ -1273,6 +1450,7 @@ def Bake(modelId, probe=None):
             # tip is a scaled hand plus an unscaled weapon length, exactly as at runtime.
             tip = gripR * nominalScale + axis * BAYONET_TIP_M
             kickY, kickZ = Forward(kickVertices) if clip == 'IjaKickPrisoner' else (0.0, 0.0)
+            palmY, palmZ = Forward(shoveVertices) if clip == 'IjaShoveForward' else (0.0, 0.0)
             back = BodyBack() if (clip in CONTACT_BAND_CLIPS and frame == 0) else None
             samples.append({
                 't': round(t, 4),
@@ -1291,6 +1469,7 @@ def Bake(modelId, probe=None):
                 'tip': [round(tip.x, 4), round(tip.y, 4), round(tip.z, 4)],
                 'butt': [round(v, 4) for v in (gripR * nominalScale - axis * .255)],
                 'bootReach': round(kickY, 4), 'bootZ': round(kickZ, 4),
+                'palmReach': round(palmY, 4), 'palmZ': round(palmZ, 4),
                 'back': back,
                 'lift': round(lift, 5),
                 'lowAt': lowAt,
@@ -1347,13 +1526,14 @@ def Bake(modelId, probe=None):
                   % (clip, stanceSpeed[0], stanceSpeed[1], REFERENCE_SPEED[clip]), flush=True)
         # The contact window, frame by frame, in runtime metres: this is what the stage
         # distances in Data_CutsceneMachineGunCaptives are derived from.
-        window = {'IjaKickPrisoner': (0.34, 0.56), 'IjaRifleButtStrike': (0.76, 0.96),
+        window = {'IjaShoveForward': (0.32, 0.58), 'IjaKickPrisoner': (0.34, 0.56),
+                  'IjaRifleButtStrike': (0.76, 0.96),
                   'IjaBayonetDownThrust': (0.66, 1.12)}.get(clip)
         if window:
             for s in samples:
                 if window[0] <= s['t'] <= window[1]:
-                    print('     REACH %-22s t=%.3f boot %.3f/%.3f  butt %.3f/%.3f  tip %.3f/%.3f'
-                          % (clip, s['t'], s['bootReach'], s['bootZ'],
+                    print('     REACH %-22s t=%.3f boot %.3f/%.3f  palm %.3f/%.3f  butt %.3f/%.3f  tip %.3f/%.3f'
+                          % (clip, s['t'], s['bootReach'], s['bootZ'], s['palmReach'], s['palmZ'],
                              -s['butt'][1], s['butt'][2], -s['tip'][1], s['tip'][2]), flush=True)
         if samples[0]['back']:
             print('   BACK     %-24s %s' % (clip, json.dumps(samples[0]['back'])), flush=True)

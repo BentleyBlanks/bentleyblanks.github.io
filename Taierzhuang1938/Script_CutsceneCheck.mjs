@@ -156,6 +156,12 @@ export function ValidateCutscene(cut, cast = CAST) {
         problems.push(`${cut.id}: ${actor.id} 的 modelVariant ${actor.modelVariant} 不在 ${actor.kind || "nra"} 的选模清单 [${allowed.join(",")}] 里`);
       }
     }
+    // 钉死的身高缩放（打击站位算到毫米的场次用）。写成 0 或者字符串的话 Actor 会
+    // 悄悄退回随机身高 —— 画面上只表现为「刺入深度又开始飘了」，所以硬查。
+    if (actor.sizeScale !== undefined
+      && (!Number.isFinite(actor.sizeScale) || actor.sizeScale < 0.8 || actor.sizeScale > 1.25)) {
+      problems.push(`${cut.id}: ${actor.id} 的 sizeScale 必须是 0.8–1.25 的数字（实际 ${actor.sizeScale}）`);
+    }
     if (!actor.track || !actor.track.length) { problems.push(`${cut.id}: ${actor.id} 没有轨道`); continue; }
     const attachments = Array.isArray(actor.attachments) ? actor.attachments
       : (Array.isArray(actor.mounts) ? actor.mounts : []);

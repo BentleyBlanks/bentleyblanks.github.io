@@ -24,23 +24,42 @@ const manifest = JSON.parse(await fs.readFile(path.join(project, "Model", "Chara
 // ---------------------------------------------------------------------------
 // 1. 清单与资产（纯 Node）
 // ---------------------------------------------------------------------------
-const CAPTIVE_CLIPS = ["CaptiveHandsUpWalk", "CaptiveHandsUpStand", "CaptiveStandToKneel",
-  "CaptiveKneelHandsHead", "CaptiveKneelPlead", "CaptiveKneelFlinch",
+const CAPTIVE_CLIPS = ["CaptiveHandsUpWalk", "CaptiveShovedStumble", "CaptiveHandsUpStand",
+  "CaptiveStandToKneel", "CaptiveKneelHandsHead", "CaptiveKneelPlead", "CaptiveKneelFlinch",
   "CaptiveStruckDown", "CaptiveStabbedCollapse"];
-const GUARD_CLIPS = ["IjaBayonetGuard", "IjaTauntGesture", "IjaKickPrisoner",
+const GUARD_CLIPS = ["IjaBayonetGuard", "IjaTauntGesture", "IjaShoveForward", "IjaKickPrisoner",
   "IjaRifleButtStrike", "IjaBayonetDownThrust"];
 const COVERAGE = {
   LugouNra02: CAPTIVE_CLIPS, LugouNra05: CAPTIVE_CLIPS,
   LugouIja01: GUARD_CLIPS, LugouIja02: GUARD_CLIPS, LugouIja03: GUARD_CLIPS,
 };
 const DURATIONS = {
-  CaptiveHandsUpWalk: [1.8, true],
+  CaptiveHandsUpWalk: [1.8, true], CaptiveShovedStumble: [0.7, false],
   CaptiveHandsUpStand: [4, true], CaptiveStandToKneel: [1, false],
   CaptiveKneelHandsHead: [4, true], CaptiveKneelPlead: [4, true], CaptiveKneelFlinch: [0.8, false],
   CaptiveStruckDown: [1.6, false], CaptiveStabbedCollapse: [2, false],
-  IjaBayonetGuard: [4, true], IjaTauntGesture: [4, true], IjaKickPrisoner: [1.2, false],
+  IjaBayonetGuard: [4, true], IjaTauntGesture: [4, true], IjaShoveForward: [0.9, false],
+  IjaKickPrisoner: [1.2, false],
   IjaRifleButtStrike: [1.4, false], IjaBayonetDownThrust: [1.6, false],
 };
+// CharacterModel 把每具骨架缩到 KIND_SPEC 的身高，而**两边不是同一个数**。
+// 第一版的门禁把日军也按 1.66 建，于是枪托与刺刀的触及各长了 2.4%（约 2 cm）——
+// 比这整套站位的容差还大。这里既照它建，也顺手核对引擎那边没改过。
+const TARGET_HEIGHT = { nra: 1.66, ija: 1.62 };
+const actorSource = await fs.readFile(path.join(project, "Script_Actor.mjs"), "utf8");
+for (const [kind, height] of Object.entries(TARGET_HEIGHT)) {
+  assert.match(actorSource, new RegExp(String.raw`\b${kind}:\s*\{\s*height:\s*${height}\b`),
+    `Script_Actor 的 KIND_SPEC.${kind}.height 不再是 ${height}，本门禁量的身高要跟着改`);
+}
+const KindOf = (modelId) => (modelId.startsWith("LugouIja") ? "ija" : "nra");
+// 本场七个人的身高缩放**钉死**（cast[].sizeScale）。触及随施动者缩放、体表随受击者
+// 缩放，两边各抽一次 ±4% 就是刺入深度 ±4 cm 的随机浮动，而下面这些站位是算到毫米的。
+const CAST_SCALES = new Set(CS_MachineGunCaptives.cast.map((entry) => entry.sizeScale));
+for (const entry of CS_MachineGunCaptives.cast) {
+  assert.equal(entry.sizeScale, 1, `${entry.id} 本场必须钉死 sizeScale（实际 ${entry.sizeScale}）`);
+}
+assert.equal(CAST_SCALES.size, 1, "本场七人的 sizeScale 必须是同一个值，门禁按它量");
+const CAST_SCALE = [...CAST_SCALES][0];
 assert.deepEqual(config.actorForward, [0, 0, -1]);
 assert.equal(config.models.length, 5);
 assert.deepEqual(Object.keys(config.clips).sort(), Object.keys(DURATIONS).sort());
@@ -94,6 +113,12 @@ for (const model of config.models) {
     const Diff = (a, b) => Math.max(...a.map((v, i) => Math.abs(v - b[i])));
     const kneelStart = Frame("CaptiveKneelHandsHead", 0);
     const standStart = Frame("CaptiveHandsUpStand", 0);
+    const walkStart = Frame("CaptiveHandsUpWalk", 0);
+    const stumble = data.clips.CaptiveShovedStumble;
+    assert.ok(Diff(Frame("CaptiveShovedStumble", 0), walkStart) === 0,
+      `${model.id} CaptiveShovedStumble 首帧必须是举手走的第 0 帧`);
+    assert.ok(Diff(Frame("CaptiveShovedStumble", stumble.frameCount - 1), standStart) === 0,
+      `${model.id} CaptiveShovedStumble 末帧必须是举手站的第 0 帧`);
     const toKneel = data.clips.CaptiveStandToKneel;
     assert.ok(Diff(Frame("CaptiveStandToKneel", 0), standStart) === 0,
       `${model.id} CaptiveStandToKneel 首帧必须是举手站姿的第 0 帧`);
@@ -136,11 +161,17 @@ const TrackAt = (id, time) => {
   };
 };
 const CONTACTS = [
+  // 推搡是唯一一次打在**站着**的人身上的接触（0.95–1.05 是举手走那个姿势的后背带）。
+  { name: "推搡", attacker: "ija_hei", victim: "captive_old", at: 7.42, clipTime: 0.40,
+    attackClip: "IjaShoveForward", victimClip: "CaptiveHandsUpWalk", band: [0.95, 1.05],
+    reach: "palm", depth: [-0.03, 0.05] },
   { name: "踢", attacker: "ija_hei", victim: "captive_old", at: 14.66, clipTime: 0.46,
     attackClip: "IjaKickPrisoner", victimClip: "CaptiveKneelHandsHead", band: [0.58, 0.68],
     reach: "boot", depth: [-0.03, 0.05] },
+  // 0.92–1.02 是跪姿的**头与后颈**（头骨 0.99 / 颈 0.97）。2026-09-16 第二轮把落点
+  // 从 0.60–0.70 的后背肩胛抬上来，站位跟着重算。
   { name: "枪托砸", attacker: "ija_bing", victim: "captive_young", at: 28.45, clipTime: 0.85,
-    attackClip: "IjaRifleButtStrike", victimClip: "CaptiveKneelPlead", band: [0.60, 0.70],
+    attackClip: "IjaRifleButtStrike", victimClip: "CaptiveKneelPlead", band: [0.92, 1.02],
     reach: "butt", depth: [-0.03, 0.05] },
   { name: "下刺可见", attacker: "ija_bing", victim: "captive_young", at: 34.16, clipTime: 0.76,
     attackClip: "IjaBayonetDownThrust", victimClip: "CaptiveKneelHandsHead", band: [0.74, 0.84],
@@ -149,10 +180,24 @@ const CONTACTS = [
     attackClip: "IjaBayonetDownThrust", victimClip: "CaptiveKneelHandsHead", band: [0.74, 0.84],
     reach: "tip", depth: [0.08, 0.16] },
 ];
+// 谁用哪具骨架：CreateLugouCharacterRig 的 `Lugou<派别><号+1>`。这一条不是装饰 ——
+// NRA02 与 NRA05 在**同一条高度带、同一个方位**上的体表距离差 2.7 cm（装具不同），
+// 按「所有 NRA 里最大的那个」算站位，受击者是另一具的时候就差出那么多。
+const VariantModel = (kind, variant) =>
+  `Lugou${(kind || "nra") === "ija" ? "Ija" : "Nra"}${String(variant + 1).padStart(2, "0")}`;
+const CastOf = (id) => {
+  const entry = CS_MachineGunCaptives.cast.find((row) => row.id === id);
+  assert.ok(entry, `过场里没有 ${id}`);
+  assert.ok(Number.isInteger(entry.modelVariant), `${id} 必须钉死 modelVariant`);
+  return entry;
+};
+
 const BEARINGS = {};
 for (const contact of CONTACTS) {
   const a = TrackAt(contact.attacker, contact.at);
   const v = TrackAt(contact.victim, contact.at);
+  contact.attackerModel = VariantModel(CastOf(contact.attacker).kind, CastOf(contact.attacker).modelVariant);
+  contact.victimModel = VariantModel(CastOf(contact.victim).kind, CastOf(contact.victim).modelVariant);
   contact.distance = Math.hypot(a.x - v.x, a.z - v.z);
   // 世界 delta → 受击者本地（local = Ry(−ry)·world；本地 −Z 是正面，+Z 是背后）
   const cos = Math.cos(v.ry);
@@ -170,8 +215,9 @@ for (const contact of CONTACTS) {
   const playing = TrackAt(contact.victim, contact.at - 0.001).state.perform;
   assert.equal(playing, contact.victimClip,
     `${contact.name}：接触前一帧 ${contact.victim} 在播 ${playing}，不是 ${contact.victimClip}`);
-  (BEARINGS[contact.victimClip] ||= []).push([contact.band[0], contact.band[1], contact.ux, contact.uz]);
-  contact.bearingIndex = BEARINGS[contact.victimClip].length - 1;
+  const perModel = (BEARINGS[contact.victimModel] ||= {});
+  (perModel[contact.victimClip] ||= []).push([contact.band[0], contact.band[1], contact.ux, contact.uz]);
+  contact.bearingIndex = perModel[contact.victimClip].length - 1;
 }
 // 押解进场：三名俘虏必须走同一段距离（同一条 clip 只带一个 referenceSpeedMps），
 // 而且那三帧上真的写着 CaptiveHandsUpWalk。
@@ -188,6 +234,22 @@ for (const row of marchSpeeds) {
 assert.ok(Math.max(...marchSpeeds.map((r) => r.track)) - Math.min(...marchSpeeds.map((r) => r.track)) < 0.01,
   "三名俘虏的进场速度必须一致（同一条走路 clip，速率按起播帧的 moveSpeed 定）");
 const MARCH_SPEED = marchSpeeds[0].track;
+// 被推那一段：轨道送他走多远，clip 里踩着地的那只脚就得相对根往后走多远。
+const STUMBLE = (() => {
+  const track = CastTrack("captive_old");
+  const start = track.findIndex((key) => key.state?.perform === "CaptiveShovedStumble");
+  assert.ok(start > 0, "captive_old 轨道上必须有 CaptiveShovedStumble 的起播帧");
+  const a = track[start];
+  const b = track[start + 1];
+  assert.ok(b, "趔趄那一段后面必须还有一帧（站定）");
+  const travel = Math.hypot(b.pos[0] - a.pos[0], b.pos[2] - a.pos[2]);
+  const seconds = b.t - a.t;
+  assert.ok(Math.abs(seconds - DURATIONS.CaptiveShovedStumble[0]) < 1e-6,
+    `趔趄那一段的走位必须正好占满 clip 的 ${DURATIONS.CaptiveShovedStumble[0]}s（实际 ${seconds}）`);
+  assert.ok(Math.abs(travel / seconds - a.state.moveSpeed * 4.2) < 0.02,
+    `趔趄那一段 ${(travel / seconds).toFixed(3)} m/s 与 moveSpeed×4.2 对不上`);
+  return travel;
+})();
 
 // 引擎接线：过场逐帧更新必须真的走这一层，SampleTrack 必须把字符串当段内常量。
 const cutsceneSource = await fs.readFile(path.join(project, "Script_Cutscene.mjs"), "utf8");
@@ -217,8 +279,11 @@ try {
   await page.waitForFunction(() => window.CaptivesCheck);
   await page.evaluate(() => window.CaptivesCheck.LoadMachineGunCaptivesAnimation("../../Animation/MachineGunCaptives/"));
 
-  for (const record of config.models) {
-    const result = await page.evaluate(async ({ record, assetRecord, bayonetTipM, BEARINGS }) => {
+  // 一具骨架跑一遍。`only`（{clipId: [秒]}）是**精简模式**：只摆那几帧、只量接触
+  // 需要的那几个数，不出图、不跑 perform 契约、不量滑步 —— 换 seed / 换 modelVariant
+  // 重跑几遍求散布用的就是它，跑全套的话一遍好几分钟。
+  const RunModel = (record, look, only = null) =>
+    page.evaluate(async ({ record, assetRecord, bayonetTipM, BEARINGS, look, only }) => {
       const C = window.CaptivesCheck;
       const T = C.T;
       const gltf = await C.loader.loadAsync(`../../Model/Character/Model_${record.id}.glb`);
@@ -226,8 +291,12 @@ try {
       const body = new T.Group();
       body.position.y = 0.85;
       actorRoot.add(body);
+      // 身高与缩放照正片建：kind 的 targetHeight（日军 1.62、国军 1.66）乘上
+      // 过场钉死的 sizeScale。Actor 把 sizeScale 写在 root.scale 上，表演层的
+      // SourceScale() 逐级乘上来，所以这里也写在 root 上。
+      actorRoot.scale.setScalar(look.sizeScale);
       const rig = new C.LugouCharacterRig({ record: assetRecord, gltf },
-        { kind: record.id.startsWith("LugouIja") ? "ija" : "nra", targetHeight: 1.66, seed: "Captives", variantIndex: 1 });
+        { kind: look.kind, targetHeight: look.targetHeight, seed: look.seed, variantIndex: look.variantIndex });
       rig.Attach({ root: actorRoot, body });
       // 只有 characterRig / root 的最小演员：没有 _UpdateRiggedWeaponMount，
       // 表演层的补枪那一步会自己让开，这条测试量的是骨头不是挂点。
@@ -262,10 +331,33 @@ try {
       });
 
       const point = (node) => node.getWorldPosition(new T.Vector3());
+      // 每个节点 10 个数：位置 3、四元数 4、缩放 3。步长是 PoseDiff 的前提。
       const Snapshot = () => {
         const values = [];
         rig.root.traverse((node) => values.push(...node.position, ...node.quaternion, ...node.scale));
         return values;
+      };
+      /**
+       * 两张姿势快照的最大差。四元数按**符号无关**比：q 与 −q 是同一个旋转，而烘焙
+       * 侧的 `decompose()` 逐帧给的符号是任意的，slerp 走到端点又会把目标帧整个翻号。
+       * once clip 保持末帧那一条必然踩到这件事：0.7 s 在双精度里到不了 0.7，取样落在
+       * 「倒数第二帧 → 末帧、混合 0.999999999999984」上，逐分量比就报出 1.449 的假误差
+       * （同一个姿势，画面上一模一样）。位置与缩放照旧逐分量比。
+       */
+      const PoseDiff = (a, b) => {
+        let worst = 0;
+        for (let i = 0; i < a.length; i += 10) {
+          for (let k = 0; k < 3; k += 1) worst = Math.max(worst, Math.abs(a[i + k] - b[i + k]));
+          for (let k = 7; k < 10; k += 1) worst = Math.max(worst, Math.abs(a[i + k] - b[i + k]));
+          let same = 0;
+          let flipped = 0;
+          for (let k = 3; k < 7; k += 1) {
+            same = Math.max(same, Math.abs(a[i + k] - b[i + k]));
+            flipped = Math.max(flipped, Math.abs(a[i + k] + b[i + k]));
+          }
+          worst = Math.max(worst, Math.min(same, flipped));
+        }
+        return worst;
       };
       // 一次遍历量四件事（顶点是真蒙皮顶点，不是骨头）：整皮包围盒、手/脚的最低点
       // （趴姿贴地）、右靴的最远前伸（踢的触及 —— 趾**骨**的高度不是它的前伸，
@@ -277,6 +369,7 @@ try {
         const max = new T.Vector3(-Infinity, -Infinity, -Infinity);
         const low = { hand: Infinity, foot: Infinity };
         let bootFront = -Infinity;
+        let palmFront = -Infinity;
         const support = bearings.map(() => -Infinity);
         const v = new T.Vector3();
         rig.root.traverse((mesh) => {
@@ -294,7 +387,12 @@ try {
               if (weight > bestWeight) { bestWeight = weight; best = skinIndex.getComponent(i, k); }
             }
             const name = names[best] || "";
-            if (/(Hand|Finger)/.test(name)) low.hand = Math.min(low.hand, v.y);
+            if (/(Hand|Finger)/.test(name)) {
+              low.hand = Math.min(low.hand, v.y);
+              // 推搡停在受击者身上的是**手掌**，不是腕关节（腕到掌心还有 7 cm）——
+              // 与踢那一下量靴面不量趾骨是同一条理由。
+              if (/[_ ]L[_ ](Hand|Finger)/.test(name)) palmFront = Math.max(palmFront, -v.z);
+            }
             if (/(Foot|Toe)/.test(name)) {
               low.foot = Math.min(low.foot, v.y);
               // GLTFLoader 用 PropertyBinding.sanitizeNodeName 把空格换成下划线，
@@ -314,6 +412,7 @@ try {
           low: { hand: Number.isFinite(low.hand) ? low.hand : null,
                  foot: Number.isFinite(low.foot) ? low.foot : null },
           bootFront: Number.isFinite(bootFront) ? bootFront : null,
+          palmFront: Number.isFinite(palmFront) ? palmFront : null,
           support: support.map((value) => (value > -1e8 ? value : null)),
         };
       };
@@ -346,7 +445,7 @@ try {
       let maxRootDrift = 0;
       let maxRestoreError = 0;
       const clips = [];
-      for (const clipId of record.clipIds) {
+      for (const clipId of (only ? Object.keys(only) : record.clipIds)) {
         const duration = C.MachineGunCaptivesLibrary().config.clips[clipId].duration;
         const loop = C.MachineGunCaptivesLibrary().config.clips[clipId].loop;
         const t0 = 5;
@@ -360,9 +459,10 @@ try {
         const EXTRA = {
           IjaBayonetDownThrust: [0.40, 0.74, 0.76, 1.06], IjaRifleButtStrike: [0.28, 0.50, 0.68, 0.85, 1.02, 1.16],
           IjaKickPrisoner: [0.46, 0.50], CaptiveStruckDown: [0.16, 0.70], CaptiveStabbedCollapse: [0.22, 0.92],
-          CaptiveStandToKneel: [0.5], CaptiveKneelFlinch: [0.09, 0.2],
+          CaptiveStandToKneel: [0.5], CaptiveKneelFlinch: [0.07, 0.12, 0.2],
+          IjaShoveForward: [0.18, 0.40, 0.52], CaptiveShovedStumble: [0.08, 0.22, 0.34],
         };
-        const times = (loop
+        const times = (only ? only[clipId].slice() : loop
           ? [0, duration * 0.17, duration * 0.33, duration * 0.5, duration * 0.66, duration * 0.83, duration]
           : [0, duration * 0.2, duration * 0.4, duration * 0.6, duration * 0.8, duration, ...(EXTRA[clipId] || [])])
           .sort((a, b) => a - b);
@@ -376,10 +476,10 @@ try {
           actorRoot.updateMatrixWorld(true);
           const pose = Snapshot();
           if (!first) first = pose;
-          for (let i = 0; i < pose.length; i += 1) motion = Math.max(motion, Math.abs(pose[i] - first[i]));
+          motion = Math.max(motion, PoseDiff(pose, first));
           // 跪着的循环姿要额外量三个打击方位上的体表距离（bearings 由过场站位反推，
           // 见 Node 侧的 CONTACTS），其余 clip 只量包围盒与手脚贴地。
-          const measured = Measure(BEARINGS[clipId] || []);
+          const measured = Measure((BEARINGS[record.id] || {})[clipId] || []);
           const bounds = measured.bounds;
           // 朝向从骨盆的横轴与躯干轴算，不看脚尖：跪姿的脚是往后折的，趾骨方向
           // 恰好指着背面。立着的人 facing.z < 0（局部 -Z 正面），趴下的人 facing.y < 0
@@ -402,7 +502,10 @@ try {
             wristL: point(rig.bones.handL).y,
             wristR: point(rig.bones.handR).y,
             bounds, facing, torsoPitch, armSpanR,
-            low: measured.low, bootFront: measured.bootFront, support: measured.support,
+            low: measured.low, bootFront: measured.bootFront, palmFront: measured.palmFront,
+            support: measured.support,
+            // 挨砸那一下要量头被打偏了多少，所以头骨的横向与前后位置也记下来。
+            headAt: point(rig.bones.head).toArray(),
             pelvisZ: pelvisAt.z,
             footLz: point(rig.bones.footL).z,
             footRz: point(rig.bones.footR).z,
@@ -412,10 +515,10 @@ try {
           for (let i = 0; i < 16; i += 1) maxRootDrift = Math.max(maxRootDrift, Math.abs(matrix[i] - originalRoot.elements[i]));
           C.ReleaseCutscenePerformer(actor);
           const restored = Snapshot();
-          for (let i = 0; i < before.length; i += 1) maxRestoreError = Math.max(maxRestoreError, Math.abs(restored[i] - before[i]));
+          maxRestoreError = Math.max(maxRestoreError, PoseDiff(restored, before));
         }
         // 联系图：循环两张、一次性三张，IJA 的镜头里画一根从枪托到刺刀尖的代枪。
-        const shots = loop ? [duration * 0.0, duration * 0.5] : [duration * 0.35, duration * 0.62, duration];
+        const shots = only ? [] : loop ? [duration * 0.0, duration * 0.5] : [duration * 0.35, duration * 0.62, duration];
         for (const at of shots) {
           Step(entry, t0 + at);
           actorRoot.updateMatrixWorld(true);
@@ -444,7 +547,9 @@ try {
         clips.push({ clipId, duration, loop, motion, samples });
       }
 
-      // ---- perform 契约 -----------------------------------------------------
+      // ---- perform 契约（精简模式不跑） ----------------------------------------
+      const contract = {};
+      if (!only) {
       // 整秒时长的那条循环：`At(3 + duration)` 要能精确落回第 0 帧，而 3 + 1.8 − 3
       // 在双精度里是 1.7999999999999998，取样就插到倒数第二帧上去了（误差 3.5e-7）。
       // 走路那条的循环接缝由烘焙产物的首尾帧逐比特断言守着，不靠这一条。
@@ -462,7 +567,6 @@ try {
       ];
       const entry = { actor, spec: { track } };
       const At = (time) => { Step(entry, time); actorRoot.updateMatrixWorld(true); return Snapshot(); };
-      const contract = {};
       contract.resolveBefore = C.ResolvePerform(track, 2.9);
       contract.resolveMid = C.ResolvePerform(track, 6.0);
       contract.resolveOnce = C.ResolvePerform(track, 9.5);
@@ -472,12 +576,12 @@ try {
       const laterPose = At(4.5);
       // loop：t0+duration 回到第 0 秒（同一条 clip 一路播过来，中间没有换段）。
       const wrapped = At(3 + loopDuration);
-      contract.loopWrapError = Math.max(...startPose.map((v, i) => Math.abs(v - wrapped[i])));
-      contract.startEqualsLater = Math.max(...startPose.map((v, i) => Math.abs(v - laterPose[i])));
+      contract.loopWrapError = PoseDiff(startPose, wrapped);
+      contract.startEqualsLater = PoseDiff(startPose, laterPose);
       // once：播完保持末帧。
       const endPose = At(9 + onceDuration);
       const heldPose = At(9 + onceDuration + 2.5);
-      contract.holdError = Math.max(...endPose.map((v, i) => Math.abs(v - heldPose[i])));
+      contract.holdError = PoseDiff(endPose, heldPose);
       // 拖时间轴：正着逐步推 vs 直接跳过去，必须逐比特相同。
       const probes = [3.05, 4.2, 6.7, 8.9, 9.4, 10.1, 13.9];
       const forward = [];
@@ -485,8 +589,7 @@ try {
       for (const time of probes) forward.push(At(time));
       const jumped = [];
       for (const time of [...probes].reverse()) jumped.unshift(At(time));
-      contract.scrubError = Math.max(...probes.map((_, index) =>
-        Math.max(...forward[index].map((v, i) => Math.abs(v - jumped[index][i])))));
+      contract.scrubError = Math.max(...probes.map((_, index) => PoseDiff(forward[index], jumped[index])));
       // 未知 clip id：回退到 POSE_CLIPS、warn 一次、不抛错。
       const warnings = [];
       const originalWarn = console.warn;
@@ -502,19 +605,20 @@ try {
       const afterUnknown = Snapshot();
       console.warn = originalWarn;
       contract.unknownWarnings = warnings.filter((line) => line.includes("NoSuchCaptivesClip")).length;
-      contract.unknownDrift = Math.max(...beforeUnknown.map((v, i) => Math.abs(v - afterUnknown[i])));
+      contract.unknownDrift = PoseDiff(beforeUnknown, afterUnknown);
       // perform:null 之后彻底还原到普通 POSE_CLIPS 姿势。
       C.ReleaseCutscenePerformer(actor);
       Step(entry, 15);
       actorRoot.updateMatrixWorld(true);
       const released = Snapshot();
-      contract.releaseDrift = Math.max(...baseline.map((v, i) => Math.abs(v - released[i])));
+      contract.releaseDrift = PoseDiff(baseline, released);
+      }
 
       // ---- 押解走的滑步量 -----------------------------------------------
       // 支撑脚相对根的后移速度必须等于 clip 自报的 referenceSpeedMps × 演员缩放。
       // 逐 1/24 s 密取样（clips 那边七个点是 0.3 s 一跳，正好会跨过抬脚那一帧）。
       let walk = null;
-      if (record.clipIds.includes("CaptiveHandsUpWalk")) {
+      if (!only && record.clipIds.includes("CaptiveHandsUpWalk")) {
         const info = C.MachineGunCaptivesLibrary().config.clips.CaptiveHandsUpWalk;
         const entry = { actor, spec: { track: [
           { t: 0, pos: [0, 0, 0], state: {} },
@@ -545,7 +649,15 @@ try {
       renderer.dispose();
       return { modelId: record.id, maxRootDrift, maxRestoreError, clips, contract, walk };
     }, { record, assetRecord: manifest.models.find((m) => m.id === record.id),
-      bayonetTipM: 1.663 - 0.255, BEARINGS });
+      bayonetTipM: 1.663 - 0.255, BEARINGS, look, only });
+
+  const BaseLook = (record, seed = "Captives", variantIndex = 1) => ({
+    kind: KindOf(record.id), targetHeight: TARGET_HEIGHT[KindOf(record.id)],
+    sizeScale: CAST_SCALE, seed, variantIndex,
+  });
+
+  for (const record of config.models) {
+    const result = await RunModel(record, BaseLook(record));
 
     results.push(result);
     const faction = record.id.startsWith("LugouIja") ? "ija" : "nra";
@@ -611,6 +723,40 @@ try {
         const wrist = Math.min(...clip.samples.map((s) => Math.min(s.wristL, s.wristR) - s.head));
         assert.ok(wrist > -0.10, `${record.id} 抱后脑：手腕要在头骨附近（${wrist.toFixed(3)} m）`);
       }
+      if (clip.clipId === "CaptiveShovedStumble") {
+        // 首尾两帧与相邻两条 clip 的第 0 帧逐比特相同（那一条在 Node 侧按烘出来的
+        // 关键帧数组断言过），这里量的是中间那一下：躯干真的被顶出去了没有，
+        // 以及踩着地的那只脚是不是正好走了轨道那 0.271 m。
+        const start = At(0), end = At(clip.duration);
+        assert.ok(start.head > 1.19 && start.head < 1.42, `${record.id} 趔趄起手必须是举手走（${start.head.toFixed(3)}）`);
+        assert.ok(end.head > 1.30 && end.head < 1.45, `${record.id} 趔趄末帧必须是举手站（${end.head.toFixed(3)}）`);
+        const dip = start.head - Math.min(...clip.samples.map((s) => s.head));
+        assert.ok(dip > 0.08 && dip < 0.26,
+          `${record.id} 被推那一下躯干要真的被顶出去（头低了 ${dip.toFixed(3)} m，要 0.08–0.26）`);
+        const lunge = Math.max(...clip.samples.map((s) => start.headAt[2] - s.headAt[2]));
+        assert.ok(lunge > 0.12, `${record.id} 头要往前甩出去（${lunge.toFixed(3)} m）`);
+        // 踩着地的是左脚：它相对根往后走的距离必须等于轨道送他走的距离。
+        const planted = end.footLz - start.footLz;
+        assert.ok(Math.abs(planted - STUMBLE) < 0.02,
+          `${record.id} 趔趄那一步滑 ${((planted - STUMBLE) * 1000).toFixed(0)} mm`
+          + `（支撑脚走 ${planted.toFixed(3)}，轨道走 ${STUMBLE.toFixed(3)}）`);
+        // 另一只脚要真的迈出去再落下（不是原地蹭）。
+        const swing = Math.max(...clip.samples.map((s) => s.toeR)) - Math.min(...clip.samples.map((s) => s.toeR));
+        assert.ok(swing > 0.04, `${record.id} 趔趄那一步右脚要抬起来（${swing.toFixed(3)} m）`);
+      }
+      if (clip.clipId === "CaptiveKneelFlinch") {
+        // 2026-09-16 第二轮：砸的是头，所以反应是**头颈猛向侧前偏**，不是整个人缩起来。
+        const start = At(0);
+        const side = Math.max(...clip.samples.map((s) => Math.abs(s.headAt[0] - start.headAt[0])));
+        const forward = Math.max(...clip.samples.map((s) => start.headAt[2] - s.headAt[2]));
+        const dip = start.head - Math.min(...clip.samples.map((s) => s.head));
+        console.log(`    挨砸 头偏 ${side.toFixed(3)} 前 ${forward.toFixed(3)} 低 ${dip.toFixed(3)}`);
+        assert.ok(side > 0.08, `${record.id} 挨枪托：头要被砸偏（横向 ${side.toFixed(3)} m，要 >0.08）`);
+        assert.ok(forward > 0.03, `${record.id} 挨枪托：头要往前栽一点（${forward.toFixed(3)} m）`);
+        assert.ok(dip > 0.02 && dip < 0.12,
+          `${record.id} 挨枪托：头低 ${dip.toFixed(3)} m —— 砸头不是让他蹲下去（要 0.02–0.12）`);
+        assert.ok(Math.abs(At(clip.duration).head - start.head) < 1e-6, `${record.id} 挨砸完要回到抱头姿`);
+      }
       if (clip.clipId === "CaptiveStruckDown" || clip.clipId === "CaptiveStabbedCollapse") {
         // 趴姿末帧：手掌与脚背要贴在地上（±1 cm），躯干仍以大腿前面当最低接触点。
         const end = At(clip.duration);
@@ -668,16 +814,18 @@ try {
         assert.ok(wind.wristR - wind.head > 0.05 && wind.wristL - wind.head < 0.02,
           `${record.id} 蓄力：右手在头上方、左手在胸前，不能两手都挤在脸前`
           + `（右 ${(wind.wristR - wind.head).toFixed(3)} / 左 ${(wind.wristL - wind.head).toFixed(3)}）`);
-        // 砸击（约 0.85 s）：枪托落到跪着的人的头肩高度，躯干前倾，右臂伸出，重心到前脚。
+        // 砸击（约 0.85 s）：**枪托落到跪着的人的头与后颈上**（2026-09-16 第二轮抬高
+        // 的落点：跪姿头骨 0.99 / 颈 0.97，原来 0.62 打的是后背肩胛）。停得更高就意味着
+        // 躯干前倾少一截、右臂收一点，那两条带子跟着实测改，不是为了修绿放宽的。
         const hit = clip.samples.reduce((best, s) => (s.rifle.butt[2] < best.rifle.butt[2] ? s : best));
-        assert.ok(hit.rifle.butt[2] < -0.75 && hit.rifle.butt[2] > -0.95,
-          `${record.id} 砸击：枪托落点前伸 ${(-hit.rifle.butt[2]).toFixed(3)} m（要 0.75–0.95）`);
-        assert.ok(hit.rifle.butt[1] > 0.55 && hit.rifle.butt[1] < 0.75,
-          `${record.id} 砸击：枪托落点高度 ${hit.rifle.butt[1].toFixed(3)} m（要 0.55–0.75）`);
+        assert.ok(hit.rifle.butt[2] < -0.74 && hit.rifle.butt[2] > -0.88,
+          `${record.id} 砸击：枪托落点前伸 ${(-hit.rifle.butt[2]).toFixed(3)} m（要 0.74–0.88）`);
+        assert.ok(hit.rifle.butt[1] > 0.90 && hit.rifle.butt[1] < 1.02,
+          `${record.id} 砸击：枪托落点高度 ${hit.rifle.butt[1].toFixed(3)} m（要 0.90–1.02，跪姿的头与后颈）`);
         assert.ok(hit.rifle.axis[1] > 0.35, `${record.id} 反握：砸的时候枪口朝上后方`);
-        assert.ok(hit.torsoPitch > 20 && hit.torsoPitch < 30,
-          `${record.id} 砸击：躯干前倾 ${hit.torsoPitch.toFixed(1)}°（要 20–30）`);
-        assert.ok(hit.armSpanR > 0.40, `${record.id} 砸击：右臂要伸出去（肩到腕 ${hit.armSpanR.toFixed(3)} m）`);
+        assert.ok(hit.torsoPitch > 14 && hit.torsoPitch < 24,
+          `${record.id} 砸击：躯干前倾 ${hit.torsoPitch.toFixed(1)}°（要 14–24）`);
+        assert.ok(hit.armSpanR > 0.36, `${record.id} 砸击：右臂要伸出去（肩到腕 ${hit.armSpanR.toFixed(3)} m）`);
         assert.ok(At(0).pelvisZ - hit.pelvisZ > 0.15,
           `${record.id} 砸击：重心要压到前脚（骨盆前移 ${(At(0).pelvisZ - hit.pelvisZ).toFixed(3)} m）`);
         assert.ok(hit.footLz < hit.pelvisZ && hit.footRz > hit.pelvisZ,
@@ -695,6 +843,28 @@ try {
         assert.ok(At(clip.duration).toeR < 0.09, `${record.id} 踢完收腿站稳`);
         const shift = Math.max(...clip.samples.map((s) => s.pelvis)) - Math.min(...clip.samples.map((s) => s.pelvis));
         assert.ok(shift > 0.02, `${record.id} 踢腿要有重心转移（骨盆起伏 ${shift.toFixed(3)} m）`);
+      }
+      if (clip.clipId === "IjaShoveForward") {
+        // 推的是手掌不是腕（腕到掌心 7 cm），高度要落在举手走那个姿势的后背带里。
+        const hit = At(0.40);
+        const apex = At(0.52);
+        console.log(`    推搡 掌面前伸 ${hit.palmFront.toFixed(3)} 腕高 ${hit.wristL.toFixed(3)}`
+          + ` 最远 ${apex.palmFront.toFixed(3)} 刺刀尖高 ${hit.rifle.tip[1].toFixed(2)} 身后 ${hit.rifle.tip[2].toFixed(2)}`);
+        assert.ok(hit.palmFront > 0.54 && hit.palmFront < 0.66,
+          `${record.id} 推搡：掌面前伸 ${hit.palmFront.toFixed(3)} m（要 0.54–0.66）`);
+        assert.ok(apex.palmFront > hit.palmFront + 0.02,
+          `${record.id} 推搡：接触之后还要再推出去一点（${(apex.palmFront - hit.palmFront).toFixed(3)} m）`);
+        assert.ok(hit.wristL > 0.92 && hit.wristL < 1.10,
+          `${record.id} 推搡：手在后背高度上（腕 ${hit.wristL.toFixed(3)} m）`);
+        assert.ok(At(0.18).palmFront < hit.palmFront - 0.25,
+          `${record.id} 推搡要有收手蓄力那一下（0.18 s 掌面 ${At(0.18).palmFront.toFixed(3)}）`);
+        // **枪必须竖着。** 推的人离站着的俘虏只有 0.74 m，枪口朝前的话 1.41 m 的
+        // 刺刀直接穿过他的大腿（喝令那一条就是朝前的，那一条对着的是趴在地上的人）。
+        const tipUp = Math.min(...clip.samples.map((s) => s.rifle.tip[1]));
+        const tipBack = Math.min(...clip.samples.map((s) => s.rifle.tip[2]));
+        assert.ok(tipUp > 2.0, `${record.id} 推搡：刺刀尖要举在头顶上方（最低 ${tipUp.toFixed(3)} m）`);
+        assert.ok(tipBack > 0.30,
+          `${record.id} 推搡：刺刀尖全程必须在身后（最前 ${(-tipBack).toFixed(3)} m），不然戳穿被推的人`);
       }
       if (clip.clipId === "IjaTauntGesture") {
         const reach = Math.min(...clip.samples.map((s) => s.rifle.tip[2]));
@@ -722,38 +892,84 @@ try {
     assert.ok(c.releaseDrift < 1e-12, `${record.id} 退出表演必须精确还原（${c.releaseDrift}）`);
   }
 
-  // ---- 三次打击的接触几何（跨骨架对） ----------------------------------------
-  // 受击者的皮在 NRA 那两具上量，打击的最远伸展在 IJA 那三具上量，站位在过场数据里。
-  // 刺入深度 = 触及 + 体表 − 站位距离。三个数分别来自三个地方，对不上就是有一处改了
-  // 没同步 —— 这正是 2026-09-15 那版踢穿胸口的形状。
-  const Support = (clipId, index) => Math.max(...results.flatMap((model) => model.clips
-    .filter((clip) => clip.clipId === clipId)
-    .map((clip) => clip.samples[0].support[index])).filter(Number.isFinite));
-  const Reach = (clipId, kind, clipTime) => {
-    const values = results.flatMap((model) => model.clips
-      .filter((clip) => clip.clipId === clipId)
-      .map((clip) => {
-        const sample = clip.samples.reduce((best, s) =>
-          (Math.abs(s.t - clipTime) < Math.abs(best.t - clipTime) ? s : best));
-        if (kind === "boot") return sample.bootFront;
-        return -sample.rifle[kind === "butt" ? "butt" : "tip"][2];
-      }));
-    return { min: Math.min(...values), max: Math.max(...values) };
+  // ---- 四次打击 + 一次推搡的接触几何（跨骨架对） ------------------------------
+  // 受击者的皮在**他自己那具**骨架上量，打击的最远伸展在**施动者那具**上量，站位在
+  // 过场数据里。刺入深度 = 触及 + 体表 − 站位距离。三个数分别来自三个地方，对不上
+  // 就是有一处改了没同步 —— 这正是 2026-09-15 那版踢穿胸口的形状。
+  //
+  // 2026-09-16 第二轮把「所有 NRA 里最大的那个体表」改成「受击者自己的体表」：
+  // NRA02 与 NRA05 在同一条带上差 2.7 cm，取 max 等于给一半的人白留 2.7 cm 的空隙。
+  const Measured = (rows, modelId, clipId) => {
+    const model = rows.find((entry) => entry.modelId === modelId);
+    assert.ok(model, `没有量过 ${modelId}`);
+    const clip = model.clips.find((entry) => entry.clipId === clipId);
+    assert.ok(clip, `${modelId} 没有量过 ${clipId}`);
+    return clip;
   };
+  const Support = (rows, contact) =>
+    Measured(rows, contact.victimModel, contact.victimClip).samples[0].support[contact.bearingIndex];
+  const Reach = (rows, contact) => {
+    const clip = Measured(rows, contact.attackerModel, contact.attackClip);
+    const sample = clip.samples.reduce((best, s) =>
+      (Math.abs(s.t - contact.clipTime) < Math.abs(best.t - contact.clipTime) ? s : best));
+    assert.ok(Math.abs(sample.t - contact.clipTime) < 1e-6,
+      `${contact.name}：${contact.attackClip} 没有在 ${contact.clipTime}s 取过样（EXTRA 漏了）`);
+    if (contact.reach === "boot") return sample.bootFront;
+    if (contact.reach === "palm") return sample.palmFront;
+    return -sample.rifle[contact.reach === "butt" ? "butt" : "tip"][2];
+  };
+  const Depths = (rows) => CONTACTS.map((contact) => {
+    const support = Support(rows, contact);
+    const reach = Reach(rows, contact);
+    return { contact, support, reach, depth: reach + support - contact.distance };
+  });
   console.log("接触几何（触及 + 体表 − 站位 = 刺入深度，米）：");
-  for (const contact of CONTACTS) {
-    const support = Support(contact.victimClip, contact.bearingIndex);
-    const reach = Reach(contact.attackClip, contact.reach, contact.clipTime);
-    const deep = { min: reach.min + support - contact.distance, max: reach.max + support - contact.distance };
+  const baseDepths = Depths(results);
+  for (const row of baseDepths) {
+    const contact = row.contact;
     console.log(`  ${contact.name.padEnd(6)} 站位 ${contact.distance.toFixed(3)}`
-      + ` 触及 ${reach.min.toFixed(3)}–${reach.max.toFixed(3)} 体表 ${support.toFixed(3)}`
-      + ` → 刺入 ${deep.min.toFixed(3)}–${deep.max.toFixed(3)}`);
-    assert.ok(Number.isFinite(support) && support > 0.08 && support < 0.30,
-      `${contact.name} 体表距离 ${support} 不合理`);
-    assert.ok(deep.min >= contact.depth[0],
-      `${contact.name} 够不着：刺入 ${deep.min.toFixed(3)} m < ${contact.depth[0]}`);
-    assert.ok(deep.max <= contact.depth[1],
-      `${contact.name} 陷体：刺入 ${deep.max.toFixed(3)} m > ${contact.depth[1]}`);
+      + ` 触及 ${row.reach.toFixed(4)}(${contact.attackerModel.slice(5)})`
+      + ` 体表 ${row.support.toFixed(4)}(${contact.victimModel.slice(5)})`
+      + ` → 刺入 ${row.depth.toFixed(4)}`);
+    assert.ok(Number.isFinite(row.support) && row.support > 0.08 && row.support < 0.30,
+      `${contact.name} 体表距离 ${row.support} 不合理`);
+    assert.ok(row.depth >= contact.depth[0],
+      `${contact.name} 够不着：刺入 ${row.depth.toFixed(4)} m < ${contact.depth[0]}`);
+    assert.ok(row.depth <= contact.depth[1],
+      `${contact.name} 陷体：刺入 ${row.depth.toFixed(4)} m > ${contact.depth[1]}`);
+  }
+
+  // ---- 换 seed、换 modelVariant 再各跑一遍：刺入深度必须一模一样 --------------
+  // 这一场的 sizeScale 钉死了（cast[].sizeScale），所以接触几何应当**只**由骨架与
+  // clip 决定。换 seed（步态相位、死亡倒法、mixer 起相位）和换 variantIndex（军装
+  // 配色）都不该动皮一毫米；动了就说明有一条隐藏的随机量还在影响身形，那就是
+  // 「刺入深度随演员浮动」这条老问题没修干净。
+  const NEEDS = {};
+  for (const contact of CONTACTS) {
+    ((NEEDS[contact.victimModel] ||= {})[contact.victimClip] ||= new Set()).add(0);
+    ((NEEDS[contact.attackerModel] ||= {})[contact.attackClip] ||= new Set()).add(contact.clipTime);
+  }
+  const series = [{ tag: "基准 seed=Captives variant=1", depths: baseDepths }];
+  for (const variation of [{ seed: "CaptivesSpreadProbe", variantIndex: 1 },
+                           { seed: "Captives", variantIndex: 4 }]) {
+    const rows = [];
+    for (const record of config.models) {
+      const wanted = NEEDS[record.id];
+      if (!wanted) continue;
+      const only = Object.fromEntries(Object.entries(wanted).map(([clipId, times]) => [clipId, [...times]]));
+      rows.push(await RunModel(record, BaseLook(record, variation.seed, variation.variantIndex), only));
+    }
+    series.push({ tag: `seed=${variation.seed} variant=${variation.variantIndex}`, depths: Depths(rows) });
+  }
+  console.log("刺入深度的散布（钉死 sizeScale 之后应当是 0）：");
+  for (let i = 0; i < CONTACTS.length; i += 1) {
+    const contact = CONTACTS[i];
+    const values = series.map((run) => run.depths[i].depth);
+    const spread = Math.max(...values) - Math.min(...values);
+    console.log(`  ${contact.name.padEnd(6)} ${values.map((v) => v.toFixed(4)).join(" / ")}`
+      + ` → 散布 ${(spread * 1000).toFixed(2)} mm`);
+    assert.ok(spread <= 0.005,
+      `${contact.name} 的刺入深度在不同 seed / modelVariant 间散布 ${(spread * 1000).toFixed(1)} mm（上限 5 mm）`);
   }
 
   assert.deepEqual(errors, []);

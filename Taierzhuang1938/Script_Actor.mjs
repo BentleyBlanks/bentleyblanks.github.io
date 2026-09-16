@@ -1270,8 +1270,15 @@ export class Actor {
       : null;
 
     // 身高 ±4% 的个体差走整体缩放，手持武器再乘 1/scale 抵消 —— 枪长是史实数据
-    this.sizeScale = (1 + (rnd() - 0.5) * 0.08)
-      * (this.isChild ? 1 : this.variant ? spec.variants[this.variant] : 1);
+    //
+    // `options.sizeScale` 把这一抽**钉死**。只有过场用得上：一场戏里踢/砸/刺的站位是
+    // 按「触及 + 体表」算到毫米的，而触及随施动者缩放、体表随受击者缩放，两边各抽
+    // ±4% 就是刺入深度 ±4 cm 的随机浮动（docs/Data_MachineGunCaptivesCutscene.md §2.1）。
+    // 钉死之后门禁量到的那个数就是玩家看到的那个数。战场上的人一律照旧随机。
+    const pinned = Number(options.sizeScale);
+    this.sizeScale = Number.isFinite(pinned) && pinned > 0 ? pinned
+      : (1 + (rnd() - 0.5) * 0.08)
+        * (this.isChild ? 1 : this.variant ? spec.variants[this.variant] : 1);
     this.weaponScale = 1 / this.sizeScale;
     this.height = spec.height * this.sizeScale;
 
@@ -3719,6 +3726,9 @@ export class ActorFactory {
     const pool = this.pool.get(kind);
     if (!pool || !pool.length || options.noPool) return null;
     if (options.rank || options.variant || options.actorVariant) return null;
+    // 钉死缩放的（过场演员）不从池里拿：池里的人身高是预建时抽的，取用时改 root.scale
+    // 就等于在已经算好挂点换算量的人身上改比例。七个人现造一遍是几毫秒的事。
+    if (Number.isFinite(Number(options.sizeScale))) return null;
     let index = pool.length - 1;
     if (options.modelVariant != null) {
       index = pool.findIndex((actor) => actor.modelVariant === options.modelVariant);

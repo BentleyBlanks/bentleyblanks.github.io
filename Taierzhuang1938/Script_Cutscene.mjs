@@ -1019,6 +1019,10 @@ export class CutsceneDirector {
             // 换一号皮就换一套骨架）。不给就照 ActorFactory 的稳定种子随机。
             modelVariant: spec.firstPerson === true ? 1
               : (Number.isInteger(spec.modelVariant) ? spec.modelVariant : undefined),
+            // 分镜可以把身高缩放钉死。战场上的人一律 ±4% 随机，但一场戏里按
+            // 「触及 + 体表」算到毫米的打击站位经不起这个抽 —— 两边各抽一次，
+            // 刺入深度就随机浮动 ±4 cm。不写就照旧随机（老数据一个字不用改）。
+            sizeScale: Number.isFinite(spec.sizeScale) ? spec.sizeScale : undefined,
             uniformHex: spec.uniformHex,
             trouserHex: spec.trouserHex,
             accessoryHex: spec.accessoryHex,

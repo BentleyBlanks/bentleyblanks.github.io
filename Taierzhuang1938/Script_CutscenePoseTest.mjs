@@ -117,6 +117,17 @@ const CUTSCENE_CASES = [
         },
       },
       {
+        // 「站住！」那一拍（2026-09-16 第二轮加）：老兵落在队列后面，日兵甲一掌推在
+        // 他后背上，7.42 s 接触、0.7 s 的趔趄。这一刻他正被顶得往前栽，头比举手走
+        // 还低一截，所以带子给整段行程；「动作库真的在播」仍由 performClip 钉死。
+        t: 7.6,
+        actors: {
+          captive_old: { performClip: "CaptiveShovedStumble", head: [1.05, 1.45], why: "被推得往前趔趄" },
+          ija_hei: { performClip: "IjaShoveForward", head: [1.18, 1.45], why: "单手推俘虏后背" },
+          captive_young: { performClip: "CaptiveHandsUpStand", head: [1.24, 1.49], why: "已经站定举手" },
+        },
+      },
+      {
         t: 9.0,
         actors: {
           captive_old: { performClip: "CaptiveHandsUpStand", head: [1.24, 1.49], why: "站定举手过头" },
@@ -144,11 +155,11 @@ const CUTSCENE_CASES = [
         },
       },
       {
-        // 挨枪托那一下的反应（2026-09-16 加）：28.45 起 0.8 s 的 CaptiveKneelFlinch，
-        // 头被砸低 9 cm 再回来。实测头 0.886–0.994，带宽同上。
+        // 挨枪托那一下的反应（2026-09-16 加，第三轮改成砸头）：28.45 起 0.8 s 的
+        // CaptiveKneelFlinch，头被砸得横向偏 0.13 m、只低 5 cm。实测头 0.934–0.994。
         t: 28.8,
         actors: {
-          captive_young: { performClip: "CaptiveKneelFlinch", head: [0.80, 1.09], why: "挨枪托，头颈猛一偏、上身缩起来" },
+          captive_young: { performClip: "CaptiveKneelFlinch", head: [0.80, 1.09], why: "挨枪托砸在头上：头猛向侧前偏 0.13 m" },
         },
       },
       {

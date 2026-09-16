@@ -44,7 +44,7 @@
 //   起伏在 ±0.12 m 内，但硬编码绝对 y 的话，地形一改就是一排悬空或陷地的人。
 //
 // ---------------------------------------------------------------------------
-// 作者动作库（Animation/MachineGunCaptives/，十三条）
+// 作者动作库（Animation/MachineGunCaptives/，十五条）
 //
 //   state.perform:"<ClipId>" 从该关键帧起播一段作者动作；perform:null 回普通姿态；
 //   未知 id 只 warn（库还没 fetch 到位的那几帧也照常走 POSE_CLIPS）。
@@ -80,18 +80,28 @@ const STAGE = Object.freeze({
  *
  * 站位不是摆好看的，是按作者动作的**实测触及距离**反推的
  *（Animation/MachineGunCaptives/Data_MachineGunCaptivesAnimation.md 的实测列）：
- *   踢     IjaKickPrisoner      靴面前伸 0.800 / 高 0.629  → 跪着的人的胸口
- *   枪托砸 IjaRifleButtStrike   落点前伸 0.799 / 高 0.620  → 跪着的人的头肩
- *   下刺   IjaBayonetDownThrust 刺刀尖前伸 1.393 / 高 0.776 → 跪着的人的上半身
- * 三种打击的高度都落在**跪姿**的躯干带上（跪姿胯 0.45、头 0.98），所以**每一次
- * 看得见的打击，受击者都必须是跪着的**。趴着的人身子只有 0.2–0.35 m 高，
- * 1.39/0.79 的下刺对他在几何上就够不着 —— 老兵那一刀因此只放在黑场里（镜 5）。
+ *   推搡   IjaShoveForward      左掌前伸 0.591 / 高 1.012  → 站着的人的后背
+ *   踢     IjaKickPrisoner      靴面前伸 0.785 / 高 0.617  → 跪着的人的胸口
+ *   枪托砸 IjaRifleButtStrike   落点前伸 0.793 / 高 0.981  → 跪着的人的头与后颈
+ *   下刺   IjaBayonetDownThrust 刺刀尖前伸 1.391 / 高 0.757 → 跪着的人的上半身
+ * 三种**打击**的高度都落在**跪姿**的躯干带上（跪姿胯 0.45、头 0.98），所以**每一次
+ * 看得见的打击，受击者都必须是跪着的**（推搡是例外：那一下推的是站着的人的后背）。
+ * 趴着的人身子只有 0.2–0.35 m 高，1.39/0.76 的下刺对他在几何上就够不着 ——
+ * 老兵那一刀因此只放在黑场里（镜 5）。
  *
  * **距离量到皮，不量到原点（2026-09-16 改）**：受击者不是一个点，跪着的人在
- * 打击那个方位上的皮离他自己的原点 0.145–0.191 m。站位 = 触及 + 那一段皮
+ * 打击那个方位上的皮离他自己的原点 0.146–0.185 m（**按受击者自己那具骨架量**，
+ * NRA02 与 NRA05 在同一条带上差出 2.7 cm）。站位 = 触及 + 那一段皮
  * （下刺再减去 0.12 m 的刺入深度）。第一版把踢的「触及」写成了趾骨**高度** 0.63、
  * 又没算这段皮，日兵站到 0.78 m，靴子整整踢进胸口 0.16 m。烘焙脚本现在把
- * 靴面前伸与逐方位的体表距离一起打印出来（BOOT / BACK / REACH 三行）。
+ * 靴面/掌面前伸与逐方位的体表距离一起打印出来（REACH / BACK 两行）。
+ *
+ * **七个人的 sizeScale 钉死 1.0（2026-09-16 第二轮加）**：战场上的人身高抽 ±4%，
+ * 而上面这四个数一边随施动者缩放、一边随受击者缩放，两边各抽一次就是刺入深度
+ * ±4 cm 的随机浮动。钉死之后门禁量到的数就是玩家看到的数（cast[].sizeScale，
+ * ValidateCutscene 硬查 0.8–1.25）。同一件事的另一半：日军的 targetHeight 是
+ * **1.62** 不是 1.66（Script_Actor KIND_SPEC），第一版的门禁按 1.66 量日军，
+ * 每个触及都长了 2.4%（枪托与刺刀各约 2 cm）。
  * 通视也逐排核过：z=-146.25 与 z=-150 两道守军胸墙在 1.9 m 机位下完全让开，
  * z=-158（Stub）与 z=-164（Ridge）按 x 分列，人都在列与列之间的走廊里。
  * 往东超过 x≈9.6 会被 Ridge 那一列挡住小腿，别再往东挪。
@@ -101,27 +111,38 @@ const SPOT = Object.freeze({
   captiveOld: [6.2, -169.4],
   captiveYoung: [7.6, -169.4],
   captiveThird: [9.0, -169.4],
+  // 老兵**押到这里就被推了**：站定点在队列后方 0.271 m，那一推把他顶进队列。
+  // 0.271 不是挑的数：CaptiveShovedStumble 里踩着地的左脚相对根从 −0.262 走到
+  // +0.009（实测，运行时米），走位比这个多一寸，那只脚就在地上蹭。
+  captiveOldHalt: [6.243, -169.667],
   // 军曹站在行列西南侧督战：背对机位，镜 4 的前景。他不动手，所以不按触及距离摆，
   // 但要**让开踢那一下的视线** —— 第一轮实拍他离机位只有 33 m、又正好压在日兵的
   // 屏幕位上，整个踢腿被他的背挡掉了。往西挪到与日兵差 0.029 rad（一个人宽的两倍）。
   gunso: [4.0, -165.6],
-  // 日兵（羞辱者）：押解位 → 踢老兵 → 指着骂 → 黑场里补老兵一刀。
+  // 日兵（羞辱者）：推老兵 → 押解位 → 踢老兵 → 指着骂 → 黑场里补老兵一刀。
+  //
+  // 2026-09-16 第二轮加的推搡位：7.0 s 他先一步到位（走的路短、速度与其他人一样），
+  // 7.02 起 `IjaShoveForward`，接触在 7.42 —— 也就是军曹喊「站住」的那一拍。
+  // 0.740 m ＝ 左手掌前伸 0.591（IJA02）+ 举手走那个姿势在这个方位上的皮 0.158（NRA05）− 0.010。
+  heiShove: [5.72, -170.19],
   heiGuard: [5.7, -171.3],
-  // 2026-09-16 按实测重摆（详见本段末尾那张表）：踢的**靴面**前伸 0.800 m，
-  // 跪着的人那个方位上的皮离他自己的原点 0.158 m，所以站 0.958 m 才是「刚好踢到」。
-  heiKick: [5.585, -170.137],
+  // 2026-09-16 按实测重摆（详见本段末尾那张表）：踢的**靴面**前伸 0.785 m，
+  // 跪着的人那个方位上的皮离他自己的原点 0.164 m，所以站 0.939 m 才是「刚好踢到」。
+  heiKick: [5.599, -170.121],
   heiThrust: [5.7, -170.75],  // 老兵那一刀在黑场里（趴姿高度对不上下刺，见文档 §2.1）
   // 日兵乙：小兵背后。枪托砸要 0.98 m、下刺要 1.43 m，所以他砸完要**退半步**再刺。
   // 站在**侧后方**而不是正后方：正后方的话动作整个被受击者挡住 —— 第一轮实拍
   // 就是这样，抡枪托那一下只看得见举过头顶的半截枪。偏出去约 0.018 rad
   // （200 mm 画面上一个人宽 0.0132 rad），砸与刺的侧影才露得出来。
   bingGuard: [8.55, -171.2],
-  bingButt: [8.390, -169.980],  // 枪托前伸 0.799 + 求饶姿那个方位的皮 0.191 = 0.98
-  bingThrust: [8.489, -170.523], // 刺刀尖 1.393 + 皮 0.157 − 刺入 0.12 = 1.432
-  // 日兵丁：第三个人后方 1.416 m（刺刀尖 1.391 + 皮 0.145 − 刺入 0.12）。他只有一刀，
+  // 枪托砸的落点 2026-09-16 第二轮抬到**头与后颈**（原来 0.62 m 是后背肩胛）：
+  // 枪托前伸 0.793（IJA03）+ 求饶姿在头颈那条带上的皮 0.185（NRA02）− 0.010 = 0.967。
+  bingButt: [8.379, -169.972],
+  bingThrust: [8.488, -170.52], // 刺刀尖 1.391 + 皮 0.159 − 刺入 0.12 = 1.430
+  // 日兵丁：第三个人后方 1.415 m（刺刀尖 1.389 + 皮 0.146 − 刺入 0.12）。他只有一刀，
   // 而那一刀在黑场里（35.36 s），所以不需要像日兵乙那样为了露侧影偏出去 —— 再往东
   // 就撞上 Ridge 那一列（x 8.25–9.75）的遮挡边界了。
-  ding: [9.476, -170.734],
+  ding: [9.477, -170.732],
 });
 
 /**
@@ -133,11 +154,15 @@ const SPOT = Object.freeze({
  * 正好落在 133 步/分。四十五米外的取景一米都看不出来。
  */
 const FROM = Object.freeze({
-  captiveOld: [7.5, -177.4],
+  // 老兵的起点整段往后挪了 0.271 m（他要在队列后面站定，等着被推进队列），
+  // 走的仍是 8.105 m —— 三名俘虏必须同速，同一条 clip 只带一个 referenceSpeedMps。
+  captiveOld: [7.543, -177.667],
   captiveYoung: [8.9, -177.4],
   captiveThird: [10.3, -177.4],
   gunso: [5.3, -173.6],
-  hei: [7.0, -179.3],
+  // 日兵甲要在 7.0 s（不是 7.4）就站到推搡位上，所以他的起点近一些：7.665 m / 7.0 s
+  // 还是 1.095 m/s，队形里没人快走。
+  hei: [6.18, -177.841],
   bing: [9.85, -179.2],
   ding: [10.8, -178.8],
 });
@@ -162,6 +187,8 @@ const MarchSpeed = (a, b, seconds) =>
 const FACE_GUN = Facing(0, 1);
 
 const MARCH_END = 7.4;
+/** 被推着趔趄那 0.7 s 的走位速度：0.271 m / 0.70 s（clip 里那只脚正好走这么远）。 */
+const SHOVE_SPEED = Number((0.271 / 0.70 / 4.2).toFixed(4));
 
 /**
  * 举着手被押过来的那一段（三名俘虏与四名日军共用）。
@@ -170,22 +197,25 @@ const MARCH_END = 7.4;
  * 七秒里从 0.26 一路滑到 0，而轨道位移是匀速的 —— 腿越迈越慢、人却照样往前飘。
  * 倒数第二帧把 moveSpeed 按住，最后 0.35 s 才收到 0，那一下就是「站住」。
  *
+ * `endAt` 只有日兵甲用：他要在 7.0 s 就站到推搡位上（接触帧 7.42 才落在「站住」
+ * 那一拍上），起点跟着往前挪，所以速度仍是全队的 1.095 m/s。
+ *
  * 2026-09-16：三名俘虏这一段给 `perform: "CaptiveHandsUpWalk"`（第一版没有，他们
  * 举着手的样子要等站定才切进来，押进场的十秒里是普通走路姿态）。那条 clip 带
  * `referenceSpeedMps`，表演层按**起播帧**的 `moveSpeed × 4.2` 缩放播放速率，支撑脚
  * 的后移速度于是等于轨道速度，不滑步。日军仍走 POSE_CLIPS 的走路（引擎自己按
  * moveSpeed 调步频），所以 `perform` 默认是 null。
  */
-function MarchIn(from, to, state, perform = null) {
+function MarchIn(from, to, state, perform = null, endAt = MARCH_END) {
   const ry = Toward(from, to);
-  const speed = MarchSpeed(from, to, MARCH_END);
-  const hold = MARCH_END - 0.35;
+  const speed = MarchSpeed(from, to, endAt);
+  const hold = endAt - 0.35;
   const at = (k) => [from[0] + (to[0] - from[0]) * k, 0, from[1] + (to[1] - from[1]) * k];
   const walk = perform ? { perform } : {};
   return [
     { t: 0.0, pos: [from[0], 0, from[1]], ry, state: { moveSpeed: speed, ...walk, ...state } },
-    { t: hold, pos: at(hold / MARCH_END), ry, state: { moveSpeed: speed, ...walk, ...state } },
-    { t: MARCH_END, pos: [to[0], 0, to[1]], ry, state: { moveSpeed: 0, ...walk, ...state } },
+    { t: hold, pos: at(hold / endAt), ry, state: { moveSpeed: speed, ...walk, ...state } },
+    { t: endAt, pos: [to[0], 0, to[1]], ry, state: { moveSpeed: 0, ...walk, ...state } },
   ];
 }
 
@@ -271,9 +301,16 @@ export const CS_MachineGunCaptives = {
     //    而趴着的人躯干只有 0.2–0.35 m —— 给得见的镜头就是「刺了个空」。
     {
       id: "captive_old", kind: "nra", weapon: null, seed: "captiveOld", modelVariant: 4,
+      sizeScale: 1.0,
       track: [
-        ...MarchIn(FROM.captiveOld, SPOT.captiveOld, {}, "CaptiveHandsUpWalk"),
-        NraHold(7.4, SPOT.captiveOld, "CaptiveHandsUpStand", { lookPitch: -0.1 }),
+        // 他走到队列**后面** 0.271 m 处站住（7.4），日兵甲一掌把他推进队列：
+        // 7.42 接触 → CaptiveShovedStumble（0.7 s，举手走 → 往前趔趄一步 → 举手站姿），
+        // 轨道在这 0.7 s 里正好送他那 0.271 m，踩着地的那只脚一寸不蹭。
+        // 首尾两帧分别**逐比特等于**举手走的第 0 帧与举手站的第 0 帧，两头都不跳。
+        ...MarchIn(FROM.captiveOld, SPOT.captiveOldHalt, {}, "CaptiveHandsUpWalk"),
+        { t: 7.42, pos: [SPOT.captiveOldHalt[0], 0, SPOT.captiveOldHalt[1]], ry: FACE_GUN,
+          state: { moveSpeed: SHOVE_SPEED, perform: "CaptiveShovedStumble", lookPitch: -0.1 } },
+        NraHold(8.12, SPOT.captiveOld, "CaptiveHandsUpStand", { lookPitch: -0.1 }),
         // 喝令跪下（10.5）之后另外两个 12.4 就往下蹲了，他拖到 13.3 才动 —— 挨那一脚
         // 的理由就在这一秒里，不用多一句台词。跪是 1.0 s 的过程（CaptiveStandToKneel），
         // 末帧就是跪姿循环的首帧，所以 14.3 那一下换 clip 看不出接缝。
@@ -289,6 +326,7 @@ export const CS_MachineGunCaptives = {
     // ── 小兵（中间）：跪下 → 求饶 → 挨一枪托闭嘴 → 镜 4 唯一一刀捅在他身上 ───────
     {
       id: "captive_young", kind: "nra", weapon: null, seed: "captiveYoung", modelVariant: 1,
+      sizeScale: 1.0,
       track: [
         ...MarchIn(FROM.captiveYoung, SPOT.captiveYoung, {}, "CaptiveHandsUpWalk"),
         NraHold(7.4, SPOT.captiveYoung, "CaptiveHandsUpStand", { lookPitch: -0.15 }),
@@ -296,7 +334,7 @@ export const CS_MachineGunCaptives = {
         NraHold(13.4, SPOT.captiveYoung, "CaptiveKneelHandsHead", { kneel: 1, lookPitch: -0.25 }),
         // 看见老兵被踢翻，他改成求饶（抬头、双手前伸）。
         NraHold(15.4, SPOT.captiveYoung, "CaptiveKneelPlead", { kneel: 1, reach: 0.45, lookPitch: -0.1 }),
-        // 28.45 挨枪托（枪托落点前 0.799 / 高 0.620，正是跪着的人的头肩）：0.8 s 的
+        // 28.45 挨枪托（枪托落点前 0.793 / 高 0.981，正是跪着的人的头与后颈）：0.8 s 的
         // CaptiveKneelFlinch —— 头颈猛一偏、上身缩起来，再回到抱头。它的首尾两帧都是
         // 抱头循环的首帧，所以 29.25 换回去时既不跳也不用另写一帧过渡。
         NraHold(28.45, SPOT.captiveYoung, "CaptiveKneelFlinch", { kneel: 1, reach: 0, lookPitch: -0.45 }),
@@ -312,6 +350,7 @@ export const CS_MachineGunCaptives = {
     // ── 第三个（东端）：全程无台词，跪着不动，最后在黑场里挨一刀 ────────────────
     {
       id: "captive_third", kind: "nra", weapon: null, seed: "captiveThird", modelVariant: 1,
+      sizeScale: 1.0,
       track: [
         ...MarchIn(FROM.captiveThird, SPOT.captiveThird, {}, "CaptiveHandsUpWalk"),
         NraHold(7.4, SPOT.captiveThird, "CaptiveHandsUpStand", { lookPitch: -0.1 }),
@@ -325,6 +364,7 @@ export const CS_MachineGunCaptives = {
     // ── 军曹：领着队伍走到行列西南侧，转身督战；下令那一下抬手一指 ────────────
     {
       id: "ija_gunso", kind: "ija", weapon: "Type38", seed: "ijaGunso", modelVariant: 0,
+      sizeScale: 1.0,
       track: [
         ...MarchIn(FROM.gunso, SPOT.gunso, { bayonetFixed: true }),
         // 走过头再转身：转过来之后背对机位，我们看见的是他的背与右肩（镜 4 的前景）。
@@ -347,12 +387,23 @@ export const CS_MachineGunCaptives = {
     //    一个人从头折磨到底，比四个人各来一下更像真的：这不是一套流程，是一个人。
     {
       id: "ija_hei", kind: "ija", weapon: "Type38", seed: "ijaHei", modelVariant: 1,
+      sizeScale: 1.0,
       track: [
-        ...MarchIn(FROM.hei, SPOT.heiGuard, { bayonetFixed: true }),
+        // 7.0 就到位（走 7.665 m / 7.0 s，仍是全队的 1.095 m/s），7.02 起推：
+        // 0.9 s 的 IjaShoveForward，接触在 +0.40 s = 7.42，正好压在军曹「站住！」
+        // 那一句里。站定处到老兵站定点 0.740 m ＝ 左掌前伸 0.591 + 他后背那段皮 0.158
+        // − 0.010。推完退到押解位（1.084 m），13.4 s 再上前踢。
+        ...MarchIn(FROM.hei, SPOT.heiShove, { bayonetFixed: true }, null, 7.0),
+        IjaHold(7.02, SPOT.heiShove, SPOT.captiveOldHalt, "IjaShoveForward", { melee: 0.5, lookPitch: -0.25 }),
+        { t: 7.92, pos: [SPOT.heiShove[0], 0, SPOT.heiShove[1]], ry: Toward(SPOT.heiShove, SPOT.heiGuard),
+          state: { moveSpeed: MarchSpeed(SPOT.heiShove, SPOT.heiGuard, 0.78), bayonetFixed: true,
+                   perform: null, melee: 0, lookPitch: -0.2 } },
+        { t: 8.70, pos: [SPOT.heiGuard[0], 0, SPOT.heiGuard[1]], ry: Toward(SPOT.heiShove, SPOT.heiGuard),
+          state: { moveSpeed: 0, bayonetFixed: true, lookPitch: -0.2 } },
         IjaHold(9.2, SPOT.heiGuard, SPOT.captiveOld, "IjaBayonetGuard", { performPhase: PHASE.hei, lookPitch: -0.2 }),
-        // 13.4→14.1 迈一步上去（1.17 m / 0.7 s = 1.67 m/s，moveSpeed 按它配，
-        // 不配的话 LintCutscene 直接报滑步）。站定处到老兵原点 0.958 m，
-        // 靴面前伸 0.800 + 他那个方位上的皮 0.158 —— 接触帧正好停在胸口的皮上。
+        // 13.4→14.1 迈一步上去（1.175 m / 0.7 s = 1.68 m/s，moveSpeed 按它配，
+        // 不配的话 LintCutscene 直接报滑步）。站定处到老兵原点 0.939 m，
+        // 靴面前伸 0.785 + 他那个方位上的皮 0.164 —— 接触帧正好停在胸口的皮上。
         { t: 13.4, pos: [SPOT.heiGuard[0], 0, SPOT.heiGuard[1]], ry: Toward(SPOT.heiGuard, SPOT.heiKick),
           state: { moveSpeed: MarchSpeed(SPOT.heiGuard, SPOT.heiKick, 0.7), bayonetFixed: true, perform: null, lookPitch: -0.2 } },
         { t: 14.1, pos: [SPOT.heiKick[0], 0, SPOT.heiKick[1]], ry: Toward(SPOT.heiKick, SPOT.captiveOld),
@@ -385,21 +436,23 @@ export const CS_MachineGunCaptives = {
     // ── 日兵乙：小兵背后。枪托砸要 0.98 m、下刺要 1.43 m，所以他砸完退半步再刺 ───
     {
       id: "ija_bing", kind: "ija", weapon: "Type38", seed: "ijaBing", modelVariant: 2,
+      sizeScale: 1.0,
       track: [
         ...MarchIn(FROM.bing, SPOT.bingGuard, { bayonetFixed: true }),
         IjaHold(9.0, SPOT.bingGuard, SPOT.captiveYoung, "IjaBayonetGuard", { performPhase: PHASE.bing, lookPitch: -0.3 }),
-        // 26.8→27.5 上前半步（1.23 m / 0.7 s）。站定处到小兵原点 0.980 m，
-        // 枪托落点前伸 0.799 + 求饶姿那个方位的皮 0.191 —— 接触帧停在他头肩的皮上。
+        // 26.8→27.5 上前半步（1.240 m / 0.7 s）。站定处到小兵原点 0.966 m，
+        // 枪托落点前伸 0.793 + 求饶姿**头颈那条带**上的皮 0.185 —— 接触帧停在他后脑上。
         { t: 26.8, pos: [SPOT.bingGuard[0], 0, SPOT.bingGuard[1]], ry: Toward(SPOT.bingGuard, SPOT.bingButt),
           state: { moveSpeed: MarchSpeed(SPOT.bingGuard, SPOT.bingButt, 0.7), bayonetFixed: true, perform: null, lookPitch: -0.3 } },
         { t: 27.5, pos: [SPOT.bingButt[0], 0, SPOT.bingButt[1]], ry: Toward(SPOT.bingButt, SPOT.captiveYoung),
           state: { moveSpeed: 0, bayonetFixed: true, lookPitch: -0.5 } },
         // 27.6 起砸（1.4 s：0.50 s 枪托抡过头顶、0.85 s 落点、1.40 s 收回持枪式）。
-        // 接触帧 28.45 与小兵起播 CaptiveKneelFlinch 的那一帧对齐。
+        // 接触帧 28.45 与小兵起播 CaptiveKneelFlinch 的那一帧对齐。落点高 0.97 m ——
+        // 跪姿头骨 0.99 / 颈 0.97，砸的是头，不是后背（2026-09-16 第二轮改）。
         IjaHold(27.6, SPOT.bingButt, SPOT.captiveYoung, "IjaRifleButtStrike", { melee: 0.85, lookPitch: -0.6 }),
         IjaHold(29.0, SPOT.bingButt, SPOT.captiveYoung, "IjaBayonetGuard", { performPhase: PHASE.bing, melee: 0, lookPitch: -0.45 }),
-        // 32.4→33.0 退半步到 1.432 m：刺刀尖前伸 1.393 + 抱头姿的皮 0.157 −
-        // 刺入深度 0.12。刺到底（+1.03 s）的刺入是 0.136 m，仍在 0.10–0.15 之内。
+        // 32.4→33.0 退半步到 1.429 m：刺刀尖前伸 1.391 + 抱头姿的皮 0.159 −
+        // 刺入深度 0.12。刺到底（+1.03 s）的刺入是 0.138 m，仍在 0.10–0.15 之内。
         { t: 32.4, pos: [SPOT.bingButt[0], 0, SPOT.bingButt[1]], ry: Toward(SPOT.bingButt, SPOT.bingThrust),
           state: { moveSpeed: MarchSpeed(SPOT.bingButt, SPOT.bingThrust, 0.6), bayonetFixed: true, perform: null, lookPitch: -0.4 } },
         { t: 33.0, pos: [SPOT.bingThrust[0], 0, SPOT.bingThrust[1]], ry: Toward(SPOT.bingThrust, SPOT.captiveYoung),
@@ -418,6 +471,7 @@ export const CS_MachineGunCaptives = {
     // ── 日兵丁：第三个人背后 1.52 m（下刺触及 1.41），一步不用挪 ────────────────
     {
       id: "ija_ding", kind: "ija", weapon: "Type38", seed: "ijaDing", modelVariant: 0,
+      sizeScale: 1.0,
       track: [
         ...MarchIn(FROM.ding, SPOT.ding, { bayonetFixed: true }),
         IjaHold(9.0, SPOT.ding, SPOT.captiveThird, "IjaBayonetGuard", { performPhase: PHASE.ding, lookPitch: -0.3 }),
@@ -444,7 +498,7 @@ export const CS_MachineGunCaptives = {
   shots: [
     {
       n: 1, seconds: 10, focalMm: 200,
-      note: "机枪位长焦北望：三名川军**举着手被押进来**（CaptiveHandsUpWalk：双手过头、缩肩、小步、有点踉跄；支撑脚的后移速度与轨道的 1.095 m/s 对齐，不滑步），四名日军跟在后头。先从土坎上露出半身，走近才看全。7.4 s 站住，切成站姿举手（CaptiveHandsUpStand，两手高出头骨 0.36）。罗班长在画外喊住玩家，不许开枪。",
+      note: "机枪位长焦北望：三名川军**举着手被押进来**（CaptiveHandsUpWalk：双手过头、缩肩、小步、有点踉跄；支撑脚的后移速度与轨道的 1.095 m/s 对齐，不滑步），四名日军跟在后头。先从土坎上露出半身，走近才看全。7.4 s 站住，切成站姿举手（CaptiveHandsUpStand，两手高出头骨 0.36）。老兵慢了半步落在队列后面 0.27 m，日兵甲一手推在他后背上（IjaShoveForward，左手前伸 0.591 / 高 1.012，7.42 s 接触），他往前踉跄一步顶进队列（CaptiveShovedStumble，0.7 s），到 8.12 s 才站定举手 —— 挨那一脚的理由从这一推就开始了。罗班长在画外喊住玩家，不许开枪。",
       camera: {
         from: STAGE.camera,
         // 锚在第三名俘虏身上，机位不动、镜头跟着他往南来（不用逐秒反算坐标）。
@@ -460,11 +514,15 @@ export const CS_MachineGunCaptives = {
       sfx: [
         { at: 0.4, name: "explosionFar", volume: 0.16 },
         { at: 6.4, name: "footstepDirt", volume: 0.18 },
+        // 7.42 那一掌：钝的，不是打击 —— 音量只给踢那一下的三分之二。
+        // 7.62 是他趔趄那一步落地。两条都是现成 cue，本轮不新生成音效。
+        { at: 7.42, name: "impactFlesh", volume: 0.22 },
+        { at: 7.62, name: "footstepDirt", volume: 0.16 },
       ],
     },
     {
       n: 2, seconds: 10, focalMm: 200,
-      note: "喝令跪下、抱头。跪是 1.0 s 的过程（CaptiveStandToKneel：蹲下去、双膝落地、手上脑后），两个 12.4 s 就动了、13.4 s 跪稳，老兵拖到 13.3 s 才动、14.3 s 才跪稳；日兵上前一步，14.2 s 起脚，14.66 s 接触（脚前伸 0.800 / 高 0.629，正是跪着的人的胸口），老兵前扑趴倒。小兵改成跪着讨命。人物占画面高度约四成，不给脸的特写。",
+      note: "喝令跪下、抱头。跪是 1.0 s 的过程（CaptiveStandToKneel：蹲下去、双膝落地、手上脑后），两个 12.4 s 就动了、13.4 s 跪稳，老兵拖到 13.3 s 才动、14.3 s 才跪稳；日兵上前一步，14.2 s 起脚，14.66 s 接触（脚前伸 0.785 / 高 0.617，正是跪着的人的胸口），老兵前扑趴倒。小兵改成跪着讨命。人物占画面高度约四成，不给脸的特写。",
       camera: {
         from: STAGE.camera,
         lookActor: "captive_young", look: [-1.0, 0.7, 0.2],
@@ -485,7 +543,7 @@ export const CS_MachineGunCaptives = {
     },
     {
       n: 3, seconds: 10, focalMm: 200,
-      note: "日兵站在趴着的老兵旁边指着骂（IjaTauntGesture）；老兵从地上顶回去一句；另一个日兵 27.6 s 把枪托翻过头顶，28.45 s 砸在跪着的小兵后背肩上（落点前伸 0.799 / 高 0.620），小兵头猛一低、上身缩起来（CaptiveKneelFlinch，0.8 s），29.25 s 收回抱头、不再出声。刺刀这一镜就在枪上了，剪影里看得见那一截直线。",
+      note: "日兵站在趴着的老兵旁边指着骂（IjaTauntGesture）；老兵从地上顶回去一句；另一个日兵 27.6 s 把枪托翻过头顶，28.45 s 砸在跪着的小兵**后脑**上（落点前伸 0.794 / 高 0.967，正是跪姿头骨 0.99 那一带，不是后背），小兵的头猛向侧前偏 0.13 m、上身晚半拍才跟过去（CaptiveKneelFlinch，0.8 s），29.25 s 收回抱头、不再出声。刺刀这一镜就在枪上了，剪影里看得见那一截直线。",
       camera: {
         from: STAGE.camera,
         lookActor: "captive_old", look: [0.4, 0.85, -0.9],
@@ -507,7 +565,7 @@ export const CS_MachineGunCaptives = {
     },
     {
       n: 4, seconds: 5, focalMm: 200,
-      note: "军曹的背影在前景下令，跪着的人在他身后。日兵乙退半步到 1.432 m，33.4 s 起刺，34.16 s 刺刀尖进小兵上半身（前伸 1.393 / 高 0.776，刺入体表 0.12 m）——全片唯一看得见的一刀，也是唯一一个还跪着的受刀者。黑场从 4.2 s 起收，到本镜末（35.0 s）全黑。不给近景、不给血。",
+      note: "军曹的背影在前景下令，跪着的人在他身后。日兵乙退半步到 1.429 m，33.4 s 起刺，34.16 s 刺刀尖进小兵上半身（前伸 1.391 / 高 0.757，刺入体表 0.12 m）——全片唯一看得见的一刀，也是唯一一个还跪着的受刀者。黑场从 4.2 s 起收，到本镜末（35.0 s）全黑。不给近景、不给血。",
       camera: {
         from: STAGE.camera,
         // 锚在军曹身上，看点偏到他右后方的行列：他占画面左半边，人在他身后。
