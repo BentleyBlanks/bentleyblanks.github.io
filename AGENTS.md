@@ -59,6 +59,12 @@
 
 - 后续所有 Blender 原始工程统一存放在 `C:\Users\Bentl\OneDrive\AI\Models\Blender`，按项目与资产建立子目录；`.blend` 及自动备份均留在该目录，不放进 github.io 仓库。仓库保留游戏所需的 GLB、贴图、重建脚本与资产说明。
 - 使用 BlenderMCP 前确认当前文件属于本任务；新资产使用独立工程，避免覆盖其他任务的场景。模型验收网页和视频仍只留本地。
+- **Blender 与 MCP 服务器不常驻。** 不把 blender 之类的本地 stdio MCP 服务器写进 `.mcp.json` 或 user scope：本机同时开着几十个会话，那样每个会话都会各拉一条空转进程链。确实需要 MCP 工具接口时当次临时注册（`claude mcp add blender -s local -- blender-mcp`），用完 `claude mcp remove blender -s local`。
+- **起 Blender 走 `node scripts/Script_BlenderMcp.mjs start`**，不手工敲 `blender.exe --python`。它带窗口起 Blender、把插件服务拉到本 worktree 专用端口、等端口应答后才返回（约 5 秒），并把 pid 记进已忽略的 `tmp/BlenderMcp/`。发 Python 用同一入口的 `exec` / `call`。
+- **一轮 Blender 活做完必须 `stop`。** `.claude/settings.json` 的 Stop / SessionEnd 钩子会兜底，但用户按 Esc 打断不触发 Stop、会话被强杀时 SessionEnd 也不一定跑到，钩子不替代收尾。跨轮要保留的成果自己存盘。
+- 报告里附无残留证据：`node scripts/Script_BlenderMcp.mjs status --scan`，或 `tasklist | findstr /i blender`。只关自己起的实例，不动别的 worktree 与用户手开的 Blender。
+- 交付仍以仓库里的重建脚本为准：Blender 里改完要让对应的 `Script_*` 重烘出 GLB 与贴图，不手工从 Blender 导一份塞进仓库。
+- 命令细节、pid 文件位置、钩子触发时机与残留排查见 [生成工具操作参考](docs/Data_AssetGeneration.md)。
 
 ## 音频资产
 
