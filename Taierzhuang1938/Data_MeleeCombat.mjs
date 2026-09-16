@@ -6,6 +6,10 @@ export const MELEE_RULES = Object.freeze({
   chargeMinS: 0.38, chargeMaxS: 1.15, staminaRecovery: 19,
   engageM: 5.5, separationM: 0.62, bindReachM: 1.15,
   knockdownS: 0.65, riseS: 1.05, staggerS: 0.65,
+  // 倒地时第一人称镜头：眼位落到地板上方 groundEyeM，镜头再抬 groundCameraPitchRad
+  // （躺着看天花板）。Script_Player 画它，剧本编排（第一关屋内伏击）要按同一组数
+  // 反算「让他看哪儿」，所以两边读同一条，别各写一个 0.78。
+  groundEyeM: 0.28, groundCameraPitchRad: 0.78,
   poiseRecovery: 17, npcTurnRate: 3.8, npcSpeed: 1.5,
   maxStepS: 1 / 90,
   inputBufferS: 0.18, parrySuccessRecoveryS: 0.12, pushSuccessRecoveryS: 0.14,

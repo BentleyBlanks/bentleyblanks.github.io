@@ -5,7 +5,8 @@ import { CloneShadedMaterial } from "./Script_Materials.mjs";
 import { AttachShadowDepth } from "./Script_ShadowDepth.mjs";
 import { MergeBodyParts } from "./Script_PartAtlasMerge.mjs";
 import { MissionTrainLifePose } from "./Script_FirstLevelMissionTrainLife.mjs";
-import { MISSION_PEOPLE_TUNING as C } from "./Data_Tuning_FirstLevel.mjs";
+import { MISSION_PEOPLE_TUNING as C, ZHOU_WOUNDS } from "./Data_Tuning_FirstLevel.mjs";
+import { CharacterWounds, PaintBakedWounds, CreateWoundUniforms } from "./Script_CharacterWounds.mjs";
 
 // Visible people share the production character rig; two-bone IK corrects hands onto the actual rails.
 export class MissionPeople {
@@ -159,19 +160,57 @@ export class MissionPeople {
     actor.characterRig.Update(poseDt,{moveSpeed:0,elapsed:this.time});
     if(!this.PlayAmbushClip(entry,id,deckY)){actor.root.visible=false;return false;}
     actor.root.updateMatrixWorld(true);
+    this.PaintRiggedWounds(entry,id,poseDt);
     return true;
   }
-  Patient(id,x,y,z,yaw,time){
-    const variant=id.length%2;let parts=this.patients.get(variant);
+  /**
+   * ZHOU_WOUNDS 投到带骨架伤员的外层表面（这条路只在挨刀之后走，所以连肚子上那一刀一起画）。
+   * 挂在 actor.woundBlood 上：actor.Dispose 会把私有材质还回去。
+   */
+  PaintRiggedWounds(entry,id,dt){
+    const actor=entry.actor,bones=actor.characterRig?.bones;
+    if(!entry.woundsPainted&&bones){
+      entry.woundsPainted=true;
+      const wounds=actor.woundBlood||=new CharacterWounds(actor.characterRig.root);
+      const stabAge=Math.max(0,this.time-(this.AmbushClip(id)?.startedAt??this.time));
+      const down=new THREE.Vector3(0,-1,0);
+      for(const w of ZHOU_WOUNDS){
+        const from=bones[w.from];if(!from)continue;
+        const point=from.getWorldPosition(new THREE.Vector3()),to=w.to&&bones[w.to];
+        if(to)point.lerp(to.getWorldPosition(new THREE.Vector3()),w.t);
+        point.y+=w.liftM;
+        wounds.Add({part:w.part,point,direction:down,radiusM:w.radiusM,ageS:w.stabbed?stabAge:w.ageS});
+      }
+    }
+    actor.woundBlood?.Update(dt);
+  }
+  /** `wounded`：null＝普通伤员；{stabbed} 给老周那一副画 ZHOU_WOUNDS（他单独一张表，材质不和别人共用）。 */
+  Patient(id,x,y,z,yaw,time,wounded=null){
+    // 老周与挨刀后的骨架版同一套外观（modelVariant 1），挨刀前后不换脸。
+    const variant=wounded?"zhou":id.length%2;let parts=this.patients.get(variant);
     if(!parts){
-      const materials=new Map(),baked=BakeMissionBody(this.actorFactory,{side:"nra",pose:variant,patient:true},materials);
+      const pose=wounded?1:variant,materials=new Map(),
+        baked=BakeMissionBody(this.actorFactory,{side:"nra",pose,patient:true,wounds:wounded?ZHOU_WOUNDS:null},materials);
       // Own material per instanced table: sharing the skinned actors' material makes three re-derive the program every draw.
       // 分件按着色签名合成图集网格（与尸体层同一路），七只网格降到四五只。
       const merged=MergeBodyParts(baked.map(part=>({key:part.key,source:materials.get(part.key),tiers:[part.geometry]})),
-        {clone:CloneShadedMaterial,cache:this.patientMerge,owned:this.patientOwned});
+        {clone:CloneShadedMaterial,cache:wounded?null:this.patientMerge,owned:this.patientOwned});
+      const uniforms=wounded?CreateWoundUniforms():null;
       parts=merged.map(entry=>{const mesh=new THREE.InstancedMesh(entry.tiers[0],entry.material,64);
         mesh.name="MissionLitterPatient";mesh.castShadow=true;mesh.receiveShadow=true;AttachShadowDepth(mesh);mesh.frustumCulled=false;mesh.count=0;
-        this.root.add(mesh);return mesh;});this.patients.set(variant,parts);
+        if(uniforms)PaintBakedWounds(mesh,uniforms);
+        this.root.add(mesh);return mesh;});
+      if(uniforms){
+        parts.wounds={uniforms,centers:baked.woundCenters};
+        ZHOU_WOUNDS.forEach((w,i)=>{const c=baked.woundCenters[i];
+          if(c&&i<uniforms.uClothWounds.value.length){uniforms.uClothWounds.value[i].set(c.x,c.y,c.z,0);uniforms.uClothWoundAge.value[i].set(w.ageS,0);}});
+      }
+      this.patients.set(variant,parts);
+    }
+    if(parts.wounds){
+      const {uniforms,centers}=parts.wounds;
+      ZHOU_WOUNDS.forEach((w,i)=>{if(centers[i]&&i<uniforms.uClothWounds.value.length)
+        uniforms.uClothWounds.value[i].w=!w.stabbed||wounded.stabbed?w.radiusM:0;});
     }
     this.patientRotation.setFromEuler(new THREE.Euler(0,yaw,0));
     this.patientMatrix.compose(new THREE.Vector3(x,y+.01+Math.sin(time*1.7+id.length)*.003,z),this.patientRotation,new THREE.Vector3(.94,.94,.94));
@@ -196,6 +235,12 @@ export class MissionPeople {
  * @param {object} soldier 目标士兵
  * @param {(soldier:object)=>object|null} Prepare 采样器工厂（运行时注入）
  */
+// 枪什么时候不在他手上了。PressureStabbed 里 0.30 s 玩家把枪夺过去，之后他两只手空着
+// 摁在肚子上 —— 共用的 Actor._UpdateRiggedWeaponMount 只认两个握点，手一空它照样把
+// 1.68 m 的三八式架在两手之间，插穿尸体（Package C2 的交接说明，口径见
+// docs/Data_FirstLevelAmbushAnimation.md）。掉了就一直藏着：他接下来是具尸体。
+const AMBUSH_RIFLE_DROPPED_AT = Object.freeze({ PressureStabbed: .30 });
+
 export function InstallAmbushPerformance(soldier,Prepare){
   const rig=soldier?.actor?.characterRig;
   if(!rig||typeof rig.Update!=="function"||rig.missionAmbushPose)return false;
@@ -205,7 +250,10 @@ export function InstallAmbushPerformance(soldier,Prepare){
     rig.missionAmbushAnimation?.Restore?.();
     const result=original.call(this,dt,state);
     const performance=soldier.missionAmbushClip;
+    if(soldier.missionAmbushWeaponDropped)state.hideWeapon=true;
     if(!performance||soldier.alive===false||state.dead)return result;
+    const dropAt=AMBUSH_RIFLE_DROPPED_AT[performance.clipId];
+    if(dropAt!=null&&performance.seconds>=dropAt){soldier.missionAmbushWeaponDropped=true;state.hideWeapon=true;}
     // 库可能还在下载：拿不到就下一帧再试，别缓存成「这个人永远没有动作」。
     const animation=rig.missionAmbushAnimation||(rig.missionAmbushAnimation=Prepare?.(soldier)||null);
     if(!animation){soldier.missionAmbushPending=true;return result;}

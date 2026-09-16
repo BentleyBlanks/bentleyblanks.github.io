@@ -73,6 +73,10 @@ export const TEXT = Object.freeze({
   "hud.unit.ija.grenadierSquad": "掷弹筒分队",
 
   // --- 白刃 QTE -------------------------------------------------------------
+  // 剧本提示环（第一关屋内伏击）。环里只有一个键面字，这三条是读屏用的说明。
+  "hud.cinematicPrompt.press": "按 {key} 抓住枪",
+  "hud.cinematicPrompt.mash": "连按 {key} 把刺刀推开",
+  "hud.cinematicPrompt.finisher": "按 {key} 捅回去",
   "hud.melee.scale": "武器控制 · 我方 ← ● → 敌方",
   "hud.melee.progressAria": "我方武器控制",
   "hud.melee.aria": "{label}，{prompt}",
@@ -197,4 +201,6 @@ export const GATED_MODULES = Object.freeze([
 export const DYNAMIC_PREFIXES = Object.freeze([
   "hud.faction.",
   "hud.unit.ija.",
+  // 剧本提示环按 mode（press/mash/finisher）拼键，三个 id 都在 Script_Hud 那张白名单里
+  "hud.cinematicPrompt.",
 ]);

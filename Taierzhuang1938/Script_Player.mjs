@@ -28,6 +28,7 @@ import { CoverLean, LeanClearance } from "./Script_CoverLean.mjs";
 import { AUTOMATIC_RECOIL } from "./Data_Tuning_FirearmHandling.mjs";
 import { FirearmHandling, GunClearance } from "./Script_FirearmHandling.mjs";
 import { CameraShake } from "./Script_CameraShake.mjs";
+import { MELEE_RULES } from "./Data_MeleeCombat.mjs";
 
 const UP = new THREE.Vector3(0, 1, 0);
 
@@ -1057,8 +1058,8 @@ export class PlayerController {
       : melee?.state === "rise" ? 1 - SmoothStep(0, 1, melee.normalized)
       : melee?.state === "down" || (melee?.state === "qte" && melee.qteKind === "ground") ? 1 : 0;
     this.meleeCameraDrop = (this.meleeCameraDrop || 0) + (floorTarget - (this.meleeCameraDrop || 0)) * Math.min(1, dt * 16);
-    cam.position.y -= this.meleeCameraDrop * (this.eyeHeight - 0.28);
-    cam.rotation.x += this.meleeCameraDrop * 0.78;
+    cam.position.y -= this.meleeCameraDrop * (this.eyeHeight - MELEE_RULES.groundEyeM);
+    cam.rotation.x += this.meleeCameraDrop * MELEE_RULES.groundCameraPitchRad;
     const focusing = melee?.state === "qte" && Number.isFinite(melee.focusYaw);
     this.meleeCameraFocus = (this.meleeCameraFocus || 0) + ((focusing ? 1 : 0) - (this.meleeCameraFocus || 0)) * Math.min(1, dt * 12);
     if (focusing) {

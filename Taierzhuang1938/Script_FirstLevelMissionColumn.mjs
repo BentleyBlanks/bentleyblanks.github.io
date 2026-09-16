@@ -197,17 +197,28 @@ export class FirstLevelMissionColumn {
   AmbushCasualty(victim, { zhouHealth = 45 } = {}) {
     const litter = this.zhou;
     if (!litter) return false;
+    // 这一拍里不许叫替补：屋里还有三个上着刺刀的日军，民夫走进去就是送死
+    //（实拍里替补在挣脱之后三秒就走进屋了）。清完屋子由 AmbushRecover 统一叫。
+    litter.ambushHold = true;
     if (victim === "zhou") {
       litter.health = Math.min(litter.health, zhouHealth);
       litter.stabbed = true;
-      litter.state = "fallen";
+      // **不在这一帧把担架摔下去。** BayonetStabDown 的下扎顶点在刀落之后 0.07 s，
+      // 这里一摔床面就从 0.76 m 掉到 0.22 m，那一刀的顶点落在老周上方 0.6 m 的空气里
+      //（2026-09-16 把刀尖投到屏幕上量出来的：差 128 px）。担架落地改由「两个抬架员
+      // 都倒了」那一条接管（下面），实拍里就是后抬者挨刀那一下（8.3 s）。
       return true;
     }
     // 抬担架的两个人：slot 1 是前（view 里 side=+1 那一头），slot 0 是后。
     const slot = victim === "frontBearer" ? 1 : 0;
     if (litter.bearers[slot] <= 0) return false;
     litter.bearers[slot] = 0;
-    litter.state = "fallen";
+    // 担架落地＝**两头都没人攥着了**，不是「死了一个」。
+    // 前抬者一死（拍表 5.4 s）就摔的话，床面从 0.76 m 掉到 0.22 m，
+    // 而捅老周那一刀（7.5 s）是按 0.86 m 的床面烘的
+    //（BayonetStabDown，docs/Data_FirstLevelAmbushAnimation.md §4）——
+    // 刀会扎在他上方大半米的空气里（2026-09-16 把刀尖投到屏幕上量出来的）。
+    if (litter.bearers.every((health) => health <= 0)) litter.state = "fallen";
     this.CaptureBearerLosses();
     return true;
   }
@@ -215,6 +226,7 @@ export class FirstLevelMissionColumn {
   AmbushRecover() {
     const litter = this.zhou;
     if (!litter) return false;
+    litter.ambushHold = false;
     if (litter.bearers.every(health => health > 0)) { litter.state = "waiting"; return false; }
     litter.state = "waiting";
     this.RequestBearer(litter);
@@ -590,7 +602,9 @@ export class FirstLevelMissionColumn {
   LitterPace(litter, base) { return litter.dragging ? base * R.litterDragScale : base; }
   RequestBearer(litter) {
     const slot=litter.bearers.findIndex(health=>health<=0);
-    if(slot<0 || this.walkers.some(w=>w.rescueTarget?.litter===litter.id))return;
+    // ambushHold：屋内伏击正在演，屋里还在白刃 —— 那副担架的替补等清完屋子再叫
+    //（AmbushRecover 一次叫两个）。见 docs/Data_FirstLevelRoomAmbush.md 拍表末两行。
+    if(slot<0 || litter.ambushHold || this.walkers.some(w=>w.rescueTarget?.litter===litter.id))return;
     const helper=this.walkers.filter(w=>w.visible&&w.health>0&&!w.assigned&&!w.rescueTarget&&!w.treating&&['medic','civilian'].includes(w.kind))
       .sort((a,b)=>Math.hypot(a.x-litter.x,a.z-litter.z)-Math.hypot(b.x-litter.x,b.z-litter.z))[0];
     if(!helper)return;

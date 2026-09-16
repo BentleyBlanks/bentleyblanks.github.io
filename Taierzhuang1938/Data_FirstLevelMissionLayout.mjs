@@ -82,6 +82,26 @@ function Room(id, x, z, w, d, { southDoor = true, northDoor = true, eastWindow =
   // Cut-away whitebox roof leaves rooms legible while retaining actual cover.
   Block(`${id}Roof`, x - w * 0.28, z, w * 0.4, 0.22, d, "structure", { y: SampleMissionTerrain(x,z) + 3.05 });
 }
+/**
+ * 檩条与一段望板。屋内伏击那一拍玩家是**躺在地板上仰头**看的
+ *（docs/Data_FirstLevelRoomAmbush.md）：白盒剖面屋顶（`<id>Roof` 只盖西侧四成）
+ * 留下的那一大片天空正好落在视野正中，躺在屋里却看见白天的天。
+ *
+ * 这里补一套梁与板，**不整个封死** —— 剖面屋顶的可读性（俯视能看进屋里）要留着，
+ * 中间那道窄缝也正好给一束天光。全部在墙顶（2.9 m）之上，不影响走位与碰撞。
+ */
+function Rafters(id, x, z, w, d) {
+  const ground = SampleMissionTerrain(x, z);
+  // 脊檩：南北向，压在两扇门的中线上。
+  Block(`${id}Ridge`, x, z, 0.34, 0.34, d + 0.6, "timber", { y: ground + 3.26 });
+  // 横梁：每 1.85 m 一根，东西向跨满整间屋。
+  const step = 1.85, count = Math.floor((d - 1.2) / step);
+  for (let i = 0; i <= count; i += 1)
+    Block(`${id}Rafter${i}`, x, z - d / 2 + 0.9 + i * step, w, 0.16, 0.24, "timber", { y: ground + 3.02 });
+  // 东侧那半边补一段望板：剖面屋顶盖的是西侧，躺在地上仰头看的正是这一片。
+  Block(`${id}Boards`, x + w * 0.26, z, w * 0.46, 0.14, d, "timber", { y: ground + 3.16 });
+}
+
 // Reuse the accepted P012 open freight-wagon boards, ribs and undercarriage.
 // Only the east door is recentered on this mission's existing unloading lane.
 const sourceCarFloor = P012_STATION_BLOCKS.find(
@@ -303,6 +323,8 @@ Wall("AmbushWestScreen", 54.6, 3.5, 0.35, 1.9, 4.2);
 // 货箱堆要留得出一个人真的站得下的角落：南面到墙内侧 1.8 m，东面到墙内侧 0.3 m。
 // 留窄了出生点会被物理挤出屋外（实拍把侧翼那个顶到了 (60.5,16.5)）。
 Block("AmbushCornerCrates", 61.9, 12.6, 3, 1.7, 1.6, "cover");
+// 被砸倒之后是躺着仰头看的：这间屋子的头顶上必须有东西（见 Rafters 的注释）。
+Rafters("ConnectedHouse", 58, 8, 12, 15);
 Room("MachineGunHouse", 43, 8, 12, 15, { northDoor: true, southDoor: true, eastWindow: true });
 Wall("CourtyardWest", 33, 25, 0.7, 2.5, 19);
 Wall("CourtyardEast", 72, 20, 0.7, 2.5, 28);

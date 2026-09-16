@@ -239,28 +239,37 @@ export const MISSION_TUNING = Object.freeze({
   // 旧的近战教学（MeleeTutor）那四条数值随 2026-09-15 的屋内伏击一起删掉了。
   meleeTriggerRadiusM: 2.7,
   // —— 屋内伏击（内部步骤 Melee，公开阶段 9）。
-  // 用户 2026-09-15：顺子刚进右手那间屋，屋里藏着的日军一刺刀顶上来，连按 F 挣脱；
-  // 背景里老周和两个抬担架的挨刀。拍表、每一条的出处与验收见 docs/Data_FirstLevelRoomAmbush.md。
-  // 冲上来的速度取跃进冲刺同一档（assaultRushMps 3.4）：屋里三米的距离约 0.9 秒到位。
+  // 用户 2026-09-16（对标《使命召唤：二战》诺曼底地堡那一段）：顺子刚进右手那间屋，
+  // 藏在壁龛里的日军一枪托把他砸翻在地；他躺在地上、眼前发黑发糊，看着老周和两个
+  // 抬担架的挨刀；那个人随后扑上来用刺刀压他的胸口 —— 抓枪、推刀、反手捅回去。
+  // 拍表、每一条的出处与验收见 docs/Data_FirstLevelRoomAmbush.md。
+  // 冲上来的速度取跃进冲刺同一档（assaultRushMps 3.4）：屋里三米的距离约 0.7 秒到位。
   ambushLungeMps: 3.4,
-  // 这一刀按 kind "qte" 结算（绕开 COMBAT.player.meleeScale），控制锁期间必须真的掉血。
-  // 契约的起始建议是 30；实拍下调到 24：挣脱之后屋里是三个上刺刀的，一记轻刺 21、
-  // 重刺 46（MELEE_WEAPONS.Bayonet × COMBAT.player.meleeScale 0.42），
-  // 从 70 血开打在班里人赶到之前必死。24 让顺子带着 76 血进这一场。
-  // 挣脱失败仍然活得下来：24 + 12（共用 standingFailureDamage）+ 18 = 54。
-  ambushStabDamage: 24,
-  // 顶住但还不给连按的那一段：刺刀已经进去了，两个人摆成僵持姿势，F 这会儿不算数。
-  // 这几秒是留给背景的 —— 前抬者(1.5)、幺娃(2.4)、后抬者(3.2) 都落在这里面，
-  // 玩家在锁住的视锥里看着他们倒下，手上没有该按的键。连按窗口随后才开。
-  // 取 2.4：顶住 + 窗口 + 结算（1.2 + 2.4 + 3.2 + 0.6 = 7.4 秒）必须在老周那一声
-  // （对齐表 7.50 秒 / 兜底 ambushZhouStabAtS 7.6）之前收尾，Script_FirstLevelMissionTest 守着这条。
-  ambushPinHoldS: 2.4,
-  // 比共用 MELEE_QTE_RULES.windowS(4.8) 短：这是被顶住的一瞬，不是久持。
-  // 运行时按 min(MELEE_QTE_RULES.windowS, 本值) 传给共用规则 —— 共用上限只会更宽，不改它。
-  ambushQteWindowS: 3.2,
-  // 对手力度，进 MeleeQte 的 decay 乘子（0.8–1.25 夹取）；比旧近战教学那一场（0.6）狠。
+  // 扑到接触距离之后再抡这么久才砸到：RifleButtStrike 全长 1.0 s，
+  // 抡到头顶那一下大约在 0.45 s。玩家看得见枪托抡起来，才谈得上「被砸」。
+  ambushButtImpactS: .45,
+  // 枪托这一下按 kind "qte" 结算（绕开 COMBAT.player.meleeScale），控制锁期间必须真的掉血。
+  // 取 20：挨完这一下顺子是 80 血；后面地面僵持输掉是 72（共用 groundFailureDamage）
+  // + 18（ambushFailureExtraDamage）= 110，满血进来也会死 —— 推刀输了就是被捅穿，
+  // 走正常阵亡与检查点重试，不留「输了也没事」的后门。
+  ambushButtDamage: 20,
+  // 地面僵持（推刀）的连按窗口。共用上限 MELEE_QTE_RULES.windowS 4.8 一个字不动，
+  // 运行时按 min(共用, 本值) 传进去 —— 这一拍只会更短。
+  ambushQteWindowS: 3.6,
+  // 对手力度，进 MeleeQte 的 decay 乘子（0.8–1.25 夹取）。
   ambushQteStrength: 0.75,
-  // 视线甩到刺刀上的时间。与 deathLookSeconds(.65) 同一条曲线，短一半：这是被撞的一下。
+  // 抓枪那一下的提示窗口：环上的弧在这么久里漏完，漏完＝刀捅进来。
+  // 1.2 s 是「看见提示、按一下」的时间，不是反应力测验。
+  ambushGrabWindowS: 1.2,
+  // 推赢之后那一下反捅的提示窗口。没按也会在窗口末尾自动补上（共用 QTE 已经判赢，
+  // 这一下只是把胜负演出来）—— 所以它是节奏，不是第二道生死闸。
+  ambushFinisherWindowS: 2.4,
+  // 反捅进去之后再锁这么久才起身：PressureStabbed 全长 1.3 s，
+  // 取 1.1 让玩家看见对面软下去、滚到右边，而不是刀还在人身上就站起来了。
+  ambushFinisherHoldS: 1.1,
+  // 反捅这一刀的伤害。领头那个必须真的死（走共用伤害链，出血、断肢、尸体照常）。
+  ambushFinisherDamage: 140,
+  // 视线甩到刺刀／担架上的时间。与 deathLookSeconds(.65) 同一条曲线，短一半。
   ambushLookSeconds: 0.35,
   // 罗班长他们从灶屋冲进来的延迟与速度（squadCatchupMps 4.5 之下，比行军 3.05 快）。
   // 契约建议 2.5；实拍下调到 1.5：晚一秒他们就赶不上第二个伏击兵放出来的时刻。
@@ -269,7 +278,8 @@ export const MISSION_TUNING = Object.freeze({
   // 老周挨这一刀之后的血量。他必须活到第 17 阶段才死：Orders 给 65，这里降到 45，
   // 后面 RetreatWall 12 / RetreatYard 6 / 空袭 18 的既有台阶不变。
   ambushZhouHealthAfter: 45,
-  // 挣脱失败的额外伤害，叠在共用 standingFailureDamage(12) 之上。
+  // 推刀输掉时叠在共用 groundFailureDamage(72) 之上的额外伤害。
+  // 20 + 72 + 18 = 110：满血也死。这一拍没有「输了继续打」的中间态。
   ambushFailureExtraDamage: 18,
   // 担架跟进：目标 = 玩家的路线进度减这个间距；南行转场时把老周这副提到队首前一个车距。
   ambushLitterFollowGapM: 4,
@@ -281,41 +291,83 @@ export const MISSION_TUNING = Object.freeze({
   ambushLitterDoorZ: 1.4,
   ambushLitterWaitS: 3,
   // 刚重生／检查点重试／调试跳转都会给 3.2 秒出生保护（Data_Tuning_Player.SPAWN.graceS）。
-  // 这一拍要等它过去再起，不然那一刀会被无敌吃掉；这里是等待上限。
+  // 这一拍要等它过去再起，不然那一下会被无敌吃掉；这里是等待上限。
   ambushProtectedWaitS: 4,
-  // 控制锁的兜底上限。正常路径由挣脱那一拍显式还控制权，不靠这个计时器。
-  // 整段锁住 ≈ ambushZhouStabAtS(7.6) + ambushWitnessTailS(0.9) = 8.5 秒，留 1 秒余量。
-  ambushLockMaxS: 9.5,
-  // 扑上来的最长时间：超时也照样捅，不许因为卡住就没有这一刀。
+  // 控制锁的兜底上限。正常路径由起身那一拍显式还控制权，不靠这个计时器。
+  // 最慢的一条路（Script_FirstLevelMissionTest 逐项加出来守着）：
+  // 扑上来 1.2 + 砸 0.45 + 躺着看到 ambushPounceAtS 8.8 + 抓枪窗口 1.2
+  // + 连按 3.6 + 共用结算 0.6 + 反捅窗口 2.4 + 反捅演完 1.1 = 19.35 秒，留一点余量。
+  ambushLockMaxS: 20.5,
+  // 扑上来的最长时间：超时也照样砸，不许因为卡住就没有这一下。
   ambushLungeMaxS: 1.2,
-  // 到这个距离就算顶上了；与共用 MELEE_RULES.bindReachM 同一个数。
+  // 到这个距离就算够得着了；与共用 MELEE_RULES.bindReachM 同一个数。
   ambushBindReachM: 1.15,
-  // 顶住的最短可见时间：QTE 没能开起来时也不许同一帧就松开。
-  ambushBindMinS: 0.4,
-  // 背景拍表（相对触发）：前抬者 → 幺娃被撞倒 → 后抬者，全部落在顶住那一段
-  //（约 1.1–3.5 秒）里，玩家在锁住的视锥里看得到、手上没有该按的键。
-  // 老周挨的那一刀由配音事件 AmbushZhouLine 触发（RoomAmbush 第三句「啊！肚子……」
-  // 起播的那一瞬，见 Data_FirstLevelMissionVoiceTiming），下面这个 7.6 秒是**没有配音时的
-  // 兜底期限**，取自该句的对齐时刻 7.50 s。所以刀与那一声永远是对上的。
-  // 这一刀**落在控制锁里面**：连按结算完之后 witness 那一段把视线拉到担架上继续锁着，
-  // 刀落下才记 ambushBroken 还控制权（口径见 docs/Data_FirstLevelRoomAmbush.md §拍表）。
-  ambushRiseSeconds: 0.7,
-  ambushBearerStabAtS: 1.5,
+  // 背景拍表（相对触发，秒）。玩家这时候躺在地上，视线被拉到北门口的担架上：
+  //   前抬者 → 老周（配音事件 AmbushZhouLine，RoomAmbush 第三句「啊！肚子……」）→
+  //   后抬者 → 幺娃被撞倒 → 领头那个扑上来压住。
+  // ambushZhouStabAtS 7.6 是**没有配音时的兜底期限**，取自对齐表的 7.50 s，
+  // 所以关掉音频跑出来的节奏一样。
+  ambushBearerStabAtS: 5.4,
   ambushZhouStabAtS: 7.6,
-  ambushYaowaDownAtS: 2.4,
-  ambushRearBearerStabAtS: 3.2,
+  ambushRearBearerStabAtS: 8.3,
+  ambushYaowaDownAtS: 8.7,
+  // 领头那个扑到身上压刺刀的时刻：老周那一刀（7.5）演完之后才轮到玩家自己这条线。
+  ambushPounceAtS: 8.8,
+  // 躺着的视线什么时候从压住自己的那个人拉到北门口的担架上。
+  ambushLookLitterAtS: 4.6,
+  // 这几秒他站在玩家东侧多远。扑过来的落点在「玩家 → 北门口担架」那条视线上，
+  // 站着不动就把担架队被捅穿的整场背景挡死了；1.1 m 让开视线，又还在扑得回来的距离上。
+  ambushDazeStandM: 1.1,
   // 刺击动作的前摇：伤害落点之前这么久起播 clip（BayonetStabStanding 全长 1.2 s）。
   ambushClipLeadS: 0.55,
   ambushYaowaDownS: 6,
-  // 锁住的视线落在刺刀那个人的胸口高度上。
+  ambushRiseSeconds: 0.7,
+  // 锁住的视线落在扑上来那个人的胸口高度上。
   ambushLookHeightM: 1.4,
-  // 连按结算完到挣脱之间的那一段（witness），视线从刺刀拉到担架上：
-  // 老周挨的那一刀必须真的被看见。担架床面 0.86 m，落地之后更低，取 0.7 m 对着肚子。
+  // 抡枪托砸下来那一下看的是**脸**，不是胸口：参考图①那一帧他的脸与肩膀撑满画面。
+  // 这一段（lunge/butt）每帧重新瞄一次他的头骨世界位置，所以这个高度只是取不到骨头时的兜底。
+  ambushButtLookHeightM: 1.52,
+  // 砸中之后镜头往后仰、躺在地上看屋梁（参考图②）。落点取在自己正前方
+  // ambushDazeLookAheadM 处、ambushDazeLookRiseM 高的地方：只抬头不转头，
+  // 抬起来正好是这间屋的檩条与望板（墙顶 2.9 m，见 §3.2 Rafters）。
+  // 这一段跟着倒地那半秒一起走完（ambushDazeLookS），4.6 s 再从屋梁摇到北门口的担架。
+  // 不写这一条会怎样：镜头停在「瞄着他胸口 ± limitedLookRadians」那条带子上，
+  // 躺下之后读到的是地板（2026-09-16 出图实拍）。
+  ambushDazeLookAheadM: 2.2,
+  ambushDazeLookRiseM: 2.3,
+  ambushDazeLookS: 1.1,
+  // 躺在地上看北门口那副担架：担架床面 0.86 m，落地之后更低，取 0.7 m 对着肚子。
   ambushLitterLookHeightM: .7,
-  // 那一刀落下之后再锁这么久才还控制权：BayonetStabDown 全长 1.4 s、在刀落之前
-  // ambushClipLeadS(0.55) 起播，所以刀落之后还有 0.85 s 的拧刀与拔刀。取 0.9 s：
-  // 挣脱那一瞬玩家看见的是刀已经拔出来、老周捂着肚子，而不是刀还插在人身上就还权。
-  ambushWitnessTailS: .9,
+  // 捅老周的那个站在担架西侧多远。原来沿用 ambushBindReachM(1.15)，而且共用走位的到达
+  // 半径（0.45 m）还要在这上面再加一截 —— 实拍逐帧量刀尖：它落在担架北边 1.3 m 的地板上。
+  // BayonetStabDown 的刀尖在他身前约 1.3 m（刀线下倾 7°、俯身进 0.24 m），所以站位取 1.25 m，
+  // 并且走位改走 DriveAmbusherOnto（把到达半径那一截先扣掉），刀尖才真的落在老周肚子上。
+  ambushZhouStabStandM: 1.25,
+  // 同一件事的第二个数：站位沿担架**长边**往脚端错开多少。BayonetStabDown 的刀尖
+  // 在他身前 1.25 m、又偏左手边 0.79 m（clip 自带的侧身），不错开的话那一刀正好扎在
+  // 老周的脖子外侧、担架头端的空气里。0.7 m 让刀尖落在床面正中略偏头端 —— 肚子。
+  ambushZhouStabLateralM: 0.7,
+  // 倒地较劲那几拍（grab/mash/finish）把第一人称那把枪连同两只手整体挪开多少米。
+  // 镜头就架在胸口上方，共用地面姿势把枪与右小臂摆在视线正中，压上来那个人的脸
+  // 与他那把上了刺刀的三八式全被挡死。往下 0.28、往前 0.38 之后：他的脸与那把刺刀
+  // 在上半屏、一点不挡，手里这把枪连同两只手落到下半屏（推远了小臂在画面里也细一圈）——
+  // 就是参考图④⑤的读法（2026-09-16 十档对比出图选的值）。
+  ambushGrappleHandM: Object.freeze({ x: 0.03, y: -0.28, z: -0.38 }),
+  // —— 晕厥与恍惚。曲线的读法与开场出轨那一段完全一样（Curve 线性 + smoothstep），
+  // 横轴是**枪托砸中那一瞬**起算的秒数，纵轴 0–1。开场那一套的形状照搬过来，
+  // 只把「一次重击 → 黑 → 慢慢回来」压缩到这一拍的长度上（OPENING_PERCEPTION）。
+  //   eyelids  眼皮（1 = 全黑）。砸中 0.45 s 后才全黑 —— 这半秒是留给「看见枪托抡过来、
+  //            画面一歪、往地上倒」的，闭太快就只剩一块黑幕；按住 0.7 s，3.3 s 前睁开。
+  //   intensity 恍惚总量（暗角、去色、二次像）；focus 失焦量（模糊像素）。
+  //   hearing  耳鸣（1 = 低通压到 ambushDazeLowHz）。
+  // 三条都拖到反捅之后才归零：人不是一站起来就好了。
+  ambushDazeEyelids: [[0,0],[.45,1],[1.15,1],[1.9,.34],[2.6,.12],[3.3,0]],
+  ambushDazeIntensity: [[0,1],[3.4,1],[5.2,.62],[7,.44],[12,.3],[16,.14],[18.5,0]],
+  ambushDazeFocus: [[0,1],[3.2,1],[4.4,.74],[5.6,.42],[7,.3],[11,.22],[15,.1],[18.5,0]],
+  ambushDazeHearing: [[0,0],[.2,1],[3.5,1],[6,.68],[9,.44],[14,.22],[18.5,0]],
+  ambushDazeLowHz: 520,
+  // 还控制权之后恍惚不是一刀切掉的：剩下的量在这么久里线性收干净。
+  ambushDazeFadeS: 1.2,
   // 演这一拍的人身上挂的「空射界」：InFireSector 对任何候选都返回 false，
   // 所以他们能走位、能演，但一枪都不开。挣脱之后这条就摘掉。
   ambushSilentSector: Object.freeze({ minX: 0, maxX: 0, minZ: 0, maxZ: 0, selfDefenseM: 0 }),
@@ -324,10 +376,10 @@ export const MISSION_TUNING = Object.freeze({
   // 挣脱之后四个人的守点半径（以 A.melee 为心，正好罩住整间屋）。
   ambushRoomHoldRadiusM: 8,
   ambushBreakHintS: 4,
-  // 挣脱之后四个人不是同一瞬间一起扑上来：顶住玩家那个就在眼前（0），
+  // 挣脱之后剩下三个人不是同一瞬间一起扑上来：
   // 刚从第二个抬担架的身上把刺刀拔出来的那个晚 ambushReleaseDelayS，
   // 东南角那个还要绕过货箱堆（ambushFlankReleaseS），捅老周的那个等自己那一刀落完。
-  // 这是这一拍能不能打的关键：实拍里三个人同时压上来，70 血的顺子在班里人赶到之前必死。
+  // 这是这一拍能不能打的关键：实拍里三个人同时压上来，顺子在班里人赶到之前必死。
   ambushReleaseDelayS: 4.5,
   ambushFlankReleaseS: 7,
   squadWatchStages: ["Courtyard","Transfer","Reception","FinalDefense"],
@@ -429,6 +481,32 @@ export const MISSION_PEOPLE_TUNING=Object.freeze({aftermathTiers:Object.freeze([
   Object.freeze({cellM:.05,enterM:70,exitM:80}),
   Object.freeze({cellM:.14}),
 ]),aftermathRefreshM:.35,aftermathRefreshDot:.00012,closeAnimationM:8,nearAnimationM:45,farAnimationM:90,nearAnimationS:1/20,idleAnimationS:1/10,midAnimationS:1/15,farAnimationS:1/8,walkThresholdMps:.08,gaitSpeedMps:3.6,carrySourceMps:1.4,loadSinkM:.08,loadLeanRad:.045,breathRate:1.7,watchYawRad:.18});
+
+// 老周身上的血（用户 2026-09-16：「应该是伤痕累累，血迹斑斑」）。担架上的两条画法共用这一张表：
+// 带骨架的伤员走 CharacterWounds.Add（沿世界竖直向下投到外层表面），实例化的烘焙姿势直接在烘焙空间摆球。
+// 他躺平、脸朝天，所以「正面」就是世界 +Y：
+//   from/to/t  锚点 = 两根语义骨（boneRoles 的键）之间的插值；to 为空就是 from 本身
+//   liftM      从骨轴往正面抬多少米（烘焙路径的球心就在这里；骨架路径只当投射起点，落点由射线定）
+//   part       CharacterWounds 的区域过滤（torso / head / arm / leg），挡在上面的手不会抢走肚子上的血
+//              脸上不放：低模脸上一团深色读出来是胡子/脏块，不是伤口（2026-09-16 实拍）
+//   radiusM    渗开的半径；ageS 是开局时已经淌了多久（BLOOD_WOUND.drySeconds=48：几十秒偏湿亮，几百秒干成褐黑）
+//   stabbed    true 的几处只在屋内伏击那一刀（litter.stabbed）之后才有；骨架版从挨刀那一刻起算年龄（会渗开、慢慢变干），
+//              ageS 只给烘焙版用（它不走时间，挨刀后、牺牲后看到的都是半干的）
+// 原本是腿伤（Data_FirstLevelMissionDialogue 的 zhou 人设），裤腿泡透、顺小腿往下淌；
+// 其余是一路上抬过来的擦伤和别人的血。一个网格 BLOOD_WOUND.slots(12) 个槽，这里 11 处。
+export const ZHOU_WOUNDS=Object.freeze([
+  Object.freeze({id:"thighR",from:"thighR",to:"calfR",t:.45,liftM:.07,part:"leg",radiusM:.19,ageS:24}),
+  Object.freeze({id:"shinR",from:"calfR",to:"footR",t:.3,liftM:.05,part:"leg",radiusM:.11,ageS:70}),
+  Object.freeze({id:"kneeL",from:"thighL",to:"calfL",t:.92,liftM:.06,part:"leg",radiusM:.075,ageS:220}),
+  Object.freeze({id:"forearmR",from:"forearmR",to:"handR",t:.55,liftM:.04,part:"arm",radiusM:.085,ageS:140}),
+  Object.freeze({id:"upperArmL",from:"upperArmL",to:"forearmL",t:.45,liftM:.05,part:"arm",radiusM:.07,ageS:420}),
+  Object.freeze({id:"chestL",from:"chest",to:"upperArmL",t:.55,liftM:.1,part:"torso",radiusM:.1,ageS:300}),
+  Object.freeze({id:"ribsR",from:"chest",to:"upperArmR",t:.3,liftM:.1,part:"torso",radiusM:.065,ageS:160}),
+  Object.freeze({id:"collar",from:"chest",to:"neck",t:.75,liftM:.08,part:"torso",radiusM:.06,ageS:260}),
+  Object.freeze({id:"belly",from:"pelvis",to:"chest",t:.5,liftM:.12,part:"torso",radiusM:.2,ageS:36,stabbed:true}),
+  Object.freeze({id:"handL",from:"handL",to:null,t:0,liftM:.03,part:"arm",radiusM:.07,ageS:36,stabbed:true}),
+  Object.freeze({id:"handR",from:"handR",to:null,t:0,liftM:.03,part:"arm",radiusM:.07,ageS:36,stabbed:true}),
+]);
 
 // User 2026-09-14: authored soft return warning, with room for combat detours.
 // Values are local design choices, not claimed COD engine constants.

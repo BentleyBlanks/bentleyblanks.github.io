@@ -1248,6 +1248,9 @@ export class Actor {
 
     this.factory = factory;
     this.bayonetFixed = options.bayonetFixed === true;
+    // 近景特写专用：这一个人的手持武器按 high 档建（刺刀走 TZM 模型，不走方块刀片）。
+    // 整场画质不动，只有被镜头怼到脸上的那一个人多这一份几何。见 SetWeaponDetail。
+    this.weaponDetail = options.weaponDetail === true;
     // 分件表的版本号。合批层按它判断要不要重扫这个人的网格 ——
     // 换枪、掏手榴弹、挂日军 GLB 皮肤都会在原地增删网格。
     this.partsRevision = 0;
@@ -1865,7 +1868,8 @@ export class Actor {
     this.weaponVariant = weaponId ? this._WeaponVariant(weaponId) : 0;
     this.partsRevision += 1;
     if (!weaponId) { this.weaponTwoHanded = false; return this; }
-    const built = this.factory.WeaponGeometry(weaponId, this.weaponVariant, { includeBayonet: this.bayonetFixed });
+    const built = this.factory.WeaponGeometry(weaponId, this.weaponVariant,
+      { includeBayonet: this.bayonetFixed, detail: this.weaponDetail });
     const group = new THREE.Group();
     for (const [key, geometry] of built.geometries) {
       const mesh = new THREE.Mesh(geometry, this.materials[key] || this.materials.steel);
@@ -1883,6 +1887,41 @@ export class Actor {
     this.weaponBolt.copy(built.bolt);
     this.weaponTwoHanded = built.twoHanded;
     return this;
+  }
+
+  /**
+   * 近景特写档：这一个人的手持武器按 high 档建（刺刀走 BAYONET_MESH_BY_WEAPON 的 TZM，
+   * 不走那根 16×24 mm 的方块刀片）。整场画质一个字不动 —— 只有被镜头怼到脸上的那一个人
+   * （屋内伏击里压住玩家的那个）多这一份几何，演完再还回去。
+   *
+   * 为什么不是「把整场切到 high」：换画质要重建全部人物与武器缓存，而且帧预算是按
+   * 当前档位定的。这里换的是**一把枪的缓存键**，多出来的只有那把刺刀的三角形，
+   * 材质桶与 high 档共用（不新增采样器，见 Script_SamplerBudgetTest）。
+   *
+   * @returns {boolean} 真的改了才 true（幂等：同一个值再调一次不重建几何）
+   */
+  SetWeaponDetail(on) {
+    const next = on === true;
+    if (this.weaponDetail === next) return false;
+    this.weaponDetail = next;
+    if (this.weaponId) this.SetWeapon(this.weaponId);
+    return true;
+  }
+
+  /**
+   * 手持武器在世界里的握持点（模型规范系的原点就是右手握点，见 _ModelWeaponGeometry）。
+   * 剧本近景要把提示环钉在**那把枪**上而不是胸口上；没枪、枪被藏起来（抬担架 / 断肢）
+   * 或者还没挂到骨骼挂点上时返回 null，调用方自己退回别的锚点。
+   *
+   * @param {THREE.Vector3} [target] 复用的向量（每帧调，别在这里 new）
+   * @returns {THREE.Vector3|null}
+   */
+  WeaponWorldPoint(target = new THREE.Vector3()) {
+    const group = this.weaponGroup;
+    if (!group || !group.visible || !group.parent) return null;
+    group.updateWorldMatrix(true, false);
+    target.setFromMatrixPosition(group.matrixWorld);
+    return Number.isFinite(target.x) && Number.isFinite(target.y) ? target : null;
   }
 
   /**
@@ -2144,8 +2183,10 @@ export class Actor {
       // 否则握姿常量会把整支步枪钉在担架杆的位置上。旗一清就还原。
       // 枪交给断肢层的那一段时间里这一条要让开：显隐归 GoreSystem 管
       // （肢块回收时枪跟着消失，ReleaseSoldier 时才还原成 true）。
+      // hideWeapon 是演出层的同一条闸：某一段烘焙动作里枪被别人夺走了（第一关屋内伏击的
+      // PressureStabbed），手一空这两个握点就会把整支枪架在肚子上插穿尸体。
       if (this.weaponGroup && !this.goreWeaponHold) {
-        this.weaponGroup.visible = !(s.carryRole || (s.woundedWalk || 0) > 0.5);
+        this.weaponGroup.visible = !(s.carryRole || s.hideWeapon || (s.woundedWalk || 0) > 0.5);
       }
     }
     const weapon = this.weaponData;
@@ -3685,6 +3726,9 @@ export class ActorFactory {
     }
     const actor = pool.splice(index, 1)[0];
     actor.bayonetFixed = options.bayonetFixed === true;
+    // 特写档不许跟着池子复用出去：上一场演完的那个人还留着它，下一个从池里出来的
+    // 普通兵就白背一份近景几何（而且他自己的 SetWeaponDetail(true) 会被当成幂等跳过）。
+    actor.weaponDetail = options.weaponDetail === true;
     actor.SetWeapon(options.weapon === undefined ? actor.spec.defaultWeapon : options.weapon);
     actor.pooled = true;
     return actor;
@@ -3819,12 +3863,12 @@ export class ActorFactory {
    * 返回的形状两条路完全一致：{ geometries, muzzle, gripFront, bolt, twoHanded }，
    * 所以 Actor.SetWeapon 一行都不用改。
    */
-  WeaponGeometry(weaponId, variant = 0, { includeBayonet = false } = {}) {
-    const key = `${weaponId}|${variant}|${this.quality}|${includeBayonet ? "bayonet" : "bare"}`;
+  WeaponGeometry(weaponId, variant = 0, { includeBayonet = false, detail = false } = {}) {
+    const key = `${weaponId}|${variant}|${this.quality}|${includeBayonet ? "bayonet" : "bare"}${detail ? "|detail" : ""}`;
     let built = this.weaponCache.get(key);
     if (!built) {
-      built = this._ModelWeaponGeometry(weaponId, variant, includeBayonet)
-        || BuildWeaponGeometry(weaponId, this.quality, includeBayonet);
+      built = this._ModelWeaponGeometry(weaponId, variant, includeBayonet, detail)
+        || BuildWeaponGeometry(weaponId, detail ? "high" : this.quality, includeBayonet);
       this.weaponCache.set(key, built);
     }
     return built;
@@ -3840,12 +3884,14 @@ export class ActorFactory {
    */
   WeaponSource(weaponId, variant = 0) {
     const built = this.weaponCache.get(`${weaponId}|${variant}|${this.quality}|bare`)
-      || this.weaponCache.get(`${weaponId}|${variant}|${this.quality}|bayonet`);
+      || this.weaponCache.get(`${weaponId}|${variant}|${this.quality}|bayonet`)
+      || this.weaponCache.get(`${weaponId}|${variant}|${this.quality}|bayonet|detail`)
+      || this.weaponCache.get(`${weaponId}|${variant}|${this.quality}|bare|detail`);
     return built ? built.source : null;
   }
 
   /** 从 TZM 模型取一把枪。挂点全部读模型的 muzzle / gripL，不再自己猜枪口在哪。 */
-  _ModelWeaponGeometry(weaponId, variant = 0, includeBayonet = false) {
+  _ModelWeaponGeometry(weaponId, variant = 0, includeBayonet = false, detail = false) {
     const id = WeaponMeshId(weaponId, variant);
     if (!id || !this.meshDocs.has(id)) return null;
     const data = WEAPONS[weaponId];
@@ -3889,7 +3935,8 @@ export class ActorFactory {
     // 刀的 socket 挂点（枪口环中心）对到枪的 muzzle 上，环再往后坐 12 mm。
     if (includeBayonet && data?.bayonet && muzzle) {
       const bayonetId = BAYONET_MESH_BY_WEAPON[weaponId];
-      const bayonetBuilt = this.quality === "high" && bayonetId && this.meshDocs.has(bayonetId)
+      // detail = 这一个人被镜头怼到脸上（剧本近景）：不管全场画质是哪一档，刀都走模型。
+      const bayonetBuilt = (detail || this.quality === "high") && bayonetId && this.meshDocs.has(bayonetId)
         ? this._InstantiateMesh(bayonetId) : null;
       if (bayonetBuilt) {
         const socketNode = bayonetBuilt.nodes.get("socket");

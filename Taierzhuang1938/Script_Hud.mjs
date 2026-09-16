@@ -506,6 +506,28 @@ export class Hud {
     this.el.mqSweet = this.el.meleeQte.querySelector(".mqTimeline b");
     this.el.mqResult = this.el.meleeQte.querySelector(".mqResult");
     this.el.mqAssist = this.el.meleeQte.querySelector(".mqAssist");
+    /**
+     * 剧本提示环（第一关屋内伏击：抓住枪 / 推刀 / 反捅）。
+     *
+     * **整块屏幕只有这一个东西**：这一拍 HUD 全部让位（只剩字幕），玩家躺在地上、
+     * 刀正压在胸口，这时候丢一张四行的进度卡过去，等于把他从这一刻拉回去读仪表。
+     * 所以是一个半透明的环，钉在压上来那把枪上，中间一个键面字：
+     *   press     一次性按键：弧在窗口里漏完，漏完＝刀捅进去
+     *   mash      连按：环随「我方控制」涨，每次有效按键脉冲一下
+     *   finisher  反捅：换一个键面字与颜色，按下去就是那一刀
+     * 常驻 DOM，只改属性与 CSS 变量。
+     */
+    this.el.cinematicPrompt = mk("hudCinematicPrompt");
+    this.el.cinematicPrompt.innerHTML =
+      `<svg viewBox="0 0 100 100" aria-hidden="true">`
+      + `<circle class="cpBase" cx="50" cy="50" r="44"/>`
+      + `<circle class="cpArc" cx="50" cy="50" r="44"/></svg>`
+      + `<span class="cpKey"></span>`;
+    this.el.cpArc = this.el.cinematicPrompt.querySelector(".cpArc");
+    this.el.cpKey = this.el.cinematicPrompt.querySelector(".cpKey");
+    this.cinematicPromptCircumference = 2 * Math.PI * 44;
+    this.el.cpArc.style.strokeDasharray = `${this.cinematicPromptCircumference}`;
+    this.el.cinematicPrompt.setAttribute("aria-hidden", "true");
     this.el.note = mk("hudNote");
     this.el.markers = mk("hudMarkers");
     this.el.missionGuide = mk("hudMissionGuide");
@@ -651,6 +673,45 @@ export class Hud {
   }
 
   MeleeQteState() { return this.meleeQteState ? { ...this.meleeQteState } : null; }
+
+  /**
+   * 剧本拍：HUD 全部让位，只留字幕、提示环与满屏的受伤／血。
+   * 与过场用的 `cinematic` 分开：那一档连字幕层都归过场自己画（.csRoot）。
+   */
+  SetCinematicBeat(on) {
+    this.root.classList.toggle("cinematicBeat", !!on);
+    return this.root.classList.contains("cinematicBeat");
+  }
+
+  /** 剧本提示环。只读脱敏快照：{mode, key, progress, timeT, pulse, x, y}。 */
+  SetCinematicPrompt(view) {
+    const root = this.el.cinematicPrompt;
+    if (!root) return null;
+    if (!view) {
+      root.className = "hudCinematicPrompt";
+      root.setAttribute("aria-hidden", "true");
+      this.cinematicPromptState = null;
+      return null;
+    }
+    const mode = ["press", "mash", "finisher"].includes(view.mode) ? view.mode : "press";
+    const progress = Math.max(0, Math.min(1, view.progress ?? 0));
+    root.className = `hudCinematicPrompt on ${mode}`;
+    root.setAttribute("aria-hidden", "false");
+    root.setAttribute("aria-label", T(`hud.cinematicPrompt.${mode}`, { key: view.key || "" }));
+    if (Number.isFinite(view.x) && Number.isFinite(view.y)) {
+      root.style.left = `${Math.round(view.x)}px`;
+      root.style.top = `${Math.round(view.y)}px`;
+    }
+    const key = String(view.key ?? "");
+    if (this.el.cpKey.textContent !== key) this.el.cpKey.textContent = key;
+    this.el.cpArc.style.strokeDashoffset = `${this.cinematicPromptCircumference * (1 - progress)}`;
+    root.style.setProperty("--cpPulse", String(Math.max(0, Math.min(1, view.pulse ?? 0))));
+    this.cinematicPromptState = { mode, key, progress, timeT: view.timeT ?? 0,
+      x: view.x ?? null, y: view.y ?? null };
+    return this.cinematicPromptState;
+  }
+
+  CinematicPromptState() { return this.cinematicPromptState ? { ...this.cinematicPromptState } : null; }
 
   /** 常驻 HUD 不再展示姓名与队伍；人物身份只在阵亡卡里出现。换枪本身算一次交互。 */
   SetWeaponUiVisible(visible) {

@@ -239,6 +239,14 @@ export function BakeMissionBody(factory,spec,materials){
       pose.Tilt(b.head,0,0,spec.patient?.06:spec.pose%2?.6:-.5);
     }
     actor.root.updateMatrixWorld(true);
+    // spec.wounds (Data_Tuning_FirstLevel.ZHOU_WOUNDS): bone anchors in the settled pose, lifted toward the
+    // patient's upward-facing front; shifted into baked space with the geometry below.
+    const woundCenters=(spec.wounds||[]).map(w=>{
+      const bones=actor.characterRig?.bones,from=bones?.[w.from];if(!from)return null;
+      const at=from.getWorldPosition(new THREE.Vector3()),to=w.to&&bones[w.to];
+      if(to)at.lerp(to.getWorldPosition(new THREE.Vector3()),w.t);
+      at.y+=w.liftM;return at;
+    });
     const parts=[],point=new THREE.Vector3(),bounds=new THREE.Box3();
     // The asset loader keeps a procedural actor when a character download fails.
     // Bake that visible fallback too; a missing optional mesh must not prevent boot.
@@ -267,6 +275,7 @@ export function BakeMissionBody(factory,spec,materials){
     });
     const center=bounds.getCenter(new THREE.Vector3());
     for(const part of parts)part.geometry.translate(-center.x,-bounds.min.y,-center.z);
+    parts.woundCenters=woundCenters.map(p=>p&&p.set(p.x-center.x,p.y-bounds.min.y,p.z-center.z));
     if(!spec.patient){
       const settled=new MissionBodySupport(()=>0).Settle(CreateBodyContactShape(parts),{x:0,z:0,yaw:0,scale:1});
       // Share the settled rest pose across every terrain placement and all LODs.

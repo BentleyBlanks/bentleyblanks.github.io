@@ -50,6 +50,8 @@ export class MeleeCombatDirector {
       lastParry: -99, lastHit: -99, move: 0, target: null, pressureBy: null,
       attack: null, hit: false, parryUsed: false, buffer: null, qteCount: 0,
       qteUntil: -99, recoveryUntil: -99, beatUntil: -99, pushUntil: -99, interruptUntil: -99,
+      // 剧本按住的倒地时长（ScriptedKnockDown 设，普通倒地是 null ＝ 共用 1.7 s）
+      groundHoldS: null,
     });
     return this.fighters.get(entity);
   }
@@ -288,54 +290,79 @@ export class MeleeCombatDirector {
     this.stats.standing++; this.Log("standingQte", player, opponent, { reason }); return true;
   }
   /**
-   * 顶住，但还不给连按。刺刀已经捅进来了，两个人摆成僵持姿势（Bind），
-   * 玩家这会儿既挥不了也换不了手里的家伙，按 F 也不算数 —— 因为 QTE 根本还没开。
+   * 剧本倒地：由任务编排把玩家砸翻在地，并按住 seconds 秒不自己爬起来。
    *
-   * 屋内伏击用它把「被顶住」这一段撑到背景里那几刀落完，再调 BeginScriptedBind
-   * 开真正的连按窗口（docs/Data_FirstLevelRoomAmbush.md）。只摆姿势与朝向，
-   * 不动 qteCount / qteUntil，也不碰 QTE 本体；出口是 BeginScriptedBind 或 EndScriptedHold。
+   * 与 KnockDown 的唯一区别在**入口**：不看操作恢复冷却，也不要求他手里正握着
+   * 白刃武器 —— 砸下来的是对方的枪托（第一关屋内伏击，docs/Data_FirstLevelRoomAmbush.md）。
+   * 倒地 → 地面镜头 → 起身全部走共用状态机；出口是 ScriptedRise 或共用地面 QTE 的结算。
    */
-  HoldScriptedBind(player, opponent, seconds = 0) {
+  ScriptedKnockDown(entity, attacker = null, seconds = 0, reason = "scripted") {
+    if (!Alive(entity) || this.Active) return false;
+    const f = this.Fighter(entity);
+    // 任务在砸下来那一瞬才把刺刀挂上（顶上来的是对方那把枪）。不在这里把缓存的武器
+    // 对齐的话，下一次 Step 会认成「换了武器」，一句 SetState(idle) 就把刚倒下的人
+    // 拽回站姿 —— 症状是掉血了、恍惚起来了，人却还站着（2026-09-16 实拍踩到）。
+    f.weapon = this.Weapon(entity);
+    f.poise = 0; f.pressureBy = attacker; f.lastHit = this.time;
+    f.groundHoldS = Math.max(0, seconds) || null;
+    this.SetState(f, "fall", R.knockdownS, "Fall");
+    this.Log("knockdown", entity, attacker, { reason, scripted: true });
+    return true;
+  }
+  /**
+   * 压住，但还不给连按：他骑上来、刺刀压向胸口（Pressure），玩家还躺着（down）。
+   * 只摆对手的姿势与朝向，不动 qteCount / qteUntil，也不碰 QTE 本体；
+   * 出口是 BeginScriptedGround 或 EndScriptedGround。
+   */
+  HoldScriptedGround(player, opponent, seconds = 0) {
     if (!Alive(player) || !Alive(opponent) || this.Active) return false;
-    const pf = this.Fighter(player), of = this.Fighter(opponent);
+    const of = this.Fighter(opponent);
     opponent.yaw = Math.atan2(opponent.position.x - player.position.x, opponent.position.z - player.position.z);
-    this.SetState(pf, "qte", seconds, "Bind");
-    this.SetState(of, "qte", seconds, "Bind");
+    this.SetState(of, "qte", seconds, "Pressure");
     this.Log("scriptedHold", player, opponent, { seconds });
     return true;
   }
   /**
-   * 收掉上面那一段顶住。QTE 已经接管（或还开着）时什么都不做 —— 那时候出口归它。
-   * "qte" 这个状态不会自己超时（StepFighter 直接 return），所以没开成 QTE 的那几条
-   * 旁路必须显式走这里，否则两个人会一直保持顶住的姿势。
+   * 剧本地面僵持（推刀）：由任务编排强制开一次倒地 QTE。
+   *
+   * 与 BeginGround 的唯一区别在**入口**：不查距离与视线、不看 qteCount / qteUntil，
+   * 也不要求玩家手里正握着白刃武器 —— 压上来的是对方的刺刀。
+   * 窗口、力度、连按进度与成败结算仍然走共用规则，成功不自动杀敌
+   *（这一拍的杀招是赢了之后玩家自己按下去的那一下反捅）。
    */
-  EndScriptedHold(player, opponent = null) {
-    if (this.Active) return false;
-    const pf = this.Fighter(player), of = opponent ? this.Fighter(opponent) : null;
-    if (pf?.state === "qte") this.SetState(pf, "idle", 0, "Guard");
-    if (of?.state === "qte") this.SetState(of, "idle");
+  BeginScriptedGround(player, opponent, { windowS = null, strength = 1, reason = "scripted" } = {}) {
+    if (!Alive(player) || !Alive(opponent) || this.Active) return false;
+    const pf = this.Fighter(player), of = this.Fighter(opponent);
+    opponent.yaw = Math.atan2(opponent.position.x - player.position.x, opponent.position.z - player.position.z);
+    of.qteCount = 0; pf.qteUntil = -99;
+    if (!this.qte.Begin("ground", opponent, { stamina: pf.stamina / 100, reason, strength, windowS })) return false;
+    const seconds = this.qte.active.windowS;
+    this.SetState(pf, "qte", seconds, "Ground");
+    this.SetState(of, "qte", seconds, "Pressure");
+    of.qteCount++; pf.qteUntil = this.time + Q.cooldownS;
+    this.stats.ground++; this.Log("scriptedGroundQte", player, opponent, { reason });
     return true;
   }
   /**
-   * 剧本僵持：由任务编排强制开一次站立 QTE。
-   *
-   * 与 BeginBind 的唯一区别在**入口**：不查武器接触几何、不查 bindReachM、不看
-   * qteCount / qteUntil，也不要求玩家手里正握着白刃武器 —— 顶上来的是对方的刺刀，
-   * 任务负责保证这一刻确实贴上了（第一关屋内伏击，docs/Data_FirstLevelRoomAmbush.md）。
-   * 窗口、力度、连按进度与成败结算仍然走共用规则，成功不自动杀敌。
+   * 收掉上面那一段压住。QTE 已经接管（或还开着）时什么都不做 —— 那时候出口归它。
+   * "qte" 这个状态不会自己超时（StepFighter 直接 return），所以没开成 QTE 的那几条
+   * 旁路（压他的人被打死、控制锁兜底超时、检查点重试）必须显式走这里。
    */
-  BeginScriptedBind(player, opponent, { windowS = null, strength = 1, reason = "scripted", label = null } = {}) {
-    if (!Alive(player) || !Alive(opponent) || this.Active) return false;
-    const pf = this.Fighter(player), of = this.Fighter(opponent);
-    // 正面顶住：两个人先互相转正，不然 Pose 的 focusYaw 会把镜头带到背后去。
-    opponent.yaw = Math.atan2(opponent.position.x - player.position.x, opponent.position.z - player.position.z);
-    of.qteCount = 0; pf.qteUntil = -99;
-    if (!this.qte.Begin("standing", opponent, { stamina: pf.stamina / 100, reason, strength, windowS, label })) return false;
-    const seconds = this.qte.active.windowS;
-    this.SetState(pf, "qte", seconds, "Bind");
-    this.SetState(of, "qte", seconds, "Bind");
-    of.qteCount++; pf.qteUntil = this.time + Q.cooldownS;
-    this.stats.standing++; this.Log("scriptedQte", player, opponent, { reason });
+  EndScriptedGround(player, opponent = null) {
+    if (this.Active) return false;
+    const of = opponent ? this.Fighter(opponent) : null;
+    if (of?.state === "qte") this.SetState(of, "idle");
+    return true;
+  }
+  /** 剧本起身：把剧本按住的倒地收掉，走共用起身（riseS + 控制恢复窗口）。 */
+  ScriptedRise(entity) {
+    const f = this.Fighter(entity);
+    if (!f || this.Active) return false;
+    f.groundHoldS = null;
+    if (!["fall", "down", "qte"].includes(f.state)) return false;
+    this.SetState(f, "rise", R.riseS, "Rise");
+    f.poise = Q.recoveryPoise;
+    if (entity === this.Player()) f.recoveryUntil = this.time + R.riseS + Q.controlRecoveryS;
     return true;
   }
   /**
@@ -631,9 +658,11 @@ export class MeleeCombatDirector {
       }
     }
     if (f.state === "fall" && f.t >= f.duration) {
-      this.SetState(f, "down", 1.7, "Ground"); return;
+      // 剧本按住的倒地（ScriptedKnockDown）用它自己的时长；普通倒地仍是 1.7 s。
+      this.SetState(f, "down", f.groundHoldS ?? 1.7, "Ground"); return;
     }
     if (f.state === "down" && f.t >= f.duration) {
+      f.groundHoldS = null;
       this.SetState(f, "rise", R.riseS, "Rise");
       f.poise = e === this.Player() ? Q.recoveryPoise : 50;
       if (e === this.Player()) f.recoveryUntil = this.time + R.riseS + Q.controlRecoveryS;
@@ -802,7 +831,7 @@ export class MeleeCombatDirector {
   State() { return { time: this.time, active: this.qte.View(), stats: { ...this.stats }, player: this.Pose(this.Fighter(this.Player())), events: this.events.slice(-14) }; }
   Cancel(reason = "reset") {
     this.qte.Cancel(); this.held.clear();
-    for (const f of this.fighters.values()) { this.SetState(f, "idle"); f.buffer=null;f.entity.meleeCombat = null; }
+    for (const f of this.fighters.values()) { this.SetState(f, "idle"); f.buffer=null;f.groundHoldS=null;f.entity.meleeCombat = null; }
     this.Log("cancel", null, null, { reason });
   }
   ReleasePlayer() { this.held.clear(); const f = this.Fighter(this.Player()); if(f)f.buffer=null;if (f && !this.Active) this.SetState(f, "idle"); }

@@ -45,7 +45,9 @@ export class FirstLevelMissionView {
       ["muleBody", new THREE.BoxGeometry(.62,.72,1.5), 0x6c6457, 7],
       ["muleHead", new THREE.BoxGeometry(.25,.56,.44), 0x746c5e, 7],
       ["spoke", new THREE.BoxGeometry(.12,.80,.07), 0x8b816d, 112],
-      ["bed", CreateP012StretcherGeometry(), 0xd1d0be, 20],
+      // 担架帆布：0xd1d0be 在门口那片天光下会被顶成一块发光的白板，躺在上面的人整个
+      // 读成一团黑影（2026-09-16 屋内伏击出图实拍）。压到脏帆布的亮度，十副担架同一份材质。
+      ["bed", CreateP012StretcherGeometry(), 0xb6ae99, 20],
       ["patient", new THREE.BoxGeometry(0.49, 0.19, 1.55), 0xd9d7cb, 26],
       ["medical", new THREE.BoxGeometry(0.24, 0.2, 0.12), 0xe1e2d5, 32],
       ["cart", new THREE.BoxGeometry(3, 0.38, 5.8), 0x8a7b69, 7],
@@ -282,7 +284,10 @@ export class FirstLevelMissionView {
       if (litter.zhou) {
         this.zhouRoot.visible = true;
         this.zhouRoot.position.set(litter.x, ground + height, litter.z);
-        this.zhouRoot.rotation.set(litter.state === "fallen" ? 0.45 : 0, yaw, 0);
+        // 落地那一下只歪一点点。原来是 0.45 rad（26°）：担架成了一道白色的斜坡，
+        // 而躺在上面的人（实例化的也好、带骨架的老周也好）是平的 —— 人浮在坡面上方，
+        // 从地板镜头看过去整副担架读不出「上面躺着个人」（2026-09-16 屋内伏击出图实拍）。
+        this.zhouRoot.rotation.set(litter.state === "fallen" ? 0.1 : 0, yaw, 0);
         this.zhouPatient.material.color.setHex(litter.health < 25 ? 0xbda5a0 : 0xd9d7cb);
       } else {
         this.Instance("bed", litter.x, ground + height, litter.z, yaw);
@@ -291,7 +296,7 @@ export class FirstLevelMissionView {
       // 没有动作库、不是他、或者他已经断气，都退回实例化的烘焙姿势 ——
       // 死人不能继续喘（第 17 阶段的告别戏用的就是那条既有姿势）。
       if(!(litter.health>0&&this.people.RiggedPatient(litter.id,litter.x,ground,litter.z,yaw,ground+height)))
-        this.people.Patient(litter.id,litter.x,ground+height+.07,litter.z,yaw,time);
+        this.people.Patient(litter.id,litter.x,ground+height+.07,litter.z,yaw,time,litter.zhou?{stabbed:!!litter.stabbed}:null);
       const SetGrip=(side,end)=>new THREE.Vector3(litter.x+Math.cos(yaw)*side*.29-Math.sin(yaw)*end,
         ground+height+.12,litter.z-Math.sin(yaw)*side*.29-Math.cos(yaw)*end);
       if (!litter.loaded && litter.state !== "placed")

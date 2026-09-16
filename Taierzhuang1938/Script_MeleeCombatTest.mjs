@@ -9,6 +9,7 @@ const Make = (weapon='Dadao', distance=1.4) => {
   return {p,e,c};
 };
 const Step = (c, seconds) => { for(let t=0;t<seconds-1e-8;t+=1/180) c.Update(Math.min(1/180,seconds-t)); };
+const StepUntil = (c, Done, limit=6) => { for(let t=0;t<limit&&!Done();t+=1/180) c.Update(1/180); };
 let count=0;const failures=[];
 const Test = (name, body) => {try{body();count++;console.log('PASS',name);}catch(error){failures.push({name,error:String(error)});console.error('FAIL',name,String(error));}};
 Test('scenario coverage includes 1/2/3 enemies and both weapon special fights',()=>{
@@ -260,33 +261,63 @@ Test('ground QTE failure and escape preserve get-up and restart the global coold
     c.SetState(c.Fighter(p),'down');assert(!c.BeginGround(other),'second attacker shares the post-QTE cooldown');
   }
 });
-// 剧本僵持的两段入口（第一关屋内伏击：先顶住、再给连按窗口）。
-// 顶住那一段 F 不算数，也不许把玩家永远钉在僵持姿势里。
-Test('scripted hold pins without a QTE, then the scripted bind opens the mash window',()=>{
+// 剧本倒地与剧本地面僵持（第一关屋内伏击：枪托砸倒 → 压刺刀 → 推刀 → 反捅）。
+// 入口放宽了几何与武器要求，机制仍然是共用那一套；压住那一段 F 不算数，
+// 也不许把玩家永远钉在地上。
+Test('scripted knockdown pins the player on the floor for as long as the beat asks',()=>{
+  // 手里是拉栓步枪（没有白刃武器）：共用 KnockDown 会拒绝。
+  const bare=Make('Bayonet',1);bare.p.meleeWeapon=null;
+  assert(!bare.c.KnockDown(bare.p,bare.e),'the ordinary knockdown still needs a melee weapon in hand');
+  // 任务在砸下来之前把刺刀挂上（顶上来的是对方那把枪），随后走剧本入口。
   const {p,e,c}=Make('Bayonet',1);
-  assert(c.HoldScriptedBind(p,e,2.4));
-  assert(!c.Active,'the hold is not a QTE: nothing to mash yet');
-  assert.equal(c.Fighter(p).state,'qte');assert.equal(c.Fighter(p).clip,'Bind');
-  assert.equal(c.Fighter(e).clip,'Bind');
-  assert(!c.AttackDown(),'a pinned player cannot swing');
-  assert(!c.CanChangeWeapon(),'nor change weapons while he is held');
-  Step(c,3);assert.equal(c.Fighter(p).state,'qte','the hold never times out on its own');
-  assert(c.BeginScriptedBind(p,e,{windowS:3.2,strength:.75,reason:'missionAmbush',label:'ambush'}));
-  assert.equal(c.qte.active.windowS,3.2);
-  assert.equal(c.View().label,'被刺刀顶住');
-  c.SetAssist('auto');Step(c,Q.windowS+Q.resolveS+.1);
-  assert(!c.Active);assert.equal(c.Fighter(p).state,'idle','the QTE owns the exit once it starts');
-  assert.equal(e.health,100,'breaking free never kills the man holding him');
+  assert(c.ScriptedKnockDown(p,e,6,'missionAmbush'));
+  Step(c,R.knockdownS+.05);
+  assert.equal(c.Fighter(p).state,'down','he is really on the ground, not just staggered');
+  Step(c,3);
+  assert.equal(c.Fighter(p).state,'down','the scripted hold outlasts the shared 1.7 s get-up');
+  assert(!c.AttackDown(),'a downed player cannot swing');
+  assert(c.ScriptedRise(p));
+  assert.equal(c.Fighter(p).state,'rise');
+  Step(c,R.riseS+.05);
+  assert.equal(c.Fighter(p).state,'idle','he gets up through the shared rise');
 });
-Test('a scripted hold that never becomes a QTE still releases both fighters',()=>{
+Test('scripted pressure holds without a QTE, then the scripted ground bind opens the mash',()=>{
   const {p,e,c}=Make('Bayonet',1);
-  assert(c.HoldScriptedBind(p,e,2.4));
-  assert(c.EndScriptedHold(p,e));
-  assert.equal(c.Fighter(p).state,'idle');assert.equal(c.Fighter(e).state,'idle');
-  assert(c.AttackDown(),'control comes back with the pose');
-  c.HoldScriptedBind(p,e,2.4);c.BeginScriptedBind(p,e,{windowS:3.2});
-  assert(!c.EndScriptedHold(p,e),'an active QTE keeps its own exit');
-  assert.equal(c.Fighter(p).state,'qte');
+  assert(c.ScriptedKnockDown(p,e,9,'missionAmbush'));
+  Step(c,R.knockdownS+.05);
+  assert(c.HoldScriptedGround(p,e,3));
+  assert(!c.Active,'the hold is not a QTE: nothing to mash yet');
+  assert.equal(c.Fighter(e).clip,'Pressure');
+  Step(c,2);
+  assert.equal(c.Fighter(e).state,'qte','the hold never times out on its own');
+  assert.equal(c.Fighter(p).state,'down','the player stays down under the blade');
+  assert(c.BeginScriptedGround(p,e,{windowS:3.6,strength:.75,reason:'missionAmbush'}));
+  assert.equal(c.qte.active.kind,'ground');
+  assert.equal(c.qte.active.windowS,3.6);
+  assert.equal(c.View().label,'倒地抵抗');
+  c.SetAssist('auto');StepUntil(c,()=>!c.Active,6);
+  assert(!c.Active,'auto assist wins the struggle well inside the window');
+  assert.equal(e.health,100,'winning the struggle never kills the man on top of him');
+  assert.equal(c.Fighter(p).state,'rise','the shared ground QTE owns the exit once it starts');
+});
+Test('a scripted pressure hold that never becomes a QTE still releases the attacker',()=>{
+  const {p,e,c}=Make('Bayonet',1);
+  c.ScriptedKnockDown(p,e,9);Step(c,R.knockdownS+.05);
+  assert(c.HoldScriptedGround(p,e,3));
+  assert(c.EndScriptedGround(p,e));
+  assert.equal(c.Fighter(e).state,'idle');
+  c.HoldScriptedGround(p,e,3);c.BeginScriptedGround(p,e,{windowS:3.6});
+  assert(!c.EndScriptedGround(p,e),'an active QTE keeps its own exit');
+  assert.equal(c.Fighter(e).state,'qte');
+});
+Test('losing the scripted ground struggle applies the shared ground failure damage',()=>{
+  const {p,e,c}=Make('Bayonet',1);
+  let damage=0;c.host.Damage=(_t,_a,amount)=>{damage+=amount;};
+  c.ScriptedKnockDown(p,e,9);Step(c,R.knockdownS+.05);
+  assert(c.BeginScriptedGround(p,e,{windowS:3.6}));
+  StepUntil(c,()=>!c.Active,6);
+  assert.equal(damage,Q.groundFailureDamage,'the shared rule, not a beat-local number');
+  assert.equal(c.Fighter(p).state,'rise');
 });
 console.log(`${count} melee rule tests passed`);
 
