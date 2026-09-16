@@ -144,7 +144,7 @@ export class FirstLevelMissionRuntime {
     this.Register();
     this.flow.Start();
     this.voiceReady = this.voice.Load().then(()=>{
-      if (host.stageJump != null) ApplyFirstLevelStageJump(this, host.stageJump);
+      if (host.stageJump != null) ApplyFirstLevelStageJump(this, host.stageJump, { midCutscenes: !!host.stageJumpMidCutscenes });
       this.musicInitializing = false;
       this.UpdateMusic();
       this.SaveCheckpoint();
@@ -3176,8 +3176,10 @@ export class FirstLevelMissionRuntime {
    *
    * 只播一次：事实 `captivesWitnessed` 记在 flow.facts 里，随检查点快照一起存取
    * （FirstLevelMissionFlow.Snapshot/Restore），所以死亡回到本阶段检查点不会重播。
-   * **事实先记再播**：宿主那边回 null 的三种情形（没有过场系统、已经在播一场、
-   * 正在换关）都是正常状态，不许因此每帧重试，也不许报错。
+   * **事实先记再播**：宿主那边回 null 的情形（没有过场系统、已经在播一场）都是
+   * 正常状态，不许因此每帧重试，也不许报错。唯一例外是**正在换关**（LevelLoading）：
+   * 从菜单跳到 04 时人一落地就在圈里，EnterLevel 收尾前的那几帧就会走到这里 ——
+   * 这时先不记，等建完再播，否则事实记上了、过场却被宿主拒掉，整段就没了。
    *
    * 播放期间世界整个停摆：装配层的 Frame() 在 `cutscene.Playing` 时只推过场与画面，
    * 玩法（玩家、AI、战车、任务运行时的 Update）一律不跑 —— 所以玩家不会在看戏的
@@ -3190,7 +3192,7 @@ export class FirstLevelMissionRuntime {
    */
   UpdateCaptivesCutscene() {
     if (this.Has("captivesWitnessed") || this.controls) return;
-    if (!this.Near(GUN_SEAT, R.captivesCutsceneRadiusM)) return;
+    if (!this.Near(GUN_SEAT, R.captivesCutsceneRadiusM) || this.LevelLoading?.()) return;
     this.Record("captivesWitnessed", { x: this.player.position.x, z: this.player.position.z });
     const pending = this.PlayMidCutscene?.(CAPTIVES_CUTSCENE_ID);
     if (!pending || typeof pending.then !== "function") return;

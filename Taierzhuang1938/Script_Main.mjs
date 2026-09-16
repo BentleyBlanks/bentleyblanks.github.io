@@ -2541,7 +2541,7 @@ async function Boot() {
       P012: () => missionRuntime?.State() || p012Flow?.State() || null,
       FirstLevelMission: () => missionRuntime?.State() || null,
       FirstLevelStages: () => FIRST_LEVEL_STAGES.map(stage => ({...stage,current:missionRuntime?.flow.phase.id===stage.id})),
-      FirstLevelJump: value => JumpFirstLevelStage(value),
+      FirstLevelJump: (value, opts) => JumpFirstLevelStage(value, opts),
       // 性能取证与专项测试直接读运行时对象（敌人表、事实、列队）；不是玩法入口。
       FirstLevelMissionRuntime: () => missionRuntime || null,
       P012Progress: () => p012Debug.State(),
@@ -3033,7 +3033,7 @@ async function Boot() {
       P012NextProgress: () => p012Debug.Next(),
       DebugOptions: () => debugOptions.Get(),
       FirstLevelStages: () => FIRST_LEVEL_STAGES.map(stage => ({...stage,current:missionRuntime?.flow.phase.id===stage.id})),
-      FirstLevelJump: value => JumpFirstLevelStage(value),
+      FirstLevelJump: value => JumpFirstLevelStage(value, { midCutscenes: true }),
       SetDebugOption: (id, enabled) => SetDebugOption(id, enabled),
       CheckpointStatus,
       ContinueCheckpoint,
@@ -3539,7 +3539,7 @@ function ClearRuntime() {
  *                      cutscenes 要不要播过场（出图与自检模式一律不播，保证镜头可复现；
  *                      过场的临时布景有近三百个网格，另在过场检查里验）
  */
-async function EnterLevel(index, { initial = false, cutscenes = !SHOT, stageJump = null } = {}) {
+async function EnterLevel(index, { initial = false, cutscenes = !SHOT, stageJump = null, stageJumpMidCutscenes = false } = {}) {
   state.advancing = true;
   state.phaseIndex = Clamp(index, 0, PHASE_TABLE.length - 1);
   const phase = PHASE_TABLE[state.phaseIndex];
@@ -4033,7 +4033,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT, stageJump
   // 它早就在缓存里了，真没到位的那几帧过场演员照常走 POSE_CLIPS。
   if(phase.whitebox?.fullMission)LoadMachineGunCaptivesAnimation().catch(error=>console.warn("[Main] captives animation",String(error).slice(0,160)));
   missionRuntime = phase.whitebox?.fullMission ? new FirstLevelMissionRuntime({
-    scene,camera,battlefield,physics,player,ai,hud,audio,combat,interact,emplacement,carry,companion,aircraft,vfx,meleeCombat,actorFactory,library,stageJump,viewmodel,
+    scene,camera,battlefield,physics,player,ai,hud,audio,combat,interact,emplacement,carry,companion,aircraft,vfx,meleeCombat,actorFactory,library,stageJump,stageJumpMidCutscenes,viewmodel,
     // 只用来打 story/mission/* 子桶标记；没有它就静默不记（测试夹具不传也照跑）。
     profiler,
     FireVehicleBullet,
@@ -4046,6 +4046,9 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT, stageJump
     // 关中过场：与关首/关末走同一条 RunCutscene（夺控制权、掐输入、Esc 跳过、
     // 播完还回来）。任务层只报「该播了」，不自己当导演。
     PlayMidCutscene:id=>PlayMidCutscene(id),
+    // 换关还没收尾（EnterLevel 里 await 着的那几帧照样在跑 Update）时 PlayMidCutscene 必回 null；
+    // 任务层据此先不记「看过」，等建完再触发。
+    LevelLoading:()=>state.advancing,
     Complete:()=>{Progress.MarkCleared(FIRST_LEVEL_P012_WHITEBOX_LEVEL_ID,0);ShowPauseMenu();menu.OpenSandboxComplete();},
     MissionFailure:castId=>{ShowPauseMenu();menu.OpenSandboxFailure(false,{castId,restartOnly:true});},
   }) : null;
@@ -6102,7 +6105,7 @@ function FinishEditorSession() {
  * 相同时走 EnterLevel 的 initial 分支 —— 那一支只重置关卡状态（剧本、兵、出生点），
  * 不碰几何。
  */
-async function StartLevel(index, { cutscenes = false, stageJump = null } = {}) {
+async function StartLevel(index, { cutscenes = false, stageJump = null, stageJumpMidCutscenes = false } = {}) {
   if (!menu || state.advancing) return state.phaseIndex;
   const target = Clamp(index, 0, PHASE_TABLE.length - 1);
   CloseMenu();
@@ -6115,7 +6118,7 @@ async function StartLevel(index, { cutscenes = false, stageJump = null } = {}) {
   hud.HideEpilogue();
   hud.HideDeathCard();
   const sameSlice = state.builtPhase === target;
-  await EnterLevel(target, { initial: sameSlice && stageJump == null, cutscenes, stageJump });
+  await EnterLevel(target, { initial: sameSlice && stageJump == null, cutscenes, stageJump, stageJumpMidCutscenes });
   // 序章播完发现后面全是暂时废弃场景时，EnterLevel 已经把主菜单重新打开
   //（EndOfficialCampaign）——这时不许再 StartRun，否则菜单开着、玩法却在底下跑。
   if (state.menu) return target;
@@ -6123,13 +6126,17 @@ async function StartLevel(index, { cutscenes = false, stageJump = null } = {}) {
   return target;
 }
 
-async function JumpFirstLevelStage(value) {
+/**
+ * 第一关阶段跳转。`midCutscenes`：落点那一段的关中过场照播（菜单里的「阶段跳转」传 true ——
+ * 人跳到 04 就是冲着那一段去的）；测试夹具走 Debug.FirstLevelJump，默认跳过，免得被导演扣住。
+ */
+async function JumpFirstLevelStage(value, { midCutscenes = false } = {}) {
   const stage = ResolveFirstLevelStage(value);
   if (state.advancing) throw new Error("Level loading is already in progress");
   const index = PHASE_TABLE.findIndex(phase => phase.whitebox?.fullMission);
   if (index < 0) return {navigating:true,phaseNumber:stage.number,phaseId:stage.id,
     url:GoToSandbox("firstLevelP012Whitebox",{stage:stage.id})};
-  await StartLevel(index, {cutscenes:false,stageJump:stage.id});
+  await StartLevel(index, {cutscenes:false,stageJump:stage.id,stageJumpMidCutscenes:midCutscenes});
   return missionRuntime.State();
 }
 

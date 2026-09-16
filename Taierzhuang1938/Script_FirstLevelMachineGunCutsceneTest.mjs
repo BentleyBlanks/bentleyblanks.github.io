@@ -72,9 +72,9 @@ try {
 
   // --- 夹具：摆到 04，人放在圈外 -------------------------------------------
   // 与 Script_FirstLevelMachineGunTest 同一套阶段摆法（那一条是诊断夹具，不冒充
-  // 正常通关）。差别只有一个：**人不放到座位上**，放在枪位正东七米，
+  // 正常通关）。差别只有一个：**人不放到座位上**，放在枪位正东触发圈外三米，
   // 让下面那一段真的用 W 走过去。
-  await page.evaluate(async () => {
+  await page.evaluate(async (radius) => {
     const g = window.Tengxian;
     await g.Debug.FirstLevelJump(3);
     const r = g.Debug.FirstLevelMissionRuntime();
@@ -95,15 +95,15 @@ try {
     for (const [i, a] of r.squad.entries()) { r.PlaceActor(a, OPENING.frontPosts[i]); r.squadRoutes.set(a.id, []); }
     r.flow.index = MISSION_STAGES.findIndex((s) => s.id === "MachineGun");
     r.flow.Enter();
-    // 圈外：枪座正东 7 m，面朝正西（yaw=+π/2 时视线是 −X）。
-    const p = r.Point({ x: 7, z: -127.4 });
+    // 圈外：枪座正东（触发半径 + 3 m），面朝正西（yaw=+π/2 时视线是 −X）。
+    const p = r.Point({ x: radius + 3, z: -127.4 });
     g.player.position.copy(p);
     g.player.body.Teleport(p.x, p.y, p.z);
     g.player.yaw = Math.PI / 2;
     g.player.pitch = 0;
     g.player.stance = "stand";
     g.player.SyncCamera(0);
-  });
+  }, MISSION_TUNING.captivesCutsceneRadiusM);
   await Step(2);
   const before = await Sample("OutsideTrigger");
   assert.equal(before.stage, "MachineGun", "夹具把阶段摆到了 04");
@@ -207,13 +207,13 @@ try {
   await page.screenshot({ path: path.join(out, "Scene_AfterCutscene.png") });
 
   // --- 走出去再走回来：不许重播 --------------------------------------------
-  await page.evaluate(() => {
+  await page.evaluate((radius) => {
     const g = window.Tengxian, r = g.Debug.FirstLevelMissionRuntime();
-    const p = r.Point({ x: 9, z: -127.4 });
+    const p = r.Point({ x: radius + 3, z: -127.4 });
     g.player.position.copy(p);
     g.player.body.Teleport(p.x, p.y, p.z);
     g.player.SyncCamera(0);
-  });
+  }, MISSION_TUNING.captivesCutsceneRadiusM);
   await Step(30);
   await page.evaluate(() => window.Tengxian.Debug.Key("KeyW", true));
   await Step(180);
@@ -267,6 +267,34 @@ try {
   receipts.push({ label: "GunStillUsable", ...firing });
   await Render(4);
   await page.screenshot({ path: path.join(out, "Scene_GunAfterCutscene.png") });
+
+  // --- 菜单「阶段跳转」：跳到 04 要播这一段，跳过 04 算看过 ----------------------
+  // 菜单走 JumpFirstLevelStage(value,{midCutscenes:true})；测试夹具的默认跳转仍然跳过。
+  const JumpState = () => page.evaluate((cutId) => {
+    const g = window.Tengxian, r = g.Debug.FirstLevelMissionRuntime();
+    return { stage: r.flow.stage.id, witnessed: r.Has("captivesWitnessed"),
+      playing: g.Debug.Cutscene().playing, current: g.Debug.Cutscene().current,
+      played: g.Debug.Cutscene().played.filter((entry) => entry.id === cutId).length };
+  }, CUT_ID);
+  await page.evaluate(() => window.Tengxian.Debug.FirstLevelJump(4, { midCutscenes: true }));
+  let menuJump = null;
+  for (let i = 0; i < 60 && !menuJump?.playing; i += 1) { await Step(10); menuJump = await JumpState(); }
+  receipts.push({ label: "MenuJump04", ...menuJump });
+  console.log("MenuJump04", JSON.stringify(menuJump));
+  assert.equal(menuJump.stage, "MachineGun", "菜单跳到了 04");
+  assert.ok(menuJump.playing && menuJump.current === CUT_ID, "菜单跳到 04 就播这一段");
+  await Render(2);
+  await page.screenshot({ path: path.join(out, "Scene_MenuJump04.png") });
+  // 像玩家一样 Esc 跳过，再跳下一段。
+  await page.keyboard.press("Escape");
+  for (let i = 0; i < 60 && (await JumpState()).playing; i += 1) await Step(10);
+  assert.ok(!(await JumpState()).playing, "Esc 跳过之后导演放手");
+  await page.evaluate(() => window.Tengxian.Debug.FirstLevelJump(5, { midCutscenes: true }));
+  await Step(60);
+  const pastJump = await JumpState();
+  receipts.push({ label: "MenuJump05", ...pastJump });
+  console.log("MenuJump05", JSON.stringify(pastJump));
+  assert.ok(pastJump.witnessed && !pastJump.playing, "菜单跳过 04 时算看过、不播");
 
   assert.deepEqual(errors, []);
   console.log("PASS 机枪点位关中过场：正常输入触发、只播一次、期间世界冻结、还权后原流程可达");

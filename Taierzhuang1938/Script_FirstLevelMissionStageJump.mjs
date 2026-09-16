@@ -9,7 +9,7 @@ import { MissionTrainMotion } from "./Data_FirstLevelMissionTrain.mjs";
 
 // Called once on a fresh runtime, after the shared level restart has cleared all
 // combat, controls, destruction and actors. Backward jumps cannot retain future facts.
-export function ApplyFirstLevelStageJump(runtime, value) {
+export function ApplyFirstLevelStageJump(runtime, value, { midCutscenes = false } = {}) {
   const r = runtime, saved = BuildFirstLevelCheckpoint(value), n = saved.phase.number;
   r.debugStart = {number:n,id:saved.phase.id};
   if (n === 1) return;
@@ -19,12 +19,13 @@ export function ApplyFirstLevelStageJump(runtime, value) {
     r.voice.played.add(step.cue); r.voice.finished.add(step.cue);
   }
   r.flow.facts = new Set(saved.facts);
-  // Debug starts never play a mid-level cutscene. Phase 4 begins on the machine-gun
-  // seat, which is the trigger circle of CS_MachineGunCaptives, and a jump puts the
-  // player there instead of walking him in - the same rule as ?phase=N building the
-  // scene without installing the script. Normal play is untouched: walking into the
-  // circle still plays it (Script_FirstLevelMissionRuntime.UpdateCaptivesCutscene).
-  if (saved.index >= MISSION_STAGES.findIndex((step) => step.id === "MachineGun")) {
+  // CS_MachineGunCaptives belongs to phase 4, which begins on the machine-gun seat
+  // inside its trigger circle. A jump from the menu's stage list (midCutscenes) lands
+  // there to see that part, so phase 4 itself still plays it; only jumps past phase 4
+  // count it as seen. Test fixtures (Debug.FirstLevelJump, ?stage=) skip it at phase 4
+  // too, or every jump regression would stop in the director's hands.
+  const machineGun = MISSION_STAGES.findIndex((step) => step.id === "MachineGun");
+  if (midCutscenes ? saved.index > machineGun : saved.index >= machineGun) {
     r.flow.facts.add("captivesWitnessed");
   }
   r.flow.log = [{kind:"debugJump",id:saved.phase.id,number:n,time:0}];

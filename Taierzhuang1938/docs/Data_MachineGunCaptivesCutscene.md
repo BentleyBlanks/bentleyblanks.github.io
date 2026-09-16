@@ -210,20 +210,25 @@ IJA02(1) / IJA03(2)，全部取自 `Data_CharacterSelection` 的选模清单，`
 写在 `Script_FirstLevelMissionRuntime.UpdateCaptivesCutscene()`，由 04 阶段的逐帧块调用。
 
 - **条件**：阶段是 `MachineGun`，且玩家第一次进入机枪座 `GUN_SEAT = (0, -127.4)` 的
-  半径 `MISSION_TUNING.captivesCutsceneRadiusM`（当前 **4 m**）以内。这一条逐帧查、
-  不挂在 `Enter` 上，所以阶段切进来时玩家已经站在圈里（从检查点或调试跳转进来就是
-  这样）也立刻算数。4 m 比机枪交互半径（`EmplacementInteraction.reachM` = 3 m）大一点：
-  玩家还没按 F 就已经看见了，接枪那一下不会被打断。
+  半径 `MISSION_TUNING.captivesCutsceneRadiusM`（当前 **12 m**）以内。这一条逐帧查、
+  不挂在 `Enter` 上，所以阶段切进来时玩家已经站在圈里也立刻算数。
+  原来是 4 m（站到枪位上才算），但 04 的机枪是可选的：拿步枪守前沿的人根本不往枪上走，
+  过场整段没了（2026-09-17 修）。12 m 盖住整条前沿 —— 03 要求走到前沿点 `(0, -124)`
+  9 m 以内，离枪座最远约 12.4 m。
 - **事实名**：`captivesWitnessed`。记在 `flow.facts` 里，随 `FirstLevelMissionFlow`
   的 `Snapshot` / `Restore` 一起存取，`Retry` / `ContinueCheckpoint` 都不清 ——
   死亡回退到本阶段检查点不会重播。
-- **事实先记再播**：宿主 `PlayMidCutscene` 回 `null` 的三种情形（过场系统还没建起来、
-  已经在播一场、正在换关）都是正常状态，记了事实就不会每帧重试，也不报错。
-- **调试跳转不播**：`ApplyFirstLevelStageJump` 跳到 04 或更后面时直接把
-  `captivesWitnessed` 记上。04 的起点就在机枪座上，也就是这一场的触发圈里，而跳转是
-  「把人放过去」不是「走过去」—— 与 `?phase=N` 只建场不装剧本同一口径。正常游玩
-  不受影响：走到枪位照样播。`Script_FirstLevelMissionBrowserTest --campaign` 的
-  `JumpStage` 在没有 `--stage-jumps` 时是空操作，所以那条整关回归走的仍然是正常触发。
+- **事实先记再播**：宿主 `PlayMidCutscene` 回 `null` 的情形（过场系统还没建起来、
+  已经在播一场）都是正常状态，记了事实就不会每帧重试，也不报错。**正在换关除外**：
+  宿主的 `LevelLoading()` 为真时先不记 —— 跳到 04 人一落地就在圈里，`EnterLevel`
+  收尾前那几帧照样跑 Update，先记了事实、过场又被宿主拒掉，整段就静默没了。
+- **阶段跳转**：菜单「调试 → 第一关阶段跳转」走 `JumpFirstLevelStage(value, {midCutscenes:true})`：
+  跳到 04 照播（人跳过去就是冲着这一段），跳到 04 之后才算看过。
+  测试夹具的 `Debug.FirstLevelJump(n)` 与 `?stage=` 默认跳到 04 及之后都直接记上
+  `captivesWitnessed`，否则十八段跳转回归会在第 4 段之后一直卡在导演手里；
+  专项回归要播就传 `Debug.FirstLevelJump(4, { midCutscenes: true })`。
+  `Script_FirstLevelMissionBrowserTest --campaign` 的 `JumpStage` 在没有 `--stage-jumps`
+  时是空操作，所以那条整关回归走的仍然是正常触发。
 - **走宿主口**：`host.PlayMidCutscene(id)`（`Script_Main` 的 `PlayMidCutscene` →
   `RunCutscene`），与关首 / 关末过场同一条路：夺控制权、掐战斗输入、放指针锁、
   收枪、Esc 跳过并以卡片补出字幕、播完还回来。任务层只报「该播了」，不自己当导演。
