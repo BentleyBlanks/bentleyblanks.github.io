@@ -5574,7 +5574,9 @@ function SwitchSlot(slot) {
   if (meleeCombat && !meleeCombat.CanChangeWeapon()) return false;
   if (!player?.Alive || !SlotWeaponId(slot)) return false;
   if (slot === state.activeSlot) return false;
-  if (viewmodel.IsBusy?.()) return false;          // 拉栓/压弹播到一半不许换手
+  // 拉栓/压弹播到一半不许换手 —— 唯一例外是换弹时拔大刀：贴脸的敌人等不到压完弹，
+  // 拔刀就是取消换弹（CancelReload 把没压完的弹退回去）。
+  if (viewmodel.IsBusy?.() && !(slot === "melee" && CancelReload())) return false;
   StashActiveSlot();
   ActivateSlot(slot);
   return true;
@@ -6636,6 +6638,8 @@ function Reload() {
   if (meleeCombat && !meleeCombat.CanChangeWeapon()) return false;
   if (!player.Alive || viewmodel.IsBusy?.()) return false;
   const w = WEAPONS[currentWeapon];
+  // 弹药在按下 R 那一刻就入账了；记下按之前的账，换弹中途拔刀时退回去。
+  state.reloadUndo = { slot: state.activeSlot, ammo: state.ammo, clips: state.clips };
   if (typeof weaponRange !== "undefined" && weaponRange && w?.magazine) {
     state.ammo = w.magazine; state.clips = 999;
     if (state.mags[state.activeSlot]) state.mags[state.activeSlot] = { ammo: state.ammo, clips: state.clips };
@@ -6660,6 +6664,23 @@ function Reload() {
     SyncP012ActiveMagazine(state);
   }
   audio.Play(w.reloadKind === "topMag" ? "magIn" : "stripperLoad", { volume: 0.75 });
+  return true;
+}
+
+/**
+ * 取消正在播的换弹（换弹中拔刀）。没压完就不算装上：弹仓与备弹回到按 R 之前，
+ * 第一关「手动装填」的完成记录也不记。不在换弹里返回 false，调用方照旧挡住。
+ */
+function CancelReload() {
+  if (viewmodel.action?.kind !== "reload") return false;
+  const undo = state.reloadUndo;
+  state.reloadUndo = null;
+  if (undo && undo.slot === state.activeSlot) {
+    state.ammo = undo.ammo; state.clips = undo.clips;
+    if (state.mags[undo.slot]) state.mags[undo.slot] = { ammo: undo.ammo, clips: undo.clips };
+  }
+  if (p012Runtime) { p012Runtime.weaponActionPending = false; p012Runtime.manualReloadPending = false; }
+  viewmodel.action = null;
   return true;
 }
 

@@ -153,6 +153,18 @@ try {
     out.ammoPrompt = D.Prompts().find((p) => p.kind === "pickup") || null;
     D.Key("KeyF", true); T.StepFrames(1); D.Key("KeyF", false); T.StepFrames(4);
     out.afterAmmo = Snap();
+
+    // --- 7) 换弹中按 3 拔刀＝取消换弹：没压完的弹退回去；换别的枪仍然不许 ----------
+    T.StepFrames(90);
+    T.state.ammo = 2; T.state.clips = 3;
+    D.Key("KeyR"); T.StepFrames(20);
+    out.reloadStarted = { action: T.viewmodel.action?.kind || null, ammo: T.state.ammo };
+    D.Key(D.SlotKey("primary")); T.StepFrames(2);
+    out.reloadGunSwitch = Snap();
+    D.Key(D.SlotKey("melee")); T.StepFrames(2);
+    out.reloadCancel = { ...Snap(), action: T.viewmodel.action?.kind || null };
+    D.Key(D.SlotKey("secondary")); T.StepFrames(4);
+    out.reloadCancelBack = Snap();
     return out;
   }, { holdFrames });
 
@@ -209,10 +221,17 @@ try {
   Check("补的是背着的汉阳造：主武器备弹 +3 个桥夹，手里的三八式不变",
     r.afterAmmo.mags.primary.clips === r.primaryMagBefore.clips + 3 && r.afterAmmo.active === "secondary"
       && r.afterAmmo.weapon === "Type38" && r.afterAmmo.ammo === 2, JSON.stringify({ before: r.primaryMagBefore, after: r.afterAmmo }));
+  Check("换弹中按 1 换别的枪仍被挡住（只有拔刀能取消换弹）",
+    r.reloadStarted.action === "reload" && r.reloadGunSwitch.active === "secondary", JSON.stringify({ s: r.reloadStarted, g: r.reloadGunSwitch }));
+  Check("换弹中按 3：立刻端上大刀，换弹动作取消，三八式还是按 R 之前的 2 发 + 3 个桥夹",
+    r.reloadCancel.active === "melee" && r.reloadCancel.viewmodel === "Dadao" && r.reloadCancel.action === null
+      && r.reloadCancel.mags.secondary.ammo === 2 && r.reloadCancel.mags.secondary.clips === 3
+      && r.reloadCancelBack.active === "secondary" && r.reloadCancelBack.ammo === 2,
+    JSON.stringify({ c: r.reloadCancel, back: r.reloadCancelBack }));
   Check("无浏览器错误", errors.length === 0, errors.slice(0, 5).join("\n"));
 } finally {
   await browser.close();
   server.close();
 }
-console.log(failed ? `FAIL  拾枪 ${failed} 条未过` : "ok  拾枪：COD 式主副武器、按住拾取、换下留地、各槽弹仓与刺刀");
+console.log(failed ? `FAIL  拾枪 ${failed} 条未过` : "ok  拾枪：COD 式主副武器、按住拾取、换下留地、各槽弹仓与刺刀、换弹中拔刀取消换弹");
 process.exit(failed ? 1 : 0);
