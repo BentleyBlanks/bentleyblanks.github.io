@@ -30,10 +30,16 @@ export class ShellVisuals {
     this.coreMaterial = new THREE.MeshStandardMaterial({ transparent: true, depthWrite: false,
       color: SHELL_VISUAL.bodyColor, metalness: SHELL_VISUAL.bodyMetalness, roughness: SHELL_VISUAL.bodyRoughness,
     });
+    this.coreMaterial.name = "ShellCore";
+    // One trail material for every shell; the per-shell fade is a vertex attribute.
+    // A per-shell clone was disposed 45 ms after impact, which released the linked
+    // program whenever no other trail was alive, so the next shell recompiled it in
+    // the middle of combat (2026-09-17 probe: every shell on stage 4 minted a new program).
     this.trailMaterial = new THREE.ShaderMaterial({
+      name: "ShellTrail",
       transparent: true, depthWrite: false, side: THREE.DoubleSide, fog: true,
       blending: THREE.NormalBlending,
-      uniforms: { ...THREE.UniformsLib.fog, uOpacity: { value: 1 },
+      uniforms: { ...THREE.UniformsLib.fog,
         uWidth: { value: new THREE.Vector2(SHELL_VISUAL.trailHeadHalfWidthM, SHELL_VISUAL.trailTailHalfWidthM) },
         uColor: { value: new THREE.Color(SHELL_VISUAL.trailColor) },
         uAlpha: { value: SHELL_VISUAL.trailOpacity } },
@@ -41,9 +47,12 @@ export class ShellVisuals {
         #include <fog_pars_vertex>
         uniform vec2 uWidth;
         attribute vec3 tangent;
+        attribute float fade;
         varying vec2 vUv;
+        varying float vFade;
         void main() {
           vUv = uv;
+          vFade = fade;
           vec4 p = modelViewMatrix * vec4(position, 1.0);
           vec3 direction = normalize(mat3(modelViewMatrix) * tangent);
           vec3 side = cross(direction, normalize(-p.xyz));
@@ -56,13 +65,13 @@ export class ShellVisuals {
         }`,
       fragmentShader: `
         #include <fog_pars_fragment>
-        uniform float uOpacity;
         uniform vec3 uColor;
         uniform float uAlpha;
         varying vec2 vUv;
+        varying float vFade;
         void main() {
           float edge = pow(max(0.0, 1.0 - abs(vUv.x * 2.0 - 1.0)), 1.6);
-          float alpha = edge * pow(1.0 - vUv.y, 2.0) * uAlpha * uOpacity;
+          float alpha = edge * pow(1.0 - vUv.y, 2.0) * uAlpha * vFade;
           gl_FragColor = vec4(uColor, alpha);
           #include <tonemapping_fragment>
           #include <colorspace_fragment>
@@ -72,6 +81,13 @@ export class ShellVisuals {
   }
   Create(shell) {
     const root = new THREE.Group(); root.name = `ShellVisual_${shell.id}`;
+    const { core, trail } = this._BuildMeshes();
+    root.add(core, trail); this.scene.add(root);
+    shell.visual = { root, core, trail, span: 0 }; shell.root = root;
+    this.Update(shell);
+    return root;
+  }
+  _BuildMeshes() {
     const core = new THREE.Mesh(this.coreGeometry, this.coreMaterial);
     core.name = "ShellCore";
     core.scale.set(SHELL_VISUAL.bodyRadiusM, SHELL_VISUAL.bodyRadiusM, SHELL_VISUAL.bodyHalfLengthM);
@@ -79,17 +95,37 @@ export class ShellVisuals {
     const geometry = new THREE.BufferGeometry(), uv = [], indices = [];
     geometry.setAttribute("position", new THREE.BufferAttribute(new Float32Array((SEGMENTS + 1) * 6), 3).setUsage(THREE.DynamicDrawUsage));
     geometry.setAttribute("tangent", new THREE.BufferAttribute(new Float32Array((SEGMENTS + 1) * 6), 3).setUsage(THREE.DynamicDrawUsage));
+    geometry.setAttribute("fade", new THREE.BufferAttribute(new Float32Array((SEGMENTS + 1) * 2).fill(1), 1).setUsage(THREE.DynamicDrawUsage));
     for (let i = 0; i <= SEGMENTS; i++) {
       uv.push(0, i / SEGMENTS, 1, i / SEGMENTS);
       if (i < SEGMENTS) { const a = i * 2; indices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
     }
     geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2)); geometry.setIndex(indices);
-    const trail = new THREE.Mesh(geometry, this.trailMaterial.clone());
+    const trail = new THREE.Mesh(geometry, this.trailMaterial);
     trail.name = "ShellTrail"; trail.frustumCulled = false; trail.userData.skipNormalDepth = true;
-    root.add(core, trail); this.scene.add(root);
-    shell.visual = { root, core, trail, span: 0 }; shell.root = root;
-    this.Update(shell);
+    return { core, trail };
+  }
+  /**
+   * Loading-screen proxy (Script_Main.WarmLevel): one body and one short ribbon on
+   * the shared materials, so the first shell of a level does not compile either
+   * program mid-combat (2026-09-17 probe: the first ShellCore link took 839 ms).
+   * Only the ribbon geometry is private; release it with DisposeWarmProxy.
+   */
+  CreateWarmProxy() {
+    const root = new THREE.Group(); root.name = "ShellVisual_Warm";
+    const { core, trail } = this._BuildMeshes();
+    const positions = trail.geometry.attributes.position, tangents = trail.geometry.attributes.tangent;
+    for (let i = 0; i <= SEGMENTS; i++) {
+      for (let side = 0; side < 2; side++) {
+        positions.setXYZ(i * 2 + side, 0, 0, i * 0.1);
+        tangents.setXYZ(i * 2 + side, 0, 0, -1);
+      }
+    }
+    root.add(core, trail);
     return root;
+  }
+  DisposeWarmProxy(root) {
+    root?.traverse((object) => { if (object.name === "ShellTrail") object.geometry.dispose(); });
   }
   Update(shell) {
     const { core, trail } = shell.visual;
@@ -121,12 +157,14 @@ export class ShellVisuals {
   Step(dt) {
     for (let i = this.fading.length - 1; i >= 0; i--) {
       const entry = this.fading[i]; entry.left -= dt;
-      entry.visual.trail.material.uniforms.uOpacity.value = Math.max(0, entry.left / FADE_S);
+      const fade = entry.visual.trail.geometry.attributes.fade;
+      fade.array.fill(Math.max(0, entry.left / FADE_S)); fade.needsUpdate = true;
       if (entry.left <= 0) { this.Remove(entry.visual); this.fading.splice(i, 1); }
     }
   }
   Remove(visual) {
-    this.scene.remove(visual.root); visual.trail.geometry.dispose(); visual.trail.material.dispose();
+    // The trail material is shared: only this shell's ribbon geometry is released.
+    this.scene.remove(visual.root); visual.trail.geometry.dispose();
   }
   Clear(shells) {
     for (const shell of shells) this.Remove(shell.visual);

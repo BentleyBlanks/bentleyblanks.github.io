@@ -101,6 +101,34 @@ try {
       `matrix=${lastRecord.cpuVisits?.matrix}`);
     Check("每帧记了新编译的着色器程序数", typeof lastRecord.newPrograms === "number",
       `newPrograms=${lastRecord.newPrograms}`);
+    // 现编指名：摆一件带独有 define 的材质（必然是新 program），那一帧要写出谁在用它。
+    {
+      const probeMaterial = new THREE.MeshBasicMaterial({ name: "ProfilerProbeMaterial", color: 0xff00ff });
+      probeMaterial.defines = { PROFILER_PROBE: 1 };
+      const probe = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.2), probeMaterial);
+      probe.name = "ProfilerProbeMesh";
+      probe.frustumCulled = false;
+      const holder = new THREE.Group();
+      holder.name = "ProfilerProbeHolder";
+      holder.add(new THREE.Group().add(probe));   // 中间隔一层无名组：主人要跳到带名字的那一层
+      holder.position.copy(T.camera.position).add(T.camera.getWorldDirection(new THREE.Vector3()).multiplyScalar(2));
+      T.scene.add(holder);
+      T.StepFrames(1);
+      const probeRow = T.profiler.history[T.profiler.history.length - 1];
+      const names = probeRow.newProgramNames || [];
+      Check("新编译的程序写出了主人（材质 @ 物体 < 父节点）",
+        names.some((name) => name.includes("ProfilerProbeMaterial") && name.includes("@ ProfilerProbeMesh")
+          && name.includes("< ProfilerProbeHolder")), `newPrograms=${probeRow.newPrograms} ${names.join(" | ")}`);
+      Check("主人条数与新程序数一致", names.length === probeRow.newPrograms,
+        `${names.length} vs ${probeRow.newPrograms}`);
+      T.scene.remove(holder);
+      probe.geometry.dispose();
+      probeMaterial.dispose();
+      T.StepFrames(2);
+      const quietRow = T.profiler.history[T.profiler.history.length - 1];
+      Check("没有新程序的帧不带主人表", quietRow.newProgramNames === null && quietRow.newPrograms === 0,
+        `newPrograms=${quietRow.newPrograms}`);
+    }
     Check("场景节点普查可用", (T.profiler.Census(T.scene)?.total.objects || 0) > 0,
       `objects=${T.profiler.Census(T.scene)?.total.objects}`);
 
@@ -133,6 +161,8 @@ try {
 
     // 显示层：两张表按汇总里实际出现的 key 排，不再有写死的名单。
     const report = await import("./Script_ProfilerReport.mjs");
+    Check("事件栏列出现编的主人", report.EventsLine(summary).includes("ProfilerProbeMaterial"),
+      report.EventsLine(summary));
     const cpuRows = report.CpuRows(summary);
     const gpuRows = report.GpuRows(summary);
     Check("CPU 表排出了子桶行", cpuRows.some((row) => row.key === "ai/act" && row.depth === 1),

@@ -55,7 +55,11 @@
 // GC（这正是「偶尔顿一下」的常见来源）；正增量折算成每帧分配速率，是 GC 压力的
 // 先行指标，并且在每个 B/E 之间单独记一份，分配大户就能指名道姓。
 // PerformanceObserver("longtask") 记录 >50 ms 的主线程占用。
-// renderer.info.programs 的逐帧增量 = 这一帧新编译了几个着色器程序（首见卡顿的来源）。
+// 新编译的着色器程序（首见卡顿的来源）按**对象身份**逐个比对 renderer.info.programs，
+// 不看数组长度的净增：同一帧里一个释放、一个新建，长度不变，净增会把那次编译吞掉。
+// 有新程序的帧再按程序找一遍场景里谁在用它，记成 `newProgramNames`
+// （「材质名（类型）@ 物体 < 带名字的父节点」），录制文件里直接写着是谁在现编。
+// 找主人要走一遍场景树，只在出现新程序的那一帧走（本来就卡了几百毫秒的那一帧）。
 //
 // 不 import three：拿的是 renderer 的裸 WebGL2 上下文与 info 表；要包的
 // Object3D.prototype 由装配层从构造参数传进来。Node 也能 import 本文件
@@ -105,6 +109,19 @@ function Percentiles(values) {
     p95: sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))],
     max: sorted[sorted.length - 1],
   };
+}
+
+/**
+ * 新程序主人的一行字：「材质名（类型）@ 物体 < 最近一个带名字的父节点」。
+ * 物体没名字就写类型；深度材质（customDepthMaterial）也照这个格式，类型会写成 MeshDepthMaterial。
+ */
+function ProgramOwnerLabel(material, object) {
+  const materialText = material.name ? `${material.name}（${material.type}）` : material.type;
+  let text = `${materialText} @ ${object.name || object.type}`;
+  let parent = object.parent;
+  while (parent && !parent.name) parent = parent.parent;
+  if (parent && !parent.isScene) text += ` < ${parent.name}`;
+  return text;
 }
 
 /** 帧间隔能不能进帧率统计：接缝帧（暂停后第一帧）、切后台/批间空档都不算。 */
@@ -163,6 +180,8 @@ export function SummarizeFrames(rows, {
   let longtaskMs = 0;
   let allocKb = 0;
   let newPrograms = 0;
+  // 同一份材质在一段里现编多次（释放了又编）要看得出来，所以按名字计次，不去重成集合。
+  const programNames = new Map();
   let loafCount = 0;
   let loafBlockingMs = 0;
   let loafStyleMs = 0;
@@ -171,6 +190,9 @@ export function SummarizeFrames(rows, {
     longtaskMs += row.longtaskMs || 0;
     allocKb += row.allocKb || 0;
     newPrograms += row.newPrograms || 0;
+    if (row.newProgramNames) {
+      for (const name of row.newProgramNames) programNames.set(name, (programNames.get(name) || 0) + 1);
+    }
     if (row.loaf) {
       loafCount += 1;
       loafBlockingMs += row.loaf.blockingMs;
@@ -205,7 +227,9 @@ export function SummarizeFrames(rows, {
     calls: last ? last.calls : 0,
     triangles: last ? last.triangles : 0,
     events: { gcCount, gcMb, longtaskMs, allocKb, newPrograms, loafCount, loafBlockingMs, loafStyleMs,
-      allocKbPerFrame: rows.length ? allocKb / rows.length : 0 },
+      allocKbPerFrame: rows.length ? allocKb / rows.length : 0,
+      // [{ name, count }]，次数多的在前；旧录制文件没有名字，这里就是空表
+      newProgramNames: [...programNames].sort((a, b) => b[1] - a[1]).map(([name, count]) => ({ name, count })) },
     worst,
     timerAvailable,
     loafAvailable,
@@ -311,6 +335,8 @@ export class FrameProfiler {
     this._ltMs = 0;
     this._lastHeap = 0;
     this._lastPrograms = 0;
+    this._lastProgramTail = null;
+    this._knownPrograms = new Set();
     this._memory = null;
     this._info = renderer ? renderer.info : null;
   }
@@ -336,7 +362,7 @@ export class FrameProfiler {
     // renderer.info 默认每次 render 调用就清零，一帧二十几次 render 只能看到最后
     // 一次的数。剖析期间改成手动：BeginFrame 清一次，帧末读到的就是整帧总量。
     if (this._info) { this._info.autoReset = false; this._info.reset(); }
-    this._lastPrograms = this._info?.programs ? this._info.programs.length : 0;
+    this._RememberPrograms(this._info?.programs || null);
     if (this._post) this._post.profiler = this;
     this._WrapShadow();
     this._WrapMatrix();
@@ -404,6 +430,8 @@ export class FrameProfiler {
     this._lastRaf = 0;
     this._lastHeap = 0;
     this._ltMs = 0;
+    // 暂停期间编出来的程序不记在接缝帧头上：那一帧并没有为它们卡。
+    this._RememberPrograms(this._info?.programs || null);
     this._gap = this.history.length > 0;
     this.revision += 1;
   }
@@ -691,12 +719,9 @@ export class FrameProfiler {
       }
       this._lastHeap = heap;
     }
-    let newPrograms = 0;
-    if (this._info && this._info.programs) {
-      const count = this._info.programs.length;
-      newPrograms = Math.max(0, count - this._lastPrograms);
-      this._lastPrograms = count;
-    }
+    const bornPrograms = this._BornPrograms();
+    const newPrograms = bornPrograms ? bornPrograms.length : 0;
+    const newProgramNames = bornPrograms ? this._ProgramOwners(bornPrograms) : null;
     // 节点访问只记给栈顶那一个桶，所以要往上累一遍才是「这一支一共走了多少节点」。
     RollUpPaths(this.cpuVisits);
     RollUpPaths(this.gpuCpu);
@@ -744,6 +769,7 @@ export class FrameProfiler {
       allocKb,
       longtaskMs: this._ltMs,
       newPrograms,
+      newProgramNames,    // 与 newPrograms 逐个对应的「谁在用它」；没有新程序为 null
       loaf: null,         // LoAF 观察者稍后挂上（不支持的浏览器恒为 null）
       // 逐实例时间轴（帧末一次 slice，B/E 里不分配）
       samples: this._sampleCount ? this._samples.slice(0, this._sampleCount * SAMPLE_STRIDE) : null,
@@ -957,6 +983,77 @@ export class FrameProfiler {
     return this.source
       ? { timerAvailable: this.source.timerAvailable, loafAvailable: this.source.loafAvailable }
       : { timerAvailable: this.timerAvailable, loafAvailable: !!this._loafObserver };
+  }
+
+  // -------------------------------------------------------------------------
+  // 新编译的着色器程序
+  // -------------------------------------------------------------------------
+
+  /** 记下当前这批程序对象（Enable / Resume 时对齐，之后逐帧比身份）。 */
+  _RememberPrograms(programs) {
+    this._knownPrograms.clear();
+    if (programs) for (const program of programs) this._knownPrograms.add(program);
+    this._lastPrograms = programs ? programs.length : 0;
+    this._lastProgramTail = programs && programs.length ? programs[programs.length - 1] : null;
+  }
+
+  /**
+   * 这一帧新出现的程序对象；没有返回 null。
+   * three 新建程序 push 在数组尾、释放时从中间 splice 掉，所以「长度与末尾那个都没变」
+   * 就是没有变化 —— 绝大多数帧只做这两次比较。
+   */
+  _BornPrograms() {
+    const programs = this._info && this._info.programs;
+    if (!programs) return null;
+    const count = programs.length;
+    const tail = count ? programs[count - 1] : null;
+    if (count === this._lastPrograms && tail === this._lastProgramTail) return null;
+    let born = null;
+    for (const program of programs) {
+      if (this._knownPrograms.has(program)) continue;
+      (born || (born = [])).push(program);
+    }
+    this._RememberPrograms(programs);
+    return born;
+  }
+
+  /**
+   * 每个新程序找一个在用它的物体，写成「材质名（类型）@ 物体 < 带名字的父节点」。
+   * 按 renderer.properties 里材质记着的程序表反查；只查 has() 过的材质，不替从没画过的
+   * 材质建属性表。后处理全屏片这类不在场景树里的材质找不到主人，退回程序自己的名字。
+   * 与 Census 同理自己走栈，不借被包了计数的 traverse。
+   */
+  _ProgramOwners(programs) {
+    const properties = this.renderer && this.renderer.properties;
+    const labels = new Map();
+    const scene = this._scene;
+    if (properties && scene) {
+      const want = new Set(programs);
+      const Check = (material, object) => {
+        if (!material) return;
+        const list = Array.isArray(material) ? material : [material];
+        for (const entry of list) {
+          if (!entry || !properties.has(entry)) continue;
+          const owned = properties.get(entry).programs;
+          if (!owned) continue;
+          for (const program of owned.values()) {
+            if (!want.has(program) || labels.has(program)) continue;
+            labels.set(program, ProgramOwnerLabel(entry, object));
+          }
+        }
+      };
+      const stack = [scene];
+      while (stack.length && labels.size < want.size) {
+        const node = stack.pop();
+        Check(node.material, node);
+        Check(node.customDepthMaterial, node);
+        Check(node.customDistanceMaterial, node);
+        const children = node.children;
+        if (children) for (let i = 0; i < children.length; i += 1) stack.push(children[i]);
+      }
+    }
+    return programs.map((program) => labels.get(program)
+      || `${program.name || "(无名)"} @ (不在场景树里)`);
   }
 
   // -------------------------------------------------------------------------

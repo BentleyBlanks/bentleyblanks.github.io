@@ -5584,6 +5584,21 @@ program 都没新建。涨出来的全是**卢沟桥人物 GLB 的材质**：`Jo
 本阵营的枪摆到镜头前、镜头转一圈，仍一个 program 不新建。头一条只能证明「这次没撞上」，
 第二条才证明预热覆盖了全部模型号。
 
+### 18.4 炮弹：每发重编拖尾、第一发现编弹体（2026-09-17）
+
+**取证**：第一关第 4 阶段（`?whitebox=p012&missionStage=4`）逐帧比对 `renderer.info.programs`
+的对象身份。第一发炮弹出现那一帧现编弹体 `ShellCore`（透明 MeshStandardMaterial，本机 839 ms）；
+之后**每一发**都新建一个拖尾 program，缓存键前两位（着色器源码编号）49,50 → 51,52 → 53,54 一路涨。
+
+**机制**：`Script_ShellVisual` 原来给每发炮弹 `trailMaterial.clone()`，落地后淡出 45 ms 就
+`material.dispose()`。场上没有别的拖尾时，这一释放让 program 的引用数归零，three 连同源码缓存
+一起删掉，下一发只能从头编译。炮击、战车主炮、空袭扫射都走 `combat.FireShell`。
+
+**做法**：拖尾材质全场一份，每发的淡出改成顶点属性 `fade`（淡出期间逐帧写，18 个顶点），
+释放时只丢这一发的条带几何；`ShellVisuals.CreateWarmProxy()` 给 `WarmLevel` 第三段的代理组
+摆一件弹体 + 一段拖尾（共用真材质），第一发炮弹不再现编。只覆盖走 `WarmLevel` 的第一关；
+测试场第一发照旧现编一次，之后不再重编。
+
 ---
 
 ## 19. 坑（按被踩频率排序）

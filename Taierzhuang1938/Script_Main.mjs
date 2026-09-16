@@ -4613,6 +4613,10 @@ async function WarmLevel(phase) {
     proxy.name = "ShaderWarm_Level";
     const grenade = CloneGrenadeAsset(combat?.grenadeAsset || null);
     if (grenade) proxy.add(grenade);
+    // 炮弹（弹体 + 拖尾）：第一关的炮击、战车主炮、空袭扫射都走 combat.FireShell，
+    // 两份材质全场共用。没有这一件的话第一发炮弹出现那一帧现编弹体（实测 839 ms）。
+    const shellProxy = combat?.shellVisuals?.CreateWarmProxy?.() || null;
+    if (shellProxy) proxy.add(shellProxy);
     // 人物 GLB 材质的**非蒙皮**变体：背枪 / 担架伤员 / 遗体这类刚体网格复用同一份材质，
     // program 缓存键不同（无 skinning）。实测车厢里第一次出现背枪时一个物理材质 program
     // 链接等了 2.8 s；这里用小盒子把每份材质的刚体变体先逼出来（含投影深度变体）。
@@ -4772,6 +4776,7 @@ async function WarmLevel(phase) {
       Lap("settle");
     } finally {
       scene.remove(proxy);
+      if (shellProxy) combat.shellVisuals.DisposeWarmProxy(shellProxy);
     }
   } finally {
     state.warming = wasWarming; state.menu = wasMenu;
