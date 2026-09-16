@@ -15,7 +15,7 @@ vendor 在 `vendor/rapier/build/rapier.module.mjs`（2.8 MB，wasm 用 base64 �
 | 下载来的 .glb 布景 | 同上，一件一只盒 | `Script_ExternalProps`；见下面「布景也是实物」 |
 | 缸／篮／板凳／条案／晾衣架／梯子／木箱 | 同上 | `Script_LivedInProps`；矮件不进导航图 |
 | 地表 | `GroundHeight(x,z)`；爆炸脏块同时生成 Rapier heightfield | 见下面「地表与爆炸形变」 |
-| 玩家、AI 士兵 | Rapier 运动学角色控制器（胶囊） | 两边同一套解算、同一套尺寸 |
+| 玩家、AI 士兵 | Rapier 运动学角色控制器（胶囊） | 两边同一套解算、同一套尺寸；胶囊之间**不互撞**，同阵营 AI 由 `AiDirector.SeparateSoldiers` 软推开（见 [敌军 AI](Data_EnemyAi.md)「同阵营软分离」） |
 | 手雷、集束手榴弹 | 动态刚体（球） | 会撞墙弹回；落地磕一下、刨一截就停（`PhysicsWorld.SettleThrown`） |
 | 尸体 | 锁旋转的动态胶囊 | 姿势归动画、位移归物理 |
 | 子弹、视线 | Rapier 射线 | 返回形状与老的 `RayAabb` 一样 |

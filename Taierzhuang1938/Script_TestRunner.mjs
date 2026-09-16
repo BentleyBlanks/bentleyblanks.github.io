@@ -193,6 +193,7 @@ export const testDefs = {
   // 敌军 AI 基建四件（docs/Data_EnemyAi.md §4）：纯 Node 规则层，毫秒级，进 tier0Fast。
   AiPerceptionTest: { file: "Script_AiPerceptionTest.mjs", desc: "感知：视锥/觉察迟滞/听觉 LKP/目标锁" },
   AiCoverTest: { file: "Script_AiCoverTest.mjs", desc: "掩体注册表：归一/散列/验证射线/侧翼/占用/探头" },
+  AiCrowdTest: { file: "Script_AiCrowdTest.mjs", desc: "同阵营软分离：叠人推开/钉住豁免/队友占用的隐蔽位" },
   AiShootingTest: { file: "Script_AiShootingTest.mjs", desc: "射击模型：误差收敛/暴露采样/走廊/点射/压制点" },
   AiCloseRangeTest: { file: "Script_AiCloseRangeTest.mjs", desc: "近距离实弹：命中/伤害/遮挡/攻击名额" },
   AiTacticsTest: { file: "Script_AiTacticsTest.mjs", desc: "班组战术：令牌/侧翼点/跃进配对/投弹/撤退" },
@@ -395,6 +396,7 @@ export const tier0Fast = [
   "TextTest",
   "AiPerceptionTest",
   "AiCoverTest",
+  "AiCrowdTest",
   "AiShootingTest",
   "AiTacticsTest",
   "AiBrainGraphTest",
@@ -484,7 +486,7 @@ export const domains = {
     label: "AI 与战场内容预算",
     // 具名同伴（罗班长、幺娃…）是从 nra 名额里出的人，goal 直接写进 AiDirector，
     // 所以碰 AI 或撒兵的改动要连着 MissionHooksTest 一起跑。
-    tests: ["AiBehaviorTest", "AiBrainGraphTest", "AiEditorTest", "AiCombatBrowserTest", "AiCloseRangeTest", "AiInitiativeBrowserTest", "AiPerceptionTest", "AiCoverTest", "AiShootingTest", "AiTacticsTest",
+    tests: ["AiBehaviorTest", "AiBrainGraphTest", "AiEditorTest", "AiCombatBrowserTest", "AiCloseRangeTest", "AiInitiativeBrowserTest", "AiPerceptionTest", "AiCoverTest", "AiCrowdTest", "AiShootingTest", "AiTacticsTest",
       "VisibilityTest", "ActorCrowdTest", "EmplacementTest", "FlareTest", "MissionHooksTest", "MissionSetpiecesTest",
       "FirstLevelP012OpeningTest", "FirstLevelP012FamilyTest", "FirstLevelP012RestingTest", "FirstLevelP012AnimationTest", "FirstLevelP012MarchTest", "FirstLevelP012TrainColumnTest", "FirstLevelP012ArrivalTest", "FirstLevelP012VillageLifeTest", "FirstLevelP012CastTest"],
   },
