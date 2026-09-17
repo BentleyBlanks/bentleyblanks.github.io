@@ -110,8 +110,14 @@ const POPUP_CSS = `
   .chip { border: 1px solid var(--ui-line, #393b3c); padding: 0 5px; cursor: pointer; }
   .chip:hover { border-color: var(--ui-gold, #ceb17a); }
   .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
-  #canvasWrap { flex: 1 1 auto; min-height: 0; }
+  #canvasWrap { flex: 1 1 auto; min-height: 0; position: relative; }
   canvas { display: block; width: 100%; height: 100%; background: #181a19; }
+  /* 标注工具的就地输入框：长在点下去的那个位置上，不弹 prompt（prompt 会把
+     整个页面卡住，还没法在无头测试里输字）。 */
+  .labelInput { position: absolute; width: 176px; z-index: 6;
+    background: var(--ui-black, #101112); border-color: var(--ui-gold, #ceb17a); }
+  img.thumb { display: block; max-width: 100%; max-height: 118px; margin-top: 4px;
+    border: 1px solid var(--ui-line, #393b3c); }
   .note { border: 1px solid var(--ui-line, #393b3c); padding: 4px 6px; margin-bottom: 5px; }
   .note.drift { border-color: #b8743c; }
   .note > .h { display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
@@ -169,8 +175,10 @@ export class OrchestrationEditor {
     this.fittedOnce = false;
     this.notes = [];
     this.localIds = new Set();
+    this.localImages = new Map();        // noteId → PNG dataURL（存在 IndexedDB 里的那几张）
     this.noteFilter = "open";
     this.lastImage = null;
+    this.labelPending = null;            // 标注工具正开着的那个输入框
     this.draft = { text: "", proposal: "", timeKind: "", timeValue: "", shapes: [], candidate: null };
     this.statusText = "";
     this.OnPageHide = () => this.host.CloseOrchestration();
@@ -191,6 +199,7 @@ export class OrchestrationEditor {
       this.map.onSelect((sel) => this.Select(sel, { fromMap: true }));
       this.map.onSketch((shape) => this.AddShape(shape));
       this.map.onMove((event) => this.SetCandidate(event?.to, event?.target));
+      this.map.onLabel((at) => this.BeginLabel(at));
       this.SetPhase(this.phaseNumber);
       this.SetTool("select");
       this.RefreshForm();
@@ -216,6 +225,7 @@ export class OrchestrationEditor {
   }
 
   Exit() {
+    this.CancelLabel();
     window.removeEventListener("pagehide", this.OnPageHide);
     if (this.win && !this.win.closed) {
       try { this.win.removeEventListener("resize", this.OnResize); } catch (error) { /* 窗口已经没了 */ }
@@ -262,10 +272,12 @@ export class OrchestrationEditor {
     }
     this.live = live;
     if (!live) { this.map?.SetLive(null); return; }
-    // 跟随实时换了阶段就重新框一次：不框的话视野还停在上一阶段那片地，
-    // 面板说「阶段 12」而图上是车站，比不跟随还糟。
+    // 跟随实时换阶段时**只在视野还是「自动」的时候**重新框景：不框的话视野停在
+    // 上一阶段那片地，面板说「阶段 12」而图上是车站；可要是用户刚自己放大到某个
+    // 院子盯着看，一换阶段就把他的镜头夺走，那比不跟随更气人。
+    // 手动标记由 map.viewTouched 记，两颗「适配」按钮把它复位。
     if (this.followLive && Number.isFinite(live.phaseNumber) && live.phaseNumber !== this.phaseNumber) {
-      this.SetPhase(live.phaseNumber, { fit: true });
+      this.SetPhase(live.phaseNumber, { fit: !this.map?.viewTouched });
     }
     const signature = LiveSignature(live);
     if (signature === this.liveSignature) return;
@@ -488,6 +500,7 @@ export class OrchestrationEditor {
     canvas.dataset.orch = "canvas";
     wrap.appendChild(canvas);
     this.ui.canvas = canvas;
+    this.ui.canvasWrap = wrap;
   }
 
   // ---------------------------------------------------------- 详情 / 批注
@@ -692,9 +705,66 @@ export class OrchestrationEditor {
   }
 
   SetTool(tool) {
+    this.CancelLabel();
     this.map?.SetTool(tool);
     for (const [id, button] of this.ui?.tools || []) button.classList.toggle("on", id === tool);
     return tool;
+  }
+
+  /**
+   * 标注工具落点 → 在点下去的地方长一个输入框。
+   * 不用 `prompt`：它会把整个窗口冻住（弹窗里尤其难看），而且无头测试根本没法给它输字。
+   * 回车落笔、Esc 取消、失焦提交非空文本；空文本不产生形状。
+   */
+  BeginLabel(at) {
+    this.CancelLabel();
+    if (!this.ui || !at || !Number.isFinite(at.x)) return null;
+    const input = this.doc.createElement("input");
+    input.type = "text";
+    input.className = "labelInput";
+    input.dataset.orch = "label-input";
+    input.placeholder = "写一句话，回车落笔";
+    input.style.left = `${Math.max(0, Math.round(at.px || 0))}px`;
+    input.style.top = `${Math.max(0, Math.round((at.py || 0) - 11))}px`;
+    input.addEventListener("keydown", (event) => {
+      event.stopPropagation();          // 别让 Esc 顺手把编辑器面板也关了
+      if (event.key === "Enter") { event.preventDefault(); this.CommitLabel(); }
+      else if (event.key === "Escape") { event.preventDefault(); this.CancelLabel(); }
+    });
+    input.addEventListener("blur", () => { if (this.labelPending) this.CommitLabel({ silent: true }); });
+    this.ui.canvasWrap.appendChild(input);
+    this.labelPending = { x: at.x, z: at.z, input };
+    try { input.focus(); } catch (error) { /* 窗口没聚焦时 focus 会抛，不影响输入 */ }
+    return input;
+  }
+
+  /** 给测试与宿主代码用：往正开着的标注输入框里填字。 */
+  SetLabelText(text) {
+    if (!this.labelPending) return null;
+    this.labelPending.input.value = String(text ?? "");
+    return this.labelPending.input.value;
+  }
+
+  CommitLabel({ silent = false } = {}) {
+    const pending = this.labelPending;
+    if (!pending) return null;
+    this.labelPending = null;
+    const text = String(pending.input.value || "").trim();
+    pending.input.remove();
+    // 空文字不生成形状 —— 图上一枚没有字的标注就是一个谜，还会跟着批注传给 agent。
+    if (!text) {
+      if (!silent) this.SetStatus("标注没写字，这一笔不算数", true);
+      return null;
+    }
+    return this.AddShape({ type: "label", x: pending.x, z: pending.z, text });
+  }
+
+  CancelLabel() {
+    const pending = this.labelPending;
+    if (!pending) return null;
+    this.labelPending = null;
+    try { pending.input.remove(); } catch (error) { /* 窗口已经关了 */ }
+    return null;
   }
 
   SetLayer(id, on) {
@@ -879,8 +949,15 @@ export class OrchestrationEditor {
       return { ok: false, reason: "invalid", errors: check.errors };
     }
     this.notes = [...this.notes, note];
-    this.lastImage = image ? { name: `${id}.png`, data: image } : null;
-    const result = await this.Persist(id, image ? { name: `${id}.png`, data: image } : null);
+    this.lastImage = image ? { id, name: `${id}.png`, data: image, stored: false } : null;
+    // 图先进 IndexedDB，再谈上传：不管这次写不写得了盘，路径只有一条 ——
+    // 「攒在本地 → 有端点时随那次 POST 补传 → 传完删掉」。
+    if (image) {
+      const stored = await PutImage(window, id, image);
+      this.lastImage.stored = !!stored;
+      if (stored) this.localImages.set(id, image);
+    }
+    const result = await this.Persist(id);
     this.ClearDraft();
     this.RefreshNotes();
     this.RefreshDetail();
@@ -891,17 +968,18 @@ export class OrchestrationEditor {
     try {
       const data = this.map?.ToPng({ scale: 1 }) || "";
       // 1.5 MB 是保存端点的硬闸；超了就不带图，别让整条批注一起被拒。
-      if (!data.startsWith("data:image/png;base64,")) return null;
-      if (data.length * 0.75 > 1.5 * 1024 * 1024) return null;
+      if (!IsPngData(data) || Oversize(data)) return null;
       return data;
     } catch (error) { return null; }
   }
 
   /**
-   * 落盘：可写就 POST 全量批注 + **只带这一次的那张图**（body 上限 8 MB），
-   * 写不了就退化成 localStorage 草稿，并在面板上把原因写明白。
+   * 落盘：可写就 POST 全量批注 + **IndexedDB 里还没上传的那些图**（一次 POST 的图
+   * 总量封在 7 MB 以内，端点的 body 上限是 8 MB；超了就分几次 POST）。
+   * 每批传成功就把那几张从 IndexedDB 删掉 —— 留着只会一直往上顶配额。
+   * 写不了就退化成 localStorage 草稿（图仍留在 IndexedDB），并把原因写在面板上。
    */
-  async Persist(pendingId, image) {
+  async Persist(pendingId) {
     let status = null;
     try {
       const response = await fetch(STATUS_URL, { cache: "no-store" });
@@ -911,43 +989,81 @@ export class OrchestrationEditor {
       return this.Degrade(pendingId, `${STATUS_URL} 取不到（${error?.message || error}）`);
     }
     if (!status || !status.writable) return this.Degrade(pendingId, `${STATUS_URL} 报 writable=false`);
-    try {
-      const images = image ? { [image.name]: image.data } : {};
-      const response = await fetch(SAVE_URL, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ level: LEVEL, notes: this.notes, images }),
-      });
-      const data = await response.json().catch(() => null);
-      if (!response.ok || !data?.ok) {
-        return this.Degrade(pendingId, `${SAVE_URL} ${response.status}${data?.error ? ` ${data.error}` : ""}`);
+    const batches = BatchImages(await this.PendingImages());
+    let count = this.notes.length;
+    let file = NotesPathFor(LEVEL);
+    let uploaded = 0;
+    for (const batch of batches) {
+      const images = {};
+      for (const one of batch) images[one.name] = one.data;
+      try {
+        const response = await fetch(SAVE_URL, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ level: LEVEL, notes: this.notes, images }),
+        });
+        const data = await response.json().catch(() => null);
+        if (!response.ok || !data?.ok) {
+          return this.Degrade(pendingId, `${SAVE_URL} ${response.status}${data?.error ? ` ${data.error}` : ""}`);
+        }
+        count = data.count;
+        file = data.file || file;
+        uploaded += data.images?.length || 0;
+        await DeleteImages(window, batch.map((one) => one.id));
+        for (const one of batch) this.localImages.delete(one.id);
+      } catch (error) {
+        return this.Degrade(pendingId, `${SAVE_URL} 出错（${error?.message || error}）`);
       }
-      this.localIds.clear();
-      this.ClearLocal();
-      this.SetStatus(`已写进 ${NotesPathFor(LEVEL)}：${data.count} 条批注`
-        + `${data.images?.length ? `，${data.images.length} 张图` : ""}`, false);
-      return { mode: "endpoint", file: data.file, count: data.count };
-    } catch (error) {
-      return this.Degrade(pendingId, `${SAVE_URL} 出错（${error?.message || error}）`);
     }
+    this.localIds.clear();
+    this.ClearLocal();
+    this.SetStatus(`已写进 ${file}：${count} 条批注`
+      + `${uploaded ? `，${uploaded} 张图（含补传）` : ""}`, false);
+    return { mode: "endpoint", file, count, images: uploaded, batches: batches.length };
   }
 
-  /** 端点不在（线上 Pages、或没开本地预览服）时的退路：localStorage + 下载 / 复制。 */
+  /** 还没上传的图：IndexedDB 里凡是仍被某条批注引用着的，都排进这次的队。 */
+  async PendingImages() {
+    const wanted = new Set(this.notes.filter((note) => note.image).map((note) => note.id));
+    const queue = [];
+    const seen = new Set();
+    for (const row of await AllImages(window)) {
+      if (!wanted.has(row.id) || seen.has(row.id) || !IsPngData(row.data) || Oversize(row.data)) continue;
+      seen.add(row.id);
+      queue.push({ id: row.id, name: `${row.id}.png`, data: row.data });
+    }
+    // IndexedDB 写不进去（隐私模式）时内存里还有一份，别让这张图跟着掉。
+    const last = this.lastImage;
+    if (last?.id && wanted.has(last.id) && !seen.has(last.id) && IsPngData(last.data) && !Oversize(last.data)) {
+      queue.push({ id: last.id, name: last.name, data: last.data });
+    }
+    return queue;
+  }
+
+  /**
+   * 端点不在（线上 Pages、或没开本地预览服）时的退路：
+   * 批注进 localStorage，**图进 IndexedDB**（几 MB 的 dataURL 一张就能把
+   * localStorage 的配额顶爆），`image` 字段照写 `<id>.png`，下次能写盘时随那一次
+   * POST 一起补传。只有 IndexedDB 也用不了时才把 `image` 抹成 null ——
+   * 指着一个哪儿都不存在的 PNG 比没有图更糟。
+   */
   Degrade(pendingId, reason) {
     if (pendingId) this.localIds.add(pendingId);
-    // 图片没地方放，索性把引用也去掉 —— 指着一个不存在的 PNG 比没有图更糟。
-    for (const note of this.notes) if (this.localIds.has(note.id)) note.image = null;
+    const lost = this.lastImage && this.lastImage.id === pendingId && !this.lastImage.stored;
+    if (lost) for (const note of this.notes) if (note.id === pendingId) note.image = null;
     let stored = false;
     try {
       const local = this.notes.filter((note) => this.localIds.has(note.id));
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ level: LEVEL, savedAt: new Date().toISOString(), notes: local }));
       stored = true;
     } catch (error) { stored = false; }
+    const kept = this.localImages.size;
     this.SetStatus(`保存失败：${reason} · ${stored
       ? `已存进本地草稿 localStorage["${STORAGE_KEY}"]（${this.localIds.size} 条），用「下载 JSON / 复制 JSON」交给 agent`
       : "localStorage 也写不了，请立刻用「复制 JSON」把草稿拷走"}`
-      + `${this.lastImage ? " · 图片没落盘，可用「下载本图」另存" : ""}`, true);
-    return { mode: "local", stored, reason };
+      + `${kept ? ` · ${kept} 张图存在 IndexedDB（${IMAGE_DB}/${IMAGE_STORE}），下次能写盘时自动补传` : ""}`
+      + `${lost ? " · 图片没地方放（IndexedDB 用不了），可用「下载本图」另存" : ""}`, true);
+    return { mode: "local", stored, reason, images: kept };
   }
 
   ClearLocal() {
@@ -983,6 +1099,13 @@ export class OrchestrationEditor {
       this.localIds.add(note.id);
     }
     this.notes = [...byId.values()];
+    // 本地草稿的图在 IndexedDB 里（退化时存的那几张）：取回来给卡片当缩略图，
+    // 也让「下载本图」能把它另存出去。
+    this.localImages = new Map();
+    const ids = new Set(this.notes.map((note) => note.id));
+    for (const row of await AllImages(window)) {
+      if (ids.has(row.id) && IsPngData(row.data)) this.localImages.set(row.id, row.data);
+    }
     if (fileError) this.SetStatus(`${fileError} · 只显示本地草稿（${this.localIds.size} 条）`, true);
     else if (this.localIds.size) this.SetStatus(`${this.notes.length} 条批注，其中 ${this.localIds.size} 条还只在本地草稿里`, true);
     else this.SetStatus(`${this.notes.length} 条批注（${NotesPathFor(LEVEL)}）`, false);
@@ -1024,12 +1147,28 @@ export class OrchestrationEditor {
     if (!this.lastImage) {
       const data = this.SnapshotImage();
       if (!data) { this.SetStatus("这张俯视图出不了 PNG", true); return null; }
-      this.lastImage = { name: `orchestration_${LEVEL}.png`, data };
+      this.lastImage = { id: null, name: `orchestration_${LEVEL}.png`, data, stored: false };
     }
-    const binary = atob(this.lastImage.data.slice("data:image/png;base64,".length));
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
-    return this.Download(this.lastImage.name, new Blob([bytes], { type: "image/png" }));
+    return this.DownloadPng(this.lastImage.name, this.lastImage.data);
+  }
+
+  /** 某一条批注自己那张图（存在 IndexedDB 里的本地草稿图）。 */
+  DownloadNoteImage(id) {
+    const data = this.localImages.get(id);
+    if (!data) { this.SetStatus(`批注 ${id} 本地没有图（它的图已经在仓库里了）`, true); return null; }
+    return this.DownloadPng(`${id}.png`, data);
+  }
+
+  DownloadPng(name, dataUrl) {
+    try {
+      const binary = atob(String(dataUrl).slice("data:image/png;base64,".length));
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+      return this.Download(name, new Blob([bytes], { type: "image/png" }));
+    } catch (error) {
+      this.SetStatus(`图片转不出来：${error?.message || error}`, true);
+      return null;
+    }
   }
 
   Download(name, blob) {
@@ -1056,7 +1195,7 @@ export class OrchestrationEditor {
     if (!note) return null;
     note.verified = true;
     note.updatedAt = new Date().toISOString();
-    const result = await this.Persist(id, null);
+    const result = await this.Persist(id);
     this.RefreshNotes();
     return { ...result, id };
   }
@@ -1333,7 +1472,22 @@ export class OrchestrationEditor {
       + `${note.proposal.to ? ` → (${Round(note.proposal.to.x)}, ${Round(note.proposal.to.z)})` : ""}`
       + `${Number.isFinite(note.proposal.seconds) ? ` ${note.proposal.seconds} s` : ""}`, "muted");
     if (note.sketch?.shapes?.length) El("div", box, `草图：${note.sketch.shapes.map(ShapeText).join("、")}`, "muted");
-    if (note.image) El("div", box, `图片：Notes/${note.level}/${note.image}`, "muted");
+    const localImage = this.localImages.get(note.id) || null;
+    if (note.image) {
+      El("div", box, `图片：Notes/${note.level}/${note.image}`
+        + `${localImage ? "（还在本地 IndexedDB，等下次能写盘时补传）" : ""}`, "muted");
+      // 缩略图：本地草稿的图直接用 IndexedDB 里的 dataURL；已经进仓库的那张走
+      // 绝对 URL —— 弹窗的文档是 about:blank，相对路径在这儿解不出来。
+      const src = localImage || RepoImageUrl(note.level, note.image);
+      if (src) {
+        const img = this.doc.createElement("img");
+        img.className = "thumb";
+        img.dataset.noteThumb = note.id;
+        img.alt = note.image;
+        img.src = src;
+        box.appendChild(img);
+      }
+    }
     if (note.resolution) El("div", box, `已处理：${note.resolution.summary}`
       + `${note.resolution.commit ? `（${note.resolution.commit}）` : ""}`, "ok");
     // 「原设置已变化」：拿现在的模型再拍一张快照逐字段对，新旧值并排列出来。
@@ -1356,8 +1510,106 @@ export class OrchestrationEditor {
     verify.type = "button";
     verify.dataset.noteAction = "verify";
     verify.addEventListener("click", () => this.MarkVerified(note.id));
+    if (localImage) {
+      const download = El("button", bar, "下载本图");
+      download.type = "button";
+      download.dataset.noteAction = "image";
+      download.title = `另存 ${note.id}.png（这张还只在本地 IndexedDB 里）`;
+      download.addEventListener("click", () => this.DownloadNoteImage(note.id));
+    }
     return box;
   }
+}
+
+// ---------------------------------------------------------------------------
+// 离线草稿的图片仓：IndexedDB（键 = 批注 id，值 = PNG dataURL）
+//
+// 为什么不进 localStorage：一张 1400×900 的 PNG dataURL 就是好几百 KB，
+// localStorage 整个域也就 5 MB —— 存两三张就把**批注正文**一起挤掉了，
+// 而批注正文才是绝对不能丢的东西。
+// 全部读写都吞异常返回 null/[]：隐私模式下 indexedDB.open 直接抛。
+// ---------------------------------------------------------------------------
+const IMAGE_DB = "tengxian1938_orchestration";
+const IMAGE_STORE = "images";
+const IMAGE_BYTES_MAX = 1.5 * 1024 * 1024;        // 单张上限，与保存端点一致
+const POST_BYTES_MAX = 7 * 1024 * 1024;           // 一次 POST 的图总量（端点 body 上限 8 MB）
+
+function IsPngData(data) { return typeof data === "string" && data.startsWith("data:image/png;base64,"); }
+function Oversize(data) { return !data || data.length * 0.75 > IMAGE_BYTES_MAX; }
+
+function OpenImageDb(win) {
+  return new Promise((resolve) => {
+    let request = null;
+    try { request = win?.indexedDB?.open(IMAGE_DB, 1); } catch (error) { request = null; }
+    if (!request) { resolve(null); return; }
+    request.onupgradeneeded = () => {
+      const db = request.result;
+      if (!db.objectStoreNames.contains(IMAGE_STORE)) db.createObjectStore(IMAGE_STORE);
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => resolve(null);
+    request.onblocked = () => resolve(null);
+  });
+}
+
+/** 开一次事务，`work(store)` 里发请求，事务 complete 之后才 resolve。 */
+function RunImageDb(win, mode, work) {
+  return OpenImageDb(win).then((db) => {
+    if (!db) return null;
+    return new Promise((resolve) => {
+      let tx = null;
+      try { tx = db.transaction(IMAGE_STORE, mode); } catch (error) { db.close(); resolve(null); return; }
+      let out = null;
+      try { out = work(tx.objectStore(IMAGE_STORE)); } catch (error) { out = null; }
+      tx.oncomplete = () => { db.close(); resolve(out); };
+      tx.onerror = () => { db.close(); resolve(null); };
+      tx.onabort = () => { db.close(); resolve(null); };
+    });
+  }).catch(() => null);
+}
+
+function PutImage(win, id, dataUrl) {
+  if (!id || !IsPngData(dataUrl)) return Promise.resolve(false);
+  return RunImageDb(win, "readwrite", (store) => { store.put(dataUrl, id); return true; }).then((ok) => !!ok);
+}
+
+function DeleteImages(win, ids) {
+  if (!ids?.length) return Promise.resolve(true);
+  return RunImageDb(win, "readwrite", (store) => { for (const id of ids) store.delete(id); return true; })
+    .then((ok) => !!ok);
+}
+
+function AllImages(win) {
+  const box = { keys: [], values: [] };
+  return RunImageDb(win, "readonly", (store) => {
+    const keys = store.getAllKeys();
+    const values = store.getAll();
+    keys.onsuccess = () => { box.keys = keys.result || []; };
+    values.onsuccess = () => { box.values = values.result || []; };
+    return box;
+  }).then((ok) => (ok
+    ? box.keys.map((id, i) => ({ id: String(id), data: box.values[i] })).filter((row) => typeof row.data === "string")
+    : []));
+}
+
+/** 按「一次 POST 的图总量」切批；一张图都没有也要发一次（notes.json 得落盘）。 */
+function BatchImages(queue) {
+  const batches = [];
+  let current = [];
+  let size = 0;
+  for (const one of queue) {
+    if (current.length && size + one.data.length > POST_BYTES_MAX) { batches.push(current); current = []; size = 0; }
+    current.push(one);
+    size += one.data.length;
+  }
+  if (current.length) batches.push(current);
+  if (!batches.length) batches.push([]);
+  return batches;
+}
+
+/** 仓库里那张图的绝对地址：弹窗文档是 about:blank，相对路径在那儿解不出来。 */
+function RepoImageUrl(level, name) {
+  try { return new URL(`./Notes/${level}/${name}`, window.location.href).href; } catch (error) { return null; }
 }
 
 // ---------------------------------------------------------------------------

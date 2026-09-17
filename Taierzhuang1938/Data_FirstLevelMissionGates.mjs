@@ -183,6 +183,7 @@ export const MISSION_FACT_GATES = Object.freeze({
   trenchEntered: Gate({
     kind: "proximity", step: "TrenchEntry", point: OPENING.trenchEntry, radiusM: 5,
     source: "FirstLevelOpening.Update",
+    note: "同一个沟口外面还有一圈更大的（8 m）只用来起 TrenchContact 那句台词，不记事实，留在代码里",
   }),
   trenchCleared: Gate({
     kind: "combat", step: "TrenchEntry", encounter: "intrusion",
@@ -191,7 +192,8 @@ export const MISSION_FACT_GATES = Object.freeze({
   shelterReached: Gate({
     kind: "proximity", step: "TrenchEntry", point: OPENING.shelter, radiusM: OPENING.shelterRadiusM,
     requires: Object.freeze(["trenchCleared"]), source: "FirstLevelOpening.Update",
-    note: "且折角是被掩护住的（ShelterProtected）",
+    note: "且折角是被掩护住的（ShelterProtected）。Shelter 步里那句 ShelterAid 喘息台词"
+      + "判「人还在折角圈里」时复用的也是这一条门（同点同半径）",
   }),
   // --- Shelter -----------------------------------------------------------
   shelterCornerHeld: Gate({

@@ -51,11 +51,19 @@ export const MAP_COLORS = Object.freeze({
   select: [255, 211, 77],
   text: [24, 26, 25],
   textLight: [242, 240, 232],
+  handle: [30, 34, 39],      // 组把手 / 拍把手的芯片底色：不透明，测试能精确数
 });
 
 const FONT = '11px "Segoe UI", system-ui, sans-serif';
 const FONT_SMALL = '10px "Segoe UI", system-ui, sans-serif';
 const GROUND_STEP_M = 2;
+// 把手芯片：成员质心右上方一枚小标签。偏移要大过成员点的拾取半径（7 px），
+// 否则点人会点到把手上 —— 「把手不许遮住成员」是这枚芯片的硬条件。
+const CHIP_PAD = 4;
+const CHIP_H = 14;
+const CHIP_DX = 10;
+const CHIP_DY = -15;
+const CHIP_HIT_R = 11;
 const TOOLS = new Set(["select", "pan", "circle", "arrow", "path", "label", "move"]);
 const DEFAULT_LAYERS = Object.freeze({
   terrain: true, blocks: true, trenches: true, roads: true, anchors: true,
@@ -112,14 +120,18 @@ export class OrchestrationMap {
     this.cssWidth = 800;
     this.cssHeight = 600;
     this.view = { cx: 0, cz: 0, scale: 2 };   // scale = 像素 / 米
+    // 用户自己拖过 / 滚过之后视野算「手动」：跟随实时换阶段时不许再抢过去重新框景。
+    // 两颗「适配」按钮（以及任何一次 Fit*）把它复位回「自动」。
+    this.viewTouched = false;
     this.ground = null;
     this.picks = [];
+    this.handles = [];
     this.drag = null;
     this.pathPoints = null;
     this.spaceDown = false;
     this.pointer = null;
 
-    this.callbacks = { select: [], hover: [], sketch: [], move: [] };
+    this.callbacks = { select: [], hover: [], sketch: [], move: [], label: [] };
 
     this.handlers = {
       down: (e) => this.OnDown(e),
@@ -227,6 +239,12 @@ export class OrchestrationMap {
   onHover(cb) { if (typeof cb === "function") this.callbacks.hover.push(cb); return this; }
   onSketch(cb) { if (typeof cb === "function") this.callbacks.sketch.push(cb); return this; }
   onMove(cb) { if (typeof cb === "function") this.callbacks.move.push(cb); return this; }
+  /**
+   * 标注工具落点。宿主接了这个回调就由宿主自己弹输入框（工作台是在弹窗 DOM 里
+   * 就地长一个小输入框），没人接才退回「直接产出一枚空文字的 label 形状」——
+   * 这样单跑俯视图模块的测试与旧用法都不受影响。
+   */
+  onLabel(cb) { if (typeof cb === "function") this.callbacks.label.push(cb); return this; }
   Emit(name, payload) {
     if (this.disposed) return;
     for (const cb of this.callbacks[name] || []) {
@@ -267,6 +285,7 @@ export class OrchestrationMap {
     this.view.scale = Math.max(0.05, scale);
     this.view.cx = (region.minX + region.maxX) / 2;
     this.view.cz = (region.minZ + region.maxZ) / 2;
+    this.viewTouched = false;         // 框过景 = 回到「自动」，跟随实时可以接手了
     this.Redraw();
     return this;
   }
@@ -297,12 +316,14 @@ export class OrchestrationMap {
       minX: box.minX - pad, maxX: box.maxX + pad, minZ: box.minZ - pad, maxZ: box.maxZ + pad,
     });
   }
+  /** 跳到某一点（「定位」批注用）。这是用户点名要看的地方，算手动视野。 */
   ZoomTo(point, radiusM = 40) {
     if (!point || !Number.isFinite(point.x)) return this;
     this.view.cx = point.x;
     this.view.cz = point.z;
     const r = Math.max(1, radiusM);
     this.view.scale = Math.max(0.05, Math.min(this.cssWidth, this.cssHeight) / (2 * r));
+    this.viewTouched = true;
     this.Redraw();
     return this;
   }
@@ -380,6 +401,12 @@ export class OrchestrationMap {
     return this;
   }
 
+  /** 把手（组 / 拍）的屏幕中心点；测试与宿主拿它去点、去对位。 */
+  HandlePoint(kind, id) {
+    const found = this.handles.find((entry) => entry.kind === kind && entry.id === id);
+    return found ? { x: found.cx, y: found.cy, w: found.w, h: found.h } : null;
+  }
+
   ToPng({ scale = 1, region = null } = {}) {
     const doc = this.canvas?.ownerDocument || globalThis.document;
     if (!doc) return "";
@@ -406,6 +433,8 @@ export class OrchestrationMap {
   Paint(ctx, view, { picks = null, interactive = false } = {}) {
     const Project = (x, z) => ({ x: (x - view.cx) * view.scale + view.w / 2, y: (z - view.cz) * view.scale + view.h / 2 });
     const Push = (sel, px, py, r) => { if (picks) picks.push({ sel, px, py, r }); };
+    // 把手先攒着，最后统一画在最上层；出图（ToPng）也照画，标注图上得看得见是哪一组。
+    const handles = [];
 
     ctx.save();
     ctx.fillStyle = Css(MAP_COLORS.backdrop);
@@ -540,10 +569,24 @@ export class OrchestrationMap {
           const a = Project(zone.minX, zone.minZ);
           const b = Project(zone.maxX, zone.maxZ);
           ctx.strokeRect(a.x, a.y, b.x - a.x, b.y - a.y);
-          if (showLabels) Label(ctx, a.x + 3, a.y - 7, zone.fact || zone.id || "", Css(MAP_COLORS.zone));
           const cx = (zone.minX + zone.maxX) / 2, cz = (zone.minZ + zone.maxZ) / 2;
           const c = Project(cx, cz);
           Push({ kind: "zone", id: zone.id || zone.fact, x: cx, z: cz }, c.x, c.y, 8);
+          // 转运四拍的框：标签做成可点的把手（返回 kind:"beat"），别只是一行描边字。
+          // 拍是设计里唯一带时间窗的一段，用户最想点开看的就是它。
+          // 登记在区域之后 = 芯片压在区域上面，点芯片拿到的是拍不是那个框。
+          if (zone.kind === "beatArea") {
+            const beatId = String(zone.id || "").replace(/^beat_/, "");
+            const beat = (this.model?.beats || []).find((entry) => entry.id === beatId) || null;
+            const text = showLabels && beat
+              ? `拍 ${beatId} · ${beat.earliestS}–${beat.latestS} s`
+              : `拍 ${beatId}`;
+            const chip = ChipBox(ctx, a.x + 2, a.y - 2 + CHIP_DY, text);
+            handles.push({ kind: "beat", id: beatId, text, color: MAP_COLORS.zone, ...chip });
+            Push({ kind: "beat", id: beatId, x: cx, z: cz }, chip.cx, chip.cy, CHIP_HIT_R);
+          } else if (showLabels) {
+            Label(ctx, a.x + 3, a.y - 7, zone.fact || zone.id || "", Css(MAP_COLORS.zone));
+          }
         }
         ctx.setLineDash([]);
       }
@@ -596,6 +639,30 @@ export class OrchestrationMap {
 
     // --- 敌人（本阶段状态上色） -------------------------------------------
     if (L.encounters) {
+      // 先登记组把手，再登记成员。拾取是「后登记的压在上面」，这个顺序保证
+      // 点到人身上拿到的永远是人 —— 把手只在没人的空处才赢。
+      // 已清除的组不给把手：第 12 阶段有十一个这样的组，遍布全关，
+      // 它们的芯片会把还在演的那几组盖掉。灰叉还在，悬停照样报得出是谁。
+      for (const encounter of this.phaseLayout?.encounters || []) {
+        const state = encounter.state || "spawned";
+        if (state === "cleared") continue;
+        const centre = Centroid(encounter.members);
+        if (!centre) continue;
+        const p = Project(centre.x, centre.z);
+        const text = showLabels ? `${encounter.id} · ${StateText(state)}` : encounter.id;
+        const chip = ChipBox(ctx, p.x + CHIP_DX, p.y + CHIP_DY, text);
+        handles.push({ kind: "encounter", id: encounter.id, text, color: StateColor(state), ...chip });
+        Push({ kind: "encounter", id: encounter.id, x: centre.x, z: centre.z }, chip.cx, chip.cy, CHIP_HIT_R);
+      }
+    }
+
+    // --- 把手芯片（组 / 拍） -----------------------------------------------
+    // 画在成员**下面**：芯片是不透明的，缩到整关视野时一枚芯片能把它标的那几个
+    // 人整个盖掉（「画上了却一个像素都验不到」的老毛病，这次是反过来把别人啃了）。
+    // 压在下面也与拾取口径一致 —— 点到人拿到的永远是人。
+    this.PaintHandles(ctx, handles);
+
+    if (L.encounters) {
       for (const encounter of this.phaseLayout?.encounters || []) {
         const state = encounter.state || "spawned";
         for (const member of encounter.members || []) {
@@ -605,18 +672,12 @@ export class OrchestrationMap {
           this.PaintMember(ctx, p, member, state);
           Push({ kind: "member", id: member.id, encounterId: encounter.id, x: member.x, z: member.z }, p.x, p.y, 7);
         }
-        // 已清除的组不写名字：第 12 阶段有十一个这样的组，它们的标签会把还在演的
-        // 那几个盖掉。灰叉还在，鼠标悬上去照样报得出是谁。
-        const first = (encounter.members || [])[0];
-        if (first && Number.isFinite(first.x) && showLabels && state !== "cleared") {
-          const p = Project(first.x, first.z);
-          Label(ctx, p.x + 8, p.y - 9, `${encounter.id} · ${StateText(state)}`, Css(StateColor(state)));
-        }
       }
     }
 
     // --- 实机层 -----------------------------------------------------------
     if (L.live && this.live) this.PaintLive(ctx, Project, Push);
+    if (interactive) this.handles = handles;
 
     // --- 草图（当前草稿 + 正在拖的那一个） --------------------------------
     for (const shape of this.sketch) {
@@ -630,6 +691,26 @@ export class OrchestrationMap {
       this.PaintTooltip(ctx, view, this.hover);
     }
     ctx.restore();
+  }
+
+  /**
+   * 组把手 / 拍把手：一枚不透明的小芯片。不透明是有意的 ——
+   * 半透明底在这张图上会和地表混成一片，既读不出字，也数不出一个精确像素。
+   */
+  PaintHandles(ctx, handles) {
+    const sel = this.selection;
+    for (const handle of handles) {
+      const picked = sel && sel.kind === handle.kind && sel.id === handle.id;
+      ctx.fillStyle = Css(MAP_COLORS.handle);
+      ctx.fillRect(handle.x, handle.y, handle.w, handle.h);
+      ctx.strokeStyle = Css(picked ? MAP_COLORS.select : handle.color);
+      ctx.lineWidth = picked ? 2 : 1;
+      ctx.strokeRect(handle.x + 0.5, handle.y + 0.5, handle.w - 1, handle.h - 1);
+      ctx.font = FONT_SMALL;
+      ctx.fillStyle = Css(picked ? MAP_COLORS.select : handle.color);
+      ctx.fillText(handle.text, handle.x + CHIP_PAD, handle.cy);
+      ctx.font = FONT;
+    }
   }
 
   PaintMember(ctx, p, member, state) {
@@ -808,9 +889,10 @@ export class OrchestrationMap {
   }
 
   PaintHighlight(ctx, Project, sel) {
-    // 组是从流程栏/详情栏选的（PickAt 不返回 encounter），但选中以后地图上得看得见
-    // 是「哪一撮人」——所以整组成员逐个描亮，而不是挑第一个人画个圈了事。
-    if (sel?.kind === "encounter") {
+    // 组既可以从流程栏/详情栏选，也可以点地图上的组把手。选中以后得看得见是
+    // 「哪一撮人」——所以整组成员逐个描亮，而不是挑第一个人画个圈了事。
+    // 拍与组同名（transferFlank 既是一拍也是一组），描亮同一撮人。
+    if (sel?.kind === "encounter" || sel?.kind === "beat") {
       const encounter = (this.phaseLayout?.encounters || []).find((entry) => entry.id === sel.id);
       if (encounter) {
         ctx.strokeStyle = Css(MAP_COLORS.select);
@@ -855,6 +937,23 @@ export class OrchestrationMap {
   DescribeSel(sel) {
     if (!sel) return [];
     const lines = [`${KindText(sel.kind)}：${sel.id ?? ""}`];
+    if (sel.kind === "encounter") {
+      const encounter = (this.phaseLayout?.encounters || []).find((entry) => entry.id === sel.id);
+      if (encounter) {
+        lines.push(`${StateText(encounter.state)} · ${(encounter.members || []).length} 人`);
+        const spawn = encounter.spawn || {};
+        const where = spawn.step || spawn.fact || spawn.beat || "";
+        if (spawn.kind) lines.push(`出现：${spawn.kind}${where ? ` ${where}` : ""}`);
+        if (encounter.standbyUntil) lines.push(`待命到 ${encounter.standbyUntil}`);
+      }
+    }
+    if (sel.kind === "beat") {
+      const beat = (this.model?.beats || []).find((entry) => entry.id === sel.id);
+      if (beat) {
+        lines.push(`装车 ${beat.loaded} 之后 · 窗口 ${beat.earliestS}–${beat.latestS} s`);
+        if (beat.hint) lines.push(String(beat.hint));
+      }
+    }
     if (sel.kind === "member") {
       const found = this.FindMember(sel.id);
       if (found) {
@@ -890,6 +989,11 @@ export class OrchestrationMap {
     if (sel.kind === "anchor") {
       const anchor = this.model?.anchors?.[sel.id];
       if (anchor) return { x: anchor.x, z: anchor.z };
+    }
+    if (sel.kind === "encounter" || sel.kind === "beat") {
+      const encounter = (this.phaseLayout?.encounters || this.model?.encounters || [])
+        .find((entry) => entry.id === sel.id);
+      if (encounter) return Centroid(encounter.members);
     }
     return null;
   }
@@ -943,7 +1047,10 @@ export class OrchestrationMap {
       return;
     }
     if (this.tool === "label") {
-      this.Emit("sketch", { type: "label", x: world.x, z: world.z, text: "" });
+      // 有人接管就把「在哪儿点的」交出去（宿主在那儿长一个输入框），
+      // 没人接才直接产出一枚空文字的标注。
+      if (this.callbacks.label.length) this.Emit("label", { x: world.x, z: world.z, px: local.x, py: local.y });
+      else this.Emit("sketch", { type: "label", x: world.x, z: world.z, text: "" });
       return;
     }
     if (this.tool === "move") {
@@ -964,6 +1071,7 @@ export class OrchestrationMap {
     if (drag?.kind === "pan") {
       this.view.cx = drag.cx - (local.x - drag.screen.x) / this.view.scale;
       this.view.cz = drag.cz - (local.y - drag.screen.y) / this.view.scale;
+      this.viewTouched = true;          // 手动挪过的视野，跟随实时不许再抢
       this.Redraw();
       return;
     }
@@ -1020,6 +1128,7 @@ export class OrchestrationMap {
     const after = this.ScreenToWorld(local.x, local.y);
     this.view.cx += before.x - after.x;     // 以鼠标为中心：光标下那一点不动
     this.view.cz += before.z - after.z;
+    this.viewTouched = true;
     this.Redraw();
   }
 
@@ -1043,9 +1152,10 @@ export class OrchestrationMap {
       win.removeEventListener("keydown", this.handlers.keyDown);
       win.removeEventListener("keyup", this.handlers.keyUp);
     }
-    this.callbacks = { select: [], hover: [], sketch: [], move: [] };
+    this.callbacks = { select: [], hover: [], sketch: [], move: [], label: [] };
     this.ground = null;
     this.picks = [];
+    this.handles = [];
     this.drag = null;
     this.pathPoints = null;
     this.live = null;
@@ -1120,6 +1230,24 @@ function Label(ctx, x, y, text, color) {
   ctx.fillStyle = color;
   ctx.fillText(text, x, y);
   ctx.font = FONT;
+}
+
+/** 一枚芯片的几何：(px, py) 是左端中点，量一次文字宽度定框。 */
+function ChipBox(ctx, px, py, text) {
+  ctx.font = FONT_SMALL;
+  const w = Math.ceil(ctx.measureText(text).width) + CHIP_PAD * 2;
+  ctx.font = FONT;
+  return { x: px, y: py - CHIP_H / 2, w, h: CHIP_H, cx: px + w / 2, cy: py };
+}
+
+/** 一组人的质心。组把手挂在这儿，比挂在「第一个人」身上更像「这一撮人」。 */
+function Centroid(members) {
+  let x = 0, z = 0, n = 0;
+  for (const member of members || []) {
+    if (!Number.isFinite(member?.x) || !Number.isFinite(member?.z)) continue;
+    x += member.x; z += member.z; n += 1;
+  }
+  return n ? { x: x / n, z: z / n } : null;
 }
 
 function StateColor(state) {

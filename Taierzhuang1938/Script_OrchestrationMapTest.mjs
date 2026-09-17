@@ -288,6 +288,79 @@ try {
   Check("点空地点不到人（不是「永远返回最近的」）", !pick.leaky);
 
   // -------------------------------------------------------------------------
+  // 3b) 组把手与拍把手：点得到「一整组」和「一拍」，且不许挡住人
+  // -------------------------------------------------------------------------
+  const chips = await page.evaluate(() => {
+    const map = window.__map;
+    map.SetTool("select");
+    map.SetSelection(null);
+    map.SetHover(null);
+    map.SetPhase(12);
+    map.FitPhase(12);
+    const layout = map.phaseLayout;
+    const transfer = (layout.encounters || []).find((entry) => entry.id === "transfer");
+    const group = map.HandlePoint("encounter", "transfer");
+    const beat = map.HandlePoint("beat", "transferFlank");
+    const groupSel = group ? map.PickAt(group.x, group.y) : null;
+    const beatSel = beat ? map.PickAt(beat.x, beat.y) : null;
+    // 把手不许遮住人：这一组每个成员在自己的屏幕位置上仍然点得中「人」。
+    const members = (transfer?.members || []).map((member) => {
+      const screen = map.WorldToScreen(member.x, member.z);
+      const hit = map.PickAt(screen.x, screen.y);
+      return { id: member.id, hit: hit ? `${hit.kind}:${hit.id}` : "null" };
+    });
+    const withChips = window.__Count(["handle"]).handle;
+    map.SetLayers({ encounters: false, zones: false });
+    const noChips = window.__Count(["handle"]).handle;
+    map.SetLayers({ encounters: true, zones: true });
+    const hoverBefore = window.__events.hover.length;
+    window.__Mouse("mousemove", group.x, group.y);
+    const hovered = map.hover;
+    const hoverAdded = window.__events.hover.length - hoverBefore;
+    map.SetSelection({ kind: "encounter", id: "transfer" });
+    const selectPx = window.__Count(["select"]).select;
+    map.SetSelection(null);
+    window.__Mouse("mousemove", beat.x, beat.y);
+    const hoveredBeat = map.hover;
+    map.SetSelection({ kind: "beat", id: "transferFlank" });
+    const beatSelectPx = window.__Count(["select"]).select;
+    map.SetSelection(null);
+    map.SetHover(null);
+    // 已清除的组不给把手：第 12 阶段这样的组有十来个，遍布全关。
+    const clearedIds = (layout.encounters || []).filter((entry) => entry.state === "cleared").map((entry) => entry.id);
+    const clearedHandles = clearedIds.filter((id) => !!map.HandlePoint("encounter", id));
+    return {
+      group, beat, groupSel, beatSel, members, withChips, noChips, hovered, hoverAdded, selectPx,
+      hoveredBeat, beatSelectPx,
+      clearedCount: clearedIds.length, clearedHandles,
+      kinds: [...new Set(map.handles.map((entry) => entry.kind))],
+      png: map.ToPng({ scale: 1 }),
+    };
+  });
+  SavePng("handles_phase12.png", chips.png);
+  delete chips.png;
+  Check("点组把手拿到整组（kind=encounter）",
+    chips.groupSel?.kind === "encounter" && chips.groupSel?.id === "transfer",
+    `把手 @ (${chips.group?.x?.toFixed(0)}, ${chips.group?.y?.toFixed(0)}) → ${JSON.stringify(chips.groupSel)}`);
+  Check("点转运拍的标签拿到那一拍（kind=beat）",
+    chips.beatSel?.kind === "beat" && chips.beatSel?.id === "transferFlank",
+    `把手 @ (${chips.beat?.x?.toFixed(0)}, ${chips.beat?.y?.toFixed(0)}) → ${JSON.stringify(chips.beatSel)}`);
+  Check("组把手不遮住成员（每个成员仍点得中人）",
+    chips.members.length > 0 && chips.members.every((row) => row.hit.startsWith("member:")),
+    chips.members.map((row) => `${row.id}→${row.hit}`).join(" "));
+  Check("把手芯片真的画在画布上（关掉敌军与触发区两层就归零）",
+    chips.withChips > 0 && chips.noChips === 0, `${chips.withChips} px → ${chips.noChips} px`);
+  Check("悬停到组把手给出 encounter sel（tooltip 走同一条路）",
+    chips.hovered?.kind === "encounter" && chips.hovered?.id === "transfer" && chips.hoverAdded >= 1,
+    JSON.stringify(chips.hovered));
+  Check("选中一整组时整组成员被描亮", chips.selectPx > 0, `${chips.selectPx} px 高亮色`);
+  Check("悬停 / 选中一拍也走同一条路（tooltip + 描亮那一撮人）",
+    chips.hoveredBeat?.kind === "beat" && chips.hoveredBeat?.id === "transferFlank" && chips.beatSelectPx > 0,
+    `${JSON.stringify(chips.hoveredBeat)}，描亮 ${chips.beatSelectPx} px`);
+  Check("已清除的组不长把手", chips.clearedCount > 0 && chips.clearedHandles.length === 0,
+    `已清除 ${chips.clearedCount} 组，把手种类 ${chips.kinds.join("/")}`);
+
+  // -------------------------------------------------------------------------
   // 4) ToPng：PNG dataURL 且 > 10 KB
   // -------------------------------------------------------------------------
   const png = await page.evaluate(() => {
@@ -426,19 +499,28 @@ try {
     const anchorAfter = map.ScreenToWorld(at.x, at.y);
     const scaleAfter = map.view.scale;
 
+    const touchedByWheel = map.viewTouched;
+
     const cx = map.view.cx, cz = map.view.cz;
     window.__Mouse("mousedown", 400, 400, 2);
     window.__Mouse("mousemove", 460, 430, 2);
     window.__Mouse("mouseup", 460, 430, 2);
+    const touchedByPan = map.viewTouched;
+    map.FitBounds();
     return {
       zoomed: scaleAfter > scaleBefore * 1.2,
       drift: Math.hypot(anchorAfter.x - anchorBefore.x, anchorAfter.z - anchorBefore.z),
       panned: Math.hypot(map.view.cx - cx, map.view.cz - cz),
+      touchedByWheel, touchedByPan, autoAfterFit: map.viewTouched,
     };
   });
   Check("滚轮放大", nav.zoomed);
   Check("滚轮以鼠标为中心（光标下那一点不动）", nav.drift < 0.05, `漂移 ${nav.drift.toFixed(4)} m`);
   Check("右键拖动平移", nav.panned > 1, `平移 ${nav.panned.toFixed(1)} m`);
+  // 手动动过的视野要能被认出来 —— 跟随实时就是靠这个标记决定抢不抢镜头。
+  Check("滚轮/拖动把视野标记成「手动」，Fit* 复位成「自动」",
+    nav.touchedByWheel === true && nav.touchedByPan === true && nav.autoAfterFit === false,
+    `wheel=${nav.touchedByWheel} pan=${nav.touchedByPan} fit=${nav.autoAfterFit}`);
 
   // -------------------------------------------------------------------------
   // 8) 图层开关：关掉一层，对应颜色的像素就得归零

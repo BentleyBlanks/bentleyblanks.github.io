@@ -11,7 +11,7 @@ Profiler 仍在独立窗口运行，复制当前入口带版本的主题链接�
 外观与操作验收见 [主菜单文档](Data_MainMenu.md) 的 `--interface-only`；相机、设置持久化与
 编辑工具功能继续由 `Script_EditorTest.mjs` 验证。
 
-开发用的十五个互斥编辑器、六个可叠加工具（Debug Rendering / Profiler / WorldInfo / 玩家状态 / 敌军 AI / 关卡编排）+ 一个入口面板。**不对玩家开放**：出图模式（`?shot=1`）下整棵
+开发用的十六个互斥编辑器、六个可叠加工具（Debug Rendering / Profiler / WorldInfo / 玩家状态 / 敌军 AI / 关卡编排）+ 一个入口面板。**不对玩家开放**：出图模式（`?shot=1`）下整棵
 DOM 是 `display:none`，任何截图里都不会有它。
 
 ## 精简测试界面
@@ -38,9 +38,12 @@ Esc 关面板；过场正在播时 Esc 归过场（跳过），不会顺手把�
 
 ## 一次只开一个
 
-八个里有六个要接管相机（摄影棚 / 自由飞行）、一个要把相机交给过场导演。
+十六个互斥编辑器里有十三个要接管相机（六个摄影棚 `cameraMode="studio"`、七个自由飞行
+`"fly"`，地形编辑器继承场景编辑器的 `"fly"`），过场时间轴还要把相机交给过场导演。
 同时开两个的结果是两边每帧各写一次 `camera.position`，画面会抖。
 所以入口面板虽然是一排开关，语义是**换到这一个**：开新的自动关旧的。
+不接管相机的三个（音频 / 资产规范 / 过场时间轴）也走同一条互斥路 —— 它们改的都是
+这一局的运行时状态，退出时得各自收干净。可叠加的六个工具不在这条规矩里。
 
 ## 面板分两组：设置 / 编辑器
 
@@ -542,6 +545,11 @@ LKP 十字、掩体的隐蔽位/射击位/法线、`task.point`、班组连到�
 右「详情 / 批注」（`FindOwner` 反查 + 批注列表 + 新建批注表单 + 保存 / 交接 / 下载）；
 底「时间轴」18 条泳道，**设计行与实际行分色**。
 
+地图上除了单个敌人 / 锚点 / 触发区 / 路线，还能直接点**整组**与**转运拍**：
+每个非已清除的遭遇组在成员质心旁有一枚把手芯片（`PickAt` 返回 `{kind:"encounter"}`），
+四个转运拍的框各有一枚金色芯片（`{kind:"beat"}`）。芯片画在成员**下面**、
+拾取也排在成员之后 —— 点到人拿到的永远是人。
+
 两条不许含糊的规矩：
 
 - **面板上的勾是运行时真值**：要求事实的 `✓/…` 直接对 `flow.Has`，不自己另算一套。
@@ -555,10 +563,11 @@ DOM 常驻、只写属性；面板 4 Hz，地图只在 live 指纹变了或选�
 
 批注：`GET /__notes/status` 可写就 `POST /__notes/save` 写进
 `Taierzhuang1938/Notes/FirstLevel/`（notes.json + `<noteId>.png`）；
-写不了就退化成 localStorage 草稿 + 「下载 / 复制 JSON」，并把原因明写在面板上。
+写不了就退化成 localStorage 草稿（正文）+ IndexedDB（图，库 `tengxian1938_orchestration`）
++ 「下载 / 复制 JSON」，并把原因明写在面板上；下次写得了盘时那些图随那一次 POST 补传。
 
-冒烟：`node Taierzhuang1938/Script_OrchestrationEditorTest.mjs`（浏览器，46 条）
-与 `node Taierzhuang1938/Script_OrchestrationMapTest.mjs`（浏览器，37 条）。
+冒烟：`node Taierzhuang1938/Script_OrchestrationEditorTest.mjs`（浏览器，64 条）
+与 `node Taierzhuang1938/Script_OrchestrationMapTest.mjs`（浏览器，45 条）。
 
 ### Profiler `Script_EditorProfiler.mjs`（叠加层，独立窗口）
 

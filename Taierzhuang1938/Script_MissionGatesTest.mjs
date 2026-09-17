@@ -7,8 +7,9 @@
 //      的交互 id 都能在源表/运行时源码里找到。
 //   2. MISSION_STEP_SPAWNS / MISSION_ENCOUNTER_ACTIVATION 与 MISSION_ENCOUNTERS、
 //      FIRST_LEVEL_ENCOUNTER_STARTS、FIRST_LEVEL_DEFERRED_ENCOUNTERS 对得上。
-//   3. **静态对账运行时源码**：SpawnEncounter 的字面量调用只剩 front 那两处，
-//      this.Near( 的出现次数 = GateNear 内一处 + 下面逐条列出的白名单。
+//   3. **静态对账两个源码文件**（运行时 + 开场脚本 Script_FirstLevelOpening）：
+//      SpawnEncounter 的字面量调用只剩 front 那两处；`.Near(` 的出现次数 = GateNear
+//      内一处 + 下面两张逐条写明理由的白名单；GateNear 引的事实必须是表里的距离门。
 //      多一处就红 —— 新写的编排门必须走表，不许再在代码里写坐标和米数。
 //   4. BuildOrchestrationModel() 能跑、JSON.stringify 不抛、各计数与源表一致。
 //
@@ -47,6 +48,7 @@ import {
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const runtimeSource = fs.readFileSync(path.join(here, "Script_FirstLevelMissionRuntime.mjs"), "utf8");
+const openingSource = fs.readFileSync(path.join(here, "Script_FirstLevelOpening.mjs"), "utf8");
 let checks = 0;
 const Check = (condition, message) => { assert.ok(condition, message); checks += 1; };
 
@@ -231,6 +233,39 @@ for (const entry of NEAR_WHITELIST)
   assert.ok(entry.pattern.test(runtimeSource), `白名单条目在源码里找不到了（${entry.why}）：${entry.pattern}`);
 checks += 1;
 
+// 开场脚本（Script_FirstLevelOpening.mjs）用同一把尺：它跑的是 Train→Unloading→
+// TrenchEntry→Shelter 那几步，记事实的距离判定一律走 r.GateNear，剩下的 .Near( 也要
+// 逐条在这里写明为什么不是编排门。
+const OPENING_NEAR_WHITELIST = [
+  { pattern: /if\(r\.Near\(C\.trenchEntry,8\)\)r\.Say\("TrenchContact"\);/,
+    why: "沟口外面那一圈更大的台词触发圈（TrenchContact），不记事实；事实 trenchEntered 走的是 5 m 那道门" },
+  { pattern: /\(!s\.near\|\|r\.Near\(s\.near,s\.nearM\)\)/,
+    why: "逃离炮击的放行点，点与半径来自 OPENING.escapePressure.shells 的 near/nearM，放的是炮不是事实" },
+];
+const openingNearCalls = [...openingSource.matchAll(/\.Near\(/g)].length;
+assert.equal(openingNearCalls, OPENING_NEAR_WHITELIST.length,
+  `Script_FirstLevelOpening 里 .Near( 应当只剩 ${OPENING_NEAR_WHITELIST.length} 处（都不记事实），实际 ${openingNearCalls} 处。`
+  + "记事实的距离判定请走 r.GateNear；确实不是编排门的，请在 OPENING_NEAR_WHITELIST 里补一条并写清理由。");
+checks += 1;
+for (const entry of OPENING_NEAR_WHITELIST)
+  assert.ok(entry.pattern.test(openingSource), `开场白名单条目在源码里找不到了（${entry.why}）：${entry.pattern}`);
+checks += 1;
+
+// 两份源码里 GateNear("<字面量>") 引的事实必须在表里，而且是距离门（家族门按前缀解析）。
+const gateNearFacts = [];
+for (const [label, source] of [["运行时", runtimeSource], ["开场脚本", openingSource]])
+  for (const m of source.matchAll(/GateNear\(\s*["']([A-Za-z0-9]+)["']\s*\)/g)) gateNearFacts.push([label, m[1]]);
+for (const [label, factId] of gateNearFacts) {
+  const entry = MissionFactGate(factId);
+  assert.ok(entry, `${label}里 GateNear("${factId}") 引了 MISSION_FACT_GATES 里没有的事实`);
+  assert.ok(["proximity", "proximityFamily"].includes(entry.gate.kind),
+    `${label}里 GateNear("${factId}") 引的不是距离门（kind=${entry.gate.kind}）`);
+}
+checks += 1;
+const openingGateFacts = gateNearFacts.filter(([label]) => label === "开场脚本").map(([, factId]) => factId);
+Check(openingGateFacts.includes("trenchEntered") && openingGateFacts.filter((id) => id === "shelterReached").length === 2,
+  "开场脚本的进沟与折角两处（折角两处：记事实 + 喘息台词）都走了 GateNear");
+
 // VoiceDone 的那一串简单 if 已经换成查表。
 Check(/const fact = MISSION_VOICE_FACTS\[id\];/.test(runtimeSource), "VoiceDone 改成查 MISSION_VOICE_FACTS");
 Check(!/if \(id === "SupportOrder"\) this\.Record/.test(runtimeSource), "VoiceDone 里不再逐条写 if");
@@ -337,3 +372,4 @@ console.log(`ok  第一关编排表闸门通过：${checks} 项`);
 console.log(`    事实门 ${Object.keys(MISSION_FACT_GATES).length} 条（requirements ${requirementFacts.length} 条全覆盖）`);
 console.log(`    按步骤生成 ${Object.values(MISSION_STEP_SPAWNS).flat().length} 次 / 遭遇组 ${model.encounters.length} 组全部登记激活规则`);
 console.log(`    运行时 SpawnEncounter 字面量 ${literalSpawns.length} 处、this.Near( ${nearCalls} 处（GateNear 1 + 白名单 ${NEAR_WHITELIST.length - 1}）`);
+console.log(`    开场脚本 .Near( ${openingNearCalls} 处（全在白名单里，都不记事实）、GateNear 字面量 ${openingGateFacts.length} 处`);

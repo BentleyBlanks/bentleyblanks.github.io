@@ -294,11 +294,11 @@ export class FirstLevelOpening {
     }
     if(stage==="TrenchEntry"){
       if(r.Near(C.trenchEntry,8))r.Say("TrenchContact");
-      if(r.Near(C.trenchEntry,5))r.Record("trenchEntered");
+      if(r.GateNear("trenchEntered"))r.Record("trenchEntered");
       const intruders=C.intruders.map(s=>r.enemies.get(s.id));
       if(intruders.every(a=>a&&!a.alive))r.Record("trenchCleared",{count:intruders.length});
       if(r.Has("trenchCleared")&&!this.trenchReleased){this.trenchReleased=true;r.Guide(C.approachRoute,{resumeAfter:C.trenchEntry});}
-      if(r.Has("trenchCleared")&&r.Near(C.shelter,C.shelterRadiusM)&&this.ShelterProtected())r.Record("shelterReached",{health:r.player.health});
+      if(r.Has("trenchCleared")&&r.GateNear("shelterReached")&&this.ShelterProtected())r.Record("shelterReached",{health:r.player.health});
     }
     if(stage==="Shelter"){
       const pursuers=C.shelterPursuers.map(s=>r.enemies.get(s.id));
@@ -325,7 +325,9 @@ export class FirstLevelOpening {
       }
       const yaowa=r.companion.Handle("yaowa"),luo=r.companion.Handle("luo");
       // The breather starts after the corner is held, never under fire.
-      if(held&&r.Near(C.shelter,C.shelterRadiusM)&&yaowa?.alive&&Distance(yaowa.position,r.player.position)<5&&
+      // 这里判的不是新事实，只是「人还在折角这个圈里」，所以复用 shelterReached 的门
+      // （同一个点、同一个半径）：折角圈要挪，改 MISSION_FACT_GATES 一处就够。
+      if(held&&r.GateNear("shelterReached")&&yaowa?.alive&&Distance(yaowa.position,r.player.position)<5&&
         luo?.alive&&Distance(luo.position,C.shelter)<12&&!r.BlocksSight(r.player.EyePosition,r.Point(yaowa.position,1)))r.Say("ShelterAid");
       this.Messenger(this.wounded,R.walkSpeedMps);
       // The physical casualty appears before the runner reaches the exchange.

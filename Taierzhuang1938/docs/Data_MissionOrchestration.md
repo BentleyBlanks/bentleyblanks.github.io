@@ -68,10 +68,14 @@
 
 运行时的 `GateNear(fact)` 只认这张表：点 = `A[gate.anchor]` 或 `gate.point`，半径 = `gate.radiusM`。
 **想改触发半径，改这里，不要去 `Script_FirstLevelMissionRuntime.mjs` 里找数字。**
+开场那几步（Train→Shelter）在 `Script_FirstLevelOpening.mjs` 里跑，它的距离门同样走
+`r.GateNear(fact)`：进沟的 `trenchEntered`、折角的 `shelterReached`（Shelter 步里那句喘息
+台词判「人还在折角圈里」复用的也是这一条门）。
 
 闸门 `node Taierzhuang1938/Script_MissionGatesTest.mjs`（纯 Node，秒级）除了对表，还
-**静态对账运行时源码**：`SpawnEncounter("<字面量>")` 只许剩 2 处（front 的 fact、拍的 `plan.id`），
-`this.Near(` 的出现次数 = `GateNear` 里 1 处 + 一张逐行写明理由的白名单。多一处就红。
+**静态对账两个源码文件**（运行时与开场脚本）：`SpawnEncounter("<字面量>")` 只许剩 2 处
+（front 的 fact、拍的 `plan.id`），`.Near(` 的出现次数 = `GateNear` 里 1 处 + 两张逐行写明
+理由的白名单（运行时 7 条、开场 2 条），`GateNear` 引的事实必须是表里的距离门。多一处就红。
 
 ---
 
@@ -165,10 +169,26 @@ P3b 的 `Script_EditorOrchestrationMap.mjs`（canvas 2D，零 three，北在上�
   实机 / 批注 / 名字。
 - **7 把工具**：选择、平移、圈选、箭头、折线、标注、候选位（把选中的敌人拖出一个
   建议位置，**不改模型**，只生成一枚 ghost 与 `proposal.to`）。
-- 阶段滑条 / 上一阶段 / 下一阶段 / 适配整关 / 适配本阶段 / **跟随实时**
-  （开着时地图阶段跟着运行时走，换阶段自动重新框景）。
+  「标注」点下去**在点击处就地长一个输入框**（`[data-orch="label-input"]`）：
+  回车落笔、Esc 取消、失焦提交非空文本，空文本不生成形状。不用 `prompt` ——
+  它会把整个弹窗冻住，而且无头测试根本没法给它输字。
+- 阶段滑条 / 上一阶段 / 下一阶段 / 适配整关 / 适配本阶段 / **跟随实时**。
 - 实机层每 0.25 s 从 `host.game.missionRuntime` 取 `State()`（**每 tick 重新取**：
   换关会换对象）→ `ApplyRuntimeState` → `SetLive`。地图只在 live 指纹变了或选中变了时重画。
+
+**点得中什么**：单个敌人、锚点、触发区、路线、友军、批注点，外加两种把手 ——
+每个非「已清除」的遭遇组在成员质心旁有一枚芯片（`PickAt` → `{kind:"encounter", id}`），
+四个转运拍的框各有一枚金色芯片（→ `{kind:"beat", id}`）。悬停 tooltip 与选中描亮
+（整组成员逐个描亮）对这两种一视同仁，点它和从左栏 / 时间轴选它走的是**同一条反查**。
+芯片是不透明的，所以画在成员**下面**、拾取也排在成员之后：**点到人拿到的永远是人**
+（缩到整关视野时，一枚芯片能把它标的那几个人整个盖住 —— 这条不是洁癖）。
+`map.HandlePoint(kind, id)` 给出芯片中心的屏幕坐标，取证与测试用它去点。
+
+**跟随实时不抢视野**：用户自己滚轮缩放或拖动平移之后，视野被标成「手动」
+（`map.viewTouched`）；跟随实时换阶段时**只在视野还是「自动」的时候**才重新框景，
+否则只换阶段、镜头一动不动。「适配整关」「适配本阶段」（以及任何一次 `Fit*`）
+把它复位回「自动」。理由两头都硬：不重新框景的话面板说「阶段 12」而图上是车站；
+抢镜头的话，用户正放大盯着某个院子看的那一刻会被拽走。
 
 ### 右栏「详情 / 批注」
 
@@ -176,9 +196,12 @@ P3b 的 `Script_EditorOrchestrationMap.mjs`（canvas 2D，零 three，北在上�
   待命/苏醒条件、移动路线与放行点、本阶段状态、实机死活与位置、引用它的事实，
   外加一个折叠的原始数据 JSON。
 - **批注区**：本对象相关批注 + 全部批注（待处理 / 已处理 / 不处理 / 全部筛选）。
-  每条显示目标、阶段、意见、建议、草图、图片路径、`resolution.summary`，
-  以及 `NoteDrift` 的「⚠ 原设置已变化」和新旧值并排；两个按钮：
-  **定位**（回选目标并把地图跳过去）、**标记已核对**（写 `verified: true`）。
+  每条显示目标、阶段、意见、建议、草图、图片路径与**缩略图**、`resolution.summary`，
+  以及 `NoteDrift` 的「⚠ 原设置已变化」和新旧值并排；按钮：
+  **定位**（回选目标并把地图跳过去）、**标记已核对**（写 `verified: true`），
+  图还只在本地时再加一颗 **下载本图**（把那张 PNG 另存出去）。
+  缩略图的来源：本地草稿的图取自 IndexedDB 里的 dataURL，已经落盘的那张走绝对 URL
+  （弹窗文档是 `about:blank`，相对路径在那儿解不出来）。
 - **新建批注**：意见文字、建议类型（`PROPOSAL_KINDS`）、时间点（阶段内第 N 秒 / 某事实满足时 / 不限）、
   草图（地图工具画的形状实时列出、点一下删掉）、候选位；
   然后 **保存草稿** / 复制交接文本 / 下载 JSON / 复制 JSON / 下载本图 / 清空草稿。
@@ -196,24 +219,28 @@ P3b 的 `Script_EditorOrchestrationMap.mjs`（canvas 2D，零 three，北在上�
 ### DOM 钩子（测试与取证用）
 
 `[data-orch]`：`header` / `live-status` / `version` / `flow` / `map` / `detail` / `timeline` / `canvas` /
-`tools` / `layers` / `stagebar`；
+`tools` / `layers` / `stagebar` / `label-input`（标注工具开着时才有）；
 `[data-flow-phase=n]`、`[data-flow-step=id]`、`[data-fact=id]`（`data-fact-state=ok|wait|past|future|none`）、
 `[data-flow-encounter=id]`、`[data-flow-route=name]`、`[data-jump=n]`、`[data-flow-orphan]`；
 `[data-tool=…]`、`[data-layer=…]`、`[data-map=phase|phase-label|prev|next|fit-all|fit-phase|follow]`；
 `[data-detail=title|owner|json|json-box|notes|form]`、
 `[data-note-field=text|proposal|timeKind|timeValue|sketch|candidate]`、
-`[data-note-action=save|handoff|download|copy|image|clear|locate|verify]`、
+`[data-note-action=save|handoff|download|copy|image|clear|locate|verify]`
+（`locate`/`verify`/`image` 也出现在每张批注卡片里，按 `[data-note=<id>]` 取用）、
 `[data-notes=status|list|filter|clipboard]`、`[data-notes-filter=…]`、`[data-note=<id>]`（`data-note-drift`）、
-`[data-shape-index=i]`；
+`[data-note-thumb=<id>]`（卡片里的缩略图）、`[data-shape-index=i]`；
 `[data-timeline=design|actual|legend]`、`[data-lane=n]`、`.tlMark[data-marker-kind=…]`（有秒数的才有 `data-marker-at`）。
 
 对外方法（`T.editor.overlays.get("orchestration")`）：
 `Select(sel)` / `SetPhase(n,{fit})` / `SetTool(id)` / `SetLayer(id,on)` / `SetFollowLive(on)` /
 `AddShape(shape)` / `RemoveShape(i)` / `SetCandidate(point,target)` /
 `SetNoteText(text)` / `SetProposalKind(kind)` / `SetNoteTime(kind,value)` / `SetNoteFilter(v)` /
+`SetLabelText(text)` / `CommitLabel()` / `CancelLabel()` /
 `ClearDraft()` / `await SaveDraft()` / `HandoffText()` / `CopyHandoff()` / `CopyJson()` /
-`DownloadJson()` / `DownloadImage()` / `await MarkVerified(id)` / `LocateNote(id)` /
-`await LoadNotes()` / `await Jump(n)`；只读字段 `model` / `live` / `notes` / `draft` / `map` / `selection` / `phaseNumber`。
+`DownloadJson()` / `DownloadImage()` / `DownloadNoteImage(id)` / `await MarkVerified(id)` / `LocateNote(id)` /
+`await LoadNotes()` / `await Jump(n)`；只读字段 `model` / `live` / `notes` / `localImages` / `draft` /
+`map` / `selection` / `phaseNumber`。
+俯视图那一侧（`tool.map`）另有 `HandlePoint(kind,id)` 与只读的 `viewTouched` / `handles`。
 
 ---
 
@@ -271,13 +298,22 @@ Taierzhuang1938/Notes/
 
 六道闸：回环 / 白名单正则 / 根目录校验 / body ≤ 8 MB / 每条 `ValidateNote` / 图片只收 PNG 且 ≤ 1.5 MB；
 **先全部校验完再开始写**，写盘一律 `.tmp` + rename。
-每次保存**只带这一次新增或改动的那张图**（全量带会撞 8 MB 上限）。
+每次保存**只带还没上传的那些图**（全量带会撞 8 MB 上限）：工作台按单张 ≤ 1.5 MB、
+一次 POST 图总量 ≤ 7 MB 切批，超了就分几次 POST，每批传成功就把那几张从 IndexedDB 删掉。
 
 **读不需要端点**：工作台直接 `fetch("./Notes/FirstLevel/notes.json?t=…", {cache:"no-store"})`，
 线上 Pages 也读得到。写不了时（线上、或没开预览服）退化成 localStorage 草稿
 （键 `tengxian1938_orchestration_notes_FirstLevel`）+ 「下载 JSON / 复制 JSON」，
 并把原因**明写在面板上**（例如 `保存失败：/__notes/status 404 · 已存进本地草稿…`）。
-退化时不写 `image` 字段：指着一个不存在的 PNG 比没有图更糟，图另存走「下载本图」。
+
+**退化时图也留着**：`image` 照写 `<noteId>.png`，PNG 的 dataURL 进 **IndexedDB**
+（库 `tengxian1938_orchestration`，store `images`，键 = 批注 id），**不进 localStorage** ——
+一张图就是几百 KB，localStorage 整个域才 5 MB，塞两三张就把**批注正文**挤没了，
+而正文才是绝对不能丢的东西。下次有端点、保存成功时，这些图随那一次 POST 一起补传，
+传完就从 IndexedDB 删掉；加载时本地草稿的图从 IndexedDB 取回显示缩略图，
+卡片上的「下载本图」能把它另存出去。
+只有 IndexedDB 也用不了（隐私模式）时才把 `image` 抹成 `null` 并在面板上说明 ——
+指着一个哪儿都不存在的 PNG 比没有图更糟。
 
 ### CLI
 
@@ -302,10 +338,15 @@ node Taierzhuang1938/Script_MissionNotesCli.mjs dismiss <id> [--summary "…"]
 3. `` ` `` 打开工具目录 → 调试 → **关卡编排**。允许弹窗。
 4. 拖阶段滑条看布局怎么变；打起来之后开「跟随实时」，左栏会实时告诉你
    **正在等哪些事实**，底栏实际行会记下真正发生的时刻。
-5. 看到不对的：在俯视图上点中那个敌人 / 触发圈 / 路线（或在左栏点阶段、步骤、事实、组），
-   用圈选 / 箭头 / 折线 / 标注画出想说的地方，要挪位置就用「候选位」把他拖到想要的位置。
+   自己缩放或拖动过之后，跟随实时就只换阶段、不再动你的镜头；想把框景交回去，
+   点一下「适配本阶段」或「适配整关」。
+5. 看到不对的：在俯视图上点中那个敌人 / 触发圈 / 路线 / **整组的把手** / **转运拍的标签**
+   （或在左栏点阶段、步骤、事实、组），用圈选 / 箭头 / 折线 / 标注画出想说的地方
+   （标注是在点的地方直接打字，回车落笔），要挪位置就用「候选位」把他拖到想要的位置。
 6. 右栏写一句人话 + 选建议类型（+ 时间点），点 **保存草稿**。
    面板会告诉你是写进了 `Taierzhuang1938/Notes/FirstLevel/notes.json` 还是退化成了本地草稿。
+   退化时那张俯视图不会丢：它躺在浏览器的 IndexedDB 里，等下一次能写盘时自动补传，
+   卡片上也看得到缩略图。
 7. 点 **复制交接文本** 把 `HandoffMarkdown` 拷给 agent（或者直接让 agent 自己去读 `notes.json`）。
 8. agent 改完、提交之后回到工作台点「重新加载」：已处理的批注会显示
    `resolution.summary`；如果目标的数据确实变了，那条批注会标 **⚠ 原设置已变化** 并把新旧值并排。
@@ -353,8 +394,8 @@ node Taierzhuang1938/Script_TestRunnerTest.mjs
 node Taierzhuang1938/Script_TextTest.mjs
 
 # 浏览器
-node Taierzhuang1938/Script_OrchestrationMapTest.mjs        # 俯视图：数像素、PickAt、ToPng、工具回调
-node Taierzhuang1938/Script_OrchestrationEditorTest.mjs     # 工作台：三栏/时间轴、事实与 flow 一致、批注退化、关窗还干净
+node Taierzhuang1938/Script_OrchestrationMapTest.mjs        # 俯视图（45 条）：数像素、PickAt、组/拍把手、ToPng、工具回调
+node Taierzhuang1938/Script_OrchestrationEditorTest.mjs     # 工作台（64 条）：三栏/时间轴、事实与 flow 一致、跟随实时不抢视野、标注输入框、批注退化与图片补传、关窗还干净
 node Taierzhuang1938/Script_EditorTest.mjs --launcher-only  # 入口面板 26 个按钮
 node Taierzhuang1938/Script_WorldInfoEditorTest.mjs
 node Taierzhuang1938/Script_PlayerStateEditorTest.mjs
