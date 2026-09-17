@@ -11,7 +11,7 @@ Profiler 仍在独立窗口运行，复制当前入口带版本的主题链接�
 外观与操作验收见 [主菜单文档](Data_MainMenu.md) 的 `--interface-only`；相机、设置持久化与
 编辑工具功能继续由 `Script_EditorTest.mjs` 验证。
 
-开发用的十五个互斥编辑器、五个可叠加工具（Debug Rendering / Profiler / WorldInfo / 玩家状态 / 敌军 AI）+ 一个入口面板。**不对玩家开放**：出图模式（`?shot=1`）下整棵
+开发用的十五个互斥编辑器、六个可叠加工具（Debug Rendering / Profiler / WorldInfo / 玩家状态 / 敌军 AI / 关卡编排）+ 一个入口面板。**不对玩家开放**：出图模式（`?shot=1`）下整棵
 DOM 是 `display:none`，任何截图里都不会有它。
 
 ## 精简测试界面
@@ -527,6 +527,38 @@ LKP 十字、掩体的隐蔽位/射击位/法线、`task.point`、班组连到�
 404 或失败一律**退化为复制片段**并把原因写在面板上，不静默失败。
 
 冒烟：`node Taierzhuang1938/Script_AiEditorTest.mjs`（浏览器，29 条）。
+
+### 关卡编排 `Script_EditorOrchestration.mjs`（叠加层，独立窗口）
+
+入口：设置 · 工具 → 调试 → 关卡编排。窗口名 `tzOrchestration`，默认 1380×900，
+`keepOnClose = true`：不接管相机、不暂停玩法、不碰指针锁 —— 边打边看走到哪一步正是主用例。
+完整口径（四张编排表、模型、批注 schema、端点、CLI、闭环流程）在
+[Data_MissionOrchestration.md](Data_MissionOrchestration.md)，这里只记面板本身。
+
+四块：左「流程」18 个公开阶段 → 27 个内部步骤（目标 / 要求事实的人话 + 实时 ✓…· — /
+对白 / 最短时长 / 本步生成的组 / 指引路线，每个阶段带一颗「从这里试玩」＝
+`Debug.FirstLevelJump(n)`）；中「俯视图」＝ `Script_EditorOrchestrationMap.mjs` 的 canvas 2D
+（13 个图层开关、7 把工具、阶段滑条、适配整关 / 本阶段、跟随实时）；
+右「详情 / 批注」（`FindOwner` 反查 + 批注列表 + 新建批注表单 + 保存 / 交接 / 下载）；
+底「时间轴」18 条泳道，**设计行与实际行分色**。
+
+两条不许含糊的规矩：
+
+- **面板上的勾是运行时真值**：要求事实的 `✓/…` 直接对 `flow.Has`，不自己另算一套。
+- **设计行的 `condition` 标记没有秒数**（`data-marker-at` 缺席）：那些事情由玩家行为触发，
+  编一个秒数出来就是把「预定安排」冒充成「真的发生过」。实际行的时刻只来自 `flow.log`。
+
+数据：`BuildOrchestrationModel()` 开窗时建一次；live 每 0.25 s 从
+`host.game.missionRuntime`（**每 tick 重新取**，换关会换对象）拿 `State()` 折成 `live`。
+没有第一关运行时也照样能看全部设计编排（顶部写「未加载第一关 · 仅显示设计编排」）。
+DOM 常驻、只写属性；面板 4 Hz，地图只在 live 指纹变了或选中变了时重画。
+
+批注：`GET /__notes/status` 可写就 `POST /__notes/save` 写进
+`Taierzhuang1938/Notes/FirstLevel/`（notes.json + `<noteId>.png`）；
+写不了就退化成 localStorage 草稿 + 「下载 / 复制 JSON」，并把原因明写在面板上。
+
+冒烟：`node Taierzhuang1938/Script_OrchestrationEditorTest.mjs`（浏览器，46 条）
+与 `node Taierzhuang1938/Script_OrchestrationMapTest.mjs`（浏览器，37 条）。
 
 ### Profiler `Script_EditorProfiler.mjs`（叠加层，独立窗口）
 

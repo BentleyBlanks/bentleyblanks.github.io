@@ -129,9 +129,9 @@ const afterGear = await page.evaluate(() => {
 });
 Check("打游戏当中按 ` 弹出入口面板", afterGear.panelOpen && afterGear.capturing,
   `进游戏时指针锁=${locked}`);
-// 三个设置 + 五个可叠加（渲染调试/性能剖析/WorldInfo/玩家状态/敌军 AI）+ 十六个编辑器（含小队行进）
+// 三个设置 + 六个可叠加（渲染调试/性能剖析/WorldInfo/玩家状态/敌军 AI/关卡编排）+ 十六个编辑器（含小队行进）
 // + 一个「全部关掉」（它的 data-editor 是空串，也被选择器数进来）
-Check("面板列出设置、调试与全部编辑器入口", afterGear.entries === 25 && afterGear.squadMarch, `按钮数=${afterGear.entries}，小队行进=${afterGear.squadMarch}`);
+Check("面板列出设置、调试与全部编辑器入口", afterGear.entries === 26 && afterGear.squadMarch, `按钮数=${afterGear.entries}，小队行进=${afterGear.squadMarch}`);
 const fpsDefault = await page.evaluate(() => {
   const fps = document.querySelector(".hudFps");
   const toggle = document.querySelector('[data-action="fps"]');

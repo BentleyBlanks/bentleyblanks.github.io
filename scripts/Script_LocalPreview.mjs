@@ -17,6 +17,10 @@
 // 响应头刻意跟线上保持一致（**不**发 COOP/COEP）：本地能跑而线上跑不了的东西，
 // 本地预览就白做了。
 //
+// 两个只在回环上可写的本地口（线上 Pages 没有，编辑器自动退化）：
+//   /__tuning/*  敌军 AI 编辑器把滑杆的数存回 Data_Tuning_*.mjs（docs/Data_EnemyAi.md §14.3）；
+//   /__notes/*   关卡编排工作台把批注草稿存进 Taierzhuang1938/Notes/<Level>/notes.json 与同目录的 PNG。
+//
 // 首页 http://127.0.0.1:<port>/__preview/ 是一个索引页：列出这棵树里所有
 // 带 index.html 的页面（按改动时间排序），并且能一键把任意 worktree 挂到
 // 相邻端口上 —— 同一个进程内多开几个 server，各自服务自己的根，
@@ -30,6 +34,10 @@ import { fileURLToPath } from "node:url";
 // 敌军 AI 编辑器的「保存到源码」（docs/Data_EnemyAi.md §14.3）。改写器是纯 Node、
 // 不认识 http：这一层只负责回环校验、白名单与原子写回。
 import { ApplyTuningChanges, TUNING_FILE_RE } from "../Taierzhuang1938/Script_TuningWriter.mjs";
+// 关卡编排工作台的「保存批注草稿」。同样只在回环上可写：
+//   GET  /__notes/status → { writable, root }
+//   POST /__notes/save   { level, notes, images } → 写 Taierzhuang1938/Notes/<Level>/notes.json 与 <noteId>.png
+import { NOTES_FILE_RE, NOTE_IMAGE_RE, LEVEL_RE, NotesPathFor, ValidateNote } from "../Taierzhuang1938/Script_MissionNotes.mjs";
 
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_ROOT = path.resolve(SCRIPT_DIR, "..");
@@ -369,6 +377,14 @@ function CreateServer(rootDir, context) {
     }
     if (route === "/__tuning/save") { await HandleTuningSave(request, response, rootDir); return; }
 
+    // 关卡编排工作台的批注草稿口。同样必须排在下面那道「只收 GET/HEAD」之前。
+    // 读批注不走端点（工作台直接 fetch ./Notes/<Level>/notes.json），只有写要过这道闸。
+    if (route === "/__notes/status") {
+      SendJson(response, 200, { writable: IsLoopback(request), root: rootDir });
+      return;
+    }
+    if (route === "/__notes/save") { await HandleNotesSave(request, response, rootDir); return; }
+
     if (request.method !== "GET" && request.method !== "HEAD") { response.writeHead(405).end(); return; }
     const filePath = path.join(rootDir, route);
     if (!filePath.startsWith(rootDir)) { response.writeHead(403).end(); return; }
@@ -426,6 +442,7 @@ function SendJson(response, status, payload) {
 // 一个 socket 错误而不是那句「body 超过 256 KB」，看起来就像本地服务器崩了。
 // 只有夸张到 32 倍上限时才真掐（那已经不是「改错了一个数」，是在灌数据）。
 function ReadBody(request, limit) {
+  const human = limit >= 1024 * 1024 ? `${Math.round(limit / 1024 / 1024)} MB` : `${Math.round(limit / 1024)} KB`;
   return new Promise((resolve, reject) => {
     const chunks = [];
     let size = 0;
@@ -441,7 +458,7 @@ function ReadBody(request, limit) {
       chunks.push(chunk);
     });
     request.on("end", () => {
-      if (overflow) reject(new Error("body 超过 256 KB"));
+      if (overflow) reject(new Error(`body 超过 ${human}`));
       else resolve(Buffer.concat(chunks).toString("utf8"));
     });
     request.on("error", reject);
@@ -489,6 +506,101 @@ async function HandleTuningSave(request, response, rootDir) {
     SendJson(response, 200, {
       ok: true, file, applied: result.applied.length, changes: result.applied, missing: result.missing,
     });
+  } catch (error) {
+    SendJson(response, 500, { ok: false, error: String(error && error.message ? error.message : error) });
+  }
+}
+
+// ------------------------------------------------ 批注草稿保存（只在本地）
+//
+// 关卡编排工作台（docs/Data_MissionOrchestration.md）写完批注要能落进仓库，
+// 这样换一棵 worktree 的 agent 也拿得到：
+//   GET  /__notes/status → { writable: true, root }
+//   POST /__notes/save   { level: "FirstLevel", notes: [...],
+//                          images: { "n_20260918_101500_ab12.png": "data:image/png;base64,…" } }
+//                       → { ok: true, count: 3, images: [...] }
+//
+// 闸门和 /__tuning 那一套一模一样（回环 / 白名单 / 根目录 / body 上限），另加两道：
+//   ⑤ 每条批注先过 ValidateNote —— 半截批注进了仓库，工作台下次加载整个列表都炸；
+//   ⑥ 图片只收 `data:image/png;base64,`，单张 ≤ 1.5 MB，文件名必须是 `<noteId>.png`。
+// 写盘一律 `.tmp` + rename，而且**先全部校验完再开始写**：
+// 一条坏图不该留下一个已经改了一半的 notes.json。
+// 读批注不需要端点（工作台直接 fetch 那个 json），所以线上 Pages 只是不能写而已。
+const NOTES_BODY_LIMIT = 8 * 1024 * 1024;
+const NOTE_IMAGE_LIMIT = Math.round(1.5 * 1024 * 1024);
+const PNG_DATA_PREFIX = "data:image/png;base64,";
+const PNG_MAGIC = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+
+function WriteAtomic(filePath, data) {
+  const temporary = `${filePath}.tmp`;
+  fs.writeFileSync(temporary, data);
+  fs.renameSync(temporary, filePath);
+}
+
+async function HandleNotesSave(request, response, rootDir) {
+  if (request.method !== "POST") { SendJson(response, 405, { ok: false, error: "只收 POST" }); return; }
+  if (!IsLoopback(request)) { SendJson(response, 403, { ok: false, error: "只接受回环地址" }); return; }
+  let body;
+  try { body = await ReadBody(request, NOTES_BODY_LIMIT); } catch (error) {
+    SendJson(response, 400, { ok: false, error: error.message });
+    return;
+  }
+  let payload;
+  try { payload = JSON.parse(body); } catch { SendJson(response, 400, { ok: false, error: "body 不是 JSON" }); return; }
+
+  const level = payload && typeof payload.level === "string" ? payload.level : "";
+  const relative = NotesPathFor(level);
+  if (!LEVEL_RE.test(level) || !NOTES_FILE_RE.test(relative)) {
+    SendJson(response, 403, { ok: false, error: "level 只能是字母数字（写死在 Taierzhuang1938/Notes/<Level>/notes.json）" });
+    return;
+  }
+  const notesFile = path.resolve(rootDir, relative);
+  if (notesFile !== path.join(rootDir, relative) || !notesFile.startsWith(rootDir + path.sep)) {
+    SendJson(response, 403, { ok: false, error: "路径不在服务根之下" });
+    return;
+  }
+  if (!Array.isArray(payload.notes)) { SendJson(response, 400, { ok: false, error: "notes 要是数组" }); return; }
+
+  const broken = [];
+  payload.notes.forEach((note, index) => {
+    const result = ValidateNote(note);
+    if (!result.ok) broken.push(`#${index}${note && note.id ? ` ${note.id}` : ""}：${result.errors.join("；")}`);
+    else if (note.level !== level) broken.push(`#${index} ${note.id}：level 是 ${note.level}，和请求的 ${level} 不是一回事`);
+  });
+  if (broken.length) { SendJson(response, 400, { ok: false, error: "批注不合规", details: broken }); return; }
+
+  const images = payload.images && typeof payload.images === "object" ? payload.images : {};
+  const pending = [];
+  for (const [name, dataUrl] of Object.entries(images)) {
+    if (!NOTE_IMAGE_RE.test(name)) {
+      SendJson(response, 403, { ok: false, error: `图片名必须是 <noteId>.png：${name}` });
+      return;
+    }
+    if (typeof dataUrl !== "string" || !dataUrl.startsWith(PNG_DATA_PREFIX)) {
+      SendJson(response, 400, { ok: false, error: `${name} 只收 data:image/png;base64,` });
+      return;
+    }
+    const buffer = Buffer.from(dataUrl.slice(PNG_DATA_PREFIX.length), "base64");
+    if (buffer.length > NOTE_IMAGE_LIMIT) {
+      SendJson(response, 400, { ok: false, error: `${name} 有 ${Math.round(buffer.length / 1024)} KB，超过 1.5 MB` });
+      return;
+    }
+    if (buffer.length < PNG_MAGIC.length || !buffer.subarray(0, PNG_MAGIC.length).equals(PNG_MAGIC)) {
+      SendJson(response, 400, { ok: false, error: `${name} 解出来不是 PNG` });
+      return;
+    }
+    pending.push({ name, buffer, file: path.join(path.dirname(notesFile), name) });
+  }
+
+  try {
+    // 目录只可能是 Taierzhuang1938/Notes/<Level>/ —— 上面那两道闸已经把别处排除了。
+    fs.mkdirSync(path.dirname(notesFile), { recursive: true });
+    for (const image of pending) WriteAtomic(image.file, image.buffer);
+    // notes.json 最后写：它是索引，不该先于图片落地。
+    WriteAtomic(notesFile, `${JSON.stringify(payload.notes, null, 2)}\n`);
+    console.log(`  /__notes/save ${relative}：${payload.notes.length} 条批注`
+      + `${pending.length ? `，${pending.length} 张图` : ""}`);
+    SendJson(response, 200, { ok: true, file: relative, count: payload.notes.length, images: pending.map((one) => one.name) });
   } catch (error) {
     SendJson(response, 500, { ok: false, error: String(error && error.message ? error.message : error) });
   }
@@ -565,7 +677,10 @@ const HELP = `本地预览服 —— 按线上同款路径把整棵树跑在 127
 索引页在 http://127.0.0.1:<port>/__preview/ ：列出所有页面，并能把任意 worktree 挂到相邻端口。
 调参表保存口（敌军 AI 编辑器，只在回环上可写）：GET /__tuning/status；POST /__tuning/save
   { file: "Taierzhuang1938/Data_Tuning_AiCover.mjs", changes: [{ path: "COVER.standoffM", value: 0.7 }] }
-  只替换那一个数字字面量，注释与格式一个字不动（Taierzhuang1938/Script_TuningWriter.mjs）。`;
+  只替换那一个数字字面量，注释与格式一个字不动（Taierzhuang1938/Script_TuningWriter.mjs）。
+批注草稿保存口（关卡编排工作台，只在回环上可写）：GET /__notes/status；POST /__notes/save
+  { level: "FirstLevel", notes: [...], images: { "n_20260918_101500_ab12.png": "data:image/png;base64,…" } }
+  逐条过 ValidateNote 后写 Taierzhuang1938/Notes/<Level>/notes.json 与同目录 PNG（单张 ≤ 1.5 MB，原子写）。`;
 
 async function Main() {
   const args = process.argv.slice(2);

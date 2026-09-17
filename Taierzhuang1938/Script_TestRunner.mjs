@@ -90,6 +90,7 @@ export const testDefs = {
   MissionReturnTest: {file:"Script_MissionReturnTest.mjs",desc:"Soft return boundaries, escort separation, hysteresis and stage corridors"},
   FirstLevelMissionReturnBrowserTest: {file:"Script_FirstLevelMissionReturnBrowserTest.mjs",timeoutMs:300000,desc:"Real first-level return overlay, input, recovery and stage lifecycle"},
   FirstLevelMissionTest: {file:'Script_FirstLevelMissionTest.mjs',args:['--audio'],desc:'新版第一关完整事实门、共享地形、实际担架队列和往返撤离'},
+  MissionGatesTest: {file:'Script_MissionGatesTest.mjs',desc:'第一关编排表：事实门覆盖、按表生成与激活规则、运行时源码对账、编排模型'},
   FirstLevelMissionBrowserTest: {file:'Script_FirstLevelMissionBrowserTest.mjs',args:['--campaign','--audio'],timeoutMs:1800000,desc:'新版第一关真实输入、移动军列、壕沟路线、作战与通关'},
   FirstLevelMealTest: {file:"Script_FirstLevelMealTest.mjs",timeoutMs:300000,desc:"Blender bacon, paired hand contact, source-clock pause and prop ownership"},
   FirstLevelTrainAnimationTest: {file:'Script_FirstLevelTrainAnimationTest.mjs',timeoutMs:600000,desc:'Archived seated animation assets: original rig samples and bench contacts'},
@@ -205,7 +206,10 @@ export const testDefs = {
   AiInitiativeBrowserTest: {file:"Script_AiInitiativeBrowserTest.mjs",timeoutMs:300000,desc:"战术执行：受压移动/跃进/失败掩体/刺刀接触/失去目标"},
   AiBrainGraphTest: { file: "Script_AiBrainGraphTest.mjs", desc: "敌军 AI 行为图：节点=STATE、边两端存在、表键可解析、任务=TASK（纯 Node，毫秒级）" },
   TuningWriterTest: { file: "Script_TuningWriterTest.mjs", desc: "调参表改写器：按花括号层级只改那一个数字、注释格式不动（纯 Node，毫秒级）" },
+  MissionNotesTest: { file: "Script_MissionNotesTest.mjs", desc: "关卡编排批注：schema/快照/漂移/交接文本 + /__notes 保存端点的四道闸（纯 Node，秒级）" },
   AiEditorTest: { file: "Script_AiEditorTest.mjs", timeoutMs: 300000, desc: "敌军 AI 编辑器：六个分节、世界叠加进出还干净、滑杆热改、重置/复制/保存退化、行为图节点数" },
+  OrchestrationMapTest: { file: "Script_OrchestrationMapTest.mjs", timeoutMs: 300000, desc: "关卡编排俯视图：各阶段数像素（敌人色随阶段变、路线色不为 0）、PickAt 点得中成员、ToPng、圈选/移动工具回调、Dispose 后不再回调" },
+  OrchestrationEditorTest: { file: "Script_OrchestrationEditorTest.mjs", timeoutMs: 300000, desc: "关卡编排工作台：入口/三栏与时间轴、要求事实与 flow 一致、实时玩家点、阶段状态、反查、批注退化到 localStorage、交接文本、关窗还干净" },
   AiCombatBrowserTest: {
     file: "Script_AiCombatBrowserTest.mjs",
     timeoutMs: 25 * 60 * 1000,
@@ -375,7 +379,7 @@ export const browserTests = new Set([
   "TrainLibraryTest",
   'ActorLocomotionTest', 'BackRifleRunTest', 'MeleeAnimationTest', 'DadaoSwingTest','GrenadeThrowTest', 'InfantryAnimationTest', 'DeathCollapseTest',
   "ActorBatchTest", "ActorCrowdTest", "ActorDepthTest", "ActorPoseTest", "AdsSightTest", "AiBehaviorTest",
-  "AiCombatBrowserTest", "AiCloseRangeTest", "AiEditorTest", "AiInitiativeBrowserTest",
+  "AiCombatBrowserTest", "AiCloseRangeTest", "AiEditorTest", "AiInitiativeBrowserTest", "OrchestrationMapTest", "OrchestrationEditorTest",
   "AudioTest", "AudioWiringTest", "BayonetTest", "BootPropTest", "BootStallTest", "BootTest", "ColliderTest",
   "CutscenePoseTest", "DamageTest", "DeathViewTest", "DestructionEditorTest", "DestructionTest",
   "DressingProbeTest", "EastSuburbNavTest", "EditorTest", "WorldInfoEditorTest", "PlayerStateEditorTest", "FixedCenterAimTest", "FpsArmTest", "FpsHandContactTest", "FpsGripEditorTest",
@@ -406,6 +410,7 @@ export const tier0Fast = [
   "AiTacticsTest",
   "AiBrainGraphTest",
   "TuningWriterTest",
+  "MissionNotesTest",
   "AutoQualityTest",
   "TextGatherCheck",
   "BootPayloadTest",
@@ -450,7 +455,7 @@ export const domains = {
   propVelocity: {label:'近景刚体道具速度与移动清晰度',tests:['CarriagePropVelocityTest']},
   squadMarch: {label:"通用小队行进",tests:["SquadMarchCoverTest","SquadMarchCoverBrowserTest","SquadMarchTest","SquadMarchAiTest","SquadMarchEditorTest","SquadMarchNavigationTest","FirstLevelSquadMarchTest","EditorLauncherTest"]},
   firstLevelTail: {label:"第一关接收院至结尾定向续接",tests:["FirstLevelMissionStageTailTest"]},
-  firstLevel: {label:'新版第一关完整任务',tests:['MachineGunCutsceneAudioTest','Type89DamageTest','FirstLevelFrontRouteBrowserTest','FirstLevelMissionTopologyTest','FirstLevelMissionTopologyBrowserTest','MissionReturnTest','FirstLevelMissionReturnBrowserTest','FirstLevelCasualtyBrowserTest','FirstLevelOpeningSequenceBrowserTest','FirstLevelCarriageAnimationTest','FirstLevelAmbushAnimationTest','FirstLevelMealTest','FirstLevelMissionTest','FirstLevelFrontPresenceTest','FirstLevelMachineGunTest','FirstLevelMachineGunCutsceneTest','FirstLevelMissionAftermathTest','FirstLevelOpeningBrowserTest','FirstLevelOpeningContactTest','FirstLevelGuideQueueTest','FirstLevelMissionFortificationsTest','FirstLevelMissionBrowserTest','FirstLevelMissionStageJumpTest','FirstLevelMissionStageContinueTest','FirstLevelMissionPresentationTest','FirstLevelTrainAnimationTest']},
+  firstLevel: {label:'新版第一关完整任务',tests:['MachineGunCutsceneAudioTest','Type89DamageTest','FirstLevelFrontRouteBrowserTest','FirstLevelMissionTopologyTest','FirstLevelMissionTopologyBrowserTest','MissionReturnTest','FirstLevelMissionReturnBrowserTest','FirstLevelCasualtyBrowserTest','FirstLevelOpeningSequenceBrowserTest','FirstLevelCarriageAnimationTest','FirstLevelAmbushAnimationTest','FirstLevelMealTest','FirstLevelMissionTest','MissionGatesTest','FirstLevelFrontPresenceTest','FirstLevelMachineGunTest','FirstLevelMachineGunCutsceneTest','FirstLevelMissionAftermathTest','FirstLevelOpeningBrowserTest','FirstLevelOpeningContactTest','FirstLevelGuideQueueTest','FirstLevelMissionFortificationsTest','FirstLevelMissionBrowserTest','FirstLevelMissionStageJumpTest','FirstLevelMissionStageContinueTest','FirstLevelMissionPresentationTest','FirstLevelTrainAnimationTest']},
   text: { label: "玩家文本 / 数值表（数据驱动闸门）", tests: ["TextTest", "TextGatherCheck"] },
   animation: { label: '独立动画资产验收', tests: ['ActorLocomotionTest','BackRifleRunTest','MeleeAnimationTest','DadaoSwingTest','GrenadeThrowTest','InfantryAnimationTest','DeathCollapseTest'] },
   explosives: { label: "爆炸白盒与通用地形形变/返掷", tests: ["ExplosionRulesTest", "ExplosionRangeTest", "CraterSurfaceTest"] },
@@ -516,7 +521,7 @@ export const domains = {
   // 在真入口上量：VoiceTest 验的是资产与交付档，量不到 AudioEngine 的装载分叉。
   voice: { label: "语音", tests: ["VoiceTest", "MachineGunCutsceneAudioTest"] },
   menu: { label: "主菜单/开机陈设", tests: ["FirstLevelP012DebugTest", "MenuTest", "DeathMenuTest", "BootPropTest"] },
-  editor: { label: "场景编辑器/第一人称检查/PCG/资产规范/可破坏编辑器/采样点", tests: ["WorldInfoEditorTest", "PlayerStateEditorTest", "AiEditorTest", "TuningWriterTest", "AssetStandardsTest", "EditorTest", "FpsGripEditorTest", "PropPcgTest", "PropPcgEditorTest", "DestructionEditorTest", "TrenchEditorTest", "SamplePointTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "CharacterModelTest"] },
+  editor: { label: "场景编辑器/第一人称检查/PCG/资产规范/可破坏编辑器/采样点", tests: ["WorldInfoEditorTest", "PlayerStateEditorTest", "AiEditorTest", "TuningWriterTest", "MissionGatesTest", "MissionNotesTest", "OrchestrationMapTest", "OrchestrationEditorTest", "AssetStandardsTest", "EditorTest", "FpsGripEditorTest", "PropPcgTest", "PropPcgEditorTest", "DestructionEditorTest", "TrenchEditorTest", "SamplePointTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "CharacterModelTest"] },
   cutscene: {
     label: "过场/剧本派发/车厢生活动作",
     // 关中过场 beat 与 LEVEL_CUES 的构建都在 Script_Story 与组装层里，
@@ -609,8 +614,13 @@ const changedDomainRules = [
   { domain: "ai", pattern: /Data_AiBrainGraph|Script_AiProbeScene/i },
   // 调参表改写器只被本地预览的保存口与编辑器测试用：改了跑 editor 域（TuningWriterTest）。
   { domain: "editor", pattern: /Script_TuningWriter/i },
+  // 关卡编排的批注层（schema / CLI）与它存下来的草稿：批注是编辑器工作台的产物，
+  // notes.json 里没有任何游戏数据，但它的形状被保存端点与 CLI 共用，改了要跑 MissionNotesTest。
+  { domain: "editor", pattern: /Script_MissionNotes|Notes\/[A-Za-z0-9]+\/notes\.json/i },
   { domain: "editor", pattern: /Script_EditorWorldInfo|Script_WorldInfoEditorTest/i },
   { domain: "editor", pattern: /Script_EditorPlayerState|Script_PlayerStateEditorTest/i },
+  // 关卡编排工作台本体与它的俯视图：改了跑 editor 域（OrchestrationEditorTest / OrchestrationMapTest）。
+  { domain: "editor", pattern: /Script_EditorOrchestration|Script_Orchestration.*Test/i },
   // 壕沟规划层与预览几何没有 Editor 字样，但「场景样条PCG」面板读的就是它们
   // （滑杆推 SetTrenchPresetOverride、预览调 CompileTrenchNetwork）——
   // 改 TRENCH_PRESETS 不跑 TrenchEditorTest，面板那一路会静默过期。

@@ -588,7 +588,10 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
   FullScene = 完整县城与四门外 / 出川军列车厢静态布景的只读巡场、种子、Spline 与环境取证；
   FirstPerson = 正片 Viewmodel 的装备切换、玩家/外部检查视角、武器挂点/IK 目标/真实掌心与骨骼残差可视化，只读不写姿态表；
   车厢不播放 CS_Chuchuan 时间轴、不加载演员/对白/字幕，不读写 Scene 的关卡文档。
-  DebugRendering、Profiler、WorldInfo 与玩家状态位于「调试」组，可叠加且不接管相机、不暂停玩法。
+  DebugRendering、Profiler、WorldInfo、玩家状态与关卡编排位于「调试」组，可叠加且不接管相机、不暂停玩法。
+  关卡编排（Orchestration）独立窗口显示第一关的真实编排：流程（18 阶段/27 步骤 + 要求事实实时勾）、
+  真实比例俯视图（按阶段看敌我布局与触发圈）、设计/实际两行时间轴、现场批注 → 交给 agent；
+  口径 `docs/Data_MissionOrchestration.md`，回归口 `Script_OrchestrationEditorTest.mjs` / `Script_OrchestrationMapTest.mjs`。
   WorldInfo 独立浮窗显示当前角色 Transform 与高度；回归口 `Script_WorldInfoEditorTest.mjs`。
   玩家状态（PlayerState）独立浮窗显示血量失血、压制晕眩、体力、后坐散布、弹药动作等隐藏状态；回归口 `Script_PlayerStateEditorTest.mjs`。
   出图模式（`?shot=1`）下整棵编辑器 DOM 是 display:none，进不了截图。

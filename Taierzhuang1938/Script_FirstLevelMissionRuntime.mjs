@@ -33,6 +33,15 @@ import {
   MISSION_PLACEMENT as P,
   MISSION_SUPPLIES,
 } from "./Data_FirstLevelMissionLayout.mjs";
+// 编排表（Data_FirstLevelMissionGates）：按步骤生成哪些组、对白记哪些事实、
+// 每个事实门的点与半径。运行时与关卡编排工作台共用同一份口径。
+import {
+  MISSION_STEP_SPAWNS,
+  MISSION_ENCOUNTER_ACTIVATION,
+  MISSION_VOICE_FACTS,
+  MISSION_FACT_GATES,
+  MissionGateFamily,
+} from "./Data_FirstLevelMissionGates.mjs";
 import { MISSION_TRAIN, MissionTrainMotion } from "./Data_FirstLevelMissionTrain.mjs";
 import { FirstLevelMissionTrain } from "./Script_FirstLevelMissionTrain.mjs";
 import { PrepareFirstLevelCarriageAnimation } from "./Script_FirstLevelCarriageAnimation.mjs";
@@ -168,6 +177,18 @@ export class FirstLevelMissionRuntime {
   Near(point, radius = 5) {
     return Distance(this.player.position, point) < radius;
   }
+  /**
+   * 事实门的距离判定：点与半径一律从 MISSION_FACT_GATES 取，代码里不再写坐标与米数。
+   * 家族门（approachShell<i> / bundleRoutePoint<i> / bundleCrawl<id>）按前缀解析出那一个点。
+   * 附加条件（是否已下车、担架是否过完、人是不是趴着）仍留在各自的调用处。
+   */
+  GateNear(fact) {
+    const exact = MISSION_FACT_GATES[fact], family = exact ? null : MissionGateFamily(fact);
+    if (exact && exact.kind !== "proximity") throw new Error(`GateNear: ${fact} is not a proximity gate`);
+    if (!exact && !family) throw new Error(`GateNear: no proximity gate for ${fact}`);
+    const gate = exact || family.gate;
+    return this.Near(family ? family.point : gate.point || A[gate.anchor], gate.radiusM);
+  }
   Say(id, options) {
     this.voice.Enqueue(id, options);
   }
@@ -297,19 +318,11 @@ export class FirstLevelMissionRuntime {
     if (id === "TrainBriefing") this.Record("trainShelling");
     if (id === "WreckImpact") this.Say("TrainShelling");
     if (id === "TrainShelling") this.Say("WreckExit");
-    if (id === "WreckExit") this.Record("unloadOrdersHeard");
     if (id === "ShelterAid") this.Say("EscapeWhisper");
-    if (id === "EscapeWhisper") this.Record("escapeWhisperHeard");
-    if (id === "SupportOrder") this.Record("supportOrdersHeard");
-    if (id === "AircraftFirst") this.Record("firstAirOrdersHeard");
-    if (id === "CarryZhou") this.Record("carryOrdersHeard");
-    if (id === "FinalExit") this.Record("finalExitHeard");
-    if (id === "Volunteer") this.Record("volunteerHeard");
-    if (id === "ZhouLift") this.Record("zhouOnLitter");
-    if (id === "BundleSupplyDirections") this.Record("bundleDirectionsHeard");
-    if (id === "SouthHope") this.Record("southHopeHeard");
-    if (id === "FollowVehicle") this.Record("followVehicleHeard");
-    if (id === "TransferHope") this.Record("transferHopeHeard");
+    // 「播完即记一条事实」的那一串走表（MISSION_VOICE_FACTS）。
+    // 带额外副作用的对白事件在 VoiceEvent 里，不在这条链上。
+    const fact = MISSION_VOICE_FACTS[id];
+    if (fact) this.Record(fact);
   }
   SyncCarriageDialogue(){
     const current=this.voice.current;
@@ -1285,6 +1298,10 @@ export class FirstLevelMissionRuntime {
     this.Objective(Localize(FirstLevelStageTextId(stage.id), stage.objective));
     if (stage.cue && !["Orders", "Courtyard", "Train", "Unloading", "Shelter", "Death"].includes(stage.id))
       this.Say(stage.cue, { urgent: ["AirFirst", "Dive", "Death"].includes(stage.id) });
+    // 按表生成这一步的遭遇组（Data_FirstLevelMissionGates.MISSION_STEP_SPAWNS，
+    // 顺序就是原来各 case 里的调用顺序）。front 与转运四拍不在表里：
+    // 前者由 UpdateFront 的 frontBattleStarted 放出，后者由 UpdateTransferBeats 按拍放出。
+    for (const id of MISSION_STEP_SPAWNS[stage.id] || []) this.SpawnEncounter(id);
     switch (stage.id) {
       case "Train":
         this.Say(stage.cue);
@@ -1310,11 +1327,8 @@ export class FirstLevelMissionRuntime {
         });
         if (this.forwardGunner) this.Defend(this.forwardGunner, A.forwardNest);
         // The finite assault is committed by UpdateFront at the last approach
-        // bend. Spawning it here lets a slow approach spend the battle offscreen.
-        this.SpawnEncounter("approach");
-        this.SpawnEncounter("tank");
-        this.SpawnEncounter("village");
-        this.SpawnEncounter("melee");
+        // bend. approach/tank/village/melee are spawned at this step (MISSION_STEP_SPAWNS,
+        // before the switch) so a slow approach can spend the battle offscreen.
         this.frontDefenders=FRONT_DEFENDERS.map(spec=>{
           const actor=this.ai.Spawn("nra",spec.x,spec.z,{weapon:spec.weapon,squadId:"MissionFrontDefense"});
           if(actor){InstallMissionSentry(actor);actor.missionId=spec.id;this.Defend(actor,spec);this.ai.SetStance(actor,spec.stance,Infinity,true);
@@ -1325,9 +1339,7 @@ export class FirstLevelMissionRuntime {
         this.tank.present=true;
         break;
       case "MachineGun":
-        this.SpawnEncounter("machineGun");
         this.tank.active = true;
-        this.SpawnEncounter("tank");
         this.SpawnGuards();
         for (const [i, actor] of this.squad.entries()) this.Defend(actor, OPENING.frontPosts[i],R.contactRadiusM,R.companionCoverSlackM);
         break;
@@ -1336,7 +1348,6 @@ export class FirstLevelMissionRuntime {
         // bundle approach. Everyone exits through its central trench junction.
         this.emplacement.Vacate("sortie");
         this.GuideSortie(MISSION_ROUTES.bundle);
-        this.SpawnEncounter("bundleApproach");
         this.EnsureBundleKeeper();
         break;
       case "Orders":
@@ -1358,8 +1369,6 @@ export class FirstLevelMissionRuntime {
           if (actor.alive && actor.missionDormant && actor.missionEncounter !== "melee") actor.scriptedNoncombatant = false;
         this.audio.Ambience("firstLevelFront");
         this.Guide(MISSION_ROUTES.village.slice(0, 3));
-        this.SpawnEncounter("village");
-        this.SpawnEncounter("melee");
         this.HideAmbushers();
         this.PostAmbushSquad();
         // Package C 的动作库还没交付时这一拍退回既有姿态，不阻断任务。
@@ -1381,7 +1390,6 @@ export class FirstLevelMissionRuntime {
         break;
       case "Courtyard":
         this.Guide(MISSION_ROUTES.village.slice(2, 6));
-        this.SpawnEncounter("courtyard");
         break;
       case "TransferApproach":
         this.Guide(MISSION_ROUTES.village.slice(-4));
@@ -1389,12 +1397,10 @@ export class FirstLevelMissionRuntime {
         break;
       case "Transfer":
         this.Guide(MISSION_ROUTES.village.slice(-4));
-        this.SpawnEncounter("transfer");
         break;
       case "AirFirst":
         this.guideRoute = null;
         this.StartAir(1, R.firstAirLeadS);
-        this.SpawnEncounter("air");
         break;
       case "Carry":
         this.column.zhou.state = "critical";
@@ -1409,22 +1415,18 @@ export class FirstLevelMissionRuntime {
         break;
       case "RetreatFirst":
         this.column.StartRetreat();
-        this.SpawnEncounter("retreat");
         this.Say("RetreatFirst");
         this.Guide(MISSION_REARGUARD_POCKETS.find(pocket=>pocket.id===stage.id).route);
         break;
       case "RetreatWall":
-        this.SpawnEncounter("retreatWall");
         this.column.zhou.health = 12;
         this.Guide(MISSION_REARGUARD_POCKETS.find(pocket=>pocket.id===stage.id).route);
         break;
       case "RetreatYard":
-        this.SpawnEncounter("retreatYard");
         this.column.zhou.health = 6;
         this.Guide(MISSION_REARGUARD_POCKETS.find(pocket=>pocket.id===stage.id).route);
         break;
       case "Reception":
-        this.SpawnEncounter("reception");
         this.column.StartReception();
         this.guideRoute = null;
         break;
@@ -1437,7 +1439,6 @@ export class FirstLevelMissionRuntime {
         if (this.bedGuide.actor) this.squadRoutes.set(this.bedGuide.actor.id, []);
         break;
       case "Death":
-        this.SpawnEncounter("final");
         this.deathMedic = this.column.walkers
           .filter((w) => w.kind === "medic" && w.health > 0 && !w.assigned)
           .sort((a, b) => Distance(a, A.zhouDrop) - Distance(b, A.zhouDrop))[0];
@@ -1700,19 +1701,20 @@ export class FirstLevelMissionRuntime {
     }
   }
   UpdateFront() {
-    for(const actor of this.enemies.values())if(this.flow.stage.id==="Village" && actor.missionEncounter!=="melee" && actor.missionDormant && Distance(actor.position,this.player.position)<55){
+    const wake=MISSION_ENCOUNTER_ACTIVATION.village.wake;
+    for(const actor of this.enemies.values())if(this.flow.stage.id===wake.step && actor.missionEncounter!=="melee" && actor.missionDormant && Distance(actor.position,this.player.position)<wake.radiusM){
       actor.missionDormant=false;actor.scriptedNoncombatant=false;
     }
     if(!["Support","MachineGun","Tank","Orders"].includes(this.flow.stage.id))return;
     if(this.flow.stage.id==="Support")for(const [i,shell] of FRONT_SHELLS.entries()){
       const fact="approachShell"+i;
-      if(!this.Has(fact)&&this.Near(shell.trigger,10)){
+      if(!this.Has(fact)&&this.GateNear(fact)){
         this.Record(fact);
         this.combat.FireShell(this.Point({x:shell.impact.x+45,z:shell.impact.z-45},32),this.Point(shell.impact),
           {kind:"Shell75",flight:1.8,radius:6,damage:70});
       }
     }
-    if(!this.Has("frontBattleStarted")&&this.Near(A.front,R.frontEngageDistanceM)){
+    if(!this.Has("frontBattleStarted")&&this.GateNear("frontBattleStarted")){
       this.Record("frontBattleStarted");
       this.frontBattleAt=this.time;
       this.SpawnEncounter("front");
@@ -1747,10 +1749,10 @@ export class FirstLevelMissionRuntime {
   }
   UpdateSortie(){
     this.EnsureBundleKeeper();
-    for(const crawl of Sortie.crawl)if(this.player.stance==='prone' && this.Near(crawl,Sortie.crawlRadiusM) && this.player.position.y<this.battlefield.GroundHeight(this.player.position.x,this.player.position.z)+.2)
+    for(const crawl of Sortie.crawl)if(this.player.stance==='prone' && this.GateNear(`bundleCrawl${crawl.id}`) && this.player.position.y<this.battlefield.GroundHeight(this.player.position.x,this.player.position.z)+.2)
       this.Record(`bundleCrawl${crawl.id}`,{x:this.player.position.x,z:this.player.position.z,stance:this.player.stance});
     const next=Sortie.route.findIndex((point,index)=>!this.Has(`bundleRoutePoint${index}`));
-    if(next>=0 && this.Near(Sortie.route[next],Sortie.checkpointRadiusM))this.Record(`bundleRoutePoint${next}`);
+    if(next>=0 && this.GateNear(`bundleRoutePoint${next}`))this.Record(`bundleRoutePoint${next}`);
     if(Sortie.route.every((point,index)=>this.Has(`bundleRoutePoint${index}`)) &&
       Sortie.crawl.every(crawl=>this.Has(`bundleCrawl${crawl.id}`)))this.Record('bundleRouteTraversed');
     if(this.Near(Sortie.house,Sortie.supplierRangeM))this.Say('BundleSupplyDirections');
@@ -1928,7 +1930,7 @@ export class FirstLevelMissionRuntime {
     zhou.x = this.player.position.x - Math.sin(yaw) * 1.6;
     zhou.z = this.player.position.z - Math.cos(yaw) * 1.6;
     zhou.yaw = yaw;
-    if (this.flow.stage.id === "Carry" && this.Near(A.ditchMouth, 2)) this.Record("atDitchMouth");
+    if (this.flow.stage.id === "Carry" && this.GateNear("atDitchMouth")) this.Record("atDitchMouth");
   }
   // ---------------------------------------------------------------------------
   // 屋内伏击（内部步骤 Melee）。编排在 Script_FirstLevelMissionAmbush，这里只做副作用。
@@ -3032,7 +3034,7 @@ export class FirstLevelMissionRuntime {
         }
         else if(kind==="southTransition"){
           this.southTransition.Hide();this.Record("southTransitionComplete");
-          if(this.Near(A.village,3))this.Record("southTraversed");
+          if(this.GateNear("southTraversed"))this.Record("southTraversed");
         }
         else if (kind === "dive") this.Record("diveComplete");
         else if (kind === "derail") { /* Rescue cue owns release. */ }
@@ -3072,9 +3074,9 @@ export class FirstLevelMissionRuntime {
         for (let i = 0; i < 3; i++) this.battlefield.OpenGate(`TrainDoor${i}`);
       }
       this.carriageSound.Update(dt);
-      if (this.Has("trainStopped") && this.Near(A.unload, 6) && !aboard) this.Record("unloaded");
+      if (this.Has("trainStopped") && this.GateNear("unloaded") && !aboard) this.Record("unloaded");
     }
-    if (stage === "Support" && this.Near(A.front, OPENING.frontReachRadiusM)) {
+    if (stage === "Support" && this.GateNear("frontReached")) {
       this.Record("frontReached");
       this.frontArrivalAt ??= this.time;
       this.frontArrivalShots ??= this.Inventory().shots;
@@ -3092,14 +3094,14 @@ export class FirstLevelMissionRuntime {
       if (gun?.belts === 3) this.Say("ThreeMagazines");
       if (gun?.belts === 2) this.Say("TwoMagazines");
     }
-    if(stage==="Orders" && this.Near(A.orders,5)){this.Record("ordersReached");this.Say("Volunteer");this.Say("ZhouLift");}
+    if(stage==="Orders" && this.GateNear("ordersReached")){this.Record("ordersReached");this.Say("Volunteer");this.Say("ZhouLift");}
     if(stage==="Tank")this.UpdateSortie();
     if(stage==="MachineGun")this.UpdateFrontAttack();
     if (stage === "Village") {
       const p=this.player.position, kitchen=P.kitchenInterior;
       if(p.x>kitchen.minX&&p.x<kitchen.maxX&&p.z>kitchen.minZ&&p.z<kitchen.maxZ)
         this.Record("kitchenTraversed",{x:p.x,z:p.z});
-      if(this.Has("kitchenTraversed") && this.Near(A.melee,R.meleeTriggerRadiusM))
+      if(this.Has("kitchenTraversed") && this.GateNear("innerCourtReached"))
         this.Record("innerCourtReached",{viaKitchen:true,x:p.x,z:p.z});
     }
     if (stage === "Melee") this.UpdateAmbush(dt);
@@ -3130,10 +3132,10 @@ export class FirstLevelMissionRuntime {
         this.Say("TransferHope");
       }
     }
-    if (stage === "TransferApproach" && this.Near(A.transfer,14)) this.Record("transferApproachReached");
+    if (stage === "TransferApproach" && this.GateNear("transferApproachReached")) this.Record("transferApproachReached");
     if (stage === "Transfer") {
       this.UpdateTransferBeats();
-      if (this.Near(A.transfer, 14)) {
+      if (this.GateNear("transferArrived")) {
         this.Record("transferArrived");
         this.column.loading = true;
         this.guideRoute = null;
@@ -3210,7 +3212,9 @@ export class FirstLevelMissionRuntime {
       if (
         remaining.length &&
         remaining.every((litter) => litter.progress >= pass + 1) &&
-        (stage==="RetreatYard" ? this.Near(remaining.at(-1),20) && MissionRouteProjection(this.column.route,this.player.position).progress>=pass-12 : this.Near(position,20))
+        // RetreatYard 的圈心是最后一副担架（活点），所以它不能走 GateNear，
+        // 只有半径仍从同一条事实门取；另外两段的圈心就是锚点本身。
+        (stage==="RetreatYard" ? this.Near(remaining.at(-1),MISSION_FACT_GATES[fact].radiusM) && MissionRouteProjection(this.column.route,this.player.position).progress>=pass-12 : this.GateNear(fact))
       )
         this.Record(fact);
     }
@@ -3219,7 +3223,7 @@ export class FirstLevelMissionRuntime {
       const remaining = this.column.litters.filter(
         (litter) => litter.visible && !litter.evacuated && !litter.loaded && litter.health > 0,
       );
-      if (remaining.length && remaining.every((litter) => litter.received) && this.Near(A.reception, 24))
+      if (remaining.length && remaining.every((litter) => litter.received) && this.GateNear("receptionPassed"))
         this.Record("receptionPassed");
     }
     if (stage === "FinalDefense") {
@@ -3236,7 +3240,7 @@ export class FirstLevelMissionRuntime {
       )
         this.Record("medicsEscaped", {survivingMedics:medics.length,handoff:MISSION_ROUTES.exit[R.finalHandoffRouteIndex]});
     }
-    if (stage === "Exit" && this.Near(A.end, 5)) this.Record("playerAtHandoff");
+    if (stage === "Exit" && this.GateNear("playerAtHandoff")) this.Record("playerAtHandoff");
     this.column.Update(dt, { moving, routeSafe: safe, maxProgress, player: this.player.position, ...(safeAt ? {SafeAt:safeAt} : {}) });
     // 老周这一副担架跟着顺子进屋，停在屋门口；伏击一响就停在原地挨刀。
     if (stage === "Village" || (stage === "Melee" && !this.Has("ambushTriggered"))) this.UpdateLeadLitter(dt);

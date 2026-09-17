@@ -44,6 +44,7 @@ import { WorldInfoEditor } from "./Script_EditorWorldInfo.mjs";
 import { PlayerStateEditor } from "./Script_EditorPlayerState.mjs";
 import { ProfilerEditor } from "./Script_EditorProfiler.mjs";
 import { AiEditor } from "./Script_EditorAi.mjs";
+import { OrchestrationEditor } from "./Script_EditorOrchestration.mjs";
 import { SquadMarchEditor } from "./Script_EditorSquadMarch.mjs";
 import {
   GraphicsSettings, AudioSettings, ControlsSettings, ApplySavedSettings,
@@ -65,7 +66,9 @@ const EDITORS = [
 const ALL = [...SETTINGS, ...EDITORS];
 // 渲染调试只读地观察后处理靶，不接管相机，因此允许叠在任意一个互斥编辑器上。
 // 性能剖析同理：它甚至要求玩法照跑（量的就是战斗中的帧），读数在独立窗口里。
-const OVERLAYS = [DebugRenderingEditor, ProfilerEditor, WorldInfoEditor, PlayerStateEditor, AiEditor];
+// 关卡编排工作台也在这一组：它是独立窗口里的 2D 俯视图 + 流程/时间轴，
+// 既不碰 three 场景也不接管相机，「边打边看走到哪一步」正是它的主用例。
+const OVERLAYS = [DebugRenderingEditor, ProfilerEditor, WorldInfoEditor, PlayerStateEditor, AiEditor, OrchestrationEditor];
 
 export class EditorSuite {
   /**
@@ -149,6 +152,7 @@ export class EditorSuite {
       CloseWorldInfo: () => suite.CloseOverlay(WorldInfoEditor.id),
       ClosePlayerState: () => suite.CloseOverlay(PlayerStateEditor.id),
       CloseAi: () => suite.CloseOverlay(AiEditor.id),
+      CloseOrchestration: () => suite.CloseOverlay(OrchestrationEditor.id),
       // 性能剖析在面板关着（玩法进行中）时要把自己的页面内小面板收起来
       get launcherOpen() { return suite.panelOpen; },
     };

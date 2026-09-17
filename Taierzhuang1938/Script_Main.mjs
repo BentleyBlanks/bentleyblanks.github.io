@@ -2915,6 +2915,9 @@ async function Boot() {
       get player() { return player; },
       // 敌军 AI 编辑器（Script_EditorAi）读这三样：导演、投掷链、导航场。
       get ai() { return ai; },
+      // 关卡编排工作台（Script_EditorOrchestration）读第一关任务运行时：
+      // 不在第一关时是 null，工作台照样显示设计编排。
+      get missionRuntime() { return missionRuntime; },
       get combat() { return combat; },
       get nav() { return ai?.ctx?.nav ?? null; },
       get currentWeapon() { return currentWeapon; },

@@ -15,6 +15,7 @@
 - 第一关公开阶段 9（内部步骤 `Melee`）是屋内伏击：顺子带着老周的担架进屋被刺刀顶住 → 顶住的那几秒里两个抬担架的阵亡 → 连按 F → 还锁着的时候老周挨一刀（活下来）→ 才还控制权，罗班长随后带人进屋。四条事实的顺序（`ambushBroken` 必须排在 `zhouStabbed` 之后）、`ambush*` 数值出处、与配音／动作两包的接口和验收命令见 [屋内伏击](docs/Data_FirstLevelRoomAmbush.md)；这一步不新增阶段，通过条件仍只有 `meleeResolved`。
 - 第一关罗班长负责实体带路与停点等候，HUD 按 COD WWII / WaW 单人战役约定显示唯一跟随或任务标记；新增可重复短命令不能抢断剧情对白。编排、台词与验收见[罗班长任务引导](docs/Data_FirstLevelLeaderGuide.md)；原有战壕掩护门与搬运职责优先。
 - 正式菜单以 `Data_Menu.CAMPAIGN_ENTRIES` 为准：第一关可玩，第二关到终章为标注“未完成”的占位，点击提示“敬请期待”。旧序章及旧章节不恢复进菜单；`?phase=N` / `Debug.StartLevel` 只建原切片，不装旧剧本、摆点或换关。每次只建当前切片，换章拆除重建。
+- 第一关的编排（哪一步放哪些人、什么条件过关、组怎么激活）**是表不是脚本**：`Data_FirstLevelMissionGates.mjs` 的四张表 + `Data_FirstLevelMission*`，运行时只读表；用户的现场意见走「关卡编排」工作台存进 `Taierzhuang1938/Notes/<Level>/notes.json`（进仓库，agent 用 `Script_MissionNotesCli.mjs` 读与结案），改完跑 `Script_MissionGatesTest.mjs`。口径见 [关卡编排工作台](docs/Data_MissionOrchestration.md)。
 - `?whitebox=p012-archive` 是旧 P0–P2 的开发回归夹具，旧资产与组件契约继续保留。旧任务表、旧 Notion 摘录和旧通关结果不能替代新版需求与验收；任务涉及哪条入口，就核对对应运行时及测试。新需求在当前任务授权范围内同步数据、消费方和文档，不按旧提案自行恢复已废弃内容。
 
 ## 跨系统契约

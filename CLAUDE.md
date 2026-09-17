@@ -20,6 +20,7 @@ node scripts/Script_LocalPreview.mjs --no-open
 - 另有两个**只在回环上可用**的调参口（滕县的敌军 AI 编辑器用，见 `Taierzhuang1938/docs/Data_EnemyAi.md` §14.3）：
   `GET /__tuning/status` 报可不可写；`POST /__tuning/save` 就地改 `Taierzhuang1938/Data_Tuning_*.mjs` 里的**那一个数字字面量**
   （注释与格式一个字不动）。线上（Pages）没有这个口，编辑器自动退化成「复制 mjs 片段」。
+- 关卡编排工作台（`Taierzhuang1938/docs/Data_MissionOrchestration.md`）的批注草稿保存口同样只在回环上可写：`GET /__notes/status`、`POST /__notes/save` 写 `Taierzhuang1938/Notes/<Level>/notes.json` 与同目录 PNG；线上退化成 localStorage + 下载 JSON。agent 接批注用 `node Taierzhuang1938/Script_MissionNotesCli.mjs handoff`。
 - Claude Code 的 `preview_start({ name: "preview" })` 使用 `.claude/launch.json`，同样核对端口与服务根目录。
 - 页面变化先本地验收，再推送；纯说明修改按根入口做静态检查。
 
