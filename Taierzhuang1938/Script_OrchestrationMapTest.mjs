@@ -91,6 +91,28 @@ const HARNESS = `<!doctype html>
       names.forEach((n, i) => { out[n] = counts[i]; });
       return out;
     };
+    // 图例里每一行都用真颜色画（它就是干这个的），于是「关掉某层，那个颜色就得
+    // 归零」这类断言必须先把图例收起来数，否则数到的是图例自己那几个像素。
+    window.__CountMap = (names) => {
+      const was = map.layers.legend;
+      if (was) map.SetLayers({ legend: false });
+      const out = window.__Count(names);
+      if (was) map.SetLayers({ legend: true });
+      return out;
+    };
+    // 标签矩形两两不许相交 —— 「文字互相压」是这一版要治的头号毛病。
+    window.__LabelOverlap = () => {
+      const list = map.placedLabels || [];
+      for (let i = 0; i < list.length; i += 1) {
+        for (let j = i + 1; j < list.length; j += 1) {
+          const a = list[i], b = list[j];
+          if (!(a.x > b.x + b.w || a.x + a.w < b.x || a.y > b.y + b.h || a.y + a.h < b.y)) {
+            return { a: a.text, b: b.text, ax: a.x, ay: a.y, bx: b.x, by: b.y };
+          }
+        }
+      }
+      return null;
+    };
     window.__Mouse = (type, px, py, button = 0) => {
       const rect = map.canvas.getBoundingClientRect();
       map.canvas.dispatchEvent(new MouseEvent(type, {
@@ -183,7 +205,7 @@ try {
       // 数像素统一在「整关」视野下做，各阶段同一把尺子 —— 换了缩放再比计数，
       // 那是在比镜头，不是在比这一阶段场上有多少人。
       map.FitBounds();
-      const counts = window.__Count(["enemyStaged", "enemyActive", "enemyDormant", "enemyPending", "route", "tactic", "friendly"]);
+      const counts = window.__CountMap(["enemyStaged", "enemyActive", "enemyDormant", "enemyPending", "route", "tactic", "friendly"]);
       // oracle 从模型来，不从画面来：这一阶段「在场」的人有几个、「还没出现」的
       // 有几个。像素数要跟着这两个数走，否则就是画了一层看不见的东西。
       let onField = 0, pending = 0;
@@ -206,17 +228,27 @@ try {
     blank.length ? `空的：${blank.map((r) => r.n).join(",")}` : `最少 ${Math.min(...perPhase.map((r) => r.ink))} px`);
 
   // 模型说这一阶段场上有人，画面上就必须数得出对应颜色的像素；模型说一个都没有，
-  // 就一个像素都不许有。这一条比「> 0」硬得多 —— 它咬住的是「模型 ↔ 画面」。
-  const enemyMismatch = perPhase.filter((r) => (r.onField > 0) !== (r.enemy > 0));
+  // 画面上也不该有。这一条咬住的是「模型 ↔ 画面」。
+  //
+  // 「一个都没有」这一侧留三个像素的余量：整张图上还有图廓（北向箭头、边缘刻度、
+  // 比例尺）和一堆文字，它们的抗锯齿边缘是连续的中间色，偶尔会有一枚正好等于某个
+  // 标记色。实测就抓到过一次：北向箭头那个「北」字的边缘等于「未出现」的灰，于是
+  // 同一份代码在这台机器上 50/50、在另一台上 49/50。标记色已经挑得离那些中性灰远
+  // 一点了（未出现改成冷灰蓝），余量是第二道保险 —— 真把一层画丢了是成百上千个
+  // 像素的事，不会只差三个。
+  const NOISE_PX = 3;
+  const Mismatch = (people, px) => (people > 0 ? px <= 0 : px > NOISE_PX);
+  const enemyMismatch = perPhase.filter((r) => Mismatch(r.onField, r.enemy));
   Check("敌人像素与模型「场上有几个人」一一对上", enemyMismatch.length === 0,
     enemyMismatch.length
       ? enemyMismatch.map((r) => `阶段${r.n} 在场${r.onField}人 但 ${r.enemy}px`).join("；")
       : perPhase.map((r) => `${r.n}:${r.onField}人/${r.enemy}px`).join(" "));
-  const pendingMismatch = perPhase.filter((r) => (r.pending > 0) !== (r.enemyPending > 0));
-  Check("未出现的组画成空心灰，且与模型的 pending 人数对得上", pendingMismatch.length === 0,
+  const pendingMismatch = perPhase.filter((r) => Mismatch(r.pending, r.enemyPending));
+  Check("未出现的组画成空心灰蓝，且与模型的 pending 人数对得上", pendingMismatch.length === 0,
     pendingMismatch.length
       ? pendingMismatch.map((r) => `阶段${r.n} pending${r.pending}人 但 ${r.enemyPending}px`).join("；")
-      : `最多 ${Math.max(...perPhase.map((r) => r.enemyPending))} px`);
+      : `有人时最多 ${Math.max(...perPhase.map((r) => r.enemyPending))} px，`
+        + `没人时最多 ${Math.max(0, ...perPhase.filter((r) => r.pending === 0).map((r) => r.enemyPending))} px`);
   const distinctEnemy = new Set(perPhase.map((r) => r.enemy));
   Check("敌人色像素随阶段变化", distinctEnemy.size >= 6,
     `${distinctEnemy.size} 种不同的计数`);
@@ -329,7 +361,13 @@ try {
     // 已清除的组不给把手：第 12 阶段这样的组有十来个，遍布全关。
     const clearedIds = (layout.encounters || []).filter((entry) => entry.state === "cleared").map((entry) => entry.id);
     const clearedHandles = clearedIds.filter((id) => !!map.HandlePoint("encounter", id));
+    // 用词：图上不许出现「拍」这种排程表里的内部叫法
+    const beatLabel = (map.placedLabels || []).find((e) => e.kind === "beat" && e.id === "transferFlank")?.text || "";
+    const jargon = (map.placedLabels || []).map((e) => e.text).filter((t) => /(^|\s)拍\s/.test(t));
+    const beatTip = map.DescribeSel({ kind: "beat", id: "transferFlank" });
+    const firstTip = map.DescribeSel({ kind: "beat", id: "transfer" });
     return {
+      beatLabel, jargon, beatTip, firstTip,
       group, beat, groupSel, beatSel, members, withChips, noChips, hovered, hoverAdded, selectPx,
       hoveredBeat, beatSelectPx,
       clearedCount: clearedIds.length, clearedHandles,
@@ -359,6 +397,13 @@ try {
     `${JSON.stringify(chips.hoveredBeat)}，描亮 ${chips.beatSelectPx} px`);
   Check("已清除的组不长把手", chips.clearedCount > 0 && chips.clearedHandles.length === 0,
     `已清除 ${chips.clearedCount} 组，把手种类 ${chips.kinds.join("/")}`);
+  Check("转运四拍在图上叫「第几波攻击」，不写内部叫法「拍」",
+    /^第 2 波攻击 · transferFlank · 35–60 秒$/.test(chips.beatLabel) && chips.jargon.length === 0,
+    `${chips.beatLabel}${chips.jargon.length ? ` ｜ 还写着：${chips.jargon.join("、")}` : ""}`);
+  Check("悬停提示同样说人话，0–0 秒那一拍写「开场即到」",
+    chips.beatTip[0] === "转运攻击波：transferFlank" && chips.beatTip[1] === "第 2 波攻击 · 35–60 秒"
+    && chips.firstTip[1] === "第 1 波攻击 · 开场即到",
+    `${chips.beatTip.join(" ｜ ")} ／ ${chips.firstTip.join(" ｜ ")}`);
 
   // -------------------------------------------------------------------------
   // 4) ToPng：PNG dataURL 且 > 10 KB
@@ -529,14 +574,38 @@ try {
     const map = window.__map;
     map.SetPhase(12);
     map.FitBounds();
-    const on = window.__Count(["route", "enemyStaged", "enemyActive"]);
+    const on = window.__CountMap(["route", "enemyStaged", "enemyActive"]);
     map.SetLayers({ routes: false });
-    const noRoutes = window.__Count(["route", "enemyStaged", "enemyActive"]);
+    const noRoutes = window.__CountMap(["route", "enemyStaged", "enemyActive"]);
     map.SetLayers({ encounters: false });
-    const noEnemies = window.__Count(["route", "enemyStaged", "enemyActive"]);
+    const noEnemies = window.__CountMap(["route", "enemyStaged", "enemyActive"]);
     map.SetLayers({ routes: true, encounters: true });
-    const back = window.__Count(["route", "enemyStaged", "enemyActive"]);
-    return { on, noRoutes, noEnemies, back };
+    const back = window.__CountMap(["route", "enemyStaged", "enemyActive"]);
+    // 图例：默认收成一枚芯片，点一下摊开，再点收起；图层关掉连芯片都没。
+    // 先把悬停清掉 —— 上一节留下的 tooltip 会跟着鼠标压在图例上，白白吃掉一百多个像素。
+    map.SetHover(null);
+    const defaultOpen = map.legendOpen;
+    const chip = window.__Count(["legendBack"]).legendBack;
+    const hit = map.legendHit ? { ...map.legendHit } : null;
+    window.__Mouse("mousedown", hit.x + 10, hit.y + 8);
+    window.__Mouse("mouseup", hit.x + 10, hit.y + 8);
+    const openedByClick = map.legendOpen;
+    const opened = window.__Count(["legendBack"]).legendBack;
+    // 摊开以后面板往上长，标题栏跟着挪：再点一下要点在新的标题栏上
+    const head = map.legendHit ? { ...map.legendHit } : null;
+    window.__Mouse("mousedown", head.x + 10, head.y + 8);
+    window.__Mouse("mouseup", head.x + 10, head.y + 8);
+    const closedByClick = map.legendOpen;
+    map.SetLegendOpen(true);
+    const openedByApi = window.__Count(["legendBack"]).legendBack;
+    map.SetLegendOpen(false);
+    map.SetLayers({ legend: false });
+    const legendOff = window.__Count(["legendBack", "scaleBar"]);
+    map.SetLayers({ legend: true });
+    return {
+      on, noRoutes, noEnemies, back, legendOff, bar: map.scaleBar,
+      defaultOpen, chip, hit, head, openedByClick, opened, closedByClick, openedByApi,
+    };
   });
   Check("关掉 routes 层后路线像素归零",
     layers.on.route > 0 && layers.noRoutes.route === 0,
@@ -546,6 +615,20 @@ try {
     `${layers.on.enemyStaged + layers.on.enemyActive} → 0`);
   Check("开回来还是原样", layers.back.route === layers.on.route
     && layers.back.enemyStaged === layers.on.enemyStaged);
+  Check("图例默认收成一枚小芯片（不挡地图）",
+    layers.defaultOpen === false && layers.chip > 0 && !!layers.hit,
+    `芯片 ${layers.chip} px @ (${layers.hit?.x}, ${layers.hit?.y}) ${layers.hit?.w}×${layers.hit?.h}`);
+  Check("点芯片摊开、再点收起（SetLegendOpen 也一样）",
+    layers.openedByClick === true && layers.closedByClick === false
+    && layers.opened > layers.chip * 3 && layers.openedByApi === layers.opened,
+    `收起 ${layers.chip} px @ (${layers.hit?.x}, ${layers.hit?.y}) → 展开 ${layers.opened} px，`
+    + `标题栏挪到 (${layers.head?.x}, ${layers.head?.y})（API 展开 ${layers.openedByApi} px）`);
+  Check("关掉 legend 层连芯片都不画", layers.legendOff.legendBack === 0,
+    `${layers.chip} px → ${layers.legendOff.legendBack} px`);
+  Check("比例尺在（关掉图例也还在），并报得出整数米长度",
+    layers.legendOff.scaleBar > 0 && Number.isFinite(layers.bar?.meters) && layers.bar.meters > 0
+    && /^\d+ m$/.test(layers.bar?.text || ""),
+    `${layers.bar?.text}（${layers.legendOff.scaleBar} px）`);
 
   // -------------------------------------------------------------------------
   // 9) live 层：玩家黄三角、死者灰叉
@@ -554,7 +637,7 @@ try {
     const map = window.__map;
     map.SetPhase(12);
     map.ZoomTo({ x: 100, z: 100 }, 60);
-    const before = window.__Count(["player", "liveEnemy", "liveDead"]);
+    const before = window.__CountMap(["player", "liveEnemy", "liveDead"]);
     map.SetLive({
       player: { x: 100, z: 100, yaw: 0.6 },
       enemies: [
@@ -563,9 +646,9 @@ try {
       ],
       guideRoute: [{ x: 90, z: 120 }, { x: 100, z: 104 }, { x: 116, z: 92 }],
     });
-    const after = window.__Count(["player", "liveEnemy", "guide"]);
+    const after = window.__CountMap(["player", "liveEnemy", "guide"]);
     map.SetLive(null);
-    const cleared = window.__Count(["player"]);
+    const cleared = window.__CountMap(["player"]);
     return { before, after, cleared };
   });
   Check("live 层画出玩家三角", live.before.player === 0 && live.after.player > 0, `${live.after.player} px`);
@@ -573,6 +656,60 @@ try {
     live.after.liveEnemy > 0 && live.after.guide > 0,
     `敌人 ${live.after.liveEnemy} px / 指引 ${live.after.guide} px`);
   Check("SetLive(null) 之后 live 层收干净", live.cleared.player === 0);
+
+  // -------------------------------------------------------------------------
+  // 9b) 整关视野：文字互不相交、图廓齐全、一次 Redraw 的耗时
+  // -------------------------------------------------------------------------
+  // 面板里这张图就是 1380×900（工作台弹窗的默认尺寸），所以耗时要在这个尺寸上量。
+  // 地表烘焙是一次性的（换模型才重烘），先 Redraw 一次把它烘完再计时。
+  for (const [w, h, file] of [[1380, 900, "overview_after.png"], [1920, 1080, "overview_after_1920.png"]]) {
+    const shot = await page.evaluate(async (size) => {
+      const map = window.__map;
+      map.canvas.style.width = `${size[0]}px`;
+      map.canvas.style.height = `${size[1]}px`;
+      map.Resize();
+      map.SetPhase(12);
+      map.FitBounds();
+      map.Redraw();
+      const samples = [];
+      for (let i = 0; i < 24; i += 1) {
+        const t0 = performance.now();
+        map.Redraw();
+        samples.push(performance.now() - t0);
+      }
+      samples.sort((a, b) => a - b);
+      // 排版缓存打掉，量一次「视野真的变了」的最坏情况
+      map.labelCache = null;
+      const t1 = performance.now();
+      map.Redraw();
+      const cold = performance.now() - t1;
+      return {
+        png: map.ToPng({ scale: 1 }),
+        median: samples[Math.floor(samples.length / 2)], max: samples[samples.length - 1], cold,
+        labels: (map.placedLabels || []).length,
+        overlap: window.__LabelOverlap(),
+        chips: (map.handles || []).length,
+        css: [map.cssWidth, map.cssHeight],
+      };
+    }, [w, h]);
+    const bytes = SavePng(file, shot.png);
+    delete shot.png;
+    if (w === 1380) {
+      Check("整关视野下没有两个标签互相压",
+        shot.overlap === null && shot.labels > 0,
+        shot.overlap ? `「${shot.overlap.a}」压住「${shot.overlap.b}」` : `排了 ${shot.labels} 个标签（其中 ${shot.chips} 个组/拍把手）`);
+      Check(`整关视野 ${w}×${h} 一次 Redraw ≤ 8 ms`, shot.median <= 8,
+        `中位 ${shot.median.toFixed(2)} ms / 最慢 ${shot.max.toFixed(2)} ms / 重排标签那一帧 ${shot.cold.toFixed(2)} ms`);
+    }
+    Info(`整关视野出图 ${file}`, `${shot.css[0]}×${shot.css[1]}，${(bytes / 1024).toFixed(0)} KB，`
+      + `标签 ${shot.labels} 个，Redraw 中位 ${shot.median.toFixed(2)} ms`);
+  }
+  await page.evaluate(() => {
+    const map = window.__map;
+    map.canvas.style.width = "1100px";
+    map.canvas.style.height = "760px";
+    map.Resize();
+  });
 
   // -------------------------------------------------------------------------
   // 10) Dispose：再派发事件不再触发任何回调

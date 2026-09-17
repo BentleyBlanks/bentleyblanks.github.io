@@ -29,26 +29,54 @@ import {
 const LEVEL = "FirstLevel";
 const REFRESH_SECONDS = 0.25;
 const STORAGE_KEY = `tengxian1938_orchestration_notes_${LEVEL}`;
+const LAYOUT_KEY = `tengxian1938_orchestration_layout_${LEVEL}`;
 const NOTES_URL = `./Notes/${LEVEL}/notes.json`;
 const STATUS_URL = "/__notes/status";
 const SAVE_URL = "/__notes/save";
 
-// 13 层，与 OrchestrationMap.SetLayers 的键一一对应。
+// 14 层，与 OrchestrationMap.SetLayers 的键一一对应。
+// 「图例」是画布左下角那块不透明的说明牌，会盖住地图，所以它必须有一个开关。
 const LAYERS = [
   ["terrain", "地表"], ["blocks", "体块"], ["trenches", "壕沟"], ["roads", "道路"],
   ["anchors", "锚点"], ["routes", "路线"], ["zones", "触发区"], ["friendlies", "友军"],
   ["encounters", "敌军"], ["tactics", "战术线"], ["live", "实机"], ["notes", "批注"],
-  ["labels", "名字"],
+  ["labels", "名字"], ["legend", "图例"],
 ];
 const TOOLS = [
   ["select", "选择"], ["pan", "平移"], ["circle", "圈选"], ["arrow", "箭头"],
   ["path", "折线"], ["label", "标注"], ["move", "候选位"],
 ];
+// 工具的小图标：16×16 描边路径，跟着文字的颜色走（currentColor）。
+// 纯字符当图标在这套窄体拉丁字里认不出来，画七条线反而最省事。
+const TOOL_ICONS = {
+  select: ["M3.5 2 L12.5 8.6 L8.2 9.3 L10.4 13.6 L8.6 14.4 L6.4 10.1 L3.5 12.9 Z"],
+  pan: ["M8 1.6 L10.2 4.6 H5.8 Z", "M8 14.4 L5.8 11.4 H10.2 Z", "M1.6 8 L4.6 5.8 V10.2 Z", "M14.4 8 L11.4 10.2 V5.8 Z"],
+  circle: ["M14 8 A6 6 0 1 1 2 8 A6 6 0 0 1 14 8 Z"],
+  arrow: ["M2.6 13.4 L13 3", "M8.2 3 H13 V7.8"],
+  path: ["M2 12.4 L6 6.4 L9.6 9.8 L14 3.4"],
+  label: ["M2.6 4 V2.6 H13.4 V4", "M8 2.6 V13.4", "M5.6 13.4 H10.4"],
+  move: ["M8 1.6 V4.8", "M8 11.2 V14.4", "M1.6 8 H4.8", "M11.2 8 H14.4", "M10.4 8 A2.4 2.4 0 1 1 5.6 8 A2.4 2.4 0 0 1 10.4 8 Z"],
+};
+const TOOL_HINT = {
+  select: "点图上的东西看它是谁",
+  pan: "按住拖动画面（右键随时可以拖）",
+  circle: "圈出一片地方",
+  arrow: "画一支箭头指方向",
+  path: "画一条折线（可以当作建议的新路线）",
+  label: "在图上写一句话",
+  move: "把选中的敌人拖到你想要的位置（只是建议，不改关卡）",
+};
+// 「只看底图」留着的那几层：地形、房子、路、壕沟 —— 底图没有这些就认不出地方了。
+const BASE_LAYERS = new Set(["terrain", "blocks", "roads", "trenches"]);
+const SVG_NS = "http://www.w3.org/2000/svg";
+const NOTE_STATUS_TEXT = { open: "待处理", resolved: "已处理", dismissed: "已忽略" };
+const NOTE_FILTER_TEXT = { ...NOTE_STATUS_TEXT, all: "全部" };
+const TIME_KIND_TEXT = { stageRelative: "阶段内第 N 秒", fact: "某件事发生时", "": "不限时刻" };
 const PROPOSAL_TEXT = {
   move: "挪位置", delay: "改延迟", retime: "改时间窗", reroute: "改路线", remove: "删掉", other: "其它",
 };
 const KIND_TEXT = {
-  phase: "阶段", step: "步骤", fact: "事实", encounter: "遭遇组", member: "敌人", beat: "节拍",
+  phase: "阶段", step: "步骤", fact: "事实", encounter: "遭遇组", member: "敌人", beat: "攻击波",
   route: "路线", zone: "触发区", anchor: "锚点", friendly: "友军", point: "地图点", time: "时间点",
   note: "批注",
 };
@@ -56,94 +84,322 @@ const STATE_TEXT = {
   pending: "未出现", spawned: "已生成", standby: "待命", dormant: "休眠", active: "活跃", cleared: "已清除",
 };
 const SPAWN_TEXT = {
-  step: "进入步骤时生成", fact: "事实满足时生成", beat: "按转运拍生成", opening: "由开场脚本生成",
+  step: "进入步骤时生成", fact: "事实满足时生成", beat: "按转运区的攻击波次出现", opening: "由开场脚本生成",
+};
+const RELEASE_TEXT = { tacticNear: "玩家走到路线上的放行点附近才动" };
+const ZONE_TEXT = {
+  gate: "过关条件的触发圈", interior: "室内判定区", crawl: "匍匐区", beatArea: "某一波攻击的落点范围",
+};
+const FRIENDLY_TEXT = {
+  squadPost: "班里弟兄的位置", guardPost: "哨位", defender: "守在这儿的自己人",
+  forwardNest: "前沿火力点", defensePost: "防御点", cartBay: "装车位",
+  tankStart: "坦克起始位", phaseSpawn: "跳关出生点",
 };
 const TIMELINE_GLYPH = {
   entry: "▸", condition: "◇", timed: "◆", beat: "■", delay: "·", wake: "✶",
   stageEntry: "▸", fact: "●",
 };
 const TIMELINE_TEXT = {
-  entry: "进入", condition: "条件", timed: "定时", beat: "拍", delay: "延迟", wake: "苏醒",
+  entry: "进入", condition: "条件", timed: "定时", beat: "攻击波", delay: "延迟", wake: "苏醒",
   stageEntry: "实际进入", fact: "实际满足",
 };
 
+// 与 Style_Interface.css / Style_Editor.css 同一套语言：黑标题栏、冷灰底、旧金选中、
+// 读数等宽。弹窗比游戏内面板宽松一档 —— 这是个桌面工具，不是贴在画面边上的抽屉。
+// 字号只有四档（18 标题 / 15 栏标题 / 13 正文 / 12 次要 + 等宽读数），间距走 8 的倍数。
 const POPUP_CSS = `
-  * { box-sizing: border-box; }
+  :root {
+    color-scheme: dark;
+    --ok: #8fca7a; --bad: #d6604a;
+    --design: #86c9dc; --actual: #7fd79a;
+    --edge: rgba(214, 217, 209, .16);
+    --edge-soft: rgba(214, 217, 209, .09);
+    --fill: rgba(214, 217, 209, .05);
+    --sunk: rgba(0, 0, 0, .22);
+    --gold-soft: rgba(223, 189, 104, .14);
+    --gold-line: rgba(223, 189, 104, .5);
+  }
+  * { box-sizing: border-box; scrollbar-width: thin; scrollbar-color: rgba(214,217,209,.22) transparent; }
   html, body { height: 100%; }
   body { margin: 0; display: flex; flex-direction: column; overflow: hidden;
-    background: var(--ui-surface, #191b1d); color: var(--ui-text, #dedbd3);
-    font: 12px/1.55 var(--ui-font, sans-serif); }
-  header { flex: 0 0 auto; padding: 8px 12px 7px; background: var(--ui-black, #101112);
-    border-bottom: 1px solid var(--ui-line, #393b3c); display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
-  h1 { margin: 0; font-size: 15px; color: var(--ui-bright, #fff); }
-  .muted { color: var(--ui-muted, #a9a8a3); }
-  .warn { color: #e6a95c; }
-  .ok { color: #8fca7a; }
-  button, select, input, textarea { font: inherit; color: var(--ui-text, #dedbd3);
-    background: var(--ui-surface, #191b1d); border: 1px solid var(--ui-line, #393b3c); }
-  button { padding: 2px 8px; cursor: pointer; }
-  button:hover { border-color: var(--ui-gold, #ceb17a); }
-  button.on { color: var(--ui-black, #101112); background: var(--ui-gold, #ceb17a); border-color: var(--ui-gold, #ceb17a); }
-  input, select, textarea { padding: 2px 5px; width: 100%; }
-  label.chk { display: inline-flex; align-items: center; gap: 3px; cursor: pointer; margin-right: 6px; }
-  label.chk > input { width: auto; }
-  #cols { flex: 1 1 auto; display: grid; grid-template-columns: 322px minmax(0, 1fr) 348px; min-height: 0; }
-  .col { min-height: 0; overflow: auto; padding: 8px 10px; border-right: 1px solid var(--ui-line, #393b3c); }
-  .col.map { overflow: hidden; display: flex; flex-direction: column; padding: 6px; gap: 5px; }
-  .col.detail { border-right: 0; }
-  h2 { margin: 0 0 6px; font-size: 11px; letter-spacing: .1em; color: var(--ui-gold, #ceb17a); }
-  .phase { border: 1px solid var(--ui-line, #393b3c); margin-bottom: 6px; }
-  .phaseHead { display: flex; align-items: center; gap: 6px; padding: 3px 6px;
-    background: rgba(255,255,255,.03); cursor: pointer; }
-  .phaseHead > b { font-weight: 600; color: var(--ui-bright, #fff); }
-  .phase.now > .phaseHead { background: rgba(206,177,122,.18); }
-  .step { padding: 4px 6px 6px; border-top: 1px dashed var(--ui-line, #393b3c); cursor: pointer; }
-  .step.now { background: rgba(206,177,122,.12); }
-  .step.sel { outline: 1px solid var(--ui-gold, #ceb17a); outline-offset: -1px; }
-  .stepId { color: var(--ui-bright, #fff); }
-  .fact { display: grid; grid-template-columns: 16px 1fr; gap: 3px; padding: 1px 0 1px 4px; cursor: pointer; }
-  .fact > i { font-style: normal; text-align: center; }
-  .fact[data-fact-state="ok"] > i { color: #8fca7a; }
-  .fact[data-fact-state="wait"] > i { color: var(--ui-gold, #ceb17a); }
-  .fact[data-fact-state="future"] > i, .fact[data-fact-state="none"] > i { color: var(--ui-muted, #a9a8a3); }
-  .chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }
-  .chip { border: 1px solid var(--ui-line, #393b3c); padding: 0 5px; cursor: pointer; }
-  .chip:hover { border-color: var(--ui-gold, #ceb17a); }
-  .bar { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; }
-  #canvasWrap { flex: 1 1 auto; min-height: 0; position: relative; }
+    background: var(--ui-surface, #101314); color: var(--ui-text, #d6d9d1);
+    font: 13px/1.6 var(--ui-font, sans-serif); -webkit-font-smoothing: antialiased; }
+  :focus-visible { outline: 1px solid var(--ui-gold, #dfbd68); outline-offset: 2px; }
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(214,217,209,.18); border: 2px solid transparent; background-clip: padding-box; }
+  ::-webkit-scrollbar-thumb:hover { background: rgba(223,189,104,.45); background-clip: padding-box; }
+  .mono { font-family: var(--ui-mono, Consolas, monospace); font-variant-numeric: tabular-nums; }
+  .muted { color: var(--ui-muted, #a3aaa4); }
+  .warn { color: var(--ui-gold, #dfbd68); }
+  .ok { color: var(--ok); }
+  .bad { color: var(--bad); }
+
+  /* --- 标题栏 ------------------------------------------------------------ */
+  header { flex: 0 0 auto; display: flex; align-items: center; gap: 16px;
+    padding: 10px 16px; background: var(--ui-black, #030404);
+    border-bottom: 1px solid var(--ui-line, #c4c6bb33); }
+  h1 { margin: 0; font: 700 18px/1.3 var(--ui-font, sans-serif); letter-spacing: .04em; color: var(--ui-bright, #eeefec); }
+  header .hTitle { display: flex; align-items: baseline; gap: 8px; flex: 0 0 auto; }
+  header .hLevel { font-size: 13px; color: var(--ui-muted, #a3aaa4); }
+  [data-orch="live-status"] { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  [data-orch="version"] { flex: 0 0 auto; font-size: 11px; color: rgba(163,170,164,.7); }
+  .tag { display: inline-flex; align-items: baseline; gap: 6px; padding: 3px 8px; font-size: 12px;
+    white-space: nowrap; border: 1px solid var(--edge); background: var(--fill); color: var(--ui-text, #d6d9d1); }
+  .tag > b { font-weight: 600; color: var(--ui-bright, #eeefec); }
+  .tag > code, .tag .num { font: 12px var(--ui-mono, Consolas, monospace); font-variant-numeric: tabular-nums; }
+  .tag.lead { border: 0; background: none; padding: 3px 0; color: var(--ui-muted, #a3aaa4); }
+  .tag.now { border-color: var(--gold-line); background: var(--gold-soft); color: var(--ui-gold, #dfbd68); }
+  .tag.now > b { color: var(--ui-gold, #dfbd68); }
+  .tag.wait { border-color: rgba(223,189,104,.3); color: var(--ui-gold, #dfbd68); cursor: pointer;
+    max-width: 196px; overflow: hidden; text-overflow: ellipsis; display: inline-block; }
+  .tag.wait:hover { background: var(--gold-soft); }
+  .tag.idle { color: var(--ui-muted, #a3aaa4); border-style: dashed; }
+
+  /* --- 三栏 -------------------------------------------------------------- */
+  #cols { flex: 1 1 auto; min-height: 0; display: grid;
+    grid-template-columns: var(--left, 344px) 5px minmax(360px, 1fr) 5px var(--right, 380px); }
+  .col { min-height: 0; overflow: auto; }
+  .col.map { overflow: visible; display: flex; flex-direction: column; padding: 8px; gap: 8px; position: relative; }
+  .gutter { cursor: col-resize; background: var(--ui-black, #030404);
+    border-left: 1px solid var(--ui-line, #c4c6bb33); border-right: 1px solid var(--ui-line, #c4c6bb33); }
+  .gutter:hover, .gutter.drag { background: var(--gold-soft); }
+  .colHead { position: sticky; top: 0; z-index: 3; display: flex; align-items: baseline; gap: 8px;
+    padding: 12px 16px 8px; background: var(--ui-surface, #101314); border-bottom: 1px solid var(--ui-line, #c4c6bb33); }
+  .colHead h2 { margin: 0; font: 700 15px/1.4 var(--ui-font, sans-serif); letter-spacing: .06em; color: var(--ui-bright, #eeefec); }
+  .colHead .sub { font-size: 12px; color: var(--ui-muted, #a3aaa4); }
+  .colHead .right { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+  .sect { margin: 16px 16px 8px; font: 700 12px/1.4 var(--ui-font, sans-serif); letter-spacing: .08em;
+    color: var(--ui-gold, #dfbd68); border-bottom: 1px solid var(--edge); padding-bottom: 6px; }
+  .empty { margin: 8px 16px; padding: 10px 12px; font-size: 12px; line-height: 1.7;
+    color: var(--ui-muted, #a3aaa4); border: 1px dashed var(--edge); background: rgba(0,0,0,.14); }
+
+  /* --- 左栏：阶段分组 + 步骤卡 ------------------------------------------- */
+  .phase { margin: 8px 16px; border: 1px solid var(--edge); background: rgba(0,0,0,.14); }
+  .phaseHead { display: grid; grid-template-columns: 12px 22px minmax(0,1fr) auto auto; align-items: center;
+    gap: 8px; width: 100%; padding: 8px; text-align: left; font: inherit; color: inherit;
+    background: transparent; border: 0; border-bottom: 1px solid transparent; cursor: pointer; }
+  .phaseHead:hover { background: var(--fill); }
+  .phase[data-open="1"] > .phaseHead { border-bottom-color: var(--edge-soft); }
+  .phase[data-open="0"] .phaseBody { display: none; }
+  .phaseHead .tw { font-size: 10px; color: var(--ui-muted, #a3aaa4); transition: transform .12s linear; }
+  .phase[data-open="0"] .tw { transform: rotate(-90deg); }
+  .phaseNum { font: 600 12px var(--ui-mono, Consolas, monospace); color: var(--ui-muted, #a3aaa4); }
+  .phaseName { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pState { font-size: 11px; padding: 1px 6px; white-space: nowrap;
+    border: 1px solid var(--edge); color: var(--ui-muted, #a3aaa4); }
+  .pState:empty { display: none; border: 0; padding: 0; }
+  .phase[data-phase-state="done"] .phaseName { color: var(--ui-muted, #a3aaa4); }
+  .phase[data-phase-state="done"] .pState { color: var(--ok); border-color: rgba(143,202,122,.35); }
+  .phase[data-phase-state="now"] { border-color: var(--gold-line); }
+  .phase[data-phase-state="now"] > .phaseHead { background: var(--gold-soft); }
+  .phase[data-phase-state="now"] .phaseName, .phase[data-phase-state="now"] .phaseNum,
+  .phase[data-phase-state="now"] .pState { color: var(--ui-gold, #dfbd68); }
+  .phase[data-phase-state="now"] .pState { border-color: var(--gold-line); }
+  button.mini { padding: 2px 8px; font: 11px/1.5 var(--ui-font, sans-serif); cursor: pointer;
+    background: transparent; border: 1px solid var(--edge-soft); color: var(--ui-muted, #a3aaa4); }
+  button.mini:hover { color: var(--ui-gold, #dfbd68); border-color: var(--gold-line); }
+  .phaseBody { padding: 8px 8px 0; }
+  .step { margin-bottom: 8px; padding: 8px; cursor: pointer;
+    border: 1px solid var(--edge-soft); background: var(--sunk); }
+  .step:hover { border-color: var(--edge); }
+  .step.now { border-color: var(--gold-line); background: rgba(223,189,104,.07); }
+  .step.sel { box-shadow: inset 3px 0 0 var(--ui-gold, #dfbd68); }
+  /* 目标句子与步骤编号各占一格：挤在同一行里，编号会被句子夹在中间，读成一句话。 */
+  .stepTop { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 8px; align-items: baseline; }
+  .stepObj { font-size: 13px; color: var(--ui-bright, #eeefec); }
+  /* 编号加个框：不加框它会被读成目标句子的一部分（「掩护 Transfer 车辆分批出发」）。 */
+  .stepId { padding: 0 5px; border: 1px solid var(--edge-soft); white-space: nowrap;
+    font: 11px/1.5 var(--ui-mono, Consolas, monospace); color: rgba(163,170,164,.75); }
+  .facts { margin-top: 8px; display: flex; flex-direction: column; gap: 4px; }
+  .fact { display: grid; grid-template-columns: 16px minmax(0,1fr); gap: 8px; align-items: start; cursor: pointer; }
+  .fact:hover .factText { color: var(--ui-bright, #eeefec); }
+  .fact > i { font-style: normal; width: 16px; height: 16px; border-radius: 50%; text-align: center;
+    font-size: 10px; line-height: 14px; border: 1px solid var(--edge); color: var(--ui-muted, #a3aaa4); }
+  .fact[data-fact-state="ok"] > i { color: var(--ok); border-color: rgba(143,202,122,.55); background: rgba(143,202,122,.12); }
+  .fact[data-fact-state="wait"] > i { color: var(--ui-gold, #dfbd68); border-color: var(--gold-line); background: var(--gold-soft); }
+  .fact[data-fact-state="past"] > i { color: rgba(143,202,122,.55); border-color: var(--edge-soft); }
+  .fact[data-fact-state="future"] > i, .fact[data-fact-state="none"] > i { border-style: dashed; }
+  .factText { font-size: 12px; color: var(--ui-text, #d6d9d1); }
+  .factId { font: 11px var(--ui-mono, Consolas, monospace); color: rgba(163,170,164,.6); margin-left: 6px; }
+  .stepMeta { margin-top: 6px; font-size: 12px; color: var(--ui-muted, #a3aaa4); }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px; }
+  .chip { display: inline-flex; align-items: baseline; gap: 4px; padding: 2px 8px; font-size: 11px; cursor: pointer;
+    border: 1px solid var(--edge); background: var(--fill); color: var(--ui-text, #d6d9d1); }
+  .chip:hover { border-color: var(--gold-line); color: var(--ui-gold, #dfbd68); }
+  .chip > code { font: 11px var(--ui-mono, Consolas, monospace); color: rgba(163,170,164,.8); }
+  .chip:hover > code { color: inherit; }
+
+  /* --- 中栏：工具条与阶段步进器 ------------------------------------------ */
+  .bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .bar .spacer { flex: 1 1 auto; }
+  .bar .sep { width: 1px; align-self: stretch; background: var(--edge); }
+  .barLabel { font-size: 12px; color: var(--ui-muted, #a3aaa4); }
+  .tchip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 9px; font: 12px/1.4 var(--ui-font, sans-serif);
+    cursor: pointer; background: rgba(0,0,0,.28); border: 1px solid var(--edge); color: var(--ui-text, #d6d9d1); }
+  .tchip:hover { border-color: rgba(214,217,209,.4); color: var(--ui-bright, #eeefec); }
+  .tchip.on { color: var(--ui-gold, #dfbd68); border-color: var(--ui-gold, #dfbd68);
+    background: var(--ui-selection, rgba(223,189,104,.14)); }
+  .tchip svg { flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: square; stroke-linejoin: miter; }
+  .drop { position: relative; }
+  .dropPanel { position: absolute; top: calc(100% + 6px); right: 0; z-index: 9; width: 300px; padding: 8px;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 2px 8px;
+    background: var(--ui-panel, rgba(13,16,17,.98)); border: 1px solid var(--ui-line, #c4c6bb33);
+    box-shadow: 0 10px 28px rgba(0,0,0,.65); }
+  .dropPanel[hidden] { display: none; }
+  .dropPanel .all { grid-column: 1 / -1; display: flex; gap: 8px; margin-top: 6px; padding-top: 8px; border-top: 1px solid var(--edge-soft); }
+  .lchip { position: relative; display: flex; align-items: center; gap: 8px; padding: 4px 6px; cursor: pointer;
+    font-size: 12px; color: var(--ui-muted, #a3aaa4); border: 1px solid transparent; }
+  .lchip:hover { background: var(--fill); }
+  .lchip input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+  /* 勾选方块叫 .tick 不叫 .box：右栏的「草图 / 候选位」那两块空槽已经占了 .box，
+     撞名的下场是这里每个勾都被撑成 30 px 高的金条。 */
+  .lchip .tick { flex: 0 0 auto; width: 12px; height: 12px; border: 1px solid var(--edge); }
+  .lchip.on { color: var(--ui-text, #d6d9d1); }
+  .lchip.on .tick { background: var(--ui-gold, #dfbd68); border-color: var(--ui-gold, #dfbd68); }
+  .lchip:has(input:focus-visible) { border-color: var(--ui-gold, #dfbd68); }
+  .stepper { display: flex; align-items: center; gap: 8px; }
+  .stepper .who { font-size: 13px; color: var(--ui-bright, #eeefec); white-space: nowrap; }
+  .stepper .who .num { font: 600 13px var(--ui-mono, Consolas, monospace); font-variant-numeric: tabular-nums; }
+  .track { position: relative; flex: 1 1 auto; min-width: 72px; height: 16px; cursor: pointer; }
+  .track::before { content: ""; position: absolute; left: 0; right: 0; top: 7px; height: 2px; background: rgba(214,217,209,.16); }
+  .track > i { position: absolute; left: 0; top: 7px; height: 2px; background: rgba(223,189,104,.55); }
+  .track > b { position: absolute; top: 2px; width: 3px; height: 12px; background: var(--ui-gold, #dfbd68); }
+  button.icon { width: 30px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+  #canvasWrap { flex: 1 1 auto; min-height: 0; position: relative; border: 1px solid var(--edge); }
   canvas { display: block; width: 100%; height: 100%; background: #181a19; }
   /* 标注工具的就地输入框：长在点下去的那个位置上，不弹 prompt（prompt 会把
      整个页面卡住，还没法在无头测试里输字）。 */
-  .labelInput { position: absolute; width: 176px; z-index: 6;
-    background: var(--ui-black, #101112); border-color: var(--ui-gold, #ceb17a); }
-  img.thumb { display: block; max-width: 100%; max-height: 118px; margin-top: 4px;
-    border: 1px solid var(--ui-line, #393b3c); }
-  .note { border: 1px solid var(--ui-line, #393b3c); padding: 4px 6px; margin-bottom: 5px; }
-  .note.drift { border-color: #b8743c; }
-  .note > .h { display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
-  .note code { font-family: Consolas, monospace; color: var(--ui-muted, #a9a8a3); }
-  pre { margin: 4px 0 0; max-height: 220px; overflow: auto; font: 11px/1.4 Consolas, monospace;
-    background: rgba(0,0,0,.25); padding: 5px; white-space: pre-wrap; word-break: break-all; }
-  .row { display: grid; grid-template-columns: 74px 1fr; gap: 3px 8px; padding: 1px 0; }
-  .row > span { color: var(--ui-muted, #a9a8a3); }
-  #tl { flex: 0 0 auto; height: 188px; overflow: auto; padding: 5px 8px;
-    border-top: 1px solid var(--ui-line, #393b3c); background: var(--ui-black, #101112); }
-  .tlRow { display: flex; min-width: 1120px; align-items: flex-start; }
-  .tlRow + .tlRow { margin-top: 4px; }
-  .tlLabel { flex: 0 0 62px; color: var(--ui-muted, #a9a8a3); }
-  .tlLane { border-left: 1px solid var(--ui-line, #393b3c); padding: 0 3px 3px; min-width: 52px; }
-  /* 第 12 阶段光「战术延迟」就有二十多枚标记：不封顶的话它会把下面的实际行顶出视野，
-     而「设计 vs 实际」两行并排看正是这条时间轴存在的理由。 */
-  .tlLane > [data-marks] { max-height: 54px; overflow-y: auto; line-height: 1.15; }
-  .tlLane > .h { color: var(--ui-muted, #a9a8a3); font-size: 10px; white-space: nowrap; overflow: hidden; }
-  .tlLane.now { background: rgba(206,177,122,.12); }
-  .tlMark { display: inline-block; padding: 0 1px; cursor: pointer; }
-  [data-timeline="design"] .tlMark { color: #7fc7d8; }
-  [data-timeline="design"] .tlMark[data-marker-kind="condition"] { color: #d8b06a; }
-  [data-timeline="actual"] .tlMark { color: #78d78f; }
-  .tlMark:hover { background: rgba(255,255,255,.14); }
-  .legend { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
-  .legend > span > i { font-style: normal; }
+  .labelInput { position: absolute; width: 200px; z-index: 9; padding: 3px 8px; font-size: 12px;
+    background: var(--ui-black, #030404); border: 1px solid var(--ui-gold, #dfbd68); color: var(--ui-text, #d6d9d1); }
+
+  /* --- 通用控件 ---------------------------------------------------------- */
+  button { font: 12px/1.5 var(--ui-font, sans-serif); color: var(--ui-text, #d6d9d1);
+    background: #151919; border: 1px solid var(--edge); border-radius: 0; padding: 5px 10px; cursor: pointer; }
+  button:hover { background: var(--ui-selection, rgba(223,189,104,.12)); color: var(--ui-gold, #dfbd68); }
+  button.primary { font-weight: 700; color: #17140c; background: var(--ui-gold, #dfbd68); border-color: var(--ui-gold, #dfbd68); }
+  button.primary:hover { color: #17140c; background: #ecd390; }
+  button.ghost { background: transparent; color: var(--ui-muted, #a3aaa4); }
+  button.ghost:hover { color: var(--ui-gold, #dfbd68); }
+  button[disabled] { opacity: .45; cursor: default; }
+  input, textarea, select { width: 100%; font: 13px/1.6 var(--ui-font, sans-serif); color: var(--ui-text, #d6d9d1);
+    background-color: rgba(0,0,0,.45); border: 1px solid var(--edge); border-radius: 0; padding: 6px 8px; }
+  input:focus, textarea:focus, select:focus { outline: none; border-color: var(--ui-gold, #dfbd68); }
+  input:disabled { color: rgba(163,170,164,.45); background-color: rgba(0,0,0,.25); }
+  textarea { resize: vertical; min-height: 68px; }
+  select { appearance: none; -webkit-appearance: none; padding-right: 26px; cursor: pointer;
+    background-image: linear-gradient(45deg, transparent 50%, var(--ui-muted, #a3aaa4) 50%),
+      linear-gradient(135deg, var(--ui-muted, #a3aaa4) 50%, transparent 50%);
+    background-position: calc(100% - 15px) 14px, calc(100% - 10px) 14px;
+    background-size: 5px 5px, 5px 5px; background-repeat: no-repeat; }
+  select option { background: var(--ui-surface, #101314); }
+  .seg { display: inline-flex; border: 1px solid var(--edge); }
+  .seg > button { border: 0; border-right: 1px solid var(--edge); background: transparent;
+    color: var(--ui-muted, #a3aaa4); padding: 5px 10px; }
+  .seg > button:last-child { border-right: 0; }
+  .seg > button:hover { background: var(--fill); color: var(--ui-text, #d6d9d1); }
+  .seg > button.on { color: var(--ui-gold, #dfbd68); background: var(--ui-selection, rgba(223,189,104,.14)); }
+
+  /* --- 右栏：详情卡 / 批注卡 / 表单 -------------------------------------- */
+  .card { margin: 8px 16px; border: 1px solid var(--edge); background: var(--sunk); }
+  .cardHead { display: flex; align-items: center; gap: 8px; padding: 8px;
+    background: var(--fill); border-bottom: 1px solid var(--edge-soft); }
+  .cardHead b { font-size: 14px; color: var(--ui-bright, #eeefec); word-break: break-all; }
+  .cardHead code { margin-left: 6px; font: 11px var(--ui-mono, Consolas, monospace); color: rgba(163,170,164,.75); }
+  .kindTag { flex: 0 0 auto; font-size: 11px; padding: 1px 6px; color: var(--ui-gold, #dfbd68); border: 1px solid var(--gold-line); }
+  .cardBody { padding: 8px; }
+  .cardBody:empty { display: none; }
+  .kv { display: grid; grid-template-columns: 76px minmax(0,1fr); gap: 8px; padding: 3px 0; font-size: 12px; }
+  .kv > .k { color: var(--ui-muted, #a3aaa4); }
+  .kv > .v { color: var(--ui-text, #d6d9d1); word-break: break-word; }
+  .kv > .v code { font: 11px var(--ui-mono, Consolas, monospace); color: rgba(163,170,164,.8); margin-left: 6px; }
+  .kv > .v .num { font-family: var(--ui-mono, Consolas, monospace); font-variant-numeric: tabular-nums; }
+  details.fold { margin: 8px; }
+  details.fold > summary { cursor: pointer; list-style-position: inside; padding: 4px 8px; font-size: 12px;
+    color: var(--ui-muted, #a3aaa4); border: 1px solid var(--edge-soft); background: var(--fill); }
+  details.fold > summary:hover { color: var(--ui-text, #d6d9d1); }
+  details.fold[open] > summary { color: var(--ui-gold, #dfbd68); border-color: rgba(223,189,104,.38); }
+  pre { margin: 8px 0 0; max-height: 220px; overflow: auto; font: 11px/1.5 var(--ui-mono, Consolas, monospace);
+    background: rgba(0,0,0,.35); border: 1px solid var(--edge-soft); padding: 8px; white-space: pre-wrap; word-break: break-all; }
+  .note { margin: 0 16px 8px; padding: 8px; border: 1px solid var(--edge); background: var(--sunk); }
+  .note .h { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .note .h .who { font-size: 12px; color: var(--ui-text, #d6d9d1); }
+  .note .txt { margin: 6px 0; font-size: 13px; color: var(--ui-bright, #eeefec); }
+  .note .line { font-size: 12px; color: var(--ui-muted, #a3aaa4); }
+  .note code { font: 11px var(--ui-mono, Consolas, monospace); color: rgba(163,170,164,.7); }
+  .note .bar { margin-top: 8px; }
+  .noteId { margin-top: 6px; word-break: break-all;
+    font: 11px var(--ui-mono, Consolas, monospace); color: rgba(163,170,164,.5); }
+  .st { font-size: 11px; padding: 1px 6px; white-space: nowrap; border: 1px solid var(--edge); color: var(--ui-muted, #a3aaa4); }
+  .st.open { color: var(--ui-gold, #dfbd68); border-color: var(--gold-line); background: var(--gold-soft); }
+  .st.resolved { color: var(--ok); border-color: rgba(143,202,122,.4); }
+  .st.dismissed { color: var(--ui-muted, #a3aaa4); border-style: dashed; }
+  .alert { margin-top: 8px; padding: 6px 8px; font-size: 12px;
+    border: 1px solid rgba(214,96,74,.55); border-left-width: 3px; background: rgba(214,96,74,.1); color: #e8a893; }
+  .alert .ah { font-weight: 700; }
+  .alert .d { display: grid; grid-template-columns: minmax(0,1fr) auto auto auto; gap: 2px 6px;
+    margin-top: 4px; font: 11px var(--ui-mono, Consolas, monospace); color: var(--ui-text, #d6d9d1); }
+  .alert .d > .p { color: rgba(163,170,164,.85); overflow: hidden; text-overflow: ellipsis; }
+  .alert .d > .from { color: rgba(163,170,164,.85); text-decoration: line-through; }
+  .alert .d > .to { color: var(--ui-bright, #eeefec); }
+  .note.drift { border-color: rgba(214,96,74,.45); }
+  img.thumb { display: block; width: 100%; max-height: 132px; object-fit: cover; object-position: center top;
+    margin-top: 8px; border: 1px solid var(--edge); }
+  .form { padding: 0 16px 16px; }
+  .field { margin-bottom: 8px; }
+  .field > label { display: block; margin-bottom: 4px; font-size: 12px; color: var(--ui-muted, #a3aaa4); }
+  .field .hint { font-size: 11px; color: rgba(163,170,164,.7); }
+  .field .row2 { display: grid; grid-template-columns: minmax(0,1.3fr) minmax(0,1fr); gap: 8px; }
+  .box { min-height: 30px; padding: 5px 8px; font-size: 12px; color: var(--ui-muted, #a3aaa4);
+    border: 1px dashed var(--edge); background: rgba(0,0,0,.2); }
+  .box.filled { border-style: solid; color: var(--ui-text, #d6d9d1); }
+  .statusBar { margin-top: 8px; padding: 6px 8px; font-size: 12px; word-break: break-word;
+    border-left: 3px solid var(--edge); background: rgba(0,0,0,.25); color: var(--ui-muted, #a3aaa4); }
+  .statusBar:empty { display: none; }
+  .statusBar.ok { border-left-color: var(--ok); color: var(--ok); }
+  .statusBar.warn { border-left-color: var(--ui-gold, #dfbd68); color: var(--ui-gold, #dfbd68); }
+
+  /* --- 时间轴 ------------------------------------------------------------ */
+  #tl { flex: 0 0 auto; display: flex; flex-direction: column;
+    background: var(--ui-black, #030404); border-top: 1px solid var(--ui-line, #c4c6bb33); }
+  #tl[data-collapsed="1"] .tlBody { display: none; }
+  .tlHead { display: flex; align-items: center; gap: 12px; padding: 6px 16px; }
+  .tlHead h2 { margin: 0; font: 700 13px/1.5 var(--ui-font, sans-serif); letter-spacing: .06em; color: var(--ui-bright, #eeefec); }
+  .tlHead .sub { font-size: 12px; color: var(--ui-muted, #a3aaa4); }
+  .legend { margin-left: auto; display: flex; align-items: center; gap: 12px; font-size: 11px; color: var(--ui-muted, #a3aaa4); }
+  .legend i { font-style: normal; margin-right: 5px; }
+  .legend .d { color: var(--design); }
+  .legend .c { color: var(--ui-gold, #dfbd68); }
+  .legend .a { color: var(--actual); }
+  .tlBody { display: flex; height: 168px; min-height: 0; }
+  .tlNames { flex: 0 0 92px; display: flex; flex-direction: column; border-right: 1px solid var(--ui-line, #c4c6bb33); }
+  .tlNames > .sp { flex: 0 0 22px; }
+  .tlNames > .n { flex: 1 1 0; display: flex; flex-direction: column; justify-content: center; gap: 2px;
+    padding: 0 8px; font-size: 12px; line-height: 1.35; }
+  .tlNames > .n.design { color: var(--design); }
+  .tlNames > .n.actual { color: var(--actual); }
+  .tlScroll { flex: 1 1 auto; overflow-x: auto; overflow-y: hidden; }
+  .tlGrid { display: flex; flex-direction: column; height: 100%; min-width: 1180px; }
+  .tlHeadRow { display: flex; flex: 0 0 22px; }
+  .tlRow { display: flex; flex: 1 1 0; min-height: 0; }
+  .tlCell { border-left: 1px solid var(--edge-soft); padding: 3px 4px 0; font-size: 11px;
+    color: var(--ui-muted, #a3aaa4); white-space: nowrap; overflow: hidden; cursor: pointer; }
+  .tlCell .num { font-family: var(--ui-mono, Consolas, monospace); }
+  .tlCell:hover { color: var(--ui-text, #d6d9d1); }
+  .tlLane { border-left: 1px solid var(--edge-soft); padding: 2px 3px; overflow-y: auto; line-height: 1.3; }
+  .tlCell.now, .tlLane.now { background: rgba(223,189,104,.1); }
+  .tlCell.now { color: var(--ui-gold, #dfbd68); }
+  .tlMark { display: inline-block; padding: 0 2px; cursor: pointer; font-size: 12px; }
+  [data-timeline="design"] .tlMark { color: var(--design); }
+  [data-timeline="design"] .tlMark[data-marker-kind="condition"] { color: var(--ui-gold, #dfbd68); }
+  [data-timeline="actual"] .tlMark { color: var(--actual); }
+  .tlMark:hover { background: rgba(255,255,255,.16); color: var(--ui-bright, #eeefec); }
+  .tlEmpty { padding: 4px 8px; font-size: 11px; color: rgba(163,170,164,.7); }
+  .tip { position: fixed; z-index: 40; max-width: 320px; padding: 6px 8px; font-size: 12px; line-height: 1.6;
+    pointer-events: none; background: var(--ui-black, #030404); border: 1px solid var(--gold-line); color: var(--ui-text, #d6d9d1);
+    box-shadow: 0 6px 18px rgba(0,0,0,.6); }
+  .tip[hidden] { display: none; }
+  .tip b { color: var(--ui-gold, #dfbd68); }
 `;
 
 const Round = (value, digits = 1) => (Number.isFinite(value) ? value.toFixed(digits) : "—");
@@ -181,6 +437,10 @@ export class OrchestrationEditor {
     this.labelPending = null;            // 标注工具正开着的那个输入框
     this.draft = { text: "", proposal: "", timeKind: "", timeValue: "", shapes: [], candidate: null };
     this.statusText = "";
+    this.headerSignature = "";
+    this.shownPhase = 0;                 // 左栏自动展开/滚动过的那一阶段
+    this.layout = ReadLayout();          // 三栏宽度与时间轴折叠状态（记在 localStorage）
+    this.drag = null;                    // 正在拖的那条分栏线
     this.OnPageHide = () => this.host.CloseOrchestration();
     this.OnResize = () => this.SyncCanvasSize(true);
   }
@@ -201,6 +461,7 @@ export class OrchestrationEditor {
       this.map.onMove((event) => this.SetCandidate(event?.to, event?.target));
       this.map.onLabel((at) => this.BeginLabel(at));
       this.SetPhase(this.phaseNumber);
+      this.OpenPhase(this.phaseNumber);        // 开窗先摊开第一阶段，别让左栏是一排关着的抽屉
       this.SetTool("select");
       this.RefreshForm();
       window.addEventListener("pagehide", this.OnPageHide);
@@ -233,6 +494,9 @@ export class OrchestrationEditor {
     try { this.map?.Dispose(); } catch (error) { console.warn("[Orchestration] 俯视图关闭出错：", error); }
     this.map = null;
     this.elapsed = 0;
+    // 顶栏是「指纹没变就不重画」的：不清掉，同一个实例再开一次窗会得到一条空的状态行。
+    this.headerSignature = "";
+    this.shownPhase = 0;
     if (this.win && !this.win.closed) this.win.close();
     this.win = null;
     this.doc = null;
@@ -314,105 +578,162 @@ export class OrchestrationEditor {
       if (parent) parent.appendChild(node);
       return node;
     };
-    const Button = (parent, text, onClick, data = {}) => {
-      const node = El("button", parent, text);
+    const Button = (parent, text, onClick, data = {}, cls = "") => {
+      const node = El("button", parent, text, cls);
       node.type = "button";
       for (const [key, value] of Object.entries(data)) node.dataset[key] = value;
       node.addEventListener("click", onClick);
       return node;
     };
     this.El = El;
+    this.Button = Button;
 
     const header = El("header", doc.body);
     header.dataset.orch = "header";
-    El("h1", header, "关卡编排 · 第一关《往南的路》");
-    const liveStatus = El("div", header, "", "muted");
+    const title = El("div", header, "", "hTitle");
+    El("h1", title, "关卡编排");
+    El("span", title, "第一关《往南的路》", "hLevel");
+    const liveStatus = El("div", header);
     liveStatus.dataset.orch = "live-status";
-    const version = El("div", header, `模型 ${this.model.version}`, "muted");
+    const version = El("div", header, `模型 ${this.model.version}`);
     version.dataset.orch = "version";
+    version.title = "这份界面读的就是游戏在跑的那份编排数据，版本号来自模型本身";
 
     const cols = El("div", doc.body);
     cols.id = "cols";
     const flow = El("div", cols, "", "col flow");
     flow.dataset.orch = "flow";
+    const leftGrip = El("div", cols, "", "gutter");
+    leftGrip.dataset.orch = "split-left";
     const map = El("div", cols, "", "col map");
     map.dataset.orch = "map";
+    const rightGrip = El("div", cols, "", "gutter");
+    rightGrip.dataset.orch = "split-right";
     const detail = El("div", cols, "", "col detail");
     detail.dataset.orch = "detail";
     const timeline = El("div", doc.body);
     timeline.id = "tl";
     timeline.dataset.orch = "timeline";
+    const tip = El("div", doc.body, "", "tip");
+    tip.dataset.orch = "tip";
+    tip.hidden = true;
 
-    this.ui = { liveStatus, flow, map, detail, timeline };
+    this.ui = { cols, liveStatus, flow, map, detail, timeline, tip };
     this.BuildFlow(El, Button, flow);
     this.BuildMapColumn(El, Button, map);
     this.BuildDetail(El, Button, detail);
-    this.BuildTimeline(El, timeline);
+    this.BuildTimeline(El, Button, timeline);
+    this.BindSplitters(leftGrip, rightGrip);
+    this.ApplyLayout();
   }
+
+  // ------------------------------------------------------------- 分栏与提示
+  /** 三栏宽度可拖；拖完记进 localStorage，下次开窗还是这个宽度。 */
+  BindSplitters(leftGrip, rightGrip) {
+    const doc = this.doc;
+    const Start = (side) => (event) => {
+      event.preventDefault();
+      this.drag = { side, x: event.clientX, left: this.layout.left, right: this.layout.right };
+      (side === "left" ? leftGrip : rightGrip).classList.add("drag");
+      doc.body.style.cursor = "col-resize";
+    };
+    leftGrip.addEventListener("mousedown", Start("left"));
+    rightGrip.addEventListener("mousedown", Start("right"));
+    doc.addEventListener("mousemove", (event) => {
+      if (!this.drag) return;
+      const delta = event.clientX - this.drag.x;
+      if (this.drag.side === "left") this.layout.left = this.drag.left + delta;
+      else this.layout.right = this.drag.right - delta;
+      this.ApplyLayout();
+    });
+    doc.addEventListener("mouseup", () => {
+      if (!this.drag) return;
+      this.drag = null;
+      leftGrip.classList.remove("drag");
+      rightGrip.classList.remove("drag");
+      doc.body.style.cursor = "";
+      WriteLayout(this.layout);
+      this.SyncCanvasSize(true);
+    });
+  }
+
+  ApplyLayout() {
+    const width = this.win?.innerWidth || 1380;
+    // 中间那栏至少 360 —— 俯视图缩到比它还窄就没法看了。
+    const left = Math.round(Math.min(Math.max(this.layout.left, 260), Math.max(280, width - 360 - 300)));
+    const right = Math.round(Math.min(Math.max(this.layout.right, 280), Math.max(300, width - 360 - left)));
+    this.layout.left = left;
+    this.layout.right = right;
+    this.ui.cols.style.setProperty("--left", `${left}px`);
+    this.ui.cols.style.setProperty("--right", `${right}px`);
+  }
+
+  /** 时间轴标记的悬停提示：自己画一个，native title 要等一秒才出、还压不住样式。 */
+  ShowTip(node, html) {
+    const tip = this.ui?.tip;
+    if (!tip || !html) return;
+    tip.textContent = "";
+    for (const line of html) {
+      const row = this.El("div", tip, "");
+      if (line.k) this.El("b", row, `${line.k} `);
+      this.El("span", row, line.v);
+    }
+    tip.hidden = false;
+    const box = node.getBoundingClientRect();
+    const size = tip.getBoundingClientRect();
+    const x = Math.max(8, Math.min(box.left, (this.win.innerWidth || 1380) - size.width - 8));
+    const y = box.top - size.height - 6;
+    tip.style.left = `${Math.round(x)}px`;
+    tip.style.top = `${Math.round(y < 8 ? box.bottom + 6 : y)}px`;
+  }
+
+  HideTip() { if (this.ui?.tip) this.ui.tip.hidden = true; }
 
   // ------------------------------------------------------------------ 流程
   BuildFlow(El, Button, root) {
-    El("h2", root, "流程 · 18 阶段 / 27 步骤");
+    const head = El("div", root, "", "colHead");
+    El("h2", head, "流程");
+    El("span", head, `${this.model.phases.length} 个阶段 · ${this.model.steps.length} 个步骤`, "sub");
+    const hint = El("div", root, "", "empty");
+    hint.dataset.orch = "flow-hint";
+
     this.ui.phases = new Map();
     this.ui.steps = new Map();
     this.ui.facts = [];
+    this.ui.flowHint = hint;
     for (const phase of this.model.phases) {
       const box = El("div", root, "", "phase");
       box.dataset.flowPhase = String(phase.number);
-      const head = El("div", box, "", "phaseHead");
-      El("b", head, String(phase.number).padStart(2, "0"));
-      El("span", head, `${phase.id} · ${phase.title}`);
-      head.addEventListener("click", () => this.Select({ kind: "phase", id: phase.id }));
-      const jump = Button(head, "从这里试玩", (event) => {
+      box.dataset.open = "0";
+      box.dataset.phaseState = "";
+      const bar = El("div", box, "", "phaseHead");
+      bar.setAttribute("role", "button");
+      bar.tabIndex = 0;
+      El("span", bar, "▾", "tw");
+      El("span", bar, String(phase.number).padStart(2, "0"), "phaseNum");
+      const name = El("span", bar, phase.title, "phaseName");
+      name.title = `${phase.title}（第 ${phase.number} 阶段，内部编号 ${phase.id}）`;
+      El("span", bar, "", "pState");
+      const Toggle = () => {
+        const open = box.dataset.open !== "1";
+        box.dataset.open = open ? "1" : "0";
+        if (open) this.Select({ kind: "phase", id: phase.id });
+      };
+      bar.addEventListener("click", Toggle);
+      bar.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        Toggle();
+      });
+      const jump = Button(bar, "从这里试玩", (event) => {
         event.stopPropagation();
         this.Jump(phase.number);
-      }, { jump: String(phase.number) });
-      jump.title = `Debug.FirstLevelJump(${phase.number})：从第 ${phase.number} 阶段开打`;
+      }, { jump: String(phase.number) }, "mini");
+      jump.title = `直接从第 ${phase.number} 阶段开打（Debug.FirstLevelJump(${phase.number})）`;
+      const body = El("div", box, "", "phaseBody");
       for (const stepId of phase.steps) {
         const step = this.model.steps.find((entry) => entry.id === stepId);
-        if (!step) continue;
-        const node = El("div", box, "", "step");
-        node.dataset.flowStep = step.id;
-        node.addEventListener("click", () => this.Select({ kind: "step", id: step.id }));
-        El("div", node, step.id, "stepId");
-        El("div", node, step.objective || "（无目标文本）");
-        const meta = [];
-        if (step.cue) meta.push(`对白 ${step.cue}`);
-        if (step.minimumSeconds) meta.push(`最短 ${step.minimumSeconds} s`);
-        if (step.guidance?.route) meta.push(`指引路线 ${step.guidance.route}`);
-        if (meta.length) El("div", node, meta.join(" · "), "muted");
-        for (const factId of step.requirements) {
-          const row = El("div", node, "", "fact");
-          row.dataset.fact = factId;
-          row.dataset.factState = "none";
-          El("i", row, "·");
-          El("span", row, `${factId} —— ${DescribeFact(this.model, factId)}`);
-          row.addEventListener("click", (event) => {
-            event.stopPropagation();
-            this.Select({ kind: "fact", id: factId });
-          });
-          this.ui.facts.push({ row, factId, step });
-        }
-        if (step.spawns.length || step.guidance?.route) {
-          const chips = El("div", node, "", "chips");
-          for (const encounterId of step.spawns) {
-            const chip = El("span", chips, `组 ${encounterId}`, "chip");
-            chip.dataset.flowEncounter = encounterId;
-            chip.addEventListener("click", (event) => {
-              event.stopPropagation();
-              this.Select({ kind: "encounter", id: encounterId });
-            });
-          }
-          if (step.guidance?.route) {
-            const chip = El("span", chips, `路线 ${step.guidance.route}`, "chip");
-            chip.dataset.flowRoute = step.guidance.route;
-            chip.addEventListener("click", (event) => {
-              event.stopPropagation();
-              this.Select({ kind: "route", id: step.guidance.route });
-            });
-          }
-        }
-        this.ui.steps.set(step.id, node);
+        if (step) this.BuildStepCard(El, body, step);
       }
       this.ui.phases.set(phase.number, box);
     }
@@ -422,77 +743,171 @@ export class OrchestrationEditor {
     if (orphans.length) {
       const box = El("div", root, "", "phase");
       box.dataset.flowOrphan = "1";
-      const head = El("div", box, "", "phaseHead");
-      El("b", head, "——");
-      El("span", head, "不属于任何公开阶段");
-      for (const step of orphans) {
-        const node = El("div", box, "", "step");
-        node.dataset.flowStep = step.id;
-        node.addEventListener("click", () => this.Select({ kind: "step", id: step.id }));
-        El("div", node, step.id, "stepId");
-        El("div", node, step.objective || "（无目标文本）");
-        this.ui.steps.set(step.id, node);
-      }
+      box.dataset.open = "1";
+      const bar = El("div", box, "", "phaseHead");
+      El("span", bar, "", "tw");
+      El("span", bar, "——", "phaseNum");
+      El("span", bar, "关卡结束（不属于任何阶段）", "phaseName");
+      const body = El("div", box, "", "phaseBody");
+      for (const step of orphans) this.BuildStepCard(El, body, step, { brief: true });
       this.ui.phases.set(0, box);
     }
+  }
+
+  /** 一张步骤小卡：目标一句在最上，要求事实逐行带状态，对白与最短时长在下面。 */
+  BuildStepCard(El, parent, step, { brief = false } = {}) {
+    const node = El("div", parent, "", "step");
+    node.dataset.flowStep = step.id;
+    node.addEventListener("click", () => this.Select({ kind: "step", id: step.id }));
+    const top = El("div", node, "", "stepTop");
+    El("span", top, step.objective || "（这一步没有写目标）", "stepObj");
+    const id = El("code", top, step.id, "stepId");
+    id.title = `内部步骤编号 ${step.id}`;
+    if (brief) { this.ui.steps.set(step.id, node); return node; }
+
+    if (step.requirements.length) {
+      const facts = El("div", node, "", "facts");
+      for (const factId of step.requirements) {
+        const row = El("div", facts, "", "fact");
+        row.dataset.fact = factId;
+        row.dataset.factState = "none";
+        El("i", row, "·");
+        const text = El("span", row, "", "factText");
+        El("span", text, DescribeFact(this.model, factId));
+        El("span", text, factId, "factId");
+        row.addEventListener("click", (event) => {
+          event.stopPropagation();
+          this.Select({ kind: "fact", id: factId });
+        });
+        this.ui.facts.push({ row, factId, step });
+      }
+    } else {
+      El("div", node, "这一步没有过关条件（走完就过）", "stepMeta");
+    }
+    const meta = [];
+    if (step.cue) meta.push(`对白 ${step.cue}`);
+    if (step.minimumSeconds) meta.push(`至少停留 ${step.minimumSeconds} 秒`);
+    if (meta.length) El("div", node, meta.join(" · "), "stepMeta");
+    if (step.spawns.length || step.guidance?.route) {
+      const chips = El("div", node, "", "chips");
+      for (const encounterId of step.spawns) {
+        const chip = El("span", chips, "放出敌军 ", "chip");
+        El("code", chip, encounterId);
+        chip.dataset.flowEncounter = encounterId;
+        chip.title = `这一步会把 ${encounterId} 这一组敌人放进场`;
+        chip.addEventListener("click", (event) => {
+          event.stopPropagation();
+          this.Select({ kind: "encounter", id: encounterId });
+        });
+      }
+      if (step.guidance?.route) {
+        const chip = El("span", chips, "指引路线 ", "chip");
+        El("code", chip, step.guidance.route);
+        chip.dataset.flowRoute = step.guidance.route;
+        chip.title = step.guidance.label || "这一步给玩家的指引";
+        chip.addEventListener("click", (event) => {
+          event.stopPropagation();
+          this.Select({ kind: "route", id: step.guidance.route });
+        });
+      }
+    }
+    this.ui.steps.set(step.id, node);
+    return node;
   }
 
   // ---------------------------------------------------------------- 俯视图
   BuildMapColumn(El, Button, root) {
     const tools = El("div", root, "", "bar");
     tools.dataset.orch = "tools";
-    El("span", tools, "工具", "muted");
     this.ui.tools = new Map();
     for (const [id, label] of TOOLS) {
-      const button = Button(tools, label, () => this.SetTool(id), { tool: id });
+      const button = Button(tools, "", () => this.SetTool(id), { tool: id }, "tchip");
+      button.appendChild(ToolIcon(this.doc, id));
+      El("span", button, label);
+      button.title = TOOL_HINT[id] || label;
       this.ui.tools.set(id, button);
     }
+    El("div", tools, "", "spacer");
 
-    const layers = El("div", root, "", "bar");
+    // 图层收进一个下拉面板：十三个开关摊在工具条上要占掉两行，那两行是从俯视图身上抠的。
+    const drop = El("div", tools, "", "drop");
+    const layerButton = Button(drop, "", () => this.ToggleLayers(), { orch: "layers-button" }, "tchip");
+    El("span", layerButton, "图层");
+    const layerCount = El("span", layerButton, "", "mono muted");
+    const layers = El("div", drop, "", "dropPanel");
     layers.dataset.orch = "layers";
-    El("span", layers, "图层", "muted");
+    layers.hidden = true;
     this.ui.layers = new Map();
+    this.ui.layerChips = new Map();
     for (const [id, label] of LAYERS) {
-      const wrap = El("label", layers, "", "chk");
+      const wrap = El("label", layers, "", "lchip on");
       const box = this.doc.createElement("input");
       box.type = "checkbox";
       box.checked = true;
       box.dataset.layer = id;
       box.addEventListener("change", () => this.SetLayer(id, box.checked));
       wrap.appendChild(box);
+      El("span", wrap, "", "tick");
       El("span", wrap, label);
       this.ui.layers.set(id, box);
+      this.ui.layerChips.set(id, wrap);
     }
+    const all = El("div", layers, "", "all");
+    Button(all, "全开", () => this.SetAllLayers(true), { orch: "layers-all" }, "ghost");
+    Button(all, "只看底图", () => this.SetAllLayers(false), { orch: "layers-none" }, "ghost");
+    this.ui.layerPanel = layers;
+    this.ui.layerCount = layerCount;
+    layerCount.textContent = `${LAYERS.length}/${LAYERS.length}`;
 
-    const stage = El("div", root, "", "bar");
+    const stage = El("div", root, "", "bar stepper");
     stage.dataset.orch = "stagebar";
-    Button(stage, "◀ 上一阶段", () => this.SetPhase(this.phaseNumber - 1, { fit: true }), { map: "prev" });
-    const slider = this.doc.createElement("input");
-    slider.type = "range";
-    slider.min = "1";
-    slider.max = String(this.model.phases.length);
-    slider.step = "1";
-    slider.value = "1";
-    slider.dataset.map = "phase";
-    slider.style.width = "180px";
-    slider.addEventListener("input", () => this.SetPhase(Number(slider.value), { fit: true }));
-    stage.appendChild(slider);
-    Button(stage, "下一阶段 ▶", () => this.SetPhase(this.phaseNumber + 1, { fit: true }), { map: "next" });
-    const label = El("span", stage, "", "muted");
+    Button(stage, "◀", () => this.SetPhase(this.phaseNumber - 1, { fit: true }), { map: "prev" }, "icon")
+      .title = "上一阶段";
+    const label = El("span", stage, "", "who");
     label.dataset.map = "phase-label";
-    Button(stage, "适配整关", () => this.map?.FitBounds(), { map: "fit-all" });
-    Button(stage, "适配本阶段", () => this.map?.FitPhase(this.phaseNumber), { map: "fit-phase" });
-    const follow = El("label", stage, "", "chk");
+    Button(stage, "▶", () => this.SetPhase(this.phaseNumber + 1, { fit: true }), { map: "next" }, "icon")
+      .title = "下一阶段";
+    // 进度条就是阶段条：点哪儿跳哪儿，左右方向键走一格。原生 range 在这套界面里太出戏。
+    const track = El("div", stage, "", "track");
+    track.dataset.map = "phase";
+    track.tabIndex = 0;
+    track.setAttribute("role", "slider");
+    track.setAttribute("aria-label", "阶段");
+    track.setAttribute("aria-valuemin", "1");
+    track.setAttribute("aria-valuemax", String(this.model.phases.length));
+    const fill = El("i", track);
+    const knob = El("b", track);
+    const Seek = (event) => {
+      const box = track.getBoundingClientRect();
+      if (box.width <= 0) return;
+      const ratio = Math.min(1, Math.max(0, (event.clientX - box.left) / box.width));
+      this.SetPhase(1 + Math.round(ratio * (this.model.phases.length - 1)), { fit: true });
+    };
+    track.addEventListener("mousedown", Seek);
+    track.addEventListener("keydown", (event) => {
+      if (event.key === "ArrowLeft") { event.preventDefault(); this.SetPhase(this.phaseNumber - 1, { fit: true }); }
+      else if (event.key === "ArrowRight") { event.preventDefault(); this.SetPhase(this.phaseNumber + 1, { fit: true }); }
+    });
+    El("div", stage, "", "sep");
+    const followButton = Button(stage, "", () => this.SetFollowLive(!this.followLive), { map: "follow-chip" }, "tchip on");
     const followBox = this.doc.createElement("input");
     followBox.type = "checkbox";
     followBox.checked = true;
     followBox.dataset.map = "follow";
-    followBox.addEventListener("change", () => this.SetFollowLive(followBox.checked));
-    follow.appendChild(followBox);
-    El("span", follow, "跟随实时");
-    this.ui.phaseSlider = slider;
+    followBox.hidden = true;
+    followButton.appendChild(followBox);
+    El("span", followButton, "跟随实时");
+    followButton.title = "玩家走到哪一阶段，这张图就跟到哪一阶段";
+    Button(stage, "适配整关", () => this.map?.FitBounds(), { map: "fit-all" }, "tchip")
+      .title = "把整张关卡装进画面";
+    Button(stage, "适配本阶段", () => this.map?.FitPhase(this.phaseNumber), { map: "fit-phase" }, "tchip")
+      .title = "只框住当前阶段那一片";
     this.ui.phaseLabel = label;
+    this.ui.phaseFill = fill;
+    this.ui.phaseKnob = knob;
+    this.ui.phaseTrack = track;
     this.ui.followBox = followBox;
+    this.ui.followButton = followButton;
 
     const wrap = El("div", root);
     wrap.id = "canvasWrap";
@@ -501,98 +916,129 @@ export class OrchestrationEditor {
     wrap.appendChild(canvas);
     this.ui.canvas = canvas;
     this.ui.canvasWrap = wrap;
+    // 点画布就把图层面板收起来 —— 它浮在图上面，忘了关会挡住右上角那一片。
+    wrap.addEventListener("mousedown", () => this.ToggleLayers(false));
+  }
+
+  ToggleLayers(force) {
+    const panel = this.ui?.layerPanel;
+    if (!panel) return false;
+    const open = force === undefined ? panel.hidden : !!force;
+    panel.hidden = !open;
+    this.ui.layerCount.parentElement.classList.toggle("on", open);
+    return open;
+  }
+
+  SetAllLayers(on) {
+    for (const [id] of this.ui?.layers || []) this.SetLayer(id, on ? true : BASE_LAYERS.has(id));
   }
 
   // ---------------------------------------------------------- 详情 / 批注
   BuildDetail(El, Button, root) {
-    El("h2", root, "详情 / 批注");
-    const title = El("div", root, "（没有选中对象）");
+    const head = El("div", root, "", "colHead");
+    El("h2", head, "详情");
+    El("span", head, "选中什么，这里就说它是谁", "sub");
+
+    const card = El("div", root, "", "card");
+    const cardHead = El("div", card, "", "cardHead");
+    const title = El("div", cardHead, "还没有选中东西");
     title.dataset.detail = "title";
-    const owner = El("div", root, "");
+    const owner = El("div", card, "", "cardBody");
     owner.dataset.detail = "owner";
-    const jsonBox = El("details", root);
+    const jsonBox = El("details", card, "", "fold");
     jsonBox.dataset.detail = "json-box";
-    El("summary", jsonBox, "原始数据 JSON");
+    El("summary", jsonBox, "原始数据（给 agent 看的 JSON）");
     const json = El("pre", jsonBox, "—");
     json.dataset.detail = "json";
 
-    El("h2", root, "本对象相关批注");
-    const related = El("div", root, "（暂无）");
+    El("div", root, "这个对象上的批注", "sect");
+    const related = El("div", root);
     related.dataset.detail = "notes";
 
-    El("h2", root, "新建批注");
-    const form = El("div", root);
+    El("div", root, "写一条批注", "sect");
+    const form = El("div", root, "", "form");
     form.dataset.detail = "form";
+
+    const textField = El("div", form, "", "field");
+    El("label", textField, "哪里不对（必填）");
     const text = this.doc.createElement("textarea");
     text.rows = 3;
-    text.placeholder = "这组敌人出现得太早。";
+    text.placeholder = "例：这组敌人出现得太早，转运刚开始就压到装车位上了。";
     text.dataset.noteField = "text";
     text.addEventListener("input", () => { this.draft.text = text.value; });
-    form.appendChild(text);
+    textField.appendChild(text);
 
-    const kindRow = El("div", form, "", "row");
-    El("span", kindRow, "建议类型");
+    const kindField = El("div", form, "", "field");
+    El("label", kindField, "你的建议");
     const proposal = this.doc.createElement("select");
     proposal.dataset.noteField = "proposal";
-    for (const [value, label] of [["", "（不写具体建议）"], ...PROPOSAL_KINDS.map((k) => [k, `${k} · ${PROPOSAL_TEXT[k] || k}`])]) {
+    for (const [value, label] of [["", "只提意见，不写具体建议"],
+      ...PROPOSAL_KINDS.map((k) => [k, PROPOSAL_TEXT[k] || k])]) {
       const option = this.doc.createElement("option");
       option.value = value;
       option.textContent = label;
       proposal.appendChild(option);
     }
     proposal.addEventListener("change", () => { this.draft.proposal = proposal.value; });
-    kindRow.appendChild(proposal);
+    kindField.appendChild(proposal);
 
-    const timeRow = El("div", form, "", "row");
-    El("span", timeRow, "时间点");
-    const timeWrap = El("div", timeRow, "", "bar");
+    const timeField = El("div", form, "", "field");
+    El("label", timeField, "指的是哪个时候");
+    const timeRow = El("div", timeField, "", "row2");
     const timeKind = this.doc.createElement("select");
     timeKind.dataset.noteField = "timeKind";
-    for (const [value, label] of [["", "不限时刻"], ["stageRelative", "阶段内第 N 秒"], ["fact", "某事实满足时"]]) {
+    for (const [value, label] of [["", TIME_KIND_TEXT[""]], ["stageRelative", TIME_KIND_TEXT.stageRelative],
+      ["fact", TIME_KIND_TEXT.fact]]) {
       const option = this.doc.createElement("option");
       option.value = value;
       option.textContent = label;
       timeKind.appendChild(option);
     }
-    timeKind.style.width = "auto";
     timeKind.addEventListener("change", () => { this.draft.timeKind = timeKind.value; this.RefreshForm(); });
-    timeWrap.appendChild(timeKind);
+    timeRow.appendChild(timeKind);
     const timeValue = this.doc.createElement("input");
+    timeValue.type = "text";
     timeValue.dataset.noteField = "timeValue";
-    timeValue.placeholder = "秒数或事实 id";
-    timeValue.style.width = "130px";
+    timeValue.placeholder = "秒数";
     timeValue.addEventListener("input", () => { this.draft.timeValue = timeValue.value; });
-    timeWrap.appendChild(timeValue);
+    timeRow.appendChild(timeValue);
 
-    const sketchRow = El("div", form, "", "row");
-    El("span", sketchRow, "草图");
-    const sketch = El("div", sketchRow, "（用中间的圈选 / 箭头 / 折线 / 标注工具画）", "muted");
+    const sketchField = El("div", form, "", "field");
+    El("label", sketchField, "画在图上的东西（点一下删掉）");
+    const sketch = El("div", sketchField, "", "box");
     sketch.dataset.noteField = "sketch";
-    const candidateRow = El("div", form, "", "row");
-    El("span", candidateRow, "候选位");
-    const candidate = El("div", candidateRow, "（用「候选位」工具把选中的敌人拖到想要的位置）", "muted");
+    const candidateField = El("div", form, "", "field");
+    El("label", candidateField, "建议挪到的位置");
+    const candidate = El("div", candidateField, "", "box");
     candidate.dataset.noteField = "candidate";
 
     const actions = El("div", form, "", "bar");
-    Button(actions, "保存草稿", () => { this.SaveDraft(); }, { noteAction: "save" });
-    Button(actions, "复制交接文本", () => this.CopyHandoff(), { noteAction: "handoff" });
-    Button(actions, "下载 JSON", () => this.DownloadJson(), { noteAction: "download" });
-    Button(actions, "复制 JSON", () => this.CopyJson(), { noteAction: "copy" });
-    Button(actions, "下载本图", () => this.DownloadImage(), { noteAction: "image" });
-    Button(actions, "清空草稿", () => this.ClearDraft(), { noteAction: "clear" });
-    const status = El("div", form, "", "muted");
+    Button(actions, "保存草稿", () => { this.SaveDraft(); }, { noteAction: "save" }, "primary");
+    Button(actions, "清空", () => this.ClearDraft(), { noteAction: "clear" }, "ghost");
+    const status = El("div", form, "", "statusBar");
     status.dataset.notes = "status";
+    const more = El("div", form, "", "bar");
+    more.style.marginTop = "8px";
+    Button(more, "复制交接文本", () => this.CopyHandoff(), { noteAction: "handoff" }, "ghost")
+      .title = "把待处理的批注整理成一段文字，贴给 agent 就能开工";
+    Button(more, "下载 JSON", () => this.DownloadJson(), { noteAction: "download" }, "ghost");
+    Button(more, "复制 JSON", () => this.CopyJson(), { noteAction: "copy" }, "ghost");
+    Button(more, "下载本图", () => this.DownloadImage(), { noteAction: "image" }, "ghost")
+      .title = "把现在这张俯视图存成 PNG";
 
-    El("h2", root, "全部批注");
-    const filter = El("div", root, "", "bar");
+    El("div", root, "全部批注", "sect");
+    const filterBar = El("div", root, "", "bar");
+    filterBar.style.margin = "8px 16px";
+    const filter = El("div", filterBar, "", "seg");
     filter.dataset.notes = "filter";
     this.ui.filters = new Map();
-    for (const [value, label] of [["open", "待处理"], ["resolved", "已处理"], ["dismissed", "不处理"], ["all", "全部"]]) {
+    for (const [value, label] of [["open", "待处理"], ["resolved", "已处理"], ["dismissed", "已忽略"], ["all", "全部"]]) {
       const button = Button(filter, label, () => this.SetNoteFilter(value), { notesFilter: value });
       this.ui.filters.set(value, button);
     }
-    Button(filter, "重新加载", () => this.LoadNotes(), { notesAction: "reload" });
-    const list = El("div", root, "（暂无）");
+    El("div", filterBar, "", "spacer").style.flex = "1 1 auto";
+    Button(filterBar, "重新加载", () => this.LoadNotes(), { notesAction: "reload" }, "ghost");
+    const list = El("div", root);
     list.dataset.notes = "list";
 
     Object.assign(this.ui, {
@@ -601,26 +1047,57 @@ export class OrchestrationEditor {
   }
 
   // -------------------------------------------------------------- 时间轴
-  BuildTimeline(El, root) {
-    const legend = El("div", root, "", "legend");
+  BuildTimeline(El, Button, root) {
+    root.dataset.collapsed = this.layout.timeline ? "0" : "1";
+    const head = El("div", root, "", "tlHead");
+    El("h2", head, "时间轴");
+    El("span", head, "上面一行是设计的安排，下面一行是这次真的发生的事", "sub");
+    const legend = El("div", head, "", "legend");
     legend.dataset.timeline = "legend";
-    const designKey = El("span", legend);
-    El("i", designKey, "◇ ◆ ■ ▸", "").style.color = "#7fc7d8";
-    El("span", designKey, " 设计（condition 只画条件、不标秒数）");
-    const actualKey = El("span", legend);
-    El("i", actualKey, "▸ ●").style.color = "#78d78f";
-    El("span", actualKey, " 实际试玩（关卡时钟）");
+    for (const [cls, glyph, label] of [
+      ["d", "◆ ■ ▸", "设计里排好时间的"],
+      ["c", "◇", "设计里等玩家触发的（没有秒数）"],
+      ["a", "● ▸", "实际试玩（关卡时钟）"],
+    ]) {
+      const key = El("span", legend, "", cls);
+      El("i", key, glyph);
+      El("span", key, label);
+    }
+    const toggle = Button(head, this.layout.timeline ? "收起" : "展开", () => this.ToggleTimeline(),
+      { timeline: "toggle" }, "ghost");
+    this.ui.timelineToggle = toggle;
 
+    const body = El("div", root, "", "tlBody");
+    const names = El("div", body, "", "tlNames");
+    El("div", names, "", "sp");
+    El("div", names, "设计", "n design");
+    const actualName = El("div", names, "", "n actual");
+    El("span", actualName, "实际");
+    const actualHint = El("span", actualName, "", "muted");
+    actualHint.style.fontSize = "11px";
+    this.ui.actualHint = actualHint;
+
+    const scroll = El("div", body, "", "tlScroll");
+    const grid = El("div", scroll, "", "tlGrid");
+    const headRow = El("div", grid, "", "tlHeadRow");
+    this.ui.laneHeads = new Map();
+    for (const phase of this.model.phases) {
+      const cell = El("div", headRow, "", "tlCell");
+      cell.style.flex = `${LaneWeight(phase)} 1 0`;
+      El("span", cell, String(phase.number), "num");
+      El("span", cell, ` ${phase.title}`);
+      cell.title = `第 ${phase.number} 阶段 · ${phase.title}`;
+      cell.addEventListener("click", () => this.Select({ kind: "phase", id: phase.id }));
+      this.ui.laneHeads.set(phase.number, cell);
+    }
     this.ui.lanes = { design: new Map(), actual: new Map() };
     for (const kind of ["design", "actual"]) {
-      const row = El("div", root, "", "tlRow");
+      const row = El("div", grid, "", "tlRow");
       row.dataset.timeline = kind;
-      El("div", row, kind === "design" ? "设计" : "实际", "tlLabel");
       for (const phase of this.model.phases) {
         const lane = El("div", row, "", "tlLane");
         lane.dataset.lane = String(phase.number);
         lane.style.flex = `${LaneWeight(phase)} 1 0`;
-        El("div", lane, `${phase.number} ${phase.id}`, "h");
         const marks = El("div", lane);
         marks.dataset.marks = kind;
         this.ui.lanes[kind].set(phase.number, { lane, marks });
@@ -630,31 +1107,63 @@ export class OrchestrationEditor {
     for (const entry of this.model.timeline) {
       const slot = this.ui.lanes.design.get(entry.phaseNumber);
       if (!slot) continue;
-      this.AddMarker(slot.marks, entry.kind, MarkerTitle(entry), MarkerSel(entry), MarkerSeconds(entry));
+      this.AddMarker(slot.marks, entry.kind, this.MarkerTip(entry), MarkerSel(entry), MarkerSeconds(entry));
     }
     this.ui.actualCount = -1;
   }
 
-  AddMarker(parent, kind, title, sel, seconds) {
+  ToggleTimeline(force) {
+    const open = force === undefined ? this.ui.timeline.dataset.collapsed === "1" : !!force;
+    this.ui.timeline.dataset.collapsed = open ? "0" : "1";
+    this.ui.timelineToggle.textContent = open ? "收起" : "展开";
+    this.layout.timeline = open;
+    WriteLayout(this.layout);
+    this.SyncCanvasSize(true);
+    return open;
+  }
+
+  AddMarker(parent, kind, tip, sel, seconds) {
     const node = this.doc.createElement("span");
     node.className = "tlMark";
     node.dataset.markerKind = kind;
     node.textContent = TIMELINE_GLYPH[kind] || "·";
     // 秒数只写在**有秒数的那几类**上。condition 是玩家行为触发的，不许假装它有时刻。
     if (Number.isFinite(seconds)) node.dataset.markerAt = String(seconds);
-    node.title = title;
+    node.dataset.tip = tip.map((line) => `${line.k ? `${line.k} ` : ""}${line.v}`).join(" · ");
+    node.addEventListener("mouseenter", () => this.ShowTip(node, tip));
+    node.addEventListener("mouseleave", () => this.HideTip());
     if (sel) {
       node.dataset.selKind = sel.kind;
       if (sel.id) node.dataset.selId = sel.id;
-      node.addEventListener("click", () => this.Select(sel));
+      node.addEventListener("click", () => { this.HideTip(); this.Select(sel); });
     }
     parent.appendChild(node);
     return node;
   }
 
+  /** 悬停提示：阶段、步骤、这件事的人话，最后才是秒数（没有秒数就明说为什么）。 */
+  MarkerTip(entry) {
+    const phase = this.model.phases.find((one) => one.number === entry.phaseNumber);
+    const seconds = MarkerSeconds(entry);
+    const lines = [
+      { k: "", v: TIMELINE_TEXT[entry.kind] || entry.kind },
+      { k: "阶段", v: phase ? `${phase.number} ${phase.title}` : String(entry.phaseNumber ?? "—") },
+      { k: "步骤", v: entry.step || "—" },
+    ];
+    const human = entry.factId ? DescribeFact(this.model, entry.factId) : entry.label;
+    if (human) lines.push({ k: "说的是", v: human });
+    if (entry.kind === "beat") lines.push({ k: "时刻", v: `第 ${entry.earliestS}–${entry.latestS} 秒之间` });
+    else if (Number.isFinite(seconds)) lines.push({ k: "时刻", v: `第 ${seconds} 秒` });
+    else lines.push({ k: "时刻", v: "没有固定秒数，等玩家做到才发生" });
+    return lines;
+  }
+
   RefreshActualTimeline() {
     if (!this.ui?.lanes) return;
     const entries = this.live?.actualTimeline || [];
+    const hint = this.live ? (entries.length ? `关卡时钟 ${Round(this.live.time)} 秒` : "刚开始，还没记录")
+      : "还没有人在跑这一关";
+    if (this.ui.actualHint.textContent !== hint) this.ui.actualHint.textContent = hint;
     if (entries.length === this.ui.actualCount) return;
     this.ui.actualCount = entries.length;
     for (const slot of this.ui.lanes.actual.values()) slot.marks.textContent = "";
@@ -662,8 +1171,15 @@ export class OrchestrationEditor {
       const slot = this.ui.lanes.actual.get(entry.phaseNumber);
       if (!slot) continue;
       const sel = entry.kind === "stageEntry" ? { kind: "step", id: entry.id } : { kind: "fact", id: entry.id };
-      this.AddMarker(slot.marks, entry.kind, `${TIMELINE_TEXT[entry.kind]} ${entry.id} · 关卡时钟 ${Round(entry.atS)} s`
-        + `（本步第 ${Round(entry.stageAtS)} s）`, sel, Math.round(entry.atS * 10) / 10);
+      const phase = this.model.phases.find((one) => one.number === entry.phaseNumber);
+      const tip = [
+        { k: "", v: TIMELINE_TEXT[entry.kind] || entry.kind },
+        { k: "阶段", v: phase ? `${phase.number} ${phase.title}` : String(entry.phaseNumber ?? "—") },
+        { k: "步骤", v: entry.kind === "stageEntry" ? entry.id : (this.model.facts[entry.id]?.step || "—") },
+      ];
+      if (entry.kind === "fact") tip.push({ k: "说的是", v: DescribeFact(this.model, entry.id) });
+      tip.push({ k: "时刻", v: `关卡时钟第 ${Round(entry.atS)} 秒（本步第 ${Round(entry.stageAtS)} 秒）` });
+      this.AddMarker(slot.marks, entry.kind, tip, sel, Math.round(entry.atS * 10) / 10);
     }
   }
 
@@ -680,7 +1196,13 @@ export class OrchestrationEditor {
     }
     if (sel && sel.kind === "step") {
       const step = this.model.steps.find((entry) => entry.id === sel.id);
-      if (step && Number.isFinite(step.phaseNumber)) this.SetPhase(step.phaseNumber, { fit: true });
+      if (step && Number.isFinite(step.phaseNumber)) {
+        this.SetPhase(step.phaseNumber, { fit: true });
+        this.OpenPhase(step.phaseNumber);
+      }
+      const node = this.ui?.steps?.get(sel.id);
+      // 从图上或时间轴上选中的步骤要在左栏露出来，否则「选中了」只体现在右栏。
+      if (node) { try { node.scrollIntoView({ block: "nearest" }); } catch (error) { /* 老浏览器 */ } }
     }
     this.RefreshDetail();
     this.RefreshFlowSelection();
@@ -690,18 +1212,37 @@ export class OrchestrationEditor {
   SetPhase(n, { fit = false } = {}) {
     const max = this.model.phases.length;
     const number = Math.min(max, Math.max(1, Number.isFinite(n) ? Math.round(n) : 1));
+    const changed = number !== this.phaseNumber;
     this.phaseNumber = number;
     if (this.map) {
       this.map.SetPhase(number);
       if (fit) this.map.FitPhase(number);
     }
-    if (this.ui?.phaseSlider) this.ui.phaseSlider.value = String(number);
+    const phase = this.model.phases.find((entry) => entry.number === number);
     if (this.ui?.phaseLabel) {
-      const phase = this.model.phases.find((entry) => entry.number === number);
-      this.ui.phaseLabel.textContent = phase ? `第 ${number} / ${max} 阶段 · ${phase.title}` : `第 ${number} 阶段`;
+      this.ui.phaseLabel.textContent = "";
+      this.El("span", this.ui.phaseLabel, `第 ${number} / ${max} 阶段`, "num");
+      this.El("span", this.ui.phaseLabel, phase ? ` · ${phase.title}` : "");
+      const ratio = max > 1 ? (number - 1) / (max - 1) : 1;
+      this.ui.phaseFill.style.width = `${(ratio * 100).toFixed(1)}%`;
+      this.ui.phaseKnob.style.left = `calc(${(ratio * 100).toFixed(1)}% - 1px)`;
+      this.ui.phaseTrack.setAttribute("aria-valuenow", String(number));
+      this.ui.phaseTrack.setAttribute("aria-valuetext", phase ? `第 ${number} 阶段 ${phase.title}` : `第 ${number} 阶段`);
     }
+    if (changed) this.OpenPhase(number, { scroll: true });
     this.RefreshLanes();
     return number;
+  }
+
+  /** 左栏把某一阶段展开并滚到看得见的地方（当前阶段换了、或用户点了别处都会走这里）。 */
+  OpenPhase(number, { scroll = false } = {}) {
+    const box = this.ui?.phases?.get(number);
+    if (!box) return null;
+    box.dataset.open = "1";
+    if (scroll) {
+      try { box.scrollIntoView({ block: "nearest" }); } catch (error) { /* 老浏览器没有参数版 */ }
+    }
+    return box;
   }
 
   SetTool(tool) {
@@ -771,11 +1312,18 @@ export class OrchestrationEditor {
     this.map?.SetLayers({ [id]: !!on });
     const box = this.ui?.layers?.get(id);
     if (box && box.checked !== !!on) box.checked = !!on;
+    this.ui?.layerChips?.get(id)?.classList.toggle("on", !!on);
+    if (this.ui?.layerCount) {
+      let count = 0;
+      for (const [, one] of this.ui.layers) if (one.checked) count += 1;
+      this.ui.layerCount.textContent = `${count}/${this.ui.layers.size}`;
+    }
   }
 
   SetFollowLive(on) {
     this.followLive = !!on;
     if (this.ui?.followBox && this.ui.followBox.checked !== this.followLive) this.ui.followBox.checked = this.followLive;
+    this.ui?.followButton?.classList.toggle("on", this.followLive);
     if (this.followLive && Number.isFinite(this.live?.phaseNumber)) this.SetPhase(this.live.phaseNumber);
   }
 
@@ -1238,19 +1786,45 @@ export class OrchestrationEditor {
     this.RefreshLanes();
   }
 
+  /** 顶栏：当前阶段 / 步骤 / 两个时钟 / 正在等什么，各自一枚小标签，不再排成一长串。 */
   RefreshHeader() {
     const live = this.live;
-    let text;
+    const waiting = live?.remaining || [];
+    const signature = live
+      ? `1|${live.phaseNumber}|${live.stepId}|${Round(live.time)}|${Round(live.stageTime)}|${waiting.join(",")}`
+      : "0";
+    if (signature === this.headerSignature) return;
+    this.headerSignature = signature;
+    const El = this.El;
+    const box = this.ui.liveStatus;
+    box.textContent = "";
+    box.dataset.hasRuntime = live ? "1" : "0";
     if (!live) {
-      text = "未加载第一关 · 仅显示设计编排（用各阶段的「从这里试玩」进去）";
-    } else {
-      const phase = this.model.phases.find((entry) => entry.number === live.phaseNumber);
-      const waiting = live.remaining?.length ? live.remaining.join(" / ") : "（无，等最短时长或推进中）";
-      text = `阶段 ${live.phaseNumber} ${phase ? phase.title : ""} · 步骤 ${live.stepId}`
-        + ` · 关卡时钟 ${Round(live.time)} s · 本步 ${Round(live.stageTime)} s · 正在等：${waiting}`;
+      El("span", box, "还没有人在跑第一关", "tag idle");
+      El("span", box, "下面是设计好的编排，点哪儿看哪儿", "tag lead");
+      return;
     }
-    if (this.ui.liveStatus.textContent !== text) this.ui.liveStatus.textContent = text;
-    this.ui.liveStatus.dataset.hasRuntime = live ? "1" : "0";
+    const phase = this.model.phases.find((entry) => entry.number === live.phaseNumber);
+    const phaseTag = El("span", box, "", "tag now");
+    El("b", phaseTag, `阶段 ${live.phaseNumber}`);
+    El("span", phaseTag, phase ? phase.title : "");
+    const stepTag = El("span", box, "", "tag");
+    El("span", stepTag, "步骤", "muted");
+    El("code", stepTag, live.stepId);
+    const clock = El("span", box, "", "tag");
+    El("span", clock, "关卡时钟", "muted");
+    El("b", clock, `${Round(live.time)} 秒`, "num");
+    const stepClock = El("span", box, "", "tag");
+    El("span", stepClock, "这一步", "muted");
+    El("b", stepClock, `${Round(live.stageTime)} 秒`, "num");
+    El("span", box, "正在等", "tag lead");
+    if (!waiting.length) { El("span", box, "没有在等条件（在等最短时长，或正在推进）", "tag idle"); return; }
+    for (const factId of waiting) {
+      const human = DescribeFact(this.model, factId);
+      const tag = El("span", box, human || factId, "tag wait");
+      tag.title = `${human}（${factId}）`;
+      tag.addEventListener("click", () => this.Select({ kind: "fact", id: factId }));
+    }
   }
 
   RefreshFlowState() {
@@ -1258,21 +1832,38 @@ export class OrchestrationEditor {
     const currentStep = live?.stepId || null;
     const currentIndex = currentStep ? this.model.steps.findIndex((step) => step.id === currentStep) : -1;
     for (const [id, node] of this.ui.steps) node.classList.toggle("now", id === currentStep);
-    for (const [number, node] of this.ui.phases) node.classList.toggle("now", number === live?.phaseNumber);
+    for (const [number, box] of this.ui.phases) {
+      if (!number) continue;                       // 末尾那组「关卡结束」没有阶段状态
+      const state = live && Number.isFinite(live.phaseNumber)
+        ? (number === live.phaseNumber ? "now" : number < live.phaseNumber ? "done" : "todo") : "";
+      if (box.dataset.phaseState === state) continue;
+      box.dataset.phaseState = state;
+      const label = box.querySelector(".pState");
+      if (label) label.textContent = state === "now" ? "正在这里" : state === "done" ? "已走过" : "";
+    }
+    // 当前阶段自己展开、自己滚到看得见 —— 十八组全收起来时，找「我现在在哪」不该靠手滚。
+    if (live && Number.isFinite(live.phaseNumber) && live.phaseNumber !== this.shownPhase) {
+      this.shownPhase = live.phaseNumber;
+      this.OpenPhase(live.phaseNumber, { scroll: true });
+    }
+    const hint = live ? "" : "还没有人在跑第一关。这里显示的是设计好的编排 —— 点阶段、步骤、事实都能看；"
+      + "想看实时的，按某个阶段的「从这里试玩」。";
+    if (this.ui.flowHint.textContent !== hint) this.ui.flowHint.textContent = hint;
+    this.ui.flowHint.style.display = hint ? "" : "none";
     for (const entry of this.ui.facts) {
       let state = "none";
       let glyph = "·";
+      let title = "还没开始跑，看不出满没满足";
       if (live) {
-        if (live.facts.has(entry.factId)) { state = "ok"; glyph = "✓"; }
-        else if (entry.step.index === currentIndex) { state = "wait"; glyph = "…"; }
-        else if (entry.step.index < currentIndex) { state = "past"; glyph = "·"; }
-        else { state = "future"; glyph = "—"; }
+        if (live.facts.has(entry.factId)) { state = "ok"; glyph = "✓"; title = "已经做到了"; }
+        else if (entry.step.index === currentIndex) { state = "wait"; glyph = "…"; title = "正在等这件事"; }
+        else if (entry.step.index < currentIndex) { state = "past"; glyph = "·"; title = "这一步已经走过了"; }
+        else { state = "future"; glyph = "—"; title = "还没走到这一步"; }
       }
       if (entry.row.dataset.factState !== state) entry.row.dataset.factState = state;
       const mark = entry.row.firstChild;
       if (mark && mark.textContent !== glyph) mark.textContent = glyph;
-      if (state === "future") entry.row.title = "未到该步";
-      else entry.row.title = state === "ok" ? "已满足" : state === "wait" ? "正在等" : "";
+      if (entry.row.title !== title) entry.row.title = title;
     }
   }
 
@@ -1287,161 +1878,248 @@ export class OrchestrationEditor {
     for (const kind of ["design", "actual"]) {
       for (const [number, slot] of this.ui.lanes[kind]) slot.lane.classList.toggle("now", number === this.phaseNumber);
     }
+    for (const [number, cell] of this.ui.laneHeads || []) cell.classList.toggle("now", number === this.phaseNumber);
   }
 
   RefreshForm() {
     if (!this.ui) return;
     const shapes = this.draft.shapes;
     this.ui.sketch.textContent = "";
+    this.ui.sketch.classList.toggle("filled", shapes.length > 0);
     if (!shapes.length) {
-      this.ui.sketch.textContent = "（用中间的圈选 / 箭头 / 折线 / 标注工具画）";
+      this.ui.sketch.textContent = "还没画。用中间的圈选 / 箭头 / 折线 / 标注工具在图上画。";
     } else {
+      const chips = this.El("div", this.ui.sketch, "", "chips");
+      chips.style.marginTop = "0";
       shapes.forEach((shape, index) => {
-        const chip = this.El("span", this.ui.sketch, `${ShapeText(shape)} ✕`, "chip");
+        const chip = this.El("span", chips, `${ShapeText(shape)} ✕`, "chip");
         chip.dataset.shapeIndex = String(index);
+        chip.title = "点一下删掉这一笔";
         chip.addEventListener("click", () => this.RemoveShape(index));
       });
     }
-    this.ui.candidate.textContent = this.draft.candidate
-      ? `${this.draft.candidate.memberId || "候选位"} → (${Round(this.draft.candidate.x)}, ${Round(this.draft.candidate.z)})`
-      : "（用「候选位」工具把选中的敌人拖到想要的位置）";
+    const candidate = this.draft.candidate;
+    this.ui.candidate.classList.toggle("filled", !!candidate);
+    this.ui.candidate.textContent = candidate
+      ? `${candidate.memberId || "选中的东西"} 挪到 (${Round(candidate.x)}, ${Round(candidate.z)})`
+      : "还没定。用「候选位」工具把选中的敌人拖到你想要的位置。";
     this.ui.timeValue.disabled = !this.draft.timeKind;
-    this.ui.timeValue.placeholder = this.draft.timeKind === "fact" ? "事实 id" : "秒数";
+    this.ui.timeValue.placeholder = this.draft.timeKind === "fact"
+      ? "写那件事的编号，例 transferArrived" : this.draft.timeKind ? "秒数" : "先选左边";
   }
 
   SetStatus(text, warn) {
     this.statusText = text;
     if (!this.ui) return;
     this.ui.status.textContent = text;
-    this.ui.status.className = warn ? "warn" : "ok";
+    this.ui.status.className = `statusBar ${warn ? "warn" : "ok"}`;
   }
 
   RefreshDetail() {
     if (!this.ui) return;
+    const El = this.El;
     const sel = this.selection;
+    this.ui.title.textContent = "";
     if (!sel) {
-      this.ui.title.textContent = "（没有选中对象）";
-      this.ui.owner.textContent = "在俯视图上点一个敌人 / 锚点 / 触发区 / 路线，或在左边点阶段、步骤、事实、组。";
+      El("span", this.ui.title, "还没有选中东西");
+      this.ui.owner.textContent = "";
+      El("div", this.ui.owner, "在中间的图上点一个敌人、锚点、触发区或路线；"
+        + "也可以在左边点阶段、步骤、要求的那件事，或者点时间轴上的标记。", "muted");
       this.ui.json.textContent = "—";
-      this.ui.related.textContent = "（暂无）";
+      this.ui.related.textContent = "";
+      El("div", this.ui.related, "选中一个对象，这里会列出它身上的批注。", "empty");
       return;
     }
-    this.ui.title.textContent = `${KIND_TEXT[sel.kind] || sel.kind}：${sel.id ?? `(${Round(sel.x)}, ${Round(sel.z)})`}`;
+    El("span", this.ui.title, KIND_TEXT[sel.kind] || sel.kind, "kindTag");
+    El("b", this.ui.title, sel.id === undefined || sel.id === null
+      ? `(${Round(sel.x)}, ${Round(sel.z)})` : this.TargetName(sel.kind, sel.id));
+    if (sel.kind === "beat" && this.BeatOrder(sel.id) > 0) El("code", this.ui.title, sel.id);
     this.ui.owner.textContent = "";
-    for (const line of this.DescribeSelection(sel)) this.El("div", this.ui.owner, line);
+    for (const row of this.DescribeSelection(sel)) {
+      const line = El("div", this.ui.owner, "", "kv");
+      El("span", line, row.k, "k");
+      const value = El("span", line, "", "v");
+      El("span", value, row.v);
+      if (row.code) El("code", value, row.code);
+    }
     const snapshot = SnapshotTarget(this.model, { kind: sel.kind, id: sel.id, x: sel.x, z: sel.z });
     this.ui.json.textContent = JSON.stringify(snapshot, null, 2);
     this.RefreshRelatedNotes(sel);
   }
 
-  /** 反查：属于哪组、哪步生成、何时/何条件激活、路线点、引用它的事实。 */
+  /** 转运区那四波攻击在界面上一律叫「第 n 波攻击」，n 是它在攻击波表里的位置。 */
+  BeatOrder(beatId) { return this.model.beats.findIndex((one) => one.id === beatId) + 1; }
+
+  /** 界面上这个对象该怎么称呼（攻击波说「第 n 波攻击」，其余就是它的编号）。 */
+  TargetName(kind, id) {
+    if (kind === "beat") {
+      const order = this.BeatOrder(id);
+      if (order > 0) return `第 ${order} 波攻击`;
+    }
+    return String(id ?? "");
+  }
+
+  /** 「转运区第 2 波攻击，进入 Transfer 这一步后第 35–60 秒之间、且已装车 4 副时出现」 */
+  BeatSentence(beatId, stepId) {
+    const order = this.BeatOrder(beatId);
+    const beat = order > 0 ? this.model.beats[order - 1] : null;
+    if (!beat) return SPAWN_TEXT.beat;
+    const head = `转运区第 ${order} 波攻击`;
+    const step = stepId || "Transfer";
+    if (beat.earliestS === beat.latestS && !beat.earliestS && !beat.loaded) return `${head}，一进 ${step} 这一步就出现`;
+    const when = beat.earliestS === beat.latestS
+      ? `进入 ${step} 这一步后第 ${beat.earliestS} 秒`
+      : `进入 ${step} 这一步后第 ${beat.earliestS}–${beat.latestS} 秒之间`;
+    return `${head}，${when}${beat.loaded ? `、且已装车 ${beat.loaded} 副` : ""}时出现`;
+  }
+
+  /**
+   * 反查：属于哪组、哪步生成、何时/何条件激活、路线点、引用它的事实。
+   * 一律「左边是问题、右边是人话」，表里的编号只当尾巴上的等宽小字。
+   */
   DescribeSelection(sel) {
     const model = this.model;
-    const lines = [];
+    const rows = [];
     const owner = sel.id ? FindOwner(model, sel.id) : null;
+    const Add = (k, v, code) => { if (v || code) rows.push({ k, v: v === undefined || v === null ? "" : String(v), code }); };
+    const At = (point) => `(${Round(point?.x)}, ${Round(point?.z)})`;
     if (sel.kind === "member" || sel.kind === "encounter") {
       const encounter = owner?.encounter;
       const member = owner?.member;
       if (encounter) {
-        lines.push(`所属遭遇组：${encounter.id}（起始阶段 ${encounter.phaseNumber ?? "—"}${encounter.deferred ? " · 本阶段内延后" : ""}）`);
+        Add("属于哪组", `第 ${encounter.phaseNumber ?? "—"} 阶段出场的一组`
+          + `${encounter.deferred ? "（这一阶段里要晚一点才放）" : ""}`, encounter.id);
         const spawn = encounter.spawn || {};
-        const where = [];
-        if (spawn.step) where.push(`步骤 ${spawn.step}`);
-        if (spawn.fact) where.push(`事实 ${spawn.fact}`);
-        if (spawn.beat) where.push(`转运拍 ${spawn.beat}`);
-        lines.push(`出现方式：${SPAWN_TEXT[spawn.kind] || spawn.kind || "—"}（kind=${spawn.kind || "—"}）`
-          + ` · ${where.join(" · ") || "—"}`);
-        if (encounter.standbyUntil) lines.push(`待命到：事实 ${encounter.standbyUntil} 满足（${DescribeFact(model, encounter.standbyUntil)}）`);
+        if (spawn.beat) {
+          // 内部字段名（kind=beat 这类）不进句子：句子说人话，编号跟在后面当小字。
+          Add("怎么出现", this.BeatSentence(spawn.beat, spawn.step), spawn.beat);
+        } else {
+          const where = [];
+          if (spawn.step) where.push(`进入步骤 ${spawn.step} 时`);
+          if (spawn.fact) where.push(`等「${DescribeFact(model, spawn.fact)}」之后`);
+          Add("怎么出现", `${SPAWN_TEXT[spawn.kind] || spawn.kind || "—"}`
+            + `${where.length ? `：${where.join("，")}` : ""}`, spawn.step || spawn.fact || undefined);
+        }
+        if (encounter.standbyUntil) {
+          Add("出场后先待命", `等「${DescribeFact(model, encounter.standbyUntil)}」之后才动`, encounter.standbyUntil);
+        }
         if (encounter.dormant) {
           const wake = encounter.wake || {};
-          lines.push(`生成即休眠，醒来条件：${wake.kind === "playerWithinM"
-            ? `玩家进 ${wake.radiusM} m（步骤 ${wake.step}）`
-            : wake.fact ? `事实 ${wake.fact}` : "—"}`);
+          Add("放下时是睡的", wake.kind === "playerWithinM"
+            ? `玩家走到 ${wake.radiusM} 米内才醒（步骤 ${wake.step}）`
+            : wake.fact ? `等「${DescribeFact(model, wake.fact)}」才醒` : "醒来条件没写");
         }
-        if (encounter.release) lines.push(`放行：${encounter.release.kind}`);
-        if (encounter.note) lines.push(`备注：${encounter.note}`);
+        if (encounter.release) Add("放行方式", RELEASE_TEXT[encounter.release.kind] || "见原始数据", encounter.release.kind);
+        if (encounter.note) Add("备注", encounter.note);
         const state = this.map?.phaseLayout?.encounters?.find((entry) => entry.id === encounter.id)?.state;
-        if (state) lines.push(`第 ${this.phaseNumber} 阶段状态：${STATE_TEXT[state] || state}`);
+        if (state) Add(`第 ${this.phaseNumber} 阶段`, STATE_TEXT[state] || state);
       }
       if (member) {
-        lines.push(`出生点 (${Round(member.x)}, ${Round(member.z)}) · 武器 ${member.weapon}`
-          + `${member.hold ? " · 钉在原地" : ""}${member.bayonet ? " · 刺刀" : ""}${member.reserve ? " · 预备队" : ""}`);
+        Add("出生点", At(member));
+        const marks = [];
+        if (member.hold) marks.push("钉在原地不追");
+        if (member.bayonet) marks.push("带刺刀");
+        if (member.reserve) marks.push("预备队");
+        if (Number.isFinite(member.releaseDelayS) && member.releaseDelayS > 0) marks.push(`出场后等 ${member.releaseDelayS} 秒`);
+        Add("武器", member.weapon);
+        if (marks.length) Add("特点", marks.join(" · "));
         if (member.tactic) {
-          lines.push(`移动路线：${member.tactic.points.length} 个点，延迟 ${member.tactic.delay} s`
-            + `${member.tactic.near ? `，且玩家要先进 (${Round(member.tactic.near.x)}, ${Round(member.tactic.near.z)}) 的 ${member.tactic.nearM} m` : ""}`);
-        } else lines.push("移动路线：无（原地）");
-        if (member.assaultLane) lines.push(`跃进线：${member.assaultLane.length} 个点`);
-        if (Number.isFinite(member.clearedAtPhase)) lines.push(`跳关口径：第 ${member.clearedAtPhase} 阶段起算已清除`);
+          Add("会怎么动", `沿 ${member.tactic.points.length} 个路点走，放行后再等 ${member.tactic.delay} 秒`
+            + `${member.tactic.near ? `；而且玩家要先走到 ${At(member.tactic.near)} 的 ${member.tactic.nearM} 米内` : ""}`);
+        } else Add("会怎么动", "不动，守在原地");
+        if (member.assaultLane) Add("跃进线", `${member.assaultLane.length} 个点（前沿那条交替跃进的线）`);
+        if (Number.isFinite(member.clearedAtPhase)) Add("跳关口径", `从第 ${member.clearedAtPhase} 阶段起算他已经被打掉`);
         const enemy = this.live?.enemies?.find((entry) => entry.id === member.id);
-        if (enemy) lines.push(`实机：${enemy.alive ? "活着" : "已阵亡"}${enemy.dormant ? " · 休眠" : ""} 位于 (${Round(enemy.x)}, ${Round(enemy.z)})`);
+        if (enemy) Add("现在", `${enemy.alive ? "活着" : "已经死了"}${enemy.dormant ? " · 还睡着" : ""}，在 ${At(enemy)}`);
       }
     } else if (sel.kind === "fact") {
       const fact = model.facts[sel.id];
-      lines.push(`判法：${DescribeFact(model, sel.id)}`);
+      Add("怎么算做到", DescribeFact(model, sel.id));
       if (fact) {
-        lines.push(`判法类别 ${fact.kind} · 所属步骤 ${fact.step ?? "—"}（第 ${fact.phaseNumber ?? "—"} 阶段）`);
-        if (fact.source) lines.push(`运行时入口：${fact.source}`);
-        if (fact.requires?.length) lines.push(`先决事实：${fact.requires.join(" / ")}`);
+        Add("属于", `步骤 ${fact.step ?? "—"}（第 ${fact.phaseNumber ?? "—"} 阶段）`, `kind=${fact.kind}`);
+        if (fact.source) Add("代码里在哪", "运行时的这个方法记的", fact.source);
+        if (fact.requires?.length) {
+          Add("得先做到", fact.requires.map((one) => DescribeFact(model, one)).join("；"), fact.requires.join(" / "));
+        }
       }
       const users = model.steps.filter((step) => step.requirements.includes(sel.id)).map((step) => step.id);
-      lines.push(`被这些步骤当作过关条件：${users.join(" / ") || "（没有，属编排触发）"}`);
-      if (this.live) lines.push(`实机：${this.live.facts.has(sel.id) ? "已满足" : "还没满足"}`);
+      Add("谁在等它", users.length ? `${users.length} 个步骤把它当过关条件` : "没有步骤等它 —— 它只负责触发编排",
+        users.join(" / ") || undefined);
+      if (this.live) Add("现在", this.live.facts.has(sel.id) ? "已经做到了" : "还没做到");
     } else if (sel.kind === "step") {
       const step = model.steps.find((entry) => entry.id === sel.id);
       if (step) {
-        lines.push(`第 ${step.phaseNumber} 阶段的第 ${step.index + 1} 个内部步骤`);
-        lines.push(`目标：${step.objective}`);
-        if (step.cue) lines.push(`对白：${step.cue}`);
-        if (step.minimumSeconds) lines.push(`最短时长：${step.minimumSeconds} s`);
-        lines.push(`过关条件：${step.requirements.join(" / ") || "（无）"}`);
-        lines.push(`本步生成：${step.spawns.join(" / ") || "（无）"}`);
-        if (step.guidance) lines.push(`指引：${step.guidance.label}${step.guidance.route ? ` · 路线 ${step.guidance.route}` : ""}`);
+        Add("在哪一段", `第 ${step.phaseNumber} 阶段的第 ${step.index + 1} 步`);
+        Add("目标", step.objective);
+        if (step.cue) Add("对白", "这一步会播一段", step.cue);
+        if (step.minimumSeconds) Add("最短时长", `至少停留 ${step.minimumSeconds} 秒`);
+        Add("过关条件", step.requirements.length ? `${step.requirements.length} 件事都做到才走下一步` : "没有条件，走完就过",
+          step.requirements.join(" / ") || undefined);
+        Add("会放出敌军", step.spawns.length ? `${step.spawns.length} 组` : "这一步不放人",
+          step.spawns.join(" / ") || undefined);
+        if (step.guidance) Add("指引", step.guidance.label, step.guidance.route || undefined);
       }
     } else if (sel.kind === "phase") {
       const phase = model.phases.find((entry) => entry.id === sel.id || entry.number === Number(sel.id));
       if (phase) {
-        lines.push(`第 ${phase.number} 公开阶段 · ${phase.title}`);
-        lines.push(`内部步骤：${phase.steps.join(" / ")}`);
-        lines.push(`跳关出生点 (${Round(phase.spawn?.x)}, ${Round(phase.spawn?.z)})`);
+        Add("阶段", `第 ${phase.number} 个 · ${phase.title}`, phase.id);
+        Add("包含步骤", `${phase.steps.length} 个`, phase.steps.join(" / "));
+        Add("从这里试玩时", `玩家出生在 ${At(phase.spawn)}`);
       }
     } else if (sel.kind === "route") {
       const points = model.routes[sel.id] || [];
-      lines.push(`路线 ${sel.id}：${points.length} 个点`);
-      if (points.length) lines.push(`起点 (${Round(points[0].x)}, ${Round(points[0].z)}) → 终点 (${Round(points[points.length - 1].x)}, ${Round(points[points.length - 1].z)})`);
+      Add("路线", `${points.length} 个点`, sel.id);
+      if (points.length) Add("从哪到哪", `${At(points[0])} → ${At(points[points.length - 1])}`);
       const users = model.steps.filter((step) => step.guidance?.route === sel.id).map((step) => step.id);
-      lines.push(`用它做指引的步骤：${users.join(" / ") || "（无）"}`);
+      Add("谁拿它做指引", users.length ? `${users.length} 个步骤` : "没有步骤拿它做指引", users.join(" / ") || undefined);
     } else if (sel.kind === "zone") {
       const zone = model.zones.find((entry) => entry.id === sel.id);
       if (zone) {
-        lines.push(`区域类别 ${zone.kind}${zone.fact ? ` · 事实 ${zone.fact}` : ""}${zone.step ? ` · 步骤 ${zone.step}` : ""}`);
-        if (Number.isFinite(zone.radiusM)) lines.push(`圆心 (${Round(zone.x)}, ${Round(zone.z)}) 半径 ${zone.radiusM} m`);
-        else lines.push(`矩形 X ${Round(zone.minX)}..${Round(zone.maxX)} · Z ${Round(zone.minZ)}..${Round(zone.maxZ)}`);
-        if (zone.fact && model.facts[zone.fact]) lines.push(`判法：${DescribeFact(model, zone.fact)}`);
+        Add("这是什么", ZONE_TEXT[zone.kind] || zone.kind, zone.kind);
+        if (Number.isFinite(zone.radiusM)) Add("范围", `以 ${At(zone)} 为心、半径 ${zone.radiusM} 米的圆`);
+        else Add("范围", `东西 ${Round(zone.minX)} 到 ${Round(zone.maxX)}、南北 ${Round(zone.minZ)} 到 ${Round(zone.maxZ)} 的方块`);
+        if (zone.step) Add("属于步骤", zone.step);
+        if (zone.fact && model.facts[zone.fact]) Add("它判的是", DescribeFact(model, zone.fact), zone.fact);
       }
     } else if (sel.kind === "anchor") {
       const anchor = model.anchors[sel.id];
-      if (anchor) lines.push(`锚点 ${sel.id} (${Round(anchor.x)}, ${Round(anchor.z)})`);
+      if (anchor) Add("位置", At(anchor), sel.id);
       const users = Object.values(model.facts).filter((fact) => fact.anchor === sel.id).map((fact) => fact.id);
-      lines.push(`引用它的事实：${users.join(" / ") || "（无）"}`);
+      Add("谁以它为准", users.length ? `${users.length} 件事拿它量距离` : "暂时没有事情用到它", users.join(" / ") || undefined);
     } else if (sel.kind === "friendly") {
       const friendly = model.friendlies.find((entry) => entry.id === sel.id);
-      if (friendly) lines.push(`友军点 ${friendly.kind} (${Round(friendly.x)}, ${Round(friendly.z)})`
-        + `${friendly.step ? ` · 步骤 ${friendly.step}` : ""}`);
+      if (friendly) {
+        Add("这是什么", FRIENDLY_TEXT[friendly.kind] || "自己人的位置", friendly.kind);
+        Add("位置", At(friendly));
+        if (friendly.step) Add("属于步骤", friendly.step);
+      }
     } else if (sel.kind === "beat") {
-      const beat = model.beats.find((entry) => entry.id === sel.id);
-      if (beat) lines.push(`转运拍 ${beat.id}：装车 ${beat.loaded} 之后，窗口 ${beat.earliestS}–${beat.latestS} s，间隔 ${beat.restS} s`);
+      const index = model.beats.findIndex((entry) => entry.id === sel.id);
+      const beat = index >= 0 ? model.beats[index] : null;
+      if (beat) {
+        Add("这是什么", `转运区的第 ${index + 1} 波攻击（一共 ${model.beats.length} 波）`, beat.id);
+        Add("什么时候来", `进入 Transfer 这一步后第 ${beat.earliestS}–${beat.latestS} 秒之间`
+          + `${beat.loaded ? `，而且要已装车 ${beat.loaded} 副` : ""}`);
+        if (index > 0) Add("与上一波隔", `${beat.restS} 秒`);
+        if (beat.hint) Add("提示语", "", beat.hint);
+      }
     } else if (sel.kind === "point") {
-      lines.push(`地图上一点 (${Round(sel.x)}, ${Round(sel.z)})`);
+      Add("位置", `地图上的一点 ${At(sel)}`);
     }
-    if (owner?.facts?.length) lines.push(`相关事实：${owner.facts.join(" / ")}`);
-    if (!lines.length) lines.push("（这个对象在模型里没有更多信息）");
-    return lines;
+    if (owner?.facts?.length) {
+      Add("牵连到的事情", `${owner.facts.length} 件`, owner.facts.join(" / "));
+    }
+    if (!rows.length) Add("说明", "这个对象在编排数据里没有更多内容了");
+    return rows;
   }
 
   RefreshRelatedNotes(sel) {
     const related = this.notes.filter((note) => note.target?.kind === sel.kind && note.target?.id === sel.id);
     this.ui.related.textContent = "";
-    if (!related.length) { this.ui.related.textContent = "（暂无）"; return; }
+    if (!related.length) {
+      this.El("div", this.ui.related, "这个对象上还没有批注。下面写一条，就挂在它身上。", "empty");
+      return;
+    }
     for (const note of related) this.ui.related.appendChild(this.NoteNode(note));
   }
 
@@ -1450,7 +2128,12 @@ export class OrchestrationEditor {
     const list = this.noteFilter === "all" ? this.notes : this.notes.filter((note) => note.status === this.noteFilter);
     for (const [value, button] of this.ui.filters) button.classList.toggle("on", value === this.noteFilter);
     this.ui.list.textContent = "";
-    if (!list.length) { this.ui.list.textContent = "（暂无）"; return; }
+    if (!list.length) {
+      this.El("div", this.ui.list, this.notes.length
+        ? `${this.notes.length} 条批注里没有「${NOTE_FILTER_TEXT[this.noteFilter] || this.noteFilter}」的。换个筛选看看。`
+        : "还没有批注。在图上选中一个东西，上面写一句话，点「保存草稿」。", "empty");
+      return;
+    }
     for (const note of list) this.ui.list.appendChild(this.NoteNode(note));
     this.map?.SetNotes(this.notes);
   }
@@ -1462,20 +2145,31 @@ export class OrchestrationEditor {
     box.dataset.note = note.id;
     box.dataset.noteStatus = note.status;
     const head = El("div", box, "", "h");
-    El("code", head, note.id);
-    El("span", head, `${KIND_TEXT[note.target?.kind] || note.target?.kind || "?"} ${note.target?.id ?? ""}`);
-    El("span", head, `第 ${note.phaseNumber ?? "—"} 阶段${note.step ? ` · ${note.step}` : ""}`, "muted");
-    if (this.localIds.has(note.id)) El("span", head, "本地草稿", "warn");
+    El("span", head, NOTE_STATUS_TEXT[note.status] || note.status, `st ${note.status}`);
+    El("span", head, `${KIND_TEXT[note.target?.kind] || note.target?.kind || "?"} `
+      + this.TargetName(note.target?.kind, note.target?.id), "who");
+    El("span", head, `第 ${note.phaseNumber ?? "—"} 阶段`, "muted");
+    if (note.step) El("code", head, note.step);
+    if (this.localIds.has(note.id)) {
+      El("span", head, "本地草稿", "warn").title = "还没写进仓库，只存在这台机器上";
+    }
     if (note.verified) El("span", head, "已核对", "ok");
-    El("div", box, note.text);
-    if (note.proposal) El("div", box, `建议：${note.proposal.kind}`
-      + `${note.proposal.to ? ` → (${Round(note.proposal.to.x)}, ${Round(note.proposal.to.z)})` : ""}`
-      + `${Number.isFinite(note.proposal.seconds) ? ` ${note.proposal.seconds} s` : ""}`, "muted");
-    if (note.sketch?.shapes?.length) El("div", box, `草图：${note.sketch.shapes.map(ShapeText).join("、")}`, "muted");
+    El("div", box, note.text, "txt");
+    if (note.time) {
+      El("div", box, `指的时候：${note.time.kind === "stageRelative" ? `阶段内第 ${note.time.seconds} 秒`
+        : note.time.kind === "fact" ? `「${DescribeFact(this.model, note.time.fact)}」的时候`
+          : `关卡时钟第 ${Round(note.time.atS)} 秒`}`, "line");
+    }
+    if (note.proposal) {
+      El("div", box, `建议：${PROPOSAL_TEXT[note.proposal.kind] || note.proposal.kind}`
+        + `${note.proposal.to ? ` 到 (${Round(note.proposal.to.x)}, ${Round(note.proposal.to.z)})` : ""}`
+        + `${Number.isFinite(note.proposal.seconds) ? ` ${note.proposal.seconds} 秒` : ""}`
+        + `${note.proposal.points?.length ? `，换成一条 ${note.proposal.points.length} 点的新路线` : ""}`, "line");
+    }
+    if (note.sketch?.shapes?.length) El("div", box, `画了：${note.sketch.shapes.map(ShapeText).join("、")}`, "line");
     const localImage = this.localImages.get(note.id) || null;
     if (note.image) {
-      El("div", box, `图片：Notes/${note.level}/${note.image}`
-        + `${localImage ? "（还在本地 IndexedDB，等下次能写盘时补传）" : ""}`, "muted");
+      El("div", box, localImage ? "图还在这台机器上，下次能写盘时自动补传" : `图：Notes/${note.level}/${note.image}`, "line");
       // 缩略图：本地草稿的图直接用 IndexedDB 里的 dataURL；已经进仓库的那张走
       // 绝对 URL —— 弹窗的文档是 about:blank，相对路径在这儿解不出来。
       const src = localImage || RepoImageUrl(note.level, note.image);
@@ -1489,34 +2183,44 @@ export class OrchestrationEditor {
       }
     }
     if (note.resolution) El("div", box, `已处理：${note.resolution.summary}`
-      + `${note.resolution.commit ? `（${note.resolution.commit}）` : ""}`, "ok");
+      + `${note.resolution.commit ? `（${note.resolution.commit}）` : ""}`, "line ok");
     // 「原设置已变化」：拿现在的模型再拍一张快照逐字段对，新旧值并排列出来。
     let drift = null;
     try { drift = NoteDrift(note, this.model); } catch (error) { drift = null; }
     if (drift?.changed) {
       box.classList.add("drift");
       box.dataset.noteDrift = String(drift.diff.length);
-      El("div", box, `⚠ 原设置已变化（${drift.diff.length} 处）`, "warn");
-      const pre = El("pre", box, drift.diff.slice(0, 8)
-        .map((row) => `${row.path || "(整体)"}: ${JSON.stringify(row.from)} → ${JSON.stringify(row.to)}`).join("\n"));
-      pre.dataset.noteDriftDetail = note.id;
+      const alert = El("div", box, "", "alert");
+      El("div", alert, `写这条批注时记下的设置已经变了（${drift.diff.length} 处）`, "ah");
+      const table = El("div", alert, "", "d");
+      table.dataset.noteDriftDetail = note.id;
+      for (const row of drift.diff.slice(0, 6)) {
+        El("span", table, row.path || "整体", "p");
+        El("span", table, JSON.stringify(row.from), "from");
+        El("span", table, "→", "muted");
+        El("span", table, JSON.stringify(row.to), "to");
+      }
+      if (drift.diff.length > 6) El("div", alert, `还有 ${drift.diff.length - 6} 处，见原始数据`, "muted");
     }
     const bar = El("div", box, "", "bar");
-    const locate = El("button", bar, "定位");
+    const locate = El("button", bar, "在图上找到它");
     locate.type = "button";
     locate.dataset.noteAction = "locate";
     locate.addEventListener("click", () => this.LocateNote(note.id));
     const verify = El("button", bar, note.verified ? "已核对" : "标记已核对");
     verify.type = "button";
     verify.dataset.noteAction = "verify";
+    verify.title = "agent 改完之后，自己看过了就点它";
     verify.addEventListener("click", () => this.MarkVerified(note.id));
     if (localImage) {
-      const download = El("button", bar, "下载本图");
+      const download = El("button", bar, "下载这张图", "ghost");
       download.type = "button";
       download.dataset.noteAction = "image";
-      download.title = `另存 ${note.id}.png（这张还只在本地 IndexedDB 里）`;
+      download.title = "把这条批注的那张俯视图另存出去（它还只在本机）";
       download.addEventListener("click", () => this.DownloadNoteImage(note.id));
     }
+    // 编号单独一行：跟按钮挤在一行会被推出卡片右边缘截掉，而它正是交接时对账的钥匙。
+    El("div", box, note.id, "noteId").title = "这条批注的编号，交接文本里按它对账";
     return box;
   }
 }
@@ -1615,6 +2319,40 @@ function RepoImageUrl(level, name) {
 // ---------------------------------------------------------------------------
 // 小工具
 // ---------------------------------------------------------------------------
+/** 工具条上的小图标：描边 SVG，颜色跟着按钮走。 */
+function ToolIcon(doc, id) {
+  const svg = doc.createElementNS(SVG_NS, "svg");
+  svg.setAttribute("viewBox", "0 0 16 16");
+  svg.setAttribute("width", "14");
+  svg.setAttribute("height", "14");
+  svg.setAttribute("aria-hidden", "true");
+  for (const d of TOOL_ICONS[id] || []) {
+    const path = doc.createElementNS(SVG_NS, "path");
+    path.setAttribute("d", d);
+    svg.appendChild(path);
+  }
+  return svg;
+}
+
+/** 三栏宽度与时间轴的折叠状态：记在主窗口的 localStorage 里，下次开窗照旧。 */
+function ReadLayout() {
+  const fallback = { left: 344, right: 380, timeline: true };
+  try {
+    const raw = window.localStorage.getItem(LAYOUT_KEY);
+    const saved = raw ? JSON.parse(raw) : null;
+    if (!saved) return fallback;
+    return {
+      left: Number.isFinite(saved.left) ? saved.left : fallback.left,
+      right: Number.isFinite(saved.right) ? saved.right : fallback.right,
+      timeline: saved.timeline !== false,
+    };
+  } catch (error) { return fallback; }
+}
+
+function WriteLayout(layout) {
+  try { window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout)); } catch (error) { /* 隐私模式 */ }
+}
+
 function ShapeText(shape) {
   if (!shape) return "?";
   if (shape.type === "circle") return `圈 r${Round(shape.r)}`;
@@ -1632,13 +2370,6 @@ function MarkerSeconds(entry) {
   if (entry.kind === "delay") return entry.atS;
   if (entry.kind === "beat") return entry.earliestS;
   return undefined;
-}
-
-function MarkerTitle(entry) {
-  const head = `${TIMELINE_TEXT[entry.kind] || entry.kind}｜${entry.step || "—"}`;
-  if (entry.kind === "beat") return `${head}｜窗口 ${entry.earliestS}–${entry.latestS} s｜${entry.label}`;
-  const seconds = MarkerSeconds(entry);
-  return `${head}${Number.isFinite(seconds) ? `｜${seconds} s` : "｜无秒数（由玩家行为触发）"}｜${entry.label}`;
 }
 
 function MarkerSel(entry) {

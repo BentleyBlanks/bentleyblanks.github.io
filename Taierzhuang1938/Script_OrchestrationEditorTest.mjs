@@ -25,6 +25,7 @@ import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
 
 const STORAGE_KEY = "tengxian1938_orchestration_notes_FirstLevel";
+const LAYOUT_KEY = "tengxian1938_orchestration_layout_FirstLevel";
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(projectDir, "..");
 const shotDir = path.join(projectDir, "_shots", "Orchestration");
@@ -61,8 +62,10 @@ try {
     null, { timeout: 300000 });
   // 上一轮如果红在半路，草稿会留在 localStorage / IndexedDB 里，
   // 下一轮的「退化成一条」「缓存 1 张图」就全对不上。开跑前先清干净。
-  await page.evaluate(async (key) => {
-    try { localStorage.removeItem(key); } catch (error) { /* 隐私模式 */ }
+  await page.evaluate(async ({ key, layoutKey }) => {
+    // 三栏宽度与时间轴的折叠状态也记在 localStorage 里：上一轮要是把时间轴收起来了，
+    // 这一轮 waitForSelector 会等一个 display:none 的标记等到超时。
+    try { localStorage.removeItem(key); localStorage.removeItem(layoutKey); } catch (error) { /* 隐私模式 */ }
     await Promise.race([
       new Promise((resolve) => {
         const request = indexedDB.deleteDatabase("tengxian1938_orchestration");
@@ -72,7 +75,7 @@ try {
       }),
       new Promise((resolve) => setTimeout(() => resolve(false), 5000)),
     ]);
-  }, STORAGE_KEY);
+  }, { key: STORAGE_KEY, layoutKey: LAYOUT_KEY });
 
   // -------------------------------------------------------------------------
   // 1) 入口：26 个按钮，工作台在「调试」组里
@@ -102,8 +105,33 @@ try {
   Check("流程栏列出 18 个阶段", await popup.locator("[data-flow-phase]").count() === 18);
   Check("流程栏列出 27 个步骤", await popup.locator("[data-flow-step]").count() === 27);
   Check("每个阶段都有「从这里试玩」", await popup.locator("[data-jump]").count() === 18);
-  Check("图层开关 13 个", await popup.locator("[data-layer]").count() === 13);
+  Check("图层开关 14 个（含画布左下角那块图例）", await popup.locator("[data-layer]").count() === 14,
+    `实际 ${await popup.locator("[data-layer]").count()}`);
   Check("工具 7 把", await popup.locator("[data-tool]").count() === 7);
+
+  // 骨架：两条可拖的分栏线 + 可收起的时间轴。宽度与折叠状态都记在 localStorage，
+  // 所以这里收完要放回去 —— 留着收起的话下一轮开窗看不到时间轴。
+  const skeleton = await page.evaluate(() => {
+    const doc = window.Taierzhuang.editor.overlays.get("orchestration").win.document;
+    const tl = doc.querySelector('[data-orch="timeline"]');
+    const toggle = doc.querySelector('[data-timeline="toggle"]');
+    const before = tl.dataset.collapsed;
+    toggle.click();
+    const collapsed = tl.dataset.collapsed;
+    toggle.click();
+    const cols = doc.getElementById("cols");
+    return {
+      before, collapsed, after: tl.dataset.collapsed,
+      splitters: doc.querySelectorAll('[data-orch="split-left"], [data-orch="split-right"]').length,
+      left: cols.style.getPropertyValue("--left"), right: cols.style.getPropertyValue("--right"),
+    };
+  });
+  Check("三栏之间有两条可拖的分栏线，宽度写在 --left/--right 上",
+    skeleton.splitters === 2 && /px$/.test(skeleton.left) && /px$/.test(skeleton.right),
+    `${skeleton.left} / ${skeleton.right}`);
+  Check("时间轴能收起也能放回来",
+    skeleton.before === "0" && skeleton.collapsed === "1" && skeleton.after === "0",
+    `${skeleton.before} → ${skeleton.collapsed} → ${skeleton.after}`);
 
   // -------------------------------------------------------------------------
   // 3) 面板上的数就是运行时的数
@@ -146,6 +174,24 @@ try {
     `面板 ${live.after.x} / 玩家 ${live.playerX}`);
   Check("跟随实时把地图拨到第 12 阶段", live.mapPhase === 12 && live.phaseNumber === 12);
 
+  const shape = await page.evaluate(() => {
+    const tool = window.Taierzhuang.editor.overlays.get("orchestration");
+    const doc = tool.win.document;
+    const Phase = (n) => doc.querySelector(`[data-flow-phase="${n}"]`);
+    return {
+      now: Phase(12).dataset.phaseState, nowOpen: Phase(12).dataset.open,
+      done: Phase(3).dataset.phaseState, todo: Phase(15).dataset.phaseState,
+      waitTags: doc.querySelectorAll('[data-orch="live-status"] .tag.wait').length,
+      remaining: tool.live?.remaining?.length ?? -1,
+    };
+  });
+  Check("左栏把当前阶段标成「正在这里」并自动展开，走过的标「已走过」",
+    shape.now === "now" && shape.nowOpen === "1" && shape.done === "done" && shape.todo === "todo",
+    `12=${shape.now}/${shape.nowOpen} 3=${shape.done} 15=${shape.todo}`);
+  Check("顶栏把「正在等」拆成一枚一枚小标签（不是一行斜杠）",
+    shape.waitTags === shape.remaining && shape.waitTags > 0,
+    `${shape.waitTags} 枚 / 实际在等 ${shape.remaining} 件`);
+
   // -------------------------------------------------------------------------
   // 4) 阶段布局与反查
   // -------------------------------------------------------------------------
@@ -169,13 +215,16 @@ try {
     lookup.states.transfer === "active" && lookup.states.transferFlank === "pending",
     `transfer=${lookup.states.transfer} transferFlank=${lookup.states.transferFlank}`);
   Check("选中成员联动到地图", lookup.mapSelection?.id === "TransferGunner");
-  Check("右栏反查出所属组 / 生成步骤 / 出现方式",
-    lookup.owner.includes("transfer") && lookup.owner.includes("Transfer") && lookup.owner.includes("beat"),
+  // 「怎么出现」要说人话：内部字段名（kind=beat 这类）不许出现在句子里，
+  // 编号（transfer / Transfer）只当尾巴上的等宽小字。
+  Check("右栏反查出所属组 / 生成步骤 / 出现方式（第 n 波攻击，不写 kind=…）",
+    lookup.owner.includes("transfer") && lookup.owner.includes("Transfer")
+    && lookup.owner.includes("第 1 波攻击") && !lookup.owner.includes("kind="),
     lookup.owner.slice(0, 120));
   Check("右栏折叠了原始数据 JSON", lookup.json.includes("\"encounter\": \"transfer\""), lookup.json.slice(0, 80));
 
   // -------------------------------------------------------------------------
-  // 4b) 点地图上的组把手 / 拍标签，走的是同一条反查
+  // 4b) 点地图上的组把手 / 攻击波标签，走的是同一条反查
   // -------------------------------------------------------------------------
   const fromMap = await page.evaluate(() => {
     const T = window.Taierzhuang;
@@ -207,11 +256,11 @@ try {
   });
   Check("点地图组把手 → 选中整组并反查出出现方式",
     fromMap.encounter.sel?.kind === "encounter" && fromMap.encounter.sel?.id === "transfer"
-    && fromMap.encounter.title.includes("遭遇组") && fromMap.encounter.owner.includes("转运拍"),
+    && fromMap.encounter.title.includes("遭遇组") && fromMap.encounter.owner.includes("波攻击"),
     `${fromMap.encounter.title} ｜ ${fromMap.encounter.owner.slice(0, 80)}`);
-  Check("点地图拍标签 → 选中那一拍并写出时间窗",
+  Check("点地图上的攻击波标签 → 选中那一波并写出时间窗",
     fromMap.beatRead.sel?.kind === "beat" && fromMap.beatRead.sel?.id === "transferFlank"
-    && /窗口 \d+–\d+ s/.test(fromMap.beatRead.owner),
+    && /第 \d+–\d+ 秒之间/.test(fromMap.beatRead.owner),
     `${fromMap.beatRead.title} ｜ ${fromMap.beatRead.owner.slice(0, 80)}`);
 
   // -------------------------------------------------------------------------
@@ -502,7 +551,7 @@ try {
   const timeline = await page.evaluate(() => {
     const doc = window.Taierzhuang.editor.overlays.get("orchestration").win.document;
     const Read = (selector) => [...doc.querySelectorAll(selector)].map((node) => ({
-      at: node.dataset.markerAt ?? null, text: node.textContent, title: node.title,
+      at: node.dataset.markerAt ?? null, text: node.textContent, tip: node.dataset.tip || "",
     }));
     return {
       condition: Read('[data-timeline="design"] .tlMark[data-marker-kind="condition"]'),
@@ -518,7 +567,10 @@ try {
   Check("设计行的 condition 标记没有秒数",
     timeline.condition.length >= 50 && timeline.condition.every((mark) => mark.at === null && !/\d/.test(mark.text)),
     `${timeline.condition.length} 个`);
-  Check("设计行的拍与定时标了秒数",
+  Check("condition 标记的悬停提示明说「没有固定秒数」",
+    timeline.condition.every((mark) => mark.tip.includes("没有固定秒数")),
+    timeline.condition[0]?.tip.slice(0, 80) || "（没有标记）");
+  Check("设计行的攻击波与定时标了秒数",
     timeline.beat.length === 4 && timeline.beat.every((mark) => mark.at !== null)
     && timeline.timed.length > 0 && timeline.timed.every((mark) => mark.at !== null),
     `beat ${timeline.beat.length} / timed ${timeline.timed.length}`);

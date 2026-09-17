@@ -299,7 +299,7 @@ export const MISSION_FACT_GATES = Object.freeze({
   }),
   transferAttacksResolved: Gate({
     kind: "combat", step: "Transfer", source: "UpdateTransferBeats",
-    text: "转运区四拍攻击全部清掉",
+    text: "转运区四波攻击全部清掉",
   }),
   zhouNext: Gate({
     kind: "column", step: "Transfer", source: "Update",

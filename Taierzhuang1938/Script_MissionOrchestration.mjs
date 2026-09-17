@@ -290,14 +290,16 @@ function BuildTimeline(steps, facts, encounters) {
       });
   }
   // 转运区四拍：唯一带窗口的一段设计时间。
-  for (const beat of MISSION_TRANSFER_BEATS)
+  // 面上一律叫「第 n 波攻击」：「拍」是排这段节奏时的内部叫法，不该出现在人看的字里。
+  MISSION_TRANSFER_BEATS.forEach((beat, index) => {
     timeline.push({
       phaseNumber: PhaseNumberForStep("Transfer"), step: "Transfer", kind: "beat",
-      label: `${beat.id}（装车 ${beat.loaded} 之后，间隔 ${beat.restS} 秒）`,
+      label: `转运区第 ${index + 1} 波攻击（装车 ${beat.loaded} 副之后，与上一波隔 ${beat.restS} 秒）`,
       factId: null, encounterId: beat.id, memberId: null,
       atS: null, earliestS: beat.earliestS, latestS: beat.latestS,
       loaded: beat.loaded, restS: beat.restS, requires: null,
     });
+  });
   // 空袭两趟的提前量。
   timeline.push({
     phaseNumber: PhaseNumberForStep("AirFirst"), step: "AirFirst", kind: "timed",
@@ -565,7 +567,7 @@ export function ModelSummary(model) {
   lines.push(`边界 X ${model.bounds.minX}..${model.bounds.maxX}  Z ${model.bounds.minZ}..${model.bounds.maxZ}`);
   lines.push(`公开阶段 ${model.phases.length} 个 / 内部步骤 ${model.steps.length} 个 / 事实门 ${Object.keys(model.facts).length} 条`);
   lines.push(`  事实门按判法：${Object.entries(factKinds).sort().map(([kind, n]) => `${kind} ${n}`).join("  ")}`);
-  lines.push(`遭遇组 ${model.encounters.length} 组 / 成员 ${members} 人 / 转运拍 ${model.beats.length} 拍`);
+  lines.push(`遭遇组 ${model.encounters.length} 组 / 成员 ${members} 人 / 转运区 ${model.beats.length} 波攻击`);
   lines.push(`路线 ${Object.keys(model.routes).length} 条 / 锚点 ${Object.keys(model.anchors).length} 个 / 区域 ${model.zones.length} 个 / 友军点 ${model.friendlies.length} 个`);
   lines.push(`时间轴 ${model.timeline.length} 项（condition ${model.timeline.filter((e) => e.kind === "condition").length} 项无秒数）`);
   lines.push(`地图：体块 ${model.layout.blocks.length} / 门 ${model.layout.gates.length} / 道路 ${model.layout.roads.length} / 壕沟 ${model.layout.trenches.length} 段`);

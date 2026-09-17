@@ -37,8 +37,8 @@
 
 | 字段 | 含义 |
 | --- | --- |
-| `spawn.kind` | `step`（进入某步骤时生成）/ `fact`（某事实满足时）/ `beat`（转运拍）/ `opening`（开场脚本生成） |
-| `spawn.step` / `.fact` / `.beat` | 对应的步骤 id / 事实 id / 拍 id |
+| `spawn.kind` | `step`（进入某步骤时生成）/ `fact`（某事实满足时）/ `beat`（转运区的第 n 波攻击）/ `opening`（开场脚本生成） |
+| `spawn.step` / `.fact` / `.beat` | 对应的步骤 id / 事实 id / 攻击波 id |
 | `standbyUntil` | 生成了但**待命**，等这条事实满足才动（`front` / `machineGun` 等 `frontBattleStarted`） |
 | `dormant` + `wake` | 生成即装睡；`wake.kind` 为 `playerWithinM`（带 `radiusM`、`step`）或 `fact` |
 | `release` | 放行规则（`tacticNear`：玩家靠近战术点才放行） |
@@ -141,15 +141,36 @@ agent 不开浏览器也能读到与工作台**一模一样**的那份编排。
 窗口名 `tzOrchestration`，默认 1380×900，主题链接从主窗口的
 `link[data-interface-theme]` 复制过去。弹窗被浏览器拦截时 `Enter()` 抛错，入口开关自动复位。
 
-**不用先通关。** 没有第一关运行时（在别的关、或还没点「进城」）时顶部写
-「未加载第一关 · 仅显示设计编排」，设计编排照样全看得见；每个阶段旁边有
+**不用先通关。** 没有第一关运行时（在别的关、或还没点「进城」）时顶栏写
+「还没有人在跑第一关」、左栏顶上给一句话说明，设计编排照样全看得见；每个阶段旁边有
 「从这里试玩」＝ `window.Taierzhuang.Debug.FirstLevelJump(n)`（从主菜单会导航）。
+
+### 界面骨架
+
+与 `Style_Interface.css` / `Style_Editor.css` 同一套语言（黑标题栏、冷灰底、旧金选中、
+读数等宽），只是宽松一档 —— 它是个桌面工具，不是贴在画面边上的抽屉。
+
+- **标题栏**：关卡名 + 一排小标签（当前阶段 / 步骤 / 关卡时钟 / 这一步多久 /
+  **正在等**的每件事各一枚，写的是人话、点一下就选中那件事），右端是模型版本。
+  一行斜杠串起来的状态文字已经拆掉了。
+- **三栏可拖**：两条分栏线 `[data-orch="split-left"|"split-right"]`，宽度写在 `#cols`
+  的 `--left` / `--right` 上，连同时间轴的折叠状态一起记在
+  `localStorage["tengxian1938_orchestration_layout_FirstLevel"]`，下次开窗照旧。
+  中间那栏有 360 px 的下限（俯视图再窄就没法看了）。
+- **底部时间轴可折叠**（`[data-timeline="toggle"]` → `#tl[data-collapsed=0|1]`）。
+- 字号只有四档：标题 18、栏标题 15、正文 13、次要 12，读数一律等宽；间距按 8 的倍数。
+  深色滚动条、`:focus-visible` 有旧金描边。所有按钮、标签、提示都用普通中文
+  （转运区那四波攻击一律叫「第 n 波攻击」，内部叫「拍」不上界面），
+  表里的编号（步骤 id、组 id、事实 id）只当尾巴上的等宽小字，**内部字段名不进句子**。
 
 ### 左栏「流程」
 
-18 个公开阶段 → 27 个内部步骤（其中 `Complete` 不属于任何公开阶段，单列在末尾）。
-每步显示目标、对白 cue、最短时长、指引路线、本步生成的组，以及每条要求事实的
-**人话（`DescribeFact`）+ 实时状态**：
+18 个公开阶段做成**可折叠分组**（`[data-flow-phase=n]` 上的 `data-open=0|1`），
+标题带状态 `data-phase-state=now|done|todo`（「正在这里」/「已走过」/不写）；
+**当前阶段自动展开并滚到看得见**，选中某个步骤时也会把它那一组打开。
+组里每步是一张小卡：目标一句在最上（步骤编号是右上角的等宽小字），
+再逐行列要求的事实，然后才是对白 / 最短时长这类次要行，末尾是本步生成的组与指引路线的小标签（可点）。
+每条事实是**人话（`DescribeFact`）+ 一枚状态圆点 + 等宽的事实编号**：
 
 | 标记 | 含义 |
 | --- | --- |
@@ -158,27 +179,33 @@ agent 不开浏览器也能读到与工作台**一模一样**的那份编排。
 | `·` | 已经走过的步 |
 | `—` | 未到该步 |
 
-点阶段 / 步骤 / 事实 / 组都会选中并联动中间的俯视图（`SetPhase` + `FitPhase`）与右栏详情。
-顶部一行实时状态：当前阶段、步骤、关卡时钟、本步时长、**正在等哪些事实**。
+点阶段 / 步骤 / 事实 / 组都会选中并联动中间的俯视图（`SetPhase` + `FitPhase`）与右栏详情；
+反过来，从图上或时间轴上选中一个步骤，左栏会把它那一组展开并滚过去。
 
 ### 中栏「俯视图」
 
 P3b 的 `Script_EditorOrchestrationMap.mjs`（canvas 2D，零 three，北在上、一米就是一米）。
 
-- **13 个图层开关**：地表 / 体块 / 壕沟 / 道路 / 锚点 / 路线 / 触发区 / 友军 / 敌军 / 战术线 /
-  实机 / 批注 / 名字。
 - **7 把工具**：选择、平移、圈选、箭头、折线、标注、候选位（把选中的敌人拖出一个
-  建议位置，**不改模型**，只生成一枚 ghost 与 `proposal.to`）。
+  建议位置，**不改模型**，只生成一枚 ghost 与 `proposal.to`）。每把都是「小图标 + 名字」
+  的芯片，当前那把亮旧金；图标是 16×16 的描边 SVG（`TOOL_ICONS`），颜色跟着按钮走。
   「标注」点下去**在点击处就地长一个输入框**（`[data-orch="label-input"]`）：
   回车落笔、Esc 取消、失焦提交非空文本，空文本不生成形状。不用 `prompt` ——
   它会把整个弹窗冻住，而且无头测试根本没法给它输字。
-- 阶段滑条 / 上一阶段 / 下一阶段 / 适配整关 / 适配本阶段 / **跟随实时**。
+- **14 个图层开关**收在工具条右端的「图层 n/14」下拉面板里（`[data-orch="layers-button"]`
+  开合，面板是 `[data-orch="layers"]`，按钮仍是 `[data-layer=id]`）：地表 / 体块 / 壕沟 /
+  道路 / 锚点 / 路线 / 触发区 / 友军 / 敌军 / 战术线 / 实机 / 批注 / 名字 / 图例，外加「全开」与
+  「只看底图」（只留地表 / 体块 / 道路 / 壕沟）。摊在工具条上要占掉两行，那两行是从俯视图身上抠的。
+  「图例」是画布左下角那块不透明的说明牌，它会盖住地图的左下角，所以这个开关必须在。
+- **阶段步进器**：`◀` / `▶` + 「第 12 / 18 阶段 · 完整转运区防御」+ 一条细进度条
+  （`[data-map="phase"]`，点哪儿跳哪儿、左右方向键走一格；原生 range 在这套界面里太出戏），
+  右边一组是 **跟随实时** / 适配整关 / 适配本阶段。
 - 实机层每 0.25 s 从 `host.game.missionRuntime` 取 `State()`（**每 tick 重新取**：
   换关会换对象）→ `ApplyRuntimeState` → `SetLive`。地图只在 live 指纹变了或选中变了时重画。
 
 **点得中什么**：单个敌人、锚点、触发区、路线、友军、批注点，外加两种把手 ——
 每个非「已清除」的遭遇组在成员质心旁有一枚芯片（`PickAt` → `{kind:"encounter", id}`），
-四个转运拍的框各有一枚金色芯片（→ `{kind:"beat", id}`）。悬停 tooltip 与选中描亮
+转运区四波攻击的框各有一枚金色芯片（→ `{kind:"beat", id}`）。悬停 tooltip 与选中描亮
 （整组成员逐个描亮）对这两种一视同仁，点它和从左栏 / 时间轴选它走的是**同一条反查**。
 芯片是不透明的，所以画在成员**下面**、拾取也排在成员之后：**点到人拿到的永远是人**
 （缩到整关视野时，一枚芯片能把它标的那几个人整个盖住 —— 这条不是洁癖）。
@@ -192,47 +219,65 @@ P3b 的 `Script_EditorOrchestrationMap.mjs`（canvas 2D，零 three，北在上�
 
 ### 右栏「详情 / 批注」
 
-- **反查**（`FindOwner`）：属于哪组、哪步生成、按什么出现（`kind=beat/step/fact/opening`）、
-  待命/苏醒条件、移动路线与放行点、本阶段状态、实机死活与位置、引用它的事实，
-  外加一个折叠的原始数据 JSON。
-- **批注区**：本对象相关批注 + 全部批注（待处理 / 已处理 / 不处理 / 全部筛选）。
-  每条显示目标、阶段、意见、建议、草图、图片路径与**缩略图**、`resolution.summary`，
-  以及 `NoteDrift` 的「⚠ 原设置已变化」和新旧值并排；按钮：
-  **定位**（回选目标并把地图跳过去）、**标记已核对**（写 `verified: true`），
-  图还只在本地时再加一颗 **下载本图**（把那张 PNG 另存出去）。
+- **详情卡**（`FindOwner` 反查）：卡头是「类别标签 + 名字」，卡身是一张键值表，
+  左边一列是问题（属于哪组 / 怎么出现 / 出场后先待命 / 会怎么动 / 现在 …），
+  右边一列是人话（「转运区第 2 波攻击，进入 Transfer 这一步后第 35–60 秒之间、且已装车 4 副时出现」），
+  表里的编号跟在值后面当等宽小字（`kind=beat`、`transfer`）。最下面是折叠的原始数据 JSON。
+- **批注区**：本对象相关批注 + 全部批注（分段按钮：待处理 / 已处理 / 已忽略 / 全部）。
+  每条是一张卡：状态小标签 + 目标 + 阶段 + 步骤（+「本地草稿」「已核对」）、意见正文、
+  指的时候、建议、草图、**缩略图**、`resolution.summary`，以及 `NoteDrift` 的醒目警示条
+  ——「写这条批注时记下的设置已经变了（n 处）」并把新旧值并排列出来；按钮：
+  **在图上找到它**（回选目标并把地图跳过去）、**标记已核对**（写 `verified: true`），
+  图还只在本地时再加一颗 **下载这张图**。
   缩略图的来源：本地草稿的图取自 IndexedDB 里的 dataURL，已经落盘的那张走绝对 URL
   （弹窗文档是 `about:blank`，相对路径在那儿解不出来）。
-- **新建批注**：意见文字、建议类型（`PROPOSAL_KINDS`）、时间点（阶段内第 N 秒 / 某事实满足时 / 不限）、
-  草图（地图工具画的形状实时列出、点一下删掉）、候选位；
-  然后 **保存草稿** / 复制交接文本 / 下载 JSON / 复制 JSON / 下载本图 / 清空草稿。
+- **写一条批注**：每项一组（哪里不对 / 你的建议 / 指的是哪个时候 / 画在图上的东西 /
+  建议挪到的位置），主按钮 **保存草稿**（实心旧金）与次按钮 **清空** 一排，
+  下面一条状态条写保存结果或退化原因（**不弹窗**），再下面是弱化的
+  复制交接文本 / 下载 JSON / 复制 JSON / 下载本图。
 
 ### 底栏「时间轴」
 
-横向 18 条泳道，**宽度按步数分配，不按秒** —— 大部分事情本来就没有秒数可排。
+左边一列固定写着「设计」「实际」（实际那行底下还写着关卡时钟走到哪儿 / 还没人在跑），
+右边是横向 18 列，**宽度按步数分配，不按秒** —— 大部分事情本来就没有秒数可排。
+最上面一行是阶段的编号与名字，**当前阶段整列（含表头）压一层旧金底**。
 
 - **设计行**（青 / 金）：`model.timeline` 的 `entry ▸`、`condition ◇`、`timed ◆`、`beat ■`、
-  `delay ·`、`wake ✶`。`condition` 只画菱形、`data-marker-at` **缺席**，鼠标悬停写
-  「无秒数（由玩家行为触发）」；`timed` / `delay` 标相对秒，`beat` 标窗口区间。
+  `delay ·`、`wake ✶`。`condition` 只画菱形、`data-marker-at` **缺席**；
+  `timed` / `delay` 标相对秒，`beat` 标窗口区间。
 - **实际行**（绿）：`live.actualTimeline` 的 `stageEntry ▸` 与 `fact ●`，标的是真实关卡时钟。
-- 点任意标记 = 选中对应的事实 / 组 / 成员 / 步骤。
+- 悬停任意标记出一张自己画的提示卡（不是 native title）：阶段、步骤、这件事的人话、
+  最后才是时刻 —— 没有秒数的那几类明写「没有固定秒数，等玩家做到才发生」。
+  同一份文字也写在 `data-tip` 上，取证与测试读它。
+- 点任意标记 = 选中对应的事实 / 组 / 成员 / 步骤；点表头 = 选中那一阶段。
+- 图例在时间轴右上角；整条时间轴可以「收起」。
 
 ### DOM 钩子（测试与取证用）
 
-`[data-orch]`：`header` / `live-status` / `version` / `flow` / `map` / `detail` / `timeline` / `canvas` /
-`tools` / `layers` / `stagebar` / `label-input`（标注工具开着时才有）；
-`[data-flow-phase=n]`、`[data-flow-step=id]`、`[data-fact=id]`（`data-fact-state=ok|wait|past|future|none`）、
+`[data-orch]`：`header` / `live-status` / `version` / `flow` / `flow-hint` / `map` / `detail` / `timeline` /
+`canvas` / `tools` / `layers` / `layers-button` / `layers-all` / `layers-none` / `stagebar` / `tip` /
+`split-left` / `split-right` / `label-input`（标注工具开着时才有）；
+`[data-flow-phase=n]`（`data-open=0|1`、`data-phase-state=now|done|todo`）、`[data-flow-step=id]`、
+`[data-fact=id]`（`data-fact-state=ok|wait|past|future|none`）、
 `[data-flow-encounter=id]`、`[data-flow-route=name]`、`[data-jump=n]`、`[data-flow-orphan]`；
-`[data-tool=…]`、`[data-layer=…]`、`[data-map=phase|phase-label|prev|next|fit-all|fit-phase|follow]`；
+`[data-tool=…]`、`[data-layer=…]`、
+`[data-map=phase|phase-label|prev|next|fit-all|fit-phase|follow|follow-chip]`
+（`phase` 现在是那条细进度条，`follow` 是芯片里那个藏起来的 checkbox）；
 `[data-detail=title|owner|json|json-box|notes|form]`、
 `[data-note-field=text|proposal|timeKind|timeValue|sketch|candidate]`、
 `[data-note-action=save|handoff|download|copy|image|clear|locate|verify]`
 （`locate`/`verify`/`image` 也出现在每张批注卡片里，按 `[data-note=<id>]` 取用）、
 `[data-notes=status|list|filter|clipboard]`、`[data-notes-filter=…]`、`[data-note=<id>]`（`data-note-drift`）、
-`[data-note-thumb=<id>]`（卡片里的缩略图）、`[data-shape-index=i]`；
-`[data-timeline=design|actual|legend]`、`[data-lane=n]`、`.tlMark[data-marker-kind=…]`（有秒数的才有 `data-marker-at`）。
+`[data-note-drift-detail=<id>]`（新旧值那张小表）、`[data-note-thumb=<id>]`（卡片里的缩略图）、
+`[data-shape-index=i]`；
+`[data-timeline=design|actual|legend|toggle]`、`#tl[data-collapsed=0|1]`、`[data-lane=n]`、
+`.tlMark[data-marker-kind=…]`（有秒数的才有 `data-marker-at`；`data-tip` 是悬停提示的纯文本）。
+三栏宽度在 `#cols` 的 `--left` / `--right`；宽度与时间轴折叠状态存
+`localStorage["tengxian1938_orchestration_layout_FirstLevel"]`。
 
 对外方法（`T.editor.overlays.get("orchestration")`）：
-`Select(sel)` / `SetPhase(n,{fit})` / `SetTool(id)` / `SetLayer(id,on)` / `SetFollowLive(on)` /
+`Select(sel)` / `SetPhase(n,{fit})` / `OpenPhase(n,{scroll})` / `SetTool(id)` / `SetLayer(id,on)` /
+`SetAllLayers(on)` / `ToggleLayers(force?)` / `ToggleTimeline(force?)` / `SetFollowLive(on)` /
 `AddShape(shape)` / `RemoveShape(i)` / `SetCandidate(point,target)` /
 `SetNoteText(text)` / `SetProposalKind(kind)` / `SetNoteTime(kind,value)` / `SetNoteFilter(v)` /
 `SetLabelText(text)` / `CommitLabel()` / `CancelLabel()` /
@@ -340,7 +385,7 @@ node Taierzhuang1938/Script_MissionNotesCli.mjs dismiss <id> [--summary "…"]
    **正在等哪些事实**，底栏实际行会记下真正发生的时刻。
    自己缩放或拖动过之后，跟随实时就只换阶段、不再动你的镜头；想把框景交回去，
    点一下「适配本阶段」或「适配整关」。
-5. 看到不对的：在俯视图上点中那个敌人 / 触发圈 / 路线 / **整组的把手** / **转运拍的标签**
+5. 看到不对的：在俯视图上点中那个敌人 / 触发圈 / 路线 / **整组的把手** / **某一波攻击的标签**
    （或在左栏点阶段、步骤、事实、组），用圈选 / 箭头 / 折线 / 标注画出想说的地方
    （标注是在点的地方直接打字，回车落笔），要挪位置就用「候选位」把他拖到想要的位置。
 6. 右栏写一句人话 + 选建议类型（+ 时间点），点 **保存草稿**。
@@ -394,8 +439,8 @@ node Taierzhuang1938/Script_TestRunnerTest.mjs
 node Taierzhuang1938/Script_TextTest.mjs
 
 # 浏览器
-node Taierzhuang1938/Script_OrchestrationMapTest.mjs        # 俯视图（45 条）：数像素、PickAt、组/拍把手、ToPng、工具回调
-node Taierzhuang1938/Script_OrchestrationEditorTest.mjs     # 工作台（64 条）：三栏/时间轴、事实与 flow 一致、跟随实时不抢视野、标注输入框、批注退化与图片补传、关窗还干净
+node Taierzhuang1938/Script_OrchestrationMapTest.mjs        # 俯视图（45 条）：数像素、PickAt、组/攻击波把手、ToPng、工具回调
+node Taierzhuang1938/Script_OrchestrationEditorTest.mjs     # 工作台（69 条）：三栏/分栏线/时间轴折叠、事实与 flow 一致、阶段状态与「正在等」小标签、跟随实时不抢视野、标注输入框、批注退化与图片补传、关窗还干净
 node Taierzhuang1938/Script_EditorTest.mjs --launcher-only  # 入口面板 26 个按钮
 node Taierzhuang1938/Script_WorldInfoEditorTest.mjs
 node Taierzhuang1938/Script_PlayerStateEditorTest.mjs

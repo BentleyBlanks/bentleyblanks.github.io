@@ -7,9 +7,18 @@
 // 绘制口径：**北在上**（Z 小在上）、X 向右。一米就是一米 —— 面板上的距离
 // 能直接拿尺子量，别在这里引入任何「示意图」式的挪位。
 //
+// 配色跟 Style_Interface.css 的界面主题同一家：冷灰底、旧金选中、浅灰字。
+// 地表被压成暗色是有意的 —— 标记是主角，底图只交代「这是哪儿」。
+//
 // 为什么底图要缓存：`layout.SampleGroundColor` 里有壕沟网格与道路走廊的逐点
-// 采样，整张图约四万格。每帧重采一次的话拖动会掉到个位数帧率，所以 2 m 一格
-// 烘到一张离屏 canvas，之后只 drawImage —— 模型换了才重烘。
+// 采样，整张图三十多万格。每帧重采一次的话拖动会掉到个位数帧率，所以 1 m 一格
+// 烘到一张离屏 canvas（顺手做一次轻模糊，去掉采样噪点的块状感），之后只
+// drawImage —— 模型换了才重烘。
+//
+// 文字为什么要排版：整关视野下二十几个锚点、二十一条路线、二十一个组的名字
+// 会糊成一片黑边，既读不出来，还把它标注的那个标记本身啃掉一半。所以所有文字
+// 都走一遍贪心避让（`PlaceLabels`）：按优先级放，放不下就换位置，再放不下就
+// 不画。排版结果缓存在 `labelCache` 上，视野/阶段/选中没变就不重排。
 //
 // 容错口径：模型字段缺了就**不画那一层**，不抛错。工作台要在「P1 的表还没长
 // 齐」「不在第一关」这些半成品状态下照样打得开。
@@ -21,54 +30,92 @@ import { PhaseLayout } from "./Script_MissionOrchestration.mjs";
 // 调色板。导出是给测试**数像素**用的：光看 visible 会漏掉「画上了却 1 px 都
 // 看不见」，所以测试按这里的精确 RGB 去数实心填充的像素数（仓库旧账：刺刀装上
 // 了却一个像素都看不见，16 项全绿照样漏过）。改颜色就等于改测试的 oracle。
+//
+// 取色跟着 Style_Interface.css：--ui-surface #101314、--ui-gold #dfbd68、
+// --ui-bright #eeefec、--ui-muted #a3aaa4。
 // ---------------------------------------------------------------------------
 export const MAP_COLORS = Object.freeze({
-  backdrop: [24, 26, 25],
-  groundTint: 0.72,          // 地表色本身接近白，压暗一档才压得住上面的标记
-  road: [214, 206, 186],
-  railway: [74, 74, 70],
-  sleeper: [96, 88, 74],
-  trench: [120, 104, 84],
-  blockFallback: [193, 189, 177],
-  blockEdge: [58, 60, 56],
-  anchor: [40, 54, 62],
-  route: [24, 200, 222],
-  tactic: [210, 96, 58],
-  assault: [232, 150, 90],
-  zone: [232, 163, 61],
-  friendly: [63, 116, 214],
-  enemyPending: [142, 142, 138],
-  enemyStaged: [142, 47, 38],
-  enemyDormant: [166, 99, 92],
-  enemyActive: [255, 74, 58],
-  enemyCleared: [128, 128, 124],
+  backdrop: [16, 19, 20],          // 关卡范围之外的空白 = 面板底色
+  groundDark: [40, 44, 42],        // 地表亮度映射的下沿
+  groundLight: [78, 82, 74],       // 上沿。压得住上面的标记，又还看得出田块与道路走廊
+  grid: [176, 186, 178],           // 50 m 网格（很淡地画）
+  road: [156, 148, 128],
+  roadEdge: [40, 42, 38],
+  railway: [104, 106, 100],
+  sleeper: [138, 130, 112],
+  trench: [124, 106, 82],
+  trenchEdge: [38, 34, 28],
+  blockFallback: [122, 124, 118],
+  blockEdge: [20, 22, 22],
+  anchor: [196, 203, 196],
+  route: [96, 196, 214],
+  tactic: [226, 122, 74],
+  assault: [236, 176, 104],
+  zone: [223, 189, 104],           // --ui-gold
+  friendly: [96, 156, 236],
+  // 「未出现」是一枚冷灰蓝，不是中性灰：图廓（北向箭头、刻度、比例尺）都是浅灰，
+  // 它们压在暗底上抗锯齿出来的中间色全是 b≤r 的中性灰。中性灰里挑颜色，早晚会有
+  // 一枚边缘像素正好等于它 —— 那会让「这一阶段一个未出现的人都没有」这条断言
+  // 凭一个像素翻红（实测就是北向箭头那个「北」字的边缘）。偏蓝一档就撞不上了。
+  enemyPending: [126, 136, 146],
+  enemyStaged: [182, 62, 48],
+  enemyDormant: [196, 118, 96],
+  enemyActive: [255, 82, 62],
+  enemyCleared: [112, 114, 110],
   player: [255, 214, 64],
-  liveEnemy: [255, 138, 92],
-  liveDead: [118, 118, 116],
-  guide: [120, 235, 160],
-  sketch: [138, 74, 200],
+  liveEnemy: [255, 150, 96],
+  liveDead: [124, 124, 120],
+  guide: [122, 232, 160],
+  sketch: [166, 126, 220],
   note: [152, 120, 192],
   select: [255, 211, 77],
-  text: [24, 26, 25],
-  textLight: [242, 240, 232],
-  handle: [30, 34, 39],      // 组把手 / 拍把手的芯片底色：不透明，测试能精确数
+  textLight: [238, 239, 236],      // --ui-bright
+  textMuted: [163, 170, 164],      // --ui-muted
+  halo: [10, 12, 12],              // 标记的深色描边：压在浅地表上也咬得住轮廓
+  labelBack: [18, 21, 23],         // 文字底板（不透明：半透明底在这张图上既读不出字也数不出像素）
+  handle: [30, 34, 39],            // 组把手 / 拍把手的芯片底色：不透明，测试能精确数
+  legendBack: [13, 16, 17],        // --ui-panel 的不透明版；图例层的 oracle
+  legendEdge: [116, 122, 116],
+  scaleBar: [214, 217, 209],       // 比例尺 / 北向箭头 / 边缘刻度
 });
 
-const FONT = '11px "Segoe UI", system-ui, sans-serif';
-const FONT_SMALL = '10px "Segoe UI", system-ui, sans-serif';
-const GROUND_STEP_M = 2;
-// 把手芯片：成员质心右上方一枚小标签。偏移要大过成员点的拾取半径（7 px），
+const FONT_FAMILY = '"TzUiLatin", "TzUiSans", "Segoe UI", system-ui, sans-serif';
+const FONT = `11px ${FONT_FAMILY}`;
+const FONT_SMALL = `10px ${FONT_FAMILY}`;
+const FONT_TINY = `9px ${FONT_FAMILY}`;
+const GROUND_STEP_M = 1;
+// 采样亮度几乎全落在 0.82–0.92 这条窄带里，直接乘个系数只会得到一张灰白纸。
+// 先把这条窄带映射到暗色区间，地形起伏才看得出来。窗口开多宽是「对比度」旋钮：
+// 开窄了田块的棋盘格会跳出来抢戏，开宽了又成一张纯色纸 —— 0.72–1.0 是折中。
+const GROUND_FLOOR = 0.72;
+const GROUND_CEIL = 1.0;
+const GROUND_CHROMA = 0.45;        // 保留一点原色相，别全灰掉
+
+// 把手芯片：成员质心旁边一枚小标签。偏移要大过成员点的拾取半径（7 px），
 // 否则点人会点到把手上 —— 「把手不许遮住成员」是这枚芯片的硬条件。
-const CHIP_PAD = 4;
-const CHIP_H = 14;
-const CHIP_DX = 10;
-const CHIP_DY = -15;
+const CHIP_PAD = 5;
+const CHIP_H = 15;
+const CHIP_DX = 11;
+const CHIP_DY = -16;
 const CHIP_HIT_R = 11;
+const LABEL_PAD_X = 4;
+const LABEL_H = 13;
+const MAX_LABELS = 72;             // 排版的硬上限：再多也读不过来，还白烧时间
+
+// 标签优先级：数字小的先占位置。选中 > 组/拍 > 锚点 > 触发圈事实名 > 路线名。
+// 悬停不在这条队伍里 —— 它走 tooltip，永远画在最上层，也永远不占别人的位置。
+const PRIORITY = { select: 0, chip: 20, anchor: 40, zone: 50, route: 60 };
+// 缩放不够时低优先级的名字直接不参加排版（px/m）。
+const LABEL_ZOOM = { anchor: 0.85, zone: 1.35, route: 1.9 };
+
+// 拾取分层：同一个位置上谁赢。人永远赢把手。
+const PICK_RANK = { zone: 1, route: 1, anchor: 2, friendly: 2, chip: 3, note: 4, member: 5, live: 6, player: 7 };
+
 const TOOLS = new Set(["select", "pan", "circle", "arrow", "path", "label", "move"]);
 const DEFAULT_LAYERS = Object.freeze({
   terrain: true, blocks: true, trenches: true, roads: true, anchors: true,
   routes: true, zones: true, friendlies: true, encounters: true, tactics: true,
-  live: true, notes: true, labels: true,
+  live: true, notes: true, labels: true, legend: true,
 });
 
 function Css(rgb, alpha = 1) {
@@ -77,13 +124,16 @@ function Css(rgb, alpha = 1) {
     ? `rgb(${rgb[0]},${rgb[1]},${rgb[2]})`
     : `rgba(${rgb[0]},${rgb[1]},${rgb[2]},${alpha})`;
 }
-function HexCss(value, fallback) {
+function HexCss(value, fallback, scale = 1) {
   if (!Number.isFinite(value)) return fallback;
   const n = value | 0;
-  return `rgb(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255})`;
+  const r = Clamp(Math.round(((n >> 16) & 255) * scale), 0, 255);
+  const g = Clamp(Math.round(((n >> 8) & 255) * scale), 0, 255);
+  const b = Clamp(Math.round((n & 255) * scale), 0, 255);
+  return `rgb(${r},${g},${b})`;
 }
 const Clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
-const Byte = (v) => Clamp(Math.round(v * 255), 0, 255);
+const Byte = (v) => Clamp(Math.round(v), 0, 255);
 
 /** 折线点归一：既吃 `{x,z}` 也吃 `[x,z]`（railway.points 就是后者）。 */
 function Points(list) {
@@ -106,6 +156,7 @@ export class OrchestrationMap {
     this.disposed = false;
 
     this.model = null;
+    this.contentBounds = null;
     this.phaseNumber = 1;
     this.phaseLayout = null;
     this.live = null;
@@ -126,6 +177,16 @@ export class OrchestrationMap {
     this.ground = null;
     this.picks = [];
     this.handles = [];
+    // 排好版、真画上去了的标签矩形。互不相交是硬条件（测试咬这一条）。
+    this.placedLabels = [];
+    this.labelCache = null;
+    this.scaleBar = null;
+    this.gridTicks = null;
+    this.gridStep = 50;
+    this.soft = null;
+    // 图例默认收着：工作台 1380 宽时地图栏只有 620 px，摊开的图例要吃掉三分之一。
+    this.legendOpen = false;
+    this.legendHit = null;
     this.drag = null;
     this.pathPoints = null;
     this.spaceDown = false;
@@ -172,6 +233,8 @@ export class OrchestrationMap {
   SetModel(model) {
     this.model = model || null;
     this.ground = null;
+    this.contentBounds = this.ComputeContentBounds();
+    this.labelCache = null;
     this.SetPhase(this.phaseNumber);
     this.FitBounds();
     return this;
@@ -191,6 +254,7 @@ export class OrchestrationMap {
       if (!layout || !Array.isArray(layout.encounters)) layout = this.FallbackPhaseLayout(number);
     }
     this.phaseLayout = layout;
+    this.labelCache = null;
     this.Redraw();
     return this;
   }
@@ -215,7 +279,7 @@ export class OrchestrationMap {
   }
 
   SetLive(live) { this.live = live || null; this.Redraw(); return this; }
-  SetSelection(sel) { this.selection = sel || null; this.Redraw(); return this; }
+  SetSelection(sel) { this.selection = sel || null; this.labelCache = null; this.Redraw(); return this; }
   SetHover(sel) {
     const before = this.hover;
     this.hover = sel || null;
@@ -224,7 +288,16 @@ export class OrchestrationMap {
     this.Redraw();
     return this;
   }
-  SetLayers(layers) { Object.assign(this.layers, layers || {}); this.Redraw(); return this; }
+  SetLayers(layers) { Object.assign(this.layers, layers || {}); this.labelCache = null; this.Redraw(); return this; }
+  /** 图例摊开还是收成一枚芯片。芯片本身也归 `legend` 图层管，关掉就一起没。 */
+  SetLegendOpen(on) {
+    const next = !!on;
+    if (next === this.legendOpen) return this;
+    this.legendOpen = next;
+    this.labelCache = null;         // 图例占的地方变了，标签得重新排
+    this.Redraw();
+    return this;
+  }
   SetSketch(shapes) { this.sketch = Array.isArray(shapes) ? shapes.slice() : []; this.Redraw(); return this; }
   SetNotes(notes) { this.notes = Array.isArray(notes) ? notes.slice() : []; this.Redraw(); return this; }
   SetTool(tool) {
@@ -272,10 +345,55 @@ export class OrchestrationMap {
     return { x: (event.clientX || 0) - rect.left, y: (event.clientY || 0) - rect.top };
   }
 
+  /**
+   * 「整关」到底是多大一块。地图数据的 bounds 是 342 × 1001 m，但第一关的戏
+   * 全在北边那 484 m 里（Z −215…269）：照 bounds 框景，一半以上的画布是空地，
+   * 整关视野只剩 0.8 px/m，什么都读不出来。所以「整关」= 编排真正用到的范围。
+   */
+  ComputeContentBounds() {
+    const model = this.model;
+    const b = model?.bounds;
+    if (!model) return null;
+    const box = { minX: Infinity, maxX: -Infinity, minZ: Infinity, maxZ: -Infinity };
+    const Add = (x, z) => {
+      if (!Number.isFinite(x) || !Number.isFinite(z)) return;
+      if (x < box.minX) box.minX = x; if (x > box.maxX) box.maxX = x;
+      if (z < box.minZ) box.minZ = z; if (z > box.maxZ) box.maxZ = z;
+    };
+    for (const encounter of model.encounters || []) {
+      for (const member of encounter.members || []) {
+        Add(member.x, member.z);
+        for (const point of Points(member.tactic?.points)) Add(point.x, point.z);
+      }
+    }
+    for (const route of Object.values(model.routes || {})) for (const p of Points(route)) Add(p.x, p.z);
+    for (const anchor of Object.values(model.anchors || {})) Add(anchor?.x, anchor?.z);
+    for (const friendly of model.friendlies || []) Add(friendly.x, friendly.z);
+    for (const zone of model.zones || []) {
+      if (Number.isFinite(zone.radiusM) && Number.isFinite(zone.x)) {
+        Add(zone.x - zone.radiusM, zone.z - zone.radiusM);
+        Add(zone.x + zone.radiusM, zone.z + zone.radiusM);
+      } else if (Number.isFinite(zone.minX)) {
+        Add(zone.minX, zone.minZ); Add(zone.maxX, zone.maxZ);
+      }
+    }
+    if (box.minX > box.maxX) return b ? { ...b } : null;
+    const pad = 26;
+    const out = {
+      minX: box.minX - pad, maxX: box.maxX + pad,
+      minZ: box.minZ - pad, maxZ: box.maxZ + pad,
+    };
+    if (b && Number.isFinite(b.minX)) {
+      out.minX = Math.max(out.minX, b.minX); out.maxX = Math.min(out.maxX, b.maxX);
+      out.minZ = Math.max(out.minZ, b.minZ); out.maxZ = Math.min(out.maxZ, b.maxZ);
+    }
+    return out;
+  }
+
   FitBounds() {
-    const b = this.model?.bounds;
-    if (!b || !Number.isFinite(b.minX)) { this.Redraw(); return this; }
-    this.FitRegion(b);
+    const region = this.contentBounds || this.model?.bounds;
+    if (!region || !Number.isFinite(region.minX)) { this.Redraw(); return this; }
+    this.FitRegion(region);
     return this;
   }
   FitRegion(region, padding = 24) {
@@ -340,12 +458,13 @@ export class OrchestrationMap {
     const pxH = Math.round(this.cssHeight * this.dpr);
     if (this.canvas.width !== pxW) this.canvas.width = pxW;
     if (this.canvas.height !== pxH) this.canvas.height = pxH;
+    this.labelCache = null;
     this.Redraw();
     return this;
   }
 
   // -------------------------------------------------------------------------
-  // 底图缓存：2 m 一格烘一次
+  // 底图缓存：1 m 一格烘一次，顺手轻模糊
   // -------------------------------------------------------------------------
   BuildGround() {
     const layout = this.model?.layout;
@@ -363,21 +482,49 @@ export class OrchestrationMap {
     off.height = rows;
     const ctx = off.getContext("2d");
     const image = ctx.createImageData(cols, rows);
-    const tint = MAP_COLORS.groundTint;
     const out = [0, 0, 0];
+    const dark = MAP_COLORS.groundDark;
+    const light = MAP_COLORS.groundLight;
+    const raw = new Float32Array(cols * rows * 3);
     for (let j = 0; j < rows; j += 1) {
       const z = b.minZ + (j + 0.5) * GROUND_STEP_M;
       for (let i = 0; i < cols; i += 1) {
         const x = b.minX + (i + 0.5) * GROUND_STEP_M;
-        let r = 0.5, g = 0.5, bl = 0.5;
+        let r = 0.85, g = 0.85, bl = 0.85;
         try {
           const sample = layout.SampleGroundColor(x, z, out);
           if (sample && Number.isFinite(sample[0])) { r = sample[0]; g = sample[1]; bl = sample[2]; }
         } catch (error) { /* 采样器不在状态就用中灰，别整层塌掉 */ }
+        const lum = 0.3 * r + 0.59 * g + 0.11 * bl;
+        const t = Clamp((lum - GROUND_FLOOR) / (GROUND_CEIL - GROUND_FLOOR), 0, 1);
+        const k = (j * cols + i) * 3;
+        raw[k] = dark[0] + (light[0] - dark[0]) * t + (r - lum) * GROUND_CHROMA * 255;
+        raw[k + 1] = dark[1] + (light[1] - dark[1]) * t + (g - lum) * GROUND_CHROMA * 255;
+        raw[k + 2] = dark[2] + (light[2] - dark[2]) * t + (bl - lum) * GROUND_CHROMA * 255;
+      }
+    }
+    // 1-2-1 可分离模糊一遍：采样器的噪点按格给值，不抹一下整张图就是方块斑。
+    const tmp = new Float32Array(raw.length);
+    for (let j = 0; j < rows; j += 1) {
+      for (let i = 0; i < cols; i += 1) {
+        const k = (j * cols + i) * 3;
+        const kl = (j * cols + Math.max(0, i - 1)) * 3;
+        const kr = (j * cols + Math.min(cols - 1, i + 1)) * 3;
+        tmp[k] = (raw[kl] + raw[k] * 2 + raw[kr]) * 0.25;
+        tmp[k + 1] = (raw[kl + 1] + raw[k + 1] * 2 + raw[kr + 1]) * 0.25;
+        tmp[k + 2] = (raw[kl + 2] + raw[k + 2] * 2 + raw[kr + 2]) * 0.25;
+      }
+    }
+    for (let j = 0; j < rows; j += 1) {
+      const up = Math.max(0, j - 1) * cols * 3;
+      const down = Math.min(rows - 1, j + 1) * cols * 3;
+      const mid = j * cols * 3;
+      for (let i = 0; i < cols; i += 1) {
+        const o = i * 3;
         const k = (j * cols + i) * 4;
-        image.data[k] = Byte(r * tint);
-        image.data[k + 1] = Byte(g * tint);
-        image.data[k + 2] = Byte(bl * tint);
+        image.data[k] = Byte((tmp[up + o] + tmp[mid + o] * 2 + tmp[down + o]) * 0.25);
+        image.data[k + 1] = Byte((tmp[up + o + 1] + tmp[mid + o + 1] * 2 + tmp[down + o + 1]) * 0.25);
+        image.data[k + 2] = Byte((tmp[up + o + 2] + tmp[mid + o + 2] * 2 + tmp[down + o + 2]) * 0.25);
         image.data[k + 3] = 255;
       }
     }
@@ -432,9 +579,14 @@ export class OrchestrationMap {
 
   Paint(ctx, view, { picks = null, interactive = false } = {}) {
     const Project = (x, z) => ({ x: (x - view.cx) * view.scale + view.w / 2, y: (z - view.cz) * view.scale + view.h / 2 });
-    const Push = (sel, px, py, r) => { if (picks) picks.push({ sel, px, py, r }); };
-    // 把手先攒着，最后统一画在最上层；出图（ToPng）也照画，标注图上得看得见是哪一组。
-    const handles = [];
+    const Push = (sel, px, py, r, rank = 1) => { if (picks) picks.push({ sel, px, py, r, rank }); };
+    // 文字先攒着，底图与标记画完再统一排版 —— 这样避让算得出「谁已经占了哪儿」。
+    const labels = [];
+    const Add = (entry) => { if (entry.text) labels.push(entry); };
+    // 标记占位图：16 px 一格的粗网格，画一个标记就把它盖到的格子涂上。
+    // 排版时拿它当「别压在人身上」的软约束 —— 逐个标记两两比会把上百个敌人
+    // 乘进内层循环，格子查表是常数次。
+    this.soft = MakeGrid(view.w, view.h);
 
     ctx.save();
     ctx.fillStyle = Css(MAP_COLORS.backdrop);
@@ -443,96 +595,16 @@ export class OrchestrationMap {
     ctx.lineCap = "round";
     ctx.font = FONT;
     ctx.textBaseline = "middle";
+    ctx.textAlign = "left";
 
     const layout = this.model?.layout || null;
     const L = this.layers;
-    // 名字只在拉近到「一米一像素」以上才写。整关视野是 342 × 1001 m，挤进面板后
-    // 不到 0.8 px/m —— 二十几个锚点、二十一条路线、二十一个组的名字会糊成一片
-    // 黑边，既读不出来，还拿深色描边把它标注的那个标记本身啃掉一半。
-    const showLabels = L.labels && view.scale >= 1.1;
+    const showLabels = !!L.labels;
 
-    // --- 地表 -------------------------------------------------------------
-    if (L.terrain && this.model) {
-      const ground = this.ground || this.BuildGround();
-      if (ground) {
-        const a = Project(ground.minX, ground.minZ);
-        ctx.imageSmoothingEnabled = true;
-        ctx.drawImage(ground.canvas, a.x, a.y, ground.width * view.scale, ground.depth * view.scale);
-      }
-    }
-
-    // --- 道路 -------------------------------------------------------------
-    if (L.roads && layout) {
-      for (const road of layout.roads || []) {
-        const pts = Points(road.points);
-        if (pts.length < 2) continue;
-        ctx.strokeStyle = Css(MAP_COLORS.road, 0.55);
-        ctx.lineWidth = Math.max(1, (road.width || 4) * view.scale);
-        Stroke(ctx, pts, Project);
-      }
-      // 铁路：路基一条粗线 + 枕木短线，别只画一条线，缩小后分不清是路还是轨
-      const rail = Points(layout.railway?.points);
-      if (rail.length >= 2) {
-        ctx.strokeStyle = Css(MAP_COLORS.railway, 0.9);
-        ctx.lineWidth = Math.max(1.5, 3.4 * view.scale);
-        Stroke(ctx, rail, Project);
-        ctx.strokeStyle = Css(MAP_COLORS.sleeper, 0.9);
-        ctx.lineWidth = 1;
-        for (let i = 1; i < rail.length; i += 1) {
-          const a = rail[i - 1], b = rail[i];
-          const len = Math.hypot(b.x - a.x, b.z - a.z) || 1;
-          const ux = (b.x - a.x) / len, uz = (b.z - a.z) / len;
-          const step = Math.max(4, 24 / Math.max(view.scale, 0.05));
-          for (let t = 0; t < len; t += step) {
-            const p = Project(a.x + ux * t, a.z + uz * t);
-            const q = Project(a.x + ux * t - uz * 1.6, a.z + uz * t + ux * 1.6);
-            const q2 = Project(a.x + ux * t + uz * 1.6, a.z + uz * t - ux * 1.6);
-            ctx.beginPath(); ctx.moveTo(q.x, q.y); ctx.lineTo(q2.x, q2.y); ctx.stroke();
-            void p;
-          }
-        }
-      }
-    }
-
-    // --- 壕沟中心线 -------------------------------------------------------
-    if (L.trenches && layout) {
-      for (const segment of layout.trenches || []) {
-        const pts = Points(segment.points);
-        if (pts.length < 2) continue;
-        ctx.strokeStyle = Css(MAP_COLORS.trench, 0.85);
-        ctx.lineWidth = Math.max(1.5, (segment.width || 4) * view.scale);
-        Stroke(ctx, pts, Project);
-      }
-    }
-
-    // --- 体块与桥 ---------------------------------------------------------
-    if (L.blocks && layout) {
-      const colors = layout.semanticColors || {};
-      const fallback = Css(MAP_COLORS.blockFallback);
-      const structure = HexCss(colors.structure, fallback);
-      ctx.lineWidth = 1;
-      for (const block of layout.blocks || []) {
-        if (!Number.isFinite(block.x) || !Number.isFinite(block.w)) continue;
-        const a = Project(block.x - block.w / 2, block.z - block.d / 2);
-        const w = Math.max(1, block.w * view.scale);
-        const d = Math.max(1, block.d * view.scale);
-        ctx.fillStyle = HexCss(colors[block.semantic], structure);
-        ctx.fillRect(a.x, a.y, w, d);
-        if (w > 4 && d > 4) {
-          ctx.strokeStyle = Css(MAP_COLORS.blockEdge, 0.4);
-          ctx.strokeRect(a.x, a.y, w, d);
-        }
-      }
-      const bridge = layout.bridge;
-      if (bridge && Number.isFinite(bridge.x) && Number.isFinite(bridge.w)) {
-        const a = Project(bridge.x - bridge.w / 2, bridge.z - bridge.d / 2);
-        ctx.fillStyle = HexCss(colors.structure, structure);
-        ctx.fillRect(a.x, a.y, Math.max(2, bridge.w * view.scale), Math.max(2, bridge.d * view.scale));
-        ctx.strokeStyle = Css(MAP_COLORS.blockEdge, 0.9);
-        ctx.lineWidth = 1.5;
-        ctx.strokeRect(a.x, a.y, Math.max(2, bridge.w * view.scale), Math.max(2, bridge.d * view.scale));
-      }
-    }
+    this.PaintTerrain(ctx, view, Project, layout);
+    this.PaintGrid(ctx, view, Project);
+    this.PaintWays(ctx, view, Project, layout);
+    this.PaintBlocks(ctx, view, Project, layout);
 
     // --- 已存批注的草图（淡色打底，先画，别盖住新画的） -------------------
     if (L.notes) {
@@ -545,139 +617,19 @@ export class OrchestrationMap {
           const p = Project(target.x, target.z);
           ctx.fillStyle = Css(MAP_COLORS.note, 0.85);
           ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2); ctx.fill();
-          Push({ kind: "note", id: note.id, x: target.x, z: target.z }, p.x, p.y, 7);
+          Push({ kind: "note", id: note.id, x: target.x, z: target.z }, p.x, p.y, 7, PICK_RANK.note);
         }
       }
     }
 
-    // --- 触发圈 / 区域 -----------------------------------------------------
-    if (L.zones) {
-      const zones = this.phaseLayout?.zones || this.model?.zones || [];
-      for (const zone of zones) {
-        const color = Css(MAP_COLORS.zone, 0.95);
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 1.2;
-        ctx.setLineDash([5, 4]);
-        if (Number.isFinite(zone.radiusM) && Number.isFinite(zone.x)) {
-          const p = Project(zone.x, zone.z);
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, Math.max(2, zone.radiusM * view.scale), 0, Math.PI * 2);
-          ctx.stroke();
-          if (showLabels) Label(ctx, p.x + 4, p.y - 8, zone.fact || zone.id || "", Css(MAP_COLORS.zone));
-          Push({ kind: "zone", id: zone.id || zone.fact, x: zone.x, z: zone.z }, p.x, p.y, 8);
-        } else if (Number.isFinite(zone.minX)) {
-          const a = Project(zone.minX, zone.minZ);
-          const b = Project(zone.maxX, zone.maxZ);
-          ctx.strokeRect(a.x, a.y, b.x - a.x, b.y - a.y);
-          const cx = (zone.minX + zone.maxX) / 2, cz = (zone.minZ + zone.maxZ) / 2;
-          const c = Project(cx, cz);
-          Push({ kind: "zone", id: zone.id || zone.fact, x: cx, z: cz }, c.x, c.y, 8);
-          // 转运四拍的框：标签做成可点的把手（返回 kind:"beat"），别只是一行描边字。
-          // 拍是设计里唯一带时间窗的一段，用户最想点开看的就是它。
-          // 登记在区域之后 = 芯片压在区域上面，点芯片拿到的是拍不是那个框。
-          if (zone.kind === "beatArea") {
-            const beatId = String(zone.id || "").replace(/^beat_/, "");
-            const beat = (this.model?.beats || []).find((entry) => entry.id === beatId) || null;
-            const text = showLabels && beat
-              ? `拍 ${beatId} · ${beat.earliestS}–${beat.latestS} s`
-              : `拍 ${beatId}`;
-            const chip = ChipBox(ctx, a.x + 2, a.y - 2 + CHIP_DY, text);
-            handles.push({ kind: "beat", id: beatId, text, color: MAP_COLORS.zone, ...chip });
-            Push({ kind: "beat", id: beatId, x: cx, z: cz }, chip.cx, chip.cy, CHIP_HIT_R);
-          } else if (showLabels) {
-            Label(ctx, a.x + 3, a.y - 7, zone.fact || zone.id || "", Css(MAP_COLORS.zone));
-          }
-        }
-        ctx.setLineDash([]);
-      }
-    }
-
-    // --- 设计路线 ---------------------------------------------------------
-    if (L.routes && this.model?.routes) {
-      const names = Array.isArray(this.phaseLayout?.routes) && this.phaseLayout.routes.length
-        ? this.phaseLayout.routes
-        : Object.keys(this.model.routes);
-      for (const name of names) {
-        const pts = Points(this.model.routes[name]);
-        if (pts.length < 2) continue;
-        const color = Css(MAP_COLORS.route);
-        DirectedPath(ctx, pts, Project, color, 2, 7);
-        const mid = pts[Math.floor(pts.length / 2)];
-        const p = Project(mid.x, mid.z);
-        if (showLabels) Label(ctx, p.x + 6, p.y, name, color);
-        Push({ kind: "route", id: name, x: mid.x, z: mid.z }, p.x, p.y, 6);
-      }
-    }
-
-    // --- 锚点 -------------------------------------------------------------
-    if (L.anchors && this.model?.anchors) {
-      ctx.lineWidth = 1.2;
-      for (const [id, point] of Object.entries(this.model.anchors)) {
-        if (!point || !Number.isFinite(point.x)) continue;
-        const p = Project(point.x, point.z);
-        ctx.strokeStyle = Css(MAP_COLORS.anchor);
-        ctx.beginPath();
-        ctx.moveTo(p.x - 4, p.y); ctx.lineTo(p.x + 4, p.y);
-        ctx.moveTo(p.x, p.y - 4); ctx.lineTo(p.x, p.y + 4);
-        ctx.stroke();
-        if (showLabels) Label(ctx, p.x + 6, p.y, id, Css(MAP_COLORS.anchor));
-        Push({ kind: "anchor", id, x: point.x, z: point.z }, p.x, p.y, 6);
-      }
-    }
-
-    // --- 友军 -------------------------------------------------------------
-    if (L.friendlies) {
-      const list = this.phaseLayout?.friendlies || this.model?.friendlies || [];
-      ctx.fillStyle = Css(MAP_COLORS.friendly);
-      for (const friendly of list) {
-        if (!Number.isFinite(friendly.x)) continue;
-        const p = Project(friendly.x, friendly.z);
-        ctx.beginPath(); ctx.arc(p.x, p.y, 3.2, 0, Math.PI * 2); ctx.fill();
-        Push({ kind: "friendly", id: friendly.id, x: friendly.x, z: friendly.z }, p.x, p.y, 6);
-      }
-    }
-
-    // --- 敌人（本阶段状态上色） -------------------------------------------
-    if (L.encounters) {
-      // 先登记组把手，再登记成员。拾取是「后登记的压在上面」，这个顺序保证
-      // 点到人身上拿到的永远是人 —— 把手只在没人的空处才赢。
-      // 已清除的组不给把手：第 12 阶段有十一个这样的组，遍布全关，
-      // 它们的芯片会把还在演的那几组盖掉。灰叉还在，悬停照样报得出是谁。
-      for (const encounter of this.phaseLayout?.encounters || []) {
-        const state = encounter.state || "spawned";
-        if (state === "cleared") continue;
-        const centre = Centroid(encounter.members);
-        if (!centre) continue;
-        const p = Project(centre.x, centre.z);
-        const text = showLabels ? `${encounter.id} · ${StateText(state)}` : encounter.id;
-        const chip = ChipBox(ctx, p.x + CHIP_DX, p.y + CHIP_DY, text);
-        handles.push({ kind: "encounter", id: encounter.id, text, color: StateColor(state), ...chip });
-        Push({ kind: "encounter", id: encounter.id, x: centre.x, z: centre.z }, chip.cx, chip.cy, CHIP_HIT_R);
-      }
-    }
-
-    // --- 把手芯片（组 / 拍） -----------------------------------------------
-    // 画在成员**下面**：芯片是不透明的，缩到整关视野时一枚芯片能把它标的那几个
-    // 人整个盖掉（「画上了却一个像素都验不到」的老毛病，这次是反过来把别人啃了）。
-    // 压在下面也与拾取口径一致 —— 点到人拿到的永远是人。
-    this.PaintHandles(ctx, handles);
-
-    if (L.encounters) {
-      for (const encounter of this.phaseLayout?.encounters || []) {
-        const state = encounter.state || "spawned";
-        for (const member of encounter.members || []) {
-          if (!Number.isFinite(member.x)) continue;
-          const p = Project(member.x, member.z);
-          if (L.tactics) this.PaintTactic(ctx, Project, member, p, state);
-          this.PaintMember(ctx, p, member, state);
-          Push({ kind: "member", id: member.id, encounterId: encounter.id, x: member.x, z: member.z }, p.x, p.y, 7);
-        }
-      }
-    }
+    if (L.zones) this.PaintZones(ctx, view, Project, Push, Add, showLabels);
+    if (L.routes) this.PaintRoutes(ctx, view, Project, Push, Add, showLabels);
+    if (L.anchors) this.PaintAnchors(ctx, view, Project, Push, Add, showLabels);
+    if (L.friendlies) this.PaintFriendlies(ctx, Project, Push);
+    if (L.encounters) this.PaintEncounters(ctx, view, Project, Push, Add, showLabels);
 
     // --- 实机层 -----------------------------------------------------------
     if (L.live && this.live) this.PaintLive(ctx, Project, Push);
-    if (interactive) this.handles = handles;
 
     // --- 草图（当前草稿 + 正在拖的那一个） --------------------------------
     for (const shape of this.sketch) {
@@ -685,85 +637,457 @@ export class OrchestrationMap {
     }
     if (interactive) this.PaintPreview(ctx, Project, view);
 
-    // --- 选中描亮 / 悬停 tooltip ------------------------------------------
+    // --- 选中描亮 ----------------------------------------------------------
     if (this.selection) this.PaintHighlight(ctx, Project, this.selection);
-    if (interactive && this.hover && this.pointer) {
-      this.PaintTooltip(ctx, view, this.hover);
+
+    // --- 画布四周的图廓：比例尺、北向、坐标刻度、图例 ----------------------
+    const chrome = this.PaintChrome(ctx, view, interactive);
+
+    // --- 文字：贪心避让后一次画完 -----------------------------------------
+    const placed = this.LayoutLabels(ctx, view, labels, chrome, interactive);
+    this.PaintLabels(ctx, placed);
+    for (const entry of placed) {
+      if (entry.pick) Push(entry.pick, entry.cx, entry.cy, CHIP_HIT_R, PICK_RANK.chip);
     }
+    if (interactive) {
+      this.placedLabels = placed;
+      this.handles = placed.filter((entry) => entry.style === "chip");
+    }
+
+    // --- 悬停 tooltip（永远在最上层，不参与避让） -------------------------
+    if (interactive && this.hover && this.pointer) this.PaintTooltip(ctx, view, this.hover);
     ctx.restore();
   }
 
-  /**
-   * 组把手 / 拍把手：一枚不透明的小芯片。不透明是有意的 ——
-   * 半透明底在这张图上会和地表混成一片，既读不出字，也数不出一个精确像素。
-   */
-  PaintHandles(ctx, handles) {
-    const sel = this.selection;
-    for (const handle of handles) {
-      const picked = sel && sel.kind === handle.kind && sel.id === handle.id;
-      ctx.fillStyle = Css(MAP_COLORS.handle);
-      ctx.fillRect(handle.x, handle.y, handle.w, handle.h);
-      ctx.strokeStyle = Css(picked ? MAP_COLORS.select : handle.color);
-      ctx.lineWidth = picked ? 2 : 1;
-      ctx.strokeRect(handle.x + 0.5, handle.y + 0.5, handle.w - 1, handle.h - 1);
-      ctx.font = FONT_SMALL;
-      ctx.fillStyle = Css(picked ? MAP_COLORS.select : handle.color);
-      ctx.fillText(handle.text, handle.x + CHIP_PAD, handle.cy);
-      ctx.font = FONT;
+  PaintTerrain(ctx, view, Project, layout) {
+    if (!this.layers.terrain || !this.model) return;
+    const ground = this.ground || this.BuildGround();
+    if (!ground) return;
+    const a = Project(ground.minX, ground.minZ);
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(ground.canvas, a.x, a.y, ground.width * view.scale, ground.depth * view.scale);
+    // 图廓线：关卡数据到此为止。没有这条线，画布边上那一大片黑看着像画崩了。
+    const b = this.model?.bounds;
+    if (b && Number.isFinite(b.minX)) {
+      const c = Project(b.maxX, b.maxZ);
+      const o = Project(b.minX, b.minZ);
+      ctx.strokeStyle = Css(MAP_COLORS.legendEdge, 0.3);
+      ctx.lineWidth = 1;
+      ctx.strokeRect(o.x + 0.5, o.y + 0.5, c.x - o.x - 1, c.y - o.y - 1);
+    }
+    void layout;
+  }
+
+  /** 50 m 网格。很淡 —— 它是量距离用的，不是画面的一部分。 */
+  PaintGrid(ctx, view, Project) {
+    this.gridTicks = null;
+    const b = this.model?.bounds;
+    if (!b || !Number.isFinite(b.minX)) return;
+    // 50 m 是基准格；缩放离谱时换成同一串整数里的另一档，别出 12.5 m 这种刻度。
+    const STEPS = [5, 10, 25, 50, 100, 200, 500, 1000];
+    let step = 50;
+    for (const candidate of STEPS) {
+      step = candidate;
+      if (candidate * view.scale >= 58) break;
+    }
+    while (step * view.scale > 210 && step > 5) {
+      const index = STEPS.indexOf(step);
+      if (index <= 0) break;
+      step = STEPS[index - 1];
+    }
+    const a = Project(b.minX, b.minZ);
+    const c = Project(b.maxX, b.maxZ);
+    const x0 = Math.max(0, a.x), x1 = Math.min(view.w, c.x);
+    const y0 = Math.max(0, a.y), y1 = Math.min(view.h, c.y);
+    if (x1 <= x0 || y1 <= y0) return;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(x0, y0, x1 - x0, y1 - y0);
+    ctx.clip();
+    ctx.lineWidth = 1;
+    const world = { minX: (x0 - view.w / 2) / view.scale + view.cx, maxX: (x1 - view.w / 2) / view.scale + view.cx,
+      minZ: (y0 - view.h / 2) / view.scale + view.cz, maxZ: (y1 - view.h / 2) / view.scale + view.cz };
+    const ticks = { x: [], z: [] };
+    for (let x = Math.ceil(world.minX / step) * step; x <= world.maxX; x += step) {
+      const p = Project(x, 0);
+      ctx.strokeStyle = Css(MAP_COLORS.grid, x % (step * 4) === 0 ? 0.17 : 0.085);
+      ctx.beginPath(); ctx.moveTo(p.x + 0.5, y0); ctx.lineTo(p.x + 0.5, y1); ctx.stroke();
+      ticks.x.push({ v: x, px: p.x });
+    }
+    for (let z = Math.ceil(world.minZ / step) * step; z <= world.maxZ; z += step) {
+      const p = Project(0, z);
+      ctx.strokeStyle = Css(MAP_COLORS.grid, z % (step * 4) === 0 ? 0.17 : 0.085);
+      ctx.beginPath(); ctx.moveTo(x0, p.y + 0.5); ctx.lineTo(x1, p.y + 0.5); ctx.stroke();
+      ticks.z.push({ v: z, px: p.y });
+    }
+    ctx.restore();
+    this.gridTicks = ticks;
+    this.gridStep = step;
+  }
+
+  /** 道路 / 铁路 / 壕沟：都带边线，线宽一致，缩到整关也分得出是哪一种。 */
+  PaintWays(ctx, view, Project, layout) {
+    if (!layout) return;
+    const L = this.layers;
+    if (L.roads) {
+      for (const road of layout.roads || []) {
+        const pts = Points(road.points);
+        if (pts.length < 2) continue;
+        const w = Math.max(1.5, (road.width || 4) * view.scale);
+        ctx.strokeStyle = Css(MAP_COLORS.roadEdge, 0.55);
+        ctx.lineWidth = w + 2;
+        Stroke(ctx, pts, Project);
+        ctx.strokeStyle = Css(MAP_COLORS.road, 0.42);
+        ctx.lineWidth = w;
+        Stroke(ctx, pts, Project);
+      }
+      // 铁路：路基一条粗线 + 枕木短线，别只画一条线，缩小后分不清是路还是轨
+      const rail = Points(layout.railway?.points);
+      if (rail.length >= 2) {
+        const w = Math.max(2, 3.4 * view.scale);
+        ctx.strokeStyle = Css(MAP_COLORS.roadEdge, 0.8);
+        ctx.lineWidth = w + 2;
+        Stroke(ctx, rail, Project);
+        ctx.strokeStyle = Css(MAP_COLORS.railway, 0.95);
+        ctx.lineWidth = w;
+        Stroke(ctx, rail, Project);
+        ctx.strokeStyle = Css(MAP_COLORS.sleeper, 0.75);
+        ctx.lineWidth = 1;
+        for (let i = 1; i < rail.length; i += 1) {
+          const a = rail[i - 1], b = rail[i];
+          const len = Math.hypot(b.x - a.x, b.z - a.z) || 1;
+          const ux = (b.x - a.x) / len, uz = (b.z - a.z) / len;
+          const step = Math.max(4, 22 / Math.max(view.scale, 0.05));
+          for (let t = 0; t < len; t += step) {
+            const q = Project(a.x + ux * t - uz * 1.7, a.z + uz * t + ux * 1.7);
+            const q2 = Project(a.x + ux * t + uz * 1.7, a.z + uz * t - ux * 1.7);
+            ctx.beginPath(); ctx.moveTo(q.x, q.y); ctx.lineTo(q2.x, q2.y); ctx.stroke();
+          }
+        }
+      }
+    }
+    if (L.trenches) {
+      for (const segment of layout.trenches || []) {
+        const pts = Points(segment.points);
+        if (pts.length < 2) continue;
+        const w = Math.max(2, (segment.width || 3.6) * view.scale);
+        ctx.strokeStyle = Css(MAP_COLORS.trenchEdge, 0.85);
+        ctx.lineWidth = w + 2;
+        Stroke(ctx, pts, Project);
+        ctx.strokeStyle = Css(MAP_COLORS.trench, 0.9);
+        ctx.lineWidth = w;
+        Stroke(ctx, pts, Project);
+      }
     }
   }
 
+  /**
+   * 体块。两千多个方块，一个个 fillRect 会把一帧吃掉一大半，所以按颜色归一批、
+   * 一次 fill；顺手做视锥剔除。阴影只给够大的块 —— 小块上的阴影只会糊成脏点。
+   */
+  PaintBlocks(ctx, view, Project, layout) {
+    if (!this.layers.blocks || !layout) return;
+    const colors = layout.semanticColors || {};
+    const fallback = Css(MAP_COLORS.blockFallback);
+    const byColor = new Map();
+    const edges = [];
+    const shadows = [];
+    const margin = 16;
+    for (const block of layout.blocks || []) {
+      if (!Number.isFinite(block.x) || !Number.isFinite(block.w)) continue;
+      const a = Project(block.x - block.w / 2, block.z - block.d / 2);
+      const w = Math.max(1, block.w * view.scale);
+      const d = Math.max(1, block.d * view.scale);
+      if (a.x > view.w + margin || a.y > view.h + margin || a.x + w < -margin || a.y + d < -margin) continue;
+      // 体块比压暗后的地表亮一档：地图上「房子是实的、地是底」，靠明度分，
+      // 再各自描一圈深边。压到和地表一个明度就等于没画。
+      const key = HexCss(colors[block.semantic], fallback, 0.95);
+      let bucket = byColor.get(key);
+      if (!bucket) { bucket = []; byColor.set(key, bucket); }
+      bucket.push([a.x, a.y, w, d]);
+      if (w > 5 && d > 5) {
+        edges.push([a.x, a.y, w, d]);
+        if (w > 9 && d > 9) shadows.push([a.x, a.y, w, d]);
+      }
+    }
+    if (shadows.length) {
+      ctx.fillStyle = "rgba(0,0,0,0.34)";
+      ctx.beginPath();
+      for (const [x, y, w, d] of shadows) ctx.rect(x + 1.5, y + 2, w, d);
+      ctx.fill();
+    }
+    for (const [color, rects] of byColor) {
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      for (const [x, y, w, d] of rects) ctx.rect(x, y, w, d);
+      ctx.fill();
+    }
+    if (edges.length) {
+      ctx.strokeStyle = Css(MAP_COLORS.blockEdge, 0.55);
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (const [x, y, w, d] of edges) ctx.rect(x + 0.5, y + 0.5, w - 1, d - 1);
+      ctx.stroke();
+    }
+    const bridge = layout.bridge;
+    if (bridge && Number.isFinite(bridge.x) && Number.isFinite(bridge.w)) {
+      const a = Project(bridge.x - bridge.w / 2, bridge.z - bridge.d / 2);
+      const w = Math.max(2, bridge.w * view.scale);
+      const d = Math.max(2, bridge.d * view.scale);
+      ctx.fillStyle = HexCss(colors.structure, fallback, 0.86);
+      ctx.fillRect(a.x, a.y, w, d);
+      ctx.strokeStyle = Css(MAP_COLORS.blockEdge, 0.95);
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(a.x + 0.5, a.y + 0.5, w - 1, d - 1);
+    }
+  }
+
+  /** 触发圈：虚线，比标记淡一档；事实名小一号。 */
+  PaintZones(ctx, view, Project, Push, Add, showLabels) {
+    const zones = this.phaseLayout?.zones || this.model?.zones || [];
+    const nameZoom = view.scale >= LABEL_ZOOM.zone;
+    const nameFor = ZoneNames(zones, showLabels && nameZoom);
+    for (const zone of zones) {
+      const name = nameFor.get(zone) || "";
+      ctx.strokeStyle = Css(MAP_COLORS.zone, 0.42);
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 5]);
+      if (Number.isFinite(zone.radiusM) && Number.isFinite(zone.x)) {
+        const p = Project(zone.x, zone.z);
+        const r = Math.max(2, zone.radiusM * view.scale);
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = Css(MAP_COLORS.zone, 0.75);
+        ctx.beginPath(); ctx.arc(p.x, p.y, 1.6, 0, Math.PI * 2); ctx.fill();
+        if (name) {
+          Add({
+            kind: "zone", id: zone.id || zone.fact, text: name,
+            ax: p.x, ay: p.y - Math.min(r, 26), color: MAP_COLORS.zone,
+            priority: PRIORITY.zone, style: "tiny", keep: 6,
+          });
+        }
+        Push({ kind: "zone", id: zone.id || zone.fact, x: zone.x, z: zone.z }, p.x, p.y, 8, PICK_RANK.zone);
+      } else if (Number.isFinite(zone.minX)) {
+        const a = Project(zone.minX, zone.minZ);
+        const b = Project(zone.maxX, zone.maxZ);
+        ctx.strokeRect(a.x, a.y, b.x - a.x, b.y - a.y);
+        ctx.setLineDash([]);
+        const cx = (zone.minX + zone.maxX) / 2, cz = (zone.minZ + zone.maxZ) / 2;
+        const c = Project(cx, cz);
+        Push({ kind: "zone", id: zone.id || zone.fact, x: cx, z: cz }, c.x, c.y, 8, PICK_RANK.zone);
+        // 转运四拍的框：标签做成可点的把手（返回 kind:"beat"），别只是一行描边字。
+        // 拍是设计里唯一带时间窗的一段，用户最想点开看的就是它。
+        if (zone.kind === "beatArea") {
+          const beatId = String(zone.id || "").replace(/^beat_/, "");
+          const wave = BeatWave(this.model, beatId);
+          const text = showLabels && wave.beat
+            ? `${wave.title} · ${beatId} · ${BeatWindow(wave.beat)}`
+            : wave.title;
+          Add({
+            kind: "beat", id: beatId, text, ax: a.x + 3, ay: a.y, color: MAP_COLORS.zone,
+            priority: PRIORITY.chip, style: "chip", keep: 4,
+            pick: { kind: "beat", id: beatId, x: cx, z: cz },
+          });
+        } else if (name) {
+          Add({
+            kind: "zone", id: zone.id || zone.fact, text: name,
+            ax: a.x + 3, ay: a.y - 2, color: MAP_COLORS.zone,
+            priority: PRIORITY.zone, style: "tiny", keep: 4,
+          });
+        }
+      }
+      ctx.setLineDash([]);
+    }
+  }
+
+  PaintRoutes(ctx, view, Project, Push, Add, showLabels) {
+    if (!this.model?.routes) return;
+    const names = Array.isArray(this.phaseLayout?.routes) && this.phaseLayout.routes.length
+      ? this.phaseLayout.routes
+      : Object.keys(this.model.routes);
+    const nameZoom = view.scale >= LABEL_ZOOM.route;
+    for (const name of names) {
+      const pts = Points(this.model.routes[name]);
+      if (pts.length < 2) continue;
+      // 不透明：半透明的线在这张图上一个精确像素都数不出来，
+      // 测试就没法回答「这条路线到底画出来没有」。
+      const color = Css(MAP_COLORS.route);
+      DirectedPath(ctx, pts, Project, color, 1.6, 7, { arrows: "along", spacing: 150, dot: 1.7 });
+      const mid = pts[Math.floor(pts.length / 2)];
+      const p = Project(mid.x, mid.z);
+      if (showLabels && nameZoom) {
+        Add({
+          kind: "route", id: name, text: name, ax: p.x, ay: p.y,
+          color: MAP_COLORS.route, priority: PRIORITY.route, style: "tiny", keep: 5,
+        });
+      }
+      Push({ kind: "route", id: name, x: mid.x, z: mid.z }, p.x, p.y, 6, PICK_RANK.route);
+    }
+  }
+
+  PaintAnchors(ctx, view, Project, Push, Add, showLabels) {
+    if (!this.model?.anchors) return;
+    const nameZoom = view.scale >= LABEL_ZOOM.anchor;
+    for (const [id, point] of Object.entries(this.model.anchors)) {
+      if (!point || !Number.isFinite(point.x)) continue;
+      const p = Project(point.x, point.z);
+      ctx.strokeStyle = Css(MAP_COLORS.halo, 0.75);
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(p.x - 4.5, p.y); ctx.lineTo(p.x + 4.5, p.y);
+      ctx.moveTo(p.x, p.y - 4.5); ctx.lineTo(p.x, p.y + 4.5);
+      ctx.stroke();
+      ctx.strokeStyle = Css(MAP_COLORS.anchor, 0.95);
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(p.x - 4.5, p.y); ctx.lineTo(p.x + 4.5, p.y);
+      ctx.moveTo(p.x, p.y - 4.5); ctx.lineTo(p.x, p.y + 4.5);
+      ctx.stroke();
+      if (showLabels && nameZoom) {
+        Add({
+          kind: "anchor", id, text: id, ax: p.x, ay: p.y,
+          color: MAP_COLORS.anchor, priority: PRIORITY.anchor, style: "text", keep: 6,
+        });
+      }
+      Push({ kind: "anchor", id, x: point.x, z: point.z }, p.x, p.y, 6, PICK_RANK.anchor);
+    }
+  }
+
+  PaintFriendlies(ctx, Project, Push) {
+    const list = this.phaseLayout?.friendlies || this.model?.friendlies || [];
+    for (const friendly of list) {
+      if (!Number.isFinite(friendly.x)) continue;
+      const p = Project(friendly.x, friendly.z);
+      ctx.fillStyle = Css(MAP_COLORS.halo, 0.8);
+      ctx.beginPath(); ctx.arc(p.x, p.y, 4.4, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = Css(MAP_COLORS.friendly);
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y - 3.6); ctx.lineTo(p.x + 3.4, p.y); ctx.lineTo(p.x, p.y + 3.6); ctx.lineTo(p.x - 3.4, p.y);
+      ctx.closePath(); ctx.fill();
+      MarkGrid(this.soft, p.x - 5, p.y - 5, 10, 10);
+      Push({ kind: "friendly", id: friendly.id, x: friendly.x, z: friendly.z }, p.x, p.y, 6, PICK_RANK.friendly);
+    }
+  }
+
+  PaintEncounters(ctx, view, Project, Push, Add, showLabels) {
+    const L = this.layers;
+    for (const encounter of this.phaseLayout?.encounters || []) {
+      const state = encounter.state || "spawned";
+      for (const member of encounter.members || []) {
+        if (!Number.isFinite(member.x)) continue;
+        const p = Project(member.x, member.z);
+        if (L.tactics) this.PaintTactic(ctx, Project, member, state);
+        this.PaintMember(ctx, p, member, state);
+        MarkGrid(this.soft, p.x - 6, p.y - 6, 12, 12);
+        Push({ kind: "member", id: member.id, encounterId: encounter.id, x: member.x, z: member.z },
+          p.x, p.y, 7, PICK_RANK.member);
+      }
+    }
+    // 已清除的组不给把手：第 12 阶段有十一个这样的组，遍布全关，
+    // 它们的芯片会把还在演的那几组盖掉。灰叉还在，悬停照样报得出是谁。
+    for (const encounter of this.phaseLayout?.encounters || []) {
+      const state = encounter.state || "spawned";
+      if (state === "cleared") continue;
+      const centre = Centroid(encounter.members);
+      if (!centre) continue;
+      const p = Project(centre.x, centre.z);
+      const text = showLabels ? `${encounter.id} · ${StateText(state)}` : encounter.id;
+      Add({
+        kind: "encounter", id: encounter.id, text, ax: p.x, ay: p.y, color: StateColor(state),
+        priority: PRIORITY.chip, style: "chip", keep: 7,
+        pick: { kind: "encounter", id: encounter.id, x: centre.x, z: centre.z },
+      });
+    }
+    void view;
+  }
+
+  /**
+   * 一个敌人。状态不能只靠颜色分 —— 打印出来、色弱、或者缩到整关视野时颜色都
+   * 不够用，所以状态还各带一种形状：未出现空心、休眠空心带芯、已清除小叉，
+   * 活跃的多一圈光晕。机枪三角、钉在原地的方块照旧。
+   */
   PaintMember(ctx, p, member, state) {
     const color = StateColor(state);
     const filled = state !== "pending" && state !== "cleared";
-    ctx.lineWidth = 1.4;
-    ctx.globalAlpha = state === "dormant" ? 0.55 : 1;
-    ctx.beginPath();
-    if (member.weapon === "Type11" || member.weapon === "MachineGun") {
-      // 机枪：三角形，尖端朝北，缩小到整张图也还认得出「这儿有挺机枪」
-      ctx.moveTo(p.x, p.y - 5.5); ctx.lineTo(p.x + 5, p.y + 4); ctx.lineTo(p.x - 5, p.y + 4); ctx.closePath();
-    } else if (member.hold) {
-      ctx.rect(p.x - 4, p.y - 4, 8, 8);
-    } else {
-      ctx.arc(p.x, p.y, 4.2, 0, Math.PI * 2);
-    }
-    if (filled) { ctx.fillStyle = Css(color); ctx.fill(); }
-    ctx.strokeStyle = Css(color);
-    ctx.stroke();
-    if (state === "cleared") {
+    const Shape = (r) => {
       ctx.beginPath();
-      ctx.moveTo(p.x - 5, p.y - 5); ctx.lineTo(p.x + 5, p.y + 5);
-      ctx.moveTo(p.x + 5, p.y - 5); ctx.lineTo(p.x - 5, p.y + 5);
+      if (member.weapon === "Type11" || member.weapon === "MachineGun") {
+        ctx.moveTo(p.x, p.y - r - 1.2); ctx.lineTo(p.x + r + 0.8, p.y + r * 0.75);
+        ctx.lineTo(p.x - r - 0.8, p.y + r * 0.75); ctx.closePath();
+      } else if (member.hold) {
+        ctx.rect(p.x - r, p.y - r, r * 2, r * 2);
+      } else {
+        ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+      }
+    };
+    if (state === "cleared") {
+      ctx.strokeStyle = Css(MAP_COLORS.halo, 0.6);
+      ctx.lineWidth = 2.6;
+      ctx.beginPath();
+      ctx.moveTo(p.x - 3.4, p.y - 3.4); ctx.lineTo(p.x + 3.4, p.y + 3.4);
+      ctx.moveTo(p.x + 3.4, p.y - 3.4); ctx.lineTo(p.x - 3.4, p.y + 3.4);
+      ctx.stroke();
+      ctx.strokeStyle = Css(color, 0.9);
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(p.x - 3.4, p.y - 3.4); ctx.lineTo(p.x + 3.4, p.y + 3.4);
+      ctx.moveTo(p.x + 3.4, p.y - 3.4); ctx.lineTo(p.x - 3.4, p.y + 3.4);
+      ctx.stroke();
+      return;
+    }
+    if (state === "active") {
+      ctx.strokeStyle = Css(color, 0.22);
+      ctx.lineWidth = 3.2;
+      Shape(7);
       ctx.stroke();
     }
+    ctx.strokeStyle = Css(MAP_COLORS.halo, 0.85);   // 深色描边：浅地表上也咬得住轮廓
+    ctx.lineWidth = 3;
+    Shape(4.2);
+    ctx.stroke();
+    ctx.globalAlpha = state === "dormant" ? 0.5 : 1;
+    if (state === "pending") ctx.setLineDash([3, 2.5]);
+    if (filled) { ctx.fillStyle = Css(color); Shape(4.2); ctx.fill(); }
+    ctx.strokeStyle = Css(color);
+    ctx.lineWidth = 1.5;
+    Shape(4.2);
+    ctx.stroke();
+    ctx.setLineDash([]);
     ctx.globalAlpha = 1;
     if (!filled || state === "dormant") {
       // 空心圈（pending）和半透明的休眠体，中间都再点一颗**不透明**的芯。
       // 看着是「位置已知、人还没到／还没醒」；同时给测试一块精确颜色去数 ——
-      // 1.4 px 的描边和 0.55 的半透明在画布上全是混出来的中间色，一个精确像素
+      // 1.5 px 的描边和 0.5 的半透明在画布上全是混出来的中间色，一个精确像素
       // 都数不出来，而「画上了却一个像素都验不到」正是这个仓库栽过的跟头。
       ctx.fillStyle = Css(color);
-      ctx.beginPath(); ctx.arc(p.x, p.y, 1.8, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(p.x, p.y, 1.7, 0, Math.PI * 2); ctx.fill();
     }
   }
 
-  PaintTactic(ctx, Project, member, origin, state) {
+  /** 战术路线：细线 + 末端箭头。跃进线用虚线，和「走过去」分得开。 */
+  PaintTactic(ctx, Project, member, state) {
     const tactic = member.tactic;
-    const dim = state === "pending" ? 0.45 : 1;
+    // 还没出现的组的路线压淡；在场的那条一律不透明 —— 同上，半透明数不出像素。
+    const dim = state === "pending" ? 0.4 : 1;
     if (tactic && Array.isArray(tactic.points) && tactic.points.length) {
       const pts = [{ x: member.x, z: member.z }, ...Points(tactic.points)];
-      DirectedPath(ctx, pts, Project, Css(MAP_COLORS.tactic, dim), 1.4, 6);
+      DirectedPath(ctx, pts, Project, Css(MAP_COLORS.tactic, dim), 1.2, 6, { arrows: "end", dot: 0 });
       if (tactic.near && Number.isFinite(tactic.near.x)) {
         const p = Project(tactic.near.x, tactic.near.z);
         ctx.strokeStyle = Css(MAP_COLORS.tactic, dim);
-        ctx.lineWidth = 1.2;
+        ctx.lineWidth = 1;
+        ctx.setLineDash([2, 2]);
         ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2); ctx.stroke();
+        ctx.setLineDash([]);
       }
     }
     if (Array.isArray(member.assaultLane) && member.assaultLane.length >= 2) {
-      DirectedPath(ctx, Points(member.assaultLane), Project, Css(MAP_COLORS.assault, dim * 0.8), 1, 5);
+      DirectedPath(ctx, Points(member.assaultLane), Project, Css(MAP_COLORS.assault, dim * 0.85), 1, 5,
+        { arrows: "end", dash: [4, 3], dot: 0 });
     }
-    void origin;
   }
 
   PaintLive(ctx, Project, Push) {
@@ -771,7 +1095,13 @@ export class OrchestrationMap {
     const guide = Array.isArray(live.guideRoute)
       ? Points(live.guideRoute)
       : Points(this.model?.routes?.[live.guideRoute]);
-    if (guide.length >= 2) DirectedPath(ctx, guide, Project, Css(MAP_COLORS.guide), 2.6, 8);
+    if (guide.length >= 2) {
+      // 当前指引路线是「现在该往哪走」，要比设计路线抢眼一档：先铺一层宽光晕。
+      ctx.strokeStyle = Css(MAP_COLORS.guide, 0.2);
+      ctx.lineWidth = 8;
+      Stroke(ctx, guide, Project);
+      DirectedPath(ctx, guide, Project, Css(MAP_COLORS.guide), 2.4, 8, { arrows: "along", spacing: 90, dot: 2 });
+    }
 
     const design = new Map();
     for (const encounter of this.phaseLayout?.encounters || []) {
@@ -783,26 +1113,30 @@ export class OrchestrationMap {
       const source = design.get(enemy.id);
       if (source && Number.isFinite(source.x)) {
         const q = Project(source.x, source.z);
-        ctx.strokeStyle = Css(enemy.alive === false ? MAP_COLORS.liveDead : MAP_COLORS.liveEnemy, 0.65);
+        ctx.strokeStyle = Css(enemy.alive === false ? MAP_COLORS.liveDead : MAP_COLORS.liveEnemy, 0.3);
         ctx.lineWidth = 1;
-        ctx.setLineDash([3, 3]);
+        ctx.setLineDash([3, 4]);
         ctx.beginPath(); ctx.moveTo(q.x, q.y); ctx.lineTo(p.x, p.y); ctx.stroke();
         ctx.setLineDash([]);
       }
       if (enemy.alive === false) {
-        ctx.strokeStyle = Css(MAP_COLORS.liveDead);
+        ctx.strokeStyle = Css(MAP_COLORS.liveDead, 0.9);
         ctx.lineWidth = 1.4;
         ctx.beginPath();
         ctx.moveTo(p.x - 4, p.y - 4); ctx.lineTo(p.x + 4, p.y + 4);
         ctx.moveTo(p.x + 4, p.y - 4); ctx.lineTo(p.x - 4, p.y + 4);
         ctx.stroke();
       } else {
+        ctx.strokeStyle = Css(MAP_COLORS.halo, 0.8);
+        ctx.lineWidth = 2.6;
+        ctx.beginPath(); ctx.arc(p.x, p.y, 3.6, 0, Math.PI * 2); ctx.stroke();
         ctx.globalAlpha = enemy.dormant ? 0.5 : 1;
         ctx.fillStyle = Css(MAP_COLORS.liveEnemy);
-        ctx.beginPath(); ctx.arc(p.x, p.y, 3.4, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(p.x, p.y, 3.6, 0, Math.PI * 2); ctx.fill();
         ctx.globalAlpha = 1;
       }
-      Push({ kind: "member", id: enemy.id, encounterId: enemy.encounter, x: enemy.x, z: enemy.z }, p.x, p.y, 6);
+      Push({ kind: "member", id: enemy.id, encounterId: enemy.encounter, x: enemy.x, z: enemy.z },
+        p.x, p.y, 6, PICK_RANK.live);
     }
     const player = live.player;
     if (player && Number.isFinite(player.x)) {
@@ -812,12 +1146,17 @@ export class OrchestrationMap {
       ctx.save();
       ctx.translate(p.x, p.y);
       ctx.rotate(-yaw);
-      ctx.fillStyle = Css(MAP_COLORS.player);
+      ctx.fillStyle = Css(MAP_COLORS.player, 0.16);
+      ctx.beginPath(); ctx.arc(0, 0, 13, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = Css(MAP_COLORS.halo, 0.9);
+      ctx.lineWidth = 3;
       ctx.beginPath();
-      ctx.moveTo(0, -8); ctx.lineTo(5.5, 6); ctx.lineTo(0, 3); ctx.lineTo(-5.5, 6);
-      ctx.closePath(); ctx.fill();
+      ctx.moveTo(0, -9); ctx.lineTo(6, 7); ctx.lineTo(0, 3.5); ctx.lineTo(-6, 7);
+      ctx.closePath(); ctx.stroke();
+      ctx.fillStyle = Css(MAP_COLORS.player);
+      ctx.fill();
       ctx.restore();
-      Push({ kind: "point", id: "player", x: player.x, z: player.z }, p.x, p.y, 8);
+      Push({ kind: "point", id: "player", x: player.x, z: player.z }, p.x, p.y, 8, PICK_RANK.player);
     }
   }
 
@@ -835,7 +1174,7 @@ export class OrchestrationMap {
       ctx.setLineDash([]);
       ctx.beginPath(); ctx.arc(p.x, p.y, 2.2, 0, Math.PI * 2); ctx.fill();   // 圈心：实心，好拖也好数
     } else if (shape.type === "arrow" && shape.from && shape.to) {
-      DirectedPath(ctx, [shape.from, shape.to], Project, color, ctx.lineWidth, 9);
+      DirectedPath(ctx, [shape.from, shape.to], Project, color, ctx.lineWidth, 9, { arrows: "end", dot: 2.2 });
     } else if (shape.type === "path" && Array.isArray(shape.points)) {
       const pts = Points(shape.points);
       if (pts.length >= 2) Stroke(ctx, pts, Project);
@@ -846,12 +1185,12 @@ export class OrchestrationMap {
     } else if (shape.type === "label" && Number.isFinite(shape.x)) {
       const p = Project(shape.x, shape.z);
       ctx.beginPath(); ctx.arc(p.x, p.y, 3, 0, Math.PI * 2); ctx.fill();
-      Label(ctx, p.x + 6, p.y, shape.text || "（待填）", color);
+      PlainLabel(ctx, p.x + 6, p.y, shape.text || "（待填）", color);
     } else if (shape.type === "ghost" && Number.isFinite(shape.x)) {
       const p = Project(shape.x, shape.z);
       ctx.setLineDash([4, 3]);
       ctx.beginPath(); ctx.arc(p.x, p.y, 6, 0, Math.PI * 2); ctx.stroke();
-      Label(ctx, p.x + 8, p.y, shape.memberId || "候选位", color);
+      PlainLabel(ctx, p.x + 8, p.y, shape.memberId || "候选位", color);
     }
     ctx.setLineDash([]);
   }
@@ -892,25 +1231,395 @@ export class OrchestrationMap {
     // 组既可以从流程栏/详情栏选，也可以点地图上的组把手。选中以后得看得见是
     // 「哪一撮人」——所以整组成员逐个描亮，而不是挑第一个人画个圈了事。
     // 拍与组同名（transferFlank 既是一拍也是一组），描亮同一撮人。
+    const Ring = (p, r) => {
+      ctx.strokeStyle = Css(MAP_COLORS.select, 0.28);
+      ctx.lineWidth = 5;
+      ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = Css(MAP_COLORS.select);
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.stroke();
+    };
     if (sel?.kind === "encounter" || sel?.kind === "beat") {
       const encounter = (this.phaseLayout?.encounters || []).find((entry) => entry.id === sel.id);
       if (encounter) {
-        ctx.strokeStyle = Css(MAP_COLORS.select);
-        ctx.lineWidth = 2;
         for (const member of encounter.members || []) {
           if (!Number.isFinite(member.x)) continue;
-          const p = Project(member.x, member.z);
-          ctx.beginPath(); ctx.arc(p.x, p.y, 9, 0, Math.PI * 2); ctx.stroke();
+          Ring(Project(member.x, member.z), 9);
         }
         return;
       }
     }
     const point = this.SelPoint(sel);
     if (!point) return;
-    const p = Project(point.x, point.z);
-    ctx.strokeStyle = Css(MAP_COLORS.select);
-    ctx.lineWidth = 2;
-    ctx.beginPath(); ctx.arc(p.x, p.y, 9, 0, Math.PI * 2); ctx.stroke();
+    Ring(Project(point.x, point.z), 9);
+  }
+
+  /**
+   * 画布四周的图廓：50 m 刻度、比例尺、北向箭头、图例。
+   * 返回它们占掉的矩形 —— 标签避让得知道这些地方不许放字。
+   */
+  PaintChrome(ctx, view, interactive) {
+    const taken = [];
+    const hitBefore = this.legendHit;
+    this.legendHit = null;
+    const ticks = this.gridTicks;
+    if (ticks && this.model?.bounds) {
+      ctx.font = FONT_TINY;
+      ctx.fillStyle = Css(MAP_COLORS.scaleBar, 0.55);
+      ctx.strokeStyle = Css(MAP_COLORS.scaleBar, 0.35);
+      ctx.lineWidth = 1;
+      ctx.textAlign = "center";
+      for (const tick of ticks.x) {
+        if (tick.px < 26 || tick.px > view.w - 26) continue;
+        ctx.beginPath(); ctx.moveTo(tick.px + 0.5, 0); ctx.lineTo(tick.px + 0.5, 4); ctx.stroke();
+        ctx.fillText(String(tick.v), tick.px, 10);
+      }
+      ctx.textAlign = "left";
+      for (const tick of ticks.z) {
+        if (tick.px < 22 || tick.px > view.h - 14) continue;
+        // 刻度线短一截、字往右让 —— 贴在一起时那道线会被读成负号。
+        ctx.beginPath(); ctx.moveTo(0, tick.px + 0.5); ctx.lineTo(3, tick.px + 0.5); ctx.stroke();
+        ctx.fillText(String(tick.v), 7, tick.px + 0.5);
+      }
+      ctx.font = FONT;
+      taken.push({ x: 0, y: 0, w: view.w, h: 16 });
+      taken.push({ x: 0, y: 0, w: 30, h: view.h });
+    }
+    this.PaintNorth(ctx, view, taken);
+    this.PaintScaleBar(ctx, view, taken);
+    if (this.layers.legend) this.PaintLegend(ctx, view, taken);
+    // 出图（ToPng）用的是另一套坐标，别拿它去改「点哪儿能开合图例」。
+    if (!interactive) this.legendHit = hitBefore;
+    return taken;
+  }
+
+  PaintNorth(ctx, view, taken) {
+    const x = view.w - 26;
+    const y = 26;
+    ctx.strokeStyle = Css(MAP_COLORS.scaleBar, 0.75);
+    ctx.fillStyle = Css(MAP_COLORS.scaleBar, 0.75);
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(x, y - 12); ctx.lineTo(x + 5, y + 5); ctx.lineTo(x, y + 1); ctx.lineTo(x - 5, y + 5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.font = FONT_SMALL;
+    ctx.textAlign = "center";
+    ctx.fillText("北", x, y + 15);
+    ctx.textAlign = "left";
+    ctx.font = FONT;
+    taken.push({ x: x - 14, y: y - 16, w: 28, h: 38 });
+  }
+
+  /** 比例尺：取一个整数米长度，画成黑白两段的尺子。旁边写清楚 X 东 / Z 南。 */
+  PaintScaleBar(ctx, view, taken) {
+    const scale = view.scale;
+    const target = Math.min(170, Math.max(60, view.w * 0.16));
+    const nice = [5, 10, 20, 25, 50, 100, 200, 250, 500, 1000];
+    let meters = nice[nice.length - 1];
+    for (const candidate of nice) {
+      if (candidate * scale >= target * 0.62) { meters = candidate; break; }
+    }
+    const width = meters * scale;
+    const x = view.w - width - 18;
+    const y = view.h - 22;
+    ctx.fillStyle = Css(MAP_COLORS.labelBack);
+    ctx.fillRect(x - 8, y - 13, width + 16, 30);
+    ctx.strokeStyle = Css(MAP_COLORS.legendEdge, 0.4);
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x - 7.5, y - 12.5, width + 15, 29);
+    ctx.fillStyle = Css(MAP_COLORS.scaleBar);
+    ctx.fillRect(x, y, width / 2, 4);
+    ctx.strokeStyle = Css(MAP_COLORS.scaleBar);
+    ctx.strokeRect(x + width / 2 + 0.5, y + 0.5, width / 2 - 1, 3);
+    ctx.font = FONT_TINY;
+    ctx.fillStyle = Css(MAP_COLORS.textLight, 0.9);
+    ctx.textAlign = "left";
+    ctx.fillText("0", x, y - 6);
+    ctx.textAlign = "right";
+    ctx.fillText(`${meters} m`, x + width, y - 6);
+    ctx.textAlign = "left";
+    ctx.fillStyle = Css(MAP_COLORS.textMuted, 0.9);
+    ctx.fillText("X 东 →   Z 南 ↓", x, y + 11);
+    ctx.font = FONT;
+    this.scaleBar = { meters, text: `${meters} m`, x, y, w: width };
+    taken.push({ x: x - 10, y: y - 15, w: width + 20, h: 34 });
+  }
+
+  /**
+   * 图例。用普通中文写状态，不写内部术语 —— 这张图是给人看的，
+   * 「pending」「standby」只有写它的人看得懂。
+   */
+  PaintLegend(ctx, view, taken) {
+    const rows = [
+      ["敌人 · 未出现", "pending"],
+      ["敌人 · 已生成", "staged"],
+      ["敌人 · 休眠", "dormant"],
+      ["敌人 · 活跃", "active"],
+      ["敌人 · 已清除", "cleared"],
+      ["机枪 / 钉在原地", "shapes"],
+      ["友军", "friendly"],
+      ["锚点", "anchor"],
+      ["触发圈", "zone"],
+      ["设计路线", "route"],
+      ["战术线 / 跃进线", "tactic"],
+      ["实时 · 玩家", "player"],
+      ["实时 · 敌人 / 阵亡", "live"],
+      ["实时 · 指引路线", "guide"],
+    ];
+    const rowH = 15;
+    const x = 38;
+    // 画布太小就只给芯片，摊开的图例会把地图本身挤没
+    const open = this.legendOpen && view.w >= 500 && view.h >= 400;
+    const w = open ? 150 : 52;
+    const headH = 20;
+    const h = open ? rows.length * rowH + 26 : headH;
+    const y = view.h - h - 16;
+    ctx.fillStyle = Css(MAP_COLORS.legendBack);
+    ctx.fillRect(x, y, w, h);
+    ctx.strokeStyle = Css(MAP_COLORS.legendEdge, 0.45);
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+    ctx.fillStyle = Css(MAP_COLORS.zone);
+    ctx.fillRect(x, y, w, 1.5);
+    // 收起 / 展开的小三角。用画的不用字符 —— 打包字体的子集里没有这些符号，
+    // 交给系统字体回退等于把它交给运气。
+    const tx = x + 9;
+    const ty = y + (open ? 9 : headH / 2);
+    ctx.fillStyle = Css(MAP_COLORS.zone);
+    ctx.beginPath();
+    if (open) { ctx.moveTo(tx - 3.5, ty - 2); ctx.lineTo(tx + 3.5, ty - 2); ctx.lineTo(tx, ty + 3); }
+    else { ctx.moveTo(tx - 2, ty - 3.5); ctx.lineTo(tx + 3, ty); ctx.lineTo(tx - 2, ty + 3.5); }
+    ctx.closePath();
+    ctx.fill();
+    ctx.font = FONT_SMALL;
+    ctx.fillStyle = Css(MAP_COLORS.textLight);
+    ctx.fillText("图例", x + 17, ty + (open ? 1 : 0));
+    if (open) {
+      ctx.font = FONT_TINY;
+      for (let i = 0; i < rows.length; i += 1) {
+        const cy = y + 26 + i * rowH + rowH / 2 - 2;
+        this.PaintLegendSwatch(ctx, rows[i][1], x + 16, cy);
+        ctx.fillStyle = Css(MAP_COLORS.textMuted);
+        ctx.fillText(rows[i][0], x + 30, cy);
+      }
+    }
+    ctx.font = FONT;
+    // 点标题栏（收起时就是整枚芯片）开合
+    this.legendHit = { x, y, w, h: Math.min(h, headH) };
+    taken.push({ x: x - 4, y: y - 4, w: w + 8, h: h + 8 });
+  }
+
+  PaintLegendSwatch(ctx, kind, x, y) {
+    const Dot = (color, r = 4) => {
+      ctx.strokeStyle = Css(MAP_COLORS.halo, 0.85);
+      ctx.lineWidth = 2.4;
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = Css(color);
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    };
+    const Ring = (color, alpha = 1) => {
+      ctx.globalAlpha = alpha;
+      ctx.strokeStyle = Css(color);
+      ctx.lineWidth = 1.4;
+      ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = Css(color);
+      ctx.beginPath(); ctx.arc(x, y, 1.7, 0, Math.PI * 2); ctx.fill();
+    };
+    const Line = (color, dash = null, width = 1.6) => {
+      ctx.strokeStyle = Css(color);
+      ctx.lineWidth = width;
+      if (dash) ctx.setLineDash(dash);
+      ctx.beginPath(); ctx.moveTo(x - 6, y); ctx.lineTo(x + 6, y); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = Css(color);
+      ctx.beginPath(); ctx.arc(x + 6, y, 2, 0, Math.PI * 2); ctx.fill();
+    };
+    switch (kind) {
+      case "pending": ctx.setLineDash([3, 2.5]); Ring(MAP_COLORS.enemyPending); ctx.setLineDash([]); break;
+      case "staged": Dot(MAP_COLORS.enemyStaged); break;
+      case "dormant": Ring(MAP_COLORS.enemyDormant, 0.5); break;
+      case "active":
+        ctx.strokeStyle = Css(MAP_COLORS.enemyActive, 0.25);
+        ctx.lineWidth = 3;
+        ctx.beginPath(); ctx.arc(x, y, 6.5, 0, Math.PI * 2); ctx.stroke();
+        Dot(MAP_COLORS.enemyActive);
+        break;
+      case "cleared":
+        ctx.strokeStyle = Css(MAP_COLORS.enemyCleared);
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(x - 3.4, y - 3.4); ctx.lineTo(x + 3.4, y + 3.4);
+        ctx.moveTo(x + 3.4, y - 3.4); ctx.lineTo(x - 3.4, y + 3.4);
+        ctx.stroke();
+        break;
+      case "shapes":
+        ctx.fillStyle = Css(MAP_COLORS.enemyStaged);
+        ctx.beginPath();
+        ctx.moveTo(x - 6, y - 4); ctx.lineTo(x - 1, y + 3.5); ctx.lineTo(x - 11, y + 3.5);
+        ctx.closePath(); ctx.fill();
+        ctx.fillRect(x + 2, y - 3.6, 7.2, 7.2);
+        break;
+      case "friendly":
+        ctx.fillStyle = Css(MAP_COLORS.friendly);
+        ctx.beginPath();
+        ctx.moveTo(x, y - 4); ctx.lineTo(x + 3.8, y); ctx.lineTo(x, y + 4); ctx.lineTo(x - 3.8, y);
+        ctx.closePath(); ctx.fill();
+        break;
+      case "anchor":
+        ctx.strokeStyle = Css(MAP_COLORS.anchor);
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(x - 4.5, y); ctx.lineTo(x + 4.5, y);
+        ctx.moveTo(x, y - 4.5); ctx.lineTo(x, y + 4.5);
+        ctx.stroke();
+        break;
+      case "zone":
+        ctx.strokeStyle = Css(MAP_COLORS.zone, 0.85);
+        ctx.lineWidth = 1;
+        ctx.setLineDash([3, 3]);
+        ctx.beginPath(); ctx.arc(x, y, 5.5, 0, Math.PI * 2); ctx.stroke();
+        ctx.setLineDash([]);
+        break;
+      case "route": Line(MAP_COLORS.route); break;
+      case "tactic":
+        ctx.strokeStyle = Css(MAP_COLORS.tactic);
+        ctx.lineWidth = 1.2;
+        ctx.beginPath(); ctx.moveTo(x - 7, y - 2.5); ctx.lineTo(x + 5, y - 2.5); ctx.stroke();
+        Arrow(ctx, x + 7, y - 2.5, 1, 0, 5, Css(MAP_COLORS.tactic));
+        ctx.strokeStyle = Css(MAP_COLORS.assault);
+        ctx.setLineDash([3, 2]);
+        ctx.beginPath(); ctx.moveTo(x - 7, y + 3); ctx.lineTo(x + 5, y + 3); ctx.stroke();
+        ctx.setLineDash([]);
+        Arrow(ctx, x + 7, y + 3, 1, 0, 5, Css(MAP_COLORS.assault));
+        break;
+      case "player":
+        ctx.fillStyle = Css(MAP_COLORS.player);
+        ctx.beginPath();
+        ctx.moveTo(x, y - 5); ctx.lineTo(x + 4, y + 4); ctx.lineTo(x, y + 1.5); ctx.lineTo(x - 4, y + 4);
+        ctx.closePath(); ctx.fill();
+        break;
+      case "live":
+        ctx.fillStyle = Css(MAP_COLORS.liveEnemy);
+        ctx.beginPath(); ctx.arc(x - 4, y, 3.4, 0, Math.PI * 2); ctx.fill();
+        ctx.strokeStyle = Css(MAP_COLORS.liveDead);
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(x + 2, y - 3.4); ctx.lineTo(x + 8.8, y + 3.4);
+        ctx.moveTo(x + 8.8, y - 3.4); ctx.lineTo(x + 2, y + 3.4);
+        ctx.stroke();
+        break;
+      case "guide": Line(MAP_COLORS.guide, null, 2); break;
+      default: break;
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // 文字排版（贪心避让）
+  // -------------------------------------------------------------------------
+  /**
+   * 排版一次能排的就排，排不下的就不画。缓存键里带视野、阶段、图层与选中 ——
+   * 跟随实时每 0.25 s 刷一次时这些都没变，就不必再排一遍。
+   */
+  LayoutLabels(ctx, view, candidates, chrome, interactive) {
+    const key = interactive
+      ? `${view.w}x${view.h}|${view.scale.toFixed(4)}|${view.cx.toFixed(2)}|${view.cz.toFixed(2)}`
+        + `|${this.phaseNumber}|${candidates.length}|${this.selection?.kind || ""}:${this.selection?.id || ""}`
+        + `|${this.layers.labels ? 1 : 0}${this.layers.legend ? 1 : 0}${this.legendOpen ? 1 : 0}`
+      : null;
+    if (key && this.labelCache && this.labelCache.key === key) return this.labelCache.placed;
+    const placed = this.PlaceLabels(ctx, view, candidates, chrome);
+    if (key) this.labelCache = { key, placed };
+    return placed;
+  }
+
+  PlaceLabels(ctx, view, candidates, chrome) {
+    const placed = [];
+    if (!candidates.length) return placed;
+    const sel = this.selection;
+    // 选中的那一个永远排第一：用户点它就是要看它。
+    for (const candidate of candidates) {
+      if (sel && candidate.kind === sel.kind && candidate.id === sel.id) candidate.priority = PRIORITY.select;
+    }
+    const markers = candidates.map((c) => ({ x: c.ax - c.keep, y: c.ay - c.keep, w: c.keep * 2, h: c.keep * 2 }));
+    const order = candidates.map((c, i) => ({ c, i }));
+    order.sort((a, b) => (a.c.priority - b.c.priority) || (a.i - b.i));
+    const pad = 3;
+    // 同名只写一次：锚点 bundle、路线 bundle、爬行框 bundleCrawlFirst 说的是同一处地方，
+    // 三行一模一样的字并排着只会让人以为看花了眼。优先级高的那个留下来。
+    const seen = new Set();
+    for (const { c, i } of order) {
+      if (placed.length >= MAX_LABELS) break;
+      if (seen.has(c.text)) continue;
+      const font = c.style === "tiny" ? FONT_TINY : FONT_SMALL;
+      ctx.font = font;
+      const textW = Math.ceil(ctx.measureText(c.text).width);
+      const w = textW + (c.style === "chip" ? CHIP_PAD * 2 : LABEL_PAD_X * 2);
+      const h = c.style === "chip" ? CHIP_H : LABEL_H;
+      let hit = null;
+      const offsets = LabelOffsets(w, c.style);
+      for (let k = 0; k < offsets.length; k += 1) {
+        const [dx, dy] = offsets[k];
+        const rect = { x: c.ax + dx, y: c.ay + dy - h / 2, w, h };
+        if (rect.x < 2 || rect.y < 2 || rect.x + w > view.w - 2 || rect.y + h > view.h - 2) continue;
+        if (HitsAny(rect, chrome, pad)) continue;
+        if (HitsAny(rect, placed, pad)) continue;
+        if (HitsMarkers(rect, markers, i)) continue;
+        // 前几个位置还要求「别压在任何一个标记上」；都占满了才允许压。
+        // 组把手只坚持两下就放弃这条 —— 它自己那一撮人就在脚下，太较真会挪到天边。
+        if (k < (c.style === "chip" ? 2 : 6) && HitsGrid(this.soft, rect)) continue;
+        hit = { dx, dy, rect, far: k >= 4 };
+        break;
+      }
+      if (!hit) continue;
+      seen.add(c.text);
+      placed.push({
+        kind: c.kind, id: c.id, text: c.text, style: c.style, color: c.color, font,
+        x: hit.rect.x, y: hit.rect.y, w, h, cx: hit.rect.x + w / 2, cy: hit.rect.y + h / 2,
+        ax: c.ax, ay: c.ay, leader: hit.far, pick: c.pick || null, priority: c.priority,
+      });
+    }
+    return placed;
+  }
+
+  PaintLabels(ctx, placed) {
+    const sel = this.selection;
+    for (const entry of placed) {
+      const picked = !!sel && sel.kind === entry.kind && sel.id === entry.id;
+      if (entry.leader) {
+        // 挪开了的名字画一条细引线回它标注的那个点，否则读者不知道这行字说的是谁。
+        ctx.strokeStyle = Css(entry.color, 0.5);
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(entry.ax, entry.ay);
+        ctx.lineTo(Clamp(entry.ax, entry.x, entry.x + entry.w), Clamp(entry.ay, entry.y, entry.y + entry.h));
+        ctx.stroke();
+      }
+      if (entry.style === "chip") {
+        RoundRect(ctx, entry.x, entry.y, entry.w, entry.h, 3);
+        ctx.fillStyle = Css(MAP_COLORS.handle);
+        ctx.fill();
+        ctx.strokeStyle = Css(picked ? MAP_COLORS.select : entry.color, picked ? 1 : 0.75);
+        ctx.lineWidth = picked ? 2 : 1;
+        RoundRect(ctx, entry.x + 0.5, entry.y + 0.5, entry.w - 1, entry.h - 1, 3);
+        ctx.stroke();
+      } else {
+        RoundRect(ctx, entry.x, entry.y, entry.w, entry.h, 2);
+        ctx.fillStyle = Css(MAP_COLORS.labelBack);
+        ctx.fill();
+        if (picked) {
+          ctx.strokeStyle = Css(MAP_COLORS.select);
+          ctx.lineWidth = 1;
+          RoundRect(ctx, entry.x + 0.5, entry.y + 0.5, entry.w - 1, entry.h - 1, 2);
+          ctx.stroke();
+        }
+      }
+      ctx.font = entry.font;
+      ctx.fillStyle = Css(picked ? MAP_COLORS.select : entry.color);
+      ctx.fillText(entry.text, entry.x + (entry.style === "chip" ? CHIP_PAD : LABEL_PAD_X), entry.cy);
+    }
+    ctx.font = FONT;
   }
 
   PaintTooltip(ctx, view, sel) {
@@ -919,19 +1628,23 @@ export class OrchestrationMap {
     ctx.font = FONT;
     let width = 0;
     for (const line of lines) width = Math.max(width, ctx.measureText(line).width);
-    const w = width + 14;
-    const h = lines.length * 14 + 10;
+    const w = width + 18;
+    const h = lines.length * 15 + 12;
     let x = this.pointer.x + 14;
     let y = this.pointer.y + 14;
     if (x + w > view.w) x = view.w - w - 4;
     if (y + h > view.h) y = view.h - h - 4;
-    ctx.fillStyle = "rgba(20,22,21,0.92)";
+    ctx.fillStyle = Css(MAP_COLORS.legendBack, 0.97);
     ctx.fillRect(x, y, w, h);
-    ctx.strokeStyle = Css(MAP_COLORS.select, 0.7);
+    ctx.strokeStyle = Css(MAP_COLORS.legendEdge, 0.5);
     ctx.lineWidth = 1;
-    ctx.strokeRect(x, y, w, h);
-    ctx.fillStyle = Css(MAP_COLORS.textLight);
-    for (let i = 0; i < lines.length; i += 1) ctx.fillText(lines[i], x + 7, y + 12 + i * 14);
+    ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+    ctx.fillStyle = Css(MAP_COLORS.zone);
+    ctx.fillRect(x, y, 2, h);
+    for (let i = 0; i < lines.length; i += 1) {
+      ctx.fillStyle = Css(i === 0 ? MAP_COLORS.textLight : MAP_COLORS.textMuted);
+      ctx.fillText(lines[i], x + 9, y + 13 + i * 15);
+    }
   }
 
   DescribeSel(sel) {
@@ -948,10 +1661,10 @@ export class OrchestrationMap {
       }
     }
     if (sel.kind === "beat") {
-      const beat = (this.model?.beats || []).find((entry) => entry.id === sel.id);
-      if (beat) {
-        lines.push(`装车 ${beat.loaded} 之后 · 窗口 ${beat.earliestS}–${beat.latestS} s`);
-        if (beat.hint) lines.push(String(beat.hint));
+      const wave = BeatWave(this.model, sel.id);
+      if (wave.beat) {
+        lines.push(`${wave.title} · ${BeatWindow(wave.beat)}`);
+        lines.push(wave.beat.loaded > 0 ? `装车 ${wave.beat.loaded} 之后放出` : "转运一开始就到");
       }
     }
     if (sel.kind === "member") {
@@ -998,17 +1711,24 @@ export class OrchestrationMap {
     return null;
   }
 
+  /**
+   * 拾取。够得着的里面取最近的；距离打平（半个像素之内）时按 rank 分高下 ——
+   * 人永远赢把手，实机位赢设计位。把手排在人后面画，但点人拿到的永远是人。
+   */
   PickAt(px, py) {
     let best = null;
     let bestD = Infinity;
-    for (let i = this.picks.length - 1; i >= 0; i -= 1) {
-      const entry = this.picks[i];
+    let bestRank = -Infinity;
+    for (const entry of this.picks) {
       const d = Math.hypot(entry.px - px, entry.py - py);
       const reach = Math.max(entry.r, 5);
       if (d > reach) continue;
-      // 倒着走：后画的压在上面（敌人/实机层盖住锚点）。同样够得着时取更近的，
-      // 距离打平时先遇到的（也就是后画的那个）胜出。
-      if (d < bestD) { best = entry; bestD = d; }
+      const rank = entry.rank ?? 1;
+      if (d < bestD - 0.5 || (d < bestD + 0.5 && rank >= bestRank)) {
+        if (d < bestD) bestD = d;
+        best = entry;
+        bestRank = rank;
+      }
     }
     return best ? { ...best.sel } : null;
   }
@@ -1028,9 +1748,17 @@ export class OrchestrationMap {
       return;
     }
     if (event.button !== 0) return;
+    // 图例的标题栏（收起时就是那枚芯片）先吃掉这一下，别顺手把底下的标记选中
+    const hit = this.legendHit;
+    if (hit && local.x >= hit.x && local.x <= hit.x + hit.w && local.y >= hit.y && local.y <= hit.y + hit.h) {
+      this.SetLegendOpen(!this.legendOpen);
+      event.preventDefault?.();
+      return;
+    }
     if (this.tool === "select") {
       const sel = this.PickAt(local.x, local.y);
       this.selection = sel;
+      this.labelCache = null;
       this.Emit("select", sel);
       this.Redraw();
       return;
@@ -1081,7 +1809,11 @@ export class OrchestrationMap {
       return;
     }
     if (this.tool === "path" && this.pathPoints?.length) { this.Redraw(); return; }
-    this.SetHover(this.PickAt(local.x, local.y));
+    const before = this.hover;
+    const next = this.PickAt(local.x, local.y);
+    this.SetHover(next);
+    // tooltip 跟着鼠标走：sel 没变也要重画，否则提示框钉在原地。
+    if (SameSel(before, next) && next) this.Redraw();
   }
 
   OnUp(event) {
@@ -1156,6 +1888,8 @@ export class OrchestrationMap {
     this.ground = null;
     this.picks = [];
     this.handles = [];
+    this.placedLabels = [];
+    this.labelCache = null;
     this.drag = null;
     this.pathPoints = null;
     this.live = null;
@@ -1175,39 +1909,45 @@ function Stroke(ctx, points, Project) {
 }
 
 /**
- * 有向折线：线 + 沿途箭头 + 每个拐点一颗实心圆点。
- * 圆点不只是好看 —— 细线在斜角上全是抗锯齿的中间色，测试数「这条路线到底画出来
- * 没有」时只能靠实心块给出精确 RGB 的像素。
+ * 有向折线。`arrows:"end"` 只在末端画一枚箭头（战术线、跃进线用这个，路上撒
+ * 满箭头只会把图糊掉）；`"along"` 沿途每 spacing 像素一枚（设计路线、指引路线）。
+ * 拐点圆点不只是好看 —— 细线在斜角上全是抗锯齿的中间色，测试数「这条路线到底
+ * 画出来没有」时只能靠实心块给出精确 RGB 的像素。
  */
-function DirectedPath(ctx, list, Project, color, width, arrow) {
+function DirectedPath(ctx, list, Project, color, width, arrow, { arrows = "along", spacing = 150, dash = null, dot = 1.7 } = {}) {
   const points = Points(list);
   if (points.length < 2) return;
   ctx.strokeStyle = color;
   ctx.fillStyle = color;
   ctx.lineWidth = width;
+  if (dash) ctx.setLineDash(dash);
   Stroke(ctx, points, Project);
-  let carry = 0;
-  const spacing = 70;
-  for (let i = 1; i < points.length; i += 1) {
-    const a = Project(points[i - 1].x, points[i - 1].z);
-    const b = Project(points[i].x, points[i].z);
-    const len = Math.hypot(b.x - a.x, b.y - a.y);
-    if (len < 1) continue;
-    const ux = (b.x - a.x) / len, uy = (b.y - a.y) / len;
-    for (let t = spacing - carry; t < len; t += spacing) {
-      Arrow(ctx, a.x + ux * t, a.y + uy * t, ux, uy, arrow, color);
+  if (dash) ctx.setLineDash([]);
+  if (arrows === "along") {
+    let carry = 0;
+    for (let i = 1; i < points.length; i += 1) {
+      const a = Project(points[i - 1].x, points[i - 1].z);
+      const b = Project(points[i].x, points[i].z);
+      const len = Math.hypot(b.x - a.x, b.y - a.y);
+      if (len < 1) continue;
+      const ux = (b.x - a.x) / len, uy = (b.y - a.y) / len;
+      for (let t = spacing - carry; t < len; t += spacing) {
+        Arrow(ctx, a.x + ux * t, a.y + uy * t, ux, uy, arrow, color);
+      }
+      carry = (carry + len) % spacing;
     }
-    carry = (carry + len) % spacing;
   }
   const last = Project(points[points.length - 1].x, points[points.length - 1].z);
   const prev = Project(points[points.length - 2].x, points[points.length - 2].z);
   const len = Math.hypot(last.x - prev.x, last.y - prev.y) || 1;
   Arrow(ctx, last.x, last.y, (last.x - prev.x) / len, (last.y - prev.y) / len, arrow, color);
-  for (const point of points) {
-    const p = Project(point.x, point.z);
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, Math.max(1.6, width), 0, Math.PI * 2);
-    ctx.fill();
+  if (dot > 0) {
+    for (const point of points) {
+      const p = Project(point.x, point.z);
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, Math.max(1.6, dot), 0, Math.PI * 2);
+      ctx.fill();
+    }
   }
 }
 
@@ -1221,23 +1961,150 @@ function Arrow(ctx, x, y, ux, uy, size, color) {
   ctx.fill();
 }
 
-function Label(ctx, x, y, text, color) {
+function RoundRect(ctx, x, y, w, h, r) {
+  const rad = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + rad, y);
+  ctx.lineTo(x + w - rad, y);
+  ctx.arcTo(x + w, y, x + w, y + rad, rad);
+  ctx.lineTo(x + w, y + h - rad);
+  ctx.arcTo(x + w, y + h, x + w - rad, y + h, rad);
+  ctx.lineTo(x + rad, y + h);
+  ctx.arcTo(x, y + h, x, y + h - rad, rad);
+  ctx.lineTo(x, y + rad);
+  ctx.arcTo(x, y, x + rad, y, rad);
+  ctx.closePath();
+}
+
+/** 草图上的随手文字：不进避让系统（它是用户自己放的），描个深色边就够。 */
+function PlainLabel(ctx, x, y, text, color) {
   if (!text) return;
   ctx.font = FONT_SMALL;
   ctx.lineWidth = 3;
-  ctx.strokeStyle = "rgba(20,22,21,0.72)";
+  ctx.strokeStyle = "rgba(14,16,17,0.8)";
   ctx.strokeText(text, x, y);
   ctx.fillStyle = color;
   ctx.fillText(text, x, y);
   ctx.font = FONT;
 }
 
-/** 一枚芯片的几何：(px, py) 是左端中点，量一次文字宽度定框。 */
-function ChipBox(ctx, px, py, text) {
-  ctx.font = FONT_SMALL;
-  const w = Math.ceil(ctx.measureText(text).width) + CHIP_PAD * 2;
-  ctx.font = FONT;
-  return { x: px, y: py - CHIP_H / 2, w, h: CHIP_H, cx: px + w / 2, cy: py };
+/** 候选位置：先试贴着标记的四个角，再往外扩，越靠后越远（远的要画引线）。 */
+function LabelOffsets(w, style) {
+  if (style === "chip") {
+    const list = [
+      [CHIP_DX, CHIP_DY], [-w - CHIP_DX, CHIP_DY], [CHIP_DX, -CHIP_DY], [-w - CHIP_DX, -CHIP_DY],
+      [-w / 2, -26], [-w / 2, 26], [CHIP_DX, -32], [-w - CHIP_DX, -32], [CHIP_DX, 32], [-w - CHIP_DX, 32],
+      [-w / 2, -44], [-w / 2, 44], [CHIP_DX + 24, -50], [-w - CHIP_DX - 24, -50],
+      [CHIP_DX + 24, 50], [-w - CHIP_DX - 24, 50], [-w / 2, -62], [-w / 2, 62],
+    ];
+    // 组把手与拍把手是可点的控件，不是装饰：宁可挂到七十像素外拉一条引线，
+    // 也不能因为身边挤满了人就整枚消失（宿主与测试都按 HandlePoint 去点它）。
+    for (const radius of [72, 104, 140]) {
+      for (let k = 0; k < 8; k += 1) {
+        const angle = (Math.PI * 2 * k) / 8 + Math.PI / 8;
+        const dx = Math.cos(angle) * radius;
+        list.push([dx < 0 ? dx - w : dx, Math.sin(angle) * radius]);
+      }
+    }
+    return list;
+  }
+  return [
+    [8, 0], [-w - 8, 0], [7, -12], [-w - 7, -12], [7, 12], [-w - 7, 12],
+    [-w / 2, -14], [-w / 2, 14], [12, -24], [-w - 12, -24], [12, 24], [-w - 12, 24],
+    [-w / 2, -28], [-w / 2, 28],
+  ];
+}
+
+function Intersects(a, b, pad) {
+  return !(a.x - pad > b.x + b.w || a.x + a.w + pad < b.x || a.y - pad > b.y + b.h || a.y + a.h + pad < b.y);
+}
+function HitsAny(rect, list, pad) {
+  for (const other of list) if (Intersects(rect, other, pad)) return true;
+  return false;
+}
+/** 名字不许压在别人的标记上 —— 压上去就等于把那个标记读没了。 */
+function HitsMarkers(rect, markers, skipIndex) {
+  for (let i = 0; i < markers.length; i += 1) {
+    if (i === skipIndex) continue;
+    if (Intersects(rect, markers[i], 0)) return true;
+  }
+  return false;
+}
+
+// 粗占位图。16 px 一格：敌人/友军/实机标记画到哪儿就涂哪儿，排版查表即可，
+// 不必拿几百个标记去和每一个候选位置两两相交。
+const GRID_CELL = 16;
+function MakeGrid(w, h) {
+  const cols = Math.max(1, Math.ceil(w / GRID_CELL));
+  const rows = Math.max(1, Math.ceil(h / GRID_CELL));
+  return { cols, rows, data: new Uint8Array(cols * rows) };
+}
+function MarkGrid(grid, x, y, w, h) {
+  if (!grid) return;
+  const i0 = Clamp(Math.floor(x / GRID_CELL), 0, grid.cols - 1);
+  const i1 = Clamp(Math.floor((x + w) / GRID_CELL), 0, grid.cols - 1);
+  const j0 = Clamp(Math.floor(y / GRID_CELL), 0, grid.rows - 1);
+  const j1 = Clamp(Math.floor((y + h) / GRID_CELL), 0, grid.rows - 1);
+  for (let j = j0; j <= j1; j += 1) {
+    for (let i = i0; i <= i1; i += 1) grid.data[j * grid.cols + i] = 1;
+  }
+}
+function HitsGrid(grid, rect) {
+  if (!grid) return false;
+  const i0 = Clamp(Math.floor(rect.x / GRID_CELL), 0, grid.cols - 1);
+  const i1 = Clamp(Math.floor((rect.x + rect.w) / GRID_CELL), 0, grid.cols - 1);
+  const j0 = Clamp(Math.floor(rect.y / GRID_CELL), 0, grid.rows - 1);
+  const j1 = Clamp(Math.floor((rect.y + rect.h) / GRID_CELL), 0, grid.rows - 1);
+  for (let j = j0; j <= j1; j += 1) {
+    for (let i = i0; i <= i1; i += 1) if (grid.data[j * grid.cols + i]) return true;
+  }
+  return false;
+}
+
+/**
+ * 转运的四「拍」在界面上叫「第几波攻击」——「拍」是排程表里的内部叫法，
+ * 图上写给人看的时候按它在 MISSION_TRANSFER_BEATS 里的次序报第几波（从 1 起）。
+ */
+function BeatWave(model, beatId) {
+  const beats = model?.beats || [];
+  const index = beats.findIndex((entry) => entry.id === beatId);
+  if (index < 0) return { title: "转运攻击", beat: null, wave: 0 };
+  return { title: `第 ${index + 1} 波攻击`, beat: beats[index], wave: index + 1 };
+}
+
+/** 时间窗的人话。首拍是 0–0 秒，照抄出来像是「没有窗口」，得说「开场即到」。 */
+function BeatWindow(beat) {
+  const early = Number(beat?.earliestS);
+  const late = Number(beat?.latestS);
+  if (!Number.isFinite(early) || !Number.isFinite(late)) return "时间未定";
+  if (early === late) return early <= 0 ? "开场即到" : `第 ${early} 秒`;
+  return `${early}–${late} 秒`;
+}
+
+/**
+ * 触发圈的名字。`bundleRoutePoint0…15` 这种一家人有十六个，十六行几乎一样的字
+ * 会把整片北城糊住 —— 一家人只写一行「bundleRoutePoint ×16」，圈还是照画。
+ */
+function ZoneNames(zones, enabled) {
+  const out = new Map();
+  if (!enabled) return out;
+  const families = new Map();
+  for (const zone of zones) {
+    const raw = String(zone.fact || zone.id || "");
+    if (!raw) continue;
+    const prefix = raw.replace(/\d+$/, "");
+    if (!families.has(prefix)) families.set(prefix, []);
+    families.get(prefix).push(zone);
+  }
+  for (const [prefix, list] of families) {
+    if (list.length > 2) {
+      out.set(list[0], `${prefix} ×${list.length}`);
+      for (let i = 1; i < list.length; i += 1) out.set(list[i], "");
+    } else {
+      for (const zone of list) out.set(zone, String(zone.fact || zone.id || ""));
+    }
+  }
+  return out;
 }
 
 /** 一组人的质心。组把手挂在这儿，比挂在「第一个人」身上更像「这一撮人」。 */
@@ -1278,7 +2145,7 @@ function KindText(kind) {
     case "zone": return "触发区";
     case "route": return "路线";
     case "friendly": return "友军";
-    case "beat": return "节拍";
+    case "beat": return "转运攻击波";
     case "note": return "批注";
     default: return "点";
   }

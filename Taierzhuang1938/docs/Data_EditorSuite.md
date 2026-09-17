@@ -538,16 +538,24 @@ LKP 十字、掩体的隐蔽位/射击位/法线、`task.point`、班组连到�
 完整口径（四张编排表、模型、批注 schema、端点、CLI、闭环流程）在
 [Data_MissionOrchestration.md](Data_MissionOrchestration.md)，这里只记面板本身。
 
-四块：左「流程」18 个公开阶段 → 27 个内部步骤（目标 / 要求事实的人话 + 实时 ✓…· — /
-对白 / 最短时长 / 本步生成的组 / 指引路线，每个阶段带一颗「从这里试玩」＝
-`Debug.FirstLevelJump(n)`）；中「俯视图」＝ `Script_EditorOrchestrationMap.mjs` 的 canvas 2D
-（13 个图层开关、7 把工具、阶段滑条、适配整关 / 本阶段、跟随实时）；
-右「详情 / 批注」（`FindOwner` 反查 + 批注列表 + 新建批注表单 + 保存 / 交接 / 下载）；
-底「时间轴」18 条泳道，**设计行与实际行分色**。
+四块：左「流程」18 个公开阶段做成可折叠分组（标题带「正在这里 / 已走过」，当前阶段自动
+展开并滚到看得见）→ 27 个内部步骤，每步一张小卡（目标一句 / 要求的事实逐行带状态圆点
+✓…· — 与人话 / 对白 / 最短时长 / 本步生成的组与指引路线做成小标签），每个阶段带一颗
+「从这里试玩」＝ `Debug.FirstLevelJump(n)`；中「俯视图」＝ `Script_EditorOrchestrationMap.mjs`
+的 canvas 2D（7 把带图标的工具芯片、收进下拉面板的 14 个图层开关、阶段步进器
+`◀ 第 12 / 18 阶段 · 完整转运区防御 ▶` + 细进度条、跟随实时 / 适配整关 / 适配本阶段）；
+右「详情 / 批注」（详情卡：键值表 + 折叠的原始 JSON；批注卡：状态标签 / 建议 / 缩略图 /
+「原设置已变化」警示条；新建表单分组清楚，主按钮「保存草稿」，结果写在状态条上不弹窗）；
+底「时间轴」左侧固定行名 + 18 列（当前阶段整列高亮），**设计行与实际行分色**，可收起。
 
-地图上除了单个敌人 / 锚点 / 触发区 / 路线，还能直接点**整组**与**转运拍**：
+标题栏是「关卡名 + 当前阶段 / 步骤 / 关卡时钟 / 这一步多久 / 正在等的每件事」各一枚小标签；
+三栏之间有可拖的分栏线，宽度与时间轴折叠状态记在
+`localStorage["tengxian1938_orchestration_layout_FirstLevel"]`。
+界面上的按钮、标签、提示一律普通中文，表里的编号只当尾巴上的等宽小字。
+
+地图上除了单个敌人 / 锚点 / 触发区 / 路线，还能直接点**整组**与**转运区的每一波攻击**：
 每个非已清除的遭遇组在成员质心旁有一枚把手芯片（`PickAt` 返回 `{kind:"encounter"}`），
-四个转运拍的框各有一枚金色芯片（`{kind:"beat"}`）。芯片画在成员**下面**、
+转运区四波攻击的框各有一枚金色芯片（`{kind:"beat"}`）。芯片画在成员**下面**、
 拾取也排在成员之后 —— 点到人拿到的永远是人。
 
 两条不许含糊的规矩：
@@ -566,7 +574,7 @@ DOM 常驻、只写属性；面板 4 Hz，地图只在 live 指纹变了或选�
 写不了就退化成 localStorage 草稿（正文）+ IndexedDB（图，库 `tengxian1938_orchestration`）
 + 「下载 / 复制 JSON」，并把原因明写在面板上；下次写得了盘时那些图随那一次 POST 补传。
 
-冒烟：`node Taierzhuang1938/Script_OrchestrationEditorTest.mjs`（浏览器，64 条）
+冒烟：`node Taierzhuang1938/Script_OrchestrationEditorTest.mjs`（浏览器，69 条）
 与 `node Taierzhuang1938/Script_OrchestrationMapTest.mjs`（浏览器，45 条）。
 
 ### Profiler `Script_EditorProfiler.mjs`（叠加层，独立窗口）
