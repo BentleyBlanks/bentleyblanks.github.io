@@ -21,7 +21,7 @@ import { BuildOrchestrationModel, PhaseLayout } from "./Script_MissionOrchestrat
 import {
   DefaultFilterState, NormalizeFilterState, ApplyPreset, ToggleFilterItem, SoloFilterItem,
   BuildOrchestrationFilter, FilterSummary, EnemyTableRows, EnemyTableCsv, SortEnemyRows, RowVisible,
-  EncounterLabel, WeaponLabel, PhaseNumberOfLayout, RouteNamesFor,
+  EncounterLabel, WeaponLabel, RouteLabel, PhaseNumberOfLayout, RouteNamesFor, ROUTE_LABELS,
   PRESETS, PRESET_IDS, ENEMY_TABLE_COLUMNS, STATE_LABELS, BAYONET_KEY,
 } from "./Script_MissionOrchestrationFilter.mjs";
 
@@ -224,6 +224,34 @@ for (const encounter of model.encounters) {
 }
 Check(EncounterLabel(model, "transferRear") === "转运区第 4 波攻击", "转运区按波次叫");
 Check(WeaponLabel("Type11") === "机枪" && WeaponLabel("Type38") === "步枪", "武器说人话");
+
+// 路线名也一样：面板上照搬 flank / ordersRejoin 这类键等于没说。
+const routeKeys = Object.keys(model.routes);
+const namelessRoutes = routeKeys.filter((name) => !ROUTE_LABELS[name]);
+assert.deepEqual(namelessRoutes, [], `这些路线还没有中文名：${namelessRoutes.join(", ")}`);
+checks += 1;
+Check(RouteLabel("flank") === "侧翼路" && RouteLabel("ordersRejoin") === "接令归队"
+  && RouteLabel("pursuit") === "敌军追击路", "路线说人话");
+Check(RouteLabel("没这条") === "路线 没这条", "没登记的路线兜底成「路线 <编号>」，不露英文键");
+Check(summary.routes.every((row) => row.label === RouteLabel(row.id) && row.code === row.id
+  && row.hint.includes(row.id)), "面板的路线行用中文名，编号留在小字与提示里");
+
+// 分组顺序：先按出现阶段、再按名字。写表的顺序不是关卡里发生的顺序。
+const groupOrder = summary.enemies.groups.map((row) => row.phaseNumber ?? 99);
+Check(groupOrder.every((phase, i) => i === 0 || groupOrder[i - 1] <= phase),
+  `分类树按出现阶段排：${groupOrder.join(",")}`);
+for (let i = 1; i < summary.enemies.groups.length; i += 1) {
+  const before = summary.enemies.groups[i - 1];
+  const now = summary.enemies.groups[i];
+  if (before.phaseNumber !== now.phaseNumber) continue;
+  Check(before.label <= now.label, `同一阶段内按名字排：${before.label} → ${now.label}`);
+}
+const sortedByGroup = SortEnemyRows(rows, "group", true);
+const rowPhases = sortedByGroup.map((row) => row.startPhase ?? 99);
+Check(rowPhases.every((phase, i) => i === 0 || rowPhases[i - 1] <= phase),
+  "布设表按组排也是先按出现阶段");
+Check(sortedByGroup[0].startPhase === Math.min(...rowPhases),
+  `第一行是最早出场的那组：${sortedByGroup[0].group}（第 ${sortedByGroup[0].startPhase} 阶段）`);
 
 // 脏输入不许把模型带崩
 Check(NormalizeFilterState(null).preset === "all", "空状态补成出厂状态");

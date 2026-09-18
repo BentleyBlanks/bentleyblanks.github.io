@@ -47,6 +47,36 @@ export const FRIENDLY_LABELS = Object.freeze({
 export const ZONE_LABELS = Object.freeze({
   gate: "过关条件的触发圈", interior: "室内判定区", crawl: "匍匐区", beatArea: "某一波攻击的落点范围",
 });
+// 路线的中文名。`MISSION_ROUTES` 的键是给代码用的（flank / ordersRejoin …），
+// 面板上照搬那些词等于没说 —— 这张表把每一条翻成「它到底是哪条路」。
+// 缺名字的（新加了一条路线还没来得及登记）兜底成「路线 <编号>」，不写英文键。
+export const ROUTE_LABELS = Object.freeze({
+  flank: "侧翼路",
+  opening: "进沟路",
+  support: "支援壕沟",
+  bundle: "取集束弹的路",
+  bundleReturn: "取弹返回",
+  orders: "接令路",
+  ordersRejoin: "接令归队",
+  south: "南行路",
+  southTraffic: "南行路的车流",
+  village: "村口路",
+  evacuation: "后撤路",
+  reception: "接收院内",
+  exit: "撤离路",
+  pursuit: "敌军追击路",
+  sortie: "出击路",
+  sortieReturn: "出击返回",
+  approach: "进沟路（开场）",
+  supportTrench: "支援壕沟（开场）",
+  trenchContact: "进沟接敌路（开场）",
+  wounded: "伤员后送路（开场）",
+  runner: "传令兵的路（开场）",
+});
+export function RouteLabel(name) {
+  return ROUTE_LABELS[name] || `路线 ${name}`;
+}
+
 // 二十一组敌人的中文名。转运区那四组不在这儿：它们的名字按攻击波次现算
 // （见 EncounterLabel），表里改了顺序名字就跟着改。
 export const ENCOUNTER_LABELS = Object.freeze({
@@ -346,6 +376,18 @@ export function BuildOrchestrationFilter(model, phaseLayout, rawState) {
 
 const Visible = (set, id) => (set == null ? true : set.has(id));
 
+/** 先按出现阶段、再按名字。没有阶段号的排在最后。 */
+export function SortByPhaseThenName(list, Key) {
+  return [...list].sort((a, b) => {
+    const left = Key(a);
+    const right = Key(b);
+    const phaseA = Number.isFinite(left.phaseNumber) ? left.phaseNumber : 99;
+    const phaseB = Number.isFinite(right.phaseNumber) ? right.phaseNumber : 99;
+    if (phaseA !== phaseB) return phaseA - phaseB;
+    return left.label < right.label ? -1 : left.label > right.label ? 1 : 0;
+  });
+}
+
 // ---------------------------------------------------------------------------
 // 面板：FilterSummary
 // ---------------------------------------------------------------------------
@@ -362,7 +404,12 @@ export function FilterSummary(model, phaseLayout, rawState, extra = {}) {
   const solo = state.solo;
   const Soloed = (kind, id) => !!solo && solo.kind === kind && String(solo.id ?? "") === String(id ?? "");
 
-  const groups = encounters.map((encounter) => {
+  // 按组排：先按**出现阶段**，同一阶段内再按名字。
+  // 按内部表的顺序排的话，第 2 阶段的组会夹在第 15 阶段的组中间 —— 那是写表的顺序，
+  // 不是关卡里发生的顺序，用户照着它数「这一关的敌人是怎么一批批上来的」会数错。
+  const groups = SortByPhaseThenName(encounters, (encounter) => ({
+    phaseNumber: encounter.phaseNumber, label: EncounterLabel(model, encounter),
+  })).map((encounter) => {
     const visible = encounter.members.filter((member) => Visible(filter.members, member.id)).length;
     return {
       kind: "encounter", id: encounter.id, key: `encounter:${encounter.id}`,
@@ -438,7 +485,8 @@ export function FilterSummary(model, phaseLayout, rawState, extra = {}) {
 
   const routes = RouteNamesFor(model, phaseLayout).map((name) => ({
     kind: "route", id: name, key: `route:${name}`,
-    label: name, code: name,
+    label: RouteLabel(name), code: name,
+    hint: `${RouteLabel(name)}（表里的编号 ${name}）：${(model?.routes?.[name] || []).length} 个路点`,
     count: (model?.routes?.[name] || []).length,
     visible: Visible(filter.routes, name) ? (model?.routes?.[name] || []).length : 0,
     on: state.routes ? state.routes.has(name) : true,
@@ -543,7 +591,8 @@ export function EnemyTableRows(model, phaseLayout, live = null) {
 }
 
 const SORTERS = {
-  group: (row) => `${row.group} ${row.member}`,
+  // 按组 = 先按出现阶段、再按组名，最后才按编号：与分类树那一节同一个顺序。
+  group: (row) => `${String(row.startPhase ?? 99).padStart(2, "0")} ${row.group} ${row.member}`,
   member: (row) => row.member,
   start: (row) => row.startPhase ?? 99,
   state: (row) => STATE_ORDER.indexOf(row.state),

@@ -427,8 +427,18 @@ try {
       tree: doc.querySelectorAll('[data-orch="filter-tree"]').length,
       tabs: doc.querySelectorAll("[data-filter-tab]").length,
       groups: groups.length,
+      // 分类树「按组」的顺序：先按出现阶段、再按名字（写表的顺序不是关卡里发生的顺序）。
+      groupOrder: groups.map((node) => node.dataset.filterRow.slice("encounter:".length)),
+      groupPhases: tool.filterSummary.enemies.groups.map((row) => row.phaseNumber),
+      firstGroup: groups[0]?.querySelector(".fName").textContent || "",
       categories: Rows("category").map((node) => node.querySelector(".fName").textContent),
       states: Rows("state").length,
+      route: {
+        name: Row("route:flank")?.querySelector(".fName").textContent || "",
+        code: Row("route:flank")?.querySelector(".fSub code")?.textContent || "",
+        title: Row("route:flank")?.title || "",
+        english: Rows("route").filter((node) => /^[A-Za-z]+$/.test(node.querySelector(".fName").textContent)).length,
+      },
       transfer: {
         name: Row("encounter:transfer")?.querySelector(".fName").textContent || "",
         sub: Row("encounter:transfer")?.querySelector(".fSub")?.textContent || "",
@@ -447,6 +457,14 @@ try {
     && filterPanel.categories.includes("敌军") && filterPanel.categories.includes("触发区"),
     filterPanel.categories.join(" "));
   Check("敌军按组列出 21 组", filterPanel.groups === 21, `实际 ${filterPanel.groups}`);
+  Check("按组的顺序是先按出现阶段、再按名字",
+    filterPanel.groupPhases.every((phase, i) => i === 0 || filterPanel.groupPhases[i - 1] <= phase)
+    && filterPanel.groupPhases[0] === 2 && filterPanel.groupOrder[0] === "intrusion",
+    `${filterPanel.firstGroup}（第 ${filterPanel.groupPhases[0]} 阶段）… ${filterPanel.groupPhases.join(",")}`);
+  Check("路线行写中文名，编号只当小字",
+    filterPanel.route.name === "侧翼路" && filterPanel.route.code === "flank"
+    && filterPanel.route.title.includes("侧翼路") && filterPanel.route.english === 0,
+    `${filterPanel.route.name} / ${filterPanel.route.code} / ${filterPanel.route.title}`);
   Check("组名是人话、后面跟着编号与本阶段状态",
     filterPanel.transfer.name === "转运区第 1 波攻击" && /transfer/.test(filterPanel.transfer.sub)
     && /活跃/.test(filterPanel.transfer.sub),
@@ -534,6 +552,60 @@ try {
     presets.active.members === presets.active.expected && presets.active.members > 0,
     `${presets.active.members} / ${presets.active.expected}`);
 
+  // 悬停只描亮，不改画面上有什么：早先那版是临时「只看这一类」，扫一遍列表
+  // 整张图闪十几次。现在指到单个对象的描一圈、指不到的什么都不动。
+  const hover = await page.evaluate(() => {
+    const tool = window.Taierzhuang.editor.overlays.get("orchestration");
+    const doc = tool.win.document;
+    const Enter = (key) => doc.querySelector(`[data-filter-row="${key}"]`)
+      .dispatchEvent(new tool.win.MouseEvent("mouseenter", { bubbles: false }));
+    const Leave = (key) => doc.querySelector(`[data-filter-row="${key}"]`)
+      .dispatchEvent(new tool.win.MouseEvent("mouseleave", { bubbles: false }));
+    const Filter = () => (tool.map.filter?.members ? tool.map.filter.members.size : "全部");
+    tool.ApplyPreset("all");
+    tool.Select({ kind: "member", id: "TransferGunner" });
+    const before = Filter();
+    Enter("state:active");
+    const onState = { filter: Filter(), hover: tool.map.hover, sel: tool.map.selection?.id };
+    Leave("state:active");
+    Enter("encounter:transfer");
+    const onGroup = { filter: Filter(), hover: tool.map.hover?.id, sel: tool.map.selection?.id };
+    Leave("encounter:transfer");
+    const after = { filter: Filter(), hover: tool.map.hover, sel: tool.map.selection?.id };
+    return { before, onState, onGroup, after };
+  });
+  Check("悬停「按状态」那种行：图上什么都不动（不再临时只画一类）",
+    hover.before === "全部" && hover.onState.filter === "全部" && hover.onState.hover === null
+    && hover.onState.sel === "TransferGunner",
+    JSON.stringify(hover.onState));
+  Check("悬停某一组：描亮那一组，画面上有什么不变",
+    hover.onGroup.filter === "全部" && hover.onGroup.hover === "transfer" && hover.onGroup.sel === "transfer",
+    JSON.stringify(hover.onGroup));
+  Check("指针挪开，描亮还给真正选中的那个",
+    hover.after.filter === "全部" && hover.after.hover === null && hover.after.sel === "TransferGunner",
+    JSON.stringify(hover.after));
+
+  const toggle = await page.evaluate(() => {
+    const tool = window.Taierzhuang.editor.overlays.get("orchestration");
+    const doc = tool.win.document;
+    const button = doc.querySelector('[data-orch="filter-button"]');
+    const drawer = doc.querySelector('[data-orch="filter-drawer"]');
+    const width = drawer.style.getPropertyValue("--fw");
+    button.click();
+    const closed = drawer.dataset.open;
+    button.click();
+    const reopened = drawer.dataset.open;
+    doc.querySelector('[data-orch="filter-close"]').click();
+    const byClose = drawer.dataset.open;
+    button.click();
+    return { width, closed, reopened, byClose, open: drawer.dataset.open, on: button.classList.contains("on") };
+  });
+  Check("分类按钮再点一次就收起（「收起」按钮也行）",
+    toggle.closed === "0" && toggle.reopened === "1" && toggle.byClose === "0"
+    && toggle.open === "1" && toggle.on,
+    `${toggle.closed} → ${toggle.reopened} → ${toggle.byClose} → ${toggle.open}`);
+  Check("分类树默认宽 220 px", toggle.width === "220px", toggle.width);
+
   // -------------------------------------------------------------------------
   // 4f) 敌军布设表：行数跟着筛选、点一行选中那个人、复制 CSV
   // -------------------------------------------------------------------------
@@ -545,6 +617,11 @@ try {
     const all = Rows().length;
     const head = [...doc.querySelectorAll('[data-orch="enemy-table"] th')].map((node) => node.textContent.trim());
     const groupRows = doc.querySelectorAll('[data-orch="enemy-table"] [data-table-group]').length;
+    // 按组排时第一条分组线是最早出场的那组；「实时」列在没有活人时写本阶段状态。
+    const firstGroup = doc.querySelector('[data-orch="enemy-table"] [data-table-group]')?.textContent || "";
+    const rowPhases = Rows().map((node) => node.querySelector("td:nth-child(3)").textContent.trim());
+    const deadCell = Rows().find((node) => node.dataset.tableGroupOf === "front")
+      ?.querySelector(".liveCell").textContent || "";
     tool.SoloTarget("encounter", "transfer");
     const filtered = Rows().map((node) => node.dataset.tableRow);
     const gunner = doc.querySelector('[data-table-row="TransferGunner"]');
@@ -561,18 +638,27 @@ try {
     tool.ApplyPreset("all");
     tool.SortEnemyTable("state");
     const sortedFirst = doc.querySelector('[data-orch="enemy-table"] [data-table-row] td:nth-child(4)')?.textContent;
+    const headAfterSort = [...doc.querySelectorAll('[data-orch="enemy-table"] th')]
+      .map((node) => node.textContent.trim());
     tool.SortEnemyTable("group");
     tool.SetFilterTab("tree");
     return {
-      all, head, groupRows, filtered, cells, picked,
+      all, head, headAfterSort, groupRows, filtered, cells, picked, firstGroup, rowPhases, deadCell,
       csvHead: csv.split("\n")[0], csvLines: csv.split("\n").length,
       collapsed, reopened, sortedFirst,
     };
   });
   Check("布设表列出这一阶段全部敌人（117 人、九列表头）",
-    table.all === 117 && table.head.length === 9 && table.head[0].startsWith("组")
-    && table.groupRows === 21,
+    table.all === 117 && table.head.length === 9 && table.groupRows === 21,
     `${table.all} 行 / 表头 ${table.head.join(" ")}`);
+  Check("按组排时第一列表头是「图标」（组名写在分组线上），换别的排法就变回「组」",
+    table.head[0] === "图标 ▲" && table.headAfterSort[0] === "组",
+    `${table.head[0]} → ${table.headAfterSort[0]}`);
+  Check("按组排的分组线从最早出场的那组开始",
+    table.firstGroup.includes("摸进壕沟的日军") && table.rowPhases[0] === "第 2 阶段",
+    `${table.firstGroup.trim()} ｜ ${table.rowPhases[0]}`);
+  Check("这一局里没有这个人时，「实时」列写他这一阶段的状态（不是一整列破折号）",
+    table.deadCell === "已清除", `front 组的实时列写「${table.deadCell}」`);
   Check("表跟着筛选联动：只看 transfer 时只剩那 4 行",
     table.filtered.length === 4 && table.filtered.includes("TransferGunner"),
     table.filtered.join(" "));

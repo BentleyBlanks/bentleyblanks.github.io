@@ -66,6 +66,26 @@ export function LoadOrchestrationIcons(doc = null) {
   return iconsPromise;
 }
 export function IconImage(name) { return ICON_IMAGES.get(name) || null; }
+
+/**
+ * 地图上这个敌人用哪张图标。
+ *
+ * 规则的正身在 `Data_OrchestrationIcons.IconForMember`（面板与地图共用），这里只
+ * 按「14 px 下认不认得出」再拧一处：「上刺刀」那张画的是一把细长的枪，缩到整关
+ * 视野只剩一道斜杠，看着像画崩了。所以图上照旧画步枪兵，刺刀退成**放大之后
+ * 才出现的小角标**（`TraitBadge`）。
+ *
+ * 这一处拧在地图这层而不是登记表里，是因为它是**画法**的限制（多少像素能认出
+ * 什么），不是「他是干什么的」的判断；面板用大图标，那边照旧该画刺刀。
+ */
+export function MapIconForMember(member, state = null, encounterId = null) {
+  const icon = IconForMember(member, state, encounterId);
+  return icon === "Bayonet" ? "Rifleman" : icon;
+}
+/** 特点角标（不是状态角标）：目前只有「上了刺刀」这一条。 */
+export function TraitBadge(member) {
+  return member?.bayonet ? "Bayonet" : null;
+}
 /** 测试与宿主问「这张图到底加载上没有」。 */
 export function LoadedIconNames() { return [...ICON_IMAGES.keys()]; }
 
@@ -105,6 +125,12 @@ export const MAP_COLORS = Object.freeze({
   enemyDormant: [196, 118, 96],
   enemyActive: [255, 82, 62],
   enemyCleared: [112, 114, 110],
+  // 缩到整关视野时，角标那张小图只剩七八个像素，看得出「有东西」却读不出是什么。
+  // 所以小尺寸下角标退成一枚纯色点，用颜色区分：休眠冷蓝灰、待命黄。
+  // 两枚都刻意躲开已经在数的颜色 —— 尤其不能用玩家那枚黄（`player`），
+  // 否则「还没 SetLive 时玩家色像素必须是 0」那条断言会被待命的兵顶红。
+  badgeDormant: [150, 176, 208],
+  badgeStandby: [236, 200, 92],
   player: [255, 214, 64],
   liveEnemy: [255, 150, 96],
   liveDead: [124, 124, 120],
@@ -141,6 +167,13 @@ const CHIP_H = 15;
 const CHIP_DX = 11;
 const CHIP_DY = -16;
 const CHIP_HIT_R = 11;
+// 挤成一堆就合并：同一组里两枚图标的中心近到「图标宽度 × 这个倍数」以内，
+// 就并成一枚簇标记。1.7 是照真数据量的 —— 整关视野下前线那十二个人彼此相隔
+// 10–13 m，换算过来 15–22 px，而图标才 14 px 宽；要把这一串串成一枚，
+// 阈值得比图标本身再宽出大半个身位。**只在同一组内合并**，不同组各归各的。
+const CLUSTER_GAP_FACTOR = 1.7;
+// 小于这个像素尺寸就不画细节角标（闭眼 / 沙漏 / 骷髅 / 刺刀），改用一枚小色点。
+const BADGE_DETAIL_PX = 18;
 const LABEL_PAD_X = 4;
 const LABEL_H = 13;
 const MAX_LABELS = 72;             // 排版的硬上限：再多也读不过来，还白烧时间
@@ -254,6 +287,8 @@ export class OrchestrationMap {
     this.marks = null;
     this.iconPx = 14;
     this.iconPixel = 1;
+    // 合并阈值：null = 跟着图标尺寸自动算；给个数就是固定像素；0 = 不合并。
+    this.clusterGap = null;
     // 染色缓存：白剪影 + 一种颜色 + 一个像素尺寸 → 一张离屏小图。
     // 不缓存的话每个标记每帧都要 source-in 合成一次，几百个人直接掉到个位数帧率。
     this.tintCache = new Map();
@@ -358,6 +393,20 @@ export class OrchestrationMap {
   }
   AllowedMember(encounterId, memberId) {
     return this.Allowed("encounters", encounterId) && this.Allowed("members", memberId);
+  }
+
+  /**
+   * 挤成一堆时合并的阈值。`null` = 跟着图标尺寸自动算（默认），
+   * `0` = 一个都不合并（想逐个点人时用），给个正数就是固定像素。
+   */
+  SetClusterGap(px) {
+    this.clusterGap = Number.isFinite(px) && px >= 0 ? px : null;
+    this.labelCache = null;
+    this.Redraw();
+    return this;
+  }
+  ClusterGapPx() {
+    return Number.isFinite(this.clusterGap) ? this.clusterGap : this.iconPx * CLUSTER_GAP_FACTOR;
   }
 
   // -------------------------------------------------------------------------
@@ -1176,12 +1225,12 @@ export class OrchestrationMap {
         ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
         ctx.stroke();
         ctx.setLineDash([]);
-        // 圈心换成同心圆图标：虚线圈说「多大范围」，图标说「这是个触发区」。
-        const icon = IconForZone(zone);
-        this.DrawIcon(ctx, p.x, p.y, icon, MAP_COLORS.zone, this.iconPx * 0.72,
-          { pixel: this.iconPixel });
-        this.CorePixel(ctx, p.x, p.y, MAP_COLORS.zone, 1.5);
-        this.Mark({ kind: "zone", id: zone.id || zone.fact, icon, x: p.x, y: p.y });
+        // 圈心不画图标：全关四十五个触发区，每个中心再摆一枚金色同心圆，整张图
+        // 就是一地金点。**虚线圈本身就是这个触发区的图标** —— 它还顺带说了多大范围，
+        // 那是一枚居中的小图标给不了的。圈心只留一颗淡淡的点标出准确坐标。
+        ctx.fillStyle = Css(MAP_COLORS.zone, 0.75);
+        ctx.beginPath(); ctx.arc(p.x, p.y, 1.6, 0, Math.PI * 2); ctx.fill();
+        this.Mark({ kind: "zone", id: zone.id || zone.fact, icon: null, x: p.x, y: p.y });
         if (name) {
           Add({
             kind: "zone", id: zone.id || zone.fact, text: name,
@@ -1197,10 +1246,14 @@ export class OrchestrationMap {
         ctx.setLineDash([]);
         const cx = (zone.minX + zone.maxX) / 2, cz = (zone.minZ + zone.maxZ) / 2;
         const c = Project(cx, cz);
-        const boxIcon = IconForZone(zone);
-        this.DrawIcon(ctx, c.x, c.y, boxIcon, MAP_COLORS.zone, this.iconPx * 0.78,
-          { pixel: this.iconPixel });
-        this.CorePixel(ctx, c.x, c.y, MAP_COLORS.zone, 1.5);
+        // 方框里只有转运那四个「攻击波」留图标：它们统共四个、各带一个时间窗，
+        // 是全图唯一需要一眼认出「这块地方会来一波人」的框。别的框同上，不画。
+        const boxIcon = zone.kind === "beatArea" ? IconForZone(zone) : null;
+        if (boxIcon) {
+          this.DrawIcon(ctx, c.x, c.y, boxIcon, MAP_COLORS.zone, this.iconPx * 0.78,
+            { pixel: this.iconPixel });
+          this.CorePixel(ctx, c.x, c.y, MAP_COLORS.zone, 1.5);
+        }
         this.Mark({ kind: "zone", id: zone.id || zone.fact, icon: boxIcon, x: c.x, y: c.y });
         Push({ kind: "zone", id: zone.id || zone.fact, x: cx, z: cz }, c.x, c.y, 8, PICK_RANK.zone);
         // 转运四拍的框：标签做成可点的把手（返回 kind:"beat"），别只是一行描边字。
@@ -1262,24 +1315,30 @@ export class OrchestrationMap {
       if (!this.Allowed("anchors", id)) continue;
       const p = Project(point.x, point.z);
       // 锚点按它到底是个什么地方画：院门画门、装车/转运画车、担架撤离点画担架，
-      // 剩下的才是通用小旗。图标画在点的上方，小十字仍标在那个准确的坐标上。
+      // 剩下的才是通用小旗。
+      //
+      // **就一枚 12 px 的图标，居中压在那个坐标上**。先前是「图标画在上方 + 小十字
+      // 标坐标」，两件东西占了一个半图标的高度，挤的地方那面小旗就骑到邻居头上去了。
+      // 图标居中之后它自己就标着坐标，十字没必要再画。
       const icon = IconForAnchor(id);
-      const drawn = this.DrawIcon(ctx, p.x, p.y - this.iconPx * 0.52, icon, MAP_COLORS.anchor,
-        this.iconPx * 0.86, { pixel: this.iconPixel });
-      if (drawn) this.Mark({ kind: "anchor", id, icon, x: p.x, y: p.y });
-      ctx.strokeStyle = Css(MAP_COLORS.halo, 0.75);
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(p.x - 4.5, p.y); ctx.lineTo(p.x + 4.5, p.y);
-      ctx.moveTo(p.x, p.y - 4.5); ctx.lineTo(p.x, p.y + 4.5);
-      ctx.stroke();
-      ctx.strokeStyle = Css(MAP_COLORS.anchor, 0.95);
-      ctx.lineWidth = 1.2;
-      ctx.beginPath();
-      ctx.moveTo(p.x - 4.5, p.y); ctx.lineTo(p.x + 4.5, p.y);
-      ctx.moveTo(p.x, p.y - 4.5); ctx.lineTo(p.x, p.y + 4.5);
-      ctx.stroke();
-      MarkGrid(this.soft, p.x - this.iconPx / 2, p.y - this.iconPx, this.iconPx, this.iconPx * 1.5);
+      const size = 12;
+      if (this.DrawIcon(ctx, p.x, p.y, icon, MAP_COLORS.anchor, size, { pixel: this.iconPixel })) {
+        this.Mark({ kind: "anchor", id, icon, x: p.x, y: p.y });
+      } else {
+        ctx.strokeStyle = Css(MAP_COLORS.halo, 0.75);
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(p.x - 4.5, p.y); ctx.lineTo(p.x + 4.5, p.y);
+        ctx.moveTo(p.x, p.y - 4.5); ctx.lineTo(p.x, p.y + 4.5);
+        ctx.stroke();
+        ctx.strokeStyle = Css(MAP_COLORS.anchor, 0.95);
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(p.x - 4.5, p.y); ctx.lineTo(p.x + 4.5, p.y);
+        ctx.moveTo(p.x, p.y - 4.5); ctx.lineTo(p.x, p.y + 4.5);
+        ctx.stroke();
+      }
+      MarkGrid(this.soft, p.x - size / 2, p.y - size / 2, size, size);
       if (showLabels && nameZoom) {
         Add({
           kind: "anchor", id, text: id, ax: p.x, ay: p.y,
@@ -1317,18 +1376,43 @@ export class OrchestrationMap {
   PaintEncounters(ctx, view, Project, Push, Add, showLabels) {
     const L = this.layers;
     const size = this.iconPx;
+    const gap = this.ClusterGapPx();
     for (const encounter of this.phaseLayout?.encounters || []) {
       const state = encounter.state || "spawned";
+      const entries = [];
       for (const member of encounter.members || []) {
         if (!Number.isFinite(member.x)) continue;
         if (!this.AllowedMember(encounter.id, member.id)) continue;
-        const p = Project(member.x, member.z);
-        if (L.tactics) this.PaintTactic(ctx, Project, member, state);
-        const icon = this.PaintMember(ctx, p, member, state, encounter.id);
-        this.Mark({ kind: "member", id: member.id, encounter: encounter.id, state, icon, x: p.x, y: p.y });
-        MarkGrid(this.soft, p.x - size / 2, p.y - size / 2, size, size);
-        Push({ kind: "member", id: member.id, encounterId: encounter.id, x: member.x, z: member.z },
-          p.x, p.y, 7, PICK_RANK.member);
+        entries.push({ member, p: Project(member.x, member.z) });
+      }
+      if (!entries.length) continue;
+      // 战术线照旧逐人画：合并的是「人在哪」，不是「他要往哪走」——
+      // 把一组的去向也并掉，图上就看不出这撮人是散开包抄还是一路平推。
+      if (L.tactics) {
+        for (const entry of entries) this.PaintTactic(ctx, Project, entry.member, state);
+      }
+      for (const group of ClusterEntries(entries, gap)) {
+        if (group.items.length === 1) {
+          const { member, p } = group.items[0];
+          const icon = this.PaintMember(ctx, p, member, state, encounter.id);
+          this.Mark({ kind: "member", id: member.id, encounter: encounter.id, state, icon, x: p.x, y: p.y });
+          MarkGrid(this.soft, p.x - size / 2, p.y - size / 2, size, size);
+          Push({ kind: "member", id: member.id, encounterId: encounter.id, x: member.x, z: member.z },
+            p.x, p.y, 7, PICK_RANK.member);
+          continue;
+        }
+        // 一撮人并成一枚：组图标 + 右下角人数。点它拿到的是**整组**
+        // （不是「这一撮」——点开之后要看的永远是这一组的编排）。
+        const icon = this.PaintCluster(ctx, group, encounter, state);
+        const world = ClusterWorld(group);
+        this.Mark({
+          kind: "cluster", id: encounter.id, encounter: encounter.id, state,
+          count: group.items.length, icon, x: group.x, y: group.y,
+        });
+        const reach = size * 0.72;
+        MarkGrid(this.soft, group.x - reach, group.y - reach, reach * 2, reach * 2);
+        Push({ kind: "encounter", id: encounter.id, cluster: group.items.length, x: world.x, z: world.z },
+          group.x, group.y, reach, PICK_RANK.member);
       }
     }
     // 已清除的组不给把手：第 12 阶段有十一个这样的组，遍布全关，
@@ -1362,7 +1446,7 @@ export class OrchestrationMap {
    */
   PaintMember(ctx, p, member, state, encounterId = null) {
     const color = StateColor(state);
-    const icon = IconForMember(member, state, encounterId);
+    const icon = MapIconForMember(member, state, encounterId);
     if (state === "active") {
       ctx.strokeStyle = Css(color, 0.22);
       ctx.lineWidth = 3.2;
@@ -1370,14 +1454,98 @@ export class OrchestrationMap {
       ctx.arc(p.x, p.y, this.iconPx * 0.6, 0, Math.PI * 2);
       ctx.stroke();
     }
-    const alpha = state === "pending" ? 0.64 : (state === "dormant" ? 0.74 : (state === "cleared" ? 0.66 : 1));
+    const alpha = StateAlpha(state);
+    // 够大才画细节角标；小了就退成一枚小色点（见 BADGE_DETAIL_PX 那条注释）。
+    const detail = this.iconPx >= BADGE_DETAIL_PX;
+    const stateBadge = StateBadge(state);
     const drawn = this.DrawIcon(ctx, p.x, p.y, icon, color, this.iconPx, {
       pixel: this.iconPixel,
       alpha,
-      badge: StateBadge(state),
+      badge: detail ? (stateBadge || TraitBadge(member)) : null,
     });
     if (drawn) this.CorePixel(ctx, p.x, p.y, color, 1.7);
     else this.PaintMemberShape(ctx, p, member, state);
+    if (!detail) this.PaintStateDot(ctx, p.x, p.y, this.iconPx, state);
+    return icon;
+  }
+
+  /**
+   * 小尺寸下的状态记号。休眠一枚冷蓝灰点、待命一枚黄点、已清除照旧一个灰叉
+   * —— 叉在任何尺寸下都认得出，是唯一不用退化的那个。
+   */
+  PaintStateDot(ctx, x, y, size, state) {
+    const half = size / 2;
+    const bx = x + half * 0.82;
+    const by = y + half * 0.82;
+    if (state === "cleared") {
+      ctx.strokeStyle = Css(MAP_COLORS.halo, 0.9);
+      ctx.lineWidth = 2.6;
+      ctx.beginPath();
+      ctx.moveTo(bx - 3, by - 3); ctx.lineTo(bx + 3, by + 3);
+      ctx.moveTo(bx + 3, by - 3); ctx.lineTo(bx - 3, by + 3);
+      ctx.stroke();
+      ctx.strokeStyle = Css(MAP_COLORS.enemyCleared);
+      ctx.lineWidth = 1.4;
+      ctx.beginPath();
+      ctx.moveTo(bx - 3, by - 3); ctx.lineTo(bx + 3, by + 3);
+      ctx.moveTo(bx + 3, by - 3); ctx.lineTo(bx - 3, by + 3);
+      ctx.stroke();
+      return;
+    }
+    const color = state === "dormant" ? MAP_COLORS.badgeDormant
+      : (state === "standby" ? MAP_COLORS.badgeStandby : null);
+    if (!color) return;
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = Css(MAP_COLORS.halo, 0.9);
+    ctx.beginPath(); ctx.arc(bx, by, 3.4, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = Css(color);
+    ctx.beginPath(); ctx.arc(bx, by, 2.2, 0, Math.PI * 2); ctx.fill();
+  }
+
+  /**
+   * 一撮挤在一起的人合成的簇标记：组里最常见的那张图标 + 右下角一枚人数芯片。
+   * 放大到彼此分得开时这枚就自己散成一个个人，不需要任何开关。
+   */
+  PaintCluster(ctx, group, encounter, state) {
+    const color = StateColor(state);
+    const icon = DominantIcon(group.items, state, encounter.id);
+    const size = this.iconPx * 1.2;
+    if (state === "active") {
+      ctx.strokeStyle = Css(color, 0.22);
+      ctx.lineWidth = 3.2;
+      ctx.beginPath();
+      ctx.arc(group.x, group.y, size * 0.62, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    const drawn = this.DrawIcon(ctx, group.x, group.y, icon, color, size, {
+      pixel: this.iconPixel, alpha: StateAlpha(state),
+    });
+    if (!drawn) {
+      // 图还没到：退回一枚实心点，人数芯片照画 —— 不许出现「一撮人不见了」。
+      ctx.fillStyle = Css(MAP_COLORS.halo, 0.8);
+      ctx.beginPath(); ctx.arc(group.x, group.y, size * 0.4, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = Css(color);
+      ctx.beginPath(); ctx.arc(group.x, group.y, size * 0.32, 0, Math.PI * 2); ctx.fill();
+    }
+    this.CorePixel(ctx, group.x, group.y, color, 1.7);
+    // 人数芯片：深底 + 状态色描边与数字。压在图标右下角，跟单人的角标同一个位置。
+    const text = String(group.items.length);
+    ctx.font = FONT_TINY;
+    const w = Math.ceil(ctx.measureText(text).width) + 7;
+    const h = 12;
+    const bx = group.x + size * 0.34;
+    const by = group.y + size * 0.26;
+    RoundRect(ctx, bx, by, w, h, 3);
+    ctx.fillStyle = Css(MAP_COLORS.handle);
+    ctx.fill();
+    ctx.strokeStyle = Css(color, 0.95);
+    ctx.lineWidth = 1;
+    RoundRect(ctx, bx + 0.5, by + 0.5, w - 1, h - 1, 3);
+    ctx.stroke();
+    ctx.fillStyle = Css(color);
+    ctx.textBaseline = "middle";
+    ctx.fillText(text, bx + 3.5, by + h / 2);
+    ctx.font = FONT;
     return icon;
   }
 
@@ -1974,7 +2142,14 @@ export class OrchestrationMap {
     if (sel.kind === "encounter") {
       const encounter = (this.phaseLayout?.encounters || []).find((entry) => entry.id === sel.id);
       if (encounter) {
-        lines.push(`${StateText(encounter.state)} · ${(encounter.members || []).length} 人`);
+        const total = (encounter.members || []).length;
+        lines.push(`${StateText(encounter.state)} · ${total} 人`);
+        // 挤成一堆合并出来的那枚：说清楚脚下这一撮是几个人，别让人以为整组就这些。
+        if (Number.isFinite(sel.cluster) && sel.cluster > 1) {
+          lines.push(sel.cluster >= total
+            ? `这一撮就是整组 ${sel.cluster} 人（挤在一起，放大就散开）`
+            : `脚下这一撮 ${sel.cluster} 人（挤在一起，放大就散开）`);
+        }
         const spawn = encounter.spawn || {};
         const where = spawn.step || spawn.fact || spawn.beat || "";
         if (spawn.kind) lines.push(`出现：${spawn.kind}${where ? ` ${where}` : ""}`);
@@ -1994,7 +2169,7 @@ export class OrchestrationMap {
         lines.push(`${found.encounter.id} · ${StateText(found.encounter.state)}`);
         const bits = [];
         // 图标说的是什么，提示里就用同一个中文词说一遍 —— 图与字不许各说各的。
-        const label = IconLabel(IconForMember(found.member, found.encounter.state, found.encounter.id));
+        const label = IconLabel(MapIconForMember(found.member, found.encounter.state, found.encounter.id));
         if (label) bits.push(label);
         if (found.member.weapon) bits.push(found.member.weapon);
         if (found.member.hold) bits.push("钉在原地");
@@ -2445,6 +2620,72 @@ function Centroid(members) {
     x += member.x; z += member.z; n += 1;
   }
   return n ? { x: x / n, z: z / n } : null;
+}
+
+/**
+ * 同一组里挤在一起的人合成几撮。**单链合并**：只要两个人近到阈值以内就算一伙，
+ * 一串隔得都不远的人会串成一整撮 —— 前线那十二个人排成一条 60 m 的线，
+ * 两两算的话谁也并不进谁，串起来才是眼睛看到的那一条。
+ * 合并只在**组内**做；不同组哪怕叠在一起也各画各的。
+ */
+function ClusterEntries(entries, gap) {
+  if (!(gap > 0) || entries.length < 2) return entries.map((e) => ({ items: [e], x: e.p.x, y: e.p.y }));
+  const parent = entries.map((_, i) => i);
+  const Find = (i) => {
+    let root = i;
+    while (parent[root] !== root) root = parent[root];
+    while (parent[i] !== root) { const next = parent[i]; parent[i] = root; i = next; }
+    return root;
+  };
+  for (let i = 0; i < entries.length; i += 1) {
+    for (let j = i + 1; j < entries.length; j += 1) {
+      const dx = entries[i].p.x - entries[j].p.x;
+      const dy = entries[i].p.y - entries[j].p.y;
+      if (dx * dx + dy * dy > gap * gap) continue;
+      const a = Find(i), b = Find(j);
+      if (a !== b) parent[a] = b;
+    }
+  }
+  const byRoot = new Map();
+  for (let i = 0; i < entries.length; i += 1) {
+    const root = Find(i);
+    let bucket = byRoot.get(root);
+    if (!bucket) { bucket = []; byRoot.set(root, bucket); }
+    bucket.push(entries[i]);
+  }
+  const out = [];
+  for (const items of byRoot.values()) {
+    let x = 0, y = 0;
+    for (const item of items) { x += item.p.x; y += item.p.y; }
+    out.push({ items, x: x / items.length, y: y / items.length });
+  }
+  return out;
+}
+/** 一撮人的世界坐标质心（拾取回调要给世界坐标，不是屏幕坐标）。 */
+function ClusterWorld(group) {
+  let x = 0, z = 0;
+  for (const item of group.items) { x += item.member.x; z += item.member.z; }
+  return { x: x / group.items.length, z: z / group.items.length };
+}
+/** 一撮人用哪张图标：数一数谁最多。打平取先出现的那个（成员顺序是定的）。 */
+function DominantIcon(items, state, encounterId) {
+  const tally = new Map();
+  let best = "Rifleman";
+  let bestN = 0;
+  for (const item of items) {
+    const icon = MapIconForMember(item.member, state, encounterId);
+    const n = (tally.get(icon) || 0) + 1;
+    tally.set(icon, n);
+    if (n > bestN) { bestN = n; best = icon; }
+  }
+  return best;
+}
+/** 状态决定的透明度。单人与簇用同一条，免得两种画法看着像两种状态。 */
+function StateAlpha(state) {
+  if (state === "pending") return 0.64;
+  if (state === "dormant") return 0.74;
+  if (state === "cleared") return 0.66;
+  return 1;
 }
 
 function StateColor(state) {

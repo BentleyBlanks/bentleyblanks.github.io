@@ -545,7 +545,7 @@ export class OrchestrationEditor {
     this.filterLayout = ReadFilterLayout();   // 抽屉开合、两个页签各自的宽度、小节折叠
     this.filterSignature = "";           // 树只在真的变了才重建
     this.tableSignature = "";
-    this.hoverPreview = false;           // 悬停时临时「只看这一类」，指针一走就还原
+    this.hoverSel = null;                // 鼠标划过某一行时临时描亮的那个对象
     this.tableSort = { column: "group", ascending: true };
     this.tableCollapsed = new Set();     // 布设表里收起来的组
     this.tableRows = [];
@@ -615,7 +615,7 @@ export class OrchestrationEditor {
     this.tableSignature = "";
     this.tableLiveCells = new Map();
     this.phaseLayoutCache = null;
-    this.hoverPreview = false;
+    this.hoverSel = null;
     if (this.win && !this.win.closed) this.win.close();
     this.win = null;
     this.doc = null;
@@ -957,7 +957,8 @@ export class OrchestrationEditor {
     const filterButton = Button(tools, "", () => this.OpenFilterDrawer(), { orch: "filter-button" }, "tchip");
     El("span", filterButton, "分类");
     const filterCount = El("span", filterButton, "", "mono muted");
-    filterButton.title = "按类型看：敌军可以按组 / 本阶段状态 / 武器 / 行为分开看，也能只看某一组；还有一张敌军布设表";
+    filterButton.title = "按类型看：敌军可以按组 / 本阶段状态 / 武器 / 行为分开看，也能只看某一组；"
+      + "还有一张敌军布设表。再点一次收起这块面板。";
     this.ui.filterButton = filterButton;
     this.ui.filterCount = filterCount;
 
@@ -1238,7 +1239,7 @@ export class OrchestrationEditor {
     const layout = this.PhaseLayoutNow();
     this.filter = BuildOrchestrationFilter(this.model, layout, this.filterState);
     this.filterSummary = FilterSummary(this.model, layout, this.filterState, { notes: this.notes.length });
-    this.hoverPreview = false;
+    this.hoverSel = null;
     // V1 的地图还没接上 SetFilter 时这里就是个空操作：面板照样能看，图上全画。
     this.map?.SetFilter?.(this.filter);
     this.RefreshFilterPanel({ rebuild });
@@ -1272,7 +1273,9 @@ export class OrchestrationEditor {
     const El = this.El;
     const root = this.ui.filterTree;
     const summary = this.filterSummary;
-    this.map?.SetHover(null);
+    // 树要重建，正被划过的那一行马上就不存在了 —— 先把描亮还回去，
+    // 否则它的 mouseleave 永远不会来，图上那一圈就钉死在那儿。
+    this.ClearHoverPreview();
     root.textContent = "";
     if (!summary) { El("div", root, "这一阶段没有可分类的东西", "fEmpty"); return; }
     const Row = (parent, row, { cls = "", icon = null, color = null, sub = "" } = {}) => {
@@ -1290,10 +1293,12 @@ export class OrchestrationEditor {
       this.IconNode(node, icon, color);
       const who = El("div", node, "", "who");
       El("span", who, row.label, "fName");
-      if (sub) {
+      // 名字说人话，表里的编号只当尾巴上的等宽小字 —— 没有补充说明也要留着编号，
+      // 不然「侧翼路」在源表里叫什么就没处对了。
+      if (sub || row.code) {
         const line = El("span", who, "", "fSub");
         if (row.code) El("code", line, row.code);
-        El("span", line, row.code ? ` · ${sub}` : sub);
+        if (sub) El("span", line, row.code ? ` · ${sub}` : sub);
       }
       El("span", node, row.visible === row.count ? String(row.count) : `${row.visible}/${row.count}`, "fNum")
         .title = `这一阶段一共 ${row.count}，现在画出来 ${row.visible}`;
@@ -1383,29 +1388,27 @@ export class OrchestrationEditor {
   }
 
   /**
-   * 悬停：能指到单个对象的（某一组、某一条路线）就让地图描亮它；
-   * 指不到单个对象的（按状态 / 武器 / 行为 / 整个类别）就临时只画这一类，
-   * 指针一挪开立刻还原 —— 「高亮」在这张图上就是「别的先让让」。
+   * 悬停 = 描亮，**不改画面上有什么**。
+   * 能指到单个对象的（某一组、某一条路线、表里的某个人）就在图上给它描一圈
+   * （`SetHover` 报给地图，`SetSelection` 画那一圈；指针不在画布上时地图不画 tooltip）；
+   * 指不到单个对象的（按状态 / 武器 / 行为 / 整个类别）就**什么都不动** ——
+   * 早先那版是临时「只画这一类」，扫一遍列表整张图闪十几次，比没有还难看。
+   * 指针离开时把描亮还给真正选中的那个对象。
    */
   HoverRow(kind, id) {
     if (!this.map) return null;
-    if (kind === "encounter" || kind === "route") {
-      this.ClearHoverPreview();
-      const sel = { kind, id };
-      this.map.SetHover(sel);
-      return sel;
-    }
-    const preview = BuildOrchestrationFilter(this.model, this.PhaseLayoutNow(),
-      { ...DefaultFilterState(), solo: { kind, id } });
-    this.hoverPreview = true;
-    this.map.SetFilter?.(preview);
-    return null;
+    if (kind !== "encounter" && kind !== "route" && kind !== "member") { this.ClearHoverPreview(); return null; }
+    const sel = { kind, id };
+    this.hoverSel = sel;
+    this.map.SetHover(sel);
+    this.map.SetSelection(sel);
+    return sel;
   }
 
   ClearHoverPreview() {
-    if (this.hoverPreview) {
-      this.hoverPreview = false;
-      this.map?.SetFilter?.(this.filter);
+    if (this.hoverSel) {
+      this.hoverSel = null;
+      this.map?.SetSelection(this.selection);     // 描亮还给真正选中的那个
     }
     this.map?.SetHover(null);
   }
@@ -1448,6 +1451,7 @@ export class OrchestrationEditor {
     if (signature === this.tableSignature) { this.RefreshTableLive(rows); return; }
     this.tableSignature = signature;
     const root = this.ui.enemyTable;
+    this.ClearHoverPreview();            // 同上：行要重建，描亮先还回去
     root.textContent = "";
     this.tableLiveCells = new Map();
 
@@ -1467,7 +1471,9 @@ export class OrchestrationEditor {
     const head = El("thead", table);
     const headRow = El("tr", head);
     for (const column of ENEMY_TABLE_COLUMNS) {
-      const cell = El("th", headRow, column.label);
+      // 按组排时组名写在分组线上，行里那一格只剩图标 —— 表头跟着改叫「图标」，
+      // 免得一列图标顶着「组」字。换成别的排法时它又变回「组」，那时行里是有组名的。
+      const cell = El("th", headRow, grouped && column.id === "group" ? "图标" : column.label);
       cell.dataset.tableSort = column.id;
       if (this.tableSort.column === column.id) {
         cell.classList.add("sorted");
@@ -1510,12 +1516,14 @@ export class OrchestrationEditor {
       El("td", node, row.traitText).title = row.traitText;
       El("td", node, row.spawnText, "num");
       El("td", node, row.routeText);
-      const live = El("td", node, row.liveText || "—", "num liveCell");
+      // 这一局里没有这个人（组还没出现、或已经算被清掉了）时，「实时」写的是
+      // 他这一阶段的状态 —— 一整列破折号看着像面板坏了。
+      const live = El("td", node, LiveCellText(row), `num liveCell${row.live ? "" : " muted"}`);
       this.tableLiveCells.set(row.member, live);
       node.title = `${row.group} · ${row.member}：点一下选中他并把图移过去`;
       node.addEventListener("click", () => this.PickEnemyRow(row.member));
-      node.addEventListener("mouseenter", () => this.map?.SetHover({ kind: "member", id: row.member }));
-      node.addEventListener("mouseleave", () => this.map?.SetHover(null));
+      node.addEventListener("mouseenter", () => this.HoverRow("member", row.member));
+      node.addEventListener("mouseleave", () => this.ClearHoverPreview());
     }
     root.appendChild(table);
   }
@@ -1526,8 +1534,9 @@ export class OrchestrationEditor {
     for (const row of rows || this.EnemyRows()) {
       const cell = this.tableLiveCells.get(row.member);
       if (!cell) continue;
-      const text = row.liveText || "—";
+      const text = LiveCellText(row);
       if (cell.textContent !== text) cell.textContent = text;
+      cell.classList.toggle("muted", !row.live);
       const node = cell.parentElement;
       if (node && row.live) node.dataset.alive = row.live.alive ? "1" : "0";
     }
@@ -2993,7 +3002,8 @@ function WriteLayout(layout) {
 /** 分类抽屉的开合、两个页签各自的宽度、四个小节的折叠：也记在 localStorage。 */
 function ReadFilterLayout() {
   const fallback = {
-    open: true, tab: "tree", width: 244, tableWidth: 620,
+    // 220 是分类树够用的最窄一档：再宽就从俯视图身上抠了（1380 的窗口里中栏只有 640 上下）。
+    open: true, tab: "tree", width: 220, tableWidth: 620,
     sections: { groups: true, states: true, weapons: false, behaviors: false },
   };
   try {
@@ -3042,6 +3052,11 @@ function IconModuleAvailable() {
 /** 图标文件的绝对地址：弹窗文档是 about:blank，相对路径在那儿解不出来。 */
 function AssetUrl(file) {
   try { return new URL(String(file).replace(/^\.\//, ""), window.location.href).href; } catch (error) { return ""; }
+}
+
+/** 布设表「实时」那一格：这一局里有这个人就写活着/阵亡与位置，没有就写他这一阶段的状态。 */
+function LiveCellText(row) {
+  return row.liveText || row.stateText || "—";
 }
 
 function ShapeText(shape) {

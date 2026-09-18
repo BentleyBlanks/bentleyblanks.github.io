@@ -622,8 +622,9 @@ const changedDomainRules = [
   { domain: "editor", pattern: /Script_EditorPlayerState|Script_PlayerStateEditorTest/i },
   // 关卡编排工作台本体与它的俯视图：改了跑 editor 域（OrchestrationEditorTest / OrchestrationMapTest）。
   { domain: "editor", pattern: /Script_EditorOrchestration|Script_Orchestration.*Test/i },
-  // 「分类查看」的纯模型（工作台的分类树与敌军布设表都读它）：改了跑 editor 域。
-  { domain: "editor", pattern: /Script_MissionOrchestrationFilter/i },
+  // 「分类查看」的纯模型（工作台的分类树与敌军布设表都读它）与那张图标登记表
+  // （俯视图与面板共用，连同 Texture/Editor 下的 PNG）：改了跑 editor 域。
+  { domain: "editor", pattern: /Script_MissionOrchestrationFilter|Data_OrchestrationIcons|Texture\/Editor\//i },
   // 壕沟规划层与预览几何没有 Editor 字样，但「场景样条PCG」面板读的就是它们
   // （滑杆推 SetTrenchPresetOverride、预览调 CompileTrenchNetwork）——
   // 改 TRENCH_PRESETS 不跑 TrenchEditorTest，面板那一路会静默过期。

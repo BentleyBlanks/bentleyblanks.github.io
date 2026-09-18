@@ -65,8 +65,8 @@ const HARNESS = `<!doctype html>
 </script>
 <script type="module">
   import { BuildOrchestrationModel, PhaseLayout } from "../../Script_MissionOrchestration.mjs";
-  import { OrchestrationMap, MAP_COLORS, LoadedIconNames } from "../../Script_EditorOrchestrationMap.mjs";
-  import { ORCHESTRATION_ICONS, ICON_ORDER, IconForMember } from "../../Data_OrchestrationIcons.mjs";
+  import { OrchestrationMap, MAP_COLORS, LoadedIconNames, MapIconForMember } from "../../Script_EditorOrchestrationMap.mjs";
+  import { ORCHESTRATION_ICONS, ICON_ORDER } from "../../Data_OrchestrationIcons.mjs";
   try {
     const canvas = document.getElementById("map");
     const model = BuildOrchestrationModel();
@@ -84,7 +84,9 @@ const HARNESS = `<!doctype html>
     window.__LoadedIcons = () => LoadedIconNames();
     window.__ICON_ORDER = ICON_ORDER;
     window.__ICON_FILES = Object.fromEntries(ICON_ORDER.map((n) => [n, ORCHESTRATION_ICONS[n].file]));
-    window.__IconForMember = IconForMember;
+    // 图上用哪张图标的口径就问地图这一层 —— 它在登记表的规则上还拧了一处
+    // （上刺刀那张细长的枪在 14 px 下认不出，图上画步枪兵 + 刺刀角标）。
+    window.__MapIcon = MapIconForMember;
 
     // 数像素：一次 getImageData，顺手把「非底色像素」也数出来 —— 那是「这张图
     // 到底有没有内容」的粗闸，防止调色板对上了但整张图其实是空的。
@@ -269,29 +271,37 @@ try {
     });
     map.SetPhase(12);
     map.FitBounds();
-    map.Redraw();
+    // 这一节查的是「每一个人画对没有」，所以先把合并关掉逐个看 ——
+    // 开着合并的话整关视野下大半的人会并进簇标记里，等于只抽查了几个。
+    map.SetClusterGap(0);
     const loaded = window.__LoadedIcons();
     const marks = map.drawnMarkers || [];
     const members = marks.filter((entry) => entry.kind === "member");
     // 每个敌人都得有图标名，而且那张名字对应的 PNG 真的加载上了。
     const broken = members.filter((entry) => !entry.icon || !loaded.includes(entry.icon));
-    // 图标要跟着「他是干什么的」走：机枪手画机枪、上刺刀的画刺刀。
+    // 图标要跟着「他是干什么的」走：机枪手画机枪、飞机画飞机；
+    // 上刺刀的画步枪兵（刺刀走角标，那张细长的枪在 14 px 下认不出）。
     const wrong = [];
+    let bayonetMen = 0;
     for (const encounter of map.phaseLayout.encounters || []) {
       for (const member of encounter.members || []) {
         const drawn = members.find((entry) => entry.id === member.id);
         if (!drawn) continue;
-        const want = window.__IconForMember(member, encounter.state, encounter.id);
+        if (member.bayonet) bayonetMen += 1;
+        const want = window.__MapIcon(member, encounter.state, encounter.id);
         if (drawn.icon !== want) wrong.push(`${member.id} 画成 ${drawn.icon}，该是 ${want}`);
       }
     }
+    const totalMembers = (map.phaseLayout.encounters || [])
+      .reduce((n, e) => n + (e.members || []).length, 0);
+    map.SetClusterGap(null);
     return {
       loaded: loaded.length, all: window.__ICON_ORDER.length,
       missing: window.__ICON_ORDER.filter((n) => !loaded.includes(n)),
       marks: marks.length, members: members.length, broken: broken.slice(0, 4),
       kinds: [...new Set(marks.map((entry) => entry.kind))].sort(),
       used: [...new Set(members.map((entry) => entry.icon))].sort(),
-      wrong: wrong.slice(0, 4),
+      wrong: wrong.slice(0, 4), bayonetMen, totalMembers,
       sheet: map.IconSheetPng({}),
     };
   });
@@ -303,8 +313,13 @@ try {
     `${icons.marks} 个标记，其中敌人 ${icons.members} 个；种类 ${icons.kinds.join("/")}`);
   Check("每个敌人都带一个已加载的图标名", icons.broken.length === 0,
     icons.broken.length ? icons.broken.map((b) => `${b.id}:${b.icon}`).join("；") : `用到 ${icons.used.join("、")}`);
-  Check("图标按「他是干什么的」选（机枪 / 刺刀 / 守点 / 飞机）", icons.wrong.length === 0,
-    icons.wrong.join("；") || "全部与登记表一致");
+  Check("关掉合并时每个敌人都单画一枚", icons.members === icons.totalMembers,
+    `${icons.members} / ${icons.totalMembers} 人`);
+  Check("图标按「他是干什么的」选（机枪 / 守点 / 飞机）", icons.wrong.length === 0,
+    icons.wrong.join("；") || "全部与地图口径一致");
+  Check("上刺刀的兵画步枪兵图标（刺刀退成放大后才出现的角标）",
+    icons.bayonetMen > 0 && !icons.used.includes("Bayonet"),
+    `${icons.bayonetMen} 个上了刺刀的兵，图上用到的图标：${icons.used.join("、")}`);
   Info("图标总表", `_shots/OrchestrationMap/icons_sheet.png，${(sheetBytes / 1024).toFixed(0)} KB`);
 
   // 图例里那一列示意图就是地图上的同一张图标 —— 把所有标记层关掉，只留图例，
@@ -337,6 +352,133 @@ try {
     legendIcons.off.enemyStagedExact === 0 && legendIcons.off.friendlyExact === 0
     && legendIcons.off.noteExact === 0,
     `${legendIcons.off.enemyStagedExact}/${legendIcons.off.friendlyExact}/${legendIcons.off.noteExact} px`);
+
+  // -------------------------------------------------------------------------
+  // 0c) 挤在一起就合并：整关视野下前线那十二个人是一枚，放大就散开
+  // -------------------------------------------------------------------------
+  const cluster = await page.evaluate(() => {
+    const map = window.__map;
+    map.SetFilter(null);
+    map.SetClusterGap(null);
+    map.SetSelection(null);
+    map.SetHover(null);
+    map.SetLive(null);
+    map.SetLayers({
+      terrain: true, blocks: true, trenches: true, roads: true, anchors: true,
+      routes: true, zones: true, friendlies: true, encounters: true, tactics: true,
+      live: true, notes: true, labels: true, legend: true,
+    });
+    // front 组在哪一阶段真的在场（不是「还没出现」也不是「已清除」）
+    let phase = null;
+    for (const entry of map.model.phases) {
+      map.SetPhase(entry.number);
+      const found = (map.phaseLayout.encounters || []).find((e) => e.id === "front");
+      if (found && found.state !== "pending" && found.state !== "cleared") { phase = entry.number; break; }
+    }
+    map.SetPhase(phase);
+    const front = (map.phaseLayout.encounters || []).find((e) => e.id === "front");
+    const frontSize = (front?.members || []).length;
+    let cx = 0, cz = 0;
+    for (const member of front?.members || []) { cx += member.x; cz += member.z; }
+    cx /= frontSize; cz /= frontSize;
+
+    const Marks = (kind, id) => (map.drawnMarkers || [])
+      .filter((e) => e.kind === kind && (!id || e.encounter === id));
+
+    map.FitBounds();
+    const wideClusters = Marks("cluster", "front");
+    const wideMembers = Marks("member", "front");
+    const chip = wideClusters[0] || null;
+    const pick = chip ? map.PickAt(chip.x, chip.y) : null;
+    const tip = pick ? map.DescribeSel(pick) : [];
+    // 不同组之间不合并：每一枚簇里的人数不能超过它所属那一组自己的人数
+    const crossGroup = Marks("cluster").filter((entry) => {
+      const owner = (map.phaseLayout.encounters || []).find((e) => e.id === entry.encounter);
+      return !owner || entry.count > (owner.members || []).length;
+    }).map((entry) => `${entry.encounter}:${entry.count}`);
+    // 人数芯片真的画在画布上：把名字层关掉（组把手也是名字层画的），
+    // 剩下还用芯片底色的就只有簇标记那枚人数了。
+    map.SetLayers({ labels: false });
+    const clusterPx = window.__CountMap(["handle"]).handleExact;
+    map.SetLayers({ labels: true });
+
+    // 放大到彼此分得开
+    map.ZoomTo({ x: cx, z: cz }, 45);
+    const nearClusters = Marks("cluster", "front");
+    const nearMembers = Marks("member", "front");
+
+    map.FitBounds();
+    return {
+      phase, frontSize, cx, cz, crossGroup, clusterPx,
+      wideClusters: wideClusters.length, wideCount: chip?.count ?? 0, wideIcon: chip?.icon || "",
+      wideMembers: wideMembers.length, pick, tip,
+      nearClusters: nearClusters.length, nearMembers: nearMembers.length,
+      png: map.ToPng({ scale: 1 }),
+    };
+  });
+  SavePng("cluster_front.png", cluster.png);
+  delete cluster.png;
+  Check("整关视野下前线那一组只画出一枚簇标记，人数写着 12",
+    cluster.wideClusters === 1 && cluster.wideCount === cluster.frontSize
+    && cluster.frontSize === 12 && cluster.wideMembers === 0,
+    `阶段 ${cluster.phase}：${cluster.wideClusters} 枚簇（count=${cluster.wideCount}，图标 ${cluster.wideIcon}），`
+    + `另有 ${cluster.wideMembers} 枚单人`);
+  Check("放大到彼此分开就散成 12 枚单人，簇标记消失",
+    cluster.nearMembers === cluster.frontSize && cluster.nearClusters === 0,
+    `${cluster.nearMembers} 枚单人 / ${cluster.nearClusters} 枚簇`);
+  Check("点簇标记拿到整组（kind=encounter），提示里报得出这一撮几个人",
+    cluster.pick?.kind === "encounter" && cluster.pick?.id === "front"
+    && cluster.pick?.cluster === cluster.frontSize
+    && cluster.tip.some((line) => line.includes(`${cluster.frontSize} 人`)),
+    `${JSON.stringify(cluster.pick)} ｜ ${cluster.tip.join(" ｜ ")}`);
+  Check("不同组之间不合并（每枚簇的人数都不超过它那一组）",
+    cluster.crossGroup.length === 0 && cluster.clusterPx > 0,
+    cluster.crossGroup.join("、") || `人数芯片 ${cluster.clusterPx} px`);
+
+  // -------------------------------------------------------------------------
+  // 0d) 触发区中心不再摆图标：虚线圈本身就是它的图标
+  // -------------------------------------------------------------------------
+  const zoneIcons = await page.evaluate(() => {
+    const map = window.__map;
+    map.SetPhase(12);
+    map.SetHover(null);
+    // 只留触发区这一层：别的层的金色（把手描边、图例顶条）会混进来
+    map.SetLayers({
+      encounters: false, friendlies: false, anchors: false, routes: false,
+      notes: false, live: false, tactics: false, legend: false, labels: false, zones: true,
+    });
+    // 挑这一阶段**真的画着**的那个圈：整份模型里四十五个触发区，第 12 阶段只画五个，
+    // 拿别的阶段的圈去量，量到的是一片没人画的空地。
+    const zone = (map.phaseLayout?.zones || map.model.zones || [])
+      .find((z) => Number.isFinite(z.radiusM) && Number.isFinite(z.x));
+    map.ZoomTo({ x: zone.x, z: zone.z }, 30);
+    const p = map.WorldToScreen(zone.x, zone.z);
+    const gold = window.__CountRect("zone", { x: p.x - 16, y: p.y - 16, w: 32, h: 32 });
+    // 虚线圈是半透明画的（0.42），混出来的颜色离纯金差着一百多档，数「金色像素」
+    // 是数不到它的。所以换个问法：把触发区这一层关掉，画面必须变 —— 变了就说明
+    // 这一层还在画东西，没被「去掉圈心图标」一起砍掉。
+    const on = window.__Count([]);
+    map.SetLayers({ zones: false });
+    const off = window.__Count([]);
+    map.SetLayers({ zones: true });
+    const withZones = on.sum, withoutZones = off.sum;
+    const marks = (map.drawnMarkers || []).filter((e) => e.kind === "zone");
+    const withIcon = marks.filter((e) => e.icon).map((e) => `${e.id}:${e.icon}`);
+    map.SetLayers({
+      encounters: true, friendlies: true, anchors: true, routes: true,
+      notes: true, live: true, tactics: true, legend: true, labels: true, zones: true,
+    });
+    map.FitBounds();
+    return { id: zone.id, gold, withZones, withoutZones, zones: marks.length, withIcon };
+  });
+  Check("触发区中心不再有金色图标像素（圈心只剩一颗淡点）", zoneIcons.gold === 0,
+    `${zoneIcons.id} 圈心 32×32 里精确金色 ${zoneIcons.gold} px`);
+  Check("虚线圈本身还画着（关掉这一层画面就变）",
+    zoneIcons.withZones !== zoneIcons.withoutZones && zoneIcons.zones > 0,
+    `${zoneIcons.zones} 个触发区在这一屏里（关掉这一层画面指纹 ${zoneIcons.withZones} → ${zoneIcons.withoutZones}）`);
+  Check("只有转运那四个攻击波的框还留图标", zoneIcons.withIcon.length === 4
+    && zoneIcons.withIcon.every((entry) => entry.endsWith(":Wave")),
+    zoneIcons.withIcon.join("、") || "一个图标都没留");
 
   // -------------------------------------------------------------------------
   // 1) 各阶段数像素：敌人色随阶段变、路线色不为 0、整张图不是空的
@@ -883,6 +1025,10 @@ try {
     map.SetHover(null);
     map.SetLive(null);
     map.SetFilter(null);
+    // 这一节问的是「过滤留下了谁」，所以先把合并关掉逐个数 ——
+    // 开着合并的话 transfer 那四个人在整关视野下会并成一枚，数出来是 0 个人，
+    // 那量的是合并不是过滤。
+    map.SetClusterGap(0);
     map.SetPhase(12);
     map.FitBounds();
     const Members = () => (map.drawnMarkers || []).filter((entry) => entry.kind === "member");
@@ -917,6 +1063,7 @@ try {
     const backRoute = window.__CountMap(["route"]).route;
     const truth = (map.model.encounters.find((entry) => entry.id === "transfer")?.members || [])
       .map((entry) => entry.id).sort();
+    map.SetClusterGap(null);
     return {
       allCount: all.length, onlyIds, onlyEnc, chipsAfter, stored, storedNulls,
       pickFiltered, pickBack, oneMember,
