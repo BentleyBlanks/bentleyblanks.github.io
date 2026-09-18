@@ -26,6 +26,7 @@ import { ServeRoot } from "./Script_DevServer.mjs";
 
 const STORAGE_KEY = "tengxian1938_orchestration_notes_FirstLevel";
 const LAYOUT_KEY = "tengxian1938_orchestration_layout_FirstLevel";
+const FILTER_KEY = "tengxian1938_orchestration_filter_FirstLevel";
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(projectDir, "..");
 const shotDir = path.join(projectDir, "_shots", "Orchestration");
@@ -45,6 +46,9 @@ page.on("console", (message) => {
   // 「保存草稿」**故意**去问一个不存在的端点：ServeRoot 没有 /__notes，
   // 浏览器照例把 404 打进 console。这正是本测试要验的退化路径，不是脚本错误。
   if (/__notes/.test(url) || /__notes/.test(message.text())) return;
+  // 图标登记表是另一包的东西，工作台按「有就用、没有就画圆点」处理；
+  // 它不在树上时浏览器会打一条 404，那不是工作台的错。
+  if (/OrchestrationIcons|Icon_Orch_/.test(url) || /OrchestrationIcons/.test(message.text())) return;
   errors.push(`CONSOLE ${message.text().slice(0, 200)} @ ${url}`);
 });
 
@@ -62,10 +66,15 @@ try {
     null, { timeout: 300000 });
   // 上一轮如果红在半路，草稿会留在 localStorage / IndexedDB 里，
   // 下一轮的「退化成一条」「缓存 1 张图」就全对不上。开跑前先清干净。
-  await page.evaluate(async ({ key, layoutKey }) => {
+  await page.evaluate(async ({ key, layoutKey, filterKey }) => {
     // 三栏宽度与时间轴的折叠状态也记在 localStorage 里：上一轮要是把时间轴收起来了，
     // 这一轮 waitForSelector 会等一个 display:none 的标记等到超时。
-    try { localStorage.removeItem(key); localStorage.removeItem(layoutKey); } catch (error) { /* 隐私模式 */ }
+    // 分类抽屉的开合与页签同理（上一轮停在「布设表」的话分类树根本不在 DOM 上）。
+    try {
+      localStorage.removeItem(key);
+      localStorage.removeItem(layoutKey);
+      localStorage.removeItem(filterKey);
+    } catch (error) { /* 隐私模式 */ }
     await Promise.race([
       new Promise((resolve) => {
         const request = indexedDB.deleteDatabase("tengxian1938_orchestration");
@@ -75,7 +84,7 @@ try {
       }),
       new Promise((resolve) => setTimeout(() => resolve(false), 5000)),
     ]);
-  }, { key: STORAGE_KEY, layoutKey: LAYOUT_KEY });
+  }, { key: STORAGE_KEY, layoutKey: LAYOUT_KEY, filterKey: FILTER_KEY });
 
   // -------------------------------------------------------------------------
   // 1) 入口：26 个按钮，工作台在「调试」组里
@@ -391,6 +400,208 @@ try {
     JSON.stringify(label.afterBlur.last));
 
   // -------------------------------------------------------------------------
+  // 4e) 分类查看：抽屉、预设、分类树、「只看」
+  //
+  // 用户的原话是「我希望能分类的看到敌军布设的位置」。这一段守的是「面板上写的数
+  // 就是图上画的数」：点「只看」之后 tool.filter 里的成员集合与分类树那一行的计数
+  // 必须一致 —— 面板说 4 人、图上画 12 个的话，用户是照着一张假名册提意见。
+  // -------------------------------------------------------------------------
+  const filterPanel = await page.evaluate(() => {
+    const T = window.Taierzhuang;
+    const tool = T.editor.overlays.get("orchestration");
+    const doc = tool.win.document;
+    tool.SetPhase(12);
+    tool.ApplyPreset("all");
+    const opened = tool.OpenFilterDrawer(true);
+    const Rows = (kind) => [...doc.querySelectorAll(`[data-filter-row^="${kind}:"]`)];
+    const groups = Rows("encounter");
+    const Row = (key) => doc.querySelector(`[data-filter-row="${key}"]`);
+    const Counts = (key) => {
+      const node = Row(key);
+      return node ? { count: Number(node.dataset.filterCount), visible: Number(node.dataset.filterVisible) } : null;
+    };
+    return {
+      opened,
+      drawer: doc.querySelectorAll('[data-orch="filter-drawer"]').length,
+      presets: doc.querySelectorAll('[data-orch="filter-presets"] [data-filter-preset]').length,
+      tree: doc.querySelectorAll('[data-orch="filter-tree"]').length,
+      tabs: doc.querySelectorAll("[data-filter-tab]").length,
+      groups: groups.length,
+      categories: Rows("category").map((node) => node.querySelector(".fName").textContent),
+      states: Rows("state").length,
+      transfer: {
+        name: Row("encounter:transfer")?.querySelector(".fName").textContent || "",
+        sub: Row("encounter:transfer")?.querySelector(".fSub")?.textContent || "",
+        counts: Counts("encounter:transfer"),
+      },
+      // 界面上不许出现内部叫法（转运区那四组叫「第 n 波攻击」，不叫「拍」）
+      jargon: [...doc.querySelectorAll('[data-orch="filter-tree"] .fName')]
+        .map((node) => node.textContent).filter((text) => /kind=|拍|beat|dormant/i.test(text)),
+    };
+  });
+  Check("工具条上的「分类」打得开抽屉，预设与分类树都在",
+    filterPanel.opened && filterPanel.drawer === 1 && filterPanel.tree === 1
+    && filterPanel.presets === 6 && filterPanel.tabs === 2,
+    `抽屉 ${filterPanel.drawer} / 预设 ${filterPanel.presets} / 页签 ${filterPanel.tabs}`);
+  Check("分类树列出六个类别", filterPanel.categories.length === 6
+    && filterPanel.categories.includes("敌军") && filterPanel.categories.includes("触发区"),
+    filterPanel.categories.join(" "));
+  Check("敌军按组列出 21 组", filterPanel.groups === 21, `实际 ${filterPanel.groups}`);
+  Check("组名是人话、后面跟着编号与本阶段状态",
+    filterPanel.transfer.name === "转运区第 1 波攻击" && /transfer/.test(filterPanel.transfer.sub)
+    && /活跃/.test(filterPanel.transfer.sub),
+    `${filterPanel.transfer.name} ｜ ${filterPanel.transfer.sub}`);
+  Check("分类树里没有内部叫法", filterPanel.jargon.length === 0, filterPanel.jargon.join(" / "));
+
+  const solo = await page.evaluate(() => {
+    const T = window.Taierzhuang;
+    const tool = T.editor.overlays.get("orchestration");
+    const doc = tool.win.document;
+    doc.querySelector('[data-filter-solo="encounter:transfer"]').click();
+    const Sets = () => ({
+      members: tool.filter.members ? [...tool.filter.members] : null,
+      encounters: tool.filter.encounters ? [...tool.filter.encounters] : null,
+      friendlies: tool.filter.friendlies ? tool.filter.friendlies.size : null,
+      zones: tool.filter.zones ? tool.filter.zones.size : null,
+    });
+    const after = Sets();
+    const row = doc.querySelector('[data-filter-row="encounter:transfer"]');
+    const other = doc.querySelector('[data-filter-row="encounter:transferFlank"]');
+    const mapFilter = tool.map.filter ? { members: tool.map.filter.members?.size ?? null } : null;
+    doc.querySelector('[data-filter-solo="encounter:transfer"]').click();     // 再点一次取消
+    const cleared = tool.filter.members === null;
+    return {
+      after, mapFilter, cleared,
+      solo: row?.dataset.solo, badge: row?.querySelector(".fNum").textContent,
+      otherBadge: other?.querySelector(".fNum").textContent,
+      counts: { count: Number(row.dataset.filterCount), visible: Number(row.dataset.filterVisible) },
+      otherCounts: { count: Number(other.dataset.filterCount), visible: Number(other.dataset.filterVisible) },
+    };
+  });
+  Check("点「只看」某一组：集合里只剩它那 4 个人",
+    solo.after.members?.length === 4 && solo.after.encounters?.length === 1
+    && solo.after.encounters[0] === "transfer",
+    JSON.stringify(solo.after.members));
+  Check("「只看」时别的类别是空集（不是不管）",
+    solo.after.friendlies === 0 && solo.after.zones === 0,
+    `友军 ${solo.after.friendlies} / 触发区 ${solo.after.zones}`);
+  Check("面板计数与集合一致（这一行 4/4、别的组 0）",
+    solo.counts.visible === 4 && solo.counts.count === 4
+    && solo.otherCounts.visible === 0 && solo.otherCounts.count === 4
+    && solo.badge === "4" && solo.otherBadge === "0/4",
+    `${solo.badge} / ${solo.otherBadge}`);
+  Check("同一份集合递给了俯视图", solo.mapFilter?.members === 4, JSON.stringify(solo.mapFilter));
+  Check("再点一次「只看」就回到全画", solo.cleared);
+
+  const presets = await page.evaluate(() => {
+    const tool = window.Taierzhuang.editor.overlays.get("orchestration");
+    const doc = tool.win.document;
+    const Read = () => ({
+      members: tool.filter.members === null ? "全部" : tool.filter.members.size,
+      friendlies: tool.filter.friendlies === null ? "全部" : tool.filter.friendlies.size,
+      zones: tool.filter.zones === null ? "全部" : tool.filter.zones.size,
+      routes: tool.filter.routes === null ? "全部" : tool.filter.routes.size,
+    });
+    doc.querySelector('[data-filter-preset="enemies"]').click();
+    const enemies = Read();
+    const on = doc.querySelector('[data-filter-preset="enemies"]').classList.contains("on");
+    doc.querySelector('[data-filter-preset="friendlies"]').click();
+    const friendlies = Read();
+    doc.querySelector('[data-filter-preset="new"]').click();
+    const fresh = { ...Read(), groups: tool.filter.encounters ? [...tool.filter.encounters] : null };
+    // 按本阶段状态筛：只留「活跃」的人
+    tool.ApplyPreset("all");
+    tool.SetFilterState({ states: new Set(["active"]) });
+    const active = {
+      members: tool.filter.members.size,
+      expected: tool.map.phaseLayout.encounters.filter((one) => one.state === "active")
+        .reduce((sum, one) => sum + one.members.length, 0),
+    };
+    tool.ApplyPreset("all");
+    return { enemies, on, friendlies, fresh, active };
+  });
+  Check("预设「只看敌军」：敌人全留，友军集合是空集",
+    presets.enemies.members === "全部" && presets.enemies.friendlies === 0
+    && presets.enemies.zones === 0 && presets.enemies.routes === 0 && presets.on,
+    JSON.stringify(presets.enemies));
+  Check("预设「只看友军」反过来",
+    presets.friendlies.friendlies === "全部" && presets.friendlies.members === 0,
+    JSON.stringify(presets.friendlies));
+  Check("预设「只看本阶段新出现的」只留出现阶段 = 当前阶段的组",
+    presets.fresh.groups?.length === 4 && presets.fresh.groups.every((id) => id.startsWith("transfer")),
+    JSON.stringify(presets.fresh.groups));
+  Check("按本阶段状态筛人，人数与 PhaseLayout 一致",
+    presets.active.members === presets.active.expected && presets.active.members > 0,
+    `${presets.active.members} / ${presets.active.expected}`);
+
+  // -------------------------------------------------------------------------
+  // 4f) 敌军布设表：行数跟着筛选、点一行选中那个人、复制 CSV
+  // -------------------------------------------------------------------------
+  const table = await page.evaluate(() => {
+    const tool = window.Taierzhuang.editor.overlays.get("orchestration");
+    const doc = tool.win.document;
+    tool.SetFilterTab("table");
+    const Rows = () => [...doc.querySelectorAll('[data-orch="enemy-table"] [data-table-row]')];
+    const all = Rows().length;
+    const head = [...doc.querySelectorAll('[data-orch="enemy-table"] th')].map((node) => node.textContent.trim());
+    const groupRows = doc.querySelectorAll('[data-orch="enemy-table"] [data-table-group]').length;
+    tool.SoloTarget("encounter", "transfer");
+    const filtered = Rows().map((node) => node.dataset.tableRow);
+    const gunner = doc.querySelector('[data-table-row="TransferGunner"]');
+    const cells = [...gunner.querySelectorAll("td")].map((node) => node.textContent.trim());
+    gunner.click();
+    const picked = { sel: tool.selection, sel2: tool.map.selection, marked: gunner.classList.contains("sel") };
+    const csv = tool.EnemyCsv();
+    // 折叠：收起这一组之后它的人就不列了
+    tool.ToggleTableGroup("transfer");
+    const collapsed = Rows().length;
+    tool.ToggleTableGroup("transfer");
+    const reopened = Rows().length;
+    // 排序：按「本阶段」排，第一行是活跃的
+    tool.ApplyPreset("all");
+    tool.SortEnemyTable("state");
+    const sortedFirst = doc.querySelector('[data-orch="enemy-table"] [data-table-row] td:nth-child(4)')?.textContent;
+    tool.SortEnemyTable("group");
+    tool.SetFilterTab("tree");
+    return {
+      all, head, groupRows, filtered, cells, picked,
+      csvHead: csv.split("\n")[0], csvLines: csv.split("\n").length,
+      collapsed, reopened, sortedFirst,
+    };
+  });
+  Check("布设表列出这一阶段全部敌人（117 人、九列表头）",
+    table.all === 117 && table.head.length === 9 && table.head[0].startsWith("组")
+    && table.groupRows === 21,
+    `${table.all} 行 / 表头 ${table.head.join(" ")}`);
+  Check("表跟着筛选联动：只看 transfer 时只剩那 4 行",
+    table.filtered.length === 4 && table.filtered.includes("TransferGunner"),
+    table.filtered.join(" "));
+  Check("行里写着组 / 编号 / 出现 / 本阶段 / 武器 / 特点 / 出生点 / 路线点",
+    table.cells[1] === "TransferGunner" && table.cells[2] === "第 12 阶段" && table.cells[3] === "活跃"
+    && table.cells[4] === "机枪" && table.cells[5].includes("钉在原地") && table.cells[6] === "113, 80",
+    table.cells.join(" ｜ "));
+  Check("点一行 = 选中那个人（右栏与地图一起跟过去）",
+    table.picked.sel?.kind === "member" && table.picked.sel?.id === "TransferGunner"
+    && table.picked.sel2?.id === "TransferGunner" && table.picked.marked,
+    JSON.stringify(table.picked.sel));
+  Check("按组能收起也能摊开", table.collapsed === 0 && table.reopened === 4,
+    `收起后 ${table.collapsed} 行、摊开后 ${table.reopened} 行`);
+  Check("点表头按那一列排（按本阶段排时活跃的在最前）", table.sortedFirst === "活跃", String(table.sortedFirst));
+  Check("「复制 CSV」首行是中文表头",
+    table.csvHead === "组,编号,出现,本阶段,武器,特点,出生点,路线点,实时" && table.csvLines === 5,
+    `${table.csvHead}（${table.csvLines - 1} 行数据）`);
+
+  // 抽屉收起来再往下走：底下那几段要量整张俯视图（批注截图的体积也是按它算的）。
+  const closed = await page.evaluate(() => {
+    const tool = window.Taierzhuang.editor.overlays.get("orchestration");
+    tool.ApplyPreset("all");
+    const open = tool.OpenFilterDrawer(false);
+    tool.Select({ kind: "member", id: "TransferGunner" });
+    return { open, filter: tool.filter.members === null };
+  });
+  Check("抽屉能收起来，收起后筛选回到全画", closed.open === false && closed.filter);
+
+  // -------------------------------------------------------------------------
   // 5) 新建批注：草图 + 候选位 + 建议，无端点时退化为 localStorage + IndexedDB
   // -------------------------------------------------------------------------
   const note = await page.evaluate(async (key) => {
@@ -582,6 +793,33 @@ try {
 
   await popup.screenshot({ path: path.join(shotDir, "Workbench.png"), fullPage: true });
 
+  // 出图：分类抽屉开着（只看转运区第 1 波攻击）与整张敌军布设表。
+  await popup.setViewportSize({ width: 1380, height: 900 });
+  await page.evaluate(() => {
+    const tool = window.Taierzhuang.editor.overlays.get("orchestration");
+    tool.SetPhase(12, { fit: true });
+    tool.OpenFilterDrawer(true);
+    tool.SetFilterTab("tree");
+    tool.SoloTarget("encounter", "transfer");
+    tool.Select({ kind: "encounter", id: "transfer" });
+  });
+  await popup.screenshot({ path: path.join(shotDir, "Workbench_filter_1380.png"), fullPage: true });
+
+  await popup.setViewportSize({ width: 1920, height: 1080 });
+  await page.evaluate(() => {
+    const tool = window.Taierzhuang.editor.overlays.get("orchestration");
+    tool.ApplyPreset("all");
+    tool.SetFilterTab("table");
+    tool.ApplyFilterWidth(760);
+    window.Taierzhuang.editor.UpdateOverlays(0.3);
+  });
+  await popup.screenshot({ path: path.join(shotDir, "Workbench_table_1920.png"), fullPage: true });
+  await page.evaluate(() => {
+    const tool = window.Taierzhuang.editor.overlays.get("orchestration");
+    tool.SetFilterTab("tree");
+    tool.OpenFilterDrawer(false);
+  });
+
   // -------------------------------------------------------------------------
   // 7) 关窗、拦截与销毁
   // -------------------------------------------------------------------------
@@ -621,8 +859,8 @@ try {
   Check("销毁套件关闭工作台窗口", disposed);
 
   // 收尾：本轮的草稿与图都清掉。留着的话下一轮的「退化成一条」「缓存 1 张」全对不上。
-  const cleaned = await page.evaluate(async (key) => {
-    try { localStorage.removeItem(key); } catch (error) { /* 隐私模式 */ }
+  const cleaned = await page.evaluate(async ({ key, filterKey }) => {
+    try { localStorage.removeItem(key); localStorage.removeItem(filterKey); } catch (error) { /* 隐私模式 */ }
     const dropped = await Promise.race([
       new Promise((resolve) => {
         const request = indexedDB.deleteDatabase("tengxian1938_orchestration");
@@ -635,13 +873,14 @@ try {
     let left = null;
     try { left = localStorage.getItem(key); } catch (error) { left = null; }
     return { dropped, left };
-  }, STORAGE_KEY);
+  }, { key: STORAGE_KEY, filterKey: FILTER_KEY });
   Check("收尾清掉 IndexedDB 与 localStorage", cleaned.dropped === "deleted" && cleaned.left === null,
     `indexedDB=${cleaned.dropped}，localStorage=${cleaned.left === null ? "空" : "还有东西"}`);
 
   Check("没有页面错误", errors.length === 0, errors.join(" | "));
   const failed = results.filter((entry) => !entry.ok);
-  console.log(`\n${results.length - failed.length}/${results.length} 项通过，截图 ${path.join(shotDir, "Workbench.png")}`);
+  console.log(`\n${results.length - failed.length}/${results.length} 项通过，截图在 ${shotDir}`
+    + "（Workbench.png / Workbench_filter_1380.png / Workbench_table_1920.png）");
   assert.equal(failed.length, 0, failed.map((entry) => `${entry.name}${entry.detail ? `（${entry.detail}）` : ""}`).join("\n"));
 } finally {
   await browser.close();

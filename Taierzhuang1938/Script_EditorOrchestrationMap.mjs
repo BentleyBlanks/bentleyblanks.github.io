@@ -25,6 +25,49 @@
 // ===========================================================================
 
 import { PhaseLayout } from "./Script_MissionOrchestration.mjs";
+import {
+  ORCHESTRATION_ICONS, ICON_ORDER, IconLabel,
+  IconForMember, IconForFriendly, IconForAnchor, IconForZone, IconForNote, StateBadge,
+} from "./Data_OrchestrationIcons.mjs";
+
+// ---------------------------------------------------------------------------
+// 图标：一整批 64×64 白剪影 PNG，进程里只加载一次
+//
+// 为什么放模块级：工作台的弹窗开了关、关了开是常事，每次重开都重新 new Image()
+// 拉二十三张图，既闪一下又白费请求。图片对象本身是无状态的，共享着用最省。
+//
+// 加载完成之前**不能出现空白**：`IconImage` 拿不到图就回 null，画的那一层退回
+// 原来的几何标记（圆/方/三角）。所以「图还没到」只是长得朴素一点，不是一片空。
+// ---------------------------------------------------------------------------
+const ICON_IMAGES = new Map();
+let iconsPromise = null;
+
+/** 加载全部图标。返回的 Promise 解析成 `Map<名字, Image>`，失败的那张就是缺席。 */
+export function LoadOrchestrationIcons(doc = null) {
+  if (iconsPromise) return iconsPromise;
+  const ImageCtor = globalThis.Image;
+  if (typeof ImageCtor !== "function") {
+    iconsPromise = Promise.resolve(ICON_IMAGES);   // 非浏览器环境：一张都不加载，照样能画
+    return iconsPromise;
+  }
+  const jobs = [];
+  for (const [name, spec] of Object.entries(ORCHESTRATION_ICONS)) {
+    jobs.push(new Promise((resolve) => {
+      const image = new ImageCtor();
+      image.onload = () => { ICON_IMAGES.set(name, image); resolve(); };
+      image.onerror = () => resolve();             // 少一张就少一张，不许拖垮整张图
+      try {
+        image.src = new URL(spec.file, import.meta.url).href;
+      } catch (error) { resolve(); }
+    }));
+  }
+  iconsPromise = Promise.all(jobs).then(() => ICON_IMAGES);
+  void doc;
+  return iconsPromise;
+}
+export function IconImage(name) { return ICON_IMAGES.get(name) || null; }
+/** 测试与宿主问「这张图到底加载上没有」。 */
+export function LoadedIconNames() { return [...ICON_IMAGES.keys()]; }
 
 // ---------------------------------------------------------------------------
 // 调色板。导出是给测试**数像素**用的：光看 visible 会漏掉「画上了却 1 px 都
@@ -111,6 +154,41 @@ const LABEL_ZOOM = { anchor: 0.85, zone: 1.35, route: 1.9 };
 // 拾取分层：同一个位置上谁赢。人永远赢把手。
 const PICK_RANK = { zone: 1, route: 1, anchor: 2, friendly: 2, chip: 3, note: 4, member: 5, live: 6, player: 7 };
 
+// 图例。**一行一张图标，跟图上画的是同一张图、同一种颜色**，所以图例就是
+// 「这张图怎么读」的唯一答案，不是另画一套示意图。用词全是普通中文 ——
+// 「pending」「standby」「beat」只有写它的人看得懂。
+const LEGEND_ROWS = Object.freeze([
+  { text: "敌人 · 未出现", icon: "Rifleman", color: "enemyPending", alpha: 0.64 },
+  { text: "敌人 · 已生成", icon: "Rifleman", color: "enemyStaged" },
+  { text: "敌人 · 待命", icon: "Rifleman", color: "enemyStaged", badge: "Reserve" },
+  { text: "敌人 · 休眠", icon: "Rifleman", color: "enemyDormant", alpha: 0.74, badge: "Dormant" },
+  { text: "敌人 · 活跃", icon: "Rifleman", color: "enemyActive" },
+  { text: "敌人 · 已清除", icon: "Rifleman", color: "enemyCleared", alpha: 0.66, badge: "Cleared" },
+  { text: "机枪手", icon: "MachineGunner", color: "enemyStaged" },
+  { text: "上刺刀", icon: "Bayonet", color: "enemyStaged" },
+  { text: "钉在原地", icon: "Hold", color: "enemyStaged" },
+  { text: "飞机", icon: "Aircraft", color: "enemyStaged" },
+  { text: "我方士兵", icon: "FriendlySquad", color: "friendly" },
+  { text: "哨位", icon: "GuardPost", color: "friendly" },
+  { text: "守军", icon: "Defender", color: "friendly" },
+  { text: "机枪巢", icon: "ForwardNest", color: "friendly" },
+  { text: "车辆 / 装车位", icon: "Cart", color: "friendly" },
+  { text: "战车起点", icon: "Tank", color: "friendly" },
+  { text: "玩家起点", icon: "Player", color: "friendly" },
+  { text: "锚点", icon: "Anchor", color: "anchor" },
+  { text: "院门", icon: "Gate", color: "anchor" },
+  { text: "补给 / 炸药包", icon: "Supply", color: "anchor" },
+  { text: "担架撤离点", icon: "Stretcher", color: "anchor" },
+  { text: "触发区", icon: "Zone", color: "zone" },
+  { text: "攻击波", icon: "Wave", color: "zone" },
+  { text: "设计路线", icon: "Route", color: "route" },
+  { text: "战术线 / 跃进线", swatch: "tactic" },
+  { text: "实时 · 玩家", icon: "Player", color: "player" },
+  { text: "实时 · 敌人 / 阵亡", swatch: "live" },
+  { text: "实时 · 指引路线", swatch: "guide" },
+  { text: "批注", icon: "Note", color: "note" },
+]);
+
 const TOOLS = new Set(["select", "pan", "circle", "arrow", "path", "label", "move"]);
 const DEFAULT_LAYERS = Object.freeze({
   terrain: true, blocks: true, trenches: true, roads: true, anchors: true,
@@ -166,6 +244,19 @@ export class OrchestrationMap {
     this.sketch = [];
     this.notes = [];
     this.tool = "select";
+    // 过滤：null = 全画。每一类是一个 Set，不在集合里的对象不画、不拾取、
+    // 也不参与标签避让 —— 工作台点「只看这一组」时地图必须真的清爽下来，
+    // 而不是「画上了但点不中」这种半吊子状态。
+    this.filter = null;
+    // 本帧真画出去的标记。宿主与测试拿它回答「屏幕上到底有什么」，
+    // 比翻模型准 —— 模型里有的东西可能被图层、过滤或视野挡掉了。
+    this.drawnMarkers = [];
+    this.marks = null;
+    this.iconPx = 14;
+    this.iconPixel = 1;
+    // 染色缓存：白剪影 + 一种颜色 + 一个像素尺寸 → 一张离屏小图。
+    // 不缓存的话每个标记每帧都要 source-in 合成一次，几百个人直接掉到个位数帧率。
+    this.tintCache = new Map();
 
     this.dpr = 1;
     this.cssWidth = 800;
@@ -225,6 +316,48 @@ export class OrchestrationMap {
 
     this.Resize();
     if (model) this.SetModel(model);
+
+    // 图标到齐了再重画一次。在这之前画的是几何标记（不会是空白），
+    // 所以宿主不等 `ready` 也能立刻看到东西；测试则 `await map.ready` 再数像素。
+    this.ready = LoadOrchestrationIcons(canvas?.ownerDocument || null).then(() => {
+      if (this.disposed) return this;
+      this.tintCache.clear();
+      this.labelCache = null;
+      this.Redraw();
+      return this;
+    });
+  }
+
+  // -------------------------------------------------------------------------
+  // 过滤（V2 的面板调这个：「只看这一组 / 这一阶段的这几条」）
+  // -------------------------------------------------------------------------
+  /**
+   * `filter = { members, encounters, routes, zones, friendlies, anchors, notes }`，
+   * 每一项是 Set 或 null；null（或整个 filter 传 null）= 这一类全画。
+   */
+  SetFilter(filter) {
+    if (!filter) {
+      this.filter = null;
+    } else {
+      const next = {};
+      for (const key of ["members", "encounters", "routes", "zones", "friendlies", "anchors", "notes"]) {
+        const value = filter[key];
+        next[key] = value instanceof Set ? value : (Array.isArray(value) ? new Set(value) : null);
+      }
+      this.filter = next;
+    }
+    this.labelCache = null;
+    this.Redraw();
+    return this;
+  }
+  /** 这一类里的这个 id 该不该画。没设过滤就一律该画。 */
+  Allowed(kind, id) {
+    const set = this.filter?.[kind];
+    if (!set) return true;
+    return set.has(id);
+  }
+  AllowedMember(encounterId, memberId) {
+    return this.Allowed("encounters", encounterId) && this.Allowed("members", memberId);
   }
 
   // -------------------------------------------------------------------------
@@ -537,6 +670,138 @@ export class OrchestrationMap {
   }
 
   // -------------------------------------------------------------------------
+  // 图标：固定屏幕尺寸、按状态染色、按「图标×颜色×尺寸」缓存
+  // -------------------------------------------------------------------------
+  /**
+   * 图标在屏幕上的边长（px）。**固定屏幕尺寸**，不随缩放线性放大 ——
+   * 标记是符号不是实物，缩到整关也得认得出，放大看细节时才稍微长大一点。
+   */
+  IconPixels(view) {
+    const scale = Number.isFinite(view?.scale) ? view.scale : this.view.scale;
+    return Math.round(Clamp(14 + (scale - 1.8) * 1.7, 14, 22));
+  }
+
+  /**
+   * 白剪影 → 「带深色描边的彩色图标」。缓存键 = 图标 × 颜色 × 像素尺寸。
+   *
+   * 描边**烘进缓存**，不是每帧画八遍：地图上同时有一百多个标记，每个描边四到八次
+   * 就是上千次 drawImage。烘一次之后每个标记只剩一次 drawImage，一帧还是 1.5 ms。
+   *
+   * 为什么非要描边不可：试过在图标底下垫一枚深色圆盘，14 px 的图标压在圆盘上
+   * 就成了一坨深色泥 —— 图标本身的颜色（尤其「未出现」那枚冷灰蓝）和圆盘分不开。
+   * 描边只贴着剪影的轮廓走，把图标从地表里剥出来，颜色还是干净的。
+   */
+  TintedIcon(name, color, raster) {
+    const image = ICON_IMAGES.get(name);
+    if (!image) return null;
+    const css = Array.isArray(color) ? Css(color) : String(color);
+    const key = `${name}|${css}|${raster}`;
+    const hit = this.tintCache.get(key);
+    if (hit) return hit;
+    const doc = this.canvas?.ownerDocument || globalThis.document;
+    if (!doc) return null;
+    const Layer = (size, fill) => {
+      const c = doc.createElement("canvas");
+      c.width = size;
+      c.height = size;
+      const g = c.getContext("2d");
+      if (!g) return null;
+      g.imageSmoothingEnabled = true;
+      g.imageSmoothingQuality = "high";
+      g.drawImage(image, 0, 0, size, size);
+      g.globalCompositeOperation = "source-in";   // 只染剪影，透明的地方还是透明
+      g.fillStyle = fill;
+      g.fillRect(0, 0, size, size);
+      return c;
+    };
+    const pad = Math.max(1, Math.round(raster * 0.075));
+    const inner = Math.max(6, raster - pad * 2);
+    const glyph = Layer(inner, css);
+    const edge = Layer(inner, Css(MAP_COLORS.halo));
+    if (!glyph || !edge) return null;
+    const off = doc.createElement("canvas");
+    off.width = raster;
+    off.height = raster;
+    const g = off.getContext("2d");
+    if (!g) return null;
+    for (let k = 0; k < 8; k += 1) {
+      const angle = (Math.PI * 2 * k) / 8;
+      g.drawImage(edge, pad + Math.cos(angle) * pad, pad + Math.sin(angle) * pad, inner, inner);
+    }
+    g.drawImage(glyph, pad, pad, inner, inner);
+    if (this.tintCache.size > 420) this.tintCache.clear();
+    this.tintCache.set(key, off);
+    return off;
+  }
+
+  /**
+   * 画一枚图标。`size` 是屏幕边长；`pixel` 是这张画布的设备像素倍率（实时画布是
+   * devicePixelRatio，出图是放大倍数）—— 染色小图按设备像素烘，缩下去才不糊。
+   * 回 false 表示这张图还没加载好，调用方该退回几何标记。
+   */
+  DrawIcon(ctx, x, y, name, color, size, {
+    pixel = 1, alpha = 1, plate = 0, badge = null, rotate = 0,
+  } = {}) {
+    const raster = Math.max(12, Math.round(size * pixel));
+    const tinted = this.TintedIcon(name, color, raster);
+    if (!tinted) return false;
+    const half = size / 2;
+    if (plate > 0) {
+      // 可选的圆形底盘。默认不给 —— 描边已经把图标从地表里剥出来了，
+      // 再垫一层只会把图标自己的颜色压暗。挤成一堆的那几层才开它。
+      ctx.fillStyle = Css(MAP_COLORS.halo, plate);
+      ctx.beginPath();
+      ctx.arc(x, y, half * 0.92, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    if (rotate) {
+      ctx.translate(x, y);
+      ctx.rotate(rotate);
+      ctx.drawImage(tinted, -half, -half, size, size);
+    } else {
+      ctx.drawImage(tinted, x - half, y - half, size, size);
+    }
+    ctx.restore();
+    if (badge) {
+      // 角标：休眠的闭眼、待命的沙漏、已清除的骷髅。用亮灰不用状态色 ——
+      // 和身下那枚同色的图标叠在一起就分不出层了。
+      const bs = Math.max(8, Math.round(size * 0.5));
+      const bx = x + half - bs * 0.3;
+      const by = y + half - bs * 0.3;
+      ctx.fillStyle = Css(MAP_COLORS.halo, 0.92);
+      ctx.beginPath();
+      ctx.arc(bx, by, bs * 0.62, 0, Math.PI * 2);
+      ctx.fill();
+      const mark = this.TintedIcon(badge, MAP_COLORS.textLight, Math.max(10, Math.round(bs * pixel)));
+      if (mark) ctx.drawImage(mark, bx - bs / 2, by - bs / 2, bs, bs);
+    }
+    return true;
+  }
+
+  /**
+   * 每枚标记中心那颗不透明的小芯。
+   *
+   * 两个用处，缺一不可：一是图标只是个符号，真正「他站在哪儿」得有个准点；
+   * 二是测试要数像素 —— 图标缩到 14 px、再加半透明与抗锯齿之后，细线图标
+   * （路线、波、闭眼）可能一个精确 RGB 的像素都剩不下，而「画上了却一个像素
+   * 都验不到」正是这个仓库栽过的跟头。这颗芯永远是精确色、永远不透明。
+   */
+  CorePixel(ctx, x, y, color, r = 1.6) {
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = Css(color);
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  /** 记一笔「本帧真画出去了」。 */
+  Mark(entry) {
+    if (this.marks) this.marks.push(entry);
+  }
+
+  // -------------------------------------------------------------------------
   // 绘制
   // -------------------------------------------------------------------------
   Redraw() {
@@ -544,7 +809,7 @@ export class OrchestrationMap {
     const ctx = this.ctx;
     ctx.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     this.picks = [];
-    this.Paint(ctx, this.Viewport(), { picks: this.picks, interactive: true });
+    this.Paint(ctx, { ...this.Viewport(), pixel: this.dpr }, { picks: this.picks, interactive: true });
     return this;
   }
 
@@ -569,11 +834,46 @@ export class OrchestrationMap {
       const rw = Math.max(1, region.maxX - region.minX);
       const rd = Math.max(1, region.maxZ - region.minZ);
       const s = Math.min((w - 16) / rw, (h - 16) / rd);
-      view = { w, h, scale: Math.max(0.05, s), cx: (region.minX + region.maxX) / 2, cz: (region.minZ + region.maxZ) / 2 };
+      view = { w, h, scale: Math.max(0.05, s), cx: (region.minX + region.maxX) / 2, cz: (region.minZ + region.maxZ) / 2, pixel: factor };
     } else {
-      view = { w, h, scale: this.view.scale * factor, cx: this.view.cx, cz: this.view.cz };
+      view = { w, h, scale: this.view.scale * factor, cx: this.view.cx, cz: this.view.cz, pixel: factor };
     }
     this.Paint(ctx, view, { picks: null, interactive: false });
+    return off.toDataURL("image/png");
+  }
+
+  /**
+   * 「这一套图标都长什么样」一张图：每个图标配一行中文名，外加 16 px 的缩略
+   * （图标是要在 14–22 px 上看的，只看大图看不出哪一个到那个尺寸就糊了）。
+   * 工作台的帮助里放它，测试也存一张当验收底片。
+   */
+  IconSheetPng({ columns = 6, cell = 104 } = {}) {
+    const doc = this.canvas?.ownerDocument || globalThis.document;
+    if (!doc) return "";
+    const names = ICON_ORDER;
+    const rows = Math.ceil(names.length / columns);
+    const off = doc.createElement("canvas");
+    off.width = columns * cell;
+    off.height = rows * cell;
+    const ctx = off.getContext("2d");
+    ctx.fillStyle = Css(MAP_COLORS.backdrop);
+    ctx.fillRect(0, 0, off.width, off.height);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    for (let i = 0; i < names.length; i += 1) {
+      const name = names[i];
+      const cx = (i % columns) * cell + cell / 2;
+      const cy = Math.floor(i / columns) * cell + cell / 2;
+      ctx.fillStyle = Css(MAP_COLORS.groundDark);
+      ctx.fillRect(cx - cell / 2 + 4, cy - cell / 2 + 4, cell - 8, cell - 8);
+      this.DrawIcon(ctx, cx, cy - 16, name, MAP_COLORS.textLight, 46, { pixel: 2, plate: 0 });
+      this.DrawIcon(ctx, cx - 14, cy + 18, name, MAP_COLORS.enemyStaged, 16, { pixel: 2, plate: 0 });
+      this.DrawIcon(ctx, cx + 10, cy + 18, name, MAP_COLORS.friendly, 22, { pixel: 2, plate: 0 });
+      ctx.font = FONT_SMALL;
+      ctx.fillStyle = Css(MAP_COLORS.textMuted);
+      ctx.fillText(`${IconLabel(name)}  ${name}`, cx, cy + 40);
+    }
+    ctx.textAlign = "left";
     return off.toDataURL("image/png");
   }
 
@@ -587,6 +887,10 @@ export class OrchestrationMap {
     // 排版时拿它当「别压在人身上」的软约束 —— 逐个标记两两比会把上百个敌人
     // 乘进内层循环，格子查表是常数次。
     this.soft = MakeGrid(view.w, view.h);
+    // 本帧的图标尺寸与设备像素倍率，以及「真画出去了什么」的收集器。
+    this.iconPx = this.IconPixels(view);
+    this.iconPixel = Number.isFinite(view.pixel) && view.pixel > 0 ? view.pixel : 1;
+    this.marks = [];
 
     ctx.save();
     ctx.fillStyle = Css(MAP_COLORS.backdrop);
@@ -609,15 +913,23 @@ export class OrchestrationMap {
     // --- 已存批注的草图（淡色打底，先画，别盖住新画的） -------------------
     if (L.notes) {
       for (const note of this.notes) {
+        if (!this.Allowed("notes", note?.id)) continue;
         for (const shape of note?.sketch?.shapes || []) {
           this.PaintShape(ctx, Project, view, shape, Css(MAP_COLORS.note, 0.5), false);
         }
         const target = note?.target;
         if (target && Number.isFinite(target.x) && Number.isFinite(target.z)) {
           const p = Project(target.x, target.z);
-          ctx.fillStyle = Css(MAP_COLORS.note, 0.85);
-          ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2); ctx.fill();
-          Push({ kind: "note", id: note.id, x: target.x, z: target.z }, p.x, p.y, 7, PICK_RANK.note);
+          const icon = IconForNote();
+          const size = this.iconPx * 0.9;
+          if (!this.DrawIcon(ctx, p.x, p.y - size * 0.2, icon, MAP_COLORS.note, size,
+            { pixel: this.iconPixel })) {
+            ctx.fillStyle = Css(MAP_COLORS.note, 0.85);
+            ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI * 2); ctx.fill();
+          }
+          this.CorePixel(ctx, p.x, p.y, MAP_COLORS.note, 1.5);
+          this.Mark({ kind: "note", id: note.id, icon, x: p.x, y: p.y });
+          Push({ kind: "note", id: note.id, x: target.x, z: target.z }, p.x, p.y, 8, PICK_RANK.note);
         }
       }
     }
@@ -657,6 +969,9 @@ export class OrchestrationMap {
     // --- 悬停 tooltip（永远在最上层，不参与避让） -------------------------
     if (interactive && this.hover && this.pointer) this.PaintTooltip(ctx, view, this.hover);
     ctx.restore();
+    // 出图（ToPng）画的是另一套视野，别让它顶掉面板正在看的那一份清单。
+    if (interactive) this.drawnMarkers = this.marks;
+    this.marks = null;
   }
 
   PaintTerrain(ctx, view, Project, layout) {
@@ -849,6 +1164,7 @@ export class OrchestrationMap {
     const nameZoom = view.scale >= LABEL_ZOOM.zone;
     const nameFor = ZoneNames(zones, showLabels && nameZoom);
     for (const zone of zones) {
+      if (!this.Allowed("zones", zone.id || zone.fact)) continue;
       const name = nameFor.get(zone) || "";
       ctx.strokeStyle = Css(MAP_COLORS.zone, 0.42);
       ctx.lineWidth = 1;
@@ -860,8 +1176,12 @@ export class OrchestrationMap {
         ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
         ctx.stroke();
         ctx.setLineDash([]);
-        ctx.fillStyle = Css(MAP_COLORS.zone, 0.75);
-        ctx.beginPath(); ctx.arc(p.x, p.y, 1.6, 0, Math.PI * 2); ctx.fill();
+        // 圈心换成同心圆图标：虚线圈说「多大范围」，图标说「这是个触发区」。
+        const icon = IconForZone(zone);
+        this.DrawIcon(ctx, p.x, p.y, icon, MAP_COLORS.zone, this.iconPx * 0.72,
+          { pixel: this.iconPixel });
+        this.CorePixel(ctx, p.x, p.y, MAP_COLORS.zone, 1.5);
+        this.Mark({ kind: "zone", id: zone.id || zone.fact, icon, x: p.x, y: p.y });
         if (name) {
           Add({
             kind: "zone", id: zone.id || zone.fact, text: name,
@@ -877,6 +1197,11 @@ export class OrchestrationMap {
         ctx.setLineDash([]);
         const cx = (zone.minX + zone.maxX) / 2, cz = (zone.minZ + zone.maxZ) / 2;
         const c = Project(cx, cz);
+        const boxIcon = IconForZone(zone);
+        this.DrawIcon(ctx, c.x, c.y, boxIcon, MAP_COLORS.zone, this.iconPx * 0.78,
+          { pixel: this.iconPixel });
+        this.CorePixel(ctx, c.x, c.y, MAP_COLORS.zone, 1.5);
+        this.Mark({ kind: "zone", id: zone.id || zone.fact, icon: boxIcon, x: c.x, y: c.y });
         Push({ kind: "zone", id: zone.id || zone.fact, x: cx, z: cz }, c.x, c.y, 8, PICK_RANK.zone);
         // 转运四拍的框：标签做成可点的把手（返回 kind:"beat"），别只是一行描边字。
         // 拍是设计里唯一带时间窗的一段，用户最想点开看的就是它。
@@ -910,6 +1235,7 @@ export class OrchestrationMap {
       : Object.keys(this.model.routes);
     const nameZoom = view.scale >= LABEL_ZOOM.route;
     for (const name of names) {
+      if (!this.Allowed("routes", name)) continue;
       const pts = Points(this.model.routes[name]);
       if (pts.length < 2) continue;
       // 不透明：半透明的线在这张图上一个精确像素都数不出来，
@@ -933,7 +1259,14 @@ export class OrchestrationMap {
     const nameZoom = view.scale >= LABEL_ZOOM.anchor;
     for (const [id, point] of Object.entries(this.model.anchors)) {
       if (!point || !Number.isFinite(point.x)) continue;
+      if (!this.Allowed("anchors", id)) continue;
       const p = Project(point.x, point.z);
+      // 锚点按它到底是个什么地方画：院门画门、装车/转运画车、担架撤离点画担架，
+      // 剩下的才是通用小旗。图标画在点的上方，小十字仍标在那个准确的坐标上。
+      const icon = IconForAnchor(id);
+      const drawn = this.DrawIcon(ctx, p.x, p.y - this.iconPx * 0.52, icon, MAP_COLORS.anchor,
+        this.iconPx * 0.86, { pixel: this.iconPixel });
+      if (drawn) this.Mark({ kind: "anchor", id, icon, x: p.x, y: p.y });
       ctx.strokeStyle = Css(MAP_COLORS.halo, 0.75);
       ctx.lineWidth = 3;
       ctx.beginPath();
@@ -946,6 +1279,7 @@ export class OrchestrationMap {
       ctx.moveTo(p.x - 4.5, p.y); ctx.lineTo(p.x + 4.5, p.y);
       ctx.moveTo(p.x, p.y - 4.5); ctx.lineTo(p.x, p.y + 4.5);
       ctx.stroke();
+      MarkGrid(this.soft, p.x - this.iconPx / 2, p.y - this.iconPx, this.iconPx, this.iconPx * 1.5);
       if (showLabels && nameZoom) {
         Add({
           kind: "anchor", id, text: id, ax: p.x, ay: p.y,
@@ -958,39 +1292,51 @@ export class OrchestrationMap {
 
   PaintFriendlies(ctx, Project, Push) {
     const list = this.phaseLayout?.friendlies || this.model?.friendlies || [];
+    const size = this.iconPx * 0.9;
     for (const friendly of list) {
       if (!Number.isFinite(friendly.x)) continue;
+      if (!this.Allowed("friendlies", friendly.id)) continue;
       const p = Project(friendly.x, friendly.z);
-      ctx.fillStyle = Css(MAP_COLORS.halo, 0.8);
-      ctx.beginPath(); ctx.arc(p.x, p.y, 4.4, 0, Math.PI * 2); ctx.fill();
-      ctx.fillStyle = Css(MAP_COLORS.friendly);
-      ctx.beginPath();
-      ctx.moveTo(p.x, p.y - 3.6); ctx.lineTo(p.x + 3.4, p.y); ctx.lineTo(p.x, p.y + 3.6); ctx.lineTo(p.x - 3.4, p.y);
-      ctx.closePath(); ctx.fill();
-      MarkGrid(this.soft, p.x - 5, p.y - 5, 10, 10);
+      const icon = IconForFriendly(friendly.kind);
+      if (!this.DrawIcon(ctx, p.x, p.y, icon, MAP_COLORS.friendly, size,
+        { pixel: this.iconPixel })) {
+        ctx.fillStyle = Css(MAP_COLORS.halo, 0.8);
+        ctx.beginPath(); ctx.arc(p.x, p.y, 4.4, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = Css(MAP_COLORS.friendly);
+        ctx.beginPath();
+        ctx.moveTo(p.x, p.y - 3.6); ctx.lineTo(p.x + 3.4, p.y); ctx.lineTo(p.x, p.y + 3.6); ctx.lineTo(p.x - 3.4, p.y);
+        ctx.closePath(); ctx.fill();
+      }
+      this.CorePixel(ctx, p.x, p.y, MAP_COLORS.friendly, 1.6);
+      this.Mark({ kind: "friendly", id: friendly.id, icon, x: p.x, y: p.y });
+      MarkGrid(this.soft, p.x - size / 2, p.y - size / 2, size, size);
       Push({ kind: "friendly", id: friendly.id, x: friendly.x, z: friendly.z }, p.x, p.y, 6, PICK_RANK.friendly);
     }
   }
 
   PaintEncounters(ctx, view, Project, Push, Add, showLabels) {
     const L = this.layers;
+    const size = this.iconPx;
     for (const encounter of this.phaseLayout?.encounters || []) {
       const state = encounter.state || "spawned";
       for (const member of encounter.members || []) {
         if (!Number.isFinite(member.x)) continue;
+        if (!this.AllowedMember(encounter.id, member.id)) continue;
         const p = Project(member.x, member.z);
         if (L.tactics) this.PaintTactic(ctx, Project, member, state);
-        this.PaintMember(ctx, p, member, state);
-        MarkGrid(this.soft, p.x - 6, p.y - 6, 12, 12);
+        const icon = this.PaintMember(ctx, p, member, state, encounter.id);
+        this.Mark({ kind: "member", id: member.id, encounter: encounter.id, state, icon, x: p.x, y: p.y });
+        MarkGrid(this.soft, p.x - size / 2, p.y - size / 2, size, size);
         Push({ kind: "member", id: member.id, encounterId: encounter.id, x: member.x, z: member.z },
           p.x, p.y, 7, PICK_RANK.member);
       }
     }
     // 已清除的组不给把手：第 12 阶段有十一个这样的组，遍布全关，
-    // 它们的芯片会把还在演的那几组盖掉。灰叉还在，悬停照样报得出是谁。
+    // 它们的芯片会把还在演的那几组盖掉。骷髅角标还在，悬停照样报得出是谁。
     for (const encounter of this.phaseLayout?.encounters || []) {
       const state = encounter.state || "spawned";
       if (state === "cleared") continue;
+      if (!this.Allowed("encounters", encounter.id)) continue;
       const centre = Centroid(encounter.members);
       if (!centre) continue;
       const p = Project(centre.x, centre.z);
@@ -1005,11 +1351,38 @@ export class OrchestrationMap {
   }
 
   /**
-   * 一个敌人。状态不能只靠颜色分 —— 打印出来、色弱、或者缩到整关视野时颜色都
-   * 不够用，所以状态还各带一种形状：未出现空心、休眠空心带芯、已清除小叉，
-   * 活跃的多一圈光晕。机枪三角、钉在原地的方块照旧。
+   * 一个敌人。
+   *
+   * 图标说「他是干什么的」（机枪 / 上刺刀 / 钉在原地 / 飞机 / 步枪兵），
+   * 颜色说「他现在是什么状态」，角标再说一遍状态里最要紧的那几种
+   * （待命的沙漏、休眠的闭眼、已清除的骷髅）。状态不能只靠颜色分 —— 打印出来、
+   * 色弱、或者缩到整关视野时颜色都不够用，所以颜色之外必须还有个形状。
+   *
+   * 回图标名，调用方记进 `drawnMarkers`。图还没加载好就退回原来的几何标记。
    */
-  PaintMember(ctx, p, member, state) {
+  PaintMember(ctx, p, member, state, encounterId = null) {
+    const color = StateColor(state);
+    const icon = IconForMember(member, state, encounterId);
+    if (state === "active") {
+      ctx.strokeStyle = Css(color, 0.22);
+      ctx.lineWidth = 3.2;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, this.iconPx * 0.6, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    const alpha = state === "pending" ? 0.64 : (state === "dormant" ? 0.74 : (state === "cleared" ? 0.66 : 1));
+    const drawn = this.DrawIcon(ctx, p.x, p.y, icon, color, this.iconPx, {
+      pixel: this.iconPixel,
+      alpha,
+      badge: StateBadge(state),
+    });
+    if (drawn) this.CorePixel(ctx, p.x, p.y, color, 1.7);
+    else this.PaintMemberShape(ctx, p, member, state);
+    return icon;
+  }
+
+  /** 图标到齐之前的兜底几何标记（也是「万一某张 PNG 丢了」的兜底）。 */
+  PaintMemberShape(ctx, p, member, state) {
     const color = StateColor(state);
     const filled = state !== "pending" && state !== "cleared";
     const Shape = (r) => {
@@ -1109,6 +1482,7 @@ export class OrchestrationMap {
     }
     for (const enemy of live.enemies || []) {
       if (!Number.isFinite(enemy.x)) continue;
+      if (!this.AllowedMember(enemy.encounter, enemy.id)) continue;
       const p = Project(enemy.x, enemy.z);
       const source = design.get(enemy.id);
       if (source && Number.isFinite(source.x)) {
@@ -1135,6 +1509,8 @@ export class OrchestrationMap {
         ctx.beginPath(); ctx.arc(p.x, p.y, 3.6, 0, Math.PI * 2); ctx.fill();
         ctx.globalAlpha = 1;
       }
+      this.Mark({ kind: "live", id: enemy.id, encounter: enemy.encounter,
+        state: enemy.alive === false ? "dead" : (enemy.dormant ? "dormant" : "alive"), icon: null, x: p.x, y: p.y });
       Push({ kind: "member", id: enemy.id, encounterId: enemy.encounter, x: enemy.x, z: enemy.z },
         p.x, p.y, 6, PICK_RANK.live);
     }
@@ -1142,20 +1518,27 @@ export class OrchestrationMap {
     if (player && Number.isFinite(player.x)) {
       const p = Project(player.x, player.z);
       const yaw = Number.isFinite(player.yaw) ? player.yaw : 0;
-      // 世界 yaw 0 看向 -Z（北）。屏幕上 -Z 是上，所以直接用同一个角度转就行。
-      ctx.save();
-      ctx.translate(p.x, p.y);
-      ctx.rotate(-yaw);
       ctx.fillStyle = Css(MAP_COLORS.player, 0.16);
-      ctx.beginPath(); ctx.arc(0, 0, 13, 0, Math.PI * 2); ctx.fill();
-      ctx.strokeStyle = Css(MAP_COLORS.halo, 0.9);
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(0, -9); ctx.lineTo(6, 7); ctx.lineTo(0, 3.5); ctx.lineTo(-6, 7);
-      ctx.closePath(); ctx.stroke();
-      ctx.fillStyle = Css(MAP_COLORS.player);
-      ctx.fill();
-      ctx.restore();
+      ctx.beginPath(); ctx.arc(p.x, p.y, 13, 0, Math.PI * 2); ctx.fill();
+      // 世界 yaw 0 看向 -Z（北）。屏幕上 -Z 是上，所以直接用同一个角度转就行。
+      const size = Math.max(16, this.iconPx * 1.15);
+      const drawn = this.DrawIcon(ctx, p.x, p.y, "Player", MAP_COLORS.player, size,
+        { pixel: this.iconPixel, rotate: -yaw });
+      if (!drawn) {
+        ctx.save();
+        ctx.translate(p.x, p.y);
+        ctx.rotate(-yaw);
+        ctx.strokeStyle = Css(MAP_COLORS.halo, 0.9);
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(0, -9); ctx.lineTo(6, 7); ctx.lineTo(0, 3.5); ctx.lineTo(-6, 7);
+        ctx.closePath(); ctx.stroke();
+        ctx.fillStyle = Css(MAP_COLORS.player);
+        ctx.fill();
+        ctx.restore();
+      }
+      this.CorePixel(ctx, p.x, p.y, MAP_COLORS.player, 1.8);
+      this.Mark({ kind: "player", id: "player", icon: "Player", x: p.x, y: p.y });
       Push({ kind: "point", id: "player", x: player.x, z: player.z }, p.x, p.y, 8, PICK_RANK.player);
     }
   }
@@ -1351,27 +1734,12 @@ export class OrchestrationMap {
    * 「pending」「standby」只有写它的人看得懂。
    */
   PaintLegend(ctx, view, taken) {
-    const rows = [
-      ["敌人 · 未出现", "pending"],
-      ["敌人 · 已生成", "staged"],
-      ["敌人 · 休眠", "dormant"],
-      ["敌人 · 活跃", "active"],
-      ["敌人 · 已清除", "cleared"],
-      ["机枪 / 钉在原地", "shapes"],
-      ["友军", "friendly"],
-      ["锚点", "anchor"],
-      ["触发圈", "zone"],
-      ["设计路线", "route"],
-      ["战术线 / 跃进线", "tactic"],
-      ["实时 · 玩家", "player"],
-      ["实时 · 敌人 / 阵亡", "live"],
-      ["实时 · 指引路线", "guide"],
-    ];
+    const rows = LEGEND_ROWS;
     const rowH = 15;
     const x = 38;
     // 画布太小就只给芯片，摊开的图例会把地图本身挤没
-    const open = this.legendOpen && view.w >= 500 && view.h >= 400;
-    const w = open ? 150 : 52;
+    const open = this.legendOpen && view.w >= 500 && view.h >= rows.length * rowH + 86;
+    const w = open ? 172 : 52;
     const headH = 20;
     const h = open ? rows.length * rowH + 26 : headH;
     const y = view.h - h - 16;
@@ -1399,9 +1767,9 @@ export class OrchestrationMap {
       ctx.font = FONT_TINY;
       for (let i = 0; i < rows.length; i += 1) {
         const cy = y + 26 + i * rowH + rowH / 2 - 2;
-        this.PaintLegendSwatch(ctx, rows[i][1], x + 16, cy);
+        this.PaintLegendSwatch(ctx, rows[i], x + 16, cy);
         ctx.fillStyle = Css(MAP_COLORS.textMuted);
-        ctx.fillText(rows[i][0], x + 30, cy);
+        ctx.fillText(rows[i].text, x + 30, cy);
       }
     }
     ctx.font = FONT;
@@ -1410,23 +1778,28 @@ export class OrchestrationMap {
     taken.push({ x: x - 4, y: y - 4, w: w + 8, h: h + 8 });
   }
 
-  PaintLegendSwatch(ctx, kind, x, y) {
-    const Dot = (color, r = 4) => {
-      ctx.strokeStyle = Css(MAP_COLORS.halo, 0.85);
-      ctx.lineWidth = 2.4;
-      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.stroke();
-      ctx.fillStyle = Css(color);
-      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
-    };
-    const Ring = (color, alpha = 1) => {
-      ctx.globalAlpha = alpha;
-      ctx.strokeStyle = Css(color);
-      ctx.lineWidth = 1.4;
-      ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.stroke();
-      ctx.globalAlpha = 1;
-      ctx.fillStyle = Css(color);
-      ctx.beginPath(); ctx.arc(x, y, 1.7, 0, Math.PI * 2); ctx.fill();
-    };
+  /**
+   * 图例的一行示意图。图标行直接画地图上那一张图（同一份染色缓存），
+   * 图例与图面永远对得上；只剩线条类（战术线 / 实时敌人 / 指引线）还是手画的。
+   */
+  PaintLegendSwatch(ctx, row, x, y) {
+    if (row.icon) {
+      const color = MAP_COLORS[row.color] || MAP_COLORS.textMuted;
+      const drawn = this.DrawIcon(ctx, x, y, row.icon, color, 13, {
+        pixel: this.iconPixel, alpha: row.alpha ?? 1, badge: row.badge || null,
+      });
+      // 图还没到（或某张 PNG 丢了）：给一枚同色实心点顶着，图例不许出现空行。
+      if (!drawn) {
+        ctx.fillStyle = Css(color);
+        ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill();
+      } else {
+        // 图例这一栏的芯点比图上的大一圈：13 px 的小图加了描边之后，
+        // 剩给「精确颜色」的地方只有两三个像素，测试一抖就红。
+        this.CorePixel(ctx, x, y, color, 2.2);
+      }
+      return;
+    }
+    const kind = row.swatch;
     const Line = (color, dash = null, width = 1.6) => {
       ctx.strokeStyle = Css(color);
       ctx.lineWidth = width;
@@ -1437,52 +1810,6 @@ export class OrchestrationMap {
       ctx.beginPath(); ctx.arc(x + 6, y, 2, 0, Math.PI * 2); ctx.fill();
     };
     switch (kind) {
-      case "pending": ctx.setLineDash([3, 2.5]); Ring(MAP_COLORS.enemyPending); ctx.setLineDash([]); break;
-      case "staged": Dot(MAP_COLORS.enemyStaged); break;
-      case "dormant": Ring(MAP_COLORS.enemyDormant, 0.5); break;
-      case "active":
-        ctx.strokeStyle = Css(MAP_COLORS.enemyActive, 0.25);
-        ctx.lineWidth = 3;
-        ctx.beginPath(); ctx.arc(x, y, 6.5, 0, Math.PI * 2); ctx.stroke();
-        Dot(MAP_COLORS.enemyActive);
-        break;
-      case "cleared":
-        ctx.strokeStyle = Css(MAP_COLORS.enemyCleared);
-        ctx.lineWidth = 1.2;
-        ctx.beginPath();
-        ctx.moveTo(x - 3.4, y - 3.4); ctx.lineTo(x + 3.4, y + 3.4);
-        ctx.moveTo(x + 3.4, y - 3.4); ctx.lineTo(x - 3.4, y + 3.4);
-        ctx.stroke();
-        break;
-      case "shapes":
-        ctx.fillStyle = Css(MAP_COLORS.enemyStaged);
-        ctx.beginPath();
-        ctx.moveTo(x - 6, y - 4); ctx.lineTo(x - 1, y + 3.5); ctx.lineTo(x - 11, y + 3.5);
-        ctx.closePath(); ctx.fill();
-        ctx.fillRect(x + 2, y - 3.6, 7.2, 7.2);
-        break;
-      case "friendly":
-        ctx.fillStyle = Css(MAP_COLORS.friendly);
-        ctx.beginPath();
-        ctx.moveTo(x, y - 4); ctx.lineTo(x + 3.8, y); ctx.lineTo(x, y + 4); ctx.lineTo(x - 3.8, y);
-        ctx.closePath(); ctx.fill();
-        break;
-      case "anchor":
-        ctx.strokeStyle = Css(MAP_COLORS.anchor);
-        ctx.lineWidth = 1.2;
-        ctx.beginPath();
-        ctx.moveTo(x - 4.5, y); ctx.lineTo(x + 4.5, y);
-        ctx.moveTo(x, y - 4.5); ctx.lineTo(x, y + 4.5);
-        ctx.stroke();
-        break;
-      case "zone":
-        ctx.strokeStyle = Css(MAP_COLORS.zone, 0.85);
-        ctx.lineWidth = 1;
-        ctx.setLineDash([3, 3]);
-        ctx.beginPath(); ctx.arc(x, y, 5.5, 0, Math.PI * 2); ctx.stroke();
-        ctx.setLineDash([]);
-        break;
-      case "route": Line(MAP_COLORS.route); break;
       case "tactic":
         ctx.strokeStyle = Css(MAP_COLORS.tactic);
         ctx.lineWidth = 1.2;
@@ -1493,12 +1820,6 @@ export class OrchestrationMap {
         ctx.beginPath(); ctx.moveTo(x - 7, y + 3); ctx.lineTo(x + 5, y + 3); ctx.stroke();
         ctx.setLineDash([]);
         Arrow(ctx, x + 7, y + 3, 1, 0, 5, Css(MAP_COLORS.assault));
-        break;
-      case "player":
-        ctx.fillStyle = Css(MAP_COLORS.player);
-        ctx.beginPath();
-        ctx.moveTo(x, y - 5); ctx.lineTo(x + 4, y + 4); ctx.lineTo(x, y + 1.5); ctx.lineTo(x - 4, y + 4);
-        ctx.closePath(); ctx.fill();
         break;
       case "live":
         ctx.fillStyle = Css(MAP_COLORS.liveEnemy);
@@ -1672,6 +1993,9 @@ export class OrchestrationMap {
       if (found) {
         lines.push(`${found.encounter.id} · ${StateText(found.encounter.state)}`);
         const bits = [];
+        // 图标说的是什么，提示里就用同一个中文词说一遍 —— 图与字不许各说各的。
+        const label = IconLabel(IconForMember(found.member, found.encounter.state, found.encounter.id));
+        if (label) bits.push(label);
         if (found.member.weapon) bits.push(found.member.weapon);
         if (found.member.hold) bits.push("钉在原地");
         if (found.member.bayonet) bits.push("刺刀");
@@ -1893,6 +2217,12 @@ export class OrchestrationMap {
     this.drag = null;
     this.pathPoints = null;
     this.live = null;
+    this.drawnMarkers = [];
+    this.marks = null;
+    this.filter = null;
+    // 染色小图是这个实例自己的离屏 canvas，跟着实例走；图片本体在模块级共享，
+    // 下次开面板还能接着用，不重下。
+    this.tintCache.clear();
   }
 }
 

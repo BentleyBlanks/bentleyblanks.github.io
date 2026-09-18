@@ -117,6 +117,45 @@ ModelSummary(model)            // CLI 摘要
 `{ player:{x,z,yaw}, guideRoute, spawned:[...runtime.spawned], transferBeats }`。
 产物 `live` 里的 `actualTimeline` 全部来自 `flow.log`（`stageEntry` 与 `fact` 两种，带关卡时钟）。
 
+### 分类查看：`Script_MissionOrchestrationFilter.mjs`（纯，Node 可跑）
+
+「这一阶段哪几个人钉在原地不动」这种问题，眼睛在一百多个标记里是数不出来的。
+这一层把「看哪些」做成数据：状态可序列化，集合交给俯视图，计数交给面板 ——
+**面板上写的数就是图上画的数**，两边同一个来源。
+
+```js
+DefaultFilterState() → {
+  preset: "all",
+  categories: { enemies, friendlies, zones, routes, anchors, notes },   // 六个开关
+  encounters | states | weapons | behaviors | friendlyKinds | zoneKinds | routes,  // null = 不限制
+  onlyNewThisPhase: false,
+  solo: null | { kind, id },        // 「只看」：压过一切别的筛选
+}
+BuildOrchestrationFilter(model, phaseLayout, state)
+  → { members, encounters, routes, zones, friendlies, anchors, notes }   // Set 或 null（null = 全画）
+FilterSummary(model, phaseLayout, state, { notes })                      // 分类树：每项 label/count/visible/on/soloed
+EnemyTableRows(model, phaseLayout, live)                                 // 敌军布设表：一行一个敌人，九列
+EnemyTableCsv(rows) / SortEnemyRows(rows, column, asc) / RowVisible(filter, row)
+ApplyPreset(state, id) / ToggleFilterItem(state, kind, id, allIds) / SoloFilterItem(state, kind, id)
+EncounterLabel(model, encounter)   // 「转运区第 1 波攻击」「村口的日军」
+PRESETS  // 全部 / 只看敌军 / 只看友军 / 只看触发区 / 只看路线 / 只看本阶段新出现的
+```
+
+口径几条：
+
+- `solo` 优先于一切：只留那一组 / 那一类，别的类别是**空集**（不是 null）。
+- 敌人的「本阶段状态」直接取 `PhaseLayout` 的 `state`，这里不另推一套。
+- 「按武器」那一节里有一项是**上了刺刀**：它和两支枪是「或」的关系（选了它 = 也要那些人）。
+- 「行为」只分两种：`hold`（钉在原地）与 `mobile`（有路线或会跃进）。
+- 路线跟着俯视图的规矩：这一阶段有自己的指引路线就只列那几条，一条都没有时列全部 ——
+  面板要是自己另算，左边写「0 条」而图上二十一条线还在。
+- 组名一律中文（`ENCOUNTER_LABELS`），转运区四组按攻击波次现算，
+  内部叫法（`kind=`、「拍」）不进任何一个 label。闸门里有一条专门守这个。
+
+闸门：`node Taierzhuang1938/Script_MissionOrchestrationFilterTest.mjs`（纯 Node，毫秒级，
+对着真模型跑：只看一组只剩 4 人、按状态筛的人数与 `PhaseLayout` 逐个数的一致、
+六个预设各自只留对应类别、布设表行数 = 这一阶段全部成员、CSV 首行是中文表头）。
+
 ### CLI
 
 ```bash
@@ -217,6 +256,88 @@ P3b 的 `Script_EditorOrchestrationMap.mjs`（canvas 2D，零 three，北在上�
 把它复位回「自动」。理由两头都硬：不重新框景的话面板说「阶段 12」而图上是车站；
 抢镜头的话，用户正放大盯着某个院子看的那一刻会被拽走。
 
+### 分类抽屉与敌军布设表
+
+工具条上的「分类 4/117」打开贴在俯视图**左边**的抽屉（`[data-orch="filter-drawer"]`，
+可收起，宽度可拖；开合、页签、宽度、四个小节的折叠记在
+`localStorage["tengxian1938_orchestration_filter_FirstLevel"]`）。
+它管的是「这一类里看哪几个」，图层开关管的是「这一类画不画」—— 两件事。
+按钮上那个 `4/117` 是**现在画出来几个人 / 这一阶段一共几个人**。
+
+**页签一「分类」**：
+
+- 顶上一排预设：全部 / 只看敌军 / 只看友军 / 只看触发区 / 只看路线 / 只看本阶段新出现的
+  （最后一个 = 出现阶段正好是当前阶段的那几组）。
+- 下面一棵树：六个类别各一行（开关 + 名字 + 计数 + 「只看」）；**敌军**底下再分四个可折叠小节
+  —— 按组（21 组，组名说人话，编号与本阶段状态在第二行的小字里）/ 按本阶段状态（未出现 ·
+  已生成 · 待命 · 休眠 · 活跃 · 已清除，各几人）/ 按武器（步枪 · 机枪 · 上了刺刀）/
+  按行为（钉在原地 · 会移动）。每一行：眼睛开关 + 小图标 + 名字 + `看得见/一共` + 「只看」。
+- **「只看」再点一次取消**，点完把那一行滚回看得见的地方。
+- 悬停：能指到单个对象的（某一组、某一条路线）让地图描亮它（`SetHover`）；
+  指不到单个对象的（按状态 / 武器 / 行为 / 整个类别）**临时只画这一类**，指针一挪开立刻还原。
+- 换阶段会重算（每一组的状态都可能变）。
+
+**页签二「布设表」**：这一阶段全部敌人一张表，九列 —— 组 / 编号 / 出现 / 本阶段 / 武器 /
+特点 / 出生点 / 路线点 / 实时。点表头按那一列排（再点一次反序），按组排时每组一条可折叠的分组线；
+表**跟着筛选联动**（图上看不见的，表里也不列），点一行 = 选中那个人并把地图 `ZoomTo` 到他的出生点；
+「复制 CSV」按现在的筛选与排序导出，首行是中文表头。有运行时时「实时」列写活着 / 阵亡与当前位置
+（每 0.25 s 只改那几个格子，整张表不重建）。
+
+行首的小图标来自 `Data_OrchestrationIcons.mjs`（登记进 import map 才去取）；
+取不到就退回彩色圆点 —— 少几张 PNG 不该让这块面板打不开。
+
+### 图标（`Data_OrchestrationIcons.mjs` + `Texture/Editor/`）
+
+图上的标记是图标，不是圆点方块。**哪个对象用哪张图标由登记表说了算**
+（`Data_OrchestrationIcons.mjs`，纯数据零依赖），地图和面板都来问同一张表 ——
+规则写在画布那一层的话，右栏就只能再抄一遍「机枪手用哪张图」，抄第二遍迟早对不上。
+
+- **素材**：`Taierzhuang1938/Texture/Editor/Icon_Orch_<名字>.png`，23 张，64×64，
+  **纯白剪影 + alpha**（白色是故意的：运行时才按状态染色）。进仓库，不是忽略目录。
+- **登记表**：`ORCHESTRATION_ICONS[名字] = { file, label }`，`label` 是普通中文
+  （「步枪兵」「机枪手」「攻击波」），图例、提示、总表上写的就是它，不写
+  `pending` / `standby` / `beat` 这种排程表里的内部叫法。
+- **选图规则**（纯函数，面板共用）：
+  - `IconForMember(member, state, encounterId)` —— 飞机 → 机枪 → 钉在原地 → 上刺刀 →
+    预备队 → 步枪兵，按这个顺序取第一条命中的。**图标只说「他是干什么的」**。
+  - `StateBadge(state)` —— 状态角标：待命=沙漏、休眠=闭眼、已清除=骷髅；
+    「未出现」不给角标（它本来就画得半透明，再挂一枚只会更糊）。
+    **状态走颜色 + 角标**，颜色仍是 `MAP_COLORS.enemy*` 那一套。
+  - `IconForFriendly(kind)` / `IconForAnchor(id)` / `IconForZone(zone)` / `IconForNote()`。
+    锚点按它实际是个什么地方画：`gate` 画院门，`bundle`/`throw`/`transferSupply` 画补给箱，
+    `train`/`unload`/`queue`/`transfer` 画车，`retreat*`/`reception`/`zhou*` 画担架。
+- **画法**：图标是**固定屏幕尺寸**（整关视野 14 px，放大到细看封顶 22 px），
+  不随缩放线性放大 —— 它是符号不是实物。染色走离屏 canvas 的 `source-in`，
+  按「图标 × 颜色 × 像素尺寸」缓存；深色描边**烘进缓存**（剪影八向偏移），
+  不是每帧描八遍，所以整关视野一帧仍是 1.5 ms 上下。
+  试过在图标底下垫深色圆盘，14 px 时图标压在盘上成了一坨深色泥，改成描边才剥得干净。
+- **每个标记中心还有一颗不透明的小芯**：一是图标只是符号，「他到底站在哪儿」得有个准点；
+  二是测试要数像素 —— 细线图标缩到 14 px 再加半透明与抗锯齿，可能一个精确 RGB 的像素都
+  剩不下，而「画上了却一个像素都验不到」是这个仓库栽过的跟头。
+- **图还没加载完不会出现空白**：`map.ready`（Promise）解析前画的是原来的几何标记
+  （圆 / 方 / 三角），到齐后自动重画一次。某张 PNG 丢了也只是那一类退回几何标记。
+  测试与需要精确取证的地方必须 `await map.ready` 再量。
+- **图例**就是这批图标本身（同一份染色缓存），所以图例和图面永远对得上。
+  `map.IconSheetPng()` 出一张「图标总表」：大图 + 16 px / 22 px 缩略 + 中文名，
+  测试存在 `_shots/OrchestrationMap/icons_sheet.png`。
+- **重出素材**：黑底白剪影的 5×5 总表生成一张（生图三级回退，见 `AGENTS.md`），
+  再按格切开、**按亮度取 alpha**（黑底本身就是 mask，PNG 自带的 alpha 不可信）、
+  裁掉空白、统一缩到 64×64。哪一格不合格就单独补一张。
+
+### 只看这一撮：`map.SetFilter(filter)`
+
+```js
+map.SetFilter({ members, encounters, routes, zones, friendlies, anchors, notes });  // 每项是 Set 或 null
+map.SetFilter(null);            // 恢复全画
+map.filter                      // 当前过滤（只读）
+map.drawnMarkers                // 本帧真画出去的标记 [{kind, id, encounter?, state?, icon, x, y}]（屏幕坐标）
+```
+
+`null` 表示这一类全画；不在集合里的对象**不画、不参与拾取、也不占标签位置** ——
+「画上了但点不中」这种半吊子状态比不过滤还难用。`members` 与 `encounters` 同时给就是且的关系。
+`drawnMarkers` 是回答「屏幕上到底有什么」的唯一口径，比翻模型准：模型里有的东西
+可能被图层、过滤或视野挡掉了。
+
 ### 右栏「详情 / 批注」
 
 - **详情卡**（`FindOwner` 反查）：卡头是「类别标签 + 名字」，卡身是一张键值表，
@@ -260,6 +381,14 @@ P3b 的 `Script_EditorOrchestrationMap.mjs`（canvas 2D，零 three，北在上�
 `[data-flow-phase=n]`（`data-open=0|1`、`data-phase-state=now|done|todo`）、`[data-flow-step=id]`、
 `[data-fact=id]`（`data-fact-state=ok|wait|past|future|none`）、
 `[data-flow-encounter=id]`、`[data-flow-route=name]`、`[data-jump=n]`、`[data-flow-orphan]`；
+`[data-orch="filter-drawer"]`（`data-open=0|1`、`data-tab=tree|table`）、`filter-button` /
+`filter-presets` / `filter-tabs` / `filter-tree` / `enemy-table` / `filter-close` / `filter-grip`；
+`[data-filter-preset=…]`、`[data-filter-tab=tree|table]`、`[data-filter-section=groups|states|weapons|behaviors]`、
+`[data-filter-row="<kind>:<id>"]`（`data-on=0|1`、`data-solo=0|1`、`data-filter-count`、`data-filter-visible`）、
+`[data-filter-toggle="<kind>:<id>"]`、`[data-filter-solo="<kind>:<id>"]`，
+`kind ∈ category|encounter|state|weapon|behavior|friendlyKind|zoneKind|route`；
+布设表里 `[data-table="enemies"]`、`[data-table-sort=<列>]`、`[data-table-group=<组>]`、
+`[data-table-row=<敌人编号>]`（`data-alive=0|1`）、`[data-table-action="csv"]`；
 `[data-tool=…]`、`[data-layer=…]`、
 `[data-map=phase|phase-label|prev|next|fit-all|fit-phase|follow|follow-chip]`
 （`phase` 现在是那条细进度条，`follow` 是芯片里那个藏起来的 checkbox）；
@@ -278,6 +407,9 @@ P3b 的 `Script_EditorOrchestrationMap.mjs`（canvas 2D，零 three，北在上�
 对外方法（`T.editor.overlays.get("orchestration")`）：
 `Select(sel)` / `SetPhase(n,{fit})` / `OpenPhase(n,{scroll})` / `SetTool(id)` / `SetLayer(id,on)` /
 `SetAllLayers(on)` / `ToggleLayers(force?)` / `ToggleTimeline(force?)` / `SetFollowLive(on)` /
+`OpenFilterDrawer(bool?)` / `SetFilterTab("tree"|"table")` / `ApplyPreset(name)` / `SetFilterState(patch)` /
+`SoloTarget(kind,id)` / `ToggleFilterRow(kind,id)` / `SortEnemyTable(column)` / `ToggleTableGroup(id)` /
+`EnemyRows()` / `EnemyCsv()` / `CopyEnemyCsv()` / `PickEnemyRow(memberId)`（只读字段 `filter` / `filterState` / `filterSummary`）/
 `AddShape(shape)` / `RemoveShape(i)` / `SetCandidate(point,target)` /
 `SetNoteText(text)` / `SetProposalKind(kind)` / `SetNoteTime(kind,value)` / `SetNoteFilter(v)` /
 `SetLabelText(text)` / `CommitLabel()` / `CancelLabel()` /
@@ -385,15 +517,20 @@ node Taierzhuang1938/Script_MissionNotesCli.mjs dismiss <id> [--summary "…"]
    **正在等哪些事实**，底栏实际行会记下真正发生的时刻。
    自己缩放或拖动过之后，跟随实时就只换阶段、不再动你的镜头；想把框景交回去，
    点一下「适配本阶段」或「适配整关」。
-5. 看到不对的：在俯视图上点中那个敌人 / 触发圈 / 路线 / **整组的把手** / **某一波攻击的标签**
+5. 图上东西太多看不清时，按工具条上的 **分类**：左边那块面板能按类型单独看 ——
+   预设「只看敌军」把友军 / 触发区 / 路线全收起来；敌军还能按组 / 本阶段状态 / 武器 /
+   行为分开看，某一组点「只看」就图上只剩他们几个（再点一次取消）。
+   要一眼看全「谁在哪、拿什么、会不会动」就切到 **布设表**：一行一个敌人，点表头排序，
+   点一行跳到他身上，「复制 CSV」能整张端走。
+6. 看到不对的：在俯视图上点中那个敌人 / 触发圈 / 路线 / **整组的把手** / **某一波攻击的标签**
    （或在左栏点阶段、步骤、事实、组），用圈选 / 箭头 / 折线 / 标注画出想说的地方
    （标注是在点的地方直接打字，回车落笔），要挪位置就用「候选位」把他拖到想要的位置。
-6. 右栏写一句人话 + 选建议类型（+ 时间点），点 **保存草稿**。
+7. 右栏写一句人话 + 选建议类型（+ 时间点），点 **保存草稿**。
    面板会告诉你是写进了 `Taierzhuang1938/Notes/FirstLevel/notes.json` 还是退化成了本地草稿。
    退化时那张俯视图不会丢：它躺在浏览器的 IndexedDB 里，等下一次能写盘时自动补传，
    卡片上也看得到缩略图。
-7. 点 **复制交接文本** 把 `HandoffMarkdown` 拷给 agent（或者直接让 agent 自己去读 `notes.json`）。
-8. agent 改完、提交之后回到工作台点「重新加载」：已处理的批注会显示
+8. 点 **复制交接文本** 把 `HandoffMarkdown` 拷给 agent（或者直接让 agent 自己去读 `notes.json`）。
+9. agent 改完、提交之后回到工作台点「重新加载」：已处理的批注会显示
    `resolution.summary`；如果目标的数据确实变了，那条批注会标 **⚠ 原设置已变化** 并把新旧值并排。
    核对无误点 **标记已核对**。
 
@@ -434,13 +571,14 @@ node Taierzhuang1938/Script_MissionNotesCli.mjs dismiss <id> [--summary "…"]
 # 纯 Node，秒级
 node Taierzhuang1938/Script_MissionGatesTest.mjs
 node Taierzhuang1938/Script_MissionNotesTest.mjs
+node Taierzhuang1938/Script_MissionOrchestrationFilterTest.mjs
 node Taierzhuang1938/Script_ModuleGraphTest.mjs
 node Taierzhuang1938/Script_TestRunnerTest.mjs
 node Taierzhuang1938/Script_TextTest.mjs
 
 # 浏览器
 node Taierzhuang1938/Script_OrchestrationMapTest.mjs        # 俯视图（45 条）：数像素、PickAt、组/攻击波把手、ToPng、工具回调
-node Taierzhuang1938/Script_OrchestrationEditorTest.mjs     # 工作台（69 条）：三栏/分栏线/时间轴折叠、事实与 flow 一致、阶段状态与「正在等」小标签、跟随实时不抢视野、标注输入框、批注退化与图片补传、关窗还干净
+node Taierzhuang1938/Script_OrchestrationEditorTest.mjs     # 工作台（91 条）：三栏/分栏线/时间轴折叠、事实与 flow 一致、阶段状态与「正在等」小标签、跟随实时不抢视野、标注输入框、分类抽屉与敌军布设表、批注退化与图片补传、关窗还干净
 node Taierzhuang1938/Script_EditorTest.mjs --launcher-only  # 入口面板 26 个按钮
 node Taierzhuang1938/Script_WorldInfoEditorTest.mjs
 node Taierzhuang1938/Script_PlayerStateEditorTest.mjs

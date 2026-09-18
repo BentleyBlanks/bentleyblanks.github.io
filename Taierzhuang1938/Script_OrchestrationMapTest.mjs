@@ -5,8 +5,20 @@
 //
 // 这一层守的是「画出来的东西真的在画布上」。**数像素，不看 visible** ——
 // 这个仓库吃过「刺刀装上了却 1 px 都看不见、16 项全绿照样漏过」的亏
-// （docs 旧账）。所以每一条断言都落在 getImageData 数出来的精确 RGB 像素数上，
+// （docs 旧账）。所以每一条断言都落在 getImageData 数出来的像素数上，
 // oracle 是模块自己导出的 MAP_COLORS，不是本文件里另抄一份颜色。
+//
+// 标记改成图标以后，`__Count` 一次数两种：
+//   `X`      —— 与目标色**每个通道差 ≤ 24** 的像素。图标缩到 14 px 又带抗锯齿，
+//                细线图标的边缘全是混出来的中间色，只认精确 RGB 会抖。
+//   `XExact` —— 精确等于目标色的像素。
+// 「画出来了吗」用前者（宽容地找墨），「关掉之后归零了吗」必须用后者 ——
+// 因为容差 24 会把好些颜色糊到一起：handle #1e2227 与底色 #101314 差 (14,15,19)、
+// legendBack #0d1011 与底色差 (3,3,3)，拿容差去问「是不是 0」，整片底色都会算进去，
+// 那不是放宽是失效。两侧各用各的尺子，没有一条老断言因此变松。
+//
+// 图标一定要 `await map.ready` 再量：加载完成前画的是兜底几何标记，
+// 那时候数出来的是另一套画法的像素。
 //
 // 被测页面是现造的：在 _shots/OrchestrationMap/ 下写一张临时 html，
 // 直接 import 纯模型模块 + 本渲染模块，不进游戏主程序 —— 俯视图是零 three 的
@@ -53,7 +65,8 @@ const HARNESS = `<!doctype html>
 </script>
 <script type="module">
   import { BuildOrchestrationModel, PhaseLayout } from "../../Script_MissionOrchestration.mjs";
-  import { OrchestrationMap, MAP_COLORS } from "../../Script_EditorOrchestrationMap.mjs";
+  import { OrchestrationMap, MAP_COLORS, LoadedIconNames } from "../../Script_EditorOrchestrationMap.mjs";
+  import { ORCHESTRATION_ICONS, ICON_ORDER, IconForMember } from "../../Data_OrchestrationIcons.mjs";
   try {
     const canvas = document.getElementById("map");
     const model = BuildOrchestrationModel();
@@ -68,14 +81,21 @@ const HARNESS = `<!doctype html>
     window.__COLORS = MAP_COLORS;
     window.__events = events;
     window.__map = map;
+    window.__LoadedIcons = () => LoadedIconNames();
+    window.__ICON_ORDER = ICON_ORDER;
+    window.__ICON_FILES = Object.fromEntries(ICON_ORDER.map((n) => [n, ORCHESTRATION_ICONS[n].file]));
+    window.__IconForMember = IconForMember;
 
     // 数像素：一次 getImageData，顺手把「非底色像素」也数出来 —— 那是「这张图
     // 到底有没有内容」的粗闸，防止调色板对上了但整张图其实是空的。
+    // 每个颜色同时给「容差 24 的墨量」与「精确 RGB 的墨量」，用法见文件头。
+    const TOL = 24;
     window.__Count = (names) => {
       const c = map.canvas;
       const data = c.getContext("2d").getImageData(0, 0, c.width, c.height).data;
       const targets = names.map((n) => MAP_COLORS[n]);
-      const counts = names.map(() => 0);
+      const near = names.map(() => 0);
+      const exact = names.map(() => 0);
       const back = MAP_COLORS.backdrop;
       let ink = 0, sum = 0;
       for (let i = 0; i < data.length; i += 4) {
@@ -84,11 +104,52 @@ const HARNESS = `<!doctype html>
         sum = (sum + r * 3 + g * 5 + b * 7) % 2147483647;
         for (let k = 0; k < targets.length; k += 1) {
           const t = targets[k];
-          if (r === t[0] && g === t[1] && b === t[2]) counts[k] += 1;
+          const dr = r - t[0], dg = g - t[1], db = b - t[2];
+          if (dr === 0 && dg === 0 && db === 0) { exact[k] += 1; near[k] += 1; continue; }
+          if (dr <= TOL && dr >= -TOL && dg <= TOL && dg >= -TOL && db <= TOL && db >= -TOL) near[k] += 1;
         }
       }
       const out = { ink, sum };
-      names.forEach((n, i) => { out[n] = counts[i]; });
+      names.forEach((n, i) => { out[n] = near[i]; out[n + "Exact"] = exact[i]; });
+      return out;
+    };
+    // 只数画布上某一块里的精确像素。
+    //
+    // 由头：图标的深色描边压在暗地表上，抗锯齿会混出一枚正好等于图例底色
+    // #0d1011 的像素（实测三枚，全在地图中间，离图例十万八千里）。拿全画布去问
+    // 「图例关掉之后是不是 0」，答案就被这种噪点左右。图例画在哪儿是定死的，
+    // 那就去那块地方数 —— 问的还是同一件事，而且问得更准。
+    window.__CountRect = (name, rect) => {
+      const c = map.canvas;
+      const w = c.width;
+      const d = map.dpr;
+      const x0 = Math.max(0, Math.floor(rect.x * d)), x1 = Math.min(w, Math.ceil((rect.x + rect.w) * d));
+      const y0 = Math.max(0, Math.floor(rect.y * d)), y1 = Math.min(c.height, Math.ceil((rect.y + rect.h) * d));
+      if (x1 <= x0 || y1 <= y0) return 0;
+      const data = c.getContext("2d").getImageData(x0, y0, x1 - x0, y1 - y0).data;
+      const t = MAP_COLORS[name];
+      let n = 0;
+      for (let i = 0; i < data.length; i += 4) {
+        if (data[i] === t[0] && data[i + 1] === t[1] && data[i + 2] === t[2]) n += 1;
+      }
+      return n;
+    };
+    // 图例占的那条竖带（css 像素）。图例永远贴着画布左下角画。
+    window.__LegendRect = () => ({ x: 24, y: 0, w: 200, h: map.cssHeight });
+    // 「这几个像素到底在哪儿」。数像素的断言一旦红了，光知道「多了 3 个」没法查，
+    // 得能指着画布说出坐标 —— 抗锯齿混出来的假阳性和真漏画，位置一看就分得开。
+    window.__Where = (name, limit = 8) => {
+      const c = map.canvas;
+      const w = c.width;
+      const data = c.getContext("2d").getImageData(0, 0, w, c.height).data;
+      const t = MAP_COLORS[name];
+      const out = [];
+      for (let i = 0; i < data.length && out.length < limit; i += 4) {
+        if (data[i] === t[0] && data[i + 1] === t[1] && data[i + 2] === t[2]) {
+          const px = (i / 4) % w, py = Math.floor((i / 4) / w);
+          out.push(Math.round(px / map.dpr) + "," + Math.round(py / map.dpr));
+        }
+      }
       return out;
     };
     // 图例里每一行都用真颜色画（它就是干这个的），于是「关掉某层，那个颜色就得
@@ -162,6 +223,8 @@ try {
   await page.waitForFunction(() => window.__ready || window.__bootError, null, { timeout: 120000 });
   const boot = await page.evaluate(() => window.__bootError);
   if (boot) throw new Error(`测试页没起来：${boot}`);
+  // 图标到齐再开始量。没有这一步，前几节量到的是「图还没加载好」的兜底画法。
+  await page.evaluate(async () => { await window.__map.ready; return true; });
 
   // -------------------------------------------------------------------------
   // 0) 模型与画布：先确认拿到的是真模型、画布按 devicePixelRatio 铺开了
@@ -194,6 +257,88 @@ try {
     setup.hasSampler ? "已烘" : "模型没带采样器：按容错口径不画这一层");
 
   // -------------------------------------------------------------------------
+  // 0b) 图标：二十三张 PNG 都到位了，而且真的画到了每个敌人身上
+  // -------------------------------------------------------------------------
+  const icons = await page.evaluate(() => {
+    const map = window.__map;
+    map.SetFilter(null);
+    map.SetLayers({
+      terrain: true, blocks: true, trenches: true, roads: true, anchors: true,
+      routes: true, zones: true, friendlies: true, encounters: true, tactics: true,
+      live: true, notes: true, labels: true, legend: true,
+    });
+    map.SetPhase(12);
+    map.FitBounds();
+    map.Redraw();
+    const loaded = window.__LoadedIcons();
+    const marks = map.drawnMarkers || [];
+    const members = marks.filter((entry) => entry.kind === "member");
+    // 每个敌人都得有图标名，而且那张名字对应的 PNG 真的加载上了。
+    const broken = members.filter((entry) => !entry.icon || !loaded.includes(entry.icon));
+    // 图标要跟着「他是干什么的」走：机枪手画机枪、上刺刀的画刺刀。
+    const wrong = [];
+    for (const encounter of map.phaseLayout.encounters || []) {
+      for (const member of encounter.members || []) {
+        const drawn = members.find((entry) => entry.id === member.id);
+        if (!drawn) continue;
+        const want = window.__IconForMember(member, encounter.state, encounter.id);
+        if (drawn.icon !== want) wrong.push(`${member.id} 画成 ${drawn.icon}，该是 ${want}`);
+      }
+    }
+    return {
+      loaded: loaded.length, all: window.__ICON_ORDER.length,
+      missing: window.__ICON_ORDER.filter((n) => !loaded.includes(n)),
+      marks: marks.length, members: members.length, broken: broken.slice(0, 4),
+      kinds: [...new Set(marks.map((entry) => entry.kind))].sort(),
+      used: [...new Set(members.map((entry) => entry.icon))].sort(),
+      wrong: wrong.slice(0, 4),
+      sheet: map.IconSheetPng({}),
+    };
+  });
+  const sheetBytes = SavePng("icons_sheet.png", icons.sheet);
+  delete icons.sheet;
+  Check("二十三张图标 PNG 全部加载成功", icons.loaded === icons.all && icons.missing.length === 0,
+    icons.missing.length ? `没加载上：${icons.missing.join(",")}` : `${icons.loaded} 张`);
+  Check("drawnMarkers 报得出本帧画了什么", icons.marks > 0 && icons.members > 0,
+    `${icons.marks} 个标记，其中敌人 ${icons.members} 个；种类 ${icons.kinds.join("/")}`);
+  Check("每个敌人都带一个已加载的图标名", icons.broken.length === 0,
+    icons.broken.length ? icons.broken.map((b) => `${b.id}:${b.icon}`).join("；") : `用到 ${icons.used.join("、")}`);
+  Check("图标按「他是干什么的」选（机枪 / 刺刀 / 守点 / 飞机）", icons.wrong.length === 0,
+    icons.wrong.join("；") || "全部与登记表一致");
+  Info("图标总表", `_shots/OrchestrationMap/icons_sheet.png，${(sheetBytes / 1024).toFixed(0)} KB`);
+
+  // 图例里那一列示意图就是地图上的同一张图标 —— 把所有标记层关掉，只留图例，
+  // 敌人色/友军色的像素必须还在；再把图例也关掉，就该一个都不剩。
+  const legendIcons = await page.evaluate(() => {
+    const map = window.__map;
+    map.SetHover(null);
+    const markerLayers = {
+      encounters: false, friendlies: false, anchors: false, zones: false,
+      routes: false, notes: false, live: false, tactics: false,
+    };
+    map.SetLayers({ ...markerLayers, legend: true });
+    map.SetLegendOpen(true);
+    const open = window.__Count(["enemyStaged", "enemyActive", "friendly", "note", "anchor"]);
+    map.SetLayers({ legend: false });
+    const off = window.__Count(["enemyStaged", "enemyActive", "friendly", "note", "anchor"]);
+    map.SetLegendOpen(false);
+    map.SetLayers({
+      encounters: true, friendlies: true, anchors: true, zones: true,
+      routes: true, notes: true, live: true, tactics: true, legend: true,
+    });
+    return { open, off };
+  });
+  Check("图例里的图标真的画出来了（关掉全部标记层，图例那一列还有像素）",
+    legendIcons.open.enemyStagedExact > 0 && legendIcons.open.enemyActiveExact > 0
+    && legendIcons.open.friendlyExact > 0 && legendIcons.open.noteExact > 0,
+    `已生成 ${legendIcons.open.enemyStagedExact} / 活跃 ${legendIcons.open.enemyActiveExact} / `
+    + `友军 ${legendIcons.open.friendlyExact} / 批注 ${legendIcons.open.noteExact} px`);
+  Check("这些像素确实来自图例（把图例也关掉就归零）",
+    legendIcons.off.enemyStagedExact === 0 && legendIcons.off.friendlyExact === 0
+    && legendIcons.off.noteExact === 0,
+    `${legendIcons.off.enemyStagedExact}/${legendIcons.off.friendlyExact}/${legendIcons.off.noteExact} px`);
+
+  // -------------------------------------------------------------------------
   // 1) 各阶段数像素：敌人色随阶段变、路线色不为 0、整张图不是空的
   // -------------------------------------------------------------------------
   const phaseNumbers = (await page.evaluate(() => window.__model.phases.map((p) => p.number)));
@@ -220,6 +365,7 @@ try {
     const bytes = SavePng(`phase_${String(row.n).padStart(2, "0")}.png`, row.png);
     delete row.png;
     row.enemy = row.enemyStaged + row.enemyActive + row.enemyDormant;
+    row.enemyExact = row.enemyStagedExact + row.enemyActiveExact + row.enemyDormantExact;
     row.bytes = bytes;
     perPhase.push(row);
   }
@@ -236,19 +382,23 @@ try {
   // 同一份代码在这台机器上 50/50、在另一台上 49/50。标记色已经挑得离那些中性灰远
   // 一点了（未出现改成冷灰蓝），余量是第二道保险 —— 真把一层画丢了是成百上千个
   // 像素的事，不会只差三个。
+  //
+  // 「有人」那一侧用容差墨量（图标有抗锯齿，细线图标的精确像素会抖），
+  // 「没人」那一侧用精确像素 —— 容差 24 在暗底上会把一大片中间色算进来，
+  // 拿它问「是不是 0」等于没问。两侧各用各的尺子。
   const NOISE_PX = 3;
-  const Mismatch = (people, px) => (people > 0 ? px <= 0 : px > NOISE_PX);
-  const enemyMismatch = perPhase.filter((r) => Mismatch(r.onField, r.enemy));
+  const Mismatch = (people, near, exact) => (people > 0 ? near <= 0 : exact > NOISE_PX);
+  const enemyMismatch = perPhase.filter((r) => Mismatch(r.onField, r.enemy, r.enemyExact));
   Check("敌人像素与模型「场上有几个人」一一对上", enemyMismatch.length === 0,
     enemyMismatch.length
       ? enemyMismatch.map((r) => `阶段${r.n} 在场${r.onField}人 但 ${r.enemy}px`).join("；")
       : perPhase.map((r) => `${r.n}:${r.onField}人/${r.enemy}px`).join(" "));
-  const pendingMismatch = perPhase.filter((r) => Mismatch(r.pending, r.enemyPending));
-  Check("未出现的组画成空心灰蓝，且与模型的 pending 人数对得上", pendingMismatch.length === 0,
+  const pendingMismatch = perPhase.filter((r) => Mismatch(r.pending, r.enemyPending, r.enemyPendingExact));
+  Check("未出现的组画成半透明的冷灰蓝，且与模型的 pending 人数对得上", pendingMismatch.length === 0,
     pendingMismatch.length
       ? pendingMismatch.map((r) => `阶段${r.n} pending${r.pending}人 但 ${r.enemyPending}px`).join("；")
       : `有人时最多 ${Math.max(...perPhase.map((r) => r.enemyPending))} px，`
-        + `没人时最多 ${Math.max(0, ...perPhase.filter((r) => r.pending === 0).map((r) => r.enemyPending))} px`);
+        + `没人时最多 ${Math.max(0, ...perPhase.filter((r) => r.pending === 0).map((r) => r.enemyPendingExact))} px（精确）`);
   const distinctEnemy = new Set(perPhase.map((r) => r.enemy));
   Check("敌人色像素随阶段变化", distinctEnemy.size >= 6,
     `${distinctEnemy.size} 种不同的计数`);
@@ -341,9 +491,11 @@ try {
       const hit = map.PickAt(screen.x, screen.y);
       return { id: member.id, hit: hit ? `${hit.kind}:${hit.id}` : "null" };
     });
-    const withChips = window.__Count(["handle"]).handle;
+    // 把手芯片的底色跟画布底色只差十几档，容差 24 会把整片底色算成芯片 ——
+    // 这一条必须用精确像素。
+    const withChips = window.__Count(["handle"]).handleExact;
     map.SetLayers({ encounters: false, zones: false });
-    const noChips = window.__Count(["handle"]).handle;
+    const noChips = window.__Count(["handle"]).handleExact;
     map.SetLayers({ encounters: true, zones: true });
     const hoverBefore = window.__events.hover.length;
     window.__Mouse("mousemove", group.x, group.y);
@@ -585,33 +737,41 @@ try {
     // 先把悬停清掉 —— 上一节留下的 tooltip 会跟着鼠标压在图例上，白白吃掉一百多个像素。
     map.SetHover(null);
     const defaultOpen = map.legendOpen;
-    const chip = window.__Count(["legendBack"]).legendBack;
+    // 图例底色 #0d1011 与画布底色 #101314 只差三档，同样只能用精确像素。
+    const band = window.__LegendRect();
+    const chip = window.__CountRect("legendBack", band);
     const hit = map.legendHit ? { ...map.legendHit } : null;
     window.__Mouse("mousedown", hit.x + 10, hit.y + 8);
     window.__Mouse("mouseup", hit.x + 10, hit.y + 8);
     const openedByClick = map.legendOpen;
-    const opened = window.__Count(["legendBack"]).legendBack;
+    const opened = window.__CountRect("legendBack", band);
     // 摊开以后面板往上长，标题栏跟着挪：再点一下要点在新的标题栏上
     const head = map.legendHit ? { ...map.legendHit } : null;
     window.__Mouse("mousedown", head.x + 10, head.y + 8);
     window.__Mouse("mouseup", head.x + 10, head.y + 8);
     const closedByClick = map.legendOpen;
     map.SetLegendOpen(true);
-    const openedByApi = window.__Count(["legendBack"]).legendBack;
+    const openedByApi = window.__CountRect("legendBack", band);
+    const legendPng = map.ToPng({ scale: 1 });
     map.SetLegendOpen(false);
     map.SetLayers({ legend: false });
     const legendOff = window.__Count(["legendBack", "scaleBar"]);
+    legendOff.inBand = window.__CountRect("legendBack", band);
+    const strays = window.__Where("legendBack");
     map.SetLayers({ legend: true });
     return {
-      on, noRoutes, noEnemies, back, legendOff, bar: map.scaleBar,
-      defaultOpen, chip, hit, head, openedByClick, opened, closedByClick, openedByApi,
+      on, noRoutes, noEnemies, back, legendOff, strays, bar: map.scaleBar,
+      defaultOpen, chip, hit, head, openedByClick, opened, closedByClick, openedByApi, legendPng,
     };
   });
+  const legendBytes = SavePng("legend_open.png", layers.legendPng);
+  delete layers.legendPng;
+  Info("摊开的图例出图", `_shots/OrchestrationMap/legend_open.png，${(legendBytes / 1024).toFixed(0)} KB`);
   Check("关掉 routes 层后路线像素归零",
-    layers.on.route > 0 && layers.noRoutes.route === 0,
+    layers.on.route > 0 && layers.noRoutes.routeExact === 0,
     `${layers.on.route} → 0`);
   Check("关掉 encounters 层后敌人像素归零",
-    layers.noEnemies.enemyStaged + layers.noEnemies.enemyActive === 0,
+    layers.noEnemies.enemyStagedExact + layers.noEnemies.enemyActiveExact === 0,
     `${layers.on.enemyStaged + layers.on.enemyActive} → 0`);
   Check("开回来还是原样", layers.back.route === layers.on.route
     && layers.back.enemyStaged === layers.on.enemyStaged);
@@ -623,8 +783,9 @@ try {
     && layers.opened > layers.chip * 3 && layers.openedByApi === layers.opened,
     `收起 ${layers.chip} px @ (${layers.hit?.x}, ${layers.hit?.y}) → 展开 ${layers.opened} px，`
     + `标题栏挪到 (${layers.head?.x}, ${layers.head?.y})（API 展开 ${layers.openedByApi} px）`);
-  Check("关掉 legend 层连芯片都不画", layers.legendOff.legendBack === 0,
-    `${layers.chip} px → ${layers.legendOff.legendBack} px`);
+  Check("关掉 legend 层连芯片都不画", layers.legendOff.inBand === 0,
+    `图例那条竖带里 ${layers.chip} px → ${layers.legendOff.inBand} px`
+    + (layers.strays?.length ? `；全画布还剩 ${layers.legendOff.legendBackExact} px（图标描边抗锯齿混出来的，在 ${layers.strays.join(" / ")}）` : ""));
   Check("比例尺在（关掉图例也还在），并报得出整数米长度",
     layers.legendOff.scaleBar > 0 && Number.isFinite(layers.bar?.meters) && layers.bar.meters > 0
     && /^\d+ m$/.test(layers.bar?.text || ""),
@@ -651,11 +812,12 @@ try {
     const cleared = window.__CountMap(["player"]);
     return { before, after, cleared };
   });
-  Check("live 层画出玩家三角", live.before.player === 0 && live.after.player > 0, `${live.after.player} px`);
+  Check("live 层画出玩家图标（带朝向）", live.before.playerExact === 0 && live.after.player > 0,
+    `${live.after.player} px`);
   Check("live 层画出实际敌人位置与 guideRoute",
     live.after.liveEnemy > 0 && live.after.guide > 0,
     `敌人 ${live.after.liveEnemy} px / 指引 ${live.after.guide} px`);
-  Check("SetLive(null) 之后 live 层收干净", live.cleared.player === 0);
+  Check("SetLive(null) 之后 live 层收干净", live.cleared.playerExact === 0);
 
   // -------------------------------------------------------------------------
   // 9b) 整关视野：文字互不相交、图廓齐全、一次 Redraw 的耗时
@@ -710,6 +872,80 @@ try {
     map.canvas.style.height = "760px";
     map.Resize();
   });
+
+  // -------------------------------------------------------------------------
+  // 9c) SetFilter：只看这一组。过滤掉的东西不画、不拾取、也不占标签位置
+  // -------------------------------------------------------------------------
+  const filter = await page.evaluate(() => {
+    const map = window.__map;
+    map.SetTool("select");
+    map.SetSelection(null);
+    map.SetHover(null);
+    map.SetLive(null);
+    map.SetFilter(null);
+    map.SetPhase(12);
+    map.FitBounds();
+    const Members = () => (map.drawnMarkers || []).filter((entry) => entry.kind === "member");
+    const all = Members();
+    const allRoute = window.__CountMap(["route"]).route;
+
+    map.SetFilter({ encounters: new Set(["transfer"]) });
+    const only = Members();
+    const onlyIds = only.map((entry) => entry.id).sort();
+    const onlyEnc = [...new Set(only.map((entry) => entry.encounter))];
+    const chipsAfter = (map.handles || []).filter((entry) => entry.kind === "encounter").map((entry) => entry.id);
+    const stored = map.filter?.encounters instanceof Set ? [...map.filter.encounters] : null;
+    const storedNulls = map.filter
+      ? ["members", "routes", "zones", "friendlies", "anchors", "notes"].every((k) => map.filter[k] === null)
+      : false;
+    // 被过滤掉的人也不该再点得中。
+    map.ZoomTo({ x: 43, z: 8 }, 40);
+    const gunner = map.WorldToScreen(43, 8);
+    const pickFiltered = map.PickAt(gunner.x, gunner.y);
+    map.SetFilter(null);
+    const pickBack = map.PickAt(gunner.x, gunner.y);
+
+    map.FitBounds();
+    map.SetFilter({ routes: new Set(["south"]) });
+    const oneRoute = window.__CountMap(["route"]).route;
+    map.SetFilter({ members: new Set(["TransferGunner"]) });
+    const oneMember = Members().map((entry) => entry.id);
+
+    map.SetFilter(null);
+    map.FitBounds();
+    const back = Members();
+    const backRoute = window.__CountMap(["route"]).route;
+    const truth = (map.model.encounters.find((entry) => entry.id === "transfer")?.members || [])
+      .map((entry) => entry.id).sort();
+    return {
+      allCount: all.length, onlyIds, onlyEnc, chipsAfter, stored, storedNulls,
+      pickFiltered, pickBack, oneMember,
+      backCount: back.length, allRoute, oneRoute, backRoute, truth,
+      png: map.ToPng({ scale: 1 }),
+    };
+  });
+  SavePng("filter_transfer.png", filter.png);
+  delete filter.png;
+  Check("SetFilter({encounters:transfer}) 之后地图上只剩 transfer 组那四个人",
+    filter.onlyIds.length === 4 && filter.onlyIds.join(",") === filter.truth.join(",")
+    && filter.onlyEnc.length === 1 && filter.onlyEnc[0] === "transfer",
+    `${filter.allCount} 人 → ${filter.onlyIds.length} 人（${filter.onlyIds.join("、")}）`);
+  Check("过滤后组把手也只剩这一个，当前过滤记在 map.filter 上",
+    filter.chipsAfter.length === 1 && filter.chipsAfter[0] === "transfer"
+    && Array.isArray(filter.stored) && filter.stored.join(",") === "transfer" && filter.storedNulls,
+    `把手 ${filter.chipsAfter.join("/") || "（无）"}；map.filter.encounters=${JSON.stringify(filter.stored)}`);
+  Check("过滤掉的人也点不中了，取消过滤又点得中",
+    filter.pickFiltered?.kind !== "member" && filter.pickBack?.id === "VillageGunner",
+    `过滤中点到 ${JSON.stringify(filter.pickFiltered)}，取消后点到 ${JSON.stringify(filter.pickBack)}`);
+  Check("路线也能只留一条（像素跟着少）",
+    filter.oneRoute > 0 && filter.oneRoute < filter.allRoute,
+    `全部 ${filter.allRoute} px → 只留 south ${filter.oneRoute} px`);
+  Check("按人过滤（members）同样生效",
+    filter.oneMember.length === 1 && filter.oneMember[0] === "TransferGunner",
+    filter.oneMember.join("、") || "（一个都没剩）");
+  Check("SetFilter(null) 恢复全画",
+    filter.backCount === filter.allCount && filter.backRoute === filter.allRoute && filter.allCount > 4,
+    `${filter.onlyIds.length} → ${filter.backCount} 人，路线 ${filter.backRoute} px`);
 
   // -------------------------------------------------------------------------
   // 10) Dispose：再派发事件不再触发任何回调

@@ -207,6 +207,7 @@ export const testDefs = {
   AiBrainGraphTest: { file: "Script_AiBrainGraphTest.mjs", desc: "敌军 AI 行为图：节点=STATE、边两端存在、表键可解析、任务=TASK（纯 Node，毫秒级）" },
   TuningWriterTest: { file: "Script_TuningWriterTest.mjs", desc: "调参表改写器：按花括号层级只改那一个数字、注释格式不动（纯 Node，毫秒级）" },
   MissionNotesTest: { file: "Script_MissionNotesTest.mjs", desc: "关卡编排批注：schema/快照/漂移/交接文本 + /__notes 保存端点的四道闸（纯 Node，秒级）" },
+  MissionOrchestrationFilterTest: { file: "Script_MissionOrchestrationFilterTest.mjs", desc: "关卡编排分类查看：只看某一组 / 按状态武器行为筛人 / 六个预设 / 敌军布设表与 CSV（纯 Node，毫秒级）" },
   AiEditorTest: { file: "Script_AiEditorTest.mjs", timeoutMs: 300000, desc: "敌军 AI 编辑器：六个分节、世界叠加进出还干净、滑杆热改、重置/复制/保存退化、行为图节点数" },
   OrchestrationMapTest: { file: "Script_OrchestrationMapTest.mjs", timeoutMs: 300000, desc: "关卡编排俯视图：各阶段数像素（敌人色随阶段变、路线色不为 0）、PickAt 点得中成员、ToPng、圈选/移动工具回调、Dispose 后不再回调" },
   OrchestrationEditorTest: { file: "Script_OrchestrationEditorTest.mjs", timeoutMs: 300000, desc: "关卡编排工作台：入口/三栏与时间轴、要求事实与 flow 一致、实时玩家点、阶段状态、反查、批注退化到 localStorage、交接文本、关窗还干净" },
@@ -521,7 +522,7 @@ export const domains = {
   // 在真入口上量：VoiceTest 验的是资产与交付档，量不到 AudioEngine 的装载分叉。
   voice: { label: "语音", tests: ["VoiceTest", "MachineGunCutsceneAudioTest"] },
   menu: { label: "主菜单/开机陈设", tests: ["FirstLevelP012DebugTest", "MenuTest", "DeathMenuTest", "BootPropTest"] },
-  editor: { label: "场景编辑器/第一人称检查/PCG/资产规范/可破坏编辑器/采样点", tests: ["WorldInfoEditorTest", "PlayerStateEditorTest", "AiEditorTest", "TuningWriterTest", "MissionGatesTest", "MissionNotesTest", "OrchestrationMapTest", "OrchestrationEditorTest", "AssetStandardsTest", "EditorTest", "FpsGripEditorTest", "PropPcgTest", "PropPcgEditorTest", "DestructionEditorTest", "TrenchEditorTest", "SamplePointTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "CharacterModelTest"] },
+  editor: { label: "场景编辑器/第一人称检查/PCG/资产规范/可破坏编辑器/采样点", tests: ["WorldInfoEditorTest", "PlayerStateEditorTest", "AiEditorTest", "TuningWriterTest", "MissionGatesTest", "MissionNotesTest", "MissionOrchestrationFilterTest", "OrchestrationMapTest", "OrchestrationEditorTest", "AssetStandardsTest", "EditorTest", "FpsGripEditorTest", "PropPcgTest", "PropPcgEditorTest", "DestructionEditorTest", "TrenchEditorTest", "SamplePointTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "CharacterModelTest"] },
   cutscene: {
     label: "过场/剧本派发/车厢生活动作",
     // 关中过场 beat 与 LEVEL_CUES 的构建都在 Script_Story 与组装层里，
@@ -621,6 +622,8 @@ const changedDomainRules = [
   { domain: "editor", pattern: /Script_EditorPlayerState|Script_PlayerStateEditorTest/i },
   // 关卡编排工作台本体与它的俯视图：改了跑 editor 域（OrchestrationEditorTest / OrchestrationMapTest）。
   { domain: "editor", pattern: /Script_EditorOrchestration|Script_Orchestration.*Test/i },
+  // 「分类查看」的纯模型（工作台的分类树与敌军布设表都读它）：改了跑 editor 域。
+  { domain: "editor", pattern: /Script_MissionOrchestrationFilter/i },
   // 壕沟规划层与预览几何没有 Editor 字样，但「场景样条PCG」面板读的就是它们
   // （滑杆推 SetTrenchPresetOverride、预览调 CompileTrenchNetwork）——
   // 改 TRENCH_PRESETS 不跑 TrenchEditorTest，面板那一路会静默过期。

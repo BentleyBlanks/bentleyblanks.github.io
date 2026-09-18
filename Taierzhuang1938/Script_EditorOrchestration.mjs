@@ -19,17 +19,29 @@
 // 「不用先通关」。那时每个阶段给一颗「从这里试玩」按钮（Debug.FirstLevelJump）。
 // ===========================================================================
 
-import { BuildOrchestrationModel, ApplyRuntimeState, DescribeFact, FindOwner } from "./Script_MissionOrchestration.mjs";
+import {
+  BuildOrchestrationModel, ApplyRuntimeState, DescribeFact, FindOwner, PhaseLayout,
+} from "./Script_MissionOrchestration.mjs";
 import { OrchestrationMap } from "./Script_EditorOrchestrationMap.mjs";
 import {
   NewNoteId, ValidateNote, SnapshotTarget, NoteDrift, HandoffMarkdown,
   PROPOSAL_KINDS, NotesPathFor,
 } from "./Script_MissionNotes.mjs";
+import {
+  DefaultFilterState, NormalizeFilterState, ApplyPreset as PresetState, ToggleFilterItem, SoloFilterItem,
+  BuildOrchestrationFilter, FilterSummary, EnemyTableRows, EnemyTableCsv, SortEnemyRows, RowVisible,
+  RouteNamesFor, PRESETS, ENEMY_TABLE_COLUMNS,
+  STATE_LABELS, FRIENDLY_LABELS, ZONE_LABELS, BAYONET_KEY,
+} from "./Script_MissionOrchestrationFilter.mjs";
 
 const LEVEL = "FirstLevel";
 const REFRESH_SECONDS = 0.25;
 const STORAGE_KEY = `tengxian1938_orchestration_notes_${LEVEL}`;
 const LAYOUT_KEY = `tengxian1938_orchestration_layout_${LEVEL}`;
+const FILTER_KEY = `tengxian1938_orchestration_filter_${LEVEL}`;
+// 图标登记表是 V1 那一包的东西，**可能还不在树上**：用字符串拼出来动态 import，
+// 加载不到就退回彩色圆点。写成字面量的话模块图闸门会顺着它去读一个可能不存在的文件。
+const ICON_MODULE = "Data_OrchestrationIcons.mjs";
 const NOTES_URL = `./Notes/${LEVEL}/notes.json`;
 const STATUS_URL = "/__notes/status";
 const SAVE_URL = "/__notes/save";
@@ -80,21 +92,32 @@ const KIND_TEXT = {
   route: "路线", zone: "触发区", anchor: "锚点", friendly: "友军", point: "地图点", time: "时间点",
   note: "批注",
 };
-const STATE_TEXT = {
-  pending: "未出现", spawned: "已生成", standby: "待命", dormant: "休眠", active: "活跃", cleared: "已清除",
-};
+// 状态 / 友军 / 触发区这三张词表与分类面板共用一份（Script_MissionOrchestrationFilter）：
+// 抄第二遍的下场是同一个状态在详情卡里叫「活跃」、在分类树里叫「在打」。
+const STATE_TEXT = STATE_LABELS;
 const SPAWN_TEXT = {
   step: "进入步骤时生成", fact: "事实满足时生成", beat: "按转运区的攻击波次出现", opening: "由开场脚本生成",
 };
 const RELEASE_TEXT = { tacticNear: "玩家走到路线上的放行点附近才动" };
-const ZONE_TEXT = {
-  gate: "过关条件的触发圈", interior: "室内判定区", crawl: "匍匐区", beatArea: "某一波攻击的落点范围",
+const ZONE_TEXT = ZONE_LABELS;
+const FRIENDLY_TEXT = FRIENDLY_LABELS;
+// 没有图标时行首那颗圆点的颜色（图标登记表在树上时优先用 PNG）。
+const DOT_COLORS = {
+  enemies: "#d6604a", friendlies: "#6fa8d6", zones: "#dfbd68", routes: "#7fd79a",
+  anchors: "#a3aaa4", notes: "#c58fd0",
+  pending: "rgba(214,217,209,.35)", spawned: "#b4553f", standby: "#c08a4a",
+  dormant: "#7a6f8f", active: "#e0553c", cleared: "rgba(163,170,164,.45)",
+  hold: "#d6a04a", mobile: "#d6604a",
 };
-const FRIENDLY_TEXT = {
-  squadPost: "班里弟兄的位置", guardPost: "哨位", defender: "守在这儿的自己人",
-  forwardNest: "前沿火力点", defensePost: "防御点", cartBay: "装车位",
-  tankStart: "坦克起始位", phaseSpawn: "跳关出生点",
+// 分类树的四个小节（敌军底下）：默认摊开「按组」与「按状态」，另两节收着。
+const FILTER_SECTIONS = [
+  ["groups", "按组"], ["states", "按本阶段状态"], ["weapons", "按武器"], ["behaviors", "按行为"],
+];
+const CATEGORY_ICONS = {
+  enemies: "Rifleman", friendlies: "FriendlySquad", zones: "Zone",
+  routes: "Route", anchors: "Anchor", notes: "Note",
 };
+const WEAPON_ICONS = { Type11: "MachineGunner", Type38: "Rifleman", [BAYONET_KEY]: "Bayonet" };
 const TIMELINE_GLYPH = {
   entry: "▸", condition: "◇", timed: "◆", beat: "■", delay: "·", wake: "✶",
   stageEntry: "▸", fact: "●",
@@ -266,7 +289,81 @@ const POPUP_CSS = `
   .track > i { position: absolute; left: 0; top: 7px; height: 2px; background: rgba(223,189,104,.55); }
   .track > b { position: absolute; top: 2px; width: 3px; height: 12px; background: var(--ui-gold, #dfbd68); }
   button.icon { width: 30px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
-  #canvasWrap { flex: 1 1 auto; min-height: 0; position: relative; border: 1px solid var(--edge); }
+  /* --- 中栏左侧：分类抽屉（按类型看地图上的东西）------------------------- */
+  .mapBody { flex: 1 1 auto; min-height: 0; display: flex; }
+  .mapBody > .gutter { flex: 0 0 5px; }
+  .mapBody > .gutter[hidden] { display: none; }
+  [data-orch="filter-drawer"] { flex: 0 0 auto; width: var(--fw, 240px); min-height: 0;
+    display: flex; flex-direction: column; border: 1px solid var(--edge); background: rgba(0,0,0,.28); }
+  [data-orch="filter-drawer"][data-open="0"] { display: none; }
+  .fHead { display: flex; align-items: center; gap: 6px; padding: 6px; border-bottom: 1px solid var(--edge-soft); }
+  .fHead .spacer { flex: 1 1 auto; }
+  .fTabs { display: inline-flex; border: 1px solid var(--edge); }
+  .fTabs > button { border: 0; border-right: 1px solid var(--edge); background: transparent;
+    color: var(--ui-muted, #a3aaa4); padding: 3px 9px; }
+  .fTabs > button:last-child { border-right: 0; }
+  .fTabs > button.on { color: var(--ui-gold, #dfbd68); background: var(--ui-selection, rgba(223,189,104,.14)); }
+  .fPresets { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px; border-bottom: 1px solid var(--edge-soft); }
+  .fPresets > button { padding: 3px 8px; font-size: 11px; }
+  .fPresets > button.on { color: var(--ui-gold, #dfbd68); border-color: var(--gold-line); background: var(--gold-soft); }
+  .fBody { flex: 1 1 auto; min-height: 0; overflow: auto; }
+  [data-orch="filter-drawer"][data-tab="tree"] [data-orch="enemy-table"],
+  [data-orch="filter-drawer"][data-tab="table"] [data-orch="filter-tree"] { display: none; }
+  /* 小节标题贴顶：二十一组摊开之后，滚到一半得还看得见自己在看哪一节。 */
+  .fSect { position: sticky; top: 0; z-index: 1;
+    display: flex; align-items: center; gap: 6px; width: 100%; padding: 4px 8px; text-align: left;
+    font: 700 11px/1.5 var(--ui-font, sans-serif); letter-spacing: .06em; color: var(--ui-gold, #dfbd68);
+    background: #14181a; border: 0; border-top: 1px solid var(--edge-soft);
+    box-shadow: inset 0 0 0 100px rgba(223,189,104,.06); cursor: pointer; }
+  .fSect:hover { box-shadow: inset 0 0 0 100px rgba(223,189,104,.14); }
+  .fSect .tw { font-size: 9px; color: var(--ui-muted, #a3aaa4); }
+  .fSect .fNum { margin-left: auto; }
+  .fRow { display: grid; grid-template-columns: 18px 16px minmax(0,1fr) auto auto; align-items: center;
+    gap: 6px; padding: 3px 8px; }
+  .fRow:hover { background: var(--fill); }
+  .fRow[data-on="0"] .fName { color: rgba(163,170,164,.45); text-decoration: line-through; }
+  .fRow[data-solo="1"] { background: var(--gold-soft); box-shadow: inset 2px 0 0 var(--ui-gold, #dfbd68); }
+  .fRow.cat { padding: 5px 8px; border-top: 1px solid var(--edge); }
+  .fRow.cat .fName { font-weight: 700; font-size: 13px; color: var(--ui-bright, #eeefec); }
+  .fRow .who { min-width: 0; display: flex; flex-direction: column; }
+  .fName { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fSub { font-size: 10px; color: rgba(163,170,164,.7); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fSub code { font: 10px var(--ui-mono, Consolas, monospace); }
+  .fNum { font: 11px var(--ui-mono, Consolas, monospace); font-variant-numeric: tabular-nums;
+    color: var(--ui-muted, #a3aaa4); white-space: nowrap; }
+  .fRow[data-dim="1"] .fNum { color: rgba(163,170,164,.4); }
+  button.fEye { width: 18px; height: 18px; padding: 0; display: inline-flex; align-items: center;
+    justify-content: center; font-size: 10px; line-height: 1; background: transparent;
+    border: 1px solid var(--edge); color: rgba(163,170,164,.5); }
+  .fRow[data-on="1"] button.fEye { color: var(--ui-gold, #dfbd68); border-color: var(--gold-line); background: var(--gold-soft); }
+  button.fSolo { padding: 1px 6px; font-size: 10px; background: transparent;
+    border: 1px solid var(--edge-soft); color: var(--ui-muted, #a3aaa4); }
+  button.fSolo:hover { color: var(--ui-gold, #dfbd68); border-color: var(--gold-line); }
+  .fRow[data-solo="1"] button.fSolo { color: var(--ui-gold, #dfbd68); border-color: var(--gold-line); background: var(--gold-soft); }
+  .fIcon { width: 16px; height: 16px; object-fit: contain; opacity: .85; }
+  .fDot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; justify-self: center; }
+  .fEmpty { padding: 8px; font-size: 11px; color: rgba(163,170,164,.7); }
+  .fBar { display: flex; align-items: center; gap: 6px; padding: 6px; font-size: 11px;
+    color: var(--ui-muted, #a3aaa4); border-bottom: 1px solid var(--edge-soft); }
+  .fBar .spacer { flex: 1 1 auto; }
+  table.enemies { width: 100%; border-collapse: collapse; font-size: 11px; }
+  table.enemies th { position: sticky; top: 0; z-index: 2; padding: 4px 6px; text-align: left; white-space: nowrap;
+    cursor: pointer; background: var(--ui-black, #030404); color: var(--ui-muted, #a3aaa4);
+    border-bottom: 1px solid var(--edge); }
+  table.enemies th:hover { color: var(--ui-text, #d6d9d1); }
+  table.enemies th.sorted { color: var(--ui-gold, #dfbd68); }
+  table.enemies td { max-width: 190px; padding: 3px 6px; white-space: nowrap; overflow: hidden;
+    text-overflow: ellipsis; border-bottom: 1px solid var(--edge-soft); }
+  table.enemies td.num { font: 11px var(--ui-mono, Consolas, monospace); font-variant-numeric: tabular-nums; }
+  table.enemies td.who { display: flex; align-items: center; gap: 6px; }
+  table.enemies tr.grp > td { cursor: pointer; background: var(--fill); color: var(--ui-gold, #dfbd68); }
+  table.enemies tr[data-table-row] { cursor: pointer; }
+  table.enemies tr[data-table-row]:hover > td { background: rgba(223,189,104,.08); }
+  table.enemies tr[data-table-row].sel > td { background: var(--gold-soft); color: var(--ui-bright, #eeefec); }
+  table.enemies tr[data-table-row][data-alive="0"] .liveCell { color: var(--bad); }
+  table.enemies tr[data-table-row][data-alive="1"] .liveCell { color: var(--ok); }
+
+  #canvasWrap { flex: 1 1 auto; min-width: 0; min-height: 0; position: relative; border: 1px solid var(--edge); }
   canvas { display: block; width: 100%; height: 100%; background: #181a19; }
   /* 标注工具的就地输入框：长在点下去的那个位置上，不弹 prompt（prompt 会把
      整个页面卡住，还没法在无头测试里输字）。 */
@@ -441,6 +538,21 @@ export class OrchestrationEditor {
     this.shownPhase = 0;                 // 左栏自动展开/滚动过的那一阶段
     this.layout = ReadLayout();          // 三栏宽度与时间轴折叠状态（记在 localStorage）
     this.drag = null;                    // 正在拖的那条分栏线
+    // --- 分类查看（V2）----------------------------------------------------
+    this.filterState = DefaultFilterState();
+    this.filter = null;                  // 折出来的那几个集合（null = 全画），测试读它
+    this.filterSummary = null;           // 分类树用的那份数据
+    this.filterLayout = ReadFilterLayout();   // 抽屉开合、两个页签各自的宽度、小节折叠
+    this.filterSignature = "";           // 树只在真的变了才重建
+    this.tableSignature = "";
+    this.hoverPreview = false;           // 悬停时临时「只看这一类」，指针一走就还原
+    this.tableSort = { column: "group", ascending: true };
+    this.tableCollapsed = new Set();     // 布设表里收起来的组
+    this.tableRows = [];
+    this.tableLiveCells = new Map();
+    this.icons = null;                   // 图标登记表（V1 的 Data_OrchestrationIcons），没有就画圆点
+    this.iconsTried = false;
+    this.phaseLayoutCache = null;
     this.OnPageHide = () => this.host.CloseOrchestration();
     this.OnResize = () => this.SyncCanvasSize(true);
   }
@@ -463,6 +575,8 @@ export class OrchestrationEditor {
       this.SetPhase(this.phaseNumber);
       this.OpenPhase(this.phaseNumber);        // 开窗先摊开第一阶段，别让左栏是一排关着的抽屉
       this.SetTool("select");
+      this.ApplyFilter({ rebuild: true });
+      this.LoadIcons();
       this.RefreshForm();
       window.addEventListener("pagehide", this.OnPageHide);
       this.win.addEventListener("resize", this.OnResize);
@@ -497,6 +611,11 @@ export class OrchestrationEditor {
     // 顶栏是「指纹没变就不重画」的：不清掉，同一个实例再开一次窗会得到一条空的状态行。
     this.headerSignature = "";
     this.shownPhase = 0;
+    this.filterSignature = "";
+    this.tableSignature = "";
+    this.tableLiveCells = new Map();
+    this.phaseLayoutCache = null;
+    this.hoverPreview = false;
     if (this.win && !this.win.closed) this.win.close();
     this.win = null;
     this.doc = null;
@@ -642,17 +761,22 @@ export class OrchestrationEditor {
     doc.addEventListener("mousemove", (event) => {
       if (!this.drag) return;
       const delta = event.clientX - this.drag.x;
+      // 分类抽屉那条把手也走这套（它在中栏里边，拖的是抽屉自己的宽度）。
+      if (this.drag.side === "filter") { this.ApplyFilterWidth(this.drag.width + delta); return; }
       if (this.drag.side === "left") this.layout.left = this.drag.left + delta;
       else this.layout.right = this.drag.right - delta;
       this.ApplyLayout();
     });
     doc.addEventListener("mouseup", () => {
       if (!this.drag) return;
+      const side = this.drag.side;
       this.drag = null;
       leftGrip.classList.remove("drag");
       rightGrip.classList.remove("drag");
+      this.ui?.filterGrip?.classList.remove("drag");
       doc.body.style.cursor = "";
-      WriteLayout(this.layout);
+      if (side === "filter") WriteFilterLayout(this.filterLayout);
+      else WriteLayout(this.layout);
       this.SyncCanvasSize(true);
     });
   }
@@ -829,6 +953,14 @@ export class OrchestrationEditor {
     }
     El("div", tools, "", "spacer");
 
+    // 「分类」开的是贴在图左边的抽屉：按类型（尤其是敌军）分开看。
+    const filterButton = Button(tools, "", () => this.OpenFilterDrawer(), { orch: "filter-button" }, "tchip");
+    El("span", filterButton, "分类");
+    const filterCount = El("span", filterButton, "", "mono muted");
+    filterButton.title = "按类型看：敌军可以按组 / 本阶段状态 / 武器 / 行为分开看，也能只看某一组；还有一张敌军布设表";
+    this.ui.filterButton = filterButton;
+    this.ui.filterCount = filterCount;
+
     // 图层收进一个下拉面板：十三个开关摊在工具条上要占掉两行，那两行是从俯视图身上抠的。
     const drop = El("div", tools, "", "drop");
     const layerButton = Button(drop, "", () => this.ToggleLayers(), { orch: "layers-button" }, "tchip");
@@ -909,7 +1041,11 @@ export class OrchestrationEditor {
     this.ui.followBox = followBox;
     this.ui.followButton = followButton;
 
-    const wrap = El("div", root);
+    // 抽屉和画布并排：抽屉是「看哪些」，画布是「长什么样」，两边同时在眼前才好挑。
+    const body = El("div", root, "", "mapBody");
+    this.ui.mapBody = body;
+    this.BuildFilterDrawer(El, Button, body);
+    const wrap = El("div", body);
     wrap.id = "canvasWrap";
     const canvas = this.doc.createElement("canvas");
     canvas.dataset.orch = "canvas";
@@ -931,6 +1067,501 @@ export class OrchestrationEditor {
 
   SetAllLayers(on) {
     for (const [id] of this.ui?.layers || []) this.SetLayer(id, on ? true : BASE_LAYERS.has(id));
+  }
+
+  // ------------------------------------------------------- 分类查看（抽屉）
+  /**
+   * 贴在俯视图左边的抽屉，两个页签：
+   *   分类   —— 六个类别各一行；敌军底下再按组 / 本阶段状态 / 武器 / 行为分四小节，
+   *            每一项一行：开关 + 名字 + 本阶段人数 + 「只看」。
+   *   布设表 —— 全部敌人一张表，可排序、按组折叠、跟着筛选联动、能复制 CSV。
+   * 「图层」管的是**画不画这一类**，这里管的是**这一类里看哪几个** —— 两件事。
+   */
+  BuildFilterDrawer(El, Button, parent) {
+    const drawer = El("aside", parent);
+    drawer.dataset.orch = "filter-drawer";
+    drawer.dataset.open = this.filterLayout.open ? "1" : "0";
+    drawer.dataset.tab = this.filterLayout.tab === "table" ? "table" : "tree";
+    drawer.addEventListener("mouseleave", () => this.ClearHoverPreview());
+
+    const head = El("div", drawer, "", "fHead");
+    const tabs = El("div", head, "", "fTabs");
+    tabs.dataset.orch = "filter-tabs";
+    this.ui.filterTabs = new Map();
+    for (const [id, label] of [["tree", "分类"], ["table", "布设表"]]) {
+      const button = Button(tabs, label, () => this.SetFilterTab(id), { filterTab: id });
+      this.ui.filterTabs.set(id, button);
+    }
+    El("div", head, "", "spacer");
+    Button(head, "收起", () => this.OpenFilterDrawer(false), { orch: "filter-close" }, "ghost")
+      .title = "收起这块面板（工具条上的「分类」再打开）";
+
+    const presets = El("div", drawer, "", "fPresets");
+    presets.dataset.orch = "filter-presets";
+    this.ui.filterPresets = new Map();
+    for (const preset of PRESETS) {
+      const button = Button(presets, preset.label, () => this.ApplyPreset(preset.id), { filterPreset: preset.id });
+      button.title = preset.hint;
+      this.ui.filterPresets.set(preset.id, button);
+    }
+
+    const body = El("div", drawer, "", "fBody");
+    const tree = El("div", body);
+    tree.dataset.orch = "filter-tree";
+    const table = El("div", body);
+    table.dataset.orch = "enemy-table";
+    this.ui.filterDrawer = drawer;
+    this.ui.filterBody = body;
+    this.ui.filterTree = tree;
+    this.ui.enemyTable = table;
+
+    const grip = El("div", parent, "", "gutter");
+    grip.dataset.orch = "filter-grip";
+    grip.title = "拖这里改这块面板的宽度";
+    grip.hidden = !this.filterLayout.open;
+    grip.addEventListener("mousedown", (event) => {
+      event.preventDefault();
+      this.drag = { side: "filter", x: event.clientX, width: this.FilterWidth() };
+      grip.classList.add("drag");
+      this.doc.body.style.cursor = "col-resize";
+    });
+    this.ui.filterGrip = grip;
+    this.ApplyFilterWidth();
+  }
+
+  /** 当前页签下抽屉多宽（分类树窄、布设表宽 —— 九列塞进 240 px 是看不了的）。 */
+  FilterWidth() {
+    return this.filterLayout.tab === "table" ? this.filterLayout.tableWidth : this.filterLayout.width;
+  }
+
+  ApplyFilterWidth(width) {
+    if (!this.ui?.filterDrawer) return 0;
+    const room = Math.max(320, (this.ui.mapBody?.clientWidth || 640) - 240);
+    const next = Math.round(Math.min(Math.max(Number.isFinite(width) ? width : this.FilterWidth(), 180), room));
+    if (this.filterLayout.tab === "table") this.filterLayout.tableWidth = next;
+    else this.filterLayout.width = next;
+    this.ui.filterDrawer.style.setProperty("--fw", `${next}px`);
+    return next;
+  }
+
+  /** 开合抽屉。不给参数就是切换。 */
+  OpenFilterDrawer(force) {
+    const drawer = this.ui?.filterDrawer;
+    if (!drawer) return false;
+    const open = force === undefined ? drawer.dataset.open !== "1" : !!force;
+    drawer.dataset.open = open ? "1" : "0";
+    this.filterLayout.open = open;
+    if (this.ui.filterGrip) this.ui.filterGrip.hidden = !open;
+    this.ui.filterButton?.classList.toggle("on", open);
+    WriteFilterLayout(this.filterLayout);
+    if (open) this.RefreshFilterPanel({ rebuild: true });
+    else this.ClearHoverPreview();
+    this.SyncCanvasSize(true);
+    return open;
+  }
+
+  SetFilterTab(tab) {
+    const next = tab === "table" ? "table" : "tree";
+    this.filterLayout.tab = next;
+    if (this.ui?.filterDrawer) this.ui.filterDrawer.dataset.tab = next;
+    // 换页签从头看起：上一页滚到哪儿，这一页不该接着那个位置。
+    if (this.ui?.filterBody) this.ui.filterBody.scrollTop = 0;
+    for (const [id, button] of this.ui?.filterTabs || []) button.classList.toggle("on", id === next);
+    this.ApplyFilterWidth();
+    WriteFilterLayout(this.filterLayout);
+    this.RefreshFilterPanel({ rebuild: true });
+    this.SyncCanvasSize(true);
+    return next;
+  }
+
+  /** 这一阶段的布局（敌人状态就在里面）。同一阶段只算一次。 */
+  PhaseLayoutNow() {
+    if (this.phaseLayoutCache?.number === this.phaseNumber) return this.phaseLayoutCache.layout;
+    let layout = null;
+    try { layout = PhaseLayout(this.model, this.phaseNumber); } catch (error) { layout = null; }
+    this.phaseLayoutCache = { number: this.phaseNumber, layout };
+    return layout;
+  }
+
+  /** 改筛选状态（patch 会并进现在这份）。测试与宿主代码都走它。 */
+  SetFilterState(patch) {
+    this.filterState = NormalizeFilterState({ ...this.filterState, ...(patch || {}) });
+    if (patch && !("preset" in patch)) this.filterState.preset = "custom";
+    this.ApplyFilter({ rebuild: true });
+    return this.filterState;
+  }
+
+  /** 预设：全部 / 只看敌军 / 只看友军 / 只看触发区 / 只看路线 / 只看本阶段新出现的。 */
+  ApplyPreset(name) {
+    this.filterState = PresetState(this.filterState, name);
+    this.ApplyFilter({ rebuild: true });
+    return this.filterState.preset;
+  }
+
+  /** 「只看」某一行：再点一次取消。 */
+  SoloTarget(kind, id) {
+    this.filterState = SoloFilterItem(this.filterState, kind, id);
+    this.ApplyFilter({ rebuild: true });
+    // 树重建过了，把这一行滚回看得见的地方 —— 二十一组里点了第十九组，
+    // 刷新完屏幕停在第一组的话，人会以为没点上。
+    const row = this.filterState.solo
+      ? this.ui?.filterTree?.querySelector(`[data-filter-row="${kind}:${id}"]`) : null;
+    if (row) { try { row.scrollIntoView({ block: "nearest" }); } catch (error) { /* 老浏览器 */ } }
+    return this.filterState.solo;
+  }
+
+  /** 眼睛开关：这一行画还是不画。 */
+  ToggleFilterRow(kind, id) {
+    this.filterState = ToggleFilterItem(this.filterState, kind, id, this.RowIdsFor(kind));
+    this.ApplyFilter({ rebuild: true });
+    return this.filterState;
+  }
+
+  /** 某一类里现在有哪些行（关掉一个 = 全集减它，得先知道全集）。 */
+  RowIdsFor(kind) {
+    const layout = this.PhaseLayoutNow();
+    const summary = this.filterSummary;
+    switch (kind) {
+      case "encounter": return (layout?.encounters || []).map((entry) => entry.id);
+      case "state": return (summary?.enemies?.states || []).map((row) => row.id);
+      case "weapon": return (summary?.enemies?.weapons || []).map((row) => row.id);
+      case "behavior": return (summary?.enemies?.behaviors || []).map((row) => row.id);
+      case "friendlyKind": return (summary?.friendlies || []).map((row) => row.id);
+      case "zoneKind": return (summary?.zones || []).map((row) => row.id);
+      case "route": return RouteNamesFor(this.model, layout);
+      default: return [];
+    }
+  }
+
+  /** 算一遍集合 → 交给俯视图 → 刷面板。阶段变了、状态变了都走这里。 */
+  ApplyFilter({ rebuild = false } = {}) {
+    const layout = this.PhaseLayoutNow();
+    this.filter = BuildOrchestrationFilter(this.model, layout, this.filterState);
+    this.filterSummary = FilterSummary(this.model, layout, this.filterState, { notes: this.notes.length });
+    this.hoverPreview = false;
+    // V1 的地图还没接上 SetFilter 时这里就是个空操作：面板照样能看，图上全画。
+    this.map?.SetFilter?.(this.filter);
+    this.RefreshFilterPanel({ rebuild });
+    return this.filter;
+  }
+
+  // -------------------------------------------------------- 分类树与布设表
+  RefreshFilterPanel({ rebuild = false } = {}) {
+    if (!this.ui?.filterDrawer) return;
+    const summary = this.filterSummary;
+    if (this.ui.filterCount && summary) {
+      const text = `${summary.enemies.visible}/${summary.enemies.count}`;
+      if (this.ui.filterCount.textContent !== text) this.ui.filterCount.textContent = text;
+    }
+    this.ui.filterButton?.classList.toggle("on", this.ui.filterDrawer.dataset.open === "1");
+    for (const [id, button] of this.ui.filterPresets || []) {
+      button.classList.toggle("on", id === this.filterState.preset);
+    }
+    for (const [id, button] of this.ui.filterTabs || []) button.classList.toggle("on", id === this.filterLayout.tab);
+    if (this.ui.filterDrawer.dataset.open !== "1") return;
+    const signature = `${this.phaseNumber}|${FilterStateSignature(this.filterState)}|${this.notes.length}|${this.icons ? 1 : 0}`;
+    if (rebuild || signature !== this.filterSignature) {
+      this.filterSignature = signature;
+      if (this.filterLayout.tab === "tree") this.RefreshFilterTree();
+      this.tableSignature = "";
+    }
+    if (this.filterLayout.tab === "table") this.RefreshEnemyTable();
+  }
+
+  RefreshFilterTree() {
+    const El = this.El;
+    const root = this.ui.filterTree;
+    const summary = this.filterSummary;
+    this.map?.SetHover(null);
+    root.textContent = "";
+    if (!summary) { El("div", root, "这一阶段没有可分类的东西", "fEmpty"); return; }
+    const Row = (parent, row, { cls = "", icon = null, color = null, sub = "" } = {}) => {
+      const node = El("div", parent, "", `fRow ${cls}`.trim());
+      node.dataset.filterRow = row.key;
+      node.dataset.on = row.on === false ? "0" : "1";
+      node.dataset.solo = row.soloed ? "1" : "0";
+      node.dataset.filterCount = String(row.count ?? 0);
+      node.dataset.filterVisible = String(row.visible ?? 0);
+      node.dataset.dim = row.visible ? "0" : "1";
+      const eye = this.Button(node, row.on === false ? "○" : "●",
+        (event) => { event.stopPropagation(); this.ToggleFilterRow(row.kind, row.id); },
+        { filterToggle: row.key }, "fEye");
+      eye.title = row.on === false ? "现在不画它，点一下画回来" : "画着，点一下收起来";
+      this.IconNode(node, icon, color);
+      const who = El("div", node, "", "who");
+      El("span", who, row.label, "fName");
+      if (sub) {
+        const line = El("span", who, "", "fSub");
+        if (row.code) El("code", line, row.code);
+        El("span", line, row.code ? ` · ${sub}` : sub);
+      }
+      El("span", node, row.visible === row.count ? String(row.count) : `${row.visible}/${row.count}`, "fNum")
+        .title = `这一阶段一共 ${row.count}，现在画出来 ${row.visible}`;
+      const solo = this.Button(node, row.soloed ? "取消" : "只看",
+        (event) => { event.stopPropagation(); this.SoloTarget(row.kind, row.id); },
+        { filterSolo: row.key }, "fSolo");
+      solo.title = row.soloed ? "回到刚才那种看法" : "图上只留这一项，别的都收起来";
+      node.title = row.hint || `${row.label}：这一阶段 ${row.count}，现在画 ${row.visible}`;
+      node.addEventListener("mouseenter", () => this.HoverRow(row.kind, row.id));
+      node.addEventListener("mouseleave", () => this.ClearHoverPreview());
+      return node;
+    };
+    const Section = (parent, id, label, rows, decorate) => {
+      const open = this.filterLayout.sections[id] !== false;
+      const head = this.Button(parent, "", () => this.ToggleFilterSection(id), { filterSection: id }, "fSect");
+      El("span", head, open ? "▾" : "▸", "tw");
+      El("span", head, label);
+      El("span", head, `${rows.length}`, "fNum");
+      if (!open) return;
+      if (!rows.length) { El("div", parent, "这一阶段这一类是空的", "fEmpty"); return; }
+      for (const row of rows) Row(parent, row, decorate(row));
+    };
+
+    for (const category of summary.categories) {
+      Row(root, category, { cls: "cat", icon: CATEGORY_ICONS[category.id], color: DOT_COLORS[category.id] });
+      if (category.id === "enemies") {
+        for (const [id, label] of FILTER_SECTIONS) {
+          const rows = id === "groups" ? summary.enemies.groups : summary.enemies[id];
+          Section(root, id, label, rows, (row) => {
+            if (id === "groups") {
+              return {
+                icon: this.GroupIcon(row.id), color: DOT_COLORS[row.state] || DOT_COLORS.enemies,
+                sub: `${row.stateText}${row.isNew ? " · 本阶段新出现" : ""}`,
+              };
+            }
+            if (id === "states") return { icon: this.icons?.StateBadge?.(row.id) || "Rifleman", color: DOT_COLORS[row.id] };
+            if (id === "weapons") return { icon: WEAPON_ICONS[row.id] || "Rifleman", color: DOT_COLORS.enemies };
+            return { icon: row.id === "hold" ? "Hold" : "Rifleman", color: DOT_COLORS[row.id] };
+          });
+        }
+      } else if (category.id === "friendlies") {
+        for (const row of summary.friendlies) {
+          Row(root, row, { icon: this.icons?.IconForFriendly?.(row.id), color: DOT_COLORS.friendlies, sub: "" });
+        }
+      } else if (category.id === "zones") {
+        for (const row of summary.zones) {
+          Row(root, row, { icon: this.icons?.IconForZone?.({ kind: row.id }), color: DOT_COLORS.zones });
+        }
+      } else if (category.id === "routes") {
+        for (const row of summary.routes) Row(root, row, { icon: "Route", color: DOT_COLORS.routes });
+      }
+    }
+  }
+
+  ToggleFilterSection(id) {
+    this.filterLayout.sections[id] = this.filterLayout.sections[id] === false;
+    WriteFilterLayout(this.filterLayout);
+    this.RefreshFilterTree();
+    return this.filterLayout.sections[id];
+  }
+
+  /** 一组用哪张图标：拿组里第一个能代表它的人（机枪手优先）。 */
+  GroupIcon(encounterId) {
+    if (!this.icons?.IconForMember) return null;
+    const layout = this.PhaseLayoutNow();
+    const encounter = (layout?.encounters || []).find((entry) => entry.id === encounterId);
+    const members = encounter?.members || [];
+    const lead = members.find((member) => member.weapon === "Type11") || members[0];
+    return lead ? this.icons.IconForMember(lead, encounter.state, encounterId) : null;
+  }
+
+  /** 行首那个小图标：有登记表就用 PNG，没有就画一颗彩色圆点。 */
+  IconNode(parent, name, color) {
+    const file = this.icons?.IconFile && name ? this.icons.IconFile(name) : "";
+    if (file) {
+      const img = this.doc.createElement("img");
+      img.className = "fIcon";
+      img.alt = "";
+      img.dataset.icon = name;
+      img.src = AssetUrl(file);
+      parent.appendChild(img);
+      return img;
+    }
+    const dot = this.El("i", parent, "", "fDot");
+    dot.style.background = color || "rgba(214,217,209,.5)";
+    return dot;
+  }
+
+  /**
+   * 悬停：能指到单个对象的（某一组、某一条路线）就让地图描亮它；
+   * 指不到单个对象的（按状态 / 武器 / 行为 / 整个类别）就临时只画这一类，
+   * 指针一挪开立刻还原 —— 「高亮」在这张图上就是「别的先让让」。
+   */
+  HoverRow(kind, id) {
+    if (!this.map) return null;
+    if (kind === "encounter" || kind === "route") {
+      this.ClearHoverPreview();
+      const sel = { kind, id };
+      this.map.SetHover(sel);
+      return sel;
+    }
+    const preview = BuildOrchestrationFilter(this.model, this.PhaseLayoutNow(),
+      { ...DefaultFilterState(), solo: { kind, id } });
+    this.hoverPreview = true;
+    this.map.SetFilter?.(preview);
+    return null;
+  }
+
+  ClearHoverPreview() {
+    if (this.hoverPreview) {
+      this.hoverPreview = false;
+      this.map?.SetFilter?.(this.filter);
+    }
+    this.map?.SetHover(null);
+  }
+
+  /** 布设表当前该列出哪些行（跟着筛选走：图上看不见的，表里也不列）。 */
+  EnemyRows() {
+    const rows = EnemyTableRows(this.model, this.PhaseLayoutNow(), this.live);
+    this.tableRows = rows;
+    return SortEnemyRows(rows.filter((row) => RowVisible(this.filter, row)),
+      this.tableSort.column, this.tableSort.ascending);
+  }
+
+  EnemyCsv() { return EnemyTableCsv(this.EnemyRows()); }
+
+  CopyEnemyCsv() { return this.CopyText(this.EnemyCsv(), "敌军布设表"); }
+
+  SortEnemyTable(column) {
+    if (this.tableSort.column === column) this.tableSort.ascending = !this.tableSort.ascending;
+    else this.tableSort = { column, ascending: true };
+    this.tableSignature = "";
+    this.RefreshEnemyTable();
+    return this.tableSort;
+  }
+
+  ToggleTableGroup(encounterId) {
+    if (this.tableCollapsed.has(encounterId)) this.tableCollapsed.delete(encounterId);
+    else this.tableCollapsed.add(encounterId);
+    this.tableSignature = "";
+    this.RefreshEnemyTable();
+    return !this.tableCollapsed.has(encounterId);
+  }
+
+  RefreshEnemyTable() {
+    if (!this.ui?.enemyTable) return;
+    const El = this.El;
+    const rows = this.EnemyRows();
+    const grouped = this.tableSort.column === "group";
+    const signature = `${this.phaseNumber}|${rows.length}|${this.tableSort.column}|${this.tableSort.ascending}`
+      + `|${[...this.tableCollapsed].sort().join(",")}|${this.icons ? 1 : 0}|${this.selection?.id || ""}`;
+    if (signature === this.tableSignature) { this.RefreshTableLive(rows); return; }
+    this.tableSignature = signature;
+    const root = this.ui.enemyTable;
+    root.textContent = "";
+    this.tableLiveCells = new Map();
+
+    const bar = El("div", root, "", "fBar");
+    El("span", bar, `${rows.length} / ${this.tableRows.length} 人`).title = "按当前筛选列出来的人数 / 这一阶段全部";
+    El("div", bar, "", "spacer");
+    this.Button(bar, "复制 CSV", () => this.CopyEnemyCsv(), { tableAction: "csv" }, "ghost")
+      .title = "把这张表按现在的筛选与排序拷成 CSV（首行是表头）";
+    if (!rows.length) {
+      El("div", root, "按现在的筛选，这一阶段一个敌人都没剩。换个预设或把开关打开。", "fEmpty");
+      return;
+    }
+
+    const table = this.doc.createElement("table");
+    table.className = "enemies";
+    table.dataset.table = "enemies";
+    const head = El("thead", table);
+    const headRow = El("tr", head);
+    for (const column of ENEMY_TABLE_COLUMNS) {
+      const cell = El("th", headRow, column.label);
+      cell.dataset.tableSort = column.id;
+      if (this.tableSort.column === column.id) {
+        cell.classList.add("sorted");
+        El("span", cell, this.tableSort.ascending ? " ▲" : " ▼");
+      }
+      cell.title = `${column.hint}（点表头按这一列排）`;
+      cell.addEventListener("click", () => this.SortEnemyTable(column.id));
+    }
+    const body = El("tbody", table);
+    let lastGroup = null;
+    for (const row of rows) {
+      if (grouped && row.encounterId !== lastGroup) {
+        lastGroup = row.encounterId;
+        const collapsed = this.tableCollapsed.has(row.encounterId);
+        const groupRow = El("tr", body, "", "grp");
+        groupRow.dataset.tableGroup = row.encounterId;
+        const cell = El("td", groupRow);
+        cell.colSpan = ENEMY_TABLE_COLUMNS.length;
+        El("span", cell, collapsed ? "▸ " : "▾ ");
+        El("span", cell, `${row.group}　`);
+        El("span", cell, `${rows.filter((one) => one.encounterId === row.encounterId).length} 人 · ${row.stateText}`, "muted");
+        groupRow.title = "点一下收起 / 摊开这一组";
+        groupRow.addEventListener("click", () => this.ToggleTableGroup(row.encounterId));
+      }
+      if (grouped && this.tableCollapsed.has(row.encounterId)) continue;
+      const node = El("tr", body);
+      node.dataset.tableRow = row.member;
+      node.dataset.tableGroupOf = row.encounterId;
+      if (row.live) node.dataset.alive = row.live.alive ? "1" : "0";
+      if (this.selection?.kind === "member" && this.selection.id === row.member) node.classList.add("sel");
+      const who = El("td", node, "", "who");
+      this.IconNode(who, this.icons?.IconForMember?.(row, row.state, row.encounterId),
+        DOT_COLORS[row.state] || DOT_COLORS.enemies);
+      // 按组排时组名已经写在上面那条分组线里了，每一行再抄一遍只是占宽度。
+      if (!grouped) El("span", who, row.group);
+      El("td", node, row.member, "mono");
+      El("td", node, row.startText);
+      El("td", node, row.stateText);
+      El("td", node, row.weaponText);
+      El("td", node, row.traitText).title = row.traitText;
+      El("td", node, row.spawnText, "num");
+      El("td", node, row.routeText);
+      const live = El("td", node, row.liveText || "—", "num liveCell");
+      this.tableLiveCells.set(row.member, live);
+      node.title = `${row.group} · ${row.member}：点一下选中他并把图移过去`;
+      node.addEventListener("click", () => this.PickEnemyRow(row.member));
+      node.addEventListener("mouseenter", () => this.map?.SetHover({ kind: "member", id: row.member }));
+      node.addEventListener("mouseleave", () => this.map?.SetHover(null));
+    }
+    root.appendChild(table);
+  }
+
+  /** 表里那些「实时」格子每 0.25 s 更新，但整张表不重建（117 行重画太贵）。 */
+  RefreshTableLive(rows) {
+    if (!this.tableLiveCells.size) return;
+    for (const row of rows || this.EnemyRows()) {
+      const cell = this.tableLiveCells.get(row.member);
+      if (!cell) continue;
+      const text = row.liveText || "—";
+      if (cell.textContent !== text) cell.textContent = text;
+      const node = cell.parentElement;
+      if (node && row.live) node.dataset.alive = row.live.alive ? "1" : "0";
+    }
+  }
+
+  /**
+   * 图标登记表是另一包的东西，可能还不在树上：登记进 import map 了才去取，
+   * 取不到就一直用彩色圆点 —— 这块面板不该因为少几张 PNG 就打不开。
+   */
+  async LoadIcons() {
+    if (this.iconsTried) return this.icons;
+    this.iconsTried = true;
+    if (!IconModuleAvailable()) return null;
+    try {
+      const mod = await import(`./${ICON_MODULE}`);
+      if (typeof mod?.IconForMember !== "function" || typeof mod?.IconFile !== "function") return null;
+      this.icons = mod;
+    } catch (error) {
+      this.icons = null;
+      return null;
+    }
+    if (this.ui) this.RefreshFilterPanel({ rebuild: true });
+    return this.icons;
+  }
+
+  /** 表里点一行 = 选中那个人并把图挪过去。 */
+  PickEnemyRow(memberId) {
+    const row = this.tableRows.find((one) => one.member === memberId);
+    this.Select({ kind: "member", id: memberId });
+    if (row) this.map?.ZoomTo({ x: row.x, z: row.z }, 60);
+    for (const node of this.ui.enemyTable.querySelectorAll("[data-table-row]")) {
+      node.classList.toggle("sel", node.dataset.tableRow === memberId);
+    }
+    return row || null;
   }
 
   // ---------------------------------------------------------- 详情 / 批注
@@ -1230,6 +1861,8 @@ export class OrchestrationEditor {
       this.ui.phaseTrack.setAttribute("aria-valuetext", phase ? `第 ${number} 阶段 ${phase.title}` : `第 ${number} 阶段`);
     }
     if (changed) this.OpenPhase(number, { scroll: true });
+    // 换阶段 = 每一组的状态都可能变，分类树上的人数跟着重算。
+    if (this.ui?.filterDrawer) this.ApplyFilter({ rebuild: changed });
     this.RefreshLanes();
     return number;
   }
@@ -1660,6 +2293,7 @@ export class OrchestrationEditor {
     this.map?.SetNotes(this.notes);
     this.RefreshNotes();
     this.RefreshDetail();
+    if (this.ui?.filterDrawer) this.ApplyFilter();       // 「批注」那一行的条数跟着变
     return this.notes;
   }
 
@@ -1766,6 +2400,8 @@ export class OrchestrationEditor {
   SyncCanvasSize(force) {
     const canvas = this.ui?.canvas;
     if (!canvas || !this.map) return;
+    // 窗口变窄时先把分类抽屉夹回去，别让它把俯视图挤没。
+    if (force && this.ui.filterDrawer?.dataset.open === "1") this.ApplyFilterWidth();
     const size = `${canvas.clientWidth}x${canvas.clientHeight}`;
     if (!force && size === this.canvasSize) return;
     this.canvasSize = size;
@@ -1784,6 +2420,7 @@ export class OrchestrationEditor {
     this.RefreshFlowState();
     this.RefreshActualTimeline();
     this.RefreshLanes();
+    this.RefreshFilterPanel();
   }
 
   /** 顶栏：当前阶段 / 步骤 / 两个时钟 / 正在等什么，各自一枚小标签，不再排成一长串。 */
@@ -2351,6 +2988,60 @@ function ReadLayout() {
 
 function WriteLayout(layout) {
   try { window.localStorage.setItem(LAYOUT_KEY, JSON.stringify(layout)); } catch (error) { /* 隐私模式 */ }
+}
+
+/** 分类抽屉的开合、两个页签各自的宽度、四个小节的折叠：也记在 localStorage。 */
+function ReadFilterLayout() {
+  const fallback = {
+    open: true, tab: "tree", width: 244, tableWidth: 620,
+    sections: { groups: true, states: true, weapons: false, behaviors: false },
+  };
+  try {
+    const raw = window.localStorage.getItem(FILTER_KEY);
+    const saved = raw ? JSON.parse(raw) : null;
+    if (!saved) return fallback;
+    return {
+      open: saved.open !== false,
+      tab: saved.tab === "table" ? "table" : "tree",
+      width: Number.isFinite(saved.width) ? saved.width : fallback.width,
+      tableWidth: Number.isFinite(saved.tableWidth) ? saved.tableWidth : fallback.tableWidth,
+      sections: { ...fallback.sections, ...(saved.sections || {}) },
+    };
+  } catch (error) { return fallback; }
+}
+
+function WriteFilterLayout(layout) {
+  try { window.localStorage.setItem(FILTER_KEY, JSON.stringify(layout)); } catch (error) { /* 隐私模式 */ }
+}
+
+/** 筛选状态变没变的廉价指纹（集合要排序，不然同一份状态每次算出不同的串）。 */
+function FilterStateSignature(state) {
+  const parts = [state.preset, state.onlyNewThisPhase ? "new" : "-",
+    state.solo ? `${state.solo.kind}:${state.solo.id}` : "-"];
+  for (const key of ["categories"]) {
+    parts.push(Object.entries(state[key]).filter(([, on]) => !on).map(([id]) => id).sort().join("+") || "all");
+  }
+  for (const key of ["encounters", "states", "weapons", "behaviors", "friendlyKinds", "zoneKinds", "routes"]) {
+    parts.push(state[key] ? [...state[key]].sort().join("+") : "*");
+  }
+  return parts.join("|");
+}
+
+/**
+ * 图标登记表在不在：只看主窗口的 import map 有没有登记它。
+ * 直接 import 试一把也行，但取不到时浏览器会把一条 404 打进控制台，
+ * 而「控制台没有红字」是别的闸门在守的东西。
+ */
+function IconModuleAvailable() {
+  try {
+    const node = document.querySelector('script[type="importmap"]');
+    return !!node && node.textContent.includes(ICON_MODULE);
+  } catch (error) { return false; }
+}
+
+/** 图标文件的绝对地址：弹窗文档是 about:blank，相对路径在那儿解不出来。 */
+function AssetUrl(file) {
+  try { return new URL(String(file).replace(/^\.\//, ""), window.location.href).href; } catch (error) { return ""; }
 }
 
 function ShapeText(shape) {

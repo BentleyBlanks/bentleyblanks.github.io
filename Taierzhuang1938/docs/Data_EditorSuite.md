@@ -553,6 +553,13 @@ LKP 十字、掩体的隐蔽位/射击位/法线、`task.point`、班组连到�
 `localStorage["tengxian1938_orchestration_layout_FirstLevel"]`。
 界面上的按钮、标签、提示一律普通中文，表里的编号只当尾巴上的等宽小字。
 
+工具条上的「分类」开的是贴在俯视图左边的抽屉（`[data-orch="filter-drawer"]`，宽度与开合记在
+`localStorage["tengxian1938_orchestration_filter_FirstLevel"]`）：上面一排预设、下面一棵分类树
+（六个类别，敌军底下再按组 / 本阶段状态 / 武器 / 行为分四小节，每一项一行「开关 + 名字 +
+本阶段人数 + 只看」），第二个页签是**敌军布设表**（九列、可排序、按组折叠、跟着筛选联动、
+点一行选中那个人、能复制 CSV）。口径与闸门见
+[Data_MissionOrchestration.md](Data_MissionOrchestration.md) §2 / §3。
+
 地图上除了单个敌人 / 锚点 / 触发区 / 路线，还能直接点**整组**与**转运区的每一波攻击**：
 每个非已清除的遭遇组在成员质心旁有一枚把手芯片（`PickAt` 返回 `{kind:"encounter"}`），
 转运区四波攻击的框各有一枚金色芯片（`{kind:"beat"}`）。芯片画在成员**下面**、
