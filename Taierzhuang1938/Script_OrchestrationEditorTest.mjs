@@ -220,9 +220,9 @@ try {
       mapSelection: tool.map.selection,
     };
   });
-  Check("第 12 阶段 transfer 组活跃、transferFlank 还没出现",
-    lookup.states.transfer === "active" && lookup.states.transferFlank === "pending",
-    `transfer=${lookup.states.transfer} transferFlank=${lookup.states.transferFlank}`);
+  Check("第 12 阶段 transfer 组活跃、transferAlley 还没出现",
+    lookup.states.transfer === "active" && lookup.states.transferAlley === "pending",
+    `transfer=${lookup.states.transfer} transferAlley=${lookup.states.transferAlley}`);
   Check("选中成员联动到地图", lookup.mapSelection?.id === "TransferGunner");
   // 「怎么出现」要说人话：内部字段名（kind=beat 这类）不许出现在句子里，
   // 编号（transfer / Transfer）只当尾巴上的等宽小字。
@@ -258,7 +258,7 @@ try {
     const group = map.HandlePoint("encounter", "transfer");
     if (group) Click(group.x, group.y);
     const encounter = Read();
-    const beat = map.HandlePoint("beat", "transferFlank");
+    const beat = map.HandlePoint("beat", "transferAlley");
     if (beat) Click(beat.x, beat.y);
     const beatRead = Read();
     return { group, beat, encounter, beatRead, handles: map.handles.length };
@@ -268,7 +268,7 @@ try {
     && fromMap.encounter.title.includes("遭遇组") && fromMap.encounter.owner.includes("波攻击"),
     `${fromMap.encounter.title} ｜ ${fromMap.encounter.owner.slice(0, 80)}`);
   Check("点地图上的攻击波标签 → 选中那一波并写出时间窗",
-    fromMap.beatRead.sel?.kind === "beat" && fromMap.beatRead.sel?.id === "transferFlank"
+    fromMap.beatRead.sel?.kind === "beat" && fromMap.beatRead.sel?.id === "transferAlley"
     && /第 \d+–\d+ 秒之间/.test(fromMap.beatRead.owner),
     `${fromMap.beatRead.title} ｜ ${fromMap.beatRead.owner.slice(0, 80)}`);
 
@@ -456,17 +456,17 @@ try {
   Check("分类树列出六个类别", filterPanel.categories.length === 6
     && filterPanel.categories.includes("敌军") && filterPanel.categories.includes("触发区"),
     filterPanel.categories.join(" "));
-  Check("敌军按组列出 21 组", filterPanel.groups === 21, `实际 ${filterPanel.groups}`);
+  Check("敌军按组列出 13 组", filterPanel.groups === 13, `实际 ${filterPanel.groups}`);
   Check("按组的顺序是先按出现阶段、再按名字",
     filterPanel.groupPhases.every((phase, i) => i === 0 || filterPanel.groupPhases[i - 1] <= phase)
-    && filterPanel.groupPhases[0] === 2 && filterPanel.groupOrder[0] === "intrusion",
+    && filterPanel.groupPhases[0] === 1 && filterPanel.groupOrder[0] === "bunkerAssault",
     `${filterPanel.firstGroup}（第 ${filterPanel.groupPhases[0]} 阶段）… ${filterPanel.groupPhases.join(",")}`);
   Check("路线行写中文名，编号只当小字",
     filterPanel.route.name === "侧翼路" && filterPanel.route.code === "flank"
     && filterPanel.route.title.includes("侧翼路") && filterPanel.route.english === 0,
     `${filterPanel.route.name} / ${filterPanel.route.code} / ${filterPanel.route.title}`);
   Check("组名是人话、后面跟着编号与本阶段状态",
-    filterPanel.transfer.name === "转运区第 1 波攻击" && /transfer/.test(filterPanel.transfer.sub)
+    filterPanel.transfer.name === "转运区第 1 处威胁" && /transfer/.test(filterPanel.transfer.sub)
     && /活跃/.test(filterPanel.transfer.sub),
     `${filterPanel.transfer.name} ｜ ${filterPanel.transfer.sub}`);
   Check("分类树里没有内部叫法", filterPanel.jargon.length === 0, filterPanel.jargon.join(" / "));
@@ -484,7 +484,7 @@ try {
     });
     const after = Sets();
     const row = doc.querySelector('[data-filter-row="encounter:transfer"]');
-    const other = doc.querySelector('[data-filter-row="encounter:transferFlank"]');
+    const other = doc.querySelector('[data-filter-row="encounter:transferAlley"]');
     const mapFilter = tool.map.filter ? { members: tool.map.filter.members?.size ?? null } : null;
     doc.querySelector('[data-filter-solo="encounter:transfer"]').click();     // 再点一次取消
     const cleared = tool.filter.members === null;
