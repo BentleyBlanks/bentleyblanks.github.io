@@ -17,6 +17,7 @@ import { MISSION_STAGE_ANCHORS as S, MISSION_STAGE_ROUTES as StageRoutes,
   MISSION_RECEPTION_SPACE as Reception } from "./Data_FirstLevelMissionTopology.mjs";
 import { SampleMissionTerrain as Ground } from "./Data_FirstLevelMissionTerrain.mjs";
 import { TRAVERSAL } from "./Data_Traversal.mjs";
+import { END_TUNING as END } from "./Data_Tuning_FirstLevelEnd.mjs";
 
 const TAN52 = Math.tan(52 * Math.PI / 180);   // Script_Physics: setMaxSlopeClimbAngle(52°)
 const CAPSULE_R = 0.35;                        // 路线净空半径（MakeCharacter 的 0.34 + 余量）
@@ -100,6 +101,28 @@ const report = {};
       .map((b) => b.id), [], `${id} must be open ground before NightGateShown`);
   }
   console.log("ok all 26 contract anchors stand in open space");
+}
+
+// ---------------------------------------------------------------------------
+// 1b. 18 桥头人员的撤出折线也要走得通（它们不在 MISSION_STAGE_ROUTES 里，
+//     以前谁都没量过）。实拍 2026-09-20：爆破手西那条的第一个点 (−80,178) 埋在
+//     BridgeSouthCoverWest 那道 1.47 m 的掩体墙里 —— 他顶着墙走不出爆破区，
+//     桥只能靠 blastFriendlyStuck 兜底晚二十秒才炸。
+// ---------------------------------------------------------------------------
+{
+  const collapsed = Solids("BunkerCollapsed");
+  const legs = [
+    ...END.demolitionPullback.map((route, index) => [`demolitionPullback${index}`,
+      [P.bridge.demolition[index], ...route]]),
+    ["officerPullback", [P.bridge.officer, ...END.officerPullback]],
+  ];
+  for (const [name, route] of legs) {
+    assert.deepEqual(RouteClearance(route, collapsed), [], `${name} 撤出折线被挡住了`);
+    const last = route.at(-1);
+    assert.ok(Distance(last, A.railBridge) > END.blastClearRadiusM,
+      `${name} 的终点要在爆破清场半径之外，实际 ${Distance(last, A.railBridge).toFixed(1)} m`);
+  }
+  console.log("ok 18 桥头三个人的撤出折线走得通、终点在爆破清场半径之外");
 }
 
 // ---------------------------------------------------------------------------
