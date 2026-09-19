@@ -18,9 +18,10 @@
 import assert from "node:assert/strict";
 import { MISSION_STAGES, MISSION_ENCOUNTERS, MISSION_TUNING as R } from "./Data_FirstLevelMission.mjs";
 import { MISSION_STEP_SPAWNS, MISSION_FACT_GATES, MISSION_SCENARIO_SIGNALS } from "./Data_FirstLevelMissionGates.mjs";
+import { MISSION_RETURN_DISABLED_STAGES } from "./Data_FirstLevelMissionReturn.mjs";
 import { FIRST_LEVEL_STAGE_ENCOUNTERS, FIRST_LEVEL_STAGES } from "./Data_FirstLevelMissionStages.mjs";
 import { MISSION_LAYOUT, MISSION_ANCHORS as A, MISSION_PLACEMENT as P, MISSION_ROUTES } from "./Data_FirstLevelMissionLayout.mjs";
-import { MISSION_RAIL_BRIDGE, MISSION_STAGE_ROUTES, MISSION_RECEPTION_SPACE } from "./Data_FirstLevelMissionTopology.mjs";
+import { MISSION_RAIL_BRIDGE, MISSION_STAGE_ROUTES, MISSION_RECEPTION_SPACE, MissionRegroupCorridor, RegroupGuideRoute } from "./Data_FirstLevelMissionTopology.mjs";
 import { MISSION_DIALOGUE } from "./Data_FirstLevelMissionDialogue.mjs";
 import { MISSION_VOICE_ALIGNMENT } from "./Data_FirstLevelMissionVoiceAlignment.mjs";
 import { FIRST_LEVEL_STAGE_MUSIC, FirstLevelMusicState } from "./Data_FirstLevelMissionMusic.mjs";
@@ -29,7 +30,7 @@ import { FirstLevelMissionColumn, MissionRouteProjection } from "./Script_FirstL
 import { EndExtras, EndDressing, EndProjectOnto, EndRouteLength, EndRoutePoint } from "./Script_FirstLevelEndCast.mjs";
 import { FirstLevelQuietMarch, QUIET_MARCH_PICKETS, QUIET_MARCH_WALL_LENGTH } from "./Script_FirstLevelQuietMarch.mjs";
 import { FirstLevelReception, RECEPTION_CAST } from "./Script_FirstLevelReception.mjs";
-import { FirstLevelBridge, BRIDGE_NORTH_IDS, BRIDGE_GUNNER_ID, REAR_COLUMN_IDS, BRIDGE_CROSSING_LENGTH } from "./Script_FirstLevelBridge.mjs";
+import { FirstLevelBridge, BRIDGE_NORTH_IDS, BRIDGE_GUNNER_ID, BRIDGE_CAST, REAR_COLUMN_IDS, BRIDGE_CROSSING_LENGTH } from "./Script_FirstLevelBridge.mjs";
 import { FirstLevelNightGate, NightLightSpecs } from "./Script_FirstLevelNightGate.mjs";
 
 let checks = 0;
@@ -257,6 +258,17 @@ const VOICE_FACT = Object.freeze({
   Check(r.dressing.people.some(entry => entry.id === "TransferDrover"), "赶车人真的画在车边");
   Check(r.dressing.props.some(entry => entry.key === "cart"), "被丢下的那辆车真的在场");
   console.log("ok 15A 三段对白全部挂在真实发生上");
+}
+// 「走到车边就问」不许再压别的前置：赶车人在沟口、离收拢点 28 m，而点名一完 15A
+// 几秒内就换步 —— 压一条 headcountDone 就等于把这句台词彻底关掉（实拍 2026-09-20 两趟）。
+{
+  const r = FakeRuntime({ stage: "Regroup" });
+  r.quietMarch.Enter("Regroup");
+  r.player.position.x = E.droverPost.x; r.player.position.z = E.droverPost.z;
+  r.Step(0.2, "Regroup");
+  Check(r.said.includes("CartAbandon") && !r.Has("headcountDone"),
+    "点名之前走到车边也问得出口（这句话的唯一条件就是「走到跟前」）");
+  console.log("ok 15A 问赶车人只认「走到车边」这一条");
 }
 
 // ---------------------------------------------------------------------------
@@ -596,6 +608,35 @@ function BridgeRuntime() {
 }
 
 // ---------------------------------------------------------------------------
+// 11b. 玩家听话地先撤：清场不许把爆破人员赶离炸点
+// ---------------------------------------------------------------------------
+{
+  const r = BridgeRuntime();
+  for (const id of BRIDGE_NORTH_IDS) { r.enemies.get(id).alive = false; r.threatIds.delete(id); }
+  r.Step(120, "BridgeCover");
+  r.flow.stage.id = "BridgeWithdraw";
+  r.bridge.Enter("BridgeWithdraw");
+  // 「桥头撤！」一喊，玩家与全班立刻退到安全区 —— 编排要的就是这样。
+  // 这时候爆破区里只剩爆破人员自己，他们的岗位**本来就在**区里。
+  // 实拍 2026-09-20：清场把 BridgeDemolitionEast 往南推了 1.3 m，装药进度钉在 3 s / 6 s，
+  // 等满 240 s 桥也不炸 —— 玩家越听话越卡死。
+  r.player.position.x = A.blastSafe.x; r.player.position.z = A.blastSafe.z;
+  for (const actor of r.squad) { actor.position.x = A.blastSafe.x; actor.position.z = A.blastSafe.z; }
+  r.facts.add("blastZoneCleared");
+  r.Step(E.demolitionSetS - 1, "BridgeWithdraw");
+  Check(!r.Has("demolitionCharged"), "这会儿药还没装完（下一条量的就是装药当中）");
+  Check(P.bridge.demolition.every((post, index) =>
+    Distance(r.extras.Any(BRIDGE_CAST[index + 1]).position, post) < 1.0),
+  "装药那几秒两名爆破手真的蹲在桥台的炸点上（清场没把他们推开）");
+  r.Step(3, "BridgeWithdraw");
+  Check(r.Has("demolitionCharged"), "玩家先撤也照样装得好药（清场不许把爆破手赶离炸点）");
+  r.Step(120, "BridgeWithdraw");
+  Check(r.Has("bridgeDestroyed"), "药装好、人自己沿撤出折线走净，桥照样炸");
+  Check(r.bridge.BlastZoneOccupant() === null, "点火那一刻爆破人员也已经出了爆破区");
+  console.log("ok 18 玩家先撤时爆破人员照样装得完药、也照样撤得出去");
+}
+
+// ---------------------------------------------------------------------------
 // 12. 炸桥一次翻完八件，桥面退出可走面（不可逆）
 // ---------------------------------------------------------------------------
 {
@@ -651,7 +692,17 @@ function BridgeRuntime() {
   const specs = NightLightSpecs(() => 0);
   Check(specs.length === P.night.braziers.length + 1 && specs.every(spec => spec.intensity > 0 && spec.distanceM > 0),
     "灯的参数是数据驱动的");
-  console.log("ok 18 夜行军先真走一段、夜景有光、退出还原");
+  // 「黑屏里那一下瞬移到底生没生效」得能一眼分清。实拍 2026-09-20 的假象是这么来的：
+  // 人**确实**被搬到了 nightSpawn，转场一结束驾驶器还攥着 marchOut 那个路点，
+  // 又把他走了 110 m 回去（修法在 Script_FirstLevelCampaignKit 的 Route stopFact）。
+  // 这两条钉住能分清所需的前提：两点离得够远，而且淡入之后接着走的就是 nightSpawn。
+  Check(Distance(A.nightSpawn, A.marchOut) > E.marchOutArriveM + 20,
+    "夜景出生点离 marchOut 远得分得清人有没有真被搬过去");
+  Check(Distance(MISSION_STAGE_ROUTES.nightMarch[0], A.nightSpawn) < 0.5,
+    "夜行路线第一点就是 nightSpawn：淡入之后接着走的就是被搬过去的那个点");
+  Check(MISSION_RETURN_DISABLED_STAGES.includes("NightMarch"),
+    "夜行军不挂回头警告：黑屏里换了半张地图，回头警告会把人按「走反了」往回拽");
+  console.log("ok 18 夜行军先真走一段、夜景有光、退出还原、瞬移落点分得清");
 }
 
 // ---------------------------------------------------------------------------
@@ -668,6 +719,17 @@ function BridgeRuntime() {
   Check(Distance(A.blastSafe, A.railBridge) > E.blastClearRadiusM,
     "爆破安全区在清场半径之外（退到那儿就一定算走净了）");
   Check(EndRouteLength(MISSION_STAGE_ROUTES.marchOut) > 20, "淡出前那一段行军是真的要走的路");
+  // 15A 的带路线到收拢点为止。回头警告那条走廊可以更长（它画的是「行动路线」），
+  // 带路不行：把队伍带出收拢点，点名要的 16 m 就永远凑不齐（实拍 2026-09-20：
+  // 走廊末点 (50,150) 离收拢点 24 m，玩家站在收拢点等 300 s 也等不到 headcountDone）。
+  {
+    const corridor = MissionRegroupCorridor("Regroup"), guide = RegroupGuideRoute("Regroup");
+    Check(Distance(guide.at(-1), corridor.onEvacuation) < 0.5,
+      `15A 带路终点就是收拢点，实际 ${JSON.stringify(guide.at(-1))}`);
+    Check(guide.length < corridor.route.length, "走廊比带路线长：回头警告照旧画到下一段");
+    Check(Distance(corridor.route.at(-1), corridor.onEvacuation) > E.headcountReachM,
+      "走廊末点确实远在点名半径之外 —— 这条闸门守的就是这个差");
+  }
   const phase = FIRST_LEVEL_STAGES.find(entry => entry.number === 18);
   Check(phase.steps.join(">") === "BridgeOrders>BridgeCover>BridgeWithdraw>NightMarch", "18 的四个内部步骤按序");
   console.log("ok 15–18 的空间与编排静态对账");

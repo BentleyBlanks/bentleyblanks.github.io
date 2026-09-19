@@ -1551,7 +1551,12 @@ export class OrchestrationEditor {
     this.iconsTried = true;
     if (!IconModuleAvailable()) return null;
     try {
-      const mod = await import(`./${ICON_MODULE}`);
+      // **路径必须是字面量。** 写成 `./${ICON_MODULE}` 的话 esbuild 会把它当成
+      // 「同目录下的任意模块」，把整个 Taierzhuang1938/ 目录（含三百多个 *Test.mjs
+      // 与 node-only 脚本）全拖进 Pages 那一包 —— 2026-09-20 实跑 Script_BrowserBundleTest：
+      // 2549 条 Could not resolve "node:fs" 之类，整包根本打不出来。
+      // 取不取得到仍由上面的 IconModuleAvailable() 说了算，行为一字不变。
+      const mod = await import("./Data_OrchestrationIcons.mjs");
       if (typeof mod?.IconForMember !== "function" || typeof mod?.IconFile !== "function") return null;
       this.icons = mod;
     } catch (error) {

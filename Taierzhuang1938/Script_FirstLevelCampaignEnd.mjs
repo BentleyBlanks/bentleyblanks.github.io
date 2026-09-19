@@ -11,7 +11,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { MISSION_ANCHORS as A, MISSION_ROUTES } from "./Data_FirstLevelMissionLayout.mjs";
-import { MISSION_STAGE_ROUTES, MISSION_RECEPTION_SPACE as Reception } from "./Data_FirstLevelMissionTopology.mjs";
+import { MISSION_STAGE_ROUTES, MISSION_RECEPTION_SPACE as Reception, RegroupGuideRoute } from "./Data_FirstLevelMissionTopology.mjs";
 import { END_TUNING as E } from "./Data_Tuning_FirstLevelEnd.mjs";
 import { CampaignActions } from "./Script_FirstLevelCampaignKit.mjs";
 
@@ -71,7 +71,7 @@ export async function Drive(ctx) {
 
   if (from <= 15) await DriveRegroup(ctx, { JumpStage, Capture, CaptureFocus, Route, Interact, WaitStage });
   if (from <= 16) await DriveHandover(ctx, { JumpStage, Capture, Route, Interact, WaitStage });
-  if (from <= 17) await DriveDeath(ctx, { JumpStage, WaitStage });
+  if (from <= 17) await DriveDeath(ctx, { JumpStage, Capture, WaitStage });
   await DriveBridge(ctx, { JumpStage, Capture, CaptureFocus, Route, WaitStage });
 
   await Capture("Complete");
@@ -96,20 +96,21 @@ async function DriveRegroup(ctx, { JumpStage, Capture, CaptureFocus, Route, Inte
     assert.ok(picket.every(entry => entry.x > A.retreatA.x), "他们站在收拢点与车路之间");
     await CaptureFocus("RegroupPicket", picket[0]);
   }
-  // 先在收拢点等对白真的走完（幺娃走到担架边检查、何有田挨个点人）。
-  await Route([{ x: A.retreatA.x + 4, z: A.retreatA.z - 6 }, { x: A.retreatA.x, z: A.retreatA.z }],
-    "RegroupRally", { fight: true });
-  const enemiesBefore = (await Mission(page)).enemies.length;
-  await WaitFact(page, "headcountDone", "15A 点名", 300, { fight: true });
-  // 点完人顺子才去问赶车人「车还走得了不」——沿沟走到车边才问（直线会横切沟壁）。
-  await Route([{ x: A.ditch.x, z: A.ditch.z }, { x: 47, z: 114 },
-    { x: E.droverPost.x + 2.4, z: E.droverPost.z + 1.2 }], "RegroupDrover", { fight: true });
+  // 顺子先拐到车边问一句「车还走得了不」——沿沟走（直线会横切沟壁）。
+  // **这一步排在收拢之前**：赶车人在沟口，离收拢点 28 m；点名一完，litterRemanned /
+  // columnMoving 紧跟着就齐，15A 几秒内换步，再回头就来不及了（实拍 2026-09-20）。
+  await Route([{ x: 47, z: 114 }, { x: E.droverPost.x + 2.4, z: E.droverPost.z + 1.2 }],
+    "RegroupDrover", { fight: true });
   {
     const shot = await Mission(page);
     assert.ok(shot.voice.played.includes("CartAbandon"), "顺子走到车边真的问过赶车人");
   }
-  await Route([{ x: 47, z: 114 }, { x: A.ditch.x, z: A.ditch.z }, { x: A.retreatA.x, z: A.retreatA.z }],
-    "RegroupBackToColumn", { fight: true });
+  // 跟着带路走到收拢点，再等对白（幺娃走到担架边检查、何有田挨个点人）。
+  // 带路线到收拢点为止（RegroupGuideRoute），队伍就停在这儿，点名的 16 m 才凑得齐。
+  const enemiesBefore = (await Mission(page)).enemies.length;
+  await Route([{ x: 47, z: 114 }, ...Points(RegroupGuideRoute("Regroup").slice(1))],
+    "RegroupRally", { fight: true });
+  await WaitFact(page, "headcountDone", "15A 点名", 300, { fight: true });
   {
     const shot = await WaitStage("WallPath", 300, { fight: true });
     const facts = shot.mission.facts;
@@ -220,9 +221,16 @@ async function DriveHandover(ctx, { JumpStage, Capture, Route, Interact, WaitSta
 }
 
 /** 17 确认老周死亡：第一人称、不判失败、接收处继续工作。 */
-async function DriveDeath(ctx, { JumpStage, WaitStage }) {
+async function DriveDeath(ctx, { JumpStage, Capture, WaitStage }) {
   const { page, output } = ctx;
   await JumpStage(17);
+  // 死亡段是第一人称、不切尸体特写：在受控演出**还挂着**的时候留一张。
+  await page.evaluate(() => {
+    const g = window.Tengxian;
+    for (let i = 0; i < 240 && !g.Debug.FirstLevelMission().control; i += 1) g.StepFrames(1, 1 / 60, false);
+    for (let i = 0; i < 180 && g.Debug.FirstLevelMission().control; i += 1) g.StepFrames(1, 1 / 60, false);
+  });
+  await Capture("DeathFirstPerson");
   await WaitStage("BridgeOrders", 420);
   {
     const shot = await Mission(page);
@@ -265,7 +273,11 @@ async function DriveBridge(ctx, { JumpStage, Capture, CaptureFocus, Route, WaitS
     assert.ok(column.some(entry => entry.load === "mg") && column.filter(entry => entry.load === "mortar").length === 2,
       "尾队带着机枪与两人抬的迫击炮部件");
     assert.ok(column.every(entry => !entry.crossed), "火力没打断以前一个人都没过桥");
-    await CaptureFocus("BridgeRearColumn", column[0]);
+    // 拍尾队要给**世界坐标**。bridgeColumn 那张表只有 id/进度/死活，没有 x/z ——
+    // 原来直接把它传给 CaptureFocus，视角被算成 NaN（口径见 Kit 里 CaptureFocus 的头注）。
+    const lead = shot.end.extras.find(entry => entry.id === column[0].id);
+    assert.ok(lead && Number.isFinite(lead.x), "尾队队首是真人实体，取得到世界坐标");
+    await CaptureFocus("BridgeRearColumn", lead);
   }
   // 压住北岸土坎的火力（真开枪；不要求杀光）。
   await page.evaluate(() => { window.MissionInputDriver.blocked.clear(); });
@@ -282,76 +294,33 @@ async function DriveBridge(ctx, { JumpStage, Capture, CaptureFocus, Route, WaitS
     await Capture("BridgeCrossed");
   }
   // 退到南岸掩护区；爆破区里还有人的时候不许炸。
-  // 退之前先报一次「现在能不能走」：射位那一小块上蹲了一整场掩护，姿势、净空、
-  // 运行状态任何一样不对，下面那条路线都会原地打转（第一版就是这么卡住的）。
-  // 射位那一小块上蹲了一整场掩护，撤的时候班里四个人又都从这儿起步 —— 玩家会被
-  // 自己人裁步挡住（09-17 的「玩家裁步挡位＋国军让路」）。先报一次现场，再朝
-  // **离人最远的方向**挪开两步，然后才走撤离路线。
+  // 退之前先报一次"现在能不能走"。这一段以前挂着「八方向试探 + 检查点恢复」两重兜底 ——
+  // 实拍 2026-09-20 查清了：人走不动不是玩法（胶囊扫掠八个方向都是通的、自己人也没挡），
+  // 是驾驶器自己把玩家的 yaw/pitch 写成了 NaN（CaptureFocus 收到一个没有 x/z 的状态对象），
+  // 拍照那几帧 player.Update 把 velocity 也算成 NaN，从此谁也走不动。
+  // 根因在 Kit 的 CaptureFocus（现在会翻红），兜底整段删掉：**真人玩家不会去点「继续检查点」**。
   console.log("WITHDRAW_START", JSON.stringify(await page.evaluate(() => {
     const g = window.Tengxian, p = g.player;
     return { running: g.state.running, control: g.state.missionControl, stance: p.stance,
       alive: p.alive, position: { ...p.position }, yaw: Number(p.yaw.toFixed(2)),
+      velocity: { x: p.velocity.x, z: p.velocity.z },
       overlap: g.physics.Overlaps(p.position.x, p.position.y + 0.04, p.position.z, p.radius, 1.78),
       carry: g.carry.KindId, cutscene: g.state.cutscene, menu: g.state.menu,
       slot: g.state.activeSlot, busy: !!p.Busy, mounted: !!g.emplacement?.Mounted,
       meleeActive: !!g.meleeCombat?.Active, meleeBlocking: !!g.meleeCombat?.Blocking,
-      meleeCanUse: !!g.meleeCombat?.CanUse?.(),
       crowd: g.ai.soldiers.filter(a => a.alive && Math.hypot(a.position.x - p.position.x, a.position.z - p.position.z) < 4)
         .map(a => ({ id: a.missionId || a.castId || a.id, side: a.side,
           d: Number(Math.hypot(a.position.x - p.position.x, a.position.z - p.position.z).toFixed(2)) })) };
   })));
-  const escaped = await page.evaluate(() => {
-    const g = window.Tengxian, p = g.player;
-    for (const key of ["KeyW", "KeyA", "KeyS", "KeyD", "ShiftLeft"]) g.Debug.Key(key, false);
-    g.Debug.Mouse(0, false); g.Debug.Mouse(2, false);
-    // 大刀还拔在手上的话 meleeCombat.Blocking 会把 forward/strafe 整个清零 ——
-    // 掩护那一场里驾驶器一旦近身就按过 V。先收刀、退架、松锁，再谈走路。
-    g.meleeCombat?.Cancel?.("campaignWithdraw");
-    g.emplacement?.Vacate?.("campaignWithdraw");
-    if (g.state.activeSlot !== "primary") g.Debug.Key("Digit1");
-    g.StepFrames(20, 1 / 60, false);
-    if (p.stance === "prone") g.Debug.Key("KeyZ");
-    if (p.stance === "crouch") g.Debug.Key("KeyC");
-    const before = { x: p.position.x, z: p.position.z };
-    // 「桥头撤」一喊，班里四个人要花两三秒才从射位上散开。先站着等他们走，
-    // 再八个方向各试 0.5 s，谁真的挪得动就走谁。
-    for (let round = 0; round < 6; round += 1) {
-      g.StepFrames(60, 1 / 60, false);
-      for (let k = 0; k < 8; k += 1) {
-        p.yaw = (Math.PI * 2 * k) / 8;
-        g.Debug.Key("KeyW", true);
-        g.StepFrames(30, 1 / 60, false);
-        g.Debug.Key("KeyW", false);
-        if (Math.hypot(p.position.x - before.x, p.position.z - before.z) > 0.6) {
-          g.Debug.Key("KeyW", true); g.StepFrames(60, 1 / 60, false); g.Debug.Key("KeyW", false);
-          return { yaw: Number(p.yaw.toFixed(2)), round, moved: true, position: { x: p.position.x, z: p.position.z } };
-        }
-      }
-    }
-    return { moved: false, position: { x: p.position.x, z: p.position.z } };
-  });
-  console.log("WITHDRAW_NUDGED", JSON.stringify(escaped));
-  // 还是挪不动：走**出厂的检查点恢复**（与玩家按「继续」同一条，不发任何事实）。
-  // player.Spawn 会做一次自由空间搜索，正好把卡住的胶囊放回走得动的地方。
-  if (!escaped.moved) {
-    const recovered = await page.evaluate(() => {
-      const g = window.Tengxian, before = [...g.Debug.FirstLevelMission().facts];
-      g.Debug.MenuAct("continueCheckpoint");
-      g.StepFrames(30, 1 / 60, false);
-      const p = g.player;
-      const from = { x: p.position.x, z: p.position.z };
-      p.yaw = Math.PI;
-      g.Debug.Key("KeyW", true);
-      for (let i = 0; i < 90; i += 1) g.StepFrames(1, 1 / 60, false);
-      g.Debug.Key("KeyW", false);
-      return { from, position: { x: p.position.x, z: p.position.z },
-        moved: Math.hypot(p.position.x - from.x, p.position.z - from.z) > 0.6,
-        factsKept: JSON.stringify(before) === JSON.stringify(g.Debug.FirstLevelMission().facts) };
+  // NaN 会一路传染而且没有任何报错，所以在这儿钉一道闸：撤退起步时玩家的速度必须是数。
+  {
+    const finite = await page.evaluate(() => {
+      const v = window.Tengxian.player.velocity;
+      return Number.isFinite(v.x) && Number.isFinite(v.y) && Number.isFinite(v.z);
     });
-    console.log("WITHDRAW_CHECKPOINT", JSON.stringify(recovered));
-    assert.ok(recovered.factsKept, "检查点恢复不许发任何事实");
-    assert.ok(recovered.moved, "检查点恢复之后人要能走：" + JSON.stringify(recovered));
+    assert.ok(finite, "撤退起步时玩家速度必须是有限数（NaN 一旦混进来，八个方向都走不动）");
   }
+
   // 撤是撤，不是边退边打：fight 会让 Route 一看见残敌就停下开枪，走不到掩护区。
   // 末段绕过 BlastSafeBank 那道 1.35 m 的土坎西头（(−69.5..−62.5, z≈197.5)），
   // 别贴着它的角走。
@@ -366,7 +335,22 @@ async function DriveBridge(ctx, { JumpStage, Capture, CaptureFocus, Route, WaitS
     const held = shot.log.find(entry => entry.id === "blastHeldForFriendly");
     console.log("BLAST_HELD", JSON.stringify(held?.detail ?? null));
   }
-  await WaitFact(page, "bridgeDestroyed", "18 爆破", 240);
+  // 爆破迟迟不炸的时候，必须说得出「**是谁**还在爆破区里」——
+  // 光一句「等不到 bridgeDestroyed」查不出任何东西（那条规则本来就是「有人就一直等」）。
+  {
+    let held = null;
+    for (let chunk = 0; chunk < 48 && !held?.fired; chunk += 1) {
+      held = await page.evaluate(() => {
+        const g = window.Tengxian, r = g.Debug.FirstLevelMissionRuntime();
+        for (let i = 0; i < 300 && !r.flow.facts.has("bridgeDestroyed"); i += 1) g.StepFrames(1, 1 / 60, false);
+        const inside = r.bridge.BlastZoneOccupant();
+        return { fired: r.flow.facts.has("bridgeDestroyed"), blast: r.bridge.State().blast,
+          inside: inside && { who: inside.who, distanceM: Number(inside.distance.toFixed(1)) } };
+      });
+      if (!held.fired) console.log("BLAST_WAIT", JSON.stringify(held));
+    }
+    assert.ok(held.fired, "18 爆破：等不到 bridgeDestroyed —— " + JSON.stringify(held));
+  }
   await Capture("BridgeBlast");
   {
     const blast = await page.evaluate(() => {
@@ -395,10 +379,25 @@ async function DriveBridge(ctx, { JumpStage, Capture, CaptureFocus, Route, WaitS
 
   // --- 18 夜入滕城：先随队走完 marchOut，黑屏字幕，夜景，进北门 ---------------
   await WaitStage("NightMarch", 180, { fight: false });
-  await Route(Points(MISSION_STAGE_ROUTES.marchOut), "NightMarchOut");
+  // 走到离 marchOut 锚点 8 m（marchOutReached）编排就接管：黑屏一起、玩家交出控制权。
+  // 驾驶器必须在这儿松手 —— 它要是攥着最后那个路点不放，黑屏里人被瞬移到
+  // nightSpawn 之后，淡入一结束它就把人原路赶回 marchOut（实拍 2026-09-20）。
+  await Route(Points(MISSION_STAGE_ROUTES.marchOut), "NightMarchOut", { stopFact: "marchOutReached" });
   await WaitFact(page, "marchOutReached", "18 走完 marchOut", 180);
   await Capture("NightFadeOut");
   await WaitFact(page, "nightArrivalPlaced", "18 黑屏里换夜景", 180);
+  {
+    // 黑屏里那一下瞬移真的把**人**搬过去了（渲染位置与 Rapier 角色体同时过去）。
+    const placed = await page.evaluate(() => {
+      const g = window.Tengxian;
+      return { position: { ...g.player.position }, body: g.player.body ? { ...g.player.body.position } : null };
+    });
+    console.log("NIGHT_ARRIVAL", JSON.stringify(placed));
+    assert.ok(Math.hypot(placed.position.x - A.nightSpawn.x, placed.position.z - A.nightSpawn.z) < 3,
+      `黑屏里玩家要真的被搬到 nightSpawn，实际 ${JSON.stringify(placed.position)}`);
+    assert.ok(!placed.body || Math.hypot(placed.body.x - placed.position.x, placed.body.z - placed.position.z) < 0.5,
+      `角色体要跟着渲染位置一起过去，实际 ${JSON.stringify(placed)}`);
+  }
   // 淡出走完、字幕正挂着的那一帧（黑屏 1 / 4 / 1，这里在 hold 的开头）。
   await Capture("NightSubtitle");
   {
@@ -421,5 +420,6 @@ async function DriveBridge(ctx, { JumpStage, Capture, CaptureFocus, Route, WaitS
     assert.ok(shot.voice.played.includes("NorthGate"), "带路军人在门外招呼");
     assert.ok(shot.facts.includes("northGateReached"), "走到北门下");
   }
+  await Capture("NightGateEntered");
   await WaitStage("Complete", 180);
 }

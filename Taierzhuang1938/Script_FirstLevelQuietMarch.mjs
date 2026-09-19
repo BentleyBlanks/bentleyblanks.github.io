@@ -117,7 +117,13 @@ export class FirstLevelQuietMarch {
     }
 
     // 4. 顺子问赶车人（走到车边才问）。
-    if (r.Has("headcountDone") && !state.cartAsked
+    //
+    // **只认「走到车边」这一条。** 原来还压了一条 `headcountDone` 前置 —— 那把这句话
+    // 变成了实际上说不出口的台词：点名一完，`litterRemanned` / `columnMoving` 紧跟着
+    // 就齐了，15A 在几秒内换步，而赶车人在 28 m 外的沟口。实拍 2026-09-20
+    // （`--stage-from=15`）连跑两趟：人赶到车边时目标已经是「沿院墙夹道继续南行」，
+    // 还挨了一条「你已偏离行动路线」。采用稿对这一句只写了「玩家走到赶车人跟前才问」。
+    if (!state.cartAsked
       && Distance(r.player.position, E.droverPost) <= E.cartAbandonReachM) {
       state.cartAsked = true;
       r.Say("CartAbandon");

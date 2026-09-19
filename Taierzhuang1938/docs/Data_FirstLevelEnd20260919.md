@@ -127,6 +127,10 @@
 * **撤出爆破区**：桥头军官喊 `BridgeWithdraw`（三句里没有「所有人都过来了」）；
   爆破人员是**此前就在场**的两个人，走到 `MISSION_PLACEMENT.bridge.demolition` 蹲 `demolitionSetS`(6 s)
   装药（`demolitionCharged`），然后沿 `demolitionPullback` / `officerPullback` 自己撤出去。
+  三条撤出折线都从西/东两道掩体墙之间那个 9 m 宽的口子（x −78..−69）走，终点在
+  `BlastSafeBank`（x −69.5..−62.5）西头以外；净空由 `Script_FirstLevelSpaceTest` 守着。
+  **药装好之前不清场**：爆破人员的岗位就在爆破区里，这会儿把区里的人往南赶，
+  赶的就是他们自己（见 §6）。桥头那三个人也不归清场管 —— 他们有自己的折线。
 * **爆破**：三个条件全满足才点火 ——
   ① `demolitionCharged`；② 玩家 `blastZoneCleared`（`blastSafe` 10 m 内，该点离桥心 48 m）；
   ③ `BlastZoneOccupant()` 为空：玩家、班里人、桥头人员、尾队，**没有一个**在桥心
@@ -206,14 +210,24 @@
 | BridgeWithdraw | 南路断了 | 这一段真正发生的是一条通路被不可逆切断；「把路打开」说反了 |
 | NightMarch | 后头还有活人 | 连夜准备迎敌，不是胜利庆典 |
 
-## 6. 实拍踩到的两个坑（别再踩）
+## 6. 实拍踩到的坑（别再踩）
 
-**桥头撤退时全班压在玩家脚下。** `BridgeWithdraw` 的带路线第一点就是南岸射位
-`bridgeCover` —— 玩家整场掩护都站在那一格上，「桥头撤！」一喊班里四个人全往他脚下走。
-取证：`running/stand/!overlap/!control/!mounted/!meleeBlocking`，**八个方向一步都挪不动**，
-身边 0.85 / 1.4 / 1.55 / 3.08 m 各站一个自己人（玩家被自己人裁步挡位，
-见 memory「滕县 士兵叠人定论」）。修法是带路线跳过第一点：撤就是各自往南走。
-往后任何「一喊撤就把全队指向玩家现在站的那个点」的编排都会复发这条。
+**「撤到南岸八个方向走不动」不是玩法，是驾驶器把玩家的视角写成了 NaN。**
+2026-09-20 查清（`--stage-from=18` 逐项取证）：那一刻胶囊扫掠八个方向**每一个都是通的**
+（`ProbeMove` 0.12/0.12），自己人最近 0.93 m 而挡位阈值只有 0.69 m，静态几何三米内只有
+一道 1.47 m 的矮墙，`overlap:false`、无控制锁、无白刃、未架枪 —— 唯独
+`player.velocity.x/z` 是 **NaN**。往回追：`Script_FirstLevelCampaignKit.CaptureFocus`
+收到的是 `shot.bridgeColumn` 里的一条状态记录（只有 `id / load / progress / crossed`，
+**没有 x/z**），于是 `Math.atan2(p.x - undefined, …)` 把 `player.yaw/pitch` 写成 NaN；
+拍照那几帧 `player.Update` 照着 NaN 的朝向算出 NaN 的 `desired`，速度从此再也回不来
+（`yaw/pitch` 拍完被还原了，**速度没人还原**）。
+修法两条：`CaptureFocus` 现在对没有有限 x/z 的点**直接翻红**（静默的 NaN 传染最难查），
+尾队那一张改用 `end.extras` 里的真实世界坐标。驾驶脚本里那一整段
+「八方向试探 + 出厂检查点恢复」兜底同时删掉 —— 真人玩家不会去点「继续检查点」，
+兜底只会把下一次同样的病藏起来。撤退起步处留了一道闸：玩家速度必须是有限数。
+
+> 旧口径（已作废）：「`BridgeWithdraw` 的带路线第一点是 `bridgeCover`，全班压在玩家脚下把他挡死」。
+> 带路线跳过第一点这条改动留着（撤就是各自往南走，本来就对），但它不是「走不动」的病根。
 
 **回援尾队在北引道上被打光。** 尾队原来在 `BridgeOrders` 就生成，要顶着一挺机枪
 等玩家从接收处走一分多钟 —— 实拍六个人死了五个，「接应尾队」整件事没了。
@@ -221,18 +235,51 @@
 `scriptEssential`（打不死、会趴下还击），三个步枪兵照常会阵亡 ——
 Notion 的「有人可能中弹」留在他们身上，不是留给整支队伍。
 
-**黑屏里那一下瞬移没生效。** `PlaceNightArrival` 原来是手写 `position.set` +
-`body.Teleport`。实拍（`--stage-from=18`）：夜景、夜天空、五盏灯、十四个布景人全换好了，
-`nightArrivalPlaced` 也记上了，**人却还在 marchOut**（−62.5, 232.3）—— 渲染位置与
-Rapier 角色体脱了钩，他在原地一步也走不动，接着从桥那边一路走到瓮城东墙撞停。
-同一类脱钩也是「撤到南岸走不动」的病根：出厂的检查点恢复（`player.Spawn`，带自由
-空间搜索）一调用人立刻就能走了。所以这一段改走 `player.Spawn(x, z, yaw)`。
-**往后任何一处剧情瞬移都别再手写 `position.set + body.Teleport`。**
+**「黑屏里那一下瞬移没生效」是假的 —— 是驾驶器把人又走回去了。**
+2026-09-19 的实拍结论写成了「渲染位置与 Rapier 角色体脱钩」。2026-09-20 加了一行取证
+（`NIGHT_ARRIVAL`，同时读 `player.position` 与 `player.body.position`）之后定论翻过来：
+两者**都**准确落在 `nightSpawn`(−160, 292)，瞬移一直是好的。真正发生的是：
+`marchOutReached` 在离锚点 8 m 就记下并起黑屏，而驾驶器的 `Route` 还攥着 `marchOut`
+那个路点不放；黑屏 6 s 一结束它接着按前进键，把刚被搬到 nightSpawn 的人**原路走了
+110 m 回到 marchOut**，再从那儿斜穿过去撞在瓮城东墙上。
+修法在驾驶器：`Route` 加了 `stopFact`，这一段走到 `marchOutReached` 就松手
+（编排接管的路线，驾驶器必须在接管点松手）。运行时那一侧什么都不用改。
+
+**所以剧情瞬移照旧写 `position.set` + `body.Teleport`**（外加一次自由空间搜索），
+不要为了「保险」去调 `player.Spawn` —— 它顺手把血量、流血、伤口、体力全复位，
+夜里进城会变成一次静默的满血补给。
+
+**带路把队伍带出了收拢点，于是点名永远凑不齐。** 15A 的带路原来直接用回头警告那条
+走廊，而走廊末点 (50,150) 比收拢点 `retreatA` 又往前 24 m —— 队伍停在那儿，点名却要
+文财/幺娃/顺子三个人都在 `headcountReachM`(16 m) 以内。实拍 2026-09-20（`--stage-from=15`）：
+玩家站在收拢点等满 300 s 也等不来 `headcountDone`，HUD 一直挂着「罗班长 · 24 米」。
+修法是新加 `RegroupGuideRoute`：**带路只带到这一步的落脚点**（`corridor.onEvacuation`）为止，
+走廊本身照旧更长（它画的是「行动路线」）。15B 的进夹道路线本来也是从收拢点起算的。
+
+**「车还走得了不」是一句说不出口的台词。** 它压了一条 `headcountDone` 前置，可点名一完，
+`litterRemanned` / `columnMoving` 紧跟着就齐，15A 几秒内换步 —— 而赶车人在 28 m 外的沟口。
+实拍两趟都是「人赶到车边时目标已经变成沿夹道南行」，还挨一条「你已偏离行动路线」。
+采用稿对这一句只写了「玩家走到赶车人跟前才问」，多出来的前置去掉；驾驶脚本也把这一拐
+排到收拢之前。**往后给一句只是氛围的台词加前置，先算一遍那一步还剩几秒。**
+
+**爆破手被自己人的「清场」赶下岗，于是桥永远炸不了。** 玩家按编排干脆地退到安全区
+（比爆破手装完药还早），爆破区里就只剩爆破人员自己；`ClearBlastZone` 把区里的人往南赶，
+赶的正是他们 —— 实拍 2026-09-20：`BridgeDemolitionEast` 被推离炸点 1.3 m，
+`state.set` 钉在 3 s / 6 s，等满 240 s 也不炸。**玩家越听话越卡死。**
+修法：药装好之前一律不清场；桥头那三个人有自己的撤出折线，清场不许再塞目标顶掉它。
+
+**撤出折线的第一个点埋在墙里。** 同一趟实拍里桥虽然炸了，却是靠 `blastFriendlyStuck`
+兜底晚二十秒炸的：`demolitionPullback[0]` 的第一个点 (−80,178) 落在
+`BridgeSouthCoverWest`（1.47 m，x −87..−78）里，人顶着墙走不到，`Walk` 的下一个点
+也就永远不换。三条折线一并改走两道掩体墙之间的口子，并补上净空闸门
+（`Script_FirstLevelSpaceTest` 的 1b 节）—— 这三条不在 `MISSION_STAGE_ROUTES` 里，
+以前一条都没人量过。
 
 驾驶脚本侧的同类教训写在 `Script_FirstLevelCampaignEnd.mjs` 的注释里：
 整关驾驶跑在 `manual=1` 下，等事实必须自己 `StepFrames`（`WaitFact` / `WaitControl`）；
 `Route` 带 `fight` 时一看见敌人就松开前进键，压制要用 `WaitFact(..., {fight:true})`，
-撤退要用 `fight:false`。
+撤退要用 `fight:false`；编排会接管的路线要带 `stopFact`，在接管点松手。
+爆破那一段不要只等事实 —— 等不到就得报得出「是谁还在爆破区里」（`BLAST_WAIT`）。
 
 ## 5. 验收命令
 

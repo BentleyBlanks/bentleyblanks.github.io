@@ -161,11 +161,16 @@ export const END_TUNING = Object.freeze({
   // 桥头军官与爆破人员（MISSION_PLACEMENT.bridge.officer / .demolition）。
   // demolition[1] (−74.2,171.4) 落在 RailBridgeDeck 上 —— 那正是南桥台，站得住。
   demolitionSetS: 6,
+  // 撤出折线都要从 BridgeSouthCoverWest(x −87..−78) 与 BridgeSouthCoverEast(x −69..−60)
+  // 之间那个 9 m 宽的口子走。西边那位原来的第一个点 (−80,178) **埋在西侧那道 1.47 m 的
+  // 掩体墙里**：他顶着墙走不到，停在离桥心 24 m 的爆破区里，桥只能靠
+  // blastFriendlyStuck 兜底晚二十秒才炸（实拍 2026-09-20）。改成先往东挪到口子上。
+  // 折线净空由 Script_FirstLevelSpaceTest 守着。
   demolitionPullback: Object.freeze([
-    Object.freeze([{ x: -80, z: 178 }, { x: -74, z: 190 }, { x: -68.5, z: 199 }]),
-    Object.freeze([{ x: -74, z: 178 }, { x: -70, z: 190 }, { x: -63.5, z: 199 }]),
+    Object.freeze([{ x: -76, z: 176 }, { x: -74, z: 190 }, { x: -70.5, z: 200 }]),
+    Object.freeze([{ x: -73, z: 178.5 }, { x: -71.5, z: 190 }, { x: -72.5, z: 200 }]),
   ]),
-  officerPullback: Object.freeze([{ x: -72, z: 182 }, { x: -68, z: 194 }, { x: -62.5, z: 200 }]),
+  officerPullback: Object.freeze([{ x: -71.5, z: 182 }, { x: -71, z: 194 }, { x: -74.5, z: 200 }]),
   demolitionMps: 3.4,
   // 爆破安全：炸之前这个半径里不许有任何己方（玩家、班里人、军官、爆破手、尾队）。
   // R.bridgeBlastRadiusM 是特效半径 12 m；安全判据取 30 m（blastSafe 离桥心 48 m）。

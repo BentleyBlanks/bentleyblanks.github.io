@@ -362,7 +362,19 @@ export function CampaignActions(ctx) {
     );
   }
 
+  /**
+   * 把视线甩到一个**世界坐标点**上拍一张，拍完原样还回去。
+   *
+   * `point` 必须带有限的 x / z。**这一条不许省**：传进来一个没有坐标的状态对象
+   * （实拍 2026-09-20：18 的 `shot.bridgeColumn` 只有 id/progress/crossed，没有 x/z）
+   * 会算出 `Math.atan2(NaN, NaN)` —— 玩家的 yaw/pitch 当场变 NaN，拍照那几帧
+   * `player.Update` 就把 **velocity 也算成 NaN**；yaw/pitch 后面被还原了，速度没有，
+   * 于是从这一刻起玩家八个方向一步都走不动，看上去像「撤到南岸卡住了」。
+   * 静默的 NaN 传染最难查，所以这里直接翻红。
+   */
   async function CaptureFocus(name,point) {
+    assert.ok(point && Number.isFinite(point.x) && Number.isFinite(point.z),
+      `CaptureFocus(${name}) 需要带有限 x/z 的世界坐标点，收到 ${JSON.stringify(point)}`);
     const view=await page.evaluate(point=>{
       const g=window.Tengxian,p=g.player.position,eye=g.player.EyePosition;
       const previous={yaw:g.player.yaw,pitch:g.player.pitch};
@@ -399,7 +411,16 @@ export function CampaignActions(ctx) {
     throw new Error(`关中过场 ${id} 在 ${label} 处两分钟都没播完`);
   }
 
-  async function Route(points, label, { fight = false, stance = "stand", sprint = false, crawl = false, rejoinRoute = null } = {}) {
+  /**
+   * `stopFact`：**这条路线走到这个事实就算走完**，剩下的路点一步也不再走。
+   *
+   * 编排里有几段是「走到某个距离门就被接管」的（18 的 marchOut：离锚点 8 m 就起
+   * 黑屏转场，黑屏里玩家被瞬移到 nightSpawn）。驾驶器不知道这回事的话，接管一结束
+   * 它还攥着同一个路点，会把刚被瞬移过去的人**原路赶回来** —— 实拍 2026-09-20：
+   * 人确实到了 nightSpawn(−160,292)，转场结束后又被驾驶器走了 110 m 回到 marchOut，
+   * 于是「黑屏里那一下瞬移没生效」看着像引擎的锅，其实是驾驶器自己走回去的。
+   */
+  async function Route(points, label, { fight = false, stance = "stand", sprint = false, crawl = false, rejoinRoute = null, stopFact = null } = {}) {
     const rejoinTarget=points.at(-1);
     await page.evaluate(
       async ({ points, stance, sprint, rejoinRoute, rejoinTarget }) => {
@@ -426,14 +447,18 @@ export function CampaignActions(ctx) {
     const carriedKind=await page.evaluate(()=>window.Tengxian.carry.KindId);
     let result, retries = 0;
     for (let chunk = 0; chunk < 90; chunk++) {
-      result = await page.evaluate(async ({fight,stance,crawl,sprint}) => {
+      result = await page.evaluate(async ({fight,stance,crawl,sprint,stopFact}) => {
         const {FRONT_SORTIE}=await import("./Data_FirstLevelFrontRoute.mjs");
         const g = window.Tengxian,
           b = window.routeBot,
           Wrap = (x) => Math.atan2(Math.sin(x), Math.cos(x));
+        const Reached = () => !!stopFact && g.Debug.FirstLevelMissionRuntime().flow.facts.has(stopFact);
+        if (Reached()) b.index = b.points.length;
         for (let i = 0; i < 600 && b.index < b.points.length && g.player.alive && g.state.running; i++) {
           const p = g.player.position,
             target = b.points[b.index];
+          // 这一段的接管条件到了：松手，剩下的路点交给编排（黑屏瞬移就在这儿发生）。
+          if (Reached()) { b.index = b.points.length; break; }
           if (Math.hypot(p.x - target.x, p.z - target.z) < 0.8) {
             b.index++;
             continue;
@@ -508,7 +533,7 @@ export function CampaignActions(ctx) {
           lastShot: g.state.lastShot,
           foe: window.MissionInputDriver?.Target()?.missionId,
         };
-      }, {fight,stance,crawl,sprint});
+      }, {fight,stance,crawl,sprint,stopFact});
       if (chunk % 4 === 0 || result.done || !result.alive) console.log(label, JSON.stringify(result));
       // A death can also leave the body stationary. Let the existing checkpoint
       // retry below handle it before applying the live-navigation stall limit.

@@ -217,3 +217,16 @@ export const MISSION_REGROUP_CORRIDORS = Object.freeze([
   {id:"ReceptionGate",route:MISSION_STAGE_ROUTES.wallPath.slice(-3),onEvacuation:null},
 ]);
 export const MissionRegroupCorridor=(id)=>MISSION_REGROUP_CORRIDORS.find(entry=>entry.id===id);
+/**
+ * **带路**用的那一段：走廊只到 `onEvacuation`（这一步的落脚点）为止。
+ *
+ * 走廊本身是给回头警告画「行动路线」用的，可以比这一步走得远；带路不行 ——
+ * 把队伍带出落脚点，凑在一起才发生的事（15A 的点名要三个人都在 16 m 内）就永远不发生。
+ * 没有 `onEvacuation` 的那一段（15C 拐进院门）整条都是带路线。
+ */
+export const RegroupGuideRoute=(id)=>{
+  const corridor=MissionRegroupCorridor(id);
+  if(!corridor?.onEvacuation)return corridor?.route;
+  const index=corridor.route.findIndex(point=>point.x===corridor.onEvacuation.x&&point.z===corridor.onEvacuation.z);
+  return index>=0?corridor.route.slice(0,index+1):corridor.route;
+};
