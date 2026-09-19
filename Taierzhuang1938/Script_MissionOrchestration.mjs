@@ -203,6 +203,8 @@ function BuildRoutes() {
   routes.pursuit = FlatRoute(MISSION_PURSUIT_ROUTE);
   routes.sortie = FlatRoute(Sortie.route);
   routes.sortieReturn = FlatRoute(MISSION_ROUTES.bundleReturn);
+  // `approach` / `supportTrench` 与 MISSION_ROUTES 的 `opening` / `support` 是同一个
+  // 数组，工作台上画两遍 —— `Script_MissionGatesTest` 点名要这两个键，所以留着。
   routes.approach = FlatRoute(OPENING.approachRoute);
   routes.supportTrench = FlatRoute(OPENING.supportRoute);
   routes.trenchContact = FlatRoute(OPENING.trenchContactRoute);

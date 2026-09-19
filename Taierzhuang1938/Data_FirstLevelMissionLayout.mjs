@@ -595,9 +595,9 @@ function FieldCover(id, x, z, w, h, d) {
   }
 }
 export const MISSION_ANCHORS = Object.freeze({
-  // `train` 锚点随军列下线（无消费者）。`unload` 留着：Script_EditorFullScene 的
-  // 巡场机位按它取点，那一带现在是空场 —— 锚点本身只是一个坐标。
-  unload: { x: -66, z: 66 },
+  // `train` / `unload` 两个锚点随军列下线（2026.09.19 第三波）：`unload` 最后一个
+  // 消费者是 Script_EditorFullScene 的「军列卸载」巡场机位，那个机位已经换成
+  // 掩蔽部与伤员集结处（按 `collection` 取点）。
   front: { x: 0, z: -124 },
   orders: Sortie.orders,
   gun: { x: 0, z: -128 },

@@ -6,37 +6,12 @@ import { AttachShadowDepth } from "./Script_ShadowDepth.mjs";
 import { MergeBodyParts } from "./Script_PartAtlasMerge.mjs";
 import { MissionTrainLifePose } from "./Script_FirstLevelMissionTrainLife.mjs";
 import { MISSION_PEOPLE_TUNING as C, ZHOU_WOUNDS } from "./Data_Tuning_FirstLevel.mjs";
-import { CharacterWounds, PaintBakedWounds, CreateWoundUniforms } from "./Script_CharacterWounds.mjs";
+import { PaintBakedWounds, CreateWoundUniforms } from "./Script_CharacterWounds.mjs";
 
 // Visible people share the production character rig; two-bone IK corrects hands onto the actual rails.
 export class MissionPeople {
   constructor({root,actorFactory,battlefield}){Object.assign(this,{root,actorFactory,battlefield});this.people=new Map();this.time=0;this.patients=new Map();this.patientMerge=new Map();this.patientOwned={materials:[],geometries:[],textures:[]};this.patientMatrix=new THREE.Matrix4();this.patientRotation=new THREE.Quaternion();}
   Begin(time,focus=null){this.focus=focus;this.dt=Math.max(0,Math.min(.05,time-this.time));this.time=time;for(const entry of this.people.values())entry.used=false;for(const parts of this.patients.values())for(const mesh of parts)mesh.count=0;}
-  /**
-   * 给某个人挂一段伏击动作（Script_FirstLevelAmbushAnimation 的 clip）。
-   * `id` 是 Person / Patient 在这一层的 id；`next` 是放完之后接上的循环段（可为 null）。
-   * 动作库还没交付时 PrepareAmbush 返回 null，这一层什么都不做，退回既有姿态。
-   */
-  SetAmbushClip(id,clipId,next=null){
-    if(!id||!clipId)return false;
-    (this.ambushClips ||= new Map()).set(id,{clipId,next,startedAt:this.time});
-    return true;
-  }
-  AmbushClip(id){return this.ambushClips?.get(id)||null;}
-  /** 采样某个 Person 身上挂着的伏击动作；没有库或没有这段就返回 false。 */
-  PlayAmbushClip(entry,id,deckY=null){
-    const performance=this.AmbushClip(id);
-    if(!performance||!this.PrepareAmbush)return false;
-    // 库可能还在下载：拿不到就每帧再试一次，别把 null 缓存成「这个人永远没有动作」。
-    const animation=entry.ambushAnimation||(entry.ambushAnimation=this.PrepareAmbush(entry.actor)||null);
-    if(!animation)return false;
-    let clipId=performance.clipId,seconds=this.time-performance.startedAt;
-    const duration=animation.ClipDuration(clipId);
-    if(seconds>=duration&&performance.next){clipId=performance.next;seconds-=duration;}
-    animation.Sample(clipId,seconds,{loop:clipId===performance.next,
-      ...(Number.isFinite(deckY)?{deckY}:{})});
-    return true;
-  }
   Person(id,x,z,yaw,{alive=true,moving=false,crouch=false,kind="bearer",carryTarget=null,role=null}={}){
     let entry=this.people.get(id);
     if(!entry){
@@ -61,12 +36,6 @@ export class MissionPeople {
     if(alive&&entry.nextPoseAt!=null&&this.time<entry.nextPoseAt)return actor;
     entry.nextPoseAt=interval?(Math.floor((this.time+entry.phase)/interval)+1)*interval-entry.phase:this.time;
     const poseDt=Math.min(.2,this.time-(entry.lastPoseAt??this.time-this.dt));entry.lastPoseAt=this.time;pose?.Restore();
-    entry.ambushAnimation?.Restore?.();
-    // 伏击里挨刀的抬担架员：走烘焙好的倒地段，而不是通用布娃娃。库缺席时退回下面两条。
-    if(this.AmbushClip(id)&&actor.characterRig){
-      actor.characterRig.Update(poseDt,{moveSpeed:0,elapsed:this.time});
-      if(this.PlayAmbushClip(entry,id)){actor.root.updateMatrixWorld(true);return actor;}
-    }
     if(!alive){
       actor.Ragdoll(new THREE.Vector3(Math.sin(entry.phase),0,Math.cos(entry.phase)));
       actor.Update(poseDt,{dead:true,dying:1,elapsed:this.time});
@@ -134,56 +103,6 @@ export class MissionPeople {
     }
     actor.root.updateMatrixWorld(true);return actor;
   }
-  /**
-   * 躺在担架上的伤员，走**带骨架的 Person** 而不是实例化的烘焙姿势 ——
-   * PatientStabbed / PatientWoundedIdle 只有骨架才播得了（老周挨那一刀之后换到这条路）。
-   * `deckY` 是担架床面高度：C 的两段伤员动作就是按这个面烘的（canvas deckY+0.003、
-   * 骨盆 +0.18、肚子 +0.29）。库不在、模型没内容或采样失败时返回 false，
-   * 调用方退回 Patient() 那条实例化路。
-   */
-  RiggedPatient(id,x,y,z,yaw,deckY){
-    if(!this.AmbushClip(id)||!this.PrepareAmbush)return false;
-    let entry=this.people.get(id);
-    if(!entry){
-      // 认可的 NRA 外观只有 LugouNra02(1) 与 LugouNra05(4)，两个都烘了伤员段。
-      const actor=this.actorFactory.Create("nra",{weapon:null,modelVariant:1,seed:id.length});
-      if(!actor?.characterRig){actor?.Dispose?.();return false;}
-      entry={actor,pose:null,planted:null,phase:0,used:true,last:{x,z},speed:0,patient:true};
-      this.people.set(id,entry);this.root.add(actor.root);
-    }
-    entry.used=true;
-    const actor=entry.actor;
-    actor.root.position.set(x,y,z);actor.root.rotation.set(0,yaw,0);
-    const poseDt=Math.min(.2,this.time-(entry.lastPoseAt??this.time-this.dt));entry.lastPoseAt=this.time;
-    entry.ambushAnimation?.Restore?.();
-    actor.root.visible=true;
-    actor.characterRig.Update(poseDt,{moveSpeed:0,elapsed:this.time});
-    if(!this.PlayAmbushClip(entry,id,deckY)){actor.root.visible=false;return false;}
-    actor.root.updateMatrixWorld(true);
-    this.PaintRiggedWounds(entry,id,poseDt);
-    return true;
-  }
-  /**
-   * ZHOU_WOUNDS 投到带骨架伤员的外层表面（这条路只在挨刀之后走，所以连肚子上那一刀一起画）。
-   * 挂在 actor.woundBlood 上：actor.Dispose 会把私有材质还回去。
-   */
-  PaintRiggedWounds(entry,id,dt){
-    const actor=entry.actor,bones=actor.characterRig?.bones;
-    if(!entry.woundsPainted&&bones){
-      entry.woundsPainted=true;
-      const wounds=actor.woundBlood||=new CharacterWounds(actor.characterRig.root);
-      const stabAge=Math.max(0,this.time-(this.AmbushClip(id)?.startedAt??this.time));
-      const down=new THREE.Vector3(0,-1,0);
-      for(const w of ZHOU_WOUNDS){
-        const from=bones[w.from];if(!from)continue;
-        const point=from.getWorldPosition(new THREE.Vector3()),to=w.to&&bones[w.to];
-        if(to)point.lerp(to.getWorldPosition(new THREE.Vector3()),w.t);
-        point.y+=w.liftM;
-        wounds.Add({part:w.part,point,direction:down,radiusM:w.radiusM,ageS:w.stabbed?stabAge:w.ageS});
-      }
-    }
-    actor.woundBlood?.Update(dt);
-  }
   /** `wounded`：null＝普通伤员；{stabbed} 给老周那一副画 ZHOU_WOUNDS（他单独一张表，材质不和别人共用）。 */
   Patient(id,x,y,z,yaw,time,wounded=null){
     // 老周与挨刀后的骨架版同一套外观（modelVariant 1），挨刀前后不换脸。
@@ -224,44 +143,6 @@ export class MissionPeople {
   Dispose(){for(const entry of this.people.values())entry.actor.Dispose();this.people.clear();
     for(const parts of this.patients.values())for(const mesh of parts){mesh.removeFromParent();mesh.geometry.dispose();mesh.material.dispose();}this.patients.clear();
     for(const texture of this.patientOwned.textures)texture.dispose();this.patientOwned.textures.length=0;this.patientMerge.clear();}
-}
-
-/**
- * 屋内伏击的演出层：`soldier.missionAmbushClip` 挂着的那一段盖在 mixer 之上。
- * 与车厢那一层同一条纪律 —— 采样之前先 Restore，只写骨骼局部，从不碰世界根。
- * 动作库（Package C 的 Animation/FirstLevelAmbush）没交付时 Prepare 返回 null，
- * 这一层整条静默让路，人物退回既有的站姿/受击/倒地姿态。
- *
- * @param {object} soldier 目标士兵
- * @param {(soldier:object)=>object|null} Prepare 采样器工厂（运行时注入）
- */
-// 枪什么时候不在他手上了。PressureStabbed 里 0.30 s 玩家把枪夺过去，之后他两只手空着
-// 摁在肚子上 —— 共用的 Actor._UpdateRiggedWeaponMount 只认两个握点，手一空它照样把
-// 1.68 m 的三八式架在两手之间，插穿尸体（Package C2 的交接说明，口径见
-// docs/Data_FirstLevelAmbushAnimation.md）。掉了就一直藏着：他接下来是具尸体。
-const AMBUSH_RIFLE_DROPPED_AT = Object.freeze({ PressureStabbed: .30 });
-
-export function InstallAmbushPerformance(soldier,Prepare){
-  const rig=soldier?.actor?.characterRig;
-  if(!rig||typeof rig.Update!=="function"||rig.missionAmbushPose)return false;
-  rig.missionAmbushPose=true;
-  const original=rig.Update;
-  rig.Update=function UpdateMissionAmbush(dt,state={}){
-    rig.missionAmbushAnimation?.Restore?.();
-    const result=original.call(this,dt,state);
-    const performance=soldier.missionAmbushClip;
-    if(soldier.missionAmbushWeaponDropped)state.hideWeapon=true;
-    if(!performance||soldier.alive===false||state.dead)return result;
-    const dropAt=AMBUSH_RIFLE_DROPPED_AT[performance.clipId];
-    if(dropAt!=null&&performance.seconds>=dropAt){soldier.missionAmbushWeaponDropped=true;state.hideWeapon=true;}
-    // 库可能还在下载：拿不到就下一帧再试，别缓存成「这个人永远没有动作」。
-    const animation=rig.missionAmbushAnimation||(rig.missionAmbushAnimation=Prepare?.(soldier)||null);
-    if(!animation){soldier.missionAmbushPending=true;return result;}
-    soldier.missionAmbushPending=false;
-    animation.Sample(performance.clipId,performance.seconds,{loop:!!performance.loop});
-    return result;
-  };
-  return true;
 }
 
 // Idle observation layers onto existing animation; it releases immediately on fire,

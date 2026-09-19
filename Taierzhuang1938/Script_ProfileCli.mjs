@@ -6,14 +6,14 @@
 // 「面板说 12 ms、脚本说 9 ms」这种谁也说服不了谁的局面。
 //
 // ## 用法
-//   node Taierzhuang1938/Script_ProfileCli.mjs --view=train --frames=300 --label=train_after
+//   node Taierzhuang1938/Script_ProfileCli.mjs --view=bunker --frames=300 --label=bunker_after
 //   node Taierzhuang1938/Script_ProfileCli.mjs --view=front --live --seconds=8
 //   node Taierzhuang1938/Script_ProfileCli.mjs --stage=14 --view=front --cpuprofile
 //   node Taierzhuang1938/Script_ProfileCli.mjs --print=Taierzhuang1938/_shots/Profile/Profile_x.json
 //   node Taierzhuang1938/Script_ProfileCli.mjs --view=front --live --seconds=8 --record --label=front
 //   node Taierzhuang1938/Script_ProfileCli.mjs --print=Taierzhuang1938/_shots/Profile/Profile_front.rec.json --frame=worst
 //
-//   --view=train|front|frontEast|x,y,z,yaw,pitch   机位（三个预设与 Script_FirstLevelFrameProbe 共用）
+//   --view=bunker|front|frontEast|x,y,z,yaw,pitch  机位（三个预设与 Script_FirstLevelFrameProbe 共用）
 //   --stage=<编号或 id>    第一关阶段跳转（docs/Data_FirstLevelStageJump.md 的 missionStage）
 //   --url=a=1&b=2          原样追加到 `?whitebox=p012` 后面
 //   --frames=300           StepFrames（dt=1/60），每帧让出一个 event-loop turn 收 GPU 查询
@@ -58,7 +58,7 @@ if (PRINT) {
 }
 
 const label = Arg("label", "profile");
-const viewArg = Arg("view", "train");
+const viewArg = Arg("view", "bunker");
 const stage = Arg("stage", "");
 const extra = Arg("url", "");
 const frames = Number(Arg("frames", "300"));
@@ -69,9 +69,9 @@ const width = Number(Arg("width", "3394"));
 const height = Number(Arg("height", "1348"));
 const CPU_PROFILE = argv.includes("--cpuprofile");
 const RECORD = argv.includes("--record");
-const custom = ["train", "front", "frontEast"].includes(viewArg) ? null : ParseCustomView(viewArg);
-if (!custom && !["train", "front", "frontEast"].includes(viewArg)) {
-  console.error(`--view 只认 train / front / frontEast 或 "x,y,z,yaw,pitch"，收到：${viewArg}`);
+const custom = ["bunker", "front", "frontEast"].includes(viewArg) ? null : ParseCustomView(viewArg);
+if (!custom && !["bunker", "front", "frontEast"].includes(viewArg)) {
+  console.error(`--view 只认 bunker / front / frontEast 或 "x,y,z,yaw,pitch"，收到：${viewArg}`);
   process.exit(2);
 }
 const outDir = path.join(project, "_shots", "Profile");

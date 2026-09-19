@@ -394,11 +394,13 @@ def Main():
             row['blockers'].append(pending['note'])
             if row.get('productionSupportTrial',{}).get('group')=='FirstLevelTrainSupportV2':
                 row['productionSupportTrial'].update(runtimeEnabled=True,runtimeScope='Support/rise subset; r12 campaign validation pending')
+    # 2026.09.19 第三波：Script_FirstLevelMissionTrain / Script_FirstLevelTrainAnimation
+    # 随军列开场删除，从哈希清单里摘掉（Animation/FirstLevelTrain 的 GLB 仍保留）。
     files=['Data_FirstLevelMission.mjs','Data_FirstLevelMissionDialogue.mjs','Data_FirstLevelMissionTrain.mjs',
         'Data_Tuning_FirstLevel.mjs','Script_FirstLevelMissionRuntime.mjs','Script_FirstLevelMissionColumn.mjs',
-        'Script_FirstLevelMissionVoice.mjs','Script_FirstLevelMissionTrain.mjs','Audio/FirstLevel/Data_FirstLevelVoiceManifest.json',
+        'Script_FirstLevelMissionVoice.mjs','Audio/FirstLevel/Data_FirstLevelVoiceManifest.json',
         'Data_FirstLevelMissionVoiceAlignment.mjs','Data_FirstLevelMissionVoiceTiming.mjs',
-        'Script_FirstLevelTrainAnimation.mjs','Script_FirstLevelMissionTrainLife.mjs']
+        'Script_FirstLevelMissionTrainLife.mjs']
     missionContract=json.loads(subprocess.check_output(['node','--input-type=module','-e',
         "import {MISSION_VERSION,MISSION_STAGES} from './Data_FirstLevelMission.mjs';"
         "import {MISSION_VOICE_TIMING} from './Data_FirstLevelMissionVoiceTiming.mjs';"

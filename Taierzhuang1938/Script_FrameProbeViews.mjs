@@ -6,25 +6,25 @@
 // 任何东西（包括这里 import 的 MISSION_ANCHORS，必须当参数传进去）。
 //
 // 机位：
-//   train      军列车厢内（开局原地，不动任务进度）
-//   front      前沿机枪位朝北（补齐卸载前的事实、瞬移到 A.gun、跑 5 秒让前沿真的打起来）
+//   bunker     掩蔽部里（开局原地，不动任务进度）
+//   front      前沿机枪位朝北（跳到 04 MachineGun、瞬移到 A.gun、跑 5 秒让前沿真的打起来）
 //   frontEast  同一位置改朝东（沿交通壕看过去，另一组可见集合）
 //   custom     任意 {x,y,z,yaw,pitch}
 
 import { MISSION_ANCHORS } from "./Data_FirstLevelMissionLayout.mjs";
 
 export { MISSION_ANCHORS };
-export const VIEW_NAMES = ["train", "front", "frontEast"];
+export const VIEW_NAMES = ["bunker", "front", "frontEast"];
 
 /**
  * 页面内摆位。**不要在这里引用模块作用域** —— 它是被序列化过去执行的。
  * @param {object} options.A             MISSION_ANCHORS（必须当参数传）
- * @param {string} options.name          train / front / frontEast
+ * @param {string} options.name          bunker / front / frontEast
  * @param {object} options.custom        {x,y,z,yaw,pitch}，给了就直接摆这个位姿
  * @param {number} options.settleFrames  摆完再推几帧（出图/取证前让画面收敛）
  * @param {number} options.settleDt      那几帧的 dt（0 = 定帧）
  */
-export function PoseView({ A, name, custom = null, settleFrames = 0, settleDt = 0 }) {
+export async function PoseView({ A, name, custom = null, settleFrames = 0, settleDt = 0 }) {
   const g = window.Tengxian;
   g.state.menu = false;
   if (custom) {
@@ -35,8 +35,7 @@ export function PoseView({ A, name, custom = null, settleFrames = 0, settleDt = 
     g.player.pitch = custom.pitch;
     g.StepFrames(5, 1 / 60, true);
   } else if (name === "front" || name === "frontEast") {
-    const rt = g.Debug.FirstLevelMissionRuntime();
-    for (const f of ["trainShelling", "trainStopped", "unloadOrdersHeard", "unloaded"]) rt.Record(f);
+    await g.Debug.FirstLevelJump(4);   // 04 MachineGun：旧军列开场的那几条事实已经不存在
     g.StepFrames(2, 1 / 60, false);
     const p = g.player.position;
     p.set(A.gun.x, g.battlefield.GroundHeight(A.gun.x, A.gun.z) + 0.1, A.gun.z);

@@ -52,7 +52,9 @@ export const ZONE_LABELS = Object.freeze({
 // 缺名字的（新加了一条路线还没来得及登记）兜底成「路线 <编号>」，不写英文键。
 export const ROUTE_LABELS = Object.freeze({
   flank: "侧翼路",
-  opening: "进沟路",
+  // 2026.09.19：军列开场下线之后，这一条（=OPENING.approachRoute）没有人再走，
+  // 只剩几何还按它让路（Data_FirstLevelMissionLayout 的避让表、交通壕中心线）。
+  opening: "旧进沟路（无人走，只作几何避让）",
   support: "支援壕沟",
   bundle: "取集束弹的路",
   bundleReturn: "取弹返回",
@@ -78,11 +80,13 @@ export const ROUTE_LABELS = Object.freeze({
   pursuit: "敌军追击路",
   sortie: "出击路",
   sortieReturn: "出击返回",
-  approach: "进沟路（开场）",
-  supportTrench: "支援壕沟（开场）",
-  trenchContact: "进沟接敌路（开场）",
-  wounded: "伤员后送路（开场）",
-  runner: "传令兵的路（开场）",
+  // 下面五条是旧军列开场留下的线。人已经不走了，几何仍按它们让路，所以工作台还画得出来。
+  // approach / supportTrench 与 opening / support 指同一个数组（重复登记，门禁点名要）。
+  approach: "旧进沟路（同 opening）",
+  supportTrench: "支援壕沟（同 support）",
+  trenchContact: "旧进沟接敌路（无人走）",
+  wounded: "旧伤员后送路（无人走）",
+  runner: "旧传令兵的路（无人走）",
 });
 export function RouteLabel(name) {
   return ROUTE_LABELS[name] || `路线 ${name}`;

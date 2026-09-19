@@ -82,7 +82,7 @@ const FIRST_LEVEL_CENTER = {
 
 export const FIRST_LEVEL_SCENE_CAMERA_PRESETS = Object.freeze({
   overview: FirstLevelView("第一关整体", FIRST_LEVEL_CENTER, [0, 460, 520], 0, 50, 2400),
-  unload: FirstLevelView("军列卸载", MISSION_ANCHORS.unload, [38, 34, 52], 1.5, 55),
+  bunker: FirstLevelView("掩蔽部与伤员集结处", MISSION_ANCHORS.collection, [34, 30, -46], 1.2, 55),
   front: FirstLevelView("前沿阵地", MISSION_ANCHORS.front, [-34, 38, 58], 1.2, 55),
   village: FirstLevelView("村落内院", MISSION_ANCHORS.melee, [44, 42, 46], 1.2, 55),
   transfer: FirstLevelView("转运棚", MISSION_ANCHORS.transfer, [40, 34, 48], 1.2, 55),

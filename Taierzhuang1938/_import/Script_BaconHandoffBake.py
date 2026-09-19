@@ -8,7 +8,8 @@ from mathutils import Vector
 from pathlib import Path
 
 projectRoot = os.environ.get('BACON_PROJECT_ROOT') or str(Path(__file__).resolve().parents[2])
-assert Path(projectRoot,'Taierzhuang1938','Script_FirstLevelMeal.mjs').is_file(), 'Set BACON_PROJECT_ROOT to the task worktree'
+# 2026.09.19 第三波：Script_FirstLevelMeal 随车厢分食下线，改用一个仍在的文件认工作区。
+assert Path(projectRoot,'Taierzhuang1938','Data_FirstLevelMission.mjs').is_file(), 'Set BACON_PROJECT_ROOT to the task worktree'
 sourceRoot = r'C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\BaconHandoff'
 outputRoot = os.path.join(projectRoot, 'Taierzhuang1938', 'Model', 'BaconHandoff')
 os.makedirs(outputRoot, exist_ok=True)

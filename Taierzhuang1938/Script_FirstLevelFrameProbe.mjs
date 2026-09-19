@@ -20,7 +20,7 @@
 //   --strict            打开上面这套
 //   --width= --height=  视口（默认 3394×1348）
 //   --rounds=5          每机位几批
-//   --views=train,front,frontEast   只量其中几个机位
+//   --views=bunker,front,frontEast  只量其中几个机位
 //   --ablate=<csv|all>  同页消融（graphics.xxx + ApplyGraphics()），见 ABLATIONS
 //   --params=a=1&b=2    原样追加到 URL（例如 skyLegacy=1）
 import path from "node:path";
@@ -46,7 +46,7 @@ const quality = arg("quality", STRICT ? "high" : "");
 const width = Number(arg("width", STRICT ? "3394" : "1920"));
 const height = Number(arg("height", STRICT ? "1348" : "1080"));
 const rounds = Number(arg("rounds", "5"));
-const views = arg("views", "train,front,frontEast").split(",").filter(Boolean);
+const views = arg("views", "bunker,front,frontEast").split(",").filter(Boolean);
 const ablate = arg("ablate", "");
 const extraParams = arg("params", "");
 // `--root=<abs>`：服务另一棵检出（量大修前基线树用；**不改那棵树**，页面代码从它取，
@@ -137,11 +137,10 @@ async function CountProbe({ A, views }) {
     return Object.fromEntries(Object.entries(counters).map(([k, v]) => [k, Math.round(v / frames)]));
   };
   const out = { views: {} };
-  for (const name of ["train", "front", "frontEast"]) {
+  for (const name of ["bunker", "front", "frontEast"]) {
     if (name === "front" || name === "frontEast") {
       if (name === "front") {
-        const rt = g.Debug.FirstLevelMissionRuntime();
-        for (const f of ["trainShelling", "trainStopped", "unloadOrdersHeard", "unloaded"]) rt.Record(f);
+        await g.Debug.FirstLevelJump(4);   // 04 MachineGun：直接进前沿，旧军列事实已下线
         g.StepFrames(2, 1 / 60, false);
         const p = g.player.position;
         p.set(A.gun.x, g.battlefield.GroundHeight(A.gun.x, A.gun.z) + 0.1, A.gun.z);
@@ -189,7 +188,7 @@ async function LiveAutoQuality(page, seconds) {
 // ---------------------------------------------------------------------------
 async function ShotProbe(page, { A, views, label, outDir }) {
   const out = { views: {}, files: {} };
-  for (const name of ["train", "front", "frontEast"]) {
+  for (const name of ["bunker", "front", "frontEast"]) {
     // settleFrames=150 且 dt=0 的定帧：TAA 历史与自动曝光都收敛到同一个稳态，
     // 两棵树才可逐像素比。
     await page.evaluate(PoseView, { A, name, settleFrames: 150, settleDt: 0 });
@@ -290,7 +289,7 @@ async function CpuProfile(page, { A, views, profileFrames }) {
   await cdp.send("Profiler.enable");
   await cdp.send("Profiler.setSamplingInterval", { interval: 80 });
   const out = { views: {} };
-  for (const name of ["train", "front", "frontEast"]) {
+  for (const name of ["bunker", "front", "frontEast"]) {
     await SetupView(name);
     if (!views.includes(name)) continue;
     await cdp.send("Profiler.start");
@@ -511,10 +510,9 @@ async function StrictProbe({ A, rounds, views, ablate }) {
   };
   const wanted = ablate === "all" ? Object.keys(ABLATIONS) : ablate.split(",").filter((k) => ABLATIONS[k]);
 
-  const SetupTrain = () => {};
-  const SetupFront = () => {
-    const rt = g.Debug.FirstLevelMissionRuntime();
-    for (const f of ["trainShelling", "trainStopped", "unloadOrdersHeard", "unloaded"]) rt.Record(f);
+  const SetupBunker = () => {};
+  const SetupFront = async () => {
+    await g.Debug.FirstLevelJump(4);   // 04 MachineGun：直接进前沿，旧军列事实已下线
     g.StepFrames(2, 1 / 60, false);
     const p = g.player.position;
     p.set(A.gun.x, g.battlefield.GroundHeight(A.gun.x, A.gun.z) + 0.1, A.gun.z);
@@ -533,9 +531,9 @@ async function StrictProbe({ A, rounds, views, ablate }) {
       radii: g.lights.csm.radii.map((v) => R(v, 1)), bakeOrder: g.lights.csm.preset.bakeOrder } : null,
     views: {}, programs: 0, memory: null };
 
-  const order = [["train", SetupTrain], ["front", SetupFront], ["frontEast", SetupFrontEast]];
+  const order = [["bunker", SetupBunker], ["front", SetupFront], ["frontEast", SetupFrontEast]];
   for (const [name, Setup] of order) {
-    Setup();                                   // 机位必须按顺序建立（front 之后才有 frontEast）
+    await Setup();                                   // 机位必须按顺序建立（front 之后才有 frontEast）
     if (!views.includes(name)) continue;
     g.StepFrames(20, 0, true);
     const row = { baseline: await Sample(true), logicOnly: await Sample(false), actors: Actors(), materials: MaterialAudit() };
@@ -648,10 +646,10 @@ async function LegacyProbe({ A, frames }) {
       return { name, wallMsPerFrame: Round(wall), render, summary, actors: Actors(), roots: Roots() };
     };
     const out = { rendererName, timer: profiler.timerAvailable, size: [g.post.width, g.post.height], quality: g.graphics?.quality ?? null, graphics: { ...g.graphics }, preset: { ...g.post.preset } };
-    out.train = await Sample("train");
-    // Force Support stage: record the facts the flow requires, let it advance, then teleport to the gun.
+    out.bunker = await Sample("bunker");
+    // 直接跳到 04 机枪位（军列开场那几条事实已经不存在了），再瞬移到枪位。
     const rt = g.Debug.FirstLevelMissionRuntime();
-    for (const f of ["trainShelling", "trainStopped", "unloadOrdersHeard", "unloaded"]) rt.Record(f);
+    await g.Debug.FirstLevelJump(4);   // 04 MachineGun：直接进前沿，旧军列事实已下线
     g.StepFrames(2, 1 / 60, false);
     const stage0 = g.Debug.FirstLevelMission().stage;
     const p = g.player.position; p.set(A.gun.x, g.battlefield.GroundHeight(A.gun.x, A.gun.z) + 0.1, A.gun.z);
@@ -673,7 +671,7 @@ async function LegacyProbe({ A, frames }) {
 function PrintLegacy(result) {
   const Line = (s) => `${s.name.padEnd(10)} wall=${s.wallMsPerFrame}ms fps=${s.summary.fps} cpu=${s.summary.cpuAvg}/${s.summary.cpuP95}/${s.summary.cpuMax} gpu=${s.summary.gpuTotal ? s.summary.gpuTotal.avg + "/" + s.summary.gpuTotal.max : "n/a"} calls=${s.render.calls} tris=${(s.render.triangles / 1e6).toFixed(2)}M actors=${s.actors.alive}/${s.actors.total} lod=${JSON.stringify(s.actors.lod)} scene=${s.actors.sceneObjects} skinned=${s.actors.skinned} meshes=${s.actors.meshes.n}(${s.actors.meshes.inst})`;
   console.log(`GPU ${result.rendererName} timer=${result.timer} size=${result.size} boot=${(result.bootMs / 1000).toFixed(1)}s quality=${JSON.stringify(result.graphics)}`);
-  for (const s of [result.train, result.front, result.frontEast]) {
+  for (const s of [result.bunker, result.front, result.frontEast]) {
     console.log(Line(s));
     console.log("   cpu:", Object.entries(s.summary.cpu).slice(0, 10).map(([k, v]) => `${k}=${v.avg}/${v.max}`).join(" "));
     console.log("   gpu:", Object.entries(s.summary.gpu).slice(0, 10).map(([k, v]) => `${k}=${v.avg}`).join(" "));

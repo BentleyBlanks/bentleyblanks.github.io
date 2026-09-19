@@ -2,7 +2,6 @@
 import * as THREE from "three";
 import { MissionAftermath } from "./Script_FirstLevelMissionAftermath.mjs";
 import { MissionPeople } from "./Script_FirstLevelMissionPeople.mjs";
-import { CreateMealProp } from "./Script_FirstLevelMeal.mjs";
 import { MISSION_TUNING } from "./Data_Tuning_FirstLevel.mjs";
 import { MID_TUNING as MID } from "./Data_Tuning_FirstLevelMid.mjs";
 import { CreateP012StretcherGeometry } from "./Script_FirstLevelP012CarryView.mjs";
@@ -31,13 +30,12 @@ export class FirstLevelMissionView {
     this.parts = {};
     // Near-camera moving props need persistent object identity and real motion
     // history. The crowd's instance slots have no previous-instance transforms.
-    this.rigidParts = {fieldPack: [], cartridge: []};
+    this.rigidParts = {fieldPack: []};
     this.rigidTemplates = {};
     this.rigidProps = new Map();
     this.personColor = new THREE.Color();
     for (const [key, geometry, color, count] of [
       ["fieldPack",new THREE.BoxGeometry(.32,.43,.21),0x857a56,4],
-      ["cartridge", new THREE.CylinderGeometry(.004,.006,.07,8).rotateX(Math.PI/2), 0xc2a45d, 32],
       ["body", new THREE.BoxGeometry(0.42, 0.65, 0.25), 0x87958d, 160],
       ["head", new THREE.SphereGeometry(0.13, 7, 5), 0xc9bda7, 160],
       ["limb", new THREE.BoxGeometry(0.13, 0.64, 0.14), 0x747c72, 640],
@@ -75,7 +73,6 @@ export class FirstLevelMissionView {
       this.meshes.push(mesh);
     }
     this.zhouRoot = new THREE.Group();
-    this.mealProps=new Map();
     this.zhouRoot.name = "MissionOriginalZhouStretcher";
     this.root.add(this.zhouRoot);
     this.zhouBed = new THREE.Mesh(CreateP012StretcherGeometry(), this.parts.bed.material);
@@ -221,39 +218,6 @@ export class FirstLevelMissionView {
   Person(x,z,yaw,time,options={}) {
     return this.people.Person(options.id||("Person"+x+"_"+z),x,z,yaw,options);
   }
-  TrainHandProps() {
-    for(const prop of this.mealProps.values())prop.visible=false;
-    for(const entry of this.train?.entries || []) {
-      const actor=entry.actor, rig=actor.actor?.characterRig, life=actor.missionTrainLife;
-      if(actor.castId&&actor.alive&&rig?.bones.chest){
-        rig.bones.chest.getWorldPosition(this.position);
-        this.RigidProp("fieldPack",actor.id,this.position.x+Math.sin(actor.yaw)*.25,this.position.y-.18,
-          this.position.z+Math.cos(actor.yaw)*.25,actor.yaw);
-      }
-      if(!rig?.missionTrainLifeActive || life.brace>.25 || life.weight<.7 || life.gestureWeight<.7)continue;
-      const kind=life.kind;
-      if(!['Eat','ShareFood','CountAmmo'].includes(kind))continue;
-      for(const side of ['L','R']) {
-        const bone=rig.bones['hand'+side];
-        bone.getWorldPosition(this.position);
-        const {x,y,z}=this.position, yaw=actor.yaw;
-        if(kind==='CountAmmo'&&side==='R')this.RigidProp('cartridge',actor.id+'R',x,y,z,yaw);
-        else if(kind==='CountAmmo'){
-          for(const offset of [-.016,0,.016])this.RigidProp('cartridge',actor.id+'L'+offset,x+offset,y+.018,z,yaw);
-        }
-        else if(kind==='ShareFood'&&side==='L'&&!life.mealPerforming){
-          let prop=this.mealProps.get(actor.id);
-          if(!prop){prop=CreateMealProp('whole');this.mealProps.set(actor.id,prop);this.root.add(prop)}
-          prop.visible=true;prop.position.set(x,y+.04,z);prop.quaternion.copy(actor.actor.root.quaternion);
-        }
-        else if(kind==='Eat'&&side==='R'){
-          let prop=this.mealProps.get(actor.id);
-          if(!prop){prop=CreateMealProp('slice');this.mealProps.set(actor.id,prop);this.root.add(prop)}
-          prop.visible=true;prop.position.set(x,y+.035,z);prop.quaternion.copy(actor.actor.root.quaternion);
-        }
-      }
-    }
-  }
   RigidProp(key, id, x, y, z, yaw) {
     const identity=key+':'+id;
     let mesh=this.rigidProps.get(identity);
@@ -271,7 +235,6 @@ export class FirstLevelMissionView {
     this.aftermath.Update(player?.position,camera);
     for (const mesh of Object.values(this.parts)) mesh.count = 0;
     for (const mesh of this.rigidProps.values()) mesh.visible=false;
-    this.TrainHandProps();
     this.UpdateSupplies(time);
     // 2026.09.19 第二波：车站卸车挨炸那一拍随军列开场下线（`column.stationBombed`
     // 已无人写入，MISSION_PLACEMENT.stationCasualties 也一并删了）。
@@ -301,11 +264,10 @@ export class FirstLevelMissionView {
       } else {
         this.Instance("bed", litter.x, ground + height, litter.z, yaw);
       }
-      // 挨过刀的老周走带骨架的伤员（PatientStabbed → 循环的 PatientWoundedIdle）；
-      // 没有动作库、不是他、或者他已经断气，都退回实例化的烘焙姿势 ——
-      // 死人不能继续喘（第 17 阶段的告别戏用的就是那条既有姿势）。
-      if(!(litter.health>0&&this.people.RiggedPatient(litter.id,litter.x,ground,litter.z,yaw,ground+height)))
-        this.people.Patient(litter.id,litter.x,ground+height+.07,litter.z,yaw,time,litter.zhou?{stabbed:!!litter.stabbed}:null);
+      // 2026.09.19 第三波：屋内伏击拍下线之后，「挨刀的老周走带骨架伤员」那条支路
+      // （MissionPeople.RiggedPatient）永远走不到 —— 挂 clip 的入口没人调了。
+      // 担架上的人统一走实例化的烘焙姿势。
+      this.people.Patient(litter.id,litter.x,ground+height+.07,litter.z,yaw,time,litter.zhou?{stabbed:!!litter.stabbed}:null);
       const SetGrip=(side,end)=>new THREE.Vector3(litter.x+Math.cos(yaw)*side*.29-Math.sin(yaw)*end,
         ground+height+.12,litter.z-Math.sin(yaw)*side*.29-Math.cos(yaw)*end);
       if (!litter.loaded && litter.state !== "placed")

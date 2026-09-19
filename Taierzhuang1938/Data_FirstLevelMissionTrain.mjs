@@ -1,5 +1,8 @@
-// Population mirrors the accepted P012 train: 40 recruits (12 / 16 / 12), plus Luo and the player.
-import { MISSION_TUNING as R } from "./Data_Tuning_FirstLevel.mjs";
+// 军列开场已随 2026.09.19 采用稿下线：车厢几何、乘车演出与 MissionTrainMotion 都删了。
+// 这张表只剩三处还有消费者 —— `life.wallOffsetM`（Script_FirstLevelMissionTrainLife 的
+// 贴墙姿态偏移，那个类现在是全项目共用的程序化姿态层）、`guideMuster` + `cars[].muster`
+// （Data_FirstLevelMissionFront 用它们把战场遗体从旧集结点让开）、以及 Script_JumpTest
+// 拿车厢坐标当跳跃靶场。坐标沿用原 P012 军列，不代表场上还有军列。
 import { trainColumn } from "./Data_FirstLevelP012TrainColumn.mjs";
 const Point = (x, z) => ({ x, z });
 export const MISSION_TRAIN = Object.freeze({
@@ -28,7 +31,6 @@ export const MISSION_TRAIN = Object.freeze({
     ],
   },
   centerX: -77,
-  approachEndZ: R.trainTravelM + 140,
   doorClearX: -73.1,
   stairFootX: -71.7,
   apronLaneX: -69,
@@ -57,12 +59,3 @@ export const MISSION_TRAIN = Object.freeze({
     };
   }),
 });
-
-// Constant approach followed by constant deceleration, with continuous speed and an exact station stop.
-export function MissionTrainMotion(time, impactAt = null, impactOffset = null) {
-  if (impactAt == null) return { offsetM: Math.max(0, R.trainTravelM - time * R.trainCruiseSpeedMps), speedMps: R.trainCruiseSpeedMps, stopped: false };
-  const distance = Math.max(0, impactOffset ?? R.trainTravelM - impactAt * R.trainCruiseSpeedMps);
-  const brakeSeconds = 2 * distance / R.trainCruiseSpeedMps;
-  const ratio = brakeSeconds > 0 ? Math.max(0, Math.min(1, (time - impactAt) / brakeSeconds)) : 1;
-  return { offsetM: distance * (1 - ratio) ** 2, speedMps: R.trainCruiseSpeedMps * (1 - ratio), stopped: ratio === 1, brakeSeconds };
-}
