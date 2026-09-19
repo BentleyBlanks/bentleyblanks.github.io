@@ -83,8 +83,19 @@ try {
   if (options.campaign) {
     await InstallInputDriver(ctx);
     if (ctx.stageFrom <= 7) await DriveFront(ctx);
-    if (ctx.stageFrom <= 14) await DriveMid(ctx);
-    await DriveEnd(ctx);
+    // `--stage-to=7`：只跑 Front 那一段（1–7）。分段夹具照样留证据与回执，
+    // 但不跑后两段、也不断言 Complete —— 一段跑通不许冒充通关。
+    if (ctx.stageTo > 7) {
+      if (ctx.stageFrom <= 14) await DriveMid(ctx);
+      if (ctx.stageTo > 14) await DriveEnd(ctx);
+    }
+    if (ctx.stageTo < 18) {
+      assert.deepEqual(ctx.errors, []);
+      console.log(`ok stages ${ctx.stageFrom}-${ctx.stageTo} driven with real player input`);
+      await fs.writeFile(path.join(output, "Data_Segment.json"),
+        JSON.stringify({ stageFrom: ctx.stageFrom, stageTo: ctx.stageTo,
+          stage: await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission().stage) }, null, 2));
+    } else {
 
     assert.equal(await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission().stage), "Complete");
     // TODO 第二波：节奏断言按新 27 步重写。旧的那几条（South 的六秒黑屏转场、
@@ -105,6 +116,7 @@ try {
         JSON.stringify(ctx.jumpReceipts, null, 2));
       console.log(`ok debug starts ${ctx.stageFrom}–18 continued with real player input through their next stage, ending at Complete`);
     } else console.log("ok entire first level completed with real player input and physical mission events");
+    }
   }
 } catch (error) {
   await CaptureFailure(ctx);

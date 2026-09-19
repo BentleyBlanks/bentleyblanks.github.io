@@ -67,9 +67,9 @@ export const testDefs = {
   SquadMarchEditorTest: {file:"Script_SquadMarchEditorTest.mjs",timeoutMs:300000,desc:"Squad editor real actors, editable routes, per-count styles and cleanup"},
   SquadMarchAiTest: {file:"Script_SquadMarchAiTest.mjs",desc:"Real adapter memory/contact distinction, movement ownership and mission pose handoff"},
   SquadMarchNavigationTest: {file:"Script_SquadMarchNavigationTest.mjs",timeoutMs:300000,desc:"Displaced squad member rejoins through real navigation and terrain"},
-  // 旧的 --march-only 只跑到军列开场结束就 break，那段已经下线。第二波 Front 包
-  // 写完 1–7 的驾驶脚本之后，把这一条改成只跑那一段（--stage-from 还没有 1–7 的分段起点）。
-  FirstLevelSquadMarchTest: {file:"Script_FirstLevelMissionBrowserTest.mjs",args:["--campaign"],timeoutMs:600000,desc:"Shared march consumed by real first-level AI on the rear communication trench approach"},
+  // 旧的 --march-only 只跑到军列开场结束就 break，那段已经下线。现在跑 Front 那一段
+  // （`--stage-to=7`）：共用行进层真正被消费的地方是后交通壕上前沿与 07 南行那两趟。
+  FirstLevelSquadMarchTest: {file:"Script_FirstLevelMissionBrowserTest.mjs",args:["--campaign","--stage-to=7"],timeoutMs:900000,desc:"Shared march consumed by real first-level AI on the rear trench approach and the south walk"},
   EditorLauncherTest: {file:"Script_EditorTest.mjs",args:["--launcher-only"],timeoutMs:240000,desc:"Editor launcher inventory including the squad march entry"},
   FirstLevelMissionAftermathTest: {file:"Script_FirstLevelMissionAftermathTest.mjs",timeoutMs:600000,desc:"Civilian body placement, actual model clearance, grounding, LOD and screenshots"},
   MachineGunCaptivesAnimationTest:{file:"Script_MachineGunCaptivesAnimationTest.mjs",timeoutMs:300000,desc:"Captives cutscene clips on five original rigs, authored grounding and the state.perform contract"},

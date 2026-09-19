@@ -38,8 +38,8 @@ try{
   // （SQUAD_MARCH.waitDistanceM 22 m）：玩家落后超过那个数，班长走不到停点就被
   // 行进层按住了，带路层的「到停点等人」根本轮不上（march 显示 waiting、
   // missionGuideWaiting 始终 false）。这条夹具要量的是带路层，不是牵引绳。
-  r.squad.forEach((s,i)=>{r.PlaceActor(s,{x:-16+(i%2?.6:-.6),z:-60-i*2});s.target=null;s.suppression=0;s.incomingFire=null;s.missionDangerUntil=0;});
-  g.player.Spawn(-16,-68,Math.PI);
+  r.squad.forEach((s,i)=>{r.PlaceActor(s,{x:-12.4+(i%2?.6:-.6),z:-44.8-i*2});s.target=null;s.suppression=0;s.incomingFire=null;s.missionDangerUntil=0;});
+  g.player.Spawn(-15,-50,Math.PI);
   r.Guide(R.south.slice(3),{fromStart:true});
   g.StepFrames(1,1/60,false);
   return r.leaderGuide.State();
