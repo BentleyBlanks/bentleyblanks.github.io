@@ -206,6 +206,26 @@
 | BridgeWithdraw | 南路断了 | 这一段真正发生的是一条通路被不可逆切断；「把路打开」说反了 |
 | NightMarch | 后头还有活人 | 连夜准备迎敌，不是胜利庆典 |
 
+## 6. 实拍踩到的两个坑（别再踩）
+
+**桥头撤退时全班压在玩家脚下。** `BridgeWithdraw` 的带路线第一点就是南岸射位
+`bridgeCover` —— 玩家整场掩护都站在那一格上，「桥头撤！」一喊班里四个人全往他脚下走。
+取证：`running/stand/!overlap/!control/!mounted/!meleeBlocking`，**八个方向一步都挪不动**，
+身边 0.85 / 1.4 / 1.55 / 3.08 m 各站一个自己人（玩家被自己人裁步挡位，
+见 memory「滕县 士兵叠人定论」）。修法是带路线跳过第一点：撤就是各自往南走。
+往后任何「一喊撤就把全队指向玩家现在站的那个点」的编排都会复发这条。
+
+**回援尾队在北引道上被打光。** 尾队原来在 `BridgeOrders` 就生成，要顶着一挺机枪
+等玩家从接收处走一分多钟 —— 实拍六个人死了五个，「接应尾队」整件事没了。
+修法两条：`southBankReached` 才放他们从北面走进来；扛机枪与抬炮管的三个人走
+`scriptEssential`（打不死、会趴下还击），三个步枪兵照常会阵亡 ——
+Notion 的「有人可能中弹」留在他们身上，不是留给整支队伍。
+
+驾驶脚本侧的同类教训写在 `Script_FirstLevelCampaignEnd.mjs` 的注释里：
+整关驾驶跑在 `manual=1` 下，等事实必须自己 `StepFrames`（`WaitFact` / `WaitControl`）；
+`Route` 带 `fight` 时一看见敌人就松开前进键，压制要用 `WaitFact(..., {fight:true})`，
+撤退要用 `fight:false`。
+
 ## 5. 验收命令
 
 纯 Node（毫秒级）：
