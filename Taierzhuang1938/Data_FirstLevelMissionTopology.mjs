@@ -148,8 +148,9 @@ export const MISSION_STAGE_ANCHORS = Object.freeze({
   // B 村落：主街障碍北侧、担架等待遮挡、东巷、障碍南侧接回主街
   streetBlock: {x:76.65,z:15}, litterHold: {x:66,z:-20}, eastAlley: {x:88,z:11},
   streetRejoin: {x:77,z:34},
-  // C 桥头接运：老周那辆车的车位、空袭时车列停住的位置、侧巷火力
-  cartBoard: {x:87,z:115}, cartHalt: {x:76,z:135}, sideAlley: {x:52,z:130},
+  // C 桥头接运：老周那辆车**旁边**的上车位（车位中心 (88,113) 让给车本身 ——
+  //   牛车碰撞盒 3 m 宽，锚点摆在车位中心就等于摆在车肚子里）、空袭时车列停住的位置、侧巷火力
+  cartBoard: {x:85.6,z:113}, cartHalt: {x:76,z:135}, sideAlley: {x:52,z:130},
   // D 桥南：靠院墙夹道两端、接收院院门
   wallPathStart: {x:56,z:207}, wallPathEnd: {x:16,z:220}, receptionGate: {x:2,z:240},
   // 18 北沙河铁路桥：桥心、两端、南岸射位、北岸土坎、爆破安全区、淡出前的行军终点
@@ -177,7 +178,7 @@ export const MISSION_STAGE_ROUTES = Object.freeze({
   courtyardBypass: [{x:58,z:-9},{x:58,z:8},{x:58,z:18},{x:53,z:24},{x:53,z:34},
     {x:53,z:39},{x:66,z:39},{x:74,z:39},S.streetRejoin],
   // 12：牛车从车位沿桥头路北上，停在路桥以北
-  cartRide: [S.cartBoard,{x:85,z:122},{x:82,z:128},{x:78,z:132},S.cartHalt],
+  cartRide: [S.cartBoard,{x:82,z:113},{x:79,z:118},{x:77,z:127},S.cartHalt],
   // 15B：靠院墙夹道（向西一段 → 左拐 → 向南一段），与撤离线同一条走廊
   wallPath: [S.wallPathStart,{x:36,z:211},{x:16,z:211},S.wallPathEnd,
     {x:12,z:230},{x:6,z:237},S.receptionGate],

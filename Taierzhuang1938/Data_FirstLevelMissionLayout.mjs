@@ -483,8 +483,9 @@ gates.push(MISSION_SOUTH_BRIDGE.wreck);
     semantic: "structure", appearSignal: B.signal });
   gates.push({ id: "RailBridgeWreckTruss", x: B.x - 2.4, y: floor + 1.5, z: B.z - 6, w: 0.6, h: 3, d: 12,
     semantic: "metal", appearSignal: B.signal });
-  gates.push({ id: "RailBridgeWreckStub", x: B.x, y: deckBottom + 0.5, z: B.z - B.deckHalfD + 3.5,
-    w: B.deckW, h: 1, d: 3, semantic: "earthDark", appearSignal: B.signal });
+  // 北桥头的断板：炸完之后堵在引道上，人走到这儿就到头了（不是「走过去掉下河」）。
+  gates.push({ id: "RailBridgeWreckStub", x: B.x, y: deckBottom + 0.75, z: B.z - B.deckHalfD + 3.5,
+    w: B.deckW, h: 1.5, d: 3, semantic: "earthDark", appearSignal: B.signal });
 }
 // 南岸遮挡（18 的射位）：中间留 x -77..-69 的缺口，爆破安全区从那儿看得见桥。
 GroundedWall("BridgeSouthCoverWest", -82.5, 177.6, 9, 1.3, 0.8);
@@ -783,12 +784,15 @@ export const MISSION_PLACEMENT = Object.freeze({
     { x: 16, z: -131 },
     { x: 2, z: -132 },
   ],
-  // 车位挪到装载区南半边：旧的 (86,141) 落在北沙河的北坡上，(86,132) 也贴着河口。
+  // 车位挪到装载区东半边，排成两列：旧的 (86,141) 落在北沙河的北坡上，(86,132)
+  // 也贴着河口。**四个车位全在 cartRide 的出场道以东** —— 牛车的碰撞盒是
+  // 3 x 5.8 m（Script_FirstLevelMissionView 的 "cart" 几何），一辆停着的车能把
+  // 相邻的车道整条封死（实拍：胶囊卡在 (82,128.26)，正是停在 (82,125) 那辆车的车尾）。
   cartBays: [
-    { x: 82, z: 112 },
-    { x: 87, z: 115 },
-    { x: 87, z: 122 },
-    { x: 82, z: 125 },
+    { x: 88, z: 113 },
+    { x: 88, z: 121 },
+    { x: 94, z: 118 },
+    { x: 94, z: 126 },
   ],
   // -------------------------------------------------------------------------
   // 2026.09.19 新区的摆位（玩法包用；每点 {x,z,yaw?}，yaw 是弧度、0 朝 +z 南）

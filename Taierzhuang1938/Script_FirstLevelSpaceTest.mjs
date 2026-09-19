@@ -229,6 +229,21 @@ const report = {};
   assert.ok(S.cartHalt.z < River.z - River.floorHalfW - River.bankRun,
     "the cart halts north of the North Sha He, not on its bank");
   assert.ok(P.cartBays.every((bay) => RiverCutAt(bay.x, bay.z) === 0), "no cart bay sits in the river channel");
+  // 停着的牛车不是布局体块（Script_FirstLevelMissionView 直接挂物理），所以上面那趟
+  // 净空看不见它们。车体 3 x 5.8 m：锚点与路线都得让开半宽 1.5 + 胶囊 0.34。
+  for (const [id, point] of Object.entries(S)) for (const bay of P.cartBays)
+    assert.ok(Math.abs(point.x - bay.x) > 1.9 || Math.abs(point.z - bay.z) > 3.3,
+      `anchor ${id} stands inside the parked cart at ${bay.x},${bay.z}`);
+  for (let i = 1; i < StageRoutes.cartRide.length; i++) {
+    const a = StageRoutes.cartRide[i - 1], b = StageRoutes.cartRide[i];
+    const length = Distance(a, b);
+    for (let d = 0; d <= length; d += 0.4) {
+      const t = d / length, x = a.x + (b.x - a.x) * t, z = a.z + (b.z - a.z) * t;
+      for (const bay of P.cartBays.slice(1))
+        assert.ok(Math.abs(x - bay.x) > 1.9 || Math.abs(z - bay.z) > 3.3,
+          `the cart lane runs through the cart parked at ${bay.x},${bay.z}`);
+    }
+  }
   report.cartRideM = +RouteLength(StageRoutes.cartRide).toFixed(1);
   console.log("ok cart ride clears a 2.5x2.9 m cart and halts north of the river", report.cartRideM + " m");
 }

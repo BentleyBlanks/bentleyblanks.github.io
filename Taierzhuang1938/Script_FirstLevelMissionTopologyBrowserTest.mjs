@@ -25,6 +25,9 @@ try{
    ...MISSION_STAGE_ROUTES};
   // 夜景那一片白天不存在，单独在下面的状态循环里走。
   delete walkRoutes.nightMarch;
+  // 10 的绕回巷从内院门出去 —— 那扇门在 courtyardGateOpen 之前是**关着**的
+  // （这正是 10 要做的事）。量的是门开之后这条路通不通。
+  g.battlefield.OpenGate('MissionCourtyardGate');g.physics.RefreshStaticQueries();
   const walks=[],body=g.physics.MakeCharacter();
   try{
    for(const [name,points] of Object.entries(walkRoutes))for(const reverse of [false,true]){
@@ -76,7 +79,7 @@ try{
   g.physics.RefreshStaticQueries();
   states.push({phase:'bothDestroyed',...Snapshot()});
   // 炸后桥面那一格必须是河槽，不是隐形的空中走道。
-  const blocked=!!g.battlefield.Raycast(new Vector3(-77,1.2,138),new Vector3(0,0,1),22,{terrain:true});
+  const blocked=!!g.battlefield.Raycast(new Vector3(-77,1,132),new Vector3(0,0,1),12,{terrain:true});
   for(const id of ['RailBridgeWreckSpan','RailBridgeWreckTruss','RailBridgeWreckStub'])
    g.battlefield.OpenGate(id);
   for(const id of ['RailBridgeDeck','RailBridgeTrussWest','RailBridgeTrussEast',
@@ -99,7 +102,9 @@ try{
  assert.ok(byPhase.bothDestroyed.railDeckY<-2,
   'the destroyed span leaves a 4 m channel, not an invisible walkway: '+byPhase.bothDestroyed.railDeckY);
  assert.equal(bridges.blocked,true,'the wreckage physically obstructs the old crossing');
- assert.deepEqual(byPhase.restored,byPhase.intact,'checkpoint replay restores both bridges exactly');
+ const Without=({phase,...rest})=>rest;
+ assert.deepEqual(Without(byPhase.restored),Without(byPhase.intact),
+  'checkpoint replay restores both bridges exactly');
  // -------------------------------------------------------------------------
  // 夜景片：白天不存在，NightGateShown 之后才走得进北门
  // -------------------------------------------------------------------------
