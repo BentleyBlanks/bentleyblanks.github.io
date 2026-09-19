@@ -43,26 +43,34 @@ try{
     for(const [id,actor] of r.enemies)if(actor.missionEncounter==="intrusion"){r.ai.Remove(actor);r.enemies.delete(id);}
     for(const [i,actor] of r.squad.entries())r.PlaceActor(actor,OPENING.shelterPosts[i]);
     r.flow.index=MISSION_STAGES.findIndex(stage=>stage.id==="Support");r.flow.Enter();
+    // 2026.09.19 重构之后 03 的入口就在前沿边上：调试跳转落地的那一帧人离 front
+    // 锚点 (0,-124) 不到 frontEngageDistanceM，UpdateFront 当场就记下
+    // frontBattleStarted 并把主力放出来。这条夹具量的是「人还在后交通壕那一段」，
+    // 所以把主力与它的事实退回待命，随后由真实走位重新触发。
+    for(const [id,actor] of r.enemies)if(actor.missionEncounter==="front"){r.ai.Remove(actor);r.enemies.delete(id);}
+    r.flow.facts.delete("frontBattleStarted");
   });
-  await Place(-32,-20);await Advance(2);
+  // 后交通壕上的两个点，都在 frontEngageDistanceM（26 m）之外：
+  // HOLD (-24,-60) 离前沿 68 m，STEP (-8,-78) 离前沿 46 m，两处都在 approach 组的火力里。
+  const HOLD={x:-24,z:-60},STEP={x:-8,z:-78};
+  await Place(HOLD.x,HOLD.z);await Advance(2);
   const initial=await Receipt("SupportEntry");
   assert.equal(initial.enemies.filter(a=>a.encounter==="approach"&&a.alive).length,MISSION_ENCOUNTERS.approach.length);
   assert.ok(initial.enemies.some(a=>a.encounter==="approach"),"approach cannot silently become an empty encounter");
   // Before making contact, a sheltered delay keeps the squad in the recess too. Sending them
   // ahead alone would test an unassisted assault against the new mobile sections.
-  await page.evaluate(async()=>{
-    const r=window.Tengxian.Debug.FirstLevelMissionRuntime(),{OPENING}=await import("./Data_FirstLevelOpening.mjs");
+  await page.evaluate(async(hold)=>{
+    const r=window.Tengxian.Debug.FirstLevelMissionRuntime();
     r.squadMarch?.Dispose();r.squadMarch=null;
     for(const [i,a] of r.squad.entries()){
-      // shelterPosts also contains two exterior sentry positions. This fixture
-      // is waiting under the roof, not leaving sentries exposed for three minutes.
-      const post={x:OPENING.shelter.x+(i%2?1:-1),z:OPENING.shelter.z+(i<2?-3:2)};
+      // 一起停在玩家这一段沟里：把班里人单独放出去，量到的就是「没人配合的强攻」。
+      const post={x:hold.x+(i%2?1:-1),z:hold.z+(i<2?-3:2)};
       r.PlaceActor(a,post);r.squadRoutes.set(a.id,[]);a.missionContactPost=null;
       r.Defend(a,post,0,0);
     }
-  });
-  await Place(-32,-20);await Advance(180);
-  await Place(-24,-60);await Advance(1);
+  },HOLD);
+  await Place(HOLD.x,HOLD.z);await Advance(180);
+  await Place(STEP.x,STEP.z);await Advance(1);
   const delayed=await Receipt("DelayedApproach");
   assert.equal(delayed.failed,false,"the sheltered delay remains playable");
   assert.equal(delayed.started,false,"a slow approach cannot spend the finite main assault");

@@ -34,8 +34,12 @@ try{
   // Repeated later route changes must not accumulate old guide detours.
   for(let i=0;i<4;i++){r.Guide(R.village.slice(0,3));r.Guide(R.south);}
   if(r.squadRoutes.get(leader.id).length>128)throw new Error("Repeated guidance route inflation");
-  r.squad.forEach((s,i)=>{r.PlaceActor(s,{x:-8+(i%2?.6:-.6),z:-94-i*2});s.target=null;s.suppression=0;s.incomingFire=null;s.missionDangerUntil=0;});
-  g.player.Spawn(-8,-103,Math.PI);
+  // 队伍摆在第一个带路停点前面一小段。共用行进层有自己的牵引绳
+  // （SQUAD_MARCH.waitDistanceM 22 m）：玩家落后超过那个数，班长走不到停点就被
+  // 行进层按住了，带路层的「到停点等人」根本轮不上（march 显示 waiting、
+  // missionGuideWaiting 始终 false）。这条夹具要量的是带路层，不是牵引绳。
+  r.squad.forEach((s,i)=>{r.PlaceActor(s,{x:-16+(i%2?.6:-.6),z:-60-i*2});s.target=null;s.suppression=0;s.incomingFire=null;s.missionDangerUntil=0;});
+  g.player.Spawn(-16,-68,Math.PI);
   r.Guide(R.south.slice(3),{fromStart:true});
   g.StepFrames(1,1/60,false);
   return r.leaderGuide.State();

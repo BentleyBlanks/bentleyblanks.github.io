@@ -188,22 +188,8 @@ export async function Drive(ctx) {
   // 04 不再触发关中过场《空地上的三个人》（契约 §2）。
   assert.equal(await page.evaluate(() => window.Tengxian.state.cutscene || null), null,
     "04 不由任务触发 CS_MachineGunCaptives");
-  // 上枪位之前先在沟里那只补给箱补一趟：一路打到这儿身上多半是空弹夹加一身血，
-  // 04 这一段又是整关火力最密的地方。没绷带顶上去，实测三十秒就躺下。
-  await Route([{ x: 0, z: -124 }, { x: -2.2, z: -122.5 }], "GunSeatResupply", { stance: "crouch" });
-  for (let refill = 0; refill < 4; refill++) {
-    if (await page.evaluate(() => window.Tengxian.player.bandages) >= 3) break;
-    await Idle(page, R.supplyCooldownS + 1);
-    await Interact();
-  }
-  await page.evaluate(() => {
-    const g = window.Tengxian;
-    if (g.player.health < 90 || g.player.bleeding) g.Debug.Key("KeyB");
-    g.StepFrames(1, 1 / 60, false);
-  });
-  console.log("GUN_SEAT_SUPPLY", JSON.stringify(await page.evaluate(() => ({
-    bandages: window.Tengxian.player.bandages, clips: window.Tengxian.state.clips,
-    health: window.Tengxian.player.health }))));
+  // 上枪位之前不绕去补给箱：在那儿等两轮冷却＝站在沟里挨打（2026-09-20 实测当场阵亡），
+  // 而且把弹板补到上限之后 05 的「前沿补给箱真的补了弹」就再也涨不动了。
   // 枪座就在三米外的沟里：这一小段不开火（fight 的 90 m 口径会让人站着对射、原地不动）。
   await Route([{ x: 0, z: -124 }, { x: 0, z: -127.4 }], "MachineGunSeat", { stance: "crouch" });
   await Interact();
@@ -305,10 +291,34 @@ export async function Drive(ctx) {
   await page.evaluate(() => { const g = window.Tengxian; if (g.emplacement.View()) g.Debug.Key("KeyF"); g.Debug.Key("KeyB"); });
   await Route([{ x: 0, z: -124 }, { x: -2.2, z: -122.5 }], "FrontResupply", { stance: "crouch" });
   await Idle(page, R.supplyCooldownS + 1);
-  const clipsBefore = await page.evaluate(() => window.Tengxian.state.clips);
+  // 补给箱把弹板加到**手里那支枪**的账上（AddSupplyClips 看 activeSlot）。
+  // 近战/投掷槽在手的时候加的是 mags.primary，state.clips 一动不动 —— 先把步枪换回手里。
+  const SupplyState = () => page.evaluate(() => {
+    const g = window.Tengxian, point = g.interact.points.get("MissionSupplyFront");
+    return { clips: g.state.clips, primaryClips: g.state.mags.primary?.clips ?? 0,
+      activeSlot: g.state.activeSlot, emptyHands: g.Debug.FirstLevelMission().emptyHands,
+      count: point?.count ?? null, reach: g.interact.Query(g.player)?.point?.id ?? null,
+      bandages: g.player.bandages };
+  });
+  await page.evaluate(() => {
+    const g = window.Tengxian;
+    if (g.state.activeSlot !== "primary") g.Debug.Key("Digit1");
+    g.StepFrames(20, 1 / 60, false);
+  });
+  const supplyBefore = await SupplyState();
   await Interact();
-  assert.equal(await page.evaluate(() => window.Tengxian.state.clips), clipsBefore + R.frontSupplyClips,
-    "前沿补给箱真的补了弹");
+  let supplyAfter = await SupplyState();
+  // 没吃上就再来一次（冷却 15 s；够不着就走回箱子跟前）。
+  for (let retry = 0; retry < 2 && supplyAfter.count === supplyBefore.count; retry++) {
+    await Idle(page, R.supplyCooldownS + 1);
+    if (supplyAfter.reach !== "MissionSupplyFront")
+      await Route([{ x: 0, z: -124 }, { x: -2.2, z: -122.5 }], `FrontResupplyRetry${retry}`, { stance: "crouch" });
+    await Interact();
+    supplyAfter = await SupplyState();
+  }
+  console.log("FRONT_SUPPLY", JSON.stringify({ before: supplyBefore, after: supplyAfter }));
+  assert.ok(supplyAfter.count > supplyBefore.count, "前沿补给箱真的被用上了：" + JSON.stringify(supplyAfter));
+  assert.equal(supplyAfter.clips, supplyBefore.clips + R.frontSupplyClips, "前沿补给箱真的补了弹");
   // 出击前把绷带补满。旧驾驶脚本一直这么做 —— 只带一卷去爬那条侧沟，
   // 三次检查点重试全烧在半路上（2026-09-20 实测 3/2 超预算）。
   for (let refill = 0; refill < 4 && await page.evaluate(() => window.Tengxian.player.bandages) < 3; refill++) {
@@ -340,26 +350,61 @@ export async function Drive(ctx) {
       const g = window.Tengxian;
       for (let i = 0; i < 900 && g.Debug.FirstLevelMission().tank.moving; i++) g.StepFrames(1, 1 / 60, false);
     });
-    const thrown = await page.evaluate(() => {
+    const thrown = await page.evaluate(async () => {
+      const { THROW } = await import("./Data_Tuning_Combat.mjs");
+      const { WEAPONS } = await import("./Data_Weapons.mjs");
       const g = window.Tengxian, tank = g.Debug.FirstLevelMission().tank, p = g.player.position;
+      const kind = WEAPONS.GrenadeBundle;
       g.player.yaw = Math.atan2(p.x - tank.x, p.z - tank.z);
-      g.player.pitch = 0.35;
-      const distance = Math.hypot(p.x - tank.x, p.z - tank.z) - 0.4;
-      const rise = g.battlefield.GroundHeight(tank.x, tank.z) - (g.player.EyePosition.y + 0.1);
-      const cosine = Math.cos(g.player.pitch), sine = Math.sin(g.player.pitch) + 0.26;
-      const speed = Math.sqrt(4.905 * distance * distance / (cosine * cosine * Math.max(0.1, distance * sine / cosine - rise)));
-      const chargeFrames = Math.round(66 * Math.max(0.08, Math.min(1, (speed - 8) / 5)));
+      // 解一条真能落到履带边上的抛物线。固定 0.35 rad 那一版是从沟底往路基上扔：
+      // 目标比出手点高两米，弹道贴着沟沿过去，两发全砸在坎上（2026-09-20 实测）。
+      // 这里按投掷模型（velocity = dir*speed，再加 speed*arcLift 的竖直分量）扫仰角，
+      // 只收初速在蓄力区间内、而且整条弧线离地都有余量的那些解，取余量最大的一条。
+      const eye = g.player.EyePosition;
+      const originY = eye.y + THROW.muzzleRiseM;
+      const distance = Math.hypot(p.x - tank.x, p.z - tank.z) - THROW.muzzleAheadM;
+      const rise = g.battlefield.GroundHeight(tank.x, tank.z) - originY;
+      let best = null;
+      for (let pitch = 0.06; pitch <= 1.3; pitch += 0.02) {
+        const cosine = Math.cos(pitch), vertical = Math.sin(pitch) + THROW.arcLift;
+        const drop = distance * vertical / cosine - rise;
+        if (drop <= 0.05) continue;
+        const speed = Math.sqrt(4.905 * distance * distance / (cosine * cosine * drop));
+        if (speed < kind.throwSpeedMin + 0.05 || speed > kind.throwSpeedMax - 0.05) continue;
+        let clearance = Infinity;
+        for (let step = 1; step <= 20; step++) {
+          const along = step / 21, x = p.x + (tank.x - p.x) * along, z = p.z + (tank.z - p.z) * along;
+          const t = distance * along / (speed * cosine);
+          const y = originY + speed * vertical * t - 4.905 * t * t;
+          clearance = Math.min(clearance, y - g.battlefield.GroundHeight(x, z));
+        }
+        if (!best || clearance > best.clearance) best = { pitch, speed, clearance };
+      }
+      // 一条都解不出来就照旧仰 0.35 满蓄力扔一发，好歹把落点记下来。
+      const shot = best || { pitch: 0.35, speed: kind.throwSpeedMax, clearance: null };
+      g.player.pitch = shot.pitch;
+      const power = (shot.speed - kind.throwSpeedMin) / (kind.throwSpeedMax - kind.throwSpeedMin);
+      const chargeFrames = Math.round(66 * Math.max(0.08, Math.min(1, power)));
       const before = g.state.bundles;
       g.Debug.Key("KeyH", true); g.StepFrames(chargeFrames, 1 / 60, false); g.Debug.Key("KeyH", false);
       g.StepFrames(1, 1 / 60, false);
       if (g.player.stance === "stand") g.Debug.Key("KeyC");
+      // 跟着这一发看它落在哪儿：炸不停的时候，落点比任何推断都说明问题。
+      let land = null;
       for (let frame = 0; frame < 300 && g.player.alive; frame++) {
+        const flying = g.combat.projectiles.find((entry) => entry.kind === "GrenadeBundle");
+        if (flying) land = { x: +flying.position.x.toFixed(2), y: +flying.position.y.toFixed(2), z: +flying.position.z.toFixed(2) };
         if (g.player.bleeding) g.Debug.Key("KeyB");
         g.StepFrames(1, 1 / 60, false);
       }
-      return { before, after: g.state.bundles, alive: g.player.alive, mission: g.Debug.FirstLevelMission() };
+      return { before, after: g.state.bundles, alive: g.player.alive, mission: g.Debug.FirstLevelMission(),
+        aim: { pitch: +shot.pitch.toFixed(3), speed: +shot.speed.toFixed(2),
+          clearance: shot.clearance == null ? null : +shot.clearance.toFixed(2),
+          distance: +distance.toFixed(2), rise: +rise.toFixed(2), solved: !!best },
+        land, landMiss: land ? +Math.hypot(land.x - tank.x, land.z - tank.z).toFixed(2) : null };
     });
-    console.log("BUNDLE_THROW", JSON.stringify({ before: thrown.before, after: thrown.after, tank: thrown.mission.tank }));
+    console.log("BUNDLE_THROW", JSON.stringify({ before: thrown.before, after: thrown.after,
+      aim: thrown.aim, land: thrown.land, landMiss: thrown.landMiss, tank: thrown.mission.tank }));
     if (thrown.mission.tank.immobilized) break;
     if (!thrown.alive) break;
   }
