@@ -2,6 +2,7 @@ import { MISSION_RECEPTION_SPACE as Reception } from "./Data_FirstLevelMissionTo
 import { MISSION_CROWD_AREAS } from "./Data_FirstLevelMissionCrowd.mjs";
 import { MISSION_TUNING as R } from "./Data_FirstLevelMission.mjs";
 import { MISSION_ROUTES, MISSION_ANCHORS as A, MISSION_PLACEMENT } from "./Data_FirstLevelMissionLayout.mjs";
+import { MID_TUNING as MID, MidDraftKind } from "./Data_Tuning_FirstLevelMid.mjs";
 export function MissionRouteLength(route) {
   return route.slice(1).reduce((sum, p, i) => sum + Math.hypot(p.x - route[i].x, p.z - route[i].z), 0);
 }
@@ -102,10 +103,13 @@ export class FirstLevelMissionColumn {
       health: 100,
       visible: false,
     }));
+    // 11 的四类人流里的两类：牛车与马车。差别只是白盒外形（Data_Tuning_FirstLevelMid.draft），
+    // 不是性能 —— Notion 的口径是「牛马车只是道路条件允许时的一段接运工具」。
     this.vehicles = MISSION_PLACEMENT.cartBays.map((point, i) => ({
       id: `EvacCart${i}`,
       ...point,
       yaw: Math.PI,
+      draft: MidDraftKind("bay", i),
       load: [],
       departed: false,
       progress: 0,
@@ -117,9 +121,15 @@ export class FirstLevelMissionColumn {
     this.traffic = Array.from({ length: 3 }, (_, i) => ({
       id: `SouthCart${i}`,
       progress: i * 32,
+      draft: MidDraftKind("traffic", i),
       ...MissionCarryRoutePoint(MISSION_ROUTES.southTraffic, i * 32),
       visible: false,
     }));
+    // 12：威胁没解除以前装载额度是 0（由 Script_FirstLevelTransferCart 每帧写）。
+    // 其余阶段不设限。
+    this.loadAllowance = Infinity;
+    // 11 接运点现场能走的伤员（归 Script_FirstLevelTransferCart 管，View 照它画）。
+    this.transferWalkers = [];
     this.active = false;
     this.gateOpen = false;
     this.loading = false;
@@ -233,6 +243,110 @@ export class FirstLevelMissionColumn {
     this.RequestBearer(litter);
     return true;
   }
+  // ---------------------------------------------------------------------------
+  // 08/10 停进遮挡与放行（Script_FirstLevelVillageBlock 调）
+  // ---------------------------------------------------------------------------
+  /**
+   * 停到自己的车位上：离开后送线，横着走到 LitterHoldCover 后面。
+   * 走完 `entry.held = true`，位置就钉在车位上不再漂。
+   */
+  UpdateHold(entry, dt, SafeAt) {
+    const slot = entry.holdSlot;
+    if (!slot) return false;
+    const distance = Math.hypot(slot.x - entry.x, slot.z - entry.z);
+    if (distance > MID.litterHoldArrivalM && SafeAt(entry)) {
+      const speed = entry.bearers ? this.LitterPace(entry, R.litterSpeedMps) : R.walkSpeedMps;
+      const step = Math.min(1, (dt * speed) / (distance || 1));
+      entry.x += (slot.x - entry.x) * step;
+      entry.z += (slot.z - entry.z) * step;
+      entry.yaw = Math.atan2(entry.x - slot.x, entry.z - slot.z);
+      entry.state = "moving";
+      entry.held = false;
+    } else {
+      entry.state = "waiting";
+      entry.held = distance <= MID.litterHoldArrivalM;
+      if (entry.held && Number.isFinite(slot.yaw)) entry.yaw = slot.yaw;
+    }
+    return true;
+  }
+  /**
+   * 放行：每个人从自己停的地方接回后送线（courtyardBypass 的接口点开始）。
+   * 不改 progress 直接传送 —— 那会让整队人横着瞬移到路线上。
+   */
+  ReleaseHold(rejoinIndex) {
+    const tail = this.route.slice(Math.max(0, rejoinIndex)).map((point) => ({ ...point }));
+    let released = 0;
+    for (const entry of [...this.litters, ...this.walkers]) {
+      if (!entry.holdSlot) continue;
+      entry.holdSlot = null;
+      entry.held = false;
+      entry.joinRoute = [{ x: entry.x, z: entry.z }, ...tail];
+      entry.joinLength = MissionRouteLength(entry.joinRoute);
+      entry.joinProgress = 0;
+      entry.progress = Math.max(0, this.length - entry.joinLength);
+      released++;
+    }
+    return released;
+  }
+  Holding() {
+    return [...this.litters, ...this.walkers].some((entry) => entry.holdSlot);
+  }
+  // ---------------------------------------------------------------------------
+  // 12/13 老周那辆车（Script_FirstLevelTransferCart 调）
+  // ---------------------------------------------------------------------------
+  /** 轮到老周时把下一辆空车叫到上车位旁边的车位上。 */
+  ReserveBoardingCart(bay) {
+    if (this.zhouRideCart) return this.zhouRideCart;
+    const cart = this.vehicles.find((entry) => !entry.departed && !entry.overturned && !entry.riding);
+    if (!cart) return null;
+    cart.approachRoute = [{ x: cart.x, z: cart.z }, { x: bay.x, z: cart.z }, { x: bay.x, z: bay.z }];
+    cart.approachProgress = 0;
+    cart.state = "approaching";
+    this.zhouRideCart = cart;
+    return cart;
+  }
+  /** 老周真的被装上那辆车（他要跟车走，不是躺在原地看着车开）。 */
+  BoardZhouOnCart() {
+    const cart = this.zhouRideCart;
+    const zhou = this.zhou;
+    if (!cart || !zhou) return null;
+    if (!cart.load.includes(zhou.id)) {
+      cart.load.push(zhou.id);
+      this.loadEvents.push({ litter: zhou.id, cart: cart.id, zhou: true });
+    }
+    zhou.loaded = true;
+    zhou.state = "loaded";
+    zhou.liftFraction = 1;
+    return cart;
+  }
+  /** 13 卸回担架：先从车上摘下来，位置交给卸人那一段（有过程，不是瞬间）。 */
+  BeginZhouUnload(target) {
+    const cart = this.zhouRideCart, zhou = this.zhou;
+    if (!zhou) return false;
+    if (cart) cart.load = cart.load.filter((id) => id !== zhou.id);
+    zhou.loaded = false;
+    zhou.state = "unloading";
+    zhou.unloadTarget = { ...target };
+    zhou.unloadedFromCart = true;   // 位置由 TransferCart.UpdateUnload 自己插值
+    return true;
+  }
+  /**
+   * 13 车列与人群被迫散开：离桥头路中线 marginM 以外，各自就近往两边让。
+   * 走的是和 08 停车位同一套 holdSlot —— 「停到那个点上不再漂」是同一件事。
+   */
+  ScatterFromRoad(marginM) {
+    const road = MID.bridgeHeadPoint.x;
+    let scattered = 0;
+    for (const entry of [...this.litters, ...this.walkers]) {
+      if (entry.health <= 0 || entry.evacuated || entry.loaded) continue;
+      if (Math.abs(entry.x - road) >= marginM) continue;
+      const side = entry.x <= road ? -1 : 1;
+      entry.holdSlot = { x: road + side * marginM, z: entry.z, yaw: entry.yaw || 0 };
+      entry.held = false;
+      scattered++;
+    }
+    return scattered;
+  }
   RetreatLimit(point) {
     const index = this.route.findIndex((p) => Math.hypot(p.x - point.x, p.z - point.z) < 0.1);
     return index < 0
@@ -294,7 +408,8 @@ export class FirstLevelMissionColumn {
   }
   StartRetreat() {
     if (this.mode === "retreat") return;
-    for(const entry of [...this.litters,...this.walkers])entry.staging=null;
+    // 收拢段重新排队：08 的停车位与 13 的散开点到这里都作废。
+    for(const entry of [...this.litters,...this.walkers]){entry.staging=null;entry.holdSlot=null;entry.held=false;}
     this.mode = "retreat";
     this.loading = false;
     const route = [
@@ -476,6 +591,7 @@ export class FirstLevelMissionColumn {
         continue;
       if (litter.unloadedFromCart && this.mode !== "retreat") continue;
       if (this.BearerShort(litter)) continue;
+      if(this.UpdateHold(litter,dt,SafeAt))continue;
       if(this.UpdateStaging(litter,this.litters.indexOf(litter),dt,moving,SafeAt))continue;
       const ownRoute = litter.joinRoute || this.route,
         ownLength = litter.joinLength || this.length;
@@ -494,11 +610,14 @@ export class FirstLevelMissionColumn {
       if (canMove) litter[progressKey] = Math.min(limit, litter[progressKey] + pace * dt);
       const at = MissionCarryRoutePoint(ownRoute, litter[progressKey]);
       Object.assign(litter, at, { state: canMove ? "moving" : "waiting" });
-      if (!litter.joinRoute && litter.progress > this.GateProgress()) litter.passedGate = true;
+      // 先把 joinRoute 的进度折算回主线，再判过没过院门 —— 10 放行之后每一副担架
+      // 都是从自己停的地方接回来的（joinRoute），老写法让它们永远 passedGate=false。
       if (litter.joinRoute) litter.progress = this.length - (ownLength - litter.joinProgress);
+      if (this.mode === "south" && litter.progress > this.GateProgress()) litter.passedGate = true;
     }
     for (const [i, walker] of this.walkers.entries()) {
       if (!walker.visible || walker.health <= 0 || walker.assigned || walker.treating || walker.rescueTarget) continue;
+      if(this.UpdateHold(walker,dt,SafeAt))continue;
       if(this.UpdateStaging(walker,i,dt,moving,SafeAt,true))continue;
       const route = walker.joinRoute || this.route,
         key = walker.joinRoute ? "joinProgress" : "progress";
@@ -522,7 +641,9 @@ export class FirstLevelMissionColumn {
     if(this.loading)this.UpdateLoadingBay(dt);
     if (this.loading && routeSafe) this.Load(dt);
     for (const cart of this.vehicles) {
-      if (cart.departed && !cart.overturned) {
+      // 顺子坐着的那一辆由 Script_FirstLevelTransferCart 沿 cartRide 驱动，这里不再推它，
+      // 也不许把车上的人当成「已后送」抹掉 —— 老周还要在 13 被卸回担架。
+      if (cart.departed && !cart.overturned && !cart.riding) {
         cart.progress = Math.min(cart.routeLength, cart.progress + dt * R.cartSpeedMps);
         Object.assign(cart, MissionCarryRoutePoint(cart.route, cart.progress));
       }
@@ -533,7 +654,7 @@ export class FirstLevelMissionColumn {
         litter.x = cart.x + Math.cos(cart.yaw) * side - Math.sin(cart.yaw) * back;
         litter.z = cart.z - Math.sin(cart.yaw) * side - Math.cos(cart.yaw) * back;
         litter.yaw = cart.yaw;
-        if (cart.departed && cart.progress >= cart.routeLength) {
+        if (cart.departed && !cart.riding && cart.progress >= cart.routeLength) {
           litter.visible = false;
           litter.evacuated = true;
         }
@@ -644,10 +765,10 @@ export class FirstLevelMissionColumn {
     }
   }
   UpdateLoadingBay(dt) {
-    const cart = this.vehicles.find(cart => !cart.departed && !cart.overturned);
+    const cart = this.vehicles.find(cart => !cart.departed && !cart.overturned && !cart.riding);
     if (!cart || cart.state === "loading") return;
     const previous = this.vehicles[this.vehicles.indexOf(cart) - 1];
-    if (previous && previous.progress < R.cartClearanceM) return;
+    if (previous && !previous.riding && previous.progress < R.cartClearanceM) return;
     cart.state = "approaching";
     cart.approachProgress = Math.min(MissionRouteLength(cart.approachRoute),
       cart.approachProgress + dt * R.cartApproachSpeedMps);
@@ -655,7 +776,7 @@ export class FirstLevelMissionColumn {
     if (cart.approachProgress >= MissionRouteLength(cart.approachRoute)) cart.state = "loading";
   }
   Depart(cart) {
-    if (cart.departed || !cart.load.length) return;
+    if (cart.departed || cart.riding || !cart.load.length) return;
     cart.departed = true;
     cart.state = "departing";
     cart.route = [{ x: cart.x, z: cart.z }, { x: 76, z: 145 }, { x: 76, z: 174 }, { x: 76, z: 198 }];
@@ -669,13 +790,17 @@ export class FirstLevelMissionColumn {
     return this.QueueAhead() === 0 && ahead.filter(litter => departing.includes(litter.id)).length >= required;
   }
   Load(dt) {
+    // 12：威胁没解除，额度就是 0 —— 装载与出发一起被压住（契约 §2）。
+    if (this.loadEvents.length >= (this.loadAllowance ?? Infinity)) return;
     const cart = this.vehicles.find(
-      (cart) => !cart.departed && !cart.overturned && cart.state === "loading" && cart.load.length < R.cartCapacity,
+      (cart) => !cart.departed && !cart.overturned && !cart.riding && cart.state === "loading" && cart.load.length < R.cartCapacity,
     );
     if (!cart) return;
     const next = this.litters.find((litter) => !litter.loaded && !litter.evacuated && litter.health > 0);
     // A reduced surviving queue must not wait forever for passengers who died.
-    if (cart.load.length && this.QueueAhead() === 0 && !this.TransferReady() && cart.load.length < R.cartCapacity) {
+    // 老周那一辆不走这条早发车：他还要被抬上来，顺子还要跟着上去。
+    if (cart !== this.zhouRideCart
+      && cart.load.length && this.QueueAhead() === 0 && !this.TransferReady() && cart.load.length < R.cartCapacity) {
       this.Depart(cart);
       return;
     }
@@ -713,8 +838,9 @@ export class FirstLevelMissionColumn {
       medic.crouch=medic.careProgress>=length;
       if(!medic.crouch)return;
     }
-    // Zhou reaches the same loading bay physically; the air raid interrupts his lift aboard.
-    if (next.zhou) return;
+    // 2026.09.19 第二波：老周真的被抬上那辆预留的牛/马车（Notion 12「顺子随老周所在
+    // 牛车或马车缓慢离开」）。**只**允许上那一辆 —— 别的车轮不到他。
+    if (next.zhou && cart !== this.zhouRideCart) return;
     next.loadOrigin ||= { x: next.x, z: next.z };
     next.loadTime = (next.loadTime || 0) + dt;
     const duration = R.vehicleLoadSeconds / R.cartCapacity;
@@ -730,7 +856,7 @@ export class FirstLevelMissionColumn {
     next.state = "loaded";
     cart.load.push(next.id);
     this.loadEvents.push({ litter: next.id, cart: cart.id });
-    if (cart.load.length === R.cartCapacity) this.Depart(cart);
+    if (cart.load.length === R.cartCapacity && cart !== this.zhouRideCart) this.Depart(cart);
   }
   Blast(point, radius, damage, Exposed = () => true) {
     for (const litter of this.litters) {
@@ -753,7 +879,10 @@ export class FirstLevelMissionColumn {
     this.loading = false;
     if(this.triageMedic){this.triageMedic.treating=false;this.triageMedic.crouch=false;}
     this.triageMedic=null;
-    const cart = this.vehicles.find((cart) => !cart.departed) || this.vehicles.at(-1);
+    // 翻的那一辆不能是顺子坐着的那一辆：13 要求那辆车停下来、把人卸回担架，
+    // 不是把玩家连人带车掀翻。翻车与受惊牲口是**路面受损堵塞**的那一部分。
+    const cart = this.vehicles.find((cart) => !cart.departed && !cart.riding)
+      || this.vehicles.filter((cart) => !cart.riding).at(-1) || this.vehicles.at(-1);
     cart.overturned = true;
     const team={x:cart.x-Math.sin(cart.yaw)*4.8,z:cart.z-Math.cos(cart.yaw)*4.8};
     const route=[team,{x:94,z:134},{x:119,z:169}];
@@ -765,8 +894,9 @@ export class FirstLevelMissionColumn {
       litter.bearers[1] = 0;
       litter.health = Math.min(litter.health, 30);
     }
-    this.zhou.bearers[1] = 0;
-    this.zhou.state = "critical";
+    // 老周这时候在车上（12 他真的被装了上去）。把他摔成 critical 会把 13 的
+    // 「有过程地卸回担架」那一段顶掉 —— 车上的人由 TransferCart.UpdateUnload 处理。
+    if (!this.zhou.loaded) { this.zhou.bearers[1] = 0; this.zhou.state = "critical"; }
     for (const [i, id] of cart.load.entries()) {
       const litter = this.litters.find((l) => l.id === id);
       litter.loaded = false;

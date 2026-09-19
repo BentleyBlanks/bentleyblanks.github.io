@@ -76,4 +76,6 @@ export const TEXT = Object.freeze({
   "firstLevel.transition.night.text": "队伍沿公路向北，进滕城北门。",
 });
 export const DYNAMIC_PREFIXES = ["firstLevel.return.", "firstLevel.interaction.", "firstLevel.guide.", "firstLevel.hint.", "firstLevel.leader.", "firstLevel.transition."];
-export const GATED_MODULES = ["Script_FirstLevelMissionRuntime.mjs", "Script_FirstLevelMissionVoice.mjs", "Script_FirstLevelOpening.mjs", "Script_FirstLevelLeaderGuide.mjs"];
+export const GATED_MODULES = ["Script_FirstLevelMissionRuntime.mjs", "Script_FirstLevelMissionVoice.mjs", "Script_FirstLevelOpening.mjs", "Script_FirstLevelLeaderGuide.mjs",
+  // 第二波 Mid 包（阶段 8–14）的两个玩法模块：零玩家可见中文，台词一律走台词表。
+  "Script_FirstLevelVillageBlock.mjs", "Script_FirstLevelTransferCart.mjs"];
