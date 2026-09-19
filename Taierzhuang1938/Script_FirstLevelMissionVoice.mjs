@@ -1,6 +1,6 @@
 import { CARRIAGE_SOUND } from "./Data_FirstLevelCarriageSound.mjs";
 import { MissionVoiceTimeline } from "./Data_FirstLevelMissionVoiceTiming.mjs";
-import { MISSION_DIALOGUE, MISSION_VOICE_CAST } from "./Data_FirstLevelMissionDialogue.mjs";
+import { MISSION_DIALOGUE, MISSION_VOICE_CAST, MissionVoiceSubtitle } from "./Data_FirstLevelMissionDialogue.mjs";
 import { Localize } from "./Script_Text.mjs";
 import { FirstLevelVoiceTextId, FirstLevelCastTextId } from "./Script_TextIds.mjs";
 import { SampleSpeechEnvelope } from "./Script_SpeechEnvelope.mjs";
@@ -15,6 +15,9 @@ export class FirstLevelMissionVoice {
     this.manifest = { cues: {} };
     this.loaded = false;
     this.errors = [];
+    // 缺录音的 cue 走字数估时长；未知 cue 直接拒收。两者都只警告一次。
+    this.missing = new Set();
+    this.unknown = new Set();
   }
   async Load() {
     try {
@@ -41,8 +44,14 @@ export class FirstLevelMissionVoice {
   }
   Enqueue(id, { urgent = false } = {}) {
     if (!id || this.played.has(id) || this.queue.includes(id)) return false;
+    // 运行时可能还在引用已经下线的 cue id：拒收并警告一次，绝不抛异常也不排进队列。
+    const cue = MISSION_DIALOGUE.find(entry => entry.id === id);
+    if (!cue) {
+      if (!this.unknown.has(id)) { this.unknown.add(id); console.warn(`FirstLevelMissionVoice: unknown cue ${id}`); }
+      return false;
+    }
     // Narrative events preempt optional reminders, never the other way round.
-    if(!MISSION_DIALOGUE.find(cue=>cue.id===id)?.guidance)this.CancelGuidance();
+    if(!cue.guidance)this.CancelGuidance();
     if (urgent) {
       this.StopParallel();
       this.audio.StopStoryVoice();
@@ -110,15 +119,15 @@ export class FirstLevelMissionVoice {
       || this.manifest.cues[cue.id]?.seconds
       || cue.lines.reduce((sum,line)=>sum+Math.max(1.1,line.text.length/5.2),0);
   }
+  // 每句开始发一条通用事件 Line，玩法包靠它把动作对到台词上（缺录音时照发）。
   DialogueLine(track, index) {
-    if ((!track.cue.id.startsWith("Train")&&track.cue.id!=="WreckImpact") || index === track.dialogueIndex) return;
-    const Notify = (lineIndex, active) => {
-      if (lineIndex < 0 || lineIndex == null) return;
-      const [start,end] = track.plan.lines[lineIndex];
-      this.Event?.("TrainDialogueLine", track.cue.id, {who:track.cue.lines[lineIndex].who,
-        index:lineIndex,start,end,sourceTime:track.sourceTime,active});
-    };
-    Notify(track.dialogueIndex,false); track.dialogueIndex=index; Notify(index,true);
+    if (index === track.dialogueIndex) return;
+    track.dialogueIndex = index;
+    if (index == null || index < 0) return;
+    const [start, end] = track.plan.lines[index];
+    this.Event?.("Line", track.cue.id, {
+      who: track.cue.lines[index].who, index, start, end, sourceTime: track.sourceTime,
+    });
   }
   StopParallel() {
     for (const track of this.current?.parallel || []) {
@@ -174,7 +183,7 @@ export class FirstLevelMissionVoice {
     const rows=tracks.filter(track=>track.index>=0).map(track=>{
       const line=track.cue.lines[track.index],at=listener&&this.Position?.(track.cue,line);
       return {speaker:Localize(FirstLevelCastTextId(line.who),MISSION_VOICE_CAST[line.who][0]),
-        text:Localize(FirstLevelVoiceTextId(track.cue.id,track.index),line.text),
+        text:Localize(FirstLevelVoiceTextId(track.cue.id,track.index),MissionVoiceSubtitle(track.cue,track.index)),
         emphasis:track.cue.subtitleEmphasis||"lead",
         distanceM:at?Math.hypot(at.x-listener.x,at.y-listener.y,at.z-listener.z):null,
         started:track.started,seconds:Math.max(.05,track.plan.lines[track.index][1]-track.sourceTime)};
@@ -185,12 +194,13 @@ export class FirstLevelMissionVoice {
   }
   PlaySegment() {
     const current = this.current, segment = current.plan.segments[current.segmentIndex];
-    const played = this.audio.PlayStoryVoice(`Mission${current.cue.id}`, {
+    // 缺录音的 cue 不碰音频引擎，但字幕、Line 事件和 Done 照常按估算时长走完。
+    const played = current.recorded ? this.audio.PlayStoryVoice(`Mission${current.cue.id}`, {
       position: this.Position?.(current.cue,current.cue.lines[Math.max(0,current.index)]),
-      environmentGain:current.cue.id.startsWith("Train")?CARRIAGE_SOUND.speechBedGain:CARRIAGE_SOUND.escapeSpeechBedGain,
+      environmentGain:CARRIAGE_SOUND.escapeSpeechBedGain,
       offset: current.sourceTime,
       maxDuration: segment.end-current.sourceTime,
-    });
+    }) : null;
     current.clock = played?.voice && Number.isFinite(this.Clock?.()) ? (played.voice.t ?? this.Clock()) : null;
     current.voice = played?.voice || null;
     current.clockSource = current.sourceTime;
@@ -210,7 +220,12 @@ export class FirstLevelMissionVoice {
       if (!cue) return;
       const total=this.Duration(cue);
       const plan=MissionVoiceTimeline(cue,total);
-      this.current={cue,plan,total,time:0,index:-1,sourceTime:0,segmentIndex:0,
+      const recorded=!!this.manifest.cues[cue.id];
+      if(!recorded&&!this.missing.has(cue.id)){
+        this.missing.add(cue.id);
+        console.warn(`FirstLevelMissionVoice: no recording for ${cue.id}; subtitles run on the estimated length`);
+      }
+      this.current={cue,plan,total,time:0,index:-1,sourceTime:0,segmentIndex:0,recorded,
         phase:"waiting",wait:plan.segments[0].wait||0,events:new Set(),parallel:[],dialogueIndex:-1};
       this.played.add(cue.id);
     }
@@ -248,7 +263,7 @@ export class FirstLevelMissionVoice {
       current.index=index;
       const line=current.cue.lines[index];
       this.hud.Say(Localize(FirstLevelCastTextId(line.who),MISSION_VOICE_CAST[line.who][0]),
-        Localize(FirstLevelVoiceTextId(current.cue.id,index),line.text),
+        Localize(FirstLevelVoiceTextId(current.cue.id,index),MissionVoiceSubtitle(current.cue,index)),
         Math.max(.05,Math.min(segment.end,current.plan.lines[index][1])-current.sourceTime));
     }
     if(current.sourceTime>=segment.end){
@@ -286,6 +301,7 @@ export class FirstLevelMissionVoice {
     return {
       loaded:this.loaded,paused:this.paused,available:Object.keys(this.manifest.cues).length,
       required:MISSION_DIALOGUE.length,played:[...this.played],finished:[...this.finished],
+      missing:[...this.missing],unknown:[...this.unknown],
       current:this.current?.cue.id||null,queue:[...this.queue],errors:[...this.errors],
       segment:this.current?.plan.segments[this.current.segmentIndex]?.id||null,
       playbackPhase:this.current?.phase||null,sourceTime:this.current?.sourceTime||0,

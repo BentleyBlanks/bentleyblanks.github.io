@@ -1,39 +1,32 @@
 import { MISSION_VOICE_ALIGNMENT } from "./Data_FirstLevelMissionVoiceAlignment.mjs";
-import { CARRIAGE_SOUND } from "./Data_FirstLevelCarriageSound.mjs";
-// Separate exchanges wait for world facts; continuous dialogue plays intact.
+// 一段连续对白只有一条录音、一个区间；动作打断处不拆音频，只在录音里留空当并打事件。
+// 2026-09-19 重构：军列相关的 gate / parallel / 事件全部下线。
 export const MISSION_VOICE_TIMING = Object.freeze({});
-export function MissionVoiceTimeline(cue,total) {
-  const aligned=MISSION_VOICE_ALIGNMENT[cue.id];
-  const weights=cue.lines.map(line=>Math.max(4,line.text.length));
-  const sum=weights.reduce((a,b)=>a+b,0);let cursor=0;
-  const lines=aligned?.lines.length===cue.lines.length?aligned.lines:weights.map(weight=>{
-    const start=cursor;cursor+=total*weight/sum;return [start,cursor];
+// 具名事件（玩法包按这些名字接动作；每句开始另有通用的 "Line" 事件）：
+//   BunkerBlast                01 BunkerBanter 末句被近爆打断的那一刻（录音在此戛然而止）
+//   RescueHeave                02 RescueLift「一、二——起！」的「起」
+//   BorrowLightMatchesPocketed 06 BorrowLight 第一处动作空当：顺子把火柴往兜里一收
+//   BorrowLightCigaretteOffered06 BorrowLight 第二处动作空当：老周摸出烟包递一根过去
+//   AircraftDiveOrder          14 AircraftReturn「先下沟！莫停车边！」句首（沿用旧 id）
+//   ZhouNoAnswer               17 ZhouDeath 第一句之后那段「……」，没人应声
+export function MissionVoiceTimeline(cue, total) {
+  const aligned = MISSION_VOICE_ALIGNMENT[cue.id];
+  const weights = cue.lines.map((line) => Math.max(4, line.text.length));
+  const sum = weights.reduce((a, b) => a + b, 0);
+  let cursor = 0;
+  const lines = aligned?.lines.length === cue.lines.length ? aligned.lines : weights.map((weight) => {
+    const start = cursor; cursor += total * weight / sum; return [start, cursor];
   });
-  const segment={id:"WholeExchange",start:0,end:total,wait:0};let parallel,tail=0;
-  if(cue.id==="TrainMeal"){
-    segment.id="ShareFood";segment.wait=4;tail=1;
-    segment.events=[{at:lines[1][1],id:"TrainFoodReceived"},
-      ...CARRIAGE_SOUND.reactions.map(reaction=>({at:lines[reaction.line][1],id:reaction.id})),
-      {at:lines[CARRIAGE_SOUND.uneasyLine][0],id:"CarriageUneasy"}];
-  }
-  if(cue.id==="TrainPack"){
-    segment.id="PrivatePacking";segment.gate="trainPackNear";
-    parallel=[{id:"TrainBanter",at:5,maxDistance:4}];
-  }
-  if(cue.id==="WreckImpact")segment.gate="trainNearShellImpact";
-  if(cue.id==="TrainShelling"){
-    segment.id="LuoRescue";segment.gate="trainLuoStanding";
-    const start=lines[0][0],end=lines[1][1],grip=lines[1][0];
-    const lift=aligned?.lines.length===2&&aligned.markers?.rescueLift||grip+(end-grip)*.18;
-    const steady=aligned?.lines.length===2&&aligned.markers?.rescueFeet||grip+(end-grip)*.7;
-    segment.events=[{at:start,id:"TrainRescue"},{at:grip,id:"TrainRescueGrip"},
-      {at:lift,id:"TrainRescueLift"},{at:steady,id:"TrainRescueFeet"},{at:steady,id:"TrainRescueSteady"}];
-  }
-  if(cue.id==="WreckExit")segment.gate="luoRescueComplete";
-  if(cue.id==="EscapeWhisper"){segment.wait=1;tail=2;}
-  if(cue.id==="AircraftReturn")segment.events=[{at:lines[2][0],id:"AircraftDiveOrder"}];
-  // Room ambush: the litter stab lands on 老周's own line, the squad orders on the last 罗班长 sentence.
-  if(cue.id==="RoomAmbush")segment.events=[{at:lines[2][0],id:"AmbushZhouLine"}];
-  if(cue.id==="RoomAmbushCleared")segment.events=[{at:lines[3][0],id:"AmbushLuoOrders"}];
-  return {lines,segments:[segment],tail,...(parallel?{parallel}:{})};
+  const segment = { id: "WholeExchange", start: 0, end: total, wait: 0 };
+  const tail = 0;
+  const Late = (index, fraction) => lines[index][0] + (lines[index][1] - lines[index][0]) * fraction;
+  if (cue.id === "BunkerBanter") segment.events = [{ at: lines[5][1], id: "BunkerBlast" }];
+  if (cue.id === "RescueLift") segment.events = [{ at: Late(2, .82), id: "RescueHeave" }];
+  if (cue.id === "BorrowLight") segment.events = [
+    { at: lines[4][1], id: "BorrowLightMatchesPocketed" },
+    { at: lines[5][1], id: "BorrowLightCigaretteOffered" },
+  ];
+  if (cue.id === "AircraftReturn") segment.events = [{ at: lines[1][0], id: "AircraftDiveOrder" }];
+  if (cue.id === "ZhouDeath") segment.events = [{ at: lines[0][1], id: "ZhouNoAnswer" }];
+  return { lines, segments: [segment], tail };
 }
