@@ -10,6 +10,10 @@ import { OPENING } from "./Data_FirstLevelOpening.mjs";
 export function ApplyFirstLevelStageJump(runtime, value, { midCutscenes = false } = {}) {
   const r = runtime, saved = BuildFirstLevelCheckpoint(value), n = saved.phase.number;
   r.debugStart = {number:n,id:saved.phase.id};
+  // 夜天空是模块级的（Script_Main 的 cutsceneSky），重建切片不会把它放下 ——
+  // 从 18 的夜行军跳回白天那几步，不还原就会得到「夜的天、白天的地」。
+  // 空间那一侧（铁路桥、北门夜景片）跟着事实自己退回去，见 MISSION_SCENARIO_SIGNALS。
+  r.RestoreSky?.();
   if (n === 1) return;
   r.hud.briefTimer = 0; r.hud.pendingTitle = null; r.hud.el.brief.classList.remove("on");
   r.voice.queue = []; r.voice.current = null;

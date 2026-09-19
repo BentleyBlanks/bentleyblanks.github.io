@@ -9,7 +9,7 @@
 import assert from "node:assert/strict";
 import { MISSION_ANCHORS as A, MISSION_ROUTES as Routes,
   MISSION_LAYOUT as Layout } from "./Data_FirstLevelMissionLayout.mjs";
-import { MISSION_RECEPTION_SPACE as Reception, MISSION_REARGUARD_POCKETS as Pockets,
+import { MISSION_RECEPTION_SPACE as Reception, MISSION_REGROUP_CORRIDORS as Corridors,
   MISSION_STAGE_ANCHORS as S, MISSION_STAGE_ROUTES as StageRoutes,
   MISSION_NORTH_RIVER as River, MISSION_RAIL_BRIDGE as RailBridge,
   MISSION_TOPOLOGY_VERSION } from "./Data_FirstLevelMissionTopology.mjs";
@@ -193,15 +193,36 @@ assert.ok(Layout.scenario.states.some((state) => state.signal === "BunkerCollaps
   "the bunker has an authored collapsed state");
 assert.ok(Layout.scenario.states.some((state) => state.signal === "NightGateShown"),
   "the closing north-gate slice hangs off its own signal");
-for (const pocket of Pockets) {
-  assert.ok(pocket.route.some((p) => Distance(p, pocket.anchor) < 0.01),
-    `${pocket.id} keeps its anchor on the route`);
-  assert.deepEqual(MISSION_RETURN_ROUTES[pocket.id], pocket.route,
+// 15（降压段）的三条走廊：回头警告跟着实际折线，不按东西坐标抄近路。
+// 旧的撤退三连战（RetreatFirst/RetreatWall/RetreatYard）已随采用稿下线，
+// 三个 id 换成 15A/15B/15C 的内部步骤名（契约 §1）。
+assert.deepEqual(Corridors.map((entry) => entry.id), ["Regroup", "WallPath", "ReceptionGate"],
+  "the regroup corridors are keyed by the live 15A/15B/15C steps");
+for (const corridor of Corridors) {
+  assert.ok(corridor.route.length >= 2, `${corridor.id} has a real corridor`);
+  assert.deepEqual(MISSION_RETURN_ROUTES[corridor.id], corridor.route,
     "return warning follows the actual bent route");
-  const next = MissionRouteNextIndex(Routes.evacuation, pocket.anchor);
-  assert.ok(Distance(Routes.evacuation[next], pocket.anchor) < 0.01,
+  if (!corridor.onEvacuation) continue;
+  assert.ok(corridor.route.some((p) => Distance(p, corridor.onEvacuation) < 0.01),
+    `${corridor.id} starts on its own corridor`);
+  const next = MissionRouteNextIndex(Routes.evacuation, corridor.onEvacuation);
+  assert.ok(Distance(Routes.evacuation[next], corridor.onEvacuation) < 0.01,
     "pursuit never selects an unrelated point by east/west coordinate");
 }
+// 15C 的夹道出口离开撤离线拐向院门，但仍在同一条靠墙走廊里（不是横穿院子抄近路）。
+for (const point of Corridors.at(-1).route) {
+  const nearest = Math.min(...Routes.evacuation.map((p) => Distance(p, point)));
+  assert.ok(nearest < 12, `the yard-gate corridor stays in the wall lane (${point.x},${point.z})`);
+}
+// 18 的三段同样按折线报「返回」，不许退化成「上一步目标 → 这一步目标」两点直线。
+for (const [id, route] of [["BridgeOrders", StageRoutes.toBridge],
+  ["BridgeWithdraw", StageRoutes.bridgeWithdraw], ["NightMarch", StageRoutes.nightMarch]])
+  assert.deepEqual(MISSION_RETURN_ROUTES[id], route, `${id} keeps its authored bent route`);
+// 06 从北头的集束弹沟一路接回集结处（ordersRejoin 的尾段就是 collectionReturn）。
+assert.deepEqual(MISSION_RETURN_ROUTES.Orders, Routes.ordersRejoin,
+  "the orders rally corridor reaches back into the bundle trench");
+assert.deepEqual(Routes.ordersRejoin.slice(-StageRoutes.collectionReturn.length),
+  StageRoutes.collectionReturn, "and its tail is the authored collection return");
 // 接收院仍然是一个院子。
 const bounds = Reception.bounds;
 const Inside = (p) => p.x >= bounds.minX && p.x <= bounds.maxX && p.z >= bounds.minZ && p.z <= bounds.maxZ;
@@ -211,6 +232,6 @@ assert.ok(!Inside(A.rearExit) && A.rearExit.x < bounds.minX, "the back door lead
 assert.ok(S.receptionGate.x > bounds.maxX && Math.abs(S.receptionGate.z - Reception.entry.z) < 2,
   "the yard gate stands on the east wall, on the line the column already walks");
 assert.ok(Reception.wardThreshold.z === Reception.ward.maxZ, "the threshold is the ward's own doorway");
-console.log("ok bridge lifecycles, bunker/night scenario states, rearguard pockets and one reception compound");
+console.log("ok bridge lifecycles, bunker/night scenario states, 15/18 return corridors and one reception compound");
 
 console.log("ok Notion 2026.09.19 topology: four zones, southward progression, metric adjacency, sight rules");

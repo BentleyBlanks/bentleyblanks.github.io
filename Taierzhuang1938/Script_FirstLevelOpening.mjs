@@ -1,6 +1,6 @@
 import { OPENING as C } from "./Data_FirstLevelOpening.mjs";
 import { MISSION_TUNING as R, OPENING_PERCEPTION as P } from "./Data_Tuning_FirstLevel.mjs";
-import { MISSION_ANCHORS as A } from "./Data_FirstLevelMissionLayout.mjs";
+import { MISSION_ANCHORS as A, MISSION_PLACEMENT as Place } from "./Data_FirstLevelMissionLayout.mjs";
 import { CLOSE_RANGE } from "./Data_Tuning_AiShooting.mjs";
 const Distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const Smooth=t=>{t=Math.max(0,Math.min(1,t));return t*t*(3-2*t)};
@@ -36,20 +36,24 @@ export class FirstLevelOpening {
     this.captives=[];
     this.reducedMotion=globalThis.matchMedia?.('(prefers-reduced-motion: reduce)');}
 
-  // --- 空间：掩蔽部一带的固定点（锚点派生，空间包改锚点这里自动跟着走） ---------
-  /** 班里人在掩蔽部与它后侧交通壕里的位置（PlaceSquad 用）。 */
+  // --- 空间：掩蔽部一带的固定点（全部取 MISSION_PLACEMENT.bunker，空间包改摆位这里跟着走） --
+  /**
+   * 班里人在掩蔽部与它后侧交通壕里的位置（PlaceSquad 用）。顺序与
+   * `PlaceSquad` 的名单一致：罗班长 / 幺娃 / 何有田 / 刘文财。
+   * 前两个是 02 掀木架、拉背包的那两位（`luoEntry` 还在后壁破口外，掀架时才挤进来）；
+   * 何有田在西边的后交通壕开火逼日兵转身；刘文财跟在他旁边。
+   */
   BunkerPost(slot){
-    const posts=[
-      {x:A.bunker.x+1.4,z:A.bunker.z+1.0},
-      {x:A.bunker.x-1.4,z:A.bunker.z+1.2},
-      {x:A.bunkerRear.x-1.2,z:A.bunkerRear.z},
-      {x:A.bunkerRear.x+1.2,z:A.bunkerRear.z},
-    ];
+    const b=Place.bunker;
+    const posts=[b.luoEntry,b.yaowaLift,b.heyoutianFire,{x:b.heyoutianFire.x+2.2,z:b.heyoutianFire.z-1.4}];
     return posts[slot]||posts.at(-1);
   }
-  /** 被木架压住的位置，与被拖出来之后站定的位置。 */
-  get TrappedPoint(){return {x:A.bunker.x,z:A.bunker.z};}
-  get RescueEnd(){return {x:A.bunker.x,z:A.bunker.z+2};}
+  /** 被木架压住的位置（两根压梁之间），与被拖出来之后站定的位置。 */
+  get TrappedPoint(){return {x:Place.bunker.player.x,z:Place.bunker.player.z};}
+  get RescueEnd(){
+    const b=Place.bunker;
+    return {x:(b.luoLift.x+b.yaowaLift.x)/2,z:(b.luoLift.z+b.yaowaLift.z)/2};
+  }
 
   // --- 01 受困 --------------------------------------------------------------
   BeginBunker(){
@@ -61,18 +65,20 @@ export class FirstLevelOpening {
     this.SpawnCaptives();
     r.Say("BunkerBanter");
   }
-  /** 门外那两名失去抵抗能力的川军（无武器、不还手）。 */
+  /** 门外那两名失去抵抗能力的川军（无武器、不还手）。摆位取 MISSION_PLACEMENT.bunker.captives。 */
   SpawnCaptives(){
     const r=this.r;
     if(this.captives.length)return;
-    for(const [i,offset] of [[-1,0],[1,-1.2]].entries()){
-      const actor=r.ai.Spawn("nra",A.bunkerKilling.x+offset[0]*1.1,A.bunkerKilling.z+offset[1],
+    for(const [i,spot] of Place.bunker.captives.entries()){
+      const actor=r.ai.Spawn("nra",spot.x,spot.z,
         {weapon:"HanYang",scriptedNoncombatant:true,squadId:"MissionBunkerCaptives"});
       if(!actor)continue;
-      actor.missionId=i===0?"BunkerCaptiveWounded":"BunkerCaptiveHelper";
+      actor.missionId=spot.id==="captiveWounded"?"BunkerCaptiveWounded":"BunkerCaptiveHelper";
       actor.unarmed=true;actor.health=R.bunkerCaptiveHealth;
+      actor.yaw=spot.yaw??0;
       r.MoveActor(actor,actor.position,0);
-      r.ai.SetStance(actor,i===0?2:1,Infinity,true);
+      // 腿断的那个躺着，扶人的那个半跪。
+      r.ai.SetStance(actor,spot.id==="captiveWounded"?2:1,Infinity,true);
       this.captives.push(actor);
     }
   }
@@ -82,7 +88,6 @@ export class FirstLevelOpening {
     if(!this.bunker||this.bunker.blastAt!=null)return;
     this.bunker.blastAt=r.time;
     this.blastAt=r.time;
-    r.battlefield.OpenGate?.("BunkerCollapsed");
     r.player.Suppress?.(.9);
     r.audio.Deafen?.(1.1);
     r.Record("bunkerCollapsed",{x:A.bunker.x,z:A.bunker.z});
@@ -112,7 +117,9 @@ export class FirstLevelOpening {
         const victim=this.captives[i],killer=r.enemies.get(i===0?"BunkerExecutionerA":"BunkerExecutionerB");
         if(killer?.alive){
           killer.scriptedNoncombatant=false;killer.missionDormant=false;killer.bayonetFixed=true;
-          r.MoveActor(killer,{x:victim?.position.x??A.bunkerKilling.x,z:(victim?.position.z??A.bunkerKilling.z)-1},R.walkSpeedMps);
+          // 下刀的站位取 MISSION_PLACEMENT.bunker.ijaKill（在俘虏北侧一米，挡不住玩家视线）。
+          r.MoveActor(killer,Place.bunker.ijaKill[i]||{x:victim?.position.x??A.bunkerKilling.x,
+            z:(victim?.position.z??A.bunkerKilling.z)-1},R.walkSpeedMps);
         }
         if(victim?.alive)victim.TakeHit?.(200,"torso",null,{melee:true});
       }
@@ -121,9 +128,11 @@ export class FirstLevelOpening {
     }
     // 日兵转向门内；同时后侧响起清理坍塌物的声音（何有田他们在挖）。
     if(since>=R.bunkerSearchAtS&&!r.Has("doorSearchStarted")){
+      // 转向门内：两个行刑兵走到门口那两点，跟进的那两人照旧压向门口。
+      let door=0;
       for(const actor of r.enemies.values())if(actor.missionEncounter==="bunkerAssault"&&actor.alive){
         actor.missionDormant=false;actor.scriptedNoncombatant=false;
-        r.MoveActor(actor,A.bunkerDoor,R.walkSpeedMps);
+        r.MoveActor(actor,Place.bunker.ijaDoor[door++]||A.bunkerDoor,R.walkSpeedMps);
       }
       r.Say("BunkerSearch");
       r.Say("ShunziCurse");

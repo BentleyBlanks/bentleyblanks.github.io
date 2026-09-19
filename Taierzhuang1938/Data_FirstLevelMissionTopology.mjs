@@ -38,11 +38,6 @@ export const MISSION_RECEPTION_SPACE = Object.freeze({
   // 这里只登记它在哪扇门上 ——「脚……慢点」是过这道坎。
   wardThreshold: {x:-26,z:243},
 });
-export const MISSION_REARGUARD_POCKETS = Object.freeze([
-  {id:"RetreatFirst",anchor:A.retreatA,route:MISSION_REAR_ROUTES.evacuation.slice(0,4)},
-  {id:"RetreatWall",anchor:A.retreatB,route:MISSION_REAR_ROUTES.evacuation.slice(3,7)},
-  {id:"RetreatYard",anchor:A.retreatC,route:MISSION_REAR_ROUTES.evacuation.slice(6)},
-]);
 
 // ---------------------------------------------------------------------------
 // 北沙河（2026.09.19 契约 §3）
@@ -192,3 +187,21 @@ export const MISSION_STAGE_ROUTES = Object.freeze({
   marchOut: [S.blastSafe,{x:-64,z:216},S.marchOut],
   nightMarch: [S.nightSpawn,S.northGateApproach,S.northGate,S.gateInside],
 });
+
+/**
+ * 阶段 15（降压段）三个内部步骤各自的折线走廊。
+ *
+ * 这张表原来是撤退三连战的三个后卫口袋（`RetreatFirst` / `RetreatWall` /
+ * `RetreatYard`）；2026.09.19 起 15 没有战斗了（契约 §2），留下来的作用只剩两个：
+ * 15A 的带路路线，以及「回头警告」跟着实际折线走 —— 撤离线在 (56,207) 连着两个
+ * 直角，按东西坐标找最近点会把人指向沟壁另一侧。
+ *
+ * `onEvacuation` 是这一段起点在撤离线上的那个顶点（15C 的夹道出口已经离开撤离线
+ * 拐进接收院院门，所以它没有）。
+ */
+export const MISSION_REGROUP_CORRIDORS = Object.freeze([
+  {id:"Regroup",route:MISSION_REAR_ROUTES.evacuation.slice(0,4),onEvacuation:A.retreatA},
+  {id:"WallPath",route:MISSION_STAGE_ROUTES.wallPath,onEvacuation:S.wallPathStart},
+  {id:"ReceptionGate",route:MISSION_STAGE_ROUTES.wallPath.slice(-3),onEvacuation:null},
+]);
+export const MissionRegroupCorridor=(id)=>MISSION_REGROUP_CORRIDORS.find(entry=>entry.id===id);

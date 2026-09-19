@@ -4,6 +4,7 @@ import { OPENING } from "./Data_FirstLevelOpening.mjs";
 import { FirstLevelOpening, OpeningRecoveryTime, SampleOpeningPerception } from "./Script_FirstLevelOpening.mjs";
 import { MISSION_AFTERMATH, FRONT_BREACHES, FRONT_ASSAULT, FRONT_COVER, FRONT_FIELD_MEN, FRONT_RESERVES, FRONT_ASSAULT_STARTS, FrontAssaultLane, FrontReserveLane } from "./Data_FirstLevelMissionFront.mjs";
 import { COVER } from "./Data_Tuning_AiCover.mjs";
+import { STANCE } from "./Data_Tuning_Player.mjs";
 import { TRAVERSAL } from "./Data_Traversal.mjs";
 import { CollectBulletNearMisses,ApplyBulletNearMisses } from "./Script_BallisticSuppression.mjs";
 import { MISSION_VOICE_ALIGNMENT } from "./Data_FirstLevelMissionVoiceAlignment.mjs";
@@ -17,7 +18,7 @@ import { FIRST_LEVEL_STAGES, ResolveFirstLevelStage, FirstLevelStageForStep } fr
 import { BuildFirstLevelCheckpoint } from "./Script_FirstLevelMissionCheckpoint.mjs";
 import { FirstLevelMissionColumn, MissionRouteNextIndex, MissionCarryRoutePoint, MissionGuideSpeed, MissionGuideRoute, MissionSquadRoute, MissionSquadPace } from "./Script_FirstLevelMissionColumn.mjs";
 import { MISSION_STAGES, MISSION_TUNING as R, FIRST_LEVEL_MISSION_PHASE, MISSION_TACTICS, MISSION_ENCOUNTERS, MISSION_PURSUIT_ROUTE, MISSION_TRANSFER_THREATS } from "./Data_FirstLevelMission.mjs";
-import { MISSION_STAGE_ROUTES } from "./Data_FirstLevelMissionTopology.mjs";
+import { MISSION_STAGE_ROUTES, MISSION_RAIL_BRIDGE } from "./Data_FirstLevelMissionTopology.mjs";
 import { MISSION_LAYOUT, MISSION_ROUTES, MISSION_ANCHORS as A, MISSION_PLACEMENT as P, MISSION_RAILWAY, MISSION_SUPPLIES } from "./Data_FirstLevelMissionLayout.mjs";
 import { MakeRailwayProfile } from "./Script_RoadPath.mjs";
 import { MISSION_TERRAIN, SampleMissionTerrain, MissionPathDistance } from "./Data_FirstLevelMissionTerrain.mjs";
@@ -27,11 +28,15 @@ import { FirstLevelMissionVoice } from "./Script_FirstLevelMissionVoice.mjs";
 
 // Exercise the real dynamic voice recipes and admission rules. Only WebAudio's
 // device nodes/decoder are stand-ins; LoadVoices, Play, SetListener, movement and
-// the simultaneous mission tracks run their production implementations.
+// the story dialogue slot run their production implementations.
+// 2026.09.19：军列开场下线，`TrainPack` / `TrainBanter` 那对并行轨随之没有数据了
+//（MissionVoiceTimeline 不再产出 parallel）。这一节改用现役的整段录音，
+// 覆盖的仍是同三件事：距离闸、预算闸、暂停/继续保留源偏移。
 {
   const {AudioEngine}=await import("./Script_Audio.mjs");
   const manifest=JSON.parse(fs.readFileSync(new URL("./Audio/FirstLevel/Data_FirstLevelVoiceManifest.json",import.meta.url)));
-  const cues=MISSION_DIALOGUE.filter(cue=>["TrainPack","TrainBanter"].includes(cue.id));
+  const cues=MISSION_DIALOGUE.filter(cue=>["BunkerBanter","SupportOrder"].includes(cue.id));
+  assert.equal(cues.length,2,"01 的黑屏对白与 03 的支援命令都还在台词表里");
   const buffers=new Map(cues.map(cue=>[manifest.cues[cue.id].sha256,
     {duration:manifest.cues[cue.id].seconds,key:`Mission${cue.id}`} ]));
   const Param=()=>({value:0,setValueAtTime(value){this.value=value;},setTargetAtTime(value){this.value=value;},
@@ -55,40 +60,44 @@ import { FirstLevelMissionVoice } from "./Script_FirstLevelMissionVoice.mjs";
       cues.map(cue=>({key:`Mission${cue.id}`,file:cue.file,kind:"story",version:manifest.cues[cue.id].sha256}))),2);
   }finally{globalThis.fetch=originalFetch;}
   const Camera=(x,y,z)=>({matrixWorld:{elements:[1,0,0,0,0,1,0,0,0,0,1,0,x,y,z,1]}});
-  const position={x:-76.2,y:2.54,z:201};
-  audio.SetListener(Camera(-77,2.8,341.9));
-  assert.equal(audio.Play("voice.MissionTrainBanter",{position,priority:true}),null,
-    "a listener left at the old rendered frame reproduces the missing briefing");
+  // 掩蔽部里说话的人。听者留在上一帧渲染完的位置上 —— 那台相机还在一百四十米外。
+  const position={x:A.bunker.x,y:.5,z:A.bunker.z};
+  audio.SetListener(Camera(A.bunker.x,2.8,A.bunker.z+140));
+  assert.equal(audio.Play("voice.MissionSupportOrder",{position,priority:true}),null,
+    "a listener left at the old rendered frame reproduces the missing shout");
   assert.equal(audio.drops.distance,1,"the real voice distance rule, not decoding or node budget, rejects it");
-  audio.SetListener(Camera(-77,2.8,201.7));
+  audio.SetListener(Camera(A.bunker.x,1,A.bunker.z+.6));
   // Even an exhausted device budget cannot consume a nearby priority dialogue.
   audio.nodeBudget=1;
   const voice=new FirstLevelMissionVoice({audio,Clock:()=>ctx.currentTime,Position:()=>position,
     hud:{SayLines(){},Say(){}}});voice.manifest=manifest;
   try{
-    voice.Enqueue("TrainPack");voice.Update(0);
+    voice.Enqueue("BunkerBanter");voice.Update(0);
     const Step=count=>{for(let i=0;i<count;i++){ctx.currentTime+=1/60;voice.Update(1/60);}};
-    Step(360);
-    const main=audio.storyVoice,parallel=voice.current.parallel[0];
-    assert.ok(main&&parallel?.voice,"both complete recordings acquire real AudioEngine voice handles");
-    assert.ok(audio.activeVoices.has(main)&&audio.activeVoices.has(parallel.voice),"the briefing does not replace the story slot");
-    assert.deepEqual(sources.map(source=>source.buffer.key),["MissionTrainPack","MissionTrainBanter"]);
-    assert.ok(sources.every(source=>source.started&&source.playbackRate.value===1),"both loaded recipes schedule a source without changing pitch");
-    assert.ok(parallel.voice.distance<2&&parallel.voice.panner,"the briefing stays spatial at the current listener");
-    assert.ok(audio.stats.priorityOverBudget>0&&audio.drops.starved===0,"priority protects both tracks from budget rejection");
-    const before=voice.State();voice.Pause();ctx.currentTime+=10;voice.Update(10);
+    Step(300);
+    const main=audio.storyVoice;
+    assert.ok(main,"the complete recording acquires a real AudioEngine voice handle");
+    assert.ok(audio.activeVoices.has(main),"and keeps the story slot for the whole exchange");
+    assert.deepEqual(sources.map(source=>source.buffer.key),["MissionBunkerBanter"]);
+    assert.ok(sources.every(source=>source.started&&source.playbackRate.value===1),
+      "the loaded recipe schedules a source without changing pitch");
+    assert.ok(main.distance<2&&main.panner,"the exchange stays spatial at the current listener");
+    assert.ok(audio.stats.priorityOverBudget>0&&audio.drops.starved===0,
+      "priority protects the dialogue from budget rejection");
+    const before=voice.State();
+    assert.ok(before.sourceTime>4&&before.sourceTime<manifest.cues.BunkerBanter.seconds,
+      "five seconds in, the exchange is genuinely mid-recording");
+    voice.Pause();ctx.currentTime+=10;voice.Update(10);
     assert.equal(voice.State().sourceTime,before.sourceTime);
-    assert.equal(voice.State().parallel[0].sourceTime,before.parallel[0].sourceTime);
-    assert.ok(sources.every(source=>source.stopped),"pause actually stops both scheduled AudioBufferSources");
+    assert.ok(sources.every(source=>source.stopped),"pause actually stops the scheduled AudioBufferSource");
     voice.Resume();
-    assert.equal(sources[2].started[1],before.sourceTime,"the banter resumes at its retained source offset");
-    assert.equal(sources[3].started[1],before.parallel[0].sourceTime,"the briefing resumes at its own source offset");
-    assert.ok(audio.storyVoice&&voice.current.parallel[0].voice);
+    assert.equal(sources[1].started[1],before.sourceTime,"the exchange resumes at its retained source offset");
+    assert.ok(audio.storyVoice);
     assert.equal(audio.errorCount,0);assert.deepEqual(audio.voiceErrors,[]);
   }finally{
     voice.Dispose();for(const timer of audio.timers)clearTimeout(timer);audio.timers.clear();
   }
-  console.log("ok real AudioEngine dialogue admission: stale listener repro, simultaneous sources, budget and pause/resume");
+  console.log("ok real AudioEngine dialogue admission: stale listener repro, budget and pause/resume");
 }
 if(process.argv.includes("--opening-audio"))process.exit(0);
 
@@ -174,23 +183,46 @@ if(process.argv.includes("--opening-audio"))process.exit(0);
       'the other man still yields instead of both ignoring separation');
   }
   {
-    const voice=new FirstLevelMissionVoice({audio:{StopStoryVoice(){}},hud:{Say(){}}});
-    const gunner={alive:true,position:{x:25,z:-161}};
-    const guard={safe:false,crossing:false,actor:{alive:true,position:{x:0,z:0}}};
-    const r=Object.create(FirstLevelMissionRuntime.prototype);
-    Object.assign(r,{voice,time:0,flow:{stage:{id:"Support"}},guards:[guard],enemies:new Map([["FrontGunner",gunner]]),
-      player:{position:{x:0,z:0},EyePosition:{},camera:{}},Has:()=>true,BlocksSight:()=>false,
-      Point:()=>({clone:()=>({project:()=>({x:2,y:0,z:0})})})});
-    voice.played.add("FrontCoverCall");voice.finished.add("FrontCoverCall");
-    r.UpdateFrontDialogue();r.time=R.frontDialogueReminderS;r.UpdateFrontDialogue();
-    assert.ok(voice.queue.includes("FrontReminder"),"unseen friends get one source-authored reminder");
-    r.time=R.frontDialogueFallbackS;r.UpdateFrontDialogue();
-    assert.ok(voice.queue.includes("FrontFallback")&&!voice.queue.includes("FrontReminder"),"fallback replaces the stale queued reminder");
-    gunner.alive=false;guard.crossing=true;r.UpdateFrontDialogue();
-    assert.ok(!voice.queue.some(id=>["FrontBlockade","FrontReminder","FrontFallback"].includes(id)),
-      "destroying the actual blocking gun cancels false blockade dialogue");
-    assert.ok(voice.queue.includes("FrontCrossing"),"a real crossing after gun destruction receives its new exchange");
-    assert.ok(!voice.finished.has("FrontFallback"),"cancelled dialogue is never falsely marked heard");
+    // 03/04 唯一现役的前沿台词 FrontBlockade（契约 §5）：看不见就等兜底那一档，
+    // 封锁的机枪先死就撤回，绝不假装播完。
+    const MakeFront=(visible)=>{
+      const voice=new FirstLevelMissionVoice({audio:{StopStoryVoice(){}},hud:{Say(){}}});
+      const gunner={alive:true,position:{x:25,z:-161}};
+      const guard={safe:false,crossing:false,actor:{alive:true,position:{x:0,z:0}}};
+      const ndc=visible?{x:0,y:0,z:0}:{x:2,y:0,z:0};
+      const r=Object.create(FirstLevelMissionRuntime.prototype);
+      Object.assign(r,{voice,time:0,missingCues:[],flow:{stage:{id:"Support"}},guards:[guard],
+        enemies:new Map([["FrontGunner",gunner]]),
+        player:{position:{x:0,z:0},EyePosition:{},camera:{}},Has:()=>true,BlocksSight:()=>false,
+        Point:()=>({clone:()=>({project:()=>ndc})})});
+      return {voice,gunner,guard,r};
+    };
+    {
+      const {voice,r}=MakeFront(false);
+      r.UpdateFrontDialogue();
+      assert.deepEqual(voice.queue,[],"an unseen blockade does not get pointed at on the first frame");
+      r.time=R.frontDialogueFallbackS;r.UpdateFrontDialogue();
+      assert.deepEqual(voice.queue,["FrontBlockade"],"but a player who never looks still gets told where to shoot");
+    }
+    {
+      const {voice,r}=MakeFront(true);
+      r.UpdateFrontDialogue();r.time=R.frontDialogueSeenS;r.UpdateFrontDialogue();
+      assert.deepEqual(voice.queue,["FrontBlockade"],"actually seeing the pinned guards brings the line forward");
+    }
+    {
+      const {voice,gunner,r}=MakeFront(false);
+      r.time=R.frontDialogueFallbackS;r.UpdateFrontDialogue();
+      gunner.alive=false;r.UpdateFrontDialogue();
+      assert.deepEqual(voice.queue,[],"destroying the actual blocking gun cancels the stale blockade line");
+      assert.ok(!voice.finished.has("FrontBlockade"),"cancelled dialogue is never falsely marked heard");
+    }
+    {
+      const {voice,r}=MakeFront(false);
+      r.Say("FrontCoverCall");
+      assert.deepEqual(voice.queue,[],"a retired cue id is refused outright, not faked through a pending queue");
+      assert.deepEqual(r.missingCues,["FrontCoverCall"]);
+      assert.ok(!voice.finished.has("FrontCoverCall"));
+    }
   }
 }
 assert.ok(P.stationCasualties.every(person=>person.health>0),"station shelling does not manufacture dead recruits at muster");
@@ -382,8 +414,23 @@ console.log("ok shared terrain, excavated trenches, structural floors only");
   const railway = MakeRailwayProfile(MISSION_RAILWAY, (x, z) => terrain.SampleHeight(x, z));
   for (let s = 0; s <= railway.path.length; s += 1) {
     const p = railway.path.At(s), soil = terrain.SampleHeight(p.x, p.z);
+    // 2026.09.19：北沙河的河槽在 z 138.8–167.2 把地面切下去，铁路桥在这一段是**桥**，
+    // 桥面自己跨过去（Data_FirstLevelMissionTopology.MISSION_RAIL_BRIDGE）。
+    // 「轨面贴土」这条只对真正压在土上的路段成立，桥段跳过（连桥台前后 5 m）。
+    if (p.z > MISSION_RAIL_BRIDGE.gapZ[0] - 5 && p.z < MISSION_RAIL_BRIDGE.gapZ[1] + 5) continue;
     const railTop = railway.RailTopAt(s) - soil;
     assert.ok(railTop > 0.2 && railTop < 0.42, `rail top stays low on the soil at z=${p.z.toFixed(1)}: ${railTop.toFixed(3)}`);
+  }
+  // 桥段本身按桥面高度对账：钢轨钉在桥面上，不跟着河槽掉下去。
+  {
+    const railTops = [];
+    for (let s = 0; s <= railway.path.length; s += 1) {
+      const p = railway.path.At(s);
+      if (p.z <= MISSION_RAIL_BRIDGE.gapZ[0] || p.z >= MISSION_RAIL_BRIDGE.gapZ[1]) continue;
+      railTops.push(railway.RailTopAt(s) - terrain.SampleHeight(p.x, p.z));
+    }
+    assert.ok(railTops.length > 20, "the channel really does carry a bridged span of railway");
+    assert.ok(Math.max(...railTops) > 1.5, "over the channel the rails stand clear of the excavated soil");
   }
   const wheels = MISSION_LAYOUT.blocks.filter(block => /^Station(?:Car\dWheel|EngineWheel)/.test(block.id));
   assert.equal(wheels.length, 3 * 8 + 8, "every car and engine wheel is seated");
@@ -405,10 +452,12 @@ const assaultLanes=Object.fromEntries(FRONT_ASSAULT_STARTS.map(start=>
   ["Assault"+start.id,[start,...FrontAssaultLane(start.x,start.z)]]));
 assert.ok(Object.values(assaultLanes).every(route=>route.length>=2&&route.at(-1).z===FRONT_ASSAULT.lines.at(-1)),"every assault lane ends on the last bound line");
 assert.ok(Object.keys(assaultLanes).length>=24,"most front riflemen and every wave drop point get a bounding lane: "+Object.keys(assaultLanes).length);
-// 接防班走的是 2026.09.19 契约路线（collectionReturn 反向）。那条线沿途的几何归
-// 空间包建，还没落地 —— 净空由空间包的 Script_FirstLevelSpaceTest 在并入
-// MISSION_ROUTES 时验收，这里先不按旧地形量（量出来的是「还没挖的沟」）。
-const reliefRoutes={};
+// 接防班（UpdateRelief）真正要走的那几条：契约路线 collectionReturn 反向的前五点，
+// 到前沿交通壕口之后沿 z≈-123 横到各自阵位。空间包把沿线几何建完之后这几条
+// 重新进净空检查 —— 第一次接回来就量出接防班正面穿过 FrontTraverseCover 那排掩体。
+const reliefApproach=[...MISSION_STAGE_ROUTES.collectionReturn].reverse().slice(0,5);
+const reliefRoutes=Object.fromEntries(P.reliefPositions.map((post,i)=>
+  ["Relief"+i,[...reliefApproach,{x:post.x,z:-123},post]]));
 for (const [name, route] of Object.entries({ ...MISSION_ROUTES, ...Object.fromEntries(MISSION_TERRAIN.trenches.filter(t=>t.role).map(t=>[t.id,t.points])), ...tacticalRoutes, ...assaultLanes, ...reserveLanes, ...reliefRoutes, ...Object.fromEntries(P.guardWithdrawalRoutes.map((route,i)=>["Guard"+i,route])) })) {
   for (let i = 1; i < route.length; i++) {
     const a = route[i - 1],
@@ -702,13 +751,13 @@ assert.equal(new Set(MISSION_DIALOGUE.map((cue) => cue.id)).size, MISSION_DIALOG
     audio:{PlayStoryVoice:(_key,options)=>{offsets.push(options.offset||0);return {duration:1};},StopStoryVoice(){}},
     hud:{Say(){}},Done:id=>done.push(id),
   });
-  voice.manifest={cues:{ThreeMagazines:{seconds:3.109},TwoMagazines:{seconds:2.429}}};
-  voice.Enqueue("ThreeMagazines");voice.Enqueue("TwoMagazines");
+  voice.manifest={cues:{TrenchCurse:{seconds:3.109},CornerCheck:{seconds:2.429}}};
+  voice.Enqueue("TrenchCurse");voice.Enqueue("CornerCheck");
   voice.Update(0);voice.Update(.3);voice.Pause();voice.Update(10);
   assert.equal(voice.current.time,.3);
   voice.Resume();
   for(let i=0;i<400;i++)voice.Update(1/60);
-  assert.deepEqual(done,["ThreeMagazines","TwoMagazines"]);
+  assert.deepEqual(done,["TrenchCurse","CornerCheck"]);
   assert.deepEqual(offsets,[0,.3,0]);
 }
 
@@ -748,9 +797,12 @@ assert.equal(new Set(MISSION_DIALOGUE.map((cue) => cue.id)).size, MISSION_DIALOG
  console.log("ok directional sustained front combat, quieter south and no train/end leakage");
 }
 {
- let clock=10;const events=[],subtitles=[];
+ // 逐句的通用 "Line" 事件（玩法包靠它把动作对到台词上）与具名事件分开收：
+ // 这一节断言的是具名的 AircraftDiveOrder 只发一次。
+ let clock=10;const events=[],lines=[],subtitles=[];
  const voice=new FirstLevelMissionVoice({audio:{PlayStoryVoice:()=>({voice:{t:clock+.005}}),StopStoryVoice(){}},
-   hud:{Say:(_who,text)=>subtitles.push(text)},Clock:()=>clock,Event:id=>events.push(id)});
+   hud:{Say:(_who,text)=>subtitles.push(text)},Clock:()=>clock,
+   Event:(id,_cue,detail)=>{if(id==="Line")lines.push(detail.index);else events.push(id);}});
  voice.manifest=JSON.parse(fs.readFileSync(new URL("./Audio/FirstLevel/Data_FirstLevelVoiceManifest.json",import.meta.url)));
  voice.Enqueue("AircraftReturn");voice.Update(0);
  const diveAt=voice.current.plan.segments[0].events[0].at;
@@ -759,6 +811,8 @@ assert.equal(new Set(MISSION_DIALOGUE.map((cue) => cue.id)).size, MISSION_DIALOG
  clock+=.2;voice.Update(.01);assert.deepEqual(events,["AircraftDiveOrder"]);
  voice.Pause();clock+=20;voice.Update(20);voice.Resume();clock+=.2;voice.Update(.01);
  assert.equal(events.length,1,"resuming the source never repeats the physical dive");
+ assert.ok(lines.length>0&&lines.every((index,i)=>i===0||index>=lines[i-1]),
+   "every spoken line still raises the generic Line event, in order");
  console.log("ok real audio clock governs subtitles and second-aircraft dive order");
 }
 
@@ -852,6 +906,15 @@ console.log("ok individual trench lanes, rounded corners, safe spacing and varia
   for(const spec of MISSION_ENCOUNTERS.bunkerAssault)
     assert.ok(Math.hypot(spec.x-A.bunkerKilling.x,spec.z-A.bunkerKilling.z)<=R.bunkerSightM,
       spec.id+" stands inside the sight line through the low breach");
+  // 01 受困：玩家躺在两根压梁之间，枪够不到，躺姿眼高就是通用的卧姿眼高
+  //（空间包按它算破口的视线，两处数不许各写各的）。
+  assert.deepEqual(A.bunker,{x:P.bunker.player.x,z:P.bunker.player.z},
+    "the bunker anchor is the authored pinned position");
+  assert.equal(P.bunker.playerEyeM,STANCE.prone.eye,"the low-breach sight line uses the shared prone eye height");
+  assert.ok(P.bunker.pinnedFrame.every(pin=>Math.hypot(pin.x-P.bunker.player.x,pin.z-P.bunker.player.z)<1.6),
+    "the pinning beams really do pin him");
+  assert.ok(Math.hypot(P.bunker.rifle.x-P.bunker.player.x,P.bunker.rifle.z-P.bunker.player.z)>2.5,
+    "the rifle is out of reach while he is pinned");
   // 12 只有两处威胁，第二处等第一处解除。
   assert.equal(MISSION_TRANSFER_THREATS.length,2,"the transfer step keeps two threats, not four waves");
   assert.equal(MISSION_TRANSFER_THREATS[0].after,null);

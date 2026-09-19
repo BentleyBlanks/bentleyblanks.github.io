@@ -80,7 +80,9 @@ export const MISSION_TUNING = Object.freeze({
   // Meal (25.331s including pauses) + overlapping exchange (14.132s),
   // then roughly nine seconds braking from the first ranging impact.
   trainTravelM: 603,
-  frontDialogueReminderS: 5,
+  // 03/04 老周指「右边破墙」（FrontBlockade）的时机。看见被压住的守军半秒就说；
+  // 一直没看见的，到第 10 秒也说一次。2026.09.19 起这一段只剩这一条 cue，
+  // 原来配「提醒」那一档（frontDialogueReminderS）随之下线。
   frontDialogueFallbackS: 10,
   frontDialogueSeenS: .5,
   trainCruiseSpeedMps: 6,

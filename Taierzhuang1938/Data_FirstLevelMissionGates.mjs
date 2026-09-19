@@ -152,6 +152,24 @@ export const MISSION_VOICE_FACTS = Object.freeze({
 });
 
 // ---------------------------------------------------------------------------
+// 3b. 场景信号 ← 事实
+//
+// 契约 §3 把可见空间的换态口子冻结成几个大写信号名，`Data_FirstLevelMissionLayout`
+// 的 scenario 状态与 gate 只认这些名字（`Script_FirstLevelWhiteboxField.SyncScenario`
+// 每帧按信号同步）。任务这边记的是小写事实名，两边靠这张表接起来 ——
+// 运行时不再各处手写 `OpenGate("BunkerCollapsed")`（那条从来就没生效过：
+// `BunkerCollapsed` 是 scenario 信号，不是任何一块 gate 的 id）。
+//
+// 只写「名字不一样」的那几条；名字本来就一致的信号（`MissionBridgeDestroyed`
+// `MissionCourtyardGateOpen`）由 `Signalled` 直接按事实名查。
+// ---------------------------------------------------------------------------
+export const MISSION_SCENARIO_SIGNALS = Object.freeze({
+  BunkerCollapsed: "bunkerCollapsed",       // 01 近爆之后换成坍塌态掩蔽部
+  RailBridgeDestroyed: "bridgeDestroyed",   // 18 炸桥：桥面 / 桁架 / 钢轨消失，残骸出现
+  NightGateShown: "nightArrivalPlaced",     // 18 黑屏里瞬移之后才画北门夜景那一片
+});
+
+// ---------------------------------------------------------------------------
 // 4. 事实门
 // ---------------------------------------------------------------------------
 const Gate = (entry) => Object.freeze(entry);

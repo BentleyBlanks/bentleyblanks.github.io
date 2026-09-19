@@ -8517,7 +8517,9 @@ function Frame(dt, render = true) {
   profiler.B("story/scenario");
   const openedScenarioGates = battlefield?.SyncScenario?.({
     objectiveIndex: state.objectiveIndex,
-    signalled: (name) => missionRuntime?.Has(name) || story.Signalled(name),
+    // 第一关的换态信号名与事实名不一样（契约 §3 冻结了大写信号名），
+    // 对照表在 Data_FirstLevelMissionGates.MISSION_SCENARIO_SIGNALS，运行时用 Signalled 查。
+    signalled: (name) => !!missionRuntime?.Signalled(name) || story.Signalled(name),
   });
   if (openedScenarioGates > 0) navGrid?.Refresh(battlefield);
   profiler.E("story/scenario");

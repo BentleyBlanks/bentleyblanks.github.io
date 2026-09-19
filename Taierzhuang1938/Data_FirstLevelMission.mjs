@@ -1,8 +1,8 @@
 import { FRONT_SORTIE as Sortie } from "./Data_FirstLevelFrontRoute.mjs";
-import { MISSION_TOPOLOGY_VERSION, MISSION_STAGE_ROUTES } from "./Data_FirstLevelMissionTopology.mjs";
+import { MISSION_TOPOLOGY_VERSION } from "./Data_FirstLevelMissionTopology.mjs";
 import { FRONT_FIELD_MEN, FRONT_RESERVES, FRONT_MACHINE_GUN_ATTACK, FRONT_APPROACH_ENEMIES, APPROACH_TACTICS } from "./Data_FirstLevelMissionFront.mjs";
 import { CHAPTER } from "./Data_MissionCh1.mjs";
-import { MISSION_LAYOUT, MISSION_ANCHORS as A, MISSION_ROUTES } from "./Data_FirstLevelMissionLayout.mjs";
+import { MISSION_LAYOUT, MISSION_ANCHORS as A, MISSION_ROUTES, MISSION_PLACEMENT as P } from "./Data_FirstLevelMissionLayout.mjs";
 export const MISSION_VERSION = MISSION_TOPOLOGY_VERSION;
 import { MISSION_TUNING } from "./Data_Tuning_FirstLevel.mjs";
 export { MISSION_TUNING } from "./Data_Tuning_FirstLevel.mjs";
@@ -10,9 +10,6 @@ export { MISSION_TUNING } from "./Data_Tuning_FirstLevel.mjs";
 // only in 1939 and has no texture. The documented aircraft near Tengxian were Type 88 reconnaissance biplanes,
 // for which there is no model yet. See docs/Data_AircraftAssets.md.
 export const MISSION_AIRCRAFT_ID = "MitsubishiKi30";
-// 2026.09.19 契约路线还没并进 MISSION_ROUTES（等空间包建完沿线几何再并），
-// 但骨架现在就要用它们带路。查表统一走这一张，运行时只认名字。
-export const MISSION_GUIDE_ROUTES = Object.freeze({ ...MISSION_ROUTES, ...MISSION_STAGE_ROUTES });
 const Stage = (id, objective, target, requirements, cue, extra = {}) =>
   Object.freeze({ id, objective, target, requirements, cue, ...extra });
 // 内部步骤 27 个 + Complete（docs/Data_FirstLevelRebuild20260919Contract.md §1）。
@@ -163,11 +160,15 @@ export const MISSION_STAGES = Object.freeze([
 ]);
 export const MISSION_ENCOUNTERS = Object.freeze({
   // 01 掩蔽部门外的行刑组：两个动手的，随后跟进两个。玩家拾枪后可以打，但不是过关条件。
+  // 起点取空间包的 MISSION_PLACEMENT.bunker.ijaStart（还在刺杀处以北 6 m，走进来才下刀）；
+  // 下刀与转向门内的两组落点在 Script_FirstLevelOpening 里按 ijaKill / ijaDoor 走。
   bunkerAssault: [
-    { id: "BunkerExecutionerA", x: A.bunkerKilling.x - 1.6, z: A.bunkerKilling.z - 1.2, weapon: "Type38", bayonet: true },
-    { id: "BunkerExecutionerB", x: A.bunkerKilling.x + 1.6, z: A.bunkerKilling.z - 1.2, weapon: "Type38", bayonet: true },
-    { id: "BunkerFollowA", x: A.bunkerKilling.x - 3.2, z: A.bunkerKilling.z - 6, weapon: "Type38", bayonet: true },
-    { id: "BunkerFollowB", x: A.bunkerKilling.x + 3.4, z: A.bunkerKilling.z - 7, weapon: "Type38", bayonet: true },
+    { id: "BunkerExecutionerA", ...P.bunker.ijaStart[0], weapon: "Type38", bayonet: true },
+    { id: "BunkerExecutionerB", ...P.bunker.ijaStart[1], weapon: "Type38", bayonet: true },
+    // 跟进那两人站在行刑组后面，但仍在破口看得见的那一小片里（R.bunkerSightM）；
+    // 与 ijaStart 拉开 3 m 以上，免得两个人叠在一格（胶囊之间不互撞）。
+    { id: "BunkerFollowA", x: A.bunkerKilling.x - 4.5, z: A.bunkerKilling.z - 9, weapon: "Type38", bayonet: true },
+    { id: "BunkerFollowB", x: A.bunkerKilling.x + 4.5, z: A.bunkerKilling.z - 10, weapon: "Type38", bayonet: true },
   ],
   approach: FRONT_APPROACH_ENEMIES,
   // The roster itself lives in Data_FirstLevelMissionFront: the assault lanes and the cover rows
@@ -222,7 +223,9 @@ export const MISSION_ENCOUNTERS = Object.freeze({
   bridgeNorth: [
     { id: "BridgeNorthGunner", x: A.bridgeEnemy.x, z: A.bridgeEnemy.z, weapon: "Type11", hold: true },
     { id: "BridgeNorthA", x: A.bridgeEnemy.x - 6, z: A.bridgeEnemy.z + 3 },
-    { id: "BridgeNorthB", x: A.bridgeEnemy.x + 7, z: A.bridgeEnemy.z + 2 },
+    // 土坎（BridgeNorthRidgeEast，z≈132.2）在这一带是实心的：出生点要摆在坎**后面**
+    // （北侧，z 更小），摆到 z+2 就是摆在土里。
+    { id: "BridgeNorthB", x: A.bridgeEnemy.x + 7, z: A.bridgeEnemy.z - 3 },
     { id: "BridgeNorthC", x: A.bridgeEnemy.x + 2, z: A.bridgeEnemy.z - 5 },
   ],
 });
@@ -268,14 +271,17 @@ export const MISSION_TACTICS = Object.freeze({
   TransferRifleA: { delay: 5, points: [{x:108,z:90},{x:102,z:91}] },
   TransferRifleB: { delay: 9, points: [{x:112,z:106},{x:104,z:112}] },
   TransferRifleC: { delay: 13, points: [{x:114,z:90},{x:107,z:94}] },
-  TransferAlleyA: { delay: 0, points: [{x:100,z:120},{x:94,z:118}] },
-  TransferAlleyB: { delay: 4, points: [{x:104,z:130},{x:96,z:128}] },
+  // 12 的第二处威胁从侧巷（A.sideAlley = (52,130)，两道院墙之间的 14 m 夹道）打出来，
+  // 沿巷口东侧向装载区压过去。跟着锚点走 —— 原来那两条还停在 2026.09.14 的 x≈100，
+  // 从新巷口直线过去会横穿转运棚的货垛（TransferStores）。
+  TransferAlleyA: { delay: 0, points: [{x:A.sideAlley.x+8,z:A.sideAlley.z-8},{x:A.sideAlley.x+10,z:A.sideAlley.z-11}] },
+  TransferAlleyB: { delay: 4, points: [{x:A.sideAlley.x+9,z:A.sideAlley.z+2},{x:A.sideAlley.x+10,z:A.sideAlley.z-3}] },
   AirPursuerA: { delay: 0, points: [{x:106,z:90},{x:102,z:92}] },
   AirPursuerB: { delay: 3, points: [{x:105,z:98},{x:104,z:111}] },
   AirPursuerC: { delay: 5, points: [{x:109,z:109},{x:100,z:114}] },
   AirPursuerD: { delay: 8, points: [{x:106,z:113},{x:99,z:115}] },
   BridgeNorthA: { delay: 2, points: [{x:-74,z:130},{x:-76,z:134}] },
-  BridgeNorthB: { delay: 6, points: [{x:-70,z:128},{x:-74,z:132}] },
+  BridgeNorthB: { delay: 6, points: [{x:-72,z:126.5},{x:-74,z:130}] },
   BridgeNorthC: { delay: 10, points: [{x:-68,z:122},{x:-72,z:128}] },
 });
 export const FIRST_LEVEL_MISSION_PHASE = Object.freeze({

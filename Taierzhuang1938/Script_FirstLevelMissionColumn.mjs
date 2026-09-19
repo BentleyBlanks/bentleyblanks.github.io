@@ -72,7 +72,8 @@ export function MissionCarryRoutePoint(route,distance){
 }
 export class FirstLevelMissionColumn {
   constructor() {
-    this.route = [...MISSION_ROUTES.south, ...MISSION_ROUTES.village.slice(1)];
+    // 07 的后送队从背坡伤员集结处起行（契约 §3 的 southWalk），不是旧军列那一头。
+    this.route = [...MISSION_ROUTES.southWalk, ...MISSION_ROUTES.village.slice(1)];
     this.length = MissionRouteLength(this.route);
     this.stagingAreas=MISSION_CROWD_AREAS.map(area=>({...area,progress:MissionRouteProjection(this.route,area.trigger).progress}));
     this.litters = Array.from({ length: R.litterCount }, (_, i) => ({
@@ -140,7 +141,7 @@ export class FirstLevelMissionColumn {
   GateProgress() {
     const index = MISSION_ROUTES.village.findIndex((p) => p.x === A.gate.x && p.z === A.gate.z);
     return (
-      MissionRouteLength(MISSION_ROUTES.south) +
+      MissionRouteLength(MISSION_ROUTES.southWalk) +
       MissionRouteLength(MISSION_ROUTES.village.slice(0, index + 1))
     );
   }

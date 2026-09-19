@@ -1,6 +1,5 @@
 import { FirstLevelTransition } from "./Script_FirstLevelTransition.mjs";
 import { FRONT_SORTIE as Sortie, SortieCrawlBlocked } from "./Data_FirstLevelFrontRoute.mjs";
-import { MISSION_REARGUARD_POCKETS } from "./Data_FirstLevelMissionTopology.mjs";
 import { FirstLevelLeaderGuide } from "./Script_FirstLevelLeaderGuide.mjs";
 import { CompactGuideRoute } from "./Script_NpcMissionGuide.mjs";
 import { MISSION_GUIDE_TUNING as GUIDE } from "./Data_Tuning_MissionGuide.mjs";
@@ -22,12 +21,11 @@ import {
   MISSION_ENCOUNTERS,
   MISSION_TACTICS,
   MISSION_GUIDANCE,
-  MISSION_GUIDE_ROUTES,
   MISSION_TRANSFER_THREATS,
   MISSION_PURSUIT_ROUTE,
   MISSION_VERSION,
 } from "./Data_FirstLevelMission.mjs";
-import { MISSION_STAGE_ROUTES } from "./Data_FirstLevelMissionTopology.mjs";
+import { MISSION_STAGE_ROUTES, MissionRegroupCorridor } from "./Data_FirstLevelMissionTopology.mjs";
 import { MISSION_DIALOGUE } from "./Data_FirstLevelMissionDialogue.mjs";
 import {
   MISSION_ANCHORS as A,
@@ -42,6 +40,7 @@ import {
   MISSION_ENCOUNTER_ACTIVATION,
   MISSION_VOICE_FACTS,
   MISSION_FACT_GATES,
+  MISSION_SCENARIO_SIGNALS,
   MissionGateFamily,
 } from "./Data_FirstLevelMissionGates.mjs";
 import { FirstLevelMissionFlow } from "./Script_FirstLevelMissionFlow.mjs";
@@ -73,10 +72,8 @@ const SCRIPT_ARRIVAL_M = 0.45;
 const Clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 /** 机枪座的座位点。 */
 const GUN_SEAT = Object.freeze({ x: 0, z: -127.4 });
-/** 台词表里有没有这条 cue。并行的 Voice 包还没合进来时，骨架按兜底路径走（见 Say）。 */
+/** 台词表里有没有这条 cue。`Script_FirstLevelVoiceTest` 静态扫这里的每一处 Say。 */
 const CUE_IDS = new Set(MISSION_DIALOGUE.map((cue) => cue.id));
-/** 兜底 cue 的「播完」延时（开发期，见 Say）。 */
-const MISSING_CUE_DELAY_S = 1.5;
 /** 抬着担架走时的落点：按步骤查表，运行时不挑分支（锚点名，见 MISSION_ANCHORS）。 */
 const CARRY_GOALS = Object.freeze({ Carry: "ditch", WallPath: "wallPathEnd", Handover: "zhouDrop" });
 /** 抬着走时指引箭头的标签（`firstLevel.guide.<label>`）。 */
@@ -103,9 +100,8 @@ export class FirstLevelMissionRuntime {
     this.column = new FirstLevelMissionColumn();
     // 关尾夜行军的黑屏字幕（参数化：标题/正文从文本表取）。
     this.transition = new FirstLevelTransition();
-    // Voice 包还没合进来时按兜底走的 cue（见 Say / UpdateMissingCues）。
+    // 运行时引用了台词表里没有的 cue（只该在改表改漏时出现，见 Say）。
     this.missingCues = [];
-    this.pendingCues = [];
     this.tank = {
       active: false,
       present: false,
@@ -175,6 +171,15 @@ export class FirstLevelMissionRuntime {
   Has(id) {
     return this.flow.Has(id);
   }
+  /**
+   * 可见空间的换态信号（契约 §3 冻结的大写名）。装配层每帧把这个问给
+   * `battlefield.SyncScenario`：掩蔽部换坍塌态、铁路桥消失、北门夜景出现，
+   * 全都由任务事实驱动 —— 所以检查点重试、阶段回跳把事实清掉的那一刻，
+   * 空间自己就退回去了，不用另写一套还原代码。
+   */
+  Signalled(name) {
+    return this.Has(MISSION_SCENARIO_SIGNALS[name] || name);
+  }
   Near(point, radius = 5) {
     return Distance(this.player.position, point) < radius;
   }
@@ -191,28 +196,17 @@ export class FirstLevelMissionRuntime {
     return this.Near(family ? family.point : gate.point || A[gate.anchor], gate.radiusM);
   }
   /**
-   * 台词。并行开发期间 Voice 包的新 cue 还不在 `MISSION_DIALOGUE` 里 —— 那种情况
-   * 只 warn 一次，然后按 `MISSION_VOICE_FACTS` 在 missingCueDelayS 之后照常记事实、
-   * 照常走 VoiceDone 链，编排不被一条没烘的音频卡住。合并之后这条路自然不再触发。
+   * 台词。Voice 包合入之后 `MISSION_DIALOGUE` 就是唯一真相：运行时引用的每一个
+   * cue id 都必须在表里（`Script_FirstLevelVoiceTest` §9 静态扫源码对账）。
+   * 真出现表外的 id 只警告一次、不排队、不抛异常 —— 编排不会被一条音频卡住，
+   * 但也不再有「假装播完、到点补记事实」那条兜底路（它会把改表改漏悄悄盖掉）。
    */
   Say(id, options) {
     if (!id) return;
     if (CUE_IDS.has(id)) { this.voice.Enqueue(id, options); return; }
-    if (this.voice.played.has(id) || this.pendingCues.some(entry => entry.id === id)) return;
-    this.voice.played.add(id);
-    if (!this.missingCues.includes(id)) {
-      this.missingCues.push(id);
-      console.warn(`[FirstLevelMission] missing dialogue cue ${id} (Voice package not merged yet)`);
-    }
-    this.pendingCues.push({ id, at: this.time + MISSING_CUE_DELAY_S });
-  }
-  /** 兜底 cue 到点：记事实、走 VoiceDone 链。 */
-  UpdateMissingCues() {
-    if (!this.pendingCues.length) return;
-    const due = this.pendingCues.filter(entry => this.time >= entry.at);
-    if (!due.length) return;
-    this.pendingCues = this.pendingCues.filter(entry => this.time < entry.at);
-    for (const entry of due) { this.voice.finished.add(entry.id); this.VoiceDone(entry.id); }
+    if (this.missingCues.includes(id)) return;
+    this.missingCues.push(id);
+    console.warn(`[FirstLevelMission] dialogue cue ${id} is not in MISSION_DIALOGUE`);
   }
   OnOrdinaryCasualty(actor) {
     if(this.failed || this.completed || !actor || actor.alive || actor.side!=="nra"
@@ -575,7 +569,7 @@ export class FirstLevelMissionRuntime {
       route===OPENING.approachRoute&&resumeAfter?TC.approach:null;
     this.squadCoverBounds=stations?new SquadCoverBounds(stations,route):null;
     for (const actor of this.squad) {
-      const naturalMarch=!stations&&[MISSION_ROUTES.support,MISSION_ROUTES.south].includes(route);
+      const naturalMarch=!stations&&[MISSION_ROUTES.support,MISSION_ROUTES.southWalk].includes(route);
       const personalRoute = naturalMarch ? MissionSquadRoute(route,this.squad.indexOf(actor)) : route;
       actor.missionNaturalMarch = naturalMarch;
       actor.missionWatch=null;
@@ -1082,10 +1076,11 @@ export class FirstLevelMissionRuntime {
         once: false,
         ...extra,
       });
-    // 01/02：掉在掩蔽部门口的那支步枪。拾起来才算真的回到战斗里。
+    // 01/02：掉在掩蔽部里的那支步枪（MISSION_PLACEMENT.bunker.rifle —— 受困时够不到，
+    // 离压住的位置 3.7 m）。拾起来才算真的回到战斗里。
     Register(
       "MissionRifle",
-      A.bunkerDoor,
+      P.bunker.rifle,
       () => this.Text("rifle"),
       () => this.flow.stage.id === "BunkerRescue" && this.Has("luoRescueComplete") && !this.Has("rifleRecovered"),
       () => {
@@ -1327,7 +1322,7 @@ export class FirstLevelMissionRuntime {
         // 15A 降压段：收拢、换手、清点。无战斗 —— 追兵由警戒兵在车路方向接住。
         this.column.StartRetreat();
         this.regroupTime = 0;
-        this.Guide(MISSION_REARGUARD_POCKETS[0].route);
+        this.Guide(MissionRegroupCorridor("Regroup").route);
         break;
       case "WallPath":
         this.column.zhou.health = 12;
@@ -1447,33 +1442,33 @@ export class FirstLevelMissionRuntime {
       && this.guards.every(guard=>!guard.actor.alive || guard.progress>=guard.route.length))
       this.Record("lastGuardsWithdrawn",{survived:this.guards.filter(guard=>guard.actor.alive).length});
   }
+  /**
+   * 03/04 前沿的台词。契约 §5 之后这一段**只有一条** cue：老周指「右边破墙」的
+   * `FrontBlockade`。2026.09.14 那套六条（呼叫 / 提醒 / 兜底 / 过沟 / 追击 / 收到）
+   * 随采用稿全部下线，台词表里已经没有它们。
+   *
+   * 说的时机仍然按「封锁是真的」判：还有守军被压在外面、封锁那挺机枪还活着。
+   * 玩家真看见那几个人被压住 `frontDialogueSeenS` 秒就说；一直没看见的，
+   * 到 `frontDialogueFallbackS` 也说一次（不说的话玩家不知道往哪打）。
+   * 机枪先被打掉就撤回这一条 —— 不指一堵已经不挡路的墙。
+   */
   UpdateFrontDialogue() {
     if(!["Support","MachineGun"].includes(this.flow.stage.id)||!this.Has("frontReached"))return;
     const remaining=this.guards.filter(guard=>guard.actor.alive&&!guard.safe);
     const gunner=this.enemies.get("FrontGunner");
-    const blocked=remaining.length&&gunner?.alive;
-    if(gunner&&!blocked)this.voice.Cancel(["FrontBlockade","FrontReminder","FrontFallback"]);
-    if(remaining.length&&!this.voice.played.has("FrontCoverCall")&&!this.voice.current)this.Say("FrontCoverCall");
-    if(this.voice.finished.has("FrontCoverCall"))this.frontDialogueAt??=this.time;
-    const age=this.frontDialogueAt==null?0:this.time-this.frontDialogueAt;
+    if(!(remaining.length&&gunner?.alive)){
+      if(gunner&&!gunner.alive)this.voice.Cancel(["FrontBlockade"]);
+      this.frontDialogueSeenAt=null;
+      return;
+    }
+    this.frontDialogueAt??=this.time;
     const visible=remaining.some(guard=>{
       const point=this.Point(guard.actor.position,1),ndc=point.clone().project(this.player.camera);
       return ndc.z>=-1&&ndc.z<=1&&Math.abs(ndc.x)<.75&&Math.abs(ndc.y)<.75&&!this.BlocksSight(this.player.EyePosition,point);
     });
     if(visible)this.frontDialogueSeenAt??=this.time;else this.frontDialogueSeenAt=null;
     const seen=this.frontDialogueSeenAt!=null&&this.time-this.frontDialogueSeenAt>=R.frontDialogueSeenS;
-    if(blocked&&this.frontDialogueAt!=null){
-      if(seen&&!this.voice.played.has("FrontFallback"))this.Say("FrontBlockade");
-      else if(!seen&&!this.voice.played.has("FrontBlockade")){
-        if(age>=R.frontDialogueFallbackS){this.voice.Cancel(["FrontReminder"]);this.Say("FrontFallback");}
-        else if(age>=R.frontDialogueReminderS)this.Say("FrontReminder");
-      }
-    }
-    if(gunner&&!gunner.alive&&remaining.some(guard=>guard.crossing)){
-      this.Say("FrontCrossing");
-      if([...this.enemies.values()].some(actor=>actor.alive&&actor.position.x>this.player.position.x))this.Say("FrontPursuit");
-    }
-    if(remaining.length&&this.guards.some(guard=>guard.safe&&guard.actor.alive))this.Say("FrontReceived");
+    if(seen||this.time-this.frontDialogueAt>=R.frontDialogueFallbackS)this.Say("FrontBlockade");
   }
   OnBlast({ position, radius, damage, byPlayer, explosiveId }) {
     if (byPlayer) {
@@ -1550,7 +1545,10 @@ export class FirstLevelMissionRuntime {
   UpdateRelief(dt) {
     if(!["Tank","Orders"].includes(this.flow.stage.id))return;
     if(!this.relief) {
-      const approach=[...MISSION_STAGE_ROUTES.collectionReturn].reverse();
+      // collectionReturn 反过来走就是「集结处 → 前沿交通壕口 (6,-124)」那一段；
+      // 再往后（(15,-111) → (30,-117)）是去集束弹沟的支线，接防班不去那儿 ——
+      // 从那里横回阵位会正面穿过 FrontTraverseCover 那排掩体。
+      const approach=[...MISSION_STAGE_ROUTES.collectionReturn].reverse().slice(0,5);
       this.relief=P.reliefPositions.map((post,i)=>{
         const actor=this.ai.Spawn("nra",A.collection.x+(i%2?1.4:-1.4),A.collection.z+Math.floor(i/2)*1.6,
           {weapon:"HanYang",squadId:"MissionRelief"});
@@ -1911,8 +1909,8 @@ export class FirstLevelMissionRuntime {
     const at = this.Point(A.railBridge, 1.2);
     this.vfx.Explosion?.(at, { radius: R.bridgeBlastRadiusM });
     this.audio.Play("shellImpact", { position: at, volume: 1 });
-    this.battlefield.OpenGate?.("RailBridgeDestroyed");
-    this.Record("RailBridgeDestroyed");
+    // 桥面 / 桁架 / 钢轨与残骸都挂在 RailBridgeDestroyed 这个信号上，
+    // 由 Signalled("RailBridgeDestroyed") → bridgeDestroyed 这条事实驱动。
     this.Record("bridgeDestroyed", { x: A.railBridge.x, z: A.railBridge.z });
     this.Say("MarchToTengxian");
   }
@@ -1943,7 +1941,6 @@ export class FirstLevelMissionRuntime {
     }
     // 夜景与夜天空都藏在黑屏里换；退出/重试时宿主还原（RestoreLevelSky）。
     this.ApplySky?.("night");
-    this.battlefield.OpenGate?.("NightGateShown");
     this.column.active = false;
     if (this.controls) { this.controls.yaw = this.player.yaw; this.controls.pitch = 0; }
     this.Record("nightArrivalPlaced", { x: point.x, z: point.z });
@@ -2226,7 +2223,7 @@ export class FirstLevelMissionRuntime {
     const stage=this.flow.stage, spec=MISSION_GUIDANCE[stage.id];
     if(!spec || this.failed || this.controls || this.completed)return null;
     let target=stage.target, label=spec.label;
-    if(spec.route)target=MissionRouteLookahead(MISSION_GUIDE_ROUTES[spec.route],this.player.position);
+    if(spec.route)target=MissionRouteLookahead(MISSION_ROUTES[spec.route],this.player.position);
     if(stage.id==="Tank"){
       const returning=this.Has("bundleTaken")&&this.Inventory().bundles>0;
       const route=returning?MISSION_ROUTES.bundleReturn:MISSION_ROUTES.bundle;
@@ -2259,7 +2256,6 @@ export class FirstLevelMissionRuntime {
     const prof = this.profiler?.on ? this.profiler : null;
     prof?.B("story/mission/voice");
     this.voice.Update(dt);
-    this.UpdateMissingCues();
     this.UpdateMusic();
     this.battleSound.Update(dt,this.flow.stage.id,this.voice.current?.phase==="playing");
     prof?.E("story/mission/voice");
