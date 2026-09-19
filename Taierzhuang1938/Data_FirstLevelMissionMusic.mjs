@@ -19,26 +19,27 @@ export const FIRST_LEVEL_MUSIC_MIX = Object.freeze({
   transitionS: 1.6, silenceS: 0.12, dialogueScale: 0.42,
   dialogueAttackS: 0.15, dialogueReleaseS: 1.2, cacheLimit: 3,
   // Preparation stays restrained; transfer defense uses the normal battle level.
-  unloadingScale: 0.45, ordersScale: 0.55, transferScale: 1, finalCarryScale: 0.55,
+  rearTrenchScale: 0.45, ordersScale: 0.55, transferScale: 1, handoverScale: 0.55,
 });
+// 2026.09.19 重构：按新 27 步重排（键序必须与 MISSION_STAGES 一致，MusicTest 守着）。
 export const FIRST_LEVEL_STAGE_MUSIC = Object.freeze({
-  Train: null, Unloading: null,
-  TrenchEntry: "IronSiege", Shelter: null,
+  Trapped: null, BunkerRescue: null, RearTrench: "IronSiege",
   Support: "CloseQuartersPressure", MachineGun: "CloseQuartersPressure", Tank: "CloseQuartersPressure", Orders: "TheFrontClosesIn",
   South: "TheRoadSouth", Village: "IronSiege", Melee: "IronSiege", Courtyard: "IronSiege",
-  TransferApproach: "TheRoadSouth", Transfer: "CloseQuartersPressure",
+  TransferApproach: "TheRoadSouth", Transfer: "CloseQuartersPressure", CartRide: "TheRoadSouth",
   AirFirst: "CloseQuartersPressure", Carry: "TheSouthRoadBreaks", Dive: "TheSouthRoadBreaks",
-  Rescue: "IronSiege", RetreatFirst: "IronSiege", RetreatWall: "IronSiege",
-  RetreatYard: "IronSiege", Reception: "IronSiege", FinalCarry: "KeepYourEyesOpen",
-  Death: null, FinalDefense: "CloseQuartersPressure", Exit: "TheLivingStillNeedUs", Complete: null,
+  Rescue: "IronSiege", Regroup: "KeepYourEyesOpen", WallPath: "TheLivingStillNeedUs",
+  ReceptionGate: "TheLivingStillNeedUs", Handover: "KeepYourEyesOpen",
+  Death: null, BridgeOrders: "TheFrontClosesIn", BridgeCover: "CloseQuartersPressure",
+  BridgeWithdraw: "OpenTheWay", NightMarch: "TheLivingStillNeedUs", Complete: null,
 });
 
 export function FirstLevelMusicState(stage, { shellImpact = false, speaking = false, failed = false } = {}) {
   const mix = FIRST_LEVEL_MUSIC_MIX;
-  const silent = failed || (stage === "Unloading" && shellImpact);
+  const silent = failed || (stage === "Trapped" && shellImpact);
   const id = silent ? null : FIRST_LEVEL_STAGE_MUSIC[stage];
-  const scale = ({ Unloading: mix.unloadingScale, Orders: mix.ordersScale,
-    Transfer: mix.transferScale, FinalCarry: mix.finalCarryScale })[stage] ?? 1;
+  const scale = ({ RearTrench: mix.rearTrenchScale, Orders: mix.ordersScale,
+    Transfer: mix.transferScale, Handover: mix.handoverScale })[stage] ?? 1;
   return { cue: id ? `firstLevel${id}` : null,
     scale: scale * (speaking ? mix.dialogueScale : 1),
     fadeOut: silent || stage === "Death" ? mix.silenceS : mix.transitionS,

@@ -1,12 +1,12 @@
 // ===========================================================================
 // Data_FirstLevelMissionGates.mjs —— 第一关《往南的路》的编排表（纯数据，零 three）
 //
-// 这一份把原先散在 Script_FirstLevelMissionRuntime 里的三样东西提出来，成为
-// 运行时与关卡编排工作台**共用的同一份口径**：
+// 2026.09.19 重构（docs/Data_FirstLevelRebuild20260919Contract.md）：27 个内部步骤。
+// 这一份是运行时与关卡编排工作台**共用的同一份口径**：
 //
 //   1. MISSION_STEP_SPAWNS         —— 进某个内部步骤时按表生成哪些遭遇组；
 //   2. MISSION_ENCOUNTER_ACTIVATION—— 每个遭遇组怎么出现 / 什么时候解除待命或苏醒；
-//   3. MISSION_VOICE_FACTS         —— 对白播完即记的事实；
+//   3. MISSION_VOICE_FACTS         —— 对白播完即记的事实（契约 §5）；
 //   4. MISSION_FACT_GATES          —— 每一个事实是怎么判出来的（含 MISSION_STAGES
 //                                     requirements 里的全部事实）。
 //
@@ -14,8 +14,8 @@
 //   · 数值只引用既有表（R / OPENING / Sortie / FRONT_SHELLS…）。只有原先在运行时
 //     里就是裸字面量、别处没有出处的半径，才在这里落成数字 —— 落下来之后**这里
 //     就是唯一出处**，运行时通过 GateNear 反过来读它。
-//   · 事实门只描述「怎么判」，附加条件（担架是否全部通过、是否已下车之类）留在
-//     运行时代码里；这里用 requires / note 说明，工作台照它讲人话。
+//   · 事实门只描述「怎么判」，附加条件（担架是否全部通过、控制接管是否演完之类）
+//     留在运行时代码里；这里用 requires / note 说明，工作台照它讲人话。
 //   · 本文件零副作用、零 three，Node 里 import 即可读。
 //
 // kind 的取值：
@@ -34,17 +34,17 @@ import { MISSION_TUNING as R } from "./Data_Tuning_FirstLevel.mjs";
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
 import { FRONT_SORTIE as Sortie } from "./Data_FirstLevelFrontRoute.mjs";
 import { FRONT_SHELLS } from "./Data_FirstLevelMissionFront.mjs";
+import { MISSION_RECEPTION_SPACE } from "./Data_FirstLevelMissionTopology.mjs";
 
 // ---------------------------------------------------------------------------
 // 1. 步骤进入时按表生成的遭遇组
 // ---------------------------------------------------------------------------
-// 顺序 = 原先 Enter(stage) 各 case 里 SpawnEncounter 的调用顺序（生成是排队的，
-// 顺序决定它们进 spawnQueue 的先后）。
+// 顺序 = Enter(stage) 里原先各 case 的 SpawnEncounter 调用顺序（生成是排队的）。
 // 不进这张表的两类：
 //   · front —— 由 UpdateFront 的 frontBattleStarted 与 Support 段的 frontReached 生成；
-//   · transfer 四拍 —— 由 UpdateTransferBeats 按 MISSION_TRANSFER_BEATS 的拍子生成
-//     （transfer 这一组本身在进 Transfer 步时就生成，所以它在表里）。
+//   · transferAlley —— 由 UpdateTransferThreats 在第一处威胁解除后放出。
 export const MISSION_STEP_SPAWNS = Object.freeze({
+  Trapped: Object.freeze(["bunkerAssault"]),
   Support: Object.freeze(["approach", "tank", "village", "melee"]),
   MachineGun: Object.freeze(["machineGun", "tank"]),
   Tank: Object.freeze(["bundleApproach"]),
@@ -52,11 +52,7 @@ export const MISSION_STEP_SPAWNS = Object.freeze({
   Courtyard: Object.freeze(["courtyard"]),
   Transfer: Object.freeze(["transfer"]),
   AirFirst: Object.freeze(["air"]),
-  RetreatFirst: Object.freeze(["retreat"]),
-  RetreatWall: Object.freeze(["retreatWall"]),
-  RetreatYard: Object.freeze(["retreatYard"]),
-  Reception: Object.freeze(["reception"]),
-  Death: Object.freeze(["final"]),
+  BridgeCover: Object.freeze(["bridgeNorth"]),
 });
 
 // ---------------------------------------------------------------------------
@@ -65,22 +61,15 @@ export const MISSION_STEP_SPAWNS = Object.freeze({
 // spawn.kind：
 //   step     进某个内部步骤时（见 MISSION_STEP_SPAWNS）
 //   fact     记下某个事实时
-//   beat     转运区的某一拍就绪时（MISSION_TRANSFER_BEATS）
-//   opening  由 Script_FirstLevelOpening 在它自己的那一段里生成
+//   threat   转运区的第二处威胁就绪时（MISSION_TRANSFER_THREATS）
 // standbyUntil：生成时是待命状态（不开火），记下这个事实才解除。
 // dormant / wake：生成时整组装睡（scriptedNoncombatant），按 wake 醒。
 export const MISSION_ENCOUNTER_ACTIVATION = Object.freeze({
-  surface: Object.freeze({
-    spawn: Object.freeze({ kind: "opening", step: "Unloading" }),
-    note: "开局炮击后由 FirstLevelOpening 生成（车站地面上的那一批）",
-  }),
-  intrusion: Object.freeze({
-    spawn: Object.freeze({ kind: "opening", step: "TrenchEntry" }),
-    note: "从 FlankBreachSap 的缺口进侧沟",
-  }),
-  shelterPursuit: Object.freeze({
-    spawn: Object.freeze({ kind: "opening", step: "Shelter" }),
-    note: "进掩蔽处时生成，沿交通壕压下来",
+  bunkerAssault: Object.freeze({
+    spawn: Object.freeze({ kind: "step", step: "Trapped" }),
+    dormant: true,
+    wake: Object.freeze({ kind: "fact", fact: "doorSearchStarted" }),
+    note: "门外行刑的两个人＋跟进的两个；受困段整段装睡（只演），日兵转向门内才醒",
   }),
   approach: Object.freeze({
     spawn: Object.freeze({ kind: "step", step: "Support" }),
@@ -114,43 +103,52 @@ export const MISSION_ENCOUNTER_ACTIVATION = Object.freeze({
   melee: Object.freeze({
     spawn: Object.freeze({ kind: "step", step: "Support" }),
     dormant: true,
-    wake: Object.freeze({ kind: "fact", fact: "ambushTriggered" }),
-    note: "屋内伏击的四个人：村口那批醒的时候他们不跟着醒，要等顺子真的进屋",
+    wake: Object.freeze({ kind: "playerWithinM", step: "Melee", radiusM: 26 }),
+    note: "连屋里的四个人：村口那批醒的时候他们不跟着醒，玩家进灶屋以东才出来",
   }),
   courtyard: Object.freeze({ spawn: Object.freeze({ kind: "step", step: "Courtyard" }) }),
-  // 四拍都在 Transfer 这一步里，由 UpdateTransferBeats 按 MISSION_TRANSFER_BEATS 放出；
-  // 第一拍（transfer）的窗口是 0 秒，所以它等价于「进 Transfer 步就生成」。
-  transfer: Object.freeze({ spawn: Object.freeze({ kind: "beat", beat: "transfer", step: "Transfer" }) }),
-  transferFlank: Object.freeze({ spawn: Object.freeze({ kind: "beat", beat: "transferFlank", step: "Transfer" }) }),
-  transferLast: Object.freeze({ spawn: Object.freeze({ kind: "beat", beat: "transferLast", step: "Transfer" }) }),
-  transferRear: Object.freeze({ spawn: Object.freeze({ kind: "beat", beat: "transferRear", step: "Transfer" }) }),
+  transfer: Object.freeze({
+    spawn: Object.freeze({ kind: "step", step: "Transfer" }),
+    note: "第一处威胁：压向装载区",
+  }),
+  transferAlley: Object.freeze({
+    spawn: Object.freeze({ kind: "threat", threat: "transferAlley", step: "Transfer" }),
+    note: "第二处威胁：侧巷火力，第一处解除（loadingThreatResolved）之后才出现",
+  }),
   air: Object.freeze({ spawn: Object.freeze({ kind: "step", step: "AirFirst" }) }),
-  retreat: Object.freeze({ spawn: Object.freeze({ kind: "step", step: "RetreatFirst" }) }),
-  retreatWall: Object.freeze({ spawn: Object.freeze({ kind: "step", step: "RetreatWall" }) }),
-  retreatYard: Object.freeze({ spawn: Object.freeze({ kind: "step", step: "RetreatYard" }) }),
-  reception: Object.freeze({ spawn: Object.freeze({ kind: "step", step: "Reception" }) }),
-  final: Object.freeze({ spawn: Object.freeze({ kind: "step", step: "Death" }) }),
+  bridgeNorth: Object.freeze({
+    spawn: Object.freeze({ kind: "step", step: "BridgeCover" }),
+    note: "北岸土坎的火力，来自北侧外围战场；不在桥边凭空生成",
+  }),
 });
 
 // ---------------------------------------------------------------------------
-// 3. 对白播完即记的事实
+// 3. 对白播完即记的事实（契约 §5 的映射表，一字不改）
 // ---------------------------------------------------------------------------
-// 只收原先 VoiceDone 里那一串「简单 if」。带额外副作用的（TrainRescue、
-// AircraftDiveOrder、TrainNearShell…）在 VoiceEvent 里，不进这张表。
 export const MISSION_VOICE_FACTS = Object.freeze({
-  TrainBriefing: "trainShelling",
-  WreckExit: "unloadOrdersHeard",
-  EscapeWhisper: "escapeWhisperHeard",
+  RescueCall: "rescueCallHeard",
   SupportOrder: "supportOrdersHeard",
-  AircraftFirst: "firstAirOrdersHeard",
-  CarryZhou: "carryOrdersHeard",
-  FinalExit: "finalExitHeard",
+  BundleOrder: "bundleOrderHeard",
   Volunteer: "volunteerHeard",
+  BorrowLight: "lightShared",
   ZhouLift: "zhouOnLitter",
-  BundleSupplyDirections: "bundleDirectionsHeard",
-  SouthHope: "southHopeHeard",
-  FollowVehicle: "followVehicleHeard",
-  TransferHope: "transferHopeHeard",
+  SouthWhisper: "southWhisperHeard",
+  VillagePointer: "mainStreetPointed",
+  TransferSorting: "transferSortingHeard",
+  VillageRoadThreat: "villageRoadThreatSeen",
+  EscortZhou: "escortGranted",
+  CartTalk: "cartTalkHeard",
+  WestDitchOrder: "westDitchPointed",
+  CarryZhou: "carryOrdersHeard",
+  PicketHold: "picketHolding",
+  ZhouCheck: "zhouChecked",
+  Headcount: "headcountDone",
+  GateChallenge: "gateChallenged",
+  ReceptionAccept: "receptionAccepted",
+  MedicAsk: "medicExamining",
+  SquadAssign: "squadAssigned",
+  BridgeOrders: "bridgeOrdersHeard",
+  MarchToTengxian: "marchOrderHeard",
 });
 
 // ---------------------------------------------------------------------------
@@ -158,54 +156,42 @@ export const MISSION_VOICE_FACTS = Object.freeze({
 // ---------------------------------------------------------------------------
 const Gate = (entry) => Object.freeze(entry);
 export const MISSION_FACT_GATES = Object.freeze({
-  // --- Train -------------------------------------------------------------
-  trainShelling: Gate({ kind: "voice", step: "Train", cue: "TrainBriefing", source: "VoiceDone" }),
-  // --- Unloading ---------------------------------------------------------
-  trainStopped: Gate({
-    kind: "scripted", step: "Unloading", source: "Update/MissionTrainMotion",
-    text: "军列按 MissionTrainMotion 停稳（同时开三扇车门）",
+  // --- Trapped -----------------------------------------------------------
+  bunkerCollapsed: Gate({
+    kind: "scripted", step: "Trapped", source: "FirstLevelOpening.UpdateBunker",
+    text: "黑屏对白被近爆打断，掩蔽部塌下来把人压住（控制接管 trapped）",
   }),
-  trainDerailed: Gate({
-    kind: "scripted", step: "Unloading", source: "FirstLevelOpening.Update/Derail",
-    text: "近失弹把那节车厢掀翻（炮击演出推到 t=1）",
+  captivesKilled: Gate({
+    kind: "scripted", step: "Trapped", source: "FirstLevelOpening.UpdateBunker",
+    text: "透过前门低处破口看见门外两名失去抵抗能力的川军被刺杀",
   }),
+  doorSearchStarted: Gate({
+    kind: "scripted", step: "Trapped", source: "FirstLevelOpening.UpdateBunker",
+    text: "门外的日兵转向门内，后侧同时响起清理坍塌物的声音",
+  }),
+  // --- BunkerRescue ------------------------------------------------------
+  rescueCallHeard: Gate({ kind: "voice", step: "BunkerRescue", cue: "RescueCall", source: "VoiceDone" }),
   luoRescueComplete: Gate({
-    kind: "cutscene", step: "Unloading", source: "Update/controls(rescue)",
-    text: "罗班长把顺子从车厢残骸里拖出来那一段演完",
+    kind: "cutscene", step: "BunkerRescue", source: "Update/controls(rescue)",
+    text: "罗班长掀开木架、幺娃拉背包，把顺子拖出坍塌的掩蔽部那一段演完",
   }),
-  unloadOrdersHeard: Gate({ kind: "voice", step: "Unloading", cue: "WreckExit", source: "VoiceDone" }),
-  unloaded: Gate({
-    kind: "proximity", step: "Unloading", anchor: "unload", radiusM: 6,
-    requires: Object.freeze(["trainStopped"]), source: "Update",
-    note: "且人已经不在车厢里（TrainContains 为假）",
+  rifleRecovered: Gate({
+    kind: "interaction", step: "BunkerRescue", interaction: "MissionRifle", anchor: "bunkerDoor",
+    source: "Register", text: "在掩蔽部门口把掉在地上的步枪捡起来",
   }),
-  // --- TrenchEntry -------------------------------------------------------
-  trenchEntered: Gate({
-    kind: "proximity", step: "TrenchEntry", point: OPENING.trenchEntry, radiusM: 5,
-    source: "FirstLevelOpening.Update",
-    note: "同一个沟口外面还有一圈更大的（8 m）只用来起 TrenchContact 那句台词，不记事实，留在代码里",
+  // --- RearTrench --------------------------------------------------------
+  rearTrenchEntered: Gate({
+    kind: "proximity", step: "RearTrench", anchor: "bunkerRear", radiusM: 5, source: "Update",
   }),
-  trenchCleared: Gate({
-    kind: "combat", step: "TrenchEntry", encounter: "intrusion",
-    source: "FirstLevelOpening.Update", text: "从缺口进沟的那一组全部阵亡",
+  cornerReached: Gate({
+    kind: "proximity", step: "RearTrench", anchor: "rearCorner", radiusM: 5, source: "Update",
+    note: "幺娃在折角检查顺子",
   }),
-  shelterReached: Gate({
-    kind: "proximity", step: "TrenchEntry", point: OPENING.shelter, radiusM: OPENING.shelterRadiusM,
-    requires: Object.freeze(["trenchCleared"]), source: "FirstLevelOpening.Update",
-    note: "且折角是被掩护住的（ShelterProtected）。Shelter 步里那句 ShelterAid 喘息台词"
-      + "判「人还在折角圈里」时复用的也是这一条门（同点同半径）",
+  collectionPointSeen: Gate({
+    kind: "proximity", step: "RearTrench", anchor: "collection", radiusM: 14, source: "Update",
+    note: "背坡伤员集结处：第一次看见担架、伤员与搬运人员",
   }),
-  // --- Shelter -----------------------------------------------------------
-  shelterCornerHeld: Gate({
-    kind: "combat", step: "Shelter", encounter: "shelterPursuit",
-    source: "FirstLevelOpening.Update", text: "压到折角的那一组全部阵亡",
-  }),
-  escapeWhisperHeard: Gate({ kind: "voice", step: "Shelter", cue: "EscapeWhisper", source: "VoiceDone" }),
-  woundedSeen: Gate({
-    kind: "scripted", step: "Shelter", source: "FirstLevelOpening.Update",
-    text: "顺子看见从前面抬下来的伤兵（视线不被挡，距离在 shelterWitnessM 内）",
-  }),
-  supportOrdersHeard: Gate({ kind: "voice", step: "Shelter", cue: "SupportOrder", source: "VoiceDone" }),
+  supportOrdersHeard: Gate({ kind: "voice", step: "RearTrench", cue: "SupportOrder", source: "VoiceDone" }),
   // --- Support -----------------------------------------------------------
   frontReached: Gate({
     kind: "proximity", step: "Support", anchor: "front", radiusM: OPENING.frontReachRadiusM,
@@ -223,11 +209,11 @@ export const MISSION_FACT_GATES = Object.freeze({
     kind: "scripted", step: "Support", source: "UpdateGuards",
     text: "头 rifleGuardCount 对守军要么撤回安全、要么阵亡",
   }),
-  zhouGunWounded: Gate({
-    kind: "scripted", step: "Support", source: "FirstLevelOpening.UpdateZhou",
-    text: "老周在机枪位上挨了那一发（负伤但没死）",
-  }),
   // --- MachineGun --------------------------------------------------------
+  zhouGunWounded: Gate({
+    kind: "scripted", step: "MachineGun", source: "FirstLevelOpening.UpdateZhou",
+    text: "老周在机枪位上挨了那一发（负伤但没死），退出枪位",
+  }),
   frontAttackRepelled: Gate({
     kind: "combat", step: "MachineGun", encounter: "machineGun", source: "UpdateFrontAttack",
     text: "machineGun 组全部阵亡或被打退（退到 retreatDistanceM 之外）",
@@ -236,6 +222,11 @@ export const MISSION_FACT_GATES = Object.freeze({
     kind: "scripted", step: "MachineGun", source: "UpdateGuards",
     text: "八对守军全部撤回交通壕或阵亡",
   }),
+  tankBlocksExit: Gate({
+    kind: "scripted", step: "MachineGun", source: "UpdateTank",
+    text: "战车压到沟口（tankStopZ 附近），把前沿的退路堵住",
+  }),
+  bundleOrderHeard: Gate({ kind: "voice", step: "MachineGun", cue: "BundleOrder", source: "VoiceDone" }),
   // --- Tank --------------------------------------------------------------
   bundleRouteTraversed: Gate({
     kind: "scripted", step: "Tank", source: "UpdateSortie",
@@ -250,28 +241,47 @@ export const MISSION_FACT_GATES = Object.freeze({
     kind: "scripted", step: "Tank", source: "OnBlast",
     text: "集束弹在履带判定半径内炸开，战车停住",
   }),
+  lastGuardsWithdrawn: Gate({
+    kind: "scripted", step: "Tank", source: "UpdateGuards",
+    text: "最后一批守军真实撤入交通壕（返程不复活去程的敌人）",
+  }),
+  reliefInPosition: Gate({
+    kind: "scripted", step: "Tank", source: "UpdateRelief",
+    text: "接防人员沿交通壕进入前沿阵位",
+  }),
   // --- Orders ------------------------------------------------------------
-  ordersReached: Gate({ kind: "proximity", step: "Orders", anchor: "orders", radiusM: 5, source: "Update" }),
+  ordersReached: Gate({ kind: "proximity", step: "Orders", anchor: "collection", radiusM: 5, source: "Update" }),
   volunteerHeard: Gate({ kind: "voice", step: "Orders", cue: "Volunteer", source: "VoiceDone" }),
+  lightShared: Gate({ kind: "voice", step: "Orders", cue: "BorrowLight", source: "VoiceDone" }),
   zhouOnLitter: Gate({ kind: "voice", step: "Orders", cue: "ZhouLift", source: "VoiceDone" }),
+  columnDeparted: Gate({
+    kind: "column", step: "Orders", source: "Update",
+    text: "后送队真实起行（担架队沿路线走出集结处）",
+  }),
   // --- South -------------------------------------------------------------
-  southTransitionComplete: Gate({
-    kind: "cutscene", step: "South", source: "Update/controls(southTransition)",
-    text: "「向南」那段黑屏转场放完",
+  southWhisperHeard: Gate({ kind: "voice", step: "South", cue: "SouthWhisper", source: "VoiceDone" }),
+  villageMouthReached: Gate({
+    kind: "proximity", step: "South", anchor: "village", radiusM: 4, source: "Update",
+    note: "真走一段（取消了旧的黑屏转场），目标时长 45–75 秒",
   }),
-  southTraversed: Gate({
-    kind: "proximity", step: "South", anchor: "village", radiusM: 3, source: "Update",
-    note: "黑屏转场结束的那一帧判一次（人已经被放到村口）",
-  }),
+  mainStreetPointed: Gate({ kind: "voice", step: "South", cue: "VillagePointer", source: "VoiceDone" }),
   // --- Village -----------------------------------------------------------
-  innerCourtReached: Gate({
-    kind: "proximity", step: "Village", anchor: "melee", radiusM: R.meleeTriggerRadiusM,
-    requires: Object.freeze(["kitchenTraversed"]), source: "Update",
+  streetBlockSeen: Gate({
+    kind: "proximity", step: "Village", anchor: "streetBlock", radiusM: 22, source: "Update",
+    note: "主街被倒墙＋横车堵住，东巷窗口有日军火力",
+  }),
+  littersInCover: Gate({
+    kind: "column", step: "Village", source: "Update",
+    text: "担架队停进可靠遮挡（litterHold），不跟进未清空间",
+  }),
+  kitchenEntered: Gate({
+    kind: "interior", step: "Village", box: "kitchenInterior", source: "Update",
+    text: "玩家从右侧灶屋绕进去",
   }),
   // --- Melee -------------------------------------------------------------
   meleeResolved: Gate({
-    kind: "scripted", step: "Melee", source: "FirstLevelAmbush.Resolve",
-    text: "屋内伏击那四个人处理完（挣脱刺刀之后清场）",
+    kind: "combat", step: "Melee", encounter: "melee", source: "UpdateMelee",
+    text: "从连屋出来的那一组处理完（提前击败就不会有固定僵持）",
   }),
   // --- Courtyard ---------------------------------------------------------
   villageGunSilent: Gate({
@@ -284,34 +294,57 @@ export const MISSION_FACT_GATES = Object.freeze({
   }),
   courtyardPassed: Gate({
     kind: "column", step: "Courtyard", source: "Update",
-    text: "还活着的担架全部通过院门",
+    text: "还活着的担架全部通过院门，在障碍南侧 streetRejoin 接回主街",
   }),
   // --- TransferApproach --------------------------------------------------
   transferApproachReached: Gate({
     kind: "proximity", step: "TransferApproach", anchor: "transfer", radiusM: 14, source: "Update",
   }),
-  transferHopeHeard: Gate({ kind: "voice", step: "TransferApproach", cue: "TransferHope", source: "VoiceDone" }),
+  transferSortingHeard: Gate({ kind: "voice", step: "TransferApproach", cue: "TransferSorting", source: "VoiceDone" }),
+  villageRoadThreatSeen: Gate({ kind: "voice", step: "TransferApproach", cue: "VillageRoadThreat", source: "VoiceDone" }),
   // --- Transfer ----------------------------------------------------------
   transferArrived: Gate({ kind: "proximity", step: "Transfer", anchor: "transfer", radiusM: 14, source: "Update" }),
-  vehiclesDeparted: Gate({
-    kind: "column", step: "Transfer", source: "Update/column.TransferReady",
-    text: "车辆分批全部出发",
+  loadingThreatResolved: Gate({
+    kind: "combat", step: "Transfer", encounter: "transfer", source: "UpdateTransferThreats",
+    text: "压向装载区的那一处威胁被清掉",
   }),
-  transferAttacksResolved: Gate({
-    kind: "combat", step: "Transfer", source: "UpdateTransferBeats",
-    text: "转运区四波攻击全部清掉",
+  firstBatchLoaded: Gate({
+    kind: "column", step: "Transfer", source: "Update",
+    text: "第一处威胁解除后接运真实推进一批（装上第一车伤员）",
+  }),
+  alleyThreatResolved: Gate({
+    kind: "combat", step: "Transfer", encounter: "transferAlley", source: "UpdateTransferThreats",
+    text: "侧巷那一处威胁被清掉",
   }),
   zhouNext: Gate({
     kind: "column", step: "Transfer", source: "Update",
     text: "队列轮到老周，他被抬向装车位（离开原位 boardingWitnessM 以上）",
   }),
-  followVehicleHeard: Gate({ kind: "voice", step: "Transfer", cue: "FollowVehicle", source: "VoiceDone" }),
+  escortGranted: Gate({ kind: "voice", step: "Transfer", cue: "EscortZhou", source: "VoiceDone" }),
+  // --- CartRide ----------------------------------------------------------
+  cartBoarded: Gate({
+    kind: "interaction", step: "CartRide", interaction: "MissionCart", anchor: "cartBoard",
+    source: "Register", text: "顺子上了老周那辆车（控制接管 cartRide，可环视）",
+  }),
+  zhouCartDeparted: Gate({
+    kind: "scripted", step: "CartRide", source: "UpdateCart",
+    text: "车沿 cartRide 路线真实离开装载位置",
+  }),
+  cartTalkHeard: Gate({ kind: "voice", step: "CartRide", cue: "CartTalk", source: "VoiceDone" }),
   // --- AirFirst ----------------------------------------------------------
   firstAirPassComplete: Gate({
     kind: "scripted", step: "AirFirst", source: "UpdateAir",
-    text: "日机第一趟扫射掠过",
+    text: "日机第一趟扫射掠过桥头道路与车列",
   }),
-  firstAirOrdersHeard: Gate({ kind: "voice", step: "AirFirst", cue: "AircraftFirst", source: "VoiceDone" }),
+  cartHalted: Gate({
+    kind: "scripted", step: "AirFirst", source: "UpdateCart",
+    text: "道路受损堵塞，车停在 cartHalt",
+  }),
+  zhouUnloaded: Gate({
+    kind: "scripted", step: "AirFirst", source: "UpdateCart",
+    text: "老周被从车上卸回担架",
+  }),
+  westDitchPointed: Gate({ kind: "voice", step: "AirFirst", cue: "WestDitchOrder", source: "VoiceDone" }),
   // --- Carry -------------------------------------------------------------
   zhouCarried: Gate({
     kind: "interaction", step: "Carry", interaction: "MissionZhouCarry", anchor: "queue",
@@ -330,44 +363,87 @@ export const MISSION_FACT_GATES = Object.freeze({
     kind: "scripted", step: "Rescue", source: "Update",
     text: "与 zhouRecovered 同时记：拖回来的那条通路当时没有威胁",
   }),
-  // --- Retreat -----------------------------------------------------------
-  retreatFirstPassed: Gate({
-    kind: "proximity", step: "RetreatFirst", anchor: "retreatA", radiusM: 20, source: "Update",
-    note: "还要求剩下的担架全部越过这一段的放行进度",
+  // --- Regroup (15A) -----------------------------------------------------
+  picketHolding: Gate({ kind: "voice", step: "Regroup", cue: "PicketHold", source: "VoiceDone" }),
+  zhouChecked: Gate({ kind: "voice", step: "Regroup", cue: "ZhouCheck", source: "VoiceDone" }),
+  headcountDone: Gate({ kind: "voice", step: "Regroup", cue: "Headcount", source: "VoiceDone" }),
+  litterRemanned: Gate({
+    kind: "scripted", step: "Regroup", source: "Update",
+    text: "缺人的担架换上抬手，队伍重新成形",
   }),
-  retreatWallPassed: Gate({
-    kind: "proximity", step: "RetreatWall", anchor: "retreatB", radiusM: 20, source: "Update",
-    note: "同上：担架先过，玩家再进圈",
+  columnMoving: Gate({
+    kind: "column", step: "Regroup", source: "Update",
+    text: "收拢完成，队伍沿院墙夹道方向重新走起来",
   }),
-  retreatYardPassed: Gate({
-    kind: "proximity", step: "RetreatYard", anchor: "retreatC", radiusM: 20, source: "Update",
-    note: "这一段的圈心是**最后一副担架**（活点），不是锚点；还要求玩家在路线上的进度跟上",
+  // --- WallPath (15B) ----------------------------------------------------
+  carryHandover: Gate({
+    kind: "interaction", step: "WallPath", interaction: "MissionZhouCarry", anchor: "wallPathStart",
+    source: "BeginCarry", text: "顺子再次接过老周担架（CarrySwap）",
   }),
-  receptionPassed: Gate({
-    kind: "proximity", step: "Reception", anchor: "reception", radiusM: 24, source: "Update",
-    note: "还要求剩下的担架全部被接收院收下",
+  wallPathTraversed: Gate({
+    kind: "proximity", step: "WallPath", anchor: "wallPathEnd", radiusM: 6, source: "Update",
+    note: "靠院墙夹道那一段留了无对白行走，全程无敌人",
   }),
-  // --- FinalCarry / Death ------------------------------------------------
+  stragglersTended: Gate({
+    kind: "column", step: "WallPath", source: "Update",
+    text: "掉队的伤员被照应上，担架队跟到夹道尽头",
+  }),
+  // --- ReceptionGate (15C) -----------------------------------------------
+  gateChallenged: Gate({ kind: "voice", step: "ReceptionGate", cue: "GateChallenge", source: "VoiceDone" }),
+  receptionAccepted: Gate({ kind: "voice", step: "ReceptionGate", cue: "ReceptionAccept", source: "VoiceDone" }),
+  woundedEntering: Gate({
+    kind: "column", step: "ReceptionGate", source: "Update",
+    text: "伤员实际进入接收院",
+  }),
+  // --- Handover ----------------------------------------------------------
+  thresholdCrossed: Gate({
+    kind: "proximity", step: "Handover", point: MISSION_RECEPTION_SPACE.wardEntry, radiusM: 3, source: "Update",
+    note: "过厢房门槛（会颠一下）——「脚……慢点」是老周最后一句话",
+  }),
   zhouPlaced: Gate({
-    kind: "interaction", step: "FinalCarry", interaction: "MissionZhouPlace", anchor: "zhouDrop",
-    source: "Register", text: "把老周放到卫生兵旁边",
+    kind: "interaction", step: "Handover", interaction: "MissionZhouPlace", anchor: "zhouDrop",
+    source: "Register", text: "把老周放到军医旁边（放下之后恢复持枪）",
   }),
+  medicExamining: Gate({ kind: "voice", step: "Handover", cue: "MedicAsk", source: "VoiceDone" }),
+  squadAssigned: Gate({ kind: "voice", step: "Handover", cue: "SquadAssign", source: "VoiceDone" }),
+  // --- Death -------------------------------------------------------------
   deathSceneComplete: Gate({
     kind: "cutscene", step: "Death", source: "Update/controls(death)",
-    text: "老周牺牲那一段演完（且 ZhouDeath 的对白放完）",
+    text: "老周牺牲那一段演完（且 ZhouDeath 的对白放完）；第一人称，不切尸体特写",
   }),
-  // --- FinalDefense ------------------------------------------------------
-  rearLaneClear: Gate({
-    kind: "combat", step: "FinalDefense", anchor: "rearExit", source: "Update",
-    text: "后门外那条巷子没有威胁（Threatens 为假）",
+  // --- Bridge ------------------------------------------------------------
+  bridgeOrdersHeard: Gate({ kind: "voice", step: "BridgeOrders", cue: "BridgeOrders", source: "VoiceDone" }),
+  southBankReached: Gate({
+    kind: "proximity", step: "BridgeCover", anchor: "bridgeCover", radiusM: 8, source: "Update",
+    note: "南岸遮挡后的射位",
   }),
-  medicsEscaped: Gate({
-    kind: "column", step: "FinalDefense", source: "Update",
-    text: "卫生兵与剩下的担架全部撤出或已通过后门",
+  bridgeFireBroken: Gate({
+    kind: "combat", step: "BridgeCover", encounter: "bridgeNorth", source: "Update",
+    text: "北岸土坎的火力被打掉（不做多波守点）",
   }),
-  // --- Exit --------------------------------------------------------------
-  playerAtHandoff: Gate({ kind: "proximity", step: "Exit", anchor: "end", radiusM: 5, source: "Update" }),
-  finalExitHeard: Gate({ kind: "voice", step: "Exit", cue: "FinalExit", source: "VoiceDone" }),
+  rearColumnCrossed: Gate({
+    kind: "column", step: "BridgeCover", source: "UpdateBridgeColumn",
+    text: "威胁解除后回援尾队沿 bridgeCrossing 真实通过铁路桥",
+  }),
+  blastZoneCleared: Gate({
+    kind: "proximity", step: "BridgeWithdraw", anchor: "blastSafe", radiusM: 10, source: "Update",
+  }),
+  bridgeDestroyed: Gate({
+    kind: "scripted", step: "BridgeWithdraw", source: "UpdateBridgeBlast",
+    text: "爆破由在场人员完成，玩家在安全距离看见桥被破坏（不可逆，信号 RailBridgeDestroyed）",
+  }),
+  marchOrderHeard: Gate({ kind: "voice", step: "BridgeWithdraw", cue: "MarchToTengxian", source: "VoiceDone" }),
+  // --- NightMarch --------------------------------------------------------
+  nightTransitionComplete: Gate({
+    kind: "scripted", step: "NightMarch", source: "Update/controls(nightTransition)",
+    text: "行军脚步 → 淡出 → 字幕 → 夜间天空 → 淡入北门外行军队列",
+  }),
+  northGateReached: Gate({
+    kind: "proximity", step: "NightMarch", anchor: "northGate", radiusM: 6, source: "Update",
+  }),
+  gateEntered: Gate({
+    kind: "proximity", step: "NightMarch", anchor: "gateInside", radiusM: 4, source: "Update",
+  }),
 
   // -----------------------------------------------------------------------
   // 不在 requirements 里、但影响编排的触发
@@ -376,13 +452,9 @@ export const MISSION_FACT_GATES = Object.freeze({
     kind: "proximity", step: "Support", anchor: "front", radiusM: R.frontEngageDistanceM,
     source: "UpdateFront", note: "放出 front 组、解除 front/machineGun/tank 的待命",
   }),
-  kitchenTraversed: Gate({
-    kind: "interior", step: "Village", box: "kitchenInterior", source: "Update",
-    text: "玩家从右侧灶屋穿过去（innerCourtReached 的前提）",
-  }),
-  ambushTriggered: Gate({
-    kind: "scripted", step: "Melee", source: "FirstLevelAmbush.Trigger",
-    text: "屋内伏击打响（melee 组从装睡里醒过来）",
+  meleeEngaged: Gate({
+    kind: "scripted", step: "Melee", source: "UpdateMelee",
+    text: "连屋那一组真的贴上玩家（走共用白刃僵持）；玩家先手打掉就不会记",
   }),
   gunOccupied: Gate({
     kind: "interaction", step: "MachineGun", interaction: "MissionGun", anchor: "gun",
@@ -392,13 +464,7 @@ export const MISSION_FACT_GATES = Object.freeze({
     kind: "scripted", step: "MachineGun", source: "Update",
     text: "机枪打出过子弹（守军交替撤退的放行条件之一）",
   }),
-  captivesWitnessed: Gate({
-    kind: "proximity", step: "MachineGun", point: OPENING.zhouGunSeat, radiusM: R.captivesCutsceneRadiusM,
-    source: "UpdateCaptivesCutscene",
-    note: "04 机枪点位那段关中过场的触发圈；运行时用的是它自己的 GUN_SEAT 常量（与机枪座共用同一个坐标）",
-  }),
-  bundleDirectionsHeard: Gate({ kind: "voice", step: "Tank", cue: "BundleSupplyDirections", source: "VoiceDone" }),
-  southHopeHeard: Gate({ kind: "voice", step: "South", cue: "SouthHope", source: "VoiceDone" }),
+  bundleDirectionsHeard: Gate({ kind: "voice", step: "Tank", cue: "BundleSupply", source: "VoiceDone" }),
 
   // --- 家族门（一串点，逐个记一条事实）-------------------------------------
   approachShell: Gate({

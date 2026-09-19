@@ -8,36 +8,36 @@
 const debug = window.Tengxian.Debug; // window.Taierzhuang 同一接口
 debug.FirstLevelStages(); // 18 个目录条目、number、id、title、steps、current
 await debug.FirstLevelJump(14); // 1–18；返回跳转完成后的任务状态
-await debug.FirstLevelJump("Reception"); // 等同于第 16 阶段
+await debug.FirstLevelJump("Handover"); // 等同于第 16 阶段
 debug.FirstLevelMission(); // phaseNumber / phaseId / phaseTitle / phaseCount
 ```
 
-必须等待 Promise 完成后再输入；加载中的第二次请求会被拒绝。无效编号在修改现场之前报错。`stage`、`index` 指内部执行步骤；当前共 27 步。Flow v2 快照以稳定 `stageId` 恢复，v1 优先读取日志中的阶段名，无日志时按原 25 步映射。正常流程的所有事实门和最短节奏保留。
+必须等待 Promise 完成后再输入；加载中的第二次请求会被拒绝。无效编号在修改现场之前报错。`stage`、`index` 指内部执行步骤；当前共 27 步。Flow v2 快照以稳定 `stageId` 恢复（2026-09-19 重构后不再兼容 v1 旧存档）。正常流程的所有事实门和最短节奏保留。
 
-2026-09-10 开局 r2：炮击阶段使用玩家所在第二节车厢，恢复后沿当前车体残骸与救援条件继续；第三阶段及后续起点使用已完成翻覆／脱险的场景。眼睑、眩晕与听觉模糊是任务实例拥有的暂态表现，离开该任务时复位，不能残留到跳关或重开。阶段跳转依然只是恢复专项，不能代替开局正常输入验收。
+2026-09-19 重构：开局从军列换成坍塌的掩蔽部（阶段 1 整段是控制接管 `trapped`，只能小幅转头），阶段 2 起点是班长已经在拖人的那一刻；第三阶段及后续起点使用已脱险的场景。眼睑、眩晕与听觉模糊是任务实例拥有的暂态表现，离开该任务时复位，不能残留到跳关或重开。阶段跳转依然只是恢复专项，不能代替开局正常输入验收。
 
 从主菜单或其他测试场跳转时，沿既有选关流程导航到第一关页面，API 返回 `navigating/url/phaseNumber` 回执；agent 应等待新页面的 `state.ready && state.running` 与目标 `phaseNumber`。也可直接打开 `?whitebox=p012&missionStage=14`（支持编号或 id），加载完成即从指定阶段开始；刷新重进同一阶段，退出第一关或普通选关会清除此参数。
 
 | 阶段 | id | 执行步骤 |
 |---|---|---|
-| 1 军列上的人味 | Train | Train |
-| 2 接近卸载点，遭遇炮击 | Unloading | Unloading |
-| 3 进沟、喘息与前线步枪掩护 | Support | TrenchEntry → Shelter → Support |
-| 4 击退前方日军（机枪可选） | MachineGun | MachineGun |
-| 5 集束手榴弹炸停战车 | Tank | Tank |
-| 6 后送命令 | Orders | Orders |
-| 7 护送转场抵达村口 | South | South |
-| 8 村口截击 | Village | Village |
-| 9 屋内伏击：枪托砸倒、地上较劲 | Melee | Melee |
-| 10 夺院并掩护伤员通过 | Courtyard | Courtyard |
-| 11 转运区抵达 | TransferApproach | TransferApproach |
-| 12 完整转运区防御 | Transfer | Transfer |
-| 13 空袭与接替担架 | AirFirst | AirFirst → Carry |
-| 14 第二轮扫射与松手 | Dive | Dive → Rescue |
-| 15 撤向接收院 | RetreatFirst | RetreatFirst → RetreatWall → RetreatYard |
-| 16 接收院战斗 | Reception | Reception → FinalCarry |
-| 17 老周牺牲 | Death | Death |
-| 18 接收院撤离 | FinalDefense | FinalDefense → Exit |
+| 1 黑屏、爆炸、受困 | Trapped | Trapped |
+| 2 班长救人，撤入后交通壕 | Rescue | BunkerRescue → RearTrench |
+| 3 接回第一批守军 | Support | Support |
+| 4 接替火力，战车压口 | MachineGun | MachineGun |
+| 5 班长带路取弹，炸停战车 | Tank | Tank |
+| 6 回到伤员集结处，接下后送 | Orders | Orders |
+| 7 沿沟南行 | South | South |
+| 8 主街受阻 | Village | Village |
+| 9 灶屋—连屋近战 | Melee | Melee |
+| 10 打开内院，放行担架 | Courtyard | Courtyard |
+| 11 抵达桥头接运点 | TransferApproach | TransferApproach |
+| 12 掩护装载与离开 | Transfer | Transfer → CartRide |
+| 13 日机空袭桥头道路与车列 | AirFirst | AirFirst |
+| 14 第二轮扫射，转入西沟 | Dive | Carry → Dive → Rescue |
+| 15 降压：收拢、换手抬运、找到接收处 | Regroup | Regroup → WallPath → ReceptionGate |
+| 16 完成交接 | Handover | Handover |
+| 17 确认老周死亡 | Death | Death |
+| 18 接应回援尾队，奉令毁桥，夜入滕城 | Bridge | BridgeOrders → BridgeCover → BridgeWithdraw → NightMarch |
 
 阶段 9 的内容 2026-09-15 换成了屋内伏击（顺子带着老周的担架进屋挨了一下），2026-09-16 又按
 《使命召唤：二战》诺曼底地堡那一段重做成「枪托砸倒 → 躺着看 → 地上较劲」，id 与通过条件都没变，

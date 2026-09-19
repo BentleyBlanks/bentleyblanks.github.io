@@ -26,26 +26,26 @@ for (const cue of cues) {
   assert.ok(entry.seconds > 90 && entry.seconds < 130 && entry.bytes < 2_000_000);
   assert.ok(Math.abs(entry.rmsDbfs + 27) <= 0.6 && entry.peakDbfs <= -3);
 }
-assert.equal(FirstLevelMusicState("Train").cue, null);
-assert.equal(FirstLevelMusicState("Unloading").cue, null);
-assert.equal(FirstLevelMusicState("Unloading", { shellImpact: true }).cue, null);
+assert.equal(FirstLevelMusicState("Trapped").cue, null);
+assert.equal(FirstLevelMusicState("BunkerRescue").cue, null);
+assert.equal(FirstLevelMusicState("Trapped", { shellImpact: true }).cue, null);
 assert.equal(FirstLevelMusicState("South").cue, "firstLevelTheRoadSouth");
 assert.equal(FirstLevelMusicState("TransferApproach").cue, "firstLevelTheRoadSouth");
 assert.equal(FirstLevelMusicState("Death").cue, null);
-for (const stage of ["Support", "MachineGun", "Tank", "Transfer", "AirFirst", "FinalDefense"]) {
+for (const stage of ["Support", "MachineGun", "Tank", "Transfer", "AirFirst", "BridgeCover"]) {
   assert.equal(FirstLevelMusicState(stage).cue, "firstLevelCloseQuartersPressure", stage);
   assert.equal(FirstLevelMusicState(stage, { failed: true }).cue, null, stage);
 }
-for (const stage of ["TrenchEntry", "Village", "Melee", "Courtyard", "Rescue", "RetreatFirst", "RetreatWall", "RetreatYard", "Reception"]) {
+for (const stage of ["RearTrench", "Village", "Melee", "Courtyard", "Rescue"]) {
   assert.equal(FirstLevelMusicState(stage).cue, "firstLevelIronSiege", stage);
 }
-assert.equal(FirstLevelMusicState("Shelter").cue, null);
+assert.equal(FirstLevelMusicState("NightMarch").cue, "firstLevelTheLivingStillNeedUs");
 assert.equal(FirstLevelMusicState("Orders").cue, "firstLevelTheFrontClosesIn");
-assert.equal(FirstLevelMusicState("FinalCarry").cue, "firstLevelKeepYourEyesOpen");
-assert.equal(FirstLevelMusicState("Exit").cue, "firstLevelTheLivingStillNeedUs");
+assert.equal(FirstLevelMusicState("Handover").cue, "firstLevelKeepYourEyesOpen");
+assert.equal(FirstLevelMusicState("WallPath").cue, "firstLevelTheLivingStillNeedUs");
 assert.equal(FirstLevelMusicState("Transfer").scale, 1);
 assert.equal(FirstLevelMusicState("Complete").cue, null);
-assert.equal(FirstLevelMusicState("Train", { failed: true }).cue, null);
+assert.equal(FirstLevelMusicState("Trapped", { failed: true }).cue, null);
 const ambience = JSON.parse(fs.readFileSync(new URL("./Audio/Amb/Data_AmbManifest.json", import.meta.url)));
 const trainBed = ambience.beds[CARRIAGE_SOUND.trainBed];
 const trainSource = ambience.carriageSources[CARRIAGE_SOUND.trainBed];
@@ -69,7 +69,7 @@ director.Update("Orders", { speaking: false });
 assert.ok(levels.at(-1)[0] > levels[0][0]);
 director.Update("Death");
 assert.equal(calls.at(-1)[0], null); assert.ok(calls.at(-1)[1].fadeOut < 0.2);
-director.Update("FinalDefense"); director.Update("Exit");
+director.Update("BridgeCover"); director.Update("WallPath");
 assert.equal(calls.at(-1)[0], "firstLevelTheLivingStillNeedUs");
 const beforeVillage = calls.length;
 director.Update("Village"); director.Update("Melee"); director.Update("Courtyard");
@@ -77,9 +77,9 @@ assert.equal(calls.length, beforeVillage + 1, "continuous close combat holds its
 assert.equal(calls.at(-1)[0], "firstLevelIronSiege");
 director.Update("TransferApproach");
 assert.equal(calls.at(-1)[0], "firstLevelTheRoadSouth", "travel leaves battle music");
-director.Update("Rescue"); director.Update("RetreatFirst"); director.Update("RetreatWall"); director.Update("RetreatYard"); director.Update("Reception");
+director.Update("Rescue");
 assert.equal(calls.at(-1)[0], "firstLevelIronSiege");
-director.Update("FinalCarry");
+director.Update("Handover");
 assert.equal(calls.at(-1)[0], "firstLevelKeepYourEyesOpen", "carrying returns to the story cue");
 director.Dispose(); assert.equal(calls.at(-1)[0], null);
 console.log("PASS nine verified assets; battle assignments, story transitions, silence, dialogue and uninterrupted combat");

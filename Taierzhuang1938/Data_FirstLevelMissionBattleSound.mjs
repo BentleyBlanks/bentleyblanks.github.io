@@ -9,19 +9,23 @@ export const MISSION_BATTLE_SOUND = Object.freeze({
     //   · startAfterS —— 头二十四秒完全留给车厢自己的动静与班里那顿饭的对话；
     //   · rampFromGain / rampS —— 军列正往北开，前线从「几乎听不见」长到「就在前头」；
     //   · airCut —— 隔着木板与铁皮，外面只剩低频（落地那一发不吃这一条，它走 Blast）。
-    Train: {gain:.62,interval:1.9,startAfterS:24,rampFromGain:.3,rampS:30,airCut:340},
-    // 第一发落在车边之后：门开了，人往外跑，外面不再是闷的。
-    Unloading:{gain:1,interval:.85,airCut:1400},
-    TrenchEntry:{gain:.85,interval:1}, Shelter:{gain:.55,interval:1.2,airCut:1100},
+    // 2026.09.19 重构：01 在坍塌的掩蔽部里，外面的前线隔着土与木架，只剩低频；
+    // 近爆之后门口破了，外面不再是闷的。
+    Trapped: {gain:.62,interval:1.9,startAfterS:24,rampFromGain:.3,rampS:30,airCut:340},
+    BunkerRescue:{gain:1,interval:.85,airCut:1400},
+    RearTrench:{gain:.85,interval:1},
     Support: {gain:1,interval:1}, MachineGun:{gain:.55,interval:1.2}, Tank:{gain:.55,interval:1.2},
     Orders:{gain:.7,interval:1.15}, South:{gain:.46,interval:1.7},
     Village:{gain:.7,interval:1.25}, Melee:{gain:.6,interval:1.3}, Courtyard:{gain:.75,interval:1.2},
-    Transfer:{gain:.8,interval:1.1}, AirFirst:{gain:.4,interval:1.5}, Carry:{gain:.65,interval:1.2},
+    TransferApproach:{gain:.6,interval:1.3},
+    Transfer:{gain:.8,interval:1.1}, CartRide:{gain:.46,interval:1.7},
+    AirFirst:{gain:.4,interval:1.5}, Carry:{gain:.65,interval:1.2},
     Dive:{gain:.35,interval:1.6}, Rescue:{gain:.6,interval:1.25},
-    RetreatFirst:{gain:.75,interval:1.15}, RetreatWall:{gain:.75,interval:1.15},
-    RetreatYard:{gain:.7,interval:1.2}, Reception:{gain:.7,interval:1.2},
-    FinalCarry:{gain:.55,interval:1.3}, Death:{gain:.28,interval:1.8},
-    FinalDefense:{gain:.75,interval:1.15}, Exit:{gain:.55,interval:1.4},
+    Regroup:{gain:.7,interval:1.2}, WallPath:{gain:.5,interval:1.5},
+    ReceptionGate:{gain:.55,interval:1.4}, Handover:{gain:.55,interval:1.3},
+    Death:{gain:.28,interval:1.8},
+    BridgeOrders:{gain:.6,interval:1.3}, BridgeCover:{gain:.85,interval:1.1},
+    BridgeWithdraw:{gain:.6,interval:1.3}, NightMarch:{gain:.3,interval:2},
   },
   sources: [
     {id:'WestRifles',cue:'rifleNraFar',x:-100,z:-210,y:5,volume:.055,airCut:1000,first:.7,intervals:[3.2,5.1,2.6,6.3]},

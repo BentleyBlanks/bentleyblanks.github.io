@@ -1,5 +1,5 @@
 import { FirstLevelTransition } from "./Script_FirstLevelTransition.mjs";
-import { FRONT_SORTIE as Sortie, SOUTH_TRANSITION, SortieCrawlBlocked } from "./Data_FirstLevelFrontRoute.mjs";
+import { FRONT_SORTIE as Sortie, SortieCrawlBlocked } from "./Data_FirstLevelFrontRoute.mjs";
 import { MISSION_REARGUARD_POCKETS } from "./Data_FirstLevelMissionTopology.mjs";
 import { FirstLevelLeaderGuide } from "./Script_FirstLevelLeaderGuide.mjs";
 import { CompactGuideRoute } from "./Script_NpcMissionGuide.mjs";
@@ -11,7 +11,6 @@ import { MISSION_TRENCH_COVER as TC } from "./Data_FirstLevelMissionTrenchCover.
 import { SquadCoverRoute, SquadCoverBounds, SquadCoverThreat } from "./Script_SquadMarchCover.mjs";
 import { SQUAD_COVER_BOUNDS as CB } from "./Data_Tuning_SquadMarch.mjs";
 import * as THREE from "three";
-import { SelectP012RecruitCast } from "./Data_FirstLevelP012Cast.mjs";
 import { AiDirector } from "./Script_Ai.mjs";
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
 import { FirstLevelOpening, SamplePerceptionCurve } from "./Script_FirstLevelOpening.mjs";
@@ -23,10 +22,13 @@ import {
   MISSION_ENCOUNTERS,
   MISSION_TACTICS,
   MISSION_GUIDANCE,
-  MISSION_TRANSFER_BEATS,
+  MISSION_GUIDE_ROUTES,
+  MISSION_TRANSFER_THREATS,
   MISSION_PURSUIT_ROUTE,
   MISSION_VERSION,
 } from "./Data_FirstLevelMission.mjs";
+import { MISSION_STAGE_ROUTES } from "./Data_FirstLevelMissionTopology.mjs";
+import { MISSION_DIALOGUE } from "./Data_FirstLevelMissionDialogue.mjs";
 import {
   MISSION_ANCHORS as A,
   MISSION_ROUTES,
@@ -42,11 +44,8 @@ import {
   MISSION_FACT_GATES,
   MissionGateFamily,
 } from "./Data_FirstLevelMissionGates.mjs";
-import { MISSION_TRAIN, MissionTrainMotion } from "./Data_FirstLevelMissionTrain.mjs";
-import { FirstLevelMissionTrain } from "./Script_FirstLevelMissionTrain.mjs";
-import { PrepareFirstLevelCarriageAnimation } from "./Script_FirstLevelCarriageAnimation.mjs";
 import { FirstLevelMissionFlow } from "./Script_FirstLevelMissionFlow.mjs";
-import { TransferBeatReady, GuardCrossingPair, FrontReplacementSlots } from "./Script_FirstLevelMissionPacing.mjs";
+import { GuardCrossingPair, FrontReplacementSlots } from "./Script_FirstLevelMissionPacing.mjs";
 import { ApplyFirstLevelStageJump } from "./Script_FirstLevelMissionStageJump.mjs";
 import {
   FirstLevelMissionColumn,
@@ -54,17 +53,13 @@ import {
   MissionRouteLength, MissionRouteProjection, MissionRouteNextIndex,
   MissionGuideSpeed, MissionGuideRoute, MissionSquadRoute, MissionSquadPace, MissionRouteLookahead,
 } from "./Script_FirstLevelMissionColumn.mjs";
-import { MELEE_QTE_RULES as Q, MELEE_RULES } from "./Data_MeleeCombat.mjs";
-import { InstallMissionSentry, InstallAmbushPerformance } from "./Script_FirstLevelMissionPeople.mjs";
-import { FirstLevelAmbush } from "./Script_FirstLevelMissionAmbush.mjs";
-import { LoadFirstLevelAmbushAnimation, PrepareFirstLevelAmbushAnimation, FIRST_LEVEL_AMBUSH_CLIPS } from "./Script_FirstLevelAmbushAnimation.mjs";
+import { MELEE_RULES } from "./Data_MeleeCombat.mjs";
+import { InstallMissionSentry } from "./Script_FirstLevelMissionPeople.mjs";
 import { SquadMarchAi } from "./Script_SquadMarchAi.mjs";
 import { FirstLevelMissionView } from "./Script_FirstLevelMissionView.mjs";
-import { FirstLevelMeal } from "./Script_FirstLevelMeal.mjs";
 import { FirstLevelMissionBattleSound } from "./Script_FirstLevelMissionBattleSound.mjs";
 import { FirstLevelMissionVoice } from "./Script_FirstLevelMissionVoice.mjs";
 import { FirstLevelMissionMusic } from "./Script_FirstLevelMissionMusic.mjs";
-import { FirstLevelCarriageSound } from "./Script_FirstLevelCarriageSound.mjs";
 import { EmplacementInteraction } from "./Script_Emplacement.mjs";
 import { Localize, T } from "./Script_Text.mjs";
 import { ActionKeyGlyph } from "./Script_Input.mjs";
@@ -76,10 +71,20 @@ const Distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 // 需要「正好站在那个点上」的演出走 DriveAmbusherOnto，它按这个数把目标往前推。
 const SCRIPT_ARRIVAL_M = 0.45;
 const Clamp = (x, a, b) => Math.max(a, Math.min(b, x));
-/** 机枪座的座位点。CreateEmplacement 与 04 关中过场的触发圈共用这一个坐标。 */
+/** 机枪座的座位点。 */
 const GUN_SEAT = Object.freeze({ x: 0, z: -127.4 });
-/** 04 机枪点位的关中过场（Data_CutsceneMachineGunCaptives，注册在 CUTSCENES 里）。 */
-const CAPTIVES_CUTSCENE_ID = "CS_MachineGunCaptives";
+/** 台词表里有没有这条 cue。并行的 Voice 包还没合进来时，骨架按兜底路径走（见 Say）。 */
+const CUE_IDS = new Set(MISSION_DIALOGUE.map((cue) => cue.id));
+/** 兜底 cue 的「播完」延时（开发期，见 Say）。 */
+const MISSING_CUE_DELAY_S = 1.5;
+/** 抬着担架走时的落点：按步骤查表，运行时不挑分支（锚点名，见 MISSION_ANCHORS）。 */
+const CARRY_GOALS = Object.freeze({ Carry: "ditch", WallPath: "wallPathEnd", Handover: "zhouDrop" });
+/** 抬着走时指引箭头的标签（`firstLevel.guide.<label>`）。 */
+const CARRY_GOAL_LABELS = Object.freeze({ Carry: "ditch", WallPath: "wallPath", Handover: "place" });
+/** 控制接管的全部 kind（契约 §2）。未知 kind 抛错 —— 不再有「兜底当成 death」。 */
+const CONTROL_KINDS = Object.freeze(["trapped", "rescue", "cartRide", "dive", "death", "nightTransition"]);
+/** 这几种短接管期间玩家不许被瞄准或打伤（复用出生保护）。 */
+const CONTROL_GRACE_KINDS = Object.freeze(["trapped", "rescue", "cartRide", "dive", "death", "nightTransition"]);
 export class FirstLevelMissionRuntime {
   constructor(host) {
     Object.assign(this, host);
@@ -96,9 +101,11 @@ export class FirstLevelMissionRuntime {
     this.failed = false;
     this.squadRoutes = new Map();
     this.column = new FirstLevelMissionColumn();
-    // 屋内伏击的编排（纯规则在 Script_FirstLevelMissionAmbush，副作用全在下面这组钩子）。
-    this.ambush = new FirstLevelAmbush(this.AmbushHooks(), R);
-    this.southTransition = new FirstLevelTransition();
+    // 关尾夜行军的黑屏字幕（参数化：标题/正文从文本表取）。
+    this.transition = new FirstLevelTransition();
+    // Voice 包还没合进来时按兜底走的 cue（见 Say / UpdateMissingCues）。
+    this.missingCues = [];
+    this.pendingCues = [];
     this.tank = {
       active: false,
       present: false,
@@ -118,9 +125,7 @@ export class FirstLevelMissionRuntime {
       Listener: () => this.player.EyePosition,
       Done: (id) => this.VoiceDone(id),
       Event: (id,cueId,detail) => this.VoiceEvent(id,cueId,detail),
-      Ready: (id) => id === "trainPackNear"
-        ? Math.hypot(this.companion.Handle("yaowa").position.x-this.player.position.x,
-          this.companion.Handle("yaowa").position.z-this.player.position.z)<3.5 : this.Has(id),
+      Ready: (id) => this.Has(id),
       Clock: this.VoiceClock,
     });
     this.view = new FirstLevelMissionView({
@@ -130,8 +135,6 @@ export class FirstLevelMissionRuntime {
       column: this.column,
       actorFactory:this.actorFactory,library:this.library,hud:this.hud,vfx:this.vfx,
     });
-    // 抬担架的两个人挨刀那一段走同一个采样器；库没交付时这条返回 null，自动让路。
-    this.view.people.PrepareAmbush = host => this.PrepareAmbushAnimation(host);
     this.oldBlast = this.combat.host.onBlast;
     this.oldSoldierDeath = this.ai.ctx.onSoldierDeath;
     this.soldierDeath = (side, actor) => {
@@ -145,10 +148,8 @@ export class FirstLevelMissionRuntime {
     };
     this.battleSound = new FirstLevelMissionBattleSound(this.audio);
     this.music = new FirstLevelMissionMusic(this.audio);
-    this.carriageSound = new FirstLevelCarriageSound(this.audio,()=>this.train?.entries||[]);
     this.musicInitializing = true;
     this.view.interact = this.interact;
-    this.meal = new FirstLevelMeal(this);
     this.leaderGuide = new FirstLevelLeaderGuide(this);
     this.Register();
     this.flow.Start();
@@ -189,8 +190,29 @@ export class FirstLevelMissionRuntime {
     const gate = exact || family.gate;
     return this.Near(family ? family.point : gate.point || A[gate.anchor], gate.radiusM);
   }
+  /**
+   * 台词。并行开发期间 Voice 包的新 cue 还不在 `MISSION_DIALOGUE` 里 —— 那种情况
+   * 只 warn 一次，然后按 `MISSION_VOICE_FACTS` 在 missingCueDelayS 之后照常记事实、
+   * 照常走 VoiceDone 链，编排不被一条没烘的音频卡住。合并之后这条路自然不再触发。
+   */
   Say(id, options) {
-    this.voice.Enqueue(id, options);
+    if (!id) return;
+    if (CUE_IDS.has(id)) { this.voice.Enqueue(id, options); return; }
+    if (this.voice.played.has(id) || this.pendingCues.some(entry => entry.id === id)) return;
+    this.voice.played.add(id);
+    if (!this.missingCues.includes(id)) {
+      this.missingCues.push(id);
+      console.warn(`[FirstLevelMission] missing dialogue cue ${id} (Voice package not merged yet)`);
+    }
+    this.pendingCues.push({ id, at: this.time + MISSING_CUE_DELAY_S });
+  }
+  /** 兜底 cue 到点：记事实、走 VoiceDone 链。 */
+  UpdateMissingCues() {
+    if (!this.pendingCues.length) return;
+    const due = this.pendingCues.filter(entry => this.time >= entry.at);
+    if (!due.length) return;
+    this.pendingCues = this.pendingCues.filter(entry => this.time < entry.at);
+    for (const entry of due) { this.voice.finished.add(entry.id); this.VoiceDone(entry.id); }
   }
   OnOrdinaryCasualty(actor) {
     if(this.failed || this.completed || !actor || actor.alive || actor.side!=="nra"
@@ -216,59 +238,37 @@ export class FirstLevelMissionRuntime {
   // briefing keeps its own source. Unknown nearby voices stay in carriage space.
   VoicePosition(cue,line) {
     if(cue.id==="WoundedArrival"&&this.opening.wounded)return this.Point(this.opening.wounded.actor.position,1.2);
-    if(line?.who==="wounded"&&this.trainWounded)return this.Point(this.trainWounded.position,1.2);
-    if(cue.id==='BundleSupplyDirections' && line?.who==='soldier' && this.bundleKeeper)
+    if(cue.id==='BundleSupply' && line?.who==='keeper' && this.bundleKeeper)
       return this.Point(this.bundleKeeper.position,1.2);
     if(cue.id==="SupportOrder"&&this.opening.runner)return this.Point(this.opening.runner.actor.position,1.3);
-    if (cue.id.startsWith("Retreat") || cue.id === "ZhouDeath") return this.Point(this.column.zhou, 1);
+    if (["ZhouDeath","ZhouCheck","ZhouLift","Threshold","PlaceLitter","MedicAsk"].includes(cue.id)) return this.Point(this.column.zhou, 1);
     const who = line?.who ?? cue.lines[0]?.who;
     if (who === "shunzi") return this.player.EyePosition.clone();
     const handled = this.companion.Handle(who)?.position;
     if (handled) return new THREE.Vector3(handled.x,handled.y+1.35,handled.z);
-    // 不走 Point()：那一条按 GroundHeight 定高，而车厢地板比地面高两米 ——
-    // 在军列上会把说话的人塞到车底下去。
     const at = this.player.position;
     return new THREE.Vector3(at.x, at.y + 1.5, at.z);
   }
   get EmptyHands() {
-    return this.controls?.kind === "death" || (["Train","Unloading"].includes(this.flow.stage.id) && !this.Has("unloaded"));
-  }
-  get ReceivingFood() {
-    return this.flow.stage.id === "Train" && !this.Has("trainFoodReceived");
+    return this.controls?.kind === "death"
+      || (["Trapped","BunkerRescue"].includes(this.flow.stage.id) && !this.Has("rifleRecovered"));
   }
   /** COD campaign: a brief objective update; the leader remains the travelling destination. */
   ObjectiveNotice() {
-    return this.ReceivingFood ? T("firstLevel.hint.receiveFood") : this.leaderGuide?.Objective() || "";
+    return this.leaderGuide?.Objective() || "";
   }
   OpeningPrompt() {
     if(this.flow.stage.id==='Tank' && this.player.stance!=='prone' && Sortie.crawl.some(c=>this.Near(c,c.d/2+2)))
       return {keys:'Z',label:T('firstLevel.hint.crawlPassage'),kind:'stance'};
-    if (this.controls || !this.EmptyHands || !["Train","Unloading"].includes(this.flow.stage.id)) return null;
-    // 接腊肉不需要按键：只在左上角目标通知里说一句（见 ObjectiveNotice），底部不挂键帽。
-    if (this.ReceivingFood) return null;
-    if (this.Has("trainStopped")) return this.player.stance==="prone"
-      ? {keys:"Z",label:T("firstLevel.hint.standAndUnload"),kind:"stance"}
-      : {keys:"WASD",label:T("firstLevel.hint.leaveTrain"),kind:"move"};
-    if (this.Has("trainProneOrder") && this.player.stance!=="crouch")
-      return {keys:"C",label:T("firstLevel.hint.trainProne"),kind:"stance"};
+    if (this.controls || !this.EmptyHands) return null;
+    if (this.flow.stage.id === "Trapped") return {keys:"",label:T("firstLevel.hint.trapped"),kind:"stance"};
     return null;
   }
   VoiceEvent(id,cueId,detail) {
-    if(id==="TrainDialogueLine"){
-      if(!detail)return;
-      if(!detail.active){this.train?.SetDialogueAction(detail.who,null);return;}
-      const clipId=OPENING.dialogueActions[cueId]?.[detail.who];
-      if(clipId)this.train?.SetDialogueAction(detail.who,clipId,0,{loop:true,duration:detail.end-detail.start});
-      return;
-    }
-    // 屋内伏击：老周那一声就是刀进去的那一瞬（Package B 在 RoomAmbush 第三句上打的点）。
-    if(id==="AmbushZhouLine"){this.ambush.CueZhouStab();return;}
-    // 罗班长「后头喊两个人上来抬！」：替补抬担架的从后队上来（幂等，Finish 里也会调）。
-    if(id==="AmbushLuoOrders"){this.column.AmbushRecover();return;}
-    if(id==="TrainIncomingFire"){this.opening.barrage.Begin();return;}
-    if(this.carriageSound.Handle(id))return;
-    if(id==="TrainRescue"){this.Record("luoRescueRequested");return;}
-    if (id === "TrainFoodReceived") { this.Record("trainFoodReceived"); return; }
+    // 逐句事件（Voice 包统一发）：目前骨架只用来把受困段的近爆打在末句上。
+    if(id==="Line")return;
+    if(id==="BunkerBlast"){this.opening.BunkerBlast();return;}
+    if(id==="RescueHeave"){this.Record("bunkerRescueHeave");return;}
     if(id==="AircraftDiveOrder" && !this.Has("diveComplete")) {
       this.Record("diveOrderHeard");
       this.BeginControl("dive", R.diveSeconds);
@@ -276,66 +276,12 @@ export class FirstLevelMissionRuntime {
       this.column.zhou.state="fallen";
       return;
     }
-    if (id==="TrainProneOrder") {
-      this.Record("trainProneOrder");
-      this.player.SetStance?.("crouch");
-      this.player.stance="crouch";
-      return;
-    }
-    if (id==="TrainFirstShell") {
-      this.opening.barrage.Begin();
-    }
-    if (id==="TrainNearShell") {
-      if(this.Has("trainNearShell"))return;
-      this.Record("trainNearShell");
-      const cue=this.voice.current;
-      const launchAt=cue?.cue.id==="TrainShelling"
-        ?cue.plan.segments.flatMap(segment=>segment.events||[]).find(event=>event.id==="TrainNearShell")?.at:null;
-      // The authored launch timestamp survives a late frame; the retained source
-      // freezes during pause and at the impact gate, unlike wall-clock time.
-      const Elapsed=Number.isFinite(launchAt)?()=>Math.max(0,cue.sourceTime-launchAt):null;
-      const offset=MissionTrainMotion(this.time+OPENING.nearShellFlightS,this.trainShellStartedAt,this.shellTrainOffset).offsetM;
-      const target=this.Point({x:-72.7,z:MISSION_TRAIN.cars[OPENING.derailCar].z+offset});
-      this.combat.FireShell(new THREE.Vector3(target.x+26,target.y+28,target.z-8),target,{
-        flight:OPENING.nearShellFlightS,kind:"Shell75",radius:5,damage:0,Elapsed,
-        OnImpact:()=>{
-          this.opening.Derail();
-          this.player.Suppress(.9);
-          for(const actor of this.squad)this.ai.SetStance(actor,2,3,true);
-          if(this.trainWounded){
-            this.trainWounded.TakeHit(70,"arm",new THREE.Vector3(-1,0,0));
-            this.ai.SetStance(this.trainWounded,1,15,true);
-          }
-          this.Record("trainSoldierWounded");
-          this.column.stationBombed=true;
-        },
-      });
-    }
   }
   VoiceDone(id) {
-    if (id === "TrainMeal") this.Say("TrainPack");
-    if (id === "TrainPack") this.Say("TrainBriefing");
-    if (id === "TrainBriefing") this.Record("trainShelling");
-    if (id === "WreckImpact") this.Say("TrainShelling");
-    if (id === "TrainShelling") this.Say("WreckExit");
-    if (id === "ShelterAid") this.Say("EscapeWhisper");
     // 「播完即记一条事实」的那一串走表（MISSION_VOICE_FACTS）。
     // 带额外副作用的对白事件在 VoiceEvent 里，不在这条链上。
     const fact = MISSION_VOICE_FACTS[id];
     if (fact) this.Record(fact);
-  }
-  SyncCarriageDialogue(){
-    const current=this.voice.current;
-    if(!current||this.Has("trainNearShellImpact"))return;
-    for(const track of [current,...(current.parallel||[])]){
-      if(track.finished||(track===current&&track.phase!=="playing"))continue;
-      const index=track.plan.lines.findIndex(([a,b])=>track.sourceTime>=a&&track.sourceTime<b);
-      if(index<0)continue;
-      const who=track.cue.lines[index].who,clipId=OPENING.dialogueActions[track.cue.id]?.[who];
-      if(!clipId)continue;
-      const [start,end]=track.plan.lines[index];
-      this.train.SetDialogueAction(who,clipId,track.sourceTime-start,{loop:true,duration:end-start});
-    }
   }
   PlaceActor(actor, point) {
     if (!actor) return;
@@ -353,38 +299,14 @@ export class FirstLevelMissionRuntime {
       this.speakingFace.source = () => luo.alive ? this.voice.Speech("luo") : null;
     }
     for (const actor of this.squad) actor.scriptEssential = OPENING.requiredSquadCast.includes(actor.castId);
-    const originals = this.squad.filter(actor => actor.castId !== "luo");
-    while (originals.length < 6) originals.push(this.ai.Spawn("nra", MISSION_TRAIN.centerX, A.train.z + R.trainTravelM, {
-      ...SelectP012RecruitCast(originals.length), weapon: "HanYang", scriptedNoncombatant: true, squadId: "MissionTrainOriginals",
-    }));
-    this.trainWounded = originals[3];
-    this.train = new FirstLevelMissionTrain({
-      Originals: () => originals, Guide: () => this.companion.Handle("luo"),
-      Spawn: (car, slot) => this.ai.Spawn("nra", MISSION_TRAIN.centerX, car.z + this.battlefield.trainOffsetM, {
-        ...SelectP012RecruitCast(slot), weapon: "HanYang", scriptedNoncombatant: true, squadId: "MissionTrain" + car.carIndex,
-      }),
-      Offset: () => this.battlefield.trainOffsetM,
-      Stopped: () => this.Has("trainStopped"),
-      Stance: (actor,stance) => this.ai.SetStance(actor,stance,.3,true),
-      PrepareAnimation: actor=>PrepareFirstLevelCarriageAnimation(actor),
-      Place: (actor, point) => { this.PlaceActor(actor, point); actor.yaw = Math.PI / 2; },
-      Hold: (actor) => {
-        if(actor.missionTrainReady && actor!==this.trainWounded){
-          this.Defend(actor,actor.position);
-        }
-        else {actor.scriptedNoncombatant=true;this.MoveActor(actor,actor.position,0);}
-      },
-      Move: (actor, point, speed) => {
-        this.ai.SetStance(actor, 0, 0.5, true);
-        this.MoveActor(actor, point, speed);
-        actor.scriptArrivalRadius = MISSION_TRAIN.arrivalRadiusM;
-      },
-      Exited: actor => {
-        if(actor.castId)this.squadRoutes.set(actor.id,[{x:-69,z:actor.position.z},{x:-69,z:70},...OPENING.approachRoute]);
-      }, Player: () => this.player.position,
-    });
-    this.train.Initialize();
-    this.view.train = this.train;
+    // 2026.09.19：开局不再有军列。班里人就在掩蔽部与它后侧的交通壕里，
+    // missionTrainReady 这个旗标沿用（UpdateSquad 拿它当「这个人已经归行军层管」）。
+    for (const [i, actor] of this.squad.entries()) {
+      actor.missionTrainReady = true;
+      this.PlaceActor(actor, this.opening.BunkerPost(i));
+      this.Defend(actor, actor.position, 0, 0);
+      this.ai.SetStance(actor, 1, 2, true);
+    }
   }
   MoveActor(actor, point, speed = R.squadSpeedMps) {
     if (!actor?.alive) return;
@@ -632,7 +554,7 @@ export class FirstLevelMissionRuntime {
     if (!actor?.alive) return;
     actor.scriptedNoncombatant = false;
     actor.p012Guided = false;
-    if(actor.side==="nra" && actor.missionTrainReady && !actor.castId && actor!==this.trainWounded)
+    if(actor.side==="nra" && actor.missionTrainReady && !actor.castId)
       actor.tacticalRadiusM=R.friendlyTacticalRadiusM;
     actor.scriptDefensive = !(actor.tacticalRadiusM > 0);
     actor.scriptSuppressible=true;
@@ -738,15 +660,12 @@ export class FirstLevelMissionRuntime {
         incomingAt:actor.incomingFire?.at,suppression:actor.suppression})),
       [...this.enemies.values()].filter(e=>e.alive&&!e.scriptedNoncombatant&&!e.missionDormant&&!e.missionSurfaceRest&&!e.missionFrontStandby).map(e=>e.position));
     this.squadCoverCalm=coverCalm;
-    if (["Train", "Unloading"].includes(stage) && !this.Has("trainStopped")) return;
-    for (const actor of [...this.squad, this.trainWounded].filter(Boolean)) {
+    // 受困那一段班里人是演出，不归行军层管。
+    if (stage === "Trapped") return;
+    for (const actor of this.squad) {
       InstallMissionSentry(actor);
       if (!actor.missionTrainReady) continue;
-      if (actor === this.trainWounded) {
-        this.ai.SetStance(actor, 1, Infinity, true);
-        continue;
-      }
-      if (actor === this.bedGuide?.actor && ["FinalCarry", "Death"].includes(stage)) {
+      if (actor === this.bedGuide?.actor && ["Handover", "Death"].includes(stage)) {
         const route = this.bedGuide.route;
         while (route.length && Distance(actor.position, route[0]) < 0.7) route.shift();
         if (route.length) this.MoveActor(actor, route[0], R.rescuerApproachMps);
@@ -757,7 +676,7 @@ export class FirstLevelMissionRuntime {
         continue;
       }
       actor.missionCoverWaiting=false;actor.missionCoverApproach=false;
-      actor.scriptedNoncombatant = stage === "South";
+      actor.scriptedNoncombatant = ["NightMarch","Regroup","WallPath","ReceptionGate"].includes(stage);
       actor.scriptEscapeStance=null;
       // The low roofs are geometry, not a Tank-step rule: the tracks can be cut
       // while Luo is still inside the side ditch, and Orders walks him back
@@ -771,20 +690,9 @@ export class FirstLevelMissionRuntime {
         this.ai.ReleaseCover(actor);
         this.ai.SetStance(actor,2,.5,true);
       }
-      // 幺娃在屋门口被撞倒：趴着不动，直到 ambushYaowaDownS 过去。
-      if(this.time<(actor.missionAmbushDownUntil||0)){
-        this.squadMarch?.Release(actor);
-        this.MoveActor(actor,actor.position,0);
-        this.ai.SetStance(actor,2,.5,true);
-        continue;
-      }
       if(this.RespondToGrenade(actor))continue;
-      // 冲进屋救人的那一段不许被「看见敌人就停下来打」拦住：顺子正被三个上刺刀的围着，
-      // 隔着灶屋门口对射帮不上忙。进了屋之后照常走共用的接触规则。
-      const ambushEntry=stage==="Melee"&&actor.missionAmbushEntry&&!this.InRoom(actor.position);
-      if(ambushEntry)actor.missionContactPost=null;
-      if(ambushEntry||crawl)actor.missionContactBound=null;
-      if(!ambushEntry&&!crawl&&R.openingContactStages.includes(stage)
+      if(crawl)actor.missionContactBound=null;
+      if(!crawl&&R.openingContactStages.includes(stage)
         // 出击带路（Tank 的 missionSortie）是领着玩家爬沟，照旧短停就走。
         &&this.RespondToContact(actor,{engage:!R.contactEscapeStages.includes(stage)&&!(stage==="Tank"&&actor.missionSortie)}))continue;
       if(!R.openingContactStages.includes(stage)){actor.missionContactPost=null;actor.missionContactBound=null;}
@@ -843,7 +751,7 @@ export class FirstLevelMissionRuntime {
         continue;
       }
       if (route?.length) {
-        if (stage === "South" || (actor.suppression < 0.4 && this.time>=(actor.missionDangerUntil||0))) this.ai.SetStance(actor, 0, 0.5, true);
+        if (["South","NightMarch","WallPath"].includes(stage) || (actor.suppression < 0.4 && this.time>=(actor.missionDangerUntil||0))) this.ai.SetStance(actor, 0, 0.5, true);
         const previous = this.squad[this.squad.indexOf(actor) - 1];
         const ahead =
           previous &&
@@ -870,7 +778,7 @@ export class FirstLevelMissionRuntime {
         }
         this.MoveActor(actor,route[0],speed);
         if(route[0].guideCheckpoint!=null)actor.scriptArrivalRadius=GUIDE.arrivalM*.5;
-      } else if (["TrenchEntry","Shelter"].includes(stage)) {
+      } else if (["BunkerRescue","RearTrench"].includes(stage)) {
         this.Defend(actor,actor.holdZone||actor.position,R.contactRadiusM,R.companionCoverSlackM);
         if(!actor.cover && this.time>=(actor.missionDangerUntil||0))this.ai.SetStance(actor,1,.5);
       } else if (["Support","MachineGun"].includes(stage)) {
@@ -885,7 +793,7 @@ export class FirstLevelMissionRuntime {
         if(!this.leaderGuide?.AtPost(actor)&&!this.WaitWatch(actor,stage))this.Defend(actor, actor.holdZone||actor.position);
         if(["Support","MachineGun","Tank"].includes(stage))this.ai.SetStance(actor,1,2);
       }
-      if (!Number.isFinite(actor.scriptEscapeStance) && actor.suppression > R.companionProneSuppression && stage !== "Train") this.ai.SetStance(actor, 2, R.companionDangerHoldS, true);
+      if (!Number.isFinite(actor.scriptEscapeStance) && actor.suppression > R.companionProneSuppression) this.ai.SetStance(actor, 2, R.companionDangerHoldS, true);
     }
     this.squadMarch?.Update(this.delta,{
       player:this.squadCoverBounds&&!coverCalm?null:this.player.position,
@@ -898,7 +806,7 @@ export class FirstLevelMissionRuntime {
           &&!actor.missionCoverWaiting
           &&!actor.missionGuideWaiting
           &&!actor.missionCoverApproach
-          &&!(actor===this.bedGuide?.actor&&["FinalCarry","Death"].includes(stage)),
+          &&!(actor===this.bedGuide?.actor&&["Handover","Death"].includes(stage)),
         noPause:!!this.squadCoverBounds,
         maxSpeed:marchSpeeds.get(actor.id)??0,
       }),
@@ -922,16 +830,10 @@ export class FirstLevelMissionRuntime {
       if (!actor) {this.spawnQueue.push(()=>this.SpawnEncounterActor(id,spec));return null;}
       actor.missionId = spec.id;InstallMissionSentry(actor);
       actor.missionEncounter=id;
-      if(id==="surface"){
-        if(!spec.advance)actor.scriptFireSector=OPENING.surfaceSector;
-        actor.scriptTrackPlayer=true;
-        actor.missionFireGroup=spec.team;
-        actor.yaw=Math.atan2(spec.x+62,spec.z-75);
-      }
       if(id==="approach")actor.scriptFireSector=R.approachFireSector;
       actor.missionReserve=!!spec.reserve;
       actor.missionReleaseDelayS=spec.releaseDelayS||0;
-      if(["village","melee"].includes(id)){actor.missionDormant=true;actor.scriptedNoncombatant=true;}
+      if(["village","melee","bunkerAssault"].includes(id)){actor.missionDormant=true;actor.scriptedNoncombatant=true;}
       if (MISSION_TACTICS[spec.id]) actor.missionTactic = { index: 0, elapsed: 0, hold: 0,
         movingSeconds: 0, distance: 0, last: { x: spec.x, z: spec.z }, shelter: {x:spec.x,z:spec.z}, mode: "cover" };
       // Finite front teams remain ordinary alert AI before the assault starts.
@@ -942,32 +844,24 @@ export class FirstLevelMissionRuntime {
       if(standby)this.ai.SetStance(actor,1,4+actor.id%3,true);
       actor.scriptAccuracyScale = actor.missionAccuracyScale = ["front","machineGun","approach"].includes(id)?R.frontAccuracyScale:.5;
       if(spec.reserve)actor.scriptAccuracyScale=actor.missionAccuracyScale=R.frontReserveAccuracyScale;
-      // They shoot while bounding down a long straight trench, like the approach screen.
-      if(id==="shelterPursuit")actor.scriptAccuracyScale=actor.missionAccuracyScale=R.approachAccuracyScale;
       actor.scriptFireIntervalScale = actor.missionFireIntervalScale = ["front","machineGun","approach"].includes(id)?R.frontFireIntervalScale:1.45;
       actor.scriptArrivalRadius = 0.7;
       actor.manualGoalUntil = Infinity;
       actor.order = "hold";
       actor.holdZone = { id: `Mission_${spec.id}`, x: spec.x, z: spec.z, radius: spec.hold ? 0.4 : 2 };
       if(!spec.hold && !WEAPONS[spec.weapon || "Type38"]?.emplaced){
-        actor.tacticalRadiusM = id === "surface" ? R.surfaceTacticalRadiusM
-          : ["intrusion","shelterPursuit"].includes(id) ? R.intrusionTacticalRadiusM : id === "approach" ? R.approachTacticalRadiusM : R.infantryTacticalRadiusM;
+        actor.tacticalRadiusM = id === "approach" ? R.approachTacticalRadiusM
+          : id === "bunkerAssault" ? R.intrusionTacticalRadiusM : R.infantryTacticalRadiusM;
       }
       // Emplaced gunners keep their firing position: the hide/peek side step is all they may do.
       // Everyone else may take cover inside their zone plus the ordinary slack.
       actor.scriptCoverSlackM = spec.hold ? R.defendHoldFixedSlackM : R.defendCoverSlackM;
-      if(id==="surface"){
-        actor.scriptAccuracyScale=actor.missionAccuracyScale=spec.advance?R.approachAccuracyScale:R.openingSurfaceAccuracyScale;
-        actor.scriptFireIntervalScale=actor.missionFireIntervalScale=R.openingSurfaceFireIntervalScale;
-        if(!spec.hold){actor.holdZone.radius=R.openingSurfaceRifleRadiusM;actor.scriptCoverSlackM=R.openingSurfaceRifleCoverSlackM;}
-      }
       // Two Type 91/97 grenades apiece (Data_Tuning_FirstLevel.enemyGrenades). The tactics layer decides
       // when one is worth throwing (target pinned in one place, 8-26 m, squad and personal cooldowns);
       // gunners on an emplacement never throw, they are married to the gun.
       if (!spec.hold && !WEAPONS[spec.weapon || "Type38"]?.emplaced) actor.grenades = R.enemyGrenades;
-      if(id==="intrusion")actor.grenades=OPENING.intruderGrenades;
-      if(id==="shelterPursuit")actor.grenades=OPENING.shelterPursuerGrenades;
-      if(id==="surface"&&!spec.hold)actor.grenades=R.openingSurfaceGrenades;
+      // 掩蔽部门外那一组是白刃行刑，不扔弹（玩家还躺在木架下）。
+      if(id==="bunkerAssault")actor.grenades=0;
       if (spec.hold) {actor.scriptDefensive=true;actor.scriptSuppressible=true;}
       if (["front","machineGun"].includes(id) && !spec.hold) actor.missionAssault = this.MakeAssault(spec.x, spec.z);
       // Supporting platoons keep their spacing and depth. They remain live combatants
@@ -1127,21 +1021,24 @@ export class FirstLevelMissionRuntime {
       this.spawnQueue.push(Spawn);
     }
   }
-  UpdateTransferBeats() {
+  /**
+   * 12 的两处威胁（契约 §2/§4）：先是压向装载区的 transfer，解除之后隔
+   * transferThreatGapS 才轮到侧巷的 transferAlley。不做四拍守波次。
+   */
+  UpdateTransferThreats() {
     const beats=this.transferBeats ||= {index:0,previousClearedAt:0,started:[],cleared:[]};
-    const plan=MISSION_TRANSFER_BEATS[beats.index];
+    const plan=MISSION_TRANSFER_THREATS[beats.index];
     if(!plan)return;
     const seconds=this.flow.stageTime;
     if(!beats.started.includes(plan.id)) {
-      if(!TransferBeatReady(plan,{seconds,loaded:this.column.loadEvents.length,previousClearedAt:beats.previousClearedAt}))return;
+      if(plan.after && (!this.Has(plan.after) || seconds<beats.previousClearedAt+R.transferThreatGapS))return;
       this.SpawnEncounter(plan.id);beats.started.push(plan.id);
       this.Record(`${plan.id}AttackStarted`,{loaded:this.column.loadEvents.length,departed:this.column.departed});
     }
     const actors=MISSION_ENCOUNTERS[plan.id].map(spec=>this.enemies.get(spec.id));
     if(actors.every(actor=>actor && !actor.alive)) {
       beats.cleared.push(plan.id);beats.previousClearedAt=seconds;beats.index++;
-      this.Record(`${plan.id}AttackCleared`,{loaded:this.column.loadEvents.length,departed:this.column.departed});
-      if(beats.index===MISSION_TRANSFER_BEATS.length)this.Record("transferAttacksResolved");
+      this.Record(plan.resolved,{loaded:this.column.loadEvents.length,departed:this.column.departed});
     }
   }
   Threatens(point, ids = null, targetHeight = 1.1) {
@@ -1185,6 +1082,31 @@ export class FirstLevelMissionRuntime {
         once: false,
         ...extra,
       });
+    // 01/02：掉在掩蔽部门口的那支步枪。拾起来才算真的回到战斗里。
+    Register(
+      "MissionRifle",
+      A.bunkerDoor,
+      () => this.Text("rifle"),
+      () => this.flow.stage.id === "BunkerRescue" && this.Has("luoRescueComplete") && !this.Has("rifleRecovered"),
+      () => {
+        this.Record("rifleRecovered");
+        this.RestoreRifle();
+        this.SaveCheckpoint();
+        return true;
+      },
+    );
+    // 13：顺子跟着老周那辆车走。
+    Register(
+      "MissionCart",
+      A.cartBoard,
+      () => this.Text("cart"),
+      () => this.flow.stage.id === "CartRide" && !this.Has("cartBoarded"),
+      () => {
+        this.Record("cartBoarded");
+        this.BeginCartRide();
+        return true;
+      },
+    );
     Register(
       "MissionBundle",
       A.bundle,
@@ -1216,7 +1138,7 @@ export class FirstLevelMissionRuntime {
       "MissionZhouCarry",
       A.queue,
       () => this.Text("carry"),
-      () => ["Carry", "FinalCarry"].includes(this.flow.stage.id) && !this.carry.Active,
+      () => ["Carry", "WallPath", "Handover"].includes(this.flow.stage.id) && !this.carry.Active,
       () => this.BeginCarry(),
       {
         Anchor: () =>
@@ -1233,7 +1155,7 @@ export class FirstLevelMissionRuntime {
       "MissionZhouPlace",
       A.zhouDrop,
       () => this.Text("place"),
-      () => this.flow.stage.id === "FinalCarry" && this.carry.KindId === "stretcher",
+      () => this.flow.stage.id === "Handover" && this.carry.KindId === "stretcher",
       () => {
         this.carry.ForceRelease("delivered");
         Object.assign(this.column.zhou, { ...A.zhouDrop, state: "placed", yaw: 0 });
@@ -1296,26 +1218,21 @@ export class FirstLevelMissionRuntime {
     this.opening.Enter(stage.id);
     this.UpdateMusic(stage.id);
     this.Objective(Localize(FirstLevelStageTextId(stage.id), stage.objective));
-    if (stage.cue && !["Orders", "Courtyard", "Train", "Unloading", "Shelter", "Death"].includes(stage.id))
+    // 进场不自动播的那几步：它们的 cue 由编排在真正发生的那一刻起播
+    // （受困段的黑屏对白、接令、院门打开、牺牲、上车）。
+    if (stage.cue && !["Trapped", "Orders", "Courtyard", "Death", "CartRide"].includes(stage.id))
       this.Say(stage.cue, { urgent: ["AirFirst", "Dive", "Death"].includes(stage.id) });
     // 按表生成这一步的遭遇组（Data_FirstLevelMissionGates.MISSION_STEP_SPAWNS，
     // 顺序就是原来各 case 里的调用顺序）。front 与转运四拍不在表里：
-    // 前者由 UpdateFront 的 frontBattleStarted 放出，后者由 UpdateTransferBeats 按拍放出。
+    // 前者由 UpdateFront 的 frontBattleStarted 放出，后者由 UpdateTransferThreats 放出。
     for (const id of MISSION_STEP_SPAWNS[stage.id] || []) this.SpawnEncounter(id);
     switch (stage.id) {
-      case "Train":
-        this.Say(stage.cue);
-        this.battlefield.SetTrainOffset(R.trainTravelM);
+      case "Trapped":
         this.PlaceSquad();
-        this.PlacePlayerTrain();
-        this.player.pitch=MISSION_TRAIN.life.mealLookPitchRad;
-        this.carriageSound.Start();
         break;
-      case "Unloading":
-        this.VoiceEvent("TrainProneOrder");
-        this.VoiceEvent("TrainFirstShell");
-        this.VoiceEvent("TrainNearShell");
-        this.Say(stage.cue, { urgent: true });
+      case "RearTrench":
+        this.audio.Ambience("firstLevelFront");
+        this.Guide(MISSION_STAGE_ROUTES.rearTrench);
         break;
       case "Support":
         this.column.zhou.visible = false;
@@ -1351,45 +1268,34 @@ export class FirstLevelMissionRuntime {
         this.EnsureBundleKeeper();
         break;
       case "Orders":
-        this.Guide(MISSION_ROUTES.orders);
+        this.Guide(MISSION_STAGE_ROUTES.collectionReturn);
         this.column.Activate();
         this.column.zhou.health = Math.min(this.column.zhou.health,65);
         this.column.zhou.state = "waiting";
         break;
       case "South":
-        for (const actor of this.enemies.values()) if (actor.alive) actor.scriptedNoncombatant = true;
+        // 前沿那一场留在身后：真走一段，不再黑屏瞬移。
+        for (const actor of this.enemies.values())
+          if (actor.alive && actor.missionEncounter !== "village" && actor.missionEncounter !== "melee")
+            actor.scriptedNoncombatant = true;
         for (const cart of this.column.traffic) cart.visible = true;
         this.audio.Ambience("firstLevelSouth");
-        this.BeginControl("southTransition",SOUTH_TRANSITION.fadeOutS+SOUTH_TRANSITION.holdS+SOUTH_TRANSITION.fadeInS);
-        this.southTransition.Update(0);
+        this.Guide(MISSION_STAGE_ROUTES.southWalk);
+        this.column.active = true;
         break;
       case "Village":
-        // 屋里伏击那一组不跟着村口的日军一起醒：他们要等顺子真的进屋。
+        // 连屋那一组不跟着村口的日军一起醒：玩家绕到灶屋以东他们才出来。
         for (const actor of this.enemies.values())
           if (actor.alive && actor.missionDormant && actor.missionEncounter !== "melee") actor.scriptedNoncombatant = false;
         this.audio.Ambience("firstLevelFront");
         this.Guide(MISSION_ROUTES.village.slice(0, 3));
-        this.HideAmbushers();
-        this.PostAmbushSquad();
-        // Package C 的动作库还没交付时这一拍退回既有姿态，不阻断任务。
-        LoadFirstLevelAmbushAnimation().catch(error => { this.ambushAnimationError = String(error); });
         this.column.active = true;
         break;
       case "Melee":
-        // 调试跳转直接落在这一步时 Village 那一趟没跑过；加载是幂等的。
-        LoadFirstLevelAmbushAnimation().catch(error => { this.ambushAnimationError = String(error); });
-        this.ambush.Reset();
-        this.ClearAmbushDaze();
-        this.SetAmbushPrompt(null);
-        this.SetAmbushViewmodel(true);
-        this.RestoreAmbushWeapon();
-        this.ambushQteSerial = null;
-        this.ambushQteResult = null;
-        this.ambushColumn = this.column.Snapshot();
-        this.HideAmbushers();
+        this.meleeStartedAt = this.time;
         break;
       case "Courtyard":
-        this.Guide(MISSION_ROUTES.village.slice(2, 6));
+        this.Guide(MISSION_STAGE_ROUTES.courtyardBypass);
         break;
       case "TransferApproach":
         this.Guide(MISSION_ROUTES.village.slice(-4));
@@ -1397,6 +1303,10 @@ export class FirstLevelMissionRuntime {
         break;
       case "Transfer":
         this.Guide(MISSION_ROUTES.village.slice(-4));
+        break;
+      case "CartRide":
+        this.guideRoute = null;
+        this.cart = { progress: 0, moving: false, halted: false, unloaded: false };
         break;
       case "AirFirst":
         this.guideRoute = null;
@@ -1413,24 +1323,22 @@ export class FirstLevelMissionRuntime {
         this.RestoreRifle();
         this.rescueTime = 0;
         break;
-      case "RetreatFirst":
+      case "Regroup":
+        // 15A 降压段：收拢、换手、清点。无战斗 —— 追兵由警戒兵在车路方向接住。
         this.column.StartRetreat();
-        this.Say("RetreatFirst");
-        this.Guide(MISSION_REARGUARD_POCKETS.find(pocket=>pocket.id===stage.id).route);
+        this.regroupTime = 0;
+        this.Guide(MISSION_REARGUARD_POCKETS[0].route);
         break;
-      case "RetreatWall":
+      case "WallPath":
         this.column.zhou.health = 12;
-        this.Guide(MISSION_REARGUARD_POCKETS.find(pocket=>pocket.id===stage.id).route);
+        this.Guide(MISSION_STAGE_ROUTES.wallPath);
         break;
-      case "RetreatYard":
+      case "ReceptionGate":
         this.column.zhou.health = 6;
-        this.Guide(MISSION_REARGUARD_POCKETS.find(pocket=>pocket.id===stage.id).route);
-        break;
-      case "Reception":
         this.column.StartReception();
         this.guideRoute = null;
         break;
-      case "FinalCarry":
+      case "Handover":
         this.column.zhou.state = "waiting";
         this.bedGuide = {
           actor: this.companion.Handle("yaowa"),
@@ -1445,13 +1353,17 @@ export class FirstLevelMissionRuntime {
         if(this.deathMedic)this.deathMedic.treating=true;
         this.deathCareRoute=null;
         break;
-      case "FinalDefense":
+      case "BridgeOrders":
         this.guideRoute = null;
-        this.Say("JapanesePursuit");
-        this.column.StartFinalExit();
+        this.audio.Ambience("firstLevelFront");
+        this.Guide(MISSION_STAGE_ROUTES.toBridge);
+        this.StartBridgeColumn();
         break;
-      case "Exit":
-        this.Guide(MISSION_ROUTES.exit);
+      case "BridgeWithdraw":
+        this.Guide(MISSION_STAGE_ROUTES.bridgeWithdraw);
+        break;
+      case "NightMarch":
+        this.BeginNightTransition();
         break;
       case "Complete":
         this.ClearReturnWarning();
@@ -1459,12 +1371,7 @@ export class FirstLevelMissionRuntime {
         this.Complete();
         break;
     }
-    if (stage.id !== "Train" && stage.id !== "Dive" && stage.id !== "Death") this.SaveCheckpoint();
-  }
-  PlacePlayerTrain() {
-    const p = { x: A.train.x, z: A.train.z + R.trainTravelM };
-    this.player.position.copy(this.Point(p));
-    this.player.body?.Teleport(this.player.position.x, this.player.position.y, this.player.position.z);
+    if (!["Trapped", "Dive", "Death", "NightMarch"].includes(stage.id)) this.SaveCheckpoint();
   }
   SpawnGuards() {
     if(this.guards.length)return;
@@ -1535,6 +1442,10 @@ export class FirstLevelMissionRuntime {
         this.Record("guardWithdrawalResolved", { survived,casualties:this.guards.length-survived,outcome:survived?"withdrawal":"lost" });
         if(survived)this.Record("guardsSafe",{survived});
       }
+    // 06 Tank：最后一批守军真的走完了自己那条撤退线（不是「安全了」而已）。
+    if(this.flow.stage.id==="Tank" && this.guards.length
+      && this.guards.every(guard=>!guard.actor.alive || guard.progress>=guard.route.length))
+      this.Record("lastGuardsWithdrawn",{survived:this.guards.filter(guard=>guard.actor.alive).length});
   }
   UpdateFrontDialogue() {
     if(!["Support","MachineGun"].includes(this.flow.stage.id)||!this.Has("frontReached"))return;
@@ -1632,15 +1543,23 @@ export class FirstLevelMissionRuntime {
       actor.scriptedNoncombatant = this.flow.stage.id === "South";
     }
   }
+  /**
+   * 接防人员（契约 §2 的 reliefInPosition）。2026.09.19 起他们不再是军列上下来的人：
+   * 一个班从背坡伤员集结处沿后交通壕上来，进前沿阵位。
+   */
   UpdateRelief(dt) {
-    if(!this.Has("unloaded") || !this.train.entries.every(entry=>entry.arrived||!entry.actor.alive))return;
+    if(!["Tank","Orders"].includes(this.flow.stage.id))return;
     if(!this.relief) {
-      // The existing eight-man relief detail keeps its authored front posts;
-      // extra rear-car survivors stay at the unloading casualty station.
-      this.relief=this.train.entries.filter(entry=>entry.carIndex===2&&entry.actor.alive).slice(0,P.reliefPositions.length).map((entry,i)=>({
-        actor:entry.actor, route:[...P.reliefApproach,{x:P.reliefPositions[i].x,z:-123},P.reliefPositions[i]], index:0, delay:i*R.reliefDelaySeconds,
-        arrived:false, distance:0, last:{x:entry.actor.position.x,z:entry.actor.position.z}
-      }));
+      const approach=[...MISSION_STAGE_ROUTES.collectionReturn].reverse();
+      this.relief=P.reliefPositions.map((post,i)=>{
+        const actor=this.ai.Spawn("nra",A.collection.x+(i%2?1.4:-1.4),A.collection.z+Math.floor(i/2)*1.6,
+          {weapon:"HanYang",squadId:"MissionRelief"});
+        if(!actor)return null;
+        InstallMissionSentry(actor);actor.missionId=`Relief${i}`;actor.missionTrainReady=true;
+        return {actor, route:[...approach,{x:post.x,z:-123},post], index:0, delay:i*R.reliefDelaySeconds,
+          arrived:false, distance:0, last:{x:actor.position.x,z:actor.position.z}};
+      }).filter(Boolean);
+      if(!this.relief.length){this.relief=null;return;}
     }
     for(const entry of this.relief) {
       const actor=entry.actor;
@@ -1654,13 +1573,14 @@ export class FirstLevelMissionRuntime {
       this.ai.SetStance(actor,0,.4,true);
       this.MoveActor(actor,entry.route[entry.index],R.reliefSpeedMps);
     }
+    if(this.relief.length && this.relief.every(entry=>entry.arrived||!entry.actor.alive))
+      this.Record("reliefInPosition",{arrived:this.relief.filter(entry=>entry.arrived).length});
   }
   UpdateTactics(dt) {
     const stage = this.flow.stage.id;
     for (const [id, actor] of this.enemies) {
       const plan = MISSION_TACTICS[id], state = actor.missionTactic;
-      if (!actor.alive || !state || actor.scriptedNoncombatant || actor.meleeCombat ||
-        ((id.startsWith("Air") || id.startsWith("Retreat")) && stage.startsWith("Retreat"))) continue;
+      if (!actor.alive || !state || actor.scriptedNoncombatant || actor.meleeCombat) continue;
       state.distance += Distance(actor.position, state.last);
       state.last = { x: actor.position.x, z: actor.position.z };
       // Local attacks start as the marching player reaches each sector, not offscreen at stage entry.
@@ -1755,7 +1675,7 @@ export class FirstLevelMissionRuntime {
     if(next>=0 && this.GateNear(`bundleRoutePoint${next}`))this.Record(`bundleRoutePoint${next}`);
     if(Sortie.route.every((point,index)=>this.Has(`bundleRoutePoint${index}`)) &&
       Sortie.crawl.every(crawl=>this.Has(`bundleCrawl${crawl.id}`)))this.Record('bundleRouteTraversed');
-    if(this.Near(Sortie.house,Sortie.supplierRangeM))this.Say('BundleSupplyDirections');
+    if(this.Near(Sortie.house,Sortie.supplierRangeM))this.Say('BundleSupply');
   }
   UpdateFrontAttack(){
     const roster=MISSION_ENCOUNTERS.machineGun;
@@ -1782,34 +1702,15 @@ export class FirstLevelMissionRuntime {
     if(actors.every(actor=>!actor.alive||actor.missionRepelled))this.Record('frontAttackRepelled',{
       killed:losses,repelled:actors.filter(actor=>actor.alive&&actor.missionRepelled).length});
   }
-  PlaceSouthArrival(){
-    const point=SOUTH_TRANSITION.arrival,y=this.battlefield.GroundHeight(point.x,point.z);
-    this.player.position.set(point.x,y,point.z);this.player.body?.Teleport(point.x,y,point.z);
-    this.player.velocity.set(0,0,0);this.player.SetStance('stand');this.player.yaw=Math.PI;this.player.pitch=0;
-    const lead=MissionRouteProjection(this.column.route,point).progress-SOUTH_TRANSITION.columnLeadM;
-    const delta=lead-Math.max(...this.column.litters.map(entry=>entry.progress));
-    for(const entry of [...this.column.litters,...this.column.walkers]){
-      entry.progress=Math.max(0,entry.progress+delta);
-      Object.assign(entry,MissionRoutePoint(this.column.route,entry.progress));
-      delete entry.staging;
-    }
-    // 黑屏里把老周这一副提到队首前一个车距：罗班长的命令是「担架从里头过」，
-    // 跟着顺子进屋的就是这一副。数组次序不动（转运区的装车配额还要用）。
-    this.column.PromoteZhouLead(R.ambushLitterLeadM);
-    for(const [i,actor] of this.squad.entries()){
-      actor.missionSortie=false;
-      this.PlaceActor(actor,{x:point.x+(i%2?2:-2),z:point.z-SOUTH_TRANSITION.squadBehindM-Math.floor(i/2)*2});
-      this.squadRoutes.set(actor.id,[]);this.Defend(actor,actor.position);
-    }
-    this.controls.yaw=this.player.yaw;this.controls.pitch=0;
-    this.Record('southTransitionPlaced',{x:point.x,z:point.z});this.player.SyncCamera(0);
-  }
   UpdateTank() {
     const tank = this.tank;
     if (!tank.active || !["Support","MachineGun","Tank","Orders"].includes(this.flow.stage.id)) {
       if(this.tankDust!=null){this.vfx.RemoveSmokeSource(this.tankDust);this.tankDust=null;}
       return;
     }
+    // 05：战车压到沟口，把前沿的退路堵住（契约 §2 的 tankBlocksExit）。
+    if(this.flow.stage.id==="MachineGun" && !tank.immobilized && tank.z>=R.tankStopZ-R.tankBlockRadiusM)
+      this.Record("tankBlocksExit",{z:tank.z});
     const muzzle=this.view.TankMuzzle(tank);
     const candidates=[this.player,...this.squad,...(this.frontDefenders||[]),...this.guards.map(g=>g.actor)]
       .filter(actor=>(actor.Alive??actor.alive)&&Distance(actor.position,tank)<100);
@@ -1918,14 +1819,18 @@ export class FirstLevelMissionRuntime {
     });
     if (ok) {
       zhou.state = "carried";
-      this.Record("zhouCarried");
+      this.Record(this.flow.stage.id === "WallPath" ? "carryHandover" : "zhouCarried");
     }
     return ok;
+  }
+  /** 抬着走的时候担架往哪儿去：按步骤查表，不在代码里挑分支。 */
+  CarryGoal() {
+    return CARRY_GOALS[this.flow.stage.id] ? A[CARRY_GOALS[this.flow.stage.id]] : A.ditch;
   }
   UpdateCarry() {
     const zhou = this.column.zhou;
     if (this.carry.KindId !== "stretcher" || zhou.state !== "carried") return;
-    const goal = this.flow.stage.id === "FinalCarry" ? A.zhouDrop : A.ditch;
+    const goal = this.CarryGoal();
     const yaw = Math.atan2(this.player.position.x - goal.x, this.player.position.z - goal.z);
     zhou.x = this.player.position.x - Math.sin(yaw) * 1.6;
     zhou.z = this.player.position.z - Math.cos(yaw) * 1.6;
@@ -1933,708 +1838,150 @@ export class FirstLevelMissionRuntime {
     if (this.flow.stage.id === "Carry" && this.GateNear("atDitchMouth")) this.Record("atDitchMouth");
   }
   // ---------------------------------------------------------------------------
-  // 屋内伏击（内部步骤 Melee）。编排在 Script_FirstLevelMissionAmbush，这里只做副作用。
-  // 口径与拍表见 docs/Data_FirstLevelRoomAmbush.md。
+  // 13 牛车（内部步骤 CartRide）。控制接管 cartRide：能环视，车沿契约路线真实移动。
+  // ---------------------------------------------------------------------------
+  BeginCartRide() {
+    this.cart ||= { progress: 0, moving: false, halted: false, unloaded: false };
+    this.cart.moving = true;
+    this.cart.from = { x: this.player.position.x, z: this.player.position.z };
+    this.BeginControl("cartRide", R.cartRideMaxS);
+    this.Say("CartTalk");
+  }
+  /** 车沿 MISSION_STAGE_ROUTES.cartRide 真走；13 停车、卸人都在这里落。 */
+  UpdateCart(dt) {
+    const cart = this.cart;
+    if (!cart || !cart.moving) return;
+    const route = MISSION_STAGE_ROUTES.cartRide, length = MissionRouteLength(route);
+    const stage = this.flow.stage.id;
+    if (stage === "CartRide" || (stage === "AirFirst" && !cart.halted))
+      cart.progress = Math.min(length, cart.progress + dt * R.cartRideSpeedMps);
+    const at = MissionRoutePoint(route, cart.progress);
+    const zhou = this.column.zhou;
+    Object.assign(zhou, { x: at.x, z: at.z, yaw: at.yaw ?? 0, state: "carried", visible: true });
+    if (this.controls?.kind === "cartRide") {
+      const y = this.battlefield.GroundHeight(at.x, at.z);
+      this.player.position.set(at.x, y, at.z);
+      this.player.body?.Teleport(at.x, y, at.z);
+      this.player.velocity.set(0, 0, 0);
+    }
+    if (cart.from && Distance(at, cart.from) >= R.cartDepartedM) this.Record("zhouCartDeparted", { x: at.x, z: at.z });
+    if (stage === "AirFirst") {
+      if (!cart.halted && (cart.progress >= length - .05 || this.Has("firstAirPassComplete"))) {
+        cart.halted = true;
+        this.Record("cartHalted", { x: at.x, z: at.z });
+        if (this.controls?.kind === "cartRide") { const kind = this.controls.kind; this.controls = null; this.Control?.(false, kind); }
+      }
+      if (cart.halted && !cart.unloaded) {
+        cart.unloaded = true;
+        Object.assign(zhou, { state: "waiting", health: Math.min(zhou.health, 45) });
+        this.Record("zhouUnloaded", { x: at.x, z: at.z });
+        this.Say("WestDitchOrder");
+      }
+    }
+  }
+  // ---------------------------------------------------------------------------
+  // 18 铁路桥（BridgeOrders → BridgeCover → BridgeWithdraw）。
+  // 尾队沿 bridgeCrossing 的折线进度真走；炸桥发信号 RailBridgeDestroyed。
+  // ---------------------------------------------------------------------------
+  StartBridgeColumn() {
+    if (this.bridgeColumn) return;
+    this.bridgeColumn = Array.from({ length: R.bridgeColumnCount }, (_, i) => ({
+      id: `RearColumn${i}`, progress: -i * R.bridgeColumnSpacingM, crossed: false, actor: null,
+    }));
+  }
+  UpdateBridgeColumn(dt) {
+    if (!this.bridgeColumn) return;
+    const route = MISSION_STAGE_ROUTES.bridgeCrossing, length = MissionRouteLength(route);
+    // 威胁没解除以前尾队压在北岸不动（不做多波守点，只是「不许白白过桥」）。
+    const moving = this.Has("bridgeFireBroken");
+    for (const entry of this.bridgeColumn) {
+      if (moving && entry.progress < length) entry.progress = Math.min(length, entry.progress + dt * R.bridgeColumnSpeedMps);
+      const at = MissionRoutePoint(route, Math.max(0, entry.progress));
+      entry.x = at.x; entry.z = at.z; entry.yaw = at.yaw ?? 0;
+      if (entry.progress >= length) entry.crossed = true;
+    }
+    if (moving && this.bridgeColumn.every(entry => entry.crossed))
+      this.Record("rearColumnCrossed", { count: this.bridgeColumn.length });
+  }
+  UpdateBridgeBlast(dt) {
+    if (this.Has("bridgeDestroyed")) return;
+    if (!this.Has("blastZoneCleared")) { this.bridgeBlastTime = 0; return; }
+    this.bridgeBlastTime = (this.bridgeBlastTime || 0) + dt;
+    if (this.bridgeBlastTime < R.bridgeBlastDelayS) return;
+    const at = this.Point(A.railBridge, 1.2);
+    this.vfx.Explosion?.(at, { radius: R.bridgeBlastRadiusM });
+    this.audio.Play("shellImpact", { position: at, volume: 1 });
+    this.battlefield.OpenGate?.("RailBridgeDestroyed");
+    this.Record("RailBridgeDestroyed");
+    this.Record("bridgeDestroyed", { x: A.railBridge.x, z: A.railBridge.z });
+    this.Say("MarchToTengxian");
+  }
+  // ---------------------------------------------------------------------------
+  // 18 夜行军（NightMarch）。黑屏字幕里瞬移到 nightSpawn 并换夜间天空。
+  // ---------------------------------------------------------------------------
+  BeginNightTransition() {
+    const night = R.nightTransition;
+    this.BeginControl("nightTransition", night.fadeOutS + night.holdS + night.fadeInS);
+    this.transition.Show({
+      title: T("firstLevel.transition.night.title"),
+      text: T("firstLevel.transition.night.text"),
+      ...night,
+    });
+    this.transition.Update(0);
+  }
+  PlaceNightArrival() {
+    const point = A.nightSpawn, y = this.battlefield.GroundHeight(point.x, point.z);
+    this.player.position.set(point.x, y, point.z);
+    this.player.body?.Teleport(point.x, y, point.z);
+    this.player.velocity.set(0, 0, 0);
+    this.player.SetStance("stand");
+    this.player.yaw = Math.PI; this.player.pitch = 0;
+    for (const [i, actor] of this.squad.entries()) {
+      this.PlaceActor(actor, { x: point.x + (i % 2 ? 2 : -2), z: point.z - 4 - Math.floor(i / 2) * 2 });
+      this.squadRoutes.set(actor.id, []);
+      this.Defend(actor, actor.position);
+    }
+    // 夜景与夜天空都藏在黑屏里换；退出/重试时宿主还原（RestoreLevelSky）。
+    this.ApplySky?.("night");
+    this.battlefield.OpenGate?.("NightGateShown");
+    this.column.active = false;
+    if (this.controls) { this.controls.yaw = this.player.yaw; this.controls.pitch = 0; }
+    this.Record("nightArrivalPlaced", { x: point.x, z: point.z });
+    this.player.SyncCamera(0);
+  }
+  // ---------------------------------------------------------------------------
+  // 09 连屋近战（内部步骤 Melee）。2026.09.19 起下线屋内伏击拍：日军从与东巷相通的
+  // 连屋进来，玩家先手打掉就不触发僵持；真贴上来才走共用白刃（Script_MeleeCombat）。
+  // 旧拍表与它那七百行副作用见 docs/Data_FirstLevelRoomAmbush.md（已作废）。
   // ---------------------------------------------------------------------------
   get Ambushers() {
     return MISSION_ENCOUNTERS.melee.map(spec => this.enemies.get(spec.id)).filter(Boolean);
   }
-  get AmbushSquad() {
-    return ["luo", "heyoutian", "liuwencai"].map(id => this.companion.Handle(id)).filter(Boolean);
-  }
-  AmbushActor(id) { return this.enemies.get(id) || null; }
-  /**
-   * 这一拍正占着屏幕：HUD 整个让位（只剩字幕与这一拍自己的提示环）。
-   * 装配层每帧读它，不认识伏击的状态机。
-   */
-  get AmbushCinematic() { return this.ambush.Scripted && this.controls?.kind === "ambush"; }
   InRoom(point) {
     const room = P.roomInterior;
     return point.x > room.minX && point.x < room.maxX && point.z > room.minZ && point.z < room.maxZ;
   }
-  LitterAtDoor() {
-    const zhou = this.column.zhou;
-    return !!zhou && Math.hypot(zhou.x - A.melee.x, zhou.z - R.ambushLitterDoorZ) <= R.ambushLitterDoorRadiusM;
-  }
-  AmbushHooks() {
-    return {
-      Record: (id, detail) => this.Record(id, detail),
-      Has: id => this.Has(id),
-      Say: (id, options) => this.Say(id, options),
-      Lock: seconds => {
-        const lead = this.AmbushActor("AmbushLead");
-        this.BeginControl("ambush", seconds,
-          { lookAt: lead ? this.Point(lead.position, R.ambushLookHeightM) : null, lookSeconds: R.ambushLookSeconds });
-      },
-      Unlock: () => this.ReleaseAmbushControl(),
-      Wake: id => this.WakeAmbusher(this.AmbushActor(id)),
-      PlayClip: (id, clipId) => this.PlayAmbushClip(this.AmbushActor(id), clipId),
-      PlayerAlive: () => this.player.alive === true,
-      KnockDown: () => this.AmbushButtStrike(),
-      Daze: on => this.SetAmbushDaze(on),
-      LookAt: what => this.AmbushLookAt(what),
-      Prompt: view => this.SetAmbushPrompt(view),
-      Pounce: () => this.AmbushPounce(),
-      BeginGround: () => this.BeginAmbushGround(),
-      EndGround: () => this.EndAmbushGround(),
-      GroundFailure: shared => this.AmbushGroundFailure(shared),
-      Finisher: () => this.AmbushFinisher(),
-      Rise: () => this.AmbushRise(),
-      ColumnCasualty: victim => this.AmbushCasualty(victim),
-      KnockDownFriend: who => this.AmbushKnockDown(who),
-      Release: () => this.ReleaseAmbushers(),
-      SquadIn: () => this.SendAmbushSquad(),
-      Finish: () => this.FinishAmbush(),
-    };
-  }
-  /** 屋里三处死角：趴下、不打、不进共用白刃配对。 */
-  HideAmbushers() {
-    for (const actor of this.Ambushers) {
-      if (!actor.alive) continue;
-      actor.missionDormant = true;
-      actor.scriptedNoncombatant = true;
-      actor.meleeDormant = true;
-      actor.meleeTraining = { passive: true, strength: R.ambushQteStrength };
-      actor.missionAmbushClip = null;
-      actor.missionAmbushReleaseAt = null;
-      // 重放这一拍时枪要回到他手上（反捅那一段会把它藏起来，见 InstallAmbushPerformance）。
-      actor.missionAmbushWeaponDropped = false;
-      actor.scriptEssential = false;
-      actor.order = "hold";
-      actor.manualGoalUntil = Infinity;
-      actor.goal.set(actor.position.x, 0, actor.position.z);
-      this.SetAmbushWeaponDetail(actor, false);
-      this.ai.SetStance(actor, 2, Infinity, true);
-    }
-    this.SetAmbushHandOffset(false);
-  }
   /**
-   * 近景特写档：被镜头怼到脸上的那个人（压住玩家那个）按 high 档建手持武器 ——
-   * 三八式上的刺刀走 TZM 模型，不走低画质那根方块刀片。整场画质一个字不动。
-   *
-   * 为什么非有不可：玩家默认画质是 high，可这一拍在 quality=low 的浏览器验收里
-   * 也要成立，而 low 档的刺刀是一根 16×24 mm 的黑盒子 —— 半米外怼着脸看就是「一块黑砖」。
-   * 演完（HideAmbushers / 这一拍收尾）还回去，免得他躺在地上当尸体时还背着一份近景几何。
+   * 连屋那一组：进 Melee 步就从连屋出来，沿 MISSION_TACTICS 的折线压到灶屋门口。
+   * 全员阵亡＝ meleeResolved；有人真的贴到白刃距离就记 meleeEngaged（取证，不是闸）。
    */
-  SetAmbushWeaponDetail(actor, on) {
-    return actor?.actor?.SetWeaponDetail?.(on === true) === true;
+  UpdateMelee() {
+    const living = this.Ambushers.filter(actor => actor.alive);
+    for (const actor of living) actor.bayonetFixed = true;
+    if (living.some(actor => Distance(actor.position, this.player.position) <= R.ambushBindReachM + .4))
+      this.Record("meleeEngaged");
+    if (this.Ambushers.length === MISSION_ENCOUNTERS.melee.length && !living.length)
+      this.Record("meleeResolved", { killed: this.Ambushers.length });
   }
   /**
-   * 起身：能走位、能演，但挂着空射界（ambushSilentSector），一枪都不开。
-   * 四个人这会儿全部 meleeDormant —— **领头那个也是**。挂着 meleeTraining 又不 dormant 的人
-   * 会被共用白刃层认领（`MeleeCombat.Step` 的 managed），`Script_Ai.Act` 见到 `meleeCombat`
-   * 就把整帧交给 `StepMeleeCombat`，那条路不走导航：他会站在藏身点一步不动，
-   * 「扑上来顶住」变成三米外凭空掉 24 点血。顶住那一瞬（HoldAmbushBind）再把他交回白刃层摆姿势。
-   * 其余三个整段留在 meleeDormant 里，免得 ImmediateThreat 把玩家从僵持里拽出来。
-   */
-  WakeAmbusher(actor) {
-    if (!actor?.alive) return;
-    actor.missionDormant = false;
-    actor.scriptedNoncombatant = false;
-    actor.scriptFireSector = R.ambushSilentSector;
-    actor.bayonetFixed = true;
-    actor.meleeDormant = true;
-    actor.meleeTraining = { passive: true, strength: R.ambushQteStrength };
-    this.ai.SetStance(actor, 0, R.ambushLockMaxS, true);
-    // 领头那个整段剧本挂叙事保护：砸倒、压刀、推刀、反捅这四下全建立在他活着上，
-    // 而玩家躺在地上的这八九秒里幺娃就站在门口、班里人在灶屋 —— 实拍里他被一枪打掉过
-    // （2026-09-16，story 7.9 s），戏就只剩玩家自己爬起来。反捅之前摘掉，所以他**真的**
-    // 死在玩家手里（AmbushFinisher）。另外三个不挂：他们死了这一拍照样走得通。
-    if (actor.missionId === "AmbushLead") {
-      actor.scriptEssential = true;
-      // 他整段都在半米到一米二之间怼着镜头（枪托、压刀、推刀、反捅四下全是特写）。
-      this.SetAmbushWeaponDetail(actor, true);
-    }
-    InstallAmbushPerformance(actor, target => this.PrepareAmbushAnimation(target));
-    this.PlayAmbushClip(actor, "AmbushRise");
-  }
-  PrepareAmbushAnimation(host) {
-    try {
-      return PrepareFirstLevelAmbushAnimation(host, (x, z) => this.battlefield.GroundHeight(x, z));
-    } catch (error) {
-      this.ambushAnimationError = String(error);
-      return null;
-    }
-  }
-  PlayAmbushClip(actor, clipId) {
-    if (!actor) return;
-    // 清单里没有这一段就当没有演出层：动作库是独立交付的，编排先落地、烘焙后到的那几天
-    // 不许让一个拼错／还没烘的 clip id 把 rig.Update 抛进异常（整页就黑了）。
-    const spec = FIRST_LEVEL_AMBUSH_CLIPS[clipId];
-    if (!spec) { this.ambushAnimationError ||= "missing ambush clip " + clipId; return; }
-    actor.missionAmbushClip = { clipId, seconds: 0, loop: !!spec.loop };
-  }
-  UpdateAmbushClips(dt) {
-    for (const actor of this.Ambushers) {
-      const clip = actor.missionAmbushClip;
-      if (!clip) continue;
-      clip.seconds += dt;
-      const spec = FIRST_LEVEL_AMBUSH_CLIPS[clip.clipId];
-      if (!clip.loop && spec && clip.seconds >= spec.duration) actor.missionAmbushClip = null;
-    }
-  }
-  /**
-   * 走到**正好那个点上**再出手。
-   *
-   * 共用 `MoveActor` 的到达半径是 0.45 m（行军够用），而这一拍要的是「刺刀落在人身上」：
-   * 差这 0.45 m，捅老周那一刀就扎在担架北边的地板上（2026-09-16 逐帧量刀尖量出来的）。
-   * 做法是把目标沿他的来向再推 0.45 m —— 他照旧在 0.45 m 处停，停的位置正好是要的那个点。
-   * 不去调 `scriptArrivalRadius`：那个半径一小，人到了点上会来回蹭。
-   */
-  DriveAmbusherOnto(actor, point, speed) {
-    if (!actor?.alive) return;
-    const dx = point.x - actor.position.x, dz = point.z - actor.position.z;
-    const distance = Math.hypot(dx, dz);
-    const past = distance > 0.05
-      ? { x: point.x + dx / distance * SCRIPT_ARRIVAL_M, z: point.z + dz / distance * SCRIPT_ARRIVAL_M }
-      : point;
-    this.DriveAmbusher(actor, past, speed);
-  }
-  DriveAmbusher(actor, point, speed) {
-    if (!actor?.alive) return;
-    this.MoveActor(actor, point, speed);
-    // 演这一拍的时候不许去找掩体：屋里正好有新加的西侧隔断，实拍里捅抬担架的那个
-    // 走到一半拐去躲在它后面，刀就落了个空。
-    this.ai.ReleaseCover(actor);
-    actor.scriptFireSector = R.ambushSilentSector;
-    actor.bayonetFixed = true;
-  }
-  /**
-   * 剧本期间的走位：领头那个扑向玩家（lunge 段），顶住之后原地不动；后面两个走到担架旁边。
-   * 捅老周的那个（AmbushRearB）会站在担架西侧等到配音里那一声为止；那一刀落在锁住的
-   * witness 段里，挣脱之后他才转普通敌兵，所以他的走位要越过 Scripted 那一段继续驱动。
-   */
-  DriveAmbushPerformers() {
-    const zhou = this.column.zhou, lead = this.AmbushActor("AmbushLead");
-    if (this.ambush.Scripted && lead?.alive) {
-      if (this.ambush.Phase === "lunge") this.DriveAmbusher(lead, this.player.position, R.ambushLungeMps);
-      else if (this.ambush.Phase === "daze") {
-        // 躺着看的那几秒他挪到玩家**东侧**：他扑过来的落点正好压在「玩家 → 北门口担架」
-        // 那条视线上，站着不动就把整场背景挡死了（2026-09-16 出图实拍）。
-        this.DriveAmbusher(lead, { x: this.player.position.x + R.ambushDazeStandM,
-          z: this.player.position.z + R.ambushDazeStandM * .45 }, R.ambushLungeMps * .5);
-      } else this.DriveAmbusher(lead, lead.position, 0);
-      lead.yaw = Math.atan2(lead.position.x - this.player.position.x, lead.position.z - this.player.position.z);
-    }
-    if (!zhou) return;
-    const yaw = zhou.yaw || 0;
-    const Grip = side => ({ x: zhou.x - Math.sin(yaw) * side * R.litterBearerOffsetM,
-      z: zhou.z - Math.cos(yaw) * side * R.litterBearerOffsetM });
-    const rearA = this.AmbushActor("AmbushRearA");
-    if ((this.ambush.Scripted || rearA?.missionAmbushClip) && rearA?.alive) {
-      const victim = zhou.bearers[1] > 0 ? Grip(1) : Grip(-1);
-      this.DriveAmbusherOnto(rearA, { x: victim.x - R.ambushBindReachM, z: victim.z }, R.ambushLungeMps);
-      rearA.yaw = Math.atan2(rearA.position.x - victim.x, rearA.position.z - victim.z);
-    }
-    const rearB = this.AmbushActor("AmbushRearB");
-    // 条件里那个 missionAmbushClip 不能省：ZhouPending 在刀落那一瞬就翻掉，而
-    // BayonetStabDown 的下扎（0.62 s）、拧刀（0.80）、拔出（1.08）还有大半段没演完。
-    // 一松手共用 AI 就按 `moveSpeed<0.08 → 面向目标` 把他转走，刀在半空里划一道弧，
-    // 从老周肚子上扫到门口去（2026-09-16 逐帧量刀尖：0.5 s 里转了 30°）。
-    if ((this.ambush.ZhouPending || rearB?.missionAmbushClip) && rearB?.alive) {
-      // 站在担架西侧、**刺刀够得到床面正中**的地方（ambushZhouStabStandM）。
-      // 原来沿用 ambushBindReachM(1.15)：那是扑过来够得着的距离，往下捅就捅在担架外
-      // 一米的地板上 —— 从地板镜头看过去他是在捅地，不是在捅老周。
-      const stab = { x: zhou.x - R.ambushZhouStabStandM, z: zhou.z + R.ambushZhouStabLateralM };
-      this.DriveAmbusherOnto(rearB, stab, R.ambushLungeMps);
-      // 面向担架的**中线**（与担架长边垂直），不是对着担架中心：错开那 0.7 m 是给刀尖留的，
-      // 对着中心的话他会斜着站，刀尖跟着斜出去，等于白错开。
-      const facing = { x: zhou.x, z: rearB.position.z };
-      rearB.yaw = Math.atan2(rearB.position.x - facing.x, rearB.position.z - facing.z);
-    }
-  }
-  /**
-   * 枪托真的砸到：先掉血（kind "qte" 绕开 meleeScale，控制锁期间必须真的掉血），
-   * 再走共用倒地 —— 玩家真的进 `down` 状态，第一人称镜头落到地板上、抬头看屋顶。
-   *
-   * 砸之前把刺刀挂到 player.meleeWeapon 上：共用白刃层的倒地／地面僵持／地面镜头
-   * 全都要求「手里有一把白刃武器」（`MeleeCombat.Weapon` 先问宿主，再回落到这个字段），
-   * 而这一刻顺子手里是拉栓步枪。顶上来的本来就是**对方那把上了刺刀的枪** ——
-   * 抓住它、推开它、反手捅回去这三下都发生在那把枪上。起身之后这个字段就摘掉。
-   */
-  AmbushButtStrike() {
-    const lead = this.AmbushActor("AmbushLead");
-    if (!lead || !this.player.alive) return false;
-    this.meleeCombat.Damage(this.player, lead, R.ambushButtDamage, "qte",
-      { yaw: lead.yaw, reach: R.ambushBindReachM });
-    if (!this.player.alive) return false;
-    this.ambushBorrowedWeapon = this.player.meleeWeapon ?? null;
-    this.player.meleeWeapon = "Bayonet";
-    this.meleeCombat.ScriptedKnockDown(this.player, lead, R.ambushLockMaxS, "missionAmbush");
-    this.SetAmbushViewmodel(false);
-    return true;
-  }
-  /**
-   * 躺在地上那几秒把第一人称的枪收起来：挨了一记枪托，枪本来就脱手了 ——
-   * 而且它正好挡在「玩家 → 北门口担架」那条视线上，担架队被捅穿的整场背景全被它盖住。
-   * 抓住**对方**那把枪的时候再回来（抓枪／推刀／反捅这三下画的就是那把枪）。
-   */
-  SetAmbushViewmodel(visible) {
-    const root = this.viewmodel?.root;
-    if (!root) return false;
-    root.visible = !!visible && !this.carry?.Blocking;
-    return true;
-  }
-  /** 他扑上来压刺刀：交回共用白刃层摆 Pressure 姿势（还不给连按）。 */
-  AmbushPounce() {
-    const lead = this.AmbushActor("AmbushLead");
-    if (!lead?.alive || !this.player.alive) return false;
-    // 扑完了才把他交给共用白刃层：从这一刻起他的整帧走 StepMeleeCombat。
-    lead.meleeDormant = false;
-    this.SetAmbushViewmodel(true);
-    return this.meleeCombat.HoldScriptedGround(this.player, lead, R.ambushLockMaxS);
-  }
-  /** 推刀：共用地面 QTE。窗口取共用上限与本拍值里小的那个，共用规则一个字不改。 */
-  BeginAmbushGround() {
-    const lead = this.AmbushActor("AmbushLead");
-    if (!lead?.alive || !this.player.alive) return false;
-    const windowS = Math.min(Q.windowS, R.ambushQteWindowS);
-    const started = this.meleeCombat.BeginScriptedGround(this.player, lead, {
-      windowS, strength: R.ambushQteStrength, reason: "missionAmbush",
-    });
-    if (started) this.ambushQteSerial = this.meleeCombat.qte.active.serial;
-    return started;
-  }
-  EndAmbushGround() {
-    return this.meleeCombat.EndScriptedGround(this.player, this.AmbushActor("AmbushLead"));
-  }
-  /**
-   * 没顶住：刀捅进去。共用地面失败伤害（MELEE_QTE_RULES.groundFailureDamage）
-   * 只有「抓枪那一下没按上」才由这里补 —— 推刀输掉的那条路共用 ResolveQte 已经扣过了。
-   * 额外的 ambushFailureExtraDamage 两条路都要扣：20 + 72 + 18 = 110，满血也死。
-   */
-  AmbushGroundFailure(shared = false) {
-    const lead = this.AmbushActor("AmbushLead");
-    if (!this.player.alive) return false;
-    const from = lead?.position?.clone?.() || null;
-    if (shared) this.player.TakeHit(Q.groundFailureDamage, "torso", null, { melee: true, from });
-    if (this.player.alive) this.player.TakeHit(R.ambushFailureExtraDamage, "torso", null, { melee: true, from });
-    return true;
-  }
-  /** 反捅：领头那个真的死在这一下上，走共用伤害链（出血、断肢、尸体、白刃音效照常）。 */
-  AmbushFinisher() {
-    const lead = this.AmbushActor("AmbushLead");
-    if (!lead?.alive) return false;
-    // 摘掉叙事保护再捅：挂着它伤害会被夹到 1 血，断肢与血也整条不走。
-    lead.scriptEssential = false;
-    this.meleeCombat.Damage(lead, this.player, R.ambushFinisherDamage, "heavy",
-      { yaw: this.player.yaw, reach: R.ambushBindReachM });
-    return true;
-  }
-  /**
-   * 起身：共用起身动作。借来的刺刀等**起完身**再还 —— 当场还的话共用层下一步
-   * 会认成「换了武器」，一句 SetState(idle) 把起身动作砍掉一半。
-   */
-  AmbushRise() {
-    this.SetAmbushViewmodel(true);
-    this.meleeCombat.ScriptedRise(this.player);
-    if (this.ambushBorrowedWeapon !== undefined) this.ambushRestoreAt = this.time + MELEE_RULES.riseS + 0.15;
-    return true;
-  }
-  RestoreAmbushWeapon() {
-    this.ambushRestoreAt = null;
-    if (this.ambushBorrowedWeapon === undefined) return false;
-    this.player.meleeWeapon = this.ambushBorrowedWeapon;
-    this.ambushBorrowedWeapon = undefined;
-    return true;
-  }
-  /**
-   * 倒地较劲那几拍（grab/mash/finish）把第一人称那把枪连同扣在它上面的两只手整体挪开。
-   * 数值与理由见 `Data_Tuning_FirstLevel.ambushGrappleHandM`；实现见 `Viewmodel.SetScriptedHandOffset`。
-   * 幂等：每帧调，只有真的换了状态才写下去。演完必须收（HideAmbushers / ResetAmbush / 收尾都收）。
-   */
-  SetAmbushHandOffset(on) {
-    const view = this.viewmodel;
-    if (typeof view?.SetScriptedHandOffset !== "function") return false;
-    const want = on === true;
-    if (this.ambushHandOffset === want) return false;
-    this.ambushHandOffset = want;
-    view.SetScriptedHandOffset(want ? R.ambushGrappleHandM : null);
-    return true;
-  }
-  /**
-   * 压上来那个人**被画出来**的脸在哪。
-   *
-   * 不能拿 `soldier.position` 加一个高度了事：烘焙 clip（RifleButtStrike）带位移，
-   * 人被画在离那个点半米开外的地方 —— 参考图①那一帧他因此偏到画面右边缘去了
-   *（2026-09-16 分层出图量到 ndc 0.23 vs 实际 0.6）。头骨的世界位置才是画面上的脸。
-   */
-  AmbushFacePoint(actor) {
-    const head = actor?.actor?.characterRig?.bones?.head;
-    if (head?.matrixWorld) {
-      head.updateWorldMatrix(true, false);
-      const point = new THREE.Vector3().setFromMatrixPosition(head.matrixWorld);
-      if (Number.isFinite(point.x) && Number.isFinite(point.y)) return point;
-    }
-    return actor ? this.Point(actor.position, R.ambushButtLookHeightM) : null;
-  }
-  /**
-   * 锁着的视线**跟着会动的目标走**：只换落点，不重开转头那一段。
-   *
-   * 与 AimControl 的区别就在这里：AimControl 每调一次都把 startYaw / lookFrom 重置成
-   * 「现在」，每帧调等于每帧重开一段 0.35 s 的 smoothstep —— 相机每帧只走千分之几，
-   * 看上去像钉死了。这一条只改终点，转头那一段照原样走完，走完之后交回 ±limitedLookRadians
-   * 的夹取（夹的中心也跟着他走）。
-   */
-  TrackControl(kind, lookAt) {
-    const control = this.controls;
-    if (!control || control.kind !== kind || !lookAt) return false;
-    const eye = this.ControlEye();
-    control.yaw = Math.atan2(eye.x - lookAt.x, eye.z - lookAt.z);
-    control.pitch = Math.atan2(lookAt.y - eye.y, Math.hypot(lookAt.x - eye.x, lookAt.z - eye.z));
-    return true;
-  }
-  /**
-   * 锁着的视线换一个落点："lead" 压住自己那个人、"litter" 北门口那副担架、
-   * "face" 抡枪托那个人的**脸**（这一段按 ambushButtImpactS 铺，转头正好在砸中那一瞬走完，
-   * 期间每帧由 TrackControl 把落点更新成他被画出来的头骨位置）。
-   */
-  /** 躺着仰头看的那根屋梁在哪：自己正前方 ambushDazeLookAheadM 处、ambushDazeLookRiseM 高。 */
-  AmbushRoofPoint() {
-    const eye = this.player.EyePosition, yaw = this.player.yaw;
-    return this.Point({ x: eye.x - Math.sin(yaw) * R.ambushDazeLookAheadM,
-      z: eye.z - Math.cos(yaw) * R.ambushDazeLookAheadM }, R.ambushDazeLookRiseM);
-  }
-  AmbushLookAt(what) {
-    if (what === "roof") return this.AimControl("ambush", this.AmbushRoofPoint(), R.ambushDazeLookS);
-    if (what === "face") {
-      const lead = this.AmbushActor("AmbushLead");
-      const face = this.AmbushFacePoint(lead);
-      if (!face) return false;
-      return this.AimControl("ambush", face, R.ambushButtImpactS);
-    }
-    if (what === "litter") {
-      const zhou = this.column.zhou;
-      if (!zhou) return false;
-      return this.AimControl("ambush", this.Point({ x: zhou.x, z: zhou.z }, R.ambushLitterLookHeightM), R.ambushLookSeconds);
-    }
-    const lead = this.AmbushActor("AmbushLead");
-    if (!lead) return false;
-    return this.AimControl("ambush", this.Point(lead.position, R.ambushLookHeightM), R.ambushLookSeconds);
-  }
-  // --- 晕厥与恍惚 ------------------------------------------------------------
-  // 与开场出轨那一段同一套通道：眼皮（uEyeClosure）＋ 恍惚四元组（uConcussion）
-  // 走 Script_PostComposite，耳鸣走 AudioEngine.SetConcussion 的低通。
-  // 曲线形状照搬 OPENING_PERCEPTION，只把横轴压到这一拍的长度上（Data_Tuning_FirstLevel）。
-  SetAmbushDaze(on) {
-    if (on) { this.ambushDazeFade = null; return true; }
-    if (this.ambushDazeFade == null && this.ambush.DazeSeconds != null) this.ambushDazeFade = 0;
-    return true;
-  }
-  /** 每帧取样；还控制权之后按 ambushDazeFadeS 线性收干净，不是一刀切掉。 */
-  UpdateAmbushDaze(dt) {
-    const age = this.ambush.DazeSeconds;
-    if (age == null) { this.ClearAmbushDaze(); return; }
-    if (this.ambushDazeFade != null) this.ambushDazeFade += Math.max(0, dt);
-    const fade = this.ambushDazeFade == null ? 1
-      : Math.max(0, 1 - this.ambushDazeFade / Math.max(1e-6, R.ambushDazeFadeS));
-    if (fade <= 0) { this.ClearAmbushDaze(); return; }
-    this.ambushDaze = {
-      eyeClosure: SamplePerceptionCurve(R.ambushDazeEyelids, age) * fade,
-      amount: SamplePerceptionCurve(R.ambushDazeIntensity, age) * fade,
-      focus: SamplePerceptionCurve(R.ambushDazeFocus, age) * fade,
-      pitch: 0, roll: 0,
-    };
-    const hearing = SamplePerceptionCurve(R.ambushDazeHearing, age) * fade;
-    if (hearing !== this.ambushHearing) this.audio?.SetConcussion?.(hearing, R.ambushDazeLowHz);
-    this.ambushHearing = hearing;
-  }
-  ClearAmbushDaze() {
-    if (!this.ambushDaze && !this.ambushHearing) return;
-    this.ambushDaze = null;
-    this.ambushDazeFade = null;
-    if (this.ambushHearing) this.audio?.SetConcussion?.(0, R.ambushDazeLowHz);
-    this.ambushHearing = 0;
-  }
-  /**
-   * 这一帧的感知（眼皮 + 恍惚）。装配层只问这一个口，不必知道是开场出轨还是屋内伏击。
-   * 两边不会同时发生；真同时出现时取更重的那一份，不做叠加。
+   * 这一帧的感知（眼皮 + 恍惚）。装配层只问这一个口。
+   * 2026.09.19 起整关只有掩蔽部那一处重击，曲线在 FirstLevelOpening 里采样。
    */
   Perception() {
-    const opening = { eyeClosure: this.opening.eyeClosure || 0, concussion: this.opening.concussion || null };
-    const daze = this.ambushDaze;
-    if (!daze) return opening;
-    if ((opening.concussion?.amount || 0) > daze.amount) return opening;
-    return { eyeClosure: Math.max(opening.eyeClosure, daze.eyeClosure), concussion: daze };
-  }
-  // --- 提示环 ----------------------------------------------------------------
-  // 屏幕上只有一个环，钉在压上来那把枪上。它不是共用的底部僵持进度卡：
-  // 这一拍整段 HUD 都让位（只剩字幕），一张四行的卡会把这一刻拉回「看仪表」。
-  SetAmbushPrompt(view) { this.ambushPrompt = view ? { ...view } : null; return true; }
-  /** 装配层每帧读一次：加上键面字与屏幕锚点。没有提示就是 null。 */
-  AmbushPromptView() {
-    const view = this.ambushPrompt;
-    if (!view || !this.player.alive) return null;
-    return { ...view, key: ActionKeyGlyph(view.action), ...this.AmbushPromptAnchor() };
+    return { eyeClosure: this.opening.eyeClosure || 0, concussion: this.opening.concussion || null };
   }
   /**
-   * 环钉在哪：把压上来那个人的握枪点投到屏幕上，再夹进安全区。
-   * 投不出来（人没了、在镜头背后）就退回屏幕中心偏下一点 —— 提示必须看得见，
-   * 宁可位置不准也不能跑到屏幕外面去。
-   */
-  AmbushPromptAnchor() {
-    const width = globalThis.innerWidth || 1280, height = globalThis.innerHeight || 720;
-    const fallback = { x: width / 2, y: height * 0.54 };
-    const lead = this.AmbushActor("AmbushLead"), camera = this.player.camera;
-    if (!lead?.alive || !camera || typeof THREE?.Vector3 !== "function") return fallback;
-    // 环钉在**他手里那把枪的握把**上（模型规范系的原点＝右手握点，由 Actor.WeaponWorldPoint 报）。
-    // 拿不到（枪被藏起来、还没挂上挂点）才退回胸口高度 —— 提示宁可位置不准也不能没有。
-    const scratch = (this.ambushAnchorPoint ||= new THREE.Vector3());
-    const point = lead.actor?.WeaponWorldPoint?.(scratch)
-      || scratch.set(lead.position.x, (lead.position.y || 0) + R.ambushLookHeightM, lead.position.z);
-    point.applyMatrix4(camera.matrixWorldInverse);
-    if (point.z >= 0) return fallback;                      // 在镜头背后：屏幕坐标会翻面
-    point.applyMatrix4(camera.projectionMatrix);
-    const x = (point.x * 0.5 + 0.5) * width, y = (-point.y * 0.5 + 0.5) * height;
-    if (!Number.isFinite(x) || !Number.isFinite(y)) return fallback;
-    // 落在安全区外就退回屏幕中央，**不夹到边角**：视线正从担架转回他身上的那零点几秒里，
-    // 他的胸口还在画面外，夹取会把环钉在右上角——玩家读到的是「提示在别的地方」。
-    const margin = 110;
-    if (x < margin || x > width - margin || y < margin || y > height - margin) return fallback;
-    return { x, y };
-  }
-  /**
-   * 提示环的按键。装配层的输入捕获先问这一条，再轮到共用白刃层 ——
-   * 抓枪那一下与反捅那一下都发生在共用 QTE 还没开（或已经结算完）的时候，
-   * 不接管的话 F 会去拾弹药、左键会去开枪。
-   * @returns {boolean} true = 这一下被这一拍吃掉了
-   */
-  AmbushInput(code, down = false, repeat = false) {
-    const view = this.ambushPrompt;
-    if (!view || !this.player.alive) return false;
-    // 连按那一段的 F 归共用 QTE（MeleeCombat.HandleInput 接管），这里不拦。
-    if (view.mode === "mash") return false;
-    const expected = view.action === "fire" ? "Mouse0" : "KeyF";
-    if (code !== expected) return false;
-    if (down && !repeat) {
-      if (view.mode === "finisher") this.ambushFinisherPressed = true;
-      else if (view.mode === "press") this.ambushGrabPressed = true;
-    }
-    return true;
-  }
-  AmbushCasualty(victim) {
-    const applied = this.column.AmbushCasualty(victim, { zhouHealth: R.ambushZhouHealthAfter });
-    if (victim === "zhou") {
-      // 这一刀落完，捅他的那个才回到普通战斗。
-      if (this.Has("ambushBroken")) this.ReleaseAmbusher(this.AmbushActor("AmbushRearB"));
-      this.view.people?.SetAmbushClip?.(this.column.zhou?.id, "PatientStabbed", "PatientWoundedIdle");
-    } else if (applied) {
-      this.view.people?.SetAmbushClip?.(`BearerCasualty${victim === "frontBearer" ? 1 : 0}`, "BearerStabbed", null);
-    }
-    return applied;
-  }
-  AmbushKnockDown(who) {
-    const actor = this.companion.Handle(who);
-    if (!actor?.alive) return false;
-    // 共用倒地规则只认手里有白刃武器的人；幺娃背的是汉阳造，所以按倒地姿态演，
-    // 先照样调一次共用接口，它拒绝也不影响这一拍。
-    this.meleeCombat.KnockDown(actor, this.AmbushActor("AmbushLead"), "missionAmbush");
-    actor.missionAmbushDownUntil = this.time + R.ambushYaowaDownS;
-    this.ai.SetStance(actor, 2, R.ambushYaowaDownS, true);
-    this.MoveActor(actor, actor.position, 0);
-    return true;
-  }
-  ReleaseAmbusher(actor) {
-    if (!actor?.alive) return null;
-    actor.scriptEssential = false;
-    actor.missionDormant = false;
-    actor.meleeDormant = false;
-    actor.meleeTraining = null;
-    actor.missionAmbushClip = null;
-    // 射界**不摘**：这一场从头到尾是屋里两三米的白刃。三八式一枪 72 点，
-    // 挨过一刀（剩 76 血）的顺子被点名就是一枪死，而且贴着脸端枪瞄准本来就不合理 ——
-    // 罗班长自己的命令就是「进！上刺刀！看准了打，里头有自己人！」。
-    // 走位与出手交给共用白刃规则（Script_MeleeCombat 的 NpcThink），伤害是刺刀的 50/110。
-    actor.tacticalRadiusM = R.infantryTacticalRadiusM;
-    this.Defend(actor, A.melee, R.ambushRoomHoldRadiusM);
-    actor.scriptFireSector = R.ambushSilentSector;
-    actor.bayonetFixed = true;
-    this.ai.SetStance(actor, 0, 1.5, true);
-    return actor;
-  }
-  /**
-   * 挣脱：四个人排着队转成普通敌兵，不是同一瞬间一起压上来。
-   * 顶住玩家那个就在眼前（0 秒），刚从抬担架的身上拔出刺刀那个晚 ambushReleaseDelayS，
-   * 东南角那个还要绕过货箱堆，捅老周的那个要等自己那一刀落完。
-   */
-  ReleaseAmbushers() {
-    for (const actor of this.Ambushers) {
-      if (!actor.alive) continue;
-      actor.missionAmbushReleaseAt = this.time + (actor.missionId === "AmbushLead" ? 0
-        : actor.missionId === "AmbushFlank" ? R.ambushFlankReleaseS : R.ambushReleaseDelayS);
-    }
-    this.UpdateAmbushRelease();
-    this.hud.Hint?.(T("firstLevel.hint.melee"), R.ambushBreakHintS);
-  }
-  UpdateAmbushRelease() {
-    const released = [];
-    for (const actor of this.Ambushers) {
-      if (!actor.alive || actor.missionAmbushReleaseAt == null || this.time < actor.missionAmbushReleaseAt) continue;
-      if (actor.missionId === "AmbushRearB" && this.ambush.ZhouPending) continue;
-      actor.missionAmbushReleaseAt = null;
-      const entry = this.ReleaseAmbusher(actor);
-      if (entry) released.push(entry);
-    }
-    if (released.length) this.meleeCombat.ClearQteBudget(released);
-  }
-  /** 罗班长、何有田、刘文财穿灶屋进屋。走既有的 squadRoutes 与共用行进节奏。 */
-  SendAmbushSquad() {
-    for (const [index, actor] of this.AmbushSquad.entries()) {
-      const entry = P.ambushSquadEntry[index] || P.ambushSquadEntry.at(-1);
-      const lane = P.ambushSquadLanesM[index] ?? 0;
-      actor.missionAmbushEntry = { ...entry };
-      actor.missionAmbushPost = null;
-      this.squadRoutes.set(actor.id,
-        [...P.ambushSquadRoute.map((point, step) => ({ x: point.x + lane * step / 2, z: point.z })), { ...entry }]);
-    }
-    this.RebuildSquadMarch(MISSION_ROUTES.village.slice(1, 4));
-  }
-  FinishAmbush() {
-    this.RestoreAmbushWeapon();
-    this.SetAmbushHandOffset(false);
-    for (const actor of this.Ambushers) this.SetAmbushWeaponDetail(actor, false);
-    this.column.AmbushRecover();
-    const yaowa = this.companion.Handle("yaowa");
-    if (yaowa) yaowa.missionAmbushDownUntil = 0;
-    this.SaveCheckpoint();
-  }
-  ReleaseAmbushControl() {
-    if (this.controls?.kind !== "ambush") return;
-    const kind = this.controls.kind;
-    this.controls = null;
-    this.Control?.(false, kind);
-  }
-  /**
-   * 罗班长他们在灶屋北门口掩护；幺娃跟着担架到屋门口（罗班长的命令：幺娃跟他）。
-   * 村口这一段一路向南（+Z），所以已经走过的折点要丢掉 —— 调试跳转把人直接放在
-   * 站位上时，留着它们会让整队先往回走六米。
-   */
-  PostAmbushSquad() {
-    const kitchen = P.kitchenInterior, room = P.roomInterior;
-    const Inside = at => (at.x > kitchen.minX && at.x < kitchen.maxX && at.z > kitchen.minZ - 1.5 && at.z < kitchen.maxZ)
-      || this.InRoom(at);
-    const Ahead = (actor, points) => {
-      // 只有已经站在灶屋／屋里的人（调试跳转直接摆到站位上）才裁前面的折点。
-      // 从村口过来的人必须先走 (58,-20) 那个门口，不然直线过去会撞上灶屋西墙。
-      if (!Inside(actor.position)) return points.map(point => ({ ...point }));
-      const kept = points.filter(point => point.z > actor.position.z - 1).map(point => ({ ...point }));
-      return kept.length ? kept : [{ ...points.at(-1) }];
-    };
-    for (const [index, actor] of this.AmbushSquad.entries()) {
-      actor.missionAmbushPost = { ...(P.ambushSquadPosts[index] || P.ambushSquadPosts.at(-1)) };
-      actor.missionAmbushEntry = null;
-      this.squadRoutes.set(actor.id, Ahead(actor, [{ x: 58, z: -20 }, actor.missionAmbushPost]));
-    }
-    const yaowa = this.companion.Handle("yaowa");
-    if (yaowa) {
-      yaowa.missionAmbushDownUntil = 0;
-      this.squadRoutes.set(yaowa.id,
-        Ahead(yaowa, [{ x: 58, z: -20 }, { x: 58, z: -9 }, { x: 58, z: -2 }, P.ambushYaowaPost]));
-    }
-    this.RebuildSquadMarch(MISSION_ROUTES.village.slice(0, 3));
-    const luo = this.companion.Handle("luo");
-    if (luo) this.leaderGuide?.Plan(this.squadRoutes.get(luo.id));
-  }
-  /** 老周这一副担架跟着顺子进屋，停在屋子北门口；其余九副留在村口。 */
-  UpdateLeadLitter(dt) {
-    const route = this.column.route;
-    const door = MissionRouteProjection(route, { x: A.melee.x, z: R.ambushLitterDoorZ }).progress;
-    const follow = MissionRouteProjection(route, this.player.position).progress - R.ambushLitterFollowGapM;
-    const rushing = this.flow.stage.id === "Melee";
-    this.column.UpdateLead(dt, {
-      limit: Math.min(door, follow),
-      speed: rushing ? R.ambushLitterRushMps : R.ambushLitterLeadMps,
-      safe: rushing || !this.Threatens(this.column.zhou, null, .9),
-    });
-  }
-  UpdateAmbush(dt) {
-    const lead = this.AmbushActor("AmbushLead");
-    const living = this.Ambushers.filter(actor => actor.alive);
-    // 屋里全程上着刺刀、不开枪：剧本旗每帧补一次，共用 AI 的守点/冲锋分支会清掉它们。
-    if (this.ambush.Started) for (const actor of living) {
-      actor.bayonetFixed = true;
-      actor.scriptFireSector = R.ambushSilentSector;
-    }
-    // 捅老周的那个在递刀途中被打死：这一拍照常落地。刀已经推出去了，而且
-    // RoomAmbushCleared 的台词（「肚子……遭捅穿了……」）与老周后面几级血量台阶
-    // 都建立在他挨了这一刀上 —— 让玩家在这两秒里把他打死就取消整条线，是更糟的结果。
-    const rearB = this.AmbushActor("AmbushRearB");
-    if (this.ambush.ZhouPending && this.Has("ambushStabbed") && rearB && !rearB.alive) this.ambush.CueZhouStab();
-    if (this.Has("ambushBroken")) this.UpdateAmbushRelease();
-    this.UpdateAmbushClips(dt);
-    if (this.ambush.Started) this.DriveAmbushPerformers();
-    const qte = this.meleeCombat.qte.active;
-    const mine = !!qte && qte.serial === this.ambushQteSerial;
-    let qteSuccess = null;
-    // 推刀输掉那条路的共用伤害（groundFailureDamage）由 MeleeCombat.ResolveQte 扣过了；
-    // 这一拍额外那一份在 AmbushGroundFailure 里加，两处不重复。
-    if (mine && qte.phase === "resolve" && this.ambushQteResult == null) this.ambushQteResult = qteSuccess = !!qte.success;
-    const view = mine ? this.meleeCombat.qte.View() : null;
-    const grabPressed = this.ambushGrabPressed === true, finisherPressed = this.ambushFinisherPressed === true;
-    this.ambushGrabPressed = false; this.ambushFinisherPressed = false;
-    this.ambush.Update(dt, {
-      litterAtDoor: this.LitterAtDoor(),
-      leadAlive: !!lead?.alive,
-      leadDistanceM: lead ? Distance(lead.position, this.player.position) : Infinity,
-      grabPressed, finisherPressed,
-      qteActive: mine,
-      qteSuccess,
-      qteProgress: view?.progress ?? 0,
-      qteTimeT: view?.timeT ?? 0,
-      qtePulse: view?.pulse ?? 0,
-      aliveCount: living.length,
-      killed: this.Ambushers.length - living.length,
-      squadInside: this.AmbushSquad.some(actor => actor.alive && this.InRoom(actor.position)),
-      playerAlive: this.player.alive,
-      playerProtected: this.player.Protected === true,
-    });
-    this.UpdateAmbushDaze(dt);
-    // 演出层（每帧两件事，都只碰画面，不碰编排）：
-    //   1) 扑过来到砸中这一段视线跟着他的脸走 —— 他是跑动中的，落点算一次就会被他甩掉；
-    //   2) 倒地较劲那几拍把第一人称那把枪与两只手挪开，让出他的脸和那把刺刀。
-    const phase = this.ambush.Phase;
-    if ((phase === "lunge" || phase === "butt") && lead?.alive) {
-      this.TrackControl("ambush", this.AmbushFacePoint(lead));
-    } else if (this.ambush.RoofView) {
-      // 躺下去的那半秒眼位从 1.6 m 掉到 groundEyeM：屋梁那个落点要每帧按当前眼位重算，
-      // 算一次的话抬头量会少掉四十来度（人在地上，看到的还是地板）。
-      this.TrackControl("ambush", this.AmbushRoofPoint());
-    }
-    this.SetAmbushHandOffset(["grab", "mash", "finish"].includes(phase));
-    if (this.ambushRestoreAt != null && this.time >= this.ambushRestoreAt) this.RestoreAmbushWeapon();
-  }
-  /**
-   * 检查点重试落在这一步上。已经挣脱过的保留战果（死掉的不复活、担架队不回滚），
-   * 只把锁与僵持清干净；还没挣脱就死了的，整拍重来。
-   */
-  ResetAmbush() {
-    this.meleeCombat.Cancel("missionAmbushRetry");
-    this.ambushQteSerial = null;
-    this.ambushQteResult = null;
-    const yaowa = this.companion.Handle("yaowa");
-    if (yaowa) yaowa.missionAmbushDownUntil = 0;
-    this.ClearAmbushDaze();
-    this.SetAmbushPrompt(null);
-    this.SetAmbushViewmodel(true);
-    this.SetAmbushHandOffset(false);
-    this.ambushGrabPressed = false;
-    this.ambushFinisherPressed = false;
-    this.RestoreAmbushWeapon();
-    if (this.Has("ambushBroken")) {
-      if (this.ambush.Phase !== "broken" && this.ambush.Phase !== "resolved") this.ambush.ResumeBroken();
-      return;
-    }
-    const rolled = ["ambushTriggered", "ambushStabbed", "ambushGrabbed",
-      "ambushBladeLanded", "ambushFinisher", "zhouStabbed"];
-    for (const id of rolled) this.flow.facts.delete(id);
-    this.flow.log = this.flow.log.filter(entry => !(entry.kind === "fact" && rolled.includes(entry.id)));
-    if (this.ambushColumn) this.column.Restore(this.ambushColumn);
-    this.ambush.Reset();
-    this.HideAmbushers();
-    this.PostAmbushSquad();
-  }
-  /**
-   * 控制锁算视线用的眼位。被枪托砸翻躺在地上的时候（屋内伏击）真正的眼位在地板上方
+   * 控制锁算视线用的眼位。被枪托砸翻躺在地上的时候（旧的屋内伏击）真正的眼位在地板上方
    * MELEE_RULES.groundEyeM —— 照站姿眼位算出来的俯仰角会把镜头压到脚底下去。
    */
   ControlEye() {
@@ -2652,6 +1999,7 @@ export class FirstLevelMissionRuntime {
     return (this.player.meleeCameraDrop || 0) * MELEE_RULES.groundCameraPitchRad;
   }
   BeginControl(kind, seconds, { lookAt = null, lookSeconds = 0 } = {}) {
+    if (!CONTROL_KINDS.includes(kind)) throw new Error(`BeginControl: unknown kind ${kind}`);
     this.controls = {
       kind,
       seconds,
@@ -2676,7 +2024,7 @@ export class FirstLevelMissionRuntime {
     }
     // A restricted short take (dive / death) locks the player's hands and view: nobody may
     // target or wound him meanwhile. Reuses spawn grace so AI and TakeHit read one flag.
-    if(kind==="death"||kind==="dive"||kind==="southTransition")this.player.spawnGrace = Math.max(this.player.spawnGrace || 0, seconds + .5);
+    if(CONTROL_GRACE_KINDS.includes(kind))this.player.spawnGrace = Math.max(this.player.spawnGrace || 0, seconds + .5);
     this.Control?.(true, kind);
   }
   /**
@@ -2695,19 +2043,6 @@ export class FirstLevelMissionRuntime {
     return true;
   }
   BeforePlayer(dt, input) {
-    this.meal.Restore();
-    // The order belongs only to the live carriage barrage. Older checkpoints
-    // can omit the impact fact even though the rescue has already completed.
-    if(["Train","Unloading"].includes(this.flow.stage.id)&&this.Has("trainProneOrder")
-      &&!this.Has("trainNearShellImpact")&&!this.Has("luoRescueComplete")){
-      input.stanceRequested="crouch";input.crouchPressed=false;input.pronePressed=false;
-    }
-    if (this.ReceivingFood) {
-      // Hold the exchange in carriage space; normal train translation and free look remain active.
-      input.forward = 0; input.strafe = 0; input.sprint = false; input.lean = 0;
-      input.crouchPressed = false; input.pronePressed = false; input.stanceRequested = null;
-      this.player.velocity.x = 0; this.player.velocity.z = 0;
-    }
     if(this.flow.stage.id==='Tank' && this.player.stance!=='prone'){
       const p=this.player.position,yaw=this.player.yaw;
       const next={x:p.x-Math.sin(yaw)*input.forward*.1+Math.cos(yaw)*input.strafe*.1,
@@ -2718,7 +2053,7 @@ export class FirstLevelMissionRuntime {
     }
     const control = this.controls;
     if (!control) return;
-    if(control.kind==="derail"||control.kind==="rescue")this.opening.PlacePlayer();
+    if(control.kind==="trapped"||control.kind==="rescue")this.opening.PlacePlayer();
     input.forward = 0;
     input.strafe = 0;
     input.sprint = false;
@@ -2743,12 +2078,10 @@ export class FirstLevelMissionRuntime {
     );
     // 倒地那一段镜头自带一份抬头，先减掉再夹取（站着的时候这一份恒为 0，行为逐字不变）。
     const pitchAim = control.pitch - this.ControlPitchBias();
-    this.player.yaw = control.yaw + Clamp(yawDelta, -R.limitedLookRadians, R.limitedLookRadians);
-    this.player.pitch = Clamp(
-      this.player.pitch,
-      pitchAim - R.limitedLookRadians,
-      pitchAim + R.limitedLookRadians,
-    );
+    // 被压在木架下只能小幅转头（契约 §2 的受困段）。
+    const limit = control.kind === "trapped" ? R.trappedLookRadians : R.limitedLookRadians;
+    this.player.yaw = control.yaw + Clamp(yawDelta, -limit, limit);
+    this.player.pitch = Clamp(this.player.pitch, pitchAim - limit, pitchAim + limit);
     if(control.kind==="rescue"){
       const poseSeconds=this.opening.RescueSampleTime();
       this.player.stance=poseSeconds<OPENING.rescuePullSeconds?"prone":poseSeconds<OPENING.rescueStandSeconds?"crouch":"stand";
@@ -2879,8 +2212,7 @@ export class FirstLevelMissionRuntime {
   UpdateReturnWarning(dt) {
     const stage=this.flow.stage,guide=this.CurrentGuide();
     const disabled=this.failed || this.completed || this.controls || !this.player.alive
-      || MISSION_RETURN_DISABLED_STAGES.includes(stage.id)
-      || (stage.id==="Unloading" && !this.Has("trainStopped"));
+      || MISSION_RETURN_DISABLED_STAGES.includes(stage.id);
     const squad=MISSION_RETURN_SQUAD_STAGES.includes(stage.id)?this.companion.Handle("luo"):null;
     const route=MISSION_RETURN_ROUTES[stage.id];
     return this.missionReturn.Update(dt,disabled?null:{stage:stage.id,
@@ -2894,36 +2226,20 @@ export class FirstLevelMissionRuntime {
     const stage=this.flow.stage, spec=MISSION_GUIDANCE[stage.id];
     if(!spec || this.failed || this.controls || this.completed)return null;
     let target=stage.target, label=spec.label;
-    if(spec.route)target=MissionRouteLookahead(MISSION_ROUTES[spec.route],this.player.position);
-    if(stage.id==='Unloading') {
-      if(!this.Has('trainStopped'))return null;
-      if(this.battlefield.TrainContains(this.player.position)) {
-        const car=MISSION_TRAIN.cars.slice().sort((a,b)=>Math.abs(a.z-this.player.position.z)-Math.abs(b.z-this.player.position.z))[0];
-        target={x:-72,z:car.z};
-      }
-    }
-    if(stage.id==='Tank'){
-      const returning=this.Has('bundleTaken')&&this.Inventory().bundles>0;
+    if(spec.route)target=MissionRouteLookahead(MISSION_GUIDE_ROUTES[spec.route],this.player.position);
+    if(stage.id==="Tank"){
+      const returning=this.Has("bundleTaken")&&this.Inventory().bundles>0;
       const route=returning?MISSION_ROUTES.bundleReturn:MISSION_ROUTES.bundle;
       target=returning?MissionRouteLookahead(route,this.player.position):
-        Sortie.route.find((point,index)=>!this.Has(`bundleRoutePoint${index}`))||A.bundle;label=returning?'throw':'bundle';
+        Sortie.route.find((point,index)=>!this.Has("bundleRoutePoint"+index))||A.bundle;label=returning?"throw":"bundle";
       if(!returning && this.Near(A.bundle,8))target=A.bundle;
     }
-    if(stage.id==='Courtyard' && this.Has('courtyardGateOpen') && this.Threatens(A.gate)) {target={x:A.gate.x,z:A.gate.z+4};label='gateThreat';}
-    if(['Carry','FinalCarry'].includes(stage.id)) {
-      if(this.carry.Active) {target=stage.id==='Carry'?A.ditchMouth:A.zhouDrop;label=stage.id==='Carry'?'ditch':'place';}
-      else {const z=this.column.zhou;target={x:z.x+Math.sin(z.yaw)*1.6,z:z.z+Math.cos(z.yaw)*1.6};}
+    if(stage.id==="Courtyard" && this.Has("courtyardGateOpen") && this.Threatens(A.gate)) {target={x:A.gate.x,z:A.gate.z+4};label="gateThreat";}
+    if(["Carry","WallPath","Handover"].includes(stage.id)) {
+      if(this.carry.Active) {target=this.CarryGoal();label=CARRY_GOAL_LABELS[stage.id];}
+      else {const z=this.column.zhou;target={x:z.x+Math.sin(z.yaw)*1.6,z:z.z+Math.cos(z.yaw)*1.6};label="carry";}
     }
-    if(stage.id==="FinalDefense")target=MissionRouteLookahead(MISSION_ROUTES.exit.slice(0,5),this.player.position);
-    if(stage.id==="RetreatYard")target=this.column.litters.filter(litter=>litter.visible && !litter.loaded && !litter.evacuated && litter.health>0).at(-1)||A.retreatC;
     let status=null;
-    if(stage.id==='TrenchEntry'&&!this.Has('trenchCleared')) {
-      target=MissionRouteLookahead(OPENING.trenchContactRoute,this.player.position);
-      label='trenchContact';status=T('firstLevel.hint.trenchContact');
-    }
-    if(stage.id==='Shelter'&&!this.Has('shelterCornerHeld')) {
-      target=OPENING.shelterCorner;label='shelterCorner';status=T('firstLevel.hint.shelterCorner');
-    }
     if(stage.id==="MachineGun"&&this.emplacement.Mounted)status=T("firstLevel.hint.guards",{safe:this.guards.filter(g=>g.safe).length,remaining:this.guards.filter(g=>g.actor.alive&&!g.safe).length});
     if(["Courtyard","TransferApproach","Transfer"].includes(stage.id))status=T("firstLevel.hint.queue",{passed:this.column.litters.filter(l=>l.passedGate).length,total:this.column.litters.filter(l=>l.health>0||l.passedGate).length,loaded:this.column.loadEvents.length});
     if(stage.id==="Transfer" && this.transferBeats?.cleared.length && this.transferBeats.started.length===this.transferBeats.cleared.length) {
@@ -2931,7 +2247,6 @@ export class FirstLevelMissionRuntime {
       label="loading";
       status=T("firstLevel.hint.transferWindow",{loaded:this.column.loadEvents.length,departed:this.column.departed});
     }
-    if(stage.id==="FinalDefense")status=T("firstLevel.hint.rearQueue",{remaining:this.column.litters.filter(l=>l.health>0&&!l.zhou&&!l.loaded&&!l.escaped).length});
     return {target,label:T(`firstLevel.guide.${label}`),status};
   }
   Update(dt) {
@@ -2944,27 +2259,13 @@ export class FirstLevelMissionRuntime {
     const prof = this.profiler?.on ? this.profiler : null;
     prof?.B("story/mission/voice");
     this.voice.Update(dt);
-    const meal=this.voice.current;
-    if(["TrainMeal","TrainPack","TrainBriefing"].includes(meal?.cue.id)&&meal.phase==="playing"){
-      if(this.trainClockCue!==meal.cue.id){
-        this.trainClockCue=meal.cue.id;
-        this.trainCueClockStart=this.time+(this.trainClockLead||0)-meal.sourceTime;
-      }
-      this.trainClockLead=Math.max(this.trainClockLead||0,this.trainCueClockStart+meal.sourceTime-this.time);
-    }
+    this.UpdateMissingCues();
     this.UpdateMusic();
     this.battleSound.Update(dt,this.flow.stage.id,this.voice.current?.phase==="playing");
-    prof?.E("story/mission/voice");
-    prof?.B("story/mission/train");
-    this.train?.Update(dt, this.Has("trainStopped") && this.Has("luoRescueComplete"), this.Has("trainIncomingFire"),this.time+(this.trainClockLead||0),this.Has("trainNearShellImpact"));
-    prof?.E("story/mission/train");
-    prof?.B("story/mission/voice");
-    this.SyncCarriageDialogue();
     prof?.E("story/mission/voice");
     prof?.B("story/mission/other");
     this.opening.Update(dt);
     if(this.failed){prof?.E("story/mission/other");return;}
-    if(this.Has("trainProneOrder") && this.player.stance==="crouch")this.Record("trainPlayerProne");
     prof?.E("story/mission/other");
     prof?.B("story/mission/spawns");
     this.DrainSpawns();
@@ -2984,6 +2285,8 @@ export class FirstLevelMissionRuntime {
     this.UpdateFlank();
     this.UpdateAir(dt);
     this.UpdateCarry();
+    this.UpdateCart(dt);
+    this.UpdateBridgeColumn(dt);
     const stage = this.flow.stage.id,
       t = this.flow.stageTime;
     if(["Support","MachineGun","Tank","Orders"].includes(stage))this.UpdateGuards(dt);
@@ -3018,9 +2321,9 @@ export class FirstLevelMissionRuntime {
       if (yaowa && Distance(yaowa.position, zhou) < 2) this.ai.SetStance(yaowa, 1, 2, true);
     }
     if (this.controls) {
-      if(this.controls.kind==="southTransition"){
-        this.southTransition.Update(this.controls.time);
-        if(this.controls.time>=SOUTH_TRANSITION.fadeOutS && !this.Has("southTransitionPlaced"))this.PlaceSouthArrival();
+      if(this.controls.kind==="nightTransition"){
+        this.transition.Update(this.controls.time);
+        if(this.controls.time>=R.nightTransition.fadeOutS && !this.Has("nightArrivalPlaced"))this.PlaceNightArrival();
       }
       this.controls.time = this.controls.kind==="rescue"?this.opening.RescueElapsed():this.controls.time+dt;
       if (this.controls.time >= this.controls.seconds &&
@@ -3028,53 +2331,32 @@ export class FirstLevelMissionRuntime {
         const kind = this.controls.kind;
         this.controls = null;
         this.Control?.(false, kind);
+        // 未知 kind 在 BeginControl 就抛错了；这里逐条按 kind 收尾，没有兜底分支。
         if(kind==="rescue"){
           const luo=this.companion.Handle("luo");if(luo){luo.missionRescueTarget=null;luo.missionCarriageAction=null;}
           this.player.stance="stand";this.Record("luoRescueComplete");
         }
-        else if(kind==="southTransition"){
-          this.southTransition.Hide();this.Record("southTransitionComplete");
-          if(this.GateNear("southTraversed"))this.Record("southTraversed");
+        else if(kind==="trapped"){ /* 受困段由 FirstLevelOpening 记事实并换步。 */ }
+        else if(kind==="cartRide"){ /* 停车由 UpdateCart 收尾。 */ }
+        else if(kind==="nightTransition"){
+          this.transition.Hide();this.Record("nightTransitionComplete");
         }
         else if (kind === "dive") this.Record("diveComplete");
-        else if (kind === "derail") { /* Rescue cue owns release. */ }
-        // 兜底：僵持没能按时收尾时也照样还控制权，由编排记 ambushBroken。
-        else if (kind === "ambush") this.ambush.Break();
-        else {
+        else if (kind === "death") {
           this.column.zhou.health = 0;
           if(this.deathMedic){this.deathMedic.treating=false;this.deathMedic.crouch=false;}
           this.Record("deathSceneComplete");
           this.RestoreRifle();
         }
+        else throw new Error(`Unhandled mission control kind ${kind}`);
       }
     }
-    if (["Train", "Unloading"].includes(stage)) {
-      // Audio keeps a real source clock even when a slow frame caps simulation dt.
-      // The moving train follows that same meal clock; otherwise it remains tens
-      // of metres short and a rendered impact strands the player waiting to stop.
-      const rideTime=this.trainShellStartedAt==null?this.time+(this.trainClockLead||0):this.time;
-      const motion = MissionTrainMotion(rideTime, this.trainShellStartedAt, this.shellTrainOffset);
-      const offset = motion.offsetM;
-      const before = this.battlefield.trainOffsetM,
-        delta = offset - before;
-      const aboard = this.battlefield.TrainContains(this.player.position);
-      this.battlefield.SetTrainOffset(offset);
-      if (aboard) {
-        this.player.position.z += delta;
-        this.player.body?.Teleport(this.player.position.x, this.player.position.y, this.player.position.z);
-      }
-      if (Math.abs(delta) > 1e-9) {
-        this.train.Translate(delta);
-        if (aboard) this.player.SyncCamera(0);
-      }
-      if (motion.stopped && !this.Has("trainStopped")) {
-        this.Record("trainStopped");
-        this.carriageSound.Stopped();
-        this.trainStoppedAt = this.time;
-        for (let i = 0; i < 3; i++) this.battlefield.OpenGate(`TrainDoor${i}`);
-      }
-      this.carriageSound.Update(dt);
-      if (this.Has("trainStopped") && this.GateNear("unloaded") && !aboard) this.Record("unloaded");
+    if (stage === "RearTrench") {
+      if (this.GateNear("rearTrenchEntered")) this.Record("rearTrenchEntered");
+      if (this.GateNear("cornerReached")) { this.Record("cornerReached"); this.Say("CornerCheck"); }
+      if (this.GateNear("collectionPointSeen")) this.Record("collectionPointSeen");
+      // 撤回的守军指路：走到集结处就起这一段（对白播完记 supportOrdersHeard）。
+      if (this.Has("collectionPointSeen")) this.Say("SupportOrder");
     }
     if (stage === "Support" && this.GateNear("frontReached")) {
       this.Record("frontReached");
@@ -3088,35 +2370,67 @@ export class FirstLevelMissionRuntime {
         this.Record("frontContact");
     }
     if (stage === "MachineGun") {
-      this.UpdateCaptivesCutscene();
       if (this.emplacement.stats.shots > 0) this.Record("gunUsed");
+      // 守军指出北头弹药屋（对白播完记 bundleOrderHeard）。
+      if (this.Has("frontAttackRepelled")) this.Say("BundleOrder");
       const gun = this.emplacement.Emplacement(this.gunId);
       if (gun?.belts === 3) this.Say("ThreeMagazines");
       if (gun?.belts === 2) this.Say("TwoMagazines");
     }
-    if(stage==="Orders" && this.GateNear("ordersReached")){this.Record("ordersReached");this.Say("Volunteer");this.Say("ZhouLift");}
+    if(stage==="Orders"){
+      if(this.GateNear("ordersReached")){this.Record("ordersReached");this.Say("Volunteer");this.Say("BorrowLight");this.Say("ZhouLift");}
+      // 后送队真实起行：担架队离开集结处，队首走出 litterSpacingM 以上。
+      if(this.Has("zhouOnLitter")&&this.column.litters.some(litter=>litter.progress>=R.litterSpacingM))
+        this.Record("columnDeparted",{lead:Math.max(...this.column.litters.map(litter=>litter.progress))});
+    }
+    if(stage==="South"){
+      this.Say("SouthWhisper");
+      if(this.GateNear("villageMouthReached")){this.Record("villageMouthReached");this.Say("VillagePointer");}
+    }
     if(stage==="Tank")this.UpdateSortie();
     if(stage==="MachineGun")this.UpdateFrontAttack();
     if (stage === "Village") {
+      if(this.GateNear("streetBlockSeen")){this.Record("streetBlockSeen");this.Say("StreetBlocked");}
       const p=this.player.position, kitchen=P.kitchenInterior;
       if(p.x>kitchen.minX&&p.x<kitchen.maxX&&p.z>kitchen.minZ&&p.z<kitchen.maxZ)
-        this.Record("kitchenTraversed",{x:p.x,z:p.z});
-      if(this.Has("kitchenTraversed") && this.GateNear("innerCourtReached"))
-        this.Record("innerCourtReached",{viaKitchen:true,x:p.x,z:p.z});
+        this.Record("kitchenEntered",{x:p.x,z:p.z});
+      // 担架队停进可靠遮挡（litterHold），不跟进未清空间。
+      if(this.Has("streetBlockSeen")&&this.column.litters.filter(litter=>litter.health>0)
+        .every(litter=>Distance(litter,A.litterHold)<=R.passageRangeM))
+        this.Record("littersInCover",{held:this.column.litters.filter(litter=>litter.health>0).length});
     }
-    if (stage === "Melee") this.UpdateAmbush(dt);
+    if (stage === "Melee") this.UpdateMelee();
+    if (stage === "BridgeCover") {
+      if(this.GateNear("southBankReached"))this.Record("southBankReached");
+      const bridge=MISSION_ENCOUNTERS.bridgeNorth.map(spec=>this.enemies.get(spec.id));
+      if(bridge.length&&bridge.every(actor=>actor&&!actor.alive))this.Record("bridgeFireBroken");
+    }
+    if (stage === "BridgeWithdraw") {
+      if(this.GateNear("blastZoneCleared"))this.Record("blastZoneCleared");
+      this.UpdateBridgeBlast(dt);
+    }
+    if (stage === "NightMarch" && this.Has("nightTransitionComplete")) {
+      if(this.GateNear("northGateReached"))this.Record("northGateReached");
+      if(this.Has("northGateReached")&&this.GateNear("gateEntered"))this.Record("gateEntered");
+    }
+    // 07 起后送队真的跟着走（旧的南行黑屏转场下线了，队伍要自己走完这一段）。
     let moving = [
+        "South",
+        "Village",
+        "Melee",
         "Courtyard",
         "TransferApproach",
         "Transfer",
-        "RetreatFirst",
-        "RetreatWall",
-        "RetreatYard",
-        "Reception",
-      ].includes(stage),
+        "Regroup",
+        "WallPath",
+        "ReceptionGate",
+      ].includes(stage) || (stage === "Orders" && this.Has("zhouOnLitter")),
       safe = true,
       maxProgress = Infinity;
     let safeAt = null;
+    // 08/09：担架停在可靠遮挡里，不跟进未清空间。
+    if (stage === "Village" || stage === "Melee")
+      maxProgress = MissionRouteProjection(this.column.route, A.litterHold).progress;
     if (stage === "Courtyard") {
       const gun = this.enemies.get("VillageGunner");
       if (gun && !gun.alive) this.Record("villageGunSilent");
@@ -3129,28 +2443,34 @@ export class FirstLevelMissionRuntime {
         this.Record("courtyardPassed",{passed:this.column.litters.filter(litter=>litter.passedGate).length,
           casualties:this.column.litters.filter(litter=>litter.health<=0&&!litter.passedGate).length});
         this.Say("LastLitter");
-        this.Say("TransferHope");
       }
     }
-    if (stage === "TransferApproach" && this.GateNear("transferApproachReached")) this.Record("transferApproachReached");
+    if (stage === "TransferApproach") {
+      if(this.GateNear("transferApproachReached")){
+        this.Record("transferApproachReached");
+        this.Say("TransferSorting");
+        this.Say("VillageRoadThreat");
+      }
+    }
     if (stage === "Transfer") {
-      this.UpdateTransferBeats();
+      this.UpdateTransferThreats();
       if (this.GateNear("transferArrived")) {
         this.Record("transferArrived");
         this.column.loading = true;
         this.guideRoute = null;
       }
-      const transferIds=MISSION_TRANSFER_BEATS.flatMap(beat=>MISSION_ENCOUNTERS[beat.id].map(spec=>spec.id));
+      const transferIds=MISSION_TRANSFER_THREATS.flatMap(threat=>MISSION_ENCOUNTERS[threat.id].map(spec=>spec.id));
       safe = !this.Threatens(A.transfer,transferIds);
       safeAt=point=>!this.Threatens(point,transferIds);
-      if (this.column.TransferReady()) this.Record("vehiclesDeparted", { count: this.column.departed,
-        survivingAhead: this.column.litters.slice(0, R.zhouQueueIndex).filter(litter => litter.health > 0).length });
+      // 每解除一处威胁，接运真实推进一批。
+      if (this.Has("loadingThreatResolved") && this.column.loadEvents.length>=R.transferBatchLoads)
+        this.Record("firstBatchLoaded",{loaded:this.column.loadEvents.length});
       if (this.column.QueueAhead() === 3) this.Say("TransferQueue");
       if (this.column.QueueAhead() === 2) this.Say("TransferTwo");
       if (this.column.QueueAhead() === 1) this.Say("TransferOne");
-      if (this.column.QueueAhead() === 0 && this.Has("transferAttacksResolved") && t >= R.transferSeconds - R.followVehicleLeadS) {
+      if (this.column.QueueAhead() === 0 && this.Has("alleyThreatResolved")) {
         this.column.BeginZhouBoarding();
-        this.Say("FollowVehicle");
+        this.Say("EscortZhou");
         if (Distance(this.column.zhou, this.column.zhouBoardingStart) >= R.boardingWitnessM)
           this.Record("zhouNext");
       }
@@ -3185,104 +2505,54 @@ export class FirstLevelMissionRuntime {
         this.Record("rescuePassageClear");
       }
     }
-    const retreats = {
-      RetreatFirst: [A.retreatA, "retreatFirstPassed"],
-      RetreatWall: [A.retreatB, "retreatWallPassed"],
-      RetreatYard: [A.retreatC, "retreatYardPassed"],
-    };
-    if (retreats[stage]) {
-      const [position, fact] = retreats[stage];
-      safe = !this.Threatens(position);
-      safeAt=point=>!this.Threatens(point);
-      for (const [id, actor] of this.enemies)
-        if (actor.alive && (id.startsWith("Retreat") || id.startsWith("Air"))) {
-          const end=MISSION_PURSUIT_ROUTE.findIndex(point=>point.x===position.x && point.z===position.z);
-          let index=Math.min(actor.missionPursuitIndex??MissionRouteNextIndex(MISSION_PURSUIT_ROUTE,actor.position),end);
-          if(Distance(actor.position,MISSION_PURSUIT_ROUTE[index])<R.tacticalArrivalM && index<end)index++;
-          actor.missionPursuitIndex=index;
-          const target=MISSION_PURSUIT_ROUTE[index];
-          if(Distance(actor.position,target)<R.tacticalArrivalM)this.Defend(actor,target);
-          else this.MoveActor(actor,target,R.pursuerSpeedMps);
-        }
-      const remaining = this.column.litters.filter(
-        (litter) => litter.visible && !litter.evacuated && !litter.loaded && litter.health > 0,
-      );
-      const pass = this.column.RetreatLimit(position) - 12;
-      maxProgress = Math.min(this.column.length, pass + remaining.length * R.litterSpacingM + 5);
-      if (
-        remaining.length &&
-        remaining.every((litter) => litter.progress >= pass + 1) &&
-        // RetreatYard 的圈心是最后一副担架（活点），所以它不能走 GateNear，
-        // 只有半径仍从同一条事实门取；另外两段的圈心就是锚点本身。
-        (stage==="RetreatYard" ? this.Near(remaining.at(-1),MISSION_FACT_GATES[fact].radiusM) && MissionRouteProjection(this.column.route,this.player.position).progress>=pass-12 : this.GateNear(fact))
-      )
-        this.Record(fact);
-    }
-    if (stage === "Reception") {
-      safe = !this.Threatens(A.reception);
-      const remaining = this.column.litters.filter(
-        (litter) => litter.visible && !litter.evacuated && !litter.loaded && litter.health > 0,
-      );
-      if (remaining.length && remaining.every((litter) => litter.received) && this.GateNear("receptionPassed"))
-        this.Record("receptionPassed");
-    }
-    if (stage === "FinalDefense") {
-      safe = !this.Threatens(A.rearExit);
+    // 15A 收拢：无战斗。空袭后的追兵由警戒兵在车路方向接住，沟壁折角切断射线。
+    if (stage === "Regroup") {
+      safe = !this.Threatens(A.retreatA);
       safeAt = point => !this.Threatens(point);
-      if (safe) this.Record("rearLaneClear");
-      const medics = this.column.walkers.filter((walker) => walker.kind === "medic" && walker.health > 0);
-      const litters = this.column.litters.filter(
-        (litter) => litter.health > 0 && !litter.zhou && !litter.loaded,
-      );
-      if (
-        safe && medics.every((walker) => walker.escaped || walker.rearCleared) &&
-        litters.every((litter) => litter.escaped || litter.rearCleared)
-      )
-        this.Record("medicsEscaped", {survivingMedics:medics.length,handoff:MISSION_ROUTES.exit[R.finalHandoffRouteIndex]});
+      for (const [id, actor] of this.enemies)
+        if (actor.alive && id.startsWith("Air")) {
+          const end = MISSION_PURSUIT_ROUTE.findIndex(point => point.x === A.retreatA.x && point.z === A.retreatA.z);
+          let index = Math.min(actor.missionPursuitIndex ?? MissionRouteNextIndex(MISSION_PURSUIT_ROUTE, actor.position), Math.max(0, end - 1));
+          if (Distance(actor.position, MISSION_PURSUIT_ROUTE[index]) < R.tacticalArrivalM && index < end - 1) index++;
+          actor.missionPursuitIndex = index;
+          this.Defend(actor, MISSION_PURSUIT_ROUTE[index]);
+        }
+      this.regroupTime = (this.regroupTime || 0) + dt;
+      if (this.regroupTime >= R.regroupRemanSeconds) {
+        for (const litter of this.column.litters) if (litter.health > 0 && litter.state === "fallen") litter.state = "waiting";
+        this.Record("litterRemanned", { litters: this.column.litters.filter(l => l.health > 0).length });
+      }
+      if (this.Has("litterRemanned") && this.column.litters.some(litter => litter.health > 0 && litter.progress > 0))
+        this.Record("columnMoving", { lead: Math.max(...this.column.litters.map(litter => litter.progress)) });
+      this.Say("PicketHold"); this.Say("ZhouCheck"); this.Say("Headcount");
     }
-    if (stage === "Exit" && this.GateNear("playerAtHandoff")) this.Record("playerAtHandoff");
+    // 15B 院墙夹道：无敌人，留一段无对白行走。
+    if (stage === "WallPath") {
+      if (this.GateNear("wallPathTraversed")) this.Record("wallPathTraversed");
+      const walking = this.column.litters.filter(litter => litter.health > 0);
+      if (walking.length && walking.every(litter => litter.progress > 0))
+        this.Record("stragglersTended", { tended: walking.length });
+    }
+    // 15C 院门：守军确认身份 → 接收人员安置 → 伤员实际入院。
+    if (stage === "ReceptionGate") {
+      this.Say("GateChallenge"); this.Say("ReceptionAccept");
+      const remaining = this.column.litters.filter(
+        (litter) => litter.visible && !litter.evacuated && !litter.loaded && litter.health > 0,
+      );
+      if (remaining.length && remaining.every((litter) => litter.received))
+        this.Record("woundedEntering", { received: remaining.length });
+    }
+    if (stage === "Handover") {
+      if (this.GateNear("thresholdCrossed")) { this.Record("thresholdCrossed"); this.Say("Threshold"); }
+      if (this.Has("zhouPlaced")) { this.Say("MedicAsk"); this.Say("SquadAssign"); }
+    }
+    if (stage === "BridgeOrders") this.Say("BridgeOrders");
     this.column.Update(dt, { moving, routeSafe: safe, maxProgress, player: this.player.position, ...(safeAt ? {SafeAt:safeAt} : {}) });
-    // 老周这一副担架跟着顺子进屋，停在屋门口；伏击一响就停在原地挨刀。
-    if (stage === "Village" || (stage === "Melee" && !this.Has("ambushTriggered"))) this.UpdateLeadLitter(dt);
-    this.meal.Update();
     this.view.Update(this.time, { tank: this.tank,player:this.player,camera:this.camera||null });
     this.flow.Update(dt);
     this.leaderGuide?.Update();
     this.hud.SetMissionReturn?.(this.UpdateReturnWarning(dt));
     prof?.E("story/mission/other");
-  }
-  /**
-   * 04 机枪点位的关中过场《空地上的三个人》。
-   *
-   * 触发：阶段是 MachineGun，且玩家**第一次**走进机枪座
-   * （GUN_SEAT，半径 R.captivesCutsceneRadiusM）。阶段切进来时玩家已经在圈里
-   * （从检查点或调试跳转进来就是这样）也立刻算数 —— 这一条逐帧查，不挂在 Enter 上。
-   *
-   * 只播一次：事实 `captivesWitnessed` 记在 flow.facts 里，随检查点快照一起存取
-   * （FirstLevelMissionFlow.Snapshot/Restore），所以死亡回到本阶段检查点不会重播。
-   * **事实先记再播**：宿主那边回 null 的情形（没有过场系统、已经在播一场）都是
-   * 正常状态，不许因此每帧重试，也不许报错。唯一例外是**正在换关**（LevelLoading）：
-   * 从菜单跳到 04 时人一落地就在圈里，EnterLevel 收尾前的那几帧就会走到这里 ——
-   * 这时先不记，等建完再播，否则事实记上了、过场却被宿主拒掉，整段就没了。
-   *
-   * 播放期间世界整个停摆：装配层的 Frame() 在 `cutscene.Playing` 时只推过场与画面，
-   * 玩法（玩家、AI、战车、任务运行时的 Update）一律不跑 —— 所以玩家不会在看戏的
-   * 时候被打死，机枪进攻队与战车也不会推进。这里不需要再冻一遍谁。
-   *
-   * 与班长提醒的顺序：Enter("MachineGun") 先 Say 了 FrontWeaponChoice（「机枪就在
-   * 旁边，顺手就接」）。玩家走到枪位时那条多半正在播，所以进场先 Pause、还权后
-   * Resume（OnPlayerDown/Retry 用的是同一对），整段提醒一个字不丢、也不会和过场
-   * 里的台词压在一起。
-   */
-  UpdateCaptivesCutscene() {
-    if (this.Has("captivesWitnessed") || this.controls) return;
-    if (!this.Near(GUN_SEAT, R.captivesCutsceneRadiusM) || this.LevelLoading?.()) return;
-    this.Record("captivesWitnessed", { x: this.player.position.x, z: this.player.position.z });
-    const pending = this.PlayMidCutscene?.(CAPTIVES_CUTSCENE_ID);
-    if (!pending || typeof pending.then !== "function") return;
-    this.voice.Pause();
-    const Resume = () => this.voice.Resume();
-    pending.then(Resume, Resume);
   }
   SaveCheckpoint() {
     this.safePoint = {
@@ -3290,9 +2560,6 @@ export class FirstLevelMissionRuntime {
       z: this.player.position.z,
       yaw: this.player.yaw,
       stance: this.player.stance,
-      trainZ: this.battlefield.TrainContains(this.player.position)
-        ? this.player.position.z - this.battlefield.trainOffsetM
-        : null,
     };
   }
   OnPlayerDown() {
@@ -3318,7 +2585,7 @@ export class FirstLevelMissionRuntime {
   Retry() {
     const point = this.retryPoint || this.safePoint;
     if (!point) return false;
-    const z = point.trainZ == null ? point.z : point.trainZ + this.battlefield.trainOffsetM;
+    const z = point.z;
     this.player.Spawn(point.x, z, point.yaw);
     // Spawn's generic search treats an exact structural-floor contact as overlap.
     // Reuse the observed checkpoint only when its full capsule still fits.
@@ -3332,6 +2599,7 @@ export class FirstLevelMissionRuntime {
     this.controls = null;
     this.Control?.(false);
     this.RestoreRifle();
+    // 重试落在受控演出里的那几步：重放那一段，其余照常恢复对白。
     const stage = this.flow.stage.id;
     if (stage === "Dive") {
       this.BeginControl("dive", R.diveSeconds);
@@ -3339,12 +2607,13 @@ export class FirstLevelMissionRuntime {
     } else if (stage === "Death") {
       this.BeginControl("death", R.deathSeconds);
       this.voice.Replay("ZhouDeath");
-    } else if(stage==='South'){
-      this.flow.facts.delete('southTransitionPlaced');
-      this.BeginControl('southTransition',SOUTH_TRANSITION.fadeOutS+SOUTH_TRANSITION.holdS+SOUTH_TRANSITION.fadeInS);
+    } else if (stage === "Trapped") {
+      this.opening.ResetBunker();
       this.voice.Resume();
-    } else if(stage==="Melee"){
-      this.ResetAmbush();
+    } else if (stage === "NightMarch") {
+      this.flow.facts.delete("nightArrivalPlaced");
+      this.RestoreSky?.();
+      this.BeginNightTransition();
       this.voice.Resume();
     } else this.voice.Resume();
     this.UpdateMusic();
@@ -3359,7 +2628,7 @@ export class FirstLevelMissionRuntime {
   }
   UpdateMusic(stage = this.flow.stage.id) {
     if (this.musicInitializing) return;
-    this.music.Update(stage, { shellImpact: this.Has("trainFirstShellImpact"),
+    this.music.Update(stage, { shellImpact: this.Has("bunkerCollapsed"),
       speaking: this.voice.current?.phase === "playing", failed: this.failed });
   }
   ObjectiveProgress() {
@@ -3394,22 +2663,17 @@ export class FirstLevelMissionRuntime {
       missionVersion: MISSION_VERSION,
       returnWarning: this.missionReturn.result,
       transferBeats:this.transferBeats || null,
-      ambush:{...this.ambush.State(),animationError:this.ambushAnimationError||null,
-        litterAtDoor:this.LitterAtDoor(),
-        cinematic:this.AmbushCinematic,
-        daze:this.ambushDaze?{...this.ambushDaze,hearing:this.ambushHearing||0}:null,
-        promptView:this.AmbushPromptView(),
-        actors:MISSION_ENCOUNTERS.melee.map(spec=>{
-          const actor=this.enemies.get(spec.id);
-          return {id:spec.id,alive:!!actor?.alive,x:actor?.position.x??null,z:actor?.position.z??null,
-            clip:actor?.missionAmbushClip?.clipId||null};
-        })},
+      melee:{actors:MISSION_ENCOUNTERS.melee.map(spec=>{
+        const actor=this.enemies.get(spec.id);
+        return {id:spec.id,alive:!!actor?.alive,x:actor?.position.x??null,z:actor?.position.z??null};
+      })},
+      cart:this.cart?{...this.cart}:null,
+      bridgeColumn:this.bridgeColumn?this.bridgeColumn.map(entry=>({...entry,actor:undefined})):null,
+      missingCues:[...this.missingCues],
       debugStart: this.debugStart || null,
       time: this.time,
       control: this.controls?.kind || null,
       emptyHands: this.EmptyHands,
-      receivingFood: this.ReceivingFood,
-      meal: this.meal.State(),
       openingPrompt: this.OpeningPrompt(),
       failed: this.failed,
       ordinaryCasualties:this.flow.log.filter(event=>event.id?.startsWith("ordinaryCasualty")).map(event=>event.detail),
@@ -3417,7 +2681,6 @@ export class FirstLevelMissionRuntime {
       playerExplosions: this.playerExplosions || [],
       column: this.column.State(),
       people:this.view.people.State(),aftermathCount:this.view.aftermath.count,aftermathTriangles:this.view.aftermath.triangles,
-      train: this.train?.State(),
       relief: this.relief?.map(entry=>({id:entry.actor.id,alive:entry.actor.alive,arrived:entry.arrived,distance:entry.distance,index:entry.index,x:entry.actor.position.x,z:entry.actor.position.z})) || [],
       voice: this.voice.State(),
       leaderGuide: this.leaderGuide?.State(),
@@ -3458,13 +2721,11 @@ export class FirstLevelMissionRuntime {
     this.ClearReturnWarning();
     this.speakingFace?.Reset();
     if(this.ai.ctx.onSoldierDeath===this.soldierDeath)this.ai.ctx.onSoldierDeath=this.oldSoldierDeath;
-    this.southTransition.Dispose();
-    this.meal.Dispose();
+    this.transition.Dispose();
     this.opening.Dispose();
     this.squadMarch?.Dispose();
     if(this.tankDust!=null)this.vfx.RemoveSmokeSource(this.tankDust);
     this.voice.Dispose();
-    this.carriageSound.Dispose();
     this.music.Dispose();
     this.battleSound.Dispose();
     this.view.Dispose();
@@ -3473,6 +2734,7 @@ export class FirstLevelMissionRuntime {
     this.combat.host.onBlast = this.oldBlast;
     this.aircraft.SetManualPose(MISSION_AIRCRAFT_ID, null);
     this.StopAirSound();
+    this.RestoreSky?.();
     this.Control?.(false);
   }
 }

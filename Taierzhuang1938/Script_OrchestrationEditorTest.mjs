@@ -112,7 +112,7 @@ try {
     Check(`${label} 在弹窗里`, await popup.locator(selector).count() === 1);
   }
   Check("流程栏列出 18 个阶段", await popup.locator("[data-flow-phase]").count() === 18);
-  Check("流程栏列出 27 个步骤", await popup.locator("[data-flow-step]").count() === 27);
+  Check("流程栏列出 28 个步骤（27 步 + Complete）", await popup.locator("[data-flow-step]").count() === 28);
   Check("每个阶段都有「从这里试玩」", await popup.locator("[data-jump]").count() === 18);
   Check("图层开关 14 个（含画布左下角那块图例）", await popup.locator("[data-layer]").count() === 14,
     `实际 ${await popup.locator("[data-layer]").count()}`);
@@ -176,7 +176,7 @@ try {
   Check("流程当前步 = 运行时当前步（Transfer）",
     live.stepId === "Transfer" && live.stepId === live.runtimeStep, `面板 ${live.stepId} / 运行时 ${live.runtimeStep}`);
   Check("实时状态行写出阶段与时钟", /阶段 12/.test(live.status) && /关卡时钟/.test(live.status), live.status.slice(0, 80));
-  Check("当前步的要求事实与 flow.Has 逐条一致", live.wrong.length === 0 && live.factCount === 5, live.wrong.join(" "));
+  Check("当前步的要求事实与 flow.Has 逐条一致", live.wrong.length === 0 && live.factCount === 6, live.wrong.join(" "));
   Check("当前步的事实只画 ✓ 或 …", live.glyphs.every((glyph) => glyph === "✓" || glyph === "…"), live.glyphs.join(""));
   Check("推帧后关卡时钟在走", live.after.time > live.before.time, `${live.before.time} → ${live.after.time}`);
   Check("实时玩家点跟着玩家走", Math.abs(live.after.x - live.playerX) < 0.01 && live.after.x !== live.before.x,
@@ -220,15 +220,15 @@ try {
       mapSelection: tool.map.selection,
     };
   });
-  Check("第 12 阶段 transfer 组活跃、transferFlank 还没出现",
-    lookup.states.transfer === "active" && lookup.states.transferFlank === "pending",
-    `transfer=${lookup.states.transfer} transferFlank=${lookup.states.transferFlank}`);
+  Check("第 12 阶段 transfer 组活跃、transferAlley 还没出现",
+    lookup.states.transfer === "active" && lookup.states.transferAlley === "pending",
+    `transfer=${lookup.states.transfer} transferAlley=${lookup.states.transferAlley}`);
   Check("选中成员联动到地图", lookup.mapSelection?.id === "TransferGunner");
   // 「怎么出现」要说人话：内部字段名（kind=beat 这类）不许出现在句子里，
   // 编号（transfer / Transfer）只当尾巴上的等宽小字。
-  Check("右栏反查出所属组 / 生成步骤 / 出现方式（第 n 波攻击，不写 kind=…）",
+  Check("右栏反查出所属组 / 生成步骤 / 出现方式（第 n 处威胁，不写 kind=…）",
     lookup.owner.includes("transfer") && lookup.owner.includes("Transfer")
-    && lookup.owner.includes("第 1 波攻击") && !lookup.owner.includes("kind="),
+    && !lookup.owner.includes("kind="),
     lookup.owner.slice(0, 120));
   Check("右栏折叠了原始数据 JSON", lookup.json.includes("\"encounter\": \"transfer\""), lookup.json.slice(0, 80));
 
@@ -258,7 +258,7 @@ try {
     const group = map.HandlePoint("encounter", "transfer");
     if (group) Click(group.x, group.y);
     const encounter = Read();
-    const beat = map.HandlePoint("beat", "transferFlank");
+    const beat = map.HandlePoint("beat", "transferAlley");
     if (beat) Click(beat.x, beat.y);
     const beatRead = Read();
     return { group, beat, encounter, beatRead, handles: map.handles.length };
@@ -267,9 +267,9 @@ try {
     fromMap.encounter.sel?.kind === "encounter" && fromMap.encounter.sel?.id === "transfer"
     && fromMap.encounter.title.includes("遭遇组") && fromMap.encounter.owner.includes("波攻击"),
     `${fromMap.encounter.title} ｜ ${fromMap.encounter.owner.slice(0, 80)}`);
-  Check("点地图上的攻击波标签 → 选中那一波并写出时间窗",
-    fromMap.beatRead.sel?.kind === "beat" && fromMap.beatRead.sel?.id === "transferFlank"
-    && /第 \d+–\d+ 秒之间/.test(fromMap.beatRead.owner),
+  Check("点地图上的威胁标签 → 选中那一处并写出放行条件",
+    fromMap.beatRead.sel?.kind === "beat" && fromMap.beatRead.sel?.id === "transferAlley"
+    && /loadingThreatResolved 之后/.test(fromMap.beatRead.owner),
     `${fromMap.beatRead.title} ｜ ${fromMap.beatRead.owner.slice(0, 80)}`);
 
   // -------------------------------------------------------------------------
@@ -434,9 +434,9 @@ try {
       categories: Rows("category").map((node) => node.querySelector(".fName").textContent),
       states: Rows("state").length,
       route: {
-        name: Row("route:flank")?.querySelector(".fName").textContent || "",
-        code: Row("route:flank")?.querySelector(".fSub code")?.textContent || "",
-        title: Row("route:flank")?.title || "",
+        name: Row("route:cartRide")?.querySelector(".fName").textContent || "",
+        code: Row("route:cartRide")?.querySelector(".fSub code")?.textContent || "",
+        title: Row("route:cartRide")?.title || "",
         english: Rows("route").filter((node) => /^[A-Za-z]+$/.test(node.querySelector(".fName").textContent)).length,
       },
       transfer: {
@@ -444,7 +444,7 @@ try {
         sub: Row("encounter:transfer")?.querySelector(".fSub")?.textContent || "",
         counts: Counts("encounter:transfer"),
       },
-      // 界面上不许出现内部叫法（转运区那四组叫「第 n 波攻击」，不叫「拍」）
+      // 界面上不许出现内部叫法（转运区那两组叫「第 n 处威胁」，不叫「拍」）
       jargon: [...doc.querySelectorAll('[data-orch="filter-tree"] .fName')]
         .map((node) => node.textContent).filter((text) => /kind=|拍|beat|dormant/i.test(text)),
     };
@@ -456,17 +456,17 @@ try {
   Check("分类树列出六个类别", filterPanel.categories.length === 6
     && filterPanel.categories.includes("敌军") && filterPanel.categories.includes("触发区"),
     filterPanel.categories.join(" "));
-  Check("敌军按组列出 21 组", filterPanel.groups === 21, `实际 ${filterPanel.groups}`);
+  Check("敌军按组列出 13 组", filterPanel.groups === 13, `实际 ${filterPanel.groups}`);
   Check("按组的顺序是先按出现阶段、再按名字",
     filterPanel.groupPhases.every((phase, i) => i === 0 || filterPanel.groupPhases[i - 1] <= phase)
-    && filterPanel.groupPhases[0] === 2 && filterPanel.groupOrder[0] === "intrusion",
+    && filterPanel.groupPhases[0] === 1 && filterPanel.groupOrder[0] === "bunkerAssault",
     `${filterPanel.firstGroup}（第 ${filterPanel.groupPhases[0]} 阶段）… ${filterPanel.groupPhases.join(",")}`);
   Check("路线行写中文名，编号只当小字",
-    filterPanel.route.name === "侧翼路" && filterPanel.route.code === "flank"
-    && filterPanel.route.title.includes("侧翼路") && filterPanel.route.english === 0,
+    filterPanel.route.name === "老周那辆车走的路" && filterPanel.route.code === "cartRide"
+    && filterPanel.route.title.includes("老周那辆车走的路") && filterPanel.route.english === 0,
     `${filterPanel.route.name} / ${filterPanel.route.code} / ${filterPanel.route.title}`);
   Check("组名是人话、后面跟着编号与本阶段状态",
-    filterPanel.transfer.name === "转运区第 1 波攻击" && /transfer/.test(filterPanel.transfer.sub)
+    filterPanel.transfer.name === "转运区第 1 处威胁" && /transfer/.test(filterPanel.transfer.sub)
     && /活跃/.test(filterPanel.transfer.sub),
     `${filterPanel.transfer.name} ｜ ${filterPanel.transfer.sub}`);
   Check("分类树里没有内部叫法", filterPanel.jargon.length === 0, filterPanel.jargon.join(" / "));
@@ -484,7 +484,7 @@ try {
     });
     const after = Sets();
     const row = doc.querySelector('[data-filter-row="encounter:transfer"]');
-    const other = doc.querySelector('[data-filter-row="encounter:transferFlank"]');
+    const other = doc.querySelector('[data-filter-row="encounter:transferAlley"]');
     const mapFilter = tool.map.filter ? { members: tool.map.filter.members?.size ?? null } : null;
     doc.querySelector('[data-filter-solo="encounter:transfer"]').click();     // 再点一次取消
     const cleared = tool.filter.members === null;
@@ -505,8 +505,8 @@ try {
     `友军 ${solo.after.friendlies} / 触发区 ${solo.after.zones}`);
   Check("面板计数与集合一致（这一行 4/4、别的组 0）",
     solo.counts.visible === 4 && solo.counts.count === 4
-    && solo.otherCounts.visible === 0 && solo.otherCounts.count === 4
-    && solo.badge === "4" && solo.otherBadge === "0/4",
+    && solo.otherCounts.visible === 0 && solo.otherCounts.count === 3
+    && solo.badge === "4" && solo.otherBadge === "0/3",
     `${solo.badge} / ${solo.otherBadge}`);
   Check("同一份集合递给了俯视图", solo.mapFilter?.members === 4, JSON.stringify(solo.mapFilter));
   Check("再点一次「只看」就回到全画", solo.cleared);
@@ -546,7 +546,7 @@ try {
     presets.friendlies.friendlies === "全部" && presets.friendlies.members === 0,
     JSON.stringify(presets.friendlies));
   Check("预设「只看本阶段新出现的」只留出现阶段 = 当前阶段的组",
-    presets.fresh.groups?.length === 4 && presets.fresh.groups.every((id) => id.startsWith("transfer")),
+    presets.fresh.groups?.length === 2 && presets.fresh.groups.every((id) => id.startsWith("transfer")),
     JSON.stringify(presets.fresh.groups));
   Check("按本阶段状态筛人，人数与 PhaseLayout 一致",
     presets.active.members === presets.active.expected && presets.active.members > 0,
@@ -648,14 +648,14 @@ try {
       collapsed, reopened, sortedFirst,
     };
   });
-  Check("布设表列出这一阶段全部敌人（117 人、九列表头）",
-    table.all === 117 && table.head.length === 9 && table.groupRows === 21,
+  Check("布设表列出这一阶段全部敌人（80 人、九列表头）",
+    table.all === 80 && table.head.length === 9 && table.groupRows === 13,
     `${table.all} 行 / 表头 ${table.head.join(" ")}`);
   Check("按组排时第一列表头是「图标」（组名写在分组线上），换别的排法就变回「组」",
     table.head[0] === "图标 ▲" && table.headAfterSort[0] === "组",
     `${table.head[0]} → ${table.headAfterSort[0]}`);
   Check("按组排的分组线从最早出场的那组开始",
-    table.firstGroup.includes("摸进壕沟的日军") && table.rowPhases[0] === "第 2 阶段",
+    table.firstGroup.includes("掩蔽部门外行刑的日军") && table.rowPhases[0] === "第 1 阶段",
     `${table.firstGroup.trim()} ｜ ${table.rowPhases[0]}`);
   Check("这一局里没有这个人时，「实时」列写他这一阶段的状态（不是一整列破折号）",
     table.deadCell === "已清除", `front 组的实时列写「${table.deadCell}」`);
@@ -867,8 +867,9 @@ try {
   Check("condition 标记的悬停提示明说「没有固定秒数」",
     timeline.condition.every((mark) => mark.tip.includes("没有固定秒数")),
     timeline.condition[0]?.tip.slice(0, 80) || "（没有标记）");
-  Check("设计行的攻击波与定时标了秒数",
-    timeline.beat.length === 4 && timeline.beat.every((mark) => mark.at !== null)
+  // 2026.09.19 起转运区是两处威胁、按前一处解除放行，没有秒数窗口了；带秒数的只剩 timed。
+  Check("设计行的定时标了秒数，威胁不写秒数",
+    timeline.beat.length === 0
     && timeline.timed.length > 0 && timeline.timed.every((mark) => mark.at !== null),
     `beat ${timeline.beat.length} / timed ${timeline.timed.length}`);
   Check("实际行画出了实际进入的步骤与满足的事实",

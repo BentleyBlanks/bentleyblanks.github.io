@@ -91,23 +91,19 @@ export function RouteLabel(name) {
 // 二十一组敌人的中文名。转运区那四组不在这儿：它们的名字按攻击波次现算
 // （见 EncounterLabel），表里改了顺序名字就跟着改。
 export const ENCOUNTER_LABELS = Object.freeze({
-  surface: "车站外冒头的日军",
-  intrusion: "摸进壕沟的日军",
-  shelterPursuit: "追到掩蔽处的日军",
+  bunkerAssault: "掩蔽部门外行刑的日军",
   approach: "压向外围阵地的日军",
   front: "前沿阵地上的日军",
   machineGun: "冲机枪位的那一波",
   bundleApproach: "护着战车的日军",
   tank: "战车与它的护卫",
   village: "村口的日军",
-  melee: "屋里伏击的四个人",
+  melee: "从连屋冲出来的日军",
   courtyard: "追进院子的日军",
+  transfer: "压向装载区的日军",
+  transferAlley: "侧巷的日军",
   air: "空袭之后压上来的日军",
-  retreat: "撤退路上的追兵",
-  retreatWall: "墙根侧击的日军",
-  retreatYard: "院子外的追兵",
-  reception: "接收院外的日军",
-  final: "最后堵街口的日军",
+  bridgeNorth: "北岸土坎上的日军",
 });
 
 // --- 预设（面板顶上那一排）------------------------------------------------
@@ -233,16 +229,11 @@ export function RouteNamesFor(model, phaseLayout) {
   return Object.keys(model?.routes || {});
 }
 
-/** 界面上这一组该怎么称呼：转运区四组按攻击波次叫，其余查词表。 */
+/** 界面上这一组该怎么称呼：查词表；转运区的两处威胁另按次序叫。 */
 export function EncounterLabel(model, encounter) {
-  const entry = typeof encounter === "string"
-    ? (model?.encounters || []).find((one) => one.id === encounter) : encounter;
   const id = typeof encounter === "string" ? encounter : encounter?.id;
-  const beatId = entry?.spawn?.kind === "beat" ? entry.spawn.beat : null;
-  if (beatId) {
-    const order = (model?.beats || []).findIndex((beat) => beat.id === beatId) + 1;
-    if (order > 0) return `转运区第 ${order} 波攻击`;
-  }
+  const order = (model?.beats || []).findIndex((threat) => threat.id === id) + 1;
+  if (order > 0) return `转运区第 ${order} 处威胁`;
   return ENCOUNTER_LABELS[id] || id || "（没名字的一组）";
 }
 

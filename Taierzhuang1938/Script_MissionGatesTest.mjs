@@ -20,7 +20,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { MISSION_STAGES, MISSION_ENCOUNTERS, MISSION_TACTICS, MISSION_TRANSFER_BEATS } from "./Data_FirstLevelMission.mjs";
+import { MISSION_STAGES, MISSION_ENCOUNTERS, MISSION_TACTICS, MISSION_TRANSFER_THREATS } from "./Data_FirstLevelMission.mjs";
 import {
   FIRST_LEVEL_STAGES,
   FIRST_LEVEL_ENCOUNTER_STARTS,
@@ -56,6 +56,34 @@ const Check = (condition, message) => { assert.ok(condition, message); checks +=
 // 1. 事实门覆盖 MISSION_STAGES 的全部 requirements
 // ---------------------------------------------------------------------------
 const cueIds = new Set(MISSION_DIALOGUE.map((cue) => cue.id));
+// 契约 §5 冻结的 cue id。台词表归并行的 Voice 包，合并之前这些 cue 还不在
+// MISSION_DIALOGUE 里 —— 所以 voice 门先对契约表，已经到位的再对台词表。
+const CONTRACT_CUES = new Set([
+  "BunkerBanter","BunkerKilling","BunkerSearch","ShunziCurse",
+  "RescueCall","RescueLift","RescueOut",
+  "TrenchCurse","CornerCheck","SupportOrder",
+  "FrontBlockade",
+  "TakeOverGun","TankTerror","BundleOrder",
+  "BundleGo","BundleProne","BundleSupply","BundleReturnCall","TankStopped",
+  "Volunteer","BorrowLight","ZhouLift",
+  "SouthWhisper","VillagePointer",
+  "StreetBlocked","KitchenDetour",
+  "MeleeRight","MeleeCurse","WindowOrder",
+  "CourtyardOpen","TwoLitters","LastLitter",
+  "TransferSorting","VillageRoadThreat",
+  "TransferDefense","TransferRight","TransferBatch","EscortZhou",
+  "CartTalk",
+  "AircraftFirst","WestDitchOrder",
+  "CarryZhou","AircraftReturn","RescueZhou",
+  "PicketHold","ZhouCheck","Headcount","CartAbandon",
+  "CarrySwap","RoadBump","HandsShake",
+  "GateChallenge","ReceptionAccept","WardGuide",
+  "Threshold","PlaceLitter","MedicAsk","SquadAssign",
+  "ZhouDeath","NextLitter",
+  "BridgeOrders","BridgeCover","BridgeWithdraw","MarchToTengxian",
+  "NorthGate",
+]);
+const KnownCue = (id) => CONTRACT_CUES.has(id) || cueIds.has(id);
 const interactionIds = new Set(
   [...runtimeSource.matchAll(/Register\(\s*\n?\s*["']([A-Za-z0-9]+)["']/g)].map((m) => m[1]),
 );
@@ -71,7 +99,7 @@ for (const stage of MISSION_STAGES)
     assert.equal(gate.step, stage.id, `${factId} 的 step 应当是 ${stage.id}，实际 ${gate.step}`);
   }
 checks += 1;
-Check(requirementFacts.length === 58, `requirements 事实共 58 条，实际 ${requirementFacts.length}`);
+Check(requirementFacts.length === 87, `requirements 事实共 87 条，实际 ${requirementFacts.length}`);
 
 const KINDS = new Set(["proximity", "proximityFamily", "interior", "voice", "interaction",
   "combat", "column", "cutscene", "scripted", "timer"]);
@@ -95,7 +123,7 @@ for (const [factId, gate] of Object.entries(MISSION_FACT_GATES)) {
   }
   if (gate.kind === "interior")
     assert.ok(MISSION_PLACEMENT[gate.box], `${factId} 的 box 不在 MISSION_PLACEMENT：${gate.box}`);
-  if (gate.kind === "voice") assert.ok(cueIds.has(gate.cue), `${factId} 的 cue 不在 MISSION_DIALOGUE：${gate.cue}`);
+  if (gate.kind === "voice") assert.ok(KnownCue(gate.cue), `${factId} 的 cue 既不在契约 §5 也不在 MISSION_DIALOGUE：${gate.cue}`);
   if (gate.kind === "interaction")
     assert.ok(interactionIds.has(gate.interaction), `${factId} 的交互 id 在运行时源码里找不到：${gate.interaction}`);
   if (gate.encounter) assert.ok(MISSION_ENCOUNTERS[gate.encounter], `${factId} 引了不存在的遭遇组：${gate.encounter}`);
@@ -108,8 +136,8 @@ for (const [factId, gate] of Object.entries(MISSION_FACT_GATES)) {
 checks += 1;
 
 // 契约点名要有的那几条编排触发。
-for (const factId of ["frontBattleStarted", "kitchenTraversed", "bundleRoutePoint", "approachShell",
-  "gunOccupied", "gunUsed", "ambushTriggered"])
+for (const factId of ["frontBattleStarted", "kitchenEntered", "bundleRoutePoint", "approachShell",
+  "gunOccupied", "gunUsed", "meleeEngaged"])
   Check(MISSION_FACT_GATES[factId], `编排触发 ${factId} 必须在表里`);
 
 // 家族门能按后缀解析回那一个点。
@@ -122,12 +150,12 @@ Check(MissionFactGate("frontReached")?.gate.kind === "proximity", "MissionFactGa
 
 // VoiceDone 的对白事实表。
 for (const [cue, factId] of Object.entries(MISSION_VOICE_FACTS)) {
-  assert.ok(cueIds.has(cue), `MISSION_VOICE_FACTS 的 cue 不存在：${cue}`);
+  assert.ok(KnownCue(cue), `MISSION_VOICE_FACTS 的 cue 不存在：${cue}`);
   assert.equal(MISSION_FACT_GATES[factId]?.kind, "voice", `${factId} 应当是 voice 门`);
   assert.equal(MISSION_FACT_GATES[factId].cue, cue, `${factId} 的 cue 与表不一致`);
 }
 checks += 1;
-Check(Object.keys(MISSION_VOICE_FACTS).length === 13, "对白事实共 13 条");
+Check(Object.keys(MISSION_VOICE_FACTS).length === 23, "对白事实共 23 条（契约 §5）");
 
 // ---------------------------------------------------------------------------
 // 2. 生成表与激活表
@@ -155,15 +183,15 @@ assert.deepEqual(
   "MISSION_ENCOUNTER_ACTIVATION 必须恰好覆盖 MISSION_ENCOUNTERS 的全部键",
 );
 checks += 1;
-const SPAWN_KINDS = new Set(["step", "fact", "beat", "opening"]);
-const beatIds = new Set(MISSION_TRANSFER_BEATS.map((beat) => beat.id));
+const SPAWN_KINDS = new Set(["step", "fact", "threat"]);
+const threatIds = new Set(MISSION_TRANSFER_THREATS.map((threat) => threat.id));
 for (const [id, activation] of Object.entries(MISSION_ENCOUNTER_ACTIVATION)) {
   assert.ok(SPAWN_KINDS.has(activation.spawn?.kind), `${id} 的 spawn.kind 不合法`);
   if (activation.spawn.step) assert.ok(stepIds.has(activation.spawn.step), `${id} 的 spawn.step 不是内部步骤`);
   if (activation.spawn.kind === "step")
     assert.ok(MISSION_STEP_SPAWNS[activation.spawn.step]?.includes(id),
       `${id} 说自己由步骤 ${activation.spawn.step} 生成，但不在 MISSION_STEP_SPAWNS 里`);
-  if (activation.spawn.kind === "beat") assert.ok(beatIds.has(activation.spawn.beat), `${id} 的拍不在 MISSION_TRANSFER_BEATS`);
+  if (activation.spawn.kind === "threat") assert.ok(threatIds.has(activation.spawn.threat), `${id} 的威胁不在 MISSION_TRANSFER_THREATS`);
   if (activation.spawn.kind === "fact") assert.ok(MISSION_FACT_GATES[activation.spawn.fact], `${id} 的生成事实没有门`);
   if (activation.standbyUntil) assert.ok(MISSION_FACT_GATES[activation.standbyUntil], `${id} 的 standbyUntil 事实没有门`);
   if (activation.dormant) {
@@ -172,10 +200,9 @@ for (const [id, activation] of Object.entries(MISSION_ENCOUNTER_ACTIVATION)) {
     if (activation.wake.kind === "playerWithinM")
       assert.ok(Number.isFinite(activation.wake.radiusM) && activation.wake.radiusM > 0, `${id} 的苏醒半径不合法`);
   }
-  // 拍表生成的四组不进 MISSION_STEP_SPAWNS（它们由 UpdateTransferBeats 放出），
-  // 唯一例外是第一拍 transfer：窗口 0 秒，仍旧按步骤生成。
-  if (activation.spawn.kind === "beat" && id !== "transfer")
-    assert.ok(!Object.values(MISSION_STEP_SPAWNS).flat().includes(id), `${id} 是拍表放出的，不该进 MISSION_STEP_SPAWNS`);
+  // 第二处威胁由 UpdateTransferThreats 放出，不进 MISSION_STEP_SPAWNS。
+  if (activation.spawn.kind === "threat")
+    assert.ok(!Object.values(MISSION_STEP_SPAWNS).flat().includes(id), id + " 是威胁表放出的，不该进 MISSION_STEP_SPAWNS");
 }
 checks += 1;
 for (const [phase, ids] of Object.entries(FIRST_LEVEL_DEFERRED_ENCOUNTERS))
@@ -193,11 +220,11 @@ const literalSpawns = [...runtimeSource.matchAll(/this\.SpawnEncounter\(\s*["'](
 assert.deepEqual(literalSpawns, ["front", "front"],
   `运行时里写死组名的 SpawnEncounter 只允许 front 那两处，实际是 ${JSON.stringify(literalSpawns)}`);
 checks += 1;
-Check(/this\.SpawnEncounter\(plan\.id\)/.test(runtimeSource), "转运四拍仍由 UpdateTransferBeats 按 plan.id 生成");
+Check(/this\.SpawnEncounter\(plan\.id\)/.test(runtimeSource), "转运区第二处威胁仍由 UpdateTransferThreats 按 plan.id 生成");
 Check(/for \(const id of MISSION_STEP_SPAWNS\[stage\.id\] \|\| \[\]\) this\.SpawnEncounter\(id\);/.test(runtimeSource),
   "Enter 在 switch 之前按 MISSION_STEP_SPAWNS 统一生成");
 // Enter 的 switch 里一处 SpawnEncounter 都不许剩（两处 front 分别在 UpdateFront 与 Update）。
-const enterBody = runtimeSource.slice(runtimeSource.indexOf("  Enter(stage) {"), runtimeSource.indexOf("  PlacePlayerTrain() {"));
+const enterBody = runtimeSource.slice(runtimeSource.indexOf("  Enter(stage) {"), runtimeSource.indexOf("  SpawnGuards() {"));
 Check(enterBody.length > 2000, "切出了 Enter(stage) 的整段");
 Check((enterBody.match(/this\.SpawnEncounter\(/g) || []).length === 1,
   "Enter 里只剩按表生成那一句 SpawnEncounter");
@@ -215,40 +242,31 @@ const NEAR_WHITELIST = [
     why: "UpdateTactics 的战术放行点，点与半径来自 MISSION_TACTICS 的 near/nearM，放的是走位不是事实" },
   { pattern: /if\(!this\.tank\.active&&this\.Near\(A\.front,R\.tankRevealDistanceM\)\)/,
     why: "战车揭示距离，改的是 tank.active（战车开始动），不记事实；半径已在 MISSION_TUNING" },
-  { pattern: /if\(this\.Near\(Sortie\.house,Sortie\.supplierRangeM\)\)this\.Say\('BundleSupplyDirections'\);/,
+  { pattern: /if\(this\.Near\(Sortie\.house,Sortie\.supplierRangeM\)\)this\.Say\('BundleSupply'\);/,
     why: "补给兵台词的触发圈；事实 bundleDirectionsHeard 由 VoiceDone 记，走的是 voice 门" },
   { pattern: /if\(!returning && this\.Near\(A\.bundle,8\)\)target=A\.bundle;/,
     why: "指引箭头的目标吸附（走到屋子附近就直接指箱子），不记事实" },
-  { pattern: /this\.Near\(remaining\.at\(-1\),MISSION_FACT_GATES\[fact\]\.radiusM\)/,
-    why: "RetreatYard 的圈心是最后一副担架这个活点，不是锚点；半径仍从 retreatYardPassed 的门里取" },
-  { pattern: /if \(!this\.Near\(GUN_SEAT, R\.captivesCutsceneRadiusM\) \|\| this\.LevelLoading\?\.\(\)\) return;/,
-    why: "04 机枪点位那段关中过场的触发圈，用的是与机枪座共用的 GUN_SEAT 常量（门在表里登记为 captivesWitnessed）" },
 ];
 const nearCalls = [...runtimeSource.matchAll(/this\.Near\(/g)].length;
 assert.equal(nearCalls, NEAR_WHITELIST.length,
-  `运行时里 this.Near( 应当只剩 ${NEAR_WHITELIST.length} 处（GateNear 内 1 处 + 白名单 ${NEAR_WHITELIST.length - 1} 处），实际 ${nearCalls} 处。`
+  "运行时里 this.Near( 应当只剩 " + NEAR_WHITELIST.length + " 处（GateNear 内 1 处 + 白名单 "
+  + (NEAR_WHITELIST.length - 1) + " 处），实际 " + nearCalls + " 处。"
   + "新的编排门请走 GateNear；确实不是编排门的，请在 Script_MissionGatesTest 的 NEAR_WHITELIST 里补一条并写清理由。");
 checks += 1;
 for (const entry of NEAR_WHITELIST)
-  assert.ok(entry.pattern.test(runtimeSource), `白名单条目在源码里找不到了（${entry.why}）：${entry.pattern}`);
+  assert.ok(entry.pattern.test(runtimeSource), "白名单条目在源码里找不到了（" + entry.why + "）：" + entry.pattern);
 checks += 1;
 
-// 开场脚本（Script_FirstLevelOpening.mjs）用同一把尺：它跑的是 Train→Unloading→
-// TrenchEntry→Shelter 那几步，记事实的距离判定一律走 r.GateNear，剩下的 .Near( 也要
-// 逐条在这里写明为什么不是编排门。
-const OPENING_NEAR_WHITELIST = [
-  { pattern: /if\(r\.Near\(C\.trenchEntry,8\)\)r\.Say\("TrenchContact"\);/,
-    why: "沟口外面那一圈更大的台词触发圈（TrenchContact），不记事实；事实 trenchEntered 走的是 5 m 那道门" },
-  { pattern: /\(!s\.near\|\|r\.Near\(s\.near,s\.nearM\)\)/,
-    why: "逃离炮击的放行点，点与半径来自 OPENING.escapePressure.shells 的 near/nearM，放的是炮不是事实" },
-];
+// 开场脚本（Script_FirstLevelOpening.mjs）用同一把尺。2026.09.19 起它一处 .Near( 都不剩：
+// 受困段是 scripted，后交通壕那三道距离门在运行时里走 GateNear。
+const OPENING_NEAR_WHITELIST = [];
 const openingNearCalls = [...openingSource.matchAll(/\.Near\(/g)].length;
 assert.equal(openingNearCalls, OPENING_NEAR_WHITELIST.length,
-  `Script_FirstLevelOpening 里 .Near( 应当只剩 ${OPENING_NEAR_WHITELIST.length} 处（都不记事实），实际 ${openingNearCalls} 处。`
-  + "记事实的距离判定请走 r.GateNear；确实不是编排门的，请在 OPENING_NEAR_WHITELIST 里补一条并写清理由。");
+  "Script_FirstLevelOpening 里 .Near( 应当只剩 " + OPENING_NEAR_WHITELIST.length + " 处（都不记事实），实际 "
+  + openingNearCalls + " 处。记事实的距离判定请走 r.GateNear；确实不是编排门的，请在 OPENING_NEAR_WHITELIST 里补一条并写清理由。");
 checks += 1;
 for (const entry of OPENING_NEAR_WHITELIST)
-  assert.ok(entry.pattern.test(openingSource), `开场白名单条目在源码里找不到了（${entry.why}）：${entry.pattern}`);
+  assert.ok(entry.pattern.test(openingSource), "开场白名单条目在源码里找不到了（" + entry.why + "）：" + entry.pattern);
 checks += 1;
 
 // 两份源码里 GateNear("<字面量>") 引的事实必须在表里，而且是距离门（家族门按前缀解析）。
@@ -257,14 +275,17 @@ for (const [label, source] of [["运行时", runtimeSource], ["开场脚本", op
   for (const m of source.matchAll(/GateNear\(\s*["']([A-Za-z0-9]+)["']\s*\)/g)) gateNearFacts.push([label, m[1]]);
 for (const [label, factId] of gateNearFacts) {
   const entry = MissionFactGate(factId);
-  assert.ok(entry, `${label}里 GateNear("${factId}") 引了 MISSION_FACT_GATES 里没有的事实`);
+  assert.ok(entry, label + "里 GateNear(" + factId + ") 引了 MISSION_FACT_GATES 里没有的事实");
   assert.ok(["proximity", "proximityFamily"].includes(entry.gate.kind),
-    `${label}里 GateNear("${factId}") 引的不是距离门（kind=${entry.gate.kind}）`);
+    label + "里 GateNear(" + factId + ") 引的不是距离门（kind=" + entry.gate.kind + "）");
 }
 checks += 1;
+const runtimeGateFacts = gateNearFacts.filter(([label]) => label === "运行时").map(([, factId]) => factId);
+for (const factId of ["rearTrenchEntered", "cornerReached", "collectionPointSeen", "villageMouthReached",
+  "streetBlockSeen", "southBankReached", "blastZoneCleared", "northGateReached", "gateEntered"])
+  Check(runtimeGateFacts.includes(factId), "新步骤的距离门 " + factId + " 走了 GateNear");
 const openingGateFacts = gateNearFacts.filter(([label]) => label === "开场脚本").map(([, factId]) => factId);
-Check(openingGateFacts.includes("trenchEntered") && openingGateFacts.filter((id) => id === "shelterReached").length === 2,
-  "开场脚本的进沟与折角两处（折角两处：记事实 + 喘息台词）都走了 GateNear");
+Check(openingGateFacts.length === 0, "开场脚本不再自己判距离门");
 
 // VoiceDone 的那一串简单 if 已经换成查表。
 Check(/const fact = MISSION_VOICE_FACTS\[id\];/.test(runtimeSource), "VoiceDone 改成查 MISSION_VOICE_FACTS");
@@ -283,7 +304,7 @@ Check(Object.keys(model.facts).length === Object.keys(MISSION_FACT_GATES).length
 Check(model.encounters.length === Object.keys(MISSION_ENCOUNTERS).length, "遭遇组数与 MISSION_ENCOUNTERS 一致");
 Check(model.encounters.reduce((sum, e) => sum + e.members.length, 0)
   === Object.values(MISSION_ENCOUNTERS).flat().length, "成员数与 MISSION_ENCOUNTERS 一致");
-Check(model.beats.length === MISSION_TRANSFER_BEATS.length, "拍数与 MISSION_TRANSFER_BEATS 一致");
+Check(model.beats.length === MISSION_TRANSFER_THREATS.length, "威胁数与 MISSION_TRANSFER_THREATS 一致");
 for (const name of ["pursuit", "sortie", "sortieReturn", "approach", "supportTrench", "flank", "village", "evacuation", "exit"])
   Check(model.routes[name]?.length, `routes 里要有 ${name}`);
 Check(model.layout.blocks.length > 500 && model.layout.gates.length > 0, "layout 带上了体块与门");
@@ -302,34 +323,38 @@ for (const entry of model.timeline.filter((item) => item.kind === "condition"))
   assert.ok(entry.atS === null && entry.earliestS === null && entry.latestS === null && entry.minimumSeconds == null,
     `条件类时间轴项不许带秒数：${entry.step}/${entry.factId}`);
 checks += 1;
-Check(model.timeline.some((entry) => entry.kind === "beat" && entry.earliestS === 35 && entry.latestS === 60),
-  "时间轴带上了转运拍的窗口");
-Check(model.timeline.some((entry) => entry.kind === "timed" && entry.minimumSeconds === 150), "时间轴带上了 minimumSeconds");
+Check(model.timeline.some((entry) => entry.kind === "threat" && entry.encounterId === "transferAlley" && entry.after === "loadingThreatResolved"),
+  "时间轴带上了第二处威胁的放行条件");
 Check(model.timeline.some((entry) => entry.kind === "delay" && entry.memberId), "时间轴带上了成员的战术延迟");
 Check(model.timeline.some((entry) => entry.kind === "wake" && entry.encounterId === "village"), "时间轴带上了装睡组的苏醒");
-Check(model.timeline.filter((entry) => entry.kind === "timed" && entry.step === "Shelter").length === 1,
-  "时间轴带上了掩蔽处最后一个追兵的推进时间");
+Check(model.timeline.filter((entry) => entry.kind === "timed" && entry.step === "Trapped").length === 2,
+  "时间轴带上了受困段的两个兜底期限");
 
 // 阶段布局：契约里点名的那几条。
 const twelve = PhaseLayout(model, 12);
 Check(twelve.encounters.find((e) => e.id === "transfer").state === "active", "阶段 12 的 transfer 组是 active");
-for (const id of ["transferFlank", "transferLast", "transferRear"])
-  Check(twelve.encounters.find((e) => e.id === id).state === "pending", `阶段 12 的 ${id} 还是 pending`);
+Check(twelve.encounters.find((e) => e.id === "transferAlley").state === "pending", "阶段 12 的 transferAlley 还是 pending");
 const four = PhaseLayout(model, 4);
 Check(four.encounters.find((e) => e.id === "village").state === "dormant", "阶段 4 的 village 组装睡");
 Check(four.encounters.find((e) => e.id === "machineGun").state === "active", "阶段 4 的 machineGun 组已放出");
-Check(PhaseLayout(model, 1).encounters.every((e) => e.state === "pending"), "阶段 1 一个敌人都还没出现");
+Check(PhaseLayout(model, 1).encounters.filter((e) => e.id !== "bunkerAssault").every((e) => e.state === "pending"),
+  "阶段 1 除了掩蔽部门外那一组之外一个敌人都还没出现");
+// 它在阶段 1 之内先装睡再醒（日兵转向门内那一刻），阶段粒度的 state 分不开这两段，
+// 所以这里只守「登记成装睡、醒的条件是 doorSearchStarted」。
+const bunkerAssault = PhaseLayout(model, 1).encounters.find((e) => e.id === "bunkerAssault");
+Check(bunkerAssault.dormant && bunkerAssault.wake.fact === "doorSearchStarted",
+  "阶段 1 的 bunkerAssault 组装睡，日兵转向门内才醒");
 const STATES = new Set(["pending", "spawned", "dormant", "standby", "active", "cleared"]);
 for (const phase of model.phases)
   for (const encounter of PhaseLayout(model, phase.number).encounters)
-    assert.ok(STATES.has(encounter.state), `阶段 ${phase.number} 的 ${encounter.id} 状态不合法：${encounter.state}`);
+    assert.ok(STATES.has(encounter.state), "阶段 " + phase.number + " 的 " + encounter.id + " 状态不合法：" + encounter.state);
 checks += 1;
 
 // 反查。
 const owner = FindOwner(model, "TransferGunner");
 Check(owner.encounter.id === "transfer" && owner.member.id === "TransferGunner", "反查出 TransferGunner 属于 transfer 组");
 Check(owner.step === "Transfer" && owner.phaseNumber === 12, "反查出它由 Transfer 步（阶段 12）放出");
-Check(owner.spawn.kind === "beat" && owner.spawn.beat === "transfer", "反查出它跟着第一拍出现");
+Check(owner.spawn.kind === "step" && owner.spawn.step === "Transfer", "反查出它进 Transfer 步就出现");
 Check(FindOwner(model, "village").member === null && FindOwner(model, "village").encounter.id === "village",
   "按组名反查到组本身");
 Check(FindOwner(model, "VillageGunner").facts.includes("villageGunSilent"), "反查出引用该成员的事实");
@@ -346,17 +371,17 @@ for (const factId of Object.keys(model.facts)) Check(DescribeFact(model, factId)
 Check(ApplyRuntimeState(model, null) === null, "没有运行时返回 null");
 const live = ApplyRuntimeState(model, {
   stageId: "Transfer", phaseNumber: 12, time: 412, stageTime: 40,
-  facts: ["transferArrived"], remaining: ["vehiclesDeparted"],
-  log: [{ kind: "stage", id: "Train", time: 0 }, { kind: "fact", id: "trainShelling", time: 31 },
+  facts: ["transferArrived"], remaining: ["loadingThreatResolved"],
+  log: [{ kind: "stage", id: "Trapped", time: 0 }, { kind: "fact", id: "bunkerCollapsed", time: 31 },
     { kind: "stage", id: "Transfer", time: 372 }, { kind: "fact", id: "transferArrived", time: 380 }],
   enemies: [{ id: "TransferGunner", alive: true, encounter: "transfer", x: 113, z: 80 }],
   player: { x: 94, z: 101, yaw: 0.2 }, guideRoute: [{ x: 94, z: 101 }],
 });
 Check(live.stepId === "Transfer" && live.phaseNumber === 12, "live 认得当前步骤与阶段");
-Check(live.facts.has("transferArrived") && live.remaining[0] === "vehiclesDeparted", "live 带上了事实与还差什么");
+Check(live.facts.has("transferArrived") && live.remaining[0] === "loadingThreatResolved", "live 带上了事实与还差什么");
 Check(live.actualTimeline.at(-1).stageAtS === 8 && live.actualTimeline.at(-1).kind === "fact",
   "实际时间轴按关卡时钟与步内时钟两套记");
-Check(live.actualTimeline[1].step === "Train" && live.actualTimeline[1].phaseNumber === 1,
+Check(live.actualTimeline[1].step === "Trapped" && live.actualTimeline[1].phaseNumber === 1,
   "实际时间轴里的事实归到它发生时那一步");
 Check(live.player.x === 94 && live.guideRoute.length === 1, "live 带上了玩家与指引路线");
 

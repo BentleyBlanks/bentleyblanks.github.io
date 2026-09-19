@@ -2,7 +2,7 @@
 // Script_MissionOrchestration.mjs —— 第一关编排模型（纯，零 three，Node 直接可跑）
 //
 // 把游戏**实际使用的**那些表（MISSION_STAGES / MISSION_ENCOUNTERS / MISSION_TACTICS /
-// MISSION_TRANSFER_BEATS / MISSION_FACT_GATES / MISSION_LAYOUT …）汇成一份供关卡编排
+// MISSION_TRANSFER_THREATS / MISSION_FACT_GATES / MISSION_LAYOUT …）汇成一份供关卡编排
 // 工作台、俯视图与 CLI 共用的模型。这里**不新建任何展示用的流程**：每一条都能指回
 // 它的来源表，改了源表这份模型跟着变。
 //
@@ -18,7 +18,7 @@ import {
   MISSION_ENCOUNTERS,
   MISSION_TACTICS,
   MISSION_GUIDANCE,
-  MISSION_TRANSFER_BEATS,
+  MISSION_TRANSFER_THREATS,
   MISSION_PURSUIT_ROUTE,
   MISSION_VERSION,
   MISSION_TUNING as R,
@@ -42,7 +42,7 @@ import { MISSION_TERRAIN } from "./Data_FirstLevelMissionTerrain.mjs";
 import { MISSION_TRENCH_NETWORK } from "./Data_FirstLevelMissionTrenches.mjs";
 import { MISSION_DEFENSE_POSTS } from "./Data_FirstLevelMissionFortifications.mjs";
 import { FRONT_DEFENDERS, FRONT_GUARD_POSTS, FrontAssaultLane, FrontReserveLane } from "./Data_FirstLevelMissionFront.mjs";
-import { MISSION_SOUTH_BRIDGE } from "./Data_FirstLevelMissionTopology.mjs";
+import { MISSION_SOUTH_BRIDGE, MISSION_STAGE_ROUTES } from "./Data_FirstLevelMissionTopology.mjs";
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
 import { FRONT_SORTIE as Sortie } from "./Data_FirstLevelFrontRoute.mjs";
 import {
@@ -208,6 +208,9 @@ function BuildRoutes() {
   routes.trenchContact = FlatRoute(OPENING.trenchContactRoute);
   routes.wounded = FlatRoute(OPENING.woundedRoute);
   routes.runner = FlatRoute(OPENING.runnerRoute);
+  // 2026.09.19 契约路线：几何还没建好，所以它们还没并进 MISSION_ROUTES，
+  // 但编排工作台现在就要画得出来（步骤的 guidance.route 已经指着它们了）。
+  for (const [name, points] of Object.entries(MISSION_STAGE_ROUTES)) routes[name] ??= FlatRoute(points);
   return routes;
 }
 
@@ -231,11 +234,11 @@ function BuildZones(facts) {
       minX: crawl.x - crawl.w / 2, maxX: crawl.x + crawl.w / 2,
       minZ: crawl.z - crawl.d / 2, maxZ: crawl.z + crawl.d / 2,
     });
-  for (const beat of MISSION_TRANSFER_BEATS) {
+  for (const beat of MISSION_TRANSFER_THREATS) {
     const roster = MISSION_ENCOUNTERS[beat.id] || [];
     if (!roster.length) continue;
     zones.push({
-      id: `beat_${beat.id}`, kind: "beatArea", step: "Transfer", fact: null,
+      id: `threat_${beat.id}`, kind: "threatArea", step: "Transfer", fact: null,
       minX: Math.min(...roster.map((spec) => spec.x)), maxX: Math.max(...roster.map((spec) => spec.x)),
       minZ: Math.min(...roster.map((spec) => spec.z)), maxZ: Math.max(...roster.map((spec) => spec.z)),
     });
@@ -289,15 +292,17 @@ function BuildTimeline(steps, facts, encounters) {
         atS: null, earliestS: null, latestS: null, requires: facts[factId]?.requires || null,
       });
   }
-  // 转运区四拍：唯一带窗口的一段设计时间。
-  // 面上一律叫「第 n 波攻击」：「拍」是排这段节奏时的内部叫法，不该出现在人看的字里。
-  MISSION_TRANSFER_BEATS.forEach((beat, index) => {
+  // 12 只有两处威胁（MISSION_TRANSFER_THREATS）：第一处进步就在，第二处等第一处解除。
+  // 面上一律叫「第 n 处威胁」：「拍」是旧四拍的内部叫法，已随 2026.09.19 重构下线。
+  MISSION_TRANSFER_THREATS.forEach((threat, index) => {
     timeline.push({
-      phaseNumber: PhaseNumberForStep("Transfer"), step: "Transfer", kind: "beat",
-      label: `转运区第 ${index + 1} 波攻击（装车 ${beat.loaded} 副之后，与上一波隔 ${beat.restS} 秒）`,
-      factId: null, encounterId: beat.id, memberId: null,
-      atS: null, earliestS: beat.earliestS, latestS: beat.latestS,
-      loaded: beat.loaded, restS: beat.restS, requires: null,
+      phaseNumber: PhaseNumberForStep("Transfer"), step: "Transfer", kind: "threat",
+      label: threat.after
+        ? `转运区第 ${index + 1} 处威胁（${threat.after} 之后隔 ${R.transferThreatGapS} 秒）`
+        : `转运区第 ${index + 1} 处威胁（进 Transfer 步即在）`,
+      factId: threat.resolved, encounterId: threat.id, memberId: null,
+      atS: null, earliestS: null, latestS: null,
+      after: threat.after || null, gapS: threat.after ? R.transferThreatGapS : 0, requires: null,
     });
   });
   // 空袭两趟的提前量。
@@ -311,12 +316,18 @@ function BuildTimeline(steps, facts, encounters) {
     label: `日机第二趟提前 ${R.secondAirLeadS} 秒起飞`, factId: null, encounterId: null, memberId: null,
     atS: R.secondAirLeadS, earliestS: null, latestS: null, requires: null,
   });
-  // 掩蔽处最后一个追兵的推进。
+  // 01 受困段的拍子：黑屏对白被近爆打断，随后门外行刑、日兵转向门内。
   timeline.push({
-    phaseNumber: PhaseNumberForStep("Shelter"), step: "Shelter", kind: "timed",
-    label: `折角只剩 ${OPENING.shelterPush.remaining} 人时，${OPENING.shelterPush.afterS} 秒后压上来`,
-    factId: null, encounterId: "shelterPursuit", memberId: null,
-    atS: OPENING.shelterPush.afterS, earliestS: null, latestS: null, requires: null,
+    phaseNumber: PhaseNumberForStep("Trapped"), step: "Trapped", kind: "timed",
+    label: `黑屏对白 ${R.bunkerBanterFallbackS} 秒后被近爆打断（没有音频时的兜底期限）`,
+    factId: "bunkerCollapsed", encounterId: null, memberId: null,
+    atS: R.bunkerBanterFallbackS, earliestS: null, latestS: null, requires: null,
+  });
+  timeline.push({
+    phaseNumber: PhaseNumberForStep("Trapped"), step: "Trapped", kind: "timed",
+    label: `近爆后 ${R.bunkerSearchAtS} 秒日兵转向门内`,
+    factId: "doorSearchStarted", encounterId: "bunkerAssault", memberId: null,
+    atS: R.bunkerSearchAtS, earliestS: null, latestS: null, requires: null,
   });
   // 各成员的战术延迟与预备队放行。
   for (const encounter of encounters)
@@ -409,7 +420,7 @@ export function BuildOrchestrationModel() {
     steps,
     facts,
     encounters,
-    beats: MISSION_TRANSFER_BEATS.map((beat) => ({ ...beat })),
+    beats: MISSION_TRANSFER_THREATS.map((beat) => ({ ...beat })),
     routes: BuildRoutes(),
     anchors: Object.fromEntries(Object.entries(MISSION_ANCHORS).map(([id, point]) => [id, Flat(point)])),
     zones: BuildZones(facts),

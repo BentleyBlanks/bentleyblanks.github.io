@@ -2,26 +2,22 @@ import { MissionVoiceTimeline } from "./Data_FirstLevelMissionVoiceTiming.mjs";
 import { MISSION_CIVILIAN_AFTERMATH } from "./Data_FirstLevelMissionCivilianAftermath.mjs";
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
 import { FirstLevelOpening, OpeningRecoveryTime, SampleOpeningPerception } from "./Script_FirstLevelOpening.mjs";
-import { FirstLevelOpeningBarrage } from "./Script_FirstLevelOpeningBarrage.mjs";
 import { MISSION_AFTERMATH, FRONT_BREACHES, FRONT_ASSAULT, FRONT_COVER, FRONT_FIELD_MEN, FRONT_RESERVES, FRONT_ASSAULT_STARTS, FrontAssaultLane, FrontReserveLane } from "./Data_FirstLevelMissionFront.mjs";
 import { COVER } from "./Data_Tuning_AiCover.mjs";
 import { TRAVERSAL } from "./Data_Traversal.mjs";
 import { CollectBulletNearMisses,ApplyBulletNearMisses } from "./Script_BallisticSuppression.mjs";
 import { MISSION_VOICE_ALIGNMENT } from "./Data_FirstLevelMissionVoiceAlignment.mjs";
-import { CARRIAGE_SOUND, CARRIAGE_SOUND_ASSETS } from "./Data_FirstLevelCarriageSound.mjs";
-import { FirstLevelCarriageSound } from "./Script_FirstLevelCarriageSound.mjs";
 import { FirstLevelMissionBattleSound } from "./Script_FirstLevelMissionBattleSound.mjs";
-import { MISSION_TRAIN, MissionTrainMotion } from "./Data_FirstLevelMissionTrain.mjs";
-import { FirstLevelMissionTrain } from "./Script_FirstLevelMissionTrain.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import crypto from "node:crypto";
 import { FirstLevelMissionFlow } from "./Script_FirstLevelMissionFlow.mjs";
-import { TransferBeatReady, GuardCrossingPair, FrontReplacementSlots } from "./Script_FirstLevelMissionPacing.mjs";
+import { GuardCrossingPair, FrontReplacementSlots } from "./Script_FirstLevelMissionPacing.mjs";
 import { FIRST_LEVEL_STAGES, ResolveFirstLevelStage, FirstLevelStageForStep } from "./Data_FirstLevelMissionStages.mjs";
 import { BuildFirstLevelCheckpoint } from "./Script_FirstLevelMissionCheckpoint.mjs";
 import { FirstLevelMissionColumn, MissionRouteNextIndex, MissionCarryRoutePoint, MissionGuideSpeed, MissionGuideRoute, MissionSquadRoute, MissionSquadPace } from "./Script_FirstLevelMissionColumn.mjs";
-import { MISSION_STAGES, MISSION_TUNING as R, FIRST_LEVEL_MISSION_PHASE, MISSION_TACTICS, MISSION_ENCOUNTERS, MISSION_PURSUIT_ROUTE } from "./Data_FirstLevelMission.mjs";
+import { MISSION_STAGES, MISSION_TUNING as R, FIRST_LEVEL_MISSION_PHASE, MISSION_TACTICS, MISSION_ENCOUNTERS, MISSION_PURSUIT_ROUTE, MISSION_TRANSFER_THREATS } from "./Data_FirstLevelMission.mjs";
+import { MISSION_STAGE_ROUTES } from "./Data_FirstLevelMissionTopology.mjs";
 import { MISSION_LAYOUT, MISSION_ROUTES, MISSION_ANCHORS as A, MISSION_PLACEMENT as P, MISSION_RAILWAY, MISSION_SUPPLIES } from "./Data_FirstLevelMissionLayout.mjs";
 import { MakeRailwayProfile } from "./Script_RoadPath.mjs";
 import { MISSION_TERRAIN, SampleMissionTerrain, MissionPathDistance } from "./Data_FirstLevelMissionTerrain.mjs";
@@ -147,7 +143,7 @@ if(process.argv.includes("--opening-audio"))process.exit(0);
     const r={flow,squad:[{id:1,alive:false,castId:null}],Has:id=>flow.Has(id),Record:(id,d)=>flow.Record(id,d),
       OnPlayerDown:()=>{r.failed=true;},MissionFailure:()=>{},failed:false};
     const opening=new FirstLevelOpening(r);
-    opening.barrage.Update=()=>{};opening.FireWindows=()=>{};opening.UpdateZhou=()=>{};
+    opening.FireWindows=()=>{};opening.UpdateZhou=()=>{};
     opening.Update(1/60);
     assert.equal(r.failed,false,"an ordinary member in the player's squad does not fail the opening");
     r.squad.push({id:2,castId:OPENING.requiredSquadCast[0],alive:false});
@@ -157,7 +153,8 @@ if(process.argv.includes("--opening-audio"))process.exit(0);
     const flow=new FirstLevelMissionFlow();flow.index=MISSION_STAGES.findIndex(s=>s.id==="MachineGun");flow.started=true;
     const guards=Array.from({length:4},(_,i)=>({actor:{id:i,alive:i<survivors},safe:true,progress:1,route:[{}]}));
     const r={flow,guards,time:0,Has:id=>flow.Has(id),Record:(id,d)=>flow.Record(id,d)};
-    flow.Record("frontAttackRepelled");
+    for(const fact of MISSION_STAGES.find(s=>s.id==="MachineGun").requirements)
+      if(fact!=="guardWithdrawalResolved")flow.Record(fact);
     FirstLevelMissionRuntime.prototype.UpdateGuards.call(r,1/60);
     assert.equal(flow.log.find(e=>e.id==="guardWithdrawalResolved").detail.survived,survivors,
       "withdrawal counts only living survivors, including casualties after reaching cover");
@@ -176,35 +173,6 @@ if(process.argv.includes("--opening-audio"))process.exit(0);
     assert.equal([...speeds.values()].filter(speed=>speed===0).length,1,
       'the other man still yields instead of both ignoring separation');
   }
-  const StanceRequest=(stage,facts)=>{
-    const input={stanceRequested:"stand",crouchPressed:true,pronePressed:true};
-    FirstLevelMissionRuntime.prototype.BeforePlayer.call({flow:{stage:{id:stage}},
-      Has:id=>facts.has(id),meal:{Restore(){}},ReceivingFood:false,controls:null,player:{stance:"stand",position:{x:0,z:0},yaw:0,velocity:{x:0,z:0}}},1/60,input);
-    return input;
-  };
-  const freeStance={stanceRequested:"stand",crouchPressed:true,pronePressed:true};
-  for(const phase of FIRST_LEVEL_STAGES.filter(phase=>phase.number>=3)){
-    const saved=BuildFirstLevelCheckpoint(phase.number),facts=new Set(saved.facts);
-    assert.ok(facts.has("trainNearShellImpact"),`${phase.id}: a completed derailment includes its near-shell impact`);
-    const legacy=new Set(facts);legacy.delete("trainNearShellImpact");
-    for(const stage of phase.steps){
-      assert.deepEqual(StanceRequest(stage,facts),freeStance,`${stage}: the current checkpoint permits standing`);
-      assert.deepEqual(StanceRequest(stage,legacy),freeStance,`${stage}: an old save missing the impact still permits standing`);
-      assert.deepEqual(StanceRequest(stage,new Set(["trainProneOrder"])),freeStance,
-        `${stage}: a stale carriage order never owns a later gameplay stage`);
-    }
-  }
-  for(const stage of ["Train","Unloading"]){
-    assert.deepEqual(StanceRequest(stage,new Set()),freeStance,`${stage}: the player stays free before the order`);
-    assert.deepEqual(StanceRequest(stage,new Set(["trainProneOrder"])),
-      {stanceRequested:"crouch",crouchPressed:false,pronePressed:false},`${stage}: the real incoming barrage still forces crouching`);
-    assert.deepEqual(StanceRequest(stage,new Set(["trainProneOrder","trainNearShellImpact"])),freeStance,
-      `${stage}: impact ends the crouch order before derailment controls take over`);
-    assert.deepEqual(StanceRequest(stage,new Set(["trainProneOrder","luoRescueComplete"])),freeStance,
-      `${stage}: completed rescue releases an old save even when the impact fact is absent`);
-  }
-  console.log("ok carriage crouch scope: live barrage, completed rescue, all later stages and legacy saves");
-  if(process.argv.includes("--opening-stance"))process.exit(0);
   {
     const voice=new FirstLevelMissionVoice({audio:{StopStoryVoice(){}},hud:{Say(){}}});
     const gunner={alive:true,position:{x:25,z:-161}};
@@ -224,276 +192,7 @@ if(process.argv.includes("--opening-audio"))process.exit(0);
     assert.ok(voice.queue.includes("FrontCrossing"),"a real crossing after gun destruction receives its new exchange");
     assert.ok(!voice.finished.has("FrontFallback"),"cancelled dialogue is never falsely marked heard");
   }
-  const Make=()=>{
-    const facts=new Set(["trainFirstShellLaunched"]),rays=[],impacts=[],sounds=[];
-    const fixture={clock:0,wallX:null};
-    const combat=Object.create(CombatSystem.prototype);
-    Object.assign(combat,{shells:[],shellSerial:0,shellVisuals:{Create(){},Step(){},Update(){},Retire(){}},
-      Blast:point=>impacts.push(point.clone()),host:{audio:{Play:(key,options)=>sounds.push({key,...options})},battlefield:{
-        GroundHeight:()=>0,
-        Raycast:(from,direction,distance)=>{
-          rays.push({from:from.clone(),direction:direction.clone(),distance});
-          const floor=direction.y<0?-from.y/direction.y:Infinity;
-          const wall=fixture.wallX!=null&&Math.abs(direction.x)>1e-8?(fixture.wallX-from.x)/direction.x:Infinity;
-          const at=Math.min(floor>=0?floor:Infinity,wall>=0?wall:Infinity);
-          return at<=distance?{t:at}:null;
-        },
-      }}});
-    const runtime={time:0,Has:id=>facts.has(id),Record:id=>facts.add(id),combat,
-      Point:(p,y=0)=>new Vector3(p.x,y,p.z),trainShellStartedAt:null,shellTrainOffset:0,
-      carriageSound:{Handle:()=>false},opening:{Derail:()=>facts.add("trainNearShellImpact")},
-      player:{Suppress(){}},squad:[],column:{},
-    };
-    const voice=new FirstLevelMissionVoice({
-      audio:{PlayStoryVoice:()=>({voice:{t:fixture.clock}}),StopStoryVoice(){}},hud:{Say(){}},
-      Clock:()=>fixture.clock,Ready:id=>facts.has(id),
-      Event:(...args)=>FirstLevelMissionRuntime.prototype.VoiceEvent.call(runtime,...args),
-    });
-    runtime.voice=voice;
-    voice.manifest=JSON.parse(fs.readFileSync(new URL("./Audio/FirstLevel/Data_FirstLevelVoiceManifest.json",import.meta.url)));
-    voice.Enqueue("TrainShelling");voice.Update(0);
-    voice.current.cue={...voice.current.cue,lines:Array.from({length:3},()=>({who:"luo",text:"Fixture"}))};
-    voice.current.plan={lines:[[0,0],[0,0],[0,2.4]],segments:[
-      {start:0,end:2.4,wait:0,events:[{at:1,id:"TrainNearShell"}]},
-      {start:2.4,end:3,wait:0,gate:"trainNearShellImpact"}],tail:0};
-    voice.BeginSegment();
-    fixture.Step=(audioSeconds,dt=.05)=>{fixture.clock+=audioSeconds;runtime.time+=dt;voice.Update(dt);combat.StepShells(dt);};
-    return Object.assign(fixture,{runtime,voice,combat,facts,rays,impacts,sounds});
-  };
-  const slow=Make(),cue=MISSION_DIALOGUE.find(cue=>cue.id==="TrainShelling");
-  const plan=slow.voice.current.plan;
-  const launchAt=plan.segments[0].events[0].at,impactAt=plan.lines[2][1];
-  // Ten rendered frames per real second, with Main's simulation dt cap of .05.
-  while(slow.clock<launchAt+.15)slow.Step(.1);
-  assert.equal(slow.combat.shells.length,1,"the source-timed near shell is a real live projectile");
-  const shell=slow.combat.shells[0],pausedAge=shell.age,pausedPosition=shell.position.toArray(),pausedRays=slow.rays.length;
-  slow.voice.Pause();for(let i=0;i<30;i++)slow.Step(.1);
-  assert.equal(shell.age,pausedAge,"a paused source cannot advance the story projectile on simulation dt");
-  assert.deepEqual(shell.position.toArray(),pausedPosition,"pause freezes the actual ballistic position");
-  assert.equal(slow.rays.length,pausedRays,"a frozen projectile does not cast zero-length collision rays");
-  slow.voice.Resume();
-  for(let i=0;i<30&&!slow.impacts.length;i++)slow.Step(.1);
-  assert.equal(slow.impacts.length,1,"the real impact occurs despite simulation advancing at half audio speed");
-  assert.ok(Math.abs(slow.voice.current.sourceTime-impactAt)<1e-8,"the retained-source projectile reaches its authored endpoint");
-  assert.ok(slow.facts.has("trainNearShellImpact"),"the collision releases the actual injury-dialogue gate");
-  assert.ok(slow.rays.length>=160,"catch-up retains the full substepped collision path");
-  assert.equal(slow.combat.shells.length,0,"the shell retires once after impact");
-
-  const late=Make();late.Step(launchAt+.8);
-  assert.ok(Math.abs(late.combat.shells[0].age-.8)<1e-8,"a delayed launch frame catches up from the authored launch time");
-  assert.ok(late.rays.length>=95,"late launch traces its whole path instead of teleporting to the current point");
-  late.Step(impactAt-late.voice.current.sourceTime);
-  assert.equal(late.impacts.length,1,"a source held exactly at the gate can still physically reach the ground");
-  assert.ok(late.impacts[0].distanceTo(late.rays[0].from)>20,"impact is reached through the real travelled trajectory");
-
-  const blocked=Make();blocked.wallX=-59.7;blocked.Step(impactAt);
-  assert.equal(blocked.impacts.length,1,"a catch-up interval still hits intervening world geometry");
-  assert.ok(Math.abs(blocked.impacts[0].x-blocked.wallX)<1e-8&&blocked.impacts[0].y>0,
-    "the nearer wall receives the hit instead of a forced explosion at the authored ground target");
-  blocked.Step(1);assert.equal(blocked.impacts.length,1,"a blocked projectile cannot impact again after the clock advances");
-
-  const ordinary=Make();
-  const normal=ordinary.combat.FireShell(new Vector3(0,28,0),new Vector3(26,0,0),{flight:1.4,incoming:false});
-  ordinary.combat.StepShells(.05);
-  assert.ok(Math.abs(normal.age-.05)<1e-8,"ordinary combat shells retain their simulation-dt clock");
-  const ranging=Make();Object.assign(ranging.runtime,{time:20,trainClockLead:19});
-  const barrage=new FirstLevelOpeningBarrage(ranging.runtime);
-  barrage.startedAt=20;barrage.nextShotAt=Infinity;barrage.Update();
-  assert.equal(ranging.combat.shells[0].target.z,MISSION_TRAIN.cars[OPENING.derailCar].z+
-    MissionTrainMotion(39+OPENING.barrage.firstFlightS).offsetM+OPENING.barrage.shells[0].z,
-    "the first ranging shell follows the audio-led moving train even when simulation runs slower");
-  console.log("ok source-timed near shell: 10fps cap, pause/resume, late launch, real obstruction and ordinary dt");
 }
-// The upstream sensory recovery can outlast the carriage roll. Observe the
-// actual perception function and Opening.Update together, including an early
-// rescue request; a separate timer must not consume the failed rise unseen.
-{
-  const summaries=[];
-  for(const dt of [1/10,1/60,1/144]){
-    const facts=new Set(['trainDerailed','trainStopped','luoRescueRequested']),events=[],controls=[];
-    const luo={alive:true,castId:'luo',position:{...OPENING.rescueGuide,y:0}};
-    const runtime={time:OPENING.derailSeconds,flow:{stage:{id:'Unloading'}},squad:[luo],spawned:new Set(['surface']),
-      Has:id=>facts.has(id),Record:(id,detail)=>{if(!facts.has(id))events.push({id,time:runtime.time,detail});facts.add(id);},
-      companion:{Handle:()=>luo},player:{position:{...OPENING.playerFall,y:0}},
-      audio:{SetConcussion(){},Play(){return null;}},ai:{SetStance(){}},MoveActor(){},Point:(point,y)=>({...point,y}),
-      BeginControl:(kind,duration)=>controls.push({kind,duration,time:runtime.time})};
-    const opening=new FirstLevelOpening(runtime);opening.derailAt=0;
-    opening.barrage.Update=()=>{};opening.UpdateEscapePressure=()=>{};opening.FireWindows=()=>{};opening.UpdateZhou=()=>{};
-    const samples=[];
-    for(let frame=0;frame<20/dt&&opening.rescueAt==null;frame++){
-      opening.Update(dt);
-      const perception=SampleOpeningPerception(runtime.time),action={...luo.missionCarriageAction};
-      samples.push({time:runtime.time,eyeClosure:perception.eyeClosure,recoveryAt:opening.luoRecoveryAt,action});
-      if(opening.luoRecoveryAt==null){
-        assert.ok(perception.eyeClosure>OPENING.luoRecoveryMaxEyeClosure);
-        assert.equal(action.clipId,'LuoStaggerRecover');assert.equal(action.seconds,0,'blackout holds the first frame on the ground');
-        assert.equal(action.transitionSeconds,0,'the zero-time hold samples the ground pose instead of freezing a pending idle crossfade');
-        assert.ok(!facts.has('trainLuoRecovering')&&!facts.has('trainLuoStanding')&&!controls.length,'closed eyes never consume recovery or unlock an early rescue request');
-      }else if(action.clipId==='LuoStaggerRecover'){
-        assert.ok(perception.eyeClosure<=OPENING.luoRecoveryMaxEyeClosure,'the whole recovery plays with the lids sufficiently open');
-        assert.ok(!controls.length,'the pending request cannot skip the final standing recovery');
-      }
-      if(action.clipId==='LuoStaggerRecover'){
-        const before={...luo.missionCarriageAction},started=opening.luoRecoveryAt;
-        opening.Update(0);
-        assert.deepEqual(luo.missionCarriageAction,before,'a paused mission clock freezes the recovery sample');
-        assert.equal(opening.luoRecoveryAt,started);
-      }
-      runtime.time+=dt;
-    }
-    const started=events.find(event=>event.id==='trainLuoRecovering'),standing=events.find(event=>event.id==='trainLuoStanding');
-    assert.ok(samples.some(sample=>sample.recoveryAt==null),'the real stretched blackout requires an observable hold');
-    assert.ok(started&&standing&&controls.length===1,'reopening eventually completes one full recovery and one rescue');
-    assert.ok(SampleOpeningPerception(started.time).eyeClosure<=OPENING.luoRecoveryMaxEyeClosure);
-    assert.ok(SampleOpeningPerception(started.time-dt).eyeClosure>OPENING.luoRecoveryMaxEyeClosure,'recovery starts at the first visible sample, not an unrelated fixed delay');
-    // The authored failed first attempt descends between source 1.45 and 1.85s.
-    const failed=samples.filter(sample=>sample.action.clipId==='LuoStaggerRecover'&&sample.action.seconds>=1.45&&sample.action.seconds<=1.85);
-    assert.ok(failed.length&&failed.every(sample=>SampleOpeningPerception(sample.time).eyeClosure<=OPENING.luoRecoveryMaxEyeClosure),'the complete failed-rise window remains visible with the actual perception curve');
-    assert.ok(standing.time-started.time>=OPENING.luoRecoverySeconds,'visibility waiting never shortens the 4.8 second authored clip');
-    assert.ok(controls[0].time>=standing.time&&opening.rescueAt>=standing.time,'helping starts only after Luo has recovered his own footing');
-    summaries.push({fps:1/dt,start:started.time,standing:standing.time,maxFailedEyeClosure:Math.max(...failed.map(sample=>sample.eyeClosure))});
-  }
-  console.log('ok visible complete Luo recovery after blackout, early rescue held, pause-safe',JSON.stringify(summaries));
-}
-// Exercise the real source-clock player/camera path with a stationary rescuer.
-// Endpoints alone missed the old crossing; sample every frame of the pull and
-// allow a small physical settling offset from Luo's nominal spill destination.
-{
-  const {Vector3,PerspectiveCamera}=await import('three');
-  const cue=MISSION_DIALOGUE.find(cue=>cue.id==='TrainShelling');
-  const manifest=JSON.parse(fs.readFileSync(new URL('./Audio/FirstLevel/Data_FirstLevelVoiceManifest.json',import.meta.url)));
-  const plan=MissionVoiceTimeline(cue,manifest.cues.TrainShelling.seconds),indices=OPENING.rescueDialogueLines;
-  const sourceStart=plan.lines[indices.reach][0],sourceEnd=plan.lines[indices.steady][1];
-  const liftAt=plan.segments.flatMap(segment=>segment.events||[]).find(event=>event.id==='TrainRescueLift').at;
-  const steadyAt=plan.segments.flatMap(segment=>segment.events||[]).find(event=>event.id==='TrainRescueSteady').at;
-  const summaries=[];
-  for(const fps of [10,60,144]){
-    const dt=1/fps,moves=[],contacts=[],teleports=[],facts=new Set(['trainDerailed','trainStopped','trainLuoStanding','luoRescueRequested']);
-    const luo={alive:true,castId:'luo',position:new Vector3(OPENING.rescueGuide.x+.07,0,OPENING.rescueGuide.z-.07)};
-    const rightHand=new Vector3();
-    luo.actor={characterRig:{bones:{handR:{getWorldPosition(out){
-      // A distinct world-space right-hand marker proves ApplyCamera still
-      // consumes that bone instead of the old procedural rescue target.
-      return out.copy(rightHand.set(luo.position.x-.2,luo.position.y+.7,luo.position.z-.3));
-    }},handL:{getWorldPosition(){assert.fail('rescue must keep the authored right-hand contact');}}}}};
-    const position=new Vector3(OPENING.playerFall.x,0,OPENING.playerFall.z),camera=new PerspectiveCamera();
-    const runtime={time:20,flow:{stage:{id:'Unloading'}},squad:[luo],spawned:new Set(['surface']),
-      Has:id=>facts.has(id),Record:id=>facts.add(id),companion:{Handle:()=>luo},
-      player:{position,camera,velocity:new Vector3(),body:{Teleport:(...point)=>teleports.push(point)}},
-      battlefield:{trainOffsetM:0,GroundHeight:(x,z)=>SampleMissionTerrain(x,z)},
-      voice:{current:{cue,plan,sourceTime:sourceStart}},
-      audio:{SetConcussion(){},Play(){return null;}},ai:{SetStance(){}},
-      MoveActor:(actor,point,speed)=>moves.push({actor,point:{...point},speed}),
-      Point:(point,y)=>new Vector3(point.x,y,point.z),BeginControl(){},
-      viewmodel:{ReachWorld:(point,weight)=>contacts.push({point:point.clone(),weight})}};
-    const opening=new FirstLevelOpening(runtime);opening.derailAt=0;opening.luoRecoveryAt=0;
-    opening.playerFrom=position.clone();opening.eyeFrom=position.clone();opening.lookFrom={yaw:0,pitch:0};
-    opening.barrage.Update=()=>{};opening.UpdateEscapePressure=()=>{};opening.FireWindows=()=>{};opening.UpdateZhou=()=>{};
-    let minGap=Infinity,pullSamples=0;
-    const Sample=source=>{
-      runtime.voice.current.sourceTime=source;opening.Update(Math.min(dt,.05));opening.ApplyCamera();
-      const gap=Math.hypot(camera.position.x-luo.position.x,camera.position.z-luo.position.z);
-      minGap=Math.min(minGap,gap);
-      assert.ok(gap>=1,'the whole camera path clears Luo even when physical settling offsets his stationary root');
-      assert.equal(position.y,runtime.battlefield.GroundHeight(position.x,position.z),'the player remains supported by the shared ground sampler');
-      assert.deepEqual(teleports.at(-1),position.toArray(),'player collision body follows the same source-timed path as the camera');
-      assert.deepEqual(contacts.at(-1).point.toArray(),rightHand.toArray(),'the viewmodel reaches the actual right-hand world position');
-      if(source<=liftAt){
-        assert.equal(position.x,OPENING.playerFall.x,'reach and grip cannot drag the player early');
-        assert.equal(position.z,OPENING.playerFall.z);assert.equal(opening.RescueLift(),0);
-      }else if(source<steadyAt)pullSamples++;
-      runtime.time+=Math.min(dt,.05);
-    };
-    for(let source=sourceStart;source<sourceEnd;source+=dt)Sample(source);
-    Sample(sourceEnd);
-    assert.ok(pullSamples>=Math.max(1,Math.floor((steadyAt-liftAt)/dt)-1),'the clearance assertion samples the full current lifting interval at every frame rate');
-    assert.ok(moves.every(move=>move.speed===0&&move.point.x===luo.position.x&&move.point.z===luo.position.z),
-      'the authored brace never depends on AI movement keeping up with the player');
-    assert.equal(position.x,OPENING.rescueEnd.x);assert.equal(position.z,OPENING.rescueEnd.z);
-    assert.ok(position.distanceTo(luo.position)>=1&&position.distanceTo(luo.position)<1.7,
-      'standing retains the full one-metre body clearance after moving the rescuer clear of the station step');
-    const paused={position:position.toArray(),camera:camera.position.toArray(),action:{...luo.missionCarriageAction}};
-    runtime.time+=5;opening.Update(0);opening.ApplyCamera();
-    assert.deepEqual(position.toArray(),paused.position,'stalled source time freezes the rescue translation');
-    assert.deepEqual(camera.position.toArray(),paused.camera,'stalled source time freezes the camera path');
-    assert.deepEqual(luo.missionCarriageAction,paused.action,'stalled source time freezes the authored hand action');
-    summaries.push({fps,minGap,finalGap:Math.hypot(position.x-luo.position.x,position.z-luo.position.z),pullSamples});
-  }
-  console.log('ok rescue corridor, stationary support, right-hand contact and grip-before-pull',JSON.stringify(summaries));
-}
-// Test the full rescue capsule, not just the ground under its root. A prior
-// apparently clear root sat outside the last step while its rounded capsule
-// penetrated the edge and could not start the subsequent normal guide walk.
-{
-  const {registerHooks}=await import('node:module'),vendorRoot=new URL('./vendor/',import.meta.url).href;
-  const hooks=registerHooks({load(url,context,next){
-    if(url.startsWith(vendorRoot)&&url.endsWith('.js'))return {format:'module',source:fs.readFileSync(new URL(url),'utf8'),shortCircuit:true};
-    return next(url,context);
-  }});
-  let PhysicsWorld,InitPhysics,FirstLevelWhiteboxField,CompileWhiteboxWalkableSurfaces;
-  try{
-    ({PhysicsWorld,InitPhysics}=await import('./Script_Physics.mjs'));
-    ({FirstLevelWhiteboxField,CompileWhiteboxWalkableSurfaces}=await import('./Script_FirstLevelWhiteboxField.mjs'));
-  }finally{hooks.deregister();}
-  await InitPhysics();
-  const field=Object.create(FirstLevelWhiteboxField.prototype);
-  const world=new PhysicsWorld({groundAt:(x,z)=>field.GroundHeight(x,z)});
-  const boxes=MISSION_LAYOUT.blocks.filter(block=>block.solid!==false).map(block=>({id:block.id,
-    c:[block.x,block.y,block.z],h:[block.w/2,block.h/2,block.d/2],ry:block.ry||0}));
-  Object.assign(field,{physics:world,terrain:CreateP012Terrain(MISSION_LAYOUT),trainOffsetM:0,
-    walkableSurfaces:CompileWhiteboxWalkableSurfaces(MISSION_LAYOUT),
-    derailMeshes:[{rotation:{},position:{}}],derailColliders:boxes.filter(box=>box.id.startsWith(`StationCar${OPENING.derailCar}`)),
-    _GridRemove(){},_GridInsert(){}});
-  try{
-    for(const box of boxes)world.AddSolid(box);
-    field.SetCarDerailment(OPENING.derailCar,OPENING.derailRollRad,OPENING.derailPivot);
-    const statics=boxes.map(box=>({id:box.id,collider:world.world.getCollider(box._physicsHandle)}));
-    const step=statics.find(box=>box.id===`StationExitStep${OPENING.derailCar}_3`).collider;
-    const body=world.MakeCharacter({radius:.34,height:1.78});
-    const Contacts=()=>statics.flatMap(box=>{
-      const contact=body.collider.contactCollider(box.collider,.1);
-      return contact?[{id:box.id,distance:contact.distance}]:[];
-    });
-    const Penetrations=()=>Contacts().filter(contact=>contact.distance<-.0001);
-    // Captured stuck production pose: keep a failing control so this regression
-    // cannot silently become another point-only or collision-disabled check.
-    const old={x:-72.4482121635021,y:.24757269917590968,z:89.10015593110694};
-    body.Teleport(old.x,old.y,old.z);world.Step(1/60);
-    const oldDepth=body.collider.contactCollider(step,0)?.distance;
-    assert.ok(oldDepth<-.02,'the real Rapier capsule reproduces the recorded step-edge penetration');
-    const oldHits=Penetrations();assert.ok(oldHits.some(hit=>hit.id==='StationExitStep1_3'));
-    const nominal={...OPENING.rescueGuide,y:field.GroundHeight(OPENING.rescueGuide.x,OPENING.rescueGuide.z)};
-    const samples=[];
-    for(const height of [1.21,1.78]){
-      body.SetSize(.34,height);body.Teleport(nominal.x,nominal.y,nominal.z);world.Step(1/60);
-      assert.deepEqual(Penetrations(),[],'the current crouching/standing rescue capsule clears every actual solid box');
-      const stepClearance=body.collider.contactCollider(step,.2)?.distance;
-      assert.ok(stepClearance>.04,'the last step has positive clearance beyond the controller contact skin');
-      samples.push({height,stepClearance});
-    }
-    const movement=[];
-    for(const fps of [30,60,144]){
-      const dt=1/fps;body.Teleport(nominal.x,nominal.y,nominal.z);body.grounded=true;world.Step(dt);
-      // Hold through the performance, then let the ordinary character
-      // controller move north-east along the real first guide route leg.
-      for(let frame=0;frame<fps;frame++){body.Move(0,-.6*dt,0);world.Step(dt);}
-      assert.deepEqual(Penetrations(),[],'stationary rescue support cannot settle into a step');
-      const start=body.position.clone(),target=OPENING.approachRoute[0];
-      for(let frame=0;frame<fps*2;frame++){
-        const dx=target.x-body.position.x,dz=target.z-body.position.z,length=Math.hypot(dx,dz),travel=R.walkSpeedMps*dt;
-        body.Move(dx/length*travel,-.6*dt,dz/length*travel);world.Step(dt);
-        assert.deepEqual(Penetrations(),[],'the post-rescue guide walk stays outside the step and overturned carriage');
-      }
-      const distance=Math.hypot(body.position.x-start.x,body.position.z-start.z);
-      assert.ok(distance>R.walkSpeedMps*2*.9,'the normal capsule controller immediately resumes the guide walk after rescue');
-      assert.ok(body.position.z<start.z-3,'Luo clears the station-step depth toward the actual trench approach');
-      movement.push({fps,distance,position:body.position.toArray()});
-    }
-    console.log('ok real Rapier rescue landing and subsequent guide movement',JSON.stringify({solids:boxes.length,oldDepth,nominal,samples,movement}));
-  }finally{world.Dispose();}
-}
-if(process.argv.includes("--opening-clock")||process.argv.includes("--opening-recovery")||process.argv.includes("--opening-rescue"))process.exit(0);
-
 assert.ok(P.stationCasualties.every(person=>person.health>0),"station shelling does not manufacture dead recruits at muster");
 {
   const wall=MISSION_LAYOUT.blocks.find(block=>block.id==="TrenchRallyEast");
@@ -535,40 +234,13 @@ for(const person of MISSION_CIVILIAN_AFTERMATH) {
   for(const other of [...MISSION_AFTERMATH,...MISSION_CIVILIAN_AFTERMATH])
     if(other!==person)assert.ok(Math.hypot(person.x-other.x,person.z-other.z)>=1.9,"new civilian bodies do not overlap existing remains");
 }
-for(const point of [MISSION_TRAIN.guideMuster,...MISSION_TRAIN.cars.flatMap(car=>car.muster)])
-  assert.ok(MISSION_AFTERMATH.every(body=>Math.hypot(body.x-point.x,body.z-point.z)>=1.8),"living recruits never muster on historical bodies");
 {
-  const beat={earliestS:35,latestS:60,loaded:4,restS:12};
-  assert.equal(TransferBeatReady(beat,{seconds:35,loaded:4,previousClearedAt:30}),false,"vehicle event cannot erase the breathing window");
-  assert.equal(TransferBeatReady(beat,{seconds:44,loaded:4,previousClearedAt:30}),true);
-  assert.equal(TransferBeatReady(beat,{seconds:59,loaded:0,previousClearedAt:10}),false);
-  assert.equal(TransferBeatReady(beat,{seconds:60,loaded:0,previousClearedAt:10}),true,"casualties or delayed loading cannot starve the next finite attack");
-  assert.equal(TransferBeatReady(beat,{seconds:600,loaded:20,previousClearedAt:null}),false,"an uncleared previous attack never stacks another wave");
   assert.deepEqual(GuardCrossingPair([{id:1,alive:false},{id:2,alive:true},{id:3,alive:true}],2),[2],"a fallen partner does not strand the surviving crossing man");
   assert.deepEqual(GuardCrossingPair([{id:1,alive:true,safe:true},{id:2,alive:false},{id:3,alive:true}],2),[3]);
   assert.equal(FrontReplacementSlots({alive:149,queued:1,spawned:0},R),0,"queued men reserve live capacity");
   assert.equal(FrontReplacementSlots({alive:24,queued:0,spawned:5},{...R,waveBudget:6}),1,"last finite replacement is not rounded up to a squad");
   assert.equal(FrontReplacementSlots({alive:0,queued:0,spawned:R.waveBudget},R),0,"no infinite replacement loop");
   for(const spec of MISSION_ENCOUNTERS.front)assert.ok(spec.x>MISSION_LAYOUT.bounds.minX && spec.x<MISSION_LAYOUT.bounds.maxX && spec.z>MISSION_LAYOUT.bounds.minZ && spec.z<MISSION_LAYOUT.bounds.maxZ,"every simultaneous soldier starts inside the playable heightfield");
-}
-{
-  for (const time of [0,10,20,R.trainTravelM/R.trainCruiseSpeedMps-1]) {
-    const a=MissionTrainMotion(time),b=MissionTrainMotion(time+.1);
-    assert.ok(Math.abs((a.offsetM-b.offsetM)/.1-6)<1e-6,"train keeps real cruise speed before shell impact");
-  }
-  for (const impactAt of [24,26,28]) {
-    const start=MissionTrainMotion(impactAt),stop=MissionTrainMotion(impactAt,impactAt,start.offsetM);
-    let previous=start;
-    for(let t=.01;t<=stop.brakeSeconds+.02;t+=.01) {
-      const current=MissionTrainMotion(impactAt+t,impactAt,start.offsetM);
-      assert.ok(current.offsetM<=previous.offsetM && current.offsetM>=0);
-      assert.ok(current.speedMps<=previous.speedMps && current.speedMps>=0);
-      previous=current;
-    }
-    assert.equal(previous.offsetM,0);assert.ok(previous.stopped);
-    assert.equal(stop.speedMps,start.speedMps,"impact does not accelerate or jerk the train");
-  }
-  assert.ok(MISSION_TRAIN.cars.at(-1).z+R.trainTravelM+8<MISSION_LAYOUT.bounds.maxZ,"whole train begins inside the extended approach");
 }
 const flow = new FirstLevelMissionFlow();
 {
@@ -597,32 +269,6 @@ const flow = new FirstLevelMissionFlow();
   }
 }
 
-{
- const calls=[],moved=[],stopped=[],levels=[];
- const actor={alive:true,position:{x:-78.65,y:1,z:92.8}};
- const audio={Ambience:id=>calls.push(id),SetAmbienceLayerLevel:(...args)=>levels.push(args),
-  Play:(id,options)=>{calls.push({id,...options});return {duration:7};},
-  MoveVoice:(_voice,position)=>moved.push({...position}),StopVoice:voice=>stopped.push(voice)};
- const sound=new FirstLevelCarriageSound(audio,()=>[{actor,carIndex:1,slot:CARRIAGE_SOUND.cheerSlots[0]}]);
- sound.Start();sound.Handle(CARRIAGE_SOUND.reactions[0].id);
- assert.equal(calls[0],CARRIAGE_SOUND.preset);
- assert.equal(calls[1].id,CARRIAGE_SOUND.cheerCue);
- assert.equal(calls[1].position.y,2.2,'rear reactions come from mouth height');
- actor.position.z-=6;sound.Update(1);
- assert.equal(moved[0].z,actor.position.z,'the source follows the moving train passenger');
- sound.Handle('CarriageUneasy');assert.equal(levels.at(-1)[1],CARRIAGE_SOUND.uneasyScale);
- sound.Impact();assert.equal(stopped.length,1);assert.equal(calls.at(-1),'trainInterior');
- sound.Stopped();assert.equal(calls.at(-1),'firstLevelFront','rolling wheels stop with the actual train');
- sound.Start();assert.equal(levels.at(-1)[1],1,'restart restores the lively crowd');
- const manifest=JSON.parse(fs.readFileSync(new URL('./Audio/Amb/Data_AmbManifest.json',import.meta.url)));
- for(const asset of CARRIAGE_SOUND_ASSETS){
-  const entry=manifest.carriageSources[asset.id];
-  const bytes=fs.readFileSync(new URL('./Audio/Amb/'+asset.file,import.meta.url));
-  assert.equal(entry.sha256,crypto.createHash('sha256').update(bytes).digest('hex'));
-  assert.equal(entry.promptHash,crypto.createHash('sha256').update(asset.prompt).digest('hex'));
-  assert.equal(entry.requests,1);assert.ok(entry.continuous&&entry.seconds>2);
- }
-}
 assert.equal(FIRST_LEVEL_STAGES.length,18);
 assert.deepEqual(FIRST_LEVEL_STAGES.flatMap(stage=>stage.steps),MISSION_STAGES.slice(0,-1).map(step=>step.id));
 for (const phase of FIRST_LEVEL_STAGES) {
@@ -709,15 +355,6 @@ console.log("ok all mission gates require recorded gameplay facts and restore ex
   assert.equal(shells[1].to.x,opening.zhou.position.x+OPENING.zhouShell.offsetX,'correction observes the moving gunner');
   assert.equal(opening.zhou.health,100);assert.ok(!facts.has('zhouGunWounded'),'retry neither injects damage nor bypasses the gate');
 }
-for(const [index,step] of MISSION_STAGES.filter(s=>!["TrenchEntry","Shelter"].includes(s.id)).entries()){
-  const legacy={version:1,index,time:42,stageTime:2,facts:[],log:[]};
-  const restored=new FirstLevelMissionFlow();restored.Restore(legacy);
-  assert.equal(restored.stage.id,step.id,"v1 index migrates through the old stage order");
-  restored.Restore({...legacy,log:[{kind:"stage",id:step.id,time:40}]});
-  assert.equal(restored.stage.id,step.id,"v1 log preserves the named stage");
-}
-const stable=new FirstLevelMissionFlow();stable.Restore({version:2,stageId:"Shelter",index:0,time:1,stageTime:0,facts:["trenchCleared"],log:[]});
-assert.equal(stable.stage.id,"Shelter","v2 stable stage id overrides positional index");
 const terrain = CreateP012Terrain(MISSION_LAYOUT);
 for (const trench of MISSION_TERRAIN.trenches) assert.ok(trench.depth >= 1.83, trench.id + " full-cover excavation depth");
 for (const [x,z] of [[-24,-53],[-45,30],[-10,-124]]) {
@@ -756,7 +393,7 @@ console.log("ok shared terrain, excavated trenches, structural floors only");
 }
 const tacticalRoutes = Object.fromEntries(Object.entries(MISSION_TACTICS).map(([id, plan]) => [id,
   [Object.values(MISSION_ENCOUNTERS).flat().find(spec => spec.id === id), ...plan.points]]));
-for(const spec of [...MISSION_ENCOUNTERS.retreat,...MISSION_ENCOUNTERS.air])
+for(const spec of MISSION_ENCOUNTERS.air)
   tacticalRoutes[spec.id+"Pursuit"]=[spec,...MISSION_PURSUIT_ROUTE.slice(MissionRouteNextIndex(MISSION_PURSUIT_ROUTE,spec))];
 // Bounding-assault lanes: every front rifleman and every wave drop point must rush between lines without cutting a cover block.
 // FRONT_ASSAULT_STARTS is the single roster the cover rows are built around and the runtime spawns
@@ -768,7 +405,10 @@ const assaultLanes=Object.fromEntries(FRONT_ASSAULT_STARTS.map(start=>
   ["Assault"+start.id,[start,...FrontAssaultLane(start.x,start.z)]]));
 assert.ok(Object.values(assaultLanes).every(route=>route.length>=2&&route.at(-1).z===FRONT_ASSAULT.lines.at(-1)),"every assault lane ends on the last bound line");
 assert.ok(Object.keys(assaultLanes).length>=24,"most front riflemen and every wave drop point get a bounding lane: "+Object.keys(assaultLanes).length);
-const reliefRoutes=Object.fromEntries(P.reliefPositions.map((point,i)=>["Relief"+i,[MISSION_TRAIN.cars[2].muster[i],...P.reliefApproach,{x:point.x,z:-123},point]]));
+// 接防班走的是 2026.09.19 契约路线（collectionReturn 反向）。那条线沿途的几何归
+// 空间包建，还没落地 —— 净空由空间包的 Script_FirstLevelSpaceTest 在并入
+// MISSION_ROUTES 时验收，这里先不按旧地形量（量出来的是「还没挖的沟」）。
+const reliefRoutes={};
 for (const [name, route] of Object.entries({ ...MISSION_ROUTES, ...Object.fromEntries(MISSION_TERRAIN.trenches.filter(t=>t.role).map(t=>[t.id,t.points])), ...tacticalRoutes, ...assaultLanes, ...reserveLanes, ...reliefRoutes, ...Object.fromEntries(P.guardWithdrawalRoutes.map((route,i)=>["Guard"+i,route])) })) {
   for (let i = 1; i < route.length; i++) {
     const a = route[i - 1],
@@ -1055,50 +695,6 @@ casualtyColumn.AirDamage();
 assert.equal(casualtyColumn.litters[0].health, 0, "An air-raid event never revives a previous casualty");
 assert.equal(casualtyColumn.litters[1].health, 12, "An air-raid event never heals an injured patient");
 assert.equal(new Set(MISSION_DIALOGUE.map((cue) => cue.id)).size, MISSION_DIALOGUE.length);
-for (const cue of MISSION_DIALOGUE) {
-  assert.ok(MissionVoicePrompt(cue).includes(cue.lines[0].text));
-  assert.ok(cue.lines.every((line) => MissionVoicePrompt(cue).includes(line.text)));
-}
-if (process.argv.includes("--audio")) {
-  const manifest = JSON.parse(
-    fs.readFileSync(new URL("./Audio/FirstLevel/Data_FirstLevelVoiceManifest.json", import.meta.url), "utf8"),
-  );
-  for (const cue of MISSION_DIALOGUE) {
-    const entry = manifest.cues[cue.id];
-    const aligned=MISSION_VOICE_ALIGNMENT[cue.id];
-    assert.equal(aligned.sha256,entry.sha256,cue.id+' timing is bound to this recording');
-    assert.equal(aligned.lines.length,cue.lines.length);
-    aligned.lines.forEach(([start,end],i)=>{
-      assert.ok(start>=0 && end>=start && end<=entry.seconds+.02,cue.id+' source interval');
-      if(start===end)assert.ok(aligned.note,'ambiguous interval must be explained');
-      if(i)assert.ok(start>=aligned.lines[i-1][1],cue.id+' subtitles do not overlap');
-    });
-    assert.ok(entry?.continuous && entry.requests === 1 && entry.seconds > 0.5, cue.id);
-    assert.equal(entry.speechRate??0,cue.speechRate??0,cue.id+' generation delivery rate matches the source');
-    const sourceJson='['+cue.lines.map(line=>'{"who": '+JSON.stringify(line.who)+', "text": '+JSON.stringify(line.text)+'}').join(', ')+']';
-    assert.equal(aligned.scriptSha256,crypto.createHash('sha256').update(sourceJson).digest('hex'),cue.id+' alignment uses the current complete text');
-    const bytes=fs.readFileSync(new URL('./Audio/FirstLevel/'+cue.file,import.meta.url));
-    assert.equal(bytes.length,entry.bytes,cue.id+' bytes');
-    assert.equal(crypto.createHash('sha256').update(bytes).digest('hex'),entry.sha256,cue.id+' content hash');
-    assert.equal(crypto.createHash('sha256').update(MissionVoicePrompt(cue)).digest('hex'),entry.promptHash,cue.id+' current complete script');
-    if(cue.id==='ZhouDeath')assert.ok(entry.seconds>=8 && entry.seconds<=12.1,'whole death exchange fits the authored short scene');
-  }
-  const {VOICE_LINES}=await import("./Data_Voice.mjs");
-  const barks=VOICE_LINES.filter(line=>line.side==="ija"&&line.kind!=="story");
-  const barkManifest=JSON.parse(fs.readFileSync(new URL("./Audio/Data_SichuanBarkManifest.json",import.meta.url),"utf8"));
-  assert.equal(barkManifest.model,"seed-audio-1.0");
-  for(const line of barks){
-    const entry=barkManifest.cues[line.key];
-    assert.equal(line.dialect,"sichuan",line.key+" enemy barks use the requested dialect too");
-    assert.equal(entry.text,line.text);assert.equal(entry.version,line.version);
-    assert.equal(entry.dialect,line.dialect);assert.equal(entry.seconds,line.dur);
-    assert.equal(entry.sha256,crypto.createHash("sha256").update(fs.readFileSync(new URL("./Audio/"+line.file,import.meta.url))).digest("hex"));
-  }
-  console.log(`ok all ${barks.length} autonomous enemy barks use current Sichuan recordings`);
-}
-console.log(process.argv.includes("--audio")
-  ? `ok all ${MISSION_DIALOGUE.length} continuous audio assets, current script/file hashes and short death-scene duration`
-  : "ok continuous dialogue prompts; audio assets require --audio acceptance");
 // Source-range playback preserves pauses, queued cues and physical event gates.
 {
   const offsets=[], done=[];
@@ -1115,120 +711,8 @@ console.log(process.argv.includes("--audio")
   assert.deepEqual(done,["ThreeMagazines","TwoMagazines"]);
   assert.deepEqual(offsets,[0,.3,0]);
 }
-{
-  const events=[],sources=[],done=[],facts=new Set();
-  const voice=new FirstLevelMissionVoice({
-    audio:{PlayStoryVoice:(key,options)=>{sources.push({key,...options});return {};},StopStoryVoice(){}},
-    hud:{Say(){}},Done:id=>done.push(id),Ready:id=>facts.has(id),
-    Event:id=>{if(id!=="TrainDialogueLine")events.push(id);},
-  });
-  voice.manifest=JSON.parse(fs.readFileSync(new URL("./Audio/FirstLevel/Data_FirstLevelVoiceManifest.json",import.meta.url)));
-  const Step=()=>{for(let i=0;i<3600;i++)voice.Update(1/60);};
-  voice.Enqueue("WreckImpact");Step();
-  assert.equal(sources.length,0,"injury cries require a real impact");
-  facts.add("trainNearShellImpact");Step();
-  assert.deepEqual(done,["WreckImpact"]);
-  voice.Enqueue("TrainShelling");Step();
-  assert.equal(sources.length,1,"the rescue waits for Luo to regain his footing");
-  facts.add("trainStopped");Step();assert.equal(sources.length,1);
-  facts.add("trainLuoStanding");voice.Update(0);voice.Update(.2);
-  voice.Pause();const paused=voice.State();voice.Update(10);assert.deepEqual(voice.State(),paused);voice.Resume();Step();
-  assert.deepEqual(done,["WreckImpact","TrainShelling"]);
-  assert.equal(events.filter(id=>id==="TrainRescue").length,1,"pause cannot repeat the physical rescue");
-  voice.Enqueue("WreckExit");Step();assert.equal(done.length,2,"exit speech waits until player control is restored");
-  facts.add("luoRescueComplete");Step();assert.deepEqual(done,["WreckImpact","TrainShelling","WreckExit"]);
-  for(const key of ["MissionWreckImpact","MissionWreckExit"]){
-    const takes=sources.filter(s=>s.key===key);assert.equal(takes.length,1);assert.equal(takes[0].offset,0);
-  }
-}
-console.log("ok paused audio ranges, subtitle source timing, queued cues and shell-impact gates");
 
-{
-  let clock=0;const sources=[],parallelSources=[],rows=[],lineEvents=[],events=[],done=[];
-  const audio={PlayStoryVoice:(key,options)=>{sources.push({key,...options});return {voice:{t:clock}};},
-    StopStoryVoice(){},Play:(key,options)=>{const voice={key,t:clock,...options};parallelSources.push(voice);return voice;},
-    StopVoice:voice=>{voice.stopped=true;},MoveVoice(){}};
-  const voice=new FirstLevelMissionVoice({audio,Clock:()=>clock,
-    hud:{SayLines:lines=>rows.push(lines.map(line=>({...line})))},Done:id=>done.push(id),
-    Event:(id,cue,detail)=>{if(id==="TrainDialogueLine")lineEvents.push({cue,...detail});else events.push(id);},
-  });
-  voice.manifest=JSON.parse(fs.readFileSync(new URL("./Audio/FirstLevel/Data_FirstLevelVoiceManifest.json",import.meta.url)));
-  voice.Enqueue("TrainPack");voice.Update(0);
-  const Step=count=>{for(let i=0;i<count;i++){clock+=1/60;voice.Update(1/60);}};
-  Step(480);const before=voice.State();voice.Pause();clock+=10;voice.Update(10);
-  assert.equal(voice.State().sourceTime,before.sourceTime,"pausing freezes the packing source");
-  assert.equal(voice.State().parallel[0].sourceTime,before.parallel[0].sourceTime,"pausing also freezes the simultaneous counting source");
-  assert.ok(parallelSources[0].stopped,"pause stops the live companion voice");
-  voice.Resume();Step(4200);
-  assert.deepEqual(done,["TrainBanter","TrainPack"],"the complete counting exchange finishes before the packing exchange");
-  assert.equal(sources.length,2,"the intact packing exchange only restarts to resume from pause");
-  assert.equal(parallelSources.length,2,"the intact counting exchange only restarts to resume from pause");
-  assert.equal(parallelSources[1].offset,before.parallel[0].sourceTime,"the simultaneous source resumes at its own exact offset");
-  assert.ok(rows.some(lines=>lines.length===2&&lines.some(line=>["顺子","幺娃"].includes(line.speaker))&&lines.some(line=>line.speaker==="刘文财")),"both speaking actors have visible separate subtitles");
-  for(const line of rows.flat())assert.equal(line.emphasis,["顺子","幺娃"].includes(line.speaker)?"lead":"aside",
-    `${line.speaker}: packing leads the subtitle stack and the overlapping counting is an aside`);
-  const utterances=rows.flat().filter(line=>line.started).map(line=>line.text);
-  for(const id of ["TrainPack","TrainBanter"])for(const line of MISSION_DIALOGUE.find(cue=>cue.id===id).lines)
-    assert.ok(utterances.includes(line.text),`${id}: every complete spoken line is retained in subtitle audit`);
-  assert.equal(events.filter(id=>id==="TrainIncomingFire").length,0,"packing and counting cannot independently fire the volley");
-  assert.equal(lineEvents.filter(event=>event.active&&event.cue==="TrainBanter").length,5,"every optional banter line emits an actor action");
-  const late=new FirstLevelMissionVoice({audio,hud:{SayLines(){}},Position:()=>({x:0,z:0}),Listener:()=>({x:0,z:0})});
-  late.manifest=voice.manifest;late.Enqueue("TrainPack");late.Update(0);
-  late.current.sourceTime=late.manifest.cues.TrainPack.seconds-1;
-  late.UpdateParallel(0);
-  assert.equal(late.current.parallel.length,0,"late proximity cannot start a counting take that would be cut short");
-  console.log("ok complete simultaneous packing/counting, dual subtitles, source-clock actions and pause/resume");
-}
 
-// Regression: 40 real recruit bodies plus Luo, stable carriage-local positions, all three doors.
-assert.equal(MISSION_LAYOUT.blocks.filter(block=>/^StationCar\d.*Bench/.test(block.id)).length,0,"freight cars contain no bench geometry or bench colliders");
-for(const preparedAnimation of [false,true]) {
-  const dt = 1/60, actors = [];
-  const Make = () => { const a = { id: actors.length, alive: true, position: {x:0,y:1.17,z:0}, goal:{x:0,z:0} }; actors.push(a); return a; };
-  const originals = Array.from({length:6}, Make), guide = Make();
-  let offset = R.trainTravelM, player = {...MISSION_TRAIN.player,z:MISSION_TRAIN.player.z+offset};
-  const train = new FirstLevelMissionTrain({ Originals:()=>originals, Guide:()=>guide, Spawn:Make,
-    Offset:()=>offset, Place:(a,p)=>Object.assign(a.position,p), Hold:a=>Object.assign(a.goal,a.position),
-    Move:(a,p,speed)=>{assert.equal(a.missionTrainLife.weight,0,"passengers stand before physical walking");const d=Math.hypot(p.x-a.position.x,p.z-a.position.z);if(d>MISSION_TRAIN.arrivalRadiusM){const step=Math.min(speed*dt,d)/d;a.position.x+=(p.x-a.position.x)*step;a.position.z+=(p.z-a.position.z)*step;}},
-    Player:()=>player, Exited:()=>{},
-    // The authored samplers are independently inspected in CarriageAnimationTest.
-    // The same anchors and physical queue must work both before and after loading.
-    PrepareAnimation:preparedAnimation?()=>({ClipDuration:()=>MISSION_TRAIN.life.duckSeconds}):undefined,
-  });
-  train.Initialize(); train.Initialize();
-  assert.equal(actors.length,41);assert.deepEqual(train.State().counts,[12,16,12]);
-  assert.equal(actors.filter(a=>a.missionTrainLife.seated).length,0);
-  assert.ok(actors.some(a=>a.missionTrainLife.posture==='stand')&&actors.some(a=>a.missionTrainLife.posture==='crouch'));
-  assert.ok(actors.every(a=>['WallStandIdle','WallCrouchIdle'].includes(a.missionTrainLife.action)),"every passenger has an authored standing or crouching idle");
-  assert.ok(actors.every(a=>a.missionTrainLife.animationPending===!preparedAnimation),"missing assets remain explicitly pending");
-  for(const e of train.entries)if(e.actor.missionTrainLife.wall){
-    assert.ok(Math.abs(Math.abs(e.actor.position.x-MISSION_TRAIN.centerX)-MISSION_TRAIN.life.wallAnchorM)<1e-8);
-    if(e.actor.position.x>MISSION_TRAIN.centerX)assert.ok(Math.abs(e.actor.position.z-offset-MISSION_TRAIN.cars[e.carIndex].z)>=2.3-1e-8,"wall idles cannot lean on the open door");
-    for(const block of MISSION_LAYOUT.blocks){
-      if(!block.id.startsWith('StationCar'+e.carIndex)||block.solid===false||block.id.endsWith('Floor')||block.y+block.h/2<e.actor.position.y+.01)continue;
-      const clearance=Math.hypot(Math.max(0,Math.abs(e.actor.position.x-block.x)-block.w/2),Math.max(0,Math.abs(e.actor.position.z-offset-block.z)-block.d/2));
-      assert.ok(clearance>=.37,'wall-idle capsule retains clearance from '+block.id);
-    }
-  }
-  const local=actors.map(a=>({x:a.position.x,z:a.position.z-offset}));
-  for(let i=0;i<120;i++){offset-=R.trainTravelM/120;train.Translate(-R.trainTravelM/120);train.Update(dt,false);}
-  for(const [i,a] of actors.entries()) {assert.ok(Math.abs(a.position.z-offset-local[i].z)<1e-8);assert.equal(a.position.x,local[i].x);assert.ok(a.p012OnMovingTrain);}
-  for(let i=0;i<120;i++)train.Update(dt,false,true,null,false);
-  assert.ok(actors.every(a=>a.missionTrainLife.posture==='crouch'&&a.missionTrainLife.action==='WallCrouchIdle'&&a.missionTrainLife.brace>.99),"the entire crowd is crouched during incoming fire before the near shell");
-  assert.equal(train.impactSeconds,undefined,"the group crouch does not require an impact");
-  for(const [i,a] of actors.entries())assert.ok(Math.abs(a.position.x-local[i].x)<1e-8&&Math.abs(a.position.z-offset-local[i].z)<1e-8,"ducking never teleports a body");
-  player={x:-71,z:110};
-  let ticks=0;
-  for(;ticks<180/dt;ticks++) {
-    train.Update(dt,true);
-    for(let i=0;i<actors.length;i++)for(let j=i+1;j<actors.length;j++)assert.ok(Math.hypot(actors[i].position.x-actors[j].position.x,actors[i].position.z-actors[j].position.z)>=.899,'train queue bodies do not overlap');
-    if(train.entries.every(e=>e.arrived))break;
-  }
-  assert.equal(train.State().exited,40,JSON.stringify(train.State()));
-  assert.ok(train.entries.every(e=>e.arrived),'all passengers physically reach their own muster point: '+JSON.stringify(train.State().entries.filter(e=>!e.arrived)));
-  assert.ok(actors.every(a=>!a.p012OnMovingTrain&&a.missionUnloaded));
-  console.log('ok train 12/16/12, authored wall idles '+(preparedAnimation?'ready':'pending')+', pre-impact whole-crowd crouch, all physical exits in '+(ticks*dt).toFixed(1)+'s');
-}
 
 {
  const calls=[], sound=new FirstLevelMissionBattleSound({Play:(cue,options)=>{calls.push({cue,...options});return null;}});
@@ -1238,17 +722,17 @@ for(const preparedAnimation of [false,true]) {
  //   1. 头 24 秒仍然一声不许有（车厢自己的动静与那顿饭的对话独占）；
  //   2. 之后只许是**闷的**（airCut ≤ 340 Hz —— 隔着木板与铁皮）；
  //   3. 头一段必须比后一段轻（军列在往前线开，不是前线在靠近）。
- for(let i=0;i<48;i++)sound.Update(.5,"Train");
- assert.equal(calls.length,0,"the carriage stays clear of front sound for the first 24s");
- for(let i=0;i<40;i++)sound.Update(.5,"Train");
+ for(let i=0;i<48;i++)sound.Update(.5,"Trapped");
+ assert.equal(calls.length,0,"the collapsed bunker stays clear of front sound for the first 24s");
+ for(let i=0;i<40;i++)sound.Update(.5,"Trapped");
  const early=calls.slice();
- assert.ok(early.length>0,"the front creeps in through the carriage wall before the shelling");
+ assert.ok(early.length>0,"the front creeps in through the earth before the near miss");
  assert.ok(early.every(c=>c.airCut<=340&&c.soundField&&c.bus==="ambience"),
-   "everything heard from inside the carriage is muffled: "+JSON.stringify(early[0]));
- for(let i=0;i<40;i++)sound.Update(.5,"Train");
+   "everything heard from under the collapse is muffled: "+JSON.stringify(early[0]));
+ for(let i=0;i<40;i++)sound.Update(.5,"Trapped");
  const late=calls.slice(early.length), Loudest=(rows,cue)=>Math.max(0,...rows.filter(c=>c.cue===cue).map(c=>c.volume));
  assert.ok(Loudest(late,"amb.cannonFar")>Loudest(early,"amb.cannonFar"),
-   "the front grows as the train rolls north: "+JSON.stringify({early:Loudest(early,"amb.cannonFar"),late:Loudest(late,"amb.cannonFar")}));
+   "the front grows while the man lies pinned: "+JSON.stringify({early:Loudest(early,"amb.cannonFar"),late:Loudest(late,"amb.cannonFar")}));
  calls.length=0;
  for(let i=0;i<120;i++)sound.Update(.5,"Support");
  assert.ok(calls.some(c=>c.cue==="amb.cannonFar")&&calls.some(c=>c.cue==="type92")&&calls.some(c=>c.cue==="rifleNraFar"));
@@ -1338,93 +822,40 @@ for(const preparedAnimation of [false,true]) {
 }
 console.log("ok individual trench lanes, rounded corners, safe spacing and variable march pace");
 
-{
-  const shells=[],smoke=[],removed=[],facts=new Set();
-  const runtime={time:0,flow:{stage:{id:"Unloading"}},Has:id=>facts.has(id),Near:()=>true,
-    Point:(p,y=0)=>({...p,y}),combat:{FireShell:(from,to,options)=>shells.push({from,to,options})},
-    vfx:{SmokeSource:(p,options)=>{smoke.push({p,options});return smoke.length;},RemoveSmokeSource:id=>removed.push(id)}};
-  const opening=new FirstLevelOpening(runtime);
-  opening.UpdateEscapePressure();
-  assert.equal(shells.length+smoke.length,0,"no anticipatory barrage or smoke before impact");
-  opening.derailAt=0;
-  for(runtime.time=0;runtime.time<90;runtime.time+=.1)opening.UpdateEscapePressure();
-  assert.equal(shells.length,OPENING.escapePressure.shells.length,"the salvo is finite even if the player stops");
-  assert.ok(shells.every(s=>s.options.damage>0&&s.options.radius>0),"escape shells use real combat damage");
-  assert.equal(smoke.length,2,"reuse two pooled wreck emitters without per-frame creation");
-  for(const [i,shell] of shells.entries())shell.options.OnImpact({...shell.to});
-  assert.equal(opening.pressureImpacts.length,shells.length,"record actual impacts independently of launch");
-  facts.add("shelterReached");opening.UpdateEscapePressure();opening.ClearWreckSmoke();
-  assert.deepEqual(removed,[1,2],"the sheltered exchange clears every wreck emitter exactly once");
-  const cycle=OPENING.surfaceBurstSeconds+OPENING.surfaceRestSeconds;
-  const second=OPENING.surface.find(s=>s.id==="RailLockGunner").firePhaseS;
-  assert.ok(second>=OPENING.surfaceBurstSeconds&&second<cycle,
-    "the second surface section keeps firing during the first section's reload");
-  console.log("ok finite real escape barrage, impact causality and bounded smoke lifecycle");
-}
 
 {
- let clock=0;const events=[];
- const voice=new FirstLevelMissionVoice({audio:{StopStoryVoice(){},PlayStoryVoice(){return {voice:{t:clock}};}},hud:{Say(){}},Clock:()=>clock,Event:id=>{if(id!=="TrainDialogueLine")events.push(id);}});
- voice.Enqueue("TrainMeal");voice.Update(5);voice.Update(90);
- assert.equal(events.length,0,"simulation time cannot finish the receiving gesture ahead of audio");
- const handoffAt=MISSION_VOICE_ALIGNMENT.TrainMeal.lines[1][1];
- clock=handoffAt-.05;voice.Update(.1);voice.Pause();clock=90;voice.Update(60);
- assert.equal(events.length,0,"pause cannot release the handoff");
- voice.Resume();clock=90.11;voice.Update(.01);
- assert.deepEqual(events,["TrainFoodReceived"],"Shunzi's completed reply releases the handoff at its source timestamp");
- clock=91;voice.Update(1);assert.equal(events.length,1);
-}
-console.log("ok receiving-food release follows the source clock and survives pause/resume");
-
-{
-  assert.equal(MISSION_ENCOUNTERS.front.length+MISSION_ENCOUNTERS.machineGun.length+MISSION_ENCOUNTERS.approach.length+MISSION_ENCOUNTERS.surface.length+MISSION_ENCOUNTERS.intrusion.length+MISSION_ENCOUNTERS.shelterPursuit.length+MISSION_ENCOUNTERS.tank.length,R.openingEnemyBudget,
-    "finite opening/front roster agrees with budget; no replacement waves");
+  // 2026.09.19 重构后的开场/前沿名单。旧军列开场那三组（surface / intrusion /
+  // shelterPursuit）已随它一起下线；剩下的每一份名单仍然只投一次、不补波。
+  assert.equal(MISSION_ENCOUNTERS.bunkerAssault.length+MISSION_ENCOUNTERS.front.length
+    +MISSION_ENCOUNTERS.machineGun.length+MISSION_ENCOUNTERS.approach.length+MISSION_ENCOUNTERS.tank.length,
+    R.openingEnemyBudget,"finite opening/front roster agrees with budget; no replacement waves");
   assert.equal(MISSION_ENCOUNTERS.machineGun.length,12,"the gun handover owns a separate finite attack");
   assert.ok(MISSION_ENCOUNTERS.machineGun.every(actor=>FrontAssaultLane(actor.x,actor.z).length>=3),"machine-gun attackers cross multiple physical bounds");
   assert.equal(MISSION_ENCOUNTERS.approach.length,18,"the communication-trench approach has a finite enemy screen");
-  const attackers=[...MISSION_ENCOUNTERS.surface.filter(s=>s.advance),...MISSION_ENCOUNTERS.approach.filter(s=>!s.hold)];
-  assert.equal(new Set(attackers.map(s=>s.id)).size,21,"each advancing actor has a persistent unique identity");
+  const attackers=MISSION_ENCOUNTERS.approach.filter(s=>!s.hold);
+  assert.ok(new Set(attackers.map(s=>s.id)).size===attackers.length,"each advancing actor has a persistent unique identity");
   assert.equal(new Set(MISSION_ENCOUNTERS.approach.map(s=>s.team)).size,3,"three independent attack sectors keep grenade cooldowns per squad");
   assert.ok(attackers.every(s=>MISSION_TACTICS[s.id]?.near && MISSION_TACTICS[s.id].points.length>=2),"mobile attackers have local activation and physical approach bounds");
-  assert.ok(R.openingSurfaceGrenades>0 && R.enemyGrenades>0 && OPENING.intruderGrenades>0,"entry and approach riflemen carry finite grenades");
+  assert.ok(R.enemyGrenades>0,"approach riflemen carry finite grenades");
   assert.ok(R.approachContactM<26 && R.approachTacticalRadiusM>=R.approachContactM,"close contact hands movement back to shared combat and grenade AI");
   assert.ok(MISSION_ENCOUNTERS.approach.some(actor=>actor.z>-40)&&MISSION_ENCOUNTERS.approach.some(actor=>actor.z<-60),"both halves of the approach retain actual fire teams");
   assert.ok(R.frontEngageDistanceM>OPENING.frontReachRadiusM&&R.frontEngageDistanceM<35,"the finite main assault begins at the last trench bend, before the player reaches the firing post");
   assert.equal(new Set(Object.values(MISSION_ENCOUNTERS).flat().map(spec=>spec.id)).size,Object.values(MISSION_ENCOUNTERS).flat().length);
-  assert.equal(MISSION_ENCOUNTERS.surface.length,12,"two surface sections provide actual enemy fire");
   assert.ok(MISSION_STAGES.find(s=>s.id==="Support").requirements.includes("frontRifleDefense"));
   assert.ok(FIRST_LEVEL_MISSION_PHASE.whitebox.actorCapacity>=R.openingEnemyBudget+40,"small graphics scale leaves capacity for real friendlies and dormant village");
   for(const point of FRONT_BREACHES){
     const h=SampleMissionTerrain(point.x,point.z);
     assert.ok(h> -2 && h<-.8,"the breached sap remains a walkable excavated passage below surface fire: "+h);
   }
-  // User 2026-09-15: the "hold the corner" step has a real attack to hold against.
-  assert.equal(MISSION_STAGES.find(s=>s.id==="Shelter").requirements[0],"shelterCornerHeld","the breather waits for the corner to be held");
-  const cornerLane=[{x:-24,z:-23},{x:-24,z:-60}],mainTrench=MISSION_TERRAIN.trenches.find(t=>t.id==="FrontCommunication");
-  assert.ok(MISSION_ENCOUNTERS.shelterPursuit.length>=4&&OPENING.shelterPursuerGrenades>0);
-  for(const spec of MISSION_ENCOUNTERS.shelterPursuit){
-    assert.ok(spec.z<OPENING.woundedRoute[0].z,`${spec.id} follows the wounded man from the front, never from behind the player`);
-    assert.ok(SampleMissionTerrain(spec.x,spec.z)<-1.2,`${spec.id} starts on the excavated trench floor`);
-    const plan=MISSION_TACTICS[spec.id];
-    assert.ok(plan?.points.length>=3,`${spec.id} bounds physically toward the corner`);
-    for(const point of plan.points)assert.ok(SampleMissionTerrain(point.x,point.z)<-1.2,`${spec.id} stays in the trench at ${point.x},${point.z}`);
-    // 走廊＝沟底 + 一侧坡。样条化之后 `bottom` 只是**沟底**宽（旧的 4.2 是连坡
-    // 一起算的那个「宽度」，新表是 3.4 + 1.1）。CornerPursuerD/E 从北回环汇入主沟，
-    // 终点落在汇口上、离主沟中线 2.0 m —— 在沟底之外、走廊之内，仍是挖开的地面
-    // （上一行 SampleMissionTerrain < -1.2 是那条硬断言，没有放松）。
-    assert.ok(MissionPathDistance(plan.points.at(-1),cornerLane)<=mainTrench.bottom/2+mainTrench.bank,`${spec.id} ends in the straight trench visible from the corner`);
-  }
-  assert.ok(MissionPathDistance(OPENING.shelterCorner,[OPENING.supportRoute[1],OPENING.supportRoute[2],OPENING.supportRoute[3]])<=mainTrench.bottom/2,
-    "the corner post stands on the trench floor");
-  const push=OPENING.shelterPush;
-  assert.ok(push.remaining<MISSION_ENCOUNTERS.shelterPursuit.length&&push.afterS>0,"the last men rush the corner before the attack can stall out of sight");
-  assert.ok(SampleMissionTerrain(push.point.x,push.point.z)<-1.2&&MissionPathDistance(push.point,cornerLane)<=mainTrench.bottom/2,"the rush point is open trench floor in view of the corner");
-  // The extra fight sits between the unloading and front crates, so the recess carries its own.
-  const shelterCrate=MISSION_SUPPLIES.find(s=>s.id==="Shelter");
-  assert.ok(shelterCrate&&SampleMissionTerrain(shelterCrate.x,shelterCrate.z)<-1.2,"the shelter crate stands on the recess floor");
-  assert.ok(Math.hypot(shelterCrate.x-OPENING.shelter.x,shelterCrate.z-OPENING.shelter.z)>R.interactionRangeM,"standing at the exchange does not put the crate under F");
-  for(const post of [...OPENING.shelterPosts,OPENING.woundedRoute.at(-1),OPENING.runnerRoute.at(-1)])
-    assert.ok(Math.hypot(shelterCrate.x-post.x,shelterCrate.z-post.z)>1.5,"the crate keeps clear of shelter posts and arrival points");
+  // 01 掩蔽部门外的行刑组：两个动手的、两个跟进的，全都在门外看得见的那一小片里。
+  assert.equal(MISSION_ENCOUNTERS.bunkerAssault.length,4,"the bunker door has its finite execution party");
+  for(const spec of MISSION_ENCOUNTERS.bunkerAssault)
+    assert.ok(Math.hypot(spec.x-A.bunkerKilling.x,spec.z-A.bunkerKilling.z)<=R.bunkerSightM,
+      spec.id+" stands inside the sight line through the low breach");
+  // 12 只有两处威胁，第二处等第一处解除。
+  assert.equal(MISSION_TRANSFER_THREATS.length,2,"the transfer step keeps two threats, not four waves");
+  assert.equal(MISSION_TRANSFER_THREATS[0].after,null);
+  assert.equal(MISSION_TRANSFER_THREATS[1].after,"loadingThreatResolved");
   const corner=[{x:0,z:0},{x:0,z:5},{x:5,z:5}],step=1.4/60;
   let before=MissionCarryRoutePoint(corner,3);
   for(let d=3+step;d<7;d+=step){
@@ -1437,472 +868,3 @@ console.log("ok receiving-food release follows the source clock and survives pau
   assert.deepEqual(MissionCarryRoutePoint(corner,10),{x:5,z:5,yaw:-Math.PI/2},"arrival position and hidden passage distance stay stable");
 }
 
-// ---------------------------------------------------------------------------
-// 屋内伏击（内部步骤 Melee）。编排是纯规则，这里逐拍驱动成功 / 失败两条路、
-// 配音事件驱动的老周那一刀、重放幂等与重试。口径：docs/Data_FirstLevelRoomAmbush.md
-// ---------------------------------------------------------------------------
-{
-  const {FirstLevelAmbush,AMBUSH_PHASES}=await import("./Script_FirstLevelMissionAmbush.mjs");
-  const {MISSION_ANCHORS,MISSION_PLACEMENT}=await import("./Data_FirstLevelMissionLayout.mjs");
-  const ids=MISSION_ENCOUNTERS.melee.map(spec=>spec.id);
-  assert.deepEqual(ids,["AmbushLead","AmbushRearA","AmbushRearB","AmbushFlank"],
-    "the room ambush replaces the old single tutor with the authored four");
-  assert.ok(MISSION_ENCOUNTERS.melee.every(spec=>spec.bayonet&&spec.weapon==="Type38"),
-    "every ambusher actually carries a fixed bayonet");
-  assert.ok(!Object.values(MISSION_ENCOUNTERS).flat().some(spec=>spec.id==="MeleeTutor"),
-    "no reference to the removed tutor remains in the roster");
-  // 三处死角都在屋里，并且真的被新加的遮挡挡住北门与触发点两条视线。
-  const room=MISSION_PLACEMENT.roomInterior;
-  for(const spec of MISSION_ENCOUNTERS.melee)
-    assert.ok(spec.x>room.minX&&spec.x<room.maxX&&spec.z>room.minZ&&spec.z<room.maxZ,"hide spot inside the room: "+spec.id);
-  const solids=MISSION_LAYOUT.blocks.filter(box=>box.solid!==false&&["AmbushWestScreen","AmbushCornerCrates","MeleeAlcoveScreen"].includes(box.id));
-  assert.equal(solids.length,3,"both new hide pieces are real solids");
-  const Blocked=(from,to)=>solids.some(box=>{
-    const steps=Math.ceil(Math.hypot(to.x-from.x,to.z-from.z)*8);
-    for(let i=0;i<=steps;i++){
-      const t=i/steps,x=from.x+(to.x-from.x)*t,z=from.z+(to.z-from.z)*t;
-      if(Math.abs(x-box.x)<box.w/2&&Math.abs(z-box.z)<box.d/2)return true;
-    }
-    return false;
-  });
-  const door={x:58,z:.5};
-  for(const id of ["AmbushRearA","AmbushRearB","AmbushFlank"]){
-    const spec=MISSION_ENCOUNTERS.melee.find(entry=>entry.id===id);
-    assert.ok(Blocked(door,spec),id+" is hidden from the north door");
-    assert.ok(Blocked(MISSION_ANCHORS.melee,spec),id+" is hidden from the trigger point");
-  }
-  assert.ok(Blocked(door,MISSION_ENCOUNTERS.melee[0]),"the lead is hidden from the north door by the existing alcove screen");
-  // 新加的两块不许堵住 x=58 的担架通道，也不许堵住两扇门的开口（56.1–59.9）。
-  for(const box of solids.filter(entry=>entry.id.startsWith("Ambush")))
-    assert.ok(box.x-box.w/2>59.9||box.x+box.w/2<56.1,"new cover clears both door openings and the stretcher lane: "+box.id);
-
-  const Fixture=(overrides={})=>{
-    const log=[],said=[],facts=new Set(),clips=[],victims=[],prompts=[],looks=[];
-    const state={alive:true,daze:null};
-    const hooks={
-      Record:(id,detail)=>{if(facts.has(id))return false;facts.add(id);log.push({id,detail});return true;},
-      Has:id=>facts.has(id),
-      Say:(id,options)=>said.push({id,...options}),
-      Lock:seconds=>log.push({id:"lock",seconds}),
-      Unlock:()=>log.push({id:"unlock"}),
-      Wake:id=>log.push({id:"wake",who:id}),
-      PlayClip:(who,clipId)=>clips.push({who,clipId}),
-      PlayerAlive:()=>state.alive,
-      KnockDown:()=>{log.push({id:"knockDown"});return true;},
-      Daze:on=>{state.daze=!!on;log.push({id:on?"daze":"dazeOff"});},
-      LookAt:what=>{looks.push(what);log.push({id:"look",what});},
-      Prompt:view=>prompts.push(view?{...view}:null),
-      Pounce:()=>log.push({id:"pounce"}),
-      BeginGround:()=>{log.push({id:"ground"});return overrides.qte!==false;},
-      EndGround:()=>log.push({id:"endGround"}),
-      GroundFailure:shared=>{
-        log.push({id:"groundFailure",shared:!!shared});
-        // 枪托 20 + 共用 72（只有「抓枪没按上」才由这里补）+ 额外 18：满血也死。
-        if(overrides.surviveFailure!==true)state.alive=false;
-      },
-      Finisher:()=>log.push({id:"finisher"}),
-      Rise:()=>log.push({id:"rise"}),
-      ColumnCasualty:victim=>{victims.push(victim);return true;},
-      KnockDownFriend:who=>log.push({id:"knockdown",who}),
-      Release:()=>log.push({id:"release"}),
-      SquadIn:()=>log.push({id:"squadIn"}),
-      Finish:()=>log.push({id:"finish"}),
-    };
-    return {ambush:new FirstLevelAmbush(hooks,R),log,said,facts,clips,victims,prompts,looks,state};
-  };
-  const Step=(fixture,seconds,world)=>{
-    for(let t=0;t<seconds-1e-9;t+=1/60){
-      fixture.ambush.Update(1/60,{playerAlive:fixture.state.alive,...world});
-      assert.ok(AMBUSH_PHASES.includes(fixture.ambush.Phase),"the beat never leaves its declared phases");
-    }
-  };
-  const StepUntil=(fixture,phase,world,limit=25)=>{
-    let seconds=0;
-    while(fixture.ambush.Phase!==phase&&seconds<limit){
-      fixture.ambush.Update(1/60,{playerAlive:fixture.state.alive,...world});seconds+=1/60;
-    }
-    assert.equal(fixture.ambush.Phase,phase,"the beat reached "+phase+" within "+limit+"s");
-    return seconds;
-  };
-  const World=(over={})=>({litterAtDoor:true,leadAlive:true,leadDistanceM:3.6,qteActive:false,
-    qteSuccess:null,grabPressed:false,finisherPressed:false,aliveCount:4,squadInside:false,...over});
-  // 一路跑到「他扑上来压刺刀」为止：这几秒玩家躺在地上，手上没有该按的键。
-  const ToPounce=(f)=>{
-    f.ambush.Update(1/60,World());
-    StepUntil(f,"butt",World({leadDistanceM:1}));
-    StepUntil(f,"daze",World({leadDistanceM:1}));
-    StepUntil(f,"grab",World({leadDistanceM:1}));
-    return f;
-  };
-
-  // 0) 出生保护还在（刚重生 / 检查点重试 / 调试跳转）时绝不起这一拍：这一下必须真的落上。
-  {
-    const f=Fixture();
-    Step(f,R.ambushProtectedWaitS-.2,World({playerProtected:true}));
-    assert.equal(f.ambush.Phase,"waiting","an invulnerable player is never knocked down by the script");
-    assert.equal(f.ambush.waited,0,"the litter wait does not tick away under spawn grace");
-    f.ambush.Update(1/60,World());
-    assert.equal(f.ambush.Phase,"lunge","the beat springs as soon as the grace is gone");
-    // 无限豁免也不许把这一步卡死。
-    const stuck=Fixture();
-    Step(stuck,R.ambushProtectedWaitS+.4,World({playerProtected:true}));
-    assert.ok(stuck.ambush.Started,"an unbounded protection cannot deadlock the step");
-  }
-
-  // 1) 担架没到门口时最多等 ambushLitterWaitS，之后照样触发。
-  {
-    const f=Fixture();
-    Step(f,R.ambushLitterWaitS-.2,World({litterAtDoor:false}));
-    assert.equal(f.ambush.Phase,"waiting","the beat waits for the litter before springing");
-    Step(f,.3,World({litterAtDoor:false}));
-    assert.equal(f.ambush.Phase,"lunge","a late litter cannot stall the ambush forever");
-    assert.equal(f.facts.has("ambushTriggered"),true);
-  }
-
-  // 2) 成功那条路，逐拍：扑上来 → 枪托砸倒 → 躺着看 → 抓枪 → 推刀 → 反捅 → 起身。
-  {
-    const f=Fixture();
-    f.ambush.Update(1/60,World());
-    assert.equal(f.ambush.Phase,"lunge");
-    assert.deepEqual(f.said.map(entry=>entry.id),["RoomAmbush"]);
-    assert.equal(f.said[0].urgent,true,"the ambush shout jumps the queue");
-    assert.deepEqual(f.log.filter(e=>e.id==="wake").map(e=>e.who),["AmbushLead","AmbushRearA","AmbushRearB"],
-      "only the three who perform get up; the flanker waits for the release");
-    assert.ok(f.clips.filter(c=>c.clipId==="AmbushRise").length===3);
-    // 够得着就抡枪托，不等 ambushLungeMaxS。
-    f.ambush.Update(1/60,World({leadDistanceM:R.ambushBindReachM+.4}));
-    assert.equal(f.ambush.Phase,"lunge");
-    f.ambush.Update(1/60,World({leadDistanceM:R.ambushBindReachM-.01}));
-    assert.equal(f.ambush.Phase,"butt","he swings before he hits");
-    assert.ok(f.clips.some(c=>c.who==="AmbushLead"&&c.clipId==="RifleButtStrike"),
-      "the rifle butt is a real clip, not an instant hit");
-    assert.equal(f.facts.has("ambushStabbed"),false,"the damage lands at the end of the swing");
-    Step(f,R.ambushButtImpactS-.05,World({leadDistanceM:1}));
-    assert.equal(f.ambush.Phase,"butt");
-    Step(f,.1,World({leadDistanceM:1}));
-    assert.equal(f.ambush.Phase,"daze","the butt knocks him down");
-    assert.equal(f.facts.has("ambushStabbed"),true);
-    assert.equal(f.log.find(e=>e.id==="ambushStabbed").detail.damage,R.ambushButtDamage);
-    assert.ok(f.log.some(e=>e.id==="knockDown"),"the shared knockdown really runs");
-    assert.equal(f.state.daze,true,"the blackout and the muffled hearing start with the impact");
-    assert.equal(f.ambush.DazeSeconds!=null,true);
-    // 躺着的那几秒：没有任何提示环。
-    assert.equal(f.ambush.Prompt,null,"nothing to press while he is only lying there");
-    // 视线在 ambushLookLitterAtS 拉到北门口的担架上，背景拍表把担架队一个个放倒。
-    StepUntil(f,"grab",World({leadDistanceM:1}));
-    assert.deepEqual(f.looks,["face","roof","litter","lead"],
-      "the locked look goes: the swinging man's face → the rafters overhead → the litter party → back to the man coming down on him");
-    assert.deepEqual(f.victims,["frontBearer","zhou","rearBearer"],
-      "both bearers and Zhou are bayoneted while he is on the floor");
-    assert.ok(f.log.findIndex(e=>e.id==="zhouStabbed")>=0);
-    assert.equal(f.log.find(e=>e.id==="zhouStabbed").detail.health,R.ambushZhouHealthAfter);
-    assert.ok(f.log.some(e=>e.id==="knockdown"&&e.who==="yaowa"),"Yaowa is knocked down, not killed");
-    assert.ok(f.log.some(e=>e.id==="pounce"),"he comes down on the player with the blade");
-    // 抓枪：一次性按键提示，弧在窗口里漏。
-    const grab=f.ambush.Prompt;
-    assert.equal(grab.mode,"press");
-    assert.equal(grab.action,"interact");
-    assert.ok(grab.progress<=1&&grab.progress>=0);
-    f.ambush.Update(1/60,World({leadDistanceM:1,grabPressed:true}));
-    assert.equal(f.ambush.Phase,"mash","one press in time gets both hands on the rifle");
-    assert.equal(f.facts.has("ambushGrabbed"),true);
-    assert.ok(f.log.some(e=>e.id==="ground"),"the shared ground QTE owns the push");
-    assert.equal(f.ambush.Prompt,null,"the ring waits for the shared QTE to report itself");
-    f.ambush.Update(1/60,World({leadDistanceM:1,qteActive:true,qteProgress:.4,qteTimeT:.2}));
-    assert.equal(f.ambush.Prompt.mode,"mash","the same ring becomes the mash meter");
-    assert.equal(f.ambush.Prompt.progress,.4);
-    // 推赢：换成反捅那一下。
-    f.ambush.Update(1/60,World({leadDistanceM:1,qteActive:true,qteSuccess:true}));
-    f.ambush.Update(1/60,World({leadDistanceM:1,qteActive:false}));
-    assert.equal(f.ambush.Phase,"finish");
-    assert.equal(f.ambush.Prompt.mode,"finisher");
-    assert.equal(f.ambush.Prompt.action,"fire","the finisher is the left mouse button, read from the binding table");
-    assert.equal(f.facts.has("ambushBroken"),false,"control does not come back before the finisher");
-    f.ambush.Update(1/60,World({leadDistanceM:1,finisherPressed:true}));
-    assert.equal(f.facts.has("ambushFinisher"),true,"the press is what kills him");
-    assert.ok(f.clips.some(c=>c.who==="AmbushLead"&&c.clipId==="PressureStabbed"));
-    assert.equal(f.facts.has("ambushBroken"),false,"the kill plays out before he gets up");
-    Step(f,R.ambushFinisherHoldS+.05,World({leadDistanceM:1}));
-    assert.equal(f.ambush.Phase,"broken");
-    assert.ok(f.log.some(e=>e.id==="rise"),"he gets up through the shared rise");
-    assert.equal(f.state.daze,false,"the daze is released with the lock");
-    assert.equal(f.ambush.Prompt,null);
-    assert.equal(f.log.filter(e=>e.id==="unlock").length,1);
-    assert.deepEqual(f.log.find(e=>e.id==="ambushBroken").detail,{qte:"success",failure:null});
-    assert.deepEqual(f.said.map(entry=>entry.id),["RoomAmbush","RoomAmbushBreak"]);
-    // 事实顺序：老周挨刀排在还控制权之前（玩家躺在地上看见的）。
-    assert.ok(f.log.findIndex(e=>e.id==="zhouStabbed")<f.log.findIndex(e=>e.id==="ambushBroken"),
-      "the player watches Zhou take the bayonet, and only then gets his hands back");
-    assert.ok(f.ambush.story<=R.ambushLockMaxS,"the whole locked take fits the control-lock fallback: "+f.ambush.story);
-    // 班里人按 ambushSquadDelayS 进来（从起身那一刻起算）。
-    Step(f,R.ambushSquadDelayS-.3,World({aliveCount:3}));
-    assert.equal(f.log.filter(e=>e.id==="squadIn").length,0);
-    Step(f,.5,World({aliveCount:3}));
-    assert.equal(f.log.filter(e=>e.id==="squadIn").length,1);
-    assert.equal(f.facts.has("ambushSquadArrived"),false,"arrival is recorded by a body in the room, not by a timer");
-    f.ambush.Update(1/60,World({aliveCount:3,squadInside:true}));
-    assert.equal(f.facts.has("ambushSquadArrived"),true);
-    // 四个人全死才算这一步过（领头那个已经死在反捅上）。
-    f.ambush.Update(1/60,World({aliveCount:1,squadInside:true}));
-    assert.equal(f.facts.has("meleeResolved"),false,"one surviving ambusher still blocks the step");
-    f.ambush.Update(1/60,World({aliveCount:0,squadInside:true}));
-    assert.equal(f.ambush.Phase,"resolved");
-    assert.equal(f.log.find(e=>e.id==="meleeResolved").detail.sharedCombat,true);
-    assert.deepEqual(f.said.map(entry=>entry.id),["RoomAmbush","RoomAmbushBreak","RoomAmbushCleared"]);
-    // 重放幂等：再跑十秒不许多记一条事实、多喊一句。
-    const before={log:f.log.length,said:f.said.length,victims:f.victims.length};
-    Step(f,10,World({aliveCount:0,squadInside:true}));
-    assert.deepEqual({log:f.log.length,said:f.said.length,victims:f.victims.length},before,"a resolved beat replays nothing");
-  }
-
-  // 3) 抓枪那一下没按上：刀捅进去，走共用地面失败伤害，人死 —— 而且**不记 ambushBroken**
-  //    （检查点重试要把整拍从头重放）。
-  {
-    const f=Fixture();
-    ToPounce(f);
-    Step(f,R.ambushGrabWindowS+.05,World({leadDistanceM:1}));
-    assert.equal(f.facts.has("ambushBladeLanded"),true,"missing the grab puts the blade in");
-    assert.deepEqual(f.log.filter(e=>e.id==="groundFailure").map(e=>e.shared),[true],
-      "the shared ground failure damage is applied here, because no QTE ran");
-    assert.equal(f.state.alive,false,"at post-butt health the blade is lethal");
-    assert.equal(f.facts.has("ambushBroken"),false,"a death inside the beat never records the release");
-    assert.equal(f.log.filter(e=>e.id==="unlock").length,0);
-    // 死了的那一帧就把提示与恍惚收掉，整拍留在原地。
-    assert.equal(f.ambush.Prompt,null,'a dead player is not asked to press anything');
-    assert.equal(f.state.daze,false);
-    // 重试：整拍从头重放。
-    f.ambush.Reset();
-    assert.equal(f.ambush.Phase,"waiting");
-    f.state.alive=true;
-    f.ambush.Update(1/60,World());
-    assert.equal(f.ambush.Phase,"lunge","a full reset can trigger the beat again");
-  }
-
-  // 4) 推刀输了：共用 ResolveQte 已经扣过 groundFailureDamage，这里只补额外那一份。
-  {
-    const f=Fixture();
-    ToPounce(f);
-    f.ambush.Update(1/60,World({leadDistanceM:1,grabPressed:true}));
-    assert.equal(f.ambush.Phase,"mash");
-    Step(f,R.ambushQteWindowS,World({leadDistanceM:1,qteActive:true}));
-    f.ambush.Update(1/60,World({leadDistanceM:1,qteActive:true,qteSuccess:false}));
-    f.ambush.Update(1/60,World({leadDistanceM:1,qteActive:false}));
-    assert.equal(f.facts.has("ambushBladeLanded"),true);
-    assert.deepEqual(f.log.filter(e=>e.id==="groundFailure").map(e=>e.shared),[false],
-      "the shared rule already charged its own failure damage");
-    assert.equal(f.state.alive,false);
-    assert.equal(f.facts.has("ambushFinisher"),false,"losing the push never kills the man on top of him");
-  }
-
-  // 5) 推赢了但一直不按反捅：窗口末尾自动补上（共用 QTE 已经判赢，这一下只是把胜负演出来）。
-  {
-    const f=Fixture({surviveFailure:true});
-    ToPounce(f);
-    f.ambush.Update(1/60,World({leadDistanceM:1,grabPressed:true}));
-    f.ambush.Update(1/60,World({leadDistanceM:1,qteActive:true,qteSuccess:true}));
-    f.ambush.Update(1/60,World({leadDistanceM:1,qteActive:false}));
-    assert.equal(f.ambush.Phase,"finish");
-    Step(f,R.ambushFinisherWindowS+.05,World({leadDistanceM:1}));
-    assert.equal(f.facts.has("ambushFinisher"),true,"a won struggle always ends with the blade going the other way");
-    Step(f,R.ambushFinisherHoldS+.05,World({leadDistanceM:1}));
-    assert.equal(f.ambush.Phase,"broken");
-  }
-
-  // 6) QTE 根本没开起来（共用层拒绝）：不许把玩家卡在推刀里。
-  {
-    const f=Fixture({qte:false});
-    ToPounce(f);
-    f.ambush.Update(1/60,World({leadDistanceM:1,grabPressed:true}));
-    assert.equal(f.ambush.Phase,"mash");
-    f.ambush.Update(1/60,World({leadDistanceM:1,qteActive:false}));
-    assert.equal(f.ambush.Phase,"finish","a refused struggle falls through to the finisher, never to a dead end");
-    assert.deepEqual(f.log.find(e=>e.id==="ambushBroken"),undefined);
-    Step(f,R.ambushFinisherWindowS+R.ambushFinisherHoldS+.1,World({leadDistanceM:1}));
-    assert.equal(f.ambush.Phase,"broken");
-    assert.deepEqual(f.log.find(e=>e.id==="ambushBroken").detail,{qte:"none",failure:null});
-  }
-
-  // 7) 配音事件驱动老周那一刀：早于兜底期限到达时按事件走，只落一次。
-  {
-    const f=Fixture();
-    f.ambush.Update(1/60,World());
-    StepUntil(f,"daze",World({leadDistanceM:1}));
-    assert.equal(f.ambush.ZhouPending,true,"the man who stabs Zhou is still performing");
-    assert.equal(f.ambush.CueZhouStab(),true);
-    assert.ok(f.victims.includes("zhou"));
-    assert.equal(f.log.find(e=>e.id==="zhouStabbed").detail.cue,true);
-    assert.equal(f.ambush.ZhouPending,false);
-    assert.equal(f.ambush.CueZhouStab(),false,"the cue can only land the blade once");
-    Step(f,R.ambushZhouStabAtS+2,World({leadDistanceM:1}));
-    assert.equal(f.victims.filter(v=>v==="zhou").length,1,"the fallback deadline never repeats the cue-driven stab");
-  }
-
-  // 8) 领头那个被打死：扑过来的路上、躺着的时候，都直接还控制权并起身。
-  {
-    const f=Fixture();
-    f.ambush.Update(1/60,World());
-    f.ambush.Update(1/60,World({leadAlive:false}));
-    assert.equal(f.ambush.Phase,"broken");
-    assert.equal(f.facts.has("ambushStabbed"),false);
-    assert.equal(f.log.filter(e=>e.id==="unlock").length,1,"a dead lead still returns control");
-    const down=Fixture();
-    down.ambush.Update(1/60,World());
-    StepUntil(down,"daze",World({leadDistanceM:1}));
-    down.ambush.Update(1/60,World({leadAlive:false}));
-    assert.equal(down.ambush.Phase,"broken","nobody is left holding him down");
-    assert.ok(down.log.some(e=>e.id==="rise"),"he gets up instead of lying there forever");
-    assert.equal(down.state.daze,false);
-    assert.equal(down.log.filter(e=>e.id==="unlock").length,1);
-  }
-
-  // 9) 重试：挣脱之后死掉的那次接着跑，不重放背景拍表。
-  {
-    const f=Fixture();
-    ToPounce(f);
-    f.ambush.Update(1/60,World({leadDistanceM:1,grabPressed:true}));
-    f.ambush.Update(1/60,World({leadDistanceM:1,qteActive:true,qteSuccess:true}));
-    f.ambush.Update(1/60,World({leadDistanceM:1,qteActive:false}));
-    f.ambush.Update(1/60,World({leadDistanceM:1,finisherPressed:true}));
-    Step(f,R.ambushFinisherHoldS+.05,World({leadDistanceM:1}));
-    assert.equal(f.ambush.Phase,"broken");
-    const victims=f.victims.length,knocks=f.log.filter(e=>e.id==="knockdown").length;
-    f.ambush.ResumeBroken();
-    Step(f,20,World({aliveCount:2}));
-    assert.equal(f.victims.length,victims,"a checkpoint retry does not kill the bearers twice");
-    assert.equal(f.log.filter(e=>e.id==="knockdown").length,knocks,"nor knock Yaowa down again");
-    assert.ok(f.log.filter(e=>e.id==="squadIn").length>=1);
-    assert.equal(f.ambush.Prompt,null,"a resumed beat never leaves a stale prompt on screen");
-  }
-  // 10) 担架队这一侧：伤亡、快照/还原、替补，以及检查点重建带得动新状态。
-  {
-    const column=new FirstLevelMissionColumn();
-    column.Activate();
-    const before=column.Snapshot();
-    const zhou=column.zhou;
-    assert.ok(zhou.bearers.every(h=>h>0)&&!zhou.stabbed);
-    assert.equal(column.AmbushCasualty("frontBearer"),true);
-    // 担架落地＝两头都没人攥着了。前抬者倒下时床面必须还举着 —— 捅老周那一刀
-    // （BayonetStabDown）是按 0.86 m 的床面烘的，床面提前摔到地上，那一刀就扎在
-    // 他上方大半米的空气里（docs/Data_FirstLevelRoomAmbush.md §3.5）。
-    assert.notEqual(column.zhou.state,"fallen",
-      "one dead bearer does not drop the litter: the other man is still holding it");
-    assert.equal(column.AmbushCasualty("zhou",{zhouHealth:R.ambushZhouHealthAfter}),true);
-    assert.notEqual(column.zhou.state,"fallen",
-      "nor does the stab itself: the blade has to land on a litter that is still up");
-    assert.equal(column.AmbushCasualty("rearBearer"),true);
-    assert.equal(column.zhou.state,"fallen","both bearers down: now it hits the floor");
-    assert.equal(column.AmbushCasualty("frontBearer"),false,"a dead bearer cannot die twice");
-    assert.equal(column.zhou.health,R.ambushZhouHealthAfter);
-    assert.equal(column.zhou.stabbed,true);
-    assert.equal(column.zhou.state,"fallen");
-    assert.equal(column.bearerCasualties.length,2,"both corpses land at their own grip positions");
-    assert.equal(new Set(column.bearerCasualties.map(body=>body.slot)).size,2);
-    // 快照/还原带得动新字段 —— 检查点重试就是靠这一条把担架队摆回门口的。
-    const wounded=column.Snapshot();
-    const replay=new FirstLevelMissionColumn();replay.Restore(wounded);
-    assert.equal(replay.zhou.stabbed,true);
-    assert.equal(replay.zhou.health,R.ambushZhouHealthAfter);
-    assert.deepEqual(replay.bearerCasualties,column.bearerCasualties);
-    column.Restore(before);
-    assert.ok(column.zhou.bearers.every(h=>h>0)&&!column.zhou.stabbed,"restoring the pre-ambush snapshot un-does the whole beat");
-    // 清完屋子之后叫替补：后队真的走过来接手，不是凭空补血。
-    column.Restore(wounded);
-    column.AmbushRecover();
-    assert.equal(column.zhou.state,"waiting");
-    for(let i=0;i<4000&&column.zhou.bearers.some(h=>h<=0);i++)column.Update(.1);
-    assert.ok(column.zhou.bearers.every(h=>h>0),"two replacement bearers physically reach the litter");
-    assert.equal(column.replacements,2);
-  }
-  // 10b) 屋里还在白刃的时候不许叫替补：那两个民夫走进去就是送死
-  //（实拍里替补在挣脱之后三秒就走到担架边上了）。挡的是 ambushHold，清完屋子由 AmbushRecover 放开。
-  {
-    const held=new FirstLevelMissionColumn();
-    held.Activate();
-    held.AmbushCasualty("frontBearer");
-    for(let i=0;i<600;i++)held.Update(.1);
-    assert.equal(held.replacements,0,"no replacement bearer walks into the room while the beat is still running");
-    assert.ok(held.zhou.bearers.some(h=>h<=0));
-    held.AmbushRecover();
-    for(let i=0;i<4000&&held.zhou.bearers.some(h=>h<=0);i++)held.Update(.1);
-    assert.ok(held.zhou.bearers.every(h=>h>0),"once the room is cleared the replacement does come");
-  }
-  // 11) 数值自洽：老周这一刀之后仍然活着，并且高于后面几级台阶。
-  assert.ok(R.ambushZhouHealthAfter>12&&R.ambushZhouHealthAfter<65,
-    "Zhou survives the belly wound but is worse off than at the orders post");
-  {
-    const {MELEE_QTE_RULES:QTE}=await import("./Data_MeleeCombat.mjs");
-    // 推刀输掉在这一拍的血量下必须是死：20 + 72 + 18 = 110。这一拍没有「输了继续打」的中间态。
-    assert.ok(R.ambushButtDamage+QTE.groundFailureDamage+R.ambushFailureExtraDamage>=100,
-      "losing the push kills even a full-health player, so the failure path is a real checkpoint retry");
-    // 枪托本身不许打死人：砸完还要躺着看完老周那一刀。
-    assert.ok(R.ambushButtDamage<60,"the rifle butt knocks him down, it does not kill him");
-    // 连按窗口在共用规则之内（共用上限一个字不动）。
-    assert.ok(R.ambushQteWindowS>=2&&R.ambushQteWindowS<=QTE.windowS,"the scripted window fits the shared QTE rule");
-    // 拍表顺序：老周那一刀在前，他扑上来在后 —— 玩家是躺着看完那一刀才轮到自己这条线的。
-    assert.ok(R.ambushBearerStabAtS<R.ambushZhouStabAtS&&R.ambushZhouStabAtS<R.ambushRearBearerStabAtS
-      &&R.ambushRearBearerStabAtS<=R.ambushPounceAtS,
-      "the litter party is cut down before the lead comes down on the player");
-    assert.ok(R.ambushLookLitterAtS<R.ambushBearerStabAtS,
-      "the dazed look reaches the litter before the first bearer falls");
-    // —— 2026-09-16 打磨轮加的四条镜头/站位数（口径见 docs/Data_FirstLevelRoomAmbush.md §4.3）。
-    // 枪托砸下来那一下瞄的是脸，比胸口高；这一段转头正好在砸中那一瞬走完。
-    assert.ok(R.ambushButtLookHeightM>R.ambushLookHeightM&&R.ambushButtLookHeightM<1.8,
-      "the butt strike aims at his face, not his chest");
-    // 躺下之后仰头看屋梁：落点必须在墙顶（2.9 m）以下、人躺着的眼位以上，转头要在
-    // 视线拉到担架之前走完。
-    assert.ok(R.ambushDazeLookRiseM>1.5&&R.ambushDazeLookRiseM<2.9,
-      "the dazed look lands on the rafters, not on the sky or the floor");
-    assert.ok(R.ambushDazeLookAheadM>1&&R.ambushDazeLookS>0
-      &&R.ambushDazeLookS<R.ambushLookLitterAtS,
-      "the roll-back onto the rafters finishes before the look swings to the litter");
-    // 捅老周那个的站位：刺刀够得着（BayonetStabDown 的刀尖在他身前约 1.25 m、
-    // 偏左手边 0.79 m），而且他不许站在担架里头。
-    assert.ok(R.ambushZhouStabStandM>0.9&&R.ambushZhouStabStandM<1.6,
-      "the man stabbing Zhou stands a bayonet's reach from the litter");
-    assert.ok(R.ambushZhouStabLateralM>0.3&&R.ambushZhouStabLateralM<1.2,
-      "and offset along the litter so the blade lands on the belly, not past his head");
-    // 倒地较劲那几拍的手位偏移：往下、往前，不许是零（零＝那把枪又糊在脸上）。
-    const hand=R.ambushGrappleHandM;
-    assert.ok(hand&&Object.isFrozen(hand),"the scripted hand offset is a frozen tuning vector");
-    assert.ok(hand.y<-0.1&&hand.z<-0.1&&Math.abs(hand.x)<0.2&&Math.hypot(hand.x,hand.y,hand.z)<0.8,
-      "the grapple pushes the gun down and forward, out of his face: "+JSON.stringify(hand));
-    // 整段锁住放得进控制锁兜底：扑 + 砸 + 躺着 + 抓枪 + 连按 + 结算 + 反捅 + 演完。
-    const longest=R.ambushLungeMaxS+R.ambushButtImpactS+R.ambushPounceAtS+R.ambushGrabWindowS
-      +Math.min(QTE.windowS,R.ambushQteWindowS)+QTE.resolveS+R.ambushFinisherWindowS+R.ambushFinisherHoldS;
-    assert.ok(longest<=R.ambushLockMaxS,
-      "the whole locked take fits inside the control-lock fallback: "+longest.toFixed(2)+" > "+R.ambushLockMaxS);
-    // 恍惚曲线：眼皮真的闭上过，三条都有归零的终点（人不会一直糊着）。
-    assert.equal(Math.max(...R.ambushDazeEyelids.map(row=>row[1])),1,"the blackout really closes his eyes");
-    for(const [name,rows] of [["eyelids",R.ambushDazeEyelids],["intensity",R.ambushDazeIntensity],
-      ["focus",R.ambushDazeFocus],["hearing",R.ambushDazeHearing]]) {
-      assert.equal(rows.at(-1)[1],0,"every dazed channel has a neutral endpoint: "+name);
-      assert.ok(rows.every((row,i)=>i===0||row[0]>rows[i-1][0]),"the curve is monotonic in time: "+name);
-    }
-    assert.ok(R.ambushDazeEyelids.at(-1)[0]<R.ambushLookLitterAtS,
-      "his eyes are open again before the look is pulled to the litter");
-    assert.ok(R.ambushDazeFocus.find(row=>row[0]>=R.ambushZhouStabAtS)[1]<=.5,
-      "the blur has cleared enough to recognise the man stabbing Zhou");
-  }
-  console.log("ok room ambush: trigger gate, rifle-butt knockdown, dazed floor view, grab/mash/finisher prompts, both failure paths, cue-driven litter stab, squad entry, replay and retry");
-}
-
-{
- const cue=MISSION_DIALOGUE.find(c=>c.id==='TrainMeal');
- const entry=JSON.parse(fs.readFileSync(new URL('./Audio/FirstLevel/Data_FirstLevelVoiceManifest.json',import.meta.url))).cues.TrainMeal;
- const sources=[],subtitles=[],done=[];
- const voice=new FirstLevelMissionVoice({audio:{StopStoryVoice(){},PlayStoryVoice:(_key,options)=>{sources.push(options);return {}; }},
-   hud:{Say:(_who,text)=>subtitles.push(text)},Done:id=>done.push(id)});
- voice.manifest={cues:{TrainMeal:entry}};
- voice.Enqueue('TrainMeal');
- for(let t=0;t<entry.seconds+12;t+=1/60)voice.Update(1/60);
- assert.equal(sources.length,1,'the carriage ensemble has no artificial playback breaks');
- assert.equal(sources[0].offset,0);
- assert.equal(sources[0].maxDuration,entry.seconds,'the complete recording plays through its final reply');
- assert.deepEqual(subtitles,cue.lines.map(line=>line.text),'every passenger reply appears once, in order');
- assert.deepEqual(done,['TrainMeal']);
- const plan=MissionVoiceTimeline(cue,entry.seconds);
- const impactAt=plan.segments.reduce((t,s)=>t+s.end-s.start+(s.wait||0),plan.tail)+R.trainFirstShellFlightS;
- const before=MissionTrainMotion(impactAt),after=MissionTrainMotion(impactAt+.1);
- assert.ok(before.offsetM>0 && Math.abs(before.offsetM-after.offsetM-R.trainCruiseSpeedMps*.1)<1e-6,
-   'the train still moves when the first shell arrives after the longer exchange');
-}

@@ -63,9 +63,6 @@ import {
 import { FIRST_LEVEL_MISSION_PHASE as FIRST_LEVEL_P012_WHITEBOX_PHASE } from "./Data_FirstLevelMission.mjs";
 import { FirstLevelMissionRuntime } from "./Script_FirstLevelMissionRuntime.mjs";
 import { FIRST_LEVEL_STAGES, ResolveFirstLevelStage } from "./Data_FirstLevelMissionStages.mjs";
-import { LoadFirstLevelCarriageAnimation } from "./Script_FirstLevelCarriageAnimation.mjs";
-import { LoadFirstLevelMeal } from "./Script_FirstLevelMeal.mjs";
-import { LoadMachineGunCaptivesAnimation } from "./Script_CutscenePerformance.mjs";
 import { FirstLevelWhiteboxField } from "./Script_FirstLevelWhiteboxField.mjs";
 import { FirstLevelP012Debug } from "./Script_FirstLevelP012Debug.mjs";
 import { FirstLevelP012Director } from "./Script_FirstLevelP012Flow.mjs";
@@ -4031,10 +4028,6 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT, stageJump
   }, phase.whitebox) : null;
   if (p012Flow) state.storyObjective = p012Flow.CurrentObjective().text;
   missionRuntime?.Dispose();
-  if(phase.whitebox?.fullMission)await Promise.all([LoadFirstLevelCarriageAnimation(),LoadFirstLevelMeal()]);
-  // 机枪点位那场关中过场的作者动作库：不 await，开机不等它；到得了那个拍子的时候
-  // 它早就在缓存里了，真没到位的那几帧过场演员照常走 POSE_CLIPS。
-  if(phase.whitebox?.fullMission)LoadMachineGunCaptivesAnimation().catch(error=>console.warn("[Main] captives animation",String(error).slice(0,160)));
   missionRuntime = phase.whitebox?.fullMission ? new FirstLevelMissionRuntime({
     scene,camera,battlefield,physics,player,ai,hud,audio,combat,interact,emplacement,carry,companion,aircraft,vfx,meleeCombat,actorFactory,library,stageJump,stageJumpMidCutscenes,viewmodel,
     // 只用来打 story/mission/* 子桶标记；没有它就静默不记（测试夹具不传也照跑）。
@@ -4052,6 +4045,10 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT, stageJump
     // 换关还没收尾（EnterLevel 里 await 着的那几帧照样在跑 Update）时 PlayMidCutscene 必回 null；
     // 任务层据此先不记「看过」，等建完再触发。
     LevelLoading:()=>state.advancing,
+    // 关尾夜行军：黑屏里换夜间天空，退出/重试时还原本关自己的天光。
+    // 天光那两个函数在另一段闭包里，装配层统一走过场导演挂的同一对钩子。
+    ApplySky:name=>cutscene?.applySky?.(name)??false,
+    RestoreSky:()=>cutscene?.restoreSky?.(),
     Complete:()=>{Progress.MarkCleared(FIRST_LEVEL_P012_WHITEBOX_LEVEL_ID,0);ShowPauseMenu();menu.OpenSandboxComplete();},
     MissionFailure:castId=>{ShowPauseMenu();menu.OpenSandboxFailure(false,{castId,restartOnly:true});},
   }) : null;

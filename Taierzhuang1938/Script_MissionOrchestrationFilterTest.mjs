@@ -9,8 +9,8 @@
 //   2. 按状态 / 按武器 / 按行为筛出来的人数，与 PhaseLayout 逐个数出来的一致。
 //   3. 六个预设各自只留对应的那一类（「只看敌军」时友军集合是**空集**，不是 null）。
 //   4. 敌军布设表行数 = 这一阶段全部成员数，每行九列字段齐；CSV 首行是中文表头。
-//   5. 界面用字是人话：组名不是内部 id，转运区四组叫「第 n 波攻击」，
-//      「拍」「kind=」这类内部叫法不出现在任何一个 label 里。
+//   5. 界面用字是人话：组名不是内部 id，转运区两组叫「第 n 处威胁」，
+//      「kind=」这类内部叫法不出现在任何一个 label 里。
 //
 // 跑法：node Taierzhuang1938/Script_MissionOrchestrationFilterTest.mjs
 // 口径：docs/Data_MissionOrchestration.md §2。
@@ -67,7 +67,7 @@ const soloRow = soloSummary.enemies.groups.find((row) => row.id === "transfer");
 Check(soloRow.visible === 4 && soloRow.count === 4 && soloRow.soloed === true, "面板计数与集合一致（4/4，标着「只看」）");
 Check(soloSummary.enemies.visible === 4 && soloSummary.enemies.count === members.length,
   `敌军一栏写 ${soloSummary.enemies.visible}/${soloSummary.enemies.count}`);
-const otherRow = soloSummary.enemies.groups.find((row) => row.id === "transferFlank");
+const otherRow = soloSummary.enemies.groups.find((row) => row.id === "transferAlley");
 Check(otherRow.visible === 0, "别的组在面板上写 0");
 
 // solo 压过一切：就算别的筛选写着只看机枪，也还是这一组的四个人
@@ -142,7 +142,7 @@ Check(fresh.friendlies.size === 0, "这个预设也只看敌军");
 // 5) 眼睛开关：从 null 关掉一个 → 全集减一；关到只剩空集；开回全集 → null
 // ---------------------------------------------------------------------------
 const groupIds = layout.encounters.map((encounter) => encounter.id);
-Check(groupIds.length === 21, `这一关二十一组（实际 ${groupIds.length}）`);
+Check(groupIds.length === 13, `这一关十三组（实际 ${groupIds.length}）`);
 let toggled = ToggleFilterItem(base, "encounter", "transfer", groupIds);
 Check(toggled.encounters.size === groupIds.length - 1 && !toggled.encounters.has("transfer"),
   "关掉一组 = 全集减那一组");
@@ -174,7 +174,7 @@ for (const row of rows) {
   `布设表这一行字段齐：${row.member}`);
 }
 const gunner = rows.find((row) => row.member === "TransferGunner");
-Check(gunner.group === "转运区第 1 波攻击" && gunner.stateText === "活跃"
+Check(gunner.group === "转运区第 1 处威胁" && gunner.stateText === "活跃"
   && gunner.weaponText === "机枪" && gunner.traitText.includes("钉在原地")
   && gunner.spawnText === "113, 80",
   `TransferGunner 这一行：${gunner.group} / ${gunner.stateText} / ${gunner.weaponText} / ${gunner.traitText}`);
@@ -222,7 +222,7 @@ for (const encounter of model.encounters) {
   const label = EncounterLabel(model, encounter);
   Check(label !== encounter.id && label.length > 1, `${encounter.id} 有中文名：${label}`);
 }
-Check(EncounterLabel(model, "transferRear") === "转运区第 4 波攻击", "转运区按波次叫");
+Check(EncounterLabel(model, "transferAlley") === "转运区第 2 处威胁", "转运区按威胁次序叫");
 Check(WeaponLabel("Type11") === "机枪" && WeaponLabel("Type38") === "步枪", "武器说人话");
 
 // 路线名也一样：面板上照搬 flank / ordersRejoin 这类键等于没说。

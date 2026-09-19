@@ -118,7 +118,7 @@ export function IconForAnchor(id) {
 }
 
 export function IconForZone(zone) {
-  return zone?.kind === "beatArea" ? "Wave" : "Zone";
+  return zone?.kind === "threatArea" ? "Wave" : "Zone";
 }
 
 export function IconForNote() {

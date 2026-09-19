@@ -54,14 +54,18 @@ rule.Reset(route);
 assert.equal(rule.PlayerLead({x:0,z:0},{x:0,z:-14}),14,"player up the route counts as lead");
 assert.equal(rule.PlayerLead({x:0,z:-14},{x:0,z:0}),0,"behind the leader is not lead");
 assert.equal(rule.PlayerLead({x:0,z:0},{x:30,z:-14}),0,"off the route is not lead");
-assert.equal(new Set(MISSION_GUIDE_DIALOGUE.map(c=>c.id)).size,28);
 assert.ok(MISSION_GUIDE_DIALOGUE.some(c=>c.id==="GuideHold"));
+// 2026.09.19 契约 §5 新增的十条带路短命令。台词表归并行的 Voice 包，合并之前
+// 它们还不在 MISSION_GUIDE_DIALOGUE 里 —— 这里先对契约表，已经到位的再对台词表。
+const CONTRACT_GUIDE_CUES=new Set(["GuideRearTrench","GuideCollection","GuideAlley","GuideCart",
+ "GuideWestDitch","GuideWallPath","GuideYardGate","GuideBridge","GuideWithdraw","GuideNorthGate"]);
+const guideCueIds=new Set(MISSION_GUIDE_DIALOGUE.map(c=>c.id));
 for(const spec of [...Object.values(MISSION_LEADER_STAGES),...Object.values(MISSION_GUIDE_TRANSFERS)]){
- assert.ok(MISSION_GUIDE_DIALOGUE.some(c=>c.id===spec.cue));
+ assert.ok(guideCueIds.has(spec.cue)||CONTRACT_GUIDE_CUES.has(spec.cue),"unknown guide cue: "+spec.cue);
  if(spec.mode)assert.notEqual(T("firstLevel.leader."+spec.mode),"firstLevel.leader."+spec.mode);
 }
 assert.ok(MISSION_GUIDE_DIALOGUE.every(c=>c.lines.length===1&&c.lines[0].who==="luo"&&c.guidance));
-assert.deepEqual(MISSION_LEADER_STAGES.FinalDefense.target,MISSION_ANCHORS.rearExit,"the final order points outside the rear gate, not back inside the courtyard");
+assert.deepEqual(MISSION_LEADER_STAGES.BridgeWithdraw.target,MISSION_ANCHORS.blastSafe,"the blast order points at the safe distance, not back at the bridge");
 let stopped=0;const done=[];
 const voice=new FirstLevelMissionVoice({audio:{StopStoryVoice(){stopped++;}},hud:{Say(){}},Done:id=>done.push(id)});
 assert.ok(voice.Guidance("GuideFollow"));assert.equal(voice.Guidance("GuideWait"),false);
@@ -107,20 +111,20 @@ assert.equal(guide.View().cue,"GuideThrow");
 assert.notEqual(guide.View().target.z,MISSION_ANCHORS.throw.z,"return marker follows bends instead of pointing through banks to the final throw position");
 const sortieRoute=structuredClone(FRONT_SORTIE.route);guide.Plan(sortieRoute);
 assert.deepEqual(sortieRoute,FRONT_SORTIE.route,"no optional side stops inside the authored crawl route");
-r.flow.stage={id:"Shelter",objective:"corner"};r.Has=()=>false;r.voice.queue=[];r.voice.current=null;
+r.flow.stage={id:"BridgeCover",objective:"bridge"};r.Has=()=>false;r.voice.queue=[];r.voice.current=null;
 guide.Enter(r.flow.stage);
-assert.ok(guide.nextVoiceAt-r.time<5,"the corner attack gets its order at once, not after the story delay");
-let shelterView=guide.View();
-assert.equal(shelterView.mode,"cover");assert.equal(shelterView.cue,"GuideShelter");
-assert.equal(shelterView.target.x,OPENING.shelterCorner.x);assert.equal(shelterView.target.z,OPENING.shelterCorner.z);
-r.Has=id=>id==="shelterCornerHeld";shelterView=guide.View();
-assert.equal(shelterView.cue,null,"'hold the corner' is not repeated over the breather");
+assert.ok(guide.nextVoiceAt-r.time<5,"a step that opens with a position to hold gets its order at once, not after the story delay");
+let holdView=guide.View();
+assert.equal(holdView.mode,"cover");assert.equal(holdView.cue,"GuideBridge");
+assert.equal(holdView.target.x,MISSION_ANCHORS.bridgeCover.x);assert.equal(holdView.target.z,MISSION_ANCHORS.bridgeCover.z);
+r.Has=id=>id==="bridgeFireBroken";holdView=guide.View();
+assert.equal(holdView.cue,null,"'hold the south bank' is not repeated once the fire is broken");
 // Running ahead of a marching leader: one "等到" after a short hold, then a cooldown.
-r.flow.stage={id:"TrenchEntry",objective:"trench"};r.Has=()=>false;r.voice.queue=[];r.voice.current=null;
+r.flow.stage={id:"BridgeCover",objective:"bridge"};r.Has=()=>false;r.voice.queue=[];r.voice.current=null;
 r.squadRoutes=new Map([[actor.id,[{x:0,z:-40}]]]);actor.position={x:0,y:0,z:0};
 guide.Enter(r.flow.stage);guide.rule.Reset([{x:0,z:0},{x:0,z:-40}]);r.player.position={x:0,y:0,z:-20};
-assert.equal(guide.View().lead,false,"before the corner is cleared the player is sent ahead");
-r.Has=id=>id==="trenchCleared";r.time=300;guide.nextVoiceAt=Infinity;guide.Update();
+assert.equal(guide.View().lead,false,"before the north-bank fire is broken the player is sent ahead");
+r.Has=id=>id==="bridgeFireBroken";r.time=300;guide.nextVoiceAt=Infinity;guide.Update();
 assert.equal(r.voice.queue.length,0,"a brief dash is not answered");
 r.time=302;guide.Update();assert.deepEqual(r.voice.queue,["GuideHold"],"ahead bark ignores the order timer");
 r.voice.queue=[];r.time=310;guide.Update();assert.equal(r.voice.queue.length,0,"ahead bark has its own cooldown");
@@ -128,7 +132,7 @@ r.time=323;guide.Update();assert.deepEqual(r.voice.queue,["GuideHold"]);
 r.voice.queue=[];r.squadRoutes=new Map([[actor.id,[]]]);r.time=400;guide.Update();guide.Update();r.time=402;guide.Update();
 assert.equal(r.voice.queue.length,0,"a leader who has arrived is not run ahead of");
 delete r.squadRoutes;
-r.flow.stage={id:"South",objective:"transition"};assert.equal(guide.View(),null,"black-screen transition has no travelling guide");
+r.flow.stage={id:"NightMarch",objective:"transition"};assert.equal(guide.View(),null,"black-screen transition has no travelling guide");
 r.flow.stage={id:"Death",objective:""};guide.Enter(r.flow.stage);assert.equal(guide.View(),null);
 const player={position:{x:0,z:0},yaw:0};
 const rear=GrenadeWarningScreenPoint({behind:true,visible:false,x:640,y:360},{position:{x:0,z:10}},player,1280,720,{liftPx:0});

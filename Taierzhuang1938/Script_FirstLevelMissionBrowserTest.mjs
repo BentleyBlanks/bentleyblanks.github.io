@@ -8,7 +8,7 @@ import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
 import { PlayFirstLevelOpening } from "./Script_FirstLevelOpeningBrowserTest.mjs";
 import { MISSION_TRAIN } from "./Data_FirstLevelMissionTrain.mjs";
-import { MISSION_ENCOUNTERS, MISSION_TRANSFER_BEATS, MISSION_TUNING as R } from "./Data_FirstLevelMission.mjs";
+import { MISSION_ENCOUNTERS, MISSION_TRANSFER_THREATS, MISSION_TUNING as R } from "./Data_FirstLevelMission.mjs";
 import { SCENE_RENDER_LIMITS } from "./Data_AssetStandards.mjs";
 const here = path.dirname(fileURLToPath(import.meta.url)),
   root = path.resolve(here, "..");
@@ -1585,8 +1585,8 @@ try {
     await Route([{ x: 95, z: 103 }], "TransferPosition", { fight: true });
     await WaitStage("AirFirst", 300, { fight: true, cover: true });
     const transferPacing=await page.evaluate(()=>{const m=window.Tengxian.Debug.FirstLevelMission();return {beats:m.transferBeats,events:m.log.filter(e=>/AttackStarted|AttackCleared|vehiclesDeparted|zhouNext/.test(e.id)),entered:m.log.find(e=>e.kind==="stage" && e.id==="Transfer")?.time,ended:m.time};});
-    assert.deepEqual(transferPacing.beats.started,MISSION_TRANSFER_BEATS.map(beat=>beat.id));
-    assert.deepEqual(transferPacing.beats.cleared,MISSION_TRANSFER_BEATS.map(beat=>beat.id),"all finite attacks actually resolve before the air raid");
+    assert.deepEqual(transferPacing.beats.started,MISSION_TRANSFER_THREATS.map(beat=>beat.id));
+    assert.deepEqual(transferPacing.beats.cleared,MISSION_TRANSFER_THREATS.map(beat=>beat.id),"all finite attacks actually resolve before the air raid");
     await fs.writeFile(path.join(output,"Data_TransferPacing.json"),JSON.stringify(transferPacing,null,2));
     console.log("transfer pacing",JSON.stringify(transferPacing));
     // Dress the wounds from the complete defense before carrying Zhou away.

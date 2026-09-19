@@ -6,7 +6,6 @@ import {LaunchBrowser} from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import {ServeRoot} from "./Script_DevServer.mjs";
 import {FIRST_LEVEL_STAGES,FIRST_LEVEL_ENCOUNTER_STARTS,FIRST_LEVEL_DEFERRED_ENCOUNTERS} from "./Data_FirstLevelMissionStages.mjs";
 import {MISSION_STAGES} from "./Data_FirstLevelMission.mjs";
-import {MISSION_TRAIN} from "./Data_FirstLevelMissionTrain.mjs";
 const here=path.dirname(fileURLToPath(import.meta.url));
 const output=path.join(here,"_shots","FirstLevelStageJump");
 await fs.mkdir(output,{recursive:true});
@@ -19,13 +18,6 @@ async function Jump(number) {
   assert.equal(await page.evaluate(()=>window.Tengxian.state.playerShots),0,"old fire cannot satisfy this start's task gates");
   assert.equal(state.phaseNumber,number);assert.equal(state.stage,FIRST_LEVEL_STAGES[number-1].entry);
   assert.equal(state.phaseCount,18);assert.ok(state.remaining.length);
-  if(number>2&&number<7){
-    const frozen=await page.evaluate(()=>{
-      const r=window.Tengxian.Debug.FirstLevelMissionRuntime();
-      return r.train.entries.filter(e=>e.actor!==r.trainWounded&&e.actor.alive&&e.actor.scriptedNoncombatant).map(e=>e.actor.id);
-    });
-    assert.deepEqual(frozen,[],"checkpoint disembarkation restores armed passengers as combatants");
-  }
   const index=MISSION_STAGES.findIndex(step=>step.id===state.stage);
   assert.ok(MISSION_STAGES.slice(0,index).flatMap(s=>s.requirements).every(f=>state.facts.includes(f)));
   const spawned=await page.evaluate(()=>[...window.Tengxian.Debug.FirstLevelMissionRuntime().spawned]);
@@ -59,29 +51,28 @@ try {
   await page.selectOption("#firstLevelStageSelect","Death");
   await page.locator('[data-action="firstLevelJump"]').click();
   await page.waitForFunction(()=>window.Tengxian?.state.ready&&!window.Tengxian.state.advancing&&window.Tengxian.Debug.FirstLevelMission()?.phaseNumber===17,null,{timeout:180000});
-  await WaitStep("FinalDefense",45);
+  await WaitStep("BridgeCover",45);
   const results=[];
   for(const number of [1,18,2,17,3,16,4,15,5,14,6,13,7,12,8,11,9,10,14,3,18,1]) {
     const start=await Jump(number);
     let after=await Step();
     if(number===2){
-      // Shelling now starts immediately on this phase entry. While the carriage
-      // rolls, the authored fallen pose is not an upright walking capsule.
-      // Check collision clearance when rescue actually returns walking control.
+      // 02 一进来班长就在拖人（控制接管 rescue）。倒在木架下的姿势不是站着的胶囊，
+      // 所以要等真的还了控制权再量净空。
       for(let seconds=0;after.controls&&seconds<45;seconds++)after=await Step(60);
       assert.ok(!after.controls,"stage 2 rescue returns player control within its deadline");
     }
+    if(number===1){
+      // 01 受困段整段是控制接管（trapped）：只能小幅转头，不量行走净空。
+      assert.equal(after.controls,true,"the trapped take owns the camera on entry");
+    }
     assert.ok(after.alive&&after.running,"play resumes "+number);
-    assert.ok(!after.overlap,"player capsule clears stage "+number+": "+JSON.stringify(after.position));
+    if(number!==1)assert.ok(!after.overlap,"player capsule clears stage "+number+": "+JSON.stringify(after.position));
     assert.equal(after.mission.failed,false);
     if(number<14)assert.equal(after.carry,null,"old stretcher is cleared");
     if(number===1){assert.ok(!after.mission.facts.includes("deathSceneComplete"));assert.equal(after.mission.column.loaded,0);}
-    if(number===2){
-      const point=await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMissionRuntime().safePoint);
-      assert.ok(Math.abs(point.trainZ-MISSION_TRAIN.player.z)<.01,"retry stays at the authored carriage-local position");
-    }
     if(number===14)await WaitStep("Rescue",40);
-    if(number===17)await WaitStep("FinalDefense",45);
+    if(number===17)await WaitStep("BridgeCover",45);
     if([4,10,13,14,16,17,18].includes(number))await page.screenshot({path:path.join(output,`Scene_Stage${number}.png`)});
     results.push({number,start,after});
     console.log("ok stage",number,start.stage,"live",after.mission.stage,"facts",after.mission.facts.length);
