@@ -55,7 +55,7 @@ export class FirstLevelBridge {
       r.extras.Keep([...BRIDGE_CAST, ...REAR_COLUMN_IDS]);
     }
     if (step === "BridgeWithdraw") {
-      this.blast = { set: 0, ready: false, fired: false, waitedS: 0 };
+      this.blast = { set: 0, ready: false, fired: false, waitedS: 0, stuckS: 0, overdue: false, lastInside: null };
     }
   }
   /**
@@ -196,10 +196,39 @@ export class FirstLevelBridge {
     const inside = this.BlastZoneOccupant();
     state.waitedS += dt;
     if (!state.ready || !r.Has("blastZoneCleared") || inside) {
-      if (inside) r.Record("blastHeldForFriendly", { who: inside.who, distanceM: Number(inside.distance.toFixed(1)) });
-      return;
+      if (inside) {
+        r.Record("blastHeldForFriendly", { who: inside.who, distanceM: Number(inside.distance.toFixed(1)) });
+        this.ClearBlastZone(inside, dt);
+      } else state.stuckS = 0;
+      if (!state.overdue) return;
     }
     this.Fire();
+  }
+  /**
+   * 把还赖在爆破区里的自己人往南岸赶（「桥头撤！」就是这个意思），并盯着他到底
+   * 动没动。**玩家永远等**；但一个被卡住不动的 NPC 不许把整关钉死 —— 他连着
+   * `blastStuckS` 秒一步没挪、而玩家早已退到安全区，就记一条 `blastFriendlyStuck`
+   * 取证并放行。这不是「到点就炸」：玩家在区里的每一秒都照样等。
+   */
+  ClearBlastZone(inside, dt) {
+    const r = this.runtime, state = this.blast;
+    if (inside.who === "player") { state.stuckS = 0; state.lastInside = null; return; }
+    const actor = inside.actor || (r.squad || []).find(entry => (entry.castId || entry.id) === inside.who);
+    if (actor?.alive) {
+      actor.scriptedNoncombatant = true;
+      r.MoveActor(actor, A.blastSafe, E.demolitionMps);
+      r.ai.SetStance(actor, 0, 1, true);
+    }
+    const at = actor ? { x: actor.position.x, z: actor.position.z } : null;
+    const moved = !state.lastInside || !at || state.lastInside.who !== inside.who
+      || Distance(state.lastInside, at) > 0.25;
+    state.lastInside = at ? { ...at, who: inside.who } : null;
+    state.stuckS = moved ? 0 : (state.stuckS || 0) + dt;
+    if (state.stuckS >= E.blastStuckS && r.Has("blastZoneCleared") && !state.overdue) {
+      state.overdue = true;
+      r.Record("blastFriendlyStuck", { who: inside.who, distanceM: Number(inside.distance.toFixed(1)),
+        stuckS: Number(state.stuckS.toFixed(1)) });
+    }
   }
   /** 爆破区里此刻还有谁（玩家 / 班里人 / 桥头人员 / 尾队）。没有就返回 null。 */
   BlastZoneOccupant() {
@@ -207,9 +236,9 @@ export class FirstLevelBridge {
     if (Distance(r.player.position, centre) <= radius) return { who: "player", distance: Distance(r.player.position, centre) };
     for (const actor of r.squad || [])
       if (actor.alive && Distance(actor.position, centre) <= radius)
-        return { who: actor.castId || actor.id, distance: Distance(actor.position, centre) };
+        return { who: actor.castId || actor.id, distance: Distance(actor.position, centre), actor };
     const nearest = r.extras.Nearest(centre);
-    if (nearest && nearest.distance <= radius) return { who: nearest.id, distance: nearest.distance };
+    if (nearest && nearest.distance <= radius) return { who: nearest.id, distance: nearest.distance, actor: nearest.actor };
     return null;
   }
   PullBack(dt) {
@@ -271,7 +300,8 @@ export class FirstLevelBridge {
   State() {
     return {
       runner: this.runner && { ...this.runner },
-      blast: this.blast && { set: Number(this.blast.set.toFixed(1)), ready: this.blast.ready, fired: this.blast.fired },
+      blast: this.blast && { set: Number(this.blast.set.toFixed(1)), ready: this.blast.ready,
+        fired: this.blast.fired, stuckS: Number((this.blast.stuckS || 0).toFixed(1)), overdue: !!this.blast.overdue },
       rearColumn: (this.column || []).map(entry => ({
         id: entry.id, load: entry.load, progress: Number(entry.progress.toFixed(1)),
         crossed: entry.crossed, pinned: entry.pinned, alive: !!this.runtime.extras.Actor(entry.id),

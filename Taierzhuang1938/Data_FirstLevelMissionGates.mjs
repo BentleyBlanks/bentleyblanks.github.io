@@ -544,6 +544,11 @@ export const MISSION_FACT_GATES = Object.freeze({
     kind: "scripted", step: "BridgeWithdraw", source: "FirstLevelBridge.UpdateWithdraw",
     text: "爆破区里还有己方，爆破一直等（取证用：证明不是到点就炸的计时器）",
   }),
+  blastFriendlyStuck: Gate({
+    kind: "scripted", step: "BridgeWithdraw", source: "FirstLevelBridge.ClearBlastZone",
+    text: "爆破区里有个自己人卡住不动了（已经喊他撤、也真的推过他）：玩家早已退到安全区，"
+      + "记一条取证之后放行。玩家本人在区里则永远等",
+  }),
   marchOutReached: Gate({
     kind: "proximity", step: "NightMarch", anchor: "marchOut", radiusM: END.marchOutArriveM,
     source: "FirstLevelNightGate.UpdateMarchOut",

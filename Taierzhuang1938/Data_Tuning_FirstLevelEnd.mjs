@@ -170,6 +170,9 @@ export const END_TUNING = Object.freeze({
   // 爆破安全：炸之前这个半径里不许有任何己方（玩家、班里人、军官、爆破手、尾队）。
   // R.bridgeBlastRadiusM 是特效半径 12 m；安全判据取 30 m（blastSafe 离桥心 48 m）。
   blastClearRadiusM: 30,
+  // 卡住的 NPC 不许把整关钉死：他连着这么久一步没挪、而且玩家早已退到安全区，
+  // 就记一条 blastFriendlyStuck 取证并放行。**玩家在区里永远等**，这一条只对 NPC。
+  blastStuckS: 20,
 
   // -------------------------------------------------------------------------
   // 18 NightMarch —— 夜入滕城北门
