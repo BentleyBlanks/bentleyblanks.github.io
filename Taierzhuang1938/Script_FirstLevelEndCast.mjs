@@ -67,14 +67,20 @@ export class EndExtras {
     this.entries = new Map();
   }
   /** 生成一个剧情用的国军实体。已经有了就直接返回原来那个。 */
-  Spawn(id, point, { weapon = "HanYang", squadId = "MissionEndCast", stance = 0 } = {}) {
+  Spawn(id, point, { weapon = "HanYang", squadId = "MissionEndCast", stance = 0,
+    unarmed = false, essential = true } = {}) {
     const existing = this.entries.get(id);
     if (existing) return existing.actor;
     const r = this.runtime;
-    const actor = r.ai.Spawn("nra", point.x, point.z, { weapon, squadId: `${squadId}_${id}` });
+    const actor = r.ai.Spawn("nra", point.x, point.z, { weapon, unarmed, squadId: `${squadId}_${id}` });
     if (!actor) return null;
     actor.missionId = id;
     actor.missionEndCast = true;
+    // 剧情人物**默认不死**（血量下限 1，走既有的 scriptEssential 那条路 ——
+    // 弹药屋留守兵、老周、开场传令兵用的都是它）。院门守军、军医、传令兵、
+    // 桥头军官与爆破人员全是「这一段必须在场的人」，被流弹打没了整段演出就断了。
+    // 真要「有人可能中弹」的地方（回援尾队里的三个步枪兵）显式传 essential: false。
+    actor.scriptEssential = essential;
     // 剧情人物不归共用行军层管，也不参加班里人的掩体逻辑。
     actor.missionTrainReady = false;
     r.InstallSentry?.(actor);

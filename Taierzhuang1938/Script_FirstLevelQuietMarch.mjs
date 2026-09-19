@@ -206,13 +206,17 @@ export class FirstLevelQuietMarch {
       r.Say("HandsShake");
     }
 
-    // 4. 无对白行走：末段不起任何 cue，量「真的静了多久」。
+    // 4. 无对白行走：手抖那一段说完之后（或者玩家已经走进夹道末段）不再起任何 cue，
+    //    量「**一边走一边**静了多久」—— 站着不动不算，那是发呆不是行走。
     const playerOn = EndProjectOnto(WALL_PATH, r.player.position);
-    if (playerOn.progress >= E.silenceFromProgressM && !r.voice.current) {
+    const advanced = playerOn.progress > (state.lastProgress ?? 0) + 1e-4;
+    state.lastProgress = Math.max(state.lastProgress ?? 0, playerOn.progress);
+    const quietLeg = state.shakeSaid || playerOn.progress >= E.silenceFromProgressM;
+    if (quietLeg && advanced && !r.voice.current) {
       state.silent += dt;
       if (!state.silenceDone && state.silent >= E.silenceSeconds) {
         state.silenceDone = true;
-        r.Record("quietWalkObserved", { seconds: state.silent, fromM: E.silenceFromProgressM });
+        r.Record("quietWalkObserved", { seconds: state.silent, fromM: Number(playerOn.progress.toFixed(1)) });
       }
     }
 

@@ -46,13 +46,11 @@ export class FirstLevelBridge {
     if (step === "BridgeOrders") {
       this.runner = { arrived: false, said: false };
       r.extras.Spawn("BridgeRunner", E.runnerSpawn, { weapon: "HanYang", squadId: "MissionBridgeRunner", stance: 0 });
-      this.StartColumn();
       r.extras.Spawn("BridgeOfficer", bridge.officer, { weapon: "HanYang", squadId: "MissionBridgeOfficer" });
       for (const [index, post] of bridge.demolition.entries())
         r.extras.Spawn(BRIDGE_CAST[index + 1], post, { weapon: null, unarmed: true, squadId: "MissionBridgeDemolition" });
     }
     if (step === "BridgeCover") {
-      this.StartColumn();
       // 传令兵回他自己的队伍去了：接收处那四个人也不跟着上桥。
       r.extras.Keep([...BRIDGE_CAST, ...REAR_COLUMN_IDS]);
     }
@@ -60,7 +58,15 @@ export class FirstLevelBridge {
       this.blast = { set: 0, ready: false, fired: false, waitedS: 0 };
     }
   }
-  /** 回援尾队：六个真人，从北岸沿 bridgeCrossing 过来。 */
+  /**
+   * 回援尾队：六个真人，从北岸沿 bridgeCrossing 过来。
+   *
+   * **玩家到了南岸射位才放他们出来**（`southBankReached`）。早放不行：他们要在
+   * 北引道上顶着一挺机枪 + 三支步枪等，玩家从接收处走过来要一分多钟 ——
+   * 实拍那一版六个人死了五个，「接应尾队」这件事整个没了。
+   * 扛机枪与抬炮管的三个人走 scriptEssential（打不死，会趴下），
+   * 三个步枪兵照常会阵亡 —— Notion 要的「有人可能中弹」留在他们身上。
+   */
   StartColumn() {
     const r = this.runtime;
     if (this.column) return;
@@ -72,7 +78,7 @@ export class FirstLevelBridge {
       const load = E.rearColumnLoads[index] || "rifle";
       r.extras.Spawn(id, point, {
         weapon: load === "mg" ? "Zb26" : "HanYang",
-        squadId: "MissionRearColumn", stance: 0,
+        squadId: "MissionRearColumn", stance: 0, essential: load !== "rifle",
       });
       return { id, index, progress, load, lane, crossed: false, pinned: false, x: point.x, z: point.z, yaw: at.yaw };
     });
@@ -93,6 +99,7 @@ export class FirstLevelBridge {
 
   UpdateColumn(dt, step) {
     const r = this.runtime;
+    if (!this.column && (step === "BridgeWithdraw" || r.Has("southBankReached"))) this.StartColumn();
     if (!this.column) return;
     const broken = r.Has("bridgeFireBroken");
     const limit = broken ? CROSSING_LENGTH : E.rearColumnHoldM;

@@ -27,7 +27,7 @@ import { FIRST_LEVEL_STAGE_MUSIC, FirstLevelMusicState } from "./Data_FirstLevel
 import { END_TUNING as E } from "./Data_Tuning_FirstLevelEnd.mjs";
 import { FirstLevelMissionColumn, MissionRouteProjection } from "./Script_FirstLevelMissionColumn.mjs";
 import { EndExtras, EndDressing, EndProjectOnto, EndRouteLength, EndRoutePoint } from "./Script_FirstLevelEndCast.mjs";
-import { FirstLevelQuietMarch, QUIET_MARCH_PICKETS } from "./Script_FirstLevelQuietMarch.mjs";
+import { FirstLevelQuietMarch, QUIET_MARCH_PICKETS, QUIET_MARCH_WALL_LENGTH } from "./Script_FirstLevelQuietMarch.mjs";
 import { FirstLevelReception, RECEPTION_CAST } from "./Script_FirstLevelReception.mjs";
 import { FirstLevelBridge, BRIDGE_NORTH_IDS, BRIDGE_GUNNER_ID, REAR_COLUMN_IDS, BRIDGE_CROSSING_LENGTH } from "./Script_FirstLevelBridge.mjs";
 import { FirstLevelNightGate, NightLightSpecs } from "./Script_FirstLevelNightGate.mjs";
@@ -291,16 +291,27 @@ const VOICE_FACT = Object.freeze({
   Object.assign(zhou, { x: after.x, z: after.z });
   r.Step(0.1, "WallPath");
   Check(r.said.includes("HandsShake"), "又走一段幺娃才说");
-  // 末段静默：站在静默段里、没人说话，量满 silenceSeconds。
-  const quiet = EndRoutePoint(wallPath, E.silenceFromProgressM + 4);
-  r.player.position.x = quiet.x; r.player.position.z = quiet.z;
-  r.Step(E.silenceSeconds + 1, "WallPath");
+  // 末段静默：站着不动不算 —— 量的是「一边走一边没人说话」。
+  let walked = E.silenceFromProgressM;
+  const Advance = (seconds, speed) => {
+    for (let i = 0; i < Math.round(seconds / r.dt); i += 1) {
+      walked = Math.min(QUIET_MARCH_WALL_LENGTH, walked + speed * r.dt);
+      const at = EndRoutePoint(wallPath, walked);
+      r.player.position.x = at.x; r.player.position.z = at.z;
+      r.Step(r.dt, "WallPath");
+    }
+  };
+  r.player.position.x = EndRoutePoint(wallPath, walked).x;
+  r.player.position.z = EndRoutePoint(wallPath, walked).z;
+  r.Step(6, "WallPath");
+  Check(!r.Has("quietWalkObserved"), "站着不动不算「无对白行走」");
+  Advance(E.silenceSeconds + 2, 1.6);
   Check(r.Has("quietWalkObserved"), `夹道末段真的走了 ${E.silenceSeconds} s 无对白的路`);
   const silence = r.recorded.find(entry => entry.id === "quietWalkObserved");
   Check(silence.detail.seconds >= E.silenceSeconds, "静默段的时长是量出来的");
-  // 这一段之后不许再有新的 cue 起头。
+  // 这一段里不许再有新的 cue 起头。
   const afterSilence = r.said.length;
-  r.Step(5, "WallPath");
+  Advance(6, 1.6);
   Check(r.said.length === afterSilence, "静默段里一条 cue 都不许插进来");
   console.log("ok 15B 换手、过坎、手抖与末段静默");
 }
@@ -506,11 +517,16 @@ function BridgeRuntime() {
   }
   r.bridge.Enter("BridgeOrders");
   r.bridge.Enter("BridgeCover");
+  // 尾队要等玩家真的到了南岸射位才从北面走进来（早放会在北引道上被打光）。
+  r.facts.add("southBankReached");
+  r.Step(0.1, "BridgeCover");
   return r;
 }
 {
   const r = BridgeRuntime();
   Check(REAR_COLUMN_IDS.length === R.bridgeColumnCount, "尾队人数取 R.bridgeColumnCount");
+  Check(REAR_COLUMN_IDS.every(id => r.extras.Any(id).scriptEssential === (E.rearColumnLoads[REAR_COLUMN_IDS.indexOf(id)] !== "rifle")),
+    "扛机枪与抬炮管的三个人打不死（scriptEssential），三个步枪兵照常会阵亡");
   Check(REAR_COLUMN_IDS.every(id => r.extras.Actor(id)), "回援尾队是六个真人实体，不是六个数据点");
   const loads = r.bridge.State().rearColumn.map(entry => entry.load);
   Check(loads.includes("mg") && loads.filter(load => load === "mortar").length === 2,

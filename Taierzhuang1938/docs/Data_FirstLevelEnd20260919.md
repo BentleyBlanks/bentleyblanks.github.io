@@ -60,7 +60,7 @@
 
 ### 15B WallPath — 换手抬运，沿墙缓行
 
-* 夹道就是撤离线尾段（北侧 2.8 m 院墙、南侧 1.1 m 矮墙，净宽 2.8 m，全长约 84 m）。
+* 夹道就是撤离线尾段（北侧 2.8 m 院墙、南侧 1.1 m 矮墙，净宽 2.8 m，全长 74.4 m）。
 * `carrySwapProgressM`(12 m) 处后抬手体力不支：`zhou.bearers[0] = 0`、`zhou.ambushHold = true`
   （那把闸的意思就是「别叫民夫顶上，这是顺子的活」），担架停下 → `carrySwapOffered` → `CarrySwap`。
   `MissionZhouCarry` 的 `Enabled` 在 15B 加了 `carrySwapOffered` 前置，撒手之前按不了 F。
@@ -180,7 +180,7 @@
 | `ditchShelterM` | 2.5 | 沟底宽下限 3.24 m 的一半 + 0.9 m 排队余量 |
 | `columnMovingM` | 3.4 | `R.litterSpacingM` |
 | `carrySwapProgressM` | 12 | 夹道 84 m 的前 1/7：先听见枪火消失再换人 |
-| `silenceFromProgressM` / `silenceSeconds` | 46 / 14 | 抬担架 1.4 m/s 走完约 60 s，末段留 14 s |
+| `silenceFromProgressM` / `silenceSeconds` | 46 / 14 | 夹道 74.4 m，46 m 之后还剩 28 m，抬担架 1.4 m/s 够走满 14 s |
 | `woundedEnteringLitters` | 2 | `R.litterCount` 7 里先进院的头两副 |
 | `surgeonReachM` | 2.4 | 站位离放置点 1.65 m + 走位到达余量 0.5 m |
 | `rearColumnHoldM` | 13 | `bridgeCrossing` 起点到北桥头 16 m，停在离桥头 3 m |

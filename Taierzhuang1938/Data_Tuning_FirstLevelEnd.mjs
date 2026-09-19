@@ -52,8 +52,9 @@ export const END_TUNING = Object.freeze({
   // -------------------------------------------------------------------------
   // 15B WallPath —— 换手抬运，沿墙缓行
   // -------------------------------------------------------------------------
-  // 后抬手脱力的位置：沿 MISSION_STAGE_ROUTES.wallPath 的里程。夹道全长约 84 m
-  // （(56,207)→…→(2,240)），12 m 让玩家先走进夹道、听见枪火消失，再喊换人。
+  // 后抬手脱力的位置：沿 MISSION_STAGE_ROUTES.wallPath 的里程。夹道全长 74.4 m
+  //（(56,207)→…→(2,240)，Script_FirstLevelSpaceTest 量的），12 m 让玩家先走进夹道、
+  // 听见近处枪火消失，再喊换人。
   carrySwapProgressM: 12,
   // 过坎：夹道里那一处 0.22 m 的坎（Data_FirstLevelMissionLayout 的 WallPathBump，
   // 体块中心 (24,211.25)，w 1.2 × d 2.8）。抬着担架走进这个半径就起 RoadBump。
@@ -62,7 +63,8 @@ export const END_TUNING = Object.freeze({
   // 幺娃看见顺子的手：过坎之后再走这么远（夹道左拐前后），起 HandsShake。
   handsShakeAfterBumpM: 6,
   // 无对白行走：夹道最后这一段不许起任何 cue（左拐之后到院门前）。
-  // 84 m 的夹道按抬担架 1.4 m/s 走完约 60 s，末段留 14 s 的静默。
+  // 74.4 m 的夹道按抬担架 1.4 m/s 走完约 53 s；46 m 之后还剩 28 m，
+  // 够走满 14 s 的静默。
   silenceFromProgressM: 46,
   silenceSeconds: 14,
   // 掉队的步行伤员：位置读 MISSION_PLACEMENT.wallPath.stragglers，但那三点落在

@@ -265,9 +265,8 @@ async function DriveBridge(ctx, { JumpStage, Capture, CaptureFocus, Route, WaitS
   }
   // 压住北岸土坎的火力（真开枪；不要求杀光）。
   await page.evaluate(() => { window.MissionInputDriver.blocked.clear(); });
-  // 站在射位上真开枪压住土坎；打断之后尾队自己过桥。
-  await Route([{ x: A.bridgeCover.x + 3, z: A.bridgeCover.z - 2 }, { x: A.bridgeCover.x, z: A.bridgeCover.z }],
-    "BridgeSuppress", { fight: true });
+  // 站在射位上真开枪压住土坎（不要再走路线：Route 的 fight 循环一看见敌人就松开
+  // 前进键，脚下不动就被判成「这条路走不通」）。打断之后尾队自己过桥。
   await WaitFact(page, "bridgeFireBroken", "18 打断北岸火力", 420, { fight: true });
   await WaitStage("BridgeWithdraw", 420, { fight: true, cover: true });
   {
@@ -279,7 +278,12 @@ async function DriveBridge(ctx, { JumpStage, Capture, CaptureFocus, Route, WaitS
     await Capture("BridgeCrossed");
   }
   // 退到南岸掩护区；爆破区里还有人的时候不许炸。
-  await Route(Points(MISSION_STAGE_ROUTES.bridgeWithdraw), "BridgeWithdrawToSafe", { fight: true });
+  // 撤是撤，不是边退边打：fight 会让 Route 一看见残敌就停下开枪，走不到掩护区。
+  // 末段绕过 BlastSafeBank 那道 1.35 m 的土坎西头（(−69.5..−62.5, z≈197.5)），
+  // 别贴着它的角走。
+  await Route([...Points(MISSION_STAGE_ROUTES.bridgeWithdraw.slice(0, -1)),
+    { x: -73, z: 201.5 }, { x: A.blastSafe.x, z: A.blastSafe.z }],
+  "BridgeWithdrawToSafe", { fight: false });
   {
     const shot = await Mission(page);
     assert.ok(shot.facts.includes("blastZoneCleared"), "玩家退到了南岸掩护区");
