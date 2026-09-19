@@ -293,6 +293,9 @@ async function DriveBridge(ctx, { JumpStage, Capture, CaptureFocus, Route, WaitS
       alive: p.alive, position: { ...p.position }, yaw: Number(p.yaw.toFixed(2)),
       overlap: g.physics.Overlaps(p.position.x, p.position.y + 0.04, p.position.z, p.radius, 1.78),
       carry: g.carry.KindId, cutscene: g.state.cutscene, menu: g.state.menu,
+      slot: g.state.activeSlot, busy: !!p.Busy, mounted: !!g.emplacement?.Mounted,
+      meleeActive: !!g.meleeCombat?.Active, meleeBlocking: !!g.meleeCombat?.Blocking,
+      meleeCanUse: !!g.meleeCombat?.CanUse?.(),
       crowd: g.ai.soldiers.filter(a => a.alive && Math.hypot(a.position.x - p.position.x, a.position.z - p.position.z) < 4)
         .map(a => ({ id: a.missionId || a.castId || a.id, side: a.side,
           d: Number(Math.hypot(a.position.x - p.position.x, a.position.z - p.position.z).toFixed(2)) })) };
@@ -301,6 +304,12 @@ async function DriveBridge(ctx, { JumpStage, Capture, CaptureFocus, Route, WaitS
     const g = window.Tengxian, p = g.player;
     for (const key of ["KeyW", "KeyA", "KeyS", "KeyD", "ShiftLeft"]) g.Debug.Key(key, false);
     g.Debug.Mouse(0, false); g.Debug.Mouse(2, false);
+    // 大刀还拔在手上的话 meleeCombat.Blocking 会把 forward/strafe 整个清零 ——
+    // 掩护那一场里驾驶器一旦近身就按过 V。先收刀、退架、松锁，再谈走路。
+    g.meleeCombat?.Cancel?.("campaignWithdraw");
+    g.emplacement?.Vacate?.("campaignWithdraw");
+    if (g.state.activeSlot !== "primary") g.Debug.Key("Digit1");
+    g.StepFrames(20, 1 / 60, false);
     if (p.stance === "prone") g.Debug.Key("KeyZ");
     if (p.stance === "crouch") g.Debug.Key("KeyC");
     const before = { x: p.position.x, z: p.position.z };
