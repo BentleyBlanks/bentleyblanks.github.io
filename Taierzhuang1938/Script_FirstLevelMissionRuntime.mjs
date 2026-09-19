@@ -2413,17 +2413,24 @@ export class FirstLevelMissionRuntime {
       if(this.GateNear("northGateReached"))this.Record("northGateReached");
       if(this.Has("northGateReached")&&this.GateNear("gateEntered"))this.Record("gateEntered");
     }
+    // 07 起后送队真的跟着走（旧的南行黑屏转场下线了，队伍要自己走完这一段）。
     let moving = [
+        "South",
+        "Village",
+        "Melee",
         "Courtyard",
         "TransferApproach",
         "Transfer",
         "Regroup",
         "WallPath",
         "ReceptionGate",
-      ].includes(stage),
+      ].includes(stage) || (stage === "Orders" && this.Has("zhouOnLitter")),
       safe = true,
       maxProgress = Infinity;
     let safeAt = null;
+    // 08/09：担架停在可靠遮挡里，不跟进未清空间。
+    if (stage === "Village" || stage === "Melee")
+      maxProgress = MissionRouteProjection(this.column.route, A.litterHold).progress;
     if (stage === "Courtyard") {
       const gun = this.enemies.get("VillageGunner");
       if (gun && !gun.alive) this.Record("villageGunSilent");
