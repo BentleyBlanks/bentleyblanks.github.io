@@ -350,6 +350,20 @@ export async function Drive(ctx) {
       const g = window.Tengxian;
       for (let i = 0; i < 900 && g.Debug.FirstLevelMission().tank.moving; i++) g.StepFrames(1, 1 / 60, false);
     });
+    // 站到投得中的地方再扔。集束弹满蓄力也就十几米，而且弹着点得落在履带 5 m 以内
+    // （tankTrackRadiusM）—— 从沟口朝二十五米外的车扔，只是白扔一发。
+    // 设计上这一拍就是「冲上去投弹，再退回遮挡」，驾驶器照着做。
+    const spot = await page.evaluate((closeM) => {
+      const g = window.Tengxian, tank = g.Debug.FirstLevelMission().tank, p = g.player.position;
+      const gap = Math.hypot(p.x - tank.x, p.z - tank.z);
+      if (gap <= closeM + 2) return null;
+      const along = (gap - closeM) / gap;
+      return { x: p.x + (tank.x - p.x) * along, z: p.z + (tank.z - p.z) * along, gap: +gap.toFixed(1) };
+    }, 7);
+    if (spot) {
+      console.log("TANK_THROW_SPOT", JSON.stringify(spot));
+      await Route([{ x: spot.x, z: spot.z }], `TankThrowSpot${attempt}`, { stance: "crouch", sprint: true });
+    }
     const thrown = await page.evaluate(async () => {
       const { THROW } = await import("./Data_Tuning_Combat.mjs");
       const { WEAPONS } = await import("./Data_Weapons.mjs");
@@ -378,6 +392,9 @@ export async function Drive(ctx) {
           const y = originY + speed * vertical * t - 4.905 * t * t;
           clearance = Math.min(clearance, y - g.battlefield.GroundHeight(x, z));
         }
+        // 取**最平**的那条够用的弧线，不是余量最大的那条。仰到 1.2 rad 去吊射，
+        // 水平分量只剩三分之一，初速差一点落点就差一半（实测解出 12.7 m、只飞了 6.5 m）。
+        if (clearance >= 0.6) { best = { pitch, speed, clearance }; break; }
         if (!best || clearance > best.clearance) best = { pitch, speed, clearance };
       }
       // 一条都解不出来就照旧仰 0.35 满蓄力扔一发，好歹把落点记下来。
@@ -407,6 +424,18 @@ export async function Drive(ctx) {
       aim: thrown.aim, land: thrown.land, landMiss: thrown.landMiss, tank: thrown.mission.tank }));
     if (thrown.mission.tank.immobilized) break;
     if (!thrown.alive) break;
+    // 投完退回遮挡（这一拍的另一半）。
+    if (spot) await Route([A.throw], `TankFallBack${attempt}`, { fight: true, stance: "crouch", sprint: true });
+    // 两发都扔完还没停住，就像玩家一样回弹药屋再领两发。
+    if (thrown.after === 0) {
+      await Route([...Routes.bundle.slice(4), { x: A.bundle.x, z: A.bundle.z + 1.2 }], `BundleRefill${attempt}`,
+        { fight: true, stance: "stand", sprint: true, crawl: true, rejoinRoute: Routes.bundle });
+      await Interact();
+      assert.equal(await page.evaluate(() => window.Tengxian.state.bundles), R.bundleSupplyCount,
+        "弹药屋再给了两发集束弹");
+      await Route(Routes.bundleReturn, `TankFlankAgain${attempt}`,
+        { fight: true, stance: "stand", sprint: true, crawl: true, rejoinRoute: Routes.bundleReturn });
+    }
   }
   await CaptureFocus("TankStopped", { x: await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission().tank.x),
     z: await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission().tank.z), height: 1.2 });

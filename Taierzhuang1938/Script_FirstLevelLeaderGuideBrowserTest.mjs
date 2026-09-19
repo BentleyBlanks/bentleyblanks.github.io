@@ -55,7 +55,22 @@ try{
   },{label,frames});trace.push(sample);return sample;
  };
  let held;
- for(let i=0;i<45;i++){held=await Sample("player-behind");if(held.waiting&&held.guide.waiting!=null)break;}
+ // 玩家在后头跟着走。班长被「离玩家太远」那条绳子（MISSION_GUIDE_TUNING.waitDistanceM 36 m）
+ // 按住的时候，他离自己的第一个停点往往只差不到一米：玩家钉在原地不动，这条绳子就永远
+ // 松不开，带路层自己的「走到停点、转身等人」根本轮不上（实测停在停点前 0.75–0.85 m，
+ // march 报 waiting 而 missionGuideWaiting 一直是 false）。跟到还差十五米的位置就停——
+ // 十五米比 rejoinM(7 m) 远，所以到了停点他还是得等人。
+ for(let i=0;i<45;i++){
+  held=await Sample("player-behind");
+  if(held.waiting&&held.guide.waiting!=null)break;
+  if(held.speed<.05)await page.evaluate(gap=>{
+   const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime(),a=r.leaderGuide.Leader;
+   const p=g.player.position,d=Math.hypot(p.x-a.position.x,p.z-a.position.z);
+   if(d<=gap)return;
+   const along=(d-gap)/d;
+   g.player.Spawn(p.x+(a.position.x-p.x)*along,p.z+(a.position.z-p.z)*along,g.player.yaw);
+  },15);
+ }
  console.log("held",JSON.stringify(held));
  assert.ok(held.waiting&&held.guide.waiting!=null,"leader physically reaches a checkpoint and waits");
  const stable=await Sample("hold",240);

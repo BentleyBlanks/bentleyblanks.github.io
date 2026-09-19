@@ -60,8 +60,13 @@ try{
   // Before making contact, a sheltered delay keeps the squad in the recess too. Sending them
   // ahead alone would test an unassisted assault against the new mobile sections.
   await page.evaluate(async(hold)=>{
-    const r=window.Tengxian.Debug.FirstLevelMissionRuntime();
+    const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime();
     r.squadMarch?.Dispose();r.squadMarch=null;
+    // 这一段量的是遭遇组的账（主力放没放、有没有复活），不是班里人在开阔沟里
+    // 硬挨三分钟能不能活。新空间的等候位没有屋顶，不垫血的话随机死一个必要角色
+    // 就直接 failed，量到的就成了「运气」。
+    g.player.health=1e9;
+    for(const a of r.squad){a.health=1e9;a.maxHealth=1e9;}
     for(const [i,a] of r.squad.entries()){
       // 一起停在玩家这一段沟里：把班里人单独放出去，量到的就是「没人配合的强攻」。
       const post={x:hold.x+(i%2?1:-1),z:hold.z+(i<2?-3:2)};
