@@ -10,7 +10,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { MISSION_ANCHORS as A } from "./Data_FirstLevelMissionLayout.mjs";
+import { MISSION_ANCHORS as A, MISSION_ROUTES } from "./Data_FirstLevelMissionLayout.mjs";
 import { MISSION_STAGE_ROUTES, MISSION_RECEPTION_SPACE as Reception } from "./Data_FirstLevelMissionTopology.mjs";
 import { END_TUNING as E } from "./Data_Tuning_FirstLevelEnd.mjs";
 import { CampaignActions } from "./Script_FirstLevelCampaignKit.mjs";
@@ -101,13 +101,14 @@ async function DriveRegroup(ctx, { JumpStage, Capture, CaptureFocus, Route, Inte
     "RegroupRally", { fight: true });
   const enemiesBefore = (await Mission(page)).enemies.length;
   await WaitFact(page, "headcountDone", "15A 点名", 300, { fight: true });
-  // 点完人顺子才去问赶车人「车还走得了不」——走到车边才问。
-  await Route([{ x: E.droverPost.x + 2.4, z: E.droverPost.z + 1.2 }], "RegroupDrover", { fight: true });
+  // 点完人顺子才去问赶车人「车还走得了不」——沿沟走到车边才问（直线会横切沟壁）。
+  await Route([{ x: A.ditch.x, z: A.ditch.z }, { x: 47, z: 114 },
+    { x: E.droverPost.x + 2.4, z: E.droverPost.z + 1.2 }], "RegroupDrover", { fight: true });
   {
     const shot = await Mission(page);
     assert.ok(shot.voice.played.includes("CartAbandon"), "顺子走到车边真的问过赶车人");
   }
-  await Route([{ x: A.retreatA.x + 4, z: A.retreatA.z - 6 }, { x: A.retreatA.x, z: A.retreatA.z }],
+  await Route([{ x: 47, z: 114 }, { x: A.ditch.x, z: A.ditch.z }, { x: A.retreatA.x, z: A.retreatA.z }],
     "RegroupBackToColumn", { fight: true });
   {
     const shot = await WaitStage("WallPath", 300, { fight: true });
@@ -120,8 +121,9 @@ async function DriveRegroup(ctx, { JumpStage, Capture, CaptureFocus, Route, Inte
   }
 
   // --- 15B 换手抬运，沿墙缓行 ------------------------------------------------
-  // 后抬手撑到 carrySwapProgressM 才撒手；撒手之前 F 是够不着担架的。
-  await Route(Points(MISSION_STAGE_ROUTES.wallPath.slice(0, 2)), "WallPathEnter", { fight: false });
+  // 先沿撤离线从收拢点南下到夹道口（(32,134)→(50,150)→(56,165)→(56,184)→(56,207)）；
+  // 直接连 wallPath 的第一点会横切整条沟。后抬手撑到 carrySwapProgressM 才撒手。
+  await Route(Points(MISSION_ROUTES.evacuation.slice(2, 7)), "WallPathEnter", { fight: false });
   await WaitFact(page, "carrySwapOffered", "15B 换手", 180);
   {
     const zhou = await page.evaluate(() => {
@@ -149,8 +151,8 @@ async function DriveRegroup(ctx, { JumpStage, Capture, CaptureFocus, Route, Inte
   }
 
   // --- 15C 院门：先拦 → 确认身份 → 接收人员指位置 → 伤员真的往里走 ------------
+  // 夹道最后一点就是院门，上面那条路线已经把人送到门口了，不再往回走。
   await WaitStage("ReceptionGate", 180);
-  await Route([{ x: A.receptionGate.x + 6, z: A.receptionGate.z }], "ReceptionGateApproach");
   {
     const held = await page.evaluate(() => {
       const mission = window.Tengxian.Debug.FirstLevelMission();
@@ -186,9 +188,11 @@ async function DriveHandover(ctx, { JumpStage, Capture, Route, Interact, WaitSta
     }
     assert.equal(await page.evaluate(() => window.Tengxian.carry.KindId), "stretcher");
   }
-  await Route([Reception.yardJunction, { x: Reception.wardExit.x, z: Reception.wardExit.z },
-    { x: Reception.wardThreshold.x, z: Reception.wardThreshold.z + 1 },
-    { x: A.zhouDrop.x, z: A.zhouDrop.z + 1.6 }], "HandoverThreshold");
+  // 厢房南门的门槛在 z=243：要往 z 更小的方向跨进去，落点是放置点本身。
+  await Route([{ x: Reception.yardJunction.x, z: Reception.yardJunction.z },
+    { x: Reception.wardExit.x, z: Reception.wardExit.z },
+    { x: Reception.wardThreshold.x, z: Reception.wardThreshold.z + 1.5 },
+    { x: A.zhouDrop.x, z: A.zhouDrop.z }], "HandoverThreshold");
   {
     const shot = await Mission(page);
     assert.ok(shot.facts.includes("thresholdCrossed"), "过了厢房门槛");
@@ -197,7 +201,7 @@ async function DriveHandover(ctx, { JumpStage, Capture, Route, Interact, WaitSta
   }
   // 军医先指位置（PlaceLitter），喊出口才允许按 F。
   await WaitFact(page, "placeOrderHeard", "16 军医指位置", 180);
-  await Route([{ x: A.zhouDrop.x, z: A.zhouDrop.z + 1.2 }], "HandoverPlace");
+  await Route([{ x: A.zhouDrop.x - 0.8, z: A.zhouDrop.z + 0.6 }], "HandoverPlace");
   await Interact();
   {
     const shot = await Mission(page);
@@ -280,26 +284,40 @@ async function DriveBridge(ctx, { JumpStage, Capture, CaptureFocus, Route, WaitS
   // 退到南岸掩护区；爆破区里还有人的时候不许炸。
   // 退之前先报一次「现在能不能走」：射位那一小块上蹲了一整场掩护，姿势、净空、
   // 运行状态任何一样不对，下面那条路线都会原地打转（第一版就是这么卡住的）。
+  // 射位那一小块上蹲了一整场掩护，撤的时候班里四个人又都从这儿起步 —— 玩家会被
+  // 自己人裁步挡住（09-17 的「玩家裁步挡位＋国军让路」）。先报一次现场，再朝
+  // **离人最远的方向**挪开两步，然后才走撤离路线。
   console.log("WITHDRAW_START", JSON.stringify(await page.evaluate(() => {
     const g = window.Tengxian, p = g.player;
     return { running: g.state.running, control: g.state.missionControl, stance: p.stance,
       alive: p.alive, position: { ...p.position }, yaw: Number(p.yaw.toFixed(2)),
       overlap: g.physics.Overlaps(p.position.x, p.position.y + 0.04, p.position.z, p.radius, 1.78),
-      carry: g.carry.KindId };
+      carry: g.carry.KindId, cutscene: g.state.cutscene, menu: g.state.menu,
+      crowd: g.ai.soldiers.filter(a => a.alive && Math.hypot(a.position.x - p.position.x, a.position.z - p.position.z) < 4)
+        .map(a => ({ id: a.missionId || a.castId || a.id, side: a.side,
+          d: Number(Math.hypot(a.position.x - p.position.x, a.position.z - p.position.z).toFixed(2)) })) };
   })));
-  // 站直、松开所有键，再往南挪两步把自己从射位那一堆人里摘出来。
-  await page.evaluate(() => {
-    const g = window.Tengxian;
+  const escaped = await page.evaluate(() => {
+    const g = window.Tengxian, p = g.player;
     for (const key of ["KeyW", "KeyA", "KeyS", "KeyD", "ShiftLeft"]) g.Debug.Key(key, false);
     g.Debug.Mouse(0, false); g.Debug.Mouse(2, false);
-    if (g.player.stance === "prone") g.Debug.Key("KeyZ");
-    if (g.player.stance === "crouch") g.Debug.Key("KeyC");
-    g.player.yaw = Math.PI;                       // 朝南（+Z），正对撤离方向
-    g.Debug.Key("KeyW", true);
-    g.StepFrames(150, 1 / 60, false);
-    g.Debug.Key("KeyW", false);
+    if (p.stance === "prone") g.Debug.Key("KeyZ");
+    if (p.stance === "crouch") g.Debug.Key("KeyC");
+    const before = { x: p.position.x, z: p.position.z };
+    // 八个方向各试 0.5 s，谁真的挪得动就走谁。
+    for (let k = 0; k < 8; k += 1) {
+      p.yaw = (Math.PI * 2 * k) / 8;
+      g.Debug.Key("KeyW", true);
+      g.StepFrames(30, 1 / 60, false);
+      g.Debug.Key("KeyW", false);
+      if (Math.hypot(p.position.x - before.x, p.position.z - before.z) > 0.6) {
+        g.Debug.Key("KeyW", true); g.StepFrames(60, 1 / 60, false); g.Debug.Key("KeyW", false);
+        return { yaw: p.yaw, moved: true, position: { x: p.position.x, z: p.position.z } };
+      }
+    }
+    return { moved: false, position: { x: p.position.x, z: p.position.z } };
   });
-  console.log("WITHDRAW_NUDGED", JSON.stringify(await page.evaluate(() => ({ ...window.Tengxian.player.position }))));
+  console.log("WITHDRAW_NUDGED", JSON.stringify(escaped));
   // 撤是撤，不是边退边打：fight 会让 Route 一看见残敌就停下开枪，走不到掩护区。
   // 末段绕过 BlastSafeBank 那道 1.35 m 的土坎西头（(−69.5..−62.5, z≈197.5)），
   // 别贴着它的角走。
