@@ -14,7 +14,10 @@ export function MissionVoiceTimeline(cue, total) {
   const weights = cue.lines.map((line) => Math.max(4, line.text.length));
   const sum = weights.reduce((a, b) => a + b, 0);
   let cursor = 0;
-  const lines = aligned?.lines.length === cue.lines.length ? aligned.lines : weights.map((weight) => {
+  // 对齐区间只在确实装得进这条时长时才用：缺录音时 total 是按字数估的，
+  // 硬套录音的区间会让后几句落在区间外，字幕和 Line 事件直接被跳过。
+  const fits = aligned?.lines.length === cue.lines.length && aligned.lines.at(-1)[1] <= total + 0.05;
+  const lines = fits ? aligned.lines : weights.map((weight) => {
     const start = cursor; cursor += total * weight / sum; return [start, cursor];
   });
   const segment = { id: "WholeExchange", start: 0, end: total, wait: 0 };

@@ -64,10 +64,10 @@
     },
     "CourtyardOpen": {
       "file": "AudioVoice_FirstLevelCourtyardOpen.mp3",
-      "seconds": 5.433,
-      "bytes": 65873,
-      "promptHash": "526a1760294d893773d5161dfadf70abe0a5af1e01e7d6da0424f399f5a9c73c",
-      "sha256": "ebbc0f6640d9c088cd0290e6ed723de5216ef1527615abcbeba31d476c8cb7ab",
+      "seconds": 4.624,
+      "bytes": 56156,
+      "promptHash": "a490beb8b80e1ae0b8e5d6b4c2ea47fef0e625b24d546a507990cf34c94d21c9",
+      "sha256": "e9ac0b829f2dae3bbba33f254b99f619fed5c02328edf20eefd979bc1a5f36fd",
       "lineCount": 2,
       "requests": 1,
       "speechRate": 0,
@@ -112,10 +112,10 @@
     },
     "AircraftFirst": {
       "file": "AudioVoice_FirstLevelAircraftFirst.mp3",
-      "seconds": 8.229,
-      "bytes": 99414,
-      "promptHash": "dfdbd8f7ff900b777a84b1480b2de4a0a6cdedaa653ff0707e4c21bfd36fb750",
-      "sha256": "ed95bebb453021ff31c807a9c0f97d23747dd0c7805b452833d5dcf7c77547c1",
+      "seconds": 6.609,
+      "bytes": 79979,
+      "promptHash": "a88f8307e58fac84c0de25be9835b63399e1ceb727d6ed2e47250c1d8ef2df84",
+      "sha256": "4901c9bbea17cfeedeb321202644dacbbd81f41a654a7dfddefe06ff31938337",
       "lineCount": 3,
       "requests": 1,
       "speechRate": 0,
@@ -652,10 +652,10 @@
     },
     "MeleeCurse": {
       "file": "AudioVoice_FirstLevelMeleeCurse.mp3",
-      "seconds": 6.609,
-      "bytes": 79979,
-      "promptHash": "66a852bd99e0979f810a0bd69c3a4f996ec3d8c7b3abe26946c2f816196ecad2",
-      "sha256": "d4c5d1bd0f3cc4fd97add8cd364c31efbc642e02d633e864f66d87a7413458b3",
+      "seconds": 2.116,
+      "bytes": 26063,
+      "promptHash": "83e47bcfe6d318c2f41141e46b6f482348ecb191f8377d07e5575dee78339eca",
+      "sha256": "afd7cfb766e3b1c96dfd8531d7c222da7d9ed78e38a1a1b1aacca21bb620e91f",
       "lineCount": 1,
       "requests": 1,
       "speechRate": 0,
@@ -1119,5 +1119,5 @@
       "mastering": "MonoBeforeLoudnessTruePeakMinus3"
     }
   },
-  "updatedAt": "2026-09-19T15:56:25.878Z"
+  "updatedAt": "2026-09-19T16:25:06.881Z"
 }

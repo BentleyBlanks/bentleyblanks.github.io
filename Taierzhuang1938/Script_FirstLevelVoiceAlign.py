@@ -125,9 +125,16 @@ def Main():
                     {"text":w["word"],"start":round(start+w["start"],3),
                      "end":round(start+w["end"],3),"probability":round(float(w["probability"]),4)}
                      for w in selected]})
+        # 一声「嗯」这种只有一个音的行，逐词对齐会塌成零长度，字幕等于不显示。
+        # 撑到 0.6 秒，但绝不越过下一句的起点（区间必须单调不重叠）。
+        for line_index in collapsed:
+            limit=ranges[line_index+1][0] if line_index+1<len(ranges) else seconds
+            ranges[line_index][1]=round(min(ranges[line_index][0]+0.6,limit),3)
         row={"sha256":digest,"scriptSha256":script_digest,"groupsSha256":groups_digest,"lines":ranges}
         if collapsed:
-            row["note"]="forced alignment collapsed line(s) "+",".join(str(i) for i in collapsed)+"; interval kept as measured"
+            row["note"]=("forced alignment collapsed line(s) "+",".join(str(i) for i in collapsed)
+                +"; widened up to 0.6s without crossing the next line, so "
+                +",".join("%d=%.2fs"%(i,ranges[i][1]-ranges[i][0]) for i in collapsed))
         all_cues[cue["id"]]=row
         (output/("Data_Aligned"+cue["id"]+".json")).write_text(
             json.dumps(evidence,ensure_ascii=False,indent=2),encoding="utf-8")
