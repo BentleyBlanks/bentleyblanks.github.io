@@ -65,7 +65,10 @@ export function ApplyFirstLevelStageJump(runtime, value, { midCutscenes = false 
     }
   }
   if (n >= 11) r.battlefield.OpenGate("MissionCourtyardGate");
-  if (n >= 13) { r.cart = { progress: 0, moving: false, halted: n >= 14, unloaded: n >= 14 }; }
+  // 13 的过关条件里有停车与卸人：跳进去时车已经开到路尽头，还没停 —— 让 UpdateCart
+  // 自己走完那两拍，不许靠预置事实混过去。14 起这两拍已经是过去的事。
+  if (n === 13) r.cart = { progress: 1e4, moving: true, halted: false, unloaded: false, from: { ...A.cartBoard } };
+  else if (n > 13) r.cart = { progress: 1e4, moving: false, halted: true, unloaded: true };
   if (n >= 14) {
     r.cartBombLaunched = true; r.bridgeBombLaunched = true;
     r.battlefield.OpenGate("TemporaryBridge"); r.battlefield.CloseGate("MissionBridgeWreck");
