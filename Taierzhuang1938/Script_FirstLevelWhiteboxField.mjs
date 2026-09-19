@@ -470,7 +470,11 @@ export class FirstLevelWhiteboxField {
   }
 
   BuildLegend() {
-    if (!this.layout.scenario || typeof document === "undefined" || this.legend) return;
+    // 图例是归档教学白盒（p012-archive）的东西。正式第一关 2026.09.19 起也有
+    // scenario（掩蔽部两态 + 关尾夜景片），但它不该在正片里挂一块色标面板 ——
+    // 布局显式写 `legend:false` 就不建。
+    if (!this.layout.scenario || this.layout.legend === false
+      || typeof document === "undefined" || this.legend) return;
     const legend = document.createElement("details");
     legend.id = "firstLevelP012Legend";
     legend.open = typeof window === "undefined" || window.innerWidth >= 640;

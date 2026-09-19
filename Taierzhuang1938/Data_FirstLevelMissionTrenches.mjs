@@ -57,8 +57,11 @@ export const MISSION_TRENCH_NETWORK = Object.freeze({
     },
     {
       id: "WestEvacuation", preset: "evacuation", role: null,
-      points: MISSION_REAR_ROUTES.evacuation,
-      source: "Data_FirstLevelMissionTopology.MISSION_REAR_ROUTES.evacuation（担架队与人群共用）",
+      // 只取到 index 6 (56,207)：15B 起沟就到头了，接上去的是靠院墙的夹道
+      // （2.8 m 净宽的两道墙，见 Data_FirstLevelMissionLayout 的 WallPath*）。
+      // 一条 5.2 m 宽的沟塞不进 2.8 m 的巷子，两者必须在这里交班。
+      points: MISSION_REAR_ROUTES.evacuation.slice(0, 7),
+      source: "Data_FirstLevelMissionTopology.MISSION_REAR_ROUTES.evacuation.slice(0,7)（担架队与人群共用；尾段 15B 是夹道不是沟）",
       routeBound: true,
     },
     {

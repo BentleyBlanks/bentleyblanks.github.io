@@ -325,6 +325,8 @@ export function BuildRailwayFromSpec(sink, spec, { groundAt, sinkFor = null, col
     path: railway.path, crownAt: railway.CrownAt, gauge: spec.gauge ?? 1.435,
     sinkFor: sinkFor || (() => sink), seed: spec.id || "railway",
     sleeper: spec.sleeper || {}, rail: spec.rail || {},
+    // 桥段：spec 里写了就转下去（道砟的缺口本来就随 `...spec.bed` 走）。
+    sleeperGaps: spec.sleeperGaps || [], railGaps: spec.railGaps || [],
   });
   return { profile: railway, bed, track };
 }

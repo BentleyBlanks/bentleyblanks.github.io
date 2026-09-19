@@ -1,5 +1,5 @@
 import { FRONT_SORTIE as Sortie } from "./Data_FirstLevelFrontRoute.mjs";
-import { MISSION_RECEPTION_SPACE } from "./Data_FirstLevelMissionTopology.mjs";
+import { MISSION_RECEPTION_SPACE, MISSION_NORTH_RIVER, RiverCutAt } from "./Data_FirstLevelMissionTopology.mjs";
 // Authored soil, metres: natural ground, roads, rail berm and excavated trenches.
 // This function is baked once into the shared rendered/physical heightfield.
 import { FRONT_BREACHES } from "./Data_FirstLevelMissionFront.mjs";
@@ -74,7 +74,18 @@ export const MISSION_TERRAIN = Object.freeze({
       ],
       width: 7,
     },
+    // 关尾夜景：北门外那条进城的路（只有 NightGateShown 之后才看得见地面上的东西，
+    // 但路面是地形，白天也压着 —— 那一带在任何一条任务路线的 200 m 之外）。
+    {
+      points: [
+        { x: -160, z: 278 },
+        { x: -160, z: 352 },
+      ],
+      width: 8,
+    },
   ],
+  // 北沙河：口径与断面函数在 Data_FirstLevelMissionTopology.MISSION_NORTH_RIVER。
+  rivers: [MISSION_NORTH_RIVER],
   // 壕沟不再是一张折线表：中心线与段级参数在 Data_FirstLevelMissionTrenches，
   // 逐点的宽/深/抛土由 Script_TrenchPlan 的位置噪声算（docs/Data_TrenchSpline.md）。
   trenchNetwork: MISSION_TRENCH_NETWORK,
@@ -93,6 +104,10 @@ export const MISSION_TERRAIN = Object.freeze({
     { x: 55, z: 6, w: 62, d: 42 },
     { x: 76, z: 113, w: 57, d: 54 },
     { x: -20, z: 235, w: 48, d: 40 },
+    // 06 背坡伤员集结处的场坪：担架队要在这儿把人放平、换手、排队，不能是田垄。
+    { x: -36, z: -100, w: 26, d: 18 },
+    // 关尾北门外的场地（行军队列、搬运、火盆）。
+    { x: -160, z: 315, w: 26, d: 56 },
   ],
 });
 // 编译一次壕沟网络，按 (spec, TrenchRevision()) 缓存。编译要走一遍圆角、分桶
@@ -154,11 +169,23 @@ export function SampleMissionTerrain(x, z, spec = MISSION_TERRAIN) {
       t = 1 - Smooth((d - step.radius) / 1.3);
     if (t > 0) height = height * (1 - t) + (natural - step.depth) * t;
   }
-  // Broad earthen ramps connect all mouths without an invisible step.
-  if (x > 54 && x < 99) height = Math.min(height, -1.8 * (1 - Smooth((Math.abs(z - 153) - 1.6) / 2.8)));
+  // 北沙河。旧写法是一行硬编码（54<x<99 就把地面压到 -1.8 的一条排水沟）；
+  // 现在是数据驱动的东西贯穿河槽，断面按 x 插值（浅滩），口径在
+  // Data_FirstLevelMissionTopology.MISSION_NORTH_RIVER。取 min 而不是相减：
+  // 路面/场坪/铁路路基先算完，河槽直接把它们切掉 —— 桥归桥、地形归地形。
+  for (const river of spec.rivers || []) {
+    const cut = RiverCutAt(x, z, river);
+    if (cut > 0) height = Math.min(height, natural - cut);
+  }
   for (const point of [
     { x: -62, z: 64 },
     { x: 54, z: 114 },
+    // 西沟南端（15A→15B）：沟在 (56,207) 到头，接的是 2.8 m 宽的靠墙夹道。
+    // 没有这道 9 m 的缓坡，担架队要从 2 m 深的沟里一步爬上来（实测坡度 1.51，
+    // 越过 Rapier 的 52° 上限 —— 整支后送队会卡在沟底）。
+    // 坡心压在沟口外侧（不是沟里）：9 m 的作用半径伸回沟里会把 PCG 摆好的踏板
+    // 抬出地面 —— 那是「路线被踏板挡住」那条红的来源。
+    { x: 52, z: 209.5 },
     MISSION_RECEPTION_SPACE.entry,
   ]) {
     const distance = Math.hypot(x - point.x, z - point.z);
