@@ -85,8 +85,8 @@ export async function Drive(ctx) {
       heyoutianFired: (Cast("heyoutian")?.lastFire || 0) > 0, position: { ...g.player.position } };
   });
   console.log("RESCUE", JSON.stringify(rescued));
-  assert.ok(rescued.facts.includes("rescueCallHeard"), "RescueCall 播完记下 rescueCallHeard");
   assert.ok(rescued.facts.includes("luoRescueComplete"), "掀木架那一段真的演完并还权");
+  assert.ok(rescued.heyoutianFired, "何有田真的从后侧交通壕开了火（不是音效）");
   assert.ok(Math.hypot(rescued.yaowa.x - P.bunker.yaowaLift.x, rescued.yaowa.z - P.bunker.yaowaLift.z) < 4,
     "幺娃真的走到拉背包那一头：" + JSON.stringify(rescued.yaowa));
   await page.evaluate(() => window.Tengxian.StepFrames(4, 1 / 60, true));
@@ -95,35 +95,53 @@ export async function Drive(ctx) {
   // 拾枪：走到掉在地上那一支跟前按 F。
   await Route([{ x: P.bunker.rifle.x, z: P.bunker.rifle.z + 1.1 }], "BunkerRifle", { stance: "crouch" });
   await Interact();
-  const armed = await page.evaluate(() => ({
-    facts: window.Tengxian.Debug.FirstLevelMission().facts,
-    emptyHands: window.Tengxian.Debug.FirstLevelMission().emptyHands,
-    played: window.Tengxian.Debug.FirstLevelMission().voice.played,
-  }));
-  assert.ok(armed.facts.includes("rifleRecovered"), "F 真的把枪捡起来了");
-  assert.ok(!armed.emptyHands, "拾枪之后手里有枪");
-  assert.ok(armed.played.includes("RescueOut"), "「枪拿到！从后头走！」在还权之后说了");
-  console.log("ok 02 rescue: frame lifted, pack pulled, rifle recovered, RescueOut spoken");
-
-  // 撤入后交通壕：站着走（探头挨骂那一条要真的被触发），经折角到背坡集结处。
-  await page.evaluate(() => { const g = window.Tengxian; if (g.player.stance !== "stand") g.Debug.Key(g.player.stance === "crouch" ? "KeyC" : "KeyZ"); });
-  await Route(MISSION_STAGE_ROUTES.rearTrench.slice(0, 5), "RearTrench", { fight: true, stance: "stand" });
-  const trench = await page.evaluate(() => {
+  // 三条对白是排队播的（RescueCall → RescueLift → RescueOut），拾枪之后再等它们说完。
+  const armed = await page.evaluate(() => {
     const g = window.Tengxian;
-    for (let i = 0; i < 90 * 60 && g.Debug.FirstLevelMissionRuntime().flow.stage.id === "RearTrench"; i++)
+    for (let i = 0; i < 90 * 60 && g.Debug.FirstLevelMissionRuntime().flow.stage.id === "BunkerRescue"; i++)
       g.StepFrames(1, 1 / 60, false);
     const m = g.Debug.FirstLevelMission();
+    return { stage: m.stage, facts: m.facts, emptyHands: m.emptyHands,
+      played: m.voice.played, queue: m.voice.queue };
+  });
+  assert.ok(armed.facts.includes("rifleRecovered"), "F 真的把枪捡起来了");
+  assert.ok(armed.facts.includes("rescueCallHeard"), "RescueCall 播完记下 rescueCallHeard");
+  assert.ok(!armed.emptyHands, "拾枪之后手里有枪");
+  // 三条是排队播的；这里只要它已经进了队（还权之后才排进去），播完在后交通壕那段核。
+  assert.ok(armed.played.includes("RescueOut") || armed.queue.includes("RescueOut"),
+    "「枪拿到！从后头走！」在还权之后排上了：" + JSON.stringify({ played: armed.played, queue: armed.queue }));
+  assert.equal(armed.stage, "RearTrench", "拾枪之后 02 进入后交通壕那一段");
+  console.log("ok 02 rescue: frame lifted, pack pulled, rifle recovered, RescueOut spoken");
+
+  // 撤入后交通壕。先站直一下（探头挨骂那一条要真的被触发），再蹲着走完 ——
+  // 门外那伙人是活的，一路站着走过去就是送人头。
+  await Route([MISSION_STAGE_ROUTES.rearTrench[0]], "RearTrenchMouth", { fight: true, stance: "crouch" });
+  const peeked = await page.evaluate(async () => {
+    const g = window.Tengxian, { FRONT_TUNING } = await import("./Data_Tuning_FirstLevelFront.mjs");
+    if (g.player.stance !== "stand") g.Debug.Key(g.player.stance === "crouch" ? "KeyC" : "KeyZ");
+    g.StepFrames(Math.ceil((FRONT_TUNING.trenchPeekS + 0.6) * 60), 1 / 60, false);
+    const played = g.Debug.FirstLevelMission().voice.played.includes("TrenchCurse");
+    g.Debug.Key("KeyC");
+    return { played, alive: g.player.alive };
+  });
+  console.log("TRENCH_PEEK", JSON.stringify(peeked));
+  await Route(MISSION_STAGE_ROUTES.rearTrench.slice(1, 5), "RearTrench", { fight: true, stance: "crouch" });
+  // 途经集结处：先取证，再等指路那一段说完。
+  await CaptureFocus("CollectionPass", A.collection);
+  await page.screenshot({ path: path.join(shots, "Scene_CollectionPass.png") });
+  await WaitStage("Support", 240, { fight: true, cover: true });
+  const trench = await page.evaluate(() => {
+    const m = window.Tengxian.Debug.FirstLevelMission();
     return { stage: m.stage, facts: m.facts, played: m.voice.played, collection: m.front.collection };
   });
   console.log("REAR_TRENCH", JSON.stringify({ stage: trench.stage, collection: trench.collection }));
   for (const fact of ["rearTrenchEntered", "cornerReached", "collectionPointSeen", "supportOrdersHeard"])
     assert.ok(trench.facts.includes(fact), `后交通壕这一段记下了 ${fact}`);
+  assert.ok(trench.played.includes("RescueOut"), "「枪拿到！从后头走！」真的播了");
   assert.ok(trench.played.includes("TrenchCurse"), "在沟里站直真的挨了骂（TrenchCurse）");
   assert.ok(trench.played.includes("CornerCheck"), "折角处幺娃检查顺子（CornerCheck）");
   assert.ok(trench.collection.dressed && trench.collection.litters >= 4 && trench.collection.people >= 8,
     "途经集结处：担架、伤员与搬运人员都在场：" + JSON.stringify(trench.collection));
-  await CaptureFocus("CollectionPass", A.collection);
-  await page.screenshot({ path: path.join(shots, "Scene_CollectionPass.png") });
   assert.equal(trench.stage, "Support", "指了路就进 03");
   console.log("ok 02 rear trench: corner check, casualty collection point seen, support orders heard");
 
@@ -131,8 +149,11 @@ export async function Drive(ctx) {
   // 03 接回第一批守军：沿后交通壕尽头上前沿，压住封锁撤路的火力。
   // =========================================================================
   await JumpStage(3);
+  // 行军段用 crawl 口径：只跟 28 m 内的人交火，远处那一片交给到位之后的守点循环。
+  // 用 90 m 的口径会把整条沟走成「站着对着五十米外连打」，人根本挪不动窝。
   await Route([...MISSION_STAGE_ROUTES.rearTrench.slice(5), ...Routes.support.slice(-1)], "SupportApproach",
-    { fight: true, stance: "crouch", rejoinRoute: [...MISSION_STAGE_ROUTES.rearTrench, ...Routes.support.slice(-1)] });
+    { fight: true, crawl: true, stance: "crouch",
+      rejoinRoute: [...MISSION_STAGE_ROUTES.rearTrench, ...Routes.support.slice(-1)] });
   const support = await WaitStage("MachineGun", 300, { fight: true, cover: true });
   await page.screenshot({ path: path.join(shots, "Scene_FrontSupport.png") });
   assert.ok(support.mission.facts.includes("frontRifleDefense"), "用步枪在前沿顶住了那一段");

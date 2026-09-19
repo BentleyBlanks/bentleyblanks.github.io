@@ -18,7 +18,6 @@
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { PlayFirstLevelOpening } from "./Script_FirstLevelOpeningBrowserTest.mjs";
 import {
   ParseCampaignArgs, OpenCampaign, CloseCampaign, CaptureFailure,
   CheckVoiceAssets, InstallInputDriver,
@@ -59,7 +58,25 @@ try {
     console.log("ok initial mission",
       JSON.stringify({ stage: initial.mission.stage, position: initial.position, slots: initial.slots }));
     if (!options.campaign) {
-      await PlayFirstLevelOpening(page, { out: output, audioClock: options.audioCheck, mount: false });
+      // 基线（不带 --campaign）：坐着把 01 看完。军列开场那一份 PlayFirstLevelOpening
+      // 随骨架下线了，这里改看新开场自己的三条事实与门外那一拍。
+      const trapped = await page.evaluate(() => {
+        const g = window.Tengxian;
+        for (let i = 0; i < 60 * 60 && g.Debug.FirstLevelMissionRuntime().flow.stage.id === "Trapped"; i++)
+          g.StepFrames(1, 1 / 60, false);
+        const mission = g.Debug.FirstLevelMission();
+        return { stage: mission.stage, facts: mission.facts, beats: mission.front.bunker.beats,
+          captives: mission.front.bunker.captives, control: mission.control };
+      });
+      await fs.writeFile(path.join(output, "Data_Opening.json"), JSON.stringify(trapped, null, 2));
+      await page.evaluate(() => window.Tengxian.StepFrames(4, 1 / 60, true));
+      await page.screenshot({ path: path.join(output, "Scene_Opening.png") });
+      for (const fact of ["bunkerCollapsed", "captivesKilled", "doorSearchStarted"])
+        assert.ok(trapped.facts.includes(fact), "受困段记下了 " + fact);
+      assert.ok(trapped.captives.length === 2 && trapped.captives.every((actor) => !actor.alive),
+        "门外两名失去抵抗能力的川军被杀害");
+      assert.equal(trapped.stage, "BunkerRescue", "「日军开始检查门内」把 01 推到 02");
+      console.log("ok baseline opening", JSON.stringify({ beats: trapped.beats }));
     }
   }
 

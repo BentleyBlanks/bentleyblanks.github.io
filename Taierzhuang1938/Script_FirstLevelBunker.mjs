@@ -125,9 +125,11 @@ export class FirstLevelBunkerShow {
     // 下刀的两个站位取 MISSION_PLACEMENT.bunker.ijaKill：[1] 在扶人川军北侧，
     // [0] 在腿伤者北侧，都不挡玩家从破口看过去的那条线。
     if (action === "butt") {
+      // 行刑那一段两个人只演不打（编排表：bunkerAssault 整段装睡，doorSearchStarted 才醒）。
+      // 放开 scriptedNoncombatant 的话通用 AI 会抢在补刺那一拍之前把腿伤者打死，
+      // 「另一名日兵从侧面补刺」就整拍消失。
       for (const [slot, killer] of [[1, killerA], [0, killerB]]) {
         if (!killer?.alive) continue;
-        killer.scriptedNoncombatant = false;
         killer.missionDormant = false;
         killer.bayonetFixed = true;
         r.MoveActor(killer, Place.bunker.ijaKill[slot] || A.bunkerKilling, R.walkSpeedMps);
@@ -221,19 +223,21 @@ export class FirstLevelBunkerShow {
     const r = this.r;
     if (!bunker || bunker.blastAt == null) return;
     const since = r.time - bunker.blastAt;
-    if (since >= R.bunkerKillingAtS && !r.Has("captivesKilled")) {
+    if (since >= R.bunkerKillingAtS && !this.beats.has("flank")) {
       if (this.killAt == null) { this.killAt = r.time; r.Say("BunkerKilling"); }
       const elapsed = r.time - this.killAt;
       for (const action of BunkerBeatsDue(this.killLine, elapsed)) this.Beat(action);
       // 侧面补刺紧跟着头一刀（两刀之间 bunkerCaptiveStabGapS）。
       if (this.stabAt != null && r.time - this.stabAt >= R.bunkerCaptiveStabGapS) this.Beat("flank");
-      if (this.captives.length && this.captives.every((actor) => !actor.alive))
-        r.Record("captivesKilled", { count: this.captives.length });
     }
+    // 「两名已经失去有效抵抗能力的伤兵仍被迅速杀害」：两刀都下了才算这一拍演完。
+    if (this.beats.has("flank") && this.captives.length && this.captives.every((actor) => !actor.alive))
+      r.Record("captivesKilled", { count: this.captives.length });
     if (r.Has("captivesKilled") && this.stabAt != null && r.time - this.stabAt >= F.bunkerRifleKickAtS)
       this.Beat("kick");
-    // 门外全灭（玩家在别的重试里先打死了他们）也要往下走：直接推到转向门内。
+    // 兜底（行刑兵在别的重试里已经被打死之类）：整段不许卡在 trappedMaxS 上。
     if (this.killAt != null && r.time - this.killAt >= F.bunkerShowFallbackS && !r.Has("doorSearchStarted")) {
+      this.Beat("flank");
       r.Record("captivesKilled", { count: this.captives.length, fallback: true });
       this.Beat("kick");
       this.creakAt ??= r.time;

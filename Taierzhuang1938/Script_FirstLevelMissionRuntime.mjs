@@ -264,6 +264,12 @@ export class FirstLevelMissionRuntime {
       return {keys:'Z',label:T('firstLevel.hint.crawlPassage'),kind:'stance'};
     if (this.controls || !this.EmptyHands) return null;
     if (this.flow.stage.id === "Trapped") return {keys:"",label:T("firstLevel.hint.trapped"),kind:"stance"};
+    // 空手的时候 Script_Main 把整条提示条交给这里（EmptyHands 分支）。够得着的任务
+    // 交互必须从这儿透出来 —— 不然 02 的目标写着「把枪捡起来」，枪跟前却没有提示。
+    const interaction=this.interact?.Query?.(this.player);
+    if(interaction?.point?.tag==="FirstLevelMission")
+      return {keys:interaction.point.gesture==="hold"?T("hud.key.holdF"):"F",
+        label:interaction.label,kind:interaction.kind||"interact"};
     return null;
   }
   VoiceEvent(id,cueId,detail) {

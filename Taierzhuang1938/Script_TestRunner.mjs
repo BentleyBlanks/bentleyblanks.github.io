@@ -597,7 +597,7 @@ const changedDomainRules = [
   //（04 关中过场整条语音通道静音那一次）。这两条把交叉的一半补上。
   { domain: "audio", pattern: /Script_Audio\.mjs|Script_AudioWiring|Data_Voice|Data_SfxSources|Data_AmbSources|Data_Tuning_Audio/ },
   { domain: "voice", pattern: /Script_Audio\.mjs|Data_Voice|Script_VoiceBake|Script_FirstLevelMissionVoice/ },
-  {domain:'firstLevel',pattern:/MissionReturn|FirstLevelMeal|BaconHandoff|FirstLevelOpening|FirstLevelMachineGun|FirstLevelFrontPresence|FirstLevelMission|FirstLevelTrain|FirstLevelCarriage|CarriageSoundscape|FirstLevelVoice|FirstLevelGuideDialogue|FirstLevelGuideVoiceAlignment|FirstLevelJapaneseSpeech|SeedAudioFirstLevel|SeedAudioCarriage|Audio\/FirstLevel|Audio\/Amb\/AudioAmb_Carriage/},
+  {domain:'firstLevel',pattern:/MissionReturn|FirstLevelMeal|BaconHandoff|FirstLevelOpening|FirstLevelMachineGun|FirstLevelFrontPresence|FirstLevelBunker|FirstLevelCollection|FirstLevelFrontShow|FirstLevelFrontTest|FirstLevelMission|FirstLevelTrain|FirstLevelCarriage|CarriageSoundscape|FirstLevelVoice|FirstLevelGuideDialogue|FirstLevelGuideVoiceAlignment|FirstLevelJapaneseSpeech|SeedAudioFirstLevel|SeedAudioCarriage|Audio\/FirstLevel|Audio\/Amb\/AudioAmb_Carriage/},
   // 静态分件的图集合批：第一关尸体层与担架伤员用它（firstLevel 那一串里的
   // 尸体 / 演出门禁），而它动的是材质与提交量，所以 render 域的开机 / 采样器 /
   // 材质门禁也要跟着跑。
