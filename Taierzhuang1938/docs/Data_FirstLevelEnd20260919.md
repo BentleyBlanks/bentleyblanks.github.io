@@ -221,6 +221,14 @@
 `scriptEssential`（打不死、会趴下还击），三个步枪兵照常会阵亡 ——
 Notion 的「有人可能中弹」留在他们身上，不是留给整支队伍。
 
+**黑屏里那一下瞬移没生效。** `PlaceNightArrival` 原来是手写 `position.set` +
+`body.Teleport`。实拍（`--stage-from=18`）：夜景、夜天空、五盏灯、十四个布景人全换好了，
+`nightArrivalPlaced` 也记上了，**人却还在 marchOut**（−62.5, 232.3）—— 渲染位置与
+Rapier 角色体脱了钩，他在原地一步也走不动，接着从桥那边一路走到瓮城东墙撞停。
+同一类脱钩也是「撤到南岸走不动」的病根：出厂的检查点恢复（`player.Spawn`，带自由
+空间搜索）一调用人立刻就能走了。所以这一段改走 `player.Spawn(x, z, yaw)`。
+**往后任何一处剧情瞬移都别再手写 `position.set + body.Teleport`。**
+
 驾驶脚本侧的同类教训写在 `Script_FirstLevelCampaignEnd.mjs` 的注释里：
 整关驾驶跑在 `manual=1` 下，等事实必须自己 `StepFrames`（`WaitFact` / `WaitControl`）；
 `Route` 带 `fight` 时一看见敌人就松开前进键，压制要用 `WaitFact(..., {fight:true})`，

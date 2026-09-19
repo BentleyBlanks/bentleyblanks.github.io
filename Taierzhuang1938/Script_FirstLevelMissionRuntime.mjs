@@ -1958,12 +1958,15 @@ export class FirstLevelMissionRuntime {
     this.transition.Update(0);
   }
   PlaceNightArrival() {
-    const point = A.nightSpawn, y = this.battlefield.GroundHeight(point.x, point.z);
-    this.player.position.set(point.x, y, point.z);
-    this.player.body?.Teleport(point.x, y, point.z);
+    const point = A.nightSpawn;
+    // **走 player.Spawn，不要手写 position.set + body.Teleport。** 实拍（2026-09-20
+    // --stage-from=18）：手写那一套之后玩家还留在 marchOut，夜景、夜天空、灯全换好了，
+    // 人却没过去 —— 渲染位置与 Rapier 角色体脱了钩，他在原地一步也走不动。
+    // Spawn 带自由空间搜索、会把角色体一起放过去（Retry 用的就是它）。
+    this.player.Spawn(point.x, point.z, Math.PI);
     this.player.velocity.set(0, 0, 0);
     this.player.SetStance("stand");
-    this.player.yaw = Math.PI; this.player.pitch = 0;
+    this.player.pitch = 0;
     for (const [i, actor] of this.squad.entries()) {
       this.PlaceActor(actor, { x: point.x + (i % 2 ? 2 : -2), z: point.z - 4 - Math.floor(i / 2) * 2 });
       this.squadRoutes.set(actor.id, []);
