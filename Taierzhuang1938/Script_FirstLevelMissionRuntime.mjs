@@ -13,6 +13,8 @@ import * as THREE from "three";
 import { AiDirector } from "./Script_Ai.mjs";
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
 import { FirstLevelOpening, SamplePerceptionCurve } from "./Script_FirstLevelOpening.mjs";
+// 公开阶段 1–7 的演出（Front 玩法包）。运行时只留构造 / Enter / Update / Draw 四个薄钩子。
+import { FirstLevelFrontShow } from "./Script_FirstLevelFrontShow.mjs";
 import { FRONT_DEFENDERS, FRONT_GUARD_POSTS, FRONT_SHELLS, FRONT_ASSAULT, FrontAssaultLane, FrontReserveLane, ClearLaneX } from "./Data_FirstLevelMissionFront.mjs";
 import {
   MISSION_STAGES,
@@ -113,6 +115,9 @@ export class FirstLevelMissionRuntime {
       lastMg: -5,
     };
     this.opening = new FirstLevelOpening(this);
+    // 阶段 1–7 的演出总线（Front）。要在 flow.Start() 之前建好：第一步 Trapped 的
+    // Enter 马上就会问它要门外那一拍。
+    this.frontShow = new FirstLevelFrontShow(this);
     this.flow = new FirstLevelMissionFlow({ Enter: (stage) => this.Enter(stage) });
     this.voice = new FirstLevelMissionVoice({
       audio: this.audio,
@@ -231,6 +236,9 @@ export class FirstLevelMissionRuntime {
   // Intact dialogue recordings follow the current speaker; overlapping Luo
   // briefing keeps its own source. Unknown nearby voices stay in carriage space.
   VoicePosition(cue,line) {
+    // 阶段 1–7 自己认领的几条（村口指路的人、指弹药屋的守军、集结处的传令兵与老周）。
+    const front=this.frontShow?.VoicePosition(cue,line);
+    if(front)return front;
     if(cue.id==="WoundedArrival"&&this.opening.wounded)return this.Point(this.opening.wounded.actor.position,1.2);
     if(cue.id==='BundleSupply' && line?.who==='keeper' && this.bundleKeeper)
       return this.Point(this.bundleKeeper.position,1.2);
@@ -259,8 +267,9 @@ export class FirstLevelMissionRuntime {
     return null;
   }
   VoiceEvent(id,cueId,detail) {
-    // 逐句事件（Voice 包统一发）：目前骨架只用来把受困段的近爆打在末句上。
-    if(id==="Line")return;
+    // 逐句事件（Voice 包统一发）：阶段 1–7 的演出靠它把动作对到台词上。
+    if(id==="Line"){this.frontShow?.OnLine(cueId,detail);return;}
+    this.frontShow?.OnEvent(id,cueId,detail);
     if(id==="BunkerBlast"){this.opening.BunkerBlast();return;}
     if(id==="RescueHeave"){this.Record("bunkerRescueHeave");return;}
     if(id==="AircraftDiveOrder" && !this.Has("diveComplete")) {
@@ -276,6 +285,7 @@ export class FirstLevelMissionRuntime {
     // 带额外副作用的对白事件在 VoiceEvent 里，不在这条链上。
     const fact = MISSION_VOICE_FACTS[id];
     if (fact) this.Record(fact);
+    this.frontShow?.OnVoiceDone(id);
   }
   PlaceActor(actor, point) {
     if (!actor) return;
@@ -672,10 +682,10 @@ export class FirstLevelMissionRuntime {
       actor.missionCoverWaiting=false;actor.missionCoverApproach=false;
       actor.scriptedNoncombatant = ["NightMarch","Regroup","WallPath","ReceptionGate"].includes(stage);
       actor.scriptEscapeStance=null;
-      // 02：罗班长正在把人从木架下拖出来。这几秒他不找掩体、不参加交火 ——
-      // 门外那伙人由何有田从后侧交通壕压着（契约 §2）。不放行的话接触反应每帧
-      // 把他推回掩体，他永远走不到压住的位置，02 就永远不开始。
-      if(stage==="BunkerRescue"&&actor.castId==="luo"&&!this.Has("luoRescueComplete")){
+      // 02：罗班长正在把人从木架下拖出来，幺娃在另一头拉背包。这几秒这两个人
+      // 不找掩体、不参加交火 —— 门外那伙人由何有田从后侧交通壕压着（契约 §2）。
+      // 不放行的话接触反应每帧把他们推回掩体，谁也走不到掀架位，02 就永远不开始。
+      if(stage==="BunkerRescue"&&["luo","yaowa"].includes(actor.castId)&&!this.Has("luoRescueComplete")){
         this.ai.ReleaseCover(actor);
         this.ai.SetStance(actor,1,.5,true);
         continue;
@@ -1219,6 +1229,7 @@ export class FirstLevelMissionRuntime {
     // Narrative companions survive incidental combat from the very first stage.
     for(const actor of this.squad||[])actor.scriptEssential=OPENING.requiredSquadCast.includes(actor.castId);
     this.opening.Enter(stage.id);
+    this.frontShow?.Enter(stage.id);
     this.UpdateMusic(stage.id);
     this.Objective(Localize(FirstLevelStageTextId(stage.id), stage.objective));
     // 进场不自动播的那几步：它们的 cue 由编排在真正发生的那一刻起播
@@ -2295,6 +2306,8 @@ export class FirstLevelMissionRuntime {
       t = this.flow.stageTime;
     if(["Support","MachineGun","Tank","Orders"].includes(stage))this.UpdateGuards(dt);
     this.UpdateFrontDialogue();
+    // 阶段 1–7 的演出（Front 包）。放在 UpdateSquad 之后：剧情走位要压过接触反应。
+    this.frontShow?.Update(dt);
     prof?.E("story/mission/director");
     prof?.B("story/mission/other");
     if (stage === "Death") {
@@ -2554,6 +2567,9 @@ export class FirstLevelMissionRuntime {
     if (stage === "BridgeOrders") this.Say("BridgeOrders");
     this.column.Update(dt, { moving, routeSafe: safe, maxProgress, player: this.player.position, ...(safeAt ? {SafeAt:safeAt} : {}) });
     this.view.Update(this.time, { tank: this.tank,player:this.player,camera:this.camera||null });
+    // 集结处的伤员与搬运人员走 view 的立即模式人群：view.Update 里 people.End()
+    // 会把这一帧没提交的人藏起来，所以补提交只能放在它后面。
+    this.frontShow?.Draw(this.time);
     this.flow.Update(dt);
     this.leaderGuide?.Update();
     this.hud.SetMissionReturn?.(this.UpdateReturnWarning(dt));
@@ -2664,6 +2680,7 @@ export class FirstLevelMissionRuntime {
   State() {
     return {
       opening:this.opening.State(),
+      front:this.frontShow?.State() || null,
       ...this.flow.State(),
       missionVersion: MISSION_VERSION,
       returnWarning: this.missionReturn.result,
@@ -2728,6 +2745,7 @@ export class FirstLevelMissionRuntime {
     if(this.ai.ctx.onSoldierDeath===this.soldierDeath)this.ai.ctx.onSoldierDeath=this.oldSoldierDeath;
     this.transition.Dispose();
     this.opening.Dispose();
+    this.frontShow?.Dispose();
     this.squadMarch?.Dispose();
     if(this.tankDust!=null)this.vfx.RemoveSmokeSource(this.tankDust);
     this.voice.Dispose();

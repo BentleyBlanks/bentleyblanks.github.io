@@ -152,6 +152,9 @@ console.log(`ok MISSION_VOICE_FACTS 的 ${Object.keys(MISSION_VOICE_FACTS).lengt
     "./Script_FirstLevelMissionRuntime.mjs", "./Script_FirstLevelOpening.mjs",
     "./Script_FirstLevelLeaderGuide.mjs", "./Data_FirstLevelLeaderGuide.mjs",
     "./Data_FirstLevelMission.mjs", "./Data_FirstLevelMissionGates.mjs",
+    // 第二波 Front 包（公开阶段 1–7）：01/02 的门外演出与 03–07 的对白落点。
+    "./Script_FirstLevelBunker.mjs", "./Script_FirstLevelCollection.mjs",
+    "./Script_FirstLevelFrontShow.mjs",
   ];
   const referenced = new Map();
   for (const name of RUNTIME_SOURCES) {
@@ -174,8 +177,8 @@ console.log(`ok MISSION_VOICE_FACTS 的 ${Object.keys(MISSION_VOICE_FACTS).lengt
   // 反过来：已经烘好、但运行时还没有触发点的剧情 cue。第二波玩法包一条条接上，
   // 接完这张表就空了。**只许变短**：出现表外的新条目说明又有一段演出被摘掉了。
   const SECOND_WAVE_UNWIRED = new Set([
-    "RescueOut", "TrenchCurse",                                  // 02 出掩蔽部、后交通壕
-    "BundleProne", "BundleReturnCall",                            // 05 取弹返程
+    // Front 包（阶段 1–7）名下的四条已在第二波接上触发点，从这张表里删了：
+    // RescueOut / TrenchCurse（02）、BundleProne / BundleReturnCall（05）。
     "KitchenDetour", "MeleeCurse", "WindowOrder",                 // 08/09 主街与连屋
     "CartAbandon", "RoadBump", "HandsShake",                      // 15 降压段
     "WardGuide", "PlaceLitter", "NextLitter",                     // 16/17 接收院
