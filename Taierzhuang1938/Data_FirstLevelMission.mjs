@@ -343,6 +343,7 @@ export const FIRST_LEVEL_MISSION_PHASE = Object.freeze({
     actorPool: { ija: 48, nra: 40 },
     actualEventsOnly: true,
     storyBeats: [],
-    activities: {},
+    // 军列那一项（trainColumn）随开场下线；arrivalGuideStart 仍被白盒场地读着。
+    activities: { arrivalGuideStart: { x: -76, z: 71 } },
   },
 });
