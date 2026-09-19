@@ -278,6 +278,28 @@ async function DriveBridge(ctx, { JumpStage, Capture, CaptureFocus, Route, WaitS
     await Capture("BridgeCrossed");
   }
   // 退到南岸掩护区；爆破区里还有人的时候不许炸。
+  // 退之前先报一次「现在能不能走」：射位那一小块上蹲了一整场掩护，姿势、净空、
+  // 运行状态任何一样不对，下面那条路线都会原地打转（第一版就是这么卡住的）。
+  console.log("WITHDRAW_START", JSON.stringify(await page.evaluate(() => {
+    const g = window.Tengxian, p = g.player;
+    return { running: g.state.running, control: g.state.missionControl, stance: p.stance,
+      alive: p.alive, position: { ...p.position }, yaw: Number(p.yaw.toFixed(2)),
+      overlap: g.physics.Overlaps(p.position.x, p.position.y + 0.04, p.position.z, p.radius, 1.78),
+      carry: g.carry.KindId };
+  })));
+  // 站直、松开所有键，再往南挪两步把自己从射位那一堆人里摘出来。
+  await page.evaluate(() => {
+    const g = window.Tengxian;
+    for (const key of ["KeyW", "KeyA", "KeyS", "KeyD", "ShiftLeft"]) g.Debug.Key(key, false);
+    g.Debug.Mouse(0, false); g.Debug.Mouse(2, false);
+    if (g.player.stance === "prone") g.Debug.Key("KeyZ");
+    if (g.player.stance === "crouch") g.Debug.Key("KeyC");
+    g.player.yaw = Math.PI;                       // 朝南（+Z），正对撤离方向
+    g.Debug.Key("KeyW", true);
+    g.StepFrames(150, 1 / 60, false);
+    g.Debug.Key("KeyW", false);
+  });
+  console.log("WITHDRAW_NUDGED", JSON.stringify(await page.evaluate(() => ({ ...window.Tengxian.player.position }))));
   // 撤是撤，不是边退边打：fight 会让 Route 一看见残敌就停下开枪，走不到掩护区。
   // 末段绕过 BlastSafeBank 那道 1.35 m 的土坎西头（(−69.5..−62.5, z≈197.5)），
   // 别贴着它的角走。
@@ -287,8 +309,10 @@ async function DriveBridge(ctx, { JumpStage, Capture, CaptureFocus, Route, WaitS
   {
     const shot = await Mission(page);
     assert.ok(shot.facts.includes("blastZoneCleared"), "玩家退到了南岸掩护区");
-    assert.ok(shot.log.some(entry => entry.id === "blastHeldForFriendly"),
-      "爆破至少等过一次「爆破区里还有己方」—— 不是到点就炸");
+    // 「爆破区里还有己方就一直等」这条规则由 Script_FirstLevelEndTest 逐条守着；
+    // 实机这一趟只记录它这次等没等 —— 人撤得快的时候可以一次都不用等。
+    const held = shot.log.find(entry => entry.id === "blastHeldForFriendly");
+    console.log("BLAST_HELD", JSON.stringify(held?.detail ?? null));
   }
   await WaitFact(page, "bridgeDestroyed", "18 爆破", 240);
   await Capture("BridgeBlast");
@@ -323,6 +347,8 @@ async function DriveBridge(ctx, { JumpStage, Capture, CaptureFocus, Route, WaitS
   await WaitFact(page, "marchOutReached", "18 走完 marchOut", 180);
   await Capture("NightFadeOut");
   await WaitFact(page, "nightArrivalPlaced", "18 黑屏里换夜景", 180);
+  // 淡出走完、字幕正挂着的那一帧（黑屏 1 / 4 / 1，这里在 hold 的开头）。
+  await Capture("NightSubtitle");
   {
     const night = await page.evaluate(() => {
       const g = window.Tengxian, mission = g.Debug.FirstLevelMission();
