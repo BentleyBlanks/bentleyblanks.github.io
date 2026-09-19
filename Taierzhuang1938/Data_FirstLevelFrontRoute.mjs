@@ -19,9 +19,8 @@ export const FRONT_SORTIE=Object.freeze({
   retreatCasualtyFraction:.5,retreatSuppression:.72,retreatSuppressionS:3,
   retreatDistanceM:12,retreatArrivalM:2,
 });
-export const SOUTH_TRANSITION=Object.freeze({fadeOutS:1,holdS:4,fadeInS:1,arrival:Point(55,-20),
-  title:'向南',text:'你们护送着老周和伤员队伍，离开了前沿。\n一路穿过交通壕和田间小路，终于抵达村口。',
-  columnLeadM:8,squadBehindM:4});
+// 旧的「向南」黑屏转场随 2026.09.19 重构下线（07 改成真走一段）。
+// 关尾夜行军的字幕走 Data_Text_FirstLevel + MISSION_TUNING.nightTransition。
 
 // An analytic terrain floor can snap a crouched capsule into a low ceiling after
 // Rapier slides it downwards. Stop at the authored entrance before that overlap.

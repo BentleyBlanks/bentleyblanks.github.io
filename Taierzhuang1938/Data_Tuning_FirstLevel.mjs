@@ -47,7 +47,7 @@ export const MISSION_TUNING = Object.freeze({
   // 其余阶段走交战规则：看见（或刚看见过）50 m 内的敌人就停下，10 m 内找掩体还击；
   // 身边的弟兄已经在打、他也知道敌人在哪，就一起停。要继续前进时一次最多两人跃进一段、
   // 其余人原地掩护（跃进前至少在接敌点打满 contactBoundAfterS），不再整队沿路线走。
-  contactEscapeStages:["Unloading","TrenchEntry","Shelter","Village","Melee"],
+  contactEscapeStages:["Trapped","BunkerRescue","RearTrench","Village","Melee"],
   contactEngageRangeM:50,
   contactMemoryS:6,
   contactSquadShareM:18,
@@ -75,7 +75,7 @@ export const MISSION_TUNING = Object.freeze({
   companionGrenadeDirections:8,
   companionGrenadeFractions:[1,.5,.25,.125,.0625],
   companionGrenadeReplanS:.25,
-  openingContactStages:["Unloading","TrenchEntry","Shelter","Support","MachineGun","Tank","Orders","Village","Melee","Courtyard","TransferApproach","Transfer","RetreatFirst","RetreatWall","RetreatYard","Reception","FinalDefense","Exit"],
+  openingContactStages:["BunkerRescue","RearTrench","Support","MachineGun","Tank","Orders","Village","Melee","Courtyard","TransferApproach","Transfer","Regroup","WallPath","ReceptionGate","BridgeOrders","BridgeCover","BridgeWithdraw"],
   // Cruise at 21.6 km/h; the remaining physical approach determines smooth braking after impact.
   // Meal (25.331s including pauses) + overlapping exchange (14.132s),
   // then roughly nine seconds braking from the first ranging impact.
@@ -167,11 +167,10 @@ export const MISSION_TUNING = Object.freeze({
   // discharger round, so a squad's stock was pooled with the launcher man). Two per rifleman is the conservative
   // reading and it is also what the pacing wants: a man who has thrown twice is out, so grenades stay an event.
   enemyGrenades:2,
-  // User 2026-09-11: sustained multi-direction contact during the approach.
-  // Twelve surface + four intruders + eighteen approach + twelve rifle-front +
-  // twelve machine-gun attackers + four escorts; each roster commits once, no respawn.
-  // User 2026-09-15: + five pursuers who follow the wounded man to the shelter corner.
-  openingEnemyBudget:67,
+  // 2026.09.19 重构后的开场/前沿名单：掩蔽部门外 4 ＋ 十八人接近屏 ＋ 十二人前沿 ＋
+  // 十二人冲机枪位 ＋ 四名战车护卫 = 50。每一份名单只投一次，不复活、不补波。
+  // （旧口径 67 里的 12 名车站地面 + 4 名进沟 + 5 名追到掩蔽处随军列开场一起下线。）
+  openingEnemyBudget:50,
   // Route attackers cover the approach; the separate front force owns the gun line.
   approachFireSector:{minX:-80,maxX:35,minZ:-118,maxZ:-18,selfDefenseM:3},
   approachAccuracyScale:.35,
@@ -397,7 +396,7 @@ export const MISSION_TUNING = Object.freeze({
   // 这是这一拍能不能打的关键：实拍里三个人同时压上来，顺子在班里人赶到之前必死。
   ambushReleaseDelayS: 4.5,
   ambushFlankReleaseS: 7,
-  squadWatchStages: ["Courtyard","Transfer","Reception","FinalDefense"],
+  squadWatchStages: ["Courtyard","Transfer","Regroup","ReceptionGate","BridgeCover"],
   squadWatchRadiusM: .85,
   squadWatchSpeedMps: .9,
   squadWatchArrivalM: .3,
@@ -480,6 +479,54 @@ export const MISSION_TUNING = Object.freeze({
   airPullUpRad: 0.14,
   // The recorded dive pass peaks 3.5 s in; start it that long before the anchor.
   airDiveSoundLeadS: 3.5,
+
+  // =========================================================================
+  // 2026.09.19 重构（docs/Data_FirstLevelRebuild20260919Contract.md）。
+  // 出处：Notion 采用稿的「通过条件」与既有同类数值；没有实拍以前一律取同族的既有值，
+  // 不新造手感（第二波 Front/Mid/End 玩法包再按实拍调）。
+  // =========================================================================
+  // —— 01 受困。黑屏对白 BunkerBanter 的末句被近爆打断；没有音频时按这个兜底期限炸。
+  // 6 句短对白，按 MissionVoiceTimeline 的 1.1 s/句下限约 7 s，取 8 留一点余量。
+  bunkerBanterFallbackS: 8,
+  // 被压住之后能转头的幅度。limitedLookRadians(0.28) 是「受控镜头」的通用夹取；
+  // 压在木架下只能「小幅转头」，取它的一半。
+  trappedLookRadians: 0.14,
+  // 受困段控制接管的兜底上限：炸 → 看清门外 → 两名川军被刺杀 → 日兵转向门内。
+  // 逐拍加出来 2.0+2.6+2.4+1.8 = 8.8，取 12 留余量（正常路径由编排显式还权）。
+  trappedMaxS: 20,
+  bunkerKillingAtS: 4.6,
+  bunkerSearchAtS: 8,
+  // 行刑那一拍两名川军的血量与倒下时刻（相对 bunkerKillingAtS）。
+  bunkerCaptiveHealth: 20,
+  bunkerCaptiveStabGapS: 1.4,
+  // 掩蔽部门外破口能看清的距离（契约 §3：8–12 m）。
+  bunkerSightM: 12,
+  // —— 02 获救。罗班长掀木架＋幺娃拉背包那一段（沿用开场救人的 LuoHelpUp 时长）。
+  bunkerRescueSeconds: 4.4,
+  // —— 05/06 战车压口与接防。战车推到 tankStopZ 这么近就算堵住退路。
+  tankBlockRadiusM: 6,
+  // —— 12 转运。第一处威胁解除后第二处最早出现的间隔（沿用旧四拍的 restS 12 s）。
+  transferThreatGapS: 12,
+  // 每解除一处威胁真实装走的批次数（cartCapacity 2 × 2 车）。
+  transferBatchLoads: 2,
+  // —— 13 牛车。抬着人的牛车（litterSpeedMps 1.4）比空车慢一档。
+  cartRideSpeedMps: 1.2,
+  cartRideMaxS: 60,
+  // 车真的离开装载位这么远才记 zhouCartDeparted（与 boardingWitnessM 同一把尺）。
+  cartDepartedM: 6,
+  // —— 15 收拢。换抬手与清点用的固定节拍（无战斗段，纯降压）。
+  regroupRemanSeconds: 3,
+  // —— 18 铁路桥。尾队沿 bridgeCrossing 过桥的人数与步速（走路 walkSpeedMps 1.7 略慢）。
+  bridgeColumnCount: 6,
+  bridgeColumnSpeedMps: 1.9,
+  bridgeColumnSpacingM: 3.4,
+  // 爆破：玩家退到 blastSafe 之后再等这么久炸（在场人员点火、跑开）。
+  bridgeBlastDelayS: 3,
+  bridgeBlastRadiusM: 12,
+  // —— 18 夜行军黑屏字幕（沿用旧南行转场的 1/4/1）。
+  nightTransition: Object.freeze({ fadeOutS: 1, holdS: 4, fadeInS: 1 }),
+  // 夜景段：淡入点到北门的行军速度（队列小跑不上，按 walkSpeedMps）。
+  nightMarchSpeedMps: 1.7,
 });
 
 // Aftermath tiers (2026-09-08 frame probe: 87 full bodies inside 30 m cost 0.9 M triangles per pass): full mesh only to

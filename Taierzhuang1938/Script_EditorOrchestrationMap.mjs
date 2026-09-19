@@ -213,7 +213,7 @@ const LEGEND_ROWS = Object.freeze([
   { text: "补给 / 炸药包", icon: "Supply", color: "anchor" },
   { text: "担架撤离点", icon: "Stretcher", color: "anchor" },
   { text: "触发区", icon: "Zone", color: "zone" },
-  { text: "攻击波", icon: "Wave", color: "zone" },
+  { text: "威胁处", icon: "Wave", color: "zone" },
   { text: "设计路线", icon: "Route", color: "route" },
   { text: "战术线 / 跃进线", swatch: "tactic" },
   { text: "实时 · 玩家", icon: "Player", color: "player" },
@@ -1248,7 +1248,7 @@ export class OrchestrationMap {
         const c = Project(cx, cz);
         // 方框里只有转运那四个「攻击波」留图标：它们统共四个、各带一个时间窗，
         // 是全图唯一需要一眼认出「这块地方会来一波人」的框。别的框同上，不画。
-        const boxIcon = zone.kind === "beatArea" ? IconForZone(zone) : null;
+        const boxIcon = zone.kind === "threatArea" ? IconForZone(zone) : null;
         if (boxIcon) {
           this.DrawIcon(ctx, c.x, c.y, boxIcon, MAP_COLORS.zone, this.iconPx * 0.78,
             { pixel: this.iconPixel });
@@ -1256,10 +1256,9 @@ export class OrchestrationMap {
         }
         this.Mark({ kind: "zone", id: zone.id || zone.fact, icon: boxIcon, x: c.x, y: c.y });
         Push({ kind: "zone", id: zone.id || zone.fact, x: cx, z: cz }, c.x, c.y, 8, PICK_RANK.zone);
-        // 转运四拍的框：标签做成可点的把手（返回 kind:"beat"），别只是一行描边字。
-        // 拍是设计里唯一带时间窗的一段，用户最想点开看的就是它。
-        if (zone.kind === "beatArea") {
-          const beatId = String(zone.id || "").replace(/^beat_/, "");
+        // 转运两处威胁的框：标签做成可点的把手（返回 kind:"beat"），别只是一行描边字。
+        if (zone.kind === "threatArea") {
+          const beatId = String(zone.id || "").replace(/^threat_/, "");
           const wave = BeatWave(this.model, beatId);
           const text = showLabels && wave.beat
             ? `${wave.title} · ${beatId} · ${BeatWindow(wave.beat)}`
@@ -2160,7 +2159,7 @@ export class OrchestrationMap {
       const wave = BeatWave(this.model, sel.id);
       if (wave.beat) {
         lines.push(`${wave.title} · ${BeatWindow(wave.beat)}`);
-        lines.push(wave.beat.loaded > 0 ? `装车 ${wave.beat.loaded} 之后放出` : "转运一开始就到");
+        lines.push(wave.beat.after ? `${wave.beat.after} 之后放出` : "转运一开始就到");
       }
     }
     if (sel.kind === "member") {
@@ -2567,23 +2566,20 @@ function HitsGrid(grid, rect) {
 }
 
 /**
- * 转运的四「拍」在界面上叫「第几波攻击」——「拍」是排程表里的内部叫法，
- * 图上写给人看的时候按它在 MISSION_TRANSFER_BEATS 里的次序报第几波（从 1 起）。
+ * 转运的两处威胁在界面上叫「第几处威胁」（旧的四「拍」已随 2026.09.19 重构下线），
+ * 图上写给人看的时候按它在 MISSION_TRANSFER_THREATS 里的次序报第几处（从 1 起）。
  */
 function BeatWave(model, beatId) {
   const beats = model?.beats || [];
   const index = beats.findIndex((entry) => entry.id === beatId);
-  if (index < 0) return { title: "转运攻击", beat: null, wave: 0 };
-  return { title: `第 ${index + 1} 波攻击`, beat: beats[index], wave: index + 1 };
+  if (index < 0) return { title: "转运威胁", beat: null, wave: 0 };
+  return { title: `第 ${index + 1} 处威胁`, beat: beats[index], wave: index + 1 };
 }
 
-/** 时间窗的人话。首拍是 0–0 秒，照抄出来像是「没有窗口」，得说「开场即到」。 */
+/** 放行条件的人话。第一处进步就在；第二处等第一处解除（没有时间窗了）。 */
 function BeatWindow(beat) {
-  const early = Number(beat?.earliestS);
-  const late = Number(beat?.latestS);
-  if (!Number.isFinite(early) || !Number.isFinite(late)) return "时间未定";
-  if (early === late) return early <= 0 ? "开场即到" : `第 ${early} 秒`;
-  return `${early}–${late} 秒`;
+  if (!beat) return "时间未定";
+  return beat.after ? `${beat.after} 之后` : "进转运即到";
 }
 
 /**

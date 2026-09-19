@@ -3,12 +3,10 @@ import { MISSION_ANCHORS as A, MISSION_PLACEMENT as P } from "./Data_FirstLevelM
 import { BuildFirstLevelCheckpoint } from "./Script_FirstLevelMissionCheckpoint.mjs";
 import { FIRST_LEVEL_STAGE_ENCOUNTERS, FIRST_LEVEL_ENCOUNTER_STARTS, FIRST_LEVEL_STAGE_CLEARED_ENEMIES, FIRST_LEVEL_DEFERRED_ENCOUNTERS } from "./Data_FirstLevelMissionStages.mjs";
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
-import { MISSION_DIALOGUE } from "./Data_FirstLevelMissionDialogue.mjs";
-import { MissionVoiceTimeline } from "./Data_FirstLevelMissionVoiceTiming.mjs";
-import { MissionTrainMotion } from "./Data_FirstLevelMissionTrain.mjs";
 
 // Called once on a fresh runtime, after the shared level restart has cleared all
 // combat, controls, destruction and actors. Backward jumps cannot retain future facts.
+// 2026.09.19 重构：18 个公开阶段按新 27 步重写（契约 §1）。
 export function ApplyFirstLevelStageJump(runtime, value, { midCutscenes = false } = {}) {
   const r = runtime, saved = BuildFirstLevelCheckpoint(value), n = saved.phase.number;
   r.debugStart = {number:n,id:saved.phase.id};
@@ -19,64 +17,19 @@ export function ApplyFirstLevelStageJump(runtime, value, { midCutscenes = false 
     r.voice.played.add(step.cue); r.voice.finished.add(step.cue);
   }
   r.flow.facts = new Set(saved.facts);
-  // CS_MachineGunCaptives belongs to phase 4, which begins on the machine-gun seat
-  // inside its trigger circle. A jump from the menu's stage list (midCutscenes) lands
-  // there to see that part, so phase 4 itself still plays it; only jumps past phase 4
-  // count it as seen. Test fixtures (Debug.FirstLevelJump, ?stage=) skip it at phase 4
-  // too, or every jump regression would stop in the director's hands.
-  const machineGun = MISSION_STAGES.findIndex((step) => step.id === "MachineGun");
-  if (midCutscenes ? saved.index > machineGun : saved.index >= machineGun) {
-    r.flow.facts.add("captivesWitnessed");
-  }
   r.flow.log = [{kind:"debugJump",id:saved.phase.id,number:n,time:0}];
   r.column.Restore(saved.column);
-  if (n === 2) {
-    r.carriageSound?.Handle("CarriageUneasy");
-    // The meal has finished while the train approaches the station. Preserve
-    // that travelled distance so the real shell impact starts normal braking.
-    r.time = r.flow.time = ["TrainMeal","TrainPack","TrainBriefing"].reduce((elapsed,id)=>{
-      const seconds=r.voice.manifest.cues[id]?.seconds;
-      if(!Number.isFinite(seconds))throw new Error("Train checkpoint requires the loaded voice manifest: "+id);
-      const plan=MissionVoiceTimeline(MISSION_DIALOGUE.find(c=>c.id===id),seconds);
-      return elapsed+plan.segments.reduce((sum,part)=>sum+part.end-part.start+(part.wait||0),plan.tail||0);
-    },0);
-    for(const id of ["TrainPack","TrainBriefing"]){r.voice.played.add(id);r.voice.finished.add(id);}
-    const offset = MissionTrainMotion(r.time).offsetM;
-    r.train.Translate(offset - r.battlefield.trainOffsetM);
-    r.battlefield.SetTrainOffset(offset);
-  }
-  if (n > 2) {
-    r.battlefield.SetTrainOffset(0);
-    r.battlefield.SetCarDerailment(OPENING.derailCar,OPENING.derailRollRad,OPENING.derailPivot);
-    r.trainShellStartedAt = -60; r.shellTrainOffset = R.trainTravelM; r.trainStoppedAt = 0;
-    for (let i = 0; i < 3; i++) r.battlefield.OpenGate(`TrainDoor${i}`);
-    for (const entry of r.train.entries) {
-      entry.exited = true; entry.arrived = true; entry.index = entry.steps.length;
-      const actor = entry.actor;
-      actor.missionUnloaded = true; actor.missionTrainReady = true; actor.p012OnMovingTrain = false;
-      actor.missionTrainLife.weight = 0; actor.missionTrainLife.gestureWeight = 0;
-      r.PlaceActor(actor,entry.steps.at(-1));
-      if(actor!==r.trainWounded)r.Defend(actor,actor.position);
-    }
-    r.train.open = true;
-    r.audio.Ambience(n === 7 ? "firstLevelSouth" : "firstLevelFront");
-  }
-  const spawn = n === 2 ? {x:A.train.x,z:A.train.z+r.battlefield.trainOffsetM} : saved.phase.spawn;
+  // 01 的受困演出只在第 1 阶段跑；跳到别处就当它演完了（控制锁不许留着）。
+  r.opening.bunker = null;
+  if (r.controls) { const kind = r.controls.kind; r.controls = null; r.Control?.(false, kind); }
+  r.audio.Ambience(n === 7 ? "firstLevelSouth" : "firstLevelFront");
+  const spawn = saved.phase.spawn;
   r.player.Spawn(spawn.x,spawn.z,spawn.yaw || 0);
-  if (n === 2) {
-    // Generic spawn searches away from exact structural-floor contact. Reuse
-    // the authored clear aisle, just above the deck, for a carriage-local retry.
-    r.player.position.copy(r.Point(spawn,.025));
-    r.player.body?.Teleport(r.player.position.x,r.player.position.y,r.player.position.z);
-  }
   r.player.pitch = 0;
-  if (n > 3) for (const [i,actor] of r.squad.entries()) {
-    // Spread the squad at the checkpoint; do not leave them aboard the old train.
-    // 屋内伏击（阶段 9）：三个人在灶屋北门外掩护，只有幺娃跟着担架在屋门口。
-    const ambushPost = actor.castId === "yaowa" ? P.ambushYaowaPost
-      : P.ambushSquadPosts[["luo","heyoutian","liuwencai"].indexOf(actor.castId)];
+  // 班里人按阶段散开：04 在前沿哨位，05–06 在机枪位两侧，其余跟在玩家后面。
+  for (const [i,actor] of (r.squad||[]).entries()) {
+    actor.missionTrainReady = true;
     const point = n === 4 ? OPENING.frontPosts[i] : n <= 6 ? P.squadFrontPositions[i]
-      : n === 9 && ambushPost ? ambushPost
       : {x:spawn.x+(i%2?2.4:-2.4),z:spawn.z+3+Math.floor(i/2)*2.4};
     r.PlaceActor(actor,point); r.Defend(actor,point);
   }
@@ -84,9 +37,8 @@ export function ApplyFirstLevelStageJump(runtime, value, { midCutscenes = false 
     r.tank.present = true; r.tank.active = true;
     r.tank.z = n >= 5 ? R.tankStopZ : R.tankFirstFireZ;
     r.tank.immobilized = n >= 6; r.tank.shots = 1;
-    // 屋内伏击之后老周带着肚子上那一刀继续往南（阶段 10 起 ambushZhouHealthAfter）。
     r.column.zhou.health = n >= 15 ? saved.column.litters.find(l=>l.zhou).health
-      : n >= 10 ? R.ambushZhouHealthAfter : 65;
+      : n >= 14 ? 45 : 65;
   }
   // Spawn only live encounters at this checkpoint. Completed finite groups stay
   // in the ledger so later Enter callbacks cannot recreate defeated enemies.
@@ -106,16 +58,14 @@ export function ApplyFirstLevelStageJump(runtime, value, { midCutscenes = false 
     }
   }
   if (n >= 8 && n <= 10) {
-    // 村口那批照常醒；屋里伏击那一组保持藏着，等顺子真的进屋（阶段 10 里他们已经死光，
-    // FIRST_LEVEL_STAGE_ENCOUNTERS 根本不建这一组）。
+    // 村口那批照常醒；连屋那一组保持藏着，等玩家绕到灶屋以东
+    //（阶段 10 里他们已经死光，FIRST_LEVEL_STAGE_ENCOUNTERS 根本不建这一组）。
     for (const actor of r.enemies.values()) if (actor.missionEncounter !== "melee") {
       actor.missionDormant=false;actor.scriptedNoncombatant=false;
     }
-    r.HideAmbushers();
-    if (n === 9) r.PostAmbushSquad();
-    if (n === 10) r.ambush.MarkResolved();
   }
   if (n >= 11) r.battlefield.OpenGate("MissionCourtyardGate");
+  if (n >= 13) { r.cart = { progress: 0, moving: false, halted: n >= 14, unloaded: n >= 14 }; }
   if (n >= 14) {
     r.cartBombLaunched = true; r.bridgeBombLaunched = true;
     r.battlefield.OpenGate("TemporaryBridge"); r.battlefield.CloseGate("MissionBridgeWreck");

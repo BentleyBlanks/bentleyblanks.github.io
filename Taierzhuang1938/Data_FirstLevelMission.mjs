@@ -1,8 +1,6 @@
 import { FRONT_SORTIE as Sortie } from "./Data_FirstLevelFrontRoute.mjs";
-import { MISSION_TOPOLOGY_VERSION } from "./Data_FirstLevelMissionTopology.mjs";
-import { OPENING } from "./Data_FirstLevelOpening.mjs";
+import { MISSION_TOPOLOGY_VERSION, MISSION_STAGE_ROUTES } from "./Data_FirstLevelMissionTopology.mjs";
 import { FRONT_FIELD_MEN, FRONT_RESERVES, FRONT_MACHINE_GUN_ATTACK, FRONT_APPROACH_ENEMIES, APPROACH_TACTICS } from "./Data_FirstLevelMissionFront.mjs";
-import { MISSION_TRAIN } from "./Data_FirstLevelMissionTrain.mjs";
 import { CHAPTER } from "./Data_MissionCh1.mjs";
 import { MISSION_LAYOUT, MISSION_ANCHORS as A, MISSION_ROUTES } from "./Data_FirstLevelMissionLayout.mjs";
 export const MISSION_VERSION = MISSION_TOPOLOGY_VERSION;
@@ -12,56 +10,78 @@ export { MISSION_TUNING } from "./Data_Tuning_FirstLevel.mjs";
 // only in 1939 and has no texture. The documented aircraft near Tengxian were Type 88 reconnaissance biplanes,
 // for which there is no model yet. See docs/Data_AircraftAssets.md.
 export const MISSION_AIRCRAFT_ID = "MitsubishiKi30";
+// 2026.09.19 契约路线还没并进 MISSION_ROUTES（等空间包建完沿线几何再并），
+// 但骨架现在就要用它们带路。查表统一走这一张，运行时只认名字。
+export const MISSION_GUIDE_ROUTES = Object.freeze({ ...MISSION_ROUTES, ...MISSION_STAGE_ROUTES });
 const Stage = (id, objective, target, requirements, cue, extra = {}) =>
   Object.freeze({ id, objective, target, requirements, cue, ...extra });
+// 内部步骤 27 个 + Complete（docs/Data_FirstLevelRebuild20260919Contract.md §1）。
+// 公开阶段仍是 18 个，分组见 Data_FirstLevelMissionStages。
 export const MISSION_STAGES = Object.freeze([
-  Stage("Train", "随军列前行，和同伴待在车厢内。", A.train, ["trainShelling"], "TrainMeal"),
   Stage(
-    "Unloading",
-    "伏低，听罗班长指挥！脱离车厢后借掩体进入交通壕。",
-    A.unload,
-    ["trainStopped", "trainDerailed", "luoRescueComplete", "unloadOrdersHeard", "unloaded"],
-    "WreckImpact",
+    "Trapped",
+    "被压住了。稳住，别出声。",
+    A.bunker,
+    ["bunkerCollapsed", "captivesKilled", "doorSearchStarted"],
+    "BunkerBanter",
   ),
-  Stage("TrenchEntry", "侧沟有日军！清出折角，跟班长进掩蔽处。", OPENING.shelter, ["trenchEntered", "trenchCleared", "shelterReached"], null),
-  Stage("Shelter", "守住折角，照看从前方撤下来的伤兵。", OPENING.shelter, ["shelterCornerHeld", "escapeWhisperHeard", "woundedSeen", "supportOrdersHeard"], "EscapeWhisper"),
+  Stage(
+    "BunkerRescue",
+    "跟着班长出去，把枪捡起来。",
+    A.bunkerDoor,
+    ["rescueCallHeard", "luoRescueComplete", "rifleRecovered"],
+    null,
+  ),
+  Stage(
+    "RearTrench",
+    "沿后交通壕撤到背坡集结处。",
+    A.collection,
+    ["rearTrenchEntered", "cornerReached", "collectionPointSeen", "supportOrdersHeard"],
+    null,
+  ),
   Stage(
     "Support",
     "沿交通壕支援前沿守军，掩护他们撤回。",
     A.front,
-    ["frontReached", "frontContact", "frontRifleDefense", "rifleWithdrawalResolved", "zhouGunWounded"],
+    ["frontReached", "frontContact", "frontRifleDefense", "rifleWithdrawalResolved"],
     null,
   ),
   Stage(
     "MachineGun",
-    "击退前方日军，掩护守军撤回；机枪可自行选用。",
+    "接替老周的火力，击退前方日军。",
     A.gun,
-    ["frontAttackRepelled", "guardWithdrawalResolved"],
-    "FrontWeaponChoice",
+    ["zhouGunWounded", "frontAttackRepelled", "guardWithdrawalResolved", "tankBlocksExit", "bundleOrderHeard"],
+    "TakeOverGun",
   ),
   Stage(
     "Tank",
-    "跟班长匍匐穿过曲折侧沟，到北边屋内领集束弹，再返回炸断战车履带。",
+    "跟班长穿过侧沟领集束弹，炸断战车履带。",
     A.bundle,
-    ["bundleRouteTraversed", "bundleTaken", "tankImmobilized"],
-    "BundleSortieOrder",
+    ["bundleRouteTraversed", "bundleTaken", "tankImmobilized", "lastGuardsWithdrawn", "reliefInPosition"],
+    "BundleGo",
   ),
   Stage(
     "Orders",
-    "撤回交通壕，与罗班长接令，带老周离开阵地。",
-    A.orders,
-    ["ordersReached", "volunteerHeard", "zhouOnLitter"],
+    "回伤员集结处接令，带老周离开阵地。",
+    A.collection,
+    ["ordersReached", "volunteerHeard", "lightShared", "zhouOnLitter", "columnDeparted"],
     "Volunteer",
   ),
   Stage(
     "South",
     "护送伤员向南，抵达村口。",
     A.village,
-    ["southTransitionComplete", "southTraversed"],
-    null,
+    ["southWhisperHeard", "villageMouthReached", "mainStreetPointed"],
+    "SouthWhisper",
   ),
-  Stage("Village", "从右侧灶屋绕进内院，夺取伤员通道。", A.melee, ["innerCourtReached"], "VillageAmbush"),
-  Stage("Melee", "屋里有埋伏！挣脱刺刀，清掉屋内日军。", A.melee, ["meleeResolved"], null),
+  Stage(
+    "Village",
+    "主街堵死了。把担架停进遮挡，从右侧灶屋绕。",
+    A.streetBlock,
+    ["streetBlockSeen", "littersInCover", "kitchenEntered"],
+    "StreetBlocked",
+  ),
+  Stage("Melee", "连屋里冲出来了！上刺刀。", A.melee, ["meleeResolved"], "MeleeRight"),
   Stage(
     "Courtyard",
     "清理窗口机枪，打开院门，掩护担架分批通过。",
@@ -71,80 +91,84 @@ export const MISSION_STAGES = Object.freeze([
   ),
   Stage(
     "TransferApproach",
-    "沿院后道路前往转运棚，掩护伤员交接。",
+    "沿主街前往桥头接运点。",
     A.transfer,
-    ["transferApproachReached", "transferHopeHeard"],
-    "TransferHope",
-    { minimumSeconds: MISSION_TUNING.transferApproachSeconds },
+    ["transferApproachReached", "transferSortingHeard", "villageRoadThreatSeen"],
+    "TransferSorting",
   ),
   Stage(
     "Transfer",
-    "压住东侧火力，盯住南侧绕行，掩护车辆分批出发。",
+    "压住装载区与侧巷，掩护伤员上车。",
     A.transfer,
-    ["transferArrived", "vehiclesDeparted", "transferAttacksResolved", "zhouNext", "followVehicleHeard"],
+    ["transferArrived", "loadingThreatResolved", "firstBatchLoaded", "alleyThreatResolved", "zhouNext", "escortGranted"],
     "TransferDefense",
-    { minimumSeconds: MISSION_TUNING.transferSeconds },
   ),
+  Stage("CartRide", "上车，跟着老周。", A.cartHalt, ["cartBoarded", "zhouCartDeparted", "cartTalkHeard"], "CartTalk"),
   Stage(
     "AirFirst",
-    "日机来袭！利用掩体，压住村东追兵。",
-    A.transfer,
-    ["firstAirPassComplete", "firstAirOrdersHeard"],
+    "日机来袭！下车找掩体。",
+    A.cartHalt,
+    ["firstAirPassComplete", "cartHalted", "zhouUnloaded", "westDitchPointed"],
     "AircraftFirst",
   ),
   Stage("Carry", "接替老周担架后端，抬往西侧下沟口。", A.queue, ["zhouCarried", "atDitchMouth", "carryOrdersHeard"], "CarryZhou"),
   Stage("Dive", "下沟！", A.ditch, ["diveComplete"], "AircraftReturn"),
+  Stage("Rescue", "拿枪断后，掩护幺娃把老周拖回担架。", A.ditch, ["zhouRecovered", "rescuePassageClear"], "RescueZhou"),
   Stage(
-    "Rescue",
-    "拿枪断后，掩护幺娃把老周拖回担架。",
-    A.ditch,
-    ["zhouRecovered", "rescuePassageClear"],
-    "RescueZhou",
-  ),
-  Stage(
-    "RetreatFirst",
-    "守住排水沟折角，让担架从身后通过。",
+    "Regroup",
+    "收拢队伍，清点人数。",
     A.retreatA,
-    ["retreatFirstPassed"],
-    "WestRetreat",
+    ["picketHolding", "zhouChecked", "headcountDone", "litterRemanned", "columnMoving"],
+    "PicketHold",
   ),
   Stage(
-    "RetreatWall",
-    "退到院墙缺口，压住北侧横射火力，为担架打开缺口。",
-    A.retreatB,
-    ["retreatWallPassed"],
-    "RetreatBleeding",
+    "WallPath",
+    "沿院墙夹道继续南行。",
+    A.wallPathEnd,
+    ["carryHandover", "wallPathTraversed", "stragglersTended"],
+    "CarrySwap",
   ),
   Stage(
-    "RetreatYard",
-    "随最后一副担架后撤，压住后院追兵，把伤员送到接收院。",
-    A.retreatC,
-    ["retreatYardPassed"],
-    "RetreatCold",
+    "ReceptionGate",
+    "找到接收处，向院门守军报清来路。",
+    A.receptionGate,
+    ["gateChallenged", "receptionAccepted", "woundedEntering"],
+    "GateChallenge",
   ),
   Stage(
-    "Reception",
-    "守住接收院入口，让最后一批伤员进入。",
-    A.reception,
-    ["receptionPassed"],
-    "ReceptionDefense",
+    "Handover",
+    "把老周抬进厢房，放到军医旁边。",
+    A.zhouDrop,
+    ["thresholdCrossed", "zhouPlaced", "medicExamining", "squadAssigned"],
+    "Threshold",
   ),
-  Stage("FinalCarry", "接过老周担架，抬入接收院，放到卫生兵旁。", A.zhouPickup, ["zhouPlaced"], "FinalCarry"),
   Stage("Death", "老周……", A.zhouDrop, ["deathSceneComplete"], "ZhouDeath"),
+  Stage("BridgeOrders", "掩护回援分队通过铁路桥", A.bridgeCover, ["bridgeOrdersHeard"], "BridgeOrders"),
   Stage(
-    "FinalDefense",
-    "打开后门外的撤退窗口，随医护退出接收院。",
-    A.finalCover,
-    ["rearLaneClear", "medicsEscaped"],
-    "ReceptionWithdrawal",
+    "BridgeCover",
+    "掩护回援分队通过铁路桥",
+    A.bridgeCover,
+    ["southBankReached", "bridgeFireBroken", "rearColumnCrossed"],
+    "BridgeCover",
   ),
-  Stage("Exit", "从后门撤入城边联络巷，跟上罗班长。", A.end, ["playerAtHandoff", "finalExitHeard"], "FinalExit"),
-  Stage("Complete", "第一关完成 · 往南的路", A.end, [], null),
+  Stage(
+    "BridgeWithdraw",
+    "退到安全距离，炸掉铁路桥。",
+    A.blastSafe,
+    ["blastZoneCleared", "bridgeDestroyed", "marchOrderHeard"],
+    "BridgeWithdraw",
+  ),
+  Stage("NightMarch", "跟罗班长进滕城北门。", A.gateInside, ["nightTransitionComplete", "northGateReached", "gateEntered"], null),
+  Stage("Complete", "第一关完成 · 往南的路", A.gateInside, [], null),
 ]);
 export const MISSION_ENCOUNTERS = Object.freeze({
-  surface: OPENING.surface,
-  intrusion: OPENING.intruders,
-  shelterPursuit: OPENING.shelterPursuers,
+  // 01 掩蔽部门外的行刑组：两个动手的，随后跟进两个。玩家拾枪后可以打，但不是过关条件。
+  bunkerAssault: [
+    { id: "BunkerExecutionerA", x: A.bunkerKilling.x - 1.6, z: A.bunkerKilling.z - 1.2, weapon: "Type38", bayonet: true },
+    { id: "BunkerExecutionerB", x: A.bunkerKilling.x + 1.6, z: A.bunkerKilling.z - 1.2, weapon: "Type38", bayonet: true },
+    { id: "BunkerFollowA", x: A.bunkerKilling.x - 3.2, z: A.bunkerKilling.z - 6, weapon: "Type38", bayonet: true },
+    { id: "BunkerFollowB", x: A.bunkerKilling.x + 3.4, z: A.bunkerKilling.z - 7, weapon: "Type38", bayonet: true },
+  ],
   approach: FRONT_APPROACH_ENEMIES,
   // The roster itself lives in Data_FirstLevelMissionFront: the assault lanes and the cover rows
   // are derived from it, and a list split across two files drifts.
@@ -164,14 +188,12 @@ export const MISSION_ENCOUNTERS = Object.freeze({
     { id: "RearWindow", x: 66, z: 16 },
     { id: "SideYard", x: 40, z: 27 },
   ],
-  // 屋内伏击（docs/Data_FirstLevelRoomAmbush.md）。四个人都上着刺刀，藏在屋里三处死角：
-  // 领头的扑玩家并顶出站立僵持，后面两个捅担架上的老周和两个抬担架的，
-  // 侧翼那个压到挣脱之后才动。
+  // 09：日军从与东巷相通的连屋出来，不再预埋伏击位（契约 §4）。玩家先手打掉就没有僵持。
   melee: [
-    { id: "AmbushLead", x: 61, z: 4, weapon: "Type38", bayonet: true },
-    { id: "AmbushRearA", x: 53.6, z: 2.4, weapon: "Type38", bayonet: true },
-    { id: "AmbushRearB", x: 53.6, z: 4.6, weapon: "Type38", bayonet: true },
-    { id: "AmbushFlank", x: 62.4, z: 14.3, weapon: "Type38", bayonet: true },
+    { id: "MeleeLead", x: 56.5, z: 13.5, weapon: "Type38", bayonet: true },
+    { id: "MeleeSecond", x: 58, z: 14.4, weapon: "Type38", bayonet: true },
+    { id: "MeleeThird", x: 54.5, z: 11, weapon: "Type38", bayonet: true },
+    { id: "MeleeAlley", x: 66, z: 17, weapon: "Type38", bayonet: true },
   ],
   courtyard: [
     { id: "CourtyardPursuerA", x: 91, z: 24 },
@@ -184,17 +206,11 @@ export const MISSION_ENCOUNTERS = Object.freeze({
     { id: "TransferRifleB", x: 117, z: 97 },
     { id: "TransferRifleC", x: 119, z: 85 },
   ],
-  transferFlank: [
-    {id:"TransferFlankA",x:112,z:114},{id:"TransferFlankB",x:105,z:122},
-    {id:"TransferFlankC",x:104,z:141},{id:"TransferFlankD",x:103,z:140},
-  ],
-  transferLast: [
-    {id:"TransferLastGunner",x:113,z:80,weapon:"Type11",hold:true},
-    {id:"TransferLastA",x:118,z:89},{id:"TransferLastB",x:120,z:98},
-    {id:"TransferLastC",x:111,z:110},
-  ],
-  transferRear: [
-    {id:"TransferRearA",x:91,z:65},{id:"TransferRearB",x:96,z:70},{id:"TransferRearC",x:88,z:66},
+  // 12 的第二处威胁：侧巷（A.sideAlley）。
+  transferAlley: [
+    { id: "TransferAlleyGunner", x: A.sideAlley.x + 2, z: A.sideAlley.z + 2, weapon: "Type11", hold: true },
+    { id: "TransferAlleyA", x: A.sideAlley.x + 5, z: A.sideAlley.z - 4 },
+    { id: "TransferAlleyB", x: A.sideAlley.x + 8, z: A.sideAlley.z + 6 },
   ],
   air: [
     { id: "AirPursuerA", x: 113, z: 89 },
@@ -202,84 +218,65 @@ export const MISSION_ENCOUNTERS = Object.freeze({
     { id: "AirPursuerC", x: 115, z: 100 },
     { id: "AirPursuerD", x: 106, z: 107 },
   ],
-  retreat: [
-    { id: "RetreatPursuerA", x: 64, z: 114 },
-    { id: "RetreatPursuerB", x: 61, z: 108 },
-    { id: "RetreatPursuerC", x: 63, z: 116 },
-    { id: "RetreatPursuerD", x: 74, z: 109 },
-  ],
-  retreatWall: [
-    {id:"WallFlankerA",x: 78, z: 167},{id:"WallFlankerB",x: 72, z: 162},
-    {id:"WallGunner",x: 80, z: 159,weapon:"Type11",hold:true},
-  ],
-  retreatYard: [
-    {id:"YardPursuerA",x: 28, z: 229},{id:"YardPursuerB",x: 27, z: 232},
-    {id:"YardPursuerC",x: 26, z: 229},
-  ],
-  reception: [
-    { id: "ReceptionGunner", x: 14, z: 232, weapon: "Type11", hold: true },
-    { id: "ReceptionRifleA", x: 14, z: 246 },
-    { id: "ReceptionRifleB", x: 8, z: 247 },
-  ],
-  final: [
-    { id: "FinalFlankerA", x: -14, z: 267 },
-    { id: "FinalFlankerB", x: -30, z: 269 },
-    { id: "FinalStreetGunner", x: 13, z: 234, weapon: "Type11", hold: true },
+  // 18 北岸土坎的火力：来自北侧外围战场，不在桥边凭空生成。
+  bridgeNorth: [
+    { id: "BridgeNorthGunner", x: A.bridgeEnemy.x, z: A.bridgeEnemy.z, weapon: "Type11", hold: true },
+    { id: "BridgeNorthA", x: A.bridgeEnemy.x - 6, z: A.bridgeEnemy.z + 3 },
+    { id: "BridgeNorthB", x: A.bridgeEnemy.x + 7, z: A.bridgeEnemy.z + 2 },
+    { id: "BridgeNorthC", x: A.bridgeEnemy.x + 2, z: A.bridgeEnemy.z - 5 },
   ],
 });
-// Finite squads cross authored openings while the shared AI owns fire and damage.
-export const MISSION_TRANSFER_BEATS=Object.freeze([
-  {id:"transfer",earliestS:0,latestS:0,loaded:0,restS:0,hint:"transferEast"},
-  {id:"transferFlank",earliestS:35,latestS:60,loaded:4,restS:12,hint:"transferFlank"},
-  {id:"transferLast",earliestS:95,latestS:115,loaded:8,restS:12,hint:"transferLast"},
-  {id:"transferRear",earliestS:155,latestS:190,loaded:9,restS:12,hint:"transferRear"},
+// 12 只有两处威胁（契约 §2/§4）：先是压向装载区的 transfer，解除之后才是侧巷的 transferAlley。
+// 每解除一处，接运真实推进一批。旧的四拍守波次（MISSION_TRANSFER_BEATS）已下线。
+export const MISSION_TRANSFER_THREATS = Object.freeze([
+  Object.freeze({ id: "transfer", after: null, resolved: "loadingThreatResolved", hint: "transferEast" }),
+  Object.freeze({ id: "transferAlley", after: "loadingThreatResolved", resolved: "alleyThreatResolved", hint: "transferAlley" }),
 ]);
 export const MISSION_PURSUIT_ROUTE=Object.freeze([
   {x:100,z:120.5},{x:74,z:120.5},{x:61,z:120.5},{x:60,z:114},...MISSION_ROUTES.evacuation,
 ]);
 export const MISSION_GUIDANCE = Object.freeze({
-  Unloading: {label:'unload'}, TrenchEntry:{label:'support',route:'opening'}, Shelter:{label:'support'}, Support:{label:'support',route:'support'},
-  MachineGun:{label:'front'},Tank:{label:'bundle',route:'bundle'},Orders:{label:'orders',route:'ordersRejoin'},
-  South:{label:'south',route:'south'},Village:{label:'village',route:'village'},
-  Courtyard:{label:'gate'},TransferApproach:{label:'transfer',route:'village'},Transfer:{label:'transfer'},AirFirst:{label:'transfer'},
+  BunkerRescue:{label:'rescue'},
+  RearTrench:{label:'rearTrench',route:'rearTrench'},
+  Support:{label:'support',route:'support'},
+  MachineGun:{label:'front'},Tank:{label:'bundle',route:'bundle'},
+  Orders:{label:'orders',route:'collectionReturn'},
+  South:{label:'south',route:'southWalk'},Village:{label:'village',route:'village'},
+  Courtyard:{label:'gate',route:'courtyardBypass'},
+  TransferApproach:{label:'transfer',route:'village'},Transfer:{label:'transfer'},
+  CartRide:{label:'cart',route:'cartRide'},AirFirst:{label:'transfer'},
   Carry:{label:'carry'},Rescue:{label:'ditch'},
-  RetreatFirst:{label:'retreat'},RetreatWall:{label:'retreat'},RetreatYard:{label:'retreat'},
-  Reception:{label:'reception'},FinalCarry:{label:'carry'},FinalDefense:{label:'rearCover'},Exit:{label:'exit',route:'exit'},
+  Regroup:{label:'regroup'},WallPath:{label:'wallPath',route:'wallPath'},
+  ReceptionGate:{label:'receptionGate'},Handover:{label:'place'},
+  BridgeOrders:{label:'bridge',route:'toBridge'},BridgeCover:{label:'bridge'},
+  BridgeWithdraw:{label:'withdraw',route:'bridgeWithdraw'},
+  NightMarch:{label:'northGate',route:'nightMarch'},
 });
 // Front riflemen no longer use point tactics: they bound between FRONT_ASSAULT lines (runtime UpdateAssault).
+const APPROACH_IDS = new Set(FRONT_APPROACH_ENEMIES.map((spec) => spec.id));
 export const MISSION_TACTICS = Object.freeze({
-  ...APPROACH_TACTICS,
-  ...Object.fromEntries(Object.entries(OPENING.intruderRoutes).map(([id,points],i)=>[id,{delay:i*2,points}])),
-  ...OPENING.shelterPursuerRoutes,
+  // APPROACH_TACTICS 里还带着旧开场那支 surface 突进队的条目（那一组随军列开场下线了），
+  // 只取 approach 组真有的人 —— 不然战术表里会留下一批不属于任何组的孤儿。
+  ...Object.fromEntries(Object.entries(APPROACH_TACTICS).filter(([id]) => APPROACH_IDS.has(id))),
   CourtyardPursuerA: { delay: 1, points: [{x:86,z:37},{x:62,z:40},{x:53,z:38}] },
   CourtyardPursuerB: { delay: 12, points: [{x:89,z:39},{x:66,z:43},{x:59,z:40}] },
   CourtyardPursuerC: { delay: 25, points: [{x:91,z:41},{x:70,z:44},{x:64,z:40}] },
+  MeleeLead: { delay: 0, points: [{x:57,z:8},{x:58,z:3.5}] },
+  MeleeSecond: { delay: 1.5, points: [{x:58.6,z:9},{x:59,z:4}] },
+  MeleeThird: { delay: 3, points: [{x:55.5,z:7},{x:56,z:4}] },
+  MeleeAlley: { delay: 5, points: [{x:62,z:17.5},{x:58,z:17},{x:58,z:13.5}] },
   TransferRifleA: { delay: 5, points: [{x:108,z:90},{x:102,z:91}] },
   TransferRifleB: { delay: 9, points: [{x:112,z:106},{x:104,z:112}] },
   TransferRifleC: { delay: 13, points: [{x:114,z:90},{x:107,z:94}] },
-  TransferFlankA: {delay:0,points:[{x:104,z:117},{x:100,z:117}]},
-  TransferFlankB: {delay:3,points:[{x:103,z:124},{x:96,z:125}]},
-  TransferFlankC: {delay:6,points:[{x:108,z:135},{x:96,z:137}]},
-  TransferFlankD: {delay:9,points:[{x:102,z:136},{x:94,z:134}]},
-  TransferLastA: {delay:0,points:[{x:110,z:90},{x:102,z:92}]},
-  TransferLastB: {delay:4,points:[{x:109,z:108},{x:102,z:114}]},
-  TransferLastC: {delay:8,points:[{x:104,z:115},{x:99,z:116}]},
-  TransferRearA: {delay:0,points:[{x:91,z:77},{x:90,z:91}]},
-  TransferRearB: {delay:3,points:[{x:96,z:81},{x:100,z:92}]},
-  TransferRearC: {delay:6,points:[{x:84,z:80},{x:86,z:95}]},
-  WallFlankerA: {delay:0,points:[{x:70,z:168},{x:66,z:181}]},
-  WallFlankerB: {delay:4,points:[{x:67,z:165},{x:65,z:172}]},
-  YardPursuerA: {delay:0,points:[{x:27,z:224},{x:26,z:215},A.retreatC]},
-  YardPursuerB: {delay:4,points:[{x:27,z:224},{x:26,z:215},A.retreatC]},
-  YardPursuerC: {delay:8,points:[{x:27,z:224},{x:26,z:215},A.retreatC]},
+  TransferAlleyA: { delay: 0, points: [{x:100,z:120},{x:94,z:118}] },
+  TransferAlleyB: { delay: 4, points: [{x:104,z:130},{x:96,z:128}] },
   AirPursuerA: { delay: 0, points: [{x:106,z:90},{x:102,z:92}] },
   AirPursuerB: { delay: 3, points: [{x:105,z:98},{x:104,z:111}] },
   AirPursuerC: { delay: 5, points: [{x:109,z:109},{x:100,z:114}] },
   AirPursuerD: { delay: 8, points: [{x:106,z:113},{x:99,z:115}] },
-  ReceptionRifleA: { delay: 3, points: [{x:9,z:246},{x:4,z:246}] },
-  ReceptionRifleB: { delay: 10, points: [{x:4,z:247},{x:-6,z:247}] },
-  FinalFlankerA: { delay: 2, points: [{x:-18,z:262},{x:-22,z:256}] },
-  FinalFlankerB: { delay: 9, points: [{x:-40,z:265},{x:-45,z:248}] },
+  BridgeNorthA: { delay: 2, points: [{x:-74,z:130},{x:-76,z:134}] },
+  BridgeNorthB: { delay: 6, points: [{x:-70,z:128},{x:-74,z:132}] },
+  BridgeNorthC: { delay: 10, points: [{x:-68,z:122},{x:-72,z:128}] },
 });
 export const FIRST_LEVEL_MISSION_PHASE = Object.freeze({
   id: "FirstLevelP012Whitebox",
@@ -296,10 +293,10 @@ export const FIRST_LEVEL_MISSION_PHASE = Object.freeze({
   music: null,
   minutes: 32,
   brief: [
-    "军列遭到炮击。支援前沿守军，然后为伤员打开往南的路。",
+    "掩蔽部被一发近失弹埋了。跟班长出去，支援前沿，再为伤员打开往南的路。",
     "WASD 移动 · Shift 冲刺 · C 蹲伏 · Z 卧倒 · F 交互 · V 大刀 · G 手榴弹 · H 集束手榴弹",
   ],
-  metaText: ["第一关完整流程白盒", "Notion 2026.09.14", "人物动作简化"],
+  metaText: ["第一关完整流程白盒", "Notion 2026.09.19", "人物动作简化"],
   level: CHAPTER,
   roster: ["luo", "yaowa", "heyoutian", "liuwencai"],
   playerCast: "shunzi",
@@ -330,7 +327,7 @@ export const FIRST_LEVEL_MISSION_PHASE = Object.freeze({
     radius: 8,
     index,
   })),
-  spawn: { ...A.train, ry: 0 },
+  spawn: { ...A.bunker, ry: 0 },
   whitebox: {
     p012: true,
     fullMission: true,
@@ -339,13 +336,13 @@ export const FIRST_LEVEL_MISSION_PHASE = Object.freeze({
     anchors: A,
     routes: MISSION_ROUTES,
     friendlyLimit: 4,
-    // Full surviving train, defenders and both finite front attacks must fit.
+    // Defenders and both finite front attacks must fit.
     actorCapacity:144,
     crowdCellM:MISSION_TUNING.frontCrowdCellM,
     // Real first-battle actors plus dormant village and NRA; casualties release capacity.
     actorPool: { ija: 48, nra: 40 },
     actualEventsOnly: true,
     storyBeats: [],
-    activities: { arrivalGuideStart: { x: -76, z: 71 }, trainColumn: { extraCount: MISSION_TRAIN.extraCount } },
+    activities: {},
   },
 });

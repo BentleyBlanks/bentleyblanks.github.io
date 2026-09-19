@@ -476,7 +476,7 @@ try {
   Check("虚线圈本身还画着（关掉这一层画面就变）",
     zoneIcons.withZones !== zoneIcons.withoutZones && zoneIcons.zones > 0,
     `${zoneIcons.zones} 个触发区在这一屏里（关掉这一层画面指纹 ${zoneIcons.withZones} → ${zoneIcons.withoutZones}）`);
-  Check("只有转运那四个攻击波的框还留图标", zoneIcons.withIcon.length === 4
+  Check("只有转运那两处威胁的框还留图标", zoneIcons.withIcon.length === 2
     && zoneIcons.withIcon.every((entry) => entry.endsWith(":Wave")),
     zoneIcons.withIcon.join("、") || "一个图标都没留");
 
@@ -624,7 +624,7 @@ try {
     const layout = map.phaseLayout;
     const transfer = (layout.encounters || []).find((entry) => entry.id === "transfer");
     const group = map.HandlePoint("encounter", "transfer");
-    const beat = map.HandlePoint("beat", "transferFlank");
+    const beat = map.HandlePoint("beat", "transferAlley");
     const groupSel = group ? map.PickAt(group.x, group.y) : null;
     const beatSel = beat ? map.PickAt(beat.x, beat.y) : null;
     // 把手不许遮住人：这一组每个成员在自己的屏幕位置上仍然点得中「人」。
@@ -648,7 +648,7 @@ try {
     map.SetSelection(null);
     window.__Mouse("mousemove", beat.x, beat.y);
     const hoveredBeat = map.hover;
-    map.SetSelection({ kind: "beat", id: "transferFlank" });
+    map.SetSelection({ kind: "beat", id: "transferAlley" });
     const beatSelectPx = window.__Count(["select"]).select;
     map.SetSelection(null);
     map.SetHover(null);
@@ -656,9 +656,9 @@ try {
     const clearedIds = (layout.encounters || []).filter((entry) => entry.state === "cleared").map((entry) => entry.id);
     const clearedHandles = clearedIds.filter((id) => !!map.HandlePoint("encounter", id));
     // 用词：图上不许出现「拍」这种排程表里的内部叫法
-    const beatLabel = (map.placedLabels || []).find((e) => e.kind === "beat" && e.id === "transferFlank")?.text || "";
+    const beatLabel = (map.placedLabels || []).find((e) => e.kind === "beat" && e.id === "transferAlley")?.text || "";
     const jargon = (map.placedLabels || []).map((e) => e.text).filter((t) => /(^|\s)拍\s/.test(t));
-    const beatTip = map.DescribeSel({ kind: "beat", id: "transferFlank" });
+    const beatTip = map.DescribeSel({ kind: "beat", id: "transferAlley" });
     const firstTip = map.DescribeSel({ kind: "beat", id: "transfer" });
     return {
       beatLabel, jargon, beatTip, firstTip,
@@ -675,7 +675,7 @@ try {
     chips.groupSel?.kind === "encounter" && chips.groupSel?.id === "transfer",
     `把手 @ (${chips.group?.x?.toFixed(0)}, ${chips.group?.y?.toFixed(0)}) → ${JSON.stringify(chips.groupSel)}`);
   Check("点转运拍的标签拿到那一拍（kind=beat）",
-    chips.beatSel?.kind === "beat" && chips.beatSel?.id === "transferFlank",
+    chips.beatSel?.kind === "beat" && chips.beatSel?.id === "transferAlley",
     `把手 @ (${chips.beat?.x?.toFixed(0)}, ${chips.beat?.y?.toFixed(0)}) → ${JSON.stringify(chips.beatSel)}`);
   Check("组把手不遮住成员（每个成员仍点得中人）",
     chips.members.length > 0 && chips.members.every((row) => row.hit.startsWith("member:")),
@@ -687,16 +687,16 @@ try {
     JSON.stringify(chips.hovered));
   Check("选中一整组时整组成员被描亮", chips.selectPx > 0, `${chips.selectPx} px 高亮色`);
   Check("悬停 / 选中一拍也走同一条路（tooltip + 描亮那一撮人）",
-    chips.hoveredBeat?.kind === "beat" && chips.hoveredBeat?.id === "transferFlank" && chips.beatSelectPx > 0,
+    chips.hoveredBeat?.kind === "beat" && chips.hoveredBeat?.id === "transferAlley" && chips.beatSelectPx > 0,
     `${JSON.stringify(chips.hoveredBeat)}，描亮 ${chips.beatSelectPx} px`);
   Check("已清除的组不长把手", chips.clearedCount > 0 && chips.clearedHandles.length === 0,
     `已清除 ${chips.clearedCount} 组，把手种类 ${chips.kinds.join("/")}`);
-  Check("转运四拍在图上叫「第几波攻击」，不写内部叫法「拍」",
-    /^第 2 波攻击 · transferFlank · 35–60 秒$/.test(chips.beatLabel) && chips.jargon.length === 0,
+  Check("转运两处威胁在图上叫「第几处威胁」，不写内部叫法「拍」",
+    /^第 2 处威胁 · transferAlley · loadingThreatResolved 之后$/.test(chips.beatLabel) && chips.jargon.length === 0,
     `${chips.beatLabel}${chips.jargon.length ? ` ｜ 还写着：${chips.jargon.join("、")}` : ""}`);
-  Check("悬停提示同样说人话，0–0 秒那一拍写「开场即到」",
-    chips.beatTip[0] === "转运攻击波：transferFlank" && chips.beatTip[1] === "第 2 波攻击 · 35–60 秒"
-    && chips.firstTip[1] === "第 1 波攻击 · 开场即到",
+  Check("悬停提示同样说人话，第一处写「进转运即到」",
+    chips.beatTip[0] === "转运攻击波：transferAlley" && chips.beatTip[1] === "第 2 处威胁 · loadingThreatResolved 之后"
+    && chips.firstTip[1] === "第 1 处威胁 · 进转运即到",
     `${chips.beatTip.join(" ｜ ")} ／ ${chips.firstTip.join(" ｜ ")}`);
 
   // -------------------------------------------------------------------------
@@ -1051,9 +1051,13 @@ try {
     map.SetFilter(null);
     const pickBack = map.PickAt(gunner.x, gunner.y);
 
-    map.FitBounds();
-    map.SetFilter({ routes: new Set(["south"]) });
+    // 阶段 12 只画一条路线（cartRide），过滤到它自己自然不会少像素 ——
+    // 换到阶段 18 量：那一段画三条（toBridge / bridgeWithdraw / nightMarch）。
+    map.SetPhase(18);map.FitBounds();
+    const allRoute18 = window.__CountMap(["route"]).route;
+    map.SetFilter({ routes: new Set(["nightMarch"]) });
     const oneRoute = window.__CountMap(["route"]).route;
+    map.SetFilter(null);map.SetPhase(12);map.FitBounds();
     map.SetFilter({ members: new Set(["TransferGunner"]) });
     const oneMember = Members().map((entry) => entry.id);
 
@@ -1067,7 +1071,7 @@ try {
     return {
       allCount: all.length, onlyIds, onlyEnc, chipsAfter, stored, storedNulls,
       pickFiltered, pickBack, oneMember,
-      backCount: back.length, allRoute, oneRoute, backRoute, truth,
+      backCount: back.length, allRoute, allRoute18, oneRoute, backRoute, truth,
       png: map.ToPng({ scale: 1 }),
     };
   });
@@ -1085,8 +1089,8 @@ try {
     filter.pickFiltered?.kind !== "member" && filter.pickBack?.id === "VillageGunner",
     `过滤中点到 ${JSON.stringify(filter.pickFiltered)}，取消后点到 ${JSON.stringify(filter.pickBack)}`);
   Check("路线也能只留一条（像素跟着少）",
-    filter.oneRoute > 0 && filter.oneRoute < filter.allRoute,
-    `全部 ${filter.allRoute} px → 只留 south ${filter.oneRoute} px`);
+    filter.oneRoute > 0 && filter.oneRoute < filter.allRoute18,
+    `阶段 18 全部 ${filter.allRoute18} px → 只留 nightMarch ${filter.oneRoute} px`);
   Check("按人过滤（members）同样生效",
     filter.oneMember.length === 1 && filter.oneMember[0] === "TransferGunner",
     filter.oneMember.join("、") || "（一个都没剩）");
