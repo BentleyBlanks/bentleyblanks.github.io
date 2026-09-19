@@ -2038,8 +2038,12 @@ export class OrchestrationMap {
     // 三行一模一样的字并排着只会让人以为看花了眼。优先级高的那个留下来。
     const seen = new Set();
     for (const { c, i } of order) {
-      if (placed.length >= MAX_LABELS) break;
-      if (seen.has(c.text)) continue;
+      // 把手（组芯片 / 威胁芯片）是**可点的控件**，不是装饰：标签预算用光了、
+      // 或者恰好跟别人重名，都不许把它整枚扔掉 —— 宿主与测试都按 HandlePoint 去点它，
+      // 扔掉之后那一下点击会落到底下的组上，看起来像「点威胁选中的却是那一组」。
+      const handle = c.style === "chip" && !!c.pick;
+      if (placed.length >= MAX_LABELS && !handle) continue;
+      if (seen.has(c.text) && !handle) continue;
       const font = c.style === "tiny" ? FONT_TINY : FONT_SMALL;
       ctx.font = font;
       const textW = Math.ceil(ctx.measureText(c.text).width);
@@ -2059,6 +2063,15 @@ export class OrchestrationMap {
         if (k < (c.style === "chip" ? 2 : 6) && HitsGrid(this.soft, rect)) continue;
         hit = { dx, dy, rect, far: k >= 4 };
         break;
+      }
+      // 四十二个候选位全被占了：把手挤着放（夹回画布里、拉一条引线），别消失。
+      if (!hit && handle) {
+        const [dx, dy] = offsets.at(-1);
+        const rect = {
+          x: Clamp(c.ax + dx, 2, Math.max(2, view.w - w - 2)),
+          y: Clamp(c.ay + dy - h / 2, 2, Math.max(2, view.h - h - 2)), w, h,
+        };
+        hit = { dx, dy, rect, far: true };
       }
       if (!hit) continue;
       seen.add(c.text);

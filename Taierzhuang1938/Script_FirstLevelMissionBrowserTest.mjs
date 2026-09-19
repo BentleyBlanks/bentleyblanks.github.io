@@ -18,7 +18,6 @@
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { PlayFirstLevelOpening } from "./Script_FirstLevelOpeningBrowserTest.mjs";
 import {
   ParseCampaignArgs, OpenCampaign, CloseCampaign, CaptureFailure,
   CheckVoiceAssets, InstallInputDriver,
@@ -59,6 +58,10 @@ try {
     console.log("ok initial mission",
       JSON.stringify({ stage: initial.mission.stage, position: initial.position, slots: initial.slots }));
     if (!options.campaign) {
+      // 开场演出基线归 Front 包（Script_FirstLevelOpeningBrowserTest）。只有这一条路用得着它，
+      // 改成按需 import —— 静态 import 会让分段夹具（--stage-from=8/11/15/18）在
+      // 模块加载期就崩掉，而它们根本不跑这一段。
+      const { PlayFirstLevelOpening } = await import("./Script_FirstLevelOpeningBrowserTest.mjs");
       await PlayFirstLevelOpening(page, { out: output, audioClock: options.audioCheck, mount: false });
     }
   }

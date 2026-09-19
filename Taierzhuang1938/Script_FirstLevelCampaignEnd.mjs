@@ -19,10 +19,69 @@ import { CampaignActions } from "./Script_FirstLevelCampaignKit.mjs";
 const Points = route => route.map(point => ({ x: point.x, z: point.z }));
 const Mission = page => page.evaluate(() => window.Tengxian.Debug.FirstLevelMission());
 
-/** 阶段 15–18，走到 Complete。 */
+/**
+ * 等某一条事实。**必须自己推帧**：整关驾驶跑在 `manual=1` 下，世界只有
+ * `StepFrames` 推才走 —— 光 `page.waitForFunction` 轮询的话时间根本不动，
+ * 等到天亮也等不来（第一次写成那样，18 卡在传令兵还没起步的那一帧）。
+ */
+async function WaitFact(page, factId, label, seconds = 120, { fight = false } = {}) {
+  let facts = [];
+  for (let chunk = 0; chunk < Math.ceil(seconds / 5); chunk += 1) {
+    facts = await page.evaluate(({ factId, fight }) => {
+      const g = window.Tengxian;
+      for (let i = 0; i < 300; i += 1) {
+        if (g.Debug.FirstLevelMission().facts.includes(factId)) break;
+        const foe = fight ? window.MissionInputDriver?.Target(90) : null;
+        if (foe) window.MissionInputDriver.Shoot(foe);
+        else { g.Debug.Mouse(0, false); g.Debug.Mouse(2, false); }
+        g.StepFrames(1, 1 / 60, false);
+      }
+      g.Debug.Mouse(0, false); g.Debug.Mouse(2, false);
+      return g.Debug.FirstLevelMission().facts;
+    }, { factId, fight });
+    if (facts.includes(factId)) break;
+  }
+  assert.ok(facts.includes(factId), `${label}：等不到事实 ${factId}`);
+  return facts;
+}
+/** 等受控演出（黑屏转场 / 死亡段）还回控制权。同样自己推帧。 */
+async function WaitControl(page, label, seconds = 60) {
+  for (let chunk = 0; chunk < Math.ceil(seconds / 5); chunk += 1) {
+    const control = await page.evaluate(() => {
+      const g = window.Tengxian;
+      for (let i = 0; i < 300 && g.Debug.FirstLevelMission().control; i += 1) g.StepFrames(1, 1 / 60, false);
+      return g.Debug.FirstLevelMission().control;
+    });
+    if (!control) return;
+  }
+  assert.fail(`${label}：受控演出没有还回控制权`);
+}
+
+/**
+ * 阶段 15–18，走到 Complete。
+ *
+ * 分段起点：`--stage-from=15` 从降压段开始，`--stage-from=18` 只跑桥与夜入城。
+ * 每一段用 `ctx.stageFrom <= n` 把门 —— 不这样的话 `--stage-from=18` 会先跳回 15，
+ * 收尾那条「跳转回执 = [stageFrom..18]」的断言当场就红。
+ */
 export async function Drive(ctx) {
   const { page, output } = ctx;
   const { JumpStage, Capture, CaptureFocus, Route, Interact, WaitStage } = CampaignActions(ctx);
+  const from = ctx.stageFrom;
+
+  if (from <= 15) await DriveRegroup(ctx, { JumpStage, Capture, CaptureFocus, Route, Interact, WaitStage });
+  if (from <= 16) await DriveHandover(ctx, { JumpStage, Capture, Route, Interact, WaitStage });
+  if (from <= 17) await DriveDeath(ctx, { JumpStage, WaitStage });
+  await DriveBridge(ctx, { JumpStage, Capture, CaptureFocus, Route, WaitStage });
+
+  await Capture("Complete");
+  assert.equal(await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission().stage), "Complete");
+  void output;
+}
+
+/** 15A/15B/15C：收拢 → 换手抬运沿墙缓行 → 院门与入院。全程无敌人。 */
+async function DriveRegroup(ctx, { JumpStage, Capture, CaptureFocus, Route, Interact, WaitStage }) {
+  const { page, output } = ctx;
 
   // --- 15A 沟口收拢：无战斗。队伍重新成形、队首走起来 ------------------------
   await JumpStage(15);
@@ -37,29 +96,33 @@ export async function Drive(ctx) {
     assert.ok(picket.every(entry => entry.x > A.retreatA.x), "他们站在收拢点与车路之间");
     await CaptureFocus("RegroupPicket", picket[0]);
   }
-  // 顺子问赶车人（走到车边才问），再回收拢点跟队伍会合。
-  await Route([{ x: E.droverPost.x + 2.4, z: E.droverPost.z + 1.2 }], "RegroupDrover", { fight: true });
+  // 先在收拢点等对白真的走完（幺娃走到担架边检查、何有田挨个点人）。
   await Route([{ x: A.retreatA.x + 4, z: A.retreatA.z - 6 }, { x: A.retreatA.x, z: A.retreatA.z }],
     "RegroupRally", { fight: true });
+  const enemiesBefore = (await Mission(page)).enemies.length;
+  await WaitFact(page, "headcountDone", "15A 点名", 300, { fight: true });
+  // 点完人顺子才去问赶车人「车还走得了不」——走到车边才问。
+  await Route([{ x: E.droverPost.x + 2.4, z: E.droverPost.z + 1.2 }], "RegroupDrover", { fight: true });
+  {
+    const shot = await Mission(page);
+    assert.ok(shot.voice.played.includes("CartAbandon"), "顺子走到车边真的问过赶车人");
+  }
+  await Route([{ x: A.retreatA.x + 4, z: A.retreatA.z - 6 }, { x: A.retreatA.x, z: A.retreatA.z }],
+    "RegroupBackToColumn", { fight: true });
   {
     const shot = await WaitStage("WallPath", 300, { fight: true });
     const facts = shot.mission.facts;
     for (const id of ["survivorsSheltered", "litterRemanned", "columnMoving", "picketHolding", "zhouChecked", "headcountDone"])
       assert.ok(facts.includes(id), `15A 缺事实 ${id}：${JSON.stringify(facts.slice(-12))}`);
-    assert.ok(facts.includes("__cartAsked") || shot.mission.voice.played.includes("CartAbandon"),
-      "顺子真的问过赶车人");
-    // 15A 全程不许冒出新的遭遇组。
-    const spawned = shot.mission.enemies.filter(actor => actor.encounter === "retreat");
-    assert.deepEqual(spawned, [], "降压段不许生成任何新的遭遇组");
+    // 15A 全程不许冒出新的敌人（降压段无战斗）。
+    assert.ok(shot.mission.enemies.length <= enemiesBefore,
+      `降压段不许生成新敌人：${enemiesBefore} → ${shot.mission.enemies.length}`);
   }
 
   // --- 15B 换手抬运，沿墙缓行 ------------------------------------------------
   // 后抬手撑到 carrySwapProgressM 才撒手；撒手之前 F 是够不着担架的。
   await Route(Points(MISSION_STAGE_ROUTES.wallPath.slice(0, 2)), "WallPathEnter", { fight: false });
-  const swapped = await page.waitForFunction(
-    () => window.Tengxian.Debug.FirstLevelMission().facts.includes("carrySwapOffered"),
-    null, { timeout: 180000 }).then(() => true).catch(() => false);
-  assert.ok(swapped, "后抬手体力不支，担架停下等人接");
+  await WaitFact(page, "carrySwapOffered", "15B 换手", 180);
   {
     const zhou = await page.evaluate(() => {
       const litter = window.Tengxian.Debug.FirstLevelMission().column.litters.find(entry => entry.zhou);
@@ -104,7 +167,11 @@ export async function Drive(ctx) {
     assert.ok(shot.voice.played.includes("WardGuide"), "刘文财在院里招呼担架跟他走");
   }
 
-  // --- 16 完成交接：过门槛、军医指位置、放下担架、分派 ------------------------
+}
+
+/** 16 完成交接：过门槛、军医指位置、放下担架、分派。 */
+async function DriveHandover(ctx, { JumpStage, Capture, Route, Interact, WaitStage }) {
+  const { page } = ctx;
   await JumpStage(16);
   {
     // 跳进 16 时老周还在院门口那副担架上：走过去接手，抬进厢房。
@@ -129,8 +196,7 @@ export async function Drive(ctx) {
     await Capture("HandoverThreshold");
   }
   // 军医先指位置（PlaceLitter），喊出口才允许按 F。
-  await page.waitForFunction(() => window.Tengxian.Debug.FirstLevelMission().facts.includes("placeOrderHeard"),
-    null, { timeout: 120000 });
+  await WaitFact(page, "placeOrderHeard", "16 军医指位置", 180);
   await Route([{ x: A.zhouDrop.x, z: A.zhouDrop.z + 1.2 }], "HandoverPlace");
   await Interact();
   {
@@ -147,7 +213,11 @@ export async function Drive(ctx) {
       assert.ok(shot.facts.includes(id), `16 缺事实 ${id}`);
   }
 
-  // --- 17 确认老周死亡：第一人称、不判失败、接收处继续工作 --------------------
+}
+
+/** 17 确认老周死亡：第一人称、不判失败、接收处继续工作。 */
+async function DriveDeath(ctx, { JumpStage, WaitStage }) {
+  const { page, output } = ctx;
   await JumpStage(17);
   await WaitStage("BridgeOrders", 420);
   {
@@ -159,19 +229,21 @@ export async function Drive(ctx) {
     await fs.writeFile(path.join(output, "Data_DeathScene.json"), JSON.stringify(shot.end.reception, null, 2));
   }
 
-  // --- 18 接应回援尾队、奉令毁桥、夜入滕城 -----------------------------------
+}
+
+/** 18 接应回援尾队、奉令毁桥、夜入滕城。 */
+async function DriveBridge(ctx, { JumpStage, Capture, CaptureFocus, Route, WaitStage }) {
+  const { page, output } = ctx;
   await JumpStage(18);
   {
     // 传令兵真人跑进接收处，跑到跟前才开口。
     const before = await Mission(page);
     assert.ok(!before.facts.includes("bridgeOrdersHeard"), "刚进 18 还没接到令");
-    await page.waitForFunction(() => window.Tengxian.Debug.FirstLevelMission().facts.includes("bridgeRunnerArrived"),
-      null, { timeout: 120000 });
+    await WaitFact(page, "bridgeRunnerArrived", "18 传令兵跑到接收处", 180);
     const runner = (await Mission(page)).end.extras.find(entry => entry.id === "BridgeRunner");
     assert.ok(runner && runner.alive, "传令兵是真人实体");
     await CaptureFocus("BridgeRunner", runner);
-    await page.waitForFunction(() => window.Tengxian.Debug.FirstLevelMission().facts.includes("bridgeOrdersHeard"),
-      null, { timeout: 120000 });
+    await WaitFact(page, "bridgeOrdersHeard", "18 接令", 180);
     assert.ok((await page.locator("#hud").innerText()).includes("铁路桥"),
       "HUD 目标更新为「掩护回援分队通过铁路桥」");
   }
@@ -183,7 +255,9 @@ export async function Drive(ctx) {
     assert.ok(shot.facts.includes("southBankReached"), "到了南岸遮挡后的射位");
     const column = shot.bridgeColumn;
     assert.equal(column.length, 6, "回援尾队是六个真人");
-    assert.ok(column.every(entry => entry.alive), "他们一开始都还活着");
+    // Notion 明说「有人可能中弹」：不要求一个不少，只要求这还是一支队伍。
+    assert.ok(column.filter(entry => entry.alive).length >= 4,
+      "北岸火力下尾队还成队：" + JSON.stringify(column.map(entry => entry.alive)));
     assert.ok(column.some(entry => entry.load === "mg") && column.filter(entry => entry.load === "mortar").length === 2,
       "尾队带着机枪与两人抬的迫击炮部件");
     assert.ok(column.every(entry => !entry.crossed), "火力没打断以前一个人都没过桥");
@@ -191,17 +265,11 @@ export async function Drive(ctx) {
   }
   // 压住北岸土坎的火力（真开枪；不要求杀光）。
   await page.evaluate(() => { window.MissionInputDriver.blocked.clear(); });
-  {
-    const broken = await page.waitForFunction(
-      () => window.Tengxian.Debug.FirstLevelMission().facts.includes("bridgeFireBroken"),
-      null, { timeout: 300000 }).then(() => true).catch(() => false);
-    if (!broken) {
-      // 站在射位上打：驾驶器的 Target 只在 WaitStage/Route 的循环里跑。
-      await Route([{ x: A.bridgeCover.x + 3, z: A.bridgeCover.z - 2 }, { x: A.bridgeCover.x, z: A.bridgeCover.z }],
-        "BridgeSuppress", { fight: true });
-      await WaitStage("BridgeWithdraw", 420, { fight: true, cover: true });
-    } else await WaitStage("BridgeWithdraw", 420, { fight: true, cover: true });
-  }
+  // 站在射位上真开枪压住土坎；打断之后尾队自己过桥。
+  await Route([{ x: A.bridgeCover.x + 3, z: A.bridgeCover.z - 2 }, { x: A.bridgeCover.x, z: A.bridgeCover.z }],
+    "BridgeSuppress", { fight: true });
+  await WaitFact(page, "bridgeFireBroken", "18 打断北岸火力", 420, { fight: true });
+  await WaitStage("BridgeWithdraw", 420, { fight: true, cover: true });
   {
     const shot = await Mission(page);
     assert.ok(shot.facts.includes("bridgeFireBroken") && shot.facts.includes("rearColumnCrossed"),
@@ -218,8 +286,7 @@ export async function Drive(ctx) {
     assert.ok(shot.log.some(entry => entry.id === "blastHeldForFriendly"),
       "爆破至少等过一次「爆破区里还有己方」—— 不是到点就炸");
   }
-  await page.waitForFunction(() => window.Tengxian.Debug.FirstLevelMission().facts.includes("bridgeDestroyed"),
-    null, { timeout: 180000 });
+  await WaitFact(page, "bridgeDestroyed", "18 爆破", 240);
   await Capture("BridgeBlast");
   {
     const blast = await page.evaluate(() => {
@@ -244,17 +311,14 @@ export async function Drive(ctx) {
     console.log("RAIL_BRIDGE_AFTER_BLAST", JSON.stringify(gone));
     assert.equal(gone.deck, 0, "炸完桥面/桁架/钢轨的碰撞一件不剩");
   }
-  await page.waitForFunction(() => window.Tengxian.Debug.FirstLevelMission().facts.includes("marchOrderHeard"),
-    null, { timeout: 120000 });
+  await WaitFact(page, "marchOrderHeard", "18 往滕县", 180);
 
   // --- 18 夜入滕城：先随队走完 marchOut，黑屏字幕，夜景，进北门 ---------------
   await WaitStage("NightMarch", 180, { fight: false });
   await Route(Points(MISSION_STAGE_ROUTES.marchOut), "NightMarchOut");
-  await page.waitForFunction(() => window.Tengxian.Debug.FirstLevelMission().facts.includes("marchOutReached"),
-    null, { timeout: 120000 });
+  await WaitFact(page, "marchOutReached", "18 走完 marchOut", 180);
   await Capture("NightFadeOut");
-  await page.waitForFunction(() => window.Tengxian.Debug.FirstLevelMission().facts.includes("nightArrivalPlaced"),
-    null, { timeout: 120000 });
+  await WaitFact(page, "nightArrivalPlaced", "18 黑屏里换夜景", 180);
   {
     const night = await page.evaluate(() => {
       const g = window.Tengxian, mission = g.Debug.FirstLevelMission();
@@ -267,7 +331,7 @@ export async function Drive(ctx) {
     assert.ok(night.dressing.people >= 10, "夜景里真的有在走的队列、搬运的人和分配防区的人");
     await fs.writeFile(path.join(output, "Data_NightGate.json"), JSON.stringify(night, null, 2));
   }
-  await page.waitForFunction(() => !window.Tengxian.Debug.FirstLevelMission().control, null, { timeout: 60000 });
+  await WaitControl(page, "18 夜行军淡入", 120);
   await Capture("NightFadeIn");
   await Route(Points(MISSION_STAGE_ROUTES.nightMarch.slice(1)), "NightMarchToGate");
   {
@@ -276,6 +340,4 @@ export async function Drive(ctx) {
     assert.ok(shot.facts.includes("northGateReached"), "走到北门下");
   }
   await WaitStage("Complete", 180);
-  await Capture("Complete");
-  assert.equal(await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission().stage), "Complete");
 }
