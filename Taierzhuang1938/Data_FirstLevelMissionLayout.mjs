@@ -1,5 +1,5 @@
 import { FRONT_SORTIE as Sortie } from "./Data_FirstLevelFrontRoute.mjs";
-import { MISSION_REAR_ANCHORS, MISSION_REAR_ROUTES, MISSION_RECEPTION_SPACE, MISSION_SOUTH_BRIDGE } from "./Data_FirstLevelMissionTopology.mjs";
+import { MISSION_REAR_ANCHORS, MISSION_REAR_ROUTES, MISSION_RECEPTION_SPACE, MISSION_SOUTH_BRIDGE, MISSION_STAGE_ANCHORS, MISSION_STAGE_ROUTES } from "./Data_FirstLevelMissionTopology.mjs";
 import { MISSION_TRENCH_COVER as TC } from "./Data_FirstLevelMissionTrenchCover.mjs";
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
 import { MISSION_TRAIN } from "./Data_FirstLevelMissionTrain.mjs";
@@ -525,6 +525,7 @@ export const MISSION_ANCHORS = Object.freeze({
   gate: { x: 53, z: 34 }, courtCover: { x: 67, z: 24 },
   transfer: { x: 95, z: 103 }, queue: { x: 74, z: 111 },
   ...MISSION_REAR_ANCHORS,
+  ...MISSION_STAGE_ANCHORS,
 });
 export const MISSION_ROUTES = Object.freeze({
   flank: [
@@ -577,6 +578,7 @@ export const MISSION_ROUTES = Object.freeze({
     { x: 76, z: 170 },
   ],
   ...MISSION_REAR_ROUTES,
+  // MISSION_STAGE_ROUTES（2026.09.19 契约路线）等空间包把沿线几何建好、过了胶囊净空再并进来。
 });
 import { FRONT_GUARD_POSTS, FRONT_COVER, FRONT_FIELD_MEN, FrontAssaultLaneCuts } from "./Data_FirstLevelMissionFront.mjs";
 export const MISSION_PLACEMENT = Object.freeze({
