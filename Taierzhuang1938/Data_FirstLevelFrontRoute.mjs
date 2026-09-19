@@ -7,7 +7,10 @@ export const FRONT_SORTIE=Object.freeze({
     Point(49,-152),Point(49,-170),Point(55,-170),Point(55,-184),
     Point(45,-184),Point(45,-203),Point(40,-203),Point(40,-213)],
   house:Point(40,-214),bundle:Point(41.8,-215),keeper:Point(37.8,-215),
-  throw:Point(30,-117),orders:Point(14,-110),
+  throw:Point(30,-117),
+  // 2026.09.19 契约 §3：接令点迁到背坡伤员集结处（与 MISSION_STAGE_ANCHORS.collection
+  // 同一片场坪），不再是前沿沟里的 (14,-110)。键名不变。
+  orders:Point(-34,-99),
   crawl:[{id:'First',x:49,z:-127,w:4.6,d:5},{id:'Second',x:55,z:-177,w:4.6,d:5}],
   crawlClearanceM:.96, crawlRoofM:1.1, crawlRadiusM:3.8,crawlEntryMarginM:.75,
   checkpointRadiusM:3.2, supplierRangeM:7, leaderArrivalM:4,leaderWaitM:12,leaderCrawlMps:1.1,

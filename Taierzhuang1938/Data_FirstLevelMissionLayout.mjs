@@ -1,5 +1,5 @@
 import { FRONT_SORTIE as Sortie } from "./Data_FirstLevelFrontRoute.mjs";
-import { MISSION_REAR_ANCHORS, MISSION_REAR_ROUTES, MISSION_RECEPTION_SPACE, MISSION_SOUTH_BRIDGE, MISSION_STAGE_ANCHORS, MISSION_STAGE_ROUTES } from "./Data_FirstLevelMissionTopology.mjs";
+import { MISSION_REAR_ANCHORS, MISSION_REAR_ROUTES, MISSION_RECEPTION_SPACE, MISSION_SOUTH_BRIDGE, MISSION_RAIL_BRIDGE, MISSION_STAGE_ANCHORS, MISSION_STAGE_ROUTES } from "./Data_FirstLevelMissionTopology.mjs";
 import { MISSION_TRENCH_COVER as TC } from "./Data_FirstLevelMissionTrenchCover.mjs";
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
 import { MISSION_TRAIN } from "./Data_FirstLevelMissionTrain.mjs";
@@ -19,7 +19,13 @@ export const MISSION_RAILWAY = Object.freeze({
   gauge: 1.435,
   // Ballast top: soil smoothed over +/-24 m, then kept 0.06-0.18 m above the local soil.
   crown: Object.freeze({ step: 4, smooth: 6, lift: 0.1, clampLo: 0.06, clampHi: 0.18 }),
-  bed: Object.freeze({ material: "railBallast", topHalf: 1.7, slope: 1.6, embed: 0.25, step: 4, chunkLen: 48 }),
+  // 道砟/枕木/钢轨在铁路桥那一段断开。弧长 = z - 起点 z（这条线是一条直线，
+  // s 与 z 一一对应）。不断开的话 crown 被 clampHi 钉在本地地面 +0.18，整条轨
+  // 会跟着河槽栽到 -4 m 去；桥面上的两段直轨在下面的 RailBridge* 里单摆。
+  sleeperGaps: Object.freeze([MISSION_RAIL_BRIDGE.gapZ.map((z) => z + 186)]),
+  railGaps: Object.freeze([MISSION_RAIL_BRIDGE.gapZ.map((z) => z + 186)]),
+  bed: Object.freeze({ material: "railBallast", topHalf: 1.7, slope: 1.6, embed: 0.25, step: 4, chunkLen: 48,
+    gaps: Object.freeze([MISSION_RAIL_BRIDGE.gapZ.map((z) => z + 186)]) }),
   sleeper: Object.freeze({ material: "timber", along: 0.22, h: 0.14, length: 2.5, lift: 0.02,
     spacing: 0.75, jitter: 0.03, ryJitter: 0.02 }),
   // Rail foot rests on the sleeper top (crown + 0.09).
@@ -59,6 +65,16 @@ function GroundedWall(id,x,z,w,h,d){
   const wall=Wall(id,x,z,w,h,d),top=wall.y+wall.h/2;
   const base=Math.min(...[-1,0,1].flatMap(a=>[-1,0,1].map(b=>SampleMissionTerrain(x+a*w/2,z+b*d/2))))-.1;
   wall.y=(top+base)/2;wall.h=top-base;return wall;
+}
+/**
+ * 同样贴地的体块，但**不登记 cover 面**。背坡土坎、河岸土堤这类东西高 3 m，
+ * 按 cover 登记会让 AI 把整道坡当成一排射击位（DeriveCoversFromColliders 照旧
+ * 会从实体盒里推出该有的那些）。
+ */
+function GroundedBlock(id,x,z,w,h,d,semantic="earthDark",extra={}){
+  const top=SampleMissionTerrain(x,z)+h;
+  const base=Math.min(...[-1,0,1].flatMap(a=>[-1,0,1].map(b=>SampleMissionTerrain(x+a*w/2,z+b*d/2))))-.1;
+  return Block(id,x,z,w,top-base,d,semantic,{y:(top+base)/2,...extra});
 }
 function DoorWall(id, x, z, w, h, opening = 3.8) {
   const side = (w - opening) / 2;
@@ -264,6 +280,14 @@ for (const x of [-25, 0, 15]) {
   Wall(`FrontParapet${x}`, x, -131, 6, 0.55, 0.9);
   Wall(`FrontTraverseCover${x}`, x + 3.6, -119.4, 0.8, 0.65, 2);
 }
+// 06 背坡伤员集结处的那道反坡（2026.09.19 契约 §3）。不是「掩体」是地形：
+// 集结处在它南边，站在担架旁边看不见机枪位、看不见掩蔽部门外、看不见北边来敌。
+// 缺口留在 x -44..-40（rearCorner 的折角），02 的队伍从那儿穿过去。
+GroundedBlock("CollectionBackslopeWest",-50,-115.5,12,3,2.5);
+GroundedBlock("CollectionBackslopeEast",-27,-115.5,26,3,2.5);
+// 集结处南缘的低土壁：担架排在它北边，老周就靠这堵墙等担架（06 的借火戏）。
+// 不往东摆第二道：那边是 02/05→06 进出集结处的走廊。
+GroundedWall("CollectionLitterWall",-40,-95,9,1.1,0.7);
 Room("BundleSupplyHouse",Sortie.house.x,Sortie.house.z,9,10,{northDoor:false});
 Block("BundleCrate",Sortie.bundle.x,Sortie.bundle.z,1.2,.5,.8,"missionRoute");
 for(const crawl of Sortie.crawl){
@@ -326,6 +350,17 @@ Wall("AmbushWestScreen", 54.6, 3.5, 0.35, 1.9, 4.2);
 Block("AmbushCornerCrates", 61.9, 12.6, 3, 1.7, 1.6, "cover");
 // 被砸倒之后是躺着仰头看的：这间屋子的头顶上必须有东西（见 Rafters 的注释）。
 Rafters("ConnectedHouse", 58, 8, 12, 15);
+// 连屋东墙通东巷的那扇门（09：melee 组从那边进来，不再预埋伏击位）。
+// Room() 的窗下槛是一整条 6.6 m，这里把它在 z 8.0..9.2 断开 1.2 m —— 门是
+// 落地的，人直接走进来，不用翻 0.82 m 的窗台。
+{
+  const sill = blocks.find((block) => block.id === "ConnectedHouseWindowSill");
+  const south = sill.z + sill.d / 2;                      // 11.3
+  sill.d = 8.0 - (sill.z - sill.d / 2); sill.z = 8.0 - sill.d / 2;   // z 4.7..8.0
+  Wall("ConnectedHouseEastDoorSill", sill.x, (9.2 + south) / 2, 0.6, 0.82, south - 9.2);
+  Block("ConnectedHouseEastDoorLintel", sill.x, 8.6, 0.6, 0.5, 1.2, "structure",
+    { y: SampleMissionTerrain(sill.x, 8.6) + 2.65 });
+}
 Room("MachineGunHouse", 43, 8, 12, 15, { northDoor: true, southDoor: true, eastWindow: true });
 Wall("CourtyardWest", 33, 25, 0.7, 2.5, 19);
 Wall("CourtyardEast", 72, 20, 0.7, 2.5, 28);
@@ -344,6 +379,38 @@ gates.push({
 Wall("VillageRoadBlock", 36, -10, 10, 1.15, 0.7);
 Wall("EastLaneRuin", 95, 6, 0.7, 2.1, 23);
 Wall("VillageApproachCover", 28, -30, 9, 1.05, 0.6);
+// ---------------------------------------------------------------------------
+// 08—10 主街、东巷、绕回短巷（2026.09.19 契约 §3）
+// ---------------------------------------------------------------------------
+// 主街是内院东墙（CourtyardEast, x=72）与新的东侧临街墙（x=82）之间那条
+// 9.3 m 宽的南北巷。担架队原本要从这儿直下桥头；08 把它堵上。
+GroundedWall("StreetWestWallNorth",72,-8,0.7,2.6,28);
+GroundedWall("StreetWestWallSouthA",72,36,0.7,2.6,4);
+GroundedWall("StreetWestWallSouthB",72,49,0.7,2.6,6);   // 缺口 z 38..46 是 10 的绕回巷接口
+GroundedWall("StreetEastWallNorth",82,-10,0.7,2.6,24);
+// 东侧那户人家的窗：正对主街障碍**北侧**，日军占住它就封死整条街。
+Wall("StreetEastWindowSill",82,5,0.7,0.85,6);
+Block("StreetEastWindowTop",82,5,0.7,0.5,6,"structure",{y:SampleMissionTerrain(82,5)+2.55});
+// 东巷口在 z 8..14；z 35..45 再留一个口 —— 内院追兵（MISSION_TACTICS 的
+// CourtyardPursuerA/B/C）就是从村东沿这条线压过来的，堵死等于把 10 的追击掐了。
+GroundedWall("StreetEastWallSouthA",82,24.5,0.7,2.6,21);
+GroundedWall("StreetEastWallSouthB",82,48.5,0.7,2.6,7);
+// 障碍：倒下的院墙 + 横倒的大车，中间只剩 0.9 m 的人缝。
+// 0.9 而不是契约写的「≤0.8」：玩家胶囊半径 0.34（Script_Physics.MakeCharacter），
+// 0.8 只剩每侧 0.06 m，真走会卡；0.9 留 0.11 m，而担架队 1.25 m 的通行宽仍过不去。
+GroundedWall("StreetBlockFallenWall",74.3,20,3.85,1.35,2);
+Block("StreetBlockCart",79.4,20,4.55,1.6,2.6,"timber");
+Block("StreetBlockCartWheel",77.4,18.4,0.3,1.2,1.2,"timber",{solid:false});
+// 担架队等待的可靠遮挡：从障碍与东窗两个方向过来的射线都被它切断。
+GroundedWall("LitterHoldCover",66,-16.5,10,1.5,0.8);
+// 东巷：日军从村东突入的那条；与连屋相通（连屋东墙的窗下槛断开 1.2 m 是那扇门）。
+GroundedWall("EastAlleyNorthWall",87.5,2,11,2.6,0.7);
+GroundedWall("EastAlleySouthWall",89,20,14,2.6,0.7);
+GroundedWall("EastAlleyEastStub",94,-4,0.7,2.6,12);
+// 10 的绕回短巷：内院门 → 南 → 东 → 主街障碍南侧。北侧就是内院南墙。
+// 南墙到 x=68 为止：再往东就压在内院追兵切进来的那条线上（CourtyardPursuerB/C）。
+GroundedWall("RejoinAlleySouth",59,44,18,2.6,0.7);
+GroundedWall("RejoinAlleyWest",50,39,0.7,2.6,10);
 // Ground-level transfer yard, queue lane and two loading bays.
 for (const x of [64, 88])
   for (const z of [109, 129]) Block(`TransferPost${x}_${z}`, x, z, 0.4, 3.5, 0.4, "structure");
@@ -353,18 +420,88 @@ Wall("TransferCorner", 95, 96, 8, 1.1, 0.7);
 Wall("TransferWestCover", 53, 121, 0.75, 1.1, 10);
 Block("TriageDesk", 66, 116, 2, 0.85, 1, "missionRoute");
 Block("TransferCrates", 93, 111, 2, 1.15, 3, "cover");
-// Temporary bridge spans the shallow drainage channel; a structural deck is valid.
-const bridge = Block("TemporaryBridge", 76, 153, 8, 0.25, 7, "structure", { y: 0.13, dynamic: true });
+// 12 的第二处威胁：侧巷。两道院墙夹出 7.3 m 净宽的巷子，巷口朝东正对装载区与
+// 出发的车列。摆在装载区**西侧**（村落那一侧）而不是东侧：东侧 x 94–112 整片
+// 是 TransferFlank*/TransferLast*/MISSION_PURSUIT_ROUTE 的既有通道，
+// 一堵墙下去就把村东追出来的那几股堵死在自己家门口。
+GroundedWall("SideAlleyWestWall", 48, 130, 0.7, 2.6, 14);
+GroundedWall("SideAlleyEastWall", 56, 130, 0.7, 2.6, 14);
+// 11—12 玩家守村路的低墙：装载区**北**缘、桥头路西肩的一段矮墙，趴在它后面
+// 正对村落方向来的路。东边不再加第二段 —— x 79–92 是村东追兵（TransferRear*）
+// 上来的线；也不能往南挪进 z 88–111，那整片是接运人群横向分流的通道
+// （MISSION_CROWD_AREAS.transfer 的 entryZ=88 / exitZ=111）。
+GroundedWall("TransferVillageWallWest", 66.5, 84, 13, 1.2, 0.8);
+// ---------------------------------------------------------------------------
+// 北沙河两座桥（2026.09.19 契约 §3）
+// ---------------------------------------------------------------------------
+// 路桥：河槽从「1.8 m 深的排水沟」变成 28.4 m 宽、4.2 m 深的河槽之后，旧的
+// 8x7 甲板两头都悬在坡上。甲板加长到 32 m（z 137..169，河口在 138.8..167.2），
+// 下面加两排排架墩。gate 生命周期一个字不改：信号到了甲板消失、可走面撤掉，
+// MissionBridgeWreck 顶上来。
+const bridge = Block("TemporaryBridge", MISSION_SOUTH_BRIDGE.deck.x, MISSION_SOUTH_BRIDGE.deck.z,
+  MISSION_SOUTH_BRIDGE.deck.w, MISSION_SOUTH_BRIDGE.deckH, MISSION_SOUTH_BRIDGE.deck.d,
+  "structure", { y: MISSION_SOUTH_BRIDGE.deckY, dynamic: true });
 surfaces.push(bridge);
 gates.push({ ...bridge, walkableId: bridge.id, signal: "MissionBridgeDestroyed" });
 gates.push(MISSION_SOUTH_BRIDGE.wreck);
+{
+  const deckBottom = MISSION_SOUTH_BRIDGE.deckY - MISSION_SOUTH_BRIDGE.deckH / 2;
+  for (const px of MISSION_SOUTH_BRIDGE.pierRows) for (const pz of MISSION_SOUTH_BRIDGE.pierZ) {
+    const foot = SampleMissionTerrain(px, pz) - 0.2;
+    Block(`TemporaryBridgePier${px}_${pz}`, px, pz, 0.55, deckBottom - foot, 0.55, "timber",
+      { y: (deckBottom + foot) / 2 });
+  }
+}
+// 铁路桥（18）。完好件全部是 gate（signal），残骸件是 appearSignal —— 桥被破坏
+// 之后甲板连同可走面一起撤掉，人再也过不去（河槽底在 -4.2）。
+{
+  const B = MISSION_RAIL_BRIDGE, deckBottom = B.deckTopY - B.deckH;
+  const deck = Block("RailBridgeDeck", B.x, B.z, B.deckW, B.deckH, B.deckHalfD * 2, "structure",
+    { y: B.deckTopY - B.deckH / 2, dynamic: true });
+  surfaces.push(deck);
+  gates.push({ ...deck, walkableId: deck.id, signal: B.signal });
+  for (const side of [-1, 1]) {
+    // 桁架：甲板两侧的主梁，站在桥上视线被它夹住，从南岸看得见桥的轮廓。
+    gates.push({ id: `RailBridgeTruss${side < 0 ? "West" : "East"}`, x: B.x + side * B.trussOffsetX,
+      y: B.deckTopY + B.trussH / 2, z: B.z, w: B.trussW, h: B.trussH, d: B.deckHalfD * 2 - 2,
+      semantic: "metal", signal: B.signal });
+    // 桥面直轨：道砟与轨在 gapZ 断开，这两段把轨接过河。
+    gates.push({ id: `RailBridgeRail${side < 0 ? "West" : "East"}`, x: B.x + side * B.railGaugeHalf,
+      y: B.deckTopY + 0.065, z: B.z, w: 0.08, h: 0.13, d: B.deckHalfD * 2 - 1,
+      semantic: "metal", signal: B.signal });
+  }
+  // 桥台做成两侧的翼墙而不是一整道：桥面下的实心盒会被路线净空判成「挡住尾队」
+  // （可走面只豁免甲板本身），翼墙让开 x=-77 的中线。
+  for (const [i, az] of B.abutmentZ.entries()) for (const side of [-1, 1]) {
+    const ax = B.x + side * (B.abutmentW / 2 - 1);
+    const foot = SampleMissionTerrain(ax, az) - 0.3;
+    Block(`RailBridgeAbutment${i ? "South" : "North"}${side < 0 ? "West" : "East"}`, ax, az, 2,
+      deckBottom - foot, B.abutmentD, "structure", { y: (deckBottom + foot) / 2 });
+  }
+  const floor = SampleMissionTerrain(B.x, B.z);
+  gates.push({ id: "RailBridgeWreckSpan", x: B.x, y: floor + 0.7, z: B.z, w: B.deckW, h: 1.4, d: 16,
+    semantic: "structure", appearSignal: B.signal });
+  gates.push({ id: "RailBridgeWreckTruss", x: B.x - 2.4, y: floor + 1.5, z: B.z - 6, w: 0.6, h: 3, d: 12,
+    semantic: "metal", appearSignal: B.signal });
+  // 北桥头的断板：炸完之后堵在引道上，人走到这儿就到头了（不是「走过去掉下河」）。
+  gates.push({ id: "RailBridgeWreckStub", x: B.x, y: deckBottom + 0.75, z: B.z - B.deckHalfD + 3.5,
+    w: B.deckW, h: 1.5, d: 3, semantic: "earthDark", appearSignal: B.signal });
+}
+// 南岸遮挡（18 的射位）：中间留 x -77..-69 的缺口，爆破安全区从那儿看得见桥。
+GroundedWall("BridgeSouthCoverWest", -82.5, 177.6, 9, 1.3, 0.8);
+GroundedWall("BridgeSouthCoverEast", -64.5, 178.4, 9, 1.45, 0.8);
+// 北岸土坎：敌军火力位（bridgeEnemy 在它北边，隔着土坎对射）。铁路那一段留缺口。
+GroundedWall("BridgeNorthRidgeWest", -87, 132.2, 10, 1.45, 1.2);
+GroundedWall("BridgeNorthRidgeEast", -66, 132.2, 12, 1.45, 1.2);
+// 爆破安全区的遮挡：离桥心 48 m，站姿眼高 1.6 刚好越过它看见桥面。
+GroundedWall("BlastSafeBank", -66, 197.5, 7, 1.35, 0.9);
 // Three separate rearguard pockets turn south after the western ditch mouth.
 GroundedWall("DrainCorner",28,134,4,1.2,.7);
 GroundedWall("DrainSightBreak",44,160,9,2.8,1);
 GroundedWall("RearWallGapWest",45,184,16,2.8,.7);
 GroundedWall("RearWallGapEast",65,184,14,2.8,.7);
 GroundedWall("RearWallSightBreak",38,199,16,2.8,1);
-GroundedWall("BackyardWall",20,224,9,2.8,.7);
+GroundedWall("BackyardWall",21.5,224,7,2.8,.7);
 Room("RearCourtyardHouse",27,232,13,12,{eastWindow:true});
 // One reception compound: street room, ward, second cover and an actual west back door.
 Room("ReceptionStreetRoom",-5,229,10,14,{eastWindow:true});
@@ -378,6 +515,30 @@ Block("ReceptionMedicine",-31,236,1,.7,1,"missionRoute");
 Wall("ReceptionSecondCover",-32,242,4,1.05,.7);
 Wall("RearExitCover",-43,235,4,1.05,.7);
 Wall("FinalAlleyCover",-60,210,.7,1.2,12);
+// ---------------------------------------------------------------------------
+// 15B—16（2026.09.19 契约 §3）
+// ---------------------------------------------------------------------------
+// 靠院墙的夹道（15B）：北侧 2.8 m 连续院墙、南侧 1.1 m 矮墙，净宽 2.8 m；
+// 西端左拐向南，途中一处 0.22 m 的坎（「前头有坎，抬高点」「前头往左拐」）。
+// 这就是 MISSION_REAR_ROUTES.evacuation 的尾段本身 —— 沟到 (56,207) 为止。
+GroundedWall("WallPathYardWall",25,209.5,22,2.8,0.7);
+GroundedWall("WallPathLowWall",27,213,18,1.1,0.7);
+Block("WallPathBump",24,211.25,1.2,0.22,2.8,"step",
+  {y:SampleMissionTerrain(24,211.25)+0.11});
+// 左拐外侧的那堵墙。南边不再补第二道：后院追兵（MISSION_TACTICS.YardPursuer*）
+// 从 (26,215) 斜切到 retreatC，第二道墙正好横在他们那条线上。
+GroundedWall("WallPathTurnWest",13.25,216.5,0.7,2.8,10);
+// 接收院院门（15C 守军盘问处）：院子东墙上 4 m 净宽的门洞，担架抬得进去。
+// 旧的 evacuation 路线本来就从 (9,240)→(-13,240) 横穿这里，现在它走的是一道真门。
+// 南边那垛只做 3 m 的门垛：再往南是 ReceptionRifleB 沿 z=247 切进院子的线。
+GroundedWall("ReceptionEastNorth",2,228,0.7,2.8,20);
+GroundedWall("ReceptionEastSouth",2,243.5,0.7,2.8,3);
+Block("ReceptionGateLintel",2,240,0.7,0.45,4,"structure",
+  {y:SampleMissionTerrain(2,240)+2.575});
+// 16 的门槛：厢房南门。0.15 m，低于 TRAVERSAL.stepMax(0.55)，走得过去但会颠一下。
+Block("WardThreshold",MISSION_RECEPTION_SPACE.wardThreshold.x,MISSION_RECEPTION_SPACE.wardThreshold.z,
+  3.8,0.15,0.7,"step",
+  {y:SampleMissionTerrain(MISSION_RECEPTION_SPACE.wardThreshold.x,MISSION_RECEPTION_SPACE.wardThreshold.z)+0.075});
 for(const post of MISSION_DEFENSE_POSTS)GroundedWall(post.id,post.x,post.z,post.w,post.h,post.d);
 // Human-scale work areas, connected landmarks and trench construction remain pure geometry.
 // Small surface details have no separate collision; functional furniture and walls do.
@@ -538,10 +699,12 @@ export const MISSION_ROUTES = Object.freeze({
   support: OPENING.supportRoute,
   bundle: Sortie.route,
   bundleReturn: Sortie.route.slice(3).reverse(),
-  orders: [Sortie.throw,{x:25,z:-110},Sortie.orders],
+  // 2026.09.19：orders 锚点迁到背坡伤员集结处，所以这两条返程线不再停在前沿的
+  // (14,-110)，而是沿交通壕退回集结处（= collectionReturn 的后半段）。
+  orders: [Sortie.throw,...MISSION_STAGE_ROUTES.collectionReturn.slice(1)],
   // The tank can be immobilized anywhere along the return trench, so the rally
   // leg starts wherever the bundle run is; the squad already walks it this way.
-  ordersRejoin: [...Sortie.route.slice(3).reverse(),{x:25,z:-110},Sortie.orders],
+  ordersRejoin: [...Sortie.route.slice(3).reverse(),...MISSION_STAGE_ROUTES.collectionReturn.slice(1)],
   south: [
     { x: -36, z: -124 },
     { x: 0, z: -124 },
@@ -553,15 +716,13 @@ export const MISSION_ROUTES = Object.freeze({
     { x: 24, z: -20 },
     { x: 48, z: -20 },
   ],
+  // 2026.09.19：内院门出来之后不再斜着切到 (64,52) —— 那条线现在压在绕回短巷的
+  // 南墙上。走 courtyardBypass 的巷子，在主街障碍南侧 streetRejoin 接回主街再南下。
   village: [
     { x: 48, z: -20 },
     { x: 58, z: -20 },
-    { x: 58, z: -9 },
-    { x: 58, z: 8 },
-    { x: 58, z: 18 },
-    { x: 53, z: 24 },
-    { x: 53, z: 34 },
-    { x: 64, z: 52 },
+    ...MISSION_STAGE_ROUTES.courtyardBypass,
+    { x: 78, z: 60 },
     { x: 76, z: 85 },
     { x: 74, z: 111 },
   ],
@@ -578,7 +739,9 @@ export const MISSION_ROUTES = Object.freeze({
     { x: 76, z: 170 },
   ],
   ...MISSION_REAR_ROUTES,
-  // MISSION_STAGE_ROUTES（2026.09.19 契约路线）等空间包把沿线几何建好、过了胶囊净空再并进来。
+  // 2026.09.19 契约路线。沿线几何已建好、0.35 m 胶囊净空由 Script_FirstLevelSpaceTest
+  // 与 Script_FirstLevelMissionTest 两道一起看着。
+  ...MISSION_STAGE_ROUTES,
 });
 import { FRONT_GUARD_POSTS, FRONT_COVER, FRONT_FIELD_MEN, FrontAssaultLaneCuts } from "./Data_FirstLevelMissionFront.mjs";
 export const MISSION_PLACEMENT = Object.freeze({
@@ -621,12 +784,100 @@ export const MISSION_PLACEMENT = Object.freeze({
     { x: 16, z: -131 },
     { x: 2, z: -132 },
   ],
+  // 车位挪到装载区东半边，排成两列：旧的 (86,141) 落在北沙河的北坡上，(86,132)
+  // 也贴着河口。**四个车位全在 cartRide 的出场道以东** —— 牛车的碰撞盒是
+  // 3 x 5.8 m（Script_FirstLevelMissionView 的 "cart" 几何），一辆停着的车能把
+  // 相邻的车道整条封死（实拍：胶囊卡在 (82,128.26)，正是停在 (82,125) 那辆车的车尾）。
   cartBays: [
-    { x: 80, z: 120 },
-    { x: 86, z: 123 },
-    { x: 86, z: 132 },
-    { x: 86, z: 141 },
+    { x: 88, z: 113 },
+    { x: 88, z: 121 },
+    { x: 94, z: 118 },
+    { x: 94, z: 126 },
   ],
+  // -------------------------------------------------------------------------
+  // 2026.09.19 新区的摆位（玩法包用；每点 {x,z,yaw?}，yaw 是弧度、0 朝 +z 南）
+  // -------------------------------------------------------------------------
+  // 01—02 掩蔽部。玩家侧躺在后半间，视线穿前门低处破口看门外 9 m 的刺杀处。
+  bunker: {
+    player: { x: -40, z: -124, yaw: Math.PI },      // 头朝北（-z），能看见门外
+    playerEyeM: 0.42,
+    rifle: { x: -36.8, z: -125.8, yaw: 1.1 },       // 够不到：离玩家 3.7 m
+    pinnedFrame: [{ x: -41.4, z: -124.2 }, { x: -38.6, z: -124.6 }],
+    captives: [
+      { id: "captiveWounded", x: -40.6, z: -141.4, yaw: 0.3 },
+      { id: "captiveHelper", x: -38.9, z: -142.2, yaw: 2.6 },
+    ],
+    captiveRifles: [{ x: -44.2, z: -143.6 }, { x: -43.4, z: -140.8 }],
+    ijaStart: [{ x: -41.8, z: -148.5, yaw: Math.PI }, { x: -37.4, z: -149.2, yaw: Math.PI }],
+    ijaKill: [{ x: -40.2, z: -143.4, yaw: Math.PI }, { x: -38.4, z: -143.8, yaw: Math.PI }],
+    ijaDoor: [{ x: -40.1, z: -135.2, yaw: Math.PI }, { x: -38.2, z: -136.4, yaw: Math.PI }],
+    luoEntry: { x: -40, z: -119.6, yaw: Math.PI },  // 从后壁破口挤进来
+    luoLift: { x: -40.6, z: -122.6, yaw: Math.PI },
+    yaowaLift: { x: -38.5, z: -122.4, yaw: Math.PI },
+    heyoutianFire: { x: -52, z: -125, yaw: -0.46 }, // 绕过掩蔽部西墙，射线到刺杀处
+  },
+  // 06 背坡伤员集结处。
+  collection: {
+    litters: [{ x: -40.5, z: -99.2, yaw: 0 }, { x: -38, z: -98.6, yaw: 0 },
+      { x: -35.5, z: -99.4, yaw: 0 }, { x: -33, z: -98.8, yaw: 0 }],
+    wounded: [{ x: -43, z: -102.4 }, { x: -42.2, z: -105 }, { x: -30.6, z: -103.2 },
+      { x: -29.4, z: -100.2 }, { x: -33.8, z: -105.8 }],
+    bearers: [{ x: -41.6, z: -97.4, yaw: 0 }, { x: -37.2, z: -97 , yaw: 0 },
+      { x: -34.2, z: -97.2, yaw: 0 }, { x: -31.4, z: -97.6, yaw: 0 }],
+    zhouWall: { x: -36.4, z: -95.9, yaw: Math.PI },  // 靠 CollectionLitterWall 的土壁等担架
+    runner: { x: -31, z: -95.4, yaw: Math.PI },
+  },
+  // 08 主街障碍。
+  streetBlock: {
+    gap: { x: 76.65, z: 20 },
+    frontParty: [{ x: 75.4, z: 13.6, yaw: 0 }, { x: 78.6, z: 12.8, yaw: 0 }],
+    withdrawnGuards: [{ x: 74.2, z: 8.4, yaw: 0 }, { x: 79.8, z: 7.2, yaw: 0 }],
+    litterWait: [{ x: 64.6, z: -19.4, yaw: 0 }, { x: 67.4, z: -20.6, yaw: 0 },
+      { x: 62.4, z: -21.2, yaw: 0 }],
+    windowShooter: { x: 83.2, z: 5, yaw: -1.57 },   // 东侧那户人家的窗后
+  },
+  // 12 牛车。座位是相对车体的偏移（+x 右、+z 车尾）。
+  cartRide: {
+    playerSeat: { dx: 0.62, dz: 0.95 },
+    zhouSeat: { dx: -0.55, dz: -0.15 },
+    drover: { dx: 0, dz: -1.55 },
+  },
+  // 15B 掉队的步行伤员，沿夹道摆。
+  wallPath: {
+    stragglers: [{ x: 31, z: 213, yaw: -1.57 }, { x: 22.6, z: 213.6, yaw: -1.57 },
+      { x: 12.6, z: 219, yaw: 0 }],
+  },
+  // 15C—17 接收院。
+  receptionYard: {
+    gateGuard: [{ x: 3.4, z: 237.6, yaw: -1.57 }, { x: 3.2, z: 242.4, yaw: -1.57 }],
+    receiver: { x: -4.6, z: 239.2, yaw: -1.57 },
+    surgeon: { x: -27.4, z: 241.2, yaw: 0 },
+    zhouPlaced: { x: -26, z: 239.4, yaw: 0 },
+    nextLitterEntry: { x: -13, z: 243.4, yaw: -1.57 },
+  },
+  // 18 铁路桥。
+  bridge: {
+    rearColumnForm: [{ x: -77, z: 122 }, { x: -79.4, z: 125.6 }, { x: -74.6, z: 126.4 }],
+    rearColumnGroups: [[{ x: -77, z: 128 }], [{ x: -78.2, z: 131.4 }], [{ x: -75.8, z: 131.8 }]],
+    officer: { x: -73.4, z: 173.6, yaw: Math.PI },
+    demolition: [{ x: -80.4, z: 172.2, yaw: Math.PI }, { x: -74.2, z: 171.4, yaw: Math.PI }],
+    luoCover: { x: -79.4, z: 180.2, yaw: Math.PI },
+    heyoutianCover: { x: -84.2, z: 179, yaw: Math.PI },
+    enemyRidge: [{ x: -68, z: 130.5, yaw: 0 }, { x: -63.4, z: 131, yaw: 0 },
+      { x: -85.6, z: 130.8, yaw: 0 }, { x: -89.2, z: 131.2, yaw: 0 }],
+  },
+  // 关尾北门夜景（NightGateShown 之前这一片根本不存在）。
+  night: {
+    column: [{ x: -161.4, z: 300 }, { x: -158.6, z: 302.4 }, { x: -160.2, z: 306.2 },
+      { x: -162, z: 310.4 }, { x: -158.2, z: 312.6 }, { x: -160.6, z: 316 },
+      { x: -159, z: 320.8 }, { x: -161.2, z: 325.4 }],
+    carriers: [{ x: -166.4, z: 330.2, yaw: 0 }, { x: -154.2, z: 331.6, yaw: 0 },
+      { x: -167.8, z: 336.4, yaw: 0 }, { x: -153.4, z: 335.2, yaw: 0 }],
+    sectorAssigners: [{ x: -156.4, z: 346.2, yaw: Math.PI }, { x: -163.8, z: 347.4, yaw: Math.PI }],
+    usher: { x: -159.2, z: 344.4, yaw: Math.PI },
+    braziers: [{ x: -166, z: 326.6 }, { x: -154, z: 327.2 }, { x: -165.4, z: 344.8 },
+      { x: -154.6, z: 345.4 }],
+  },
 });
 export const MISSION_SUPPLIES = Object.freeze([
   {id:"Unloading",x:-68.5,z:66,supportHeight:.85},
@@ -722,8 +973,100 @@ for (let i = blocks.length - 1; i >= 0; i--) {
   }));
   if(crosses)blocks.splice(i,1);
 }
+// ---------------------------------------------------------------------------
+// scenario：同一处空间的两种状态（Script_FirstLevelWhiteboxField.SetScenarioState）
+// ---------------------------------------------------------------------------
+/**
+ * 三个状态是**线性**的（SyncScenario 取「最后一个信号已满足」的那个），正好对上
+ * 关卡时间轴：完好掩蔽部 → 01 近爆之后的坍塌掩蔽部 → 18 关尾的夜景片。
+ * 夜景那一片写在最后一个状态里，所以 `NightGateShown` 之前它既不画也不进碰撞
+ * —— 白天那一带就是一块空地。
+ *
+ * 为什么不进 `blocks`：坍塌/完好两套墙同时存在没有意义，而 gate 是「一块一个网格」，
+ * 四十块各自一个 draw call。scenario 走 BuildSink 合批，切态只重建这一个 sink。
+ */
+const BUNKER_GROUND = SampleMissionTerrain(-40, -127);
+const NIGHT_GROUND = SampleMissionTerrain(-160, 334);
+function ScenarioBlock(id, x, z, w, h, d, semantic, y, extra = {}) {
+  return { id, x, y, z, w, h, d, semantic, tag: "whiteboxWall", ...extra };
+}
+const MISSION_SCENARIO = (() => {
+  const g = BUNKER_GROUND, n = NIGHT_GROUND;
+  const B = (id, x, z, w, h, d, semantic, top) =>
+    ScenarioBlock(id, x, z, w, h, d, semantic, g + top - h / 2);
+  // 两态共用的壳：西/东侧墙、前墙两垛、后墙两垛、中隔墙两垛。
+  const shell = [
+    B("BunkerWest", -44.25, -127, 0.5, 2.2, 12, "earthDark", 2.2),
+    B("BunkerEast", -35.75, -127, 0.5, 2.2, 12, "earthDark", 2.2),
+    B("BunkerFrontWest", -42.85, -133, 3.3, 2.2, 0.5, "earthDark", 2.2),
+    B("BunkerFrontEast", -37.15, -133, 3.3, 2.2, 0.5, "earthDark", 2.2),
+    B("BunkerRearWest", -43.05, -121, 2.9, 2.2, 0.5, "earthDark", 2.2),
+    B("BunkerRearEast", -36.95, -121, 2.9, 2.2, 0.5, "earthDark", 2.2),
+    B("BunkerPartitionWest", -43.05, -127, 2.9, 2.2, 0.5, "timber", 2.2),
+    B("BunkerPartitionEast", -36.95, -127, 2.9, 2.2, 0.5, "timber", 2.2),
+  ];
+  const intact = [...shell,
+    B("BunkerDoorLintel", -40, -133, 2.4, 0.2, 0.5, "timber", 2.2),
+    B("BunkerRearLintel", -40, -121, 3.2, 0.2, 0.5, "timber", 2.2),
+    B("BunkerPartitionLintel", -40, -127, 3.2, 0.2, 0.5, "timber", 2.2),
+    B("BunkerRoof", -40, -127, 9, 0.3, 12, "timber", 2.5),
+  ];
+  // 坍塌态：前半间塌了，前门只剩 0–1.20 m 的低处破口。躺姿眼高 0.35–0.50 m
+  // 从后半间 (-40,-124) 看出去，门外 8–12 m（z −141…−145）整个人都在视野里；
+  // 门槛的碎砖与门框立柱各遮住一部分。
+  const collapsed = [...shell,
+    B("BunkerFrontLintel", -40, -133, 2.4, 1.0, 0.5, "earthDark", 2.2),
+    B("BunkerDoorRubble", -40.95, -133, 0.9, 0.22, 0.7, "earthDark", 0.22),
+    B("BunkerDoorPost", -39.15, -133, 0.3, 2.2, 0.45, "timber", 2.2),
+    B("BunkerPartitionSill", -40, -127, 3.2, 0.18, 0.5, "earthDark", 0.18),
+    B("BunkerRoofRear", -40, -124, 9, 0.3, 6, "timber", 2.5),
+    B("BunkerRoofSlab", -40, -128.6, 5, 0.3, 2.6, "timber", 1.45),
+    B("BunkerRubbleA", -42.2, -130.4, 3.4, 1.1, 3.2, "earthDark", 1.1),
+    B("BunkerRubbleB", -37.4, -131.2, 2.6, 0.85, 2.4, "earthDark", 0.85),
+    B("BunkerBeamPinWest", -41.4, -124.2, 0.7, 0.55, 1.0, "timber", 0.55),
+    B("BunkerBeamPinEast", -38.6, -124.6, 0.6, 0.5, 0.9, "timber", 0.5),
+    B("BunkerClutter", -40, -122.2, 1.8, 0.5, 0.8, "timber", 0.5),
+  ];
+  const N = (id, x, z, w, h, d, semantic, top) =>
+    ScenarioBlock(id, x, z, w, h, d, semantic, n + top - h / 2);
+  // 关尾北门：城墙 9 m（Data_Tengxian.CITY 的实测是 11.5，白盒取低一档）、门洞净宽
+  // 3.8（对 Data_Tengxian.BARBICAN.innerGateW）、半圆瓮城简化成方瓮城体块。
+  // 不 import 城池生成器：这只是一片夜景，不是滕县。
+  const night = [...collapsed,
+    N("NightWallWest", -178.45, 340, 33.1, 9, 5, "plaster", 9),
+    N("NightWallEast", -143.05, 340, 30.1, 9, 5, "plaster", 9),
+    N("NightGateLintel", -160, 340, 3.8, 3.4, 5, "plaster", 9),
+    N("NightGateTower", -160, 344, 17, 4.5, 11, "timber", 13.5),
+    N("NightBarbicanSideWest", -178, 331, 4, 7, 18, "plaster", 7),
+    N("NightBarbicanSideEast", -142, 331, 4, 7, 18, "plaster", 7),
+    N("NightBarbicanFrontWest", -171, 322, 18, 7, 4, "plaster", 7),
+    N("NightBarbicanFrontEast", -149, 322, 18, 7, 4, "plaster", 7),
+    N("NightBarbicanLintel", -160, 322, 4, 2, 4, "plaster", 7),
+    N("NightApproachWallWest", -172, 308, 0.7, 1.8, 28, "cover", 1.8),
+    N("NightApproachWallEast", -148, 308, 0.7, 1.8, 28, "cover", 1.8),
+  ];
+  for (const [i, p] of [[-166, 326.6], [-154, 327.2], [-165.4, 344.8], [-154.6, 345.4]].entries())
+    night.push(ScenarioBlock(`NightBrazier${i}`, p[0], p[1], 0.8, 0.7, 0.8, "metal",
+      SampleMissionTerrain(p[0], p[1]) + 0.35));
+  return Object.freeze({
+    replaceBlockIds: [],
+    states: [
+      { id: "BunkerIntact", signal: null, blocks: intact },
+      { id: "BunkerCollapsed", signal: "BunkerCollapsed", blocks: collapsed },
+      { id: "NightGate", signal: "NightGateShown", blocks: night },
+    ],
+  });
+})();
+export const MISSION_NIGHT_GATE_BLOCK_IDS = Object.freeze(
+  MISSION_SCENARIO.states[2].blocks
+    .filter((block) => !MISSION_SCENARIO.states[1].blocks.some((prior) => prior.id === block.id))
+    .map((block) => block.id));
+
 export const MISSION_LAYOUT = Object.freeze({
-  id: "FirstLevelMissionSeptember14",
+  id: "FirstLevelMissionSeptember19",
+  scenario: MISSION_SCENARIO,
+  // 归档教学白盒的色标面板不进正片（Script_FirstLevelWhiteboxField.BuildLegend）。
+  legend: false,
   fortifications: true,
   derailCar: OPENING.derailCar,
   terrain: "P012Heightfield",

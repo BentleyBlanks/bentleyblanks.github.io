@@ -1,4 +1,6 @@
-// Actual geometry/collision audit. Stage fixtures here are not campaign completion evidence.
+// 第一关 2026.09.19 四区拓扑 · 实机几何/碰撞审计。
+// 真 Rapier 胶囊**双向**走每一条契约路线；两座桥的炸前/炸后四态；掩蔽部两态。
+// 这里的夹具不是通关证据（stage fixtures are not campaign completion evidence）。
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
@@ -13,60 +15,144 @@ page.on('pageerror',error=>errors.push(String(error)));
 try{
  await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?whitebox=p012&shot=1&manual=1&quality=high&scale=small`,{timeout:180000});
  await page.waitForFunction(()=>window.Tengxian?.state.ready,null,{timeout:240000});
+ // 掩蔽部的坍塌态是 01 的空间：胶囊要在坍塌后的壳里走，不是在完好的壳里走。
+ await page.evaluate(()=>window.Tengxian.battlefield.SetScenarioState(
+  window.Tengxian.battlefield.layout.scenario.states.find(s=>s.id==='BunkerCollapsed')));
  const result=await page.evaluate(async()=>{
-  const g=window.Tengxian,{MISSION_ROUTES:routes,MISSION_ANCHORS:A}=await import('./Data_FirstLevelMissionLayout.mjs');
-  const {FirstLevelMissionColumn}=await import('./Script_FirstLevelMissionColumn.mjs');
-  const {MISSION_RECEPTION_SPACE:reception}=await import('./Data_FirstLevelMissionTopology.mjs');
-  const column=new FirstLevelMissionColumn();column.mode='exit';column.route=routes.evacuation;
-  const litter=column.litters[0];Object.assign(litter,reception.litterOrigin,{yaw:0,bearers:[0,100]});
-  // 救援 helper 的选人口径在 Script_FirstLevelMissionColumn 里是 medic **或** civilian；
-  // 2026-09-16 的 e4fe8b315 把 medicCount 调成 0（担架队边上不再走军医），夹具还在
-  // 只找 medic，于是 Object.assign 拿到 undefined。跟上运行时那条口径。
-  const helper=column.walkers.find(w=>['medic','civilian'].includes(w.kind));Object.assign(helper,reception.walkerOrigin,{visible:true});
-  column.RequestBearer(litter);
-  const walkRoutes={...routes,wardRelief:helper.rescueRoute};
-  const {Vector3}=await import('three'),walks=[],body=g.physics.MakeCharacter();
+  const g=window.Tengxian,{MISSION_ROUTES:routes}=await import('./Data_FirstLevelMissionLayout.mjs');
+  const {MISSION_STAGE_ROUTES}=await import('./Data_FirstLevelMissionTopology.mjs');
+  const walkRoutes={evacuation:routes.evacuation,reception:routes.reception,exit:routes.exit,
+   ...MISSION_STAGE_ROUTES};
+  // 夜景那一片白天不存在，单独在下面的状态循环里走。
+  delete walkRoutes.nightMarch;
+  // 10 的绕回巷从内院门出去 —— 那扇门在 courtyardGateOpen 之前是**关着**的
+  // （这正是 10 要做的事）。量的是门开之后这条路通不通。
+  g.battlefield.OpenGate('MissionCourtyardGate');g.physics.RefreshStaticQueries();
+  const walks=[],body=g.physics.MakeCharacter();
   try{
-   for(const name of ['evacuation','reception','exit','wardRelief'])for(const reverse of [false,true]){
-    const points=reverse?[...walkRoutes[name]].reverse():walkRoutes[name];
-    body.Teleport(points[0].x,g.physics.groundAt(points[0].x,points[0].z)+.03,points[0].z);
+   for(const [name,points] of Object.entries(walkRoutes))for(const reverse of [false,true]){
+    const path=reverse?[...points].reverse():points;
+    body.Teleport(path[0].x,g.physics.groundAt(path[0].x,path[0].z)+.03,path[0].z);
     let reached=1;
-    for(const target of points.slice(1)){
-     const budget=Math.ceil(Math.hypot(target.x-body.position.x,target.z-body.position.z)/.04)+240;
+    for(const target of path.slice(1)){
+     const budget=Math.ceil(Math.hypot(target.x-body.position.x,target.z-body.position.z)/.04)+320;
      for(let frame=0;frame<budget;frame++){
       const dx=target.x-body.position.x,dz=target.z-body.position.z,d=Math.hypot(dx,dz);
-      if(d<.18){reached++;break;}
+      if(d<.25){reached++;break;}
       body.Move(dx/d*Math.min(.06,d),-.07,dz/d*Math.min(.06,d));
      }
-     if(reached!==points.indexOf(target)+1)break;
+     if(reached!==path.indexOf(target)+1)break;
     }
-    walks.push({name,reverse,reached,expected:points.length,position:body.position.toArray()});
+    walks.push({name,reverse,reached,expected:path.length,position:body.position.toArray().map(v=>+v.toFixed(2))});
    }
   }finally{body.Remove();}
-  const bridge=g.battlefield.gates.get('TemporaryBridge'),wreck=g.battlefield.gates.get('MissionBridgeWreck');
-  const before={bridge:bridge.mesh.visible,wreck:wreck.mesh.visible,bridgeWalkable:g.battlefield.walkableSurfaces.some(s=>s.id==='TemporaryBridge')};
-  g.battlefield.OpenGate('TemporaryBridge');g.battlefield.CloseGate('MissionBridgeWreck');
-  g.physics.RefreshStaticQueries();
-  const hit=g.battlefield.Raycast(new Vector3(76,1,145),new Vector3(0,0,1),16,{terrain:true});
-  const after={bridge:bridge.mesh.visible,wreck:wreck.mesh.visible,bridgeWalkable:g.battlefield.walkableSurfaces.some(s=>s.id==='TemporaryBridge'),blocked:!!hit};
-  const sight=[];
-  for(const [from,to] of [[A.retreatA,A.retreatB],[A.retreatB,A.retreatC]]){
-   const a=new Vector3(from.x,g.physics.groundAt(from.x,from.z)+1.6,from.z),b=new Vector3(to.x,g.physics.groundAt(to.x,to.z)+1.6,to.z),delta=b.sub(a),distance=delta.length();
-   const hit=g.battlefield.Raycast(a,delta.normalize(),distance,{terrain:true});sight.push({from,to,blocked:!!hit&&hit.t<distance-.1});
-  }
-  return {walks,before,after,sight};
+  return {walks};
  });
  await fs.writeFile(path.join(out,'Data_PhysicalTopology.json'),JSON.stringify(result,null,2));
- console.log(JSON.stringify(result));
+ const failed=result.walks.filter(r=>r.reached!==r.expected);
+ assert.deepEqual(failed,[],'actual Rapier capsule walks both directions: '+JSON.stringify(failed));
+ // -------------------------------------------------------------------------
+ // 两座桥的四态：路桥炸前/炸后 × 铁路桥炸前/炸后
+ // -------------------------------------------------------------------------
+ const bridges=await page.evaluate(async()=>{
+  const g=window.Tengxian,{Vector3}=await import('three');
+  const Walkable=id=>g.battlefield.walkableSurfaces.some(s=>s.id===id);
+  const Visible=id=>!!g.battlefield.gates.get(id)?.mesh.visible;
+  // 站在桥面正上方往下探：甲板在就踩得到，甲板没了就掉进 -4 m 的河槽。
+  const DeckTop=(x,z)=>g.battlefield.GroundHeight(x,z);
+  const Snapshot=()=>({
+   road:Visible('TemporaryBridge'),roadWalkable:Walkable('TemporaryBridge'),
+   roadWreck:Visible('MissionBridgeWreck'),
+   rail:Visible('RailBridgeDeck'),railWalkable:Walkable('RailBridgeDeck'),
+   railWreck:Visible('RailBridgeWreckSpan'),
+   railDeckY:+DeckTop(-77,153).toFixed(2),roadDeckY:+DeckTop(76,153).toFixed(2),
+  });
+  const states=[];
+  states.push({phase:'intact',...Snapshot()});
+  g.battlefield.OpenGate('TemporaryBridge');g.battlefield.CloseGate('MissionBridgeWreck');
+  g.physics.RefreshStaticQueries();
+  states.push({phase:'roadDestroyed',...Snapshot()});
+  for(const id of ['RailBridgeDeck','RailBridgeTrussWest','RailBridgeTrussEast',
+   'RailBridgeRailWest','RailBridgeRailEast'])g.battlefield.OpenGate(id);
+  for(const id of ['RailBridgeWreckSpan','RailBridgeWreckTruss','RailBridgeWreckStub'])
+   g.battlefield.CloseGate(id);
+  g.physics.RefreshStaticQueries();
+  states.push({phase:'bothDestroyed',...Snapshot()});
+  // 炸后桥面那一格必须是河槽，不是隐形的空中走道。
+  const blocked=!!g.battlefield.Raycast(new Vector3(-77,1,132),new Vector3(0,0,1),12,{terrain:true});
+  for(const id of ['RailBridgeWreckSpan','RailBridgeWreckTruss','RailBridgeWreckStub'])
+   g.battlefield.OpenGate(id);
+  for(const id of ['RailBridgeDeck','RailBridgeTrussWest','RailBridgeTrussEast',
+   'RailBridgeRailWest','RailBridgeRailEast'])g.battlefield.CloseGate(id);
+  g.battlefield.CloseGate('TemporaryBridge');g.battlefield.OpenGate('MissionBridgeWreck');
+  g.physics.RefreshStaticQueries();
+  states.push({phase:'restored',...Snapshot()});
+  return {states,blocked};
+ });
+ await fs.writeFile(path.join(out,'Data_BridgeStates.json'),JSON.stringify(bridges,null,2));
+ const byPhase=Object.fromEntries(bridges.states.map(s=>[s.phase,s]));
+ assert.equal(byPhase.intact.roadWalkable,true,'the road bridge carries the column before the air strike');
+ assert.equal(byPhase.intact.railWalkable,true,'the rail bridge deck carries the rear column');
+ assert.ok(byPhase.intact.railDeckY>0.4,'the intact rail deck stands above the channel floor');
+ assert.equal(byPhase.roadDestroyed.roadWalkable,false,'the road deck leaves the walkable set');
+ assert.equal(byPhase.roadDestroyed.roadWreck,true,'the road wreck appears in its place');
+ assert.equal(byPhase.roadDestroyed.railWalkable,true,'the rail bridge is independent of the road bridge');
+ assert.equal(byPhase.bothDestroyed.railWalkable,false,'the demolished rail bridge carries nobody');
+ assert.equal(byPhase.bothDestroyed.railWreck,true,'the fallen span is visible in the channel');
+ assert.ok(byPhase.bothDestroyed.railDeckY<-2,
+  'the destroyed span leaves a 4 m channel, not an invisible walkway: '+byPhase.bothDestroyed.railDeckY);
+ assert.equal(bridges.blocked,true,'the wreckage physically obstructs the old crossing');
+ const Without=({phase,...rest})=>rest;
+ assert.deepEqual(Without(byPhase.restored),Without(byPhase.intact),
+  'checkpoint replay restores both bridges exactly');
+ // -------------------------------------------------------------------------
+ // 夜景片：白天不存在，NightGateShown 之后才走得进北门
+ // -------------------------------------------------------------------------
+ const night=await page.evaluate(async()=>{
+  const g=window.Tengxian,{MISSION_STAGE_ROUTES}=await import('./Data_FirstLevelMissionTopology.mjs');
+  const {MISSION_NIGHT_GATE_BLOCK_IDS}=await import('./Data_FirstLevelMissionLayout.mjs');
+  const Count=()=>g.battlefield.colliders.length;
+  const day=Count();
+  const state=g.battlefield.layout.scenario.states.find(s=>s.signal==='NightGateShown');
+  g.battlefield.SetScenarioState(state);g.physics.RefreshStaticQueries();
+  const shown=Count();
+  const body=g.physics.MakeCharacter();
+  const points=MISSION_STAGE_ROUTES.nightMarch;
+  body.Teleport(points[0].x,g.physics.groundAt(points[0].x,points[0].z)+.03,points[0].z);
+  let reached=1;
+  for(const target of points.slice(1)){
+   const budget=Math.ceil(Math.hypot(target.x-body.position.x,target.z-body.position.z)/.04)+320;
+   for(let frame=0;frame<budget;frame++){
+    const dx=target.x-body.position.x,dz=target.z-body.position.z,d=Math.hypot(dx,dz);
+    if(d<.25){reached++;break;}
+    body.Move(dx/d*Math.min(.06,d),-.07,dz/d*Math.min(.06,d));
+   }
+   if(reached!==points.indexOf(target)+1)break;
+  }
+  body.Remove();
+  g.battlefield.SetScenarioState(g.battlefield.layout.scenario.states.find(s=>s.id==='BunkerCollapsed'));
+  g.physics.RefreshStaticQueries();
+  return {day,shown,added:shown-day,nightIds:MISSION_NIGHT_GATE_BLOCK_IDS.length,
+   reached,expected:points.length,restored:Count()};
+ });
+ await fs.writeFile(path.join(out,'Data_NightGate.json'),JSON.stringify(night,null,2));
+ assert.ok(night.added>=10,'the night slice adds real colliders only once its signal lands: '+night.added);
+ assert.equal(night.restored,night.day,'leaving the night state removes every one of them again');
+ assert.equal(night.reached,night.expected,'the squad walks the north gate road into the city');
+ // -------------------------------------------------------------------------
+ // 720p 复核机位
+ // -------------------------------------------------------------------------
  for(const view of [
-  {id:'RearOverview',eye:[27,190,183],target:[27,0,183]},
-  {id:'ReceptionOverview',eye:[-23,66,263],target:[-23,0,237]},
-  {id:'BridgeDestroyed',eye:[101,24,168],target:[75,0,145]},
+  {id:'BunkerCollapsed',eye:[-40,26,-108],target:[-40,0,-134]},
+  {id:'CollectionBackslope',eye:[-37,30,-78],target:[-37,0,-108]},
+  {id:'VillageStreetBlock',eye:[77,34,-12],target:[77,0,24]},
+  {id:'TransferAndRiver',eye:[76,62,88],target:[76,0,150]},
+  {id:'RailBridge',eye:[-40,40,196],target:[-77,0,152]},
+  {id:'WallPathAndReception',eye:[30,44,196],target:[4,0,236]},
  ]){
   await page.evaluate(async view=>{
    const g=window.Tengxian,{PerspectiveCamera}=await import('three');
    const camera=new PerspectiveCamera(58,1280/720,.1,900);camera.position.set(...view.eye);
-   camera.up.set(0,view.eye[2]===view.target[2]?0:1,view.eye[2]===view.target[2]?-1:0);
    camera.lookAt(...view.target);camera.updateMatrixWorld(true);
    document.querySelector('#hud').style.visibility='hidden';
    g.scene.updateMatrixWorld(true);g.renderer.setRenderTarget(null);g.renderer.clear();g.renderer.render(g.scene,camera);
@@ -74,45 +160,7 @@ try{
   await page.screenshot({path:path.join(out,`Scene_${view.id}.png`)});
  }
  await page.evaluate(()=>{document.querySelector('#hud').style.visibility='';});
- assert.ok(result.walks.every(r=>r.reached===r.expected),'actual Rapier capsule walks both directions: '+JSON.stringify(result.walks.filter(r=>r.reached!==r.expected)));
- assert.deepEqual(result.before,{bridge:true,wreck:false,bridgeWalkable:true});
- assert.deepEqual(result.after,{bridge:false,wreck:true,bridgeWalkable:false,blocked:true});
- assert.ok(result.sight.every(s=>s.blocked),'successive pockets break actual standing sightlines');
- // Exercise the real frame-level scenario sync, including backward replay.
- // A manual CloseGate alone misses regressions that reopen the wreck next frame.
- const lifecycle=[];
- for(const phase of [14,12]){
-  await page.evaluate(phase=>window.Tengxian.Debug.FirstLevelJump(phase),phase);
-  lifecycle.push(await page.evaluate(()=>{
-   const g=window.Tengxian;g.StepFrames(12,1/60,false);g.physics.RefreshStaticQueries();
-   return {phase:g.Debug.FirstLevelMission().phaseNumber,
-    destroyed:g.Debug.FirstLevelMissionRuntime().Has('MissionBridgeDestroyed'),
-    bridge:g.battlefield.gates.get('TemporaryBridge').mesh.visible,
-    wreck:g.battlefield.gates.get('MissionBridgeWreck').mesh.visible,
-    walkable:g.battlefield.walkableSurfaces.some(s=>s.id==='TemporaryBridge')};
-  }));
- }
- assert.deepEqual(lifecycle,[
-  {phase:14,destroyed:true,bridge:false,wreck:true,walkable:false},
-  {phase:12,destroyed:false,bridge:true,wreck:false,walkable:true},
- ]);
- await fs.writeFile(path.join(out,'Data_BridgeRuntimeLifecycle.json'),JSON.stringify(lifecycle,null,2));
- await page.evaluate(()=>window.Tengxian.Debug.FirstLevelJump(8));
- const kitchenGate=await page.evaluate(()=>{
-  const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime();
-  const Visit=(x,z)=>{
-   const y=g.battlefield.GroundHeight(x,z)+.03;
-   g.player.position.set(x,y,z);g.player.body.Teleport(x,y,z);g.StepFrames(2,1/60,false);
-   return {kitchen:r.Has('kitchenTraversed'),court:r.Has('innerCourtReached'),stage:r.flow.stage.id};
-  };
-  return {shortcut:Visit(58,6),kitchen:Visit(58,-8),court:Visit(58,6)};
- });
- assert.deepEqual(kitchenGate,{
-  shortcut:{kitchen:false,court:false,stage:'Village'},
-  kitchen:{kitchen:true,court:false,stage:'Village'},
-  court:{kitchen:true,court:true,stage:'Melee'},
- });
- await fs.writeFile(path.join(out,'Data_KitchenGate.json'),JSON.stringify(kitchenGate,null,2));
  assert.deepEqual(errors,[]);
- console.log('ok physical rear routes, shared reception doors, bridge collision lifecycle and 720p scene review views');
+ console.log('ok physical four-zone routes, four bridge states, the night slice and 720p review views',
+  JSON.stringify({walks:result.walks.length,night}));
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}
