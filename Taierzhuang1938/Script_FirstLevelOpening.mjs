@@ -212,7 +212,11 @@ export class FirstLevelOpening {
     }
     if(stage==="Trapped")this.UpdateBunker();
     if(stage==="BunkerRescue")this.UpdateRescue();
-    if(stage==="Support")this.SpawnZhou();
+    // 老周本来在 03 上枪位。可是 04 有自己的起点（选章 / Debug.FirstLevelJump(4)）：
+    // 从那儿开局的话 SpawnZhou 一次都没跑过，UpdateZhou 里 this.zhou 是空的，
+    // 「老周腿伤恶化退出枪位」永远记不下来，04 也就永远过不去（2026-09-20 实测：
+    // 打到只剩 zhouGunWounded 一条，人在枪位上活活打死）。SpawnZhou 自己带幂等闸。
+    if(stage==="Support"||stage==="MachineGun")this.SpawnZhou();
     this.FireWindows();
     this.UpdateZhou();
   }
