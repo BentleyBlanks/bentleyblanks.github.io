@@ -23,6 +23,24 @@ export async function Drive(ctx) {
   const shots = path.join(output, "..", "L1Front");
   await fs.mkdir(shots, { recursive: true });
 
+  /**
+   * 取证照：把视线转到某处、渲一帧、拍一张存进 `_shots/L1Front`，再把视角还回去。
+   * 与 Kit 的 `CaptureFocus` 分工：那一只是带预算断言的正式取样，这一只只管「看得见」。
+   */
+  async function LookShot(name, point) {
+    const view = await page.evaluate((point) => {
+      const g = window.Tengxian, p = g.player.position, eye = g.player.EyePosition;
+      const previous = { yaw: g.player.yaw, pitch: g.player.pitch };
+      g.player.yaw = Math.atan2(p.x - point.x, p.z - point.z);
+      g.player.pitch = Math.atan2(g.battlefield.GroundHeight(point.x, point.z) + (point.height ?? 1.2) - eye.y,
+        Math.hypot(p.x - point.x, p.z - point.z));
+      g.StepFrames(4, 1 / 60, true);
+      return previous;
+    }, { x: point.x, z: point.z, height: point.height ?? 1.2 });
+    await page.screenshot({ path: path.join(shots, `Scene_${name}.png`) });
+    await page.evaluate((view) => Object.assign(window.Tengxian.player, view), view);
+  }
+
   // =========================================================================
   // 01 受困：黑屏对白被近爆打断 → 只能转头 → 看清门外的刺杀 → 日兵转向门内。
   // 玩家这一段没有任何输入，驾驶脚本要做的就是「像玩家一样坐着看完并核对」。
@@ -312,7 +330,7 @@ export async function Drive(ctx) {
   assert.ok(taken.mission.facts.includes("bundleRouteTraversed"), "侧沟线上的检查点与爬行段都真的走过了");
   assert.ok(taken.mission.voice.played.includes("BundleSupply"), "留守兵交代了「就剩这些了」");
   assert.ok(taken.mission.voice.played.includes("BundleProne"), "中段罗班长喊过「趴下！它转过来了！」");
-  await page.screenshot({ path: path.join(shots, "Scene_BundleHouse.png") });
+  await LookShot("BundleHouse", A.bundle);
   await Route(Routes.bundleReturn, "TankFlank", { fight: true, stance: "stand", sprint: true, crawl: true, rejoinRoute: Routes.bundleReturn });
   for (let attempt = 0; attempt < 3; attempt++) {
     if (await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission().tank.immobilized)) break;
@@ -362,17 +380,26 @@ export async function Drive(ctx) {
   await JumpStage(6);
   await Route(MISSION_STAGE_ROUTES.collectionReturn, "CollectionReturn",
     { fight: true, stance: "crouch", crawl: true, rejoinRoute: MISSION_STAGE_ROUTES.collectionReturn });
-  const orders = await page.evaluate(() => {
-    const g = window.Tengxian;
-    for (let i = 0; i < 150 * 60 && g.Debug.FirstLevelMissionRuntime().flow.stage.id === "Orders"; i++) {
-      if (g.player.bleeding && g.player.health < 85) g.Debug.Key("KeyB");
-      g.StepFrames(1, 1 / 60, false);
+  // 分段推：借火那一拍要在演的时候拍，等整段走完老周已经上担架抬走了。
+  let orders = null;
+  for (let chunk = 0; chunk < 60; chunk++) {
+    orders = await page.evaluate(() => {
+      const g = window.Tengxian;
+      for (let i = 0; i < 150 && g.Debug.FirstLevelMissionRuntime().flow.stage.id === "Orders"; i++) {
+        if (g.player.bleeding && g.player.health < 85) g.Debug.Key("KeyB");
+        g.StepFrames(1, 1 / 60, false);
+      }
+      const m = g.Debug.FirstLevelMission();
+      return { stage: m.stage, facts: m.facts, played: m.voice.played, front: m.front, column: m.column };
+    });
+    if (orders.front.collection.borrow.includes("light") && !ctx.capturedActivities.has("BorrowLight")) {
+      ctx.capturedActivities.add("BorrowLight");
+      await LookShot("BorrowLight", P.collection.zhouWall);
     }
-    const m = g.Debug.FirstLevelMission();
-    return { stage: m.stage, facts: m.facts, played: m.voice.played, front: m.front, column: m.column };
-  });
+    if (orders.stage !== "Orders") break;
+  }
   console.log("ORDERS", JSON.stringify({ stage: orders.stage, borrow: orders.front.collection.borrow }));
-  await page.screenshot({ path: path.join(shots, "Scene_BorrowLight.png") });
+  if (!ctx.capturedActivities.has("BorrowLight")) await LookShot("BorrowLight", P.collection.zhouWall);
   for (const fact of ["ordersReached", "volunteerHeard", "lightShared", "zhouOnLitter", "columnDeparted"])
     assert.ok(orders.facts.includes(fact), `06 记下了 ${fact}`);
   assert.deepEqual(orders.front.collection.borrow, ["ask", "pat", "pocket", "offer", "light", "share", "wince"],
@@ -386,9 +413,12 @@ export async function Drive(ctx) {
   // 07 沿沟南行：真走 135 m，目标时长 45–75 秒。
   // =========================================================================
   await JumpStage(7);
-  await Route(Routes.southWalk, "SouthWalk", { fight: false, stance: "stand", sprint: false });
+  // 拆两段只为在路上拍一张（Capture 只渲几帧，进不了阶段计时）。
+  await Route(Routes.southWalk.slice(0, 5), "SouthWalkFirst", { fight: false, stance: "stand", sprint: false });
+  await LookShot("SouthWalk", Routes.southWalk[6]);
+  await Route(Routes.southWalk.slice(5), "SouthWalk", { fight: false, stance: "stand", sprint: false });
   const south = await WaitStage("Village", 120);
-  await page.screenshot({ path: path.join(shots, "Scene_SouthWalk.png") });
+  await LookShot("SouthVillageMouth", A.village);
   const pacing = await page.evaluate(() => {
     const stages = window.Tengxian.Debug.FirstLevelMission().log.filter((e) => e.kind === "stage");
     const index = stages.findIndex((e) => e.id === "South");
