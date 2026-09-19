@@ -313,15 +313,19 @@ async function DriveBridge(ctx, { JumpStage, Capture, CaptureFocus, Route, WaitS
     if (p.stance === "prone") g.Debug.Key("KeyZ");
     if (p.stance === "crouch") g.Debug.Key("KeyC");
     const before = { x: p.position.x, z: p.position.z };
-    // 八个方向各试 0.5 s，谁真的挪得动就走谁。
-    for (let k = 0; k < 8; k += 1) {
-      p.yaw = (Math.PI * 2 * k) / 8;
-      g.Debug.Key("KeyW", true);
-      g.StepFrames(30, 1 / 60, false);
-      g.Debug.Key("KeyW", false);
-      if (Math.hypot(p.position.x - before.x, p.position.z - before.z) > 0.6) {
-        g.Debug.Key("KeyW", true); g.StepFrames(60, 1 / 60, false); g.Debug.Key("KeyW", false);
-        return { yaw: p.yaw, moved: true, position: { x: p.position.x, z: p.position.z } };
+    // 「桥头撤」一喊，班里四个人要花两三秒才从射位上散开。先站着等他们走，
+    // 再八个方向各试 0.5 s，谁真的挪得动就走谁。
+    for (let round = 0; round < 6; round += 1) {
+      g.StepFrames(60, 1 / 60, false);
+      for (let k = 0; k < 8; k += 1) {
+        p.yaw = (Math.PI * 2 * k) / 8;
+        g.Debug.Key("KeyW", true);
+        g.StepFrames(30, 1 / 60, false);
+        g.Debug.Key("KeyW", false);
+        if (Math.hypot(p.position.x - before.x, p.position.z - before.z) > 0.6) {
+          g.Debug.Key("KeyW", true); g.StepFrames(60, 1 / 60, false); g.Debug.Key("KeyW", false);
+          return { yaw: Number(p.yaw.toFixed(2)), round, moved: true, position: { x: p.position.x, z: p.position.z } };
+        }
       }
     }
     return { moved: false, position: { x: p.position.x, z: p.position.z } };

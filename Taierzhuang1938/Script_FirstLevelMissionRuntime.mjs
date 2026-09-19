@@ -1405,7 +1405,11 @@ export class FirstLevelMissionRuntime {
         this.bridge.Enter("BridgeCover");
         break;
       case "BridgeWithdraw":
-        this.Guide(MISSION_STAGE_ROUTES.bridgeWithdraw);
+        // 带路线**跳过第一点**（那就是南岸射位 bridgeCover）。不跳的话「桥头撤！」
+        // 一喊，班里四个人全往玩家脚下那一格走 —— 实拍是玩家被自己人裁步挡死在
+        // 射位上，八个方向一步都挪不动（口径见 docs/Data_FirstLevelEnd20260919.md）。
+        // 撤就是各自往南走，不是先集合再走。
+        this.Guide(MISSION_STAGE_ROUTES.bridgeWithdraw.slice(1));
         this.bridge.Enter("BridgeWithdraw");
         break;
       case "NightMarch":
