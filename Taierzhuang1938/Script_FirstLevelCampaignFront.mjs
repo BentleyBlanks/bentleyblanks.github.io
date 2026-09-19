@@ -348,6 +348,17 @@ export async function Drive(ctx) {
     // 引信烧完时车已经开出去七八米 —— 2026-09-20 实测三发全空。
     await page.evaluate(() => {
       const g = window.Tengxian;
+      const Gap = () => {
+        const tank = g.Debug.FirstLevelMission().tank, p = g.player.position;
+        return Math.hypot(p.x - tank.x, p.z - tank.z);
+      };
+      // 先在沟里等它压过来，别自己横穿开阔地去够它。战车本来就朝玩家推进，
+      // 而这一段的伤全在那二十几米没遮没挡的地上（实测跑过去之后只剩两成血，
+      // 回集结处的路上连死三次）。
+      for (let i = 0; i < 3600 && Gap() > 16; i++) {
+        if (g.player.bleeding && g.player.health < 85) g.Debug.Key("KeyB");
+        g.StepFrames(1, 1 / 60, false);
+      }
       for (let i = 0; i < 900 && g.Debug.FirstLevelMission().tank.moving; i++) g.StepFrames(1, 1 / 60, false);
     });
     // 站到投得中的地方再扔。集束弹满蓄力也就十几米，而且弹着点得落在履带 5 m 以内
@@ -422,10 +433,11 @@ export async function Drive(ctx) {
     });
     console.log("BUNDLE_THROW", JSON.stringify({ before: thrown.before, after: thrown.after,
       aim: thrown.aim, land: thrown.land, landMiss: thrown.landMiss, tank: thrown.mission.tank }));
-    if (thrown.mission.tank.immobilized) break;
     if (!thrown.alive) break;
-    // 投完退回遮挡（这一拍的另一半）。
+    // 投完退回遮挡 —— 这一拍的另一半，炸停了也要退。原先「停住就 break」把人
+    // 留在了开阔地正中间，06 一开场就是带着两成血从那儿往回走。
     if (spot) await Route([A.throw], `TankFallBack${attempt}`, { fight: true, stance: "crouch", sprint: true });
+    if (thrown.mission.tank.immobilized) break;
     // 两发都扔完还没停住，就像玩家一样回弹药屋再领两发。
     if (thrown.after === 0) {
       await Route([...Routes.bundle.slice(4), { x: A.bundle.x, z: A.bundle.z + 1.2 }], `BundleRefill${attempt}`,
@@ -440,6 +452,14 @@ export async function Drive(ctx) {
   await CaptureFocus("TankStopped", { x: await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission().tank.x),
     z: await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission().tank.z), height: 1.2 });
   await page.screenshot({ path: path.join(shots, "Scene_TankStopped.png") });
+  // 车停了，沟里先包扎再走：06 要沿后交通壕走回集结处，带着一身血上路就是白送。
+  await page.evaluate(() => {
+    const g = window.Tengxian;
+    for (let i = 0; i < 600 && (g.player.bleeding || g.player.health < 90) && g.player.bandages > 0; i++) {
+      if (i % 60 === 0) g.Debug.Key("KeyB");
+      g.StepFrames(1, 1 / 60, false);
+    }
+  });
   const tankStage = await WaitStage("Orders", 240, { fight: true });
   for (const fact of ["tankImmobilized", "lastGuardsWithdrawn", "reliefInPosition"])
     assert.ok(tankStage.mission.facts.includes(fact), `05 记下了 ${fact}`);

@@ -132,7 +132,10 @@ try{
   g.StepFrames(30,1/60,false);return r.leaderGuide.State();
  });
  assert.equal(rejoin.released.length,1,"catching up releases one checkpoint");
+ // 带路的这一段走得很慢（共用行进层给班长的配速实测 0.35 m/s 上下），四秒挪不够一米。
+ // 多给几段时间，量的还是「他真的又走起来了」，不是「四秒内走了多远」。
  let moved=await Sample("advance",240);
+ for(let i=0;i<6&&Math.hypot(moved.p.x-held.p.x,moved.p.z-held.p.z)<=1;i++)moved=await Sample("advance",240);
  assert.ok(Math.hypot(moved.p.x-held.p.x,moved.p.z-held.p.z)>1,"leader resumes actual movement");
  assert.ok(moved.guide.events.some(e=>e.kind==="rejoin"));
  // Compare with the same base actor sample: free-arm gesture must not drag the

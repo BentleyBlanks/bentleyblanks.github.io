@@ -58,6 +58,28 @@ try{
   const initial=await Receipt("SupportEntry");
   assert.equal(initial.enemies.filter(a=>a.encounter==="approach"&&a.alive).length,MISSION_ENCOUNTERS.approach.length);
   assert.ok(initial.enemies.some(a=>a.encounter==="approach"),"approach cannot silently become an empty encounter");
+  // 先量「看得见」，再量「等三分钟」。壕沟是压着地面走的，站在哪一截决定看不看得见
+  // 对面，所以按路线上的点依次试，而不是钉死一个老坐标；而且要趁十八个人都还活着的
+  // 时候量 —— 打完三分钟再找活口，量到的是运气不是视线。
+  let contact=[];
+  for(const spot of [HOLD,STEP,{x:-24,z:-40},{x:-24,z:-23}]){
+    await Place(spot.x,spot.z);await Advance(2);
+    contact=await page.evaluate(()=>{
+      const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime(),eye=g.player.EyePosition;
+      const targets=[...r.enemies.values()].filter(a=>a.alive&&a.missionEncounter==="approach"&&!r.BlocksSight(eye,r.Point(a.position,a.stance===2?.35:.95)));
+      if(!targets.length)return [];
+      const target=r.Point(targets[0].position,.95),p=g.player.position;
+      g.player.yaw=Math.atan2(p.x-target.x,p.z-target.z);
+      g.player.pitch=Math.atan2(eye.y-target.y,Math.hypot(p.x-target.x,p.z-target.z));
+      g.player.SyncCamera(0);g.StepFrames(1,1/60,true);
+      return targets.map(a=>a.missionId);
+    });
+    console.log("VISIBLE_FROM",JSON.stringify({spot,seen:contact.length}));
+    if(contact.length)break;
+  }
+  assert.ok(contact.length,"the approach has visible live enemies from the actual trench route");
+  await page.screenshot({path:path.join(out,"Scene_ApproachContact.png")});
+  receipts.push({label:"VisibleApproach",enemies:contact});
   // Before making contact, a sheltered delay keeps the squad in the recess too. Sending them
   // ahead alone would test an unassisted assault against the new mobile sections.
   await page.evaluate(async(hold)=>{
@@ -82,27 +104,6 @@ try{
   assert.equal(delayed.started,false,"a slow approach cannot spend the finite main assault");
   assert.equal(delayed.enemies.filter(a=>a.encounter==="front").length,0);
   assert.ok(delayed.enemies.some(a=>a.encounter==="approach"&&a.shots>0),"approach troops participate in real combat");
-  // 在后交通壕这一段上找一个真看得见 approach 组的站位。壕沟是压着地面走的，
-  // 站在哪一截决定看不看得见对面，所以按路线上的点依次试，而不是钉死一个老坐标。
-  let contact=[];
-  for(const spot of [HOLD,STEP,{x:-24,z:-40},{x:-24,z:-23}]){
-    await Place(spot.x,spot.z);await Advance(2);
-    contact=await page.evaluate(()=>{
-    const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime(),eye=g.player.EyePosition;
-    const targets=[...r.enemies.values()].filter(a=>a.alive&&a.missionEncounter==="approach"&&!r.BlocksSight(eye,r.Point(a.position,a.stance===2?.35:.95)));
-    if(!targets.length)return [];
-    const target=r.Point(targets[0].position,.95),p=g.player.position;
-    g.player.yaw=Math.atan2(p.x-target.x,p.z-target.z);
-    g.player.pitch=Math.atan2(eye.y-target.y,Math.hypot(p.x-target.x,p.z-target.z));
-    g.player.SyncCamera(0);g.StepFrames(1,1/60,true);
-    return targets.map(a=>a.missionId);
-    });
-    console.log("VISIBLE_FROM",JSON.stringify({spot,seen:contact.length}));
-    if(contact.length)break;
-  }
-  assert.ok(contact.length,"the approach has visible live enemies from the actual trench route");
-  await page.screenshot({path:path.join(out,"Scene_ApproachContact.png")});
-  receipts.push({label:"VisibleApproach",enemies:contact});
   await Place(-8,-112);await Advance(1);
   const arrived=await Receipt("LastTrenchBend");
   const front=arrived.enemies.filter(a=>a.encounter==="front");
