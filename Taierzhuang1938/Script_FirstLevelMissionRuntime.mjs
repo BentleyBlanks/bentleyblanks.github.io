@@ -1959,11 +1959,15 @@ export class FirstLevelMissionRuntime {
   }
   PlaceNightArrival() {
     const point = A.nightSpawn;
-    // **走 player.Spawn，不要手写 position.set + body.Teleport。** 实拍（2026-09-20
-    // --stage-from=18）：手写那一套之后玩家还留在 marchOut，夜景、夜天空、灯全换好了，
-    // 人却没过去 —— 渲染位置与 Rapier 角色体脱了钩，他在原地一步也走不动。
-    // Spawn 带自由空间搜索、会把角色体一起放过去（Retry 用的就是它）。
+    // 照 `Retry()` 那一套原样做：**先 Spawn（带自由空间搜索），再把位置与角色体
+    // 一起写过去**。只写 position + Teleport 不行（实拍 2026-09-20 `--stage-from=18`：
+    // 夜景、夜天空、五盏灯、十四个布景人全换好了，`nightArrivalPlaced` 也记上了，
+    // 人却还留在 marchOut (−62.5,232.3) —— 渲染位置与 Rapier 角色体脱了钩，
+    // 他在原地一步也走不动）。**这一条仍未在实拍里验过**，见交付报告的遗留项。
+    const y = this.battlefield.GroundHeight(point.x, point.z);
     this.player.Spawn(point.x, point.z, Math.PI);
+    this.player.position.set(point.x, y, point.z);
+    this.player.body?.Teleport(point.x, y, point.z);
     this.player.velocity.set(0, 0, 0);
     this.player.SetStance("stand");
     this.player.pitch = 0;
