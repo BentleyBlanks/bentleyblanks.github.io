@@ -331,6 +331,27 @@ async function DriveBridge(ctx, { JumpStage, Capture, CaptureFocus, Route, WaitS
     return { moved: false, position: { x: p.position.x, z: p.position.z } };
   });
   console.log("WITHDRAW_NUDGED", JSON.stringify(escaped));
+  // 还是挪不动：走**出厂的检查点恢复**（与玩家按「继续」同一条，不发任何事实）。
+  // player.Spawn 会做一次自由空间搜索，正好把卡住的胶囊放回走得动的地方。
+  if (!escaped.moved) {
+    const recovered = await page.evaluate(() => {
+      const g = window.Tengxian, before = [...g.Debug.FirstLevelMission().facts];
+      g.Debug.MenuAct("continueCheckpoint");
+      g.StepFrames(30, 1 / 60, false);
+      const p = g.player;
+      const from = { x: p.position.x, z: p.position.z };
+      p.yaw = Math.PI;
+      g.Debug.Key("KeyW", true);
+      for (let i = 0; i < 90; i += 1) g.StepFrames(1, 1 / 60, false);
+      g.Debug.Key("KeyW", false);
+      return { from, position: { x: p.position.x, z: p.position.z },
+        moved: Math.hypot(p.position.x - from.x, p.position.z - from.z) > 0.6,
+        factsKept: JSON.stringify(before) === JSON.stringify(g.Debug.FirstLevelMission().facts) };
+    });
+    console.log("WITHDRAW_CHECKPOINT", JSON.stringify(recovered));
+    assert.ok(recovered.factsKept, "检查点恢复不许发任何事实");
+    assert.ok(recovered.moved, "检查点恢复之后人要能走：" + JSON.stringify(recovered));
+  }
   // 撤是撤，不是边退边打：fight 会让 Route 一看见残敌就停下开枪，走不到掩护区。
   // 末段绕过 BlastSafeBank 那道 1.35 m 的土坎西头（(−69.5..−62.5, z≈197.5)），
   // 别贴着它的角走。
