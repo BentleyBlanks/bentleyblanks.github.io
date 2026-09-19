@@ -190,6 +190,32 @@ export async function Drive(ctx) {
     "04 不由任务触发 CS_MachineGunCaptives");
   // 上枪位之前不绕去补给箱：在那儿等两轮冷却＝站在沟里挨打（2026-09-20 实测当场阵亡），
   // 而且把弹板补到上限之后 05 的「前沿补给箱真的补了弹」就再也涨不动了。
+  // 先等老周因伤退出枪位，再上去接替 —— 04 的拍子就是这么写的（TakeOverGun）。
+  // 抢在他前头坐上枪座，交接那一拍演不完，zhouGunWounded 记不下来，04 永远过不去：
+  // 2026-09-20 实测有一趟其余四条全记下了，就剩这一条，人在枪位上打到阵亡。
+  const zhouOff = await page.evaluate(() => {
+    const g = window.Tengxian;
+    for (let i = 0; i < 60 * 60 && !g.Debug.FirstLevelMission().facts.includes("zhouGunWounded"); i++) {
+      if (!window.MissionInputDriver.EvadeGrenade()) {
+        const foe = window.MissionInputDriver.Target(60);
+        if (foe) window.MissionInputDriver.Shoot(foe);
+        else {
+          g.Debug.Mouse(0, false); g.Debug.Mouse(2, false);
+          if (g.state.activeSlot === "melee") g.Debug.Key("Digit1");
+          if (g.state.ammo === 0) g.Debug.Key("KeyR");
+        }
+        // 打一段、缩回墙垛后面一段，和 WaitStage 的 cover 一个口径。
+        if ((g.player.stance === "crouch") !== (g.ai.time % 5 < 2)) g.Debug.Key("KeyC");
+      }
+      if (g.player.bleeding && g.player.health < 85) g.Debug.Key("KeyB");
+      g.StepFrames(1, 1 / 60, false);
+      if (!g.player.alive) break;
+    }
+    g.Debug.Mouse(0, false); g.Debug.Mouse(2, false);
+    const m = g.Debug.FirstLevelMission();
+    return { wounded: m.facts.includes("zhouGunWounded"), health: g.player.health, alive: g.player.alive };
+  });
+  console.log("ZHOU_OFF_GUN", JSON.stringify(zhouOff));
   // 枪座就在三米外的沟里：这一小段不开火（fight 的 90 m 口径会让人站着对射、原地不动）。
   await Route([{ x: 0, z: -124 }, { x: 0, z: -127.4 }], "MachineGunSeat", { stance: "crouch" });
   await Interact();
