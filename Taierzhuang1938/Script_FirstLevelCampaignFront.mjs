@@ -381,7 +381,7 @@ export async function Drive(ctx) {
       // 先在沟里等它压过来，别自己横穿开阔地去够它。战车本来就朝玩家推进，
       // 而这一段的伤全在那二十几米没遮没挡的地上（实测跑过去之后只剩两成血，
       // 回集结处的路上连死三次）。
-      for (let i = 0; i < 3600 && Gap() > 16; i++) {
+      for (let i = 0; i < 3600 && Gap() > 9; i++) {
         if (g.player.bleeding && g.player.health < 85) g.Debug.Key("KeyB");
         g.StepFrames(1, 1 / 60, false);
       }
@@ -397,9 +397,22 @@ export async function Drive(ctx) {
       const g = window.Tengxian, tank = g.Debug.FirstLevelMission().tank, p = g.player.position;
       const gap = Math.hypot(p.x - tank.x, p.z - tank.z);
       if (gap <= throwRangeM) return null;
-      const along = Math.min(gap - throwRangeM + 2, stepM) / gap;
-      return { x: p.x + (tank.x - p.x) * along, z: p.z + (tank.z - p.z) * along, gap: +gap.toFixed(1) };
-    }, { throwRangeM: 15, stepM: 6 });
+      // 只往前挪到还留在沟里的那一步：目标点一旦爬上路基，人卡在沟壁前，
+      // 整条腿被判成「走不通」（2026-09-20 实测）。按一米一档往前探，
+      // 地面高度跟脚下差太多就不再往前。
+      const want = Math.min(gap - throwRangeM + 1, stepM);
+      let reach = 0;
+      for (let step = 1; step <= Math.ceil(want); step++) {
+        const along = Math.min(step, want) / gap;
+        const x = p.x + (tank.x - p.x) * along, z = p.z + (tank.z - p.z) * along;
+        if (Math.abs(g.battlefield.GroundHeight(x, z) - p.y) > 0.7) break;
+        reach = Math.min(step, want);
+      }
+      if (reach < 1) return null;
+      const along = reach / gap;
+      return { x: p.x + (tank.x - p.x) * along, z: p.z + (tank.z - p.z) * along,
+        gap: +gap.toFixed(1), reach: +reach.toFixed(1) };
+    }, { throwRangeM: 9, stepM: 8 });
     let moved = false;
     if (spot) {
       console.log("TANK_THROW_SPOT", JSON.stringify(spot));
@@ -423,12 +436,17 @@ export async function Drive(ctx) {
       const originY = eye.y + THROW.muzzleRiseM;
       const distance = Math.hypot(p.x - tank.x, p.z - tank.z) - THROW.muzzleAheadM;
       const rise = g.battlefield.GroundHeight(tank.x, tank.z) - originY;
+      // 实测标定：按这个抛物线模型解出来的弹，真实飞行只有解算距离的 ~0.56 倍
+      // （2026-09-20 四发一致：解 12.68 m 飞 7.03 / 7.10 m，解 14.49 m 飞 7.4 m）。
+      // 差在出手方向上，不在初速上。所以按「更远的目标」解，落点才落在车身上。
+      // 顺带一个后果：集束弹的真实射程只有九米出头，十二米开外怎么解都够不着。
+      const solveFor = distance / 0.56;
       let best = null;
       for (let pitch = 0.06; pitch <= 1.3; pitch += 0.02) {
         const cosine = Math.cos(pitch), vertical = Math.sin(pitch) + THROW.arcLift;
-        const drop = distance * vertical / cosine - rise;
+        const drop = solveFor * vertical / cosine - rise;
         if (drop <= 0.05) continue;
-        const speed = Math.sqrt(4.905 * distance * distance / (cosine * cosine * drop));
+        const speed = Math.sqrt(4.905 * solveFor * solveFor / (cosine * cosine * drop));
         if (speed < kind.throwSpeedMin + 0.05 || speed > kind.throwSpeedMax - 0.05) continue;
         let clearance = Infinity;
         for (let step = 1; step <= 20; step++) {
