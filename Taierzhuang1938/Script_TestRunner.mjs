@@ -576,6 +576,8 @@ const changedDomainRules = [
   // 整关驾驶脚本拆成了「公共 Kit + 三段」（2026.09.19 重构，第二波三个玩法包各改一段）。
   // 文件名里没有「Mission」，上面那些按 FirstLevelMission* 选域的规则盖不到。
   {domain:"firstLevel",pattern:/FirstLevelCampaign(Kit|Front|Mid|End)/},
+  // 第二波玩法包的新模块（阶段 1–7 / 8–14 / 15–18）：文件名不带 FirstLevelMission 前缀，单列一条。
+  {domain:"firstLevel",pattern:/FirstLevel(Bunker|Collection|BorrowLight|VillageBlock|TransferCart|QuietMarch|Bridge|NightGate)|Data_Tuning_FirstLevel(Front|Mid|End)|FirstLevel(Front|Mid|End)Test/},
   // 屋内伏击那一拍 2026.09.19 下线（09 改成连屋近战，担架不进屋）：采样器与它的门禁已删，
   // Animation/FirstLevelAmbush/ 的 JSON 保留但已无消费者，改它不再牵动任何测试。
   {domain:"combat",pattern:/FpsSkeleton|FpsSkeletal|FpsAnimation|Animation\/FirstPerson\/Data_Fps/},
