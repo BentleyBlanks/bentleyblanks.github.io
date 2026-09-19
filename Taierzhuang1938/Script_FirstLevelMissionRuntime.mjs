@@ -1974,7 +1974,14 @@ export class FirstLevelMissionRuntime {
       this.Record("meleeResolved", { killed: this.Ambushers.length });
   }
   /**
-   * 控制锁算视线用的眼位。被枪托砸翻躺在地上的时候（屋内伏击）真正的眼位在地板上方
+   * 这一帧的感知（眼皮 + 恍惚）。装配层只问这一个口。
+   * 2026.09.19 起整关只有掩蔽部那一处重击，曲线在 FirstLevelOpening 里采样。
+   */
+  Perception() {
+    return { eyeClosure: this.opening.eyeClosure || 0, concussion: this.opening.concussion || null };
+  }
+  /**
+   * 控制锁算视线用的眼位。被枪托砸翻躺在地上的时候（旧的屋内伏击）真正的眼位在地板上方
    * MELEE_RULES.groundEyeM —— 照站姿眼位算出来的俯仰角会把镜头压到脚底下去。
    */
   ControlEye() {
