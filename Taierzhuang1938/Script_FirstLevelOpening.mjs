@@ -33,7 +33,7 @@ export function SampleOpeningPerception(elapsed){
 export class FirstLevelOpening {
   constructor(runtime){this.r=runtime;this.peakPlayerShooters=0;this.fireSeen=new Map();this.fireEvents=[];this.shotCount=0;this.playerShotCount=0;this.peakVisible=0;
     this.pack={id:"ShunziPack",contents:["CivilianClothes"],carried:true};
-    this.captives=[];
+    // `captives` 是取 Front 包那一份的只读视图（见下面的 getter）。
     this.reducedMotion=globalThis.matchMedia?.('(prefers-reduced-motion: reduce)');}
 
   // --- 空间：掩蔽部一带的固定点（全部取 MISSION_PLACEMENT.bunker，空间包改摆位这里跟着走） --
@@ -65,23 +65,14 @@ export class FirstLevelOpening {
     this.SpawnCaptives();
     r.Say("BunkerBanter");
   }
-  /** 门外那两名失去抵抗能力的川军（无武器、不还手）。摆位取 MISSION_PLACEMENT.bunker.captives。 */
+  /**
+   * 门外那两名失去抵抗能力的川军（无武器、不还手）与落在几米外的两支步枪。
+   * 摆位与整拍行刑归 Front 玩法包的 `Script_FirstLevelBunker`，这里只转发。
+   */
   SpawnCaptives(){
-    const r=this.r;
-    if(this.captives.length)return;
-    for(const [i,spot] of Place.bunker.captives.entries()){
-      const actor=r.ai.Spawn("nra",spot.x,spot.z,
-        {weapon:"HanYang",scriptedNoncombatant:true,squadId:"MissionBunkerCaptives"});
-      if(!actor)continue;
-      actor.missionId=spot.id==="captiveWounded"?"BunkerCaptiveWounded":"BunkerCaptiveHelper";
-      actor.unarmed=true;actor.health=R.bunkerCaptiveHealth;
-      actor.yaw=spot.yaw??0;
-      r.MoveActor(actor,actor.position,0);
-      // 腿断的那个躺着，扶人的那个半跪。
-      r.ai.SetStance(actor,spot.id==="captiveWounded"?2:1,Infinity,true);
-      this.captives.push(actor);
-    }
+    this.r.frontShow?.bunker.Begin();
   }
+  get captives(){return this.r.frontShow?.bunker.captives || [];}
   /** 近爆（黑屏对白末句被打断处；没有音频时按 bunkerBlastAtS 兜底）。 */
   BunkerBlast(){
     const r=this.r;
@@ -97,47 +88,21 @@ export class FirstLevelOpening {
     const r=this.r;
     for(const id of ["bunkerCollapsed","captivesKilled","doorSearchStarted"])r.flow.facts.delete(id);
     r.flow.log=r.flow.log.filter(entry=>!(entry.kind==="fact"&&["bunkerCollapsed","captivesKilled","doorSearchStarted"].includes(entry.id)));
-    for(const actor of this.captives)if(actor?.alive)actor.health=R.bunkerCaptiveHealth;
+    r.frontShow?.bunker.Reset();
     this.bunker=null;this.blastAt=null;
     this.BeginBunker();
   }
+  /**
+   * 受困段每帧。近爆兜底留在这里（它是感知曲线的起点）；门外的行刑、踢枪、
+   * 转向门内与后侧清理坍塌物的声音全在 Front 包的 `FirstLevelBunkerShow`。
+   */
   UpdateBunker(){
     const r=this.r,bunker=this.bunker;
     if(!bunker)return;
     const age=r.time-bunker.started;
     if(bunker.blastAt==null&&age>=R.bunkerBanterFallbackS)this.BunkerBlast();
     if(bunker.blastAt==null)return;
-    const since=r.time-bunker.blastAt;
-    // 门外的行刑：两名日兵走到俘虏身上，逐个下刀。玩家透过前门低处破口看着。
-    if(since>=R.bunkerKillingAtS&&!r.Has("captivesKilled")){
-      if(bunker.killAt==null){bunker.killAt=r.time;r.Say("BunkerKilling");}
-      const elapsed=r.time-bunker.killAt;
-      const want=Math.min(this.captives.length,1+Math.floor(elapsed/R.bunkerCaptiveStabGapS));
-      for(let i=0;i<want;i++){
-        const victim=this.captives[i],killer=r.enemies.get(i===0?"BunkerExecutionerA":"BunkerExecutionerB");
-        if(killer?.alive){
-          killer.scriptedNoncombatant=false;killer.missionDormant=false;killer.bayonetFixed=true;
-          // 下刀的站位取 MISSION_PLACEMENT.bunker.ijaKill（在俘虏北侧一米，挡不住玩家视线）。
-          r.MoveActor(killer,Place.bunker.ijaKill[i]||{x:victim?.position.x??A.bunkerKilling.x,
-            z:(victim?.position.z??A.bunkerKilling.z)-1},R.walkSpeedMps);
-        }
-        if(victim?.alive)victim.TakeHit?.(200,"torso",null,{melee:true});
-      }
-      if(this.captives.length&&this.captives.every(actor=>!actor.alive))
-        r.Record("captivesKilled",{count:this.captives.length});
-    }
-    // 日兵转向门内；同时后侧响起清理坍塌物的声音（何有田他们在挖）。
-    if(since>=R.bunkerSearchAtS&&!r.Has("doorSearchStarted")){
-      // 转向门内：两个行刑兵走到门口那两点，跟进的那两人照旧压向门口。
-      let door=0;
-      for(const actor of r.enemies.values())if(actor.missionEncounter==="bunkerAssault"&&actor.alive){
-        actor.missionDormant=false;actor.scriptedNoncombatant=false;
-        r.MoveActor(actor,Place.bunker.ijaDoor[door++]||A.bunkerDoor,R.walkSpeedMps);
-      }
-      r.Say("BunkerSearch");
-      r.Say("ShunziCurse");
-      r.Record("doorSearchStarted",{x:A.bunkerDoor.x,z:A.bunkerDoor.z});
-    }
+    r.frontShow?.bunker.UpdateBunker(bunker);
   }
 
   // --- 02 获救 --------------------------------------------------------------
@@ -154,6 +119,9 @@ export class FirstLevelOpening {
     const reach=this.TrappedPoint;
     // 走到空间包给的掀架位（luoLift）—— 从后壁破口挤进来那一步靠它，不再随手估一个点。
     if(Distance(luo.position,reach)>C.rescueReachM){r.MoveActor(luo,Place.bunker.luoLift,R.walkSpeedMps);return;}
+    // 掀木架的同时幺娃要在另一头拉背包（Notion 02）。两个人都到位（或等满兜底）才起接管。
+    this.rescueGatherAt??=r.time;
+    if(r.frontShow&&!r.frontShow.bunker.RescueGatherReady(this.rescueGatherAt))return;
     this.rescueAt=r.time;
     this.rescueDuration=R.bunkerRescueSeconds;
     r.BeginControl("rescue",this.rescueDuration);
@@ -244,7 +212,11 @@ export class FirstLevelOpening {
     }
     if(stage==="Trapped")this.UpdateBunker();
     if(stage==="BunkerRescue")this.UpdateRescue();
-    if(stage==="Support")this.SpawnZhou();
+    // 老周本来在 03 上枪位。可是 04 有自己的起点（选章 / Debug.FirstLevelJump(4)）：
+    // 从那儿开局的话 SpawnZhou 一次都没跑过，UpdateZhou 里 this.zhou 是空的，
+    // 「老周腿伤恶化退出枪位」永远记不下来，04 也就永远过不去（2026-09-20 实测：
+    // 打到只剩 zhouGunWounded 一条，人在枪位上活活打死）。SpawnZhou 自己带幂等闸。
+    if(stage==="Support"||stage==="MachineGun")this.SpawnZhou();
     this.FireWindows();
     this.UpdateZhou();
   }

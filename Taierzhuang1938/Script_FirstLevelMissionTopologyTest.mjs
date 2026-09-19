@@ -91,11 +91,14 @@ const measured = {
   wallPathM: MissionRouteLength(StageRoutes.wallPath),
   toBridgeM: MissionRouteLength(StageRoutes.toBridge),
 };
-// 掩蔽部门外的刺杀处在 8–12 m 的可读距离上（不是贴脸，也不是看不清的远处）。
-assert.ok(measured.bunkerKillingM >= 16 && measured.bunkerKillingM <= 24,
-  `the killing ground sits 8-12 m beyond the door: ${measured.bunkerKillingM.toFixed(1)} m from the player`);
-assert.ok(Distance(S.bunkerDoor, S.bunkerKilling) >= 6 && Distance(S.bunkerDoor, S.bunkerKilling) <= 12,
-  "8-12 m from the doorway itself");
+// 掩蔽部门外的刺杀处要在看得清的距离上。契约 §3 原写「门外 8–12 m」（离受困位 18–22 m），
+// 2026-09-20 实拍下来那个距离在破口里只有几个像素，集成方定为前移到门外约 3 m ——
+// 离受困位 13.5 m。仍然不是贴脸（门框还能裁掉创口），但人看得清在干什么。
+assert.ok(measured.bunkerKillingM >= 11 && measured.bunkerKillingM <= 16,
+  `the killing ground sits about 3 m beyond the door: ${measured.bunkerKillingM.toFixed(1)} m from the player`);
+// 门外那一段：够远到门框还能裁掉创口，够近到看得清（2026-09-20 起约 3 m）。
+assert.ok(Distance(S.bunkerDoor, S.bunkerKilling) >= 2 && Distance(S.bunkerDoor, S.bunkerKilling) <= 6,
+  `2-6 m from the doorway itself: ${Distance(S.bunkerDoor, S.bunkerKilling).toFixed(1)} m`);
 // 02 的折角与集结处在同一片背坡之后。
 assert.ok(Distance(S.rearCorner, S.collection) < 20, "the trench corner and the collection point are neighbours");
 assert.ok(S.rearCorner.z < S.collection.z, "the corner is north of the collection point");

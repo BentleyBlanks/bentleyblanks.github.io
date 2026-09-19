@@ -53,6 +53,7 @@ export const testDefs = {
   FirstLevelMissionTopologyTest: {file:"Script_FirstLevelMissionTopologyTest.mjs",desc:"Notion September 19 four zones: southward progression, metric adjacency and sight rules"},
   FirstLevelMissionTopologyBrowserTest: {file:"Script_FirstLevelMissionTopologyBrowserTest.mjs",timeoutMs:300000,desc:"Real Rapier walks of every contract route, four bridge states, night slice and 720p views"},
   FirstLevelSpaceTest: {file:"Script_FirstLevelSpaceTest.mjs",desc:"September 19 whitebox space: anchors, capsule routes, bunker sightline, street gap, lane width, river and bridges"},
+  FirstLevelFrontTest: {file:"Script_FirstLevelFrontTest.mjs",desc:"第一关阶段 1–7：行刑节拍与 Line 对位、救援放行、集结处摆位、借火事件、07 时长闸、运行时薄钩子（纯 Node）"},
   CarriagePropVelocityTest: {file:'Script_CarriagePropVelocityTest.mjs',timeoutMs:300000,desc:'Real pork/pack GPU velocities with moving camera, stop and reappearance; high-quality opening'},
   MotionVectorContractTest: {file:'Script_MotionVectorContractTest.mjs',timeoutMs:120000,desc:'GPU admission contract for new rigid/skinned renderers, bone attachments, foreground inheritance and history lifecycle'},
   HitDisorientationTest: {file:"Script_HitDisorientationTest.mjs",timeoutMs:420000,desc:"Shared bullet disorientation: real GPU/audio, decay and lifecycle"},
@@ -66,9 +67,9 @@ export const testDefs = {
   SquadMarchEditorTest: {file:"Script_SquadMarchEditorTest.mjs",timeoutMs:300000,desc:"Squad editor real actors, editable routes, per-count styles and cleanup"},
   SquadMarchAiTest: {file:"Script_SquadMarchAiTest.mjs",desc:"Real adapter memory/contact distinction, movement ownership and mission pose handoff"},
   SquadMarchNavigationTest: {file:"Script_SquadMarchNavigationTest.mjs",timeoutMs:300000,desc:"Displaced squad member rejoins through real navigation and terrain"},
-  // 旧的 --march-only 只跑到军列开场结束就 break，那段已经下线。第二波 Front 包
-  // 写完 1–7 的驾驶脚本之后，把这一条改成只跑那一段（--stage-from 还没有 1–7 的分段起点）。
-  FirstLevelSquadMarchTest: {file:"Script_FirstLevelMissionBrowserTest.mjs",args:["--campaign"],timeoutMs:600000,desc:"Shared march consumed by real first-level AI on the rear communication trench approach"},
+  // 旧的 --march-only 只跑到军列开场结束就 break，那段已经下线。现在跑 Front 那一段
+  // （`--stage-to=7`）：共用行进层真正被消费的地方是后交通壕上前沿与 07 南行那两趟。
+  FirstLevelSquadMarchTest: {file:"Script_FirstLevelMissionBrowserTest.mjs",args:["--campaign","--stage-to=7"],timeoutMs:900000,desc:"Shared march consumed by real first-level AI on the rear trench approach and the south walk"},
   EditorLauncherTest: {file:"Script_EditorTest.mjs",args:["--launcher-only"],timeoutMs:240000,desc:"Editor launcher inventory including the squad march entry"},
   FirstLevelMissionAftermathTest: {file:"Script_FirstLevelMissionAftermathTest.mjs",timeoutMs:600000,desc:"Civilian body placement, actual model clearance, grounding, LOD and screenshots"},
   MachineGunCaptivesAnimationTest:{file:"Script_MachineGunCaptivesAnimationTest.mjs",timeoutMs:300000,desc:"Captives cutscene clips on five original rigs, authored grounding and the state.perform contract"},
@@ -429,6 +430,7 @@ export const tier0Fast = [
   "TrenchPlanTest",
   "FirstLevelVoiceTest",
   "FirstLevelSpaceTest",
+  "FirstLevelFrontTest",
 ];
 
 export const tier0Browser = ["BootTest", "BootStallTest", "GeoTest"];
@@ -453,7 +455,7 @@ export const domains = {
   propVelocity: {label:'近景刚体道具速度与移动清晰度',tests:['CarriagePropVelocityTest']},
   squadMarch: {label:"通用小队行进",tests:["SquadMarchCoverTest","SquadMarchCoverBrowserTest","SquadMarchTest","SquadMarchAiTest","SquadMarchEditorTest","SquadMarchNavigationTest","FirstLevelSquadMarchTest","EditorLauncherTest"]},
   firstLevelTail: {label:"第一关降压段至结尾定向续接",tests:["FirstLevelMissionStageRegroupTest","FirstLevelMissionStageTailTest"]},
-  firstLevel: {label:'新版第一关完整任务',tests:['FirstLevelEndTest','MachineGunCutsceneAudioTest','Type89DamageTest','FirstLevelFrontRouteBrowserTest','FirstLevelMissionTopologyTest','FirstLevelMissionTopologyBrowserTest','FirstLevelSpaceTest','MissionReturnTest','FirstLevelMissionReturnBrowserTest','FirstLevelCasualtyBrowserTest','FirstLevelMissionTest','MissionGatesTest','FirstLevelVoiceTest','FirstLevelVoiceAudioTest','FirstLevelFrontPresenceTest','FirstLevelMachineGunTest','FirstLevelMachineGunCutsceneTest','FirstLevelMissionAftermathTest','FirstLevelMissionFortificationsTest','FirstLevelMissionBrowserTest','FirstLevelMissionStageJumpTest','FirstLevelMissionStageContinueTest','FirstLevelMissionPresentationTest','FirstLevelMidTest']},
+  firstLevel: {label:'新版第一关完整任务',tests:['FirstLevelEndTest','MachineGunCutsceneAudioTest','Type89DamageTest','FirstLevelFrontRouteBrowserTest','FirstLevelMissionTopologyTest','FirstLevelMissionTopologyBrowserTest','FirstLevelSpaceTest','MissionReturnTest','FirstLevelMissionReturnBrowserTest','FirstLevelCasualtyBrowserTest','FirstLevelMissionTest','MissionGatesTest','FirstLevelVoiceTest','FirstLevelVoiceAudioTest','FirstLevelFrontPresenceTest','FirstLevelMachineGunTest','FirstLevelMachineGunCutsceneTest','FirstLevelMissionAftermathTest','FirstLevelMissionFortificationsTest','FirstLevelMissionBrowserTest','FirstLevelMissionStageJumpTest','FirstLevelMissionStageContinueTest','FirstLevelMissionPresentationTest','FirstLevelMidTest','FirstLevelFrontTest']},
   text: { label: "玩家文本 / 数值表（数据驱动闸门）", tests: ["TextTest", "TextGatherCheck"] },
   animation: { label: '独立动画资产验收', tests: ['ActorLocomotionTest','BackRifleRunTest','MeleeAnimationTest','DadaoSwingTest','GrenadeThrowTest','InfantryAnimationTest','DeathCollapseTest'] },
   explosives: { label: "爆炸白盒与通用地形形变/返掷", tests: ["ExplosionRulesTest", "ExplosionRangeTest", "CraterSurfaceTest"] },
@@ -604,7 +606,7 @@ const changedDomainRules = [
   //（04 关中过场整条语音通道静音那一次）。这两条把交叉的一半补上。
   { domain: "audio", pattern: /Script_Audio\.mjs|Script_AudioWiring|Data_Voice|Data_SfxSources|Data_AmbSources|Data_Tuning_Audio/ },
   { domain: "voice", pattern: /Script_Audio\.mjs|Data_Voice|Script_VoiceBake|Script_FirstLevelMissionVoice/ },
-  {domain:'firstLevel',pattern:/MissionReturn|FirstLevelMeal|BaconHandoff|FirstLevelOpening|FirstLevelMachineGun|FirstLevelFrontPresence|FirstLevelMission|FirstLevelTrain|FirstLevelCarriage|CarriageSoundscape|FirstLevelVoice|FirstLevelGuideDialogue|FirstLevelGuideVoiceAlignment|FirstLevelJapaneseSpeech|SeedAudioFirstLevel|SeedAudioCarriage|Audio\/FirstLevel|Audio\/Amb\/AudioAmb_Carriage/},
+  {domain:'firstLevel',pattern:/MissionReturn|FirstLevelMeal|BaconHandoff|FirstLevelOpening|FirstLevelMachineGun|FirstLevelFrontPresence|FirstLevelBunker|FirstLevelCollection|FirstLevelFrontShow|FirstLevelFrontTest|FirstLevelMission|FirstLevelTrain|FirstLevelCarriage|CarriageSoundscape|FirstLevelVoice|FirstLevelGuideDialogue|FirstLevelGuideVoiceAlignment|FirstLevelJapaneseSpeech|SeedAudioFirstLevel|SeedAudioCarriage|Audio\/FirstLevel|Audio\/Amb\/AudioAmb_Carriage/},
   // 静态分件的图集合批：第一关尸体层与担架伤员用它（firstLevel 那一串里的
   // 尸体 / 演出门禁），而它动的是材质与提交量，所以 render 域的开机 / 采样器 /
   // 材质门禁也要跟着跑。

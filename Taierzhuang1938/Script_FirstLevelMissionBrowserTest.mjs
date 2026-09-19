@@ -58,19 +58,44 @@ try {
     console.log("ok initial mission",
       JSON.stringify({ stage: initial.mission.stage, position: initial.position, slots: initial.slots }));
     if (!options.campaign) {
-      // 开场演出基线归 Front 包（Script_FirstLevelOpeningBrowserTest）。只有这一条路用得着它，
-      // 改成按需 import —— 静态 import 会让分段夹具（--stage-from=8/11/15/18）在
-      // 模块加载期就崩掉，而它们根本不跑这一段。
-      const { PlayFirstLevelOpening } = await import("./Script_FirstLevelOpeningBrowserTest.mjs");
-      await PlayFirstLevelOpening(page, { out: output, audioClock: options.audioCheck, mount: false });
+      // 基线（不带 --campaign）：坐着把 01 看完。军列开场那一份 PlayFirstLevelOpening
+      // 随骨架下线了，这里改看新开场自己的三条事实与门外那一拍。
+      const trapped = await page.evaluate(() => {
+        const g = window.Tengxian;
+        for (let i = 0; i < 60 * 60 && g.Debug.FirstLevelMissionRuntime().flow.stage.id === "Trapped"; i++)
+          g.StepFrames(1, 1 / 60, false);
+        const mission = g.Debug.FirstLevelMission();
+        return { stage: mission.stage, facts: mission.facts, beats: mission.front.bunker.beats,
+          captives: mission.front.bunker.captives, control: mission.control };
+      });
+      await fs.writeFile(path.join(output, "Data_Opening.json"), JSON.stringify(trapped, null, 2));
+      await page.evaluate(() => window.Tengxian.StepFrames(4, 1 / 60, true));
+      await page.screenshot({ path: path.join(output, "Scene_Opening.png") });
+      for (const fact of ["bunkerCollapsed", "captivesKilled", "doorSearchStarted"])
+        assert.ok(trapped.facts.includes(fact), "受困段记下了 " + fact);
+      assert.ok(trapped.captives.length === 2 && trapped.captives.every((actor) => !actor.alive),
+        "门外两名失去抵抗能力的川军被杀害");
+      assert.equal(trapped.stage, "BunkerRescue", "「日军开始检查门内」把 01 推到 02");
+      console.log("ok baseline opening", JSON.stringify({ beats: trapped.beats }));
     }
   }
 
   if (options.campaign) {
     await InstallInputDriver(ctx);
     if (ctx.stageFrom <= 7) await DriveFront(ctx);
-    if (ctx.stageFrom <= 14) await DriveMid(ctx);
-    await DriveEnd(ctx);
+    // `--stage-to=7`：只跑 Front 那一段（1–7）。分段夹具照样留证据与回执，
+    // 但不跑后两段、也不断言 Complete —— 一段跑通不许冒充通关。
+    if (ctx.stageTo > 7) {
+      if (ctx.stageFrom <= 14) await DriveMid(ctx);
+      if (ctx.stageTo > 14) await DriveEnd(ctx);
+    }
+    if (ctx.stageTo < 18) {
+      assert.deepEqual(ctx.errors, []);
+      console.log(`ok stages ${ctx.stageFrom}-${ctx.stageTo} driven with real player input`);
+      await fs.writeFile(path.join(output, "Data_Segment.json"),
+        JSON.stringify({ stageFrom: ctx.stageFrom, stageTo: ctx.stageTo,
+          stage: await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission().stage) }, null, 2));
+    } else {
 
     assert.equal(await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission().stage), "Complete");
     // TODO 第二波：节奏断言按新 27 步重写。旧的那几条（South 的六秒黑屏转场、
@@ -91,6 +116,7 @@ try {
         JSON.stringify(ctx.jumpReceipts, null, 2));
       console.log(`ok debug starts ${ctx.stageFrom}–18 continued with real player input through their next stage, ending at Complete`);
     } else console.log("ok entire first level completed with real player input and physical mission events");
+    }
   }
 } catch (error) {
   await CaptureFailure(ctx);

@@ -282,8 +282,10 @@ export const MISSION_FACT_GATES = Object.freeze({
   // --- South -------------------------------------------------------------
   southWhisperHeard: Gate({ kind: "voice", step: "South", cue: "SouthWhisper", source: "VoiceDone" }),
   villageMouthReached: Gate({
-    kind: "proximity", step: "South", anchor: "village", radiusM: 4, source: "Update",
-    note: "真走一段（取消了旧的黑屏转场），目标时长 45–75 秒",
+    kind: "proximity", step: "South", anchor: "village", radiusM: 9, source: "Update",
+    note: "真走一段（取消了旧的黑屏转场），目标时长 45–75 秒；"
+      + "半径要盖住 southWalk 的终点 (48,-20) —— 它离 village 锚点 7 m，"
+      + "4 m 的门谁沿着路走到头都够不着，07 会永远停在那儿",
   }),
   mainStreetPointed: Gate({ kind: "voice", step: "South", cue: "VillagePointer", source: "VoiceDone" }),
   // --- Village -----------------------------------------------------------

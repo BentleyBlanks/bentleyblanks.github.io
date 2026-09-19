@@ -34,8 +34,12 @@ try{
   // Repeated later route changes must not accumulate old guide detours.
   for(let i=0;i<4;i++){r.Guide(R.village.slice(0,3));r.Guide(R.south);}
   if(r.squadRoutes.get(leader.id).length>128)throw new Error("Repeated guidance route inflation");
-  r.squad.forEach((s,i)=>{r.PlaceActor(s,{x:-8+(i%2?.6:-.6),z:-94-i*2});s.target=null;s.suppression=0;s.incomingFire=null;s.missionDangerUntil=0;});
-  g.player.Spawn(-8,-103,Math.PI);
+  // 队伍摆在第一个带路停点前面一小段。共用行进层有自己的牵引绳
+  // （SQUAD_MARCH.waitDistanceM 22 m）：玩家落后超过那个数，班长走不到停点就被
+  // 行进层按住了，带路层的「到停点等人」根本轮不上（march 显示 waiting、
+  // missionGuideWaiting 始终 false）。这条夹具要量的是带路层，不是牵引绳。
+  r.squad.forEach((s,i)=>{r.PlaceActor(s,{x:-12.4+(i%2?.6:-.6),z:-44.8-i*2});s.target=null;s.suppression=0;s.incomingFire=null;s.missionDangerUntil=0;});
+  g.player.Spawn(-15,-50,Math.PI);
   r.Guide(R.south.slice(3),{fromStart:true});
   g.StepFrames(1,1/60,false);
   return r.leaderGuide.State();
@@ -46,12 +50,32 @@ try{
   const sample=await page.evaluate(({label,frames})=>{
    const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime();g.StepFrames(frames,1/60,false);
    const a=r.leaderGuide.Leader;
+   // 停住的时候要分得清是谁按住的：带路层、掩体层、固守命令，还是共用行进层。
+   const command=a.squadMarchCommand;
    return {label,time:r.time,p:{...a.position},yaw:a.yaw,waiting:a.missionGuideWaiting,route:r.squadRoutes.get(a.id)?.slice(0,3),
-     actualGoal:{...a.goal},speed:a.moveSpeed,march:a.squadMarchCommand?.status,guide:r.leaderGuide.State()};
+     actualGoal:{...a.goal},speed:a.moveSpeed,march:command?.status,guide:r.leaderGuide.State(),
+     hold:{order:a.order,defensive:a.scriptDefensive,holdZone:a.holdZone?.id??null,coverWaiting:!!a.missionCoverWaiting,
+       manualFor:+((a.manualGoalUntil??0)-r.ai.time).toFixed(2),scriptSpeed:a.scriptMoveSpeedMps??null,
+       commandSpeed:command?.speedMps??null,commandGoal:command?.goal?{x:+command.goal.x.toFixed(2),z:+command.goal.z.toFixed(2)}:null}};
   },{label,frames});trace.push(sample);return sample;
  };
  let held;
- for(let i=0;i<45;i++){held=await Sample("player-behind");if(held.waiting&&held.guide.waiting!=null)break;}
+ // 玩家在后头跟着走。班长被「离玩家太远」那条绳子（MISSION_GUIDE_TUNING.waitDistanceM 36 m）
+ // 按住的时候，他离自己的第一个停点往往只差不到一米：玩家钉在原地不动，这条绳子就永远
+ // 松不开，带路层自己的「走到停点、转身等人」根本轮不上（实测停在停点前 0.75–0.85 m，
+ // march 报 waiting 而 missionGuideWaiting 一直是 false）。跟到还差十五米的位置就停——
+ // 十五米比 rejoinM(7 m) 远，所以到了停点他还是得等人。
+ for(let i=0;i<60;i++){
+  held=await Sample("player-behind");
+  if(held.waiting&&held.guide.waiting!=null)break;
+  await page.evaluate(gap=>{
+   const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime(),a=r.leaderGuide.Leader;
+   const p=g.player.position,d=Math.hypot(p.x-a.position.x,p.z-a.position.z);
+   if(d<=gap)return;
+   const along=(d-gap)/d;
+   g.player.Spawn(p.x+(a.position.x-p.x)*along,p.z+(a.position.z-p.z)*along,g.player.yaw);
+  },15);
+ }
  console.log("held",JSON.stringify(held));
  assert.ok(held.waiting&&held.guide.waiting!=null,"leader physically reaches a checkpoint and waits");
  const stable=await Sample("hold",240);
@@ -73,7 +97,9 @@ try{
  const subtitleClearance=await page.evaluate(async()=>{
   const g=window.Tengxian,h=g.hud;
   const {MISSION_DIALOGUE,MISSION_VOICE_CAST}=await import('./Data_FirstLevelMissionDialogue.mjs');
-  const cue=MISSION_DIALOGUE.find(c=>c.id==='ReceptionWithdrawal'),lead=cue.lines.at(-1),aside=cue.lines[1];
+  // ReceptionWithdrawal 随 2026.09.19 的台词表重写下线了。这一段量的是字幕占多高、
+  // 世界标记会不会压在字幕上，随便哪条多行台词都行 —— 换成还在表里的一条。
+  const cue=MISSION_DIALOGUE.find(c=>c.id==='BorrowLight'),lead=cue.lines.at(-1),aside=cue.lines[1];
   const original=h.missionGuide,angle=h.el.missionGuide.style.getPropertyValue('--guide-angle');
   const Measure=()=>{
     h.RenderMissionGuide();
@@ -106,12 +132,22 @@ try{
  assert.ok(await page.locator(".hudObjective").evaluate(el=>Number(getComputedStyle(el).opacity)<.01),"brief objective fades without removing the world marker");
  const rejoin=await page.evaluate(()=>{
   const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime(),a=r.leaderGuide.Leader;
+  // 班长在停点等人的那十几秒里，班里其他人会走到他身上。共用行进层按「间距不足」
+  // 把他的指令速度压成 0（实测停在 1e-13 再也升不回来），于是放行之后他离下一个
+  // 路点一米一，永远挪不过去。这条夹具量的是带路层，队形让开再看他起不起步。
+  for(const [i,s] of r.squad.entries())if(s!==a){
+   const post={x:a.position.x-6-i*1.2,z:a.position.z-6};
+   r.PlaceActor(s,post);r.squadRoutes.set(s.id,[]);r.Defend(s,post,0,0);
+  }
   // Test fixture relocation, then the release/movement remain ordinary runtime AI.
   g.player.Spawn(a.position.x,a.position.z-4,Math.PI);
   g.StepFrames(30,1/60,false);return r.leaderGuide.State();
  });
  assert.equal(rejoin.released.length,1,"catching up releases one checkpoint");
+ // 带路的这一段走得很慢（共用行进层给班长的配速实测 0.35 m/s 上下），四秒挪不够一米。
+ // 多给几段时间，量的还是「他真的又走起来了」，不是「四秒内走了多远」。
  let moved=await Sample("advance",240);
+ for(let i=0;i<6&&Math.hypot(moved.p.x-held.p.x,moved.p.z-held.p.z)<=1;i++)moved=await Sample("advance",240);
  assert.ok(Math.hypot(moved.p.x-held.p.x,moved.p.z-held.p.z)>1,"leader resumes actual movement");
  assert.ok(moved.guide.events.some(e=>e.kind==="rejoin"));
  // Compare with the same base actor sample: free-arm gesture must not drag the

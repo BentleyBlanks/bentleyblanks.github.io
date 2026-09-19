@@ -34,7 +34,11 @@ try{
   await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?whitebox=p012&shot=1&manual=1&quality=low&scale=small`,{timeout:180000});
   await page.waitForFunction(()=>window.Tengxian?.state?.ready,null,{timeout:240000});
   await page.evaluate(async()=>{
-    const g=window.Tengxian;await g.Debug.FirstLevelJump(3);
+    // 从 02 起跳，不是 03。2026.09.19 重构之后 03 的入口就在前沿边上：跳到 03 落地
+    // 那一帧人离 front 锚点 (0,-124) 不到 frontEngageDistanceM，UpdateFront 当场记下
+    // frontBattleStarted 把主力放出来 —— 这条夹具要看的正是「主力还没被放出来」。
+    // 放出来之后再删人删事实也回不去：同一份名册不会第二次生成（这正是它该有的行为）。
+    const g=window.Tengxian;await g.Debug.FirstLevelJump(2);
     const r=g.Debug.FirstLevelMissionRuntime(),{MISSION_STAGES}=await import("./Data_FirstLevelMission.mjs");
     const {OPENING}=await import("./Data_FirstLevelOpening.mjs");
     // Support follows a cleared trench and a squad already at the dressing
@@ -43,45 +47,63 @@ try{
     for(const [id,actor] of r.enemies)if(actor.missionEncounter==="intrusion"){r.ai.Remove(actor);r.enemies.delete(id);}
     for(const [i,actor] of r.squad.entries())r.PlaceActor(actor,OPENING.shelterPosts[i]);
     r.flow.index=MISSION_STAGES.findIndex(stage=>stage.id==="Support");r.flow.Enter();
+    // 兜底：万一起跳位置又变到前沿 26 m 以内，至少把事实退回去（人已经放出来的话
+    // 下面 LastTrenchBend 那条名册断言会当场翻红，那是该翻的）。
+    r.flow.facts.delete("frontBattleStarted");
   });
-  await Place(-32,-20);await Advance(2);
+  // 后交通壕上的两个点，都在 frontEngageDistanceM（26 m）之外：
+  // HOLD (-24,-60) 离前沿 68 m，STEP (-8,-78) 离前沿 46 m，两处都在 approach 组的火力里。
+  const HOLD={x:-24,z:-60},STEP={x:-8,z:-78};
+  await Place(HOLD.x,HOLD.z);await Advance(2);
   const initial=await Receipt("SupportEntry");
   assert.equal(initial.enemies.filter(a=>a.encounter==="approach"&&a.alive).length,MISSION_ENCOUNTERS.approach.length);
   assert.ok(initial.enemies.some(a=>a.encounter==="approach"),"approach cannot silently become an empty encounter");
+  // 先量「看得见」，再量「等三分钟」。壕沟是压着地面走的，站在哪一截决定看不看得见
+  // 对面，所以按路线上的点依次试，而不是钉死一个老坐标；而且要趁十八个人都还活着的
+  // 时候量 —— 打完三分钟再找活口，量到的是运气不是视线。
+  let contact=[];
+  for(const spot of [HOLD,STEP,{x:-24,z:-40},{x:-24,z:-23}]){
+    await Place(spot.x,spot.z);await Advance(2);
+    contact=await page.evaluate(()=>{
+      const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime(),eye=g.player.EyePosition;
+      const targets=[...r.enemies.values()].filter(a=>a.alive&&a.missionEncounter==="approach"&&!r.BlocksSight(eye,r.Point(a.position,a.stance===2?.35:.95)));
+      if(!targets.length)return [];
+      const target=r.Point(targets[0].position,.95),p=g.player.position;
+      g.player.yaw=Math.atan2(p.x-target.x,p.z-target.z);
+      g.player.pitch=Math.atan2(eye.y-target.y,Math.hypot(p.x-target.x,p.z-target.z));
+      g.player.SyncCamera(0);g.StepFrames(1,1/60,true);
+      return targets.map(a=>a.missionId);
+    });
+    console.log("VISIBLE_FROM",JSON.stringify({spot,seen:contact.length}));
+    if(contact.length)break;
+  }
+  assert.ok(contact.length,"the approach has visible live enemies from the actual trench route");
+  await page.screenshot({path:path.join(out,"Scene_ApproachContact.png")});
+  receipts.push({label:"VisibleApproach",enemies:contact});
   // Before making contact, a sheltered delay keeps the squad in the recess too. Sending them
   // ahead alone would test an unassisted assault against the new mobile sections.
-  await page.evaluate(async()=>{
-    const r=window.Tengxian.Debug.FirstLevelMissionRuntime(),{OPENING}=await import("./Data_FirstLevelOpening.mjs");
+  await page.evaluate(async(hold)=>{
+    const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime();
     r.squadMarch?.Dispose();r.squadMarch=null;
+    // 这一段量的是遭遇组的账（主力放没放、有没有复活），不是班里人在开阔沟里
+    // 硬挨三分钟能不能活。新空间的等候位没有屋顶，不垫血的话随机死一个必要角色
+    // 就直接 failed，量到的就成了「运气」。
+    g.player.health=1e9;
+    for(const a of r.squad){a.health=1e9;a.maxHealth=1e9;}
     for(const [i,a] of r.squad.entries()){
-      // shelterPosts also contains two exterior sentry positions. This fixture
-      // is waiting under the roof, not leaving sentries exposed for three minutes.
-      const post={x:OPENING.shelter.x+(i%2?1:-1),z:OPENING.shelter.z+(i<2?-3:2)};
+      // 一起停在玩家这一段沟里：把班里人单独放出去，量到的就是「没人配合的强攻」。
+      const post={x:hold.x+(i%2?1:-1),z:hold.z+(i<2?-3:2)};
       r.PlaceActor(a,post);r.squadRoutes.set(a.id,[]);a.missionContactPost=null;
       r.Defend(a,post,0,0);
     }
-  });
-  await Place(-32,-20);await Advance(180);
-  await Place(-24,-60);await Advance(1);
+  },HOLD);
+  await Place(HOLD.x,HOLD.z);await Advance(180);
+  await Place(STEP.x,STEP.z);await Advance(1);
   const delayed=await Receipt("DelayedApproach");
   assert.equal(delayed.failed,false,"the sheltered delay remains playable");
   assert.equal(delayed.started,false,"a slow approach cannot spend the finite main assault");
   assert.equal(delayed.enemies.filter(a=>a.encounter==="front").length,0);
   assert.ok(delayed.enemies.some(a=>a.encounter==="approach"&&a.shots>0),"approach troops participate in real combat");
-  await Place(-24,-40);await Advance(2);
-  const contact=await page.evaluate(()=>{
-    const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime(),eye=g.player.EyePosition;
-    const targets=[...r.enemies.values()].filter(a=>a.alive&&a.missionEncounter==="approach"&&!r.BlocksSight(eye,r.Point(a.position,a.stance===2?.35:.95)));
-    if(!targets.length)return [];
-    const target=r.Point(targets[0].position,.95),p=g.player.position;
-    g.player.yaw=Math.atan2(p.x-target.x,p.z-target.z);
-    g.player.pitch=Math.atan2(eye.y-target.y,Math.hypot(p.x-target.x,p.z-target.z));
-    g.player.SyncCamera(0);g.StepFrames(1,1/60,true);
-    return targets.map(a=>a.missionId);
-  });
-  assert.ok(contact.length,"the approach has visible live enemies from the actual trench route");
-  await page.screenshot({path:path.join(out,"Scene_ApproachContact.png")});
-  receipts.push({label:"VisibleApproach",enemies:contact});
   await Place(-8,-112);await Advance(1);
   const arrived=await Receipt("LastTrenchBend");
   const front=arrived.enemies.filter(a=>a.encounter==="front");

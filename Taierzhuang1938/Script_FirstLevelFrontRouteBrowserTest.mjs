@@ -246,20 +246,42 @@ try{
   for(let i=0;i<6000 && r.flow.stage.id==='Orders';i++)g.StepFrames(1,1/60,false);
   const started={stage:r.flow.stage.id,control:r.controls?.kind};
   g.StepFrames(150,1/60,false);
-  return {health,started,stage:r.flow.stage.id,control:r.controls?.kind,opacity:document.querySelector('#firstLevelSouthTransition').style.opacity};
+  return {health,started,stage:r.flow.stage.id,control:r.controls?.kind??null,startedAt:r.time};
  });
- assert.equal(arrival.started.stage,'South');assert.equal(arrival.control,'southTransition');assert.equal(arrival.opacity,'1');
+ // 2026.09.19 重构：07 取消了旧的黑屏瞬移（southTransition），改成真走一段。
+ assert.equal(arrival.started.stage,'South');
+ assert.equal(arrival.control,null,'南行没有控制接管，人是自己走过去的');
+ assert.equal(await page.evaluate(()=>!!document.querySelector('#firstLevelSouthTransition')),false,
+  '旧的南行黑屏层已经不存在');
  await page.evaluate(()=>window.Tengxian.StepFrames(1,1/60,true));
- await page.screenshot({path:path.join(out,'Scene_SouthBlackout.png')});
- const end=await page.evaluate(()=>{
-  const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime();g.StepFrames(250,1/60,false);
+ await page.screenshot({path:path.join(out,'Scene_SouthWalk.png')});
+ const end=await page.evaluate(async()=>{
+  const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime();
+  const {MISSION_ROUTES}=await import('./Data_FirstLevelMissionLayout.mjs');
+  const route=MISSION_ROUTES.southWalk;let index=0,frame=0;
+  const began=r.time;
+  for(;frame<60*150&&r.flow.stage.id==='South';frame++){
+   const p=g.player.position;
+   while(index<route.length-1&&Math.hypot(p.x-route[index].x,p.z-route[index].z)<1.4)index++;
+   const target=route[index];
+   const yaw=Math.atan2(p.x-target.x,p.z-target.z);
+   const gap=Math.atan2(Math.sin(yaw-g.player.yaw),Math.cos(yaw-g.player.yaw));
+   g.player.yaw+=Math.max(-.05,Math.min(.05,gap));g.player.pitch=0;
+   g.Debug.Key('KeyW',Math.abs(gap)<.6);
+   g.StepFrames(1,1/60,false);
+  }
+  g.Debug.Key('KeyW',false);
   return {stage:r.flow.stage.id,control:r.controls?.kind||null,position:g.player.position.toArray(),
+    seconds:r.time-began,
     health:r.column.litters.map(l=>({id:l.id,health:l.health,bearers:[...l.bearers]})),
-    facts:[...r.flow.facts],hidden:document.querySelector('#firstLevelSouthTransition').style.display};
+    facts:[...r.flow.facts]};
  });
- assert.equal(end.stage,'Village');assert.equal(end.control,null);assert.equal(end.hidden,'none');
- assert.ok(Math.hypot(end.position[0]-55,end.position[2]+20)<1);assert.deepEqual(end.health,arrival.health);
- assert.ok(end.facts.includes('southTransitionComplete') && !end.facts.includes('deathSceneComplete'));
+ console.log('SOUTH_WALK',JSON.stringify({stage:end.stage,seconds:+end.seconds.toFixed(1),position:end.position}));
+ assert.equal(end.stage,'Village');assert.equal(end.control,null);
+ assert.ok(Math.hypot(end.position[0]-55,end.position[2]+20)<12,'真的走到了村北口：'+JSON.stringify(end.position));
+ assert.deepEqual(end.health,arrival.health,'南行途中担架队没有减员');
+ assert.ok(end.facts.includes('villageMouthReached')&&end.facts.includes('mainStreetPointed')
+   &&!end.facts.includes('deathSceneComplete'),'07 的通过条件是走到村口并被指路');
  await page.evaluate(()=>window.Tengxian.Debug.FirstLevelJump(12));
  const supplyReach=await page.evaluate(()=>{
   const g=window.Tengxian,point=g.interact.points.get('MissionSupplyTransfer');

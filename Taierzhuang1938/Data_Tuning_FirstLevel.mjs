@@ -586,3 +586,7 @@ export const MISSION_RETURN = Object.freeze({
 // 公开阶段 15–18（End 玩法包）的数值与摆位另立一张表，入口仍是本文件
 // （契约 docs/Data_FirstLevelRebuild20260919Contract.md §8）。
 export { END_TUNING, END_ROUTES } from "./Data_Tuning_FirstLevelEnd.mjs";
+// 第二波 Front 玩法包（公开阶段 1–7）的数值另起一张表，减少三包并行时的同文件冲突。
+// 这一行让「数值只有一个入口」的口径保持不变：import Data_Tuning_FirstLevel 就拿得到。
+export { FRONT_TUNING, FRONT_TUNING_SOURCES, BUNKER_KILL_BEATS, BORROW_LIGHT_BEATS,
+  SouthWalkLengthM, SouthWalkSeconds } from "./Data_Tuning_FirstLevelFront.mjs";

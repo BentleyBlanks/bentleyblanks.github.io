@@ -44,6 +44,8 @@ const ROUTE_RETRY_BUDGET = 2;
 
 /** 分段驾驶脚本允许的起点：每一段的第一个公开阶段。 */
 export const CAMPAIGN_SEGMENT_STARTS = Object.freeze([8, 11, 15, 18]);
+/** `--stage-to` 允许的终点：Front 段末（7）、Mid 段末（14）、整关（18）。 */
+export const CAMPAIGN_SEGMENT_ENDS = Object.freeze([7, 14, 18]);
 
 export function ParseCampaignArgs(argv = process.argv) {
   const Has = (flag) => argv.includes(flag);
@@ -54,17 +56,25 @@ export function ParseCampaignArgs(argv = process.argv) {
     stageFrom === 1 || (stageJumps && CAMPAIGN_SEGMENT_STARTS.includes(stageFrom)),
     "continuation suites start at 1 or at a segment boundary (" + CAMPAIGN_SEGMENT_STARTS.join(" / ") + ")",
   );
+  // 只跑某一段到它的末尾（`--stage-to=7` = Front 包的 1–7）。默认 18 = 整关走到 Complete。
+  // 分段跑出来的证据目录与整关分开，一段跑通不许冒充通关。
+  const toRaw = argv.find((arg) => arg.startsWith("--stage-to="))?.split("=")[1];
+  const stageTo = Number(toRaw || 18);
+  assert.ok(CAMPAIGN_SEGMENT_ENDS.includes(stageTo), "segment suites end at " + CAMPAIGN_SEGMENT_ENDS.join(" / "));
+  assert.ok(stageTo >= stageFrom, "a segment cannot end before it starts");
   return {
     campaign: Has("--campaign"),
     audioCheck: Has("--audio"),
     stageJumps,
     allowCheckpointRetry: Has("--allow-checkpoint-retry"),
-    stageFrom,
-    suite: stageFrom === 8 ? "FirstLevelStageVillage"
-      : stageFrom === 11 ? "FirstLevelStageTransfer"
-        : stageFrom === 15 ? "FirstLevelStageRegroup"
-          : stageFrom === 18 ? "FirstLevelStageTail"
-            : stageJumps ? "FirstLevelStageContinue" : "FirstLevelMission",
+    stageFrom, stageTo,
+    suite: stageTo === 7 ? "FirstLevelStageFront"
+      : stageTo === 14 ? "FirstLevelStageMiddle"
+        : stageFrom === 8 ? "FirstLevelStageVillage"
+          : stageFrom === 11 ? "FirstLevelStageTransfer"
+            : stageFrom === 15 ? "FirstLevelStageRegroup"
+              : stageFrom === 18 ? "FirstLevelStageTail"
+                : stageJumps ? "FirstLevelStageContinue" : "FirstLevelMission",
   };
 }
 
@@ -79,7 +89,7 @@ export async function OpenCampaign(options) {
   page.on("pageerror", (error) => { errors.push(String(error)); console.log("PAGEERROR", String(error)); });
   const ctx = {
     page, browser, server, output, errors, options,
-    stageJumps: options.stageJumps, stageFrom: options.stageFrom,
+    stageJumps: options.stageJumps, stageFrom: options.stageFrom, stageTo: options.stageTo,
     jumpReceipts: [], campaignRetries: [], capturedActivities: new Set(),
   };
   await page.goto(
@@ -144,6 +154,10 @@ export async function CheckVoiceAssets(ctx) {
 export async function InstallInputDriver(ctx) {
   await ctx.page.evaluate(async () => {
           const g = window.Tengxian;
+          // 躲手榴弹这一段读的是真实爆炸口径（爆心抬高、命中高度、判墙余量）。
+          // 以前这里直接写 BLAST，可页面作用域里根本没有这个名字 —— 只要真有一颗
+          // 手榴弹落到玩家附近，整条驾驶就炸在 "BLAST is not defined" 上（04 实测）。
+          const { BLAST } = await import("./Data_Tuning_Combat.mjs");
           window.MissionInputDriver = {
             blocked: new Map(),
             EvadeGrenade() {

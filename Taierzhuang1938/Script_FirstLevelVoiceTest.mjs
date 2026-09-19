@@ -158,6 +158,9 @@ console.log(`ok MISSION_VOICE_FACTS 的 ${Object.keys(MISSION_VOICE_FACTS).lengt
     // 否则「哪条 cue 已经有触发点了」会静默地对不上（契约 §8 的分包约定）。
     "./Script_FirstLevelQuietMarch.mjs", "./Script_FirstLevelReception.mjs",
     "./Script_FirstLevelBridge.mjs", "./Script_FirstLevelNightGate.mjs",
+    // 第二波 Front 包（公开阶段 1–7）：01/02 的门外演出与 03–07 的对白落点。
+    "./Script_FirstLevelBunker.mjs", "./Script_FirstLevelCollection.mjs",
+    "./Script_FirstLevelFrontShow.mjs",
   ];
   const referenced = new Map();
   for (const name of RUNTIME_SOURCES) {
@@ -182,11 +185,11 @@ console.log(`ok MISSION_VOICE_FACTS 的 ${Object.keys(MISSION_VOICE_FACTS).lengt
   // 2026.09.20 End 包（阶段 15–18）接完了自己那七条：CartAbandon / RoadBump /
   // HandsShake / WardGuide / PlaceLitter / NextLitter / NorthGate。名单只许变短。
   const SECOND_WAVE_UNWIRED = new Set([
-    "RescueOut", "TrenchCurse",                                  // 02 出掩蔽部、后交通壕
-    "BundleProne", "BundleReturnCall",                            // 05 取弹返程
     // 08/09 的 KitchenDetour / MeleeCurse / WindowOrder 已由第二波 Mid 包接上触发点
     //（Script_FirstLevelVillageBlock），2026-09-20 从这张名单里划掉。
     // 15–18 的七条已由第二波 End 包接上触发点，2026-09-20 同日划掉。
+    // Front 包（阶段 1–7）名下的四条已在第二波接上触发点，从这张表里删了：
+    // RescueOut / TrenchCurse（02）、BundleProne / BundleReturnCall（05）。
   ]);
   const unwired = story.map((cue) => cue.id).filter((id) => !referenced.has(id));
   for (const id of unwired) assert.ok(SECOND_WAVE_UNWIRED.has(id), "这条剧情 cue 没有任何触发点：" + id);

@@ -16,12 +16,17 @@ try{
   await page.waitForFunction(()=>window.Tengxian?.state?.ready,null,{timeout:240000});
   await page.locator("#bootStart").click();
   await page.evaluate(()=>window.Tengxian.StepFrames(1,1/60,true));
+  // 2026.09.19 重构：军列开场下线了，`r.train` 不再存在。改用 03 前沿那一排真实
+  // 守军（squadId "MissionFrontDefense"，非叙事必需）当这一条的被测对象 ——
+  // 验的还是同三件事：真伤害、真减员、任务不受影响。
+  await page.evaluate(async()=>{await window.Tengxian.Debug.FirstLevelJump(3);});
+  await page.evaluate(()=>window.Tengxian.StepFrames(120,1/60,false));
   const result=await page.evaluate(()=>{
     const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime();
-    const candidates=r.train.entries.map(e=>e.actor).filter(a=>!a.castId&&a!==r.trainWounded);
+    const candidates=(r.frontDefenders||[]).filter(a=>a?.alive&&!a.castId);
     const ordinary=candidates.sort((a,b)=>a.position.distanceTo(g.player.position)-b.position.distanceTo(g.player.position))[0];
     const witness=candidates.find(a=>a!==ordinary&&a.squadId===ordinary.squadId);
-    if(!witness)throw new Error("ordinary squad fixture requires two real train actors");
+    if(!witness)throw new Error("ordinary squad fixture requires two real front defenders");
     // Controlled positions provide an unobstructed witness, using real actors.
     r.PlaceActor(ordinary,{x:-69,z:95});r.PlaceActor(witness,{x:-69,z:97});
     g.player.position.set(-69,r.battlefield.GroundHeight(-69,94),94);

@@ -153,9 +153,10 @@ const report = {};
   report.bunkerSight = band;
   // 门框与碎砖必须真的遮住一部分（不然「破口」就是一扇敞开的门）。
   const eye = Eye(S.bunker, 0.42);
-  // 门框把视野切成一条缝：刺杀处正前方看得见，左右各 6 m 就被门垛挡住；
-  // 门框立柱本身再挡掉当中一条（-38.3 正在立柱的射影上）。
-  report.bunkerOcclusion = [-46, -38.3, -34].map((x) => ({ x,
+  // 门框把视野切成一条缝：刺杀处正前方看得见，左右两侧被门垛挡住；
+  // 门框立柱本身再挡掉当中一条（行刑处 2026-09-20 前移到 z=-137.5 之后，
+  // 那条缝是 x -40.75…-38.25，立柱的射影落在 -39…-38.25 之间）。
+  report.bunkerOcclusion = [-46, -43, -38.6, -37.5, -34].map((x) => ({ x,
     blocker: SightBlocker(eye, { x, z: S.bunkerKilling.z, y: Ground(x, S.bunkerKilling.z) + 1.2 }, blocks) }));
   for (const row of report.bunkerOcclusion)
     assert.ok(row.blocker, `the doorway must occlude x=${row.x} outside the bunker`);
