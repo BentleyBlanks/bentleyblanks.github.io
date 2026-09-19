@@ -485,6 +485,35 @@ for (const [name, route] of Object.entries({ ...MISSION_ROUTES, ...Object.fromEn
     }
   }
 }
+// scenario 的三态体块**不在** MISSION_LAYOUT.blocks 里，上面那趟净空一块都扫不到。
+// 01/02 真正要走的是两条短路：玩家从压住的位置被拖出来、再从后壁破口出沟；
+// 日兵从门外刺杀处走到门内。两条都要在**每一个** scenario 态里通得过 ——
+// 实拍教训：杂物堆摆在后壁破口那道 3.2 m 门里，两边各剩 0.7 m，
+// 罗班长进不来，02 永远不开始，而所有既有门禁全是绿的。
+{
+  const bunker=P.bunker;
+  const lanes={
+    BunkerExit:[{x:bunker.player.x,z:bunker.player.z},
+      {x:(bunker.luoLift.x+bunker.yaowaLift.x)/2,z:(bunker.luoLift.z+bunker.yaowaLift.z)/2},
+      {x:bunker.luoEntry.x,z:bunker.luoEntry.z},A.bunkerRear,MISSION_STAGE_ROUTES.rearTrench[1]],
+    BunkerAssault:[bunker.ijaStart[0],bunker.ijaKill[0],bunker.ijaDoor[0],A.bunkerDoor],
+    BunkerAssaultB:[bunker.ijaStart[1],bunker.ijaKill[1],bunker.ijaDoor[1],A.bunkerDoor],
+  };
+  for(const state of MISSION_LAYOUT.scenario.states)for(const [name,lane] of Object.entries(lanes)){
+    for(let i=1;i<lane.length;i++){
+      const a=lane[i-1],b=lane[i],distance=Math.hypot(a.x-b.x,a.z-b.z);
+      for(let d=0;d<=distance;d+=.2){
+        const t=d/distance,x=a.x+(b.x-a.x)*t,z=a.z+(b.z-a.z)*t,y=SampleMissionTerrain(x,z);
+        for(const box of state.blocks)assert.ok(
+          !(Math.abs(x-box.x)<box.w/2+.35&&Math.abs(z-box.z)<box.d/2+.35
+            &&box.y+box.h/2>y+.3&&box.y-box.h/2<y+1.7),
+          name+" is blocked by "+box.id+" in scenario state "+state.id
+            +" at "+x.toFixed(1)+","+z.toFixed(1));
+      }
+    }
+  }
+  console.log("ok both bunker lanes stay walkable in every scenario state");
+}
 const frontCover=MISSION_LAYOUT.blocks.filter(block=>block.id.startsWith("FrontCover"));
 for(const wall of [...["FrontTraverseBlastScreen","BundleParapet","FlankParapet","MachineGunSideCover-1","MachineGunSideCover1"]
   .map(id=>{const found=MISSION_LAYOUT.blocks.find(b=>b.id===id);assert.ok(found,"hand-built cover survives generic route cleanup: "+id);return found;}),...frontCover]){

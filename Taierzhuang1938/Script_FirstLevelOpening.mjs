@@ -152,7 +152,8 @@ export class FirstLevelOpening {
     const luo=r.companion.Handle("luo");
     if(!luo?.alive)return;
     const reach=this.TrappedPoint;
-    if(Distance(luo.position,reach)>C.rescueReachM){r.MoveActor(luo,{x:reach.x+1,z:reach.z+.6},R.walkSpeedMps);return;}
+    // 走到空间包给的掀架位（luoLift）—— 从后壁破口挤进来那一步靠它，不再随手估一个点。
+    if(Distance(luo.position,reach)>C.rescueReachM){r.MoveActor(luo,Place.bunker.luoLift,R.walkSpeedMps);return;}
     this.rescueAt=r.time;
     this.rescueDuration=R.bunkerRescueSeconds;
     r.BeginControl("rescue",this.rescueDuration);

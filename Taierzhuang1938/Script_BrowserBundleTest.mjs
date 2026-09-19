@@ -56,7 +56,7 @@ try {
       await page.waitForFunction(() => window.Tengxian.state.running && document.getElementById('boot').classList.contains('gone'), null, {timeout:10000});
       const before = await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission().time);
       await page.waitForFunction(before => window.Tengxian.Debug.FirstLevelMission().time > before, before, {timeout:10000});
-      assert.ok(await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission().stage === "Train"));
+      assert.ok(await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission().stage === "Trapped"));
     } else if (fixture.name === 'MissingCharacters') {
       const partial=await page.evaluate(()=>{const g=window.Tengxian;const actors=g.ai.soldiers.filter(a=>a.missionTrainPassenger);
         return {count:actors.length,models:actors.map(a=>a.actor.characterRig?.modelId||null),train:g.Debug.FirstLevelMission().train};});

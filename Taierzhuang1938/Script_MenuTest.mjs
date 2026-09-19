@@ -1507,7 +1507,7 @@ async function CheckMissionList() {
     menu.SelectLevel(menu.entries.findIndex(entry => entry.sandboxKey === "firstLevelP012Whitebox"));
   });
   await page.click("#menu .mnMissionTrack .mnChapterLevel.on");
-  await page.waitForFunction(() => window.Taierzhuang?.Debug?.FirstLevelMission?.()?.stage === "Train",
+  await page.waitForFunction(() => window.Taierzhuang?.Debug?.FirstLevelMission?.()?.stage === "Trapped",
     null, { timeout: 240000 });
   const p012Entered = await page.evaluate(() => ({
     query: new URL(location.href).searchParams.get("whitebox"),

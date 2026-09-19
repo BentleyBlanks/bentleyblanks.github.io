@@ -1025,7 +1025,11 @@ const MISSION_SCENARIO = (() => {
     B("BunkerRubbleB", -37.4, -131.2, 2.6, 0.85, 2.4, "earthDark", 0.85),
     B("BunkerBeamPinWest", -41.4, -124.2, 0.7, 0.55, 1.0, "timber", 0.55),
     B("BunkerBeamPinEast", -38.6, -124.6, 0.6, 0.5, 0.9, "timber", 0.5),
-    B("BunkerClutter", -40, -122.2, 1.8, 0.5, 0.8, "timber", 0.5),
+    // 杂物堆靠西墙放。原来摆在 x=-40，正好压在后壁破口那道 3.2 m 门里：
+    // 两边各只剩 0.7 m，人的胶囊（直径 0.84）过不去 —— 罗班长进不来、玩家也出不去，
+    // 实拍出来是「02 永远不开始」。scenario 的体块不在 MISSION_LAYOUT.blocks 里，
+    // 所有既有的净空检查都扫不到它，所以 Script_FirstLevelMissionTest 另加了一条。
+    B("BunkerClutter", -42.4, -122.2, 1.8, 0.5, 0.8, "timber", 0.5),
   ];
   const N = (id, x, z, w, h, d, semantic, top) =>
     ScenarioBlock(id, x, z, w, h, d, semantic, n + top - h / 2);

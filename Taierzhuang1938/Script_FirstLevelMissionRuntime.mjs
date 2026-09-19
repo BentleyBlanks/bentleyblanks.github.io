@@ -672,6 +672,14 @@ export class FirstLevelMissionRuntime {
       actor.missionCoverWaiting=false;actor.missionCoverApproach=false;
       actor.scriptedNoncombatant = ["NightMarch","Regroup","WallPath","ReceptionGate"].includes(stage);
       actor.scriptEscapeStance=null;
+      // 02：罗班长正在把人从木架下拖出来。这几秒他不找掩体、不参加交火 ——
+      // 门外那伙人由何有田从后侧交通壕压着（契约 §2）。不放行的话接触反应每帧
+      // 把他推回掩体，他永远走不到压住的位置，02 就永远不开始。
+      if(stage==="BunkerRescue"&&actor.castId==="luo"&&!this.Has("luoRescueComplete")){
+        this.ai.ReleaseCover(actor);
+        this.ai.SetStance(actor,1,.5,true);
+        continue;
+      }
       // The low roofs are geometry, not a Tank-step rule: the tracks can be cut
       // while Luo is still inside the side ditch, and Orders walks him back
       // under the same roofs. A standing capsule stops dead at the slab.
