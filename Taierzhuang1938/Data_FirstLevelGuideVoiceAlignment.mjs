@@ -30,23 +30,13 @@ export const GUIDE_VOICE_ALIGNMENT = Object.freeze({
       ]
     ]
   },
-  "GuideTrench": {
-    "sha256": "48df1badef50e66f296ad83fca2df63b6806d1864fe46611770a566d454a341a",
-    "scriptSha256": "46ba4a3c41f6f250b74a73bc73bccbab27486bfdb8d782b5d19f80a308d899f0",
+  "GuideRearTrench": {
+    "sha256": "ed205d80fc02753775c3801f518166037cb2fde6880bb1a9edec92cccefc5276",
+    "scriptSha256": "bdb9e7690d8efd49fe56992095ef5c6727c4e378a3aa9da891f0cae27a754078",
     "lines": [
       [
         0,
-        5.93
-      ]
-    ]
-  },
-  "GuideShelter": {
-    "sha256": "29af83c9e6e75bb77004b796d5d391cdd63d2ce7b294b8be15ffda9810812211",
-    "scriptSha256": "0e290213ce10740864bd0975a9f6b809f6d580b3eefa4d92440651c351d9a04e",
-    "lines": [
-      [
-        0,
-        5.329
+        3.109
       ]
     ]
   },
@@ -97,6 +87,16 @@ export const GUIDE_VOICE_ALIGNMENT = Object.freeze({
       [
         0,
         8.229
+      ]
+    ]
+  },
+  "GuideCollection": {
+    "sha256": "dbfcc06111f9e4842477ea91f2c470b05bc6ac3fd844545ed03c6fddbedf1e3a",
+    "scriptSha256": "a4b747d1a861d5cd013145d596cc99df8158a909cbf3d30f6eb609dd6c91a4d0",
+    "lines": [
+      [
+        0,
+        3.527
       ]
     ]
   },
@@ -170,23 +170,33 @@ export const GUIDE_VOICE_ALIGNMENT = Object.freeze({
       ]
     ]
   },
-  "GuideSouthFlank": {
-    "sha256": "1c2c0e5df168cc0bec81318d4369c47c268096138a8f1577dec8cc9a4a48ef03",
-    "scriptSha256": "1dca197ad3e539b433821d4e28b55a69251a93d2ca978919d5a759bf6778f572",
+  "GuideAlley": {
+    "sha256": "f81456857c95ca4f4e5e4e55946bbce4ece550c873bc801e74cd9bc4c6b1c9ec",
+    "scriptSha256": "d959ddaa14a57e29688b2612c73540db992bca222454edf032205391ff3b268d",
     "lines": [
       [
         0,
-        5.93
+        3.318
       ]
     ]
   },
-  "GuideNorthRear": {
-    "sha256": "39baf7eb427d1d0962ed41f5437a5d322c75abb1c06c5d96073824db2d1743f1",
-    "scriptSha256": "1d53b06b4fb27f3ec32111bd67a610c117abfa62275914c2f079fba7ed7e7467",
+  "GuideCart": {
+    "sha256": "2de5de7be51510088acb9aa408a93c602f9a9e8e47c48a4745a85c5ba63a1639",
+    "scriptSha256": "824cfe57b1abc6740342b20fe6b1688b3247da18ebef7d2ad4541ebf8678c11f",
     "lines": [
       [
         0,
-        4.833
+        3.318
+      ]
+    ]
+  },
+  "GuideWestDitch": {
+    "sha256": "00abad24996883477111c8e9a9fc10950ef733437918c5dfcffadf9646a2c03a",
+    "scriptSha256": "3b5f9ee9dd376a596a49f87eee663d89e26d7bd84eaa0a6f065a608446147d49",
+    "lines": [
+      [
+        0,
+        3.736
       ]
     ]
   },
@@ -210,43 +220,23 @@ export const GUIDE_VOICE_ALIGNMENT = Object.freeze({
       ]
     ]
   },
-  "GuideRetreatFirst": {
-    "sha256": "2f5cdcb7522458ea5c233711bf90151d483ff311a0fd6818689064fe6b24e819",
-    "scriptSha256": "1e23c518a73cc689a25c148951f9e1b389a01be1fc9647eb5192da5e3ed91f3a",
+  "GuideWallPath": {
+    "sha256": "c95a2c97dabc19b68f6a58c9fdb6741549d970c3d3a8c1f625d8e60387ed1ee4",
+    "scriptSha256": "854d39f2c052fa8dea86d3a9123e99654397810b1dc253473207594ca898e238",
     "lines": [
       [
         0,
-        6.844
+        3.527
       ]
     ]
   },
-  "GuideRetreatWall": {
-    "sha256": "94893ea3317682271411117e60ccb06c8eddf6c17bbea5b897fa696848552023",
-    "scriptSha256": "b507d7bf9fb9b574be9860aa497a3004009451b539c490a4c07a7fa8d0426ffd",
+  "GuideYardGate": {
+    "sha256": "8fb4abc08c76f01cdcf280651a8a47d6b86c7a2f9b69ba2b012d1645ec3c581c",
+    "scriptSha256": "2e5713ba6d0401ce308a67a7ca6a06d1d6f1b3a23912c7e3d701d5bbebf0af40",
     "lines": [
       [
         0,
-        5.433
-      ]
-    ]
-  },
-  "GuideRetreatYard": {
-    "sha256": "e048932b5d02363c7cbca1990089d59e4266cccbb7bb852a81439d3ad43e584c",
-    "scriptSha256": "fbd28bcece2b87d5b06cecb87eb495ac442cb52e04832d275fafb3139c7328a0",
-    "lines": [
-      [
-        0,
-        6.348
-      ]
-    ]
-  },
-  "GuideReception": {
-    "sha256": "ce558975c1f3455c7ebd3ccb8c3da6daf2d2a16972d79604d3642e43beb223e4",
-    "scriptSha256": "51e078d8e828eb4830d5ed929ae06d209e7df5c5e22cbf3f997db6f1077029f5",
-    "lines": [
-      [
-        0,
-        7.34
+        3.109
       ]
     ]
   },
@@ -260,23 +250,33 @@ export const GUIDE_VOICE_ALIGNMENT = Object.freeze({
       ]
     ]
   },
-  "GuideRearDefense": {
-    "sha256": "5438cd86563c3eeea1e723a5d1ca5f69625ba2639e94dcfe71aa07f837afd907",
-    "scriptSha256": "1f60d113c416d2877dfa311cdc26e3e553a6bae2664a0027e6f0f832c15c18cc",
+  "GuideBridge": {
+    "sha256": "f69bd9a1bde6069f9abe991b53a5dced69ee6753f682feb973fd16e516a75191",
+    "scriptSha256": "6ecdbde5931c0b2d3037372d02508ad25ee2c78bff42ac809e4b50991c76691f",
     "lines": [
       [
         0,
-        5.433
+        3.527
       ]
     ]
   },
-  "GuideExit": {
-    "sha256": "54a753e1a16c576a3781a25237f733805f90ce1e814f2d03e77f8fcf0806eabb",
-    "scriptSha256": "5b6a79c1815a536c0c5916c5e72ddb7ab01c42b15ad4f567e8005314a0ee3b34",
+  "GuideWithdraw": {
+    "sha256": "91d2be4aef0a53383fa7c4cfdd731c08c0ee79ccc198ca28c7bfc651f1f781e7",
+    "scriptSha256": "3838bcb0ed6eaedd9bc1a878a9d5430192570dc388ea9602bfb7a84577864c1f",
     "lines": [
       [
         0,
-        5.12
+        3.109
+      ]
+    ]
+  },
+  "GuideNorthGate": {
+    "sha256": "ae7c35d05b0e872bf52c5e0ac2913f1a0d514b48f3ed65b2bf53cd9c6c0c6025",
+    "scriptSha256": "581d945f88c2bd6390df8aa4c2f69ebe4fd8ca25566bc18382c05afbcc518019",
+    "lines": [
+      [
+        0,
+        2.821
       ]
     ]
   }
