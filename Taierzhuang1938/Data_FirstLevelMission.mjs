@@ -207,11 +207,15 @@ export const MISSION_ENCOUNTERS = Object.freeze({
     { id: "TransferRifleB", x: 117, z: 97 },
     { id: "TransferRifleC", x: 119, z: 85 },
   ],
-  // 12 的第二处威胁：侧巷（A.sideAlley）。
+  // 12 的第二处威胁：装载区东南的侧巷（A.sideAlley 是巷子净空的中心，
+  // 两道墙在 z 118/126）。机枪架在巷子深处朝西封住巷口，两个步枪手往巷口外压。
   transferAlley: [
-    { id: "TransferAlleyGunner", x: A.sideAlley.x + 2, z: A.sideAlley.z + 2, weapon: "Type11", hold: true },
-    { id: "TransferAlleyA", x: A.sideAlley.x + 5, z: A.sideAlley.z - 4 },
-    { id: "TransferAlleyB", x: A.sideAlley.x + 8, z: A.sideAlley.z + 6 },
+    // 架在巷子中段而不是巷底：巷口净宽 7.3 m（z 118.35–125.65），从 x=107 望出去
+    // 的射界在桥头路（x≈76）上摊成 z 109–135，正好罩住车列离开的那一段；
+    // 再往东退（x≥106）射界就收得比路窄，机枪打不到出场的车。
+    { id: "TransferAlleyGunner", x: A.sideAlley.x + 4, z: A.sideAlley.z, weapon: "Type11", hold: true },
+    { id: "TransferAlleyA", x: A.sideAlley.x + 3, z: A.sideAlley.z - 1.5 },
+    { id: "TransferAlleyB", x: A.sideAlley.x + 5, z: A.sideAlley.z + 1.8 },
   ],
   air: [
     { id: "AirPursuerA", x: 113, z: 89 },
@@ -271,11 +275,9 @@ export const MISSION_TACTICS = Object.freeze({
   TransferRifleA: { delay: 5, points: [{x:108,z:90},{x:102,z:91}] },
   TransferRifleB: { delay: 9, points: [{x:112,z:106},{x:104,z:112}] },
   TransferRifleC: { delay: 13, points: [{x:114,z:90},{x:107,z:94}] },
-  // 12 的第二处威胁从侧巷（A.sideAlley = (52,130)，两道院墙之间的 14 m 夹道）打出来，
-  // 沿巷口东侧向装载区压过去。跟着锚点走 —— 原来那两条还停在 2026.09.14 的 x≈100，
-  // 从新巷口直线过去会横穿转运棚的货垛（TransferStores）。
-  TransferAlleyA: { delay: 0, points: [{x:A.sideAlley.x+8,z:A.sideAlley.z-8},{x:A.sideAlley.x+10,z:A.sideAlley.z-11}] },
-  TransferAlleyB: { delay: 4, points: [{x:A.sideAlley.x+9,z:A.sideAlley.z+2},{x:A.sideAlley.x+10,z:A.sideAlley.z-3}] },
+  // 出巷口（x≈96）往西压向车位与牛马车的出场道；让开四个车位的 3 x 5.8 m 车盒。
+  TransferAlleyA: { delay: 0, points: [{x:99,z:121.5},{x:91,z:122.5}] },
+  TransferAlleyB: { delay: 4, points: [{x:99,z:124},{x:90,z:131}] },
   AirPursuerA: { delay: 0, points: [{x:106,z:90},{x:102,z:92}] },
   AirPursuerB: { delay: 3, points: [{x:105,z:98},{x:104,z:111}] },
   AirPursuerC: { delay: 5, points: [{x:109,z:109},{x:100,z:114}] },

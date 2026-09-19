@@ -1,21 +1,26 @@
 import { FRONT_SORTIE as Sortie } from "./Data_FirstLevelFrontRoute.mjs";
-import { MISSION_REAR_ANCHORS, MISSION_REAR_ROUTES, MISSION_RECEPTION_SPACE, MISSION_SOUTH_BRIDGE, MISSION_RAIL_BRIDGE, MISSION_STAGE_ANCHORS, MISSION_STAGE_ROUTES } from "./Data_FirstLevelMissionTopology.mjs";
+import { MISSION_REAR_ANCHORS, MISSION_REAR_ROUTES, MISSION_RECEPTION_SPACE, MISSION_SOUTH_BRIDGE, MISSION_RAIL_BRIDGE, MISSION_STAGE_ANCHORS, MISSION_STAGE_ROUTES, MISSION_NORTH_RIVER, RiverProfileAt, RiverCutAt } from "./Data_FirstLevelMissionTopology.mjs";
 import { MISSION_TRENCH_COVER as TC } from "./Data_FirstLevelMissionTrenchCover.mjs";
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
-import { MISSION_TRAIN } from "./Data_FirstLevelMissionTrain.mjs";
 import { MISSION_DEFENSE_POSTS } from "./Data_FirstLevelMissionFortifications.mjs";
-import { P012_STATION_BLOCKS } from "./Data_FirstLevelP012Station.mjs";
-import { MISSION_TERRAIN, SampleMissionTerrain, MissionPathDistance, SampleMissionGroundColor, SampleMissionGroundSurface, TrenchPlanFor } from "./Data_FirstLevelMissionTerrain.mjs";
+import { MISSION_TERRAIN, SampleMissionTerrain, SampleMissionNaturalHeight, MissionPathDistance, SampleMissionGroundColor, SampleMissionGroundSurface, TrenchPlanFor } from "./Data_FirstLevelMissionTerrain.mjs";
 import { PlanTrenchDressing } from "./Script_TrenchPlan.mjs";
-import { MakeRailwayProfile } from "./Script_RoadPath.mjs";
-// A low field line through the halt: two rails on sleepers on a shallow ballast
-// bed that follows the shared heightfield. Script_RoadSpline builds it from this
-// spec (whitebox field and the scene-spline editor preview alike); there are no
-// rail boxes at an absolute height. Rail top is ~0.3 m above the soil.
+// 2026.09.19 第二波：这一关的**边界**。军列与车站下线之后，旧的 z 到 743
+// （进站跑道尽头）有一半是空地 —— 地形高度场每格点都要烘，纯白烧。
+// z 北到 -232：最北的实体是弹药屋北墙 z=-219.3，北侧那道 3.1 m 地形墙在
+//   z −202…−184 之间爬满，进攻出生线在 z≈−199，都留在里面。
+// z 南到 370：夜景北门片最南一件是门楼 z=349.5，行军终点锚点 z=352。
+// x **不收**：−205 / 137 正是东西两道地形墙各自爬满的那条线
+//   （Data_FirstLevelMissionTerrain.SampleMissionNaturalHeight），再往里收就把墙削了。
+const MISSION_BOUNDS = Object.freeze({ minX: -205, maxX: 137, minZ: -232, maxZ: 370 });
+// 铁路桥（18）南北引道的一段低轨：两根钢轨坐在枕木上、枕木坐在跟着共享高度场
+// 走的浅道砟上。Script_RoadSpline 照这份 spec 建（白盒场与场景样条编辑器共用），
+// 没有绝对高度的轨道盒。轨顶高出土面约 0.3 m。
 export const MISSION_RAILWAY = Object.freeze({
   id: "MissionRailway",
-  // North end stops at the foot of the 3 m field bank (z < -184) instead of climbing it.
-  points: Object.freeze([[-77, -186], [-77, MISSION_TRAIN.approachEndZ]]),
+  // 北端停在 3 m 田埂脚下（z < -184）当远景，不往上爬；南端到桥南 z=185 就收 ——
+  // 再往南是接收院与撤离线那一片，铺下去只是一条没人用的路基。
+  points: Object.freeze([[-77, -186], [-77, 185]]),
   gauge: 1.435,
   // Ballast top: soil smoothed over +/-24 m, then kept 0.06-0.18 m above the local soil.
   crown: Object.freeze({ step: 4, smooth: 6, lift: 0.1, clampLo: 0.06, clampHi: 0.18 }),
@@ -31,14 +36,6 @@ export const MISSION_RAILWAY = Object.freeze({
   // Rail foot rests on the sleeper top (crown + 0.09).
   rail: Object.freeze({ material: "metal", w: 0.08, h: 0.13, lift: 0.155, segLen: 12 }),
 });
-const railProfile = MakeRailwayProfile(MISSION_RAILWAY, SampleMissionTerrain);
-// Box wheels keep their authored top inside the underframe; the bottom stands on the rail top.
-function SeatOnRail(block) {
-  const top = block.y + block.h / 2, rail = railProfile.RailTopNear(block.x, block.z);
-  block.h = top - rail;
-  block.y = (top + rail) / 2;
-  return block;
-}
 const blocks = [],
   gates = [],
   surfaces = [];
@@ -119,141 +116,13 @@ function Rafters(id, x, z, w, d) {
   Block(`${id}Boards`, x + w * 0.26, z, w * 0.46, 0.14, d, "timber", { y: ground + 3.16 });
 }
 
-// Reuse the accepted P012 open freight-wagon boards, ribs and undercarriage.
-// Only the east door is recentered on this mission's existing unloading lane.
-const sourceCarFloor = P012_STATION_BLOCKS.find(
-  (block) => block.id === "StationCar0Floor",
-);
-const sourceCarParts = P012_STATION_BLOCKS.filter((block) =>
-  /^StationCar0(?:NorthEnd|SouthEnd|WestWaist|WestRib|Wheel|Underframe)/.test(
-    block.id,
-  ),
-);
-for (let i = 0; i < 3; i++) {
-  const z = 74 + i * 14,
-    id = "StationCar" + i,
-    lengthScale = 12.8 / sourceCarFloor.d;
-  const floor = Block(
-    id + "Floor",
-    -77,
-    z,
-    sourceCarFloor.w,
-    0.24,
-    12.8,
-    "structure",
-    { y: 1.05 },
-  );
-  surfaces.push(floor);
-  for (const part of sourceCarParts) {
-    const block = Block(
-      part.id.replace("StationCar0", id),
-      -77 + part.x - sourceCarFloor.x,
-      z + (part.z - sourceCarFloor.z) * lengthScale,
-      part.w,
-      part.h,
-      part.d * lengthScale,
-      part.semantic,
-      { y: part.y - 0.08 },
-    );
-    if (part.id.includes("Wheel")) SeatOnRail(block);
-  }
-  for (const side of [-1, 1]) {
-    Block(
-      id + "EastWaist" + side,
-      -74.6,
-      z + side * 4.3,
-      0.22,
-      1.4,
-      4.2,
-      "structure",
-      { y: 1.87 },
-    );
-    for (let rib = 0; rib < 3; rib++)
-      Block(
-        id + "EastRib" + side + "_" + rib,
-        -74.44,
-        z + side * (2.4 + rib * 1.5),
-        0.12,
-        1.5,
-        0.14,
-        "boundary",
-        { y: 1.87 },
-      );
-  }
-  const deck = floor.y + floor.h / 2;
-  // Cargo stays in the end pockets. The middle door and central unloading lane stay clear.
-  for(const end of [-1,1]) {
-    const cargoZ=z+end*5.65, cargoId=id+'Cargo'+end;
-    Block(cargoId+'Crate',-77,cargoZ,.82,.58,.62,'trainWood',{y:deck+.29});
-    for(const band of [-1,1]) Block(cargoId+'Band'+band,-77+band*.28,cargoZ,.055,.60,.64,'trainMetal',{y:deck+.30,solid:false});
-    Block(cargoId+'Lid',-77,cargoZ,.86,.045,.65,'trainWood',{y:deck+.603,solid:false});
-    for(const side of [-1,1]) {
-      const x=-77+side*1.65;
-      Block(cargoId+'Bedroll'+side,x,cargoZ,.56,.28,.55,'trainCanvas',{y:deck+.14,solid:false});
-      for(const strap of [-1,1]) Block(cargoId+'Strap'+side+'_'+strap,x+strap*.17,cargoZ,.045,.30,.57,'trainWood',{y:deck+.15,solid:false});
-    }
-  }
-  for(const [slot,seat] of MISSION_TRAIN.cars[i].seats.entries()) if(Math.abs(seat.x+77)>1.2) {
-    // Personal kit rests between adjacent feet, never at the removed seat height.
-    const side=Math.sign(seat.x+77), packId=id+'Pack'+slot, x=-77+side*2.08, kitZ=seat.z+.53;
-    Block(packId,x,kitZ,.27,.43,.24,'trainCanvas',{y:deck+.215,solid:false});
-    Block(packId+'Flap',x-side*.15,kitZ,.045,.14,.25,'trainWood',{y:deck+.34,solid:false});
-    Block(packId+'Canteen',x,kitZ+.20,.14,.21,.13,'trainMetal',{y:deck+.105,solid:false});
-  }
-  if (i < 2)
-    Block(id + "Coupler", -77, z + 7, 0.4, 0.35, 1.4, "boundary", { y: 0.97 });
-  for (let step = 0; step < 4; step++) {
-    const stair = Block(
-      "StationExitStep" + i + "_" + step,
-      -74.3 + step * 0.5,
-      z,
-      0.65,
-      1.02 - step * 0.25,
-      4.2,
-      "step",
-      { y: (1.02 - step * 0.25) / 2 },
-    );
-    surfaces.push(stair);
-  }
-  gates.push({
-    id: "TrainDoor" + i,
-    x: -74.6,
-    y: 1.87,
-    z,
-    w: 0.22,
-    h: 1.4,
-    d: 4.5,
-    semantic: "structure",
-    signal: "MissionTrainStopped",
-  });
-}
-// Keep the original box-built steam engine: open cab, chimney, wheels and side rods.
-const sourceEngineFrame = P012_STATION_BLOCKS.find(
-  (block) => block.id === "StationEngineFrame",
-);
-for (const part of P012_STATION_BLOCKS.filter((block) =>
-  block.id.startsWith("StationEngine"),
-)) {
-  const block = Block(
-    part.id,
-    -77 + part.x - sourceEngineFrame.x,
-    58 + part.z - sourceEngineFrame.z,
-    part.w,
-    part.h,
-    part.d,
-    part.semantic,
-    { y: part.y },
-  );
-  if (part.id.startsWith("StationEngineWheel")) SeatOnRail(block);
-}
-// Sleepers and rails are not layout blocks: see MISSION_RAILWAY above.
-Block("SupplyTable", -68.5, 66, 2, 0.85, 1, "missionRoute");
-Room("UnloadingShed", -58, 85, 9, 9);
-Wall("BrokenStationWall", -68, 55, 9, 1.1, 0.65);
-GroundedWall("ApronEastBank",-63,80,.8,1.65,9);
-GroundedWall("TrenchMouthBank",-58.5,65,.9,1.5,7);
-GroundedWall("FlankLockBank",-37,56,.65,1.1,5);
-GroundedWall("RailLockBank",-90.5,48,.65,1.1,5);
+// 2026.09.19 第二波：三节车厢、蒸汽机车、三扇车门 gate、卸车月台那一套
+// （SupplyTable / UnloadingShed / BrokenStationWall / Apron*/TrenchMouth*/RailLock*/
+//  FlankLockBank / 水塔 / StationSupply / StationMedical / stationCasualties /
+//  MISSION_SUPPLIES.Unloading / derailCar）随军列开场一起下线 —— 运行时早已不装它们。
+// 归档夹具 `?whitebox=p012-archive`（Data_FirstLevelP012Station 的同名件）原样保留，
+// Script_FirstLevelWhiteboxField 的 IsP012TrainBlock / SetTrainOffset / SetCarDerailment
+// 仍归它用。git history 里能取回旧摆法，这里不留注释墓碑。
 // Rally behind the eastern earth traverse while the player clears the breach.
 const trenchRallyWall=GroundedWall("TrenchRallyEast",-42.3,33,.65,2,15);
 trenchRallyWall.cover={faceX:1,faceZ:0,
@@ -420,12 +289,25 @@ Wall("TransferCorner", 95, 96, 8, 1.1, 0.7);
 Wall("TransferWestCover", 53, 121, 0.75, 1.1, 10);
 Block("TriageDesk", 66, 116, 2, 0.85, 1, "missionRoute");
 Block("TransferCrates", 93, 111, 2, 1.15, 3, "cover");
-// 12 的第二处威胁：侧巷。两道院墙夹出 7.3 m 净宽的巷子，巷口朝东正对装载区与
-// 出发的车列。摆在装载区**西侧**（村落那一侧）而不是东侧：东侧 x 94–112 整片
-// 是 TransferFlank*/TransferLast*/MISSION_PURSUIT_ROUTE 的既有通道，
-// 一堵墙下去就把村东追出来的那几股堵死在自己家门口。
-GroundedWall("SideAlleyWestWall", 48, 130, 0.7, 2.6, 14);
-GroundedWall("SideAlleyEastWall", 56, 130, 0.7, 2.6, 14);
+// 12 的第二处威胁：侧巷。两道院墙夹出 7.3 m 净宽的东西向巷子，巷口朝**西**
+// 正对装载区的车位与牛马车的出场道（cartRide 沿 x≈76–86 往北走）。
+// 2026.09.19 第二波挪回装载区**东南侧**：Notion 的口径是「村东突入部队沿既有
+// 东巷追出」，第二处威胁就该从东／东南压过来。第一波之所以摆在西侧，是因为
+// 东侧 x 94–112 被 transferFlank/transferLast/transferRear 与 MISSION_PURSUIT_ROUTE
+// 占着 —— 那三组已随新版下线（12 只剩 transfer 与 transferAlley 两处），
+// 追兵线 MISSION_PURSUIT_ROUTE 走 z=120.5 的北沿，从巷口北边擦过去，不打架。
+// 北墙比南墙短 4 m（x 102..112 对 98..112）：空袭后的村东追兵（MISSION_ENCOUNTERS.air
+// → MISSION_PURSUIT_ROUTE）正是沿 x≈100 这条线南下再转西的，一道齐头的北墙会把
+// 他们整组顶死在墙根上（实测 AirPursuerA–D 四条线全撞 SideAlleyNorthWall）。
+// 让开之后巷口朝西北张开，机枪的射界也顺带罩住装载区那一侧。
+// 集成复核：AirPursuerC 从 (115,100) 直插追兵线 (100,120.5) 时擦过北墙西端（102.2,117.4），再收 1.5 m（x 103.5..112）。
+GroundedWall("SideAlleyNorthWall", 107.75, 118, 8.5, 2.6, 0.7);
+GroundedWall("SideAlleySouthWall", 105, 126, 14, 2.6, 0.7);
+// 巷子东头封口，火力位只能从西边那个口出来（不然它就是一片开阔地不是巷子）。
+GroundedWall("SideAlleyEastStub", 112, 122, 0.7, 2.6, 8);
+// 旧西侧那两道墙改成装载区西缘的一段普通院墙：车位与人群那一侧要有个边，
+// 但不再夹出巷子。让开 ditchMouth (53,114) 与 evacuation 的起手一段。
+GroundedWall("TransferYardWestWall", 50, 131, 0.7, 2.6, 12);
 // 11—12 玩家守村路的低墙：装载区**北**缘、桥头路西肩的一段矮墙，趴在它后面
 // 正对村落方向来的路。东边不再加第二段 —— x 79–92 是村东追兵（TransferRear*）
 // 上来的线；也不能往南挪进 z 88–111，那整片是接运人群横向分流的通道
@@ -486,6 +368,42 @@ gates.push(MISSION_SOUTH_BRIDGE.wreck);
   // 北桥头的断板：炸完之后堵在引道上，人走到这儿就到头了（不是「走过去掉下河」）。
   gates.push({ id: "RailBridgeWreckStub", x: B.x, y: deckBottom + 0.75, z: B.z - B.deckHalfD + 3.5,
     w: B.deckW, h: 1.5, d: 3, semantic: "earthDark", appearSignal: B.signal });
+}
+// ---------------------------------------------------------------------------
+// 北沙河的水面（2026.09.19 第二波）
+// ---------------------------------------------------------------------------
+/**
+ * 河槽原来只是一道凹地 —— 站在桥上往下看是一条土沟，读不出「这是一条河」。
+ * 这里沿槽底铺一层**示意水面**：`solid:false`，不进碰撞、不挡子弹、不进
+ * PlanTrenchDressing 的 keepOut，净空与视线断言也都按 `solid !== false` 过滤，
+ * 所以它挡不住任何一条路线、也挡不住任何一条射线。
+ *
+ * 水位取槽底以上 `LEVEL` = 1.2 m（契约要的 1.0–1.4）。三月枯水，河面比槽窄：
+ * 平槽底半宽 11 m，水面只铺 7.5 m 半宽，两侧各留 3.5 m 干滩。
+ * 浅滩（WestDitchFord，x≈47）那一段断面只有 1.05 m 深 —— 1.2 m 的水位会顶到
+ * 自然地面之上，所以 `depth < 3` 的 x 一律不铺：撤离线过河踩的就是那片露出来的
+ * 滩地，`floorHalfW` 一路收窄，水面在进浅滩之前先变窄、再断开。
+ * 两座桥下连续：路桥甲板底在 +0.0、铁路桥甲板底在 +0.11，水面在 −3 m 上下。
+ */
+{
+  const RIVER = MISSION_NORTH_RIVER, SEG = 6, LEVEL = 1.2;
+  for (let x = -192; x <= 132; x += SEG) {
+    const profile = RiverProfileAt(x, RIVER);
+    if (profile.depth < 3) continue;                       // 浅滩：露滩地，不铺水
+    const halfW = Math.min(7.5, profile.floorHalfW - 3.5);
+    if (halfW < 1) continue;
+    Block(`NorthRiverWater${Math.round(x) < 0 ? "W" : "E"}${Math.abs(Math.round(x))}`,
+      x, RIVER.z, SEG + 0.2, 0.14, halfW * 2, "water",
+      { y: SampleMissionTerrain(x, RIVER.z) + LEVEL, solid: false });
+  }
+  // 水边的芦苇丛：给河一条读得出来的边。踩在水线外 0.6 m 的干滩上、顶过水面
+  // 0.6 m（不然一丛比水面还矮的草在水边读不出来）。不带碰撞。
+  for (const [i, x] of [-150, -108, -60, 18, 66, 92, 118].entries()) for (const side of [-1, 1]) {
+    const halfW = Math.min(7.5, RiverProfileAt(x, RIVER).floorHalfW - 3.5);
+    const z = RIVER.z + side * (halfW + 0.6);
+    Detail(`NorthRiverReeds${i}${side < 0 ? "N" : "S"}`, x, z, 3.4, 1.9, 1.2, "foliage",
+      { y: SampleMissionTerrain(x, z) + 0.95 });
+  }
 }
 // 南岸遮挡（18 的射位）：中间留 x -77..-69 的缺口，爆破安全区从那儿看得见桥。
 GroundedWall("BridgeSouthCoverWest", -82.5, 177.6, 9, 1.3, 0.8);
@@ -552,7 +470,7 @@ function SupplyStack(id, x, z, rows = 2) {
     for (const side of [-1,1]) Detail(id+'Strap'+row+col+side,cx+side*.27,z,.055,.51,.68,"metal",{y});
   }
 }
-for (const [id,x,z,rows] of [["StationSupply",-54,64,3],["StationMedical",-60,82,2],
+for (const [id,x,z,rows] of [
   ["KitchenStores",61,-12,2],["CourtStores",37,22,2],["TransferStores",66,124,3],
   ["ReceptionStores",-35,221,2]]) SupplyStack(id,x,z,rows);
 // 护壁 / 踏板 / 射击位 / 杂物不再在这里手写：见文件末尾 MISSION_TRENCH_PLACEMENTS
@@ -562,15 +480,15 @@ for (const wall of blocks.filter(b=>b.semantic==='cover' && b.h<1.21 && b.w>2 &&
   for (let x=wall.x-wall.w/2+.25,i=0;x<wall.x+wall.w/2-.2;x+=.65,i++)
     Detail(wall.id+'BagSeam'+i,x,wall.z-.01,.035,wall.h+.018,wall.d+.024,'earthDark');
 }
-// Station telegraph line, water tower and damaged outbuildings establish direction and depth.
-for (let z=-184;z<MISSION_TRAIN.approachEndZ;z+=28) {
+// 铁路沿线的电线杆：跟着新的轨道范围走（z −184…185），落在北沙河槽里的那一根跳过
+// —— 河槽把地面切到 −4.2，杆子会长在河床上。水塔随车站一起下线。
+for (let z=-184;z<=182;z+=28) {
+  if (RiverCutAt(-86, z) > 0.5) continue;
   Block('TelegraphPole'+z,-86,z,.22,6,.22,'timber');
   Detail('TelegraphCrossarm'+z,-86,z,2.6,.14,.16,'timber',{y:SampleMissionTerrain(-86,z)+5.35});
   for(const side of [-1,1]) Detail('TelegraphWire'+z+side,-86+side*.9,z+14,.018,.018,28,'metal',
     {y:SampleMissionTerrain(-86,z)+5.48});
 }
-for (const x of [-1,1]) for(const z of [-1,1]) Block('WaterTowerLeg'+x+z,-98+x*1.3,68+z*1.3,.32,5,.32,'timber');
-Block('WaterTowerTank',-98,68,3.8,2.3,3.8,'metal',{y:6.1});
 function FarmSilhouette(id,x,z,w,d,h=3.8) {
   Room(id,x,z,w,d);
   const ground=SampleMissionTerrain(x,z);
@@ -593,8 +511,13 @@ for(const [row,points] of [
   ['East',[-180,-151,-116,-81,-43,-5,36,71,104,142,167].map((z,i)=>({x:125+(i%3)*2,z}))],
   ['West',[-165,-131,-97,-63,-29,6,84,122,151].map((z,i)=>({x:-117-(i%2)*5,z}))],
   ['SouthRoad',[-83,-51,-20,12,43,71].map((z,i)=>({x:18+(i%2)*3,z}))],
-  ['RailApproach',Array.from({length:Math.ceil((MISSION_TRAIN.approachEndZ-175)/24)},(_,i)=>({x:i%2?-109:-47,z:175+i*24}))],
+  // 铁路南引道（桥南）：旧的一列一路排到进站跑道尽头 z=743，其中东侧那一半
+  // （x=-47）还压在接收院与撤离线那一带。新范围只跟到 bounds 的南界，两列都
+  // 让开 x -62…1 的接收院／撤离走廊。
+  ['RailApproach',[200,224,248,272,296,320,344].map((z,i)=>({x:i%2?-105:-92,z}))],
 ]) for(const [i,p] of points.entries()) {
+  // 河槽里不长树：断面在这儿把地面切下去 4.2 m，树会立在河床上。
+  if (RiverCutAt(p.x, p.z) > 0.5) continue;
   const id='FieldPoplar'+row+i, ground=SampleMissionTerrain(p.x,p.z),height=6+(i%3)*.7;
   Block(id+'Trunk',p.x,p.z,.28,height*.65,.3,'timber');
   Detail(id+'Crown',p.x,p.z,1.8,height*.6,1.6,'foliage',{y:ground+height*.75});
@@ -672,7 +595,8 @@ function FieldCover(id, x, z, w, h, d) {
   }
 }
 export const MISSION_ANCHORS = Object.freeze({
-  train: MISSION_TRAIN.player,
+  // `train` 锚点随军列下线（无消费者）。`unload` 留着：Script_EditorFullScene 的
+  // 巡场机位按它取点，那一带现在是空场 —— 锚点本身只是一个坐标。
   unload: { x: -66, z: 66 },
   front: { x: 0, z: -124 },
   orders: Sortie.orders,
@@ -705,17 +629,12 @@ export const MISSION_ROUTES = Object.freeze({
   // The tank can be immobilized anywhere along the return trench, so the rally
   // leg starts wherever the bundle run is; the squad already walks it this way.
   ordersRejoin: [...Sortie.route.slice(3).reverse(),...MISSION_STAGE_ROUTES.collectionReturn.slice(1)],
-  south: [
-    { x: -36, z: -124 },
-    { x: 0, z: -124 },
-    { x: -8, z: -112 },
-    { x: -8, z: -78 },
-    { x: -24, z: -60 },
-    { x: -24, z: -18 },
-    { x: 0, z: 0 },
-    { x: 24, z: -20 },
-    { x: 48, z: -20 },
-  ],
+  // 2026.09.19 第二波：旧 `south` 与 07 的 `southWalk` 合成一条。
+  // 旧线从前沿 (-36,-124) 起手、走的是已经取消的那两个大折返；新版 06 的后送队
+  // 是从**背坡伤员集结处**起行的（columnDeparted），和玩家走同一条线才对得上
+  // 「队伍沿交通线南下」。担架队（Script_FirstLevelMissionColumn）与罗班长带路
+  // 都读这个键，这里指同一个数组，不再各走各的。
+  south: MISSION_STAGE_ROUTES.southWalk,
   // 2026.09.19：内院门出来之后不再斜着切到 (64,52) —— 那条线现在压在绕回短巷的
   // 南墙上。走 courtyardBypass 的巷子，在主街障碍南侧 streetRejoin 接回主街再南下。
   village: [
@@ -743,12 +662,8 @@ export const MISSION_ROUTES = Object.freeze({
   // 与 Script_FirstLevelMissionTest 两道一起看着。
   ...MISSION_STAGE_ROUTES,
 });
-import { FRONT_GUARD_POSTS, FRONT_COVER, FRONT_FIELD_MEN, FrontAssaultLaneCuts } from "./Data_FirstLevelMissionFront.mjs";
+import { FRONT_GUARD_POSTS, FRONT_COVER, FRONT_FIELD_MEN, FrontAssaultLaneCuts, APPROACH_TACTICS } from "./Data_FirstLevelMissionFront.mjs";
 export const MISSION_PLACEMENT = Object.freeze({
-  stationCasualties: [
-    { x: -62, z: 69, yaw: -0.4, health: 35 },
-    { x: -64, z: 77, yaw: 2.1, health: 28 },
-  ],
   squadFrontPositions:[{x:-1.7,z:-129},{x:1.7,z:-128.7},{x:14,z:-129},{x:16,z:-127.5}],
   reliefApproach: [{x:-69,z:106},{x:-71,z:74},{x:-66,z:66},...MISSION_ROUTES.opening,...MISSION_ROUTES.support,{x:6,z:-123}],
   reliefPositions: [{x:-30,z:-123.4},{x:-26,z:-124.9},{x:-21,z:-122.8},{x:-17,z:-125},{x:-10,z:-124.3},{x:4,z:-123.2},{x:11,z:-125},{x:20,z:-124.6}],
@@ -880,7 +795,6 @@ export const MISSION_PLACEMENT = Object.freeze({
   },
 });
 export const MISSION_SUPPLIES = Object.freeze([
-  {id:"Unloading",x:-68.5,z:66,supportHeight:.85},
   // 2026-09-15: the shelter corner is now a fight of its own, between the trench
   // and the front crates. Kept on the recess floor, clear of its entry lane and posts.
   {id:"Shelter",x:-34.2,z:-18.3,supportHeight:null},
@@ -904,6 +818,72 @@ const TRENCH_TRAFFIC_LANES = [
   //（Data_FirstLevelMission.MISSION_TACTICS.YardPursuerA/B/C，三条同线）。
   [{ x: 27, z: 224 }, MISSION_REAR_ROUTES.evacuation[7], MISSION_REAR_ANCHORS.retreatC],
 ];
+// ---------------------------------------------------------------------------
+// 07 南行沿线的路肩（2026.09.19 第二波）
+// ---------------------------------------------------------------------------
+/**
+ * 新的 `southWalk` 比旧线短 53 m（188 → 135），代价是它在 FrontCommunication 的
+ * 沟身里只走得到一小段，后面几段是开阔田地 —— 走起来读不出「沿交通线南下」。
+ * 这里沿路肩摆一排**断续**的低土坎：每段 8.5 m、左右交替、离中线 3.6 m
+ *（担架队 1.25 m 通行宽 + 0.35 胶囊都在净空之外）。不连成一堵墙：那会把这条线
+ * 变成一条走廊，也会横在别人的线上。
+ *
+ * 所以摆在这里而不是上面那些 Wall() 旁边：要先有 MISSION_ROUTES / MISSION_PLACEMENT
+ * 才能逐件躲开**别人的**路线。三道筛子：
+ *   1. 脚下已经被挖过或压平过（沟、路、场坪）的不摆 —— 那是别人的通道，
+ *      而且土坎会一头扎进沟里长成 3 m 高（实测 SouthWalkShoulder0 曾是 3.43 m）；
+ *   2. 离任何一条非 07 的路线／战术折线近于 5.5 m 的不摆；
+ *   3. 已经被别的实心件占了的地方不摆（第一版有一段正好长在 FieldPoplarSouthRoad2
+ *      那棵白杨身上）。
+ * 语义取 earthDark 不取 cover：这是地形不是工事，射击位交给
+ * DeriveCoversFromColliders 从实体盒里推（见 GroundedBlock 的注释）。
+ */
+{
+  const line = MISSION_STAGE_ROUTES.southWalk;
+  const placed = blocks.filter((block) => block.solid !== false);
+  const others = [
+    ...Object.entries(MISSION_ROUTES).filter(([name]) => name !== "south" && name !== "southWalk")
+      .map(([, route]) => route),
+    MISSION_PLACEMENT.reliefApproach, ...MISSION_PLACEMENT.guardWithdrawalRoutes,
+    ...TRENCH_TRAFFIC_LANES, ...Object.values(APPROACH_TACTICS).map((plan) => plan.points),
+    OPENING.woundedRoute, OPENING.runnerRoute, OPENING.trenchContactRoute,
+  ];
+  const Bank = (id, x, z, w, h, d, ry) => {
+    const c = Math.cos(ry), s = Math.sin(ry);
+    let base = Infinity;
+    for (const a of [-1, 0, 1]) for (const b of [-1, 0, 1])
+      base = Math.min(base, SampleMissionTerrain(x + (a * w / 2) * c + (b * d / 2) * s,
+        z - (a * w / 2) * s + (b * d / 2) * c));
+    base -= 0.1;
+    const top = SampleMissionTerrain(x, z) + h;
+    return Block(id, x, z, w, top - base, d, "earthDark", { y: (top + base) / 2, ry });
+  };
+  // [路线第几段, 段内位置 0–1, 摆在哪一侧, 露出地面多高]
+  for (const [i, [leg, t, side, h]] of [
+    [2, 0.30, 1, 1.25], [2, 0.74, -1, 1.05],
+    [3, 0.28, 1, 1.15], [3, 0.72, -1, 1.3],
+    [4, 0.32, -1, 1.1], [4, 0.78, 1, 1.25],
+    [5, 0.35, -1, 1.2], [5, 0.80, 1, 1.05],
+    [6, 0.30, -1, 1.15], [6, 0.70, 1, 1.25],
+  ].entries()) {
+    const a = line[leg], b = line[leg + 1], len = Math.hypot(b.x - a.x, b.z - a.z);
+    const ry = Math.atan2(b.x - a.x, b.z - a.z);
+    const x = a.x + (b.x - a.x) * t + ((b.z - a.z) / len) * side * 3.6;
+    const z = a.z + (b.z - a.z) * t - ((b.x - a.x) / len) * side * 3.6;
+    if (SampleMissionNaturalHeight(x, z) - SampleMissionTerrain(x, z) > 0.5) continue;
+    if (others.some((route) => MissionPathDistance({ x, z }, route) < 5.5)) continue;
+    // 两个世界 AABB 相隔 0.8 m 以上才摆（外接圆太狠：8.5 m 长的件对上一整间屋子，
+    // 半径一加就把整条路肩清光）。
+    const hx = Math.abs(Math.cos(ry)) * 0.375 + Math.abs(Math.sin(ry)) * 4.25;
+    const hz = Math.abs(Math.sin(ry)) * 0.375 + Math.abs(Math.cos(ry)) * 4.25;
+    if (placed.some((box) => {
+      const bc = Math.abs(Math.cos(box.ry || 0)), bs = Math.abs(Math.sin(box.ry || 0));
+      return Math.abs(box.x - x) < hx + (bc * box.w + bs * box.d) / 2 + 0.8
+        && Math.abs(box.z - z) < hz + (bs * box.w + bc * box.d) / 2 + 0.8;
+    })) continue;
+    Bank(`SouthWalkShoulder${i}`, x, z, 0.75, h, 8.5, ry);
+  }
+}
 // 壕沟布设：沿编译好的中心线自动摆护壁、踏板、射击位沙袋和杂物
 // （Script_TrenchPlan.PlanTrenchDressing，参数在 TRENCH_PRESETS）。
 // 旧写法是「每 5 m 两侧各一根桩 + 3 条横板」的双重循环，间距、根数、倾斜全是
@@ -1072,14 +1052,18 @@ export const MISSION_LAYOUT = Object.freeze({
   // 归档教学白盒的色标面板不进正片（Script_FirstLevelWhiteboxField.BuildLegend）。
   legend: false,
   fortifications: true,
-  derailCar: OPENING.derailCar,
   terrain: "P012Heightfield",
   terrainSpec: MISSION_TERRAIN,
   SampleGroundColor: SampleMissionGroundColor,
   // Layered terrain palette + splat weights; used only when ground.terrainLayers loads.
   SampleGroundSurface: SampleMissionGroundSurface,
-  bounds: { minX: -205, maxX: 137, minZ: -258, maxZ: MISSION_TRAIN.approachEndZ },
-  ground: { x: -34, z: (MISSION_TRAIN.approachEndZ-258)/2, w: 342, d: MISSION_TRAIN.approachEndZ+258, h: 1, y: -0.5, semantic: "ground", pbr: "Ground", pbrOptions: { normalScale: .5, metalness: 0 }, terrainLayers: "MissionPlain" },
+  // 地块与 bounds 是同一个矩形：高度场按 ground 的 w/d 逐格烘（Data_FirstLevelP012Terrain），
+  // 玩家位置按 bounds 夹（Script_FirstLevelWhiteboxField）。两边写不一样就会出现
+  // 「能走到的地方没有地」或者「烘了一片谁也到不了的地」。
+  bounds: MISSION_BOUNDS,
+  ground: { x: (MISSION_BOUNDS.minX + MISSION_BOUNDS.maxX) / 2, z: (MISSION_BOUNDS.minZ + MISSION_BOUNDS.maxZ) / 2,
+    w: MISSION_BOUNDS.maxX - MISSION_BOUNDS.minX, d: MISSION_BOUNDS.maxZ - MISSION_BOUNDS.minZ,
+    h: 1, y: -0.5, semantic: "ground", pbr: "Ground", pbrOptions: { normalScale: .5, metalness: 0 }, terrainLayers: "MissionPlain" },
   railway: MISSION_RAILWAY,
   semanticColors: {
     railBallast: 0x5a5750,
@@ -1090,9 +1074,9 @@ export const MISSION_LAYOUT = Object.freeze({
     plaster: 0xaaa69b,
     roof: 0x686c68,
     canvas: 0xa4a393,
-    trainWood: 0x82715c,
-    trainCanvas: 0x747c67,
-    trainMetal: 0x59625e,
+    // 北沙河的示意水面。压得比天空暗一档（天穹在白天读出来接近 0x9fb0bb），
+    // 不然从桥上往下看是一条亮带，反而比河槽更不像水。
+    water: 0x5c6f78,
     ground: 0x86877d,
     structure: 0xc1bdb1,
     cover: 0x6d8b98,

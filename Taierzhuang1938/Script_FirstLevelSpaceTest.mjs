@@ -116,6 +116,19 @@ const report = {};
     .map(([name, route]) => [name, +RouteLength(route).toFixed(1)]));
   report.walkSeconds = Object.fromEntries(["southWalk", "wallPath", "toBridge", "bridgeCrossing",
     "marchOut", "nightMarch"].map((name) => [name, +(RouteLength(StageRoutes[name]) / 1.4).toFixed(0)]));
+  // 07 的目标时长是 45–75 秒（契约 §2）。这里只钉**长度**的上限 —— 配速归 Front
+  // 玩法包（行军 2.2–2.6 m/s）：140 m 在 2.2 m/s 下是 64 s，还在窗口里；
+  // 旧的 188 m 线连 2.6 m/s 都要 72 s，一慢就超。
+  report.southWalkM = report.routeLengths.southWalk;
+  assert.ok(report.southWalkM <= 140,
+    `07 southWalk is 45-75 s of marching, not a hike: ${report.southWalkM} m`);
+  assert.ok(report.southWalkM >= 110, `07 still walks a real stretch: ${report.southWalkM} m`);
+  // 担架队跟着走同一条线：通行宽 1.25 m（两人抬）要过得去。
+  const litterBlocked = RouteClearance(StageRoutes.southWalk, Solids("BunkerCollapsed"),
+    { margin: 0.65 });
+  assert.deepEqual(litterBlocked, [], "a two-bearer litter team walks 07 beside the player");
+  // 旧 `south` 键与 07 合成一条（担架队与带路都读它）。
+  assert.ok(Routes.south === StageRoutes.southWalk, "the legacy `south` route is the 07 walk itself");
   console.log("ok every contract route clears a 0.35 m capsule and is merged into MISSION_ROUTES",
     JSON.stringify(report.routeLengths));
 }
@@ -449,6 +462,128 @@ const report = {};
       [], `placement ${point.x},${point.z} is inside a block`);
   }
   console.log("ok placement keys for bunker/collection/street/cart/wall/reception/bridge/night");
+}
+
+// ---------------------------------------------------------------------------
+// 13. 北沙河的水面：读得出是一条河，但拦不住任何东西
+// ---------------------------------------------------------------------------
+{
+  const water = Layout.blocks.filter((block) => block.semantic === "water");
+  assert.ok(water.length >= 30, `the channel carries a water surface: ${water.length} slabs`);
+  assert.ok(Layout.semanticColors.water !== undefined, "the water surface has its own semantic colour");
+  // 一块都不许是实心：不进碰撞、不挡子弹、不进净空与视线。
+  assert.deepEqual(water.filter((block) => block.solid !== false).map((b) => b.id), [],
+    "the water surface is never a solid");
+  const solids = Solids("BunkerCollapsed");
+  assert.deepEqual(solids.filter((block) => block.semantic === "water").map((b) => b.id), [],
+    "no water slab reaches the clearance / sightline set");
+  // 水位：槽底以上 1.0–1.4 m，且离自然河岸还有余量（不是一条漫出来的河）。
+  const depths = water.map((block) => {
+    const floor = Ground(block.x, block.z);
+    return { id: block.id, level: block.y + block.h / 2 - floor, freeboard: Ground(block.x, River.z + River.floorHalfW + River.bankRun + 2) - (block.y + block.h / 2) };
+  });
+  report.waterLevelM = +Math.max(...depths.map((d) => d.level)).toFixed(2);
+  for (const d of depths)
+    assert.ok(d.level >= 1.0 && d.level <= 1.4, `${d.id} sits 1.0-1.4 m above the channel floor: ${d.level.toFixed(2)}`);
+  // 河面比槽窄，且浅滩处收窄／断开露出滩地。
+  const halfWidths = water.map((block) => block.d / 2);
+  assert.ok(Math.max(...halfWidths) < River.floorHalfW,
+    `March low water is narrower than the trough: ${Math.max(...halfWidths)} < ${River.floorHalfW}`);
+  const ford = River.fords[0];
+  assert.deepEqual(water.filter((block) => Math.abs(block.x - ford.x) <= ford.halfW).map((b) => b.id), [],
+    "the ford shows bare shoal, not water");
+  assert.ok(halfWidths.some((half) => half < Math.max(...halfWidths) - 1),
+    "the surface narrows on its way into the ford instead of stopping square");
+  // 两座桥下连续（桥墩之间不断流）。
+  for (const [label, x] of [["road bridge", RoadBridge.deck.x], ["rail bridge", RailBridge.x]])
+    assert.ok(water.some((block) => Math.abs(block.x - x) <= block.w / 2 + 3),
+      `the water runs under the ${label}`);
+  report.waterHalfWidthM = [+Math.min(...halfWidths).toFixed(2), +Math.max(...halfWidths).toFixed(2)];
+  console.log("ok North Sha He reads as water: non-solid slabs, 1.2 m low water, dry ford, continuous under both bridges",
+    JSON.stringify({ slabs: water.length, levelM: report.waterLevelM, halfWidthM: report.waterHalfWidthM }));
+}
+
+// ---------------------------------------------------------------------------
+// 14. 侧巷在装载区东南，火力够得着出场的车列，玩家够得着从巷口出来的人
+// ---------------------------------------------------------------------------
+{
+  const Named = (id) => Layout.blocks.find((box) => box.id === id);
+  const north = Named("SideAlleyNorthWall"), south = Named("SideAlleySouthWall");
+  assert.ok(north && south, "the side alley is two yard walls");
+  const clear = (south.z - south.d / 2) - (north.z + north.d / 2);
+  report.sideAlleyWidthM = +clear.toFixed(2);
+  assert.ok(clear >= 5 && clear <= 9, `the alley is an alley, not a yard: ${clear.toFixed(2)} m`);
+  assert.ok(north.h >= 2.4 && south.h >= 2.4, "both sides are full-height yard walls");
+  // 东南侧：巷身整个在装载区以东、桥头路以东。
+  assert.ok(S.sideAlley.x > A.queue.x + 15, "the alley is east of the loading lane");
+  assert.ok(S.sideAlley.z > 110 && S.sideAlley.z < 136, "the alley opens onto the departure road, not the yard entrance");
+  assert.ok(S.sideAlley.z > north.z && S.sideAlley.z < south.z, "the anchor stands in the alley itself");
+  // 旧的西侧那条巷子没了。
+  assert.deepEqual(Layout.blocks.filter((b) => /^SideAlley/.test(b.id) && b.x < 80).map((b) => b.id), [],
+    "the first-wave west-side alley is gone");
+  const solids = Solids("BunkerCollapsed");
+  // 巷口朝西：从巷子里望得见牛马车的出场道（cartRide 中段与桥头路）。
+  const mouth = { x: north.x - north.w / 2, z: S.sideAlley.z };
+  report.sideAlleySight = {};
+  for (const [label, target] of [["cartRide", StageRoutes.cartRide[2]], ["bridgeheadRoad", { x: 76, z: 127 }]]) {
+    const blocker = SightBlocker(Eye({ x: S.sideAlley.x + 4, z: S.sideAlley.z }, 1.1), Eye(target, 1.2), solids);
+    report.sideAlleySight[label] = blocker;
+    assert.equal(blocker, null, `the alley gun covers the ${label}: blocked by ${blocker}`);
+  }
+  // 玩家朝村落方向的低墙／墙角射位打得到从巷口出来的人。
+  for (const [label, from] of [["village wall", { x: 66.5, z: 85.5 }], ["yard corner", { x: 95, z: 97.5 }]]) {
+    const blocker = SightBlocker(Eye(from, 1.6), Eye(mouth, 1.4), solids);
+    report.sideAlleySight[label] = blocker;
+    assert.equal(blocker, null, `the player returns fire from the ${label}: blocked by ${blocker}`);
+  }
+  // 巷身不许压在车位上，也不许挡住 cartRide 本身。
+  for (const bay of P.cartBays) for (const wall of [north, south])
+    assert.ok(Math.abs(bay.x - wall.x) > wall.w / 2 + 2 || Math.abs(bay.z - wall.z) > wall.d / 2 + 3.2,
+      `the alley wall stands clear of the cart bay at ${bay.x},${bay.z}`);
+  assert.deepEqual(RouteClearance(StageRoutes.cartRide, solids, { boxHalf: [1.25, 1.45], ceiling: 2.2 }), [],
+    "moving the alley east leaves the cart lane clear");
+  console.log("ok the side alley moved to the south-east of the loading yard",
+    JSON.stringify({ widthM: report.sideAlleyWidthM, anchor: S.sideAlley }));
+}
+
+// ---------------------------------------------------------------------------
+// 15. 军列/车站下线与 bounds 收缩
+// ---------------------------------------------------------------------------
+{
+  const gone = /^(?:StationCar\d|StationEngine|StationExitStep|TrainDoor|WaterTower|SupplyTable$|UnloadingShed|BrokenStationWall$|ApronEastBank$|TrenchMouthBank$|RailLockBank$|FlankLockBank$|StationSupply|StationMedical)/;
+  for (const collection of [Layout.blocks, Layout.gates, ...Layout.scenario.states.map((s) => s.blocks)])
+    assert.deepEqual(collection.filter((item) => gone.test(item.id)).map((i) => i.id), [],
+      "no train or unloading-platform geometry is left in the mission layout");
+  assert.deepEqual(Layout.walkableSurfaces.map((s) => s.id), ["TemporaryBridge", "RailBridgeDeck"],
+    "the only walkable surfaces left are the two bridge decks");
+  assert.equal(P.stationCasualties, undefined, "the station casualty placement is gone");
+  assert.equal(Layout.derailCar, undefined, "the derailed-carriage hook is gone");
+  // 铁路只剩铁路桥引道。
+  const [railNorth, railSouth] = Layout.railway.points;
+  report.railwayZ = [railNorth[1], railSouth[1]];
+  assert.ok(railSouth[1] <= 200, `the track stops south of the rail bridge: z=${railSouth[1]}`);
+  assert.ok(railNorth[1] <= -184 && railSouth[1] > RailBridge.z + RailBridge.deckHalfD,
+    "the track still carries both approaches of the rail bridge");
+  // bounds 收到实际内容外沿，且每一件（含夜景片）仍在里面。
+  const B = Layout.bounds;
+  report.bounds = B;
+  assert.ok(B.maxZ <= 400 && B.maxZ >= 360, `the level ends south of the night gate slice: ${B.maxZ}`);
+  assert.ok(B.minZ <= -225 && B.minZ >= -245, `the north field bank stays inside: ${B.minZ}`);
+  const everything = [...Layout.blocks, ...Layout.gates, ...Layout.scenario.states.flatMap((s) => s.blocks)];
+  const outside = everything.filter((item) => item.x - item.w / 2 < B.minX || item.x + item.w / 2 > B.maxX
+    || item.z - item.d / 2 < B.minZ || item.z + item.d / 2 > B.maxZ).map((i) => i.id);
+  assert.deepEqual(outside, [], "every authored piece stays inside the shrunken bounds");
+  for (const [id, point] of Object.entries(A))
+    assert.ok(point.x > B.minX && point.x < B.maxX && point.z > B.minZ && point.z < B.maxZ,
+      `anchor ${id} stands inside the bounds`);
+  // 地块与 bounds 是同一个矩形（高度场按 ground 烘，玩家按 bounds 夹）。
+  const g = Layout.ground;
+  assert.equal(g.w, B.maxX - B.minX);
+  assert.equal(g.d, B.maxZ - B.minZ);
+  assert.equal(g.x, (B.minX + B.maxX) / 2);
+  assert.equal(g.z, (B.minZ + B.maxZ) / 2);
+  console.log("ok the train, the station platform and the 370+ m approach run are gone",
+    JSON.stringify({ bounds: B, groundM: [g.w, g.d], railwayZ: report.railwayZ }));
 }
 
 console.log("ok first-level 2026.09.19 space:", JSON.stringify(report));

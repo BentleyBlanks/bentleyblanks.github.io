@@ -52,6 +52,33 @@ try{
  const failed=result.walks.filter(r=>r.reached!==r.expected);
  assert.deepEqual(failed,[],'actual Rapier capsule walks both directions: '+JSON.stringify(failed));
  // -------------------------------------------------------------------------
+ // 水面是示意不是空间；军列几何真的从场上消失了
+ // -------------------------------------------------------------------------
+ const river=await page.evaluate(async()=>{
+  const g=window.Tengxian,{Vector3}=await import('three');
+  const {MISSION_LAYOUT}=await import('./Data_FirstLevelMissionLayout.mjs');
+  const water=MISSION_LAYOUT.blocks.filter(b=>b.semantic==='water');
+  const sample=water[Math.floor(water.length/2)];
+  // 实机射线穿过水面那一层：碰不到任何实体（水没有碰撞，子弹也不停）。
+  const through=g.battlefield.Raycast(new Vector3(sample.x,sample.y,sample.z-6),
+   new Vector3(0,0,1),12,{terrain:false});
+  // 水面之上贴着走一趟：脚下是河床不是水皮。
+  const floorY=g.battlefield.GroundHeight(sample.x,sample.z);
+  return {water:water.length,throughId:through?.box?.id||through?.box?.tag||null,
+   waterTopY:+(sample.y+sample.h/2).toFixed(2),floorY:+floorY.toFixed(2),
+   trainColliders:g.battlefield.colliders.filter(c=>/^Station|^TrainDoor/.test(c.id||'')).length,
+   bounds:g.battlefield.bounds};
+ });
+ await fs.writeFile(path.join(out,'Data_RiverSurface.json'),JSON.stringify(river,null,2));
+ assert.ok(river.water>=30,'the channel carries a water surface: '+river.water);
+ assert.equal(river.throughId,null,'a shot crosses the river surface without hitting anything');
+ assert.ok(river.waterTopY-river.floorY>=1&&river.waterTopY-river.floorY<=1.4,
+  'the water stands 1.0-1.4 m over the channel floor, and the floor is still what you stand on: '
+  +JSON.stringify({waterTopY:river.waterTopY,floorY:river.floorY}));
+ assert.equal(river.trainColliders,0,'no train or station collider survives in the live field');
+ assert.ok(river.bounds.maxZ<=400&&river.bounds.minZ>=-245,
+  'the live field uses the shrunken bounds: '+JSON.stringify(river.bounds));
+ // -------------------------------------------------------------------------
  // 两座桥的四态：路桥炸前/炸后 × 铁路桥炸前/炸后
  // -------------------------------------------------------------------------
  const bridges=await page.evaluate(async()=>{
@@ -146,7 +173,11 @@ try{
   {id:'BunkerCollapsed',eye:[-40,26,-108],target:[-40,0,-134]},
   {id:'CollectionBackslope',eye:[-37,30,-78],target:[-37,0,-108]},
   {id:'VillageStreetBlock',eye:[77,34,-12],target:[77,0,24]},
+  // 07 南行新线的中段（沟身出来那一段）与东南侧巷／车位：两处都是第二波改动的。
+  {id:'SouthWalkMiddle',eye:[-10,30,-70],target:[6,0,-26]},
+  {id:'SideAlleyAndBays',eye:[118,34,140],target:[86,0,118]},
   {id:'TransferAndRiver',eye:[76,62,88],target:[76,0,150]},
+  {id:'RiverRoadBridge',eye:[76,10,132],target:[76,-3,168]},
   {id:'RailBridge',eye:[-40,40,196],target:[-77,0,152]},
   {id:'WallPathAndReception',eye:[30,44,196],target:[4,0,236]},
  ]){

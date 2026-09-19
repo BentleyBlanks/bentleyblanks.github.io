@@ -269,9 +269,8 @@ export class FirstLevelMissionView {
     for (const mesh of this.rigidProps.values()) mesh.visible=false;
     this.TrainHandProps();
     this.UpdateSupplies(time);
-    if (this.column.stationBombed)
-      for (const person of MISSION_PLACEMENT.stationCasualties)
-        this.Person(person.x, person.z, person.yaw, time, { id:"Station"+person.x, alive: person.health > 0, crouch: true });
+    // 2026.09.19 第二波：车站卸车挨炸那一拍随军列开场下线（`column.stationBombed`
+    // 已无人写入，MISSION_PLACEMENT.stationCasualties 也一并删了）。
     for (const litter of this.column.litters) {
       if (!litter.visible) continue;
       const ground = this.battlefield.GroundHeight(litter.x, litter.z),

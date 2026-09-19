@@ -225,7 +225,7 @@ if(process.argv.includes("--opening-audio"))process.exit(0);
     }
   }
 }
-assert.ok(P.stationCasualties.every(person=>person.health>0),"station shelling does not manufacture dead recruits at muster");
+// 2026.09.19 第二波：车站卸车那一拍（连同 MISSION_PLACEMENT.stationCasualties）随军列下线。
 {
   const wall=MISSION_LAYOUT.blocks.find(block=>block.id==="TrenchRallyEast");
   assert.equal(wall.cover.faceZ,0,"rally cover normal is perpendicular to its long wall");
@@ -408,9 +408,14 @@ assert.ok(SampleMissionTerrain(135,90)>2.8 && SampleMissionTerrain(-204,90)>3.8,
 console.log("ok shared terrain, excavated trenches, structural floors only");
 // The railway is a PCG spec on the shared heightfield, not boxes at an absolute height
 // (the old rails sat at y=0.76 over ~0 m soil and floated 0.7 m above their sleepers).
+// 2026.09.19 第二波：军列与车站下线，轨只剩铁路桥（18）的南北引道，线上不再停车厢
+// —— 原来那条「每个车轮坐在轨顶」的断言随之下线，轨道本身仍按低 PCG 轨校验。
 {
   assert.equal(MISSION_LAYOUT.railway, MISSION_RAILWAY, "the whitebox field builds the layout's railway spec");
   assert.ok(!MISSION_LAYOUT.blocks.some(block => /^Rail(?:Sleeper)?-?\d/.test(block.id)), "no hand-placed rail or sleeper boxes");
+  assert.ok(!MISSION_LAYOUT.blocks.some(block => /^Station(?:Car\d|Engine|ExitStep)/.test(block.id)),
+    "no parked train or station platform remains in the mission layout");
+  assert.ok(!MISSION_LAYOUT.gates.some(gate => /^TrainDoor/.test(gate.id)), "no carriage doors remain");
   const railway = MakeRailwayProfile(MISSION_RAILWAY, (x, z) => terrain.SampleHeight(x, z));
   for (let s = 0; s <= railway.path.length; s += 1) {
     const p = railway.path.At(s), soil = terrain.SampleHeight(p.x, p.z);
@@ -421,22 +426,21 @@ console.log("ok shared terrain, excavated trenches, structural floors only");
     const railTop = railway.RailTopAt(s) - soil;
     assert.ok(railTop > 0.2 && railTop < 0.42, `rail top stays low on the soil at z=${p.z.toFixed(1)}: ${railTop.toFixed(3)}`);
   }
-  // 桥段本身按桥面高度对账：钢轨钉在桥面上，不跟着河槽掉下去。
+  // 桥段：样条轨在 gapZ 之间断开不画，桥面上的两段直轨是 gate 体块（RailBridgeRailWest/East），
+  // 高度与炸前炸后状态由 Script_FirstLevelSpaceTest 与 TopologyBrowserTest 对账；这里只确认铁路确实跨过河槽。
   {
-    const railTops = [];
+    let bridged = 0;
     for (let s = 0; s <= railway.path.length; s += 1) {
       const p = railway.path.At(s);
-      if (p.z <= MISSION_RAIL_BRIDGE.gapZ[0] || p.z >= MISSION_RAIL_BRIDGE.gapZ[1]) continue;
-      railTops.push(railway.RailTopAt(s) - terrain.SampleHeight(p.x, p.z));
+      if (p.z > MISSION_RAIL_BRIDGE.gapZ[0] && p.z < MISSION_RAIL_BRIDGE.gapZ[1]) bridged += 1;
     }
-    assert.ok(railTops.length > 20, "the channel really does carry a bridged span of railway");
-    assert.ok(Math.max(...railTops) > 1.5, "over the channel the rails stand clear of the excavated soil");
+    assert.ok(bridged > 20, "the channel really does carry a bridged span of railway");
   }
-  const wheels = MISSION_LAYOUT.blocks.filter(block => /^Station(?:Car\dWheel|EngineWheel)/.test(block.id));
-  assert.equal(wheels.length, 3 * 8 + 8, "every car and engine wheel is seated");
-  for (const wheel of wheels)
-    assert.ok(Math.abs(wheel.y - wheel.h / 2 - railway.RailTopNear(wheel.x, wheel.z)) < 0.01, `${wheel.id} stands on the rail top`);
-  console.log("ok railway is a low PCG track and the parked train stands on it");
+  // 轨只留铁路桥两头的引道：北端到田埂脚下当远景，南端过桥之后就收。
+  const [north, south] = MISSION_RAILWAY.points;
+  assert.ok(north[1] <= -184 && south[1] >= 180 && south[1] <= 200,
+    `the track is only the rail-bridge approach: z ${north[1]}..${south[1]}`);
+  console.log("ok railway is a low PCG track covering only the rail-bridge approach");
 }
 const tacticalRoutes = Object.fromEntries(Object.entries(MISSION_TACTICS).map(([id, plan]) => [id,
   [Object.values(MISSION_ENCOUNTERS).flat().find(spec => spec.id === id), ...plan.points]]));
@@ -470,6 +474,8 @@ for (const [name, route] of Object.entries({ ...MISSION_ROUTES, ...Object.fromEn
         y = SampleMissionTerrain(x, z);
       for (const box of MISSION_LAYOUT.blocks) {
         if (MISSION_LAYOUT.walkableSurfaces.some((surface) => surface.id === box.id)) continue;
+        // 不登记碰撞的示意件（北沙河水面、芦苇）挡不住人；桥上的路线脚下量到的是河床。
+        if (box.solid === false) continue;
         const dx=x-box.x, dz=z-box.z, cosine=Math.cos(box.ry||0), sine=Math.sin(box.ry||0);
         const blocked =
           Math.abs(dx*cosine-dz*sine) < box.w / 2 + 0.35 &&
@@ -864,9 +870,10 @@ assert.equal(new Set(MISSION_DIALOGUE.map((cue) => cue.id)).size, MISSION_DIALOG
  assert.equal(MissionGuideSpeed(actor,{x:0,z:5},target),R.squadSpeedMps,"nearby guide keeps walking pace");
  assert.equal(MissionGuideSpeed(actor,{x:0,z:-40},target,true),0,"spacing still takes priority");
  assert.equal(MissionGuideSpeed({x:0,z:-124},{x:48,z:-20},{x:-1,z:-123},false,[{x:-8,z:-112},{x:-24,z:-60},{x:-24,z:-18},{x:0,z:0},{x:48,z:-20}]),R.squadCatchupMps,"a squad behind a route bend catches up instead of waiting forever");
- const pending=[{x:25,z:-110},{x:15,z:-111},{x:6,z:-124},{x:-8,z:-112},A.orders];
+ // 夹具取真实的接令归队线尾段：它在伤员集结处与南行线的起点重合，晚到的人先把这段走完再南下。
+ const pending=MISSION_ROUTES.ordersRejoin.slice(-5);
  const south=MissionGuideRoute({x:27,z:-113},pending,MISSION_ROUTES.south);
- assert.deepEqual(south.slice(0,4),pending.slice(0,4),"a delayed companion returns through the bundle trench before heading south");
+ assert.deepEqual(south.slice(0,pending.length),pending,"a delayed companion returns through the bundle trench before heading south");
  const village=MissionGuideRoute({x:-8,z:-78},south,MISSION_ROUTES.village);
  assert.deepEqual(village.slice(0,south.length),south,"village orders preserve the unfinished southbound path");
  assert.deepEqual(MissionGuideRoute({x:16,z:-124},pending,MISSION_ROUTES.bundle,MISSION_ROUTES.bundle,true),MISSION_ROUTES.bundle,"explicit entry starts at the cleared central junction");

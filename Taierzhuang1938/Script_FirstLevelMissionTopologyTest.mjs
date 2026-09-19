@@ -113,6 +113,32 @@ assert.ok(measured.blastSafeM >= 40, `blast stand-off: ${measured.blastSafeM.toF
 // 15A—C 的降压步行：按 1.4 m/s 至少要有一分钟的「没人打你」的路。
 const regroupSeconds = (measured.wallPathM) / 1.4;
 assert.ok(regroupSeconds > 45, `15B gives the player a real breather: ${regroupSeconds.toFixed(0)} s at 1.4 m/s`);
+// 07 沿沟南行：契约 §2 要 45–75 秒。配速归 Front 玩法包（行军 2.2–2.6 m/s），
+// 这里量的是它在那个配速带里落不落进窗口 —— 旧的 188 m 线连 2.6 m/s 都要 72 s。
+for (const [pace, label] of [[2.2, "slow march"], [2.6, "quick march"]]) {
+  const seconds = measured.southWalkM / pace;
+  assert.ok(seconds >= 45 && seconds <= 75,
+    `07 is 45-75 s at ${label} (${pace} m/s): ${seconds.toFixed(0)} s over ${measured.southWalkM.toFixed(1)} m`);
+}
+// 07 的两端仍然是「集结处 → 村北口」，中间不再往北折返。
+assert.ok(StageRoutes.southWalk[0] === S.collection, "07 starts at the casualty collection point");
+assert.ok(Math.abs(StageRoutes.southWalk.at(-1).x - A.village.x) < 10
+  && Math.abs(StageRoutes.southWalk.at(-1).z - A.village.z) < 6, "07 ends at the village mouth");
+{
+  const backtrack = StageRoutes.southWalk.slice(1)
+    .filter((p, i) => p.z < StageRoutes.southWalk[i].z - 1).map((p) => `${p.x},${p.z}`);
+  assert.deepEqual(backtrack, [], "07 never turns back north");
+}
+// 12 的第二处威胁来自东／东南（Notion「村东突入部队沿既有东巷追出」），
+// 威胁的是沿桥头路离开的牛马车，不是装载区的西侧。
+assert.ok(S.sideAlley.x > A.queue.x + 15 && S.sideAlley.x > S.cartBoard.x + 10,
+  `the side alley is east of the loading yard and the boarding bay: x=${S.sideAlley.x}`);
+assert.ok(S.sideAlley.z > S.cartBoard.z && S.sideAlley.z < River.z - 15,
+  "the side alley sits south-east of the bays and north of the river");
+{
+  const road = StageRoutes.cartRide.map((p) => Math.hypot(p.x - S.sideAlley.x, p.z - S.sideAlley.z));
+  assert.ok(Math.min(...road) < 30, `the alley can reach the departure road: ${Math.min(...road).toFixed(1)} m`);
+}
 console.log("ok metric adjacency", JSON.stringify(Object.fromEntries(
   Object.entries(measured).map(([k, v]) => [k, +v.toFixed(1)]))));
 
@@ -125,6 +151,9 @@ const solids = [
   ...Layout.scenario.states.find((state) => state.id === "BunkerCollapsed").blocks
     .filter((block) => block.solid !== false),
 ];
+// 北沙河的水面是**示意**，不是空间：它既不挡路也不挡视线，所以一块都进不了这张表。
+assert.deepEqual(solids.filter((block) => block.semantic === "water").map((b) => b.id), [],
+  "the river surface never becomes geometry that blocks a line");
 function Blocked(from, to, eye = 1.6) {
   const a = { ...from, y: SampleMissionTerrain(from.x, from.z) + eye };
   const b = { ...to, y: SampleMissionTerrain(to.x, to.z) + eye };
