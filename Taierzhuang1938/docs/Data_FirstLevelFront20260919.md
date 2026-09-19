@@ -177,6 +177,11 @@ villageMouthReached（village 4 m）→ Say VillagePointer
 播完，落在 60–70 秒，符合契约的 45–75 秒。`Script_FirstLevelFrontTest` 用
 `SouthWalkSeconds()` 静态核这条算式，`--campaign` 的 Front 段实测阶段时长再核一次。
 
+**到达闸的半径**：`villageMouthReached` 是 9 m，不是 4 m。`southWalk` 的终点 (48,−20)
+离 `village` 锚点 (55,−20) 整整 7 m —— 4 m 的门意味着沿路走到头的人还差三米够不着，
+07 会永远停在那儿（2026-09-20 实测：走完全程 150 秒仍停在 South）。契约 §8 把这条路
+冻在 135 m，所以动的是门的半径，不是路。
+
 ---
 
 ## 3. 数值出处
@@ -219,7 +224,8 @@ node Taierzhuang1938/Script_FirstLevelLeaderGuideTest.mjs
 
 ```powershell
 node Taierzhuang1938/Script_FirstLevelMissionBrowserTest.mjs                 # 基线：01 坐着看完
-node Taierzhuang1938/Script_FirstLevelMissionBrowserTest.mjs --campaign      # Front 段（会在 Mid 的 TODO 停下）
+node Taierzhuang1938/Script_FirstLevelMissionBrowserTest.mjs --campaign --stage-to=7   # 只跑 1–7（runner 的 FirstLevelSquadMarchTest 就是这条）
+node Taierzhuang1938/Script_FirstLevelMissionBrowserTest.mjs --campaign      # 整关（Mid 还是 TODO，会在那儿停下）
 node Taierzhuang1938/Script_FirstLevelMissionStageJumpTest.mjs
 node Taierzhuang1938/Script_FirstLevelMachineGunTest.mjs
 node Taierzhuang1938/Script_FirstLevelMachineGunCutsceneTest.mjs

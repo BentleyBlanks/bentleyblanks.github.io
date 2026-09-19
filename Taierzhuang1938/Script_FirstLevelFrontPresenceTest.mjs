@@ -34,7 +34,11 @@ try{
   await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?whitebox=p012&shot=1&manual=1&quality=low&scale=small`,{timeout:180000});
   await page.waitForFunction(()=>window.Tengxian?.state?.ready,null,{timeout:240000});
   await page.evaluate(async()=>{
-    const g=window.Tengxian;await g.Debug.FirstLevelJump(3);
+    // 从 02 起跳，不是 03。2026.09.19 重构之后 03 的入口就在前沿边上：跳到 03 落地
+    // 那一帧人离 front 锚点 (0,-124) 不到 frontEngageDistanceM，UpdateFront 当场记下
+    // frontBattleStarted 把主力放出来 —— 这条夹具要看的正是「主力还没被放出来」。
+    // 放出来之后再删人删事实也回不去：同一份名册不会第二次生成（这正是它该有的行为）。
+    const g=window.Tengxian;await g.Debug.FirstLevelJump(2);
     const r=g.Debug.FirstLevelMissionRuntime(),{MISSION_STAGES}=await import("./Data_FirstLevelMission.mjs");
     const {OPENING}=await import("./Data_FirstLevelOpening.mjs");
     // Support follows a cleared trench and a squad already at the dressing
@@ -43,11 +47,8 @@ try{
     for(const [id,actor] of r.enemies)if(actor.missionEncounter==="intrusion"){r.ai.Remove(actor);r.enemies.delete(id);}
     for(const [i,actor] of r.squad.entries())r.PlaceActor(actor,OPENING.shelterPosts[i]);
     r.flow.index=MISSION_STAGES.findIndex(stage=>stage.id==="Support");r.flow.Enter();
-    // 2026.09.19 重构之后 03 的入口就在前沿边上：调试跳转落地的那一帧人离 front
-    // 锚点 (0,-124) 不到 frontEngageDistanceM，UpdateFront 当场就记下
-    // frontBattleStarted 并把主力放出来。这条夹具量的是「人还在后交通壕那一段」，
-    // 所以把主力与它的事实退回待命，随后由真实走位重新触发。
-    for(const [id,actor] of r.enemies)if(actor.missionEncounter==="front"){r.ai.Remove(actor);r.enemies.delete(id);}
+    // 兜底：万一起跳位置又变到前沿 26 m 以内，至少把事实退回去（人已经放出来的话
+    // 下面 LastTrenchBend 那条名册断言会当场翻红，那是该翻的）。
     r.flow.facts.delete("frontBattleStarted");
   });
   // 后交通壕上的两个点，都在 frontEngageDistanceM（26 m）之外：

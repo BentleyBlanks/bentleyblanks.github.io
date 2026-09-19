@@ -60,10 +60,10 @@ try{
  // 松不开，带路层自己的「走到停点、转身等人」根本轮不上（实测停在停点前 0.75–0.85 m，
  // march 报 waiting 而 missionGuideWaiting 一直是 false）。跟到还差十五米的位置就停——
  // 十五米比 rejoinM(7 m) 远，所以到了停点他还是得等人。
- for(let i=0;i<45;i++){
+ for(let i=0;i<60;i++){
   held=await Sample("player-behind");
   if(held.waiting&&held.guide.waiting!=null)break;
-  if(held.speed<.05)await page.evaluate(gap=>{
+  await page.evaluate(gap=>{
    const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime(),a=r.leaderGuide.Leader;
    const p=g.player.position,d=Math.hypot(p.x-a.position.x,p.z-a.position.z);
    if(d<=gap)return;
@@ -92,7 +92,9 @@ try{
  const subtitleClearance=await page.evaluate(async()=>{
   const g=window.Tengxian,h=g.hud;
   const {MISSION_DIALOGUE,MISSION_VOICE_CAST}=await import('./Data_FirstLevelMissionDialogue.mjs');
-  const cue=MISSION_DIALOGUE.find(c=>c.id==='ReceptionWithdrawal'),lead=cue.lines.at(-1),aside=cue.lines[1];
+  // ReceptionWithdrawal 随 2026.09.19 的台词表重写下线了。这一段量的是字幕占多高、
+  // 世界标记会不会压在字幕上，随便哪条多行台词都行 —— 换成还在表里的一条。
+  const cue=MISSION_DIALOGUE.find(c=>c.id==='BorrowLight'),lead=cue.lines.at(-1),aside=cue.lines[1];
   const original=h.missionGuide,angle=h.el.missionGuide.style.getPropertyValue('--guide-angle');
   const Measure=()=>{
     h.RenderMissionGuide();
