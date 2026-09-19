@@ -163,3 +163,24 @@
 - 普通队员阵亡不判失败；老周死亡不判失败；NPC 带路跑停节奏走共享 `SquadMarchAi`。
 - 调试跳转、改写任务事实不算正常通关证据。
 - 删除资产包（`Animation/FirstLevelTrain/`、车厢环境声等）先列清单报集成方，不自行删。
+
+## 8. 第一波验收记录与第二波口径（2026-09-20）
+
+第一波三包、集成修缝、空间第二波均已验收并合入集成分支。以下是对前文的修订，冲突处以本节为准。
+
+**已定的偏差**
+- 主街人缝 0.90 m（玩家胶囊半径 0.34，0.8 会卡；担架队通行宽 1.25 m 仍过不去）。
+- 侧巷在装载区东南侧，`sideAlley` (103,122)，巷口朝西对着车位与桥头路；`cartBoard` 是车旁边的上车位，不是车位中心。
+- 15B 夹道就是撤离线 `evacuation` 的尾段；`retreatA` (32,134)、`retreatC` (16,222)。
+- `orders` 锚点在集结处 (−34,−99)，运行时统一用 `collection`；`MISSION_ROUTES.south` 与 `southWalk` 是同一个数组（135 m；2.2 m/s 约 62 秒）。
+- 空间换态：掩蔽部完好/坍塌与北门夜景走 `layout.scenario` 线性三态，由事实驱动（`MISSION_SCENARIO_SIGNALS`：信号 → 事实；回跳/重试清事实时空间自动退回）；铁路桥走 gates（5 个完好件 + 3 个残骸件）。**scenario 体块不在 `MISSION_LAYOUT.blocks` 里**，净空检查要分态单独扫（`Script_FirstLevelMissionTest` 已有三条短路 × 三态的闸，新增必经短路要加进去）。
+- 日语行：台词表 `text` 存中文译文（即屏幕字幕），假名在 `Data_FirstLevelJapaneseSpeech.mjs`（不进字体字表）。无名喊话统一 cast `crowd`（显示「有人」）。
+- 播放器对每句发 `Line` 事件；具名事件 `BunkerBlast` `RescueHeave` `AircraftDiveOrder` `BorrowLightMatchesPocketed` `BorrowLightCigaretteOffered` `ZhouNoAnswer`。台词表是 cue id 的唯一来源：`Script_FirstLevelVoiceTest` 静态扫描运行时引用；**还没有触发点的 cue 名单写死在该测试里且只许变短**（现 14 条：`RescueOut` `TrenchCurse` `BundleProne` `BundleReturnCall` `KitchenDetour` `MeleeCurse` `WindowOrder` `CartAbandon` `RoadBump` `HandsShake` `WardGuide` `PlaceLitter` `NextLitter` `NorthGate`）——第二波做完应为 0。
+- 工作台用词：转运区是「第 n 处威胁」（zone kind `threatArea`）。`MISSION_TUNING.openingEnemyBudget` 50。
+
+**第二波分包（并行三路，各自独立 worktree，基于集成分支当前 HEAD）**
+- **Front（阶段 1–7）**、**Mid（阶段 8–14）**、**End（阶段 15–18）**：把各自阶段从最小实现做到 Notion 要求的完整演出与通过条件，并写完本段的整关驾驶脚本。
+- 新逻辑放新模块（运行时只留薄钩子：自己步骤的 `Enter` 分支与 `Update` 段）：Front → `Script_FirstLevelBunker.mjs` 等；Mid → `Script_FirstLevelTransferCart.mjs` 等；End → `Script_FirstLevelQuietMarch.mjs` `Script_FirstLevelBridge.mjs` `Script_FirstLevelNightGate.mjs` 等。数据表（`Data_FirstLevelMission` / `…Gates` / `…Stages` / `…LeaderGuide` / `Data_Text_FirstLevel` / `Data_Tuning_FirstLevel`）**只改自己步骤的行**；数值可另建 `Data_Tuning_FirstLevel<Front|Mid|End>.mjs` 并入口 re-export，减少同文件冲突。
+- 驾驶脚本：公共部分在 `Script_FirstLevelCampaignKit.mjs`（`ParseCampaignArgs` `OpenCampaign` `CloseCampaign` `CaptureFailure` `CheckVoiceAssets` `InstallInputDriver` `CampaignActions(ctx)` → `JumpStage/Capture/CaptureFocus/WaitOutCutscene/Route/Interact/RetryCampaign/WaitStage`；`ctx`: `page browser server output errors options stageJumps stageFrom jumpReceipts campaignRetries capturedActivities`；`--stage-from` 取 8 / 11 / 15 / 18）。各包只写自己的 `Script_FirstLevelCampaign<Front|Mid|End>.mjs`；要改 Kit 的，改动保持向后兼容并写进报告。
+- 剧情人物必须走到某处的步骤：接触反应/找掩体不得盖过剧情移动（02 罗班长掀架的先例在 `UpdateSquad`），同类情形各包自己放行并加测试。
+- 各包名下的旧红测试由各包修或按新口径重写：Front → `FirstLevelCasualtyBrowserTest`、`FirstLevelMachineGunTest`、`FirstLevelMachineGunCutsceneTest`（04 不再触发过场：改成断言「不触发」或改测过场自身）、`FirstLevelFrontRouteBrowserTest`、`FirstLevelFrontPresenceTest`、`FirstLevelSquadMarchTest`、`FirstLevelLeaderGuideBrowserTest`；Mid → `CarriagePropVelocityTest`（被测对象换成 12/13 牛马车上老周的担架与车上近景件，保持 high 画质真实资产检查，**不得删**）、`FirstLevelAmbushAnimationTest`（随屋内伏击拍下线，连同其动画模块一并处理）、`FirstLevelMissionAftermathTest`；End → `FirstLevelMissionMusicBrowserTest`、`FirstLevelMissionStageTailTest`（`--stage-from=15/18`）、`OrchestrationEditorTest` 两条威胁把手拾取、`BrowserBundleTest` 的 `missionTrainPassenger` 夹具。
