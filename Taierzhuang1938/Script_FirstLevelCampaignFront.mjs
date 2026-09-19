@@ -170,10 +170,33 @@ export async function Drive(ctx) {
   // 04 不再触发关中过场《空地上的三个人》（契约 §2）。
   assert.equal(await page.evaluate(() => window.Tengxian.state.cutscene || null), null,
     "04 不由任务触发 CS_MachineGunCaptives");
+  // 上枪位之前先在沟里那只补给箱补一趟：一路打到这儿身上多半是空弹夹加一身血，
+  // 04 这一段又是整关火力最密的地方。没绷带顶上去，实测三十秒就躺下。
+  await Route([{ x: 0, z: -124 }, { x: -2.2, z: -122.5 }], "GunSeatResupply", { stance: "crouch" });
+  for (let refill = 0; refill < 4; refill++) {
+    if (await page.evaluate(() => window.Tengxian.player.bandages) >= 3) break;
+    await Idle(page, R.supplyCooldownS + 1);
+    await Interact();
+  }
+  await page.evaluate(() => {
+    const g = window.Tengxian;
+    if (g.player.health < 90 || g.player.bleeding) g.Debug.Key("KeyB");
+    g.StepFrames(1, 1 / 60, false);
+  });
+  console.log("GUN_SEAT_SUPPLY", JSON.stringify(await page.evaluate(() => ({
+    bandages: window.Tengxian.player.bandages, clips: window.Tengxian.state.clips,
+    health: window.Tengxian.player.health }))));
   // 枪座就在三米外的沟里：这一小段不开火（fight 的 90 m 口径会让人站着对射、原地不动）。
   await Route([{ x: 0, z: -124 }, { x: 0, z: -127.4 }], "MachineGunSeat", { stance: "crouch" });
   await Interact();
-  const mounted = await page.evaluate(() => window.Tengxian.emplacement.Mounted);
+  // 一下按不上就再按几下。枪座的交互半径不大，走到位那一帧人还在往前挪，
+  // 按早了就落空 —— 落空之后这一段会变成「站在开阔地上用步枪对着四十个人打」。
+  let mounted = await page.evaluate(() => window.Tengxian.emplacement.Mounted);
+  for (let tries = 0; tries < 4 && !mounted; tries++) {
+    await page.evaluate(() => window.Tengxian.StepFrames(20, 1 / 60, false));
+    await Interact();
+    mounted = await page.evaluate(() => window.Tengxian.emplacement.Mounted);
+  }
   console.log("MACHINE_GUN_MOUNTED", mounted);
   await Capture("MachineGun");
   await page.screenshot({ path: path.join(shots, "Scene_MachineGun.png") });
@@ -187,7 +210,16 @@ export async function Drive(ctx) {
         }
         if (!g.emplacement.Mounted) {
           if (window.MissionInputDriver.EvadeGrenade()) { g.StepFrames(1, 1 / 60, false); continue; }
+          // 被手榴弹赶下枪位（或压根没按上）之后，空当里再坐回去：
+          // 这一段的活路是枪座后面那道墙垛，不是站在开阔地上跟人对枪。
+          if (!g.combat.GrenadeThreats(p).length && gun && !gun.dead && i % 90 === 45) {
+            g.Debug.Key("KeyF", true); g.StepFrames(1, 1 / 60, false); g.Debug.Key("KeyF", false);
+            if (g.emplacement.Mounted) continue;
+          }
           const foe = window.MissionInputDriver.Target(90);
+          // 没目标就缩回墙垛后面（和 WaitStage 的 cover 一个口径：打一段、藏一段）。
+          const hide = !foe || g.state.ammo === 0 || g.ai.time % 5 < 2;
+          if ((g.player.stance === "crouch") !== hide) g.Debug.Key("KeyC");
           if (foe) window.MissionInputDriver.Shoot(foe);
           else { g.Debug.Mouse(0, false); g.Debug.Mouse(2, false); if (g.state.ammo === 0) g.Debug.Key("KeyR"); }
           if (g.player.bleeding && g.player.health < 85) g.Debug.Key("KeyB");
@@ -261,8 +293,10 @@ export async function Drive(ctx) {
     "前沿补给箱真的补了弹");
   // 出击前把绷带补满。旧驾驶脚本一直这么做 —— 只带一卷去爬那条侧沟，
   // 三次检查点重试全烧在半路上（2026-09-20 实测 3/2 超预算）。
-  for (let refill = 0; refill < 3 && await page.evaluate(() => window.Tengxian.player.bandages) < 3; refill++) {
+  for (let refill = 0; refill < 4 && await page.evaluate(() => window.Tengxian.player.bandages) < 3; refill++) {
     await Idle(page, R.supplyCooldownS + 1);
+    if (!(await page.evaluate(() => window.Tengxian.interact.Query(window.Tengxian.player)?.point?.id === "MissionSupplyFront")))
+      await Route([{ x: 0, z: -124 }, { x: -2.2, z: -122.5 }], `FrontDressings${refill}`, { stance: "crouch" });
     await Interact();
   }
   console.log("BANDAGES", await page.evaluate(() => window.Tengxian.player.bandages));
@@ -282,6 +316,12 @@ export async function Drive(ctx) {
   await Route(Routes.bundleReturn, "TankFlank", { fight: true, stance: "stand", sprint: true, crawl: true, rejoinRoute: Routes.bundleReturn });
   for (let attempt = 0; attempt < 3; attempt++) {
     if (await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission().tank.immobilized)) break;
+    // 等它停下来再扔。战车在 advance/halt 之间循环，朝一辆正在开的车扔集束弹，
+    // 引信烧完时车已经开出去七八米 —— 2026-09-20 实测三发全空。
+    await page.evaluate(() => {
+      const g = window.Tengxian;
+      for (let i = 0; i < 900 && g.Debug.FirstLevelMission().tank.moving; i++) g.StepFrames(1, 1 / 60, false);
+    });
     const thrown = await page.evaluate(() => {
       const g = window.Tengxian, tank = g.Debug.FirstLevelMission().tank, p = g.player.position;
       g.player.yaw = Math.atan2(p.x - tank.x, p.z - tank.z);
