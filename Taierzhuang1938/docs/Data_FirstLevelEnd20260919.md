@@ -127,6 +127,10 @@
 * **撤出爆破区**：桥头军官喊 `BridgeWithdraw`（三句里没有「所有人都过来了」）；
   爆破人员是**此前就在场**的两个人，走到 `MISSION_PLACEMENT.bridge.demolition` 蹲 `demolitionSetS`(6 s)
   装药（`demolitionCharged`），然后沿 `demolitionPullback` / `officerPullback` 自己撤出去。
+  三条撤出折线都从西/东两道掩体墙之间那个 9 m 宽的口子（x −78..−69）走，终点在
+  `BlastSafeBank`（x −69.5..−62.5）西头以外；净空由 `Script_FirstLevelSpaceTest` 守着。
+  **药装好之前不清场**：爆破人员的岗位就在爆破区里，这会儿把区里的人往南赶，
+  赶的就是他们自己（见 §6）。桥头那三个人也不归清场管 —— 他们有自己的折线。
 * **爆破**：三个条件全满足才点火 ——
   ① `demolitionCharged`；② 玩家 `blastZoneCleared`（`blastSafe` 10 m 内，该点离桥心 48 m）；
   ③ `BlastZoneOccupant()` 为空：玩家、班里人、桥头人员、尾队，**没有一个**在桥心
@@ -245,10 +249,24 @@ Notion 的「有人可能中弹」留在他们身上，不是留给整支队伍�
 不要为了「保险」去调 `player.Spawn` —— 它顺手把血量、流血、伤口、体力全复位，
 夜里进城会变成一次静默的满血补给。
 
+**爆破手被自己人的「清场」赶下岗，于是桥永远炸不了。** 玩家按编排干脆地退到安全区
+（比爆破手装完药还早），爆破区里就只剩爆破人员自己；`ClearBlastZone` 把区里的人往南赶，
+赶的正是他们 —— 实拍 2026-09-20：`BridgeDemolitionEast` 被推离炸点 1.3 m，
+`state.set` 钉在 3 s / 6 s，等满 240 s 也不炸。**玩家越听话越卡死。**
+修法：药装好之前一律不清场；桥头那三个人有自己的撤出折线，清场不许再塞目标顶掉它。
+
+**撤出折线的第一个点埋在墙里。** 同一趟实拍里桥虽然炸了，却是靠 `blastFriendlyStuck`
+兜底晚二十秒炸的：`demolitionPullback[0]` 的第一个点 (−80,178) 落在
+`BridgeSouthCoverWest`（1.47 m，x −87..−78）里，人顶着墙走不到，`Walk` 的下一个点
+也就永远不换。三条折线一并改走两道掩体墙之间的口子，并补上净空闸门
+（`Script_FirstLevelSpaceTest` 的 1b 节）—— 这三条不在 `MISSION_STAGE_ROUTES` 里，
+以前一条都没人量过。
+
 驾驶脚本侧的同类教训写在 `Script_FirstLevelCampaignEnd.mjs` 的注释里：
 整关驾驶跑在 `manual=1` 下，等事实必须自己 `StepFrames`（`WaitFact` / `WaitControl`）；
 `Route` 带 `fight` 时一看见敌人就松开前进键，压制要用 `WaitFact(..., {fight:true})`，
-撤退要用 `fight:false`。
+撤退要用 `fight:false`；编排会接管的路线要带 `stopFact`，在接管点松手。
+爆破那一段不要只等事实 —— 等不到就得报得出「是谁还在爆破区里」（`BLAST_WAIT`）。
 
 ## 5. 验收命令
 

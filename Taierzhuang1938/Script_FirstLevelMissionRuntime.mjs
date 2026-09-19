@@ -25,7 +25,7 @@ import {
   MISSION_PURSUIT_ROUTE,
   MISSION_VERSION,
 } from "./Data_FirstLevelMission.mjs";
-import { MISSION_STAGE_ROUTES, MissionRegroupCorridor } from "./Data_FirstLevelMissionTopology.mjs";
+import { MISSION_STAGE_ROUTES, MissionRegroupCorridor, RegroupGuideRoute } from "./Data_FirstLevelMissionTopology.mjs";
 import { MISSION_DIALOGUE } from "./Data_FirstLevelMissionDialogue.mjs";
 import {
   MISSION_ANCHORS as A,
@@ -1378,8 +1378,12 @@ export class FirstLevelMissionRuntime {
         break;
       case "Regroup":
         // 15A 降压段：收拢、换手、清点。无战斗 —— 追兵由警戒兵在车路方向接住。
+        // **带路只带到收拢点为止。** 那条走廊（回头警告用的）第 4 点是撤离线的下一段，
+        // 拿它当带路终点的话队伍会走出收拢点 24 m，而点名要三个人都在 16 m 以内 ——
+        // 实拍 2026-09-20：玩家站在收拢点上等满 300 s 也等不来 headcountDone，
+        // HUD 一直挂着「罗班长 · 24 米」。15B 的进夹道路线也是从收拢点起算的。
         this.column.StartRetreat();
-        this.Guide(MissionRegroupCorridor("Regroup").route);
+        this.Guide(RegroupGuideRoute("Regroup"));
         this.quietMarch.Enter("Regroup");
         break;
       case "WallPath":

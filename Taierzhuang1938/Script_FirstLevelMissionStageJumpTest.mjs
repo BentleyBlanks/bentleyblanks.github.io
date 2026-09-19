@@ -86,17 +86,21 @@ try {
   // 摆关尾状态走出厂入口（flow.Enter / bridge.Fire / PlaceNightArrival），
   // 收回来走玩家真会按的那两条（阵亡重试、调试选章）。
   {
+    // 桥的四个件按**闸门**看（完好件是可走面，不在 battlefield.colliders 里；
+    // 口径与 Script_FirstLevelMissionTopologyBrowserTest 的 Visible/Walkable 一致）。
     const World=()=>page.evaluate(()=>{
       const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime();
-      const ids=g.battlefield.colliders.map(box=>box.id||"");
+      const Visible=id=>!!g.battlefield.gates.get(id)?.mesh.visible;
       return {stage:r.flow.stage.id,
         night:r.flow.facts.has("nightArrivalPlaced"),blown:r.flow.facts.has("bridgeDestroyed"),
-        deck:ids.filter(id=>/RailBridge(Deck|Truss|Rail)/.test(id)).length,
+        deck:Visible("RailBridgeDeck"),
+        deckWalkable:g.battlefield.walkableSurfaces.some(s=>s.id==="RailBridgeDeck"),
+        wreck:Visible("RailBridgeWreckSpan"),
         lights:r.nightLights?.count??0,rear:(r.bridge.State().rearColumn||[]).length};
     });
     await Jump(18);
     const fresh=await World();
-    assert.ok(fresh.deck>0&&!fresh.blown&&!fresh.night&&fresh.lights===0&&fresh.rear===0,
+    assert.ok(fresh.deck&&fresh.deckWalkable&&!fresh.wreck&&!fresh.blown&&!fresh.night&&fresh.lights===0&&fresh.rear===0,
       "跳进 18：桥完好、没有夜景、没有夜灯、尾队还没起行 "+JSON.stringify(fresh));
     const ended=await page.evaluate(nightIndex=>{
       const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime();
@@ -109,7 +113,7 @@ try {
       return {x:+g.player.position.x.toFixed(1),z:+g.player.position.z.toFixed(1)};
     },MISSION_STAGES.findIndex(step=>step.id==="NightMarch"));
     const tail=await World();
-    assert.ok(tail.deck===0&&tail.blown&&tail.night&&tail.lights>=5,
+    assert.ok(!tail.deck&&!tail.deckWalkable&&tail.wreck&&tail.blown&&tail.night&&tail.lights>=5,
       "关尾状态真的摆起来了（桥没了、夜景与夜灯都在）"+JSON.stringify({tail,ended}));
     // ① 死亡重试：夜景与夜天空退回去重演，桥**不**回来（爆破不可逆）。
     const retried=await page.evaluate(()=>{
@@ -118,16 +122,16 @@ try {
     });
     assert.ok(retried,"18 的死亡重试真的恢复了");
     const afterRetry=await World();
-    assert.ok(!afterRetry.night&&afterRetry.lights===0&&afterRetry.deck===0&&afterRetry.blown,
+    assert.ok(!afterRetry.night&&afterRetry.lights===0&&!afterRetry.deck&&afterRetry.blown,
       "死亡重试：夜景与夜灯全撤，炸掉的桥不会自己长回来 "+JSON.stringify(afterRetry));
     // ② 回跳到 12 再跳回 18：桥完好、夜景消失、天空还原、尾队重置。
     await Jump(12);
     const back=await World();
-    assert.ok(back.deck>0&&!back.blown&&!back.night&&back.lights===0,
+    assert.ok(back.deck&&back.deckWalkable&&!back.wreck&&!back.blown&&!back.night&&back.lights===0,
       "从 18 回跳到 12：桥完好、夜景与夜灯一盏不留 "+JSON.stringify(back));
     await Jump(18);
     const again=await World();
-    assert.ok(again.deck>0&&!again.blown&&!again.night&&again.lights===0&&again.rear===0,
+    assert.ok(again.deck&&again.deckWalkable&&!again.wreck&&!again.blown&&!again.night&&again.lights===0&&again.rear===0,
       "再跳回 18：桥完好、没有夜景、尾队重置 "+JSON.stringify(again));
     console.log("ok 18 关尾还原：死亡重试退夜景、回跳还桥与天空、尾队重置");
   }

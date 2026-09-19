@@ -11,7 +11,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { MISSION_ANCHORS as A, MISSION_ROUTES } from "./Data_FirstLevelMissionLayout.mjs";
-import { MISSION_STAGE_ROUTES, MISSION_RECEPTION_SPACE as Reception } from "./Data_FirstLevelMissionTopology.mjs";
+import { MISSION_STAGE_ROUTES, MISSION_RECEPTION_SPACE as Reception, RegroupGuideRoute } from "./Data_FirstLevelMissionTopology.mjs";
 import { END_TUNING as E } from "./Data_Tuning_FirstLevelEnd.mjs";
 import { CampaignActions } from "./Script_FirstLevelCampaignKit.mjs";
 
@@ -96,20 +96,21 @@ async function DriveRegroup(ctx, { JumpStage, Capture, CaptureFocus, Route, Inte
     assert.ok(picket.every(entry => entry.x > A.retreatA.x), "他们站在收拢点与车路之间");
     await CaptureFocus("RegroupPicket", picket[0]);
   }
-  // 先在收拢点等对白真的走完（幺娃走到担架边检查、何有田挨个点人）。
-  await Route([{ x: A.retreatA.x + 4, z: A.retreatA.z - 6 }, { x: A.retreatA.x, z: A.retreatA.z }],
-    "RegroupRally", { fight: true });
-  const enemiesBefore = (await Mission(page)).enemies.length;
-  await WaitFact(page, "headcountDone", "15A 点名", 300, { fight: true });
-  // 点完人顺子才去问赶车人「车还走得了不」——沿沟走到车边才问（直线会横切沟壁）。
-  await Route([{ x: A.ditch.x, z: A.ditch.z }, { x: 47, z: 114 },
-    { x: E.droverPost.x + 2.4, z: E.droverPost.z + 1.2 }], "RegroupDrover", { fight: true });
+  // 顺子先拐到车边问一句「车还走得了不」——沿沟走（直线会横切沟壁）。
+  // **这一步排在收拢之前**：赶车人在沟口，离收拢点 28 m；点名一完，litterRemanned /
+  // columnMoving 紧跟着就齐，15A 几秒内换步，再回头就来不及了（实拍 2026-09-20）。
+  await Route([{ x: 47, z: 114 }, { x: E.droverPost.x + 2.4, z: E.droverPost.z + 1.2 }],
+    "RegroupDrover", { fight: true });
   {
     const shot = await Mission(page);
     assert.ok(shot.voice.played.includes("CartAbandon"), "顺子走到车边真的问过赶车人");
   }
-  await Route([{ x: 47, z: 114 }, { x: A.ditch.x, z: A.ditch.z }, { x: A.retreatA.x, z: A.retreatA.z }],
-    "RegroupBackToColumn", { fight: true });
+  // 跟着带路走到收拢点，再等对白（幺娃走到担架边检查、何有田挨个点人）。
+  // 带路线到收拢点为止（RegroupGuideRoute），队伍就停在这儿，点名的 16 m 才凑得齐。
+  const enemiesBefore = (await Mission(page)).enemies.length;
+  await Route([{ x: 47, z: 114 }, ...Points(RegroupGuideRoute("Regroup").slice(1))],
+    "RegroupRally", { fight: true });
+  await WaitFact(page, "headcountDone", "15A 点名", 300, { fight: true });
   {
     const shot = await WaitStage("WallPath", 300, { fight: true });
     const facts = shot.mission.facts;
