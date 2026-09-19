@@ -50,8 +50,13 @@ try{
   const sample=await page.evaluate(({label,frames})=>{
    const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime();g.StepFrames(frames,1/60,false);
    const a=r.leaderGuide.Leader;
+   // 停住的时候要分得清是谁按住的：带路层、掩体层、固守命令，还是共用行进层。
+   const command=a.squadMarchCommand;
    return {label,time:r.time,p:{...a.position},yaw:a.yaw,waiting:a.missionGuideWaiting,route:r.squadRoutes.get(a.id)?.slice(0,3),
-     actualGoal:{...a.goal},speed:a.moveSpeed,march:a.squadMarchCommand?.status,guide:r.leaderGuide.State()};
+     actualGoal:{...a.goal},speed:a.moveSpeed,march:command?.status,guide:r.leaderGuide.State(),
+     hold:{order:a.order,defensive:a.scriptDefensive,holdZone:a.holdZone?.id??null,coverWaiting:!!a.missionCoverWaiting,
+       manualFor:+((a.manualGoalUntil??0)-r.ai.time).toFixed(2),scriptSpeed:a.scriptMoveSpeedMps??null,
+       commandSpeed:command?.speedMps??null,commandGoal:command?.goal?{x:+command.goal.x.toFixed(2),z:+command.goal.z.toFixed(2)}:null}};
   },{label,frames});trace.push(sample);return sample;
  };
  let held;

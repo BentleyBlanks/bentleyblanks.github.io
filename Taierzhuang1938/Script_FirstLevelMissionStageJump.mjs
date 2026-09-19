@@ -30,11 +30,17 @@ export function ApplyFirstLevelStageJump(runtime, value, { midCutscenes = false 
   const spawn = saved.phase.spawn;
   r.player.Spawn(spawn.x,spawn.z,spawn.yaw || 0);
   r.player.pitch = 0;
-  // 班里人按阶段散开：04 在前沿哨位，05–06 在机枪位两侧，其余跟在玩家后面。
+  // 02 的班里人得在掩蔽部门口：罗班长在木架这头、幺娃在背包那头、何有田在后侧沟里压制。
+  // 放到前沿哨位去（squadFrontPositions）那一趟，幺娃站在八十米外的机枪位上，
+  // 掀木架那一拍永远凑不齐人，luoRescueComplete 记不下来（2026-09-20 实测）。
+  const bunkerPosts = [P.bunker.luoLift, P.bunker.yaowaLift, P.bunker.heyoutianFire,
+    {x:P.bunker.heyoutianFire.x+2.2, z:P.bunker.heyoutianFire.z+1.6}];
+  // 班里人按阶段散开：02 在掩蔽部门口，04 在前沿哨位，03/05–06 在机枪位两侧，其余跟在玩家后面。
   for (const [i,actor] of (r.squad||[]).entries()) {
     actor.missionTrainReady = true;
-    const point = n === 4 ? OPENING.frontPosts[i] : n <= 6 ? P.squadFrontPositions[i]
-      : {x:spawn.x+(i%2?2.4:-2.4),z:spawn.z+3+Math.floor(i/2)*2.4};
+    const point = n === 2 ? bunkerPosts[i] || bunkerPosts.at(-1)
+      : n === 4 ? OPENING.frontPosts[i] : n <= 6 ? P.squadFrontPositions[i]
+        : {x:spawn.x+(i%2?2.4:-2.4),z:spawn.z+3+Math.floor(i/2)*2.4};
     r.PlaceActor(actor,point); r.Defend(actor,point);
   }
   if (n > 3) {

@@ -452,15 +452,24 @@ export async function Drive(ctx) {
   await CaptureFocus("TankStopped", { x: await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission().tank.x),
     z: await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission().tank.z), height: 1.2 });
   await page.screenshot({ path: path.join(shots, "Scene_TankStopped.png") });
-  // 车停了，沟里先包扎再走：06 要沿后交通壕走回集结处，带着一身血上路就是白送。
+  // 车停了就撤回前沿沟里。05 结束到 06 之间还要等最后一批守军撤完、接防班进阵位，
+  // 那是好几十秒；蹲在侧沟口那个没遮挡的地方等，等不到（实测死在 WaitStage 里）。
+  await Route([{ x: 25, z: -110 }, { x: 15, z: -111 }, { x: 6, z: -124 }, { x: 0, z: -124 }],
+    "BackToFront", { fight: true, stance: "crouch", crawl: true });
+  // 顺路在前沿补给箱补一次绷带，再包扎。
+  await Idle(page, R.supplyCooldownS + 1);
+  await Route([{ x: -2.2, z: -122.5 }], "TankRecovery", { stance: "crouch" });
+  await Interact();
   await page.evaluate(() => {
     const g = window.Tengxian;
-    for (let i = 0; i < 600 && (g.player.bleeding || g.player.health < 90) && g.player.bandages > 0; i++) {
-      if (i % 60 === 0) g.Debug.Key("KeyB");
+    for (let i = 0; i < 900 && (g.player.bleeding || g.player.health < 95) && g.player.bandages > 0; i++) {
+      if (i % 90 === 0) g.Debug.Key("KeyB");
       g.StepFrames(1, 1 / 60, false);
     }
   });
-  const tankStage = await WaitStage("Orders", 240, { fight: true });
+  console.log("TANK_RECOVERY", JSON.stringify(await page.evaluate(() => ({
+    health: window.Tengxian.player.health, bandages: window.Tengxian.player.bandages }))));
+  const tankStage = await WaitStage("Orders", 240, { fight: true, cover: true });
   for (const fact of ["tankImmobilized", "lastGuardsWithdrawn", "reliefInPosition"])
     assert.ok(tankStage.mission.facts.includes(fact), `05 记下了 ${fact}`);
   assert.ok(tankStage.mission.voice.played.includes("TankStopped"), "「停了！」在履带断掉之后说了");
