@@ -259,6 +259,13 @@ export async function Drive(ctx) {
   await Interact();
   assert.equal(await page.evaluate(() => window.Tengxian.state.clips), clipsBefore + R.frontSupplyClips,
     "前沿补给箱真的补了弹");
+  // 出击前把绷带补满。旧驾驶脚本一直这么做 —— 只带一卷去爬那条侧沟，
+  // 三次检查点重试全烧在半路上（2026-09-20 实测 3/2 超预算）。
+  for (let refill = 0; refill < 3 && await page.evaluate(() => window.Tengxian.player.bandages) < 3; refill++) {
+    await Idle(page, R.supplyCooldownS + 1);
+    await Interact();
+  }
+  console.log("BANDAGES", await page.evaluate(() => window.Tengxian.player.bandages));
   await Route([{ x: 0, z: -124 }, ...Routes.bundle, { x: A.bundle.x, z: A.bundle.z + 1.2 }], "BundleApproach",
     { fight: true, stance: "stand", sprint: true, crawl: true, rejoinRoute: Routes.bundle });
   await page.evaluate(() => { const g = window.Tengxian; if (g.player.bleeding) g.Debug.Key("KeyB"); g.StepFrames(1, 1 / 60, false); });
