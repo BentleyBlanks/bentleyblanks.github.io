@@ -364,16 +364,24 @@ export async function Drive(ctx) {
     // 站到投得中的地方再扔。集束弹满蓄力也就十几米，而且弹着点得落在履带 5 m 以内
     // （tankTrackRadiusM）—— 从沟口朝二十五米外的车扔，只是白扔一发。
     // 设计上这一拍就是「冲上去投弹，再退回遮挡」，驾驶器照着做。
-    const spot = await page.evaluate((closeM) => {
+    // 十五米以内不挪窝：实测 11.6 m 与 14.6 m 两发都解得出弧线也炸停了车，
+    // 而沟沿外那一步根本走不上去 —— 目标点落在路基上，人卡在沟壁前判成「路不通」。
+    // 真要挪也一次只挪六米，别一脚迈出沟。
+    const spot = await page.evaluate(({ throwRangeM, stepM }) => {
       const g = window.Tengxian, tank = g.Debug.FirstLevelMission().tank, p = g.player.position;
       const gap = Math.hypot(p.x - tank.x, p.z - tank.z);
-      if (gap <= closeM + 2) return null;
-      const along = (gap - closeM) / gap;
+      if (gap <= throwRangeM) return null;
+      const along = Math.min(gap - throwRangeM + 2, stepM) / gap;
       return { x: p.x + (tank.x - p.x) * along, z: p.z + (tank.z - p.z) * along, gap: +gap.toFixed(1) };
-    }, 7);
+    }, { throwRangeM: 15, stepM: 6 });
+    let moved = false;
     if (spot) {
       console.log("TANK_THROW_SPOT", JSON.stringify(spot));
-      await Route([{ x: spot.x, z: spot.z }], `TankThrowSpot${attempt}`, { stance: "crouch", sprint: true });
+      // 走不过去就在原地投：玩家也是这么打的，够不着就先扔一发试试。
+      try {
+        await Route([{ x: spot.x, z: spot.z }], `TankThrowSpot${attempt}`, { stance: "crouch", sprint: true });
+        moved = true;
+      } catch (error) { console.log("TANK_THROW_SPOT_BLOCKED", String(error.message).slice(0, 120)); }
     }
     const thrown = await page.evaluate(async () => {
       const { THROW } = await import("./Data_Tuning_Combat.mjs");
@@ -436,7 +444,7 @@ export async function Drive(ctx) {
     if (!thrown.alive) break;
     // 投完退回遮挡 —— 这一拍的另一半，炸停了也要退。原先「停住就 break」把人
     // 留在了开阔地正中间，06 一开场就是带着两成血从那儿往回走。
-    if (spot) await Route([A.throw], `TankFallBack${attempt}`, { fight: true, stance: "crouch", sprint: true });
+    if (moved) await Route([A.throw], `TankFallBack${attempt}`, { fight: true, stance: "crouch", sprint: true });
     if (thrown.mission.tank.immobilized) break;
     // 两发都扔完还没停住，就像玩家一样回弹药屋再领两发。
     if (thrown.after === 0) {
