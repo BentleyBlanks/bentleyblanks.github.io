@@ -4045,9 +4045,10 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT, stageJump
     // 换关还没收尾（EnterLevel 里 await 着的那几帧照样在跑 Update）时 PlayMidCutscene 必回 null；
     // 任务层据此先不记「看过」，等建完再触发。
     LevelLoading:()=>state.advancing,
-    // 关尾夜行军：黑屏里换夜间天空，退出/重试时还原成本关自己的天光。
-    ApplySky:name=>ApplySkyPreset(name),
-    RestoreSky:()=>RestoreLevelSky(),
+    // 关尾夜行军：黑屏里换夜间天空，退出/重试时还原本关自己的天光。
+    // 天光那两个函数在另一段闭包里，装配层统一走过场导演挂的同一对钩子。
+    ApplySky:name=>cutscene?.applySky?.(name)??false,
+    RestoreSky:()=>cutscene?.restoreSky?.(),
     Complete:()=>{Progress.MarkCleared(FIRST_LEVEL_P012_WHITEBOX_LEVEL_ID,0);ShowPauseMenu();menu.OpenSandboxComplete();},
     MissionFailure:castId=>{ShowPauseMenu();menu.OpenSandboxFailure(false,{castId,restartOnly:true});},
   }) : null;
