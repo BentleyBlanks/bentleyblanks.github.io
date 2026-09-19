@@ -193,7 +193,7 @@ if(process.argv.includes("--opening-audio"))process.exit(0);
     assert.ok(!voice.finished.has("FrontFallback"),"cancelled dialogue is never falsely marked heard");
   }
 }
-assert.ok(P.stationCasualties.every(person=>person.health>0),"station shelling does not manufacture dead recruits at muster");
+// 2026.09.19 第二波：车站卸车那一拍（连同 MISSION_PLACEMENT.stationCasualties）随军列下线。
 {
   const wall=MISSION_LAYOUT.blocks.find(block=>block.id==="TrenchRallyEast");
   assert.equal(wall.cover.faceZ,0,"rally cover normal is perpendicular to its long wall");
@@ -376,20 +376,25 @@ assert.ok(SampleMissionTerrain(135,90)>2.8 && SampleMissionTerrain(-204,90)>3.8,
 console.log("ok shared terrain, excavated trenches, structural floors only");
 // The railway is a PCG spec on the shared heightfield, not boxes at an absolute height
 // (the old rails sat at y=0.76 over ~0 m soil and floated 0.7 m above their sleepers).
+// 2026.09.19 第二波：军列与车站下线，轨只剩铁路桥（18）的南北引道，线上不再停车厢
+// —— 原来那条「每个车轮坐在轨顶」的断言随之下线，轨道本身仍按低 PCG 轨校验。
 {
   assert.equal(MISSION_LAYOUT.railway, MISSION_RAILWAY, "the whitebox field builds the layout's railway spec");
   assert.ok(!MISSION_LAYOUT.blocks.some(block => /^Rail(?:Sleeper)?-?\d/.test(block.id)), "no hand-placed rail or sleeper boxes");
+  assert.ok(!MISSION_LAYOUT.blocks.some(block => /^Station(?:Car\d|Engine|ExitStep)/.test(block.id)),
+    "no parked train or station platform remains in the mission layout");
+  assert.ok(!MISSION_LAYOUT.gates.some(gate => /^TrainDoor/.test(gate.id)), "no carriage doors remain");
   const railway = MakeRailwayProfile(MISSION_RAILWAY, (x, z) => terrain.SampleHeight(x, z));
   for (let s = 0; s <= railway.path.length; s += 1) {
     const p = railway.path.At(s), soil = terrain.SampleHeight(p.x, p.z);
     const railTop = railway.RailTopAt(s) - soil;
     assert.ok(railTop > 0.2 && railTop < 0.42, `rail top stays low on the soil at z=${p.z.toFixed(1)}: ${railTop.toFixed(3)}`);
   }
-  const wheels = MISSION_LAYOUT.blocks.filter(block => /^Station(?:Car\dWheel|EngineWheel)/.test(block.id));
-  assert.equal(wheels.length, 3 * 8 + 8, "every car and engine wheel is seated");
-  for (const wheel of wheels)
-    assert.ok(Math.abs(wheel.y - wheel.h / 2 - railway.RailTopNear(wheel.x, wheel.z)) < 0.01, `${wheel.id} stands on the rail top`);
-  console.log("ok railway is a low PCG track and the parked train stands on it");
+  // 轨只留铁路桥两头的引道：北端到田埂脚下当远景，南端过桥之后就收。
+  const [north, south] = MISSION_RAILWAY.points;
+  assert.ok(north[1] <= -184 && south[1] >= 180 && south[1] <= 200,
+    `the track is only the rail-bridge approach: z ${north[1]}..${south[1]}`);
+  console.log("ok railway is a low PCG track covering only the rail-bridge approach");
 }
 const tacticalRoutes = Object.fromEntries(Object.entries(MISSION_TACTICS).map(([id, plan]) => [id,
   [Object.values(MISSION_ENCOUNTERS).flat().find(spec => spec.id === id), ...plan.points]]));

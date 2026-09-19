@@ -150,7 +150,10 @@ export const MISSION_STAGE_ANCHORS = Object.freeze({
   streetRejoin: {x:77,z:34},
   // C 桥头接运：老周那辆车**旁边**的上车位（车位中心 (88,113) 让给车本身 ——
   //   牛车碰撞盒 3 m 宽，锚点摆在车位中心就等于摆在车肚子里）、空袭时车列停住的位置、侧巷火力
-  cartBoard: {x:85.6,z:113}, cartHalt: {x:76,z:135}, sideAlley: {x:52,z:130},
+  // sideAlley 在装载区**东南**（2026.09.19 第二波挪回来的）：Notion 说第二处威胁
+  //   是「村东突入部队沿既有东巷追出」，巷口朝西正对车位与牛马车的出场道。
+  //   坐标是巷子净空的中心，两道墙在 z 118/126（Data_FirstLevelMissionLayout 的 SideAlley*）。
+  cartBoard: {x:85.6,z:113}, cartHalt: {x:76,z:135}, sideAlley: {x:103,z:122},
   // D 桥南：靠院墙夹道两端、接收院院门
   wallPathStart: {x:56,z:207}, wallPathEnd: {x:16,z:220}, receptionGate: {x:2,z:240},
   // 18 北沙河铁路桥：桥心、两端、南岸射位、北岸土坎、爆破安全区、淡出前的行军终点
@@ -171,9 +174,14 @@ export const MISSION_STAGE_ROUTES = Object.freeze({
   // 05→06：炸停战车之后原路退回集结处
   collectionReturn: [{x:30,z:-117},{x:25,z:-110},{x:15,z:-111},{x:6,z:-124},
     {x:-8,z:-112},{x:-14,z:-104},{x:-26,z:-100},S.collection],
-  // 07：沿沟南行。西侧那两折就是 FrontCommunication 的沟身。
-  southWalk: [S.collection,{x:-24,z:-92},{x:-8,z:-78},{x:-24,z:-60},{x:-24,z:-18},
-    {x:0,z:0},{x:24,z:-20},{x:48,z:-20}],
+  // 07：沿沟南行，终点是村北口。2026.09.19 第二波把 188 m 收到 135 m ——
+  // 契约要的是 45–75 秒，旧线按行军配速要两分多钟，多出来的全在两个大折返上：
+  // 旧线先西折到 (-8,-78) 再折回 x=-24 直下 42 m，最后从 (0,0) 往**北**倒回
+  // (24,-20) 才转东。新线保持「沿 FrontCommunication 的沟身南下、战斗声渐远」
+  // 的走法（-16 那两段仍在沟里），把折返换成一条连续的东南斜线。
+  // 135.4 m：2.2 m/s 行军 62 s、2.6 m/s 52 s，都落在 45–75 s 里（配速归 Front 包）。
+  southWalk: [S.collection,{x:-26,z:-92},{x:-16,z:-76},{x:-16,z:-52},{x:-6,z:-32},
+    {x:12,z:-24},{x:30,z:-23},{x:48,z:-20}],
   // 10：灶屋—连屋—内院—短巷，绕过主街障碍，在障碍南侧接回主街
   courtyardBypass: [{x:58,z:-9},{x:58,z:8},{x:58,z:18},{x:53,z:24},{x:53,z:34},
     {x:53,z:39},{x:66,z:39},{x:74,z:39},S.streetRejoin],

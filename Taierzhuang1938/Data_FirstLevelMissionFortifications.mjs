@@ -32,9 +32,10 @@ export const MISSION_DEFENSE_OBJECTS = Object.freeze([
   {id:"WestRoadTimber",asset:"battlefieldBeamObstacle01",x:-55,z:-139,ry:.3,scale:1,solid:true},
   {id:"EastRoadTimber",asset:"battlefieldBeamObstacle01",x:62,z:-129,ry:-.25,scale:1,solid:true},
   {id:"TransferWireNorth",asset:"battlefieldBarbedWire02",x:104,z:100,ry:Math.PI/2,scale:1,solid:true},
-  // 2026-09-19：从 x=107 挪到 112 —— 侧巷（SideAlley*，x 97..109）就是从这儿打进来的，
-  // 一卷铁丝网横在巷子中间等于把 12 的第二处威胁封死在自己家门口。
-  {id:"TransferWireSouth",asset:"battlefieldBarbedWire02",x:112,z:130,ry:Math.PI/2,scale:1,solid:true},
+  // 2026-09-19 第二波：侧巷挪到装载区东南（SideAlley*，巷身 x 96..112、z 118..126），
+  // 这卷网退到巷子**南边**的空地上 —— 横在巷口或巷身里等于把 12 的第二处威胁
+  // 封死在自己家门口（TransferAlley* 的出击折线从 x≈96 的巷口往西走）。
+  {id:"TransferWireSouth",asset:"battlefieldBarbedWire02",x:106,z:133,ry:Math.PI/2,scale:1,solid:true},
   {id:"StationReserveStores",asset:"battlefieldSupplyBox",x:-57,z:61,ry:.2,scale:1,solid:true},
   {id:"FrontAmmunition",asset:"battlefieldCompartmentCrate",x:-29,z:-120,ry:.15,scale:1,solid:true},
   {id:"TransferReserveStores",asset:"battlefieldSupplyBox",x:102,z:108,ry:.4,scale:1,solid:true},

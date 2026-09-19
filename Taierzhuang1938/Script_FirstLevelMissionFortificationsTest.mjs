@@ -69,7 +69,9 @@ try {
     const cuts=[];
     const actors=Object.values(MISSION_ENCOUNTERS).flat();
     const tactics=Object.fromEntries(Object.entries(MISSION_TACTICS).map(([id,plan])=>[id,[actors.find(s=>s.id===id),...plan.points]]));
-    for(const s of [...MISSION_ENCOUNTERS.retreat,...MISSION_ENCOUNTERS.air])tactics[s.id+"Pursuit"]=[s,...MISSION_PURSUIT_ROUTE.slice(MissionRouteNextIndex(MISSION_PURSUIT_ROUTE,s))];
+    // 2026.09.19：`retreat` 组随新版下线，追兵只剩空袭后的 `air`
+    //（Script_FirstLevelMissionTest 那边同一行已经是这样写的）。
+    for(const s of MISSION_ENCOUNTERS.air)tactics[s.id+"Pursuit"]=[s,...MISSION_PURSUIT_ROUTE.slice(MissionRouteNextIndex(MISSION_PURSUIT_ROUTE,s))];
     const spawns=Object.fromEntries(actors.map(s=>[s.id+"Spawn",[s,s]]));
     for(const [name,route] of Object.entries({...MISSION_ROUTES,...Object.fromEntries(MISSION_TERRAIN.trenches.filter(t=>t.role).map(t=>[t.id,t.points])),...tactics,...spawns,...Object.fromEntries(MISSION_PLACEMENT.guardWithdrawalRoutes.map((r,i)=>[`Guard${i}`,r]))}))
       for(let i=1;i<route.length;i++){
@@ -136,7 +138,9 @@ try {
     {id:"ReserveLoop",x:-55,z:-16,yaw:-.1,pitch:-.04},
     {id:"RearLoop",x:-35,z:103,yaw:1.6,pitch:-.03},
     {id:"Transfer",x:87,z:105,yaw:-.8,pitch:-.04},
-    {id:"Station",x:-59,z:54,yaw:.8,pitch:-.04},
+    // 2026.09.19 第二波：旧的 Station 机位（-59,54，朝车站月台）随军列几何下线，
+    // 换成同一片后方的 StationDefense 沙袋位本身，仍然看的是那组工事。
+    {id:"RearDefense",x:-63,z:41,yaw:.15,pitch:-.04},
   ]) {
     await page.evaluate(shot=>{
       const g=window.Tengxian;
