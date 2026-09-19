@@ -204,7 +204,7 @@ export class FirstLevelFrontShow {
       whisperDone: this.whisperDone,
       southAt: this.southAt,
       tankStoppedAt: this.tankStoppedAt,
-      bundleOrderGuard: this.bundleOrderGuard?.missionId ?? null,
+      bundleOrderGuard: this.bundleOrderGuard?.missionId ?? this.bundleOrderGuard?.id ?? null,
     };
   }
   Dispose() {
