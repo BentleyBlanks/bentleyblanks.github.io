@@ -66,7 +66,7 @@ export const testDefs = {
   SquadMarchEditorTest: {file:"Script_SquadMarchEditorTest.mjs",timeoutMs:300000,desc:"Squad editor real actors, editable routes, per-count styles and cleanup"},
   SquadMarchAiTest: {file:"Script_SquadMarchAiTest.mjs",desc:"Real adapter memory/contact distinction, movement ownership and mission pose handoff"},
   SquadMarchNavigationTest: {file:"Script_SquadMarchNavigationTest.mjs",timeoutMs:300000,desc:"Displaced squad member rejoins through real navigation and terrain"},
-  FirstLevelSquadMarchTest: {file:"Script_FirstLevelMissionBrowserTest.mjs",args:["--campaign","--march-only"],timeoutMs:600000,desc:"Shared march consumed by real first-level AI on the uninterrupted train/front approach"},
+  FirstLevelSquadMarchTest: {file:"Script_FirstLevelMissionBrowserTest.mjs",args:["--campaign"],timeoutMs:600000,desc:"Shared march consumed by real first-level AI on the rear communication trench approach"},
   EditorLauncherTest: {file:"Script_EditorTest.mjs",args:["--launcher-only"],timeoutMs:240000,desc:"Editor launcher inventory including the squad march entry"},
   FirstLevelMissionAftermathTest: {file:"Script_FirstLevelMissionAftermathTest.mjs",timeoutMs:600000,desc:"Civilian body placement, actual model clearance, grounding, LOD and screenshots"},
   MachineGunCaptivesAnimationTest:{file:"Script_MachineGunCaptivesAnimationTest.mjs",timeoutMs:300000,desc:"Captives cutscene clips on five original rigs, authored grounding and the state.perform contract"},
@@ -75,7 +75,7 @@ export const testDefs = {
   // The 150-actor mission rebuilds 18 starts; a measured full continuation reached Complete
   // at the old 1200 s limit. Match the full campaign allowance without changing any assertions.
   FirstLevelMissionStageContinueTest: {file:"Script_FirstLevelMissionBrowserTest.mjs",args:["--campaign","--stage-jumps"],timeoutMs:1800000,desc:"Play forward from each of the 18 debug starts through the next stage"},
-  FirstLevelMissionStageTailTest: {file:"Script_FirstLevelMissionBrowserTest.mjs",args:["--campaign","--stage-jumps","--stage-from=16"],timeoutMs:600000,desc:"Targeted 16–18 continuation, stretcher handoff and final exit"},
+  FirstLevelMissionStageTailTest: {file:"Script_FirstLevelMissionBrowserTest.mjs",args:["--campaign","--stage-jumps","--stage-from=18"],timeoutMs:600000,desc:"Targeted stage 18 continuation: rail bridge, demolition and the night march into Tengxian"},
   FirstLevelMissionPresentationTest: {file:"Script_FirstLevelMissionPresentationTest.mjs",timeoutMs:240000,desc:"Real stretcher grip, idle feet, ADS fire and mounted recoil"},
   FirstLevelMissionFortificationsTest: {file:"Script_FirstLevelMissionFortificationsTest.mjs",timeoutMs:600000,desc:"Loaded field defenses, route clearance and merged scene screenshots"},
   FirstLevelMachineGunTest: {file:"Script_FirstLevelMachineGunTest.mjs",timeoutMs:240000,desc:"Finite gun-stage enemies, live NPC movement/fire, casualty continuation and retry"},
@@ -569,6 +569,9 @@ const changedDomainRules = [
   { domain: "animation", pattern: /DeathCollapse|DeathPose|ActorDeath|MotionDeath/ },
   {domain:"hud",pattern:/IncomingFire/},
   {domain:"squadMarch",pattern:/SquadMarch/},
+  // 整关驾驶脚本拆成了「公共 Kit + 三段」（2026.09.19 重构，第二波三个玩法包各改一段）。
+  // 文件名里没有「Mission」，上面那些按 FirstLevelMission* 选域的规则盖不到。
+  {domain:"firstLevel",pattern:/FirstLevelCampaign(Kit|Front|Mid|End)/},
   // 屋内伏击的动作库：运行时采样器、烘焙脚本与 Animation/FirstLevelAmbush/ 的 JSON。
   // 既是第一关那一拍的演出（firstLevel），也是一份独立动画资产（animation）。
   {domain:"firstLevel",pattern:/FirstLevelAmbush|Animation\/FirstLevelAmbush/},

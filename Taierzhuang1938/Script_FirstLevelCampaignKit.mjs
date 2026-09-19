@@ -1,0 +1,705 @@
+// 第一关整关驾驶脚本的公共部分（纯 Node 测试脚本，不进 index.html import map）。
+//
+// 2026.09.19 重构之后，整关驾驶由四个文件分担：
+//   · 本文件            浏览器/服务起停、注入页面的输入驱动器、七个通用动作、--audio 逐条解码检查
+//   · Script_FirstLevelCampaignFront.mjs   阶段 1–7
+//   · Script_FirstLevelCampaignMid.mjs     阶段 8–14
+//   · Script_FirstLevelCampaignEnd.mjs     阶段 15–18
+//   · Script_FirstLevelMissionBrowserTest.mjs  薄编排器：解析参数、依次驱动三段、收尾断言
+//
+// 拆开的理由：第二波三个玩法包要并行写各自那一段的驾驶脚本，不该都改同一个 1700 行文件。
+//
+// 状态一律走 `ctx`，模块级不留任何可变全局：
+//   ctx.page           playwright 页面
+//   ctx.browser        浏览器实例
+//   ctx.server         临时静态服务
+//   ctx.output         证据目录（_shots/<suite>，忽略目录）
+//   ctx.errors         页面异常（pageerror）累积
+//   ctx.options        ParseCampaignArgs 的结果
+//   ctx.stageJumps     是否允许调试跳转（false 时 JumpStage 直接 return）
+//   ctx.stageFrom      这一趟从哪个公开阶段开始
+//   ctx.jumpReceipts   每次跳转的回执（Data_JumpContinuation.json）
+//   ctx.campaignRetries 检查点重试回执（Data_NormalCheckpointRetries.json）
+//   ctx.capturedActivities 只拍一次的现场（Set）
+//
+// 动作从 `CampaignActions(ctx)` 取：JumpStage / Capture / CaptureFocus /
+// WaitOutCutscene / Route / Interact / RetryCampaign / WaitStage。
+import assert from "node:assert/strict";
+import fs from "node:fs/promises";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
+import { ServeRoot } from "./Script_DevServer.mjs";
+import { MISSION_DIALOGUE } from "./Data_FirstLevelMissionDialogue.mjs";
+import { MISSION_TUNING as R } from "./Data_FirstLevelMission.mjs";
+import { SCENE_RENDER_LIMITS } from "./Data_AssetStandards.mjs";
+
+const here = path.dirname(fileURLToPath(import.meta.url));
+const root = path.resolve(here, "..");
+
+// How many checkpoint retries one leg may spend before the route is called
+// unwalkable. Two covers an unlucky firefight; a leg that needs more is telling
+// you the level got harder, not that the dice went badly.
+const ROUTE_RETRY_BUDGET = 2;
+
+/** 分段驾驶脚本允许的起点：每一段的第一个公开阶段。 */
+export const CAMPAIGN_SEGMENT_STARTS = Object.freeze([8, 11, 15, 18]);
+
+export function ParseCampaignArgs(argv = process.argv) {
+  const Has = (flag) => argv.includes(flag);
+  const stageJumps = Has("--stage-jumps");
+  const raw = argv.find((arg) => arg.startsWith("--stage-from="))?.split("=")[1];
+  const stageFrom = Number(raw || 1);
+  assert.ok(
+    stageFrom === 1 || (stageJumps && CAMPAIGN_SEGMENT_STARTS.includes(stageFrom)),
+    "continuation suites start at 1 or at a segment boundary (" + CAMPAIGN_SEGMENT_STARTS.join(" / ") + ")",
+  );
+  return {
+    campaign: Has("--campaign"),
+    audioCheck: Has("--audio"),
+    stageJumps,
+    allowCheckpointRetry: Has("--allow-checkpoint-retry"),
+    stageFrom,
+    suite: stageFrom === 8 ? "FirstLevelStageVillage"
+      : stageFrom === 11 ? "FirstLevelStageTransfer"
+        : stageFrom === 15 ? "FirstLevelStageRegroup"
+          : stageFrom === 18 ? "FirstLevelStageTail"
+            : stageJumps ? "FirstLevelStageContinue" : "FirstLevelMission",
+  };
+}
+
+/** 起服务、起浏览器、开页面，返回 ctx。 */
+export async function OpenCampaign(options) {
+  const output = path.join(here, "_shots", options.suite);
+  await fs.mkdir(output, { recursive: true });
+  const server = await ServeRoot(root, 0);
+  const browser = await LaunchBrowser();
+  const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+  const errors = [];
+  page.on("pageerror", (error) => { errors.push(String(error)); console.log("PAGEERROR", String(error)); });
+  const ctx = {
+    page, browser, server, output, errors, options,
+    stageJumps: options.stageJumps, stageFrom: options.stageFrom,
+    jumpReceipts: [], campaignRetries: [], capturedActivities: new Set(),
+  };
+  await page.goto(
+    `http://127.0.0.1:${server.address().port}/Taierzhuang1938/?whitebox=p012&${options.audioCheck ? "menu=0" : "shot=1"}&manual=1&quality=low&scale=small`,
+    { waitUntil: "domcontentloaded", timeout: 180000 },
+  );
+  await page.waitForFunction(() => window.Tengxian?.state?.ready, null, { timeout: 180000 });
+  return ctx;
+}
+
+/** 收尾：证据落盘、关浏览器、关服务。失败与成功走同一条。 */
+export async function CloseCampaign(ctx) {
+  await fs.writeFile(path.join(ctx.output, "Data_NormalCheckpointRetries.json"),
+    JSON.stringify(ctx.campaignRetries, null, 2));
+  await ctx.browser.close();
+  await new Promise((resolve) => ctx.server.close(resolve));
+}
+
+/** 失败时的现场：任务状态、截图、开机文字。 */
+export async function CaptureFailure(ctx) {
+  await ctx.page.evaluate(() => window.Tengxian?.Debug.FirstLevelMission())
+    .then((state) => fs.writeFile(path.join(ctx.output, "Data_Failure.json"), JSON.stringify(state, null, 2)))
+    .catch(() => {});
+  await ctx.page.screenshot({ path: path.join(ctx.output, "Scene_Failure.png") }).catch(() => {});
+  console.error(await ctx.page.evaluate(() => ({
+    boot: document.querySelector("#bootText")?.textContent,
+    body: document.body.innerText.slice(-1800),
+  })).catch(() => null));
+}
+
+/**
+ * `--audio`：真按开始键解锁音频上下文，再逐条 cue 走真实解码与播放。
+ * 车厢环境床那几条随军列开场一起下线，不再检查。
+ */
+export async function CheckVoiceAssets(ctx) {
+  const { page } = ctx;
+  await page.locator("#bootStart").click();
+  await page.waitForFunction(() => window.Tengxian.audio.ctx?.state === "running", null, { timeout: 15000 });
+  const voices = await page.evaluate(async () => {
+    const g = window.Tengxian, { MISSION_DIALOGUE } = await import("./Data_FirstLevelMissionDialogue.mjs");
+    g.audio.Unlock();
+    const cues = MISSION_DIALOGUE.map((cue) => {
+      const played = g.audio.PlayStoryVoice(`Mission${cue.id}`);
+      return { id: cue.id, decoded: !!g.audio.voiceBank.get(`Mission${cue.id}`),
+        seconds: played?.duration || 0, started: !!played?.voice };
+    });
+    g.audio.StopStoryVoice();
+    return { context: g.audio.ctx?.state, cues };
+  });
+  assert.equal(voices.context, "running", "The real start button unlocks the audio context");
+  assert.equal(voices.cues.length, MISSION_DIALOGUE.length, "every authored cue is checked");
+  assert.ok(voices.cues.every((cue) => cue.decoded && cue.started && cue.seconds > 0.5),
+    "Every whole Seed Audio cue must decode and create a real playback source: "
+    + JSON.stringify(voices.cues.filter((cue) => !(cue.decoded && cue.started && cue.seconds > 0.5))));
+  console.log("ok every first-level voice asset decoded and played in the real audio engine");
+  // Ambience loads on its own schedule; wait for the shipped loader, inject nothing.
+  await page.waitForFunction(() => window.Tengxian.audio.ambReady && !window.Tengxian.audio.ambLoading,
+    null, { timeout: 60000 });
+}
+
+/** 把逐帧输入驱动器装进页面：躲手榴弹 / 选目标 / 射击 / 近战。 */
+export async function InstallInputDriver(ctx) {
+  await ctx.page.evaluate(async () => {
+          const g = window.Tengxian;
+          window.MissionInputDriver = {
+            blocked: new Map(),
+            EvadeGrenade() {
+              const p=g.player,threat=g.combat.GrenadeThreats(p.position).find(t=>{
+                const from=t.position.clone();from.y+=BLAST.originRiseM;
+                const ray=p.position.clone();ray.y+=BLAST.playerHitRiseM;ray.sub(from);
+                const d=ray.length(),hit=d>BLAST.wallMarginM?g.battlefield.Raycast(from,ray.normalize(),d,{terrain:true}):null;
+                return !hit||hit.t>=d-BLAST.wallMarginM;
+              });
+              if(!threat){
+                if(this.evading){g.Debug.Key("KeyW",false);g.Debug.Key("ShiftLeft",false);this.evading=false;}
+                return false;
+              }
+              // Read the same live warning used by the HUD, then turn and sprint
+              // through an open physical direction. Do not clear the projectile.
+              const away=Math.atan2(p.position.x-threat.position.x,p.position.z-threat.position.z);
+              let heading=null;
+              for(const offset of [0,.55,-.55,1.1,-1.1,1.65,-1.65]){
+                const angle=away+offset,x=p.position.x+Math.sin(angle)*1.2,z=p.position.z+Math.cos(angle)*1.2;
+                const y=g.battlefield.GroundHeight(x,z);
+                if(Math.abs(y-p.position.y)<.4&&!g.physics.Overlaps(x,y+.04,z,p.radius,1.78)){heading=angle;break;}
+              }
+              if(heading==null)return false;
+              if(p.stance!=="stand")g.Debug.Key(p.stance==="crouch"?"KeyC":"KeyZ");
+              const yaw=heading+Math.PI,gap=Math.atan2(Math.sin(yaw-p.yaw-p.aimYaw),Math.cos(yaw-p.yaw-p.aimYaw));
+              g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);
+              g.Debug.Look(Math.max(-30,Math.min(30,-gap/.0022)),0);
+              g.Debug.Key("KeyW",Math.abs(gap)<.3);g.Debug.Key("ShiftLeft",true);
+              this.evading=true;this.evadeFrames=(this.evadeFrames||0)+1;
+              return true;
+            },
+            Target(maxRange=90) {
+              // A real bind has priority over an unobstructed distant rifle target.
+              const opponent=g.meleeCombat.qte.active?.attacker;
+              if(g.meleeCombat.Active && opponent?.alive)return opponent;
+              if(this.observedShot!==g.state.playerShots) {
+                this.observedShot=g.state.playerShots;
+                if(this.lastTarget && g.state.lastShot?.hitKind==="wall")this.blocked.set(this.lastTarget,g.ai.time+4);
+              }
+              const eye = g.player.EyePosition;
+              return g.ai.soldiers
+                .filter(
+                  (a) =>
+                    a.side === "ija" &&
+                    a.alive &&
+                    !a.scriptedNoncombatant &&
+                    (this.blocked.get(a.id)||0) < g.ai.time &&
+                    a.position.distanceTo(eye) < maxRange,
+                )
+                .sort((a, b) => a.position.distanceToSquared(eye) - b.position.distanceToSquared(eye))
+                .find((a) => {
+                  const to = a.position.clone();
+                  to.y += a.stance === 2 ? 0.3 : a.stance === 1 ? 0.85 : 1.2;
+                  const d = to.sub(eye),
+                    length = d.length(),
+                    hit = g.battlefield.Raycast(eye, d.normalize(), length, {terrain:true});
+                  return !hit || hit.t >= length - 0.25;
+                });
+            },
+            Shoot(foe) {
+              if(g.meleeCombat.Active){
+                g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);
+                g.Debug.Key("KeyF",true);g.Debug.Key("KeyF",false);return;
+              }
+              this.lastTarget=foe.id;
+              g.Debug.Mouse(0, false);
+              const eye = g.player.EyePosition,
+                to = foe.position.clone();
+              to.y += foe.stance === 2 ? 0.3 : foe.stance === 1 ? 0.85 : 1.2;
+              const dx = to.x - eye.x,
+                dz = to.z - eye.z,
+                yaw = Math.atan2(-dx, -dz),
+                gap = Math.atan2(Math.sin(yaw - g.player.yaw), Math.cos(yaw - g.player.yaw));
+              g.player.yaw += Math.max(-0.06, Math.min(0.06, gap));
+              g.player.pitch = Math.atan2(to.y - eye.y, Math.hypot(dx, dz)) - g.player.aimPitch;
+              g.player.yaw -= g.player.aimYaw;
+              const distance=foe.position.distanceTo(g.player.position),fighter=g.meleeCombat.Fighter(g.player);
+              // Mobile enemies now reach real bayonet contact. The campaign maps V
+              // to the equipped melee slot (Dadao), so keep that weapon out through
+              // contact instead of switching back to the rifle on every frame.
+              if(distance<3 && Math.abs(gap)<.2){
+                g.Debug.Mouse(2,false);
+                if(g.state.activeSlot!=="melee"){g.Debug.Key("KeyV");return;}
+                if(!fighter.weapon)return;
+                this.meleeResponses=(this.meleeResponses||0)+1;
+                if(g.meleeCombat.Active){g.Debug.Key("KeyF",true);g.Debug.Key("KeyF",false);}
+                else if(fighter.state==="idle"){
+                  const attacker=g.meleeCombat.Fighter(foe);
+                  if(attacker.attack && attacker.t>attacker.attack.windup-.13 && attacker.t<attacker.attack.windup
+                    && distance<attacker.attack.reach){g.Debug.Mouse(2,true);g.Debug.Mouse(2,false);}
+                  else if(distance<2.3){g.Debug.Mouse(0,true);g.Debug.Mouse(0,false);}
+                }
+                return;
+              }
+              if(g.state.activeSlot!=="primary"){g.Debug.Key("Digit1");return;}
+              g.Debug.Mouse(2, true);
+              if (g.state.ammo === 0) g.Debug.Key("KeyR");
+              else if (Math.abs(gap) < 0.06) g.Debug.Mouse(0, true);
+            },
+          };
+  });
+}
+
+/** 七个通用动作，全部闭包在 ctx 上（模块级不留可变全局）。 */
+export function CampaignActions(ctx) {
+  const { page, output, errors } = ctx;
+  const { audioCheck, allowCheckpointRetry } = ctx.options;
+  const stageJumps = ctx.stageJumps, stageFrom = ctx.stageFrom;
+  const jumpReceipts = ctx.jumpReceipts, campaignRetries = ctx.campaignRetries;
+  const capturedActivities = ctx.capturedActivities;
+  void errors; void audioCheck;
+
+  async function JumpStage(number) {
+    if (!stageJumps) return;
+    const receipt = await page.evaluate(async number => {
+      const g=window.Tengxian, before=g.Debug.FirstLevelMission();
+      const after=await g.Debug.FirstLevelJump(number);
+      // Test driver memory belongs to the old actors, just like the old runtime.
+      if(window.MissionInputDriver){window.MissionInputDriver.blocked.clear();window.MissionInputDriver.lastTarget=null;window.MissionInputDriver.observedShot=0;}
+      return {number,before:before.stage,beforePhase:before.phaseNumber,after:after.stage,phase:after.phaseNumber,remaining:after.remaining};
+    },number);
+    assert.equal(receipt.phase,number);assert.ok(receipt.remaining.length);
+    if(number>stageFrom)assert.equal(receipt.beforePhase,number,"previous debug start reaches the next public phase before restarting it");
+    jumpReceipts.push(receipt);console.log("STAGE_JUMP",JSON.stringify(receipt));
+  }
+
+  async function Capture(name) {
+    await page.evaluate(() => window.Tengxian.StepFrames(6, 1 / 60, true));
+    const render = await page.evaluate(() => {
+      const g = window.Tengxian,
+        info = g.renderer.info,
+        reset = info.autoReset;
+      info.autoReset = false;
+      info.reset();
+      g.StepFrames(1, 1 / 60, true);
+      const result = { drawCalls: info.render.calls, triangles: info.render.triangles };
+      // 预算读数旁边带上「谁在花」：活人 / 尸体 / LOD 分布、蒙皮数，以及按场景根节点拆的三角形。
+      // 超预算时光看一个总数定不了责任，A/B 两棵树各跑一遍就能看出是布景、人物还是尸体在涨。
+      const soldiers = g.ai ? g.ai.soldiers : [];
+      const lod = {};
+      for (const s of soldiers) { const k = (s.alive ? "" : "dead:") + (s.renderLod || "none"); lod[k] = (lod[k] || 0) + 1; }
+      let skinned = 0, meshes = 0;
+      g.scene.traverse((o) => { if (o.isSkinnedMesh) skinned++; if (o.isMesh && o.visible) meshes++; });
+      result.actors = { total: soldiers.length, alive: soldiers.filter((s) => s.alive).length,
+        ija: soldiers.filter((s) => s.alive && s.side === "ija").length, nra: soldiers.filter((s) => s.alive && s.side === "nra").length, lod, skinned, meshes };
+      result.roots = g.scene.children.map((c) => { let tris = 0, m = 0; c.traverse((o) => { if (o.isMesh && o.visible) { m++; const geo = o.geometry; const n = (geo.index ? geo.index.count : geo.attributes.position?.count || 0) / 3; tris += n * (o.isInstancedMesh ? o.count : 1); } }); return { name: c.name || c.type, m, tris: Math.round(tris) }; }).filter((r) => r.tris > 20000).sort((a, b) => b.tris - a.tris).slice(0, 14);
+      info.autoReset = reset;
+      return result;
+    });
+    console.log("BUDGET", name, JSON.stringify(render));
+    if(name==="MachineGun") {
+      const timing=await page.evaluate(async()=>{
+        const {Box3,Vector3}=await import("three");
+        const g=window.Tengxian,gl=g.renderer.getContext(),samples=[];
+        for(let i=0;i<24;i++){const start=performance.now();g.StepFrames(1,1/60,true);gl.finish();if(i>=4)samples.push(performance.now()-start);}
+        samples.sort((a,b)=>a-b);
+        const reducedBounds=Object.fromEntries([...g.ai.crowd.kinds].map(([key,entry])=>{
+          const bounds=new Box3();for(const mesh of entry.meshes){mesh.geometry.computeBoundingBox();bounds.union(mesh.geometry.boundingBox);}
+          return [key,bounds.getSize(new Vector3()).toArray()];
+        }));
+        return {method:"synchronous simulation and GPU completion, 4 warmup and 20 measured frames",p50Ms:samples[10],p95Ms:samples[19],reducedBounds,
+          actualLivingEnemies:g.ai.soldiers.filter(actor=>actor.alive && actor.side==="ija").length,
+          front:g.Debug.FirstLevelMission().assault,crowd:g.ai.crowd?.BakeReport(),cellM:g.ai.crowd?.cellM};
+      });
+      await fs.writeFile(path.join(output,"Data_FrontFrameTiming.json"),JSON.stringify(timing,null,2));
+      const standing=Object.entries(timing.crowd).filter(([key])=>key.endsWith(":standing"));
+      assert.ok(timing.cellM>0 && standing.length>=2 && standing.every(([,entry])=>entry.bodySpan>1.2),"the optimized standing crowd retains human-sized bodies");
+      for(const [key,entry] of Object.entries(timing.crowd))assert.ok(entry.size.every((size,axis)=>Math.abs(size-timing.reducedBounds[key][axis])<=2*Math.sqrt(3)*timing.cellM),"clustering preserves the original pose bounds: "+key);
+    }
+    assert.ok(
+      render.drawCalls <= SCENE_RENDER_LIMITS.drawCalls && render.triangles <= SCENE_RENDER_LIMITS.triangles,
+      `${name} must fit the shared whole-frame rendering budget: ${JSON.stringify(render)}`,
+    );
+    await page.screenshot({ path: path.join(output, `Scene_${name}.png`) });
+    await fs.writeFile(
+      path.join(output, `Data_${name}.json`),
+      JSON.stringify(
+        await page.evaluate(() => ({
+          mission: window.Tengxian.Debug.FirstLevelMission(),
+          position: { ...window.Tengxian.player.position },
+          health: window.Tengxian.player.health,
+          medical:{bleeding:window.Tengxian.player.bleeding,bandages:window.Tengxian.player.bandages,
+            regenTo:window.Tengxian.player.bandageRegenTo},
+          damage:window.missionDamage?.slice(-12),
+          cast: window.Tengxian.ai.soldiers
+            .filter((a) => a.castId)
+            .map((a) => ({
+              id: a.castId,
+              position: { ...a.position },
+              goal: { ...a.goal },
+              stance: a.stance,
+              unloaded: a.missionUnloaded,
+              exitIndex: a.missionExitIndex,
+              speedMps:a.moveSpeed*3.6,scriptSpeedMps:a.scriptMoveSpeedMps,yaw:a.yaw,
+              march:a.squadMarchCommand,targetVisible:a.targetVisible,
+              route:window.Tengxian.Debug.FirstLevelMissionRuntime().squadRoutes.get(a.id)?.slice(0,3),
+            })),
+        })),
+        null,
+        2,
+      ),
+    );
+  }
+
+  async function CaptureFocus(name,point) {
+    const view=await page.evaluate(point=>{
+      const g=window.Tengxian,p=g.player.position,eye=g.player.EyePosition;
+      const previous={yaw:g.player.yaw,pitch:g.player.pitch};
+      g.player.yaw=Math.atan2(p.x-point.x,p.z-point.z);
+      g.player.pitch=Math.atan2(g.battlefield.GroundHeight(point.x,point.z)+(point.height||1.2)-eye.y,Math.hypot(p.x-point.x,p.z-point.z));
+      return previous;
+    },point);
+    await Capture(name);
+    await page.evaluate(view=>Object.assign(window.Tengxian.player,view),view);
+  }
+  // How many checkpoint retries one leg may spend before the route is called
+  // unwalkable. Two covers an unlucky firefight; a leg that needs more is telling
+
+
+  /**
+   * 等一场关中过场播完（不按 Esc：这条测试要的就是「玩家坐着看完」的时序）。
+   * Route 的内循环自己会等；这一只给循环之外的按键动作用（上机枪、补弹、交互）。
+   */
+  async function WaitOutCutscene(label) {
+    if (!(await page.evaluate(() => !!window.Tengxian.state.cutscene))) return false;
+    const id = await page.evaluate(() => window.Tengxian.state.cutscene);
+    console.log("CUTSCENE_WAIT", label, id);
+    for (let i = 0; i < 60; i += 1) {
+      await page.evaluate(() => {
+        const g = window.Tengxian;
+        g.Debug.Key("KeyW", false); g.Debug.Mouse(0, false); g.Debug.Mouse(2, false);
+        g.StepFrames(120, 1 / 60, false);
+      });
+      if (!(await page.evaluate(() => !!window.Tengxian.state.cutscene))) {
+        console.log("CUTSCENE_DONE", label, id);
+        return true;
+      }
+    }
+    throw new Error(`关中过场 ${id} 在 ${label} 处两分钟都没播完`);
+  }
+
+  async function Route(points, label, { fight = false, stance = "stand", sprint = false, crawl = false, rejoinRoute = null } = {}) {
+    const rejoinTarget=points.at(-1);
+    await page.evaluate(
+      async ({ points, stance, sprint, rejoinRoute, rejoinTarget }) => {
+        const g = window.Tengxian;
+        if(rejoinRoute){
+          const {MissionRouteBetween}=await import("./Script_FirstLevelMissionColumn.mjs");
+          points=MissionRouteBetween(rejoinRoute,g.player.position,rejoinTarget);
+        }
+        window.routeBot = { points, index: 0, frames: 0, stalled: 0, last: { ...g.player.position } };
+        if (g.player.stance !== stance)
+          g.Debug.Key(
+            stance === "crouch"
+              ? "KeyC"
+              : stance === "prone"
+                ? "KeyZ"
+                : g.player.stance === "crouch"
+                  ? "KeyC"
+                  : "KeyZ",
+          );
+        g.Debug.Key("ShiftLeft", sprint);
+      },
+      { points, stance, sprint, rejoinRoute, rejoinTarget },
+    );
+    const carriedKind=await page.evaluate(()=>window.Tengxian.carry.KindId);
+    let result, retries = 0;
+    for (let chunk = 0; chunk < 90; chunk++) {
+      result = await page.evaluate(async ({fight,stance,crawl,sprint}) => {
+        const {FRONT_SORTIE}=await import("./Data_FirstLevelFrontRoute.mjs");
+        const g = window.Tengxian,
+          b = window.routeBot,
+          Wrap = (x) => Math.atan2(Math.sin(x), Math.cos(x));
+        for (let i = 0; i < 600 && b.index < b.points.length && g.player.alive && g.state.running; i++) {
+          const p = g.player.position,
+            target = b.points[b.index];
+          if (Math.hypot(p.x - target.x, p.z - target.z) < 0.8) {
+            b.index++;
+            continue;
+          }
+          // 关中过场（04 机枪点位那一场）：玩家这时候没有控制权，什么键都递不进去。
+          // 像玩家一样等它播完 —— 松手、照常推帧、这一段不算进停滞计数
+          // （44 s 不动的话，下面那条「三个 chunk 没挪窝就算走不通」会把整条路判死）。
+          if (g.state.cutscene) {
+            g.Debug.Key("KeyW", false);
+            g.Debug.Mouse(0, false);
+            g.Debug.Mouse(2, false);
+            b.cutsceneFrames = (b.cutsceneFrames || 0) + 1;
+            b.cutscenes = b.cutscenes || {};
+            b.cutscenes[g.state.cutscene] = (b.cutscenes[g.state.cutscene] || 0) + 1;
+            g.StepFrames(1, 1 / 60, false);
+            b.frames++;
+            continue;
+          }
+          const evading=crawl&&fight&&window.MissionInputDriver.EvadeGrenade();
+          const foe = fight&&!evading ? window.MissionInputDriver.Target(crawl?28:90) : null;
+          if(crawl&&!evading){
+            const low=FRONT_SORTIE.crawl.some(c=>Math.abs(p.x-c.x)<c.w/2+1 && Math.abs(p.z-c.z)<c.d/2+3);
+            const desired=low?"prone":stance;
+            if(g.player.stance!==desired)g.Debug.Key(desired==="prone"?"KeyZ":desired==="crouch"?"KeyC":g.player.stance==="prone"?"KeyZ":"KeyC");
+            g.Debug.Key("ShiftLeft",sprint&&!low&&!foe);
+          }
+          if(evading){g.StepFrames(1,1/60,false);b.frames++;continue;}
+          if (foe) {
+            g.Debug.Key("KeyW", false);
+            window.MissionInputDriver.Shoot(foe);
+          } else {
+            g.Debug.Mouse(0, false);
+            g.Debug.Mouse(2, false);
+            const yaw = Math.atan2(p.x - target.x, p.z - target.z);
+            const gap = Wrap(yaw - g.player.yaw);
+            g.Debug.Key("KeyW", Math.abs(gap) < 0.65);
+            g.player.yaw += Math.max(-0.04, Math.min(0.04, gap));
+            g.player.pitch = 0;
+          }
+          if (g.player.bleeding && g.player.health < 80) g.Debug.Key("KeyB");
+          g.StepFrames(1, 1 / 60, false);
+          b.frames++;
+        }
+        g.Debug.Key("KeyW", false);
+        g.Debug.Mouse(0, false);
+        g.Debug.Mouse(2, false);
+        const chunkCutscene = b.cutsceneFrames || 0;
+        b.cutsceneFrames = 0;
+        b.stalled = chunkCutscene > 0 ? 0
+          : (Math.hypot(g.player.position.x - b.last.x, g.player.position.z - b.last.z) < 0.2 ? b.stalled + 1 : 0);
+        b.last = { ...g.player.position };
+        return {
+          done:
+            b.index === b.points.length ||
+            (g.Debug.FirstLevelMissionRuntime().flow.completed &&
+              Math.hypot(g.player.position.x - b.points.at(-1).x, g.player.position.z - b.points.at(-1).z) < 5),
+          index: b.index,
+          target: b.points[b.index],
+          position: { ...g.player.position },
+          alive: g.player.alive,
+          health: g.player.health,
+          medical:{bleeding:g.player.bleeding,bandages:g.player.bandages,regenTo:g.player.bandageRegenTo},
+          stage: g.Debug.FirstLevelMissionRuntime().flow.stage.id,
+          stalled: b.stalled,
+          cutscene: g.state.cutscene,
+          cutsceneFrames: chunkCutscene,
+          cutscenesSeen: b.cutscenes || null,
+          shots: g.state.playerShots,
+          ammo: g.state.ammo,
+          clips: g.state.clips,
+          activeSlot:g.state.activeSlot,primaryMagazine:{...g.state.mags.primary},
+          lastShot: g.state.lastShot,
+          foe: window.MissionInputDriver?.Target()?.missionId,
+        };
+      }, {fight,stance,crawl,sprint});
+      if (chunk % 4 === 0 || result.done || !result.alive) console.log(label, JSON.stringify(result));
+      // A death can also leave the body stationary. Let the existing checkpoint
+      // retry below handle it before applying the live-navigation stall limit.
+      if (result.done || (result.alive && result.stalled >= 3)) break;
+      if (!result.alive) {
+        // Losing a firefight is an outcome of live combat, not a regression: this
+        // bot fights standing in the open with no cover, and the runs that died
+        // died at a different waypoint each time while other runs walked the whole
+        // level. Recover the way a player does — the shipped checkpoint retry,
+        // which restores the player without granting facts, spending supplies or
+        // moving what he carries — and hold the route to "completable" rather than
+        // "never loses a fight". Drift in difficulty still surfaces here, as a
+        // route that burns its retry budget instead of one unlucky death.
+        if (++retries > ROUTE_RETRY_BUDGET) break;
+        console.log(label, `player died at waypoint ${result.index}; checkpoint retry ${retries}/${ROUTE_RETRY_BUDGET}`);
+        const retry=await page.evaluate(async ({ stance, sprint, rejoinRoute, rejoinTarget }) => {
+          const g = window.Tengxian;
+          const Snapshot=()=>{const r=g.Debug.FirstLevelMissionRuntime();return {
+            stage:r.flow.stage.id,time:r.time,position:g.player.position.toArray(),facts:[...r.flow.facts],
+            enemies:[...r.enemies.values()].map(a=>({id:a.id,alive:a.alive}))};};
+          const before=Snapshot();
+          g.Debug.MenuAct("continueCheckpoint");
+          const after=Snapshot();
+          g.StepFrames(1, 1 / 60, false);
+          // Re-establish the stance and sprint the leg asked for, and re-seed the
+          // stall detector: the retry teleports the body to the checkpoint.
+          if (g.player.stance !== stance)
+            g.Debug.Key(stance === "crouch" ? "KeyC" : stance === "prone" ? "KeyZ"
+              : g.player.stance === "crouch" ? "KeyC" : "KeyZ");
+          g.Debug.Key("ShiftLeft", sprint);
+          const b = window.routeBot;
+          // Stage progression may save a newer checkpoint. Join the authored
+          // polyline from the actual spawn; never replay a stale house entry.
+          if(rejoinRoute){
+            const {MissionRouteBetween}=await import("./Script_FirstLevelMissionColumn.mjs");
+            b.points=MissionRouteBetween(rejoinRoute,g.player.position,rejoinTarget);
+          }
+          b.index = 0;
+          b.stalled = 0; b.last = { ...g.player.position };
+          return {before,after};
+        }, { stance, sprint, rejoinRoute, rejoinTarget });
+        assert.equal(retry.after.stage,retry.before.stage,'route retry retains the mission step');
+        assert.deepEqual(retry.after.facts,retry.before.facts,'route retry retains every mission fact');
+        assert.deepEqual(retry.after.enemies,retry.before.enemies,'route retry retains enemy casualties');
+        campaignRetries.push({kind:'route',label,stage:retry.before.stage,time:retry.before.time,
+          beforePosition:retry.before.position,afterPosition:retry.after.position,
+          factsPreserved:true,casualtiesPreserved:true});
+        // A player recovering at the depot can use its real crate before setting
+        // out again. Do not grant supplies from the checkpoint or from the driver.
+        const depot=await page.evaluate(()=>{
+          const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime();
+          return r.flow.stage.id==='Tank'&&g.player.bandages===0&&g.interact.Query(g.player)?.point?.id==='MissionBundle';
+        });
+        if(depot){await Interact();assert.equal(await page.evaluate(()=>window.Tengxian.player.bandages),R.bundleSupplyBandages,'depot retry physically replenishes dressings');}
+        if(carriedKind==='stretcher' && await page.evaluate(()=>window.Tengxian.carry.KindId!=='stretcher')){
+          // Death really drops the patient. Retry restores the player, so walk
+          // back and use F before continuing; an empty-handed arrival is not a carry.
+          const pickup=await page.evaluate(()=>{
+            const z=window.Tengxian.Debug.FirstLevelMission().column.litters.find(l=>l.zhou);
+            return {x:z.x+Math.sin(z.yaw)*1.6,z:z.z+Math.cos(z.yaw)*1.6};
+          });
+          await Route([pickup],label+'Repick',{fight:true,stance});
+          await Interact();
+          assert.equal(await page.evaluate(()=>window.Tengxian.carry.KindId),'stretcher','checkpoint retry reacquires the real patient through F');
+          await page.evaluate(({points,sprint})=>{
+            const g=window.Tengxian;
+            window.routeBot={points,index:0,frames:0,stalled:0,last:{...g.player.position}};
+            g.Debug.Key('ShiftLeft',sprint);
+          },{points,sprint});
+        }
+      }
+    }
+    await page.evaluate(() => window.Tengxian.Debug.Key("ShiftLeft", false));
+    await Capture(label);
+    assert.ok(result.alive, `${label}: player alive (spent ${retries}/${ROUTE_RETRY_BUDGET} checkpoint retries)`);
+    assert.ok(result.done, `${label}: actual body reached route end`);
+    return result;
+  }
+
+  async function Interact() {
+    // 交互键在过场期间递不进去（见 WaitOutCutscene）。
+    await WaitOutCutscene("Interact");
+    return page.evaluate(() => {
+      const g = window.Tengxian,
+        query = g.Debug.Interact();
+      const interaction=g.interact.Query(g.player);
+      if(interaction?.point?.tag==="FirstLevelMission"){
+        g.StepFrames(1,1/60,true);
+        const prompt=g.hud.actionPrompts.find(p=>p.label===interaction.label);
+        if(!prompt||!document.querySelector(".actionText")?.textContent)throw Error("mission interaction needs a visible action label");
+      }
+      g.Debug.Key("KeyF", true);
+      g.StepFrames(90, 1 / 60, false);
+      g.Debug.Key("KeyF", false);
+      return query;
+    });
+  }
+
+  async function RetryCampaign({rewalk=true}={}) {
+    if(!allowCheckpointRetry||stageJumps||campaignRetries.filter(retry=>retry.kind!=="route").length>=3)return false;
+    const before=await page.evaluate(()=>{
+      const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime();
+      return {dead:!g.player.alive,stage:r.flow.stage.id,time:r.time,position:g.player.position.toArray(),facts:[...r.flow.facts],
+        route:window.routeBot?.points||[],enemies:[...r.enemies.values()].map(a=>({id:a.id,alive:a.alive}))};
+    });
+    if(!before.dead)return false;
+    await page.locator('.mnItem[data-act="continueCheckpoint"]').click();
+    await page.waitForFunction(()=>window.Tengxian.player.alive&&window.Tengxian.state.running,null,{timeout:10000});
+    const after=await page.evaluate(()=>{
+      const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime();
+      for(const key of ['KeyW','KeyS','KeyF','ShiftLeft'])g.Debug.Key(key,false);
+      g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);window.MissionInputDriver.evading=false;
+      return {stage:r.flow.stage.id,position:g.player.position.toArray(),facts:[...r.flow.facts],enemies:[...r.enemies.values()].map(a=>({id:a.id,alive:a.alive}))};
+    });
+    assert.equal(after.stage,before.stage,'normal retry retains the current mission step');
+    assert.deepEqual(after.facts,before.facts,'normal retry neither grants nor erases mission facts');
+    assert.deepEqual(after.enemies,before.enemies,'normal retry retains actual enemy casualties');
+    campaignRetries.push({kind:"campaign",stage:before.stage,time:before.time,beforePosition:before.position,afterPosition:after.position,factsPreserved:true,casualtiesPreserved:true});
+    console.log('NORMAL_CHECKPOINT_RETRY',JSON.stringify(campaignRetries.at(-1)));
+    // Walk back through the last observed route using the ordinary movement driver.
+    if(rewalk&&before.route.length)await Route(before.route,`CheckpointReturn${campaignRetries.length}`,{fight:true,stance:'crouch'});
+    return true;
+  }
+
+  async function WaitStage(expected, seconds = 240, { fight = false, cover = false } = {}) {
+    // Read only the step id in the per-frame loop. Full State clones the entire
+    // casualty/transport ledger; keep that diagnostic snapshot at chunk boundaries.
+    let state;
+    for (let chunk = 0; chunk < Math.ceil(seconds / 5); chunk++) {
+      state = await page.evaluate(
+        ({ expected, fight, cover }) => {
+          const g = window.Tengxian;
+          for (let i = 0; i < 300 && g.player.alive && g.Debug.FirstLevelMissionRuntime().flow.stage.id !== expected; i++) {
+            const evading=window.MissionInputDriver.EvadeGrenade();
+            // At a waist-high defensive wall, use normal crouch/peek inputs.
+            // Grenade evasion can leave the player standing outside its protection.
+            if(cover&&!evading){
+              const hide=g.state.ammo===0 || g.ai.time%5<3;
+              if((g.player.stance==="crouch")!==hide)g.Debug.Key("KeyC");
+            }
+            const foe = fight&&!evading ? window.MissionInputDriver.Target(90) : null;
+            if (foe) window.MissionInputDriver.Shoot(foe);
+            else if(!evading) {
+              g.Debug.Mouse(0, false);
+              g.Debug.Mouse(2, false);
+              if(g.state.activeSlot==="melee")g.Debug.Key("Digit1");
+              if(g.state.ammo===0)g.Debug.Key("KeyR");
+            }
+            if (g.player.bleeding && g.player.health < 80) g.Debug.Key("KeyB");
+            g.StepFrames(1, 1 / 60, false);
+            if(g.Debug.FirstLevelMissionRuntime().flow.stage.id==="Rescue"&&!window.rescueWitnessCaptured &&
+              ['yaowa','liuwencai'].every(id=>g.ai.soldiers.find(a=>a.castId===id)?.missionRescueReady))break;
+          }
+          g.Debug.Mouse(0, false);
+          g.Debug.Mouse(2, false);
+          return { mission: g.Debug.FirstLevelMission(), health: g.player.health, alive: g.player.alive };
+        },
+        { expected, fight, cover },
+      );
+      if(state.mission.stage==="Transfer" && state.mission.column.loaded>0 && !capturedActivities.has("TransferLoading")) {
+        capturedActivities.add("TransferLoading");
+        const cart=state.mission.column.vehicles.find(c=>!c.departed);
+        await CaptureFocus("TransferLoading",cart);
+        const collision=await page.evaluate(id=>{
+          const g=window.Tengxian,box=g.battlefield.colliders.find(b=>b.id===id);
+          const origin=g.player.position.clone().set(box.max[0]+.3,box.c[1],box.c[2]);
+          const direction=origin.clone().set(-1,0,0),hit=g.battlefield.Raycast(origin,direction,8);
+          return {id:hit?.box?.id,solid:g.physics.Overlaps(box.c[0],box.c[1],box.c[2],.2,.5)};
+        },cart.id);
+        assert.equal(collision.id,cart.id,"Moving transport remains a real bullet blocker at its current position");
+        assert.ok(collision.solid,"The visible transport occupies the physical world");
+      }
+      if(state.mission.stage==="Death" && state.mission.control==="death" && !capturedActivities.has("ZhouDeath")) {
+        capturedActivities.add("ZhouDeath");await Capture("ZhouDeath");
+        const focus=await page.evaluate(()=>{
+          const g=window.Tengxian,eye=g.player.EyePosition,z=g.Debug.FirstLevelMission().column.litters.find(l=>l.zhou);
+          const desiredPitch=Math.atan2(g.battlefield.GroundHeight(z.x,z.z)+.44-eye.y,Math.hypot(z.x-eye.x,z.z-.7-eye.z));
+          return {empty:g.Debug.FirstLevelMission().emptyHands,prompt:g.Debug.FirstLevelMission().openingPrompt,pitchError:Math.abs(g.player.pitch-desiredPitch)};
+        });
+        assert.ok(focus.empty&&focus.prompt===null&&focus.pitchError<.29,'death scene looks down at Zhou with the weapon put away');
+      }
+      if(state.mission.stage==="Rescue" && !capturedActivities.has("MedicalRescue") &&
+        await page.evaluate(()=>['yaowa','liuwencai'].every(id=>window.Tengxian.ai.soldiers.find(a=>a.castId===id)?.missionRescueReady))) {
+        await page.evaluate(()=>{window.rescueWitnessCaptured=true;});
+        capturedActivities.add("MedicalRescue");await CaptureFocus("MedicalRescue",state.mission.column.litters.find(l=>l.zhou));
+      }
+      if(chunk%12===11)console.log("WAIT_PROGRESS",JSON.stringify({expected,stage:state.mission.stage,time:state.mission.time,health:state.health,remaining:state.mission.remaining}));
+      if(!state.alive&&await RetryCampaign())continue;
+      if (state.mission.stage === expected || !state.alive) break;
+    }
+    console.log(
+      "wait",
+      expected,
+      JSON.stringify({
+        stage: state.mission.stage,
+        remaining: state.mission.remaining,
+        health: state.health,
+        column: state.mission.column.gatePassed,
+      }),
+    );
+    await Capture(expected);
+    assert.ok(state.alive);
+    assert.equal(state.mission.stage, expected);
+    return state;
+  }
+
+  return { JumpStage, Capture, CaptureFocus, WaitOutCutscene, Route, Interact, RetryCampaign, WaitStage };
+}
