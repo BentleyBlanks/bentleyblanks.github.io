@@ -37,11 +37,9 @@ try{
   for(const [i,a] of r.squad.entries()){r.PlaceActor(a,OPENING.frontPosts[i]);r.squadRoutes.set(a.id,[]);}
   const p=r.Point({x:0,z:-127.4});g.player.position.copy(p);g.player.body.Teleport(p.x,p.y,p.z);g.player.yaw=0;g.player.pitch=0;g.player.stance="crouch";g.player.SyncCamera(0);
   // This fixture drops the player straight onto the seat, which is exactly the
-  // trigger circle of the 04 mid-level cutscene. Mark it seen so the director
-  // never takes the camera here; the cutscene has its own regression
-  // (Script_FirstLevelMachineGunCutsceneTest) and none of the assertions below
-  // are relaxed by this line.
-  r.Record("captivesWitnessed",{fixture:"MachineGunRegression"});
+  // 2026.09.19 重构（契约 §2）：04 不再由任务触发关中过场《空地上的三个人》，
+  // 所以这里也不用再拿 captivesWitnessed 把导演挡在门外。不触发这一条由
+  // Script_FirstLevelMachineGunCutsceneTest 的 A 段守。
  });
  const before=await Receipt("RifleForceExhausted");
  assert.ok(!before.soldiers.some(a=>a.encounter==="machineGun"),"rifle stage cannot spend the machine-gun attack early");

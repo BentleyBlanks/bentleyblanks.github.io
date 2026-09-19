@@ -583,3 +583,8 @@ export const MISSION_RETURN = Object.freeze({
   urgentM:58,squadUrgentM:105,edgeM:14,edgeUrgentM:6,edgeHysteresisM:3,
   enterDelayS:1.25,stageGraceS:3,
 });
+
+// 第二波 Front 玩法包（公开阶段 1–7）的数值另起一张表，减少三包并行时的同文件冲突。
+// 这一行让「数值只有一个入口」的口径保持不变：import Data_Tuning_FirstLevel 就拿得到。
+export { FRONT_TUNING, FRONT_TUNING_SOURCES, BUNKER_KILL_BEATS, BORROW_LIGHT_BEATS,
+  SouthWalkLengthM, SouthWalkSeconds } from "./Data_Tuning_FirstLevelFront.mjs";

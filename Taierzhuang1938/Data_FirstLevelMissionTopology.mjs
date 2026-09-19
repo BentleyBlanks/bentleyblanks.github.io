@@ -138,7 +138,11 @@ export const MISSION_RAIL_BRIDGE = Object.freeze({
 export const MISSION_STAGE_ANCHORS = Object.freeze({
   // A 前沿：被炸塌的掩蔽部（门朝北）、门外刺杀处、后壁破口、背坡土坎的缺口、伤员集结处
   // bunkerDoor 落在门外 1.5 m 而不是门框那一格：锚点要站得住人（「不被体块埋」）。
-  bunker: {x:-40,z:-124}, bunkerDoor: {x:-40,z:-134.5}, bunkerKilling: {x:-40,z:-142},
+  bunker: {x:-40,z:-124}, bunkerDoor: {x:-40,z:-134.5},
+  // 行刑处挪到门外约 3 m（2026-09-20 实拍：原来的 -142 离受困位 18 m，
+  // 从破口看过去人只有几个像素，「看清」这条通过条件根本读不出来）。
+  // 现在受困位 (-40,-124) 到这里 13.5 m，仍在契约 §3 的 8–12 m 视距带外缘。
+  bunkerKilling: {x:-40,z:-137.5},
   bunkerRear: {x:-40,z:-119}, rearCorner: {x:-42,z:-113}, collection: {x:-37,z:-101},
   // B 村落：主街障碍北侧、担架等待遮挡、东巷、障碍南侧接回主街
   streetBlock: {x:76.65,z:15}, litterHold: {x:66,z:-20}, eastAlley: {x:88,z:11},

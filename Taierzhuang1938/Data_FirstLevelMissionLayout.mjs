@@ -718,18 +718,23 @@ export const MISSION_PLACEMENT = Object.freeze({
     playerEyeM: 0.42,
     rifle: { x: -36.8, z: -125.8, yaw: 1.1 },       // 够不到：离玩家 3.7 m
     pinnedFrame: [{ x: -41.4, z: -124.2 }, { x: -38.6, z: -124.6 }],
+    // 2026-09-20：行刑处随 bunkerKilling 前移 4.5 m（原来在 18 m 外，破口里看不清）。
+    // 日兵仍从北面冲上来 —— ijaStart 留在远处不动，ijaDoor 也不动（它在门口）。
+    // 破口在这个距离上只开出 x -40.75…-38.25 一条缝（当中还有门框立柱的影子），
+    // 两个人都要摆在缝里看得见的那两段上，不然行刑整拍被门垛吃掉。
     captives: [
-      { id: "captiveWounded", x: -40.6, z: -141.4, yaw: 0.3 },
-      { id: "captiveHelper", x: -38.9, z: -142.2, yaw: 2.6 },
+      { id: "captiveWounded", x: -40.5, z: -136.9, yaw: 0.3 },
+      { id: "captiveHelper", x: -39.5, z: -137.7, yaw: 2.6 },
     ],
-    captiveRifles: [{ x: -44.2, z: -143.6 }, { x: -43.4, z: -140.8 }],
+    captiveRifles: [{ x: -40.9, z: -138.6 }, { x: -42, z: -135.9 }],
     ijaStart: [{ x: -41.8, z: -148.5, yaw: Math.PI }, { x: -37.4, z: -149.2, yaw: Math.PI }],
-    ijaKill: [{ x: -40.2, z: -143.4, yaw: Math.PI }, { x: -38.4, z: -143.8, yaw: Math.PI }],
+    ijaKill: [{ x: -40.4, z: -138.9, yaw: Math.PI }, { x: -39.3, z: -139.3, yaw: Math.PI }],
     ijaDoor: [{ x: -40.1, z: -135.2, yaw: Math.PI }, { x: -38.2, z: -136.4, yaw: Math.PI }],
     luoEntry: { x: -40, z: -119.6, yaw: Math.PI },  // 从后壁破口挤进来
     luoLift: { x: -40.6, z: -122.6, yaw: Math.PI },
     yaowaLift: { x: -38.5, z: -122.4, yaw: Math.PI },
-    heyoutianFire: { x: -52, z: -125, yaw: -0.46 }, // 绕过掩蔽部西墙，射线到刺杀处
+    // 行刑处前移之后原来的 (-52,-125) 被掩蔽部西墙切掉了；挪 0.85 m 重新看得见刺杀处。
+    heyoutianFire: { x: -52.6, z: -125.6, yaw: -0.36 }, // 绕过掩蔽部西墙，射线到刺杀处
   },
   // 06 背坡伤员集结处。
   collection: {

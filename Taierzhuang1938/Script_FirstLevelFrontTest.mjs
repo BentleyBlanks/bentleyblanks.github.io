@@ -150,21 +150,21 @@ const Cue = (id) => MISSION_DIALOGUE.find((cue) => cue.id === id);
 // ---------------------------------------------------------------------------
 {
   assert.strictEqual(MISSION_ROUTES.south, MISSION_ROUTES.southWalk, "south 与 southWalk 是同一条（契约 §8）");
-  const length = SouthWalkLengthM();
+  const length = SouthWalkLengthM(MISSION_ROUTES.southWalk);
   assert.ok(length > 120 && length < 150, `南行全长 ${length.toFixed(1)} m（契约 §8 记的是 135 m）`);
   const pointer = Cue("VillagePointer");
   const pointerSeconds = MissionVoiceTimeline(pointer, 7.94).lines.at(-1)[1];
   for (const speed of [F.southMarchSpeedMps.min, F.southMarchSpeedMps.max]) {
-    const walk = SouthWalkSeconds(speed);
+    const walk = SouthWalkSeconds(speed, MISSION_ROUTES.southWalk);
     const total = walk + pointerSeconds;
     assert.ok(total >= F.southTargetSecondsMin && total <= F.southTargetSecondsMax,
       `${speed} m/s 走完再加指路那一句共 ${total.toFixed(1)} s，要落在 `
       + `${F.southTargetSecondsMin}–${F.southTargetSecondsMax} 秒`);
   }
   // 一路小跑也不许掉出下限：冲刺速度下光走路就已经接近下限，指路那一句补上去。
-  assert.ok(SouthWalkSeconds(4.2) + pointerSeconds >= F.southTargetSecondsMin * 0.8,
+  assert.ok(SouthWalkSeconds(4.2, MISSION_ROUTES.southWalk) + pointerSeconds >= F.southTargetSecondsMin * 0.8,
     "冲刺跑完也不会短到失去「走了一段路」的感觉");
-  assert.ok(F.southWhisperFallbackS < SouthWalkSeconds(F.southMarchSpeedMps.max),
+  assert.ok(F.southWhisperFallbackS < SouthWalkSeconds(F.southMarchSpeedMps.max, MISSION_ROUTES.southWalk),
     "私语的兜底要在走完之前触发，不然抵达村口时那一段还没说");
 }
 

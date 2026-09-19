@@ -171,6 +171,9 @@ export class FirstLevelCollection {
       this.zhouParked = true;
       Object.assign(zhou, { ...Place.collection.zhouWall, state: "fallen", visible: true });
     }
+    // 贴着土壁、脸朝经过的玩家 —— 不许横在路当中（集成方 2026-09-20 的口径）。
+    if (!r.Has("zhouOnLitter"))
+      zhou.yaw = Math.atan2(r.player.position.x - zhou.x, r.player.position.z - zhou.z);
     for (const action of BorrowPosesDue(this.borrowLine, this.borrowEvents)) this.Pose(action);
     if (this.shareAt != null && r.time - this.shareAt >= F.borrowLightS + F.borrowWinceS) {
       this.Pose("wince");

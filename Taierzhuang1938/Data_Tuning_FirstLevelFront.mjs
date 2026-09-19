@@ -8,8 +8,10 @@
 //
 // 纯数据、零副作用、零 three：Node 里 import 即可读。
 // ===========================================================================
-import { MISSION_TUNING as R } from "./Data_Tuning_FirstLevel.mjs";
-import { MISSION_ROUTES } from "./Data_FirstLevelMissionLayout.mjs";
+// 这张表**不许 import 任何第一关的其它表**：入口 Data_Tuning_FirstLevel 会 re-export 它，
+// 反过来再引它就成了循环（Data_Tuning_FirstLevel → 本表 → Layout → … → Tuning，实测炸在
+// Data_FirstLevelMissionTrain 的 "Cannot access R before initialization"）。
+// 需要路线或别处的数值时由调用方传进来。
 
 export const FRONT_TUNING = Object.freeze({
   // =========================================================================
@@ -125,8 +127,8 @@ export const FRONT_TUNING = Object.freeze({
   southPointerSideM: 3.2,
 });
 
-/** 07 南行的路线全长（m）。`MISSION_ROUTES.south` 与 `southWalk` 是同一个数组。 */
-export function SouthWalkLengthM(route = MISSION_ROUTES.southWalk) {
+/** 07 南行的路线全长（m）。传 `MISSION_ROUTES.southWalk`（它与 `south` 是同一个数组）。 */
+export function SouthWalkLengthM(route) {
   let total = 0;
   for (let i = 1; i < route.length; i++)
     total += Math.hypot(route[i].x - route[i - 1].x, route[i].z - route[i - 1].z);
@@ -137,7 +139,7 @@ export function SouthWalkLengthM(route = MISSION_ROUTES.southWalk) {
  * 07 在给定行军速度下的纯行走秒数（不含抵达村口后 VillagePointer 播完那一段）。
  * 时长闸的算式只有这一处，测试与文档共用。
  */
-export function SouthWalkSeconds(speedMps, route = MISSION_ROUTES.southWalk) {
+export function SouthWalkSeconds(speedMps, route) {
   return SouthWalkLengthM(route) / speedMps;
 }
 
@@ -181,9 +183,9 @@ export const FRONT_TUNING_SOURCES = Object.freeze({
   bunkerKillFallbackS: "MissionVoiceTimeline 对 BunkerKilling 的 7.84 秒 / 4 句",
   bunkerButtStrikeS: "Data_MeleeCombat 的近战 windup 同量级",
   bunkerRearDigIntervalS: "一记 debrisFall 的间隔，按旁边有人在扒土的频率",
-  rescueGatherMaxS: `bunkerRescueSeconds ${R.bunkerRescueSeconds} s 之前两个人要到位`,
+  rescueGatherMaxS: "bunkerRescueSeconds（4.4 s）之前两个人要到位",
   bundleProneRangeM: "Data_Tuning_AiShooting 的 CLOSE_RANGE 同一档",
   southMarchSpeedMps: "Notion 采用稿 07 的配速要求（2.2–2.6 m/s）",
   southTargetSecondsMin: "契约 §2：07 目标时长 45–75 秒",
-  zhouLiftMoveS: `litterSpeedMps ${R.litterSpeedMps} m/s 量级`,
+  zhouLiftMoveS: "litterSpeedMps（1.4 m/s）量级",
 });
