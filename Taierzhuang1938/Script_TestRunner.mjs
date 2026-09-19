@@ -76,6 +76,8 @@ export const testDefs = {
   // The 150-actor mission rebuilds 18 starts; a measured full continuation reached Complete
   // at the old 1200 s limit. Match the full campaign allowance without changing any assertions.
   FirstLevelMissionStageContinueTest: {file:"Script_FirstLevelMissionBrowserTest.mjs",args:["--campaign","--stage-jumps"],timeoutMs:1800000,desc:"Play forward from each of the 18 debug starts through the next stage"},
+  // End 包（阶段 15–18）的两个分段起点：15 是降压三步 + 交接 + 死亡，18 是桥与夜入城。
+  FirstLevelMissionStageRegroupTest: {file:"Script_FirstLevelMissionBrowserTest.mjs",args:["--campaign","--stage-jumps","--stage-from=15"],timeoutMs:900000,desc:"Targeted stage 15 continuation: regroup, carry hand-over, reception gate, handover and Zhou's death"},
   FirstLevelMissionStageTailTest: {file:"Script_FirstLevelMissionBrowserTest.mjs",args:["--campaign","--stage-jumps","--stage-from=18"],timeoutMs:600000,desc:"Targeted stage 18 continuation: rail bridge, demolition and the night march into Tengxian"},
   FirstLevelMissionPresentationTest: {file:"Script_FirstLevelMissionPresentationTest.mjs",timeoutMs:240000,desc:"Real stretcher grip, idle feet, ADS fire and mounted recoil"},
   FirstLevelMissionFortificationsTest: {file:"Script_FirstLevelMissionFortificationsTest.mjs",timeoutMs:600000,desc:"Loaded field defenses, route clearance and merged scene screenshots"},
@@ -87,6 +89,7 @@ export const testDefs = {
   MissionReturnTest: {file:"Script_MissionReturnTest.mjs",desc:"Soft return boundaries, escort separation, hysteresis and stage corridors"},
   FirstLevelMissionReturnBrowserTest: {file:"Script_FirstLevelMissionReturnBrowserTest.mjs",timeoutMs:300000,desc:"Real first-level return overlay, input, recovery and stage lifecycle"},
   FirstLevelMissionTest: {file:'Script_FirstLevelMissionTest.mjs',desc:'新版第一关完整事实门、共享地形、实际担架队列和往返撤离'},
+  FirstLevelEndTest: {file:'Script_FirstLevelEndTest.mjs',desc:'第一关 15–18：降压段无战斗、换手与静默行走、院门盘问与入院、门槛与最后一句、死亡段与接收处继续工作、尾队过桥与爆破清场、夜景与天空还原（纯 Node，毫秒级）'},
   MissionGatesTest: {file:'Script_MissionGatesTest.mjs',desc:'第一关编排表：事实门覆盖、按表生成与激活规则、运行时源码对账、编排模型'},
   FirstLevelMidTest: {file:'Script_FirstLevelMidTest.mjs',desc:'第一关 08–14（Mid 包）：担架停进遮挡、连屋近战先手、内院放行计数、两处威胁与装载联动、上车/停车/卸人时序、空袭目标与扑沟'},
   FirstLevelVoiceTest: {file:'Script_FirstLevelVoiceTest.mjs',desc:'第一关台词表：契约 cue 清单/句数、与 Notion 转录逐字对账、日语行假名与中文字幕、具名事件、缺录音兜底（纯 Node，毫秒级）'},
@@ -357,6 +360,7 @@ export const browserTests = new Set([
   "FirstLevelMidTest",
   "FirstLevelMissionStageJumpTest",
   "FirstLevelMissionStageContinueTest",
+  "FirstLevelMissionStageRegroupTest",
   "FirstLevelMissionStageTailTest",
   "FirstLevelMissionPresentationTest",
   "FirstLevelMissionBrowserTest",
@@ -448,8 +452,8 @@ export const domains = {
   motionVector: {label:'统一运动矢量接入契约',tests:['MotionVectorContractTest']},
   propVelocity: {label:'近景刚体道具速度与移动清晰度',tests:['CarriagePropVelocityTest']},
   squadMarch: {label:"通用小队行进",tests:["SquadMarchCoverTest","SquadMarchCoverBrowserTest","SquadMarchTest","SquadMarchAiTest","SquadMarchEditorTest","SquadMarchNavigationTest","FirstLevelSquadMarchTest","EditorLauncherTest"]},
-  firstLevelTail: {label:"第一关接收院至结尾定向续接",tests:["FirstLevelMissionStageTailTest"]},
-  firstLevel: {label:'新版第一关完整任务',tests:['MachineGunCutsceneAudioTest','Type89DamageTest','FirstLevelFrontRouteBrowserTest','FirstLevelMissionTopologyTest','FirstLevelMissionTopologyBrowserTest','FirstLevelSpaceTest','MissionReturnTest','FirstLevelMissionReturnBrowserTest','FirstLevelCasualtyBrowserTest','FirstLevelMissionTest','MissionGatesTest','FirstLevelMidTest','FirstLevelVoiceTest','FirstLevelVoiceAudioTest','FirstLevelFrontPresenceTest','FirstLevelMachineGunTest','FirstLevelMachineGunCutsceneTest','FirstLevelMissionAftermathTest','FirstLevelMissionFortificationsTest','FirstLevelMissionBrowserTest','FirstLevelMissionStageJumpTest','FirstLevelMissionStageContinueTest','FirstLevelMissionPresentationTest']},
+  firstLevelTail: {label:"第一关降压段至结尾定向续接",tests:["FirstLevelMissionStageRegroupTest","FirstLevelMissionStageTailTest"]},
+  firstLevel: {label:'新版第一关完整任务',tests:['FirstLevelEndTest','MachineGunCutsceneAudioTest','Type89DamageTest','FirstLevelFrontRouteBrowserTest','FirstLevelMissionTopologyTest','FirstLevelMissionTopologyBrowserTest','FirstLevelSpaceTest','MissionReturnTest','FirstLevelMissionReturnBrowserTest','FirstLevelCasualtyBrowserTest','FirstLevelMissionTest','MissionGatesTest','FirstLevelVoiceTest','FirstLevelVoiceAudioTest','FirstLevelFrontPresenceTest','FirstLevelMachineGunTest','FirstLevelMachineGunCutsceneTest','FirstLevelMissionAftermathTest','FirstLevelMissionFortificationsTest','FirstLevelMissionBrowserTest','FirstLevelMissionStageJumpTest','FirstLevelMissionStageContinueTest','FirstLevelMissionPresentationTest','FirstLevelMidTest']},
   text: { label: "玩家文本 / 数值表（数据驱动闸门）", tests: ["TextTest", "TextGatherCheck"] },
   animation: { label: '独立动画资产验收', tests: ['ActorLocomotionTest','BackRifleRunTest','MeleeAnimationTest','DadaoSwingTest','GrenadeThrowTest','InfantryAnimationTest','DeathCollapseTest'] },
   explosives: { label: "爆炸白盒与通用地形形变/返掷", tests: ["ExplosionRulesTest", "ExplosionRangeTest", "CraterSurfaceTest"] },
@@ -576,6 +580,9 @@ const changedDomainRules = [
   // 整关驾驶脚本拆成了「公共 Kit + 三段」（2026.09.19 重构，第二波三个玩法包各改一段）。
   // 文件名里没有「Mission」，上面那些按 FirstLevelMission* 选域的规则盖不到。
   {domain:"firstLevel",pattern:/FirstLevelCampaign(Kit|Front|Mid|End)/},
+  // End 包（阶段 15–18）的新模块：文件名里同样没有「Mission」。
+  {domain:"firstLevel",pattern:/FirstLevelEndCast|FirstLevelQuietMarch|FirstLevelReception|FirstLevelBridge|FirstLevelNightGate|FirstLevelNightLights|Data_Tuning_FirstLevelEnd/},
+  {domain:"firstLevelTail",pattern:/FirstLevelQuietMarch|FirstLevelReception|FirstLevelBridge|FirstLevelNightGate|FirstLevelNightLights|Data_Tuning_FirstLevelEnd|FirstLevelCampaignEnd/},
   // 第二波玩法包的新模块（阶段 1–7 / 8–14 / 15–18）：文件名不带 FirstLevelMission 前缀，单列一条。
   {domain:"firstLevel",pattern:/FirstLevel(Bunker|Collection|BorrowLight|VillageBlock|TransferCart|QuietMarch|Bridge|NightGate)|Data_Tuning_FirstLevel(Front|Mid|End)|FirstLevel(Front|Mid|End)Test/},
   // 屋内伏击那一拍 2026.09.19 下线（09 改成连屋近战，担架不进屋）：采样器与它的门禁已删，

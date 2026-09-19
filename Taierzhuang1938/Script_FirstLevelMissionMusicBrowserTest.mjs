@@ -21,12 +21,17 @@ try {
   await page.waitForFunction(() => window.Tengxian.audio.ctx?.state === "running" && !window.Tengxian.audio.musicLayer, null, { timeout: 60000 });
   assert.equal(requests.length, 0, "the carriage must not load any first-level score");
   await page.screenshot({ path: path.join(output, "Scene_CarriageMusic.png") });
-  const starts = [[1,null],[3,"IronSiege"],[3,null,"Shelter"],
+  // 2026.09.20 第二波（End 包）：夹具按新 27 步重写。旧的 Shelter / FinalCarry / Exit
+  // 三个内部步骤随采用稿下线，换成现役的 BunkerRescue / WallPath / NightMarch；
+  // 15A 与 17 是静的，18 的桥头回到紧张、爆破那一步是「南路断了」。
+  const starts = [[1,null],[2,null,"BunkerRescue"],[3,"IronSiege","RearTrench"],
     [3,"CloseQuartersPressure","Support"],[4,"CloseQuartersPressure"],[5,"CloseQuartersPressure"],
     [6,"TheFrontClosesIn"],[7,"TheRoadSouth"],[8,"IronSiege"],[9,"IronSiege"],[10,"IronSiege"],
     [11,"TheRoadSouth"],[12,"CloseQuartersPressure"],[13,"CloseQuartersPressure"],[14,"TheSouthRoadBreaks"],
-    [15,"IronSiege"],[16,"IronSiege"],[16,"KeepYourEyesOpen","FinalCarry"],
-    [17,null],[18,"CloseQuartersPressure"],[18,"TheLivingStillNeedUs","Exit"]];
+    [15,null],[15,"TheLivingStillNeedUs","WallPath"],[15,"TheLivingStillNeedUs","ReceptionGate"],
+    [16,"KeepYourEyesOpen"],[17,null],
+    [18,"TheFrontClosesIn"],[18,"CloseQuartersPressure","BridgeCover"],
+    [18,"TheSouthRoadBreaks","BridgeWithdraw"],[18,"TheLivingStillNeedUs","NightMarch"]];
   for (const [number, id, step] of starts) {
     if (number !== 1) await page.evaluate(number => window.Tengxian.Debug.FirstLevelJump(number), number);
     // Internal story boundaries share public starts; this remains a wiring diagnostic.

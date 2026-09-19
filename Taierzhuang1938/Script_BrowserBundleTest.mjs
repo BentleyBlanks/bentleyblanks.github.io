@@ -58,13 +58,23 @@ try {
       await page.waitForFunction(before => window.Tengxian.Debug.FirstLevelMission().time > before, before, {timeout:10000});
       assert.ok(await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission().stage === "Trapped"));
     } else if (fixture.name === 'MissingCharacters') {
-      const partial=await page.evaluate(()=>{const g=window.Tengxian;const actors=g.ai.soldiers.filter(a=>a.missionTrainPassenger);
-        return {count:actors.length,models:actors.map(a=>a.actor.characterRig?.modelId||null),train:g.Debug.FirstLevelMission().train};});
-      assert.equal(partial.count,41,'interrupted models preserve every physical passenger');
-      assert.deepEqual(partial.train.counts,[12,16,12]);
+      // 2026.09.19 军列开场下线：不再有 41 名车厢乘客，`missionTrainPassenger` 这个
+      // 旗标也没人写了。同一件事改在新开场的实际在场人身上验 —— 01 一开机，
+      // 掩蔽部里是班里那四个人，门外是两名失去抵抗能力的川军。
+      const partial=await page.evaluate(()=>{const g=window.Tengxian;
+        const actors=g.ai.soldiers.filter(a=>a.alive&&a.side==='nra');
+        const mission=g.Debug.FirstLevelMission();
+        return {count:actors.length,models:actors.map(a=>a.actor.characterRig?.modelId||null),
+          cast:actors.map(a=>a.castId).filter(Boolean).sort(),
+          captives:mission.opening.captives.map(entry=>entry.id).sort(),stage:mission.stage};});
+      assert.equal(partial.stage,'Trapped','the interrupted boot still opens on the collapsed bunker');
+      assert.ok(partial.count>=6,'interrupted models preserve every physical person on the field: '+partial.count);
+      assert.deepEqual(partial.cast,['heyoutian','liuwencai','luo','yaowa'],'the whole squad is physically present');
+      assert.deepEqual(partial.captives,['BunkerCaptiveHelper','BunkerCaptiveWounded'],
+        'both captives outside the door survive the interrupted download');
       assert.ok(partial.models.includes(null),'missing selected models use the explicit whitebox fallback');
-      assert.ok(partial.models.includes('LugouNra05'),'the surviving soldier keeps its original model ID');
-      assert.ok(partial.models.every(id=>id===null||id==='LugouNra05'),'failed downloads never shift soldier slots into another model or officer');
+      assert.ok(partial.models.every(id=>id===null||id==='LugouNra05'),
+        'failed downloads never shift soldier slots into another model or officer');
       await page.locator('#bootStart').click();
       await page.waitForFunction(()=>window.Tengxian.state.running&&document.getElementById('boot').classList.contains('gone'),null,{timeout:10000});
     } else {

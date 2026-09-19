@@ -31,6 +31,7 @@
 //   timer            计时满足
 // ===========================================================================
 import { MISSION_TUNING as R } from "./Data_Tuning_FirstLevel.mjs";
+import { END_TUNING as END } from "./Data_Tuning_FirstLevelEnd.mjs";
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
 import { FRONT_SORTIE as Sortie } from "./Data_FirstLevelFrontRoute.mjs";
 import { FRONT_SHELLS } from "./Data_FirstLevelMissionFront.mjs";
@@ -389,32 +390,38 @@ export const MISSION_FACT_GATES = Object.freeze({
   zhouChecked: Gate({ kind: "voice", step: "Regroup", cue: "ZhouCheck", source: "VoiceDone" }),
   headcountDone: Gate({ kind: "voice", step: "Regroup", cue: "Headcount", source: "VoiceDone" }),
   litterRemanned: Gate({
-    kind: "scripted", step: "Regroup", source: "Update",
-    text: "缺人的担架换上抬手，队伍重新成形",
+    kind: "scripted", step: "Regroup", source: "FirstLevelQuietMarch.UpdateRegroup",
+    text: "缺人的担架真的等来了替补（民夫走过去接手，BearerShort/RequestBearer 那条路），"
+      + "倒下的担架重新立起来，老周担架两端都有人；前置是 survivorsSheltered",
+    requires: ["survivorsSheltered"],
   }),
   columnMoving: Gate({
-    kind: "column", step: "Regroup", source: "Update",
-    text: "收拢完成，队伍沿院墙夹道方向重新走起来",
+    kind: "column", step: "Regroup", source: "FirstLevelQuietMarch.UpdateRegroup",
+    text: "队首沿撤离线真的走出一个担架间距（不是进沟就算）",
+    requires: ["litterRemanned"],
   }),
   // --- WallPath (15B) ----------------------------------------------------
   carryHandover: Gate({
     kind: "interaction", step: "WallPath", interaction: "MissionZhouCarry", anchor: "wallPathStart",
-    source: "BeginCarry", text: "顺子再次接过老周担架（CarrySwap）",
+    source: "BeginCarry", text: "后抬手撒手之后顺子按 F 接过老周担架（CarrySwap）",
+    requires: ["carrySwapOffered"],
   }),
   wallPathTraversed: Gate({
     kind: "proximity", step: "WallPath", anchor: "wallPathEnd", radiusM: 6, source: "Update",
-    note: "靠院墙夹道那一段留了无对白行走，全程无敌人",
+    note: "靠院墙夹道那一段留了无对白行走（quietWalkObserved 取证），全程无敌人",
   }),
   stragglersTended: Gate({
-    kind: "column", step: "WallPath", source: "Update",
-    text: "掉队的伤员被照应上，担架队跟到夹道尽头",
+    kind: "column", step: "WallPath", source: "FirstLevelQuietMarch.UpdateWallPath",
+    text: "每个掉队的步行伤员身边都真的有人走到了（照应者跟到并排的距离内）",
   }),
   // --- ReceptionGate (15C) -----------------------------------------------
   gateChallenged: Gate({ kind: "voice", step: "ReceptionGate", cue: "GateChallenge", source: "VoiceDone" }),
   receptionAccepted: Gate({ kind: "voice", step: "ReceptionGate", cue: "ReceptionAccept", source: "VoiceDone" }),
   woundedEntering: Gate({
-    kind: "column", step: "ReceptionGate", source: "Update",
-    text: "伤员实际进入接收院",
+    kind: "column", step: "ReceptionGate", source: "FirstLevelReception.UpdateGate",
+    text: "接收人员把位置说清楚（receptionAccepted）之后担架队才上入院路线；"
+      + "全部幸存担架都在路上、而且已经有 " + END.woundedEnteringLitters + " 副真的进了院子",
+    requires: ["receptionAccepted"],
   }),
   // --- Handover ----------------------------------------------------------
   thresholdCrossed: Gate({
@@ -423,41 +430,57 @@ export const MISSION_FACT_GATES = Object.freeze({
   }),
   zhouPlaced: Gate({
     kind: "interaction", step: "Handover", interaction: "MissionZhouPlace", anchor: "zhouDrop",
-    source: "Register", text: "把老周放到军医旁边（放下之后恢复持枪）",
+    source: "Register", text: "军医指了位置（placeOrderHeard）之后，玩家与前抬手一起把老周放下；放下就恢复持枪",
+    requires: ["placeOrderHeard"],
   }),
   medicExamining: Gate({ kind: "voice", step: "Handover", cue: "MedicAsk", source: "VoiceDone" }),
   squadAssigned: Gate({ kind: "voice", step: "Handover", cue: "SquadAssign", source: "VoiceDone" }),
   // --- Death -------------------------------------------------------------
   deathSceneComplete: Gate({
-    kind: "cutscene", step: "Death", source: "Update/controls(death)",
-    text: "老周牺牲那一段演完（且 ZhouDeath 的对白放完）；第一人称，不切尸体特写",
+    kind: "cutscene", step: "Death", source: "controls(death) + FirstLevelReception.UpdateDeath",
+    text: "老周牺牲那一段演完（第一人称，不切尸体特写，ZhouDeath 七句放完），"
+      + "而且接收处真的继续在工作：门外又抬进来一副担架、军医转过去救下一个、幺娃把覆盖物拉正。"
+      + "老周死亡不判全关失败",
   }),
   // --- Bridge ------------------------------------------------------------
-  bridgeOrdersHeard: Gate({ kind: "voice", step: "BridgeOrders", cue: "BridgeOrders", source: "VoiceDone" }),
+  bridgeOrdersHeard: Gate({
+    kind: "voice", step: "BridgeOrders", cue: "BridgeOrders", source: "VoiceDone",
+    note: "传令兵真人跑到接收处玩家跟前才起（bridgeRunnerArrived）",
+  }),
   southBankReached: Gate({
     kind: "proximity", step: "BridgeCover", anchor: "bridgeCover", radiusM: 8, source: "Update",
     note: "南岸遮挡后的射位",
   }),
   bridgeFireBroken: Gate({
-    kind: "combat", step: "BridgeCover", encounter: "bridgeNorth", source: "Update",
-    text: "北岸土坎的火力被打掉（不做多波守点）",
+    kind: "combat", step: "BridgeCover", encounter: "bridgeNorth", member: "BridgeNorthGunner",
+    source: "FirstLevelBridge.FireBroken",
+    text: "北岸土坎的火力被打断：架在坎上那挺机枪必须哑，而且活着的人谁也够不到桥头与桥心。"
+      + "不做多波守点，也不要求杀光（Notion：玩家不承担「杀光所有敌军」）",
   }),
   rearColumnCrossed: Gate({
-    kind: "column", step: "BridgeCover", source: "UpdateBridgeColumn",
-    text: "威胁解除后回援尾队沿 bridgeCrossing 真实通过铁路桥",
+    kind: "column", step: "BridgeCover", source: "FirstLevelBridge.UpdateColumn",
+    text: "威胁解除后，还活着的回援尾队每一个都沿 bridgeCrossing 真的下了南桥头"
+      + "（火力下停在北引道的那一段不算通过；中弹倒下的不拦着这一条）",
+    requires: ["bridgeFireBroken"],
   }),
   blastZoneCleared: Gate({
     kind: "proximity", step: "BridgeWithdraw", anchor: "blastSafe", radiusM: 10, source: "Update",
+    note: "玩家退到南岸掩护区；爆破区里还有己方时爆破继续等（blastHeldForFriendly）",
   }),
   bridgeDestroyed: Gate({
-    kind: "scripted", step: "BridgeWithdraw", source: "UpdateBridgeBlast",
-    text: "爆破由在场人员完成，玩家在安全距离看见桥被破坏（不可逆，信号 RailBridgeDestroyed）",
+    kind: "scripted", step: "BridgeWithdraw", source: "FirstLevelBridge.UpdateWithdraw",
+    text: "爆破由此前就在场的人员完成（demolitionCharged），爆破区 "
+      + END.blastClearRadiusM + " m 内一个己方都没有才点火 —— 不是到点就炸的计时器。"
+      + "玩家在安全距离看见桥被破坏：5 个完好件消失、3 个残骸件出现（信号 RailBridgeDestroyed，不可逆）",
+    requires: ["blastZoneCleared", "demolitionCharged"],
   }),
   marchOrderHeard: Gate({ kind: "voice", step: "BridgeWithdraw", cue: "MarchToTengxian", source: "VoiceDone" }),
   // --- NightMarch --------------------------------------------------------
   nightTransitionComplete: Gate({
     kind: "scripted", step: "NightMarch", source: "Update/controls(nightTransition)",
-    text: "行军脚步 → 淡出 → 字幕 → 夜间天空 → 淡入北门外行军队列",
+    text: "先随队真的走完 marchOut 那一段（marchOutReached），行军脚步不停 → 淡出 → "
+      + "字幕「1938年3月15日 夜｜滕县」→ 黑屏里换夜间天空并瞬移 → 淡入北门外行军队列",
+    requires: ["marchOutReached"],
   }),
   northGateReached: Gate({
     kind: "proximity", step: "NightMarch", anchor: "northGate", radiusM: 6, source: "Update",
@@ -541,6 +564,58 @@ export const MISSION_FACT_GATES = Object.freeze({
     text: "机枪打出过子弹（守军交替撤退的放行条件之一）",
   }),
   bundleDirectionsHeard: Gate({ kind: "voice", step: "Tank", cue: "BundleSupply", source: "VoiceDone" }),
+  // --- 15–18 玩法包（End）的内部辅助事实（契约 §2 允许各包自己加）-------------
+  survivorsSheltered: Gate({
+    kind: "column", step: "Regroup", source: "FirstLevelQuietMarch.UpdateRegroup",
+    text: "幸存者全部贴进撤离沟的遮挡里、此刻没有敌人能看见他们（litterRemanned 的前置）",
+    requires: ["rescuePassageClear"],
+  }),
+  carrySwapOffered: Gate({
+    kind: "scripted", step: "WallPath", source: "FirstLevelQuietMarch.UpdateWallPath",
+    text: "后抬手体力不支撒手，担架停下等人接（CarrySwap 起在这一刻）",
+  }),
+  roadBumpCrossed: Gate({
+    kind: "scripted", step: "WallPath", source: "FirstLevelQuietMarch.UpdateWallPath",
+    text: "抬着老周走上夹道里那一处 0.22 m 的坎（WallPathBump，起 RoadBump）",
+  }),
+  quietWalkObserved: Gate({
+    kind: "timer", step: "WallPath", source: "FirstLevelQuietMarch.UpdateWallPath",
+    text: "夹道末段真的走了一整段无对白的路（取证用，不是过关条件）",
+  }),
+  placeOrderHeard: Gate({
+    kind: "voice", step: "Handover", cue: "PlaceLitter", source: "FirstLevelReception.UpdateHandover",
+    text: "军医指了位置（喊出口之后才允许按 F 放下担架）",
+  }),
+  squadDispersed: Gate({
+    kind: "scripted", step: "Handover", source: "FirstLevelReception.UpdateHandover",
+    text: "分派完人真的走开／留下（文财问路、何有田跟班长看外头、幺娃留在担架边）",
+  }),
+  bridgeRunnerArrived: Gate({
+    kind: "scripted", step: "BridgeOrders", source: "FirstLevelBridge.UpdateOrders",
+    text: "传令兵真人跑到接收处玩家跟前（BridgeOrders 起在这一刻，不是进步骤就喊）",
+  }),
+  demolitionCharged: Gate({
+    kind: "scripted", step: "BridgeWithdraw", source: "FirstLevelBridge.UpdateWithdraw",
+    text: "桥头原本就在场的爆破人员把药装好了（顺子不参与）",
+  }),
+  blastHeldForFriendly: Gate({
+    kind: "scripted", step: "BridgeWithdraw", source: "FirstLevelBridge.UpdateWithdraw",
+    text: "爆破区里还有己方，爆破一直等（取证用：证明不是到点就炸的计时器）",
+  }),
+  blastFriendlyStuck: Gate({
+    kind: "scripted", step: "BridgeWithdraw", source: "FirstLevelBridge.ClearBlastZone",
+    text: "爆破区里有个自己人卡住不动了（已经喊他撤、也真的推过他）：玩家早已退到安全区，"
+      + "记一条取证之后放行。玩家本人在区里则永远等",
+  }),
+  marchOutReached: Gate({
+    kind: "proximity", step: "NightMarch", anchor: "marchOut", radiusM: END.marchOutArriveM,
+    source: "FirstLevelNightGate.UpdateMarchOut",
+    note: "爆破之后随队走完 marchOut 那一段，才起黑屏转场（不是进步骤就淡出）",
+  }),
+  nightUsherLeading: Gate({
+    kind: "scripted", step: "NightMarch", source: "FirstLevelNightGate.UpdateNight",
+    text: "带路军人喊完话，领着小队从回援队列里分出来往门洞走",
+  }),
 
   // --- 家族门（一串点，逐个记一条事实）-------------------------------------
   approachShell: Gate({

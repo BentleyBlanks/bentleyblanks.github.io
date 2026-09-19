@@ -83,9 +83,12 @@ export function ApplyFirstLevelStageJump(runtime, value, { midCutscenes = false 
   while (r.spawnQueue.length) r.DrainSpawns();
   if (n === 14) {r.BeginCarry();r.UpdateCarry();}
   if (n === 17) {
+    // 幺娃守在担架边；军医是 15C 起就在院子里的那个真人（EnsureYardCast 已经建好），
+    // 直接摆到担架另一侧，省掉他从厢房另一头走过来的那十几秒。
     const yaowa=r.companion.Handle("yaowa");
     r.PlaceActor(yaowa,{x:A.zhouDrop.x+1,z:A.zhouDrop.z});
-    if (r.deathMedic) Object.assign(r.deathMedic,{x:A.zhouDrop.x-1,z:A.zhouDrop.z});
+    const surgeon=r.extras.Actor("WardSurgeon");
+    if (surgeon) r.PlaceActor(surgeon,{x:A.zhouDrop.x-1,z:A.zhouDrop.z});
   }
   r.view.Update(0,{tank:r.tank,player:r.player,camera:r.camera});
   r.SaveCheckpoint();
