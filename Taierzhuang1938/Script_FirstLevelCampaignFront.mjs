@@ -170,7 +170,8 @@ export async function Drive(ctx) {
   // 04 不再触发关中过场《空地上的三个人》（契约 §2）。
   assert.equal(await page.evaluate(() => window.Tengxian.state.cutscene || null), null,
     "04 不由任务触发 CS_MachineGunCaptives");
-  await Route([{ x: 0, z: -124 }, { x: 0, z: -127.4 }], "MachineGunSeat", { stance: "crouch", fight: true });
+  // 枪座就在三米外的沟里：这一小段不开火（fight 的 90 m 口径会让人站着对射、原地不动）。
+  await Route([{ x: 0, z: -124 }, { x: 0, z: -127.4 }], "MachineGunSeat", { stance: "crouch" });
   await Interact();
   const mounted = await page.evaluate(() => window.Tengxian.emplacement.Mounted);
   console.log("MACHINE_GUN_MOUNTED", mounted);
