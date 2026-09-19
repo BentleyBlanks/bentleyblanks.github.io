@@ -144,6 +144,10 @@ export async function CheckVoiceAssets(ctx) {
 export async function InstallInputDriver(ctx) {
   await ctx.page.evaluate(async () => {
           const g = window.Tengxian;
+          // 躲手榴弹这一段读的是真实爆炸口径（爆心抬高、命中高度、判墙余量）。
+          // 以前这里直接写 BLAST，可页面作用域里根本没有这个名字 —— 只要真有一颗
+          // 手榴弹落到玩家附近，整条驾驶就炸在 "BLAST is not defined" 上（04 实测）。
+          const { BLAST } = await import("./Data_Tuning_Combat.mjs");
           window.MissionInputDriver = {
             blocked: new Map(),
             EvadeGrenade() {
