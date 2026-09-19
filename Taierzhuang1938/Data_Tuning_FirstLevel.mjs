@@ -117,7 +117,10 @@ export const MISSION_TUNING = Object.freeze({
   walkSpeedMps: 1.7,
   squadSpeedMps: 3.05,
   diveSeconds: 2,
-  deathSeconds: 12,
+  // 17 老周牺牲那一段的接管时长。旧的 8–12 s 是采用稿之前的短版；现在 ZhouDeath
+  // 是七句 + 第一句之后那段「……」，强制对齐量出来 13.52 s
+  //（Data_FirstLevelMissionVoiceAlignment.ZhouDeath 末句结束时刻），留半秒收尾。
+  deathSeconds: 14,
   deathLookSeconds: .65,
   deathLookHeightM: .44,
   // Commit the finite front force at the last approach bend, not while the
@@ -520,14 +523,10 @@ export const MISSION_TUNING = Object.freeze({
   cartRideMaxS: 60,
   // 车真的离开装载位这么远才记 zhouCartDeparted（与 boardingWitnessM 同一把尺）。
   cartDepartedM: 6,
-  // —— 15 收拢。换抬手与清点用的固定节拍（无战斗段，纯降压）。
-  regroupRemanSeconds: 3,
   // —— 18 铁路桥。尾队沿 bridgeCrossing 过桥的人数与步速（走路 walkSpeedMps 1.7 略慢）。
   bridgeColumnCount: 6,
   bridgeColumnSpeedMps: 1.9,
   bridgeColumnSpacingM: 3.4,
-  // 爆破：玩家退到 blastSafe 之后再等这么久炸（在场人员点火、跑开）。
-  bridgeBlastDelayS: 3,
   bridgeBlastRadiusM: 12,
   // —— 18 夜行军黑屏字幕（沿用旧南行转场的 1/4/1）。
   nightTransition: Object.freeze({ fadeOutS: 1, holdS: 4, fadeInS: 1 }),
@@ -583,3 +582,7 @@ export const MISSION_RETURN = Object.freeze({
   urgentM:58,squadUrgentM:105,edgeM:14,edgeUrgentM:6,edgeHysteresisM:3,
   enterDelayS:1.25,stageGraceS:3,
 });
+
+// 公开阶段 15–18（End 玩法包）的数值与摆位另立一张表，入口仍是本文件
+// （契约 docs/Data_FirstLevelRebuild20260919Contract.md §8）。
+export { END_TUNING, END_ROUTES } from "./Data_Tuning_FirstLevelEnd.mjs";

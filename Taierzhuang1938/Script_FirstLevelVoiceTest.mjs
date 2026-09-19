@@ -152,6 +152,10 @@ console.log(`ok MISSION_VOICE_FACTS 的 ${Object.keys(MISSION_VOICE_FACTS).lengt
     "./Script_FirstLevelMissionRuntime.mjs", "./Script_FirstLevelOpening.mjs",
     "./Script_FirstLevelLeaderGuide.mjs", "./Data_FirstLevelLeaderGuide.mjs",
     "./Data_FirstLevelMission.mjs", "./Data_FirstLevelMissionGates.mjs",
+    // 第二波把演出搬进各玩法包的新模块，运行时只留薄钩子 —— 扫描范围跟着走，
+    // 否则「哪条 cue 已经有触发点了」会静默地对不上（契约 §8 的分包约定）。
+    "./Script_FirstLevelQuietMarch.mjs", "./Script_FirstLevelReception.mjs",
+    "./Script_FirstLevelBridge.mjs", "./Script_FirstLevelNightGate.mjs",
   ];
   const referenced = new Map();
   for (const name of RUNTIME_SOURCES) {
@@ -173,13 +177,12 @@ console.log(`ok MISSION_VOICE_FACTS 的 ${Object.keys(MISSION_VOICE_FACTS).lengt
   assert.deepEqual(missing, [], "运行时引用了台词表里没有的 cue：" + JSON.stringify(missing));
   // 反过来：已经烘好、但运行时还没有触发点的剧情 cue。第二波玩法包一条条接上，
   // 接完这张表就空了。**只许变短**：出现表外的新条目说明又有一段演出被摘掉了。
+  // 2026.09.20 End 包（阶段 15–18）接完了自己那七条：CartAbandon / RoadBump /
+  // HandsShake / WardGuide / PlaceLitter / NextLitter / NorthGate。名单只许变短。
   const SECOND_WAVE_UNWIRED = new Set([
     "RescueOut", "TrenchCurse",                                  // 02 出掩蔽部、后交通壕
     "BundleProne", "BundleReturnCall",                            // 05 取弹返程
     "KitchenDetour", "MeleeCurse", "WindowOrder",                 // 08/09 主街与连屋
-    "CartAbandon", "RoadBump", "HandsShake",                      // 15 降压段
-    "WardGuide", "PlaceLitter", "NextLitter",                     // 16/17 接收院
-    "NorthGate",                                                  // 18 北门
   ]);
   const unwired = story.map((cue) => cue.id).filter((id) => !referenced.has(id));
   for (const id of unwired) assert.ok(SECOND_WAVE_UNWIRED.has(id), "这条剧情 cue 没有任何触发点：" + id);

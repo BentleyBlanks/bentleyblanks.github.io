@@ -59,6 +59,13 @@ import { FirstLevelMissionView } from "./Script_FirstLevelMissionView.mjs";
 import { FirstLevelMissionBattleSound } from "./Script_FirstLevelMissionBattleSound.mjs";
 import { FirstLevelMissionVoice } from "./Script_FirstLevelMissionVoice.mjs";
 import { FirstLevelMissionMusic } from "./Script_FirstLevelMissionMusic.mjs";
+// 15–18（End 包）：运行时只留薄钩子，演出与判定在这几个模块里。
+import { EndExtras, EndDressing } from "./Script_FirstLevelEndCast.mjs";
+import { FirstLevelQuietMarch } from "./Script_FirstLevelQuietMarch.mjs";
+import { FirstLevelReception } from "./Script_FirstLevelReception.mjs";
+import { FirstLevelBridge } from "./Script_FirstLevelBridge.mjs";
+import { FirstLevelNightGate } from "./Script_FirstLevelNightGate.mjs";
+import { FirstLevelNightLights } from "./Script_FirstLevelNightLights.mjs";
 import { EmplacementInteraction } from "./Script_Emplacement.mjs";
 import { Localize, T } from "./Script_Text.mjs";
 import { ActionKeyGlyph } from "./Script_Input.mjs";
@@ -146,6 +153,16 @@ export class FirstLevelMissionRuntime {
     this.music = new FirstLevelMissionMusic(this.audio);
     this.musicInitializing = true;
     this.view.interact = this.interact;
+    // 15–18：真人实体层 + 布景层 + 四个步骤模块（契约 §8 的 End 包）。
+    // 布景层挂到 view 上，由它在 people.Begin/End 之间画一次。
+    this.extras = new EndExtras(this);
+    this.dressing = new EndDressing();
+    this.view.extras = this.dressing;
+    this.nightLights = new FirstLevelNightLights({ scene: this.scene });
+    this.quietMarch = new FirstLevelQuietMarch(this);
+    this.reception = new FirstLevelReception(this);
+    this.bridge = new FirstLevelBridge(this);
+    this.nightGate = new FirstLevelNightGate(this);
     this.leaderGuide = new FirstLevelLeaderGuide(this);
     this.Register();
     this.flow.Start();
@@ -259,8 +276,9 @@ export class FirstLevelMissionRuntime {
     return null;
   }
   VoiceEvent(id,cueId,detail) {
-    // 逐句事件（Voice 包统一发）：目前骨架只用来把受困段的近爆打在末句上。
-    if(id==="Line")return;
+    // 逐句事件（Voice 包统一发）：受困段的近爆打在末句上；15A 的点名靠它让
+    // 说话的人与何有田互相转过去（「逐个应答要对着真人」）。
+    if(id==="Line"){this.quietMarch.OnLine(cueId,detail);return;}
     if(id==="BunkerBlast"){this.opening.BunkerBlast();return;}
     if(id==="RescueHeave"){this.Record("bunkerRescueHeave");return;}
     if(id==="AircraftDiveOrder" && !this.Has("diveComplete")) {
@@ -276,6 +294,14 @@ export class FirstLevelMissionRuntime {
     // 带额外副作用的对白事件在 VoiceEvent 里，不在这条链上。
     const fact = MISSION_VOICE_FACTS[id];
     if (fact) this.Record(fact);
+  }
+  /** End 包的剧情人物也走共用的待机姿态层（那一层要 three，模块自己不 import）。 */
+  InstallSentry(actor) {
+    if (actor) InstallMissionSentry(actor);
+  }
+  /** 某个点在担架队当前路线上的里程（15C 拦在院门外排队要用）。 */
+  ColumnProgressAt(point) {
+    return MissionRouteProjection(this.column.route, point).progress;
   }
   PlaceActor(actor, point) {
     if (!actor) return;
@@ -659,6 +685,9 @@ export class FirstLevelMissionRuntime {
     for (const actor of this.squad) {
       InstallMissionSentry(actor);
       if (!actor.missionTrainReady) continue;
+      // 16 的分派与 17 的何有田：接了吩咐的人真的走开／留下，接触反应不许盖过去
+      //（口径同 02 罗班长掀木架那一处放行）。路线在 FirstLevelReception。
+      if (this.reception.HasWalk(actor.id)) { actor.scriptedNoncombatant = true; continue; }
       if (actor === this.bedGuide?.actor && ["Handover", "Death"].includes(stage)) {
         const route = this.bedGuide.route;
         while (route.length && Distance(actor.position, route[0]) < 0.7) route.shift();
@@ -808,7 +837,8 @@ export class FirstLevelMissionRuntime {
           &&!actor.missionCoverWaiting
           &&!actor.missionGuideWaiting
           &&!actor.missionCoverApproach
-          &&!(actor===this.bedGuide?.actor&&["Handover","Death"].includes(stage)),
+          &&!(actor===this.bedGuide?.actor&&["Handover","Death"].includes(stage))
+          &&!this.reception.HasWalk(actor.id),
         noPause:!!this.squadCoverBounds,
         maxSpeed:marchSpeeds.get(actor.id)??0,
       }),
@@ -1141,7 +1171,9 @@ export class FirstLevelMissionRuntime {
       "MissionZhouCarry",
       A.queue,
       () => this.Text("carry"),
-      () => ["Carry", "WallPath", "Handover"].includes(this.flow.stage.id) && !this.carry.Active,
+      // 15B 的换手不是一进夹道就能按：后抬手真的撒了手（carrySwapOffered）才轮到顺子。
+      () => ["Carry", "WallPath", "Handover"].includes(this.flow.stage.id) && !this.carry.Active
+        && (this.flow.stage.id !== "WallPath" || this.Has("carrySwapOffered")),
       () => this.BeginCarry(),
       {
         Anchor: () =>
@@ -1158,11 +1190,15 @@ export class FirstLevelMissionRuntime {
       "MissionZhouPlace",
       A.zhouDrop,
       () => this.Text("place"),
-      () => this.flow.stage.id === "Handover" && this.carry.KindId === "stretcher",
+      // 军医先指位置（PlaceLitter → placeOrderHeard），玩家与前抬手才一起放下。
+      () => this.flow.stage.id === "Handover" && this.carry.KindId === "stretcher" && this.Has("placeOrderHeard"),
       () => {
         this.carry.ForceRelease("delivered");
-        Object.assign(this.column.zhou, { ...A.zhouDrop, state: "placed", yaw: 0 });
+        Object.assign(this.column.zhou, { ...A.zhouDrop, state: "placed", yaw: 0, roll: 0 });
         this.Record("zhouPlaced");
+        // 放下担架就恢复正常持枪（Notion 16）。
+        this.RestoreRifle();
+        this.SaveCheckpoint();
         return true;
       },
     );
@@ -1222,8 +1258,10 @@ export class FirstLevelMissionRuntime {
     this.UpdateMusic(stage.id);
     this.Objective(Localize(FirstLevelStageTextId(stage.id), stage.objective));
     // 进场不自动播的那几步：它们的 cue 由编排在真正发生的那一刻起播
-    // （受困段的黑屏对白、接令、院门打开、牺牲、上车）。
-    if (stage.cue && !["Trapped", "Orders", "Courtyard", "Death", "CartRide"].includes(stage.id))
+    // （受困段的黑屏对白、接令、院门打开、牺牲、上车；15B 后抬手撒手、15C 院门
+    // 守军喝止、16 过门槛、18 传令兵跑到跟前与尾队被顶在桥头）。
+    if (stage.cue && !["Trapped", "Orders", "Courtyard", "Death", "CartRide",
+      "WallPath", "ReceptionGate", "Handover", "BridgeOrders", "BridgeCover"].includes(stage.id))
       this.Say(stage.cue, { urgent: ["AirFirst", "Dive", "Death"].includes(stage.id) });
     // 按表生成这一步的遭遇组（Data_FirstLevelMissionGates.MISSION_STEP_SPAWNS，
     // 顺序就是原来各 case 里的调用顺序）。front 与转运四拍不在表里：
@@ -1329,17 +1367,19 @@ export class FirstLevelMissionRuntime {
       case "Regroup":
         // 15A 降压段：收拢、换手、清点。无战斗 —— 追兵由警戒兵在车路方向接住。
         this.column.StartRetreat();
-        this.regroupTime = 0;
         this.Guide(MissionRegroupCorridor("Regroup").route);
+        this.quietMarch.Enter("Regroup");
         break;
       case "WallPath":
         this.column.zhou.health = 12;
         this.Guide(MISSION_STAGE_ROUTES.wallPath);
+        this.quietMarch.Enter("WallPath");
         break;
       case "ReceptionGate":
+        // StartReception 挪到「接收人员把位置说清楚」之后（FirstLevelReception）。
         this.column.zhou.health = 6;
-        this.column.StartReception();
         this.guideRoute = null;
+        this.reception.Enter("ReceptionGate");
         break;
       case "Handover":
         this.column.zhou.state = "waiting";
@@ -1348,25 +1388,29 @@ export class FirstLevelMissionRuntime {
           route: [...MISSION_ROUTES.reception, { x: A.zhouDrop.x + 1, z: A.zhouDrop.z }],
         };
         if (this.bedGuide.actor) this.squadRoutes.set(this.bedGuide.actor.id, []);
+        this.EnsureYardCast();
+        this.reception.Enter("Handover");
         break;
       case "Death":
-        this.deathMedic = this.column.walkers
-          .filter((w) => w.kind === "medic" && w.health > 0 && !w.assigned)
-          .sort((a, b) => Distance(a, A.zhouDrop) - Distance(b, A.zhouDrop))[0];
-        if(this.deathMedic)this.deathMedic.treating=true;
-        this.deathCareRoute=null;
+        this.EnsureYardCast();
+        this.reception.Enter("Death");
         break;
       case "BridgeOrders":
         this.guideRoute = null;
         this.audio.Ambience("firstLevelFront");
         this.Guide(MISSION_STAGE_ROUTES.toBridge);
-        this.StartBridgeColumn();
+        this.bridge.Enter("BridgeOrders");
+        break;
+      case "BridgeCover":
+        this.bridge.Enter("BridgeCover");
         break;
       case "BridgeWithdraw":
         this.Guide(MISSION_STAGE_ROUTES.bridgeWithdraw);
+        this.bridge.Enter("BridgeWithdraw");
         break;
       case "NightMarch":
-        this.BeginNightTransition();
+        // 爆破之后先随队走完 marchOut 才淡出（FirstLevelNightGate）。
+        this.nightGate.Enter("NightMarch");
         break;
       case "Complete":
         this.ClearReturnWarning();
@@ -1886,41 +1930,15 @@ export class FirstLevelMissionRuntime {
     }
   }
   // ---------------------------------------------------------------------------
-  // 18 铁路桥（BridgeOrders → BridgeCover → BridgeWithdraw）。
-  // 尾队沿 bridgeCrossing 的折线进度真走；炸桥发信号 RailBridgeDestroyed。
+  // 15C–17 接收院常驻的那四个人（院门守军两名、接收人员、军医）。
+  // 直接跳进 16/17 时 15C 的 Enter 没跑过，这里补齐 —— 演出不能靠「上一步一定走过」。
   // ---------------------------------------------------------------------------
-  StartBridgeColumn() {
-    if (this.bridgeColumn) return;
-    this.bridgeColumn = Array.from({ length: R.bridgeColumnCount }, (_, i) => ({
-      id: `RearColumn${i}`, progress: -i * R.bridgeColumnSpacingM, crossed: false, actor: null,
-    }));
-  }
-  UpdateBridgeColumn(dt) {
-    if (!this.bridgeColumn) return;
-    const route = MISSION_STAGE_ROUTES.bridgeCrossing, length = MissionRouteLength(route);
-    // 威胁没解除以前尾队压在北岸不动（不做多波守点，只是「不许白白过桥」）。
-    const moving = this.Has("bridgeFireBroken");
-    for (const entry of this.bridgeColumn) {
-      if (moving && entry.progress < length) entry.progress = Math.min(length, entry.progress + dt * R.bridgeColumnSpeedMps);
-      const at = MissionRoutePoint(route, Math.max(0, entry.progress));
-      entry.x = at.x; entry.z = at.z; entry.yaw = at.yaw ?? 0;
-      if (entry.progress >= length) entry.crossed = true;
-    }
-    if (moving && this.bridgeColumn.every(entry => entry.crossed))
-      this.Record("rearColumnCrossed", { count: this.bridgeColumn.length });
-  }
-  UpdateBridgeBlast(dt) {
-    if (this.Has("bridgeDestroyed")) return;
-    if (!this.Has("blastZoneCleared")) { this.bridgeBlastTime = 0; return; }
-    this.bridgeBlastTime = (this.bridgeBlastTime || 0) + dt;
-    if (this.bridgeBlastTime < R.bridgeBlastDelayS) return;
-    const at = this.Point(A.railBridge, 1.2);
-    this.vfx.Explosion?.(at, { radius: R.bridgeBlastRadiusM });
-    this.audio.Play("shellImpact", { position: at, volume: 1 });
-    // 桥面 / 桁架 / 钢轨与残骸都挂在 RailBridgeDestroyed 这个信号上，
-    // 由 Signalled("RailBridgeDestroyed") → bridgeDestroyed 这条事实驱动。
-    this.Record("bridgeDestroyed", { x: A.railBridge.x, z: A.railBridge.z });
-    this.Say("MarchToTengxian");
+  EnsureYardCast() {
+    const yard = P.receptionYard;
+    this.extras.Spawn("GateGuardNorth", yard.gateGuard[0], { weapon: "HanYang", squadId: "MissionYardGate" });
+    this.extras.Spawn("GateGuardSouth", yard.gateGuard[1], { weapon: "HanYang", squadId: "MissionYardGate" });
+    this.extras.Spawn("YardReceiver", yard.receiver, { weapon: null, unarmed: true, squadId: "MissionYardReceiver" });
+    this.extras.Spawn("WardSurgeon", yard.surgeon, { weapon: null, unarmed: true, squadId: "MissionWardSurgeon" });
   }
   // ---------------------------------------------------------------------------
   // 18 夜行军（NightMarch）。黑屏字幕里瞬移到 nightSpawn 并换夜间天空。
@@ -2290,40 +2308,14 @@ export class FirstLevelMissionRuntime {
     this.UpdateAir(dt);
     this.UpdateCarry();
     this.UpdateCart(dt);
-    this.UpdateBridgeColumn(dt);
+    // 15–18 的布景每帧重报一次（没报的人这一帧自动藏起来）。
+    this.dressing.Begin();
     const stage = this.flow.stage.id,
       t = this.flow.stageTime;
     if(["Support","MachineGun","Tank","Orders"].includes(stage))this.UpdateGuards(dt);
     this.UpdateFrontDialogue();
     prof?.E("story/mission/director");
     prof?.B("story/mission/other");
-    if (stage === "Death") {
-      if (this.deathMedic?.health<=0) {this.deathMedic.treating=false;this.deathMedic=null;this.deathCareRoute=null;}
-      const medic=this.deathMedic, zhou=this.column.zhou;
-      const helper=medic || this.squad.find(actor=>actor.alive);
-      if (helper) {
-        const p=medic?helper:helper.position, finish={x:zhou.x-1,z:zhou.z};
-        if(!this.deathCareRoute) {
-          const ward=P.wardInterior, inWard=p.x>ward.minX&&p.x<ward.maxX&&p.z<ward.maxZ&&p.z>ward.minZ;
-          this.deathCareRoute=[...(inWard?[]:MISSION_ROUTES.reception.slice(2)),finish];
-        }
-        while(this.deathCareRoute.length>1&&Distance(p,this.deathCareRoute[0])<.5)this.deathCareRoute.shift();
-        const target=this.deathCareRoute[0],distance=Distance(p,target);
-        if(medic){
-          const step=Math.min(1,dt*R.medicApproachMps/(distance||1));
-          medic.x+=(target.x-medic.x)*step;medic.z+=(target.z-medic.z)*step;
-          medic.yaw=Math.atan2(p.x-target.x,p.z-target.z);
-          medic.crouch=this.deathCareRoute.length===1&&distance<1.5;
-        }else this.MoveActor(helper,target,R.medicApproachMps);
-        if(this.deathCareRoute.length===1&&distance<1.2&&!this.Has("deathMedicArrived")){
-          this.Record("deathMedicArrived",{helper:medic?.id||helper.castId});
-          this.BeginControl("death",R.deathSeconds);
-          this.Say("ZhouDeath",{urgent:true});
-        }
-      }
-      const yaowa = this.companion.Handle("yaowa");
-      if (yaowa && Distance(yaowa.position, zhou) < 2) this.ai.SetStance(yaowa, 1, 2, true);
-    }
     if (this.controls) {
       if(this.controls.kind==="nightTransition"){
         this.transition.Update(this.controls.time);
@@ -2347,9 +2339,10 @@ export class FirstLevelMissionRuntime {
         }
         else if (kind === "dive") this.Record("diveComplete");
         else if (kind === "death") {
+          // 确认完了，但 17 还没走完：接收处要真的继续工作（门外那一副担架、
+          // 军医转过去救下一个、幺娃拉正覆盖物）才记 deathSceneComplete。
           this.column.zhou.health = 0;
-          if(this.deathMedic){this.deathMedic.treating=false;this.deathMedic.crouch=false;}
-          this.Record("deathSceneComplete");
+          this.reception.OnDeathSceneEnd();
           this.RestoreRifle();
         }
         else throw new Error(`Unhandled mission control kind ${kind}`);
@@ -2403,15 +2396,12 @@ export class FirstLevelMissionRuntime {
         this.Record("littersInCover",{held:this.column.litters.filter(litter=>litter.health>0).length});
     }
     if (stage === "Melee") this.UpdateMelee();
-    if (stage === "BridgeCover") {
-      if(this.GateNear("southBankReached"))this.Record("southBankReached");
-      const bridge=MISSION_ENCOUNTERS.bridgeNorth.map(spec=>this.enemies.get(spec.id));
-      if(bridge.length&&bridge.every(actor=>actor&&!actor.alive))this.Record("bridgeFireBroken");
-    }
-    if (stage === "BridgeWithdraw") {
-      if(this.GateNear("blastZoneCleared"))this.Record("blastZoneCleared");
-      this.UpdateBridgeBlast(dt);
-    }
+    // --- 18 铁路桥：接令、掩护尾队、撤出爆破区（演出与判定在 FirstLevelBridge）---
+    if (stage === "BridgeCover" && this.GateNear("southBankReached")) this.Record("southBankReached");
+    if (stage === "BridgeWithdraw" && this.GateNear("blastZoneCleared")) this.Record("blastZoneCleared");
+    if (["BridgeOrders", "BridgeCover", "BridgeWithdraw"].includes(stage)) this.bridge.Update(dt, stage);
+    // --- 18 夜入滕城：先随队走完 marchOut，黑屏里换天，再随队进北门 ---
+    this.nightGate.Update(dt, stage);
     if (stage === "NightMarch" && this.Has("nightTransitionComplete")) {
       if(this.GateNear("northGateReached"))this.Record("northGateReached");
       if(this.Has("northGateReached")&&this.GateNear("gateEntered"))this.Record("gateEntered");
@@ -2522,36 +2512,20 @@ export class FirstLevelMissionRuntime {
           actor.missionPursuitIndex = index;
           this.Defend(actor, MISSION_PURSUIT_ROUTE[index]);
         }
-      this.regroupTime = (this.regroupTime || 0) + dt;
-      if (this.regroupTime >= R.regroupRemanSeconds) {
-        for (const litter of this.column.litters) if (litter.health > 0 && litter.state === "fallen") litter.state = "waiting";
-        this.Record("litterRemanned", { litters: this.column.litters.filter(l => l.health > 0).length });
-      }
-      if (this.Has("litterRemanned") && this.column.litters.some(litter => litter.health > 0 && litter.progress > 0))
-        this.Record("columnMoving", { lead: Math.max(...this.column.litters.map(litter => litter.progress)) });
-      this.Say("PicketHold"); this.Say("ZhouCheck"); this.Say("Headcount");
+      this.Say("PicketHold");
     }
     // 15B 院墙夹道：无敌人，留一段无对白行走。
-    if (stage === "WallPath") {
-      if (this.GateNear("wallPathTraversed")) this.Record("wallPathTraversed");
-      const walking = this.column.litters.filter(litter => litter.health > 0);
-      if (walking.length && walking.every(litter => litter.progress > 0))
-        this.Record("stragglersTended", { tended: walking.length });
+    if (stage === "WallPath" && this.GateNear("wallPathTraversed")) this.Record("wallPathTraversed");
+    // 15C 院门：守军确认身份 → 接收人员安置 → 伤员实际入院（担架队先压在门外）。
+    if (stage === "ReceptionGate") maxProgress = Math.min(maxProgress, this.reception.GateLimit());
+    // 16 过门槛：「脚……慢点」是老周最后一句话。
+    if (stage === "Handover" && this.GateNear("thresholdCrossed")) {
+      this.Record("thresholdCrossed");
+      this.Say("Threshold");
     }
-    // 15C 院门：守军确认身份 → 接收人员安置 → 伤员实际入院。
-    if (stage === "ReceptionGate") {
-      this.Say("GateChallenge"); this.Say("ReceptionAccept");
-      const remaining = this.column.litters.filter(
-        (litter) => litter.visible && !litter.evacuated && !litter.loaded && litter.health > 0,
-      );
-      if (remaining.length && remaining.every((litter) => litter.received))
-        this.Record("woundedEntering", { received: remaining.length });
-    }
-    if (stage === "Handover") {
-      if (this.GateNear("thresholdCrossed")) { this.Record("thresholdCrossed"); this.Say("Threshold"); }
-      if (this.Has("zhouPlaced")) { this.Say("MedicAsk"); this.Say("SquadAssign"); }
-    }
-    if (stage === "BridgeOrders") this.Say("BridgeOrders");
+    // 15A/15B 与 15C/16/17 的演出与判定（新模块，运行时只留这两句钩子）。
+    if (["Regroup", "WallPath"].includes(stage)) this.quietMarch.Update(dt, stage);
+    if (["ReceptionGate", "Handover", "Death", "BridgeOrders"].includes(stage)) this.reception.Update(dt, stage);
     this.column.Update(dt, { moving, routeSafe: safe, maxProgress, player: this.player.position, ...(safeAt ? {SafeAt:safeAt} : {}) });
     this.view.Update(this.time, { tank: this.tank,player:this.player,camera:this.camera||null });
     this.flow.Update(dt);
@@ -2609,14 +2583,17 @@ export class FirstLevelMissionRuntime {
     if (stage === "Dive") {
       this.BeginControl("dive", R.diveSeconds);
       this.voice.Replay("AircraftReturn");
-    } else if (stage === "Death") {
+    } else if (stage === "Death" && !this.reception.death?.confirmed) {
       this.BeginControl("death", R.deathSeconds);
       this.voice.Replay("ZhouDeath");
     } else if (stage === "Trapped") {
       this.opening.ResetBunker();
       this.voice.Resume();
     } else if (stage === "NightMarch") {
+      // 夜景与夜天空都跟着 nightArrivalPlaced 走：清掉它，空间与天光自己退回白天，
+      // 灯也一盏不留，然后把黑屏转场重演一遍（marchOutReached 已经记下，不重走那一段）。
       this.flow.facts.delete("nightArrivalPlaced");
+      this.nightLights?.Sync([]);
       this.RestoreSky?.();
       this.BeginNightTransition();
       this.voice.Resume();
@@ -2673,7 +2650,13 @@ export class FirstLevelMissionRuntime {
         return {id:spec.id,alive:!!actor?.alive,x:actor?.position.x??null,z:actor?.position.z??null};
       })},
       cart:this.cart?{...this.cart}:null,
-      bridgeColumn:this.bridgeColumn?this.bridgeColumn.map(entry=>({...entry,actor:undefined})):null,
+      // 15–18（End 包）的现场：布景、剧情实体、四个步骤模块各自的进度。
+      end:{
+        dressing:this.dressing.State(), extras:this.extras.State(),
+        quietMarch:this.quietMarch.State(), reception:this.reception.State(),
+        bridge:this.bridge.State(), nightGate:this.nightGate.State(),
+      },
+      bridgeColumn:this.bridge.State().rearColumn,
       missingCues:[...this.missingCues],
       debugStart: this.debugStart || null,
       time: this.time,
@@ -2727,6 +2710,8 @@ export class FirstLevelMissionRuntime {
     this.speakingFace?.Reset();
     if(this.ai.ctx.onSoldierDeath===this.soldierDeath)this.ai.ctx.onSoldierDeath=this.oldSoldierDeath;
     this.transition.Dispose();
+    this.extras.Clear();
+    this.nightLights?.Dispose();
     this.opening.Dispose();
     this.squadMarch?.Dispose();
     if(this.tankDust!=null)this.vfx.RemoveSmokeSource(this.tankDust);

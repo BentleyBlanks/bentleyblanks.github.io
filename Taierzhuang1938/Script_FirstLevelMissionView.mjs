@@ -286,7 +286,8 @@ export class FirstLevelMissionView {
         // 落地那一下只歪一点点。原来是 0.45 rad（26°）：担架成了一道白色的斜坡，
         // 而躺在上面的人（实例化的也好、带骨架的老周也好）是平的 —— 人浮在坡面上方，
         // 从地板镜头看过去整副担架读不出「上面躺着个人」（2026-09-16 屋内伏击出图实拍）。
-        this.zhouRoot.rotation.set(litter.state === "fallen" ? 0.1 : 0, yaw, 0);
+        // litter.roll 是 16 过厢房门槛时那一歪（FirstLevelReception 写，几帧就回正）。
+        this.zhouRoot.rotation.set(litter.state === "fallen" ? 0.1 : 0, yaw, litter.roll || 0);
         this.zhouPatient.material.color.setHex(litter.health < 25 ? 0xbda5a0 : 0xd9d7cb);
       } else {
         this.Instance("bed", litter.x, ground + height, litter.z, yaw);
@@ -367,6 +368,9 @@ export class FirstLevelMissionView {
         }
       }
     }
+    // 15–18 的布景（掉队伤员、门外抬进来的下一副担架、夜景里的队列与搬运）：
+    // 必须画在 people.Begin/End 之间，没报的那一帧人自动藏起来。
+    this.extras?.Draw(this, time);
     this.people.End();
     const visibleCarts=new Set([...this.column.vehicles,...this.column.traffic.filter(c=>c.visible)].filter(c=>c.z<=178).map(c=>c.id));
     for(const [id,box] of this.cartColliders)if(!visibleCarts.has(id)){

@@ -43,6 +43,15 @@ assert.equal(FirstLevelMusicState("NightMarch").cue, "firstLevelTheLivingStillNe
 assert.equal(FirstLevelMusicState("Orders").cue, "firstLevelTheFrontClosesIn");
 assert.equal(FirstLevelMusicState("Handover").cue, "firstLevelKeepYourEyesOpen");
 assert.equal(FirstLevelMusicState("WallPath").cue, "firstLevelTheLivingStillNeedUs");
+// 15–18 的情绪核（End 包 2026.09.20）：15A 与 17 静，15B/15C 压到背景，
+// 18 桥头回到紧张、爆破那一步是「南路断了」，夜入城收束。
+assert.equal(FirstLevelMusicState("Regroup").cue, null, "15A 降压段不放乐");
+assert.ok(FirstLevelMusicState("Regroup").fadeOut < 0.2, "15A 与 17 同一条快淡出");
+assert.ok(FirstLevelMusicState("WallPath").scale < 0.6 && FirstLevelMusicState("ReceptionGate").scale < 0.6,
+  "沿墙缓行与院门段的配乐压在喘息与脚步下面");
+assert.equal(FirstLevelMusicState("BridgeOrders").cue, "firstLevelTheFrontClosesIn");
+assert.equal(FirstLevelMusicState("BridgeWithdraw").cue, "firstLevelTheSouthRoadBreaks",
+  "炸桥这一步是一条通路被不可逆切断，不是「把路打开」");
 assert.equal(FirstLevelMusicState("Transfer").scale, 1);
 assert.equal(FirstLevelMusicState("Complete").cue, null);
 assert.equal(FirstLevelMusicState("Trapped", { failed: true }).cue, null);

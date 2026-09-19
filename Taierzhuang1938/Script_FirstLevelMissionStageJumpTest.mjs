@@ -51,7 +51,10 @@ try {
   await page.selectOption("#firstLevelStageSelect","Death");
   await page.locator('[data-action="firstLevelJump"]').click();
   await page.waitForFunction(()=>window.Tengxian?.state.ready&&!window.Tengxian.state.advancing&&window.Tengxian.Debug.FirstLevelMission()?.phaseNumber===17,null,{timeout:180000});
-  await WaitStep("BridgeCover",45);
+  // 17 → 18 现在长了：死亡确认之后接收处要真的继续工作（门外那一副担架走进来、
+  // 军医转过去救下一个）才算 17 走完，18 又要等传令兵**跑到**接收处才开口。
+  // 实拍 deathSceneComplete 在 36 s、BridgeOrders 的对白还要十几秒（End 包 2026.09.20）。
+  await WaitStep("BridgeCover",150);
   const results=[];
   for(const number of [1,18,2,17,3,16,4,15,5,14,6,13,7,12,8,11,9,10,14,3,18,1]) {
     const start=await Jump(number);
@@ -72,7 +75,7 @@ try {
     if(number<14)assert.equal(after.carry,null,"old stretcher is cleared");
     if(number===1){assert.ok(!after.mission.facts.includes("deathSceneComplete"));assert.equal(after.mission.column.loaded,0);}
     if(number===14)await WaitStep("Rescue",40);
-    if(number===17)await WaitStep("BridgeCover",45);
+    if(number===17)await WaitStep("BridgeCover",150);
     if([4,10,13,14,16,17,18].includes(number))await page.screenshot({path:path.join(output,`Scene_Stage${number}.png`)});
     results.push({number,start,after});
     console.log("ok stage",number,start.stage,"live",after.mission.stage,"facts",after.mission.facts.length);
