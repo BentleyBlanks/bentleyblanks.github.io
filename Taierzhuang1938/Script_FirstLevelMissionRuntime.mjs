@@ -1943,17 +1943,21 @@ export class FirstLevelMissionRuntime {
   }
   PlaceNightArrival() {
     const point = A.nightSpawn;
-    // 照 `Retry()` 那一套原样做：**先 Spawn（带自由空间搜索），再把位置与角色体
-    // 一起写过去**。只写 position + Teleport 不行（实拍 2026-09-20 `--stage-from=18`：
-    // 夜景、夜天空、五盏灯、十四个布景人全换好了，`nightArrivalPlaced` 也记上了，
-    // 人却还留在 marchOut (−62.5,232.3) —— 渲染位置与 Rapier 角色体脱了钩，
-    // 他在原地一步也走不动）。**这一条仍未在实拍里验过**，见交付报告的遗留项。
-    const y = this.battlefield.GroundHeight(point.x, point.z);
-    this.player.Spawn(point.x, point.z, Math.PI);
-    this.player.position.set(point.x, y, point.z);
-    this.player.body?.Teleport(point.x, y, point.z);
+    // 写 position + 角色体 Teleport 就够，外加一次自由空间搜索（免得锚点哪天被布设盖住）。
+    //
+    // **别改成 player.Spawn。** 它顺手把血量、流血、伤口、体力、持枪状态全复位 ——
+    // 夜里进城会变成一次静默的满血补给。2026-09-19 那一版因为「实拍人没被搬过去」
+    // 改用了 Spawn；2026-09-20 的取证（NIGHT_ARRIVAL：同时读 player.position 与
+    // player.body.position）证明瞬移一直是好的，人是被**驾驶脚本**按着前进键原路
+    // 走回 marchOut 的（修法在 Script_FirstLevelCampaignKit 的 Route stopFact）。
+    const free = this.physics?.FindFreeSpot
+      ? this.physics.FindFreeSpot(point.x, point.z, this.player.radius, 1.78)
+      : { x: point.x, y: this.battlefield.GroundHeight(point.x, point.z), z: point.z };
+    this.player.position.set(free.x, free.y, free.z);
+    this.player.body?.Teleport(free.x, free.y, free.z);
     this.player.velocity.set(0, 0, 0);
     this.player.SetStance("stand");
+    this.player.yaw = Math.PI;
     this.player.pitch = 0;
     for (const [i, actor] of this.squad.entries()) {
       this.PlaceActor(actor, { x: point.x + (i % 2 ? 2 : -2), z: point.z - 4 - Math.floor(i / 2) * 2 });

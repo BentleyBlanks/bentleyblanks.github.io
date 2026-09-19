@@ -206,14 +206,24 @@
 | BridgeWithdraw | 南路断了 | 这一段真正发生的是一条通路被不可逆切断；「把路打开」说反了 |
 | NightMarch | 后头还有活人 | 连夜准备迎敌，不是胜利庆典 |
 
-## 6. 实拍踩到的两个坑（别再踩）
+## 6. 实拍踩到的坑（别再踩）
 
-**桥头撤退时全班压在玩家脚下。** `BridgeWithdraw` 的带路线第一点就是南岸射位
-`bridgeCover` —— 玩家整场掩护都站在那一格上，「桥头撤！」一喊班里四个人全往他脚下走。
-取证：`running/stand/!overlap/!control/!mounted/!meleeBlocking`，**八个方向一步都挪不动**，
-身边 0.85 / 1.4 / 1.55 / 3.08 m 各站一个自己人（玩家被自己人裁步挡位，
-见 memory「滕县 士兵叠人定论」）。修法是带路线跳过第一点：撤就是各自往南走。
-往后任何「一喊撤就把全队指向玩家现在站的那个点」的编排都会复发这条。
+**「撤到南岸八个方向走不动」不是玩法，是驾驶器把玩家的视角写成了 NaN。**
+2026-09-20 查清（`--stage-from=18` 逐项取证）：那一刻胶囊扫掠八个方向**每一个都是通的**
+（`ProbeMove` 0.12/0.12），自己人最近 0.93 m 而挡位阈值只有 0.69 m，静态几何三米内只有
+一道 1.47 m 的矮墙，`overlap:false`、无控制锁、无白刃、未架枪 —— 唯独
+`player.velocity.x/z` 是 **NaN**。往回追：`Script_FirstLevelCampaignKit.CaptureFocus`
+收到的是 `shot.bridgeColumn` 里的一条状态记录（只有 `id / load / progress / crossed`，
+**没有 x/z**），于是 `Math.atan2(p.x - undefined, …)` 把 `player.yaw/pitch` 写成 NaN；
+拍照那几帧 `player.Update` 照着 NaN 的朝向算出 NaN 的 `desired`，速度从此再也回不来
+（`yaw/pitch` 拍完被还原了，**速度没人还原**）。
+修法两条：`CaptureFocus` 现在对没有有限 x/z 的点**直接翻红**（静默的 NaN 传染最难查），
+尾队那一张改用 `end.extras` 里的真实世界坐标。驾驶脚本里那一整段
+「八方向试探 + 出厂检查点恢复」兜底同时删掉 —— 真人玩家不会去点「继续检查点」，
+兜底只会把下一次同样的病藏起来。撤退起步处留了一道闸：玩家速度必须是有限数。
+
+> 旧口径（已作废）：「`BridgeWithdraw` 的带路线第一点是 `bridgeCover`，全班压在玩家脚下把他挡死」。
+> 带路线跳过第一点这条改动留着（撤就是各自往南走，本来就对），但它不是「走不动」的病根。
 
 **回援尾队在北引道上被打光。** 尾队原来在 `BridgeOrders` 就生成，要顶着一挺机枪
 等玩家从接收处走一分多钟 —— 实拍六个人死了五个，「接应尾队」整件事没了。
@@ -221,13 +231,19 @@
 `scriptEssential`（打不死、会趴下还击），三个步枪兵照常会阵亡 ——
 Notion 的「有人可能中弹」留在他们身上，不是留给整支队伍。
 
-**黑屏里那一下瞬移没生效。** `PlaceNightArrival` 原来是手写 `position.set` +
-`body.Teleport`。实拍（`--stage-from=18`）：夜景、夜天空、五盏灯、十四个布景人全换好了，
-`nightArrivalPlaced` 也记上了，**人却还在 marchOut**（−62.5, 232.3）—— 渲染位置与
-Rapier 角色体脱了钩，他在原地一步也走不动，接着从桥那边一路走到瓮城东墙撞停。
-同一类脱钩也是「撤到南岸走不动」的病根：出厂的检查点恢复（`player.Spawn`，带自由
-空间搜索）一调用人立刻就能走了。所以这一段改走 `player.Spawn(x, z, yaw)`。
-**往后任何一处剧情瞬移都别再手写 `position.set + body.Teleport`。**
+**「黑屏里那一下瞬移没生效」是假的 —— 是驾驶器把人又走回去了。**
+2026-09-19 的实拍结论写成了「渲染位置与 Rapier 角色体脱钩」。2026-09-20 加了一行取证
+（`NIGHT_ARRIVAL`，同时读 `player.position` 与 `player.body.position`）之后定论翻过来：
+两者**都**准确落在 `nightSpawn`(−160, 292)，瞬移一直是好的。真正发生的是：
+`marchOutReached` 在离锚点 8 m 就记下并起黑屏，而驾驶器的 `Route` 还攥着 `marchOut`
+那个路点不放；黑屏 6 s 一结束它接着按前进键，把刚被搬到 nightSpawn 的人**原路走了
+110 m 回到 marchOut**，再从那儿斜穿过去撞在瓮城东墙上。
+修法在驾驶器：`Route` 加了 `stopFact`，这一段走到 `marchOutReached` 就松手
+（编排接管的路线，驾驶器必须在接管点松手）。运行时那一侧什么都不用改。
+
+**所以剧情瞬移照旧写 `position.set` + `body.Teleport`**（外加一次自由空间搜索），
+不要为了「保险」去调 `player.Spawn` —— 它顺手把血量、流血、伤口、体力全复位，
+夜里进城会变成一次静默的满血补给。
 
 驾驶脚本侧的同类教训写在 `Script_FirstLevelCampaignEnd.mjs` 的注释里：
 整关驾驶跑在 `manual=1` 下，等事实必须自己 `StepFrames`（`WaitFact` / `WaitControl`）；

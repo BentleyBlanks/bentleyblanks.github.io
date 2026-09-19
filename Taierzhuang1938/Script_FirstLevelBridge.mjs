@@ -198,7 +198,12 @@ export class FirstLevelBridge {
     if (!state.ready || !r.Has("blastZoneCleared") || inside) {
       if (inside) {
         r.Record("blastHeldForFriendly", { who: inside.who, distanceM: Number(inside.distance.toFixed(1)) });
-        this.ClearBlastZone(inside, dt);
+        // **药装好之前不许清场。** 爆破人员的岗位就在爆破区里：这会儿把区里的人往南赶，
+        // 赶的就是他们自己 —— 他们再也走不回桥台，装药进度停在半路，桥永远炸不了。
+        // 实拍 2026-09-20（玩家按编排干脆地退到安全区，比爆破手装完药还早到）：
+        // BridgeDemolitionEast 被推离炸点 1.3 m，state.set 钉在 3 s / 6 s，等满 240 s 也不炸。
+        // 装好之后 PullBack 会沿各自的折线把他们送出去，那时候再谈清场。
+        if (state.ready) this.ClearBlastZone(inside, dt); else state.stuckS = 0;
       } else state.stuckS = 0;
       if (!state.overdue) return;
     }
@@ -214,7 +219,10 @@ export class FirstLevelBridge {
     const r = this.runtime, state = this.blast;
     if (inside.who === "player") { state.stuckS = 0; state.lastInside = null; return; }
     const actor = inside.actor || (r.squad || []).find(entry => (entry.castId || entry.id) === inside.who);
-    if (actor?.alive) {
+    // 桥头那三个人（军官 + 两名爆破手）有自己的撤出折线，`PullBack` 每帧都在走。
+    // 再塞一个「去 blastSafe」的目标只会把折线顶掉 —— 两条指令互相拉扯，人留在区里打转。
+    const scripted = BRIDGE_CAST.includes(inside.who);
+    if (actor?.alive && !scripted) {
       actor.scriptedNoncombatant = true;
       r.MoveActor(actor, A.blastSafe, E.demolitionMps);
       r.ai.SetStance(actor, 0, 1, true);
