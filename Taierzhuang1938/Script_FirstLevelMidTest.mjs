@@ -16,7 +16,7 @@
 import assert from "node:assert/strict";
 import { MISSION_STAGES, MISSION_ENCOUNTERS, MISSION_TRANSFER_THREATS } from "./Data_FirstLevelMission.mjs";
 import { MISSION_ANCHORS as A, MISSION_PLACEMENT as P, MISSION_ROUTES } from "./Data_FirstLevelMissionLayout.mjs";
-import { MISSION_FACT_GATES, MISSION_ENCOUNTER_ACTIVATION } from "./Data_FirstLevelMissionGates.mjs";
+import { MISSION_FACT_GATES, MISSION_ENCOUNTER_ACTIVATION, MissionGateInArea } from "./Data_FirstLevelMissionGates.mjs";
 import { MISSION_TUNING as R } from "./Data_Tuning_FirstLevel.mjs";
 import { MID_TUNING as M, MidLitterHoldSlots, MidDraftKind } from "./Data_Tuning_FirstLevelMid.mjs";
 import { FirstLevelMissionFlow } from "./Script_FirstLevelMissionFlow.mjs";
@@ -119,6 +119,35 @@ const Step = (host, module, seconds, options = {}) => {
   Check(!cover({ x: 66, z: -20 }), "只挡住窗口那一条射线不算停进遮挡");
   blocked = new Set([Math.round(P.streetBlock.windowShooter.x), Math.round(P.streetBlock.gap.x)]);
   Check(cover({ x: 66, z: -20 }), "窗口与主街缺口两条射线都断了才算");
+
+  // 2026-09-20 演出打磨：「街堵了」要在**村北口往主街一看**就成立，不是钻进街里走十几米。
+  const gate = MISSION_FACT_GATES.streetBlockSeen;
+  Check(gate.kind === "proximity" && gate.anchor === "streetBlock", "还是一道走 GateNear 的距离门");
+  Check(!!gate.area && !!gate.sight, "改成「人在北口 box 里 + 到障碍有通视」");
+  Check(gate.sight.anchor === "streetBlock", "看的就是主街障碍那一头");
+  // box 要盖住主街北口（两道街墙从 z=−22 起，北口在那以北一小段），
+  // 而且整个落在两道街墙之间的街心里。
+  Check(gate.area.minZ <= -24 && gate.area.maxZ >= -10,
+    `北口这一带都算数：z ${gate.area.minZ}…${gate.area.maxZ}`);
+  Check(gate.area.minX >= 72.35 && gate.area.maxX <= 81.65,
+    `box 在两道街墙之间（x ${gate.area.minX}…${gate.area.maxX}）`);
+  // 外圈半径仍要盖得住 box 的四个角（GateNear 最后那一步还是 Near）。
+  for (const corner of [[gate.area.minX, gate.area.minZ], [gate.area.maxX, gate.area.minZ],
+    [gate.area.minX, gate.area.maxZ], [gate.area.maxX, gate.area.maxZ]])
+    Check(Distance({ x: corner[0], z: corner[1] }, A.streetBlock) < gate.radiusM,
+      `半径盖得住 box 的角 ${corner}`);
+  Check(MissionGateInArea({ x: 77, z: -21 }, gate.area), "站在北口里算数");
+  Check(!MissionGateInArea({ x: 66, z: -20 }, gate.area), "还在担架等待点那一带不算数");
+  Check(!MissionGateInArea({ x: 77, z: 4 }, gate.area), "已经走进街当中的不靠这条门补记");
+  // 喊话的前队站在玩家来向（北口）与障碍之间，而且让开街心那条视线。
+  const party = P.streetBlock.frontParty;
+  for (const spot of party) {
+    Check(spot.z < P.streetBlock.gap.z && spot.z > gate.area.maxZ,
+      `前队站在北口与障碍之间（z=${spot.z}）`);
+    Check(Math.abs(spot.x - A.streetBlock.x) > 1.2, `前队让开街心那条视线（x=${spot.x}）`);
+  }
+  Check(party.some((spot) => Math.abs(spot.yaw - Math.PI) < 0.01),
+    "至少一个人回头朝北喊（「后头莫挤！街堵了！」是喊给后头的）");
 }
 {
   // 担架真的走到车位上、停下来，而且不跟着玩家进未清空间。

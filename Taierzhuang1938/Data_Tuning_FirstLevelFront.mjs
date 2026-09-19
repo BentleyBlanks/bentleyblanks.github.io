@@ -45,6 +45,12 @@ export const FRONT_TUNING = Object.freeze({
   // 后侧同伴清理坍塌物的声音：从踢枪那一刻起，每这么久响一记 debrisFall。
   bunkerRearDigIntervalS: 1.9,
   bunkerRearDigVolume: 0.55,
+  // 受困期间把视野收窄（「卡着只能盯着看」）。基准 FOV 是 CAMERA.baseFovDeg=55；
+  // 收到 50 之后门外 8.5 m 处一个站着的人在 720p 里有约 150 像素高（55° 时约 134）。
+  // 取的是 min(玩家的 FOV, 50)：把 FOV 调得更窄的玩家不会反被拉宽。
+  trappedFovDeg: 50,
+  // 收窄/还原的指数追赶系数（1/s）。1.6 → 约 1.9 秒走完九成，镜头不「啵」一下。
+  trappedFovLerpRate: 1.6,
 
   // =========================================================================
   // 02 班长救人 · 撤入后交通壕
@@ -93,6 +99,18 @@ export const FRONT_TUNING = Object.freeze({
   // 02 路过时就已经在了；传令兵 06 才到。
   collectionDressStep: "RearTrench",
   collectionRunnerStep: "Orders",
+  // 借火戏的触发（2026-09-20 演出打磨）。Notion：老周靠在土壁边等担架、摸兜找火，
+  // 「**看见顺子经过**」才开口 —— 所以这一段不再随 ordersReached 自动开播，
+  // 要玩家真的走到他跟前、脸朝着他。
+  borrowTriggerM: 3.2,
+  // 「大致面向他」：视线与「玩家→老周」的夹角在这个弧度以内（±40°）。
+  borrowFacingRad: 0.7,
+  // 一直不过去也得往下走（编排不许被玩家的站位卡死）：volunteerHeard 之后这么久兜底。
+  borrowApproachFallbackS: 40,
+  // 对白期间抬老周那两个担架员等在这么远外，不挤进两人中间。
+  borrowClearRadiusM: 4,
+  // 担架员从等待位走上来那一段的时长（ZhouLift 催的时候起步）。
+  bearerCloseMoveS: 2.2,
   // 摸兜找火那两下的间隔（一次「摸」）。
   borrowPatIntervalS: 0.9,
   // 顺子把火柴往兜里一收 / 老周递烟：事件到了之后这一小段动作时长。
@@ -181,6 +199,9 @@ export const BORROW_LIGHT_BEATS = Object.freeze([
 
 export const FRONT_TUNING_SOURCES = Object.freeze({
   bunkerKillFallbackS: "MissionVoiceTimeline 对 BunkerKilling 的 7.84 秒 / 4 句",
+  trappedFovDeg: "CAMERA.baseFovDeg 55 收一档；8.5 m 处站着的人在 720p 里约 150 px 高",
+  borrowTriggerM: "Notion 06「看见顺子经过」；R.contactRadiusM 同量级的搭话距离",
+  borrowClearRadiusM: "两人对话的取景余量：担架员退到画面外",
   bunkerButtStrikeS: "Data_MeleeCombat 的近战 windup 同量级",
   bunkerRearDigIntervalS: "一记 debrisFall 的间隔，按旁边有人在扒土的频率",
   rescueGatherMaxS: "bunkerRescueSeconds（4.4 s）之前两个人要到位",

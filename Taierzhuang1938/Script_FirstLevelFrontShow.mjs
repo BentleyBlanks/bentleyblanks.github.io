@@ -48,6 +48,22 @@ export class FirstLevelFrontShow {
     this.southAt = null;
     this.whisperDone = false;
     this.bundleOrderGuard = null;
+    this.fovDeg = null;
+  }
+
+  /**
+   * 受困段把视野收窄（Notion 01「只能小幅转头」——「卡着只能盯着看」）。
+   * Script_Main 每帧拿基准 FOV 来问一次，平滑归这里：`trapped` 接管期间追向
+   * min(基准, trappedFovDeg)，还权之后平滑还原。玩家把 FOV 调得比它还窄的不动。
+   */
+  NarrowFovDeg(baseFov, dt) {
+    const trapped = this.r.controls?.kind === "trapped";
+    const want = trapped ? Math.min(baseFov, F.trappedFovDeg) : baseFov;
+    if (this.fovDeg == null) this.fovDeg = want;
+    const step = Math.min(1, Math.max(0, dt) * F.trappedFovLerpRate);
+    this.fovDeg += (want - this.fovDeg) * step;
+    if (Math.abs(this.fovDeg - want) < 0.01) this.fovDeg = want;
+    return this.fovDeg;
   }
 
   // --- 步骤进入 -------------------------------------------------------------
@@ -204,6 +220,7 @@ export class FirstLevelFrontShow {
       whisperDone: this.whisperDone,
       southAt: this.southAt,
       tankStoppedAt: this.tankStoppedAt,
+      fovDeg: this.fovDeg == null ? null : +this.fovDeg.toFixed(2),
       bundleOrderGuard: this.bundleOrderGuard?.missionId ?? this.bundleOrderGuard?.id ?? null,
     };
   }

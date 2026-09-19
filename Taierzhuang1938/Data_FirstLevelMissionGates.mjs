@@ -290,8 +290,15 @@ export const MISSION_FACT_GATES = Object.freeze({
   mainStreetPointed: Gate({ kind: "voice", step: "South", cue: "VillagePointer", source: "VoiceDone" }),
   // --- Village -----------------------------------------------------------
   streetBlockSeen: Gate({
-    kind: "proximity", step: "Village", anchor: "streetBlock", radiusM: 22, source: "Update",
-    note: "主街被倒墙＋横车堵住，东巷窗口有日军火力",
+    kind: "proximity", step: "Village", anchor: "streetBlock", radiusM: 46, source: "Update",
+    // 2026-09-20 演出打磨：原来是「离 (76.65,15) 22 m 以内」，而主街西侧
+    // (StreetWestWallNorth) 与内院东墙 (CourtyardEast) 把 x=72 一线从 z=−22 封到 34 ——
+    // 玩家得从北口钻进主街往南走十几米才够得着。Notion 08 的意思是队伍到村北口、
+    // 往主街一看就知道过不去，所以改成「人站在主街北口这个 box 里、且到障碍有通视」。
+    // 半径留 46 m（box 最远一角到锚点 45.3 m）当外圈兜底，真正判的是 area + sight。
+    area: Object.freeze({ minX: 72.6, maxX: 81.4, minZ: -30, maxZ: -6 }),
+    sight: Object.freeze({ anchor: "streetBlock", toM: 1.2 }),
+    note: "站在主街北口（x 72.6–81.4、z −30…−6）望得见倒墙＋横车；东巷窗口有日军火力",
   }),
   littersInCover: Gate({
     kind: "column", step: "Village", source: "FirstLevelVillageBlock.UpdateVillage",
@@ -662,6 +669,16 @@ export function MissionGateFamily(fact) {
     return { id, gate, index, key: gate.keys ? suffix : String(index), point: gate.points[index] };
   }
   return null;
+}
+
+/**
+ * 距离门可以再挂一个 `area` 矩形（08「队伍到村北口」那种「人要站在这一带」）。
+ * 矩形写在表里，运行时只调这个函数 —— 坐标不散落在 Script_ 里。
+ */
+export function MissionGateInArea(point, area) {
+  if (!area) return true;
+  return point.x >= area.minX && point.x <= area.maxX
+    && point.z >= area.minZ && point.z <= area.maxZ;
 }
 
 /** 事实门查表：精确条目优先，其次按家族前缀解析。找不到返回 null。 */

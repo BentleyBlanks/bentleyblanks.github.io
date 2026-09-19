@@ -712,29 +712,32 @@ export const MISSION_PLACEMENT = Object.freeze({
   // -------------------------------------------------------------------------
   // 2026.09.19 新区的摆位（玩法包用；每点 {x,z,yaw?}，yaw 是弧度、0 朝 +z 南）
   // -------------------------------------------------------------------------
-  // 01—02 掩蔽部。玩家侧躺在后半间，视线穿前门低处破口看门外 9 m 的刺杀处。
+  // 01—02 掩蔽部。玩家侧躺在后半间，视线穿中隔墙缺口与前门低处破口看门外 8.5 m 的刺杀处。
+  // 2026-09-20 演出打磨：整间从 8.5 × 12 收到 7 × 7，屋里屋外的摆位全部跟着前移。
   bunker: {
-    player: { x: -40, z: -124, yaw: Math.PI },      // 头朝北（-z），能看见门外
+    player: { x: -40, z: -123.4, yaw: Math.PI },    // 头朝北（-z），能看见门外
     playerEyeM: 0.42,
-    rifle: { x: -36.8, z: -125.8, yaw: 1.1 },       // 够不到：离玩家 3.7 m
-    pinnedFrame: [{ x: -41.4, z: -124.2 }, { x: -38.6, z: -124.6 }],
-    // 2026-09-20：行刑处随 bunkerKilling 前移 4.5 m（原来在 18 m 外，破口里看不清）。
-    // 日兵仍从北面冲上来 —— ijaStart 留在远处不动，ijaDoor 也不动（它在门口）。
-    // 破口在这个距离上只开出 x -40.75…-38.25 一条缝（当中还有门框立柱的影子），
-    // 两个人都要摆在缝里看得见的那两段上，不然行刑整拍被门垛吃掉。
+    // 够不到：离玩家 2.8 m（后半间只有 3 m 进深，枪甩到东北角那块地上）。
+    rifle: { x: -37.6, z: -121.9, yaw: 1.1 },
+    pinnedFrame: [{ x: -41.15, z: -123.4 }, { x: -38.85, z: -123.6 }],
+    // 门外这一片全部落在破口的射影里：眼睛 (-40,-123.4,+0.42) 穿 x −41.4…−38.6
+    // 那道 2.8 m 的缝，8.5 m 处开出 x −42.59…−37.41，当中门框立柱再挡掉
+    // −38.80…−38.24 一条。四个人（两名川军、两名日兵）都摆在主缝里。
     captives: [
-      { id: "captiveWounded", x: -40.5, z: -136.9, yaw: 0.3 },
-      { id: "captiveHelper", x: -39.5, z: -137.7, yaw: 2.6 },
+      { id: "captiveWounded", x: -40.9, z: -131.3, yaw: 0.3 },
+      { id: "captiveHelper", x: -39.8, z: -132.0, yaw: 2.6 },
     ],
-    captiveRifles: [{ x: -40.9, z: -138.6 }, { x: -42, z: -135.9 }],
-    ijaStart: [{ x: -41.8, z: -148.5, yaw: Math.PI }, { x: -37.4, z: -149.2, yaw: Math.PI }],
-    ijaKill: [{ x: -40.4, z: -138.9, yaw: Math.PI }, { x: -39.3, z: -139.3, yaw: Math.PI }],
-    ijaDoor: [{ x: -40.1, z: -135.2, yaw: Math.PI }, { x: -38.2, z: -136.4, yaw: Math.PI }],
+    // 缴下来的两支枪落在两人**几米外**（Notion：「已经落在数米外」），而且都还在破口的
+    // 射影里；踢开那一支往门口这边滑，滑完也不许被门垛吃掉。
+    captiveRifles: [{ x: -42.0, z: -133.6 }, { x: -37.9, z: -132.9 }],
+    ijaStart: [{ x: -41.3, z: -138.2, yaw: Math.PI }, { x: -37.9, z: -138.9, yaw: Math.PI }],
+    ijaKill: [{ x: -40.8, z: -132.4, yaw: Math.PI }, { x: -39.9, z: -133.2, yaw: Math.PI }],
+    ijaDoor: [{ x: -40.3, z: -130.3, yaw: Math.PI }, { x: -38.9, z: -130.6, yaw: Math.PI }],
     luoEntry: { x: -40, z: -119.6, yaw: Math.PI },  // 从后壁破口挤进来
-    luoLift: { x: -40.6, z: -122.6, yaw: Math.PI },
-    yaowaLift: { x: -38.5, z: -122.4, yaw: Math.PI },
-    // 行刑处前移之后原来的 (-52,-125) 被掩蔽部西墙切掉了；挪 0.85 m 重新看得见刺杀处。
-    heyoutianFire: { x: -52.6, z: -125.6, yaw: -0.36 }, // 绕过掩蔽部西墙，射线到刺杀处
+    luoLift: { x: -40.5, z: -122.3, yaw: Math.PI },
+    yaowaLift: { x: -39.5, z: -122.2, yaw: Math.PI },
+    // 绕过掩蔽部西墙，射线到刺杀处（西墙现在只到 z=−128，线从它北边过去）。
+    heyoutianFire: { x: -52.6, z: -125.6, yaw: -0.36 },
   },
   // 06 背坡伤员集结处。
   collection: {
@@ -742,15 +745,28 @@ export const MISSION_PLACEMENT = Object.freeze({
       { x: -35.5, z: -99.4, yaw: 0 }, { x: -33, z: -98.8, yaw: 0 }],
     wounded: [{ x: -43, z: -102.4 }, { x: -42.2, z: -105 }, { x: -30.6, z: -103.2 },
       { x: -29.4, z: -100.2 }, { x: -33.8, z: -105.8 }],
-    bearers: [{ x: -41.6, z: -97.4, yaw: 0 }, { x: -37.2, z: -97 , yaw: 0 },
-      { x: -34.2, z: -97.2, yaw: 0 }, { x: -31.4, z: -97.6, yaw: 0 }],
+    // 2026-09-20 演出打磨：原来 (-37.2,-97) 与 (-34.2,-97.2) 两个搬运人员正好堵在
+    // 玩家来向（集结处锚点 (-37,-101)）与老周 (-36.4,-95.9) 之间 —— 实拍里借火那一拍
+    // 整个画面是两张后背，老周根本不在画里。四个人都退到担架那一侧，
+    // 离老周最近的也有 4.3 m，`borrowClearRadiusM` 那条门守着这个距离。
+    bearers: [{ x: -42.6, z: -98.2, yaw: 0 }, { x: -42.0, z: -96.6, yaw: 0 },
+      { x: -33.4, z: -100.6, yaw: 0 }, { x: -31.0, z: -98.6, yaw: 0 }],
+    // 抬老周那两个：对白期间在 4.2–4.3 m 外等（`bearerWait`，都让开玩家→老周那条轴线
+    // 3.8 m 以上），ZhouLift 催的时候才走上来（`bearerClose`，在老周北侧左右分开站，
+    // 不站进土壁里）。
+    bearerWait: [{ x: -40.3, z: -97.6, yaw: 0 }, { x: -32.4, z: -97.4, yaw: 0 }],
+    bearerClose: [{ x: -37.9, z: -96.6, yaw: 0 }, { x: -35.0, z: -96.8, yaw: 0 }],
     zhouWall: { x: -36.4, z: -95.9, yaw: Math.PI },  // 靠 CollectionLitterWall 的土壁等担架
+    // 玩家过来借火站的地方：老周正北 2.6 m，两个人中间空着，火柴与纸烟读得出来。
+    borrowStand: { x: -36.5, z: -98.5 },
     runner: { x: -31, z: -95.4, yaw: Math.PI },
   },
   // 08 主街障碍。
   streetBlock: {
     gap: { x: 76.65, z: 20 },
-    frontParty: [{ x: 75.4, z: 13.6, yaw: 0 }, { x: 78.6, z: 12.8, yaw: 0 }],
+    // 喊话的前队站在**玩家来向（北口）与障碍之间**，一个回头朝北喊「后头莫挤！街堵了！」、
+    // 一个还盯着堵死的街口。两个都让开街心 x=76.65 那条线（望障碍的视线门走那条线）。
+    frontParty: [{ x: 74.6, z: 9.4, yaw: Math.PI }, { x: 79.2, z: 13.2, yaw: 0 }],
     withdrawnGuards: [{ x: 74.2, z: 8.4, yaw: 0 }, { x: 79.8, z: 7.2, yaw: 0 }],
     litterWait: [{ x: 64.6, z: -19.4, yaw: 0 }, { x: 67.4, z: -20.6, yaw: 0 },
       { x: 62.4, z: -21.2, yaw: 0 }],
@@ -970,7 +986,7 @@ for (let i = blocks.length - 1; i >= 0; i--) {
  * 为什么不进 `blocks`：坍塌/完好两套墙同时存在没有意义，而 gate 是「一块一个网格」，
  * 四十块各自一个 draw call。scenario 走 BuildSink 合批，切态只重建这一个 sink。
  */
-const BUNKER_GROUND = SampleMissionTerrain(-40, -127);
+const BUNKER_GROUND = SampleMissionTerrain(-40, -124.5);
 const NIGHT_GROUND = SampleMissionTerrain(-160, 334);
 function ScenarioBlock(id, x, z, w, h, d, semantic, y, extra = {}) {
   return { id, x, y, z, w, h, d, semantic, tag: "whiteboxWall", ...extra };
@@ -979,42 +995,55 @@ const MISSION_SCENARIO = (() => {
   const g = BUNKER_GROUND, n = NIGHT_GROUND;
   const B = (id, x, z, w, h, d, semantic, top) =>
     ScenarioBlock(id, x, z, w, h, d, semantic, g + top - h / 2);
+  // 2026-09-20 演出打磨：Notion 写的是「前沿交通壕旁的**小型**掩蔽部」，而原来这间
+  // 8.5 × 12 m 的屋子把行刑处顶到 13.5 m 外 —— 720p 下门外的人只有约 70 像素高，
+  // 「必须让玩家清楚看懂」读不出来。现在整间收成 7 × 7 m（外廓 x −43.5…−36.5、
+  // z −128…−121），前后两间各 3.5 m：受困位 (−40,−123.4) 到前门 4.6 m、到行刑处 8.5 m。
+  //
   // 两态共用的壳：西/东侧墙、前墙两垛、后墙两垛、中隔墙两垛。
+  // 前门缺口 x −41.4…−38.6（2.8 m）、中隔墙缺口与后壁缺口都是 x −41.6…−38.4（3.2 m）
+  // —— 三道口子**同轴**，躺在后半间正对着看出去，门外那一片不会被中隔墙裁掉。
   const shell = [
-    B("BunkerWest", -44.25, -127, 0.5, 2.2, 12, "earthDark", 2.2),
-    B("BunkerEast", -35.75, -127, 0.5, 2.2, 12, "earthDark", 2.2),
-    B("BunkerFrontWest", -42.85, -133, 3.3, 2.2, 0.5, "earthDark", 2.2),
-    B("BunkerFrontEast", -37.15, -133, 3.3, 2.2, 0.5, "earthDark", 2.2),
-    B("BunkerRearWest", -43.05, -121, 2.9, 2.2, 0.5, "earthDark", 2.2),
-    B("BunkerRearEast", -36.95, -121, 2.9, 2.2, 0.5, "earthDark", 2.2),
-    B("BunkerPartitionWest", -43.05, -127, 2.9, 2.2, 0.5, "timber", 2.2),
-    B("BunkerPartitionEast", -36.95, -127, 2.9, 2.2, 0.5, "timber", 2.2),
+    B("BunkerWest", -43.25, -124.5, 0.5, 2.2, 7, "earthDark", 2.2),
+    B("BunkerEast", -36.75, -124.5, 0.5, 2.2, 7, "earthDark", 2.2),
+    B("BunkerFrontWest", -42.45, -128, 2.1, 2.2, 0.5, "earthDark", 2.2),
+    B("BunkerFrontEast", -37.55, -128, 2.1, 2.2, 0.5, "earthDark", 2.2),
+    B("BunkerRearWest", -42.55, -121, 1.9, 2.2, 0.5, "earthDark", 2.2),
+    B("BunkerRearEast", -37.45, -121, 1.9, 2.2, 0.5, "earthDark", 2.2),
+    B("BunkerPartitionWest", -42.55, -124.5, 1.9, 2.2, 0.5, "timber", 2.2),
+    B("BunkerPartitionEast", -37.45, -124.5, 1.9, 2.2, 0.5, "timber", 2.2),
   ];
   const intact = [...shell,
-    B("BunkerDoorLintel", -40, -133, 2.4, 0.2, 0.5, "timber", 2.2),
+    B("BunkerDoorLintel", -40, -128, 2.8, 0.2, 0.5, "timber", 2.2),
     B("BunkerRearLintel", -40, -121, 3.2, 0.2, 0.5, "timber", 2.2),
-    B("BunkerPartitionLintel", -40, -127, 3.2, 0.2, 0.5, "timber", 2.2),
-    B("BunkerRoof", -40, -127, 9, 0.3, 12, "timber", 2.5),
+    B("BunkerPartitionLintel", -40, -124.5, 3.2, 0.2, 0.5, "timber", 2.2),
+    B("BunkerRoof", -40, -124.5, 7, 0.3, 7, "timber", 2.5),
   ];
-  // 坍塌态：前半间塌了，前门只剩 0–1.20 m 的低处破口。躺姿眼高 0.35–0.50 m
-  // 从后半间 (-40,-124) 看出去，门外 8–12 m（z −141…−145）整个人都在视野里；
-  // 门槛的碎砖与门框立柱各遮住一部分。
+  // 坍塌态：前半间塌了，前门只剩 0–1.35 m 的低处破口。躺姿眼高 0.35–0.50 m
+  // 从后半间 (-40,-123.4) 看出去，门外 2–12 m 一个站着的人（头顶 1.75）整个在视野里：
+  // 破口上沿 1.35 m 在 4.6 m 处，射到 8.5 m 的头顶那条线只走到 1.14 m，从沿下过去。
+  // 门槛的碎砖与门框立柱各遮住一部分，创口仍由门框、尘土与人物身体挡着。
   const collapsed = [...shell,
-    B("BunkerFrontLintel", -40, -133, 2.4, 1.0, 0.5, "earthDark", 2.2),
-    B("BunkerDoorRubble", -40.95, -133, 0.9, 0.22, 0.7, "earthDark", 0.22),
-    B("BunkerDoorPost", -39.15, -133, 0.3, 2.2, 0.45, "timber", 2.2),
-    B("BunkerPartitionSill", -40, -127, 3.2, 0.18, 0.5, "earthDark", 0.18),
-    B("BunkerRoofRear", -40, -124, 9, 0.3, 6, "timber", 2.5),
-    B("BunkerRoofSlab", -40, -128.6, 5, 0.3, 2.6, "timber", 1.45),
-    B("BunkerRubbleA", -42.2, -130.4, 3.4, 1.1, 3.2, "earthDark", 1.1),
-    B("BunkerRubbleB", -37.4, -131.2, 2.6, 0.85, 2.4, "earthDark", 0.85),
-    B("BunkerBeamPinWest", -41.4, -124.2, 0.7, 0.55, 1.0, "timber", 0.55),
-    B("BunkerBeamPinEast", -38.6, -124.6, 0.6, 0.5, 0.9, "timber", 0.5),
+    B("BunkerFrontLintel", -40, -128, 2.8, 0.85, 0.5, "earthDark", 2.2),
+    B("BunkerDoorRubble", -40.9, -128, 0.9, 0.22, 0.7, "earthDark", 0.22),
+    B("BunkerDoorPost", -39.2, -128, 0.3, 2.2, 0.45, "timber", 2.2),
+    B("BunkerPartitionSill", -40, -124.5, 3.2, 0.18, 0.5, "earthDark", 0.18),
+    B("BunkerRoofRear", -40, -122.75, 7, 0.3, 3.5, "timber", 2.5),
+    // 塌下来的顶板悬在前半间当中：底面 1.35 m，正好压在破口上沿那条线上，
+    // 从躺姿看过去它在视线**上方**（3 m 处那条线才 0.89 m），只把天光压掉。
+    B("BunkerRoofSlab", -40, -125.6, 4, 0.3, 1.6, "timber", 1.65),
+    // 前半间两角的塌方堆。都退到破口射影之外（4.3 m 处那条锥只有 x −41.31…−38.69），
+    // 不许啃掉门外那一片的左右边。
+    B("BunkerRubbleA", -42.3, -126.4, 1.4, 1.1, 2.6, "earthDark", 1.1),
+    B("BunkerRubbleB", -37.7, -126.8, 1.4, 0.85, 1.8, "earthDark", 0.85),
+    B("BunkerBeamPinWest", -41.15, -123.4, 0.7, 0.55, 0.9, "timber", 0.55),
+    B("BunkerBeamPinEast", -38.85, -123.6, 0.6, 0.5, 0.8, "timber", 0.5),
     // 杂物堆靠西墙放。原来摆在 x=-40，正好压在后壁破口那道 3.2 m 门里：
     // 两边各只剩 0.7 m，人的胶囊（直径 0.84）过不去 —— 罗班长进不来、玩家也出不去，
     // 实拍出来是「02 永远不开始」。scenario 的体块不在 MISSION_LAYOUT.blocks 里，
     // 所有既有的净空检查都扫不到它，所以 Script_FirstLevelMissionTest 另加了一条。
-    B("BunkerClutter", -42.4, -122.2, 1.8, 0.5, 0.8, "timber", 0.5),
+    // 屋子收小之后它也跟着收：x −42.95…−41.85，整块留在后壁缺口（x −41.6 起）以西。
+    B("BunkerClutter", -42.4, -122, 1.1, 0.5, 0.8, "timber", 0.5),
   ];
   const N = (id, x, z, w, h, d, semantic, top) =>
     ScenarioBlock(id, x, z, w, h, d, semantic, n + top - h / 2);

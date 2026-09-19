@@ -535,6 +535,26 @@ export async function Drive(ctx) {
   await JumpStage(6);
   await Route(MISSION_STAGE_ROUTES.collectionReturn, "CollectionReturn",
     { fight: true, stance: "crouch", crawl: true, rejoinRoute: MISSION_STAGE_ROUTES.collectionReturn });
+  // 2026-09-20 演出打磨：借火不再随 ordersReached 自动开播 —— Notion 06 是老周
+  // 「看见顺子经过」才开口。像玩家一样走到他跟前站定、脸朝着他。
+  await Route([{ x: P.collection.borrowStand.x, z: P.collection.borrowStand.z }], "BorrowStand",
+    { fight: false, stance: "stand" });
+  await page.evaluate((zhou) => {
+    const g = window.Tengxian, p = g.player.position;
+    g.player.yaw = Math.atan2(p.x - zhou.x, p.z - zhou.z);
+    g.player.pitch = 0;
+    g.StepFrames(6, 1 / 60, false);
+  }, { x: P.collection.zhouWall.x, z: P.collection.zhouWall.z });
+  const borrowStand = await page.evaluate(() => {
+    const g = window.Tengxian, m = g.Debug.FirstLevelMission();
+    return { player: { x: +g.player.position.x.toFixed(2), z: +g.player.position.z.toFixed(2) },
+      zhou: { x: +m.column.zhou.x.toFixed(2), z: +m.column.zhou.z.toFixed(2) },
+      facts: m.facts, borrow: m.front.collection.borrow, said: m.voice.played };
+  });
+  console.log("BORROW_STAND", JSON.stringify(borrowStand));
+  assert.ok(Math.hypot(borrowStand.player.x - borrowStand.zhou.x,
+    borrowStand.player.z - borrowStand.zhou.z) <= F.borrowTriggerM + 0.5,
+  "玩家真的走到了老周跟前：" + JSON.stringify(borrowStand));
   // 分段推：借火那一拍要在演的时候拍，等整段走完老周已经上担架抬走了。
   let orders = null;
   for (let chunk = 0; chunk < 60; chunk++) {
@@ -549,16 +569,17 @@ export async function Drive(ctx) {
     });
     if (orders.front.collection.borrow.includes("light") && !ctx.capturedActivities.has("BorrowLight")) {
       ctx.capturedActivities.add("BorrowLight");
-      await LookShot("BorrowLight", P.collection.zhouWall);
+      await LookShot("BorrowLight", { ...P.collection.zhouWall, height: 0.9 });
     }
     if (orders.stage !== "Orders") break;
   }
   console.log("ORDERS", JSON.stringify({ stage: orders.stage, borrow: orders.front.collection.borrow }));
-  if (!ctx.capturedActivities.has("BorrowLight")) await LookShot("BorrowLight", P.collection.zhouWall);
+  if (!ctx.capturedActivities.has("BorrowLight")) await LookShot("BorrowLight", { ...P.collection.zhouWall, height: 0.9 });
   for (const fact of ["ordersReached", "volunteerHeard", "lightShared", "zhouOnLitter", "columnDeparted"])
     assert.ok(orders.facts.includes(fact), `06 记下了 ${fact}`);
   assert.deepEqual(orders.front.collection.borrow, ["ask", "pat", "pocket", "offer", "light", "share", "wince"],
     "借火戏七个姿态按 BorrowLight 的句子与两处动作空当逐个对上：" + JSON.stringify(orders.front.collection.borrow));
+  assert.ok(orders.front.collection.borrowSaid, "借火是走到老周跟前触发的（不是进 06 就自动排队）");
   assert.ok(orders.front.collection.zhouLifted, "担架员真的把老周抬上了担架");
   assert.ok(orders.front.collection.runner, "传令兵在集结处");
   assert.equal(orders.stage, "South", "后送队起行把 06 推到 07");

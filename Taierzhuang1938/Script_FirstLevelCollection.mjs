@@ -37,6 +37,23 @@ export function CollectionDressing(placement = Place.collection) {
   return people;
 }
 
+/**
+ * 「玩家现在够不够格开始借火」：走到老周跟前 borrowTriggerM 米以内、而且大致面向他。
+ * 纯几何（不吃运行时），测试拿它对账触发口径。
+ *
+ * `yaw` 是**玩家**的朝向：Script_Player 的前向量是 (-sin yaw, -cos yaw)，
+ * 所以「看着老周」那一档是 atan2(player.x − zhou.x, player.z − zhou.z)
+ *（NPC 的 yaw 是反过来的另一套，别混用）。
+ */
+export function BorrowLightCued(player, zhou, yaw, tuning = F) {
+  const distance = Math.hypot(zhou.x - player.x, zhou.z - player.z);
+  if (distance > tuning.borrowTriggerM) return false;
+  if (distance < 0.05) return true;
+  const want = Math.atan2(player.x - zhou.x, player.z - zhou.z);
+  const gap = Math.atan2(Math.sin(want - yaw), Math.cos(want - yaw));
+  return Math.abs(gap) <= tuning.borrowFacingRad;
+}
+
 /** 给定收到的 Line 下标与已经到过的具名事件，返回这一刻应该摆出来的借火姿态。 */
 export function BorrowPosesDue(lineIndex, events, beats = BORROW_LIGHT_BEATS) {
   const due = [];
@@ -61,6 +78,13 @@ export class FirstLevelCollection {
     this.zhouParked = false;
     this.zhouLiftAt = null;
     this.zhouLiftFrom = null;
+    // 抬老周那两个担架员：对白期间在 bearerWait 上等，ZhouLift 催的时候才走上来。
+    this.liftBearers = Place.collection.bearerWait.map((spot, i) => ({
+      id: `CollectionLiftBearer${i}`, x: spot.x, z: spot.z, yaw: spot.yaw ?? 0,
+    }));
+    this.bearerCloseAt = null;
+    this.borrowSaid = false;
+    this.volunteerAt = null;
   }
 
   // --- 摆位 -----------------------------------------------------------------
@@ -93,6 +117,10 @@ export class FirstLevelCollection {
     for (const person of this.people)
       r.view.Person(person.x, person.z, person.yaw, time,
         { id: person.id, kind: person.kind === "wounded" ? "medic" : "bearer", crouch: person.crouch });
+    // 抬老周那两个：06 才出现（担架队在这儿等着接他），位置由 UpdateOrders 推。
+    if (r.Has("ordersReached"))
+      for (const bearer of this.liftBearers)
+        r.view.Person(bearer.x, bearer.z, bearer.yaw, time, { id: bearer.id, kind: "bearer" });
   }
 
   /**
@@ -154,12 +182,45 @@ export class FirstLevelCollection {
   ShowMatch(on) {
     const r = this.r;
     if (on && !this.match && r.scene) {
-      this.match = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.02, 0.07),
+      this.match = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.03, 0.11),
         new THREE.MeshLambertMaterial({ color: 0xc8a262 }));
       this.match.name = "MissionShunziMatchbox";
       r.scene.add(this.match);
     }
     if (this.match) this.match.visible = !!on;
+  }
+
+  /**
+   * 借火那一段该不该开播。Notion 06：老周靠在土壁边摸兜找火，
+   * 「**看见顺子经过**」才开口 —— 所以要玩家真的走到他跟前、脸朝着他。
+   * 一直不过去也得往下走：volunteerHeard 之后 borrowApproachFallbackS 秒兜底。
+   */
+  UpdateBorrowCue() {
+    const r = this.r;
+    if (this.borrowSaid || !r.Has("volunteerHeard")) return;
+    this.volunteerAt ??= r.time;
+    const cued = BorrowLightCued(r.player.position, r.column.zhou, r.player.yaw);
+    if (!cued && r.time - this.volunteerAt < F.borrowApproachFallbackS) return;
+    this.borrowSaid = true;
+    r.Say("BorrowLight");
+  }
+  /**
+   * 抬老周那两个担架员：对白期间在 borrowClearRadiusM 外等着，不挤进两人中间；
+   * 借火演完（lightShared，也就是担架员开口催的那一刻）才走上来。
+   */
+  UpdateLiftBearers(dt) {
+    const r = this.r, zhou = r.column.zhou;
+    const coming = r.Has("lightShared");
+    if (coming) this.bearerCloseAt ??= r.time;
+    const t = this.bearerCloseAt == null ? 0
+      : Math.min(1, (r.time - this.bearerCloseAt) / F.bearerCloseMoveS);
+    for (const [i, bearer] of this.liftBearers.entries()) {
+      const from = Place.collection.bearerWait[i], to = Place.collection.bearerClose[i] || from;
+      bearer.x = from.x + (to.x - from.x) * t;
+      bearer.z = from.z + (to.z - from.z) * t;
+      bearer.yaw = Math.atan2(zhou.x - bearer.x, zhou.z - bearer.z);
+    }
+    void dt;
   }
 
   /** 06 每帧：借火姿态推进、老周被抬上担架那一小段。 */
@@ -174,6 +235,10 @@ export class FirstLevelCollection {
     // 贴着土壁、脸朝经过的玩家 —— 不许横在路当中（集成方 2026-09-20 的口径）。
     if (!r.Has("zhouOnLitter"))
       zhou.yaw = Math.atan2(r.player.position.x - zhou.x, r.player.position.z - zhou.z);
+    this.UpdateBorrowCue();
+    this.UpdateLiftBearers(dt);
+    // 借火演完，担架员才开口催（ZhouLift 播完 → zhouOnLitter）。
+    if (r.Has("lightShared")) r.Say("ZhouLift");
     for (const action of BorrowPosesDue(this.borrowLine, this.borrowEvents)) this.Pose(action);
     if (this.shareAt != null && r.time - this.shareAt >= F.borrowLightS + F.borrowWinceS) {
       this.Pose("wince");
@@ -183,8 +248,11 @@ export class FirstLevelCollection {
     if (this.smoke?.visible)
       this.smoke.position.set(zhou.x, r.battlefield.GroundHeight(zhou.x, zhou.z) + 0.72, zhou.z);
     if (this.match?.visible) {
-      const eye = r.player.EyePosition;
-      this.match.position.set(eye.x, eye.y - 0.22, eye.z);
+      // 伸在身前 0.5 m、眼下 0.2 m：贴在相机上（旧写法）等于一个像素都看不见，
+      // 而「把火递近一点」这一拍要的就是两人之间读得出这只手。
+      const eye = r.player.EyePosition, yaw = r.player.yaw;
+      this.match.position.set(eye.x - Math.sin(yaw) * 0.5, eye.y - 0.2, eye.z - Math.cos(yaw) * 0.5);
+      this.match.rotation.y = yaw;
     }
     // 担架员来催（ZhouLift 播完 → zhouOnLitter）之后，老周从土壁挪回队列。
     if (r.Has("zhouOnLitter")) {
@@ -224,6 +292,8 @@ export class FirstLevelCollection {
       litters: this.props.length,
       runner: this.runner?.actor?.alive ? { x: this.runner.actor.position.x, z: this.runner.actor.position.z } : null,
       borrow: BORROW_POSE_ORDER.filter((action) => this.poses.has(action)),
+      borrowSaid: this.borrowSaid,
+      liftBearers: this.liftBearers.map((bearer) => ({ id: bearer.id, x: +bearer.x.toFixed(2), z: +bearer.z.toFixed(2) })),
       zhouParked: this.zhouParked,
       zhouLifted: this.zhouLiftAt != null,
     };

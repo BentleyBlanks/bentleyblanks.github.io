@@ -131,6 +131,13 @@ export class FirstLevelLeaderGuide {
         mode=label="collect";cue="GuideGunSupply";variant+="Supply";
       }else if(r.emplacement.Mounted){mode=label="cover";cue=null;}
     }
+    // 06：借火那一段演完之前，目标标记指着靠土壁等担架的老周。
+    // Notion 06 是老周「看见顺子经过」才开口 —— 轻引导，只挪标记，不接管、不喊话
+    //（cue=null：这一拍不是班长下的命令，配音表里也没有对应的 Guide 句）。
+    if(variant==="Orders"&&!r.Has("lightShared")&&r.column?.zhou){
+      const zhou=r.column.zhou;
+      target={x:zhou.x,z:zhou.z};mode=label="move";cue=null;variant+="Zhou";
+    }
     if(variant==="Courtyard") {
       if(r.Has("villageGunSilent")){target=A.gate;mode=label="open";}
       if(r.Has("courtyardGateOpen")&&r.Has("villageGunSilent")){target=A.courtCover;mode=label="cover";cue="GuideCourtCover";variant+="Cover";}

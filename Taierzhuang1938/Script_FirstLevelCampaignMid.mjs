@@ -11,6 +11,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { MISSION_TRANSFER_THREATS } from "./Data_FirstLevelMission.mjs";
+import { MISSION_PLACEMENT as P } from "./Data_FirstLevelMissionLayout.mjs";
 import { MID_TUNING as M } from "./Data_Tuning_FirstLevelMid.mjs";
 import { CampaignActions } from "./Script_FirstLevelCampaignKit.mjs";
 
@@ -75,11 +76,21 @@ export async function Drive(ctx) {
     // 主街（x 73–81）从北口进：村口那条巷子在 x=72、z≈−24 那一小段是通的，
     // 再往南整条街都被 StreetWestWallNorth / StreetEastWallNorth 夹住，
     // 一路能看到 z=20 的倒墙与横车。
-    await Route([{ x: 58, z: -21 }, { x: 66, z: -24 }, { x: 72, z: -24.3 }, { x: 76, z: -21 },
-      { x: 77, z: -12 }, { x: 77, z: -5 }], "StreetBlockApproach", { fight: true });
-    assert.ok(await page.evaluate(() =>
-      window.Tengxian.Debug.FirstLevelMission().facts.includes("streetBlockSeen")),
-    "走到主街障碍北侧就看见了倒墙与横车");
+    // 2026-09-20 演出打磨：`streetBlockSeen` 改成「人在北口那个 box 里 + 到障碍有通视」，
+    // 所以**刚进北口**就该记上，不用再往南钻十几米。
+    await Route([{ x: 58, z: -21 }, { x: 66, z: -24 }, { x: 72, z: -24.3 }, { x: 76, z: -22 }],
+      "StreetBlockMouth", { fight: true });
+    await LookAt(page, P.streetBlock.gap);
+    const mouth = await page.evaluate(() => {
+      const g = window.Tengxian, m = g.Debug.FirstLevelMission();
+      return { at: { x: +g.player.position.x.toFixed(2), z: +g.player.position.z.toFixed(2) },
+        seen: m.facts.includes("streetBlockSeen"), said: m.voice.played.includes("StreetBlocked") };
+    });
+    console.log("STREET_MOUTH", JSON.stringify(mouth));
+    assert.ok(mouth.seen, "站在村北口往主街一看就记下了倒墙与横车：" + JSON.stringify(mouth));
+    // 北口那一眼：倒墙/横车与喊话的前队要同框。
+    await page.screenshot({ path: path.join(output, "Scene_StreetBlockApproach.png") });
+    await Route([{ x: 77, z: -12 }, { x: 77, z: -5 }], "StreetBlockApproach", { fight: true });
     await Capture("StreetBlockAndLitters");
     // 班长查看相邻房屋 → KitchenDetour；他走他的，玩家跟进灶屋。
     // 担架队同时自己往 LitterHoldCover 后面的车位走，这里不代劳。

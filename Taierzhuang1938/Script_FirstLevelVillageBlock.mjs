@@ -212,6 +212,14 @@ export class FirstLevelVillageBlock {
     this.released = true;
   }
 
+  /** 「街堵了！」从前队那个回头喊话的人嘴里出来，不是贴在玩家脸上。 */
+  VoicePosition(cue) {
+    if (cue.id !== "StreetBlocked") return null;
+    const actor = this.bystanders.find((a) => a.missionId === "StreetFrontParty0" && a.alive)
+      || this.bystanders.find((a) => a.alive);
+    return actor ? this.r.Point(actor.position, 1.3) : null;
+  }
+
   /** 担架队还停着没有？工作台与测试用。 */
   State() {
     return {

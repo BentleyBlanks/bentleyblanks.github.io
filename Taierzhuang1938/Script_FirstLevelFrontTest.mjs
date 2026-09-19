@@ -25,7 +25,7 @@ import {
   SouthWalkLengthM, SouthWalkSeconds,
 } from "./Data_Tuning_FirstLevelFront.mjs";
 import { BunkerBeatsDue, BUNKER_BEAT_ORDER } from "./Script_FirstLevelBunker.mjs";
-import { CollectionDressing, BorrowPosesDue, BORROW_POSE_ORDER } from "./Script_FirstLevelCollection.mjs";
+import { CollectionDressing, BorrowPosesDue, BORROW_POSE_ORDER, BorrowLightCued } from "./Script_FirstLevelCollection.mjs";
 import { SouthPointerSpot, FRONT_WIRED_CUES } from "./Script_FirstLevelFrontShow.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -73,8 +73,11 @@ const Cue = (id) => MISSION_DIALOGUE.find((cue) => cue.id === id);
     assert.ok(nearest >= 1.5, `缴下的步枪要在几米外，不是压在身下（实测 ${nearest.toFixed(2)} m）`);
   }
   const sight = Math.hypot(A.bunkerKilling.x - A.bunker.x, A.bunkerKilling.z - A.bunker.z);
-  assert.ok(sight <= R.bunkerSightM + 6.5,
+  // 2026-09-20 演出打磨：掩蔽部从 12 m 进深收到 7 m 之后，这一段落在破口视距**之内**
+  // （8.5 m < 12 m），不再需要旧那条 +6.5 m 的宽限。720p 下人有约 150 像素高。
+  assert.ok(sight <= R.bunkerSightM,
     `受困位置看得清行刑处（破口视距 ${R.bunkerSightM} m，实测 ${sight.toFixed(1)} m）`);
+  assert.ok(sight <= 9, `行刑处离受困位不超过 9 m（实测 ${sight.toFixed(1)} m）`);
   assert.equal(bunker.ijaKill.length, 2, "下刀的两个站位由空间包给（不在代码里估）");
   assert.equal(bunker.ijaDoor.length, 2, "转向门内的两个落点由空间包给");
 }
@@ -117,6 +120,55 @@ const Cue = (id) => MISSION_DIALOGUE.find((cue) => cue.id === id);
     "「就剩这一根了」之前只摸了兜；收火柴要等事件，不许提前");
   assert.deepEqual(BORROW_POSE_ORDER, ["ask", "pat", "pocket", "offer", "light", "share", "wince"],
     "State().collection.borrow 的顺序＝原文的动作顺序");
+}
+
+// ---------------------------------------------------------------------------
+// 4b. 06 借火的取景（2026-09-20 演出打磨）
+//
+// 实拍出来的问题：画面被两名担架员的后背挡满、老周不在画里、玩家也没面向他。
+// Notion 06 是老周「看见顺子经过」才开口 —— 所以这一段要玩家走到跟前、脸朝着他，
+// 而担架员要在两人中间那条轴线之外等着。
+// ---------------------------------------------------------------------------
+{
+  const zhou = P.collection.zhouWall, stand = P.collection.borrowStand;
+  const Distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
+  assert.ok(Distance(stand, zhou) <= F.borrowTriggerM,
+    `借火站位在触发圈里：${Distance(stand, zhou).toFixed(2)} m ≤ ${F.borrowTriggerM}`);
+  // 站在那儿、面朝老周 → 开播；背对他或者隔着五米 → 不开播。
+  const facing = Math.atan2(stand.x - zhou.x, stand.z - zhou.z);
+  assert.ok(BorrowLightCued(stand, zhou, facing), "走到跟前、脸朝着老周就开口");
+  assert.ok(!BorrowLightCued(stand, zhou, facing + Math.PI), "背对着他不开口");
+  assert.ok(!BorrowLightCued({ x: stand.x, z: stand.z - 5 }, zhou, facing), "隔着五米不开口");
+  assert.ok(F.borrowApproachFallbackS > 0 && F.borrowApproachFallbackS < 90,
+    "一直不过去也要兜底，但不能拖成一分半");
+  // 担架员与摆位人员都让开「玩家 → 老周」那条轴线，也不贴着老周站。
+  assert.equal(P.collection.bearerWait.length, 2, "抬老周的是两个人");
+  assert.equal(P.collection.bearerClose.length, P.collection.bearerWait.length,
+    "等待位与走上来之后的位置一一对应");
+  const OffAxis = (p) => {
+    const dx = zhou.x - stand.x, dz = zhou.z - stand.z, len2 = dx * dx + dz * dz;
+    const t = Math.max(0, Math.min(1, ((p.x - stand.x) * dx + (p.z - stand.z) * dz) / len2));
+    return Math.hypot(p.x - (stand.x + dx * t), p.z - (stand.z + dz * t));
+  };
+  for (const spot of [...P.collection.bearerWait, ...P.collection.bearers]) {
+    assert.ok(Distance(spot, zhou) >= F.borrowClearRadiusM,
+      `对白期间没人站进老周 ${F.borrowClearRadiusM} m 以内（${JSON.stringify(spot)}）`);
+    assert.ok(OffAxis(spot) >= 2,
+      `没人挡在玩家与老周之间（${JSON.stringify(spot)} 离轴线只有 ${OffAxis(spot).toFixed(2)} m）`);
+  }
+  // 走上来之后贴着老周，但不许站进土壁里（CollectionLitterWall 在 z −95.3…−94.7）。
+  for (const spot of P.collection.bearerClose) {
+    assert.ok(Distance(spot, zhou) < 2.5, "催的时候担架员真的走到了老周身边");
+    assert.ok(spot.z < -95.9, "担架员从北侧过来，不站进土壁");
+  }
+  assert.ok(F.bearerCloseMoveS > 0.5 && F.bearerCloseMoveS < 6, "走上来那一段是一步路，不是一段路");
+  // 触发点搬到 Front 包：运行时进 Orders 只排 Volunteer 那一条。
+  const runtime = Read("Script_FirstLevelMissionRuntime.mjs");
+  assert.ok(/this\.Record\("ordersReached"\);this\.Say\("Volunteer"\);\}/.test(runtime),
+    "ordersReached 只排 Volunteer，BorrowLight / ZhouLift 由 FirstLevelCollection 按演出放");
+  const collection = Read("Script_FirstLevelCollection.mjs");
+  assert.ok(/r\.Say\("BorrowLight"\)/.test(collection) && /r\.Say\("ZhouLift"\)/.test(collection),
+    "借火与担架员催都由集结处那一层放");
 }
 
 // ---------------------------------------------------------------------------

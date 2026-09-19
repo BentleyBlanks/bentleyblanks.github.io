@@ -157,11 +157,19 @@ const report = {};
 }
 
 // ---------------------------------------------------------------------------
-// 3. 掩蔽部：躺姿视线到门外 8–12 m
+// 3. 掩蔽部：小型（7 × 7 m）、躺姿视线到门外 2–12 m，行刑处整个人都在视野里
 // ---------------------------------------------------------------------------
 {
   const blocks = Solids("BunkerCollapsed");
-  const doorZ = -133, band = [];
+  // 2026-09-20 演出打磨：屋子从 12 m 进深收到 7 m，前墙在 z=-128。
+  const doorZ = -128, band = [];
+  // 受困位到前门 4–5 m、到行刑处 ≤ 9 m（Notion 01「必须让玩家清楚看懂」）。
+  report.bunkerDepthM = +(Math.abs(S.bunker.z - doorZ)).toFixed(2);
+  report.bunkerKillingM = +Distance(S.bunker, S.bunkerKilling).toFixed(2);
+  assert.ok(report.bunkerDepthM >= 4 && report.bunkerDepthM <= 5,
+    `the pinned spot is 4-5 m behind the front wall: ${report.bunkerDepthM} m`);
+  assert.ok(report.bunkerKillingM <= 9,
+    `the killing ground reads at a glance: ${report.bunkerKillingM} m from the pinned spot`);
   for (const eyeH of [0.35, 0.42, 0.50]) {
     const eye = Eye(S.bunker, eyeH);
     for (const [label, target] of [["killing", S.bunkerKilling], ["8m", { x: S.bunker.x, z: doorZ - 8 }],
@@ -174,12 +182,31 @@ const report = {};
     }
   }
   report.bunkerSight = band;
+  // 「两名川军和两名日兵」的**全身**（膝到头顶）都不许被中隔墙裁掉。
+  // 脚底那一档（0.05）允许被门槛碎砖挡住 —— 那正是「门框与尘土遮住创口」的一部分，
+  // 但挡住它的只许是门口那一带，绝不能是中隔墙。
+  report.bunkerFullBody = [];
+  for (const eyeH of [0.35, 0.42, 0.50]) {
+    const eye = Eye(S.bunker, eyeH);
+    for (const [label, point] of [["captiveWounded", P.bunker.captives[0]],
+      ["captiveHelper", P.bunker.captives[1]],
+      ["ijaA", P.bunker.ijaKill[1]], ["ijaB", P.bunker.ijaKill[0]]]) {
+      for (const h of [0.35, 0.9, 1.75]) {
+        const blocker = SightBlocker(eye, { x: point.x, z: point.z, y: Ground(point.x, point.z) + h }, blocks);
+        assert.equal(blocker, null,
+          `prone eye ${eyeH} sees ${label} at ${h} m (blocked by ${blocker})`);
+      }
+      const feet = SightBlocker(eye, { x: point.x, z: point.z, y: Ground(point.x, point.z) + 0.05 }, blocks);
+      assert.ok(!/Partition/.test(feet || ""), `the partition never crops ${label}`);
+      if (eyeH === 0.42) report.bunkerFullBody.push({ label, d: +Distance(S.bunker, point).toFixed(2), feet });
+    }
+  }
   // 门框与碎砖必须真的遮住一部分（不然「破口」就是一扇敞开的门）。
   const eye = Eye(S.bunker, 0.42);
-  // 门框把视野切成一条缝：刺杀处正前方看得见，左右两侧被门垛挡住；
-  // 门框立柱本身再挡掉当中一条（行刑处 2026-09-20 前移到 z=-137.5 之后，
-  // 那条缝是 x -40.75…-38.25，立柱的射影落在 -39…-38.25 之间）。
-  report.bunkerOcclusion = [-46, -43, -38.6, -37.5, -34].map((x) => ({ x,
+  // 门框把视野切成一条缝：刺杀处正前方看得见，左右两侧被门垛与塌方堆挡住；
+  // 门框立柱本身再挡掉当中一条（行刑处 z=-131.9 这一档，缝是 x -42.59…-37.41，
+  // 立柱的射影落在 -38.80…-38.24）。
+  report.bunkerOcclusion = [-47, -43, -38.5, -37, -34].map((x) => ({ x,
     blocker: SightBlocker(eye, { x, z: S.bunkerKilling.z, y: Ground(x, S.bunkerKilling.z) + 1.2 }, blocks) }));
   for (const row of report.bunkerOcclusion)
     assert.ok(row.blocker, `the doorway must occlude x=${row.x} outside the bunker`);

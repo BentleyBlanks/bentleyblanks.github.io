@@ -8285,7 +8285,10 @@ function Frame(dt, render = true) {
     firePunch = Math.max(0, firePunch - dt / FIRE_PUNCH_DECAY_S);
   }
   const punch = firePunch * firePunch;
-  const targetFov = p012BinocularRaised ? 25 : baseFov + punch * FIRE_PUNCH_FOV_DEG;
+  // 第一关 01 受困段把视野收窄（Script_FirstLevelFrontShow.NarrowFovDeg 管平滑）；
+  // 其它时候原样返回基准 FOV，这一层不改任何既有手感。
+  const missionFov = missionRuntime?.NarrowFovDeg?.(baseFov, dt) ?? baseFov;
+  const targetFov = p012BinocularRaised ? 25 : missionFov + punch * FIRE_PUNCH_FOV_DEG;
   if (Math.abs(camera.fov - targetFov) > 0.001) {
     camera.fov = targetFov;
     camera.updateProjectionMatrix();

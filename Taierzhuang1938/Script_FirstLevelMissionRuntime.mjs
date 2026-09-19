@@ -44,6 +44,7 @@ import {
   MISSION_FACT_GATES,
   MISSION_SCENARIO_SIGNALS,
   MissionGateFamily,
+  MissionGateInArea,
 } from "./Data_FirstLevelMissionGates.mjs";
 import { FirstLevelMissionFlow } from "./Script_FirstLevelMissionFlow.mjs";
 import { GuardCrossingPair, FrontReplacementSlots } from "./Script_FirstLevelMissionPacing.mjs";
@@ -213,6 +214,13 @@ export class FirstLevelMissionRuntime {
     return Distance(this.player.position, point) < radius;
   }
   /**
+   * 镜头视野：`Script_Main` 每帧拿算好的基准 FOV 来问一次。现在只有 01 受困段用它
+   * （把视野收窄到「卡着只能盯着看」），平滑与数值都在 Front 包的 FirstLevelFrontShow。
+   */
+  NarrowFovDeg(baseFov, dt) {
+    return this.frontShow?.NarrowFovDeg(baseFov, dt) ?? baseFov;
+  }
+  /**
    * 事实门的距离判定：点与半径一律从 MISSION_FACT_GATES 取，代码里不再写坐标与米数。
    * 家族门（approachShell<i> / bundleRoutePoint<i> / bundleCrawl<id>）按前缀解析出那一个点。
    * 附加条件（是否已下车、担架是否过完、人是不是趴着）仍留在各自的调用处。
@@ -222,6 +230,12 @@ export class FirstLevelMissionRuntime {
     if (exact && exact.kind !== "proximity") throw new Error(`GateNear: ${fact} is not a proximity gate`);
     if (!exact && !family) throw new Error(`GateNear: no proximity gate for ${fact}`);
     const gate = exact || family.gate;
+    // 表里还能再挂两道条件（矩形与视线都写在 MISSION_FACT_GATES 里，这儿不写坐标）：
+    //   area  —— 人要站在这一带（08「队伍到村北口、往主街一看」）
+    //   sight —— 真的望得见那个锚点，不是「隔着一道院墙离得近」
+    if (gate.area && !MissionGateInArea(this.player.position, gate.area)) return false;
+    if (gate.sight && this.BlocksSight(this.player.EyePosition.clone(),
+      this.Point(A[gate.sight.anchor], gate.sight.toM))) return false;
     return this.Near(family ? family.point : gate.point || A[gate.anchor], gate.radiusM);
   }
   /**
@@ -263,6 +277,9 @@ export class FirstLevelMissionRuntime {
     // 阶段 1–7 自己认领的几条（村口指路的人、指弹药屋的守军、集结处的传令兵与老周）。
     const front=this.frontShow?.VoicePosition(cue,line);
     if(front)return front;
+    // 08 主街那一头喊话的前队（Mid 包）。
+    const village=this.village?.VoicePosition(cue,line);
+    if(village)return village;
     if(cue.id==="WoundedArrival"&&this.opening.wounded)return this.Point(this.opening.wounded.actor.position,1.2);
     if(cue.id==='BundleSupply' && line?.who==='keeper' && this.bundleKeeper)
       return this.Point(this.bundleKeeper.position,1.2);
@@ -2396,7 +2413,10 @@ export class FirstLevelMissionRuntime {
       // 余弹仍然由 HUD 与 GuideGunSupply 交代。
     }
     if(stage==="Orders"){
-      if(this.GateNear("ordersReached")){this.Record("ordersReached");this.Say("Volunteer");this.Say("BorrowLight");this.Say("ZhouLift");}
+      // 2026-09-20 演出打磨：借火与担架员催的两段不再随 ordersReached 一起排进队 ——
+      // Notion 06 是老周「看见顺子经过」才开口，触发与担架员的走位在
+      // Script_FirstLevelCollection.UpdateOrders 里（玩家走到他跟前、脸朝着他）。
+      if(this.GateNear("ordersReached")){this.Record("ordersReached");this.Say("Volunteer");}
       // 后送队真实起行：担架队离开集结处，队首走出 litterSpacingM 以上。
       if(this.Has("zhouOnLitter")&&this.column.litters.some(litter=>litter.progress>=R.litterSpacingM))
         this.Record("columnDeparted",{lead:Math.max(...this.column.litters.map(litter=>litter.progress))});

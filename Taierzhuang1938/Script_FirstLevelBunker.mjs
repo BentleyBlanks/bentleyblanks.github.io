@@ -178,8 +178,10 @@ export class FirstLevelBunkerShow {
       // 一名日兵用靴子踢开尸体旁的步枪；另一人已经把枪口转向门内。
       const mesh = this.rifleProps[0];
       if (mesh) {
-        mesh.position.x -= F.bunkerRifleSlideM * 0.7;
-        mesh.position.z += F.bunkerRifleSlideM * 0.7;
+        // 往门口这边踢（+x 偏东、+z 朝门）：往西南踢会把它滑到门垛的射影里，
+        // 玩家从破口看过去这一拍就没了。
+        mesh.position.x += F.bunkerRifleSlideM * 0.4;
+        mesh.position.z += F.bunkerRifleSlideM * 0.8;
         r.audio?.Play?.("impactWood", { position: mesh.position.clone(), volume: 0.7 });
       }
       if (killerB?.alive) {
