@@ -26,11 +26,11 @@ export const TEXT = Object.freeze({
   "menu.progress.notFired": "尚未开枪",
   "menu.progress.guards": "安全撤回 {safe} 人 · 阵亡 {lost} 人 / 共 {target} 人",
   // 2026.09.19 重构（docs/Data_FirstLevelRebuild20260919Contract.md §2）：27 步的全部过关条件。
-  "menu.condition.bunkerCollapsed": "等待近失弹把掩蔽部埋下来",
+  "menu.condition.bunkerCollapsed": "等近失弹把掩蔽部炸塌",
   "menu.condition.captivesKilled": "透过门口破口看清门外发生的事",
   "menu.condition.doorSearchStarted": "等门外的日军转向门内",
   "menu.condition.rescueCallHeard": "听到后侧交通壕传来的掩护火力",
-  "menu.condition.luoRescueComplete": "接受罗班长救援，从压住的木架下出来",
+  "menu.condition.luoRescueComplete": "接受罗班长救援，从坍塌的木架下出来",
   "menu.condition.rifleRecovered": "捡起掉在门口的步枪",
   "menu.condition.rearTrenchEntered": "退进后交通壕",
   "menu.condition.cornerReached": "到达后交通壕折角",

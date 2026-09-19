@@ -36,7 +36,7 @@ export const TEXT = Object.freeze({
   "firstLevel.interaction.place": "将老周放在军医旁",
   "firstLevel.interaction.supply": "补充弹药、手榴弹和绷带",
   "firstLevel.hint.melee": "V 拔刀 · F 拨推 · 左键挥刀",
-  "firstLevel.hint.trapped": "压住了，动不了。只能转头看。",
+  "firstLevel.hint.trapped": "被压住了，动不了。只能转头看。",
   "firstLevel.guide.distance": "{label} · {distance} 米",
   "firstLevel.guide.rescue": "掩蔽部门口",
   "firstLevel.guide.rearTrench": "后交通壕折角",
