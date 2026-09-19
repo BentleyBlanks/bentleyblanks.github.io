@@ -4,6 +4,7 @@ import { MissionAftermath } from "./Script_FirstLevelMissionAftermath.mjs";
 import { MissionPeople } from "./Script_FirstLevelMissionPeople.mjs";
 import { CreateMealProp } from "./Script_FirstLevelMeal.mjs";
 import { MISSION_TUNING } from "./Data_Tuning_FirstLevel.mjs";
+import { MID_TUNING as MID } from "./Data_Tuning_FirstLevelMid.mjs";
 import { CreateP012StretcherGeometry } from "./Script_FirstLevelP012CarryView.mjs";
 import { BuildSink } from "./Script_World.mjs";
 import { PlaceGeometry } from "./Script_Geo.mjs";
@@ -44,6 +45,9 @@ export class FirstLevelMissionView {
       ["cartShaft", new THREE.BoxGeometry(.10,.1,3.5), 0x75634c, 14],
       ["muleBody", new THREE.BoxGeometry(.62,.72,1.5), 0x6c6457, 7],
       ["muleHead", new THREE.BoxGeometry(.25,.56,.44), 0x746c5e, 7],
+      // 11 的牛/马两种白盒变体（Data_Tuning_FirstLevelMid.draft）：躯干与头按比例缩，
+      // 牛另外挂一对角。**实例桶满了是静默截断** —— 七辆车各两只角，容量按 MID.hornCapacity 给。
+      ["draftHorn", new THREE.BoxGeometry(...MID.horn.size), 0xa39c86, MID.hornCapacity],
       ["spoke", new THREE.BoxGeometry(.12,.80,.07), 0x8b816d, 112],
       // 担架帆布：0xd1d0be 在门口那片天光下会被顶成一块发光的白板，躺在上面的人整个
       // 读成一团黑影（2026-09-16 屋内伏击出图实拍）。压到脏帆布的亮度，十副担架同一份材质。
@@ -288,6 +292,11 @@ export class FirstLevelMissionView {
         // 从地板镜头看过去整副担架读不出「上面躺着个人」（2026-09-16 屋内伏击出图实拍）。
         this.zhouRoot.rotation.set(litter.state === "fallen" ? 0.1 : 0, yaw, 0);
         this.zhouPatient.material.color.setHex(litter.health < 25 ? 0xbda5a0 : 0xd9d7cb);
+        // 老周担架上的近景件（他的挎包）。**身份稳定的普通 Mesh**，不是实例 ——
+        // 逐实例形变不在 MotionVector 契约内（见 Script_PostPrepass 抬头），
+        // 12/13 这副担架会跟着牛马车走、相机也跟着走，正是那类近景移动件。
+        this.RigidProp("fieldPack", "ZhouKit",
+          litter.x + Math.cos(yaw) * .34, ground + height + .1, litter.z - Math.sin(yaw) * .34, yaw);
       } else {
         this.Instance("bed", litter.x, ground + height, litter.z, yaw);
       }
@@ -333,6 +342,15 @@ export class FirstLevelMissionView {
           crouch: walker.crouch,
         });
     }
+    // 11 的第四类人流：接运点现场能自己走 / 互相搀扶的伤员
+    //（Script_FirstLevelTransferCart 摆位，这里只画）。
+    for (const walker of this.column.transferWalkers || []) {
+      if (!walker.visible) continue;
+      this.Person(walker.x, walker.z, walker.yaw, time, {
+        id: walker.id, kind: "wounded", alive: true,
+        moving: !!walker.moving, crouch: !!walker.crouch,
+      });
+    }
     for (const cart of [...this.column.vehicles, ...this.column.traffic.filter((cart) => cart.visible)]) {
       if (cart.z > 178) continue;
       const y = this.battlefield.GroundHeight(cart.x, cart.z);
@@ -349,11 +367,22 @@ export class FirstLevelMissionView {
       if(!cart.overturned || team&&team.progress<team.length){
         const yaw=team?.yaw??cart.yaw, mc=Math.cos(yaw),ms=Math.sin(yaw);
         const mx=team?.x??cart.x-s*4.8,mz=team?.z??cart.z-c*4.8,my=this.battlefield.GroundHeight(mx,mz);
-        this.Instance("muleBody",mx,my+1,mz,yaw);
-        this.Instance("muleHead",mx-ms*.8,my+1.5,mz-mc*.8,yaw);
+        // 牛 / 马：同一对实例桶，按 Data_Tuning_FirstLevelMid.draft 的比例缩。
+        const draft=MID.draft[cart.draft==="ox"?"ox":"horse"];
+        const [bx,by,bz]=draft.bodyScale,[hx,hy,hz]=draft.headScale;
+        const headY=my+1.5-draft.headDrop;
+        this.Instance("muleBody",mx,my+1*by,mz,yaw,bx,by,bz);
+        this.Instance("muleHead",mx-ms*.8,headY,mz-mc*.8,yaw,hx,hy,hz);
+        // 牛角：一对，挂在头两侧前上方，往外岔开。
+        if(draft.horn)for(const side of [-1,1])
+          this.Instance("draftHorn",
+            mx-ms*(.8+MID.horn.forwardM)+mc*side*MID.horn.lateralM,
+            headY+MID.horn.riseM,
+            mz-mc*(.8+MID.horn.forwardM)-ms*side*MID.horn.lateralM,
+            yaw,1,1,1,0,side*MID.horn.tiltRad);
         for(const side of [-1,1])for(const end of [-1,1]){
           const swing=moving||team?Math.sin(time*(team?10:6)+side*end*Math.PI/2)*.32:0;
-          this.Instance("limb",mx+mc*side*.21-ms*end*.52,my+.37,mz-ms*side*.21-mc*end*.52,yaw,.8,1.1,.8,swing);
+          this.Instance("limb",mx+mc*side*.21*bx-ms*end*.52*bz,my+.37*by,mz-ms*side*.21*bx-mc*end*.52*bz,yaw,.8,1.1*by,.8,swing);
         }
         this.Person(mx+mc*1.1,mz-ms*1.1,yaw,time,{id:cart.id+"Driver",kind:"medic",moving:moving||!!team});
       }

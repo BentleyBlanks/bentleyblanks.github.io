@@ -103,8 +103,10 @@ export const MISSION_ENCOUNTER_ACTIVATION = Object.freeze({
   melee: Object.freeze({
     spawn: Object.freeze({ kind: "step", step: "Support" }),
     dormant: true,
-    wake: Object.freeze({ kind: "playerWithinM", step: "Melee", radiusM: 26 }),
-    note: "连屋里的四个人：村口那批醒的时候他们不跟着醒，玩家进灶屋以东才出来",
+    // 玩家先进灶屋（kitchenEntered）、再走到连屋这个半径里，他们才从东巷那扇门进来。
+    // 实装：Script_FirstLevelVillageBlock.UpdateMeleeBeat。
+    wake: Object.freeze({ kind: "playerWithinM", step: "Melee", radiusM: 26, fact: "kitchenEntered" }),
+    note: "连屋里的四个人：村口那批醒的时候他们不跟着醒，玩家进了灶屋、走到连屋附近才出来",
   }),
   courtyard: Object.freeze({ spawn: Object.freeze({ kind: "step", step: "Courtyard" }) }),
   transfer: Object.freeze({
@@ -289,8 +291,8 @@ export const MISSION_FACT_GATES = Object.freeze({
     note: "主街被倒墙＋横车堵住，东巷窗口有日军火力",
   }),
   littersInCover: Gate({
-    kind: "column", step: "Village", source: "Update",
-    text: "担架队停进可靠遮挡（litterHold），不跟进未清空间",
+    kind: "column", step: "Village", source: "FirstLevelVillageBlock.UpdateVillage",
+    text: "每一副活着的担架都停到 litterWait 的车位上，而且窗口与主街缺口两条射线都被 LitterHoldCover 切断",
   }),
   kitchenEntered: Gate({
     kind: "interior", step: "Village", box: "kitchenInterior", source: "Update",
@@ -311,8 +313,9 @@ export const MISSION_FACT_GATES = Object.freeze({
     source: "Register", text: "院门打开（担架从这里过）",
   }),
   courtyardPassed: Gate({
-    kind: "column", step: "Courtyard", source: "Update",
-    text: "还活着的担架全部通过院门，在障碍南侧 streetRejoin 接回主街",
+    kind: "column", step: "Courtyard", source: "Update/VillageCourtyardCleared",
+    requires: Object.freeze(["rearCoverDisengaged"]),
+    text: "还活着的担架全部通过院门、在障碍南侧 streetRejoin 接回主街，且队尾掩护已经脱离",
   }),
   // --- TransferApproach --------------------------------------------------
   transferApproachReached: Gate({
@@ -327,26 +330,26 @@ export const MISSION_FACT_GATES = Object.freeze({
     text: "压向装载区的那一处威胁被清掉",
   }),
   firstBatchLoaded: Gate({
-    kind: "column", step: "Transfer", source: "Update",
-    text: "第一处威胁解除后接运真实推进一批（装上第一车伤员）",
+    kind: "column", step: "Transfer", source: "FirstLevelTransferCart.UpdateTransfer",
+    text: "第一处威胁解除后放开一批装载额度，这一批真的装满并且车真的开走了",
   }),
   alleyThreatResolved: Gate({
     kind: "combat", step: "Transfer", encounter: "transferAlley", source: "UpdateTransferThreats",
     text: "侧巷那一处威胁被清掉",
   }),
   zhouNext: Gate({
-    kind: "column", step: "Transfer", source: "Update",
-    text: "队列轮到老周，他被抬向装车位（离开原位 boardingWitnessM 以上）",
+    kind: "column", step: "Transfer", source: "FirstLevelTransferCart.UpdateTransfer",
+    text: "队列轮到老周：给他叫来一辆牛/马车，他被抬向装车位（离开原位 boardingWitnessM 以上）",
   }),
   escortGranted: Gate({ kind: "voice", step: "Transfer", cue: "EscortZhou", source: "VoiceDone" }),
   // --- CartRide ----------------------------------------------------------
   cartBoarded: Gate({
     kind: "interaction", step: "CartRide", interaction: "MissionCart", anchor: "cartBoard",
-    source: "Register", text: "顺子上了老周那辆车（控制接管 cartRide，可环视）",
+    source: "Register", text: "顺子坐上老周那辆牛/马车的车板（控制接管 cartRide，可环视）",
   }),
   zhouCartDeparted: Gate({
-    kind: "scripted", step: "CartRide", source: "UpdateCart",
-    text: "车沿 cartRide 路线真实离开装载位置",
+    kind: "scripted", step: "CartRide", source: "FirstLevelTransferCart.UpdateRide",
+    text: "那辆车沿 cartRide 路线真实离开装载位置（cartDepartedM 以上）",
   }),
   cartTalkHeard: Gate({ kind: "voice", step: "CartRide", cue: "CartTalk", source: "VoiceDone" }),
   // --- AirFirst ----------------------------------------------------------
@@ -355,12 +358,12 @@ export const MISSION_FACT_GATES = Object.freeze({
     text: "日机第一趟扫射掠过桥头道路与车列",
   }),
   cartHalted: Gate({
-    kind: "scripted", step: "AirFirst", source: "UpdateCart",
-    text: "道路受损堵塞，车停在 cartHalt",
+    kind: "scripted", step: "AirFirst", source: "FirstLevelTransferCart.UpdateRide",
+    text: "道路受损堵塞，车停在 cartHalt，控制权还给玩家",
   }),
   zhouUnloaded: Gate({
-    kind: "scripted", step: "AirFirst", source: "UpdateCart",
-    text: "老周被从车上卸回担架",
+    kind: "scripted", step: "AirFirst", source: "FirstLevelTransferCart.UpdateUnload",
+    text: "两个搬运的人走到车边，用 unloadSeconds 把老周从车板放回地面的担架上（有过程，不是瞬间）",
   }),
   westDitchPointed: Gate({ kind: "voice", step: "AirFirst", cue: "WestDitchOrder", source: "VoiceDone" }),
   // --- Carry -------------------------------------------------------------
@@ -473,6 +476,61 @@ export const MISSION_FACT_GATES = Object.freeze({
   meleeEngaged: Gate({
     kind: "scripted", step: "Melee", source: "UpdateMelee",
     text: "连屋那一组真的贴上玩家（走共用白刃僵持）；玩家先手打掉就不会记",
+  }),
+
+  // --- 08–14 的内部辅助事实（第二波 Mid 包，契约 §2「实现包可以增加内部辅助事实」）---
+  houseChecked: Gate({
+    kind: "scripted", step: "Village", source: "FirstLevelVillageBlock.UpdateVillage",
+    text: "罗班长真的走到相邻房屋（灶屋北门内侧）查看过了 —— KitchenDetour 在这之后才喊",
+  }),
+  outsideWatched: Gate({
+    kind: "scripted", step: "Village", source: "FirstLevelVillageBlock.UpdateVillage",
+    text: "何有田退到主街这一侧的观察位（「外头我看着！」）",
+  }),
+  meleeBreachStarted: Gate({
+    kind: "scripted", step: "Melee", source: "FirstLevelVillageBlock.UpdateMeleeBeat",
+    text: "连屋那一组从东巷那扇门进来（玩家进了灶屋、走到连屋附近才放）",
+  }),
+  windowFireHolding: Gate({
+    kind: "combat", step: "Melee", member: "VillageGunner", encounter: "village",
+    source: "FirstLevelVillageBlock.UpdateMeleeBeat",
+    text: "近战结束了，窗口那挺机枪还活着、射线仍然通到院门 —— WindowOrder 就是这时候喊的",
+  }),
+  rearCoverDisengaged: Gate({
+    kind: "scripted", step: "Courtyard", source: "FirstLevelVillageBlock.UpdateCourtyard",
+    text: "队尾掩护（刘文财）走过院门以南 rearCoverClearM，队尾脱离",
+  }),
+  transferSorted: Gate({
+    kind: "column", step: "TransferApproach", source: "FirstLevelTransferCart.UpdateApproach",
+    text: "分流真的发生了：躺着的进了装载区集结口袋，能走的跟着往前头去了",
+  }),
+  bridgeHeadSeen: Gate({
+    kind: "scripted", step: "TransferApproach", source: "FirstLevelTransferCart.UpdateApproach",
+    text: "玩家辨认桥头方向：对准路桥，或者已经走到车位那一排以南",
+  }),
+  villageRoadWatched: Gate({
+    kind: "scripted", step: "TransferApproach", source: "FirstLevelTransferCart.UpdateApproach",
+    text: "玩家辨认村路威胁：在接运区回头对着村路来路，或者追兵已经露头",
+  }),
+  transferPostsManned: Gate({
+    kind: "scripted", step: "Transfer", source: "FirstLevelTransferCart.UpdateTransfer",
+    text: "班里人上了低墙/墙角一线的射位（不站在伤员中间四面打）",
+  }),
+  escortRelieved: Gate({
+    kind: "scripted", step: "Transfer", source: "FirstLevelTransferCart.UpdateTransfer",
+    text: "何有田真的走过来接住顺子的射位 —— EscortZhou 在这之后才喊",
+  }),
+  luoAtHalt: Gate({
+    kind: "scripted", step: "AirFirst", source: "FirstLevelTransferCart.UpdateAirGround",
+    text: "罗班长从后方赶到停车处（「莫挤路上！能下沟的下沟！」）",
+  }),
+  ditchSheltered: Gate({
+    kind: "scripted", step: "Rescue", source: "FirstLevelTransferCart.UpdateDitch",
+    text: "老周进了沟内遮挡（离下沟口 ditchMouth 这个半径以内）",
+  }),
+  columnOffRoad: Gate({
+    kind: "column", step: "Rescue", source: "FirstLevelTransferCart.UpdateDitch",
+    text: "老周那一副担架与玩家都离开了桥头主车道（整队重新成形是 15A 的 columnMoving）",
   }),
   gunOccupied: Gate({
     kind: "interaction", step: "MachineGun", interaction: "MissionGun", anchor: "gun",

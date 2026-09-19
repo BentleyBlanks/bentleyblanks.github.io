@@ -1,5 +1,19 @@
-// Pixel regression independent of the campaign route: real meal/pack geometry,
-// a moving parent and camera, then a camera-only move. Never disable velocity.
+// Pixel regression independent of the campaign route: real geometry, a moving
+// parent and camera, then a camera-only move. Never disable velocity.
+//
+// 2026.09.19 第二波：被测对象换了一批。原来量的是军列车厢里的腊肉与背包 —— 军列开场
+// 随采用稿下线，那两样已经没有了。现在量 12/13 老周那辆牛/马车上的近景件：
+//   · stretcherBed / patient —— 老周的担架与躺着的人（`zhouRoot` 下的 Mesh，
+//     走 matrixWorld 那一路，就是原来腊肉的那条路径）；
+//   · zhouKit                —— 担架上那件挎包（`RigidProp` 建的身份稳定普通 Mesh，
+//     就是原来背包的那条路径）。
+// 车板（`parts.cart`）是 InstancedMesh：**逐实例形变本来就不在 MotionVector 契约内**
+//（Script_PostPrepass 抬头写明「近景移动交互件用身份稳定的普通 Mesh」），
+// 所以它只作为现场读数记在 Data_Velocity.json 里，不当判据。
+// 事故形态一模一样：**父物体在动、相机跟着动**（顺子坐在车板上，车沿 cartRide 走），
+// 判据一字不改 —— 同速时零屏幕位移、停下立刻归零、重新出现不许拿旧变换、
+// 纯相机运动要留得住、原有绘制回调不许被顶掉。画质仍然是 high、资产仍然是真的。
+// 口径见 docs/Data_CarriagePropVelocity.md。
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -19,23 +33,33 @@ try{
   await page.goto(`http://127.0.0.1:${local?19119:server.address().port}/Taierzhuang1938/?whitebox=p012&shot=1&manual=1&quality=high&scale=small`,{timeout:180000});
   await page.waitForFunction(()=>window.Tengxian?.state?.ready,null,{timeout:180000});
   await page.evaluate(()=>window.Tengxian.StepFrames(48,1/60,true));
-  await page.screenshot({path:path.join(output,'Scene_MovingMeal.png')});
+  // 跳到 12（掩护装载与离开）：车位上真的停着牛车与马车，老周的担架也真的在场。
+  await page.evaluate(async()=>{await window.Tengxian.Debug.FirstLevelJump(12);window.Tengxian.StepFrames(30,1/60,true);});
+  await page.screenshot({path:path.join(output,'Scene_TransferCarts.png')});
+  // 让老周那一副担架露出来（12 起它是可见的近景件），再拍一张车列。
   await page.evaluate(()=>{
     const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime();
-    for(let i=0;i<750 && (r.voice.current?.sourceTime??0)<1.2;i++)g.StepFrames(1,1/60,false);
+    const cart=r.column.vehicles.find(entry=>!entry.departed)||r.column.vehicles[0];
+    const zhou=r.column.zhou;
+    Object.assign(zhou,{x:cart.x-2.2,z:cart.z,visible:true,state:'waiting'});
+    g.player.position.set(cart.x-7,g.battlefield.GroundHeight(cart.x-7,cart.z-4),cart.z-4);
+    g.player.yaw=Math.atan2(g.player.position.x-cart.x,g.player.position.z-cart.z);
+    g.player.pitch=-.08;
     g.post.NotifyCameraCut();g.StepFrames(30,1/60,true);
   });
-  await page.screenshot({path:path.join(output,'Scene_ReceivingPork.png')});
-  await page.evaluate(()=>{const g=window.Tengxian;g.player.yaw=2.1;g.player.pitch=-.15;g.StepFrames(24,1/60,true)});
-  await page.screenshot({path:path.join(output,'Scene_Backpacks.png')});
+  await page.screenshot({path:path.join(output,'Scene_ZhouLitterOnCart.png')});
   result=await page.evaluate(async()=>{
     const T=await import('three'),{PrepassPass}=await import('./Script_PostPrepass.mjs');
     const {MakeFullscreenMaterial,MakeRenderTarget}=await import('./Script_PostCommon.mjs');
     const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime(),renderer=g.renderer;
-    const live={meal:r.meal.State(),trainOffset:r.battlefield.trainOffsetM,
+    const live={stage:r.flow.stage.id,
       taa:g.post.taaEnabled,velocity:!!g.post.VelocityTexture,motionBlur:!!g.post.motionBlurPass.active,
-      packs:r.view.rigidParts?.fieldPack?.length??r.view.parts.fieldPack?.count,
-      rigidIdentities:[...r.view.rigidProps?.keys?.()||[]]};
+      // 四类人流里的两类：牛车与马车都在车位上（白盒变体，Data_Tuning_FirstLevelMid.draft）。
+      draft:r.column.vehicles.map(cart=>cart.draft),
+      carts:r.column.vehicles.length,
+      deckInstances:r.view.parts.cart.instanceMatrix.count,
+      litterVisible:!!r.column.zhou.visible,
+      kits:r.view.rigidParts.fieldPack.length};
     const pipeline={preset:{velocity:true,hzb:false},hdrCapable:true,hdrType:T.HalfFloatType,targets:{}};
     const pass=new PrepassPass(pipeline);pass.Resize(320,240);
     const target=MakeRenderTarget(320,240,{type:T.HalfFloatType});
@@ -55,11 +79,12 @@ try{
       speeds.sort((a,b)=>a-b);xs.sort((a,b)=>a-b);
       return {pixels:speeds.length,p50:speeds[Math.floor(speeds.length*.5)],p95:speeds[Math.floor(speeds.length*.95)],x50:xs[Math.floor(xs.length*.5)]};
     };
-    const sources=[];
-    for(const [name,root] of [['whole',r.meal.whole],['slice',r.meal.slice]]){
-      root.traverse(o=>{if(o.isMesh && ![o.material].flat().some(m=>m.allowOverride===false))sources.push({name,source:o})});
-    }
-    sources.push({name:'fieldPack',source:r.view.rigidParts?.fieldPack?.[0]||r.view.parts.fieldPack});
+    // 车上的三件近景，全是身份稳定的普通 Mesh（契约覆盖的那一类）。
+    const sources=[
+      {name:'stretcherBed',source:r.view.zhouBed},
+      {name:'patient',source:r.view.zhouPatient},
+      {name:'zhouKit',source:r.view.rigidProps.get('fieldPack:ZhouKit')},
+    ];
     const samples=[];
     for(const {name,source} of sources){
       const geometry=source.geometry.clone();geometry.computeBoundingBox();
@@ -67,14 +92,12 @@ try{
       geometry.translate(-center.x,-center.y,-center.z);geometry.scale(...Array(3).fill(.8/Math.max(size.x,size.y,size.z)));
       if(size.y<=size.x && size.y<size.z)geometry.rotateX(Math.PI/2);
       else if(size.x<size.y && size.x<size.z)geometry.rotateY(Math.PI/2);
-      // The whole pork's cut-face primitive faces -Z. Inspect its front face,
-      // not an empty backface-culling result from the shared prepass.
+      // 朝向：让有法线的那一面对着相机，别量到一张被背面剔除掉的空图。
       let facing=0;const normals=geometry.attributes.normal;
       for(let i=0;i<normals.count;i++)facing+=normals.getZ(i);
       if(facing<-.01)geometry.rotateY(Math.PI);
-      // Exercise multiple draws of one object too: advancing history inside
-      // onAfterRender would give later material groups camera-only velocity.
-      const material=name==='fieldPack'?geometry.groups.map(()=>source.material):source.material;
+      // 同一个对象多趟绘制也要覆盖：在 onAfterRender 里推历史会让后面的材质组只剩相机速度。
+      const material=source.isInstancedMesh?geometry.groups.map(()=>source.material):source.material;
       const object=source.isInstancedMesh?new T.InstancedMesh(geometry,material,1):new T.Mesh(geometry,material);
       let before=0,after=0;object.onBeforeRender=()=>before++;object.onAfterRender=()=>after++;
       object.frustumCulled=false;
@@ -82,7 +105,7 @@ try{
       const camera=new T.PerspectiveCamera(60,320/240,.01,100);camera.position.z=2;
       const prev=new T.Matrix4(),matrix=new T.Matrix4();let frame=0;
       const Draw=(offset,cameraOffset)=>{
-        // Packs used to move in instanceMatrix, while pork moved via matrixWorld.
+        // 车板在 instanceMatrix 里动，担架与人在 matrixWorld 里动 —— 两条路都要量。
         if(object.isInstancedMesh){object.setMatrixAt(0,matrix.makeTranslation(offset,0,0));object.instanceMatrix.needsUpdate=true;}
         else parent.position.x=offset;
         camera.position.x=cameraOffset;scene.updateMatrixWorld(true);camera.updateMatrixWorld(true);
@@ -91,7 +114,7 @@ try{
         prev.copy(vp);return Read();
       };
       Draw(0,0);const coMoving=Draw(.12,.12),stopped=Draw(.12,.12),cameraOnly=Draw(.12,.20);
-      // New/reappearing objects must not reuse a stale transform from an old draw.
+      // 新出现 / 重新出现的对象不许拿上一次绘制留下的旧变换。
       object.visible=false;Draw(.30,.30);object.visible=true;const reappeared=Draw(.30,.30);
       samples.push({name,instanced:!!source.isInstancedMesh,coMoving,stopped,cameraOnly,reappeared,hooks:{before,after}});
       geometry.dispose();
@@ -102,8 +125,12 @@ try{
   });
   console.log('PROP_VELOCITY',JSON.stringify(result));
   await fs.writeFile(path.join(output,'Data_Velocity.json'),JSON.stringify({result,errors},null,2));
-  assert.ok(result.live.taa&&result.live.velocity&&result.live.motionBlur,'the real opening runs TAA and motion blur');
-  assert.ok(result.live.packs>0,'the actual opening creates backpacks');
+  assert.ok(result.live.taa&&result.live.velocity&&result.live.motionBlur,'the real level runs TAA and motion blur');
+  assert.equal(result.live.stage,'Transfer','the subject is inspected at the actual loading stage');
+  assert.ok(result.live.draft.includes('ox')&&result.live.draft.includes('horse'),
+    'the transfer point really fields both ox and horse carts');
+  assert.ok(result.live.deckInstances>0,'the cart deck is a real instanced bucket');
+  assert.ok(result.live.kits>0,'the litter really carries a stable-identity near-camera prop');
   for(const s of result.samples){
     assert.ok(s.coMoving.pixels>100,`${s.name}: real mesh pixels are present`);
     assert.ok(s.coMoving.p95<.15,`${s.name}: co-moving camera/prop has zero screen motion: ${JSON.stringify(s)}`);
@@ -113,5 +140,5 @@ try{
     assert.ok(s.hooks.before>0&&s.hooks.before===s.hooks.after,`${s.name}: original draw callbacks survive`);
   }
   assert.deepEqual(errors,[]);
-  console.log('PASS real pork and backpack pixels: co-motion, stop, camera-only motion');
+  console.log('PASS real stretcher and cart-deck pixels: co-motion, stop, camera-only motion');
 }finally{await browser.close();if(server)await new Promise(resolve=>server.close(resolve));}

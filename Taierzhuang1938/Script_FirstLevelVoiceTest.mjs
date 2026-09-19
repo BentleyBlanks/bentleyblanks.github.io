@@ -152,6 +152,8 @@ console.log(`ok MISSION_VOICE_FACTS 的 ${Object.keys(MISSION_VOICE_FACTS).lengt
     "./Script_FirstLevelMissionRuntime.mjs", "./Script_FirstLevelOpening.mjs",
     "./Script_FirstLevelLeaderGuide.mjs", "./Data_FirstLevelLeaderGuide.mjs",
     "./Data_FirstLevelMission.mjs", "./Data_FirstLevelMissionGates.mjs",
+    // 第二波玩法包：运行时只留薄钩子，08–14 的 Say 在这两个模块里。
+    "./Script_FirstLevelVillageBlock.mjs", "./Script_FirstLevelTransferCart.mjs",
   ];
   const referenced = new Map();
   for (const name of RUNTIME_SOURCES) {
@@ -176,7 +178,8 @@ console.log(`ok MISSION_VOICE_FACTS 的 ${Object.keys(MISSION_VOICE_FACTS).lengt
   const SECOND_WAVE_UNWIRED = new Set([
     "RescueOut", "TrenchCurse",                                  // 02 出掩蔽部、后交通壕
     "BundleProne", "BundleReturnCall",                            // 05 取弹返程
-    "KitchenDetour", "MeleeCurse", "WindowOrder",                 // 08/09 主街与连屋
+    // 08/09 的 KitchenDetour / MeleeCurse / WindowOrder 已由第二波 Mid 包接上触发点
+    //（Script_FirstLevelVillageBlock），2026-09-20 从这张名单里划掉。
     "CartAbandon", "RoadBump", "HandsShake",                      // 15 降压段
     "WardGuide", "PlaceLitter", "NextLitter",                     // 16/17 接收院
     "NorthGate",                                                  // 18 北门

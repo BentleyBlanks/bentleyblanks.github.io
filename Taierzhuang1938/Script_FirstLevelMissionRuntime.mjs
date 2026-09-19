@@ -52,6 +52,10 @@ import {
   MissionRouteLength, MissionRouteProjection, MissionRouteNextIndex,
   MissionGuideSpeed, MissionGuideRoute, MissionSquadRoute, MissionSquadPace, MissionRouteLookahead,
 } from "./Script_FirstLevelMissionColumn.mjs";
+// 08–14 的演出与通过条件（2026.09.19 第二波 Mid 包）。运行时只留薄钩子：
+// 自己步骤的 Enter 分支与 Update 段，逻辑在这两个模块里。
+import { FirstLevelVillageBlock, VillageCourtyardCleared, VillagePendingLitters } from "./Script_FirstLevelVillageBlock.mjs";
+import { FirstLevelTransferCart } from "./Script_FirstLevelTransferCart.mjs";
 import { MELEE_RULES } from "./Data_MeleeCombat.mjs";
 import { InstallMissionSentry } from "./Script_FirstLevelMissionPeople.mjs";
 import { SquadMarchAi } from "./Script_SquadMarchAi.mjs";
@@ -113,6 +117,9 @@ export class FirstLevelMissionRuntime {
       lastMg: -5,
     };
     this.opening = new FirstLevelOpening(this);
+    // 08–10 村落改道、11–14 接运与空袭（第二波 Mid 包）。
+    this.village = new FirstLevelVillageBlock(this);
+    this.transferCart = new FirstLevelTransferCart(this);
     this.flow = new FirstLevelMissionFlow({ Enter: (stage) => this.Enter(stage) });
     this.voice = new FirstLevelMissionVoice({
       audio: this.audio,
@@ -1105,8 +1112,8 @@ export class FirstLevelMissionRuntime {
       () => this.Text("cart"),
       () => this.flow.stage.id === "CartRide" && !this.Has("cartBoarded"),
       () => {
+        if (!this.BeginCartRide()) return false;
         this.Record("cartBoarded");
-        this.BeginCartRide();
         return true;
       },
     );
@@ -1222,8 +1229,8 @@ export class FirstLevelMissionRuntime {
     this.UpdateMusic(stage.id);
     this.Objective(Localize(FirstLevelStageTextId(stage.id), stage.objective));
     // 进场不自动播的那几步：它们的 cue 由编排在真正发生的那一刻起播
-    // （受困段的黑屏对白、接令、院门打开、牺牲、上车）。
-    if (stage.cue && !["Trapped", "Orders", "Courtyard", "Death", "CartRide"].includes(stage.id))
+    // （受困段的黑屏对白、接令、连屋破门、院门打开、牺牲、上车）。
+    if (stage.cue && !["Trapped", "Orders", "Melee", "Courtyard", "Death", "CartRide"].includes(stage.id))
       this.Say(stage.cue, { urgent: ["AirFirst", "Dive", "Death"].includes(stage.id) });
     // 按表生成这一步的遭遇组（Data_FirstLevelMissionGates.MISSION_STEP_SPAWNS，
     // 顺序就是原来各 case 里的调用顺序）。front 与转运四拍不在表里：
@@ -1293,26 +1300,31 @@ export class FirstLevelMissionRuntime {
         this.audio.Ambience("firstLevelFront");
         this.Guide(MISSION_ROUTES.village.slice(0, 3));
         this.column.active = true;
+        this.village.Enter(stage.id);
         break;
       case "Melee":
         this.meleeStartedAt = this.time;
+        this.village.Enter(stage.id);
         break;
       case "Courtyard":
         this.Guide(MISSION_STAGE_ROUTES.courtyardBypass);
+        this.village.Enter(stage.id);
         break;
       case "TransferApproach":
         this.Guide(MISSION_ROUTES.village.slice(-4));
         this.column.loading = true;
+        this.transferCart.Enter(stage.id);
         break;
       case "Transfer":
         this.Guide(MISSION_ROUTES.village.slice(-4));
+        this.transferCart.Enter(stage.id);
         break;
       case "CartRide":
         this.guideRoute = null;
-        this.cart = { progress: 0, moving: false, halted: false, unloaded: false };
         break;
       case "AirFirst":
         this.guideRoute = null;
+        this.transferCart.Enter(stage.id);
         this.StartAir(1, R.firstAirLeadS);
         break;
       case "Carry":
@@ -1844,46 +1856,18 @@ export class FirstLevelMissionRuntime {
     if (this.flow.stage.id === "Carry" && this.GateNear("atDitchMouth")) this.Record("atDitchMouth");
   }
   // ---------------------------------------------------------------------------
-  // 13 牛车（内部步骤 CartRide）。控制接管 cartRide：能环视，车沿契约路线真实移动。
+  // 12/13 老周那辆牛/马车（内部步骤 CartRide → AirFirst）。
+  // 实装在 Script_FirstLevelTransferCart：车是 column.vehicles 里真的那一辆，
+  // 老周被装在车上、顺子坐在车板上（座位偏移读 MISSION_PLACEMENT.cartRide），
+  // 车沿 MISSION_STAGE_ROUTES.cartRide 真走，13 在 cartHalt 停住并还权。
   // ---------------------------------------------------------------------------
   BeginCartRide() {
-    this.cart ||= { progress: 0, moving: false, halted: false, unloaded: false };
-    this.cart.moving = true;
-    this.cart.from = { x: this.player.position.x, z: this.player.position.z };
+    if (!this.transferCart.Board()) return false;
     this.BeginControl("cartRide", R.cartRideMaxS);
-    this.Say("CartTalk");
+    return true;
   }
-  /** 车沿 MISSION_STAGE_ROUTES.cartRide 真走；13 停车、卸人都在这里落。 */
   UpdateCart(dt) {
-    const cart = this.cart;
-    if (!cart || !cart.moving) return;
-    const route = MISSION_STAGE_ROUTES.cartRide, length = MissionRouteLength(route);
-    const stage = this.flow.stage.id;
-    if (stage === "CartRide" || (stage === "AirFirst" && !cart.halted))
-      cart.progress = Math.min(length, cart.progress + dt * R.cartRideSpeedMps);
-    const at = MissionRoutePoint(route, cart.progress);
-    const zhou = this.column.zhou;
-    Object.assign(zhou, { x: at.x, z: at.z, yaw: at.yaw ?? 0, state: "carried", visible: true });
-    if (this.controls?.kind === "cartRide") {
-      const y = this.battlefield.GroundHeight(at.x, at.z);
-      this.player.position.set(at.x, y, at.z);
-      this.player.body?.Teleport(at.x, y, at.z);
-      this.player.velocity.set(0, 0, 0);
-    }
-    if (cart.from && Distance(at, cart.from) >= R.cartDepartedM) this.Record("zhouCartDeparted", { x: at.x, z: at.z });
-    if (stage === "AirFirst") {
-      if (!cart.halted && (cart.progress >= length - .05 || this.Has("firstAirPassComplete"))) {
-        cart.halted = true;
-        this.Record("cartHalted", { x: at.x, z: at.z });
-        if (this.controls?.kind === "cartRide") { const kind = this.controls.kind; this.controls = null; this.Control?.(false, kind); }
-      }
-      if (cart.halted && !cart.unloaded) {
-        cart.unloaded = true;
-        Object.assign(zhou, { state: "waiting", health: Math.min(zhou.health, 45) });
-        this.Record("zhouUnloaded", { x: at.x, z: at.z });
-        this.Say("WestDitchOrder");
-      }
-    }
+    this.transferCart.UpdateRide(dt);
   }
   // ---------------------------------------------------------------------------
   // 18 铁路桥（BridgeOrders → BridgeCover → BridgeWithdraw）。
@@ -2397,11 +2381,9 @@ export class FirstLevelMissionRuntime {
       const p=this.player.position, kitchen=P.kitchenInterior;
       if(p.x>kitchen.minX&&p.x<kitchen.maxX&&p.z>kitchen.minZ&&p.z<kitchen.maxZ)
         this.Record("kitchenEntered",{x:p.x,z:p.z});
-      // 担架队停进可靠遮挡（litterHold），不跟进未清空间。
-      if(this.Has("streetBlockSeen")&&this.column.litters.filter(litter=>litter.health>0)
-        .every(litter=>Distance(litter,A.litterHold)<=R.passageRangeM))
-        this.Record("littersInCover",{held:this.column.litters.filter(litter=>litter.health>0).length});
     }
+    // 08–10 的演出（担架真的停进遮挡、班长查看相邻房屋、连屋来敌、开院门放行）。
+    this.village.Update(dt);
     if (stage === "Melee") this.UpdateMelee();
     if (stage === "BridgeCover") {
       if(this.GateNear("southBankReached"))this.Record("southBankReached");
@@ -2439,22 +2421,16 @@ export class FirstLevelMissionRuntime {
       if (gun && !gun.alive) this.Record("villageGunSilent");
       safeAt = point => Distance(point,A.gate) > R.passageRangeM || (this.Has("villageGunSilent") && !this.Threatens(point));
       if (this.Has("courtyardGateOpen") && this.Has("villageGunSilent")) this.Say("CourtyardOpen");
-      const pending=this.column.litters.filter(litter=>litter.health>0&&!litter.passedGate);
+      // 「后头还有两副」「过了」按真实队列计数喊；通过条件另加「队尾掩护脱离」。
+      const pending=VillagePendingLitters(this.column);
       if(pending.length===2)this.Say("TwoLitters");
-      if(pending.length===0){
+      if(VillageCourtyardCleared(this.column,this.Has("rearCoverDisengaged"))){
         this.Say("LastLitter");
         this.Record("courtyardPassed",{passed:this.column.litters.filter(litter=>litter.passedGate).length,
           casualties:this.column.litters.filter(litter=>litter.health<=0&&!litter.passedGate).length});
-        this.Say("LastLitter");
       }
     }
-    if (stage === "TransferApproach") {
-      if(this.GateNear("transferApproachReached")){
-        this.Record("transferApproachReached");
-        this.Say("TransferSorting");
-        this.Say("VillageRoadThreat");
-      }
-    }
+    if (stage === "TransferApproach" && this.GateNear("transferApproachReached")) this.Record("transferApproachReached");
     if (stage === "Transfer") {
       this.UpdateTransferThreats();
       if (this.GateNear("transferArrived")) {
@@ -2465,21 +2441,14 @@ export class FirstLevelMissionRuntime {
       const transferIds=MISSION_TRANSFER_THREATS.flatMap(threat=>MISSION_ENCOUNTERS[threat.id].map(spec=>spec.id));
       safe = !this.Threatens(A.transfer,transferIds);
       safeAt=point=>!this.Threatens(point,transferIds);
-      // 每解除一处威胁，接运真实推进一批。
-      if (this.Has("loadingThreatResolved") && this.column.loadEvents.length>=R.transferBatchLoads)
-        this.Record("firstBatchLoaded",{loaded:this.column.loadEvents.length});
       // 每装完一批喊一次「这批过了，下一批」；侧巷那一处露头时喊「右边有人」。
       // 原来那三条按队列人数倒数的（TransferQueue / TransferTwo / TransferOne）
       // 随采用稿下线 —— 12 现在只有两处威胁，不是四拍守波次。
       if (this.Has("firstBatchLoaded")) this.Say("TransferBatch");
       if (this.Has("transferAlleyAttackStarted")) this.Say("TransferRight");
-      if (this.column.QueueAhead() === 0 && this.Has("alleyThreatResolved")) {
-        this.column.BeginZhouBoarding();
-        this.Say("EscortZhou");
-        if (Distance(this.column.zhou, this.column.zhouBoardingStart) >= R.boardingWitnessM)
-          this.Record("zhouNext");
-      }
     }
+    // 11–14 的演出（四类人流分流、装载额度随威胁放开、上车与停车、卸回担架）。
+    this.transferCart.Update(dt);
     if (stage === "Rescue") {
       safe = !this.Threatens(A.ditch);
       const zhou = this.column.zhou;
@@ -2672,7 +2641,9 @@ export class FirstLevelMissionRuntime {
         const actor=this.enemies.get(spec.id);
         return {id:spec.id,alive:!!actor?.alive,x:actor?.position.x??null,z:actor?.position.z??null};
       })},
-      cart:this.cart?{...this.cart}:null,
+      cart:this.transferCart.State().ride,
+      village:this.village.State(),
+      transferCart:this.transferCart.State(),
       bridgeColumn:this.bridgeColumn?this.bridgeColumn.map(entry=>({...entry,actor:undefined})):null,
       missingCues:[...this.missingCues],
       debugStart: this.debugStart || null,

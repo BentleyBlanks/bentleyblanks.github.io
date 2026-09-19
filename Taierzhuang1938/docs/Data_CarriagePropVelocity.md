@@ -54,3 +54,30 @@ node Taierzhuang1938/Script_TestRunner.mjs --profile=prepush --domain=propVeloci
 
 - 旧 `TaauTest.ScaleShot` 每档推进 28 个游戏帧，世界姿态随时间变化，八帧 Halton 周期又错开四帧。原预通道对照同样失败（0.75：35.31 dB，0.67：35.61 dB）；修复后的预通道原测试为 35.31 / 35.60 dB。将测试统一为冻结游戏时间、重置采样相位、累积 32 帧，仍保留原 PSNR 下限和单调性断言，最终 **22/22 通过**：0.85 / 0.75 / 0.67 分别为 49.43 / 46.63 / 44.63 dB。运行时 TAA 参数未改。
 - `FirstLevelMissionBrowserTest --campaign --audio` 本次在 `TrenchContact` 战斗阵亡；用原预通道和原任务视图替换的基线页也在同阶段报 `player died, actual combat outcome`。车厢交接、炮击、救援和出车厢均已走过；**本次没有完整通关证据**，该战斗失败不登记为豁免、不冒充全绿，日志分别保留为 `VelocityMissionRegression.log` / `VelocityCampaignBaseline.log`。
+
+## 2026.09.19 第二波：被测对象更换
+
+军列开场随 2026.09.19 采用稿下线，原来的被测对象（车厢里的腊肉与背包）**在场景里已经不存在**，
+这条门禁一跑就死在 `result.live.packs>0`。按契约 §7「后者的被测对象随开场更换时，改成新开场的
+近景道具，保持 high 画质真实资产检查」，2026-09-20 把它换成 12/13 桥头接运那一段：
+
+| 旧对象 | 新对象 | 为什么对得上 |
+| --- | --- | --- |
+| 腊肉整块 / 切片（`r.meal.whole/slice`，普通 Mesh，父物体在动） | `r.view.zhouBed`（老周担架的帆布） | 同样是 matrixWorld 驱动的近景件；12 它跟着牛/马车走，13 被卸回地面 |
+| 车厢里躺着的人 | `r.view.zhouPatient`（担架上的老周） | 同上，且它是**相机正对着看**的那一件 |
+| 背包 `RigidProp('fieldPack',…)` | `RigidProp('fieldPack','ZhouKit',…)`（担架上的挎包） | 同一条 `RigidProp` 路径、同样是身份稳定的普通 Mesh |
+
+**事故形态没变**：父物体在动（车沿 `cartRide` 走 / 担架被抬着走）、相机跟着动（顺子坐在车板上）。
+判据一字未改：同速时零屏幕位移、停下立刻归零、重新出现不许拿旧变换、纯相机运动要留得住、
+原有绘制回调不许被顶掉；画质仍是 `quality=high`，资产仍是真的。
+
+测试现在先 `Debug.FirstLevelJump(12)` 跳到装载那一步再取对象，并顺带记三条现场读数：
+`draft`（车位上牛车与马车都在）、`deckInstances`、`kits`。
+
+**车板（`parts.cart`）不当判据**：它是 InstancedMesh，而逐实例形变本来就不在 MotionVector 契约内
+（`Script_PostPrepass` 抬头：「InstancedMesh / BatchedMesh 的逐实例形变仍不在此契约内，
+近景移动交互件用身份稳定的普通 Mesh」）。实测它的同速位移是 12.6 px，与该条说明一致；
+读数仍写进 `Data_Velocity.json` 备查，但不作断言。
+
+选测域 `propVelocity` 同步换成 `CarriagePropVelocity|PostPrepass|FirstLevelMissionView|FirstLevelTransferCart|FirstLevelMissionColumn`
+（`FirstLevelMeal` 不再是它的对象），`Script_TestRunnerTest` 的对应断言一起改。

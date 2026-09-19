@@ -72,7 +72,6 @@ export const testDefs = {
   EditorLauncherTest: {file:"Script_EditorTest.mjs",args:["--launcher-only"],timeoutMs:240000,desc:"Editor launcher inventory including the squad march entry"},
   FirstLevelMissionAftermathTest: {file:"Script_FirstLevelMissionAftermathTest.mjs",timeoutMs:600000,desc:"Civilian body placement, actual model clearance, grounding, LOD and screenshots"},
   MachineGunCaptivesAnimationTest:{file:"Script_MachineGunCaptivesAnimationTest.mjs",timeoutMs:300000,desc:"Captives cutscene clips on five original rigs, authored grounding and the state.perform contract"},
-  FirstLevelAmbushAnimationTest:{file:"Script_FirstLevelAmbushAnimationTest.mjs",timeoutMs:300000,desc:"Room-ambush clips on the original rigs, bayonet tips, litter contacts and loop seams"},
   FirstLevelMissionStageJumpTest: {file:"Script_FirstLevelMissionStageJumpTest.mjs",timeoutMs:900000,desc:"18 stage starts, backward jumps and resumed mission gates"},
   // The 150-actor mission rebuilds 18 starts; a measured full continuation reached Complete
   // at the old 1200 s limit. Match the full campaign allowance without changing any assertions.
@@ -89,6 +88,7 @@ export const testDefs = {
   FirstLevelMissionReturnBrowserTest: {file:"Script_FirstLevelMissionReturnBrowserTest.mjs",timeoutMs:300000,desc:"Real first-level return overlay, input, recovery and stage lifecycle"},
   FirstLevelMissionTest: {file:'Script_FirstLevelMissionTest.mjs',desc:'新版第一关完整事实门、共享地形、实际担架队列和往返撤离'},
   MissionGatesTest: {file:'Script_MissionGatesTest.mjs',desc:'第一关编排表：事实门覆盖、按表生成与激活规则、运行时源码对账、编排模型'},
+  FirstLevelMidTest: {file:'Script_FirstLevelMidTest.mjs',desc:'第一关 08–14（Mid 包）：担架停进遮挡、连屋近战先手、内院放行计数、两处威胁与装载联动、上车/停车/卸人时序、空袭目标与扑沟'},
   FirstLevelVoiceTest: {file:'Script_FirstLevelVoiceTest.mjs',desc:'第一关台词表：契约 cue 清单/句数、与 Notion 转录逐字对账、日语行假名与中文字幕、具名事件、缺录音兜底（纯 Node，毫秒级）'},
   FirstLevelVoiceAudioTest: {file:'Script_FirstLevelVoiceTest.mjs',args:['--audio'],desc:'第一关配音资产严格门：整段录音、当前提示词/台词哈希、强制对齐区间、清单无残留、敌军自动口令川话清单'},
   FirstLevelMissionBrowserTest: {file:'Script_FirstLevelMissionBrowserTest.mjs',args:['--campaign','--audio'],timeoutMs:1800000,desc:'新版第一关真实输入、移动军列、壕沟路线、作战与通关'},
@@ -354,13 +354,13 @@ export const browserTests = new Set([
   "EditorLauncherTest",
   "FirstLevelMissionFortificationsTest",
   "FirstLevelMissionMusicBrowserTest",
+  "FirstLevelMidTest",
   "FirstLevelMissionStageJumpTest",
   "FirstLevelMissionStageContinueTest",
   "FirstLevelMissionStageTailTest",
   "FirstLevelMissionPresentationTest",
   "FirstLevelMissionBrowserTest",
   "MachineGunCaptivesAnimationTest",
-  "FirstLevelAmbushAnimationTest",
   "CarriagePropVelocityTest",
   "MotionVectorContractTest",
   "BrowserBundleTest",
@@ -449,7 +449,7 @@ export const domains = {
   propVelocity: {label:'近景刚体道具速度与移动清晰度',tests:['CarriagePropVelocityTest']},
   squadMarch: {label:"通用小队行进",tests:["SquadMarchCoverTest","SquadMarchCoverBrowserTest","SquadMarchTest","SquadMarchAiTest","SquadMarchEditorTest","SquadMarchNavigationTest","FirstLevelSquadMarchTest","EditorLauncherTest"]},
   firstLevelTail: {label:"第一关接收院至结尾定向续接",tests:["FirstLevelMissionStageTailTest"]},
-  firstLevel: {label:'新版第一关完整任务',tests:['MachineGunCutsceneAudioTest','Type89DamageTest','FirstLevelFrontRouteBrowserTest','FirstLevelMissionTopologyTest','FirstLevelMissionTopologyBrowserTest','FirstLevelSpaceTest','MissionReturnTest','FirstLevelMissionReturnBrowserTest','FirstLevelCasualtyBrowserTest','FirstLevelAmbushAnimationTest','FirstLevelMissionTest','MissionGatesTest','FirstLevelVoiceTest','FirstLevelVoiceAudioTest','FirstLevelFrontPresenceTest','FirstLevelMachineGunTest','FirstLevelMachineGunCutsceneTest','FirstLevelMissionAftermathTest','FirstLevelMissionFortificationsTest','FirstLevelMissionBrowserTest','FirstLevelMissionStageJumpTest','FirstLevelMissionStageContinueTest','FirstLevelMissionPresentationTest']},
+  firstLevel: {label:'新版第一关完整任务',tests:['MachineGunCutsceneAudioTest','Type89DamageTest','FirstLevelFrontRouteBrowserTest','FirstLevelMissionTopologyTest','FirstLevelMissionTopologyBrowserTest','FirstLevelSpaceTest','MissionReturnTest','FirstLevelMissionReturnBrowserTest','FirstLevelCasualtyBrowserTest','FirstLevelMissionTest','MissionGatesTest','FirstLevelMidTest','FirstLevelVoiceTest','FirstLevelVoiceAudioTest','FirstLevelFrontPresenceTest','FirstLevelMachineGunTest','FirstLevelMachineGunCutsceneTest','FirstLevelMissionAftermathTest','FirstLevelMissionFortificationsTest','FirstLevelMissionBrowserTest','FirstLevelMissionStageJumpTest','FirstLevelMissionStageContinueTest','FirstLevelMissionPresentationTest']},
   text: { label: "玩家文本 / 数值表（数据驱动闸门）", tests: ["TextTest", "TextGatherCheck"] },
   animation: { label: '独立动画资产验收', tests: ['ActorLocomotionTest','BackRifleRunTest','MeleeAnimationTest','DadaoSwingTest','GrenadeThrowTest','InfantryAnimationTest','DeathCollapseTest'] },
   explosives: { label: "爆炸白盒与通用地形形变/返掷", tests: ["ExplosionRulesTest", "ExplosionRangeTest", "CraterSurfaceTest"] },
@@ -566,7 +566,9 @@ const changedDomainRules = [
   // Script_SkinnedClone 还被 /Skinn/ 那条拉进 motionVector（骨骼历史按 Skeleton 记）。
   // Script_ShadowSkip 是阴影烘焙那一趟的子树跳过包装（ShadowSkipTest 是它的纯 Node 门禁）。
   { domain: "render", pattern: /Script_SkinnedClone|Script_ShadowDepth|Script_ShadowSkip/ },
-  {domain:'propVelocity',pattern:/CarriagePropVelocity|PostPrepass|FirstLevelMissionView|FirstLevelMeal/},
+  // 2026.09.19 第二波：被测对象从军列车厢里的腊肉/背包换成 12/13 牛马车上老周的担架与车上近景件
+  // （军列开场已下线）。改牛马车的那两个模块也要拉进这个域。
+  {domain:'propVelocity',pattern:/CarriagePropVelocity|PostPrepass|FirstLevelMissionView|FirstLevelTransferCart|FirstLevelMissionColumn/},
   { domain: "render", pattern: /DeathPose|Data_Tuning_ActorDeath/ },
   { domain: "animation", pattern: /DeathCollapse|DeathPose|ActorDeath|MotionDeath/ },
   {domain:"hud",pattern:/IncomingFire/},
@@ -574,10 +576,8 @@ const changedDomainRules = [
   // 整关驾驶脚本拆成了「公共 Kit + 三段」（2026.09.19 重构，第二波三个玩法包各改一段）。
   // 文件名里没有「Mission」，上面那些按 FirstLevelMission* 选域的规则盖不到。
   {domain:"firstLevel",pattern:/FirstLevelCampaign(Kit|Front|Mid|End)/},
-  // 屋内伏击的动作库：运行时采样器、烘焙脚本与 Animation/FirstLevelAmbush/ 的 JSON。
-  // 既是第一关那一拍的演出（firstLevel），也是一份独立动画资产（animation）。
-  {domain:"firstLevel",pattern:/FirstLevelAmbush|Animation\/FirstLevelAmbush/},
-  {domain:"animation",pattern:/FirstLevelAmbush|Animation\/FirstLevelAmbush/},
+  // 屋内伏击那一拍 2026.09.19 下线（09 改成连屋近战，担架不进屋）：采样器与它的门禁已删，
+  // Animation/FirstLevelAmbush/ 的 JSON 保留但已无消费者，改它不再牵动任何测试。
   {domain:"combat",pattern:/FpsSkeleton|FpsSkeletal|FpsAnimation|Animation\/FirstPerson\/Data_Fps/},
   { domain: "combat", pattern: /CoverLean/i },
   // 断肢：规则/数值/视觉三层与测试场都归 combat（它挂在 TakeHit/Kill 那条链上）。
