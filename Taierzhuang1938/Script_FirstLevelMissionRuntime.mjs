@@ -1509,8 +1509,8 @@ export class FirstLevelMissionRuntime {
     // Acquisition remains the actual house interaction, never inferred from a blast.
     this.Record("tankImmobilized", { position: { x: position.x, z: position.z }, explosiveId });
     this.Say("TankStopped");
-    this.Say("JapaneseFlank");
-    this.Say("FlankWarning");
+    // 2026.09.19：侧翼那两条（JapaneseFlank / FlankWarning）随采用稿下线，
+    // 侧翼动作本身照旧 —— 只是不再配台词。
     for (const id of ["FlankA", "FlankB"]) {
       const actor = this.enemies.get(id);
       if (actor) {
@@ -2369,9 +2369,8 @@ export class FirstLevelMissionRuntime {
       if (this.emplacement.stats.shots > 0) this.Record("gunUsed");
       // 守军指出北头弹药屋（对白播完记 bundleOrderHeard）。
       if (this.Has("frontAttackRepelled")) this.Say("BundleOrder");
-      const gun = this.emplacement.Emplacement(this.gunId);
-      if (gun?.belts === 3) this.Say("ThreeMagazines");
-      if (gun?.belts === 2) this.Say("TwoMagazines");
+      // 机枪弹药倒计时那两条（ThreeMagazines / TwoMagazines）随采用稿下线；
+      // 余弹仍然由 HUD 与 GuideGunSupply 交代。
     }
     if(stage==="Orders"){
       if(this.GateNear("ordersReached")){this.Record("ordersReached");this.Say("Volunteer");this.Say("BorrowLight");this.Say("ZhouLift");}
@@ -2433,9 +2432,9 @@ export class FirstLevelMissionRuntime {
       safeAt = point => Distance(point,A.gate) > R.passageRangeM || (this.Has("villageGunSilent") && !this.Threatens(point));
       if (this.Has("courtyardGateOpen") && this.Has("villageGunSilent")) this.Say("CourtyardOpen");
       const pending=this.column.litters.filter(litter=>litter.health>0&&!litter.passedGate);
-      if(this.column.zhou.passedGate)this.Say("ZhouThreshold");
       if(pending.length===2)this.Say("TwoLitters");
       if(pending.length===0){
+        this.Say("LastLitter");
         this.Record("courtyardPassed",{passed:this.column.litters.filter(litter=>litter.passedGate).length,
           casualties:this.column.litters.filter(litter=>litter.health<=0&&!litter.passedGate).length});
         this.Say("LastLitter");
@@ -2461,9 +2460,11 @@ export class FirstLevelMissionRuntime {
       // 每解除一处威胁，接运真实推进一批。
       if (this.Has("loadingThreatResolved") && this.column.loadEvents.length>=R.transferBatchLoads)
         this.Record("firstBatchLoaded",{loaded:this.column.loadEvents.length});
-      if (this.column.QueueAhead() === 3) this.Say("TransferQueue");
-      if (this.column.QueueAhead() === 2) this.Say("TransferTwo");
-      if (this.column.QueueAhead() === 1) this.Say("TransferOne");
+      // 每装完一批喊一次「这批过了，下一批」；侧巷那一处露头时喊「右边有人」。
+      // 原来那三条按队列人数倒数的（TransferQueue / TransferTwo / TransferOne）
+      // 随采用稿下线 —— 12 现在只有两处威胁，不是四拍守波次。
+      if (this.Has("firstBatchLoaded")) this.Say("TransferBatch");
+      if (this.Has("transferAlleyAttackStarted")) this.Say("TransferRight");
       if (this.column.QueueAhead() === 0 && this.Has("alleyThreatResolved")) {
         this.column.BeginZhouBoarding();
         this.Say("EscortZhou");

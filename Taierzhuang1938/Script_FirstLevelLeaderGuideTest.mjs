@@ -55,21 +55,27 @@ assert.equal(rule.PlayerLead({x:0,z:0},{x:0,z:-14}),14,"player up the route coun
 assert.equal(rule.PlayerLead({x:0,z:-14},{x:0,z:0}),0,"behind the leader is not lead");
 assert.equal(rule.PlayerLead({x:0,z:0},{x:30,z:-14}),0,"off the route is not lead");
 assert.ok(MISSION_GUIDE_DIALOGUE.some(c=>c.id==="GuideHold"));
-// 2026.09.19 契约 §5 新增的十条带路短命令。台词表归并行的 Voice 包，合并之前
-// 它们还不在 MISSION_GUIDE_DIALOGUE 里 —— 这里先对契约表，已经到位的再对台词表。
-const CONTRACT_GUIDE_CUES=new Set(["GuideRearTrench","GuideCollection","GuideAlley","GuideCart",
- "GuideWestDitch","GuideWallPath","GuideYardGate","GuideBridge","GuideWithdraw","GuideNorthGate"]);
+// 2026.09.19 契约 §5 新增的十条带路短命令。Voice 包已经合入，所以这里不再留
+// 「还没到位就先对契约表」那条退路：每一条都必须真的在 MISSION_GUIDE_DIALOGUE 里。
+const CONTRACT_GUIDE_CUES=["GuideRearTrench","GuideCollection","GuideAlley","GuideCart",
+ "GuideWestDitch","GuideWallPath","GuideYardGate","GuideBridge","GuideWithdraw","GuideNorthGate"];
 const guideCueIds=new Set(MISSION_GUIDE_DIALOGUE.map(c=>c.id));
+for(const cue of CONTRACT_GUIDE_CUES)assert.ok(guideCueIds.has(cue),"contract guide cue is not recorded: "+cue);
 for(const spec of [...Object.values(MISSION_LEADER_STAGES),...Object.values(MISSION_GUIDE_TRANSFERS)]){
- assert.ok(guideCueIds.has(spec.cue)||CONTRACT_GUIDE_CUES.has(spec.cue),"unknown guide cue: "+spec.cue);
+ assert.ok(guideCueIds.has(spec.cue),"unknown guide cue: "+spec.cue);
  if(spec.mode)assert.notEqual(T("firstLevel.leader."+spec.mode),"firstLevel.leader."+spec.mode);
 }
+// 下线的那十条不许还挂在编排上（契约 §5）。
+for(const retired of ["GuideTrench","GuideShelter","GuideRetreatFirst","GuideRetreatWall","GuideRetreatYard",
+ "GuideReception","GuideRearDefense","GuideExit","GuideSouthFlank","GuideNorthRear"])
+ assert.ok(!guideCueIds.has(retired),"retired guide cue is still in the table: "+retired);
 assert.ok(MISSION_GUIDE_DIALOGUE.every(c=>c.lines.length===1&&c.lines[0].who==="luo"&&c.guidance));
 assert.deepEqual(MISSION_LEADER_STAGES.BridgeWithdraw.target,MISSION_ANCHORS.blastSafe,"the blast order points at the safe distance, not back at the bridge");
 let stopped=0;const done=[];
 const voice=new FirstLevelMissionVoice({audio:{StopStoryVoice(){stopped++;}},hud:{Say(){}},Done:id=>done.push(id)});
 assert.ok(voice.Guidance("GuideFollow"));assert.equal(voice.Guidance("GuideWait"),false);
-voice.Enqueue("SouthOrders");assert.deepEqual(voice.queue,["SouthOrders"]);
+voice.Enqueue("SouthWhisper");assert.deepEqual(voice.queue,["SouthWhisper"],
+ "a story cue preempts the queued reminder instead of queueing behind it");
 voice.queue=[];voice.current={cue:MISSION_GUIDE_DIALOGUE[0]};
 assert.equal(voice.Guidance("GuideWait"),false);
 voice.CancelGuidance();assert.equal(voice.current,null);assert.equal(stopped,1);assert.deepEqual(done,[]);
@@ -84,7 +90,7 @@ const guide=new FirstLevelLeaderGuide(r);guide.Enter(r.flow.stage);r.time=19;gui
 assert.deepEqual(r.voice.queue,["GuideFollow"]);
 r.voice.queue=[];guide.Update();assert.equal(r.voice.queue.length,0,"no repeat every frame");
 r.time=57;guide.Update();assert.deepEqual(r.voice.queue,["GuideFollow"]);
-r.voice.queue=["SouthOrders"];r.time=200;guide.Update();assert.deepEqual(r.voice.queue,["SouthOrders"]);
+r.voice.queue=["SouthWhisper"];r.time=200;guide.Update();assert.deepEqual(r.voice.queue,["SouthWhisper"]);
 r.voice.queue=[];r.time=201;guide.Update();assert.equal(r.voice.queue.length,0,"quiet gap after story");
 r.flow.stage={id:"MachineGun",objective:"gun"};
 const gun={rounds:12,belts:0};r.emplacement={Mounted:true,Emplacement:()=>gun};

@@ -1,4 +1,4 @@
-import { CARRIAGE_SOUND } from "./Data_FirstLevelCarriageSound.mjs";
+import { MISSION_TUNING } from "./Data_Tuning_FirstLevel.mjs";
 import { MissionVoiceTimeline } from "./Data_FirstLevelMissionVoiceTiming.mjs";
 import { MISSION_DIALOGUE, MISSION_VOICE_CAST, MissionVoiceSubtitle } from "./Data_FirstLevelMissionDialogue.mjs";
 import { Localize } from "./Script_Text.mjs";
@@ -197,7 +197,7 @@ export class FirstLevelMissionVoice {
     // 缺录音的 cue 不碰音频引擎，但字幕、Line 事件和 Done 照常按估算时长走完。
     const played = current.recorded ? this.audio.PlayStoryVoice(`Mission${current.cue.id}`, {
       position: this.Position?.(current.cue,current.cue.lines[Math.max(0,current.index)]),
-      environmentGain:CARRIAGE_SOUND.escapeSpeechBedGain,
+      environmentGain:MISSION_TUNING.storyVoiceBedGain,
       offset: current.sourceTime,
       maxDuration: segment.end-current.sourceTime,
     }) : null;

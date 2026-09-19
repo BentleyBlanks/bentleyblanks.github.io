@@ -18,6 +18,9 @@ import { JAPANESE_SPEECH } from "./Data_FirstLevelJapaneseSpeech.mjs";
 import { MISSION_VOICE_ALIGNMENT } from "./Data_FirstLevelMissionVoiceAlignment.mjs";
 import { MissionVoiceTimeline } from "./Data_FirstLevelMissionVoiceTiming.mjs";
 import { FirstLevelMissionVoice } from "./Script_FirstLevelMissionVoice.mjs";
+import { MISSION_VOICE_FACTS } from "./Data_FirstLevelMissionGates.mjs";
+import { MISSION_STAGES } from "./Data_FirstLevelMission.mjs";
+import { MISSION_LEADER_STAGES, MISSION_GUIDE_TRANSFERS } from "./Data_FirstLevelLeaderGuide.mjs";
 
 const Read = (name) => fs.readFileSync(new URL(name, import.meta.url), "utf8");
 const contract = Read("./docs/Data_FirstLevelRebuild20260919Contract.md");
@@ -125,12 +128,63 @@ for (const cue of guide) {
 }
 console.log(`ok 带路短命令按契约重排：下线 ${Ids(guideLine[1]).length} 条、新增 ${Ids(guideLine[2]).length} 条`);
 
-// 8. MISSION_VOICE_FACTS 的 cue 都存在。运行时那张表在 Spine 包手里，这里按契约清单对账；
-//    合并后应改成直接 import Data_FirstLevelMissionGates 的 MISSION_VOICE_FACTS。
+// 8. MISSION_VOICE_FACTS：直接对运行时那张表，不再对契约正文的清单。
+//    契约列出的每一对都必须在表里；表可以多，但多出来的那一条要说得出理由。
 const factPairs = [...contractSection.matchAll(/`([A-Za-z]+)→([A-Za-z]+)`/g)].map(([, cue, fact]) => [cue, fact]);
 assert.ok(factPairs.length >= 20, "契约 §5 的播完记事实清单可解析，实际 " + factPairs.length);
-for (const [cue, fact] of factPairs) assert.ok(byId.has(cue), `MISSION_VOICE_FACTS 的 cue 不存在：${cue}（→${fact}）`);
-console.log(`ok 契约列出的 ${factPairs.length} 条「播完记事实」的 cue 都在表里`);
+for (const [cue, fact] of factPairs) {
+  assert.ok(byId.has(cue), `MISSION_VOICE_FACTS 的 cue 不存在：${cue}（→${fact}）`);
+  assert.equal(MISSION_VOICE_FACTS[cue], fact, `${cue} 播完应记 ${fact}`);
+}
+for (const cue of Object.keys(MISSION_VOICE_FACTS)) assert.ok(byId.has(cue), "编排表引用了不存在的 cue：" + cue);
+// 运行时比契约多的那一条：06 老周上担架（ZhouLift→zhouOnLitter）本来就写在 §2 的
+// requirements 里，只是 §5 的映射清单漏列。
+assert.deepEqual(
+  Object.keys(MISSION_VOICE_FACTS).filter((cue) => !factPairs.some(([id]) => id === cue)),
+  ["ZhouLift"], "编排表比契约多出来的「播完记事实」只有 ZhouLift 这一条");
+console.log(`ok MISSION_VOICE_FACTS 的 ${Object.keys(MISSION_VOICE_FACTS).length} 条与契约逐条对上`);
+
+// 8b. 运行时源码里引用的每一个 cue id 都必须在台词表里。
+//     Enqueue 对未知 cue 只警告不抛异常（有意如此），所以改表改漏不会在运行时炸，
+//     只会变成「那句话再也不响了」—— 那就得在这里红。
+{
+  const RUNTIME_SOURCES = [
+    "./Script_FirstLevelMissionRuntime.mjs", "./Script_FirstLevelOpening.mjs",
+    "./Script_FirstLevelLeaderGuide.mjs", "./Data_FirstLevelLeaderGuide.mjs",
+    "./Data_FirstLevelMission.mjs", "./Data_FirstLevelMissionGates.mjs",
+  ];
+  const referenced = new Map();
+  for (const name of RUNTIME_SOURCES) {
+    const text = Read(name);
+    // Say("X") / Enqueue("X") / Replay("X") / Cancel(["X","Y"]) / voice.played.has("X")
+    for (const [, id] of text.matchAll(/\b(?:Say|Enqueue|Replay|Guidance)\(\s*["']([A-Za-z][A-Za-z0-9]*)["']/g))
+      referenced.set(id, name);
+    for (const [, list] of text.matchAll(/\bCancel\(\s*\[([^\]]*)\]/g))
+      for (const [, id] of list.matchAll(/["']([A-Za-z][A-Za-z0-9]*)["']/g)) referenced.set(id, name);
+    for (const [, id] of text.matchAll(/voice\.(?:played|finished)\.has\(\s*["']([A-Za-z][A-Za-z0-9]*)["']/g))
+      referenced.set(id, name);
+  }
+  // MISSION_STAGES 的每一步 cue 与带路编排里的 cue（数据，不是字面量）。
+  for (const stage of MISSION_STAGES) if (stage.cue) referenced.set(stage.cue, "MISSION_STAGES");
+  for (const spec of [...Object.values(MISSION_LEADER_STAGES), ...Object.values(MISSION_GUIDE_TRANSFERS)])
+    referenced.set(spec.cue, "MISSION_LEADER_STAGES");
+  assert.ok(referenced.size >= 40, "静态扫描至少应找到 40 个 cue 引用，实际 " + referenced.size);
+  const missing = [...referenced].filter(([id]) => !byId.has(id));
+  assert.deepEqual(missing, [], "运行时引用了台词表里没有的 cue：" + JSON.stringify(missing));
+  // 反过来：已经烘好、但运行时还没有触发点的剧情 cue。第二波玩法包一条条接上，
+  // 接完这张表就空了。**只许变短**：出现表外的新条目说明又有一段演出被摘掉了。
+  const SECOND_WAVE_UNWIRED = new Set([
+    "RescueOut", "TrenchCurse",                                  // 02 出掩蔽部、后交通壕
+    "BundleProne", "BundleReturnCall",                            // 05 取弹返程
+    "KitchenDetour", "MeleeCurse", "WindowOrder",                 // 08/09 主街与连屋
+    "CartAbandon", "RoadBump", "HandsShake",                      // 15 降压段
+    "WardGuide", "PlaceLitter", "NextLitter",                     // 16/17 接收院
+    "NorthGate",                                                  // 18 北门
+  ]);
+  const unwired = story.map((cue) => cue.id).filter((id) => !referenced.has(id));
+  for (const id of unwired) assert.ok(SECOND_WAVE_UNWIRED.has(id), "这条剧情 cue 没有任何触发点：" + id);
+  console.log(`ok 运行时 ${referenced.size} 处 cue 引用全部落在台词表里（还有 ${unwired.length} 条等第二波接触发点）`);
+}
 
 // 9. 具名事件：玩法包按名字接动作。
 const Events = (id, seconds) => {

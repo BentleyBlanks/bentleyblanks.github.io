@@ -503,6 +503,10 @@ export const MISSION_TUNING = Object.freeze({
   bunkerCaptiveStabGapS: 1.4,
   // 掩蔽部门外破口能看清的距离（契约 §3：8–12 m）。
   bunkerSightM: 12,
+  // 剧情台词压环境声的深度（storyDuck）。0.68 这个数来自旧军列开场逃出车厢那一段
+  // （Data_FirstLevelCarriageSound.escapeSpeechBedGain）：环境压到 68%，人声出得来，
+  // 外头的动静还在。军列开场下线之后这个数留在这里，播放器不再依赖车厢声音表。
+  storyVoiceBedGain: 0.68,
   // —— 02 获救。罗班长掀木架＋幺娃拉背包那一段（沿用开场救人的 LuoHelpUp 时长）。
   bunkerRescueSeconds: 4.4,
   // —— 05/06 战车压口与接防。战车推到 tankStopZ 这么近就算堵住退路。
