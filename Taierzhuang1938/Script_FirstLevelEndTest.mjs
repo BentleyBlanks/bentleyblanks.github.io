@@ -29,7 +29,7 @@ import { END_TUNING as E } from "./Data_Tuning_FirstLevelEnd.mjs";
 import { FirstLevelMissionColumn, MissionRouteProjection } from "./Script_FirstLevelMissionColumn.mjs";
 import { EndExtras, EndDressing, EndProjectOnto, EndRouteLength, EndRoutePoint } from "./Script_FirstLevelEndCast.mjs";
 import { FirstLevelQuietMarch, QUIET_MARCH_PICKETS, QUIET_MARCH_WALL_LENGTH } from "./Script_FirstLevelQuietMarch.mjs";
-import { FirstLevelReception, RECEPTION_CAST } from "./Script_FirstLevelReception.mjs";
+import { FirstLevelReception, RECEPTION_CAST, ReceptionBedGuideRoute } from "./Script_FirstLevelReception.mjs";
 import { FirstLevelBridge, BRIDGE_NORTH_IDS, BRIDGE_GUNNER_ID, BRIDGE_CAST, REAR_COLUMN_IDS, BRIDGE_CROSSING_LENGTH } from "./Script_FirstLevelBridge.mjs";
 import { FirstLevelNightGate, NightLightSpecs } from "./Script_FirstLevelNightGate.mjs";
 
@@ -410,6 +410,11 @@ const VOICE_FACT = Object.freeze({
 // 7. 16 门槛与放下担架：老周最后一句话，放下才恢复持枪
 // ---------------------------------------------------------------------------
 {
+  const handoverGuide=ReceptionBedGuideRoute("Handover"),deathGuide=ReceptionBedGuideRoute("Death");
+  Check(handoverGuide.length>1&&Distance(handoverGuide.at(-1),P.receptionYard.yaowaBedside)<1e-6,
+    "16 幺娃沿真实接收路线走到数据化床边位");
+  Check(deathGuide.length===1&&Distance(deathGuide[0],P.receptionYard.yaowaBedside)<1e-6,
+    "17 丢弃 16 未走完的中间点，只保留床边终点");
   // 台词侧：「脚……慢点」之后老周再没有任何一句。
   const order = MISSION_DIALOGUE.map(cue => cue.id);
   const thresholdAt = order.indexOf("Threshold");
@@ -487,7 +492,9 @@ const VOICE_FACT = Object.freeze({
   r.extras.Spawn("WardSurgeon", P.receptionYard.surgeon, { weapon: null, unarmed: true });
   // 幺娃守在担架边（正片里 bedGuide 把他带过来）。
   const yaowa = r.companion.Handle("yaowa");
-  yaowa.position.x = A.zhouDrop.x + 1; yaowa.position.z = A.zhouDrop.z;
+  Object.assign(yaowa.position, P.receptionYard.yaowaBedside);
+  Check(Distance(yaowa.position, zhou) > 1.8 && Distance(yaowa.position, zhou) < 2.4,
+    "幺娃留在担架旁，同时让开玩家后抬手与镜头通道");
   r.reception.Enter("Death");
   r.Step(0.2, "Death");
   Check(!r.Has("deathMedicArrived"), "军医还在厢房另一头，不许直接起死亡段");

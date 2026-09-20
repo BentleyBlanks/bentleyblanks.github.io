@@ -14,13 +14,18 @@
 // ===========================================================================
 import { END_TUNING as E } from "./Data_Tuning_FirstLevelEnd.mjs";
 import { MISSION_TUNING as R } from "./Data_Tuning_FirstLevel.mjs";
-import { MISSION_ANCHORS as A, MISSION_PLACEMENT as P } from "./Data_FirstLevelMissionLayout.mjs";
+import { MISSION_ANCHORS as A, MISSION_PLACEMENT as P, MISSION_ROUTES } from "./Data_FirstLevelMissionLayout.mjs";
 import { EndRouteLength, EndRoutePoint } from "./Script_FirstLevelEndCast.mjs";
 
 const Distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 const NEXT_LITTER_LENGTH = EndRouteLength(E.nextLitterRoute);
 /** 15C–17 常驻的三个人：院门守军两名、接收人员、军医。 */
 export const RECEPTION_CAST = Object.freeze(["GateGuardNorth", "GateGuardSouth", "YardReceiver", "WardSurgeon"]);
+/** 16 真走完整接收路线；17 丢弃可能残留的中间点，只收束到床边。 */
+export function ReceptionBedGuideRoute(step) {
+  const bedside={...P.receptionYard.yaowaBedside};
+  return step==="Handover"?[...MISSION_ROUTES.reception.map(point=>({...point})),bedside]:[bedside];
+}
 
 export class FirstLevelReception {
   constructor(runtime) {
@@ -270,7 +275,7 @@ export class FirstLevelReception {
       death: this.death && {
         confirmed: this.death.confirmed, nextSaid: this.death.nextSaid,
         nextProgress: Number(this.death.nextProgress.toFixed(2)),
-        treating: !!this.death.treating, resumed: this.death.resumed,
+        treating: !!this.death.treating, coverS:Number(this.death.coverS.toFixed(2)), resumed: this.death.resumed,
       },
       walks: [...this.walks.values()].map(walk => ({ cast: walk.actor.castId, remaining: walk.route.length })),
     };

@@ -342,8 +342,18 @@ const report = {};
   assert.ok(gate >= 3.2, `the reception gate passes a litter: ${gate.toFixed(2)} m`);
   assert.ok(Math.abs(S.receptionGate.x - north.x) < 0.01 && S.receptionGate.z > north.z + north.d / 2
     && S.receptionGate.z < south.z - south.d / 2, "the receptionGate anchor stands in the gateway");
+  const bedside=P.receptionYard.yaowaBedside,ward=Reception.ward;
+  assert.ok(bedside.x>ward.minX+CAPSULE_R&&bedside.x<ward.maxX-CAPSULE_R
+    &&bedside.z>ward.minZ+CAPSULE_R&&bedside.z<ward.maxZ-CAPSULE_R,
+  "Yaowa's bedside post leaves a full capsule inside the ward");
+  const bedsideDistance=Math.hypot(bedside.x-A.zhouDrop.x,bedside.z-A.zhouDrop.z);
+  assert.ok(bedsideDistance>1.8&&bedsideDistance<2.4,
+    `Yaowa stays beside Zhou without occupying the player's rear handle: ${bedsideDistance.toFixed(2)} m`);
+  assert.deepEqual(RouteClearance([...Routes.reception,bedside],Solids("BunkerCollapsed")),[],
+    "Yaowa walks to the bedside post through the real ward route");
   console.log("ok 15B lane, bump, ward threshold and reception gateway",
-    JSON.stringify({ lane: report.wallPathWidthM, bump: bump.h, threshold: threshold.h, gate: report.receptionGateM }));
+    JSON.stringify({ lane: report.wallPathWidthM, bump: bump.h, threshold: threshold.h,
+      gate: report.receptionGateM,bedsideM:+bedsideDistance.toFixed(2) }));
 }
 
 // ---------------------------------------------------------------------------

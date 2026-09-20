@@ -790,6 +790,9 @@ export const MISSION_PLACEMENT = Object.freeze({
     gateGuard: [{ x: 3.4, z: 237.6, yaw: -1.57 }, { x: 3.2, z: 242.4, yaw: -1.57 }],
     receiver: { x: -4.6, z: 239.2, yaw: -1.57 },
     surgeon: { x: -27.4, z: 241.2, yaw: 0 },
+    // 幺娃留在老周担架东侧，但让开顺子后抬手的胶囊和第一人称镜头通道。
+    // 到 zhouDrop 1.96 m，仍在死亡段整理覆盖物的 2.4 m 距离门内。
+    yaowaBedside: { x: -23.1, z: 241.5, yaw: 1.83 },
     zhouPlaced: { x: -26, z: 239.4, yaw: 0 },
     nextLitterEntry: { x: -13, z: 243.4, yaw: -1.57 },
   },

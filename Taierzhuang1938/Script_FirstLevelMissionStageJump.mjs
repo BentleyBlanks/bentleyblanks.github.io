@@ -92,7 +92,7 @@ export function ApplyFirstLevelStageJump(runtime, value, { midCutscenes = false 
     // 幺娃守在担架边；军医是 15C 起就在院子里的那个真人（EnsureYardCast 已经建好），
     // 直接摆到担架另一侧，省掉他从厢房另一头走过来的那十几秒。
     const yaowa=r.companion.Handle("yaowa");
-    r.PlaceActor(yaowa,{x:A.zhouDrop.x+1,z:A.zhouDrop.z});
+    r.PlaceActor(yaowa,P.receptionYard.yaowaBedside);
     const surgeon=r.extras.Actor("WardSurgeon");
     if (surgeon) r.PlaceActor(surgeon,{x:A.zhouDrop.x-1,z:A.zhouDrop.z});
   }

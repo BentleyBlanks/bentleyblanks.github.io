@@ -105,7 +105,8 @@
 
 ### 17 Death — 确认老周死亡
 
-* 军医真的走到担架边（`surgeonReachM`）→ `deathMedicArrived` → `BeginControl("death", 14 s)`
+* 军医真的走到担架边（`surgeonReachM`）→ `deathMedicArrived` → `BeginControl("death", 14 s)`；
+  幺娃沿真实接收路线走到 `receptionYard.yaowaBedside`，在担架东侧约 2 m 留守，既能整理覆盖物，也让开顺子后抬手与第一人称镜头通道。
   → `ZhouDeath`（七句，第一句之后有 `ZhouNoAnswer` 的停顿）。
   `deathSeconds` 从 12 抬到 **14**：强制对齐量出 `ZhouDeath` 是 13.52 s，旧的 8–12 s 口径作废。
 * 受控演出放完只是**确认**（`reception.OnDeathSceneEnd()`）。17 走完还要接收处真的继续工作：

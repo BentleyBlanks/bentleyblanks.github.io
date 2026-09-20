@@ -69,7 +69,7 @@ import { FirstLevelMissionMusic } from "./Script_FirstLevelMissionMusic.mjs";
 // 15–18（End 包）：运行时只留薄钩子，演出与判定在这几个模块里。
 import { EndExtras, EndDressing } from "./Script_FirstLevelEndCast.mjs";
 import { FirstLevelQuietMarch } from "./Script_FirstLevelQuietMarch.mjs";
-import { FirstLevelReception } from "./Script_FirstLevelReception.mjs";
+import { FirstLevelReception, ReceptionBedGuideRoute } from "./Script_FirstLevelReception.mjs";
 import { FirstLevelBridge } from "./Script_FirstLevelBridge.mjs";
 import { FirstLevelNightGate } from "./Script_FirstLevelNightGate.mjs";
 import { FirstLevelNightLights } from "./Script_FirstLevelNightLights.mjs";
@@ -1466,13 +1466,20 @@ export class FirstLevelMissionRuntime {
         this.column.zhou.state = "waiting";
         this.bedGuide = {
           actor: this.companion.Handle("yaowa"),
-          route: [...MISSION_ROUTES.reception, { x: A.zhouDrop.x + 1, z: A.zhouDrop.z }],
+          route: ReceptionBedGuideRoute("Handover"),
         };
         if (this.bedGuide.actor) this.squadRoutes.set(this.bedGuide.actor.id, []);
         this.EnsureYardCast();
         this.reception.Enter("Handover");
         break;
       case "Death":
+        // 16 的长接收路线可能还剩中间点；17 只保留床边这一段，避免幺娃被旧路线
+        // 拉回门外，导致他永远够不到覆盖物。正常流程仍由 MoveActor 真走到侧位。
+        this.bedGuide = {
+          actor: this.companion.Handle("yaowa"),
+          route: ReceptionBedGuideRoute("Death"),
+        };
+        if (this.bedGuide.actor) this.squadRoutes.set(this.bedGuide.actor.id, []);
         this.EnsureYardCast();
         this.reception.Enter("Death");
         break;
