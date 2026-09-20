@@ -67,7 +67,8 @@ export async function Drive(ctx) {
       g.StepFrames(30, 1 / 60, false);
       const m = g.Debug.FirstLevelMission();
       return { stage: m.stage, time: m.time, facts: m.facts, beats: m.front.bunker.beats,
-        captives: m.front.bunker.captives, control: m.control };
+        captives: m.front.bunker.captives, control: m.control,
+        voice: m.voice.current, voiceLineIndex: m.front.bunker.killLine };
     });
     trappedFrames.push(state);
     // 关键帧：受困视角看门外的行刑（第一刀、补刺、踢枪、转向门内各一张）。
