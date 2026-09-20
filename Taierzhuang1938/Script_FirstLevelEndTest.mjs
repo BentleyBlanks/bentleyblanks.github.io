@@ -497,8 +497,9 @@ const VOICE_FACT = Object.freeze({
     "幺娃留在担架旁，同时让开玩家后抬手与镜头通道");
   r.reception.Enter("Death");
   r.Step(0.2, "Death");
-  Check(yaowa.missionHideWeapon === true && yaowa.missionReach === 1 && yaowa.scriptedNoncombatant,
-    "幺娃收枪、空手伸向覆盖物，不以战斗姿态瞄着老周");
+  Check(yaowa.missionHideWeapon === true && yaowa.missionReach === 1
+      && yaowa.scriptedNoncombatant && yaowa.stance === 1,
+    "幺娃收枪、低姿空手伸向覆盖物，不以战斗姿态瞄着老周");
   Check(!r.Has("deathMedicArrived"), "军医还在厢房另一头，不许直接起死亡段");
   r.Step(20, "Death");
   Check(r.Has("deathMedicArrived"), "军医真的走到担架边");

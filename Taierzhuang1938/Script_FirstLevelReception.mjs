@@ -222,7 +222,9 @@ export class FirstLevelReception {
       yaowa.missionReach=bedside?1:0;
       yaowa.scriptedNoncombatant=true;
       if(bedside){
-        r.ai.SetStance(yaowa,0,2,true);
+        // 低姿优先选共用 crouchIdle；否则 rigged actor 会把 reach 解释成
+        // standReach/AttackCommand，双手举过头顶。白盒仍吃 missionReach 的前下伸手。
+        r.ai.SetStance(yaowa,1,2,true);
         yaowa.yaw=Math.atan2(yaowa.position.x-zhou.x,yaowa.position.z-zhou.z);
       }
     }

@@ -13,6 +13,7 @@ import path from "node:path";
 import { MISSION_ANCHORS as A, MISSION_ROUTES } from "./Data_FirstLevelMissionLayout.mjs";
 import { MISSION_STAGE_ROUTES, MISSION_RECEPTION_SPACE as Reception, RegroupGuideRoute } from "./Data_FirstLevelMissionTopology.mjs";
 import { END_TUNING as E } from "./Data_Tuning_FirstLevelEnd.mjs";
+import { MISSION_TUNING as R } from "./Data_Tuning_FirstLevel.mjs";
 import { CampaignActions } from "./Script_FirstLevelCampaignKit.mjs";
 
 /** 折线转成 Route 能吃的点串（去掉 yaw 之类的附加字段）。 */
@@ -277,12 +278,26 @@ async function DriveDeath(ctx, { JumpStage, Capture, WaitStage }) {
   const { page, output } = ctx;
   await JumpStage(17);
   // 死亡段是第一人称、不切尸体特写：在受控演出**还挂着**的时候留一张。
-  await page.evaluate(() => {
+  const deathControl = await page.evaluate(() => {
     const g = window.Tengxian;
     for (let i = 0; i < 240 && !g.Debug.FirstLevelMission().control; i += 1) g.StepFrames(1, 1 / 60, false);
+    const startedAt = g.Debug.FirstLevelMission().time;
     for (let i = 0; i < 180 && g.Debug.FirstLevelMission().control; i += 1) g.StepFrames(1, 1 / 60, false);
+    return { startedAt, previewAt: g.Debug.FirstLevelMission().time,
+      control: g.Debug.FirstLevelMission().control };
   });
+  assert.equal(deathControl.control, "death", "床边第一人称截图发生在 death 控制段内");
   await Capture("DeathFirstPerson");
+  await WaitControl(page, "17 老周死亡段", R.deathSeconds + 10);
+  Object.assign(deathControl, await page.evaluate(() => {
+    const mission = window.Tengxian.Debug.FirstLevelMission();
+    return { endedAt: mission.time, voiceFinished: mission.voice.finished.includes("ZhouDeath") };
+  }));
+  deathControl.durationS = deathControl.endedAt - deathControl.startedAt;
+  assert.ok(deathControl.durationS >= R.deathSeconds - 1 / 30,
+    `17 death 控制段要实际走满 ${R.deathSeconds}s，实际 ${deathControl.durationS.toFixed(3)}s`);
+  assert.ok(deathControl.voiceFinished, "death 控制归还时 ZhouDeath 七句已经实际播完");
+  await fs.writeFile(path.join(output, "Data_DeathControl.json"), JSON.stringify(deathControl, null, 2));
   await WaitStage("BridgeOrders", 420);
   {
     const shot = await Mission(page);
@@ -290,6 +305,13 @@ async function DriveDeath(ctx, { JumpStage, Capture, WaitStage }) {
     assert.equal(shot.failed, false, "老周死亡不判全关失败");
     assert.ok(shot.voice.played.includes("NextLitter"), "门外又抬来伤员，接收处继续工作");
     assert.ok(shot.end.reception.death.treating, "军医转过去救下一个");
+    const yaowa = await page.evaluate(() => {
+      const actor = window.Tengxian.Debug.FirstLevelMissionRuntime().companion.Handle("yaowa");
+      return { hideWeapon: !!actor?.missionHideWeapon, reach: actor?.missionReach || 0,
+        noncombatant: !!actor?.scriptedNoncombatant, weaponVisible: actor?.actor?.weaponGroup?.visible !== false };
+    });
+    assert.deepEqual(yaowa, { hideWeapon: false, reach: 0, noncombatant: false, weaponVisible: true },
+      "18 接令前要还回幺娃的步枪与正常战斗状态");
     await fs.writeFile(path.join(output, "Data_DeathScene.json"), JSON.stringify(shot.end.reception, null, 2));
     await Capture("NextLitter");
   }
@@ -467,7 +489,11 @@ async function DriveBridge(ctx, { JumpStage, Capture, CaptureFocus, Route, WaitS
   }
   await WaitControl(page, "18 夜行军淡入", 120);
   await Capture("NightFadeIn");
-  await Route(Points(MISSION_STAGE_ROUTES.nightMarch.slice(1)), "NightMarchToGate");
+  // 真实走到瓮城外的 approach 再拍：这张不能靠 debug 跳转或另一次瞬移伪造，
+  // 它证明玩家在淡入后仍随队夜行，而且尚未进入北门。
+  await Route(Points(MISSION_STAGE_ROUTES.nightMarch.slice(1, 2)), "NightMarchApproach");
+  await Capture("NightMarchApproach");
+  await Route(Points(MISSION_STAGE_ROUTES.nightMarch.slice(2)), "NightMarchToGate");
   {
     const shot = await Mission(page);
     assert.ok(shot.voice.played.includes("NorthGate"), "带路军人在门外招呼");
