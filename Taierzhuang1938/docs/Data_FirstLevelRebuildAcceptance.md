@@ -89,8 +89,38 @@
 
 先前冻结运行时候选 `5098edee`、文档证据集成点 `a8a8e334e` 已完成当时的 quick：
 90 通过、0 历史基线、0 失败，用时 123.4 秒；原始记录为 `tmp/L1Handoff/Data_QuickFrozen.log`。
-此后当前集成候选推进到 `a887b09f0`。其最新 `BuildBrowserBundle --preview` 构建成功：423 个模块、
-4,981,588 bytes、内容版本 `3567979183637027`。这只证明模块可打包；合并入口的浏览器功能验收仍待父任务完成。
+此后生产运行时候选推进到 `a887b09f0`；当前交付父提交为 `00ef41227`，从前者到后者的变更只涉及驾驶器、测试与文档，
+没有再改生产 runtime。最新 `BuildBrowserBundle --preview` 构建成功：423 个模块、4,981,588 bytes、内容版本
+`3567979183637027`。构建本身只证明模块可打包；下表另列实际浏览器功能结果。
+
+本轮最终十项功能门禁已执行完，结果为 **9 通过、1 项既有真实失败**：
+
+| 门禁 | 结果 | 本轮证据边界 |
+| --- | --- | --- |
+| `Script_BrowserBundleTest.mjs` | 通过，143.8 s | Whitebox / MainMenu / MissingCharacters 三场景，13 个脚本请求，加载版本 `3567979183637027` |
+| `Script_BootTest.mjs` | **失败，163.2 s** | phase 0 通过；phase 1–6 均为“日军远景辨识材质未接全 count=0” |
+| `Script_MenuTest.mjs` | 通过，216 s | 菜单功能门禁 |
+| `Script_FirstLevelMissionStageJumpTest.mjs` | 通过，164.7 s | 18 个阶段调试重建；不是正常整关流程 |
+| `Script_DeathMenuTest.mjs` | 通过，47.9 s | 测试夹具修正后复验 |
+| `Script_HudPromptBrowserTest.mjs` | 通过，31.7 s | HUD 提示浏览器功能 |
+| `Script_OrchestrationMapTest.mjs` | 75/75 通过，4.8 s | 编排地图 |
+| `Script_OrchestrationEditorTest.mjs` | 101/101 通过，28.5 s | 工作台编辑器 |
+| `Script_MotionVectorContractTest.mjs` | 通过，2.6 s | 46 个 GPU 场景 |
+| `Script_CarriagePropVelocityTest.mjs` | 通过，50.6 s | high 画质真实资产与运动历史 |
+
+`DeathMenuTest` 的 `d019423a6` 修复已集成到父提交 `68c3c1f64`；`OrchestrationEditorTest` 把旧的 80 人夹具
+改为当前 74 人的 `acbe24011` 已集成到 `00ef41227`。两项都只修测试夹具，没有改变生产数据或通过门槛。
+
+`BootTest` 的失败不能写成通过，但也不是本次第一关候选新增的回归。当前 `origin/master` `af6599cdb` 与
+`a887b09f0` 的 BootTest、Actor、CharacterModel、ActorBatch、Data_Battle 对应 blob 相同；现行可见的蒙皮 GLB
+人体材质只接通用 PBR，70–240 m 日军远景辨识 shader 仍只接在已退出可见场景的旧程序化材质上。
+审计记录为本地
+`C:\Users\Bentl\Documents\CodexReview\FirstLevelClaudeHandoff_20260920\FrontFinalEvidence\Data_BootMaterialAudit.md`。
+
+父任务还完成了 1280×720 high 的 LocalPreview 功能验收：8098 的 `/__preview/ping` 指向本树，正常点击
+Start 进入 `Trapped`，debug 12 可重建 `Transfer` 且 `running=true`，页面加载版本
+`3567979183637027`、`errors=[]`，截图已审看。这是 `functional-preview`、`normalCampaignEvidence=false` 的
+功能证据，不是正常流程或关卡无阻塞证据。
 
 浏览器专项 `Script_FirstLevelMissionTopologyBrowserTest.mjs` 本轮也退出 0：26 条实体行走路径通过，
 北门夜景体块由日间 704 件切到 719 件（新增 15 件），四个夜行锚点全部抵达，退出后恢复 704 件。
@@ -196,13 +226,14 @@ Jump/archive 工具、音频与音乐检查消费。`OPENING.woundedRoute`、`ru
 全套 prepush，均不再继续运行，也不再作为本次交付的强制门禁。保留这些手测项并不构成全关通过证据；
 本文仍不承诺当前候选流程无阻塞。
 
-当前候选的**最终功能门禁结果尚未完成**，仍待父任务验证并如实记录：
+当前候选的功能门禁已经得到上表的最终结果：9 通过、`BootTest` 1 项既有真实失败，不能写成十项全绿。
+完整测试和预览证据的本地归档位置定为
+`C:\Users\Bentl\Documents\CodexReview\FirstLevelClaudeHandoff_20260920\FunctionalTests` 和
+`C:\Users\Bentl\Documents\CodexReview\FirstLevelClaudeHandoff_20260920\FunctionalReview`；发布合并入口和线上内容核对
+仍待交付回执独立记录，本文不预写已经上线。以上功能检查不承担正常关卡路线、战斗生存或流程阻塞的验收职责。
 
-- 已构建合并入口的真实浏览器启动、正式菜单与页面功能；构建成功本身不等于浏览器通过。
-- 18 个阶段调试重建、交互与存档恢复、关卡编排工作台的功能检查。
-- 资源与音频机器门禁、high 画质渲染契约，以及发布合并入口与线上内容核对。
-
-以上功能检查不承担正常关卡路线、战斗生存或流程阻塞的验收职责。
+现有 `FirstLevelVoiceTest` 与资源检查只提供机器门禁结果；全部 93 条 cue 的口音、表演和实机主观听感仍保留下表人工试听，
+不能由机器通过替代。
 
 登记层仍有一项可继续清理：`Script_FirstLevelMissionColumn` 的 `AmbushCasualty` / `AmbushRecover`
 随屋内伏击拍失去调用方。`MISSION_ROUTES.reception` / `.exit` / `.flank` 等旧名字仍有
