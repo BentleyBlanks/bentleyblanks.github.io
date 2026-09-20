@@ -424,7 +424,7 @@ for (const [x,z] of [[-24,-53],[-45,30],[-10,-124]]) {
 assert.equal(MISSION_TERRAIN.trenches.find(t=>t.id==='BundleApproach').depth, MISSION_TERRAIN.steps[0].depth, 'supply house floor remains level with trench');
 for (const [x, z] of [
   [-24, -53],
-  [-8, -106],
+  [-11, -108],
   [12, -124],
   [A.retreatA.x, A.retreatA.z],
 ])

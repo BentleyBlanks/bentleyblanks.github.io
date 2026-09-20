@@ -51,6 +51,9 @@ try{
  await fs.writeFile(path.join(out,'Data_PhysicalTopology.json'),JSON.stringify(result,null,2));
  const failed=result.walks.filter(r=>r.reached!==r.expected);
  assert.deepEqual(failed,[],'actual Rapier capsule walks both directions: '+JSON.stringify(failed));
+ const frontReturn=result.walks.filter(r=>r.name==='collectionReturn');
+ assert.deepEqual(frontReturn.map(r=>r.reverse).sort(),[false,true],
+  '03/06 shared trench keeps explicit forward and reverse Rapier capsule coverage');
  // -------------------------------------------------------------------------
  // 水面是示意不是空间；军列几何真的从场上消失了
  // -------------------------------------------------------------------------
@@ -191,7 +194,50 @@ try{
   await page.screenshot({path:path.join(out,`Scene_${view.id}.png`)});
  }
  await page.evaluate(()=>{document.querySelector('#hud').style.visibility='';});
+ // 06 的长样本曾在旧地形上卡在 (-8,-112)→(-14,-104) 的沟壁。上面的
+ // MakeCharacter 是与玩家同尺寸的 Rapier 胶囊；这里再用 Orders 现场里的真实
+ // g.player、姿态切换和 W 输入走一次返程，连友军实体阻挡一起覆盖。
+ const playerReturn=await page.evaluate(async()=>{
+  const g=window.Tengxian,{MISSION_STAGE_ROUTES}=await import('./Data_FirstLevelMissionTopology.mjs');
+  const {FRONT_SORTIE}=await import('./Data_FirstLevelFrontRoute.mjs');
+  await g.Debug.FirstLevelJump(6);
+  for(const actor of g.Debug.FirstLevelMissionRuntime().enemies.values())actor.scriptedNoncombatant=true;
+  const mission=g.Debug.FirstLevelMissionRuntime();mission.tank.active=false;
+  const points=MISSION_STAGE_ROUTES.collectionReturn;
+  g.player.Spawn(points[0].x,points[0].z,0);g.player.health=100;g.player.bleeding=0;
+  if(g.player.stance!=='crouch')g.Debug.Key('KeyC');
+  g.StepFrames(2,1/60,false);
+  const b={index:0,last:{x:g.player.position.x,z:g.player.position.z},stalled:0},chunks=[];
+  const Wrap=x=>Math.atan2(Math.sin(x),Math.cos(x));
+  for(let chunk=0;chunk<30&&b.index<points.length&&g.player.alive;chunk++){
+   for(let frame=0;frame<600&&b.index<points.length&&g.player.alive;frame++){
+    const p=g.player.position,target=points[b.index];
+    if(Math.hypot(p.x-target.x,p.z-target.z)<.8){b.index++;continue;}
+    const low=FRONT_SORTIE.crawl.some(c=>Math.abs(p.x-c.x)<c.w/2+1&&Math.abs(p.z-c.z)<c.d/2+3);
+    const desired=low?'prone':'crouch';
+    if(g.player.stance!==desired)g.Debug.Key(desired==='prone'?'KeyZ':g.player.stance==='prone'?'KeyZ':'KeyC');
+    const yaw=Math.atan2(p.x-target.x,p.z-target.z),gap=Wrap(yaw-g.player.yaw);
+    g.Debug.Key('KeyW',Math.abs(gap)<.65);g.player.yaw+=Math.max(-.04,Math.min(.04,gap));g.player.pitch=0;
+    g.StepFrames(1,1/60,false);
+   }
+   const moved=Math.hypot(g.player.position.x-b.last.x,g.player.position.z-b.last.z);
+   b.stalled=moved<.2?b.stalled+1:0;
+   chunks.push({index:b.index,moved:+moved.toFixed(2),stalled:b.stalled,
+    x:+g.player.position.x.toFixed(2),z:+g.player.position.z.toFixed(2)});
+   b.last={x:g.player.position.x,z:g.player.position.z};
+  }
+  g.Debug.Key('KeyW',false);
+  return {stage:mission.flow.stage.id,alive:g.player.alive,reached:b.index,expected:points.length,
+   maxStalled:Math.max(0,...chunks.map(chunk=>chunk.stalled)),chunks,
+   end:{x:+g.player.position.x.toFixed(2),y:+g.player.position.y.toFixed(2),z:+g.player.position.z.toFixed(2)}};
+ });
+ await fs.writeFile(path.join(out,'Data_CollectionReturnPlayer.json'),JSON.stringify(playerReturn,null,2));
+ assert.equal(playerReturn.alive,true,'the actual Orders player survives the physical return probe');
+ assert.equal(playerReturn.reached,playerReturn.expected,
+  'the actual Orders player reaches every collectionReturn waypoint: '+JSON.stringify(playerReturn));
+ assert.equal(playerReturn.maxStalled,0,
+  'the actual Orders player never spends a ten-second chunk pinned to the trench wall: '+JSON.stringify(playerReturn));
  assert.deepEqual(errors,[]);
  console.log('ok physical four-zone routes, four bridge states, the night slice and 720p review views',
-  JSON.stringify({walks:result.walks.length,night}));
+  JSON.stringify({walks:result.walks.length,playerReturn,night}));
 }finally{await browser.close();await new Promise(resolve=>server.close(resolve));}

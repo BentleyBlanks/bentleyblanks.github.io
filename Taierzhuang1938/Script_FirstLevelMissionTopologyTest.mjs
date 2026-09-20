@@ -11,8 +11,10 @@ import { MISSION_ANCHORS as A, MISSION_ROUTES as Routes,
   MISSION_LAYOUT as Layout } from "./Data_FirstLevelMissionLayout.mjs";
 import { MISSION_RECEPTION_SPACE as Reception, MISSION_REGROUP_CORRIDORS as Corridors,
   MISSION_STAGE_ANCHORS as S, MISSION_STAGE_ROUTES as StageRoutes,
+  MISSION_FRONT_COLLECTION_ROUTE as FrontCollectionRoute,
   MISSION_NORTH_RIVER as River, MISSION_RAIL_BRIDGE as RailBridge,
   MISSION_TOPOLOGY_VERSION } from "./Data_FirstLevelMissionTopology.mjs";
+import { OPENING } from "./Data_FirstLevelOpening.mjs";
 import { MISSION_RETURN_ROUTES } from "./Data_FirstLevelMissionReturn.mjs";
 import { MissionRouteLength, MissionRouteNextIndex } from "./Script_FirstLevelMissionColumn.mjs";
 import { SampleMissionTerrain } from "./Data_FirstLevelMissionTerrain.mjs";
@@ -60,6 +62,28 @@ console.log("ok four zones hold their anchors and run monotonically south", ZONE
   const south = Math.max(...route.map((p) => p.z));
   assert.ok(south >= S.collection.z, "02 reaches at least as far south as the collection point");
   assert.ok(route.at(-1).z < S.collection.z - 15, "02 ends back at the front communication trench");
+  assert.deepEqual(route.slice(-FrontCollectionRoute.length), FrontCollectionRoute,
+    "03 entry uses the shared collection-to-front trench centerline");
+  assert.deepEqual(StageRoutes.collectionReturn.slice(-FrontCollectionRoute.length),
+    [...FrontCollectionRoute].reverse(), "06 reverses the same physical trench centerline");
+  assert.deepEqual(OPENING.supportRoute.slice(-FrontCollectionRoute.length), FrontCollectionRoute,
+    "FrontCommunication is excavated from the shared 03/06 route");
+  let worstSlope = 0;
+  for (let i = 1; i < FrontCollectionRoute.length; i++) {
+    const a = FrontCollectionRoute[i - 1], b = FrontCollectionRoute[i];
+    const distance = Distance(a, b), samples = Math.ceil(distance / 0.2);
+    let previous = { ...a, y: SampleMissionTerrain(a.x, a.z) };
+    for (let sample = 1; sample <= samples; sample++) {
+      const t = sample / samples;
+      const point = { x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t };
+      point.y = SampleMissionTerrain(point.x, point.z);
+      worstSlope = Math.max(worstSlope,
+        Math.abs(point.y - previous.y) / Distance(point, previous));
+      previous = point;
+    }
+  }
+  assert.ok(worstSlope < Math.tan(52 * Math.PI / 180),
+    `the shared trench floor is climbable in both directions: slope ${worstSlope.toFixed(3)}`);
 }
 const SOUTHBOUND = ["southWalk", "courtyardBypass", "cartRide", "wallPath"];
 for (const name of SOUTHBOUND) {

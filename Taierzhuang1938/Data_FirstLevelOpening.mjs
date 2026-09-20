@@ -1,5 +1,7 @@
 // 2026-09-10 opening rebuild. Gameplay reconstruction of a local flank breach;
 // these coordinates are not claims about surveyed 1938 positions.
+import { MISSION_FRONT_COLLECTION_ROUTE } from "./Data_FirstLevelMissionTopology.mjs";
+
 export const OPENING = Object.freeze({
   // Only these authored companions are required by later dialogue and rescue.
   // Membership of a squad alone never makes an ordinary soldier a failure target.
@@ -20,8 +22,10 @@ export const OPENING = Object.freeze({
   // the exchange. No scripted damage immunity or global ceasefire in this area.
   approachRoute: [{x:-66,z:66},{x:-62,z:64},{x:-45,z:41},{x:-45,z:24},
     {x:-37,z:24},{x:-37,z:6},{x:-45,z:6},{x:-45,z:-20},{x:-32,z:-20}],
+  // The tail is also the 03/06 player route. FrontCommunication is excavated from
+  // this array, so both directions get a real ramp instead of a one-way trench wall.
   supportRoute: [{x:-32,z:-20},{x:-32,z:-23},{x:-24,z:-23},{x:-24,z:-60},
-    {x:-8,z:-78},{x:-8,z:-112},{x:6,z:-124}],
+    ...MISSION_FRONT_COLLECTION_ROUTE],
   woundedRoute: [{x:-24,z:-56},{x:-24,z:-23},{x:-32,z:-23},{x:-32,z:-21}],
   runnerRoute: [{x:-24,z:-60},{x:-24,z:-23},{x:-31,z:-23},{x:-31,z:-24}],
   shelterPosts: [{x:-32,z:-24},{x:-32,z:-21},{x:-40,z:-20},{x:-37,z:-20}],

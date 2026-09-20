@@ -166,15 +166,20 @@ export const MISSION_STAGE_ANCHORS = Object.freeze({
   northGate: {x:-160,z:340}, gateInside: {x:-160,z:352},
 });
 const S=MISSION_STAGE_ANCHORS;
+// 03 从伤员集结处接回前沿、06 再沿同一交通壕返回。这里是两趟共用的唯一中心线；
+// FrontCommunication 的挖沟数据也直接引用它，避免平面路点改了而地形仍留着旧沟。
+export const MISSION_FRONT_COLLECTION_ROUTE = Object.freeze([
+  S.collection,{x:-26,z:-100},{x:-14,z:-104},{x:-8,z:-112},{x:6,z:-124},
+]);
 export const MISSION_STAGE_ROUTES = Object.freeze({
   // 02：后壁破口 → 背坡土坎的缺口（折角）→ 途经伤员集结处 → 接回前沿交通壕
   // 接回 FrontCommunication 走 (-14,-104)→(-8,-112) 这一折：直接沿 x=-8 北上会
   // 压在 TrenchBoundFrontLeft 的护墙上（沟里那对错身掩体）。
-  rearTrench: [S.bunkerRear,{x:-42,z:-116},S.rearCorner,{x:-40,z:-106},S.collection,
-    {x:-26,z:-100},{x:-14,z:-104},{x:-8,z:-112},{x:6,z:-124}],
+  rearTrench: [S.bunkerRear,{x:-42,z:-116},S.rearCorner,{x:-40,z:-106},
+    ...MISSION_FRONT_COLLECTION_ROUTE],
   // 05→06：炸停战车之后原路退回集结处
-  collectionReturn: [{x:30,z:-117},{x:25,z:-110},{x:15,z:-111},{x:6,z:-124},
-    {x:-8,z:-112},{x:-14,z:-104},{x:-26,z:-100},S.collection],
+  collectionReturn: [{x:30,z:-117},{x:25,z:-110},{x:15,z:-111},
+    ...[...MISSION_FRONT_COLLECTION_ROUTE].reverse()],
   // 07：沿沟南行，终点是村北口。2026.09.19 第二波把 188 m 收到 135 m ——
   // 契约要的是 45–75 秒，旧线按行军配速要两分多钟，多出来的全在两个大折返上：
   // 旧线先西折到 (-8,-78) 再折回 x=-24 直下 42 m，最后从 (0,0) 往**北**倒回
