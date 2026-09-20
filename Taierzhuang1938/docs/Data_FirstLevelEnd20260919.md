@@ -321,3 +321,29 @@ runner 登记：纯 node 的 `FirstLevelEndTest` 在 `firstLevel` 域；
 
 取证截图留在忽略目录 `Taierzhuang1938/_shots/`（`FirstLevelStageRegroup` / `FirstLevelStageTail` /
 `L1End`）。调试跳转与改写事实不算正常通关证据。
+
+### 2026-09-20 本次分段实测
+
+`--campaign --stage-jumps --stage-from=15` 已通过，原始回执为：
+
+```text
+ok debug starts 15–18 continued with real player input through their next stage, ending at Complete
+```
+
+这条夹具会在 15、16、17、18 **每个阶段重新执行一次 debug jump 并重建先验状态**；
+它证明四个调试起点都能接受真实玩家输入、走过各自下一阶段，最后一次 18 能到
+`Complete`。它不是一份从 15 开始、保留同一份运行时状态连续走到结尾的通关证据。
+17 的实际 `death` 控制段量得 14.000 s，控制归还时 `ZhouDeath` 已播放完毕。
+
+`--campaign --stage-jumps --stage-from=18` 也已独立通过，原始回执为：
+
+```text
+ok debug starts 18–18 continued with real player input through their next stage, ending at Complete
+```
+
+这趟从 18 的 debug 先验起步，玩家真实开火打断北岸火力、退到安全区、等己方撤净后
+炸桥，随后走完 `marchOut`；黑屏落点的渲染位置与角色体都为 (−160, 292)，淡入后又由
+真实输入走到 `northGateApproach` 再进门。两趟日志分别留在忽略目录
+`_shots/L1End/Run_Stage15ToComplete_20260920.log` 与
+`_shots/L1End/Run_Stage18ToComplete_20260920.log`；六张 1280×720 取证图也归档在
+`_shots/L1End/`。
