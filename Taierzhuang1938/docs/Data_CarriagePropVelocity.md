@@ -19,6 +19,7 @@
 - 所有材质组完成后才统一推进历史；中间没画出的物体重新出现时不能读取陈旧矩阵。新管线、切画质、换场景也不会从克隆的 userData 继承旧历史。
 - `MarkDynamicPrepass` 保留为兼容和诊断标记；不再决定普通 Mesh 是否获得正确速度。
 - 近景背包和弹药改成按角色/道具身份复用的普通 Mesh，共享几何和材质，并遵守原有数量上限；每帧没有新建网格。腊肉不改资产。第一人称手枪继续保留前景零速度规则。
+- 第一关接运段以 `zhouRideCart.id` 锁定老周/玩家所乘的车：从预留上车位开始，车板、栏杆、车辕、四轮、八根辐条、牲口躯干/头/角/四肢均复用普通 Mesh，直到场景销毁；其余远车继续实例化。停车还权和卸载不会让近车退回无逐实例历史的路径。
 - 远景 InstancedMesh / BatchedMesh 的逐实例运动仍是既有近似。**近景、手持、骨骼附件、交互道具不得直接复用没有逐实例历史的路径**。后续要把这些道具重新实例化，必须一并实现稳定实例身份及上一帧实例矩阵，并通过同一像素测试。
 
 ## 验证与证据
@@ -66,6 +67,7 @@ node Taierzhuang1938/Script_TestRunner.mjs --profile=prepush --domain=propVeloci
 | 腊肉整块 / 切片（`r.meal.whole/slice`，普通 Mesh，父物体在动） | `r.view.zhouBed`（老周担架的帆布） | 同样是 matrixWorld 驱动的近景件；12 它跟着牛/马车走，13 被卸回地面 |
 | 车厢里躺着的人 | `r.view.zhouPatient`（担架上的老周） | 同上，且它是**相机正对着看**的那一件 |
 | 背包 `RigidProp('fieldPack',…)` | `RigidProp('fieldPack','ZhouKit',…)`（担架上的挎包） | 同一条 `RigidProp` 路径、同样是身份稳定的普通 Mesh |
+| 车厢壳体与门 | 老周/玩家所乘车的车板、栏杆、车辕、轮/辐条与牲口挂件 | 同样是随载具父运动、相机同行的近景刚体；按 `cart.id + part identity` 复用普通 Mesh |
 
 **事故形态没变**：父物体在动（车沿 `cartRide` 走 / 担架被抬着走）、相机跟着动（顺子坐在车板上）。
 判据一字未改：同速时零屏幕位移、停下立刻归零、重新出现不许拿旧变换、纯相机运动要留得住、
@@ -74,10 +76,10 @@ node Taierzhuang1938/Script_TestRunner.mjs --profile=prepush --domain=propVeloci
 测试现在先 `Debug.FirstLevelJump(12)` 跳到装载那一步再取对象，并顺带记三条现场读数：
 `draft`（车位上牛车与马车都在）、`deckInstances`、`kits`。
 
-**车板（`parts.cart`）不当判据**：它是 InstancedMesh，而逐实例形变本来就不在 MotionVector 契约内
-（`Script_PostPrepass` 抬头：「InstancedMesh / BatchedMesh 的逐实例形变仍不在此契约内，
-近景移动交互件用身份稳定的普通 Mesh」）。实测它的同速位移是 12.6 px，与该条说明一致；
-读数仍写进 `Data_Velocity.json` 备查，但不作断言。
+第二波最初只记录 `parts.cart` 的现场读数、不作断言，随车相机下测得错误速度约 12.6 px/帧。
+这暴露了真实近景车体仍违反上面的普通 Mesh 契约。现在被老周/玩家占用的那辆车从 `ReserveBoardingCart`
+起就改用稳定普通 Mesh；测试直接读取生产车板和代表性栏杆、车辕、车轮、辐条、牲口挂件几何，逐件验收
+同速、停止、隐藏重现、纯相机运动与原回调。远车的 `parts.*` 实例桶仍保留，只负责不靠近玩家的车辆。
 
 选测域 `propVelocity` 同步换成 `CarriagePropVelocity|PostPrepass|FirstLevelMissionView|FirstLevelTransferCart|FirstLevelMissionColumn`
 （`FirstLevelMeal` 不再是它的对象），`Script_TestRunnerTest` 的对应断言一起改。

@@ -33,6 +33,10 @@ export class FirstLevelMissionView {
     this.rigidParts = {fieldPack: []};
     this.rigidTemplates = {};
     this.rigidProps = new Map();
+    // 老周/玩家将要乘坐的那辆车从预留开始就保持逐件稳定身份，直到场景销毁。
+    // 这样上车、同行、停车和卸载近景里的车板与挂件都走普通 Mesh 的真实
+    // matrixWorld 历史；其他远车仍留在实例桶里。
+    this.stableCartParts = new Map();
     this.personColor = new THREE.Color();
     for (const [key, geometry, color, count] of [
       ["fieldPack",new THREE.BoxGeometry(.32,.43,.21),0x857a56,4],
@@ -199,6 +203,37 @@ export class FirstLevelMissionView {
     this.scale.set(1,1,1);this.matrix.compose(this.position,this.rotation,this.scale);
     mesh.setMatrixAt(index,this.matrix);
   }
+  StableCartPart(cart,key,identity) {
+    const id=`${cart.id}:${identity}`;
+    let mesh=this.stableCartParts.get(id);
+    if(!mesh){
+      const source=this.parts[key];
+      mesh=new THREE.Mesh(source.geometry,source.material);
+      mesh.name=`MissionCart_${id}`;
+      mesh.castShadow=true;mesh.receiveShadow=true;mesh.frustumCulled=false;
+      mesh.userData.missionCartPart={cartId:cart.id,key,identity};
+      this.stableCartParts.set(id,mesh);this.root.add(mesh);
+    }
+    mesh.visible=true;
+    return mesh;
+  }
+  StableInstance(key,cart,identity,x,y,z,yaw=0,sx=1,sy=1,sz=1,rx=0,rz=0) {
+    const mesh=this.StableCartPart(cart,key,identity);
+    mesh.position.set(x,y,z);
+    mesh.quaternion.setFromEuler(new THREE.Euler(rx,yaw,rz,"YXZ"));
+    mesh.scale.set(sx,sy,sz);
+    return mesh;
+  }
+  StableCartInstance(key,cart,identity,ground,x,y,z,rx=0,rz=0) {
+    const mesh=this.StableCartPart(cart,key,identity);
+    this.cartRotation.setFromEuler(new THREE.Euler(0,cart.yaw,cart.overturned?1.1:0,"YXZ"));
+    this.position.set(x,y,z).applyQuaternion(this.cartRotation);
+    this.position.add(new THREE.Vector3(cart.x,ground+(cart.overturned?1.6:1),cart.z));
+    this.localRotation.setFromEuler(new THREE.Euler(rx,0,rz));
+    this.rotation.copy(this.cartRotation).multiply(this.localRotation);
+    mesh.position.copy(this.position);mesh.quaternion.copy(this.rotation);mesh.scale.set(1,1,1);
+    return mesh;
+  }
   SyncCartCollider(cart,ground) {
     let box=this.cartColliders.get(cart.id);
     if(box&&box.overturned!==cart.overturned){
@@ -235,6 +270,7 @@ export class FirstLevelMissionView {
     this.aftermath.Update(player?.position,camera);
     for (const mesh of Object.values(this.parts)) mesh.count = 0;
     for (const mesh of this.rigidProps.values()) mesh.visible=false;
+    for (const mesh of this.stableCartParts.values()) mesh.visible=false;
     this.UpdateSupplies(time);
     // 2026.09.19 第二波：车站卸车挨炸那一拍随军列开场下线（`column.stationBombed`
     // 已无人写入，MISSION_PLACEMENT.stationCasualties 也一并删了）。
@@ -314,17 +350,25 @@ export class FirstLevelMissionView {
         moving: !!walker.moving, crouch: !!walker.crouch,
       });
     }
+    const stableCartId=this.column.zhouRideCart?.id||null;
     for (const cart of [...this.column.vehicles, ...this.column.traffic.filter((cart) => cart.visible)]) {
       if (cart.z > 178) continue;
       const y = this.battlefield.GroundHeight(cart.x, cart.z);
       this.SyncCartCollider(cart,y);
-      this.CartInstance("cart",cart,y,0,0,0);
+      const stable=cart.id===stableCartId;
+      if(stable)this.StableCartInstance("cart",cart,"deck",y,0,0,0);
+      else this.CartInstance("cart",cart,y,0,0,0);
       const c=Math.cos(cart.yaw),s=Math.sin(cart.yaw);
       const moving=!cart.overturned&&(cart.departed||cart.state==="approaching"||cart.id.startsWith("SouthCart"));
       const travel=(cart.progress||0)+(cart.approachProgress||0);
       for(const side of [-1,1]){
-        this.CartInstance("cartRail",cart,y,side*1.4,.45,0);
-        this.CartInstance("cartShaft",cart,y,side*.58,-.16,-3.75);
+        if(stable){
+          this.StableCartInstance("cartRail",cart,`rail:${side}`,y,side*1.4,.45,0);
+          this.StableCartInstance("cartShaft",cart,`shaft:${side}`,y,side*.58,-.16,-3.75);
+        }else{
+          this.CartInstance("cartRail",cart,y,side*1.4,.45,0);
+          this.CartInstance("cartShaft",cart,y,side*.58,-.16,-3.75);
+        }
       }
       const team=cart.boltedTeam;
       if(!cart.overturned || team&&team.progress<team.length){
@@ -334,24 +378,36 @@ export class FirstLevelMissionView {
         const draft=MID.draft[cart.draft==="ox"?"ox":"horse"];
         const [bx,by,bz]=draft.bodyScale,[hx,hy,hz]=draft.headScale;
         const headY=my+1.5-draft.headDrop;
-        this.Instance("muleBody",mx,my+1*by,mz,yaw,bx,by,bz);
-        this.Instance("muleHead",mx-ms*.8,headY,mz-mc*.8,yaw,hx,hy,hz);
+        if(stable){
+          this.StableInstance("muleBody",cart,"draftBody",mx,my+1*by,mz,yaw,bx,by,bz);
+          this.StableInstance("muleHead",cart,"draftHead",mx-ms*.8,headY,mz-mc*.8,yaw,hx,hy,hz);
+        }else{
+          this.Instance("muleBody",mx,my+1*by,mz,yaw,bx,by,bz);
+          this.Instance("muleHead",mx-ms*.8,headY,mz-mc*.8,yaw,hx,hy,hz);
+        }
         // 牛角：一对，挂在头两侧前上方，往外岔开。
-        if(draft.horn)for(const side of [-1,1])
-          this.Instance("draftHorn",
-            mx-ms*(.8+MID.horn.forwardM)+mc*side*MID.horn.lateralM,
+        if(draft.horn)for(const side of [-1,1]){
+          const horn=[mx-ms*(.8+MID.horn.forwardM)+mc*side*MID.horn.lateralM,
             headY+MID.horn.riseM,
-            mz-mc*(.8+MID.horn.forwardM)-ms*side*MID.horn.lateralM,
-            yaw,1,1,1,0,side*MID.horn.tiltRad);
+            mz-mc*(.8+MID.horn.forwardM)-ms*side*MID.horn.lateralM];
+          if(stable)this.StableInstance("draftHorn",cart,`draftHorn:${side}`,...horn,yaw,1,1,1,0,side*MID.horn.tiltRad);
+          else this.Instance("draftHorn",...horn,yaw,1,1,1,0,side*MID.horn.tiltRad);
+        }
         for(const side of [-1,1])for(const end of [-1,1]){
           const swing=moving||team?Math.sin(time*(team?10:6)+side*end*Math.PI/2)*.32:0;
-          this.Instance("limb",mx+mc*side*.21*bx-ms*end*.52*bz,my+.37*by,mz-ms*side*.21*bx-mc*end*.52*bz,yaw,.8,1.1*by,.8,swing);
+          const limb=[mx+mc*side*.21*bx-ms*end*.52*bz,my+.37*by,mz-ms*side*.21*bx-mc*end*.52*bz];
+          if(stable)this.StableInstance("limb",cart,`draftLimb:${side}:${end}`,...limb,yaw,.8,1.1*by,.8,swing);
+          else this.Instance("limb",...limb,yaw,.8,1.1*by,.8,swing);
         }
         this.Person(mx+mc*1.1,mz-ms*1.1,yaw,time,{id:cart.id+"Driver",kind:"medic",moving:moving||!!team});
       }
       for(const side of [-1,1])for(const end of [-1,1]){
-        this.CartInstance("wheel",cart,y,side*1.55,-.51,-end*1.8,0,Math.PI/2);
-        for(const phase of [0,Math.PI/2])this.CartInstance("spoke",cart,y,side*1.635,-.51,-end*1.8,travel/.48+phase);
+        if(stable)this.StableCartInstance("wheel",cart,`wheel:${side}:${end}`,y,side*1.55,-.51,-end*1.8,0,Math.PI/2);
+        else this.CartInstance("wheel",cart,y,side*1.55,-.51,-end*1.8,0,Math.PI/2);
+        for(const [phaseIndex,phase] of [0,Math.PI/2].entries()){
+          if(stable)this.StableCartInstance("spoke",cart,`spoke:${side}:${end}:${phaseIndex}`,y,side*1.635,-.51,-end*1.8,travel/.48+phase);
+          else this.CartInstance("spoke",cart,y,side*1.635,-.51,-end*1.8,travel/.48+phase);
+        }
       }
       if (cart.id.startsWith("SouthCart")) {
         for (const side of [-1, 1]) {

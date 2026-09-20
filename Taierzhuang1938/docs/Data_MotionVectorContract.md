@@ -35,7 +35,7 @@
 
 该测试登记在 `Script_TestRunner` 的 `motionVector` 域与浏览器测试集。`--changed --profile=prepush` 对项目内 Script / Data 模块及 GLB / glTF 变更自动追加它，不依赖已知道具文件名。`Script_TestRunnerTest` 用尚不存在的工厂名验证这一选择规则，纯 Markdown 文档仍不启动浏览器。
 
-真实近景资产还须保留针对其实际几何的检查。`Script_CarriagePropVelocityTest.mjs` 继续验收 high 画质车厢、腊肉和背包；通用夹具不能代替新资产自己的轮廓、骨权重和运动接入验收。旧关卡 / 剧情重构不得顺手删除通用速度门禁。
+真实近景资产还须保留针对其实际几何的检查。`Script_CarriagePropVelocityTest.mjs` 继续验收 high 画质下老周/玩家所乘车的车板、栏杆、车辕、车轮、辐条、牲口挂件，以及担架、伤员和挎包；通用夹具不能代替新资产自己的轮廓、骨权重和运动接入验收。旧关卡 / 剧情重构不得顺手删除通用速度门禁。
 
 ```powershell
 node Taierzhuang1938/Script_TestRunner.mjs --only=MotionVectorContractTest,CarriagePropVelocityTest --fail-fast

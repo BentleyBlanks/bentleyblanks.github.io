@@ -54,7 +54,7 @@ export const testDefs = {
   FirstLevelMissionTopologyBrowserTest: {file:"Script_FirstLevelMissionTopologyBrowserTest.mjs",timeoutMs:300000,desc:"Real Rapier walks of every contract route, four bridge states, night slice and 720p views"},
   FirstLevelSpaceTest: {file:"Script_FirstLevelSpaceTest.mjs",desc:"September 19 whitebox space: anchors, capsule routes, bunker sightline, street gap, lane width, river and bridges"},
   FirstLevelFrontTest: {file:"Script_FirstLevelFrontTest.mjs",desc:"第一关阶段 1–7：行刑节拍与 Line 对位、救援放行、集结处摆位、借火事件、07 时长闸、运行时薄钩子（纯 Node）"},
-  CarriagePropVelocityTest: {file:'Script_CarriagePropVelocityTest.mjs',timeoutMs:300000,desc:'道具 GPU 速度在相机移动、停止与重新出现时保持正确'},
+  CarriagePropVelocityTest: {file:'Script_CarriagePropVelocityTest.mjs',timeoutMs:300000,desc:'Real cart/stretcher GPU velocities with moving camera, stop and reappearance; high-quality transfer scene'},
   MotionVectorContractTest: {file:'Script_MotionVectorContractTest.mjs',timeoutMs:120000,desc:'GPU admission contract for new rigid/skinned renderers, bone attachments, foreground inheritance and history lifecycle'},
   HitDisorientationTest: {file:"Script_HitDisorientationTest.mjs",timeoutMs:420000,desc:"Shared bullet disorientation: real GPU/audio, decay and lifecycle"},
   IncomingFireBrowserTest: {file:"Script_IncomingFireBrowserTest.mjs",timeoutMs:300000,desc:"Real near-fire/hit HUD, camera bearings, sector merging, expiry and compact screenshots"},

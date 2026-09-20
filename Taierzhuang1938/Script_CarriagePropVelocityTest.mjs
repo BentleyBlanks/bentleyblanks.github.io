@@ -5,11 +5,9 @@
 // 随采用稿下线，那两样已经没有了。现在量 12/13 老周那辆牛/马车上的近景件：
 //   · stretcherBed / patient —— 老周的担架与躺着的人（`zhouRoot` 下的 Mesh，
 //     走 matrixWorld 那一路，就是原来腊肉的那条路径）；
-//   · zhouKit                —— 担架上那件挎包（`RigidProp` 建的身份稳定普通 Mesh，
-//     就是原来背包的那条路径）。
-// 车板（`parts.cart`）是 InstancedMesh：**逐实例形变本来就不在 MotionVector 契约内**
-//（Script_PostPrepass 抬头写明「近景移动交互件用身份稳定的普通 Mesh」），
-// 所以它只作为现场读数记在 Data_Velocity.json 里，不当判据。
+//   · zhouKit                —— 担架上那件挎包（`RigidProp` 建的身份稳定普通 Mesh）；
+//   · cartDeck / rail / shaft / wheel / spoke / draft* —— 老周/玩家那辆车从预留到
+//     停车卸载始终复用的普通 Mesh。其余远车仍走实例桶。
 // 事故形态一模一样：**父物体在动、相机跟着动**（顺子坐在车板上，车沿 cartRide 走），
 // 判据一字不改 —— 同速时零屏幕位移、停下立刻归零、重新出现不许拿旧变换、
 // 纯相机运动要留得住、原有绘制回调不许被顶掉。画质仍然是 high、资产仍然是真的。
@@ -39,7 +37,8 @@ try{
   // 让老周那一副担架露出来（12 起它是可见的近景件），再拍一张车列。
   await page.evaluate(()=>{
     const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime();
-    const cart=r.column.vehicles.find(entry=>!entry.departed)||r.column.vehicles[0];
+    const candidate=r.column.vehicles.find(entry=>!entry.departed)||r.column.vehicles[0];
+    const cart=r.column.zhouRideCart||r.column.ReserveBoardingCart({x:candidate.x,z:candidate.z});
     const zhou=r.column.zhou;
     Object.assign(zhou,{x:cart.x-2.2,z:cart.z,visible:true,state:'waiting'});
     g.player.position.set(cart.x-7,g.battlefield.GroundHeight(cart.x-7,cart.z-4),cart.z-4);
@@ -52,12 +51,18 @@ try{
     const T=await import('three'),{PrepassPass}=await import('./Script_PostPrepass.mjs');
     const {MakeFullscreenMaterial,MakeRenderTarget}=await import('./Script_PostCommon.mjs');
     const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime(),renderer=g.renderer;
+    const stableCart=r.column.zhouRideCart;
+    const stableParts=[...r.view.stableCartParts.values()]
+      .filter(mesh=>mesh.visible&&mesh.userData.missionCartPart?.cartId===stableCart.id);
     const live={stage:r.flow.stage.id,
       taa:g.post.taaEnabled,velocity:!!g.post.VelocityTexture,motionBlur:!!g.post.motionBlurPass.active,
       // 四类人流里的两类：牛车与马车都在车位上（白盒变体，Data_Tuning_FirstLevelMid.draft）。
       draft:r.column.vehicles.map(cart=>cart.draft),
       carts:r.column.vehicles.length,
-      deckInstances:r.view.parts.cart.instanceMatrix.count,
+      deckInstances:r.view.parts.cart.count,
+      stableCartId:stableCart.id,
+      stableDraft:stableCart.draft,
+      stablePartIds:stableParts.map(mesh=>mesh.userData.missionCartPart.identity).sort(),
       litterVisible:!!r.column.zhou.visible,
       kits:r.view.rigidParts.fieldPack.length};
     const pipeline={preset:{velocity:true,hzb:false},hdrCapable:true,hdrType:T.HalfFloatType,targets:{}};
@@ -79,8 +84,17 @@ try{
       speeds.sort((a,b)=>a-b);xs.sort((a,b)=>a-b);
       return {pixels:speeds.length,p50:speeds[Math.floor(speeds.length*.5)],p95:speeds[Math.floor(speeds.length*.95)],x50:xs[Math.floor(xs.length*.5)]};
     };
-    // 车上的三件近景，全是身份稳定的普通 Mesh（契约覆盖的那一类）。
+    const Stable=identity=>r.view.stableCartParts.get(`${stableCart.id}:${identity}`);
+    // 车板、代表性挂件和担架件都取生产几何；它们必须是身份稳定的普通 Mesh。
     const sources=[
+      {name:'cartDeck',source:Stable('deck')},
+      {name:'cartRail',source:Stable('rail:-1')},
+      {name:'cartShaft',source:Stable('shaft:-1')},
+      {name:'cartWheel',source:Stable('wheel:-1:-1')},
+      {name:'cartSpoke',source:Stable('spoke:-1:-1:0')},
+      {name:'draftBody',source:Stable('draftBody')},
+      {name:'draftHead',source:Stable('draftHead')},
+      {name:'draftLimb',source:Stable('draftLimb:-1:-1')},
       {name:'stretcherBed',source:r.view.zhouBed},
       {name:'patient',source:r.view.zhouPatient},
       {name:'zhouKit',source:r.view.rigidProps.get('fieldPack:ZhouKit')},
@@ -96,18 +110,16 @@ try{
       let facing=0;const normals=geometry.attributes.normal;
       for(let i=0;i<normals.count;i++)facing+=normals.getZ(i);
       if(facing<-.01)geometry.rotateY(Math.PI);
+      if(!source?.isMesh||source.isInstancedMesh)throw Error(`${name}: production source is not a stable ordinary Mesh`);
       // 同一个对象多趟绘制也要覆盖：在 onAfterRender 里推历史会让后面的材质组只剩相机速度。
-      const material=source.isInstancedMesh?geometry.groups.map(()=>source.material):source.material;
-      const object=source.isInstancedMesh?new T.InstancedMesh(geometry,material,1):new T.Mesh(geometry,material);
+      const object=new T.Mesh(geometry,source.material);
       let before=0,after=0;object.onBeforeRender=()=>before++;object.onAfterRender=()=>after++;
       object.frustumCulled=false;
       const scene=new T.Scene(),parent=new T.Group();scene.add(parent);parent.add(object);
       const camera=new T.PerspectiveCamera(60,320/240,.01,100);camera.position.z=2;
-      const prev=new T.Matrix4(),matrix=new T.Matrix4();let frame=0;
+      const prev=new T.Matrix4();let frame=0;
       const Draw=(offset,cameraOffset)=>{
-        // 车板在 instanceMatrix 里动，担架与人在 matrixWorld 里动 —— 两条路都要量。
-        if(object.isInstancedMesh){object.setMatrixAt(0,matrix.makeTranslation(offset,0,0));object.instanceMatrix.needsUpdate=true;}
-        else parent.position.x=offset;
+        parent.position.x=offset;
         camera.position.x=cameraOffset;scene.updateMatrixWorld(true);camera.updateMatrixWorld(true);
         const vp=new T.Matrix4().multiplyMatrices(camera.projectionMatrix,camera.matrixWorldInverse);
         pass.Render({renderer,scene,camera,viewProjection:vp,prevViewProjection:prev,hasPrev:frame++>0});
@@ -129,7 +141,14 @@ try{
   assert.equal(result.live.stage,'Transfer','the subject is inspected at the actual loading stage');
   assert.ok(result.live.draft.includes('ox')&&result.live.draft.includes('horse'),
     'the transfer point really fields both ox and horse carts');
-  assert.ok(result.live.deckInstances>0,'the cart deck is a real instanced bucket');
+  const expected=['deck','draftBody','draftHead',
+    ...[-1,1].flatMap(side=>[`rail:${side}`,`shaft:${side}`]),
+    ...[-1,1].flatMap(side=>[-1,1].flatMap(end=>[
+      `wheel:${side}:${end}`,`spoke:${side}:${end}:0`,`spoke:${side}:${end}:1`,`draftLimb:${side}:${end}`,
+    ])),
+    ...(result.live.stableDraft==='ox'?['draftHorn:-1','draftHorn:1']:[])].sort();
+  assert.deepEqual(result.live.stablePartIds,expected,'the reserved player cart keeps every near-view piece on stable Mesh identity');
+  assert.ok(result.live.deckInstances>0,'other distant cart decks remain in the instanced bucket');
   assert.ok(result.live.kits>0,'the litter really carries a stable-identity near-camera prop');
   for(const s of result.samples){
     assert.ok(s.coMoving.pixels>100,`${s.name}: real mesh pixels are present`);
@@ -140,5 +159,5 @@ try{
     assert.ok(s.hooks.before>0&&s.hooks.before===s.hooks.after,`${s.name}: original draw callbacks survive`);
   }
   assert.deepEqual(errors,[]);
-  console.log('PASS real stretcher and cart-deck pixels: co-motion, stop, camera-only motion');
+  console.log('PASS real cart deck, attachments and stretcher pixels: co-motion, stop, reappearance and camera-only motion');
 }finally{await browser.close();if(server)await new Promise(resolve=>server.close(resolve));}
