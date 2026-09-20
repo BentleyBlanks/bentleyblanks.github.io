@@ -10,7 +10,8 @@
 // Script_FirstLevelMissionTopologyBrowserTest 里走。
 import assert from "node:assert/strict";
 import { MISSION_LAYOUT as Layout, MISSION_ANCHORS as A, MISSION_ROUTES as Routes,
-  MISSION_PLACEMENT as P, MISSION_NIGHT_GATE_BLOCK_IDS as NightIds } from "./Data_FirstLevelMissionLayout.mjs";
+  MISSION_PLACEMENT as P, MISSION_NIGHT_GATE_BLOCK_IDS as NightIds, MISSION_SUPPLIES,
+  MISSION_SUPPLY_COLLIDER } from "./Data_FirstLevelMissionLayout.mjs";
 import { MISSION_STAGE_ANCHORS as S, MISSION_STAGE_ROUTES as StageRoutes,
   MISSION_NORTH_RIVER as River, RiverCutAt, RiverProfileAt,
   MISSION_RAIL_BRIDGE as RailBridge, MISSION_SOUTH_BRIDGE as RoadBridge,
@@ -18,6 +19,7 @@ import { MISSION_STAGE_ANCHORS as S, MISSION_STAGE_ROUTES as StageRoutes,
 import { SampleMissionTerrain as Ground } from "./Data_FirstLevelMissionTerrain.mjs";
 import { TRAVERSAL } from "./Data_Traversal.mjs";
 import { END_TUNING as END } from "./Data_Tuning_FirstLevelEnd.mjs";
+import { ZhouGunExitRoute } from "./Script_FirstLevelOpening.mjs";
 
 const TAN52 = Math.tan(52 * Math.PI / 180);   // Script_Physics: setMaxSlopeClimbAngle(52°)
 const CAPSULE_R = 0.35;                        // 路线净空半径（MakeCharacter 的 0.34 + 余量）
@@ -81,6 +83,34 @@ const Distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 const RouteLength = (route) => route.slice(1)
   .reduce((sum, p, i) => sum + Distance(route[i], p), 0);
 const report = {};
+
+// The wounded gunner must walk around the runtime supply collider from every
+// physically plausible side. This also samples the one-metre trench-to-step
+// rise; the open south detour must climb it as a slope, not a vertical lip.
+{
+  const spec=MISSION_SUPPLIES.find(entry=>entry.id==="Front"),size=MISSION_SUPPLY_COLLIDER;
+  const supply={id:"MissionSupplyFront",x:spec.x,z:spec.z,w:size.w,h:size.h,d:size.d,
+    y:Ground(spec.x,spec.z)+size.h/2};
+  for(const start of [
+    {id:"west",x:-3.0401633947848508,z:-123.90232699904317},
+    {id:"east",x:0,z:-123.9},
+    {id:"north",x:-2,z:-125.2},
+  ]){
+    const route=[start,...ZhouGunExitRoute(start,.34)];
+    assert.deepEqual(RouteClearance(route,[...Solids(),supply]),[],`${start.id} Zhou exit route is physically clear`);
+    let previous=Walkable(route[0].x,route[0].z);
+    for(let leg=1;leg<route.length;leg++){
+      const a=route[leg-1],b=route[leg],length=Distance(a,b),steps=Math.ceil(length/.2);
+      for(let i=1;i<=steps;i++){
+        const t=i/steps,y=Walkable(a.x+(b.x-a.x)*t,a.z+(b.z-a.z)*t);
+        assert.ok(y-previous<=TAN52*(length/steps)+.03,
+          `${start.id} Zhou exit climbs a passable slope (${previous.toFixed(2)} -> ${y.toFixed(2)})`);
+        previous=y;
+      }
+    }
+  }
+  console.log("ok wounded Zhou routes around the front supply and climbs the real south-side slope");
+}
 
 // ---------------------------------------------------------------------------
 // 1. 契约锚点站得住人

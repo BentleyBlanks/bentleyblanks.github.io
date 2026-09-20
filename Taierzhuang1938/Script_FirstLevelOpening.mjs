@@ -1,6 +1,7 @@
 import { OPENING as C } from "./Data_FirstLevelOpening.mjs";
 import { MISSION_TUNING as R, OPENING_PERCEPTION as P } from "./Data_Tuning_FirstLevel.mjs";
-import { MISSION_ANCHORS as A, MISSION_PLACEMENT as Place } from "./Data_FirstLevelMissionLayout.mjs";
+import { MISSION_ANCHORS as A, MISSION_PLACEMENT as Place, MISSION_SUPPLIES,
+  MISSION_SUPPLY_COLLIDER } from "./Data_FirstLevelMissionLayout.mjs";
 import { CLOSE_RANGE } from "./Data_Tuning_AiShooting.mjs";
 const Distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const Smooth=t=>{t=Math.max(0,Math.min(1,t));return t*t*(3-2*t)};
@@ -23,6 +24,40 @@ export function SampleOpeningPerception(elapsed){
     amount:Curve(P.intensity,age),focus:Curve(P.focus,age),
     pitch:Curve(P.pitch,age),roll:Curve(P.roll,age),
   };
+}
+
+const ZhouSupply=MISSION_SUPPLIES.find(spec=>spec.id==="Front");
+const SegmentHitsRect=(a,b,rect)=>{
+  let lo=0,hi=1;
+  for(const [origin,delta,min,max] of [[a.x,b.x-a.x,rect.minX,rect.maxX],[a.z,b.z-a.z,rect.minZ,rect.maxZ]]){
+    if(Math.abs(delta)<1e-9){if(origin>=min&&origin<=max)continue;return false;}
+    let enter=(min-origin)/delta,exit=(max-origin)/delta;
+    if(enter>exit)[enter,exit]=[exit,enter];
+    lo=Math.max(lo,enter);hi=Math.min(hi,exit);
+    if(lo>hi)return false;
+  }
+  return true;
+};
+/**
+ * Physical exit route around the front supply crate. The candidates cover a
+ * gunner displaced west, east, or already south of the crate; the shortest
+ * route whose every leg clears the real crouched capsule is selected.
+ */
+export function ZhouGunExitRoute(start,radius=.34){
+  const rest={...C.zhouRest};
+  if(!ZhouSupply)return [rest];
+  const halfW=MISSION_SUPPLY_COLLIDER.w/2+radius,halfD=MISSION_SUPPLY_COLLIDER.d/2+radius;
+  const rect={minX:ZhouSupply.x-halfW,maxX:ZhouSupply.x+halfW,
+    minZ:ZhouSupply.z-halfD,maxZ:ZhouSupply.z+halfD};
+  const [west,east]=C.zhouExitBypass.map(point=>({...point}));
+  const candidates=[[rest],[east,rest],[west,east,rest]];
+  const clear=route=>{
+    let from=start;
+    for(const to of route){if(SegmentHitsRect(from,to,rect))return false;from=to;}
+    return true;
+  };
+  const length=route=>{let total=0,from=start;for(const to of route){total+=Distance(from,to);from=to;}return total;};
+  return candidates.filter(clear).sort((a,b)=>length(a)-length(b))[0]||[west,east,rest];
 }
 
 // 2026.09.19 重构（docs/Data_FirstLevelRebuild20260919Contract.md §2）：
@@ -251,7 +286,13 @@ export class FirstLevelOpening {
     if(a.health>=C.zhouWoundThreshold)return;
     r.emplacement.NpcVacate(r.gunId,"wounded");
     a.scriptedNoncombatant=true;r.ai.SetStance(a,1,.3,true);
-    if(Distance(a.position,C.zhouRest)>C.zhouExitRadiusM){r.MoveActor(a,C.zhouRest,R.walkSpeedMps);return;}
+    if(!this.zhouExitRoute)this.zhouExitRoute=ZhouGunExitRoute(a.position,
+      a.childCapsules?.[1]?.radius||a.body?.radius||.34);
+    while(this.zhouExitRoute.length>1&&Distance(a.position,this.zhouExitRoute[0])<=C.zhouExitWaypointRadiusM)
+      this.zhouExitRoute.shift();
+    if(Distance(a.position,C.zhouRest)>C.zhouExitRadiusM){
+      r.MoveActor(a,this.zhouExitRoute[0]||C.zhouRest,R.walkSpeedMps);return;
+    }
     // The same narrative casualty continues on the existing litter. Switch
     // representation only at his observed position after the real hit and move.
     Object.assign(r.column.zhou,{x:a.position.x,z:a.position.z,health:Math.max(0,a.health),visible:true,state:"waiting",yaw:a.yaw});

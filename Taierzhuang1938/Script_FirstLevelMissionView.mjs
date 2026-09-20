@@ -8,7 +8,7 @@ import { CreateP012StretcherGeometry } from "./Script_FirstLevelP012CarryView.mj
 import { BuildSink } from "./Script_World.mjs";
 import { PlaceGeometry } from "./Script_Geo.mjs";
 import { ApplyShadowDepth, AttachShadowDepth } from "./Script_ShadowDepth.mjs";
-import { MISSION_PLACEMENT, MISSION_SUPPLIES } from "./Data_FirstLevelMissionLayout.mjs";
+import { MISSION_PLACEMENT, MISSION_SUPPLIES, MISSION_SUPPLY_COLLIDER } from "./Data_FirstLevelMissionLayout.mjs";
 import { Type89Damage } from "./Script_Type89Damage.mjs";
 export class FirstLevelMissionView {
   constructor({ scene, battlefield, physics, column, actorFactory, library, hud, vfx }) {
@@ -115,11 +115,12 @@ export class FirstLevelMissionView {
     const sink=new BuildSink();
     this.supplyMarkers=[];
     for(const spec of [...MISSION_SUPPLIES,{id:"Bundle",x:13,z:-118,supportHeight:.5}]){
+      const size=MISSION_SUPPLY_COLLIDER;
       const y=this.battlefield.GroundHeight(spec.x,spec.z)+(spec.supportHeight||0)+.25;
       const material=new THREE.MeshStandardMaterial({color:0x9b927b,roughness:.88,
         metalness:0,emissive:0xffeac8,emissiveIntensity:0});
-      const geometry=PlaceGeometry(new THREE.BoxGeometry(.96,.5,.64),{x:spec.x,y,z:spec.z});
-      const center=[spec.x,y,spec.z],half=[.48,.25,.32];
+      const geometry=PlaceGeometry(new THREE.BoxGeometry(size.w,size.h,size.d),{x:spec.x,y,z:spec.z});
+      const center=[spec.x,y,spec.z],half=[size.w/2,size.h/2,size.d/2];
       const collider={c:center,h:half,min:center.map((v,i)=>v-half[i]),max:center.map((v,i)=>v+half[i]),tag:"missionSupply",ry:0};
       this.physics.AddSolid(collider);
       this.battlefield.colliders.push(collider);

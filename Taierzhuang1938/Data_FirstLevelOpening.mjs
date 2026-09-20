@@ -35,6 +35,12 @@ export const OPENING = Object.freeze({
   frontPosts: [{x:-4,z:-124},{x:4,z:-122},{x:12,z:-124},{x:16,z:-124}],
   zhouGunSeat: {x:0,z:-127.4},
   zhouRest: {x:2.1,z:-124.6},
+  // The front supply crate sits between the firing step and the rest point.
+  // A wounded gunner can end up on either side of it, so the handover
+  // follows the open south edge of the traverse instead of cutting through
+  // the crate with one diagonal move.
+  zhouExitBypass: [{x:-3.8,z:-122.5},{x:1.2,z:-122.5}],
+  zhouExitWaypointRadiusM:.5,
   zhouWoundThreshold:95,
   zhouExitRadiusM:.65,
   zhouShell: {from:{x:18,z:-210},height:30,flight:1.8,radius:3,damage:55,offsetX:1.1,

@@ -823,6 +823,10 @@ export const MISSION_PLACEMENT = Object.freeze({
       { x: -154.6, z: 345.4 }],
   },
 });
+// The mission view and scripted routes share this physical footprint. Keeping
+// it here prevents a visible crate from gaining a different collision size in
+// the renderer and in route-clearance checks.
+export const MISSION_SUPPLY_COLLIDER = Object.freeze({w:.96,h:.5,d:.64});
 export const MISSION_SUPPLIES = Object.freeze([
   // 2026-09-15: the shelter corner is now a fight of its own, between the trench
   // and the front crates. Kept on the recess floor, clear of its entry lane and posts.

@@ -1,7 +1,7 @@
 import { MissionVoiceTimeline } from "./Data_FirstLevelMissionVoiceTiming.mjs";
 import { MISSION_CIVILIAN_AFTERMATH } from "./Data_FirstLevelMissionCivilianAftermath.mjs";
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
-import { FirstLevelOpening, OpeningRecoveryTime, SampleOpeningPerception } from "./Script_FirstLevelOpening.mjs";
+import { FirstLevelOpening, OpeningRecoveryTime, SampleOpeningPerception, ZhouGunExitRoute } from "./Script_FirstLevelOpening.mjs";
 import { MISSION_AFTERMATH, FRONT_BREACHES, FRONT_ASSAULT, FRONT_COVER, FRONT_FIELD_MEN, FRONT_RESERVES, FRONT_ASSAULT_STARTS, FrontAssaultLane, FrontReserveLane } from "./Data_FirstLevelMissionFront.mjs";
 import { COVER } from "./Data_Tuning_AiCover.mjs";
 import { STANCE } from "./Data_Tuning_Player.mjs";
@@ -19,7 +19,8 @@ import { BuildFirstLevelCheckpoint } from "./Script_FirstLevelMissionCheckpoint.
 import { FirstLevelMissionColumn, MissionRouteNextIndex, MissionCarryRoutePoint, MissionGuideSpeed, MissionGuideRoute, MissionSquadRoute, MissionSquadPace } from "./Script_FirstLevelMissionColumn.mjs";
 import { MISSION_STAGES, MISSION_TUNING as R, FIRST_LEVEL_MISSION_PHASE, MISSION_TACTICS, MISSION_ENCOUNTERS, MISSION_PURSUIT_ROUTE, MISSION_TRANSFER_THREATS } from "./Data_FirstLevelMission.mjs";
 import { MISSION_STAGE_ROUTES, MISSION_RAIL_BRIDGE } from "./Data_FirstLevelMissionTopology.mjs";
-import { MISSION_LAYOUT, MISSION_ROUTES, MISSION_ANCHORS as A, MISSION_PLACEMENT as P, MISSION_RAILWAY, MISSION_SUPPLIES } from "./Data_FirstLevelMissionLayout.mjs";
+import { MISSION_LAYOUT, MISSION_ROUTES, MISSION_ANCHORS as A, MISSION_PLACEMENT as P, MISSION_RAILWAY,
+  MISSION_SUPPLIES, MISSION_SUPPLY_COLLIDER } from "./Data_FirstLevelMissionLayout.mjs";
 import { MakeRailwayProfile } from "./Script_RoadPath.mjs";
 import { MISSION_TERRAIN, SampleMissionTerrain, MissionPathDistance } from "./Data_FirstLevelMissionTerrain.mjs";
 import { CreateP012Terrain } from "./Data_FirstLevelP012Terrain.mjs";
@@ -429,6 +430,28 @@ console.log("ok all mission gates require recorded gameplay facts and restore ex
   facts.clear();calls.length=0;opening.zhou.alive=false;opening.zhou.health=0;
   opening.UpdateZhou();
   assert.ok(facts.has("zhouGunKilled")&&!facts.has("zhouGunWounded")&&calls.includes("fail"),"actual death fails the mission instead of becoming a living litter");
+}
+{
+  const supply=MISSION_SUPPLIES.find(spec=>spec.id==="Front"),radius=.34;
+  const rect={minX:supply.x-MISSION_SUPPLY_COLLIDER.w/2-radius,maxX:supply.x+MISSION_SUPPLY_COLLIDER.w/2+radius,
+    minZ:supply.z-MISSION_SUPPLY_COLLIDER.d/2-radius,maxZ:supply.z+MISSION_SUPPLY_COLLIDER.d/2+radius};
+  const starts=[
+    {id:"west failure",x:-3.0401633947848508,z:-123.90232699904317},
+    {id:"east",x:0,z:-123.9},
+    {id:"north",x:-2,z:-125.2},
+  ];
+  for(const start of starts){
+    const route=ZhouGunExitRoute(start,radius),points=[start,...route];
+    assert.deepEqual(route.at(-1),OPENING.zhouRest,`${start.id} exit still ends at the authored rest point`);
+    for(let i=1;i<points.length;i++){
+      const a=points[i-1],b=points[i],length=Math.hypot(b.x-a.x,b.z-a.z);
+      for(let d=0;d<=length;d+=.05){
+        const t=length?d/length:0,x=a.x+(b.x-a.x)*t,z=a.z+(b.z-a.z)*t;
+        assert.ok(x<rect.minX||x>rect.maxX||z<rect.minZ||z>rect.maxZ,
+          `${start.id} exit clears the physical front supply crate at ${x.toFixed(2)},${z.toFixed(2)}`);
+      }
+    }
+  }
 }
 {
   const facts=new Set(['frontRifleDefense','rifleWithdrawalResolved']),shells=[];
