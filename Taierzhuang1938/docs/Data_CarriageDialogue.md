@@ -1,5 +1,7 @@
 # 车厢群体对白 · 2026-09-10
 
+> **历史版本。** 正式第一关已按 [2026-09-19 采用稿](Data_FirstLevelRebuildSource20260919.md) 改为掩蔽部开场；车厢对白、分食和军列部署不再运行。当前配音口径见 [2026-09-19 配音同步](Data_FirstLevelVoiceSync20260919.md)。
+
 当前版本已按 Notion 第一、第二阶段重录；见 [2026-09-14 配音同步](Data_FirstLevelVoiceSyncSeptember14.md)。下方为历史版本，不能用旧 cue 数量、台词或时序验收当前开场。
 
 ## 当前：车厢部署与近弹打断 · 2026-09-12
@@ -34,7 +36,7 @@
 
 ## 历史：长对白第一版
 
-本次只替换第一关 `TrainMeal`：Volcengine `seed-audio-1.0` 一次请求生成一条完整录音，88.842 秒、30 句、七个角色。台词与表演要求的唯一来源是 [Data_FirstLevelMissionDialogue.mjs](../Data_FirstLevelMissionDialogue.mjs)，成品为 [AudioVoice_FirstLevelTrainMeal.mp3](../Audio/FirstLevel/AudioVoice_FirstLevelTrainMeal.mp3)。炮击后的 `TrainShelling` 沿用现有录音。
+本次只替换第一关 `TrainMeal`：Volcengine `seed-audio-1.0` 一次请求生成一条完整录音，88.842 秒、30 句、七个角色。台词与表演要求的唯一来源是 [Data_FirstLevelMissionDialogue.mjs](../Data_FirstLevelMissionDialogue.mjs)，当时的成品 `AudioVoice_FirstLevelTrainMeal.mp3` 已随军列开场下线。炮击后的 `TrainShelling` 沿用当时录音。
 
 后排与靠窗士兵先自己讨水、留水，听到前排分肉才插话；前排把肉传过去后，靠窗的人接着帮忙找滚落的子弹。远处闷响引出猜测和追问，班长并不知道敌情，只让大家坐好。短暂停顿后继续递水、收脚和吃东西，保留人在不确定中维持日常的反应。两名新增说话身份来自现有乘客，不新增人物模型或动画资产。
 

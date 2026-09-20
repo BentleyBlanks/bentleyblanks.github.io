@@ -100,7 +100,7 @@ const report = {};
     assert.deepEqual(Solids("BunkerCollapsed").filter((box) => Hits(S[id].x, S[id].z, y, box, 0.34, 1.7))
       .map((b) => b.id), [], `${id} must be open ground before NightGateShown`);
   }
-  console.log("ok all 26 contract anchors stand in open space");
+  console.log(`ok all ${Object.keys(S).length} contract anchors stand in open space`);
 }
 
 // ---------------------------------------------------------------------------
@@ -363,7 +363,8 @@ const report = {};
   }
   const intact = Layout.gates.filter((gate) => gate.signal === RailBridge.signal);
   const wreck = Layout.gates.filter((gate) => gate.appearSignal === RailBridge.signal);
-  assert.ok(intact.length >= 3 && wreck.length >= 2, "destroying the bridge swaps whole pieces");
+  assert.equal(intact.length, 5, "the intact railway bridge has all five gated pieces");
+  assert.equal(wreck.length, 3, "the destroyed railway bridge has all three wreck pieces");
   assert.ok(intact.some((gate) => gate.walkableId === "RailBridgeDeck"),
     "the deck leaves walkableSurfaces when the bridge goes");
   // 炸后：河槽上没有任何别的可走面。

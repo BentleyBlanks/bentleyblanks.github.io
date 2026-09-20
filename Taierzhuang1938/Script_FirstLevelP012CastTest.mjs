@@ -5,9 +5,11 @@ import { COMPANION_CAST } from "./Script_Companion.mjs";
 import { T } from "./Script_Text.mjs";
 import { P012_COMPANION_CAST, SelectP012CompanionCast, SelectP012RecruitCast } from "./Data_FirstLevelP012Cast.mjs";
 
-const runtime = readFileSync(new URL("./Script_FirstLevelMissionRuntime.mjs", import.meta.url), "utf8");
-assert.match(runtime, /SelectP012RecruitCast\(originals.length\)/, "original unnamed passengers use the approved train rig");
-assert.match(runtime, /SelectP012RecruitCast\(slot\)/, "extra passengers use the approved train rig");
+const main = readFileSync(new URL("./Script_Main.mjs", import.meta.url), "utf8");
+assert.match(main, /SelectP012CompanionCast\(castId, identity\)/,
+  "current P012 named companions use the approved stable cast");
+assert.match(main, /SelectP012RecruitCast\(spec\.slot/,
+  "the P012 archive train fixture still uses the approved recruit cast");
 const ids = ["luo", "yaowa", "heyoutian", "liuwencai", "zhaodegui", "xiaoqin"];
 const manifest = JSON.parse(readFileSync(new URL("./Model/Character/Data_LugouCharacterManifest.json", import.meta.url), "utf8"));
 assert.deepEqual(Object.keys(P012_COMPANION_CAST), ids);

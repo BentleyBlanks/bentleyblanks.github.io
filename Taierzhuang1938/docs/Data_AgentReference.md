@@ -68,25 +68,97 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
 - 先读：`docs/Data_TengxianIntegration.md`（模块契约与推定值索引）。
 
 ### 第一关《往南的路》
-- `Data_FirstLevelMissionStages`：Notion 18 阶段目录；第 11–13 阶段采用原文最后的扩展修订。`Data_FirstLevelMission` / `Data_Tuning_FirstLevel` 保留 24 个执行步骤及通关状态的事实门、有限敌人、节奏和装备。
-- 调试选项可从主菜单、暂停菜单选择任一阶段并继续；agent 使用 `await window.Tengxian.Debug.FirstLevelJump(1)`（1–18 或目录 id），`Debug.FirstLevelStages()` 查询目录。状态中的 `phaseNumber/phaseId/phaseCount` 是剧情阶段，`stage` 是兼容原有工具的当前执行步骤。详见 [阶段跳转](Data_FirstLevelStageJump.md)。
-- `Data_FirstLevelMissionLayout` / `Terrain`：纯数据空间与共享高度场。室外地面不使用盒体；列车地板、台阶和桥面属于结构。
-- `Data_FirstLevelMissionFortifications` / `Script_FirstLevelMissionFortifications`：第一关专用地面工事，复用沙袋、桩网与木障碍，经 `BuildSink` 分区合批。史料、推定范围、布设与验证见 [工事布设](Data_FirstLevelFortifications.md)。
-- `Script_FirstLevelMissionRuntime` / `Flow` / `Column` / `View`：实际操作、阶段记录、20 副担架和装车/撤离。
-- `Data_FirstLevelMissionCrowd`：院落/转运区分散停靠点、错峰汇流和轻伤员等候区域。
-- `Data_FirstLevelMissionCivilianAftermath`：房屋周边成年平民遗体，按实际屋体、通行路线和地形筛选布点；复用男女平民模型、俯卧/仰卧定格与 `MissionAftermath` 实例化距离层，不加入 AI、碰撞或任务伤亡计数。`Script_FirstLevelMissionAftermathTest` 验真实模型净空、贴地、距离层、重建与六处截图。
-- `Data_FirstLevelMissionFront`：前沿增援、沿途火力、友军据点和战场遗体布局；`FRONT_ASSAULT` / `FrontAssaultLane` 是跃进冲击的跳线与落点几何（禁行列、增援落点）。`Script_FirstLevelMissionAftermath`：八种烘焙姿势按实例化三级距离层绘制（全模 / 5 cm / 14 cm 聚类），每帧自做视锥与距离压表，材质克隆自人物材质（`Script_Materials.CloneShadedMaterial`，别再与蒙皮网格共用同一材质对象，three 会每次切换 skinning/instancing 重算着色器参数；克隆体按 `Script_MaterialPatches.PatchesOf` 取同一份补丁列表重新 `ApplyPatches`，不是抄钩子——抄过来的 defines / SyncDefines 仍指向源材质，会出孪生程序）。距离与聚类粒度在 `Data_Tuning_FirstLevel.MISSION_PEOPLE_TUNING`。
-- 首战节奏（2026-09-11）：32 名有限敌军分为封锁、清沟、交通壕沿途火力、前沿主力和战车随行组；沿途火力在 Support 进入时投入，前沿主力在玩家距阵地小于 `frontEngageDistanceM` 时投入，避免沿途空场及慢走提前消耗主战。前沿步枪兵按 `FRONT_ASSAULT.lines` 跃进（`UpdateAssault`：冲—跪射—被压制卧倒回退—最后一线守 `assaultFinalHoldS` 后退回 `assaultRegroupLine` 再来），机枪手（`hold`）仍是固定火力点。`waveBudget` 为零，不补兵；遭遇由 `spawnQueue` 每帧按 `spawnPerFrame` 放置。`Script_FirstLevelFrontPresenceTest` 验慢速接近时的有限兵力、实际沿途开火和返回触发区不复活敌人。
-- 帧取证：`node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --label=<名字>`（车厢 / 前沿朝北 / 前沿朝东三机位的 CPU 分桶、GPU 分段、GC、draw call 与日军位移），结果落 `_shots/FirstLevelFrame/`；`Debug.FirstLevelMissionRuntime()` 直接给运行时对象。2026-09-08 加了五个模式：`--strict`（§13.1 同口径，逐 pass GPU/submit/draw 归账 + `--ablate=` 配对消融 + `--root=` 服务另一棵检出）、`--counts`（只数不计时）、`--cpuprofile`（CDP 采样）、`--live`（真 rAF 45 s 看自动降档落到第几级）、`--shot` / `--diff=a,b`（定帧出图 + 逐像素比对，带 8×6 粗网格定位）。账与结论在 [渲染管线](Data_TechRenderPipeline.md) §13.9。
-- `Script_FirstLevelMissionPeople`：真实担架员/轻伤员角色、抬运握持校正、停步接地、警戒观察与按距离降低远景动画频率。
-- `Script_ActorStandIdle` / `Data_Tuning_ActorIdle`：站住的人身上的**程序化待机叠加层**。中性站姿待机 clip 尚未交付，`Script_FirstLevelP012CastAppearance.InstallP012ActorMotion` 把站定的人的 clip 定格（`timeScale=0`，AdvanceFire 定在 `advanceFireHold`＝clip 后段站定那一截，AttackCommand 定在 25%），否则「上前射击」会在原地循环成踏步；定格之后由这一层叠呼吸、重心倒换与扫视，两条腿用两骨 IK 钉在 clip 摆好的落脚点上，脚不滑。每帧先 `Restore()` 再让 mixer 采样，FK 不累积。装在第一关（`?whitebox=p012`）每个 AI 士兵身上，敌我同享；担架员（`carryRole`）、白刃、开火、卧倒/蹲、车厢生活姿势期间让开。真正的待机 clip 到位后连同 `rate=0` 一起撤，需求见 [P012 动作需求](Data_FirstLevelP012AnimationNeeds.md)。验收在 `Script_FirstLevelP012AnimationTest.mjs`（头/胸峰峰值 > 2 cm、双脚 < 5 mm、定格帧脚踝离根 < 0.25 m）。
-- `Script_FirstLevelTrainAnimation` / `MissionTrainLife` / `MissionTrain`：四型号原骨架侧凳支撑、扶腿起身、生活手势和物理队列衔接。库在 `Animation/FirstLevelTrain`，接入门禁为 `Script_FirstLevelTrainAnimationTest.mjs`；其余动作和缺口见 [动画进度](Data_FirstLevelMissionAnimationProgress.md)。
-- `Data_FirstLevelMissionDialogue` / `Script_FirstLevelMissionVoice`：整段连续对白。`Script_SeedAudioFirstLevelBake.mjs` 仅从环境变量取密钥，每段一个请求、一个音频文件；`--dry` 审核请求，`Script_FirstLevelMissionTest.mjs --audio` 验实际资产。
-- 班长面部蒙皮与语音节奏由 `Script_CharacterFacialAnimation` / `Script_SpeechEnvelope` 接入，使用独立 NRA05 面部模型与原音轨播放时钟；资产、说话人隔离及验收见 [面部对白说明](Data_CharacterSpeech.md)。
-- 当前入口直接覆盖 `?whitebox=p012`。`p012-archive` 只供旧模型、调试与共享组件回归，不作为新版验收。
-- 本地通关：`node Taierzhuang1938/Script_FirstLevelMissionBrowserTest.mjs --campaign`。截图、过程 JSON 留在忽略目录 `_shots/FirstLevelMission`。
-- `Script_FirstLevelMissionPresentationTest.mjs`：独立夹具验证抬运与停步握持、双脚接地、持续警戒走动、右键射击、机枪后坐及土坡爆炸遮挡；不能替代真实通关。
-- 来源与逐项验收见 [Data_FirstLevelRebuildAcceptance.md](Data_FirstLevelRebuildAcceptance.md)。
+
+需求来源是 Notion `2026.09.19` 采用稿（[转录](Data_FirstLevelRebuildSource20260919.md)），跨包接口冻结在
+[分包契约](Data_FirstLevelRebuild20260919Contract.md)。范围决定、逐阶段通过条件与未做项见
+[重构验收](Data_FirstLevelRebuildAcceptance.md)；空间坐标见[空间拓扑](Data_FirstLevelTopology20260919.md)；
+配音见[配音同步](Data_FirstLevelVoiceSync20260919.md)。**旧的军列开场、屋内伏击、2026.09.14 拓扑都已下线**，
+相关旧文档只作历史查证。
+
+**编排层（表，不是脚本）**
+
+- `Data_FirstLevelMissionStages`：18 个公开阶段目录。`Data_FirstLevelMission` / `Data_FirstLevelMissionGates`：
+  27 个内部执行步骤、每步的 requirements、`MISSION_FACT_GATES`（距离门一律 `GateNear`）、遭遇组与激活条件、
+  `MISSION_SCENARIO_SIGNALS`。运行时只读表，只许一处按表 `SpawnEncounter`。门禁：`Script_MissionGatesTest`。
+- `Data_Tuning_FirstLevel` 是数值总入口，按段分表：`Data_Tuning_FirstLevelFront` / `…Mid` / `…End`
+  （Mid 那一份**不从入口 re-export** —— 会成求值期的环，需要它的模块直接 import）。
+- 阶段跳转：`await window.Tengxian.Debug.FirstLevelJump(1)`（1–18 或目录 id），`Debug.FirstLevelStages()` 查目录。
+  状态里的 `phaseNumber/phaseId/phaseCount` 是公开阶段，`stage` 是当前内部步骤。详见 [阶段跳转](Data_FirstLevelStageJump.md)。
+
+**空间（纯数据）**
+
+- `Data_FirstLevelMissionTopology`：四区锚点与路线（`MISSION_STAGE_ANCHORS` / `MISSION_STAGE_ROUTES` /
+  `MISSION_REAR_*`）、北沙河 `MISSION_NORTH_RIVER`（含浅滩与断面函数）、路桥 `MISSION_SOUTH_BRIDGE`、
+  铁路桥 `MISSION_RAIL_BRIDGE`、接收院 `MISSION_RECEPTION_SPACE`、15A/B/C 走廊。
+- `Data_FirstLevelMissionLayout`：体块、gates、`MISSION_SCENARIO` 三态（掩蔽部完好/坍塌/北门夜景）、
+  `MISSION_ANCHORS`、`MISSION_ROUTES`、`MISSION_PLACEMENT`、`bounds`。**scenario 体块不在 `blocks` 里，
+  净空检查要分态单独扫。** `Data_FirstLevelMissionTerrain` 是共享高度场；室外地面不用盒体，桥面属于结构。
+- `Data_FirstLevelMissionTrenches` + `Script_TrenchPlan` / `Script_TrenchSpline`：样条壕沟（见 [壕沟样条 PCG](Data_TrenchSpline.md)）。
+  `Data_FirstLevelMissionFortifications` / `Script_FirstLevelMissionFortifications`：地面工事，经 `BuildSink` 分区合批
+  （见 [工事布设](Data_FirstLevelFortifications.md)）。
+- 门禁：`Script_FirstLevelSpaceTest`（锚点/路线净空、人缝、夹道、桥、河、夜景、军列下线、bounds）、
+  `Script_FirstLevelMissionTopologyTest`（分区单调、锚点归区、走廊）、`…TopologyBrowserTest`（真实物理通行）。
+
+**运行时与三个玩法包**
+
+- `Script_FirstLevelMissionRuntime` / `Flow` / `Checkpoint` / `StageJump` / `Column` / `View` / `People` /
+  `Transition` / `LeaderGuide`：装配、事实记录、担架队与车、实例化人群。运行时对各玩法包**只留薄钩子**
+  （自己步骤的 `Enter` 分支与 `Update` 段那几行）。
+- 阶段 1–7（[说明](Data_FirstLevelFront20260919.md)）：`Script_FirstLevelBunker`（01/02 掩蔽部整拍）、
+  `Script_FirstLevelCollection`（背坡集结处、借火戏、上担架）、`Script_FirstLevelFrontShow`（总线）、
+  `Data_Tuning_FirstLevelFront`、`Script_FirstLevelFrontTest`、`Script_FirstLevelCampaignFront`。
+- 阶段 8–14（[说明](Data_FirstLevelMid20260919.md)）：`Script_FirstLevelVillageBlock`（08/09/10）、
+  `Script_FirstLevelTransferCart`（11–14 的分流、装载额度、上车与卸担架）、`Data_Tuning_FirstLevelMid`、
+  `Script_FirstLevelMidTest`、`Script_FirstLevelCampaignMid`。
+- 阶段 15–18（[说明](Data_FirstLevelEnd20260919.md)）：`Script_FirstLevelEndCast`（公共真人/布景层，零 three）、
+  `Script_FirstLevelQuietMarch`（15A/15B）、`Script_FirstLevelReception`（15C/16/17）、`Script_FirstLevelBridge`（18 桥头）、
+  `Script_FirstLevelNightGate`（18 夜入北门）、`Script_FirstLevelNightLights`（夜景点光，唯一带 three 的一只）、
+  `Data_Tuning_FirstLevelEnd`、`Script_FirstLevelEndTest`、`Script_FirstLevelCampaignEnd`。
+- 驾驶脚本公共层 `Script_FirstLevelCampaignKit`：`ParseCampaignArgs` / `OpenCampaign` / `CloseCampaign` /
+  `CaptureFailure` / `CheckVoiceAssets` / `InstallInputDriver` / `CampaignActions(ctx)`（`JumpStage` `Capture`
+  `CaptureFocus` `WaitOutCutscene` `Route` `Interact` `RetryCampaign` `WaitStage`）。`--stage-from` 只收 8 / 11 / 15 / 18，
+  `--stage-to` 只收 7 / 14 / 18。
+
+**人群、遗体与外观**
+
+- `Script_FirstLevelMissionPeople`：担架员/伤员角色、抬运握持校正、停步接地、警戒观察、按距离降动画频率。
+  `MissionTrainLifePose`（在 `Script_FirstLevelMissionTrainLife`，名字是军列时代的遗留）现在是全项目共用的
+  程序化姿态层，`ActorStandIdle` / `MissionAftermath` / `NpcGuideGesture` / `P012CastAppearance` 都在用。
+- `Data_FirstLevelMissionFront`：前沿增援、沿途火力、友军据点与战场遗体布局；`FRONT_ASSAULT` / `FrontAssaultLane`
+  是跃进冲击的跳线与落点几何。`Script_FirstLevelMissionAftermath`：八种烘焙姿势按实例化三级距离层绘制
+  （全模 / 5 cm / 14 cm 聚类），材质克隆自人物材质（`Script_Materials.CloneShadedMaterial` —— 别与蒙皮网格共用
+  同一材质对象，three 会每次切换 skinning/instancing 重算着色器参数；克隆体按 `Script_MaterialPatches.PatchesOf`
+  重新 `ApplyPatches`，抄钩子会出孪生程序）。距离与聚类粒度在 `Data_Tuning_FirstLevel.MISSION_PEOPLE_TUNING`。
+- `Data_FirstLevelMissionCrowd`：院落/转运区分散停靠点、错峰汇流与轻伤员等候区。
+  `Data_FirstLevelMissionCivilianAftermath`：房屋周边平民遗体，不进 AI、碰撞与伤亡计数，
+  验收 `Script_FirstLevelMissionAftermathTest`。
+- `Script_ActorStandIdle` / `Data_Tuning_ActorIdle`：站住的人身上的程序化待机叠加层（呼吸、重心倒换、扫视，
+  两骨 IK 钉脚）。中性站姿 clip 尚未交付，`Script_FirstLevelP012CastAppearance.InstallP012ActorMotion` 先把站定的人
+  的 clip 定格。需求见 [P012 动作需求](Data_FirstLevelP012AnimationNeeds.md)，验收
+  `Script_FirstLevelP012AnimationTest`。
+
+**对白与配音**
+
+- `Data_FirstLevelMissionDialogue` 是 cue id 的唯一来源；`Data_FirstLevelJapaneseSpeech` 存日语假名（不进字体字表）；
+  `Data_FirstLevelMissionVoiceTiming` 存具名事件；`Data_FirstLevelMissionVoiceAlignment` / `…GuideVoiceAlignment`
+  由强制对齐脚本写回。播放器 `Script_FirstLevelMissionVoice` 每句发一条 `Line` 事件，玩法包靠它把动作对到台词上。
+- 烘焙 `Script_SeedAudioFirstLevelBake`（密钥只从 `VOLCENGINE_API_KEY` 读，每段一个请求一条 mp3，
+  `--dry` 审清单、`--prune` 删下线 cue）；对齐 `Script_FirstLevelVoiceAlign.py`。
+  门禁 `Script_FirstLevelVoiceTest`（加 `--audio` 验实际资产）。
+- 班长面部蒙皮与语音节奏走 `Script_CharacterFacialAnimation` / `Script_SpeechEnvelope`，见 [面部对白说明](Data_CharacterSpeech.md)。
+
+**帧取证与入口**
+
+- `node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --label=<名字>`：三机位（`bunker` 掩蔽部 / `front` 前沿朝北 /
+  `frontEast` 同位朝东）的 CPU 分桶、GPU 分段、GC、draw call 与日军位移，结果落 `_shots/FirstLevelFrame/`。
+  五个模式：`--strict`、`--counts`、`--cpuprofile`、`--live`、`--shot` / `--diff=a,b`。机位与 `Script_ProfileCli`
+  共用 `Script_FrameProbeViews`。账与结论在 [渲染管线](Data_TechRenderPipeline.md) §13.9。
+  `Debug.FirstLevelMissionRuntime()` 直接给运行时对象。
+- 当前入口直接覆盖 `?whitebox=p012`；`p012-archive` 只供旧模型、调试与共享组件回归，不作为新版验收。
+- 本地通关：`node Taierzhuang1938/Script_FirstLevelMissionBrowserTest.mjs --campaign`（分段加
+  `--stage-from=8|11|15|18 --stage-jumps` 或 `--stage-to=7`）。截图与过程 JSON 留在忽略目录 `_shots/`。
+- `Script_FirstLevelMissionPresentationTest`：独立夹具验抬运与停步握持、双脚接地、警戒走动、右键射击、
+  机枪后坐与土坡爆炸遮挡；不能替代真实通关。
 
 ### 渲染管线 / GI / 灯光天空
 
@@ -456,10 +528,10 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
   采样按「过场时间 − t0」定位，拖时间轴/跳过/补卡都确定性一致；未知 id 警告一次后退回 POSE_CLIPS。
   口径在 `docs/Data_CutsceneRedo.md` §1.3，烘焙脚本 `_import/Script_MachineGunCaptivesBake.py`，
   门禁 `Script_MachineGunCaptivesAnimationTest.mjs`，资产说明 `Animation/MachineGunCaptives/Data_MachineGunCaptivesAnimation.md`。
-- 第一关 04 机枪点位的关中过场 `CS_MachineGunCaptives`（`Data_CutsceneMachineGunCaptives.mjs`）：
-  触发在 `Script_FirstLevelMissionRuntime.UpdateCaptivesCutscene`，半径在
-  `Data_Tuning_FirstLevel.captivesCutsceneRadiusM`，回归口 `Script_FirstLevelMachineGunCutsceneTest.mjs`；
-  口径 [docs/Data_MachineGunCaptivesCutscene.md](Data_MachineGunCaptivesCutscene.md)。
+- 关中过场《空地上的三个人》`CS_MachineGunCaptives`（`Data_CutsceneMachineGunCaptives.mjs`）：
+  **2026-09-19 起任务不再触发它**（主题由 01 掩蔽部门外那一拍承担），资产、数据与过场自身的回归全保留。
+  回归口 `Script_FirstLevelMachineGunCutsceneTest.mjs`（断言任务不触发 + 过场自身仍可直接播）与
+  `Script_MachineGunCutsceneAudioTest.mjs`；口径 [docs/Data_MachineGunCaptivesCutscene.md](Data_MachineGunCaptivesCutscene.md)。
   出图白盒关的过场用 `Script_CutsceneShot.mjs --whitebox=p012`（或数据里的 `shotWhitebox`）。
 - `Script_Story.mjs` —— 保留章节目标、台词和分镜的派发接口；当前第一关任务由 `FirstLevelMission` 系列推进，旧章节与归档 P012 按各自入口保留共享组件回归。史实注记卡 `Data_History.mjs`，
   编剧红线在 `Data_Script.mjs` 头注与 `docs/Data_HistoryQuotes.md`。先读 `docs/Data_CutsceneRedo.md`。

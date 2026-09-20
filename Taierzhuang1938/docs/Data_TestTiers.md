@@ -12,7 +12,7 @@
 3. **full**：完整 Tier 0 + 命中领域，供共享底座、集成批和终验；
 4. **Tier 2**：性能实测与出图仍是低频人工审查，不由 `--changed` 自动执行。
 
-旧七章整局通关测试 `Script_PlayTest.mjs` 已删除。当前正片是新版第一关《往南的路》（`?whitebox=p012`），由 `FirstLevelMissionTest` 与 `FirstLevelMissionBrowserTest --campaign` 验证；旧 P0/P1/P2 浏览器测试只覆盖 `p012-archive`，不能替代新版通关。
+旧七章整局通关测试 `Script_PlayTest.mjs` 已删除。当前正片是第一关《往南的路》（`?whitebox=p012`，2026-09-19 采用稿），由 `FirstLevelMissionTest` 与 `FirstLevelMissionBrowserTest --campaign` 验证，三段各有自己的纯 Node 门禁（`FirstLevelFrontTest` / `FirstLevelMidTest` / `FirstLevelEndTest`）；旧 P0/P1/P2 浏览器测试只覆盖 `p012-archive`，不能替代新版通关。
 跨模块安全网由 BootTest、当前任务浏览器验收及领域专项承担，领域专项仍负责深度，
 例如伤害口径重放、整墙碰撞扫掠、碰撞盒与几何对账、AI 决策和编辑器数据契约。
 
@@ -105,7 +105,8 @@ npm 根入口也已拆档：`npm test` 只调度 Git 改动命中的游戏项目
 
 | 领域 | 自动探针 |
 |---|---|
-| firstLevel | FirstLevelMissionTest / FirstLevelMissionBrowserTest（`--campaign`；quick 只跑纯 Node，prepush 包含浏览器） |
+| firstLevel | 纯 Node：FirstLevelMissionTest、MissionGatesTest、FirstLevelSpaceTest、FirstLevelMissionTopologyTest、FirstLevelFrontTest（1–7）、FirstLevelMidTest（8–14）、FirstLevelEndTest（15–18）、FirstLevelVoiceTest、FirstLevelLeaderGuideTest、MissionOrchestrationFilterTest。浏览器（prepush）：FirstLevelMissionBrowserTest（`--campaign`，分段 `--stage-from=8\|11\|15\|18 --stage-jumps` / `--stage-to=7`）、FirstLevelMissionStageJumpTest、FirstLevelMachineGunTest、FirstLevelMachineGunCutsceneTest、FirstLevelFrontPresenceTest、FirstLevelFrontRouteBrowserTest、FirstLevelCasualtyBrowserTest、FirstLevelLeaderGuideBrowserTest、CarriagePropVelocityTest |
+| firstLevelTail | 两个分段浏览器夹具：FirstLevelMissionStageRegroupTest（`--stage-from=15`）、FirstLevelMissionStageTailTest（`--stage-from=18`） |
 | terrain | HeightmapVerify → JieheTerrain → TengxianLayout → Physics → Jump → Destruction |
 | physics | Physics → Collider → Jump → Destruction → FractureBake |
 | combat | Damage → GunFeel → FixedCenterAim → ReticleCalibration → SprintCrosshair → SprintViewmodel → FpsArm → SprintMelee → Bayonet → Range → MeleeQte |
@@ -145,7 +146,7 @@ npm 根入口也已拆档：`npm test` 只调度 Git 改动命中的游戏项目
 单跑排障直接 `node Taierzhuang1938/Script_<名字>.mjs`；`SamplerBudgetTest` 最贵，
 只有碰材质补丁 / 新增采样器时才必须跑。
 
-新版第一关的配音完成验收另加 `node Taierzhuang1938/Script_FirstLevelMissionTest.mjs --audio` 与 `node Taierzhuang1938/Script_FirstLevelMissionBrowserTest.mjs --audio --campaign`。默认套件通过不代表配音完成；来源与未完成项见 [重构验收](Data_FirstLevelRebuildAcceptance.md)。仅在声音资产或相应完成声明涉及本次任务时追加严格门禁。
+新版第一关的配音完成验收另加 `node Taierzhuang1938/Script_FirstLevelVoiceTest.mjs --audio`、`node Taierzhuang1938/Script_FirstLevelMissionTest.mjs --audio` 与 `node Taierzhuang1938/Script_FirstLevelMissionBrowserTest.mjs --audio --campaign`。默认套件通过不代表配音完成；来源与未完成项见 [重构验收](Data_FirstLevelRebuildAcceptance.md)。仅在声音资产或相应完成声明涉及本次任务时追加严格门禁。
 
 ## 六、Tier 2 —— 低频人工审查
 

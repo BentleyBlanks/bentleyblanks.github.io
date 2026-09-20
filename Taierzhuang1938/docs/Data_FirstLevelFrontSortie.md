@@ -1,5 +1,7 @@
 # 第一关前沿出击与护送转场（2026-09-14）
 
+> **历史版本。** 2026-09-19 采用稿已经下线 04 任务中过场和 06→07 黑屏传送，并重写 01–07。当前口径见 [阶段 1–7 玩法包](Data_FirstLevelFront20260919.md)；本页保留旧修订过程，不再给出现行命令。
+
 来源：[Notion 空间、流程拓扑图](https://app.notion.com/p/3da60335331c80e49763cf5c2e2df8b5)，读取页面更新时间 2026-09-14 13:38:54 UTC；用户随后在本任务给出的文字和红色批注覆盖该页旧表中的 04 强制机枪及 07 最低 75 秒南行。Notion 原文保持只读。
 
 ## 当前行为
@@ -26,11 +28,10 @@
 
 ## 验证入口与证据
 
-- `node Taierzhuang1938/Script_FirstLevelFrontRouteBrowserTest.mjs`：1280×720；双向真实胶囊通行、两处站／蹲／卧通道、跳过路线的反例、未用机枪的战斗事实、补给兵及班长职责、06→07→村口的黑屏和伤情守恒。战斗事实与路线检查使用局部运行时夹具，不冒充全关正常输入通关。
+- `node Taierzhuang1938/Script_FirstLevelFrontRouteBrowserTest.mjs`：当时的 1280×720 旧版验证；其中 06→07 黑屏口径已经作废，不能替代当前 07 真实南行。
 - 该专项同时驱动罗班长真实的 `Think`／`Act`、任务路线和 Rapier 胶囊，逐点检查补给屋去程与返程，持续注入入口受火通知，检查两处通道双向的真实胶囊高度、强制起身请求、等候／追赶与离开通道后的约束释放。仅玩家的跟随位置和受火通知由夹具提供，不摆放或瞬移班长；回执为 `_shots/FrontSortie/Data_LeaderRoute.json`。
 - `node Taierzhuang1938/Script_FirstLevelMissionTest.mjs`：既有全部任务事实、地形、友军／日军通行、担架、字幕和存档检查。
-- `node Taierzhuang1938/Script_FirstLevelMissionBrowserTest.mjs --campaign --through-south --allow-checkpoint-retry`：从乘车到村口的正常输入验证；完整后半关可去掉 `--through-south`。
-- `node Taierzhuang1938/Script_FirstLevelMissionBrowserTest.mjs --campaign --sortie-fixture --through-south`：隔离 05，初始化时清除此前前沿敌军；新侧沟敌军和战车保持实战，之后以正常输入领取、投掷并自然转场。该夹具不作为从开场连续通关的证据。
+- 旧 `--through-south` 与 `--sortie-fixture` 已下线。当前 01–07 用 `node Taierzhuang1938/Script_FirstLevelMissionBrowserTest.mjs --campaign --stage-to=7`；定向跳转只用于排障，不替代正常整关证据。
 - `node Taierzhuang1938/Script_TestRunner.mjs --profile=quick --changed=origin/master`：按改动选测。
 
 本地截图和夹具回执在 `_shots/FrontSortie`，不提交截图。完成的验证结果在交付时据实际运行记录说明，未完成的正常输入检查不记为通过。

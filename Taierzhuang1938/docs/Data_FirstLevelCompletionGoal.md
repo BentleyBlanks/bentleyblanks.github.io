@@ -1,5 +1,7 @@
 # 第一关完整白盒 Goal
 
+> **历史版本。** 本页的军列开场、25 个运行阶段和旧关尾已被 [2026-09-19 采用稿](Data_FirstLevelRebuildSource20260919.md) 取代。当前完成条件与未完成项见 [重构验收](Data_FirstLevelRebuildAcceptance.md)。
+
 按[当前第一关设计](https://app.notion.com/p/3d360335331c81ea86f6f637ab92327c)实施。正式入口为 `?whitebox=p012`。按用户补充，Notion 仅作需求来源，不继续写入。
 
 ## 达成条件

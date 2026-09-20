@@ -1,5 +1,7 @@
 # 第一关《往南的路》全部人物动作／动画接力需求
 
+> **2026-09-19 范围更新。** 军列车厢、座椅、腊肉交接和屋内固定伏击拍已经下线；相关资产与旧需求保留作历史资料，不再作为正式第一关的缺口。当前白盒用简化姿态完成流程。后续若进入人物动画制作，优先需求是：01 门外行刑与掀木架救援、06 借火、12 上车、13 卸回担架、16 过门槛与放担架、18 抬重武器过桥与爆破人员撤出、夜间搬运。当前任务不制作这些新动画。
+
 2026-09-12 当前开场：三车新兵为 **12 / 16 / 12，共 40 人，另有罗班长，仍是同一批 41 NPC**。三车长凳全部移除，普通乘客使用靠墙站立／蹲姿循环，幺娃递食与班长安排任务时保留过道空间。刘文财、何有田拌嘴与班长下车安排同期播放；密集来火时全体先蹲下，近炮随后打断安抚，班长先撑起失败、踉跄站稳，再伸手扶顺子。
 
 本轮 [FirstLevelCarriage 库](../Animation/FirstLevelCarriage/Data_FirstLevelCarriageAnimation.json)由 BlenderMCP 在获准的 NRA02／NRA05 原骨架制作 **10 种动作、13 个分型号片段**：两种墙边 idle、突然蹲避、刘／何说话、幺娃惊呼、班长交代／蹲姿安抚／失败起身／扶起。已接入当前车厢与对白事件；旧 `FirstLevelTrain` 坐凳库保留资产与保真门禁，不再驱动当前乘车姿态。本轮作者曲线不是视频恢复结果，未据此补报原片／raw／模型三栏视频验收；口型、精细指握、逐阶下车及其他阶段未交付的专用表演仍保留缺口。新动作接入不等于完整第一关或下方 48 项已全部验收。
@@ -155,7 +157,7 @@ TrainSupport V1 插值失败保留在历史，V2 对应审阅 V4。r11 接入冻
 
 - [正式步兵库](../Model/Character/Data_InfantryAnimations.json)：两军 01–04 八份动画 GLB、五种正式动作；[InfantryAnimation](../Script_InfantryAnimation.mjs)负责衔接，复用游戏原网格。
 - 原 GLB 的 RifleIdle 实际单膝据枪，LeanWallSitPeek 实际地面坐姿；名字不等于适用。CarryStretcherFront／Rear、WoundedLimp 有旧素材，但接触和过渡仍须复核。[背枪跑资产](../Animation/BackRifleRun/Animation_LugouNraBackRifleRun.glb)已有消费方，不覆盖成未经审阅的本地版本。
-- [Train](../Script_FirstLevelMissionTrain.mjs)拥有墙边站／蹲、来火蹲避、起身等待与实体队列；[CarriageAnimation](../Script_FirstLevelCarriageAnimation.mjs)采样 [FirstLevelCarriage 原骨架曲线库](../Animation/FirstLevelCarriage/Data_FirstLevelCarriageAnimation.json)，NRA02 六片、NRA05 七片，共 10 类型／13 片段。[TrainLife](../Script_FirstLevelMissionTrainLife.mjs)选择 idle／对白／独立救援动作，处理可恢复的墙面视觉偏移，不再叠旧生活 FK；[CastAppearance](../Script_FirstLevelP012CastAppearance.mjs)包裹 mixer。每帧先还原 position／quaternion／scale，再采样；真实行走时释放全身 idle。旧 [TrainAnimation](../Script_FirstLevelTrainAnimation.mjs)与[侧凳库](../Animation/FirstLevelTrain/Data_FirstLevelTrainAnimation.json)仅保留历史资产门禁。
+- 历史 `Script_FirstLevelMissionTrain` 拥有墙边站／蹲、来火蹲避、起身等待与实体队列；历史 `Script_FirstLevelCarriageAnimation` 采样 [FirstLevelCarriage 原骨架曲线库](../Animation/FirstLevelCarriage/Data_FirstLevelCarriageAnimation.json)，NRA02 六片、NRA05 七片，共 10 类型／13 片段。[TrainLife](../Script_FirstLevelMissionTrainLife.mjs)选择 idle／对白／独立救援动作，处理可恢复的墙面视觉偏移，不再叠旧生活 FK；[CastAppearance](../Script_FirstLevelP012CastAppearance.mjs)包裹 mixer。每帧先还原 position／quaternion／scale，再采样；真实行走时释放全身 idle。旧 `Script_FirstLevelTrainAnimation` 已删除，[侧凳库](../Animation/FirstLevelTrain/Data_FirstLevelTrainAnimation.json)仅保留历史资产门禁。
 - missionTrainLife 的 posture／basePosture／action／actionSeconds／dialogueAction／phase／weight／brace／yaw 驱动当前姿态，seated 恒为 false；animationPending 明确表示资产未就绪。独立 missionCarriageAction 由 [Opening](../Script_FirstLevelOpening.mjs)绑定班长失败起身／扶起，即使车厢 idle 已停也采样，世界位置与任务事实仍归 Opening。missionTrainLifeActive 同时影响[背枪挂接](../Script_FirstLevelP012BackRifle.mjs)和[View 手中道具](../Script_FirstLevelMissionView.mjs)；不能替换姿态后把枪和食物一并弄丢，乘车局部速度排除整车平移。
 - [Column](../Script_FirstLevelMissionColumn.mjs)是患者身份、抬手健康、队列装车、补位、撤离事实来源。View 里大量患者与医护是实例化白盒，需要骨架适配层；仅导出 GLB 不算已接上。
 - 当前白盒前后抬手距担架中心各 1.6 m，床面显示高度随状态取 0.82／0.22／1.2 m，**是占位数值，不是最终握点标准**。测量[真实担架几何](../Script_FirstLevelP012CarryView.mjs)、[Carry](../Script_Carry.mjs)和原骨架后统一适配，不照抄旧文档 2.4 m 身体间距。

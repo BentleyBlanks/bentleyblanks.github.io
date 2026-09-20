@@ -1,6 +1,209 @@
 # 第一关重构验收
 
-## 2026-09-15 掩蔽处折角实际来敌
+## 2026-09-19 采用稿重构
+
+需求来源：Notion `2026.09.19` 采用稿（[转录](Data_FirstLevelRebuildSource20260919.md)，台词一字不改）。
+跨包接口冻结在[分包契约](Data_FirstLevelRebuild20260919Contract.md)。
+本节是当前口径；下面「历史版本」那一整段讲的是已经下线的军列开场。
+
+### 范围决定
+
+- **入口不变**：`?whitebox=p012`（`fullMission`）。`?whitebox=p012-archive` 的旧 P0–P2 夹具、
+  `Script_FirstLevelP012*` / `Data_FirstLevelP012*` / `Data_Text_P012` / `Data_Tuning_P012` 本轮一条没动。
+- **18 个公开阶段、28 个内部步骤**（调试菜单仍是 18 项；第 15 阶段含 `Regroup` / `WallPath` / `ReceptionGate` 三个内部步骤）。
+  下线的旧步骤：`Train` `Unloading` `TrenchEntry` `Shelter` `RetreatFirst` `RetreatWall` `RetreatYard`
+  `Reception` `FinalCarry` `FinalDefense` `Exit`。
+- **开场换成掩蔽部**：黑屏对白被近爆打断 → 受困（控制接管 `trapped`）→ 透过前门低处破口看见门外
+  两名失去抵抗能力的川军被刺杀 → 何有田从后侧开火、罗班长掀木架救人。军列、卸载场、车厢生活、
+  掩蔽处折角来敌那一整套都下线了。
+- **通过条件一律挂在「真的发生了」上**：人真的走到、车真的开走、敌人真的被打掉、伤员真的进院、
+  尾队真的过桥。不许用计时器顶替。控制接管保留 `rescue` `dive` `death`，新增 `trapped` `cartRide`
+  `nightTransition`，下线 `derail` `southTransition`；`BeginControl` 的释放分支遇到未知 kind 必须抛错，
+  不许兜底当成 death。
+- **空间分四区，Z 单调南行**：A(−220…−96) → B(−30…46) → C(86…145) → 北沙河(z≈153) → D(165…252)，
+  18 是唯一一次回头向北。新建掩蔽部（完好/坍塌两态）、背坡伤员集结处、主街倒墙＋横车与东巷窗口、
+  内院出口短巷、侧巷、15B 靠院墙夹道、接收院院门与厢房门槛、铁路桥（可整体炸毁）、关尾北门夜景。
+  坐标与验收口径见[空间拓扑](Data_FirstLevelTopology20260919.md)。
+- **遭遇组收敛**：转运只有两处威胁（`transfer` 压向装载区、`transferAlley` 侧巷），不做四拍守波次；
+  桥头只有 `bridgeNorth`（北岸土坎），不在桥边凭空生成。下线 `surface` `intrusion` `shelterPursuit`
+  `transferFlank` `transferLast` `transferRear` `retreat*` `reception` `final` 与 `MISSION_TRANSFER_BEATS` 四拍。
+- **配音**：一段连续多人对白 = 一个 cue = 一次 SeedAudio 请求 = 一条 mp3；剧情 65 条 + 带路 28 条 = 93 条录音、
+  206 句、638.7 秒。日语行送 TTS 用纯假名、屏幕显示中文译文。口径见[配音同步](Data_FirstLevelVoiceSync20260919.md)。
+- **04 关中过场《空地上的三个人》不再由任务触发**（主题已由 01 承担）：资产、数据与过场自身的回归全保留，
+  任务侧断言改成「不触发」。**屋内伏击那一拍下线**（担架不进屋，老周不在这里挨刀）。
+
+### 契约 §8 记下的偏差（以这些为准）
+
+- 主街人缝 **0.90 m**（玩家胶囊半径 0.34，0.8 会卡；担架队通行宽 1.25 m 仍过不去）。
+- 侧巷在装载区东南侧，`sideAlley` (103,122)，巷口朝西对着车位与桥头路；`cartBoard` 是车旁的上车位，不是车位中心。
+- 15B 夹道就是撤离线 `evacuation` 的尾段；`retreatA` (32,134)、`retreatC` (16,222)。
+- `orders` 锚点在集结处 (−34,−99)，运行时统一用 `collection`；`MISSION_ROUTES.south` 与 `southWalk` 是同一个数组
+  （135.4 m，2.2–2.6 m/s 约 52–62 秒，加上到村口的 `VillagePointer` 落在 60–70 秒）。
+- 空间换态：掩蔽部完好/坍塌与北门夜景走 `layout.scenario` 线性三态（事实驱动，回跳自动退回）；
+  铁路桥走 gates（5 个完好件 + 3 个残骸件）。**scenario 体块不在 `MISSION_LAYOUT.blocks` 里，净空要分态单独扫。**
+- 07 的到达门半径是 **9 m** 不是 4 m：`southWalk` 的终点 (48,−20) 离 `village` 锚点 (55,−20) 有 7 m，
+  4 m 的门会让人走到头还差三米够不着（实测走完 150 秒仍停在 South）。路冻在 135 m，所以动的是门。
+- 工作台用词：转运区是「第 n 处威胁」（zone kind `threatArea`）。`MISSION_TUNING.openingEnemyBudget` 50。
+
+### 逐阶段：Notion 通过条件 → 事实 → 验证入口
+
+「事实」是 `MISSION_STAGES` 的 requirements（各包另加的内部辅助事实不在这张表里，登记在 `MISSION_FACT_GATES`）。
+验证入口一律从 worktree 根用 `node Taierzhuang1938/<脚本>` 跑。
+
+| 阶段 | 内部步骤 | Notion 通过条件 | 事实 | 验证入口 |
+| --- | --- | --- | --- | --- |
+| 1 Trapped | `Trapped` | 被埋在坍塌的掩蔽部里，看见门外两名川军被刺杀，日兵转向门内 | `bunkerCollapsed` `captivesKilled` `doorSearchStarted` | `FirstLevelFrontTest`、`MissionBrowserTest --campaign --stage-to=7` |
+| 2 Rescue | `BunkerRescue` → `RearTrench` | 被救出、拿到枪，经折角撤入后交通壕并途经背坡集结处，听到撤回守军指路 | `rescueCallHeard` `luoRescueComplete` `rifleRecovered` / `rearTrenchEntered` `cornerReached` `collectionPointSeen` `supportOrdersHeard` | 同上 |
+| 3 Support | `Support` | 打断封锁撤路的直接火力，第一批存活守军真实撤入沟内 | `frontReached` `frontContact` `frontRifleDefense` `rifleWithdrawalResolved` | 同上 + `FirstLevelFrontRouteBrowserTest` |
+| 4 MachineGun | `MachineGun` | 老周退出枪位、玩家接替（机枪可选），后续守军退到最后遮挡，战车压口，守军指出弹药屋 | `zhouGunWounded` `frontAttackRepelled` `guardWithdrawalResolved` `tankBlocksExit` `bundleOrderHeard` | `FirstLevelMachineGunTest`、`FirstLevelMachineGunCutsceneTest`（断言不触发过场） |
+| 5 Tank | `Tank` | 走完取弹路、取到集束弹、炸停战车，最后一批守军真实撤入、接防人员进阵位 | `bundleRouteTraversed` `bundleTaken` `tankImmobilized` `lastGuardsWithdrawn` `reliefInPosition` | `FirstLevelFrontTest`、`--campaign --stage-to=7` |
+| 6 Orders | `Orders` | 回到集结处接下后送差事，借火戏演完，老周上担架，后送队真实起行 | `ordersReached` `volunteerHeard` `lightShared` `zhouOnLitter` `columnDeparted` | 同上 |
+| 7 South | `South` | 真走一段（45–75 秒），听到顺子与幺娃的私语，到村口被路边的人指路 | `southWhisperHeard` `villageMouthReached` `mainStreetPointed` | `FirstLevelFrontTest` 的 `SouthWalkSeconds()` 静态核 + 实跑阶段时长 |
+| 8 Village | `Village` | 主街被倒墙＋横车堵住，担架队停进可靠遮挡不跟进，玩家进灶屋 | `streetBlockSeen` `littersInCover` `kitchenEntered` | `FirstLevelMidTest`、`--campaign --stage-from=8 --stage-jumps` |
+| 9 Melee | `Melee` | 连屋来的日军被解决；提前打掉就不走固定 QTE | `meleeResolved` | 同上 |
+| 10 Courtyard | `Courtyard` | 打开内院，担架从 08 等待点真实穿院绕过障碍，在 `streetRejoin` 接回主街 | `villageGunSilent` `courtyardGateOpen` `courtyardPassed` | 同上 |
+| 11 TransferApproach | `TransferApproach` | 抵达桥头接运点，辨认出牛车/马车/人力担架/步行伤员，看住村路来路 | `transferApproachReached` `transferSortingHeard` `villageRoadThreatSeen` | `FirstLevelMidTest`、`--campaign --stage-from=11 --stage-jumps` |
+| 12 Transfer | `Transfer` → `CartRide` | 两处威胁各解除一处就真实推进一批装载；老周轮到、上车、车真实离开装载位 | `transferArrived` `loadingThreatResolved` `firstBatchLoaded` `alleyThreatResolved` `zhouNext` `escortGranted` / `cartBoarded` `zhouCartDeparted` `cartTalkHeard` | 同上 + `CarriagePropVelocityTest` |
+| 13 AirFirst | `AirFirst` | 第一轮航过扫射桥头道路与车列，道路堵塞，车停下，老周卸回担架 | `firstAirPassComplete` `cartHalted` `zhouUnloaded` `westDitchPointed` | 同上 |
+| 14 Dive | `Carry` → `Dive` → `Rescue` | 接过担架后端、松手扑沟、老周再次受创后被救起，飞机离开 | `zhouCarried` `atDitchMouth` `carryOrdersHeard` / `diveComplete` / `zhouRecovered` `rescuePassageClear` | 同上 |
+| 15 Regroup | `Regroup` → `WallPath` → `ReceptionGate` | 无战斗：收拢、换手抬运、沿墙缓行、院门确认身份、伤员实际入院 | `picketHolding` `zhouChecked` `headcountDone` `litterRemanned` `columnMoving` / `carryHandover` `wallPathTraversed` `stragglersTended` / `gateChallenged` `receptionAccepted` `woundedEntering` | `FirstLevelEndTest`、`--campaign --stage-from=15 --stage-jumps`、`FirstLevelMissionStageRegroupTest` |
+| 16 Handover | `Handover` | 过门槛（老周最后一句话）、亲手放下担架、军医查看、班长分派 | `thresholdCrossed` `zhouPlaced` `medicExamining` `squadAssigned` | 同上 |
+| 17 Death | `Death` | 第一人称确认老周死亡，接收处继续工作；不判全关失败 | `deathSceneComplete` | 同上 |
+| 18 Bridge | `BridgeOrders` → `BridgeCover` → `BridgeWithdraw` → `NightMarch` | 接令、掩护回援尾队真实过桥、撤出爆破区后桥被不可逆破坏、夜里随队进滕县北门 | `bridgeOrdersHeard` / `southBankReached` `bridgeFireBroken` `rearColumnCrossed` / `blastZoneCleared` `bridgeDestroyed` `marchOrderHeard` / `nightTransitionComplete` `northGateReached` `gateEntered` | `FirstLevelEndTest`、`--campaign --stage-from=18 --stage-jumps`、`FirstLevelMissionStageTailTest` |
+
+常驻的表级门禁（改任何一步都要跑）：`Script_FirstLevelMissionTest`、`Script_MissionGatesTest`、
+`Script_FirstLevelSpaceTest`、`Script_FirstLevelVoiceTest`（配音变化加 `--audio`）、`Script_TextTest`、
+`Script_ModuleGraphTest`、`Script_TestRunnerTest`、`Script_FirstLevelMissionStageJumpTest`。
+
+### 2026-09-20 本任务实际复核
+
+本节只记录本任务在当前 worktree 实际跑过的结果；下方历史段落和三个玩法包的既有报告属于继承证据。
+纯 Node 定向检查全部退出 0：`MissionGatesTest` 219 项、`MissionOrchestrationFilterTest` 176 项、
+`FirstLevelEndTest` 177 项、`TestRunnerTest` 420 项（216/216 个测试文件已登记），以及
+`FirstLevelMissionTest`、`FirstLevelFrontTest`、`FirstLevelMidTest`、`FirstLevelVoiceTest`、
+`FirstLevelSpaceTest`、`FirstLevelMissionTopologyTest`、`FirstLevelWhiteboxSurfaceTest`、
+`FirstLevelP012CastTest`、`FirstLevelP012FlowTest`、`MissionNotesTest`、`ModuleGraphTest`、`TextTest`。
+`TextTest` 为 0 失败、1 组既有未静态引用警告。
+
+浏览器专项 `Script_FirstLevelMissionTopologyBrowserTest.mjs` 本轮也退出 0：26 条实体行走路径通过，
+北门夜景体块由日间 704 件切到 719 件（新增 15 件），四个夜行锚点全部抵达，退出后恢复 704 件。
+它产出的 1280×720 图片是高空拓扑审查视角，只证明体块、桥态和路线装配；不能替代下列主观视角构图验收。
+
+浏览器与 1280×720 视觉项目尚待本轮实测：01 行刑四帧（人物目标约 130 px）、06 借火、08 北口路障，
+以及 18 夜景淡入、进门前墙体/门洞/行军队列/担架可读性。未完成前不把纯 Node 结果写成整关、跳关或视觉全绿。
+
+Node 24 会继承仓库根 `"type":"commonjs"`；vendored Three 实际全是 ESM，因此在
+`vendor/three/package.json` 增加局部 `{"private":true,"type":"module"}` 包边界。没有改第三方源码；
+它修复了 `P012FlowTest`、`WhiteboxSurfaceTest`、`ModuleGraphTest` 与 runner 自测的模块解释。
+仓库没有 `package-lock.json`，所以 `npm ci --ignore-scripts` 无法运行；本轮只用
+`npm install --ignore-scripts --no-package-lock --no-audit --no-fund` 补齐被忽略的本地依赖，没有生成锁文件。
+
+### 本轮死代码清理边界
+
+已删除九个无导入方、且只服务旧军列开场或旧车厢演出的模块：
+`Script_CarriageSoundscapeRender`、`Script_FirstLevelCarriageAnimation`、`Script_FirstLevelCarriageSound`、
+`Script_FirstLevelMeal`、`Script_FirstLevelMissionTrain`、`Script_FirstLevelOpeningBarrage`、
+`Script_FirstLevelTrainAnimation`、`_import/Script_FirstLevelTrainContactProbe`、
+`_import/Script_FirstLevelTrainGameVerify`。对应 import map、runner 和离线工具登记一并收口。
+同时删除路桥残骸上全仓无生产者的 `MissionBridgeRepaired` 消失信号；残骸仍由
+`MissionBridgeDestroyed` 出现并保持，行为与此前实际运行一致。
+
+保留仍有现行消费者的 `Script_FirstLevelMissionTrainLife`、`Data_FirstLevelMissionTrain` 与
+`Data_FirstLevelCarriageSound`：前者仍给通用姿态和 P012 archive 使用，后两者仍被 TrainLife、Front 数据、
+Jump/archive 工具、音频与音乐检查消费。`OPENING.woundedRoute`、`runnerRoute`、`shelterPursuerRoutes`、
+`surface`、`trenchEntry` 也仍被布局、编排、Front 或运行时引用，不能按历史命名删除。
+`ambushHold` 当前还承担 15B 后抬手停等闸门；不要与已经失去调用方的旧
+`AmbushCasualty` / `AmbushRecover` 方法混为一谈。
+
+### 已知差距与未做项
+
+汇总自三个玩法包与空间包的交付报告，按段排。
+
+**阶段 1–7**
+
+- **03 缺掩体交替站位**。`TC.support` 的四个站位里只有 `FrontLeft(-8,-106)` 落在新入口这一段上，
+  另外三个还在旧的车站方向。补齐要空间包在「集结处 → 前沿」这一段加实体掩体 —— 虚拟站位没有墙，
+  等于让人站在开阔地上。
+- **行刑可读性已经进入候选实现，待实拍复核**：掩蔽部从 8.5×12 m 收到 7×7 m，受困位到前墙 4.6 m、
+  到行刑锚点 8.5 m；受困阶段 FOV 平滑收到 50°。纯 Node 已验证三档躺姿眼高、四人全身、门框遮挡、
+  步枪 2.83 m 够不到与三态必经短路；还缺 720p 四帧实拍确认人物是否达到约 130 px。
+- **借火取景已经进入候选实现，待实拍复核**：玩家在老周 3.2 m 内且朝向误差 ≤0.7 rad 才触发；
+  两名担架员等在 4 m 外，`ZhouLift` 才靠近。烟和火柴仍是白盒，没有手部 IK 和点火光，符合本轮简化姿态范围。
+- **老周靠土壁**用 `state "fallen"` 表示「还没上担架」，视觉上是躺在土壁边而不是靠坐。
+- **行刑的创口遮挡**靠门框与身体位置，没有专门的遮挡体积；换摆位要重新看一眼。
+- **集束弹的实际射程只有解算的 0.56 倍**：四次实测一致（解算 12.68 m 实飞 7.03/7.10，解算 14.49 m 实飞 7.4），
+  误差在出手方向不在速度上。现在的修法是「按战车更远去瞄」并走到九米以内再投。根因没解，
+  投掷解算本身还欠一次修正。
+- **04 的调试起点偏难**：直接从 04 跳进去比正常打过来吃紧，跳转起点的兵力/弹药还没按实际配平。
+- **`MISSION_ROUTES.support` 的头段是旧线**：03 现在从后交通壕尽头进场，`support` 的前两点
+  `(-32,-20) → (-32,-23)` 还指着旧掩蔽处那一带。现在靠 `MissionGuideRoute` 的 join 逻辑绕过去，
+  没有把线本身改短。
+
+**阶段 8–14**
+
+- **08 北口判定已经进入候选实现，待实拍复核**：`streetBlockSeen` 现在要求玩家位于
+  x=72.6…81.4、z=−30…−6 的北口矩形内，并对 `streetBlock` 有通视；46 m 半径只作外圈兜底。
+  纯 Node 已验证矩形反例、四角半径和前队站位，还缺 720p 北口实拍确认倒墙、横车与喊话前队能同时读清。
+- **车板的 `InstancedMesh` 逐实例速度**：12/13 车上的近景件走实例化，逐实例形变不在 MotionVector
+  契约内。老周的担架与挎包已经改成身份稳定的普通 Mesh，车板其余小件还没有。
+- **共用行进层的班长会被自己队伍压停**：剧情要求班长走到某处时，`UpdateSquad` 的接触反应/找掩体
+  每帧把他推回掩体；各包只在自己的步骤里逐个放行（02 掀架、08 查房屋、13 赶到停车点），
+  没有在共享层给「剧情走位优先」一个统一出口。
+
+**阶段 15–18**
+
+- 实拍踩过的三条已修（桥头撤退全班压玩家脚下、回援尾队在北引道被打光、黑屏瞬移没生效），
+  修法与复发条件写在 [15–18 玩法包](Data_FirstLevelEnd20260919.md) 第 6 节，别再踩。
+- **夜景瞬移走 `position.set + body.Teleport`，并同时更新 yaw/pitch/velocity**。`player.Spawn` 会把生命、
+  流血、伤口和体力静默复位，不能用于剧情时间转场。2026-09-20 实拍确认位置与 Rapier 角色体都落在
+  `nightSpawn`；真正的回走来自驾驶器仍攥着旧路点，已用 `Route.stopFact` 松手。
+
+**空间与登记**
+
+- `MISSION_ROUTES.reception` / `.exit` / `.flank` / `.opening` 四条只服务已下线步骤的路线仍有消费者
+  （`Column.StartReception` / `StartFinalExit`、`UpdateFlank`、几何避让表），本轮没有硬删；
+  连同其它「文档说的和代码对不上」的地方列在[空间拓扑](Data_FirstLevelTopology20260919.md)第 8 节。
+- `Script_FirstLevelMissionColumn` 里的 `AmbushCasualty` / `AmbushRecover` 随屋内伏击拍失去调用方，
+  还留在文件里。
+
+**配音（需人工试听，机器判不了）**
+
+| cue | 为什么 |
+| --- | --- |
+| 全部 93 条 | 四川话的地道程度与播音腔；转写的同音误识说明不了口音对错 |
+| `ZhouCheck` | 老周那一声「嗯」只有 0.12 秒字幕窗口，实机看会不会一闪而过 |
+| `BunkerKilling` / `BunkerSearch` | 日语发音像不像 1938 年日军口令，日/中在同一条里衔接是否自然 |
+| `BunkerBanter` | 末句被近爆切断的手感 |
+| `BorrowLight` | 两处动作空当的长度对不对得上收火柴与递烟的实机动作 |
+| `MeleeCurse` | 白刃顶住时的破音是发狠还是喊疼 |
+| `AircraftFirst` | 「飞机——！」的示警感与人群距离 |
+
+### 已退出第一关正文的资产（留着，等用户定夺）
+
+军列开场与屋内伏击下线之后，下面这些资产已经没有第一关正文消费者。部分仍被序章、archive 夹具、
+离线工具或完整性测试引用，因此**本轮一件没删**；不能只凭目录名批量清理。合计约 26 MB。
+
+| 路径 | 大小 | 原消费者 |
+| --- | --- | --- |
+| `Animation/FirstLevelTrain/`（4 个 GLB + 清单，5 个文件） | 18.4 MB | `Script_FirstLevelTrainAnimation.mjs`（2026-09-19 第三波删除） |
+| `Animation/FirstLevelCarriage/`（2 个动作 JSON + 清单 + 说明） | 3.8 MB | `Script_FirstLevelCarriageAnimation.mjs`（同上） |
+| `Animation/FirstLevelAmbush/`（5 个动作 JSON + 清单） | 2.7 MB | `Script_FirstLevelAmbushAnimation.mjs`（随屋内伏击拍由 Mid 包删除） |
+| `Audio/Amb/AudioAmb_CarriageCrowd.mp3` | 627 KB | `Script_Audio.AMBIENCE_PRESETS.firstLevelCarriage`，已经没有场景选这一档 |
+| `Audio/Amb/AudioAmb_CarriageRearCheer.mp3` | 111 KB | 同上（`CARRIAGE_SOUND.cheerCue`） |
+| `Audio/Amb/AudioAmb_TrainCarriageOnly.mp3` | 620 KB | 第一关正文不播；`Script_FirstLevelMissionMusicTest` 仍按 SHA-256 校验，删之前必须先核对该资产契约 |
+
+**不在这张表里、别顺手删的**：`Animation/MachineGunCaptives/`（过场保留、自身仍有回归）、
+`Audio/Amb/AudioAmb_TrainInterior.mp3`（出川序章过场 `Data_CutsceneChuchuan` / `Data_MissionCh0` 在用）、
+`Audio/Sfx/AudioSfx_Train*.mp3` 与 `AudioSfx_Carriage*.mp3`（`trainBrake` / `trainWhistle` /
+`carriageRattle` / `carriageDoorSlide` 四个 cue 仍由出川过场与 `Data_FirstLevelP012Arrival` 播）。
+
+## 历史版本（军列开场，2026.09.14 及以前）
+
+下面整段是军列开场那一版的记录，**不是当前口径**：列车、卸载场、掩蔽处折角、屋内伏击、
+04 关中过场由任务触发、75 秒南行、黑屏转场这些都已随 2026-09-19 采用稿下线。
+内容原样保留，只作历史查证。
+
+### 2026-09-15 掩蔽处折角实际来敌
 
 用户反馈：目标写「守住折角，照看从前方撤下来的伤兵」，但掩蔽处附近根本没有日军，整段空空荡荡。实测确认不是生成失败，是这一步本来就没排敌人：清完侧沟四人后，场上剩下的 12 名地面兵全在南边卸载场，距掩蔽处 56–92 米且全部被土壁挡住，北侧伤兵来的方向一个都没有。
 
@@ -21,11 +224,11 @@
 - 整关正常通关没有拿到 `Complete`。不带重试的三次：第一次折角 0 发（加补给箱前），第二次机枪位打空流血（驱动补给门槛修正前），第三次折角零伤害，但清沟时就用光绷带，前沿流血死亡。带 `--allow-checkpoint-retry` 的一次：车厢到接机枪整段通过，第 5 阶段取集束弹用掉两次重试，最后红在第 9 阶段连屋埋伏「两个担架员已倒」。从第 8 阶段起的定向续跑中第 8–13 阶段通过，红在第 14 阶段 Rescue 未转入 RetreatFirst；该跑法跳过第 3 阶段，本次代码不参与。另一会话已在 `90a57f76a` 记录干净 master 整关两跑一红。
 - 玩家站在折角无敌、不开枪 60 秒（改为单人冲锋之前的取证）：第 29 秒开始挨打，第 41 秒第一人贴到 2 米内。这次取证用调试手段清沟并传送了队员，队员沿原路线往回跑没有帮忙，只说明「不打就会被压上来」，不是正常难度数据。
 
-## 2026-09-14 前沿出击后续修订
+### 2026-09-14 前沿出击后续修订
 
 04 机枪改为可选；05 延长为北侧曲折匍匐沟取弹、返回炸断履带；06 接令后黑屏文字抵达 07 村口。当前契约和专项验证见 [前沿出击与护送转场](Data_FirstLevelFrontSortie.md)。下文 75 秒南行与历史全关通关记录属于此前版本，不能当作这次修订的验收结果。
 
-## 2026-09-14 空间拓扑与完整流程
+### 2026-09-14 空间拓扑与完整流程
 
 按 Notion「空间、流程拓扑图」最新 `2026.09.14` 章节重构，来源、坐标组织和专项入口见 [本次空间与流程验收](Data_FirstLevelTopologySeptember14.md)。12–13 共用转运区，南桥实际损毁后横向抬到西沟；15A/B/C 转向南并穿过真实墙缺口；16–18 共用接收院，后门连接联络巷。灶屋经过事实成为进入内院的先决条件，后半程追兵、担架、医护替补和返程指引均使用新路线。另修复守军汇流互相等待的实测死锁。
 
@@ -33,7 +236,7 @@
 
 74 项 quick 通过；空间物理、工事、18 阶段跳转、返程 UI、七关启动、MotionVector GPU、发布浏览器包、模块图、测试登记与返程规则的 10 项选测通过。最终增补的病房替补路线、守军汇流、灶屋反例和断桥回跳复原复验通过。四条实体路线双向分别完成 11/11、4/4、9/9、5/5 个点；720p 白盒图已审看。完整 prepush 150 项计划未全量执行，详见本次验收说明。
 
-## 2026-09-13 剧情角色生存与火力避险
+### 2026-09-13 剧情角色生存与火力避险
 
 按用户最新决定，罗班长、幺娃、何有田、刘文财从开场起启用战斗致死保护；
 独立机枪手老周和承担开场必经交接的伤员、传令兵同样保护。普通队员仍可阵亡。
@@ -64,7 +267,7 @@ MotionVector GPU 门禁与发布 bundle 构建通过。
 本地记录位于 `_shots/FirstLevelMission`、`_shots/FirstLevelCasualties`、`_shots/AiInitiative`。
 
 
-## 2026-09-12 机枪接替时的战场停滞
+### 2026-09-12 机枪接替时的战场停滞
 
 前沿步枪守备与机枪接替原先共用同一批 12 名敌军，补兵预算为零；前一段打光后，机枪段没有自己的攻击队。现在机枪阶段单独提交一次 12 人、三组的有限攻击队，从北侧既有通行线进入，沿共享跃进、掩体与射击逻辑交战。前一段不会提前消耗这批人；阶段重入、检查点重试不复制或复活已提交的演员。阶段跳转目录、前沿人数统计和开场总名册同步更新。容量留足所有列车幸存者、守军与两批前沿敌军共存的空间，避免存活友军较多时敌军一直滞留在生成队列。
 
@@ -74,7 +277,7 @@ MotionVector GPU 门禁与发布 bundle 构建通过。
 
 验收：46 项 quick 全过；运动矢量、18 阶段跳转与机枪专项通过。合并普通伤亡和投射贴花更新后，任务规则、机枪可见交火、普通伤亡、模块图及测试登记 5 项复验全过，浏览器无页面异常。机枪专项实测 12 名进攻者均移动，16 秒内敌军开火 41 次、友军还击 121 次；掩体蹲伏不强行露头，完整跃进周期内检查射界有实际可见目标。正常 `--campaign --through-south` 在修改前后均因清沟段何有田阵亡触发保留的剧情失败规则，因此不宣称正常整关通关。
 
-## 2026-09-12 普通队员伤亡与任务继续
+### 2026-09-12 普通队员伤亡与任务继续
 
 普通士兵所属小组不决定任务生死。开场失败目标明确限定在
 `OPENING.requiredSquadCast` 的四名剧情同伴；老周沿用独立剧情判定。
@@ -103,7 +306,7 @@ prepush 自动选出的 118 项检查在开场专项后收窄为相关门禁，
 
 当前任务数据版本：first-level-20260910-opening-r2，车厢表演按下方 2026-09-12 迭代更新。2026-09-10 用户明确废止旧 140/150 人指标；此前记录只代表对应历史版本，不能替代当前开局验收。正式入口：[第一关白盒](https://bentleyblanks.github.io/Taierzhuang1938/?whitebox=p012)。
 
-## 2026-09-12 车厢部署、弹雨与班长救援
+### 2026-09-12 车厢部署、弹雨与班长救援
 
 用户确认第一版四川口吻台词后，保留短分食，接入刘文财数子弹、何有田拌嘴与罗班长同时部署下车任务。拌嘴、部署和炮击各由一次完整 Seed Audio 生成请求交付；并行对白各自使用真实音源时钟和姓名字幕行。近炮在“等这阵过去——”末尾实际命中，班长先播放完整可见的 4.8 秒踉跄起身，再向主角伸手、抓住、拉起并确认站稳。详细源稿、录音哈希及对齐依据见 [车厢对白](Data_CarriageDialogue.md)。
 
@@ -115,11 +318,11 @@ prepush 自动选出的 118 项检查在开场专项后收窄为相关门禁，
 
 用户随后明确本次只验收第一关第一阶段。后续老周交接、转运、医疗输入与无关编辑器的临时修补已从本次交付撤出，后续整关失败日志仅留本地，不作为开场交付门槛。第一阶段的动作、配音、字幕、弹雨与救援专项及发布入口按本段单独记录。
 
-## 2026-09-12 炮震感官重做
+### 2026-09-12 炮震感官重做
 
 开场恢复改为一次闭眼、连续睁眼、分层失焦与有限镜头回稳，保留拉长的听觉恢复。下面 2026-09-11 的反复眨眼读数是旧版本证据；本次对标资料、取舍与验收入口见 [黑视与炮震恢复](Data_OpeningShellshock.md)。
 
-## 2026-09-11 翻车恢复与双方交火
+### 2026-09-11 翻车恢复与双方交火
 
 用户要求延长翻车后的黑视、眩晕和听觉受阻，并修复日军站桩、双方近距离不交战。撞击峰值以后按 `openingRecoveryScale` 拉长恢复曲线；物理翻覆与拖扶保持原时间轴。实时正常开局测得：撞击后 11.31 秒听觉滤波仍为 3845 Hz，9.30 秒眼睑闭合量仍为 0.63；起身后的眩晕为 8 秒。
 
@@ -133,7 +336,7 @@ prepush 自动选出的 118 项检查在开场专项后收窄为相关门禁，
 
 验收驱动同步修复了死亡重试后空手继续搬运的问题：保留原重试预算，实际走回伤员并按 F 重新抬起，仍断言担架确已携带。起身专项只跳过正在受击或死亡的姿态，受伤存活者在踉跄结束后恢复采样；队列停步引起的原生跑／站剪辑切换归入原生动作接缝报告。原有起身速度、足部漂移、独立 mixer 对照、穿透和最少采样数量门槛保留，专项复验通过；原生剪辑切换仍测到 4.38 m/s 的单帧骨盆速度，未在此次 AI 调整中修改动画。截图与详细记录归档在本地 `C:/Users/Bentl/Documents/CodexReview/TrainAmbushPressure_20260911`，不提交到仓库。
 
-## 2026-09-11 沟口队伍卡点修正
+### 2026-09-11 沟口队伍卡点修正
 
 用户截图中的沟口阶段，原等候位排在主沟中央，导航却只提示继续去阵地。正常输入停等复查确认四名同伴会停在这段通路；主线对照没有当前清沟状态提示。另对路线队列验证：已到岗的班长清沟后会重新选中身后的沟口路点，再折返向北，存在与后排迎面挤阻的风险。
 
@@ -143,7 +346,7 @@ prepush 自动选出的 118 项检查在开场专项后收窄为相关门禁，
 
 任务纯规则、共享行进规则与接入器、文本、测试登记五项检查通过。新增压力效果前的实时停等录像也正常接枪，接枪前生命 86.63；证据为 `RealtimeRegroup`。一次手动步进的 `--campaign --regroup` 在已接枪后因实际受伤死亡，保留在 `CampaignDeathBeforePressure`，不能计作完整通关。未修改主线的普通路线对照通过了机枪及战车段，至院落后主动结束；两次路线／等待不同，不能据此声称已证明主线存在同一失败。后续集成、恢复及发布复验以本轮最终记录为准。
 
-### 翻车至入沟的连续压力
+#### 翻车至入沟的连续压力
 
 用户随后指出救出后压迫感过早松掉。本次复用现有炮弹、弹着／烟尘池和喘息音效：翻覆后最多六发有限炮击，以固定世界落点沿车体、卸载空地和沟口外侧推进；至少间隔 4.5 秒，进沟后停止发起新的逃生段炮击。炮弹仍走实际飞行、碰撞、爆炸伤害及掩体链，落点不追随玩家，未添加无敌、人数补刷或伪造命中。两组地面封锁兵错开开火／休止相位，各自保留原休止时长和三名玩家射手上限。
 
@@ -161,7 +364,7 @@ prepush 自动选出的 118 项检查在开场专项后收窄为相关门禁，
 
 最终发布构建含 358 个输入，内容戳 `71014458605767`；白盒开始、正式菜单、人物资源缺失降级三个合并入口检查均通过，记录为 `Data_FinalBloodBundle.log`。独占树 LocalPreview 的 `/__preview/` 已核对实际根目录；本轮截图、带音轨录像、最终部署提交及线上合并文件／对白 SHA-256 回执保留在本地 `_shots/FirstLevelGuideJam`，不提交验收产物。
 
-## r2 玩家车厢与冲击恢复
+### r2 玩家车厢与冲击恢复
 
 用户纠正后，改为玩家所在第二节车厢真实侧翻，车体网格与碰撞同步，玩家视点随车旋转后落在残骸安全侧，由罗班长近身拖出。侧翻 2.4 秒、拖出 3.2 秒，恢复操作后保留短暂眩晕。眼睑上下合拢、两次未完全睁开与一次轻眨眼由既有后处理合成，暂停不推进；近弹命中后声音短暂闷化，再逐渐清晰，耳鸣与既有急喘素材共同表现受冲击后的恢复。
 
@@ -183,7 +386,7 @@ prepush 自动选出的 118 项检查在开场专项后收窄为相关门禁，
 
 源码缓存戳已更新；实际发布合并包含 345 个输入，最终内容版本 `3212310142528114`。线上验收发现救出后仍残留“从打开的车门下车”的旧提示，已改为借车体掩护、跟班长进入交通壕；该文案收尾重新通过文本／字库和模块图检查，并从本地合并入口正常开始，实际到达救援结束、查看新提示。此次仅文案改变，未重复整关实玩。截图、含游戏音轨录像、基线对照与发布核对回执只留本地 `_shots/FirstLevelPlayerCarriage`，不进入站点仓库。人物仍采用现有素材与有限程序编排，未生成专用成品动画。
 
-## 2026-09-10 机枪接管前重构
+### 2026-09-10 机枪接管前重构
 
 - 车内短对白与停顿约 25 秒；当前玩家车厢侧翻与近身救援见上方 r2。此前 r1 翻前车、2.1 秒拉人和 8 / 24 / 8 分布已被替换，下方 r1 实测仅为历史记录。
 - 首轮敌军名册为 6 名地面封锁、4 名侧沟突入、18 名前沿进攻、4 名战车随行，共 32 名。没有额外伤亡补刷和波次预算。后续村庄敌人及静态遗体另计；同屏可见量由投影和遮挡取样，同时准许对玩家射击最多 3 名，人数不等于命中数。
@@ -219,7 +422,7 @@ prepush 自动选出的 118 项检查在开场专项后收窄为相关门禁，
 本地预览根目录为本任务独占 worktree，服务地址 `http://127.0.0.1:8081/__preview/`。发布合并入口含 345 个构建输入，内容戳 `2000501952846395`；线上核对脚本验证 Pages 的同一内容戳、第一关版本、真实点击开始后的运行状态，以及 TrainMeal / TrainShelling / EscapeWhisper 三个远端 MP3 的 SHA-256，结果保存 `Data_OnlineVerification.json`。源码 import map 已同步更新；验收页、截图和视频均不提交。
 
 
-## 2026-09-09 同场兵力与节奏调整（历史版本）
+### 2026-09-09 同场兵力与节奏调整（历史版本）
 
 - 首战初始 140 名前沿敌军、6 名沿途敌军、4 名战车护卫，共 150 个实际 AI。后方部队保持纵深，按梯次移动；额外增援只补伤亡，另有有限预算。原先的 42 是增援预算。村内预置敌人、静态遗体不计入首战这 150 人。
 - 待撤守军使用实体掩体，玩家接枪后两人一组实际进沟。伤亡和撤回分开记账；全灭不播放撤回成功对白，也不伪造获救人数。界面继续使用战况反馈，实际数量保留在诊断记录中。
@@ -236,7 +439,7 @@ prepush 自动选出的 118 项检查在开场专项后收窄为相关门禁，
 
 七场景启动、正式菜单/白盒/人物资源缺失的发布合并入口均已复测通过。第一关领域 prepush 选出的 30 项检查经分批修复和复验全部通过，另通过七场景启动、发布合并入口与人物远景八姿态检查。18 起点逐段续接曾在到达 Complete 时撞上旧 1200 秒上限，统一使用与连续通关相同的 1800 秒上限后，以 1149.7 秒正常退出；没有放宽玩法、路径或阶段断言。证据留在本地 `_shots`，不提交截图和测试构建。
 
-## 实现与验收清单
+### 实现与验收清单
 
 - [x] 同一 `?whitebox=p012` 和主菜单第一关入口直接使用新版流程
 - [x] 接物结束后行驶军列自由移动、遭袭临停与混乱下车、炮后私语
@@ -261,7 +464,7 @@ prepush 自动选出的 118 项检查在开场专项后收窄为相关门禁，
 - [x] 基线 5f6ad124 的 55 项快速检查及六项定向检查通过；后续版本与本轮的门禁和完整通关结果分别记录于文末
 
 
-## 军列与车厢活动（历史 8 / 24 / 8 版本，当前见 r2）
+### 军列与车厢活动（历史 8 / 24 / 8 版本，当前见 r2）
 
 复用旧 P012 敞顶货运车厢的地板、侧板、立柱、车轮和底架，以及原机车的锅炉、驾驶室、烟囱、轮组和连杆。三节车厢中 40 名士兵按 8 / 24 / 8 分布，中间主车厢另有罗班长和玩家，即 41 个真实 NPC 加玩家；原六人槽位与 34 名背景士兵没有被删减。
 
@@ -271,7 +474,7 @@ prepush 自动选出的 118 项检查在开场专项后收窄为相关门禁，
 
 炮击时收拢手持物并护头；停车开门后，同一批人物按三处实体车梯排队，先平滑起身，再交回原有行走和战斗系统。队列不依赖玩家离开阶段才启动、不瞬移、不补刷。纯队列全员集结 94.3 秒，包含起身时间；实际浏览器全员下车后完整通关，8 秒乘车测量的最大车体相对漂移约 0.000128 米，脚部接触没有可测滑移。车内和斜俯视截图已审看。
 
-## 连续配音
+### 连续配音
 
 使用 Volcengine 的 seed-audio-1.0，接口和参数依据[官方音频生成教程](https://docs.volcengine.com/docs/6561/2550782?lang=zh)。密钥仅在运行时从 VOLCENGINE_API_KEY 读取，经 X-Api-Key 请求头发送；不进入提示词、日志或 Git。用户更新豆包语音密钥后鉴权成功，早期 401 问题已解决。
 
@@ -281,7 +484,7 @@ prepush 自动选出的 118 项检查在开场专项后收窄为相关门禁，
 
 原始文件与生成请求保持完整。当前播放器按源录音时间拆分车厢闲聊的三个段落，并分别等待炮弹实际落地、士兵实际受伤后继续对应对白；暂停恢复从同一源片段偏移继续。41 个 cue 的字幕使用脚本强制对齐结果，绑定录音 SHA-256，不再按字数平摊时长；SouthHope 中无法可靠分离的短促应声保留音频而省去该字幕窗口。结算仍要求玩家实际到达联络巷且 FinalExit 说完。口型与精细表演见动画接力任务。
 
-## 范围与验证
+### 范围与验证
 
 新版直接覆盖 ?whitebox=p012 及菜单第一关入口。旧 ?whitebox=p012-archive 仅保留为开发回归夹具。地面全面采用共享高度场，结构地板和车厢甲板保留实体支撑；战斗、白刃伤害和 QTE 继续复用共享系统。动画为现有骨架加程序化白盒动作，未制作新的精细动作资产。
 
@@ -300,7 +503,7 @@ prepush 自动选出的 118 项检查在开场专项后收窄为相关门禁，
 上一轮配音基线（5f6ad124）已通过完整真实输入通关：41 段录音实际解码并创建播放源；TrainMeal 38.833 秒后才开始炮击；实测南行 75.017 秒、转运 224.767 秒、死亡短镜头 12 秒，FinalExit 完整播放后才结算。Pages 合并入口浏览器验收通过（104.8 秒）；最终构建含 268 个模块，内容版本 3237053575573076。发布后核对对应 Actions 提交、线上清单与代表性音频哈希、实际配音播放和车厢活动，证据写入本地 Data_OnlineVoicedTrain.json。截图、声音检测、构建及逐项日志保存在忽略目录 _shots/FirstLevelMission，不提交验收网页、截图或演示视频。临时 NVIDIA D3D11 参数仅用于本机，发布前还原共用测试工具。
 
 
-## 2026-09-07 任务流程细化
+### 2026-09-07 任务流程细化
 
 本轮按用户最新要求优先处理任务目标与流程，地形美术和新 PBR 贴图暂缓。既有共享地形、40 名新兵加罗班长、20 副担架、36 名轻伤员与共享战斗判定保留。
 
@@ -319,7 +522,7 @@ prepush 自动选出的 118 项检查在开场专项后收窄为相关门禁，
 
 关键任务交互显示动作名称与长按 F，避免只出现未说明用途的图标；补给箱具有与可见外形一致的物理碰撞。直达白盒入口保留新启动优化，在点击开始后后台预热白刃动作数据。
 
-## 首场战斗可信度门槛（用户追加，2026-09-07）
+### 首场战斗可信度门槛（用户追加，2026-09-07）
 
 通关脚本通过只是必要条件。必须同时审看玩家沿沟接近、接枪、横向瞄准、守军撤回和战车被炸停时的实际画面。本轮已审看上述场景，并以当前版本重新完整通关。
 
@@ -335,7 +538,7 @@ prepush 自动选出的 118 项检查在开场专项后收窄为相关门禁，
 具名引导只在落后玩家时追赶，领先超过 26 米则等待；不再因为离玩家较远而向前加速。纯规则检查覆盖前后方向与队列让路优先级。
 
 
-## r3/r4 流程细化验收（2026-09-07）
+### r3/r4 流程细化验收（2026-09-07）
 
 按当前相对 origin/master 的改动重新计算 prepush 范围，共 116 项；已逐项匹配通过记录，缺项 0、历史基线失败 0、新增失败 0。门禁覆盖任务、语音、物理、伤害、武器、AI、动画兼容、编辑器、场景、渲染与七切片开机。r3 合并入口浏览器验收通过，构建含 273 个输入模块，内容戳 2242420853527785。
 
@@ -345,7 +548,7 @@ prepush 自动选出的 118 项检查在开场专项后收窄为相关门禁，
 
 最终截图已审看；完整记录保留在本地 _shots/FirstLevelMission：Data_FinalSelection.log、Data_CredibleRegression.log、Data_FinalCampaign.log、Data_FrontVisual.json、Data_RealtimeOpening.json、Data_DistantSoundSignal.json 和 Data_ReleaseVerification.json。动画接力及验收说明的 44 个本地引用均已核对。精细人物动作、口型及地形 PBR 美术按用户要求另行迭代。
 
-## 线上模型中断补修（r4）
+### 线上模型中断补修（r4）
 
 真实线上冷启动遇到部分国军模型下载内容不完整，原先按加载结果数组下标选人会改变身份并在缺槽时阻断启动。现按原始模型 ID 查找，缺失模型使用既有程序化白盒人物，保留 41 名乘员和 8 / 24 / 8 分布；不会把普通士兵错换成其他槽位或军官。此修复保证部分资源失败时可继续启动，不代表网络下载故障已经消失。
 
@@ -353,7 +556,7 @@ prepush 自动选出的 118 项检查在开场专项后收窄为相关门禁，
 
 线上 41 段 MP3 实际下载并逐个核对 SHA-256，全部一致；原本中断的三组人物与动画共六个文件也已重新下载并核对一致。部署提交及最终线上启动、配音源、车内空手和乘员活动取证写入本地交付回执。定向日志为 Data_CharacterFallbackRegression.log，音频取证为 Data_OnlineAllVoiceHashes.json。
 
-## 遭袭临停、同行与炮弹修复（r5）
+### 遭袭临停、同行与炮弹修复（r5）
 
 开场从幺娃递食到顺子接过并回答期间，玩家保持空手并可自由转头，不能移动、跳跃或改变姿态。解锁跟随 TrainMeal 原录音的 5.4 秒接物时点，暂停不推进；开头仍保留 5 秒观察停顿。交互提示和跨电脑动画交接要求已同步。
 
@@ -374,7 +577,7 @@ TrainShelling 按“突然遭炮击→下令司机停车→车未停不得跳车
 最终合并入口包含 273 个输入模块，内容版本 1630979196520812，SHA-256 为 5cb5defa5096c1e2e93fabdbb6b5fdab18aae5dd2e569dd4b102a55f7340443c。线上部署提交、实际开场与新录音核验写入本地交付回执；截图和演示仍仅保留本地。
 
 
-## r12 迭代要求与完成条件
+### r12 迭代要求与完成条件
 
 本轮以用户连续实玩反馈为准，不写回 Notion。完成条件是第一关从乘车到联络巷以真实输入连续通过；没有改事实、瞬移或调试跳关；灶屋敌人来自预置名册，小队实际到场；抬运者有握持、步态和停步支撑，等候者会换站位并观察；撤离数量只供内部判定；右键持瞄、最后几发弹药和机枪连续射击均正常。
 
@@ -394,7 +597,7 @@ TrainShelling 按“突然遭炮击→下令司机停车→车未停不得跳车
 按改动选中的 117 项门禁已逐项核对通过，缺项 0、历史基线 0、未解决失败 0；包含七切片启动和主动缺失人物资源时的合并入口启动。最后仅调整转运提示措辞，并重新通过 TextTest、ModuleGraphTest 与合并构建。最终合并版本 2804566343771941，包含 277 个输入模块；精确部署提交和线上内容哈希另存本地交付回执。证据保存在 C:/Users/Bentl/Documents/CodexReview/FirstLevelNaturalCrowd_20260907，不提交截图、验收网页或演示视频。
 
 
-## r13 帧成本、首战节奏与战场遗体（2026-09-08）
+### r13 帧成本、首战节奏与战场遗体（2026-09-08）
 
 用户反馈：第一关白盒卡、日军人少且站桩、遗体太少（要求至少三倍、性能不得变差）。本轮先用 `Script_FirstLevelFrameProbe.mjs`（车厢内 / 前沿朝北 / 前沿朝东三机位，1080p 默认 high，无头 Edge D3D11，RTX 4070 SUPER）取基线，再逐项修：
 
@@ -417,7 +620,7 @@ TrainShelling 按“突然遭炮击→下令司机停车→车未停不得跳车
 
 推送前门禁（`--changed=origin/master --profile=prepush`，118 项）：116 通过、历史基线 0、未通过 2。`BrowserBundleTest` 因共享 node_modules 缺 esbuild 在 0.1 s 内退出（环境问题，package.json 仍声明 0.28.2）；`FirstLevelMissionBrowserTest` 在运行器 600 s 上限内没跑完。为分清原因，把基线提交 5ba0a4b59 与本版在同一台机器上顺序各跑一次 `--campaign --audio`：基线 1554 s、本版 1584 s，两者都通过、都远超 600 s——是本机当前负载下该项本来就跑不进上限（同期用户在跑 Edge / Codex），不是本轮回归；直接运行该测试的完整通关记录见上文。
 
-## r14 对象池、每帧垃圾与关卡预热（2026-09-08）
+### r14 对象池、每帧垃圾与关卡预热（2026-09-08）
 
 用户在 r13 之后从优先级清单里选了四项：人物对象池、每帧垃圾清理、新增预热环节、MRT 主通道砍掉深度法线预通道。前三项落地；第四项在同一天被 master 的 3A 渲染大修（`81dcb2624`，帧图 + GTAO/SSIL + Hi-Z SSR + 级联阴影 + 体积雾）截断：新管线的预通道本身就是 MRT（法线视深 / 速度 / 深度纹理），HZB → SSR / GTAO / 接触阴影都在主通道**之前**消费它，「主通道一次写完、不再预通道」在这套结构下等于把 GTAO / SSR 改成延迟解算，是另一个量级的改动，本轮不做。旧管线上的实装（含四附件 / AO 延后解算 / 遮罩钩子 / 贴花深度拷贝时机等踩坑）留在分支 `claude/level-one-mrt-archive-3b567c`（提交 1cd20aca0），只作参考。
 
@@ -431,7 +634,7 @@ TrainShelling 按“突然遭炮击→下令司机停车→车未停不得跳车
   - `Script_BootTest` 全过（236 s，紧贴运行器 240 s 上限，主因是 3A 管线各章的着色器预热）。
   - 推送前门禁（`--changed=origin/master --profile=prepush`，134 项，与另一 worktree 的门禁共用浏览器槽，共 4471 s）：127 通过、未通过 7。`TextTest` 是预热里两条 console.warn 标签用了中文，改 ASCII 后单跑通过；`FirstLevelMissionBrowserTest` 仍是本机负载下跑不进 600 s（r13 记录的基线 1554 s）；`ActorBatchTest` / `PropInstancingTest`（像素差 0.04–0.10% 与噪声底相当）、`FirstLevelP012ActorTest`（`ApplyScriptDefense` 读 `this.ctx.audioWiring` 抛错）、`ExplosionRangeTest`（首个弹坑帧多编 1 个 program）、`CraterSurfaceTest`（弹坑壁贴花环 93 像素）五项在未改动的 master 检出（5a2eb4ed2）上逐一复跑、同样失败，是 3A / 音频合并遗留，不属本轮。
 
-## 2026-09-09 后送队规模修正
+### 2026-09-09 后送队规模修正
 
 按用户最新要求，后送队从 20 副担架、36 名轻伤员、14 名医护、8 名民夫缩为 10 副担架、20 名担架员、2 名医护、2 名救援民夫。取消随队轻伤人群，武装护送仍由玩家与四名具名同伴承担。每副担架仍只有前后两个抬架位，救援补位不重复生成人物。2026-09-16 用户再缩：担架减到 7 副（14 名担架员），随队的 2 名医护取消，小队之外不再有任何穿军装的护送者；2 名救援民夫保留（他们是担架员的补位，不是士兵）。死亡段的救护由小队成员兜底，最终防御的「医护撤离」条件在没有医护时按空集成立。数值在 `Data_Tuning_FirstLevel.mjs`（`litterCount` / `medicCount`）。替补池只剩两名民夫之后，伏击加空袭要补的抬架位一定不够，于是列队加了一条规则（`FirstLevelMissionColumn.BearerShort`）：少一个抬架员、又没有替补可派时，剩下那个人**拖着担架走**（步速乘 `litterDragScale` 0.55），替补空出来再接手；以前那一副会永远停在转运点、撤退段走不完。
 
@@ -443,7 +646,7 @@ TrainShelling 按“突然遭炮击→下令司机停车→车未停不得跳车
 
 主线合并边界：末段续测基于 4c1b5b42；合入 440387e8 后重新通过 FirstLevelMissionTest 和真实 BrowserBundleTest（226.7 秒，三种启动场景）。最后合入 811e9855 的站立呼吸动作后，ModuleGraphTest 与 Pages 预览打包通过，未重复整关浏览器回归。
 
-## 2026-09-11 静态遗体贴地
+### 2026-09-11 静态遗体贴地
 
 `MissionAftermath` 原先已经在载入时把倒地姿态烘成共享静态网格，但放置只取中心地面高度，加上未经支撑检查的 `pile` 偏移。军人还残留站立动画的关节旋转，最低的头盔或靴尖碰地后躯干仍可能悬空。初始采样也会误用随后驶离的列车地板。
 
@@ -456,12 +659,12 @@ TrainShelling 按“突然遭炮击→下令司机停车→车未停不得跳车
 合入 `47c85880a` 后通过：尸体专项与换关释放（51.6 s）、共享地面采样、白盒浏览器（20.7 s）、七场景 Boot（187.3 s）、第一关逻辑（37.7 s）、正常开场（103.2 s）、工事场景（50.6 s）及完整真实输入通关 `FirstLevelMissionBrowserTest --campaign --audio`（1096.6 s，抵达 Complete，声音、节奏、流程与页面错误断言通过）。模块图和 Pages 预览打包通过。此次实际证据不包括额外的 18 阶段跳转／续玩和动画扩展套件，不能据此宣称整套 firstLevel 九项全绿。
 
 
-### 2026-09-11：任务目标仅在暂停页显示
+#### 2026-09-11：任务目标仅在暂停页显示
 
 - 按玩家反馈移除第一关的屏幕箭头／距离导航、目标更新通知及任务教学弹字（含机枪、集束弹、近战、担架通行和转运提醒）。Esc 暂停页直接读取当前内部任务步骤的目标，不显示教学按键；继续游戏或切到其他菜单页时收起。
 - 本地定向浏览器验收覆盖军列、机枪与战车阶段的当前目标、Esc 暂停／继续、调试页返回和 640×800 窄屏；已查看暂停与游戏截图。阶段跳转只用于 UI 取证，不作为正常通关证据。截图与探针留在本任务本地 `_shots/PauseObjective`。
 
-## 2026-09-11 交通壕行进中的多向攻击
+### 2026-09-11 交通壕行进中的多向攻击
 
 按本轮玩家反馈，入口地面兵从 6 人扩为 12 人，支援路线从 6 人扩为 18 人，分别从西侧、东侧与前方折角施压。全段固定名册合计 50 人，死者不重生；前沿主力仍在最后折角才投入。
 

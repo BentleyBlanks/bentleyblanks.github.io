@@ -1,5 +1,7 @@
 # 第一关重构 · Notion 实现基准
 
+> **历史版本。** 本页记录军列开场的旧采用稿，已被 [2026-09-19 采用稿](Data_FirstLevelRebuildSource20260919.md) 取代，不再作为实现与验收来源。
+
 来源：https://app.notion.com/p/3d360335331c81ea86f6f637ab92327c?pvs=204
 读取日期：2026-09-07
 

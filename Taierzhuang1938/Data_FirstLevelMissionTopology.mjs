@@ -110,7 +110,7 @@ export const MISSION_SOUTH_BRIDGE = Object.freeze({
   pierZ: Object.freeze([142, 147, 159, 164]),
   // Visible collapsed abutment blocks the former road after the actual bomb hit.
   wreck: {id:"MissionBridgeWreck",x:76,z:153,w:8.8,h:4.4,d:6,y:.45,
-    semantic:"earthDark",appearSignal:"MissionBridgeDestroyed",signal:"MissionBridgeRepaired"},
+    semantic:"earthDark",appearSignal:"MissionBridgeDestroyed"},
 });
 
 /**

@@ -20,7 +20,7 @@
 
 ---
 
-## 1. 数据：四张表（`Data_FirstLevelMissionGates.mjs`）
+## 1. 数据：四张主表与场景信号（`Data_FirstLevelMissionGates.mjs`）
 
 纯数据、零 three，Node 直接 import。数值一律**引用既有表**（`MISSION_TUNING` / `OPENING` /
 `FRONT_SORTIE`），不在这里抄数字 —— 抄一次就多一个会悄悄走样的副本。
@@ -37,8 +37,8 @@
 
 | 字段 | 含义 |
 | --- | --- |
-| `spawn.kind` | `step`（进入某步骤时生成）/ `fact`（某事实满足时）/ `beat`（转运区的第 n 波攻击）/ `opening`（开场脚本生成） |
-| `spawn.step` / `.fact` / `.beat` | 对应的步骤 id / 事实 id / 攻击波 id |
+| `spawn.kind` | `step`（进入某步骤时生成）/ `fact`（某事实满足时）/ `threat`（转运区后一处威胁就绪） |
+| `spawn.step` / `.fact` / `.threat` | 对应的步骤 id / 事实 id / 威胁组 id |
 | `standbyUntil` | 生成了但**待命**，等这条事实满足才动（`front` / `machineGun` 等 `frontBattleStarted`） |
 | `dormant` + `wake` | 生成即装睡；`wake.kind` 为 `playerWithinM`（带 `radiusM`、`step`）或 `fact` |
 | `release` | 放行规则（`tacticNear`：玩家靠近战术点才放行） |
@@ -51,9 +51,22 @@
 `{ 对白 cue: 事实 id }`。运行时 `VoiceDone(id)` 查这张表记事实；带额外逻辑的几条
 （TrainRescue 那类）仍留在代码里，不进表。
 
+### `MISSION_SCENARIO_SIGNALS`
+
+可见场景的大换态只通过这张“信号名 → 事实名”映射进入空间层：`BunkerCollapsed → bunkerCollapsed`、
+`RailBridgeDestroyed → bridgeDestroyed`、`NightGateShown → nightArrivalPlaced`。同名信号由
+`Signalled` 直接查事实。运行时不能用 `OpenGate` 假装切换 scenario；回跳时空间层也据事实退回正确状态。
+
+### `MISSION_TRANSFER_THREATS`（`Data_FirstLevelMission.mjs`）
+
+阶段 12 现在只有两处威胁：`transfer` 进入 `Transfer` 就已在场，解除并记下
+`loadingThreatResolved` 后，隔 `transferThreatGapS` 才放出 `transferAlley`；第二处解除事实是
+`alleyThreatResolved`。工作台把它们画成 `threatArea`，边界来自各组成员坐标的包围盒，界面统一称
+“第 n 处威胁”。旧四拍 `beat` 口径已经下线。
+
 ### `MISSION_FACT_GATES`
 
-69 条，`MISSION_STAGES` 里出现的 58 条 `requirements` 事实**全覆盖**，外加
+当前 120 条，`MISSION_STAGES` 的全部 `requirements` 事实均覆盖，外加
 `frontBattleStarted` / `kitchenTraversed` / `bundleRoutePoint` 这类影响编排的触发。
 每条至少带 `step` 与能生成人话的字段：
 
@@ -82,20 +95,20 @@
 ## 2. 模型：`Script_MissionOrchestration.mjs`（纯，Node 可跑）
 
 把上面那几张表 + `MISSION_STAGES` / `MISSION_ENCOUNTERS` / `MISSION_TACTICS` /
-`MISSION_TRANSFER_BEATS` / `MISSION_LAYOUT` / 路线 / 锚点汇成一份，工作台、俯视图与 CLI 共用。
+`MISSION_TRANSFER_THREATS` / `MISSION_LAYOUT` / 路线 / 锚点汇成一份，工作台、俯视图与 CLI 共用。
 
 ```js
 BuildOrchestrationModel() → {
   version, levelId, bounds,
   phases[18]  { number, id, title, steps[], spawn }
-  steps[27]   { id, index, phaseNumber, objective, target, cue, minimumSeconds,
+  steps[28]   { id, index, phaseNumber, objective, target, cue, minimumSeconds,
                 requirements[], guidance{label,route}, spawns[] }
   facts{69}   { id, kind, step, phaseNumber, anchor, point, radiusM, box, cue,
                 interaction, encounter, member, requires, source, text }
-  encounters[21] { id, phaseNumber, deferred, spawn, standbyUntil, dormant, wake, release,
+  encounters[13] { id, phaseNumber, deferred, spawn, standbyUntil, dormant, wake, release,
                    members[{ id,x,z,weapon,hold,bayonet,team,reserve,releaseDelayS,
                              tactic, assaultLane, clearedAtPhase }] }
-  beats[4], routes{21}, anchors{26}, zones[45], friendlies[56], timeline[172], layout{…}
+  beats[2], routes{32}, anchors{51}, zones[44], friendlies[56], timeline[172], layout{…}
 }
 PhaseLayout(model, n)          // 这一阶段开始时：每组的 state + 区域/路线/友军/步骤
 ApplyRuntimeState(model, rs)   // 运行时 State() → live（含 actualTimeline）
@@ -272,7 +285,7 @@ P3b 的 `Script_EditorOrchestrationMap.mjs`（canvas 2D，零 three，北在上�
 - 顶上一排预设：全部 / 只看敌军 / 只看友军 / 只看触发区 / 只看路线 / 只看本阶段新出现的
   （最后一个 = 出现阶段正好是当前阶段的那几组）。
 - 下面一棵树：六个类别各一行（开关 + 名字 + 计数 + 「只看」）；**敌军**底下再分四个可折叠小节
-  —— 按组（21 组，**先按出现阶段、再按名字**排，组名说人话，编号与本阶段状态在第二行的小字里）/ 按本阶段状态（未出现 ·
+  —— 按组（当前 13 组，**先按出现阶段、再按名字**排，组名说人话，编号与本阶段状态在第二行的小字里）/ 按本阶段状态（未出现 ·
   已生成 · 待命 · 休眠 · 活跃 · 已清除，各几人）/ 按武器（步枪 · 机枪 · 上了刺刀）/
   按行为（钉在原地 · 会移动）。每一行：眼睛开关 + 小图标 + 名字 + `看得见/一共` + 「只看」。
 - **「只看」再点一次取消**，点完把那一行滚回看得见的地方。
@@ -565,7 +578,7 @@ node Taierzhuang1938/Script_MissionNotesCli.mjs dismiss <id> [--summary "…"]
    要看编排本身：`node Taierzhuang1938/Script_MissionOrchestrationCli.mjs phase <n>`。
 2. **改表，不改脚本**：出现时机改 `MISSION_STEP_SPAWNS` / `MISSION_ENCOUNTER_ACTIVATION`，
    触发半径改 `MISSION_FACT_GATES`，位置与路线改 `MISSION_ENCOUNTERS` / `MISSION_TACTICS`，
-   拍的窗口改 `MISSION_TRANSFER_BEATS`，数值改 `Data_Tuning_FirstLevel`。
+   转运威胁的先后改 `MISSION_TRANSFER_THREATS`，间隔数值改 `Data_Tuning_FirstLevel`。
    在 `Script_FirstLevelMissionRuntime.mjs` 里写死一个数字 = 下一次 `MissionGatesTest` 变红。
 3. **自测**：
    ```bash
@@ -605,7 +618,10 @@ node Taierzhuang1938/Script_PlayerStateEditorTest.mjs
 
 # 改了编排表还要跑
 node Taierzhuang1938/Script_FirstLevelMissionTest.mjs
+node Taierzhuang1938/Script_FirstLevelSpaceTest.mjs
+node Taierzhuang1938/Script_FirstLevelMissionTopologyTest.mjs
 node Taierzhuang1938/Script_FirstLevelMissionStageJumpTest.mjs
+node Taierzhuang1938/Script_FirstLevelMissionTopologyBrowserTest.mjs
 ```
 
 截图落在 `Taierzhuang1938/_shots/Orchestration/` 与 `_shots/OrchestrationMap/`（忽略目录）。
