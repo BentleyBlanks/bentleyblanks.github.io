@@ -23,7 +23,7 @@ const output=path.join(here,'_shots/CarriagePropVelocity');
 await fs.mkdir(output,{recursive:true});
 const local=process.argv.includes('--local');
 const server=local?null:await ServeRoot(path.dirname(here),0),browser=await LaunchBrowser();
-const page=await browser.newPage({viewport:{width:1440,height:900}}),errors=[];
+const page=await browser.newPage({viewport:{width:1280,height:720}}),errors=[];
 page.on('pageerror',e=>errors.push(String(e)));
 page.on('console',m=>{if(m.type()==='error'&&!/fonts\.(googleapis|gstatic)/.test(m.location()?.url||''))errors.push(m.text())});
 let result;
