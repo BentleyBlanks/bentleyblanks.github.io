@@ -189,7 +189,7 @@ const PICK_RANK = { zone: 1, route: 1, anchor: 2, friendly: 2, chip: 3, note: 4,
 
 // 图例。**一行一张图标，跟图上画的是同一张图、同一种颜色**，所以图例就是
 // 「这张图怎么读」的唯一答案，不是另画一套示意图。用词全是普通中文 ——
-// 「pending」「standby」「beat」只有写它的人看得懂。
+// 「pending」「standby」只有写它的人看得懂。
 const LEGEND_ROWS = Object.freeze([
   { text: "敌人 · 未出现", icon: "Rifleman", color: "enemyPending", alpha: 0.64 },
   { text: "敌人 · 已生成", icon: "Rifleman", color: "enemyStaged" },
@@ -862,7 +862,7 @@ export class OrchestrationMap {
     return this;
   }
 
-  /** 把手（组 / 拍）的屏幕中心点；测试与宿主拿它去点、去对位。 */
+  /** 把手（组 / 转运威胁）的屏幕中心点；测试与宿主拿它去点、去对位。 */
   HandlePoint(kind, id) {
     const found = this.handles.find((entry) => entry.kind === kind && entry.id === id);
     return found ? { x: found.cx, y: found.cy, w: found.w, h: found.h } : null;
@@ -1246,8 +1246,7 @@ export class OrchestrationMap {
         ctx.setLineDash([]);
         const cx = (zone.minX + zone.maxX) / 2, cz = (zone.minZ + zone.maxZ) / 2;
         const c = Project(cx, cz);
-        // 方框里只有转运那四个「攻击波」留图标：它们统共四个、各带一个时间窗，
-        // 是全图唯一需要一眼认出「这块地方会来一波人」的框。别的框同上，不画。
+        // 方框里只有转运两处威胁留图标，便于一眼辨出压向装载区和侧巷的两块压力。
         const boxIcon = zone.kind === "threatArea" ? IconForZone(zone) : null;
         if (boxIcon) {
           this.DrawIcon(ctx, c.x, c.y, boxIcon, MAP_COLORS.zone, this.iconPx * 0.78,
@@ -1256,17 +1255,17 @@ export class OrchestrationMap {
         }
         this.Mark({ kind: "zone", id: zone.id || zone.fact, icon: boxIcon, x: c.x, y: c.y });
         Push({ kind: "zone", id: zone.id || zone.fact, x: cx, z: cz }, c.x, c.y, 8, PICK_RANK.zone);
-        // 转运两处威胁的框：标签做成可点的把手（返回 kind:"beat"），别只是一行描边字。
+        // 转运两处威胁的框：标签做成各自可点的把手，别只是一行描边字。
         if (zone.kind === "threatArea") {
-          const beatId = String(zone.id || "").replace(/^threat_/, "");
-          const wave = BeatWave(this.model, beatId);
-          const text = showLabels && wave.beat
-            ? `${wave.title} · ${beatId} · ${BeatWindow(wave.beat)}`
-            : wave.title;
+          const threatId = String(zone.id || "").replace(/^threat_/, "");
+          const info = ThreatInfo(this.model, threatId);
+          const text = showLabels && info.threat
+            ? `${info.title} · ${threatId} · ${ThreatWindow(info.threat)}`
+            : info.title;
           Add({
-            kind: "beat", id: beatId, text, ax: a.x + 3, ay: a.y, color: MAP_COLORS.zone,
+            kind: "threat", id: threatId, text, ax: a.x + 3, ay: a.y, color: MAP_COLORS.zone,
             priority: PRIORITY.chip, style: "chip", keep: 4,
-            pick: { kind: "beat", id: beatId, x: cx, z: cz },
+            pick: { kind: "threat", id: threatId, x: cx, z: cz },
           });
         } else if (name) {
           Add({
@@ -1789,7 +1788,7 @@ export class OrchestrationMap {
       ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.stroke();
     };
-    if (sel?.kind === "encounter" || sel?.kind === "beat") {
+    if (sel?.kind === "encounter" || sel?.kind === "threat") {
       const encounter = (this.phaseLayout?.encounters || []).find((entry) => entry.id === sel.id);
       if (encounter) {
         for (const member of encounter.members || []) {
@@ -2163,16 +2162,16 @@ export class OrchestrationMap {
             : `脚下这一撮 ${sel.cluster} 人（挤在一起，放大就散开）`);
         }
         const spawn = encounter.spawn || {};
-        const where = spawn.step || spawn.fact || spawn.beat || "";
+        const where = spawn.step || spawn.fact || spawn.threat || "";
         if (spawn.kind) lines.push(`出现：${spawn.kind}${where ? ` ${where}` : ""}`);
         if (encounter.standbyUntil) lines.push(`待命到 ${encounter.standbyUntil}`);
       }
     }
-    if (sel.kind === "beat") {
-      const wave = BeatWave(this.model, sel.id);
-      if (wave.beat) {
-        lines.push(`${wave.title} · ${BeatWindow(wave.beat)}`);
-        lines.push(wave.beat.after ? `${wave.beat.after} 之后放出` : "转运一开始就到");
+    if (sel.kind === "threat") {
+      const info = ThreatInfo(this.model, sel.id);
+      if (info.threat) {
+        lines.push(`${info.title} · ${ThreatWindow(info.threat)}`);
+        lines.push(`解除后记 ${info.threat.resolved}`);
       }
     }
     if (sel.kind === "member") {
@@ -2214,7 +2213,7 @@ export class OrchestrationMap {
       const anchor = this.model?.anchors?.[sel.id];
       if (anchor) return { x: anchor.x, z: anchor.z };
     }
-    if (sel.kind === "encounter" || sel.kind === "beat") {
+    if (sel.kind === "encounter" || sel.kind === "threat") {
       const encounter = (this.phaseLayout?.encounters || this.model?.encounters || [])
         .find((entry) => entry.id === sel.id);
       if (encounter) return Centroid(encounter.members);
@@ -2582,17 +2581,17 @@ function HitsGrid(grid, rect) {
  * 转运的两处威胁在界面上叫「第几处威胁」（旧的四「拍」已随 2026.09.19 重构下线），
  * 图上写给人看的时候按它在 MISSION_TRANSFER_THREATS 里的次序报第几处（从 1 起）。
  */
-function BeatWave(model, beatId) {
-  const beats = model?.beats || [];
-  const index = beats.findIndex((entry) => entry.id === beatId);
-  if (index < 0) return { title: "转运威胁", beat: null, wave: 0 };
-  return { title: `第 ${index + 1} 处威胁`, beat: beats[index], wave: index + 1 };
+function ThreatInfo(model, threatId) {
+  const threats = model?.transferThreats || [];
+  const index = threats.findIndex((entry) => entry.id === threatId);
+  if (index < 0) return { title: "转运威胁", threat: null, order: 0 };
+  return { title: `第 ${index + 1} 处威胁`, threat: threats[index], order: index + 1 };
 }
 
-/** 放行条件的人话。第一处进步就在；第二处等第一处解除（没有时间窗了）。 */
-function BeatWindow(beat) {
-  if (!beat) return "时间未定";
-  return beat.after ? `${beat.after} 之后` : "进转运即到";
+/** 出现条件的人话。第一处进步就在；第二处等第一处解除。 */
+function ThreatWindow(threat) {
+  if (!threat) return "条件未定";
+  return threat.after ? `${threat.after} 之后` : `进 ${threat.step || "Transfer"} 即到`;
 }
 
 /**
@@ -2725,7 +2724,7 @@ function KindText(kind) {
     case "zone": return "触发区";
     case "route": return "路线";
     case "friendly": return "友军";
-    case "beat": return "转运攻击波";
+    case "threat": return "转运威胁";
     case "note": return "批注";
     default: return "点";
   }

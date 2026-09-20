@@ -15,8 +15,8 @@
 //      不碰 DOM、不碰 three、不读文件。Node 直接 import 就能跑。
 //   2. 不新造事实：状态取自 PhaseLayout 的 state，人数取自模型的成员表；
 //      这里不另算一套「大概是这样」的口径。
-//   3. 界面上说人话：组有中文名，转运区那四组一律叫「第 n 波攻击」（「拍」是排
-//      节奏时的内部叫法，不上界面），内部字段名只当尾巴上的等宽小字。
+//   3. 界面上说人话：组有中文名，转运区两组按事实表叫「第 n 处威胁」，
+//      内部字段名只当尾巴上的等宽小字。
 //
 // 跑法（闸门）：node Taierzhuang1938/Script_MissionOrchestrationFilterTest.mjs
 // 口径：docs/Data_MissionOrchestration.md §2。
@@ -45,7 +45,7 @@ export const FRIENDLY_LABELS = Object.freeze({
   tankStart: "坦克起始位", phaseSpawn: "跳关出生点",
 });
 export const ZONE_LABELS = Object.freeze({
-  gate: "过关条件的触发圈", interior: "室内判定区", crawl: "匍匐区", beatArea: "某一波攻击的落点范围",
+  gate: "过关条件的触发圈", interior: "室内判定区", crawl: "匍匐区", threatArea: "某一处威胁的落点范围",
 });
 // 路线的中文名。`MISSION_ROUTES` 的键是给代码用的（flank / ordersRejoin …），
 // 面板上照搬那些词等于没说 —— 这张表把每一条翻成「它到底是哪条路」。
@@ -92,8 +92,7 @@ export function RouteLabel(name) {
   return ROUTE_LABELS[name] || `路线 ${name}`;
 }
 
-// 二十一组敌人的中文名。转运区那四组不在这儿：它们的名字按攻击波次现算
-// （见 EncounterLabel），表里改了顺序名字就跟着改。
+// 敌军组的中文名。转运区两组由 EncounterLabel 按威胁事实表顺序现算。
 export const ENCOUNTER_LABELS = Object.freeze({
   bunkerAssault: "掩蔽部门外行刑的日军",
   approach: "压向外围阵地的日军",
@@ -236,7 +235,7 @@ export function RouteNamesFor(model, phaseLayout) {
 /** 界面上这一组该怎么称呼：查词表；转运区的两处威胁另按次序叫。 */
 export function EncounterLabel(model, encounter) {
   const id = typeof encounter === "string" ? encounter : encounter?.id;
-  const order = (model?.beats || []).findIndex((threat) => threat.id === id) + 1;
+  const order = (model?.transferThreats || []).findIndex((threat) => threat.id === id) + 1;
   if (order > 0) return `转运区第 ${order} 处威胁`;
   return ENCOUNTER_LABELS[id] || id || "（没名字的一组）";
 }

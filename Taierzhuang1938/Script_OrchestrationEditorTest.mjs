@@ -224,7 +224,7 @@ try {
     lookup.states.transfer === "active" && lookup.states.transferAlley === "pending",
     `transfer=${lookup.states.transfer} transferAlley=${lookup.states.transferAlley}`);
   Check("选中成员联动到地图", lookup.mapSelection?.id === "TransferGunner");
-  // 「怎么出现」要说人话：内部字段名（kind=beat 这类）不许出现在句子里，
+  // 「怎么出现」要说人话：内部字段名不许出现在句子里，
   // 编号（transfer / Transfer）只当尾巴上的等宽小字。
   Check("右栏反查出所属组 / 生成步骤 / 出现方式（第 n 处威胁，不写 kind=…）",
     lookup.owner.includes("transfer") && lookup.owner.includes("Transfer")
@@ -233,7 +233,7 @@ try {
   Check("右栏折叠了原始数据 JSON", lookup.json.includes("\"encounter\": \"transfer\""), lookup.json.slice(0, 80));
 
   // -------------------------------------------------------------------------
-  // 4b) 点地图上的组把手 / 攻击波标签，走的是同一条反查
+  // 4b) 点地图上的组把手 / 威胁标签，走的是同一条反查
   // -------------------------------------------------------------------------
   const fromMap = await page.evaluate(() => {
     const T = window.Taierzhuang;
@@ -258,19 +258,21 @@ try {
     const group = map.HandlePoint("encounter", "transfer");
     if (group) Click(group.x, group.y);
     const encounter = Read();
-    const beat = map.HandlePoint("beat", "transferAlley");
-    if (beat) Click(beat.x, beat.y);
-    const beatRead = Read();
-    return { group, beat, encounter, beatRead, handles: map.handles.length };
+    const threat = map.HandlePoint("threat", "transferAlley");
+    if (threat) Click(threat.x, threat.y);
+    const threatRead = Read();
+    return { group, threat, encounter, threatRead, handles: map.handles.length };
   });
   Check("点地图组把手 → 选中整组并反查出出现方式",
     fromMap.encounter.sel?.kind === "encounter" && fromMap.encounter.sel?.id === "transfer"
-    && fromMap.encounter.title.includes("遭遇组") && fromMap.encounter.owner.includes("波攻击"),
+    && fromMap.encounter.title.includes("遭遇组") && fromMap.encounter.owner.includes("第 1 处威胁")
+    && fromMap.encounter.owner.includes("loadingThreatResolved"),
     `${fromMap.encounter.title} ｜ ${fromMap.encounter.owner.slice(0, 80)}`);
   Check("点地图上的威胁标签 → 选中那一处并写出放行条件",
-    fromMap.beatRead.sel?.kind === "beat" && fromMap.beatRead.sel?.id === "transferAlley"
-    && /loadingThreatResolved 之后/.test(fromMap.beatRead.owner),
-    `${fromMap.beatRead.title} ｜ ${fromMap.beatRead.owner.slice(0, 80)}`);
+    fromMap.threatRead.sel?.kind === "threat" && fromMap.threatRead.sel?.id === "transferAlley"
+    && /loadingThreatResolved 之后/.test(fromMap.threatRead.owner)
+    && /alleyThreatResolved/.test(fromMap.threatRead.owner),
+    `${fromMap.threatRead.title} ｜ ${fromMap.threatRead.owner.slice(0, 80)}`);
 
   // -------------------------------------------------------------------------
   // 4c) 跟随实时不抢视野：手动缩放过就只换阶段、不重新框景
@@ -852,7 +854,7 @@ try {
     }));
     return {
       condition: Read('[data-timeline="design"] .tlMark[data-marker-kind="condition"]'),
-      beat: Read('[data-timeline="design"] .tlMark[data-marker-kind="beat"]'),
+      threat: Read('[data-timeline="design"] .tlMark[data-marker-kind="threat"]'),
       timed: Read('[data-timeline="design"] .tlMark[data-marker-kind="timed"]'),
       stageEntry: Read('[data-timeline="actual"] .tlMark[data-marker-kind="stageEntry"]'),
       actualFact: Read('[data-timeline="actual"] .tlMark[data-marker-kind="fact"]'),
@@ -869,9 +871,9 @@ try {
     timeline.condition[0]?.tip.slice(0, 80) || "（没有标记）");
   // 2026.09.19 起转运区是两处威胁、按前一处解除放行，没有秒数窗口了；带秒数的只剩 timed。
   Check("设计行的定时标了秒数，威胁不写秒数",
-    timeline.beat.length === 0
+    timeline.threat.length === 2 && timeline.threat.every((mark) => mark.at === null && !mark.tip.includes("undefined"))
     && timeline.timed.length > 0 && timeline.timed.every((mark) => mark.at !== null),
-    `beat ${timeline.beat.length} / timed ${timeline.timed.length}`);
+    `threat ${timeline.threat.length} / timed ${timeline.timed.length}`);
   Check("实际行画出了实际进入的步骤与满足的事实",
     timeline.stageEntry.length > 0 && timeline.stageEntry.every((mark) => mark.at !== null)
     && timeline.actualFact.length > 0,

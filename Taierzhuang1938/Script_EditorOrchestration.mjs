@@ -88,7 +88,7 @@ const PROPOSAL_TEXT = {
   move: "挪位置", delay: "改延迟", retime: "改时间窗", reroute: "改路线", remove: "删掉", other: "其它",
 };
 const KIND_TEXT = {
-  phase: "阶段", step: "步骤", fact: "事实", encounter: "遭遇组", member: "敌人", beat: "攻击波",
+  phase: "阶段", step: "步骤", fact: "事实", encounter: "遭遇组", member: "敌人", threat: "转运威胁",
   route: "路线", zone: "触发区", anchor: "锚点", friendly: "友军", point: "地图点", time: "时间点",
   note: "批注",
 };
@@ -96,7 +96,7 @@ const KIND_TEXT = {
 // 抄第二遍的下场是同一个状态在详情卡里叫「活跃」、在分类树里叫「在打」。
 const STATE_TEXT = STATE_LABELS;
 const SPAWN_TEXT = {
-  step: "进入步骤时生成", fact: "事实满足时生成", beat: "按转运区的攻击波次出现", opening: "由开场脚本生成",
+  step: "进入步骤时生成", fact: "事实满足时生成", threat: "按转运区威胁事实出现", opening: "由开场脚本生成",
 };
 const RELEASE_TEXT = { tacticNear: "玩家走到路线上的放行点附近才动" };
 const ZONE_TEXT = ZONE_LABELS;
@@ -119,11 +119,11 @@ const CATEGORY_ICONS = {
 };
 const WEAPON_ICONS = { Type11: "MachineGunner", Type38: "Rifleman", [BAYONET_KEY]: "Bayonet" };
 const TIMELINE_GLYPH = {
-  entry: "▸", condition: "◇", timed: "◆", beat: "■", delay: "·", wake: "✶",
+  entry: "▸", condition: "◇", timed: "◆", threat: "■", delay: "·", wake: "✶",
   stageEntry: "▸", fact: "●",
 };
 const TIMELINE_TEXT = {
-  entry: "进入", condition: "条件", timed: "定时", beat: "攻击波", delay: "延迟", wake: "苏醒",
+  entry: "进入", condition: "条件", timed: "定时", threat: "威胁", delay: "延迟", wake: "苏醒",
   stageEntry: "实际进入", fact: "实际满足",
 };
 
@@ -1797,7 +1797,9 @@ export class OrchestrationEditor {
     ];
     const human = entry.factId ? DescribeFact(this.model, entry.factId) : entry.label;
     if (human) lines.push({ k: "说的是", v: human });
-    if (entry.kind === "beat") lines.push({ k: "时刻", v: `第 ${entry.earliestS}–${entry.latestS} 秒之间` });
+    if (entry.kind === "threat") lines.push({ k: "时刻", v: entry.after
+      ? `等事实 ${entry.after} 后出现；解除后记 ${entry.factId}`
+      : `进入 ${entry.step} 即出现；解除后记 ${entry.factId}` });
     else if (Number.isFinite(seconds)) lines.push({ k: "时刻", v: `第 ${seconds} 秒` });
     else lines.push({ k: "时刻", v: "没有固定秒数，等玩家做到才发生" });
     return lines;
@@ -2584,7 +2586,7 @@ export class OrchestrationEditor {
     El("span", this.ui.title, KIND_TEXT[sel.kind] || sel.kind, "kindTag");
     El("b", this.ui.title, sel.id === undefined || sel.id === null
       ? `(${Round(sel.x)}, ${Round(sel.z)})` : this.TargetName(sel.kind, sel.id));
-    if (sel.kind === "beat" && this.BeatOrder(sel.id) > 0) El("code", this.ui.title, sel.id);
+    if (sel.kind === "threat" && this.ThreatOrder(sel.id) > 0) El("code", this.ui.title, sel.id);
     this.ui.owner.textContent = "";
     for (const row of this.DescribeSelection(sel)) {
       const line = El("div", this.ui.owner, "", "kv");
@@ -2598,30 +2600,25 @@ export class OrchestrationEditor {
     this.RefreshRelatedNotes(sel);
   }
 
-  /** 转运区那四波攻击在界面上一律叫「第 n 波攻击」，n 是它在攻击波表里的位置。 */
-  BeatOrder(beatId) { return this.model.beats.findIndex((one) => one.id === beatId) + 1; }
+  /** 转运区两处威胁按事实表顺序编号。 */
+  ThreatOrder(threatId) { return this.model.transferThreats.findIndex((one) => one.id === threatId) + 1; }
 
-  /** 界面上这个对象该怎么称呼（攻击波说「第 n 波攻击」，其余就是它的编号）。 */
+  /** 界面上这个对象该怎么称呼（转运威胁按事实表顺序编号，其余使用自身编号）。 */
   TargetName(kind, id) {
-    if (kind === "beat") {
-      const order = this.BeatOrder(id);
-      if (order > 0) return `第 ${order} 波攻击`;
+    if (kind === "threat") {
+      const order = this.ThreatOrder(id);
+      if (order > 0) return `第 ${order} 处威胁`;
     }
     return String(id ?? "");
   }
 
-  /** 「转运区第 2 波攻击，进入 Transfer 这一步后第 35–60 秒之间、且已装车 4 副时出现」 */
-  BeatSentence(beatId, stepId) {
-    const order = this.BeatOrder(beatId);
-    const beat = order > 0 ? this.model.beats[order - 1] : null;
-    if (!beat) return SPAWN_TEXT.beat;
-    const head = `转运区第 ${order} 波攻击`;
-    const step = stepId || "Transfer";
-    if (beat.earliestS === beat.latestS && !beat.earliestS && !beat.loaded) return `${head}，一进 ${step} 这一步就出现`;
-    const when = beat.earliestS === beat.latestS
-      ? `进入 ${step} 这一步后第 ${beat.earliestS} 秒`
-      : `进入 ${step} 这一步后第 ${beat.earliestS}–${beat.latestS} 秒之间`;
-    return `${head}，${when}${beat.loaded ? `、且已装车 ${beat.loaded} 副` : ""}时出现`;
+  /** 「转运区第 2 处威胁，loadingThreatResolved 之后出现；解除后记 alleyThreatResolved」。 */
+  ThreatSentence(threatId) {
+    const order = this.ThreatOrder(threatId);
+    const threat = order > 0 ? this.model.transferThreats[order - 1] : null;
+    if (!threat) return SPAWN_TEXT.threat;
+    const when = threat.after ? `${threat.after} 之后出现` : `进入 ${threat.step} 即出现`;
+    return `转运区第 ${order} 处威胁，${when}；解除后记 ${threat.resolved}`;
   }
 
   /**
@@ -2641,9 +2638,9 @@ export class OrchestrationEditor {
         Add("属于哪组", `第 ${encounter.phaseNumber ?? "—"} 阶段出场的一组`
           + `${encounter.deferred ? "（这一阶段里要晚一点才放）" : ""}`, encounter.id);
         const spawn = encounter.spawn || {};
-        if (spawn.beat) {
-          // 内部字段名（kind=beat 这类）不进句子：句子说人话，编号跟在后面当小字。
-          Add("怎么出现", this.BeatSentence(spawn.beat, spawn.step), spawn.beat);
+        const threat = model.transferThreats.find((entry) => entry.id === encounter.id);
+        if (threat) {
+          Add("怎么出现", this.ThreatSentence(threat.id), threat.id);
         } else {
           const where = [];
           if (spawn.step) where.push(`进入步骤 ${spawn.step} 时`);
@@ -2744,15 +2741,14 @@ export class OrchestrationEditor {
         Add("位置", At(friendly));
         if (friendly.step) Add("属于步骤", friendly.step);
       }
-    } else if (sel.kind === "beat") {
-      const index = model.beats.findIndex((entry) => entry.id === sel.id);
-      const beat = index >= 0 ? model.beats[index] : null;
-      if (beat) {
-        Add("这是什么", `转运区的第 ${index + 1} 波攻击（一共 ${model.beats.length} 波）`, beat.id);
-        Add("什么时候来", `进入 Transfer 这一步后第 ${beat.earliestS}–${beat.latestS} 秒之间`
-          + `${beat.loaded ? `，而且要已装车 ${beat.loaded} 副` : ""}`);
-        if (index > 0) Add("与上一波隔", `${beat.restS} 秒`);
-        if (beat.hint) Add("提示语", "", beat.hint);
+    } else if (sel.kind === "threat") {
+      const index = model.transferThreats.findIndex((entry) => entry.id === sel.id);
+      const threat = index >= 0 ? model.transferThreats[index] : null;
+      if (threat) {
+        Add("这是什么", `转运区的第 ${index + 1} 处威胁（一共 ${model.transferThreats.length} 处）`, threat.id);
+        Add("怎么出现", threat.after ? `${threat.after} 之后出现` : `进入 ${threat.step} 即出现`, threat.after || threat.step);
+        Add("解除后记", "解除这处威胁后记录事实", threat.resolved);
+        if (threat.hint) Add("地图位置", "由这个锚点标出", threat.hint);
       }
     } else if (sel.kind === "point") {
       Add("位置", `地图上的一点 ${At(sel)}`);
@@ -3079,11 +3075,11 @@ function MarkerSeconds(entry) {
   // 给它们编一个秒数就是把「设计的预定安排」和「实际发生」混成一锅。
   if (entry.kind === "timed") return Number.isFinite(entry.atS) ? entry.atS : entry.minimumSeconds;
   if (entry.kind === "delay") return entry.atS;
-  if (entry.kind === "beat") return entry.earliestS;
   return undefined;
 }
 
 function MarkerSel(entry) {
+  if (entry.kind === "threat" && entry.encounterId) return { kind: "threat", id: entry.encounterId };
   if (entry.factId) return { kind: "fact", id: entry.factId };
   if (entry.memberId) return { kind: "member", id: entry.memberId };
   if (entry.encounterId) return { kind: "encounter", id: entry.encounterId };

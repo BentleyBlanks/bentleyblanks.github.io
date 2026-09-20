@@ -624,9 +624,9 @@ try {
     const layout = map.phaseLayout;
     const transfer = (layout.encounters || []).find((entry) => entry.id === "transfer");
     const group = map.HandlePoint("encounter", "transfer");
-    const beat = map.HandlePoint("beat", "transferAlley");
+    const threat = map.HandlePoint("threat", "transferAlley");
     const groupSel = group ? map.PickAt(group.x, group.y) : null;
-    const beatSel = beat ? map.PickAt(beat.x, beat.y) : null;
+    const threatSel = threat ? map.PickAt(threat.x, threat.y) : null;
     // 把手不许遮住人：这一组每个成员在自己的屏幕位置上仍然点得中「人」。
     const members = (transfer?.members || []).map((member) => {
       const screen = map.WorldToScreen(member.x, member.z);
@@ -646,24 +646,24 @@ try {
     map.SetSelection({ kind: "encounter", id: "transfer" });
     const selectPx = window.__Count(["select"]).select;
     map.SetSelection(null);
-    window.__Mouse("mousemove", beat.x, beat.y);
-    const hoveredBeat = map.hover;
-    map.SetSelection({ kind: "beat", id: "transferAlley" });
-    const beatSelectPx = window.__Count(["select"]).select;
+    window.__Mouse("mousemove", threat.x, threat.y);
+    const hoveredThreat = map.hover;
+    map.SetSelection({ kind: "threat", id: "transferAlley" });
+    const threatSelectPx = window.__Count(["select"]).select;
     map.SetSelection(null);
     map.SetHover(null);
     // 已清除的组不给把手：第 12 阶段这样的组有十来个，遍布全关。
     const clearedIds = (layout.encounters || []).filter((entry) => entry.state === "cleared").map((entry) => entry.id);
     const clearedHandles = clearedIds.filter((id) => !!map.HandlePoint("encounter", id));
     // 用词：图上不许出现「拍」这种排程表里的内部叫法
-    const beatLabel = (map.placedLabels || []).find((e) => e.kind === "beat" && e.id === "transferAlley")?.text || "";
+    const threatLabel = (map.placedLabels || []).find((e) => e.kind === "threat" && e.id === "transferAlley")?.text || "";
     const jargon = (map.placedLabels || []).map((e) => e.text).filter((t) => /(^|\s)拍\s/.test(t));
-    const beatTip = map.DescribeSel({ kind: "beat", id: "transferAlley" });
-    const firstTip = map.DescribeSel({ kind: "beat", id: "transfer" });
+    const threatTip = map.DescribeSel({ kind: "threat", id: "transferAlley" });
+    const firstTip = map.DescribeSel({ kind: "threat", id: "transfer" });
     return {
-      beatLabel, jargon, beatTip, firstTip,
-      group, beat, groupSel, beatSel, members, withChips, noChips, hovered, hoverAdded, selectPx,
-      hoveredBeat, beatSelectPx,
+      threatLabel, jargon, threatTip, firstTip,
+      group, threat, groupSel, threatSel, members, withChips, noChips, hovered, hoverAdded, selectPx,
+      hoveredThreat, threatSelectPx,
       clearedCount: clearedIds.length, clearedHandles,
       kinds: [...new Set(map.handles.map((entry) => entry.kind))],
       png: map.ToPng({ scale: 1 }),
@@ -674,9 +674,9 @@ try {
   Check("点组把手拿到整组（kind=encounter）",
     chips.groupSel?.kind === "encounter" && chips.groupSel?.id === "transfer",
     `把手 @ (${chips.group?.x?.toFixed(0)}, ${chips.group?.y?.toFixed(0)}) → ${JSON.stringify(chips.groupSel)}`);
-  Check("点转运拍的标签拿到那一拍（kind=beat）",
-    chips.beatSel?.kind === "beat" && chips.beatSel?.id === "transferAlley",
-    `把手 @ (${chips.beat?.x?.toFixed(0)}, ${chips.beat?.y?.toFixed(0)}) → ${JSON.stringify(chips.beatSel)}`);
+  Check("点第二处威胁标签拿到第二处威胁",
+    chips.threatSel?.kind === "threat" && chips.threatSel?.id === "transferAlley",
+    `把手 @ (${chips.threat?.x?.toFixed(0)}, ${chips.threat?.y?.toFixed(0)}) → ${JSON.stringify(chips.threatSel)}`);
   Check("组把手不遮住成员（每个成员仍点得中人）",
     chips.members.length > 0 && chips.members.every((row) => row.hit.startsWith("member:")),
     chips.members.map((row) => `${row.id}→${row.hit}`).join(" "));
@@ -686,18 +686,19 @@ try {
     chips.hovered?.kind === "encounter" && chips.hovered?.id === "transfer" && chips.hoverAdded >= 1,
     JSON.stringify(chips.hovered));
   Check("选中一整组时整组成员被描亮", chips.selectPx > 0, `${chips.selectPx} px 高亮色`);
-  Check("悬停 / 选中一拍也走同一条路（tooltip + 描亮那一撮人）",
-    chips.hoveredBeat?.kind === "beat" && chips.hoveredBeat?.id === "transferAlley" && chips.beatSelectPx > 0,
-    `${JSON.stringify(chips.hoveredBeat)}，描亮 ${chips.beatSelectPx} px`);
+  Check("悬停 / 选中第二处威胁也走同一条路（tooltip + 描亮那一撮人）",
+    chips.hoveredThreat?.kind === "threat" && chips.hoveredThreat?.id === "transferAlley" && chips.threatSelectPx > 0,
+    `${JSON.stringify(chips.hoveredThreat)}，描亮 ${chips.threatSelectPx} px`);
   Check("已清除的组不长把手", chips.clearedCount > 0 && chips.clearedHandles.length === 0,
     `已清除 ${chips.clearedCount} 组，把手种类 ${chips.kinds.join("/")}`);
   Check("转运两处威胁在图上叫「第几处威胁」，不写内部叫法「拍」",
-    /^第 2 处威胁 · transferAlley · loadingThreatResolved 之后$/.test(chips.beatLabel) && chips.jargon.length === 0,
-    `${chips.beatLabel}${chips.jargon.length ? ` ｜ 还写着：${chips.jargon.join("、")}` : ""}`);
+    /^第 2 处威胁 · transferAlley · loadingThreatResolved 之后$/.test(chips.threatLabel) && chips.jargon.length === 0,
+    `${chips.threatLabel}${chips.jargon.length ? ` ｜ 还写着：${chips.jargon.join("、")}` : ""}`);
   Check("悬停提示同样说人话，第一处写「进转运即到」",
-    chips.beatTip[0] === "转运攻击波：transferAlley" && chips.beatTip[1] === "第 2 处威胁 · loadingThreatResolved 之后"
-    && chips.firstTip[1] === "第 1 处威胁 · 进转运即到",
-    `${chips.beatTip.join(" ｜ ")} ／ ${chips.firstTip.join(" ｜ ")}`);
+    chips.threatTip[0] === "转运威胁：transferAlley" && chips.threatTip[1] === "第 2 处威胁 · loadingThreatResolved 之后"
+    && chips.threatTip[2] === "解除后记 alleyThreatResolved"
+    && chips.firstTip[1] === "第 1 处威胁 · 进 Transfer 即到",
+    `${chips.threatTip.join(" ｜ ")} ／ ${chips.firstTip.join(" ｜ ")}`);
 
   // -------------------------------------------------------------------------
   // 4) ToPng：PNG dataURL 且 > 10 KB

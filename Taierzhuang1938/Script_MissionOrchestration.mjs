@@ -8,7 +8,7 @@
 //
 // 设计时间轴与实际试玩要分清：
 //   · condition 类的时间轴项**没有秒数** —— 它们由玩家行为触发；
-//   · timed / beat / delay 才带秒数（minimumSeconds、拍表窗口、战术延迟…）；
+//   · timed / delay 才带秒数；转运威胁由先后事实驱动，没有伪造时间窗；
 //   · 实际发生的时间只从运行时的 flow.log 来（ApplyRuntimeState 的 actualTimeline）。
 //
 // 跑法：node Taierzhuang1938/Script_MissionOrchestrationCli.mjs summary
@@ -236,11 +236,11 @@ function BuildZones(facts) {
       minX: crawl.x - crawl.w / 2, maxX: crawl.x + crawl.w / 2,
       minZ: crawl.z - crawl.d / 2, maxZ: crawl.z + crawl.d / 2,
     });
-  for (const beat of MISSION_TRANSFER_THREATS) {
-    const roster = MISSION_ENCOUNTERS[beat.id] || [];
+  for (const threat of MISSION_TRANSFER_THREATS) {
+    const roster = MISSION_ENCOUNTERS[threat.id] || [];
     if (!roster.length) continue;
     zones.push({
-      id: `threat_${beat.id}`, kind: "threatArea", step: "Transfer", fact: null,
+      id: `threat_${threat.id}`, kind: "threatArea", step: "Transfer", fact: threat.resolved,
       minX: Math.min(...roster.map((spec) => spec.x)), maxX: Math.max(...roster.map((spec) => spec.x)),
       minZ: Math.min(...roster.map((spec) => spec.z)), maxZ: Math.max(...roster.map((spec) => spec.z)),
     });
@@ -422,7 +422,9 @@ export function BuildOrchestrationModel() {
     steps,
     facts,
     encounters,
-    beats: MISSION_TRANSFER_THREATS.map((beat) => ({ ...beat })),
+    transferThreats: MISSION_TRANSFER_THREATS.map((threat, index) => ({
+      ...threat, order: index + 1, step: "Transfer",
+    })),
     routes: BuildRoutes(),
     anchors: Object.fromEntries(Object.entries(MISSION_ANCHORS).map(([id, point]) => [id, Flat(point)])),
     zones: BuildZones(facts),
@@ -580,7 +582,7 @@ export function ModelSummary(model) {
   lines.push(`边界 X ${model.bounds.minX}..${model.bounds.maxX}  Z ${model.bounds.minZ}..${model.bounds.maxZ}`);
   lines.push(`公开阶段 ${model.phases.length} 个 / 内部步骤 ${model.steps.length} 个 / 事实门 ${Object.keys(model.facts).length} 条`);
   lines.push(`  事实门按判法：${Object.entries(factKinds).sort().map(([kind, n]) => `${kind} ${n}`).join("  ")}`);
-  lines.push(`遭遇组 ${model.encounters.length} 组 / 成员 ${members} 人 / 转运区 ${model.beats.length} 波攻击`);
+  lines.push(`遭遇组 ${model.encounters.length} 组 / 成员 ${members} 人 / 转运区 ${model.transferThreats.length} 处威胁`);
   lines.push(`路线 ${Object.keys(model.routes).length} 条 / 锚点 ${Object.keys(model.anchors).length} 个 / 区域 ${model.zones.length} 个 / 友军点 ${model.friendlies.length} 个`);
   lines.push(`时间轴 ${model.timeline.length} 项（condition ${model.timeline.filter((e) => e.kind === "condition").length} 项无秒数）`);
   lines.push(`地图：体块 ${model.layout.blocks.length} / 门 ${model.layout.gates.length} / 道路 ${model.layout.roads.length} / 壕沟 ${model.layout.trenches.length} 段`);

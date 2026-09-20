@@ -30,7 +30,7 @@ export const LEVEL_RE = /^[A-Za-z0-9]+$/;
 
 export const NOTE_STATUSES = Object.freeze(["open", "resolved", "dismissed"]);
 export const TARGET_KINDS = Object.freeze([
-  "phase", "step", "fact", "encounter", "member", "beat",
+  "phase", "step", "fact", "encounter", "member", "threat", "beat",
   "route", "zone", "anchor", "friendly", "point", "time",
 ]);
 export const PROPOSAL_KINDS = Object.freeze(["move", "delay", "retime", "reroute", "remove", "other"]);
@@ -38,7 +38,7 @@ export const SHAPE_KINDS = Object.freeze(["circle", "arrow", "path", "label", "g
 export const TIME_KINDS = Object.freeze(["stageRelative", "fact", "actual"]);
 
 /** 有 id 才认得出目标的那几类（point / time 靠坐标与秒数自证）。 */
-const KINDS_NEED_ID = Object.freeze(["phase", "step", "fact", "encounter", "member", "beat", "route", "zone", "anchor", "friendly"]);
+const KINDS_NEED_ID = Object.freeze(["phase", "step", "fact", "encounter", "member", "threat", "beat", "route", "zone", "anchor", "friendly"]);
 
 const ID_ALPHABET = "abcdefghijklmnopqrstuvwxyz0123456789";
 
@@ -347,6 +347,13 @@ export function SnapshotTarget(model, target) {
     return Put({ kind: "beat", ...rest, id }, "beatKind", beatKind);
   }
 
+  if (kind === "threat") {
+    const threats = model && Array.isArray(model.transferThreats) ? model.transferThreats : [];
+    const threat = threats.find((one) => one.id === id);
+    if (!threat) return Missing();
+    return { kind: "threat", ...Clone(threat), id };
+  }
+
   if (kind === "route") {
     const points = model && model.routes ? model.routes[id] : null;
     if (!points) return Missing();
@@ -357,7 +364,7 @@ export function SnapshotTarget(model, target) {
     const zones = model && Array.isArray(model.zones) ? model.zones : [];
     const zone = zones.find((one) => one.id === id);
     if (!zone) return Missing();
-    // zone 自己那个 kind（gate/interior/crawl/beatArea）会撞上快照的 kind，改名 shape。
+    // zone 自己那个 kind（gate/interior/crawl/threatArea）会撞上快照的 kind，改名 shape。
     const { kind: shape, ...rest } = Clone(zone);
     return { kind: "zone", shape, ...rest, id };
   }

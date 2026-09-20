@@ -304,7 +304,10 @@ Check(Object.keys(model.facts).length === Object.keys(MISSION_FACT_GATES).length
 Check(model.encounters.length === Object.keys(MISSION_ENCOUNTERS).length, "遭遇组数与 MISSION_ENCOUNTERS 一致");
 Check(model.encounters.reduce((sum, e) => sum + e.members.length, 0)
   === Object.values(MISSION_ENCOUNTERS).flat().length, "成员数与 MISSION_ENCOUNTERS 一致");
-Check(model.beats.length === MISSION_TRANSFER_THREATS.length, "威胁数与 MISSION_TRANSFER_THREATS 一致");
+Check(model.transferThreats.length === MISSION_TRANSFER_THREATS.length, "威胁数与 MISSION_TRANSFER_THREATS 一致");
+Check(model.transferThreats.every((threat, index) => threat.order === index + 1
+  && threat.step === "Transfer" && typeof threat.resolved === "string"),
+"工作台威胁模型带顺序、出现事实与解除事实");
 for (const name of ["pursuit", "sortie", "sortieReturn", "approach", "supportTrench", "flank", "village", "evacuation", "exit"])
   Check(model.routes[name]?.length, `routes 里要有 ${name}`);
 Check(model.layout.blocks.length > 500 && model.layout.gates.length > 0, "layout 带上了体块与门");
