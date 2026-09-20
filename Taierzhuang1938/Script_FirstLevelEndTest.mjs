@@ -427,20 +427,26 @@ const VOICE_FACT = Object.freeze({
   r.carry.KindId = "stretcher";
   r.reception.Enter("Handover");
   r.extras.Spawn("WardSurgeon", P.receptionYard.surgeon, { weapon: null, unarmed: true });
+  // 即使先走到放置点旁边，没过门槛、老周最后一句没播完，军医也不能抢先喊。
+  r.player.position.x = A.zhouDrop.x; r.player.position.z = A.zhouDrop.z;
+  r.Step(20, "Handover");
+  Check(!r.said.includes("PlaceLitter"), "没过门槛以前军医不能提前指位置");
   // 过门槛：担架真的歪一下，然后回正。
   r.facts.add("thresholdCrossed");
   r.Step(E.thresholdTiltS / 2, "Handover");
   Check(Math.abs(zhou.roll) > 0.02, "过门槛担架真的歪了一下");
   r.Step(E.thresholdTiltS, "Handover");
   Check(Math.abs(zhou.roll) < 1e-6, "颠完就回正，不是一直斜着");
-  // 军医先指位置，才允许按 F。
-  Check(!r.Has("placeOrderHeard"), "军医还没指位置");
-  r.player.position.x = A.zhouDrop.x; r.player.position.z = A.zhouDrop.z;
+  Check(!r.said.includes("PlaceLitter"), "Threshold 还没播完时军医不能把它压到队尾");
+  r.Say("Threshold");
   r.Step(20, "Handover");
-  Check(r.said.includes("PlaceLitter"), "抬到位置边上、军医到位，他才说「这副放这里」");
+  Check(r.said.indexOf("Threshold") < r.said.indexOf("PlaceLitter"),
+    "过门槛最后一句播完以后，军医才说「这副放这里」");
   Check(r.Has("placeOrderHeard"), "喊出口就记 placeOrderHeard（F 的前置）");
   const placeGate = MISSION_FACT_GATES.zhouPlaced;
   Check(placeGate.requires?.includes("placeOrderHeard"), "zhouPlaced 的前置写进了编排表");
+  Check(MISSION_FACT_GATES.placeOrderHeard.requires?.includes("thresholdCrossed"),
+    "军医指位置的编排事实也显式依赖真实过门槛");
   // 放下之后军医真的开始看伤，其余伤员在流程里班长才分派。
   r.facts.add("zhouPlaced");
   Object.assign(zhou, { state: "placed" });

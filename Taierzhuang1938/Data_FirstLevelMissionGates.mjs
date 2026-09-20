@@ -593,7 +593,8 @@ export const MISSION_FACT_GATES = Object.freeze({
   }),
   placeOrderHeard: Gate({
     kind: "voice", step: "Handover", cue: "PlaceLitter", source: "FirstLevelReception.UpdateHandover",
-    text: "军医指了位置（喊出口之后才允许按 F 放下担架）",
+    text: "老周过门槛的最后一句说完之后，军医才指位置（喊出口之后才允许按 F 放下担架）",
+    requires: ["thresholdCrossed"],
   }),
   squadDispersed: Gate({
     kind: "scripted", step: "Handover", source: "FirstLevelReception.UpdateHandover",

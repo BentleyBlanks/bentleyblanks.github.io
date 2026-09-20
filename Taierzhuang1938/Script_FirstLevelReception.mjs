@@ -136,6 +136,10 @@ export class FirstLevelReception {
 
     // 「这副放这里」：抬着人走到位置边上、军医到位，才喊；喊出口才允许按 F 放下。
     if (!placed && ready && !state.placeAsked && r.carry?.KindId === "stretcher"
+      // 采用稿顺序是先过门槛轻歪、老周说完最后一句，再由军医指位置。
+      // 只看离放置点的距离会在门外 5 m 范围内提前喊 PlaceLitter，反把
+      // Threshold 排到队尾；这里等真实门槛事实与该句实际播完。
+      && r.Has("thresholdCrossed") && r.voice.played.has("Threshold")
       && Distance(r.player.position, A.zhouDrop) <= E.placeOrderReachM) {
       state.placeAsked = true;
       r.Say("PlaceLitter");
