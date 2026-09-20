@@ -281,9 +281,13 @@ async function DriveDeath(ctx, { JumpStage, Capture, WaitStage }) {
   const deathControl = await page.evaluate(() => {
     const g = window.Tengxian;
     for (let i = 0; i < 240 && !g.Debug.FirstLevelMission().control; i += 1) g.StepFrames(1, 1 / 60, false);
-    const startedAt = g.Debug.FirstLevelMission().time;
+    const runtime = g.Debug.FirstLevelMissionRuntime();
+    const observedAt = runtime.time, observedElapsed = runtime.controls?.time || 0;
+    // JumpStage 或自然入场可能在本轮观察到 control 以前已经推进过若干帧；
+    // controls.time 是受控段自己的实际时钟，用它反推起点，不能拿观察时刻冒充起点。
+    const startedAt = observedAt - observedElapsed;
     for (let i = 0; i < 180 && g.Debug.FirstLevelMission().control; i += 1) g.StepFrames(1, 1 / 60, false);
-    return { startedAt, previewAt: g.Debug.FirstLevelMission().time,
+    return { startedAt, observedAt, observedElapsed, previewAt: g.Debug.FirstLevelMission().time,
       control: g.Debug.FirstLevelMission().control };
   });
   assert.equal(deathControl.control, "death", "床边第一人称截图发生在 death 控制段内");
