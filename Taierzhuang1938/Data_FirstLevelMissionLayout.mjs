@@ -719,8 +719,9 @@ export const MISSION_PLACEMENT = Object.freeze({
   bunker: {
     player: { x: -40, z: -123.4, yaw: Math.PI },    // 头朝北（-z），能看见门外
     playerEyeM: 0.42,
-    // 够不到：离玩家 2.8 m（后半间只有 3 m 进深，枪甩到东北角那块地上）。
-    rifle: { x: -37.6, z: -121.9, yaw: 1.1 },
+    // 够不到：离玩家 2.6 m。离东墙、后墙的内表面都留出约 0.8 m，让同源 HanYang
+    // 地枪模型完整躺在屋内，不把枪身插进墙里。
+    rifle: { x: -37.8, z: -122.1, yaw: 0.15 },
     pinnedFrame: [{ x: -41.15, z: -123.4 }, { x: -38.85, z: -123.6 }],
     // 门外这一片全部落在破口的射影里：眼睛 (-40,-123.4,+0.42) 穿 x −41.4…−38.6
     // 那道 2.8 m 的缝，8.5 m 处开出 x −42.59…−37.41，当中门框立柱再挡掉
@@ -732,7 +733,9 @@ export const MISSION_PLACEMENT = Object.freeze({
     // 缴下来的两支枪落在两人**几米外**（Notion：「已经落在数米外」），而且都还在破口的
     // 射影里；踢开那一支往门口这边滑，滑完也不许被门垛吃掉。
     captiveRifles: [{ x: -42.0, z: -133.6 }, { x: -37.9, z: -132.9 }],
-    ijaStart: [{ x: -41.3, z: -138.2, yaw: Math.PI }, { x: -37.9, z: -138.9, yaw: Math.PI }],
+    // A 去右侧的 ijaKill[1]、B 去左侧的 ijaKill[0]：起点同侧且离落点 3–4 m，
+    // 近爆黑视的 4.6 s 内能走到，不再交叉相撞后隔空触发第一拍。
+    ijaStart: [{ x: -38.4, z: -135.8, yaw: Math.PI }, { x: -41.2, z: -136.0, yaw: Math.PI }],
     ijaKill: [{ x: -40.8, z: -132.4, yaw: Math.PI }, { x: -39.9, z: -133.2, yaw: Math.PI }],
     ijaDoor: [{ x: -40.3, z: -130.3, yaw: Math.PI }, { x: -38.9, z: -130.6, yaw: Math.PI }],
     luoEntry: { x: -40, z: -119.6, yaw: Math.PI },  // 从后壁破口挤进来

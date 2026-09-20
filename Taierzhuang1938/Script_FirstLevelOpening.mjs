@@ -100,7 +100,10 @@ export class FirstLevelOpening {
     const r=this.r,bunker=this.bunker;
     if(!bunker)return;
     const age=r.time-bunker.started;
-    if(bunker.blastAt==null&&age>=R.bunkerBanterFallbackS)this.BunkerBlast();
+    // 正常录音和缺录音的估时字幕都会在末句结束发 BunkerBlast。8 秒只救一个
+    // 根本没有可推进 BunkerBanter 时间轴的异常态，不能抢在 16.744 秒录音前炸。
+    if(bunker.blastAt==null&&age>=R.bunkerBanterFallbackS
+      &&r.voice.current?.cue?.id!=="BunkerBanter")this.BunkerBlast();
     if(bunker.blastAt==null)return;
     r.frontShow?.bunker.UpdateBunker(bunker);
   }

@@ -203,6 +203,9 @@ export class FirstLevelMissionRuntime {
     this.nightGate = new FirstLevelNightGate(this);
     this.leaderGuide = new FirstLevelLeaderGuide(this);
     this.Register();
+    // 02 的交互点与玩家实际看到的是同一坐标、同一 HanYang 几何。它不另注册一条
+    // 通用地枪交互，避免 F 在两个候选之间抢焦点；任务交互完成时统一拆掉。
+    this.bunkerRifle = this.SpawnMissionRifle?.(P.bunker.rifle) ?? null;
     this.flow.Start();
     this.voiceReady = this.voice.Load().then(()=>{
       if (host.stageJump != null) ApplyFirstLevelStageJump(this, host.stageJump, { midCutscenes: !!host.stageJumpMidCutscenes });
@@ -225,6 +228,11 @@ export class FirstLevelMissionRuntime {
   }
   Has(id) {
     return this.flow.Has(id);
+  }
+  RemoveBunkerRifle() {
+    if (!this.bunkerRifle) return;
+    this.RemoveMissionRifle?.(this.bunkerRifle);
+    this.bunkerRifle = null;
   }
   /**
    * 可见空间的换态信号（契约 §3 冻结的大写名）。装配层每帧把这个问给
@@ -388,6 +396,10 @@ export class FirstLevelMissionRuntime {
     // missionTrainReady 这个旗标沿用（UpdateSquad 拿它当「这个人已经归行军层管」）。
     for (const [i, actor] of this.squad.entries()) {
       actor.missionTrainReady = true;
+      // 01 是玩家受困时的行刑演出。班里人此刻只在后侧挖掘；真正开火必须等
+      // doorSearchStarted 把流程推进 02，再由 FirstLevelBunker.UpdateSuppression
+      // 单独放开何有田。否则通用 AI 会让全班提前射杀两名行刑兵。
+      actor.scriptedNoncombatant = true;
       this.PlaceActor(actor, this.opening.BunkerPost(i));
       this.Defend(actor, actor.position, 0, 0);
       this.ai.SetStance(actor, 1, 2, true);
@@ -745,8 +757,12 @@ export class FirstLevelMissionRuntime {
         incomingAt:actor.incomingFire?.at,suppression:actor.suppression})),
       [...this.enemies.values()].filter(e=>e.alive&&!e.scriptedNoncombatant&&!e.missionDormant&&!e.missionSurfaceRest&&!e.missionFrontStandby).map(e=>e.position));
     this.squadCoverCalm=coverCalm;
-    // 受困那一段班里人是演出，不归行军层管。
-    if (stage === "Trapped") return;
+    // 受困那一段班里人是演出，不归行军层管，也不许通用 AI 提前救场。
+    if (stage === "Trapped") {
+      for (const actor of this.squad) actor.scriptedNoncombatant = true;
+      return;
+    }
+    const bunkerRescueLocked = stage === "BunkerRescue" && !this.Has("luoRescueComplete");
     for (const actor of this.squad) {
       InstallMissionSentry(actor);
       if (!actor.missionTrainReady) continue;
@@ -764,12 +780,15 @@ export class FirstLevelMissionRuntime {
         continue;
       }
       actor.missionCoverWaiting=false;actor.missionCoverApproach=false;
-      actor.scriptedNoncombatant = ["NightMarch","Regroup","WallPath","ReceptionGate"].includes(stage);
+      // 02 尚未还权时，罗/幺娃在掀木架，文财留在后侧；只有 FrontShow 在本帧
+      // UpdateSquad 之后明确放开的何有田能开火。救援完成后全班恢复通用战斗 AI。
+      actor.scriptedNoncombatant = bunkerRescueLocked
+        || ["NightMarch","Regroup","WallPath","ReceptionGate"].includes(stage);
       actor.scriptEscapeStance=null;
       // 02：罗班长正在把人从木架下拖出来，幺娃在另一头拉背包。这几秒这两个人
       // 不找掩体、不参加交火 —— 门外那伙人由何有田从后侧交通壕压着（契约 §2）。
       // 不放行的话接触反应每帧把他们推回掩体，谁也走不到掀架位，02 就永远不开始。
-      if(stage==="BunkerRescue"&&["luo","yaowa"].includes(actor.castId)&&!this.Has("luoRescueComplete")){
+      if(bunkerRescueLocked&&["luo","yaowa"].includes(actor.castId)){
         this.ai.ReleaseCover(actor);
         this.ai.SetStance(actor,1,.5,true);
         continue;
@@ -1188,6 +1207,7 @@ export class FirstLevelMissionRuntime {
       () => this.flow.stage.id === "BunkerRescue" && this.Has("luoRescueComplete") && !this.Has("rifleRecovered"),
       () => {
         this.Record("rifleRecovered");
+        this.RemoveBunkerRifle();
         this.RestoreRifle();
         this.SaveCheckpoint();
         return true;
@@ -2349,6 +2369,8 @@ export class FirstLevelMissionRuntime {
     return {target,label:T(`firstLevel.guide.${label}`),status};
   }
   Update(dt) {
+    // 阶段跳转/检查点可直接补齐 rifleRecovered，不经过 MissionRifle.OnComplete。
+    if (this.Has("rifleRecovered")) this.RemoveBunkerRifle();
     if (this.completed || this.failed) return;
     this.delta = dt;
     this.time += dt;
@@ -2400,7 +2422,7 @@ export class FirstLevelMissionRuntime {
         if(this.controls.time>=R.nightTransition.fadeOutS && !this.Has("nightArrivalPlaced"))this.PlaceNightArrival();
       }
       this.controls.time = this.controls.kind==="rescue"?this.opening.RescueElapsed():this.controls.time+dt;
-      if (this.controls.time >= this.controls.seconds &&
+      if (this.controls.time >= this.controls.seconds && this.controls.kind!=="trapped" &&
         (this.controls.kind!=="death" || this.voice.finished.has("ZhouDeath"))) {
         const kind = this.controls.kind;
         this.controls = null;
@@ -2794,6 +2816,7 @@ export class FirstLevelMissionRuntime {
     };
   }
   Dispose() {
+    this.RemoveBunkerRifle();
     this.leaderGuide?.Dispose();
     this.ClearReturnWarning();
     this.speakingFace?.Reset();

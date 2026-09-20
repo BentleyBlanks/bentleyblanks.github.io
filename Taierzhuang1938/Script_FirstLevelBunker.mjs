@@ -36,17 +36,25 @@ export function BunkerBeatsDue(lineIndex, elapsed, beats = BUNKER_KILL_BEATS) {
   return due;
 }
 
+/** 两名搜索兵都实际走到门口（阵亡者不再构成搜索阻塞）才允许记录 doorSearchStarted。 */
+export function BunkerDoorSearchReady(actors, targets, arriveM) {
+  return actors.every((actor, slot) => !!actor && (!actor.alive || Distance(actor.position, targets[slot]) <= arriveM));
+}
+
 export class FirstLevelBunkerShow {
   constructor(runtime) {
     this.r = runtime;
     this.captives = [];
     this.rifleProps = [];
     this.beats = new Set();
+    this.killRequested = false;
     this.killAt = null;
     this.killLine = null;
     this.stabAt = null;
     this.kickAt = null;
     this.creakAt = null;
+    this.approachStarted = false;
+    this.postKillHold = null;
     this.digAt = null;
     this.nextDigAt = 0;
   }
@@ -96,7 +104,10 @@ export class FirstLevelBunkerShow {
       if (spot) mesh.position.x = spot.x, mesh.position.z = spot.z;
     }
     this.beats.clear();
+    this.killRequested = false;
     this.killAt = this.killLine = this.stabAt = this.kickAt = this.creakAt = this.digAt = null;
+    this.approachStarted = false;
+    this.postKillHold = null;
     this.nextDigAt = 0;
   }
   Executioner(slot) {
@@ -105,6 +116,46 @@ export class FirstLevelBunkerShow {
   /** 扶人的那个（日兵甲下手）与腿伤的那个（日兵乙侧面补刺）。 */
   get Helper() { return this.captives.find((actor) => actor.missionId === "BunkerCaptiveHelper"); }
   get Wounded() { return this.captives.find((actor) => actor.missionId === "BunkerCaptiveWounded"); }
+
+  /** 近爆黑视期间先让两名行刑兵走到人跟前；第一拍不能隔着六米把人“远程砸倒”。 */
+  ApproachExecutioners() {
+    if (this.approachStarted) return;
+    this.approachStarted = true;
+    for (const [slot, killer] of [[1, this.Executioner(0)], [0, this.Executioner(1)]]) {
+      if (!killer?.alive) continue;
+      killer.missionDormant = false;
+      killer.scriptedNoncombatant = true;
+      killer.bayonetFixed = true;
+      this.r.MoveActor(killer, Place.bunker.ijaKill[slot] || A.bunkerKilling, R.walkSpeedMps);
+    }
+  }
+
+  /** 木架响后持续把两名搜索兵送向各自门口；剧情非战斗态避免接触反应改写目标。 */
+  DriveDoorSearch() {
+    const r = this.r;
+    for (const [slot, actor] of [this.Executioner(0), this.Executioner(1)].entries()) {
+      if (!actor?.alive) continue;
+      const target = Place.bunker.ijaDoor[slot] || A.bunkerDoor;
+      actor.missionDormant = false;
+      // 到门前仍由剧情走位接管；提前放回战斗 AI 会让接触反应把人推去西侧。
+      actor.scriptedNoncombatant = true;
+      actor.watchYaw = Math.atan2(actor.position.x - target.x, actor.position.z - target.z);
+      actor.watchUntil = r.ai.time + 0.25;
+      actor.yaw = actor.watchYaw;
+      r.MoveActor(actor, target, R.walkSpeedMps);
+    }
+  }
+
+  /** 补刺后让两人自然退到尸体胶囊之外，等木架声；否则接触分离会把他们一路推出破口画面。 */
+  HoldAfterKill() {
+    if (!this.postKillHold) return;
+    for (const [slot, actor] of [this.Executioner(0), this.Executioner(1)].entries()) {
+      if (!actor?.alive) continue;
+      actor.missionDormant = false;
+      actor.scriptedNoncombatant = true;
+      this.r.MoveActor(actor, this.postKillHold[slot], R.walkSpeedMps);
+    }
+  }
 
   /** 沿 from→to 方向把人推开 metres 米（被砸倒、往后缩、被踹开都走这一条）。 */
   Shove(actor, from, metres) {
@@ -128,6 +179,7 @@ export class FirstLevelBunkerShow {
       // 行刑那一段两个人只演不打（编排表：bunkerAssault 整段装睡，doorSearchStarted 才醒）。
       // 放开 scriptedNoncombatant 的话通用 AI 会抢在补刺那一拍之前把腿伤者打死，
       // 「另一名日兵从侧面补刺」就整拍消失。
+      this.ApproachExecutioners();
       for (const [slot, killer] of [[1, killerA], [0, killerB]]) {
         if (!killer?.alive) continue;
         killer.missionDormant = false;
@@ -155,6 +207,9 @@ export class FirstLevelBunkerShow {
     }
     if (action === "stab") {
       this.stabAt = r.time;
+      // 第二名日兵趁第一刀落下时绕到腿伤者侧面；1.4 秒后补刺时他已经站到位。
+      if (killerB?.alive && wounded)
+        r.MoveActor(killerB, { x: wounded.position.x + F.bunkerFlankOffsetM, z: wounded.position.z }, R.walkSpeedMps);
       // 挺刺刀逼上去 → 伸手去抓枪身 → 被踹开 → 遭刺杀。
       if (helper?.alive && killerA) {
         const to = killerA.position;
@@ -171,6 +226,12 @@ export class FirstLevelBunkerShow {
       if (killerB?.alive && wounded)
         r.MoveActor(killerB, { x: wounded.position.x + F.bunkerFlankOffsetM, z: wounded.position.z }, R.walkSpeedMps);
       if (wounded?.alive) wounded.TakeHit?.(200, "torso", null, { melee: true });
+      // A 从扶人伤兵的倒地胶囊旁退回右侧下刀位；B 留在腿伤者东侧 1.1 m。
+      // 两个点彼此约 2.4 m，且都在破口射影内，后续只靠普通 MoveActor 到位。
+      this.postKillHold = [
+        Place.bunker.ijaKill[1] || A.bunkerKilling,
+        wounded ? { x: wounded.position.x + F.bunkerFlankOffsetM, z: wounded.position.z } : Place.bunker.ijaKill[0],
+      ];
       r.audio?.Play?.("bayonetHit", { position: r.Point(A.bunkerKilling, 0.4), volume: 0.9 });
       return;
     }
@@ -196,14 +257,7 @@ export class FirstLevelBunkerShow {
     if (action === "creak") {
       // 木架轻响 → 日兵真的转向门内走。
       r.audio?.Play?.("impactWood", { position: r.Point(Place.bunker.player, 0.35), volume: 0.5 });
-      let door = 0;
-      for (const actor of r.enemies.values())
-        if (actor.missionEncounter === "bunkerAssault" && actor.alive) {
-          actor.missionDormant = false;
-          actor.scriptedNoncombatant = false;
-          r.MoveActor(actor, Place.bunker.ijaDoor[door++] || A.bunkerDoor, R.walkSpeedMps);
-        }
-      r.Record("doorSearchStarted", { x: A.bunkerDoor.x, z: A.bunkerDoor.z });
+      this.DriveDoorSearch();
       return;
     }
   }
@@ -225,10 +279,15 @@ export class FirstLevelBunkerShow {
     const r = this.r;
     if (!bunker || bunker.blastAt == null) return;
     const since = r.time - bunker.blastAt;
+    this.ApproachExecutioners();
     if (since >= R.bunkerKillingAtS && !this.beats.has("flank")) {
-      if (this.killAt == null) { this.killAt = r.time; r.Say("BunkerKilling"); }
-      const elapsed = r.time - this.killAt;
-      for (const action of BunkerBeatsDue(this.killLine, elapsed)) this.Beat(action);
+      // Say 只负责入队。前一条对白若仍在播，不能拿「已经请求」冒充「已经开口」
+      // 去跑 0/2.1/4.2/6.3 秒动作；真正的起点由 OnLine(BunkerKilling, 0) 写。
+      if (!this.killRequested) { this.killRequested = true; r.Say("BunkerKilling"); }
+      if (this.killAt != null) {
+        const elapsed = r.time - this.killAt;
+        for (const action of BunkerBeatsDue(this.killLine, elapsed)) this.Beat(action);
+      }
       // 侧面补刺紧跟着头一刀（两刀之间 bunkerCaptiveStabGapS）。
       if (this.stabAt != null && r.time - this.stabAt >= R.bunkerCaptiveStabGapS) this.Beat("flank");
     }
@@ -237,14 +296,29 @@ export class FirstLevelBunkerShow {
       r.Record("captivesKilled", { count: this.captives.length });
     if (r.Has("captivesKilled") && this.stabAt != null && r.time - this.stabAt >= F.bunkerRifleKickAtS)
       this.Beat("kick");
-    // 兜底（行刑兵在别的重试里已经被打死之类）：整段不许卡在 trappedMaxS 上。
-    if (this.killAt != null && r.time - this.killAt >= F.bunkerShowFallbackS && !r.Has("doorSearchStarted")) {
+    // 只有三条后续对白都没有处于可推进的 current/queue 时才走整段兜底。真实录音和
+    // 缺录音估时字幕都必须先把 ShunziCurse 播完，不能在他说到一半提前响木架。
+    const bunkerVoiceIds = ["BunkerKilling", "BunkerSearch", "ShunziCurse"];
+    const bunkerVoiceActive = bunkerVoiceIds.includes(r.voice.current?.cue?.id)
+      || r.voice.queue?.some?.((id) => bunkerVoiceIds.includes(id));
+    if (this.killAt != null && r.time - this.killAt >= F.bunkerShowFallbackS
+      && !r.Has("doorSearchStarted") && !bunkerVoiceActive) {
       this.Beat("flank");
       r.Record("captivesKilled", { count: this.captives.length, fallback: true });
       this.Beat("kick");
       this.creakAt ??= r.time;
     }
     if (this.creakAt != null && r.time - this.creakAt >= F.bunkerCreakAfterS) this.Beat("creak");
+    if (this.beats.has("flank") && !this.beats.has("creak")) this.HoldAfterKill();
+    if (this.beats.has("creak") && !r.Has("doorSearchStarted")) {
+      this.DriveDoorSearch();
+      const actors = [this.Executioner(0), this.Executioner(1)];
+      const targets = actors.map((_, slot) => Place.bunker.ijaDoor[slot] || A.bunkerDoor);
+      if (BunkerDoorSearchReady(actors, targets, F.bunkerDoorArriveM)) {
+        for (const actor of actors) if (actor?.alive) actor.scriptedNoncombatant = false;
+        r.Record("doorSearchStarted", { x: A.bunkerDoor.x, z: A.bunkerDoor.z });
+      }
+    }
     this.UpdateRearDigging();
   }
   /** 后侧同伴清理坍塌物的声音（一记一记的碎砖土块，不是连续床）。 */

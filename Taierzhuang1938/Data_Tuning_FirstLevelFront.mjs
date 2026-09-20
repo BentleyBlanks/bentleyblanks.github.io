@@ -39,8 +39,10 @@ export const FRONT_TUNING = Object.freeze({
   bunkerRifleSlideM: 1.8,
   // 木架轻响 → 日兵转向门内。ShunziCurse（3.94 秒）播完之后这么久响一声。
   bunkerCreakAfterS: 0.7,
+  // 木架响后等日兵真的走近门口再记 doorSearchStarted；1.4 m 是近身到门垛的一步距离。
+  bunkerDoorArriveM: 1.4,
   // 全段兜底：killAt 之后这么久还没走到「转向门内」就直接推到那一步
-  // （trappedMaxS 20 秒是控制接管的上限，留 4 秒余量）。
+  // （trappedMaxS 40 秒只防失控；正常路径等两名搜索兵实际到门再进入 02 并显式还权）。
   bunkerShowFallbackS: 16,
   // 后侧同伴清理坍塌物的声音：从踢枪那一刻起，每这么久响一记 debrisFall。
   bunkerRearDigIntervalS: 1.9,
@@ -114,8 +116,6 @@ export const FRONT_TUNING = Object.freeze({
   borrowTriggerM: 3.2,
   // 「大致面向他」：视线与「玩家→老周」的夹角在这个弧度以内（±40°）。
   borrowFacingRad: 0.7,
-  // 一直不过去也得往下走（编排不许被玩家的站位卡死）：volunteerHeard 之后这么久兜底。
-  borrowApproachFallbackS: 40,
   // 对白期间抬老周那两个担架员等在这么远外，不挤进两人中间。
   borrowClearRadiusM: 4,
   // 担架员从等待位走上来那一段的时长（ZhouLift 催的时候起步）。

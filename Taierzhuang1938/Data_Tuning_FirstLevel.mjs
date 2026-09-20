@@ -344,9 +344,10 @@ export const MISSION_TUNING = Object.freeze({
   // 被压住之后能转头的幅度。limitedLookRadians(0.28) 是「受控镜头」的通用夹取；
   // 压在木架下只能「小幅转头」，取它的一半。
   trappedLookRadians: 0.14,
-  // 受困段控制接管的兜底上限：炸 → 看清门外 → 两名川军被刺杀 → 日兵转向门内。
-  // 逐拍加出来 2.0+2.6+2.4+1.8 = 8.8，取 12 留余量（正常路径由编排显式还权）。
-  trappedMaxS: 20,
+  // 受困段验收/驾驶预算：炸 → 看清门外 → 两名川军被刺杀 → 日兵转向门内。
+  // 四条真实录音串行约 37 s 才到 doorSearchStarted；48 s 留足走位与低帧余量。
+  // 控制权本身只随 Trapped → BunkerRescue 的真实阶段交接释放，不再由这个预算提前还权。
+  trappedMaxS: 48,
   bunkerKillingAtS: 4.6,
   bunkerSearchAtS: 8,
   // 行刑那一拍两名川军的血量与倒下时刻（相对 bunkerKillingAtS）。

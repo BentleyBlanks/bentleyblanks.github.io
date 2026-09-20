@@ -237,18 +237,26 @@ console.log("ok 具名事件齐全，整段录音不拆段");
     voice.Guidance("NoSuchCueAtAll"); voice.Cancel(["NoSuchCueAtAll"]); voice.Replay("NoSuchCueAtAll");
     assert.ok(voice.Enqueue("BorrowLight"), "台词表里的 cue 照常入队");
     for (let i = 0; i < 6000 && !done.length; i++) voice.Update(1 / 60);
+    assert.ok(voice.Enqueue("BunkerBanter"), "缺录音的掩蔽部闲谈也走估时时间轴");
+    for (let i = 0; i < 6000 && done.length < 2; i++) voice.Update(1 / 60);
+    assert.ok(voice.Enqueue("BunkerKilling"), "缺录音的行刑对白也走估时时间轴");
+    for (let i = 0; i < 6000 && done.length < 3; i++) voice.Update(1 / 60);
   } finally {
     console.warn = original;
   }
-  assert.deepEqual(done, ["BorrowLight"], "缺录音的 cue 也要走完并 Done");
-  assert.equal(lines.length, 9, "九句都发了 Line 事件");
-  assert.deepEqual(lines.map((line) => line.index), [0, 1, 2, 3, 4, 5, 6, 7, 8], "Line 事件按句序");
+  assert.deepEqual(done, ["BorrowLight", "BunkerBanter", "BunkerKilling"], "缺录音的 cue 也要走完并 Done");
+  assert.equal(lines.filter((line) => line.cue === "BorrowLight").length, 9, "借火九句都发了 Line 事件");
+  assert.deepEqual(lines.filter((line) => line.cue === "BorrowLight").map((line) => line.index),
+    [0, 1, 2, 3, 4, 5, 6, 7, 8], "Line 事件按句序");
   assert.equal(lines[0].who, "zhou", "Line 事件带说话人");
-  assert.equal(said.length, 9, "缺录音时字幕照出");
+  assert.equal(said.length, 19, "三条缺录音对白的十九句字幕都照出");
   assert.ok(events.includes("BorrowLightMatchesPocketed"), "缺录音时具名事件照发");
+  assert.ok(events.includes("BunkerBlast"), "缺录音估时时间轴仍在闲谈末句发 BunkerBlast");
+  assert.deepEqual(lines.filter((line) => line.cue === "BunkerKilling").map((line) => line.index),
+    [0, 1, 2, 3], "缺录音行刑对白仍逐句发 Line，动作可从真实 line 0 起拍");
   assert.equal(warnings.filter((text) => text.includes("BorrowLight")).length, 1, "缺录音只警告一次");
   assert.ok(warnings.some((text) => text.includes("NoSuchCueAtAll")), "未知 cue 警告一次");
-  assert.deepEqual(voice.State().missing, ["BorrowLight"]);
+  assert.deepEqual(voice.State().missing, ["BorrowLight", "BunkerBanter", "BunkerKilling"]);
   assert.deepEqual(voice.State().unknown, ["NoSuchCueAtAll"]);
   console.log("ok 缺录音兜底：字幕、Line 事件与 Done 照常，未知 cue 只警告不抛异常");
 }

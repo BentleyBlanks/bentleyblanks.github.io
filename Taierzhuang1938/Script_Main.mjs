@@ -4037,6 +4037,13 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT, stageJump
     VoiceClock:()=>MANUAL_STEP?null:audio.ctx?.currentTime,
     Inventory:()=>({ammo:state.ammo,clips:state.clips,grenades:state.grenades,bundles:state.bundles,shots:state.playerShots}),
     GiveSupply:({clips=0,grenades=0,bundles=0,bandages=0})=>{AddSupplyClips(clips);state.grenades+=grenades;state.bundles+=bundles;player.bandages+=bandages;},
+    SpawnMissionRifle:(point)=>{
+      const item={weaponId:"HanYang",weaponVariant:0,yaw:point.yaw??0,
+        position:{x:point.x,y:battlefield.GroundHeight(point.x,point.z),z:point.z},view:null};
+      BuildGroundWeaponView(item);
+      return item;
+    },
+    RemoveMissionRifle:item=>DisposeGroundWeaponView(item),
     RestoreRifle:()=>{if(!IsGunSlot(state.activeSlot))SwitchSlot(LastGunSlot());SyncMissionHands();viewmodel.root.visible=!carry?.Blocking;},
     Control:active=>{state.missionControl=active;state.cooking=null;state.cook=0;input.fire=false;input.ads=false;},
     // 关中过场：与关首/关末走同一条 RunCutscene（夺控制权、掐输入、Esc 跳过、

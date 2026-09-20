@@ -59,7 +59,9 @@ export async function Drive(ctx) {
 
   // 逐拍推进并取证：近爆 → 行刑 → 踢枪 → 转向门内。
   const trappedFrames = [];
-  for (let chunk = 0; chunk < 60; chunk++) {
+  // 真录音串行到木架轻响约 30 s，之后两名搜索兵还要实际走到门口；按受困控制预算
+  // 再留 5 s 观察窗，结束仍以 stage 状态到达为准，不把固定秒数当成推进事实。
+  for (let chunk = 0; chunk < Math.ceil((R.trappedMaxS + 5) / 0.5); chunk++) {
     const state = await page.evaluate(() => {
       const g = window.Tengxian;
       g.StepFrames(30, 1 / 60, false);
@@ -72,13 +74,20 @@ export async function Drive(ctx) {
     for (const [beat, name] of [["butt", "TrappedButt"], ["stab", "TrappedStab"], ["flank", "TrappedFlank"], ["creak", "TrappedDoor"]])
       if (state.beats.includes(beat) && !ctx.capturedActivities.has(name)) {
         ctx.capturedActivities.add(name);
-        await page.evaluate(() => window.Tengxian.StepFrames(4, 1 / 60, true));
+        // 木架响后留半秒，拍到两个人真实转身迈向门口，而不是刚写入 creak 的静止帧。
+        await page.evaluate((frames) => window.Tengxian.StepFrames(frames, 1 / 60, true), beat === "creak" ? 30 : 4);
         await page.screenshot({ path: path.join(shots, `Scene_${name}.png`) });
       }
     if (state.stage !== "Trapped") break;
   }
   const trapped = trappedFrames.at(-1);
   await fs.writeFile(path.join(shots, "Data_Trapped.json"), JSON.stringify(trappedFrames, null, 2));
+  const buttFrame = trappedFrames.find((frame) => frame.beats.includes("butt"));
+  assert.equal(buttFrame?.voice, "BunkerKilling", "枪托第一拍只能从实际开播的 BunkerKilling 起");
+  assert.ok((buttFrame?.voiceLineIndex ?? -1) >= 0,
+    "BunkerKilling 还在队列里时不许用 elapsed 兜底提前演枪托");
+  const creakFrame = trappedFrames.find((frame) => frame.beats.includes("creak"));
+  assert.notEqual(creakFrame?.voice, "ShunziCurse", "顺子的低声咒骂必须播完，木架才响");
   for (const fact of ["bunkerCollapsed", "captivesKilled", "doorSearchStarted"])
     assert.ok(trapped.facts.includes(fact), `受困段真的记下了 ${fact}：` + JSON.stringify(trapped.facts));
   assert.deepEqual(trapped.beats.slice(0, 4), ["butt", "recoil", "rise", "stab"],

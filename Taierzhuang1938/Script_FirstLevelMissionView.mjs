@@ -306,7 +306,9 @@ export class FirstLevelMissionView {
       this.people.Patient(litter.id,litter.x,ground+height+.07,litter.z,yaw,time,litter.zhou?{stabbed:!!litter.stabbed}:null);
       const SetGrip=(side,end)=>new THREE.Vector3(litter.x+Math.cos(yaw)*side*.29-Math.sin(yaw)*end,
         ground+height+.12,litter.z-Math.sin(yaw)*side*.29-Math.cos(yaw)*end);
-      if (!litter.loaded && litter.state !== "placed")
+      // 06 借火时仍是这副担架原有的两名担架员，只是 Collection 用同一组人物 id
+      // 把他们摆到 4–5 m 外等待；别在正式抬架位再自动画一份，造成四人重叠。
+      if (!litter.loaded && litter.state !== "placed" && !litter.borrowBearersStaged)
         for (const [index, side] of [-1, 1].entries()) {
           if (litter.bearers[index] <= 0 || (litter.state === "carried" && side === -1)) continue;
           this.Person(

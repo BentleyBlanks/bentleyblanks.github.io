@@ -80,11 +80,12 @@ export class FirstLevelCollection {
     this.zhouLiftFrom = null;
     // 抬老周那两个担架员：对白期间在 bearerWait 上等，ZhouLift 催的时候才走上来。
     this.liftBearers = Place.collection.bearerWait.map((spot, i) => ({
-      id: `CollectionLiftBearer${i}`, x: spot.x, z: spot.z, yaw: spot.yaw ?? 0,
+      // 沿用 column/view 里这副担架原有的两个人物身份；Orders 只是把同两个人
+      // 从正式抬架位暂时摆到对白等待位，不能另造一对叠在他们身上。
+      id: `${runtime.column.zhou.id}Bearer${i}`, x: spot.x, z: spot.z, yaw: spot.yaw ?? 0,
     }));
     this.bearerCloseAt = null;
     this.borrowSaid = false;
-    this.volunteerAt = null;
   }
 
   // --- 摆位 -----------------------------------------------------------------
@@ -118,9 +119,10 @@ export class FirstLevelCollection {
       r.view.Person(person.x, person.z, person.yaw, time,
         { id: person.id, kind: person.kind === "wounded" ? "medic" : "bearer", crouch: person.crouch });
     // 抬老周那两个：06 才出现（担架队在这儿等着接他），位置由 UpdateOrders 推。
-    if (r.Has("ordersReached"))
+    if (r.Has("ordersReached") && r.column.zhou.borrowBearersStaged)
       for (const bearer of this.liftBearers)
-        r.view.Person(bearer.x, bearer.z, bearer.yaw, time, { id: bearer.id, kind: "bearer" });
+        r.view.Person(bearer.x, bearer.z, bearer.yaw, time,
+          { id: bearer.id, kind: "bearer", moving: this.bearerCloseAt != null });
   }
 
   /**
@@ -182,7 +184,9 @@ export class FirstLevelCollection {
   ShowMatch(on) {
     const r = this.r;
     if (on && !this.match && r.scene) {
-      this.match = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.03, 0.11),
+      // 1930 年代常见小盒火柴约 3.5 × 1.2 × 5.5 cm。旧白盒 8 × 3 × 11 cm
+      // 又钉在视线正中，近景会变成遮住老周脸胸的一整块黄板。
+      this.match = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.012, 0.055),
         new THREE.MeshLambertMaterial({ color: 0xc8a262 }));
       this.match.name = "MissionShunziMatchbox";
       r.scene.add(this.match);
@@ -193,14 +197,11 @@ export class FirstLevelCollection {
   /**
    * 借火那一段该不该开播。Notion 06：老周靠在土壁边摸兜找火，
    * 「**看见顺子经过**」才开口 —— 所以要玩家真的走到他跟前、脸朝着他。
-   * 一直不过去也得往下走：volunteerHeard 之后 borrowApproachFallbackS 秒兜底。
    */
   UpdateBorrowCue() {
     const r = this.r;
     if (this.borrowSaid || !r.Has("volunteerHeard")) return;
-    this.volunteerAt ??= r.time;
-    const cued = BorrowLightCued(r.player.position, r.column.zhou, r.player.yaw);
-    if (!cued && r.time - this.volunteerAt < F.borrowApproachFallbackS) return;
+    if (!BorrowLightCued(r.player.position, r.column.zhou, r.player.yaw)) return;
     this.borrowSaid = true;
     r.Say("BorrowLight");
   }
@@ -218,7 +219,7 @@ export class FirstLevelCollection {
       const from = Place.collection.bearerWait[i], to = Place.collection.bearerClose[i] || from;
       bearer.x = from.x + (to.x - from.x) * t;
       bearer.z = from.z + (to.z - from.z) * t;
-      bearer.yaw = Math.atan2(zhou.x - bearer.x, zhou.z - bearer.z);
+      bearer.yaw = Math.atan2(bearer.x - zhou.x, bearer.z - zhou.z);
     }
     void dt;
   }
@@ -232,6 +233,9 @@ export class FirstLevelCollection {
       this.zhouParked = true;
       Object.assign(zhou, { ...Place.collection.zhouWall, state: "fallen", visible: true });
     }
+    // View 平时会从 column.zhou 自动画出这一副担架自己的两名担架员；借火期间
+    // 改由 Draw 用同一组 id 报告等待位，避免正式抬架位与等待位同时出现四个人。
+    zhou.borrowBearersStaged = !r.Has("zhouOnLitter");
     // 贴着土壁、脸朝经过的玩家 —— 不许横在路当中（集成方 2026-09-20 的口径）。
     if (!r.Has("zhouOnLitter"))
       zhou.yaw = Math.atan2(r.player.position.x - zhou.x, r.player.position.z - zhou.z);
@@ -248,14 +252,19 @@ export class FirstLevelCollection {
     if (this.smoke?.visible)
       this.smoke.position.set(zhou.x, r.battlefield.GroundHeight(zhou.x, zhou.z) + 0.72, zhou.z);
     if (this.match?.visible) {
-      // 伸在身前 0.5 m、眼下 0.2 m：贴在相机上（旧写法）等于一个像素都看不见，
-      // 而「把火递近一点」这一拍要的就是两人之间读得出这只手。
-      const eye = r.player.EyePosition, yaw = r.player.yaw;
-      this.match.position.set(eye.x - Math.sin(yaw) * 0.5, eye.y - 0.2, eye.z - Math.cos(yaw) * 0.5);
+      // 跟随俯仰放在右手侧、视线下方：递火时仍读得到，但不会盖住对面人物。
+      const eye = r.player.EyePosition, yaw = r.player.yaw, pitch = r.player.pitch || 0;
+      const forwardM = 0.62, sideM = 0.18, downM = 0.18, pitchCos = Math.cos(pitch);
+      this.match.position.set(
+        eye.x - Math.sin(yaw) * pitchCos * forwardM + Math.cos(yaw) * sideM,
+        eye.y + Math.sin(pitch) * forwardM - downM,
+        eye.z - Math.cos(yaw) * pitchCos * forwardM - Math.sin(yaw) * sideM,
+      );
       this.match.rotation.y = yaw;
     }
     // 担架员来催（ZhouLift 播完 → zhouOnLitter）之后，老周从土壁挪回队列。
     if (r.Has("zhouOnLitter")) {
+      zhou.borrowBearersStaged = false;
       if (this.zhouLiftAt == null) {
         this.zhouLiftAt = r.time;
         this.zhouLiftFrom = { x: zhou.x, z: zhou.z };
@@ -273,6 +282,7 @@ export class FirstLevelCollection {
 
   /** 07 起行之后集结处那一带的收尾：小道具收掉，摆位留着。 */
   Leave() {
+    if (this.r.column?.zhou) this.r.column.zhou.borrowBearersStaged = false;
     this.ShowMatch(false);
     this.ShowSmoke(false);
   }

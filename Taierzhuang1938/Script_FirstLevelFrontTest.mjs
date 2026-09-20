@@ -24,7 +24,7 @@ import {
   FRONT_TUNING as F, FRONT_TUNING_SOURCES, BUNKER_KILL_BEATS, BORROW_LIGHT_BEATS,
   SouthWalkLengthM, SouthWalkSeconds,
 } from "./Data_Tuning_FirstLevelFront.mjs";
-import { BunkerBeatsDue, BUNKER_BEAT_ORDER } from "./Script_FirstLevelBunker.mjs";
+import { BunkerBeatsDue, BunkerDoorSearchReady, BUNKER_BEAT_ORDER } from "./Script_FirstLevelBunker.mjs";
 import { CollectionDressing, BorrowPosesDue, BORROW_POSE_ORDER, BorrowLightCued } from "./Script_FirstLevelCollection.mjs";
 import { SouthPointerSpot, FRONT_WIRED_CUES } from "./Script_FirstLevelFrontShow.mjs";
 
@@ -59,6 +59,16 @@ const Cue = (id) => MISSION_DIALOGUE.find((cue) => cue.id === id);
   assert.deepEqual(BUNKER_BEAT_ORDER,
     ["butt", "recoil", "rise", "stab", "flank", "kick", "creak"],
     "State().bunker.beats 的顺序＝原文的动作顺序（补刺 → 踢枪 → 木架轻响）");
+  const targets = [{ x: 0, z: 0 }, { x: 2, z: 0 }];
+  assert.equal(BunkerDoorSearchReady([
+    { alive: true, position: { x: 0, z: 3 } }, { alive: true, position: { x: 2, z: 0 } },
+  ], targets, F.bunkerDoorArriveM), false, "木架响了但搜索兵还没走到门口，不能提前推进 02");
+  assert.equal(BunkerDoorSearchReady([
+    null, { alive: true, position: { x: 2, z: 0 } },
+  ], targets, F.bunkerDoorArriveM), false, "搜索兵没有生成或查找失败时不能冒充阵亡而放行");
+  assert.equal(BunkerDoorSearchReady([
+    { alive: true, position: { x: 0, z: 1 } }, { alive: false, position: { x: 9, z: 9 } },
+  ], targets, F.bunkerDoorArriveM), true, "活着的搜索兵实际到门口、另一人阵亡时才可放行");
 }
 
 // ---------------------------------------------------------------------------
@@ -94,10 +104,25 @@ const Cue = (id) => MISSION_DIALOGUE.find((cue) => cue.id === id);
     "等两个人到位的兜底要比掀架那一段本身留得宽");
   // 剧情移动放行：接触反应不许盖过掀架/拉背包（契约 §8 的先例）。
   const runtime = Read("Script_FirstLevelMissionRuntime.mjs");
-  assert.ok(/stage==="BunkerRescue"&&\["luo","yaowa"\]\.includes\(actor\.castId\)/.test(runtime),
+  assert.ok(/bunkerRescueLocked&&\["luo","yaowa"\]\.includes\(actor\.castId\)/.test(runtime),
     "UpdateSquad 里罗班长与幺娃在 02 都被放行（不然谁也走不到掀架位）");
   assert.ok(/heyoutianFire/.test(Read("Script_FirstLevelBunker.mjs")),
     "何有田在后侧交通壕那个射位上压制");
+  const opening = Read("Script_FirstLevelOpening.mjs"), show = Read("Script_FirstLevelBunker.mjs");
+  assert.ok(/age>=R\.bunkerBanterFallbackS[\s\S]*r\.voice\.current\?\.cue\?\.id!=="BunkerBanter"/.test(opening),
+    "正常录音与缺录音估时字幕都等 BunkerBanter 末句事件，8 秒兜底不抢拍");
+  assert.ok(/if \(!this\.killRequested\)[\s\S]*r\.Say\("BunkerKilling"\)/.test(show)
+    && /if \(this\.killAt != null\)[\s\S]*BunkerBeatsDue/.test(show),
+    "BunkerKilling 已排队不等于实际开播；收到 Line 前绝不推进动作兜底");
+  assert.ok(/bunkerVoiceActive[\s\S]*!r\.Has\("doorSearchStarted"\) && !bunkerVoiceActive/.test(show),
+    "整段兜底也必须让 BunkerKilling / BunkerSearch / ShunziCurse 的时间轴先走完");
+  const main = Read("Script_Main.mjs");
+  assert.ok(runtime.includes("this.bunkerRifle = this.SpawnMissionRifle?.(P.bunker.rifle)")
+    && runtime.includes("this.RemoveBunkerRifle();")
+    && main.includes("SpawnMissionRifle:(point)")
+    && main.includes("BuildGroundWeaponView(item)")
+    && main.includes("RemoveMissionRifle:item=>DisposeGroundWeaponView(item)"),
+  "02 的任务交互与可见 HanYang 共用 bunker.rifle 坐标，拾取或退出会拆掉模型");
 }
 
 // ---------------------------------------------------------------------------
@@ -139,8 +164,6 @@ const Cue = (id) => MISSION_DIALOGUE.find((cue) => cue.id === id);
   assert.ok(BorrowLightCued(stand, zhou, facing), "走到跟前、脸朝着老周就开口");
   assert.ok(!BorrowLightCued(stand, zhou, facing + Math.PI), "背对着他不开口");
   assert.ok(!BorrowLightCued({ x: stand.x, z: stand.z - 5 }, zhou, facing), "隔着五米不开口");
-  assert.ok(F.borrowApproachFallbackS > 0 && F.borrowApproachFallbackS < 90,
-    "一直不过去也要兜底，但不能拖成一分半");
   // 担架员与摆位人员都让开「玩家 → 老周」那条轴线，也不贴着老周站。
   assert.equal(P.collection.bearerWait.length, 2, "抬老周的是两个人");
   assert.equal(P.collection.bearerClose.length, P.collection.bearerWait.length,
@@ -169,6 +192,17 @@ const Cue = (id) => MISSION_DIALOGUE.find((cue) => cue.id === id);
   const collection = Read("Script_FirstLevelCollection.mjs");
   assert.ok(/r\.Say\("BorrowLight"\)/.test(collection) && /r\.Say\("ZhouLift"\)/.test(collection),
     "借火与担架员催都由集结处那一层放");
+  assert.ok(/if \(!BorrowLightCued\([^)]+\)\) return;/.test(collection) && !collection.includes("borrowApproachFallbackS"),
+    "借火只由距离与朝向触发，不许计时兜底伪造「老周看见顺子经过」");
+  assert.ok(collection.includes("`${runtime.column.zhou.id}Bearer${i}`")
+    && collection.includes("zhou.borrowBearersStaged = !r.Has(\"zhouOnLitter\")"),
+  "等待位复用 column.zhou 原有两名担架员的身份，不另造一对叠在正式抬架位");
+  const view = Read("Script_FirstLevelMissionView.mjs");
+  assert.ok(view.includes("!litter.borrowBearersStaged"),
+    "借火对白期间 View 不在正式抬架位重复画同两名担架员");
+  assert.ok(collection.includes("new THREE.BoxGeometry(0.035, 0.012, 0.055)")
+    && collection.includes("pitchCos * forwardM") && collection.includes("sideM = 0.18"),
+  "火柴盒按真实小尺寸放在随俯仰移动的右手侧，不再钉在视线正中遮住老周");
 }
 
 // ---------------------------------------------------------------------------
@@ -271,6 +305,13 @@ const Cue = (id) => MISSION_DIALOGUE.find((cue) => cue.id === id);
   // Update 必须排在 UpdateSquad 之后（剧情走位要压过接触反应）。
   assert.ok(runtime.indexOf("this.UpdateSquad();") < runtime.indexOf("this.frontShow?.Update(dt)"),
     "Front 的剧情走位排在 UpdateSquad 之后");
+  assert.ok(/this\.controls\.time >= this\.controls\.seconds && this\.controls\.kind!=="trapped"/.test(runtime),
+    "trapped 控制只随真实阶段交接释放，不被旧最大时长抢先还权");
+  assert.ok(/actor\.scriptedNoncombatant = true;[\s\S]*this\.PlaceActor\(actor, this\.opening\.BunkerPost\(i\)\)/.test(runtime),
+    "01 摆班组时先压住通用战斗 AI，不许提前射杀行刑兵");
+  assert.ok(/const bunkerRescueLocked = stage === "BunkerRescue" && !this\.Has\("luoRescueComplete"\)/.test(runtime)
+    && /actor\.scriptedNoncombatant = bunkerRescueLocked/.test(runtime),
+    "02 还权前全班继续受控，只由 FrontShow 单独放开何有田");
 }
 
 // ---------------------------------------------------------------------------

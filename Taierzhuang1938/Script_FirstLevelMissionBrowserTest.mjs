@@ -91,6 +91,10 @@ try {
       if (ctx.stageFrom <= 14) await DriveMid(ctx);
       if (ctx.stageTo > 14) await DriveEnd(ctx);
     }
+    if (options.allowCheckpointRetry)
+      console.log(`checkpoint retries explicitly allowed: ${ctx.campaignRetries.length}`);
+    else assert.equal(ctx.campaignRetries.length, 0,
+      "默认整关样本必须 zero-checkpoint-retry；需要真实复活的诊断跑法显式传 --allow-checkpoint-retry");
     if (ctx.stageTo < 18) {
       assert.deepEqual(ctx.errors, []);
       console.log(`ok stages ${ctx.stageFrom}-${ctx.stageTo} driven with real player input`);
@@ -100,9 +104,11 @@ try {
     } else {
 
     assert.equal(await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission().stage), "Complete");
-    // TODO 第二波：节奏断言按新 27 个可玩步骤重写。旧的那几条（South 的六秒黑屏转场、
-    // TransferApproach 30–60 s、Transfer 2–4 min）量的是已经下线的步骤 ——
-    // 07 现在是真走一段 45–75 秒，12 只有两处威胁，各包按自己那一段的口径补。
+    // 现行节奏断言分散在真正驾驶对应段的包里：Front 实测 07 为 45–75 秒，End 实测
+    // 15B 连续无对白行走 14 m（最近约 10.92 秒）、17 的约 14 秒 death 控制段等到
+    // ZhouDeath finished。这里保留
+    // 27 个可玩步骤的逐段耗时作为诊断回执，不复活已经下线的 South 黑屏、
+    // TransferApproach 30–60 秒或 Transfer 2–4 分钟旧契约。
     const pacing = await page.evaluate(() => {
       const stages = window.Tengxian.Debug.FirstLevelMission().log.filter((e) => e.kind === "stage");
       return Object.fromEntries(stages.slice(0, -1).map((e, i) => [e.id, stages[i + 1].time - e.time]));
