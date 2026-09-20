@@ -497,6 +497,8 @@ const VOICE_FACT = Object.freeze({
     "幺娃留在担架旁，同时让开玩家后抬手与镜头通道");
   r.reception.Enter("Death");
   r.Step(0.2, "Death");
+  Check(yaowa.missionHideWeapon === true && yaowa.missionReach === 1 && yaowa.scriptedNoncombatant,
+    "幺娃收枪、空手伸向覆盖物，不以战斗姿态瞄着老周");
   Check(!r.Has("deathMedicArrived"), "军医还在厢房另一头，不许直接起死亡段");
   r.Step(20, "Death");
   Check(r.Has("deathMedicArrived"), "军医真的走到担架边");
@@ -516,6 +518,9 @@ const VOICE_FACT = Object.freeze({
   Check(r.Has("deathSceneComplete"), "接收处继续工作了，17 才算走完");
   const detail = r.recorded.find(entry => entry.id === "deathSceneComplete").detail;
   Check(detail.nextLitter && detail.surgeonTreating, "取证里写清了「接收处继续工作」是怎么判的");
+  r.reception.EndBedsideCare();
+  Check(yaowa.missionHideWeapon === false && yaowa.missionReach === 0 && !yaowa.scriptedNoncombatant,
+    "18 接令前还回幺娃的步枪与正常战斗状态");
   // 老周死亡不判全关失败。
   Check(!MISSION_STAGES.some(stage => stage.requirements.includes("zhouSurvived")), "过关条件里没有「老周活着」");
   Check(MISSION_FACT_GATES.deathSceneComplete.text.includes("不判全关失败"), "编排表里写明老周死亡不判失败");

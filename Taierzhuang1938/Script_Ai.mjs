@@ -3149,6 +3149,10 @@ export class AiDirector {
         hurt: s.hurtPose,
         elapsed: this.time,
         lookYaw: s.lookYaw, lookPitch: s.lookPitchBlend || 0,
+        // 任务演出只复用 Actor 已有的空手 reach 姿态与武器显隐闸，不另建动作资产。
+        // 旗一清，Actor.Update 会在同一条通道把步枪和战斗姿态还回来。
+        reach: s.missionReach || 0,
+        hideWeapon: !!s.missionHideWeapon,
         // 摆点层（EscortColumn）钉在 soldier 上的两个负重旗：担架员前/后位
         // 与「能走的轻伤员」。姿态取用在 CharacterModel._ActionForState。
         carryRole: s.carryRole || null,

@@ -1484,6 +1484,7 @@ export class FirstLevelMissionRuntime {
         this.reception.Enter("Death");
         break;
       case "BridgeOrders":
+        this.reception.EndBedsideCare();
         this.guideRoute = null;
         this.audio.Ambience("firstLevelFront");
         this.Guide(MISSION_STAGE_ROUTES.toBridge);

@@ -59,7 +59,22 @@ export class FirstLevelReception {
     if (step === "Death") {
       this.death = { confirmed: false, nextProgress: 0, nextSaid: false, coverS: 0, resumed: false };
       r.extras.Keep(RECEPTION_CAST);
+      const yaowa=r.companion.Handle("yaowa");
+      if(yaowa){
+        yaowa.missionHideWeapon=true;
+        yaowa.missionReach=0;
+        yaowa.scriptedNoncombatant=true;
+      }
     }
+  }
+  /** 18 接令时还回步枪与正常 AI；显隐同时还原，下一帧无需等模型重建。 */
+  EndBedsideCare() {
+    const yaowa=this.runtime.companion.Handle("yaowa");
+    if(!yaowa)return;
+    yaowa.missionHideWeapon=false;
+    yaowa.missionReach=0;
+    yaowa.scriptedNoncombatant=false;
+    if(yaowa.actor?.weaponGroup)yaowa.actor.weaponGroup.visible=true;
   }
 
   // -------------------------------------------------------------------------
@@ -201,7 +216,16 @@ export class FirstLevelReception {
       }
     }
     const yaowa = r.companion.Handle("yaowa");
-    if (yaowa?.alive && Distance(yaowa.position, zhou) < 2) r.ai.SetStance(yaowa, 1, 2, true);
+    if(yaowa?.alive){
+      const bedside=Distance(yaowa.position,zhou)<2.4;
+      yaowa.missionHideWeapon=true;
+      yaowa.missionReach=bedside?1:0;
+      yaowa.scriptedNoncombatant=true;
+      if(bedside){
+        r.ai.SetStance(yaowa,0,2,true);
+        yaowa.yaw=Math.atan2(yaowa.position.x-zhou.x,yaowa.position.z-zhou.z);
+      }
+    }
 
     if (!state.confirmed) return;
     // 门外又抬来伤员：一副真的担架走进院子，军医转过去救下一个。
