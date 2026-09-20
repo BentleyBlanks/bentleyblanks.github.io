@@ -63,10 +63,10 @@ export const END_TUNING = Object.freeze({
   // 幺娃看见顺子的手：过坎之后再走这么远（夹道左拐前后），起 HandsShake。
   handsShakeAfterBumpM: 6,
   // 无对白行走：夹道最后这一段不许起任何 cue（左拐之后到院门前）。
-  // 74.4 m 的夹道按抬担架 1.4 m/s 走完约 53 s；46 m 之后还剩 28 m，
-  // 够走满 14 s 的静默。
+  // 采用稿只要求一段真实行走，没有锁定秒数；用走过的米数取证，避免帧率、受伤
+  // 减速或玩家走法把同一条路测成不同长度。14 m 约等于末段两道院墙之间的一跨。
   silenceFromProgressM: 46,
-  silenceSeconds: 14,
+  silenceWalkM: 14,
   // 掉队的步行伤员：位置读 MISSION_PLACEMENT.wallPath.stragglers，但那三点落在
   // 南侧矮墙（WallPathLowWall，z 212.65–213.35）上 —— 投影回夹道中线再用。
   stragglerWalkMps: 0.95,

@@ -713,6 +713,13 @@ export class FirstLevelMissionColumn {
    */
   BearerShort(litter) {
     if (!litter.bearers.some(health => health <= 0)) { litter.dragging = false; return false; }
+    // 15B reserves this vacant handle for Shunzi's authored F handoff.  Do not
+    // apply the normal one-bearer drag fallback while the player walks up to it.
+    if (litter.scriptedHandoffHold) {
+      litter.dragging = false;
+      litter.state = "waiting";
+      return true;
+    }
     this.RequestBearer(litter);
     const pending = this.walkers.some(w => w.rescueTarget?.litter === litter.id);
     const alone = !pending && litter.bearers.some(health => health > 0);

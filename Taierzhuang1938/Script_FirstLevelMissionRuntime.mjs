@@ -2551,7 +2551,9 @@ export class FirstLevelMissionRuntime {
       this.Say("Threshold");
     }
     // 15A/15B 与 15C/16/17 的演出与判定（新模块，运行时只留这两句钩子）。
-    if (["Regroup", "WallPath"].includes(stage)) this.quietMarch.Update(dt, stage);
+    // 15B 的夹道在 (16,220) 切到 15C，但真实路线还要再走到 (2,240) 的院门。
+    // 静默观察窗口跨过这个内部步骤边界，直到门卫盘问起头为止。
+    if (["Regroup", "WallPath", "ReceptionGate"].includes(stage)) this.quietMarch.Update(dt, stage);
     if (["ReceptionGate", "Handover", "Death", "BridgeOrders"].includes(stage)) this.reception.Update(dt, stage);
     this.column.Update(dt, { moving, routeSafe: safe, maxProgress, player: this.player.position, ...(safeAt ? {SafeAt:safeAt} : {}) });
     this.view.Update(this.time, { tank: this.tank,player:this.player,camera:this.camera||null });

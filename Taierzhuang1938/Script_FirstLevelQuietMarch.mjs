@@ -54,7 +54,7 @@ export class FirstLevelQuietMarch {
     if (step === "WallPath") {
       this.wall = {
         swapOffered: false, bumpSaid: false, bumpAt: null, shakeSaid: false,
-        silent: 0, silenceDone: false, tended: false,
+        silent: 0, silentDistanceM: 0, silenceDone: false, tended: false,
         stragglers: STRAGGLERS.map(entry => ({ ...entry, tenderProgress: Math.max(0, entry.progress - 9) })),
       };
       // 15B 全程无敌人：15A 的警戒兵留在沟口那一头，队伍已经走过去了。
@@ -187,6 +187,11 @@ export class FirstLevelQuietMarch {
     if (!state.swapOffered && !r.Has("carryHandover") && zhouOn.progress >= E.carrySwapProgressM) {
       state.swapOffered = true;
       zhou.ambushHold = true;
+      // Unlike the ordinary one-bearer fallback, this vacant handle is waiting
+      // for the player's authored F handoff and must not drift away while the
+      // player approaches it.  Keep this separate from the older room-ambush
+      // replacement lock so Carry/Dive/rescue retain their existing semantics.
+      zhou.scriptedHandoffHold = true;
       zhou.bearers[0] = 0;
       zhou.state = "waiting";
       r.Record("carrySwapOffered", { x: zhou.x, z: zhou.z, progress: zhouOn.progress });
@@ -195,6 +200,7 @@ export class FirstLevelQuietMarch {
     // 顺子接过之后后端就是他：把槽位填回去，解开替补闸。
     if (r.Has("carryHandover") && zhou.ambushHold) {
       zhou.ambushHold = false;
+      zhou.scriptedHandoffHold = false;
       zhou.bearers[0] = Math.max(zhou.bearers[0], 75);
     }
 
@@ -215,15 +221,26 @@ export class FirstLevelQuietMarch {
     // 4. 无对白行走：手抖那一段说完之后（或者玩家已经走进夹道末段）不再起任何 cue，
     //    量「**一边走一边**静了多久」—— 站着不动不算，那是发呆不是行走。
     const playerOn = EndProjectOnto(WALL_PATH, r.player.position);
-    const advanced = playerOn.progress > (state.lastProgress ?? 0) + 1e-4;
-    state.lastProgress = Math.max(state.lastProgress ?? 0, playerOn.progress);
+    const previousProgress = state.lastProgress ?? playerOn.progress;
+    const advancedM = Math.max(0, playerOn.progress - previousProgress);
+    state.lastProgress = Math.max(previousProgress, playerOn.progress);
     const quietLeg = state.shakeSaid || playerOn.progress >= E.silenceFromProgressM;
-    if (quietLeg && advanced && !r.voice.current) {
+    if (quietLeg && advancedM > 1e-4 && !r.voice.current) {
       state.silent += dt;
-      if (!state.silenceDone && state.silent >= E.silenceSeconds) {
+      state.silentDistanceM += advancedM;
+      if (!state.silenceDone && state.silentDistanceM >= E.silenceWalkM) {
         state.silenceDone = true;
-        r.Record("quietWalkObserved", { seconds: state.silent, fromM: Number(playerOn.progress.toFixed(1)) });
+        r.Record("quietWalkObserved", {
+          seconds: Number(state.silent.toFixed(2)),
+          distanceM: Number(state.silentDistanceM.toFixed(1)),
+          toM: Number(playerOn.progress.toFixed(1)),
+        });
       }
+    } else if (quietLeg && r.voice.current) {
+      // “连续无对白”不能把两段被台词隔开的碎片相加冒充。台词一旦起头，
+      // 这一扇静默窗口从零重新量；站着不动仍然不会累计。
+      state.silent = 0;
+      state.silentDistanceM = 0;
     }
 
     // 5. 掉队的步行伤员与照应他们的人。
@@ -279,7 +296,8 @@ export class FirstLevelQuietMarch {
 
   Update(dt, step) {
     if (step === "Regroup") this.UpdateRegroup(dt);
-    if (step === "WallPath") this.UpdateWallPath(dt);
+    // WallPath 的步骤边界在夹道折点，连续无对白路段则一直延伸到院门盘问前。
+    if (["WallPath", "ReceptionGate"].includes(step)) this.UpdateWallPath(dt);
     this.Dress(step);
   }
   State() {
@@ -287,7 +305,8 @@ export class FirstLevelQuietMarch {
       regroup: this.regroup && { sheltered: this.regroup.sheltered, cartAsked: this.regroup.cartAsked },
       wallPath: this.wall && {
         swapOffered: this.wall.swapOffered, bump: this.wall.bumpSaid, shake: this.wall.shakeSaid,
-        silentSeconds: Number(this.wall.silent.toFixed(2)), tended: this.wall.tended,
+        silentSeconds: Number(this.wall.silent.toFixed(2)),
+        silentDistanceM: Number(this.wall.silentDistanceM.toFixed(2)), tended: this.wall.tended,
         stragglers: this.wall.stragglers.map(entry => ({ id: entry.id, tended: !!entry.tended })),
       },
     };

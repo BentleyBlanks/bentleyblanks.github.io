@@ -61,14 +61,17 @@
 ### 15B WallPath — 换手抬运，沿墙缓行
 
 * 夹道就是撤离线尾段（北侧 2.8 m 院墙、南侧 1.1 m 矮墙，净宽 2.8 m，全长 74.4 m）。
-* `carrySwapProgressM`(12 m) 处后抬手体力不支：`zhou.bearers[0] = 0`、`zhou.ambushHold = true`
-  （那把闸的意思就是「别叫民夫顶上，这是顺子的活」），担架停下 → `carrySwapOffered` → `CarrySwap`。
+* `carrySwapProgressM`(12 m) 处后抬手体力不支：`zhou.bearers[0] = 0`、`zhou.ambushHold = true`，
+  并用 `scriptedHandoffHold` 区分这次剧情换手与普通单人拖行，担架原地等玩家 → `carrySwapOffered` → `CarrySwap`。
   `MissionZhouCarry` 的 `Enabled` 在 15B 加了 `carrySwapOffered` 前置，撒手之前按不了 F。
   接过之后把槽位填回去、解开 `ambushHold`。
 * 过坎：抬着人走进 `E.roadBump`(24,211.25) 的 `roadBumpReachM` → `roadBumpCrossed` → `RoadBump`。
 * 手抖：过坎之后再走 `handsShakeAfterBumpM` → `HandsShake`。
 * **无对白行走**：`silenceFromProgressM`(46 m) 之后不再起任何 cue；
-  量到连续 `silenceSeconds`(14 s) 没人说话就记 `quietWalkObserved`（取证，不是过关条件）。
+  实际走满 `silenceWalkM`(14 m) 且期间没人说话才记 `quietWalkObserved`（同时记录实测秒数；
+  取证，不是过关条件）。采用稿要求的是一段真实无对白行走，没有锁定秒数，距离判据不受帧率、
+  受伤减速或玩家走法影响。内部步骤在夹道折点 `(16,220)` 从 `WallPath` 切到 `ReceptionGate`，
+  但真实路线还要继续到院门 `(2,240)`；观察窗口跨过这条步骤边界，门卫等连续 14 m 走满后才起盘问。
 * `stragglersTended`：三名掉队伤员的位置读 `MISSION_PLACEMENT.wallPath.stragglers`，
   **投影回夹道中线**再用（原始三点落在南侧矮墙上）；照应的人从后头赶上来，
   并排（同里程 + 横向 `stragglerLateralM`）才算照应上。
@@ -184,7 +187,7 @@
 | `ditchShelterM` | 2.5 | 沟底宽下限 3.24 m 的一半 + 0.9 m 排队余量 |
 | `columnMovingM` | 3.4 | `R.litterSpacingM` |
 | `carrySwapProgressM` | 12 | 夹道 84 m 的前 1/7：先听见枪火消失再换人 |
-| `silenceFromProgressM` / `silenceSeconds` | 46 / 14 | 夹道 74.4 m，46 m 之后还剩 28 m，抬担架 1.4 m/s 够走满 14 s |
+| `silenceFromProgressM` / `silenceWalkM` | 46 / 14 | 夹道 74.4 m；采用稿要求真实无对白路段，按末段两道院墙之间的一跨量 14 m |
 | `woundedEnteringLitters` | 2 | `R.litterCount` 7 里先进院的头两副 |
 | `surgeonReachM` | 2.4 | 站位离放置点 1.65 m + 走位到达余量 0.5 m |
 | `rearColumnHoldM` | 13 | `bridgeCrossing` 起点到北桥头 16 m，停在离桥头 3 m |

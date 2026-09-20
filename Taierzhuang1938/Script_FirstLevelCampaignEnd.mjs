@@ -66,11 +66,11 @@ async function WaitControl(page, label, seconds = 60) {
  */
 export async function Drive(ctx) {
   const { page, output } = ctx;
-  const { JumpStage, Capture, CaptureFocus, Route, Interact, WaitStage } = CampaignActions(ctx);
+  const { JumpStage, Capture, CaptureFocus, Route, Interact, InteractProbe, WaitStage } = CampaignActions(ctx);
   const from = ctx.stageFrom;
 
-  if (from <= 15) await DriveRegroup(ctx, { JumpStage, Capture, CaptureFocus, Route, Interact, WaitStage });
-  if (from <= 16) await DriveHandover(ctx, { JumpStage, Capture, Route, Interact, WaitStage });
+  if (from <= 15) await DriveRegroup(ctx, { JumpStage, Capture, CaptureFocus, Route, Interact, InteractProbe, WaitStage });
+  if (from <= 16) await DriveHandover(ctx, { JumpStage, Capture, Route, Interact, InteractProbe, WaitStage });
   if (from <= 17) await DriveDeath(ctx, { JumpStage, Capture, WaitStage });
   await DriveBridge(ctx, { JumpStage, Capture, CaptureFocus, Route, WaitStage });
 
@@ -80,7 +80,7 @@ export async function Drive(ctx) {
 }
 
 /** 15A/15B/15C：收拢 → 换手抬运沿墙缓行 → 院门与入院。全程无敌人。 */
-async function DriveRegroup(ctx, { JumpStage, Capture, CaptureFocus, Route, Interact, WaitStage }) {
+async function DriveRegroup(ctx, { JumpStage, Capture, CaptureFocus, Route, Interact, InteractProbe, WaitStage }) {
   const { page, output } = ctx;
 
   // --- 15A 沟口收拢：无战斗。队伍重新成形、队首走起来 ------------------------
@@ -132,9 +132,10 @@ async function DriveRegroup(ctx, { JumpStage, Capture, CaptureFocus, Route, Inte
       return { x: litter.x + Math.sin(litter.yaw) * 1.6, z: litter.z + Math.cos(litter.yaw) * 1.6 };
     });
     await Route([zhou], "WallPathSwapPickup");
+    const probe = await InteractProbe("WallPathSwap");
     await Interact();
     assert.equal(await page.evaluate(() => window.Tengxian.carry.KindId), "stretcher",
-      "顺子按 F 真的接过了老周担架后端");
+      "顺子按 F 真的接过了老周担架后端：" + JSON.stringify(probe));
   }
   await Capture("WallPathCarry");
   // 过坎 → 幺娃说手抖 → 一整段无对白行走 → 夹道尽头。
@@ -146,7 +147,7 @@ async function DriveRegroup(ctx, { JumpStage, Capture, CaptureFocus, Route, Inte
     assert.ok(shot.voice.played.includes("RoadBump") && shot.voice.played.includes("HandsShake"),
       "过坎与手抖两段都真的说了");
     const quiet = shot.log.find(entry => entry.id === "quietWalkObserved");
-    assert.ok(quiet && quiet.detail.seconds >= E.silenceSeconds,
+    assert.ok(quiet && quiet.detail.distanceM >= E.silenceWalkM,
       `夹道末段要有一整段无对白行走，实际 ${JSON.stringify(quiet?.detail)}`);
     await fs.writeFile(path.join(output, "Data_QuietWalk.json"), JSON.stringify(quiet, null, 2));
   }
@@ -173,7 +174,7 @@ async function DriveRegroup(ctx, { JumpStage, Capture, CaptureFocus, Route, Inte
 }
 
 /** 16 完成交接：过门槛、军医指位置、放下担架、分派。 */
-async function DriveHandover(ctx, { JumpStage, Capture, Route, Interact, WaitStage }) {
+async function DriveHandover(ctx, { JumpStage, Capture, Route, Interact, InteractProbe, WaitStage }) {
   const { page } = ctx;
   await JumpStage(16);
   {
@@ -185,6 +186,7 @@ async function DriveHandover(ctx, { JumpStage, Capture, Route, Interact, WaitSta
         return { x: litter.x + Math.sin(litter.yaw) * 1.6, z: litter.z + Math.cos(litter.yaw) * 1.6 };
       });
       await Route([pickup], "HandoverPickup");
+      await InteractProbe("HandoverPickup");
       await Interact();
     }
     assert.equal(await page.evaluate(() => window.Tengxian.carry.KindId), "stretcher");
@@ -203,10 +205,11 @@ async function DriveHandover(ctx, { JumpStage, Capture, Route, Interact, WaitSta
   // 军医先指位置（PlaceLitter），喊出口才允许按 F。
   await WaitFact(page, "placeOrderHeard", "16 军医指位置", 180);
   await Route([{ x: A.zhouDrop.x - 0.8, z: A.zhouDrop.z + 0.6 }], "HandoverPlace");
+  const placeProbe = await InteractProbe("HandoverPlace");
   await Interact();
   {
     const shot = await Mission(page);
-    assert.ok(shot.facts.includes("zhouPlaced"), "玩家与前抬手一起把老周放下了");
+    assert.ok(shot.facts.includes("zhouPlaced"), "玩家与前抬手一起把老周放下了：" + JSON.stringify(placeProbe));
     assert.equal(shot.emptyHands, false, "放下担架之后恢复正常持枪");
     assert.equal(await page.evaluate(() => window.Tengxian.carry.Active), false);
     await Capture("HandoverPlaced");
@@ -239,6 +242,7 @@ async function DriveDeath(ctx, { JumpStage, Capture, WaitStage }) {
     assert.ok(shot.voice.played.includes("NextLitter"), "门外又抬来伤员，接收处继续工作");
     assert.ok(shot.end.reception.death.treating, "军医转过去救下一个");
     await fs.writeFile(path.join(output, "Data_DeathScene.json"), JSON.stringify(shot.end.reception, null, 2));
+    await Capture("NextLitter");
   }
 
 }

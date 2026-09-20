@@ -632,6 +632,48 @@ export function CampaignActions(ctx) {
     });
   }
 
+  /**
+   * 「站在这儿按 F 为什么没反应」的取证。
+   *
+   * 交互点不出提示只有四种可能：够不着、朝向不对、`Enabled` 没过、被更近的点压住。
+   * 光断言 `carry.KindId === "stretcher"` 报不出是哪一种（2026-09-21 的 15B 就卡在这儿：
+   * 驾驶器站到算好的接手点上，HUD 一片空白，报告里只有一句「没有提示」）。
+   * 这里把附近每一个交互点的锚点、距离、`Enabled` 各报一遍，顺带报现在选中的是谁。
+   */
+  async function InteractProbe(label) {
+    const probe = await page.evaluate(() => {
+      const g = window.Tengxian, p = g.player;
+      const best = g.interact.Query(p);
+      const points = [];
+      for (const point of g.interact.points.values()) {
+        const anchor = typeof point.Anchor === "function" ? point.Anchor() : point.position;
+        if (!anchor) { points.push({ id: point.id, anchor: null }); continue; }
+        const dist = Math.hypot(anchor.x - p.position.x, anchor.z - p.position.z);
+        if (dist > 12) continue;
+        let enabled = null;
+        try { enabled = point.Enabled ? !!point.Enabled({ point, player: p, dist, system: g.interact }) : true; }
+        catch (error) { enabled = `throw:${error.message}`; }
+        points.push({
+          id: point.id, enabled, reachM: point.reachM,
+          dist: Number(dist.toFixed(2)),
+          dy: anchor.y == null ? null : Number((anchor.y - p.position.y).toFixed(2)),
+          anchor: { x: Number(anchor.x.toFixed(2)), z: Number(anchor.z.toFixed(2)) },
+        });
+      }
+      const zhou = g.Debug.FirstLevelMission().column.litters.find(entry => entry.zhou) || null;
+      return {
+        stage: g.Debug.FirstLevelMissionRuntime().flow.stage.id,
+        player: { x: Number(p.position.x.toFixed(2)), y: Number(p.position.y.toFixed(2)), z: Number(p.position.z.toFixed(2)), yaw: Number(p.yaw.toFixed(2)) },
+        carry: { kind: g.carry.KindId, active: g.carry.Active },
+        best: best && { id: best.point?.id ?? best.kind, dist: Number(best.dist.toFixed(2)), label: best.label },
+        zhou: zhou && { x: Number(zhou.x.toFixed(2)), z: Number(zhou.z.toFixed(2)), yaw: Number(zhou.yaw.toFixed(2)), state: zhou.state, bearers: [...zhou.bearers], ambushHold: !!zhou.ambushHold },
+        points: points.sort((a, b) => (a.dist ?? 99) - (b.dist ?? 99)),
+      };
+    });
+    console.log("INTERACT_PROBE", label, JSON.stringify(probe));
+    return probe;
+  }
+
   async function RetryCampaign({rewalk=true}={}) {
     if(!allowCheckpointRetry||stageJumps||campaignRetries.filter(retry=>retry.kind!=="route").length>=3)return false;
     const before=await page.evaluate(()=>{
@@ -740,5 +782,5 @@ export function CampaignActions(ctx) {
     return state;
   }
 
-  return { JumpStage, Capture, CaptureFocus, WaitOutCutscene, Route, Interact, RetryCampaign, WaitStage };
+  return { JumpStage, Capture, CaptureFocus, WaitOutCutscene, Route, Interact, InteractProbe, RetryCampaign, WaitStage };
 }

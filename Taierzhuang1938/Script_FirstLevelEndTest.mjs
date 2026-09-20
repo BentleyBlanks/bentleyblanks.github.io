@@ -130,7 +130,7 @@ function FakeRuntime({ stage = "Regroup" } = {}) {
       r.time += r.dt; r.ai.time += r.dt;
       r.dressing.Begin();
       let maxProgress = Infinity;
-      if (["Regroup", "WallPath"].includes(step)) r.quietMarch.Update(r.dt, step);
+      if (["Regroup", "WallPath", "ReceptionGate"].includes(step)) r.quietMarch.Update(r.dt, step);
       if (["ReceptionGate", "Handover", "Death", "BridgeOrders"].includes(step)) r.reception.Update(r.dt, step);
       if (step === "ReceptionGate") maxProgress = r.reception.GateLimit();
       if (["BridgeOrders", "BridgeCover", "BridgeWithdraw"].includes(step)) r.bridge.Update(r.dt, step);
@@ -288,12 +288,13 @@ const VOICE_FACT = Object.freeze({
   Object.assign(zhou, { x: swap.x, z: swap.z, yaw: swap.yaw });
   r.Step(0.1, "WallPath");
   Check(r.Has("carrySwapOffered") && r.said.includes("CarrySwap"), "走到换手点后抬手才撒手");
-  Check(zhou.bearers[0] === 0 && zhou.ambushHold === true,
-    "撒手之后担架后端真的空着、而且不许叫民夫顶上（那是顺子的活）");
+  Check(zhou.bearers[0] === 0 && zhou.ambushHold === true && zhou.scriptedHandoffHold === true,
+    "撒手之后担架后端真的空着、原地等顺子且不许叫民夫顶上");
   // 顺子按 F 接过去。
   r.facts.add("carryHandover"); r.carry.KindId = "stretcher";
   r.Step(0.1, "WallPath");
-  Check(zhou.bearers[0] > 0 && !zhou.ambushHold, "顺子接手之后后端就是他，替补闸解开");
+  Check(zhou.bearers[0] > 0 && !zhou.ambushHold && !zhou.scriptedHandoffHold,
+    "顺子接手之后后端就是他，原地等待和替补两把闸都解开");
   // 过坎。
   Object.assign(zhou, { x: E.roadBump.x, z: E.roadBump.z });
   r.Step(0.1, "WallPath");
@@ -305,22 +306,30 @@ const VOICE_FACT = Object.freeze({
   Check(r.said.includes("HandsShake"), "又走一段幺娃才说");
   // 末段静默：站着不动不算 —— 量的是「一边走一边没人说话」。
   let walked = E.silenceFromProgressM;
+  const wallPathEndM = EndProjectOnto(wallPath, A.wallPathEnd).progress;
   const Advance = (seconds, speed) => {
     for (let i = 0; i < Math.round(seconds / r.dt); i += 1) {
       walked = Math.min(QUIET_MARCH_WALL_LENGTH, walked + speed * r.dt);
       const at = EndRoutePoint(wallPath, walked);
       r.player.position.x = at.x; r.player.position.z = at.z;
-      r.Step(r.dt, "WallPath");
+      r.Step(r.dt, walked >= wallPathEndM ? "ReceptionGate" : "WallPath");
     }
   };
   r.player.position.x = EndRoutePoint(wallPath, walked).x;
   r.player.position.z = EndRoutePoint(wallPath, walked).z;
   r.Step(6, "WallPath");
   Check(!r.Has("quietWalkObserved"), "站着不动不算「无对白行走」");
-  Advance(E.silenceSeconds + 2, 1.6);
-  Check(r.Has("quietWalkObserved"), `夹道末段真的走了 ${E.silenceSeconds} s 无对白的路`);
+  Advance(E.silenceWalkM / 2 / 1.6, 1.6);
+  r.voice.current = { id: "interruption" };
+  Advance(1, 1.6);
+  r.voice.current = null;
+  Check(!r.Has("quietWalkObserved") && r.quietMarch.wall.silentDistanceM === 0,
+    "被对白打断的两段路不能拼成连续静默");
+  Advance(E.silenceWalkM / 1.6 + 2, 1.6);
+  Check(r.Has("quietWalkObserved"), `夹道末段真的走了 ${E.silenceWalkM} m 无对白的路`);
+  Check(walked > wallPathEndM, "连续静默观察跨过 WallPath → ReceptionGate 的真实路线边界");
   const silence = r.recorded.find(entry => entry.id === "quietWalkObserved");
-  Check(silence.detail.seconds >= E.silenceSeconds, "静默段的时长是量出来的");
+  Check(silence.detail.distanceM >= E.silenceWalkM, "静默段的实际行走距离是量出来的");
   // 这一段里不许再有新的 cue 起头。
   const afterSilence = r.said.length;
   Advance(6, 1.6);
@@ -372,7 +381,10 @@ const VOICE_FACT = Object.freeze({
   Check(!r.said.includes("GateChallenge"), "玩家还没走到门口就不许喝止");
   r.player.position.x = A.receptionGate.x; r.player.position.z = A.receptionGate.z;
   r.Step(0.2, "ReceptionGate");
-  Check(r.said.includes("GateChallenge"), "走到门口守军才喝止");
+  Check(!r.said.includes("GateChallenge"), "夹道静默还没走满时，即使到门口也不抢先起盘问");
+  r.facts.add("quietWalkObserved");
+  r.Step(0.2, "ReceptionGate");
+  Check(r.said.includes("GateChallenge"), "连续静默走满且到了门口，守军才喝止");
   Check(r.column.mode !== "reception", "身份没确认以前伤员不许往院里走");
   r.Finish("GateChallenge");
   r.Step(6, "ReceptionGate");
@@ -634,6 +646,49 @@ function BridgeRuntime() {
   Check(r.Has("bridgeDestroyed"), "药装好、人自己沿撤出折线走净，桥照样炸");
   Check(r.bridge.BlastZoneOccupant() === null, "点火那一刻爆破人员也已经出了爆破区");
   console.log("ok 18 玩家先撤时爆破人员照样装得完药、也照样撤得出去");
+}
+
+// ---------------------------------------------------------------------------
+// 11c. blastFriendlyStuck 只救被地形卡死的 NPC，绝不把玩家当成超时项
+// ---------------------------------------------------------------------------
+{
+  const r = FakeRuntime({ stage: "BridgeWithdraw" });
+  r.bridge.Enter("BridgeOrders");
+  r.bridge.Enter("BridgeWithdraw");
+  r.player.position.x = A.blastSafe.x; r.player.position.z = A.blastSafe.z;
+  for (const actor of r.squad) { actor.position.x = A.blastSafe.x; actor.position.z = A.blastSafe.z; }
+  const stuck = r.squad[0];
+  stuck.position.x = A.railBridge.x; stuck.position.z = A.railBridge.z;
+  r.facts.add("blastZoneCleared");
+  r.facts.add("demolitionCharged");
+  r.bridge.blast.ready = true;
+  const moveActor = r.MoveActor;
+  r.MoveActor = (actor, point, speed) => {
+    if (actor !== stuck) moveActor(actor, point, speed);
+  };
+  r.Step(E.blastStuckS - 0.5, "BridgeWithdraw");
+  Check(!r.Has("blastFriendlyStuck") && !r.Has("bridgeDestroyed"),
+    `NPC 还没连续卡满 ${E.blastStuckS} 秒，不许提前放行`);
+  r.Step(1, "BridgeWithdraw");
+  const evidence = r.recorded.find(entry => entry.id === "blastFriendlyStuck");
+  Check(evidence?.detail.who === stuck.castId && evidence.detail.stuckS >= E.blastStuckS,
+    `NPC 连续卡满 ${E.blastStuckS} 秒才留下 blastFriendlyStuck 取证`);
+  Check(r.Has("bridgeDestroyed") && r.bridge.State().blast.overdue,
+    "NPC 卡死兜底记证后允许爆破，关卡不会永久钉死");
+
+  const player = FakeRuntime({ stage: "BridgeWithdraw" });
+  player.bridge.Enter("BridgeOrders");
+  player.bridge.Enter("BridgeWithdraw");
+  player.player.position.x = A.railBridge.x; player.player.position.z = A.railBridge.z;
+  for (const actor of player.squad) { actor.position.x = A.blastSafe.x; actor.position.z = A.blastSafe.z; }
+  player.facts.add("blastZoneCleared");
+  player.facts.add("demolitionCharged");
+  player.bridge.blast.ready = true;
+  player.Step(E.blastStuckS * 3, "BridgeWithdraw");
+  Check(!player.Has("blastFriendlyStuck") && !player.Has("bridgeDestroyed")
+    && !player.bridge.State().blast.overdue,
+  `玩家在爆破区里等 ${E.blastStuckS * 3} 秒仍不触发 NPC 兜底，也永远不放行`);
+  console.log("ok 18 blastFriendlyStuck 只对卡死 NPC 放行，玩家在区里永远等");
 }
 
 // ---------------------------------------------------------------------------

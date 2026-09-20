@@ -696,6 +696,25 @@ console.log(
   short.Update(.1, { moving: true, routeSafe: true });
   assert.ok(!litter.dragging, "a refilled crew stops dragging");
 }
+// A vacant handle reserved for a real player handoff stays where it was offered;
+// ordinary under-strength litters above still keep the existing drag fallback.
+{
+  const handoff = new FirstLevelMissionColumn();
+  handoff.Activate(); handoff.gateOpen = true;
+  const litter = handoff.zhou;
+  litter.bearers[0] = 0;
+  litter.scriptedHandoffHold = true;
+  const before = { x: litter.x, z: litter.z, progress: litter.progress };
+  for (let i = 0; i < 120; i++) handoff.Update(1 / 60, { moving: true, routeSafe: true });
+  assert.deepEqual({ x: litter.x, z: litter.z, progress: litter.progress }, before,
+    "a litter waiting for the player's handoff does not drift away from its prompt");
+  assert.equal(litter.state, "waiting");
+  assert.equal(litter.dragging, false);
+  litter.scriptedHandoffHold = false;
+  litter.bearers[0] = 75;
+  handoff.Update(1 / 60, { moving: true, routeSafe: true });
+  assert.ok(litter.progress > before.progress, "the litter resumes after the player fills the handle");
+}
 // Survivor counts change the number of useful loads; missing people cannot fill a cart.
 for (const lost of Array.from({length:R.zhouQueueIndex+1},(_,i)=>i)) {
   const reduced = new FirstLevelMissionColumn();
