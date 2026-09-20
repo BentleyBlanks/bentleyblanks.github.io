@@ -93,9 +93,10 @@ node Taierzhuang1938/Script_FirstLevelMissionBrowserTest.mjs --campaign --audio
 node Taierzhuang1938/Script_SeedAudioCarriageBake.mjs
 # 全环境烘焙也保留独立生成的车厢资产与来源；此命令仅处理车厢组。
 node Taierzhuang1938/Script_AmbBake.mjs CarriageCrowdSeedAudio
-# 本地试听文件不提交进游戏仓库。
-node Taierzhuang1938/Script_CarriageSoundscapeRender.mjs --output=C:/Users/Bentl/Downloads/CodexCarriageDialogue_20260910/AudioVoice_CarriageFullSoundscapeV2.mp3
 ```
+
+`Script_CarriageSoundscapeRender.mjs` 只服务已经下线的第一关军列开场，已在 2026-09-20
+死代码清理中删除；旧的完整试听混音及其下述测量只作历史记录，不再提供现行渲染命令。
 
 完整试听通过 FFmpeg 混音，对两次后排反应加左右位置、低通与短反射；游戏中则经实时总线和真实乘客声源播放，转头、音量设置及环境随机声会影响听感。完整混音测得均方平均 -23.7 dBFS、样本峰值 -3.2 dBFS。技术检查验证文件、播放与时序，不代表人工听审通过。
 
