@@ -227,7 +227,10 @@ try{
    b.last={x:g.player.position.x,z:g.player.position.z};
   }
   g.Debug.Key('KeyW',false);
-  return {stage:mission.flow.stage.id,alive:g.player.alive,reached:b.index,expected:points.length,
+  return {fixture:{kind:'controlled-topology',stageStart:'debug FirstLevelJump(6)',
+    playerSpawn:'collectionReturn[0]',playerHealthSet:100,enemiesDisabled:true,tankDisabled:true,
+    scope:'terrain and dynamic friendly blockers only; not Orders survival or continuous campaign'},
+   stage:mission.flow.stage.id,alive:g.player.alive,reached:b.index,expected:points.length,
    maxStalled:Math.max(0,...chunks.map(chunk=>chunk.stalled)),chunks,
    end:{x:+g.player.position.x.toFixed(2),y:+g.player.position.y.toFixed(2),z:+g.player.position.z.toFixed(2)}};
  });
