@@ -87,7 +87,7 @@
 
 闸门 `node Taierzhuang1938/Script_MissionGatesTest.mjs`（纯 Node，秒级）除了对表，还
 **静态对账两个源码文件**（运行时与开场脚本）：`SpawnEncounter("<字面量>")` 只许剩 2 处
-（front 的 fact、拍的 `plan.id`），`.Near(` 的出现次数 = `GateNear` 里 1 处 + 两张逐行写明
+（front 的 fact、威胁表的 `plan.id`），`.Near(` 的出现次数 = `GateNear` 里 1 处 + 两张逐行写明
 理由的白名单（运行时 7 条、开场 2 条），`GateNear` 引的事实必须是表里的距离门。多一处就红。
 
 ---
@@ -108,7 +108,7 @@ BuildOrchestrationModel() → {
   encounters[13] { id, phaseNumber, deferred, spawn, standbyUntil, dormant, wake, release,
                    members[{ id,x,z,weapon,hold,bayonet,team,reserve,releaseDelayS,
                              tactic, assaultLane, clearedAtPhase }] }
-  beats[2], routes{32}, anchors{51}, zones[44], friendlies[56], timeline[172], layout{…}
+  transferThreats[2], routes{32}, anchors{51}, zones[44], friendlies[56], timeline[172], layout{…}
 }
 PhaseLayout(model, n)          // 这一阶段开始时：每组的 state + 区域/路线/友军/步骤
 ApplyRuntimeState(model, rs)   // 运行时 State() → live（含 actualTimeline）
@@ -123,7 +123,7 @@ ModelSummary(model)            // CLI 摘要
 `FIRST_LEVEL_ENCOUNTER_STARTS` / `..._DEFERRED_ENCOUNTERS` / `..._STAGE_ENCOUNTERS` /
 `..._STAGE_CLEARED_ENEMIES` 推，与「跳关」用的是同一套口径。
 
-`timeline` 的 `kind`：`entry` / `condition` / `timed` / `beat` / `delay` / `wake`。
+`timeline` 的 `kind`：`entry` / `condition` / `timed` / `threat` / `delay` / `wake`。
 **`condition` 没有 `atS`** —— 这是硬规矩，工作台与 CLI 都据此决定画不画秒数。
 
 `ApplyRuntimeState(model, runtimeState)` 的 `runtimeState` = `runtime.State()` 再补
@@ -150,7 +150,7 @@ FilterSummary(model, phaseLayout, state, { notes })                      // 分�
 EnemyTableRows(model, phaseLayout, live)                                 // 敌军布设表：一行一个敌人，九列
 EnemyTableCsv(rows) / SortEnemyRows(rows, column, asc) / RowVisible(filter, row)
 ApplyPreset(state, id) / ToggleFilterItem(state, kind, id, allIds) / SoloFilterItem(state, kind, id)
-EncounterLabel(model, encounter)   // 「转运区第 1 波攻击」「村口的日军」
+EncounterLabel(model, encounter)   // 「转运区第 1 处威胁」「村口的日军」
 PRESETS  // 全部 / 只看敌军 / 只看友军 / 只看触发区 / 只看路线 / 只看本阶段新出现的
 ```
 
@@ -164,7 +164,7 @@ PRESETS  // 全部 / 只看敌军 / 只看友军 / 只看触发区 / 只看路�
   面板要是自己另算，左边写「0 条」而图上二十一条线还在。
 - 组名一律中文（`ENCOUNTER_LABELS`），路线名也是（`ROUTE_LABELS` / `RouteLabel(name)`：
   flank = 侧翼路、ordersRejoin = 接令归队…，没登记的兜底成「路线 &lt;编号&gt;」，不露英文键）；
-  转运区四组按攻击波次现算，内部叫法（`kind=`、「拍」）不进任何一个 label。闸门里有专门守这两条的断言。
+  转运区两组按威胁事实表的顺序现算，旧内部叫法「拍」不进任何一个 label。闸门里有专门守这两条的断言。
 - **按组的顺序是先按出现阶段、再按名字**（`SortByPhaseThenName`），分类树与布设表同一个顺序 ——
   按源表的顺序排的话，第 2 阶段的组会夹在第 15 阶段的组中间，那是写表的顺序，不是关卡里发生的顺序。
 
@@ -215,7 +215,7 @@ agent 不开浏览器也能读到与工作台**一模一样**的那份编排。
 - **底部时间轴可折叠**（`[data-timeline="toggle"]` → `#tl[data-collapsed=0|1]`）。
 - 字号只有四档：标题 18、栏标题 15、正文 13、次要 12，读数一律等宽；间距按 8 的倍数。
   深色滚动条、`:focus-visible` 有旧金描边。所有按钮、标签、提示都用普通中文
-  （转运区那四波攻击一律叫「第 n 波攻击」，内部叫「拍」不上界面），
+  （转运区两处威胁一律叫「第 n 处威胁」，旧内部叫法「拍」不上界面），
   表里的编号（步骤 id、组 id、事实 id）只当尾巴上的等宽小字，**内部字段名不进句子**。
 
 ### 左栏「流程」
@@ -260,7 +260,7 @@ P3b 的 `Script_EditorOrchestrationMap.mjs`（canvas 2D，零 three，北在上�
 
 **点得中什么**：单个敌人、锚点、触发区、路线、友军、批注点，外加两种把手 ——
 每个非「已清除」的遭遇组在成员质心旁有一枚芯片（`PickAt` → `{kind:"encounter", id}`），
-转运区四波攻击的框各有一枚金色芯片（→ `{kind:"beat", id}`）。悬停 tooltip 与选中描亮
+转运区两处威胁的框各有一枚金色芯片（→ `{kind:"threat", id}`）。悬停 tooltip 与选中描亮
 （整组成员逐个描亮）对这两种一视同仁，点它和从左栏 / 时间轴选它走的是**同一条反查**。
 芯片是不透明的，所以画在成员**下面**、拾取也排在成员之后：**点到人拿到的永远是人**
 （缩到整关视野时，一枚芯片能把它标的那几个人整个盖住 —— 这条不是洁癖）。
@@ -318,8 +318,8 @@ P3b 的 `Script_EditorOrchestrationMap.mjs`（canvas 2D，零 three，北在上�
 - **素材**：`Taierzhuang1938/Texture/Editor/Icon_Orch_<名字>.png`，23 张，64×64，
   **纯白剪影 + alpha**（白色是故意的：运行时才按状态染色）。进仓库，不是忽略目录。
 - **登记表**：`ORCHESTRATION_ICONS[名字] = { file, label }`，`label` 是普通中文
-  （「步枪兵」「机枪手」「攻击波」），图例、提示、总表上写的就是它，不写
-  `pending` / `standby` / `beat` 这种排程表里的内部叫法。
+  （「步枪兵」「机枪手」「补给箱」），图例、提示、总表上写的就是它，不写
+  `pending` / `standby` / `threat` 这种排程表里的内部叫法。
 - **选图规则**（纯函数，面板共用）：
   - `IconForMember(member, state, encounterId)` —— 飞机 → 机枪 → 钉在原地 → 上刺刀 →
     预备队 → 步枪兵，按这个顺序取第一条命中的。**图标只说「他是干什么的」**。
@@ -355,7 +355,7 @@ P3b 的 `Script_EditorOrchestrationMap.mjs`（canvas 2D，零 three，北在上�
   18 px 以上才画闭眼 / 沙漏 / 骷髅。上刺刀的兵图上画成步枪兵，刺刀退成 18 px 以上才出现的角标
   （`MapIconForMember` / `TraitBadge`，画法限制在地图层；面板用大图标照旧画刺刀）。
 - **锚点与触发区**：锚点只画一枚 12 px 图标居中压在坐标上；触发区不再画圈心图标，
-  只留虚线圈 + 名字 + 一颗淡圈心点，转运四个攻击波的方框保留图标与时间窗。
+  只留虚线圈 + 名字 + 一颗淡圈心点，转运两处威胁的方框保留图标与出现条件。
 
 ### 只看这一撮：`map.SetFilter(filter)`
 
@@ -375,8 +375,8 @@ map.drawnMarkers                // 本帧真画出去的标记 [{kind, id, encou
 
 - **详情卡**（`FindOwner` 反查）：卡头是「类别标签 + 名字」，卡身是一张键值表，
   左边一列是问题（属于哪组 / 怎么出现 / 出场后先待命 / 会怎么动 / 现在 …），
-  右边一列是人话（「转运区第 2 波攻击，进入 Transfer 这一步后第 35–60 秒之间、且已装车 4 副时出现」），
-  表里的编号跟在值后面当等宽小字（`kind=beat`、`transfer`）。最下面是折叠的原始数据 JSON。
+  右边一列是人话（「转运区第 2 处威胁，`loadingThreatResolved` 之后出现；解除后记 `alleyThreatResolved`」），
+  表里的编号跟在值后面当等宽小字（`kind=threat`、`transfer`）。最下面是折叠的原始数据 JSON。
 - **批注区**：本对象相关批注 + 全部批注（分段按钮：待处理 / 已处理 / 已忽略 / 全部）。
   每条是一张卡：状态小标签 + 目标 + 阶段 + 步骤（+「本地草稿」「已核对」）、意见正文、
   指的时候、建议、草图、**缩略图**、`resolution.summary`，以及 `NoteDrift` 的醒目警示条
@@ -396,9 +396,9 @@ map.drawnMarkers                // 本帧真画出去的标记 [{kind, id, encou
 右边是横向 18 列，**宽度按步数分配，不按秒** —— 大部分事情本来就没有秒数可排。
 最上面一行是阶段的编号与名字，**当前阶段整列（含表头）压一层旧金底**。
 
-- **设计行**（青 / 金）：`model.timeline` 的 `entry ▸`、`condition ◇`、`timed ◆`、`beat ■`、
+- **设计行**（青 / 金）：`model.timeline` 的 `entry ▸`、`condition ◇`、`timed ◆`、`threat ■`、
   `delay ·`、`wake ✶`。`condition` 只画菱形、`data-marker-at` **缺席**；
-  `timed` / `delay` 标相对秒，`beat` 标窗口区间。
+  `timed` / `delay` 标相对秒，`threat` 标进入条件与解除事实。
 - **实际行**（绿）：`live.actualTimeline` 的 `stageEntry ▸` 与 `fact ●`，标的是真实关卡时钟。
 - 悬停任意标记出一张自己画的提示卡（不是 native title）：阶段、步骤、这件事的人话、
   最后才是时刻 —— 没有秒数的那几类明写「没有固定秒数，等玩家做到才发生」。
@@ -465,7 +465,7 @@ map.drawnMarkers                // 本帧真画出去的标记 [{kind, id, encou
 {
   id: "n_YYYYMMDD_HHMMSS_xxxx", createdAt, updatedAt, status: "open"|"resolved"|"dismissed",
   level: "FirstLevel", missionVersion,               // 来自 model.version
-  target: { kind: "phase"|"step"|"fact"|"encounter"|"member"|"beat"
+  target: { kind: "phase"|"step"|"fact"|"encounter"|"member"|"threat"
                  |"route"|"zone"|"anchor"|"friendly"|"point"|"time", id?, x?, z? },
   phaseNumber, step,
   time: null | {kind:"stageRelative",seconds} | {kind:"fact",fact} | {kind:"actual",atS},
@@ -479,6 +479,9 @@ map.drawnMarkers                // 本帧真画出去的标记 [{kind, id, encou
   resolution: null | { at, by:"agent", summary, commit?, applied? },
 }
 ```
+
+`beat` 只为读取旧批注保留在校验器里；现行工作台新建转运批注一律写 `kind:"threat"`，
+并从 `model.transferThreats` 拍快照。
 
 **`original` 是这套东西能闭环的原因。** 批注是「这组敌人出现得太早」，而「早」是相对
 **当时那份编排**说的。不存下当时的 spawn / 坐标 / 事实门，等 agent 改完回头看，
@@ -555,7 +558,7 @@ node Taierzhuang1938/Script_MissionNotesCli.mjs dismiss <id> [--summary "…"]
    行为分开看，某一组点「只看」就图上只剩他们几个（再点一次取消）。
    要一眼看全「谁在哪、拿什么、会不会动」就切到 **布设表**：一行一个敌人，点表头排序，
    点一行跳到他身上，「复制 CSV」能整张端走。
-6. 看到不对的：在俯视图上点中那个敌人 / 触发圈 / 路线 / **整组的把手** / **某一波攻击的标签**
+6. 看到不对的：在俯视图上点中那个敌人 / 触发圈 / 路线 / **整组的把手** / **某一处威胁的标签**
    （或在左栏点阶段、步骤、事实、组），用圈选 / 箭头 / 折线 / 标注画出想说的地方
    （标注是在点的地方直接打字，回车落笔），要挪位置就用「候选位」把他拖到想要的位置。
 7. 右栏写一句人话 + 选建议类型（+ 时间点），点 **保存草稿**。
@@ -610,7 +613,7 @@ node Taierzhuang1938/Script_TestRunnerTest.mjs
 node Taierzhuang1938/Script_TextTest.mjs
 
 # 浏览器
-node Taierzhuang1938/Script_OrchestrationMapTest.mjs        # 俯视图（45 条）：数像素、PickAt、组/攻击波把手、ToPng、工具回调
+node Taierzhuang1938/Script_OrchestrationMapTest.mjs        # 俯视图（45 条）：数像素、PickAt、组/威胁把手、ToPng、工具回调
 node Taierzhuang1938/Script_OrchestrationEditorTest.mjs     # 工作台（101 条）：三栏/分栏线/时间轴折叠、事实与 flow 一致、阶段状态与「正在等」小标签、跟随实时不抢视野、标注输入框、分类抽屉与敌军布设表、批注退化与图片补传、关窗还干净
 node Taierzhuang1938/Script_EditorTest.mjs --launcher-only  # 入口面板 26 个按钮
 node Taierzhuang1938/Script_WorldInfoEditorTest.mjs
