@@ -153,10 +153,14 @@ try {
     r.frontArrivalAt = r.time - 17; r.frontArrivalShots = r.Inventory().shots;
     g.Debug.Pause();
   });
-  assert.equal(await page.locator(".mnPauseCondition").count(), 5);
+  assert.deepEqual(await page.locator(".mnPauseCondition").evaluateAll(rows => rows.map(row => row.dataset.condition)),
+    ["frontReached", "frontContact", "frontRifleDefense", "rifleWithdrawalResolved"]);
+  assert.equal(await page.locator(".mnPauseCondition").count(), 4);
   assert.equal(await page.locator(".mnPauseCondition.complete").count(), 2);
-  assert.equal(await page.locator(".mnPauseProgressSummary").textContent(), "已达成 2 / 5 项");
+  assert.equal(await page.locator(".mnPauseProgressSummary").textContent(), "已达成 2 / 4 项");
   assert.match(await page.locator('[data-condition="frontRifleDefense"]').textContent(), /17 \/ 40 秒.*尚未开枪/);
+  assert.equal(await page.locator('[data-condition="zhouGunWounded"]').count(), 0,
+    "zhouGunWounded belongs to the following MachineGun stage");
   await page.screenshot({path:path.join(out,"Scene_MissionProgressDesktop.png")});
   for (const viewport of [{width:390,height:844},{width:844,height:390}]) {
     await page.setViewportSize(viewport);
@@ -164,8 +168,8 @@ try {
     const menuBounds = await page.locator(".mnList").boundingBox();
     assert.ok(bounds.x >= 0 && bounds.y >= 0 && bounds.x + bounds.width <= viewport.width && bounds.y + bounds.height <= viewport.height);
     assert.ok(bounds.y + bounds.height <= menuBounds.y || bounds.x >= menuBounds.x + menuBounds.width, "progress and pause buttons do not overlap");
-    await page.locator('[data-condition="zhouGunWounded"]').scrollIntoViewIfNeeded();
-    assert.ok(await page.locator('[data-condition="zhouGunWounded"]').isVisible());
+    await page.locator('[data-condition="rifleWithdrawalResolved"]').scrollIntoViewIfNeeded();
+    assert.ok(await page.locator('[data-condition="rifleWithdrawalResolved"]').isVisible());
     await page.screenshot({path:path.join(out,`Scene_MissionProgress${viewport.width}.png`)});
   }
   await page.setViewportSize({width:1920,height:1080});
@@ -180,8 +184,12 @@ try {
     const g=window.Tengxian, r=g.Debug.FirstLevelMissionRuntime();
     r.flow.index++; g.menu.Show("pause");
   });
-  assert.equal(await page.locator(".mnPauseCondition").count(), 2, "new stage replaces all previous conditions");
+  assert.deepEqual(await page.locator(".mnPauseCondition").evaluateAll(rows => rows.map(row => row.dataset.condition)),
+    ["zhouGunWounded", "frontAttackRepelled", "guardWithdrawalResolved", "tankBlocksExit", "bundleOrderHeard"],
+    "MachineGun exposes its five current conditions, including zhouGunWounded");
+  assert.equal(await page.locator(".mnPauseCondition").count(), 5, "new stage replaces all previous conditions");
   assert.equal(await page.locator('[data-condition="frontReached"]').count(), 0);
+  assert.ok(await page.locator('[data-condition="zhouGunWounded"]').isVisible());
   await page.evaluate(() => {
     const g=window.Tengxian, r=g.Debug.FirstLevelMissionRuntime();
     while (!r.flow.completed) r.flow.index++;
