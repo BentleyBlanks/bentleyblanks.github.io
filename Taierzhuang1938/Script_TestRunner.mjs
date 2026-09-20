@@ -581,7 +581,7 @@ const changedDomainRules = [
   {domain:"squadMarch",pattern:/SquadMarch/},
   // 整关驾驶脚本拆成了「公共 Kit + 三段」（2026.09.19 重构，第二波三个玩法包各改一段）。
   // 文件名里没有「Mission」，上面那些按 FirstLevelMission* 选域的规则盖不到。
-  {domain:"firstLevel",pattern:/FirstLevelCampaign(Kit|Front|Mid|End)/},
+  {domain:"firstLevel",pattern:/FirstLevelCampaign(Kit|Front|Mid|End)|FirstLevelBundleThrowDriver/},
   // End 包（阶段 15–18）的新模块：文件名里同样没有「Mission」。
   {domain:"firstLevel",pattern:/FirstLevelEndCast|FirstLevelQuietMarch|FirstLevelReception|FirstLevelBridge|FirstLevelNightGate|FirstLevelNightLights|Data_Tuning_FirstLevelEnd/},
   {domain:"firstLevelTail",pattern:/FirstLevelQuietMarch|FirstLevelReception|FirstLevelBridge|FirstLevelNightGate|FirstLevelNightLights|Data_Tuning_FirstLevelEnd|FirstLevelCampaignEnd/},

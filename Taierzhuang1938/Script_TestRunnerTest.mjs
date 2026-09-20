@@ -130,6 +130,9 @@ checks += 1;
 
 const missionChange = InferDomains(["Taierzhuang1938/Script_MissionSetpieces.mjs"]);
 Check(missionChange.domains.includes("cutscene") && missionChange.domains.includes("ai"), "任务摆点映射 cutscene/ai");
+const bundleThrowDriverChange = InferDomains(["Taierzhuang1938/Script_FirstLevelBundleThrowDriver.mjs"]);
+Check(bundleThrowDriverChange.domains.includes("firstLevel"), "05 投弹驾驶模块映射 firstLevel");
+assert.deepEqual(bundleThrowDriverChange.unmatchedProjectFiles, []);
 const missionQuick = ResolveSelection(ParseArgs(["--changed=origin/master"]), missionChange.domains, missionChange);
 Check(missionQuick.includes("MissionSetpiecesTest"), "任务摆点编辑循环跑纯 Node 专项");
 const missionPrepush = ResolveSelection(ParseArgs(["--changed=origin/master", "--profile=prepush"]), missionChange.domains, missionChange);
