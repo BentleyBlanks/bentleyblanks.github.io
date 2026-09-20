@@ -77,9 +77,8 @@ export class FirstLevelReception {
       r.extras.WalkTo("GateGuardNorth", E.gateBlock, E.gateGuardMps, { arriveM: 0.5, yaw: E.gateBlock.yaw });
       r.extras.Hold("GateGuardSouth", yard.gateGuard[1], { yaw: yard.gateGuard[1].yaw });
       const guard = r.extras.Actor("GateGuardNorth");
-      // 15B 的连续静默从夹道跨进本步骤；走满之后才让 15C 的第一句盘问起头。
-      if (!state.challenged && guard && r.Has("quietWalkObserved")
-        && Distance(r.player.position, A.receptionGate) <= E.gateChallengeReachM) {
+      // 静默段是取证，不是硬门：即使末段被合法对白打断，到院门后仍必须能盘问放行。
+      if (!state.challenged && guard && Distance(r.player.position, A.receptionGate) <= E.gateChallengeReachM) {
         state.challenged = true;
         r.Say("GateChallenge");
       }

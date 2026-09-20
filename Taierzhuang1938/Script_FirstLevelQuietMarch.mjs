@@ -300,6 +300,13 @@ export class FirstLevelQuietMarch {
     if (["WallPath", "ReceptionGate"].includes(step)) this.UpdateWallPath(dt);
     this.Dress(step);
   }
+  /** 夹道末段正在量连续静默；带路短命令此时应让路，剧情对白仍按正常优先级播放。 */
+  QuietWindowActive() {
+    if (!this.wall || this.runtime.Has("quietWalkObserved")
+      || !["WallPath", "ReceptionGate"].includes(this.runtime.flow.stage.id)) return false;
+    const progress = EndProjectOnto(WALL_PATH, this.runtime.player.position).progress;
+    return this.wall.shakeSaid && progress >= E.silenceFromProgressM;
+  }
   State() {
     return {
       regroup: this.regroup && { sheltered: this.regroup.sheltered, cartAsked: this.regroup.cartAsked },

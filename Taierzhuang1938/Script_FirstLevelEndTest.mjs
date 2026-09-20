@@ -380,11 +380,13 @@ const VOICE_FACT = Object.freeze({
   Check(limit < r.ColumnProgressAt(A.receptionGate) && limit > 0, "没放行以前担架队压在院门以东排队");
   Check(!r.said.includes("GateChallenge"), "玩家还没走到门口就不许喝止");
   r.player.position.x = A.receptionGate.x; r.player.position.z = A.receptionGate.z;
+  // 模拟末段有一条合法对白把连续静默窗口打断；取证可以缺，关键流程不能被它锁死。
+  r.voice.current = { cue: { id: "GuideFollow", guidance: true } };
   r.Step(0.2, "ReceptionGate");
-  Check(!r.said.includes("GateChallenge"), "夹道静默还没走满时，即使到门口也不抢先起盘问");
-  r.facts.add("quietWalkObserved");
+  r.voice.current = null;
   r.Step(0.2, "ReceptionGate");
-  Check(r.said.includes("GateChallenge"), "连续静默走满且到了门口，守军才喝止");
+  Check(!r.Has("quietWalkObserved") && r.said.includes("GateChallenge"),
+    "末段对白打断了静默取证，到院门仍能盘问放行，不把取证变成软锁");
   Check(r.column.mode !== "reception", "身份没确认以前伤员不许往院里走");
   r.Finish("GateChallenge");
   r.Step(6, "ReceptionGate");
