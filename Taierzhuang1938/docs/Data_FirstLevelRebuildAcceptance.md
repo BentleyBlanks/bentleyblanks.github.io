@@ -44,7 +44,8 @@
   铁路桥走 gates（5 个完好件 + 3 个残骸件）。**scenario 体块不在 `MISSION_LAYOUT.blocks` 里，净空要分态单独扫。**
 - 07 的到达门半径是 **9 m** 不是 4 m：`southWalk` 的终点 (48,−20) 离 `village` 锚点 (55,−20) 有 7 m，
   4 m 的门会让人走到头还差三米够不着（实测走完 150 秒仍停在 South）。路冻在 135 m，所以动的是门。
-- 工作台用词：转运区是「第 n 处威胁」（zone kind `threatArea`）。`MISSION_TUNING.openingEnemyBudget` 50。
+- 工作台用词：转运区是「第 n 处威胁」（zone kind `threatArea`）。`MISSION_TUNING.openingEnemyBudget` 是
+  有限名单 44 人：掩蔽部门外 4、接近屏 12、前沿 12、机枪位 12、战车护卫 4；不是 actor pool 容量。
 
 ### 逐阶段：Notion 通过条件 → 事实 → 验证入口
 
@@ -86,11 +87,18 @@
 `FirstLevelP012CastTest`、`FirstLevelP012FlowTest`、`MissionNotesTest`、`ModuleGraphTest`、`TextTest`。
 `TextTest` 为 0 失败、1 组既有未静态引用警告。
 
+冻结运行时候选 `5098edee`、文档证据集成点 `a8a8e334e` 已完成当前 quick：
+90 通过、0 历史基线、0 失败，用时 123.4 秒；原始记录为 `tmp/L1Handoff/Data_QuickFrozen.log`。
+同一候选的 `BuildBrowserBundle --preview` 构建成功：423 个模块、4,980,310 bytes、内容版本
+`4349808292926384`。这只证明模块可打包；合并入口的浏览器启动与画面仍待唯一 GPU 槽实测。
+
 浏览器专项 `Script_FirstLevelMissionTopologyBrowserTest.mjs` 本轮也退出 0：26 条实体行走路径通过，
 北门夜景体块由日间 704 件切到 719 件（新增 15 件），四个夜行锚点全部抵达，退出后恢复 704 件。
 它产出的 1280×720 图片是高空拓扑审查视角，只证明体块、桥态和路线装配；不能替代下列主观视角构图验收。
 
-本轮 1280×720 浏览器证据如下；截图与 JSON 都在已忽略的 `_shots/L1Staging*`，不提交仓库：
+本轮 1280×720 浏览器证据如下；截图与 JSON 都在已忽略的 `_shots/L1Staging*`，不提交仓库。
+同一批已忽略证据另复制到本地评审归档
+`C:\Users\Bentl\Documents\CodexReview\FirstLevelClaudeHandoff_20260920`，供候选复核使用：
 
 - **01→02 从正常开局连续跑到拾枪**（不是阶段跳转）：枪托拍在任务时钟 20.183 秒、
   `BunkerKilling` 第 0 行刚开播 0.033 秒时发生；刺刀拍在第 3 行、源时钟 5.833 秒；
@@ -109,6 +117,12 @@
 - **18 夜景也是 debug-start 视觉摆台，不是阶段 18 功能完成**：1/4/1 淡出换态跑过后落在
   `NightMarch` 的 `nightSpawn (-160,292)`，55° FOV 下城墙、门洞和行军队列可读；场景有 5 盏夜灯、
   14 名布景人物、4 件布景道具，22 名人物当帧全部可见。
+
+关尾另有功能分段证据：`--campaign --stage-jumps --stage-from=15` 已逐个重建 15、16、17、18 的
+调试先验，并用真实玩家输入走过各自下一阶段；17 的 `death` 控制段实测 14.000 秒，归还控制时
+`ZhouDeath` 已播放完。`--stage-from=18` 的独立运行从调试先验真实压制北岸、撤出、等尾队过桥、炸桥，
+再走完 `marchOut` 和北门进城到 `Complete`。15B 的无对白窗口按真实 14 m 取证，最近实测 10.92 秒；
+它不阻塞院门到达闸。这些都是分段/调试起点证据，不是一份从 01 保持同一运行时状态走到结尾的通关。
 
 这些实拍只证明上述局部时序、交互和构图；没有把 06/08/18 的调试起点写成 2026-09-19 重构的整关通关，
 也没有把纯 Node、拓扑高空图或 HTTP 可访问误写成整关视觉全绿。
@@ -136,55 +150,40 @@ Jump/archive 工具、音频与音乐检查消费。`OPENING.woundedRoute`、`ru
 `ambushHold` 当前还承担 15B 后抬手停等闸门；不要与已经失去调用方的旧
 `AmbushCasualty` / `AmbushRecover` 方法混为一谈。
 
-### 已知差距与未做项
+### 当前实现收口与待验边界
 
-汇总自三个玩法包与空间包的交付报告，按段排。
+下列曾经列为缺口的项目已在冻结候选中收口，不再作为未完成项：
 
-**阶段 1–7**
+- 03 的接近段使用三个真实掩体和 cover-bound controller 让四名队员交替推进；重建后的 Support 段没有
+  实体掩体，明确 `hasBounds === false`，不再合成旧车站方向的虚构站位。`rearTrench` 与
+  `collectionReturn` 共用当前沟槽，Rapier 胶囊双向专项已走通。
+- 05 集束弹按实际 `JUMP.gravityMps2 = 19.6 m/s²`、完整 3D aim vector 与枪口偏移解算，投掷前清掉
+  残留自由瞄准；`bundleCoveredThrowRangeM = 9` 对应沟内有效距离。旧“只有解算的 0.56 倍”结论混用了
+  9.81 m/s²、平面偏移和碰撞后位置，已经撤销。
+- 老周将乘的车从预留到上车、同行、停车、卸载都复用身份稳定的普通 Mesh 车板、挂件、轮组与担架件；
+  远车仍可实例化。`CarriagePropVelocityTest` 对生产几何与运动历史有专项断言。
+- 剧情人物走位已在实际消费处压过共享接触反应：Front 演出在 `UpdateSquad` 后更新，02/08/13 的人物
+  按各自编排放行；16/17 的 `reception.walks` 会让 `UpdateSquad` 与 `SquadMarchAi` 让路。旧的“班长会被
+  自己队伍永久压停”不是当前未解问题。
+- 15B 的 14 m 静默取证、17 的 14 秒死亡确认、18 的撤桥/炸桥/夜行/进门均已有上述分段证据；
+  桥头挤压、北引道尾队被打光和夜景传送回走三项实拍故障已经修复。
 
-- **03 缺掩体交替站位**。`TC.support` 的四个站位里只有 `FrontLeft(-8,-106)` 落在新入口这一段上，
-  另外三个还在旧的车站方向。补齐要空间包在「集结处 → 前沿」这一段加实体掩体 —— 虚拟站位没有墙，
-  等于让人站在开阔地上。
-- **借火仍是白盒姿态**：3.2 m 距离、0.7 rad 朝向门槛和两名担架员在 4 m 外等待已经过
-  720p debug-start 实拍；烟与火柴仍没有手部 IK 和点火光，老周也仍以担架卧姿表现靠在土壁边。
-- **老周靠土壁**用 `state "fallen"` 表示「还没上担架」，视觉上是躺在土壁边而不是靠坐。
-- **行刑的创口遮挡**靠门框与身体位置，没有专门的遮挡体积；换摆位要重新看一眼。
-- **集束弹的实际射程只有解算的 0.56 倍**：四次实测一致（解算 12.68 m 实飞 7.03/7.10，解算 14.49 m 实飞 7.4），
-  误差在出手方向不在速度上。现在的修法是「按战车更远去瞄」并走到九米以内再投。根因没解，
-  投掷解算本身还欠一次修正。
-- **04 的调试起点偏难**：直接从 04 跳进去比正常打过来吃紧，跳转起点的兵力/弹药还没按实际配平。
-- **`MISSION_ROUTES.support` 的头段是旧线**：03 现在从后交通壕尽头进场，`support` 的前两点
-  `(-32,-20) → (-32,-23)` 还指着旧掩蔽处那一带。现在靠 `MissionGuideRoute` 的 join 逻辑绕过去，
-  没有把线本身改短。
+仍需保留的产品表现限制：借火的烟与火柴是白盒，没有手部 IK 或点火光；“靠土壁”等担架用
+`state "fallen"` 表现为卧姿；行刑创口只靠门框、尘土与身体位置遮挡，改摆位后仍需重新看构图。
+08 当前只有 Node 门、拓扑与 720p debug-start 构图证据，没有当前冻结候选从上一阶段实际走入并完成
+08 的连续功能样本。
 
-**阶段 8–14**
+当前冻结候选**尚未完成**以下最终门禁，不能写成全绿：
 
-- **08 北口只有 debug-start 视觉证据**：`streetBlockSeen` 现在要求玩家位于
-  x=72.6…81.4、z=−30…−6 的北口矩形内，并对 `streetBlock` 有通视；46 m 半径只作外圈兜底。
-  纯 Node 已验证矩形反例、四角半径和前队站位，720p 摆台已确认倒墙、横车与四名喊话前队同时可读；
-  这仍不能替代从上一阶段实际走入并完成 08 的功能验收。
-- **车板的 `InstancedMesh` 逐实例速度**：12/13 车上的近景件走实例化，逐实例形变不在 MotionVector
-  契约内。老周的担架与挎包已经改成身份稳定的普通 Mesh，车板其余小件还没有。
-- **共用行进层的班长会被自己队伍压停**：剧情要求班长走到某处时，`UpdateSquad` 的接触反应/找掩体
-  每帧把他推回掩体；各包只在自己的步骤里逐个放行（02 掀架、08 查房屋、13 赶到停车点），
-  没有在共享层给「剧情走位优先」一个统一出口。
+- 三次最终无复活样本；正式样本不得带 `--allow-checkpoint-retry`。修夹具前的一次取证因 capture state
+  漏掉 `voice` / `voiceLineIndex` 而失败，当时运行时本身已到 `BunkerRescue`；该次不计完成样本或稳定率分母。
+- 从 01 保持同一运行时状态到 `Complete` 的完整 `--campaign --audio`。
+- 当前候选的 prepush 全套。
+- 已构建合并入口的真实浏览器启动、交互与画面验收；构建成功本身不等于浏览器通过。
 
-**阶段 15–18**
-
-- 实拍踩过的三条已修（桥头撤退全班压玩家脚下、回援尾队在北引道被打光、黑屏瞬移没生效），
-  修法与复发条件写在 [15–18 玩法包](Data_FirstLevelEnd20260919.md) 第 6 节，别再踩。
-- **夜景瞬移走 `position.set + body.Teleport`，并同时更新 yaw/pitch/velocity**。`player.Spawn` 会把生命、
-  流血、伤口和体力静默复位，不能用于剧情时间转场。2026-09-20 实拍确认位置与 Rapier 角色体都落在
-  `nightSpawn`；这份实拍是 debug-start 夜景换态与构图证据，不是阶段 18 功能完成。真正的回走来自驾驶器
-  仍攥着旧路点，已用 `Route.stopFact` 松手。
-
-**空间与登记**
-
-- `MISSION_ROUTES.reception` / `.exit` / `.flank` / `.opening` 四条只服务已下线步骤的路线仍有消费者
-  （`Column.StartReception` / `StartFinalExit`、`UpdateFlank`、几何避让表），本轮没有硬删；
-  连同其它「文档说的和代码对不上」的地方列在[空间拓扑](Data_FirstLevelTopology20260919.md)第 8 节。
-- `Script_FirstLevelMissionColumn` 里的 `AmbushCasualty` / `AmbushRecover` 随屋内伏击拍失去调用方，
-  还留在文件里。
+登记层仍有一项可继续清理：`Script_FirstLevelMissionColumn` 的 `AmbushCasualty` / `AmbushRecover`
+随屋内伏击拍失去调用方。`MISSION_ROUTES.reception` / `.exit` / `.flank` 等旧名字仍有
+`StartReception` / `StartFinalExit` / `UpdateFlank` 等现行消费者，不能按名字直接删除。
 
 **配音（需人工试听，机器判不了）**
 
