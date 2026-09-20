@@ -87,10 +87,10 @@
 `FirstLevelP012CastTest`、`FirstLevelP012FlowTest`、`MissionNotesTest`、`ModuleGraphTest`、`TextTest`。
 `TextTest` 为 0 失败、1 组既有未静态引用警告。
 
-冻结运行时候选 `5098edee`、文档证据集成点 `a8a8e334e` 已完成当前 quick：
+先前冻结运行时候选 `5098edee`、文档证据集成点 `a8a8e334e` 已完成当时的 quick：
 90 通过、0 历史基线、0 失败，用时 123.4 秒；原始记录为 `tmp/L1Handoff/Data_QuickFrozen.log`。
-同一候选的 `BuildBrowserBundle --preview` 构建成功：423 个模块、4,980,310 bytes、内容版本
-`4349808292926384`。这只证明模块可打包；合并入口的浏览器启动与画面仍待唯一 GPU 槽实测。
+此后当前集成候选推进到 `a887b09f0`。其最新 `BuildBrowserBundle --preview` 构建成功：423 个模块、
+4,981,588 bytes、内容版本 `3567979183637027`。这只证明模块可打包；合并入口的浏览器功能验收仍待父任务完成。
 
 浏览器专项 `Script_FirstLevelMissionTopologyBrowserTest.mjs` 本轮也退出 0：26 条实体行走路径通过，
 北门夜景体块由日间 704 件切到 719 件（新增 15 件），四个夜行锚点全部抵达，退出后恢复 704 件。
@@ -167,19 +167,42 @@ Jump/archive 工具、音频与音乐检查消费。`OPENING.woundedRoute`、`ru
   自己队伍永久压停”不是当前未解问题。
 - 15B 的 14 m 静默取证、17 的 14 秒死亡确认、18 的撤桥/炸桥/夜行/进门均已有上述分段证据；
   桥头挤压、北引道尾队被打光和夜景传送回走三项实拍故障已经修复。
+- 当前 `a887b09f0` 把前沿补给箱真实 footprint 提为共用数据；`ZhouGunExitRoute` 让受伤老周从箱体南侧开放坡道
+  折线撤离，最终仍到原 `zhouRest` 和 0.65 m 到位门，没有传送、移动补给箱、放宽到位门或改变真实伤害与碰撞。
+  父任务已审查补丁和轨迹；Front 实跑的 Mission、Space、ModuleGraph、TestRunner、Text 定向检查通过。
+- 新增 Zhou 撤离浏览器专项的三个起点，都让真实 0.34×1.21 m 胶囊到达原终点；但该专项明确是
+  `controlled-physics-fixture`，元数据为 `normalCampaignEvidence=false`。它只证明路径与实体碰撞在受控条件下兼容，
+  不能替代正常战役流程，也不能证明整关没有阻塞。
 
 仍需保留的产品表现限制：借火的烟与火柴是白盒，没有手部 IK 或点火光；“靠土壁”等担架用
 `state "fallen"` 表现为卧姿；行刑创口只靠门框、尘土与身体位置遮挡，改摆位后仍需重新看构图。
 08 当前只有 Node 门、拓扑与 720p debug-start 构图证据，没有当前冻结候选从上一阶段实际走入并完成
 08 的连续功能样本。
 
-当前冻结候选**尚未完成**以下最终门禁，不能写成全绿：
+已有正常流程失败与未完成记录继续保留，不能改写成通过：
 
-- 三次最终无复活样本；正式样本不得带 `--allow-checkpoint-retry`。修夹具前的一次取证因 capture state
-  漏掉 `voice` / `voiceLineIndex` 而失败，当时运行时本身已到 `BunkerRescue`；该次不计完成样本或稳定率分母。
-- 从 01 保持同一运行时状态到 `Complete` 的完整 `--campaign --audio`。
-- 当前候选的 prepush 全套。
-- 已构建合并入口的真实浏览器启动、交互与画面验收；构建成功本身不等于浏览器通过。
+- `RunFrozen01` 因 capture state 漏掉 `voice` / `voiceLineIndex` 而失败，当时运行时本身已到
+  `BunkerRescue`；这是采集字段错误，不计玩法失败、玩法成功或稳定率分母。
+- `RunFrozen02` 在旧候选的 03→04 生还门失败；后续修复后的 `RunFrozen03` 走完 03 后在 MachineGun 阶段
+  阵亡，未到 05–07。这两次均为 0 次重试的有效正常样本，但都早于当前 `a887b09f0`，不能推导当前候选通过或失败。
+- 当前候选 `RunFrozen04` 正常走到 Orders（06），最后一帧 `BorrowStand` 玩家存活、生命 80、重试 0；随后
+  CampaignFront 驾驶器仍读取已变更的快照字段 `m.column.zhou.x`，触发 TypeError 并以 exit 1 结束；现行正式快照
+  实际在 `m.column.litters` 中以 `zhou:true` 标识老周，并非生产坐标缺失。Front 已在独立验证提交 `3637a8529`
+  只修驾驶器取值，纯 Node 与现有失败 JSON 核对通过，但没有继续运行 campaign。这仍是驾驶器异常导致的未完成记录，
+  不是玩法通过，也不足以认定游戏本身在该处阻塞。`RunFrozen05/06` 未启动。
+
+用户随后明确只要求本次做功能性检测，关卡流程与阻塞由用户自己手测。因此原计划的三次正常 1–7 样本、
+与两个集成样本合计的五次稳定性统计、从 01 到 `Complete` 的完整 `--campaign --audio`，以及包含长流程项的
+全套 prepush，均不再继续运行，也不再作为本次交付的强制门禁。保留这些手测项并不构成全关通过证据；
+本文仍不承诺当前候选流程无阻塞。
+
+当前候选的**最终功能门禁结果尚未完成**，仍待父任务验证并如实记录：
+
+- 已构建合并入口的真实浏览器启动、正式菜单与页面功能；构建成功本身不等于浏览器通过。
+- 18 个阶段调试重建、交互与存档恢复、关卡编排工作台的功能检查。
+- 资源与音频机器门禁、high 画质渲染契约，以及发布合并入口与线上内容核对。
+
+以上功能检查不承担正常关卡路线、战斗生存或流程阻塞的验收职责。
 
 登记层仍有一项可继续清理：`Script_FirstLevelMissionColumn` 的 `AmbushCasualty` / `AmbushRecover`
 随屋内伏击拍失去调用方。`MISSION_ROUTES.reception` / `.exit` / `.flank` 等旧名字仍有
