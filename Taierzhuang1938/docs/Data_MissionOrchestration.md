@@ -101,7 +101,7 @@
 BuildOrchestrationModel() → {
   version, levelId, bounds,
   phases[18]  { number, id, title, steps[], spawn }
-  steps[28]   { id, index, phaseNumber, objective, target, cue, minimumSeconds,
+  steps[28]   { id, index, phaseNumber, objective, target, cue, minimumSeconds, // 27 个可玩步骤 + Complete
                 requirements[], guidance{label,route}, spawns[] }
   facts{69}   { id, kind, step, phaseNumber, anchor, point, radiusM, box, cue,
                 interaction, encounter, member, requires, source, text }

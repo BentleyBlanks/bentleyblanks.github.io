@@ -1,6 +1,6 @@
 import { MISSION_RECEPTION_SPACE, MISSION_STAGE_ROUTES as Stage } from "./Data_FirstLevelMissionTopology.mjs";
 // Notion 2026-09-19（docs/Data_FirstLevelRebuild20260919Contract.md §1）：18 个公开阶段，
-// 27 个内部步骤。公开阶段只做分组与调试跳转的起点，事实门仍各自独立。
+// 27 个可玩内部步骤；流程表另有终止哨兵 Complete。公开阶段只做分组与调试跳转的起点，事实门仍各自独立。
 import { MISSION_ANCHORS as A, MISSION_ROUTES as Routes } from "./Data_FirstLevelMissionLayout.mjs";
 const Phase = (number, id, title, steps, spawn) => Object.freeze({
   number, id, title, steps: Object.freeze(steps), entry: steps[0], spawn: Object.freeze(spawn),

@@ -111,7 +111,9 @@ export async function Drive(ctx) {
   await page.screenshot({ path: path.join(shots, "Scene_Rescued.png") });
 
   // 拾枪：走到掉在地上那一支跟前按 F。
-  await Route([{ x: P.bunker.rifle.x, z: P.bunker.rifle.z + 1.1 }], "BunkerRifle", { stance: "crouch" });
+  // 目标点就是可交互步枪本身。原先额外向北偏 1.1 m，点落在坍塌门垛的胶囊边缘；
+  // 玩家已经贴到枪前、HUD 也出现 F 提示，却会因离那个虚构偏移点 0.81 m 而被 Route 判失败。
+  await Route([{ x: P.bunker.rifle.x, z: P.bunker.rifle.z }], "BunkerRifle", { stance: "crouch" });
   await Interact();
   // 三条对白是排队播的（RescueCall → RescueLift → RescueOut），拾枪之后再等它们说完。
   const armed = await page.evaluate(() => {

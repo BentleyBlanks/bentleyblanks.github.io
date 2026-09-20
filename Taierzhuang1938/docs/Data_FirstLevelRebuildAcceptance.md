@@ -8,9 +8,10 @@
 
 ### 范围决定
 
-- **入口不变**：`?whitebox=p012`（`fullMission`）。`?whitebox=p012-archive` 的旧 P0–P2 夹具、
-  `Script_FirstLevelP012*` / `Data_FirstLevelP012*` / `Data_Text_P012` / `Data_Tuning_P012` 本轮一条没动。
-- **18 个公开阶段、28 个内部步骤**（调试菜单仍是 18 项；第 15 阶段含 `Regroup` / `WallPath` / `ReceptionGate` 三个内部步骤）。
+- **入口不变**：`?whitebox=p012`（`fullMission`）。`?whitebox=p012-archive` 的旧 P0–P2 运行时、
+  `Data_FirstLevelP012*` / `Data_Text_P012` / `Data_Tuning_P012` 没有改行为；`Script_FirstLevelP012CastTest`
+  只把已删除的正文军列乘客静态断言换成现行具名同伴与 archive 招募路径。
+- **18 个公开阶段、27 个可玩内部步骤**（调试菜单仍是 18 项；流程表另有终止哨兵 `Complete`；第 15 阶段含 `Regroup` / `WallPath` / `ReceptionGate` 三个内部步骤）。
   下线的旧步骤：`Train` `Unloading` `TrenchEntry` `Shelter` `RetreatFirst` `RetreatWall` `RetreatYard`
   `Reception` `FinalCarry` `FinalDefense` `Exit`。
 - **开场换成掩蔽部**：黑屏对白被近爆打断 → 受困（控制接管 `trapped`）→ 透过前门低处破口看见门外

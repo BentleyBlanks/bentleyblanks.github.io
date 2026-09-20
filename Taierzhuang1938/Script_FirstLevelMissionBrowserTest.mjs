@@ -98,7 +98,7 @@ try {
     } else {
 
     assert.equal(await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission().stage), "Complete");
-    // TODO 第二波：节奏断言按新 27 步重写。旧的那几条（South 的六秒黑屏转场、
+    // TODO 第二波：节奏断言按新 27 个可玩步骤重写。旧的那几条（South 的六秒黑屏转场、
     // TransferApproach 30–60 s、Transfer 2–4 min）量的是已经下线的步骤 ——
     // 07 现在是真走一段 45–75 秒，12 只有两处威胁，各包按自己那一段的口径补。
     const pacing = await page.evaluate(() => {
