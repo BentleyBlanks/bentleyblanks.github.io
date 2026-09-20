@@ -438,7 +438,7 @@ const VOICE_FACT = Object.freeze({
   r.Step(E.thresholdTiltS, "Handover");
   Check(Math.abs(zhou.roll) < 1e-6, "颠完就回正，不是一直斜着");
   Check(!r.said.includes("PlaceLitter"), "Threshold 还没播完时军医不能把它压到队尾");
-  r.Say("Threshold");
+  r.Finish("Threshold");
   r.Step(20, "Handover");
   Check(r.said.indexOf("Threshold") < r.said.indexOf("PlaceLitter"),
     "过门槛最后一句播完以后，军医才说「这副放这里」");

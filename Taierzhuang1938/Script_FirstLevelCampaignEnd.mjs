@@ -56,20 +56,20 @@ async function WaitControl(page, label, seconds = 60) {
   }
   assert.fail(`${label}：受控演出没有还回控制权`);
 }
-/** 等一条现场对白实际播完；只推进世界，不伪造 played 历史。 */
-async function WaitVoicePlayed(page, cue, label, seconds = 60) {
+/** 等一条现场对白实际播完；只推进世界，不伪造 finished 历史。 */
+async function WaitVoiceFinished(page, cue, label, seconds = 60) {
   let voice = null;
   for (let chunk = 0; chunk < Math.ceil(seconds / 5); chunk += 1) {
     voice = await page.evaluate((cue) => {
       const g = window.Tengxian;
       for (let i = 0; i < 300; i += 1) {
         const state = g.Debug.FirstLevelMission().voice;
-        if (state.played.includes(cue)) return state;
+        if (state.finished.includes(cue)) return state;
         g.StepFrames(1, 1 / 60, false);
       }
       return g.Debug.FirstLevelMission().voice;
     }, cue);
-    if (voice.played.includes(cue)) return voice;
+    if (voice.finished.includes(cue)) return voice;
   }
   assert.fail(`${label}：对白 ${cue} 没有实际播完，现场 ${JSON.stringify(voice)}`);
 }
@@ -241,9 +241,9 @@ async function DriveHandover(ctx, { JumpStage, Capture, Route, Interact, Interac
   {
     let shot = await Mission(page);
     assert.ok(shot.facts.includes("thresholdCrossed"), "过了厢房门槛");
-    await WaitVoicePlayed(page, "Threshold", "16 老周过门槛最后一句", 90);
+    await WaitVoiceFinished(page, "Threshold", "16 老周过门槛最后一句", 90);
     shot = await Mission(page);
-    assert.ok(shot.voice.played.includes("Threshold"), "「脚……慢点」已在现场实际播完");
+    assert.ok(shot.voice.finished.includes("Threshold"), "「脚……慢点」已在现场实际播完");
     await Capture("HandoverThreshold");
   }
   // 军医先指位置（PlaceLitter），喊出口才允许按 F。
