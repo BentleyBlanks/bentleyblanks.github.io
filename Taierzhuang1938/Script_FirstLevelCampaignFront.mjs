@@ -504,8 +504,10 @@ export async function Drive(ctx) {
   }, { x: P.collection.zhouWall.x, z: P.collection.zhouWall.z });
   const borrowStand = await page.evaluate(() => {
     const g = window.Tengxian, m = g.Debug.FirstLevelMission();
+    const zhou = m.column.litters.find((litter) => litter.zhou);
+    if (!zhou) throw new Error("Zhou's litter is missing from the mission snapshot");
     return { player: { x: +g.player.position.x.toFixed(2), z: +g.player.position.z.toFixed(2) },
-      zhou: { x: +m.column.zhou.x.toFixed(2), z: +m.column.zhou.z.toFixed(2) },
+      zhou: { x: +zhou.x.toFixed(2), z: +zhou.z.toFixed(2) },
       facts: m.facts, borrow: m.front.collection.borrow, said: m.voice.played };
   });
   console.log("BORROW_STAND", JSON.stringify(borrowStand));
