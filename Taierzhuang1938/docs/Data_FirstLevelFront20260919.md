@@ -37,7 +37,8 @@ VoicePosition → frontShow.VoicePosition 优先
 - `Update` 在 `UpdateSquad` 之后。剧情要求某人走到某处时，接触反应 / 找掩体每帧都会把他推回掩体；
   放在后面下的走位命令才留得住。02 罗班长掀架的先例在 `UpdateSquad` 里，本包把幺娃也一并放行。
 - `Draw` 在 `view.Update` 之后。集结处的伤员与搬运人员走 `FirstLevelMissionView.Person`
-  那条实例化人群（不占 AI 的 `actorPool`，那 40 个名额被守军、接防班与前沿防御排满了）。
+  那条实例化人群，不占 AI actor。当前开场敌军预算是 44：掩蔽部门外 4、接近屏 12、
+  前沿 12、机枪位 12、战车护卫 4；这是 `openingEnemyBudget` 的有限名单口径，不是 `actorPool` 容量。
   它是立即模式，`view.Update` 末尾的 `people.End()` 会把这一帧没提交的人藏起来。
 
 `Script_FirstLevelOpening` 只留近爆兜底与感知曲线，门外那一拍整段转交 `FirstLevelBunkerShow`
@@ -73,8 +74,10 @@ ShunziCurse 播完 +bunkerCreakAfterS  creak 木架轻响 → 日兵真的走向
   「另一名日兵从侧面补刺」整拍消失 —— 这是本轮实拍踩到的第一个坑。
 - 不做血腥特写：只有位置、姿态与一次 `TakeHit`，创口由门框、尘土与身体遮挡。
 
-没有音频时按 `bunkerKillFallbackS`（相对 killAt 的 0 / 2.1 / 4.2 / 6.3 秒）兜底，
-整段再有一道 `bunkerShowFallbackS` = 16 秒（短于 `trappedMaxS` 20 秒）。
+正常路径只认 `BunkerKilling` 的逐句 `Line`：请求该 cue 时只记 `killRequested`，收到它的
+第一句才设置 `killAt` 并开始四拍。实录 `BunkerBanter` 长 16.744 秒；8 秒近爆兜底不能
+抢断仍在推进的 `BunkerBanter`，后续整段兜底也不能抢 `BunkerKilling`、`BunkerSearch`
+或 `ShunziCurse`。只有对应 cue/Line 实际缺失时，`bunkerKillFallbackS` 才补拍。
 
 ### 02 BunkerRescue / RearTrench —— 班长救人，撤入后交通壕
 
@@ -100,17 +103,17 @@ collectionPointSeen（collection 14 m）—— 第一次看见担架、伤员与
 
 ### 03 Support —— 接回第一批守军
 
-沿用旧演出。入口变成后交通壕尽头：`MISSION_STAGE_ROUTES.rearTrench` 的尾段与
-`MISSION_ROUTES.support` 共用 `(-8,-112) → (6,-124)` 两点，`MissionGuideRoute` 的
-join 逻辑自己把「集结处 → 前沿」这一截接上，不需要新路线。
+沿用旧演出。入口变成后交通壕尽头：`MISSION_STAGE_ROUTES.rearTrench` 与
+`MISSION_ROUTES.support` 都引用 `MISSION_FRONT_COLLECTION_ROUTE`；`MissionGuideRoute`
+的 join 逻辑把「集结处 → 前沿」这一截接上，不需要第二套中心线。
 
 `FrontBlockade`（老周指右边破墙）由 `UpdateFrontDialogue` 按「封锁是真的」判时机。
 通过条件不变：`frontReached` `frontContact` `frontRifleDefense` `rifleWithdrawalResolved`。
 
-> **遗留**：契约要求这一段有「掩体交替站位」。`TC.support` 的四个站位里只有
-> `FrontLeft(-8,-106)` 落在新入口这一段上，另外三个在旧的车站方向。
-> 补齐要空间包在集结处→前沿这一段加实体掩体（虚拟站位没有墙＝人站在开阔地上），
-> 本包没有自造几何。
+掩护行进分成两个有实际几何依据的门。接近段保留三个真实掩体和 cover-bound controller，
+四名队员按 `[[0,2],[1],[0,2],[1]]` 交替使用；重建后的 Support 段没有实体掩体，因而明确
+`hasBounds === false`，不再合成虚构的 cover-bound controller 或绕向退役站位。四人仍各自
+保留平滑个人路线，并实际走完到 `OPENING.frontPosts` 的 authored 前沿阵位。
 
 ### 04 MachineGun —— 接替火力，战车压口
 
@@ -143,6 +146,12 @@ reliefInPosition（接防班从集结处沿后交通壕进阵位）
 
 返程不复活去程敌人（`bundleApproach` 只在 `Enter("Tank")` 生成一次）。
 
+投弹驱动按实际 `JUMP.gravityMps2 = 19.6 m/s²` 解算，投掷前清零步枪残留的
+`player.aimYaw/aimPitch`，并按完整 3D aim vector 计入 `THROW.muzzleAheadM` 与
+`muzzleRiseM`。`bundleCoveredThrowRangeM = 9` 要求战车进入沟内可投范围后再出手。
+旧结论“真实飞行只有解算距离约 0.56 倍、原因未解”是错误诊断：它混用了 9.81 m/s²、
+平面枪口偏移、残留自由瞄准，并把碰撞后弹跳滚动的位置当成首次落点；当前实现已纠正。
+
 ### 06 Orders —— 回到伤员集结处，接下后送
 
 ```
@@ -159,6 +168,11 @@ BorrowLight（9 句）逐句 / 逐事件驱动七个姿态：
 ZhouLift 播完 → zhouOnLitter → 老周用 zhouLiftMoveS 秒从土壁挪回队列（state 转 "waiting"）
 担架队起行 → columnDeparted
 ```
+
+03 去程和 06 返程共用 `MISSION_FRONT_COLLECTION_ROUTE`，`OPENING.supportRoute` 也引用
+这条中心线，实际沟槽直接按它开挖。共享段 52.13 m，`rearTrench` 全长 71.85 m，
+`collectionReturn` 全长 86.60 m；共享沟底最大坡度 0.043（约 2.44°）。这避免路线点与
+实际沟槽再次漂移成单向陡壁。
 
 烟与火柴是两个小白盒（`MissionZhouCigarette` / `MissionShunziMatchbox`），
 不做手部 IK —— 本轮口径是「流程与白盒到位，人物动作可以简化」。
@@ -192,9 +206,10 @@ villageMouthReached（village 4 m）→ Say VillagePointer
 | 数值 | 出处 |
 | --- | --- |
 | `bunkerKillFallbackS` `[0,2.1,4.2,6.3]` | `MissionVoiceTimeline` 对 `BunkerKilling` 的 7.84 秒 / 4 句 |
-| `bunkerShowFallbackS` 16 | 短于 `MISSION_TUNING.trappedMaxS` 20 秒 |
+| `BunkerBanter` 16.744 秒实录 / `killAt` | 旧 8 秒近爆兜底不得抢断当前 cue；`killAt` 只在首个 `BunkerKilling` Line 设置 |
 | `bunkerButtStrikeS` 0.45 | `Data_MeleeCombat` 的近战 windup 同量级 |
 | `bundleProneRangeM` 40 / `bundleProneArcRad` 0.5 | `Data_Tuning_AiShooting` 的 `CLOSE_RANGE` 一档；0.5 rad≈29°，比 `tankHullMgArcRad` 宽一点 |
+| `bundleCoveredThrowRangeM` 9 | 19.6 m/s² 世界重力、`GrenadeBundle` 13 m/s 满蓄力与完整 3D 枪口偏移 |
 | `southMarchSpeedMps` 2.2–2.6 | Notion 采用稿 07 的配速要求 |
 | `southTargetSecondsMin/Max` 45 / 75 | 契约 §2 |
 | `zhouLiftMoveS` 2.6 | `MISSION_TUNING.litterSpeedMps` 1.4 m/s 量级 |
@@ -238,11 +253,22 @@ node Taierzhuang1938/Script_FirstLevelLeaderGuideBrowserTest.mjs
 取证截图落在 `Taierzhuang1938/_shots/L1Front/`（忽略目录）：受困视角看行刑的四个关键帧、
 获救、后交通壕途经集结处、前沿接应、机枪位、弹药屋、战车压口、借火、南行途中。
 
+当前共享沟槽专项证据：Rapier 胶囊双向走完 `rearTrench` 9/9 点、
+`collectionReturn` 8/8 点；受控真实 `g.player` 从前沿返程走完 8/8 点，存活、
+`maxStalled: 0`，六个 10 秒位移块为 12.79、15.05、12.94、15.95、15.89、6.05 m，
+终点 `(-36.21,-100.94)`。该夹具关闭敌军和战车、从 debug stage 6 Spawn 满血玩家，
+只证明地形与动态友军可通行，不算正常 Orders 存活或 01→07 连续通关。
+
+修复前旧样本 `RunFixed01` 在 03→04 保有 front 12、approach 3，检查点重试 0；05 首发
+`blastMiss: 1.8` 并成功 `tankImmobilized`，随后在 06 CollectionReturn 约
+`(-9.82,-103.91)` 卡死。它是修复前失败样本，不能计入当前稳定率。最终五样本门禁为三次
+无复活 `--campaign --stage-to=7`、一次 prepush campaign/audio、一次 SquadMarch 1→7，
+至少通过 4/5；这些最终样本尚未执行，正式命令不得带 `--allow-checkpoint-retry`。
+
 ---
 
 ## 5. 已知缺口
 
-- **03 的掩体交替站位**：需要空间包在「集结处 → 前沿」这一段加实体掩体，见上文 03。
 - **借火的手部动作**：烟与火柴是白盒，没有手部 IK，也没有点火的光。
 - **老周靠土壁**：用 `state "fallen"` 表示「还没上担架」，视觉上是躺在土壁边而不是靠坐。
 - **行刑的创口遮挡**：靠门框与身体位置，没有专门的遮挡体积；换摆位时要重新看一眼。
