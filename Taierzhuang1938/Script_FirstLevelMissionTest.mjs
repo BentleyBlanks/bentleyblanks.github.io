@@ -121,6 +121,35 @@ if(process.argv.includes("--opening-audio"))process.exit(0);
     ({Vector3}=await import("three"));
   } finally {hooks.deregister();}
   {
+    const id="ApproachNorthA";
+    const actor={id:1,alive:true,scriptedNoncombatant:true,missionTacticStandby:true,meleeCombat:false,
+      position:new Vector3(-18,0,-142),suppression:0,scriptDefensive:true,
+      tacticalRadiusM:0,missionTacticalRadiusM:R.approachTacticalRadiusM,
+      missionTactic:{index:0,elapsed:0,hold:0,movingSeconds:0,distance:0,
+        last:{x:-18,z:-142},shelter:{x:-18,z:-142},mode:"cover"}};
+    let near=false,moved=0;
+    const runtime={flow:{stage:{id:"Support"}},enemies:new Map([[id,actor]]),
+      Near:()=>near,ai:{SetStance(){}},Defend(){},MoveActor(){moved++;}};
+    FirstLevelMissionRuntime.prototype.UpdateTactics.call(runtime,1/60);
+    assert.equal(actor.scriptedNoncombatant,true,"an unreached local approach sector cannot fight offscreen");
+    assert.equal(actor.missionTacticStandby,true);
+    assert.equal(actor.missionTactic.released,undefined);
+    near=true;
+    FirstLevelMissionRuntime.prototype.UpdateTactics.call(runtime,1/60);
+    assert.equal(actor.scriptedNoncombatant,false,"entering the authored near gate releases the local attack");
+    assert.equal(actor.missionTacticStandby,false);
+    assert.equal(actor.missionTactic.released,true);
+    assert.equal(actor.tacticalRadiusM,R.approachTacticalRadiusM);
+    assert.ok(moved>0,"the released actor resumes its authored physical approach");
+    const movedAfterRelease=moved;
+    actor.missionTactic={index:0,elapsed:0,hold:0,movingSeconds:0,distance:0,
+      last:{x:-18,z:-142},shelter:{x:-18,z:-142},mode:"cover"};
+    actor.scriptedNoncombatant=true;actor.missionTacticStandby=false;
+    FirstLevelMissionRuntime.prototype.UpdateTactics.call(runtime,1/60);
+    assert.equal(actor.scriptedNoncombatant,true,"the near gate does not clear a noncombatant duty it does not own");
+    assert.equal(moved,movedAfterRelease);
+  }
+  {
     const exposed={health:R.checkpointUnsafeSaveHealth-1};
     assert.equal(FirstLevelCheckpointIsSafe(exposed,true),false,
       "a near-fatal checkpoint in direct fire cannot replace the previous safe point");
@@ -974,6 +1003,9 @@ console.log("ok individual trench lanes, rounded corners, safe spacing and varia
   assert.ok(new Set(attackers.map(s=>s.id)).size===attackers.length,"each advancing actor has a persistent unique identity");
   assert.equal(new Set(MISSION_ENCOUNTERS.approach.map(s=>s.team)).size,2,"north and north-east sectors keep grenade cooldowns per squad");
   assert.ok(attackers.every(s=>MISSION_TACTICS[s.id]?.near && MISSION_TACTICS[s.id].points.length>=2),"mobile attackers have local activation and physical approach bounds");
+  assert.ok(P.guardWithdrawalRoutes.every(route=>route[0].z<R.approachFireSector.minZ&&route[1].z<R.approachFireSector.minZ
+    &&route[2].z>=R.approachFireSector.minZ),
+  "the approach screen excludes the waiting line and sheltered bound, then begins at the exposed withdrawal bound");
   assert.ok(R.enemyGrenades>0,"approach riflemen carry finite grenades");
   assert.ok(R.approachContactM<26 && R.approachTacticalRadiusM>=R.approachContactM,"close contact hands movement back to shared combat and grenade AI");
   assert.ok(MISSION_ENCOUNTERS.approach.every(actor=>actor.z<R.tankStopZ&&actor.x>=-20),

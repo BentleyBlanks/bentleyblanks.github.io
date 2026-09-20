@@ -115,6 +115,10 @@ collectionPointSeen（collection 14 m）—— 第一次看见担架、伤员与
 `hasBounds === false`，不再合成虚构的 cover-bound controller 或绕向退役站位。四人仍各自
 保留平滑个人路线，并实际走完到 `OPENING.frontPosts` 的 authored 前沿阵位。
 
+接近屏的两个局部攻击组在玩家进入各自 `near` 门之前保持待命，不能隔着数个沟弯提前向
+等待撤回的守军开火。它们放行后的射界从撤退线第一个暴露点（z≈−137）开始；z=−145 的
+等待线与 z=−140 的最后一个隐蔽点归前沿枪线，不属于接近屏。
+
 ### 04 MachineGun —— 接替火力，战车压口
 
 ```

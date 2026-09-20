@@ -159,8 +159,10 @@ export const MISSION_TUNING = Object.freeze({
   // 十二人冲机枪位 ＋ 四名战车护卫 = 44。每一份名单只投一次、不复活、不补波。
   // （旧口径 67 里的 12 名车站地面 + 4 名进沟 + 5 名追到掩蔽处随军列开场一起下线。）
   openingEnemyBudget:44,
-  // Route attackers cover the approach; the separate front force owns the gun line.
-  approachFireSector:{minX:-22,maxX:42,minZ:-145,maxZ:-120,selfDefenseM:3},
+  // Route attackers cover the exposed communication-trench approach; the separate front force
+  // owns the gun line. z=-145 is the defenders' waiting line and z=-140 is its last sheltered
+  // bound, so neither belongs to this screen. The first exposed withdrawal bound begins near -137.
+  approachFireSector:{minX:-22,maxX:42,minZ:-139,maxZ:-120,selfDefenseM:3},
   approachAccuracyScale:.35,
   approachTacticalRadiusM:24,
   approachContactM:18,

@@ -987,6 +987,11 @@ export class FirstLevelMissionRuntime {
         actor.missionTacticalRadiusM=actor.tacticalRadiusM;
         actor.tacticalRadiusM=0;
         actor.scriptDefensive=true;actor.scriptSuppressible=true;
+        // A local attack does not exist for combat before the marching player reaches its sector.
+        // `near` used to hold only movement, so this group acquired and killed waiting defenders
+        // offscreen while the player was still several trench bends away.
+        actor.missionTacticStandby=true;
+        actor.scriptedNoncombatant=true;
       }
       this.enemies.set(spec.id, actor);
       return actor;
@@ -1743,15 +1748,19 @@ export class FirstLevelMissionRuntime {
     const stage = this.flow.stage.id;
     for (const [id, actor] of this.enemies) {
       const plan = MISSION_TACTICS[id], state = actor.missionTactic;
-      if (!actor.alive || !state || actor.scriptedNoncombatant || actor.meleeCombat) continue;
-      state.distance += Distance(actor.position, state.last);
-      state.last = { x: actor.position.x, z: actor.position.z };
+      if (!actor.alive || !state || actor.meleeCombat) continue;
       // Local attacks start as the marching player reaches each sector, not offscreen at stage entry.
       if(plan.near && !state.released){
         if(!this.Near(plan.near,plan.nearM))continue;
         state.released=true;
+        // Clear only the noncombatant state owned by this local-attack gate. Other authored
+        // noncombatant duties must survive a generic tactics update.
+        if(actor.missionTacticStandby){actor.missionTacticStandby=false;actor.scriptedNoncombatant=false;}
         actor.tacticalRadiusM=actor.missionTacticalRadiusM;actor.scriptDefensive=false;
       }
+      if(actor.scriptedNoncombatant)continue;
+      state.distance += Distance(actor.position, state.last);
+      state.last = { x: actor.position.x, z: actor.position.z };
       state.elapsed += dt;
       // Let shared AI finish throws, fight/charge visible close threats and search after the final bound.
       if(plan.near && (actor.actor?.pendingGrenadeThrow || actor.actor?.characterRig?.infantry?.IsThrowing() || actor.state==="grenade" ||
