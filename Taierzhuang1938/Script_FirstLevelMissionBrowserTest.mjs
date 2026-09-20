@@ -4,6 +4,8 @@
 //   node Taierzhuang1938/Script_FirstLevelMissionBrowserTest.mjs --campaign     整关：真实玩家输入走完 18 个阶段
 //   node …  --campaign --audio                                                  再加逐条录音的真实解码与播放
 //   node …  --campaign --stage-jumps [--stage-from=8|11|15|18]                  从某个分段起点继续
+//   node …  --campaign --stage-jumps --stage-from=15 --probe-quiet-guidance-interrupt
+//                                                                                专项验证静默取消带路 cue；不算默认连续通关
 //
 // 2026.09.19 重构之后这个文件只是**薄编排器**：参数、三段驱动、收尾断言。
 // 公共动作在 Script_FirstLevelCampaignKit.mjs，三段分别在

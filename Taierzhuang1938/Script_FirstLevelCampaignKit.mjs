@@ -66,6 +66,9 @@ export function ParseCampaignArgs(argv = process.argv) {
     campaign: Has("--campaign"),
     audioCheck: Has("--audio"),
     stageJumps,
+    // 专项回归才允许主动排入一条带路短命令，验证静默窗口会取消它且不锁院门。
+    // 默认整关/分段驾驶只观察运行时自主产生的 cue，不能改写真实语音排队。
+    quietGuidanceInterruptProbe: Has("--probe-quiet-guidance-interrupt"),
     allowCheckpointRetry: Has("--allow-checkpoint-retry"),
     stageFrom, stageTo,
     suite: stageTo === 7 ? "FirstLevelStageFront"

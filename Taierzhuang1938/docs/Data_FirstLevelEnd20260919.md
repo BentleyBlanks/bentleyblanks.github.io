@@ -306,6 +306,7 @@ node Taierzhuang1938/Script_MissionOrchestrationFilterTest.mjs
 
 ```powershell
 node Taierzhuang1938/Script_FirstLevelMissionBrowserTest.mjs --campaign --stage-jumps --stage-from=15
+node Taierzhuang1938/Script_FirstLevelMissionBrowserTest.mjs --campaign --stage-jumps --stage-from=15 --probe-quiet-guidance-interrupt
 node Taierzhuang1938/Script_FirstLevelMissionBrowserTest.mjs --campaign --stage-jumps --stage-from=18
 node Taierzhuang1938/Script_FirstLevelMissionStageJumpTest.mjs
 node Taierzhuang1938/Script_FirstLevelMissionMusicBrowserTest.mjs

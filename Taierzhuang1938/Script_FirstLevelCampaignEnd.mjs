@@ -148,15 +148,22 @@ async function DriveRegroup(ctx, { JumpStage, Capture, CaptureFocus, Route, Inte
     return { x: point.x, z: point.z };
   }, { progress: E.silenceFromProgressM - 1 });
   await Route([...Points(MISSION_STAGE_ROUTES.wallPath.slice(1, 3)), quietProbe], "WallPathBeforeQuiet");
-  const guidance = await page.evaluate(() => {
-    const g = window.Tengxian, r = g.Debug.FirstLevelMissionRuntime();
-    for (let i = 0; i < 900 && r.voice.current; i += 1) g.StepFrames(1, 1 / 60, false);
-    const cue = r.leaderGuide?.View()?.cue;
-    return { cue, started: !!cue && r.voice.Guidance(cue) };
-  });
-  assert.ok(guidance.started && /^Guide/.test(guidance.cue),
-    `静默段前要能排入一条合法带路短命令：${JSON.stringify(guidance)}`);
-  console.log("QUIET_GUIDANCE_INTERRUPT", JSON.stringify(guidance));
+  const guidance = ctx.options.quietGuidanceInterruptProbe
+    ? await page.evaluate(() => {
+      const g = window.Tengxian, r = g.Debug.FirstLevelMissionRuntime();
+      for (let i = 0; i < 900 && r.voice.current; i += 1) g.StepFrames(1, 1 / 60, false);
+      const cue = r.leaderGuide?.View()?.cue;
+      return { cue, started: !!cue && r.voice.Guidance(cue) };
+    })
+    : await page.evaluate(() => {
+      const r = window.Tengxian.Debug.FirstLevelMissionRuntime();
+      return { cue: r.leaderGuide?.View()?.cue || null, started: false };
+    });
+  if (ctx.options.quietGuidanceInterruptProbe) {
+    assert.ok(guidance.started && /^Guide/.test(guidance.cue),
+      `静默段前要能排入一条合法带路短命令：${JSON.stringify(guidance)}`);
+    console.log("QUIET_GUIDANCE_INTERRUPT", JSON.stringify(guidance));
+  } else console.log("QUIET_GUIDANCE_OBSERVED", JSON.stringify(guidance));
   await Route(Points(MISSION_STAGE_ROUTES.wallPath.slice(3)), "WallPathToGate");
   {
     const shot = await Mission(page);
