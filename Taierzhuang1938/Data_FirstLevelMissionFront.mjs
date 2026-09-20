@@ -177,17 +177,16 @@ export function FrontAssaultLaneCuts(x,z,w,d,slackM=.4){
   }
   return false;
 }
-// Three successive crossfires: west, east and the forward bend. All are finite actors.
+// The rebuilt 03 entry runs from the casualty collection point to the traverse
+// trench. Keep a finite north / north-east screen on that live leg; the retired
+// station-side west/east teams were never encountered after the 2026.09.19 cut.
 export const FRONT_APPROACH_ENEMIES=[
-  {id:"ApproachWestGunner",x:-68,z:-17,weapon:"Type11",hold:true,team:"West"},
-  ...[[-61,-27],[-74,-35],[-64,-36],[-70,-42],[-58,-40]].map(([x,z],i)=>
-    ({id:"ApproachWest"+"ABCDE"[i],x,z,team:"West",bayonet:true})),
-  {id:"ApproachEastGunner",x:2,z:-39,weapon:"Type11",hold:true,team:"East"},
-  ...[[5,-48],[0,-56],[8,-59],[5,-67],[9,-68]].map(([x,z],i)=>
-    ({id:"ApproachEast"+"ABCDE"[i],x,z,team:"East",bayonet:true})),
-  {id:"ApproachBendGunner",x:19,z:-88,weapon:"Type11",hold:true,team:"Bend"},
-  ...[[22,-95],[27,-103],[20,-110],[29,-105],[17,-108]].map(([x,z],i)=>
-    ({id:"ApproachBend"+i,x,z,team:"Bend",bayonet:true})),
+  {id:"ApproachNorthGunner",x:-15,z:-138,weapon:"Type11",hold:true,team:"North"},
+  ...[[-18,-142],[-11,-139],[3,-141],[6,-139],[20,-142]].map(([x,z],i)=>
+    ({id:"ApproachNorth"+"ABCDE"[i],x,z,team:"North",bayonet:true})),
+  {id:"ApproachNorthEastGunner",x:31,z:-139,weapon:"Type11",hold:true,team:"NorthEast"},
+  ...[[26,-142],[25,-140],[31,-142],[35,-139],[39,-142]].map(([x,z],i)=>
+    ({id:"ApproachNorthEast"+"ABCDE"[i],x,z,team:"NorthEast",bayonet:true})),
 ];
 // Bounded approach routes end at the trench lip; shared tactical AI closes on observed targets.
 export const APPROACH_TACTICS=Object.fromEntries([
@@ -196,9 +195,10 @@ export const APPROACH_TACTICS=Object.fromEntries([
     points:[{x:s.x+(s.team==="Rail"?8:-6),z:s.z},{x:s.x+(s.team==="Rail"?14:-12),z:s.z}],
   }]),
   ...FRONT_APPROACH_ENEMIES.filter(s=>!s.hold).map((s,i)=>[s.id,{
-    near:s.team==="West"?{x:-24,z:-38}:s.team==="East"?{x:-24,z:-63}:{x:-8,z:-100},
+    near:s.team==="North"?{x:-8,z:-112}:{x:6,z:-124},
     nearM:18,delay:(i%5)*1.5,
-    points:[{x:s.x+(s.team==="West"?9:-9),z:s.z},{x:s.x+(s.team==="West"?17:-18),z:s.z}],
+    points:[{x:s.x+(s.team==="North"?2:-2),z:s.z+6},
+      {x:s.x+(s.team==="North"?4:-4),z:s.z+12}],
   }]),
 ]);
 export const FRONT_DEFENDERS=[

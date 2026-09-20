@@ -620,7 +620,9 @@ export const MISSION_ROUTES = Object.freeze({
     { x: 91, z: -10 },
   ],
   opening: OPENING.approachRoute,
-  support: OPENING.supportRoute,
+  // The rebuilt 03 entry comes from the casualty collection point. Keep only
+  // that live communication-trench leg; the station-side head is retired.
+  support: MISSION_STAGE_ROUTES.rearTrench.slice(4),
   bundle: Sortie.route,
   bundleReturn: Sortie.route.slice(3).reverse(),
   // 2026.09.19：orders 锚点迁到背坡伤员集结处，所以这两条返程线不再停在前沿的
@@ -665,7 +667,7 @@ export const MISSION_ROUTES = Object.freeze({
 import { FRONT_GUARD_POSTS, FRONT_COVER, FRONT_FIELD_MEN, FrontAssaultLaneCuts, APPROACH_TACTICS } from "./Data_FirstLevelMissionFront.mjs";
 export const MISSION_PLACEMENT = Object.freeze({
   squadFrontPositions:[{x:-1.7,z:-129},{x:1.7,z:-128.7},{x:14,z:-129},{x:16,z:-127.5}],
-  reliefApproach: [{x:-69,z:106},{x:-71,z:74},{x:-66,z:66},...MISSION_ROUTES.opening,...MISSION_ROUTES.support,{x:6,z:-123}],
+  reliefApproach: [...MISSION_ROUTES.support,{x:6,z:-123}],
   reliefPositions: [{x:-30,z:-123.4},{x:-26,z:-124.9},{x:-21,z:-122.8},{x:-17,z:-125},{x:-10,z:-124.3},{x:4,z:-123.2},{x:11,z:-125},{x:20,z:-124.6}],
   // First arrivals move furthest down the communication trench; the mouth stays open.
   guardWithdrawalRoutes: Array.from({length:8},(_,i)=>[

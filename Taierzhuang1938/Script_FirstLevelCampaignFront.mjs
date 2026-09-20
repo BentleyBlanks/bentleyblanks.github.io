@@ -8,6 +8,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { MISSION_ROUTES as Routes, MISSION_ANCHORS as A, MISSION_PLACEMENT as P } from "./Data_FirstLevelMissionLayout.mjs";
 import { MISSION_STAGE_ROUTES } from "./Data_FirstLevelMissionTopology.mjs";
+import { DriveBundleThrow } from "./Script_FirstLevelBundleThrowDriver.mjs";
 import { MISSION_TUNING as R } from "./Data_FirstLevelMission.mjs";
 import { FRONT_TUNING as F } from "./Data_Tuning_FirstLevelFront.mjs";
 import { CampaignActions } from "./Script_FirstLevelCampaignKit.mjs";
@@ -183,6 +184,25 @@ export async function Drive(ctx) {
     "第一批里至少有一个活着撤回来（不是八个全死算过）");
   console.log("ok 03 support: blockade called, first pair of defenders withdrew alive");
 
+  // Keep the real continuous 03→04 battlefield as evidence for the stage-jump
+  // reconstruction. A debug preset must match observed casualties and assault
+  // state; an arbitrary percentage would only tune the test's difficulty.
+  const continuous04 = await page.evaluate(() => {
+    const r=window.Tengxian.Debug.FirstLevelMissionRuntime();
+    const actors=[...r.enemies].filter(([,a])=>["front","approach"].includes(a.missionEncounter))
+      .map(([id,a])=>({id,encounter:a.missionEncounter,alive:a.alive,state:a.state,order:a.order,
+        standby:!!a.missionFrontStandby,reserve:!!a.missionReserve,
+        position:{x:+a.position.x.toFixed(2),z:+a.position.z.toFixed(2)},
+        assault:a.missionAssault?{index:a.missionAssault.index,hold:+(a.missionAssault.hold||0).toFixed(2)}:null}));
+    return {time:r.time,stage:r.flow.stage.id,
+      alive:Object.fromEntries(["front","approach"].map(encounter=>[encounter,
+        actors.filter(a=>a.encounter===encounter&&a.alive).length])),actors};
+  });
+  await fs.writeFile(path.join(shots,"Data_Stage04Continuous.json"),JSON.stringify(continuous04,null,2));
+  console.log("STAGE04_CONTINUOUS",JSON.stringify({alive:continuous04.alive,
+    frontDead:continuous04.actors.filter(a=>a.encounter==="front"&&!a.alive).map(a=>a.id),
+    approachDead:continuous04.actors.filter(a=>a.encounter==="approach"&&!a.alive).map(a=>a.id)}));
+
   // =========================================================================
   // 04 接替火力，战车压口。机枪是可选的，但这一趟真的坐上去打。
   // =========================================================================
@@ -233,18 +253,28 @@ export async function Drive(ctx) {
   await Capture("MachineGun");
   await page.screenshot({ path: path.join(shots, "Scene_MachineGun.png") });
   for (let chunk = 0; chunk < 40; chunk++) {
-    const defense = await page.evaluate(() => {
+    const defense = await page.evaluate(({healHealth,remountHealth}) => {
       const g = window.Tengxian;
       for (let i = 0; i < 600; i++) {
         const p = g.player.position, gun = g.emplacement.Emplacement("MissionGun");
         if (g.combat.GrenadeThreats(p).length && g.emplacement.Mounted) {
           g.Debug.Mouse(0, false); g.Debug.Key("KeyF", true); g.Debug.Key("KeyF", false);
         }
+        // A real player does not stay welded to the gun while bleeding out.
+        // Leave it, crouch behind its wall, dress, and wait for the ordinary
+        // bandage regeneration before exposing the torso again.
+        if (g.emplacement.Mounted && g.player.bandages > 0
+          && g.player.bleeding && g.player.health < healHealth) {
+          g.Debug.Mouse(0, false); g.Debug.Key("KeyF", true); g.Debug.Key("KeyF", false);
+          if (g.player.stance !== "crouch") g.Debug.Key("KeyC");
+          g.Debug.Key("KeyB");
+        }
         if (!g.emplacement.Mounted) {
           if (window.MissionInputDriver.EvadeGrenade()) { g.StepFrames(1, 1 / 60, false); continue; }
           // 被手榴弹赶下枪位（或压根没按上）之后，空当里再坐回去：
           // 这一段的活路是枪座后面那道墙垛，不是站在开阔地上跟人对枪。
-          if (!g.combat.GrenadeThreats(p).length && gun && !gun.dead && i % 90 === 45) {
+          if (!g.combat.GrenadeThreats(p).length && !g.player.bleeding
+            && g.player.health >= remountHealth && gun && !gun.dead && i % 90 === 45) {
             g.Debug.Key("KeyF", true); g.StepFrames(1, 1 / 60, false); g.Debug.Key("KeyF", false);
             if (g.emplacement.Mounted) continue;
           }
@@ -285,7 +315,7 @@ export async function Drive(ctx) {
       g.Debug.Mouse(0, false); g.Debug.Key("KeyR", false);
       return { stage: g.Debug.FirstLevelMissionRuntime().flow.stage.id, alive: g.player.alive,
         health: g.player.health, gun: g.emplacement.View(), mission: g.Debug.FirstLevelMission() };
-    });
+    },{healHealth:F.machineGunDriverHealHealth,remountHealth:F.machineGunDriverRemountHealth});
     console.log("defense", JSON.stringify({ stage: defense.stage, health: defense.health, gun: defense.gun,
       remaining: defense.mission.remaining }));
     if (!defense.alive || defense.stage !== "MachineGun") { ctx.machineGun = defense; break; }
@@ -374,7 +404,7 @@ export async function Drive(ctx) {
     if (await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission().tank.immobilized)) break;
     // 等它停下来再扔。战车在 advance/halt 之间循环，朝一辆正在开的车扔集束弹，
     // 引信烧完时车已经开出去七八米 —— 2026-09-20 实测三发全空。
-    await page.evaluate(() => {
+    await page.evaluate(coveredRangeM => {
       const g = window.Tengxian;
       const Gap = () => {
         const tank = g.Debug.FirstLevelMission().tank, p = g.player.position;
@@ -383,114 +413,27 @@ export async function Drive(ctx) {
       // 先在沟里等它压过来，别自己横穿开阔地去够它。战车本来就朝玩家推进，
       // 而这一段的伤全在那二十几米没遮没挡的地上（实测跑过去之后只剩两成血，
       // 回集结处的路上连死三次）。
-      for (let i = 0; i < 3600 && Gap() > 9; i++) {
+      for (let i = 0; i < 3600 && Gap() > coveredRangeM; i++) {
         if (g.player.bleeding && g.player.health < 85) g.Debug.Key("KeyB");
         g.StepFrames(1, 1 / 60, false);
       }
       for (let i = 0; i < 900 && g.Debug.FirstLevelMission().tank.moving; i++) g.StepFrames(1, 1 / 60, false);
-    });
-    // 站到投得中的地方再扔。集束弹满蓄力也就十几米，而且弹着点得落在履带 5 m 以内
-    // （tankTrackRadiusM）—— 从沟口朝二十五米外的车扔，只是白扔一发。
-    // 设计上这一拍就是「冲上去投弹，再退回遮挡」，驾驶器照着做。
-    // 十五米以内不挪窝：实测 11.6 m 与 14.6 m 两发都解得出弧线也炸停了车，
-    // 而沟沿外那一步根本走不上去 —— 目标点落在路基上，人卡在沟壁前判成「路不通」。
-    // 真要挪也一次只挪六米，别一脚迈出沟。
-    const spot = await page.evaluate(({ throwRangeM, stepM }) => {
-      const g = window.Tengxian, tank = g.Debug.FirstLevelMission().tank, p = g.player.position;
-      const gap = Math.hypot(p.x - tank.x, p.z - tank.z);
-      if (gap <= throwRangeM) return null;
-      // 只往前挪到还留在沟里的那一步：目标点一旦爬上路基，人卡在沟壁前，
-      // 整条腿被判成「走不通」（2026-09-20 实测）。按一米一档往前探，
-      // 地面高度跟脚下差太多就不再往前。
-      const want = Math.min(gap - throwRangeM + 1, stepM);
-      let reach = 0;
-      for (let step = 1; step <= Math.ceil(want); step++) {
-        const along = Math.min(step, want) / gap;
-        const x = p.x + (tank.x - p.x) * along, z = p.z + (tank.z - p.z) * along;
-        if (Math.abs(g.battlefield.GroundHeight(x, z) - p.y) > 0.7) break;
-        reach = Math.min(step, want);
-      }
-      if (reach < 1) return null;
-      const along = reach / gap;
-      return { x: p.x + (tank.x - p.x) * along, z: p.z + (tank.z - p.z) * along,
-        gap: +gap.toFixed(1), reach: +reach.toFixed(1) };
-    }, { throwRangeM: 9, stepM: 8 });
-    let moved = false;
-    if (spot) {
-      console.log("TANK_THROW_SPOT", JSON.stringify(spot));
-      // 走不过去就在原地投：玩家也是这么打的，够不着就先扔一发试试。
-      try {
-        await Route([{ x: spot.x, z: spot.z }], `TankThrowSpot${attempt}`, { stance: "crouch", sprint: true });
-        moved = true;
-      } catch (error) { console.log("TANK_THROW_SPOT_BLOCKED", String(error.message).slice(0, 120)); }
-    }
-    const thrown = await page.evaluate(async () => {
-      const { THROW } = await import("./Data_Tuning_Combat.mjs");
-      const { WEAPONS } = await import("./Data_Weapons.mjs");
-      const g = window.Tengxian, tank = g.Debug.FirstLevelMission().tank, p = g.player.position;
-      const kind = WEAPONS.GrenadeBundle;
-      g.player.yaw = Math.atan2(p.x - tank.x, p.z - tank.z);
-      // 解一条真能落到履带边上的抛物线。固定 0.35 rad 那一版是从沟底往路基上扔：
-      // 目标比出手点高两米，弹道贴着沟沿过去，两发全砸在坎上（2026-09-20 实测）。
-      // 这里按投掷模型（velocity = dir*speed，再加 speed*arcLift 的竖直分量）扫仰角，
-      // 只收初速在蓄力区间内、而且整条弧线离地都有余量的那些解，取余量最大的一条。
-      const eye = g.player.EyePosition;
-      const originY = eye.y + THROW.muzzleRiseM;
-      const distance = Math.hypot(p.x - tank.x, p.z - tank.z) - THROW.muzzleAheadM;
-      const rise = g.battlefield.GroundHeight(tank.x, tank.z) - originY;
-      // 实测标定：按这个抛物线模型解出来的弹，真实飞行只有解算距离的 ~0.56 倍
-      // （2026-09-20 四发一致：解 12.68 m 飞 7.03 / 7.10 m，解 14.49 m 飞 7.4 m）。
-      // 差在出手方向上，不在初速上。所以按「更远的目标」解，落点才落在车身上。
-      // 顺带一个后果：集束弹的真实射程只有九米出头，十二米开外怎么解都够不着。
-      const solveFor = distance / 0.56;
-      let best = null;
-      for (let pitch = 0.06; pitch <= 1.3; pitch += 0.02) {
-        const cosine = Math.cos(pitch), vertical = Math.sin(pitch) + THROW.arcLift;
-        const drop = solveFor * vertical / cosine - rise;
-        if (drop <= 0.05) continue;
-        const speed = Math.sqrt(4.905 * solveFor * solveFor / (cosine * cosine * drop));
-        if (speed < kind.throwSpeedMin + 0.05 || speed > kind.throwSpeedMax - 0.05) continue;
-        let clearance = Infinity;
-        for (let step = 1; step <= 20; step++) {
-          const along = step / 21, x = p.x + (tank.x - p.x) * along, z = p.z + (tank.z - p.z) * along;
-          const t = distance * along / (speed * cosine);
-          const y = originY + speed * vertical * t - 4.905 * t * t;
-          clearance = Math.min(clearance, y - g.battlefield.GroundHeight(x, z));
-        }
-        // 取**最平**的那条够用的弧线，不是余量最大的那条。仰到 1.2 rad 去吊射，
-        // 水平分量只剩三分之一，初速差一点落点就差一半（实测解出 12.7 m、只飞了 6.5 m）。
-        if (clearance >= 0.6) { best = { pitch, speed, clearance }; break; }
-        if (!best || clearance > best.clearance) best = { pitch, speed, clearance };
-      }
-      // 一条都解不出来就照旧仰 0.35 满蓄力扔一发，好歹把落点记下来。
-      const shot = best || { pitch: 0.35, speed: kind.throwSpeedMax, clearance: null };
-      g.player.pitch = shot.pitch;
-      const power = (shot.speed - kind.throwSpeedMin) / (kind.throwSpeedMax - kind.throwSpeedMin);
-      const chargeFrames = Math.round(66 * Math.max(0.08, Math.min(1, power)));
-      const before = g.state.bundles;
-      g.Debug.Key("KeyH", true); g.StepFrames(chargeFrames, 1 / 60, false); g.Debug.Key("KeyH", false);
-      g.StepFrames(1, 1 / 60, false);
-      if (g.player.stance === "stand") g.Debug.Key("KeyC");
-      // 跟着这一发看它落在哪儿：炸不停的时候，落点比任何推断都说明问题。
-      let land = null;
-      for (let frame = 0; frame < 300 && g.player.alive; frame++) {
-        const flying = g.combat.projectiles.find((entry) => entry.kind === "GrenadeBundle");
-        if (flying) land = { x: +flying.position.x.toFixed(2), y: +flying.position.y.toFixed(2), z: +flying.position.z.toFixed(2) };
-        if (g.player.bleeding) g.Debug.Key("KeyB");
-        g.StepFrames(1, 1 / 60, false);
-      }
-      return { before, after: g.state.bundles, alive: g.player.alive, mission: g.Debug.FirstLevelMission(),
-        aim: { pitch: +shot.pitch.toFixed(3), speed: +shot.speed.toFixed(2),
-          clearance: shot.clearance == null ? null : +shot.clearance.toFixed(2),
-          distance: +distance.toFixed(2), rise: +rise.toFixed(2), solved: !!best },
-        land, landMiss: land ? +Math.hypot(land.x - tank.x, land.z - tank.z).toFixed(2) : null };
-    });
+    },F.bundleCoveredThrowRangeM);
+    // The tank now reaches its authored exit-blocking stop inside the covered
+    // throw radius. Stay at A.throw; a driver walking onto the road is a test bug.
+    const covered = await page.evaluate(throwPoint => {
+      const g=window.Tengxian,tank=g.Debug.FirstLevelMission().tank,p=g.player.position;
+      return {gap:Math.hypot(p.x-tank.x,p.z-tank.z),
+        throwGap:Math.hypot(p.x-throwPoint.x,p.z-throwPoint.z)};
+    },A.throw);
+    assert.ok(covered.throwGap<1.5,`driver stays at the covered throw point (${covered.throwGap.toFixed(2)} m)`);
+    assert.ok(covered.gap <= F.bundleCoveredThrowRangeM+.5,
+      `tank reaches the covered throw lane (${covered.gap.toFixed(2)} m)`);
+    const thrown = await DriveBundleThrow(page);
     console.log("BUNDLE_THROW", JSON.stringify({ before: thrown.before, after: thrown.after,
-      aim: thrown.aim, land: thrown.land, landMiss: thrown.landMiss, tank: thrown.mission.tank }));
-    if (!thrown.alive) break;
-    // 投完退回遮挡 —— 这一拍的另一半，炸停了也要退。原先「停住就 break」把人
-    // 留在了开阔地正中间，06 一开场就是带着两成血从那儿往回走。
-    if (moved) await Route([A.throw], `TankFallBack${attempt}`, { fight: true, stance: "crouch", sprint: true });
+      aim:thrown.aim,requested:thrown.requested,launch:thrown.launch,firstVelocityBreak:thrown.firstVelocityBreak,
+      firstContact:thrown.firstContact,land:thrown.land,blast:thrown.blast,blastMiss:thrown.blastMiss,tank:thrown.mission.tank }));
+    assert.ok(thrown.alive,`TankThrow${attempt}: player survives through the real bundle detonation`);
     if (thrown.mission.tank.immobilized) break;
     // 两发都扔完还没停住，就像玩家一样回弹药屋再领两发。
     if (thrown.after === 0) {
@@ -503,6 +446,8 @@ export async function Drive(ctx) {
         { fight: true, stance: "stand", sprint: true, crawl: true, rejoinRoute: Routes.bundleReturn });
     }
   }
+  assert.ok(await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMission().tank.immobilized),
+    "05 cannot leave the throw point until a real bundle blast cuts the track");
   await CaptureFocus("TankStopped", { x: await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission().tank.x),
     z: await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission().tank.z), height: 1.2 });
   await page.screenshot({ path: path.join(shots, "Scene_TankStopped.png") });

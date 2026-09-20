@@ -18,7 +18,10 @@ export const FRONT_SORTIE=Object.freeze({
   // Finite defenders hold two bends, separate from the frontal attack at 04.
   enemies:[{id:'BundleBendA',x:61,z:-155,hold:true},{id:'BundleBendB',x:62,z:-188,hold:true},
     {id:'BundleHouseGuard',x:34,z:-204,hold:true}],
-  tankRoadX:35,tankNorthZ:-194,tankSouthZ:-123,tankLeadM:12,
+  // At the authored throw point (30,-117), a tank at road x=35 and this six
+  // metre lead is 7.8 m away: inside the covered bundle reach while still
+  // physically blocking the trench exit at tankSouthZ.
+  tankRoadX:35,tankNorthZ:-194,tankSouthZ:-123,tankLeadM:6,
   retreatCasualtyFraction:.5,retreatSuppression:.72,retreatSuppressionS:3,
   retreatDistanceM:12,retreatArrivalM:2,
 });

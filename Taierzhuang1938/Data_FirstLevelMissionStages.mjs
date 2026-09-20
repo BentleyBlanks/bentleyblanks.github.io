@@ -2,6 +2,7 @@ import { MISSION_RECEPTION_SPACE, MISSION_STAGE_ROUTES as Stage } from "./Data_F
 // Notion 2026-09-19（docs/Data_FirstLevelRebuild20260919Contract.md §1）：18 个公开阶段，
 // 27 个可玩内部步骤；流程表另有终止哨兵 Complete。公开阶段只做分组与调试跳转的起点，事实门仍各自独立。
 import { MISSION_ANCHORS as A, MISSION_ROUTES as Routes } from "./Data_FirstLevelMissionLayout.mjs";
+import { FRONT_APPROACH_ENEMIES } from "./Data_FirstLevelMissionFront.mjs";
 const Phase = (number, id, title, steps, spawn) => Object.freeze({
   number, id, title, steps: Object.freeze(steps), entry: steps[0], spawn: Object.freeze(spawn),
 });
@@ -37,6 +38,11 @@ export const FIRST_LEVEL_DEFERRED_ENCOUNTERS=Object.freeze({
 // Reaching the inner court assumes its entrance has been cleared; the window
 // gun and side courtyard defenders still belong to the upcoming capture task.
 export const FIRST_LEVEL_STAGE_CLEARED_ENEMIES = Object.freeze({
+  // A 04 debug start represents the observed continuous 03→04 battlefield.
+  // Data_Stage04Continuous.json (2026-09-20 run) had all 12 front men alive and
+  // 11/12 approach attackers dead; the north-east gunner was the sole survivor.
+  // Rebuild the group for that survivor, while pre-clearing the actual 11 ids.
+  4: Object.freeze(FRONT_APPROACH_ENEMIES.filter(spec=>spec.id!=="ApproachNorthEastGunner").map(spec=>spec.id)),
   9: Object.freeze(["VillageCorner","KitchenGuard"]),
   10: Object.freeze(["VillageCorner","KitchenGuard"]),
 });
@@ -45,7 +51,7 @@ export const FIRST_LEVEL_STAGE_CLEARED_ENEMIES = Object.freeze({
 export const FIRST_LEVEL_STAGE_ENCOUNTERS = Object.freeze([
   ["bunkerAssault"], ["bunkerAssault"],
   ["front","approach","tank","village","melee"],
-  ["front","machineGun","approach","tank","village","melee"],
+  ["front","approach","machineGun","tank","village","melee"],
   ["front","machineGun","approach","tank","village","melee","bundleApproach"],
   ["village","melee"], ["village","melee"], ["village","melee"], ["village","melee"],
   ["village","courtyard"], [], ["transfer"], ["air"], ["air"],

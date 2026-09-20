@@ -3,13 +3,15 @@ import {SquadCoverRoute,SquadCoverBounds,SquadCoverThreat} from './Script_SquadM
 import {SQUAD_COVER_THREAT as TH} from './Data_Tuning_SquadMarch.mjs';
 import {MISSION_TRENCH_COVER as C} from './Data_FirstLevelMissionTrenchCover.mjs';
 import {OPENING} from './Data_FirstLevelOpening.mjs';
-import {MISSION_LAYOUT} from './Data_FirstLevelMissionLayout.mjs';
+import {MISSION_LAYOUT,MISSION_ROUTES} from './Data_FirstLevelMissionLayout.mjs';
 import {SampleMissionTerrain} from './Data_FirstLevelMissionTerrain.mjs';
-for(const [name,route] of [['approach',OPENING.approachRoute],['support',OPENING.supportRoute]]){
+for(const [name,route] of [['approach',OPENING.approachRoute],['support',MISSION_ROUTES.support]]){
  const stations=C[name],bounds=new SquadCoverBounds(stations,route);
  const members=Array.from({length:4},(_,slot)=>{
   const path=SquadCoverRoute(route,stations,slot,C),posts=path.filter(p=>Number.isInteger(p.coverBound));
-  assert.ok(posts.length);
+  // The rebuilt Support leg has no capsule-clear shelter. Do not invent a wall
+  // merely to give the pairs a detour; all four keep the central lane moving.
+  assert.ok(posts.length || name==='support'&&!stations.length);
   // Every detour, not just endpoints, clears solids with an infantry capsule.
   for(let i=1;i<path.length;i++){
    const a=path[i-1],b=path[i],length=Math.hypot(a.x-b.x,a.z-b.z);
@@ -22,10 +24,15 @@ for(const [name,route] of [['approach',OPENING.approachRoute],['support',OPENING
     }
    }
   }
-  return {alive:true,bounds:posts,position:{...posts[0]},passed:-1};
+  return {alive:true,bounds:posts,position:{...(posts[0]||route[0])},passed:-1};
  });
+ if(!stations.length){
+  assert.ok(members.every(member=>member.bounds.length===0),
+    'the rebuilt Support route keeps no off-route shelter detours');
+  continue;
+ }
  bounds.Update(route[0],members);assert.equal(bounds.CanLeave(0),false,'player behind keeps both groups sheltered');
- const follower=members[3],post={...follower.position};follower.position={x:100,z:100};
+ const follower=members.findLast(member=>member.bounds.some(p=>p.coverBound===0)),post={...follower.position};follower.position={x:100,z:100};
  bounds.Update(stations[0],members);assert.equal(bounds.CanLeave(0),false,'must observe the covering pair physically arrive');
  follower.position=post;follower.evading=true;bounds.Update(stations[0],members);assert.equal(bounds.CanLeave(0),false,'grenade evasion is not covering');
  follower.evading=false;bounds.Update(stations[0],members);assert.equal(bounds.CanLeave(0),true);assert.equal(bounds.CanLeave(1),false);
@@ -50,5 +57,7 @@ for(const [name,route] of [['approach',OPENING.approachRoute],['support',OPENING
  const path=SquadCoverRoute(OPENING.approachRoute,C.approach,0,C);
  assert.ok(path.filter(p=>p.coverTransit||Number.isInteger(p.coverBound)).every(p=>Number.isInteger(p.coverStation)),'every bound detour point is marked skippable');
 }
-assert.equal(MISSION_LAYOUT.blocks.filter(b=>b.id.startsWith('TrenchBound')).length,18,'all nine two-arm shelters survive layout cleanup');
+const shelterCount=C.rally.length+C.approach.length+C.support.length;
+assert.equal(MISSION_LAYOUT.blocks.filter(b=>b.id.startsWith('TrenchBound')).length,shelterCount*2,
+  'every retained cover station has both physical arms and no retired shelter geometry remains');
 console.log('ok trench cover capsule routes, player gate, staggered pairs, grenade interruption, final release, casualty handling and contact-only drill');

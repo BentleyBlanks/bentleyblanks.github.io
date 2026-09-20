@@ -79,6 +79,31 @@ import { ActionKeyGlyph } from "./Script_Input.mjs";
 import { FirstLevelStageTextId } from "./Script_TextIds.mjs";
 // Only for `emplaced`: a man married to a machine gun never carries throwables here.
 import { WEAPONS } from "./Data_Weapons.mjs";
+
+export function FirstLevelCheckpointVitals(point={},player={},tuning=R){
+  const savedHealth=Number.isFinite(point.health)?point.health:player.health;
+  const savedBandages=Number.isFinite(point.bandages)?point.bandages:player.bandages;
+  const spawnedHealth=Number.isFinite(player.health)?player.health:0;
+  const currentBandages=Number.isFinite(player.bandages)?player.bandages:0;
+  return {
+    // Player.Spawn() already restores a full body. Checkpoint metadata may add
+    // resources, but must never turn that fresh body back into the saved wound.
+    health:Math.min(100,Math.max(tuning.checkpointRetryHealthMin,spawnedHealth,Number.isFinite(savedHealth)?savedHealth:0)),
+    bleeding:0,
+    bandages:Math.max(tuning.checkpointRetryBandagesMin,currentBandages,Number.isFinite(savedBandages)?savedBandages:0),
+  };
+}
+
+export function FirstLevelCheckpointIsSafe(player,directThreat,tuning=R){
+  return !(directThreat&&player.health<tuning.checkpointUnsafeSaveHealth);
+}
+export function FirstLevelCheckpointThreatRange(player,ai){
+  const stance=player.stance==="prone"?2:player.stance==="crouch"?1:0;
+  return ai.SightRange(stance);
+}
+export function FirstLevelRifleContribution(shots,stageEntryShots){
+  return Number.isFinite(shots)&&Number.isFinite(stageEntryShots)&&shots>stageEntryShots;
+}
 const Distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 // 剧本走位的到达半径：走到离目标这么近就算到了（MoveActor 写进 actor.scriptArrivalRadius）。
 // 需要「正好站在那个点上」的演出走 DriveAmbusherOnto，它按这个数把目标往前推。
@@ -1113,7 +1138,7 @@ export class FirstLevelMissionRuntime {
       this.Record(plan.resolved,{loaded:this.column.loadEvents.length,departed:this.column.departed});
     }
   }
-  Threatens(point, ids = null, targetHeight = 1.1) {
+  Threatens(point, ids = null, targetHeight = 1.1, rangeM = R.passageRangeM) {
     return [...this.enemies].some(([id, actor]) => {
       if (
         (ids && !ids.includes(id)) ||
@@ -1126,7 +1151,7 @@ export class FirstLevelMissionRuntime {
         actor.state === "suppressed"
       )
         return false;
-      if (Distance(actor.position, point) > R.passageRangeM) return false;
+      if (Distance(actor.position, point) > rangeM) return false;
       const eye = actor.stance === 2 ? .35 : actor.stance === 1 ? .9 : 1.35;
       const from = actor.position.clone().add(new THREE.Vector3(0, eye, 0)),
         to = this.Point(point, targetHeight),
@@ -1319,6 +1344,12 @@ export class FirstLevelMissionRuntime {
       case "Support":
         this.column.zhou.visible = false;
         this.audio.Ambience("firstLevelFront");
+        // Count the player's whole Support engagement. The new approach has
+        // live attackers, and a player may break that fire before crossing the
+        // exact frontReached radius; sampling only at the final point soft-locks
+        // an already-cleared battlefield behind one extra, meaningless shot.
+        this.frontArrivalAt=null;
+        this.frontArrivalShots=this.Inventory().shots;
         this.Guide(MISSION_ROUTES.support);
         this.forwardGunner = this.ai.Spawn("nra", A.forwardNest.x, A.forwardNest.z, {
           weapon: "Zb26",
@@ -1499,7 +1530,7 @@ export class FirstLevelMissionRuntime {
     const pair=GuardCrossingPair(this.guards.map(guard=>({id:guard.actor.id,safe:guard.safe,alive:guard.actor.alive})),R.guardPairSize);
     for (const guard of this.guards) {
       if (!guard.actor.alive || guard.progress>=guard.route.length) continue;
-      if(!guard.safe && (!pair.includes(guard.actor.id) || !(this.Has("gunUsed") || this.flow.stage.id==="MachineGun" || this.Has("frontAttackRepelled") || (this.flow.stage.id==="Support" && this.Has("frontReached") && this.guards.indexOf(guard)<OPENING.rifleGuardCount && this.Inventory().shots>this.frontArrivalShots)) || (!guard.crossing && this.time<(this.nextGuardCrossingAt||0)))) {
+      if(!guard.safe && (!pair.includes(guard.actor.id) || !(this.Has("gunUsed") || this.flow.stage.id==="MachineGun" || this.Has("frontAttackRepelled") || (this.flow.stage.id==="Support" && this.Has("frontReached") && this.guards.indexOf(guard)<OPENING.rifleGuardCount && FirstLevelRifleContribution(this.Inventory().shots,this.frontArrivalShots))) || (!guard.crossing && this.time<(this.nextGuardCrossingAt||0)))) {
         this.Defend(guard.actor,guard.actor.position,0,0);this.ai.SetStance(guard.actor,2,Infinity,true);continue;
       }
       // Test the waiting man's actual prone silhouette, then commit to the bound.
@@ -2399,7 +2430,7 @@ export class FirstLevelMissionRuntime {
       this.frontArrivalAt ??= this.time;
       this.frontArrivalShots ??= this.Inventory().shots;
       if(this.time-this.frontArrivalAt>=R.frontRifleDefenseSeconds &&
-        this.Inventory().shots>this.frontArrivalShots)this.Record("frontRifleDefense");
+        FirstLevelRifleContribution(this.Inventory().shots,this.frontArrivalShots))this.Record("frontRifleDefense");
       this.SpawnEncounter("front");
       this.tank.active = true;
       if ([...this.enemies.values()].some((actor) => actor.lastFire > 0) || this.Inventory().shots > 0)
@@ -2566,12 +2597,24 @@ export class FirstLevelMissionRuntime {
     prof?.E("story/mission/other");
   }
   SaveCheckpoint() {
+    const targetHeight=Number.isFinite(this.player.eyeHeight)?this.player.eyeHeight:1.1;
+    // Passage checks intentionally use their local 36 m corridor. A checkpoint
+    // must cover the full range from which production AI can actually acquire
+    // this stance (120 / 80 / 45 m before any global sight multiplier), or an
+    // exposed near-fatal player can overwrite safety while a rifleman fires
+    // from beyond the passage radius.
+    const threatRange=FirstLevelCheckpointThreatRange(this.player,this.ai);
+    if(!FirstLevelCheckpointIsSafe(this.player,
+      this.Threatens(this.player.position,null,targetHeight,threatRange)))return false;
     this.safePoint = {
       x: this.player.position.x,
       z: this.player.position.z,
       yaw: this.player.yaw,
       stance: this.player.stance,
+      health:this.player.health,
+      bandages:this.player.bandages,
     };
+    return true;
   }
   OnPlayerDown() {
     this.ClearReturnWarning();
@@ -2585,6 +2628,8 @@ export class FirstLevelMissionRuntime {
             z: this.player.position.z,
             yaw: this.player.yaw,
             stance: this.player.stance,
+            health:this.player.health,
+            bandages:this.player.bandages,
           }
         : this.safePoint;
     this.carry.ForceRelease("playerDown");
@@ -2606,6 +2651,7 @@ export class FirstLevelMissionRuntime {
       this.player.body?.Teleport(savedPosition.x, savedPosition.y, savedPosition.z);
     }
     this.player.stance = point.stance || "stand";
+    Object.assign(this.player,FirstLevelCheckpointVitals(point,this.player));
     this.failed = false;
     this.controls = null;
     this.Control?.(false);

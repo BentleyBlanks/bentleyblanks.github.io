@@ -14,7 +14,7 @@ import fs from "node:fs";
 import crypto from "node:crypto";
 import { FirstLevelMissionFlow } from "./Script_FirstLevelMissionFlow.mjs";
 import { GuardCrossingPair, FrontReplacementSlots } from "./Script_FirstLevelMissionPacing.mjs";
-import { FIRST_LEVEL_STAGES, ResolveFirstLevelStage, FirstLevelStageForStep } from "./Data_FirstLevelMissionStages.mjs";
+import { FIRST_LEVEL_STAGES, FIRST_LEVEL_STAGE_ENCOUNTERS, FIRST_LEVEL_STAGE_CLEARED_ENEMIES, ResolveFirstLevelStage, FirstLevelStageForStep } from "./Data_FirstLevelMissionStages.mjs";
 import { BuildFirstLevelCheckpoint } from "./Script_FirstLevelMissionCheckpoint.mjs";
 import { FirstLevelMissionColumn, MissionRouteNextIndex, MissionCarryRoutePoint, MissionGuideSpeed, MissionGuideRoute, MissionSquadRoute, MissionSquadPace } from "./Script_FirstLevelMissionColumn.mjs";
 import { MISSION_STAGES, MISSION_TUNING as R, FIRST_LEVEL_MISSION_PHASE, MISSION_TACTICS, MISSION_ENCOUNTERS, MISSION_PURSUIT_ROUTE, MISSION_TRANSFER_THREATS } from "./Data_FirstLevelMission.mjs";
@@ -112,12 +112,33 @@ if(process.argv.includes("--opening-audio"))process.exit(0);
       return {format:"module",source:fs.readFileSync(new URL(url),"utf8"),shortCircuit:true};
     return next(url,context);
   }});
-  let CombatSystem,FirstLevelMissionRuntime,Vector3;
+  let CombatSystem,FirstLevelMissionRuntime,FirstLevelCheckpointVitals,FirstLevelCheckpointIsSafe,FirstLevelCheckpointThreatRange,
+    FirstLevelRifleContribution,Vector3;
   try {
     ({CombatSystem}=await import("./Script_Combat.mjs"));
-    ({FirstLevelMissionRuntime}=await import("./Script_FirstLevelMissionRuntime.mjs"));
+    ({FirstLevelMissionRuntime,FirstLevelCheckpointVitals,FirstLevelCheckpointIsSafe,FirstLevelCheckpointThreatRange,FirstLevelRifleContribution}=
+      await import("./Script_FirstLevelMissionRuntime.mjs"));
     ({Vector3}=await import("three"));
   } finally {hooks.deregister();}
+  {
+    const exposed={health:R.checkpointUnsafeSaveHealth-1};
+    assert.equal(FirstLevelCheckpointIsSafe(exposed,true),false,
+      "a near-fatal checkpoint in direct fire cannot replace the previous safe point");
+    assert.equal(FirstLevelCheckpointIsSafe(exposed,false),true,
+      "the same player may save after breaking direct sight");
+    const sight={SightRange:stance=>[120,80,45][stance]};
+    assert.deepEqual(["stand","crouch","prone"].map(stance=>FirstLevelCheckpointThreatRange({stance},sight)),[120,80,45],
+      "checkpoint safety uses the production AI acquisition range for the player's real stance");
+    assert.deepEqual(FirstLevelCheckpointVitals({health:9,bandages:0},{health:100,bandages:0}),{
+      health:100,bleeding:0,bandages:R.checkpointRetryBandagesMin,
+    },"checkpoint metadata never downgrades Spawn's full-health body and grants one dressing");
+    assert.deepEqual(FirstLevelCheckpointVitals({health:82,bandages:2},{health:100,bandages:0}),{
+      health:100,bleeding:0,bandages:2,
+    },"a healthy checkpoint restores its stronger saved inventory without reducing Spawn health");
+    assert.equal(FirstLevelRifleContribution(5,5),false,"shots from before Support never satisfy its defence");
+    assert.equal(FirstLevelRifleContribution(6,5),true,
+      "a shot fired anywhere in the live Support approach remains a valid rifle contribution at the front");
+  }
   {
     const flow=new FirstLevelMissionFlow(),said=[];
     const ordinary={id:901,side:"nra",alive:false,squadId:"TestSquad",position:new Vector3()};
@@ -320,6 +341,14 @@ for (const phase of FIRST_LEVEL_STAGES) {
 }
 for(const value of [0,19,-1,1.5,"Complete","Carry",null])assert.throws(()=>ResolveFirstLevelStage(value));
 console.log("ok 18 Notion stages, complete prior facts, live destination gates and independent reconstructed columns");
+assert.ok(FIRST_LEVEL_STAGE_ENCOUNTERS[3].includes("approach"),
+  "04 debug start rebuilds the observed sole approach survivor");
+assert.deepEqual(FIRST_LEVEL_STAGE_CLEARED_ENEMIES[4],
+  MISSION_ENCOUNTERS.approach.filter(spec=>spec.id!=="ApproachNorthEastGunner").map(spec=>spec.id),
+  "04 debug start pre-clears the eleven approach casualties observed at the continuous transition");
+assert.ok(FIRST_LEVEL_STAGE_CLEARED_ENEMIES[4].every(id=>!MISSION_ENCOUNTERS.front.some(spec=>spec.id===id)),
+  "04 debug start retains the full front line observed at the continuous transition");
+console.log("ok stage 04 reconstructs the post-03 battlefield instead of a full fresh roster");
 flow.Start();
 for (const stage of MISSION_STAGES.slice(0, -1)) {
   assert.equal(flow.stage.id, stage.id);
@@ -940,14 +969,15 @@ console.log("ok individual trench lanes, rounded corners, safe spacing and varia
     R.openingEnemyBudget,"finite opening/front roster agrees with budget; no replacement waves");
   assert.equal(MISSION_ENCOUNTERS.machineGun.length,12,"the gun handover owns a separate finite attack");
   assert.ok(MISSION_ENCOUNTERS.machineGun.every(actor=>FrontAssaultLane(actor.x,actor.z).length>=3),"machine-gun attackers cross multiple physical bounds");
-  assert.equal(MISSION_ENCOUNTERS.approach.length,18,"the communication-trench approach has a finite enemy screen");
+  assert.equal(MISSION_ENCOUNTERS.approach.length,12,"the rebuilt communication-trench approach has a finite enemy screen");
   const attackers=MISSION_ENCOUNTERS.approach.filter(s=>!s.hold);
   assert.ok(new Set(attackers.map(s=>s.id)).size===attackers.length,"each advancing actor has a persistent unique identity");
-  assert.equal(new Set(MISSION_ENCOUNTERS.approach.map(s=>s.team)).size,3,"three independent attack sectors keep grenade cooldowns per squad");
+  assert.equal(new Set(MISSION_ENCOUNTERS.approach.map(s=>s.team)).size,2,"north and north-east sectors keep grenade cooldowns per squad");
   assert.ok(attackers.every(s=>MISSION_TACTICS[s.id]?.near && MISSION_TACTICS[s.id].points.length>=2),"mobile attackers have local activation and physical approach bounds");
   assert.ok(R.enemyGrenades>0,"approach riflemen carry finite grenades");
   assert.ok(R.approachContactM<26 && R.approachTacticalRadiusM>=R.approachContactM,"close contact hands movement back to shared combat and grenade AI");
-  assert.ok(MISSION_ENCOUNTERS.approach.some(actor=>actor.z>-40)&&MISSION_ENCOUNTERS.approach.some(actor=>actor.z<-60),"both halves of the approach retain actual fire teams");
+  assert.ok(MISSION_ENCOUNTERS.approach.every(actor=>actor.z<R.tankStopZ&&actor.x>=-20),
+    "every approach actor now enters from north or north-east of the live front route");
   assert.ok(R.frontEngageDistanceM>OPENING.frontReachRadiusM&&R.frontEngageDistanceM<35,"the finite main assault begins at the last trench bend, before the player reaches the firing post");
   assert.equal(new Set(Object.values(MISSION_ENCOUNTERS).flat().map(spec=>spec.id)).size,Object.values(MISSION_ENCOUNTERS).flat().length);
   assert.ok(MISSION_STAGES.find(s=>s.id==="Support").requirements.includes("frontRifleDefense"));
@@ -985,4 +1015,3 @@ console.log("ok individual trench lanes, rounded corners, safe spacing and varia
   }
   assert.deepEqual(MissionCarryRoutePoint(corner,10),{x:5,z:5,yaw:-Math.PI/2},"arrival position and hidden passage distance stay stable");
 }
-

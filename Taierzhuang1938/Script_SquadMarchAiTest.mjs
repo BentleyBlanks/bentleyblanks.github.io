@@ -28,9 +28,18 @@ const recovery=new SquadMarchAi(navAi,[blocked],{route:[{x:0,z:0},{x:0,z:-100}]}
 for(let i=0;i<120;i++)recovery.Update(1/60);
 assert.ok(blocked.goal.distanceTo(blocked.position)>14,'a real stall restores the far goal required by host navigation');
 recovery.Dispose();
+const guideLeader={id:'Guide',alive:true,position:new Vector3(0,0,0),goal:new Vector3(),moveSpeed:0,grounded:true,yaw:Math.PI};
+const closeFollower={id:'Follower',alive:true,position:new Vector3(0,0,-.1),goal:new Vector3(),moveSpeed:0,grounded:true,yaw:Math.PI};
+const guide=new SquadMarchAi(ai,[guideLeader,closeFollower],{
+  route:[{x:0,z:0},{x:0,z:-20}],preset:'guided',leaderIndex:0,pauses:false,
+});
+guide.Update(1/60);
+assert.ok(guideLeader.squadMarchCommand.speedMps>0,
+  'a follower inside separation distance cannot deadlock the released guide leader');
+guide.Dispose();
 let poseState;
 const actor={characterRig:{p012ActorMotion:true,Update(_dt,state){poseState=state;}}},soldier={actor,squadMarchCommand:{breath:1}};
 InstallSquadMarchActor(soldier);actor.characterRig.Update(.1,{aim:1,lookYaw:.8,firing:false});assert.equal(poseState.aim,0,'memory aim yields to actual recovery pose');
 actor.characterRig.Update(.1,{aim:1,firing:true});assert.equal(poseState.aim,1,'real shot preserves weapon pose');
 delete soldier.squadMarchCommand;actor.characterRig.Update(.1,{aim:.7});assert.equal(poseState.aim,.7,'normal mission pose resumes after release');
-console.log('ok actual AI adapter: memory-only movement/rest, combat and traversal handoff, disposal, existing mission pose recovery');
+console.log('ok actual AI adapter: memory-only movement/rest, guide separation recovery, combat and traversal handoff, disposal, existing mission pose recovery');

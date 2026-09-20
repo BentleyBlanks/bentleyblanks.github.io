@@ -234,6 +234,11 @@ export class SquadMarch {
       if(m.avoidGoal){target=m.avoidGoal;distance=Distance(o.position,target);dx=(target.x-o.position.x)/(distance||1);dz=(target.z-o.position.z)/(distance||1);m.avoiding=true;}
       let gap=Infinity;
       for(const other of obstacles){
+        // The guide owns the head of the column. Followers can bunch into his
+        // wait point while he rallies the player; once released, they must not
+        // keep his speed clamped to zero by the ordinary follower-separation
+        // rule. Static obstacles and the player still use avoidance above.
+        if(m.leader&&this.members.has(String(other.id)))continue;
         const ox=other.position.x-o.position.x,oz=other.position.z-o.position.z,forward=ox*dx+oz*dz;
         const across=Math.abs(ox*dz-oz*dx);
         if(forward>0&&across<t.separationM)gap=Math.min(gap,forward+t.separationM-Math.sqrt(t.separationM**2-across**2));

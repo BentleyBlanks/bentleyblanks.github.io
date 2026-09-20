@@ -76,6 +76,11 @@ export const FRONT_TUNING = Object.freeze({
   bundleHandoverS: 1.2,
   // 文财看沟口站在前沿交通壕口（MISSION_ROUTES.support 的末点）。
   trenchMouthWatch: Object.freeze({ x: 6, z: -124 }),
+  // Browser driver survival discipline: leave the exposed gun when a bleeding
+  // wound has crossed this line, dress behind its wall, and do not remount until
+  // the ordinary bandage regeneration has restored a viable firing state.
+  machineGunDriverHealHealth: 78,
+  machineGunDriverRemountHealth: 76,
 
   // =========================================================================
   // 05 取弹炸车
@@ -89,6 +94,10 @@ export const FRONT_TUNING = Object.freeze({
   bundleReturnTankGainM: 12,
   // 一直没压过来也要喊（返程压力靠对白交代）：取到弹之后这么久兜底。
   bundleReturnFallbackS: 22,
+  // With the real 19.6 m/s² world gravity, a 13 m/s bundle from the ditch floor
+  // has roughly nine metres of useful covered reach. The tank stop must enter
+  // this radius; the driver waits in the ditch and never chases onto the road.
+  bundleCoveredThrowRangeM: 9,
   // 「停了！」在履带断掉之后这么久说（先让爆炸声过去）。
   tankStoppedAfterS: 1.4,
 
@@ -206,6 +215,8 @@ export const FRONT_TUNING_SOURCES = Object.freeze({
   bunkerRearDigIntervalS: "一记 debrisFall 的间隔，按旁边有人在扒土的频率",
   rescueGatherMaxS: "bunkerRescueSeconds（4.4 s）之前两个人要到位",
   bundleProneRangeM: "Data_Tuning_AiShooting 的 CLOSE_RANGE 同一档",
+  bundleCoveredThrowRangeM: "19.6 m/s² 世界重力与 GrenadeBundle 13 m/s 满蓄力弹道",
+  machineGunDriverHealHealth: "WOUNDS.bandageRegenCap 80 以下留两点受击余量",
   southMarchSpeedMps: "Notion 采用稿 07 的配速要求（2.2–2.6 m/s）",
   southTargetSecondsMin: "契约 §2：07 目标时长 45–75 秒",
   zhouLiftMoveS: "litterSpeedMps（1.4 m/s）量级",

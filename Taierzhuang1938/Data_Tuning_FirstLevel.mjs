@@ -155,12 +155,12 @@ export const MISSION_TUNING = Object.freeze({
   // discharger round, so a squad's stock was pooled with the launcher man). Two per rifleman is the conservative
   // reading and it is also what the pacing wants: a man who has thrown twice is out, so grenades stay an event.
   enemyGrenades:2,
-  // 2026.09.19 重构后的开场/前沿名单：掩蔽部门外 4 ＋ 十八人接近屏 ＋ 十二人前沿 ＋
-  // 十二人冲机枪位 ＋ 四名战车护卫 = 50。每一份名单只投一次，不复活、不补波。
+  // 2026.09.19 重构后的开场/前沿名单：掩蔽部门外 4 ＋ 十二人接近屏 ＋ 十二人前沿 ＋
+  // 十二人冲机枪位 ＋ 四名战车护卫 = 44。每一份名单只投一次、不复活、不补波。
   // （旧口径 67 里的 12 名车站地面 + 4 名进沟 + 5 名追到掩蔽处随军列开场一起下线。）
-  openingEnemyBudget:50,
+  openingEnemyBudget:44,
   // Route attackers cover the approach; the separate front force owns the gun line.
-  approachFireSector:{minX:-80,maxX:35,minZ:-118,maxZ:-18,selfDefenseM:3},
+  approachFireSector:{minX:-22,maxX:42,minZ:-145,maxZ:-120,selfDefenseM:3},
   approachAccuracyScale:.35,
   approachTacticalRadiusM:24,
   approachContactM:18,
@@ -189,8 +189,19 @@ export const MISSION_TUNING = Object.freeze({
   tankFiringHaltSeconds: 5,
   bundleSupplyCount: 2,
   // September 15 stability fix: the northern depot supports the return leg's
-  // wound budget. Actual pickup caps dressings; checkpoint retry grants none.
+  // wound budget. Actual pickup caps dressings.
   bundleSupplyBandages: 3,
+  // Linear checkpoint campaigns such as Call of Duty restore the player to a
+  // viable combat state instead of replaying an exposed autosave with the same
+  // near-fatal wound. Player.Spawn currently restores 100 health; this floor
+  // preserves that stronger result and one dressing while keeping the authored
+  // position and battle state.
+  checkpointRetryHealthMin:65,
+  checkpointRetryBandagesMin:1,
+  // An autosave below this line waits while a live enemy has direct sight. The
+  // previous safe point remains valid; once sight is broken, the same caller can
+  // replace it normally.
+  checkpointUnsafeSaveHealth:45,
   tankStopZ: -123,
   tankShellIntervalS: 13,
   tankShellScatterM: 2.6,

@@ -132,14 +132,7 @@ try{
  assert.ok(await page.locator(".hudObjective").evaluate(el=>Number(getComputedStyle(el).opacity)<.01),"brief objective fades without removing the world marker");
  const rejoin=await page.evaluate(()=>{
   const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime(),a=r.leaderGuide.Leader;
-  // 班长在停点等人的那十几秒里，班里其他人会走到他身上。共用行进层按「间距不足」
-  // 把他的指令速度压成 0（实测停在 1e-13 再也升不回来），于是放行之后他离下一个
-  // 路点一米一，永远挪不过去。这条夹具量的是带路层，队形让开再看他起不起步。
-  for(const [i,s] of r.squad.entries())if(s!==a){
-   const post={x:a.position.x-6-i*1.2,z:a.position.z-6};
-   r.PlaceActor(s,post);r.squadRoutes.set(s.id,[]);r.Defend(s,post,0,0);
-  }
-  // Test fixture relocation, then the release/movement remain ordinary runtime AI.
+  // 保留停点时自然挤到班长身边的队形；共用行进层必须能在放行后让领队自己走出人堆。
   g.player.Spawn(a.position.x,a.position.z-4,Math.PI);
   g.StepFrames(30,1/60,false);return r.leaderGuide.State();
  });
