@@ -650,8 +650,8 @@ try {
       collapsed, reopened, sortedFirst,
     };
   });
-  Check("布设表列出这一阶段全部敌人（80 人、九列表头）",
-    table.all === 80 && table.head.length === 9 && table.groupRows === 13,
+  Check("布设表列出当前编排全部敌人（74 人、九列表头）",
+    table.all === 74 && table.head.length === 9 && table.groupRows === 13,
     `${table.all} 行 / 表头 ${table.head.join(" ")}`);
   Check("按组排时第一列表头是「图标」（组名写在分组线上），换别的排法就变回「组」",
     table.head[0] === "图标 ▲" && table.headAfterSort[0] === "组",
