@@ -37,9 +37,8 @@ import { SCENE_RENDER_LIMITS } from "./Data_AssetStandards.mjs";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(here, "..");
 
-// How many checkpoint retries one leg may spend before the route is called
-// unwalkable. Two covers an unlucky firefight; a leg that needs more is telling
-// you the level got harder, not that the dice went badly.
+// How many explicitly opted-in checkpoint retries one leg may spend before the
+// route is called unwalkable. Normal campaign evidence fails on the first death.
 const ROUTE_RETRY_BUDGET = 2;
 
 /** 分段驾驶脚本允许的起点：每一段的第一个公开阶段。 */
@@ -542,6 +541,10 @@ export function CampaignActions(ctx) {
       // retry below handle it before applying the live-navigation stall limit.
       if (result.done || (result.alive && result.stalled >= 3)) break;
       if (!result.alive) {
+        // Default campaign and segment evidence is a continuous-life run. Keep
+        // the dead-state diagnostics in `result` and let the final assertions
+        // fail unless the caller explicitly requested shipped checkpoint retry.
+        if (!allowCheckpointRetry) break;
         // Losing a firefight is an outcome of live combat, not a regression: this
         // bot fights standing in the open with no cover, and the runs that died
         // died at a different waypoint each time while other runs walked the whole
