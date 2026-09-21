@@ -942,6 +942,7 @@ export class FirstLevelMissionRuntime {
         weapon: spec.weapon || "Type38",
         squadId: `Mission_${id}${spec.team?"_"+spec.team:""}`,
         bayonetFixed: !!spec.bayonet,
+        modelVariant: spec.modelVariant,
       });
       if (!actor) {this.spawnQueue.push(()=>this.SpawnEncounterActor(id,spec));return null;}
       actor.missionId = spec.id;InstallMissionSentry(actor);
@@ -1351,7 +1352,7 @@ export class FirstLevelMissionRuntime {
     // 进场不自动播的那几步：它们的 cue 由编排在真正发生的那一刻起播
     // （受困段的黑屏对白、接令、连屋破门、院门打开、牺牲、上车；15B 后抬手撒手、15C 院门
     // 守军喝止、16 过门槛、18 传令兵跑到跟前与尾队被顶在桥头）。
-    if (stage.cue && !["Trapped", "Orders", "Melee", "Courtyard", "Death", "CartRide",
+    if (stage.cue && !["Trapped", "BunkerRescue", "Orders", "Melee", "Courtyard", "Death", "CartRide",
       "WallPath", "ReceptionGate", "Handover", "BridgeOrders", "BridgeCover"].includes(stage.id))
       this.Say(stage.cue, { urgent: ["AirFirst", "Dive", "Death"].includes(stage.id) });
     // 按表生成这一步的遭遇组（Data_FirstLevelMissionGates.MISSION_STEP_SPAWNS，
@@ -1563,12 +1564,13 @@ export class FirstLevelMissionRuntime {
     const pair=GuardCrossingPair(this.guards.map(guard=>({id:guard.actor.id,safe:guard.safe,alive:guard.actor.alive})),R.guardPairSize);
     for (const guard of this.guards) {
       if (!guard.actor.alive || guard.progress>=guard.route.length) continue;
-      if(!guard.safe && (!pair.includes(guard.actor.id) || !(this.Has("gunUsed") || this.flow.stage.id==="MachineGun" || this.Has("frontAttackRepelled") || (this.flow.stage.id==="Support" && this.Has("frontReached") && this.guards.indexOf(guard)<OPENING.rifleGuardCount && FirstLevelRifleContribution(this.Inventory().shots,this.frontArrivalShots))) || (!guard.crossing && this.time<(this.nextGuardCrossingAt||0)))) {
+      if(!guard.safe && (!pair.includes(guard.actor.id) || !(this.Has("gunUsed") || this.flow.stage.id==="MachineGun" || this.Has("frontAttackRepelled") || (this.flow.stage.id==="Support" && this.Has("frontReached") && this.guards.indexOf(guard)<OPENING.rifleGuardCount && this.Has("frontRifleDefense"))) || (!guard.crossing && this.time<(this.nextGuardCrossingAt||0)))) {
         this.Defend(guard.actor,guard.actor.position,0,0);this.ai.SetStance(guard.actor,2,Infinity,true);continue;
       }
       // Test the waiting man's actual prone silhouette, then commit to the bound.
       // Rechecking a standing silhouette every frame stranded men in their shelter.
-      if (guard.crossing || !this.Threatens(guard.actor.position,null,guard.actor.stance===2?.35:1.1)) {
+      const openingPair=this.flow.stage.id==="Support"&&this.guards.indexOf(guard)<OPENING.rifleGuardCount;
+      if (guard.crossing || !this.Threatens(guard.actor.position,openingPair?["FrontGunner"]:null,guard.actor.stance===2?.35:1.1)) {
         guard.crossing=true;
         guard.actor.scriptedNoncombatant=false;
         this.ai.SetStance(guard.actor,guard.safe?1:0,1.2);
@@ -1600,7 +1602,7 @@ export class FirstLevelMissionRuntime {
         this.ai.SetStance(guard.actor,1,1.5);
       }
     }
-    if(this.flow.stage.id==="Support" && this.guards.slice(0,OPENING.rifleGuardCount).length===OPENING.rifleGuardCount && this.guards.slice(0,OPENING.rifleGuardCount).every(g=>g.safe||!g.actor.alive))this.Record("rifleWithdrawalResolved",{survived:this.guards.slice(0,OPENING.rifleGuardCount).filter(g=>g.safe&&g.actor.alive).length});
+    if(this.flow.stage.id==="Support" && this.guards.slice(0,OPENING.rifleGuardCount).length===OPENING.rifleGuardCount && this.guards.slice(0,OPENING.rifleGuardCount).some(g=>g.safe&&g.actor.alive) && this.guards.slice(0,OPENING.rifleGuardCount).every(g=>g.safe||!g.actor.alive))this.Record("rifleWithdrawalResolved",{survived:this.guards.slice(0,OPENING.rifleGuardCount).filter(g=>g.safe&&g.actor.alive).length});
     if (this.guards.length && this.guards.every((guard) => guard.safe || !guard.actor.alive))
       {
         const survived=this.guards.filter(guard=>guard.safe && guard.actor.alive).length;
@@ -2355,6 +2357,9 @@ export class FirstLevelMissionRuntime {
     if(!spec || this.failed || this.controls || this.completed)return null;
     let target=stage.target, label=spec.label;
     if(spec.route)target=MissionRouteLookahead(MISSION_ROUTES[spec.route],this.player.position);
+    if(stage.id==="Support"&&this.Has("frontReached")&&!this.Has("frontRifleDefense")){
+      target=this.enemies.get("FrontGunner")?.position||target;label="frontBlocker";
+    }
     if(stage.id==="Tank"){
       const returning=this.Has("bundleTaken")&&this.Inventory().bundles>0;
       const route=returning?MISSION_ROUTES.bundleReturn:MISSION_ROUTES.bundle;
@@ -2466,10 +2471,13 @@ export class FirstLevelMissionRuntime {
     }
     if (stage === "Support" && this.GateNear("frontReached")) {
       this.Record("frontReached");
+    }
+    if (stage === "Support" && this.Has("frontReached")) {
       this.frontArrivalAt ??= this.time;
       this.frontArrivalShots ??= this.Inventory().shots;
-      if(this.time-this.frontArrivalAt>=R.frontRifleDefenseSeconds &&
-        FirstLevelRifleContribution(this.Inventory().shots,this.frontArrivalShots))this.Record("frontRifleDefense");
+      const blocker=this.enemies.get("FrontGunner");
+      if(blocker&&(!blocker.alive||blocker.suppression>=R.threatSuppression||blocker.state==="suppressed"))
+        this.Record("frontRifleDefense",{blocker:"FrontGunner",alive:blocker.alive,suppression:blocker.suppression});
       this.SpawnEncounter("front");
       this.tank.active = true;
       if ([...this.enemies.values()].some((actor) => actor.lastFire > 0) || this.Inventory().shots > 0)
@@ -2735,14 +2743,6 @@ export class FirstLevelMissionRuntime {
     progress.conditions = progress.conditions.map(condition => {
       const row = { ...condition, text: T(`menu.condition.${condition.id}`) };
       if (condition.id === "minimumSeconds") row.detail = T("menu.progress.seconds", condition);
-      if (condition.id === "frontRifleDefense") {
-        row.text = T("menu.condition.frontRifleDefense", { seconds: R.frontRifleDefenseSeconds });
-        row.detail = T("menu.progress.rifle", {
-          current: Math.min(R.frontRifleDefenseSeconds, Math.floor(Math.max(0, this.time - (this.frontArrivalAt ?? this.time)))),
-          target: R.frontRifleDefenseSeconds,
-          fired: T(this.Inventory().shots > (this.frontArrivalShots ?? this.Inventory().shots) ? "menu.progress.fired" : "menu.progress.notFired"),
-        });
-      }
       if (condition.id === "rifleWithdrawalResolved" || condition.id === "guardWithdrawalResolved") {
         const guards = condition.id === "rifleWithdrawalResolved" ? this.guards.slice(0, OPENING.rifleGuardCount) : this.guards;
         row.detail = T("menu.progress.guards", {

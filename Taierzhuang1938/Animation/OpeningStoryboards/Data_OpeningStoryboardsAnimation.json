@@ -1,0 +1,760 @@
+{
+  "schema": 1,
+  "version": "20260922OpeningStoryboardsV1",
+  "fps": 24,
+  "actorForward": [
+    0,
+    0,
+    -1
+  ],
+  "blendSeconds": 0.12,
+  "clips": {
+    "SupplyReceive": {
+      "duration": 3,
+      "loop": true,
+      "weaponHold": "free"
+    },
+    "ClipLoad": {
+      "duration": 3,
+      "loop": true,
+      "weaponHold": "free"
+    },
+    "MessengerReport": {
+      "duration": 3,
+      "loop": true,
+      "weaponHold": "oneHandRight"
+    },
+    "DuckBlast": {
+      "duration": 1.2,
+      "loop": false,
+      "weaponHold": "free"
+    },
+    "WoundedReach": {
+      "duration": 3,
+      "loop": true,
+      "weaponHold": "free"
+    },
+    "CaptiveHeld": {
+      "duration": 3,
+      "loop": true,
+      "weaponHold": "free"
+    },
+    "CollarControl": {
+      "duration": 2,
+      "loop": true,
+      "weaponHold": "oneHandRight"
+    },
+    "BayonetClearWood": {
+      "duration": 1.6,
+      "loop": false,
+      "weaponHold": "twoHand"
+    },
+    "CollarDrag": {
+      "duration": 2.2,
+      "loop": false,
+      "weaponHold": "oneHandRight"
+    },
+    "ButtThreat": {
+      "duration": 1.4,
+      "loop": false,
+      "weaponHold": "twoHand"
+    },
+    "InterrogateCrouch": {
+      "duration": 3,
+      "loop": true,
+      "weaponHold": "free"
+    },
+    "InterpreterPoint": {
+      "duration": 3,
+      "loop": true,
+      "weaponHold": "free"
+    },
+    "CreepDadao": {
+      "duration": 1.8,
+      "loop": true,
+      "weaponHold": "oneHandRight"
+    },
+    "DadaoAmbush": {
+      "duration": 0.85,
+      "loop": false,
+      "weaponHold": "oneHandRight"
+    },
+    "RifleDeflect": {
+      "duration": 0.8,
+      "loop": false,
+      "weaponHold": "oneHandRight"
+    },
+    "PullComrade": {
+      "duration": 2,
+      "loop": false,
+      "weaponHold": "free"
+    },
+    "KickRifle": {
+      "duration": 1.2,
+      "loop": false,
+      "weaponHold": "free"
+    },
+    "PointBlockade": {
+      "duration": 3,
+      "loop": true,
+      "weaponHold": "oneHandRight"
+    },
+    "ShotCollapse": {
+      "duration": 1.6,
+      "loop": false,
+      "weaponHold": "free"
+    },
+    "GuardTurn": {
+      "duration": 1.2,
+      "loop": false,
+      "weaponHold": "twoHand"
+    }
+  },
+  "models": [
+    {
+      "id": "LugouNra02",
+      "file": "Animation_LugouNra02OpeningStoryboards.json",
+      "sha256": "d1756c0b887531108f53a18cec1d6adbf990361342d0e22f65c6499d624c7645",
+      "originalModelSha256": "39c08ca82148e140ee2952caffdd0dee99750fb734038a5263d216c9a7345225",
+      "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningStoryboards_20260922\\Scene_LugouNra02OpeningStoryboards.blend",
+      "clips": [
+        {
+          "clip": "SupplyReceive",
+          "frames": 73,
+          "floorCorrectionMin": -0.01197904348373413,
+          "floorCorrectionMax": -0.011630535125732422
+        },
+        {
+          "clip": "ClipLoad",
+          "frames": 73,
+          "floorCorrectionMin": -0.01197904348373413,
+          "floorCorrectionMax": -0.011630535125732422
+        },
+        {
+          "clip": "MessengerReport",
+          "frames": 73,
+          "floorCorrectionMin": 7.152557373046875e-07,
+          "floorCorrectionMax": 1.2516975402832031e-06
+        },
+        {
+          "clip": "DuckBlast",
+          "frames": 30,
+          "floorCorrectionMin": -0.011571347713470459,
+          "floorCorrectionMax": -0.010318577289581299
+        },
+        {
+          "clip": "WoundedReach",
+          "frames": 73,
+          "floorCorrectionMin": 0.05157655477523804,
+          "floorCorrectionMax": 0.05157655477523804
+        },
+        {
+          "clip": "CaptiveHeld",
+          "frames": 73,
+          "floorCorrectionMin": -0.011630535125732422,
+          "floorCorrectionMax": -0.011023879051208496
+        },
+        {
+          "clip": "CollarControl",
+          "frames": 49,
+          "floorCorrectionMin": 7.748603820800781e-07,
+          "floorCorrectionMax": 1.1324882507324219e-06
+        },
+        {
+          "clip": "BayonetClearWood",
+          "frames": 40,
+          "floorCorrectionMin": 7.152557373046875e-07,
+          "floorCorrectionMax": 1.2516975402832031e-06
+        },
+        {
+          "clip": "CollarDrag",
+          "frames": 54,
+          "floorCorrectionMin": 7.152557373046875e-07,
+          "floorCorrectionMax": 1.1324882507324219e-06
+        },
+        {
+          "clip": "ButtThreat",
+          "frames": 35,
+          "floorCorrectionMin": 7.748603820800781e-07,
+          "floorCorrectionMax": 1.2516975402832031e-06
+        },
+        {
+          "clip": "InterrogateCrouch",
+          "frames": 73,
+          "floorCorrectionMin": -0.01032346487045288,
+          "floorCorrectionMax": -0.01032346487045288
+        },
+        {
+          "clip": "InterpreterPoint",
+          "frames": 73,
+          "floorCorrectionMin": -0.01197904348373413,
+          "floorCorrectionMax": -0.011630535125732422
+        },
+        {
+          "clip": "CreepDadao",
+          "frames": 45,
+          "floorCorrectionMin": 8.344650268554688e-07,
+          "floorCorrectionMax": 1.6093254089355469e-06
+        },
+        {
+          "clip": "DadaoAmbush",
+          "frames": 22,
+          "floorCorrectionMin": 5.960464477539062e-07,
+          "floorCorrectionMax": 1.2516975402832031e-06
+        },
+        {
+          "clip": "RifleDeflect",
+          "frames": 21,
+          "floorCorrectionMin": 7.152557373046875e-07,
+          "floorCorrectionMax": 1.2516975402832031e-06
+        },
+        {
+          "clip": "PullComrade",
+          "frames": 49,
+          "floorCorrectionMin": -0.012260854244232178,
+          "floorCorrectionMax": -0.010320603847503662
+        },
+        {
+          "clip": "KickRifle",
+          "frames": 30,
+          "floorCorrectionMin": 7.152557373046875e-07,
+          "floorCorrectionMax": 1.1324882507324219e-06
+        },
+        {
+          "clip": "PointBlockade",
+          "frames": 73,
+          "floorCorrectionMin": 7.152557373046875e-07,
+          "floorCorrectionMax": 1.2516975402832031e-06
+        },
+        {
+          "clip": "ShotCollapse",
+          "frames": 40,
+          "floorCorrectionMin": -0.08759605884552002,
+          "floorCorrectionMax": 0.018057286739349365
+        },
+        {
+          "clip": "GuardTurn",
+          "frames": 30,
+          "floorCorrectionMin": 7.748603820800781e-07,
+          "floorCorrectionMax": 1.2516975402832031e-06
+        }
+      ]
+    },
+    {
+      "id": "LugouNra05",
+      "file": "Animation_LugouNra05OpeningStoryboards.json",
+      "sha256": "869dce71de662500007e72bd9babedf9ac1f2bfb6d6c33a05164ab895c087f2e",
+      "originalModelSha256": "acbc9184da059bdf6c3c18d051f3eba77d1dd3acba469e8dbc876b092f174250",
+      "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningStoryboards_20260922\\Scene_LugouNra05OpeningStoryboards.blend",
+      "clips": [
+        {
+          "clip": "SupplyReceive",
+          "frames": 73,
+          "floorCorrectionMin": -0.02059340476989746,
+          "floorCorrectionMax": -0.020264923572540283
+        },
+        {
+          "clip": "ClipLoad",
+          "frames": 73,
+          "floorCorrectionMin": -0.02059340476989746,
+          "floorCorrectionMax": -0.020264923572540283
+        },
+        {
+          "clip": "MessengerReport",
+          "frames": 73,
+          "floorCorrectionMin": 8.940696716308594e-07,
+          "floorCorrectionMax": 1.3709068298339844e-06
+        },
+        {
+          "clip": "DuckBlast",
+          "frames": 30,
+          "floorCorrectionMin": -0.020209074020385742,
+          "floorCorrectionMax": -0.01896071434020996
+        },
+        {
+          "clip": "WoundedReach",
+          "frames": 73,
+          "floorCorrectionMin": 0.06063169240951538,
+          "floorCorrectionMax": 0.06063169240951538
+        },
+        {
+          "clip": "CaptiveHeld",
+          "frames": 73,
+          "floorCorrectionMin": -0.020264923572540283,
+          "floorCorrectionMax": -0.0196913480758667
+        },
+        {
+          "clip": "CollarControl",
+          "frames": 49,
+          "floorCorrectionMin": 8.940696716308594e-07,
+          "floorCorrectionMax": 1.3709068298339844e-06
+        },
+        {
+          "clip": "BayonetClearWood",
+          "frames": 40,
+          "floorCorrectionMin": 1.0728836059570312e-06,
+          "floorCorrectionMax": 1.4901161193847656e-06
+        },
+        {
+          "clip": "CollarDrag",
+          "frames": 54,
+          "floorCorrectionMin": 7.748603820800781e-07,
+          "floorCorrectionMax": 1.4901161193847656e-06
+        },
+        {
+          "clip": "ButtThreat",
+          "frames": 35,
+          "floorCorrectionMin": 8.344650268554688e-07,
+          "floorCorrectionMax": 1.4901161193847656e-06
+        },
+        {
+          "clip": "InterrogateCrouch",
+          "frames": 73,
+          "floorCorrectionMin": -0.018964707851409912,
+          "floorCorrectionMax": -0.018964707851409912
+        },
+        {
+          "clip": "InterpreterPoint",
+          "frames": 73,
+          "floorCorrectionMin": -0.02059340476989746,
+          "floorCorrectionMax": -0.020264923572540283
+        },
+        {
+          "clip": "CreepDadao",
+          "frames": 45,
+          "floorCorrectionMin": 8.344650268554688e-07,
+          "floorCorrectionMax": 3.516674041748047e-06
+        },
+        {
+          "clip": "DadaoAmbush",
+          "frames": 22,
+          "floorCorrectionMin": 7.748603820800781e-07,
+          "floorCorrectionMax": 1.4901161193847656e-06
+        },
+        {
+          "clip": "RifleDeflect",
+          "frames": 21,
+          "floorCorrectionMin": 8.344650268554688e-07,
+          "floorCorrectionMax": 1.430511474609375e-06
+        },
+        {
+          "clip": "PullComrade",
+          "frames": 49,
+          "floorCorrectionMin": -0.020858287811279297,
+          "floorCorrectionMax": -0.018962383270263672
+        },
+        {
+          "clip": "KickRifle",
+          "frames": 30,
+          "floorCorrectionMin": 1.0132789611816406e-06,
+          "floorCorrectionMax": 1.430511474609375e-06
+        },
+        {
+          "clip": "PointBlockade",
+          "frames": 73,
+          "floorCorrectionMin": 8.940696716308594e-07,
+          "floorCorrectionMax": 1.3709068298339844e-06
+        },
+        {
+          "clip": "ShotCollapse",
+          "frames": 40,
+          "floorCorrectionMin": -0.0876913070678711,
+          "floorCorrectionMax": 0.021359622478485107
+        },
+        {
+          "clip": "GuardTurn",
+          "frames": 30,
+          "floorCorrectionMin": 8.940696716308594e-07,
+          "floorCorrectionMax": 1.3709068298339844e-06
+        }
+      ]
+    },
+    {
+      "id": "LugouIja01",
+      "file": "Animation_LugouIja01OpeningStoryboards.json",
+      "sha256": "f6cfc9f042a0075cf9dcfdae277293c7b0044cf747ce507eb4b728901095bbbe",
+      "originalModelSha256": "23fa4ef88891bd14d49dfb9a3e61b9f0dcaf45b8956a720aab24d9c4c23eb9c7",
+      "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningStoryboards_20260922\\Scene_LugouIja01OpeningStoryboards.blend",
+      "clips": [
+        {
+          "clip": "SupplyReceive",
+          "frames": 73,
+          "floorCorrectionMin": 0.017632663249969482,
+          "floorCorrectionMax": 0.017976582050323486
+        },
+        {
+          "clip": "ClipLoad",
+          "frames": 73,
+          "floorCorrectionMin": 0.017632663249969482,
+          "floorCorrectionMax": 0.017976582050323486
+        },
+        {
+          "clip": "MessengerReport",
+          "frames": 73,
+          "floorCorrectionMin": -1.1920928955078125e-07,
+          "floorCorrectionMax": 3.5762786865234375e-07
+        },
+        {
+          "clip": "DuckBlast",
+          "frames": 30,
+          "floorCorrectionMin": 0.01803499460220337,
+          "floorCorrectionMax": 0.019460201263427734
+        },
+        {
+          "clip": "WoundedReach",
+          "frames": 73,
+          "floorCorrectionMin": 0.06799352169036865,
+          "floorCorrectionMax": 0.06799352169036865
+        },
+        {
+          "clip": "CaptiveHeld",
+          "frames": 73,
+          "floorCorrectionMin": 0.017976582050323486,
+          "floorCorrectionMax": 0.018576622009277344
+        },
+        {
+          "clip": "CollarControl",
+          "frames": 49,
+          "floorCorrectionMin": -5.960464477539063e-08,
+          "floorCorrectionMax": 3.5762786865234375e-07
+        },
+        {
+          "clip": "BayonetClearWood",
+          "frames": 40,
+          "floorCorrectionMin": -5.960464477539063e-08,
+          "floorCorrectionMax": 5.960464477539062e-07
+        },
+        {
+          "clip": "CollarDrag",
+          "frames": 54,
+          "floorCorrectionMin": -1.7881393432617188e-07,
+          "floorCorrectionMax": 4.76837158203125e-07
+        },
+        {
+          "clip": "ButtThreat",
+          "frames": 35,
+          "floorCorrectionMin": 1.1920928955078125e-07,
+          "floorCorrectionMax": 4.76837158203125e-07
+        },
+        {
+          "clip": "InterrogateCrouch",
+          "frames": 73,
+          "floorCorrectionMin": 0.01946192979812622,
+          "floorCorrectionMax": 0.01946192979812622
+        },
+        {
+          "clip": "InterpreterPoint",
+          "frames": 73,
+          "floorCorrectionMin": 0.017632663249969482,
+          "floorCorrectionMax": 0.017976582050323486
+        },
+        {
+          "clip": "CreepDadao",
+          "frames": 45,
+          "floorCorrectionMin": 1.1920928955078125e-07,
+          "floorCorrectionMax": 6.556510925292969e-07
+        },
+        {
+          "clip": "DadaoAmbush",
+          "frames": 22,
+          "floorCorrectionMin": -1.7881393432617188e-07,
+          "floorCorrectionMax": 4.172325134277344e-07
+        },
+        {
+          "clip": "RifleDeflect",
+          "frames": 21,
+          "floorCorrectionMin": -1.1920928955078125e-07,
+          "floorCorrectionMax": 4.172325134277344e-07
+        },
+        {
+          "clip": "PullComrade",
+          "frames": 49,
+          "floorCorrectionMin": 0.017355620861053467,
+          "floorCorrectionMax": 0.019465625286102295
+        },
+        {
+          "clip": "KickRifle",
+          "frames": 30,
+          "floorCorrectionMin": -5.960464477539063e-08,
+          "floorCorrectionMax": 4.76837158203125e-07
+        },
+        {
+          "clip": "PointBlockade",
+          "frames": 73,
+          "floorCorrectionMin": -1.1920928955078125e-07,
+          "floorCorrectionMax": 3.5762786865234375e-07
+        },
+        {
+          "clip": "ShotCollapse",
+          "frames": 40,
+          "floorCorrectionMin": -0.10541719198226929,
+          "floorCorrectionMax": 0.05881541967391968
+        },
+        {
+          "clip": "GuardTurn",
+          "frames": 30,
+          "floorCorrectionMin": -1.1920928955078125e-07,
+          "floorCorrectionMax": 3.5762786865234375e-07
+        }
+      ]
+    },
+    {
+      "id": "LugouIja02",
+      "file": "Animation_LugouIja02OpeningStoryboards.json",
+      "sha256": "53ab8cd516acfecec0ad25434a0ae01670907a6e5f81ab370afcb072ad78adbc",
+      "originalModelSha256": "8c4860ec2d4dd3076b06ff7e593e5dcfd4d23aefe2fedf6f9fdec3b0e12cc9aa",
+      "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningStoryboards_20260922\\Scene_LugouIja02OpeningStoryboards.blend",
+      "clips": [
+        {
+          "clip": "SupplyReceive",
+          "frames": 73,
+          "floorCorrectionMin": 0.02111673355102539,
+          "floorCorrectionMax": 0.02140223979949951
+        },
+        {
+          "clip": "ClipLoad",
+          "frames": 73,
+          "floorCorrectionMin": 0.02111673355102539,
+          "floorCorrectionMax": 0.02140223979949951
+        },
+        {
+          "clip": "MessengerReport",
+          "frames": 73,
+          "floorCorrectionMin": -0.0002969503402709961,
+          "floorCorrectionMax": -0.0002872347831726074
+        },
+        {
+          "clip": "DuckBlast",
+          "frames": 30,
+          "floorCorrectionMin": 0.021451056003570557,
+          "floorCorrectionMax": 0.022452056407928467
+        },
+        {
+          "clip": "WoundedReach",
+          "frames": 73,
+          "floorCorrectionMin": 0.07033014297485352,
+          "floorCorrectionMax": 0.07033014297485352
+        },
+        {
+          "clip": "CaptiveHeld",
+          "frames": 73,
+          "floorCorrectionMin": 0.02140223979949951,
+          "floorCorrectionMax": 0.02190333604812622
+        },
+        {
+          "clip": "CollarControl",
+          "frames": 49,
+          "floorCorrectionMin": -0.0003108382225036621,
+          "floorCorrectionMax": -0.0002974867820739746
+        },
+        {
+          "clip": "BayonetClearWood",
+          "frames": 40,
+          "floorCorrectionMin": -0.0005966424942016602,
+          "floorCorrectionMax": -0.0004304647445678711
+        },
+        {
+          "clip": "CollarDrag",
+          "frames": 54,
+          "floorCorrectionMin": -0.0003109574317932129,
+          "floorCorrectionMax": -0.00029772520065307617
+        },
+        {
+          "clip": "ButtThreat",
+          "frames": 35,
+          "floorCorrectionMin": -0.0005187392234802246,
+          "floorCorrectionMax": -0.0003637075424194336
+        },
+        {
+          "clip": "InterrogateCrouch",
+          "frames": 73,
+          "floorCorrectionMin": 0.02245354652404785,
+          "floorCorrectionMax": 0.02245354652404785
+        },
+        {
+          "clip": "InterpreterPoint",
+          "frames": 73,
+          "floorCorrectionMin": 0.02111673355102539,
+          "floorCorrectionMax": 0.02140223979949951
+        },
+        {
+          "clip": "CreepDadao",
+          "frames": 45,
+          "floorCorrectionMin": -0.0003432631492614746,
+          "floorCorrectionMax": 0.0016731023788452148
+        },
+        {
+          "clip": "DadaoAmbush",
+          "frames": 22,
+          "floorCorrectionMin": -0.0003628730773925781,
+          "floorCorrectionMax": -0.0002575516700744629
+        },
+        {
+          "clip": "RifleDeflect",
+          "frames": 21,
+          "floorCorrectionMin": -0.00029653310775756836,
+          "floorCorrectionMax": -0.00026530027389526367
+        },
+        {
+          "clip": "PullComrade",
+          "frames": 49,
+          "floorCorrectionMin": 0.020887255668640137,
+          "floorCorrectionMax": 0.022461354732513428
+        },
+        {
+          "clip": "KickRifle",
+          "frames": 30,
+          "floorCorrectionMin": -0.0007019639015197754,
+          "floorCorrectionMax": -0.00020509958267211914
+        },
+        {
+          "clip": "PointBlockade",
+          "frames": 73,
+          "floorCorrectionMin": -0.0002969503402709961,
+          "floorCorrectionMax": -0.0002872347831726074
+        },
+        {
+          "clip": "ShotCollapse",
+          "frames": 40,
+          "floorCorrectionMin": -0.10542041063308716,
+          "floorCorrectionMax": 0.060373663902282715
+        },
+        {
+          "clip": "GuardTurn",
+          "frames": 30,
+          "floorCorrectionMin": -0.00034815073013305664,
+          "floorCorrectionMax": -0.00029087066650390625
+        }
+      ]
+    },
+    {
+      "id": "LugouIja03",
+      "file": "Animation_LugouIja03OpeningStoryboards.json",
+      "sha256": "9da4d5ba40b3b5009f91ab786cd3edf600fd1f71f3f6584ed1b3f9b2e1a91ee5",
+      "originalModelSha256": "6d97c801f7ea62430e5397fde980ad0964ab5081fa5f15249434bce4cbf3f89d",
+      "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningStoryboards_20260922\\Scene_LugouIja03OpeningStoryboards.blend",
+      "clips": [
+        {
+          "clip": "SupplyReceive",
+          "frames": 73,
+          "floorCorrectionMin": 0.02110731601715088,
+          "floorCorrectionMax": 0.021392822265625
+        },
+        {
+          "clip": "ClipLoad",
+          "frames": 73,
+          "floorCorrectionMin": 0.02110731601715088,
+          "floorCorrectionMax": 0.021392822265625
+        },
+        {
+          "clip": "MessengerReport",
+          "frames": 73,
+          "floorCorrectionMin": -0.00029915571212768555,
+          "floorCorrectionMax": -0.00028955936431884766
+        },
+        {
+          "clip": "DuckBlast",
+          "frames": 30,
+          "floorCorrectionMin": 0.021441519260406494,
+          "floorCorrectionMax": 0.02244424819946289
+        },
+        {
+          "clip": "WoundedReach",
+          "frames": 73,
+          "floorCorrectionMin": 0.07033467292785645,
+          "floorCorrectionMax": 0.07033467292785645
+        },
+        {
+          "clip": "CaptiveHeld",
+          "frames": 73,
+          "floorCorrectionMin": 0.021392822265625,
+          "floorCorrectionMax": 0.021893739700317383
+        },
+        {
+          "clip": "CollarControl",
+          "frames": 49,
+          "floorCorrectionMin": -0.0003135204315185547,
+          "floorCorrectionMax": -0.0003000497817993164
+        },
+        {
+          "clip": "BayonetClearWood",
+          "frames": 40,
+          "floorCorrectionMin": -0.0005871057510375977,
+          "floorCorrectionMax": -0.0004267096519470215
+        },
+        {
+          "clip": "CollarDrag",
+          "frames": 54,
+          "floorCorrectionMin": -0.00031298398971557617,
+          "floorCorrectionMax": -0.0003001689910888672
+        },
+        {
+          "clip": "ButtThreat",
+          "frames": 35,
+          "floorCorrectionMin": -0.0005128383636474609,
+          "floorCorrectionMax": -0.0003616213798522949
+        },
+        {
+          "clip": "InterrogateCrouch",
+          "frames": 73,
+          "floorCorrectionMin": 0.022445976734161377,
+          "floorCorrectionMax": 0.022445976734161377
+        },
+        {
+          "clip": "InterpreterPoint",
+          "frames": 73,
+          "floorCorrectionMin": 0.02110731601715088,
+          "floorCorrectionMax": 0.021392822265625
+        },
+        {
+          "clip": "CreepDadao",
+          "frames": 45,
+          "floorCorrectionMin": -0.00034159421920776367,
+          "floorCorrectionMax": 0.001676023006439209
+        },
+        {
+          "clip": "DadaoAmbush",
+          "frames": 22,
+          "floorCorrectionMin": -0.00036638975143432617,
+          "floorCorrectionMax": -0.0002535581588745117
+        },
+        {
+          "clip": "RifleDeflect",
+          "frames": 21,
+          "floorCorrectionMin": -0.0002989768981933594,
+          "floorCorrectionMax": -0.0002669095993041992
+        },
+        {
+          "clip": "PullComrade",
+          "frames": 49,
+          "floorCorrectionMin": 0.020877599716186523,
+          "floorCorrectionMax": 0.022453904151916504
+        },
+        {
+          "clip": "KickRifle",
+          "frames": 30,
+          "floorCorrectionMin": -0.0007035136222839355,
+          "floorCorrectionMax": -0.00020188093185424805
+        },
+        {
+          "clip": "PointBlockade",
+          "frames": 73,
+          "floorCorrectionMin": -0.00029915571212768555,
+          "floorCorrectionMax": -0.00028955936431884766
+        },
+        {
+          "clip": "ShotCollapse",
+          "frames": 40,
+          "floorCorrectionMin": -0.10546618700027466,
+          "floorCorrectionMax": 0.06035447120666504
+        },
+        {
+          "clip": "GuardTurn",
+          "frames": 30,
+          "floorCorrectionMin": -0.0003515481948852539,
+          "floorCorrectionMax": -0.0002932548522949219
+        }
+      ]
+    }
+  ]
+}

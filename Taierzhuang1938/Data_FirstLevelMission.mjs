@@ -163,8 +163,8 @@ export const MISSION_ENCOUNTERS = Object.freeze({
   // 起点取空间包的 MISSION_PLACEMENT.bunker.ijaStart（还在刺杀处以北 6 m，走进来才下刀）；
   // 下刀与转向门内的两组落点在 Script_FirstLevelOpening 里按 ijaKill / ijaDoor 走。
   bunkerAssault: [
-    { id: "BunkerExecutionerA", ...P.bunker.ijaStart[0], weapon: "Type38", bayonet: true },
-    { id: "BunkerExecutionerB", ...P.bunker.ijaStart[1], weapon: "Type38", bayonet: true },
+    { id: "BunkerExecutionerA", ...P.bunker.ijaStart[0], modelVariant:1, weapon: "Type38", bayonet: true },
+    { id: "BunkerExecutionerB", ...P.bunker.ijaStart[1], modelVariant:2, weapon: "Type38", bayonet: true },
     // 跟进那两人站在行刑组后面，但仍在破口看得见的那一小片里（R.bunkerSightM）；
     // 与 ijaStart 拉开 3 m 以上，免得两个人叠在一格（胶囊之间不互撞）。
     { id: "BunkerFollowA", x: A.bunkerKilling.x - 4.5, z: A.bunkerKilling.z - 9, weapon: "Type38", bayonet: true },
@@ -301,7 +301,7 @@ export const FIRST_LEVEL_MISSION_PHASE = Object.freeze({
   music: null,
   minutes: 32,
   brief: [
-    "掩蔽部被一发近失弹埋了。跟班长出去，支援前沿，再为伤员打开往南的路。",
+    "炮火正向后延伸，日军先头兵紧跟而来。补弹，准备撤向后交通壕。",
     "WASD 移动 · Shift 冲刺 · C 蹲伏 · Z 卧倒 · F 交互 · V 大刀 · G 手榴弹 · H 集束手榴弹",
   ],
   metaText: ["第一关完整流程白盒", "Notion 2026.09.19", "人物动作简化"],

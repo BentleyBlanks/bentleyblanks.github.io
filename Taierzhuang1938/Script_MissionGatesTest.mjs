@@ -345,8 +345,8 @@ Check(PhaseLayout(model, 1).encounters.filter((e) => e.id !== "bunkerAssault").e
 // 它在阶段 1 之内先装睡再醒（日兵转向门内那一刻），阶段粒度的 state 分不开这两段，
 // 所以这里只守「登记成装睡、醒的条件是 doorSearchStarted」。
 const bunkerAssault = PhaseLayout(model, 1).encounters.find((e) => e.id === "bunkerAssault");
-Check(bunkerAssault.dormant && bunkerAssault.wake.fact === "doorSearchStarted",
-  "阶段 1 的 bunkerAssault 组装睡，日兵转向门内才醒");
+Check(bunkerAssault.dormant && bunkerAssault.wake.fact === "rifleRecovered",
+  "01–02 日兵由分镜驱动，拾枪后交还战斗 AI");
 const STATES = new Set(["pending", "spawned", "dormant", "standby", "active", "cleared"]);
 for (const phase of model.phases)
   for (const encounter of PhaseLayout(model, phase.number).encounters)

@@ -1,5 +1,7 @@
 # 第一关重构验收
 
+> 01–03 已由 [2026.09.21 正文](Data_FirstLevelOpeningSource20260921.md) 和 [分镜重构](Data_OpeningStoryboards20260922.md) 覆盖。以下旧受困/双俘虏/掀架段落仅作历史；04–18 保留原口径。
+
 ## 2026-09-19 采用稿重构
 
 需求来源：Notion `2026.09.19` 采用稿（[转录](Data_FirstLevelRebuildSource20260919.md)，台词一字不改）。

@@ -1,5 +1,7 @@
 # 第一关 · 公开阶段 1–7（Front 玩法包）
 
+> 01–03 已由 [2026.09.21 正文](Data_FirstLevelOpeningSource20260921.md) 和 [分镜重构](Data_OpeningStoryboards20260922.md) 覆盖。以下旧受困/双俘虏/掀架段落仅作历史；04–18 保留原口径。
+
 需求原文：[Notion 2026.09.19 采用稿转录](Data_FirstLevelRebuildSource20260919.md) 的 01–07（台词一字不改）。
 接口冻结：[分包契约](Data_FirstLevelRebuild20260919Contract.md) §2 / §3 / §5 / §8。
 对白与事件接口：[配音同步](Data_FirstLevelVoiceSync20260919.md)。

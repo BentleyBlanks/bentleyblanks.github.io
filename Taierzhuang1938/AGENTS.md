@@ -6,6 +6,8 @@
 
 ## 当前入口与任务范围
 
+- **01–03 当前采用稿为 Notion 2026.09.21 修订**：[正文](docs/Data_FirstLevelOpeningSource20260921.md)、[分镜与验收](docs/Data_OpeningStoryboards20260922.md)。这些阶段优先于下文 2026.09.19 历史描述；01 一个俘虏被枪杀，02 主审/翻译与大刀反扑、拖救踢枪，03 解除直接封锁并让存活守军实际入沟。导演为 `Script_OpeningStoryboards`，动作从 BlenderMCP 烘焙的 `Animation/OpeningStoryboards` 加载。仅验 01–03 用 `Script_FirstLevelMissionBrowserTest.mjs --campaign --stage-to=3`；04–18 保留既有来源。
+
 - 正片第一关是《往南的路》，入口 `?whitebox=p012`，序章已并入。需求来源是 Notion `2026.09.19` 采用稿（转录见 [采用稿](docs/Data_FirstLevelRebuildSource20260919.md)），跨包接口冻结在 [分包契约](docs/Data_FirstLevelRebuild20260919Contract.md)（步骤 id、事实名、锚点/路线键、遭遇组 id、cue id 都在那里改，不各自改名）。任务、对白和数值分别由 `Data_FirstLevelMission`、`Data_FirstLevelMissionDialogue`、`Data_Tuning_FirstLevel` 管理；范围决定、逐阶段通过条件与未完成项见 [重构验收](docs/Data_FirstLevelRebuildAcceptance.md)。
 - **18 个公开阶段、27 个可玩内部步骤**（调试菜单 18 项；流程表另有终止哨兵 `Complete`）：1 Trapped｜2 Rescue(`BunkerRescue`→`RearTrench`)｜3 Support｜4 MachineGun｜5 Tank｜6 Orders｜7 South｜8 Village｜9 Melee｜10 Courtyard｜11 TransferApproach｜12 Transfer(`Transfer`→`CartRide`)｜13 AirFirst｜14 Dive(`Carry`→`Dive`→`Rescue`)｜15 Regroup(`Regroup`→`WallPath`→`ReceptionGate`)｜16 Handover｜17 Death｜18 Bridge(`BridgeOrders`→`BridgeCover`→`BridgeWithdraw`→`NightMarch`)。旧的 `Train` `Unloading` `TrenchEntry` `Shelter` `Retreat*` `Reception` `FinalCarry` `FinalDefense` `Exit` 已下线。调试菜单与 agent 跳转接口见 [阶段跳转](docs/Data_FirstLevelStageJump.md)。
 - 各段的实装口径分三册，改哪一段读哪一册：[阶段 1–7](docs/Data_FirstLevelFront20260919.md)、[阶段 8–14](docs/Data_FirstLevelMid20260919.md)、[阶段 15–18](docs/Data_FirstLevelEnd20260919.md)。通过条件一律挂在「真的发生了」上 —— 人真的走到、车真的开走、敌人真的被打掉；不许用计时器顶替。新玩法逻辑放新模块，`Script_FirstLevelMissionRuntime` 只留自己步骤的 `Enter` 分支与 `Update` 段那几行薄钩子。

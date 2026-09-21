@@ -83,7 +83,7 @@ export class FirstLevelOpening {
     const posts=[b.luoEntry,b.yaowaLift,b.heyoutianFire,{x:b.heyoutianFire.x+2.2,z:b.heyoutianFire.z-1.4}];
     return posts[slot]||posts.at(-1);
   }
-  /** 被木架压住的位置（两根压梁之间），与被拖出来之后站定的位置。 */
+  /** 分镜控制段的起始位置与获救位置。 */
   get TrappedPoint(){return {x:Place.bunker.player.x,z:Place.bunker.player.z};}
   get RescueEnd(){
     const b=Place.bunker;
@@ -98,11 +98,10 @@ export class FirstLevelOpening {
     r.BeginControl("trapped",R.trappedMaxS,{lookAt:r.Point(A.bunkerDoor,1.1),lookSeconds:R.deathLookSeconds});
     r.player.stance="prone";
     this.SpawnCaptives();
-    r.Say("BunkerBanter");
   }
   /**
-   * 门外那两名失去抵抗能力的川军（无武器、不还手）与落在几米外的两支步枪。
-   * 摆位与整拍行刑归 Front 玩法包的 `Script_FirstLevelBunker`，这里只转发。
+   * 当前唯一俘虏、翻译与先头兵由分镜导演管理。
+   * 摆位与事件归 `Script_OpeningStoryboards`，这里只转发。
    */
   SpawnCaptives(){
     this.r.frontShow?.bunker.Begin();
@@ -117,6 +116,7 @@ export class FirstLevelOpening {
     r.player.Suppress?.(.9);
     r.audio.Deafen?.(1.1);
     r.Record("bunkerCollapsed",{x:A.bunker.x,z:A.bunker.z});
+    r.frontShow?.bunker.Blast();
   }
   /** 检查点重试落在 01：整拍重来。 */
   ResetBunker(){
@@ -134,10 +134,10 @@ export class FirstLevelOpening {
   UpdateBunker(){
     const r=this.r,bunker=this.bunker;
     if(!bunker)return;
-    const age=r.time-bunker.started;
+    const age=r.time-(r.frontShow?.bunker.started??bunker.started);
     // 正常录音和缺录音的估时字幕都会在末句结束发 BunkerBlast。8 秒只救一个
     // 根本没有可推进 BunkerBanter 时间轴的异常态，不能抢在 16.744 秒录音前炸。
-    if(bunker.blastAt==null&&age>=R.bunkerBanterFallbackS
+    if(r.frontShow?.bunker.voiceStarted&&bunker.blastAt==null&&age>=R.bunkerBanterFallbackS
       &&r.voice.current?.cue?.id!=="BunkerBanter")this.BunkerBlast();
     if(bunker.blastAt==null)return;
     r.frontShow?.bunker.UpdateBunker(bunker);
@@ -149,27 +149,12 @@ export class FirstLevelOpening {
   RescueLift(){
     return this.rescueAt==null?0:Smooth((this.RescueSampleTime()-C.rescuePullSeconds)/(C.rescueStandSeconds-C.rescuePullSeconds));
   }
-  UpdateRescue(){
-    const r=this.r;
-    if(r.Has("luoRescueComplete")||this.rescueAt!=null)return;
-    const luo=r.companion.Handle("luo");
-    if(!luo?.alive)return;
-    const reach=this.TrappedPoint;
-    // 走到空间包给的掀架位（luoLift）—— 从后壁破口挤进来那一步靠它，不再随手估一个点。
-    if(Distance(luo.position,reach)>C.rescueReachM){r.MoveActor(luo,Place.bunker.luoLift,R.walkSpeedMps);return;}
-    // 掀木架的同时幺娃要在另一头拉背包（Notion 02）。两个人都到位（或等满兜底）才起接管。
-    this.rescueGatherAt??=r.time;
-    if(r.frontShow&&!r.frontShow.bunker.RescueGatherReady(this.rescueGatherAt))return;
-    this.rescueAt=r.time;
-    this.rescueDuration=R.bunkerRescueSeconds;
-    r.BeginControl("rescue",this.rescueDuration);
-    r.Say("RescueLift");
-    r.Record("playerDraggedFromWreck",{from:{...r.player.position},to:this.RescueEnd});
-  }
+  UpdateRescue(){ /* Storyboard director owns this performance. */ }
   /** 受困与被拖出来那两段的身体位置（BeforePlayer 每帧调）。 */
   PlacePlayer(){
     const r=this.r;
     if(r.Has("luoRescueComplete"))return;
+    if(r.frontShow?.bunker){r.frontShow.bunker.PlacePlayer();return;}
     const from=this.TrappedPoint,to=this.RescueEnd,t=this.RescueLift();
     const x=from.x+(to.x-from.x)*t,z=from.z+(to.z-from.z)*t;
     const y=r.battlefield.GroundHeight(x,z);
@@ -179,6 +164,7 @@ export class FirstLevelOpening {
   ApplyCamera(){
     const r=this.r;
     this.eyeClosure=0;this.concussion=null;this.blackout=0;
+    if(r.frontShow?.bunker.ApplyCamera())return;
     if(this.blastAt==null)return;
     const elapsed=r.time-this.blastAt;
     const perception=SampleOpeningPerception(elapsed);
@@ -197,9 +183,7 @@ export class FirstLevelOpening {
     const r=this.r;
     if(stage==="Trapped")this.BeginBunker();
     if(stage==="BunkerRescue"){
-      // 何有田从后侧交通壕开火逼日兵转身。
-      if(r.controls?.kind==="trapped"){const kind=r.controls.kind;r.controls=null;r.Control?.(false,kind);}
-      r.Say("RescueCall");
+      if(!r.controls)r.BeginControl("trapped",R.trappedMaxS);
     }
     if(stage==="Support"){
       r.rifleStartShots=r.Inventory().shots;

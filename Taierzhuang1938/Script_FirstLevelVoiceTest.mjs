@@ -24,7 +24,8 @@ import { MISSION_LEADER_STAGES, MISSION_GUIDE_TRANSFERS } from "./Data_FirstLeve
 
 const Read = (name) => fs.readFileSync(new URL(name, import.meta.url), "utf8");
 const contract = Read("./docs/Data_FirstLevelRebuild20260919Contract.md");
-const source = Read("./docs/Data_FirstLevelRebuildSource20260919.md");
+const previousSource = Read("./docs/Data_FirstLevelRebuildSource20260919.md");
+const source = Read("./docs/Data_FirstLevelOpeningSource20260921.md") + previousSource.slice(previousSource.indexOf("# 04｜"));
 const story = MISSION_DIALOGUE.filter((cue) => !cue.guidance);
 const guide = MISSION_DIALOGUE.filter((cue) => cue.guidance);
 const byId = new Map(MISSION_DIALOGUE.map((cue) => [cue.id, cue]));
@@ -159,7 +160,7 @@ console.log(`ok MISSION_VOICE_FACTS 的 ${Object.keys(MISSION_VOICE_FACTS).lengt
     "./Script_FirstLevelQuietMarch.mjs", "./Script_FirstLevelReception.mjs",
     "./Script_FirstLevelBridge.mjs", "./Script_FirstLevelNightGate.mjs",
     // 第二波 Front 包（公开阶段 1–7）：01/02 的门外演出与 03–07 的对白落点。
-    "./Script_FirstLevelBunker.mjs", "./Script_FirstLevelCollection.mjs",
+    "./Script_OpeningStoryboards.mjs", "./Script_FirstLevelCollection.mjs",
     "./Script_FirstLevelFrontShow.mjs",
   ];
   const referenced = new Map();
@@ -202,7 +203,7 @@ const Events = (id, seconds) => {
   return (MissionVoiceTimeline(cue, seconds).segments[0].events || []).map((event) => event.id);
 };
 assert.ok(Events("BunkerBanter", 20).includes("BunkerBlast"), "BunkerBanter 末句要打 BunkerBlast");
-assert.ok(Events("RescueLift", 12).includes("RescueHeave"), "RescueLift 的「起」要打 RescueHeave");
+assert.ok(!Events("RescueLift", 12).includes("RescueHeave"), "新版近身反扑不触发旧掀木架事件");
 assert.ok(Events("AircraftReturn", 8).includes("AircraftDiveOrder"), "AircraftReturn 要沿用 AircraftDiveOrder");
 assert.deepEqual(Events("BorrowLight", 40),
   ["BorrowLightMatchesPocketed", "BorrowLightCigaretteOffered"], "借火的两处动作空当各有事件");
@@ -249,11 +250,11 @@ console.log("ok 具名事件齐全，整段录音不拆段");
   assert.deepEqual(lines.filter((line) => line.cue === "BorrowLight").map((line) => line.index),
     [0, 1, 2, 3, 4, 5, 6, 7, 8], "Line 事件按句序");
   assert.equal(lines[0].who, "zhou", "Line 事件带说话人");
-  assert.equal(said.length, 19, "三条缺录音对白的十九句字幕都照出");
+  assert.equal(said.length, 22, "三条缺录音对白的二十二句字幕都照出");
   assert.ok(events.includes("BorrowLightMatchesPocketed"), "缺录音时具名事件照发");
   assert.ok(events.includes("BunkerBlast"), "缺录音估时时间轴仍在闲谈末句发 BunkerBlast");
   assert.deepEqual(lines.filter((line) => line.cue === "BunkerKilling").map((line) => line.index),
-    [0, 1, 2, 3], "缺录音行刑对白仍逐句发 Line，动作可从真实 line 0 起拍");
+    [0, 1, 2, 3, 4, 5], "缺录音审问对白仍逐句发 Line，动作可从真实 line 0 起拍");
   assert.equal(warnings.filter((text) => text.includes("BorrowLight")).length, 1, "缺录音只警告一次");
   assert.ok(warnings.some((text) => text.includes("NoSuchCueAtAll")), "未知 cue 警告一次");
   assert.deepEqual(voice.State().missing, ["BorrowLight", "BunkerBanter", "BunkerKilling"]);
@@ -270,7 +271,7 @@ console.log("ok 具名事件齐全，整段录音不拆段");
   voice.manifest = { cues: { BunkerKilling: { seconds: 12 } } };
   voice.Enqueue("BunkerKilling");
   for (let i = 0; i < 2000; i++) voice.Update(1 / 60);
-  assert.ok(said.includes("日兵甲：站起来！快点！"), "日语行的字幕是中文译文：" + said.join(" / "));
+  assert.ok(said.includes("日兵甲：别动，混蛋！"), "日语行的字幕是中文译文：" + said.join(" / "));
   assert.ok(said.every((row) => !/[぀-ヿ]/.test(row)), "字幕里不许出现假名");
   console.log("ok 日语行字幕显示中文译文");
 }

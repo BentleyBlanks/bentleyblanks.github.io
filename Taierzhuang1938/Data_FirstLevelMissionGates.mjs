@@ -69,7 +69,7 @@ export const MISSION_ENCOUNTER_ACTIVATION = Object.freeze({
   bunkerAssault: Object.freeze({
     spawn: Object.freeze({ kind: "step", step: "Trapped" }),
     dormant: true,
-    wake: Object.freeze({ kind: "fact", fact: "doorSearchStarted" }),
+    wake: Object.freeze({ kind: "fact", fact: "rifleRecovered" }),
     note: "门外行刑的两个人＋跟进的两个；受困段整段装睡（只演），日兵转向门内才醒",
   }),
   approach: Object.freeze({
@@ -223,12 +223,12 @@ export const MISSION_FACT_GATES = Object.freeze({
     text: "到了前沿之后双方开过火（有敌人开枪，或者玩家打过枪）",
   }),
   frontRifleDefense: Gate({
-    kind: "timer", step: "Support", seconds: R.frontRifleDefenseSeconds, source: "Update",
-    text: "到前沿后用步枪顶住 frontRifleDefenseSeconds 秒，且期间开过枪",
+    kind: "combat", step: "Support", source: "Update",
+    text: "右侧破墙的封锁机枪已被压制或击败，无固定时长或击杀数",
   }),
   rifleWithdrawalResolved: Gate({
     kind: "scripted", step: "Support", source: "UpdateGuards",
-    text: "头 rifleGuardCount 对守军要么撤回安全、要么阵亡",
+    text: "第一批存活守军全部撤入安全位置，至少一人存活",
   }),
   // --- MachineGun --------------------------------------------------------
   zhouGunWounded: Gate({

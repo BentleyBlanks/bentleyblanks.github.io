@@ -438,7 +438,13 @@ export class FirstLevelWhiteboxField {
       sink.Add(block.semantic, PlaceGeometry(MakeBox(block.w, block.h, block.d, 1, block.id), block));
       if (block.solid !== false) sink.Solid(block.x, block.y, block.z, block.w / 2, block.h / 2, block.d / 2, block.tag, block.ry || 0);
     }
-    this.scenarioMeshes = sink.Flush(this.scene, { Get: key => this.materials.get(key) || this.whiteMaterial });
+    this.scenarioMeshes = sink.Flush(this.scene, { Get: key => {
+      if(key==="OpeningEarth")return this.library.Get("Adobe",{color:0x777064,repeat:2});
+      if(key==="OpeningWood")return this.library.Get("WoodBeam",{color:0x706351,repeat:2});
+      if(this.layout.legend===false&&state.id!=="NightGate"&&key==="timber")return this.library.Get("WoodBeam",{color:0x766957,repeat:2});
+      if(this.layout.legend===false&&state.id!=="NightGate"&&key==="earthDark")return this.library.Get("Adobe",{color:0x777064,repeat:2});
+      return this.materials.get(key) || this.whiteMaterial;
+    }});
     for (const mesh of this.scenarioMeshes) { mesh.name = `FirstLevelWhitebox_Hub_${state.id}`; mesh.castShadow = true; mesh.receiveShadow = true; this.meshes.push(mesh); }
     this.scenarioColliders = sink.colliders;
     for (const collider of this.scenarioColliders) { this.colliders.push(collider); if (this.physics) this.physics.AddSolid(collider); }

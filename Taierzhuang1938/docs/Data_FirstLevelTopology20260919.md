@@ -1,5 +1,7 @@
 # 第一关空间拓扑 · 2026-09-19 采用稿
 
+> 01–03 已由 [2026.09.21 正文](Data_FirstLevelOpeningSource20260921.md) 和 [分镜重构](Data_OpeningStoryboards20260922.md) 覆盖。以下旧受困/双俘虏/掀架段落仅作历史；04–18 保留原口径。
+
 需求来源：[Notion 2026.09.19 采用稿转录](Data_FirstLevelRebuildSource20260919.md)，接口冻结在[分包契约](Data_FirstLevelRebuild20260919Contract.md) §3 与 §8。
 本页取代 [2026-09-14 空间与流程重构](Data_FirstLevelTopologySeptember14.md)。
 

@@ -45,7 +45,12 @@ async function CollectStrings(files) {
   const strings = [];
   for (const file of files) {
     const mod = await import(pathToFileURL(path.join(projectDir, file)).href);
-    Walk({ ...mod }, strings);
+    if(file==="Data_FirstLevelMissionDialogue.mjs"){
+      // Delivery instructions can contain kana for TTS; only subtitles and
+      // speaker labels are displayed by the game.
+      Walk(mod.MISSION_DIALOGUE.map(cue=>cue.lines.map((line,index)=>mod.MissionVoiceSubtitle(cue,index))),strings);
+      Walk(Object.values(mod.MISSION_VOICE_CAST).map(row=>row[0]),strings);
+    }else Walk({ ...mod }, strings);
   }
   return strings;
 }

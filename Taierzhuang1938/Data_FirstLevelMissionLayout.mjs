@@ -717,11 +717,11 @@ export const MISSION_PLACEMENT = Object.freeze({
   // 01—02 掩蔽部。玩家侧躺在后半间，视线穿中隔墙缺口与前门低处破口看门外 8.5 m 的刺杀处。
   // 2026-09-20 演出打磨：整间从 8.5 × 12 收到 7 × 7，屋里屋外的摆位全部跟着前移。
   bunker: {
-    player: { x: -40, z: -123.4, yaw: Math.PI },    // 头朝北（-z），能看见门外
+    player: { x: -40, z: -126, yaw: 0 },    // 面朝北，近入口的地面视角
     playerEyeM: 0.42,
     // 够不到：离玩家 2.6 m。离东墙、后墙的内表面都留出约 0.8 m，让同源 HanYang
     // 地枪模型完整躺在屋内，不把枪身插进墙里。
-    rifle: { x: -37.8, z: -122.1, yaw: 0.15 },
+    rifle: { x: -39.6, z: -127.15, yaw: 0.15 },
     pinnedFrame: [{ x: -41.15, z: -123.4 }, { x: -38.85, z: -123.6 }],
     // 门外这一片全部落在破口的射影里：眼睛 (-40,-123.4,+0.42) 穿 x −41.4…−38.6
     // 那道 2.8 m 的缝，8.5 m 处开出 x −42.59…−37.41，当中门框立柱再挡掉
@@ -742,7 +742,7 @@ export const MISSION_PLACEMENT = Object.freeze({
     luoLift: { x: -40.5, z: -122.3, yaw: Math.PI },
     yaowaLift: { x: -39.5, z: -122.2, yaw: Math.PI },
     // 绕过掩蔽部西墙，射线到刺杀处（西墙现在只到 z=−128，线从它北边过去）。
-    heyoutianFire: { x: -52.6, z: -125.6, yaw: -0.36 },
+    heyoutianFire: { x: -42.65, z: -129.5, yaw: 0 },
   },
   // 06 背坡伤员集结处。
   collection: {
@@ -1016,17 +1016,28 @@ const MISSION_SCENARIO = (() => {
   // 前门缺口 x −41.4…−38.6（2.8 m）、中隔墙缺口与后壁缺口都是 x −41.6…−38.4（3.2 m）
   // —— 三道口子**同轴**，躺在后半间正对着看出去，门外那一片不会被中隔墙裁掉。
   const shell = [
+    // 2026.09.21 storyboard: a covered recess off a timber-revetted trench.
+    // Banks hide the surface battlefield from the ground-level opening camera.
+    ...Array.from({length:10},(_,i)=>{
+      const z=-129.4-i*2,ground=SampleMissionTerrain(-40,z);
+      return [-1,1].flatMap(side=>{
+        const x=-40+side*4.35,h=1.8+(i%3)*.11;
+        return [ScenarioBlock(`OpeningBank${side}_${i}`,x,z,1.8,h,2.1,"OpeningEarth",ground+h/2),
+          ...[.35,.72,1.09,1.46].map((rise,j)=>ScenarioBlock(`OpeningRevetment${side}_${i}_${j}`,x-side*.91,z,.14,.22,2.06,"OpeningWood",ground+rise)),
+          ScenarioBlock(`OpeningPost${side}_${i}`,x-side*1.03,z-.87,.18,1.7,.2,"OpeningWood",ground+.85)];
+      });
+    }).flat(),
     B("BunkerWest", -43.25, -124.5, 0.5, 2.2, 7, "earthDark", 2.2),
     B("BunkerEast", -36.75, -124.5, 0.5, 2.2, 7, "earthDark", 2.2),
-    B("BunkerFrontWest", -42.45, -128, 2.1, 2.2, 0.5, "earthDark", 2.2),
-    B("BunkerFrontEast", -37.55, -128, 2.1, 2.2, 0.5, "earthDark", 2.2),
+    B("BunkerFrontWest", -43, -128, 1, 2.2, 0.5, "earthDark", 2.2),
+    B("BunkerFrontEast", -37, -128, 1, 2.2, 0.5, "earthDark", 2.2),
     B("BunkerRearWest", -42.55, -121, 1.9, 2.2, 0.5, "earthDark", 2.2),
     B("BunkerRearEast", -37.45, -121, 1.9, 2.2, 0.5, "earthDark", 2.2),
     B("BunkerPartitionWest", -42.55, -124.5, 1.9, 2.2, 0.5, "timber", 2.2),
     B("BunkerPartitionEast", -37.45, -124.5, 1.9, 2.2, 0.5, "timber", 2.2),
   ];
   const intact = [...shell,
-    B("BunkerDoorLintel", -40, -128, 2.8, 0.2, 0.5, "timber", 2.2),
+    B("BunkerDoorLintel", -40, -128, 5, 0.2, 0.5, "timber", 2.2),
     B("BunkerRearLintel", -40, -121, 3.2, 0.2, 0.5, "timber", 2.2),
     B("BunkerPartitionLintel", -40, -124.5, 3.2, 0.2, 0.5, "timber", 2.2),
     B("BunkerRoof", -40, -124.5, 7, 0.3, 7, "timber", 2.5),
@@ -1036,14 +1047,14 @@ const MISSION_SCENARIO = (() => {
   // 破口上沿 1.35 m 在 4.6 m 处，射到 8.5 m 的头顶那条线只走到 1.14 m，从沿下过去。
   // 门槛的碎砖与门框立柱各遮住一部分，创口仍由门框、尘土与人物身体挡着。
   const collapsed = [...shell,
-    B("BunkerFrontLintel", -40, -128, 2.8, 0.85, 0.5, "earthDark", 2.2),
-    B("BunkerDoorRubble", -40.9, -128, 0.9, 0.22, 0.7, "earthDark", 0.22),
-    B("BunkerDoorPost", -39.2, -128, 0.3, 2.2, 0.45, "timber", 2.2),
+    B("BunkerFrontLintel", -40, -128, 5, 0.2, 0.5, "timber", 2.2),
+    B("BunkerDoorRubble", -37.7, -128, 0.9, 0.22, 0.7, "earthDark", 0.22),
+    B("BunkerDoorPost", -42.5, -128, 0.25, 2.2, 0.45, "timber", 2.2),
     B("BunkerPartitionSill", -40, -124.5, 3.2, 0.18, 0.5, "earthDark", 0.18),
     B("BunkerRoofRear", -40, -122.75, 7, 0.3, 3.5, "timber", 2.5),
     // 塌下来的顶板悬在前半间当中：底面 1.35 m，正好压在破口上沿那条线上，
     // 从躺姿看过去它在视线**上方**（3 m 处那条线才 0.89 m），只把天光压掉。
-    B("BunkerRoofSlab", -40, -125.6, 4, 0.3, 1.6, "timber", 1.65),
+    B("BunkerRoofSlab", -40, -125.6, 7, 0.3, 3.2, "timber", 2.5),
     // 前半间两角的塌方堆。都退到破口射影之外（4.3 m 处那条锥只有 x −41.31…−38.69），
     // 不许啃掉门外那一片的左右边。
     B("BunkerRubbleA", -42.3, -126.4, 1.4, 1.1, 2.6, "earthDark", 1.1),

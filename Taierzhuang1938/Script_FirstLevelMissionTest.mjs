@@ -1051,10 +1051,8 @@ console.log("ok individual trench lanes, rounded corners, safe spacing and varia
   assert.deepEqual(A.bunker,{x:P.bunker.player.x,z:P.bunker.player.z},
     "the bunker anchor is the authored pinned position");
   assert.equal(P.bunker.playerEyeM,STANCE.prone.eye,"the low-breach sight line uses the shared prone eye height");
-  assert.ok(P.bunker.pinnedFrame.every(pin=>Math.hypot(pin.x-P.bunker.player.x,pin.z-P.bunker.player.z)<1.6),
-    "the pinning beams really do pin him");
-  assert.ok(Math.hypot(P.bunker.rifle.x-P.bunker.player.x,P.bunker.rifle.z-P.bunker.player.z)>2.5,
-    "the rifle is out of reach while he is pinned");
+  assert.ok(Math.hypot(P.bunker.rifle.x-P.bunker.player.x,P.bunker.rifle.z-P.bunker.player.z)<1.5,
+    "the kicked rifle ends within the released player's reach");
   // 12 只有两处威胁，第二处等第一处解除。
   assert.equal(MISSION_TRANSFER_THREATS.length,2,"the transfer step keeps two threats, not four waves");
   assert.equal(MISSION_TRANSFER_THREATS[0].after,null);

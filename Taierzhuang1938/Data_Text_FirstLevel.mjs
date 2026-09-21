@@ -3,6 +3,7 @@
 // 新增掩蔽部、后交通壕、牛车、院墙夹道、接收院门与铁路桥几段。
 export const TEXT = Object.freeze({
   "firstLevel.guide.front": "击退前方日军",
+  "firstLevel.guide.frontBlocker": "压制右侧破墙的机枪，掩护守军撤回",
   "firstLevel.hint.crawlPassage": "趴下，匍匐穿过低矮通道",
   "firstLevel.leader.follow": "跟随",
   "firstLevel.leader.rally": "集合",

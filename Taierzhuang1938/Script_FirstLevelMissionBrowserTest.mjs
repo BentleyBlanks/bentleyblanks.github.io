@@ -62,6 +62,7 @@ try {
     if (!options.campaign) {
       // 基线（不带 --campaign）：坐着把 01 看完。军列开场那一份 PlayFirstLevelOpening
       // 随骨架下线了，这里改看新开场自己的三条事实与门外那一拍。
+      await page.waitForFunction(()=>window.Tengxian.Debug.FirstLevelMissionRuntime().frontShow.bunker.ready,null,{timeout:60000});
       const trapped = await page.evaluate(() => {
         const g = window.Tengxian;
         for (let i = 0; i < 60 * 60 && g.Debug.FirstLevelMissionRuntime().flow.stage.id === "Trapped"; i++)
@@ -75,8 +76,8 @@ try {
       await page.screenshot({ path: path.join(output, "Scene_Opening.png") });
       for (const fact of ["bunkerCollapsed", "captivesKilled", "doorSearchStarted"])
         assert.ok(trapped.facts.includes(fact), "受困段记下了 " + fact);
-      assert.ok(trapped.captives.length === 2 && trapped.captives.every((actor) => !actor.alive),
-        "门外两名失去抵抗能力的川军被杀害");
+      assert.ok(trapped.captives.length === 1 && trapped.captives.every((actor) => !actor.alive),
+        "门外唯一俘虏被枪杀");
       assert.equal(trapped.stage, "BunkerRescue", "「日军开始检查门内」把 01 推到 02");
       console.log("ok baseline opening", JSON.stringify({ beats: trapped.beats }));
     }

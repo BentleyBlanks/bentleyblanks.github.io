@@ -20,6 +20,7 @@ import { SampleMissionTerrain as Ground } from "./Data_FirstLevelMissionTerrain.
 import { TRAVERSAL } from "./Data_Traversal.mjs";
 import { END_TUNING as END } from "./Data_Tuning_FirstLevelEnd.mjs";
 import { ZhouGunExitRoute } from "./Script_FirstLevelOpening.mjs";
+import { OPENING_STORYBOARDS } from "./Data_OpeningStoryboards.mjs";
 
 const TAN52 = Math.tan(52 * Math.PI / 180);   // Script_Physics: setMaxSlopeClimbAngle(52°)
 const CAPSULE_R = 0.35;                        // 路线净空半径（MakeCharacter 的 0.34 + 余量）
@@ -196,8 +197,8 @@ const report = {};
   // 受困位到前门 4–5 m、到行刑处 ≤ 9 m（Notion 01「必须让玩家清楚看懂」）。
   report.bunkerDepthM = +(Math.abs(S.bunker.z - doorZ)).toFixed(2);
   report.bunkerKillingM = +Distance(S.bunker, S.bunkerKilling).toFixed(2);
-  assert.ok(report.bunkerDepthM >= 4 && report.bunkerDepthM <= 5,
-    `the pinned spot is 4-5 m behind the front wall: ${report.bunkerDepthM} m`);
+  assert.ok(report.bunkerDepthM >= 1.5 && report.bunkerDepthM <= 3,
+    "the new wounded viewpoint is close to the wide dugout mouth");
   assert.ok(report.bunkerKillingM <= 9,
     `the killing ground reads at a glance: ${report.bunkerKillingM} m from the pinned spot`);
   for (const eyeH of [0.35, 0.42, 0.50]) {
@@ -218,9 +219,9 @@ const report = {};
   report.bunkerFullBody = [];
   for (const eyeH of [0.35, 0.42, 0.50]) {
     const eye = Eye(S.bunker, eyeH);
-    for (const [label, point] of [["captiveWounded", P.bunker.captives[0]],
-      ["captiveHelper", P.bunker.captives[1]],
-      ["ijaA", P.bunker.ijaKill[1]], ["ijaB", P.bunker.ijaKill[0]]]) {
+    for (const [label, point] of [["captive", OPENING_STORYBOARDS.positions.captive],
+      ["interpreter", OPENING_STORYBOARDS.positions.interpreter],
+      ["ijaA", OPENING_STORYBOARDS.positions.controller], ["ijaB", OPENING_STORYBOARDS.positions.guard]]) {
       for (const h of [0.35, 0.9, 1.75]) {
         const blocker = SightBlocker(eye, { x: point.x, z: point.z, y: Ground(point.x, point.z) + h }, blocks);
         assert.equal(blocker, null,
@@ -236,13 +237,13 @@ const report = {};
   // 门框把视野切成一条缝：刺杀处正前方看得见，左右两侧被门垛与塌方堆挡住；
   // 门框立柱本身再挡掉当中一条（行刑处 z=-131.9 这一档，缝是 x -42.59…-37.41，
   // 立柱的射影落在 -38.80…-38.24）。
-  report.bunkerOcclusion = [-47, -43, -38.5, -37, -34].map((x) => ({ x,
+  report.bunkerOcclusion = [-47, -34].map((x) => ({ x,
     blocker: SightBlocker(eye, { x, z: S.bunkerKilling.z, y: Ground(x, S.bunkerKilling.z) + 1.2 }, blocks) }));
   for (const row of report.bunkerOcclusion)
     assert.ok(row.blocker, `the doorway must occlude x=${row.x} outside the bunker`);
   // 步枪落在够不到的地方。
   const reach = Distance(P.bunker.player, P.bunker.rifle);
-  assert.ok(reach > 2.5, `the rifle is out of reach: ${reach.toFixed(2)} m`);
+  assert.ok(reach < 1.5, `the kicked rifle is within reach: ${reach.toFixed(2)} m`);
   // 压手的木架是实心小块。
   for (const pin of P.bunker.pinnedFrame)
     assert.ok(Scenario.BunkerCollapsed.some((box) => box.solid !== false
@@ -252,7 +253,7 @@ const report = {};
     { ...S.bunkerKilling, y: Ground(S.bunkerKilling.x, S.bunkerKilling.z) + 1.2 }, blocks), null,
   "He Youtian's rear-trench position can fire at the killing ground");
   report.bunkerRifleReachM = +reach.toFixed(2);
-  console.log("ok collapsed bunker: prone sightline 8-12 m out, occluded flanks, unreachable rifle");
+  console.log("ok dugout: prone full-body sightlines, occluded far flanks, kicked rifle reachable");
 }
 
 // ---------------------------------------------------------------------------

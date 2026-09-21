@@ -23,8 +23,7 @@ export function MissionVoiceTimeline(cue, total) {
   const segment = { id: "WholeExchange", start: 0, end: total, wait: 0 };
   const tail = 0;
   const Late = (index, fraction) => lines[index][0] + (lines[index][1] - lines[index][0]) * fraction;
-  if (cue.id === "BunkerBanter") segment.events = [{ at: lines[5][1], id: "BunkerBlast" }];
-  if (cue.id === "RescueLift") segment.events = [{ at: Late(2, .82), id: "RescueHeave" }];
+  if (cue.id === "BunkerBanter") segment.events = [{ at: lines.at(-1)[1], id: "BunkerBlast" }];
   if (cue.id === "BorrowLight") segment.events = [
     { at: lines[4][1], id: "BorrowLightMatchesPocketed" },
     { at: lines[5][1], id: "BorrowLightCigaretteOffered" },

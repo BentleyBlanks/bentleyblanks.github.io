@@ -38,7 +38,7 @@ export const TEXT = Object.freeze({
   "menu.condition.supportOrdersHeard": "听完支援前沿的命令",
   "menu.condition.frontReached": "沿交通壕到达前沿阵地",
   "menu.condition.frontContact": "在前沿与日军交火",
-  "menu.condition.frontRifleDefense": "抵达前沿后开枪掩护，经过 {seconds} 秒并处于前沿阵地",
+  "menu.condition.frontRifleDefense": "解除右侧破墙的直接封锁火力",
   "menu.condition.rifleWithdrawalResolved": "掩护第一批守军撤离，直至无人滞留",
   "menu.condition.zhouGunWounded": "掩护负伤的老周撤离机枪位",
   "menu.condition.gunUsed": "接手机枪并开火",

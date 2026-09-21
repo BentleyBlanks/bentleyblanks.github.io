@@ -11,8 +11,8 @@
 //   · 屏幕字幕是 Notion 括号里的中文译文，写在台词表的 line.text 上。
 // 键是「cue id:行下标」。
 export const JAPANESE_SPEECH = Object.freeze({
-  "BunkerKilling:0": Object.freeze({ kana: "たて！はやく！", kanji: "立て！早く！" }),
-  "BunkerKilling:3": Object.freeze({ kana: "ころせ！はやくしろ！", kanji: "殺せ！早くしろ！" }),
-  "BunkerSearch:0": Object.freeze({ kana: "なかをみろ！", kanji: "中を見ろ！" }),
-  "BunkerSearch:1": Object.freeze({ kana: "まだいるぞ！", kanji: "まだいるぞ！" }),
+  "BunkerSearch:0": Object.freeze({kana:"まえへ！いそげ！",kanji:"前へ！急げ！"}),
+  "BunkerSearch:1": Object.freeze({kana:"とまるな！",kanji:"止まるな！"}),
+  "BunkerKilling:1": Object.freeze({kana:"うごくな、ばかやろう！",kanji:"動くな、馬鹿野郎！"}),
+  "ShunziCurse:0": Object.freeze({kana:"でろ！このやろう！",kanji:"出ろ！この野郎！"}),
 });

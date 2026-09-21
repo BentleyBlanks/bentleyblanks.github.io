@@ -17,7 +17,8 @@ import { MISSION_TUNING as R } from "./Data_Tuning_FirstLevel.mjs";
 import { FRONT_TUNING as F } from "./Data_Tuning_FirstLevelFront.mjs";
 import { MISSION_ANCHORS as A, MISSION_ROUTES, MISSION_PLACEMENT as Place } from "./Data_FirstLevelMissionLayout.mjs";
 import { MissionRouteProjection, MissionCarryRoutePoint } from "./Script_FirstLevelMissionColumn.mjs";
-import { FirstLevelBunkerShow } from "./Script_FirstLevelBunker.mjs";
+import { FirstLevelBunkerShow } from "./Script_OpeningStoryboards.mjs";
+import { OPENING_STORYBOARDS } from "./Data_OpeningStoryboards.mjs";
 import { FirstLevelCollection } from "./Script_FirstLevelCollection.mjs";
 
 const Distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
@@ -58,7 +59,7 @@ export class FirstLevelFrontShow {
    */
   NarrowFovDeg(baseFov, dt) {
     const trapped = this.r.controls?.kind === "trapped";
-    const want = trapped ? Math.min(baseFov, F.trappedFovDeg) : baseFov;
+    const want = trapped ? OPENING_STORYBOARDS.fov : baseFov;
     if (this.fovDeg == null) this.fovDeg = want;
     const step = Math.min(1, Math.max(0, dt) * F.trappedFovLerpRate);
     this.fovDeg += (want - this.fovDeg) * step;
@@ -69,6 +70,7 @@ export class FirstLevelFrontShow {
   // --- 步骤进入 -------------------------------------------------------------
   Enter(stageId) {
     const r = this.r;
+    this.bunker.Enter(stageId);
     this.stageAt = r.time;
     // 02 途经背坡集结处：摆位在玩家第一次路过之前就得在那儿。
     if (stageId === F.collectionDressStep) { this.collection.Dress(); this.trenchAt = r.time; }
@@ -88,14 +90,14 @@ export class FirstLevelFrontShow {
     const r = this.r;
     if (cue.id === "VillagePointer") return r.Point(this.pointer, 1.5);
     if (cue.id === "BundleOrder" && this.bundleOrderGuard?.alive) return r.Point(this.bundleOrderGuard.position, 1.3);
-    return this.collection.VoicePosition(cue, line);
+    return this.bunker.VoicePosition(cue, line) || this.collection.VoicePosition(cue, line);
   }
 
   // --- 每帧 -----------------------------------------------------------------
   /** 在 `UpdateSquad` 之后调：这里下的走位命令要压过接触反应与行军层。 */
   Update(dt) {
     const stage = this.r.flow.stage.id;
-    if (stage === "BunkerRescue") this.UpdateRescue();
+    this.bunker.Update(dt);
     if (stage === "RearTrench") this.UpdateRearTrench();
     if (stage === "MachineGun") this.UpdateMachineGun();
     if (stage === "Tank") this.UpdateTank();
@@ -108,17 +110,6 @@ export class FirstLevelFrontShow {
     const r = this.r;
     if (this.southAt != null && r.view?.Person)
       r.view.Person(this.pointer.x, this.pointer.z, this.pointer.yaw, time, { id: "SouthRoadPointer", kind: "bearer" });
-  }
-
-  // --- 02 获救 ---------------------------------------------------------------
-  UpdateRescue() {
-    const r = this.r;
-    // 何有田从后侧交通壕开火逼日兵转身还击（真实弹道，不是音效）。
-    this.bunker.UpdateSuppression();
-    if (!r.Has("luoRescueComplete")) return;
-    // 「枪拿到！从后头走！」—— 还权之后、拾枪之前。
-    this.rescueOutAt ??= r.time;
-    if (r.time - this.rescueOutAt >= F.rescueOutAfterS) r.Say("RescueOut");
   }
 
   // --- 02 后交通壕 -----------------------------------------------------------

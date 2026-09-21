@@ -37,8 +37,8 @@
 
 | 步骤 | requirements | 说明 |
 | --- | --- | --- |
-| Trapped | `bunkerCollapsed`(scripted) `captivesKilled`(scripted) `doorSearchStarted`(scripted) | 黑屏对白 `BunkerBanter` 被近爆打断 → 受困（控制接管 `trapped`，只能小幅转头）→ 透过前门低处破口目睹两名失去抵抗能力的川军被刺杀 → 日兵转向门内；同时后侧响起清理坍塌物的声音。无「救俘虏」假目标 |
-| BunkerRescue | `rescueCallHeard`(voice) `luoRescueComplete`(scripted) `rifleRecovered`(interaction) | 何有田从后侧交通壕开火逼日兵转身；罗班长掀木架、幺娃拉背包（短暂接管 `rescue`）→ 还权 → 玩家拾枪 |
+| Trapped | `bunkerCollapsed`(scripted) `captivesKilled`(scripted) `doorSearchStarted`(scripted) | 补弹与传令 → 洞外近失弹 → 贴地看先头兵推进、唯一俘虏被枪杀 → 拨木、揪领拖出、枪托击晕；控制接管 `trapped`，无救俘虏目标 |
+| BunkerRescue | `rescueCallHeard`(voice) `luoRescueComplete`(scripted) `rifleRecovered`(interaction) | 日兵近前主审、翻译旁侧；罗班长大刀反扑，拨枪、拖救与踢枪，何有田真实开火掩护 → 归还移动 → F 拾枪恢复武器；翻译逃走 |
 | RearTrench | `rearTrenchEntered`(proximity) `cornerReached`(proximity) `collectionPointSeen`(proximity) `supportOrdersHeard`(voice) | 经折角（幺娃检查顺子）→ 途经背坡伤员集结处（第一次看见担架、伤员、搬运人员）→ 撤回守军指路 |
 | Support | `frontReached` `frontContact` `frontRifleDefense` `rifleWithdrawalResolved` | 打断封锁撤路的直接火力（老周指「右边破墙」）；第一批存活守军**真实**撤入沟内。老周此时仍在机枪位作战 |
 | MachineGun | `zhouGunWounded` `frontAttackRepelled` `guardWithdrawalResolved` `tankBlocksExit` `bundleOrderHeard`(voice) | 老周腿伤恶化退出枪位 → 玩家接替（机枪仍可选）→ 后续守军退到最后遮挡 → 战车压口 → 守军指出北头弹药屋。**旧 04 关中过场 `CS_MachineGunCaptives` 不再由任务触发**（主题已由 01 承担；过场资产与文件保留，不删） |
@@ -101,13 +101,15 @@
 
 ## 5. 对白 cue
 
+01–03 已于 2026-09-22 按 [2026.09.21 原文](Data_FirstLevelOpeningSource20260921.md) 更新；旧 cue id 保留为兼容键，ShunziCurse 现为日兵发现顺子的喊声。
+
 规矩：同一段连续多人对白 = 一个 cue = 一次 SeedAudio 请求 = 一条音频；动作打断处用 `VoiceTiming` 的分段（`gate`/`wait`/`events`）在同一条音频里停/续，不拆成多条。台词逐字取自 Notion 转录；日语行送 TTS 用纯假名、汉字写法留注释、屏幕字幕显示中文译文（Notion 括号里的译文）。旧 cue 全部下线（含四条死 cue），旧音频删除。
 
 | 步骤 | cue id（句数） |
 | --- | --- |
-| Trapped | `BunkerBanter`(6，黑屏；末句被近爆打断) · `BunkerKilling`(4，日兵甲/伤兵/扶人川军/日兵乙) · `BunkerSearch`(2，日语) · `ShunziCurse`(1，压声) |
-| BunkerRescue | `RescueCall`(3) · `RescueLift`(3) · `RescueOut`(1) |
-| RearTrench | `TrenchCurse`(3) · `CornerCheck`(3) · `SupportOrder`(4) |
+| Trapped | `BunkerBanter`(7，黑屏；末句被近爆打断) · `BunkerKilling`(6，日兵甲/伤兵/扶人川军/日兵乙) · `BunkerSearch`(2，日语) · `ShunziCurse`(1，压声) |
+| BunkerRescue | `RescueCall`(6) · `RescueLift`(3) · `RescueOut`(3) |
+| RearTrench | `TrenchCurse`(4) · `CornerCheck`(5) · `SupportOrder`(4) |
 | Support | `FrontBlockade`(2) |
 | MachineGun | `TakeOverGun`(2) · `TankTerror`(2) · `BundleOrder`(2) |
 | Tank | `BundleGo`(2) · `BundleProne`(1) · `BundleSupply`(2) · `BundleReturnCall`(2) · `TankStopped`(2) |

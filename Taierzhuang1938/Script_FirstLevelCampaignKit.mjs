@@ -44,7 +44,7 @@ const ROUTE_RETRY_BUDGET = 2;
 /** 分段驾驶脚本允许的起点：每一段的第一个公开阶段。 */
 export const CAMPAIGN_SEGMENT_STARTS = Object.freeze([8, 11, 15, 18]);
 /** `--stage-to` 允许的终点：Front 段末（7）、Mid 段末（14）、整关（18）。 */
-export const CAMPAIGN_SEGMENT_ENDS = Object.freeze([7, 14, 18]);
+export const CAMPAIGN_SEGMENT_ENDS = Object.freeze([3, 7, 14, 18]);
 
 export function ParseCampaignArgs(argv = process.argv) {
   const Has = (flag) => argv.includes(flag);
@@ -70,7 +70,7 @@ export function ParseCampaignArgs(argv = process.argv) {
     quietGuidanceInterruptProbe: Has("--probe-quiet-guidance-interrupt"),
     allowCheckpointRetry: Has("--allow-checkpoint-retry"),
     stageFrom, stageTo,
-    suite: stageTo === 7 ? "FirstLevelStageFront"
+    suite: stageTo === 3 ? "FirstLevelOpeningStoryboards" : stageTo === 7 ? "FirstLevelStageFront"
       : stageTo === 14 ? "FirstLevelStageMiddle"
         : stageFrom === 8 ? "FirstLevelStageVillage"
           : stageFrom === 11 ? "FirstLevelStageTransfer"
@@ -95,7 +95,7 @@ export async function OpenCampaign(options) {
     jumpReceipts: [], campaignRetries: [], capturedActivities: new Set(),
   };
   await page.goto(
-    `http://127.0.0.1:${server.address().port}/Taierzhuang1938/?whitebox=p012&${options.audioCheck ? "menu=0" : "shot=1"}&manual=1&quality=low&scale=small`,
+    `http://127.0.0.1:${server.address().port}/Taierzhuang1938/?whitebox=p012&${options.audioCheck ? "menu=0" : "shot=1"}&manual=1&quality=${options.quality||"low"}&scale=small`,
     { waitUntil: "domcontentloaded", timeout: 180000 },
   );
   await page.waitForFunction(() => window.Tengxian?.state?.ready, null, { timeout: 180000 });
@@ -126,27 +126,28 @@ export async function CaptureFailure(ctx) {
  * `--audio`：真按开始键解锁音频上下文，再逐条 cue 走真实解码与播放。
  * 车厢环境床那几条随军列开场一起下线，不再检查。
  */
-export async function CheckVoiceAssets(ctx) {
+export async function CheckVoiceAssets(ctx, ids = null) {
   const { page } = ctx;
   await page.locator("#bootStart").click();
   await page.waitForFunction(() => window.Tengxian.audio.ctx?.state === "running", null, { timeout: 15000 });
-  const voices = await page.evaluate(async () => {
+  const voices = await page.evaluate(async ids => {
     const g = window.Tengxian, { MISSION_DIALOGUE } = await import("./Data_FirstLevelMissionDialogue.mjs");
     g.audio.Unlock();
-    const cues = MISSION_DIALOGUE.map((cue) => {
+    const cues = MISSION_DIALOGUE.filter(cue=>!ids||ids.includes(cue.id)).map((cue) => {
       const played = g.audio.PlayStoryVoice(`Mission${cue.id}`);
       return { id: cue.id, decoded: !!g.audio.voiceBank.get(`Mission${cue.id}`),
         seconds: played?.duration || 0, started: !!played?.voice };
     });
     g.audio.StopStoryVoice();
     return { context: g.audio.ctx?.state, cues };
-  });
+  },ids);
   assert.equal(voices.context, "running", "The real start button unlocks the audio context");
-  assert.equal(voices.cues.length, MISSION_DIALOGUE.length, "every authored cue is checked");
+  assert.equal(voices.cues.length, ids?.length||MISSION_DIALOGUE.length, "every selected cue is checked");
   assert.ok(voices.cues.every((cue) => cue.decoded && cue.started && cue.seconds > 0.5),
     "Every whole Seed Audio cue must decode and create a real playback source: "
     + JSON.stringify(voices.cues.filter((cue) => !(cue.decoded && cue.started && cue.seconds > 0.5))));
-  console.log("ok every first-level voice asset decoded and played in the real audio engine");
+  await fs.writeFile(path.join(ctx.output,"Data_VoicePlayback.json"),JSON.stringify(voices,null,2));
+  console.log("ok selected first-level voice assets decoded and played in the real audio engine");
   // Ambience loads on its own schedule; wait for the shipped loader, inject nothing.
   await page.waitForFunction(() => window.Tengxian.audio.ambReady && !window.Tengxian.audio.ambLoading,
     null, { timeout: 60000 });
@@ -209,10 +210,10 @@ export async function InstallInputDriver(ctx) {
                     (this.blocked.get(a.id)||0) < g.ai.time &&
                     a.position.distanceTo(eye) < maxRange,
                 )
-                .sort((a, b) => a.position.distanceToSquared(eye) - b.position.distanceToSquared(eye))
+                .sort((a, b) => (a.missionId===this.priorityTarget?-1:0)-(b.missionId===this.priorityTarget?-1:0) || a.position.distanceToSquared(eye) - b.position.distanceToSquared(eye))
                 .find((a) => {
                   const to = a.position.clone();
-                  to.y += a.stance === 2 ? 0.3 : a.stance === 1 ? 0.85 : 1.2;
+                  to.y += a.missionId===this.priorityTarget ? 1.2 : a.stance === 2 ? 0.3 : a.stance === 1 ? 0.85 : 1.2;
                   const d = to.sub(eye),
                     length = d.length(),
                     hit = g.battlefield.Raycast(eye, d.normalize(), length, {terrain:true});
@@ -228,7 +229,7 @@ export async function InstallInputDriver(ctx) {
               g.Debug.Mouse(0, false);
               const eye = g.player.EyePosition,
                 to = foe.position.clone();
-              to.y += foe.stance === 2 ? 0.3 : foe.stance === 1 ? 0.85 : 1.2;
+              to.y += foe.missionId===this.priorityTarget ? 1.2 : foe.stance === 2 ? 0.3 : foe.stance === 1 ? 0.85 : 1.2;
               const dx = to.x - eye.x,
                 dz = to.z - eye.z,
                 yaw = Math.atan2(-dx, -dz),

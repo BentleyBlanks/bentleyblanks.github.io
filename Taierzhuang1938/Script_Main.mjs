@@ -8641,7 +8641,7 @@ function Frame(dt, render = true) {
     dt,
   });
   // 准心指着谁。写实档（targetInfo=false）整条链短路，不扫也不投射线。
-  hud.SetTarget(MELEE_TEST ? null : identify.Update(dt, {
+  hud.SetTarget(MELEE_TEST || missionRuntime?.frontShow?.bunker.CameraActive ? null : identify.Update(dt, {
     eye: _idEye.copy(player.EyePosition),
     dir: player.AimDirection(_idAim),
     soldiers: ai.soldiers,
@@ -8753,7 +8753,10 @@ THREE.Skeleton.prototype.update = function SkeletonUpdateOncePerFrame() {
  * 必然抄漏（夜战预设 exposure 是 3.6，抄成 0.5 整帧就是纯黑）。
  */
 function RenderScene(dt) {
-  if (viewmodel?.body) viewmodel.body.root.visible = !!player?.Alive && !(player.meleeCameraDrop > 0.05) && !state.cutscene && !state.menu && !editor?.Capturing;
+  missionRuntime?.frontShow?.bunker.BeforeRender();
+  const openingBody=missionRuntime?.frontShow?.bunker.CameraActive;
+  if(openingBody&&viewmodel)viewmodel.root.visible=false;
+  if (viewmodel?.body) viewmodel.body.root.visible = !openingBody && !!player?.Alive && !(player.meleeCameraDrop > 0.05) && !state.cutscene && !state.menu && !editor?.Capturing;
   const phase = PHASE_TABLE[state.phaseIndex];
   // 剖析：GPU 帧从这里开到 post.Render 之后 —— GI 的几趟探针 pass、阴影烘焙、
   // 整条合成链都在这个窗口里按段计时（剖析器关着时这些调用是空转）。
