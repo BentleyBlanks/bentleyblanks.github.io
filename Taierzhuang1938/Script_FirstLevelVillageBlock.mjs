@@ -121,7 +121,8 @@ export class FirstLevelVillageBlock {
     const luo = r.companion.Handle("luo");
     if (luo?.alive && !this.luoSent) {
       this.luoSent = true;
-      r.squadRoutes.set(luo.id, [{ ...P.ambushSquadPosts[2] }]);
+      // 先到门外、再穿门洞：只给门内一个点的话，从西边来会顶死在灶屋西墙上。
+      r.squadRoutes.set(luo.id, [{ ...M.houseCheckDoorApproach }, { ...P.ambushSquadPosts[2] }]);
     }
     // 走到门口、或者人已经在灶屋里，就算查看过了；他阵亡就由别人接着喊。
     const kitchen = P.kitchenInterior;

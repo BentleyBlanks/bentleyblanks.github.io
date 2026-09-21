@@ -27,6 +27,9 @@ export const MID_TUNING = Object.freeze({
   // 罗班长查看相邻房屋：走到灶屋北门内侧这么近就算查看过。
   // 灶屋北墙 z=-16.5、门在 x≈58；落点用 MISSION_PLACEMENT.ambushSquadPosts[2]。
   houseCheckArrivalM: 1.5,
+  // 进门前先到北门外正对门洞的这个点（门洞 x 56.1–59.9）。直接朝门内侧的掩护位走，
+  // 从西边来的直线会斜穿灶屋西北角，人顶在西墙外 x≈51.3 来回蹭，进不了门。
+  houseCheckDoorApproach: { x: 58, z: -18.6 },
   // 何有田「外头我看着」：退到主街这一侧的观察位。
   outsideWatchArrivalM: 1.8,
 
