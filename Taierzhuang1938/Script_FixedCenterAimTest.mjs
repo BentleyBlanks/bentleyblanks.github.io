@@ -53,7 +53,11 @@ const report = await page.evaluate((firearms) => {
 
   document.dispatchEvent(new MouseEvent("mousedown", { button: 2, bubbles: true }));
   const sights = {};
-  for (const id of firearms) {
+  const crouchSights = {};
+  // 蹲姿的持枪下沉曾叠在开镜姿势外面：照门低 20 px，弹孔落在准星上方。
+  const rows = [...firearms.map((id) => [id, "stand"]), ...firearms.map((id) => [id, "crouch"])];
+  for (const [id, stance] of rows) {
+    T.player.SetStance(stance);
     T.player.aimYaw = 0;
     T.player.aimPitch = 0;
     T.viewmodel.Equip(id);
@@ -72,7 +76,7 @@ const report = await page.evaluate((firearms) => {
       y: p.y * innerHeight * 0.5,
       error: Math.hypot(p.x * innerWidth * 0.5, p.y * innerHeight * 0.5),
     });
-    sights[id] = {
+    (stance === "stand" ? sights : crouchSights)[id] = {
       rear: toPixels(rear),
       axis: toPixels(axis),
       ads: T.player.ads,
@@ -80,7 +84,8 @@ const report = await page.evaluate((firearms) => {
       configuredOffsetMm: Math.hypot(vm.adsOffset.x, vm.adsOffset.y) * 1000,
     };
   }
-  return { center, sights };
+  T.player.SetStance("stand");
+  return { center, sights, crouchSights };
 }, FIREARMS);
 
 // Reproduce stationary close-wall firing through the production trigger and
@@ -125,7 +130,7 @@ const screenshotPath = path.join(os.tmpdir(), "TaierzhuangFixedCenterAds.png");
 await page.screenshot({ path: screenshotPath });
 console.log(JSON.stringify({ ...report, screenshotPath, errors }, null, 2));
 
-const sightRows = Object.values(report.sights);
+const sightRows = [...Object.values(report.sights), ...Object.values(report.crouchSights)];
 const passed = report.wall.innerFraction > 0.55 && report.wall.valid && Math.abs(report.wall.meanX) < 0.2
   && Math.abs(report.wall.meanY) < 0.2 && report.wall.left > 20 && report.wall.right > 20
   && Math.abs(report.center.crosshairX - 640) < 0.1
@@ -133,11 +138,11 @@ const passed = report.wall.innerFraction > 0.55 && report.wall.valid && Math.abs
   && report.center.freeAimDeg === 0
   && Math.abs(report.center.aimYaw) < 1e-6 && Math.abs(report.center.aimPitch) < 1e-6
   && report.center.directionErrorDeg < 0.0001
-  && sightRows.length === FIREARMS.length
+  && sightRows.length === FIREARMS.length * 2
   && sightRows.every((row) => row.ads > 0.99 && !row.crosshairVisible
     && row.configuredOffsetMm < 0.001 && row.rear.error < 1.5 && row.axis.error < 1.5)
   && errors.length === 0;
-console.log(`${passed ? "ok  " : "FAIL"} 固定中心准心、弹道与 ${FIREARMS.length} 支枪机械瞄具共轴`);
+console.log(`${passed ? "ok  " : "FAIL"} 固定中心准心、弹道与 ${FIREARMS.length} 支枪机械瞄具共轴（站姿 + 蹲姿）`);
 
 await browser.close();
 server.close();

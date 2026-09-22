@@ -2471,9 +2471,12 @@ export class Viewmodel {
     // --- 状态层：起跳收枪 / 滞空换重心 / 落地下沉 / 蹲低 / 掏枪 / 贴墙收枪 ---
     // 上升段枪口略压、枪身贴胸；越过最高点以后手臂开始向前接落地。
     // 这里读竖直速度而不是只读 grounded，同一次滞空才会有清楚的两段动作。
+    // 蹲低只是腰射的持枪姿态，开镜时必须淡掉：它叠在解出来的开镜姿势外面，
+    // 原来蹲着开镜照门会比屏幕中心低 1.2 cm（720p 下约 20 px），弹孔全落在准星上方。
+    const crouchCarry = crouchValue * (1 - adsVisual);
     let stateY = land * 0.055 - jumpRise * 0.026 + jumpFall * 0.014
-      + crouchValue * -0.012 + (1 - equip) * -0.26;
-    let stateZ = jumpRise * 0.030 - jumpFall * 0.012 + crouchValue * 0.010;
+      + crouchCarry * -0.012 + (1 - equip) * -0.26;
+    let stateZ = jumpRise * 0.030 - jumpFall * 0.012 + crouchCarry * 0.010;
     let stateRx = land * 0.16 - jumpRise * 0.13 + jumpFall * 0.09 + (1 - equip) * -0.55;
 
     this.statePivot.position.set(0, stateY, stateZ);
