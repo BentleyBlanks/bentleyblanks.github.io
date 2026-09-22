@@ -45,7 +45,7 @@ try {
     T.StepFrames(3);
     const startY = T.camera.position.y;
     T.player.Kill();
-    T.StepFrames(58);
+    T.StepFrames(92);
 
     const card = document.querySelector(".hudDeathCard");
     const style = getComputedStyle(card);

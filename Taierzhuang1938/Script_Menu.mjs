@@ -629,7 +629,14 @@ export class MainMenu {
     this.itemEls.find(el => !el.disabled)?.focus({ preventScroll: true });
   }
 
+  SetDeathReveal(value) {
+    this.deathReveal = value;
+    this.root.style.setProperty("--death-reveal", String(value));
+    this.root.classList.toggle("deathFalling",value < .5);
+  }
+
   ClearSandboxComplete() {
+    this.SetDeathReveal(1);
     this.sandboxCompleteStyle?.remove();
     this.sandboxCompleteStyle = null;
     this.root.classList.remove("p012Complete");
@@ -980,6 +987,7 @@ export class MainMenu {
   // 动作
   // -------------------------------------------------------------------------
   Activate(id, { confirmed = false } = {}) {
+    if (this.mode === "failure" && this.deathReveal < .5) return;
     // 确认框开着时是模态的：背后的列表一概不响应（键盘、鼠标、Debug.MenuAct 都一样）。
     if (this.confirmItem) return;
     // Terminal screens accept only their own visible, enabled actions.

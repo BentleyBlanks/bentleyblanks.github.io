@@ -16,7 +16,7 @@ const page = await browser.newPage({ viewport: { width: 1920, height: 1080 } });
 const errors = [];
 page.on("pageerror", error => errors.push(String(error)));
 try {
-  await page.goto(`${base}/Taierzhuang1938/?whitebox=p012&shot=1&manual=1&quality=medium&scale=small`, { timeout: 120000 });
+  await page.goto(`${base}/Taierzhuang1938/?whitebox=p012&missionStage=3&shot=1&manual=1&quality=high&scale=small`, { timeout: 120000 });
   await page.waitForFunction(() => window.Tengxian?.state?.ready && window.Tengxian?.Debug?.FirstLevelMission?.(), null, { timeout: 180000 });
   const setup = await page.evaluate(async () => {
     const g = window.Tengxian;
@@ -27,12 +27,19 @@ try {
     FirstLevelMissionRuntime.prototype.State = original;
     const r = window.deathRuntime;
     await r.voiceReady;
-    g.StepFrames(2);
+    g.interact.hooks.TakeWeapon("HanYang",5);
+    for(const actor of g.ai.soldiers) if(actor.side==="ija") actor.position.x+=800;
+    g.player.spawnGrace=999;
+    g.StepFrames(90,1/60,false);
+    g.player.yaw=Math.PI;g.player.pitch=-.1;g.player.SyncCamera(0);
+    g.StepFrames(1,1/60,true);
     r.SaveCheckpoint();
     window.deathSafe = { ...r.safePoint };
     // Move away from the saved location and use a control segment to reproduce
     // the former ContinueCheckpoint -> OnPlayerDown -> retryPoint bug.
-    g.player.position.x += 3;
+    g.player.position.z -= 3;
+    g.player.position.y=g.physics.GroundProbe(g.player.position.x,g.player.position.z,g.player.position.y).y;
+    g.player.body.Teleport(g.player.position.x,g.player.position.y,g.player.position.z);
     g.player.SyncCamera(0);
     r.controls = { kind: "fixture", time: 0, seconds: 999 };
     g.player.spawnGrace = 0;
@@ -52,7 +59,35 @@ try {
   assert.equal(setup.alive, false);
   assert.equal(setup.pauseClass, false);
   assert.deepEqual(setup.items, ["continueCheckpoint", "restartSandbox", "exitSandbox"]);
+  assert.ok(await page.evaluate(()=>{
+    const g=window.Tengxian;g.Debug.MenuAct("continueCheckpoint");return !g.player.Alive;
+  }),"hidden retry actions cannot interrupt the collapse");
   assert.ok(await page.locator(".mnPauseObjective").isHidden(), "pause-only objective stays out of death screen");
+  const collapse = [];
+  for (const frame of [0,12,27,42,57,80,112]) {
+    const sample = await page.evaluate(({frame,previous}) => {
+      const g=window.Tengxian;
+      g.StepFrames(frame-previous,1/60,true);
+      g.StepFrames(1,0,true);
+      const wrist=g.viewmodel.riggedArms?.gripNodes.r;
+      const ndc=wrist?.getWorldPosition(g.player.position.clone()).project(g.camera).toArray();
+      return {frame,time:g.player.deadTime,camera:g.camera.position.toArray(),roll:g.camera.rotation.z,
+        weapon:g.viewmodel.weaponId,wristNdc:ndc,
+        hands:g.viewmodel.root.visible,gunPitch:g.viewmodel.wallPivot.rotation.x,
+        reveal:g.menu.deathReveal,impact:g.player.deathImpactPlayed,
+        frozen:window.deathWorld===window.DeathWorld()};
+    },{frame,previous:collapse.at(-1)?.frame || 0});
+    collapse.push(sample);
+    await page.screenshot({path:path.join(out,`Scene_Collapse${String(frame).padStart(3,"0")}.png`)});
+  }
+  await fs.writeFile(path.join(out,"Data_Collapse.json"),JSON.stringify(collapse,null,2));
+  assert.ok(collapse.every(row=>row.frozen),"only the death performance advances");
+  assert.ok(collapse[0].hands && collapse[1].hands && !collapse.at(-1).hands,"hands fall out of view instead of vanishing on the lethal frame");
+  assert.ok(collapse[0].weapon==="HanYang" && Math.abs(collapse[0].wristNdc[0])<1 && Math.abs(collapse[0].wristNdc[1])<1,
+    "actual rifle hand is in the frame at death, not just an enabled root");
+  assert.ok(collapse[2].gunPitch<collapse[0].gunPitch-.04,"held weapon lowers with the skeletal hands");
+  assert.ok(collapse[0].reveal===0 && collapse[3].reveal===0 && collapse.at(-1).reveal===1,"menu waits for the complete collapse");
+  assert.ok(!collapse[2].impact && collapse.at(-1).impact,"body impact belongs to ground contact");
   await page.keyboard.press("Escape");
   const frozen = await page.evaluate(() => {
     const g = window.Tengxian;
@@ -90,6 +125,29 @@ try {
   });
   assert.ok(restored.alive && restored.health === 100 && !restored.failed && restored.running && restored.closed && !restored.deathClass);
   assert.ok(restored.distance < .1 && restored.preserved && restored.gun, JSON.stringify(restored));
+  const stances=[];
+  for(const [stance,eye] of [["crouch",1.05],["prone",.42]]) {
+    const result=await page.evaluate(({stance,eye})=>{
+      const g=window.Tengxian,p=g.player;
+      p.position.z-=3;
+      p.position.y=g.physics.GroundProbe(p.position.x,p.position.z,p.position.y).y;
+      p.body.Teleport(p.position.x,p.position.y,p.position.z);
+      p.stance=stance;p.eyeHeight=eye;
+      p.stanceBlend={stand:stance==="stand"?1:0,crouch:stance==="crouch"?1:0,prone:stance==="prone"?1:0};
+      p.pitch=-.12;p.SyncCamera(0);
+      g.viewmodel.Update(1/60,{playerPosition:p.position,playerYaw:p.yaw,crouch:p.stanceBlend.crouch,prone:p.stanceBlend.prone,alive:true});
+      const start=g.camera.position.clone();
+      p.spawnGrace=0;p.TakeHit(10000,"torso");
+      g.StepFrames(112,1/60,true);
+      const ground=g.physics.GroundProbe(g.camera.position.x,g.camera.position.z,p.position.y,.12,4).y;
+      return {stance,start:start.toArray(),end:g.camera.position.toArray(),height:g.camera.position.y-ground,
+        roll:g.camera.rotation.z,reveal:g.menu.deathReveal,gl:g.renderer.getContext().getError()};
+    },{stance,eye});
+    stances.push(result);
+    assert.ok(result.height>=.12 && result.height<.25 && Math.abs(result.roll)>1 && result.reveal===1 && result.gl===0,JSON.stringify(result));
+    await page.screenshot({path:path.join(out,`Scene_Death${stance}.png`)});
+    await page.getByRole("button",{name:"从检查点开始",exact:true}).click();
+  }
   await page.evaluate(() => window.Tengxian.Debug.Pause());
   assert.equal(await page.locator(".mnTitleMain").textContent(), "游戏暂停");
   assert.ok(await page.locator(".mnPauseObjective").isVisible(), "pause still displays the mission objective");
@@ -97,7 +155,7 @@ try {
   assert.ok(await page.evaluate(() => window.Tengxian.state.running && !window.Tengxian.menu.open));
   await page.evaluate(() => {
     const g = window.Tengxian;
-    g.player.spawnGrace = 0; g.player.TakeHit(10000, "torso"); g.StepFrames(1);
+    g.player.spawnGrace = 0; g.player.TakeHit(10000, "torso"); g.StepFrames(112);
   });
   await page.keyboard.press("Enter");
   assert.ok(await page.evaluate(() => window.Tengxian.player.Alive && window.Tengxian.state.running && !window.Tengxian.menu.open));
@@ -154,13 +212,13 @@ try {
     g.Debug.Pause();
   });
   assert.deepEqual(await page.locator(".mnPauseCondition").evaluateAll(rows => rows.map(row => row.dataset.condition)),
-    ["frontReached", "frontContact", "frontRifleDefense", "rifleWithdrawalResolved"]);
-  assert.equal(await page.locator(".mnPauseCondition").count(), 4);
+    ["frontReached", "rightNestCaptured", "frontContact", "frontRifleDefense", "rifleWithdrawalResolved", "zhouGunWounded", "tankPreviewed"]);
+  assert.equal(await page.locator(".mnPauseCondition").count(), 7);
   assert.equal(await page.locator(".mnPauseCondition.complete").count(), 2);
-  assert.equal(await page.locator(".mnPauseProgressSummary").textContent(), "已达成 2 / 4 项");
-  assert.match(await page.locator('[data-condition="frontRifleDefense"]').textContent(), /17 \/ 40 秒.*尚未开枪/);
-  assert.equal(await page.locator('[data-condition="zhouGunWounded"]').count(), 0,
-    "zhouGunWounded belongs to the following MachineGun stage");
+  assert.equal(await page.locator(".mnPauseProgressSummary").textContent(), "已达成 2 / 7 项");
+  assert.match(await page.locator('[data-condition="frontRifleDefense"]').textContent(), /击退进攻组并解除撤退缺口的直接火力/);
+  assert.equal(await page.locator('[data-condition="zhouGunWounded"]').count(), 1,
+    "current adopted Support stage includes Zhou's wound before the withdrawal");
   await page.screenshot({path:path.join(out,"Scene_MissionProgressDesktop.png")});
   for (const viewport of [{width:390,height:844},{width:844,height:390}]) {
     await page.setViewportSize(viewport);
@@ -185,11 +243,11 @@ try {
     r.flow.index++; g.menu.Show("pause");
   });
   assert.deepEqual(await page.locator(".mnPauseCondition").evaluateAll(rows => rows.map(row => row.dataset.condition)),
-    ["zhouGunWounded", "frontAttackRepelled", "guardWithdrawalResolved", "tankBlocksExit", "bundleOrderHeard"],
-    "MachineGun exposes its five current conditions, including zhouGunWounded");
+    ["tankPositionPressured", "remainingGuardsGathered", "tankBlocksExit", "rightRearReached", "bundleOrderHeard"],
+    "MachineGun exposes the adopted tank-pressure and retreat conditions");
   assert.equal(await page.locator(".mnPauseCondition").count(), 5, "new stage replaces all previous conditions");
   assert.equal(await page.locator('[data-condition="frontReached"]').count(), 0);
-  assert.ok(await page.locator('[data-condition="zhouGunWounded"]').isVisible());
+  assert.ok(await page.locator('[data-condition="tankPositionPressured"]').isVisible());
   await page.evaluate(() => {
     const g=window.Tengxian, r=g.Debug.FirstLevelMissionRuntime();
     while (!r.flow.completed) r.flow.index++;
@@ -198,7 +256,7 @@ try {
   assert.equal(await page.locator(".mnPauseProgressSummary").textContent(), "当前任务已完成");
   assert.equal(await page.locator(".mnPauseCondition").count(), 0);
   assert.deepEqual(errors, []);
-  await fs.writeFile(path.join(out, "Data_DeathMenu.json"), JSON.stringify({ setup, frozen, restored, unavailable, companionFailure, errors }, null, 2));
+  await fs.writeFile(path.join(out, "Data_DeathMenu.json"), JSON.stringify({ setup, collapse, stances, frozen, restored, unavailable, companionFailure, errors }, null, 2));
   console.log("DeathMenuTest PASS: independent death state, frozen world, falling camera, mouse/Enter checkpoint recovery, pause regression and missing checkpoint");
 } finally {
   await browser.close();

@@ -46,6 +46,7 @@ import { FPS_DADAO_SWING } from "./Data_FpsDadaoSwing.mjs";
 import { FirstPersonBody } from "./Script_FirstPersonBody.mjs";
 import { FrameQuaternion } from "./Script_FpsAnatomy.mjs";
 import { FpsSkeletalAnimation } from "./Script_FpsSkeletalAnimation.mjs";
+import { BeginDeathHands, UpdateDeathHands, ResetDeathHands } from "./Script_PlayerDeath.mjs";
 
 import { AUTOMATIC_RECOIL, WALL_CARRY, MUZZLE_FLASH } from "./Data_Tuning_FirearmHandling.mjs";
 
@@ -1740,6 +1741,7 @@ export class Viewmodel {
 
   /** @param {string|null} weaponId Data_Weapons.WEAPONS 的 id；null = 空手 */
   Equip(weaponId, variant = 0) {
+    ResetDeathHands(this);
     // 换枪重建整棵 rig：上一帧刷好的世界矩阵指的是另一棵树。
     this._rootMatrixFresh = false;
     if(this.skeletalAnimation){this.skeletalAnimation.preview=null;this.skeletalAnimation.current=null;}
@@ -2335,6 +2337,7 @@ export class Viewmodel {
   }
 
   Update(dt, input = {}) {
+    ResetDeathHands(this);
     // 这一帧要把整棵第一人称树的局部变换重写一遍，上一帧刷好的世界矩阵全部作废。
     this._rootMatrixFresh = false;
     for (const wounds of this.woundBlood?.values() || []) wounds.Update(dt);
@@ -2548,6 +2551,10 @@ export class Viewmodel {
       parent, (this.root.visible || !!input.carryBodyVisible) && !(input.meleeCameraDrop > 0.05));
     this._UpdateSleeves();
   }
+
+  BeginDeath() { BeginDeathHands(this); }
+  UpdateDeath(player) { UpdateDeathHands(this,player); }
+  ResetDeath() { ResetDeathHands(this); }
 
   ReachWorld(target,weight=1) {
     if(this.weapon||!target)return;

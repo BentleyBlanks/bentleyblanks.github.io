@@ -181,6 +181,7 @@ export const testDefs = {
   DeathCollapseTest: { file: "Script_DeathCollapseTest.mjs", timeoutMs: 300000,
     desc: "Kimodo受击倒下：两军四候选、稳定随机、全身贴地与终帧保持" },
   CharacterHitboxMathTest: { file: "Script_CharacterHitboxMathTest.mjs", desc: "人物子弹代理：精确球/胶囊首交点（纯 Node）" },
+  PlayerDeathTest: {file:"Script_PlayerDeathTest.mjs",desc:"First-person collapse stance/slope/platform/wall continuity and held endpoint"},
   PlayerHitboxTest: { file: "Script_PlayerHitboxTest.mjs", desc: "玩家命中几何：三姿态分段 / 正面部位次序 / 卧倒藏躯干 / 瞄点 / 散点部位分布（纯 Node，毫秒级）" },
   PlayerActorBlockTest: { file: "Script_PlayerActorBlockTest.mjs", desc: "玩家走不进人物身体：正面挡/贴边滑/窄缝/被挤出/豁免（纯 Node）" },
   CoverLeanTest: { file: "Script_CoverLeanTest.mjs", desc: "墙角自动探身规则、侧向稳定性和头部扫掠（纯 Node）" },
@@ -528,7 +529,7 @@ export const domains = {
   // 「声库装没装进去」与「输出端有没有电平」是两件事，后者只有 MachineGunCutsceneAudioTest
   // 在真入口上量：VoiceTest 验的是资产与交付档，量不到 AudioEngine 的装载分叉。
   voice: { label: "语音", tests: ["VoiceTest", "MachineGunCutsceneAudioTest"] },
-  menu: { label: "主菜单/开机陈设", tests: ["FirstLevelP012DebugTest", "MenuTest", "DeathMenuTest", "BootPropTest"] },
+  menu: { label: "主菜单/开机陈设", tests: ["FirstLevelP012DebugTest", "MenuTest", "DeathMenuTest", "PlayerDeathTest", "BootPropTest"] },
   editor: { label: "场景编辑器/第一人称检查/PCG/资产规范/可破坏编辑器/采样点", tests: ["WorldInfoEditorTest", "PlayerStateEditorTest", "AiEditorTest", "TuningWriterTest", "MissionGatesTest", "MissionNotesTest", "MissionOrchestrationFilterTest", "OrchestrationMapTest", "OrchestrationEditorTest", "AssetStandardsTest", "EditorTest", "FpsGripEditorTest", "PropPcgTest", "PropPcgEditorTest", "DestructionEditorTest", "TrenchEditorTest", "SamplePointTest", "WestDistrictCoverageTest", "WestSuburbBlocksTest", "CharacterModelTest"] },
   cutscene: {
     label: "过场/剧本派发/车厢生活动作",
@@ -561,6 +562,8 @@ export const domains = {
 };
 
 const changedDomainRules = [
+  {domain:"menu",pattern:/PlayerDeath/},
+  {domain:"combat",pattern:/PlayerDeath/},
   {domain:"openingStoryboards",pattern:/OpeningStoryboards|OpeningStoryboardAnimation|OpeningStoryboardBake|FirstLevelCampaignOpening/},
   // 剖析器的显示层与命令行入口：文件名里没有「Profiler」，下面 render 域那条
   // 通配的 /Profiler/ 盖不到 Script_ProfileCli / Script_FrameProbeViews。

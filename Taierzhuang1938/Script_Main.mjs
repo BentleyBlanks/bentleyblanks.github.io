@@ -82,6 +82,8 @@ import {
 } from "./Script_FirstLevelWhiteboxFlow.mjs";
 import { NavGrid } from "./Script_Navigation.mjs";
 import { PlayerController } from "./Script_Player.mjs";
+import { DeathTime, DeathReveal, DeathDof } from "./Script_PlayerDeath.mjs";
+import { PLAYER_DEATH } from "./Data_Tuning_PlayerDeath.mjs";
 import { AiDirector, MakeSoldierIdentity, STATE as AI_STATE, CAPSULE as AI_CAPSULE } from "./Script_Ai.mjs";
 import { ActorFactory } from "./Script_Actor.mjs";
 import { GetLugouCharacterVariantEntries } from "./Script_CharacterModel.mjs";
@@ -5714,13 +5716,13 @@ function PlayHurtCues() {
 }
 
 function OnPlayerDown() {
+  viewmodel?.BeginDeath();
   if(missionRuntime){
     missionRuntime.OnPlayerDown();
     ShowDeathMenu();return;
   }
   if (MELEE_TEST) {
     state.pendingRespawn = false; state.deathTimer = 0;
-    viewmodel.root.visible = false; audio.Play("bodyFall", {volume:.8});
     hud.Hint(T("hud.hint.meleeTestDown"), 30); return;
   }
   if(p012Runtime){
@@ -5738,9 +5740,6 @@ function OnPlayerDown() {
   hud.ShowDeathCard(identity, T("hud.death.unit"), REINFORCE.deathCardSeconds);
   state.deathTimer = REINFORCE.deathCardSeconds;
   state.pendingRespawn = true;
-  // 倒地镜头保留战场，但手里的枪不能冻结在半空；接管下一名士兵时再恢复。
-  if (viewmodel) viewmodel.root.visible = false;
-  audio.Play("bodyFall", { volume: 0.9 });
   if (story) story.Signal("playerDown");
   // 池子见底：四月四日真下过的命令 —— 担架兵、炊事兵、伙夫都编进来
   if (state.nraPool > 0 && state.nraPool / (state.phasePoolNra || 1) < REINFORCE.lastDitchAt) {
@@ -6086,6 +6085,7 @@ function OpenMenu() {
 
 /** 收起菜单，把 HUD、枪、齿轮还回来。 */
 function CloseMenu() {
+  viewmodel?.ResetDeath();
   if (!menu) return;
   menu.Close();
   state.menu = false;
@@ -6373,12 +6373,20 @@ function ShowDeathMenu(atLoad = false) {
   state.pendingRespawn = false;
   state.deathTimer = 0;
   p012CarryView?.Update(0, { alive: false });
-  viewmodel.root.visible = false;
   if (viewmodel.body) viewmodel.body.root.visible = false;
-  audio.Play("bodyFall", { volume: .9 });
   SuspendGameplay();
   document.getElementById("edRoot")?.classList.add("off");
   menu.OpenSandboxFailure(atLoad);
+  menu.SetDeathReveal(0);
+}
+
+function UpdatePlayerDeath() {
+  viewmodel.UpdateDeath(player);
+  if (!player.deathImpactPlayed && DeathTime(player) >= PLAYER_DEATH.impactS) {
+    player.deathImpactPlayed = true;
+    audio.Play("bodyFall", {volume:.9});
+  }
+  if (menu?.mode === "failure") menu.SetDeathReveal(DeathReveal(player));
 }
 
 /** 游戏中按 Esc：挂暂停。世界冻在原地（Frame 不跑），相机不动。 */
@@ -6421,6 +6429,7 @@ function ResumeFromPause() {
   if (missionRuntime?.completed || missionRuntime?.failed) return;
   if (p012Runtime?.completed) return;
   if (p012Runtime?.failed) return;
+  viewmodel?.ResetDeath();
   // 设置面板很可能还开着：关掉「画质」那一页只关那一页，**入口面板留着**
   //（Close() 不动 panelOpen）。不收掉它 editor.Capturing 就一直是 true，
   // 于是「继续」之后：Frame 走的还是编辑器那条分支（世界冻着）、Guard 把每一次
@@ -8039,7 +8048,7 @@ function UpdateAiDebugOverlay() {
 function Frame(dt, render = true) {
   if (menu?.open && menu.mode === "failure") {
     // Only the fallen viewpoint advances; AI, damage and mission clocks stay frozen.
-    if (!player.Alive) player.Update(dt);
+    if (!player.Alive) { player.Update(dt); UpdatePlayerDeath(); }
     if (render) RenderScene(0);
     return;
   }
@@ -8349,7 +8358,8 @@ function Frame(dt, render = true) {
   lastLookDeltaYaw = dYaw;
 
   profiler.B("viewmodel");
-  viewmodel.Update(dt, {
+  if (!player.Alive && viewmodel.deathHands) UpdatePlayerDeath();
+  else viewmodel.Update(dt, {
     wallLower: player.gunClearance.lower,
     playerPosition: player.position, playerYaw: player.yaw,
     carryBodyVisible: !!p012CarryView?.rig.root.visible && !state.cutscene && !state.menu && player.Alive,
@@ -8778,7 +8788,7 @@ THREE.Skeleton.prototype.update = function SkeletonUpdateOncePerFrame() {
  */
 function RenderScene(dt) {
   missionRuntime?.frontShow?.bunker.BeforeRender();
-  const openingBody=missionRuntime?.frontShow?.bunker.CameraActive;
+  const openingBody=player?.Alive && missionRuntime?.frontShow?.bunker.CameraActive;
   if(openingBody&&viewmodel)viewmodel.root.visible=false;
   if (viewmodel?.body) viewmodel.body.root.visible = !openingBody && !!player?.Alive && !(player.meleeCameraDrop > 0.05) && !state.cutscene && !state.menu && !editor?.Capturing;
   const phase = PHASE_TABLE[state.phaseIndex];
@@ -8903,8 +8913,8 @@ function RenderScene(dt) {
   const suppression = player ? player.suppression : 0;
   const health = player ? player.health : 100;
   // 阵亡画面先在 3D 合成链里做「前景清楚、背景重度散焦」，HUD 的半透明
-  // mask 与生平卡随后由浏览器叠上去。死亡最初 0.32 秒渐入，和 UI 遮罩同步。
-  const deathDof = player && !player.Alive ? Clamp01(player.deadTime / 0.32) : 0;
+  // mask 与生平卡随后由浏览器叠上去。景深等到触地前后再渐入，先看清倒地动作。
+  const deathDof = player && !player.Alive ? DeathDof(player) : 0;
   // 跟相机自己的 ADS 过渡而不是枪模动画走：同一趟 150 ms 收放，拉栓/装填时
   // 又会被 adsSuppress 自然摘掉。没有铁瞄的刀/手雷不属于「开镜」，不触发。
   const adsNearDof = state.running && !state.menu && !state.cutscene && player?.Alive
@@ -8941,7 +8951,7 @@ function RenderScene(dt) {
     contrast: preset.contrast,
     grain: (skyName === "night" ? 0.020 : 0.014) * graphics.grain,
     // 眼皮与恍惚：开场出轨与屋内伏击共用同一组通道，由运行时合成成一份。
-    eyeClosure: missionRuntime?.Perception().eyeClosure || 0,
+    eyeClosure: player?.Alive ? missionRuntime?.Perception().eyeClosure || 0 : 0,
     concussion: missionRuntime?.Perception().concussion,
     vignette: (0.42 + suppression * 0.22) * graphics.vignette,
     damage: Clamp01(1 - health / 62) * 0.55,

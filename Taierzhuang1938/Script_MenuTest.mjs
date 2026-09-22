@@ -432,7 +432,7 @@ async function Boot(query = "") {
 // --completion-only avoids loading the full battlefield for this visual gate.
 {
   const source=fs.readFileSync(path.join(projectDir,"Script_Menu.mjs"),"utf8").replace(/\r/g,"");
-  const methods=["OpenSandboxComplete","ClearSandboxComplete"].map(name=>source.match(new RegExp(`  ${name}\\([^\\n]*[\\s\\S]*?\\n  }\\n`))[0]).join(",");
+  const methods=["OpenSandboxComplete","ClearSandboxComplete","SetDeathReveal"].map(name=>source.match(new RegExp(`  ${name}\\([^\\n]*[\\s\\S]*?\\n  }\\n`))[0]).join(",");
   await page.setContent(`<style>${fs.readFileSync(path.join(projectDir,"Style_Menu.css"),"utf8")}</style><body style="background:#829aaa"><div id="menu"><div class="mnTitle"><div class="mnTitleSub"></div></div><nav class="mnList">重新测试 / 返回主菜单</nav></div></body>`);
   // 抠出来的两个方法在这张空白页里跑，模块作用域一概不在场：文本表的 T 由这里
   // 喂一个回显键名的替身。这一组守的是**淡黑动画与操作可见性**（CSS + class），

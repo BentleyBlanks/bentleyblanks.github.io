@@ -314,6 +314,7 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
 - `Script_FpsAnatomy.mjs` 建立掌面与指节屈曲轴；`Script_RiggedModel.mjs` 以腕部约束和连续肘部方向解双骨 IK。
 - `Script_FirstPersonBody.mjs` 管理世界空间上衣、腿与姿态混合；`Script_Viewmodel.Equip(null)` 保留空手摆臂。
 - 第一人称 Blender 工程与验收入口见 `docs/Data_FirstPersonEmbodiment.md`；`Script_FirstPersonEmbodimentTest.mjs` 检查全枪连续动作、空手跑步与低头身体。
+- 玩家阵亡的手臂失力、贴地机位与菜单时序见 [玩家阵亡演出](Data_PlayerDeath.md)，入口为 `Script_PlayerDeath.mjs`，数值为 `Data_Tuning_PlayerDeath.mjs`。
 - 十名蒙皮士兵（`Model/Character/`）由 `_import/Script_BakeLugouCharacters.{ps1,py}`
   从 3ds Max 桥烘出。**动它之前先读那份 py 的模块头注**：2026-08-29 有一次重烘把根骨
   位移轨道烘丢了，十六条 clip 的人全钉在站立高度，而当时唯一的贴地审计对此完全看不见

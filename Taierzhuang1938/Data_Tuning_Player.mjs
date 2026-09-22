@@ -9,8 +9,7 @@
 //   · 难度档（自由瞄准角、体力秒数、受伤倍率、压制倍率）→ `Data_Battle.DIFFICULTY`；
 //   · 部位倍率、单发上限、失血上限、爆炸倍率 → `Data_Battle.COMBAT.player`（口径见
 //     docs/Data_PlayerDamage.md，那几个数不许在这里再存一份）；
-//   · 阵亡镜头与白刃相机的演出曲线 → 留在 Script_Player.SyncDeathCamera / SyncCamera：
-//     那是一段一次性的镜头表演，不是玩家每帧都在感觉的旋钮。
+//   · 阵亡镜头、手臂与菜单时序 → Data_Tuning_PlayerDeath；白刃相机曲线在 SyncCamera。
 
 /**
  * 姿态参数。眼高按真人来：站 1.62，蹲 1.05，卧 0.42（趴下之后视线只比枪高一点）。
