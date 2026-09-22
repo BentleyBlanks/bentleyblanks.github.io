@@ -1273,6 +1273,20 @@ async function CheckMissionList() {
   Check("暂停里按一次 Esc 就回到游戏，松开 Esc 后指针锁仍在、暂停层不回弹",
     !escResume.menu.open && escResume.running && escResume.locked === true,
     `open=${escResume.menu.open} mode=${escResume.menu.mode} running=${escResume.running} locked=${escResume.locked}`);
+  // 真 Edge 里复现过：松键之后才拿到的锁，偶尔十几毫秒后又被浏览器收回去（没有新按键）。
+  // 刚拿到锁就掉的那一下不能当玩家按 Esc 再弹暂停；等过浏览器冷却自己把锁要回来。
+  const echo = await page.evaluate(async () => {
+    const T = window.Taierzhuang;
+    T.Debug.ReleasePointerLock();
+    T.Debug.RequestPointerLock();
+    T.Debug.DropPointerLock();
+    const right = { open: T.Debug.Menu().open, running: T.state.running, locked: T.Debug.PointerLock().locked };
+    await new Promise((resolve) => setTimeout(resolve, 1500));
+    return { ...right, relocked: T.Debug.PointerLock().locked };
+  });
+  Check("刚拿到指针锁就被收走不弹暂停，过冷却后自动把锁要回来",
+    !echo.open && echo.running && !echo.locked && echo.relocked,
+    JSON.stringify(echo));
 
   const titleConfirm = await page.evaluate(() => {
     window.Taierzhuang.Debug.Pause();

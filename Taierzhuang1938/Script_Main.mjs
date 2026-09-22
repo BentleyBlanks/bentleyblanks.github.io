@@ -2640,6 +2640,7 @@ async function Boot() {
         spikesDropped: lookSpike.dropped, lastSpike: lookSpike.last,
       }),
       ReleasePointerLock,
+      RequestPointerLock,
       // 模拟浏览器吞掉 Esc、只抛 pointerlockchange 的真实路径；菜单冒烟锁死这条回归。
       DropPointerLock: () => {
         if (FAKE_POINTER_LOCK) {
@@ -5792,6 +5793,14 @@ let intentionalPointerUnlock = false;
 // 才关得掉。过场按 Esc 跳过是同一条路。所以 Esc 按着期间的抢锁一律压到松开之后再发。
 let escapeHeld = false;
 let lockAfterEscape = false;
+// 上面那条压到松键之后仍不是百分之百（2026-09-23 用系统级按键在真 Edge 里复现过）：
+// 偶尔锁刚给出来十几毫秒，浏览器又自己收回去，页面这边没有任何新按键。
+// 人不可能在拿到锁之后这么快又按一次 Esc，所以「刚拿到锁 LOCK_ECHO_MS 内的非主动解锁」
+// 不当玩家暂停：游戏照跑，等过浏览器 1.25 s 的重锁冷却再自己要一次，要不到就提示点一下。
+const LOCK_ECHO_MS = 250;
+const LOCK_ECHO_RETRY_MS = 1300;
+let lockGrantedAt = -Infinity;
+let lockEchoRetry = 0;
 window.addEventListener("keydown", (event) => {
   if (event.key === "Escape") escapeHeld = true;
 }, true);
@@ -5920,6 +5929,7 @@ function ResetLookSpikeHistory() {
 function ReleasePointerLock() {
   // 等着 Esc 松开再抢的那一下也作废：松开之前又暂停 / 进过场了。
   lockAfterEscape = false;
+  clearTimeout(lockEchoRetry);
   if (FAKE_POINTER_LOCK) {
     if (fakeLocked) {
       intentionalPointerUnlock = true;
@@ -5940,7 +5950,11 @@ function OnPointerLockChange() {
   if (PointerLocked()) {
     // Alt 或编辑器已接管时，晚到的异步 requestPointerLock 也必须立即退回去。
     if (altMouseFree || (editor && editor.Capturing)) { ReleasePointerLock(); return; }
+    // 暂停 / 菜单已经盖上来了，晚到的锁也退回去：不然菜单里光标是藏着的，
+    // 下一次 Esc 被浏览器拿去解锁、页面收不到按键，玩家要按两次才能继续。
+    if (menu && menu.open) { ReleasePointerLock(); return; }
     intentionalPointerUnlock = false;
+    lockGrantedAt = performance.now();
     ResetLookSpikeHistory();
     return;
   }
@@ -5957,6 +5971,13 @@ function OnPointerLockChange() {
   // 这条兜底让真人按 Esc 与冒烟合成 Esc 走到同一个 PauseGame。
   if (!intentional && state.ready && state.running && menu
       && !state.cutscene && !state.advancing && !(editor && editor.Capturing)) {
+    if (performance.now() - lockGrantedAt < LOCK_ECHO_MS) {
+      clearTimeout(lockEchoRetry);
+      lockEchoRetry = setTimeout(() => {
+        if (state.running && !state.menu && !state.cutscene && !PointerLocked()) RequestPointerLock();
+      }, LOCK_ECHO_RETRY_MS);
+      return;
+    }
     PauseGame();
   }
 }
