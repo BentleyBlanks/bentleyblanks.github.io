@@ -271,6 +271,12 @@ assert.ok(new IdentifySystem().Update(0.016,
 // 卧倒的人只有一条线那么高，同一条平视射线认不到 —— 这一条是姿态该换来的收益。
 assert.equal(new IdentifySystem().Update(0.016,
   { eye, dir: ahead, soldiers: [MakeSoldier({ z: -30, stance: 2 })] }), null, "卧倒的人更难被认出");
+// 坐标坏成 NaN 的人不认：原来两个比较都判 false 放行，卡片上报「NaNm」，还挤掉真正对着的那个人。
+const nanGuy = MakeSoldier({ id: 3 }); nanGuy.position.x = NaN;
+assert.equal(new IdentifySystem().Update(0.016, { eye, dir: ahead, soldiers: [nanGuy] }), null,
+  "坐标是 NaN 的人不进候选");
+assert.equal(new IdentifySystem().Update(0.016, { eye, dir: ahead, soldiers: [nanGuy, enemy] }).meta,
+  "步兵第10联队 · 18m", "NaN 的人不挤掉准心真正对着的那个");
 // 散布撑大，锥跟着撑大 —— 准心画多大就认多宽。
 assert.equal(new IdentifySystem().Update(0.016,
   { eye, dir: ahead, soldiers: [MakeSoldier({ x: 1.6 })] }), null);

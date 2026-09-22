@@ -297,7 +297,9 @@ export class IdentifySystem {
     const Consider = (entity, x, y, z, halfW, halfH, maxRange) => {
       const rx = x - eye.x, ry = y - eye.y, rz = z - eye.z;
       const t = rx * dir.x + ry * dir.y + rz * dir.z;
-      if (t < IDENTIFY.minRangeM || t > maxRange) return;
+      // 写成「不在区间里就退」而不是「小于/大于就退」：坐标里混进 NaN 时
+      // 两个比较都是 false，原写法会把这个人放进来，卡片上就是「NaNm」。
+      if (!(t >= IDENTIFY.minRangeM && t <= maxRange)) return;
       // 到瞄准射线的垂距，拆成"横着差多少"与"竖着差多少"分别按胶囊尺寸归一。
       const px = rx - dir.x * t, py = ry - dir.y * t, pz = rz - dir.z * t;
       const cone = Math.min(IDENTIFY.coneCapM, t * coneTan);
@@ -305,7 +307,7 @@ export class IdentifySystem {
       const reachH = Math.max(halfH, cone);
       const horiz = Math.sqrt(px * px + pz * pz);
       const n = Math.hypot(horiz / reachW, py / reachH);
-      if (n > 1) return;
+      if (!(n <= 1)) return;
       this.stats.candidates += 1;
       // 对得越准排越前；同样准就取近的（远处那个多半只是恰好在同一条线上）。
       const score = n + t / (maxRange * 40);
