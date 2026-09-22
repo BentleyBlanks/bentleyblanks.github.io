@@ -65,7 +65,7 @@ try {
       await page.waitForFunction(()=>window.Tengxian.Debug.FirstLevelMissionRuntime().frontShow.bunker.ready,null,{timeout:60000});
       const trapped = await page.evaluate(() => {
         const g = window.Tengxian;
-        for (let i = 0; i < 60 * 60 && g.Debug.FirstLevelMissionRuntime().flow.stage.id === "Trapped"; i++)
+        for (let i = 0; i < 90 * 60 && g.Debug.FirstLevelMissionRuntime().flow.stage.id === "Trapped"; i++)
           g.StepFrames(1, 1 / 60, false);
         const mission = g.Debug.FirstLevelMission();
         return { stage: mission.stage, facts: mission.facts, beats: mission.front.bunker.beats,

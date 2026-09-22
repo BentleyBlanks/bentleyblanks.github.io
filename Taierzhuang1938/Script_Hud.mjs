@@ -371,6 +371,8 @@ export class Hud {
     this.el.damage = mk("hudDamage");
     this.el.meleeKillBlood = mk("hudMeleeKillBlood");
     this.el.meleeKillBlood.setAttribute("aria-hidden", "true");
+    this.el.storyBlood = mk("hudStoryBlood");
+    this.el.storyBlood.setAttribute("aria-hidden", "true");
     this.el.healthWarning = mk("hudHealthWarning");
     this.el.healthWarning.setAttribute("role", "status");
     this.el.healthWarning.setAttribute("aria-live", "polite");
@@ -1035,6 +1037,11 @@ export class Hud {
       backgroundImage: style.backgroundImage,
       blendMode: style.mixBlendMode,
     };
+  }
+
+  SetStoryBlood(amount=0) {
+    SetStyle(this.el.storyBlood,"opacity",Math.max(0,Math.min(1,amount)).toFixed(3));
+    SetClass(this.el.storyBlood,"on",amount>.001);
   }
 
   SetSuppression(v) {
