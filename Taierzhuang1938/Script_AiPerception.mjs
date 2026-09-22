@@ -413,8 +413,11 @@ export class PerceptionModel {
     for (let i = 0; i < mem.list.length; i += 1) mem.list[i].sensedThisTick = false;
 
     // ── 1. 这一拍看见了谁 ──────────────────────────────────────────────
-    let nearest = null, nearestDist = Infinity, nearestId = null;
-    let lockCand = null, lockDist = Infinity, lockSeen = false;
+    // rank：候选自带的选目标倍率（`c.rank`，Think 给禁火的人身上的玩家打
+    // `LOCK.heldTargetRank`）。只进 nearest / switchDistanceRatio 的比较，
+    // 觉察、通视、发现距离与报出去的 dist 都是真实距离。
+    let nearest = null, nearestDist = Infinity, nearestRank = Infinity, nearestId = null;
+    let lockCand = null, lockDist = Infinity, lockRank = Infinity, lockSeen = false;
     const count = candidates ? candidates.length : 0;
     for (let i = 0; i < count; i += 1) {
       const c = candidates[i];
@@ -424,6 +427,7 @@ export class PerceptionModel {
       if (id === undefined || id === null) continue;
       const dx = c.position.x - sx, dz = c.position.z - sz;
       const dist = Math.sqrt(dx * dx + dz * dz);
+      const rank = c.rank > 1 ? dist * c.rank : dist;
       const stance = c.stance | 0;
       const isLock = mem.lockId !== null && id === mem.lockId;
 
@@ -445,7 +449,7 @@ export class PerceptionModel {
       // 光 Map 的增删就够把「热路径零分配」这条毁掉。
       let track = mem.tracks.get(id);
       if (!track) {
-        if (!seen) { if (isLock) { lockCand = c; lockDist = dist; lockSeen = false; } continue; }
+        if (!seen) { if (isLock) { lockCand = c; lockDist = dist; lockRank = rank; lockSeen = false; } continue; }
         track = this._TrackFor(mem, id, !!c.isPlayer, c.ref || null, now);
       } else if (c.ref) {
         track.ref = c.ref;
@@ -470,12 +474,12 @@ export class PerceptionModel {
         track.lkp.y = Number.isFinite(c.position.y) ? c.position.y : 0;
         track.lkp.z = c.position.z;
         track.lkpTime = now;
-        if (dist < nearestDist) { nearestDist = dist; nearest = c; nearestId = id; }
+        if (rank < nearestRank) { nearestRank = rank; nearestDist = dist; nearest = c; nearestId = id; }
       } else {
         track.visible = false;
         this._Fade(track, now, dt);
       }
-      if (isLock) { lockCand = c; lockDist = dist; lockSeen = seen; }
+      if (isLock) { lockCand = c; lockDist = dist; lockRank = rank; lockSeen = seen; }
     }
 
     // ── 2. 这一拍没出现在候选里的记忆：衰减 / 过期 ─────────────────────
@@ -495,7 +499,7 @@ export class PerceptionModel {
     const sameAcquired = nearest !== null && mem.lockId !== null && nearestId === mem.lockId;
     // 锁定期过了、而且新目标近到当前目标的一半，才允许主动换人。
     const muchBetter = nearest !== null && mem.lockId !== null && !sameAcquired
-      && now >= mem.lockUntil && nearestDist < lockDist * lock.switchDistanceRatio;
+      && now >= mem.lockUntil && nearestRank < lockRank * lock.switchDistanceRatio;
 
     if (lockSeen && !muchBetter) {
       target = lockCand; dist = lockDist; visible = true; mem.lostTime = 0;

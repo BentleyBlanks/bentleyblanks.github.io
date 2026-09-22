@@ -389,6 +389,51 @@ console.log("ok  矮掩体蹲藏跪射 / 高掩体贴墙侧步；侧步取威胁
 }
 console.log("ok  打分单调：更近 / 更正对 / 更高（封顶）/ 不可走扣分 / 友军挤扣分 / 俯射掉分 / toward 反超");
 
+// ------------------------------------------- ⑦c 现役掩体的保留分（2026-09-23）
+//
+// 病根：重选没有保留分，人刚跑到位就被几米外分数高一点点的新点挖走，
+// 一个探头周期都跑不完。`opts.keepCoverId` 让现役点在**最终排序之前**多拿
+// `COVER_WEIGHTS.incumbent` 分：差得比它少就留下，差得比它多仍然换。
+{
+  const host = MakeHost();
+  const me = { x: 0, z: 0, id: "me" };
+  const threat = [{ x: 30, y: 0, z: 0, stance: 0, id: "p" }];
+  // 两堵一模一样的矮墙，都在人与威胁之间，只差距离 —— 分差正好是 gap × |distanceM|。
+  const Wall = (x) => ({ x, z: 0, height: LOW_H, faceX: 1, faceZ: 0 });
+  const HELD_X = 12;
+  const heldId = CoverId(HELD_X, 0);
+
+  // 先把「不给 keepCoverId 时一分不加」钉住（Score 的单调性契约不受这一项影响）。
+  const reg0 = new CoverRegistry([Wall(HELD_X)], host);
+  const held = NormalizeCover(Wall(HELD_X));
+  const plain = reg0.Score(me, held, threat);
+  Check(Math.abs(reg0.Score(me, held, threat, { keepCoverId: null }) - plain) < 1e-9,
+    "keepCoverId 为空时不加保留分");
+  Check(Math.abs(reg0.Score(me, held, threat, { keepCoverId: CoverId(1, 1) }) - plain) < 1e-9,
+    "别人的现役点不加保留分");
+  Check(Math.abs(reg0.Score(me, held, threat, { keepCoverId: heldId }) - plain
+    - COVER_WEIGHTS.incumbent) < 1e-9,
+    "现役那个点正好多拿 weights.incumbent 分");
+
+  // 同样两个点，看 Query 选谁。gap 是竞争者比现役近多少米（距离项 1 分/米）。
+  const Winner = (gapM, keep) => {
+    const reg = new CoverRegistry([Wall(HELD_X), Wall(HELD_X - gapM)], host);
+    const found = reg.Query(me, threat, { keepCoverId: keep });
+    Check(found.length === 2, "两个候选都进了结果");
+    return found[0].cover.id;
+  };
+  const closerGap = COVER_WEIGHTS.incumbent / Math.abs(COVER_WEIGHTS.distanceM);
+  const smallGap = closerGap * 0.5;     // 差距小于保留分
+  const bigGap = closerGap * 1.5;       // 差距大于保留分
+  Check(Winner(smallGap, null) === CoverId(HELD_X - smallGap, 0),
+    "不给保留分时，近一点的那个本来就赢");
+  Check(Winner(smallGap, heldId) === heldId,
+    "差距小于 incumbent：现役那个被保留");
+  Check(Winner(bigGap, heldId) === CoverId(HELD_X - bigGap, 0),
+    "差距大于 incumbent：仍然换到明显更好的点");
+}
+console.log("ok  ⑦c 现役掩体保留分：只给 keepCoverId 那个点、差距小于 incumbent 保留、大于就换");
+
 // ---------------------------------------------------------------- ⑦b 验证过的分更高
 
 {

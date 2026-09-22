@@ -1271,3 +1271,107 @@ prepush 时 `FirstLevelOpeningBrowserTest` 卡在 ShelterRegroup，基线通过�
 
 现在进入 Shelter 时按各人离遮蔽点的远近分配岗位：近的人拿里面的岗位，远的人拿外侧岗位，谁都不用走回头路。幺娃仍固定在玩家身边的岗位（`OPENING.shelterYaowaPost`，`ShelterAid` 要求他在玩家 5 m 内）。修后该测试通过。
 
+
+## 19. 2026-09-23：「干站」与「反复蹲起」—— 关卡脚本和大脑抢同一个人
+
+用户实拍（第 4 阶段前沿，坡顶两个日军站着不动）：「为什么经常能看到非常愚蠢的站在那里不动的敌军，以及一直蹲下站起不知道在做什么的敌军？是系统设计不好还是配置不好？」
+
+### 19.1 取证（改前）
+
+探针 `probe_ai_idle2.mjs`（本地不进仓库，同口径的验收条见 19.5）：`?whitebox=p012` → `Debug.FirstLevelJump(4)`，玩家摆到 `MISSION_ANCHORS.gun`，开战 20 s 后每 0.1 s 采样 30 s，110 m 内 27 个日军，只给玩家无敌。
+
+| 指标 | 改前 |
+| --- | --- |
+| 30 s 内 0 发子弹 | 15 / 27 |
+| 被 `missionFireHold` 禁火 > 90% 时间 | 16 / 27 |
+| 连续 4 s 既不动也不开枪的人·帧 | 31% |
+| 30 s 内蹲/站切换 ≥ 6 次 | 15 / 27 |
+| 站姿人·帧（全部 110 m 内） | 48% |
+| 有掩体的人·帧 | 39% |
+
+**「站着不动」四个来源**，按占比：
+
+1. **关卡禁火窗口把人弄瞎了（主因）。** `Script_FirstLevelOpening.FireWindows` 每帧只放 `playerFireLimit`（3）个人打玩家，其余 `missionFireHold=true`；而 `Think` 的 `playerOpen` 把这个旗挂在**选目标**那一层 —— 被禁火的人连看玩家都不许，只能盯着藏在壕里的国军 AI，目标只剩记忆里的一个点，端着枪对着空气站着。截图里那两个就是：FIRE / SUPPRESS、站姿、目标是记忆里的国军。
+2. **守点单位的姿态没人管。** `Think` 的 `scriptDefensive` 分支直接 return，`ApplyScriptDefense` 给 FIRE 却从不调 `FireStance`：22 m 外的机枪手站姿 FIRE 了整整 30 s。§15 只补了「没目标时 WATCH」，有目标时仍是上次什么姿势就什么姿势。
+3. **对射规则偏爱站姿。** `FireStance` 没掩体、没压制、目标 ≥ 26 m 就站着打（2026-08 的取向「远距离站姿射击本来就是这场仗里最常见的样子」）。46 m 内 54% 的人·帧是站姿。
+4. **冻结的侧翼组。** `Flank*` 四人 `scriptedNoncombatant`，跪在 64–73 m 处玩家视野里 30 s 一动不动、无目标，占「干站」人·帧的一半。本轮**没动**（关卡内容的账，见 19.6）。
+
+**「反复蹲起」三个来源**：
+
+1. **跃进脚本和大脑抢腿（主因）。** `UpdateAssault` 最后一线每 `assaultFinalHoldS` 4.5 s 或打满 4 发就 `FrontLateralBound` + `MoveActor` 横挪 3–6 m：`MoveActor` 清守区、清 `scriptDefensive`、清大脑刚选的掩体（`UpdateCover` 对走剧本路线的人 `ReleaseCover`）并强制站起来跑，到点 `Defend()` 再强制跪下。大脑同时在 11 m 内挑掩体、蹲着以 1.4 m/s 走过去要 5–8 s，走到一半被拽走；因为不许打玩家，4 发永远打不满，4.5 s 定时器每次都触发。一个典型样本 30 s：跪 → 走向掩体 → 被拽走站起 → 跪 → 选另一个掩体 → …… 切换 13 次、0 发。
+2. **掩体重选没有保留分。** `UpdateCover` 每 `reselectMinS` 2.5 s 重选、威胁点挪 `threatMoveM` 4 m 就重算，现役掩体没有任何加分，人刚到位就换到 8–10 m 外分数高一点点的新点。
+3. **SUPPRESS 里的姿势抖动。** 41 次「站 → 蹲」发生在 SUPPRESS 内：`FireStance` 每拍重算，目标只在记忆里，到最后目击点的距离在 26 m 门槛两侧摆，2.2 s 承诺期只把频率压到每两三秒一次；加上 `s.cover` 被脚本清掉又选回来造成 COVER_ENGAGE ↔ SUPPRESS 互换（18 / 13 次），每次都重设姿势。
+
+**结论：不是行为图配错，是所有权。** 关卡脚本直接写 AI 的 `order` / `holdZone` / `cover` / `stance` / `p012Guided` / `missionFireHold`，大脑不知道自己被接管，继续按自己的状态选姿势和掩体。另外 `AiCombatBrowserTest` 明确把「正走剧本路线的人」剔出分母，而这批人正是玩家眼里最蠢的那群，所以这两种蠢从没被门禁量到。
+
+### 19.2 改法（四项 + 一条补丁，两个 opus 代理分包、主会话集成验收）
+
+**① 禁火只挡扳机，不挡眼睛**（`Script_Ai.mjs`、`Script_FirstLevelOpening.mjs`、`Data_FirstLevelOpening.mjs`）
+
+- `Think.playerOpen` 去掉 `!missionFireHold` 那一层，改成 `s.missionFireHold` 并进「不占新锁名额」的那一串：被禁火的人可以自由锁定玩家。`playerTargetedBy` 的计数本来就不数禁火的人，一字未改，所以**没有开火窗口的阶段行为逐位相同**。
+- `TryFire` 的扳机闸分两档。新字段 `Soldier.missionFireSuppressOnly`：为真时不 return，跳过「暴露采样 + 抢令牌」，直接向 `SuppressPoint` 压制射击 —— 命中恒 false、不占令牌，**不进 TTK 账**。其余闸（瞄准时间、枪口朝向、友军走廊、`ShotPathClear`）一道不少。
+- `FireWindows` 每帧与 `missionFireHold` 同处重置 `missionFireSuppressOnly`，选完 `chosen` 后按原顺序再取 `OPENING.playerSuppressLimit`（3）个未入选的候选置压制档（`missionFireHold` 仍为 true，`FirstLevelMissionTest:345` 的「非禁火人数 ≤ playerFireLimit」断言不变）。
+- **补丁：禁火的人先打能打的**（`Data_Tuning_AiPerception.LOCK.heldTargetRank` 3、`Script_AiPerception.Sense` 的 `c.rank`、`Think._PushNear` 的 rank 参数）。只改①之后原来「拿不到玩家就打国军」的那批人全变成锁玩家 + 哑火（采样内总弹数 47 → 21）。现在 `Think` 给禁火（非压制档）的人身上的玩家打 rank：选 / 换目标时玩家的距离乘 3 再比 —— 有看得见的国军就打国军，一个都看不见才盯玩家（面向、进掩体、举枪，扳机仍在 `TryFire` 里挡着）。rank 只进 nearest 与 `switchDistanceRatio` 的比较，觉察、通视、发现距离、报出去的 `dist` 一律真实距离。`AiPerceptionTest` 新增一项。
+
+**② 无掩体就至少跪**（`Data_Tuning_Ai.FIRE_STANCE`、`Script_Ai.FireStance` / `ApplyScriptDefense`）
+
+- `FIRE_STANCE = { kneelWithinM: 26, standBeyondM: 34, openGroundKneel: true }`。`FireStance` 保留卧姿+压制、压制双阈值、矮掩体三条；然后「没掩体、有目标、人是静止的（不走剧本路线、不在换位、动作信号没起来）就至少跪」；距离规则改成迟滞带（站着的压进 26 m 才跪，跪着的退过 34 m 才站）。卧姿仍只由压制给：眼高 0.5 m 会被沙袋挡住。
+- `ApplyScriptDefense` 的 FIRE 兜底分支给姿态（可缺省调用 `this.FireStance`，纯 JS 沙箱重放的 `P012ActorTest` / `P012RuntimeTest` 缺它时退回旧行为）。固定机枪位 `stanceUntil = Infinity`，这条 2.2 s 的请求过不了承诺闸。
+- `Data_AiBrainGraph` 登记 `FIRE_STANCE` 与四条边的表键（140 → 152），`Script_EditorAi` brain 表 `only` 加 `FIRE_STANCE`。
+
+**③ 位移只有一个主人**（`Script_FirstLevelMissionRuntime.UpdateAssault`、`Data_Tuning_FirstLevel`）
+
+- `FrontLateralBound` 整个删掉，连同 `assaultLateralMinM` / `assaultLateralMaxM`。最后一线触发时只记一轮（`s.shifts++`、`s.hold = 0`、`s.volley = fireSequence`），`s.mode` 保持 `"hold"`，不移动、不重发 `Defend`、不碰姿态；`assaultLateralShifts`（键名保留，语义改成「退回重来前打 / 守几轮」）轮之后照旧退回 `assaultRegroupLine`。退回重来的总节奏与改前一致，只是中间不再被拽。换位归大脑：掩体周期 + `WATCH.displace*`。
+- 守线计时从进掩体到位起算：`coverPhase === "approach"` 的那一趟不计 `s.hold`，但**一条线只给 `assaultCoverWalkS` 5 s 的预算**（11 m ÷ `BRAIN.coverApproachMps` 2.4 ≈ 4.6 s）。不封顶实测会把关卡卡死：改选掩体的人一轮打不完、永远不退回 regroup 线，`InfantryBlockade`（85 m 内还有活着、没被压制、看得见撤退口的日军就算堵住）解不开，03–06 实机红在 `lastGuardsWithdrawn`；封顶后绿（A/B 四组见交付记录）。
+- `FirstLevelMissionTest` 新增断言：守线全程 `MoveActor` 调用数 = 0、approach 期间 `hold` 不走、预算用完仍能打完一轮、两轮才退回。
+
+**④ 掩体保留分与迟滞**（`Data_Tuning_AiCover.COVER_WEIGHTS.incumbent` 8、`Script_AiCover.Query` 的 `opts.keepCoverId`、`Script_Ai.UpdateCover`）
+
+- 现役掩体加 8 分（≈ 8 m 路程），加在验证前的完整分上，两次排序都带着；验证分 18–26 仍压得过它，所以「这个点挡不住他」照样换。
+- 已经到位（`coverPhase` 是 hide / peek）的人不做常规重选，`threatMoveM` 只对 approach 相位或没掩体的人生效；紧急四条与跃进不受影响。`AiCoverTest` 新增 9 条（112 → 121）。
+- `FireStance` 的迟滞带见②。
+
+### 19.3 改后（同一条探针、同一机位，集成后的树）
+
+| 指标 | 改前 | 改后 |
+| --- | --- | --- |
+| 站姿人·帧（110 m 内全部） | 48% | **28%** |
+| 站姿人·帧（< 46 m / 46–74 m） | 54% / 38% | **29% / 25%** |
+| 有掩体的人·帧 | 39% | **56%** |
+| 「站着干站」`fire s0 open` 人·帧 | 336 | 39（跪着守着的 `fire s1 open` 0 → 532） |
+| 22 m 外那挺机枪 | 站姿 FIRE 30 s | 整段跪姿 |
+| SUPPRESS 内站↔蹲 | 50 | 25 |
+| COVER_ENGAGE ↔ SUPPRESS 互换 | 18 / 13 | 6 / 9 |
+| 掩体里 hide↔peek 的姿势切换（正常周期） | 24 | 76 |
+| 蹲起 ≥ 6 次 / ≥ 10 次的人 | 15 / 7 | 15 / 6 |
+| 30 s 内 0 发子弹的人 | 15 / 27 | 14 / 27 |
+| 采样内总弹数 / 打向玩家 | 47 / 18 | 32 / 15 |
+| 连续 4 s 既不动也不开枪 | 31% | 48% |
+
+怎么读：
+
+- 「站着不动」这一类基本没了：站姿只剩跑动的人；机枪手跪下了；有掩体的人多了四成。
+- 蹲起**总次数没降但成分换了**：脚本拽人造成的空地蹲起和 COVER_ENGAGE ↔ SUPPRESS 互换下去，掩体里的缩头—探头周期上来。后者是要的节奏（`COVER_CYCLE` 的 hide 0.9–2.2 s / peek 0.7–1.6 s），门禁口径 `AiBehaviorTest`「12 s 内单兵最多切换」仍是 4 次（闸门 6）。要再压就得放慢 `COVER_CYCLE` 的节拍，那是另一个题。
+- 「4 s 既不动也不开枪」**涨到 48%**：一半是冻结的侧翼四人（1200 人·帧，本轮没动），另一半是缩在掩体里、被禁火、目标看不见的人 —— 缩在沙袋后面等一个射击窗口，画面上是「躲着」而不是「干站着」。打向玩家的弹数 18 → 15 基本不变，TTK 账没动（`DamageTest` 25/25，TTK 16.9 s）。
+
+### 19.4 门禁（集成后的树，直接 node 跑）
+
+| 门禁 | 结果 |
+| --- | --- |
+| `AiPerceptionTest` 12 项（新增「禁火先打能打的」）/ `AiCoverTest` 121 条 / `AiBrainGraphTest` 862 条 / `TuningWriterTest` 457 条 / `AiTacticsTest` / `AiShootingTest` / `TextTest` / `ModuleGraphTest` | 全绿 |
+| `FirstLevelMissionTest`（含③的新断言）/ `FirstLevelFrontTest` / `P012ActorTest` / `P012RuntimeTest` / `MissionGatesTest` | 全绿 |
+| `AiBehaviorTest` | 12/12，姿态 12 s 最多 4 次、瞬转 4.77°、移动同向 96.3% |
+| `DamageTest` | 25/25，三人 25 m 对射 TTK 16.1 s（闸门 8–24 s），TTK 账没动 |
+| `AiEditorTest` | 32/32，行为图 80 个键，面板外仍只有 `SIGHT_BY_STANCE.0` |
+| `FirstLevelMissionBrowserTest --campaign --stage-from=3 --stage-to=6` | 绿：`lastGuardsWithdrawn` t=353、`frontDisengaged` t=431.7，`ok stages 3-6 driven with real player input` |
+| `AiCombatBrowserTest` | 13/14：①②④⑤⑥⑦⑧⑨ 全过（受控场 6/6 到位、隐蔽帧 60%、绕出正面锥 179°、投出 2 枚、⑨ 四秒没挪窝 0/5）；**③「实墙遮挡时停火」改前就红**：同一夹具在干净的 master 树上复跑同样出膛（12 发里 7 发，本树 7 发），同一堵墙 (−47, −10.85, h 1.72)，前沿重建后射击位地面比藏身位高 1.1 m，压制点的射线从墙顶上方过去 —— 夹具选址的账，不是本轮 |
+| `AiCloseRangeTest` | **改前就红**：夹具要的 `FrontTraverseBlastScreen` 在前沿重建（680cb67c3）后已不存在，1553 个 block 里没有这个 id |
+| `AiInitiativeBrowserTest` | **改前就红**：`gunnerShelter` 一条，把本轮九个大脑文件全部还原到 HEAD 重跑同样红、同样的值 |
+
+### 19.5 留给下一轮
+
+1. **冻结的侧翼四人**（`Flank*`，`scriptedNoncombatant`）仍跪在 64–73 m 处一动不动：改成 `missionFrontStandby`（§16 给那 143 人做过）或摆到视野外，是关卡内容的账。
+2. **开火窗口与掩体周期不同步**：`FireWindows` 的候选要求这一帧对玩家有通视，缩头的人拿不到窗口，探头那 1 s 里又轮不到他。要提火力密度，可把窗口做成「拿到就保留到打出 N 发」，或者把 `playerSuppressLimit` 从 3 抬到 5–6（压制档不进 TTK 账）。
+3. `COVER_CYCLE.refinedSides` 仍只有国军：日军连续探头看不见目标也不换点。当初排除日军的理由（屋内伏击拍失序）已随伏击拍下线，可以重新评估。
+4. 把 19.1 的探针口径（0 发人数、4 s 干站占比、蹲起次数，**分母含走剧本路线的人**）加进 `AiCombatBrowserTest`；现有 ⑨ 只量「4 秒挪没挪窝」。
+5. `assaultLateralShifts` 键名与语义不符，要不要改名一起改 §15 的历史段落。

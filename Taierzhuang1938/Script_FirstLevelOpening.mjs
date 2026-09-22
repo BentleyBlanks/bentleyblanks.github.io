@@ -262,6 +262,7 @@ export class FirstLevelOpening {
       }
       // Live enemies fight the rescuers while the captive has no control.
       a.missionFireHold=captive;
+      a.missionFireSuppressOnly=false;
       a.missionSurfaceRest=false;
       if(captive||!active||!a.alive||a.scriptedNoncombatant)continue;
       a.missionFireHold=true;
@@ -290,6 +291,15 @@ export class FirstLevelOpening {
     }
     for(const a of candidates)if(chosen.length<C.playerFireLimit&&!chosen.includes(a))chosen.push(a);
     for(const a of chosen)a.missionFireHold=false;
+    // Held shooters may still lay suppressing fire: those shots never resolve a
+    // hit and never take a firing token, so the authored aimed-shooter cap and
+    // the player TTK budget are unchanged.
+    let suppressors=0;
+    for(const a of candidates){
+      if(suppressors>=C.playerSuppressLimit)break;
+      if(chosen.includes(a))continue;
+      a.missionFireSuppressOnly=true;suppressors+=1;
+    }
     this.playerShooters=chosen.map(a=>a.missionId);
     this.peakPlayerShooters=Math.max(this.peakPlayerShooters,this.playerShooters.length);
     this.visible=visible;this.peakVisible=Math.max(this.peakVisible,visible);

@@ -16,7 +16,7 @@ import { OPENING } from "./Data_FirstLevelOpening.mjs";
 import { FirstLevelOpening, SamplePerceptionCurve } from "./Script_FirstLevelOpening.mjs";
 // 公开阶段 1–7 的演出（Front 玩法包）。运行时只留构造 / Enter / Update / Draw 四个薄钩子。
 import { FirstLevelFrontShow } from "./Script_FirstLevelFrontShow.mjs";
-import { FRONT_GUARD_POSTS, FRONT_SHELLS, FRONT_ASSAULT, FrontAssaultLane, FrontReserveLane, ClearLaneX } from "./Data_FirstLevelMissionFront.mjs";
+import { FRONT_GUARD_POSTS, FRONT_SHELLS, FRONT_ASSAULT, FrontAssaultLane, FrontReserveLane } from "./Data_FirstLevelMissionFront.mjs";
 import {
   MISSION_STAGES,
   MISSION_TUNING as R,
@@ -1006,33 +1006,12 @@ export class FirstLevelMissionRuntime {
     if (!points.length) return null;
     // Hold times are scaled per man (0.6-1.4) so the field never moves in lockstep.
     const jitter = .6 + ((Math.abs(Math.round(x * 3 + z * 7)) % 17) / 16) * .8;
-    // shifts/volley (2026-09-09, docs/Data_EnemyAi.md §15): the last line is no longer an eleven second
-    // stand. A man fires assaultVolleyShots rounds or holds assaultFinalHoldS seconds, then sidesteps to a
-    // fresh firing position on the same line (assaultLateralShifts times) before falling back a line and
-    // coming again. volley is the fireSequence snapshot taken when he settled on the position.
-    return { points, index: 0, hold: 0, pinned: 0, cycles: 0, shifts: 0, volley: 0, mode: "rush", jitter };
-  }
-  /**
-   * A fresh firing position on the same bound line: 3-6 m to one side, out of the cover columns.
-   *
-   * The sweep itself has to clear those columns too, not just the endpoint - `ClearLaneX` only pushes the
-   * endpoint out, and a man at x=-3 stepping +6 m lands at +3 (legal) after walking straight through the
-   * Center column between them. Both sides are tried; if neither is clear he keeps the position he has and
-   * the caller falls back a line instead.
-   */
-  FrontLateralBound(target, s) {
-    const span = Math.max(0, R.assaultLateralMaxM - R.assaultLateralMinM);
-    const step = R.assaultLateralMinM
-      + ((Math.abs(Math.round(target.x * 5 + target.z * 3)) + s.shifts * 7) % 16) / 15 * span;
-    const first = s.shifts % 2 === 0 ? 1 : -1;
-    for (const side of [first, -first]) {
-      const x = ClearLaneX(target.x + side * step, target.x);
-      if (Math.abs(x - target.x) < R.assaultLateralMinM * .5) continue;
-      const lo = Math.min(x, target.x), hi = Math.max(x, target.x);
-      if (FRONT_ASSAULT.blockedX.some(([a, b]) => hi > a && lo < b)) continue;
-      return { x, z: target.z };
-    }
-    return null;
+    // shifts/volley (2026-09-23, docs/Data_EnemyAi.md §15): on the last line `shifts` counts **finished
+    // rounds**, it does not move anyone. A round ends when the man has fired assaultVolleyShots rounds or
+    // held assaultFinalHoldS seconds; after assaultLateralShifts rounds he falls back to
+    // assaultRegroupLine and comes again. volley is the fireSequence snapshot taken when the round began.
+    // walk is the per-line budget of "walking into cover does not count as holding the line".
+    return { points, index: 0, hold: 0, walk: 0, pinned: 0, cycles: 0, shifts: 0, volley: 0, mode: "rush", jitter };
   }
   UpdateAssault(dt) {
     const active = ["Support", "MachineGun", "Tank"].includes(this.flow.stage.id);
@@ -1088,28 +1067,35 @@ export class FirstLevelMissionRuntime {
           // Kneeling stays the fallback for a line that has nothing to hide behind.
           this.Defend(actor, target, R.defendHoldRadiusM, R.assaultCoverSearchM);
           this.ai.SetStance(actor, 1, 1, true);
-          s.mode = "hold"; s.hold = 0; s.volley = actor.fireSequence;
+          s.mode = "hold"; s.hold = 0; s.walk = 0; s.volley = actor.fireSequence;
         }
-        s.hold += dt;
+        // The hold clock starts when he is **in** his cover, not when he set off for it (2026-09-23,
+        // docs/Data_EnemyAi.md §15): the walk to a cover point takes longer than assaultFinalHoldS, so
+        // counting it made the timer fire while he was still on the way and the script pulled him off
+        // again - he never arrived anywhere. The pause is a budget of assaultCoverWalkS **per line**, not
+        // a free pass: a man who keeps re-picking covers would otherwise never finish a round, never fall
+        // back to assaultRegroupLine, and the front would sit on the retreat breach for good (measured:
+        // the 03-06 campaign never reaches lastGuardsWithdrawn without this cap).
+        if (actor.cover && actor.coverPhase === "approach" && s.walk < R.assaultCoverWalkS) s.walk += dt;
+        else s.hold += dt;
         const last = s.index === s.points.length - 1;
         if(last && actor.missionReserve)continue;
-        // The last line used to be a flat eleven second stand, three times over. Now it is the same
-        // volley/hold rhythm as every other bound: fire assaultVolleyShots rounds or hold
-        // assaultFinalHoldS seconds, then take a fresh firing position 3-6 m along the line
-        // (assaultLateralShifts of them), and only then fall back to assaultRegroupLine and come again.
+        // One system owns a man's legs. On the last line the script only counts rounds - fire
+        // assaultVolleyShots rounds or hold assaultFinalHoldS seconds and the round is over - and the
+        // combat brain moves him (hide/peek cover cycle, WATCH.displace* sidesteps). The lateral bound
+        // that used to happen here was a second relocation system on top of that one: its MoveActor
+        // cleared holdZone, scriptDefensive and the cover the brain had just picked, so the front stood
+        // up and knelt again every few seconds instead of reaching anything. After assaultLateralShifts
+        // rounds he still falls back to assaultRegroupLine and comes again - same round count as before,
+        // one walk into cover (assaultCoverWalkS) longer per line.
         const spent = last && actor.fireSequence - s.volley >= R.assaultVolleyShots;
         if (s.hold >= (last ? R.assaultFinalHoldS : R.assaultHoldS) * s.jitter || spent) {
-          if (!last) s.index++;
-          else if (s.shifts < R.assaultLateralShifts) {
-            const point = this.FrontLateralBound(target, s);
-            // Nowhere to slide (both sides run into a cover column): fall back a line instead of
-            // standing here, and let the regroup budget below decide whether he comes again.
-            if (point) { s.points[s.index] = point; s.shifts++; }
-            else if (s.cycles < R.assaultRegroupCycles) { s.index = Math.max(0, Math.min(s.points.length - 1, R.assaultRegroupLine)); s.cycles++; s.shifts = 0; }
-            else continue;
-          } else if (s.cycles < R.assaultRegroupCycles) { s.index = Math.max(0, Math.min(s.points.length - 1, R.assaultRegroupLine)); s.cycles++; s.shifts = 0; }
-          else continue;
-          s.hold = 0; s.mode = "rush";
+          if (!last) { s.index++; s.hold = 0; s.mode = "rush"; }
+          else if (s.shifts < R.assaultLateralShifts) { s.shifts++; s.hold = 0; s.volley = actor.fireSequence; }
+          else if (s.cycles < R.assaultRegroupCycles) {
+            s.index = Math.max(0, Math.min(s.points.length - 1, R.assaultRegroupLine));
+            s.cycles++; s.shifts = 0; s.hold = 0; s.mode = "rush";
+          }
         }
       }
     }

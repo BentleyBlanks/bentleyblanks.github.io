@@ -127,15 +127,23 @@ export const MISSION_TUNING = Object.freeze({
   assaultHoldS:3.5,
   // 2026-09-09 (docs/Data_EnemyAi.md §15): the last line was an eleven second stand - live capture showed
   // 21 of the 31 men in the 46-74 m band sitting in assault "hold" and 23 of them not moving at all over
-  // four seconds. It is now the same volley/hold rhythm as the other bounds: fire assaultVolleyShots
-  // rounds or hold assaultFinalHoldS seconds, then slide 3-6 m along the line to a fresh firing position
-  // (assaultLateralShifts of them, cover columns avoided by ClearLaneX), and only then fall back to
-  // assaultRegroupLine and come again. 4.5 s is one bolt-rifle volley plus the walk.
+  // four seconds. It is now a volley/hold rhythm: fire assaultVolleyShots rounds or hold
+  // assaultFinalHoldS seconds and that round is over. 4.5 s is one bolt-rifle volley plus the walk.
+  // 2026-09-23: the end of a round no longer slides him 3-6 m along the line - `FrontLateralBound` and
+  // its assaultLateralMinM / assaultLateralMaxM are deleted. Displacement has exactly one owner now, the
+  // combat brain (hide/peek cover cycle plus WATCH.displace* in Data_Tuning_Ai); the script only counts.
   assaultFinalHoldS:4.5,
   assaultVolleyShots:4,
+  // 到线之后走进掩体的那一趟不算守线时间（`UpdateAssault`）：一条线只给这一趟，封顶到这里。
+  // 上限按大脑自己的接近速度算：走的最远是 defendHoldRadiusM + assaultCoverSearchM = 11 m，
+  // 速度是 Data_Tuning_Ai.BRAIN.coverApproachMps = 2.4 m/s，11 / 2.4 ≈ 4.6 s，取 5 s。
+  // 不封顶的后果实测过：反复改选掩体的人一轮也打不完、永远不退回 assaultRegroupLine，
+  // 前沿就一直压在撤退口上，03–06 的 lastGuardsWithdrawn 等不到（2026-09-23 A/B）。
+  assaultCoverWalkS:5,
+  // How many rounds a man plays out on the last line before falling back to assaultRegroupLine and coming
+  // again. One round = assaultVolleyShots rounds fired or assaultFinalHoldS seconds held (the old name is
+  // kept because it is the same beat count that used to pace the lateral bounds).
   assaultLateralShifts:2,
-  assaultLateralMinM:3,
-  assaultLateralMaxM:6,
   assaultRegroupLine:1,
   assaultRegroupCycles:3,
   assaultArrivalM:.9,

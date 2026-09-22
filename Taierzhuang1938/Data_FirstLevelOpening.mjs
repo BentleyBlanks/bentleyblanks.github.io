@@ -78,6 +78,12 @@ export const OPENING = Object.freeze({
     CornerPursuerE:{delay:8,points:[{x:-27,z:-58.6},{x:-31.2,z:-56},{x:-31.2,z:-51},{x:-30.5,z:-48},{x:-25.2,z:-44.6}]},
   },
   playerFireLimit: 3,
+  // 压制档的人数（2026-09-23）。瞄准档（playerFireLimit）已经由射击令牌与轮转窗口
+  // 封顶在 3 人，那是**会命中**的那一档，玩家的 TTK 账全在它身上。这一档不同：
+  // 被禁火的人向玩家的压制点射击，命中恒 false、不占令牌，只制造近失弹与压制感，
+  // 所以**不进 TTK 账**。3 个人 ≈ 一个班的火力感，再多就成了「打不中的弹幕」。
+  // 其余被禁火的人只许看、进掩体、探头、举枪，一发不打。
+  playerSuppressLimit: 3,
   fireSlotSeconds: 3.5,
   rifleGuardCount: 2,
   frontReachRadiusM: 9,

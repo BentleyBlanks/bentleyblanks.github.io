@@ -149,8 +149,9 @@ export const BRAIN_GRAPH = Object.freeze({
     }),
     Object.freeze({
       from: "idle", to: "fire", priority: 7,
-      when: "守点单位有目标但没选到掩体：原地对射（守点子梯的兜底）",
-      keys: Object.freeze(["COVER.defaultRadiusM", "COVER.minUsefulM"]),
+      when: "守点单位有目标但没选到掩体：原地对射，姿势与主梯同一把尺子（FireStance；固定机枪位的 stanceUntil=Infinity 挡住这条请求）",
+      keys: Object.freeze(["COVER.defaultRadiusM", "COVER.minUsefulM",
+        "FIRE_STANCE.kneelWithinM", "FIRE_STANCE.standBeyondM", "FIRE_STANCE.openGroundKneel"]),
     }),
 
     // --- 8 压制（主梯第一条，全局判据）------------------------------------
@@ -250,9 +251,10 @@ export const BRAIN_GRAPH = Object.freeze({
     }),
     Object.freeze({
       from: "fire", to: "cover_engage", priority: 13,
-      when: "原地对射时 UpdateCover 终于选到了一个点（FIRE 里仍然每拍查掩体，限流 reselectMinS）：转进掩体周期",
+      when: "原地对射时 UpdateCover 终于选到了一个点（FIRE 里仍然每拍查掩体，限流 reselectMinS）：转进掩体周期。已经到位（hide/peek）之后常规重选就停了，现役点另有保留分",
       keys: Object.freeze(["COVER.defaultRadiusM", "COVER.minUsefulM", "COVER_CYCLE.reselectMinS",
-        "COVER_WEIGHTS.validatedCrouched", "COVER_WEIGHTS.occupiedOther"]),
+        "COVER_WEIGHTS.validatedCrouched", "COVER_WEIGHTS.occupiedOther", "COVER_WEIGHTS.incumbent",
+        "BRAIN.threatMoveM"]),
     }),
     Object.freeze({
       from: "bound", to: "cover_engage", priority: 13,
@@ -290,9 +292,10 @@ export const BRAIN_GRAPH = Object.freeze({
     // --- 15 压制射击 ------------------------------------------------------
     Object.freeze({
       from: "fire", to: "suppress", priority: 15,
-      when: "身边没有可用掩体、看不见目标、但最后目击情报还够可信：向 LKP / 掩体沿压制射击，不再闭嘴发呆",
+      when: "身边没有可用掩体、看不见目标、但最后目击情报还够可信：向 LKP / 掩体沿压制射击，不再闭嘴发呆（姿势同样走 FireStance）",
       keys: Object.freeze(["TACTICS.suppressConfidence", "TACTICS.suppressMaxAgeS",
-        "MEMORY.confidenceDecayPerS", "MEMORY.memoryS", "SHOOTING.suppressAboveCoverM"]),
+        "MEMORY.confidenceDecayPerS", "MEMORY.memoryS", "SHOOTING.suppressAboveCoverM",
+        "FIRE_STANCE.kneelWithinM", "FIRE_STANCE.standBeyondM", "FIRE_STANCE.openGroundKneel"]),
     }),
     Object.freeze({
       from: "cover_engage", to: "suppress", priority: 15,
@@ -303,9 +306,11 @@ export const BRAIN_GRAPH = Object.freeze({
     // --- 16 就地对射（兜底）----------------------------------------------
     Object.freeze({
       from: "advance", to: "fire", priority: 16,
-      when: "有目标、在交战距离内，但身边没有可用掩体、情报也不到压制射击的门槛：就地对射（FireStance 决定站还是蹲）",
+      when: "有目标、在交战距离内，但身边没有可用掩体、情报也不到压制射击的门槛：就地对射（FireStance 决定站还是蹲：没掩体又停着就至少跪，距离规则带 26/34 m 迟滞带）",
       keys: Object.freeze(["ENGAGE.defaultM", "ENGAGE.supportM", "ENGAGE.hysteresisM",
-        "COVER.defaultRadiusM", "SIGHT_BY_STANCE.0", "AIM.initialErrorRad.boltRifle"]),
+        "COVER.defaultRadiusM", "SIGHT_BY_STANCE.0", "AIM.initialErrorRad.boltRifle",
+        "FIRE_STANCE.kneelWithinM", "FIRE_STANCE.standBeyondM", "FIRE_STANCE.openGroundKneel",
+        "BRAIN.movingSignal"]),
     }),
     Object.freeze({
       from: "suppress", to: "fire", priority: 16,
@@ -458,6 +463,7 @@ export const BRAIN_GRAPH = Object.freeze({
     SIGHT_SCALE_RANGE: "Data_Tuning_Ai",
     SQUAD: "Data_Tuning_Ai",
     ENGAGE: "Data_Tuning_Ai",
+    FIRE_STANCE: "Data_Tuning_Ai",
     ACTOR_DETAIL: "Data_Tuning_Ai",
     HURT_FLINCH: "Data_Tuning_Ai",
     BRAIN: "Data_Tuning_Ai",

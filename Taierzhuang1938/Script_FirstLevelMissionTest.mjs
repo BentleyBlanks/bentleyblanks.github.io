@@ -239,6 +239,64 @@ if(process.argv.includes("--opening-audio"))process.exit(0);
     assert.deepEqual(r.missingCues,["FrontCoverCall"]);
     assert.ok(!voice.finished.has("FrontCoverCall"),"retired dialogue cannot invent a heard event");
   }
+  {
+    // 2026-09-23 (docs/Data_EnemyAi.md §15): one owner for a man's legs. On the last bound line the
+    // script only counts rounds - the combat brain (cover cycle / displace) is what moves him - and a
+    // round is only timed once he is actually in his cover, not while he is still walking to it.
+    const start=FRONT_ASSAULT_STARTS[0];
+    const moves=[],defends=[],stances=[];
+    const r=Object.create(FirstLevelMissionRuntime.prototype);
+    Object.assign(r,{flow:{stage:{id:"Support"}},enemies:new Map(),time:0,
+      ai:{SetStance:(actor,stance)=>stances.push(stance)},
+      MoveActor:(actor,point,speed)=>moves.push({point,speed}),
+      Defend:(actor,point,radius,slack)=>defends.push({point,radius,slack})});
+    const s=FirstLevelMissionRuntime.prototype.MakeAssault.call(r,start.x,start.z);
+    s.jitter=1;s.index=s.points.length-1;
+    const line=s.points[s.index],lineSnapshot={...line};
+    const actor={id:1,alive:true,fireSequence:0,suppression:0,tacticalRadiusM:0,stance:1,
+      position:{x:line.x,y:0,z:line.z},missionAssault:s};
+    r.enemies.set(actor.id,actor);
+    const dt=1/30,Step=n=>{for(let i=0;i<n;i++)FirstLevelMissionRuntime.prototype.UpdateAssault.call(r,dt);};
+    const StepUntil=(done,what)=>{
+      for(let i=0;i<900&&!done();i++)Step(1);
+      assert.ok(done(),"the bounding script reaches this beat on its own: "+what);
+    };
+    Step(1);
+    assert.equal(s.mode,"hold","a man who reached the last line holds it as an anchor");
+    assert.equal(defends.length,1,"settling on the line issues exactly one Defend");
+    // The brain picked a cover and is walking to it: those seconds are not hold time.
+    actor.cover={id:7,hidePos:{x:line.x+4,z:line.z-3}};actor.coverPhase="approach";
+    const walking=s.hold;
+    Step(Math.floor(R.assaultCoverWalkS/dt)-1);
+    assert.equal(s.hold,walking,"walking into cover never runs the hold clock");
+    assert.ok(s.walk>0&&s.walk<=R.assaultCoverWalkS,"the pause is a per-line budget: "+s.walk);
+    assert.equal(s.shifts,0,"a man still on his way to cover has not finished a round");
+    // ...but the budget is finite: a man who keeps re-picking covers still plays out his rounds and
+    // falls back, otherwise the front camps on the retreat breach for good.
+    StepUntil(()=>s.shifts===1,"the walk budget runs out and the round finishes anyway");
+    assert.equal(s.mode,"hold","the man keeps holding the line; his legs stay with the combat brain");
+    assert.deepEqual({...s.points[s.index]},lineSnapshot,"the script no longer rewrites his firing position");
+    assert.equal(defends.length,1,"a finished round does not re-issue Defend");
+    assert.deepEqual(stances,[1],"holding the line is one kneel, not a kneel per round");
+    // Firing the volley ends a round early, exactly as the timer does.
+    actor.coverPhase="hide";
+    actor.fireSequence+=R.assaultVolleyShots;
+    Step(1);
+    assert.equal(s.shifts,2,"a spent volley ends a round as well: "+JSON.stringify(s.shifts));
+    assert.equal(s.volley,actor.fireSequence,"the next round counts shots from where this one ended");
+    assert.equal(moves.length,0,"no MoveActor is issued while he holds the line");
+    // Rounds spent: now - and only now - he falls back a line and comes again.
+    assert.equal(R.assaultLateralShifts,2,"this fixture plays out every round of the last line");
+    StepUntil(()=>s.index===R.assaultRegroupLine,"fall back after the last round");
+    assert.equal(moves.length,0,"the rounds themselves never moved him");
+    assert.equal(s.cycles,1);
+    assert.equal(s.shifts,0,"the regroup line starts his round count over");
+    assert.equal(s.mode,"rush");
+    Step(1);
+    assert.equal(moves.length,1,"the fall-back to the regroup line is the only script move");
+    assert.equal(moves[0].speed,R.assaultRushMps);
+    assert.deepEqual({...moves[0].point},{...s.points[R.assaultRegroupLine]},"he runs back to the regroup line itself");
+  }
 
 }
 // 2026.09.19 第二波：车站卸车那一拍（连同 MISSION_PLACEMENT.stationCasualties）随军列下线。

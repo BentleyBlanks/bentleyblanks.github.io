@@ -776,6 +776,15 @@ export class CoverRegistry {
       score += W.toward * gain;
     }
 
+    // 现役掩体的保留分（`COVER_WEIGHTS.incumbent`，见表注）。算在 `_Extras` 里
+    // 是因为这一项要进 `base`（验证前的完整分），②③ 两次排序都要带着它 ——
+    // 加在验证之后就只影响前 maxValidate 名，排在后面的旧点照样被挖走。
+    // 不给 `keepCoverId` 的调用（包括 `Score()` 的单调性测试）一分不加。
+    if (opts && opts.keepCoverId !== undefined && opts.keepCoverId !== null
+      && cover.id === opts.keepCoverId) {
+      score += W.incumbent;
+    }
+
     return score;
   }
 
@@ -817,7 +826,10 @@ export class CoverRegistry {
    * @param {Array}  threats `[{x,y,z,stance,id}]`（一般 1 个：当前目标或 LKP）
    *                 多于一个时**只按第一个**算姿势与验证，其余暂不参与打分（已知取舍）。
    * @param {object} [opts] `{ radiusM, maxCandidates, maxValidate, towardX, towardZ,
-   *                           minAllySpacingM, allies:[{x,z}], soldierId, suppression, useSteer, allowRetreat }`
+   *                           minAllySpacingM, allies:[{x,z}], soldierId, suppression, useSteer, allowRetreat,
+   *                           keepCoverId }`
+   *                 `keepCoverId` 是这个兵**现在占着**的点：它在最终排序之前多拿
+   *                 `COVER_WEIGHTS.incumbent` 分（保留分，见表注）。
    * @return {Array<{cover, score, base, distance, validated, blockedStanding, blockedCrouched,
    *                 side, hidePos:{x,z}, firePos:{x,z}, fireStance, hideStance}>} 按 score 降序
    */

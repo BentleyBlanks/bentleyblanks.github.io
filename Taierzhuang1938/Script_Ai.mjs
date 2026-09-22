@@ -18,12 +18,13 @@ import { BLAST } from "./Data_Tuning_Combat.mjs";
 import { TRAVERSAL, TraversalPlan, TraversalCurve, TraversalLanding } from "./Data_Traversal.mjs";
 import { ActorCrowd } from "./Script_ActorCrowd.mjs";
 import {
-  SIGHT_BY_STANCE, SIGHT_SCALE_RANGE, SQUAD, ENGAGE, ACTOR_DETAIL, HURT_FLINCH, BRAIN, WATCH, CROWD,
+  SIGHT_BY_STANCE, SIGHT_SCALE_RANGE, SQUAD, ENGAGE, FIRE_STANCE, ACTOR_DETAIL, HURT_FLINCH, BRAIN, WATCH, CROWD,
 } from "./Data_Tuning_Ai.mjs";
 import { PlayerHitboxes, PlayerAimPoint, RaycastPlayerHitboxes, GaussianPair } from "./Script_PlayerHitbox.mjs";
 // 敌军 AI 的四件基建（docs/Data_EnemyAi.md §4）。四个模块都不 import three，
 // 只吃普通对象 `{x,y,z}` 与本文件组装的 host 回调 —— Script_Ai 仍是唯一的 three 适配层。
 import { PerceptionModel, PLAYER_TRACK_ID, ALERT_ORDER } from "./Script_AiPerception.mjs";
+import { LOCK as PERCEPTION_LOCK } from "./Data_Tuning_AiPerception.mjs";
 import { CoverRegistry } from "./Script_AiCover.mjs";
 import { COVER, COVER_CYCLE, DERIVED_COVER } from "./Data_Tuning_AiCover.mjs";
 import { ShootingModel, CloseRangeWeight } from "./Script_AiShooting.mjs";
@@ -349,6 +350,15 @@ export class Soldier {
      * 拿它当战位标识会认不出「这挺机枪已经有人了」。见 AiDirector.Spawn。
      */
     this.emplacementId = null;
+    /**
+     * 【2026-09-23】禁火的第二档：**压制档**。关卡编排（`Script_FirstLevelOpening.FireWindows`）
+     * 每拍与 `missionFireHold` 同一处重置 / 置起。`missionFireHold` 为真时这一位决定
+     * 扳机怎么扣：false = 一发不打（原行为），true = 跳过「暴露采样 + 抢令牌」那条
+     * 瞄准分支，直接向 `SuppressPoint` 压制射击 —— 命中恒 false、不占射击令牌，
+     * 所以**不进 TTK 账**，只制造近失弹与压制感。瞄准档的人数仍由 `playerFireLimit`
+     * 与令牌封顶，这一位不放宽任何一条。
+     */
+    this.missionFireSuppressOnly = false;
     this.muzzle = new THREE.Vector3();
     this.lastFire = -99;
     // --- 第二波（docs/Data_EnemyAi.md §5）在士兵上新增的字段 ------------------
@@ -612,11 +622,11 @@ export class AiDirector {
     // （Script_AiPerception 头注偏离 b），漏填不会静默退回旧的全知行为。
     this.nearSlots = [
       { ref: null, isPlayer: false, id: 0, dist: 1e9, stance: 0, position: null,
-        visible: false, moving: false, firingRecently: false },
+        visible: false, moving: false, firingRecently: false, rank: 1 },
       { ref: null, isPlayer: false, id: 0, dist: 1e9, stance: 0, position: null,
-        visible: false, moving: false, firingRecently: false },
+        visible: false, moving: false, firingRecently: false, rank: 1 },
       { ref: null, isPlayer: false, id: 0, dist: 1e9, stance: 0, position: null,
-        visible: false, moving: false, firingRecently: false },
+        visible: false, moving: false, firingRecently: false, rank: 1 },
     ];
     /** Sense 要的稠密候选数组（只放有 ref 的槽，长度每拍重写，不新建）。 */
     this.senseCandidates = [];
@@ -672,6 +682,8 @@ export class AiDirector {
       maxValidate: COVER.maxValidate, soldierId: null, suppression: 0,
       allies: null, minAllySpacingM: COVER.minAllySpacingM,
       towardX: NaN, towardZ: NaN,
+      /** 现役掩体 id（保留分，`COVER_WEIGHTS.incumbent`）。在构造器里定死形状。 */
+      keepCoverId: null,
     };
     this._coverAllies = [];
     /** TryFire 的复用容器：友军躯干（射击走廊）、枪口、瞄点。 */
@@ -1656,19 +1668,19 @@ export class AiDirector {
   }
 
   /** 把一个候选敌人塞进"最近三个"的槽位里（插入排序，不产生垃圾）。 */
-  _PushNear(dist, ref, isPlayer, id, stance, position) {
+  _PushNear(dist, ref, isPlayer, id, stance, position, rank = 1) {
     const slots = this.nearSlots;
     if (dist >= slots[2].dist) return;
     let i = 2;
     while (i > 0 && dist < slots[i - 1].dist) {
       const dst = slots[i], src = slots[i - 1];
       dst.dist = src.dist; dst.ref = src.ref; dst.isPlayer = src.isPlayer;
-      dst.id = src.id; dst.stance = src.stance; dst.position = src.position;
+      dst.id = src.id; dst.stance = src.stance; dst.position = src.position; dst.rank = src.rank;
       i -= 1;
     }
     const t = slots[i];
     t.dist = dist; t.ref = ref; t.isPlayer = isPlayer;
-    t.id = id; t.stance = stance; t.position = position;
+    t.id = id; t.stance = stance; t.position = position; t.rank = rank;
   }
 
   // ---------------------------------------------------------------- 决策
@@ -1708,7 +1720,7 @@ export class AiDirector {
     const slots = this.nearSlots;
     for (const slot of slots) {
       slot.dist = 1e9; slot.ref = null; slot.position = null;
-      slot.visible = false; slot.moving = false; slot.firingRecently = false;
+      slot.visible = false; slot.moving = false; slot.firingRecently = false; slot.rank = 1;
     }
     // 距离门槛按**目标的姿态**缩放：站着的人一百二十米外就看得见，趴下的四十五米。
     // 这是姿态第一次真的影响"会不会被打"，也是潜行命令能成立的前提。
@@ -1718,16 +1730,32 @@ export class AiDirector {
     // ER2 的 AI 会分散目标，不会九个人焊死一个人。
     // Authored covering teams may keep observing while their trigger is held.
     // Visibility, sector checks and the real firing-token cap still apply.
-    const playerOpen = player && player.Alive && !player.Protected && (s.scriptTrackPlayer || !s.missionFireHold)
+    //
+    // 【2026-09-23】**禁火只挡扳机，不挡眼睛。** 旧写法把 `!s.missionFireHold` 挂在
+    // 选目标这一层：关卡的开火窗口一关上，那个人连**看**玩家都不许，只能盯着藏在
+    // 壕里的国军 AI —— 目标于是只剩记忆里的一个点，人站在原地既不动也不开枪
+    //（实拍：第 4 阶段前沿 110 m 内 27 个日军里 16 个被 `missionFireHold` 禁火超过
+    // 九成时间，31% 的人·帧连续 4 s 既不动也不开枪）。扳机那道闸在 `TryFire` 里，
+    // 这里只决定「他知不知道玩家在哪」：被禁火的人照样面向玩家、找掩体、探头、举枪。
+    //
+    // 名额那一条不变：`playerTargetedBy`（Update 里重数）**本来就不数禁火的人**，
+    // 所以没有开火窗口的阶段行为与改前逐位相同 —— 非禁火的人仍然吃满这条上限。
+    const playerOpen = player && player.Alive && !player.Protected
       // 已经锁住玩家的人不占「新锁」名额。旧写法达到上限后会把现有三个人也一起
       // 排除，下一次 Think 全部转头找 NPC，再下一次又转回来，正是集体抽搐的一条源头。
-      && (s.scriptTrackPlayer || s.target?.isPlayer || this.playerTargetedBy < (COMBAT.maxShootersOnPlayer ?? 3)
+      && (s.scriptTrackPlayer || s.missionFireHold || s.target?.isPlayer
+        || this.playerTargetedBy < (COMBAT.maxShootersOnPlayer ?? 3)
         || s.position.distanceTo(player.position) <= CLOSE_RANGE.priorityM);
     if (enemySide === "nra" && playerOpen) {
       const d = s.position.distanceTo(player.position);
       const st = player.stance === "prone" ? 2 : player.stance === "crouch" ? 1 : 0;
       if (d < this.SightRange(st) && this.InFireSector(s,player.position)) {
-        this._PushNear(d, player, true, PLAYER_TRACK_ID, st, player.position);
+        // 【2026-09-23】被禁火（且不是压制档）的人**先打能打的**：玩家的距离乘
+        // `LOCK.heldTargetRank` 再进选目标 —— 有看得见的国军就打国军，一个都看不见
+        // 才盯着玩家（面向、进掩体、举枪，扳机仍在 TryFire 里挡着）。不然禁火一放开
+        // 眼睛，原来打国军的那批人全变成锁玩家 + 哑火（实测总弹数 77 → 49）。
+        const rank = s.missionFireHold && !s.missionFireSuppressOnly ? PERCEPTION_LOCK.heldTargetRank : 1;
+        this._PushNear(d, player, true, PLAYER_TRACK_ID, st, player.position, rank);
       }
     }
     for (const other of this.soldiers) {
@@ -2131,12 +2159,19 @@ export class AiDirector {
    * 一万九千帧，而且七成以上的**移动**帧也是蹲着的：一群人半蹲着在街上以 0.6 倍速
    * 蹭来蹭去，既看不出在打谁，也看不出在往哪去 —— 「老是下蹲不知道在干嘛」就是这个。
    *
-   * 蹲是有代价的姿势（移动减速 40%、视线降到 1.0 m），所以要有理由才蹲。三条理由：
+   * 蹲是有代价的姿势（移动减速 40%、视线降到 1.0 m），所以要有理由才蹲。四条理由：
    *   1. 有人正朝我打（suppression 起来了）——最正当的一条；
    *   2. 我已经缩到矮掩体后面了：跑向掩体的路上站着跑，**到位**才蹲下去；
    *      掩体本身高过 1.25 m 的话站着就能靠，蹲下反而看不见敌人；
-   *   3. 二十六米内的对射：这个距离缩小轮廓才划算。
-   * 一条都不占就站着打 —— 远距离站姿射击本来就是这场仗里最常见的样子。
+   *   3.【2026-09-23】**空地上停着打就至少跪**（`FIRE_STANCE.openGroundKneel`）：
+   *      没有掩体、有目标、人这一拍是静止的 —— 站姿只留给移动中的人。旧版这一格是
+   *      「26 m 开外一律站着」，实拍下来 46 m 内 54% 的人·帧站姿、22 m 外那挺机枪
+   *      站姿 FIRE 了 30 s（守点子梯给 FIRE 却从不问姿势，见 `ApplyScriptDefense`）。
+   *   4. 距离规则（带迟滞，见下）。
+   *
+   * **卧姿只由压制给**：眼高 0.5 m 的人被一排沙袋挡得干干净净，主动趴下等于主动瞎掉。
+   *
+   * @param {number} bestDist 到目标（或最后目击点）的水平距离，米。
    */
   FireStance(s, bestDist) {
     // 已经卧倒且压制未清的人保持卧姿射击：头顶还在过弹时不撑起半个身子，
@@ -2148,7 +2183,17 @@ export class AiDirector {
     const c = s.cover;
     if (c && (c.height ?? 1) < 1.25
       && Math.hypot(c.x - s.position.x, c.z - s.position.z) < 1.3) return 1;
-    return bestDist < 26 ? 1 : 0;
+    // 「在动」的三条来源：走剧本路线的护送 / 冲击、正在换位（§15 的 DISPLACE）、
+    // 这一拍动作信号已经起来了。三条都不成立才算「停在空地上打」。
+    const moving = (s.p012Guided === true && Number.isFinite(s.scriptMoveSpeedMps))
+      || this.time < s.displaceUntil
+      || s.moveSpeed > BRAIN.movingSignal;
+    if (FIRE_STANCE.openGroundKneel && !c && !moving) return 1;
+    // 距离规则带迟滞：站着的人要压进 kneelWithinM 才跪，跪着的人要退过 standBeyondM
+    // 才站。单阈值那一版在 SUPPRESS 里每拍重算，全场 41 次站↔蹲全落在那一格。
+    return s.stance >= 1
+      ? (bestDist < FIRE_STANCE.standBeyondM ? 1 : 0)
+      : (bestDist < FIRE_STANCE.kneelWithinM ? 1 : 0);
   }
 
   /**
@@ -2502,9 +2547,17 @@ export class AiDirector {
       else if (now - s.grenadeThreatAt < COVER_CYCLE.reselectMinS) urgent = true;
     }
     // ② 常规重选：威胁挪远了才值得重算（他还在原地的话上一次的账仍然成立）。
+    //
+    // 【2026-09-23】**已经到位的人不做常规重选。** `coverPhase` 一旦从 "approach" 转成
+    // "hide" / "peek"，这个人就在跑缩头—探头—点射的周期了；这时候还按 `threatMoveM`
+    // （4 m）重算，只会让他刚站稳就被 8–10 m 外一个分数高一点点的新点挖走 ——
+    // 一个探头周期都跑不完，整场仗在两堵墙之间来回跑。紧急那一档（掩体被炸没、
+    // 被判抄侧翼、压制爆表、手榴弹落在脚边）与跃进（bounding）不受这条影响：
+    // 那几条说的是「这个点已经废了」，这条说的是「还没废就别乱动」。
+    const settled = !!cover && (s.coverPhase === "hide" || s.coverPhase === "peek");
     const refinedFlank = COVER_CYCLE.refinedSides.includes(s.side);
     let want = urgent || bounding || !cover;
-    if (!want && cover && !(refinedFlank && Number.isFinite(s.coverFlankedAt))
+    if (!want && cover && !settled && !(refinedFlank && Number.isFinite(s.coverFlankedAt))
       && Math.sqrt((threat.x - s.coverThreatX) ** 2 + (threat.z - s.coverThreatZ) ** 2) > BRAIN.threatMoveM) {
       want = true;
     }
@@ -2530,6 +2583,9 @@ export class AiDirector {
     }
     opts.radiusM = radiusM;
     opts.soldierId = s.id;
+    // 现役掩体的保留分（`COVER_WEIGHTS.incumbent`）：紧急重选时也照给 ——
+    // 那一档的胜负本来就由验证分（18–26）决定，8 分压不住「这个点挡不住他」。
+    opts.keepCoverId = cover ? cover.id : null;
     opts.suppression = s.suppression;
     opts.allowRetreat = Number.isFinite(s.scriptCoverMaxRiseM);
     // 派生掩体点只给 DERIVED_COVER.usableBy 里的阵营用（见表注）。
@@ -3621,6 +3677,20 @@ export class AiDirector {
       s.state = STATE.COVER_ENGAGE;
     } else {
       s.state = STATE.FIRE;
+      // 【2026-09-23】守点子梯以前只给状态不给姿势：`Defend()` 过的前沿日军拿到 FIRE
+      // 之后就一直**站着**打（实拍 22 m 外那挺机枪站姿 FIRE 了 30 s）。现在与主梯的
+      // FIRE 分支同一把尺子（`FireStance`，2.2 s 承诺期）。
+      //
+      // **写成可缺省调用**：这个函数被 `Script_FirstLevelP012ActorTest` /
+      // `Script_FirstLevelP012RuntimeTest` 抽进没有表、没有 AiDirector 实例的纯 JS
+      // 沙箱重放，缺 `FireStance` 时退回旧行为（只给状态，姿势不动）。
+      // 固定机枪位不受影响：它的 `SetStance(actor, spec.stance, Infinity, true)` 把
+      // `stanceUntil` 钉在 Infinity，这条 2.2 s 的请求过不了 SetStance 的承诺闸。
+      if (this.FireStance && this.SetStance && s.target?.position) {
+        const dx = s.target.position.x - s.position.x;
+        const dz = s.target.position.z - s.position.z;
+        this.SetStance(s, this.FireStance(s, Math.sqrt(dx * dx + dz * dz)), 2.2);
+      }
     }
   }
 
@@ -3875,7 +3945,14 @@ export class AiDirector {
     s.aimTime += dt;
     // Authored fire windows hold the trigger, while cooling and acquiring aim
     // continue normally between bursts.
-    if (s.missionSurfaceRest || (s.missionFireHold && s.target.isPlayer)) return;
+    //
+    // 【2026-09-23】禁火分两档。`missionFireSuppressOnly` 为真的那一档**不 return**：
+    // 他跳过下面的「暴露采样 + 抢令牌」，直接走压制射击（打 SuppressPoint、命中恒
+    // false、不占令牌），所以一枚子弹都不进 TTK 账，只让玩家听见近失弹、被压住。
+    // 其余闸（瞄准时间、枪口朝向、友军走廊、ShotPathClear）照常一道不少。
+    const holdingTrigger = s.missionFireHold && s.target.isPlayer;
+    if (s.missionSurfaceRest || (holdingTrigger && !s.missionFireSuppressOnly)) return;
+    const suppressOnly = holdingTrigger && s.missionFireSuppressOnly;
     const aimNeeded = s.weapon.aiAimTimeS ?? 0.8;
     if (s.aimTime < aimNeeded * (1 + s.suppression)) return;
     // 枪口还没转过去就不能凭概率从侧后方命中。方向闸门也让「转身—瞄准—开火」
@@ -3894,7 +3971,8 @@ export class AiDirector {
     const targetId = s.target.isPlayer ? PLAYER_TRACK_ID : s.target.id;
     let exposure = 0;
     let aimed = null;
-    if (s.targetVisible !== false) {
+    // 压制档整段跳过：`aimed` 留 null，下面自动落到 SuppressPoint 那一支。
+    if (!suppressOnly && s.targetVisible !== false) {
       const samples = toPlayer
         ? this.shooting.PlayerSamples(player)
         : this.shooting.SoldierSamples(s.target.position, s.target.stance, undefined,

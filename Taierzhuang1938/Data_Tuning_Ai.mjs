@@ -79,6 +79,35 @@ export const ENGAGE = Freeze({
 });
 
 /**
+ * 对射姿势（`Script_Ai.FireStance` 读它，`FIRE` / `SUPPRESS` 与守点子梯共用）。
+ *
+ * 病根（2026-09-23 实拍，第 4 阶段前沿开战 20 s 后采样 30 s，110 m 内 27 个日军）：
+ *   · 旧式子的最后一行是 `return bestDist < 26 ? 1 : 0` —— **没有掩体、没有压制、
+ *     目标 26 m 开外一律站着打**。46 m 内 54% 的人·帧是站姿；22 m 外那挺机枪
+ *     站着 FIRE 了整整 30 s（`ApplyScriptDefense` 给 FIRE 却从不调这个函数）。
+ *   · 那个 26 m 还是**单阈值**：SUPPRESS 状态下每拍重算，全场 41 次「站→蹲」
+ *     全发生在 SUPPRESS 内，人在阈值上一秒蹲一次。
+ *
+ * 对标：3A 里没有掩体的步兵在 30–70 m 交火是跪或卧，站姿只留给**移动中**的人 ——
+ * 站着打空地上的枪战既读不出「他在还击」也读不出「他在挪窝」，只像一排木桩。
+ *
+ * kneelWithinM 26   站着的人目标近于它就跪（沿用旧的 26，这一侧的行为不变）。
+ * standBeyondM 34   跪着的人目标远于它才站起来。两个数之间是**迟滞带**：
+ *                   26–34 m 上来回晃的目标不再把人踢得一秒蹲一次。
+ * openGroundKneel true  没掩体、有目标、**人是静止的**就至少跪下；站姿只留给移动中
+ *                   （走剧本路线、正在换位、或这一拍 moveSpeed 过 `BRAIN.movingSignal`）。
+ *                   关掉它就退回旧的「只按距离判」。
+ *
+ * **卧姿仍然只由压制决定，不按距离卧倒**：卧姿眼高 0.5 m，一排沙袋就把视线全挡住，
+ * 主动趴下等于主动瞎掉（`StanceEye` 那一组数）。
+ */
+export const FIRE_STANCE = Freeze({
+  kneelWithinM: 26,
+  standBeyondM: 34,
+  openGroundKneel: true,
+});
+
+/**
  * 人物 LOD 的距离预算。**这是性能账，不是玩法数** —— 改它只影响一帧多少提交，
  * 不影响谁看得见谁（那条在 SIGHT_BY_STANCE）。
  *

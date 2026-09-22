@@ -343,6 +343,36 @@ const ok = (line) => { checks += 1; console.log(`ok ${checks} — ${line}`); };
   ok("目标锁迟滞：闪断 1.2 s 内不换 / 5 s 才遗忘 / 锁定期过后近到一半才换人");
 }
 
+// ---------------------------------------------------------------- 禁火的人先打能打的（rank）
+{
+  const host = MakeHost();
+  const model = new PerceptionModel(host);
+  const s = MakeSoldier(1, "ija", 0, 0, 0, 0);
+  const player = MakeCand(PLAYER_TRACK_ID, 0, -25, { isPlayer: true, moving: true });
+  player.rank = LK.heldTargetRank;                    // Think 给禁火的人身上的玩家打的标
+  const nra = MakeCand(81, 0, -30, { moving: true });
+  const cands = [player, nra];
+  for (let i = 0; i < 3; i += 1) Step(model, host, s, cands);
+  let r = model.Sense(s, cands, 0);
+  assert.equal(r.trackId, 81, `玩家 25 m × rank ${LK.heldTargetRank} 输给 30 m 的国军：先打能打的`);
+  assert.equal(r.dist, 30, "报出去的 dist 是真实距离，不带倍率");
+  assert.ok(model.Track(s, PLAYER_TRACK_ID), "玩家照样建了 Track（觉察、LKP 都按真实距离累积）");
+
+  nra.visible = false;                                // 国军缩回壕里
+  const until = host.t + LK.keepBlindS + 0.4;
+  while (host.t < until) r = Step(model, host, s, cands);
+  assert.equal(r.trackId, PLAYER_TRACK_ID, "一个国军都看不见时玩家仍然赢：面向玩家、进掩体，扳机另有闸");
+  assert.equal(r.dist, 25, "换到玩家之后报的仍是真实距离");
+
+  // 对照：不打标时 25 m 的玩家本来就赢 30 m 的国军。
+  const model2 = new PerceptionModel(host);
+  const s2 = MakeSoldier(2, "ija", 0, 0, 0, 0);
+  const c2 = [MakeCand(PLAYER_TRACK_ID, 0, -25, { isPlayer: true, moving: true }), MakeCand(82, 0, -30, { moving: true })];
+  for (let i = 0; i < 3; i += 1) Step(model2, host, s2, c2);
+  assert.equal(model2.Sense(s2, c2, 0).trackId, PLAYER_TRACK_ID, "对照：rank 1 时更近的玩家赢");
+  ok(`禁火的人先打能打的：rank ${LK.heldTargetRank} 只进选 / 换目标的比较，真实距离照报`);
+}
+
 // ---------------------------------------------------------------- Attach / Forget
 {
   const host = MakeHost();
@@ -438,4 +468,4 @@ const ok = (line) => { checks += 1; console.log(`ok ${checks} — ${line}`); };
   ok("照明弹：发现距离倍率只经 host.SightRange 生效，感知层没有第二处乘法");
 }
 
-console.log(`AiPerceptionTest OK — ${checks} 项：视锥/姿态/觉察标定/级别迟滞/听觉/LKP 记忆/目标锁/Attach/零分配/照明弹`);
+console.log(`AiPerceptionTest OK — ${checks} 项：视锥/姿态/觉察标定/级别迟滞/听觉/LKP 记忆/目标锁/禁火先打能打的/Attach/零分配/照明弹`);
