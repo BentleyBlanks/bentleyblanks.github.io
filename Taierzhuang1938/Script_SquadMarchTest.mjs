@@ -16,12 +16,24 @@ function Simulation(count=6,seed=17,extra={}){
         const delta=Math.atan2(Math.sin(Math.atan2(-dx,-dz)-o.yaw),Math.cos(Math.atan2(-dx,-dz)-o.yaw));
         o.yaw+=Math.max(-3.6*dt,Math.min(3.6*dt,delta));}
       o.speedMps=command.speedMps;
-      if(command.status==='resting')assert.equal(o.speedMps,0,'rest means a real stop');
+      if(command.status==='resting'||command.status==='pausing'||command.status==='starting')assert.equal(o.speedMps,0,'rest means a real stop');
     }
     return output;
   };
   const Run=seconds=>{for(let i=0;i<seconds*60;i++)Tick();};
   return {march,observations,Tick,Run};
+}
+// Mean pairwise correlation of follower speed traces: 1 means the column moves in lockstep.
+function SpeedCorrelation(sim,seconds){
+  const traces=new Map([...sim.march.members.values()].filter(m=>!m.leader).map(m=>[m.id,[]]));
+  for(let i=0;i<seconds*60;i++){const output=sim.Tick();if(i%30===0)for(const [id,trace] of traces)trace.push(output.get(id).speedMps);}
+  const series=[...traces.values()],pairs=[];
+  for(let a=0;a<series.length;a++)for(let b=a+1;b<series.length;b++){
+    const x=series[a],y=series[b],mx=x.reduce((p,q)=>p+q,0)/x.length,my=y.reduce((p,q)=>p+q,0)/y.length;
+    let xy=0,xx=0,yy=0;for(let k=0;k<x.length;k++){xy+=(x[k]-mx)*(y[k]-my);xx+=(x[k]-mx)**2;yy+=(y[k]-my)**2;}
+    pairs.push(xx&&yy?xy/Math.sqrt(xx*yy):1);
+  }
+  return pairs.reduce((p,q)=>p+q,0)/pairs.length;
 }
 
 for(const count of [1,3,6,9,12,24]){
@@ -49,6 +61,50 @@ assert.ok(!a.march.events.some(e=>e.id===leader.id&&e.type==='brake'&&e.time>bef
 leader.alive=false;a.Tick();assert.ok([...a.march.members.values()].find(m=>m.leader).id!==leader.id,'surviving member takes over after leader death');
 const narrow=Simulation(6);for(const o of narrow.observations)o.canPause=false;narrow.Run(20);assert.equal(narrow.march.events.filter(e=>e.type==='stop').length,0,'narrow unsafe areas forbid optional rests');
 const urgent=Simulation(6,17,{preset:'urgent'});urgent.Run(20);assert.equal(urgent.march.events.filter(e=>e.type==='stop').length,0,'urgent transfer has no optional rests');
+// User 2026-09-23: walking and urgent transfer are staggered too, not only guided rests.
+for(const [preset,type] of [['walk','stop'],['urgent','ease']]){
+  const sim=Simulation(6,17,{preset});const correlation=SpeedCorrelation(sim,90);
+  const members=[...sim.march.members.values()],events=sim.march.events.filter(e=>e.type===type);
+  assert.ok(members.every(m=>m.leader?!events.some(e=>e.id===m.id):events.filter(e=>e.id===m.id).length>=3),`${preset}: every follower staggers several times, the leader never`);
+  assert.ok(correlation<.6,`${preset}: followers no longer move in lockstep (speed correlation ${correlation.toFixed(2)})`);
+  assert.ok(sim.observations.every(o=>o.position.z<(preset==='walk'?-80:-250)),`${preset}: the whole squad keeps advancing`);
+  if(preset==='urgent')assert.equal(sim.march.events.filter(e=>e.type==='stop').length,0,'urgent staggering eases the pace but never stops');
+  console.log(`ok ${preset}: staggered ${type}s, speed correlation ${correlation.toFixed(2)}`);
+}
+// User 2026-09-23: a stop is breathing; only a low-chance stop is a slight left/right alert scan.
+{
+  const sim=Simulation(24,17),rests=new Map(),T=sim.march.tuning;
+  for(let i=0;i<90*60;i++){
+    for(const [id,o] of sim.Tick()){
+      if(o.status!=='resting')continue;
+      const key=`${id}:${sim.march.members.get(id).cycles}`,rest=rests.get(key)??{alert:false,min:0,max:0};
+      rest.alert||=o.alert===1;rest.min=Math.min(rest.min,o.lookYaw);rest.max=Math.max(rest.max,o.lookYaw);rests.set(key,rest);
+    }
+  }
+  const all=[...rests.values()],alerts=all.filter(r=>r.alert),share=alerts.length/all.length;
+  assert.ok(all.length>60&&share>.05&&share<.4,`alert scans are a low-chance subset of stops (${alerts.length}/${all.length})`);
+  assert.ok(alerts.every(r=>r.min<-.15&&r.max>.15&&Math.max(-r.min,r.max)<=T.lookYawRad+1e-9),'an alert looks both left and right, slightly');
+  assert.ok(all.filter(r=>!r.alert).every(r=>Math.max(-r.min,r.max)<=T.restGlanceRad+1e-9),'an ordinary stop keeps the eyes on the route');
+  console.log(`ok alert scans on ${alerts.length}/${all.length} stops`);
+}
+{
+  const arrived=Simulation(3,17,{route:[{x:0,z:0},{x:0,z:-8}],tuning:{alertChance:1}});arrived.Run(20);
+  assert.ok([...arrived.march.outputs.values()].every(o=>o.status==='arrived'));
+  assert.ok(arrived.march.events.filter(e=>e.type==='alert').length>=3,'people standing at the destination re-roll alert scans');
+}
+// User 2026-09-23: the start is random too. Followers standing still set off at different moments.
+{
+  const sim=Simulation(9,17),started=new Map();
+  for(let i=0;i<3*60;i++)for(const [id,o] of sim.Tick())if(o.speedMps>0&&!started.has(id))started.set(id,sim.march.time);
+  const leader=[...sim.march.members.values()].find(m=>m.leader),times=[...started.entries()].filter(([id])=>id!==leader.id).map(([,t])=>t);
+  assert.ok(started.get(leader.id)<.05,'the leader sets off at once');
+  assert.equal(times.length,8);assert.ok(Math.max(...times)-Math.min(...times)>.5,'followers set off at staggered moments');
+  const lanes=[...sim.march.members.values()].filter(m=>!m.leader).map(m=>m.route[0].x);
+  const lateral=lanes.map(x=>x-Math.round(x/sim.march.tuning.spreadM)*sim.march.tuning.spreadM);
+  assert.ok(Math.max(...lateral.map(Math.abs))>.2,'lanes are loose, not a ruled grid');
+  const moving=Simulation(6,17);for(const o of moving.observations)o.speedMps=3.2;
+  moving.Tick();assert.ok([...moving.march.outputs.values()].every(o=>o.status!=='starting'&&o.speedMps>0),'a mid-march rebuild never inserts a start delay');
+}
 const wait=Simulation(3);wait.Run(2);const lead=wait.observations[0];wait.Tick(1/60,{player:{x:lead.position.x,z:lead.position.z+40}});assert.equal(wait.march.outputs.get(lead.id).status,'waiting');
 wait.Tick(1/60,{player:{x:lead.position.x,z:lead.position.z+3}});assert.notEqual(wait.march.outputs.get(lead.id).status,'waiting');
 const straggler=wait.observations[2];straggler.position.z=lead.position.z+55;

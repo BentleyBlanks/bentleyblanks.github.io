@@ -10,16 +10,31 @@ export const SQUAD_MARCH = Object.freeze({
   waitDistanceM: 22, resumeDistanceM: 14,
   lookYawRad: .48, breathRateHz: .65, breathScale: 1.5,
   turnRateRad: 3.6, maxCount: 24, maxRoutePoints: 128,
+  // User 2026-09-23: a stop is breathing by default; only a low-chance stop turns
+  // into a slight left/right alert scan. Stationary members re-roll every retry window.
+  alertChance: .2, alertMinS: 1.8, alertMaxS: 3, alertRetryMinS: 3.5, alertRetryMaxS: 7,
+  restGlanceRad: .1, lookChestShare: .3,
+  // User 2026-09-23: the start is not a parade block. Followers standing still react
+  // 0..startDelayMaxS late; lanes/rows jitter by this fraction of spreadM/spacingM;
+  // the first run window reaches down to firstRunScale*runMinS.
+  startDelayMaxS: 1.2, startStillMps: .3, formationJitter: .22, firstRunScale: .5,
+  // Walk/urgent stagger: slow personal pace drift, ease-off phases for urgent, and a
+  // dead-banded pull back toward the formation slot (guided keeps its leader pacing).
+  paceWobble: 0, paceHzMin: .05, paceHzMax: .13, easeScale: .72, regroupM: 1.5, regroupScale: .14,
 });
 
+// cadence: rest = run/brake/breathe; pause = walk/brake/brief stop (no panting);
+// ease = never stops, alternates full pace with an eased pace (urgent transfer).
 export const SQUAD_MARCH_PRESETS = Object.freeze({
-  guided: Object.freeze({}),
-  walk: Object.freeze({ speedMps: SQUAD_MARCH.walkMps }),
-  urgent: Object.freeze({ pauses: false, speedMps: 4.5 }),
+  guided: Object.freeze({ cadence: 'rest' }),
+  walk: Object.freeze({ cadence: 'pause', speedMps: SQUAD_MARCH.walkMps, leaderSpeedScale: .94,
+    runMinS: 4, runMaxS: 9, restMinS: .6, restMaxS: 1.4, stopGapS: .9, restFraction: .25, paceWobble: .06 }),
+  urgent: Object.freeze({ cadence: 'ease', speedMps: 4.5, leaderSpeedScale: .95,
+    runMinS: 1.6, runMaxS: 3.6, restMinS: .8, restMaxS: 1.6, stopGapS: .5, paceWobble: .05 }),
 });
 
 export const SQUAD_MARCH_EDITOR = Object.freeze({
-  count: 6, seed: 17, leaderIndex: 0, preset: 'guided',
+  count: 6, seed: 17, leaderIndex: 0, preset: 'guided', startYawJitterRad: .45,
   storageKey: 'tengxian1938_squad_march_v1',
   route: Object.freeze([
     Object.freeze({x:-12,z:10}), Object.freeze({x:-12,z:-12}),

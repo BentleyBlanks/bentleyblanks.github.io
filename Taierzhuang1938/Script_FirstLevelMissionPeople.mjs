@@ -163,7 +163,7 @@ export function InstallMissionSentry(soldier){
       pose.Chain(b.upperArmR,b.forearmR,b.handR,soldier.missionRescueTarget.clone().addScaledVector(pose.Local(.22,0,0).sub(pose.Local(0,0,0)),1),pose.Local(.5,.8,-.5));
       rig.root.updateWorldMatrix(true,true);return result;
     }
-    if(!soldier.alive || soldier.squadMarchCommand?.breath || state.dead || state.firing || state.moveSpeed>.08 || state.carryRole || state.meleeCombat ||
+    if(!soldier.alive || soldier.squadMarchCommand?.breath || soldier.squadMarchCommand?.alert || soldier.squadMarchCommand?.lookYaw || state.dead || state.firing || state.moveSpeed>.08 || state.carryRole || state.meleeCombat ||
       soldier.target || soldier.missionTrainLife?.weight>.01)return result;
     pose.basis=actor.root;
     const b=rig.bones,scan=Math.sin(time*.23+phase);

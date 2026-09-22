@@ -39,6 +39,8 @@ export class StandIdleLayer {
     this._offset = new THREE.Vector3();
     this._pole = new THREE.Vector3();
     this._quaternion = new THREE.Quaternion();
+    // 行进层给了视线（喘息扫一眼、警戒张望）时与闲逛扫视之间的混合权重，免得头一帧跳过去。
+    this.directed = 0;
   }
 
   /** mixer 采样之前调用：把上一帧叠上去的骨头全部还原。 */
@@ -54,6 +56,10 @@ export class StandIdleLayer {
     const t = this.time + this.phase;
     const march = this.soldier.squadMarchCommand;
     const recovering = march?.breath > 0;
+    // 行进层指定了视线：喘息、驻足时的一眼，或低概率的警戒张望（左右稍微看看）。
+    const directed = !!march?.controlled && (recovering || march.alert > 0 || Math.abs(march.lookYaw || 0) > 1e-4);
+    this.directed += ((directed ? 1 : 0) - this.directed) * (1 - Math.exp(-Math.max(0, dt) * 6));
+    const look = directed ? march.lookYaw || 0 : 0, share = SQUAD_MARCH.lookChestShare, w = this.directed;
     const breath = Math.sin(t * TAU * (recovering ? SQUAD_MARCH.breathRateHz : C.breathRateHz))
       * (recovering ? SQUAD_MARCH.breathScale : 1);
     const shift = Math.sin(t * TAU * C.shiftRateHz) * 0.75 + Math.sin(t * TAU * C.shiftJitterHz) * 0.25;
@@ -81,11 +87,13 @@ export class StandIdleLayer {
       pose.Save(bone);
       bone.quaternion.copy(bone.parent.getWorldQuaternion(this._quaternion).invert().multiply(foot.rotation));
     }
-    pose.Tilt(bones.chest, -breath * C.breathChestRad, scan * C.chestYawRad, -shift * C.shiftLeanRad);
+    // 指定视线时肩线带走一部分转角（lookChestShare），头只转剩下的，合起来就是 lookYaw。
+    pose.Tilt(bones.chest, -breath * C.breathChestRad,
+      scan * C.chestYawRad * (1 - w) + look * share * w, -shift * C.shiftLeanRad);
     // 头让给哨兵层（它装在任务演员身上，摆幅更大）；没有它的人由这里张望。
-    if (!rig.missionSentryPose || recovering) {
+    if (!rig.missionSentryPose || directed) {
       pose.Tilt(bones.head, Math.sin(t * TAU * C.headPitchRateHz) * C.headPitchRad,
-        recovering ? march.lookYaw : scan * C.headYawRad, 0);
+        scan * C.headYawRad * (1 - w) + look * (1 - share) * w, 0);
     }
     // 这里**不做**整棵子树的 updateWorldMatrix：那是一趟约 137 个节点的递归，几十个站着的人
     // 同时走就是整帧最大的单项（账在 Script_CharacterModel._GroundInfantryBlend 的头注里）。

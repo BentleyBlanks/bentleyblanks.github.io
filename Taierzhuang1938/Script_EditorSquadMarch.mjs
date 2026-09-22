@@ -1,12 +1,17 @@
 import * as THREE from 'three';
 import { Panel,Section,Slider,Select,ButtonRow,Button,Toggle,Note,El,Row } from './Script_EditorUi.mjs';
 import { SQUAD_MARCH as C,SQUAD_MARCH_EDITOR as E,SQUAD_MARCH_PRESETS } from './Data_Tuning_SquadMarch.mjs';
-import { SquadMarch,ValidateSquadMarchConfig } from './Script_SquadMarch.mjs';
+import { SquadMarch,SquadMarchRandom,ValidateSquadMarchConfig } from './Script_SquadMarch.mjs';
 import { InstallSquadMarchActor } from './Script_SquadMarchActor.mjs';
 import { MarkNoPrepass } from './Script_Post.mjs';
 
-const COLORS={running:'#a7cbe3',braking:'#ddb668',resting:'#f2cd75',catchup:'#8bdbc4',waiting:'#efaa80',yielding:'#c49fe1',arrived:'#98c58e'};
-const LABELS={running:'跑动',braking:'收步',resting:'喘息观察',catchup:'追赶',waiting:'等候',yielding:'让行',arrived:'到达'};
+const COLORS={running:'#a7cbe3',starting:'#6f7d88',braking:'#ddb668',resting:'#f2cd75',pausing:'#f2cd75',easing:'#5f8fc4',alert:'#e0675a',
+  catchup:'#8bdbc4',waiting:'#efaa80',yielding:'#c49fe1',arrived:'#98c58e'};
+const LABELS={running:'行进',starting:'待发',braking:'收步',resting:'喘息',pausing:'驻足',easing:'放缓',catchup:'追赶',waiting:'等候',yielding:'让行',arrived:'到达'};
+const LEGEND='蓝：行进　深蓝：放缓　灰：待发　金：喘息 / 驻足　红：警戒张望　绿：追赶 / 到达　紫：让行';
+// Slider wording follows the preset's cadence (Data_Tuning_SquadMarch presets).
+const CADENCE={rest:{run:'跑动',stop:'喘息',gap:'停步'},pause:{run:'行走',stop:'驻足',gap:'停步'},ease:{run:'全速',stop:'放缓',gap:'放缓'}};
+const Status=o=>o?.alert?'alert':o?.status;
 const Clone=value=>JSON.parse(JSON.stringify(value));
 const Angle=a=>Math.atan2(Math.sin(a),Math.cos(a));
 
@@ -50,7 +55,10 @@ export class SquadMarchEditor {
     ButtonRow(squad,[{label:'换一个随机样式',onClick:()=>{this.config.seed=String(Math.floor(Math.random()*1e9));seed.value=this.config.seed;this.Rebuild();}},
       {label:'同种子重播',onClick:()=>this.Rebuild()}]);
     Select(squad,'班长',Array.from({length:this.config.count},(_,i)=>({value:String(i),label:`队员 ${i+1}`})),String(this.config.leaderIndex),v=>{this.config.leaderIndex=Number(v);this.Rebuild();});
-    Select(squad,'行进方式',[{value:'guided',label:'带路跑 · 错峰喘息'},{value:'walk',label:'步行'},{value:'urgent',label:'紧急转移 · 持续前进'}],this.config.preset,v=>{this.config.preset=v;delete this.config.tuning.speedMps;this.BuildUi();this.Rebuild();});
+    Select(squad,'行进方式',[{value:'guided',label:'带路跑 · 错峰喘息'},{value:'walk',label:'步行 · 错开驻足'},{value:'urgent',label:'紧急转移 · 错开放缓'}],this.config.preset,v=>{
+      // Values a preset supplies (speed, cadence windows) restart from the new preset.
+      for(const key of Object.keys({...SQUAD_MARCH_PRESETS[this.config.preset],...SQUAD_MARCH_PRESETS[v]}))delete this.config.tuning[key];
+      this.config.preset=v;this.BuildUi();this.Rebuild();});
     const play=Section(body,'观看');
     this.playToggle=Toggle(play,'播放 / 暂停',this.playing,v=>{this.playing=v;});
     ButtonRow(play,[{label:'前进一帧',onClick:()=>{this.playing=false;this.playToggle.Set(false);this.Step(1/60);}},
@@ -59,15 +67,18 @@ export class SquadMarchEditor {
     this.followToggle=Toggle(play,'近看所选队员',this.follow,v=>{this.follow=v;this.Frame();});
     Select(play,'观察队员',Array.from({length:this.config.count},(_,i)=>({value:String(i),label:`队员 ${i+1}`})),String(Math.min(this.selected,this.config.count-1)),v=>{this.selected=Number(v);});
     const parameters=Section(body,'行进参数');
-    const tuning={...C,...SQUAD_MARCH_PRESETS[this.config.preset],...this.config.tuning};
-    const fields=[['speedMps','速度（米/秒）',.5,6,.1],['spreadM','横向疏密（米）',.5,4,.1],['spacingM','前后间距（米）',1,3.5,.1],
-      ['runMinS','最短跑动（秒）',1,8,.1],['runMaxS','最长跑动（秒）',1,10,.1],['restMinS','最短喘息（秒）',.3,3,.1],['restMaxS','最长喘息（秒）',.3,4,.1],
-      ['stopGapS','停步错开（秒）',.1,2,.1],['speedVariation','个人速度差',0,.2,.01],['lookYawRad','观察转角',.1,.7,.05]];
+    const tuning={...C,...SQUAD_MARCH_PRESETS[this.config.preset],...this.config.tuning},words=CADENCE[tuning.cadence??'rest'];
+    const fields=[['speedMps','速度（米/秒）',.5,6,.05],['spreadM','横向疏密（米）',.5,4,.1],['spacingM','前后间距（米）',1,3.5,.1],
+      ['formationJitter','队形随机',0,.45,.01],['startDelayMaxS','起步错开（秒）',0,3,.1],
+      ['runMinS',`最短${words.run}（秒）`,1,8,.1],['runMaxS',`最长${words.run}（秒）`,1,10,.1],['restMinS',`最短${words.stop}（秒）`,.3,3,.1],['restMaxS',`最长${words.stop}（秒）`,.3,4,.1],
+      ...(tuning.cadence==='ease'?[['easeScale','放缓速度比例',.4,.95,.01]]:[]),
+      ['stopGapS',`${words.gap}错开（秒）`,.1,2,.1],['speedVariation','个人速度差',0,.2,.01],['paceWobble','步速起伏',0,.2,.01],
+      ['alertChance','警戒张望概率',0,1,.05],['lookYawRad','张望转角',.1,.7,.05]];
     for(const [key,label,min,max,step] of fields){
       this.sliders[key]=Slider(parameters,{label,min,max,step,value:tuning[key],onInput:v=>{
         this.config.tuning[key]=v;
         for(const [low,high] of [['runMinS','runMaxS'],['restMinS','restMaxS']]){
-          const values={...C,...this.config.tuning};if(values[low]>values[high]){const other=key===low?high:low;this.config.tuning[other]=v;this.sliders[other].Set(v);}
+          const values={...C,...SQUAD_MARCH_PRESETS[this.config.preset],...this.config.tuning};if(values[low]>values[high]){const other=key===low?high:low;this.config.tuning[other]=v;this.sliders[other].Set(v);}
         }
         this.Rebuild();
       }});
@@ -88,8 +99,8 @@ export class SquadMarchEditor {
     }
     this.BindRouteInput();
     const history=Section(body,'全队状态 · 最近 15 秒');
-    this.timeline=El('canvas');this.timeline.width=560;this.timeline.height=60+this.config.count*22;this.timeline.style.cssText='width:100%;background:#20262b';this.historyPanel.replaceChildren();Note(this.historyPanel,'各人跑停 · 最近 15 秒　蓝：跑动　金：喘息　绿：追赶 / 到达');this.historyPanel.appendChild(this.timeline);this.timeline.style.maxWidth='620px';this.timeline.style.display='block';this.timeline.style.margin='auto';
-    Note(history,'蓝：跑动　金：喘息　绿：追赶 / 到达　紫：让行');
+    this.timeline=El('canvas');this.timeline.width=560;this.timeline.height=60+this.config.count*22;this.timeline.style.cssText='width:100%;background:#20262b';this.historyPanel.replaceChildren();Note(this.historyPanel,`各人状态 · 最近 15 秒　${LEGEND}`);this.historyPanel.appendChild(this.timeline);this.timeline.style.maxWidth='620px';this.timeline.style.display='block';this.timeline.style.margin='auto';
+    Note(history,LEGEND);
 
     const save=Section(body,'保存样式');
     ButtonRow(save,[{label:'保存此人数的样式',onClick:()=>this.SaveProfile()},
@@ -146,7 +157,9 @@ export class SquadMarchEditor {
     for(const member of this.march.members.values()){
       const actor=this.host.actorFactory.Create('nra',{seed:i*7+3,weapon:'HanYang',modelVariant:i%4});
       const first=member.route[0]??this.config.route[0],next=member.route[1]??this.config.route.at(-1);actor.root.position.set(first.x,0,first.z);
-      const soldier={id:i+1,actor,alive:true,position:actor.root.position,yaw:Math.atan2(first.x-next.x,first.z-next.z),moveSpeed:0,memberId:member.id};
+      // Followers do not all face the route exactly; they turn onto it as they set off.
+      const turn=member.leader?0:(SquadMarchRandom(`${this.config.seed}:${member.id}:pose`)()-.5)*2*E.startYawJitterRad;
+      const soldier={id:i+1,actor,alive:true,position:actor.root.position,yaw:Math.atan2(first.x-next.x,first.z-next.z)+turn,moveSpeed:0,memberId:member.id};
       actor.root.rotation.y=soldier.yaw;InstallSquadMarchActor(soldier);this.studio.stand.add(actor.root);this.actors.push(actor);this.soldiers.push(soldier);i++;
       const label=El('canvas');label.width=192;label.height=48;const ctx=label.getContext('2d');
       ctx.fillStyle='#101518cc';ctx.fillRect(0,0,192,48);ctx.fillStyle=member.leader?'#f2d275':'#ffffff';ctx.font='bold 30px sans-serif';ctx.textAlign='center';ctx.fillText(`${i}${member.leader?' 班长':''}`,96,35);
@@ -180,8 +193,8 @@ export class SquadMarchEditor {
       s.actor.root.rotation.y=s.yaw;
       s.actor.Update(dt,{moveSpeed:s.moveSpeed,moveSpeedMps:s.moveSpeed*3.6,aim:0,grounded:true,elapsed:this.march.time,lookYaw:o.lookYaw});
     }
-    if(this.march.time>=this.sampleAt){this.sampleAt=this.march.time+.1;this.samples.push({time:this.march.time,states:[...this.march.members.keys()].map(id=>outputs.get(id)?.status)});while(this.samples[0]?.time<this.march.time-15)this.samples.shift();this.DrawRoute();this.DrawTimeline();
-      const s=this.soldiers[this.selected],o=outputs.get(s.memberId);this.SetStatus(`队员 ${this.selected+1}${o.leader?' · 班长':''}：${LABELS[o.status]||o.status} · ${(s.moveSpeed*3.6).toFixed(1)} 米/秒 · ${this.march.time.toFixed(1)} 秒`);
+    if(this.march.time>=this.sampleAt){this.sampleAt=this.march.time+.1;this.samples.push({time:this.march.time,states:[...this.march.members.keys()].map(id=>Status(outputs.get(id)))});while(this.samples[0]?.time<this.march.time-15)this.samples.shift();this.DrawRoute();this.DrawTimeline();
+      const s=this.soldiers[this.selected],o=outputs.get(s.memberId);this.SetStatus(`队员 ${this.selected+1}${o.leader?' · 班长':''}：${LABELS[o.status]||o.status}${o.alert?' · 警戒张望':''} · ${(s.moveSpeed*3.6).toFixed(1)} 米/秒 · ${this.march.time.toFixed(1)} 秒`);
     }
   }
   DrawRoute(){
@@ -192,7 +205,7 @@ export class SquadMarchEditor {
     for(let v=-span/2;v<=span/2;v+=gridStep){ctx.beginPath();ctx.moveTo(X(v),0);ctx.lineTo(X(v),canvas.height);ctx.stroke();ctx.beginPath();ctx.moveTo(0,Z(v));ctx.lineTo(canvas.width,Z(v));ctx.stroke();}
     ctx.strokeStyle='#ccb77a';ctx.lineWidth=3;ctx.beginPath();this.config.route.forEach((p,i)=>i?ctx.lineTo(X(p.x),Z(p.z)):ctx.moveTo(X(p.x),Z(p.z)));ctx.stroke();
     this.config.route.forEach((p,i)=>{ctx.fillStyle=i===this.routeIndex?'#fff0bc':'#cbb16a';ctx.beginPath();ctx.arc(X(p.x),Z(p.z),7,0,Math.PI*2);ctx.fill();ctx.font='18px sans-serif';ctx.fillText(String(i+1),X(p.x)+10,Z(p.z)-8);});
-    for(const s of this.soldiers){ctx.fillStyle=s.squadMarchCommand?.leader?'#ffffff':COLORS[s.squadMarchCommand?.status]||'#9bc9e8';ctx.beginPath();ctx.arc(X(s.position.x),Z(s.position.z),4,0,Math.PI*2);ctx.fill();}
+    for(const s of this.soldiers){ctx.fillStyle=s.squadMarchCommand?.leader?'#ffffff':COLORS[Status(s.squadMarchCommand)]||'#9bc9e8';ctx.beginPath();ctx.arc(X(s.position.x),Z(s.position.z),4,0,Math.PI*2);ctx.fill();}
   }
   DrawTimeline(){
     if(!this.timeline)return;const ctx=this.timeline.getContext('2d'),w=this.timeline.width;ctx.clearRect(0,0,w,this.timeline.height);ctx.font='17px sans-serif';

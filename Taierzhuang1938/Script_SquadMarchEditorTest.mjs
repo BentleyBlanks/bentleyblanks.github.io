@@ -61,10 +61,25 @@ try{
     for(let i=0;i<5400;i++)e.Step(1/60);
     return [...e.march.members.values()].map(m=>({id:m.id,leader:m.leader,cycles:m.cycles}));
   });assert.ok(cycles.every(m=>m.leader?m.cycles===0:m.cycles>=3),'each real model completes at least three independent run/rest cycles');
-  await page.evaluate(()=>{const e=window.Tengxian.editor.active;e.LoadConfig({...e.config,count:6,leaderIndex:0,route:[{x:-12,z:10},{x:-12,z:-12},{x:12,z:-12},{x:12,z:10}]});e.playing=false;for(let i=0;i<420;i++)e.Step(1/60);e.Frame();});
+  // User 2026-09-23: walking and urgent transfer stagger as well (brief stops / eased pace).
+  for(const [preset,type] of [['walk','stop'],['urgent','ease']]){
+    const staggered=await page.evaluate(({preset})=>{
+      const e=window.Tengxian.editor.active;e.LoadConfig({...e.config,count:6,leaderIndex:0,seed:'17',preset,tuning:{},route:[{x:0,z:12},{x:0,z:-500}]});e.playing=false;
+      for(let i=0;i<3600;i++)e.Step(1/60);
+      return {preset:e.config.preset,events:e.march.events.map(v=>({id:v.id,type:v.type})),leader:[...e.march.members.values()].find(m=>m.leader).id,
+        option:[...document.querySelectorAll('[data-squad-march] option')].some(o=>o.value===preset&&o.textContent.includes('错开'))};
+    },{preset});
+    const followers=new Set(staggered.events.filter(v=>v.type===type).map(v=>v.id));
+    assert.equal(staggered.preset,preset);assert.ok(staggered.option,`${preset}: the menu names its staggering`);
+    assert.ok(followers.size===5&&!followers.has(staggered.leader),`${preset}: all five real followers stagger, the leader does not`);
+    if(preset==='urgent')assert.ok(!staggered.events.some(v=>v.type==='stop'),'urgent transfer never stops');
+    console.log(`ok ${preset}: real actors stagger by ${type}`);
+  }
+  // Scans are a low-chance state; force the chance here so the rest pose check is deterministic.
+  await page.evaluate(()=>{const e=window.Tengxian.editor.active;e.LoadConfig({...e.config,count:6,leaderIndex:0,preset:'guided',tuning:{alertChance:1},route:[{x:-12,z:10},{x:-12,z:-12},{x:12,z:-12},{x:12,z:10}]});e.playing=false;for(let i=0;i<420;i++)e.Step(1/60);e.Frame();});
   await page.screenshot({path:path.join(out,'Scene_SquadMarchSix.png')});
-  const rest=await page.evaluate(()=>{const e=window.Tengxian.editor.active;for(let i=0;i<600;i++){e.Step(1/60);const at=e.soldiers.findIndex(s=>s.squadMarchCommand?.status==='resting'&&Math.abs(s.squadMarchCommand.lookYaw)>.15);if(at>=0){e.selected=at;e.follow=true;e.Frame();return {id:e.soldiers[at].memberId,speed:e.soldiers[at].moveSpeed,look:e.soldiers[at].squadMarchCommand.lookYaw};}}return null;});
-  assert.ok(rest&&rest.speed===0&&Math.abs(rest.look)>.15,'resting actor is stopped and actually scanning');
+  const rest=await page.evaluate(()=>{const e=window.Tengxian.editor.active;for(let i=0;i<600;i++){e.Step(1/60);const at=e.soldiers.findIndex(s=>s.squadMarchCommand?.status==='resting'&&s.squadMarchCommand.alert&&Math.abs(s.squadMarchCommand.lookYaw)>.15);if(at>=0){e.selected=at;e.follow=true;e.Frame();return {id:e.soldiers[at].memberId,speed:e.soldiers[at].moveSpeed,look:e.soldiers[at].squadMarchCommand.lookYaw};}}return null;});
+  assert.ok(rest&&rest.speed===0&&Math.abs(rest.look)>.15,'a resting actor on an alert stop is stopped and actually scanning');
   await page.screenshot({path:path.join(out,'Scene_SquadMarchRest.png')});
   const pose=await page.evaluate(()=>{
     const e=window.Tengxian.editor.active,s=e.soldiers[e.selected],bones=s.actor.characterRig.bones;

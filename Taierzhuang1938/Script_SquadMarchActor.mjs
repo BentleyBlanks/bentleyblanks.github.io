@@ -10,7 +10,7 @@ export function InstallSquadMarchActor(soldier){
   if(rig.p012ActorMotion){
     const original=rig.Update;
     rig.Update=function UpdateSquadMarchMissionActor(dt,state={}){
-      const recovering=soldier.squadMarchCommand?.breath&&!state.firing;
+      const command=soldier.squadMarchCommand,recovering=(command?.breath||command?.alert)&&!state.firing;
       return original.call(this,dt,recovering?{...state,aim:0,lookYaw:0}:state);
     };
     return true;

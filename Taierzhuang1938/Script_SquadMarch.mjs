@@ -94,7 +94,10 @@ export function ValidateSquadMarchConfig(raw) {
     ||t.accelerationMps2<.1||t.decelerationMps2<.1||t.separationM<.4||t.spacingM<t.separationM
     ||t.restFraction<=0||t.restFraction>.5||t.resumeDistanceM>=t.waitDistanceM
     ||t.speedVariation>.5||t.leaderSpeedScale<=0||t.leaderSpeedScale>1||t.catchupM<1||t.catchupScale<1||t.catchupScale>2
-    ||t.arrivalM<.05||t.localRadiusM<t.separationM||t.stopGapS<.1||t.turnRateRad<.1)throw new Error('Inconsistent march tuning range');
+    ||t.arrivalM<.05||t.localRadiusM<t.separationM||t.stopGapS<.1||t.turnRateRad<.1
+    ||t.alertChance>1||t.alertMaxS<t.alertMinS||t.alertMinS<.3||t.alertRetryMinS<.5||t.alertRetryMaxS<t.alertRetryMinS
+    ||t.startDelayMaxS>5||t.formationJitter>.45||t.firstRunScale<.1||t.firstRunScale>1||t.paceWobble>.3||t.paceHzMax<t.paceHzMin
+    ||t.easeScale<.3||t.easeScale>1||t.regroupScale>.5||t.lookChestShare>1||!['rest','pause','ease'].includes(t.cadence??'rest'))throw new Error('Inconsistent march tuning range');
   if(config.members){
     if(!Array.isArray(config.members)||config.members.length!==config.count||config.members.some(m=>!m||m.id==null||String(m.id)==='')
       ||new Set(config.members.map(m=>String(m.id))).size!==config.count)throw new Error('Member IDs must be unique and match count');
@@ -108,8 +111,12 @@ export function SquadMarchRoute(route,slot,tuning=C,seed=17) {
   const rnd=SquadMarchRandom(`${seed}:lane:${slot}`);
   const singleFile=route.some(p=>p.width<A.narrowWidthM);
   const row=slot===0?0:Math.floor((slot-1)/3)+1;
-  const lane=slot===0||singleFile?0:((slot-1)%3-1)*tuning.spreadM+(rnd()-.5)*.4;
-  const back=slot===0?0:(singleFile?slot:row)*tuning.spacingM+(rnd()-.5)*.3;
+  // Loose, not a parade block: jitter is a fraction of the lane spacing, and half that
+  // of the row spacing. Rows are the tight axis: a later member must still be able to
+  // reach a front slot past rear members already parked (corner routes, 14 people).
+  const jitter=tuning.formationJitter??C.formationJitter;
+  const lane=slot===0||singleFile?0:((slot-1)%3-1)*tuning.spreadM+(rnd()-.5)*2*jitter*tuning.spreadM;
+  const back=slot===0?0:(singleFile?slot:row)*tuning.spacingM+(rnd()-.5)*jitter*tuning.spacingM;
   return route.map((p,i)=>{
     const a=route[Math.max(0,i-1)],b=route[Math.min(route.length-1,i+1)];
     const d=Distance(a,b)||1,dx=(b.x-a.x)/d,dz=(b.z-a.z)/d;
@@ -122,36 +129,67 @@ export class SquadMarch {
   constructor(raw) {
     this.config=ValidateSquadMarchConfig(raw);
     this.tuning={...C,...SQUAD_MARCH_PRESETS[this.config.preset],...this.config.tuning};
+    this.cadence=this.tuning.cadence??'rest';
     this.time=0;this.events=[];this.members=new Map();this.outputs=new Map();this.waiting=false;
     const specs=this.config.members??Array.from({length:this.config.count},(_,i)=>({id:`Member${i+1}`}));
     let slot=1;
     for(let i=0;i<specs.length;i++){
-      const spec=specs[i],id=String(spec.id),leader=i===this.config.leaderIndex;
-      const rnd=SquadMarchRandom(`${this.config.seed}:${id}`);
-      const formationSlot=leader?0:slot++;
-      const followDistance=leader?0:(Math.floor((formationSlot-1)/3)+1)*this.tuning.spacingM;
-      const member={id,leader,rnd,route:spec.route?.map(p=>({...p}))??SquadMarchRoute(this.config.route,formationSlot,this.tuning,this.config.seed),
-        index:0,phase:'run',speed:0,runLeft:0,restLeft:0,restLength:1,restSign:1,cycles:0,lastStop:-Infinity,
-        formationSlot,followDistance,stride:1+(rnd()-.5)*2*this.tuning.speedVariation};
-      member.runLeft=this.RunDuration(member);this.members.set(id,member);
+      const spec=specs[i],id=String(spec.id),formationSlot=i===this.config.leaderIndex?0:slot++;
+      const route=spec.route?.map(p=>({...p}))??SquadMarchRoute(this.config.route,formationSlot,this.tuning,this.config.seed);
+      this.members.set(id,this.NewMember(id,formationSlot,route));
     }
+  }
+  // Cadence draws (run/rest lengths) use rnd; start, pace and alert draws use a separate
+  // style stream so adding a presentation choice never reshuffles the stop schedule.
+  NewMember(id,slot,route){
+    const t=this.tuning,rnd=SquadMarchRandom(`${this.config.seed}:${id}`),style=SquadMarchRandom(`${this.config.seed}:${id}:style`);
+    const m={id,leader:slot===0,rnd,style,route,index:0,phase:'run',speed:0,runLeft:0,restLeft:0,restLength:1,restSign:1,cycles:0,lastStop:-Infinity,
+      formationSlot:slot,followDistance:slot===0?0:(Math.floor((slot-1)/3)+1)*t.spacingM,stride:1+(rnd()-.5)*2*t.speedVariation,
+      startLeft:slot===0?0:t.startDelayMaxS*style(),paceHz:t.paceHzMin+style()*(t.paceHzMax-t.paceHzMin),pacePhase:style()*Math.PI*2,
+      alert:null,alertNext:null};
+    // The first window reaches lower than later ones, so first stops do not bunch at runMinS.
+    const first=t.runMinS*t.firstRunScale;m.runLeft=first+rnd()*(t.runMaxS-first);
+    return m;
   }
   RunDuration(m){return this.tuning.runMinS+m.rnd()*(this.tuning.runMaxS-this.tuning.runMinS);}
   SetLeader(id){
     if(!this.members.has(String(id)))throw new Error('Leader must be a squad member');
-    for(const m of this.members.values()){m.leader=m.id===String(id);if(m.leader){m.followDistance=0;this.Resume(m,'role');}}
+    for(const m of this.members.values()){m.leader=m.id===String(id);if(m.leader){m.followDistance=0;m.startLeft=0;this.Resume(m,'role');}}
+  }
+  // A slight look out to one side, hold, across to the other, hold, back to the route.
+  StartAlert(m,minLength=0){
+    const t=this.tuning,s=m.style,length=Math.max(minLength,t.alertMinS+s()*(t.alertMaxS-t.alertMinS));
+    m.alert={at:this.time,length,sign:s()<.5?-1:1,first:t.lookYawRad*(.6+s()*.35),second:t.lookYawRad*(.6+s()*.35)};
+    this.Event(m,'alert','random');return length;
+  }
+  AlertYaw(m){
+    const a=m.alert;if(!a)return 0;
+    const p=(this.time-a.at)/a.length;
+    if(p>=1){m.alert=null;return 0;}
+    const keys=[[0,0],[.2,a.first*a.sign],[.4,a.first*a.sign],[.64,-a.second*a.sign],[.82,-a.second*a.sign],[1,0]];
+    let i=1;while(p>keys[i][0])i++;
+    const [p0,v0]=keys[i-1],[p1,v1]=keys[i],k=(p-p0)/(p1-p0);
+    return v0+(v1-v0)*k*k*(3-2*k);
+  }
+  // Members standing for a while (arrived, held) roll a low-chance alert every retry window.
+  Still(m){
+    const t=this.tuning;
+    if(!m.alert){
+      if(m.alertNext==null)m.alertNext=this.time+.4+m.style()*.8;
+      else if(this.time>=m.alertNext){
+        m.alertNext=this.time+t.alertRetryMinS+m.style()*(t.alertRetryMaxS-t.alertRetryMinS);
+        if(m.style()<t.alertChance)this.StartAlert(m);
+      }
+    }
+    return this.AlertYaw(m);
   }
   AddMember(id,{route=null}={}){
     id=String(id);
     if(this.members.has(id))throw new Error('Member already belongs to this squad');
     if(this.members.size>=C.maxCount)throw new Error('Squad is full');
     let slot=this.members.size?1:0;const occupied=new Set([...this.members.values()].map(m=>m.formationSlot));while(occupied.has(slot))slot++;
-    const rnd=SquadMarchRandom(`${this.config.seed}:${id}`);
-    const m={id,leader:slot===0,rnd,route:route==null?SquadMarchRoute(this.config.route,slot,this.tuning,this.config.seed):MemberRoute(route),
-      index:0,phase:'run',speed:0,restLeft:0,restLength:1,restSign:1,cycles:0,lastStop:-Infinity,
-      formationSlot:slot,followDistance:slot===0?0:(Math.floor((slot-1)/3)+1)*this.tuning.spacingM,
-      stride:1+(rnd()-.5)*2*this.tuning.speedVariation};
-    m.runLeft=this.RunDuration(m);this.members.set(id,m);this.config.count=this.members.size;return m;
+    const m=this.NewMember(id,slot,route==null?SquadMarchRoute(this.config.route,slot,this.tuning,this.config.seed):MemberRoute(route));
+    this.members.set(id,m);this.config.count=this.members.size;return m;
   }
   RemoveMember(id){
     const m=this.members.get(String(id));if(!m)return false;
@@ -164,7 +202,7 @@ export class SquadMarch {
     m.route=MemberRoute(route);m.index=0;m.arrived=false;this.Resume(m,'route');
   }
   Event(m,type,reason){this.events.push({id:m.id,type,reason,time:this.time});if(this.events.length>512)this.events.shift();}
-  Resume(m,reason){if(m.phase!=='run')this.Event(m,'resume',reason);m.phase='run';m.runLeft=this.RunDuration(m);m.restLeft=0;
+  Resume(m,reason){if(m.phase!=='run')this.Event(m,'resume',reason);m.phase='run';m.runLeft=this.RunDuration(m);m.restLeft=0;m.alert=null;m.alertNext=null;
     if(reason!=='cadence'){m.avoidGoal=null;m.avoidRoute=[];}}
   Update(dt,observations,{player=null,paused=false}={}){
     if(paused||!(dt>0))return this.outputs;
@@ -204,11 +242,15 @@ export class SquadMarch {
         this.outputs.set(m.id,{id:m.id,status:o?.alive===false?'dead':'released',controlled:false,speedMps:0,lookYaw:0,breath:0});continue;
       }
       m.suspended=false;
+      // Reaction delay only for a member starting from standstill; a mid-march rebuild
+      // (hosts rebuild on route changes) must never make running people stop.
+      if(!m.started){m.started=true;if((o.speedMps??0)>t.startStillMps)m.startLeft=0;}
       const beforeIndex=m.index;
       while(m.index<m.route.length&&Distance(o.position,m.route[m.index])<t.arrivalM)m.index++;
       if(m.index!==beforeIndex){m.avoidGoal=null;m.avoidRoute=[];}
       let target=m.route[m.index];
-      if(!target){if(!m.arrived)this.Resume(m,'arrived');m.arrived=true;m.speed=0;this.outputs.set(m.id,{id:m.id,status:'arrived',controlled:true,goal:{...o.position},speedMps:0,lookYaw:0,breath:0,leader:m.leader});continue;}
+      if(!target){if(!m.arrived)this.Resume(m,'arrived');m.arrived=true;m.speed=0;m.startLeft=0;const lookYaw=this.Still(m);
+        this.outputs.set(m.id,{id:m.id,status:'arrived',controlled:true,goal:{...o.position},speedMps:0,lookYaw,alert:m.alert?1:0,breath:0,leader:m.leader});continue;}
       m.arrived=false;
       let distance=Distance(o.position,target),dx=(target.x-o.position.x)/(distance||1),dz=(target.z-o.position.z)/(distance||1);
       const obstacles=observations.filter(other=>String(other.id)!==m.id&&other.alive!==false&&other.active!==false);
@@ -247,7 +289,10 @@ export class SquadMarch {
       const tooFarAhead=!m.leader&&lead&&(progress.get(m.id)??0)>leadProgress+t.spacingM*2;
       const catchup=behind>t.catchupM||playerProgress-(progress.get(m.id)??playerProgress)>t.catchupM;
       const wait=this.waiting&&(m.leader||!catchup);
-      const noPause=o.noPause||m.avoiding||target.width<A.narrowWidthM||catchup||wait||o.maxSpeed===0||t.pauses===false||this.config.preset==='walk';
+      const cadence=this.cadence;
+      if(m.startLeft>0){if(m.leader||catchup||o.noPause)m.startLeft=0;else m.startLeft-=dt;}
+      const starting=m.startLeft>0;
+      const noPause=o.noPause||m.avoiding||target.width<A.narrowWidthM||catchup||wait||starting||o.maxSpeed===0||(t.pauses===false&&cadence!=='ease');
       if(noPause||m.leader){if(m.phase!=='run')this.Resume(m,'priority');}
       if(!noPause&&!m.leader&&m.phase==='run'&&gap>t.separationM){
         // Count time actually running. A blocked member cannot "rest" while stuck.
@@ -259,34 +304,56 @@ export class SquadMarch {
           const stopped=local.filter(other=>other.phase!=='run').length;
           const last=Math.max(-Infinity,...local.map(other=>other.lastStop));
           const maxRest=Math.max(1,Math.floor(local.length*t.restFraction));
-          if(stopped<maxRest&&this.time-last>=t.stopGapS&&o.canPause!==false){
-            m.phase='brake';m.lastStop=this.time;m.restLength=t.restMinS+m.rnd()*(t.restMaxS-t.restMinS);m.restLeft=m.restLength;m.restSign=m.rnd()<.5?-1:1;
-            this.Event(m,'brake','cadence');
+          // An eased pace never stops, so it is not bound by the host's safe-stop check.
+          if(stopped<maxRest&&this.time-last>=t.stopGapS&&(cadence==='ease'||o.canPause!==false)){
+            m.lastStop=this.time;m.restLength=t.restMinS+m.rnd()*(t.restMaxS-t.restMinS);m.restLeft=m.restLength;m.restSign=m.rnd()<.5?-1:1;
+            if(cadence==='ease'){m.phase='ease';this.Event(m,'ease','cadence');}
+            else{m.phase='brake';this.Event(m,'brake','cadence');}
           }
         }
       }
-      if(m.phase==='rest'){
+      if(m.phase==='rest'||m.phase==='ease'){
         m.restLeft-=dt;
         if(m.restLeft<=0){m.cycles++;this.Resume(m,'cadence');}
       }
       const bearing=Math.atan2(-dx,-dz),turn=Math.abs(Angle(bearing-(o.yaw??bearing)));
-      let wanted=Math.min(t.speedMps*m.stride*(catchup?t.catchupScale:1),o.maxSpeed??Infinity);
-      if(m.leader&&!catchup&&this.members.size>1&&this.config.preset==='guided')wanted*=t.leaderSpeedScale*Clamp(1-(lag-t.catchupM*.3)/t.catchupM*.5,.55,1);
+      let pace=m.stride;
+      if(!m.leader){
+        // Personal pace drifts slowly, so walk/urgent columns breathe instead of moving as one block.
+        pace*=1+t.paceWobble*Math.sin(this.time*m.paceHz*Math.PI*2+m.pacePhase);
+        // Outside a dead band, drift back toward the formation slot (guided relies on its slower leader).
+        if(cadence!=='rest'&&!catchup&&lead&&lead!==o&&t.regroupScale>0){
+          const error=leadProgress-(progress.get(m.id)??leadProgress)-m.followDistance,over=Math.abs(error)-t.regroupM;
+          if(over>0)pace*=1+Math.sign(error)*Math.min(t.regroupScale,over*t.regroupScale/3);
+        }
+        if(m.phase==='ease')pace*=t.easeScale;
+      }
+      let wanted=Math.min(t.speedMps*pace*(catchup?t.catchupScale:1),o.maxSpeed??Infinity);
+      if(m.leader&&!catchup&&this.members.size>1)wanted*=t.leaderSpeedScale*Clamp(1-(lag-t.catchupM*.3)/t.catchupM*.5,.55,1);
       if(tooFarAhead)wanted=Math.min(wanted,t.speedMps*t.leaderSpeedScale*.65);
       // AI hosts may aim/strafe independently of travel; body yaw must not throttle them twice.
       if(o.turnLimited!==false)wanted*=Math.max(.25,Math.cos(Math.min(Math.PI/2,turn)));
       wanted=Math.min(wanted,Math.sqrt(Math.max(0,2*t.decelerationMps2*(distance-(m.avoiding?A.brakingMarginM:t.arrivalM*.5)))));
-      if(m.phase!=='run'||wait)wanted=0;
+      if(m.phase==='brake'||m.phase==='rest'||wait||starting)wanted=0;
       if(gap<t.separationM*2)wanted=Math.min(wanted,Math.max(0,(gap-t.separationM)*2));
       m.speed+=Clamp(wanted-m.speed,-t.decelerationMps2*dt,t.accelerationMps2*dt);
       if(gap<=t.separationM||o.maxSpeed===0)m.speed=0;
-      if(m.phase==='brake'&&m.speed<.05&&(o.speedMps??0)<.12){m.phase='rest';m.speed=0;this.Event(m,'stop','cadence');}
+      if(m.phase==='brake'&&m.speed<.05&&(o.speedMps??0)<.12){
+        m.phase='rest';m.speed=0;this.Event(m,'stop','cadence');
+        // Low chance: this stop becomes a slight alert scan; the stop lasts the whole scan.
+        if(m.style()<t.alertChance){m.restLeft=m.restLength=this.StartAlert(m,m.restLeft);}
+      }
       const rest=m.phase==='rest';
-      // One complete left/right scan, returning to the route before moving again.
+      // Ordinary stops keep the eyes on the route with one small settling glance.
       const restProgress=1-m.restLeft/m.restLength;
-      const lookYaw=rest?Math.sin(restProgress*Math.PI*2)*Math.sin(restProgress*Math.PI)*m.restSign*t.lookYawRad:0;
-      this.outputs.set(m.id,{id:m.id,status:wait?'waiting':m.phase==='brake'?'braking':rest?'resting':catchup?'catchup':gap<=t.separationM?'yielding':'running',
-        controlled:true,goal:{...target},arrivalM:m.avoiding?A.hostArrivalM:t.arrivalM*.5,speedMps:m.speed,lookYaw,breath:rest?1:0,leader:m.leader,index:m.index,cycles:m.cycles});
+      let lookYaw=0;
+      if(rest)lookYaw=m.alert?this.AlertYaw(m):Math.sin(restProgress*Math.PI)**2*m.restSign*t.restGlanceRad;
+      else if(wait&&m.speed<.05)lookYaw=this.Still(m);
+      else{m.alert=null;m.alertNext=null;}
+      const status=wait?'waiting':starting?'starting':m.phase==='brake'?'braking':rest?(cadence==='pause'?'pausing':'resting')
+        :m.phase==='ease'?'easing':catchup?'catchup':gap<=t.separationM?'yielding':'running';
+      this.outputs.set(m.id,{id:m.id,status,controlled:true,goal:{...target},arrivalM:m.avoiding?A.hostArrivalM:t.arrivalM*.5,speedMps:m.speed,
+        lookYaw,alert:m.alert?1:0,breath:rest&&cadence==='rest'?1:0,leader:m.leader,index:m.index,cycles:m.cycles});
     }
     return this.outputs;
   }
