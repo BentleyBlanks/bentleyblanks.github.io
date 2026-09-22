@@ -349,12 +349,15 @@ const ok = (line) => { checks += 1; console.log(`ok ${checks} — ${line}`); };
   const model = new PerceptionModel(host);
   const s = MakeSoldier(1, "ija", 0, 0, 0, 0);
   const player = MakeCand(PLAYER_TRACK_ID, 0, -25, { isPlayer: true, moving: true });
-  player.rank = LK.heldTargetRank;                    // Think 给禁火的人身上的玩家打的标
+  // Think 给禁火的人身上的玩家打的标是 LK.heldTargetRank；表里默认 1（关掉，见表注），
+  // 这里显式给 3 量机制本身。
+  const HELD_RANK = 3;
+  player.rank = HELD_RANK;
   const nra = MakeCand(81, 0, -30, { moving: true });
   const cands = [player, nra];
   for (let i = 0; i < 3; i += 1) Step(model, host, s, cands);
   let r = model.Sense(s, cands, 0);
-  assert.equal(r.trackId, 81, `玩家 25 m × rank ${LK.heldTargetRank} 输给 30 m 的国军：先打能打的`);
+  assert.equal(r.trackId, 81, `玩家 25 m × rank ${HELD_RANK} 输给 30 m 的国军：先打能打的`);
   assert.equal(r.dist, 30, "报出去的 dist 是真实距离，不带倍率");
   assert.ok(model.Track(s, PLAYER_TRACK_ID), "玩家照样建了 Track（觉察、LKP 都按真实距离累积）");
 
@@ -370,7 +373,8 @@ const ok = (line) => { checks += 1; console.log(`ok ${checks} — ${line}`); };
   const c2 = [MakeCand(PLAYER_TRACK_ID, 0, -25, { isPlayer: true, moving: true }), MakeCand(82, 0, -30, { moving: true })];
   for (let i = 0; i < 3; i += 1) Step(model2, host, s2, c2);
   assert.equal(model2.Sense(s2, c2, 0).trackId, PLAYER_TRACK_ID, "对照：rank 1 时更近的玩家赢");
-  ok(`禁火的人先打能打的：rank ${LK.heldTargetRank} 只进选 / 换目标的比较，真实距离照报`);
+  assert.ok(LK.heldTargetRank >= 1, "表里的 heldTargetRank 是个 ≥ 1 的倍率（1 = 关掉）");
+  ok(`禁火的人先打能打的（机制，表默认关）：rank ${HELD_RANK} 只进选 / 换目标的比较，真实距离照报`);
 }
 
 // ---------------------------------------------------------------- Attach / Forget

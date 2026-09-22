@@ -425,6 +425,7 @@ export function CampaignActions(ctx) {
    * 于是「黑屏里那一下瞬移没生效」看着像引擎的锅，其实是驾驶器自己走回去的。
    */
   async function Route(points, label, { fight = false, stance = "stand", sprint = false, crawl = false, rejoinRoute = null, stopFact = null, arrivalM = 0.8 } = {}) {
+    let routeGuardHp;
     const rejoinTarget=points.at(-1);
     await page.evaluate(
       async ({ points, stance, sprint, rejoinRoute, rejoinTarget }) => {
@@ -536,9 +537,32 @@ export function CampaignActions(ctx) {
           activeSlot:g.state.activeSlot,primaryMagazine:{...g.state.mags.primary},
           lastShot: g.state.lastShot,
           foe: window.MissionInputDriver?.Target()?.missionId,
+          // Guard telemetry: the guard batches are a mission-failure condition, so the log has to
+          // show who is alive, where he is, and which enemies are shooting at him.
+          guards: (() => {
+            const rt = g.Debug.FirstLevelMissionRuntime();
+            const guards = rt.guards || [];
+            const ids = new Set(guards.map((x) => x.actor.id));
+            const hunters = g.ai.soldiers.filter((s) => s.alive && s.side === "ija" && s.target && !s.target.isPlayer && ids.has(s.target.id))
+              .map((s) => ({ id: s.id, enc: s.missionEncounter || null, st: s.state, sn: s.stance, cv: !!s.cover,
+                fh: !!s.missionFireHold, so: !!s.missionFireSuppressOnly, tv: !!s.targetVisible, tg: s.target.id,
+                d: Math.round(Math.hypot(s.position.x - s.target.position.x, s.position.z - s.target.position.z)) }));
+            const targets = { player: 0, guard: 0, other: 0, none: 0, standby: 0, held: 0, alive: 0 };
+            for (const s of g.ai.soldiers) {
+              if (!s.alive || s.side !== "ija") continue;
+              targets.alive += 1; if (s.missionFrontStandby) targets.standby += 1; if (s.missionFireHold) targets.held += 1;
+              if (!s.target) targets.none += 1; else if (s.target.isPlayer) targets.player += 1; else if (ids.has(s.target.id)) targets.guard += 1; else targets.other += 1;
+            }
+            return { targets, started: !!rt.Has?.("frontBattleStarted"), list: guards.map((x) => ({ id: x.actor.id, alive: x.actor.alive, hp: Math.round(Math.max(0, x.actor.health)),
+              x: +x.actor.position.x.toFixed(1), z: +x.actor.position.z.toFixed(1), st: x.actor.state, sn: x.actor.stance,
+              probe: x.probe || null, crossing: !!x.crossing, nc: !!x.actor.scriptedNoncombatant })), hunters };
+          })(),
         };
       }, {fight,stance,crawl,sprint,stopFact,arrivalM});
-      if (chunk % 4 === 0 || result.done || !result.alive) console.log(label, JSON.stringify(result));
+      const guardHp = (result.guards?.list || []).map((x) => x.alive ? x.hp : -1).join(",");
+      const guardHit = routeGuardHp !== undefined && guardHp !== routeGuardHp;
+      routeGuardHp = guardHp;
+      if (chunk % 4 === 0 || result.done || !result.alive || guardHit || (result.guards?.hunters?.length > 0)) console.log(label, JSON.stringify(result));
       // A death can also leave the body stationary. Let the existing checkpoint
       // retry below handle it before applying the live-navigation stall limit.
       if (result.done || (result.alive && result.stalled >= 3)) break;

@@ -981,7 +981,7 @@ export class AiDirector {
       let nearestD = SQUAD.enemyFocusM;
       const enemySide = group.side === "nra" ? "ija" : "nra";
       for (const other of this.soldiers) {
-        if (!other.alive || other.side !== enemySide) continue;
+        if (!other.alive || other.side !== enemySide || other.missionUntargetable) continue;
         const d = Math.hypot(other.position.x - group.x, other.position.z - group.z);
         if (d < nearestD) {
           nearestD = d;
@@ -1760,6 +1760,9 @@ export class AiDirector {
     }
     for (const other of this.soldiers) {
       if (other.side !== enemySide || !other.alive) continue;
+      // 关卡标成「还没轮到他们挨打」的人（第一关等待接应的守军，见 FrontBattle.UpdateGuards）：
+      // 不进候选，也就不进记忆、黑板与任务分配 —— 不是看不见，是这一拍的仗不在他们身上。
+      if (other.missionUntargetable) continue;
       if (!this.InFireSector(s,other.position)) continue;
       const d = s.position.distanceTo(other.position);
       if (d < this.SightRange(other.stance)) {

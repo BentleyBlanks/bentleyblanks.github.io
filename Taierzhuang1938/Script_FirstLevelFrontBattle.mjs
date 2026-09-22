@@ -136,6 +136,17 @@ export class FirstLevelFrontBattle {
     const stage=r.flow.stage.id;
     const clear=!this.InfantryBlockade()&&!this.TankBlockade();
     for(const [i,g] of r.guards.entries()){
+      const firstBatch=i<B.firstBatch;
+      const released=firstBatch?r.Has("rightNestCaptured")&&r.Has("frontRifleDefense"):
+        r.Has("tankImmobilized")&&r.Has("tankFireDisabled");
+      // 2026-09-23: guards waiting to be relieved are not an AI target. A whole guard batch dying is a
+      // mission failure, and the last assault line sits 11 m from their trench: once the front stopped
+      // being yanked sideways every few seconds (docs/Data_EnemyAi.md §19), the men there stayed under
+      // the combat brain, saw the prone guards, shared them on the blackboard and bayonet-charged them
+      // before the player reached the nest (both batch guards dead by RightNestApproach, campaign
+      // 03-06 red twice). Same authored protection as the near-tactic standby: the fight for these men
+      // starts when the player relieves them, not offscreen. Released (withdrawing) guards are fair game.
+      g.actor.missionUntargetable=g.actor.alive&&!released;
       if(!g.actor.alive||g.progress>=g.route.length)continue;
       // The nearest man probes the visible breach once, then returns to his original cover.
       // This is real movement of the existing defender, with no scripted casualty or teleport.
@@ -147,9 +158,6 @@ export class FirstLevelFrontBattle {
           if(g.probe!=="complete"){r.ai.SetStance(g.actor,1,.5,true);r.MoveActor(g.actor,target,R.guardSpeedMps);continue;}
         }
       }
-      const firstBatch=i<B.firstBatch;
-      const released=firstBatch?r.Has("rightNestCaptured")&&r.Has("frontRifleDefense"):
-        r.Has("tankImmobilized")&&r.Has("tankFireDisabled");
       // Stage 04 moves the existing second batch to the last covered line, never across the gap.
       const gather=!firstBatch&&stage!=="Support";
       if(g.progress===0)g.progress=1;
