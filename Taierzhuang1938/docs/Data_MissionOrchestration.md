@@ -127,8 +127,14 @@ ModelSummary(model)            // CLI 摘要
 **`condition` 没有 `atS`** —— 这是硬规矩，工作台与 CLI 都据此决定画不画秒数。
 
 `ApplyRuntimeState(model, runtimeState)` 的 `runtimeState` = `runtime.State()` 再补
-`{ player:{x,z,yaw}, guideRoute, spawned:[...runtime.spawned], transferBeats }`。
+`{ player:{x,z,yaw}, guideRoute, spawned:[...runtime.spawned], transferBeats, squad }`。
 产物 `live` 里的 `actualTimeline` 全部来自 `flow.log`（`stageEntry` 与 `fact` 两种，带关卡时钟）。
+
+`live.squad` 是**班里那几个人的实时位置**：`[{ id, label, x, z, alive, yaw }]`。
+工作台那一侧（`SquadState(runtime)`）把 `runtime.squad`（`companion.Handle(castId)`
+拿到的演员句柄数组，开场之前是空的）折成这个形状，名字走文本表
+（`Data_Companions` 的 `labelKey` → `T()`，查不到退回 castId）；模型这一层只把
+坐标不是有限数的筛掉 —— 人还没造出来时 `position` 是 NaN，画上去就是一枚钉在原点的友军图标。
 
 ### 分类查看：`Script_MissionOrchestrationFilter.mjs`（纯，Node 可跑）
 
@@ -190,9 +196,12 @@ agent 不开浏览器也能读到与工作台**一模一样**的那份编排。
 
 ## 3. 工作台：`Script_EditorOrchestration.mjs`（叠加层，独立窗口）
 
-入口：设置 · 工具（`` ` `` 键）→ 调试 → **关卡编排**。
-与 Debug Rendering / Profiler / WorldInfo / 玩家状态 / 敌军 AI 同组：
+入口：设置 · 工具（`` ` `` 键）→ **编辑器** → **关卡编排**。
+按钮画在「编辑器」组里（用户找它的时候想的是「我要编关卡」），但**语义上它仍是叠加层**：
+和 Debug Rendering / Profiler / WorldInfo / 玩家状态 / 敌军 AI 一样走 `ToggleOverlay`，
 不接管相机、不暂停玩法、不碰指针锁，`keepOnClose = true` —— 边打边看正是主用例。
+（`Script_Editor.mjs` 里它留在 `OVERLAYS` 数组中，只是分组表 `EDITOR_ENTRIES` 把按钮
+画进编辑器那一组；`this.entries` 每个 id 仍只登记一次，面板按钮总数 26 不变。）
 窗口名 `tzOrchestration`，默认 1380×900，主题链接从主窗口的
 `link[data-interface-theme]` 复制过去。弹窗被浏览器拦截时 `Enter()` 抛错，入口开关自动复位。
 
@@ -205,9 +214,11 @@ agent 不开浏览器也能读到与工作台**一模一样**的那份编排。
 与 `Style_Interface.css` / `Style_Editor.css` 同一套语言（黑标题栏、冷灰底、旧金选中、
 读数等宽），只是宽松一档 —— 它是个桌面工具，不是贴在画面边上的抽屉。
 
-- **标题栏**：关卡名 + 一排小标签（当前阶段 / 步骤 / 关卡时钟 / 这一步多久 /
-  **正在等**的每件事各一枚，写的是人话、点一下就选中那件事），右端是模型版本。
-  一行斜杠串起来的状态文字已经拆掉了。
+- **标题栏**：关卡名 + **一枚**状态标签 + 右端的模型版本。没运行时写
+  「还没有人在跑第一关」，有运行时写「实时 · 第 12 阶段 · 掩护装载与离开」。
+  **步骤、关卡时钟、这一步用时、正在等的那几件事都不在顶栏** —— 它们是时间轴里的
+  信息，顶栏再排一串就是同一份数据在屏幕上出现两次，而两处迟早会对不上。
+  它们现在住在时间轴（见下面「底栏」）。
 - **三栏可拖**：两条分栏线 `[data-orch="split-left"|"split-right"]`，宽度写在 `#cols`
   的 `--left` / `--right` 上，连同时间轴的折叠状态一起记在
   `localStorage["tengxian1938_orchestration_layout_FirstLevel"]`，下次开窗照旧。
@@ -247,6 +258,39 @@ P3b 的 `Script_EditorOrchestrationMap.mjs`（canvas 2D，零 three，北在上�
   「标注」点下去**在点击处就地长一个输入框**（`[data-orch="label-input"]`）：
   回车落笔、Esc 取消、失焦提交非空文本，空文本不生成形状。不用 `prompt` ——
   它会把整个弹窗冻住，而且无头测试根本没法给它输字。
+- **每把工具都得有出口，而且不止一个**。「折线」单击落点、有一段跟着光标的橡皮筋，
+  **双击 / 回车 / 右键任一都结束**（≥2 点才产出形状），**Esc 取消整条**，**退格退掉
+  最后一个点**；换别的工具时已经画了两点以上就当画完了、只落了一个点就当没画。画到
+  一半光标旁有一句「回车 / 双击结束 · Esc 取消」——**画在画布上，不是 DOM**。键盘只在
+  「手上真有件没做完的事」时才接，而且焦点在输入框里一概不管（弹窗里有批注正文与标注
+  输入框）。「圈选」「箭头」拖开不到 4 px 不产出：一次误点留下半径 1 m 的圈或零长的
+  箭头，删起来比画还麻烦。对外是 `map.FinishPath()` / `map.CancelPath()` 与只读的
+  `map.pathPoints`（永远是数组）。
+- **自己画的那几笔也是对象**：select 工具下点得中（`PickAt` → `{kind:"sketch", index}`，
+  index 是 `SetSketch` 那个数组的下标），圈按圈心或圈周、箭头与折线按端点或线段、标注
+  按文字框、候选位按中心。选中的那一笔描一圈旧金的粗边，悬停提示写人话（「圈选 · 半径
+  12 m」「候选位 · TransferGunner」）。拾取排名在触发区/路线之上、锚点之下，候选位与人
+  同级且**同分时人赢**——「点到人拿到的永远是人」对草图同样成立。工作台在选中草图时接
+  Delete 删掉它。「候选位」工具从已经摆出来的那枚 ghost 上按下再拖 = 重新放它（原来标的
+  是谁不变），不必一次次从人身上重拖。
+- **@ 提及**：按住 Ctrl（Mac 上 Meta）点图上任何点得中的对象 → `Emit("mention", sel)`，
+  载荷与 `onSelect` 同形，但**不改选中、不改画面**——「我要在文字里提到它」和「我现在要
+  看它」是两件事，混在一起就得为了提一句话丢掉正在看的东西。任何工具下都生效（含平移
+  与画到一半的折线，这时不落点）。另有一次性的 `map.ArmMention(true)`（批注对话框那个「@」
+  按钮用它）：下一次普通左键点击等同 Ctrl+点，**点完就解除，点空地也解除**，武装时光标
+  变成十字、旁边写着「点一个对象 = @ 它」。注册器 `map.onMention(cb)`，与 `onSelect` 并列。
+- **实机层还画跟着玩家走的那个班**：`SetLive(live)` 的 `live.squad = [{id,label,x,z,alive,yaw}]`
+  （id 是角色号、label 是中文名、yaw 可能没有）。友军色的「我方士兵」图标，朝向跟玩家
+  箭头同一套规则（世界 yaw 0 看向 −Z ＝ 屏幕上方），名字走同一套避让排版，阵亡画灰 ✕。
+  点得中（`{kind:"friendly", id, live:true}`），提示写「实时 · 罗班长（活着）」。
+  `drawnMarkers` 里记成 `kind:"liveFriendly"`。分类里的「友军」集合装的是**设计**友军点的
+  id，跟角色号不是一个命名空间，所以**过滤不会把实时小队滤掉**——只有「实机」图层能关掉它。
+- **打死一个人，设计层当场变**：实机名单里查得到而且 `alive===false` 的那一枚，设计层按
+  「已击毙」画 —— 灰色、更淡、右下角一枚骷髅角标（跟「已清除」同一套画法与尺寸规则），
+  `drawnMarkers` 里那个成员 `state:"dead"`，提示写「已击毙」。并成一枚的簇，人数芯片改写
+  「活着/总数」（例如 `3/4`），全灭整撮转灰。**只有查得到而且死了才算死**：名单里没有的
+  那个人多半是还没生成，算成死会在刚进这一阶段时就报全灭。这一层跟着「实机」图层走 ——
+  关掉它就是要看纯设计，那时候不该有人是灰的。
 - **14 个图层开关**收在工具条右端的「图层 n/14」下拉面板里（`[data-orch="layers-button"]`
   开合，面板是 `[data-orch="layers"]`，按钮仍是 `[data-layer=id]`）：地表 / 体块 / 壕沟 /
   道路 / 锚点 / 路线 / 触发区 / 友军 / 敌军 / 战术线 / 实机 / 批注 / 名字 / 图例，外加「全开」与
@@ -363,7 +407,9 @@ P3b 的 `Script_EditorOrchestrationMap.mjs`（canvas 2D，零 three，北在上�
 map.SetFilter({ members, encounters, routes, zones, friendlies, anchors, notes });  // 每项是 Set 或 null
 map.SetFilter(null);            // 恢复全画
 map.filter                      // 当前过滤（只读）
-map.drawnMarkers                // 本帧真画出去的标记 [{kind, id, encounter?, state?, icon, x, y}]（屏幕坐标）
+map.drawnMarkers                // 本帧真画出去的标记 [{kind, id, encounter?, state?, alive?, icon, x, y}]（屏幕坐标）
+                                // kind ∈ member|cluster|zone|anchor|friendly|note|live|liveFriendly|player
+                                // member 的 state 多一个 "dead"（这一局里被打死了）；cluster 的 alive 是这一撮还剩几个
 ```
 
 `null` 表示这一类全画；不在集合里的对象**不画、不参与拾取、也不占标签位置** ——
@@ -371,30 +417,104 @@ map.drawnMarkers                // 本帧真画出去的标记 [{kind, id, encou
 `drawnMarkers` 是回答「屏幕上到底有什么」的唯一口径，比翻模型准：模型里有的东西
 可能被图层、过滤或视野挡掉了。
 
-### 右栏「详情 / 批注」
+### 右栏：两个页签「详情 / 批注」
+
+页签条在栏头右端（`[data-orch="detail-tabs"]`、`[data-detail-tab=detail|notes]`，
+当前那个 `data-on="1"`），选哪一页记在 layout localStorage 里，下次开窗还停在这儿。
+**写批注的表单不在右栏** —— 它搬进了浮在俯视图上的对话框（下一节）。
+
+**页签一「详情」**：
 
 - **详情卡**（`FindOwner` 反查）：卡头是「类别标签 + 名字」，卡身是一张键值表，
   左边一列是问题（属于哪组 / 怎么出现 / 出场后先待命 / 会怎么动 / 现在 …），
   右边一列是人话（「转运区第 2 处威胁，`loadingThreatResolved` 之后出现；解除后记 `alleyThreatResolved`」），
   表里的编号跟在值后面当等宽小字（`kind=threat`、`transfer`）。最下面是折叠的原始数据 JSON。
-- **批注区**：本对象相关批注 + 全部批注（分段按钮：待处理 / 已处理 / 已忽略 / 全部）。
-  每条是一张卡：状态小标签 + 目标 + 阶段 + 步骤（+「本地草稿」「已核对」）、意见正文、
+  成员那张表里**「现在」永远有一行**：这一局里有这个人就写「活着 · (113.0, 80.0)」或
+  「已击毙」，没有他就写这一阶段的设计状态（「这一局里没有他 · 第 12 阶段是「已清除」」）——
+  空着会让人以为面板没接上运行时。它和布设表的「实时」列、图上的灰角标说的是同一件事。
+  选中一笔**草图**时（`{kind:"sketch", index}`）写的是那一笔本身：「草图 · 圈选 半径 12 米」
+  加一句「怎么删掉：按 Delete，或点对话框里那枚芯片的 ✕」。
+- **这个对象上的批注**：目标正好是当前选中那个对象的那几条（卡片样式见下）。
+
+**页签二「批注」**：
+
+- 全部批注（分段按钮：待处理 / 已处理 / 已忽略 / 全部 + 「重新加载」）。
+  顶上一条 `[data-notes="hint"]` 镜着状态条那句话（对话框常常是关着的，
+  「重新加载」按下去什么都不动会让人以为按钮坏了）。
+- 每条是一张卡：状态小标签 + 目标 + 阶段 + 步骤（+「本地草稿」「已核对」）、意见正文、
   指的时候、建议、草图、**缩略图**、`resolution.summary`，以及 `NoteDrift` 的醒目警示条
   ——「写这条批注时记下的设置已经变了（n 处）」并把新旧值并排列出来；按钮：
   **在图上找到它**（回选目标并把地图跳过去）、**标记已核对**（写 `verified: true`），
   图还只在本地时再加一颗 **下载这张图**。
   缩略图的来源：本地草稿的图取自 IndexedDB 里的 dataURL，已经落盘的那张走绝对 URL
   （弹窗文档是 `about:blank`，相对路径在那儿解不出来）。
-- **写一条批注**：每项一组（哪里不对 / 你的建议 / 指的是哪个时候 / 画在图上的东西 /
-  建议挪到的位置），主按钮 **保存草稿**（实心旧金）与次按钮 **清空** 一排，
-  下面一条状态条写保存结果或退化原因（**不弹窗**），再下面是弱化的
-  复制交接文本 / 下载 JSON / 复制 JSON / 下载本图。
+- 底部一行弱化的导出：复制交接文本 / 下载 JSON / 复制 JSON / 下载本图。
+
+### 写批注：浮在俯视图上的那一个对话框
+
+用户的原话是「右侧的批注太复杂了…我只需要一个对话框」。写批注这件事是**对着图说话**的：
+圈一笔、拖个候选位、Ctrl 点两个人，然后写一句。这些动作全在图上，表单就该贴着图。
+
+`[data-orch="note-dialog"]`（`data-open=0|1`）浮在俯视图右下角，标题栏可拖、右上角有 ✕；
+工具条末尾（图层之后）一枚芯片「写批注」`[data-orch="note-button"]` 开合它（再点一次收起；
+排在最后是因为窄栏下工具条本来就折两行，放末尾只占第二行的空位，不会把「分类 / 图层」挤下去）。
+**在图上一动手它自己就开**：画了一笔 / 拖了候选位 / Ctrl 点提及了一个对象。
+焦点不在输入框上时按 Esc 收起（**草稿不清**）。从上到下：
+
+1. **「哪个阶段 · 哪个状态」下拉框** `[data-note-field="state"]`：18 个
+   `<optgroup label="第 n 阶段 · 标题">`，每组里依次是 `phase:<id>`「阶段开始」、
+   每个 `step:<id>`「步骤 · 目标一句」（缩进）、该步每条要求事实 `fact:<id>`
+   「　等：&lt;DescribeFact 人话&gt;」。选谁决定这条批注的 `phaseNumber` / `step` /
+   （选了事实时）`time = {kind:"fact", fact}`。默认落在正在看那一阶段的第一步；
+   跟着实时而且实时正在这一阶段时落在实时那一步。翻到别的阶段它跟过去，
+   已经落在这一阶段里就不动。
+   **改下拉框只 `SetPhase` + `OpenPhase`，绝不动 selection** —— 刚在图上点中的那个敌人
+   正是用户要说的那个。反过来成立：在左栏 / 时间轴 / 图上选中 phase / step / fact 时
+   下拉框同步过去。**亲手定过的就钉住**（下拉框改过、或在左栏 / 时间轴上点过阶段 / 步骤 / 事实）：
+   跟随实时换阶段时下拉框不再自动挪，清空或保存之后才恢复跟随 —— 否则在第 12 阶段打着、
+   想给第 1 阶段的某件事提意见，下一拍就被拨回第 12 阶段。下拉框里没有的那一项（时间轴上点得到的事实不一定是某一步的过关条件）
+   **退到它所属的那一步**：面板上显示的和草稿里记的必须是同一样东西。
+2. **「哪里不对」** `[data-note-field="text"]` + 一行 **@ 提及芯片**
+   `[data-note-field="mentions"]`：每枚 `[data-note-mention="<kind>:<id>"]` 写
+   「类别 · 名字 ✕」，点它删掉；旁边一颗 **「@ 点图选」** `[data-note-action="mention-arm"]`
+   （调 `map.ArmMention(true)`，武装时亮旧金，跟着 `map.mentionArmed` 走不自己记一份），
+   底下小字「按住 Ctrl 点图上的东西也行」。收到 `map.onMention(sel)` 时：
+   sel 是 phase / step / fact 就改下拉框，否则去重后加进 `draft.mentions`
+   （存 `{kind, id, label, x?, z?}`），并在 textarea 光标处插入「@名字 」（draft.text 同步）。
+3. **建议类型** `[data-note-field="proposal"]` 与 **秒数** `[data-note-field="timeValue"]`
+   （「相对本步 n 秒」，为空即 null）一行。`time` 的优先级：下拉框选了事实 →
+   `{kind:"fact"}`；否则填了秒数 → `{kind:"stageRelative"}`；否则 null。
+   原来那个「时刻类型」下拉框没了 —— 选了事实还要再选一次「某件事发生时」是同一件事问两遍。
+4. **草图行**：每一笔一枚带 ✕ 的芯片 `[data-shape-index=i]`，
+   加一枚**候选位芯片** `[data-note-action="candidate-clear"]`（点它 = `SetCandidate(null)`）。
+   在图上选中一笔草图（select 工具下草图可拾取）按 **Delete / Backspace** 也能删；
+   `RemoveShape(index)` 在 `index >= draft.shapes.length` 时等价于 `SetCandidate(null)`
+   —— `DraftShapes()` 把候选位 ghost 放在最后，不这么写「候选位加了就删不掉」。
+5. **保存草稿 / 清空** + 状态条 `[data-notes="status"]`（**不弹窗**）。
+   「清空」清的是这条意见（正文 / 草图 / 候选位 / 提及），**不清**「哪个阶段 · 哪个状态」。
+
+**这条批注说的是哪个东西**（`DraftTarget()`）三级优先：① 现在选中的那个；
+② 没选中就用第一枚 @ 提及；③ 都没有才落到下拉框选的那一项。
+原来是「没选中一律落在阶段上」，于是所有「没点着东西但选了某一步」的意见全挂在阶段上。
 
 ### 底栏「时间轴」
 
-左边一列固定写着「设计」「实际」（实际那行底下还写着关卡时钟走到哪儿 / 还没人在跑），
-右边是横向 18 列，**宽度按步数分配，不按秒** —— 大部分事情本来就没有秒数可排。
-最上面一行是阶段的编号与名字，**当前阶段整列（含表头）压一层旧金底**。
+左边一列固定写着「设计」「实际」，右边是横向 18 列，**宽度按步数分配，不按秒** ——
+大部分事情本来就没有秒数可排。最上面一行是阶段的编号与名字，
+**当前阶段整列（含表头）压一层旧金底**。
+
+**顶栏搬下来的那几条信息都在这儿**：
+
+- 「实际」那行的名字底下（`.tlNames .n.actual .muted`，等宽）写
+  「关卡时钟 83.0 秒 · 这一步 12.0 秒 · 步骤 Transfer」，没运行时写「还没有人在跑这一关」。
+  每 tick **只改这一个节点的文本**。
+- 当前阶段那条**实际**泳道末尾，每件**正在等**的事一枚空心标记
+  `.tlMark[data-marker-kind="waiting"]`（`○`，**没有 `data-marker-at`** —— 它要等玩家
+  做到才发生），提示写「正在等：&lt;DescribeFact 人话&gt;……没有固定秒数，等玩家做到才发生」，
+  点它选中那条事实。事实一满足就从 `live.remaining` 里掉出去，同时作为实心 `fact ●`
+  出现在上面那串实际标记里 —— 两个符号是同一件事的前后两态。
+  按 `live.phaseNumber + remaining` 的指纹增量维护，没变就不重建。
+- 「跟随实时」芯片仍在阶段步进条上，不在这儿。
 
 - **设计行**（青 / 金）：`model.timeline` 的 `entry ▸`、`condition ◇`、`timed ◆`、`threat ■`、
   `delay ·`、`wake ✶`。`condition` 只画菱形、`data-marker-at` **缺席**；
@@ -410,7 +530,8 @@ map.drawnMarkers                // 本帧真画出去的标记 [{kind, id, encou
 
 `[data-orch]`：`header` / `live-status` / `version` / `flow` / `flow-hint` / `map` / `detail` / `timeline` /
 `canvas` / `tools` / `layers` / `layers-button` / `layers-all` / `layers-none` / `stagebar` / `tip` /
-`split-left` / `split-right` / `label-input`（标注工具开着时才有）；
+`split-left` / `split-right` / `label-input`（标注工具开着时才有）/
+`detail-tabs` / `note-button` / `note-dialog`（`data-open=0|1`）；
 `[data-flow-phase=n]`（`data-open=0|1`、`data-phase-state=now|done|todo`）、`[data-flow-step=id]`、
 `[data-fact=id]`（`data-fact-state=ok|wait|past|future|none`）、
 `[data-flow-encounter=id]`、`[data-flow-route=name]`、`[data-jump=n]`、`[data-flow-orphan]`；
@@ -425,16 +546,19 @@ map.drawnMarkers                // 本帧真画出去的标记 [{kind, id, encou
 `[data-tool=…]`、`[data-layer=…]`、
 `[data-map=phase|phase-label|prev|next|fit-all|fit-phase|follow|follow-chip]`
 （`phase` 现在是那条细进度条，`follow` 是芯片里那个藏起来的 checkbox）；
-`[data-detail=title|owner|json|json-box|notes|form]`、
-`[data-note-field=text|proposal|timeKind|timeValue|sketch|candidate]`、
-`[data-note-action=save|handoff|download|copy|image|clear|locate|verify]`
+`[data-detail=title|owner|json|json-box|notes]`、
+`[data-detail-tab=detail|notes]`（`data-on=0|1`）、`[data-detail-panel=detail|notes]`（`data-on=0|1`）、
+`[data-note-field=state|text|mentions|proposal|timeValue|sketch|candidate]`、
+`[data-note-mention="<kind>:<id>"]`（提及芯片）、
+`[data-note-action=save|clear|close|mention-arm|candidate-clear|handoff|download|copy|image|locate|verify]`
 （`locate`/`verify`/`image` 也出现在每张批注卡片里，按 `[data-note=<id>]` 取用）、
-`[data-notes=status|list|filter|clipboard]`、`[data-notes-filter=…]`、`[data-note=<id>]`（`data-note-drift`）、
+`[data-notes=status|hint|list|filter|clipboard]`、`[data-notes-filter=…]`、`[data-note=<id>]`（`data-note-drift`）、
 `[data-note-drift-detail=<id>]`（新旧值那张小表）、`[data-note-thumb=<id>]`（卡片里的缩略图）、
 `[data-shape-index=i]`；
 `[data-timeline=design|actual|legend|toggle]`、`#tl[data-collapsed=0|1]`、`[data-lane=n]`、
-`.tlMark[data-marker-kind=…]`（有秒数的才有 `data-marker-at`；`data-tip` 是悬停提示的纯文本）。
-三栏宽度在 `#cols` 的 `--left` / `--right`；宽度与时间轴折叠状态存
+`.tlMark[data-marker-kind=…]`（有秒数的才有 `data-marker-at`；`waiting` 那几枚一定没有；
+`data-tip` 是悬停提示的纯文本，`data-sel-kind` / `data-sel-id` 是点它选中谁）。
+三栏宽度在 `#cols` 的 `--left` / `--right`；宽度、时间轴折叠状态与右栏停在哪一页（`detailTab`）存
 `localStorage["tengxian1938_orchestration_layout_FirstLevel"]`。
 
 对外方法（`T.editor.overlays.get("orchestration")`）：
@@ -443,14 +567,22 @@ map.drawnMarkers                // 本帧真画出去的标记 [{kind, id, encou
 `OpenFilterDrawer(bool?)` / `SetFilterTab("tree"|"table")` / `ApplyPreset(name)` / `SetFilterState(patch)` /
 `SoloTarget(kind,id)` / `ToggleFilterRow(kind,id)` / `SortEnemyTable(column)` / `ToggleTableGroup(id)` /
 `EnemyRows()` / `EnemyCsv()` / `CopyEnemyCsv()` / `PickEnemyRow(memberId)`（只读字段 `filter` / `filterState` / `filterSummary`）/
-`AddShape(shape)` / `RemoveShape(i)` / `SetCandidate(point,target)` /
-`SetNoteText(text)` / `SetProposalKind(kind)` / `SetNoteTime(kind,value)` / `SetNoteFilter(v)` /
+`SetDetailTab("detail"|"notes")` /
+`AddShape(shape)` / `RemoveShape(i)`（`i >= draft.shapes.length` = 取消候选位）/ `SetCandidate(point,target)` /
+`OpenNoteDialog(force?)` / `SetNoteState("phase:<id>"|"step:<id>"|"fact:<id>")` /
+`AddMention(sel)` / `RemoveMention(kind,id)` / `ArmMention(on)` /
+`SetNoteText(text)` / `SetProposalKind(kind)` / `SetNoteTime(seconds)` / `SetNoteFilter(v)` /
 `SetLabelText(text)` / `CommitLabel()` / `CancelLabel()` /
 `ClearDraft()` / `await SaveDraft()` / `HandoffText()` / `CopyHandoff()` / `CopyJson()` /
 `DownloadJson()` / `DownloadImage()` / `DownloadNoteImage(id)` / `await MarkVerified(id)` / `LocateNote(id)` /
-`await LoadNotes()` / `await Jump(n)`；只读字段 `model` / `live` / `notes` / `localImages` / `draft` /
-`map` / `selection` / `phaseNumber`。
-俯视图那一侧（`tool.map`）另有 `HandlePoint(kind,id)` 与只读的 `viewTouched` / `handles`。
+`await LoadNotes()` / `await Jump(n)`；只读字段 `model` / `live` / `notes` / `localImages` /
+`draft`（含 `draft.mentions` 与 `draft.state`）/ `map` / `selection` / `phaseNumber`。
+俯视图那一侧（`tool.map`）另有 `HandlePoint(kind,id)`、`ArmMention(on)`、
+`onMention(cb)`（Ctrl / Meta + 点任何可拾取对象时回调，**selection 不变**）、
+`FinishPath()` / `CancelPath()`，以及只读的 `viewTouched` / `handles` / `mentionArmed`。
+select 工具下草图形状可拾取：`onSelect` 会给出 `{kind:"sketch", index}`，
+index 是上一次 `SetSketch(array)` 传进去那个数组的下标（ghost 在最后）。
+`SetLive(live)` 认 `live.squad`（画成友军图标，拾取为 `{kind:"friendly", id, live:true}`）。
 
 ---
 
@@ -470,6 +602,7 @@ map.drawnMarkers                // 本帧真画出去的标记 [{kind, id, encou
   phaseNumber, step,
   time: null | {kind:"stageRelative",seconds} | {kind:"fact",fact} | {kind:"actual",atS},
   text,                                              // 用户的意见
+  mentions?: [{ kind, id?, label?, x?, z?, original? }],   // @ 出来的那几个对象（可选）
   original: SnapshotTarget(model, target),           // **写批注那一刻目标的真实数据**
   proposal: null | { kind:"move"|"delay"|"retime"|"reroute"|"remove"|"other",
                      to?, points?, seconds?, earliestS?, latestS?, note? },
@@ -482,6 +615,17 @@ map.drawnMarkers                // 本帧真画出去的标记 [{kind, id, encou
 
 `beat` 只为读取旧批注保留在校验器里；现行工作台新建转运批注一律写 `kind:"threat"`，
 并从 `model.transferThreats` 拍快照。
+
+**`mentions`（@ 提及）**：一条意见常常要同时指到好几个东西（「这个机枪手压着
+@老周那辆车走的路 的路」）。每一枚与 `target` 同一套形状，`ValidateNote` 复用同一条校验：
+`kind` 必须在 `TARGET_KINDS` 里、要带 `id`（`point` 例外，要有限的 `x`/`z`）、**不许重复**
+（同一个对象提两遍，agent 那边就得自己去重，而去重这件事只该做一次）。
+`label` 是界面上的人话，`original` 是 `SaveDraft` 给每一枚拍的快照
+（被 @ 的可能是**这一局实时的班里人**，编排表里没有他 —— `SnapshotTarget` 那时报
+`{kind, id, missing:true}`，**不抛**：一条批注不该因为提到了一个活人就存不下去）。
+整个字段**可选**，旧批注没有它照样合法；没提及时 `SaveDraft` 干脆不写这个键。
+`NoteDrift` **不管 mentions** —— 漂移说的是这条批注的目标变没变。
+`HandoffMarkdown` 在每条批注下面多一行「提及：类别 名字（`编号`）；…」。
 
 **`original` 是这套东西能闭环的原因。** 批注是「这组敌人出现得太早」，而「早」是相对
 **当时那份编排**说的。不存下当时的 spawn / 坐标 / 事实门，等 agent 改完回头看，
@@ -548,9 +692,10 @@ node Taierzhuang1938/Script_MissionNotesCli.mjs dismiss <id> [--summary "…"]
 1. 起本地预览：`node scripts/Script_LocalPreview.mjs --no-open`（8080 被占时看输出端口）。
 2. 打开 `http://127.0.0.1:<port>/Taierzhuang1938/?whitebox=p012`；
    想从某一阶段开打就加 `&missionStage=<1..18>`。
-3. `` ` `` 打开工具目录 → 调试 → **关卡编排**。允许弹窗。
+3. `` ` `` 打开工具目录 → **编辑器** → **关卡编排**。允许弹窗。
 4. 拖阶段滑条看布局怎么变；打起来之后开「跟随实时」，左栏会实时告诉你
-   **正在等哪些事实**，底栏实际行会记下真正发生的时刻。
+   **正在等哪些事实**（底栏实际行末尾也有一枚枚空心标记），
+   实际行还会记下真正发生的时刻、关卡时钟走到哪儿、这一步用了多久。
    自己缩放或拖动过之后，跟随实时就只换阶段、不再动你的镜头；想把框景交回去，
    点一下「适配本阶段」或「适配整关」。
 5. 图上东西太多看不清时，按工具条上的 **分类**：左边那块面板能按类型单独看 ——
@@ -561,11 +706,17 @@ node Taierzhuang1938/Script_MissionNotesCli.mjs dismiss <id> [--summary "…"]
 6. 看到不对的：在俯视图上点中那个敌人 / 触发圈 / 路线 / **整组的把手** / **某一处威胁的标签**
    （或在左栏点阶段、步骤、事实、组），用圈选 / 箭头 / 折线 / 标注画出想说的地方
    （标注是在点的地方直接打字，回车落笔），要挪位置就用「候选位」把他拖到想要的位置。
-7. 右栏写一句人话 + 选建议类型（+ 时间点），点 **保存草稿**。
-   面板会告诉你是写进了 `Taierzhuang1938/Notes/FirstLevel/notes.json` 还是退化成了本地草稿。
+   画错了：点草图芯片的 ✕，或者在图上点中那一笔按 **Delete**；候选位不要了点它的 ✕。
+7. 手一动，**批注对话框**就自己浮出来（工具条末尾的「写批注」也能开）。
+   在它里面：上面那个下拉框选「哪个阶段 · 哪个状态」（选到某一步、甚至某一件要等的事），
+   写一句人话，要同时点到别的东西就按住 **Ctrl 点图上的它**（或按「@ 点图选」再点一下），
+   选建议类型（要的话填「相对本步 n 秒」），点 **保存草稿**。
+   状态条会告诉你是写进了 `Taierzhuang1938/Notes/FirstLevel/notes.json` 还是退化成了本地草稿
+   （右栏「批注」页上也镜着同一句）。
    退化时那张俯视图不会丢：它躺在浏览器的 IndexedDB 里，等下一次能写盘时自动补传，
    卡片上也看得到缩略图。
-8. 点 **复制交接文本** 把 `HandoffMarkdown` 拷给 agent（或者直接让 agent 自己去读 `notes.json`）。
+8. 切到右栏的 **批注** 页，点 **复制交接文本** 把 `HandoffMarkdown` 拷给 agent
+   （或者直接让 agent 自己去读 `notes.json`）。
 9. agent 改完、提交之后回到工作台点「重新加载」：已处理的批注会显示
    `resolution.summary`；如果目标的数据确实变了，那条批注会标 **⚠ 原设置已变化** 并把新旧值并排。
    核对无误点 **标记已核对**。
@@ -614,7 +765,7 @@ node Taierzhuang1938/Script_TextTest.mjs
 
 # 浏览器
 node Taierzhuang1938/Script_OrchestrationMapTest.mjs        # 俯视图（45 条）：数像素、PickAt、组/威胁把手、ToPng、工具回调
-node Taierzhuang1938/Script_OrchestrationEditorTest.mjs     # 工作台（101 条）：三栏/分栏线/时间轴折叠、事实与 flow 一致、阶段状态与「正在等」小标签、跟随实时不抢视野、标注输入框、分类抽屉与敌军布设表、批注退化与图片补传、关窗还干净
+node Taierzhuang1938/Script_OrchestrationEditorTest.mjs     # 工作台（152 条）：三栏/分栏线/时间轴折叠、事实与 flow 一致、顶栏只剩一枚状态、时间轴接住时钟与「正在等」空心标记、live 指纹含玩家朝向与班里人、跟随实时不抢视野、标注输入框、分类抽屉与敌军布设表、右栏两页签、批注对话框（阶段/状态下拉框、@ 提及、候选位 ✕、Delete 删草图）、批注退化与图片补传、关窗还干净
 node Taierzhuang1938/Script_EditorTest.mjs --launcher-only  # 入口面板 26 个按钮
 node Taierzhuang1938/Script_WorldInfoEditorTest.mjs
 node Taierzhuang1938/Script_PlayerStateEditorTest.mjs

@@ -87,13 +87,17 @@ try {
   }, { key: STORAGE_KEY, layoutKey: LAYOUT_KEY, filterKey: FILTER_KEY });
 
   // -------------------------------------------------------------------------
-  // 1) 入口：26 个按钮，工作台在「调试」组里
+  // 1) 入口：26 个按钮，工作台在「编辑器」组里
+  //    （它在语义上仍是叠加层 —— 独立窗口、不接管相机、keepOnClose —— 但用户
+  //     去找它时想的是「我要编关卡」，所以按钮画在编辑器组）
   // -------------------------------------------------------------------------
   Check("入口面板共 26 个按钮", await page.locator(".edPanel.launcher [data-editor]").count() === 26,
     `实际 ${await page.locator(".edPanel.launcher [data-editor]").count()}`);
   const group = await page.locator(".edPanel.launcher .edSection")
     .filter({ has: page.locator('[data-editor="orchestration"]') }).locator(":scope > .h").textContent();
-  Check("关卡编排入口在「调试」组", group === "调试", `实际「${group}」`);
+  Check("关卡编排入口在「编辑器」组", group === "编辑器", `实际「${group}」`);
+  Check("关卡编排只登记一个入口按钮",
+    await page.locator('.edPanel.launcher [data-editor="orchestration"]').count() === 1);
 
   // -------------------------------------------------------------------------
   // 2) 打开：独立弹窗，三栏与时间轴都在
@@ -117,6 +121,19 @@ try {
   Check("图层开关 14 个（含画布左下角那块图例）", await popup.locator("[data-layer]").count() === 14,
     `实际 ${await popup.locator("[data-layer]").count()}`);
   Check("工具 7 把", await popup.locator("[data-tool]").count() === 7);
+  for (const [selector, label] of [
+    ['[data-orch="detail-tabs"]', "右栏页签条"], ['[data-detail-panel="detail"]', "详情页"],
+    ['[data-detail-panel="notes"]', "批注页"], ['[data-orch="note-dialog"]', "批注对话框"],
+    ['[data-orch="note-button"]', "工具条末尾的「写批注」"], ['[data-note-field="state"]', "阶段/状态下拉框"],
+    ['[data-note-field="mentions"]', "@ 提及那一行"], ['[data-note-action="mention-arm"]', "「@ 点图选」"],
+  ]) {
+    Check(`${label} 在弹窗里`, await popup.locator(selector).count() === 1);
+  }
+  // 写批注的表单搬进了对话框：右栏里不许再留一份（两份表单只会各写各的）。
+  Check("右栏里没有写批注的表单了",
+    await popup.locator('[data-detail-panel] [data-note-field="text"]').count() === 0);
+  Check("「时刻类型」那个下拉框拿掉了（上面选了事实就不用再选一次）",
+    await popup.locator('[data-note-field="timeKind"]').count() === 0);
 
   // 骨架：两条可拖的分栏线 + 可收起的时间轴。宽度与折叠状态都记在 localStorage，
   // 所以这里收完要放回去 —— 留着收起的话下一轮开窗看不到时间轴。
@@ -164,6 +181,9 @@ try {
       runtimeStep: runtime.flow.stage.id,
       phaseNumber: tool.live?.phaseNumber ?? null,
       status: doc.querySelector('[data-orch="live-status"]').textContent,
+      statusTags: doc.querySelectorAll('[data-orch="live-status"] .tag').length,
+      actualHint: doc.querySelector(".tlNames .n.actual .muted")?.textContent || "",
+      squad: (tool.live?.squad || []).map((mate) => ({ id: mate.id, label: mate.label, alive: mate.alive })),
       wrong, glyphs,
       factCount: rows.length,
       before,
@@ -175,13 +195,51 @@ try {
   });
   Check("流程当前步 = 运行时当前步（Transfer）",
     live.stepId === "Transfer" && live.stepId === live.runtimeStep, `面板 ${live.stepId} / 运行时 ${live.runtimeStep}`);
-  Check("实时状态行写出阶段与时钟", /阶段 12/.test(live.status) && /关卡时钟/.test(live.status), live.status.slice(0, 80));
+  // 顶栏只留一枚状态：跑没跑、跑到哪一阶段。步骤 / 关卡时钟 / 这一步用时 / 正在等
+  // 全是时间轴里的信息 —— 同一份数据在屏幕上出现两次，两处迟早会对不上。
+  Check("顶栏只有一枚状态标签，写「实时 · 第 12 阶段」",
+    live.statusTags === 1 && /实时/.test(live.status) && /第 12 阶段/.test(live.status),
+    `${live.statusTags} 枚：${live.status.slice(0, 80)}`);
+  Check("顶栏不再写步骤 / 关卡时钟 / 这一步用时 / 正在等",
+    !/关卡时钟/.test(live.status) && !/正在等/.test(live.status) && !/这一步/.test(live.status)
+    && !/步骤/.test(live.status),
+    live.status.slice(0, 80));
+  Check("时间轴「实际」行接住了关卡时钟 / 这一步用时 / 当前步骤",
+    /关卡时钟 [\d.]+ 秒/.test(live.actualHint) && /这一步 [\d.]+ 秒/.test(live.actualHint)
+    && live.actualHint.includes("步骤 Transfer"),
+    live.actualHint);
   Check("当前步的要求事实与 flow.Has 逐条一致", live.wrong.length === 0 && live.factCount === 6, live.wrong.join(" "));
   Check("当前步的事实只画 ✓ 或 …", live.glyphs.every((glyph) => glyph === "✓" || glyph === "…"), live.glyphs.join(""));
   Check("推帧后关卡时钟在走", live.after.time > live.before.time, `${live.before.time} → ${live.after.time}`);
   Check("实时玩家点跟着玩家走", Math.abs(live.after.x - live.playerX) < 0.01 && live.after.x !== live.before.x,
     `面板 ${live.after.x} / 玩家 ${live.playerX}`);
   Check("跟随实时把地图拨到第 12 阶段", live.mapPhase === 12 && live.phaseNumber === 12);
+  // 班里那几个人：位置来自演员句柄，名字来自文本表（不是 castId）。
+  Check("实时里带上了班里那几个人的位置与名字",
+    live.squad.length >= 3 && live.squad.every((mate) => typeof mate.label === "string" && mate.label)
+    && live.squad.some((mate) => mate.id === "luo") && live.squad.every((mate) => mate.label !== mate.id),
+    JSON.stringify(live.squad));
+
+  // 指纹：玩家原地转身、或班里人挪了位置，图都得重画。原来只看位置与时钟，
+  // 于是转身时那枚箭头钉在旧方向上不动（用户实测里的第一条）。
+  const fingerprint = await page.evaluate(() => {
+    const T = window.Taierzhuang;
+    const tool = T.editor.overlays.get("orchestration");
+    const before = tool.liveSignature;
+    T.player.yaw += 0.6;                       // 只转身，一步不挪
+    tool.PollRuntime();
+    const afterYaw = tool.liveSignature;
+    const mate = tool.live?.squad?.[0] ? tool.runtime.squad.find((one) => one?.castId === tool.live.squad[0].id) : null;
+    if (mate) mate.position.x += 3;
+    tool.PollRuntime();
+    const afterSquad = tool.liveSignature;
+    return { before, afterYaw, afterSquad, moved: !!mate };
+  });
+  Check("玩家原地转身也算 live 变了（yaw 进指纹）", fingerprint.afterYaw !== fingerprint.before,
+    `${fingerprint.before} → ${fingerprint.afterYaw}`);
+  Check("班里人挪了位置也算 live 变了",
+    fingerprint.moved && fingerprint.afterSquad !== fingerprint.afterYaw,
+    `${fingerprint.afterYaw} → ${fingerprint.afterSquad}`);
 
   const shape = await page.evaluate(() => {
     const tool = window.Taierzhuang.editor.overlays.get("orchestration");
@@ -190,16 +248,29 @@ try {
     return {
       now: Phase(12).dataset.phaseState, nowOpen: Phase(12).dataset.open,
       done: Phase(3).dataset.phaseState, todo: Phase(15).dataset.phaseState,
-      waitTags: doc.querySelectorAll('[data-orch="live-status"] .tag.wait').length,
+      // 「正在等」搬进了时间轴：当前阶段实际泳道末尾一件事一枚空心标记。
+      waitMarks: [...doc.querySelectorAll('[data-timeline="actual"] .tlMark[data-marker-kind="waiting"]')]
+        .map((node) => ({ lane: node.closest("[data-lane]")?.dataset.lane, at: node.dataset.markerAt ?? null,
+          text: node.textContent, tip: node.dataset.tip || "", id: node.dataset.selId })),
+      elsewhere: [...doc.querySelectorAll('[data-lane]:not([data-lane="12"]) .tlMark[data-marker-kind="waiting"]')].length,
       remaining: tool.live?.remaining?.length ?? -1,
+      remainingIds: [...(tool.live?.remaining || [])],
     };
   });
   Check("左栏把当前阶段标成「正在这里」并自动展开，走过的标「已走过」",
     shape.now === "now" && shape.nowOpen === "1" && shape.done === "done" && shape.todo === "todo",
     `12=${shape.now}/${shape.nowOpen} 3=${shape.done} 15=${shape.todo}`);
-  Check("顶栏把「正在等」拆成一枚一枚小标签（不是一行斜杠）",
-    shape.waitTags === shape.remaining && shape.waitTags > 0,
-    `${shape.waitTags} 枚 / 实际在等 ${shape.remaining} 件`);
+  Check("时间轴实际行末尾给每件「正在等」的事一枚空心标记",
+    shape.waitMarks.length === shape.remaining && shape.waitMarks.length > 0
+    && shape.waitMarks.every((mark) => mark.text === "○"),
+    `${shape.waitMarks.length} 枚 / 实际在等 ${shape.remaining} 件`);
+  Check("「正在等」的标记只在当前阶段那条泳道上，且都没有秒数",
+    shape.elsewhere === 0 && shape.waitMarks.every((mark) => mark.lane === "12" && mark.at === null),
+    JSON.stringify(shape.waitMarks.map((mark) => `${mark.lane}:${mark.at}`)));
+  Check("「正在等」的提示写人话并明说没有固定秒数，点它选中那件事",
+    shape.waitMarks.every((mark) => mark.tip.includes("正在等：") && mark.tip.includes("没有固定秒数"))
+    && shape.waitMarks.every((mark) => shape.remainingIds.includes(mark.id)),
+    shape.waitMarks[0]?.tip.slice(0, 90) || "（没有标记）");
 
   // -------------------------------------------------------------------------
   // 4) 阶段布局与反查
@@ -231,6 +302,45 @@ try {
     && !lookup.owner.includes("kind="),
     lookup.owner.slice(0, 120));
   Check("右栏折叠了原始数据 JSON", lookup.json.includes("\"encounter\": \"transfer\""), lookup.json.slice(0, 80));
+
+  // 敌人被击毙之后，详情卡那一行「现在」要跟着变 —— 它和布设表的「实时」列、
+  // 图上的灰角标说的必须是同一件事。
+  const nowRow = await page.evaluate(() => {
+    const T = window.Taierzhuang;
+    const tool = T.editor.overlays.get("orchestration");
+    const doc = tool.win.document;
+    const Row = () => {
+      const rows = [...doc.querySelectorAll('[data-detail="owner"] .kv')];
+      const hit = rows.find((node) => node.querySelector(".k")?.textContent === "现在");
+      return hit ? hit.querySelector(".v").textContent : "";
+    };
+    tool.Select({ kind: "member", id: "TransferGunner" });
+    const alive = Row();
+    // 打死他：把运行时报上来的 enemies 里这一个改成 alive:false（原方法在原型上，
+    // 挂一个同名的自有属性遮住它，读完 delete 掉就还原）。
+    const real = tool.runtime.State.bind(tool.runtime);
+    tool.runtime.State = () => {
+      const state = real();
+      return { ...state, enemies: state.enemies.map((one) => (one.id === "TransferGunner" ? { ...one, alive: false } : one)) };
+    };
+    tool.PollRuntime();
+    tool.Select({ kind: "member", id: "TransferGunner" });
+    const dead = Row();
+    delete tool.runtime.State;
+    tool.PollRuntime();
+    // 这一局里根本没有的那个人（front 组在第 12 阶段已清除）写的是设计状态，不是空白。
+    const absentId = tool.model.encounters.find((one) => one.id === "front")?.members?.[0]?.id || null;
+    if (absentId) tool.Select({ kind: "member", id: absentId });
+    const absent = absentId ? Row() : "";
+    tool.Select({ kind: "member", id: "TransferGunner" });
+    return { alive, dead, absent, absentId, restored: typeof tool.runtime.State === "function" };
+  });
+  Check("详情卡成员那张表有一行「现在」，活着时写位置",
+    /^活着 · \(/.test(nowRow.alive) && nowRow.restored, `「${nowRow.alive}」`);
+  Check("敌人被击毙之后「现在」写「已击毙」", nowRow.dead === "已击毙", `「${nowRow.dead}」`);
+  Check("这一局里没有的那个人，「现在」写他这一阶段的设计状态（不是空白）",
+    nowRow.absent.includes("这一局里没有他") && /第 12 阶段是「.+」/.test(nowRow.absent),
+    `${nowRow.absentId} →「${nowRow.absent}」`);
 
   // -------------------------------------------------------------------------
   // 4b) 点地图上的组把手 / 威胁标签，走的是同一条反查
@@ -650,8 +760,8 @@ try {
       collapsed, reopened, sortedFirst,
     };
   });
-  Check("布设表列出当前编排全部敌人（74 人、九列表头）",
-    table.all === 74 && table.head.length === 9 && table.groupRows === 13,
+  Check("布设表列出当前编排全部敌人（61 人、九列表头）",
+    table.all === 61 && table.head.length === 9 && table.groupRows === 13,
     `${table.all} 行 / 表头 ${table.head.join(" ")}`);
   Check("按组排时第一列表头是「图标」（组名写在分组线上），换别的排法就变回「组」",
     table.head[0] === "图标 ▲" && table.headAfterSort[0] === "组",
@@ -690,15 +800,299 @@ try {
   Check("抽屉能收起来，收起后筛选回到全画", closed.open === false && closed.filter);
 
   // -------------------------------------------------------------------------
-  // 5) 新建批注：草图 + 候选位 + 建议，无端点时退化为 localStorage + IndexedDB
+  // 4g) 右栏两个页签 + 那个唯一的批注对话框
+  //
+  // 用户的原话是「右侧的批注太复杂了…我只需要一个对话框」。这一段守四件事：
+  //   ① 右栏只剩「详情 / 批注」两页，写批注的表单不在那儿；
+  //   ② 对话框在图上一动手（画一笔 / 拖候选位 / 提及一个对象）就自己打开；
+  //   ③ 「哪个阶段·哪个状态」下拉框决定这条批注挂在哪儿，**改它不许动 selection**；
+  //   ④ 候选位删得掉（用户实测点名的那条：加了就再也去不掉）。
+  // -------------------------------------------------------------------------
+  const tabs = await page.evaluate(() => {
+    const tool = window.Taierzhuang.editor.overlays.get("orchestration");
+    const doc = tool.win.document;
+    const Panels = () => Object.fromEntries([...doc.querySelectorAll("[data-detail-panel]")]
+      .map((node) => [node.dataset.detailPanel, node.dataset.on]));
+    const Tabs = () => Object.fromEntries([...doc.querySelectorAll("[data-detail-tab]")]
+      .map((node) => [node.dataset.detailTab, node.dataset.on]));
+    const first = { panels: Panels(), tabs: Tabs() };
+    doc.querySelector('[data-detail-tab="notes"]').click();
+    const onNotes = { panels: Panels(), tabs: Tabs() };
+    let saved = null;
+    try { saved = JSON.parse(localStorage.getItem("tengxian1938_orchestration_layout_FirstLevel") || "null"); }
+    catch (error) { saved = null; }
+    doc.querySelector('[data-detail-tab="detail"]').click();
+    return {
+      first, onNotes, savedTab: saved?.detailTab || null,
+      back: Tabs(),
+      // 导出那一行（复制交接文本 / 下载 JSON / 复制 JSON / 下载本图）在「批注」页底部
+      exports: [...doc.querySelectorAll('[data-detail-panel="notes"] [data-note-action]')]
+        .map((node) => node.dataset.noteAction),
+      relatedInDetail: doc.querySelectorAll('[data-detail-panel="detail"] [data-detail="notes"]').length,
+      listInNotes: doc.querySelectorAll('[data-detail-panel="notes"] [data-notes="list"]').length,
+    };
+  });
+  Check("右栏默认停在「详情」页", tabs.first.panels.detail === "1" && tabs.first.panels.notes === "0"
+    && tabs.first.tabs.detail === "1" && tabs.first.tabs.notes === "0", JSON.stringify(tabs.first));
+  Check("点「批注」页签换过去，并记进 layout localStorage",
+    tabs.onNotes.panels.notes === "1" && tabs.onNotes.panels.detail === "0"
+    && tabs.onNotes.tabs.notes === "1" && tabs.savedTab === "notes" && tabs.back.detail === "1",
+    `${JSON.stringify(tabs.onNotes.panels)} / 存的是 ${tabs.savedTab}`);
+  Check("「这个对象上的批注」在详情页、全部批注列表在批注页",
+    tabs.relatedInDetail === 1 && tabs.listInNotes === 1);
+  Check("四颗导出按钮在批注页底部",
+    ["handoff", "download", "copy", "image"].every((id) => tabs.exports.includes(id)),
+    tabs.exports.join(" "));
+
+  const dialog = await page.evaluate(() => {
+    const tool = window.Taierzhuang.editor.overlays.get("orchestration");
+    const doc = tool.win.document;
+    const box = doc.querySelector('[data-orch="note-dialog"]');
+    const button = doc.querySelector('[data-orch="note-button"]');
+    tool.ClearDraft();
+    tool.OpenNoteDialog(false);
+    const closed = box.dataset.open;
+    button.click();
+    const byButton = { open: box.dataset.open, on: button.classList.contains("on") };
+    button.click();
+    const byButtonAgain = box.dataset.open;
+    // 图上画了一笔 → 自己开
+    tool.AddShape({ type: "circle", x: 113, z: 80, r: 12 });
+    const byShape = box.dataset.open;
+    tool.OpenNoteDialog(false);
+    // 拖了候选位 → 也自己开
+    tool.SetCandidate({ x: 126, z: 74 }, { kind: "member", id: "TransferGunner" });
+    const byCandidate = box.dataset.open;
+    // Esc（焦点不在输入框上）收起，草稿不清
+    doc.body.dispatchEvent(new tool.win.KeyboardEvent("keydown", { key: "Escape", bubbles: true, cancelable: true }));
+    const byEsc = { open: box.dataset.open, shapes: tool.draft.shapes.length, candidate: !!tool.draft.candidate };
+    tool.OpenNoteDialog(true);
+    return { closed, byButton, byButtonAgain, byShape, byCandidate, byEsc };
+  });
+  Check("工具条上的「写批注」开合对话框",
+    dialog.closed === "0" && dialog.byButton.open === "1" && dialog.byButton.on
+    && dialog.byButtonAgain === "0",
+    `${dialog.closed} → ${dialog.byButton.open} → ${dialog.byButtonAgain}`);
+  Check("在图上画一笔 / 拖候选位，对话框自己打开",
+    dialog.byShape === "1" && dialog.byCandidate === "1");
+  Check("Esc 收起对话框但不清草稿",
+    dialog.byEsc.open === "0" && dialog.byEsc.shapes === 1 && dialog.byEsc.candidate,
+    JSON.stringify(dialog.byEsc));
+
+  const stateSelect = await page.evaluate(() => {
+    const tool = window.Taierzhuang.editor.overlays.get("orchestration");
+    const doc = tool.win.document;
+    const select = doc.querySelector('[data-note-field="state"]');
+    const groups = [...select.querySelectorAll("optgroup")];
+    const kinds = [...select.options].reduce((acc, option) => {
+      const kind = option.value.split(":")[0];
+      acc[kind] = (acc[kind] || 0) + 1;
+      return acc;
+    }, {});
+    tool.SetPhase(12);
+    tool.Select({ kind: "member", id: "TransferGunner" });
+    const before = { sel: tool.selection?.id, phase: tool.phaseNumber, value: select.value };
+    // 改下拉框：只换在看哪一阶段，**不许动 selection**
+    tool.SetNoteState("step:Village");
+    const afterStep = {
+      sel: tool.selection?.id, phase: tool.phaseNumber, value: select.value,
+      state: tool.draft.state, step: tool.DraftStep(), target: tool.DraftTarget(),
+    };
+    // 选一件「要等的事」→ time 记成 {kind:"fact"}
+    const fact = tool.model.steps.find((step) => step.id === "Village")?.requirements?.[0] || null;
+    if (fact) tool.SetNoteState(`fact:${fact}`);
+    const afterFact = { time: tool.DraftTime(), value: select.value, step: tool.DraftStep() };
+    // 反过来：在左栏选中某一步，下拉框跟过去
+    tool.Select({ kind: "step", id: "Transfer" });
+    const bySelection = { value: select.value, phase: tool.phaseNumber };
+    // 没选中东西也没提及时，target 落在下拉框选的那一项上（不再总是阶段）
+    tool.Select(null);
+    const noSelection = tool.DraftTarget();
+    tool.SetNoteTime(18);
+    const bySeconds = tool.DraftTime();
+    tool.SetNoteTime("");
+    tool.Select({ kind: "member", id: "TransferGunner" });
+    return { groups: groups.length, groupLabel: groups[0].label, kinds, before, afterStep, afterFact,
+      bySelection, noSelection, bySeconds, optionCount: select.options.length };
+  });
+  Check("下拉框 18 个阶段分组，阶段 / 步骤 / 要求事实三级都在",
+    stateSelect.groups === 18 && stateSelect.kinds.phase === 18 && stateSelect.kinds.step === 27
+    && stateSelect.kinds.fact > 60 && /^第 1 阶段 · /.test(stateSelect.groupLabel),
+    `${stateSelect.groups} 组 / ${JSON.stringify(stateSelect.kinds)} / 「${stateSelect.groupLabel}」`);
+  Check("改下拉框只换阶段，不碰 selection",
+    stateSelect.afterStep.sel === "TransferGunner" && stateSelect.afterStep.value === "step:Village"
+    && stateSelect.afterStep.phase !== stateSelect.before.phase
+    && stateSelect.afterStep.step === "Village",
+    `选中 ${stateSelect.afterStep.sel}，阶段 ${stateSelect.before.phase} → ${stateSelect.afterStep.phase}`);
+  Check("选了某件「要等的事」，这条批注的时刻就记成那件事",
+    stateSelect.afterFact.time?.kind === "fact" && stateSelect.afterFact.step === "Village",
+    JSON.stringify(stateSelect.afterFact.time));
+  Check("只填秒数时记成「相对本步 n 秒」",
+    stateSelect.bySeconds?.kind === "stageRelative" && stateSelect.bySeconds.seconds === 18,
+    JSON.stringify(stateSelect.bySeconds));
+  Check("在左栏 / 时间轴选中一个步骤，下拉框跟过去",
+    stateSelect.bySelection.value === "step:Transfer" && stateSelect.bySelection.phase === 12,
+    JSON.stringify(stateSelect.bySelection));
+  Check("没选中东西时，批注落在下拉框那一项上（不再总是落到阶段）",
+    stateSelect.noSelection.kind === "step" && stateSelect.noSelection.id === "Transfer",
+    JSON.stringify(stateSelect.noSelection));
+
+  const mention = await page.evaluate(() => {
+    const tool = window.Taierzhuang.editor.overlays.get("orchestration");
+    const doc = tool.win.document;
+    tool.ClearDraft();
+    tool.SetNoteText("这儿不对：");
+    const Chips = () => [...doc.querySelectorAll("[data-note-mention]")].map((node) => node.dataset.noteMention);
+    tool.AddMention({ kind: "encounter", id: "transfer" });
+    const one = { chips: Chips(), text: tool.draft.text, label: tool.draft.mentions[0]?.label };
+    tool.AddMention({ kind: "encounter", id: "transfer" });          // 重复的不再加一枚
+    const dedupe = Chips();
+    tool.AddMention({ kind: "route", id: "cartRide" });
+    const two = { chips: Chips(), text: tool.draft.text };
+    // 提及阶段 / 步骤 / 事实 = 改下拉框，不进提及芯片
+    tool.AddMention({ kind: "step", id: "Village" });
+    const asState = { chips: Chips(), value: doc.querySelector('[data-note-field="state"]').value };
+    // ✕ 删掉一枚
+    doc.querySelector('[data-note-mention="route:cartRide"]').click();
+    const afterRemove = Chips();
+    // 「@ 点图选」武装一次
+    const arm = doc.querySelector('[data-note-action="mention-arm"]');
+    arm.click();
+    const armed = { armed: !!tool.map.mentionArmed, lit: arm.classList.contains("armed") };
+    tool.ArmMention(false);
+    // 没选中东西时，第一枚提及就是这条批注的目标
+    tool.Select(null);
+    const target = tool.DraftTarget();
+    tool.Select({ kind: "member", id: "TransferGunner" });
+    return { one, dedupe, two, asState, afterRemove, armed, target,
+      hasArmApi: typeof tool.map.ArmMention === "function" };
+  });
+  Check("@ 提及加一枚芯片，名字说人话，正文里插「@名字 」",
+    mention.one.chips.length === 1 && mention.one.chips[0] === "encounter:transfer"
+    && mention.one.label === "转运区第 1 处威胁"
+    && mention.one.text.includes("@转运区第 1 处威胁 "),
+    `${JSON.stringify(mention.one.chips)}｜${mention.one.text}`);
+  Check("同一个对象不重复加", mention.dedupe.length === 1, JSON.stringify(mention.dedupe));
+  Check("再 @ 一个：两枚芯片", mention.two.chips.length === 2
+    && mention.two.chips.includes("route:cartRide"), JSON.stringify(mention.two.chips));
+  Check("@ 到阶段 / 步骤 / 事实时走下拉框，不当作提及",
+    mention.asState.chips.length === 2 && mention.asState.value === "step:Village",
+    `${mention.asState.chips.length} 枚 / 下拉框 ${mention.asState.value}`);
+  Check("芯片上的 ✕ 删得掉", mention.afterRemove.length === 1
+    && mention.afterRemove[0] === "encounter:transfer", JSON.stringify(mention.afterRemove));
+  Check("「@ 点图选」把俯视图武装成一次性提及",
+    mention.hasArmApi ? (mention.armed.armed && mention.armed.lit) : true,
+    mention.hasArmApi ? JSON.stringify(mention.armed) : "（俯视图还没接 ArmMention，跳过）");
+  Check("没选中东西时，第一枚提及就是这条批注的目标",
+    mention.target.kind === "encounter" && mention.target.id === "transfer",
+    JSON.stringify(mention.target));
+
+  // 真在图上按住 Ctrl 点一下：加一枚提及、**selection 一动不动**、对话框自己开。
+  // 这一条走的是俯视图那一侧的 onMention 契约，两边接得上才算数。
+  const ctrlClick = await page.evaluate(() => {
+    const tool = window.Taierzhuang.editor.overlays.get("orchestration");
+    const map = tool.map;
+    if (typeof map.onMention !== "function") return { skipped: true };
+    tool.ClearDraft();
+    tool.OpenNoteDialog(false);
+    tool.SetTool("select");
+    tool.SetPhase(12, { fit: true });
+    tool.Select({ kind: "member", id: "TransferGunner" });
+    map.SetClusterGap?.(0);                   // 逐人画，别点到一枚簇标记上
+    const marker = (map.drawnMarkers || []).find((one) => one.kind === "member" && one.id !== "TransferGunner");
+    if (!marker) { map.SetClusterGap?.(null); return { skipped: true }; }
+    const rect = map.canvas.getBoundingClientRect();
+    for (const type of ["mousedown", "mouseup"]) {
+      map.canvas.dispatchEvent(new tool.win.MouseEvent(type, {
+        clientX: rect.left + marker.x, clientY: rect.top + marker.y,
+        button: 0, ctrlKey: true, bubbles: true, cancelable: true,
+      }));
+    }
+    const out = {
+      skipped: false, wanted: marker.id,
+      mentions: tool.draft.mentions.map((one) => `${one.kind}:${one.id}`),
+      sel: tool.selection?.id,
+      dialog: tool.win.document.querySelector('[data-orch="note-dialog"]').dataset.open,
+      text: tool.draft.text,
+    };
+    map.SetClusterGap?.(null);
+    tool.ClearDraft();
+    tool.OpenNoteDialog(false);
+    tool.Select({ kind: "member", id: "TransferGunner" });
+    return out;
+  });
+  Check("在图上按住 Ctrl 点一个敌人：加一枚提及，selection 不变，对话框自己开",
+    ctrlClick.skipped
+    || (ctrlClick.mentions.length === 1 && ctrlClick.mentions[0] === `member:${ctrlClick.wanted}`
+      && ctrlClick.sel === "TransferGunner" && ctrlClick.dialog === "1"
+      && ctrlClick.text.includes(`@${ctrlClick.wanted}`)),
+    ctrlClick.skipped ? "（俯视图还没接 onMention，跳过）" : JSON.stringify(ctrlClick));
+
+  const sketchEdit = await page.evaluate(() => {
+    const tool = window.Taierzhuang.editor.overlays.get("orchestration");
+    const doc = tool.win.document;
+    tool.ClearDraft();
+    tool.AddShape({ type: "circle", x: 113, z: 80, r: 12 });
+    tool.AddShape({ type: "arrow", from: { x: 113, z: 80 }, to: { x: 126, z: 74 } });
+    tool.SetCandidate({ x: 126, z: 74 }, { kind: "member", id: "TransferGunner" });
+    const chips = [...doc.querySelectorAll('[data-note-field="sketch"] [data-shape-index]')]
+      .map((node) => node.textContent);
+    const clear = doc.querySelector('[data-note-action="candidate-clear"]');
+    const candidateChip = clear?.textContent || "";
+    clear?.click();                                   // 候选位的 ✕：这就是「加了就删不掉」那条
+    const afterClear = { candidate: tool.draft.candidate, shapes: tool.draft.shapes.length,
+      sketchShapes: tool.DraftShapes().length };
+    // 选中图上一笔草图 → Delete 删掉它
+    tool.Select({ kind: "sketch", index: 0 }, { fromMap: true });
+    const picked = {
+      title: doc.querySelector('[data-detail="title"]').textContent,
+      owner: doc.querySelector('[data-detail="owner"]').textContent,
+    };
+    doc.body.dispatchEvent(new tool.win.KeyboardEvent("keydown", { key: "Delete", bubbles: true, cancelable: true }));
+    const afterDelete = { shapes: tool.draft.shapes.length, first: tool.draft.shapes[0]?.type, sel: tool.selection };
+    // 在输入框里按 Backspace 不许删草图
+    tool.Select({ kind: "sketch", index: 0 }, { fromMap: true });
+    doc.querySelector('[data-note-field="text"]')
+      .dispatchEvent(new tool.win.KeyboardEvent("keydown", { key: "Backspace", bubbles: true, cancelable: true }));
+    const inTextarea = tool.draft.shapes.length;
+    // 候选位那一枚 ghost 在 DraftShapes 的最后：按它的下标删 = 取消候选位
+    tool.SetCandidate({ x: 130, z: 70 }, { kind: "member", id: "TransferGunner" });
+    tool.RemoveShape(tool.draft.shapes.length);
+    const ghostByIndex = tool.draft.candidate;
+    tool.ClearDraft();
+    tool.Select({ kind: "member", id: "TransferGunner" });
+    return { chips, candidateChip, afterClear, picked, afterDelete, inTextarea, ghostByIndex };
+  });
+  Check("草图每一笔一枚带 ✕ 的芯片", sketchEdit.chips.length === 2
+    && sketchEdit.chips[0].includes("圈选") && sketchEdit.chips.every((text) => text.includes("✕")),
+    sketchEdit.chips.join(" ｜ "));
+  Check("候选位也有 ✕，点了就没了（「加了就删不掉」那条）",
+    sketchEdit.candidateChip.includes("✕") && sketchEdit.afterClear.candidate === null
+    && sketchEdit.afterClear.shapes === 2 && sketchEdit.afterClear.sketchShapes === 2,
+    `${sketchEdit.candidateChip} → ${JSON.stringify(sketchEdit.afterClear)}`);
+  Check("在图上选中一笔草图，详情卡说得出它是什么",
+    sketchEdit.picked.title.includes("草图") && sketchEdit.picked.title.includes("圈选")
+    && sketchEdit.picked.owner.includes("半径") && sketchEdit.picked.owner.includes("Delete"),
+    `${sketchEdit.picked.title} ｜ ${sketchEdit.picked.owner.slice(0, 60)}`);
+  Check("按 Delete 删掉选中的那一笔", sketchEdit.afterDelete.shapes === 1
+    && sketchEdit.afterDelete.first === "arrow" && sketchEdit.afterDelete.sel === null,
+    JSON.stringify(sketchEdit.afterDelete));
+  Check("焦点在输入框里时 Backspace 不删草图", sketchEdit.inTextarea === 1, String(sketchEdit.inTextarea));
+  Check("按最后那个下标删 = 取消候选位", sketchEdit.ghostByIndex === null, JSON.stringify(sketchEdit.ghostByIndex));
+
+  // -------------------------------------------------------------------------
+  // 5) 新建批注：草图 + 候选位 + 建议 + @ 提及，无端点时退化为 localStorage + IndexedDB
   // -------------------------------------------------------------------------
   const note = await page.evaluate(async (key) => {
     const T = window.Taierzhuang;
     const tool = T.editor.overlays.get("orchestration");
+    tool.SetPhase(12);
+    tool.Select({ kind: "member", id: "TransferGunner" });
     tool.SetNoteText("这组敌人出现得太早，转运刚开始就压到装车位上了。");
     tool.AddShape({ type: "circle", x: 113, z: 80, r: 12 });
     tool.SetCandidate({ x: 126, z: 74 }, { kind: "member", id: "TransferGunner" });
     tool.SetProposalKind("move");
+    tool.AddMention({ kind: "route", id: "cartRide" });
     const saved = await tool.SaveDraft();
     const doc = tool.win.document;
     let stored = null;
@@ -712,7 +1106,9 @@ try {
       stored: stored && Array.isArray(stored.notes) ? stored.notes.map((one) => one.id) : null,
       note: first,
       handoff: tool.HandoffText(),
-      draftCleared: tool.draft.shapes.length === 0 && tool.draft.text === "" && tool.draft.candidate === null,
+      draftCleared: tool.draft.shapes.length === 0 && tool.draft.text === ""
+        && tool.draft.candidate === null && tool.draft.mentions.length === 0,
+      stateKept: tool.draft.state?.id || null,
     };
   }, STORAGE_KEY);
   Check("保存草稿成功并退化到本地", note.saved?.ok && note.saved.mode === "local", JSON.stringify(note.saved));
@@ -734,7 +1130,19 @@ try {
     JSON.stringify(note.note?.proposal));
   Check("没端点也照写图片引用 <id>.png（图在 IndexedDB 里等补传）",
     note.note?.image === `${note.saved.id}.png`, String(note.note?.image));
-  Check("保存后草稿清空", note.draftCleared);
+  Check("@ 提及连同它自己那份「当时的真实数据」一起落进批注",
+    note.note?.mentions?.length === 1 && note.note.mentions[0].kind === "route"
+    && note.note.mentions[0].id === "cartRide" && note.note.mentions[0].label === "老周那辆车走的路"
+    && Array.isArray(note.note.mentions[0].original?.points),
+    JSON.stringify(note.note?.mentions)?.slice(0, 160));
+  Check("阶段 / 步骤来自「哪个阶段·哪个状态」下拉框",
+    note.note?.phaseNumber === 12 && note.note?.step === "Transfer",
+    `第 ${note.note?.phaseNumber} 阶段 · ${note.note?.step}`);
+  Check("交接文本给提及单列一行",
+    note.handoff.includes("- 提及：") && note.handoff.includes("老周那辆车走的路"),
+    note.handoff.split("\n").find((line) => line.startsWith("- 提及：")) || "（没有那一行）");
+  Check("保存后草稿清空，但「哪个阶段·哪个状态」留着",
+    note.draftCleared && note.stateKept === "Transfer", `留着的是 ${note.stateKept}`);
 
   // 图进 IndexedDB、不进 localStorage：一张 PNG dataURL 就能把 5 MB 的配额顶爆，
   // 而 localStorage 里躺着的是**批注正文**，那才是绝对不能丢的东西。
@@ -882,6 +1290,28 @@ try {
 
   await popup.screenshot({ path: path.join(shotDir, "Workbench.png"), fullPage: true });
 
+  // 出图：批注对话框开着（下拉框 + @ 提及 + 草图 + 候选位）与右栏的「批注」页。
+  await page.evaluate(() => {
+    const tool = window.Taierzhuang.editor.overlays.get("orchestration");
+    tool.SetPhase(12, { fit: true });
+    tool.Select({ kind: "member", id: "TransferGunner" });
+    tool.SetNoteText("这个机枪手压着");
+    tool.AddMention({ kind: "route", id: "cartRide" });
+    tool.SetNoteText(`${tool.draft.text}的路，往东挪十米。`);
+    tool.AddShape({ type: "circle", x: 113, z: 80, r: 12 });
+    tool.SetCandidate({ x: 126, z: 74 }, { kind: "member", id: "TransferGunner" });
+    tool.SetProposalKind("move");
+    tool.OpenNoteDialog(true);
+    tool.SetDetailTab("notes");
+  });
+  await popup.screenshot({ path: path.join(shotDir, "Workbench_note_dialog.png"), fullPage: true });
+  await page.evaluate(() => {
+    const tool = window.Taierzhuang.editor.overlays.get("orchestration");
+    tool.ClearDraft();
+    tool.OpenNoteDialog(false);
+    tool.SetDetailTab("detail");
+  });
+
   // 出图：分类抽屉开着（只看转运区第 1 波攻击）与整张敌军布设表。
   await popup.setViewportSize({ width: 1380, height: 900 });
   await page.evaluate(() => {
@@ -969,7 +1399,7 @@ try {
   Check("没有页面错误", errors.length === 0, errors.join(" | "));
   const failed = results.filter((entry) => !entry.ok);
   console.log(`\n${results.length - failed.length}/${results.length} 项通过，截图在 ${shotDir}`
-    + "（Workbench.png / Workbench_filter_1380.png / Workbench_table_1920.png）");
+    + "（Workbench.png / Workbench_note_dialog.png / Workbench_filter_1380.png / Workbench_table_1920.png）");
   assert.equal(failed.length, 0, failed.map((entry) => `${entry.name}${entry.detail ? `（${entry.detail}）` : ""}`).join("\n"));
 } finally {
   await browser.close();

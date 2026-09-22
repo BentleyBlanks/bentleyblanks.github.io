@@ -519,6 +519,15 @@ export function ApplyRuntimeState(model, runtimeState) {
     spawned: runtimeState.spawned ? [...runtimeState.spawned] : null,
     transferBeats: runtimeState.transferBeats ?? null,
     player: runtimeState.player ? { x: runtimeState.player.x, z: runtimeState.player.z, yaw: runtimeState.player.yaw ?? null } : null,
+    // 班里那几个人：调用方（工作台）已经把演员句柄折成 {id,label,x,z,alive,yaw} 了，
+    // 这里只把坐标不是有限数的那几个筛掉 —— 人还没造出来时 position 会是 NaN，
+    // 画到图上就是一枚钉在原点的友军图标，比不画更误导。
+    squad: (Array.isArray(runtimeState.squad) ? runtimeState.squad : [])
+      .filter((mate) => mate && Number.isFinite(mate.x) && Number.isFinite(mate.z))
+      .map((mate) => ({
+        id: mate.id, label: mate.label ?? null, x: mate.x, z: mate.z,
+        alive: !!mate.alive, yaw: Number.isFinite(mate.yaw) ? mate.yaw : null,
+      })),
     guideRoute: runtimeState.guideRoute ? FlatRoute(runtimeState.guideRoute) : null,
     actualTimeline,
   };

@@ -37,6 +37,17 @@ export const PROPOSAL_KINDS = Object.freeze(["move", "delay", "retime", "reroute
 export const SHAPE_KINDS = Object.freeze(["circle", "arrow", "path", "label", "ghost"]);
 export const TIME_KINDS = Object.freeze(["stageRelative", "fact", "actual"]);
 
+/**
+ * 每一类目标在界面与交接文本里怎么称呼。**只此一份**：工作台的详情卡、批注卡、
+ * 提及芯片与这里的 HandoffMarkdown 都来问它，抄第二遍的下场是同一个东西
+ * 在卡片上叫「敌人」、在交接文本里叫 `member`。
+ */
+export const TARGET_KIND_LABELS = Object.freeze({
+  phase: "阶段", step: "步骤", fact: "事实", encounter: "遭遇组", member: "敌人", threat: "转运威胁",
+  beat: "转运威胁（旧记法）", route: "路线", zone: "触发区", anchor: "锚点", friendly: "友军",
+  point: "地图点", time: "时间点",
+});
+
 /** 有 id 才认得出目标的那几类（point / time 靠坐标与秒数自证）。 */
 const KINDS_NEED_ID = Object.freeze(["phase", "step", "fact", "encounter", "member", "threat", "beat", "route", "zone", "anchor", "friendly"]);
 
@@ -124,6 +135,29 @@ function CheckTarget(target, errors) {
   }
   if (target.x !== undefined && !Finite(target.x)) errors.push("target.x 不是有限数");
   if (target.z !== undefined && !Finite(target.z)) errors.push("target.z 不是有限数");
+}
+
+/**
+ * `@ 提及`：一条批注顺手点到的那几个别的对象（「这个机枪手压着 @老周那辆车 的路」）。
+ * 可选、旧批注没有这一项也合法 —— 加字段不能把已经在仓库里的批注判成非法。
+ * 与 target 同一套形状，所以校验复用 CheckTarget；多一条「不许重复」：
+ * 同一个对象提两遍，agent 那边就得自己去重，而去重这件事只该做一次。
+ */
+function CheckMentions(mentions, errors) {
+  if (mentions === null || mentions === undefined) return;
+  if (!Array.isArray(mentions)) { errors.push("mentions 要是数组或不写"); return; }
+  const seen = new Set();
+  mentions.forEach((mention, index) => {
+    const at = `mentions[${index}]`;
+    if (!IsPlainObject(mention)) { errors.push(`${at} 要是对象`); return; }
+    const before = errors.length;
+    CheckTarget(mention, errors);
+    for (let i = before; i < errors.length; i += 1) errors[i] = `${at}.${errors[i]}`;
+    if (mention.label !== undefined && typeof mention.label !== "string") errors.push(`${at}.label 要是字符串`);
+    const key = `${mention.kind}:${mention.id ?? `${mention.x},${mention.z}`}`;
+    if (seen.has(key)) errors.push(`${at} 与前面重复了：${key}`);
+    seen.add(key);
+  });
 }
 
 function CheckTime(time, errors) {
@@ -216,6 +250,7 @@ export function ValidateNote(note) {
   }
 
   CheckTarget(note.target, errors);
+  CheckMentions(note.mentions, errors);
   CheckTime(note.time, errors);
   CheckProposal(note.proposal, errors);
   CheckSketch(note.sketch, errors);
@@ -378,6 +413,8 @@ export function SnapshotTarget(model, target) {
   if (kind === "friendly") {
     const list = model && Array.isArray(model.friendlies) ? model.friendlies : [];
     const friendly = list.find((one) => one.id === id);
+    // 被 @ 提及的友军可能是**这一局实时的班里人**（罗班长这种，castId 不在编排表里），
+    // 那就只能报 missing —— 但绝不能抛：一条批注不该因为提到了一个活人就存不下去。
     if (!friendly) return Missing();
     const { kind: friendlyKind, ...rest } = Clone(friendly);
     return { kind: "friendly", friendlyKind, ...rest, id, x: friendly.x, z: friendly.z };
@@ -462,6 +499,18 @@ function DescribeProposal(note) {
   return bits.join(" ");
 }
 
+/** 「提及：敌人 TransferGunner（TransferGunner）」：类别说人话，编号照抄，好让 agent 直接去查。 */
+function DescribeMentions(note) {
+  const list = Array.isArray(note.mentions) ? note.mentions : [];
+  if (!list.length) return "";
+  return list.map((mention) => {
+    const kind = TARGET_KIND_LABELS[mention.kind] || mention.kind;
+    if (mention.id === undefined || mention.id === null) return `${kind} ${FormatPoint(mention)}`;
+    const name = mention.label && mention.label !== String(mention.id) ? mention.label : String(mention.id);
+    return `${kind} ${name}（\`${mention.id}\`）`;
+  }).join("；");
+}
+
 function DescribeSketch(note) {
   const shapes = note.sketch && Array.isArray(note.sketch.shapes) ? note.sketch.shapes : [];
   if (!shapes.length) return "无";
@@ -529,6 +578,8 @@ export function HandoffMarkdown(notes, model = null, options = {}) {
       lines.push(`- 目标：${DescribeTarget(note)}`
         + `${note.step ? `（步骤 \`${note.step}\`）` : ""} · ${DescribeTime(note)}`);
       lines.push(`- 意见：${note.text}`);
+      const mentions = DescribeMentions(note);
+      if (mentions) lines.push(`- 提及：${mentions}`);
       lines.push(`- 建议：${DescribeProposal(note)}`);
       lines.push("- 原设置：");
       for (const row of OriginalLines(note.original)) lines.push(`  - ${row}`);

@@ -245,7 +245,38 @@ function MakeNote(patch = {}) {
   for (const junk of [null, undefined, 42, "note", []]) {
     Check(!ValidateNote(junk).ok, `${JSON.stringify(junk)} 不是一条批注`);
   }
-  console.log(`ok  ② ValidateNote：正常的过，${cases.length} 种坏法逐条报出人话`);
+
+  // `mentions`（@ 提及）是后加的字段：**加它不能把已经在仓库里的批注判成非法**。
+  const mentioned = MakeNote({
+    mentions: [
+      { kind: "member", id: "TransferRifle", label: "TransferRifle", x: 47, z: 11,
+        original: SnapshotTarget(model, { kind: "member", id: "TransferRifle" }) },
+      { kind: "route", id: "evacuation", label: "撤离路" },
+      { kind: "point", x: 12, z: -34 },
+    ],
+  });
+  Check(ValidateNote(mentioned).ok, `带 @ 提及的批注合法：${ValidateNote(mentioned).errors.join("；")}`);
+  Check(ValidateNote(MakeNote()).ok && MakeNote().mentions === undefined, "旧批注没有 mentions 也照样合法");
+  Check(ValidateNote(MakeNote({ mentions: [] })).ok, "空的 mentions 数组也合法");
+  const mentionCases = [
+    [{ mentions: {} }, /mentions 要是数组/],
+    [{ mentions: [{ kind: "blob", id: "x" }] }, /mentions\[0\]\.target\.kind 不认识/],
+    [{ mentions: [{ kind: "member" }] }, /mentions\[0\]\.target\.kind=member 要带 id/],
+    [{ mentions: [{ kind: "point", x: 1 }] }, /mentions\[0\]\.target\.kind=point 要带有限的 x\/z/],
+    [{ mentions: [{ kind: "member", id: "A" }, { kind: "member", id: "A" }] }, /mentions\[1\] 与前面重复了/],
+    [{ mentions: [{ kind: "member", id: "A", label: 7 }] }, /mentions\[0\]\.label 要是字符串/],
+  ];
+  for (const [patch, pattern] of mentionCases) {
+    const broken = ValidateNote(MakeNote(patch));
+    Check(!broken.ok && broken.errors.some((error) => pattern.test(error)),
+      `${JSON.stringify(patch).slice(0, 70)} → ${pattern}（实际 ${JSON.stringify(broken.errors)}）`);
+  }
+  // 被 @ 的可能是这一局实时的班里人（castId 不在编排表里）：要优雅地报 missing，不许抛。
+  const liveMate = SnapshotTarget(model, { kind: "friendly", id: "luo" });
+  Check(liveMate.kind === "friendly" && liveMate.id === "luo" && liveMate.missing === true,
+    `实时班里人拍快照报 missing 而不是抛：${JSON.stringify(liveMate)}`);
+  console.log(`ok  ② ValidateNote：正常的过，${cases.length + mentionCases.length} 种坏法逐条报出人话，`
+    + "mentions 可选且向后兼容");
 }
 
 // =========================================================== ③ SnapshotTarget
@@ -390,6 +421,24 @@ function MakeNote(patch = {}) {
   const parsed = JSON.parse(block);
   Check(Array.isArray(parsed) && parsed.length === 2 && parsed[0].id === "n_20260918_101500_ab12",
     "```json 块是能直接 JSON.parse 的那两条");
+
+  // @ 提及要出现在交接文本里：agent 顺着「提及」那一行就能查到被点到的那几个东西。
+  const withMentions = HandoffMarkdown([MakeNote({
+    id: "n_20260918_101800_gh78",
+    text: "这个机枪手压着老周那辆车的路。",
+    mentions: [
+      { kind: "route", id: "evacuation", label: "撤离路" },
+      { kind: "friendly", id: "squadPost1", label: "班里的位置" },
+    ],
+  })], model);
+  Check(withMentions.includes("- 提及："), "交接文本给 @ 提及单列一行");
+  Check(withMentions.includes("路线 撤离路（`evacuation`）")
+    && withMentions.includes("友军 班里的位置（`squadPost1`）"),
+    `提及那一行写「类别 名字（编号）」：${withMentions.split("\n").find((line) => line.startsWith("- 提及："))}`);
+  Check(!HandoffMarkdown([MakeNote()], model).includes("- 提及："), "没提及就不多这一行");
+  // mentions 不进漂移：漂移说的是**这条批注的目标**变没变，提及只是顺手指了一下。
+  const mentionDrift = NoteDrift(MakeNote({ mentions: [{ kind: "route", id: "evacuation" }] }), MakeModel());
+  Check(!mentionDrift.changed, `加了 mentions 不会被算成漂移：${JSON.stringify(mentionDrift.diff)}`);
 
   const moved = MakeModel();
   moved.encounters[0].members[0].x = 46.5;

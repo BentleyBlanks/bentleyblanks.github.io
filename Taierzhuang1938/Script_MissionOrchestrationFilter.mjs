@@ -80,6 +80,10 @@ export const ROUTE_LABELS = Object.freeze({
   pursuit: "敌军追击路",
   sortie: "出击路",
   sortieReturn: "出击返回",
+  // 2026.09.22 前沿重建（一处缺口 + 三条独立线）新加的两条。没有中文名的话，
+  // 分类树左边就写着 `rightRear`，而「路线名一律中文」是这张表自己的门禁在守的。
+  rightRear: "从右侧机枪位退回后方的路",
+  attack: "从后方压上缺口的路",
   // 下面五条是旧军列开场留下的线。人已经不走了，几何仍按它们让路，所以工作台还画得出来。
   // approach / supportTrench 与 opening / support 指同一个数组（重复登记，门禁点名要）。
   approach: "旧进沟路（同 opening）",

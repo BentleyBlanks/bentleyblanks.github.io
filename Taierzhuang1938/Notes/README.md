@@ -24,9 +24,16 @@ Taierzhuang1938/Notes/
 schema、校验与交接文本的口径都在 `Taierzhuang1938/Script_MissionNotes.mjs`
 （纯模块，Node 与浏览器共用），闸门是 `node Taierzhuang1938/Script_MissionNotesTest.mjs`。
 
+一条批注除了 `target`（它主要在说的那个东西）之外，还可能带一个 **`mentions`** 数组：
+用户在图上 Ctrl 点出来的 **@ 提及**，形状与 `target` 一样，各自也带一份 `original` 快照。
+它是可选的 —— 旧批注没有这个字段照样合法，`drift` 也不看它。交接文本里它是
+每条批注下面的「提及：类别 名字（编号）」那一行。
+
 ## 怎么存进来
 
-工作台按「保存草稿」时先问本地预览服 `GET /__notes/status`：
+工作台里写批注的地方是**浮在俯视图上的那个对话框**（工具条上的「写批注」开它；
+在图上画一笔 / 拖候选位 / Ctrl 点一个对象时它自己会开）。按「保存草稿」时先问本地预览服
+`GET /__notes/status`：
 - 可写（回环）→ `POST /__notes/save`，由 `scripts/Script_LocalPreview.mjs` 原子写回这里；
 - 不可写（线上 Pages、或者没开预览服）→ 退化成 localStorage 草稿 + 「下载 JSON」，
   下载下来的文件手动放到对应关卡目录即可。

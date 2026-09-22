@@ -22,6 +22,11 @@
 //
 // 容错口径：模型字段缺了就**不画那一层**，不抛错。工作台要在「P1 的表还没长
 // 齐」「不在第一关」这些半成品状态下照样打得开。
+//
+// 交互口径：每一种「进去了的状态」都得有出口，而且出口不止一个 —— 折线可以
+// 双击、回车、右键结束，Esc 整条不要，退格退一个点，换工具也算画完；画到一半时
+// 光标旁写着这句话。开着某个模式却看不出来、或者只有一种退出办法，用户的感受
+// 就是「点了没反应」和「停不下来」。
 // ===========================================================================
 
 import { PhaseLayout } from "./Script_MissionOrchestration.mjs";
@@ -185,7 +190,13 @@ const PRIORITY = { select: 0, chip: 20, anchor: 40, zone: 50, route: 60 };
 const LABEL_ZOOM = { anchor: 0.85, zone: 1.35, route: 1.9 };
 
 // 拾取分层：同一个位置上谁赢。人永远赢把手。
-const PICK_RANK = { zone: 1, route: 1, anchor: 2, friendly: 2, chip: 3, note: 4, member: 5, live: 6, player: 7 };
+// 草图（用户自己画的圈/箭头/折线/标注）排在触发区与路线之上、锚点之下：它是刚画上去
+// 的一笔，要点得中；可它又只是一层批注，不该把底下真正的编排对象挡住。
+// 候选位（ghost）是个精确的点，跟人同级 —— 拖它 = 重放候选位，那是 move 工具的主用例。
+const PICK_RANK = { zone: 1, route: 1, sketch: 1.5, anchor: 2, friendly: 2, chip: 3, note: 4, member: 5, live: 6, player: 7 };
+// 拖出来的圈 / 箭头小于这么多像素就不算一笔：手一抖点一下会生成半径 1 m 的圈
+// 和零长的箭头，删起来比画还麻烦。
+const MIN_DRAG_PX = 4;
 
 // 图例。**一行一张图标，跟图上画的是同一张图、同一种颜色**，所以图例就是
 // 「这张图怎么读」的唯一答案，不是另画一套示意图。用词全是普通中文 ——
@@ -314,25 +325,40 @@ export class OrchestrationMap {
     this.legendOpen = false;
     this.legendHit = null;
     this.drag = null;
-    this.pathPoints = null;
+    // 折线正在落的那几个点（世界坐标）。**永远是数组**：宿主要读它判断「还在画吗」，
+    // 一会儿 null 一会儿数组的字段每个调用方都得先防一次空。
+    this.pathPoints = [];
+    // 候选位上一次拖的是谁。ghost 形状只记得 memberId，可候选位也能是锚点或触发区
+    // 挪出来的 —— 再拖那一枚时得把原来的 target 原样还回去。
+    this.moveTarget = null;
+    // 一次性的「@ 提及」武装：下一次普通左键点击等同 Ctrl+点，点完就解除。
+    this.mentionArmed = false;
+    // 光标旁那句小提示这一帧画在哪儿（没画就是 null）。测试与宿主按它取证。
+    this.cursorHint = null;
     this.spaceDown = false;
     this.pointer = null;
 
-    this.callbacks = { select: [], hover: [], sketch: [], move: [], label: [] };
+    this.callbacks = { select: [], hover: [], sketch: [], move: [], label: [], mention: [] };
 
     this.handlers = {
       down: (e) => this.OnDown(e),
       move: (e) => this.OnMove(e),
       up: (e) => this.OnUp(e),
-      leave: () => { this.pointer = null; this.SetHover(null); },
+      // 鼠标离开画布：橡皮筋预览与光标提示都钉在最后那个位置，必须重画一次抹掉。
+      // SetHover(null) 只在 hover 真的变了时才重画，画折线时 hover 本来就是 null。
+      leave: () => { this.pointer = null; this.SetHover(null); this.Redraw(); },
       wheel: (e) => this.OnWheel(e),
       dbl: (e) => this.OnDoubleClick(e),
       menu: (e) => e.preventDefault(),
       winMove: (e) => { if (e.target !== this.canvas) this.OnMove(e); },
       winUp: (e) => { if (e.target !== this.canvas) this.OnUp(e); },
-      keyDown: (e) => { if (e.code === "Space" || e.key === " ") this.spaceDown = true; },
+      keyDown: (e) => this.OnKeyDown(e),
+      // 松开空格一律停平移：按下时焦点在画布、松开时焦点跑进输入框，这种半截状态
+      // 会让地图从此一直以为空格按着。
       keyUp: (e) => { if (e.code === "Space" || e.key === " ") this.spaceDown = false; },
     };
+    // 武装「@ 提及」时把鼠标样式换成十字；解除时还回宿主原来设的那一个。
+    this.baseCursor = canvas?.style?.cursor || "";
     if (canvas) {
       canvas.addEventListener("mousedown", this.handlers.down);
       canvas.addEventListener("mousemove", this.handlers.move);
@@ -393,6 +419,19 @@ export class OrchestrationMap {
   }
   AllowedMember(encounterId, memberId) {
     return this.Allowed("encounters", encounterId) && this.Allowed("members", memberId);
+  }
+  /**
+   * 实时小队的这个人该不该画。
+   *
+   * `friendlies` 集合装的是**设计**友军点的 id（squadPost、guardPost 那几个），
+   * 实时小队的 id 是角色号（luo、zhou…）—— 两套 id 根本不是一个命名空间。照集合
+   * 直接滤的话，一点「只看某一处友军点」，正跟着玩家走的那个班就整个没了。
+   * 所以只有当这个 id 真的也是个设计友军点、而且被滤掉了，才不画。
+   */
+  SquadAllowed(id) {
+    const set = this.filter?.friendlies;
+    if (!set || set.has(id)) return true;
+    return !(this.model?.friendlies || []).some((entry) => entry.id === id);
   }
 
   /**
@@ -480,12 +519,34 @@ export class OrchestrationMap {
     this.Redraw();
     return this;
   }
-  SetSketch(shapes) { this.sketch = Array.isArray(shapes) ? shapes.slice() : []; this.Redraw(); return this; }
+  SetSketch(shapes) {
+    this.sketch = Array.isArray(shapes) ? shapes.slice() : [];
+    // 草图换了一整批时，选中的那个下标可能已经指向别人、或者指空了（宿主删掉一笔
+    // 之后下标整体前移）。指空就把选中清掉 —— 宁可没选中，也不能描亮错的那一笔。
+    if (this.selection?.kind === "sketch" && !this.sketch[this.selection.index]) {
+      this.selection = null;
+      this.labelCache = null;
+    }
+    this.Redraw();
+    return this;
+  }
   SetNotes(notes) { this.notes = Array.isArray(notes) ? notes.slice() : []; this.Redraw(); return this; }
+  /**
+   * 换工具。**没画完的折线先收尾再换**：已经落了两个点以上就当这一笔画完了
+   * （辛苦点出来的线因为顺手点了别的工具就没了，比多出一笔还气人），只落了一个点
+   * 才当没画过 —— 一个点连不成线，留着也没用。
+   */
   SetTool(tool) {
-    this.tool = TOOLS.has(tool) ? tool : "select";
-    this.drag = null;
-    this.pathPoints = null;
+    const next = TOOLS.has(tool) ? tool : "select";
+    if (next !== this.tool) {
+      if (this.tool === "path") {
+        if (this.pathPoints.length >= 2) this.FinishPath();
+        else this.CancelPath();
+      }
+      // 换工具 = 上一件事做完了：拖到一半的圈/箭头/候选位不该跟着新工具继续。
+      this.drag = null;
+    }
+    this.tool = next;
     this.Redraw();
     return this;
   }
@@ -500,6 +561,26 @@ export class OrchestrationMap {
    * 这样单跑俯视图模块的测试与旧用法都不受影响。
    */
   onLabel(cb) { if (typeof cb === "function") this.callbacks.label.push(cb); return this; }
+  /**
+   * 「@ 提及」：Ctrl（Mac 上 Meta）点图上任何一个点得中的对象，或者武装之后点一下。
+   * 载荷跟 `onSelect` 同形，但**不改选中、不改画面** —— 它说的是「我要在文字里提到
+   * 这个东西」，不是「我现在要看它」。这两件事混在一起的话，用户为了提一句话就得
+   * 把正在看的对象丢掉。
+   */
+  onMention(cb) { if (typeof cb === "function") this.callbacks.mention.push(cb); return this; }
+  /**
+   * 武装一次性的 @ 提及：接下来那一次普通左键点击等同 Ctrl+点，**点完就解除**
+   * （点空地也解除 —— 悬着一个隐形的模式比没有还糟）。给的是右栏那个「@」按钮用的：
+   * 光有 Ctrl+点的话，没人知道有这么个用法。
+   */
+  ArmMention(on = true) {
+    const next = !!on;
+    if (next === this.mentionArmed) return this;
+    this.mentionArmed = next;
+    if (this.canvas?.style) this.canvas.style.cursor = next ? "crosshair" : this.baseCursor;
+    this.Redraw();
+    return this;
+  }
   Emit(name, payload) {
     if (this.disposed) return;
     for (const cb of this.callbacks[name] || []) {
@@ -990,11 +1071,15 @@ export class OrchestrationMap {
     if (L.encounters) this.PaintEncounters(ctx, view, Project, Push, Add, showLabels);
 
     // --- 实机层 -----------------------------------------------------------
-    if (L.live && this.live) this.PaintLive(ctx, Project, Push);
+    if (L.live && this.live) this.PaintLive(ctx, Project, Push, Add, showLabels);
 
     // --- 草图（当前草稿 + 正在拖的那一个） --------------------------------
-    for (const shape of this.sketch) {
-      this.PaintShape(ctx, Project, view, shape, Css(MAP_COLORS.sketch), true);
+    // 选中的那一笔描亮：草图也是能点中、能按 Delete 删掉的东西，
+    // 看不出「现在选的是哪一笔」的话，删之前根本不敢按。
+    const pickedShape = this.selection?.kind === "sketch" ? this.selection.index : -1;
+    for (let i = 0; i < this.sketch.length; i += 1) {
+      this.PaintShape(ctx, Project, view, this.sketch[i], Css(MAP_COLORS.sketch), true,
+        { highlight: i === pickedShape });
     }
     if (interactive) this.PaintPreview(ctx, Project, view);
 
@@ -1015,7 +1100,8 @@ export class OrchestrationMap {
       this.handles = placed.filter((entry) => entry.style === "chip");
     }
 
-    // --- 悬停 tooltip（永远在最上层，不参与避让） -------------------------
+    // --- 光标旁的小提示 + 悬停 tooltip（永远在最上层，不参与避让） -------
+    if (interactive) this.PaintCursorHint(ctx, view);
     if (interactive && this.hover && this.pointer) this.PaintTooltip(ctx, view, this.hover);
     ctx.restore();
     // 出图（ToPng）画的是另一套视野，别让它顶掉面板正在看的那一份清单。
@@ -1371,10 +1457,32 @@ export class OrchestrationMap {
     }
   }
 
+  /**
+   * 这一局里已经被打死的人（按 id 查）。
+   *
+   * 设计层拿它给「已击毙」的那几个换画法 —— 先前设计层完全不看实机数据，打死一个人
+   * 图标照旧，实机层只在同一位置补一枚 4 px 的灰叉，还被图标盖住，等于「打了没反应」。
+   * 跟着 `live` 图层走：关掉实机就是要看纯设计，那时候不该有人是灰的。
+   */
+  LiveDeadIds() {
+    if (!this.layers.live || !this.live) return null;
+    const list = this.live.enemies;
+    if (!Array.isArray(list) || !list.length) return null;
+    const dead = new Set();
+    const known = new Set();
+    for (const enemy of list) {
+      if (!enemy?.id) continue;
+      known.add(enemy.id);
+      if (enemy.alive === false) dead.add(enemy.id);
+    }
+    return { dead, known };
+  }
+
   PaintEncounters(ctx, view, Project, Push, Add, showLabels) {
     const L = this.layers;
     const size = this.iconPx;
     const gap = this.ClusterGapPx();
+    const live = this.LiveDeadIds();
     for (const encounter of this.phaseLayout?.encounters || []) {
       const state = encounter.state || "spawned";
       const entries = [];
@@ -1392,8 +1500,12 @@ export class OrchestrationMap {
       for (const group of ClusterEntries(entries, gap)) {
         if (group.items.length === 1) {
           const { member, p } = group.items[0];
-          const icon = this.PaintMember(ctx, p, member, state, encounter.id);
-          this.Mark({ kind: "member", id: member.id, encounter: encounter.id, state, icon, x: p.x, y: p.y });
+          const dead = !!live?.dead.has(member.id);
+          const icon = this.PaintMember(ctx, p, member, state, encounter.id, dead);
+          this.Mark({
+            kind: "member", id: member.id, encounter: encounter.id,
+            state: dead ? "dead" : state, icon, x: p.x, y: p.y,
+          });
           MarkGrid(this.soft, p.x - size / 2, p.y - size / 2, size, size);
           Push({ kind: "member", id: member.id, encounterId: encounter.id, x: member.x, z: member.z },
             p.x, p.y, 7, PICK_RANK.member);
@@ -1401,11 +1513,15 @@ export class OrchestrationMap {
         }
         // 一撮人并成一枚：组图标 + 右下角人数。点它拿到的是**整组**
         // （不是「这一撮」——点开之后要看的永远是这一组的编排）。
-        const icon = this.PaintCluster(ctx, group, encounter, state);
+        // 有实机数据时人数写成「活着/总数」，全灭了整撮转灰 —— 并起来之后
+        // 单个人的骷髅角标就看不见了，人数芯片得替它把话说了。
+        const tally = ClusterTally(group, live);
+        const icon = this.PaintCluster(ctx, group, encounter, state, tally);
         const world = ClusterWorld(group);
         this.Mark({
-          kind: "cluster", id: encounter.id, encounter: encounter.id, state,
-          count: group.items.length, icon, x: group.x, y: group.y,
+          kind: "cluster", id: encounter.id, encounter: encounter.id,
+          state: tally.wiped ? "dead" : state,
+          count: group.items.length, alive: tally.known ? tally.alive : null, icon, x: group.x, y: group.y,
         });
         const reach = size * 0.72;
         MarkGrid(this.soft, group.x - reach, group.y - reach, reach * 2, reach * 2);
@@ -1440,30 +1556,33 @@ export class OrchestrationMap {
    * （待命的沙漏、休眠的闭眼、已清除的骷髅）。状态不能只靠颜色分 —— 打印出来、
    * 色弱、或者缩到整关视野时颜色都不够用，所以颜色之外必须还有个形状。
    *
+   * 这一局里已经被打死的（`dead`）按「已击毙」画：灰、更淡、右下角一枚骷髅角标，
+   * 走的就是「已清除」那一套画法与尺寸规则 —— 打死一个人图上得当场看得出来。
+   *
    * 回图标名，调用方记进 `drawnMarkers`。图还没加载好就退回原来的几何标记。
    */
-  PaintMember(ctx, p, member, state, encounterId = null) {
-    const color = StateColor(state);
+  PaintMember(ctx, p, member, state, encounterId = null, dead = false) {
+    const color = dead ? MAP_COLORS.liveDead : StateColor(state);
     const icon = MapIconForMember(member, state, encounterId);
-    if (state === "active") {
+    if (state === "active" && !dead) {
       ctx.strokeStyle = Css(color, 0.22);
       ctx.lineWidth = 3.2;
       ctx.beginPath();
       ctx.arc(p.x, p.y, this.iconPx * 0.6, 0, Math.PI * 2);
       ctx.stroke();
     }
-    const alpha = StateAlpha(state);
+    const alpha = dead ? 0.55 : StateAlpha(state);
     // 够大才画细节角标；小了就退成一枚小色点（见 BADGE_DETAIL_PX 那条注释）。
     const detail = this.iconPx >= BADGE_DETAIL_PX;
-    const stateBadge = StateBadge(state);
+    const stateBadge = dead ? StateBadge("cleared") : StateBadge(state);
     const drawn = this.DrawIcon(ctx, p.x, p.y, icon, color, this.iconPx, {
       pixel: this.iconPixel,
       alpha,
       badge: detail ? (stateBadge || TraitBadge(member)) : null,
     });
     if (drawn) this.CorePixel(ctx, p.x, p.y, color, 1.7);
-    else this.PaintMemberShape(ctx, p, member, state);
-    if (!detail) this.PaintStateDot(ctx, p.x, p.y, this.iconPx, state);
+    else this.PaintMemberShape(ctx, p, member, dead ? "cleared" : state);
+    if (!detail) this.PaintStateDot(ctx, p.x, p.y, this.iconPx, dead ? "cleared" : state);
     return icon;
   }
 
@@ -1504,11 +1623,11 @@ export class OrchestrationMap {
    * 一撮挤在一起的人合成的簇标记：组里最常见的那张图标 + 右下角一枚人数芯片。
    * 放大到彼此分得开时这枚就自己散成一个个人，不需要任何开关。
    */
-  PaintCluster(ctx, group, encounter, state) {
-    const color = StateColor(state);
+  PaintCluster(ctx, group, encounter, state, tally = null) {
+    const color = tally?.wiped ? MAP_COLORS.liveDead : StateColor(state);
     const icon = DominantIcon(group.items, state, encounter.id);
     const size = this.iconPx * 1.2;
-    if (state === "active") {
+    if (state === "active" && !tally?.wiped) {
       ctx.strokeStyle = Css(color, 0.22);
       ctx.lineWidth = 3.2;
       ctx.beginPath();
@@ -1516,7 +1635,7 @@ export class OrchestrationMap {
       ctx.stroke();
     }
     const drawn = this.DrawIcon(ctx, group.x, group.y, icon, color, size, {
-      pixel: this.iconPixel, alpha: StateAlpha(state),
+      pixel: this.iconPixel, alpha: tally?.wiped ? 0.55 : StateAlpha(state),
     });
     if (!drawn) {
       // 图还没到：退回一枚实心点，人数芯片照画 —— 不许出现「一撮人不见了」。
@@ -1527,7 +1646,8 @@ export class OrchestrationMap {
     }
     this.CorePixel(ctx, group.x, group.y, color, 1.7);
     // 人数芯片：深底 + 状态色描边与数字。压在图标右下角，跟单人的角标同一个位置。
-    const text = String(group.items.length);
+    // 有实机数据就写「活着/总数」——「这一撮还剩几个」是打起来时最想知道的那个数。
+    const text = tally?.known ? `${tally.alive}/${group.items.length}` : String(group.items.length);
     ctx.font = FONT_TINY;
     const w = Math.ceil(ctx.measureText(text).width) + 7;
     const h = 12;
@@ -1629,7 +1749,7 @@ export class OrchestrationMap {
     }
   }
 
-  PaintLive(ctx, Project, Push) {
+  PaintLive(ctx, Project, Push, Add = null, showLabels = false) {
     const live = this.live;
     const guide = Array.isArray(live.guideRoute)
       ? Points(live.guideRoute)
@@ -1680,6 +1800,59 @@ export class OrchestrationMap {
       Push({ kind: "member", id: enemy.id, encounterId: enemy.encounter, x: enemy.x, z: enemy.z },
         p.x, p.y, 6, PICK_RANK.live);
     }
+
+    // --- 跟着玩家走的那个班：这一局里真人真位置，名字写在旁边 ---------------
+    // 友军色 + 我方士兵图标，朝向跟玩家箭头同一套规则（世界 yaw 0 看向 -Z = 屏幕上方）。
+    for (const mate of live.squad || []) {
+      if (!mate || !Number.isFinite(mate.x) || !Number.isFinite(mate.z)) continue;
+      if (!this.SquadAllowed(mate.id)) continue;
+      const p = Project(mate.x, mate.z);
+      const dead = mate.alive === false;
+      const size = this.iconPx * 0.95;
+      let icon = null;
+      if (dead) {
+        // 阵亡的一律画灰叉，跟实时敌人那一套同形 —— 叉在任何尺寸下都认得出。
+        ctx.strokeStyle = Css(MAP_COLORS.halo, 0.85);
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(p.x - 4.5, p.y - 4.5); ctx.lineTo(p.x + 4.5, p.y + 4.5);
+        ctx.moveTo(p.x + 4.5, p.y - 4.5); ctx.lineTo(p.x - 4.5, p.y + 4.5);
+        ctx.stroke();
+        ctx.strokeStyle = Css(MAP_COLORS.liveDead);
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(p.x - 4.5, p.y - 4.5); ctx.lineTo(p.x + 4.5, p.y + 4.5);
+        ctx.moveTo(p.x + 4.5, p.y - 4.5); ctx.lineTo(p.x - 4.5, p.y + 4.5);
+        ctx.stroke();
+        this.CorePixel(ctx, p.x, p.y, MAP_COLORS.liveDead, 1.6);
+      } else {
+        icon = "FriendlySquad";
+        const yaw = Number.isFinite(mate.yaw) ? mate.yaw : null;
+        const drawn = this.DrawIcon(ctx, p.x, p.y, icon, MAP_COLORS.friendly, size,
+          { pixel: this.iconPixel, rotate: yaw === null ? 0 : -yaw });
+        if (!drawn) {
+          icon = null;
+          ctx.fillStyle = Css(MAP_COLORS.halo, 0.8);
+          ctx.beginPath(); ctx.arc(p.x, p.y, 4.6, 0, Math.PI * 2); ctx.fill();
+          ctx.fillStyle = Css(MAP_COLORS.friendly);
+          ctx.beginPath(); ctx.arc(p.x, p.y, 3.4, 0, Math.PI * 2); ctx.fill();
+        }
+        this.CorePixel(ctx, p.x, p.y, MAP_COLORS.friendly, 1.7);
+      }
+      this.Mark({ kind: "liveFriendly", id: mate.id, state: dead ? "dead" : "alive", icon, x: p.x, y: p.y });
+      MarkGrid(this.soft, p.x - size / 2, p.y - size / 2, size, size);
+      if (Add && showLabels && mate.label) {
+        Add({
+          kind: "friendly", id: mate.id, text: mate.label, ax: p.x, ay: p.y,
+          color: dead ? MAP_COLORS.liveDead : MAP_COLORS.friendly,
+          priority: PRIORITY.anchor, style: "text", keep: 7,
+        });
+      }
+      // 实时位赢设计位：这个班正站在哪儿，比他的出生点更值得点中。
+      Push({ kind: "friendly", id: mate.id, live: true, x: mate.x, z: mate.z },
+        p.x, p.y, 7, PICK_RANK.live);
+    }
+
     const player = live.player;
     if (player && Number.isFinite(player.x)) {
       const p = Project(player.x, player.z);
@@ -1709,11 +1882,23 @@ export class OrchestrationMap {
     }
   }
 
-  PaintShape(ctx, Project, view, shape, color, solid) {
+  /**
+   * 画一笔草图。`highlight` = 这一笔正被选中：先照原样描一圈旧金的粗边，再把本体
+   * 加粗一档画上去。草图本身是紫的，压在暗地表上光靠加粗看不出选没选中 ——
+   * 而「现在选的是哪一笔」不明确的话，用户是不敢按 Delete 的。
+   */
+  PaintShape(ctx, Project, view, shape, color, solid, { highlight = false, width = 0 } = {}) {
     if (!shape) return;
+    if (highlight) {
+      // 描边不透明、而且要比本体宽出一圈半以上：半透明的金边一个精确像素都数不出来，
+      // 只宽出一点的话本体一盖，剩下的全是抗锯齿混色 ——「选中了却验不到」
+      // 正是这个仓库栽过的跟头。
+      this.PaintShape(ctx, Project, view, shape, Css(MAP_COLORS.select), solid,
+        { width: (solid ? 1.8 : 1.2) + 5 });
+    }
     ctx.strokeStyle = color;
     ctx.fillStyle = color;
-    ctx.lineWidth = solid ? 1.8 : 1.2;
+    ctx.lineWidth = width > 0 ? width : (solid ? 1.8 : 1.2) + (highlight ? 1 : 0);
     if (!solid) ctx.setLineDash([4, 3]);
     if (shape.type === "circle" && Number.isFinite(shape.x)) {
       const p = Project(shape.x, shape.z);
@@ -1747,7 +1932,7 @@ export class OrchestrationMap {
   PaintPreview(ctx, Project, view) {
     const drag = this.drag;
     const color = Css(MAP_COLORS.sketch);
-    if (this.pathPoints && this.pathPoints.length) {
+    if (this.pathPoints.length) {
       const pts = this.pathPoints.slice();
       if (this.pointer) pts.push(this.ScreenToWorld(this.pointer.x, this.pointer.y));
       if (pts.length >= 2) { ctx.strokeStyle = color; ctx.lineWidth = 1.8; Stroke(ctx, pts, Project); }
@@ -1774,6 +1959,42 @@ export class OrchestrationMap {
       ctx.beginPath(); ctx.arc(b.x, b.y, 6, 0, Math.PI * 2); ctx.stroke();
       ctx.setLineDash([]);
     }
+  }
+
+  /**
+   * 光标旁那句小提示。**用画布画，不用 DOM**：这一层是纯 canvas，往宿主的弹窗里
+   * 插节点等于把地图的内部状态漏到外面，弹窗一重排提示就飘到别处去了。
+   *
+   * 只在「有个模式正开着」的时候出现 —— 折线画到一半、@ 提及武装着。这两种状态
+   * 光看画面都认不出来，用户只会觉得「点了没反应」或者「怎么停不下来」。
+   */
+  PaintCursorHint(ctx, view) {
+    this.cursorHint = null;
+    if (!this.pointer) return;
+    let text = "";
+    let accent = MAP_COLORS.sketch;
+    if (this.mentionArmed) { text = "点一个对象 = @ 它"; accent = MAP_COLORS.select; }
+    else if (this.tool === "path" && this.pathPoints.length) text = "回车 / 双击结束 · Esc 取消";
+    if (!text) return;
+    ctx.font = FONT_SMALL;
+    const w = Math.ceil(ctx.measureText(text).width) + 14;
+    const h = 18;
+    let x = this.pointer.x + 15;
+    let y = this.pointer.y - h - 9;
+    if (x + w > view.w - 3) x = Math.max(3, view.w - w - 3);
+    if (y < 3) y = Math.min(view.h - h - 3, this.pointer.y + 19);
+    RoundRect(ctx, x, y, w, h, 3);
+    ctx.fillStyle = Css(MAP_COLORS.labelBack);    // 不透明：半透明的提示压在地表上读不出字
+    ctx.fill();
+    ctx.strokeStyle = Css(accent, 0.85);
+    ctx.lineWidth = 1;
+    RoundRect(ctx, x + 0.5, y + 0.5, w - 1, h - 1, 3);
+    ctx.stroke();
+    ctx.fillStyle = Css(MAP_COLORS.textLight);
+    ctx.textBaseline = "middle";
+    ctx.fillText(text, x + 7, y + h / 2);
+    ctx.font = FONT;
+    this.cursorHint = { x, y, w, h, text };
   }
 
   PaintHighlight(ctx, Project, sel) {
@@ -2014,6 +2235,9 @@ export class OrchestrationMap {
       ? `${view.w}x${view.h}|${view.scale.toFixed(4)}|${view.cx.toFixed(2)}|${view.cz.toFixed(2)}`
         + `|${this.phaseNumber}|${candidates.length}|${this.selection?.kind || ""}:${this.selection?.id || ""}`
         + `|${this.layers.labels ? 1 : 0}${this.layers.legend ? 1 : 0}${this.legendOpen ? 1 : 0}`
+        // 实时小队的名字是唯一会**自己走**的标签：人数没变、视野没变，位置却每 0.25 s
+        // 换一次。不把位置算进缓存键的话，名字会钉在原地，人走了字还留着。
+        + `|${SquadKey(this.live?.squad)}`
       : null;
     if (key && this.labelCache && this.labelCache.key === key) return this.labelCache.placed;
     const placed = this.PlaceLabels(ctx, view, candidates, chrome);
@@ -2149,7 +2373,10 @@ export class OrchestrationMap {
 
   DescribeSel(sel) {
     if (!sel) return [];
-    const lines = [`${KindText(sel.kind)}：${sel.id ?? ""}`];
+    if (sel.kind === "sketch") return this.DescribeSketch(sel);
+    const lines = [sel.kind === "friendly" && sel.live
+      ? LiveMateText(this.live?.squad, sel.id)
+      : `${KindText(sel.kind)}：${sel.id ?? ""}`];
     if (sel.kind === "encounter") {
       const encounter = (this.phaseLayout?.encounters || []).find((entry) => entry.id === sel.id);
       if (encounter) {
@@ -2177,7 +2404,9 @@ export class OrchestrationMap {
     if (sel.kind === "member") {
       const found = this.FindMember(sel.id);
       if (found) {
-        lines.push(`${found.encounter.id} · ${StateText(found.encounter.state)}`);
+        // 打死了就先说这一句：这时候「他属于哪一组、按计划该干什么」都是次要的。
+        const dead = !!this.LiveDeadIds()?.dead.has(sel.id);
+        lines.push(`${found.encounter.id} · ${dead ? "已击毙" : StateText(found.encounter.state)}`);
         const bits = [];
         // 图标说的是什么，提示里就用同一个中文词说一遍 —— 图与字不许各说各的。
         const label = IconLabel(MapIconForMember(found.member, found.encounter.state, found.encounter.id));
@@ -2191,6 +2420,105 @@ export class OrchestrationMap {
     }
     if (Number.isFinite(sel.x)) lines.push(`x ${sel.x.toFixed(1)}  z ${sel.z.toFixed(1)}`);
     return lines;
+  }
+
+  /**
+   * 自己画的那一笔怎么说给人听。写的是「圈选 · 半径 12 m」这种话 ——
+   * 提示卡里冒出 `type:"circle"` 或者数组下标，那是把内部字段名甩到脸上。
+   */
+  DescribeSketch(sel) {
+    const shape = this.sketch[sel?.index];
+    if (!shape) return [];
+    const lines = [];
+    if (shape.type === "circle") {
+      lines.push(`圈选 · 半径 ${Round1(shape.r)} m`);
+      if (Number.isFinite(shape.x)) lines.push(`x ${Round1(shape.x)}  z ${Round1(shape.z)}`);
+    } else if (shape.type === "arrow") {
+      const len = Math.hypot((shape.to?.x ?? 0) - (shape.from?.x ?? 0), (shape.to?.z ?? 0) - (shape.from?.z ?? 0));
+      lines.push(`箭头 · 长 ${Round1(len)} m`);
+    } else if (shape.type === "path") {
+      const pts = Points(shape.points);
+      let len = 0;
+      for (let i = 1; i < pts.length; i += 1) len += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].z - pts[i - 1].z);
+      lines.push(`折线 · ${pts.length} 个点 · 全长 ${Round1(len)} m`);
+    } else if (shape.type === "label") {
+      lines.push(`标注 · ${shape.text || "（待填）"}`);
+    } else if (shape.type === "ghost") {
+      lines.push(`候选位 · ${shape.memberId || "选中的东西"}`);
+      if (Number.isFinite(shape.x)) lines.push(`挪到 x ${Round1(shape.x)}  z ${Round1(shape.z)}`);
+    } else {
+      lines.push("画上去的一笔");
+    }
+    return lines;
+  }
+
+  /**
+   * 自己画的那几笔里，这一下点中了哪一个。
+   *
+   * 圈按「圈心或圈周」、箭头与折线按「端点或线段」，都按屏幕像素算 —— 世界米数在
+   * 整关视野下是 0.8 px/m，照米数给容差等于点不中任何东西。回的是 `{sel, d, rank}`
+   * 列表，`PickAt` 拿去跟别的对象一起排。
+   */
+  SketchPicks(px, py) {
+    const out = [];
+    const Hit = (index, d) => out.push({ sel: { kind: "sketch", index }, d, rank: PICK_RANK.sketch });
+    for (let i = 0; i < this.sketch.length; i += 1) {
+      const shape = this.sketch[i];
+      if (!shape) continue;
+      if (shape.type === "circle" && Number.isFinite(shape.x)) {
+        const c = this.WorldToScreen(shape.x, shape.z);
+        const d = Math.hypot(c.x - px, c.y - py);
+        const rim = Math.abs(d - Math.max(2, (shape.r || 1) * this.view.scale));
+        if (d <= 8) Hit(i, d);
+        else if (rim <= 6) Hit(i, rim);
+      } else if (shape.type === "arrow" && shape.from && shape.to) {
+        const a = this.WorldToScreen(shape.from.x, shape.from.z);
+        const b = this.WorldToScreen(shape.to.x, shape.to.z);
+        const ends = Math.min(Math.hypot(a.x - px, a.y - py), Math.hypot(b.x - px, b.y - py));
+        const seg = SegmentDistance(px, py, a, b);
+        if (ends <= 8) Hit(i, ends);
+        else if (seg <= 5) Hit(i, seg);
+      } else if (shape.type === "path") {
+        const pts = Points(shape.points).map((p) => this.WorldToScreen(p.x, p.z));
+        let best = Infinity;
+        let onSeg = Infinity;
+        for (let k = 0; k < pts.length; k += 1) {
+          best = Math.min(best, Math.hypot(pts[k].x - px, pts[k].y - py));
+          if (k > 0) onSeg = Math.min(onSeg, SegmentDistance(px, py, pts[k - 1], pts[k]));
+        }
+        if (best <= 8) Hit(i, best);
+        else if (onSeg <= 5) Hit(i, onSeg);
+      } else if (shape.type === "label" && Number.isFinite(shape.x)) {
+        // 文字框：写的时候是 `PlainLabel(x + 6, y)`，所以框子在锚点右边、上下各半行。
+        const p = this.WorldToScreen(shape.x, shape.z);
+        const text = shape.text || "（待填）";
+        const w = TextWidth(this.ctx, text, FONT_SMALL) + 10;
+        if (px >= p.x - 4 && px <= p.x + 6 + w && py >= p.y - LABEL_H / 2 && py <= p.y + LABEL_H / 2) {
+          Hit(i, Math.hypot(p.x - px, p.y - py));
+        }
+      } else if (shape.type === "ghost" && Number.isFinite(shape.x)) {
+        const p = this.WorldToScreen(shape.x, shape.z);
+        const d = Math.hypot(p.x - px, p.y - py);
+        if (d <= 10) out.push({ sel: { kind: "sketch", index: i }, d, rank: PICK_RANK.member });
+      }
+    }
+    return out;
+  }
+
+  /**
+   * 这一枚候选位原本标的是谁。ghost 形状只记得 memberId，可候选位也能是从锚点或
+   * 触发区拖出来的 —— 所以上一次拖它的那个 target 留在 `moveTarget` 里，优先用它。
+   */
+  GhostTarget(shape) {
+    const last = this.moveTarget;
+    if (last && (!shape?.memberId || last.id === shape.memberId)) return last;
+    if (shape?.memberId) {
+      const found = this.FindMember(shape.memberId);
+      return found
+        ? { kind: "member", id: shape.memberId, encounterId: found.encounter.id, x: found.member.x, z: found.member.z }
+        : { kind: "member", id: shape.memberId };
+    }
+    return MovableSel(this.selection) ? this.selection : null;
   }
 
   FindMember(id) {
@@ -2224,23 +2552,29 @@ export class OrchestrationMap {
   /**
    * 拾取。够得着的里面取最近的；距离打平（半个像素之内）时按 rank 分高下 ——
    * 人永远赢把手，实机位赢设计位。把手排在人后面画，但点人拿到的永远是人。
+   *
+   * 自己画的那几笔也参加（`SketchPicks`），而且**先过一遍**：同分时后来者赢，
+   * 把草图排在前面，一枚候选位正好压在某个人身上时拿到的仍然是那个人。
    */
   PickAt(px, py) {
     let best = null;
     let bestD = Infinity;
     let bestRank = -Infinity;
+    const Consider = (sel, d, rank) => {
+      if (d < bestD - 0.5 || (d < bestD + 0.5 && rank >= bestRank)) {
+        if (d < bestD) bestD = d;
+        best = sel;
+        bestRank = rank;
+      }
+    };
+    for (const hit of this.SketchPicks(px, py)) Consider(hit.sel, hit.d, hit.rank);
     for (const entry of this.picks) {
       const d = Math.hypot(entry.px - px, entry.py - py);
       const reach = Math.max(entry.r, 5);
       if (d > reach) continue;
-      const rank = entry.rank ?? 1;
-      if (d < bestD - 0.5 || (d < bestD + 0.5 && rank >= bestRank)) {
-        if (d < bestD) bestD = d;
-        best = entry;
-        bestRank = rank;
-      }
+      Consider(entry.sel, d, entry.rank ?? 1);
     }
-    return best ? { ...best.sel } : null;
+    return best ? { ...best } : null;
   }
 
   // -------------------------------------------------------------------------
@@ -2251,6 +2585,23 @@ export class OrchestrationMap {
     const local = this.LocalPoint(event);
     this.pointer = local;
     const world = this.ScreenToWorld(local.x, local.y);
+    // --- @ 提及：Ctrl（Mac 上 Meta）+ 左键，或者武装之后的那一下 -------------
+    // **任何工具下都生效**，连平移工具与画到一半的折线也认（这时候不落点）——
+    // 「要提一个东西还得先切回选择工具」这种规矩没人记得住。
+    if (event.button === 0 && (this.mentionArmed || event.ctrlKey || event.metaKey)) {
+      const sel = this.PickAt(local.x, local.y);
+      if (this.mentionArmed) this.ArmMention(false);     // 一次性：点空了也解除
+      // 草图是自己刚画上去的一笔，不是编排里的东西，@ 它没有意义。
+      if (sel && sel.kind !== "sketch") this.Emit("mention", sel);
+      event.preventDefault?.();
+      return;
+    }
+    // 折线画到一半的右键是「画完了」，不是平移：右键一拖，刚点出来的线就全丢了。
+    if (this.tool === "path" && this.pathPoints.length && event.button === 2) {
+      this.FinishPath();
+      event.preventDefault?.();
+      return;
+    }
     const panning = event.button === 2 || event.button === 1 || this.spaceDown || this.tool === "pan";
     if (panning) {
       this.drag = { kind: "pan", screen: local, cx: this.view.cx, cz: this.view.cz };
@@ -2279,7 +2630,6 @@ export class OrchestrationMap {
       return;
     }
     if (this.tool === "path") {
-      if (!this.pathPoints) this.pathPoints = [];
       this.pathPoints.push(world);
       this.Redraw();
       return;
@@ -2293,8 +2643,20 @@ export class OrchestrationMap {
     }
     if (this.tool === "move") {
       const picked = this.PickAt(local.x, local.y);
+      // 从已经摆出来的那枚候选位上按下 = 把它重新放一遍（原来标的是谁不变）。
+      // 先前只能一次次从人身上重拖，摆歪了连挪都挪不动。
+      const ghost = picked?.kind === "sketch" ? this.sketch[picked.index] : null;
+      if (ghost && ghost.type === "ghost") {
+        const target = this.GhostTarget(ghost);
+        if (!target) return;
+        this.moveTarget = target;
+        this.drag = { kind: "move", screen: local, world: { x: ghost.x, z: ghost.z }, current: world, target };
+        this.Redraw();
+        return;
+      }
       const target = MovableSel(picked) ? picked : (MovableSel(this.selection) ? this.selection : null);
       if (!target) return;
+      this.moveTarget = target;
       const origin = this.SelPoint(target) || world;
       this.drag = { kind: "move", screen: local, world: origin, current: world, target };
       this.Redraw();
@@ -2318,12 +2680,15 @@ export class OrchestrationMap {
       this.Redraw();
       return;
     }
-    if (this.tool === "path" && this.pathPoints?.length) { this.Redraw(); return; }
+    // 折线画到一半：光标那一段橡皮筋和提示都跟着走，这时候不去算悬停
+    //（要点的是下一个落点，不是脚下那个人）。
+    if (this.tool === "path" && this.pathPoints.length) { this.Redraw(); return; }
     const before = this.hover;
     const next = this.PickAt(local.x, local.y);
     this.SetHover(next);
     // tooltip 跟着鼠标走：sel 没变也要重画，否则提示框钉在原地。
-    if (SameSel(before, next) && next) this.Redraw();
+    // 武装 @ 提及时那句小提示也贴着光标，同理（悬停照常算 —— 正要 @ 谁总得先看清）。
+    if ((SameSel(before, next) && next) || this.mentionArmed) this.Redraw();
   }
 
   OnUp(event) {
@@ -2332,32 +2697,97 @@ export class OrchestrationMap {
     this.drag = null;
     if (!drag) return;
     const local = this.LocalPoint(event);
-    this.pointer = local;
+    // 在画布外面松手：世界坐标照算（拖出去的那一笔本来就该落在外面），但光标不留在
+    // 画布外 —— 提示与 tooltip 会跟着画到边上去。
+    const inside = local.x >= 0 && local.y >= 0 && local.x <= this.cssWidth && local.y <= this.cssHeight;
+    this.pointer = inside ? local : null;
     const world = this.ScreenToWorld(local.x, local.y);
+    // 手一抖的那一下不算一笔：圈与箭头都要求真的拖开过几个像素，
+    // 否则一次误点就在图上留一枚半径 1 m 的圈或者一支零长的箭头。
+    const moved = Math.hypot(local.x - (drag.screen?.x ?? local.x), local.y - (drag.screen?.y ?? local.y));
     if (drag.kind === "circle") {
-      const r = Math.hypot(world.x - drag.world.x, world.z - drag.world.z);
-      this.Emit("sketch", { type: "circle", x: drag.world.x, z: drag.world.z, r: Math.max(1, r) });
+      if (moved >= MIN_DRAG_PX) {
+        const r = Math.hypot(world.x - drag.world.x, world.z - drag.world.z);
+        this.Emit("sketch", { type: "circle", x: drag.world.x, z: drag.world.z, r: Math.max(1, r) });
+      }
     } else if (drag.kind === "arrow") {
-      this.Emit("sketch", { type: "arrow", from: { ...drag.world }, to: { ...world } });
+      if (moved >= MIN_DRAG_PX) this.Emit("sketch", { type: "arrow", from: { ...drag.world }, to: { ...world } });
     } else if (drag.kind === "move" && drag.target) {
       this.Emit("move", { target: { ...drag.target }, to: { x: world.x, z: world.z } });
     }
     this.Redraw();
   }
 
-  OnDoubleClick(event) {
-    if (this.disposed) return;
-    if (this.tool !== "path" || !this.pathPoints) return;
+  /**
+   * 结束折线，产出一笔 `sketch`。双击 / 回车 / 右键 / 切工具走的都是这里 ——
+   * 先前只有双击能收尾，画上瘾了就停不下来，切工具还把点全丢了。
+   * 不足两点当没画过（一个点连不成线）。回产出的形状，没产出回 null。
+   */
+  FinishPath() {
     const points = this.pathPoints;
-    this.pathPoints = null;
+    this.pathPoints = [];
+    if (!points.length) { this.Redraw(); return null; }
     // 双击的第一下已经落过一个点，末尾那两个几乎重合的点丢掉一个。
     if (points.length >= 2) {
       const a = points[points.length - 1], b = points[points.length - 2];
-      if (Math.hypot(a.x - b.x, a.z - b.z) * this.view.scale < 4) points.pop();
+      if (Math.hypot(a.x - b.x, a.z - b.z) * this.view.scale < MIN_DRAG_PX) points.pop();
     }
-    if (points.length >= 2) this.Emit("sketch", { type: "path", points });
+    let shape = null;
+    if (points.length >= 2) {
+      shape = { type: "path", points };
+      this.Emit("sketch", shape);
+    }
     this.Redraw();
+    return shape;
+  }
+
+  /** 整条折线不要了（Esc）。回 true 表示确实丢掉了没画完的东西。 */
+  CancelPath() {
+    const had = this.pathPoints.length > 0;
+    this.pathPoints = [];
+    if (had) this.Redraw();
+    return had;
+  }
+
+  OnDoubleClick(event) {
+    if (this.disposed) return;
+    if (this.tool !== "path" || !this.pathPoints.length) return;
+    this.FinishPath();
     event.preventDefault?.();
+  }
+
+  /**
+   * 键盘。**焦点在输入框里的时候一概不接**：工作台弹窗里有好几个输入框（批注正文、
+   * 标注文字），折线的回车与退格把用户正在打的字吃掉，那是最难查的一类怪事。
+   *
+   * 只有「手上正有一件没做完的事」时才吃掉按键（画着折线、武装着 @、拖着圈）——
+   * 平时的回车与 Esc 归宿主（弹窗自己也要用）。
+   */
+  OnKeyDown(event) {
+    if (this.disposed) return;
+    if (TypingTarget(event.target)) return;
+    if (event.code === "Space" || event.key === " ") { this.spaceDown = true; return; }
+    const drawing = this.tool === "path" && this.pathPoints.length > 0;
+    if (event.key === "Enter") {
+      if (!drawing) return;
+      this.FinishPath();
+      event.preventDefault?.();
+      return;
+    }
+    if (event.key === "Backspace") {
+      if (!drawing) return;
+      this.pathPoints.pop();                 // 退一个点，不是整条丢掉
+      this.Redraw();
+      event.preventDefault?.();
+      return;
+    }
+    if (event.key === "Escape") {
+      let handled = false;
+      if (this.mentionArmed) { this.ArmMention(false); handled = true; }
+      if (drawing) { this.CancelPath(); handled = true; }
+      else if (this.drag && this.drag.kind !== "pan") { this.drag = null; this.Redraw(); handled = true; }
+      if (handled) event.preventDefault?.();
+    }
   }
 
   OnWheel(event) {
@@ -2394,14 +2824,18 @@ export class OrchestrationMap {
       win.removeEventListener("keydown", this.handlers.keyDown);
       win.removeEventListener("keyup", this.handlers.keyUp);
     }
-    this.callbacks = { select: [], hover: [], sketch: [], move: [], label: [] };
+    this.callbacks = { select: [], hover: [], sketch: [], move: [], label: [], mention: [] };
     this.ground = null;
     this.picks = [];
     this.handles = [];
     this.placedLabels = [];
     this.labelCache = null;
     this.drag = null;
-    this.pathPoints = null;
+    this.pathPoints = [];
+    this.moveTarget = null;
+    this.cursorHint = null;
+    this.mentionArmed = false;
+    if (canvas?.style) canvas.style.cursor = this.baseCursor;
     this.live = null;
     this.drawnMarkers = [];
     this.marks = null;
@@ -2490,6 +2924,69 @@ function RoundRect(ctx, x, y, w, h, r) {
   ctx.lineTo(x, y + rad);
   ctx.arcTo(x, y, x + rad, y, rad);
   ctx.closePath();
+}
+
+/** 点到线段的距离（屏幕像素）。折线与箭头的拾取全靠它。 */
+function SegmentDistance(px, py, a, b) {
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const len = dx * dx + dy * dy;
+  if (len <= 1e-6) return Math.hypot(px - a.x, py - a.y);
+  const t = Clamp(((px - a.x) * dx + (py - a.y) * dy) / len, 0, 1);
+  return Math.hypot(px - (a.x + dx * t), py - (a.y + dy * t));
+}
+/** 量一段文字有多宽。量完把字体还回去 —— 别把调用方的画笔状态搅了。 */
+function TextWidth(ctx, text, font) {
+  if (!ctx) return String(text).length * 6;
+  const was = ctx.font;
+  ctx.font = font;
+  const w = ctx.measureText(text).width;
+  ctx.font = was;
+  return w;
+}
+/** 一位小数。界面上的米数写到厘米既读不过来也没那个精度。 */
+function Round1(v) { return Number.isFinite(v) ? (Math.round(v * 10) / 10).toString() : "?"; }
+/** 实时小队这一帧的指纹：名字要跟着人走，排版缓存就得认得出「人挪了」。 */
+function SquadKey(squad) {
+  if (!Array.isArray(squad) || !squad.length) return "";
+  let key = "";
+  for (const mate of squad) {
+    key += `${mate?.id || ""}${Math.round(mate?.x || 0)},${Math.round(mate?.z || 0)}${mate?.alive === false ? "x" : ""};`;
+  }
+  return key;
+}
+/** 实时小队成员的提示头一行：写中文名与死活，不写角色号。 */
+function LiveMateText(squad, id) {
+  const mate = (squad || []).find((entry) => entry?.id === id);
+  const name = mate?.label || id || "";
+  return `实时 · ${name}（${mate?.alive === false ? "阵亡" : "活着"}）`;
+}
+/**
+ * 一撮人里还剩几个活的。
+ *
+ * **只有「查得到而且死了」才算死**：实机名单里没有的那个人多半是还没生成，不是
+ * 阵亡 —— 把「不知道」算成死，芯片会在刚进这一阶段时就报全灭。
+ * 整组一个都不在实机名单里就回 `known:false`，芯片照旧只写总数。
+ */
+function ClusterTally(group, live) {
+  if (!live) return { known: false, alive: 0, wiped: false };
+  let seen = 0, dead = 0;
+  for (const item of group.items) {
+    if (live.known.has(item.member.id)) seen += 1;
+    if (live.dead.has(item.member.id)) dead += 1;
+  }
+  if (!seen) return { known: false, alive: 0, wiped: false };
+  const alive = group.items.length - dead;
+  return { known: true, alive, wiped: alive === 0 };
+}
+/**
+ * 焦点是不是落在能打字的地方。是的话键盘归它 —— 工作台弹窗里有好几个输入框，
+ * 折线的回车/退格要是把用户正在打的字吃掉，查起来是最难受的一类怪事。
+ */
+function TypingTarget(target) {
+  if (!target || typeof target !== "object") return false;
+  const tag = String(target.tagName || "").toUpperCase();
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
+  return !!target.isContentEditable;
 }
 
 /** 草图上的随手文字：不进避让系统（它是用户自己放的），描个深色边就够。 */
@@ -2726,6 +3223,7 @@ function KindText(kind) {
     case "friendly": return "友军";
     case "threat": return "转运威胁";
     case "note": return "批注";
+    case "sketch": return "画上去的一笔";
     default: return "点";
   }
 }
@@ -2735,5 +3233,7 @@ function MovableSel(sel) {
 function SameSel(a, b) {
   if (!a && !b) return true;
   if (!a || !b) return false;
-  return a.kind === b.kind && a.id === b.id && a.encounterId === b.encounterId;
+  // 草图形状没有 id，靠下标区分：不比下标的话，从一个圈挪到旁边那支箭头会被当成
+  // 「还是同一个」，提示卡就不跟着换了。
+  return a.kind === b.kind && a.id === b.id && a.encounterId === b.encounterId && a.index === b.index;
 }

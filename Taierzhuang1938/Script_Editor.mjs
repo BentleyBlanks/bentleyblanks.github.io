@@ -69,6 +69,12 @@ const ALL = [...SETTINGS, ...EDITORS];
 // 关卡编排工作台也在这一组：它是独立窗口里的 2D 俯视图 + 流程/时间轴，
 // 既不碰 three 场景也不接管相机，「边打边看走到哪一步」正是它的主用例。
 const OVERLAYS = [DebugRenderingEditor, ProfilerEditor, WorldInfoEditor, PlayerStateEditor, AiEditor, OrchestrationEditor];
+// 面板上的**分组**与上面那条「叠加语义」是两件事。关卡编排在语义上仍是叠加层
+// （独立窗口、不接管相机、keepOnClose，走 ToggleOverlay），但用户去找它的时候
+// 想的是「我要编关卡」，不是「我要调试」—— 所以按钮画进「编辑器」组。
+// 分两张表是为了让 this.entries 每个 id 只登记一次（同一个按钮画两遍就有两处开关）。
+const DEBUG_ENTRIES = OVERLAYS.filter((editor) => editor !== OrchestrationEditor);
+const EDITOR_ENTRIES = [...EDITORS, OrchestrationEditor];
 
 export class EditorSuite {
   /**
@@ -239,7 +245,7 @@ export class EditorSuite {
       body.appendChild(section);
     }
     Group("设置", SETTINGS);
-    const debugGroup = Group("调试", OVERLAYS);
+    const debugGroup = Group("调试", DEBUG_ENTRIES);
     this.fpsToggle = El("button", "edBtn wide", "显示 FPS");
     this.fpsToggle.type = "button";
     this.fpsToggle.dataset.action = "fps";
@@ -250,7 +256,7 @@ export class EditorSuite {
       this.RefreshFpsToggle();
     });
     debugGroup.appendChild(this.fpsToggle);
-    Group("编辑器", EDITORS);
+    Group("编辑器", EDITOR_ENTRIES);
 
     const off = El("button", "edBtn wide danger", "全部关掉");
     off.type = "button";

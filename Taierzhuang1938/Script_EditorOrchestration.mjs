@@ -25,14 +25,16 @@ import {
 import { OrchestrationMap } from "./Script_EditorOrchestrationMap.mjs";
 import {
   NewNoteId, ValidateNote, SnapshotTarget, NoteDrift, HandoffMarkdown,
-  PROPOSAL_KINDS, NotesPathFor,
+  PROPOSAL_KINDS, NotesPathFor, TARGET_KIND_LABELS,
 } from "./Script_MissionNotes.mjs";
 import {
   DefaultFilterState, NormalizeFilterState, ApplyPreset as PresetState, ToggleFilterItem, SoloFilterItem,
   BuildOrchestrationFilter, FilterSummary, EnemyTableRows, EnemyTableCsv, SortEnemyRows, RowVisible,
-  RouteNamesFor, PRESETS, ENEMY_TABLE_COLUMNS,
+  RouteNamesFor, PRESETS, ENEMY_TABLE_COLUMNS, EncounterLabel, RouteLabel,
   STATE_LABELS, FRIENDLY_LABELS, ZONE_LABELS, BAYONET_KEY,
 } from "./Script_MissionOrchestrationFilter.mjs";
+import { COMPANION_CAST } from "./Data_Companions.mjs";
+import { T } from "./Script_Text.mjs";
 
 const LEVEL = "FirstLevel";
 const REFRESH_SECONDS = 0.25;
@@ -83,15 +85,12 @@ const BASE_LAYERS = new Set(["terrain", "blocks", "roads", "trenches"]);
 const SVG_NS = "http://www.w3.org/2000/svg";
 const NOTE_STATUS_TEXT = { open: "待处理", resolved: "已处理", dismissed: "已忽略" };
 const NOTE_FILTER_TEXT = { ...NOTE_STATUS_TEXT, all: "全部" };
-const TIME_KIND_TEXT = { stageRelative: "阶段内第 N 秒", fact: "某件事发生时", "": "不限时刻" };
 const PROPOSAL_TEXT = {
   move: "挪位置", delay: "改延迟", retime: "改时间窗", reroute: "改路线", remove: "删掉", other: "其它",
 };
-const KIND_TEXT = {
-  phase: "阶段", step: "步骤", fact: "事实", encounter: "遭遇组", member: "敌人", threat: "转运威胁",
-  route: "路线", zone: "触发区", anchor: "锚点", friendly: "友军", point: "地图点", time: "时间点",
-  note: "批注",
-};
+// 类别的中文名走批注层那一份（TARGET_KIND_LABELS）：交接文本与这块面板必须叫同一个名字。
+// 「批注」与「草图」不是批注目标，只在界面上出现，所以在这儿补。
+const KIND_TEXT = { ...TARGET_KIND_LABELS, note: "批注", sketch: "草图" };
 // 状态 / 友军 / 触发区这三张词表与分类面板共用一份（Script_MissionOrchestrationFilter）：
 // 抄第二遍的下场是同一个状态在详情卡里叫「活跃」、在分类树里叫「在打」。
 const STATE_TEXT = STATE_LABELS;
@@ -120,11 +119,13 @@ const CATEGORY_ICONS = {
 const WEAPON_ICONS = { Type11: "MachineGunner", Type38: "Rifleman", [BAYONET_KEY]: "Bayonet" };
 const TIMELINE_GLYPH = {
   entry: "▸", condition: "◇", timed: "◆", threat: "■", delay: "·", wake: "✶",
-  stageEntry: "▸", fact: "●",
+  // 实际行的 ● 是「已经发生了」，正在等的那几件事用空心的 ○ —— 满足之后它自己
+  // 就会变成实际行里那枚实心 ●，两个符号是同一件事的前后两态。
+  stageEntry: "▸", fact: "●", waiting: "○",
 };
 const TIMELINE_TEXT = {
   entry: "进入", condition: "条件", timed: "定时", threat: "威胁", delay: "延迟", wake: "苏醒",
-  stageEntry: "实际进入", fact: "实际满足",
+  stageEntry: "实际进入", fact: "实际满足", waiting: "正在等",
 };
 
 // 与 Style_Interface.css / Style_Editor.css 同一套语言：黑标题栏、冷灰底、旧金选中、
@@ -442,6 +443,39 @@ const POPUP_CSS = `
   .note.drift { border-color: rgba(214,96,74,.45); }
   img.thumb { display: block; width: 100%; max-height: 132px; object-fit: cover; object-position: center top;
     margin-top: 8px; border: 1px solid var(--edge); }
+  /* 右栏两个页签：「详情」看选中的东西，「批注」看攒了哪些意见。
+     写批注的表单搬到了浮在图上的对话框里 —— 它要跟着图走，不该占住右栏。 */
+  .dTabs { display: inline-flex; border: 1px solid var(--edge); margin-left: auto; }
+  .dTabs > button { border: 0; border-right: 1px solid var(--edge); background: transparent;
+    color: var(--ui-muted, #a3aaa4); padding: 4px 12px; }
+  .dTabs > button:last-child { border-right: 0; }
+  .dTabs > button[data-on="1"] { color: var(--ui-gold, #dfbd68); background: var(--ui-selection, rgba(223,189,104,.14)); }
+  [data-detail-panel][data-on="0"] { display: none; }
+  [data-notes="hint"] { margin: 8px 16px; padding: 6px 8px; font-size: 12px; word-break: break-word;
+    border-left: 3px solid var(--edge); background: rgba(0,0,0,.25); color: var(--ui-muted, #a3aaa4); }
+  [data-notes="hint"]:empty { display: none; }
+
+  /* --- 批注对话框（浮在俯视图右下角，标题栏可拖）-------------------------- */
+  [data-orch="note-dialog"] { position: absolute; right: 16px; bottom: 16px; z-index: 12; width: 352px;
+    max-height: calc(100% - 32px); display: flex; flex-direction: column;
+    background: var(--ui-panel, rgba(13,16,17,.98)); border: 1px solid var(--gold-line);
+    box-shadow: 0 12px 32px rgba(0,0,0,.7); }
+  [data-orch="note-dialog"][data-open="0"] { display: none; }
+  .ndHead { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; padding: 6px 8px; cursor: move;
+    background: var(--ui-black, #030404); border-bottom: 1px solid var(--edge); }
+  .ndHead h3 { margin: 0; font: 700 13px/1.5 var(--ui-font, sans-serif); letter-spacing: .06em;
+    color: var(--ui-gold, #dfbd68); }
+  .ndHead .spacer { flex: 1 1 auto; }
+  .ndBody { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 8px; }
+  .ndBody .field { margin-bottom: 8px; }
+  .ndBody textarea { min-height: 56px; }
+  .ndRow { display: grid; grid-template-columns: minmax(0,1.4fr) minmax(0,1fr); gap: 8px; }
+  .mentions { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 4px; }
+  .mentions .chip.on { color: var(--ui-gold, #dfbd68); border-color: var(--gold-line); background: var(--gold-soft); }
+  .mentions button { padding: 2px 8px; font-size: 11px; }
+  .mentions button.armed { color: var(--ui-gold, #dfbd68); border-color: var(--ui-gold, #dfbd68);
+    background: var(--ui-selection, rgba(223,189,104,.14)); }
+
   .form { padding: 0 16px 16px; }
   .field { margin-bottom: 8px; }
   .field > label { display: block; margin-bottom: 4px; font-size: 12px; color: var(--ui-muted, #a3aaa4); }
@@ -468,11 +502,16 @@ const POPUP_CSS = `
   .legend .d { color: var(--design); }
   .legend .c { color: var(--ui-gold, #dfbd68); }
   .legend .a { color: var(--actual); }
-  .tlBody { display: flex; height: 168px; min-height: 0; }
-  .tlNames { flex: 0 0 92px; display: flex; flex-direction: column; border-right: 1px solid var(--ui-line, #c4c6bb33); }
+  /* 184 而不是 168：「实际」那行的名字底下多了三条读数，168 时最后一行会被切掉半个字。 */
+  .tlBody { display: flex; height: 184px; min-height: 0; }
+  /* 152 而不是 92：关卡时钟 / 这一步用时 / 当前步骤三条读数从顶栏搬到了「实际」
+     这一行的名字底下，92 px 装不下，会溢出到泳道外面。 */
+  .tlNames { flex: 0 0 152px; display: flex; flex-direction: column; border-right: 1px solid var(--ui-line, #c4c6bb33); }
   .tlNames > .sp { flex: 0 0 22px; }
-  .tlNames > .n { flex: 1 1 0; display: flex; flex-direction: column; justify-content: center; gap: 2px;
+  .tlNames > .n { flex: 1 1 0; min-height: 0; overflow: hidden;
+    display: flex; flex-direction: column; justify-content: center; gap: 2px;
     padding: 0 8px; font-size: 12px; line-height: 1.35; }
+  .tlNames > .n .muted { line-height: 1.5; }
   .tlNames > .n.design { color: var(--design); }
   .tlNames > .n.actual { color: var(--actual); }
   .tlScroll { flex: 1 1 auto; overflow-x: auto; overflow-y: hidden; }
@@ -490,6 +529,8 @@ const POPUP_CSS = `
   [data-timeline="design"] .tlMark { color: var(--design); }
   [data-timeline="design"] .tlMark[data-marker-kind="condition"] { color: var(--ui-gold, #dfbd68); }
   [data-timeline="actual"] .tlMark { color: var(--actual); }
+  /* 正在等的那几件事画成空心的：它还没发生，不能和实际行那些实心 ● 混成一样。 */
+  [data-timeline="actual"] .tlMark[data-marker-kind="waiting"] { color: var(--ui-gold, #dfbd68); }
   .tlMark:hover { background: rgba(255,255,255,.16); color: var(--ui-bright, #eeefec); }
   .tlEmpty { padding: 4px 8px; font-size: 11px; color: rgba(163,170,164,.7); }
   .tip { position: fixed; z-index: 40; max-width: 320px; padding: 6px 8px; font-size: 12px; line-height: 1.6;
@@ -532,9 +573,14 @@ export class OrchestrationEditor {
     this.noteFilter = "open";
     this.lastImage = null;
     this.labelPending = null;            // 标注工具正开着的那个输入框
-    this.draft = { text: "", proposal: "", timeKind: "", timeValue: "", shapes: [], candidate: null };
+    // 一条批注的草稿。`state` 是「哪个阶段 · 哪个状态」那个下拉框选中的东西
+    // （`{kind:"phase"|"step"|"fact", id}`），它决定这条批注的阶段 / 步骤 / 事实时刻；
+    // `mentions` 是 @ 出来的那几个对象 —— 与 target 分开，一条意见常常要指到好几个东西。
+    this.draft = NewDraft();
     this.statusText = "";
+    this.noteDrag = null;                // 正在拖批注对话框的标题栏
     this.headerSignature = "";
+    this.waitSignature = "";             // 时间轴上「正在等」那几枚标记的指纹
     this.shownPhase = 0;                 // 左栏自动展开/滚动过的那一阶段
     this.layout = ReadLayout();          // 三栏宽度与时间轴折叠状态（记在 localStorage）
     this.drag = null;                    // 正在拖的那条分栏线
@@ -572,11 +618,15 @@ export class OrchestrationEditor {
       this.map.onSketch((shape) => this.AddShape(shape));
       this.map.onMove((event) => this.SetCandidate(event?.to, event?.target));
       this.map.onLabel((at) => this.BeginLabel(at));
+      // Ctrl（Mac 上 Meta）+ 点 = 「提及这个东西」，选中**不变**。俯视图那一侧实现，
+      // 还没接上时这里就是个空操作：面板照开，只是少一条快捷路。
+      this.map.onMention?.((sel) => this.AddMention(sel));
       this.SetPhase(this.phaseNumber);
       this.OpenPhase(this.phaseNumber);        // 开窗先摊开第一阶段，别让左栏是一排关着的抽屉
       this.SetTool("select");
       this.ApplyFilter({ rebuild: true });
       this.LoadIcons();
+      this.SetNoteState(this.DefaultNoteState());
       this.RefreshForm();
       window.addEventListener("pagehide", this.OnPageHide);
       this.win.addEventListener("resize", this.OnResize);
@@ -608,8 +658,11 @@ export class OrchestrationEditor {
     try { this.map?.Dispose(); } catch (error) { console.warn("[Orchestration] 俯视图关闭出错：", error); }
     this.map = null;
     this.elapsed = 0;
-    // 顶栏是「指纹没变就不重画」的：不清掉，同一个实例再开一次窗会得到一条空的状态行。
+    // 顶栏与时间轴上那几枚「正在等」都是「指纹没变就不重画」的：
+    // 不清掉，同一个实例再开一次窗会得到一条空的状态行与一排空泳道。
     this.headerSignature = "";
+    this.waitSignature = "";
+    this.noteDrag = null;
     this.shownPhase = 0;
     this.filterSignature = "";
     this.tableSignature = "";
@@ -649,6 +702,7 @@ export class OrchestrationEditor {
         guideRoute: runtime.guideRoute || null,
         spawned: runtime.spawned ? [...runtime.spawned] : null,
         transferBeats: runtime.transferBeats ?? null,
+        squad: SquadState(runtime),
       });
     } catch (error) {
       live = null;
@@ -743,7 +797,30 @@ export class OrchestrationEditor {
     this.BuildDetail(El, Button, detail);
     this.BuildTimeline(El, Button, timeline);
     this.BindSplitters(leftGrip, rightGrip);
+    this.BindKeys();
+    this.SetDetailTab(this.layout.detailTab);
     this.ApplyLayout();
+  }
+
+  /**
+   * 窗口级键盘：Esc 收起批注对话框（草稿不清），Delete / Backspace 删掉选中的那一笔草图。
+   * **只在焦点不在输入控件上时**才接管 —— 在 textarea 里按 Backspace 当然是删字，
+   * 顺手把用户画的圈删掉是这类快捷键最经典的事故。
+   */
+  BindKeys() {
+    this.doc.addEventListener("keydown", (event) => {
+      if (Typing(event.target)) return;
+      if (event.key === "Escape") {
+        if (this.ui?.noteDialog?.dataset.open !== "1") return;
+        event.preventDefault();
+        this.OpenNoteDialog(false);
+        return;
+      }
+      if (event.key !== "Delete" && event.key !== "Backspace") return;
+      if (this.selection?.kind !== "sketch") return;
+      event.preventDefault();
+      this.RemoveShape(this.selection.index);
+    });
   }
 
   // ------------------------------------------------------------- 分栏与提示
@@ -992,6 +1069,14 @@ export class OrchestrationEditor {
     this.ui.layerCount = layerCount;
     layerCount.textContent = `${LAYERS.length}/${LAYERS.length}`;
 
+    // 「写批注」开的是浮在图右下角的那个对话框。图上一动手它也会自己开。
+    // 放在工具条**末尾**（图层之后）：窄栏下工具条本来就折成两行，排在最后只占第二行的空位，
+    // 不会把「分类 / 图层」挤下去，也不会让阶段条再折一行。
+    const noteButton = Button(tools, "", () => this.OpenNoteDialog(), { orch: "note-button" }, "tchip");
+    El("span", noteButton, "写批注");
+    noteButton.title = "打开写批注的对话框（再点一次收起）。在图上画一笔、拖候选位或 Ctrl 点一个对象，它也会自己打开。";
+    this.ui.noteButton = noteButton;
+
     const stage = El("div", root, "", "bar stepper");
     stage.dataset.orch = "stagebar";
     Button(stage, "◀", () => this.SetPhase(this.phaseNumber - 1, { fit: true }), { map: "prev" }, "icon")
@@ -1055,6 +1140,8 @@ export class OrchestrationEditor {
     this.ui.canvasWrap = wrap;
     // 点画布就把图层面板收起来 —— 它浮在图上面，忘了关会挡住右上角那一片。
     wrap.addEventListener("mousedown", () => this.ToggleLayers(false));
+    // 批注对话框浮在这一栏上（不是右栏里的一块）：写批注是对着图说话。
+    this.BuildNoteDialog(El, Button, root);
   }
 
   ToggleLayers(force) {
@@ -1579,11 +1666,36 @@ export class OrchestrationEditor {
   }
 
   // ---------------------------------------------------------- 详情 / 批注
+  /**
+   * 右栏两个页签：
+   *   详情 —— 选中对象的反查 + **这个对象上的**批注；
+   *   批注 —— 全部批注（按状态分段）+ 导出。
+   * 写批注的表单不在这里：它搬进了浮在俯视图上的对话框（BuildNoteDialog）——
+   * 用户是对着图说话的，表单钉在右栏就意味着眼睛要在两栏之间来回跳。
+   */
   BuildDetail(El, Button, root) {
     const head = El("div", root, "", "colHead");
     El("h2", head, "详情");
     El("span", head, "选中什么，这里就说它是谁", "sub");
+    const tabs = El("div", head, "", "dTabs");
+    tabs.dataset.orch = "detail-tabs";
+    this.ui.detailTabs = new Map();
+    for (const [id, label] of [["detail", "详情"], ["notes", "批注"]]) {
+      const button = Button(tabs, label, () => this.SetDetailTab(id), { detailTab: id });
+      button.dataset.on = "0";
+      this.ui.detailTabs.set(id, button);
+    }
 
+    const detailPanel = El("div", root);
+    detailPanel.dataset.detailPanel = "detail";
+    const notesPanel = El("div", root);
+    notesPanel.dataset.detailPanel = "notes";
+    this.ui.detailPanels = new Map([["detail", detailPanel], ["notes", notesPanel]]);
+    this.BuildDetailCard(El, Button, detailPanel);
+    this.BuildNotesTab(El, Button, notesPanel);
+  }
+
+  BuildDetailCard(El, Button, root) {
     const card = El("div", root, "", "card");
     const cardHead = El("div", card, "", "cardHead");
     const title = El("div", cardHead, "还没有选中东西");
@@ -1599,78 +1711,11 @@ export class OrchestrationEditor {
     El("div", root, "这个对象上的批注", "sect");
     const related = El("div", root);
     related.dataset.detail = "notes";
+    Object.assign(this.ui, { title, owner, json, related });
+  }
 
-    El("div", root, "写一条批注", "sect");
-    const form = El("div", root, "", "form");
-    form.dataset.detail = "form";
-
-    const textField = El("div", form, "", "field");
-    El("label", textField, "哪里不对（必填）");
-    const text = this.doc.createElement("textarea");
-    text.rows = 3;
-    text.placeholder = "例：这组敌人出现得太早，转运刚开始就压到装车位上了。";
-    text.dataset.noteField = "text";
-    text.addEventListener("input", () => { this.draft.text = text.value; });
-    textField.appendChild(text);
-
-    const kindField = El("div", form, "", "field");
-    El("label", kindField, "你的建议");
-    const proposal = this.doc.createElement("select");
-    proposal.dataset.noteField = "proposal";
-    for (const [value, label] of [["", "只提意见，不写具体建议"],
-      ...PROPOSAL_KINDS.map((k) => [k, PROPOSAL_TEXT[k] || k])]) {
-      const option = this.doc.createElement("option");
-      option.value = value;
-      option.textContent = label;
-      proposal.appendChild(option);
-    }
-    proposal.addEventListener("change", () => { this.draft.proposal = proposal.value; });
-    kindField.appendChild(proposal);
-
-    const timeField = El("div", form, "", "field");
-    El("label", timeField, "指的是哪个时候");
-    const timeRow = El("div", timeField, "", "row2");
-    const timeKind = this.doc.createElement("select");
-    timeKind.dataset.noteField = "timeKind";
-    for (const [value, label] of [["", TIME_KIND_TEXT[""]], ["stageRelative", TIME_KIND_TEXT.stageRelative],
-      ["fact", TIME_KIND_TEXT.fact]]) {
-      const option = this.doc.createElement("option");
-      option.value = value;
-      option.textContent = label;
-      timeKind.appendChild(option);
-    }
-    timeKind.addEventListener("change", () => { this.draft.timeKind = timeKind.value; this.RefreshForm(); });
-    timeRow.appendChild(timeKind);
-    const timeValue = this.doc.createElement("input");
-    timeValue.type = "text";
-    timeValue.dataset.noteField = "timeValue";
-    timeValue.placeholder = "秒数";
-    timeValue.addEventListener("input", () => { this.draft.timeValue = timeValue.value; });
-    timeRow.appendChild(timeValue);
-
-    const sketchField = El("div", form, "", "field");
-    El("label", sketchField, "画在图上的东西（点一下删掉）");
-    const sketch = El("div", sketchField, "", "box");
-    sketch.dataset.noteField = "sketch";
-    const candidateField = El("div", form, "", "field");
-    El("label", candidateField, "建议挪到的位置");
-    const candidate = El("div", candidateField, "", "box");
-    candidate.dataset.noteField = "candidate";
-
-    const actions = El("div", form, "", "bar");
-    Button(actions, "保存草稿", () => { this.SaveDraft(); }, { noteAction: "save" }, "primary");
-    Button(actions, "清空", () => this.ClearDraft(), { noteAction: "clear" }, "ghost");
-    const status = El("div", form, "", "statusBar");
-    status.dataset.notes = "status";
-    const more = El("div", form, "", "bar");
-    more.style.marginTop = "8px";
-    Button(more, "复制交接文本", () => this.CopyHandoff(), { noteAction: "handoff" }, "ghost")
-      .title = "把待处理的批注整理成一段文字，贴给 agent 就能开工";
-    Button(more, "下载 JSON", () => this.DownloadJson(), { noteAction: "download" }, "ghost");
-    Button(more, "复制 JSON", () => this.CopyJson(), { noteAction: "copy" }, "ghost");
-    Button(more, "下载本图", () => this.DownloadImage(), { noteAction: "image" }, "ghost")
-      .title = "把现在这张俯视图存成 PNG";
-
+  /** 页签二：全部批注 + 一行弱化的导出。写批注的表单不在这儿（见 BuildNoteDialog）。 */
+  BuildNotesTab(El, Button, root) {
     El("div", root, "全部批注", "sect");
     const filterBar = El("div", root, "", "bar");
     filterBar.style.margin = "8px 16px";
@@ -1683,12 +1728,161 @@ export class OrchestrationEditor {
     }
     El("div", filterBar, "", "spacer").style.flex = "1 1 auto";
     Button(filterBar, "重新加载", () => this.LoadNotes(), { notesAction: "reload" }, "ghost");
+    // 保存 / 加载的结果写在对话框的状态条上，可对话框常常是关着的 ——
+    // 「重新加载」按完什么都不动会让人以为按钮坏了，所以这儿镜一份同样的话。
+    const hint = El("div", root);
+    hint.dataset.notes = "hint";
     const list = El("div", root);
     list.dataset.notes = "list";
 
-    Object.assign(this.ui, {
-      title, owner, json, related, text, proposal, timeKind, timeValue, sketch, candidate, status, list,
+    const more = El("div", root, "", "bar");
+    more.style.margin = "8px 16px 16px";
+    Button(more, "复制交接文本", () => this.CopyHandoff(), { noteAction: "handoff" }, "ghost")
+      .title = "把待处理的批注整理成一段文字，贴给 agent 就能开工";
+    Button(more, "下载 JSON", () => this.DownloadJson(), { noteAction: "download" }, "ghost");
+    Button(more, "复制 JSON", () => this.CopyJson(), { noteAction: "copy" }, "ghost");
+    Button(more, "下载本图", () => this.DownloadImage(), { noteAction: "image" }, "ghost")
+      .title = "把现在这张俯视图存成 PNG";
+    Object.assign(this.ui, { list, notesHint: hint });
+  }
+
+  /**
+   * 批注对话框：浮在俯视图右下角、标题栏可拖、有 ✕。
+   *
+   * 为什么是对话框不是右栏的一块：写批注这件事是**对着图说话**的 —— 圈一笔、
+   * 拖个候选位、Ctrl 点两个人，然后写一句。这些动作全在图上，表单就该贴着图。
+   * 用户在图上一动手（画一笔 / 拖候选位 / 提及一个对象），它自己会打开。
+   */
+  BuildNoteDialog(El, Button, parent) {
+    const box = El("div", parent);
+    box.dataset.orch = "note-dialog";
+    box.dataset.open = "0";
+
+    const head = El("div", box, "", "ndHead");
+    El("h3", head, "写一条批注");
+    El("div", head, "", "spacer");
+    Button(head, "✕", () => this.OpenNoteDialog(false), { noteAction: "close" }, "ghost")
+      .title = "收起（草稿不丢）";
+    this.BindNoteDrag(box, head);
+
+    const body = El("div", box, "", "ndBody");
+
+    // ① 哪个阶段 · 哪个状态：一个下拉框把 18 个阶段 / 28 个步骤 / 要求事实摊平。
+    //    选它只换「在看哪一阶段」，**不动 selection** —— 否则刚在图上点中的那个
+    //    敌人会被这一下换掉，而用户想说的正是他。
+    const stateField = El("div", body, "", "field");
+    El("label", stateField, "哪个阶段 · 哪个状态");
+    const state = this.doc.createElement("select");
+    state.dataset.noteField = "state";
+    state.title = "这条批注挂在哪一阶段的哪一步（或哪一件要等的事）上";
+    // 下拉框里到底有哪几项，记一份：时间轴上点得到的事实不一定是某一步的过关条件，
+    // 那时 SetNoteState 要退到它所属的那一步，否则 select 会静静地把 value 吞成空串。
+    this.noteStateOptions = new Set();
+    const Option = (value, label) => {
+      this.noteStateOptions.add(value);
+      return NoteStateOption(this.doc, value, label);
+    };
+    for (const phase of this.model.phases) {
+      const group = this.doc.createElement("optgroup");
+      group.label = `第 ${phase.number} 阶段 · ${phase.title}`;
+      group.appendChild(Option(`phase:${phase.id}`, "阶段开始"));
+      for (const stepId of phase.steps) {
+        const step = this.model.steps.find((entry) => entry.id === stepId);
+        if (!step) continue;
+        group.appendChild(Option(`step:${step.id}`, `　步骤 · ${step.objective || step.id}`));
+        for (const factId of step.requirements || []) {
+          group.appendChild(Option(`fact:${factId}`, `　　等：${DescribeFact(this.model, factId)}`));
+        }
+      }
+      state.appendChild(group);
+    }
+    state.addEventListener("change", () => this.SetNoteState(state.value, { pin: true }));
+    stateField.appendChild(state);
+
+    // ② 哪里不对 + @ 提及
+    const textField = El("div", body, "", "field");
+    El("label", textField, "哪里不对（必填）");
+    const text = this.doc.createElement("textarea");
+    text.rows = 3;
+    text.placeholder = "例：这组敌人出现得太早，转运刚开始就压到装车位上了。";
+    text.dataset.noteField = "text";
+    text.addEventListener("input", () => { this.draft.text = text.value; });
+    textField.appendChild(text);
+    const mentionRow = El("div", textField, "", "mentions");
+    const mentions = El("div", mentionRow, "", "mentions");
+    mentions.dataset.noteField = "mentions";
+    const arm = Button(mentionRow, "@ 点图选", () => this.ArmMention(!this.map?.mentionArmed),
+      { noteAction: "mention-arm" }, "ghost");
+    arm.title = "点一下，然后在图上点你想提到的那个东西";
+    this.ui.mentionButton = arm;
+    El("div", textField, "按住 Ctrl 点图上的东西也行", "hint");
+
+    // ③ 建议类型 + 秒数
+    const kindField = El("div", body, "", "field");
+    El("label", kindField, "你的建议");
+    const row = El("div", kindField, "", "ndRow");
+    const proposal = this.doc.createElement("select");
+    proposal.dataset.noteField = "proposal";
+    for (const [value, label] of [["", "只提意见，不写具体建议"],
+      ...PROPOSAL_KINDS.map((k) => [k, PROPOSAL_TEXT[k] || k])]) {
+      const option = this.doc.createElement("option");
+      option.value = value;
+      option.textContent = label;
+      proposal.appendChild(option);
+    }
+    proposal.addEventListener("change", () => { this.draft.proposal = proposal.value; });
+    row.appendChild(proposal);
+    const timeValue = this.doc.createElement("input");
+    timeValue.type = "text";
+    timeValue.dataset.noteField = "timeValue";
+    timeValue.placeholder = "相对本步 n 秒";
+    timeValue.title = "这条意见说的是进入这一步之后第几秒；上面选了某件要等的事就不必填";
+    timeValue.addEventListener("input", () => { this.draft.timeValue = timeValue.value; });
+    row.appendChild(timeValue);
+
+    // ④ 画在图上的东西 + 候选位
+    const sketchField = El("div", body, "", "field");
+    El("label", sketchField, "画在图上的东西");
+    const sketch = El("div", sketchField, "", "box");
+    sketch.dataset.noteField = "sketch";
+    const candidate = El("div", sketchField, "", "box");
+    candidate.dataset.noteField = "candidate";
+    candidate.style.marginTop = "8px";
+
+    // ⑤ 保存 / 清空 + 状态条（**不弹窗**：弹窗会把整个工作台冻住）
+    const actions = El("div", body, "", "bar");
+    Button(actions, "保存草稿", () => { this.SaveDraft(); }, { noteAction: "save" }, "primary");
+    Button(actions, "清空", () => this.ClearDraft(), { noteAction: "clear" }, "ghost");
+    const status = El("div", body, "", "statusBar");
+    status.dataset.notes = "status";
+
+    this.ui.noteDialog = box;
+    Object.assign(this.ui, { text, proposal, timeValue, sketch, candidate, status, noteState: state, mentions });
+  }
+
+  /** 标题栏拖动：拖过一次就改用 left/top 定位（原来是钉在右下角的）。 */
+  BindNoteDrag(box, head) {
+    head.addEventListener("mousedown", (event) => {
+      if (event.target.closest("button")) return;
+      event.preventDefault();
+      const rect = box.getBoundingClientRect();
+      const host = box.offsetParent || this.ui.map;
+      const base = host.getBoundingClientRect();
+      this.noteDrag = { dx: event.clientX - rect.left, dy: event.clientY - rect.top, base };
     });
+    this.doc.addEventListener("mousemove", (event) => {
+      const drag = this.noteDrag;
+      if (!drag) return;
+      const width = box.offsetWidth;
+      const height = box.offsetHeight;
+      const left = Math.min(Math.max(0, event.clientX - drag.dx - drag.base.left), Math.max(0, drag.base.width - width));
+      const top = Math.min(Math.max(0, event.clientY - drag.dy - drag.base.top), Math.max(0, drag.base.height - height));
+      box.style.left = `${Math.round(left)}px`;
+      box.style.top = `${Math.round(top)}px`;
+      box.style.right = "auto";
+      box.style.bottom = "auto";
+    });
+    this.doc.addEventListener("mouseup", () => { this.noteDrag = null; });
   }
 
   // -------------------------------------------------------------- 时间轴
@@ -1718,7 +1912,9 @@ export class OrchestrationEditor {
     El("div", names, "设计", "n design");
     const actualName = El("div", names, "", "n actual");
     El("span", actualName, "实际");
-    const actualHint = El("span", actualName, "", "muted");
+    // 关卡时钟 / 这一步用时 / 当前步骤三条读数都写在这一个节点上：它们本来就是
+    // 时间轴的信息，顶栏不必再排一串小标签。每 tick 只改这一处文本。
+    const actualHint = El("span", actualName, "", "muted mono");
     actualHint.style.fontSize = "11px";
     this.ui.actualHint = actualHint;
 
@@ -1745,7 +1941,11 @@ export class OrchestrationEditor {
         lane.style.flex = `${LaneWeight(phase)} 1 0`;
         const marks = El("div", lane);
         marks.dataset.marks = kind;
-        this.ui.lanes[kind].set(phase.number, { lane, marks });
+        // 实际行末尾还留一格给「正在等」的那几件事：它们还没发生，不能混进上面
+        // 那串已经发生过的标记里，但它们属于**实际**这一行 —— 说的是这一局。
+        const waits = kind === "actual" ? El("div", lane) : null;
+        if (waits) waits.dataset.marks = "waiting";
+        this.ui.lanes[kind].set(phase.number, { lane, marks, waits });
       }
     }
     // 设计行只画一次：它不随运行时变。
@@ -1807,10 +2007,15 @@ export class OrchestrationEditor {
 
   RefreshActualTimeline() {
     if (!this.ui?.lanes) return;
-    const entries = this.live?.actualTimeline || [];
-    const hint = this.live ? (entries.length ? `关卡时钟 ${Round(this.live.time)} 秒` : "刚开始，还没记录")
+    const live = this.live;
+    const entries = live?.actualTimeline || [];
+    // 顶栏原来那一串小标签（步骤 / 关卡时钟 / 这一步用时）搬到了这儿 ——
+    // 它们本来就是时间轴的信息，摆在实际行的名字底下正好挨着那一行的标记。
+    const hint = live
+      ? `关卡时钟 ${Round(live.time)} 秒 · 这一步 ${Round(live.stageTime)} 秒 · 步骤 ${live.stepId || "—"}`
       : "还没有人在跑这一关";
     if (this.ui.actualHint.textContent !== hint) this.ui.actualHint.textContent = hint;
+    this.RefreshWaitingMarks();
     if (entries.length === this.ui.actualCount) return;
     this.ui.actualCount = entries.length;
     for (const slot of this.ui.lanes.actual.values()) slot.marks.textContent = "";
@@ -1827,6 +2032,36 @@ export class OrchestrationEditor {
       if (entry.kind === "fact") tip.push({ k: "说的是", v: DescribeFact(this.model, entry.id) });
       tip.push({ k: "时刻", v: `关卡时钟第 ${Round(entry.atS)} 秒（本步第 ${Round(entry.stageAtS)} 秒）` });
       this.AddMarker(slot.marks, entry.kind, tip, sel, Math.round(entry.atS * 10) / 10);
+    }
+  }
+
+  /**
+   * 当前阶段实际泳道末尾的「正在等」：每件还没满足的事一枚空心标记，
+   * **不带 `data-marker-at`** —— 它要等玩家做到才发生，没有秒数可标。
+   * 事实一旦满足，它就从 `live.remaining` 里掉出去、同时作为实心 ● 出现在
+   * 上面那串实际标记里，两边是同一件事的前后两态。指纹没变就不重建。
+   */
+  RefreshWaitingMarks() {
+    const live = this.live;
+    const waiting = live?.remaining || [];
+    const signature = `${live?.phaseNumber ?? "-"}|${waiting.join(",")}`;
+    if (signature === this.waitSignature) return;
+    this.waitSignature = signature;
+    for (const slot of this.ui.lanes.actual.values()) {
+      if (slot.waits && slot.waits.firstChild) slot.waits.textContent = "";
+    }
+    const slot = this.ui.lanes.actual.get(live?.phaseNumber);
+    if (!slot?.waits) return;
+    const phase = this.model.phases.find((one) => one.number === live.phaseNumber);
+    for (const factId of waiting) {
+      const human = DescribeFact(this.model, factId);
+      const tip = [
+        { k: "", v: `正在等：${human}` },
+        { k: "阶段", v: phase ? `${phase.number} ${phase.title}` : String(live.phaseNumber ?? "—") },
+        { k: "步骤", v: this.model.facts[factId]?.step || live.stepId || "—" },
+        { k: "时刻", v: "没有固定秒数，等玩家做到才发生" },
+      ];
+      this.AddMarker(slot.waits, "waiting", tip, { kind: "fact", id: factId }, undefined);
     }
   }
 
@@ -1850,6 +2085,11 @@ export class OrchestrationEditor {
       const node = this.ui?.steps?.get(sel.id);
       // 从图上或时间轴上选中的步骤要在左栏露出来，否则「选中了」只体现在右栏。
       if (node) { try { node.scrollIntoView({ block: "nearest" }); } catch (error) { /* 老浏览器 */ } }
+    }
+    // 在左栏 / 时间轴 / 图上选中阶段、步骤、事实 = 也就选定了「批注挂在哪儿」，
+    // 对话框那个下拉框跟过去。反过来不成立：改下拉框不许动 selection。
+    if (sel && (sel.kind === "phase" || sel.kind === "step" || sel.kind === "fact")) {
+      this.SetNoteState(`${sel.kind}:${sel.id}`, { navigate: false, pin: true });
     }
     this.RefreshDetail();
     this.RefreshFlowSelection();
@@ -1877,10 +2117,31 @@ export class OrchestrationEditor {
       this.ui.phaseTrack.setAttribute("aria-valuetext", phase ? `第 ${number} 阶段 ${phase.title}` : `第 ${number} 阶段`);
     }
     if (changed) this.OpenPhase(number, { scroll: true });
+    this.SyncNoteStateToPhase(number);
     // 换阶段 = 每一组的状态都可能变，分类树上的人数跟着重算。
     if (this.ui?.filterDrawer) this.ApplyFilter({ rebuild: changed });
     this.RefreshLanes();
     return number;
+  }
+
+  /**
+   * 翻到别的阶段时，批注对话框那个下拉框跟过去（落在这一阶段的第一步；跟着实时
+   * 而且实时正在这一阶段时落在实时那一步）。已经落在这一阶段里就不动 ——
+   * 用户在这一阶段里挑好了某一步，不该因为跟随实时抖一下就被拨回第一步。
+   */
+  SyncNoteStateToPhase(number) {
+    if (!this.ui?.noteState) return;
+    if (this.draft.statePinned) return;          // 亲手定过的不动，清空 / 保存之后才恢复跟随
+    if (this.draft.state?.phaseNumber === number) return;
+    const live = this.live;
+    if (this.followLive && live?.phaseNumber === number && live.stepId
+      && this.noteStateOptions?.has(`step:${live.stepId}`)) {
+      this.SetNoteState(`step:${live.stepId}`, { navigate: false });
+      return;
+    }
+    const phase = this.model.phases.find((entry) => entry.number === number);
+    const first = phase?.steps?.[0];
+    this.SetNoteState(first ? `step:${first}` : `phase:${phase?.id ?? ""}`, { navigate: false });
   }
 
   /** 左栏把某一阶段展开并滚到看得见的地方（当前阶段换了、或用户点了别处都会走这里）。 */
@@ -1976,21 +2237,32 @@ export class OrchestrationEditor {
     if (this.followLive && Number.isFinite(this.live?.phaseNumber)) this.SetPhase(this.live.phaseNumber);
   }
 
-  /** 地图工具画出来的一笔（也供测试直接塞形状）。 */
+  /** 地图工具画出来的一笔（也供测试直接塞形状）。画了一笔 = 有话要说，对话框自己开。 */
   AddShape(shape) {
     if (!shape || !shape.type) return null;
     const next = { ...shape };
     if (next.type === "label" && !next.text) next.text = (this.draft.text || "标注").slice(0, 12);
     this.draft.shapes.push(next);
     this.map?.SetSketch(this.DraftShapes());
+    this.OpenNoteDialog(true);
     this.RefreshForm();
     return next;
   }
 
+  /**
+   * 删掉第 index 笔。`DraftShapes()` 把候选位 ghost 放在**最后**，所以
+   * `index >= shapes.length` 说的就是它 —— 那一枚要走 `SetCandidate(null)`，
+   * 不然候选位加上去就再也去不掉（用户实测里点名的那条）。
+   */
   RemoveShape(index) {
-    this.draft.shapes.splice(index, 1);
+    const at = Number(index);
+    if (!Number.isFinite(at) || at < 0) return null;
+    if (this.selection?.kind === "sketch") this.Select(null);
+    if (at >= this.draft.shapes.length) { this.SetCandidate(null); return null; }
+    const removed = this.draft.shapes.splice(at, 1)[0] || null;
     this.map?.SetSketch(this.DraftShapes());
     this.RefreshForm();
+    return removed;
   }
 
   /** move 工具拖出来的候选位：不改模型，只作为 proposal.to 与一枚 ghost。 */
@@ -2000,6 +2272,7 @@ export class OrchestrationEditor {
       this.draft.candidate = { x: point.x, z: point.z, memberId: target?.id || this.selection?.id || null };
       if (!this.draft.proposal) { this.draft.proposal = "move"; if (this.ui) this.ui.proposal.value = "move"; }
       if (target && target.kind && target.id) this.Select({ kind: target.kind, id: target.id, x: target.x, z: target.z });
+      this.OpenNoteDialog(true);
     }
     this.map?.SetSketch(this.DraftShapes());
     this.RefreshForm();
@@ -2018,11 +2291,12 @@ export class OrchestrationEditor {
     return this.draft.proposal;
   }
 
-  SetNoteTime(kind, value) {
-    this.draft.timeKind = kind || "";
-    this.draft.timeValue = value === undefined || value === null ? "" : String(value);
-    if (this.ui) { this.ui.timeKind.value = this.draft.timeKind; this.ui.timeValue.value = this.draft.timeValue; }
+  /** 「相对本步 n 秒」。空着就是不限时刻；选了某件要等的事时它不起作用。 */
+  SetNoteTime(seconds) {
+    this.draft.timeValue = seconds === undefined || seconds === null ? "" : String(seconds);
+    if (this.ui) this.ui.timeValue.value = this.draft.timeValue;
     this.RefreshForm();
+    return this.draft.timeValue;
   }
 
   SetNoteFilter(value) {
@@ -2030,16 +2304,180 @@ export class OrchestrationEditor {
     this.RefreshNotes();
   }
 
+  /** 清空这条意见。**「哪个阶段 · 哪个状态」留着** —— 清的是话，不是你翻到的地方。 */
   ClearDraft() {
-    this.draft = { text: "", proposal: "", timeKind: "", timeValue: "", shapes: [], candidate: null };
+    const state = this.draft.state;
+    this.draft = NewDraft();
+    this.draft.state = state;
+    // 钉住的那一项随草稿一起解开：要是它指着别的阶段（刚给第 1 阶段提完意见、图还在第 12 阶段），
+    // 这里就对回正在看的这一阶段；同一阶段里挑的那一步照旧留着。
+    this.SyncNoteStateToPhase(this.phaseNumber);
     if (this.ui) {
       this.ui.text.value = "";
       this.ui.proposal.value = "";
-      this.ui.timeKind.value = "";
       this.ui.timeValue.value = "";
     }
     this.map?.SetSketch([]);
+    this.ArmMention(false);
     this.RefreshForm();
+  }
+
+  // ---------------------------------------------------------- 批注对话框
+  /** 开合批注对话框。不给参数就是切换；`true` 是「本来就该让他看见」（图上动了手）。 */
+  OpenNoteDialog(force) {
+    const box = this.ui?.noteDialog;
+    if (!box) return false;
+    const open = force === undefined ? box.dataset.open !== "1" : !!force;
+    if (open === (box.dataset.open === "1")) return open;
+    box.dataset.open = open ? "1" : "0";
+    this.ui.noteButton?.classList.toggle("on", open);
+    if (!open) this.ArmMention(false);
+    else this.RefreshForm();
+    return open;
+  }
+
+  /** 下拉框默认落在哪儿：跟着实时时是实时正在跑的那一步，否则是在看那一阶段的第一步。 */
+  DefaultNoteState() {
+    if (this.followLive && this.live?.stepId && this.model.steps.some((step) => step.id === this.live.stepId)) {
+      return `step:${this.live.stepId}`;
+    }
+    const phase = this.model.phases.find((entry) => entry.number === this.phaseNumber) || this.model.phases[0];
+    const first = phase?.steps?.[0];
+    return first ? `step:${first}` : `phase:${phase?.id ?? ""}`;
+  }
+
+  /**
+   * 选「哪个阶段 · 哪个状态」。它决定这条批注的阶段 / 步骤 /（选了事实时）时刻。
+   * **只 SetPhase + OpenPhase，不改 selection** —— 用户刚在图上点中的那个敌人
+   * 正是他要说的那个，下拉框一换就把他丢掉是最气人的一种「帮忙」。
+   */
+  SetNoteState(value, { navigate = true, pin = false } = {}) {
+    const resolved = this.ResolveNoteState(value);
+    if (!resolved) return this.draft.state;
+    this.draft.state = resolved;
+    // 用户亲手在下拉框 / 左栏 / 时间轴上定过的，跟随实时换阶段时**不再自动挪**：
+    // 否则在第 12 阶段打着、想给第 1 阶段的某件事提意见，下一拍就被拨回第 12 阶段。
+    if (pin) this.draft.statePinned = true;
+    const key = `${resolved.kind}:${resolved.id}`;
+    if (this.ui?.noteState && this.ui.noteState.value !== key) this.ui.noteState.value = key;
+    if (navigate && Number.isFinite(resolved.phaseNumber)) {
+      this.SetPhase(resolved.phaseNumber);
+      this.OpenPhase(resolved.phaseNumber);
+    }
+    this.RefreshForm();
+    return resolved;
+  }
+
+  /**
+   * `"step:Transfer"` → `{kind, id, phaseNumber, step}`。
+   * 下拉框里没有这一项时（时间轴上点得到的事实不一定是某一步的过关条件）
+   * **退到它所属的那一步**：面板上显示的和 draft 里记的必须是同一样东西。
+   */
+  ResolveNoteState(value) {
+    const raw = String(value ?? "");
+    const cut = raw.indexOf(":");
+    const kind = cut > 0 ? raw.slice(0, cut) : "";
+    const id = cut > 0 ? raw.slice(cut + 1) : "";
+    const Has = (key) => !this.ui?.noteState || this.noteStateOptions?.has(key);
+    if (kind === "fact") {
+      const fact = this.model.facts[id];
+      if (fact && Has(`fact:${id}`)) {
+        return { kind: "fact", id, phaseNumber: fact.phaseNumber ?? this.phaseNumber, step: fact.step ?? null };
+      }
+      if (fact?.step) return this.ResolveNoteState(`step:${fact.step}`);
+      return null;
+    }
+    if (kind === "step") {
+      const step = this.model.steps.find((entry) => entry.id === id);
+      if (!step) return null;
+      if (Has(`step:${id}`)) {
+        return { kind: "step", id, phaseNumber: step.phaseNumber ?? this.phaseNumber, step: id };
+      }
+      const owner = this.model.phases.find((entry) => entry.number === step.phaseNumber);
+      return owner ? this.ResolveNoteState(`phase:${owner.id}`) : null;
+    }
+    if (kind === "phase") {
+      const phase = this.model.phases.find((entry) => entry.id === id || entry.number === Number(id));
+      if (!phase) return null;
+      return { kind: "phase", id: phase.id, phaseNumber: phase.number, step: phase.steps?.[0] ?? null };
+    }
+    return null;
+  }
+
+  /**
+   * 加一枚 @ 提及。阶段 / 步骤 / 事实不算提及 —— 它们是「挂在哪儿」，改下拉框就行。
+   * 已经提过的不重复加；加完在 textarea 光标处插一个「@名字 」，让正文读得通。
+   */
+  AddMention(sel) {
+    if (!sel || !sel.kind) return null;
+    if (sel.kind === "phase" || sel.kind === "step" || sel.kind === "fact") {
+      this.OpenNoteDialog(true);
+      this.SetNoteState(`${sel.kind}:${sel.id}`, { navigate: false, pin: true });
+      return null;
+    }
+    if (sel.kind === "note" || sel.kind === "sketch") return null;
+    const id = sel.id === undefined ? null : sel.id;
+    const hasPoint = Number.isFinite(sel.x) && Number.isFinite(sel.z);
+    if (id === null && !hasPoint) return null;
+    const mention = { kind: sel.kind, id, label: this.MentionLabel(sel.kind, id) };
+    if (hasPoint) { mention.x = sel.x; mention.z = sel.z; }
+    this.OpenNoteDialog(true);
+    const key = MentionKey(mention);
+    if (this.draft.mentions.some((one) => MentionKey(one) === key)) { this.RefreshForm(); return null; }
+    this.draft.mentions.push(mention);
+    this.InsertMentionText(mention.label);
+    this.ArmMention(false);
+    this.RefreshForm();
+    return mention;
+  }
+
+  RemoveMention(kind, id) {
+    const key = MentionKey({ kind, id: id === undefined ? null : id });
+    const at = this.draft.mentions.findIndex((one) => MentionKey(one) === key);
+    if (at < 0) return null;
+    const removed = this.draft.mentions.splice(at, 1)[0];
+    this.RefreshForm();
+    return removed;
+  }
+
+  /** 「@ 点图选」：武装一次，下一次普通点击等同 Ctrl+点。俯视图那边命中后自动解除。 */
+  ArmMention(on) {
+    const want = !!on;
+    if (want) this.OpenNoteDialog(true);
+    this.map?.ArmMention?.(want);
+    this.ui?.mentionButton?.classList.toggle("armed", want && !!this.map?.mentionArmed);
+    return want;
+  }
+
+  /** 提及芯片上写的名字：组名 / 路线名说人话，别的按详情卡那一套称呼。 */
+  MentionLabel(kind, id) {
+    if (id === null || id === undefined) return KIND_TEXT[kind] || kind;
+    if (kind === "encounter") return EncounterLabel(this.model, id);
+    if (kind === "route") return RouteLabel(id);
+    return this.TargetName(kind, id);
+  }
+
+  /** 在 textarea 光标处插入「@名字 」，并把 draft.text 同步过去。 */
+  InsertMentionText(label) {
+    const node = this.ui?.text;
+    const insert = `@${label} `;
+    if (!node) { this.draft.text = `${this.draft.text}${insert}`; return this.draft.text; }
+    const value = node.value;
+    const at = Number.isFinite(node.selectionStart) ? node.selectionStart : value.length;
+    node.value = `${value.slice(0, at)}${insert}${value.slice(at)}`;
+    this.draft.text = node.value;
+    try { node.setSelectionRange(at + insert.length, at + insert.length); } catch (error) { /* 没聚焦 */ }
+    return this.draft.text;
+  }
+
+  /** 右栏两个页签：详情 / 批注。记进 layout，下次开窗还停在这一页。 */
+  SetDetailTab(tab) {
+    const next = tab === "notes" ? "notes" : "detail";
+    this.layout.detailTab = next;
+    for (const [id, panel] of this.ui?.detailPanels || []) panel.dataset.on = id === next ? "1" : "0";
+    for (const [id, button] of this.ui?.detailTabs || []) button.dataset.on = id === next ? "1" : "0";
+    WriteLayout(this.layout);
+    return next;
   }
 
   async Jump(number) {
@@ -2066,38 +2504,71 @@ export class OrchestrationEditor {
     return shapes;
   }
 
-  /** 当前选中翻成一条批注的 target；没选中就落在当前阶段上。 */
+  /**
+   * 这条批注说的是**哪个东西**。三级优先：
+   *   ① 现在选中的那个（图上点的、左栏点的）；
+   *   ② 没选中就用第一枚 @ 提及 —— 用户 Ctrl 点它的时候就是在指它；
+   *   ③ 都没有才落到下拉框选的那一项（步骤 / 事实 / 阶段）。
+   * 原来是「没选中一律落在阶段上」，于是所有「没点着东西但选了某一步」的意见
+   * 全都挂在阶段上，agent 拿到手还得自己猜是哪一步。
+   */
   DraftTarget() {
     const sel = this.selection;
+    if (sel && sel.kind !== "note" && sel.kind !== "sketch") {
+      const target = { kind: sel.kind, id: sel.id };
+      if (Number.isFinite(sel.x) && Number.isFinite(sel.z)) { target.x = sel.x; target.z = sel.z; }
+      if (sel.kind !== "point" || Number.isFinite(target.x)) return target;
+    }
+    const first = this.draft.mentions[0];
+    if (first) {
+      const target = { kind: first.kind };
+      if (first.id !== null && first.id !== undefined) target.id = first.id;
+      if (Number.isFinite(first.x) && Number.isFinite(first.z)) { target.x = first.x; target.z = first.z; }
+      return target;
+    }
+    const state = this.draft.state || this.ResolveNoteState(this.DefaultNoteState());
     const phase = this.model.phases.find((entry) => entry.number === this.phaseNumber);
-    if (!sel || sel.kind === "note") return { kind: "phase", id: phase?.id ?? String(this.phaseNumber) };
-    const target = { kind: sel.kind, id: sel.id };
-    if (Number.isFinite(sel.x) && Number.isFinite(sel.z)) { target.x = sel.x; target.z = sel.z; }
-    if (sel.kind === "point" && !Number.isFinite(target.x)) return { kind: "phase", id: phase?.id ?? String(this.phaseNumber) };
-    return target;
+    if (!state) return { kind: "phase", id: phase?.id ?? String(this.phaseNumber) };
+    return { kind: state.kind, id: state.id };
   }
 
+  /** 挂在哪一步：下拉框说了算（选阶段时就是那一阶段的第一步）。 */
   DraftStep() {
-    const sel = this.selection;
-    if (sel?.kind === "step") return sel.id;
-    const owner = sel?.id ? FindOwner(this.model, sel.id) : null;
-    if (owner?.step) return owner.step;
-    if (this.live?.stepId && this.live.phaseNumber === this.phaseNumber) return this.live.stepId;
-    const phase = this.model.phases.find((entry) => entry.number === this.phaseNumber);
+    const state = this.draft.state;
+    if (state?.step) return state.step;
+    const phase = this.model.phases.find((entry) => entry.number === this.DraftPhaseNumber());
     return phase?.steps?.[0] ?? null;
   }
 
+  DraftPhaseNumber() {
+    const state = this.draft.state;
+    return Number.isFinite(state?.phaseNumber) ? state.phaseNumber : this.phaseNumber;
+  }
+
+  /**
+   * 指的是哪个时候。优先级：下拉框选了某件要等的事 → 那件事满足时；
+   * 否则填了秒数 → 进入这一步之后第 n 秒；都没有 → 不限时刻。
+   * 原来那个「时刻类型」下拉框没了：选了事实还要再选一次「某件事发生时」，
+   * 是同一件事问两遍。
+   */
   DraftTime() {
-    const kind = this.draft.timeKind;
-    if (kind === "stageRelative") {
-      const seconds = Number(this.draft.timeValue);
-      return Number.isFinite(seconds) ? { kind: "stageRelative", seconds } : null;
-    }
-    if (kind === "fact") {
-      const fact = String(this.draft.timeValue || "").trim();
-      return fact ? { kind: "fact", fact } : null;
-    }
-    return null;
+    if (this.draft.state?.kind === "fact") return { kind: "fact", fact: this.draft.state.id };
+    const raw = String(this.draft.timeValue ?? "").trim();
+    if (!raw) return null;
+    const seconds = Number(raw);
+    return Number.isFinite(seconds) ? { kind: "stageRelative", seconds } : null;
+  }
+
+  /** @ 提及连同各自「当时的真实数据」：agent 顺着它能查到被提到的那几个东西。 */
+  DraftMentions() {
+    return this.draft.mentions.map((mention) => {
+      const out = { kind: mention.kind };
+      if (mention.id !== null && mention.id !== undefined) out.id = mention.id;
+      if (mention.label) out.label = mention.label;
+      if (Number.isFinite(mention.x) && Number.isFinite(mention.z)) { out.x = mention.x; out.z = mention.z; }
+      out.original = SnapshotTarget(this.model, out);
+      return out;
+    });
   }
 
   DraftProposal() {
@@ -2122,6 +2593,7 @@ export class OrchestrationEditor {
     const now = new Date();
     const id = NewNoteId(now);
     const image = this.SnapshotImage();
+    const mentions = this.DraftMentions();
     const note = {
       id,
       createdAt: now.toISOString(),
@@ -2130,7 +2602,7 @@ export class OrchestrationEditor {
       level: LEVEL,
       missionVersion: this.model.version,
       target,
-      phaseNumber: this.phaseNumber,
+      phaseNumber: this.DraftPhaseNumber(),
       step: this.DraftStep(),
       time: this.DraftTime(),
       text,
@@ -2140,6 +2612,8 @@ export class OrchestrationEditor {
       image: image ? `${id}.png` : null,
       resolution: null,
     };
+    // 没提及就整个字段不写：旧批注本来就没有它，空数组只会让 notes.json 的 diff 多一行。
+    if (mentions.length) note.mentions = mentions;
     const check = ValidateNote(note);
     if (!check.ok) {
       this.SetStatus(`批注不合规：${check.errors.join("；")}`, true);
@@ -2437,47 +2911,36 @@ export class OrchestrationEditor {
     this.RefreshActualTimeline();
     this.RefreshLanes();
     this.RefreshFilterPanel();
+    // 「@ 点图选」是一次性武装，命中后由俯视图那边自己解除 —— 这里跟着它的状态走，
+    // 不自己记一份，否则按钮亮着而地图早就不等了。
+    const armed = !!this.map?.mentionArmed;
+    if (this.ui.mentionButton && this.ui.mentionButton.classList.contains("armed") !== armed) {
+      this.ui.mentionButton.classList.toggle("armed", armed);
+    }
   }
 
-  /** 顶栏：当前阶段 / 步骤 / 两个时钟 / 正在等什么，各自一枚小标签，不再排成一长串。 */
+  /**
+   * 顶栏只留**一枚**状态：跑没跑、跑到哪一阶段。
+   *
+   * 步骤、关卡时钟、这一步用时、正在等的那几件事都是**时间轴里的信息** ——
+   * 顶栏再排一串小标签就是同一份数据在屏幕上出现两次，而两处迟早会对不上。
+   * 它们现在住在时间轴：读数在「实际」行的名字底下，正在等的事是那一行末尾的空心标记。
+   */
   RefreshHeader() {
     const live = this.live;
-    const waiting = live?.remaining || [];
-    const signature = live
-      ? `1|${live.phaseNumber}|${live.stepId}|${Round(live.time)}|${Round(live.stageTime)}|${waiting.join(",")}`
-      : "0";
+    const signature = live ? `1|${live.phaseNumber}` : "0";
     if (signature === this.headerSignature) return;
     this.headerSignature = signature;
     const El = this.El;
     const box = this.ui.liveStatus;
     box.textContent = "";
     box.dataset.hasRuntime = live ? "1" : "0";
-    if (!live) {
-      El("span", box, "还没有人在跑第一关", "tag idle");
-      El("span", box, "下面是设计好的编排，点哪儿看哪儿", "tag lead");
-      return;
-    }
+    if (!live) { El("span", box, "还没有人在跑第一关", "tag idle"); return; }
     const phase = this.model.phases.find((entry) => entry.number === live.phaseNumber);
-    const phaseTag = El("span", box, "", "tag now");
-    El("b", phaseTag, `阶段 ${live.phaseNumber}`);
-    El("span", phaseTag, phase ? phase.title : "");
-    const stepTag = El("span", box, "", "tag");
-    El("span", stepTag, "步骤", "muted");
-    El("code", stepTag, live.stepId);
-    const clock = El("span", box, "", "tag");
-    El("span", clock, "关卡时钟", "muted");
-    El("b", clock, `${Round(live.time)} 秒`, "num");
-    const stepClock = El("span", box, "", "tag");
-    El("span", stepClock, "这一步", "muted");
-    El("b", stepClock, `${Round(live.stageTime)} 秒`, "num");
-    El("span", box, "正在等", "tag lead");
-    if (!waiting.length) { El("span", box, "没有在等条件（在等最短时长，或正在推进）", "tag idle"); return; }
-    for (const factId of waiting) {
-      const human = DescribeFact(this.model, factId);
-      const tag = El("span", box, human || factId, "tag wait");
-      tag.title = `${human}（${factId}）`;
-      tag.addEventListener("click", () => this.Select({ kind: "fact", id: factId }));
-    }
+    const tag = El("span", box, "", "tag now");
+    El("b", tag, "实时");
+    El("span", tag, `第 ${live.phaseNumber} 阶段${phase ? ` · ${phase.title}` : ""}`);
+    tag.title = "关卡时钟、这一步用时、正在等的事都在底下的时间轴上";
   }
 
   RefreshFlowState() {
@@ -2535,37 +2998,72 @@ export class OrchestrationEditor {
   }
 
   RefreshForm() {
-    if (!this.ui) return;
+    if (!this.ui?.sketch) return;
+    const El = this.El;
     const shapes = this.draft.shapes;
     this.ui.sketch.textContent = "";
     this.ui.sketch.classList.toggle("filled", shapes.length > 0);
     if (!shapes.length) {
-      this.ui.sketch.textContent = "还没画。用中间的圈选 / 箭头 / 折线 / 标注工具在图上画。";
+      this.ui.sketch.textContent = "还没画。用工具条上的圈选 / 箭头 / 折线 / 标注在图上画。";
     } else {
-      const chips = this.El("div", this.ui.sketch, "", "chips");
+      const chips = El("div", this.ui.sketch, "", "chips");
       chips.style.marginTop = "0";
       shapes.forEach((shape, index) => {
-        const chip = this.El("span", chips, `${ShapeText(shape)} ✕`, "chip");
+        const chip = El("span", chips, `${ShapeText(shape)} ✕`, "chip");
         chip.dataset.shapeIndex = String(index);
-        chip.title = "点一下删掉这一笔";
+        chip.title = "点一下删掉这一笔（在图上选中它按 Delete 也行）";
         chip.addEventListener("click", () => this.RemoveShape(index));
       });
     }
+    // 候选位也要有 ✕：它是 DraftShapes 的最后一枚，加上去之后本来没处删。
     const candidate = this.draft.candidate;
+    this.ui.candidate.textContent = "";
     this.ui.candidate.classList.toggle("filled", !!candidate);
-    this.ui.candidate.textContent = candidate
-      ? `${candidate.memberId || "选中的东西"} 挪到 (${Round(candidate.x)}, ${Round(candidate.z)})`
-      : "还没定。用「候选位」工具把选中的敌人拖到你想要的位置。";
-    this.ui.timeValue.disabled = !this.draft.timeKind;
-    this.ui.timeValue.placeholder = this.draft.timeKind === "fact"
-      ? "写那件事的编号，例 transferArrived" : this.draft.timeKind ? "秒数" : "先选左边";
+    if (!candidate) {
+      this.ui.candidate.textContent = "还没定建议挪到哪儿。用「候选位」工具把选中的敌人拖过去。";
+    } else {
+      const chips = El("div", this.ui.candidate, "", "chips");
+      chips.style.marginTop = "0";
+      const chip = El("span", chips,
+        `${candidate.memberId || "选中的东西"} 挪到 (${Round(candidate.x)}, ${Round(candidate.z)}) ✕`, "chip");
+      chip.dataset.noteAction = "candidate-clear";
+      chip.title = "点一下取消这个候选位";
+      chip.addEventListener("click", () => this.SetCandidate(null));
+    }
+    this.RefreshMentions();
+    if (this.ui.noteState && this.draft.state) {
+      const key = `${this.draft.state.kind}:${this.draft.state.id}`;
+      if (this.ui.noteState.value !== key) this.ui.noteState.value = key;
+    }
+  }
+
+  /** @ 提及那一行：每枚「类别 · 名字 ✕」，加一颗「@ 点图选」。 */
+  RefreshMentions() {
+    const box = this.ui?.mentions;
+    if (!box) return;
+    const El = this.El;
+    box.textContent = "";
+    if (!this.draft.mentions.length) {
+      El("span", box, "还没 @ 谁", "muted").style.fontSize = "11px";
+    }
+    for (const mention of this.draft.mentions) {
+      const chip = El("span", box, "", "chip on");
+      chip.dataset.noteMention = MentionKey(mention);
+      El("span", chip, `${KIND_TEXT[mention.kind] || mention.kind} · ${mention.label || mention.id} ✕`);
+      chip.title = `${KIND_TEXT[mention.kind] || mention.kind} ${mention.id ?? ""}：点一下去掉这一枚`;
+      chip.addEventListener("click", () => this.RemoveMention(mention.kind, mention.id));
+    }
+    this.ui.mentionButton?.classList.toggle("armed", !!this.map?.mentionArmed);
   }
 
   SetStatus(text, warn) {
     this.statusText = text;
-    if (!this.ui) return;
+    if (!this.ui?.status) return;
     this.ui.status.textContent = text;
     this.ui.status.className = `statusBar ${warn ? "warn" : "ok"}`;
+    // 对话框常常是关着的：同一句话在「批注」页签上也留一份，否则「重新加载」
+    // 按下去什么都不动，看着像按钮坏了。
+    if (this.ui.notesHint) this.ui.notesHint.textContent = text;
   }
 
   RefreshDetail() {
@@ -2584,8 +3082,10 @@ export class OrchestrationEditor {
       return;
     }
     El("span", this.ui.title, KIND_TEXT[sel.kind] || sel.kind, "kindTag");
-    El("b", this.ui.title, sel.id === undefined || sel.id === null
-      ? `(${Round(sel.x)}, ${Round(sel.z)})` : this.TargetName(sel.kind, sel.id));
+    El("b", this.ui.title, sel.kind === "sketch"
+      ? ShapeText(this.DraftShapes()[sel.index] ?? null)
+      : (sel.id === undefined || sel.id === null
+        ? `(${Round(sel.x)}, ${Round(sel.z)})` : this.TargetName(sel.kind, sel.id)));
     if (sel.kind === "threat" && this.ThreatOrder(sel.id) > 0) El("code", this.ui.title, sel.id);
     this.ui.owner.textContent = "";
     for (const row of this.DescribeSelection(sel)) {
@@ -2595,7 +3095,10 @@ export class OrchestrationEditor {
       El("span", value, row.v);
       if (row.code) El("code", value, row.code);
     }
-    const snapshot = SnapshotTarget(this.model, { kind: sel.kind, id: sel.id, x: sel.x, z: sel.z });
+    // 草图不是编排里的东西，拍它的快照只会得到一句 missing；这里直接给那一笔本身。
+    const snapshot = sel.kind === "sketch"
+      ? (this.DraftShapes()[sel.index] ?? { kind: "sketch", index: sel.index, missing: true })
+      : SnapshotTarget(this.model, { kind: sel.kind, id: sel.id, x: sel.x, z: sel.z });
     this.ui.json.textContent = JSON.stringify(snapshot, null, 2);
     this.RefreshRelatedNotes(sel);
   }
@@ -2634,6 +3137,9 @@ export class OrchestrationEditor {
     if (sel.kind === "member" || sel.kind === "encounter") {
       const encounter = owner?.encounter;
       const member = owner?.member;
+      const layout = this.map?.phaseLayout || this.PhaseLayoutNow();
+      const phaseState = encounter
+        ? layout?.encounters?.find((entry) => entry.id === encounter.id)?.state : null;
       if (encounter) {
         Add("属于哪组", `第 ${encounter.phaseNumber ?? "—"} 阶段出场的一组`
           + `${encounter.deferred ? "（这一阶段里要晚一点才放）" : ""}`, encounter.id);
@@ -2659,8 +3165,7 @@ export class OrchestrationEditor {
         }
         if (encounter.release) Add("放行方式", RELEASE_TEXT[encounter.release.kind] || "见原始数据", encounter.release.kind);
         if (encounter.note) Add("备注", encounter.note);
-        const state = this.map?.phaseLayout?.encounters?.find((entry) => entry.id === encounter.id)?.state;
-        if (state) Add(`第 ${this.phaseNumber} 阶段`, STATE_TEXT[state] || state);
+        if (phaseState) Add(`第 ${this.phaseNumber} 阶段`, STATE_TEXT[phaseState] || phaseState);
       }
       if (member) {
         Add("出生点", At(member));
@@ -2677,8 +3182,19 @@ export class OrchestrationEditor {
         } else Add("会怎么动", "不动，守在原地");
         if (member.assaultLane) Add("跃进线", `${member.assaultLane.length} 个点（前沿那条交替跃进的线）`);
         if (Number.isFinite(member.clearedAtPhase)) Add("跳关口径", `从第 ${member.clearedAtPhase} 阶段起算他已经被打掉`);
+        // 「现在」永远有一行。这一局里有这个人就写他的死活与位置（击毙之后布设表、
+        // 图上的灰角标与这里说的必须是同一件事）；没有他就写这一阶段的设计状态 ——
+        // 空着会让人以为面板没接上运行时。
         const enemy = this.live?.enemies?.find((entry) => entry.id === member.id);
-        if (enemy) Add("现在", `${enemy.alive ? "活着" : "已经死了"}${enemy.dormant ? " · 还睡着" : ""}，在 ${At(enemy)}`);
+        if (enemy) {
+          Add("现在", enemy.alive
+            ? `活着 · ${At(enemy)}${enemy.dormant ? "（还睡着）" : ""}`
+            : "已击毙");
+        } else if (this.live) {
+          Add("现在", `这一局里没有他 · 第 ${this.phaseNumber} 阶段是「${STATE_TEXT[phaseState] || phaseState || "未出现"}」`);
+        } else {
+          Add("现在", `还没有人在跑这一关 · 第 ${this.phaseNumber} 阶段是「${STATE_TEXT[phaseState] || phaseState || "未出现"}」`);
+        }
       }
     } else if (sel.kind === "fact") {
       const fact = model.facts[sel.id];
@@ -2740,6 +3256,24 @@ export class OrchestrationEditor {
         Add("这是什么", FRIENDLY_TEXT[friendly.kind] || "自己人的位置", friendly.kind);
         Add("位置", At(friendly));
         if (friendly.step) Add("属于步骤", friendly.step);
+      }
+      // 班里那几个人只存在于这一局（编排表里没有他们）：认不出来就按实时的说。
+      const mate = this.live?.squad?.find((entry) => entry.id === sel.id);
+      if (mate) {
+        Add("这是什么", "班里的人（这一局实时的）", sel.id);
+        Add("现在", mate.alive ? `活着 · ${At(mate)}` : "已经牺牲了");
+      }
+    } else if (sel.kind === "sketch") {
+      const shape = this.DraftShapes()[sel.index] || null;
+      if (!shape) Add("说明", "这一笔已经删掉了");
+      else {
+        Add("这是什么", SHAPE_KIND_TEXT[shape.type] || shape.type);
+        if (shape.type === "circle") Add("范围", `以 ${At(shape)} 为心、半径 ${Round(shape.r)} 米的圈`);
+        else if (shape.type === "arrow") Add("从哪到哪", `${At(shape.from)} → ${At(shape.to)}`);
+        else if (shape.type === "path") Add("折线", `${shape.points?.length ?? 0} 个点，从 ${At(shape.points?.[0])} 起`);
+        else if (shape.type === "label") Add("写的是", shape.text || "（空）");
+        else if (shape.type === "ghost") Add("位置", `建议把 ${shape.memberId || "选中的东西"} 挪到 ${At(shape)}`);
+        Add("怎么删掉", "按 Delete，或点对话框里那枚芯片的 ✕");
       }
     } else if (sel.kind === "threat") {
       const index = model.transferThreats.findIndex((entry) => entry.id === sel.id);
@@ -2983,7 +3517,7 @@ function ToolIcon(doc, id) {
 
 /** 三栏宽度与时间轴的折叠状态：记在主窗口的 localStorage 里，下次开窗照旧。 */
 function ReadLayout() {
-  const fallback = { left: 344, right: 380, timeline: true };
+  const fallback = { left: 344, right: 380, timeline: true, detailTab: "detail" };
   try {
     const raw = window.localStorage.getItem(LAYOUT_KEY);
     const saved = raw ? JSON.parse(raw) : null;
@@ -2992,6 +3526,7 @@ function ReadLayout() {
       left: Number.isFinite(saved.left) ? saved.left : fallback.left,
       right: Number.isFinite(saved.right) ? saved.right : fallback.right,
       timeline: saved.timeline !== false,
+      detailTab: saved.detailTab === "notes" ? "notes" : "detail",
     };
   } catch (error) { return fallback; }
 }
@@ -3060,14 +3595,77 @@ function LiveCellText(row) {
   return row.liveText || row.stateText || "—";
 }
 
+/** 一笔草图在界面上叫什么（工具条上那七把里的名字，别另起一套）。 */
+const SHAPE_KIND_TEXT = {
+  circle: "圈选", arrow: "箭头", path: "折线", label: "标注", ghost: "候选位",
+};
+
 function ShapeText(shape) {
-  if (!shape) return "?";
-  if (shape.type === "circle") return `圈 r${Round(shape.r)}`;
+  if (!shape) return "（这一笔没了）";
+  if (shape.type === "circle") return `圈选 半径 ${Round(shape.r)} 米`;
   if (shape.type === "arrow") return "箭头";
   if (shape.type === "path") return `折线 ${shape.points?.length ?? 0} 点`;
   if (shape.type === "label") return `标注「${shape.text || ""}」`;
   if (shape.type === "ghost") return `候选位 ${shape.memberId || ""}`.trim();
-  return shape.type;
+  return SHAPE_KIND_TEXT[shape.type] || shape.type;
+}
+
+/** 一条空草稿。`state` 由 SetNoteState 填，不在这儿猜（那时还不知道在看哪一阶段）。 */
+function NewDraft() {
+  return { text: "", proposal: "", timeValue: "", shapes: [], candidate: null, mentions: [], state: null, statePinned: false };
+}
+
+/** @ 提及的去重键：有编号按编号，地图上一点按坐标。 */
+function MentionKey(mention) {
+  if (!mention) return "";
+  if (mention.id === null || mention.id === undefined) {
+    return `${mention.kind}:${Round(mention.x)},${Round(mention.z)}`;
+  }
+  return `${mention.kind}:${mention.id}`;
+}
+
+/** 焦点在不在输入控件上 —— Delete / Esc 那两条快捷键只在「不在打字」时才接管。 */
+function Typing(node) {
+  const tag = node && node.tagName;
+  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT" || !!node?.isContentEditable;
+}
+
+function NoteStateOption(doc, value, label) {
+  const option = doc.createElement("option");
+  option.value = value;
+  option.textContent = label;
+  return option;
+}
+
+/**
+ * 班里那几个人的实时位置。`runtime.squad` 是 `companion.Handle(castId)` 拿到的
+ * **演员句柄**数组（开场之前是空的 / undefined），这里折成模型层认得的形状。
+ * 名字走文本表（`Data_Companions` 的 labelKey）—— 查不到就退回 castId，
+ * 少一条译文不该让图上那个人没名字。
+ */
+function SquadState(runtime) {
+  const list = Array.isArray(runtime?.squad) ? runtime.squad : [];
+  const out = [];
+  for (const actor of list) {
+    const castId = actor?.castId || actor?.id || null;
+    const at = actor?.position;
+    if (!castId || !at || !Number.isFinite(at.x) || !Number.isFinite(at.z)) continue;
+    out.push({
+      id: castId,
+      label: CompanionLabel(castId) || String(castId),
+      x: at.x, z: at.z,
+      alive: !!actor.alive,
+      yaw: Number.isFinite(actor.yaw) ? actor.yaw : null,
+    });
+  }
+  return out;
+}
+
+function CompanionLabel(castId) {
+  const key = COMPANION_CAST[castId]?.labelKey;
+  if (!key) return "";
+  const text = T(key);
+  return text && text !== key ? text : "";
 }
 
 function MarkerSeconds(entry) {
@@ -3087,14 +3685,28 @@ function MarkerSel(entry) {
   return null;
 }
 
-/** live 变没变的廉价指纹：步骤、时钟（0.5 s 粒度）、玩家格点、敌人生死与位置。 */
+/**
+ * live 变没变的廉价指纹：步骤、时钟（0.5 s 粒度）、玩家格点**与朝向**、
+ * 敌人生死与位置、班里那几个人的位置与生死。
+ *
+ * 朝向必须进指纹：玩家原地转身时位置一格没动、时钟走得也不够半秒，图上那枚
+ * 箭头就会钉在旧方向上不动 —— 用户实测里第一条说的就是这个。量化到约 2°
+ * （`yaw * 30` 四舍五入，一格约 1.9°）：再细就是每帧重画，再粗就看得出跳。
+ */
 function LiveSignature(live) {
   let hash = live.enemies.length;
   for (const enemy of live.enemies) {
     hash = (hash * 31 + (enemy.x | 0) * 7 + (enemy.z | 0) * 13 + (enemy.alive ? 1 : 0) + (enemy.dormant ? 2 : 0)) % 1000000007;
   }
-  const player = live.player ? `${Math.round(live.player.x * 2)},${Math.round(live.player.z * 2)}` : "-";
-  return `${live.stepId}|${Math.round((live.time || 0) * 2)}|${player}|${live.facts.size}|${hash}`;
+  const player = live.player
+    ? `${Math.round(live.player.x * 2)},${Math.round(live.player.z * 2)},${Math.round((live.player.yaw || 0) * 30)}`
+    : "-";
+  let squad = (live.squad || []).length;
+  for (const mate of live.squad || []) {
+    squad = (squad * 31 + Math.round(mate.x * 2) * 7 + Math.round(mate.z * 2) * 13
+      + (mate.alive ? 1 : 0) + Math.round((mate.yaw || 0) * 30) * 3) % 1000000007;
+  }
+  return `${live.stepId}|${Math.round((live.time || 0) * 2)}|${player}|${live.facts.size}|${hash}|${squad}`;
 }
 
 export default OrchestrationEditor;

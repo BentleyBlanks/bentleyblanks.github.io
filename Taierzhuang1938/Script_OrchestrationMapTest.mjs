@@ -71,11 +71,12 @@ const HARNESS = `<!doctype html>
     const canvas = document.getElementById("map");
     const model = BuildOrchestrationModel();
     const map = new OrchestrationMap(canvas, { model });
-    const events = { select: [], hover: [], sketch: [], move: [] };
+    const events = { select: [], hover: [], sketch: [], move: [], mention: [] };
     map.onSelect((s) => events.select.push(s));
     map.onHover((s) => events.hover.push(s));
     map.onSketch((s) => events.sketch.push(s));
     map.onMove((m) => events.move.push(m));
+    map.onMention((s) => events.mention.push(s));
     window.__model = model;
     window.__PhaseLayout = PhaseLayout;
     window.__COLORS = MAP_COLORS;
@@ -176,11 +177,51 @@ const HARNESS = `<!doctype html>
       }
       return null;
     };
-    window.__Mouse = (type, px, py, button = 0) => {
+    window.__Mouse = (type, px, py, button = 0, extra = null) => {
       const rect = map.canvas.getBoundingClientRect();
       map.canvas.dispatchEvent(new MouseEvent(type, {
         clientX: rect.left + px, clientY: rect.top + py, button, bubbles: true, cancelable: true,
+        ...(extra || {}),
       }));
+    };
+    // 键盘走 window：地图的监听就挂在那儿（画布本身不聚焦，按键根本到不了它）。
+    window.__Key = (key, target = null) => {
+      const event = new KeyboardEvent("keydown", { key, bubbles: true, cancelable: true });
+      (target || window).dispatchEvent(event);
+      return event.defaultPrevented;
+    };
+    // 玩家标记那一撮像素：上下左右各几个、以及每个像素相对中心的偏移。
+    // 朝向断言靠它 —— 「箭头转了没有、转对方向没有」只能从像素分布上读出来。
+    //
+    // 这里用容差 24 不用精确色：图标转起来之后整张图都是插值出来的，25 px 见方的
+    // 箭头连十几个精确像素都剩不下，拿十几个点去比分布纯属抛硬币。玩家那枚黄
+    // （255,214,64）附近没有别的调色板颜色，容差在这一小块里不会数进别人。
+    // 中心那颗 1.8 px 的芯是对称的，会把两侧各算一份，所以留一圈死区跳过它。
+    window.__PlayerPixels = (cx, cy, r) => {
+      const c = map.canvas;
+      const d = map.dpr;
+      const t = MAP_COLORS.player;
+      const TOL_PX = 24;
+      const x0 = Math.max(0, Math.floor((cx - r) * d)), x1 = Math.min(c.width, Math.ceil((cx + r) * d));
+      const y0 = Math.max(0, Math.floor((cy - r) * d)), y1 = Math.min(c.height, Math.ceil((cy + r) * d));
+      const data = c.getContext("2d").getImageData(x0, y0, x1 - x0, y1 - y0).data;
+      const w = x1 - x0;
+      const mx = cx * d, my = cy * d;
+      const dead = Math.ceil(2 * d);
+      const out = { n: 0, up: 0, down: 0, left: 0, right: 0, offsets: [] };
+      for (let i = 0; i < data.length; i += 4) {
+        if (Math.abs(data[i] - t[0]) > TOL_PX || Math.abs(data[i + 1] - t[1]) > TOL_PX
+          || Math.abs(data[i + 2] - t[2]) > TOL_PX) continue;
+        const px = x0 + (i / 4) % w, py = y0 + Math.floor((i / 4) / w);
+        const dx = px - mx, dy = py - my;
+        out.n += 1;
+        out.offsets.push([Math.round(dx), Math.round(dy)]);
+        if (dy < -dead) out.up += 1;
+        if (dy > dead) out.down += 1;
+        if (dx < -dead) out.left += 1;
+        if (dx > dead) out.right += 1;
+      }
+      return out;
     };
     window.__ready = true;
   } catch (error) {
@@ -418,12 +459,14 @@ try {
   });
   SavePng("cluster_front.png", cluster.png);
   delete cluster.png;
-  Check("整关视野下前线那一组只画出一枚簇标记，人数写着 12",
+  // 人数照模型现算，不写死：前线那一组的编制改过一次（12 → 10），写死的数字
+  // 会在别人调编排的那天翻红，红的却是「合并」这件跟它无关的事。
+  Check("整关视野下前线那一组只画出一枚簇标记，人数就是这一组的人数",
     cluster.wideClusters === 1 && cluster.wideCount === cluster.frontSize
-    && cluster.frontSize === 12 && cluster.wideMembers === 0,
+    && cluster.frontSize >= 6 && cluster.wideMembers === 0,
     `阶段 ${cluster.phase}：${cluster.wideClusters} 枚簇（count=${cluster.wideCount}，图标 ${cluster.wideIcon}），`
     + `另有 ${cluster.wideMembers} 枚单人`);
-  Check("放大到彼此分开就散成 12 枚单人，簇标记消失",
+  Check("放大到彼此分开就散成一个个人，簇标记消失",
     cluster.nearMembers === cluster.frontSize && cluster.nearClusters === 0,
     `${cluster.nearMembers} 枚单人 / ${cluster.nearClusters} 枚簇`);
   Check("点簇标记拿到整组（kind=encounter），提示里报得出这一撮几个人",
@@ -1100,17 +1143,573 @@ try {
     `${filter.onlyIds.length} → ${filter.backCount} 人，路线 ${filter.backRoute} px`);
 
   // -------------------------------------------------------------------------
+  // 9d) 折线：单击落点，双击 / 回车 / 右键都能收尾，Esc 整条丢、退格退一点
+  //
+  // 这一节守的是「进去了出得来」：先前只有双击能结束，切工具还把点全丢了，
+  // 用户的原话是「开始了就停不下来」。
+  // -------------------------------------------------------------------------
+  const pathTool = await page.evaluate(() => {
+    const map = window.__map;
+    const events = window.__events;
+    map.SetFilter(null);
+    map.SetSketch([]);
+    map.SetSelection(null);
+    map.SetHover(null);
+    map.SetLive(null);
+    map.SetPhase(12);
+    map.FitBounds();
+    const Click = (p) => { window.__Mouse("mousedown", p.x, p.y); window.__Mouse("mouseup", p.x, p.y); };
+    const Last = () => events.sketch[events.sketch.length - 1];
+    const a = map.WorldToScreen(20, 0), b = map.WorldToScreen(60, 20), c = map.WorldToScreen(90, -10);
+    const out = {};
+
+    // --- 落点 + 橡皮筋 + 光标提示 ---
+    map.SetTool("path");
+    Click(a);
+    out.afterOne = map.pathPoints.length;
+    window.__Mouse("mousemove", b.x, b.y);
+    out.hintText = map.cursorHint?.text || "";
+    out.hintPx = map.cursorHint ? window.__CountRect("labelBack", map.cursorHint) : 0;
+    Click(b); Click(c);
+    out.afterThree = map.pathPoints.length;
+
+    // --- 退格退一个点 ---
+    out.backspaceAte = window.__Key("Backspace");
+    out.afterBackspace = map.pathPoints.length;
+
+    // --- 回车结束 ---
+    let before = events.sketch.length;
+    out.enterAte = window.__Key("Enter");
+    out.enterAdded = events.sketch.length - before;
+    out.enterShape = Last();
+    out.afterEnter = map.pathPoints.length;
+
+    // --- Esc 整条丢掉 ---
+    before = events.sketch.length;
+    Click(a); Click(b);
+    out.escAte = window.__Key("Escape");
+    out.afterEsc = map.pathPoints.length;
+    out.escAdded = events.sketch.length - before;
+
+    // --- 右键结束（而不是拖着平移） ---
+    before = events.sketch.length;
+    const cx = map.view.cx, cz = map.view.cz;
+    Click(a); Click(c);
+    window.__Mouse("mousedown", b.x, b.y, 2);
+    window.__Mouse("mousemove", b.x + 60, b.y + 40, 2);
+    window.__Mouse("mouseup", b.x + 60, b.y + 40, 2);
+    out.rightAdded = events.sketch.length - before;
+    out.rightShape = Last();
+    out.panned = Math.hypot(map.view.cx - cx, map.view.cz - cz);
+
+    // --- 双击结束（第一下已经落过点，末尾两个重合的只算一个） ---
+    before = events.sketch.length;
+    Click(a); Click(b); Click(b);
+    window.__Mouse("dblclick", b.x, b.y);
+    out.dblAdded = events.sketch.length - before;
+    out.dblPoints = Last()?.points?.length ?? 0;
+
+    // --- 切工具：两点以上先提交，只有一点就丢掉 ---
+    before = events.sketch.length;
+    map.SetTool("path"); Click(a); Click(c);
+    map.SetTool("select");
+    out.toolCommitted = events.sketch.length - before;
+    out.toolShape = Last();
+    before = events.sketch.length;
+    map.SetTool("path"); Click(a);
+    map.SetTool("select");
+    out.toolDropped = events.sketch.length - before;
+    out.afterTool = map.pathPoints.length;
+
+    // --- 焦点在输入框里时一概不接（弹窗里有批注正文与标注输入框） ---
+    const input = document.createElement("input");
+    document.body.appendChild(input);
+    map.SetTool("path"); Click(a); Click(b); Click(c);
+    before = events.sketch.length;
+    out.typingAte = window.__Key("Enter", input) || window.__Key("Backspace", input)
+      || window.__Key("Escape", input);
+    out.typingLeft = map.pathPoints.length;
+    out.typingAdded = events.sketch.length - before;
+    input.remove();
+    map.CancelPath();
+    map.SetTool("select");
+    map.SetSketch([]);
+    return out;
+  });
+  Check("折线单击落点，光标旁画着「怎么结束」那句话",
+    pathTool.afterOne === 1 && pathTool.afterThree === 3
+    && pathTool.hintText === "回车 / 双击结束 · Esc 取消" && pathTool.hintPx > 0,
+    `落了 ${pathTool.afterThree} 个点；提示「${pathTool.hintText}」${pathTool.hintPx} px`);
+  Check("退格退掉最后一个点（不是整条丢）",
+    pathTool.afterBackspace === 2 && pathTool.backspaceAte === true,
+    `3 → ${pathTool.afterBackspace} 个点`);
+  Check("回车结束并产出折线",
+    pathTool.enterAdded === 1 && pathTool.enterShape?.type === "path"
+    && pathTool.enterShape.points.length === 2 && pathTool.afterEnter === 0 && pathTool.enterAte === true,
+    `产出 ${pathTool.enterShape?.points?.length} 个点`);
+  Check("Esc 取消整条（不产出任何形状）",
+    pathTool.afterEsc === 0 && pathTool.escAdded === 0 && pathTool.escAte === true,
+    `剩 ${pathTool.afterEsc} 个点，产出 ${pathTool.escAdded} 笔`);
+  Check("右键结束折线，而不是拖着平移",
+    pathTool.rightAdded === 1 && pathTool.rightShape?.type === "path" && pathTool.panned < 0.001,
+    `产出 ${pathTool.rightAdded} 笔，视野挪了 ${pathTool.panned.toFixed(3)} m`);
+  Check("双击结束，末尾两个重合的点只算一个",
+    pathTool.dblAdded === 1 && pathTool.dblPoints === 2,
+    `点了 3 下 + 双击 → ${pathTool.dblPoints} 个点`);
+  Check("切工具时：两点以上先提交，只落了一点就丢掉",
+    pathTool.toolCommitted === 1 && pathTool.toolShape?.type === "path"
+    && pathTool.toolDropped === 0 && pathTool.afterTool === 0,
+    `提交 ${pathTool.toolCommitted} 笔 / 丢弃那次产出 ${pathTool.toolDropped} 笔`);
+  Check("焦点在输入框里时回车退格都不归地图管",
+    pathTool.typingAte === false && pathTool.typingLeft === 3 && pathTool.typingAdded === 0,
+    `按完还剩 ${pathTool.typingLeft} 个点，产出 ${pathTool.typingAdded} 笔`);
+
+  // -------------------------------------------------------------------------
+  // 9e) 圈选 / 箭头：手一抖的那一下不算一笔
+  // -------------------------------------------------------------------------
+  const tinyDrag = await page.evaluate(() => {
+    const map = window.__map;
+    const events = window.__events;
+    map.SetPhase(12);
+    map.FitBounds();
+    const p = map.WorldToScreen(40, 20);
+    const Drag = (tool, dx, dy) => {
+      map.SetTool(tool);
+      const before = events.sketch.length;
+      window.__Mouse("mousedown", p.x, p.y);
+      window.__Mouse("mousemove", p.x + dx, p.y + dy);
+      window.__Mouse("mouseup", p.x + dx, p.y + dy);
+      return { added: events.sketch.length - before, left: map.drag };
+    };
+    const tinyCircle = Drag("circle", 2, 1);
+    const realCircle = Drag("circle", 34, 12);
+    const tinyArrow = Drag("arrow", 1, 2);
+    const realArrow = Drag("arrow", 40, -18);
+    map.SetTool("select");
+    map.SetSketch([]);
+    return { tinyCircle, realCircle, tinyArrow, realArrow, last: events.sketch[events.sketch.length - 1] };
+  });
+  Check("误点一下不生成半径 1 m 的圈 / 零长的箭头",
+    tinyDrag.tinyCircle.added === 0 && tinyDrag.tinyArrow.added === 0,
+    `圈 ${tinyDrag.tinyCircle.added} 笔 / 箭头 ${tinyDrag.tinyArrow.added} 笔`);
+  Check("真拖开一段还是照样产出，且拖完不留半拉状态",
+    tinyDrag.realCircle.added === 1 && tinyDrag.realArrow.added === 1
+    && tinyDrag.realCircle.left === null && tinyDrag.realArrow.left === null,
+    `圈 ${tinyDrag.realCircle.added} 笔 / 箭头 ${tinyDrag.realArrow.added} 笔`);
+
+  // -------------------------------------------------------------------------
+  // 9f) 画上去的那几笔也点得中、选得中、看得出选中了哪一笔
+  // -------------------------------------------------------------------------
+  const sketchPick = await page.evaluate(() => {
+    const map = window.__map;
+    map.SetTool("select");
+    map.SetLive(null);
+    map.SetFilter(null);
+    map.SetSelection(null);
+    map.SetHover(null);
+    map.SetPhase(12);
+    map.SetClusterGap(0);                 // 逐个人画，免得点到的是一撮人
+    map.ZoomTo({ x: 43, z: 8 }, 60);      // VillageGunner 就在 (43, 8)
+    const shapes = [
+      { type: "circle", x: 0, z: 0, r: 12 },
+      { type: "arrow", from: { x: 20, z: -30 }, to: { x: 60, z: -30 } },
+      { type: "path", points: [{ x: -20, z: 40 }, { x: 0, z: 50 }, { x: 20, z: 40 }] },
+      { type: "label", x: 60, z: 20, text: "这里太早" },
+      { type: "ghost", x: 43, z: 8, memberId: "TransferGunner" },       // 正压在一个人身上
+      { type: "ghost", x: 95, z: -34, memberId: "TransferGunner" },     // 空地上的那一枚
+    ];
+    const emptySpot = map.WorldToScreen(95, -34);
+    const beforeGhost = map.PickAt(emptySpot.x, emptySpot.y);
+    map.SetSketch(shapes);
+    const S = (x, z) => map.WorldToScreen(x, z);
+    const centre = S(0, 0);
+    const rim = { x: centre.x + 12 * map.view.scale, y: centre.y };
+    const arrowA = S(20, -30), arrowB = S(60, -30);
+    const pathMid = S(-10, 45);
+    const label = S(60, 20);
+    const onMan = S(43, 8);
+    const picks = {
+      circleCentre: map.PickAt(centre.x, centre.y),
+      circleRim: map.PickAt(rim.x, rim.y),
+      arrowEnd: map.PickAt(arrowA.x, arrowA.y),
+      arrowMid: map.PickAt((arrowA.x + arrowB.x) / 2, arrowA.y),
+      pathSeg: map.PickAt(pathMid.x, pathMid.y),
+      labelBox: map.PickAt(label.x + 18, label.y),
+      ghostEmpty: map.PickAt(emptySpot.x, emptySpot.y),
+      onMan: map.PickAt(onMan.x, onMan.y),
+    };
+    const tips = {
+      circle: map.DescribeSketch({ index: 0 }),
+      ghost: map.DescribeSketch({ index: 4 }),
+      path: map.DescribeSketch({ index: 2 }),
+    };
+    // 选中那一笔要描亮：旧金像素只可能来自它（这一屏没有别的选中）。
+    const plain = window.__CountMap(["select"]).selectExact;
+    map.SetSelection({ kind: "sketch", index: 0 });
+    const lit = window.__CountMap(["select"]).selectExact;
+    map.SetSelection(null);
+    // 悬停在两笔之间挪动要认得出「换了一个」（草图没有 id，只有下标）
+    window.__Mouse("mousemove", centre.x, centre.y);
+    const hoverA = map.hover;
+    window.__Mouse("mousemove", arrowA.x, arrowA.y);
+    const hoverB = map.hover;
+    map.SetHover(null);
+    map.SetClusterGap(null);
+    return { picks, tips, plain, lit, hoverA, hoverB, beforeGhost, png: map.ToPng({ scale: 1 }) };
+  });
+  SavePng("sketch_picks.png", sketchPick.png);
+  delete sketchPick.png;
+  const pk = sketchPick.picks;
+  const Sketch = (sel, index) => sel?.kind === "sketch" && sel.index === index;
+  Check("圈的圈心与圈周都点得中（拿到 {kind:sketch, index}）",
+    Sketch(pk.circleCentre, 0) && Sketch(pk.circleRim, 0),
+    `圈心 ${JSON.stringify(pk.circleCentre)}，圈周 ${JSON.stringify(pk.circleRim)}`);
+  Check("箭头的端点与线身、折线的线段、标注的文字框都点得中",
+    Sketch(pk.arrowEnd, 1) && Sketch(pk.arrowMid, 1) && Sketch(pk.pathSeg, 2) && Sketch(pk.labelBox, 3),
+    `箭头端 ${JSON.stringify(pk.arrowEnd)} / 箭头身 ${JSON.stringify(pk.arrowMid)} / `
+    + `折线 ${JSON.stringify(pk.pathSeg)} / 标注 ${JSON.stringify(pk.labelBox)}`);
+  Check("空地上的候选位点得中；压在人身上的那一枚让位给人",
+    Sketch(pk.ghostEmpty, 5) && pk.onMan?.kind === "member" && pk.onMan?.id === "VillageGunner",
+    `空地 ${JSON.stringify(pk.ghostEmpty)}（没放之前那儿是 ${JSON.stringify(sketchPick.beforeGhost)}）；`
+    + `压在人身上点到 ${JSON.stringify(pk.onMan)}`);
+  Check("选中的那一笔描亮（旧金像素只可能来自它）",
+    sketchPick.plain === 0 && sketchPick.lit > 40,
+    `没选中 ${sketchPick.plain} px → 选中 ${sketchPick.lit} px`);
+  Check("提示写人话，不写 type 与下标",
+    sketchPick.tips.circle[0] === "圈选 · 半径 12 m"
+    && sketchPick.tips.ghost[0] === "候选位 · TransferGunner"
+    && /^折线 · 3 个点/.test(sketchPick.tips.path[0]),
+    `${sketchPick.tips.circle[0]} ｜ ${sketchPick.tips.ghost[0]} ｜ ${sketchPick.tips.path[0]}`);
+  Check("悬停在不同的两笔之间换得过来（草图靠下标区分）",
+    Sketch(sketchPick.hoverA, 0) && Sketch(sketchPick.hoverB, 1),
+    `${JSON.stringify(sketchPick.hoverA)} → ${JSON.stringify(sketchPick.hoverB)}`);
+
+  // -------------------------------------------------------------------------
+  // 9g) 候选位放歪了能重新放（从 ghost 上按下再拖）
+  // -------------------------------------------------------------------------
+  const ghostMove = await page.evaluate(() => {
+    const map = window.__map;
+    const events = window.__events;
+    map.SetPhase(12);
+    map.ZoomTo({ x: 43, z: 8 }, 60);
+    map.SetSketch([{ type: "ghost", x: 95, z: -34, memberId: "TransferGunner" }]);
+    map.SetTool("move");
+    const from = map.WorldToScreen(95, -34);
+    const before = events.move.length;
+    window.__Mouse("mousedown", from.x, from.y);
+    window.__Mouse("mousemove", from.x + 50, from.y + 30);
+    window.__Mouse("mouseup", from.x + 50, from.y + 30);
+    const payload = events.move[events.move.length - 1];
+    const want = map.ScreenToWorld(from.x + 50, from.y + 30);
+    map.SetTool("select");
+    map.SetSketch([]);
+    return { added: events.move.length - before, payload, want, left: map.drag };
+  });
+  Check("从候选位上按下再拖 = 重新放它（target 还是原来那个人）",
+    ghostMove.added === 1 && ghostMove.payload?.target?.kind === "member"
+    && ghostMove.payload?.target?.id === "TransferGunner"
+    && Math.hypot(ghostMove.payload.to.x - ghostMove.want.x, ghostMove.payload.to.z - ghostMove.want.z) < 0.5
+    && ghostMove.left === null,
+    `target=${JSON.stringify(ghostMove.payload?.target)} → (${ghostMove.payload?.to?.x?.toFixed(1)}, ${ghostMove.payload?.to?.z?.toFixed(1)})`);
+
+  // -------------------------------------------------------------------------
+  // 9h) @ 提及：Ctrl+点发出去，不改选中；武装一次就只管一次
+  // -------------------------------------------------------------------------
+  const mention = await page.evaluate(() => {
+    const map = window.__map;
+    const events = window.__events;
+    map.SetTool("select");
+    map.SetSketch([]);
+    map.SetSelection(null);
+    map.SetHover(null);
+    map.SetLive(null);
+    map.SetClusterGap(0);
+    map.SetPhase(12);
+    map.ZoomTo({ x: 43, z: 8 }, 40);
+    const on = map.WorldToScreen(43, 8);
+    const empty = { x: on.x + 260, y: on.y + 240 };
+    const out = {};
+    const Counts = () => ({ mention: events.mention.length, select: events.select.length });
+
+    // --- Ctrl+点：发 mention、不改选中 ---
+    let base = Counts();
+    window.__Mouse("mousedown", on.x, on.y, 0, { ctrlKey: true });
+    window.__Mouse("mouseup", on.x, on.y, 0, { ctrlKey: true });
+    out.ctrlAdded = events.mention.length - base.mention;
+    out.ctrlSelectAdded = events.select.length - base.select;
+    out.ctrlSel = events.mention[events.mention.length - 1];
+    out.selectionAfterCtrl = map.selection;
+
+    // --- 平移工具下也认（任何工具都认） ---
+    map.SetTool("pan");
+    base = Counts();
+    const cx = map.view.cx;
+    window.__Mouse("mousedown", on.x, on.y, 0, { ctrlKey: true });
+    window.__Mouse("mousemove", on.x + 40, on.y + 40, 0, { ctrlKey: true });
+    window.__Mouse("mouseup", on.x + 40, on.y + 40, 0, { ctrlKey: true });
+    out.panToolAdded = events.mention.length - base.mention;
+    out.panToolMoved = Math.abs(map.view.cx - cx);
+    map.SetTool("select");
+
+    // --- 武装：普通一下等同 Ctrl+点，点完就解除 ---
+    map.ArmMention(true);
+    out.armed = map.mentionArmed;
+    out.cursor = map.canvas.style.cursor;
+    window.__Mouse("mousemove", on.x, on.y);
+    out.hint = map.cursorHint?.text || "";
+    base = Counts();
+    window.__Mouse("mousedown", on.x, on.y);
+    window.__Mouse("mouseup", on.x, on.y);
+    out.armedAdded = events.mention.length - base.mention;
+    out.armedSelectAdded = events.select.length - base.select;
+    out.disarmed = map.mentionArmed === false;
+    out.cursorBack = map.canvas.style.cursor;
+    // 再点一次：已经解除了，这一下就是普通选中
+    base = Counts();
+    window.__Mouse("mousedown", on.x, on.y);
+    window.__Mouse("mouseup", on.x, on.y);
+    out.afterDisarmMention = events.mention.length - base.mention;
+    out.afterDisarmSelect = events.select.length - base.select;
+
+    // --- 武装之后点空地：不发 mention，但照样解除 ---
+    map.ArmMention(true);
+    base = Counts();
+    window.__Mouse("mousedown", empty.x, empty.y);
+    window.__Mouse("mouseup", empty.x, empty.y);
+    out.emptyAdded = events.mention.length - base.mention;
+    out.emptyDisarmed = map.mentionArmed === false;
+
+    map.SetSelection(null);
+    map.SetClusterGap(null);
+    return out;
+  });
+  Check("Ctrl+点发 @ 提及，载荷与 onSelect 同形，且不改选中",
+    mention.ctrlAdded === 1 && mention.ctrlSel?.kind === "member" && mention.ctrlSel?.id === "VillageGunner"
+    && Number.isFinite(mention.ctrlSel?.x) && mention.ctrlSelectAdded === 0
+    && mention.selectionAfterCtrl === null,
+    `${JSON.stringify(mention.ctrlSel)}；选中回调 +${mention.ctrlSelectAdded}，selection=${JSON.stringify(mention.selectionAfterCtrl)}`);
+  Check("任何工具下都认（平移工具下 Ctrl+点不平移）",
+    mention.panToolAdded === 1 && mention.panToolMoved < 0.001,
+    `+${mention.panToolAdded} 条，视野挪了 ${mention.panToolMoved.toFixed(3)} m`);
+  Check("ArmMention 之后普通一点就是 @，光标与提示都跟着变",
+    mention.armed === true && mention.cursor === "crosshair"
+    && mention.hint === "点一个对象 = @ 它" && mention.armedAdded === 1
+    && mention.armedSelectAdded === 0 && mention.disarmed && mention.cursorBack !== "crosshair",
+    `提示「${mention.hint}」，点完解除=${mention.disarmed}，光标还原为「${mention.cursorBack || "（默认）"}」`);
+  Check("武装只管一次：再点就是普通选中",
+    mention.afterDisarmMention === 0 && mention.afterDisarmSelect === 1,
+    `mention +${mention.afterDisarmMention} / select +${mention.afterDisarmSelect}`);
+  Check("武装之后点空地：不发 @，但那个模式也解除掉",
+    mention.emptyAdded === 0 && mention.emptyDisarmed,
+    `+${mention.emptyAdded} 条，已解除=${mention.emptyDisarmed}`);
+
+  // -------------------------------------------------------------------------
+  // 9i) 实时小队：跟着玩家走的那个班画在图上、点得中、名字写在旁边
+  // -------------------------------------------------------------------------
+  const squad = await page.evaluate(() => {
+    const map = window.__map;
+    map.SetTool("select");
+    map.SetSketch([]);
+    map.SetSelection(null);
+    map.SetHover(null);
+    map.SetFilter(null);
+    map.SetLive(null);
+    map.SetPhase(12);
+    map.ZoomTo({ x: 100, z: 100 }, 60);
+    const before = window.__CountMap(["friendly", "liveDead"]);
+    map.SetLive({
+      player: { x: 100, z: 100, yaw: 0 },
+      enemies: [],
+      squad: [
+        { id: "luo", label: "罗班长", x: 112, z: 92, alive: true, yaw: Math.PI / 2 },
+        { id: "zhou", label: "老周", x: 88, z: 108, alive: true, yaw: null },
+        { id: "wang", label: "小王", x: 100, z: 118, alive: false, yaw: null },
+      ],
+    });
+    const after = window.__CountMap(["friendly", "liveDead"]);
+    const Marks = () => (map.drawnMarkers || []).filter((entry) => entry.kind === "liveFriendly");
+    const marks = Marks().map((entry) => `${entry.id}:${entry.state}:${entry.icon || "无图标"}`).sort();
+    const luo = map.WorldToScreen(112, 92);
+    const pick = map.PickAt(luo.x, luo.y);
+    const tip = map.DescribeSel(pick);
+    const dead = map.WorldToScreen(100, 118);
+    const deadTip = map.DescribeSel(map.PickAt(dead.x, dead.y));
+    const names = (map.placedLabels || []).map((entry) => entry.text)
+      .filter((text) => ["罗班长", "老周", "小王"].includes(text)).sort();
+    // 「只看某一处设计友军点」不许把正跟着玩家走的班滤没了（两套 id 不是一个命名空间）
+    map.SetFilter({ friendlies: new Set(["playerStart"]) });
+    const filtered = Marks().length;
+    map.SetFilter(null);
+    map.SetLayers({ live: false });
+    const layerOff = Marks().length;
+    map.SetLayers({ live: true });
+    const png = map.ToPng({ scale: 1 });
+    map.SetLive(null);
+    return { before, after, marks, pick, tip, deadTip, names, filtered, layerOff, png };
+  });
+  SavePng("live_squad.png", squad.png);
+  delete squad.png;
+  Check("实时小队三个人都画出来了，阵亡的那个是灰叉",
+    squad.marks.join(" ") === "luo:alive:FriendlySquad wang:dead:无图标 zhou:alive:FriendlySquad"
+    && squad.after.friendly > squad.before.friendly
+    && squad.before.liveDeadExact === 0 && squad.after.liveDeadExact > 0,
+    `${squad.marks.join("、")}；友军色 ${squad.before.friendly} → ${squad.after.friendly} px，`
+    + `阵亡灰 ${squad.before.liveDeadExact} → ${squad.after.liveDeadExact} px`);
+  Check("点得中实时小队成员，提示写中文名与死活",
+    squad.pick?.kind === "friendly" && squad.pick?.id === "luo" && squad.pick?.live === true
+    && squad.tip[0] === "实时 · 罗班长（活着）" && squad.deadTip[0] === "实时 · 小王（阵亡）",
+    `${JSON.stringify(squad.pick)} ｜ ${squad.tip.join(" ｜ ")} ｜ ${squad.deadTip[0]}`);
+  Check("名字画在旁边（走的是同一套避让排版）",
+    squad.names.length === 3 && ["罗班长", "老周", "小王"].every((name) => squad.names.includes(name)),
+    squad.names.join("、") || "（一个名字都没排上）");
+  Check("按设计友军点过滤不会把实时小队误滤掉；关掉实机层才没有",
+    squad.filtered === 3 && squad.layerOff === 0,
+    `过滤后还剩 ${squad.filtered} 个，关掉实机层剩 ${squad.layerOff} 个`);
+
+  // -------------------------------------------------------------------------
+  // 9j) 打死一个人，设计层当场看得出来
+  // -------------------------------------------------------------------------
+  const killed = await page.evaluate(() => {
+    const map = window.__map;
+    map.SetTool("select");
+    map.SetSelection(null);
+    map.SetHover(null);
+    map.SetFilter(null);
+    map.SetLive(null);
+    map.SetPhase(12);
+    map.SetClusterGap(0);
+    const transfer = (map.phaseLayout.encounters || []).find((entry) => entry.id === "transfer");
+    const members = (transfer.members || []).map((member) => ({ id: member.id, x: member.x, z: member.z }));
+    const victim = members[0];
+    map.ZoomTo({ x: victim.x, z: victim.z }, 30);
+    const p = map.WorldToScreen(victim.x, victim.z);
+    const box = { x: p.x - 11, y: p.y - 11, w: 22, h: 22 };
+    const Mark = () => (map.drawnMarkers || []).find((entry) => entry.kind === "member" && entry.id === victim.id);
+    const beforeGray = window.__CountRect("liveDead", box);
+    const beforeState = Mark()?.state;
+    // 尸体本身画在三十米外（人是往前扑倒的）—— 量的是**设计层**那一枚变没变
+    map.SetLive({ enemies: [{ id: victim.id, alive: false, encounter: "transfer", x: victim.x + 30, z: victim.z + 30 }] });
+    const afterGray = window.__CountRect("liveDead", box);
+    const afterState = Mark()?.state;
+    const tip = map.DescribeSel({ kind: "member", id: victim.id });
+    const others = (map.drawnMarkers || [])
+      .filter((entry) => entry.kind === "member" && entry.state === "dead").map((entry) => entry.id);
+    map.SetLayers({ live: false });
+    const layerOffState = Mark()?.state;
+    map.SetLayers({ live: true });
+
+    // 并成一枚的时候人数芯片写「活着/总数」，全灭整撮转灰
+    map.SetFilter({ encounters: new Set(["transfer"]) });
+    map.SetClusterGap(200);
+    map.FitPhase(12);
+    const Cluster = () => (map.drawnMarkers || []).find((entry) => entry.kind === "cluster" && entry.encounter === "transfer");
+    const partial = Cluster();
+    map.SetLive({ enemies: members.map((m) => ({ id: m.id, alive: false, encounter: "transfer", x: m.x, z: m.z })) });
+    const wiped = Cluster();
+    map.SetLive(null);
+    const clean = Cluster();
+    map.SetFilter(null);
+    map.SetClusterGap(null);
+    map.FitBounds();
+    return {
+      victim: victim.id, total: members.length, beforeGray, afterGray, beforeState, afterState,
+      tip, others, layerOffState,
+      partial: partial ? { count: partial.count, alive: partial.alive, state: partial.state } : null,
+      wiped: wiped ? { count: wiped.count, alive: wiped.alive, state: wiped.state } : null,
+      clean: clean ? { count: clean.count, alive: clean.alive, state: clean.state } : null,
+    };
+  });
+  Check("击毙的那个人在设计层变灰（drawnMarkers 里 state=dead）",
+    killed.beforeState !== "dead" && killed.afterState === "dead"
+    && killed.beforeGray === 0 && killed.afterGray > 0,
+    `${killed.victim}：${killed.beforeState} → ${killed.afterState}，`
+    + `他那一小块里的灰 ${killed.beforeGray} → ${killed.afterGray} px`);
+  Check("只有被打死的那一个变（drawnMarkers 数得出击毙数）",
+    killed.others.length === 1 && killed.others[0] === killed.victim,
+    `state=dead 的有 ${killed.others.length} 个：${killed.others.join("、")}`);
+  Check("提示里写「已击毙」；关掉实机层就回到纯设计",
+    killed.tip.some((line) => line.includes("已击毙")) && killed.layerOffState !== "dead",
+    `${killed.tip.join(" ｜ ")}；关掉实机层后 state=${killed.layerOffState}`);
+  Check("并成一枚时人数芯片写「活着/总数」，全灭整撮转灰",
+    killed.partial?.count === killed.total && killed.partial?.alive === killed.total - 1
+    && killed.partial?.state !== "dead"
+    && killed.wiped?.alive === 0 && killed.wiped?.state === "dead"
+    && killed.clean?.alive === null,
+    `打死一个 ${killed.partial?.alive}/${killed.partial?.count}，全灭 ${killed.wiped?.alive}/${killed.wiped?.count}`
+    + `（state=${killed.wiped?.state}），没有实机数据时写总数 ${killed.clean?.count}`);
+
+  // -------------------------------------------------------------------------
+  // 9k) 玩家箭头真的按 yaw 转，而且转对了方向
+  //
+  // 玩家 forward = (−sin yaw, −cos yaw)：yaw 0 朝 −Z（屏幕上方），yaw = +π/2 朝 −X
+  // （屏幕左方）。图标本身是一支宽底窄尖的箭头，所以「尖端朝哪儿」= 像素少的那一侧。
+  // -------------------------------------------------------------------------
+  const heading = await page.evaluate(() => {
+    const map = window.__map;
+    map.SetLive(null);
+    map.SetFilter(null);
+    map.SetSelection(null);
+    map.SetHover(null);
+    map.SetPhase(12);
+    map.SetLayers({ legend: false });      // 图例里那一行「实时 · 玩家」用的是同一张图、同一种颜色
+    map.ZoomTo({ x: 100, z: 100 }, 30);
+    const p = map.WorldToScreen(100, 100);
+    const Shot = (yaw) => {
+      map.SetLive({ player: { x: 100, z: 100, yaw }, enemies: [] });
+      return window.__PlayerPixels(p.x, p.y, 26);
+    };
+    const north = Shot(0);
+    const west = Shot(Math.PI / 2);
+    const east = Shot(-Math.PI / 2);
+    map.SetLive(null);
+    map.SetLayers({ legend: true });
+    return { north, west, east };
+  });
+  // 绕图标中心转：yaw 0 的每个像素 (dx,dy) 转 −90° 之后应落在 yaw=+π/2 那一版的 (dy,−dx)。
+  const westSet = new Set(heading.west.offsets.map(([x, y]) => `${x},${y}`));
+  let mapped = 0;
+  for (const [dx, dy] of heading.north.offsets) {
+    let hit = false;
+    for (let ox = -1; ox <= 1 && !hit; ox += 1) {
+      for (let oy = -1; oy <= 1 && !hit; oy += 1) if (westSet.has(`${dy + ox},${-dx + oy}`)) hit = true;
+    }
+    if (hit) mapped += 1;
+  }
+  const overlap = heading.north.offsets.length ? mapped / heading.north.offsets.length : 0;
+  // 数出来只有几十个像素是正常的：标记是**固定屏幕尺寸**的符号（封顶 22 px），
+  // 再转个角度就全是重采样混出来的中间色。方向靠的是两侧的比例和整体的旋转对位，
+  // 不是像素总量。
+  Check("玩家箭头画得出来，两个朝向的像素分布不一样",
+    heading.north.n >= 25 && heading.west.n >= 25
+    && heading.north.offsets.map((o) => o.join(",")).join(";")
+      !== heading.west.offsets.map((o) => o.join(",")).join(";"),
+    `yaw 0：上 ${heading.north.up} / 下 ${heading.north.down} / 左 ${heading.north.left} / 右 ${heading.north.right}；`
+    + `yaw +π/2：上 ${heading.west.up} / 下 ${heading.west.down} / 左 ${heading.west.left} / 右 ${heading.west.right}`);
+  Check("yaw 0 尖端朝上、yaw = +π/2 尖端朝左（−π/2 朝右）",
+    heading.north.down > heading.north.up * 1.3
+    && heading.west.right > heading.west.left * 1.3
+    && heading.east.left > heading.east.right * 1.3,
+    `朝北 下/上 = ${(heading.north.down / Math.max(1, heading.north.up)).toFixed(2)}；`
+    + `朝西 右/左 = ${(heading.west.right / Math.max(1, heading.west.left)).toFixed(2)}；`
+    + `朝东 左/右 = ${(heading.east.left / Math.max(1, heading.east.right)).toFixed(2)}`);
+  Check("是绕图标中心整体转的（把 yaw 0 那一版转 −90° 能对上 yaw = +π/2 那一版）",
+    overlap >= 0.6,
+    `${(overlap * 100).toFixed(0)}% 的像素对得上（${mapped}/${heading.north.offsets.length}）`);
+
+  // -------------------------------------------------------------------------
   // 10) Dispose：再派发事件不再触发任何回调
   // -------------------------------------------------------------------------
   const disposed = await page.evaluate(() => {
     const map = window.__map;
     map.SetTool("circle");
-    const counts = {
+    const Snapshot = () => ({
       select: window.__events.select.length,
       hover: window.__events.hover.length,
       sketch: window.__events.sketch.length,
       move: window.__events.move.length,
-    };
+      mention: window.__events.mention.length,
+    });
+    const counts = Snapshot();
     map.Dispose();
     const a = map.WorldToScreen(40, 20);
     window.__Mouse("mousedown", a.x, a.y);
@@ -1119,23 +1718,21 @@ try {
     map.SetTool("select");
     window.__Mouse("mousedown", a.x, a.y);
     window.__Mouse("mouseup", a.x, a.y);
+    window.__Mouse("mousedown", a.x, a.y, 0, { ctrlKey: true });
+    // 折线的键盘出口也得跟着 Dispose 一起摘掉
+    map.SetTool("path");
+    window.__Mouse("mousedown", a.x, a.y);
+    window.__Key("Enter");
     map.canvas.dispatchEvent(new WheelEvent("wheel", { clientX: 10, clientY: 10, deltaY: -200, bubbles: true }));
     let threw = null;
     try { map.Redraw(); map.SetPhase(4); } catch (error) { threw = String(error); }
-    return {
-      after: {
-        select: window.__events.select.length,
-        hover: window.__events.hover.length,
-        sketch: window.__events.sketch.length,
-        move: window.__events.move.length,
-      },
-      counts, threw, flag: map.disposed,
-    };
+    return { after: Snapshot(), counts, threw, flag: map.disposed };
   });
-  const quiet = ["select", "hover", "sketch", "move"].every((k) => disposed.after[k] === disposed.counts[k]);
-  Check("Dispose 后再派发事件不再触发回调", quiet,
+  const quiet = ["select", "hover", "sketch", "move", "mention"].every((k) => disposed.after[k] === disposed.counts[k]);
+  Check("Dispose 后再派发事件不再触发回调（键盘与 @ 提及也一起摘掉）", quiet,
     `select ${disposed.counts.select}→${disposed.after.select}, sketch ${disposed.counts.sketch}→${disposed.after.sketch}, `
-    + `move ${disposed.counts.move}→${disposed.after.move}, hover ${disposed.counts.hover}→${disposed.after.hover}`);
+    + `move ${disposed.counts.move}→${disposed.after.move}, hover ${disposed.counts.hover}→${disposed.after.hover}, `
+    + `mention ${disposed.counts.mention}→${disposed.after.mention}`);
   Check("Dispose 后调 Redraw/SetPhase 不抛错", disposed.threw === null && disposed.flag === true, disposed.threw || "");
 
   Check("没有脚本错误", errors.length === 0, errors.slice(0, 3).join(" | "));
