@@ -65,15 +65,7 @@ export const MISSION_TERRAIN = Object.freeze({
       ],
       width: 10,
     },
-    {
-      points: [
-        { x: 38, z: -198 },
-        { x: 36, z: -169 },
-        { x: 28, z: -136 },
-        { x: 27, z: -111 },
-      ],
-      width: 7,
-    },
+    {points:Sortie.road,width:7},
     // 关尾夜景：北门外那条进城的路（只有 NightGateShown 之后才看得见地面上的东西，
     // 但路面是地形，白天也压着 —— 那一带在任何一条任务路线的 200 m 之外）。
     {
@@ -95,7 +87,8 @@ export const MISSION_TERRAIN = Object.freeze({
   get trenches() { return TrenchPlanFor(this).trenches; },
   steps: [
     {x:Sortie.house.x,z:Sortie.house.z,radius:6,depth:Sortie.trenchDepthM},
-    { x: 0, z: -127.5, radius: 3.6, depth: 0.88 },
+    {...Sortie.nest,radius:4.5,depth:.6},
+    {...Sortie.leftSeat,radius:3,depth:.65},
     { x: 15, z: -127.5, radius: 3.2, depth: 0.9 },
     { x: -25, z: -127.5, radius: 3.2, depth: 0.88 },
   ],
@@ -130,7 +123,9 @@ export function SampleMissionNaturalHeight(x, z) {
   const east = 4.2 * Smooth((x - 116) / 21) * (.88 + .12 * Math.cos(z / 35));
   const west = 4.3 * Smooth((-x - 190) / 15);
   const north = 3.1 * Smooth((-z - 184) / 18) * (.86 + .14 * Math.cos(x / 31));
-  return field + east + west + north;
+  // Authored front bank: defenders shelter on its south side; flanking guns see around the ends.
+  const bank=2.1*(1-Smooth(Math.abs(z+154)/3.5))*(1-Smooth((Math.abs(x+5)-21)/4));
+  return field + east + west + north + bank;
 }
 export function SampleMissionTerrain(x, z, spec = MISSION_TERRAIN) {
   const natural = SampleMissionNaturalHeight(x, z);

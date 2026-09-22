@@ -28,7 +28,7 @@ export const MISSION_DEFENSE_ASSETS = Object.freeze([
 // Individual obstacles keep their measured native dimensions. No filled OBB around an open nest.
 export const MISSION_DEFENSE_OBJECTS = Object.freeze([
   ...[-63,-59.8,-56.6,-53.4,-46.8,-43.6,-40.4].map((x,i)=>({id:`WestWire${i}`,asset:"battlefieldBarbedWire02",x,z:-147,ry:0,scale:1,solid:true})),
-  ...[44,47.2,50.4,58.8,60.2,63.4].map((x,i)=>({id:`EastWire${i}`,asset:"battlefieldBarbedWire02",x,z:-137,ry:.12,scale:1,solid:true})),
+  ...[55,58.2,61.4,67.8,71.2,74.4].map((x,i)=>({id:`EastWire${i}`,asset:"battlefieldBarbedWire02",x,z:-137,ry:.12,scale:1,solid:true})),
   {id:"WestRoadTimber",asset:"battlefieldBeamObstacle01",x:-55,z:-139,ry:.3,scale:1,solid:true},
   {id:"EastRoadTimber",asset:"battlefieldBeamObstacle01",x:62,z:-129,ry:-.25,scale:1,solid:true},
   {id:"TransferWireNorth",asset:"battlefieldBarbedWire02",x:104,z:100,ry:Math.PI/2,scale:1,solid:true},

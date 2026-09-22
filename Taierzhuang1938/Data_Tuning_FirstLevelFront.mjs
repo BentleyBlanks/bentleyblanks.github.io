@@ -221,3 +221,11 @@ export const FRONT_TUNING_SOURCES = Object.freeze({
   southTargetSecondsMin: "契约 §2：07 目标时长 45–75 秒",
   zhouLiftMoveS: "litterSpeedMps（1.4 m/s）量级",
 });
+
+// Notion 2026-09-22 front whitebox calibration: proximity is physical, all deaths are observed.
+export const FRONT_BATTLE_TUNING=Object.freeze({
+  arrivalM:1.0,leaderLeadM:3,captureRadiusM:4,rearArrivalM:3.5,attackArrivalM:3,
+  firstBatch:2,assaultKills:3,assaultIds:["FrontGunner","FrontRifleA","FrontRifleB","FrontRifleC","FrontRifleD"],
+  guardHeightM:1.2,blockadeRangeM:85,gatherSpacingM:1.35,zhouHealth:80,
+  bandage:{radius:.087,height:.2,y:-.19,color:0xb6ac8b},
+});

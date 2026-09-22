@@ -7,7 +7,8 @@ import { MISSION_ROUTES as Routes, MISSION_ANCHORS as A } from "./Data_FirstLeve
 const overrides={
   RearTrench:Stage.rearTrench,
   Support:Routes.support,
-  Tank:[A.gun,...Routes.bundle,A.bundle],
+  MachineGun:Routes.rightRear,
+  Tank:[...Routes.bundle,...Routes.bundleReturn,...Routes.attack,...Routes.orders],
   // 06 接令：战车刚停下时玩家还在北头的集束弹沟里。回头警告的走廊必须从那儿一路
   // 接回集结处（ordersRejoin 的尾段就是 collectionReturn），只给 collectionReturn
   // 的话，站在弹药屋边上就会被判成「偏离路线」。

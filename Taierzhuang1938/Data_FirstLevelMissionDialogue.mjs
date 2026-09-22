@@ -23,6 +23,7 @@ export const MISSION_VOICE_CAST = Object.freeze({
   captiveWounded: ["伤兵", "腿骨断了的四川伤兵，疼得发抖还嘴硬，从牙缝里骂出来，与老周声音不同"],
   captiveHelper: ["扶人川军", "四川成年男兵，拖着同伴已经脱力，被枪托砸倒后还挣扎出声"],
   guard: ["守军", "四川前沿守军，跑动后气喘，隔着枪声喊话要让人听清"],
+  relief: ["接防兵", "四川成年军人，从后交通壕赶来接防，喘着气简短交接"],
   keeper: ["留守兵", "守弹药屋的四川老兵，嗓子哑，交代东西干脆"],
   loader: ["接运兵", "桥头接运点的四川男兵，整天喊人分流，声音大而例行"],
   drover: ["赶车人", "赶牛马车的四川壮年男人，不是军人，带吆喝牲口的腔调"],
@@ -138,64 +139,23 @@ export const MISSION_DIALOGUE = Object.freeze([
     ["guard", "还在前头！机枪压到起的！"],
     ["luo", "何有田守后头！顺子，跟老子走！"],
   ], {delivery:"撤回守军从前方冲来，喘气报告并指路。班长先问老周，再指后沟安排何有田警戒，喊顺子回头接应。"}),
-  // 03 接回第一批守军
-  Cue("FrontBlockade", [
-    ["zhou", "右边破墙！冒火那个口子！"],
-    ["luo", "顺子，压住那边！让他们下来！"],
-  ], {
-    delivery: "老周趴在机枪位上，一边打一边扭头吼指示，嗓子已经喊哑；罗班长在他旁边隔着枪声下令。两句都必须盖过枪声被听清。",
-  }),
-  // 04 接替火力，战车压口
-  Cue("TakeOverGun", [
-    ["zhou", "外头还有人！"],
-    ["luo", "看到了！顺子，接这边！"],
-  ], {
-    delivery: "老周腿伤恶化正被架下枪位，这句是撑着最后一口气喊的，尾音发虚；罗班长应一声就把人换上去。",
-  }),
-  Cue("TankTerror", [
-    ["heyoutian", "妈卖批……战车过来了！"],
-    ["luo", "都下去！莫站枪口上！"],
-  ], {
-    soundscape: "前沿机枪位：近处重机枪点射与弹壳落地，道路方向传来越来越近的履带碾压、发动机低频和护卫步兵的脚步；远处炮弹落点持续。",
-    delivery: "何有田先是低声骂了半句——那是看清来的是什么东西时的一愣——后半句才喊出来；罗班长立刻把所有人压下去，吼得很硬。",
-  }),
-  Cue("BundleOrder", [
-    ["guard", "北头弹药屋还有集束弹！"],
-    ["luo", "何有田接枪！文财看沟口！顺子跟我！"],
-  ], {
-    delivery: "守军从最后遮挡后面喊过来，离得有点远；罗班长三道分派一口气排完，一句比一句短。",
-  }),
-  // 05 班长带路取弹，炸停战车
-  Cue("BundleGo", [
-    ["heyoutian", "走！这边老子顶到！"],
-    ["luo", "它看那边了！现在走！"],
-  ], {
-    delivery: "何有田在机枪后面咬着牙喊，射击声就在他嘴边；罗班长盯着战车炮塔转向的那一瞬间开口，「现在走」要有抓住空当的果断。",
-  }),
-  Cue("BundleProne", [
-    ["luo", "趴下！它转过来了！"],
-  ], {
-    delivery: "罗班长一把把人按到沟底，喊声短而炸，先出声后补气。",
-  }),
-  Cue("BundleSupply", [
-    ["keeper", "那边！就剩这些了！"],
-    ["luo", "拿起，原路回！"],
-  ], {
-    soundscape: "前沿弹药屋里：土墙压住外头的枪炮，近处木箱翻动、金属弹药碰撞、脚步在碎砖上打滑；屋外远处履带声持续。",
-    delivery: "留守兵嗓子已经哑了，一边指一边说；罗班长拿到就走，不寒暄。",
-  }),
-  Cue("BundleReturnCall", [
-    ["heyoutian", "班长！它往沟口挤了！"],
-    ["luo", "听到了！顺子，跟紧！"],
-  ], {
-    delivery: "何有田的声音明显在很远的地方，隔着一段沟喊过来，要有距离感和回荡；罗班长在近处应答，音量正常。",
-  }),
-  Cue("TankStopped", [
-    ["heyoutian", "停了！"],
-    ["luo", "莫伸脑壳！后头的人先过！"],
-  ], {
-    delivery: "何有田喊出来的是确认不是欢呼，短促一声；罗班长立刻把人压回遮挡后面，不许起身看。",
-  }),
+  // Notion 2026-09-22: stages 03–05, verbatim source and complete exchanges.
+  Cue("FrontBlockade", [["zhou", "右边破墙！冒火那个口子！把路封死了！"], ["luo", "周哥，顶一下！我们去拿右边！"], ["luo", "顺子，跟紧！莫走外头！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
+  Cue("FrontApproach", [["luo", "贴这道墙！前头有人！"], ["luo", "口子压住了，进！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
+  Cue("FrontAttack", [["luo", "土坎前头那一伙！莫让他们压到口子上！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
+  Cue("FrontWithdraw", [["luo", "压下去了！前头的，下来！往沟里走！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
+  Cue("TakeOverGun", [["luo", "何有田，接周哥那边！幺娃，扶他下去！"], ["zhou", "外头还有人！"], ["luo", "看到了！这边有人接，你先下去！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
+  Cue("TankRoadContact", [["heyoutian", "右边路上！战车出来了！"], ["luo", "先看住跟车的！前头还有人没下来！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
+  Cue("TankTerror", [["luo", "下来！莫站枪口上！退后墙！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
+  Cue("BundleOrder", [["guard", "外边旧弹药屋还有集束弹！后沟能过去！"], ["luo", "文财，看住沟口！何有田，前头交给你！"], ["luo", "顺子，跟我走后沟，去拿弹！"], ["shunzi", "前头还咋个过？"], ["luo", "莫走路上！跟到老子！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
+  Cue("BundleGo", [["heyoutian", "班长，快点！这边老子顶到！"], ["luo", "顺子，下沟！屋在墙后头！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
+  Cue("BundleProne", [["luo", "低点！上头看得到！"], ["luo", "前头岔口！有人下沟了！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
+  Cue("BundleSupply", [["keeper", "里头那个箱子！就剩这些！"], ["luo", "拿起！沿刚才的沟回！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
+  Cue("BundleReturnCall", [["heyoutian", "它又往前挤了！前头的人还卡到起！"], ["luo", "听到了！顺子，跟紧！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
+  Cue("BundleAttack", [["luo", "就这边！莫上大路！"], ["luo", "顺子，拿弹！旁边的人我看到！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
+  Cue("BundleRetreat", [["luo", "回来！低头！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
+  Cue("TankStopped", [["heyoutian", "停了！口子能过！"], ["luo", "前头的，下来！莫堵沟口！"], ["liuwencai", "还有人！后头跟上！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
+  Cue("FrontRelief", [["liuwencai", "这批过了！"], ["relief", "这里我们接！你们先下！"], ["luo", "走！回伤员那边！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
   // 06 回到伤员集结处，接下后送
   Cue("Volunteer", [
     ["runner", "这里有人接！你们班护着伤员往南，送到桥头接运点！"],
@@ -574,6 +534,7 @@ const SOUNDSCAPE_ZONES = Object.freeze({
   BunkerBanter: "bunker", BunkerKilling: "bunker", BunkerSearch: "bunker", ShunziCurse: "bunker",
   RescueCall: "rescue", RescueLift: "rescue", RescueOut: "rescue",
   TrenchCurse: "trench", CornerCheck: "trench", SupportOrder: "trench",
+  FrontApproach:"front",FrontAttack:"front",FrontWithdraw:"front",TankRoadContact:"front",BundleAttack:"bundle",BundleRetreat:"bundle",FrontRelief:"front",
   FrontBlockade: "front", TakeOverGun: "front", TankTerror: "front", BundleOrder: "front",
   BundleGo: "bundle", BundleProne: "bundle", BundleSupply: "bundle", BundleReturnCall: "bundle", TankStopped: "bundle",
   Volunteer: "collection", BorrowLight: "collection", ZhouLift: "collection",

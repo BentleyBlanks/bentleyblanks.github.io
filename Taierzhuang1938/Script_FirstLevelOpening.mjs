@@ -199,7 +199,8 @@ export class FirstLevelOpening {
     this.zhou.scriptEssential=true;
     r.PlaceActor(this.zhou,C.zhouGunSeat);
     r.Defend(this.zhou,C.zhouGunSeat,0,R.companionCoverSlackM);r.ai.SetStance(this.zhou,1,.5,true);
-    r.emplacement.NpcOccupy(r.gunId,this.zhou);
+    r.emplacement.NpcOccupy(r.leftGunId,this.zhou);
+    r.view.BandageZhou(this.zhou);
   }
   SpawnMessenger(id,route,weapon){
     const r=this.r,actor=r.ai.Spawn("nra",route[0].x,route[0].z,{weapon,scriptedNoncombatant:true,squadId:id});
@@ -242,47 +243,7 @@ export class FirstLevelOpening {
     this.FireWindows();
     this.UpdateZhou();
   }
-  UpdateZhou(){
-    const r=this.r,a=this.zhou;
-    if(!a||r.Has("zhouGunWounded"))return;
-    if(!a.alive){
-      r.Record("zhouGunKilled",{actorId:a.id});r.OnPlayerDown();r.MissionFailure?.("zhou");return;
-    }
-    if(a.lastFire>0)r.Record("zhouCoverFired");
-    // The gunner owns a separate opening script, outside UpdateSquad. Give
-    // him the same real cover/escape response while the gun is still his;
-    // actual injury continues into the existing wounded handover below.
-    if(a.health>=C.zhouWoundThreshold){
-      const shelter=r.RespondToGrenade(a)||r.RespondToContact(a);
-      if(!shelter)r.Defend(a,C.zhouGunSeat,0,R.companionCoverSlackM);
-    }
-    if(a.health>=C.zhouWoundThreshold&&(!r.Has("frontRifleDefense")||!r.Has("rifleWithdrawalResolved")))return;
-    if(a.health>=C.zhouWoundThreshold&&(!this.zhouShellSent||r.time-this.zhouShellAt>=C.zhouShell.retryAfterS)){
-      const correcting=!!this.zhouShellSent;
-      this.zhouShellSent=true;this.zhouShellAt=r.time;
-      const spec=C.zhouShell,target=r.Point({x:a.position.x+spec.offsetX,z:a.position.z},.65);
-      // A real dodge or parapet can defeat the first round. Re-range from a
-      // steeper trajectory; only observed injury releases the handover gate.
-      const from=correcting?{x:target.x+spec.retryFromOffset.x,z:target.z+spec.retryFromOffset.z}:spec.from;
-      r.combat.FireShell(r.Point(from,spec.height),target,{...spec,kind:"Shell75",
-        OnImpact:()=>r.Record("zhouGunBlast",{x:target.x,z:target.z})});
-    }
-    if(a.health>=C.zhouWoundThreshold)return;
-    r.emplacement.NpcVacate(r.gunId,"wounded");
-    a.scriptedNoncombatant=true;r.ai.SetStance(a,1,.3,true);
-    if(!this.zhouExitRoute)this.zhouExitRoute=ZhouGunExitRoute(a.position,
-      a.childCapsules?.[1]?.radius||a.body?.radius||.34);
-    while(this.zhouExitRoute.length>1&&Distance(a.position,this.zhouExitRoute[0])<=C.zhouExitWaypointRadiusM)
-      this.zhouExitRoute.shift();
-    if(Distance(a.position,C.zhouRest)>C.zhouExitRadiusM){
-      r.MoveActor(a,this.zhouExitRoute[0]||C.zhouRest,R.walkSpeedMps);return;
-    }
-    // The same narrative casualty continues on the existing litter. Switch
-    // representation only at his observed position after the real hit and move.
-    Object.assign(r.column.zhou,{x:a.position.x,z:a.position.z,health:Math.max(0,a.health),visible:true,state:"waiting",yaw:a.yaw});
-    r.Record("zhouGunWounded",{actorId:a.id,health:a.health,alive:a.alive,fired:a.lastFire>0});
-    r.ai.Remove(a);
-  }
+  UpdateZhou(){this.r.frontBattle.UpdateZhou();}
   Dispose(){
     this.eyeClosure=0;this.blackout=0;this.concussion=null;
     this.r.audio.SetConcussion?.(0);

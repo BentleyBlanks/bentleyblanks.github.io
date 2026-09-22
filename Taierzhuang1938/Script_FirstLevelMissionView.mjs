@@ -10,6 +10,7 @@ import { PlaceGeometry } from "./Script_Geo.mjs";
 import { ApplyShadowDepth, AttachShadowDepth } from "./Script_ShadowDepth.mjs";
 import { MISSION_PLACEMENT, MISSION_SUPPLIES, MISSION_SUPPLY_COLLIDER } from "./Data_FirstLevelMissionLayout.mjs";
 import { Type89Damage } from "./Script_Type89Damage.mjs";
+import { FRONT_BATTLE_TUNING } from "./Data_Tuning_FirstLevelFront.mjs";
 export class FirstLevelMissionView {
   constructor({ scene, battlefield, physics, column, actorFactory, library, hud, vfx }) {
     Object.assign(this, { scene, battlefield, physics, column, actorFactory, library, vfx });
@@ -453,7 +454,15 @@ export class FirstLevelMissionView {
       }
     }
   }
+  BandageZhou(soldier){
+    const bone=soldier.actor?.characterRig?.bones?.shinL;if(!bone||this.frontBandage)return;
+    const b=FRONT_BATTLE_TUNING.bandage,material=new THREE.MeshStandardMaterial({color:b.color,roughness:1});
+    const mesh=new THREE.Mesh(new THREE.CylinderGeometry(b.radius,b.radius,b.height,10),material);
+    mesh.name="ZhouExistingLegBandage";mesh.position.y=b.y;mesh.castShadow=true;AttachShadowDepth(mesh);
+    bone.add(mesh);this.frontBandage=mesh;this.materials.push(material);
+  }
   Dispose() {
+    if(this.frontBandage){this.frontBandage.removeFromParent();this.frontBandage.geometry.dispose();}
     this.tankDamage.Dispose();
     this.people.Dispose();this.aftermath.Dispose();
     for (const collider of this.colliders) {

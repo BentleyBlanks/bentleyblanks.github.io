@@ -2,8 +2,8 @@
 // 2026.09.19 重构（docs/Data_FirstLevelRebuild20260919Contract.md）：军列开场的文案下线，
 // 新增掩蔽部、后交通壕、牛车、院墙夹道、接收院门与铁路桥几段。
 export const TEXT = Object.freeze({
-  "firstLevel.guide.front": "击退前方日军",
-  "firstLevel.guide.frontBlocker": "压制右侧破墙的机枪，掩护守军撤回",
+  "firstLevel.guide.front": "掩护守军通过撤退缺口",
+  "firstLevel.guide.frontBlocker": "夺取右侧机枪阵位，解除撤口封锁",
   "firstLevel.hint.crawlPassage": "趴下，匍匐穿过低矮通道",
   "firstLevel.leader.follow": "跟随",
   "firstLevel.leader.rally": "集合",
@@ -64,9 +64,9 @@ export const TEXT = Object.freeze({
   "firstLevel.hint.guards": "压住火力，让眼前这组守军撤回，随后掩护下一组",
   "firstLevel.hint.guardCrossed": "有守军进沟了！继续压住火力，掩护下一组",
   "firstLevel.hint.guardsLoss": "活着的守军已经撤回，其余已伤亡。下机枪，去侧沟领取集束弹炸停战车",
-  "firstLevel.hint.guardsLost": "前沿守军没能撤回来。战车正逼近沟口，下机枪去侧沟领取集束弹",
+  "firstLevel.hint.guardsLost": "这一批守军全部阵亡，接应失败",
   "firstLevel.hint.gunSupply": "机枪弹药不足：F 离位，身后弹药箱可补充弹匣",
-  "firstLevel.hint.bundle": "按住 H 蓄力投向履带，松开后退回沟内；炮塔仍能开火",
+  "firstLevel.hint.bundle": "按住 H 蓄力投向战车，炸停并解除火力后退回支沟",
   "firstLevel.hint.bundleEmpty": "集束弹已用完：回侧沟弹药箱补充后继续投掷",
   "firstLevel.hint.queue": "担架正在分批通过，留意两侧火力和来路",
   "firstLevel.hint.transferEast": "压向装载区！压住火力，让第一批伤员完成装载",

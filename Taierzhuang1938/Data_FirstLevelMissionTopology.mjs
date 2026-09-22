@@ -1,7 +1,8 @@
 // Notion: 空间、流程拓扑图 / 2026.09.19 采用稿（docs/Data_FirstLevelRebuild20260919Contract.md §3）。
 // X east, Z south, metres. The sketch fixes adjacency and direction; the metres below are the
 // whitebox calibration the space package owns. Key names are the cross-package contract.
-export const MISSION_TOPOLOGY_VERSION = "first-level-20260919-four-zones-r1";
+import { FRONT_SORTIE as Sortie } from "./Data_FirstLevelFrontRoute.mjs";
+export const MISSION_TOPOLOGY_VERSION = "first-level-20260922-front-topology-r1";
 export const MISSION_REAR_ANCHORS = Object.freeze({
   ditchMouth: {x:53,z:114}, ditch: {x:39,z:116},
   // retreatA (=15A 收拢点) moved 6 m north of its old z=140: the North Sha He channel now
@@ -178,7 +179,7 @@ export const MISSION_STAGE_ROUTES = Object.freeze({
   rearTrench: [S.bunkerRear,{x:-42,z:-116},S.rearCorner,{x:-40,z:-106},
     ...MISSION_FRONT_COLLECTION_ROUTE],
   // 05→06：炸停战车之后原路退回集结处
-  collectionReturn: [{x:30,z:-117},{x:25,z:-110},{x:15,z:-111},
+  collectionReturn: [Sortie.rear,{x:22,z:-129},{x:22,z:-119},{x:14,z:-116},
     ...[...MISSION_FRONT_COLLECTION_ROUTE].reverse()],
   // 07：沿沟南行，终点是村北口。2026.09.19 第二波把 188 m 收到 135 m ——
   // 契约要的是 45–75 秒，旧线按行军配速要两分多钟，多出来的全在两个大折返上：

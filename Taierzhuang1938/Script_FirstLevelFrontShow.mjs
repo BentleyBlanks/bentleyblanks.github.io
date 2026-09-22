@@ -1,3 +1,4 @@
+import { FRONT_SORTIE } from "./Data_FirstLevelFrontRoute.mjs";
 // ===========================================================================
 // Script_FirstLevelFrontShow.mjs —— 公开阶段 1–7 的演出总线（Front 玩法包）
 //
@@ -99,7 +100,7 @@ export class FirstLevelFrontShow {
     const stage = this.r.flow.stage.id;
     this.bunker.Update(dt);
     if (stage === "RearTrench") this.UpdateRearTrench();
-    if (stage === "MachineGun") this.UpdateMachineGun();
+    // Right-position capture, handover and retreat are driven by the persistent battlefield.
     if (stage === "Tank") this.UpdateTank();
     if (stage === "Orders") this.collection.UpdateOrders(dt);
     if (stage === "South") this.UpdateSouth();
@@ -160,13 +161,8 @@ export class FirstLevelFrontShow {
   // --- 05 取弹炸车 -----------------------------------------------------------
   UpdateTank() {
     const r = this.r, tank = r.tank;
-    this.PostHandover();
-    // 「趴下！它转过来了！」：战车真的在往玩家这边转炮塔。
-    if (!r.Has("bundleTaken") && tank.present && !tank.immobilized) {
-      const toPlayer = Math.atan2(tank.x - r.player.position.x, tank.z - r.player.position.z);
-      const gap = Math.abs(Math.atan2(Math.sin(toPlayer - tank.turretYaw), Math.cos(toPlayer - tank.turretYaw)));
-      if (Distance(tank, r.player.position) <= F.bundleProneRangeM && gap <= F.bundleProneArcRad) r.Say("BundleProne");
-    }
+    if(!r.Has("bundleTaken")&&r.Near(FRONT_SORTIE.damagedLip,3)
+      &&!r.BlocksSight(r.view.TankMuzzle(tank),r.Point(r.player.position,1.65),r.view.tankCollider))r.Say("BundleProne");
     // 返程：「班长！它往沟口挤了！」—— 战车比取弹那一刻又往南压了一段。
     if (r.Has("bundleTaken")) {
       if (this.bundleTakenTankZ == null) { this.bundleTakenTankZ = tank.z; this.bundleTakenAt = r.time; }

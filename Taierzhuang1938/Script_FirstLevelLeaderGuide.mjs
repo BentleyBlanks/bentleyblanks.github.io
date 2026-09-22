@@ -150,6 +150,8 @@ export class FirstLevelLeaderGuide {
       if(r.carry.Active){target=r.flow.stage.id==="Carry"?A.ditchMouth:A.zhouDrop;mode=label=r.flow.stage.id==="Carry"?"move":"place";}
       else {const z=r.column.zhou;target={x:z.x+Math.sin(z.yaw)*1.6,z:z.z+Math.cos(z.yaw)*1.6};}
     }
+    const battle=r.frontBattle?.Guide();
+    if(battle){target=battle.target;mode=label="move";cue=null;variant=r.flow.stage.id+"_"+r.frontBattle.leg;}
     if(mode==="follow"||mode==="rally") {
       target=actor.position;
       label=actor.missionGuideWaiting||actor.missionCoverWaiting?"rally":"follow";
@@ -162,7 +164,7 @@ export class FirstLevelLeaderGuide {
       target:{x:target.x,y:(leaderTarget?actor.position.y:r.battlefield.GroundHeight(target.x,target.z))+(leaderTarget?G.markerHeightM:1.15),z:target.z},
       name:leaderTarget?T("gameplay.cast.luo"):T(`firstLevel.leader.${label}`),
       action:T(`firstLevel.leader.${label}`),distance:Distance(r.player.position,target),
-      objective:Localize(FirstLevelStageTextId(r.flow.stage.id),r.flow.stage.objective)};
+      objective:battle?.objective||Localize(FirstLevelStageTextId(r.flow.stage.id),r.flow.stage.objective)};
   }
   Update() {
     const r=this.r,view=this.View();this.view=view;

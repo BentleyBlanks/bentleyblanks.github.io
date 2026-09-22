@@ -9,8 +9,8 @@ const Phase = (number, id, title, steps, spawn) => Object.freeze({
 export const FIRST_LEVEL_STAGES = Object.freeze([
   Phase(1, "Trapped", "黑屏、爆炸、受困", ["Trapped"], A.bunker),
   Phase(2, "Rescue", "班长救人，撤入后交通壕", ["BunkerRescue", "RearTrench"], A.bunker),
-  Phase(3, "Support", "接回第一批守军", ["Support"], Stage.rearTrench.at(-1)),
-  Phase(4, "MachineGun", "接替火力，战车压口", ["MachineGun"], {x:0,z:-127.4}),
+  Phase(3, "Support", "夺取右侧阵位，接回第一批守军", ["Support"], Routes.support[0]),
+  Phase(4, "MachineGun", "战车压进，退至阵位后侧", ["MachineGun"], A.front),
   Phase(5, "Tank", "班长带路取弹，炸停战车", ["Tank"], Routes.bundle[0]),
   Phase(6, "Orders", "回到伤员集结处，接下后送", ["Orders"], A.collection),
   Phase(7, "South", "沿沟南行", ["South"], A.collection),
@@ -39,10 +39,10 @@ export const FIRST_LEVEL_DEFERRED_ENCOUNTERS=Object.freeze({
 // gun and side courtyard defenders still belong to the upcoming capture task.
 export const FIRST_LEVEL_STAGE_CLEARED_ENEMIES = Object.freeze({
   // A 04 debug start represents the observed continuous 03→04 battlefield.
-  // Data_Stage04Continuous.json (2026-09-20 run) had all 12 front men alive and
-  // 11/12 approach attackers dead; the north-east gunner was the sole survivor.
+  // Capturing the right nest requires all four existing position guards to be neutralized.
   // Rebuild the group for that survivor, while pre-clearing the actual 11 ids.
-  4: Object.freeze(FRONT_APPROACH_ENEMIES.filter(spec=>spec.id!=="ApproachNorthEastGunner").map(spec=>spec.id)),
+  4: Object.freeze(FRONT_APPROACH_ENEMIES.map(spec=>spec.id)),
+  5: Object.freeze(FRONT_APPROACH_ENEMIES.map(spec=>spec.id)),
   9: Object.freeze(["VillageCorner","KitchenGuard"]),
   10: Object.freeze(["VillageCorner","KitchenGuard"]),
 });

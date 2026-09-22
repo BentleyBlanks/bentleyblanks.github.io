@@ -33,6 +33,7 @@
 import { MISSION_TUNING as R } from "./Data_Tuning_FirstLevel.mjs";
 import { END_TUNING as END } from "./Data_Tuning_FirstLevelEnd.mjs";
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
+import { FRONT_BATTLE_TUNING as B } from "./Data_Tuning_FirstLevelFront.mjs";
 import { FRONT_SORTIE as Sortie } from "./Data_FirstLevelFrontRoute.mjs";
 import { FRONT_SHELLS } from "./Data_FirstLevelMissionFront.mjs";
 import { MISSION_RECEPTION_SPACE } from "./Data_FirstLevelMissionTopology.mjs";
@@ -213,10 +214,25 @@ export const MISSION_FACT_GATES = Object.freeze({
     note: "背坡伤员集结处：第一次看见担架、伤员与搬运人员",
   }),
   supportOrdersHeard: Gate({ kind: "voice", step: "RearTrench", cue: "SupportOrder", source: "VoiceDone" }),
+  ...Object.fromEntries([
+    ["rightNestCaptured","Support","阵位守卫已清除，玩家与班长实际占据右侧阵位"],
+    ["tankPreviewed","Support","同一辆战车行至东北道路远段"],
+    ["leftGunHandover","Support","何有田接替左侧枪位"],
+    ["tankPositionPressured","MachineGun","战车炮弹实际命中右侧射位周边"],
+    ["remainingGuardsGathered","MachineGun","既有余队收拢至最后遮挡"],
+    ["rightRearReached","MachineGun","玩家与班长抵达后墙实遮挡"],
+    ["bundleReturned","Tank","取弹后沿原沟返回岔口"],
+    ["attackPositionReached","Tank","玩家与班长抵达道路侧攻击点"],
+    ["tankFireDisabled","Tank","玩家有效攻击使战车失去封锁火力"],
+    ["attackRetreated","Tank","投弹后玩家退回支沟"],
+    ["frontDisengaged","Tank","玩家与班长沿支沟撤回后交通壕"],
+    ["collectionReturned","Tank","接防完成，玩家与班长返回集结处"],
+    ["guardBatchLost","Support","一批守军全部阵亡，接应失败"],
+  ].map(([id,step,text])=>[id,Gate({kind:"scripted",step,text,source:"FirstLevelFrontBattle"})])),
   // --- Support -----------------------------------------------------------
   frontReached: Gate({
-    kind: "proximity", step: "Support", anchor: "front", radiusM: OPENING.frontReachRadiusM,
-    source: "Update",
+    kind: "proximity", step: "Support", anchor: "front", radiusM: B.captureRadiusM,
+    source: "FirstLevelFrontBattle.UpdateCapture", note: "四名守卫已清除，玩家与班长都进入阵位",
   }),
   frontContact: Gate({
     kind: "combat", step: "Support", source: "Update",
@@ -224,7 +240,7 @@ export const MISSION_FACT_GATES = Object.freeze({
   }),
   frontRifleDefense: Gate({
     kind: "combat", step: "Support", source: "Update",
-    text: "右侧破墙的封锁机枪已被压制或击败，无固定时长或击杀数",
+    text: "指定进攻组达到击杀阈值，且撤口直接火力解除",
   }),
   rifleWithdrawalResolved: Gate({
     kind: "scripted", step: "Support", source: "UpdateGuards",
@@ -232,16 +248,16 @@ export const MISSION_FACT_GATES = Object.freeze({
   }),
   // --- MachineGun --------------------------------------------------------
   zhouGunWounded: Gate({
-    kind: "scripted", step: "MachineGun", source: "FirstLevelOpening.UpdateZhou",
-    text: "老周在机枪位上挨了那一发（负伤但没死），退出枪位",
+    kind: "scripted", step: "Support", source: "FirstLevelFrontBattle.UpdateZhou",
+    text: "老周既有腿伤，经己方沟道实际撤到集结处",
   }),
   frontAttackRepelled: Gate({
     kind: "combat", step: "MachineGun", encounter: "machineGun", source: "UpdateFrontAttack",
     text: "machineGun 组全部阵亡或被打退（退到 retreatDistanceM 之外）",
   }),
   guardWithdrawalResolved: Gate({
-    kind: "scripted", step: "MachineGun", source: "UpdateGuards",
-    text: "八对守军全部撤回交通壕或阵亡",
+    kind: "scripted", step: "Tank", source: "FirstLevelFrontBattle.UpdateGuards",
+    text: "两批均至少一人存活，所有存活守军实际撤入安全区",
   }),
   tankBlocksExit: Gate({
     kind: "scripted", step: "MachineGun", source: "UpdateTank",
@@ -251,12 +267,12 @@ export const MISSION_FACT_GATES = Object.freeze({
   // --- Tank --------------------------------------------------------------
   bundleRouteTraversed: Gate({
     kind: "scripted", step: "Tank", source: "UpdateSortie",
-    requires: Object.freeze(["bundleRoutePoint", "bundleCrawl"]),
-    text: "侧沟线上每个检查点都走到、两段爬行段都趴着过了",
+    requires: Object.freeze(["bundleRoutePoint"]),
+    text: "沿阵位后侧支沟到达旧弹药屋，无无效强制匍匐",
   }),
   bundleTaken: Gate({
     kind: "interaction", step: "Tank", interaction: "MissionBundle", anchor: "bundle",
-    source: "Register", text: "在北边屋里领到集束手榴弹",
+    source: "Register", text: "在东南旧院弹药屋从后门领到集束弹",
   }),
   tankImmobilized: Gate({
     kind: "scripted", step: "Tank", source: "OnBlast",
@@ -639,13 +655,7 @@ export const MISSION_FACT_GATES = Object.freeze({
     pointsFrom: "FRONT_SORTIE.route", points: Sortie.route, radiusM: Sortie.checkpointRadiusM,
     source: "UpdateSortie", text: "侧沟线上的第 i 个检查点（bundleRouteTraversed 的前提之一）",
   }),
-  bundleCrawl: Gate({
-    kind: "proximityFamily", step: "Tank", family: "bundleCrawl",
-    pointsFrom: "FRONT_SORTIE.crawl", points: Sortie.crawl,
-    keys: Sortie.crawl.map((crawl) => crawl.id), radiusM: Sortie.crawlRadiusM,
-    source: "UpdateSortie", note: "还要求人是趴着的、而且身子确实在沟底",
-    text: "趴着通过第 i 段矮顶爬行段（bundleRouteTraversed 的前提之一）",
-  }),
+
 });
 
 // 家族门的所有条目（工作台与运行时都用它做前缀匹配）。

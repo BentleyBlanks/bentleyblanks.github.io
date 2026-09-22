@@ -1,5 +1,8 @@
 # 第一关 2026.09.19 重构 · 分包契约
 
+> 2026-09-22 更新：03–05 的当前空间、事件门和对白以 [新采用稿](Data_FirstLevelFrontSource20260922.md) 与 [白盒契约](Data_FirstLevelFrontTopology20260922.md) 为准；本文其他阶段继续有效。
+
+
 需求来源：[Notion 2026.09.19 采用稿转录](Data_FirstLevelRebuildSource20260919.md)（台词一字不改）。本文件是各实现包之间的接口契约：**名字（步骤 id、事实名、锚点/路线键、遭遇组 id、cue id）在这里冻结**，实现包不许各自改名；确需改动先报给集成方（主会话），由集成方改本文件后再动代码。坐标、数值、内部实现归各包自己定。
 
 入口不变：`?whitebox=p012`（`fullMission`）。`?whitebox=p012-archive` 夹具及其 `Script_FirstLevelP012*` / `Data_FirstLevelP012*` / `Data_Text_P012` **本轮一律不动**。
@@ -110,9 +113,9 @@
 | Trapped | `BunkerBanter`(7，黑屏；末句被近爆打断) · `BunkerKilling`(6，日兵甲/伤兵/扶人川军/日兵乙) · `BunkerSearch`(2，日语) · `ShunziCurse`(1，压声) |
 | BunkerRescue | `RescueCall`(6) · `RescueLift`(3) · `RescueOut`(3) |
 | RearTrench | `TrenchCurse`(4) · `CornerCheck`(5) · `SupportOrder`(4) |
-| Support | `FrontBlockade`(2) |
-| MachineGun | `TakeOverGun`(2) · `TankTerror`(2) · `BundleOrder`(2) |
-| Tank | `BundleGo`(2) · `BundleProne`(1) · `BundleSupply`(2) · `BundleReturnCall`(2) · `TankStopped`(2) |
+| Support | `FrontBlockade`(3) · `FrontApproach`(2) · `FrontAttack`(1) · `FrontWithdraw`(1) · `TakeOverGun`(3) |
+| MachineGun | `TankRoadContact`(2) · `TankTerror`(1) · `BundleOrder`(5) |
+| Tank | `BundleGo`(2) · `BundleProne`(2) · `BundleSupply`(2) · `BundleReturnCall`(2) · `BundleAttack`(2) · `BundleRetreat`(1) · `TankStopped`(3) · `FrontRelief`(3) |
 | Orders | `Volunteer`(5：传令兵/罗/传令兵/顺子/罗) · `BorrowLight`(9，含两处动作停顿) · `ZhouLift`(4) |
 | South | `SouthWhisper`(6) · `VillagePointer`(1) |
 | Village | `StreetBlocked`(2) · `KitchenDetour`(2) |

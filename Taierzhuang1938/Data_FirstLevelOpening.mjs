@@ -1,5 +1,6 @@
 // 2026-09-10 opening rebuild. Gameplay reconstruction of a local flank breach;
 // these coordinates are not claims about surveyed 1938 positions.
+import { FRONT_SORTIE as Sortie } from "./Data_FirstLevelFrontRoute.mjs";
 import { MISSION_FRONT_COLLECTION_ROUTE } from "./Data_FirstLevelMissionTopology.mjs";
 
 export const OPENING = Object.freeze({
@@ -32,9 +33,9 @@ export const OPENING = Object.freeze({
   // Clear the middle of the trench for the player and late-arriving companions.
   trenchCoverPosts: [{x:-43.55,z:36.15},{x:-46.45,z:32.15},{x:-43.55,z:37.85},{x:-46.45,z:33.85}],
   trenchContactRoute: [{x:-66,z:66},{x:-62,z:64},{x:-45,z:41},{x:-45,z:24},{x:-37,z:24},{x:-37,z:18}],
-  frontPosts: [{x:-4,z:-124},{x:4,z:-122},{x:12,z:-124},{x:16,z:-124}],
-  zhouGunSeat: {x:0,z:-127.4},
-  zhouRest: {x:2.1,z:-124.6},
+  frontPosts: [{x:25,z:-141},{x:-25,z:-100},Sortie.leftSeat,{x:-18,z:-123}],
+  zhouGunSeat: Sortie.leftSeat,
+  zhouRest: {x:-36,z:-99},
   // The front supply crate sits between the firing step and the rest point.
   // A wounded gunner can end up on either side of it, so the handover
   // follows the open south edge of the traverse instead of cutting through

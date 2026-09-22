@@ -1,3 +1,4 @@
+import { FRONT_SORTIE as Sortie } from "./Data_FirstLevelFrontRoute.mjs";
 import { MISSION_STAGES, MISSION_ENCOUNTERS, MISSION_TUNING as R } from "./Data_FirstLevelMission.mjs";
 import { MISSION_ANCHORS as A, MISSION_PLACEMENT as P } from "./Data_FirstLevelMissionLayout.mjs";
 import { BuildFirstLevelCheckpoint } from "./Script_FirstLevelMissionCheckpoint.mjs";
@@ -39,13 +40,17 @@ export function ApplyFirstLevelStageJump(runtime, value, { midCutscenes = false 
   for (const [i,actor] of (r.squad||[]).entries()) {
     actor.missionTrainReady = true;
     const point = n === 2 ? bunkerPosts[i] || bunkerPosts.at(-1)
-      : n === 4 ? OPENING.frontPosts[i] : n <= 6 ? P.squadFrontPositions[i]
+      : n === 3 ? {x:spawn.x+(i%2?1:-1),z:spawn.z+2+Math.floor(i/2)*2}
+      : n === 4 ? OPENING.frontPosts[i] : n === 5 ? (i===0?Sortie.rear:OPENING.frontPosts[i]) : n <= 6 ? P.squadFrontPositions[i]
         : {x:spawn.x+(i%2?2.4:-2.4),z:spawn.z+3+Math.floor(i/2)*2.4};
     r.PlaceActor(actor,point); r.Defend(actor,point);
   }
   if (n > 3) {
     r.tank.present = true; r.tank.active = true;
-    r.tank.z = n >= 5 ? R.tankStopZ : R.tankFirstFireZ;
+    const tankPoint=Sortie.road[n>=5?Sortie.tankBlockIndex:Sortie.tankPreviewIndex];
+    Object.assign(r.tank,tankPoint);
+    if(n>=4)r.flow.facts.add("rightNestCaptured");
+    if(n>=5)r.flow.facts.add("tankPositionPressured");
     r.tank.immobilized = n >= 6; r.tank.shots = 1;
     r.column.zhou.health = n >= 15 ? saved.column.litters.find(l=>l.zhou).health
       : n >= 14 ? 45 : 65;
@@ -62,7 +67,7 @@ export function ApplyFirstLevelStageJump(runtime, value, { midCutscenes = false 
   }
   if (n >= 4 && n <= 5) {
     r.SpawnGuards();
-    if (n === 5) for (const guard of r.guards) {
+    for (const guard of r.guards.slice(0,OPENING.rifleGuardCount)) {
       guard.safe = true; guard.progress = guard.route.length;
       r.PlaceActor(guard.actor,guard.route.at(-1));
     }

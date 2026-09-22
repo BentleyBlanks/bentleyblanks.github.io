@@ -1,5 +1,8 @@
 # 第一关空间拓扑 · 2026-09-19 采用稿
 
+> 2026-09-22 更新：03–05 的当前空间、事件门和对白以 [新采用稿](Data_FirstLevelFrontSource20260922.md) 与 [白盒契约](Data_FirstLevelFrontTopology20260922.md) 为准；本文其他阶段继续有效。
+
+
 > 01–03 已由 [2026.09.21 正文](Data_FirstLevelOpeningSource20260921.md) 和 [分镜重构](Data_OpeningStoryboards20260922.md) 覆盖。以下旧受困/双俘虏/掀架段落仅作历史；04–18 保留原口径。
 
 需求来源：[Notion 2026.09.19 采用稿转录](Data_FirstLevelRebuildSource20260919.md)，接口冻结在[分包契约](Data_FirstLevelRebuild20260919Contract.md) §3 与 §8。

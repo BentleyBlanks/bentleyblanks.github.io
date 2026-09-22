@@ -44,7 +44,7 @@ const ROUTE_RETRY_BUDGET = 2;
 /** 分段驾驶脚本允许的起点：每一段的第一个公开阶段。 */
 export const CAMPAIGN_SEGMENT_STARTS = Object.freeze([8, 11, 15, 18]);
 /** `--stage-to` 允许的终点：Front 段末（7）、Mid 段末（14）、整关（18）。 */
-export const CAMPAIGN_SEGMENT_ENDS = Object.freeze([3, 7, 14, 18]);
+export const CAMPAIGN_SEGMENT_ENDS = Object.freeze([3, 6, 7, 14, 18]);
 
 export function ParseCampaignArgs(argv = process.argv) {
   const Has = (flag) => argv.includes(flag);
@@ -52,7 +52,7 @@ export function ParseCampaignArgs(argv = process.argv) {
   const raw = argv.find((arg) => arg.startsWith("--stage-from="))?.split("=")[1];
   const stageFrom = Number(raw || 1);
   assert.ok(
-    stageFrom === 1 || (stageJumps && CAMPAIGN_SEGMENT_STARTS.includes(stageFrom)),
+    stageFrom === 1 || stageFrom === 3 || (stageJumps && CAMPAIGN_SEGMENT_STARTS.includes(stageFrom)),
     "continuation suites start at 1 or at a segment boundary (" + CAMPAIGN_SEGMENT_STARTS.join(" / ") + ")",
   );
   // 只跑某一段到它的末尾（`--stage-to=7` = Front 包的 1–7）。默认 18 = 整关走到 Complete。
@@ -64,13 +64,14 @@ export function ParseCampaignArgs(argv = process.argv) {
   return {
     campaign: Has("--campaign"),
     audioCheck: Has("--audio"),
+    probeFrontGun: Has("--probe-front-gun"),
     stageJumps,
     // 专项回归才允许主动排入一条带路短命令，验证静默窗口会取消它且不锁院门。
     // 默认整关/分段驾驶只观察运行时自主产生的 cue，不能改写真实语音排队。
     quietGuidanceInterruptProbe: Has("--probe-quiet-guidance-interrupt"),
     allowCheckpointRetry: Has("--allow-checkpoint-retry"),
     stageFrom, stageTo,
-    suite: stageTo === 3 ? "FirstLevelOpeningStoryboards" : stageTo === 7 ? "FirstLevelStageFront"
+    suite: stageFrom === 3 ? "FirstLevelFrontTopology" : stageTo === 3 ? "FirstLevelOpeningStoryboards" : stageTo === 7 ? "FirstLevelStageFront"
       : stageTo === 14 ? "FirstLevelStageMiddle"
         : stageFrom === 8 ? "FirstLevelStageVillage"
           : stageFrom === 11 ? "FirstLevelStageTransfer"
@@ -95,7 +96,7 @@ export async function OpenCampaign(options) {
     jumpReceipts: [], campaignRetries: [], capturedActivities: new Set(),
   };
   await page.goto(
-    `http://127.0.0.1:${server.address().port}/Taierzhuang1938/?whitebox=p012&${options.audioCheck ? "menu=0" : "shot=1"}&manual=1&quality=${options.quality||"low"}&scale=small`,
+    `http://127.0.0.1:${server.address().port}/Taierzhuang1938/?whitebox=p012&${options.audioCheck ? "menu=0" : "shot=1"}&manual=1${options.stageFrom===3?"&missionStage=3":""}&quality=${options.quality||"low"}&scale=small`,
     { waitUntil: "domcontentloaded", timeout: 180000 },
   );
   await page.waitForFunction(() => window.Tengxian?.state?.ready, null, { timeout: 180000 });
@@ -423,7 +424,7 @@ export function CampaignActions(ctx) {
    * 人确实到了 nightSpawn(−160,292)，转场结束后又被驾驶器走了 110 m 回到 marchOut，
    * 于是「黑屏里那一下瞬移没生效」看着像引擎的锅，其实是驾驶器自己走回去的。
    */
-  async function Route(points, label, { fight = false, stance = "stand", sprint = false, crawl = false, rejoinRoute = null, stopFact = null } = {}) {
+  async function Route(points, label, { fight = false, stance = "stand", sprint = false, crawl = false, rejoinRoute = null, stopFact = null, arrivalM = 0.8 } = {}) {
     const rejoinTarget=points.at(-1);
     await page.evaluate(
       async ({ points, stance, sprint, rejoinRoute, rejoinTarget }) => {
@@ -450,7 +451,7 @@ export function CampaignActions(ctx) {
     const carriedKind=await page.evaluate(()=>window.Tengxian.carry.KindId);
     let result, retries = 0;
     for (let chunk = 0; chunk < 90; chunk++) {
-      result = await page.evaluate(async ({fight,stance,crawl,sprint,stopFact}) => {
+      result = await page.evaluate(async ({fight,stance,crawl,sprint,stopFact,arrivalM}) => {
         const {FRONT_SORTIE}=await import("./Data_FirstLevelFrontRoute.mjs");
         const g = window.Tengxian,
           b = window.routeBot,
@@ -462,7 +463,7 @@ export function CampaignActions(ctx) {
             target = b.points[b.index];
           // 这一段的接管条件到了：松手，剩下的路点交给编排（黑屏瞬移就在这儿发生）。
           if (Reached()) { b.index = b.points.length; break; }
-          if (Math.hypot(p.x - target.x, p.z - target.z) < 0.8) {
+          if (Math.hypot(p.x - target.x, p.z - target.z) < arrivalM) {
             b.index++;
             continue;
           }
@@ -536,7 +537,7 @@ export function CampaignActions(ctx) {
           lastShot: g.state.lastShot,
           foe: window.MissionInputDriver?.Target()?.missionId,
         };
-      }, {fight,stance,crawl,sprint,stopFact});
+      }, {fight,stance,crawl,sprint,stopFact,arrivalM});
       if (chunk % 4 === 0 || result.done || !result.alive) console.log(label, JSON.stringify(result));
       // A death can also leave the body stationary. Let the existing checkpoint
       // retry below handle it before applying the live-navigation stall limit.

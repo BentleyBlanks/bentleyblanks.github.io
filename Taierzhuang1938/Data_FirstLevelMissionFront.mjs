@@ -1,5 +1,6 @@
 import { MISSION_TUNING as FIRST_LEVEL_TUNING } from "./Data_Tuning_FirstLevel.mjs";
 import { MISSION_TRAIN } from "./Data_FirstLevelMissionTrain.mjs";
+import { FRONT_SORTIE as Sortie } from "./Data_FirstLevelFrontRoute.mjs";
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
 // Authored squads and persistent aftermath. Historical dead do not affect live combat counts.
 // 2026-09-09: the Center squad's fifth man moved 12,-188 -> 12,-190. At -188 he was inside the
@@ -76,18 +77,12 @@ export const FRONT_COVER=Object.freeze({
 // starts on this field, and a roster split across two files drifts. `Data_FirstLevelMission`
 // spreads this straight into MISSION_ENCOUNTERS.front.
 export const FRONT_RIFLEMEN=Object.freeze([
-  {id:"FrontGunner",x:25,z:-161,weapon:"Type11",hold:true},
-  {id:"FrontRifleA",x:-18,z:-159},
-  {id:"FrontRifleB",x:-9,z:-164},
-  {id:"FrontRifleC",x:14,z:-154},
-  {id:"FrontRifleD",x:30,z:-151},
-  {id:"FrontRifleE",x:-29,z:-171},
-  {id:"FrontRifleF",x:-22,z:-178},
-  {id:"FrontRifleG",x:-10,z:-180},
-  {id:"FrontRifleH",x:2,z:-177},
-  {id:"FrontRifleI",x:9,z:-170},
-  {id:"FrontRifleJ",x:20,z:-179},
-  {id:"FrontSupportGunner",x:33,z:-181,weapon:"Type11",hold:true},
+  {id:"FrontGunner",x:17,z:-161,weapon:"Type11",hold:true},
+  {id:"FrontRifleA",x:23,z:-163},{id:"FrontRifleB",x:28,z:-167},
+  {id:"FrontRifleC",x:15,z:-170},{id:"FrontRifleD",x:33,z:-158},
+  {id:"FrontRifleE",x:-30,z:-169},{id:"FrontRifleF",x:-18,z:-179},
+  {id:"FrontRifleG",x:-9,z:-173},{id:"FrontRifleH",x:4,z:-183},
+  {id:"FrontSupportGunner",x:-23,z:-184,weapon:"Type11",hold:true},
 ]);
 /** Every man the front stages put on this field. The cover rows never build on one of these
  *  firing positions - a bank standing on a man is a man standing in a bank. */
@@ -181,12 +176,10 @@ export function FrontAssaultLaneCuts(x,z,w,d,slackM=.4){
 // trench. Keep a finite north / north-east screen on that live leg; the retired
 // station-side west/east teams were never encountered after the 2026.09.19 cut.
 export const FRONT_APPROACH_ENEMIES=[
-  {id:"ApproachNorthGunner",x:-15,z:-138,weapon:"Type11",hold:true,team:"North"},
-  ...[[-18,-142],[-11,-139],[3,-141],[6,-139],[20,-142]].map(([x,z],i)=>
-    ({id:"ApproachNorth"+"ABCDE"[i],x,z,team:"North",bayonet:true})),
-  {id:"ApproachNorthEastGunner",x:31,z:-139,weapon:"Type11",hold:true,team:"NorthEast"},
-  ...[[26,-142],[25,-140],[31,-142],[35,-139],[39,-142]].map(([x,z],i)=>
-    ({id:"ApproachNorthEast"+"ABCDE"[i],x,z,team:"NorthEast",bayonet:true})),
+  {id:"RightNestGunner",...Sortie.nest,weapon:"Type11",hold:true,team:"Nest"},
+  {id:"RightNestGuard",x:30,z:-142,hold:true,team:"Nest"},
+  {id:"RightEntryGuard",x:22,z:-136,hold:true,team:"Nest"},
+  {id:"RightLinkGuard",x:25,z:-131,hold:true,team:"Nest"},
 ];
 // Bounded approach routes end at the trench lip; shared tactical AI closes on observed targets.
 export const APPROACH_TACTICS=Object.fromEntries([
@@ -194,22 +187,14 @@ export const APPROACH_TACTICS=Object.fromEntries([
     near:{x:-52,z:50},nearM:18,delay:(i%3)*2,
     points:[{x:s.x+(s.team==="Rail"?8:-6),z:s.z},{x:s.x+(s.team==="Rail"?14:-12),z:s.z}],
   }]),
-  ...FRONT_APPROACH_ENEMIES.filter(s=>!s.hold).map((s,i)=>[s.id,{
-    near:s.team==="North"?{x:-8,z:-112}:{x:6,z:-124},
-    nearM:18,delay:(i%5)*1.5,
-    points:[{x:s.x+(s.team==="North"?2:-2),z:s.z+6},
-      {x:s.x+(s.team==="North"?4:-4),z:s.z+12}],
-  }]),
+  ...Sortie.enemies.map((s,i)=>[s.id,{near:Sortie.rear,nearM:20,delay:i*2,
+    points:[{x:40,z:s.z},{x:35,z:-123},{x:29,z:-120}]}]),
 ]);
-export const FRONT_DEFENDERS=[
-  [-54,15,"HanYang"],[-49,6,"Zb26"],[-52,-3,"HanYang"],[-43,-19,"HanYang"],
-  [-21,-54,"HanYang"],[-13,-63,"Zb26"],[-19,-70,"HanYang"],
-  [-38,-133,"HanYang"],[-31,-138,"Zb26"],[-23,-131,"HanYang"],[-17,-137,"HanYang"],
-  [-9,-134,"HanYang"],[5,-138,"HanYang"],[19,-135,"Zb26"],[25,-140,"HanYang"],
-].map(([x,z,weapon],i)=>({id:"FrontDefender"+i,x,z,weapon,stance:i%4===0?2:1}));
-export const FRONT_GUARD_POSTS=[[-29,-145],[-22,-145],[-12,-145],[-4,-145],[7,-145],[14,-145],[21,-145],[28,-145]]
+export const FRONT_DEFENDERS=[[-19,-125,"HanYang"],[-26,-132,"HanYang"]]
+  .map(([x,z,weapon],i)=>({id:"FrontDefender"+i,x,z,weapon,stance:1}));
+export const FRONT_GUARD_POSTS=[[-12,-148],[-16,-148],[-21,-148],[-24,-148],[0,-148],[4,-148],[9,-148],[13,-148]]
   .map(([x,z])=>({x,z}));
-export const FRONT_BREACHES=[{x:-22,z:8,radius:4,depth:1.05}];
+export const FRONT_BREACHES=[{x:-22,z:8,radius:4,depth:1.05},{...Sortie.gap,radius:3.2,depth:.35},{...Sortie.damagedLip,radius:3,depth:.8}];
 export const FRONT_SHELLS=[
   {trigger:{x:-46,z:37},impact:{x:-37,z:22}},
   {trigger:{x:-24,z:-28},impact:{x:-31,z:-45}},

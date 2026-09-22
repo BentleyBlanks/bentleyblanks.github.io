@@ -1,3 +1,6 @@
+import { FirstLevelFrontBattle } from "./Script_FirstLevelFrontBattle.mjs";
+import { FRONT_SORTIE as S } from "./Data_FirstLevelFrontRoute.mjs";
+import { MISSION_FRONT_COLLECTION_ROUTE } from "./Data_FirstLevelMissionTopology.mjs";
 import { MissionVoiceTimeline } from "./Data_FirstLevelMissionVoiceTiming.mjs";
 import { MISSION_CIVILIAN_AFTERMATH } from "./Data_FirstLevelMissionCivilianAftermath.mjs";
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
@@ -22,7 +25,7 @@ import { MISSION_STAGE_ROUTES, MISSION_RAIL_BRIDGE } from "./Data_FirstLevelMiss
 import { MISSION_LAYOUT, MISSION_ROUTES, MISSION_ANCHORS as A, MISSION_PLACEMENT as P, MISSION_RAILWAY,
   MISSION_SUPPLIES, MISSION_SUPPLY_COLLIDER } from "./Data_FirstLevelMissionLayout.mjs";
 import { MakeRailwayProfile } from "./Script_RoadPath.mjs";
-import { MISSION_TERRAIN, SampleMissionTerrain, MissionPathDistance } from "./Data_FirstLevelMissionTerrain.mjs";
+import { MISSION_TERRAIN, SampleMissionTerrain, SampleMissionNaturalHeight, MissionPathDistance } from "./Data_FirstLevelMissionTerrain.mjs";
 import { CreateP012Terrain } from "./Data_FirstLevelP012Terrain.mjs";
 import { MISSION_DIALOGUE, MissionVoicePrompt } from "./Data_FirstLevelMissionDialogue.mjs";
 import { FirstLevelMissionVoice } from "./Script_FirstLevelMissionVoice.mjs";
@@ -122,33 +125,10 @@ if(process.argv.includes("--opening-audio"))process.exit(0);
     ({Vector3}=await import("three"));
   } finally {hooks.deregister();}
   {
-    const id="ApproachNorthA";
-    const actor={id:1,alive:true,scriptedNoncombatant:true,missionTacticStandby:true,meleeCombat:false,
-      position:new Vector3(-18,0,-142),suppression:0,scriptDefensive:true,
-      tacticalRadiusM:0,missionTacticalRadiusM:R.approachTacticalRadiusM,
-      missionTactic:{index:0,elapsed:0,hold:0,movingSeconds:0,distance:0,
-        last:{x:-18,z:-142},shelter:{x:-18,z:-142},mode:"cover"}};
-    let near=false,moved=0;
-    const runtime={flow:{stage:{id:"Support"}},enemies:new Map([[id,actor]]),
-      Near:()=>near,ai:{SetStance(){}},Defend(){},MoveActor(){moved++;}};
-    FirstLevelMissionRuntime.prototype.UpdateTactics.call(runtime,1/60);
-    assert.equal(actor.scriptedNoncombatant,true,"an unreached local approach sector cannot fight offscreen");
-    assert.equal(actor.missionTacticStandby,true);
-    assert.equal(actor.missionTactic.released,undefined);
-    near=true;
-    FirstLevelMissionRuntime.prototype.UpdateTactics.call(runtime,1/60);
-    assert.equal(actor.scriptedNoncombatant,false,"entering the authored near gate releases the local attack");
-    assert.equal(actor.missionTacticStandby,false);
-    assert.equal(actor.missionTactic.released,true);
-    assert.equal(actor.tacticalRadiusM,R.approachTacticalRadiusM);
-    assert.ok(moved>0,"the released actor resumes its authored physical approach");
-    const movedAfterRelease=moved;
-    actor.missionTactic={index:0,elapsed:0,hold:0,movingSeconds:0,distance:0,
-      last:{x:-18,z:-142},shelter:{x:-18,z:-142},mode:"cover"};
-    actor.scriptedNoncombatant=true;actor.missionTacticStandby=false;
-    FirstLevelMissionRuntime.prototype.UpdateTactics.call(runtime,1/60);
-    assert.equal(actor.scriptedNoncombatant,true,"the near gate does not clear a noncombatant duty it does not own");
-    assert.equal(moved,movedAfterRelease);
+    assert.deepEqual(MISSION_ENCOUNTERS.approach.map(a=>a.id),
+      ["RightNestGunner","RightNestGuard","RightEntryGuard","RightLinkGuard"]);
+    assert.ok(MISSION_ENCOUNTERS.approach.every(a=>a.hold&&!MISSION_TACTICS[a.id]),
+      "03 captures four existing defenders; the retired approach assault cannot move them away");
   }
   {
     const exposed={health:R.checkpointUnsafeSaveHealth-1};
@@ -209,72 +189,31 @@ if(process.argv.includes("--opening-audio"))process.exit(0);
     r.squad.push({id:2,castId:OPENING.requiredSquadCast[0],alive:false});
     opening.Update(1/60);assert.equal(r.failed,true,"the existing required-companion contract is preserved");
   }
-  for(const survivors of [0,1,3]){
-    const flow=new FirstLevelMissionFlow();flow.index=MISSION_STAGES.findIndex(s=>s.id==="MachineGun");flow.started=true;
-    const guards=Array.from({length:4},(_,i)=>({actor:{id:i,alive:i<survivors},safe:true,progress:1,route:[{}]}));
-    const r={flow,guards,time:0,Has:id=>flow.Has(id),Record:(id,d)=>flow.Record(id,d)};
-    for(const fact of MISSION_STAGES.find(s=>s.id==="MachineGun").requirements)
-      if(fact!=="guardWithdrawalResolved")flow.Record(fact);
+  // 2026-09-22: both batches must physically recover; losing an entire batch fails.
+  for(const survivors of [0,1,6]){
+    const facts=new Map(),failures=[];
+    const guards=Array.from({length:8},(_,i)=>({actor:{id:i,alive:i<2||i<2+survivors},safe:true,progress:1,route:[{}]}));
+    const r={flow:{stage:{id:"Tank"}},guards,Has:()=>true,Record:(id,d)=>facts.set(id,d),
+      OnPlayerDown:()=>failures.push("down"),MissionFailure:id=>failures.push(id)};
+    r.frontBattle=new FirstLevelFrontBattle(r);
+    r.frontBattle.InfantryBlockade=()=>false;r.frontBattle.TankBlockade=()=>false;
     FirstLevelMissionRuntime.prototype.UpdateGuards.call(r,1/60);
-    assert.equal(flow.log.find(e=>e.id==="guardWithdrawalResolved").detail.survived,survivors,
-      "withdrawal counts only living survivors, including casualties after reaching cover");
-    flow.Update(1/60);assert.equal(flow.stage.id,"Tank","partial or total ordinary losses never strand withdrawal");
+    assert.equal(facts.has("lastGuardsWithdrawn"),survivors>0);
+    if(survivors)assert.equal(facts.get("lastGuardsWithdrawn").survived,survivors);
+    else assert.deepEqual(failures,["down","guards"],"all dead is failure, not an empty successful withdrawal");
   }
   {
-    const guards=[[-3.15,-124.16],[-3.13,-123.53]].map(([x,z],i)=>({
-      actor:{id:77+i,alive:true,position:{x,z}},safe:true,crossing:true,progress:4,
-      route:Array.from({length:7},()=>({x:6,z:-124})),
-    }));
-    const speeds=new Map(),r={guards,time:1,flow:{stage:{id:'Tank'}},ai:{SetStance(){}},
-      Has:()=>true,Record(){},Say(){},MoveActor:(actor,point,speed)=>speeds.set(actor.id,speed)};
-    FirstLevelMissionRuntime.prototype.UpdateGuards.call(r,1/60);
-    assert.equal([...speeds.values()].filter(speed=>speed>0).length,1,
-      'recorded converging guard pair grants one passage instead of mutual yield');
-    assert.equal([...speeds.values()].filter(speed=>speed===0).length,1,
-      'the other man still yields instead of both ignoring separation');
+    const voice=new FirstLevelMissionVoice({audio:{StopStoryVoice(){}},hud:{Say(){}}});
+    const r=Object.create(FirstLevelMissionRuntime.prototype);
+    Object.assign(r,{voice,missingCues:[]});
+    r.Say("FrontBlockade");
+    assert.deepEqual(voice.queue,["FrontBlockade"],"the complete new three-line exchange is queued");
+    assert.equal(MISSION_DIALOGUE.find(c=>c.id==="FrontBlockade").lines.length,3);
+    r.Say("FrontCoverCall");
+    assert.deepEqual(r.missingCues,["FrontCoverCall"]);
+    assert.ok(!voice.finished.has("FrontCoverCall"),"retired dialogue cannot invent a heard event");
   }
-  {
-    // 03/04 唯一现役的前沿台词 FrontBlockade（契约 §5）：看不见就等兜底那一档，
-    // 封锁的机枪先死就撤回，绝不假装播完。
-    const MakeFront=(visible)=>{
-      const voice=new FirstLevelMissionVoice({audio:{StopStoryVoice(){}},hud:{Say(){}}});
-      const gunner={alive:true,position:{x:25,z:-161}};
-      const guard={safe:false,crossing:false,actor:{alive:true,position:{x:0,z:0}}};
-      const ndc=visible?{x:0,y:0,z:0}:{x:2,y:0,z:0};
-      const r=Object.create(FirstLevelMissionRuntime.prototype);
-      Object.assign(r,{voice,time:0,missingCues:[],flow:{stage:{id:"Support"}},guards:[guard],
-        enemies:new Map([["FrontGunner",gunner]]),
-        player:{position:{x:0,z:0},EyePosition:{},camera:{}},Has:()=>true,BlocksSight:()=>false,
-        Point:()=>({clone:()=>({project:()=>ndc})})});
-      return {voice,gunner,guard,r};
-    };
-    {
-      const {voice,r}=MakeFront(false);
-      r.UpdateFrontDialogue();
-      assert.deepEqual(voice.queue,[],"an unseen blockade does not get pointed at on the first frame");
-      r.time=R.frontDialogueFallbackS;r.UpdateFrontDialogue();
-      assert.deepEqual(voice.queue,["FrontBlockade"],"but a player who never looks still gets told where to shoot");
-    }
-    {
-      const {voice,r}=MakeFront(true);
-      r.UpdateFrontDialogue();r.time=R.frontDialogueSeenS;r.UpdateFrontDialogue();
-      assert.deepEqual(voice.queue,["FrontBlockade"],"actually seeing the pinned guards brings the line forward");
-    }
-    {
-      const {voice,gunner,r}=MakeFront(false);
-      r.time=R.frontDialogueFallbackS;r.UpdateFrontDialogue();
-      gunner.alive=false;r.UpdateFrontDialogue();
-      assert.deepEqual(voice.queue,[],"destroying the actual blocking gun cancels the stale blockade line");
-      assert.ok(!voice.finished.has("FrontBlockade"),"cancelled dialogue is never falsely marked heard");
-    }
-    {
-      const {voice,r}=MakeFront(false);
-      r.Say("FrontCoverCall");
-      assert.deepEqual(voice.queue,[],"a retired cue id is refused outright, not faked through a pending queue");
-      assert.deepEqual(r.missingCues,["FrontCoverCall"]);
-      assert.ok(!voice.finished.has("FrontCoverCall"));
-    }
-  }
+
 }
 // 2026.09.19 第二波：车站卸车那一拍（连同 MISSION_PLACEMENT.stationCasualties）随军列下线。
 {
@@ -372,10 +311,10 @@ for (const phase of FIRST_LEVEL_STAGES) {
 for(const value of [0,19,-1,1.5,"Complete","Carry",null])assert.throws(()=>ResolveFirstLevelStage(value));
 console.log("ok 18 Notion stages, complete prior facts, live destination gates and independent reconstructed columns");
 assert.ok(FIRST_LEVEL_STAGE_ENCOUNTERS[3].includes("approach"),
-  "04 debug start rebuilds the observed sole approach survivor");
+  "04 reconstructs the persistent capture roster");
 assert.deepEqual(FIRST_LEVEL_STAGE_CLEARED_ENEMIES[4],
-  MISSION_ENCOUNTERS.approach.filter(spec=>spec.id!=="ApproachNorthEastGunner").map(spec=>spec.id),
-  "04 debug start pre-clears the eleven approach casualties observed at the continuous transition");
+  MISSION_ENCOUNTERS.approach.map(spec=>spec.id),
+  "04 preserves the four casualties required to capture the right position");
 assert.ok(FIRST_LEVEL_STAGE_CLEARED_ENEMIES[4].every(id=>!MISSION_ENCOUNTERS.front.some(spec=>spec.id===id)),
   "04 debug start retains the full front line observed at the continuous transition");
 console.log("ok stage 04 reconstructs the post-03 battlefield instead of a full fresh roster");
@@ -417,19 +356,26 @@ console.log("ok all mission gates require recorded gameplay facts and restore ex
 }
 {
   const facts=new Map(),calls=[];
-  const r={column:{zhou:{id:"Zhou",health:100,visible:false}},Has:id=>facts.has(id),Record:(id,detail)=>facts.set(id,detail),
-    Point:p=>p,MoveActor:()=>calls.push("move"),OnPlayerDown:()=>calls.push("fail"),MissionFailure:id=>calls.push(id),
-    emplacement:{NpcVacate:()=>calls.push("vacate")},ai:{SetStance(){},Remove:()=>calls.push("remove")}};
+  const yaowa={id:2,alive:true,position:{...S.leftSeat}};
+  const zhou={id:54,alive:true,health:80,position:{...S.leftSeat}};
+  const r={opening:{zhou},column:{zhou:{health:100,visible:false}},squadRoutes:new Map(),
+    companion:{Handle:()=>yaowa},Has:id=>facts.has(id),Record:(id,d)=>facts.set(id,d),
+    Defend:()=>calls.push("defend"),OnPlayerDown:()=>calls.push("fail"),MissionFailure:id=>calls.push(id),
+    emplacement:{NpcVacate:()=>calls.push("vacate")},ai:{Remove:()=>calls.push("remove")}};
+  const battle=new FirstLevelFrontBattle(r);r.frontBattle=battle;
   const opening=new FirstLevelOpening(r);
-  opening.zhou={id:54,alive:true,health:80,lastFire:5,position:{...OPENING.zhouGunSeat},yaw:0};
   opening.UpdateZhou();
-  assert.ok(calls.includes("move")&&!facts.has("zhouGunWounded"),"an early actual wound makes Zhou leave the gun, not wait under fire for later gates");
-  opening.zhou.position={...OPENING.zhouRest};opening.UpdateZhou();
-  assert.equal(r.column.zhou.health,80,"representation transfer preserves actual injury");
-  assert.ok(facts.get("zhouGunWounded").alive&&calls.includes("remove"));
-  facts.clear();calls.length=0;opening.zhou.alive=false;opening.zhou.health=0;
+  assert.ok(calls.includes("defend")&&!facts.has("zhouGunWounded"),"prior wound holds until the first batch is safe");
+  facts.set("rifleWithdrawalResolved",true);
+  battle.Walk=()=>false;opening.UpdateZhou();
+  assert.ok(calls.includes("vacate")&&!facts.has("zhouGunWounded"),"leaving the gun cannot substitute for actual arrival");
+  assert.deepEqual(battle.walks.get(zhou.id).route.at(-1),P.collection.zhouWall);
+  zhou.position={...P.collection.zhouWall};battle.Walk=()=>true;opening.UpdateZhou();
+  assert.equal(r.column.zhou.health,80,"representation transfer preserves the established wound");
+  assert.ok(facts.get("zhouGunWounded").priorWound&&calls.includes("remove"));
+  facts.delete("zhouGunWounded");calls.length=0;zhou.alive=false;zhou.health=0;
   opening.UpdateZhou();
-  assert.ok(facts.has("zhouGunKilled")&&!facts.has("zhouGunWounded")&&calls.includes("fail"),"actual death fails the mission instead of becoming a living litter");
+  assert.ok(facts.has("zhouGunKilled")&&!facts.has("zhouGunWounded")&&calls.includes("fail"));
 }
 {
   const supply=MISSION_SUPPLIES.find(spec=>spec.id==="Front"),radius=.34;
@@ -453,21 +399,8 @@ console.log("ok all mission gates require recorded gameplay facts and restore ex
     }
   }
 }
-{
-  const facts=new Set(['frontRifleDefense','rifleWithdrawalResolved']),shells=[];
-  const r={time:100,Has:id=>facts.has(id),Record:id=>facts.add(id),Point:(p,y=0)=>({...p,y}),
-    RespondToGrenade:()=>false,RespondToContact:()=>false,Defend(){},
-    combat:{FireShell:(from,to,options)=>shells.push({from,to,options})}};
-  const opening=new FirstLevelOpening(r);
-  opening.zhou={id:54,alive:true,health:100,lastFire:5,position:{...OPENING.zhouGunSeat},yaw:0};
-  opening.UpdateZhou();shells[0].options.OnImpact();
-  assert.ok(facts.has('zhouGunBlast')&&!facts.has('zhouGunWounded'),'a harmless physical impact cannot grant the wound');
-  r.time+=OPENING.zhouShell.retryAfterS-.01;opening.UpdateZhou();assert.equal(shells.length,1);
-  r.time+=.02;opening.zhou.position.x+=1;opening.UpdateZhou();assert.equal(shells.length,2);
-  assert.notDeepEqual(shells[1].from,shells[0].from,'a missed round is corrected to a steeper source');
-  assert.equal(shells[1].to.x,opening.zhou.position.x+OPENING.zhouShell.offsetX,'correction observes the moving gunner');
-  assert.equal(opening.zhou.health,100);assert.ok(!facts.has('zhouGunWounded'),'retry neither injects damage nor bypasses the gate');
-}
+// Zhou's former scripted shell wound is retired: he arrives bandaged in 03.
+assert.ok(!fs.readFileSync(new URL("./Script_FirstLevelOpening.mjs",import.meta.url),"utf8").includes("combat.FireShell"));
 const terrain = CreateP012Terrain(MISSION_LAYOUT);
 for (const trench of MISSION_TERRAIN.trenches) assert.ok(trench.depth >= 1.83, trench.id + " full-cover excavation depth");
 for (const [x,z] of [[-24,-53],[-45,30],[-10,-124]]) {
@@ -540,9 +473,8 @@ assert.ok(Object.keys(assaultLanes).length>=24,"most front riflemen and every wa
 // 接防班（UpdateRelief）真正要走的那几条：契约路线 collectionReturn 反向的前五点，
 // 到前沿交通壕口之后沿 z≈-123 横到各自阵位。空间包把沿线几何建完之后这几条
 // 重新进净空检查 —— 第一次接回来就量出接防班正面穿过 FrontTraverseCover 那排掩体。
-const reliefApproach=[...MISSION_STAGE_ROUTES.collectionReturn].reverse().slice(0,5);
 const reliefRoutes=Object.fromEntries(P.reliefPositions.map((post,i)=>
-  ["Relief"+i,[...reliefApproach,{x:post.x,z:-123},post]]));
+  ["Relief"+i,[...MISSION_FRONT_COLLECTION_ROUTE,...(i?[post]:S.leftRoute.slice(1))]]));
 for (const [name, route] of Object.entries({ ...MISSION_ROUTES, ...Object.fromEntries(MISSION_TERRAIN.trenches.filter(t=>t.role).map(t=>[t.id,t.points])), ...tacticalRoutes, ...assaultLanes, ...reserveLanes, ...reliefRoutes, ...Object.fromEntries(P.guardWithdrawalRoutes.map((route,i)=>["Guard"+i,route])) })) {
   for (let i = 1; i < route.length; i++) {
     const a = route[i - 1],
@@ -602,7 +534,7 @@ for (const [name, route] of Object.entries({ ...MISSION_ROUTES, ...Object.fromEn
   console.log("ok both bunker lanes stay walkable in every scenario state");
 }
 const frontCover=MISSION_LAYOUT.blocks.filter(block=>block.id.startsWith("FrontCover"));
-for(const wall of [...["FrontTraverseBlastScreen","BundleParapet","FlankParapet","MachineGunSideCover-1","MachineGunSideCover1"]
+for(const wall of [...["RightNestRearWall","RightNestEastWall","SupplyRoadScreen","GuardEastFlank"]
   .map(id=>{const found=MISSION_LAYOUT.blocks.find(b=>b.id===id);assert.ok(found,"hand-built cover survives generic route cleanup: "+id);return found;}),...frontCover]){
   for(const x of [-1,0,1])for(const z of [-1,0,1])assert.ok(wall.y-wall.h/2<=SampleMissionTerrain(wall.x+x*wall.w/2,wall.z+z*wall.d/2),"cover foundations follow the slope: "+wall.id);
 }
@@ -663,12 +595,12 @@ console.log("ok authored capsule routes clear walls, crates and gun supports");
   // new banks whichever target it is tracking. Half hull width is 1.2 m: the collider in
   // Script_FirstLevelMissionView is h=[1.075,1.28,2.15] and it drives along its own length.
   // (FieldRuin1 already stands in the default advance; that predates this pass and is left alone.)
-  for(const destinationX of [R.tankPursuitBounds.minX,36,R.tankPursuitBounds.maxX]){
-    const from=P.tankStart,to={x:destinationX,z:R.tankFirstFireZ},length=Math.hypot(to.x-from.x,to.z-from.z);
+  for(let index=1;index<=S.tankEndIndex;index++){
+    const from=S.road[index-1],to=S.road[index],length=Math.hypot(to.x-from.x,to.z-from.z);
     for(let travelled=0;travelled<=length;travelled+=.25){
       const t=travelled/length,x=from.x+(to.x-from.x)*t,z=from.z+(to.z-from.z)*t;
       for(const block of frontCover)assert.ok(Math.abs(block.x-x)>=block.w/2+1.2||Math.abs(block.z-z)>=block.d/2+1.2,
-        `${block.id} stands in the tank advance to x=${destinationX}`);
+        `${block.id} stands in tank road segment ${index}`);
     }
   }
 }
@@ -989,10 +921,13 @@ assert.equal(new Set(MISSION_DIALOGUE.map((cue) => cue.id)).size, MISSION_DIALOG
 }
 
 {
-  const routes=R.squadRouteLanesM.map((_,slot)=>MissionSquadRoute(MISSION_ROUTES.support,slot));
-  assert.ok(routes.every(route=>route.length>MISSION_ROUTES.support.length*3));
+  // The front director owns the narrow capture bends. Generic march lanes still
+  // apply to the common collection approach; their physical clearance stays covered.
+  const guideRoute=MISSION_FRONT_COLLECTION_ROUTE;
+  const routes=R.squadRouteLanesM.map((_,slot)=>MissionSquadRoute(guideRoute,slot));
+  assert.ok(routes.every(route=>route.length>guideRoute.length*3));
   for(const route of routes){
-    assert.deepEqual(route.at(-1),MISSION_ROUTES.support.at(-1),"firing-post approach retains the final authored point");
+    assert.deepEqual(route.at(-1),guideRoute.at(-1),"collection approach retains the final authored point");
     for(const p of route) {
       assert.ok(Number.isFinite(terrain.SampleHeight(p.x,p.z)));
       for(const box of MISSION_LAYOUT.blocks){
@@ -1021,25 +956,19 @@ console.log("ok individual trench lanes, rounded corners, safe spacing and varia
     R.openingEnemyBudget,"finite opening/front roster agrees with budget; no replacement waves");
   assert.equal(MISSION_ENCOUNTERS.machineGun.length,12,"the gun handover owns a separate finite attack");
   assert.ok(MISSION_ENCOUNTERS.machineGun.every(actor=>FrontAssaultLane(actor.x,actor.z).length>=3),"machine-gun attackers cross multiple physical bounds");
-  assert.equal(MISSION_ENCOUNTERS.approach.length,12,"the rebuilt communication-trench approach has a finite enemy screen");
-  const attackers=MISSION_ENCOUNTERS.approach.filter(s=>!s.hold);
-  assert.ok(new Set(attackers.map(s=>s.id)).size===attackers.length,"each advancing actor has a persistent unique identity");
-  assert.equal(new Set(MISSION_ENCOUNTERS.approach.map(s=>s.team)).size,2,"north and north-east sectors keep grenade cooldowns per squad");
-  assert.ok(attackers.every(s=>MISSION_TACTICS[s.id]?.near && MISSION_TACTICS[s.id].points.length>=2),"mobile attackers have local activation and physical approach bounds");
-  assert.ok(P.guardWithdrawalRoutes.every(route=>route[0].z<R.approachFireSector.minZ&&route[1].z<R.approachFireSector.minZ
-    &&route[2].z>=R.approachFireSector.minZ),
-  "the approach screen excludes the waiting line and sheltered bound, then begins at the exposed withdrawal bound");
-  assert.ok(R.enemyGrenades>0,"approach riflemen carry finite grenades");
-  assert.ok(R.approachContactM<26 && R.approachTacticalRadiusM>=R.approachContactM,"close contact hands movement back to shared combat and grenade AI");
-  assert.ok(MISSION_ENCOUNTERS.approach.every(actor=>actor.z<R.tankStopZ&&actor.x>=-20),
-    "every approach actor now enters from north or north-east of the live front route");
+  assert.equal(MISSION_ENCOUNTERS.approach.length,4,"the captured right position has four finite defenders");
+  assert.ok(MISSION_ENCOUNTERS.approach.every(a=>a.hold),"capture defenders hold their real posts");
+  assert.ok(P.guardWithdrawalRoutes.every(route=>route.some(p=>p.x===S.gap.x&&p.z===S.gap.z)),
+    "every guard uses the same authored shallow breach");
+  assert.ok(R.enemyGrenades>0,"the finite enemy roster keeps its real grenades");
   assert.ok(R.frontEngageDistanceM>OPENING.frontReachRadiusM&&R.frontEngageDistanceM<35,"the finite main assault begins at the last trench bend, before the player reaches the firing post");
   assert.equal(new Set(Object.values(MISSION_ENCOUNTERS).flat().map(spec=>spec.id)).size,Object.values(MISSION_ENCOUNTERS).flat().length);
   assert.ok(MISSION_STAGES.find(s=>s.id==="Support").requirements.includes("frontRifleDefense"));
   assert.ok(FIRST_LEVEL_MISSION_PHASE.whitebox.actorCapacity>=R.openingEnemyBudget+40,"small graphics scale leaves capacity for real friendlies and dormant village");
   for(const point of FRONT_BREACHES){
     const h=SampleMissionTerrain(point.x,point.z);
-    assert.ok(h> -2 && h<-.8,"the breached sap remains a walkable excavated passage below surface fire: "+h);
+    const depth=SampleMissionNaturalHeight(point.x,point.z)-h;
+    assert.ok(depth>=0&&depth<=point.depth+.001,"the damaged sap respects its shallow depth below natural soil: "+depth);
   }
   // 01 掩蔽部门外的行刑组：两个动手的、两个跟进的，全都在门外看得见的那一小片里。
   assert.equal(MISSION_ENCOUNTERS.bunkerAssault.length,4,"the bunker door has its finite execution party");

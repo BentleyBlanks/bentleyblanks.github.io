@@ -158,7 +158,7 @@ export const MISSION_TUNING = Object.freeze({
   // 2026.09.19 重构后的开场/前沿名单：掩蔽部门外 4 ＋ 十二人接近屏 ＋ 十二人前沿 ＋
   // 十二人冲机枪位 ＋ 四名战车护卫 = 44。每一份名单只投一次、不复活、不补波。
   // （旧口径 67 里的 12 名车站地面 + 4 名进沟 + 5 名追到掩蔽处随军列开场一起下线。）
-  openingEnemyBudget:44,
+  openingEnemyBudget:32,
   // Route attackers cover the exposed communication-trench approach; the separate front force
   // owns the gun line. z=-145 is the defenders' waiting line and z=-140 is its last sheltered
   // bound, so neither belongs to this screen. The first exposed withdrawal bound begins near -137.
@@ -177,7 +177,7 @@ export const MISSION_TUNING = Object.freeze({
   frontCrowdCellM:.045,
   guardPairSize:2,
   guardCrossingGapS:2,
-  guardSafeRouteIndex:3,
+  guardSafeRouteIndex:5,
   // Finite casualty replacements count successful spawns and include queued men in the live cap.
   waveFirstDelayS:18,
   waveIntervalS:26,
@@ -204,11 +204,11 @@ export const MISSION_TUNING = Object.freeze({
   // previous safe point remains valid; once sight is broken, the same caller can
   // replace it normally.
   checkpointUnsafeSaveHealth:45,
-  tankStopZ: -123,
+  tankStopZ: -146,
   tankShellIntervalS: 13,
   tankShellScatterM: 2.6,
   tankCannonMinRangeM:12,
-  tankFirstFireZ:-150,
+  tankFirstFireZ:-153,
   tankNestAimOffsetZ:-1,
   tankNestAimRiseM:.3,
   tankShellSpeedMps:180,

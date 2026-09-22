@@ -25,7 +25,8 @@ import { MISSION_LEADER_STAGES, MISSION_GUIDE_TRANSFERS } from "./Data_FirstLeve
 const Read = (name) => fs.readFileSync(new URL(name, import.meta.url), "utf8");
 const contract = Read("./docs/Data_FirstLevelRebuild20260919Contract.md");
 const previousSource = Read("./docs/Data_FirstLevelRebuildSource20260919.md");
-const source = Read("./docs/Data_FirstLevelOpeningSource20260921.md") + previousSource.slice(previousSource.indexOf("# 04｜"));
+const openingSource=Read("./docs/Data_FirstLevelOpeningSource20260921.md");
+const source=openingSource.slice(0,openingSource.indexOf("# 03｜"))+Read("./docs/Data_FirstLevelFrontSource20260922.md")+previousSource.slice(previousSource.indexOf("# 06｜"));
 const story = MISSION_DIALOGUE.filter((cue) => !cue.guidance);
 const guide = MISSION_DIALOGUE.filter((cue) => cue.guidance);
 const byId = new Map(MISSION_DIALOGUE.map((cue) => [cue.id, cue]));
@@ -161,7 +162,7 @@ console.log(`ok MISSION_VOICE_FACTS 的 ${Object.keys(MISSION_VOICE_FACTS).lengt
     "./Script_FirstLevelBridge.mjs", "./Script_FirstLevelNightGate.mjs",
     // 第二波 Front 包（公开阶段 1–7）：01/02 的门外演出与 03–07 的对白落点。
     "./Script_OpeningStoryboards.mjs", "./Script_FirstLevelCollection.mjs",
-    "./Script_FirstLevelFrontShow.mjs",
+    "./Script_FirstLevelFrontShow.mjs", "./Script_FirstLevelFrontBattle.mjs",
   ];
   const referenced = new Map();
   for (const name of RUNTIME_SOURCES) {

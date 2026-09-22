@@ -47,6 +47,14 @@ export const MISSION_TRENCH_NETWORK = Object.freeze({
       source: "Data_FirstLevelMissionTrenches（自有点；与 OPENING.frontPosts / zhouGunSeat 同一条线）",
       routeBound: false,
     },
+    ...[
+      ["RightApproach",Sortie.approach,1.85],
+      ["RightRear",Sortie.rearRoute,1.85],
+      ["RoadAttack",Sortie.attackRoute,1.85],
+      ["LeftGunAccess",Sortie.leftRoute,1.85],
+      ["GuardBackslope",[{x:-24,z:-148},{x:14,z:-148}],1.85],
+      ["GuardWithdrawal",Sortie.guardRoute,1.85],
+    ].map(([id,points,depth])=>({id,preset:"communication",role:null,points,depth,floorW:3.8,bankW:1.6,bermH:.15,routeBound:true,source:"Data_FirstLevelFrontRoute"})),
     {
       id: "BundleApproach", preset: "communication", role: null,
       points: Sortie.route,

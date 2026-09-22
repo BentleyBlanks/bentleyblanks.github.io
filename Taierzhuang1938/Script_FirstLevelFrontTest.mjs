@@ -44,7 +44,8 @@ const Cue = (id) => MISSION_DIALOGUE.find((cue) => cue.id === id);
   assert.ok(opening.includes('r.Record("luoRescueComplete")'));
   const support=MISSION_STAGES.find(stage=>stage.id==="Support");
   assert.ok(JSON.stringify(support).includes("rifleWithdrawalResolved"));
-  assert.ok(Read("Script_FirstLevelMissionRuntime.mjs").includes('blocker.suppression>=R.threatSuppression'));
+  assert.ok(Read("Script_FirstLevelMissionRuntime.mjs").includes('actor.suppression >= R.threatSuppression'));
+  assert.ok(Read("Script_FirstLevelFrontBattle.mjs").includes('r.Threatens(p,null,B.guardHeightM,B.blockadeRangeM)'));
 }
 
 // ---------------------------------------------------------------------------
@@ -275,9 +276,9 @@ const Cue = (id) => MISSION_DIALOGUE.find((cue) => cue.id === id);
     Trapped: ["bunkerCollapsed", "captivesKilled", "doorSearchStarted"],
     BunkerRescue: ["rescueCallHeard", "luoRescueComplete", "rifleRecovered"],
     RearTrench: ["rearTrenchEntered", "cornerReached", "collectionPointSeen", "supportOrdersHeard"],
-    Support: ["frontReached", "frontContact", "frontRifleDefense", "rifleWithdrawalResolved"],
-    MachineGun: ["zhouGunWounded", "frontAttackRepelled", "guardWithdrawalResolved", "tankBlocksExit", "bundleOrderHeard"],
-    Tank: ["bundleRouteTraversed", "bundleTaken", "tankImmobilized", "lastGuardsWithdrawn", "reliefInPosition"],
+    Support: ["frontReached", "rightNestCaptured", "frontContact", "frontRifleDefense", "rifleWithdrawalResolved", "zhouGunWounded", "tankPreviewed"],
+    MachineGun: ["tankPositionPressured", "remainingGuardsGathered", "tankBlocksExit", "rightRearReached", "bundleOrderHeard"],
+    Tank: ["bundleRouteTraversed", "bundleTaken", "bundleReturned", "attackPositionReached", "tankImmobilized", "tankFireDisabled", "attackRetreated", "lastGuardsWithdrawn", "frontDisengaged", "reliefInPosition", "collectionReturned"],
     Orders: ["ordersReached", "volunteerHeard", "lightShared", "zhouOnLitter", "columnDeparted"],
     South: ["southWhisperHeard", "villageMouthReached", "mainStreetPointed"],
   };

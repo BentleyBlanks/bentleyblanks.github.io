@@ -111,17 +111,5 @@ export async function DriveOpening(ctx){
   for(const fact of ["rearTrenchEntered","cornerReached","collectionPointSeen","supportOrdersHeard"])assert.ok(rear.facts.includes(fact),fact);
   for(const cue of ["TrenchCurse","CornerCheck","SupportOrder"])assert.ok(rear.voice.played.includes(cue),cue);
   assert.ok(rear.front.collection.litters>=4&&rear.front.collection.people>=8,"casualty collection is present");
-  await Route([...MISSION_STAGE_ROUTES.rearTrench.slice(5),...Routes.support.slice(-1)],"OpeningSupportApproach",
-    {fight:true,crawl:true,stance:"crouch",rejoinRoute:[...MISSION_STAGE_ROUTES.rearTrench,...Routes.support.slice(-1)]});
-  await Route([{x:5,z:-123},{x:0,z:-123},{x:0,z:-127.4}],"OpeningFiringStep",{stance:"stand"});
-  await page.evaluate(()=>{window.MissionInputDriver.priorityTarget="FrontGunner";});
-  const support=await WaitStage("MachineGun",120,{fight:true});
-  await page.evaluate(()=>{window.MissionInputDriver.priorityTarget=null;});
-  await page.evaluate(()=>window.Tengxian.StepFrames(2,1/60,true));
-  await page.screenshot({path:path.join(output,"Scene_Opening_DefendersSafe.png")});
-  for(const fact of ["frontRifleDefense","rifleWithdrawalResolved"])assert.ok(support.mission.facts.includes(fact),fact);
-  const survivors=support.mission.guards.slice(0,2).filter(a=>a.alive);
-  assert.ok(survivors.length>0&&survivors.every(a=>a.safe),"every surviving first-wave defender physically reaches safety");
-  assert.deepEqual(ctx.errors,[]);
-  console.log("ok 01–03 normal progression, F pickup, direct-fire suppression and actual withdrawal");
+  console.log("ok 01–02 normal progression to Support");
 }

@@ -1,39 +1,34 @@
-// User revision, 2026-09-14: the northern supply house is reached under tank fire.
-// Pure shared geometry: terrain, mission, guidance and collision audits read this route.
-const Point=(x,z)=>({x,z});
+// Notion 2026-09-22: one breach, three independent routes. X east, Z south, metres.
+const Point=(x,z)=>Object.freeze({x,z});
 export const FRONT_SORTIE=Object.freeze({
-  route:[Point(6,-124),Point(15,-111),Point(25,-110),Point(30,-117),
-    Point(49,-117),Point(49,-135),Point(55,-135),Point(55,-152),
-    Point(49,-152),Point(49,-170),Point(55,-170),Point(55,-184),
-    Point(45,-184),Point(45,-203),Point(40,-203),Point(40,-213)],
-  house:Point(40,-214),bundle:Point(41.8,-215),keeper:Point(37.8,-215),
-  throw:Point(30,-117),
-  // 2026.09.19 契约 §3：接令点迁到背坡伤员集结处（与 MISSION_STAGE_ANCHORS.collection
-  // 同一片场坪），不再是前沿沟里的 (14,-110)。键名不变。
-  orders:Point(-34,-99),
-  crawl:[{id:'First',x:49,z:-127,w:4.6,d:5},{id:'Second',x:55,z:-177,w:4.6,d:5}],
-  crawlClearanceM:.96, crawlRoofM:1.1, crawlRadiusM:3.8,crawlEntryMarginM:.75,
-  checkpointRadiusM:3.2, supplierRangeM:7, leaderArrivalM:4,leaderWaitM:12,leaderCrawlMps:1.1,
-  trenchBottomM:3.6,trenchDepthM:2,trenchBankM:1.3,
-  // Finite defenders hold two bends, separate from the frontal attack at 04.
-  enemies:[{id:'BundleBendA',x:61,z:-155,hold:true},{id:'BundleBendB',x:62,z:-188,hold:true},
-    {id:'BundleHouseGuard',x:34,z:-204,hold:true}],
-  // At the authored throw point (30,-117), a tank at road x=35 and this six
-  // metre lead is 7.8 m away: inside the covered bundle reach while still
-  // physically blocking the trench exit at tankSouthZ.
-  tankRoadX:35,tankNorthZ:-194,tankSouthZ:-123,tankLeadM:6,
+  approach:[Point(6,-124),Point(14,-116),Point(22,-119),Point(22,-129),Point(22,-138),Point(27,-141)],
+  nest:Point(27,-142), seat:Point(27,-141), rear:Point(27,-127),
+  rearRoute:[Point(27,-141),Point(26,-138),Point(22,-138),Point(22,-129),Point(27,-127)],
+  route:[Point(27,-127),Point(27,-119),Point(29,-101),Point(34,-101),Point(34,-108)],
+  attackRoute:[Point(27,-127),Point(35,-127),Point(38,-134),Point(39,-140)],
+  house:Point(34,-110),bundle:Point(35.5,-110),keeper:Point(31.8,-111),
+  throw:Point(39,-140),orders:Point(-34,-99),
+  leftGun:Point(-31,-151),leftSeat:Point(-31,-150),
+  leftRoute:[Point(6,-124),Point(-20,-124),Point(-28,-133),Point(-31,-141),Point(-31,-150)],
+  gap:Point(-8,-139),lastCover:Point(-8,-148),
+  guardRoute:[Point(-8,-148),Point(-8,-143),Point(-8,-139),Point(-8,-132),Point(-17,-127),Point(-17,-124)],
+  // Exposure at the damaged lip rewards crouching; there is no artificial ceiling.
+  crawl:[],damagedLip:Point(27,-119),
+  crawlClearanceM:.96,crawlRoofM:1.1,crawlRadiusM:3.8,crawlEntryMarginM:.75,
+  checkpointRadiusM:3.2,supplierRangeM:7,leaderArrivalM:3,leaderWaitM:10,leaderCrawlMps:1.1,
+  trenchBottomM:3.8,trenchDepthM:1.85,trenchBankM:1.6,
+  enemies:[{id:'BundleBendA',x:44,z:-125,hold:false},{id:'BundleBendB',x:44,z:-120,hold:false}],
+  // Fixed road: progress never follows the player backwards.
+  road:[Point(65,-200),Point(59,-181),Point(50,-164),Point(47,-153),Point(44,-146),Point(44,-145),Point(47,-116)],
+  tankPreviewIndex:1,tankPressureIndex:3,tankBlockIndex:4,tankEndIndex:5,
+  tankRoadX:44,tankNorthZ:-200,tankSouthZ:-140,tankLeadM:6,
   retreatCasualtyFraction:.5,retreatSuppression:.72,retreatSuppressionS:3,
   retreatDistanceM:12,retreatArrivalM:2,
 });
-// 旧的「向南」黑屏转场随 2026.09.19 重构下线（07 改成真走一段）。
-// 关尾夜行军的字幕走 Data_Text_FirstLevel + MISSION_TUNING.nightTransition。
-
-// An analytic terrain floor can snap a crouched capsule into a low ceiling after
-// Rapier slides it downwards. Stop at the authored entrance before that overlap.
 export function SortieCrawlBlocked(position,next,stance){
   if(stance==='prone')return false;
   return FRONT_SORTIE.crawl.some(c=>{
-    const Inside=p=>Math.abs(p.x-c.x)<c.w/2 && Math.abs(p.z-c.z)<c.d/2+FRONT_SORTIE.crawlEntryMarginM;
-    return Inside(next) && (!Inside(position)||Math.abs(next.z-c.z)<Math.abs(position.z-c.z));
+    const Inside=p=>Math.abs(p.x-c.x)<c.w/2&&Math.abs(p.z-c.z)<c.d/2+FRONT_SORTIE.crawlEntryMarginM;
+    return Inside(next)&&(!Inside(position)||Math.abs(next.z-c.z)<Math.abs(position.z-c.z));
   });
 }

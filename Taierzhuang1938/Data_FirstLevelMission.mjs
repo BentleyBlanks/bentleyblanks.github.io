@@ -38,23 +38,23 @@ export const MISSION_STAGES = Object.freeze([
   ),
   Stage(
     "Support",
-    "沿交通壕支援前沿守军，掩护他们撤回。",
+    "跟随班长，夺取右侧机枪阵位。",
     A.front,
-    ["frontReached", "frontContact", "frontRifleDefense", "rifleWithdrawalResolved"],
+    ["frontReached", "rightNestCaptured", "frontContact", "frontRifleDefense", "rifleWithdrawalResolved", "zhouGunWounded", "tankPreviewed"],
     null,
   ),
   Stage(
     "MachineGun",
-    "接替老周的火力，击退前方日军。",
+    "掩护后续守军，留意右前方道路。",
     A.gun,
-    ["zhouGunWounded", "frontAttackRepelled", "guardWithdrawalResolved", "tankBlocksExit", "bundleOrderHeard"],
-    "TakeOverGun",
+    ["tankPositionPressured", "remainingGuardsGathered", "tankBlocksExit", "rightRearReached", "bundleOrderHeard"],
+    null,
   ),
   Stage(
     "Tank",
-    "跟班长穿过侧沟领集束弹，炸断战车履带。",
+    "沿后侧支沟取得集束弹，解除撤口封锁。",
     A.bundle,
-    ["bundleRouteTraversed", "bundleTaken", "tankImmobilized", "lastGuardsWithdrawn", "reliefInPosition"],
+    ["bundleRouteTraversed", "bundleTaken", "bundleReturned", "attackPositionReached", "tankImmobilized", "tankFireDisabled", "attackRetreated", "lastGuardsWithdrawn", "frontDisengaged", "reliefInPosition", "collectionReturned"],
     "BundleGo",
   ),
   Stage(
@@ -176,12 +176,7 @@ export const MISSION_ENCOUNTERS = Object.freeze({
   front: [...FRONT_FIELD_MEN,...FRONT_RESERVES],
   machineGun: FRONT_MACHINE_GUN_ATTACK,
   bundleApproach: Sortie.enemies,
-  tank: [
-    { id: "TankEscortA", x: 24, z: -145 },
-    { id: "TankEscortB", x: 28, z: -152 },
-    { id: "FlankA", x: 58, z: -139 },
-    { id: "FlankB", x: 63, z: -144 },
-  ],
+  tank: [{id:"TankEscortA",x:53,z:-180},{id:"TankEscortB",x:55,z:-176}],
   village: [
     { id: "VillageGunner", x: 43, z: 8, weapon: "Type11", hold: true },
     { id: "VillageCorner", x: 54, z: -12 },
@@ -355,3 +350,8 @@ export const FIRST_LEVEL_MISSION_PHASE = Object.freeze({
     activities: { arrivalGuideStart: { x: -76, z: 71 } },
   },
 });
+
+export const FRONT_BATTLE_OBJECTIVES=Object.freeze({capture:"跟随班长，夺取右侧机枪阵位。",coverFirst:"掩护第一批守军撤入交通壕。",
+    coverRest:"掩护后续守军，留意右前方道路。",rear:"跟随班长，退到阵位后墙。",
+    supply:"沿后侧支沟取得集束弹。",return:"沿原支沟返回阵位后侧岔口。",attack:"跟随班长接近战车，解除撤口封锁。",
+    retreat:"退回支沟遮挡，掩护剩余守军撤回。",disengage:"沿后交通壕撤离，随班长返回伤员集结处。"});

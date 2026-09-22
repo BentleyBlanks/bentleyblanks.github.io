@@ -3,6 +3,7 @@
 //
 // 口径：全程只用正常输入（WASD / F / 鼠标 / H），不改任务事实、不瞬移、不发子弹外挂。
 // 调试跳转只在 --stage-jumps 下生效，且每次跳转前上一段必须真的走到了下一个公开阶段。
+import { DriveFrontBattle } from "./Script_FirstLevelCampaignFrontBattle.mjs";
 import { DriveOpening } from "./Script_FirstLevelCampaignOpening.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
@@ -43,311 +44,20 @@ export async function Drive(ctx) {
     await page.evaluate((view) => Object.assign(window.Tengxian.player, view), view);
   }
 
-  await DriveOpening(ctx);
+  if(ctx.stageFrom===1)await DriveOpening(ctx);
+  await DriveFrontBattle(ctx);
   if(ctx.stageTo===3)return;
-
-  // Keep the real continuous 03→04 battlefield as evidence for the stage-jump
-  // reconstruction. A debug preset must match observed casualties and assault
-  // state; an arbitrary percentage would only tune the test's difficulty.
-  const continuous04 = await page.evaluate(() => {
-    const r=window.Tengxian.Debug.FirstLevelMissionRuntime();
-    const actors=[...r.enemies].filter(([,a])=>["front","approach"].includes(a.missionEncounter))
-      .map(([id,a])=>({id,encounter:a.missionEncounter,alive:a.alive,state:a.state,order:a.order,
-        standby:!!a.missionFrontStandby,reserve:!!a.missionReserve,
-        position:{x:+a.position.x.toFixed(2),z:+a.position.z.toFixed(2)},
-        assault:a.missionAssault?{index:a.missionAssault.index,hold:+(a.missionAssault.hold||0).toFixed(2)}:null}));
-    return {time:r.time,stage:r.flow.stage.id,
-      alive:Object.fromEntries(["front","approach"].map(encounter=>[encounter,
-        actors.filter(a=>a.encounter===encounter&&a.alive).length])),actors};
-  });
-  await fs.writeFile(path.join(shots,"Data_Stage04Continuous.json"),JSON.stringify(continuous04,null,2));
-  console.log("STAGE04_CONTINUOUS",JSON.stringify({alive:continuous04.alive,
-    frontDead:continuous04.actors.filter(a=>a.encounter==="front"&&!a.alive).map(a=>a.id),
-    approachDead:continuous04.actors.filter(a=>a.encounter==="approach"&&!a.alive).map(a=>a.id)}));
-
-  // =========================================================================
-  // 04 接替火力，战车压口。机枪是可选的，但这一趟真的坐上去打。
-  // =========================================================================
-  await JumpStage(4);
-  // 04 不再触发关中过场《空地上的三个人》（契约 §2）。
-  assert.equal(await page.evaluate(() => window.Tengxian.state.cutscene || null), null,
-    "04 不由任务触发 CS_MachineGunCaptives");
-  // 上枪位之前不绕去补给箱：在那儿等两轮冷却＝站在沟里挨打（2026-09-20 实测当场阵亡），
-  // 而且把弹板补到上限之后 05 的「前沿补给箱真的补了弹」就再也涨不动了。
-  // 先等老周因伤退出枪位，再上去接替 —— 04 的拍子就是这么写的（TakeOverGun）。
-  // 抢在他前头坐上枪座，交接那一拍演不完，zhouGunWounded 记不下来，04 永远过不去：
-  // 2026-09-20 实测有一趟其余四条全记下了，就剩这一条，人在枪位上打到阵亡。
-  const zhouOff = await page.evaluate(() => {
-    const g = window.Tengxian;
-    for (let i = 0; i < 60 * 60 && !g.Debug.FirstLevelMission().facts.includes("zhouGunWounded"); i++) {
-      if (!window.MissionInputDriver.EvadeGrenade()) {
-        const foe = window.MissionInputDriver.Target(60);
-        if (foe) window.MissionInputDriver.Shoot(foe);
-        else {
-          g.Debug.Mouse(0, false); g.Debug.Mouse(2, false);
-          if (g.state.activeSlot === "melee") g.Debug.Key("Digit1");
-          if (g.state.ammo === 0) g.Debug.Key("KeyR");
-        }
-        // 打一段、缩回墙垛后面一段，和 WaitStage 的 cover 一个口径。
-        if ((g.player.stance === "crouch") !== (g.ai.time % 5 < 2)) g.Debug.Key("KeyC");
-      }
-      if (g.player.bleeding && g.player.health < 85) g.Debug.Key("KeyB");
-      g.StepFrames(1, 1 / 60, false);
-      if (!g.player.alive) break;
-    }
-    g.Debug.Mouse(0, false); g.Debug.Mouse(2, false);
-    const m = g.Debug.FirstLevelMission();
-    return { wounded: m.facts.includes("zhouGunWounded"), health: g.player.health, alive: g.player.alive };
-  });
-  console.log("ZHOU_OFF_GUN", JSON.stringify(zhouOff));
-  // 枪座就在三米外的沟里：这一小段不开火（fight 的 90 m 口径会让人站着对射、原地不动）。
-  await Route([{ x: 0, z: -124 }, { x: 0, z: -127.4 }], "MachineGunSeat", { stance: "crouch" });
-  await Interact();
-  // 一下按不上就再按几下。枪座的交互半径不大，走到位那一帧人还在往前挪，
-  // 按早了就落空 —— 落空之后这一段会变成「站在开阔地上用步枪对着四十个人打」。
-  let mounted = await page.evaluate(() => window.Tengxian.emplacement.Mounted);
-  for (let tries = 0; tries < 4 && !mounted; tries++) {
-    await page.evaluate(() => window.Tengxian.StepFrames(20, 1 / 60, false));
-    await Interact();
-    mounted = await page.evaluate(() => window.Tengxian.emplacement.Mounted);
-  }
-  console.log("MACHINE_GUN_MOUNTED", mounted);
-  await Capture("MachineGun");
-  await page.screenshot({ path: path.join(shots, "Scene_MachineGun.png") });
-  for (let chunk = 0; chunk < 40; chunk++) {
-    const defense = await page.evaluate(({healHealth,remountHealth}) => {
-      const g = window.Tengxian;
-      for (let i = 0; i < 600; i++) {
-        const p = g.player.position, gun = g.emplacement.Emplacement("MissionGun");
-        if (g.combat.GrenadeThreats(p).length && g.emplacement.Mounted) {
-          g.Debug.Mouse(0, false); g.Debug.Key("KeyF", true); g.Debug.Key("KeyF", false);
-        }
-        // A real player does not stay welded to the gun while bleeding out.
-        // Leave it, crouch behind its wall, dress, and wait for the ordinary
-        // bandage regeneration before exposing the torso again.
-        if (g.emplacement.Mounted && g.player.bandages > 0
-          && g.player.bleeding && g.player.health < healHealth) {
-          g.Debug.Mouse(0, false); g.Debug.Key("KeyF", true); g.Debug.Key("KeyF", false);
-          if (g.player.stance !== "crouch") g.Debug.Key("KeyC");
-          g.Debug.Key("KeyB");
-        }
-        if (!g.emplacement.Mounted) {
-          if (window.MissionInputDriver.EvadeGrenade()) { g.StepFrames(1, 1 / 60, false); continue; }
-          // 被手榴弹赶下枪位（或压根没按上）之后，空当里再坐回去：
-          // 这一段的活路是枪座后面那道墙垛，不是站在开阔地上跟人对枪。
-          if (!g.combat.GrenadeThreats(p).length && !g.player.bleeding
-            && g.player.health >= remountHealth && gun && !gun.dead && i % 90 === 45) {
-            g.Debug.Key("KeyF", true); g.StepFrames(1, 1 / 60, false); g.Debug.Key("KeyF", false);
-            if (g.emplacement.Mounted) continue;
-          }
-          const foe = window.MissionInputDriver.Target(90);
-          // 没目标就缩回墙垛后面（和 WaitStage 的 cover 一个口径：打一段、藏一段）。
-          const hide = !foe || g.state.ammo === 0 || g.ai.time % 5 < 2;
-          if ((g.player.stance === "crouch") !== hide) g.Debug.Key("KeyC");
-          if (foe) window.MissionInputDriver.Shoot(foe);
-          else { g.Debug.Mouse(0, false); g.Debug.Mouse(2, false); if (g.state.ammo === 0) g.Debug.Key("KeyR"); }
-          if (g.player.bleeding && g.player.health < 85) g.Debug.Key("KeyB");
-          g.StepFrames(1, 1 / 60, false);
-          if (g.Debug.FirstLevelMissionRuntime().flow.stage.id !== "MachineGun" || !g.player.alive) break;
-          continue;
-        }
-        const target = g.ai.soldiers
-          .filter((a) => a.side === "ija" && a.alive && a.position.z < p.z - 3 &&
-            Math.abs(Math.atan2(p.x - a.position.x, p.z - a.position.z) - gun.baseYaw) < gun.arc.yaw - 0.03)
-          .sort((a, b) => a.position.distanceToSquared(p) - b.position.distanceToSquared(p))
-          .find((a) => {
-            const from = g.player.EyePosition.clone(), to = a.position.clone();
-            to.y += a.stance === 2 ? 0.45 : a.stance === 1 ? 1 : 1.55;
-            const d = to.sub(from), len = d.length();
-            const hit = g.battlefield.Raycast(from, d.normalize(), len, { terrain: true });
-            return !hit || hit.t >= len - 0.3;
-          });
-        if (target) {
-          const eye = g.player.EyePosition, dx = target.position.x - eye.x, dz = target.position.z - eye.z;
-          g.player.yaw = Math.atan2(-dx, -dz);
-          g.player.pitch = Math.atan2(target.position.y + (target.stance === 2 ? 0.45 : target.stance === 1 ? 1 : 1.55) - eye.y, Math.hypot(dx, dz));
-          g.Debug.Mouse(0, true);
-        } else g.Debug.Mouse(0, false);
-        if (g.player.bleeding && g.player.health < 85) g.Debug.Key("KeyB");
-        if (gun.rounds === 0) g.Debug.Key("KeyR");
-        g.Debug.Key("KeyR", !!gun.jam);
-        g.StepFrames(1, 1 / 60, false);
-        if (g.Debug.FirstLevelMissionRuntime().flow.stage.id !== "MachineGun" || !g.player.alive) break;
-      }
-      g.Debug.Mouse(0, false); g.Debug.Key("KeyR", false);
-      return { stage: g.Debug.FirstLevelMissionRuntime().flow.stage.id, alive: g.player.alive,
-        health: g.player.health, gun: g.emplacement.View(), mission: g.Debug.FirstLevelMission() };
-    },{healHealth:F.machineGunDriverHealHealth,remountHealth:F.machineGunDriverRemountHealth});
-    console.log("defense", JSON.stringify({ stage: defense.stage, health: defense.health, gun: defense.gun,
-      remaining: defense.mission.remaining }));
-    if (!defense.alive || defense.stage !== "MachineGun") { ctx.machineGun = defense; break; }
-    if (defense.gun && defense.gun.rounds === 0 && defense.gun.belts === 0) {
-      await page.evaluate(() => { const g = window.Tengxian; g.Debug.Key("KeyF", true); g.StepFrames(1, 1 / 60, false); g.Debug.Key("KeyF", false); });
-      await Route([{ x: 0, z: -124 }, { x: -2.2, z: -122.5 }], "MachineGunResupply", { stance: "crouch" });
-      await Interact();
-      if (await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission().stage) === "MachineGun") {
-        await Route([{ x: 0, z: -124 }, { x: 0, z: -127.4 }], "ReturnToMachineGun", { stance: "crouch" });
-        if (await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission().stage) === "MachineGun") await Interact();
-      }
-    }
-    ctx.machineGun = defense;
-  }
-  const gunStage = ctx.machineGun;
-  await fs.writeFile(path.join(shots, "Data_MachineGun.json"), JSON.stringify(gunStage?.mission ?? null, null, 2));
-  assert.ok(gunStage?.alive, "机枪段玩家活下来了");
-  assert.equal(gunStage.stage, "Tank", "守军退到最后遮挡、战车压口，04 自己推到 05");
-  for (const fact of ["zhouGunWounded", "frontAttackRepelled", "guardWithdrawalResolved", "tankBlocksExit", "bundleOrderHeard"])
-    assert.ok(gunStage.mission.facts.includes(fact), `04 记下了 ${fact}`);
-  assert.ok(gunStage.mission.voice.played.includes("TankTerror"), "战车出现时何有田喊了那一声");
-  // 指路的那个守军是从还活着的撤退守军里挑的；八个人全阵亡的那一趟就没人可挑，
-  // 命令仍然下达（bundleOrderHeard 上面已经断言过）。这里只记录，不当硬条件。
-  console.log("BUNDLE_ORDER_GUARD", JSON.stringify(gunStage.mission.front.bundleOrderGuard));
-  console.log("ok 04 machine gun: Zhou wounded off the gun, attack repelled, tank blocks the exit, bundle ordered");
-
-  // =========================================================================
-  // 05 班长带路取弹，炸停战车
-  // =========================================================================
-  await JumpStage(5);
-  await page.evaluate(() => { const g = window.Tengxian; if (g.emplacement.View()) g.Debug.Key("KeyF"); g.Debug.Key("KeyB"); });
-  await Route([{ x: 0, z: -124 }, { x: -2.2, z: -122.5 }], "FrontResupply", { stance: "crouch" });
-  await Idle(page, R.supplyCooldownS + 1);
-  // 补给箱把弹板加到**手里那支枪**的账上（AddSupplyClips 看 activeSlot）。
-  // 近战/投掷槽在手的时候加的是 mags.primary，state.clips 一动不动 —— 先把步枪换回手里。
-  const SupplyState = () => page.evaluate(() => {
-    const g = window.Tengxian, point = g.interact.points.get("MissionSupplyFront");
-    return { clips: g.state.clips, primaryClips: g.state.mags.primary?.clips ?? 0,
-      activeSlot: g.state.activeSlot, emptyHands: g.Debug.FirstLevelMission().emptyHands,
-      count: point?.count ?? null, reach: g.interact.Query(g.player)?.point?.id ?? null,
-      bandages: g.player.bandages };
-  });
-  await page.evaluate(() => {
-    const g = window.Tengxian;
-    if (g.state.activeSlot !== "primary") g.Debug.Key("Digit1");
-    g.StepFrames(20, 1 / 60, false);
-  });
-  const supplyBefore = await SupplyState();
-  await Interact();
-  let supplyAfter = await SupplyState();
-  // 没吃上就再来一次（冷却 15 s；够不着就走回箱子跟前）。
-  for (let retry = 0; retry < 2 && supplyAfter.count === supplyBefore.count; retry++) {
-    await Idle(page, R.supplyCooldownS + 1);
-    if (supplyAfter.reach !== "MissionSupplyFront")
-      await Route([{ x: 0, z: -124 }, { x: -2.2, z: -122.5 }], `FrontResupplyRetry${retry}`, { stance: "crouch" });
-    await Interact();
-    supplyAfter = await SupplyState();
-  }
-  console.log("FRONT_SUPPLY", JSON.stringify({ before: supplyBefore, after: supplyAfter }));
-  assert.ok(supplyAfter.count > supplyBefore.count, "前沿补给箱真的被用上了：" + JSON.stringify(supplyAfter));
-  assert.equal(supplyAfter.clips, supplyBefore.clips + R.frontSupplyClips, "前沿补给箱真的补了弹");
-  // 出击前把绷带补满。旧驾驶脚本一直这么做 —— 只带一卷去爬那条侧沟，
-  // 三次检查点重试全烧在半路上（2026-09-20 实测 3/2 超预算）。
-  for (let refill = 0; refill < 4 && await page.evaluate(() => window.Tengxian.player.bandages) < 3; refill++) {
-    await Idle(page, R.supplyCooldownS + 1);
-    if (!(await page.evaluate(() => window.Tengxian.interact.Query(window.Tengxian.player)?.point?.id === "MissionSupplyFront")))
-      await Route([{ x: 0, z: -124 }, { x: -2.2, z: -122.5 }], `FrontDressings${refill}`, { stance: "crouch" });
-    await Interact();
-  }
-  console.log("BANDAGES", await page.evaluate(() => window.Tengxian.player.bandages));
-  await Route([{ x: 0, z: -124 }, ...Routes.bundle, { x: A.bundle.x, z: A.bundle.z + 1.2 }], "BundleApproach",
-    { fight: true, stance: "stand", sprint: true, crawl: true, rejoinRoute: Routes.bundle });
-  await page.evaluate(() => { const g = window.Tengxian; if (g.player.bleeding) g.Debug.Key("KeyB"); g.StepFrames(1, 1 / 60, false); });
-  await Interact();
-  const taken = await page.evaluate(() => ({
-    bundles: window.Tengxian.state.bundles,
-    mission: window.Tengxian.Debug.FirstLevelMission(),
-  }));
-  assert.equal(taken.bundles, R.bundleSupplyCount, "弹药屋真的领到了集束弹");
-  assert.ok(taken.mission.facts.includes("bundleRouteTraversed"), "侧沟线上的检查点与爬行段都真的走过了");
-  assert.ok(taken.mission.voice.played.includes("BundleSupply"), "留守兵交代了「就剩这些了」");
-  assert.ok(taken.mission.voice.played.includes("BundleProne"), "中段罗班长喊过「趴下！它转过来了！」");
-  await LookShot("BundleHouse", A.bundle);
-  await Route(Routes.bundleReturn, "TankFlank", { fight: true, stance: "stand", sprint: true, crawl: true, rejoinRoute: Routes.bundleReturn });
-  for (let attempt = 0; attempt < 3; attempt++) {
-    if (await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission().tank.immobilized)) break;
-    // 等它停下来再扔。战车在 advance/halt 之间循环，朝一辆正在开的车扔集束弹，
-    // 引信烧完时车已经开出去七八米 —— 2026-09-20 实测三发全空。
-    await page.evaluate(coveredRangeM => {
-      const g = window.Tengxian;
-      const Gap = () => {
-        const tank = g.Debug.FirstLevelMission().tank, p = g.player.position;
-        return Math.hypot(p.x - tank.x, p.z - tank.z);
-      };
-      // 先在沟里等它压过来，别自己横穿开阔地去够它。战车本来就朝玩家推进，
-      // 而这一段的伤全在那二十几米没遮没挡的地上（实测跑过去之后只剩两成血，
-      // 回集结处的路上连死三次）。
-      for (let i = 0; i < 3600 && Gap() > coveredRangeM; i++) {
-        if (g.player.bleeding && g.player.health < 85) g.Debug.Key("KeyB");
-        g.StepFrames(1, 1 / 60, false);
-      }
-      for (let i = 0; i < 900 && g.Debug.FirstLevelMission().tank.moving; i++) g.StepFrames(1, 1 / 60, false);
-    },F.bundleCoveredThrowRangeM);
-    // The tank now reaches its authored exit-blocking stop inside the covered
-    // throw radius. Stay at A.throw; a driver walking onto the road is a test bug.
-    const covered = await page.evaluate(throwPoint => {
-      const g=window.Tengxian,tank=g.Debug.FirstLevelMission().tank,p=g.player.position;
-      return {gap:Math.hypot(p.x-tank.x,p.z-tank.z),
-        throwGap:Math.hypot(p.x-throwPoint.x,p.z-throwPoint.z)};
-    },A.throw);
-    assert.ok(covered.throwGap<1.5,`driver stays at the covered throw point (${covered.throwGap.toFixed(2)} m)`);
-    assert.ok(covered.gap <= F.bundleCoveredThrowRangeM+.5,
-      `tank reaches the covered throw lane (${covered.gap.toFixed(2)} m)`);
-    const thrown = await DriveBundleThrow(page);
-    console.log("BUNDLE_THROW", JSON.stringify({ before: thrown.before, after: thrown.after,
-      aim:thrown.aim,requested:thrown.requested,launch:thrown.launch,firstVelocityBreak:thrown.firstVelocityBreak,
-      firstContact:thrown.firstContact,land:thrown.land,blast:thrown.blast,blastMiss:thrown.blastMiss,tank:thrown.mission.tank }));
-    assert.ok(thrown.alive,`TankThrow${attempt}: player survives through the real bundle detonation`);
-    if (thrown.mission.tank.immobilized) break;
-    // 两发都扔完还没停住，就像玩家一样回弹药屋再领两发。
-    if (thrown.after === 0) {
-      await Route([...Routes.bundle.slice(4), { x: A.bundle.x, z: A.bundle.z + 1.2 }], `BundleRefill${attempt}`,
-        { fight: true, stance: "stand", sprint: true, crawl: true, rejoinRoute: Routes.bundle });
-      await Interact();
-      assert.equal(await page.evaluate(() => window.Tengxian.state.bundles), R.bundleSupplyCount,
-        "弹药屋再给了两发集束弹");
-      await Route(Routes.bundleReturn, `TankFlankAgain${attempt}`,
-        { fight: true, stance: "stand", sprint: true, crawl: true, rejoinRoute: Routes.bundleReturn });
-    }
-  }
-  assert.ok(await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMission().tank.immobilized),
-    "05 cannot leave the throw point until a real bundle blast cuts the track");
-  await CaptureFocus("TankStopped", { x: await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission().tank.x),
-    z: await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission().tank.z), height: 1.2 });
-  await page.screenshot({ path: path.join(shots, "Scene_TankStopped.png") });
-  // 车停了就撤回前沿沟里。05 结束到 06 之间还要等最后一批守军撤完、接防班进阵位，
-  // 那是好几十秒；蹲在侧沟口那个没遮挡的地方等，等不到（实测死在 WaitStage 里）。
-  await Route([{ x: 25, z: -110 }, { x: 15, z: -111 }, { x: 6, z: -124 }, { x: 0, z: -124 }],
-    "BackToFront", { fight: true, stance: "crouch", crawl: true });
-  // 顺路在前沿补给箱补一次绷带，再包扎。
-  await Idle(page, R.supplyCooldownS + 1);
-  await Route([{ x: -2.2, z: -122.5 }], "TankRecovery", { stance: "crouch" });
-  await Interact();
-  await page.evaluate(() => {
-    const g = window.Tengxian;
-    for (let i = 0; i < 900 && (g.player.bleeding || g.player.health < 95) && g.player.bandages > 0; i++) {
-      if (i % 90 === 0) g.Debug.Key("KeyB");
-      g.StepFrames(1, 1 / 60, false);
-    }
-  });
-  console.log("TANK_RECOVERY", JSON.stringify(await page.evaluate(() => ({
-    health: window.Tengxian.player.health, bandages: window.Tengxian.player.bandages }))));
-  const tankStage = await WaitStage("Orders", 240, { fight: true, cover: true });
-  for (const fact of ["tankImmobilized", "lastGuardsWithdrawn", "reliefInPosition"])
-    assert.ok(tankStage.mission.facts.includes(fact), `05 记下了 ${fact}`);
-  assert.ok(tankStage.mission.voice.played.includes("TankStopped"), "「停了！」在履带断掉之后说了");
-  assert.ok(tankStage.mission.voice.played.includes("BundleReturnCall"), "返程何有田喊了「它往沟口挤了」");
-  assert.ok(tankStage.mission.relief.some((entry) => entry.arrived), "接防人员真的进了阵位");
-  console.log("ok 05 tank: bundle taken on the side ditch, tracks cut, last guards out, relief in position");
 
   // =========================================================================
   // 06 回到伤员集结处，接下后送（含借火戏）
   // =========================================================================
   await JumpStage(6);
-  await Route(MISSION_STAGE_ROUTES.collectionReturn, "CollectionReturn",
+  await Route([A.collection], "CollectionReturn",
     { fight: true, stance: "crouch", crawl: true, rejoinRoute: MISSION_STAGE_ROUTES.collectionReturn });
   // 2026-09-20 演出打磨：借火不再随 ordersReached 自动开播 —— Notion 06 是老周
   // 「看见顺子经过」才开口。像玩家一样走到他跟前站定、脸朝着他。
   await Route([{ x: P.collection.borrowStand.x, z: P.collection.borrowStand.z }], "BorrowStand",
-    { fight: false, stance: "stand" });
+    { fight: false, stance: "stand", arrivalM: 0.2 });
   await page.evaluate((zhou) => {
     const g = window.Tengxian, p = g.player.position;
     g.player.yaw = Math.atan2(p.x - zhou.x, p.z - zhou.z);
@@ -364,7 +74,7 @@ export async function Drive(ctx) {
   });
   console.log("BORROW_STAND", JSON.stringify(borrowStand));
   assert.ok(Math.hypot(borrowStand.player.x - borrowStand.zhou.x,
-    borrowStand.player.z - borrowStand.zhou.z) <= F.borrowTriggerM + 0.5,
+    borrowStand.player.z - borrowStand.zhou.z) <= F.borrowTriggerM,
   "玩家真的走到了老周跟前：" + JSON.stringify(borrowStand));
   // 分段推：借火那一拍要在演的时候拍，等整段走完老周已经上担架抬走了。
   let orders = null;
@@ -399,6 +109,7 @@ export async function Drive(ctx) {
   // =========================================================================
   // 07 沿沟南行：真走 135 m，目标时长 45–75 秒。
   // =========================================================================
+  if(ctx.stageTo===6)return;
   await JumpStage(7);
   // 拆两段只为在路上拍一张（Capture 只渲几帧，进不了阶段计时）。
   await Route(Routes.southWalk.slice(0, 5), "SouthWalkFirst", { fight: false, stance: "stand", sprint: false });

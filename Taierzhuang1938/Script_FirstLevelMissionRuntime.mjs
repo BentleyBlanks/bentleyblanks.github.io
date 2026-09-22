@@ -1,3 +1,4 @@
+import { FirstLevelFrontBattle } from "./Script_FirstLevelFrontBattle.mjs";
 import { FirstLevelTransition } from "./Script_FirstLevelTransition.mjs";
 import { FRONT_SORTIE as Sortie, SortieCrawlBlocked } from "./Data_FirstLevelFrontRoute.mjs";
 import { FirstLevelLeaderGuide } from "./Script_FirstLevelLeaderGuide.mjs";
@@ -110,7 +111,7 @@ const Distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 const SCRIPT_ARRIVAL_M = 0.45;
 const Clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 /** 机枪座的座位点。 */
-const GUN_SEAT = Object.freeze({ x: 0, z: -127.4 });
+const GUN_SEAT = Sortie.seat;
 /** 台词表里有没有这条 cue。`Script_FirstLevelVoiceTest` 静态扫这里的每一处 Say。 */
 const CUE_IDS = new Set(MISSION_DIALOGUE.map((cue) => cue.id));
 /** 抬着担架走时的落点：按步骤查表，运行时不挑分支（锚点名，见 MISSION_ANCHORS）。 */
@@ -155,6 +156,7 @@ export class FirstLevelMissionRuntime {
     // 阶段 1–7 的演出总线（Front）。要在 flow.Start() 之前建好：第一步 Trapped 的
     // Enter 马上就会问它要门外那一拍。
     this.frontShow = new FirstLevelFrontShow(this);
+    this.frontBattle = new FirstLevelFrontBattle(this);
     // 08–10 村落改道、11–14 接运与空袭（第二波 Mid 包）。
     this.village = new FirstLevelVillageBlock(this);
     this.transferCart = new FirstLevelTransferCart(this);
@@ -762,6 +764,7 @@ export class FirstLevelMissionRuntime {
       for (const actor of this.squad) actor.scriptedNoncombatant = true;
       return;
     }
+    if(this.frontBattle.Active)return;
     const bunkerRescueLocked = stage === "BunkerRescue" && !this.Has("luoRescueComplete");
     for (const actor of this.squad) {
       InstallMissionSentry(actor);
@@ -947,7 +950,7 @@ export class FirstLevelMissionRuntime {
       if (!actor) {this.spawnQueue.push(()=>this.SpawnEncounterActor(id,spec));return null;}
       actor.missionId = spec.id;InstallMissionSentry(actor);
       actor.missionEncounter=id;
-      if(id==="approach")actor.scriptFireSector=R.approachFireSector;
+      // Local right-position defenders use their actual geometry and line of sight.
       actor.missionReserve=!!spec.reserve;
       actor.missionReleaseDelayS=spec.releaseDelayS||0;
       if(["village","melee","bunkerAssault"].includes(id)){actor.missionDormant=true;actor.scriptedNoncombatant=true;}
@@ -1306,6 +1309,7 @@ export class FirstLevelMissionRuntime {
           Anchor:()=>new THREE.Vector3(spec.x,this.battlefield.GroundHeight(spec.x,spec.z)+(spec.supportHeight||0)+.3,spec.z)},
       );
     }
+    this.leftGunId=this.emplacement.CreateEmplacement({id:"MissionLeftGun",tag:"FirstLevelMission",kindId:"Zb26Nest",position:this.Point(Sortie.leftGun,1.45),seat:this.Point(Sortie.leftSeat),baseYaw:0,arcYawDeg:85,belts:6});
     this.gunId = this.emplacement.CreateEmplacement({
       id: "MissionGun",
       tag: "FirstLevelMission",
@@ -1313,7 +1317,7 @@ export class FirstLevelMissionRuntime {
       position: this.Point(A.gun, 1.45),
       seat: this.Point(GUN_SEAT),
       baseYaw: 0,
-      arcYawDeg: 62,
+      arcYawDeg: 115,
       belts: 4,
       payload:{followSight:true,supportedSeat:true},
       OnOccupy: () => {
@@ -1332,7 +1336,7 @@ export class FirstLevelMissionRuntime {
         emplacement: this.emplacement,
         gunId: this.gunId,
         carry: this.carry,
-        Available: () => ["MachineGun", "Tank"].includes(this.flow.stage.id),
+        Available: () => this.Has("rightNestCaptured") && ["Support", "MachineGun", "Tank"].includes(this.flow.stage.id),
         reachM: 3,
         facingDot: null,
       }),
@@ -1377,11 +1381,7 @@ export class FirstLevelMissionRuntime {
         this.frontArrivalAt=null;
         this.frontArrivalShots=this.Inventory().shots;
         this.Guide(MISSION_ROUTES.support);
-        this.forwardGunner = this.ai.Spawn("nra", A.forwardNest.x, A.forwardNest.z, {
-          weapon: "Zb26",
-          squadId: "MissionForwardNest",
-        });
-        if (this.forwardGunner) this.Defend(this.forwardGunner, A.forwardNest);
+        // Lao Zhou occupies the persistent left gun.
         // The finite assault is committed by UpdateFront at the last approach
         // bend. approach/tank/village/melee are spawned at this step (MISSION_STEP_SPAWNS,
         // before the switch) so a slow approach can spend the battle offscreen.
@@ -1407,7 +1407,7 @@ export class FirstLevelMissionRuntime {
         this.EnsureBundleKeeper();
         break;
       case "Orders":
-        this.Guide(MISSION_STAGE_ROUTES.collectionReturn);
+        this.Guide([{x:A.collection.x+1.5,z:A.collection.z},A.collection]);
         this.column.Activate();
         this.column.zhou.health = Math.min(this.column.zhou.health,65);
         this.column.zhou.state = "waiting";
@@ -1537,6 +1537,7 @@ export class FirstLevelMissionRuntime {
         this.Complete();
         break;
     }
+    this.frontBattle.Enter(stage.id);
     if (!["Trapped", "Dive", "Death", "NightMarch"].includes(stage.id)) this.SaveCheckpoint();
   }
   SpawnGuards() {
@@ -1560,88 +1561,7 @@ export class FirstLevelMissionRuntime {
       }
     }
   }
-  UpdateGuards(dt) {
-    const pair=GuardCrossingPair(this.guards.map(guard=>({id:guard.actor.id,safe:guard.safe,alive:guard.actor.alive})),R.guardPairSize);
-    for (const guard of this.guards) {
-      if (!guard.actor.alive || guard.progress>=guard.route.length) continue;
-      if(!guard.safe && (!pair.includes(guard.actor.id) || !(this.Has("gunUsed") || this.flow.stage.id==="MachineGun" || this.Has("frontAttackRepelled") || (this.flow.stage.id==="Support" && this.Has("frontReached") && this.guards.indexOf(guard)<OPENING.rifleGuardCount && this.Has("frontRifleDefense"))) || (!guard.crossing && this.time<(this.nextGuardCrossingAt||0)))) {
-        this.Defend(guard.actor,guard.actor.position,0,0);this.ai.SetStance(guard.actor,2,Infinity,true);continue;
-      }
-      // Test the waiting man's actual prone silhouette, then commit to the bound.
-      // Rechecking a standing silhouette every frame stranded men in their shelter.
-      const openingPair=this.flow.stage.id==="Support"&&this.guards.indexOf(guard)<OPENING.rifleGuardCount;
-      if (guard.crossing || !this.Threatens(guard.actor.position,openingPair?["FrontGunner"]:null,guard.actor.stance===2?.35:1.1)) {
-        guard.crossing=true;
-        guard.actor.scriptedNoncombatant=false;
-        this.ai.SetStance(guard.actor,guard.safe?1:0,1.2);
-        if (Distance(guard.actor.position, guard.route[guard.progress]) < 1.4) guard.progress++;
-        if(!guard.safe && guard.progress>R.guardSafeRouteIndex) {
-          guard.safe = true;
-          this.Record(`guardWithdrawn${guard.actor.id}`,{survived:this.guards.filter(entry=>entry.safe).length});
-          this.nextGuardCrossingAt=this.time+R.guardCrossingGapS;
-        }
-        if (guard.progress >= guard.route.length) {
-          this.MoveActor(guard.actor,guard.actor.position,0);
-          this.ai.SetStance(guard.actor,1,Infinity,true);
-          continue;
-        }
-        const target=guard.route[guard.progress],p=guard.actor.position;
-        const distance=Distance(p,target)||1,dx=(target.x-p.x)/distance,dz=(target.z-p.z)/distance;
-        const blocked=this.guards.some(other=>other!==guard&&other.progress<other.route.length&&other.actor.alive&&
-          // A strict route order prevents two converging men from each seeing
-          // the other just ahead and yielding forever at the trench junction.
-          (other.progress>guard.progress || (other.progress===guard.progress &&
-            (Distance(other.actor.position,other.route[other.progress])<distance ||
-             (Distance(other.actor.position,other.route[other.progress])===distance && other.actor.id<guard.actor.id))))&&
-          (other.actor.position.x-p.x)*dx+(other.actor.position.z-p.z)*dz>0&&
-          Math.abs((other.actor.position.x-p.x)*dz-(other.actor.position.z-p.z)*dx)<.65&&
-          Distance(other.actor.position,p)<1.4);
-        this.MoveActor(guard.actor,target,blocked?0:R.guardSpeedMps);
-      } else {
-        this.Defend(guard.actor,guard.actor.position);
-        this.ai.SetStance(guard.actor,1,1.5);
-      }
-    }
-    if(this.flow.stage.id==="Support" && this.guards.slice(0,OPENING.rifleGuardCount).length===OPENING.rifleGuardCount && this.guards.slice(0,OPENING.rifleGuardCount).some(g=>g.safe&&g.actor.alive) && this.guards.slice(0,OPENING.rifleGuardCount).every(g=>g.safe||!g.actor.alive))this.Record("rifleWithdrawalResolved",{survived:this.guards.slice(0,OPENING.rifleGuardCount).filter(g=>g.safe&&g.actor.alive).length});
-    if (this.guards.length && this.guards.every((guard) => guard.safe || !guard.actor.alive))
-      {
-        const survived=this.guards.filter(guard=>guard.safe && guard.actor.alive).length;
-        this.Record("guardWithdrawalResolved", { survived,casualties:this.guards.length-survived,outcome:survived?"withdrawal":"lost" });
-        if(survived)this.Record("guardsSafe",{survived});
-      }
-    // 06 Tank：最后一批守军真的走完了自己那条撤退线（不是「安全了」而已）。
-    if(this.flow.stage.id==="Tank" && this.guards.length
-      && this.guards.every(guard=>!guard.actor.alive || guard.progress>=guard.route.length))
-      this.Record("lastGuardsWithdrawn",{survived:this.guards.filter(guard=>guard.actor.alive).length});
-  }
-  /**
-   * 03/04 前沿的台词。契约 §5 之后这一段**只有一条** cue：老周指「右边破墙」的
-   * `FrontBlockade`。2026.09.14 那套六条（呼叫 / 提醒 / 兜底 / 过沟 / 追击 / 收到）
-   * 随采用稿全部下线，台词表里已经没有它们。
-   *
-   * 说的时机仍然按「封锁是真的」判：还有守军被压在外面、封锁那挺机枪还活着。
-   * 玩家真看见那几个人被压住 `frontDialogueSeenS` 秒就说；一直没看见的，
-   * 到 `frontDialogueFallbackS` 也说一次（不说的话玩家不知道往哪打）。
-   * 机枪先被打掉就撤回这一条 —— 不指一堵已经不挡路的墙。
-   */
-  UpdateFrontDialogue() {
-    if(!["Support","MachineGun"].includes(this.flow.stage.id)||!this.Has("frontReached"))return;
-    const remaining=this.guards.filter(guard=>guard.actor.alive&&!guard.safe);
-    const gunner=this.enemies.get("FrontGunner");
-    if(!(remaining.length&&gunner?.alive)){
-      if(gunner&&!gunner.alive)this.voice.Cancel(["FrontBlockade"]);
-      this.frontDialogueSeenAt=null;
-      return;
-    }
-    this.frontDialogueAt??=this.time;
-    const visible=remaining.some(guard=>{
-      const point=this.Point(guard.actor.position,1),ndc=point.clone().project(this.player.camera);
-      return ndc.z>=-1&&ndc.z<=1&&Math.abs(ndc.x)<.75&&Math.abs(ndc.y)<.75&&!this.BlocksSight(this.player.EyePosition,point);
-    });
-    if(visible)this.frontDialogueSeenAt??=this.time;else this.frontDialogueSeenAt=null;
-    const seen=this.frontDialogueSeenAt!=null&&this.time-this.frontDialogueSeenAt>=R.frontDialogueSeenS;
-    if(seen||this.time-this.frontDialogueAt>=R.frontDialogueFallbackS)this.Say("FrontBlockade");
-  }
+  UpdateGuards(dt) { this.frontBattle.UpdateGuards(dt); }
   OnBlast({ position, radius, damage, byPlayer, explosiveId }) {
     if (byPlayer) {
       (this.playerExplosions ||= []).push({
@@ -1674,6 +1594,8 @@ export class FirstLevelMissionRuntime {
     const hit = this.battlefield.Raycast(from, delta.normalize(), distance);
     if (hit && hit.box?.tag !== "missionTank" && hit.t < distance - 0.25) return;
     this.tank.immobilized = true;
+    this.tank.fireDisabled = true;
+    this.Record("tankFireDisabled",{explosiveId});
     this.tank.moving = false;
     this.tank.damageAt = this.time;
     const impactX=position.x-this.tank.x,impactZ=position.z-this.tank.z,yaw=this.tank.hullYaw??Math.PI;
@@ -1714,38 +1636,7 @@ export class FirstLevelMissionRuntime {
    * 接防人员（契约 §2 的 reliefInPosition）。2026.09.19 起他们不再是军列上下来的人：
    * 一个班从背坡伤员集结处沿后交通壕上来，进前沿阵位。
    */
-  UpdateRelief(dt) {
-    if(!["Tank","Orders"].includes(this.flow.stage.id))return;
-    if(!this.relief) {
-      // collectionReturn 反过来走就是「集结处 → 前沿交通壕口 (6,-124)」那一段；
-      // 再往后（(15,-111) → (30,-117)）是去集束弹沟的支线，接防班不去那儿 ——
-      // 从那里横回阵位会正面穿过 FrontTraverseCover 那排掩体。
-      const approach=[...MISSION_STAGE_ROUTES.collectionReturn].reverse().slice(0,5);
-      this.relief=P.reliefPositions.map((post,i)=>{
-        const actor=this.ai.Spawn("nra",A.collection.x+(i%2?1.4:-1.4),A.collection.z+Math.floor(i/2)*1.6,
-          {weapon:"HanYang",squadId:"MissionRelief"});
-        if(!actor)return null;
-        InstallMissionSentry(actor);actor.missionId=`Relief${i}`;actor.missionTrainReady=true;
-        return {actor, route:[...approach,{x:post.x,z:-123},post], index:0, delay:i*R.reliefDelaySeconds,
-          arrived:false, distance:0, last:{x:actor.position.x,z:actor.position.z}};
-      }).filter(Boolean);
-      if(!this.relief.length){this.relief=null;return;}
-    }
-    for(const entry of this.relief) {
-      const actor=entry.actor;
-      if(!actor.alive||entry.arrived)continue;
-      entry.distance+=Distance(actor.position,entry.last);entry.last={x:actor.position.x,z:actor.position.z};
-      if(entry.delay>0){entry.delay-=dt;continue;}
-      while(entry.index<entry.route.length&&Distance(actor.position,entry.route[entry.index])<1)entry.index++;
-      if(entry.index>=entry.route.length){entry.arrived=true;this.Defend(actor,actor.position);this.ai.SetStance(actor,1,2);continue;}
-      actor.scriptedNoncombatant=false;
-      if(this.RespondToContact(actor))continue;
-      this.ai.SetStance(actor,0,.4,true);
-      this.MoveActor(actor,entry.route[entry.index],R.reliefSpeedMps);
-    }
-    if(this.relief.length && this.relief.every(entry=>entry.arrived||!entry.actor.alive))
-      this.Record("reliefInPosition",{arrived:this.relief.filter(entry=>entry.arrived).length});
-  }
+  UpdateRelief(dt) { this.frontBattle.UpdateRelief(dt); }
   UpdateTactics(dt) {
     const stage = this.flow.stage.id;
     for (const [id, actor] of this.enemies) {
@@ -1815,7 +1706,7 @@ export class FirstLevelMissionRuntime {
       for(const actor of this.enemies.values())if(actor.missionFrontStandby){actor.scriptedNoncombatant=false;actor.missionFrontStandby=false;}
       for(const guard of this.guards){this.Defend(guard.actor,guard.actor.position,0,0);this.ai.SetStance(guard.actor,2,Infinity,true);}
     }
-    if(!this.tank.active&&this.Near(A.front,R.tankRevealDistanceM)){this.tank.active=true;this.tank.lastShell=this.time;}
+    // The front director reveals the vehicle only during the first batch handover.
   }
   GuideSortie(route) {
     const holdingRoutes=new Map([...this.squadRoutes].map(([id,points])=>[id,points.map(point=>{
@@ -1882,9 +1773,6 @@ export class FirstLevelMissionRuntime {
       if(this.tankDust!=null){this.vfx.RemoveSmokeSource(this.tankDust);this.tankDust=null;}
       return;
     }
-    // 05：战车压到沟口，把前沿的退路堵住（契约 §2 的 tankBlocksExit）。
-    if(this.flow.stage.id==="MachineGun" && !tank.immobilized && tank.z>=R.tankStopZ-R.tankBlockRadiusM)
-      this.Record("tankBlocksExit",{z:tank.z});
     const muzzle=this.view.TankMuzzle(tank);
     const candidates=[this.player,...this.squad,...(this.frontDefenders||[]),...this.guards.map(g=>g.actor)]
       .filter(actor=>(actor.Alive??actor.alive)&&Distance(actor.position,tank)<100);
@@ -1901,26 +1789,16 @@ export class FirstLevelMissionRuntime {
     }
     const tracked=tank.lastSeen && this.time-(tank.lastSeenAt||0)<R.tankTargetMemoryS?tank.lastSeen:null;
     tank.advanceTime = (tank.advanceTime || 0) + this.delta;
-    const cycle = R.tankAdvanceSeconds + R.tankFiringHaltSeconds;
-    const advanceZ=this.Has("forwardNestDestroyed")?R.tankStopZ:R.tankFirstFireZ;
-    const sortie=this.flow.stage.id==='Tank';
-    const pursuitZ=sortie?Clamp(this.player.position.z-Sortie.tankLeadM,Sortie.tankNorthZ,Sortie.tankSouthZ):advanceZ;
-    tank.moving = !tank.immobilized && (sortie?Math.abs(tank.z-pursuitZ)>.3:tank.z<advanceZ) && tank.advanceTime % cycle < R.tankAdvanceSeconds;
-    if (tank.moving){
-      const destination=sortie?{x:Sortie.tankRoadX,z:pursuitZ}:
-        {x:Clamp((tracked?.x??12)+24,R.tankPursuitBounds.minX,R.tankPursuitBounds.maxX),z:advanceZ};
-      tank.moveYaw=Math.atan2(tank.x-destination.x,tank.z-destination.z);
-      const distance=Distance(tank,destination),step=Math.min(1,this.delta*R.tankSpeedMps/(distance||1));
-      tank.x+=(destination.x-tank.x)*step;tank.z+=(destination.z-tank.z)*step;
-    }
+    const sortie=this.flow.stage.id==="Tank";
+    this.frontBattle.MoveTank(this.delta);
     if(tank.moving){
       const point=this.Point({x:tank.x,z:tank.z-2},.2);
       if(this.tankDust==null)this.tankDust=this.vfx.SmokeSource(point,R.tankDust);
       else this.vfx.MoveSmokeSource(this.tankDust,point);
     }else if(this.tankDust!=null){this.vfx.RemoveSmokeSource(this.tankDust);this.tankDust=null;}
-    if(this.flow.stage.id==="Support" && !this.Has("frontRifleDefense"))return;
+    if(this.flow.stage.id==="Support" || tank.immobilized || tank.fireDisabled)return;
     const targets = P.tankTargets;
-    const target = !this.Has("forwardNestDestroyed")?A.forwardNest:tracked||targets[tank.shots % targets.length];
+    const target=tank.battleTarget||Sortie.nest;
     const hullTarget=tank.moving?tank.moveYaw:Math.atan2(tank.x-target.x,tank.z-target.z);
     tank.hullYaw??=Math.PI;
     if(!tank.immobilized)tank.hullYaw+=Clamp(Math.atan2(Math.sin(hullTarget-tank.hullYaw),Math.cos(hullTarget-tank.hullYaw)),-this.delta*R.tankHullTurnRad,this.delta*R.tankHullTurnRad);
@@ -1932,8 +1810,7 @@ export class FirstLevelMissionRuntime {
       tank.shots++;
       const from = this.view.TankMuzzle(tank);
       this.vfx.MuzzleFlash(from,this.Point(target).sub(from).normalize(),{scale:2,kind:"hmg"});
-      const aim=this.Has("forwardNestDestroyed")?{x:target.x+Math.sin(tank.shots*2.399)*R.tankShellScatterM,z:target.z+Math.cos(tank.shots*1.79)*R.tankShellScatterM}:{x:target.x,z:target.z+R.tankNestAimOffsetZ};
-      const impactTarget=this.Point(aim,this.Has("forwardNestDestroyed")?0:R.tankNestAimRiseM);
+      const impactTarget=this.Point(target,.9);
       this.combat.FireShell(from, impactTarget, {
         flight: Math.max(.06,from.distanceTo(impactTarget)/R.tankShellSpeedMps),
         kind: "Shell57",
@@ -1950,14 +1827,14 @@ export class FirstLevelMissionRuntime {
             revision:crater?.revision||0});
           if(tank.impacts.length>8)tank.impacts.shift();
           for (const actor of this.squad)if(Distance(actor.position,position)<12)this.ai.SetStance(actor,2,2,true);
-          if (!this.Has("forwardNestDestroyed") && Distance(position,A.forwardNest)<6) {
-            this.Record("forwardNestDestroyed");
+          if (!this.Has("tankPositionPressured") && Distance(position,Sortie.nest)<8) {
+            this.Record("tankPositionPressured",{x:position.x,z:position.z});
             this.Say("TankTerror");
           }
         },
       });
     }
-    if(!this.Has("forwardNestDestroyed"))return;
+    if(!this.Has("tankPositionPressured"))return;
     const mgYaw=visible?Math.atan2(tank.x-visible.position.x,tank.z-visible.position.z):tank.hullYaw;
     const burst=tank.advanceTime%(R.tankMgBurstSeconds+R.tankMgRestSeconds)<R.tankMgBurstSeconds;
     // The sortie alternates moving MG sweeps with halted cannon fire. Slow
@@ -2357,16 +2234,8 @@ export class FirstLevelMissionRuntime {
     if(!spec || this.failed || this.controls || this.completed)return null;
     let target=stage.target, label=spec.label;
     if(spec.route)target=MissionRouteLookahead(MISSION_ROUTES[spec.route],this.player.position);
-    if(stage.id==="Support"&&this.Has("frontReached")&&!this.Has("frontRifleDefense")){
-      target=this.enemies.get("FrontGunner")?.position||target;label="frontBlocker";
-    }
-    if(stage.id==="Tank"){
-      const returning=this.Has("bundleTaken")&&this.Inventory().bundles>0;
-      const route=returning?MISSION_ROUTES.bundleReturn:MISSION_ROUTES.bundle;
-      target=returning?MissionRouteLookahead(route,this.player.position):
-        Sortie.route.find((point,index)=>!this.Has("bundleRoutePoint"+index))||A.bundle;label=returning?"throw":"bundle";
-      if(!returning && this.Near(A.bundle,8))target=A.bundle;
-    }
+    const battleGuide=this.frontBattle.Guide();
+    if(battleGuide){target=battleGuide.target;label=battleGuide.label;}
     if(stage.id==="Courtyard" && this.Has("courtyardGateOpen") && this.Threatens(A.gate)) {target={x:A.gate.x,z:A.gate.z+4};label="gateThreat";}
     if(["Carry","WallPath","Handover"].includes(stage.id)) {
       if(this.carry.Active) {target=this.CarryGoal();label=CARRY_GOAL_LABELS[stage.id];}
@@ -2425,9 +2294,9 @@ export class FirstLevelMissionRuntime {
     const stage = this.flow.stage.id,
       t = this.flow.stageTime;
     if(["Support","MachineGun","Tank","Orders"].includes(stage))this.UpdateGuards(dt);
-    this.UpdateFrontDialogue();
     // 阶段 1–7 的演出（Front 包）。放在 UpdateSquad 之后：剧情走位要压过接触反应。
     this.frontShow?.Update(dt);
+    this.frontBattle.Update(dt);
     prof?.E("story/mission/director");
     prof?.B("story/mission/other");
     if (this.controls) {
@@ -2469,27 +2338,6 @@ export class FirstLevelMissionRuntime {
       // 撤回的守军指路：走到集结处就起这一段（对白播完记 supportOrdersHeard）。
       if (this.Has("collectionPointSeen")) this.Say("SupportOrder");
     }
-    if (stage === "Support" && this.GateNear("frontReached")) {
-      this.Record("frontReached");
-    }
-    if (stage === "Support" && this.Has("frontReached")) {
-      this.frontArrivalAt ??= this.time;
-      this.frontArrivalShots ??= this.Inventory().shots;
-      const blocker=this.enemies.get("FrontGunner");
-      if(blocker&&(!blocker.alive||blocker.suppression>=R.threatSuppression||blocker.state==="suppressed"))
-        this.Record("frontRifleDefense",{blocker:"FrontGunner",alive:blocker.alive,suppression:blocker.suppression});
-      this.SpawnEncounter("front");
-      this.tank.active = true;
-      if ([...this.enemies.values()].some((actor) => actor.lastFire > 0) || this.Inventory().shots > 0)
-        this.Record("frontContact");
-    }
-    if (stage === "MachineGun") {
-      if (this.emplacement.stats.shots > 0) this.Record("gunUsed");
-      // 守军指出北头弹药屋（对白播完记 bundleOrderHeard）。
-      if (this.Has("frontAttackRepelled")) this.Say("BundleOrder");
-      // 机枪弹药倒计时那两条（ThreeMagazines / TwoMagazines）随采用稿下线；
-      // 余弹仍然由 HUD 与 GuideGunSupply 交代。
-    }
     if(stage==="Orders"){
       // 2026-09-20 演出打磨：借火与担架员催的两段不再随 ordersReached 一起排进队 ——
       // Notion 06 是老周「看见顺子经过」才开口，触发与担架员的走位在
@@ -2504,7 +2352,7 @@ export class FirstLevelMissionRuntime {
       if(this.GateNear("villageMouthReached")){this.Record("villageMouthReached");this.Say("VillagePointer");}
     }
     if(stage==="Tank")this.UpdateSortie();
-    if(stage==="MachineGun")this.UpdateFrontAttack();
+    // Retreat and capture gates are owned by FirstLevelFrontBattle.
     if (stage === "Village") {
       if(this.GateNear("streetBlockSeen")){this.Record("streetBlockSeen");this.Say("StreetBlocked");}
       const p=this.player.position, kitchen=P.kitchenInterior;
@@ -2759,6 +2607,7 @@ export class FirstLevelMissionRuntime {
     return {
       opening:this.opening.State(),
       front:this.frontShow?.State() || null,
+      frontBattle:this.frontBattle.State(),
       ...this.flow.State(),
       missionVersion: MISSION_VERSION,
       returnWarning: this.missionReturn.result,

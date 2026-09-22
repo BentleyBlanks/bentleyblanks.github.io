@@ -146,8 +146,8 @@ GroundedWall("OpeningShelterWest",-36,-17,.8,2.4,4);
 GroundedWall("OpeningShelterWestNorth",-36,-24,.8,2.4,4);
 // Defensive parapets are small sandbag stacks above genuine excavated soil.
 for (const x of [-25, 0, 15]) {
-  Wall(`FrontParapet${x}`, x, -131, 6, 0.55, 0.9);
-  Wall(`FrontTraverseCover${x}`, x + 3.6, -119.4, 0.8, 0.65, 2);
+  if(x!==-25)Wall(`FrontParapet${x}`, x, -131, 6, 0.55, 0.9);
+  if(x!==-25)Wall(`FrontTraverseCover${x}`, x + 3.6, -119.4, 0.8, 0.65, 2);
 }
 // 06 背坡伤员集结处的那道反坡（2026.09.19 契约 §3）。不是「掩体」是地形：
 // 集结处在它南边，站在担架旁边看不见机枪位、看不见掩蔽部门外、看不见北边来敌。
@@ -159,49 +159,29 @@ GroundedBlock("CollectionBackslopeEast",-27,-115.5,26,3,2.5);
 GroundedWall("CollectionLitterWall",-40,-95,9,1.1,0.7);
 Room("BundleSupplyHouse",Sortie.house.x,Sortie.house.z,9,10,{northDoor:false});
 Block("BundleCrate",Sortie.bundle.x,Sortie.bundle.z,1.2,.5,.8,"missionRoute");
-for(const crawl of Sortie.crawl){
-  const ground=SampleMissionTerrain(crawl.x,crawl.z);
-  Block(`BundleCrawl${crawl.id}Roof`,crawl.x,crawl.z,crawl.w,Sortie.crawlRoofM,crawl.d,"timber",
-    {y:ground+Sortie.crawlClearanceM+Sortie.crawlRoofM/2});
-  for(const side of [-1,1])GroundedWall(`BundleCrawl${crawl.id}Side${side}`,crawl.x+side*crawl.w/2,
-    crawl.z,.4,2.4,crawl.d+2);
-}
-// Traverse walls face the tank road and interrupt long fire lanes. Open ends lead around each bend.
-for(const [i,x,z,d] of [[0,45,-131,9],[1,53,-143,8],[2,45,-161,9],[3,51.5,-177,8]])
-  GroundedWall(`BundleTankScreen${i}`,x,z,.7,2.6,d);
-// A traverse stops the tank from firing lengthwise down the full front trench.
-GroundedWall("FrontTraverseBlastScreen",25.1,-124.5,.7,3.75,5.5);
-GroundedWall("BundleParapet",13,-118.9,5.2,1.65,.7);
-GroundedWall("FlankParapet",23,-112.6,5.4,1.5,.75);
-// The forward weapon belongs to its real gunner; no suspended placeholder mesh.
-// Side protection sits behind the muzzle so the documented firing arc stays usable.
-for (const side of [-1, 1]) GroundedWall(`MachineGunSideCover${side}`, side * 2.8, -126.7, 0.65, 1.8, 4);
-// The authored ZB-26 minimum is 0.12294 m below its model origin.
-const gunRestTop=SampleMissionTerrain(0,-128)+1.45+.08-.12294;
-const gunRestHeight=gunRestTop-SampleMissionTerrain(0,-128.55);
-Block("MachineGunRest",0,-128.55,1.18,gunRestHeight,1.0,"cover");
-// A timber firing step carries the shooter's feet even after nearby shelling
-// deforms the soil. The gun and the shooter share a stable physical foundation.
-Block("MachineGunFiringStep",0,-127.5,2.2,.18,1.9,"timber",
-  {y:SampleMissionTerrain(0,-127.4)-.09});
-for (const [i, x, z, w] of [
-  [0, -26, -164, 10],
-  [1, 28, -158, 9],
-  [2, 62, -144, 10],
-  [3, 35, -82, 14],
-])
-  Wall(`FieldRuin${i}`, x, z, w, i<2?.75:1.3, 0.7);
-for(const x of [-28,-23,-18,-13,-8,-3,2,7])Wall(`WithdrawCover${x}`,x,-150,3.8,.88,.65);
-// The three 0.62 m EnemyForwardCover slabs that used to sit alone on z=-173 are gone: they were
-// below the crouch-and-hide band and one 4.2 m slab only ever registered a single cover point.
-// The FRONT_COVER rows at the end of this file rebuild that row across the whole front.
-// Real shelter for the waiting pairs; south-facing withdrawal paths remain open.
-for(const [i,post] of FRONT_GUARD_POSTS.entries()) {
-  GroundedWall(`GuardWaitingCover${i}`,post.x,post.z-1.25,5.8,1,.65);
-  for(const side of [-1,1])GroundedWall(`GuardWaitingWing${i}_${side}`,post.x+side*2.7,post.z,.5,1,3.8);
-}
-for(const [i,x,z] of [[0,-16,-149.5],[1,-8,-151.5],[2,12,-151.5],[3,23,-151.5],[4,-32,-153.5],[5,-6,-158.5]])
-  Wall("AssaultApproachCover"+i,x,z,2.6,.58,.6);
+GroundedWall("RightNestRearWall",28.5,-135,9,3.2,.8);
+GroundedWall("RightNestEastWall",33.5,-136,.8,3.0,8);
+GroundedWall("RightNestWestStub",20,-142,.8,.35,5);
+GroundedWall("RightNestFrontRest",27,-143,3.4,.7,.75);
+GroundedWall("RightNestNorthRuin",31.5,-147,4,1.2,.7);
+GroundedWall("RightApproachTraverse",18.8,-124,.7,2.8,9);
+GroundedWall("RightApproachOuter",25.5,-121,.65,1.05,3.5);
+GroundedWall("RoadAttackScreen",41.8,-135.4,.75,2.8,6);
+GroundedWall("RoadAttackRearWall",32,-131,4.5,2.6,.75);
+GroundedWall("SupplyRoadScreen",41,-114,.8,3.5,14);
+GroundedWall("SupplyCourtSouth",39,-100,4,2.3,.7);
+GroundedWall("SupplyCourtWest",24.8,-109,.7,2.7,9);
+GroundedWall("GuardSafeTraverse",-5,-129,5.5,3,.8);
+// An unbroken high flank prevents a free bypass from the trapped men into the ammunition sap.
+GroundedBlock("GuardEastFlank",16,-147,2.2,3.0,9);
+GroundedWall("LeftGunParapet",-31,-152,4.5,.7,.8);
+GroundedWall("LeftGunSide",-34,-149,.7,2,5);
+// Rest height follows the same floor and origin as the usable captured gun.
+const gunRestTop=SampleMissionTerrain(Sortie.nest.x,Sortie.nest.z)+1.45+.08-.12294;
+Block("MachineGunRest",27,-142.6,1.18,gunRestTop-SampleMissionTerrain(27,-142.6),.7,"cover");
+Block("MachineGunFiringStep",27,-141,2.2,.12,1.9,"timber",{y:SampleMissionTerrain(27,-141)-.06});
+for(const [i,x,z,w] of [[0,-26,-164,10],[1,28,-169,7],[2,58,-174,6],[3,35,-82,14]])
+  Wall(`FieldRuin${i}`,x,z,w,i<2?.8:1.3,.7);
 // The village route passes through a kitchen, inner courtyard and connected rooms.
 Room("Kitchen", 58, -9, 12, 15, { northDoor: true, southDoor: true });
 Room("ConnectedHouse", 58, 8, 12, 15, { northDoor: true, southDoor: true, eastWindow: true });
@@ -598,15 +578,16 @@ export const MISSION_ANCHORS = Object.freeze({
   // `train` / `unload` 两个锚点随军列下线（2026.09.19 第三波）：`unload` 最后一个
   // 消费者是 Script_EditorFullScene 的「军列卸载」巡场机位，那个机位已经换成
   // 掩蔽部与伤员集结处（按 `collection` 取点）。
-  front: { x: 0, z: -124 },
+  front: Sortie.nest,
+  rightRear:Sortie.rear,withdrawalGap:Sortie.gap,
   orders: Sortie.orders,
-  gun: { x: 0, z: -128 },
+  gun: Sortie.nest,
   bundle: Sortie.bundle,
-  throw: { x: 30, z: -117 },
+  throw: Sortie.throw,
   village: { x: 55, z: -20 },
   melee: { x: 58, z: 6 },
   transferSupply: { x: 93, z: 110 },
-  forwardNest: { x: -24, z: -130 },
+  forwardNest: Sortie.leftGun,
   gate: { x: 53, z: 34 }, courtCover: { x: 67, z: 24 },
   transfer: { x: 95, z: 103 }, queue: { x: 74, z: 111 },
   ...MISSION_REAR_ANCHORS,
@@ -622,15 +603,16 @@ export const MISSION_ROUTES = Object.freeze({
   opening: OPENING.approachRoute,
   // The rebuilt 03 entry comes from the casualty collection point. Keep only
   // that live communication-trench leg; the station-side head is retired.
-  support: MISSION_STAGE_ROUTES.rearTrench.slice(4),
+  support: [...MISSION_STAGE_ROUTES.rearTrench.slice(4),...Sortie.approach.slice(1)],
+  rightRear:Sortie.rearRoute,attack:Sortie.attackRoute,
   bundle: Sortie.route,
-  bundleReturn: Sortie.route.slice(3).reverse(),
+  bundleReturn: [...Sortie.route].reverse(),
   // 2026.09.19：orders 锚点迁到背坡伤员集结处，所以这两条返程线不再停在前沿的
   // (14,-110)，而是沿交通壕退回集结处（= collectionReturn 的后半段）。
-  orders: [Sortie.throw,...MISSION_STAGE_ROUTES.collectionReturn.slice(1)],
+  orders: [...Sortie.attackRoute].reverse().concat(MISSION_STAGE_ROUTES.collectionReturn.slice(1)),
   // The tank can be immobilized anywhere along the return trench, so the rally
   // leg starts wherever the bundle run is; the squad already walks it this way.
-  ordersRejoin: [...Sortie.route.slice(3).reverse(),...MISSION_STAGE_ROUTES.collectionReturn.slice(1)],
+  ordersRejoin: [...Sortie.route].reverse().concat(MISSION_STAGE_ROUTES.collectionReturn.slice(1)),
   // 2026.09.19 第二波：旧 `south` 与 07 的 `southWalk` 合成一条。
   // 旧线从前沿 (-36,-124) 起手、走的是已经取消的那两个大折返；新版 06 的后送队
   // 是从**背坡伤员集结处**起行的（columnDeparted），和玩家走同一条线才对得上
@@ -666,18 +648,11 @@ export const MISSION_ROUTES = Object.freeze({
 });
 import { FRONT_GUARD_POSTS, FRONT_COVER, FRONT_FIELD_MEN, FrontAssaultLaneCuts, APPROACH_TACTICS } from "./Data_FirstLevelMissionFront.mjs";
 export const MISSION_PLACEMENT = Object.freeze({
-  squadFrontPositions:[{x:-1.7,z:-129},{x:1.7,z:-128.7},{x:14,z:-129},{x:16,z:-127.5}],
-  reliefApproach: [...MISSION_ROUTES.support,{x:6,z:-123}],
-  reliefPositions: [{x:-30,z:-123.4},{x:-26,z:-124.9},{x:-21,z:-122.8},{x:-17,z:-125},{x:-10,z:-124.3},{x:4,z:-123.2},{x:11,z:-125},{x:20,z:-124.6}],
-  // First arrivals move furthest down the communication trench; the mouth stays open.
-  guardWithdrawalRoutes: Array.from({length:8},(_,i)=>[
-    FRONT_GUARD_POSTS[i],
-    {x:FRONT_GUARD_POSTS[i].x,z:-140},
-    {x:-20+i*.45,z:-137+i*.35},
-    {x:-20+i*.35,z:-124+i*.2},
-    {x:6,z:-124},
-    {x:-8,z:-112},
-    {x:-8+(i%2?1:-1),z:-92-Math.floor(i/2)*2.8},
+  squadFrontPositions:OPENING.frontPosts,
+  reliefApproach:MISSION_STAGE_ROUTES.rearTrench.slice(4),
+  reliefPositions:[Sortie.leftSeat,{x:-18,z:-123}],
+  guardWithdrawalRoutes:Array.from({length:8},(_,i)=>[
+    FRONT_GUARD_POSTS[i],...Sortie.guardRoute,{x:-18+i*1.5,z:-124},
   ]),
   kitchenInterior: {minX:53,maxX:63,minZ:-15,maxZ:-2},
   // ConnectedHouse（58,8，12×15）的可站区域：墙心 x 52/64、z 0.5/15.5，墙厚 0.6。
@@ -695,7 +670,7 @@ export const MISSION_PLACEMENT = Object.freeze({
   ambushSquadRoute: [{x:58,z:-8},{x:58,z:-3},{x:58,z:-0.4}],
   ambushSquadLanesM: [-0.7,0.7,0],
   wardInterior: MISSION_RECEPTION_SPACE.ward,
-  tankStart: { x: 36, z: -173 },
+  tankStart: Sortie.road[0],
   tankTargets: [
     { x: -24, z: -130 },
     { x: 16, z: -131 },
@@ -831,7 +806,7 @@ export const MISSION_SUPPLIES = Object.freeze([
   // 2026-09-15: the shelter corner is now a fight of its own, between the trench
   // and the front crates. Kept on the recess floor, clear of its entry lane and posts.
   {id:"Shelter",x:-34.2,z:-18.3,supportHeight:null},
-  {id:"Front",x:-2.2,z:-124,supportHeight:null},
+  {id:"Front",x:29.5,z:-128,supportHeight:null},
   {id:"Orders",x:Sortie.orders.x-1.5,z:Sortie.orders.z,supportHeight:null},
   {id:"Courtyard",x:50,z:33.05,supportHeight:null},
   {id:"Transfer",x:93,z:110,supportHeight:1.15},

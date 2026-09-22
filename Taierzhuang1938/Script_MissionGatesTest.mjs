@@ -99,7 +99,7 @@ for (const stage of MISSION_STAGES)
     assert.equal(gate.step, stage.id, `${factId} 的 step 应当是 ${stage.id}，实际 ${gate.step}`);
   }
 checks += 1;
-Check(requirementFacts.length === 87, `requirements 事实共 87 条，实际 ${requirementFacts.length}`);
+Check(requirementFacts.length === 96, `requirements 事实共 96 条，实际 ${requirementFacts.length}`);
 
 const KINDS = new Set(["proximity", "proximityFamily", "interior", "voice", "interaction",
   "combat", "column", "cutscene", "scripted", "timer"]);
@@ -143,7 +143,7 @@ for (const factId of ["frontBattleStarted", "kitchenEntered", "bundleRoutePoint"
 // 家族门能按后缀解析回那一个点。
 Check(MissionGateFamily("approachShell2")?.point, "approachShell2 能解析出点");
 Check(MissionGateFamily("bundleRoutePoint0")?.point, "bundleRoutePoint0 能解析出点");
-Check(MissionGateFamily("bundleCrawlFirst")?.point, "bundleCrawlFirst 能解析出点");
+Check(MissionGateFamily("bundleCrawlFirst") === null, "新支沟没有无效矮顶或强制匍匐门");
 Check(MissionGateFamily("bundleRoutePoint999") === null, "越界的家族事实解析不出来");
 Check(MissionGateFamily("frontReached") === null, "非家族事实不会被家族前缀吃掉");
 Check(MissionFactGate("frontReached")?.gate.kind === "proximity", "MissionFactGate 精确命中");
@@ -217,8 +217,8 @@ checks += 1;
 // SpawnEncounter 的字面量调用：只剩 front 那两处（UpdateFront 记 frontBattleStarted
 // 时那一处，与 Update 的 Support 段补的那一处）。其余全部走 MISSION_STEP_SPAWNS。
 const literalSpawns = [...runtimeSource.matchAll(/this\.SpawnEncounter\(\s*["']([A-Za-z0-9]+)["']\s*\)/g)].map((m) => m[1]);
-assert.deepEqual(literalSpawns, ["front", "front"],
-  `运行时里写死组名的 SpawnEncounter 只允许 front 那两处，实际是 ${JSON.stringify(literalSpawns)}`);
+assert.deepEqual(literalSpawns, ["front"],
+  `运行时只保留 front 的幂等补建，03 的初始部署由 FrontBattle 负责，实际是 ${JSON.stringify(literalSpawns)}`);
 checks += 1;
 Check(/this\.SpawnEncounter\(plan\.id\)/.test(runtimeSource), "转运区第二处威胁仍由 UpdateTransferThreats 按 plan.id 生成");
 Check(/for \(const id of MISSION_STEP_SPAWNS\[stage\.id\] \|\| \[\]\) this\.SpawnEncounter\(id\);/.test(runtimeSource),
@@ -240,12 +240,8 @@ const NEAR_WHITELIST = [
     why: "OpeningPrompt 的「按 Z 趴下」键帽提示，靠近爬行段就显示，不记任何事实" },
   { pattern: /if\(!this\.Near\(plan\.near,plan\.nearM\)\)continue;/,
     why: "UpdateTactics 的战术放行点，点与半径来自 MISSION_TACTICS 的 near/nearM，放的是走位不是事实" },
-  { pattern: /if\(!this\.tank\.active&&this\.Near\(A\.front,R\.tankRevealDistanceM\)\)/,
-    why: "战车揭示距离，改的是 tank.active（战车开始动），不记事实；半径已在 MISSION_TUNING" },
   { pattern: /if\(this\.Near\(Sortie\.house,Sortie\.supplierRangeM\)\)this\.Say\('BundleSupply'\);/,
     why: "补给兵台词的触发圈；事实 bundleDirectionsHeard 由 VoiceDone 记，走的是 voice 门" },
-  { pattern: /if\(!returning && this\.Near\(A\.bundle,8\)\)target=A\.bundle;/,
-    why: "指引箭头的目标吸附（走到屋子附近就直接指箱子），不记事实" },
 ];
 const nearCalls = [...runtimeSource.matchAll(/this\.Near\(/g)].length;
 assert.equal(nearCalls, NEAR_WHITELIST.length,
@@ -311,7 +307,7 @@ Check(model.transferThreats.every((threat, index) => threat.order === index + 1
 for (const name of ["pursuit", "sortie", "sortieReturn", "approach", "supportTrench", "flank", "village", "evacuation", "exit"])
   Check(model.routes[name]?.length, `routes 里要有 ${name}`);
 Check(model.layout.blocks.length > 500 && model.layout.gates.length > 0, "layout 带上了体块与门");
-Check(model.layout.roads.length > 0 && model.layout.trenches.length === 7, "layout 带上了道路与 7 段壕沟");
+Check(model.layout.roads.length > 0 && model.layout.trenches.length === 13, "layout 带上了道路与 13 段壕沟，包括新版前沿六段连接");
 Check(model.layout.railway.points.length > 0 && !!model.layout.bridge, "layout 带上了铁路与桥");
 Check(typeof model.layout.SampleGroundColor === "function", "layout 带上了地表取色函数");
 Check(Object.keys(model.layout.semanticColors).length > 5, "layout 带上了语义色");
@@ -363,7 +359,7 @@ Check(FindOwner(model, "village").member === null && FindOwner(model, "village")
 Check(FindOwner(model, "VillageGunner").facts.includes("villageGunSilent"), "反查出引用该成员的事实");
 
 // 人话。
-Check(DescribeFact(model, "frontReached").includes("front") && DescribeFact(model, "frontReached").includes("9"),
+Check(DescribeFact(model, "frontReached").includes("front") && DescribeFact(model, "frontReached").includes("4"),
   "DescribeFact 讲得出 frontReached 的锚点与半径");
 Check(DescribeFact(model, "supportOrdersHeard").includes("SupportOrder"), "DescribeFact 讲得出对白门");
 Check(DescribeFact(model, "bundleTaken").includes("MissionBundle"), "DescribeFact 讲得出交互门");
