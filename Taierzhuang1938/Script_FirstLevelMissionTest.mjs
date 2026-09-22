@@ -142,6 +142,21 @@ if(process.argv.includes("--opening-audio"))process.exit(0);
     show.playerMeleeDormancy=false;show.savedMeleeDormancy=true;show.ReleaseMeleeDormancy();
     assert.equal(show.r.player.meleeDormant,false,"melee eligibility returns after captive camera control");
     console.log("ok rescue waits for every original vanguard casualty and restores player melee eligibility");
+    const coverActors=new Map(Object.keys(C.coverPosts).map((id,i)=>[id,{alive:true,position:{...(i?{x:-40,z:-118}:C.positions.heRear)},...(i?{}:{moveArriveM:.63})}]));
+    show.r.companion={Handle:id=>coverActors.get(id)};show.r.ai={ReleaseCover(){}};
+    show.r.MoveActor=(actor,point)=>{actor.next={...point};};show.r.Defend=(actor,point)=>{actor.defended={...point};};
+    show.UpdateSuppression();
+    for(const [id,actor] of coverActors){assert.deepEqual(actor.next,C.coverRoutes[id][0]);assert.ok(actor.moveArriveM<C.coverWaypointArrivalM);}
+    show.ReleaseSuppressionMovement();
+    assert.equal(coverActors.get("heyoutian").moveArriveM,.63,"temporary exact corner arrival restores the preceding movement contract");
+    assert.equal(Object.hasOwn(coverActors.get("liuwencai"),"moveArriveM"),false,"an absent arrival override stays absent after interruption");
+    for(let step=0;step<8;step++){
+      show.UpdateSuppression();for(const actor of coverActors.values())if(actor.next)Object.assign(actor.position,actor.next);
+    }
+    for(const [id,actor] of coverActors){assert.deepEqual(actor.defended,C.coverPosts[id]);assert.equal(show.coverWalks[id].ownsArrival,false);}
+    assert.equal(coverActors.get("heyoutian").moveArriveM,.63);
+    assert.equal(Object.hasOwn(coverActors.get("liuwencai"),"moveArriveM"),false);
+    console.log("ok both covering actors visit their door waypoints and release temporary movement ownership");
   }
   {
     const actor={alive:true,missionFrontStandby:true,position:new Vector3(0,0,-10),stance:0,suppression:0};
@@ -149,6 +164,40 @@ if(process.argv.includes("--opening-audio"))process.exit(0);
     assert.equal(FirstLevelMissionRuntime.prototype.Threatens.call(r,{x:0,z:0}),true,"waiting to advance does not erase a live enemy's firing lane");
     r.battlefield.Raycast=()=>({t:1});
     assert.equal(FirstLevelMissionRuntime.prototype.Threatens.call(r,{x:0,z:0}),false,"physical cover still blocks a preplaced enemy");
+  }
+  {
+    const r=Object.create(FirstLevelMissionRuntime.prototype);
+    const Person=(x,z,head=true)=>{const person={alive:true,position:new Vector3(x,0,z),actor:{}};
+      if(head)person.actor.characterRig={bones:{head:{getWorldPosition:out=>out.copy(person.position).add(new Vector3(0,1.6,0))}}};
+      return person;};
+    const luo=Person(2,-4),guard=Person(5,-2),farGuard=Person(25,-2),deadGuard=Person(1,-1),relief=Person(10,-20);
+    deadGuard.alive=false;
+    Object.assign(r,{player:{position:new Vector3(),EyePosition:new Vector3(0,1.7,0)},
+      guards:[{actor:deadGuard},{actor:farGuard},{actor:guard}],relief:[{actor:deadGuard},{actor:relief}],
+      frontShow:{VoicePosition:cue=>cue.id==="BundleOrder"?new Vector3(99,99,99):null},
+      companion:{Handle:who=>who==="luo"?luo:null},
+      Point:(position,height)=>position.clone().add(new Vector3(0,height,0))});
+    const bundle=MISSION_DIALOGUE.find(cue=>cue.id==="BundleOrder"),exchange=MISSION_DIALOGUE.find(cue=>cue.id==="FrontRelief");
+    assert.deepEqual(r.VoicePosition(bundle,bundle.lines[0]).toArray(),[5,1.6,-2],
+      "the current living report guard speaks from his physical head, not the player's fallback position");
+    assert.equal(r.frontShow.bundleOrderGuard,guard,"the complete report retains one actual speaker");
+    guard.position.x=30;
+    assert.deepEqual(r.VoicePosition(bundle,bundle.lines[0]).toArray(),[30,1.6,-2],
+      "the same guard's moving head is followed even when another guard becomes nearer");
+    assert.deepEqual(r.VoicePosition(bundle,bundle.lines.find(line=>line.who==="luo")).toArray(),[2,1.35,-4],
+      "the leader's answer is not pinned to the report guard by the old whole-cue adapter");
+    assert.deepEqual(r.VoicePosition(bundle,bundle.lines.find(line=>line.who==="shunzi")).toArray(),[0,1.7,0],
+      "the new Shunzi response retains first-person ownership within the same cue");
+    guard.alive=false;
+    assert.deepEqual(r.VoicePosition(bundle,bundle.lines[0]).toArray(),[25,1.6,-2],
+      "a dead reporting guard is replaced by an actual surviving guard, never an invented position");
+    const reliefLine=exchange.lines.find(line=>line.who==="relief");
+    assert.deepEqual(r.VoicePosition(exchange,reliefLine).toArray(),[10,1.6,-20],
+      "the newly authored relief line follows the living replacement soldier");
+    delete relief.actor.characterRig;relief.position.z=-15;
+    assert.deepEqual(r.VoicePosition(exchange,reliefLine).toArray(),[10,1.3,-15],
+      "a missing selected model keeps the real relief entity's position");
+    console.log("ok field dialogue maps the living report guard and relief soldier without moving other cue speakers");
   }
   {
     assert.deepEqual(MISSION_ENCOUNTERS.approach.map(a=>a.id),
@@ -602,12 +651,16 @@ for (const [name, route] of Object.entries({ ...MISSION_ROUTES, ...Object.fromEn
 // 罗班长进不来，02 永远不开始，而所有既有门禁全是绿的。
 {
   const bunker=P.bunker;
+  const {OPENING_STORYBOARDS:storyboards}=await import("./Data_OpeningStoryboards.mjs");
   const lanes={
     BunkerExit:[{x:bunker.player.x,z:bunker.player.z},
       {x:(bunker.luoLift.x+bunker.yaowaLift.x)/2,z:(bunker.luoLift.z+bunker.yaowaLift.z)/2},
       {x:bunker.luoEntry.x,z:bunker.luoEntry.z},A.bunkerRear,MISSION_STAGE_ROUTES.rearTrench[1]],
     BunkerAssault:[bunker.ijaStart[0],bunker.ijaKill[0],bunker.ijaDoor[0],A.bunkerDoor],
     BunkerAssaultB:[bunker.ijaStart[1],bunker.ijaKill[1],bunker.ijaDoor[1],A.bunkerDoor],
+    CoverHe:[storyboards.positions.heRear,...storyboards.coverRoutes.heyoutian],
+    CoverWen:[{x:-40,z:-118},...storyboards.coverRoutes.liuwencai],
+    PullReturn:[storyboards.positions.pullEnd,...storyboards.pullReturnWaypoints,storyboards.positions.luoPull],
   };
   for(const state of MISSION_LAYOUT.scenario.states)for(const [name,lane] of Object.entries(lanes)){
     for(let i=1;i<lane.length;i++){

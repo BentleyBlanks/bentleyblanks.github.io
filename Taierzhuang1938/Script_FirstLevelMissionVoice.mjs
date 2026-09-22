@@ -34,7 +34,7 @@ export class FirstLevelMissionVoice {
         side: cue.subtitles === false ? "ija" : "nra",
         gain: 1,
         version: this.manifest.cues[cue.id].sha256,
-        analyzeSpeech: cue.lines.some(line => line.who === "luo"),
+        analyzeSpeech: true,
       }));
       await this.audio.LoadVoices(new URL("./Audio/FirstLevel/", import.meta.url).href, entries);
       this.loaded = true;
@@ -192,11 +192,23 @@ export class FirstLevelMissionVoice {
     if(this.hud.SayLines)this.hud.SayLines(rows,seconds);
     else for(const row of rows)if(row.started)this.hud.Say(row.speaker,row.text,row.seconds);
   }
+  // Alignment gaps belong to the speaker who just finished. Falling back to
+  // line zero here used to fling the entire take back across the room on pauses.
+  Speaker(track) {
+    let index = 0;
+    for (let i = 0; i < track.plan.lines.length; i++) {
+      if (track.plan.lines[i][0] > track.sourceTime) break;
+      index = i;
+    }
+    return track.cue.lines[index];
+  }
   PlaySegment() {
     const current = this.current, segment = current.plan.segments[current.segmentIndex];
+    const line = this.Speaker(current);
     // 缺录音的 cue 不碰音频引擎，但字幕、Line 事件和 Done 照常按估算时长走完。
     const played = current.recorded ? this.audio.PlayStoryVoice(`Mission${current.cue.id}`, {
-      position: this.Position?.(current.cue,current.cue.lines[Math.max(0,current.index)]),
+      position: this.Position?.(current.cue,line),
+      dialogue: true, firstPerson: line.who === "shunzi",
       environmentGain:MISSION_TUNING.storyVoiceBedGain,
       offset: current.sourceTime,
       maxDuration: segment.end-current.sourceTime,
@@ -254,8 +266,12 @@ export class FirstLevelMissionVoice {
     const index=current.plan.lines.findIndex(([start,end])=>current.sourceTime>=start&&current.sourceTime<end);
     const spokenIndex=current.sourceTime<segment.end?index:-1;
     this.DialogueLine(current,spokenIndex);
-    const position=this.Position?.(current.cue,current.cue.lines[Math.max(0,index)]);
-    if(position&&this.audio.storyVoice)this.audio.MoveVoice?.(this.audio.storyVoice,position);
+    const line=this.Speaker(current),position=this.Position?.(current.cue,line);
+    if(this.audio.storyVoice) {
+      if(this.audio.SetStoryVoiceSpeaker)this.audio.SetStoryVoiceSpeaker(this.audio.storyVoice,
+        {position,firstPerson:line.who==="shunzi",who:line.who,speaking:spokenIndex>=0});
+      else if(position)this.audio.MoveVoice?.(this.audio.storyVoice,position);
+    }
     if(current.plan.parallel) {
       current.started=spokenIndex>=0&&spokenIndex!==current.index; current.index=spokenIndex;
       this.UpdateParallel(dt);this.ShowParallelSubtitles();

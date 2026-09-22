@@ -220,6 +220,36 @@ for (const cue of MISSION_DIALOGUE) {
   assert.equal(plan.lines.length, cue.lines.length, cue.id + " 每句一个区间");
 }
 console.log("ok 具名事件齐全，整段录音不拆段");
+{
+  const cue=byId.get("ShunziCurse"),plan=MissionVoiceTimeline(cue,12.5);
+  assert.equal(plan.segments.length,1);
+  assert.equal(plan.segments[0].start,plan.lines[0][0]-.35,
+    "discovery enters the intact Japanese take just before speech, not seven seconds of leading effects");
+  assert.equal(plan.lines[0][0],MISSION_VOICE_ALIGNMENT.ShunziCurse.lines[0][0],
+    "speech keeps original source-relative timestamps after the entry offset");
+}
+
+// Speaker routing changes perspective without restarting a continuous take.
+{
+  const routes=[],plays=[];
+  const audio={
+    PlayStoryVoice(key,options){const voice={key};this.storyVoice=voice;plays.push({key,options,voice});return {voice};},
+    StopStoryVoice(){this.storyVoice=null;},
+    SetStoryVoiceSpeaker(voice,options){routes.push({voice,...options});},
+  };
+  const voice=new FirstLevelMissionVoice({audio,hud:{Say(){}},Position:()=>({x:8,y:1.6,z:0})});
+  voice.manifest={cues:{BunkerBanter:{seconds:24.2}}};
+  voice.Enqueue("BunkerBanter");
+  for(let i=0;i<1400;i++)voice.Update(1/60);
+  assert.equal(plays.length,1,"speaker changes must not split or restart the whole take");
+  assert.ok(plays[0].options.dialogue,"whole takes opt into switchable dialogue routes");
+  assert.ok(routes.some(row=>row.who==="shunzi"&&row.firstPerson),"own lines use the first-person route");
+  assert.ok(routes.some(row=>row.who==="runner"&&!row.firstPerson),"the runner remains a world source");
+  assert.ok(routes.every(row=>row.voice===plays[0].voice),"every speaker uses the same source handle");
+  const gap={cue:byId.get("RescueCall"),plan:MissionVoiceTimeline(byId.get("RescueCall"),10.8),sourceTime:8.5};
+  assert.equal(voice.Speaker(gap).who,"shunzi","a pause after the player's line must not move the take back to its first speaker");
+  console.log("ok whole-cue speaker routing preserves source and first-person ownership");
+}
 
 // 10. 播放器：缺录音照走字幕与事件、未知 cue 不抛异常。
 {

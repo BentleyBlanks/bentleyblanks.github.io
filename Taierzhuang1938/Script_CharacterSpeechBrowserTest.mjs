@@ -15,7 +15,7 @@ try {
   await page.waitForFunction(()=>window.Tengxian?.state.ready,null,{timeout:180000});
   await page.locator('#bootStart').click();
   await page.waitForFunction(()=>window.Tengxian.audio.ctx?.state==='running' &&
-    window.Tengxian.audio.voiceBank.get('MissionTrainBriefing')?.speechEnvelope,null,{timeout:90000});
+    window.Tengxian.audio.voiceBank.get('MissionGuideFollow')?.speechEnvelope,null,{timeout:90000});
   const initial=await page.evaluate(async()=>{
     const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime();await r.voiceReady;
     g.StepFrames(12,1/60,true);
@@ -38,9 +38,9 @@ try {
     const ordinary=g.actorFactory.Create('nra',{modelVariant:4,seed:31});
     const ordinaryHasFace=!!ordinary.characterRig.facial;ordinary.Dispose();
     await g.audio.ctx.resume();r.voice.Clock=()=>g.audio.ctx.currentTime;
-    r.voice.Replay('TrainBriefing');r.voice.Update(0);
+    r.voice.Replay('GuideFollow');r.voice.Update(0);
     return {model:rig.modelId,controls:face.controls.length,ordinaryHasFace,
-      envelopeSamples:g.audio.voiceBank.get('MissionTrainBriefing')?.speechEnvelope?.levels.length,
+      envelopeSamples:g.audio.voiceBank.get('MissionGuideFollow')?.speechEnvelope?.levels.length,
       audioState:g.audio.ctx.state,skinCounts:meshes.map(m=>m.skeleton.bones.length)};
   });
   assert.equal(initial.controls,11);assert.equal(initial.ordinaryHasFace,false);
@@ -77,7 +77,7 @@ try {
   });
   assert.equal(pause.level,0);assert.ok(pause.angle<1e-6);
   const resumed=await page.evaluate(()=>{
-    const p=window.SpeechProbe;p.r.voice.Replay('TrainBriefing');p.r.voice.Update(0);p.g.StepFrames(1,1/60,true);
+    const p=window.SpeechProbe;p.r.voice.Replay('GuideFollow');p.r.voice.Update(0);p.g.StepFrames(1,1/60,true);
     return {phase:p.r.voice.State().playbackPhase,source:p.r.voice.current.clockSource};
   });
   assert.equal(resumed.phase,'playing');assert.equal(resumed.source,0);

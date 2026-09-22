@@ -21,6 +21,10 @@ export function MissionVoiceTimeline(cue, total) {
     const start = cursor; cursor += total * weight / sum; return [start, cursor];
   });
   const segment = { id: "WholeExchange", start: 0, end: total, wait: 0 };
+  // This take has seven seconds of effects before the actual Japanese command.
+  // Enter the same intact recording just before its first line; timestamps stay
+  // source-relative so speech, subtitle and the discovery action agree.
+  if (cue.id === "ShunziCurse" && fits) segment.start = Math.max(0, lines[0][0] - .35);
   const tail = 0;
   const Late = (index, fraction) => lines[index][0] + (lines[index][1] - lines[index][0]) * fraction;
   if (cue.id === "BunkerBanter") segment.events = [{ at: lines.at(-1)[1], id: "BunkerBlast" }];

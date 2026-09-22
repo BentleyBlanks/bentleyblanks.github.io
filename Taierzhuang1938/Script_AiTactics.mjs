@@ -195,7 +195,7 @@ export function ChargeOpportunity(soldier, now, attackers = 0) {
 /** 不参与战术分配的人（伙夫、担架队、赤手空拳的）。 */
 function IsNoncombatant(soldier) {
   if (!soldier) return true;
-  if (soldier.unarmed === true) return true;
+  if (soldier.unarmed === true || soldier.scriptedNoncombatant === true) return true;
   return ROLE_PREFERENCE[soldier.tacticalRole] === "none";
 }
 
@@ -936,7 +936,12 @@ export class TacticsDirector {
     // 不参与战术分配的人（伙夫、担架队、赤手空拳的）：一条任务都不给，
     // kind 留 null 让 Script_Ai 走本地决策（他们本来就有自己的走位）。
     slot.excluded = IsNoncombatant(soldier);
-    if (slot.excluded) slot.restricted = true;
+    if (slot.excluded) {
+      slot.restricted = true;
+      // A scripted speaker may have acquired a firing slot before the scene
+      // took control. Return it before assigning this squad's active shooters.
+      this.ReleaseToken(soldier.id);
+    }
   }
 
   _AssignEngage(slot, enemy) {

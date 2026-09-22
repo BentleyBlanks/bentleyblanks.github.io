@@ -1,18 +1,33 @@
 // Targeted 03–06 topology checks; gameplay evidence uses the continuous browser driver.
 import assert from "node:assert/strict";
-import {BatchRecovered,AssaultWindow} from "./Script_FirstLevelFrontBattle.mjs";
+import {BatchRecovered,AssaultWindow,FrontEntryRoute} from "./Script_FirstLevelFrontBattle.mjs";
 import {MISSION_STAGES} from "./Data_FirstLevelMission.mjs";
 import {MISSION_LAYOUT as L,MISSION_ROUTES as R,MISSION_PLACEMENT as P} from './Data_FirstLevelMissionLayout.mjs';
 import {FRONT_SORTIE as S} from './Data_FirstLevelFrontRoute.mjs';
+import {FRONT_BATTLE_TUNING as B} from './Data_Tuning_FirstLevelFront.mjs';
 import {SampleMissionTerrain as G} from './Data_FirstLevelMissionTerrain.mjs';
 const solids=[...L.blocks,...L.scenario.states.find(s=>s.id==='BunkerCollapsed').blocks].filter(b=>b.solid!==false&&!L.walkableSurfaces.some(s=>s.id===b.id));
-const routes={support:R.support,rear:S.rearRoute,ammo:R.bundle,attack:S.attackRoute,left:S.leftRoute,orders:R.orders,...Object.fromEntries(P.guardWithdrawalRoutes.map((r,i)=>['guard'+i,r]))};
+const routes={support:R.support,leaderCapture:[...R.support.slice(0,-1),S.leaderCover],rear:S.rearRoute,ammo:R.bundle,attack:S.attackRoute,left:S.leftRoute,orders:R.orders,...Object.fromEntries(P.guardWithdrawalRoutes.map((r,i)=>['guard'+i,r]))};
+const descendingEntries=new Set(['rearExit','blockedLuo','blockedWen']);
+for(const [name,start] of Object.entries({rearExit:{x:-40,z:-120.4},blockedLuo:{x:-37.373,z:-117.11},blockedWen:{x:-36.625,z:-117.11}})){
+ const entry=FrontEntryRoute(start,R.support);
+ assert.ok(entry.some(p=>p.x===-42&&p.z===-116),name+' retains the southern bank corner');
+ assert.ok(entry.some(p=>p.x===-42&&p.z===-113),name+' goes through the real rear-bank opening');
+ routes[name]=[start,...entry];
+}
+const initialized=FrontEntryRoute(R.support[0],R.support);
+assert.deepEqual(initialized.map(({x,z})=>({x,z})),R.support,'03 initialization at collection never retraces the rear exit');
+const advanced=FrontEntryRoute(R.support[1],R.support);
+assert.deepEqual(advanced.map(({x,z})=>({x,z})),R.support.slice(1),'an advanced companion keeps its actual route progress');
 for(const [name,route] of Object.entries(routes)){
  const hits=new Set(),slopes=[];let prev=null;
  for(let i=1;i<route.length;i++){const a=route[i-1],b=route[i],len=Math.hypot(a.x-b.x,a.z-b.z),steps=Math.ceil(len/.2);
  for(let n=0;n<=steps;n++){const x=a.x+(b.x-a.x)*n/steps,z=a.z+(b.z-a.z)*n/steps,y=G(x,z);
  for(const s of solids){const c=Math.cos(s.ry||0),q=Math.sin(s.ry||0),dx=x-s.x,dz=z-s.z;if(Math.abs(dx*c-dz*q)<s.w/2+.35&&Math.abs(dx*q+dz*c)<s.d/2+.35&&s.y+s.h/2>y+.3&&s.y-s.h/2<y+1.7)hits.add(s.id);}
- if(prev&&Math.abs(y-prev.y)>Math.tan(52*Math.PI/180)*Math.hypot(x-prev.x,z-prev.z)+.035)slopes.push([+x.toFixed(1),+z.toFixed(1),+(y-prev.y).toFixed(2)]);prev={x,y,z};}}
+ // The inherited rear exit descends into collection; gravity can descend a
+ // steep bank. Its upward slopes still obey the controller's climbing limit,
+ // and the real capsule descent is covered by --rear-entry-only.
+ if(prev&&(descendingEntries.has(name)?y-prev.y:Math.abs(y-prev.y))>Math.tan(52*Math.PI/180)*Math.hypot(x-prev.x,z-prev.z)+.035)slopes.push([+x.toFixed(1),+z.toFixed(1),+(y-prev.y).toFixed(2)]);prev={x,y,z};}}
  assert.deepEqual([...hits],[],name+' capsule clearance');assert.deepEqual(slopes,[],name+' climbable terrain');
 }
 const Eye=(p,h)=>({...p,y:G(p.x,p.z)+h});
@@ -26,6 +41,11 @@ for(const index of [S.tankBlockIndex,S.tankEndIndex]){
 }
 assert.equal(Sight(Eye(S.seat,1.65),Eye(S.gap,1.2)),null,'captured position can see the rescued men cross the breach');
 assert.equal(Sight(Eye(S.nest,1.45),Eye(S.gap,1.2)),null,'the right gun actually controls the breach before capture');
+assert.ok(Math.hypot(S.leaderCover.x-S.seat.x,S.leaderCover.z-S.seat.z)-B.arrivalM-.4>=1.5,
+  'leader cover stays separate from the player seat even with arrival and cover allowances');
+assert.ok(Math.hypot(S.leaderCover.x-S.nest.x,S.leaderCover.z-S.nest.z)+B.arrivalM<=B.captureRadiusM,
+  'arriving at the separate leader post still completes physical capture');
+assert.equal(Sight(Eye(S.leaderCover,1.2),Eye(S.gap,1.2)),null,'the crouching leader retains a real firing lane to the breach');
 assert.deepEqual(R.bundleReturn,[...R.bundle].reverse(),'return is the same branch');
 assert.deepEqual(S.attackRoute[0],S.rear);assert.deepEqual(S.route[0],S.rear);
 assert.ok(S.house.x<S.road[S.tankEndIndex].x,'ammo house stays on the friendly side of road');

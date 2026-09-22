@@ -3,7 +3,7 @@ import { FRONT_SORTIE as S } from "./Data_FirstLevelFrontRoute.mjs";
 import { FRONT_BATTLE_TUNING as B } from "./Data_Tuning_FirstLevelFront.mjs";
 import { MISSION_TUNING as R } from "./Data_Tuning_FirstLevel.mjs";
 import { MISSION_ROUTES as Routes, MISSION_ANCHORS as A, MISSION_PLACEMENT as P } from "./Data_FirstLevelMissionLayout.mjs";
-import { MISSION_FRONT_COLLECTION_ROUTE } from "./Data_FirstLevelMissionTopology.mjs";
+import { MISSION_FRONT_COLLECTION_ROUTE, MISSION_STAGE_ROUTES } from "./Data_FirstLevelMissionTopology.mjs";
 import { MISSION_ENCOUNTERS, FRONT_BATTLE_OBJECTIVES as Objectives } from "./Data_FirstLevelMission.mjs";
 import { MissionRouteProjection, MissionRoutePoint, MissionRouteLength, MissionRouteLookahead } from "./Script_FirstLevelMissionColumn.mjs";
 import { InstallMissionSentry } from "./Script_FirstLevelMissionPeople.mjs";
@@ -12,6 +12,19 @@ const Distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const AliveBatch=batch=>batch.filter(g=>g.actor.alive);
 export function BatchRecovered(batch){return batch.length>0&&AliveBatch(batch).length>0&&AliveBatch(batch).every(g=>g.safe&&g.progress>=g.route.length);}
 export function AssaultWindow(actors,captured,blocked,threshold=B.assaultKills){return captured&&actors.length>=threshold&&actors.filter(a=>a&&!a.alive).length>=threshold&&!blocked;}
+// The player can reach Support while companions are still behind the rear bank.
+// Join each actor's actual progress to the existing exit polyline; collection is
+// not an unconditional first goal, and actors already there never walk back.
+export function FrontEntryRoute(position,route){
+  const joined=[...MISSION_STAGE_ROUTES.rearTrench.slice(0,4),...route];
+  const {progress}=MissionRouteProjection(joined,position),remaining=[MissionRoutePoint(joined,progress)];
+  let distance=0;
+  for(let i=1;i<joined.length;i++){
+    distance+=Distance(joined[i-1],joined[i]);
+    if(distance>progress+.01)remaining.push({...joined[i]});
+  }
+  return remaining;
+}
 export class FirstLevelFrontBattle {
   constructor(runtime){this.r=runtime;this.walks=new Map();this.leg=null;this.blocked=true;}
   get Active(){return ["Support","MachineGun","Tank"].includes(this.r.flow.stage.id);}
@@ -19,13 +32,28 @@ export class FirstLevelFrontBattle {
   SetWalk(actor,route){if(!actor)return;this.walks.set(actor.id,{route:route.map(p=>({...p})),index:0});this.r.squadRoutes.set(actor.id,route.map(p=>({...p})));}
   Walk(actor,{follow=false,speed=R.squadSpeedMps}={}){
     const r=this.r,w=actor&&this.walks.get(actor.id);if(!actor?.alive||!w)return false;
-    while(w.index<w.route.length&&Distance(actor.position,w.route[w.index])<B.arrivalM)w.index++;
+    // Intermediate points describe checked trench corners. Advancing a metre
+    // early cuts across the inside cover at the right-hand approach; this
+    // corridor intentionally disables the AI's arbitrary obstacle detours.
+    const Arrival=()=>w.index<w.route.length-1?B.arrivalM*.25:B.arrivalM;
+    const previousIndex=w.index;
+    while(w.index<w.route.length&&Distance(actor.position,w.route[w.index])<Arrival())w.index++;
+    if(w.index!==previousIndex)w.rejoin=null;
     if(w.index>=w.route.length){r.Defend(actor,w.route.at(-1),0,.4);r.ai.SetStance(actor,1,.5,true);r.squadRoutes.set(actor.id,[]);return true;}
     if(r.RespondToGrenade(actor))return false;
     const ahead=MissionRouteProjection(w.route,actor.position).progress>MissionRouteProjection(w.route,r.player.position).progress+B.leaderLeadM;
     const wait=follow&&ahead&&Distance(actor.position,r.player.position)>S.leaderWaitM;
+    // Crowd pressure or a grenade evade can leave an actor beside the checked
+    // corridor. Keep one fixed return point until reached, so the next waypoint
+    // cannot pull him back into the same cover every other frame.
+    if(w.rejoin&&Distance(actor.position,w.rejoin)<B.arrivalM*.25)w.rejoin=null;
+    if(!w.rejoin&&w.index>0){
+      const segment=[w.route[w.index-1],w.route[w.index]],projection=MissionRouteProjection(segment,actor.position);
+      if(projection.distance>B.arrivalM*.5)w.rejoin=MissionRoutePoint(segment,projection.progress);
+    }
     actor.missionGuideWaiting=wait;r.squadMarch?.Release(actor);r.ai.ReleaseCover(actor);
-    r.ai.SetStance(actor,1,.5,true);r.MoveActor(actor,w.route[w.index],wait?0:speed);
+    r.ai.SetStance(actor,1,.5,true);r.MoveActor(actor,w.rejoin||w.route[w.index],wait?0:speed);
+    actor.scriptArrivalRadius=Math.min(actor.scriptArrivalRadius,(w.rejoin?B.arrivalM*.25:Arrival())*.5);
     r.squadRoutes.set(actor.id,w.route.slice(w.index));
     if(wait)r.leaderGuide?.Watch(actor);return false;
   }
@@ -46,14 +74,16 @@ export class FirstLevelFrontBattle {
     if(!this.Active)return;const r=this.r;
     for(const actor of r.squad){actor.missionTrainReady=true;actor.scriptedNoncombatant=false;actor.missionNaturalMarch=false;}
     if(stage==="Support"){
-      this.SetLeg("capture",Routes.support);r.Record("frontBattleStarted");r.frontBattleAt=r.time;
+      this.SetLeg("capture",FrontEntryRoute(this.Leader.position,[...Routes.support.slice(0,-1),S.leaderCover]));r.Record("frontBattleStarted");r.frontBattleAt=r.time;
       r.tank.present=false;r.tank.active=false;
-      this.SetWalk(r.companion.Handle("heyoutian"),[...MISSION_FRONT_COLLECTION_ROUTE,...S.leftRoute.slice(1,-1)]);
-      this.SetWalk(r.companion.Handle("liuwencai"),[...MISSION_FRONT_COLLECTION_ROUTE,{x:-18,z:-123}]);
-      this.SetWalk(r.companion.Handle("yaowa"),[...MISSION_FRONT_COLLECTION_ROUTE,...S.leftRoute.slice(1,-2)]);
+      for(const [role,route] of [
+        ["heyoutian",[...MISSION_FRONT_COLLECTION_ROUTE,...S.leftRoute.slice(1,-1)]],
+        ["liuwencai",[...MISSION_FRONT_COLLECTION_ROUTE,{x:-18,z:-123}]],
+        ["yaowa",[...MISSION_FRONT_COLLECTION_ROUTE,...S.leftRoute.slice(1,-2)]],
+      ]){const actor=r.companion.Handle(role);if(actor)this.SetWalk(actor,FrontEntryRoute(actor.position,route));}
       r.Say("FrontBlockade");
     }
-    if(stage==="MachineGun"){r.Say("TankRoadContact");r.tank.present=true;r.tank.active=true;this.SetLeg("cover",[S.seat]);}
+    if(stage==="MachineGun"){r.Say("TankRoadContact");r.tank.present=true;r.tank.active=true;this.SetLeg("cover",[S.leaderCover]);}
     if(stage==="Tank"){r.emplacement.Vacate("sortie");this.SetLeg("supply",Routes.bundle);r.EnsureBundleKeeper();r.Say("BundleGo");}
   }
   InfantryBlockade(){
@@ -81,7 +111,7 @@ export class FirstLevelFrontBattle {
     const defenders=MISSION_ENCOUNTERS.approach.map(s=>r.enemies.get(s.id));
     if(r.Near(S.nest,B.captureRadiusM)&&Distance(this.Leader.position,S.nest)<B.captureRadiusM
       &&defenders.every(a=>a&&!a.alive)){
-      r.Record("frontReached");r.Record("rightNestCaptured");r.Say("FrontAttack");this.SetLeg("cover",[S.seat]);
+      r.Record("frontReached");r.Record("rightNestCaptured");r.Say("FrontAttack");this.SetLeg("cover",[S.leaderCover]);
     }
     if([...r.enemies.values()].some(a=>a.lastFire>0)||r.Inventory().shots>0)r.Record("frontContact");
     const assault=B.assaultIds.map(id=>r.enemies.get(id));

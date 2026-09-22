@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { CampaignActions } from "./Script_FirstLevelCampaignKit.mjs";
-import { MISSION_PLACEMENT as P, MISSION_ROUTES as Routes, MISSION_ANCHORS as A } from "./Data_FirstLevelMissionLayout.mjs";
+import { MISSION_PLACEMENT as P, MISSION_ANCHORS as A } from "./Data_FirstLevelMissionLayout.mjs";
 import { MISSION_STAGE_ROUTES } from "./Data_FirstLevelMissionTopology.mjs";
 import { MISSION_ENCOUNTERS } from "./Data_FirstLevelMission.mjs";
 import { OPENING_STORYBOARDS as Storyboards } from "./Data_OpeningStoryboards.mjs";
@@ -17,7 +17,7 @@ export async function DriveOpening(ctx){
       const g=window.Tengxian;
       const probe=window.openingMotionProbe??={previous:{},maxStep:0,maxTurn:0,maxCameraStep:0,minShoulderBehind:Infinity,violations:[],jointTravel:{}};
       for(let frame=0;frame<15;frame++){
-        g.StepFrames(1,1/60,false);
+        g.StepFrames(1,1/60,frame===14);
         const r=g.Debug.FirstLevelMissionRuntime(),s=r.frontShow.bunker,cam=g.player.camera,Vec=()=>g.player.position.clone();
         probe.births??={};
         for(const actor of r.enemies.values())if(!probe.births[actor.missionId])probe.births[actor.missionId]={
@@ -29,6 +29,16 @@ export async function DriveOpening(ctx){
           if(!a.openingStoryboardLast||a.openingStoryboardHidden||!a.alive)continue;
           const id=a.missionId||a.castId||a.id,previous=probe.previous[id],root=a.actor.root;
           const foot=a.actor.characterRig?.bones.footL.getWorldPosition(Vec());
+          const acting=a.actor.characterRig?.openingActorPerformanceState;
+          if(acting&&!acting.protected){
+            probe.acting??={};const key=acting.cue+"/"+acting.role;
+            const bones=a.actor.characterRig.bones,head=bones.head.quaternion;
+            const hand=root.worldToLocal(bones.handR.getWorldPosition(Vec()));
+            const row=probe.acting[key]??={head:head.toArray(),hand:hand.toArray(),headRadians:0,handMetres:0,speakingFrames:0};
+            row.headRadians=Math.max(row.headRadians,head.angleTo(head.clone().fromArray(row.head)));
+            row.handMetres=Math.max(row.handMetres,hand.distanceTo(Vec().fromArray(row.hand)));
+            if(acting.speaking)row.speakingFrames++;
+          }
           if(previous){
             const step=Math.hypot(root.position.x-previous.x,root.position.z-previous.z);
             const turn=Math.abs(Math.atan2(Math.sin(a.yaw-previous.yaw),Math.cos(a.yaw-previous.yaw)));
@@ -40,29 +50,42 @@ export async function DriveOpening(ctx){
         }
         if(s.CameraActive&&s.playerBody){
           if(probe.camera)probe.maxCameraStep=Math.max(probe.maxCameraStep,cam.position.distanceTo(Vec().fromArray(probe.camera)));
+          if(probe.cameraRotation)probe.maxCameraTurn=Math.max(probe.maxCameraTurn||0,cam.quaternion.angleTo(cam.quaternion.clone().fromArray(probe.cameraRotation))*180/Math.PI);
           probe.camera=cam.position.toArray();
+          probe.cameraRotation=cam.quaternion.toArray();
           for(const side of ['L','R']){
             const shoulder=s.playerBody.characterRig.bones['upperArm'+side].getWorldPosition(Vec());cam.worldToLocal(shoulder);
             probe.minShoulderBehind=Math.min(probe.minShoulderBehind,shoulder.z);
           }
         }
+        if(probe.wasCameraActive&&!s.CameraActive&&probe.cameraRotation)
+          probe.releaseCameraTurn=cam.quaternion.angleTo(cam.quaternion.clone().fromArray(probe.cameraRotation))*180/Math.PI;
+        probe.wasCameraActive=s.CameraActive;
         if(s.phase==='Ambush'&&s.Age<.5&&!s.Executioner(1).alive)probe.violations.push({phase:s.phase,error:'guard fell before contact'});
         if(s.phase==='Black'&&r.opening.eyeClosure>.1)probe.violations.push({phase:s.phase,error:'strike obscured by black screen'});
-        if(s.phase==='Drag'&&s.Age>.8){
-          const hand=s.playerBody.characterRig.bones.handL.getWorldPosition(Vec());
-          const gap=hand.distanceTo(s.Executioner(0).actor.characterRig.bones.handL.getWorldPosition(Vec()));
-          if(gap>.03&&probe.violations.length<20)probe.violations.push({phase:s.phase,error:'drag hands separated',gap});
+        if(['Captive','CaptiveShot','Discover','Drag','Butt','Interrogate','Creep'].includes(s.phase)){
+          const he=r.companion.Handle('heyoutian');
+          if(he.position.z<-123)probe.violations.push({phase:s.phase,error:'He Youtian exposed before the ambush'});
+        }
+        for(const [side,hand] of Object.entries(s.firstPersonState?.hands||{})){
+          if(!s.CameraActive)continue;
+          probe.maxWristBend=Math.max(probe.maxWristBend||0,hand.wristBend);
+          probe.maxWristTwist=Math.max(probe.maxWristTwist||0,Math.abs(hand.wristTwist));
+          probe.maxHandRotationStep=Math.max(probe.maxHandRotationStep||0,hand.rotationStepDegrees||0);
+          probe.maxPartnerHandRotationStep=Math.max(probe.maxPartnerHandRotationStep||0,hand.partnerRotationStepDegrees||0);
+          if(Number.isFinite(hand.partnerWristBend))probe.maxPartnerWristBend=Math.max(probe.maxPartnerWristBend||0,hand.partnerWristBend);
+          const paired=s.phase==='Drag'&&s.Age>.8&&side==='l'||s.phase==='Pull'&&s.Age>.35&&s.Age<2.3;
+          const valid=hand.wristBend<=42.1&&Math.abs(hand.wristTwist)<1&&hand.reachRatio<=.971&&hand.shoulderBehind>.08
+            &&(!Number.isFinite(hand.partnerWristBend)||hand.partnerWristBend<=42.1)
+            &&(!Number.isFinite(hand.partnerRotationStepDegrees)||hand.partnerRotationStepDegrees<20);
+          const contact=!paired||(hand.contactError<.005&&hand.partnerContactError<.005&&hand.palmGap<.022
+            &&hand.palmOpposition<-.85&&Math.abs(hand.partnerWristTwist)<1);
+          if((!valid||!contact)&&probe.violations.length<20)probe.violations.push({phase:s.phase,age:s.Age,side,hand});
         }
       }
       const r=g.Debug.FirstLevelMissionRuntime(),m=g.Debug.FirstLevelMission();
       const show=r.frontShow.bunker;
-      let graspDistances;
-      if(show.phase==="Pull"&&show.Age>.2&&show.Age<1.9){
-        const playerBones=show.playerBody.characterRig.bones,luoBones=r.companion.Handle("luo").actor.characterRig.bones;
-        graspDistances=["L","R"].map(side=>playerBones["hand"+side].getWorldPosition(g.player.position.clone())
-          .distanceTo(luoBones[side==="L"?"handR":"handL"].getWorldPosition(g.player.position.clone())));
-      }
-      return {stage:m.stage,time:m.time,facts:m.facts,voice:m.voice,...show.State(),graspDistances,alive:g.player.alive,
+      return {stage:m.stage,time:m.time,facts:m.facts,voice:m.voice,...show.State(),firstPerson:show.firstPersonState,alive:g.player.alive,
         combat:[...r.squad,...r.enemies.values()].filter(a=>a.castId||a.missionEncounter==="bunkerAssault")
           .map(a=>({id:a.castId||a.missionId,alive:a.alive,health:a.health,x:a.position.x,z:a.position.z,
             weapon:a.weapon?.id,shots:a.lastFire,target:a.target?.isPlayer?"player":a.target?.ref?.missionId||a.target?.ref?.castId,visible:a.targetVisible,suppression:a.suppression}))};
@@ -73,16 +96,8 @@ export async function DriveOpening(ctx){
       state,damage:await page.evaluate(()=>window.missionDamage),motion:await page.evaluate(()=>window.openingMotionProbe)},null,2));
     assert.equal(state.error,undefined,"animation library loaded");
     assert.ok(state.alive,"player survives the authored opening");
-    if(state.graspDistances&&!state.graspDistances.every(distance=>distance<.03)){
-      await fs.writeFile(path.join(output,"Data_GraspFailure.json"),JSON.stringify(await page.evaluate(()=>{
-        const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime(),s=r.frontShow.bunker,Vec=()=>g.player.position.clone();
-        const Bones=actor=>Object.fromEntries(["upperArmL","upperArmR","forearmL","forearmR","handL","handR"].map(key=>[key,actor.characterRig.bones[key].getWorldPosition(Vec()).toArray()]));
-        return {phase:s.phase,age:s.Age,player:Bones(s.playerBody),luo:Bones(r.companion.Handle("luo").actor),camera:g.player.camera.position.toArray()};
-      }),null,2));
-      assert.fail(`rescue hand contact at ${state.phaseTime}: ${state.graspDistances}`);
-    }
     if(state.phaseTime>=.35&&!captured.has(state.phase)){
-      captured.add(state.phase);await page.evaluate(()=>window.Tengxian.StepFrames(2,1/60,true));
+      captured.add(state.phase);
       await page.screenshot({path:path.join(output,`Scene_Opening_${state.phase}.png`)});
       console.log("STORYBOARD",state.phase,state.time);
     }
@@ -94,6 +109,15 @@ export async function DriveOpening(ctx){
   assert.deepEqual(motion.violations,[],"actors move continuously and impacts precede falls");
   assert.ok(motion.minShoulderBehind>.08,"both open sleeve roots remain behind the eye throughout the opening");
   assert.ok(motion.maxCameraStep<.14,"camera transitions do not teleport between storyboard views");
+  assert.ok(motion.maxCameraTurn<10,"camera orientations blend continuously between shots");
+  assert.ok(motion.maxHandRotationStep<12,"palms acquire/release contact without a one-frame flip");
+  assert.ok(motion.maxPartnerHandRotationStep<20,"the helper's palms approach contact without an orientation jump");
+  assert.ok(motion.releaseCameraTurn<5,"returning control retains the last presented view");
+  for(const key of ["BunkerBanter/yaowa","BunkerBanter/luo","BunkerBanter/runner","BunkerKilling/interpreter","RescueCall/interpreter"]){
+    const acting=motion.acting[key];
+    assert.ok(acting?.speakingFrames>10,`${key}: the actual speaking actor receives dialogue gestures`);
+    assert.ok(acting.headRadians>.06||acting.handMetres>.055,`${key}: visible acting continues during the exchange`);
+  }
   const final=frames.at(-1);
   assert.equal(final.phase,"Released","interrogation, ambush, pull and kick complete");
   for(const phase of ["Orders","Blast","Advance","Captive","CaptiveShot","Discover","Drag","Butt","Black","Interrogate","Creep","Ambush","Deflect","Pull","Kick"])
@@ -130,6 +154,29 @@ export async function DriveOpening(ctx){
   await WaitStage("RearTrench",5);
   const armed=await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMission());
   assert.ok(armed.facts.includes("rifleRecovered"));assert.equal(armed.emptyHands,false);
+  await page.evaluate(()=>{
+    const s=window.Tengxian.Debug.FirstLevelMissionRuntime().frontShow.bunker,update=s.UpdatePerformances;
+    window.openingRearActing={};window.openingRearHeard={};
+    s.UpdatePerformances=function(){
+      const current=this.r.voice.current;
+      if(current?.phase==="playing"){
+        const index=current.plan.lines.findIndex(([start,end])=>current.sourceTime>=start&&current.sourceTime<end);
+        const who=current.cue.lines[index]?.who;
+        if(['guard','zhou','luo'].includes(who)){
+          const key=current.cue.id+'/'+who,row=window.openingRearHeard[key]??={frames:0,visibleFrames:0};
+          row.frames++;if(this.SpeakerActor(who)?.actor.poseVisible)row.visibleFrames++;
+        }
+      }
+      for(const role of ['guard','zhou','luo']){
+        const actor=this.SpeakerActor(role),rig=actor?.actor?.characterRig,state=rig?.openingActorPerformanceState;
+        if(!state?.speaking)continue;
+        const key=state.cue+'/'+role,head=rig.bones.head.quaternion;
+        const row=window.openingRearActing[key]??={frames:0,head:head.toArray(),turn:0};
+        row.frames++;row.turn=Math.max(row.turn,head.angleTo(head.clone().fromArray(row.head)));
+      }
+      return update.apply(this,arguments);
+    };
+  });
   await Route(MISSION_STAGE_ROUTES.rearTrench.slice(0,5),"OpeningRearTrench",{fight:true,stance:"crouch"});
   await CaptureFocus("OpeningCollection",A.collection);
   await WaitStage("Support",120,{fight:true,cover:true});
@@ -140,4 +187,23 @@ export async function DriveOpening(ctx){
   for(const cue of ["TrenchCurse","CornerCheck","SupportOrder"])assert.ok(rear.voice.played.includes(cue),cue);
   assert.ok(rear.front.collection.litters>=4&&rear.front.collection.people>=8,"casualty collection is present");
   console.log("ok 01–02 normal progression to Support");
+}
+
+export async function CheckOpeningActing(ctx){
+  const {page,output}=ctx;
+  const rearActing=await page.evaluate(()=>window.openingRearActing);
+  const heard=await page.evaluate(()=>window.openingRearHeard);
+  await fs.writeFile(path.join(output,"Data_OpeningRearActing.json"),JSON.stringify(rearActing,null,2));
+  await fs.writeFile(path.join(output,"Data_OpeningRearHeard.json"),JSON.stringify(heard,null,2));
+  // Culled actors legitimately skip detailed bone updates. Check every audible
+  // speaker actually rendered nearby, including the required collection report.
+  const visible=Object.keys(heard).filter(key=>heard[key].visibleFrames>10);
+  assert.ok(visible.includes('SupportOrder/guard'),"the collection report has its real visible speaker");
+  assert.ok(visible.some(key=>key.startsWith('Front')&&key.endsWith('/luo')),"Luo performs visible front commands");
+  for(const key of visible){
+    assert.ok(rearActing[key]?.frames>10,`${key}: actual visible 02–03 speaker has an active performance`);
+    assert.ok(rearActing[key].turn>.03,`${key}: actual visible 02–03 speaker visibly turns/nods`);
+  }
+  assert.deepEqual(ctx.errors,[]);
+  console.log("ok 01–03 normal progression, continuous hands and visible dialogue performances");
 }

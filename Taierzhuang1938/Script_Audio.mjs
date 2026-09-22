@@ -45,7 +45,7 @@ import { FIRST_LEVEL_MUSIC_CUES, FIRST_LEVEL_MUSIC_MIX } from "./Data_FirstLevel
 import { HIT_DISORIENTATION } from "./Data_Tuning_Player.mjs";
 import { GUN_AUDIBILITY } from "./Data_Tuning_Audio.mjs";
 import { CARRIAGE_SOUND } from "./Data_FirstLevelCarriageSound.mjs";
-import { AUDIO_MIX_DEFAULTS } from "./Data_Tuning_Audio.mjs";
+import { AUDIO_MIX_DEFAULTS, STORY_SPEECH } from "./Data_Tuning_Audio.mjs";
 import { BuildSpeechEnvelope } from "./Script_SpeechEnvelope.mjs";
 
 // 包络地板。低于这个值当作静音（见文件头坑 2）。
@@ -4466,7 +4466,8 @@ export class AudioEngine {
    * @returns {{key:string,duration:number,voice:object}|null} null = 没有这条音频，
    *   由调用方降级成纯字幕（这是常态，不是错误：台词先写、音频后烘）。
    */
-  PlayStoryVoice(key, { position = null, volume = 1, offset = 0, maxDuration = Infinity, environmentGain = 1 } = {}) {
+  PlayStoryVoice(key, { position = null, volume = 1, offset = 0, maxDuration = Infinity, environmentGain = 1,
+    dialogue = false, firstPerson = false } = {}) {
     if (!this.ctx || this.disposed || this.voiceMute) return null;
     const entry = key ? this.voiceBank.get(key) : null;
     if (!entry) return null;
@@ -4478,12 +4479,40 @@ export class AudioEngine {
       if (dx * dx + dy * dy + dz * dz > VOICE_CULL_M * VOICE_CULL_M) at = null;
     }
     this.StopStoryVoice();
-    const voice = this.Play("voice." + key, { position: at, volume, offset, maxDuration, pitch: 1, priority: true });
+    // A single intact take can contain both the player and nearby characters.
+    // Keep its BufferSource running; two gain paths switch the *perspective*.
+    const voice = this.Play("voice." + key, { position: dialogue ? (at || this.listenerPos) : at,
+      volume, offset, maxDuration, pitch: 1, priority: true, storySpeech: dialogue });
     if (!voice) return null;
     this.storyDuck.gain.setTargetAtTime(Clamp01(environmentGain),this.ctx.currentTime,.06);
     this.storyVoice = voice;
     this.storyVoiceKey = key;
+    if (dialogue) this.SetStoryVoiceSpeaker(voice, { position: at, firstPerson });
     return { key, duration: entry.duration || entry.dur || 0, voice };
+  }
+
+  SetStoryVoiceSpeaker(voice, { position = null, firstPerson = false, who = null, speaking = true } = {}) {
+    if (!voice?.storySelfGain || !this.ctx || voice.reclaimed || voice.stopping) return false;
+    const centred = firstPerson || !position;
+    const changed = centred !== voice.storySpeakerFirstPerson;
+    const t = this.ctx.currentTime, tau = STORY_SPEECH.switchS;
+    if (changed || voice.storySpeakerFirstPerson == null) {
+      voice.storySelfGain.gain.setTargetAtTime(centred ? 1 : 0, t, tau);
+      voice.storyWorldGain.gain.setTargetAtTime(centred ? 0 : 1, t, tau);
+    }
+    voice.storySpeakerFirstPerson = centred;
+    voice.storySpeaker = who;
+    const speechChanged = voice.storySpeakerSpeaking !== speaking;
+    voice.storySpeakerSpeaking = speaking;
+    if (speechChanged && this.concussionAmount != null) this.SetConcussion(this.concussionAmount, this.concussionLowHz);
+    if (centred) {
+      voice.wetGain.gain.setTargetAtTime(0, t, tau);
+      voice.distance = 0;
+      voice.effectiveGain = voice.baseGain;
+    } else {
+      this.MoveVoice(voice, position);
+    }
+    return true;
   }
 
   /** 掐掉正在响的剧情台词（换关、切过场、被下一条顶掉时）。 */
@@ -4493,6 +4522,7 @@ export class AudioEngine {
     const stopped = this.StopVoice(this.storyVoice);
     this.storyVoice = null;
     this.storyVoiceKey = null;
+    if(this.concussionAmount!=null)this.SetConcussion(this.concussionAmount,this.concussionLowHz);
     return stopped;
   }
 
@@ -4825,7 +4855,7 @@ export class AudioEngine {
 
   Play(name, { position = null, volume = 1, pitch = 1, delay = 0, offset = 0, maxDuration = Infinity, pan = 0, burst = null, priority = false,
     bus = "sfx", airCut = 0, soundField = false, firstPerson = false, occlusion = null,
-    weaponClass = null, sourceSizeM = 0 } = {}) {
+    weaponClass = null, sourceSizeM = 0, storySpeech = false } = {}) {
     // priority：玩家自己的枪永远要响。实测 59 个兵在打时 liveNodes 峰值 118/120，
     // AI 枪声丢 40.4%，**玩家自己的枪也丢了 8.3%** —— 因为玩家和 59 个兵共用
     // "rifleNra" 这一个去重 key，22 ms 窗口内谁先谁得。
@@ -5022,7 +5052,15 @@ export class AudioEngine {
       // farGrouped 是**取证字段**：WebAudio 读不出一个节点接到哪儿去了，
       // 而「这句喊话有没有被扔进远声组」正是 Script_AudioWiringTest 要断言的事。
       v.farGrouped = bus === "sfx" && distance > FAR_GROUP_M && !IsVoiceCue(name);
-      panner.connect(v.farGrouped ? this.farGain : this.Bus(bus));
+      if (storySpeech) {
+        const world = v.Gain(1), self = v.Gain(0);
+        // Own speech must not inherit the world source's HRTF, occlusion,
+        // distance or reverb. Downmix the recorded take to a centred voice.
+        self.channelCount = 1; self.channelCountMode = "explicit";
+        panner.connect(world).connect(this.Bus(bus));
+        src.connect(self).connect(this.Bus(bus));
+        v.storyWorldGain = world; v.storySelfGain = self;
+      } else panner.connect(v.farGrouped ? this.farGain : this.Bus(bus));
       // MoveVoice 要搬的就是这几样：方位、空气低通、混响占比、遮挡。
       v.panner = panner;
       v.air = air;
@@ -5055,6 +5093,7 @@ export class AudioEngine {
       this.FreeVoice(v);
       return null;
     }
+    if (storySpeech) wet.gain.value = STORY_SPEECH.worldWet;
     v.wetBase = wet.gain.value;                    // 配方给的干湿比；MoveVoice 按新距离重乘
     wet.gain.value = Clamp01(wet.gain.value * v.wetScale);
     this.activeVoices.add(v);
@@ -5196,7 +5235,8 @@ export class AudioEngine {
 
   FreeVoice(v) {
     this.pendingVoices.delete(v);
-    if(v===this.storyVoice){this.storyVoice=null;this.storyVoiceKey=null;this.storyDuck?.gain.setTargetAtTime(1,this.ctx.currentTime,.25);}
+    if(v===this.storyVoice){this.storyVoice=null;this.storyVoiceKey=null;this.storyDuck?.gain.setTargetAtTime(1,this.ctx.currentTime,.25);
+      if(this.concussionAmount!=null)this.SetConcussion(this.concussionAmount,this.concussionLowHz);}
     this.activeVoices.delete(v);
     for (let i = 0; i < v.nodes.length; i += 1) {
       try { v.nodes[i].disconnect(); } catch (err) { /* 已断开 */ }
@@ -5363,7 +5403,12 @@ export class AudioEngine {
    */
   SetConcussion(amount,lowHz=650){
     if(!this.ctx||this.disposed)return;
-    this.concussionFilter.frequency.setValueAtTime(20000*Math.pow(Math.max(200,lowHz)/20000,Clamp01(amount)),this.ctx.currentTime);
+    this.concussionAmount=amount;this.concussionLowHz=lowHz;
+    const cutoff=20000*Math.pow(Math.max(200,lowHz)/20000,Clamp01(amount));
+    // Keep the concussion's muffled perspective, but preserve the consonants of
+    // an active story line. Outside audible dialogue the authored curve resumes.
+    const floor=this.storyVoice?.storySpeakerSpeaking?STORY_SPEECH.concussionSpeechFloorHz:0;
+    this.concussionFilter.frequency.setValueAtTime(Math.max(cutoff,floor),this.ctx.currentTime);
   }
 
   Deafen(seconds = 0.4, holdS = DEAFEN_ATTACK_HOLD_S) {

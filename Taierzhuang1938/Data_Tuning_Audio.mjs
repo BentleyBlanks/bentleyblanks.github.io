@@ -2,6 +2,10 @@
 
 // 2026-09-11 用户要求：当前及后续环境床默认 10%；恢复默认使用同一份数值。
 export const AUDIO_MIX_DEFAULTS = Object.freeze({ sfx: 1, music: 1, ambience: 0.1 });
+// Whole dialogue takes already contain their recorded room/foley bed. Their
+// live spatial send stays subtle; the player's own lines remain centred and dry.
+export const STORY_SPEECH = Object.freeze({ worldWet: 0.045, switchS: 0.018,
+  concussionSpeechFloorHz: 4200 });
 //
 // **纯数据**：不 import three、不 import 规则代码、不含函数。规则在 `Script_AudioWiring.mjs`。
 //

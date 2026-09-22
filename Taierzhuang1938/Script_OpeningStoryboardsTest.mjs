@@ -31,4 +31,16 @@ assert.ok(p.march.every(point=>Number.isFinite(point.x)&&Number.isFinite(point.z
 assert.ok(p.march[2].z>p.march[0].z,"follow-up enemies advance south toward the dugout");
 assert.ok(Math.hypot(p.guardNear.x-p.luoAmbush.x,p.guardNear.z-p.luoAmbush.z)<1,"dadao ambush within physical reach");
 assert.ok(Math.hypot(p.rifleEnd.x-p.rescued.x,p.rifleEnd.z-p.rescued.z)<1.5,"kicked rifle within pickup reach");
+const returnRoute=[p.pullEnd,...C.pullReturnWaypoints,p.luoPull];
+let progress=0,minimum=Infinity;
+for(let i=1;i<returnRoute.length;i++){
+  const a=returnRoute[i-1],b=returnRoute[i],length=Math.hypot(b.x-a.x,b.z-a.z);
+  for(let d=0;d<=length;d+=.02){
+    const t=d/length,distance=Math.hypot(a.x+(b.x-a.x)*t-p.rescued.x,a.z+(b.z-a.z)*t-p.rescued.z);
+    assert.ok(distance>=Math.hypot(p.pullEnd.x-p.rescued.x,p.pullEnd.z-p.rescued.z)-.001,"release never moves the leader closer through the player");
+    if(progress+d>=C.walkMps*.2)minimum=Math.min(minimum,distance);
+  }
+  progress+=length;
+}
+assert.ok(minimum>.7,"after the first 0.2s of release, the return path keeps the two body capsules separate");
 console.log(`ok opening storyboards: five original rigs, 100 clips, ${frames} normalized frames, V3 cast and pickup placement`);

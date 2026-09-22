@@ -56,6 +56,9 @@ export const testDefs = {
   FirstLevelFrontTopologyTest:{file:"Script_FirstLevelFrontTopologyTest.mjs",desc:"03–06 connected front: clearance, real cover and physical withdrawal gates"},
   FirstLevelFrontTest: {file:"Script_FirstLevelFrontTest.mjs",desc:"第一关阶段 1–7：分镜契约、集结处、借火、南行与演出接线（纯 Node）"},
   OpeningStoryboardsTest: {file:"Script_OpeningStoryboardsTest.mjs",desc:"01–03 source rigs, baked animation hashes, normalized poses and V3 placement"},
+  OpeningActorPerformanceBrowserTest: {file:"Script_OpeningActorPerformanceBrowserTest.mjs",timeoutMs:300000,desc:"Production-rig dialogue, idle, guard movement, planted feet and high-quality acting views"},
+  OpeningFirstPersonTest: {file:"Script_OpeningFirstPersonTest.mjs",desc:"Production-arm anatomy, wrist twist and fixed bone lengths across 2000 poses"},
+  FirstLevelVoicePerspectiveTest: {file:"Script_FirstLevelVoicePerspectiveTest.mjs",timeoutMs:120000,desc:"Actual WebAudio self/world perspective, continuous cue source and audible dialogue filtering"},
   CarriagePropVelocityTest: {file:'Script_CarriagePropVelocityTest.mjs',timeoutMs:300000,desc:'Real cart/stretcher GPU velocities with moving camera, stop and reappearance; high-quality transfer scene'},
   MotionVectorContractTest: {file:'Script_MotionVectorContractTest.mjs',timeoutMs:120000,desc:'GPU admission contract for new rigid/skinned renderers, bone attachments, foreground inheritance and history lifecycle'},
   HitDisorientationTest: {file:"Script_HitDisorientationTest.mjs",timeoutMs:420000,desc:"Shared bullet disorientation: real GPU/audio, decay and lifecycle"},
@@ -343,6 +346,7 @@ export const testDefs = {
 };
 
 export const browserTests = new Set([
+  "OpeningActorPerformanceBrowserTest", "FirstLevelVoicePerspectiveTest",
   "FirstLevelFrontRouteBrowserTest",
   "FirstLevelLeaderGuideBrowserTest",
   "FirstLevelMissionTopologyBrowserTest",
@@ -447,6 +451,7 @@ export const tier0Browser = ["BootTest", "BootStallTest", "GeoTest"];
 export const tier0 = [...tier0Browser, ...tier0Fast];
 
 export const tier2 = [
+  "OpeningActorPerformanceBrowserTest",
   "ShotTest",
   "GiTest",
   "PerformanceTest",
@@ -457,7 +462,7 @@ export const tier2 = [
 ];
 
 export const domains = {
-  openingStoryboards: {label:"01–03 storyboard reconstruction",tests:["OpeningStoryboardsTest"]},
+  openingStoryboards: {label:"01–03 storyboard reconstruction",tests:["OpeningStoryboardsTest","OpeningActorPerformanceBrowserTest","OpeningFirstPersonTest","FirstLevelVoicePerspectiveTest"]},
   missionGuide: {label:"Physical mission leader and HUD",tests:["FirstLevelLeaderGuideTest","FirstLevelLeaderGuideBrowserTest","FirstLevelMissionTest","FirstLevelMissionBrowserTest"]},
   characterSpeech: {label:"班长面部对白",tests:["CharacterSpeechTest","CharacterSpeechBrowserTest"]},
   motionVector: {label:'统一运动矢量接入契约',tests:['MotionVectorContractTest']},
@@ -525,7 +530,7 @@ export const domains = {
     // 所以也挂在这个域下。
     tests: ["CarryTest", "EmplacementTest", "HudPromptTest", "HudPromptBrowserTest", "WeaponPickupTest", "TelegraphTest", "MissionHooksTest", "MissionSetpiecesTest"],
   },
-  audio: { label: "音效/音乐/环境声", tests: ["FirstLevelMissionMusicTest", "FirstLevelMissionMusicBrowserTest", "AudioTest", "AudioWiringTest", "MachineGunCutsceneAudioTest"] },
+  audio: { label: "音效/音乐/环境声", tests: ["FirstLevelVoicePerspectiveTest","FirstLevelMissionMusicTest", "FirstLevelMissionMusicBrowserTest", "AudioTest", "AudioWiringTest", "MachineGunCutsceneAudioTest"] },
   // 「声库装没装进去」与「输出端有没有电平」是两件事，后者只有 MachineGunCutsceneAudioTest
   // 在真入口上量：VoiceTest 验的是资产与交付档，量不到 AudioEngine 的装载分叉。
   voice: { label: "语音", tests: ["VoiceTest", "MachineGunCutsceneAudioTest"] },
@@ -564,7 +569,7 @@ export const domains = {
 const changedDomainRules = [
   {domain:"menu",pattern:/PlayerDeath/},
   {domain:"combat",pattern:/PlayerDeath/},
-  {domain:"openingStoryboards",pattern:/OpeningStoryboards|OpeningStoryboardAnimation|OpeningStoryboardBake|FirstLevelCampaignOpening/},
+  {domain:"openingStoryboards",pattern:/OpeningStoryboards|OpeningStoryboardAnimation|OpeningStoryboardBake|OpeningActorPerformance|OpeningFirstPerson|FirstLevelCampaignOpening/},
   // 剖析器的显示层与命令行入口：文件名里没有「Profiler」，下面 render 域那条
   // 通配的 /Profiler/ 盖不到 Script_ProfileCli / Script_FrameProbeViews。
   // 归 render（ProfilerTest 在那一串里）；命令行自己的冒烟在 tier 2 的 perf 档。

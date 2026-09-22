@@ -34,7 +34,7 @@ export async function DriveFrontBattle(ctx){
     return state.mission;
   }
   assert.equal((await State()).stage,"Support");
-  await Route(Routes.support,"RightNestApproach",{stance:"crouch",fight:true,crawl:true});
+  await Route(Routes.support,"RightNestApproach",{stance:"crouch",fight:true,crawl:true,recoverAfterEvade:true});
   await WaitFact("rightNestCaptured",90,true);
   const sight=await page.evaluate(async()=>{
     const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime(),{FRONT_SORTIE:S}=await import('./Data_FirstLevelFrontRoute.mjs');
@@ -42,6 +42,24 @@ export async function DriveFrontBattle(ctx){
   });
   assert.equal(sight.player,false,"player can observe the actual breach through the rendered world");
   assert.equal(sight.gun,false,"right gun has a physical firing lane onto the breach");
+  const staging=await page.evaluate(async()=>{
+    const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime(),T=await import('three');
+    const {FRONT_SORTIE:S}=await import('./Data_FirstLevelFrontRoute.mjs');
+    const {MISSION_LAYOUT:L}=await import('./Data_FirstLevelMissionLayout.mjs');
+    const luo=r.companion.Handle('luo'),gun=r.scene.getObjectByName('Emplacement_MissionGun');
+    const rest=L.blocks.find(b=>b.id==='RightNestFrontRest'),vertex=new T.Vector3();let supportedY=Infinity;
+    gun.updateMatrixWorld(true);
+    gun.traverse(mesh=>{if(!mesh.isMesh)return;const positions=mesh.geometry.attributes.position;
+      for(let i=0;i<positions.count;i++){vertex.fromBufferAttribute(positions,i).applyMatrix4(mesh.matrixWorld);
+        if(Math.abs(vertex.x-rest.x)<rest.w/2&&Math.abs(vertex.z-rest.z)<rest.d/2)supportedY=Math.min(supportedY,vertex.y);}
+    });
+    return {separation:Math.hypot(luo.position.x-g.player.position.x,luo.position.z-g.player.position.z),
+      seatDistance:Math.hypot(luo.position.x-S.seat.x,luo.position.z-S.seat.z),
+      gunSupportGap:supportedY-(rest.y+rest.h/2),luo:luo.position.toArray(),player:g.player.position.toArray()};
+  });
+  await fs.writeFile(path.join(output,'Data_FrontStaging.json'),JSON.stringify(staging,null,2));
+  assert.ok(staging.separation>=1.5&&staging.seatDistance>=1.5,'Luo occupies his own firing post clear of the player');
+  assert.ok(staging.gunSupportGap>=-.02&&staging.gunSupportGap<.04,'the visible gun rests on its actual parapet');
   if(ctx.options.probeFrontGun){
     await Interact();
     const gun=await page.evaluate(()=>{
@@ -54,7 +72,7 @@ export async function DriveFrontBattle(ctx){
     await fs.writeFile(path.join(output,"Data_CapturedGunInput.json"),JSON.stringify(gun,null,2));
     assert.equal(gun.mounted,"MissionGun");assert.ok(gun.after>gun.before&&gun.released&&gun.alive,"F, real burst and F release work at the captured gun");
   }
-  await CaptureFocus("RightNestCaptured",S.nest);
+  await CaptureFocus("RightNestCaptured",S.gap);
   const first=await WaitStage("MachineGun",240,{fight:true});
   assert.ok(first.mission.guards.slice(0,2).some(g=>g.alive));
   assert.ok(first.mission.guards.slice(0,2).filter(g=>g.alive).every(g=>g.safe));

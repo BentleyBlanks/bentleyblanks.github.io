@@ -424,7 +424,7 @@ export function CampaignActions(ctx) {
    * 人确实到了 nightSpawn(−160,292)，转场结束后又被驾驶器走了 110 m 回到 marchOut，
    * 于是「黑屏里那一下瞬移没生效」看着像引擎的锅，其实是驾驶器自己走回去的。
    */
-  async function Route(points, label, { fight = false, stance = "stand", sprint = false, crawl = false, rejoinRoute = null, stopFact = null, arrivalM = 0.8 } = {}) {
+  async function Route(points, label, { fight = false, stance = "stand", sprint = false, crawl = false, rejoinRoute = null, stopFact = null, arrivalM = 0.8, recoverAfterEvade = false } = {}) {
     let routeGuardHp;
     const rejoinTarget=points.at(-1);
     await page.evaluate(
@@ -434,7 +434,7 @@ export function CampaignActions(ctx) {
           const {MissionRouteBetween}=await import("./Script_FirstLevelMissionColumn.mjs");
           points=MissionRouteBetween(rejoinRoute,g.player.position,rejoinTarget);
         }
-        window.routeBot = { points, index: 0, frames: 0, stalled: 0, last: { ...g.player.position } };
+        window.routeBot = { points, corridor:points, index: 0, frames: 0, stalled: 0, last: { ...g.player.position } };
         if (g.player.stance !== stance)
           g.Debug.Key(
             stance === "crouch"
@@ -452,8 +452,9 @@ export function CampaignActions(ctx) {
     const carriedKind=await page.evaluate(()=>window.Tengxian.carry.KindId);
     let result, retries = 0;
     for (let chunk = 0; chunk < 90; chunk++) {
-      result = await page.evaluate(async ({fight,stance,crawl,sprint,stopFact,arrivalM}) => {
+      result = await page.evaluate(async ({fight,stance,crawl,sprint,stopFact,arrivalM,recoverAfterEvade}) => {
         const {FRONT_SORTIE}=await import("./Data_FirstLevelFrontRoute.mjs");
+        const {MissionRouteProjection, MissionRoutePoint, MissionRouteNextIndex}=await import("./Script_FirstLevelMissionColumn.mjs");
         const g = window.Tengxian,
           b = window.routeBot,
           Wrap = (x) => Math.atan2(Math.sin(x), Math.cos(x));
@@ -483,6 +484,20 @@ export function CampaignActions(ctx) {
             continue;
           }
           const evading=crawl&&fight&&window.MissionInputDriver.EvadeGrenade();
+          if(recoverAfterEvade){
+            if(evading)b.wasEvading=true;
+            else if(b.wasEvading){
+              b.wasEvading=false;
+              const projection=MissionRouteProjection(b.corridor,p);
+              if(projection.distance>arrivalM+.2){
+                // Re-enter the checked corridor using normal movement before
+                // resuming the next corner; a grenade may leave us behind a wall.
+                b.points=[MissionRoutePoint(b.corridor,projection.progress),
+                  ...b.corridor.slice(MissionRouteNextIndex(b.corridor,p))];
+                b.index=0;b.evadeRejoins=(b.evadeRejoins||0)+1;continue;
+              }
+            }
+          }
           const foe = fight&&!evading ? window.MissionInputDriver.Target(crawl?28:90) : null;
           if(crawl&&!evading){
             const low=FRONT_SORTIE.crawl.some(c=>Math.abs(p.x-c.x)<c.w/2+1 && Math.abs(p.z-c.z)<c.d/2+3);
@@ -527,7 +542,7 @@ export function CampaignActions(ctx) {
           health: g.player.health,
           medical:{bleeding:g.player.bleeding,bandages:g.player.bandages,regenTo:g.player.bandageRegenTo},
           stage: g.Debug.FirstLevelMissionRuntime().flow.stage.id,
-          stalled: b.stalled,
+          stalled: b.stalled,evadeRejoins:b.evadeRejoins||0,
           cutscene: g.state.cutscene,
           cutsceneFrames: chunkCutscene,
           cutscenesSeen: b.cutscenes || null,
@@ -558,7 +573,7 @@ export function CampaignActions(ctx) {
               probe: x.probe || null, crossing: !!x.crossing, nc: !!x.actor.scriptedNoncombatant })), hunters };
           })(),
         };
-      }, {fight,stance,crawl,sprint,stopFact,arrivalM});
+      }, {fight,stance,crawl,sprint,stopFact,arrivalM,recoverAfterEvade});
       const guardHp = (result.guards?.list || []).map((x) => x.alive ? x.hp : -1).join(",");
       const guardHit = routeGuardHp !== undefined && guardHp !== routeGuardHp;
       routeGuardHp = guardHp;

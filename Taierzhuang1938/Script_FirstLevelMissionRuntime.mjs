@@ -309,8 +309,26 @@ export class FirstLevelMissionRuntime {
   // Intact dialogue recordings follow the current speaker; overlapping Luo
   // briefing keeps its own source. Unknown nearby voices stay in carriage space.
   VoicePosition(cue,line) {
+    const who = line?.who ?? cue.lines[0]?.who;
+    let fieldSpeaker;
+    if(cue.id==="FrontRelief"&&who==="relief")
+      fieldSpeaker=this.relief?.find(entry=>entry.actor?.alive&&entry.actor.actor)?.actor;
+    if(cue.id==="BundleOrder"&&who==="guard"){
+      fieldSpeaker=this.frontShow?.bundleOrderGuard;
+      if(!fieldSpeaker?.alive||!fieldSpeaker.actor){
+        fieldSpeaker=this.guards?.map(entry=>entry.actor).filter(actor=>actor?.alive&&actor.actor)
+          .sort((a,b)=>Distance(a.position,this.player.position)-Distance(b.position,this.player.position))[0];
+        if(this.frontShow)this.frontShow.bundleOrderGuard=fieldSpeaker||null;
+      }
+    }
+    if(fieldSpeaker){
+      const head=fieldSpeaker.actor.characterRig?.bones?.head||fieldSpeaker.actor.head;
+      return head?.getWorldPosition(new THREE.Vector3())||this.Point(fieldSpeaker.position,1.3);
+    }
     // 阶段 1–7 自己认领的几条（村口指路的人、指弹药屋的守军、集结处的传令兵与老周）。
-    const front=this.frontShow?.VoicePosition(cue,line);
+    // BundleOrder changes speaker within one cue; the legacy front adapter
+    // assigns its whole exchange to the reporting guard.
+    const front=cue.id==="BundleOrder"?null:this.frontShow?.VoicePosition(cue,line);
     if(front)return front;
     // 08 主街那一头喊话的前队（Mid 包）。
     const village=this.village?.VoicePosition(cue,line);
@@ -320,7 +338,6 @@ export class FirstLevelMissionRuntime {
       return this.Point(this.bundleKeeper.position,1.2);
     if(cue.id==="SupportOrder"&&this.opening.runner)return this.Point(this.opening.runner.actor.position,1.3);
     if (["ZhouDeath","ZhouCheck","ZhouLift","Threshold","PlaceLitter","MedicAsk"].includes(cue.id)) return this.Point(this.column.zhou, 1);
-    const who = line?.who ?? cue.lines[0]?.who;
     if (who === "shunzi") return this.player.EyePosition.clone();
     const handled = this.companion.Handle(who)?.position;
     if (handled) return new THREE.Vector3(handled.x,handled.y+1.35,handled.z);

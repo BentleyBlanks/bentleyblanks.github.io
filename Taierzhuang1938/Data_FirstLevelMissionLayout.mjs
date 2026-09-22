@@ -162,7 +162,7 @@ Block("BundleCrate",Sortie.bundle.x,Sortie.bundle.z,1.2,.5,.8,"missionRoute");
 GroundedWall("RightNestRearWall",28.5,-135,9,3.2,.8);
 GroundedWall("RightNestEastWall",33.5,-136,.8,3.0,8);
 GroundedWall("RightNestWestStub",20,-142,.8,.35,5);
-GroundedWall("RightNestFrontRest",27,-143,3.4,.7,.75);
+GroundedWall("RightNestFrontRest",27,-142.75,3.4,1.5,.75);
 GroundedWall("RightNestNorthRuin",31.5,-147,4,1.2,.7);
 GroundedWall("RightApproachTraverse",18.8,-124,.7,2.8,9);
 GroundedWall("RightApproachOuter",25.5,-121,.65,1.05,3.5);

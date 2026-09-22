@@ -28,8 +28,14 @@ try {
       await page.route('**/Texture_DadaoBase.webp*', () => {});
       await page.route(/Texture_Carriage(?:BenchWood|FloorSteel|CeilingSteel)Base\.webp/, route => route.fulfill({status:404,body:'missing test texture'}));
     }
-    if (fixture.name === 'MissingCharacters') await page.route(/Model_LugouNra0[124][.]glb/,
-      route => route.fulfill({status:503,body:'interrupted character download'}));
+    if (fixture.name === 'MissingCharacters') {
+      await page.route(/Model_LugouNra0[124][.]glb/,
+        route => route.fulfill({status:503,body:'interrupted character download'}));
+      await page.addInitScript(() => {
+        window.bundleFixtureErrors=[];
+        window.addEventListener('error',event=>window.bundleFixtureErrors.push(event.message));
+      });
+    }
     page.on('pageerror', error => errors.push(String(error)));
     page.on('request', request => { if (/\.m?js(?:\?|$)/.test(request.url())) modules.add(new URL(request.url()).pathname); });
     await page.route('**/Taierzhuang1938/?*', route => route.fulfill({contentType:'text/html',body:result.html}));
@@ -58,25 +64,79 @@ try {
       await page.waitForFunction(before => window.Tengxian.Debug.FirstLevelMission().time > before, before, {timeout:10000});
       assert.ok(await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission().stage === "Trapped"));
     } else if (fixture.name === 'MissingCharacters') {
-      // 2026.09.19 军列开场下线：不再有 41 名车厢乘客，`missionTrainPassenger` 这个
-      // 旗标也没人写了。同一件事改在新开场的实际在场人身上验 —— 01 一开机，
-      // 掩蔽部里是班里那四个人，门外是两名失去抵抗能力的川军。
+      // The current opening creates its one captive, interpreter and runner only
+      // after Start. Preserve each selected appearance slot through the failed
+      // downloads, then exercise their actual director and close-up performances.
       const partial=await page.evaluate(()=>{const g=window.Tengxian;
         const actors=g.ai.soldiers.filter(a=>a.alive&&a.side==='nra');
         const mission=g.Debug.FirstLevelMission();
-        return {count:actors.length,models:actors.map(a=>a.actor.characterRig?.modelId||null),
-          cast:actors.map(a=>a.castId).filter(Boolean).sort(),
-          captives:mission.opening.captives.map(entry=>entry.id).sort(),stage:mission.stage};});
+        return {count:actors.length,models:Object.fromEntries(actors.map(a=>[a.castId,a.actor?.characterRig?.modelId||null])),
+          cast:actors.map(a=>a.castId).filter(Boolean).sort(),stage:mission.stage};});
       assert.equal(partial.stage,'Trapped','the interrupted boot still opens on the collapsed bunker');
-      assert.ok(partial.count>=6,'interrupted models preserve every physical person on the field: '+partial.count);
+      assert.equal(partial.count,4,'all four squad members exist before the director starts');
       assert.deepEqual(partial.cast,['heyoutian','liuwencai','luo','yaowa'],'the whole squad is physically present');
-      assert.deepEqual(partial.captives,['BunkerCaptiveHelper','BunkerCaptiveWounded'],
-        'both captives outside the door survive the interrupted download');
-      assert.ok(partial.models.includes(null),'missing selected models use the explicit whitebox fallback');
-      assert.ok(partial.models.every(id=>id===null||id==='LugouNra05'),
-        'failed downloads never shift soldier slots into another model or officer');
+      assert.deepEqual(partial.models,{luo:'LugouNra05',yaowa:null,heyoutian:null,liuwencai:null},
+        'failed selected slots stay whitebox; the surviving approved leader keeps his own appearance');
       await page.locator('#bootStart').click();
       await page.waitForFunction(()=>window.Tengxian.state.running&&document.getElementById('boot').classList.contains('gone'),null,{timeout:10000});
+      await page.waitForFunction(()=>{const b=window.Tengxian.Debug.FirstLevelMissionRuntime()?.frontShow?.bunker;
+        return window.bundleFixtureErrors.length||b?.ready&&b.setup&&b.firstPerson;},null,{timeout:60000});
+      assert.deepEqual(await page.evaluate(()=>window.bundleFixtureErrors),[],
+        'the new opening director must finish setup with missing selected character models');
+      const setup=await page.evaluate(()=>{const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime(),b=r.frontShow.bunker;
+        const Person=a=>{const root=a?.actor?.root;let attached=false;
+          for(let node=root;node;node=node.parent)if(node===r.scene)attached=true;
+          return {alive:a?.alive===true,physical:!!root&&root.children.length>0&&!!a.body&&g.ai.soldiers.includes(a),
+            attached,lod:a?.renderLod||null,
+            finite:!!root&&[...root.position.toArray(),...root.quaternion.toArray(),...root.scale.toArray(),a.position.x,a.position.y,a.position.z].every(Number.isFinite),
+            model:a?.actor?.characterRig?.modelId||null};};
+        return {count:g.ai.soldiers.filter(a=>a.alive&&a.side==='nra').length,
+          captives:b.captives.map(a=>a.missionId).sort(),
+          cast:Object.fromEntries(Object.entries(b.cast).map(([id,a])=>[id,Person(a)])),
+          squad:Object.fromEntries(r.squad.map(a=>[a.castId,Person(a)])),
+          enemies:Object.fromEntries(['BunkerExecutionerA','BunkerExecutionerB','BunkerFollowA','BunkerFollowB'].map(id=>[id,Person(r.enemies.get(id))])),
+          playerModel:b.playerBody?.characterRig?.modelId||null};});
+      assert.equal(setup.count,6,'the four squad members, one captive and runner all remain physical NRA actors');
+      assert.deepEqual(setup.captives,['BunkerCaptiveHelper'],'the adopted opening has exactly one physical captive');
+      assert.deepEqual(Object.keys(setup.cast).sort(),['BunkerCaptiveHelper','BunkerInterpreter','BunkerRunner'],
+        'the director creates its complete current cast after Start');
+      assert.deepEqual(Object.fromEntries(Object.entries(setup.cast).map(([id,a])=>[id,a.model])),
+        {BunkerCaptiveHelper:null,BunkerInterpreter:null,BunkerRunner:'LugouNra05'},
+        'new cast uses its requested model slots instead of reassigning failed downloads');
+      assert.equal(setup.playerModel,null,'the protagonist also preserves the missing NRA02 slot');
+      for(const [id,actor] of Object.entries({...setup.squad,...setup.cast,...setup.enemies})) {
+        assert.ok(actor.alive&&actor.physical&&actor.finite,`${id} remains a live physical person: ${JSON.stringify(actor)}`);
+        assert.ok(actor.attached||['culled','crowd'].includes(actor.lod),
+          `${id} must be in the scene or explicitly represented by the normal culling/LOD system`);
+      }
+      // Let ordinary production time and the real cue tracks drive the complete
+      // captive/contact sequence into the interrogation close-up. No debug jump,
+      // synthetic mission facts or manual phase advancement may mask a crash.
+      await page.waitForFunction(()=>{const b=window.Tengxian.Debug.FirstLevelMissionRuntime()?.frontShow?.bunker;
+        return window.bundleFixtureErrors.length||b?.phase==='Interrogate'&&b.Age>2;},null,{timeout:180000});
+      const closeup=await page.evaluate(()=>{const r=window.Tengxian.Debug.FirstLevelMissionRuntime(),b=r.frontShow.bunker;
+        const actors=[...r.squad,...Object.values(b.cast),...['BunkerExecutionerA','BunkerExecutionerB','BunkerFollowA','BunkerFollowB'].map(id=>r.enemies.get(id))];
+        return {errors:window.bundleFixtureErrors,stage:r.flow.stage.id,phase:b.phase,time:r.time,
+          beats:[...b.beats],camera:r.player.camera.position.toArray(),captives:b.captives.map(a=>({id:a.missionId,alive:a.alive})),
+          actors:actors.map(a=>{const root=a?.actor?.root;let attached=false,finite=!!root;
+            for(let node=root;node;node=node.parent)if(node===r.scene)attached=true;
+            root?.traverse(node=>{finite&&=node.matrixWorld.elements.every(Number.isFinite);});
+            return {id:a?.castId||a?.missionId,attached,finite,lod:a?.renderLod||null};})};});
+      await fs.writeFile(path.join(outputDir,'MissingCharacters.json'),JSON.stringify({partial,setup,closeup},null,2));
+      assert.deepEqual(closeup.errors,[],'missing characters must not crash the captive, collar, strike or interrogation performances');
+      assert.equal(closeup.stage,'BunkerRescue');
+      assert.equal(closeup.phase,'Interrogate');
+      for(const phase of ['Advance','Captive','CaptiveShot','Discover','Drag','Butt','Interrogate'])
+        assert.ok(closeup.beats.includes(phase),'the missing-model run physically completed '+phase);
+      assert.deepEqual(closeup.captives,[{id:'BunkerCaptiveHelper',alive:false}],
+        'the actual captive survives creation and reaches the authored shooting outcome');
+      for(const actor of closeup.actors)assert.ok(actor.finite&&(actor.attached||['culled','crowd'].includes(actor.lod)),
+        `${actor.id} still has a finite hierarchy under the normal culling/LOD contract`);
+      for(const id of ['BunkerExecutionerA','BunkerInterpreter']) {
+        const actor=closeup.actors.find(a=>a.id===id);
+        assert.ok(actor?.attached&&actor.lod==='detail',`${id} must actually render in the interrogation close-up`);
+      }
+      assert.ok(closeup.camera.every(Number.isFinite),'the interrogation camera remains finite');
     } else {
       assert.equal(await page.evaluate(() => window.Tengxian.Debug.Menu().open), true);
       await page.evaluate(()=>window.Tengxian.Debug.MenuAct("debug"));

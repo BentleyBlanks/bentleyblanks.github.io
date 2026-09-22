@@ -4,7 +4,7 @@
 // 口径：全程只用正常输入（WASD / F / 鼠标 / H），不改任务事实、不瞬移、不发子弹外挂。
 // 调试跳转只在 --stage-jumps 下生效，且每次跳转前上一段必须真的走到了下一个公开阶段。
 import { DriveFrontBattle } from "./Script_FirstLevelCampaignFrontBattle.mjs";
-import { DriveOpening } from "./Script_FirstLevelCampaignOpening.mjs";
+import { DriveOpening, CheckOpeningActing } from "./Script_FirstLevelCampaignOpening.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -46,6 +46,7 @@ export async function Drive(ctx) {
 
   if(ctx.stageFrom===1)await DriveOpening(ctx);
   await DriveFrontBattle(ctx);
+  if(ctx.stageFrom===1)await CheckOpeningActing(ctx);
   if(ctx.stageTo===3)return;
 
   // =========================================================================

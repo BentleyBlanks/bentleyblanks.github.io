@@ -269,6 +269,34 @@ console.log("ok  令牌：玩家/AI 两套上限、续租、换目标、释放�
 }
 console.log("ok  六人组：三种以上任务、support 不绕后、ENGAGE 与令牌一一对应、对象复用");
 
+{
+  const host=MakeHost(),director=new TacticsDirector(host,MakeCoverRegistry());
+  const speakers=Array.from({length:AI_CAP},(_,index)=>MakeSoldier({
+    id:1000+index,side:"nra",tacticalRole:"leader",scriptedNoncombatant:true,z:12,
+  }));
+  const riflemen=Array.from({length:AI_CAP},(_,index)=>MakeSoldier({
+    id:2000+index,side:"nra",scriptDefensive:true,z:12,
+  }));
+  const members=[...speakers,...riflemen],group=MakeGroup(members,{id:"scriptedReport",side:"nra"});
+  const blackboard=director.Blackboard(group.id,group.side);
+  for(const member of members)blackboard.Share(member,MakeTrack({id:99,x:0,z:0,yaw:Math.PI}));
+  // Simulate ordinary soldiers entering a dialogue after they already held
+  // all firing slots. Their replacements must not wait for the lease timeout.
+  for(const speaker of speakers)Check(director.AcquireToken(99,speaker.id),"fixture fills the target's existing firing slots");
+  director.UpdateSquad(group,null);
+  for(const speaker of speakers)Check(speaker.task.kind===null&&!director.HasToken(speaker.id,99),
+    "script-controlled noncombatants neither fight nor reserve another soldier's firing slot");
+  for(const rifleman of riflemen)Check(rifleman.task.kind===TASK.ENGAGE&&director.HasToken(rifleman.id,99),
+    "actual covering riflemen receive the released slots in the same allocation");
+  host.now=.1;director.UpdateSquad(group,null);
+  for(const speaker of speakers)Check(!director.HasToken(speaker.id,99),"a continuing speech cannot reacquire a firing slot");
+  speakers[0].scriptedNoncombatant=false;director.ReleaseTokensForTarget(99);
+  host.now=.2;director.UpdateSquad(group,null);
+  Check(speakers[0].task.kind===TASK.ENGAGE&&director.HasToken(speakers[0].id,99),
+    "a released actor resumes ordinary combat allocation");
+}
+console.log("ok scripted speakers release firing slots to actual riflemen and can rejoin combat");
+
 // ===========================================================================
 {
   // --- ③ 剧本旗与守区：只给 HOLD / ENGAGE / SUPPRESS / GRENADE ----------

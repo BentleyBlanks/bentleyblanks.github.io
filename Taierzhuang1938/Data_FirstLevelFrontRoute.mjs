@@ -2,7 +2,7 @@
 const Point=(x,z)=>Object.freeze({x,z});
 export const FRONT_SORTIE=Object.freeze({
   approach:[Point(6,-124),Point(14,-116),Point(22,-119),Point(22,-129),Point(22,-138),Point(27,-141)],
-  nest:Point(27,-142), seat:Point(27,-141), rear:Point(27,-127),
+  nest:Point(27,-142), seat:Point(27,-141),leaderCover:Point(24,-142), rear:Point(27,-127),
   rearRoute:[Point(27,-141),Point(26,-138),Point(22,-138),Point(22,-129),Point(27,-127)],
   route:[Point(27,-127),Point(27,-119),Point(29,-101),Point(34,-101),Point(34,-108)],
   attackRoute:[Point(27,-127),Point(35,-127),Point(38,-134),Point(39,-140)],
