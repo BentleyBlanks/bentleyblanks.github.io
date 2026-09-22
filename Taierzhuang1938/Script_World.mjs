@@ -74,8 +74,12 @@ export class BuildSink {
    *   · c/h/ry  —— **真实朝向的长方体**，交给 Script_Physics 建 Rapier 碰撞体
    *   · min/max —— 仍然是那个轴对齐包围盒。AI 找掩体、导航位图、编辑器拾取
    *                这些「粗筛」照旧读它，一个字都不用改（ry=0 时两者完全等价）。
+   *
+   * surface（可选）：这只盒子挨枪的弹着表面，压过按 tag 查的 Script_Main.SURFACE_BY_TAG。
+   * 给同一个 tag 底下材质不一的场景用 —— 第一关白盒的沙袋墙、木料、墙体碰撞 tag 全是
+   * whiteboxWall，只有这一格分得出该出沙、出木屑还是溅火星。
    */
-  Solid(cx, cy, cz, hx, hy, hz, tag = "wall", ry = 0) {
+  Solid(cx, cy, cz, hx, hy, hz, tag = "wall", ry = 0, surface = null) {
     const ax = Math.abs(Math.cos(ry)) * hx + Math.abs(Math.sin(ry)) * hz;
     const az = Math.abs(Math.sin(ry)) * hx + Math.abs(Math.cos(ry)) * hz;
     this.colliders.push({
@@ -85,6 +89,7 @@ export class BuildSink {
       h: [hx, hy, hz],
       ry,
       tag,
+      ...(surface ? { surface } : {}),
       destruction: ColliderDestructionData(tag),
     });
   }

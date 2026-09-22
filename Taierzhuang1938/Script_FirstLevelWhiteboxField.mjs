@@ -21,6 +21,7 @@ import { LoadMissionFortifications, AddMissionFortifications } from "./Script_Fi
 import {
   FIRST_LEVEL_WHITEBOX_LAYOUT,
 } from "./Data_FirstLevelWhitebox.mjs";
+import { IsMissionSandbagBlock } from "./Data_FirstLevelMissionFortifications.mjs";
 
 export function IsP012TrainBlock(id) { return /^Station(?:Car\d|Engine|ExitStep)/.test(id); }
 /** 跟着车厢一起平移的那两扇门（SetTrainOffset 每帧改它们的 z）。 */
@@ -66,6 +67,17 @@ function MakeSemanticMaterial(name, color) {
   material.userData.firstLevelWhitebox = true;
   material.userData.whiteboxSemantic = name;
   return material;
+}
+
+/**
+ * 白盒体块挨枪的弹着表面。碰撞 tag 一律 whiteboxWall（按 tag 查只能落成砖墙），
+ * 这里按体块自己分：显式 surface > 换成沙袋模型的那几段 > layout.semanticSurfaces。
+ * 都没有就返回 null，交还 Script_Main.SURFACE_BY_TAG 按 tag 兜底。
+ */
+export function WhiteboxSurface(spec, layout) {
+  if (spec.surface) return spec.surface;
+  if (layout?.fortifications && IsMissionSandbagBlock(spec.id || "")) return "sandbag";
+  return layout?.semanticSurfaces?.[spec.semantic] || null;
 }
 
 /** 把 frozen 的布局规格翻成可挂物理 handle 的碰撞记录。 */
@@ -252,7 +264,7 @@ export class FirstLevelWhiteboxField {
       }));
       if (block.solid !== false) {
         targetSink.Solid(block.x, block.y, block.z, block.w * 0.5, block.h * 0.5,
-          block.d * 0.5, block.tag, block.ry || 0);
+          block.d * 0.5, block.tag, block.ry || 0, WhiteboxSurface(block, this.layout));
       }
       if (block.cover) {
         for(const point of block.cover.points||[block])
@@ -436,7 +448,8 @@ export class FirstLevelWhiteboxField {
     sink.SetSector("FirstLevelWhiteboxScenario");
     for (const block of state.blocks) {
       sink.Add(block.semantic, PlaceGeometry(MakeBox(block.w, block.h, block.d, 1, block.id), block));
-      if (block.solid !== false) sink.Solid(block.x, block.y, block.z, block.w / 2, block.h / 2, block.d / 2, block.tag, block.ry || 0);
+      if (block.solid !== false) sink.Solid(block.x, block.y, block.z, block.w / 2, block.h / 2, block.d / 2, block.tag, block.ry || 0,
+        WhiteboxSurface(block, this.layout));
     }
     this.scenarioMeshes = sink.Flush(this.scene, { Get: key => {
       if(key==="OpeningEarth")return this.library.Get("Adobe",{color:0x777064,repeat:2});

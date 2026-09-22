@@ -671,7 +671,9 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
 
 ### VFX
 - `Script_Vfx.mjs` —— 粒子与特效（弹孔/砖粉/烟/碎砖弹跳）；三条架构约束在头注。
-  先读：`docs/Data_TechRenderPipeline.md`。
+  先读：`docs/Data_TechRenderPipeline.md`。战车机枪的光束（`TracerBeam`，带像素下限/上限的分段条带）
+  与硬面火星（`Impact` 的 `hardSparks`）口径在 `Data_Tuning_BulletVisual.mjs`，说明见
+  `docs/Data_FirstLevelFront20260919.md` 05 节，回归口 `Script_VehicleTracerTest.mjs`。
 
 ### 测试 / 出图
 - `Script_TestRunner.mjs` 分级入口；`Script_BootTest.mjs` 七片切片开机 + 性能红线；

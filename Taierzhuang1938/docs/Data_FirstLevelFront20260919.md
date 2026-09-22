@@ -152,6 +152,17 @@ reliefInPosition（接防班从集结处沿后交通壕进阵位）
 
 返程不复活去程敌人（`bundleApproach` 只在 `Enter("Tank")` 生成一次）。
 
+**战车机枪的弹道表现（2026-09-22）。** 用户要「看到清晰的一条子弹的光束」和「子弹在墙上飞溅的火花」。
+`Script_Main.FireVehicleBullet` 每发画一条 `Vfx.TracerBeam`：从车首机枪口铺到弹着点，弹头按表现速度飞过去，
+掠过的一段留余辉；线宽按顶点离相机的距离设像素下限（远处不细成一根头发）与上限（贴脸飞过不成光棍），
+光束条带切 32 段，保证逐段按距离收宽。打到硬面（`brick` / `metal`）时 `Impact(..., {hardSparks:true})`
+顺着反弹方向溅一簇火星、弹着点闪一下，并播砖面命中音与跳弹；土、沙包、木头不溅火星。
+第一关白盒碰撞 tag 一律是 `whiteboxWall`，弹着表面按体块分（`Script_FirstLevelWhiteboxField.WhiteboxSurface`）：
+换成沙袋模型的段落是 `sandbag`，`timber` 木料是 `wood`，土方是 `dirt`，其余墙体按 tag 落为砖墙，
+所以沟边横墙（`BundleTankScreen*`）会溅火星，而沙袋胸墙只扬沙。只改表现，不改弹速、散布、伤害与命中；
+数值在 `Data_Tuning_BulletVisual`，回归口 `Script_VehicleTracerTest.mjs`（数像素：光束对旧曳光、远端线宽、
+贴脸上限、火星与表面判定）。
+
 投弹驱动按实际 `JUMP.gravityMps2 = 19.6 m/s²` 解算，投掷前清零步枪残留的
 `player.aimYaw/aimPitch`，并按完整 3D aim vector 计入 `THROW.muzzleAheadM` 与
 `muzzleRiseM`。`bundleCoveredThrowRangeM = 9` 要求战车进入沟内可投范围后再出手。

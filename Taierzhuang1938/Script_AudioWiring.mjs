@@ -62,6 +62,9 @@ const STEP_BY_TAG = {
   platform: "wood", bridge: "wood", floor: "wood", balk: "wood",
   villageCourtyard: "stone", villageFoundation: "stone",
   terrain: "dirt", dirt: "dirt", embankment: "dirt", ramp: "dirt",
+  // 第一关白盒块挨枪按砖墙出屑（SURFACE_BY_TAG），但顶面多是踏步、路线示意和覆土的
+  // 掩蔽部顶 —— 踩上去仍是土，别跟着弹着表变成石板声。
+  whiteboxWall: "dirt", whiteboxCeiling: "dirt",
 };
 
 /** 立面 tag：数「六米内围着几面墙」时只认这些。矮的、通透的不算。 */

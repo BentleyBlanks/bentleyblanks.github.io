@@ -36,6 +36,7 @@ import * as THREE from "three";
 import { Mulberry32, HashString } from "./Script_Noise.mjs";
 import { MarkNoPrepass } from "./Script_Post.mjs";
 import { MUZZLE_FLASH } from "./Data_Tuning_FirearmHandling.mjs";
+import { VEHICLE_TRACER, HARD_SURFACE_SPARKS } from "./Data_Tuning_BulletVisual.mjs";
 import { BloodEffects } from "./Script_BloodEffects.mjs";
 
 // ---------------------------------------------------------------------------
@@ -87,8 +88,15 @@ export const VFX_PALETTE = {
   muzzleEdge: LinearOf(0xFF9A3A, 3.2),
   tracerNra: LinearOf(0xFFE3B0, 5.5),    // 中方：偏暖白
   tracerIja: LinearOf(0xCFE6FF, 5.0),    // 日方：偏冷白/淡青
+  // 光束的余辉：比弹头暗一档、色相更饱和，弹头掠过之后留下的那条线（TracerBeam）
+  tracerTrailNra: LinearOf(0xFFB45E, 3.2),
+  tracerTrailIja: LinearOf(0x9CC4FF, 3.2),
   sparkHot: LinearOf(0xFFE2B0, 6.5),
   sparkCool: LinearOf(0xD05A16, 2.0),
+  // 砖墙/铁件上的弹着火星（_HardSurfaceSparks）：比铁板那档更偏橙，一眼读成「火」
+  // 而不是一把白色碎玻璃；尾色压到暗橙红，熄灭前有一段冷却。
+  sparkBurstHot: LinearOf(0xFFC46A, 5.5),
+  sparkBurstCool: LinearOf(0xFF6418, 2.4),
   markerWarn: LinearOf(0xFF6A3A, 3.0),   // 炮弹落点预警：准星线稿与收缩环
   markerHot: LinearOf(0xFFC48A, 9.0),    // 预警最后半秒的中心亮核
   markerScorch: LinearOf(0x66605A),      // 准星线稿间的焦土颗粒：比任何地面都暗一档，读作阴影而不是橙漆
@@ -212,12 +220,23 @@ attribute vec2 iSpin;        // 起始角 / 角速度
 attribute vec3 iColorA;
 attribute vec3 iColorB;
 attribute vec4 iParams;      // x 峰值不透明度 y 淡入占比 z 阻尼系数 w 种子
-attribute vec4 iExtra;       // x 拉伸长度(米) y 闪烁频率 z 地面高度 w 备用
+attribute vec4 iExtra;       // x 拉伸长度(米) y 闪烁频率 z 地面高度（光束池：像素上限半宽）
+                             // w 序列帧起始帧（拉伸池：像素保底半宽）
 #ifdef ORIENT_NORMAL
 attribute vec3 iNormal;
 #endif
 
 uniform float uTime;
+#if defined(SHAPE_STREAK) || defined(SHAPE_BEAM)
+uniform vec2 uResolution;      // 渲染分辨率：拉伸池按它把「几个像素」换算成米
+#endif
+#ifdef SHAPE_BEAM
+// 光束不走弹道积分，iSpin / iAccel 空着，借来递光束参数：
+// x 飞行时间(秒) y 余辉时间常数(秒) z 全长(米) w 弹头亮段(米)
+varying vec4 vBeam;
+varying float vBeamTrail;      // 余辉相对弹头的亮度（iAccel.y）
+varying float vBeamMuzzleFade; // 枪口端淡入长度（米，iAccel.z）
+#endif
 uniform float uGlobalFade;
 uniform float uFadeOutStart;   // 淡出起点：普通池 0.45，序列帧火球 0.82（16 帧要播完）
 #ifdef AERIAL
@@ -278,6 +297,13 @@ void main() {
   vec3 world = iOrigin
     + (iVelocity - iAccel / k) * ((1.0 - exp(-k * age)) / k)
     + iAccel * (age / k);
+#ifdef SHAPE_BEAM
+  // 光束钉在弹着点上不动：弹头的飞行在片元里按寿命揭开，iVelocity 只给方向。
+  world = iOrigin;
+  vBeam = vec4(iSpin.x, iSpin.y, iExtra.x, iAccel.x);
+  vBeamTrail = iAccel.y;
+  vBeamMuzzleFade = iAccel.z;
+#endif
 
 #ifdef SHAPE_PUFF
   // 常驻烟源把 iExtra.z 写成很小的上升流摆幅；没有写时仍是 -9999，
@@ -335,7 +361,24 @@ void main() {
   vec3 dir = normalize(iVelocity + vec3(0.0, 1e-5, 0.0));
 #endif
   vec3 side = normalize(cross(dir, normalize(toCam + vec3(1e-5))));
-  offset = dir * ((corner.x - 1.0) * 0.5 * iExtra.x) + side * (corner.y * size);
+  vec3 along = dir * ((corner.x - 1.0) * 0.5 * iExtra.x);
+  float halfWidth = size;
+#if defined(SHAPE_STREAK) || defined(SHAPE_BEAM)
+  // 像素保底（iExtra.w > 0 才开；旧的曳光/火星写 0，行为不变）。按**这个顶点自己**
+  // 离相机的距离换算：一条四十米的光束两端远近差得多，只按头部算的话尾巴会细成头发。
+  // side 对整条线是同一个方向（线与相机张成的平面的法线），所以逐顶点改宽度不会扭。
+  if (iExtra.w > 0.0) {
+    float camDist = length(cameraPosition - (world + along));
+    float metresPerPixel = camDist * 2.0 / (projectionMatrix[1][1] * uResolution.y);
+    halfWidth = max(halfWidth, metresPerPixel * iExtra.w);
+#ifdef SHAPE_BEAM
+    // 上限（iExtra.z，光束池没有 GROUND_BOUNCE，这一格空着）：子弹贴着脸飞过去时
+    // 3 cm 的物理宽度能占三四十个像素，读起来是一根光棍，不是一发弹。
+    if (iExtra.z > 0.0) halfWidth = min(halfWidth, metresPerPixel * iExtra.z);
+#endif
+  }
+#endif
+  offset = along + side * (corner.y * halfWidth);
 #else
   // 面向相机：从 viewMatrix 取相机的右/上轴（比 modelViewMatrix 稳，
   // 因为整个池挂在 root 上、模型矩阵是单位阵）
@@ -359,6 +402,9 @@ void main() {
 
   vColor = mix(iColorA, iColorB, smoothstep(0.0, 0.8, t01));
   vColorAlt = iColorB;
+#ifdef SHAPE_BEAM
+  vColor = iColorA;        // 弹头色；余辉色是 vColorAlt。两段按位置分，不按寿命渐变
+#endif
 #ifdef SHAPE_DECAL
   vRays = iExtra.x;        // iExtra 是顶点属性，片元拿不到，得靠 varying 递过去
   vDecalSize = size;
@@ -449,6 +495,11 @@ varying vec3 vDecalTangent;
 varying vec3 vDecalBitangent;
 varying vec3 vDecalWorldPosition;
 #endif
+#ifdef SHAPE_BEAM
+varying vec4 vBeam;        // x 飞行时间 y 余辉时间常数 z 全长 w 弹头亮段
+varying float vBeamTrail;
+varying float vBeamMuzzleFade;
+#endif
 #ifdef SHAPE_MARKER
 uniform vec3 uMarkerSoil;  // 焦土颗粒色（受光）
 uniform vec3 uMarkerDust;  // 掀起的尘团色（受光）
@@ -507,6 +558,24 @@ void main() {
   float across = exp(-p.y * p.y * 5.5);
   float head = clamp(p.x * 0.5 + 0.5, 0.0, 1.0);
   mask = across * mix(0.03, 1.0, pow(head, 2.2));
+#elif defined(SHAPE_BEAM)
+  // 一发子弹的光束（TracerBeam）。整条线从枪口铺到弹着点，但不是一下子全亮：
+  // 弹头按「已活秒数 / 飞行时间」从枪口飞过去，掠过的那一段按余辉常数暗下去。
+  // vShape.x：-1 是枪口，+1 是弹着点。
+  float flight = max(vBeam.x, 1e-4);
+  float along = p.x * 0.5 + 0.5;
+  float since = vAgeS - along * flight;            // 弹头掠过这一点多久了；负 = 还没飞到
+  float reached = step(0.0, since);
+  float behind = since / flight * vBeam.z;         // 这一点落后弹头几米
+  // 弹头到了弹着点就没了 —— 它打进墙里了，只剩余辉。
+  float headAlive = 1.0 - smoothstep(flight, flight + 0.012, vAgeS);
+  float head = reached * headAlive * (1.0 - smoothstep(0.0, max(vBeam.w, 0.01), behind));
+  float trail = reached * exp(-max(since, 0.0) / max(vBeam.y, 1e-3)) * vBeamTrail;
+  float muzzle = smoothstep(0.0, max(vBeamMuzzleFade, 1e-3), along * vBeam.z);
+  // 弹头胖一点、余辉细一点：线宽由顶点给的是像素保底，这里只分配亮度的横向分布。
+  float across = exp(-p.y * p.y * mix(3.2, 1.8, head));
+  mask = across * max(head, trail) * muzzle;
+  color = mix(vColorAlt, vColor, clamp(head * 1.5, 0.0, 1.0));
 #elif defined(SHAPE_RING)
   // 贴地扩散的尘环 —— 爆炸"有当量"的关键一笔
   float n = Vnoise(p * 3.4 + vec2(vSeed * 23.0, 7.0));
@@ -833,6 +902,8 @@ const SPAWN = {
   life: 1, sizeStart: 0.2, sizeEnd: 0.5,
   drag: 0.8, opacity: 1, fadeIn: 0.08,
   angle: 0, spin: 0, stretch: 0, flicker: 0, groundY: -9999, frame: 0,
+  // 拉伸池（曳光/火星/光束）的像素保底半宽；0 = 只按米算（旧行为）
+  minPx: 0,
   colorA: VFX_PALETTE.dust, colorB: VFX_PALETTE.dustDense,
   seed: 0, nx: 0, ny: 1, nz: 0,
 };
@@ -852,7 +923,7 @@ function ResetSpawn() {
   SPAWN.life = 1; SPAWN.sizeStart = 0.2; SPAWN.sizeEnd = 0.5;
   SPAWN.drag = 0.8; SPAWN.opacity = 1; SPAWN.fadeIn = 0.08;
   SPAWN.angle = 0; SPAWN.spin = 0; SPAWN.stretch = 0; SPAWN.flicker = 0;
-  SPAWN.groundY = -9999; SPAWN.seed = 0; SPAWN.frame = 0;
+  SPAWN.groundY = -9999; SPAWN.seed = 0; SPAWN.frame = 0; SPAWN.minPx = 0;
   SPAWN.colorA = VFX_PALETTE.dust; SPAWN.colorB = VFX_PALETTE.dustDense;
   SPAWN.nx = 0; SPAWN.ny = 1; SPAWN.nz = 0;
   return SPAWN;
@@ -864,6 +935,27 @@ function MakeQuadGeometry() {
   geometry.setAttribute("position", new THREE.Float32BufferAttribute(
     [-1, -1, 0, 1, -1, 0, 1, 1, 0, -1, 1, 0], 3));
   geometry.setIndex([0, 1, 2, 0, 2, 3]);
+  return geometry;
+}
+
+/**
+ * 沿 x 切成 segments 段的长条（x 仍是 -1..1，y 是 ±1）。只有光束池用：一条光束从几十米外
+ * 一直拉到相机身边，线宽的像素保底/上限按**顶点**离相机的距离算，四个角的面片只能在两端
+ * 之间线性插值 —— 中间离相机最近的那一段会胀成一个楔子。切段之后每一截各按自己的距离收宽。
+ */
+function MakeStripGeometry(segments) {
+  const geometry = new THREE.InstancedBufferGeometry();
+  const positions = [], index = [];
+  for (let i = 0; i <= segments; i += 1) {
+    const x = -1 + (2 * i) / segments;
+    positions.push(x, -1, 0, x, 1, 0);
+    if (i < segments) {
+      const a = i * 2;
+      index.push(a, a + 2, a + 3, a, a + 3, a + 1);
+    }
+  }
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(index);
   return geometry;
 }
 
@@ -884,7 +976,7 @@ class ParticlePool {
     this.dirtyMin = Infinity;
     this.dirtyMax = -Infinity;
 
-    const geometry = MakeQuadGeometry();
+    const geometry = config.segments ? MakeStripGeometry(config.segments) : MakeQuadGeometry();
     const n = this.capacity;
     this.arrays = {
       iSpawnLife: new Float32Array(n * 2),
@@ -999,7 +1091,9 @@ class ParticlePool {
     a.iParams[i * 4] = s.opacity; a.iParams[i * 4 + 1] = s.fadeIn;
     a.iParams[i * 4 + 2] = s.drag; a.iParams[i * 4 + 3] = s.seed;
     a.iExtra[i * 4] = s.stretch; a.iExtra[i * 4 + 1] = s.flicker;
-    a.iExtra[i * 4 + 2] = s.groundY; a.iExtra[i * 4 + 3] = s.frame || 0;
+    // iExtra.w：序列帧池放起始帧，拉伸池放像素保底半宽（两者从不同池里出，不冲突）
+    a.iExtra[i * 4 + 2] = s.groundY;
+    a.iExtra[i * 4 + 3] = (this.config.orient === "stretch" ? s.minPx : s.frame) || 0;
     if (a.iNormal) {
       a.iNormal[i * 3] = s.nx; a.iNormal[i * 3 + 1] = s.ny; a.iNormal[i * 3 + 2] = s.nz;
     }
@@ -1490,6 +1584,13 @@ export class VfxSystem {
         shape: "streak", orient: "stretch", blending: THREE.AdditiveBlending,
         bounce: true, softRange: 0.12, renderOrder: 9,
       }, this.shared),
+      // 一发一条的弹道光束（TracerBeam，战车机枪）。容量固定、不吃画质档预算：
+      // 它是「火力从哪儿来」的玩法信号，与落点预警准星同一个待遇。
+      // 淡出全交给片元里的余辉，池级淡出推到寿命最末。
+      beam: new ParticlePool(48, {
+        shape: "beam", orient: "stretch", blending: THREE.AdditiveBlending,
+        softRange: 0.12, renderOrder: 9, fadeOutStart: 0.995, segments: 32,
+      }, this.shared),
       // 枪口焰：星芒
       star: new ParticlePool(cap(POOL_SHARE.star, 24), {
         shape: "star", orient: "billboard", blending: THREE.AdditiveBlending,
@@ -1897,8 +1998,48 @@ export class VfxSystem {
     this.pools.streak.Spawn(s, this.time);
   }
 
-  /** 命中反馈。不同表面必须一眼分得出来，这是"打得实不实"的全部。 */
-  Impact(position, normal, surface = "dirt", { weaponKind = "rifle" } = {}) {
+  /**
+   * 一发子弹一条的弹道光束（战车机枪，Script_Main.FireVehicleBullet）。
+   *
+   * 与 Tracer 的区别：Tracer 是一小段跟着速度跑的亮条，迎面打来会沿视线塌成一个点，
+   * 远处又细到不足一个像素。这里是**一整条从枪口到弹着点的线**：弹头按表现速度飞过去，
+   * 掠过的那一段留余辉慢慢暗下去；线宽带像素保底，四十米外仍读得出一条线。
+   * 颜色沿用曳光的敌我约定（中方暖、日方冷），参数见 Data_Tuning_BulletVisual。
+   */
+  TracerBeam(from, to, { kind = "ija", speed = VEHICLE_TRACER.speedMps } = {}) {
+    TMP_A.copy(to).sub(from);
+    const distance = TMP_A.length();
+    if (distance < 0.05) return;
+    TMP_A.divideScalar(distance);
+    const T = VEHICLE_TRACER;
+    const flight = distance / Math.max(speed, 1);
+    const s = ResetSpawn();
+    // 钉在弹着点上（着色器里 SHAPE_BEAM 不积分弹道），iVelocity 只给方向
+    s.x = to.x; s.y = to.y; s.z = to.z;
+    s.vx = TMP_A.x; s.vy = TMP_A.y; s.vz = TMP_A.z;
+    s.life = flight + T.glowS * 5;
+    s.sizeStart = T.halfWidthM; s.sizeEnd = T.halfWidthM;
+    s.stretch = distance;
+    s.minPx = T.minHalfWidthPx;
+    s.groundY = T.maxHalfWidthPx;        // 光束池没有地面回弹，这一格借来放像素上限
+    // 光束参数借空着的弹道槽递进着色器（见 VERT_PARTICLE 的 SHAPE_BEAM 抬头）
+    s.angle = flight; s.spin = T.glowS;
+    s.ax = T.headLengthM; s.ay = T.trailOpacity; s.az = T.muzzleFadeM;
+    s.opacity = 1; s.fadeIn = 0;
+    const warm = kind !== "ija";
+    s.colorA = warm ? VFX_PALETTE.tracerNra : VFX_PALETTE.tracerIja;
+    s.colorB = warm ? VFX_PALETTE.tracerTrailNra : VFX_PALETTE.tracerTrailIja;
+    s.seed = this.random();
+    this.pools.beam.Spawn(s, this.time);
+    this.lastTracerBeam = { kind: warm ? "nra" : "ija", distance, flight, life: s.life };
+  }
+
+  /**
+   * 命中反馈。不同表面必须一眼分得出来，这是"打得实不实"的全部。
+   * hardSparks：打在硬面（HARD_SURFACE_SPARKS.surfaces）上另出一簇火星与亮闪 ——
+   * 目前只有战车机枪传；incoming 是弹道方向，火星顺着反弹方向溅出去。
+   */
+  Impact(position, normal, surface = "dirt", { weaponKind = "rifle", hardSparks = false, incoming = null } = {}) {
     const profile = SURFACE_PROFILES[surface] || SURFACE_PROFILES.dirt;
     const n = TMP_A.copy(normal).normalize();
     // 打在地上（法线朝上）碎块就落在弹着点；打在墙上则要一路掉到地面 ——
@@ -1954,6 +2095,9 @@ export class VfxSystem {
       s.seed = this.random();
       this.pools.streak.Spawn(s, this.time);
     }
+    if (hardSparks && HARD_SURFACE_SPARKS.surfaces.includes(surface)) {
+      this._HardSurfaceSparks(position, n, incoming, groundY);
+    }
 
     // 沙包被打穿：一股顺着重力往下淌的沙流，不是爆开的云
     if (profile.sandStream) {
@@ -1997,6 +2141,56 @@ export class VfxSystem {
       this._SpawnDecal(position, n, profile.decalSize, profile.decalRim, profile.decalHole,
         0.85, 1, variant);
     }
+  }
+
+  /**
+   * 硬面弹着的火星：一簇顺着反弹方向溅开、带重力会弹跳的亮条，加弹着点一下星芒亮闪。
+   * 火星带像素保底宽度 —— 二十米外一颗 1.6 cm 的火星本来连一个像素都占不满。
+   * n 是 Impact 里的 TMP_A（后面贴弹孔还要用），这里只动 TMP_B / TMP_C。
+   */
+  _HardSurfaceSparks(position, n, incoming, groundY) {
+    const P = HARD_SURFACE_SPARKS;
+    const axis = TMP_C.copy(n);
+    if (incoming) {
+      // 镜面反弹方向 d − 2(d·n)n，再往法线拉回一部分：掠射进来的弹，火星贴着墙面往前溅；
+      // 正面打进来的弹，火星迎着来路散开。
+      const dot = incoming.x * n.x + incoming.y * n.y + incoming.z * n.z;
+      axis.set(incoming.x - 2 * dot * n.x, incoming.y - 2 * dot * n.y, incoming.z - 2 * dot * n.z);
+      if (axis.lengthSq() > 1e-8) {
+        axis.normalize().multiplyScalar(P.reflectWeight).addScaledVector(n, 1 - P.reflectWeight);
+        if (axis.lengthSq() > 1e-8) axis.normalize(); else axis.copy(n);
+      } else axis.copy(n);
+    }
+    const count = Math.max(1, Math.round(P.count * this.spawnScale));
+    for (let i = 0; i < count; i += 1) {
+      const s = ResetSpawn();
+      this._ConeVelocity(axis, P.spread, this._Range(P.speedMps[0], P.speedMps[1]));
+      s.x = position.x + n.x * 0.03; s.y = position.y + n.y * 0.03; s.z = position.z + n.z * 0.03;
+      s.vx = TMP_B.x; s.vy = TMP_B.y + 0.8; s.vz = TMP_B.z;
+      s.ay = -9.8; s.drag = 1.2;
+      s.life = this._Range(P.lifeS[0], P.lifeS[1]);
+      s.sizeStart = P.halfWidthM; s.sizeEnd = P.halfWidthM * 0.35;
+      s.stretch = this._Range(P.lengthM[0], P.lengthM[1]);
+      s.minPx = P.minHalfWidthPx;
+      s.opacity = 1; s.fadeIn = 0.02;
+      s.groundY = groundY;
+      s.colorA = VFX_PALETTE.sparkBurstHot; s.colorB = VFX_PALETTE.sparkBurstCool;
+      s.seed = this.random();
+      this.pools.streak.Spawn(s, this.time);
+    }
+    // 弹着点那一下亮闪：星芒池（与枪口焰同一个形状），两三帧就灭
+    const f = ResetSpawn();
+    f.x = position.x + n.x * 0.04; f.y = position.y + n.y * 0.04; f.z = position.z + n.z * 0.04;
+    f.drag = 12;
+    f.life = P.flashLifeS;
+    f.sizeStart = P.flashSizeM; f.sizeEnd = P.flashSizeM * 1.3;
+    f.opacity = 1; f.fadeIn = 0.02;
+    f.angle = this._Range(0, 6.283); f.spin = this._Signed(6);
+    f.colorA = VFX_PALETTE.muzzleCore; f.colorB = VFX_PALETTE.sparkBurstHot;
+    f.seed = this.random();
+    this.pools.star.Spawn(f, this.time);
+    this.lastHardSurfaceSparks = { count, position: [position.x, position.y, position.z],
+      axis: [axis.x, axis.y, axis.z] };
   }
 
   /**

@@ -1122,6 +1122,16 @@ export const MISSION_LAYOUT = Object.freeze({
     w: MISSION_BOUNDS.maxX - MISSION_BOUNDS.minX, d: MISSION_BOUNDS.maxZ - MISSION_BOUNDS.minZ,
     h: 1, y: -0.5, semantic: "ground", pbr: "Ground", pbrOptions: { normalScale: .5, metalness: 0 }, terrainLayers: "MissionPlain" },
   railway: MISSION_RAILWAY,
+  // 挨枪的弹着表面（Script_Main.SURFACE_BY_TAG 的值域）。碰撞 tag 一律是 whiteboxWall，
+  // 不在这里的 semantic（cover / structure / plaster / roof …）按 tag 落成砖墙 ——
+  // 战车机枪打上去溅火星的就是这些。换成沙袋模型的那几段（IsMissionSandbagBlock）
+  // 另标 sandbag；只画了袋缝、仍是蓝色白盒块的矮墙照墙算，看上去是墙就按墙溅火星。
+  semanticSurfaces: {
+    timber: "wood", OpeningWood: "wood", foliage: "wood",
+    metal: "metal",
+    earthDark: "dirt", OpeningEarth: "dirt", ground: "dirt", railBallast: "dirt", step: "dirt",
+    water: "water",
+  },
   semanticColors: {
     railBallast: 0x5a5750,
     foliage: 0x68715f,

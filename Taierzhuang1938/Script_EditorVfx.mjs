@@ -17,6 +17,8 @@ const INSTANT_EFFECTS = [
   { id: "ImpactWood", name: "命中 · 木材", note: "木屑与粉尘", run: (v) => v.Impact(new THREE.Vector3(0, 0.85, 0), new THREE.Vector3(0, 0, -1), "wood") },
   { id: "ImpactMetal", name: "命中 · 金属", note: "火星与跳弹", run: (v) => v.Impact(new THREE.Vector3(0, 0.85, 0), new THREE.Vector3(0, 0, -1), "metal") },
   { id: "Tracer", name: "曳光弹", note: "中方暖白弹道", run: (v) => v.Tracer(new THREE.Vector3(-4, 1.1, 0), new THREE.Vector3(4, 1.1, 0), { speed: 90, kind: "nra" }) },
+  { id: "TracerBeam", name: "战车机枪光束", note: "枪口到弹着点一整条，弹头 + 余辉", run: (v) => v.TracerBeam(new THREE.Vector3(-6, 1.3, -3), new THREE.Vector3(3, 0.9, 1), { speed: 60, kind: "ija" }) },
+  { id: "ImpactBrickSparks", name: "命中 · 砖墙（战车机枪）", note: "砖粉 + 顺反弹方向的火星与亮闪", run: (v) => v.Impact(new THREE.Vector3(0, 0.85, 0), new THREE.Vector3(0, 0, -1), "brick", { weaponKind: "lmg", hardSparks: true, incoming: new THREE.Vector3(0.6, -0.1, 1).normalize() }) },
   { id: "Blood", name: "血雾", note: "命中反馈：雾芯+溅射+血滴+地渍", run: (v, s) => v.Blood(new THREE.Vector3(0, 1.0, 0), new THREE.Vector3(0, 0, -1), s) },
   { id: "Incoming", name: "炮弹落点预警", note: "准星贴图 + 收缩环 + 落点尘", run: (v) => v.IncomingMarker(new THREE.Vector3(0, 0.03, 0), 2.6, { radius: 11 }) },
 ];

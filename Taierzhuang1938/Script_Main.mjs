@@ -4744,6 +4744,9 @@ async function WarmLevel(phase) {
           smokeHandle = vfx.SmokeSource({ x: spot.x, y: groundY + 0.5, z: spot.z }, { kind: "dust", rate: 12, radius: 0.6, rise: 0.4, life: 1.5, opacity: 0.2 });
           vfx.MuzzleFlash(eye.clone().addScaledVector(forward, 0.6), forward, { kind: "rifle" });
           vfx.Tracer(eye.clone().addScaledVector(forward, 0.6), spot.clone(), { kind: "nra" });
+          // 战车机枪的光束池（SHAPE_BEAM）与硬面火星：第一次挨扫射时别现编着色器
+          vfx.TracerBeam(eye.clone().addScaledVector(forward, 0.6), spot.clone(), { kind: "ija" });
+          vfx.Impact(spot.clone().setY(groundY), new THREE.Vector3(0, 1, 0), "brick", { hardSparks: true, incoming: forward });
           vfx.Impact(spot.clone().setY(groundY), new THREE.Vector3(0, 1, 0), "dirt");
           vfx.Blood(spot.clone().setY(groundY + 1), forward, 1);
         }
@@ -7263,7 +7266,20 @@ const SURFACE_BY_TAG = {
   ramp: "dirt", grave: "dirt", embankment: "dirt", kan: "dirt",
   dirt: "dirt", fieldBank: "dirt", villageStraw: "dirt",
   wall: "brick", parapet: "brick", rubble: "brick", householdCrock: "brick",
+  // 【2026-09-22】第一关白盒的墙、门、顶棚与战车一直没登记：战车机枪打白盒墙、打战车都落回
+  // dirt 出土灰，硬面火星（Data_Tuning_BulletVisual）永远触发不了。tag 这一层只能按最常见的
+  // 墙体算砖；同一个 whiteboxWall 底下的沙袋墙与木料由碰撞盒自带的 surface 分开（ImpactSurface）。
+  whiteboxWall: "brick", whiteboxGate: "wood", whiteboxCeiling: "wood", missionTank: "metal",
 };
+
+/**
+ * 一只碰撞盒挨枪的弹着表面：盒子自己带的 surface 优先（第一关白盒按体块标：沙袋墙、
+ * 木料、墙体的碰撞 tag 全是 whiteboxWall，见 Script_FirstLevelWhiteboxField.WhiteboxSurface），
+ * 其次按 tag 查 SURFACE_BY_TAG，再落到调用方给的兜底。
+ */
+function ImpactSurface(box, fallback) {
+  return box?.surface || SURFACE_BY_TAG[box?.tag] || fallback;
+}
 
 /** 表面 → 实录命中音。sandbag 与 dirt 共用土声（沙包里装的就是土）。 */
 const IMPACT_CUE = {
@@ -7631,7 +7647,7 @@ function TryFire(dt, returningGrenade = false) {
     ConfirmHit(died);
   } else if (shot.wall) {
     const n = new THREE.Vector3(shot.wall.normal[0], shot.wall.normal[1], shot.wall.normal[2]);
-    const surface = SURFACE_BY_TAG[shot.wall.box.tag] || "brick";
+    const surface = ImpactSurface(shot.wall.box, "brick");
     vfx.Impact(_hitPoint, n, surface, { weaponKind: weapon.kind });
     audio.Play(IMPACT_CUE[surface] || "impactBrick", { position: _hitPoint.clone(), volume: 0.55 });
     // 跳弹：打在硬面上四分之一的概率削飞出去。种子跟着射击序号走（不是 Math.random）——
@@ -7685,13 +7701,21 @@ function FireVehicleBullet(from,direction,{weaponId="Type11",damageScale=1,sourc
   if(player.Alive)targets.push(playerTarget);
   const weapon=WEAPONS[weaponId],result=MarchBullet(from,direction,weapon,targets,sourceCollider),end=_hitPoint.clone();
   vfx.MuzzleFlash(from,direction,{scale:1.1,kind:"hmg"});
-  vfx.Tracer(from,end,{kind:"ija"});audio.PlayGunshot("type92",{position:from,volume:.85});
+  // 每发一条从枪口到弹着点的光束（不是步枪那种 1/5 的短曳光）：玩家要看得清火力从哪儿来、
+  // 扫到了哪儿。口径见 Data_Tuning_BulletVisual。
+  vfx.TracerBeam(from,end,{kind:"ija"});audio.PlayGunshot("type92",{position:from,volume:.85});
   if(result.soldier===playerTarget)player.TakeHit(weapon.damage*damageScale*(COMBAT.player?.bulletScale??.4),result.part,direction,{from,bullet:true});
   // 车载重机枪走 hmg 那一档（断肢概率比步枪高一个量级，见 SEVER_RULES）。
   else if(result.soldier){result.soldier.TakeHit(weapon.damage*damageScale,result.part,direction,
     {kind:"hmg",shapeId:result.shape?.id||null,weaponId,point:end.clone()});
     if(result.part==="head")vfx.HeadshotBlood(end,direction,result.soldier);else vfx.Blood(end,direction,.5);}
-  else if(result.wall){const normal=new THREE.Vector3(...result.wall.normal);vfx.Impact(end,normal,SURFACE_BY_TAG[result.wall.box?.tag]||"dirt",{weaponKind:weapon.kind});}
+  else if(result.wall){
+    const normal=new THREE.Vector3(...result.wall.normal),surface=ImpactSurface(result.wall.box,"dirt");
+    // hardSparks：砖墙、铁件上溅一簇火星（土、沙包、木头照旧只出屑）。声音与架设机枪那条同口径。
+    vfx.Impact(end,normal,surface,{weaponKind:weapon.kind,hardSparks:true,incoming:direction});
+    audio.Play(IMPACT_CUE[surface]||"impactDirt",{position:end.clone(),volume:.5});
+    audioWiring.Ricochet(end,surface,state.frame);
+  }
   return {hit:result.soldier===playerTarget?"player":result.soldier?.missionId||null,wall:result.wall?.box?.tag||null,end:end.toArray()};
 }
 function FireEmplacedShot(shot) {
@@ -7745,7 +7769,7 @@ function FireEmplacedShot(shot) {
     ConfirmHit(died);
   } else if (result.wall) {
     const n = new THREE.Vector3(result.wall.normal[0], result.wall.normal[1], result.wall.normal[2]);
-    const surface = SURFACE_BY_TAG[result.wall.box.tag] || "brick";
+    const surface = ImpactSurface(result.wall.box, "brick");
     vfx.Impact(_hitPoint, n, surface, { weaponKind: mountedWeapon.kind });
     audio.Play(IMPACT_CUE[surface] || "impactBrick", { position: _hitPoint.clone(), volume: 0.5 });
     audioWiring.Ricochet(_hitPoint, surface, shot.index);
