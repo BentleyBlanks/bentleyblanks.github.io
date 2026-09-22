@@ -43,13 +43,11 @@ import { MISSION_RECEPTION_SPACE } from "./Data_FirstLevelMissionTopology.mjs";
 // ---------------------------------------------------------------------------
 // 顺序 = Enter(stage) 里原先各 case 的 SpawnEncounter 调用顺序（生成是排队的）。
 // 不进这张表的两类：
-//   · front —— 由 UpdateFront 的 frontBattleStarted 与 Support 段的 frontReached 生成；
 //   · transferAlley —— 由 UpdateTransferThreats 在第一处威胁解除后放出。
 export const MISSION_STEP_SPAWNS = Object.freeze({
   Trapped: Object.freeze(["bunkerAssault"]),
-  Support: Object.freeze(["approach", "tank", "village", "melee"]),
-  MachineGun: Object.freeze(["machineGun", "tank"]),
-  Tank: Object.freeze(["bundleApproach"]),
+  BunkerRescue: Object.freeze(["approach", "front", "machineGun", "tank", "bundleApproach"]),
+  Support: Object.freeze(["village", "melee"]),
   Village: Object.freeze(["village", "melee"]),
   Courtyard: Object.freeze(["courtyard"]),
   Transfer: Object.freeze(["transfer"]),
@@ -64,36 +62,36 @@ export const MISSION_STEP_SPAWNS = Object.freeze({
 //   step     进某个内部步骤时（见 MISSION_STEP_SPAWNS）
 //   fact     记下某个事实时
 //   threat   转运区的第二处威胁就绪时（MISSION_TRANSFER_THREATS）
-// standbyUntil：生成时是待命状态（不开火），记下这个事实才解除。
+// standbyUntil：提前在位、正常索敌开火；该事实记下后才沿突击路线推进。
 // dormant / wake：生成时整组装睡（scriptedNoncombatant），按 wake 醒。
 export const MISSION_ENCOUNTER_ACTIVATION = Object.freeze({
   bunkerAssault: Object.freeze({
     spawn: Object.freeze({ kind: "step", step: "Trapped" }),
     dormant: true,
-    wake: Object.freeze({ kind: "fact", fact: "rifleRecovered" }),
-    note: "门外行刑的两个人＋跟进的两个；受困段整段装睡（只演），日兵转向门内才醒",
+    wake: Object.freeze({ kind: "scripted", step: "BunkerRescue", source: "FirstLevelBunkerShow.ReleaseCombat",
+      text: "小队反扑时解除演出保护并交战；全部清场后才拖救还权" }),
+    note: "两名行刑兵与两名跟进兵；反扑时解除演出保护，由小队真实击杀四人后才拖救还权",
   }),
   approach: Object.freeze({
-    spawn: Object.freeze({ kind: "step", step: "Support" }),
-    release: Object.freeze({ kind: "tacticNear" }),
-    note: "生成即在位；每个人由 MISSION_TACTICS 的 near/nearM 放行（玩家走到那一段才动）",
+    spawn: Object.freeze({ kind: "step", step: "BunkerRescue" }),
+    note: "02 预先布置右阵位四名守兵，正常索敌开火；03 接近只触发夺点判定",
   }),
   front: Object.freeze({
-    spawn: Object.freeze({ kind: "fact", fact: "frontBattleStarted", step: "Support" }),
+    spawn: Object.freeze({ kind: "step", step: "BunkerRescue" }),
     standbyUntil: "frontBattleStarted",
-    note: "UpdateFront 记 frontBattleStarted 时生成；Support 段走到 frontReached 也会补一次",
+    note: "02 已在远处交火；03 开始沿突击路线推进，同一批实体持续到撤离",
   }),
   machineGun: Object.freeze({
-    spawn: Object.freeze({ kind: "step", step: "MachineGun" }),
-    standbyUntil: "frontBattleStarted",
+    spawn: Object.freeze({ kind: "step", step: "BunkerRescue" }),
+    standbyUntil: "tankPreviewed",
   }),
   tank: Object.freeze({
-    spawn: Object.freeze({ kind: "step", step: "Support" }),
+    spawn: Object.freeze({ kind: "step", step: "BunkerRescue" }),
     standbyUntil: "frontBattleStarted",
-    note: "Flank* 两个人生成即 scriptedNoncombatant，等编排放行",
+    note: "道路护兵在 02 预先入场，与后续战车保持同一战场",
   }),
   bundleApproach: Object.freeze({
-    spawn: Object.freeze({ kind: "step", step: "Tank" }),
+    spawn: Object.freeze({ kind: "step", step: "BunkerRescue" }),
     note: "侧沟两处拐角与补给屋门口的守兵，全是 hold",
   }),
   village: Object.freeze({
@@ -518,8 +516,8 @@ export const MISSION_FACT_GATES = Object.freeze({
   // 不在 requirements 里、但影响编排的触发
   // -----------------------------------------------------------------------
   frontBattleStarted: Gate({
-    kind: "proximity", step: "Support", anchor: "front", radiusM: R.frontEngageDistanceM,
-    source: "UpdateFront", note: "放出 front 组、解除 front/machineGun/tank 的待命",
+    kind: "scripted", step: "Support", source: "FirstLevelFrontBattle.Enter",
+    text: "进入 03 后，已在位的前沿部队开始突击推进；敌军实体在 02 已经预置",
   }),
   meleeEngaged: Gate({
     kind: "scripted", step: "Melee", source: "UpdateMelee",

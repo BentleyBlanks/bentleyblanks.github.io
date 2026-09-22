@@ -16,7 +16,7 @@ import { OPENING } from "./Data_FirstLevelOpening.mjs";
 import { FirstLevelOpening, SamplePerceptionCurve } from "./Script_FirstLevelOpening.mjs";
 // 公开阶段 1–7 的演出（Front 玩法包）。运行时只留构造 / Enter / Update / Draw 四个薄钩子。
 import { FirstLevelFrontShow } from "./Script_FirstLevelFrontShow.mjs";
-import { FRONT_DEFENDERS, FRONT_GUARD_POSTS, FRONT_SHELLS, FRONT_ASSAULT, FrontAssaultLane, FrontReserveLane, ClearLaneX } from "./Data_FirstLevelMissionFront.mjs";
+import { FRONT_GUARD_POSTS, FRONT_SHELLS, FRONT_ASSAULT, FrontAssaultLane, FrontReserveLane, ClearLaneX } from "./Data_FirstLevelMissionFront.mjs";
 import {
   MISSION_STAGES,
   MISSION_TUNING as R,
@@ -757,7 +757,7 @@ export class FirstLevelMissionRuntime {
     const coverCalm=!!this.squadCoverBounds&&!this.squadCoverThreat.Update(this.ai.time,
       this.squad.map(actor=>({alive:actor.alive,position:actor.position,targetVisible:!!actor.targetVisible,
         incomingAt:actor.incomingFire?.at,suppression:actor.suppression})),
-      [...this.enemies.values()].filter(e=>e.alive&&!e.scriptedNoncombatant&&!e.missionDormant&&!e.missionSurfaceRest&&!e.missionFrontStandby).map(e=>e.position));
+      [...this.enemies.values()].filter(e=>e.alive&&!e.scriptedNoncombatant&&!e.missionDormant&&!e.missionSurfaceRest).map(e=>e.position));
     this.squadCoverCalm=coverCalm;
     // 受困那一段班里人是演出，不归行军层管，也不许通用 AI 提前救场。
     if (stage === "Trapped") {
@@ -958,7 +958,8 @@ export class FirstLevelMissionRuntime {
         movingSeconds: 0, distance: 0, last: { x: spec.x, z: spec.z }, shelter: {x:spec.x,z:spec.z}, mode: "cover" };
       // Finite front teams remain ordinary alert AI before the assault starts.
       // Only the later tank-flank group waits for its authored release.
-      const standby=["front","machineGun","tank"].includes(id)&&!spec.id.startsWith("Flank")&&!this.Has("frontBattleStarted");
+      const standbyFact=MISSION_ENCOUNTER_ACTIVATION[id]?.standbyUntil;
+      const standby=!!standbyFact&&!spec.id.startsWith("Flank")&&!this.Has(standbyFact);
       if(id==="tank"&&spec.id.startsWith("Flank"))actor.scriptedNoncombatant=true;
       actor.missionFrontStandby=standby;
       if(standby)this.ai.SetStance(actor,1,4+actor.id%3,true);
@@ -1173,8 +1174,6 @@ export class FirstLevelMissionRuntime {
         !actor.alive ||
         actor.scriptedNoncombatant ||
         actor.missionSurfaceRest ||
-        // 待命的人在 WATCH 里一枪都不开，对通路不构成威胁（和改成真 AI 之前一个意思）
-        actor.missionFrontStandby ||
         actor.suppression >= R.threatSuppression ||
         actor.state === "suppressed"
       )
@@ -1360,8 +1359,7 @@ export class FirstLevelMissionRuntime {
       "WallPath", "ReceptionGate", "Handover", "BridgeOrders", "BridgeCover"].includes(stage.id))
       this.Say(stage.cue, { urgent: ["AirFirst", "Dive", "Death"].includes(stage.id) });
     // 按表生成这一步的遭遇组（Data_FirstLevelMissionGates.MISSION_STEP_SPAWNS，
-    // 顺序就是原来各 case 里的调用顺序）。front 与转运四拍不在表里：
-    // 前者由 UpdateFront 的 frontBattleStarted 放出，后者由 UpdateTransferThreats 放出。
+    // 顺序就是表里的调用顺序）。转运四拍由 UpdateTransferThreats 放出。
     for (const id of MISSION_STEP_SPAWNS[stage.id] || []) this.SpawnEncounter(id);
     switch (stage.id) {
       case "Trapped":
@@ -1381,17 +1379,7 @@ export class FirstLevelMissionRuntime {
         this.frontArrivalAt=null;
         this.frontArrivalShots=this.Inventory().shots;
         this.Guide(MISSION_ROUTES.support);
-        // Lao Zhou occupies the persistent left gun.
-        // The finite assault is committed by UpdateFront at the last approach
-        // bend. approach/tank/village/melee are spawned at this step (MISSION_STEP_SPAWNS,
-        // before the switch) so a slow approach can spend the battle offscreen.
-        this.frontDefenders=FRONT_DEFENDERS.map(spec=>{
-          const actor=this.ai.Spawn("nra",spec.x,spec.z,{weapon:spec.weapon,squadId:"MissionFrontDefense"});
-          if(actor){InstallMissionSentry(actor);actor.missionId=spec.id;this.Defend(actor,spec);this.ai.SetStance(actor,spec.stance,Infinity,true);
-            actor.scriptAccuracyScale=R.defenderAccuracyScale;actor.scriptFireIntervalScale=R.defenderFireIntervalScale;}
-          return actor;
-        }).filter(Boolean);
-        this.SpawnGuards();
+        // Front actors have occupied their positions since the rescue began.
         this.tank.present=true;
         break;
       case "MachineGun":
@@ -1686,6 +1674,10 @@ export class FirstLevelMissionRuntime {
     }
   }
   UpdateFront() {
+    for(const actor of this.enemies.values())if(actor.missionFrontStandby
+      &&this.Has(MISSION_ENCOUNTER_ACTIVATION[actor.missionEncounter]?.standbyUntil)){
+      actor.missionFrontStandby=false;
+    }
     const wake=MISSION_ENCOUNTER_ACTIVATION.village.wake;
     for(const actor of this.enemies.values())if(this.flow.stage.id===wake.step && actor.missionEncounter!=="melee" && actor.missionDormant && Distance(actor.position,this.player.position)<wake.radiusM){
       actor.missionDormant=false;actor.scriptedNoncombatant=false;
@@ -1698,13 +1690,6 @@ export class FirstLevelMissionRuntime {
         this.combat.FireShell(this.Point({x:shell.impact.x+45,z:shell.impact.z-45},32),this.Point(shell.impact),
           {kind:"Shell75",flight:1.8,radius:6,damage:70});
       }
-    }
-    if(!this.Has("frontBattleStarted")&&this.GateNear("frontBattleStarted")){
-      this.Record("frontBattleStarted");
-      this.frontBattleAt=this.time;
-      this.SpawnEncounter("front");
-      for(const actor of this.enemies.values())if(actor.missionFrontStandby){actor.scriptedNoncombatant=false;actor.missionFrontStandby=false;}
-      for(const guard of this.guards){this.Defend(guard.actor,guard.actor.position,0,0);this.ai.SetStance(guard.actor,2,Infinity,true);}
     }
     // The front director reveals the vehicle only during the first batch handover.
   }

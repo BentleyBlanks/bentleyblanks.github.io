@@ -125,6 +125,32 @@ if(process.argv.includes("--opening-audio"))process.exit(0);
     ({Vector3}=await import("three"));
   } finally {hooks.deregister();}
   {
+    const {FirstLevelBunkerShow}=await import("./Script_OpeningStoryboards.mjs");
+    const {OPENING_STORYBOARDS:C}=await import("./Data_OpeningStoryboards.mjs");
+    const actors=C.vanguardIds.map(id=>({id,alive:false,health:0}));
+    const show=Object.create(FirstLevelBunkerShow.prototype);
+    show.r={enemies:new Map(actors.map(a=>[a.id,a])),player:{meleeDormant:true},Defend(){},Record(){assert.fail("uncleared rescue must not record completion");}};
+    assert.ok(show.VanguardCleared());
+    for(const actor of actors){
+      actor.alive=true;actor.health=100;actor.scriptEssential=true;actor.scriptedNoncombatant=true;
+      assert.equal(show.VanguardCleared(),false);show.Release();
+      show.ReleaseCombat(actor);
+      assert.ok(actor.alive&&actor.health===100&&!actor.scriptEssential&&!actor.scriptedNoncombatant,"release enables combat without inventing a casualty");
+      actor.alive=false;actor.health=0;
+    }
+    show.r.enemies.delete(C.vanguardIds[0]);assert.equal(show.VanguardCleared(),false,"missing actor is not proof of a kill");
+    show.playerMeleeDormancy=false;show.savedMeleeDormancy=true;show.ReleaseMeleeDormancy();
+    assert.equal(show.r.player.meleeDormant,false,"melee eligibility returns after captive camera control");
+    console.log("ok rescue waits for every original vanguard casualty and restores player melee eligibility");
+  }
+  {
+    const actor={alive:true,missionFrontStandby:true,position:new Vector3(0,0,-10),stance:0,suppression:0};
+    const r={enemies:new Map([["preplaced",actor]]),Point:(p,y)=>new Vector3(p.x,y,p.z),battlefield:{Raycast:()=>null}};
+    assert.equal(FirstLevelMissionRuntime.prototype.Threatens.call(r,{x:0,z:0}),true,"waiting to advance does not erase a live enemy's firing lane");
+    r.battlefield.Raycast=()=>({t:1});
+    assert.equal(FirstLevelMissionRuntime.prototype.Threatens.call(r,{x:0,z:0}),false,"physical cover still blocks a preplaced enemy");
+  }
+  {
     assert.deepEqual(MISSION_ENCOUNTERS.approach.map(a=>a.id),
       ["RightNestGunner","RightNestGuard","RightEntryGuard","RightLinkGuard"]);
     assert.ok(MISSION_ENCOUNTERS.approach.every(a=>a.hold&&!MISSION_TACTICS[a.id]),
@@ -338,12 +364,19 @@ console.log("ok all mission gates require recorded gameplay facts and restore ex
     position:Position(0,i===7?3:40+i),stance:0,missionEncounter:"front"}));
   const r={time:0,flow:{stage:{id:"Support"}},enemies:new Map(enemies.map(a=>[a.id,a])),
     player:{position:Position(0,0),EyePosition:Position(0,0),camera:{}},Point:p=>p,BlocksSight:()=>false};
-  const opening=new FirstLevelOpening(r);
-  for(let slot=0;slot<8;slot++){
+    const opening=new FirstLevelOpening(r);
+    for(let slot=0;slot<8;slot++){
     r.time=slot*OPENING.fireSlotSeconds;opening.FireWindows();
     assert.equal(enemies[7].missionFireHold,false,"close enemy keeps a firing window across distant rotations");
-    assert.ok(enemies.filter(a=>!a.missionFireHold).length<=OPENING.playerFireLimit);
-  }
+      assert.ok(enemies.filter(a=>!a.missionFireHold).length<=OPENING.playerFireLimit);
+    }
+    r.frontShow={bunker:{CameraActive:true}};r.flow.stage.id="BunkerRescue";
+    opening.FireWindows();
+    assert.ok(enemies.every(a=>a.missionFireHold&&!a.scriptedNoncombatant),"captivity removes player firing slots while enemies remain combatants");
+    assert.deepEqual(opening.playerShooters,[],"rescue cannot assign a shooter to the helpless player");
+    r.frontShow.bunker.CameraActive=false;opening.FireWindows();
+    assert.ok(opening.playerShooters.length>0,"player firing slots resume when camera control ends");
+    r.flow.stage.id="Support";
   r.BlocksSight=(from)=>from===enemies[7].position;opening.FireWindows();
   assert.equal(enemies[7].missionFireHold,true,"wall-blocked close enemy cannot displace visible shooters");
   for(const [i,a] of enemies.entries())a.missionFireGroup=i===6?'Rail':'Flank';

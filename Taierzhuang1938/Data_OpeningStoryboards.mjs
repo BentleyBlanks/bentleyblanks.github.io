@@ -7,6 +7,12 @@ export const OPENING_STORYBOARDS = Object.freeze({
   ambushS:1.1, bladeContactS:.56, deflectS:1.0, pullS:2.4, kickS:1.2, kickContactS:.48,
   walkMps:2.3, turnRps:4.5, poseBlendS:.28, cameraBlendS:.65,
   strikeBlood:{holdS:1.3,fadeS:8,opacity:.92},
+  // Local counterattack: the same four vanguard soldiers must fall before the pull.
+  vanguardIds:["BunkerExecutionerA","BunkerExecutionerB","BunkerFollowA","BunkerFollowB"],
+  coverPosts:{heyoutian:{x:-41.8,z:-127.5},liuwencai:{x:-38.3,z:-132.5}},
+  coverArrivalM:.7, counterattackHoldM:.4,
+  // Close counterattack has deliberate aimed fire, above the distant battle's suppression tuning.
+  counterattackAccuracyScale:2,
   firstPerson:{shoulderBackM:.14,shoulderDropM:.22,shoulderHalfWidthM:.18},
   positions:{
     seated:{x:-40,z:-126.0}, trapped:{x:-40,z:-126.4}, interrogated:{x:-40,z:-129.25}, rescued:{x:-40,z:-126.1},

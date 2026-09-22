@@ -250,7 +250,7 @@ export class FirstLevelOpening {
     if(this.breathVoice)this.r.audio.StopVoice?.(this.breathVoice,.15);
   }
   FireWindows(){
-    const r=this.r,active=FIRE_WINDOW_STAGES.includes(r.flow.stage.id);
+    const r=this.r,active=FIRE_WINDOW_STAGES.includes(r.flow.stage.id),captive=r.frontShow?.bunker?.CameraActive===true;
     const candidates=[];
     let visible=0;
     for(const a of r.enemies.values()){
@@ -260,9 +260,10 @@ export class FirstLevelOpening {
         this.shotCount++;if(a.target?.isPlayer)this.playerShotCount++;
         if(this.fireEvents.length>256)this.fireEvents.shift();
       }
-      a.missionFireHold=false;
+      // Live enemies fight the rescuers while the captive has no control.
+      a.missionFireHold=captive;
       a.missionSurfaceRest=false;
-      if(!active||!a.alive||a.scriptedNoncombatant)continue;
+      if(captive||!active||!a.alive||a.scriptedNoncombatant)continue;
       a.missionFireHold=true;
       const projected=a.position.clone();projected.y+=1;projected.project(r.player.camera);
       if(Math.abs(projected.x)<=1&&Math.abs(projected.y)<=1&&projected.z>=-1&&projected.z<=1&&

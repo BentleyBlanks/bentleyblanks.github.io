@@ -8,7 +8,7 @@
 //   2. MISSION_STEP_SPAWNS / MISSION_ENCOUNTER_ACTIVATION 与 MISSION_ENCOUNTERS、
 //      FIRST_LEVEL_ENCOUNTER_STARTS、FIRST_LEVEL_DEFERRED_ENCOUNTERS 对得上。
 //   3. **静态对账两个源码文件**（运行时 + 开场脚本 Script_FirstLevelOpening）：
-//      SpawnEncounter 的字面量调用只剩 front 那两处；`.Near(` 的出现次数 = GateNear
+//      SpawnEncounter 不再有字面量调用；`.Near(` 的出现次数 = GateNear
 //      内一处 + 下面两张逐条写明理由的白名单；GateNear 引的事实必须是表里的距离门。
 //      多一处就红 —— 新写的编排门必须走表，不许再在代码里写坐标和米数。
 //   4. BuildOrchestrationModel() 能跑、JSON.stringify 不抛、各计数与源表一致。
@@ -214,16 +214,15 @@ checks += 1;
 // ---------------------------------------------------------------------------
 // 3. 静态对账运行时源码
 // ---------------------------------------------------------------------------
-// SpawnEncounter 的字面量调用：只剩 front 那两处（UpdateFront 记 frontBattleStarted
-// 时那一处，与 Update 的 Support 段补的那一处）。其余全部走 MISSION_STEP_SPAWNS。
+// 所有初始部署走 MISSION_STEP_SPAWNS；接近目标或进入下一步不得临时补建前沿敌军。
 const literalSpawns = [...runtimeSource.matchAll(/this\.SpawnEncounter\(\s*["']([A-Za-z0-9]+)["']\s*\)/g)].map((m) => m[1]);
-assert.deepEqual(literalSpawns, ["front"],
-  `运行时只保留 front 的幂等补建，03 的初始部署由 FrontBattle 负责，实际是 ${JSON.stringify(literalSpawns)}`);
+assert.deepEqual(literalSpawns, [],
+  `前沿部队在 02 按表预置，接近时不得补建，实际是 ${JSON.stringify(literalSpawns)}`);
 checks += 1;
 Check(/this\.SpawnEncounter\(plan\.id\)/.test(runtimeSource), "转运区第二处威胁仍由 UpdateTransferThreats 按 plan.id 生成");
 Check(/for \(const id of MISSION_STEP_SPAWNS\[stage\.id\] \|\| \[\]\) this\.SpawnEncounter\(id\);/.test(runtimeSource),
   "Enter 在 switch 之前按 MISSION_STEP_SPAWNS 统一生成");
-// Enter 的 switch 里一处 SpawnEncounter 都不许剩（两处 front 分别在 UpdateFront 与 Update）。
+// Enter 的 switch 里一处 SpawnEncounter 都不许剩。
 const enterBody = runtimeSource.slice(runtimeSource.indexOf("  Enter(stage) {"), runtimeSource.indexOf("  SpawnGuards() {"));
 Check(enterBody.length > 2000, "切出了 Enter(stage) 的整段");
 Check((enterBody.match(/this\.SpawnEncounter\(/g) || []).length === 1,
@@ -338,11 +337,13 @@ Check(four.encounters.find((e) => e.id === "village").state === "dormant", "阶�
 Check(four.encounters.find((e) => e.id === "machineGun").state === "active", "阶段 4 的 machineGun 组已放出");
 Check(PhaseLayout(model, 1).encounters.filter((e) => e.id !== "bunkerAssault").every((e) => e.state === "pending"),
   "阶段 1 除了掩蔽部门外那一组之外一个敌人都还没出现");
-// 它在阶段 1 之内先装睡再醒（日兵转向门内那一刻），阶段粒度的 state 分不开这两段，
-// 所以这里只守「登记成装睡、醒的条件是 doorSearchStarted」。
+// 先头兵在 02 反扑时交还真实战斗，四人必须在拖救之前死亡。
 const bunkerAssault = PhaseLayout(model, 1).encounters.find((e) => e.id === "bunkerAssault");
-Check(bunkerAssault.dormant && bunkerAssault.wake.fact === "rifleRecovered",
-  "01–02 日兵由分镜驱动，拾枪后交还战斗 AI");
+Check(bunkerAssault.dormant && bunkerAssault.wake.step === "BunkerRescue" && bunkerAssault.wake.source === "FirstLevelBunkerShow.ReleaseCombat",
+  "02 反扑时日兵交还战斗 AI，由小队清场后才拖救还权");
+for(const id of ["approach","front","machineGun","tank","bundleApproach"])
+  Check(MISSION_STEP_SPAWNS.BunkerRescue.includes(id)&&FIRST_LEVEL_ENCOUNTER_STARTS[id]===2,
+    `${id} 在 02 预置，出门和接近阵位不再生成`);
 const STATES = new Set(["pending", "spawned", "dormant", "standby", "active", "cleared"]);
 for (const phase of model.phases)
   for (const encounter of PhaseLayout(model, phase.number).encounters)

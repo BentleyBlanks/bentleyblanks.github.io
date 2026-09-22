@@ -7,6 +7,7 @@ import { MISSION_FRONT_COLLECTION_ROUTE } from "./Data_FirstLevelMissionTopology
 import { MISSION_ENCOUNTERS, FRONT_BATTLE_OBJECTIVES as Objectives } from "./Data_FirstLevelMission.mjs";
 import { MissionRouteProjection, MissionRoutePoint, MissionRouteLength, MissionRouteLookahead } from "./Script_FirstLevelMissionColumn.mjs";
 import { InstallMissionSentry } from "./Script_FirstLevelMissionPeople.mjs";
+import { FRONT_DEFENDERS } from "./Data_FirstLevelMissionFront.mjs";
 const Distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const AliveBatch=batch=>batch.filter(g=>g.actor.alive);
 export function BatchRecovered(batch){return batch.length>0&&AliveBatch(batch).length>0&&AliveBatch(batch).every(g=>g.safe&&g.progress>=g.route.length);}
@@ -29,11 +30,23 @@ export class FirstLevelFrontBattle {
     if(wait)r.leaderGuide?.Watch(actor);return false;
   }
   SetLeg(id,route){if(this.leg===id)return;this.leg=id;this.leaderRoute=route;this.SetWalk(this.Leader,route);}
+  Prepare(){
+    const r=this.r;
+    if(!r.frontDefenders?.length)r.frontDefenders=FRONT_DEFENDERS.map(spec=>{
+      const actor=r.ai.Spawn("nra",spec.x,spec.z,{weapon:spec.weapon,squadId:"MissionFrontDefense"});
+      if(actor){InstallMissionSentry(actor);actor.missionId=spec.id;r.Defend(actor,spec);r.ai.SetStance(actor,spec.stance,Infinity,true);
+        actor.scriptAccuracyScale=R.defenderAccuracyScale;actor.scriptFireIntervalScale=R.defenderFireIntervalScale;}
+      return actor;
+    }).filter(Boolean);
+    r.SpawnGuards();
+    if(!r.Has("zhouGunWounded"))r.opening.SpawnZhou();
+  }
   Enter(stage){
+    if(["BunkerRescue","Support"].includes(stage))this.Prepare();
     if(!this.Active)return;const r=this.r;
     for(const actor of r.squad){actor.missionTrainReady=true;actor.scriptedNoncombatant=false;actor.missionNaturalMarch=false;}
     if(stage==="Support"){
-      this.SetLeg("capture",Routes.support);r.SpawnEncounter("front");r.Record("frontBattleStarted");r.frontBattleAt=r.time;
+      this.SetLeg("capture",Routes.support);r.Record("frontBattleStarted");r.frontBattleAt=r.time;
       r.tank.present=false;r.tank.active=false;
       this.SetWalk(r.companion.Handle("heyoutian"),[...MISSION_FRONT_COLLECTION_ROUTE,...S.leftRoute.slice(1,-1)]);
       this.SetWalk(r.companion.Handle("liuwencai"),[...MISSION_FRONT_COLLECTION_ROUTE,{x:-18,z:-123}]);

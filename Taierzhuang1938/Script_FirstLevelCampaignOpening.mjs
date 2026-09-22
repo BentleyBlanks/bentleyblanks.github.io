@@ -5,6 +5,8 @@ import path from "node:path";
 import { CampaignActions } from "./Script_FirstLevelCampaignKit.mjs";
 import { MISSION_PLACEMENT as P, MISSION_ROUTES as Routes, MISSION_ANCHORS as A } from "./Data_FirstLevelMissionLayout.mjs";
 import { MISSION_STAGE_ROUTES } from "./Data_FirstLevelMissionTopology.mjs";
+import { MISSION_ENCOUNTERS } from "./Data_FirstLevelMission.mjs";
+import { OPENING_STORYBOARDS as Storyboards } from "./Data_OpeningStoryboards.mjs";
 
 export async function DriveOpening(ctx){
   const {page,output}=ctx,{Route,Interact,WaitStage,CaptureFocus}=CampaignActions(ctx);
@@ -17,6 +19,12 @@ export async function DriveOpening(ctx){
       for(let frame=0;frame<15;frame++){
         g.StepFrames(1,1/60,false);
         const r=g.Debug.FirstLevelMissionRuntime(),s=r.frontShow.bunker,cam=g.player.camera,Vec=()=>g.player.position.clone();
+        probe.births??={};
+        for(const actor of r.enemies.values())if(!probe.births[actor.missionId])probe.births[actor.missionId]={
+          entity:actor.id,phase:s.phase,stage:r.flow.stage.id,time:r.time,
+          distance:Math.hypot(actor.position.x-r.player.position.x,actor.position.z-r.player.position.z)};
+        if(["Pull","Kick","Released"].includes(s.phase)&&!s.VanguardCleared()&&probe.violations.length<20)
+          probe.violations.push({phase:s.phase,error:"rescue proceeded while vanguard alive"});
         for(const a of [...Object.values(s.cast),...r.squad,...r.enemies.values()]){
           if(!a.openingStoryboardLast||a.openingStoryboardHidden||!a.alive)continue;
           const id=a.missionId||a.castId||a.id,previous=probe.previous[id],root=a.actor.root;
@@ -54,9 +62,15 @@ export async function DriveOpening(ctx){
         graspDistances=["L","R"].map(side=>playerBones["hand"+side].getWorldPosition(g.player.position.clone())
           .distanceTo(luoBones[side==="L"?"handR":"handL"].getWorldPosition(g.player.position.clone())));
       }
-      return {stage:m.stage,time:m.time,facts:m.facts,voice:m.voice,...show.State(),graspDistances,alive:g.player.alive};
+      return {stage:m.stage,time:m.time,facts:m.facts,voice:m.voice,...show.State(),graspDistances,alive:g.player.alive,
+        combat:[...r.squad,...r.enemies.values()].filter(a=>a.castId||a.missionEncounter==="bunkerAssault")
+          .map(a=>({id:a.castId||a.missionId,alive:a.alive,health:a.health,x:a.position.x,z:a.position.z,
+            weapon:a.weapon?.id,shots:a.lastFire,target:a.target?.isPlayer?"player":a.target?.ref?.missionId||a.target?.ref?.castId,visible:a.targetVisible,suppression:a.suppression}))};
     });
     frames.push(state);
+    if(state.phase==="Cover"&&i%20===0)console.log("COUNTERATTACK",state.time,JSON.stringify(state.combat));
+    if(!state.alive)await fs.writeFile(path.join(output,"Data_OpeningCombatFailure.json"),JSON.stringify({
+      state,damage:await page.evaluate(()=>window.missionDamage),motion:await page.evaluate(()=>window.openingMotionProbe)},null,2));
     assert.equal(state.error,undefined,"animation library loaded");
     assert.ok(state.alive,"player survives the authored opening");
     if(state.graspDistances&&!state.graspDistances.every(distance=>distance<.03)){
@@ -91,14 +105,26 @@ export async function DriveOpening(ctx){
     down:!r.enemies.get("BunkerExecutionerB").alive,deathClip:r.enemies.get("BunkerExecutionerB").actor.characterRig.deathClipState?.clip.name,
     guideAlive:r.frontShow.bunker.cast.BunkerInterpreter.alive,
     heFired:r.companion.Handle("heyoutian").lastFire>0,deflectedImpact:r.frontShow.bunker.deflectedImpact,
+    vanguard:[...r.enemies.values()].filter(a=>a.missionEncounter==="bunkerAssault").map(a=>({id:a.missionId,alive:a.alive,health:a.health,essential:a.scriptEssential})),
+    playerShots:r.Inventory().shots,
+    front:[...r.enemies.values()].map(a=>({id:a.missionId,entity:a.id})),
     rifles:r.frontShow.bunker.rifleProps.length,control:r.controls?.kind||null};});
   await fs.writeFile(path.join(output,"Data_RescuePhysicalEvents.json"),JSON.stringify(guard,null,2));
   assert.ok(guard.down,"the ambushed guard falls");assert.ok(guard.guideAlive,"the interpreter can escape");
   assert.match(guard.deathClip,/DeathCollapse[A-D]/,"the contacted guard uses the existing Kimodo collapse library");
   assert.ok(guard.heFired,"He Youtian actually fires covering shots");
+  assert.deepEqual(guard.vanguard.map(a=>a.id).sort(),[...Storyboards.vanguardIds].sort(),"all four original vanguard soldiers accounted for");
+  assert.ok(guard.vanguard.every(a=>!a.alive&&a.health<=0&&!a.essential),"squad has really killed all four before rescue release");
+  assert.equal(guard.playerShots,0,"player did not perform the squad's clearing task");
+  for(const id of ["approach","front","machineGun","tank","bundleApproach"].flatMap(group=>MISSION_ENCOUNTERS[group].map(a=>a.id))){
+    const birth=motion.births[id];
+    assert.ok(birth&&birth.stage==="BunkerRescue"&&birth.distance>25,`distant enemy ${id} exists during rescue before the player exits`);
+  }
   assert.ok(guard.deflectedImpact?.hit,"the deflected shot strikes the real trench wall");
   assert.equal(guard.rifles,1,"the ambushed guard releases his rifle");
   assert.equal(guard.control,null,"movement returns before rifle pickup");
+  await page.evaluate(()=>window.Tengxian.StepFrames(2,1/60,true));
+  await page.screenshot({path:path.join(output,"Scene_RescueCleared.png")});
   await Route([{x:P.bunker.rifle.x,z:P.bunker.rifle.z+.6}],"OpeningRifle",{stance:"crouch"});
   await Interact();
   await WaitStage("RearTrench",5);
@@ -108,6 +134,8 @@ export async function DriveOpening(ctx){
   await CaptureFocus("OpeningCollection",A.collection);
   await WaitStage("Support",120,{fight:true,cover:true});
   const rear=await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMission());
+  const continued=await page.evaluate(()=>Object.fromEntries([...window.Tengxian.Debug.FirstLevelMissionRuntime().enemies.values()].map(a=>[a.missionId,a.id])));
+  for(const actor of guard.front)assert.equal(continued[actor.id],actor.entity,`${actor.id} remains the same entity when 03 begins`);
   for(const fact of ["rearTrenchEntered","cornerReached","collectionPointSeen","supportOrdersHeard"])assert.ok(rear.facts.includes(fact),fact);
   for(const cue of ["TrenchCurse","CornerCheck","SupportOrder"])assert.ok(rear.voice.played.includes(cue),cue);
   assert.ok(rear.front.collection.litters>=4&&rear.front.collection.people>=8,"casualty collection is present");

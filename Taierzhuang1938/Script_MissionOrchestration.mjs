@@ -360,9 +360,9 @@ function BuildTimeline(steps, facts, encounters) {
         phaseNumber: PhaseNumberForStep(encounter.wake.step) ?? encounter.phaseNumber,
         step: encounter.wake.step || (encounter.wake.fact ? MISSION_FACT_GATES[encounter.wake.fact]?.step : null) || null,
         kind: "wake",
-        label: encounter.wake.kind === "playerWithinM"
+        label: encounter.wake.text || (encounter.wake.kind === "playerWithinM"
           ? `${encounter.id} 在玩家进 ${encounter.wake.radiusM} m 时苏醒`
-          : `${encounter.id} 在 ${encounter.wake.fact} 时苏醒`,
+          : `${encounter.id} 在 ${encounter.wake.fact} 时苏醒`),
         factId: encounter.wake.fact || null, encounterId: encounter.id, memberId: null,
         atS: null, earliestS: null, latestS: null, requires: null,
       });

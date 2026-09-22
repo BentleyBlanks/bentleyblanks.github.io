@@ -27,7 +27,7 @@ export const FIRST_LEVEL_STAGES = Object.freeze([
   Phase(18, "Bridge", "接应回援尾队，奉令毁桥，夜入滕城", ["BridgeOrders", "BridgeCover", "BridgeWithdraw", "NightMarch"], MISSION_RECEPTION_SPACE.deathView),
 ]);
 export const FIRST_LEVEL_ENCOUNTER_STARTS = Object.freeze({
-  bunkerAssault:1, front:3, approach:3, tank:3, village:3, melee:3, machineGun:4, bundleApproach:5,
+  bunkerAssault:1, front:2, approach:2, tank:2, village:3, melee:3, machineGun:2, bundleApproach:2,
   courtyard:10, transfer:12, transferAlley:12, air:13, bridgeNorth:18,
 });
 // These belong to the current public phase but arrive after its entry encounter.
@@ -40,7 +40,7 @@ export const FIRST_LEVEL_DEFERRED_ENCOUNTERS=Object.freeze({
 export const FIRST_LEVEL_STAGE_CLEARED_ENEMIES = Object.freeze({
   // A 04 debug start represents the observed continuous 03→04 battlefield.
   // Capturing the right nest requires all four existing position guards to be neutralized.
-  // Rebuild the group for that survivor, while pre-clearing the actual 11 ids.
+  // Rebuild the persistent roster while pre-clearing those four original ids.
   4: Object.freeze(FRONT_APPROACH_ENEMIES.map(spec=>spec.id)),
   5: Object.freeze(FRONT_APPROACH_ENEMIES.map(spec=>spec.id)),
   9: Object.freeze(["VillageCorner","KitchenGuard"]),
@@ -49,9 +49,9 @@ export const FIRST_LEVEL_STAGE_CLEARED_ENEMIES = Object.freeze({
 // 下标对齐 FIRST_LEVEL_STAGES（第 n 阶段读 [n-1]）。这里写的是**跳到该阶段时仍活着**的组，
 // 没列进来又已经开始过的组会被登记成 spawned（不再重建）。
 export const FIRST_LEVEL_STAGE_ENCOUNTERS = Object.freeze([
-  ["bunkerAssault"], ["bunkerAssault"],
-  ["front","approach","tank","village","melee"],
-  ["front","approach","machineGun","tank","village","melee"],
+  ["bunkerAssault"], ["bunkerAssault","front","approach","machineGun","tank","bundleApproach"],
+  ["front","approach","machineGun","tank","bundleApproach","village","melee"],
+  ["front","approach","machineGun","tank","bundleApproach","village","melee"],
   ["front","machineGun","approach","tank","village","melee","bundleApproach"],
   ["village","melee"], ["village","melee"], ["village","melee"], ["village","melee"],
   ["village","courtyard"], [], ["transfer"], ["air"], ["air"],

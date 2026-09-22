@@ -246,6 +246,10 @@ export class FirstLevelBunkerShow {
   Update(dt){
     this.delta=dt;
     const r=this.r,stage=r.flow.stage.id;
+    if(this.CameraActive){
+      if(!this.savedMeleeDormancy){this.playerMeleeDormancy=r.player.meleeDormant;this.savedMeleeDormancy=true;}
+      r.player.meleeDormant=true;
+    }else this.ReleaseMeleeDormancy();
     const bloodAge=this.strikeAt==null?Infinity:r.time-this.strikeAt;
     this.bloodMask=C.strikeBlood.opacity*(1-Smooth((bloodAge-C.strikeBlood.holdS)/C.strikeBlood.fadeS));
     r.hud.SetStoryBlood?.(this.bloodMask);
@@ -279,7 +283,7 @@ export class FirstLevelBunkerShow {
     }else{
       this.Mark(this.cast.BunkerRunner,{x:-40,z:-118},{x:-40,z:-118},null);
       this.Mark(yaowa,P.bunker.yaowaLift,S.trapped,null);
-      this.Mark(wen,{x:-40,z:-118},S.trapped,null);
+      if(!["Deflect","Cover","Pull","Kick","Released"].includes(p))this.Mark(wen,{x:-40,z:-118},S.trapped,null);
       if(!["Deflect","Cover","Pull","Kick","Released"].includes(p))this.Mark(he,S.heCover,S.guard,null);
       if(["Advance","Captive","CaptiveShot"].includes(p)){
         this.Mark(one,S.controller,S.captive,p==="CaptiveShot"?null:"CollarControl");
@@ -334,17 +338,17 @@ export class FirstLevelBunkerShow {
         if(a>=C.ambushS)this.Set("Deflect");
       }else if(p==="Deflect"||p==="Cover"){
         this.Mark(luo,p==="Deflect"?Mix(S.luoAmbush,S.luoDeflect,a/C.deflectS):this.From(luo,S.pullStart,a/1.7),S.interrogated,p==="Deflect"?"RifleDeflect":this.Arrived(luo,S.pullStart)?"PullComrade":null,p==="Deflect"?a:0);
-        this.Mark(one,S.interrogator,{x:-37,z:-130},"GuardTurn");this.EscapeGuide(guide,a+C.ambushS);
+        if(!one.openingCombatReleased)this.Mark(one,S.interrogator,{x:-37,z:-130},"GuardTurn");this.EscapeGuide(guide,a+C.ambushS);
         if(p==="Deflect"&&a>.7&&!this.deflectedShot){this.deflectedShot=true;this.Shot(one,r.Point({x:-35.5,z:-130.3},1.05),true);}
+        if(this.deflectedShot)this.ReleaseCombat(one);
         this.UpdateSuppression();
         if(p==="Deflect"&&a>=C.deflectS)this.Set("Cover");
-        if(p==="Cover"&&this.pullRequested&&this.Arrived(luo,S.pullStart)){this.Set("Pull");r.Say("RescueOut");}
+        if(p==="Cover"&&this.pullRequested&&this.Arrived(luo,S.pullStart)&&this.VanguardCleared()){this.Set("Pull");r.Say("RescueOut");}
       }else if(p==="Pull"||p==="Kick"){
         Equip(luo,null);
         const pulling=p==="Pull"&&a<=C.pullS;
         const luoPoint=p==="Kick"?S.luoPull:pulling?Mix(S.pullStart,S.pullEnd,a/C.pullS):Mix(S.pullEnd,S.luoPull,(a-C.pullS)/2);
         this.Mark(luo,luoPoint,this.PlayerPoint(),p==="Kick"?"KickRifle":pulling?"PullComrade":null);
-        this.Mark(one,S.march[1],S.heCover,null);
         this.EscapeGuide(guide,a+2);this.UpdateSuppression();
         if(p==="Kick"){
           this.MoveRifle(Mix(S.rifleStart,S.rifleEnd,(a-C.kickContactS)/(C.kickS-C.kickContactS)));
@@ -361,6 +365,7 @@ export class FirstLevelBunkerShow {
     for(const [i,id] of ["BunkerFollowA","BunkerFollowB"].entries()){
       const actor=r.enemies.get(id);if(!actor)continue;
       if(["Supply","Orders","Blast"].includes(p)){this.Hide(actor);continue;}
+      if(["Ambush","Deflect","Cover","Pull","Kick","Released"].includes(p)){this.ReleaseCombat(actor);continue;}
       actor.missionDormant=false;actor.scriptedNoncombatant=true;
       const start=S.march[i],end={x:start.x,z:S.march[2].z-i*1.8},t=Clamp((r.time-r.opening.blastAt-C.wakeS-i*2)/12);
       this.Mark(actor,Mix(start,end,t),end,null);
@@ -391,6 +396,8 @@ export class FirstLevelBunkerShow {
   }
   MoveRifle(point){const item=this.r.bunkerRifle;if(item?.view){const pos=this.r.Point(point);Object.assign(item.position,pos);item.view.position.copy(pos);}}
   Release(){
+    if(!this.VanguardCleared())return;
+    this.ReleaseMeleeDormancy();
     const r=this.r;this.Set("Released");r.Record("playerDraggedFromWreck",{to:S.rescued});r.Record("luoRescueComplete");
     const kind=r.controls?.kind;r.controls=null;r.Control?.(false,kind);r.player.stance="crouch";
     const direction=r.player.camera.getWorldDirection(new THREE.Vector3());
@@ -399,9 +406,28 @@ export class FirstLevelBunkerShow {
     this.playerBody.root.visible=false;
   }
   UpdateSuppression(){
-    const r=this.r,he=r.companion.Handle("heyoutian");if(!he)return;
-    he.openingStoryboardPose=null;he.openingStoryboardTravel=null;he.openingStoryboardLast=null;
-    he.scriptedNoncombatant=false;r.Defend(he,S.heCover,0,.4);he.watchYaw=Face(S.heCover,S.march[0]);he.watchUntil=r.ai.time+1;
+    const r=this.r;
+    for(const [id,post] of Object.entries(C.coverPosts)){
+      const actor=r.companion.Handle(id);if(!actor?.alive)continue;
+      actor.openingStoryboardPose=null;actor.openingStoryboardTravel=null;actor.openingStoryboardLast=null;
+      actor.scriptedNoncombatant=false;
+      if(Distance(actor.position,post)>C.coverArrivalM){r.ai.ReleaseCover(actor);r.MoveActor(actor,post,C.walkMps);}
+      else r.Defend(actor,post,0,.4);
+      actor.scriptAccuracyScale=C.counterattackAccuracyScale;
+    }
+  }
+  VanguardCleared(){return C.vanguardIds.every(id=>this.r.enemies.get(id)?.alive===false);}
+  ReleaseMeleeDormancy(){
+    if(this.savedMeleeDormancy){this.r.player.meleeDormant=this.playerMeleeDormancy;this.savedMeleeDormancy=false;}
+  }
+  ReleaseCombat(actor){
+    if(!actor?.alive||actor.openingCombatReleased)return;
+    actor.openingCombatReleased=true;actor.scriptEssential=false;actor.scriptedNoncombatant=false;actor.missionDormant=false;
+    actor.openingStoryboardPose=null;actor.openingStoryboardTravel=null;actor.openingStoryboardLast=null;actor.openingStoryboardContact=null;
+    // Turn and fight the counterattack from the current post, without the old
+    // intrusion roaming radius pushing the soldiers through Luo and the captive.
+    actor.tacticalRadiusM=0;
+    this.r.Defend(actor,actor.position,C.counterattackHoldM,C.counterattackHoldM);
   }
   RescueGatherReady(){return false;}
   PlayerPoint(){
@@ -485,8 +511,8 @@ export class FirstLevelBunkerShow {
   Reset(){this.Dispose();for(const actor of Object.values(this.cast))this.r.ai.Remove(actor);this.cast={};this.captives=[];this.playerBody=null;this.setup=false;this.phase="Supply";this.at=this.r.time;this.started=this.r.time;this.voiceStarted=false;this.interrogationStarted=false;this.rescueVoiceDone=false;this.shotFired=false;this.deflectedShot=false;this.deflectedImpact=null;this.escapeAt=null;this.pointActor=null;this.beats.clear();
     this.strikeAt=null;this.bloodMask=0;this.rifleDrop=null;this.captiveHitAt=null;this.bladeHitAt=null;this.clearAt=null;this.kneelAt=null;
     this.searchVoiceDone=false;this.kickRequested=false;this.ambushRequested=false;this.pullRequested=false;this.cameraFrom=null;this.presentedCamera=null;this.phaseFrom=null;
-    for(const actor of [...this.r.squad,...this.r.enemies.values()]){actor.openingStoryboardLast=null;actor.openingStoryboardPose=null;actor.openingStoryboardTravel=null;actor.openingStoryboardContact=null;actor.openingStoryboardAim=0;}
+    for(const actor of [...this.r.squad,...this.r.enemies.values()]){if(actor.openingCombatReleased)actor.missionFireHold=false;actor.openingCombatReleased=false;actor.openingStoryboardLast=null;actor.openingStoryboardPose=null;actor.openingStoryboardTravel=null;actor.openingStoryboardContact=null;actor.openingStoryboardAim=0;}
   }
   State(){return {phase:this.phase,phaseTime:this.Age,ready:this.ready,error:this.error,beats:[...this.beats],captives:this.captives.map(a=>({id:a.missionId,alive:a.alive,x:a.position.x,z:a.position.z})),actors:Object.fromEntries(Object.entries(this.cast).map(([id,a])=>[id,{x:a.position.x,z:a.position.z,clip:a.openingStoryboardPose?.clip}]))};}
-  Dispose(){this.r.hud.SetStoryBlood?.(0);this.supplyRoot?.removeFromParent();this.playerBody?.root.removeFromParent();this.playerBody?.Dispose?.();for(const prop of this.rifleProps)prop.removeFromParent();this.rifleProps=[];for(const material of this.owned)material.dispose();for(const geometry of this.ownedGeometry||[])geometry.dispose();this.owned=[];this.ownedGeometry=[];}
+  Dispose(){this.ReleaseMeleeDormancy();this.r.hud.SetStoryBlood?.(0);this.supplyRoot?.removeFromParent();this.playerBody?.root.removeFromParent();this.playerBody?.Dispose?.();for(const prop of this.rifleProps)prop.removeFromParent();this.rifleProps=[];for(const material of this.owned)material.dispose();for(const geometry of this.ownedGeometry||[])geometry.dispose();this.owned=[];this.ownedGeometry=[];}
 }
