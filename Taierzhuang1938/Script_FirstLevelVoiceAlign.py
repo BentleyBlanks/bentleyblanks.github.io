@@ -93,8 +93,11 @@ def Lines(model, jobs_path, result_path):
         samples=decode_audio(job["file"],sampling_rate=16000)
         # 中文给一句简体提示，否则 medium 常吐繁体、字错率被虚高。
         prompt=job.get("initialPrompt") or ("以下是简体中文的句子。" if lang=="zh" else None)
-        segments,_=model.transcribe(samples,language=lang,beam_size=5,vad_filter=False,
-            condition_on_previous_text=False,without_timestamps=False,initial_prompt=prompt)
+        # 一句台词只有几秒：只用温度 0、束宽 2、按字数封顶输出长度。温度回退 + 束宽 5 会在
+        # 短句上反复生成到 448 个 token 的上限（实测 75 条 take 转写跑了 30 分钟还没完）。
+        limit=max(24,len(Normalize(job.get("text","")))*3+16)
+        segments,_=model.transcribe(samples,language=lang,beam_size=2,vad_filter=False,temperature=0.0,
+            condition_on_previous_text=False,without_timestamps=True,initial_prompt=prompt,max_new_tokens=limit)
         text="".join(seg.text for seg in segments).strip()
         reference=job.get("reference") or job["text"]
         row={"text":text,"cer":round(Cer(text,reference),4)}

@@ -12,6 +12,7 @@
 //
 //   --only=a,b    只处理这几条 cue          --lines=...  只处理这几句（逐句格式）
 //   --takes=N     逐句每句生成几条 take（默认 3）        --rescore  不发请求，只对已有 take 重新打分选优
+//                 选中 take 带扣分项的句子，--takes 大于已有条数时只补抽缺的那几条
 //   --dry         只列清单，不发请求          --force      无视 promptHash 重摇
 //   --jobs=N      并发（默认 2，上限 2：本机还有别的包在调）
 //   --prune       删掉台词表里已经不存在的 cue / 句的成品与清单条目；逐句录齐的 cue 删掉旧整段
@@ -115,7 +116,9 @@ function PerLineJobs() {
 function LineUpToDate(job, manifest) {
   const entry = manifest.lines?.[job.line.id];
   const ref = CastReference(job.line.who);
-  return !force && entry && ref && entry.promptHash === Hash(LinePrompt(job.cue, job.index))
+  // 选中的 take 带扣分项、且已有 take 少于这次要的条数：补抽（已有 take 复用，只发缺的那几条）。
+  const shortOfTakes = entry?.flagged?.length > 0 && (entry.takes?.length ?? 0) < takesPerLine;
+  return !force && !shortOfTakes && entry && ref && entry.promptHash === Hash(LinePrompt(job.cue, job.index))
     && entry.castSha256 === ref.sha256 && fs.existsSync(path.join(out, job.line.file));
 }
 
