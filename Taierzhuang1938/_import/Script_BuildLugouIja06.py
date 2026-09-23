@@ -366,8 +366,8 @@ def PaintFace(rgb, posMap, mask):
     lips = Smooth(1.0, .5, np.abs(x - LIP_LINE)) * Smooth(2.6, 1.9, az) * (y > 9.0)
     beard *= 1 - lips
     dots = (Noise((h, w), 21, 1.2) > .58).astype(np.float32) * .6 + Noise((h, w), 22, 3.0) * .4
-    stubble = beard * (.36 + .34 * dots)
-    out = out * (1 - stubble[..., None]) + np.array([.16, .16, .17], np.float32) * stubble[..., None]
+    stubble = beard * (.30 + .30 * dots)
+    out = out * (1 - stubble[..., None]) + np.array([.19, .19, .20], np.float32) * stubble[..., None]
     # Thin line moustache along the upper lip, tapering to the mouth corners.
     lipTop = LIP_LINE + .45 + .10 * (az / 2.2) ** 2
     thick = .62 * (1 - .55 * (az / 2.3) ** 2)

@@ -84,7 +84,9 @@ try {
     const leader = factory.Create("nra", {modelVariant: 1, castId: "luo", weapon: null});
     const regular = factory.Create("nra", {modelVariant: 1, weapon: null});
     const green = factory.Create("nra", {modelVariant: 4, weapon: null});
-    check(leader.pooled && Cloth(leader)?.userData.nraUniformPalette === "leader", "pooled leader receives his uniform");
+    // Luo is a facial cast (Data_CharacterSpeech): a named speaker never takes a pooled body
+    // (Face package, 2026-09-23), and still gets his own dye.
+    check(!leader.pooled && Cloth(leader)?.userData.nraUniformPalette === "leader", "named leader (face rig, never pooled) receives his uniform");
     check(Cloth(regular)?.userData.nraUniformPalette === "grayBlue" && Cloth(green)?.userData.nraUniformPalette === "leader", "soldier palettes remain independent");
     check(Cloth(leader) !== Cloth(regular) && Cloth(leader).map === Cloth(regular).map, "leader dye preserves the shared atlas without changing other soldiers");
     for (const candidate of [leader, regular, green]) {
@@ -613,7 +615,7 @@ try {
     }
 
     for (const item of [actor, armed, ija, baselineA, baselineB, seatTest, seatedArmed]) item.Dispose();
-    return "5 套获准军人外观, 16 动作, 11 骨骼命中体, 主角国军 02, 程序化动作兼容, 百姓男女分身, seated legs, weapon-palm clearance; bayonet vertices " + bayonetMeshes.join(", ");
+    return "6 套获准军人外观, 16 动作, 11 骨骼命中体, 主角国军 02, 程序化动作兼容, 百姓男女分身, seated legs, weapon-palm clearance; bayonet vertices " + bayonetMeshes.join(", ");
   });
   console.log(`ActorPoseTest: PASS (${result})`);
 } finally {

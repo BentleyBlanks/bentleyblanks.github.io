@@ -1702,7 +1702,7 @@
       "vertices": 8909,
       "triangles": 14643,
       "limitedWeightVertices": 131,
-      "bytes": 5492792,
+      "bytes": 5487588,
       "boneRoles": {
         "head": "Bip001 Head",
         "neck": "Bip001 Neck",
