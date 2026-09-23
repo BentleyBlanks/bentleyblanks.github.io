@@ -11,7 +11,7 @@ path; start/stop the instance around it). Environment:
   OPENING_BLEND_DIR  editable scenes, validation and partner tracks; never inside the
                      repository (default OneDrive/AI/Models/Blender/Taierzhuang1938/
                      OpeningStoryboards_20260923 -- the 20260922 sources stay untouched)
-  OPENING_VERSION    manifest version (default 20260923OpeningStoryboardsV2)
+  OPENING_VERSION    manifest version (default 20260923OpeningStoryboardsV3)
   OPENING_MODEL      comma list of rigs (default all five)
   OPENING_CLIPS      comma list: bake only these clips and merge into the rig's JSON
   OPENING_PASS       'bake' (default) | 'partner' (dump the partner tracks the paired
@@ -38,7 +38,7 @@ from mathutils import Vector, Matrix
 project = Path(os.environ['OPENING_PROJECT'])
 private = Path(os.environ.get('OPENING_BLEND_DIR')
                or 'C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/OpeningStoryboards_20260923')
-VERSION = os.environ.get('OPENING_VERSION') or '20260923OpeningStoryboardsV2'
+VERSION = os.environ.get('OPENING_VERSION') or '20260923OpeningStoryboardsV3'
 output = Path(os.environ.get('OPENING_OUTPUT') or (project / 'Animation/OpeningStoryboards'))
 reviews = Path(os.environ.get('OPENING_REVIEW') or (project.parent / 'tmp/OpeningStoryboards/BlenderReview'))
 PASS = os.environ.get('OPENING_PASS', 'bake')
@@ -425,7 +425,10 @@ def Validate(clip, spec, samples, lifts, gripErrors, seam, scale):
     metres), grip error against world/partner targets, overreach, loop seam, NaN."""
     report = {'clip': clip, 'frames': len(samples), 'floorCorrectionMin': round(min(lifts), 5),
               'floorCorrectionMax': round(max(lifts), 5), 'loopSeam': round(seam, 9),
-              'gripSolveErrorM': round(max(gripErrors) * scale, 5)}
+              'gripSolveErrorM': round(max(gripErrors) * scale, 5),
+              # Declared foot plants [side, t0, t1] (clip seconds): the browser review measures
+              # the runtime foot drift inside exactly these windows.
+              'plants': [[side, round(t0, 4), round(t1, 4)] for side, t0, t1 in spec.get('plants', [])]}
     worstBy = {}
     for s in samples:
         for label, ratio in s['overreach']:
@@ -547,7 +550,7 @@ def WriteManifest(results):
             report = private / ('Data_' + modelId + 'OpeningValidation.json')
             if report.exists():
                 keep = ('frames', 'footSlideM', 'contactErrorM', 'gripSolveErrorM', 'wallPenetrationM',
-                        'pelvisMaxStepM', 'floorCorrectionMin', 'floorCorrectionMax', 'root', 'finite')
+                        'pelvisMaxStepM', 'floorCorrectionMin', 'floorCorrectionMax', 'root', 'finite', 'plants')
                 row['clips'] = [dict({'clip': c['clip']}, **{k: c[k] for k in keep if k in c})
                                 for c in json.loads(report.read_text())['clips'] if c['clip'] in asset['clips']]
     manifest = {'schema': 2, 'version': VERSION, 'fps': FPS, 'actorForward': [0, 0, -1], 'blendSeconds': .12,

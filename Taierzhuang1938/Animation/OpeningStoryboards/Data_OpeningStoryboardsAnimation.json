@@ -1,6 +1,6 @@
 {
  "schema": 2,
- "version": "20260923OpeningStoryboardsV2",
+ "version": "20260923OpeningStoryboardsV3",
  "fps": 24,
  "actorForward": [
   0,
@@ -2028,7 +2028,7 @@
   {
    "id": "LugouNra02",
    "file": "Animation_LugouNra02OpeningStoryboards.json",
-   "sha256": "f9bae75a382b6bf5a61ce68bc76e4b0a5003abd3a4a5eeb071da77d4293b3ec8",
+   "sha256": "9a2e80071059931750ee2afd2355b471faf564efd2fd1bb9e6ca18b2a6d119dd",
    "originalModelSha256": "39c08ca82148e140ee2952caffdd0dee99750fb734038a5263d216c9a7345225",
    "clipIds": [
     "SupplyReceive",
@@ -2254,7 +2254,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "ClipLoad",
@@ -2280,7 +2281,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "MessengerReport",
@@ -2306,7 +2308,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "DuckBlast",
@@ -2332,7 +2335,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "WoundedReach",
@@ -2358,7 +2362,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "CaptiveHeld",
@@ -2384,7 +2389,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "CollarControl",
@@ -2410,7 +2416,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "BayonetClearWood",
@@ -2436,7 +2443,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "CollarDrag",
@@ -2462,7 +2470,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "ButtThreat",
@@ -2488,7 +2497,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "InterrogateCrouch",
@@ -2514,7 +2524,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "InterpreterPoint",
@@ -2540,7 +2551,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "CreepDadao",
@@ -2566,7 +2578,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "DadaoAmbush",
@@ -2592,7 +2605,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "RifleDeflect",
@@ -2618,7 +2632,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "PullComrade",
@@ -2644,7 +2659,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "KickRifle",
@@ -2670,7 +2686,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "PointBlockade",
@@ -2696,7 +2713,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "ShotCollapse",
@@ -2722,7 +2740,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "GuardTurn",
@@ -2748,7 +2767,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "WoundedSitRifleIdle",
@@ -2775,7 +2795,19 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       4.0
+      ],
+      [
+       "R",
+       0,
+       4.0
+      ]
+     ]
     },
     {
      "clip": "BanterLaugh",
@@ -2801,7 +2833,19 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       1.6
+      ],
+      [
+       "R",
+       0,
+       1.6
+      ]
+     ]
     },
     {
      "clip": "BanterLookShoulder",
@@ -2827,7 +2871,19 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       2.2
+      ],
+      [
+       "R",
+       0,
+       2.2
+      ]
+     ]
     },
     {
      "clip": "BanterPatRifle",
@@ -2853,7 +2909,19 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       2.0
+      ],
+      [
+       "R",
+       0,
+       2.0
+      ]
+     ]
     },
     {
      "clip": "WoundedRiseWall",
@@ -2880,7 +2948,19 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0.45,
+       2.8
+      ],
+      [
+       "R",
+       0.45,
+       2.8
+      ]
+     ]
     },
     {
      "clip": "BlastSlamBuried",
@@ -2907,7 +2987,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "CaptiveDraggedFromDirt",
@@ -2934,7 +3015,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "CaptiveWallBrace",
@@ -2961,7 +3043,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "CaptiveKneelMud",
@@ -2988,7 +3071,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "CaptiveHeadPulledBack",
@@ -3015,13 +3099,14 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "CaptiveThroatCut",
      "frames": 25,
      "footSlideM": 0.0,
-     "contactErrorM": 0.0,
+     "contactErrorM": 0.0181,
      "gripSolveErrorM": 0.0,
      "wallPenetrationM": 0.0042,
      "pelvisMaxStepM": 0.0178,
@@ -3042,13 +3127,14 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "CaptiveClutchThroat",
      "frames": 73,
      "footSlideM": 0.0,
-     "contactErrorM": 0.0,
+     "contactErrorM": 0.0269,
      "gripSolveErrorM": 0.0,
      "wallPenetrationM": 0.0042,
      "pelvisMaxStepM": 0.0042,
@@ -3069,7 +3155,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "CaptiveWallSlideTwitch",
@@ -3096,7 +3183,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "InterpreterCrouchAsk",
@@ -3122,7 +3210,19 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       3.2
+      ],
+      [
+       "R",
+       0,
+       3.2
+      ]
+     ]
     },
     {
      "clip": "InterpreterGrabCollar",
@@ -3148,7 +3248,19 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       3.0
+      ],
+      [
+       "R",
+       0,
+       3.0
+      ]
+     ]
     },
     {
      "clip": "InterpreterFlee",
@@ -3174,7 +3286,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "HeDadaoParryChop",
@@ -3200,7 +3313,24 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": [
+      [
+       "R",
+       0,
+       0.55
+      ],
+      [
+       "L",
+       0.32,
+       1.5
+      ],
+      [
+       "R",
+       0.76,
+       1.5
+      ]
+     ]
     },
     {
      "clip": "HeSwapDadaoRifle",
@@ -3226,7 +3356,19 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       1.6
+      ],
+      [
+       "R",
+       0,
+       1.6
+      ]
+     ]
     }
    ]
   },
@@ -3444,7 +3586,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "ClipLoad",
@@ -3470,7 +3613,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "MessengerReport",
@@ -3496,7 +3640,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "DuckBlast",
@@ -3522,7 +3667,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "WoundedReach",
@@ -3548,7 +3694,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "CaptiveHeld",
@@ -3574,7 +3721,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "CollarControl",
@@ -3600,7 +3748,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "BayonetClearWood",
@@ -3626,7 +3775,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "CollarDrag",
@@ -3652,7 +3802,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "ButtThreat",
@@ -3678,7 +3829,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "InterrogateCrouch",
@@ -3704,7 +3856,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "InterpreterPoint",
@@ -3730,7 +3883,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "CreepDadao",
@@ -3756,7 +3910,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "DadaoAmbush",
@@ -3782,7 +3937,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "RifleDeflect",
@@ -3808,7 +3964,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "PullComrade",
@@ -3834,7 +3991,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "KickRifle",
@@ -3860,7 +4018,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "PointBlockade",
@@ -3886,7 +4045,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "ShotCollapse",
@@ -3912,7 +4072,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "GuardTurn",
@@ -3938,7 +4099,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "LuoDadaoChopRear",
@@ -3964,7 +4126,19 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": [
+      [
+       "R",
+       0,
+       1.3
+      ],
+      [
+       "L",
+       0.45,
+       1.3
+      ]
+     ]
     },
     {
      "clip": "LuoDragToCover",
@@ -3990,7 +4164,49 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0.0,
+       0.6
+      ],
+      [
+       "L",
+       0.85,
+       1.2
+      ],
+      [
+       "L",
+       1.45,
+       1.8
+      ],
+      [
+       "L",
+       2.05,
+       2.6
+      ],
+      [
+       "R",
+       0.0,
+       0.9
+      ],
+      [
+       "R",
+       1.15,
+       1.5
+      ],
+      [
+       "R",
+       1.75,
+       2.1
+      ],
+      [
+       "R",
+       2.3,
+       2.6
+      ]
+     ]
     },
     {
      "clip": "LuoKneelCheck",
@@ -4016,7 +4232,19 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0.6,
+       2.6
+      ],
+      [
+       "R",
+       0.6,
+       2.6
+      ]
+     ]
     }
    ]
   },
@@ -4236,7 +4464,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "ClipLoad",
@@ -4262,7 +4491,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "MessengerReport",
@@ -4288,7 +4518,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "DuckBlast",
@@ -4314,7 +4545,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "WoundedReach",
@@ -4340,7 +4572,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "CaptiveHeld",
@@ -4366,7 +4599,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "CollarControl",
@@ -4392,7 +4626,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "BayonetClearWood",
@@ -4418,7 +4653,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "CollarDrag",
@@ -4444,7 +4680,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "ButtThreat",
@@ -4470,7 +4707,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "InterrogateCrouch",
@@ -4496,7 +4734,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "InterpreterPoint",
@@ -4522,7 +4761,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "CreepDadao",
@@ -4548,7 +4788,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "DadaoAmbush",
@@ -4574,7 +4815,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "RifleDeflect",
@@ -4600,7 +4842,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "PullComrade",
@@ -4626,7 +4869,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "KickRifle",
@@ -4652,7 +4896,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "PointBlockade",
@@ -4678,7 +4923,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "ShotCollapse",
@@ -4704,7 +4950,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "GuardTurn",
@@ -4730,7 +4977,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "IjaPullArm",
@@ -4756,7 +5004,64 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0.0,
+       0.78
+      ],
+      [
+       "L",
+       1.02,
+       1.3
+      ],
+      [
+       "L",
+       1.52,
+       2.02
+      ],
+      [
+       "L",
+       2.24,
+       3.05
+      ],
+      [
+       "L",
+       3.25,
+       4.4
+      ],
+      [
+       "R",
+       0.0,
+       0.52
+      ],
+      [
+       "R",
+       0.76,
+       1.06
+      ],
+      [
+       "R",
+       1.28,
+       1.6
+      ],
+      [
+       "R",
+       1.84,
+       2.28
+      ],
+      [
+       "R",
+       2.5,
+       3.95
+      ],
+      [
+       "R",
+       4.2,
+       4.4
+      ]
+     ]
     },
     {
      "clip": "IjaReadyRifle",
@@ -4782,7 +5087,19 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": [
+      [
+       "R",
+       0,
+       1.1
+      ],
+      [
+       "L",
+       0,
+       1.1
+      ]
+     ]
     },
     {
      "clip": "IjaCornerFire",
@@ -4808,7 +5125,19 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       2.6
+      ],
+      [
+       "R",
+       0,
+       2.6
+      ]
+     ]
     },
     {
      "clip": "IjaJunctionPeek",
@@ -4835,7 +5164,19 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       3.2
+      ],
+      [
+       "R",
+       0,
+       3.2
+      ]
+     ]
     },
     {
      "clip": "IjaChoppedFallWall",
@@ -4862,7 +5203,29 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       0.5
+      ],
+      [
+       "R",
+       0,
+       0.62
+      ],
+      [
+       "L",
+       0.62,
+       1.4
+      ],
+      [
+       "R",
+       0.92,
+       1.4
+      ]
+     ]
     }
    ]
   },
@@ -5092,7 +5455,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "ClipLoad",
@@ -5118,7 +5482,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "MessengerReport",
@@ -5144,7 +5509,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "DuckBlast",
@@ -5170,7 +5536,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "WoundedReach",
@@ -5196,7 +5563,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "CaptiveHeld",
@@ -5222,7 +5590,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "CollarControl",
@@ -5248,7 +5617,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "BayonetClearWood",
@@ -5274,7 +5644,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "CollarDrag",
@@ -5300,7 +5671,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "ButtThreat",
@@ -5326,7 +5698,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "InterrogateCrouch",
@@ -5352,7 +5725,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "InterpreterPoint",
@@ -5378,7 +5752,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "CreepDadao",
@@ -5404,7 +5779,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "DadaoAmbush",
@@ -5430,7 +5806,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "RifleDeflect",
@@ -5456,7 +5833,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "PullComrade",
@@ -5482,7 +5860,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "KickRifle",
@@ -5508,7 +5887,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "PointBlockade",
@@ -5534,7 +5914,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "ShotCollapse",
@@ -5560,7 +5941,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "GuardTurn",
@@ -5586,7 +5968,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "IjaDragCollarFromDirt",
@@ -5612,7 +5995,59 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0.0,
+       0.57
+      ],
+      [
+       "L",
+       0.82,
+       1.1
+      ],
+      [
+       "L",
+       1.36,
+       1.74
+      ],
+      [
+       "L",
+       2.0,
+       2.52
+      ],
+      [
+       "L",
+       2.76,
+       4.4
+      ],
+      [
+       "R",
+       0.0,
+       0.3
+      ],
+      [
+       "R",
+       0.55,
+       0.84
+      ],
+      [
+       "R",
+       1.08,
+       1.42
+      ],
+      [
+       "R",
+       1.7,
+       2.06
+      ],
+      [
+       "R",
+       2.3,
+       4.4
+      ]
+     ]
     },
     {
      "clip": "IjaShoveToWall",
@@ -5638,7 +6073,19 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": [
+      [
+       "R",
+       0,
+       1.0
+      ],
+      [
+       "L",
+       0.32,
+       1.0
+      ]
+     ]
     },
     {
      "clip": "IjaHairGrabPull",
@@ -5664,7 +6111,19 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": [
+      [
+       "R",
+       0,
+       1.0
+      ],
+      [
+       "L",
+       0.2,
+       1.0
+      ]
+     ]
     },
     {
      "clip": "IjaDrawBayonet",
@@ -5690,7 +6149,19 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": [
+      [
+       "R",
+       0,
+       0.8
+      ],
+      [
+       "L",
+       0,
+       0.8
+      ]
+     ]
     },
     {
      "clip": "IjaThroatSlash",
@@ -5716,7 +6187,19 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": [
+      [
+       "R",
+       0,
+       4.0
+      ],
+      [
+       "L",
+       0,
+       4.0
+      ]
+     ]
     },
     {
      "clip": "IjaWipeSheathBayonet",
@@ -5742,7 +6225,19 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": [
+      [
+       "R",
+       0,
+       2.4
+      ],
+      [
+       "L",
+       0,
+       2.4
+      ]
+     ]
     },
     {
      "clip": "IjaReadyRifle",
@@ -5768,7 +6263,19 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": [
+      [
+       "R",
+       0,
+       1.1
+      ],
+      [
+       "L",
+       0,
+       1.1
+      ]
+     ]
     },
     {
      "clip": "IjaCornerFire",
@@ -5794,7 +6301,19 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       2.6
+      ],
+      [
+       "R",
+       0,
+       2.6
+      ]
+     ]
     },
     {
      "clip": "IjaJunctionPeek",
@@ -5821,7 +6340,19 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       3.2
+      ],
+      [
+       "R",
+       0,
+       3.2
+      ]
+     ]
     },
     {
      "clip": "IjaSlingRifle",
@@ -5847,7 +6378,19 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       0.8
+      ],
+      [
+       "R",
+       0,
+       0.8
+      ]
+     ]
     },
     {
      "clip": "IjaCollarDragSnag",
@@ -5873,7 +6416,29 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0.0,
+       0.66
+      ],
+      [
+       "L",
+       0.9,
+       2.2
+      ],
+      [
+       "R",
+       0.0,
+       0.4
+      ],
+      [
+       "R",
+       0.62,
+       2.2
+      ]
+     ]
     },
     {
      "clip": "IjaKickBeam",
@@ -5899,7 +6464,19 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       1.2
+      ],
+      [
+       "R",
+       0.85,
+       1.2
+      ]
+     ]
     },
     {
      "clip": "IjaButtStrike",
@@ -5925,7 +6502,19 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       1.0
+      ],
+      [
+       "R",
+       0,
+       1.0
+      ]
+     ]
     },
     {
      "clip": "IjaHoldCollarUp",
@@ -5951,7 +6540,19 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       3.8
+      ],
+      [
+       "R",
+       0,
+       3.8
+      ]
+     ]
     },
     {
      "clip": "IjaParriedChoppedFall",
@@ -5977,7 +6578,19 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0.45,
+       0.78
+      ],
+      [
+       "R",
+       0.45,
+       0.78
+      ]
+     ]
     }
    ]
   },
@@ -6192,7 +6805,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "ClipLoad",
@@ -6218,7 +6832,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "MessengerReport",
@@ -6244,7 +6859,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "DuckBlast",
@@ -6270,7 +6886,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "WoundedReach",
@@ -6296,7 +6913,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "CaptiveHeld",
@@ -6322,7 +6940,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "CollarControl",
@@ -6348,7 +6967,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "BayonetClearWood",
@@ -6374,7 +6994,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "CollarDrag",
@@ -6400,7 +7021,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "ButtThreat",
@@ -6426,7 +7048,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "InterrogateCrouch",
@@ -6452,7 +7075,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "InterpreterPoint",
@@ -6478,7 +7102,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "CreepDadao",
@@ -6504,7 +7129,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "DadaoAmbush",
@@ -6530,7 +7156,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "RifleDeflect",
@@ -6556,7 +7183,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "PullComrade",
@@ -6582,7 +7210,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "KickRifle",
@@ -6608,7 +7237,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "PointBlockade",
@@ -6634,7 +7264,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "ShotCollapse",
@@ -6660,7 +7291,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     },
     {
      "clip": "GuardTurn",
@@ -6686,7 +7318,8 @@
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
-     "finite": true
+     "finite": true,
+     "plants": []
     }
    ]
   }

@@ -1677,7 +1677,7 @@ STAGES['slashWipe'] = {'anchor': 'comrade', 'notes': 'IjaWipeSheathBayonet start
 PARTNER_SOURCES['LugouNra02'].update({
     'CaptiveHeadPulledBack': ['crown', 'hairBack', 'throat'],
     'CaptiveThroatCut': ['crown', 'hairBack', 'throat'],
-    'CaptiveClutchThroat': ['crown', 'hairBack'],
+    'CaptiveClutchThroat': ['crown', 'hairBack', 'throat'],
     'CaptiveWallSlideTwitch': ['shoulderR', 'hairBack'],
 })
 
@@ -1845,13 +1845,15 @@ def BuildHeadPulledBack(T, name):
 
 def ThroatCutKeys(T):
     base = HeadPulledBackKeys(T)(1.8)
-    throatR, throatL = (.14, -.14, .05), (-.14, -.14, .05)
+    # Each hand clamps its own side of the neck, fingers round towards the nape and the thumbs
+    # meeting over the cut -- not palms cupping the jaw (that read as a face-in-hands gesture).
+    throatR, throatL = (.165, -.21, .004), (-.161, -.192, .037)
     rows = [
         (0.00, {}),
         (0.24, {'shrug': base['shrug'] + .10, 'bend': base['bend'] - .06}),
         # Both hands to the throat.
-        (0.36, {'handRel.R': throatR, 'palmF.R': (-.55, 0, .83), 'palmN.R': (0, .95, .2), 'curl.R': .65,
-                'handRel.L': throatL, 'palmF.L': (.55, 0, .83), 'palmN.L': (0, .95, .2), 'curl.L': .65,
+        (0.36, {'handRel.R': throatR, 'palmF.R': (-.31, .93, .21), 'palmN.R': (.95, .3, .05), 'curl.R': .65,
+                'handRel.L': throatL, 'palmF.L': (.31, .93, .21), 'palmN.L': (-.95, .3, .05), 'curl.L': .65,
                 'shrug': base['shrug'] + .16}),
         # Slammed back into the wall; the fist keeps the head.
         (0.52, {'pelvis': Add3(base['pelvis'], (.03, .04, -.01)), 'lean': base['lean'] + .08, 'bend': base['bend'] - .10,
@@ -1862,10 +1864,25 @@ def ThroatCutKeys(T):
     return Keys(base, rows, lag={'handRel': .02})
 
 
+def OwnThroatCheck(T, stage, since):
+    """Each hand's knuckles at its side of his own neck: the dumped 'throat' patch moved 4.5 cm to
+    that side, 3.5 cm back and 2.5 cm down (source metres)."""
+    def Check(t):
+        if t < since:
+            return {}
+        try:
+            hit = PartnerPoint(T, stage, 'comrade', 'comrade', 'throat', t)
+        except KeyError:   # an older partner dump without this clip's throat patch
+            hit = None
+        return {s: tuple(hit[0] + Vector((side * .045, .035, -.025))) for s, side in (('R', -1), ('L', 1))} if hit else {}
+    return Check
+
+
 @Builder('CaptiveThroatCut')
 def BuildThroatCut(T, name):
     anim = ThroatCutKeys(T)
     spec = {'pose': lambda t: T.Nest(anim(t)), 'reviewProps': lambda t: [R3_WALL_BOX],
+            'check': OwnThroatCheck(T, 'slashCut', .40),
             'reviewFrames': lambda n: [0, int(n * .24), int(n * .36), int(n * .52), n - 1]}
     spec.update(R3Review())
     return spec
@@ -1896,7 +1913,7 @@ def ClutchPose(T, t):
 
 @Builder('CaptiveClutchThroat')
 def BuildClutchThroat(T, name):
-    spec = {'pose': lambda t: T.Nest(ClutchPose(T, t)),
+    spec = {'pose': lambda t: T.Nest(ClutchPose(T, t)), 'check': OwnThroatCheck(T, 'slashTaunt', 0.0),
             'reviewProps': lambda t: [R3_WALL_BOX]}
     spec.update(R3Review())
     return spec
