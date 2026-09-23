@@ -314,7 +314,9 @@ async function FrameAb() {
           for (let i = 0; i < blockFrames; i++) {
             tankMs = 0;
             const start = performance.now(); g.StepFrames(1, 1 / 60, true); gl.finish();
-            out[mode].push(performance.now() - start);
+            const ms = performance.now() - start;
+            out[mode].push(ms);
+            (out.frames ||= []).push({ mode, round, i, ms: +ms.toFixed(1), tankMs: mode === "A" ? +tankMs.toFixed(2) : null });
             if (mode === "A") out.tankMsA.push(tankMs);
             out["nodes" + mode] = Math.max(out["nodes" + mode], g.audio?.liveNodes ?? 0);
           }
@@ -323,7 +325,9 @@ async function FrameAb() {
       R.tankRuntime = tr; tr.Update = update;
       const Stats = (list) => { const s = [...list].sort((a, b) => a - b); return { n: s.length, p50: +s[Math.floor(s.length * 0.5)].toFixed(2),
         p95: +s[Math.floor(s.length * 0.95)].toFixed(2), mean: +(s.reduce((a, b) => a + b, 0) / s.length).toFixed(2) }; };
-      return { A: Stats(out.A), B: Stats(out.B), ratioP95: +(Stats(out.A).p95 / Stats(out.B).p95).toFixed(3),
+      // 最慢的 12 帧落在哪一块的第几帧（换路径的余波 vs 平稳段）。
+      const slowest = [...out.frames].sort((a, b) => b.ms - a.ms).slice(0, 12);
+      return { slowest, A: Stats(out.A), B: Stats(out.B), ratioP95: +(Stats(out.A).p95 / Stats(out.B).p95).toFixed(3),
         tankUpdateMsA: Stats(out.tankMsA), nodes: { A: out.nodesA, B: out.nodesB },
         tank: { state: R.tank.damageState, x: +R.tank.x.toFixed(1), z: +R.tank.z.toFixed(1), waypoint: R.tank.waypoint } };
     }, { rounds, blockFrames });

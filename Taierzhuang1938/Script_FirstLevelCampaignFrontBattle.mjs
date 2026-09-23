@@ -33,6 +33,41 @@ export async function DriveFrontBattle(ctx){
     assert.ok(state.alive,`${fact}: player survives`);assert.ok(state.mission.facts.includes(fact),`${fact}: physical event completes`);
     return state.mission;
   }
+  // 在阵位里等（03 等进 04、04 等压住阵位）：躲手榴弹（EvadeGrenade）照常躲，躲完离座位 3 m 以上就走回来。
+  // 2026-09-24 实测：躲雷把人甩到阵位东墙外 (34,−139)/(35,−147)/(42,−141)，一直站在那儿等，
+  // 03 末尾战车开到、04 战车机枪都打得到那儿（探针 3 次里 1 次死在 03 的 (35.4,−147.5)）。玩家躲完会回掩体。
+  async function ReturnToSeat(label){
+    const off=await page.evaluate(({x,z})=>{const p=window.Tengxian.player.position;return {d:Math.hypot(p.x-x,p.z-z),x:p.x,z:p.z,alive:window.Tengxian.player.alive};},S.seat);
+    if(!off.alive||off.d<=3)return;
+    // 东墙（x 33.5，z −140…−132）外面的人从墙南头绕回来（他也是从那儿被甩出去的）。
+    await Route(off.x>32.5?[{x:off.x,z:-141.8},{x:30,z:-141.8},S.seat]:[S.seat],label,{stance:"crouch",fight:true,recoverAfterEvade:true});
+  }
+  async function HoldNest({stage=null,fact=null},seconds,label){
+    let state;
+    for(let i=0;i<seconds;i+=5){
+      state=await page.evaluate(({stage,fact})=>{
+        const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime(),Done=()=>stage?r.flow.stage.id===stage:r.Has(fact);
+        let evaded=false;
+        for(let f=0;f<300&&g.player.alive&&!Done();f++){
+          const evading=window.MissionInputDriver.EvadeGrenade();evaded||=evading;
+          const foe=evading?null:window.MissionInputDriver.Target(90);
+          if(foe)window.MissionInputDriver.Shoot(foe);
+          else if(!evading){g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);
+            if(g.state.activeSlot==="melee")g.Debug.Key("Digit1");if(g.state.ammo===0)g.Debug.Key("KeyR");}
+          if(g.player.bleeding&&g.player.health<80)g.Debug.Key("KeyB");
+          g.StepFrames(1,1/60,false);
+        }
+        g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);
+        return {alive:g.player.alive,health:g.player.health,done:Done(),evaded,mission:g.Debug.FirstLevelMission()};
+      },{stage,fact});
+      if(state.done||!state.alive)break;
+      await ReturnToSeat(label);
+    }
+    const what=stage||fact;
+    if(fact)await fs.writeFile(path.join(output,`Data_${fact}.json`),JSON.stringify(state,null,2));
+    assert.ok(state.alive,`${what}: player survives in the nest`);assert.ok(state.done,`${what}: reached while holding the nest`);
+    return state;
+  }
   assert.equal((await State()).stage,"Support");
   await Route(Routes.support,"RightNestApproach",{stance:"crouch",fight:true,crawl:true,recoverAfterEvade:true});
   await WaitFact("rightNestCaptured",90,true);
@@ -73,7 +108,7 @@ export async function DriveFrontBattle(ctx){
     assert.equal(gun.mounted,"MissionGun");assert.ok(gun.after>gun.before&&gun.released&&gun.alive,"F, real burst and F release work at the captured gun");
   }
   await CaptureFocus("RightNestCaptured",S.gap);
-  const first=await WaitStage("MachineGun",240,{fight:true});
+  const first=await HoldNest({stage:"MachineGun"},240,"ReturnToNestAfterEvade");
   assert.ok(first.mission.guards.slice(0,2).some(g=>g.alive));
   assert.ok(first.mission.guards.slice(0,2).filter(g=>g.alive).every(g=>g.safe));
   assert.ok(first.mission.guards.slice(2).some(g=>g.alive&&!g.safe));
@@ -81,12 +116,8 @@ export async function DriveFrontBattle(ctx){
   const guardIds=await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMissionRuntime().guards.map(g=>g.actor.id));
   await CaptureFocus("FirstBatchSafe",S.gap);
   if(ctx.stageTo===3)return;
-  // 03 里躲手榴弹（EvadeGrenade）会把人甩出阵位（2026-09-24 实测三次：甩到阵位东墙外 (34,−139)/(42,−141)，
-  // 在战车机枪射界里站了 20 s）。玩家躲完会回掩体：离座位 3 m 以上就用正常移动走回来。
-  const off=await page.evaluate(({x,z})=>{const p=window.Tengxian.player.position;return {d:Math.hypot(p.x-x,p.z-z),x:p.x,z:p.z};},S.seat);
-  // 东墙（x 33.5，z −140…−132）外面的人从墙南头绕回来（他也是从那儿被甩出去的）。
-  if(off.d>3)await Route(off.x>32.5?[{x:off.x,z:-141.8},{x:30,z:-141.8},S.seat]:[S.seat],"ReturnToNestAfterEvade",{stance:"crouch",fight:true,recoverAfterEvade:true});
-  await WaitFact("tankPositionPressured",120,true);
+  await ReturnToSeat("ReturnToNestAfterEvade");
+  await HoldNest({fact:"tankPositionPressured"},120,"ReturnToNestAfterEvade");
   await Route(S.rearRoute,"RightNestShortRetreat",{stance:"crouch",fight:false});
   await WaitStage("Tank",180);
   assert.deepEqual(await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMissionRuntime().guards.map(g=>g.actor.id)),guardIds,"04 retains both existing guard batches");

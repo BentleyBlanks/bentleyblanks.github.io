@@ -2,7 +2,7 @@
 // debug probe call this exact solver and input sequence.
 // 2026-09-23 战车两段毁伤（Script_FirstLevelTankBrain）：大脑接管时（tank.brain）瞄的是**车体局部**的
 // 一个点，不再瞄车中心；旧路径（没有大脑）照旧瞄车中心。aim：
-//   "farTrack"（默认）—— 越过车顶扔到**远侧**履带边上：断履带，车体挡住弹片（2026-09-24 审查：瞄近侧履带
+//   "farTrack"（默认）—— 越过车顶扔到**远侧**履带外 1.9 m：断履带，车体挡住弹片（2026-09-24 审查：瞄近侧履带
 //                        的那一版爆点离投掷者只有 4 m，每颗自伤 40–52 血）；
 //   "deck"            —— 扔上车顶后甲板（碰撞盒顶 2.56 m）：炸发动机舱 = 彻底哑火；
 //   "track"           —— 近侧履带（只留作对照，会自伤）。
@@ -22,8 +22,10 @@ export async function DriveBundleThrow(page, { aim: aimKind = "farTrack" } = {})
     const side = c * (p.x - tank.x) - s * (p.z - tank.z) < 0 ? -1 : 1;
     // 车体局部 → 世界：x 右、z 车尾。履带：外侧 0.45 m、车尾方向 0.7 m；后甲板：车顶（碰撞盒顶 2.56 m）。
     const local = aimKind === "deck" ? { x: 0, z: 1.2, rise: HullTop }
-      // 远侧：离车体外沿 1.2 m（2026-09-24 实测离 0.5 m 那一版弧线擦着车顶落在后甲板上，一颗直接哑火，跳过了断履带）。
-      : aimKind === "track" ? { x: side * 1.55, z: 0.7, rise: 0 } : { x: -side * 2.3, z: 0.7, rise: 0 };
+      // 远侧：离车体外沿 1.9 m（离履带区 ≈ 1.9 m，620 × (1 − 1.9/4.2)² ≈ 185 ≥ trackMinDamage 35，照样断履带）。
+      // 2026-09-24 实测离 0.5 m、1.2 m 两版都有弧线擦着远侧车顶边落在后甲板上（3 次里 2 次），一颗直接哑火、跳过断履带：
+      // 最平的那条弧线下降段太缓，过车顶边时离顶只有几厘米；离远一点，下降段有地方落下来。
+      : aimKind === "track" ? { x: side * 1.55, z: 0.7, rise: 0 } : { x: -side * 3.0, z: 0.7, rise: 0 };
     target = { x: tank.x + c * local.x + s * local.z, z: tank.z - s * local.x + c * local.z, rise: local.rise };
   }
   // 车体外廓（碰撞盒 2.15 × 4.30，四周留 0.25 m）里的采样点按车顶算地面。
@@ -66,8 +68,9 @@ export async function DriveBundleThrow(page, { aim: aimKind = "farTrack" } = {})
     const speed = Math.sqrt(halfGravity * distance * distance / (cosine * cosine * drop));
     if (speed < kind.throwSpeedMin + 0.05 || speed > kind.throwSpeedMax - 0.05) continue;
     let clearance = Infinity;
-    for (let step = 1; step <= 20; step++) {
-      const along = step / 21,travel=THROW.muzzleAheadM*cosine+distance*along,
+    // 60 个采样点（原 20 个 ≈ 25 cm 一点，会漏掉车顶边那一下）。
+    for (let step = 1; step <= 60; step++) {
+      const along = step / 61,travel=THROW.muzzleAheadM*cosine+distance*along,
         x=p.x+(target.x-p.x)*travel/rawDistance,z=p.z+(target.z-p.z)*travel/rawDistance;
       const t = distance * along / (speed * cosine);
       const y = originY + speed * vertical * t - halfGravity * t * t;
