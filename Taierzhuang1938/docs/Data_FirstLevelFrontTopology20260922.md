@@ -1,5 +1,7 @@
 # 第一关 03–06 白盒与连续流程
 
+> 2026-09-23：本册的**空间部分（坐标、路线、阵位、战车路）已被 [01–06 空间 2026-09-23](Data_FirstLevelSpace0106_20260923.md) 取代**，下文坐标是 09.22 旧版，只作流程与历史参考。
+
 采用 [2026-09-22 Notion 正文](Data_FirstLevelFrontSource20260922.md) 与其空间拓扑子文档的三张参考图。坐标仍为 X 向东、Z 向南、米制。新增逻辑集中于 `Script_FirstLevelFrontBattle.mjs`；位置与路线由 `Data_FirstLevelFrontRoute.mjs` 共享给地形、碰撞、AI 和指引。
 
 ## 空间

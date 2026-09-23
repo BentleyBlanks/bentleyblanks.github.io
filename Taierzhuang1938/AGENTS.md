@@ -7,6 +7,7 @@
 ## 当前入口与任务范围
 
 - **03–05 当前采用稿为 Notion 2026.09.22 修订**：[正文](docs/Data_FirstLevelFrontSource20260922.md)、[白盒与连续流程](docs/Data_FirstLevelFrontTopology20260922.md)。以右侧夺点、同一撤口、同一道路战车、东南旧院取弹、原路返回攻击支路为准。导演为 `Script_FirstLevelFrontBattle`。本轮用户限定实机验收 03–06：`Script_FirstLevelMissionBrowserTest.mjs --campaign --stage-from=3 --stage-to=6`，仅加载时初始化 03，之后连续推进，不测试 07 及其他阶段。
+- **01–06 空间以 [2026-09-23 空间重排](docs/Data_FirstLevelSpace0106_20260923.md) 为准**（防炮洞与前沿交通壕、02 撤退、观察射台、右侧阵位与后墙岔口、取弹沟与攻击支路、战车语义路点、01–05 敌我名册、可破坏掩体、K1–K11 关键帧）；与下面两条的旧坐标冲突时以它为准。静态验收 `node Taierzhuang1938/Script_FirstLevelFrontTopologyTest.mjs`（量尺 `Script_FirstLevelSpaceProbe.mjs`），重构分包口径见 [01–05 重构契约](docs/Data_FirstLevel0105Refactor20260923Contract.md)。
 - **01–02 沿用 Notion 2026.09.21 修订**：[正文](docs/Data_FirstLevelOpeningSource20260921.md)、[分镜与验收](docs/Data_OpeningStoryboards20260922.md)。01 一个俘虏被枪杀，02 主审/翻译与大刀反扑、拖救踢枪。导演为 `Script_OpeningStoryboards`，既有动作从 `Animation/OpeningStoryboards` 加载。2026-09-23 现场反馈追加：四名先头兵必须由小队真实清场后才拖救还权；前沿五组敌军在 02 预置，03–05 不因接近临时生成。此项用 `--campaign --stage-to=3` 从 01 连续复测。06–18 沿用既有来源与连接；前沿新版衔接 06 的原集结处。
 
 - 正片第一关是《往南的路》，入口 `?whitebox=p012`，序章已并入。需求来源是 Notion `2026.09.19` 采用稿（转录见 [采用稿](docs/Data_FirstLevelRebuildSource20260919.md)），跨包接口冻结在 [分包契约](docs/Data_FirstLevelRebuild20260919Contract.md)（步骤 id、事实名、锚点/路线键、遭遇组 id、cue id 都在那里改，不各自改名）。任务、对白和数值分别由 `Data_FirstLevelMission`、`Data_FirstLevelMissionDialogue`、`Data_Tuning_FirstLevel` 管理；范围决定、逐阶段通过条件与未完成项见 [重构验收](docs/Data_FirstLevelRebuildAcceptance.md)。

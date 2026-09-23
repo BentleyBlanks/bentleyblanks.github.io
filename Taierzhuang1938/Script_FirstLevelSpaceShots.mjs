@@ -20,7 +20,7 @@ const W = (id) => { const i = Rt.FrontTankIndex(id), w = TP[i], t = w.faceTo ? R
 // Which mission stage each frame is shot in (people and tank as that stage places them), and an optional tank pose.
 const PLAN = [
   { stage: 2, frames: [["K1", null], ["K2", null]] },
-  { stage: 3, frames: [["K3", null], ["K4", null], ["K10", null], ["TOP", null]] },
+  { stage: 3, frames: [["K3", null], ["K4", null, ["approach"]], ["K10", null, ["approach"]], ["TOP", null]] },
   { stage: 4, frames: [["K5", W("HullDown")], ["K6", W("BendExit")], ["K7", W("Pressure")]] },
   { stage: 5, frames: [["K8", W("Block")], ["K9", W("Block")]] },
   { stage: 6, frames: [["K11", null]] },
@@ -40,7 +40,12 @@ try {
     await page.evaluate(() => window.Tengxian.StepFrames(120));
     const opened = await page.evaluate(() => window.Tengxian.Debug.OpenEditor("samplePoints"));
     log.push({ stage, opened, errors: [...errors] });
-    for (const [k, tank] of todo) {
+    for (const [k, tank, hide] of todo) {
+      // K4/K10 are after the capture: hide the stage-3 nest defenders (the gunner stands 1 m in front of the seat).
+      await page.evaluate(async (groups) => {
+        const r = window.Tengxian.Debug.FirstLevelMissionRuntime(), { MISSION_ENCOUNTERS: E } = await import("./Data_FirstLevelMission.mjs");
+        for (const g of ["approach"]) for (const s of E[g]) { const a = r.enemies.get(s.id); if (a?.root) a.root.visible = !(groups || []).includes(g); }
+      }, hide || null);
       const kf = K[k];
       const pose = k === "TOP" ? { id: k, x: 10, z: -150, y: 110, yaw: 0, pitch: -1.5, fov: 70 }
         : { id: k, x: kf.camera.x, z: kf.camera.z, y: kf.camera.y, yaw: kf.yawRad, pitch: kf.pitchRad, fov: k === "K5" ? 20 : k === "K6" ? 45 : k === "K3" ? 80 : 66 };
