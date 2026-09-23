@@ -60,27 +60,36 @@ try {
   const buffers=meters.map(m=>new Float32Array(m.fftSize));
   window.Meter=()=>{meters.forEach((m,i)=>m.getFloatTimeDomainData(buffers[i]));let e=0,d=0;for(let i=0;i<buffers[0].length;i++){const l=buffers[0][i],r=buffers[1][i];e+=(l*l+r*r)/2;d+=(l-r)**2;}
     return {e,d,n:buffers[0].length};};
+  // 混响回路单独一块表：别人那句的混响尾巴（open 档 IR 长 2.6 s）会拖进紧接着的顺子那句，
+  // 量「居中」只取混响回路已经安静（比主输出低 46 dB 以上）的窗口，不靠猜一个保护时长。
+  const reverbMeter=a.ctx.createAnalyser();reverbMeter.fftSize=2048;for(const conv of Object.values(a.reverbs))conv.connect(reverbMeter);
+  const reverbBuffer=new Float32Array(reverbMeter.fftSize);
+  window.ReverbEnergy=()=>{reverbMeter.getFloatTimeDomainData(reverbBuffer);let e=0;for(const x of reverbBuffer)e+=x*x;return e;};
   const dest=a.ctx.createMediaStreamDestination();a.softClip.connect(dest);
   window.chunks=[];window.recorder=new MediaRecorder(dest.stream);window.recorder.ondataavailable=e=>window.chunks.push(e.data);window.recorder.start();
   window.pumping=true;(async()=>{let last=performance.now();while(window.pumping){await Wait(16);const now=performance.now();voice.Update(Math.min(.05,(now-last)/1000));last=now;}})();
   const left={x:-6,y:1.6,z:-1};
   const handle=voice.PlayScene(selfId,{speakers:new Proxy({},{get:()=>left})});
   const own={e:0,d:0,n:0},world={e:0,d:0,n:0};let ownRoute=null,worldRoute=null,duckDuring=null,farDuring=null,barkDuring=null,routeSwitch=false;
-  const firstRoute=new Map();let lastWorld=-1e9;
+  const firstRoute=new Map();let lastWorld=-1e9,ownSkippedReverb=0;
   while(!handle.done){await Wait(12);
     const live=[...a.activeVoices].filter(v=>v.dialogueLine&&!v.stopping);
     for(const v of live){const fp=v.storySelfGain.gain.value>.5;if(firstRoute.has(v)&&firstRoute.get(v)!==fp)routeSwitch=true;firstRoute.set(v,fp);}
     const m=window.Meter();
-    // 别人那句的混响尾巴会拖进紧接着的顺子那句：世界声源停了 0.8 s 以后才量「居中」。
-    if(live.some(v=>!v.storySpeakerFirstPerson))lastWorld=a.ctx.currentTime;
-    if(live.length===1&&live[0].storySpeakerFirstPerson&&a.ctx.currentTime-lastWorld>.8){own.e+=m.e;own.d+=m.d;own.n+=m.n;ownRoute??={self:live[0].storySelfGain.gain.value,world:live[0].storyWorldGain.gain.value,wet:live[0].wetGain?.gain.value??0};}
+    // 量「居中」的窗口：场上只剩顺子那一句（别的声源连淡出中的、被让掉的喊话都算在内），
+    // 别的声源停了 0.3 s 以上（分析窗 46 ms 与淡出都在里头），且混响回路已经安静。
+    const others=[...a.activeVoices].filter(v=>!(v.dialogueLine&&v.storySpeakerFirstPerson&&!v.stopping));
+    if(others.length)lastWorld=a.ctx.currentTime;
+    if(live.length===1&&live[0].storySpeakerFirstPerson&&a.ctx.currentTime-lastWorld>.3){
+      if(window.ReverbEnergy()>m.e*2.5e-5)ownSkippedReverb++;
+      else{own.e+=m.e;own.d+=m.d;own.n+=m.n;ownRoute??={self:live[0].storySelfGain.gain.value,world:live[0].storyWorldGain.gain.value,wet:live[0].wetGain?.gain.value??0};}}
     if(live.length===1&&!live[0].storySpeakerFirstPerson){world.e+=m.e;world.d+=m.d;world.n+=m.n;worldRoute??={self:live[0].storySelfGain.gain.value,world:live[0].storyWorldGain.gain.value,distance:live[0].distance};}
     if(live.length&&duckDuring==null){await Wait(300);duckDuring=a.dialogueDuck.gain.value;farDuring=a.dialogueFarDuck.gain.value;
       const before=a.drops.dialogue;a.voicesReady=true;a.Bark('rally',{position:{x:3,y:0,z:-3},seed:1});barkDuring=a.drops.dialogue-before;}
   }
   await Wait(holdMs+700);
   const R=x=>({rms:Math.sqrt(x.e/Math.max(1,x.n)),diff:Math.sqrt(x.d/Math.max(1,x.n))});
-  return {own:R(own),world:R(world),ownRoute,worldRoute,routeSwitch,duckDuring,farDuring,duckAfter:a.dialogueDuck.gain.value,
+  return {own:{...R(own),windows:own.n/2048,skippedReverb:ownSkippedReverb},world:R(world),ownRoute,worldRoute,routeSwitch,duckDuring,farDuring,duckAfter:a.dialogueDuck.gain.value,
     farAfter:a.dialogueFarDuck.gain.value,barkDuring,yieldAfter:a.dialogueYield,availableLines:voice.State().availableLines,
     errors:voice.State().errors,voiceErrors:a.voiceErrors};
  },{selfId:selfScene.id,holdMs:DIALOGUE_DUCK.holdS*1000});
