@@ -10,7 +10,7 @@ import math
 from pathlib import Path
 from mathutils import Vector
 
-project = Path(bpy.context.scene.get('OxCartProject', Path(__file__).resolve().parents[1]))
+project = Path(bpy.context.scene['OxCartProject']) if 'OxCartProject' in bpy.context.scene else Path(__file__).resolve().parents[1]
 model_dir = project / 'Model' / 'OxCart'
 model_dir.mkdir(parents=True, exist_ok=True)
 private_dir = Path('C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/OxCart')
@@ -19,6 +19,7 @@ private_dir.mkdir(parents=True, exist_ok=True)
 for previous in list(bpy.data.objects): bpy.data.objects.remove(previous, do_unlink=True)
 for collection in list(bpy.data.collections):
     if collection.name != 'Collection': bpy.data.collections.remove(collection)
+bpy.ops.outliner.orphans_purge(do_recursive=True)
 scene = bpy.context.scene
 scene.render.fps = 30
 scene.frame_start = 1
@@ -117,6 +118,48 @@ def LoftY(name, stations, mat, col, parent=None, sides=18):
     col.objects.link(obj)
     return Finish(obj, name, mat, col, parent)
 
+def SmoothStations(stations, steps=3):
+    """Round a measured silhouette without losing its shoulder and hip landmarks."""
+    result = []
+    for index in range(len(stations)-1):
+        previous = stations[max(0,index-1)]
+        current = stations[index]
+        following = stations[index+1]
+        next_station = stations[min(len(stations)-1,index+2)]
+        for step in range(steps):
+            t = step / steps
+            values = []
+            for a,b,c,d in zip(previous,current,following,next_station):
+                values.append(.5*((2*b)+(-a+c)*t+(2*a-5*b+4*c-d)*t*t
+                                  +(-a+3*b-3*c+d)*t*t*t))
+            result.append(tuple(values))
+    result.append(stations[-1])
+    return result
+
+def LoftZ(name, stations, mat, col, parent=None, sides=14):
+    """An organic limb shaped by height, center, and two cross-section radii."""
+    vertices = []
+    faces = []
+    for z, center_x, center_y, radius_x, radius_y in stations:
+        for step in range(sides):
+            angle = 2*math.pi*step/sides
+            vertices.append((center_x+radius_x*math.cos(angle),
+                             center_y+radius_y*math.sin(angle),z))
+    for station in range(len(stations)-1):
+        for step in range(sides):
+            next_step = (step+1)%sides
+            faces.append((station*sides+step,(station+1)*sides+step,
+                          (station+1)*sides+next_step,station*sides+next_step))
+    faces.extend((tuple(reversed(range(sides))),
+                  tuple((len(stations)-1)*sides+step for step in range(sides))))
+    mesh = bpy.data.meshes.new(name+'Mesh')
+    mesh.from_pydata(vertices, [], faces)
+    mesh.update()
+    for polygon in mesh.polygons: polygon.use_smooth = True
+    obj = bpy.data.objects.new(name,mesh)
+    col.objects.link(obj)
+    return Finish(obj,name,mat,col,parent)
+
 def Cylinder(name, center, radius, depth, mat, col, parent=None, vertices=12, axis='Z'):
     bpy.ops.mesh.primitive_cylinder_add(vertices=vertices, radius=radius, depth=depth, location=center)
     obj = bpy.context.view_layer.objects.active
@@ -208,11 +251,17 @@ def BuildAnimal(kind):
     # The body is one tapered surface: a draft ox has a deep, heavy forequarter;
     # the horse has longer legs, a tucked barrel and a higher withers line.
     if is_ox:
-        torso_stations = [
-            (3.10,.17,1.30,.24),(3.28,.45,1.30,.43),(3.55,.56,1.31,.52),
-            (3.90,.57,1.29,.54),(4.24,.58,1.30,.56),(4.54,.62,1.33,.60),
-            (4.78,.56,1.35,.59),(4.98,.38,1.34,.45),(5.08,.20,1.35,.25)]
-        Ellipsoid('OxShoulderHump',(0,4.57,1.81),(.45,.34,.23),coat,col,body,18,10)
+        # The withers rise out of the whole forequarter.  The deep brisket,
+        # narrower waist and rounded pelvic end belong to the same skin mesh.
+        ox_profile = [
+            (3.06,.19,1.57,1.11),(3.24,.46,1.80,.92),
+            (3.45,.57,1.84,.79),(3.70,.59,1.79,.77),
+            (3.96,.57,1.75,.75),(4.19,.59,1.82,.70),
+            (4.40,.65,1.96,.68),(4.56,.67,2.04,.67),
+            (4.72,.62,1.97,.68),(4.89,.46,1.72,.83),
+            (5.05,.22,1.47,1.05)]
+        torso_stations = [(y,width,(top+bottom)/2,(top-bottom)/2)
+                          for y,width,top,bottom in SmoothStations(ox_profile)]
     else:
         torso_stations = [
             (3.12,.16,1.50,.22),(3.30,.38,1.48,.39),(3.56,.46,1.48,.46),
@@ -220,7 +269,11 @@ def BuildAnimal(kind):
             (4.72,.48,1.54,.54),(4.90,.32,1.54,.43),(5.00,.16,1.53,.23)]
     LoftY(kind+'Torso',torso_stations,coat,col,body)
     if is_ox:
-        Ellipsoid('OxDewlap',(0,4.65,.9),(.26,.32,.29),ox_light,col,body)
+        # A ventral fold under the neck and broad chest, instead of a ball.
+        LoftY('OxDewlap',SmoothStations([
+            (4.39,.07,.93,.12),(4.53,.19,.92,.22),
+            (4.72,.24,.94,.29),(4.92,.20,1.04,.27),
+            (5.14,.09,1.17,.15)]),coat,col,body,14)
     else:
         Curve('HorseMane',[(0,4.69,1.94),(0,4.87,2.15),(0,5.04,2.27),(0,5.23,2.33)],
               .075,horse_dark,col,body)
@@ -257,20 +310,43 @@ def BuildAnimal(kind):
     leg_pivots=[]
     for side in (-1,1):
         for front in (True,False):
-            x=side*(.33 if is_ox else .28)
+            x=side*(.39 if is_ox else .28)
             y=4.72 if front else 3.48
-            upper_z=1.22 if is_ox else 1.48
-            joint=.58 if is_ox else .72
-            knee_y=y+(.06 if front else -.18)
-            foot_y=y+(.10 if front else .06)
+            upper_z=1.27 if is_ox else 1.48
+            joint=(.57 if front else .62) if is_ox else .72
+            knee_y=y+(.03 if front else -.23) if is_ox else y+(.06 if front else -.18)
+            foot_y=y+(.07 if front else .03) if is_ox else y+(.10 if front else .06)
             name=f'{kind}{"Front" if front else "Rear"}{"Left" if side<0 else "Right"}'
             pivot=Empty(name+'Pivot',(x,y,upper_z),col,root)
-            TaperBone(name+'Upper',(x,y,upper_z),(x,knee_y,joint),
-                      .19 if is_ox else (.155 if front else .19),
-                      .12 if is_ox else .095,coat,col,pivot)
+            if is_ox:
+                # The upper foreleg flows out of the shoulder; the haunch
+                # narrows through a backwards hock. Keep pivots for the walk.
+                upper_stations = (
+                    [(1.65,side*.30,y-.09,.15,.18),
+                     (1.42,side*.36,y-.06,.20,.23),
+                     (1.23,x,y-.03,.25,.26),
+                     (1.03,x,y,.20,.22),(.76,x,knee_y-.015,.15,.17),
+                     (joint,x,knee_y,.125,.14)] if front else
+                    [(1.59,side*.27,3.47,.14,.18),
+                     (1.43,side*.31,3.44,.18,.23),
+                     (1.25,x,3.38,.27,.30),
+                     (1.03,x,3.32,.22,.23),(.80,x,3.27,.16,.18),
+                     (joint,x,knee_y,.125,.15)])
+                LoftZ(name+'Upper',SmoothStations(upper_stations,2),coat,col,pivot)
+            else:
+                TaperBone(name+'Upper',(x,y,upper_z),(x,knee_y,joint),
+                          .155 if front else .19,.095,coat,col,pivot)
             knee=Empty(name+'KneePivot',(x,knee_y,joint),col,pivot)
-            TaperBone(name+'Lower',(x,knee_y,joint),(x,foot_y,.18),
-                      .11 if is_ox else .085,.075 if is_ox else .06,coat,col,knee)
+            if is_ox:
+                lower_stations = [
+                    (joint+.04,x,knee_y,.125,.14),
+                    (.48,x,knee_y+(.015 if front else .08),.105,.12),
+                    (.30,x,foot_y-.03,.095,.105),
+                    (.17,x,foot_y,.12,.12)]
+                LoftZ(name+'Lower',SmoothStations(lower_stations,2),coat,col,knee)
+            else:
+                TaperBone(name+'Lower',(x,knee_y,joint),(x,foot_y,.18),
+                          .085,.06,coat,col,knee)
             Ellipsoid(name+'Hoof',(x,foot_y+.07,.105),
                       (.16,.23,.10) if is_ox else (.135,.17,.11),hoof,col,knee,12,8)
             leg_pivots.append((pivot,knee,side,front))
