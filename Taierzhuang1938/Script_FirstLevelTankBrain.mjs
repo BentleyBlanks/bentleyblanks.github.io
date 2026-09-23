@@ -666,9 +666,9 @@ export class TankBrain {
       }
     }
     if (!pick) return false;
-    // 撤离窗口（目标带 damageCap）：机枪这一串也只按上限伤人（压制照旧）。
+    // 撤离窗口（目标带 damageCap）：机枪这一串不伤人（压制、弹着照旧）—— 一发机枪弹不论多轻都开一道流血伤口。
     const capped = (world.targets || []).find((t) => t.id === pick.id && t.damageCap != null);
-    if (capped && pick.damage) pick.cap = capped.damageCap;
+    if (capped && pick.damage) { pick.damage = false; pick.capped = true; }
     slot.burst = { ...pick, start: this.time, shots: 0 };
     slot.phase = "burst"; slot.until = this.time + M.burstS; slot.nextShot = this.time;
     this.telemetry.bursts.push({ t: this.time, weapon, kind: pick.kind, target: pick.id, damage: pick.damage });
@@ -685,7 +685,7 @@ export class TankBrain {
         const n = ++b.shots, spread = M.spreadM + (M.spreadPerM || 0) * Dist(b.point, this);
         at = { x: b.point.x + Math.sin(n * 2.399) * spread, y: b.point.y + Math.cos(n * 1.79) * spread * 0.3, z: b.point.z + Math.cos(n * 2.399) * spread };
       }
-      this.fire.push({ weapon, at, kind: b.kind, target: b.id, damageScale: b.damage ? M.damageScale * (b.cap ?? 1) : 0 });
+      this.fire.push({ weapon, at, kind: b.kind, target: b.id, damageScale: b.damage ? M.damageScale : 0 });
       slot.nextShot += M.shotIntervalS;
     }
     if (this.time >= slot.until) { slot.phase = "rest"; slot.until = this.time + this.Range(M.restMinS, M.restMaxS); slot.burst = null; }

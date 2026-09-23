@@ -22,12 +22,13 @@ export async function DriveBundleThrow(page, { aim: aimKind = "farTrack" } = {})
     const side = c * (p.x - tank.x) - s * (p.z - tank.z) < 0 ? -1 : 1;
     // 车体局部 → 世界：x 右、z 车尾。履带：外侧 0.45 m、车尾方向 0.7 m；后甲板：车顶（碰撞盒顶 2.56 m）。
     const local = aimKind === "deck" ? { x: 0, z: 1.2, rise: HullTop }
-      : aimKind === "track" ? { x: side * 1.55, z: 0.7, rise: 0 } : { x: -side * 1.6, z: 0.7, rise: 0 };
+      // 远侧：离车体外沿 1.2 m（2026-09-24 实测离 0.5 m 那一版弧线擦着车顶落在后甲板上，一颗直接哑火，跳过了断履带）。
+      : aimKind === "track" ? { x: side * 1.55, z: 0.7, rise: 0 } : { x: -side * 2.3, z: 0.7, rise: 0 };
     target = { x: tank.x + c * local.x + s * local.z, z: tank.z - s * local.x + c * local.z, rise: local.rise };
   }
   // 车体外廓（碰撞盒 2.15 × 4.30，四周留 0.25 m）里的采样点按车顶算地面。
   const OverHull = (x, z) => { const dx = x - tank.x, dz = z - tank.z, lx = c * dx - s * dz, lz = s * dx + c * dz;
-    return Math.abs(lx) <= 1.075 + 0.25 && Math.abs(lz) <= 2.15 + 0.25; };
+    return Math.abs(lx) <= 1.075 + 0.45 && Math.abs(lz) <= 2.15 + 0.45; };
   const hits = [], TakeHit = g.player.TakeHit;
   g.player.TakeHit = function (...args) {
     const before = this.health, result = TakeHit.apply(this, args), opts = args[3] || {};

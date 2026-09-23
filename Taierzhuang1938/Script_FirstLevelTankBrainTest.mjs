@@ -487,6 +487,13 @@ function Run(brain, world, seconds, each = null) {
   ok(capped.length >= 3 && capped.every((f) => f.damage <= TANK.gunner.shellDamage * TANK.gunner.retreatDamageScale + 1e-9),
     `retreat window: every shell near the player is capped (${capped.map((f) => f.damage.toFixed(0)).join(",")})`);
   ok(capped.every((f) => f.coverDamage === TANK.gunner.shellDamage), "cover still takes the full shell (warning / capped shells break walls too)");
+  ok(TANK.gunner.shellDamage * TANK.gunner.retreatDamageScale < 4 && TANK.gunner.shellDamage * TANK.gunner.warningDamageScale < 4,
+    "warning / retreat shells stay under BLAST.playerMinDamage (every TakeHit opens a bleeding wound)");
+  const mgCap = CreateTankBrain(StraightPath(), TANK, { seed: 39 });
+  mgCap.PlaceAt(1); mgCap.hullYaw = YawTo(mgCap, runner);
+  const mgHits = [];
+  Run(mgCap, World({ targets: [runner] }), 20, (o) => { for (const f of o.fire) if (f.weapon !== "main") mgHits.push(f); });
+  ok(mgHits.length > 0 && mgHits.every((f) => f.damageScale === 0), `retreat window: hull MG bursts at the player never wound (${mgHits.length} rounds)`);
 
   // 11c 挪窝：目标离上一发瞄的位置 > moveResetM，散布回到第一发（不接着收敛）。
   const mover = CreateTankBrain(StraightPath(), TANK, { seed: 33 });

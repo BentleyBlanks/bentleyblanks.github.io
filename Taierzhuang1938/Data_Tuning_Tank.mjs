@@ -107,7 +107,9 @@ export const TANK = Object.freeze({
     // 警告弹只砸土不要命：伤害乘这个数（2026-09-23 实测：满伤害的沿上一发在 1.8 m 外
     // 把只剩 15 血的玩家直接炸死，预兆等于没给）。落点离还没被警告过的玩家这么近的任何一发
     // （包括轰阵位掩体的区域弹）都按警告弹算。
-    warningDamageScale: 0.2,
+    // 2026-09-24：0.2 → 0.04。Player.TakeHit 不论伤害大小**每一下都开一道流血伤口**（约 0.7 HP/s，叠加），
+    // 0.2 × 85 贴身还有 9 点、照样开伤口；0.04 × 85 = 3.4 低于 BLAST.playerMinDamage 4 → 只给压制、不进 TakeHit。
+    warningDamageScale: 0.04,
     warningRadiusM: 4.5,
     // 「新暴露」：玩家离开视线超过这么久再露头，下一发重新从警告弹开始。
     reexposeS: 6,
@@ -116,7 +118,9 @@ export const TANK = Object.freeze({
     moveResetM: 4,
     // 剧本撤离窗口（04 阵位被压住以后、玩家回到阵位后墙 rightRearReached 以前）：战车照样开炮、照样砸土，
     // 但落在玩家弹片范围里的那一发只按这个比例伤人，权重也降一档（先封缺口）。「退后墙！」是命令，不是陷阱。
-    retreatDamageScale: 0.2,
+    // 同警告弹：低于 BLAST.playerMinDamage，只压制不开伤口（2026-09-24 实测 0.2 时撤离途中两下擦伤叠出 3.6 HP/s 的流血）。
+    // 车体机枪对带上限的目标这一串整串不伤人（机枪弹一中就是一道伤口）。
+    retreatDamageScale: 0.04,
     retreatWeightScale: 0.5,
     // 打不死的剧情人物（scriptEssential：何有田、罗班长…血量托底到 1）：权重乘这个数。
     // 2026-09-24 审查实测：05 里主炮 11 发全打 60–80 m 外守左机枪的何有田，玩家那条攻击支路 3–10% 的时间被指着。

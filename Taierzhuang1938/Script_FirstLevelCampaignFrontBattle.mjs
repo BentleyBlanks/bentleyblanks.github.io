@@ -81,6 +81,11 @@ export async function DriveFrontBattle(ctx){
   const guardIds=await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMissionRuntime().guards.map(g=>g.actor.id));
   await CaptureFocus("FirstBatchSafe",S.gap);
   if(ctx.stageTo===3)return;
+  // 03 里躲手榴弹（EvadeGrenade）会把人甩出阵位（2026-09-24 实测三次：甩到阵位东墙外 (34,−139)/(42,−141)，
+  // 在战车机枪射界里站了 20 s）。玩家躲完会回掩体：离座位 3 m 以上就用正常移动走回来。
+  const off=await page.evaluate(({x,z})=>{const p=window.Tengxian.player.position;return {d:Math.hypot(p.x-x,p.z-z),x:p.x,z:p.z};},S.seat);
+  // 东墙（x 33.5，z −140…−132）外面的人从墙南头绕回来（他也是从那儿被甩出去的）。
+  if(off.d>3)await Route(off.x>32.5?[{x:off.x,z:-141.8},{x:30,z:-141.8},S.seat]:[S.seat],"ReturnToNestAfterEvade",{stance:"crouch",fight:true,recoverAfterEvade:true});
   await WaitFact("tankPositionPressured",120,true);
   await Route(S.rearRoute,"RightNestShortRetreat",{stance:"crouch",fight:false});
   await WaitStage("Tank",180);
