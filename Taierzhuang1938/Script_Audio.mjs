@@ -4391,7 +4391,7 @@ export class AudioEngine {
    *   · 同类 4.5 s  —— 同一句话不会连着来第二遍
    * 玩家自己那句（priority）不受全局闸限制，但仍受同类闸限制。
    *
-   * 认得出是谁在喊时（`who`，或第一关装的 `barkSpeaker` 按位置认人，见
+   * 认得出是谁在喊时（`who`，或第一关 01–06 装的 `barkSpeaker` 按位置认人、不认已阵亡的人，见
    * Script_FirstLevelMissionVoice.BarkSpeaker）只在这个人自己的版本里挑：声库键 `<key>@<who>`
    * （Data_FirstLevelVoiceCast.SQUAD_BARK_*，用他的定妆音录的）。没有本人版本的 TTS 句不说
    *（那是别人的嗓子），真人素材句（`sample`）照常可选；一条本人版本都没有才退回公用声库。

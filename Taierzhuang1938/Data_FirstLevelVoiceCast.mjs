@@ -167,6 +167,11 @@ export const SQUAD_BARK_KEYS = Object.freeze({
 export const SQUAD_BARK_CAST = Object.freeze({
   luo: "squad", yaowa: "squad", heyoutian: "squad", liuwencai: "squad", zhou: "squad", shunzi: "player",
 });
+/**
+ * 本人版本只在 01–06（MISSION_STAGES 从 Trapped 到 Orders）认人。07 以后的班组喊话仍走公用声库、照旧叠变调，
+ * 这一轮不改后半关的行为（契约 §2.3 只管 01–06 的 cue；FirstLevelVoiceTest 第 11 节核对这张表与关卡步骤表一致）。
+ */
+export const SQUAD_BARK_STAGES = Object.freeze(["Trapped", "BunkerRescue", "RearTrench", "Support", "MachineGun", "Tank", "Orders"]);
 export const SquadBarkKey = (key, who) => `${key}@${who}`;
 const Pascal = (text) => String(text).split("_").map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join("");
 /** 相对 Audio/FirstLevel/ 的文件名。 */

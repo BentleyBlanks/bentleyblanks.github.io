@@ -2,7 +2,7 @@ import { MISSION_TUNING } from "./Data_Tuning_FirstLevel.mjs";
 import { MissionVoiceTimeline } from "./Data_FirstLevelMissionVoiceTiming.mjs";
 import { MISSION_DIALOGUE, MISSION_VOICE_CAST, MissionVoiceSubtitle } from "./Data_FirstLevelMissionDialogue.mjs";
 import { FIRST_LEVEL_DIALOGUE_DIRECTION, LineDirection, PlaybackOffset } from "./Data_FirstLevelDialogueDirection.mjs";
-import { FIRST_LEVEL_VOICE_CAST, SQUAD_BARK_CAST } from "./Data_FirstLevelVoiceCast.mjs";
+import { FIRST_LEVEL_VOICE_CAST, SQUAD_BARK_CAST, SQUAD_BARK_STAGES } from "./Data_FirstLevelVoiceCast.mjs";
 import { Localize } from "./Script_Text.mjs";
 import { FirstLevelVoiceTextId, FirstLevelCastTextId } from "./Script_TextIds.mjs";
 import { SampleSpeechEnvelope } from "./Script_SpeechEnvelope.mjs";
@@ -43,8 +43,12 @@ const BARK_CUE = Object.freeze({ id: "SquadBark", lines: Object.freeze([]) });
 export const BARK_SPEAKER_MATCH_M = 0.6;
 
 export class FirstLevelMissionVoice {
-  constructor({ audio, hud, Position, Listener, Done, Event, Ready, Clock }) {
-    Object.assign(this, { audio, hud, Position, Listener, Done, Event, Ready, Clock });
+  /**
+   * Stage() → 当前关卡步骤 id；Alive(who) → 这个班组成员还活着没有（缺省当活着）。两者只给班组喊话认人用：
+   * 认人只在 SQUAD_BARK_STAGES（01–06）里生效，没注入 Stage 就一律不认；死人不认（阵亡那一声是旁边的人喊的）。
+   */
+  constructor({ audio, hud, Position, Listener, Done, Event, Ready, Clock, Stage, Alive }) {
+    Object.assign(this, { audio, hud, Position, Listener, Done, Event, Ready, Clock, Stage, Alive });
     this.dialogue = new DialoguePlayer({
       audio,
       Clock,
@@ -132,11 +136,14 @@ export class FirstLevelMissionVoice {
    * 这里拿位置去对：玩家下令（种子 0、priority）对玩家本人；其余对班组每个人现在的位置（VoicePosition
    * 按 who 找人的那条通路），水平距离 ≤ BARK_SPEAKER_MATCH_M 的最近那个。VoicePosition 找不到人时
    * 退回的是玩家身边那一点，先量出这一点，等于它的一律当「没找到」。认不出返回 null（用公用声库）。
+   * 只在 01–06（SQUAD_BARK_STAGES）认人，07 以后行为不变；已阵亡的人不认——Script_Ai.Kill 在阵亡处喊的
+   * hurt 是旁边的人喊的，不能认成死者自己（那样「班长哦！班长！」就再也挑不到了）。
    */
   BarkSpeaker({ seed = 0, side = "nra", position = null, priority = false } = {}) {
     if (side !== "nra" || !position) return null;
     const Flat = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
     try {
+      if (!SQUAD_BARK_STAGES.includes(this.Stage?.())) return null;
       if (!seed && priority) {
         const listener = this.Listener?.();
         return listener && SQUAD_BARK_CAST.shunzi && Flat(listener, position) <= BARK_SPEAKER_MATCH_M ? "shunzi" : null;
@@ -145,6 +152,7 @@ export class FirstLevelMissionVoice {
       let best = null, bestDistance = BARK_SPEAKER_MATCH_M;
       for (const who of Object.keys(SQUAD_BARK_CAST)) {
         if (who === "shunzi") continue;
+        if (this.Alive && !this.Alive(who)) continue;
         const at = this.Position(BARK_CUE, { who });
         if (!at || (fallback && at.distanceTo(fallback) < 1e-3)) continue;
         const distance = Flat(at, position);

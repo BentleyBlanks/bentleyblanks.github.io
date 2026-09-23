@@ -19,8 +19,8 @@ import {
 import { JAPANESE_SPEECH } from "./Data_FirstLevelJapaneseSpeech.mjs";
 import { MISSION_VOICE_ALIGNMENT } from "./Data_FirstLevelMissionVoiceAlignment.mjs";
 import { MissionVoiceTimeline } from "./Data_FirstLevelMissionVoiceTiming.mjs";
-import { FIRST_LEVEL_DIALOGUE_DIRECTION, PROJECTION_DB, DIALOGUE_DUCK, LineDirection, FALLBACK_GAP_S } from "./Data_FirstLevelDialogueDirection.mjs";
-import { FIRST_LEVEL_VOICE_CAST, CastVoiceOwner, SQUAD_BARK_KEYS, SQUAD_BARK_CAST, SquadBarkEntries, SquadBarkKey }
+import { FIRST_LEVEL_DIALOGUE_DIRECTION, PROJECTION_DB, DIALOGUE_DUCK, LineDirection, FALLBACK_GAP_S, MAX_LIVE_DIALOGUE_LINES } from "./Data_FirstLevelDialogueDirection.mjs";
+import { FIRST_LEVEL_VOICE_CAST, CastVoiceOwner, SQUAD_BARK_KEYS, SQUAD_BARK_CAST, SQUAD_BARK_STAGES, SquadBarkEntries, SquadBarkKey }
   from "./Data_FirstLevelVoiceCast.mjs";
 import { FirstLevelMissionVoice, BARK_SPEAKER_MATCH_M } from "./Script_FirstLevelMissionVoice.mjs";
 import { AudioEngine } from "./Script_Audio.mjs";
@@ -364,6 +364,28 @@ const FakeAudio = () => {
   console.log("ok 多声部：每句独立声源挂各自头上、可重叠、逐句字幕、侧链与喊话让路");
 }
 {
+  // 10a'. 契约 §6：剧情语音同时 ≤ 3 路。四场并行（外加一次旧整段单槽）也不超，最早开口的那句淡出让位。
+  assert.equal(MAX_LIVE_DIALOGUE_LINES, 3, "契约 §6 的剧情语音路数");
+  const audio = FakeAudio(), ends = [];
+  const player = new DialoguePlayer({ audio, Clock: () => audio.t, Event: (id, scene, detail) => { if (id === "SceneEnd") ends.push(scene); } });
+  const Scene = (id, at) => ({ id, priority: true, lines: [{ id: id + ".01", index: 0, who: "luo", key: "Key" + id, duration: 3,
+    speaker: "", text: "", subtitle: false, direction: { after: "start", offsetS: at } }] });
+  const Step = (seconds) => { for (let i = 0; i < Math.round(seconds * 60); i++) { audio.t += 1 / 60; player.Update(1 / 60); } };
+  ["A", "B", "C", "D"].forEach((id, i) => player.Play(Scene(id, i * 0.2)));
+  Step(0.9);
+  assert.equal(audio.plays.length, 4, "四句都开了口");
+  assert.ok(player.stats.maxSounding <= MAX_LIVE_DIALOGUE_LINES, "同时出声的剧情语音不超过 3 路：" + player.stats.maxSounding);
+  assert.deepEqual(audio.stops, ["KeyA"], "满了以后最早开口的那句让位");
+  assert.equal(player.stats.budgetCuts, 1);
+  assert.ok(ends.includes("A"), "让位的那场照常走完（不会卡住等它）");
+  audio.storyVoice = { key: "legacy" };
+  player.Play(Scene("E", 0));
+  Step(0.1);
+  assert.ok(player.stats.maxSounding <= MAX_LIVE_DIALOGUE_LINES, "旧整段单槽也算一路");
+  assert.deepEqual(audio.stops, ["KeyA", "KeyB", "KeyC"], "单槽占着一路时再让两句");
+  console.log("ok 剧情语音同时 ≤ 3 路：满了最早开口的那句淡出让位（旧整段单槽算一路）");
+}
+{
   // 10b. 截断事件、等事件、等 gate、顺子第一人称、暂停续播偏移、Skip。
   const audio = FakeAudio(), events = [];
   const player = new DialoguePlayer({ audio, Event: (id, scene, detail) => events.push(id), Clock: () => audio.t });
@@ -506,9 +528,13 @@ const FakeAudio = () => {
   // 11b. 认人：喊话位置对上某人现在的位置（≤ BARK_SPEAKER_MATCH_M，取最近），玩家下令对顺子；找不到的人退回玩家那一点，不算数。
   const V = (x, y, z) => ({ x, y, z, distanceTo(o) { return Math.hypot(x - o.x, y - o.y, z - o.z); } });
   const heads = { luo: V(5, 1.5, 0), yaowa: V(5.9, 1.5, 0), zhou: null };
+  const ordersStage = MISSION_STAGES.findIndex((stage) => stage.id === "Orders");
+  assert.deepEqual([...SQUAD_BARK_STAGES], MISSION_STAGES.slice(0, ordersStage + 1).map((stage) => stage.id), "本人版本认人的范围正好是 01–06 的步骤");
+  let stage = "Support";
+  const dead = new Set();
   const probe = new FirstLevelMissionVoice({ audio: { voiceBank: new Map() },
     Position: (cue, line) => { assert.equal(cue.id, "SquadBark"); return line.who in heads ? heads[line.who] : V(0, 1.5, 0); },
-    Listener: () => V(0.1, 1.6, 0) });
+    Listener: () => V(0.1, 1.6, 0), Stage: () => stage, Alive: (who) => !dead.has(who) });
   assert.equal(probe.BarkSpeaker({ seed: 12, side: "nra", position: V(5.2, 0, 0.1) }), "luo", "脚底对头：认出罗班长");
   assert.equal(probe.BarkSpeaker({ seed: 13, side: "nra", position: V(5.6, 0, 0) }), "yaowa", "两人都在范围内取最近的");
   assert.equal(probe.BarkSpeaker({ seed: 12, side: "nra", position: V(5 + BARK_SPEAKER_MATCH_M + 0.95, 0, 3) }), null, "离谁都远：公用声库");
@@ -516,8 +542,23 @@ const FakeAudio = () => {
   assert.equal(probe.BarkSpeaker({ seed: 12, side: "nra", position: V(0, 0, 0) }), null, "找不到的人退回玩家那一点，不许把玩家身边的兵认成他");
   assert.equal(probe.BarkSpeaker({ seed: 0, priority: true, side: "nra", position: V(0, 0, 0) }), "shunzi", "玩家下令是顺子");
   assert.equal(probe.BarkSpeaker({ seed: 0, priority: true, side: "nra", position: V(4, 0, 0) }), null, "不在玩家脚下的无种子喊话不算顺子");
-  assert.equal(new FirstLevelMissionVoice({ audio: {}, Position: () => { throw new Error("boom"); } })
+  assert.equal(new FirstLevelMissionVoice({ audio: {}, Stage: () => "Support", Position: () => { throw new Error("boom"); } })
     .BarkSpeaker({ seed: 3, side: "nra", position: V(0, 0, 0) }), null, "认人出错只退回公用声库");
+  // 阵亡：Script_Ai.Kill 在死者脚下喊 hurt，那是旁边的人喊的，不许认成死者本人（hurt_down 要留在可选里）。
+  dead.add("luo");
+  assert.equal(probe.BarkSpeaker({ seed: 19, side: "nra", position: V(5, 0, 0) }), null, "死人位置上的喊话不认成死者");
+  assert.equal(probe.BarkSpeaker({ seed: 13, side: "nra", position: V(5.6, 0, 0) }), "yaowa", "死者旁边活着的人照认");
+  dead.clear();
+  // 07 以后（South 起）不认人：后半关班组喊话仍走公用声库、照旧变调。
+  for (const later of ["South", "Village", "Regroup", "NightMarch"]) {
+    stage = later;
+    assert.equal(probe.BarkSpeaker({ seed: 12, side: "nra", position: V(5.2, 0, 0.1) }), null, later + " 不认人（07 以后行为不变）");
+    assert.equal(probe.BarkSpeaker({ seed: 0, priority: true, side: "nra", position: V(0, 0, 0) }), null, later + " 玩家下令也走公用声库");
+  }
+  stage = "Orders";
+  assert.equal(probe.BarkSpeaker({ seed: 12, side: "nra", position: V(5.2, 0, 0.1) }), "luo", "06 Orders 还认人");
+  assert.equal(new FirstLevelMissionVoice({ audio: {}, Position: () => heads.luo })
+    .BarkSpeaker({ seed: 12, side: "nra", position: V(5.2, 0, 0.1) }), null, "没注入关卡步骤就不认人");
   {
     const audio = { voiceBank: new Map() };
     const disposed = new FirstLevelMissionVoice({ audio, Position: () => null });
@@ -583,8 +624,10 @@ if (process.argv.includes("--audio")) {
     ? JSON.parse(Read("./Audio/FirstLevel/Data_FirstLevelVoiceTranscriptReview.json")).lines || {} : {};
   const usedReviews = new Set();
   manifest.lines ||= {};
-  // 逐句录音还没烘的 01–06 场景（Step 2 全量生成后清空）。**只许变短**。
-  const PENDING_PER_LINE_BAKE = new Set(perLine.map((cue) => cue.id).filter((id) => !byId.get(id).lines.every((line) => manifest.lines[line.id])));
+  // 逐句录音还没烘的 01–06 场景：写死的名单，**只许变短**（2026-09-24 全量已烘完，清空）。
+  // 不能从清单现算——那样某场录音整条丢了也会被当成「待烘」放行，运行时悄悄退回按估时只出字幕。
+  const PENDING_PER_LINE_BAKE = new Set([]);
+  for (const id of PENDING_PER_LINE_BAKE) assert.ok(perLine.some((cue) => cue.id === id), id + " 不是 01–06 的逐句场景，别往待烘名单里放");
   const Hash = (text) => crypto.createHash("sha256").update(text).digest("hex");
   let seconds = 0, lineCount = 0;
   for (const cue of MISSION_DIALOGUE) {
@@ -678,7 +721,11 @@ if (process.argv.includes("--audio")) {
       });
       continue;
     }
-    if (cue.perLine && !manifest.cues[cue.id]) { assert.ok(PENDING_PER_LINE_BAKE.has(cue.id)); continue; }
+    if (cue.perLine) {
+      if (!PENDING_PER_LINE_BAKE.has(cue.id))
+        assert.fail(`${cue.id} 是 01–06 的逐句场景，切句录音没录齐（缺 ${cue.lines.filter((line) => !manifest.lines[line.id]).map((line) => line.id).join(",")}），也不在写死的待烘名单里`);
+      continue;
+    }
     const entry = manifest.cues[cue.id];
     assert.ok(entry, cue.id + " 没有录音条目");
     const aligned = MISSION_VOICE_ALIGNMENT[cue.id];
@@ -742,6 +789,9 @@ if (process.argv.includes("--audio")) {
   const squad = JSON.parse(Read("./Audio/FirstLevel/Data_FirstLevelSquadBarkManifest.json"));
   assert.equal(squad.model, "seed-audio-1.0");
   let squadRequests = 0, judged = 0, own = 0, flagged = 0;
+  // 字错率超门槛的要有绑定这条录音（sha256 + 转写原文）的逐字核对记录，与场景片段同一口径；重录即失效。
+  const barkReviews = JSON.parse(Read("./Audio/FirstLevel/Data_FirstLevelSquadBarkTranscriptReview.json")).barks || {};
+  const usedBarkReviews = new Set(), barkListen = [];
   for (const who of Object.keys(SQUAD_BARK_CAST)) {
     const person = squad.people[who];
     assert.ok(person, who + " 的本人版本还没录（Script_SeedAudioSquadBarkBake.mjs）");
@@ -767,7 +817,14 @@ if (process.argv.includes("--audio")) {
       const want = [...bark.text].filter((c) => /[\p{L}\p{N}]/u.test(c)).length, got = [...(bark.transcript || "")].filter((c) => /[\p{L}\p{N}]/u.test(c)).length;
       if (bark.voicedS >= BARK_CHECK.judgeVoicedS && bark.cer > BARK_CHECK.reviewedMaxCer)
         assert.ok(Math.abs(got - want) <= Math.max(2, 0.3 * want), `${entry.bank} 字错率 ${bark.cer} 且字数差 ${got - want}：念错 / 漏词`);
-      if (bark.cer > BARK_CHECK.maxCer) flagged++;
+      if (bark.cer > BARK_CHECK.maxCer) {
+        flagged++;
+        const review = barkReviews[entry.bank];
+        assert.ok(review && review.sha256 === bark.sha256 && review.transcript === bark.transcript && review.note,
+          `${entry.bank} 字错率 ${bark.cer} 超门槛，又没有绑定这条录音的逐字核对记录（Data_FirstLevelSquadBarkTranscriptReview.json）`);
+        usedBarkReviews.add(entry.bank);
+        if (review.needsListening) barkListen.push(entry.bank);
+      }
       if (bark.voicedS >= BARK_CHECK.judgeVoicedS) {
         long++; judged++;
         const closer = bark.nearestOther && bark.nearestOther[1] - bark.speakerCos > BARK_CHECK.wrongVoiceMargin;
@@ -780,7 +837,8 @@ if (process.argv.includes("--audio")) {
   const barkDir = new URL("./Audio/FirstLevel/Barks/", import.meta.url);
   const barkFiles = new Set(SquadBarkEntries().map((e) => e.file.replace(/^Barks\//, "")));
   for (const name of fs.readdirSync(barkDir)) assert.ok(barkFiles.has(name), "Barks 里有清单外的录音：" + name);
-  console.log(`ok 班组战斗短句本人版本 ${SquadBarkEntries().length} 条，${Object.keys(SQUAD_BARK_CAST).length} 人共请求 ${squadRequests} 次；够长的 ${judged} 句里 ${own} 句离本人定妆音最近；字错率超 ${BARK_CHECK.maxCer} 待人工试听 ${flagged} 句（字数对得上，多是四川话被写成普通话同音字）`);
+  for (const bank of Object.keys(barkReviews)) assert.ok(usedBarkReviews.has(bank), "喊话转写核对记录已过期（录音换了或不再超门槛），删掉：" + bank);
+  console.log(`ok 班组战斗短句本人版本 ${SquadBarkEntries().length} 条，${Object.keys(SQUAD_BARK_CAST).length} 人共请求 ${squadRequests} 次；够长的 ${judged} 句里 ${own} 句离本人定妆音最近；字错率超 ${BARK_CHECK.maxCer} 的 ${flagged} 句都有逐字核对记录（字数对得上，多是四川话被写成普通话近音字），其中 ${barkListen.length} 句逐字对不上、要人工试听：${barkListen.join(",")}`);
 } else {
   console.log("ok 台词数据侧全绿；录音资产需要 --audio 验收");
 }
