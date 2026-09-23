@@ -104,10 +104,13 @@ class Glb:
             pbr = material.get('pbrMetallicRoughness', {})
             for key in ('baseColorTexture', 'metallicRoughnessTexture'): pbr.pop(key, None)
             for key in ('normalTexture', 'occlusionTexture', 'emissiveTexture'): material.pop(key, None)
+            # Material extensions (KHR_materials_specular...) may point at textures too;
+            # the runtime replaces these materials by name, so only the name matters.
+            material.pop('extensions', None)
         for key in ('images', 'textures', 'samplers'): doc.pop(key, None)
         for key in ('extensionsUsed', 'extensionsRequired'):
             if key in doc:
-                doc[key] = [e for e in doc[key] if e not in ('EXT_texture_webp', 'KHR_texture_transform')]
+                doc[key] = [e for e in doc[key] if not e.startswith(('EXT_texture', 'KHR_texture', 'KHR_materials'))]
                 if not doc[key]: doc.pop(key)
 
     def Compact(self):

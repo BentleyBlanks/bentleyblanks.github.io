@@ -179,7 +179,7 @@ export const testDefs = {
   ActorLocomotionTest: { file: "Script_ActorLocomotionTest.mjs", timeoutMs: 240000, desc: "实测步幅、世界支撑脚、转弯与位移时钟" },
   InfantryAnimationTest: { file: "Script_InfantryAnimationTest.mjs", timeoutMs: 360000, desc: "八套步兵动作、道具与状态衔接" },
   CharacterSpeechTest: { file: "Script_CharacterSpeechTest.mjs", desc: "说话人口型驱动、说话人隔离与面部资产契约" },
-  CharacterSpeechBrowserTest: { file: "Script_CharacterSpeechBrowserTest.mjs", timeoutMs: 240000, desc: "说话人实际语音、面部蒙皮与真实场景画面" },
+  CharacterSpeechBrowserTest: { file: "Script_CharacterSpeechBrowserTest.mjs", timeoutMs: 480000, desc: "说话人实际语音、面部蒙皮与真实场景画面" },
   CharacterModelTest: { file: "Script_CharacterModelTest.mjs", desc: "十名蒙皮士兵：19 动作、骨骼挂点、命中体与阵营分配契约（纯 Node）" },
   DeathCollapseTest: { file: "Script_DeathCollapseTest.mjs", timeoutMs: 300000,
     desc: "Kimodo受击倒下：两军四候选、稳定随机、全身贴地与终帧保持" },

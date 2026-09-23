@@ -106,9 +106,12 @@ export class CharacterFacialAnimation {
       jaw = C.breathJaw * breath; close = C.breathClose * (1 - breath);
     }
     this.speaking = active;
+    // When the voice stops (line end, pause, cancel) the lip shapes let go as fast
+    // as the jaw, so the mouth is shut within ~0.1 s.
+    const shapeRelease = active ? C.shapeReleaseS : C.releaseS;
     this.jaw = Approach(this.jaw, jaw, step, C.attackS, C.releaseS);
-    this.wide = Approach(this.wide, wide, step, C.shapeAttackS, C.shapeReleaseS);
-    this.round = Approach(this.round, round, step, C.shapeAttackS, C.shapeReleaseS);
+    this.wide = Approach(this.wide, wide, step, C.shapeAttackS, shapeRelease);
+    this.round = Approach(this.round, round, step, C.shapeAttackS, shapeRelease);
     this.close = Approach(this.close, close, step, C.shapeAttackS, C.shapeReleaseS);
     this.level = this.jaw;
     // Stress: rising edge lifts the brows, feeds the head nod, may trigger a blink.
