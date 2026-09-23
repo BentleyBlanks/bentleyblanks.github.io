@@ -219,7 +219,7 @@ const Dist = (c, L) => Math.hypot(c.position.x - L.x, c.position.z - L.z);
   let roof = null;
   const bf = {
     GroundHeight: trenchGround,
-    Raycast: () => roof,
+    Raycast: (o, d, far) => (typeof roof === "function" ? roof(o, far) : roof),
     NearbyColliders: () => [],
   };
   const gate = { firstLevelSoundscape: true };
@@ -236,8 +236,26 @@ const Dist = (c, L) => Math.hypot(c.position.x - L.x, c.position.z - L.z);
   const flat = new AudioWiring({ battlefield: { ...bf, GroundHeight: () => 0 }, audio: gate, player: null });
   flat.zoneCache.clear();
   assert.equal(flat.Zone({ x: 0, y: 1.0, z: 0 }), "interior", "平地上的屋顶 → interior（没被抢成 dugout）");
-  roof = { t: 3, box: { tag: "dugoutRoof", min: [-1, 2, -1], max: [1, 2.3, 1] } };
+  const taggedRoof = { t: 3, box: { tag: "dugoutRoof", min: [-1, 2, -1], max: [1, 2.3, 1] } };
+  roof = taggedRoof;
   assert.equal(Z(0, -1, 30), "dugout", "布设标了 dugoutRoof → 直接 dugout");
+  // 头顶先撞上一根窄塌梁（1.0 × 1.6 m）、梁上面才是洞顶 —— Space 包新洞室里顺子躺的位置就是这样。
+  const beam = { tag: "whiteboxWall", min: [-0.5, -1.3, -0.8], max: [0.5, -1.0, 0.8] };
+  const lid = { tag: "whiteboxWall", min: [-2, 0.1, -2], max: [2, 0.6, 2] };
+  const Stack = (layers) => (o, far) => {
+    let best = null;
+    for (const b of layers) {
+      if (b.min[1] < o.y || o.x < b.min[0] || o.x > b.max[0] || o.z < b.min[2] || o.z > b.max[2]) continue;
+      const t = b.min[1] - o.y;
+      if (t <= far && (!best || t < best.t)) best = { t, box: b };
+    }
+    return best;
+  };
+  roof = Stack([beam, lid]);
+  assert.equal(Z(0, -2 + 0.42, 0), "dugout", "窄梁挂在洞顶下面 → 看穿梁仍是 dugout");
+  roof = Stack([beam]);
+  assert.equal(Z(0, -2 + 0.42, 0), "trench", "沟上只横一根梁、上面是天 → 仍是 trench");
+  roof = taggedRoof;
   // 任务侧开关关着（07 以后、其它关卡）：沟与洞都回到这一轮之前的四档。
   gate.firstLevelSoundscape = false;
   assert.equal(Z(0, -1, 30), "interior", "开关关着：dugoutRoof 退回 interior");

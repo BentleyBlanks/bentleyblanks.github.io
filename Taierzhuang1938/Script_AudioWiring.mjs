@@ -420,16 +420,31 @@ export class AudioWiring {
     return { trench: rise >= need, sunkDirs, rise, ground };
   }
 
-  /** 头顶那一击是不是防炮洞的顶：布设标了 dugoutRoof，或低矮、够宽、且人陷在地下。 */
-  IsDugoutRoof(hit, position, sink) {
+  /**
+   * 头顶那一击是不是防炮洞的顶：布设标了 dugoutRoof，或低矮、够宽、且人陷在地下。
+   *
+   * 【2026-09-24】头顶先撞上的是一根窄梁（塌下来的顶梁、门楣）时，从梁上面再往上问一次：
+   * Space 包的新洞室里，顺子躺的位置头顶先是 1.0 m 宽的塌梁 BunkerRoofSag，真正的洞顶在它上面，
+   * 只问一次会把洞里判成 trench。只多问一次；沟上横着一根门楣、上面是天的，仍判 trench。
+   */
+  IsDugoutRoof(hit, position, sink, lookThrough = true) {
     const box = hit?.box;
     if (!box || !box.min || !box.max) return false;
     if (box.tag && DUGOUT_TAGS.has(box.tag)) return true;
     if (!(sink.sunkDirs >= TRENCH_ZONE.dugoutSunkDirs) || sink.ground === null) return false;
+    const origin = position.y + 0.1;
+    const roofAbove = origin + (hit.t || 0) - sink.ground;
+    if (!(roofAbove <= TRENCH_ZONE.dugoutRoofMaxM)) return false;
     const spanX = box.max[0] - box.min[0], spanZ = box.max[2] - box.min[2];
-    if (!(spanX >= TRENCH_ZONE.dugoutRoofMinSpanM && spanZ >= TRENCH_ZONE.dugoutRoofMinSpanM)) return false;
-    const roofAbove = position.y + 0.1 + (hit.t || 0) - sink.ground;
-    return roofAbove <= TRENCH_ZONE.dugoutRoofMaxM;
+    if (spanX >= TRENCH_ZONE.dugoutRoofMinSpanM && spanZ >= TRENCH_ZONE.dugoutRoofMinSpanM) return true;
+    const bf = this.Battlefield;
+    if (!lookThrough || !bf || typeof bf.Raycast !== "function" || !Number.isFinite(box.max[1])) return false;
+    const fromY = box.max[1] + 0.02;
+    const left = sink.ground + TRENCH_ZONE.dugoutRoofMaxM - fromY;
+    if (!(left > 0)) return false;
+    const next = bf.Raycast({ x: position.x, y: fromY, z: position.z }, { x: 0, y: 1, z: 0 }, left, { terrain: false });
+    if (!next?.box) return false;
+    return this.IsDugoutRoof({ t: fromY - origin + (next.t || 0), box: next.box }, position, sink, false);
   }
 
   /** 六米内围着几面立面。矮过 wallMinHeightM 的不算 —— 田埂挡不住声音。 */
