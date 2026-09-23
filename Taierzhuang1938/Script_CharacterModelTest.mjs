@@ -84,13 +84,13 @@ const manifestPath = path.join(characterDir, "Data_LugouCharacterManifest.json")
 assert.ok(fs.existsSync(manifestPath), "character bake manifest exists");
 const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
 assert.equal(manifest.schema, 2);
-assert.equal(manifest.models.length, 10, "ten character records");
+assert.equal(manifest.models.length, 11, "eleven character records (IJA06 added 2026-09-24)");
 assert.deepEqual(manifest.models.map((model) => model.id), [
-  "LugouIja01", "LugouIja02", "LugouIja03", "LugouIja04", "LugouIja05",
+  "LugouIja01", "LugouIja02", "LugouIja03", "LugouIja04", "LugouIja05", "LugouIja06",
   "LugouNra01", "LugouNra02", "LugouNra03", "LugouNra04", "LugouNra05",
 ]);
 assert.equal(manifest.models.filter((model) => model.faction === "nra").length, 5);
-assert.equal(manifest.models.filter((model) => model.faction === "ija").length, 5);
+assert.equal(manifest.models.filter((model) => model.faction === "ija").length, 6);
 
 const expectedDeathClips = ["DeathCollapseA", "DeathCollapseB", "DeathCollapseC", "DeathCollapseD"];
 for (const faction of ["Nra", "Ija"]) {
@@ -354,7 +354,7 @@ assert.match(editor, /IsLugouAnimationAllowed\(actor\.kind, this\.clipId\)/,
   "editor rechecks every lineup actor before playing an imported clip");
 assert.match(editor, /动作适用对象/, "editor reports the action's intended character type");
 assert.match(runtime, /LUGOU_MODEL_VARIANTS_BY_KIND/, "runtime records the approved appearance contract");
-assert.deepEqual(CHARACTER_MODEL_VARIANTS_BY_KIND, {nra:[1,4],nraDare:[1,4],nraOfficer:[4],ija:[0,1,2],ijaOfficer:[0]});
+assert.deepEqual(CHARACTER_MODEL_VARIANTS_BY_KIND, {nra:[1,4],nraDare:[1,4],nraOfficer:[4],ija:[0,1,2,5],ijaOfficer:[0]});
 assert.equal(CHARACTER_PROTAGONIST_VARIANT, 1);
 for (const [kind, variants] of Object.entries(CHARACTER_RANDOM_VARIANTS_BY_KIND)) {
   assert.deepEqual([...new Set(variants)].sort(), [...CHARACTER_MODEL_VARIANTS_BY_KIND[kind]].sort(), "anonymous weighting retains exactly the approved models");

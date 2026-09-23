@@ -10,7 +10,7 @@ const Smooth = value => { const t=Clamp(value,0,1);return t*t*(3-2*t); };
 // World-root translation remains exclusively owned by movement/physics.
 export class ActorLocomotion {
   constructor(rig, phase=0) {
-    this.rig=rig;this.profiles=ACTOR_LOCOMOTION_PROFILES[rig.modelId]||{};
+    this.rig=rig;this.profiles=ACTOR_LOCOMOTION_PROFILES[rig.clipModelId||rig.modelId]||{};
     this.phase=phase;this.previous=new THREE.Vector3();this.position=new THREE.Vector3();
     this.scale=new THREE.Vector3();this.sampled=false;this.elapsed=null;this.step=0;
     this.speedMps=0;this.discontinuity=false;this.lastAction=null;

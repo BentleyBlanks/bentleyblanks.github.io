@@ -348,7 +348,6 @@
       "facialUrl": "./Model/Character/Model_LugouIja02Facial.glb",
       "facialVersion": "686ba4ba94fe0847",
       "facialCast": [
-        "ijaA",
         "ijaD"
       ],
       "faction": "ija",
@@ -1683,6 +1682,348 @@
         }
       },
       "pelvisHeightSpreadMeters": 0.854825,
+      "pelvisTrackSource": "3d1f879b"
+    },
+    {
+      "id": "LugouIja06",
+      "facialUrl": "./Model/Character/Model_LugouIja06Facial.glb",
+      "facialVersion": "10a2291ef4065654",
+      "facialCast": [
+        "ijaA"
+      ],
+      "faction": "ija",
+      "url": "./Model/Character/Model_LugouIja06.glb",
+      "source": "Model_LugouIja02.glb",
+      "derivedFrom": "LugouIja02",
+      "builder": "_import/Script_BuildLugouIja06.py",
+      "approved": "2026-09-24",
+      "animationSource": "LugouIjaCanonical",
+      "animationSourceModel": "LugouIja01",
+      "vertices": 8909,
+      "triangles": 14643,
+      "limitedWeightVertices": 131,
+      "bytes": 5492792,
+      "boneRoles": {
+        "head": "Bip001 Head",
+        "neck": "Bip001 Neck",
+        "chest": "Bip001 Spine2",
+        "pelvis": "Bip001 Pelvis",
+        "handR": "Bip001 R Hand",
+        "handL": "Bip001 L Hand",
+        "footR": "Bip001 R Foot",
+        "footL": "Bip001 L Foot",
+        "upperArmR": "Bip001 R UpperArm",
+        "upperArmL": "Bip001 L UpperArm",
+        "forearmR": "Bip001 R Forearm",
+        "forearmL": "Bip001 L Forearm",
+        "thighR": "Bip001 R Thigh",
+        "thighL": "Bip001 L Thigh",
+        "calfR": "Bip001 R Calf",
+        "calfL": "Bip001 L Calf"
+      },
+      "bounds": {
+        "min": [
+          -0.557658,
+          -0.217298,
+          0
+        ],
+        "max": [
+          0.557658,
+          0.217298,
+          1.748735
+        ],
+        "size": [
+          1.115316,
+          0.434596,
+          1.748735
+        ]
+      },
+      "sockets": [
+        "Socket_WeaponR",
+        "Socket_WeaponL",
+        "Socket_BackBlade",
+        "Socket_HeadGear"
+      ],
+      "animations": [
+        "LeanWallSitPeek",
+        "RifleIdle",
+        "RifleIdleAlt",
+        "RifleRun",
+        "CrouchFire",
+        "CrouchFireAlt",
+        "CrouchIdle",
+        "MachineGunFire",
+        "EmplacementIdle",
+        "AttackCommand",
+        "ProneFire",
+        "StandFireCrouch",
+        "StandFireCrouchAlt",
+        "AdvanceKneelFire",
+        "AdvanceFire",
+        "PistolFire",
+        "CarryStretcherFront",
+        "CarryStretcherRear",
+        "WoundedLimp"
+      ],
+      "animationAudit": {
+        "LeanWallSitPeek": {
+          "sourceFrames": 78,
+          "sourceBones": 52,
+          "maxPoseDeltaError": 0.00003528594970703125,
+          "maxGroundCorrectionMeters": 0.039718,
+          "maxGroundPenetrationMeters": 0.077558,
+          "pelvisHeightMeters": [
+            0.141007,
+            0.151185
+          ]
+        },
+        "RifleIdle": {
+          "sourceFrames": 52,
+          "sourceBones": 52,
+          "maxPoseDeltaError": 0.00002200188009737758,
+          "maxGroundCorrectionMeters": 0.032314,
+          "maxGroundPenetrationMeters": 0.0375,
+          "pelvisHeightMeters": [
+            0.312331,
+            0.313143
+          ]
+        },
+        "RifleIdleAlt": {
+          "sourceFrames": 52,
+          "sourceBones": 52,
+          "maxPoseDeltaError": 0.00002288852192577906,
+          "maxGroundCorrectionMeters": 0.032314,
+          "maxGroundPenetrationMeters": 0.0375,
+          "pelvisHeightMeters": [
+            0.312331,
+            0.313143
+          ]
+        },
+        "RifleRun": {
+          "sourceFrames": 44,
+          "sourceBones": 52,
+          "maxPoseDeltaError": 0.000027041533030569553,
+          "maxGroundCorrectionMeters": 0.04608,
+          "maxGroundPenetrationMeters": 0.091975,
+          "pelvisHeightMeters": [
+            0.672844,
+            0.773263
+          ]
+        },
+        "CrouchFire": {
+          "sourceFrames": 24,
+          "sourceBones": 52,
+          "maxPoseDeltaError": 0.00003361701965332031,
+          "maxGroundCorrectionMeters": 0.039971,
+          "maxGroundPenetrationMeters": 0.038517,
+          "pelvisHeightMeters": [
+            0.569126,
+            0.569881
+          ]
+        },
+        "CrouchFireAlt": {
+          "sourceFrames": 9,
+          "sourceBones": 52,
+          "maxPoseDeltaError": 0.000024798534468573052,
+          "maxGroundCorrectionMeters": 0.039285,
+          "maxGroundPenetrationMeters": 0.038924,
+          "pelvisHeightMeters": [
+            0.528015,
+            0.528541
+          ]
+        },
+        "CrouchIdle": {
+          "sourceFrames": 161,
+          "sourceBones": 52,
+          "maxPoseDeltaError": 0.000014144927263259888,
+          "maxGroundCorrectionMeters": 0.050199,
+          "maxGroundPenetrationMeters": 0.060916,
+          "pelvisHeightMeters": [
+            0.599324,
+            0.599324
+          ]
+        },
+        "MachineGunFire": {
+          "sourceFrames": 31,
+          "sourceBones": 52,
+          "maxPoseDeltaError": 0.000022605311642109882,
+          "maxGroundCorrectionMeters": 0.083424,
+          "maxGroundPenetrationMeters": 0.009692,
+          "pelvisHeightMeters": [
+            0.526515,
+            0.527448
+          ]
+        },
+        "EmplacementIdle": {
+          "sourceFrames": 161,
+          "sourceBones": 52,
+          "maxPoseDeltaError": 0.000015258789289873675,
+          "maxGroundCorrectionMeters": 0.038907,
+          "maxGroundPenetrationMeters": 0.038657,
+          "pelvisHeightMeters": [
+            0.527095,
+            0.527095
+          ]
+        },
+        "AttackCommand": {
+          "sourceFrames": 121,
+          "sourceBones": 52,
+          "maxPoseDeltaError": 0.0000306465954054147,
+          "maxGroundCorrectionMeters": 0.068742,
+          "maxGroundPenetrationMeters": 0.049305,
+          "pelvisHeightMeters": [
+            0.768416,
+            0.851492
+          ]
+        },
+        "ProneFire": {
+          "sourceFrames": 14,
+          "sourceBones": 52,
+          "maxPoseDeltaError": 0.00002944469451904297,
+          "maxGroundCorrectionMeters": 0.070329,
+          "maxGroundPenetrationMeters": 0.026205,
+          "pelvisHeightMeters": [
+            0.911158,
+            0.913547
+          ]
+        },
+        "StandFireCrouch": {
+          "sourceFrames": 96,
+          "sourceBones": 52,
+          "maxPoseDeltaError": 0.0000152587890625,
+          "maxGroundCorrectionMeters": 0.016405,
+          "maxGroundPenetrationMeters": 0.204532,
+          "pelvisHeightMeters": [
+            0.096058,
+            0.249393
+          ]
+        },
+        "StandFireCrouchAlt": {
+          "sourceFrames": 96,
+          "sourceBones": 52,
+          "maxPoseDeltaError": 0.0000248076394200325,
+          "maxGroundCorrectionMeters": 0.066078,
+          "maxGroundPenetrationMeters": 0.05766,
+          "pelvisHeightMeters": [
+            0.348356,
+            0.80698
+          ]
+        },
+        "AdvanceKneelFire": {
+          "sourceFrames": 101,
+          "sourceBones": 52,
+          "maxPoseDeltaError": 0.000026702880859375,
+          "maxGroundCorrectionMeters": 0.042457,
+          "maxGroundPenetrationMeters": 0.084658,
+          "pelvisHeightMeters": [
+            0.374777,
+            0.783084
+          ]
+        },
+        "AdvanceFire": {
+          "sourceFrames": 88,
+          "sourceBones": 52,
+          "maxPoseDeltaError": 0.00002833529197232565,
+          "maxGroundCorrectionMeters": 0.080692,
+          "maxGroundPenetrationMeters": 0.057811,
+          "pelvisHeightMeters": [
+            0.780741,
+            0.891022
+          ]
+        },
+        "PistolFire": {
+          "sourceFrames": 81,
+          "sourceBones": 52,
+          "maxPoseDeltaError": 0.000036597251892089844,
+          "maxGroundCorrectionMeters": 0.044729,
+          "maxGroundPenetrationMeters": 0.016323,
+          "pelvisHeightMeters": [
+            0.450116,
+            0.454333
+          ]
+        },
+        "CarryStretcherFront": {
+          "sourceFrames": 25,
+          "sourceBones": 52,
+          "maxPoseDeltaError": 0,
+          "maxGroundCorrectionMeters": 0.037339,
+          "maxGroundPenetrationMeters": 0.019966,
+          "pelvisHeightMeters": [
+            0.837905,
+            0.87908
+          ]
+        },
+        "CarryStretcherRear": {
+          "sourceFrames": 25,
+          "sourceBones": 52,
+          "maxPoseDeltaError": 0,
+          "maxGroundCorrectionMeters": 0.061333,
+          "maxGroundPenetrationMeters": 0.019894,
+          "pelvisHeightMeters": [
+            0.897811,
+            0.940363
+          ]
+        },
+        "WoundedLimp": {
+          "sourceFrames": 45,
+          "sourceBones": 52,
+          "maxPoseDeltaError": 0,
+          "maxGroundCorrectionMeters": 0.067533,
+          "maxGroundPenetrationMeters": 0.01087,
+          "pelvisHeightMeters": [
+            0.876373,
+            0.95088
+          ]
+        }
+      },
+      "missingTextures": [],
+      "validation": {
+        "armatures": 1,
+        "skinnedMeshes": 1,
+        "animations": [
+          "AdvanceFire",
+          "AdvanceKneelFire",
+          "AttackCommand",
+          "CarryStretcherFront",
+          "CarryStretcherRear",
+          "CrouchFire",
+          "CrouchFireAlt",
+          "CrouchIdle",
+          "EmplacementIdle",
+          "LeanWallSitPeek",
+          "MachineGunFire",
+          "PistolFire",
+          "ProneFire",
+          "RifleIdle",
+          "RifleIdleAlt",
+          "RifleRun",
+          "StandFireCrouch",
+          "StandFireCrouchAlt",
+          "WoundedLimp"
+        ],
+        "maxGroundPenetrationMeters": {
+          "AdvanceFire": 0.057811,
+          "AdvanceKneelFire": 0.084658,
+          "AttackCommand": 0.049305,
+          "CrouchFire": 0.038517,
+          "CrouchFireAlt": 0.038924,
+          "CrouchIdle": 0.060916,
+          "EmplacementIdle": 0.038657,
+          "LeanWallSitPeek": 0.077558,
+          "MachineGunFire": 0.009692,
+          "PistolFire": 0.016323,
+          "ProneFire": 0.026205,
+          "RifleIdle": 0.0375,
+          "RifleIdleAlt": 0.0375,
+          "RifleRun": 0.091975,
+          "StandFireCrouch": 0.204532,
+          "StandFireCrouchAlt": 0.05766,
+          "CarryStretcherFront": 0.019966,
+          "CarryStretcherRear": 0.019894,
+          "WoundedLimp": 0.01087
+        }
+      },
+      "pelvisHeightSpreadMeters": 0.854822,
       "pelvisTrackSource": "3d1f879b"
     },
     {

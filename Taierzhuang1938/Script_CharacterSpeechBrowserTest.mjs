@@ -49,7 +49,7 @@ try {
     const ordinaryHasFace=!!ordinary.characterRig.facial;ordinary.Dispose();
     // Speaking cast: named roles get their pinned model's facial skin, never a pooled body.
     const cast={};
-    for(const [castId,kind,variant] of [['ijaA','ija',1],['ijaB','ija',0],['guard','nra',1],['luo','nra',4]]){
+    for(const [castId,kind,variant] of [['ijaA','ija',5],['ijaB','ija',0],['ijaD','ija',1],['guard','nra',1],['luo','nra',4]]){
       const actor=g.actorFactory.Create(kind,{castId,modelVariant:variant,seed:41});
       cast[castId]={model:actor.characterRig?.modelId,face:actor.characterRig?.facial?.controls.length||0,
         eyes:actor.characterRig?.facial?.eyes.length||0,pooled:!!actor.pooled,
@@ -74,7 +74,7 @@ try {
   assert.equal(initial.controls,13);assert.equal(initial.ordinaryHasFace,false,'anonymous soldiers keep the plain skin');
   assert.ok(initial.listener,'Yaowa (NRA02 speaker) has a face rig');
   assert.ok(initial.bound?.luo&&initial.bound?.yaowa,'speaker binder bound Luo and Yaowa');
-  for(const [castId,model] of [['ijaA','LugouIja02'],['ijaB','LugouIja01'],['guard','LugouNra02'],['luo','LugouNra05']]){
+  for(const [castId,model] of [['ijaA','LugouIja06'],['ijaB','LugouIja01'],['ijaD','LugouIja02'],['guard','LugouNra02'],['luo','LugouNra05']]){
     const entry=initial.cast[castId];
     assert.equal(entry.model,model,`${castId} wears ${model}`);assert.equal(entry.face,13);assert.equal(entry.eyes,2);
     assert.equal(entry.pooled,false,`${castId} is never a pooled body`);assert.equal(entry.oral,1);
@@ -243,7 +243,7 @@ try {
 
   // Close-ups of every facial skin, rest and mid-word, through the production chain.
   const closeups=[];
-  for(const [castId,kind,variant] of [['yaowa','nra',1],['luo','nra',4],['ijaA','ija',1],['ijaB','ija',0]]){
+  for(const [castId,kind,variant] of [['yaowa','nra',1],['luo','nra',4],['ijaA','ija',5],['ijaB','ija',0],['ijaD','ija',1]]){
     for(const [label,speech,distance] of [['Rest',null,1.2],['Open',{active:true,jaw:.85,wide:.2,round:.1,close:0,stress:0},1.2],
       ['Round',{active:true,jaw:.45,wide:0,round:.9,close:0,stress:0},1.2],['Blink',{blink:true},1.2],['Near',{active:true,jaw:.7,wide:.6,round:0,close:0,stress:0},.75]]){
       const info=await page.evaluate(({castId,kind,variant,label,speech,distance})=>{

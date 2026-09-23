@@ -305,7 +305,7 @@ export function PerformCutsceneActor(entry, dt, time, Update) {
     });
     return false;
   }
-  const record = library.models.get(rig.modelId);
+  const record = library.models.get(rig.clipModelId || rig.modelId);
   if (!record) {
     WarnOnce(`${rig.modelId}|rig`,
       `[CutscenePerformance] no authored clips for rig ${rig.modelId}; falling back to POSE_CLIPS`);

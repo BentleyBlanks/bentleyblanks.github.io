@@ -277,7 +277,7 @@ try {
     // Explicit rejected numbers and deterministic/random seeds cannot restore a banned face.
     for (const kind of ["nra", "nraDare", "ija"]) for (let number = 0; number < 8; number++) {
       const candidate = factory.Create(kind, {seed:number,modelVariant:number % 5,weapon:null});
-      const allowed = kind.startsWith("nra") ? ["LugouNra02","LugouNra05"] : ["LugouIja01","LugouIja02","LugouIja03"];
+      const allowed = kind.startsWith("nra") ? ["LugouNra02","LugouNra05"] : ["LugouIja01","LugouIja02","LugouIja03","LugouIja06"];
       check(allowed.includes(candidate.modelId), `banned appearance ${candidate.modelId}`);
       if (candidate.modelId === "LugouNra05") {
         for (const id of ["RifleCrouchAdvance","StandToKneel","KneelHold","KneelToStand","GrenadeThrow"]) {
@@ -297,7 +297,7 @@ try {
     protagonist.Dispose();
     for (const [kind, prefix] of [["nra", "LugouNra"], ["ija", "LugouIja"]]) {
       const variants = [];
-      for (const modelVariant of kind === "nra" ? [1,4] : [0,1,2]) {
+      for (const modelVariant of kind === "nra" ? [1,4] : [0,1,2,5]) {
         const candidate = factory.Create(kind, { seed: `${kind}:${modelVariant}`, modelVariant, weapon: null });
         variants.push(candidate.modelId);
         checkHeadHitbox(candidate);
@@ -307,7 +307,7 @@ try {
         CheckIjaBackpackHelmet(candidate);
         candidate.Dispose();
       }
-      check(variants.join(",") === (kind === "nra" ? [2,5] : [1,2,3]).map((n) => `${prefix}0${n}`).join(","),
+      check(variants.join(",") === (kind === "nra" ? [2,5] : [1,2,3,6]).map((n) => `${prefix}0${n}`).join(","),
         `${kind} approved lineup mismatch: ${variants.join(",")}`);
       const officer = factory.Create(`${kind}Officer`, { seed: `${kind}:officer`, modelVariant: 4, weapon: null });
       check(officer.modelId === `${prefix}0${kind === "nra" ? 5 : 1}`, `${kind} officer model mismatch: ${officer.modelId}`);
@@ -379,7 +379,7 @@ try {
         `civilian ${variant} height out of range: ${civilian.height}`);
     }
     // Imported pose axes must drive the actual barrel in world space, at every stance.
-    for (const modelVariant of [0,1,2]) {
+    for (const modelVariant of [0,1,2,5]) {
       const gunner = factory.Create("ija", { seed: 410 + modelVariant, modelVariant, weapon: "Type38" });
       gunner.root.rotation.y = 1.1;
       const expected = new THREE.Vector3(), actual = new THREE.Vector3();

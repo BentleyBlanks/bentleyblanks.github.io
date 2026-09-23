@@ -43,6 +43,9 @@ MODELS = {
               # the split, so only teeth and tongue are added, set deeper inside it.
               'cavity': False, 'teethBack': .45},  # sealed lips: lip line and half width, Head-local cm
 }
+# IJA06 (standard rifleman, 2026-09-24) is IJA02 reshaped by _import/Script_BuildLugouIja06.py:
+# same head topology, lip line kept in place; its upper lids sit 2 mm lower (narrower eyes).
+MODELS['Ija06'] = {**MODELS['Ija02'], 'base': 'Model_LugouIja06.glb', 'eyeOpening': (1.10, .40)}
 
 # Pose deltas in Head-local cm (up, forward, outward for paired bones) and jaw
 # degrees about Head +Z (opens). Values follow the NRA05 review rig's ranges
@@ -717,11 +720,12 @@ def BakeJobs(repo):
     common = {'repo': repo, 'oralMode': 'merged', 'stripImages': True, 'stripAnimations': True,
               'poseMask': POSE_MASK, 'eyes': EYES}
     jobs = {}
-    for model, head in (('Nra02', 'Bip002 Head'), ('Ija02', 'Bip001 Head')):
+    for model, head, folder in (('Nra02', 'Bip002 Head', 'FacialRigs_20260923'), ('Ija02', 'Bip001 Head', 'FacialRigs_20260923'),
+                                ('Ija06', 'Bip001 Head', 'Characters_20260924')):
         jobs[model] = {**common, 'scene': 'Scene_%sFacialTalk' % model, 'rig': 'Rig_%sFacial' % model,
                        'headBone': head, 'base': 'Model_Lugou%s.glb' % model, 'output': 'Model_Lugou%sFacial.glb' % model,
                        'action': 'Animation_%sFacialPoses' % model, 'poseFrames': POSE_FRAMES, 'weightMode': 'index',
-                       'source': 'FacialRigs_20260923/%s' % model, 'sourceFile': 'Animation_%sFacialTalk.blend' % model}
+                       'source': '%s/%s' % (folder, model), 'sourceFile': 'Animation_%sFacialTalk.blend' % model}
     # IJA01 shares IJA02's head mesh, vertex order and triangles: weights, cut lips,
     # bones and oral parts are carried over rigidly in the head frame.
     jobs['Ija01'] = {**jobs['Ija02'], 'base': 'Model_LugouIja01.glb', 'output': 'Model_LugouIja01Facial.glb',

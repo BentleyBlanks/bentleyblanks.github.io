@@ -4,7 +4,7 @@
 // 这里实例化。每名士兵只抽取获准外观；第一人称过场主角固定 Nra02。
 
 import * as THREE from "three";
-import { CHARACTER_MODEL_VARIANTS_BY_KIND, CHARACTER_PROTAGONIST_VARIANT, CHARACTER_INFANTRY_SOURCE_BY_MODEL, CHARACTER_RANDOM_VARIANTS_BY_KIND } from "./Data_CharacterSelection.mjs";
+import { CHARACTER_MODEL_VARIANTS_BY_KIND, CHARACTER_PROTAGONIST_VARIANT, CHARACTER_INFANTRY_SOURCE_BY_MODEL, CHARACTER_RANDOM_VARIANTS_BY_KIND, CharacterClipModelId } from "./Data_CharacterSelection.mjs";
 import { ApplyNraUniform, NraUniformPalette } from "./Script_UniformColors.mjs";
 import { DEATH_POSE } from "./Data_DeathPose.mjs";
 import { DEATH_CONTACT } from "./Data_Tuning_ActorDeath.mjs";
@@ -703,6 +703,8 @@ export class LugouCharacterRig {
     this.kind = kind;
     this.variantIndex = variantIndex;
     this.modelId = asset.record.id;
+    // Per-model clip libraries are keyed by this id (IJA06 plays IJA02's: same skeleton).
+    this.clipModelId = CharacterClipModelId(this.modelId);
     // 一具人七个分件共用一份 Skeleton（见 Script_SkinnedClone 的抬头）。
     this.root = CloneSkinnedRig(asset.gltf.scene);
     this.facial = asset.gltf.userData?.facialRig
