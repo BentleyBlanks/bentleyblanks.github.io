@@ -4,8 +4,31 @@ import { LoadMeleeAnimations } from "./Script_MeleeAnimationData.mjs";
 import { Quaternion } from "three";
 import { OpeningActorPerformance, ResolveOpeningActorPose, CorrectOpeningActorGrips, SettleOpeningCaptive } from "./Script_OpeningActorPerformance.mjs";
 import { ApplyOpeningRescueReady } from "./Script_OpeningFirstPerson.mjs";
+import { OpeningPropSet, ApplyOpeningWeaponTrack } from "./Script_OpeningProps.mjs";
 export { SetOpeningActorPerformance, ClearOpeningActorPerformance } from "./Script_OpeningActorPerformance.mjs";
 let library, pending;
+// Reused straight from the machine-gun captives library (contract §5.4 reuse list plus the
+// clips the 0922 director already borrowed). Only the rigs that were baked with them get them.
+const CAPTIVES_REUSED = ["IjaBayonetGuard","CaptiveStandToKneel","CaptiveHandsUpWalk","CaptiveKneelPlead",
+  "IjaKickPrisoner","IjaShoveForward","IjaTauntGesture","CaptiveKneelFlinch","CaptiveShovedStumble"];
+const Quat = new Quaternion(), QuatRef = new Quaternion(), QuatAdd = new Quaternion();
+
+/** Static metadata of one opening clip (manifest `clips[name]`): role, contacts, holdLoop, ... */
+export function OpeningClipMeta(clip){return library?.config.clips?.[clip]||null;}
+/** Paired staging (runtime metres, anchor frame) and prop definitions from the manifest. */
+export function OpeningStage(name){return library?.config.stages?.[name]||null;}
+
+/** A clip with a `holdLoop` window keeps sampling inside it once the playhead passes its end,
+ * so a director can hold "fist in the hair" or "kneeling, hand on shoulder" for as long as
+ * the dialogue runs without freezing the body. */
+export function OpeningHoldSeconds(clip,seconds){
+  const hold=OpeningClipMeta(clip)?.holdLoop;
+  if(!hold||!(seconds>hold[1]))return seconds;
+  const span=hold[1]-hold[0];
+  return span>1e-6?hold[0]+((seconds-hold[0])%span):hold[1];
+}
+/** Terminal clips end on the corpse; the frozen-corpse logic lets them finish their frames. */
+export function IsOpeningTerminalClip(clip){return clip==="ShotCollapse"||OpeningClipMeta(clip)?.terminal===true;}
 export function LoadOpeningStoryboardAnimation(){
   return pending ||= (async()=>{
     const Read=async(file)=>{const response=await fetch(C.animationBase+file+"?v="+C.version);if(!response.ok)throw Error(`Opening animation ${file}: ${response.status}`);return response.json();};
@@ -15,20 +38,20 @@ export function LoadOpeningStoryboardAnimation(){
     for(const [id,record] of models){
       const source=captives.models.get(id);
       if(source&&JSON.stringify(source.bones)!==JSON.stringify(record.bones))throw Error(`Opening animation rig order: ${id}`);
-      for(const clip of ["IjaBayonetGuard","CaptiveStandToKneel","CaptiveHandsUpWalk","CaptiveKneelPlead"])if(source?.clips[clip])record.clips[clip]=source.clips[clip];
+      for(const clip of CAPTIVES_REUSED)if(source?.clips[clip]&&!record.clips[clip])record.clips[clip]=source.clips[clip];
     }
     return library={config,models};
   })();
 }
 export function UpdateOpeningStoryboardCorpse(soldier){
   const actor=soldier?.actor,rig=actor?.characterRig,pose=soldier?.openingStoryboardPose;
-  if(soldier?.alive||!rig||pose?.clip!=="ShotCollapse"||soldier.deadTime<=.9||soldier.corpse)return;
+  if(soldier?.alive||!rig||!IsOpeningTerminalClip(pose?.clip)||soldier.deadTime<=.9||soldier.corpse)return;
   const duration=library?.models.get(rig.modelId)?.clips[pose.clip]?.duration;
   if(!(duration>0))return;
   const shown=rig.openingStoryboardState;
   if(shown?.clipId===pose.clip&&shown.seconds>=duration&&shown.blend>=1)return;
-  // AI freezes settled corpses after its normal 0.9-second fall. This authored
-  // kneeling collapse takes 1.6 seconds, so finish only its remaining frames.
+  // AI freezes settled corpses after its normal 0.9-second fall. Authored terminal
+  // collapses (ShotCollapse 1.6 s, CaptiveWallSlideTwitch 3.2 s ...) finish their frames.
   // Once the actual terminal pose is displayed, the normal frozen-corpse cost
   // stays zero; no second hit, root movement or death restart is introduced.
   actor.Update(Math.min(.1,Math.max(0,pose.seconds-(shown?.seconds||0))),{
@@ -56,6 +79,7 @@ export function InstallOpeningStoryboardAnimation(soldier){
     const record=library?.models.get(rig.modelId);
     let pose=ResolveOpeningActorPose(soldier,soldier.openingStoryboardPose,clock,record);
     if(pose&&record&&!record.clips[pose.clip]&&pose.clip!=="DadaoAmbush")pose=null;
+    if(pose&&OpeningClipMeta(pose.clip)?.holdLoop)pose={...pose,seconds:OpeningHoldSeconds(pose.clip,pose.seconds)};
     const nativeCombat=soldier.openingStoryboardTravel==null&&(state.firing||state.fire>0||state.aim>.6
       ||state.meleeCombat?.state==="attack"||state.meleeCombat?.state==="bind");
     // Front commands can occur while moving and firing. An explicit pointing
@@ -68,7 +92,7 @@ export function InstallOpeningStoryboardAnimation(soldier){
     if(pose?.meleeGuard)state={...state,aim:0,meleeCombat:{weapon:"Dadao",state:"idle",action:"Guard",clip:"DadaoGuard",
       normalized:clock%1,t:clock,weight:1}};
     const result=original.call(this,dt,state);
-    if(pose?.clip==="ShotCollapse"&&state.dead){
+    if(IsOpeningTerminalClip(pose?.clip)&&state.dead){
       // This kneeling collapse already contains the grounded whole-body fall.
       // Native death may still advance for combat bookkeeping, but its separate
       // body support tilt/lift must not be applied on top of the authored corpse.
@@ -79,6 +103,7 @@ export function InstallOpeningStoryboardAnimation(soldier){
     if(rig.openingSlungRifle)rig.openingSlungRifle.visible=false;
     if(!pose&&soldier.openingStoryboardTravel==null&&!soldier.openingActorPerformance){
       if(lastKey==="InterrogateCrouch"&&actor.weaponGroup)actor.weaponGroup.visible=true;
+      rig.openingProps?.HideAll();
       rig.openingStoryboardState=null;lastKey=null;displayed=null;blendFrom=null;return result;
     }
     // Native Kimodo death owns the guard from the instant the blade connects.
@@ -114,6 +139,7 @@ export function InstallOpeningStoryboardAnimation(soldier){
     if(pose.nativeArms)for(let i=0;i<bones.length;i++)if(/UpperArm|Forearm|Hand|Finger|Clavicle/.test(bones[i].name)){
       bones[i].position.copy(locomotion[i].p);bones[i].quaternion.copy(locomotion[i].q);
     }
+    if(pose.additive)ApplyOpeningAdditive(performer,record,pose.additive);
     }else{rig.openingStoryboardState=null;}
     const blend=nativeCombat?1:Math.min(1,(clock-blendAt)/C.poseBlendS),mix=blend*blend*(3-2*blend);
     if(blendFrom&&blend<1)for(let i=0;i<bones.length;i++){
@@ -155,14 +181,22 @@ export function InstallOpeningStoryboardAnimation(soldier){
       if(remaining<.004&&clock-blendAt>=C.poseBlendS)rescueHandoff=false;
       rig.openingRescueHandoff={active:rescueHandoff,remaining};
     }
+    const clipRow=pose?record?.clips[pose.clip]:null;
     if(rescueHandoffApplied||pose?.nativeArms)actor._UpdateRiggedWeaponMount?.();
-    else if(pose&&pose.clip!=="DadaoAmbush")performer?._AimWeapon(pose.weaponHold||record?.clips[pose.clip]?.weaponHold);
+    else if(clipRow?.props?.weapon&&!pose.weaponHold)ApplyOpeningWeaponTrack(actor,clipRow,pose.seconds);
+    else if(pose&&pose.clip!=="DadaoAmbush")performer?._AimWeapon(pose.weaponHold||clipRow?.weaponHold);
     else if(soldier.openingActorPerformance&&!rig.openingActorPerformanceState?.headOnly&&!rig.openingActorPerformanceState?.protected)
       actor._UpdateRiggedWeaponMount?.();
+    if(clipRow?.props||rig.openingProps){
+      rig.openingProps ||= new OpeningPropSet(actor,library?.config.props||{});
+      rig.openingProps.Update(clipRow,pose?.seconds||0,rig.root);
+    }
     soldier.openingStoryboardContact?.();
     if(actor.weaponGroup){
       const slung=pose?.clip==="InterrogateCrouch";
-      actor.weaponGroup.visible=!slung;
+      // A clip with a `weapon` track decides visibility itself (a rifle thrown away, a
+      // planted dadao); everything else keeps the 0922 slung-rifle rule.
+      if(!clipRow?.props?.weapon)actor.weaponGroup.visible=!slung;
       if(slung&&!rig.openingSlungRifle){
         const prop=rig.openingSlungRifle=actor.weaponGroup.clone();
         actor.root.add(prop);
@@ -176,4 +210,37 @@ export function InstallOpeningStoryboardAnimation(soldier){
     rig.openingStoryboardState=pose?{...performer?.state,clipId:pose.clip,seconds:pose.seconds,blend:mix}:null;
     return result;
   };
+}
+
+/** Additive layer: q = q_base * inverse(q_reference) * q_additive(t) on the clip's masked bones.
+ * pose.additive = { clip, seconds, weight } (weight 0..1). Reference: the additive clip's own
+ * frame 0, or "Clip@0" from the manifest. Positions are left alone. */
+function ApplyOpeningAdditive(performer,record,additive){
+  const meta=OpeningClipMeta(additive?.clip),clip=record?.clips[additive?.clip];
+  if(!performer||!meta?.additive||!clip)return;
+  const weight=Math.max(0,Math.min(1,Number.isFinite(additive.weight)?additive.weight:1));
+  if(weight<=0)return;
+  const count=performer.bones.length;
+  const sample=performer.additiveSample ||= new Float64Array(count*7);
+  const reference=performer.additiveReference ||= new Float64Array(count*7);
+  const refName=String(meta.additive.reference||"frame0");
+  const refClip=refName==="frame0"?clip:record.clips[refName.split("@")[0]];
+  if(!refClip)return;
+  performer._SampleInto(clip,Number(additive.seconds)||0,sample);
+  performer._SampleInto(refClip,0,reference);
+  const masks=meta.additive.bones||[];
+  performer.additiveMask ||= new Map();
+  let mask=performer.additiveMask.get(additive.clip);
+  if(!mask){
+    mask=record.bones.map(name=>masks.some(role=>name.endsWith(" "+role)||name.includes(" "+role)));
+    performer.additiveMask.set(additive.clip,mask);
+  }
+  for(let i=0;i<count;i++){
+    if(!mask[i])continue;
+    QuatRef.fromArray(reference,i*7+3).invert();
+    QuatAdd.fromArray(sample,i*7+3);
+    Quat.copy(QuatRef).multiply(QuatAdd);
+    if(weight<1)Quat.slerp(QuatRef.identity(),1-weight);
+    performer.bones[i].quaternion.multiply(Quat);
+  }
 }

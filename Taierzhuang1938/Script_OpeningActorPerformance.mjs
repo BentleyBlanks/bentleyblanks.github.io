@@ -5,7 +5,15 @@ import { OpeningActorAnatomy, SolveOpeningActorArm, CurlOpeningActorFingers, Ope
 
 const Clamp=(value,low=0,high=1)=>Math.max(low,Math.min(high,value));
 const Smooth=value=>{value=Clamp(value);return value*value*(3-2*value);};
-const ContactClips=new Set(["DuckBlast","BayonetClearWood","CollarDrag","ButtThreat","DadaoAmbush","RifleDeflect","PullComrade","KickRifle","ShotCollapse","CaptiveStandToKneel"]);
+const ContactClips=new Set(["DuckBlast","BayonetClearWood","CollarDrag","ButtThreat","DadaoAmbush","RifleDeflect","PullComrade","KickRifle","ShotCollapse","CaptiveStandToKneel",
+  // 2026-09-23 library: every paired, contact or violent beat keeps its authored timing and
+  // hands (no dialogue gestures or idle substitution on top of them).
+  "WoundedRiseWall","BlastSlamBuried","IjaDragCollarFromDirt","IjaPullArm","CaptiveDraggedFromDirt","CaptiveWallBrace",
+  "IjaShoveToWall","IjaHairGrabPull","CaptiveHeadPulledBack","IjaDrawBayonet","IjaThroatSlash","CaptiveThroatCut",
+  "CaptiveClutchThroat","CaptiveWallSlideTwitch","IjaWipeSheathBayonet","IjaReadyRifle","IjaSlingRifle","IjaCollarDragSnag",
+  "IjaKickBeam","IjaButtStrike","IjaHoldCollarUp","InterpreterGrabCollar","InterpreterFlee","LuoDadaoChopRear",
+  "IjaChoppedFallWall","HeDadaoParryChop","IjaParriedChoppedFall","LuoDragToCover","HeSwapDadaoRifle","LuoKneelCheck",
+  "BanterPatRifle","IjaKickPrisoner","IjaShoveForward","CaptiveKneelFlinch","CaptiveShovedStumble"]);
 const Guards=new Set(["ijaA","ijaB","guard","heyoutian","liuwencai"]);
 const Hash=value=>[...String(value)].reduce((sum,char)=>(sum*31+char.charCodeAt(0))>>>0,7);
 const HandClips=new Set(["ButtThreat","InterrogateCrouch","InterpreterPoint","MessengerReport","PointBlockade"]);

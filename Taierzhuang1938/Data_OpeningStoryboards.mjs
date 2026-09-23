@@ -1,7 +1,24 @@
 // Metres relative to the existing bunker/traffic-trench ground sampler.
 // Composition follows Notion 01–03, 03–07 V2 and 08–09A V3 (2026-09-21).
 export const OPENING_STORYBOARDS = Object.freeze({
-  version:"20260922OpeningStoryboardsV1", animationBase:"./Animation/OpeningStoryboards/",
+  version:"20260923OpeningStoryboardsV2", animationBase:"./Animation/OpeningStoryboards/",
+  // 2026-09-23 action library (contract §5.4). Names are frozen; per-clip metadata (role,
+  // contacts, stages, props, root motion, holdLoop, next) is in the manifest `clips`.
+  clips:{
+    reused:["ClipLoad","MessengerReport","CollarControl","CollarDrag","BayonetClearWood","ButtThreat","CreepDadao",
+      "DadaoHeavy","RifleDeflect","DadaoParry","KickRifle","GuardTurn","PointBlockade","InterrogateCrouch","InterpreterPoint",
+      "DeathCollapseA","DeathCollapseB","DeathCollapseC","DeathCollapseD",
+      "IjaKickPrisoner","IjaShoveForward","IjaTauntGesture","CaptiveKneelFlinch","CaptiveShovedStumble"],
+    authored:["WoundedSitRifleIdle","BanterLaugh","BanterLookShoulder","BanterPatRifle","WoundedRiseWall","BlastSlamBuried",
+      "IjaDragCollarFromDirt","IjaPullArm","CaptiveDraggedFromDirt","CaptiveKneelMud","CaptiveWallBrace",
+      "IjaHairGrabPull","CaptiveHeadPulledBack","IjaDrawBayonet","IjaThroatSlash","CaptiveThroatCut","CaptiveClutchThroat",
+      "CaptiveWallSlideTwitch","IjaWipeSheathBayonet","IjaReadyRifle","IjaCornerFire","IjaJunctionPeek","IjaSlingRifle",
+      "IjaCollarDragSnag","IjaKickBeam","IjaButtStrike","IjaHoldCollarUp","InterpreterCrouchAsk","InterpreterGrabCollar",
+      "InterpreterFlee","LuoDadaoChopRear","IjaChoppedFallWall","HeDadaoParryChop","IjaParriedChoppedFall","LuoDragToCover",
+      "HeSwapDadaoRifle","LuoKneelCheck"],
+    // Not in §5.4, added for the draft's "日兵甲把他推到沟壁上" pair (reported to the integrator).
+    added:["IjaShoveToWall"],
+  },
   fps:24, fov:65, fadeInS:1.8, wakeS:5.0, strikeBlackS:1.4,
   discoverS:3.6, clearWoodS:1.6, dragS:2.8, buttS:1.4, buttContactS:.85,
   ambushS:1.1, bladeContactS:.56, deflectS:1.0, pullS:2.4, kickS:1.2, kickContactS:.48,

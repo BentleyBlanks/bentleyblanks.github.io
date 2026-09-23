@@ -2537,6 +2537,37 @@ def PlayerGhost(T, collar, lying=True):
 BEAM_PINNED = ((-.30, -.74, .20), (1, .12, .05))     # centre, axis (source, ijaA frame at IjaKickBeam)
 
 
+def _BeamPoses(scale=.9128):
+    """The beam's three key states in IjaKickBeam's root frame, RUNTIME metres (three.js actor
+    frame: +x right, +y up, -z forward; ijaA stands at the root facing -z). Same numbers the
+    `beam` track of IjaKickBeam starts and ends on; 'nudged' is BayonetClearWood's 12 deg swing
+    about the far (splintered) end."""
+    def R(p):
+        return [round(-p[0] * scale, 3), round(p[2] * scale, 3), round(p[1] * scale, 3)]
+
+    def D(v):
+        n = math.sqrt(sum(c * c for c in v))
+        return [round(-v[0] / n, 4), round(v[2] / n, 4), round(v[1] / n, 4)]
+
+    def Yaw(v, a):
+        c, s_ = math.cos(a), math.sin(a)
+        return (v[0] * c - v[1] * s_, v[0] * s_ + v[1] * c, v[2])
+    c, a = BEAM_PINNED
+    n = math.sqrt(sum(x * x for x in a))
+    a = tuple(x / n for x in a)
+    half = .775 / scale
+    far = (c[0] + a[0] * half, c[1] + a[1] * half, c[2] + a[2] * half)
+    a12 = Yaw(a, math.radians(12))
+    nudged = (far[0] - a12[0] * half, far[1] - a12[1] * half, c[2])
+    kicked = (c[0] - .28, c[1] - .42, c[2])
+    return {'pinned': {'centre': R(c), 'axis': D(a)}, 'nudged': {'centre': R(nudged), 'axis': D(a12)},
+            'kicked': {'centre': R(kicked), 'axis': D(Yaw(a, .9))},
+            'frame': 'IjaKickBeam root (ijaA), runtime metres; axis = the long (+X model) axis, splintered end at +axis'}
+
+
+PROPS['beam']['poses'] = _BeamPoses()
+
+
 @Builder('IjaKickBeam')
 def BuildKickBeam(T, name):
     H, P, SX = T.H, T.P, T.SX
