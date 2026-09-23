@@ -32,6 +32,7 @@ import { WEAPONS } from "./Data_Weapons.mjs";
 import { MISSION_DEFENSE_OBJECTS, MISSION_STAKE_FENCE } from "./Data_FirstLevelMissionFortifications.mjs";
 import { AMBIENT_FIRE } from "./Data_Tuning_AiShooting.mjs";
 import { SQUAD_REACTION, CHARGE_FOLLOW, MELEE_STALL } from "./Data_Tuning_AiTactics.mjs";
+import { COVER_CYCLE } from "./Data_Tuning_AiCover.mjs";
 
 let checks = 0;
 const Check = (ok, message) => { assert.ok(ok, message); checks += 1; };
@@ -288,6 +289,9 @@ function MakeWorld(stage = "BunkerRescue") {
   // Machine-gun attack: charge once, then repelled.
   world.facts.add("tankPreviewed"); r.time = 6; pressure.Update();
   Eq(pressure.phase.id, "tankShown");
+  // Men of the machine-gun attack killed while they were still waiting are not the attack's casualties.
+  const mgWait = FrontGroupMembers("mgAttack", enemies);
+  Check(pressure.groupState.get("mgAttack").total === mgWait.length, "fixture: nobody of the attack died in standby here");
   r.time = 6.3; pressure.Update();
   Eq(pressure.events.filter((e) => e.kind === "fallback" && e.group === "center").length, fallbacksBefore,
     "a group that already fell back does not fall back again on the next phase");
@@ -318,6 +322,23 @@ function MakeWorld(stage = "BunkerRescue") {
   r2.time = 1; p2.Update();
   Check(w2.defends.some(([id, x, z]) => id === "RightNestGuard" && x === 31 && z === -146), "two nest casualties send the rest to the rear anchor");
   Check(w2.barks.some(([, kind]) => kind === "fallback"));
+  // A group that lost men before its first phase counts casualties from the men it went in with.
+  {
+    const { r: r4, world: w4, enemies: e4, pressure: p4 } = MakeWorld("Support");
+    w4.facts.add("frontBattleStarted");
+    r4.time = 1; p4.Update();
+    const mgMen = FrontGroupMembers("mgAttack", e4);
+    const half = Math.ceil(mgMen.length / 2);
+    for (const a of mgMen.slice(0, half)) a.alive = false;
+    w4.facts.add("tankPreviewed"); r4.time = 2; p4.Update(); r4.time = 2.3; p4.Update();
+    Check(!p4.events.some((e) => e.kind === "fallback" && e.group === "mgAttack"),
+      "half the attack killed while waiting: it does not fall back the moment it shows");
+    const st = p4.groupState.get("mgAttack");
+    Eq([st.deadAtStart, st.total], [half, mgMen.length - half]);
+    for (const a of mgMen.slice(half, half + Math.ceil((mgMen.length - half) / 2))) a.alive = false;
+    r4.time = 2.6; p4.Update();
+    Check(p4.events.some((e) => e.kind === "fallback" && e.group === "mgAttack"), "half of the men it went in with: now it falls back");
+  }
   // Phase exit logs why a configured charge never happened; a hold phase freezes a former assault man in place.
   {
     const { r: r3, world: w3, enemies: e3, pressure: p3 } = MakeWorld("Support");
@@ -388,6 +409,22 @@ function Man(ai, side, x, z, options = {}) {
   for (let i = 0; i < 6; i++) { s.ambientPickAt = -99; s.ambientUntil = -99; s.ambientFirePoint = null; ai.PickAmbientFire(s);
     Eq(s.ambientFirePoint?.id, "front", "the point in front of him is picked before the one behind"); }
   Check(s.ambientUntil >= ai.time + AMBIENT_FIRE.dwellMinS && s.ambientUntil <= ai.time + AMBIENT_FIRE.dwellMaxS, "he keeps a point for the dwell window");
+  // §20.11 The bank top itself is masked by his own parapet: the point is retried one raise step higher (a high round).
+  {
+    const low = Man(ai, "ija", 40, 0); low.yaw = 0;
+    low.ambientFirePoints = [{ id: "bank", x: 40, z: -30, h: 0.3, r: 1 }];
+    const Raycast = ctx.battlefield.Raycast;
+    let rays = 0;
+    ctx.battlefield.Raycast = (from, dir, len) => { rays++; return dir.y < 0 ? { t: len * 0.3, normal: [0, 1, 0] } : null; };
+    ai.PickAmbientFire(low);
+    Check(low.ambientFirePoint && low.ambientFirePoint.y > 0.3 + 1e-6, "a masked bank top is taken as a high round over it");
+    Check(rays <= AMBIENT_FIRE.losRetries, "every raise step is one ray inside the losRetries budget");
+    ctx.battlefield.Raycast = () => ({ t: 0.5, normal: [0, 1, 0] });
+    low.ambientFirePoint = null; low.ambientPickAt = -99; low.ambientUntil = -99;
+    Eq(ai.PickAmbientFire(low), null, "fully masked at every height: no point");
+    ctx.battlefield.Raycast = Raycast;
+    ai.soldiers.splice(ai.soldiers.indexOf(low), 1);
+  }
   // A man with a real shot never takes ambient.
   s.target = { isPlayer: false, position: new THREE.Vector3(5, 0, -5), id: 99 }; s.targetVisible = true;
   Eq(ai.PickAmbientFire(s), null, "a visible, unheld target owns the trigger");
@@ -613,6 +650,28 @@ function Man(ai, side, x, z, options = {}) {
   Check(w.cover === cover, "a peek that got a round out resets the count");
   Peek(w, false);
   Check(w.cover === null && w.failedCoverId === "parapetBox", "01-06: three peeks in a row that saw him but fired nothing: move to another cover");
+  // §20.11 A man with authorised points whose covers all fire nothing goes out to kneel in the open for a while.
+  {
+    const o = Man(ai, "ija", 0, 0, { state: "cover_engage" });
+    o.target = { isPlayer: false, position: new THREE.Vector3(0, 0, -30), id: 8 }; o.targetVisible = true;
+    o.ambientFirePoints = [{ id: "bank", x: 0, z: -30, h: 0.3, r: 1 }];
+    const Burn = (id) => { o.cover = { ...cover, id }; for (let i = 0; i < COVER_CYCLE.blindPeeksBeforeMove; i++) Peek(o, false); };
+    Burn("coverA");
+    Check(!(o.missionOpenUntil > ai.time), "one bad cover: he just tries another");
+    ai.time += 5; Burn("coverB");
+    Check(o.missionOpenUntil > ai.time && ai.stats.openGround === 1, "two bad covers inside the window: he kneels in the open for a while");
+    o.task = null; o.suppression = 0; o.position.set(0, 0, 0);
+    Check(ai.UpdateCover(o) === false && o.cover == null, "while it lasts he picks no cover");
+    const p = Man(ai, "ija", 2, 0, { state: "cover_engage" });
+    p.target = o.target; p.targetVisible = true;
+    for (const id of ["c1", "c2"]) { p.cover = { ...cover, id }; for (let i = 0; i < COVER_CYCLE.blindPeeksBeforeMove; i++) Peek(p, false); }
+    Check(!(p.missionOpenUntil > ai.time), "a man without authorised points never leaves cover this way");
+    ai.missionCoverRules = false;
+    const q = Man(ai, "ija", 4, 0, { state: "cover_engage" }); q.target = o.target; q.targetVisible = true; q.ambientFirePoints = o.ambientFirePoints;
+    for (const id of ["d1", "d2", "d3"]) { q.cover = { ...cover, id }; for (let i = 0; i < 4; i++) Peek(q, false); }
+    Check(!(q.missionOpenUntil > ai.time), "07+: the switch is off, nobody goes out into the open");
+    ai.missionCoverRules = true;
+  }
 }
 // §20.7 Melee stall: pulled into a bayonet fight across a parapet he cannot climb, a man stood there for 86 s.
 {

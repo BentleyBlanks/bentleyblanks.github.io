@@ -285,6 +285,10 @@ export const SAMPLES = Freeze({
  * blockedRetryS    一个点从枪口打过去被挡死之后，这么久之内这个人不再挑它（先换别的点）。
  * impactAboveM     没打到碰撞体的那一发，弹道末端离地不到这么高就算钻进了土（在地面溅一蓬土）：
  *                  土坎顶是高度函数、不在射线世界里，不这样算的话打土坎的子弹一发弹着都没有。
+ * raiseStepsM      挑点时一个点按这几档抬高重试通视（米，加在点的 h 上）：土坎顶本身被自己面前的
+ *                  沟沿 / 胸墙挡住时，抬高一档就是「越过土坎打过去」的高弹（弹道末端在空中，什么都
+ *                  不溅，与原来的高偏弹同一个样子）。2026-09-24 实机挑点侦察：03 待命区掩体里的探头位
+ *                  对土坎顶多半不通、抬 0.8 m 就通的有一批；每一档算一条射线，受 losRetries 约束。
  */
 export const AMBIENT_FIRE = Freeze({
   dwellMinS: 3,
@@ -296,7 +300,8 @@ export const AMBIENT_FIRE = Freeze({
   rifleIntervalScale: 1.8,
   mgIntervalScale: 1.6,
   scatterM: 1.4,
-  losRetries: 5,
+  losRetries: 8,
+  raiseStepsM: Object.freeze([0, 0.8, 1.6]),
   pickEveryS: 0.9,
   stalledTargetS: 2.5,
   impactAboveM: 1.2,

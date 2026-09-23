@@ -208,6 +208,13 @@ export const COVER_CYCLE = Freeze({
    *  blindPeeksBeforeMove 次就换点。09-24 探针：03 的掩体里有人看得见左前枪位的老周、
    *  36 m 外一发打不过去，缩头探头一整个相位。07 以后开关关着，仍只认「没看见」。 */
   missionWastedPeekIsBlind: true,
+  /** 任务侧开关下、手上有关卡授权点（`ambientFirePoints`）的人：missionOpenWindowS 秒内因为瞎探 /
+   *  白探头连换 missionOpenAfterMoves 次掩体，说明身边的掩体探头位都打不出去 —— 接下来
+   *  missionOpenGroundS 秒不选掩体，就地跪着打（空地上的探头位对授权点大多是通的）。
+   *  2026-09-24 实机挑点侦察：03 待命区掩体里的人对任何授权点都不通，同一片空地上的人全通。 */
+  missionOpenAfterMoves: 2,
+  missionOpenWindowS: 30,
+  missionOpenGroundS: 12,
   /** 当前掩体被判侧翼要**持续**这么久才紧急换点：目标在两侧敌人间来回切时单拍判定会翻。 */
   flankGraceS: 1.5,
   /** blindPeeksBeforeMove / flankGraceS / 按隐蔽位判侧翼这三条只对这些阵营生效。

@@ -416,6 +416,10 @@ export class Soldier {
     /** 跃进喊话（§20）：上一次 Think 结束时的状态、上一次喊「前へ」的时刻。 */
     this.thinkEndState = null;
     this.advanceBarkAt = -99;
+    /** 身边掩体都打不出去时去空地（§20.11）：最近一次瞎探换点的时刻、窗口内次数、不选掩体到什么时候。 */
+    this.blindMoveAt = -99;
+    this.blindMoves = 0;
+    this.missionOpenUntil = -99;
     /** 军官（分队长）：阵亡时本组压制 + 迟疑，旁人喊「分队长殿がやられた」。由关卡置位。 */
     this.aiOfficer = false;
     /** 反应层认的「本组」键（压力表的组 id）；空串时退回 squadId。 */
@@ -763,7 +767,8 @@ export class AiDirector {
     this._ambientEye = { x: 0, y: 0, z: 0 };
     this._ambientTo = { x: 0, y: 0, z: 0 };
     this.stats = { suppressShots: 0, aimedShots: 0, coverPicks: 0, grenades: 0, peeks: 0, displaces: 0,
-      ambientShots: 0, groupCharges: 0, chargeFollows: 0, hesitations: 0, meleeStallReleases: 0, advanceBarks: 0 };
+      ambientShots: 0, groupCharges: 0, chargeFollows: 0, hesitations: 0, meleeStallReleases: 0, advanceBarks: 0,
+      openGround: 0 };
     /**
      * 任务侧开关（2026-09-23，docs/Data_EnemyAi.md §20）。**默认全关**：第一关以外逐位不变。
      * 第一关 01–06 的任务相位由 `Script_FirstLevelFrontPressure` 每帧写：
@@ -2439,10 +2444,17 @@ export class AiDirector {
         const inCone = (dx * fx + dz * fz) / d >= cosCone;
         if (inCone !== (pass === 0)) continue;
         if (tries >= AMBIENT_FIRE.losRetries) break;
-        tries += 1;
         to.x = p.x; to.z = p.z;
-        to.y = (bf ? bf.GroundHeight(p.x, p.z) : 0) + (Number.isFinite(p.h) ? p.h : 0.5);
-        if (!this.shooting.ShotPathClear(eye, to)) continue;
+        const base = (bf ? bf.GroundHeight(p.x, p.z) : 0) + (Number.isFinite(p.h) ? p.h : 0.5);
+        // 点本身被挡时按 raiseStepsM 抬高重试（越过土坎的高弹，见表注）；每一档一条射线。
+        let clear = false;
+        for (const raise of AMBIENT_FIRE.raiseStepsM) {
+          if (tries >= AMBIENT_FIRE.losRetries) break;
+          tries += 1;
+          to.y = base + raise;
+          if (this.shooting.ShotPathClear(eye, to)) { clear = true; break; }
+        }
+        if (!clear) continue;
         const aim = s.ambientAim || (s.ambientAim = { x: 0, y: 0, z: 0, r: 0, id: null });
         aim.x = to.x; aim.y = to.y; aim.z = to.z;
         aim.r = Number.isFinite(p.r) ? p.r : AMBIENT_FIRE.scatterM;
@@ -2927,6 +2939,8 @@ export class AiDirector {
     const threat = this.ThreatPoint(s);
     if (!threat) { this.ReleaseCover(s); return false; }
     const now = this.time;
+    // 【§20.11】身边的掩体都打不出去（连换几次都是瞎探）：这段时间不选掩体，就地跪着打。
+    if (this.missionCoverRules && now < s.missionOpenUntil) { this.ReleaseCover(s); return false; }
     const task = s.task;
     const bounding = !!task && task.kind === TASK.BOUND;
     let cover = s.cover;
@@ -3127,6 +3141,16 @@ export class AiDirector {
         if (s.blindPeeks >= COVER_CYCLE.blindPeeksBeforeMove) {
           s.failedCoverId = c.id; s.failedCoverUntil = this.time + COVER_CYCLE.failedRetryS;
           this.ReleaseCover(s); s.coverPickAt = -99;
+          // 【§20.11】有授权点的人短时间里连换几个掩体都打不出去：去空地上跪着打一阵。
+          if (this.missionCoverRules && s.ambientFirePoints && s.ambientFirePoints.length) {
+            s.blindMoves = this.time - s.blindMoveAt <= COVER_CYCLE.missionOpenWindowS ? s.blindMoves + 1 : 1;
+            s.blindMoveAt = this.time;
+            if (s.blindMoves >= COVER_CYCLE.missionOpenAfterMoves) {
+              s.missionOpenUntil = this.time + COVER_CYCLE.missionOpenGroundS;
+              s.blindMoves = 0;
+              this.stats.openGround += 1;
+            }
+          }
           return;
         }
         s.coverPhase = "hide";

@@ -267,11 +267,19 @@ export class FirstLevelFrontPressure {
     return alive.sort((a, b) => Distance(a.position, p) - Distance(b.position, p))[0] || null;
   }
 
-  /** 组的整关账（没有就建）；total 取见过的最多人数（死人不让分母变小，晚生成的人让它变大）。 */
+  /**
+   * 组的整关账（没有就建）；total 取见过的最多人数（死人不让分母变小，晚生成的人让它变大）。
+   * **建账那一刻已经死了的人不算这个组的伤亡**（deadAtStart）：机枪攻击组在 03 待命时就会被打掉几个，
+   * 04 一露面按全名单算就已经「伤亡过半」，露面 0.1 s 就退线（2026-09-24 探针 fix1）。
+   */
   GroupState(groupId, members) {
     let st = this.groupState.get(groupId);
-    if (!st) { st = { total: members.length, fallbackDone: false, fallbackUntil: 0 }; this.groupState.set(groupId, st); }
-    st.total = Math.max(st.total, members.length);
+    if (!st) {
+      const dead = members.filter((a) => !a.alive).length;
+      st = { deadAtStart: dead, total: members.length - dead, fallbackDone: false, fallbackUntil: 0 };
+      this.groupState.set(groupId, st);
+    }
+    st.total = Math.max(st.total, members.length - st.deadAtStart);
     return st;
   }
 
