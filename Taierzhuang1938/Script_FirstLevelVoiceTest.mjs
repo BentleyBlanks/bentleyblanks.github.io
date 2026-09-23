@@ -444,6 +444,22 @@ const FakeAudio = () => {
   console.log("ok 缺录音兜底：逐句按估时、旧整段照旧，字幕/Line/Done 齐全，未知 cue 只警告");
 }
 {
+  // 10c'. 排队播放的逐句场景给旧读法的 current.plan.lines / sourceTime / index（开场分镜按它找「谁在说」）。
+  const voice = new FirstLevelMissionVoice({ audio: { PlayStoryVoice() {}, StopStoryVoice() {}, SetDialogueDuck() {} }, hud: { Say() {} } });
+  voice.manifest = { cues: {}, lines: {} };
+  voice.Enqueue("SupportOrder");
+  const seen = new Set();
+  for (let i = 0; i < 3000 && !voice.finished.has("SupportOrder"); i++) {
+    voice.Update(1 / 60);
+    const current = voice.current;
+    if (!current) continue;
+    const index = current.plan.lines.findIndex(([start, end]) => current.sourceTime >= start && current.sourceTime < end);
+    if (index >= 0) { assert.equal(index, current.index, "plan.lines 与 index 指向同一句"); seen.add(current.cue.lines[index].who); }
+  }
+  assert.deepEqual([...seen].sort(), ["guard", "luo", "shunzi"], "按 plan.lines 找得到每个说话人");
+  console.log("ok 排队的逐句场景兼容旧读法：current.plan.lines / sourceTime / index");
+}
+{
   // 10d. 旧整段录音的说话人路由不变（待下线的 09.21 cue）。
   const routes = [], plays = [];
   const audio = {

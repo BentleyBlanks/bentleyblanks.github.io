@@ -19,6 +19,24 @@ export function EstimateLineSeconds(line) {
   const chars = String(line.text || "").replace(/[\s，。！？、；：…—“”‘’「」（）,.!?]/g, "").length;
   return Math.max(0.6, chars / (CHARS_PER_SECOND[line.lang === "ja" ? "ja" : "zh"]) + 0.25);
 }
+/**
+ * 排队播放的逐句场景也给旧读法一个 current：`plan.lines[i] = [开口时刻, 结束时刻]`（场景时钟，还没开口的是
+ * [Infinity, Infinity]）、`sourceTime` = 场景时钟、`index` = 正在说的那句。开场分镜、驾驶脚本按这三样找「谁在说」。
+ */
+function PerLineCurrent(cue, scene) {
+  const Plan = () => ({
+    lines: scene.lines.map((l) => l.state === "pending" || l.startAt == null ? [Infinity, Infinity]
+      : [l.startAt, l.state === "done" ? l.endAt : l.startAt + l.playLength]),
+    segments: [{ start: 0, end: Infinity }], parallel: [],
+  });
+  return {
+    cue, scene, phase: "playing", time: 0, parallel: [], events: new Set(),
+    get plan() { return Plan(); },
+    get sourceTime() { return scene.time; },
+    get index() { return scene.lines.findLastIndex((l) => l.state === "playing"); },
+  };
+}
+
 export class FirstLevelMissionVoice {
   constructor({ audio, hud, Position, Listener, Done, Event, Ready, Clock }) {
     Object.assign(this, { audio, hud, Position, Listener, Done, Event, Ready, Clock });
@@ -367,7 +385,7 @@ export class FirstLevelMissionVoice {
         const scene = this.dialogue.Play(this.BuildScene(cue), {
           Position: (line) => this.Position?.(cue, cue.lines[line.index]),
         });
-        this.current = { cue, scene, phase: "playing", time: 0, sourceTime: 0, index: -1, parallel: [], events: new Set() };
+        this.current = PerLineCurrent(cue, scene);
         this.played.add(cue.id);
         return;
       }
