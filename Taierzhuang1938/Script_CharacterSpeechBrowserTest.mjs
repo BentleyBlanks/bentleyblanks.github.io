@@ -1,6 +1,6 @@
 // Live speaker faces in the real first level: every face-rigged speaker moves its
 // mouth with its own lines and nobody else's; listeners keep their mouths closed;
-// facial skins of all four models render at 1-2 m through the production post
+// facial skins of all five models render at 1-2 m through the production post
 // chain; the mouth writes real motion vectors while talking and none when still.
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
@@ -333,7 +333,7 @@ try {
   await fs.writeFile(path.join(output,'Data_CharacterSpeech.json'),JSON.stringify({initial,samples,pauseReceipt,pause,resumed,closeups,velocity,
     faceTrack:{key:trackRun.key,shots,track:trackStats,envelope:envelopeStats,trackRows:trackPass.rows,envelopeRows:envelopePass.rows},errors},null,2));
   assert.deepEqual(errors,[]);
-  console.log(`ok live faces: Luo speaks with his own line, Yaowa listens closed-mouthed; ${closeups.length} close-ups of 4 facial skins; `
+  console.log(`ok live faces: Luo speaks with his own line, Yaowa listens closed-mouthed; ${closeups.length} close-ups of 5 facial skins; `
     +`mouth velocity ${velocity.speaking.mouth.max.toFixed(2)} px talking / ${velocity.silent.mouth.max.toFixed(3)} px still; `
     +`TakeOverGun track ${JSON.stringify(trackStats)} vs envelope ${JSON.stringify(envelopeStats)}`);
 } catch(error){

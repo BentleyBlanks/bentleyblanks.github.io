@@ -1687,7 +1687,7 @@
     {
       "id": "LugouIja06",
       "facialUrl": "./Model/Character/Model_LugouIja06Facial.glb",
-      "facialVersion": "10a2291ef4065654",
+      "facialVersion": "8d07656ea557d1cf",
       "facialCast": [
         "ijaA"
       ],
@@ -1702,7 +1702,7 @@
       "vertices": 8909,
       "triangles": 14643,
       "limitedWeightVertices": 131,
-      "bytes": 5487588,
+      "bytes": 5487780,
       "boneRoles": {
         "head": "Bip001 Head",
         "neck": "Bip001 Neck",
@@ -1730,12 +1730,12 @@
         "max": [
           0.557658,
           0.217298,
-          1.748735
+          1.747525
         ],
         "size": [
           1.115316,
           0.434596,
-          1.748735
+          1.747525
         ]
       },
       "sockets": [

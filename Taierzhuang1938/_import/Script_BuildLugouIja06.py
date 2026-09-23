@@ -50,8 +50,8 @@ SHAPE = {
     'upperLidDown': .20, 'lowerLidUp': .06, 'crease': .14,
 }
 # Cap (cm, head frame).
-CAP = {'segments': 32, 'bandFront': 13.6, 'bandBack': 11.6, 'ease': .38, 'crownTop': 22.5,
-       'crownBackDrop': .9, 'flare': .05, 'visorLength': 5.0, 'visorDrop': 1.6, 'visorSpan': 68.0,
+CAP = {'segments': 32, 'bandFront': 13.6, 'bandBack': 11.6, 'ease': .38, 'crownTop': 23.0,
+       'crownBackDrop': 2.3, 'flare': .05, 'visorLength': 5.0, 'visorDrop': 1.6, 'visorSpan': 68.0,
        'visorThickness': .22, 'starRadius': .95, 'starHeight': 1.7}
 
 
@@ -159,7 +159,7 @@ def BuildCap(head, c=CAP):
     r[-1] = r[0]; ring0[:, 1] = r
     skullTop = float(head[:, 0].max())
     levels = [0.0, .30, .55, .78, .93, 1.0]
-    flares = [0.0, .012, .040, .070, .068, .030]
+    flares = [0.0, .012, .040, .062, .050, .005]
     wall = np.array([[(BandX(th) + (c['crownTop'] - c['crownBackDrop'] * (.5 - np.cos(th) * .5) - BandX(th)) * f,
                        center[0] + ring0[k, 1] * (1 + fl + c['flare'] * f * (np.cos(th) * .5 + .5)) * math.cos(th),
                        center[1] + ring0[k, 1] * (1 + fl + c['flare'] * f * (np.cos(th) * .5 + .5)) * math.sin(th))
