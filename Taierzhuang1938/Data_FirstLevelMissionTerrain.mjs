@@ -1,8 +1,8 @@
-import { FRONT_SORTIE as Sortie } from "./Data_FirstLevelFrontRoute.mjs";
+import { FRONT_SORTIE as Sortie, FRONT_SPACE as Space } from "./Data_FirstLevelFrontRoute.mjs";
 import { MISSION_RECEPTION_SPACE, MISSION_NORTH_RIVER, RiverCutAt } from "./Data_FirstLevelMissionTopology.mjs";
 // Authored soil, metres: natural ground, roads, rail berm and excavated trenches.
 // This function is baked once into the shared rendered/physical heightfield.
-import { FRONT_BREACHES } from "./Data_FirstLevelMissionFront.mjs";
+import { FRONT_BREACHES, FRONT_BOUND_CRATERS } from "./Data_FirstLevelMissionFront.mjs";
 import { MISSION_TRENCH_NETWORK } from "./Data_FirstLevelMissionTrenches.mjs";
 import { CompileTrenchNetwork, TrenchRevision } from "./Script_TrenchPlan.mjs";
 const Smooth = (value) => {
@@ -65,7 +65,10 @@ export const MISSION_TERRAIN = Object.freeze({
       ],
       width: 10,
     },
+    // 2026-09-23 proposal A: the tank road (plateau cutting -> bend behind NorthRuin -> west along
+    // the front to the stop point north of the berm line) and the blocked south road it forks from.
     {points:Sortie.road,width:7},
+    {points:Space.southRoad,width:6},
     // 关尾夜景：北门外那条进城的路（只有 NightGateShown 之后才看得见地面上的东西，
     // 但路面是地形，白天也压着 —— 那一带在任何一条任务路线的 200 m 之外）。
     {
@@ -86,11 +89,35 @@ export const MISSION_TERRAIN = Object.freeze({
   // 参数之后 revision 一抬，下一次读就得是新的那份。
   get trenches() { return TrenchPlanFor(this).trenches; },
   steps: [
-    {x:Sortie.house.x,z:Sortie.house.z,radius:6,depth:Sortie.trenchDepthM},
-    {...Sortie.nest,radius:4.5,depth:.6},
+    // 2026-09-23 01-06 space rebuild (docs/Data_FirstLevelSpace0106_20260923.md). A step sets the ground to
+    // natural-depth inside its radius: it digs pits and raises trench floors alike.
+    // Nest compound floor (x 24..37, z -145.6..-156.8), dug half a metre.
+    {x:28.5,z:-152.2,radius:5.5,depth:.5},
     {...Sortie.leftSeat,radius:3,depth:.65},
-    { x: 15, z: -127.5, radius: 3.2, depth: 0.9 },
-    { x: -25, z: -127.5, radius: 3.2, depth: 0.88 },
+    // 03 tank preview (K5): the switchback top is a 3 m pad 0.6 m above the road floor, so the cutting lip hides
+    // the hull but not the turret (FRONT_TANK_PATH HullDown).
+    {x:49.5,z:-202.4,radius:3,depth:2.05},
+    // 03 observation fire step at the spur's end: floor 0.4 m below the field (spur 0.95 -> 0.4 ramp, ~23 deg).
+    {...Space.observation,radius:.7,depth:.4},
+    // 01 dugout pit, dug into the outer (north-west) wall of the bend M; opens east onto the trench.
+    {x:-0.4,z:-125.9,radius:1.9,depth:2.0},
+    // Depth transitions (all under 45 deg): support sap -> right low trench, gap sap -> gap junction,
+    // right low trench -> nest west door.
+    {x:-5.6,z:-140.9,radius:1.0,depth:1.65},{x:-8,z:-142.6,radius:.9,depth:1.5},{x:23.4,z:-149.9,radius:.9,depth:.95},
+    // Rear junction -> rear door ramp (trench floor -2 up to the nest floor -0.5).
+    {x:29.7,z:-143.9,radius:1.1,depth:1.25},{x:29.7,z:-145.0,radius:.8,depth:.8},
+    // The near-miss crater at the bend's inner corner: the SSW leg's east wall is down to 1.05 m
+    // for ~4 m ("沟壁塌低段"), exposed to the fold F and the junction J.
+    {x:2.8,z:-120.4,radius:1.7,depth:1.05},
+    // Ammo sap climbs out at the yard's north gate (two treads).
+    {x:41.3,z:-119.9,radius:1.2,depth:1.0},{x:41.2,z:-118.3,radius:1.0,depth:.4},
+    // Berm-end craters: explain the tank's sight lane past the berm's east end and give the flank group its last line.
+    ...Space.bermEndCraters.map((p,i)=>({...p,radius:[1.4,1.4,1.5,1.4,1.3,1.2,1.2][i],depth:[.7,.6,.6,.6,.6,.6,.6][i]})),
+    ...FRONT_BOUND_CRATERS.map((p)=>({...p,radius:1.3,depth:.6})),
+    ...Space.flankCraters.map((p)=>({x:p.x,z:p.z,radius:p.r,depth:.7})),
+    ...Space.escortCraters.map((p)=>({x:p.x,z:p.z,radius:p.r,depth:.55})),
+    // South-road roadblock crater just past the fork (FRONT_SPACE.roadblock): cuts the road the tank would need.
+    {x:Space.roadblock.crater.x,z:Space.roadblock.crater.z,radius:Space.roadblock.crater.r,depth:Space.roadblock.crater.depth},
   ],
   pads: [
     { x: -71, z: 74, w: 13, d: 50 },
@@ -124,7 +151,10 @@ export function SampleMissionNaturalHeight(x, z) {
   const west = 4.3 * Smooth((-x - 190) / 15);
   const north = 3.1 * Smooth((-z - 184) / 18) * (.86 + .14 * Math.cos(x / 31));
   // Authored front bank: defenders shelter on its south side; flanking guns see around the ends.
-  const bank=2.1*(1-Smooth(Math.abs(z+154)/3.5))*(1-Smooth((Math.abs(x+5)-21)/4));
+  // 2026-09-23 proposal A: crest moved 6 m north (z=-160) and shortened to x -30..12 (fades out by
+  // x=-34 / x=16) so the 01 break-in corridor stays 30+ m behind the backslope and the right nest
+  // sits past the berm's east end, where it can flank both the gap and the frontal approach.
+  const bank=2.1*(1-Smooth(Math.abs(z+160)/3.5))*(1-Smooth((Math.abs(x+9)-21)/4));
   return field + east + west + north + bank;
 }
 export function SampleMissionTerrain(x, z, spec = MISSION_TERRAIN) {

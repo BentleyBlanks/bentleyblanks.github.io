@@ -166,7 +166,10 @@ export const MISSION_TUNING = Object.freeze({
   // 2026.09.19 重构后的开场/前沿名单：掩蔽部门外 4 ＋ 十二人接近屏 ＋ 十二人前沿 ＋
   // 十二人冲机枪位 ＋ 四名战车护卫 = 44。每一份名单只投一次、不复活、不补波。
   // （旧口径 67 里的 12 名车站地面 + 4 名进沟 + 5 名追到掩蔽处随军列开场一起下线。）
-  openingEnemyBudget:32,
+  // 2026-09-23 01–06 space rebuild: bunkerAssault 4 + front 10 (fire base 4, bounding 6) + machineGun 4 +
+  // approach 4 + tank escorts 4 = 26. The other 01–05 groups (backdrop, pursuit, flank, officer, reserve,
+  // cut-in) are counted against contract §6 (<= 55 cumulative, <= 30 alive) in Script_FirstLevelFrontTopologyTest.
+  openingEnemyBudget:26,
   // Route attackers cover the exposed communication-trench approach; the separate front force
   // owns the gun line. z=-145 is the defenders' waiting line and z=-140 is its last sheltered
   // bound, so neither belongs to this screen. The first exposed withdrawal bound begins near -137.

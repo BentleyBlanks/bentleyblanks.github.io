@@ -1,66 +1,306 @@
-// Targeted 03–06 topology checks; gameplay evidence uses the continuous browser driver.
+// 第一关 01–06 空间门禁（纯 Node）。2026-09-23 空间重排：docs/Data_FirstLevelSpace0106_20260923.md。
+// 量尺在 Script_FirstLevelSpaceProbe（共享地面采样器 + 体块 + 场景态 + 铁丝网包络）；这里只钉阈值。
+// 关键帧 K1–K11 的「看得见 / 看不见」、战车路（净空、hull-down、路弯遮挡、先压阵位再封口、稳定射界、
+// 坎线以北、侧后攻击位、路障）、路线胶囊净空、暴露节奏、每个敌人初始有掩体、预算、视线外入口、
+// 取弹沟不连通背坡、01 进场通道 30 m 规则，以及 03–06 既有的撤退/夺点/分批判定。
 import assert from "node:assert/strict";
 import {BatchRecovered,AssaultWindow,FrontEntryRoute} from "./Script_FirstLevelFrontBattle.mjs";
 import {MISSION_STAGES} from "./Data_FirstLevelMission.mjs";
-import {MISSION_LAYOUT as L,MISSION_ROUTES as R,MISSION_PLACEMENT as P} from './Data_FirstLevelMissionLayout.mjs';
-import {FRONT_SORTIE as S} from './Data_FirstLevelFrontRoute.mjs';
-import {FRONT_BATTLE_TUNING as B} from './Data_Tuning_FirstLevelFront.mjs';
-import {SampleMissionTerrain as G} from './Data_FirstLevelMissionTerrain.mjs';
-const solids=[...L.blocks,...L.scenario.states.find(s=>s.id==='BunkerCollapsed').blocks].filter(b=>b.solid!==false&&!L.walkableSurfaces.some(s=>s.id===b.id));
-const routes={support:R.support,leaderCapture:[...R.support.slice(0,-1),S.leaderCover],rear:S.rearRoute,ammo:R.bundle,attack:S.attackRoute,left:S.leftRoute,orders:R.orders,...Object.fromEntries(P.guardWithdrawalRoutes.map((r,i)=>['guard'+i,r]))};
-const descendingEntries=new Set(['rearExit','blockedLuo','blockedWen']);
-for(const [name,start] of Object.entries({rearExit:{x:-40,z:-120.4},blockedLuo:{x:-37.373,z:-117.11},blockedWen:{x:-36.625,z:-117.11}})){
- const entry=FrontEntryRoute(start,R.support);
- assert.ok(entry.some(p=>p.x===-42&&p.z===-116),name+' retains the southern bank corner');
- assert.ok(entry.some(p=>p.x===-42&&p.z===-113),name+' goes through the real rear-bank opening');
- routes[name]=[start,...entry];
-}
-const initialized=FrontEntryRoute(R.support[0],R.support);
-assert.deepEqual(initialized.map(({x,z})=>({x,z})),R.support,'03 initialization at collection never retraces the rear exit');
-const advanced=FrontEntryRoute(R.support[1],R.support);
-assert.deepEqual(advanced.map(({x,z})=>({x,z})),R.support.slice(1),'an advanced companion keeps its actual route progress');
-for(const [name,route] of Object.entries(routes)){
- const hits=new Set(),slopes=[];let prev=null;
- for(let i=1;i<route.length;i++){const a=route[i-1],b=route[i],len=Math.hypot(a.x-b.x,a.z-b.z),steps=Math.ceil(len/.2);
- for(let n=0;n<=steps;n++){const x=a.x+(b.x-a.x)*n/steps,z=a.z+(b.z-a.z)*n/steps,y=G(x,z);
- for(const s of solids){const c=Math.cos(s.ry||0),q=Math.sin(s.ry||0),dx=x-s.x,dz=z-s.z;if(Math.abs(dx*c-dz*q)<s.w/2+.35&&Math.abs(dx*q+dz*c)<s.d/2+.35&&s.y+s.h/2>y+.3&&s.y-s.h/2<y+1.7)hits.add(s.id);}
- // The inherited rear exit descends into collection; gravity can descend a
- // steep bank. Its upward slopes still obey the controller's climbing limit,
- // and the real capsule descent is covered by --rear-entry-only.
- if(prev&&(descendingEntries.has(name)?y-prev.y:Math.abs(y-prev.y))>Math.tan(52*Math.PI/180)*Math.hypot(x-prev.x,z-prev.z)+.035)slopes.push([+x.toFixed(1),+z.toFixed(1),+(y-prev.y).toFixed(2)]);prev={x,y,z};}}
- assert.deepEqual([...hits],[],name+' capsule clearance');assert.deepEqual(slopes,[],name+' climbable terrain');
-}
-const Eye=(p,h)=>({...p,y:G(p.x,p.z)+h});
-function Sight(a,b){const len=Math.hypot(a.x-b.x,a.z-b.z);for(let d=.1;d<len;d+=.1){const t=d/len,x=a.x+(b.x-a.x)*t,z=a.z+(b.z-a.z)*t,y=a.y+(b.y-a.y)*t;if(G(x,z)>y)return 'terrain';for(const s of solids){const c=Math.cos(s.ry||0),q=Math.sin(s.ry||0),dx=x-s.x,dz=z-s.z;if(Math.abs(dx*c-dz*q)<s.w/2&&Math.abs(dx*q+dz*c)<s.d/2&&y>s.y-s.h/2&&y<s.y+s.h/2)return s.id;}}return null;}
+import {MISSION_ROUTES as R} from "./Data_FirstLevelMissionLayout.mjs";
+import {MISSION_STAGE_ROUTES as SR} from "./Data_FirstLevelMissionTopology.mjs";
+import {FRONT_SORTIE as S,FRONT_SPACE as SP,FRONT_TANK_PATH as TP,FrontTankIndex} from "./Data_FirstLevelFrontRoute.mjs";
+import {FRONT_BATTLE_TUNING as B} from "./Data_Tuning_FirstLevelFront.mjs";
+import {FRONT_BREAKABLES,FRONT_UNBREAKABLE} from "./Data_FirstLevelFrontBreakables.mjs";
+import {MISSION_LAYOUT as L} from "./Data_FirstLevelMissionLayout.mjs";
+import {FRONT_GUARD_POSTS,FRONT_FLANK_GROUP,FrontAssaultLane,FRONT_TANK_ESCORT_SLOTS} from "./Data_FirstLevelMissionFront.mjs";
+import {TANK_HEIGHTS as TH} from "./Data_FirstLevelSpaceKeyframes.mjs";
+import {MISSION_ENCOUNTERS as E} from "./Data_FirstLevelMission.mjs";
+import {SampleMissionTerrain as G,SampleMissionNaturalHeight as N} from "./Data_FirstLevelMissionTerrain.mjs";
+import {ProbeKeyframes,ProbeTank,ProbeRoutes,ProbeExposure,ProbeEnemyCover,ProbeCounts,ProbeEntries,ProbeSeparation,
+  ProbeEngagement,RouteClearance,Sight,Eye,D,RouteLength,ProbeWireLanes,Bearing} from "./Script_FirstLevelSpaceProbe.mjs";
+import {MISSION_ENCOUNTER_ACTIVATION as ACTIVATION} from "./Data_FirstLevelMissionGates.mjs";
 
-for(const index of [S.tankBlockIndex,S.tankEndIndex]){
-  const muzzle=Eye(S.road[index],2.1);
-  assert.equal(Sight(muzzle,Eye(S.gap,1.2)),null,'tank actually controls the same gap throughout 04–05');
-  assert.ok(Sight(muzzle,Eye(S.rear,1.7)),'rear junction shields a standing person');
-  assert.ok(Sight(muzzle,Eye(S.guardRoute.at(-1),1.2)),'guard safe zone is behind real cover');
+// ---------------------------------------------------------------- K1–K11 (+K1i/K2b)
+const keyframes=ProbeKeyframes();
+for(const k of keyframes){
+  for(const r of k.rows)assert.ok(r.pass,`${k.id} ${k.label}: ${r.name} ${r.mustHide?"must be hidden":"must be seen"} (${r.vis}/${r.of}, ${r.blockers.join("|")||"clear"})`);
+  if(k.frameDeg)assert.ok(k.spanDeg<=k.frameDeg,`${k.id} fits one frame: ${k.spanDeg} deg > ${k.frameDeg}`);
 }
-assert.equal(Sight(Eye(S.seat,1.65),Eye(S.gap,1.2)),null,'captured position can see the rescued men cross the breach');
-assert.equal(Sight(Eye(S.nest,1.45),Eye(S.gap,1.2)),null,'the right gun actually controls the breach before capture');
-assert.ok(Math.hypot(S.leaderCover.x-S.seat.x,S.leaderCover.z-S.seat.z)-B.arrivalM-.4>=1.5,
-  'leader cover stays separate from the player seat even with arrival and cover allowances');
-assert.ok(Math.hypot(S.leaderCover.x-S.nest.x,S.leaderCover.z-S.nest.z)+B.arrivalM<=B.captureRadiusM,
-  'arriving at the separate leader post still completes physical capture');
-assert.equal(Sight(Eye(S.leaderCover,1.2),Eye(S.gap,1.2)),null,'the crouching leader retains a real firing lane to the breach');
-assert.deepEqual(R.bundleReturn,[...R.bundle].reverse(),'return is the same branch');
-assert.deepEqual(S.attackRoute[0],S.rear);assert.deepEqual(S.route[0],S.rear);
-assert.ok(S.house.x<S.road[S.tankEndIndex].x,'ammo house stays on the friendly side of road');
-assert.ok(S.house.z>S.rear.z,'ammo house is southeast');
-assert.notDeepEqual(S.throw,S.seat,'throw does not return to MG seat');
-const guard=(alive,safe,progress=4)=>({actor:{alive},safe,progress,route:Array(4)});
-assert.equal(BatchRecovered([]),false);assert.equal(BatchRecovered([guard(false,true)]),false);
-assert.equal(BatchRecovered([guard(true,false)]),false,'running is not recovered');
-assert.equal(BatchRecovered([guard(true,true,3)]),false,'a flag cannot replace completed travel');
-assert.equal(BatchRecovered([guard(true,true),guard(false,false)]),true,'surviving batch reaches safety');
-const assault=[{alive:false},{alive:false},{alive:false},{alive:true},{alive:true}];
-assert.equal(AssaultWindow(assault,true,false),true,'finite threshold does not require battlefield wipe');
-assert.equal(AssaultWindow(assault,true,true),false,'direct fire still closes the window');
-assert.equal(AssaultWindow(assault,false,false),false,'capture is required');
-const requirements=id=>MISSION_STAGES.find(s=>s.id===id).requirements;
-for(const fact of ['tankImmobilized','tankFireDisabled','attackRetreated','lastGuardsWithdrawn','reliefInPosition','collectionReturned'])assert.ok(requirements('Tank').includes(fact));
-assert.ok(requirements('MachineGun').includes('rightRearReached'));assert.ok(requirements('Support').includes('rifleWithdrawalResolved'));
-console.log('ok 03–06 routes, tank sightlines, covered junction, finite assault and physical batch gates');
+assert.deepEqual(["K1","K2","K3","K4","K5","K6","K7","K8","K9","K10","K11"].filter(id=>!keyframes.some(k=>k.id===id)),[],"all eleven contract keyframes are measured");
+console.log("ok keyframes "+keyframes.map(k=>`${k.id}${k.frameDeg?`(${k.spanDeg}deg)`:""}`).join(" "));
+
+// ---------------------------------------------------------------- tank path
+{
+  const kinds=new Set(TP.map(w=>w.kind));
+  for(const kind of ["cruise","hullDown","firePoint","block","squeeze"])assert.ok(kinds.has(kind),`tank path has a ${kind} waypoint`);
+  for(const w of TP)for(const key of ["faceTo","turretTo"])if(w[key])assert.ok(SP.tankTargets[w[key]],`${w.id}.${key} names a FRONT_SPACE.tankTargets entry`);
+  assert.equal(new Set(TP.map(w=>w.id)).size,TP.length,"tank waypoint ids are unique");
+  // Old keys keep their meaning and resolve by id (integration decision: never renumber by hand).
+  assert.equal(S.tankPreviewIndex,FrontTankIndex("HullDown"));assert.equal(S.tankPressureIndex,FrontTankIndex("Pressure"));
+  assert.equal(S.tankBlockIndex,FrontTankIndex("Block"));assert.equal(S.tankEndIndex,FrontTankIndex("Squeeze"));
+  assert.equal(TP[S.tankPreviewIndex].kind,"hullDown");assert.equal(TP[S.tankPressureIndex].kind,"firePoint");
+  assert.equal(TP[S.tankBlockIndex].kind,"block");assert.equal(TP[S.tankEndIndex].kind,"squeeze");
+  assert.ok(S.tankPressureIndex<S.tankBlockIndex,"the tank presses the nest before it seals the gap");
+  assert.deepEqual(S.road.slice(0,TP.length),TP.map(w=>({x:w.x,z:w.z})),"the terrain road is the tank path");
+  const t=ProbeTank();
+  assert.deepEqual(t.footprintHits,[],"the 5.75 x 2.18 m hull never touches a block or a wire belt");
+  assert.ok(t.maxPitchDeg<=8,`the road is drivable: ${t.maxPitchDeg} deg`);
+  const wp=Object.fromEntries(t.waypoints.map(w=>[w.id,w]));
+  assert.ok(!wp.Start.turretSeen&&!wp.Start.hullSeen,"the tank starts out of sight of the nest seat");
+  assert.ok(wp.HullDown.turretSeen&&!wp.HullDown.hullSeen,"HullDown shows the turret only");
+  assert.ok(!wp.Bend.turretSeen,"the bend is behind NorthRuin");
+  assert.ok(wp.BendExit.hullSeen&&wp.Pressure.hullSeen,"the tank comes out of the bend in full view");
+  const hidden=t.turretTransitions.find(x=>!x.seen),back=t.turretTransitions.find(x=>x.seen&&x.s>(hidden?.s??0));
+  assert.ok(hidden&&back&&back.s-hidden.s>=20,`the ruin hides the tank for a real stretch of road: ${JSON.stringify(t.turretTransitions)}`);
+  // K6: after the preview the tank drops out of sight for 20 m+ and reappears coming out of the bend.
+  const sHull=wp.HullDown.s,sExit=wp.BendExit.s;
+  const gone=t.turretTransitions.find(x=>!x.seen&&x.s>sHull),reappear=t.turretTransitions.find(x=>x.seen&&x.s>(gone?.s??1e9));
+  assert.ok(gone&&reappear&&reappear.s-gone.s>=20&&reappear.s<=sExit,`after HullDown the ruin hides 20 m+ and the tank reappears at the bend exit: ${JSON.stringify(t.turretTransitions)}`);
+  // K5 (09.23 review): the preview reads on screen. The whole turret (hull top up) shows over the cutting lip,
+  // its upper part stands against the sky, and it is at most 60 m from the seat: >= 10.5 px tall at 720p / 55 deg
+  // (>= 15 px aiming down the sights). 20 px at 55 deg would need the tank within 30 m - not a far-road preview.
+  const v=t.hullDownView;
+  assert.ok(v.distM<=60,`HullDown is within 60 m of the seat: ${v.distM}`);
+  assert.ok(v.shownFromM!==null&&v.shownFromM<=TH.hullTop+0.05,`the whole turret shows over the lip: from ${v.shownFromM} m`);
+  assert.ok(v.skyFromM!==null&&TH.turretTop-v.skyFromM>=0.6,`the turret stands against the sky: sky behind from ${v.skyFromM} m`);
+  assert.ok(v.px720>=10.5&&v.px720Ads>=15,`K5 turret on screen: ${v.px720} px (ADS ${v.px720Ads} px) at 720p`);
+  assert.equal(t.gapLast21m.seen,t.gapLast21m.n,"the gun holds the gap over the last 21 m of the path (a stable lane, not one edge)");
+  assert.ok(t.gapGridBlock.ok>=6&&t.gapGridSqueeze.ok>=6,`Block/Squeeze see the gap over ±1 m x 4 heights: ${t.gapGridBlock.ok}/${t.gapGridSqueeze.ok} of 12`);
+  assert.ok(t.blockNorthOfCrestM>=5&&t.squeezeNorthOfCrestM>=5,"the tank stops north of the berm line, never in our depth");
+  assert.ok(t.pressureSeesSeat,"from the pressure point the gun reaches the nest seat");
+  for(const [id,d] of Object.entries(t.denies)){
+    for(const key of ["rearJunctionStanding","safeZone","lastCoverCrouched","throwCrouched","damagedLipCrouched"])
+      assert.equal(d[key],false,`${id}: the gun must not see ${key}`);
+    assert.ok(d.seat,`${id}: the gun still covers the nest seat`);
+  }
+  assert.ok(t.denies.Block.damagedLipStanding,"standing up at the damaged lip shows you to the tank (K8 is a choice)");
+  assert.ok(t.throwRelDeg>=90,`the attack position is behind the hull's beam: ${t.throwRelDeg} deg off the nose`);
+  assert.equal(t.tailHullMg.inArc,0,"hull MG (±26 deg on the gap) does not reach the attack tail: that is the turret's job");
+  assert.ok(t.tailTurret.Block>=t.tailTurret.n/2&&t.tailTurret.Squeeze>=t.tailTurret.n/2,
+    `the turret MG covers the attack branch's last 4.7 m (risk window): ${JSON.stringify(t.tailTurret)}`);
+  assert.ok(t.roadblock.length===2&&t.roadblock.every(b=>b.roadDistM<=3),"the cart and the felled pole sit across the south road");
+  assert.ok(t.roadblockCraterDepth>=1,"the roadblock crater cuts the south road");
+  console.log(`ok tank path ${t.lengthM} m: hidden start, hull-down at ${wp.HullDown.seatDist} m (${v.px720} px, ADS ${v.px720Ads} px, skyline from ${v.skyFromM} m), ruin hides ${back.s-hidden.s}/${reappear.s-gone.s} m, `
+    +`gap lane ${t.gapLast21m.seen}/${t.gapLast21m.n}, block ${t.blockNorthOfCrestM} m north of the crest, rear quarter ${t.throwRelDeg} deg`);
+}
+
+// ---------------------------------------------------------------- routes (players, NPCs, enemies)
+{
+  const routes=ProbeRoutes();
+  for(const [name,r] of Object.entries(routes)){
+    assert.deepEqual(r.hits,[],`${name}: capsule clearance`);
+    assert.deepEqual(r.slopes,[],`${name}: climbable (52 deg)`);
+  }
+  const retreat=RouteLength(SR.rearTrench);
+  assert.ok(retreat>=40&&retreat<=60,`02 retreat is 40-60 m (contract §4): ${retreat.toFixed(1)}`);
+  assert.ok(D(SR.rearTrench.at(-1),R.support[0])<1,"02 ends at the casualty collection (06 same place)");
+  // No single straight leg of the 03 approach runs longer than 10 m.
+  const longest=Math.max(...S.approach.slice(1).map((p,i)=>D(p,S.approach[i])));
+  assert.ok(longest<=10,`03 approach legs stay short (cover rhythm): ${longest.toFixed(1)} m`);
+  // 05 -> 06 return (104 m): no stretch longer than 60 m without a beat - K10 at the west door, He and the rest of the
+  // line meeting in the safe zone (FRONT_SPACE.returnMeet), the collection. (09.24 review: 80 m of nothing.)
+  {
+    const r=SR.collectionReturn,At=(p)=>{let best=1e9,bs=0,acc=0;for(let i=1;i<r.length;i++){const a=r[i-1],b=r[i],L=D(a,b),
+      t=Math.max(0,Math.min(1,((p.x-a.x)*(b.x-a.x)+(p.z-a.z)*(b.z-a.z))/(L*L))),d=D(p,{x:a.x+(b.x-a.x)*t,z:a.z+(b.z-a.z)*t});
+      if(d<best){best=d;bs=acc+L*t;}acc+=L;}return {s:bs,off:best};};
+    const beats=[{s:0},At(SP.westDoor),At(SP.returnMeet),{s:RouteLength(r)}];
+    assert.ok(At(SP.returnMeet).off<=SP.returnMeet.radiusM,"the return beat lies on the 05->06 route");
+    const gaps=beats.slice(1).map((b,i)=>b.s-beats[i].s);
+    assert.ok(Math.max(...gaps)<=60,`05->06 return has a beat every 60 m: ${gaps.map(g=>g.toFixed(0)).join("/")}`);
+  }
+  console.log(`ok ${Object.keys(routes).length} routes clear a 0.35 m capsule and climb under 52 deg; 02 retreat ${retreat.toFixed(1)} m`);
+}
+
+// ---------------------------------------------------------------- exposure rhythm
+{
+  const e=ProbeExposure();
+  assert.equal(e.support03.crouchedExposed,0,"03 support sap: crouched is covered from every threat");
+  assert.ok(e.rightTrenchVsNest.longestCrouchedRunM<=4,`03 right low trench: the nest can see a crouched man for at most 4 m running: ${e.rightTrenchVsNest.longestCrouchedRunM}`);
+  // 2026-09-24: the flank group's last line is north-east of the nest now; fire step 0 catches its bounds across the field.
+  assert.ok(new Set(e.fireSteps[0].standingSees.filter(id=>id.startsWith("FrontFlank")).map(id=>id.split("@")[0])).size>=3,
+    `fire step 0 engages the flank group while it bounds (<= 60 m): ${e.fireSteps[0].standingSees.join(",")}`);
+  assert.ok(e.fireSteps[1].standingSees.includes("RightNestGunner"),"fire step 1 engages the nest gunner over the low west wall");
+  assert.ok(e.fireSteps.every(f=>f.crouchedSeen.length===0),"crouched on a fire step nobody in the nest sees you");
+  assert.equal(e.retreat02FromFold.sswLegStandingExposed,0,"02: the fold F cannot shoot down the intact south-south-west leg");
+  assert.ok(/[CS]/.test(e.retreat02FromFold.profile.slice(0,10)),"02: the low-wall stretch right after the return spot is briefly exposed to the fold");
+  assert.ok(e.retreat02.longestCrouchedRunM<=5,`02 retreat exposure is short: ${e.retreat02.longestCrouchedRunM} m`);
+  assert.ok(e.attackTail4m.exposed>=e.attackTail4m.samples/2,`05 attack branch: its last 4 m are a real risk window: ${e.attackTail4m.exposed}/${e.attackTail4m.samples}`);
+  assert.ok(e.attack05.longestCrouchedRunM<=4,`05 attack branch before the tail keeps cover beats: ${e.attack05.longestCrouchedRunM} m`);
+  assert.ok(e.rearRoute04.longestCrouchedRunM<=8,`04 short withdrawal exposure: ${e.rearRoute04.longestCrouchedRunM} m`);
+  console.log(`ok exposure: 03 sap 0 m, right trench ${e.rightTrenchVsNest.longestCrouchedRunM} m, 02 ${e.retreat02.longestCrouchedRunM} m, 05 tail ${e.attackTail4m.exposed}/${e.attackTail4m.samples}`);
+}
+
+// ---------------------------------------------------------------- lanes the runtime raycasts (wire stakes/strands are ray colliders)
+{
+  const lanes=ProbeWireLanes();
+  for(const l of lanes)assert.equal(l.blocker,null,`${l.name}: clear of every block, terrain and wire roll (blocked by ${l.blocker})`);
+  console.log(`ok runtime gap lanes clear of wire: ${lanes.length}`);
+}
+// The 05 cut-in pair is pre-placed at BunkerRescue (hold). From its posts it must not see the gap or the
+// backslope guards: FrontBattle.InfantryBlockade keeps the 03 withdrawal shut while any live enemy sees the gap.
+for(const e of S.enemies){
+  assert.equal(e.hold,true,`${e.id}: the cut-in pair holds its sap until 05`);
+  for(const h of [.9,1.35]){
+    assert.notEqual(Sight(Eye(e,h),Eye(S.gap,B.guardHeightM),{wire:true}),null,`${e.id} (eye ${h} m) cannot see the gap from its post`);
+    for(const g of FRONT_GUARD_POSTS)assert.notEqual(Sight(Eye(e,h),Eye(g,1.0)),null,`${e.id} cannot see guard post ${g.x},${g.z}`);
+  }
+}
+console.log(`ok 05 cut-in pair hidden from the gap and the backslope: ${S.enemies.length}`);
+// The tank seals the gap; its escorts guard the tank. An escort slot that sees the gap keeps InfantryBlockade on after the
+// tank is disabled, and the last guards never withdraw (03-06 cold start 09.24: stuck on lastGuardsWithdrawn).
+for(const e of FRONT_TANK_ESCORT_SLOTS)for(const p of [S.gap,{x:S.gap.x,z:S.gap.z-2},{x:S.gap.x,z:S.gap.z+2}])for(const h of [.9,1.35])
+  assert.notEqual(Sight(Eye(e,h),Eye(p,B.guardHeightM),{wire:true}),null,`escort slot ${e.id} (eye ${h} m) cannot see the gap point ${p.x},${p.z}`);
+console.log(`ok tank escort slots hidden from the gap: ${FRONT_TANK_ESCORT_SLOTS.length}`);
+// The backslope scrape must not be enfiladed: no planned enemy start or lane point (front, flank group, 04 push)
+// sees a kneeling guard on it. The flank group's last line sits south of the berm's east end, on the scrape's
+// axis; without ScrapeEastTraverse it killed the whole second batch in the 03-06 cold start (guardBatchLost).
+{
+  const who=[...FRONT_FLANK_GROUP.flatMap(f=>[f,...f.lane]),
+    ...[...E.front,...E.machineGun].flatMap(s=>[s,...(s.hold?[]:FrontAssaultLane(s.x,s.z))])];
+  const enfilade=[];
+  for(const w of who)for(const g of FRONT_GUARD_POSTS)if([1.0,1.35].some(h=>Sight(Eye(w,h),Eye(g,.8))===null))enfilade.push(`${w.id||"lane"}@${w.x},${w.z}->${g.x}`);
+  assert.deepEqual(enfilade,[],"no enemy start or lane point enfilades the backslope scrape");
+  for(const f of FRONT_FLANK_GROUP)assert.equal(Sight(Eye(f.lane.at(-1),1.0),Eye(S.gap,1.2)),null,`${f.id} last line still sees the gap over ScrapeEastTraverse`);
+  console.log(`ok backslope scrape not enfiladed from ${who.length} enemy points`);
+}
+// FrontBattle gathers the second guard batch at lastCover + k*gatherSpacingM along lastCover.z and walks each man
+// there in a straight line from his post: every hold and every walk must be capsule-clear (GapLastCover once
+// stood across the line and pinned the second man; remainingGuardsGathered never fired in the 03-06 cold start).
+{
+  const holds=FRONT_GUARD_POSTS.slice(B.firstBatch).map((p,k)=>({post:p,hold:{x:S.lastCover.x+k*B.gatherSpacingM,z:S.lastCover.z}}));
+  for(const {post,hold} of holds){
+    const walk=RouteClearance([post,hold]);
+    assert.deepEqual(walk.hits,[],`guard ${post.x},${post.z} walks clear to its gather hold ${hold.x.toFixed(2)},${hold.z}`);
+  }
+  console.log(`ok second-batch gather line clear: ${holds.length} holds`);
+}
+
+// ---------------------------------------------------------------- enemies: cover, roles, budget, hidden entries
+{
+  const c=ProbeEnemyCover();
+  assert.deepEqual(c.uncovered,[],"every enemy start (and every bound's last line) has real cover or is dug in");
+  for(const f of c.flankGap){
+    assert.ok(f.seesGap,`${f.id}'s last line sees the gap`);
+    // 2026-09-24 review: the captured gun meets them at 15-25 m (not point blank); they hold the gap at rifle range.
+    assert.ok(f.dist>=15&&f.dist<=55,`${f.id} last line is 15-55 m from the gap: ${f.dist}`);
+    assert.ok(f.seatDist>=15&&f.seatDist<=25,`${f.id} last line is 15-25 m from the captured gun: ${f.seatDist}`);
+  }
+  // Nest guards face the side the player comes from (south-west: right low trench, west door, rear junction),
+  // within 60 deg; the gunner's gun lies on the gap.
+  const Off=(a,b)=>{let d=a-b;while(d>180)d-=360;while(d<-180)d+=360;return Math.abs(d);};
+  for(const g of c.nestFaces){
+    assert.equal(g.onApproach,false,`${g.id} guards the nest, not the player's approach trench`);
+    assert.ok(g.faceBearing!==null,`${g.id} has an authored facing`);
+    if(g.role==="nestGun")assert.ok(Off(g.faceBearing,Bearing(S.nest,S.gap))<=20,`${g.id} lays the gun on the gap: ${g.faceBearing}`);
+    else assert.ok(Off(g.faceBearing,-135)<=60,`${g.id} faces south-west (our side) within 60 deg: ${g.faceBearing}`);
+  }
+  for(const row of c.rows)assert.ok(row.role,`${row.group}/${row.id} carries a role`);
+  // Budget from the real spawn tables (MISSION_STEP_SPAWNS + activation facts + retire), contract §6.
+  const n=ProbeCounts();
+  assert.deepEqual(n.unresolved,[],"every 01-05 enemy has a spawn stage and a leave stage");
+  assert.ok(n.cumulative<=55,`01-05 cumulative enemies <= 55: ${n.cumulative}`);
+  assert.ok(n.alive03<=30&&n.alive04<=30&&n.alive05<=30,`03-05 worst-case alive <= 30: ${n.alive03}/${n.alive04}/${n.alive05}`);
+  for(const g of ["bunkerAssault","bunkerBackdrop","bunkerPursuit"]){
+    assert.ok(ACTIVATION[g].retire,`${g} declares how its survivors leave (retire)`);
+    assert.ok(!n.alive03ByGroup[g]&&!n.alive05ByGroup[g],`${g} is off the field before 03`);
+  }
+  // Where the pursuers retire to is out of sight of every 02-06 friendly spot (and of the 04/05 routes).
+  const ex=ProbeExposure();
+  assert.deepEqual(ex.fallbackSees,[],"the 02 pursuers' fallback (depth sap) is unseen from RJ, the 04/05 routes, SJ, RC and the collection");
+  assert.ok(!ex.rearRoute04.by?.pursuitFallback0&&!ex.rearRoute04.by?.pursuitFallback1,"RJ and the 04 rear route are hidden from the pursuit fallback");
+  // No two 01-05 starts share a spot (NPC capsules do not collide: two men spawned on one point merge into one).
+  {
+    const starts=["bunkerAssault","bunkerBackdrop","bunkerPursuit","approach","front","frontFlank","frontOfficer","machineGun","tank","frontReserve","bundleApproach"]
+      .flatMap(g=>E[g].map(s=>({id:g+"/"+s.id,x:s.x,z:s.z})));
+    const close=[];
+    for(let i=0;i<starts.length;i++)for(let j=i+1;j<starts.length;j++)if(D(starts[i],starts[j])<0.8)close.push(`${starts[i].id}~${starts[j].id}`);
+    assert.deepEqual(close,[],"01-05 starts are at least 0.8 m apart");
+  }
+  for(const e of ProbeEntries()){
+    const seen=e.rows.filter(r=>r.visible&&r.dist<60);
+    assert.deepEqual(seen.map(r=>`${r.from}@${r.dist}`),[],`${e.id} enters out of sight (>= 60 m or hidden)`);
+    if(/^MachineGunAttack|^waveCentre|^NorthWestPlateau/.test(e.id))
+      assert.deepEqual(e.rows.filter(r=>r.visible).map(r=>r.from),[],`${e.id} is inside the jump-off trench, hidden from every friendly post`);
+  }
+  console.log(`ok enemies: ${c.rows.length} starts covered, flank last line sees the gap, cumulative ${n.cumulative}, alive 02-05 ${n.alive["02"]}/${n.alive03}/${n.alive04}/${n.alive05}`);
+}
+
+// ---------------------------------------------------------------- separation, 01 corridor, flood fill, engagement
+{
+  const s=ProbeSeparation();
+  assert.ok(s.ammoVsBackslopeM>=30,`the ammo sap stays far from the backslope: ${s.ammoVsBackslopeM}`);
+  assert.ok(s.ammoVsRightTrenchM>=8,`the ammo sap and the approach trench are separate: ${s.ammoVsRightTrenchM}`);
+  assert.ok(s.corridor01.minFriendlyM>=30&&s.corridor01.mutualWithin30.length===0,
+    `01 break-in corridor is >= 30 m from the firing line and unseen: ${JSON.stringify(s.corridor01)}`);
+  for(const [key,value] of Object.entries(s.backslopeFlood))if(key.startsWith("reaches"))
+    assert.equal(value,false,`without the gap the backslope must not connect: ${key}`);
+  const g=ProbeEngagement();
+  assert.ok(g.in15to60/g.n>=0.5,`the main engagement band is 15-60 m: ${g.in15to60}/${g.n} ${JSON.stringify(g.bands)}`);
+  console.log(`ok separation: ammo/backslope ${s.ammoVsBackslopeM} m, 01 corridor ${s.corridor01.minFriendlyM} m unseen, engagement bands ${JSON.stringify(g.bands)}`);
+}
+
+// ---------------------------------------------------------------- breakable cover (data for the Tank package mechanism)
+{
+  const Block=id=>L.blocks.find(b=>b.id===id);
+  for(const id of FRONT_UNBREAKABLE)assert.ok(Block(id),"unbreakable "+id+" exists");
+  for(const b of FRONT_BREAKABLES){
+    assert.ok(b.hits>=1&&b.stages.length===b.hits,b.id+": one stage per hit");
+    if(b.block){
+      const block=Block(b.block);assert.ok(block,b.id+" names a real block "+b.block);
+      assert.ok(!FRONT_UNBREAKABLE.includes(b.block),b.id+" is not on the unbreakable list");
+      let top=block.y+block.h/2-G(block.x,block.z);
+      for(const stage of b.stages){assert.ok(stage.topM<top,b.id+" goes down a stage at a time");top=stage.topM;}
+    } else {
+      let depth=N(b.terrain.x,b.terrain.z)-G(b.terrain.x,b.terrain.z);
+      for(const stage of b.stages){assert.ok(stage.depthM<depth,b.id+" gets shallower a stage at a time");depth=stage.depthM;}
+    }
+  }
+  for(const id of ["RightNestRearWest","RightNestRearEast","GapLastCover","RoadsideRuin"])assert.ok(FRONT_UNBREAKABLE.includes(id),id+" never breaks");
+  assert.equal(FRONT_BREAKABLES.filter(b=>/^RightNest/.test(b.block||"")).length,3,"three nest front parapet sections break");
+  assert.ok(FRONT_BREAKABLES.find(b=>b.block==="NorthRuinGable")?.visualOnly,"the bend occluder only changes its look");
+  console.log("ok breakables: "+FRONT_BREAKABLES.map(b=>b.id).join(",")+"; "+FRONT_UNBREAKABLE.length+" never break");
+}
+
+// ---------------------------------------------------------------- 03–06 entry, capture and batch logic
+{
+  // 02 ends at the collection; the companions pick up the 03 route from wherever they stand on the rear trench.
+  for(const [name,start] of Object.entries({rearCorner:{x:-4.2,z:-113.6},rearTrench:{x:-16.5,z:-111.3},supportJunction:{x:-28.6,z:-110.2}})){
+    const entry=FrontEntryRoute(start,R.support);
+    assert.ok(entry.some(p=>p.x===SP.supportJunction.x&&p.z===SP.supportJunction.z),name+" goes through the support junction");
+    const c=RouteClearance([start,...entry],{state:"BunkerCollapsed",descendOnly:true});
+    assert.deepEqual(c.hits,[],name+" entry capsule clearance");assert.deepEqual(c.slopes,[],name+" entry climbable");
+  }
+  const initialized=FrontEntryRoute(R.support[0],R.support);
+  assert.deepEqual(initialized.map(({x,z})=>({x,z})),R.support,"03 initialization at collection never retraces the rear exit");
+  const advanced=FrontEntryRoute(R.support[1],R.support);
+  assert.deepEqual(advanced.map(({x,z})=>({x,z})),R.support.slice(1),"an advanced companion keeps its actual route progress");
+  const see=(a,ah,b,bh)=>Sight(Eye(a,ah),Eye(b,bh))===null;
+  assert.ok(see(S.seat,1.65,S.gap,1.2),"captured position can see the rescued men cross the breach");
+  assert.ok(see(S.nest,1.45,S.gap,1.2),"the right gun actually controls the breach before capture");
+  assert.ok(D(S.leaderCover,S.seat)-B.arrivalM-.4>=1.5,"leader cover stays separate from the player seat even with arrival and cover allowances");
+  assert.ok(D(S.leaderCover,S.nest)+B.arrivalM<=B.captureRadiusM,"arriving at the separate leader post still completes physical capture");
+  assert.ok(see(S.leaderCover,1.2,S.gap,1.2),"the crouching leader retains a real firing lane to the breach");
+  const lead=RouteClearance([...R.support.slice(0,-1),S.leaderCover]);
+  assert.deepEqual([...lead.hits,...lead.slopes],[],"the leader's capture leg reaches his post");
+  assert.deepEqual(R.bundleReturn,[...R.bundle].reverse(),"return is the same branch");
+  assert.deepEqual(S.attackRoute[0],S.rear);assert.deepEqual(S.route[0],S.rear);
+  // Old ammo yard: south-east of the nest behind the line, west of the (blocked) south road, entered from its back door.
+  assert.ok(S.house.z>S.rear.z+20&&S.house.x>S.seat.x,"ammo house is south-east of the nest, on our side");
+  assert.ok(S.house.x<Math.min(...SP.southRoad.map(p=>p.x)),"ammo house stays west of the road");
+  assert.ok(S.route.at(-1).x<S.house.x,"the ammo route ends at the house's west (back) door");
+  assert.notDeepEqual(S.throw,S.seat,"throw does not return to MG seat");
+  assert.ok(D(S.throw,S.house)>20&&D(S.throw,S.seat)>10,"attack position, ammo house and firing seat are three different places");
+  const guard=(alive,safe,progress=4)=>({actor:{alive},safe,progress,route:Array(4)});
+  assert.equal(BatchRecovered([]),false);assert.equal(BatchRecovered([guard(false,true)]),false);
+  assert.equal(BatchRecovered([guard(true,false)]),false,'running is not recovered');
+  assert.equal(BatchRecovered([guard(true,true,3)]),false,'a flag cannot replace completed travel');
+  assert.equal(BatchRecovered([guard(true,true),guard(false,false)]),true,'surviving batch reaches safety');
+  const assault=[{alive:false},{alive:false},{alive:false},{alive:true},{alive:true}];
+  assert.equal(AssaultWindow(assault,true,false),true,'finite threshold does not require battlefield wipe');
+  assert.equal(AssaultWindow(assault,true,true),false,'direct fire still closes the window');
+  assert.equal(AssaultWindow(assault,false,false),false,'capture is required');
+  const requirements=id=>MISSION_STAGES.find(s=>s.id===id).requirements;
+  for(const fact of ['tankImmobilized','tankFireDisabled','attackRetreated','lastGuardsWithdrawn','reliefInPosition','collectionReturned'])assert.ok(requirements('Tank').includes(fact));
+  assert.ok(requirements('MachineGun').includes('rightRearReached'));assert.ok(requirements('Support').includes('rifleWithdrawalResolved'));
+}
+console.log("ok 01–06 space: keyframes, tank lane, routes, exposure rhythm, covered starts, hidden entries, separation and 03–06 gates");

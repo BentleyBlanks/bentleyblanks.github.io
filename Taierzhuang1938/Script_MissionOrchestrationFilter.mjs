@@ -99,10 +99,16 @@ export function RouteLabel(name) {
 // 敌军组的中文名。转运区两组由 EncounterLabel 按威胁事实表顺序现算。
 export const ENCOUNTER_LABELS = Object.freeze({
   bunkerAssault: "掩蔽部门外行刑的日军",
-  approach: "压向外围阵地的日军",
+  // 2026-09-23 01–06 空间重排（契约 §8）：approach 现在是占住右侧阵位的四人，bundleApproach 是 05 切入的两人。
+  bunkerBackdrop: "远处推进与还击的背景兵",
+  bunkerPursuit: "追进交通壕的日军",
+  approach: "占住右侧阵位的日军",
   front: "前沿阵地上的日军",
+  frontFlank: "摸向土坎东头的侧翼组",
+  frontOfficer: "前沿指挥的日军军官",
+  frontReserve: "从视线外补上来的日军",
   machineGun: "冲机枪位的那一波",
-  bundleApproach: "护着战车的日军",
+  bundleApproach: "从道路连接沟切进取弹沟的日军",
   tank: "战车与它的护卫",
   village: "村口的日军",
   melee: "从连屋冲出来的日军",

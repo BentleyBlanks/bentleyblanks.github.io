@@ -1,0 +1,185 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>First Level 01-06 Space Map</title>
+<style>
+body{margin:0;background:#1b1d1f;color:#eee;font-family:"Microsoft YaHei","PingFang SC",sans-serif;}
+#wrap{position:relative;width:1880px;}
+.panel{position:absolute;}
+canvas{position:absolute;left:0;top:0;}
+svg{position:absolute;left:0;top:0;overflow:visible}
+#legend{position:absolute;left:30px;width:1080px;font-size:13px;line-height:1.5;color:#ddd}
+#legend b{color:#fff}
+.sw{display:inline-block;width:22px;height:10px;margin:0 4px -1px 12px;border:1px solid #000}
+h1{position:absolute;left:30px;top:6px;margin:0;font-size:20px;color:#fff}
+.sub{position:absolute;left:30px;top:34px;font-size:12.5px;color:#bbb;width:1820px}
+.ptitle{position:absolute;font-size:14px;color:#fff;font-weight:bold}
+</style></head><body><div id="wrap">
+<h1>第一关 01–06 空间（2026-09-23 重排 · 最终实现）· 由数据表直接绘制 · topology first-level-20260923-space-0106</h1>
+<div class="sub">X 向东 →，Z 向南 ↓（上北下南）。底色 = 共享地面采样器晕渲 + 开挖深度（深褐 = 沟底）；方块 = MISSION_LAYOUT.blocks（右上放大图叠加 BunkerCollapsed 态）；黄虚框 = 前沿土坎（z=−160）；青扇 = K1–K11 机位（静态视线由 Script_FirstLevelSpaceProbe 实算）。</div>
+<div id="main" class="panel" style="left:30px;top:74px"></div><div class="ptitle" style="left:30px;top:56px">主图 6 px = 1 m（01–06 全景）</div>
+<div id="insetA" class="panel" style="left:1130px;top:74px"></div><div class="ptitle" style="left:1130px;top:56px">01–02 前沿交通壕与防炮洞（12 px = 1 m，坍塌态）</div>
+<div id="insetB" class="panel" style="left:1130px;top:560px"></div><div class="ptitle" style="left:1130px;top:542px">右侧口袋：阵位 / 后墙岔口 / 旧院 / 攻击支路 / 战车封口（11 px = 1 m）</div>
+<div id="legend"></div>
+</div>
+<script>
+const DATA = __DATA__;
+const NS="http://www.w3.org/2000/svg";
+function el(tag,attrs,parent,text){const e=document.createElementNS(NS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(text!=null)e.textContent=text;parent&&parent.appendChild(e);return e;}
+const semColor={cover:"#5b87a6",earthDark:"#8a6440",structure:"#a09a90",plaster:"#c9c0ae",timber:"#8e6d3c",missionRoute:"#3cb35a",roof:"#707470",foliage:"#6d7a5f",metal:"#5a605d",step:"#c4a668",canvas:"#a4a393",OpeningEarth:"#8a6440",OpeningWood:"#8e6d3c"};
+function DrawMap(host,view,scale,opts={}){
+  const w=Math.round((view.maxX-view.minX)*scale),h=Math.round((view.maxZ-view.minZ)*scale);
+  host.style.width=w+"px";host.style.height=h+"px";
+  const cv=document.createElement("canvas");cv.width=w;cv.height=h;host.appendChild(cv);
+  const ctx=cv.getContext("2d");const img=ctx.createImageData(w,h);const D=DATA,E=D.EXT;
+  const sample=(arr,x,z)=>{let i=Math.floor((x-E.minX)/D.step),j=Math.floor((z-E.minZ)/D.step);i=Math.max(0,Math.min(D.W-1,i));j=Math.max(0,Math.min(D.H-1,j));return arr[j*D.W+i];};
+  for(let py=0;py<h;py++)for(let px=0;px<w;px++){
+    const x=view.minX+(px+.5)/scale,z=view.minZ+(py+.5)/scale;const g=sample(D.hg,x,z),c=sample(D.cut,x,z);
+    const gx=sample(D.hg,x+D.step,z)-sample(D.hg,x-D.step,z),gz=sample(D.hg,x,z+D.step)-sample(D.hg,x,z-D.step);
+    let shade=.8+(-gx*.9-gz*.9)*.55;shade=Math.max(.35,Math.min(1.3,shade));
+    let r=118,gg=112,b=96;if(g>0.8){r=146;gg=132;b=98;}if(g>1.6){r=160;gg=146;b=108;}
+    if(c<-0.25){r=104;gg=88;b=68;}if(c<-0.8){r=84;gg=68;b=52;}if(c<-1.4){r=60;gg=47;b=36;}
+    const k=(py*w+px)*4;img.data[k]=r*shade;img.data[k+1]=gg*shade;img.data[k+2]=b*shade;img.data[k+3]=255;}
+  ctx.putImageData(img,0,0);
+  const svg=el("svg",{width:w,height:h,viewBox:`0 0 ${w} ${h}`},host);const defs=el("defs",{},svg);
+  const X=x=>(x-view.minX)*scale,Z=z=>(z-view.minZ)*scale;const fs=opts.font||11;
+  const gstep=opts.grid||10;
+  for(let x=Math.ceil(view.minX/gstep)*gstep;x<=view.maxX;x+=gstep){el("line",{x1:X(x),y1:0,x2:X(x),y2:h,stroke:"#fff","stroke-opacity":x%(gstep*2)?.05:.12},svg);el("text",{x:X(x)+2,y:h-3,fill:"#ccc","font-size":fs-2},svg,`x${x}`);}
+  for(let z=Math.ceil(view.minZ/gstep)*gstep;z<=view.maxZ;z+=gstep){el("line",{x1:0,y1:Z(z),x2:w,y2:Z(z),stroke:"#fff","stroke-opacity":z%(gstep*2)?.05:.12},svg);el("text",{x:2,y:Z(z)-2,fill:"#ccc","font-size":fs-2},svg,`z${z}`);}
+  const clip=el("clipPath",{id:"c"+host.id},defs);el("rect",{x:0,y:0,width:w,height:h},clip);
+  const g=el("g",{"clip-path":`url(#c${host.id})`},svg);
+  const Poly=(pts,attrs)=>el("polyline",{points:pts.map(p=>`${X(p.x)},${Z(p.z)}`).join(" "),fill:"none","stroke-linejoin":"round",...attrs},g);
+  const arrow=(id,color)=>{const m=el("marker",{id:id+host.id,viewBox:"0 0 10 10",refX:8,refY:5,markerWidth:5,markerHeight:5,orient:"auto-start-reverse"},defs);el("path",{d:"M0,0 L10,5 L0,10 z",fill:color},m);return `url(#${id}${host.id})`;};
+  const Txt=(x,z,t,color="#fff",size=fs,anchor="start",bold=false)=>el("text",{x:X(x),y:Z(z),fill:color,"font-size":size,"text-anchor":anchor,"font-weight":bold?"bold":"normal","paint-order":"stroke",stroke:"#000","stroke-width":2.6},g,t);
+  for(const r of D.roads)Poly(r.points,{stroke:"#d8c592","stroke-width":r.width*scale,"stroke-opacity":.22});
+  // berm crest outline
+  el("rect",{x:X(-30),y:Z(-163.5),width:42*scale,height:7*scale,fill:"#e0c070","fill-opacity":.06,stroke:"#e0c070","stroke-dasharray":"6 3","stroke-width":1.3},g);
+  for(const t of D.trenches)Poly(t.points,{stroke:"#f0e6d0","stroke-width":1,"stroke-dasharray":"3 3","stroke-opacity":.45});
+  const drawBlocks=(list,alpha=.9)=>{for(const b of list){const gg=el("g",{transform:`translate(${X(b.x)},${Z(b.z)}) rotate(${-b.ry*180/Math.PI})`},g);
+    el("rect",{x:-b.w/2*scale,y:-b.d/2*scale,width:b.w*scale,height:b.d*scale,fill:semColor[b.sem]||"#888",stroke:"#111","stroke-width":.6,"fill-opacity":alpha},gg);}};
+  drawBlocks(D.blocks);if(opts.scen)drawBlocks(D.scen,.95);
+  for(const o of D.wire){el("line",{x1:X(o.x-1.6),y1:Z(o.z),x2:X(o.x+1.6),y2:Z(o.z),stroke:"#eee","stroke-width":1.6,"stroke-dasharray":"1 2"},g);}
+  for(const p of D.poles){el("circle",{cx:X(p.x),cy:Z(p.z),r:p.lean?4:3,fill:p.lean?"#ffcc66":"#d9b98a",stroke:"#000"},g);}
+  const RT=D.routes,S=D.S,SP=D.SP;
+  // enemy lanes first (under routes)
+  for(const l of D.bgLanes)Poly(l.pts,{stroke:"#ff5a48","stroke-width":1,"stroke-opacity":.75,"marker-end":arrow("abg","#ff5a48")});
+  for(const l of D.fgLanes)Poly(l.pts,{stroke:"#ff9a30","stroke-width":1.6,"stroke-dasharray":"5 2","marker-end":arrow("afg","#ff9a30")});
+  Poly([{x:D.officer.x,z:D.officer.z},...D.officer.lane],{stroke:"#ffd400","stroke-width":1.2,"stroke-dasharray":"2 2"});
+  for(const s of D.enemies.bunkerBackdrop.filter(s=>s.route).slice(0,1))Poly([s,...s.route],{stroke:"#c0304a","stroke-width":1.6,"stroke-dasharray":"1 3","marker-end":arrow("abd","#c0304a")});
+  for(const s of D.enemies.bunkerPursuit.filter(s=>s.route))Poly([s,...s.route],{stroke:"#ff4070","stroke-width":1.2,"stroke-dasharray":"4 2","marker-end":arrow("apu","#ff4070")});
+  Poly(RT.roadLink,{stroke:"#ff60b0","stroke-width":1.4,"stroke-dasharray":"4 2","marker-end":arrow("arl","#ff60b0")});
+  // friendly routes
+  for(const r of D.guardRoutes.slice(0,2))Poly(r,{stroke:"#5fa8ff","stroke-width":1.4,"stroke-dasharray":"4 3","marker-end":arrow("agd","#5fa8ff")});
+  Poly(RT.left,{stroke:"#5fe0e0","stroke-width":1.5,"stroke-dasharray":"6 3","marker-end":arrow("alf","#5fe0e0")});
+  Poly(RT.collectionReturn,{stroke:"#fff1b0","stroke-width":1.2,"stroke-dasharray":"1 3"});
+  Poly(RT.rearTrench,{stroke:"#ffd27a","stroke-width":2.4,"stroke-dasharray":"7 3","marker-end":arrow("art","#ffd27a")});
+  Poly(RT.support,{stroke:"#ff9d1a","stroke-width":2.6,"marker-end":arrow("asp","#ff9d1a")});
+  Poly(RT.rearRoute,{stroke:"#ffffff","stroke-width":2,"stroke-dasharray":"3 2","marker-end":arrow("arr","#ffffff")});
+  Poly(RT.bundle,{stroke:"#ffe23a","stroke-width":2.4,"marker-end":arrow("abu","#ffe23a")});
+  Poly(RT.attack,{stroke:"#ff4fd8","stroke-width":2.4,"marker-end":arrow("aat","#ff4fd8")});
+  // tank path
+  Poly(D.TP,{stroke:"#b01818","stroke-width":3,"stroke-opacity":.95,"marker-end":arrow("atk","#b01818")});
+  const kindColor={cruise:"#b01818",hullDown:"#ff7070",firePoint:"#ff3030",block:"#ff0000",squeeze:"#ff9090"};
+  D.TP.forEach((p,i)=>{el("circle",{cx:X(p.x),cy:Z(p.z),r:opts.big?6:4.5,fill:kindColor[p.kind],stroke:"#fff","stroke-width":1.2},g);
+    if(opts.tankLabels!==false&&(opts.big?i>=5:true)){const lbl=`${p.id} ${p.kind}${p.faceTo?" 车体→"+p.faceTo:""}${p.turretTo&&p.turretTo!==p.faceTo?" 炮塔→"+p.turretTo:""}${p.holdS?" "+p.holdS+"s":""}`;Txt(p.x+(opts.big?1:2),p.z-(opts.big?.8:1.4),lbl,"#ffb0b0",fs,"start",true);}});
+  // hull MG arc at block toward the gap (±26 deg)
+  const Wedge=(c,centerDeg,halfDeg,rad,color,label)=>{const a0=(centerDeg-halfDeg)*Math.PI/180,a1=(centerDeg+halfDeg)*Math.PI/180;const P=a=>({x:c.x+Math.sin(a)*rad,z:c.z-Math.cos(a)*rad});const p0=P(a0),p1=P(a1);
+    el("path",{d:`M${X(c.x)},${Z(c.z)} L${X(p0.x)},${Z(p0.z)} A${rad*scale},${rad*scale} 0 ${halfDeg*2>180?1:0} 1 ${X(p1.x)},${Z(p1.z)} z`,fill:color,"fill-opacity":.08,stroke:color,"stroke-opacity":.55,"stroke-dasharray":"3 3"},g);
+    if(label){const pm=P((a0+a1)/2);Txt((c.x+pm.x)/2,(c.z+pm.z)/2,label,color,fs-1,"middle");}};
+  const brg=(a,b)=>Math.atan2(b.x-a.x,-(b.z-a.z))*180/Math.PI;
+  const blk=D.TP.find(p=>p.kind==="block");
+  if(opts.arcs){Wedge(blk,brg(blk,S.gap),26,opts.big?16:48,"#ff6060",opts.big?null:"车体机枪 ±26°（朝缺口）");
+    Wedge(S.seat,-80,110,opts.big?9:26,"#7dff8a",opts.big?null:"夺点机枪射界（缺口→正面→道路）");
+    Wedge(S.leftSeat,55,40,opts.big?9:36,"#5fe0e0",opts.big?null:"老周侧射（沿土坎北侧）");}
+  // sight lines
+  const SL=(a,b,color,label,dash)=>{el("line",{x1:X(a.x),y1:Z(a.z),x2:X(b.x),y2:Z(b.z),stroke:color,"stroke-width":1.3,"stroke-dasharray":dash||"",opacity:.95},g);if(label)Txt((a.x+b.x)/2,(a.z+b.z)/2-.8,label,color,fs-1,"middle");};
+  if(opts.sight){const t2=D.TP.find(p=>p.kind==="hullDown");SL(S.seat,t2,"#ffa0a0","K5 露炮塔（车体被路堑沿遮）","6 3");SL(blk,S.gap,"#ff6060","战车@封口→缺口 通视","5 3");SL(S.seat,S.gap,"#7dff8a",null);}
+  // friendlies
+  const Dot=(p,fill,r,shape,label,dx=6,dy=-4,color="#fff")=>{const cx=X(p.x),cy=Z(p.z);
+    if(shape==="sq")el("rect",{x:cx-r,y:cy-r,width:2*r,height:2*r,fill,stroke:"#000","stroke-width":1},g);
+    else if(shape==="tri")el("path",{d:`M${cx},${cy-r-1} L${cx+r+1},${cy+r} L${cx-r-1},${cy+r} z`,fill,stroke:"#000","stroke-width":1},g);
+    else if(shape==="dia")el("path",{d:`M${cx},${cy-r-1} L${cx+r+1},${cy} L${cx},${cy+r+1} L${cx-r-1},${cy} z`,fill,stroke:"#000","stroke-width":1},g);
+    else if(shape==="x")el("path",{d:`M${cx-r},${cy-r} L${cx+r},${cy+r} M${cx+r},${cy-r} L${cx-r},${cy+r}`,stroke:fill,"stroke-width":2.2},g);
+    else if(shape==="ring")el("circle",{cx,cy,r,fill:"none",stroke:fill,"stroke-width":2},g);
+    else if(shape==="star")el("path",{d:`M${cx},${cy-r-2} L${cx+r*.5},${cy-r*.3} L${cx+r+2},${cy-r*.2} L${cx+r*.7},${cy+r*.5} L${cx+r},${cy+r+2} L${cx},${cy+r*.8} L${cx-r},${cy+r+2} L${cx-r*.7},${cy+r*.5} L${cx-r-2},${cy-r*.2} L${cx-r*.5},${cy-r*.3} z`,fill,stroke:"#000"},g);
+    else el("circle",{cx,cy,r,fill,stroke:"#000","stroke-width":1},g);
+    if(label)el("text",{x:cx+dx,y:cy+dy,fill:color,"font-size":fs,"paint-order":"stroke",stroke:"#000","stroke-width":2.6},g,label);};
+  const big=opts.big,lab=opts.labels!==false;
+  D.guardPosts.forEach((p,i)=>Dot(p,i<2?"#1e7bff":"#6fb0ff",big?5:3.5,"c",lab&&i===0&&!big?"守军 8（背坡浅刮沟 z−156，深蓝=第一批）":null,-40,16));
+  D.defenders.forEach(p=>Dot(p,"#6fb0ff",3.5,"sq",null));
+  Dot(S.leftSeat,"#3aa0ff",7,"star",lab&&!big?"老周左枪位（土坎西端）→何有田→接防":null,-150,-12);
+  Dot(S.keeper,"#3cb35a",big?5:3.5,"c",big?"留守兵":null);
+  // enemies
+  const En=D.enemies;
+  En.bunkerAssault.forEach(s=>Dot(s,"#ff2020",big?5:3.5,"x",opts.opening?s.role:null,5,-4,"#ff9090"));
+  En.bunkerBackdrop.forEach(s=>Dot(s,s.side==="nra"?"#4fa0ff":"#c0304a",big?4:2.6,s.side==="nra"?"c":"x",null));
+  En.bunkerPursuit.forEach(s=>Dot(s,"#ff4070",big?5:3.5,"ring",opts.opening?s.id.replace("BunkerPursuit","追"):null,5,-4,"#ffb0c0"));
+  En.approach.forEach(s=>Dot(s,"#ff2020",big?6:4,"dia",big?s.id.replace("RightNest","").replace("Right",""):null,6,-4,"#ffb0b0"));
+  En.front.forEach(s=>Dot(s,s.hold?"#ff5a3a":"#ff7050",big?5:4,s.hold?"sq":"c",null));
+  En.frontFlank.forEach(s=>Dot(s,"#ff9a30",big?5:4,"tri",null));
+  En.frontOfficer.forEach(s=>Dot(s,"#ffd400",big?6:5,"star",lab&&!big?"军官":null,6,-4,"#ffe680"));
+  En.tank.forEach(s=>Dot(s,"#b050ff",3.5,"c",null));
+  En.machineGun.forEach(s=>Dot(s,"#ff3050",big?5:3.5,"sq",null));
+  for(const f of D.fireSteps)Dot(f,"#9dff6a",big?5:3.5,"dia",big?"射击踏台":null,6,-4,"#caffb0");
+  if(D.roadblock){Dot(D.roadblock.cart,"#e0c070",big?6:4.5,"sq",lab&&!big?"路障（弹坑+翻车+倒杆）":null,6,-4,"#f0e0a0");}
+  Dot(D.rcFrame,"#e0b060",big?6:4.5,"dia",lab&&!big?"RC 木框":null,6,12,"#f0d090");
+  En.escortSlots.forEach(s=>Dot(s,"#b050ff",big?5:4,"ring",big?s.id.replace("TankEscort","护"):null,5,-4,"#e0b0ff"));
+  En.bundleApproach.forEach(s=>Dot(s,"#ff60b0",big?5:4,"c",big?s.id.replace("BundleBend","切入"):null,5,-4,"#ffb0e0"));
+  En.reserveEntries.forEach(s=>{Dot(s,"#ff7050",8,"ring",null);for(const q of s.slots)Dot(q,"#ff7050",2.5,"c",null);if(lab&&!big)Txt(s.x+(s.x>0?-2:2),s.z+3.5,"增援入口 "+s.id+"（视线外）","#ffb0a0",fs-1,s.x>0?"end":"start");});
+  // K frames
+  if(opts.kframes){for(const [k,v] of Object.entries(D.K)){const want=opts.kframes===true||opts.kframes.includes(k.split(" ")[0]);if(!want)continue;
+    const c=v.camera;const yaw=v.bearing*Math.PI/180;const rad=opts.coneM||14,half=35*Math.PI/180;
+    const P=a=>({x:c.x+Math.sin(a)*rad,z:c.z-Math.cos(a)*rad});const p0=P(yaw-half),p1=P(yaw+half);
+    el("path",{d:`M${X(c.x)},${Z(c.z)} L${X(p0.x)},${Z(p0.z)} A${rad*scale},${rad*scale} 0 0 1 ${X(p1.x)},${Z(p1.z)} z`,fill:"#7fffd4","fill-opacity":.13,stroke:"#7fffd4","stroke-width":1.2},g);
+    el("circle",{cx:X(c.x),cy:Z(c.z),r:4,fill:"#7fffd4",stroke:"#000"},g);
+    const lp=P(yaw);Txt(lp.x,lp.z,k.split(" ")[0],"#aaffe8",fs+1,"middle",true);}}
+  // anchors
+  const An=(p,label,dx=7,dy=-6,color="#fffbb0")=>{el("circle",{cx:X(p.x),cy:Z(p.z),r:big?4:3,fill:"none",stroke:color,"stroke-width":1.6},g);
+    el("text",{x:X(p.x)+dx,y:Z(p.z)+dy,fill:color,"font-size":fs,"font-weight":"bold","paint-order":"stroke",stroke:"#000","stroke-width":3,"text-anchor":dx<0?"end":"start"},g,label);};
+  for(const [p,label,dx,dy] of (opts.anchors||[]))An(p,label,dx,dy);
+  for(const [x,z,t,c,a] of (opts.notes||[]))Txt(x,z,t,c||"#f0e6d0",fs-1,a||"start");
+  // scale bar & north
+  const sb=opts.scaleBar||20;const sx=w-sb*scale-30,sy=h-26;
+  el("rect",{x:sx-6,y:sy-18,width:sb*scale+50,height:30,fill:"#000","fill-opacity":.55},svg);
+  el("line",{x1:sx,y1:sy,x2:sx+sb*scale,y2:sy,stroke:"#fff","stroke-width":3},svg);
+  for(const t of [0,.5,1])el("line",{x1:sx+t*sb*scale,y1:sy-5,x2:sx+t*sb*scale,y2:sy+5,stroke:"#fff","stroke-width":2},svg);
+  el("text",{x:sx,y:sy-8,fill:"#fff","font-size":12},svg,`0`);el("text",{x:sx+sb*scale,y:sy-8,fill:"#fff","font-size":12,"text-anchor":"middle"},svg,`${sb} m`);
+  const nx=w-26,ny=36;el("path",{d:`M${nx},${ny-22} L${nx+9},${ny+6} L${nx},${ny} L${nx-9},${ny+6} z`,fill:"#fff"},svg);
+  el("text",{x:nx,y:ny+20,fill:"#fff","font-size":13,"text-anchor":"middle","font-weight":"bold"},svg,"N");
+}
+const S=DATA.S,SP=DATA.SP,A=DATA.A;
+DrawMap(document.getElementById("main"),{minX:-62,maxX:118,minZ:-233,maxZ:-94},6,{arcs:true,sight:true,kframes:["K3","K4","K5","K6","K8","K9","K10","K11"],coneM:13,scaleBar:20,
+  anchors:[[A.collection,"06 集结处 collection",-8,14],[A.supportJunction,"SJ 支沟交汇（02 终点/03 起点）",-8,4],[A.rearCorner,"RC 后交通壕折角",8,10],
+    [SP.observation,"OS 观察射台",-8,-8],[SP.fold,"折角",-8,12],[SP.safeZone,"安全区",-8,-2],[SP.gapJunction,"GJ",-8,14],[S.gap,"唯一缺口",-8,-6],[S.lastCover,"最后遮挡",-8,-8],
+    [S.nest,"右侧阵位（残墙院）",-8,-12],[S.rear,"后墙岔口 RJ",8,14],[S.damagedLip,"受损沟沿 DL",8,-6],[S.house,"旧院·弹药屋",8,-6],[S.throw,"攻击位",8,4],
+    [A.bunkerBend,"01 防炮洞",-10,-10]],
+  notes:[[-29,-163.8,"前沿土坎 z=−160，x −30…12，顶 +2.1 m","#f0d070"],[46,-196.5,"NorthRuin（路弯遮挡）","#ffd0a0"],[-24,-188.3,"火力基地（坡上残墙）","#ffb080"],
+    [70,-208,"台地边路堑→折返顶（车体低于堑沿）","#ffb0b0"],[33,-176,"侧翼组→阵位东北弹坑群","#ffc080"],[30,-126,"01 前沟（日军从东头下来）","#ff9090"],[18,-104,"纵深支沟（先头兵南下）","#ff9090"],
+    [66,-150,"南段道路（岔口后弹坑+翻车+倒杆截断）","#d8c592"],[-44,-228,"北侧出发壕（04 推进/补员/西侧增援，视线外）","#ff9a80"],[-29,-152,"浅刮沟西头横墙（守军只能走缺口）","#9fd0ff"],[6,-139,"右侧低沟 1.85 m + 两处射击踏台 + 折角横墙","#caffb0"]]});
+DrawMap(document.getElementById("insetA"),{minX:-32,maxX:28,minZ:-134,maxZ:-97},12,{scen:true,big:true,opening:true,labels:false,tankLabels:false,kframes:["K1","K2","K3","K11"],coneM:6,scaleBar:5,grid:5,font:12,
+  anchors:[[A.bunker,"顺子（洞内低处）",-8,16],[A.bunkerKilling,"K 杀俘位",6,14],[A.bunkerJunction,"J 岔口（丁探头）",6,16],[A.bunkerFold,"F 折角（丙射击）",6,-8],
+    [A.bunkerRear,"还权位（塌土后）",-8,4],[A.bunkerCrater,"塌低段（近失弹坑）",8,6],[A.rearCorner,"RC 后交通壕折角（K2 看见班长）",8,4],[A.supportJunction,"SJ",-8,-6],[A.collection,"06 集结处",8,14],
+    [SP.observation,"OS 观察射台",8,-6],[DATA.bunkerPlace.liuwencaiShot,"刘文财远射位",-8,-4]],
+  notes:[[-28,-100,"02 撤退 47 m：塌土→塌低段（暴露≤5 m）→完整土壁→折角→集结处","#ffd27a"]]});
+DrawMap(document.getElementById("insetB"),{minX:16,maxX:66,minZ:-170,maxZ:-104},11,{big:true,labels:false,arcs:true,kframes:["K4","K7","K8","K9","K10"],coneM:7,scaleBar:10,grid:5,font:11.5,
+  anchors:[[S.seat,"MG 座",-8,-10],[SP.westDoor,"西门 WD",-8,14],[S.rear,"后墙岔口 RJ",-8,14],[SP.rearDoor,"后门",8,4],[S.damagedLip,"受损沟沿 DL",-8,-6],[S.house,"弹药屋",8,-8],[S.bundle,"集束弹",8,12],
+    [S.throw,"攻击位（最后 4.7 m 暴露）",8,4],[SP.roadMouth,"路口连接口",8,-8]],
+  notes:[[37.6,-151,"山墙","#f0f0f0"],[40.5,-121.7,"枯树","#e0d0a0"],[52,-127.4,"道路连接支沟（05 切入）","#ffb0e0"]]});
+const L=DATA.len;
+document.getElementById("legend").style.top=(74+Math.round(139*6)+24)+"px";
+document.getElementById("legend").innerHTML=`
+<b>路线</b><span class="sw" style="background:#ffd27a"></span>02 撤退 rearTrench ${L.rearTrench} m
+<span class="sw" style="background:#ff9d1a"></span>03 集结处→支沟→观察射台→缺口交汇→右低沟→阵位 ${L.support} m
+<span class="sw" style="background:#fff"></span>04 短撤 ${L.rearRoute} m
+<span class="sw" style="background:#ffe23a"></span>05 取弹 ${L.bundle} m（往返同线）
+<span class="sw" style="background:#ff4fd8"></span>05 攻击支路 ${L.attack} m
+<span class="sw" style="background:#fff1b0"></span>05→06 返回 ${L.collectionReturn} m
+<span class="sw" style="background:#5fe0e0"></span>何有田/老周/接防 ${L.left} m
+<span class="sw" style="background:#5fa8ff"></span>守军撤退（缺口→交汇→折角→安全区）
+<span class="sw" style="background:#b01818"></span>战车语义路点 ${L.tank} m（id + kind；Block/Squeeze 车体朝缺口、炮塔另指）<br>
+<b>敌军</b><span class="sw" style="background:#ff2020"></span>✕ 01 甲乙丙丁 <span class="sw" style="background:#c0304a"></span>01 背景先头兵（沿前沟→岔口→纵深支沟） <span class="sw" style="background:#ff4070"></span>○ 02 追兵
+<span class="sw" style="background:#ff2020"></span>◇ 阵位组 4（枪手+2 院内守卫朝西门+连接口守卫） <span class="sw" style="background:#ff5a3a"></span>■ 火力基地 4 <span class="sw" style="background:#ff7050;border-radius:6px"></span>● 跃进组 6（细红线=三次跃进）
+<span class="sw" style="background:#ff9a30"></span>▲ 侧翼组 4 = 03 指定进攻组（橙虚线→阵位东北弹坑群，最后一线看得见缺口） <span class="sw" style="background:#ffd400"></span>★ 军官
+<span class="sw" style="background:#ff3050"></span>■ 04 推进 4（北侧出发壕出口，细红线=跃进） <span class="sw" style="background:#b050ff"></span>战车护兵 4（● 路堑出发点，○ 封口时的路侧弹坑槽位） <span class="sw" style="background:#ff60b0"></span>05 切入 2（道路连接支沟） ○ 增援入口 2 处（出发壕西端 3 人 / 路堑 2 人，视线外）<br>
+<b>友军</b><span class="sw" style="background:#1e7bff;border-radius:6px"></span>第一批守军 2 <span class="sw" style="background:#6fb0ff;border-radius:6px"></span>其余守军 6 · ■ 后沟步枪手 · ★ 老周左枪位 · <span class="sw" style="background:#4fa0ff;border-radius:6px"></span>01 远处还击的川军<br>
+<b>其他</b> 黄虚框=前沿土坎（高度函数）· 白虚线=壕沟中心线（TrenchPlan）· 白点线=铁丝网 · 土黄点=路边电线杆（每 26 m，岔口一根斜杆）· 绿菱=射击踏台 · 黄方=路障 · 棕菱=RC 木框· 青色扇形=关键帧机位与 70° 视锥 · 红扇=战车车体机枪 ±26° · 绿扇=夺点机枪射界 · 青扇=老周侧射<br>
+<b>体块</b><span class="sw" style="background:#5b87a6"></span>cover <span class="sw" style="background:#8a6440"></span>earthDark <span class="sw" style="background:#a09a90"></span>structure <span class="sw" style="background:#c9c0ae"></span>plaster（院墙/山墙）<span class="sw" style="background:#8e6d3c"></span>timber <span class="sw" style="background:#3cb35a"></span>集束弹箱`;
+</script></body></html>

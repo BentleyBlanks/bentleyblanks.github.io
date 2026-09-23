@@ -568,7 +568,8 @@ try {
   Check("分类树列出六个类别", filterPanel.categories.length === 6
     && filterPanel.categories.includes("敌军") && filterPanel.categories.includes("触发区"),
     filterPanel.categories.join(" "));
-  Check("敌军按组列出 13 组", filterPanel.groups === 13, `实际 ${filterPanel.groups}`);
+  // 2026-09-23 01–05 重构契约 §8 新增五组（bunkerBackdrop/bunkerPursuit/frontFlank/frontOfficer/frontReserve）。
+  Check("敌军按组列出 18 组", filterPanel.groups === 18, `实际 ${filterPanel.groups}`);
   Check("按组的顺序是先按出现阶段、再按名字",
     filterPanel.groupPhases.every((phase, i) => i === 0 || filterPanel.groupPhases[i - 1] <= phase)
     && filterPanel.groupPhases[0] === 1 && filterPanel.groupOrder[0] === "bunkerAssault",
@@ -760,8 +761,9 @@ try {
       collapsed, reopened, sortedFirst,
     };
   });
-  Check("布设表列出当前编排全部敌人（61 人、九列表头）",
-    table.all === 61 && table.head.length === 9 && table.groupRows === 13,
+  // 2026-09-23 01–05 重构：新增五组、前沿组 12→10 等，全关敌人 61→78（契约 §8 组 id 表）。
+  Check("布设表列出当前编排全部敌人（78 人、九列表头）",
+    table.all === 78 && table.head.length === 9 && table.groupRows === 18,
     `${table.all} 行 / 表头 ${table.head.join(" ")}`);
   Check("按组排时第一列表头是「图标」（组名写在分组线上），换别的排法就变回「组」",
     table.head[0] === "图标 ▲" && table.headAfterSort[0] === "组",

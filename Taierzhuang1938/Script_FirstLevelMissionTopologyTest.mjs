@@ -20,7 +20,8 @@ import { MissionRouteLength, MissionRouteNextIndex } from "./Script_FirstLevelMi
 import { SampleMissionTerrain } from "./Data_FirstLevelMissionTerrain.mjs";
 
 const Distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
-assert.match(MISSION_TOPOLOGY_VERSION, /^first-level-20260919-/, "the adopted 2026.09.19 topology is live");
+// 2026-09-23: 01–06 空间按 3A 线性关卡重排（docs/Data_FirstLevelSpace0106_20260923.md），其余区沿用 09.19 采用稿。
+assert.match(MISSION_TOPOLOGY_VERSION, /^first-level-20260923-space-0106$/, "the 2026.09.23 01-06 space rebuild is live");
 
 // ---------------------------------------------------------------------------
 // 1. 四个空间区：各自的 z 带，且 A → B → C → 北沙河 → D 单调南行
@@ -52,18 +53,20 @@ console.log("ok four zones hold their anchors and run monotonically south", ZONE
 // ---------------------------------------------------------------------------
 // 2. 阶段路线的方向：15 之前一路南下，18 是唯一一次回头向北
 // ---------------------------------------------------------------------------
-// 02 是例外，也只是这一个例外：它先向南撤出掩蔽部、途经伤员集结处（06 在那儿等着），
-// 再折回前沿交通壕三岔口去接 03 —— Notion 正文写的就是「02 去 03 时经过 06 的
-// 背坡伤员集结处」，不是一条单向南下的腿。
+// 02 沿前沿交通壕撤出（塌低段 → 完整土壁 → 后交通壕折角 RC → 支沟交汇 SJ），终点就是
+// 06 的伤员集结处；03 从同一个集结处起步，经 SJ 转入支沟北上（2026-09-23 空间重排）。
 {
   const route = StageRoutes.rearTrench;
   assert.ok(route.some((p) => Math.hypot(p.x - S.collection.x, p.z - S.collection.z) < 0.01),
     "02 walks through the casualty collection point on its way to 03");
   const south = Math.max(...route.map((p) => p.z));
   assert.ok(south >= S.collection.z, "02 reaches at least as far south as the collection point");
-  assert.ok(route.at(-1).z < S.collection.z - 15, "02 ends back at the front communication trench");
-  assert.deepEqual(route.slice(-FrontCollectionRoute.length), FrontCollectionRoute,
-    "03 entry uses the shared collection-to-front trench centerline");
+  assert.ok(Distance(route.at(-1), S.collection) < 0.01 && Distance(Routes.support[0], S.collection) < 0.01,
+    "02 ends at the casualty collection and 03 starts there");
+  assert.deepEqual(route.slice(-FrontCollectionRoute.length), [...FrontCollectionRoute].reverse(),
+    "02 comes down the shared collection-to-front trench centerline");
+  assert.deepEqual(Routes.support.slice(0, FrontCollectionRoute.length), FrontCollectionRoute,
+    "03 leaves the collection along the same centerline");
   assert.deepEqual(StageRoutes.collectionReturn.slice(-FrontCollectionRoute.length),
     [...FrontCollectionRoute].reverse(), "06 reverses the same physical trench centerline");
   assert.deepEqual(OPENING.supportRoute.slice(-FrontCollectionRoute.length), FrontCollectionRoute,
@@ -124,8 +127,11 @@ assert.ok(measured.bunkerKillingM >= 7 && measured.bunkerKillingM <= 9,
 // 门外那一段：够远到门框还能裁掉创口，够近到看得清（门外 3–4 m，锚点在门外 1.35 m）。
 assert.ok(Distance(S.bunkerDoor, S.bunkerKilling) >= 2 && Distance(S.bunkerDoor, S.bunkerKilling) <= 6,
   `2-6 m from the doorway itself: ${Distance(S.bunkerDoor, S.bunkerKilling).toFixed(1)} m`);
-// 02 的折角与集结处在同一片背坡之后。
-assert.ok(Distance(S.rearCorner, S.collection) < 20, "the trench corner and the collection point are neighbours");
+// 02：折角 RC 在支沟交汇 SJ 之前，SJ 与集结处相邻（同一片背坡之后）。
+assert.ok(StageRoutes.rearTrench.indexOf(S.rearCorner) >= 0
+  && StageRoutes.rearTrench.indexOf(S.rearCorner) < StageRoutes.rearTrench.indexOf(S.supportJunction),
+  "the retreat turns the rear corner before the support junction");
+assert.ok(Distance(S.supportJunction, S.collection) < 15, "the support junction and the collection point are neighbours");
 assert.ok(S.rearCorner.z < S.collection.z, "the corner is north of the collection point");
 // 06 的接令点与集结处同区。
 assert.ok(Distance(A.orders, S.collection) < 12, "the orders anchor moved into the collection area");

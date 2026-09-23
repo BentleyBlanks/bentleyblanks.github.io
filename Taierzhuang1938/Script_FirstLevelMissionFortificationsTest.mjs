@@ -26,7 +26,7 @@ try {
       surface:surfaceArray&&{array:!!surfaceArray.isDataArrayTexture,size:[surfaceArray.image.width,surfaceArray.image.height,surfaceArray.image.depth],colorSpace:surfaceArray.colorSpace},
       layerAttributes:groundMeshes.every(m=>m.geometry.attributes.terrainLayers?.itemSize===3&&m.geometry.attributes.color),
       depths:await (async()=>{const {SampleMissionNaturalHeight}=await import('./Data_FirstLevelMissionTerrain.mjs');
-        return [[-24,-53],[-45,30],[-10,-124]].map(([x,z])=>({x,z,depth:SampleMissionNaturalHeight(x,z)-field.TerrainHeight(x,z)}));})()};
+        return [[-24,-53],[-45,30],[-14.8,-133.7],[8,-124.5]].map(([x,z])=>({x,z,depth:SampleMissionNaturalHeight(x,z)-field.TerrainHeight(x,z)}));})()};
     const {MISSION_ROUTES,MISSION_PLACEMENT}=await import("./Data_FirstLevelMissionLayout.mjs");
     const {MissionRouteNextIndex}=await import("./Script_FirstLevelMissionColumn.mjs");
     const {MISSION_TERRAIN}=await import("./Data_FirstLevelMissionTerrain.mjs");

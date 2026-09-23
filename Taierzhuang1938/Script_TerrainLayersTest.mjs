@@ -87,7 +87,8 @@ Check(() => assert.equal(TERRAIN_QUALITY.low.antiTile, false));
   const road = MISSION_TERRAIN.roads[0].points[1];
   Sample(road.x, road.z, color, layers);
   Check(() => assert.ok(layers[0] > 0.99 && layers[2] < 0.01, `车道中心 ${layers}`));
-  const trench = MISSION_TERRAIN.trenches.find((t) => t.id === "FrontTraverse").points[1];
+  // 2026-09-23 01-06 space rebuild: the old rear traverse (FrontTraverse) became the west leg of BunkerTrench.
+  const trench = MISSION_TERRAIN.trenches.find((t) => t.id === "BunkerTrench").points[1];
   Sample(trench.x, trench.z, color, layers);
   Check(() => assert.ok(layers[1] > 0.99 && layers[2] < 0.01, `沟底 ${layers}`));
   Sample(-77, 0, color, layers);

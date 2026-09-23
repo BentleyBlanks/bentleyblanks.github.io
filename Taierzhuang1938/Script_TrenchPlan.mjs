@@ -358,6 +358,11 @@ export function CompileTrenchNetwork(spec, { natural = null, jitterScale = 1, le
       dense: path.points,
       cornerRadiusM,
       jitterScale: js,
+      // frameLengthM: lay the stations and the dressing out as if the segment were this long (arc length
+      // from its start). Re-routing or trimming a segment's tail then leaves every station, revetment,
+      // duckboard, bay and prop before the change byte-identical (the 2026-09-23 01-06 rebuild moved
+      // FrontCommunication's north end; the 07+ dressing along its 220 m must not reshuffle).
+      frameLength: seg.frameLengthM > 0 ? seg.frameLengthM : null,
       stations: [],
       junctions: [],
       bounds: null,
@@ -601,10 +606,12 @@ export function CompileTrenchNetwork(spec, { natural = null, jitterScale = 1, le
 
   for (const seg of segs) {
     const { path } = seg;
-    const steps = Math.max(1, Math.round(path.length));
+    const frame = seg.frameLength ?? path.length;
+    const steps = Math.max(1, Math.round(frame));
     let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
     for (let i = 0; i <= steps; i += 1) {
-      const s = (path.length * i) / steps;
+      const s = (frame * i) / steps;
+      if (s > path.length + 1e-9) break;
       const p = path.At(s);
       const nx = -p.tz, nz = p.tx;
       const halfFloor = HalfFloorAt(seg.index, p.x, p.z);
@@ -710,7 +717,7 @@ export function CompileTrenchNetwork(spec, { natural = null, jitterScale = 1, le
       control: seg.control, nominal: seg.nominal, corners: seg.corners,
       path: seg.path, stations: seg.stations, junctions: seg.junctions,
       bounds: seg.bounds,
-      cornerRadiusM: seg.cornerRadiusM, jitterScale: seg.jitterScale,
+      cornerRadiusM: seg.cornerRadiusM, jitterScale: seg.jitterScale, frameLength: seg.frameLength,
       params: seg.preset_,
       // 逐点场的段级出口（回归与编辑器按段取样用；Corridor 在三岔口会跳到邻段）
       HalfFloorAt: (x, z) => HalfFloorAt(seg.index, x, z),
@@ -828,9 +835,12 @@ export function PlanTrenchDressing(plan, {
     const p = seg.params;
     const stations = seg.stations;
     const length = seg.path.length;
+    // frame = the arc length the stations were laid out for (= length unless the segment pins frameLengthM).
+    const frame = seg.frameLength ?? length;
+    const frameSteps = Math.max(1, Math.round(frame));
     if (!stations.length || length < 2 * END_CLEAR_M) continue;
     const IndexAt = (s) => Math.min(stations.length - 1,
-      Math.max(0, Math.round((s / length) * (stations.length - 1))));
+      Math.max(0, Math.round((s / frame) * frameSteps)));
     const StationAt = (s) => stations[IndexAt(s)];
 
     // --- 护壁：每 spacingM 一组，两侧各自抽签 ---
@@ -908,9 +918,9 @@ export function PlanTrenchDressing(plan, {
       const bayRnd = Mulberry32(HashString(`${seed}:${seg.id}:bay`));
       const sideSign = bays.side === "plus" ? 1 : -1;
       let placed = 0;
-      const count = Math.max(1, Math.round(length / bays.everyM));
+      const count = Math.max(1, Math.round(frame / bays.everyM));
       for (let i = 0; i < count && placed < bays.maxCount; i += 1) {
-        const nominal = (length * (i + 0.5)) / count;
+        const nominal = (frame * (i + 0.5)) / count;
         const bs = nominal + (bayRnd() * 2 - 1) * bays.jitter * bays.everyM * 0.5;
         if (bs < BAY_CLEAR_M || bs > length - BAY_CLEAR_M) continue;
         const st = StationAt(bs);
@@ -935,12 +945,16 @@ export function PlanTrenchDressing(plan, {
 
     // --- 杂物：沟底随机撒，只发登记过的资产名 ---
     const props = p.props;
-    const total = Math.round(length * props.perM);
+    const total = Math.round(frame * props.perM);
     if (total > 0 && props.kinds.length) {
       const propRnd = Mulberry32(HashString(`${seed}:${seg.id}:props`));
       for (let i = 0; i < total; i += 1) {
-        const ps = END_CLEAR_M + propRnd() * Math.max(0, length - 2 * END_CLEAR_M);
+        const ps = END_CLEAR_M + propRnd() * Math.max(0, frame - 2 * END_CLEAR_M);
         const st = StationAt(ps);
+        if (ps > length - END_CLEAR_M) {
+          // Past a trimmed tail: burn the draws this prop would have taken so the ones after keep their values.
+          propRnd(); propRnd(); propRnd(); continue;
+        }
         if (st.junctionClear) { stats.skipped.junction += 1; continue; }
         const lateral = (propRnd() * 2 - 1) * Math.max(0, st.halfFloor - 0.55);
         const x = st.x + st.nx * lateral;

@@ -1,6 +1,6 @@
 import { FRONT_SORTIE as Sortie } from "./Data_FirstLevelFrontRoute.mjs";
 import { MISSION_TOPOLOGY_VERSION } from "./Data_FirstLevelMissionTopology.mjs";
-import { FRONT_FIELD_MEN, FRONT_RESERVES, FRONT_MACHINE_GUN_ATTACK, FRONT_APPROACH_ENEMIES, APPROACH_TACTICS } from "./Data_FirstLevelMissionFront.mjs";
+import { FRONT_FIELD_MEN, FRONT_RESERVES, FRONT_MACHINE_GUN_ATTACK, FRONT_APPROACH_ENEMIES, APPROACH_TACTICS, FRONT_FLANK_GROUP, FRONT_OFFICER, FRONT_RESERVE_ENTRIES } from "./Data_FirstLevelMissionFront.mjs";
 import { CHAPTER } from "./Data_MissionCh1.mjs";
 import { MISSION_LAYOUT, MISSION_ANCHORS as A, MISSION_ROUTES, MISSION_PLACEMENT as P } from "./Data_FirstLevelMissionLayout.mjs";
 export const MISSION_VERSION = MISSION_TOPOLOGY_VERSION;
@@ -162,23 +162,60 @@ export const MISSION_ENCOUNTERS = Object.freeze({
   // 01 掩蔽部门外的行刑组：两个动手的，随后跟进两个。玩家拾枪后可以打，但不是过关条件。
   // 起点取空间包的 MISSION_PLACEMENT.bunker.ijaStart（还在刺杀处以北 6 m，走进来才下刀）；
   // 下刀与转向门内的两组落点在 Script_FirstLevelOpening 里按 ijaKill / ijaDoor 走。
+  // 2026-09-23 space rebuild (docs/Data_FirstLevelSpace0106_20260923.md §3). Contract §5.8 ids.
+  // ijaA/ijaB come down the link sap from the lost east end to the kill spot outside the mouth;
+  // ijaC stands at the fold F (fire step), ijaD at the junction J - both inside the K1 cone. `enter`
+  // is the link-sap leg the Opening package walks them in on (start -> post), never used as a spawn.
   bunkerAssault: [
-    // 说话角色的外观只在 Data_FirstLevelSpeakingCast 钉死（日兵甲 IJA02、日兵乙 IJA01，
-    // 2026-09-23 契约 §5.1）；这里只写 castId，不再另写 modelVariant。
-    { id: "BunkerExecutionerA", ...P.bunker.ijaStart[0], castId: "ijaA", weapon: "Type38", bayonet: true },
-    { id: "BunkerExecutionerB", ...P.bunker.ijaStart[1], castId: "ijaB", weapon: "Type38", bayonet: true },
-    // 跟进那两人站在行刑组后面，但仍在破口看得见的那一小片里（R.bunkerSightM）；
-    // 与 ijaStart 拉开 3 m 以上，免得两个人叠在一格（胶囊之间不互撞）。
-    { id: "BunkerFollowA", x: A.bunkerKilling.x - 4.5, z: A.bunkerKilling.z - 9, weapon: "Type38", bayonet: true },
-    { id: "BunkerFollowB", x: A.bunkerKilling.x + 4.5, z: A.bunkerKilling.z - 10, weapon: "Type38", bayonet: true },
+    // 说话角色的外观只在 Data_FirstLevelSpeakingCast 钉死（日兵甲 IJA06、日兵乙 IJA01、丙 IJA01、丁 IJA02，
+    // 契约 §5.1 / v1.3）；这里只写 castId，不再另写 modelVariant。日兵甲的步枪不上刺刀（他用手持短刺刀割喉）。
+    { id: "BunkerExecutionerA", role: "ijaA", ...P.bunker.ijaStart[0], castId: "ijaA", weapon: "Type38", bayonet: false },
+    { id: "BunkerExecutionerB", role: "ijaB", ...P.bunker.ijaStart[1], castId: "ijaB", weapon: "Type38", bayonet: true },
+    { id: "BunkerFollowA", role: "ijaC", ...A.bunkerFold, castId: "ijaC", weapon: "Type38", bayonet: true,
+      enter: [{x:24.2,z:-130.6},{x:23.5,z:-130},A.bunkerFold] },
+    { id: "BunkerFollowB", role: "ijaD", ...A.bunkerJunction, castId: "ijaD", weapon: "Type38", bayonet: true,
+      enter: [{x:26.4,z:-133.4},{x:23.5,z:-130},A.bunkerFold,A.bunkerJunction] },
+  ],
+  // 01 background: the vanguard's forward elements pass J into the depth sap (out of sight south);
+  // three distant NRA return fire from the rear corner and the support sap (never hit, fire points).
+  bunkerBackdrop: [
+    // They come down the upper link (the later attack branch) past the captured nest's rear
+    // junction and the link sap, then turn south into the depth sap at J.
+    ...[[36.4,-142.9],[39.4,-146],[39.7,-148.8],[40.6,-152],[41.5,-154.2],[43,-158]].map(([x,z],i)=>
+      ({ id: `BunkerBackdropIja${i}`, side: "ija", role: "backdrop", x, z, weapon: i===3?"Type11":"Type38",
+        route: [...(i>=2?[{x:39.8,z:-150}]:[]),...(i>=1?[{x:39.4,z:-144.2}]:[]),{x:35,z:-142.5},{x:29.7,z:-141.5},
+          {x:27,z:-135.5},{x:23.5,z:-130},A.bunkerFold,A.bunkerJunction,{x:15.2,z:-118.5},{x:17.5,z:-111},{x:20.5,z:-102}],
+        delayS: 2.2*i })),
+    // side:"nra" members are friendly return fire (Ai package's backdrop mechanism spawns them on the
+    // NRA side; the generic encounter spawner must never create this group - see its activation).
+    { id: "BunkerBackdropNra0", side: "nra", role: "backdropNra", x: -5.6, z: -112, weapon: "HanYang", fireAt: A.bunkerJunction },
+    { id: "BunkerBackdropNra1", side: "nra", role: "backdropNra", x: -9.4, z: -111.4, weapon: "HanYang", fireAt: A.bunkerFold },
+    { id: "BunkerBackdropNra2", side: "nra", role: "backdropNra", x: -26.4, z: -124.4, weapon: "HanYang", fireAt: A.bunkerFold },
+  ],
+  // 02 pursuers: one base-of-fire man holds the fold F; three follow down the link sap to J and the
+  // mouth (the player looks back and sees them on the spot he just left). None ever passes the bend M.
+  bunkerPursuit: [
+    // 1.35 m past the fold F along the sap (the fire step's far side): ijaC may still be standing on F itself.
+    { id: "BunkerPursuitFold", role: "pursuitBase", x: 19.2, z: -126.5, weapon: "Type38", hold: true, faceTo: A.bunkerRear },
+    { id: "BunkerPursuitA", role: "pursuit", x: 27, z: -135.5, weapon: "Type38", route: [{x:23.5,z:-130},A.bunkerFold,A.bunkerJunction], delayS: 3 },
+    { id: "BunkerPursuitB", role: "pursuit", x: 29.7, z: -141.5, weapon: "Type38", route: [{x:23.5,z:-130},A.bunkerJunction,{x:6.8,z:-124.2}], delayS: 7 },
+    { id: "BunkerPursuitC", role: "pursuit", x: 33, z: -143.2, weapon: "Type38", route: [{x:27,z:-135.5},A.bunkerFold,{x:9.6,z:-125.1}], delayS: 11 },
   ],
   approach: FRONT_APPROACH_ENEMIES,
   // The roster itself lives in Data_FirstLevelMissionFront: the assault lanes and the cover rows
   // are derived from it, and a list split across two files drifts.
   front: [...FRONT_FIELD_MEN,...FRONT_RESERVES],
+  // 03 designated assault group (flank to the berm's east end) and its officer.
+  frontFlank: FRONT_FLANK_GROUP,
+  frontOfficer: [FRONT_OFFICER],
+  // 04/05 reinforcements from out-of-sight entries (budget in FRONT_RESERVE_ENTRIES).
+  frontReserve: FRONT_RESERVE_ENTRIES.flatMap((entry)=>entry.slots.map((slot,i)=>
+    ({ id: `FrontReserve${entry.id}${i}`, role: "reserve", ...slot, entry: entry.id, stage: entry.slotStages[i] }))),
   machineGun: FRONT_MACHINE_GUN_ATTACK,
   bundleApproach: Sortie.enemies,
-  tank: [{id:"TankEscortA",x:53,z:-180},{id:"TankEscortB",x:55,z:-176}],
+  // Escorts start with the tank in the plateau road cutting (hidden); FRONT_TANK_ESCORT_SLOTS are their block-point slots.
+  tank: [{id:"TankEscortA",role:"escort",x:101,z:-208.5},{id:"TankEscortB",role:"escort",x:106.5,z:-210.5},
+    {id:"TankEscortC",role:"escort",x:99,z:-212.5},{id:"TankEscortD",role:"escort",x:104,z:-215}],
   village: [
     { id: "VillageGunner", x: 43, z: 8, weapon: "Type11", hold: true },
     { id: "VillageCorner", x: 54, z: -12 },
