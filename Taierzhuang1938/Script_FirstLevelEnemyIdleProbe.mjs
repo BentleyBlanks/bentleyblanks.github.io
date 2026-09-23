@@ -103,6 +103,26 @@ await page.evaluate(({ rangeM, sampleS }) => {
     P.ticks.push({ t: +now.toFixed(2), step: rt.flow.stage.id, phase: rt.frontPressure?.phase?.id ?? null,
       px: +pp.x.toFixed(1), pz: +pp.z.toFixed(1), guards: guardsAlive, hunters, rows });
   };
+  // 玩家挨打的账（谁、什么、掉多少）：更强的敌人不许把驾驶器打死（§19 的教训），红了先看这一份。
+  P.hits = [];
+  const player = g.player, take = player.TakeHit.bind(player);
+  player.TakeHit = function (damage, part, direction, info = {}) {
+    const before = player.health, out = take(damage, part, direction, info);
+    try {
+      let who = null, best = 2.5;
+      const from = info && info.from;
+      if (from) for (const s of ai.soldiers) {
+        if (s.side !== "ija") continue;
+        const d = Math.hypot(s.position.x - from.x, s.position.z - from.z);
+        if (d < best) { best = d; who = s.missionId || String(s.id); }
+      }
+      const rt = g.Debug.FirstLevelMissionRuntime?.();
+      P.hits.push({ t: +ai.time.toFixed(2), step: rt?.flow?.stage?.id ?? null, lost: +(before - player.health).toFixed(1),
+        kind: info?.blast ? "blast" : info?.melee ? "melee" : info?.bullet ? "bullet" : "other", who,
+        d: from ? +Math.hypot(from.x - player.position.x, from.z - player.position.z).toFixed(1) : null });
+    } catch (error) { P.error = P.error || String(error); }
+    return out;
+  };
   const original = ai.Update;
   ai.Update = function (dt, camera) {
     const out = original.call(this, dt, camera);
@@ -131,7 +151,7 @@ const wallS = (Date.now() - startedAt) / 1000;
 // ---------------------------------------------------------------------------
 const head = await page.evaluate(() => {
   const P = window.EnemyIdleProbe;
-  return { meta: P.meta, states: P.states, count: P.ticks.length, error: P.error };
+  return { meta: P.meta, states: P.states, count: P.ticks.length, error: P.error, hits: P.hits };
 });
 const ticks = [];
 for (let at = 0; at < head.count; at += 1500)
@@ -140,6 +160,7 @@ const facts = await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission(
 await Kit.CloseCampaign(ctx);
 
 const report = AnalyzeEnemyIdle({ meta: head.meta, states: head.states, ticks });
+report.playerHits = SummarizeHits(head.hits);
 Object.assign(report, { label, root: treeRoot, stageFrom, stageTo, wallS: +wallS.toFixed(0), samplerError: head.error, facts,
   driveError: driveError ? String(driveError.message || driveError).slice(0, 600) : null });
 PrintReport(report);
@@ -303,6 +324,21 @@ function AnalyzeEnemyIdle({ meta, states, ticks }) {
     transitions, soldiers: perSoldier };
 }
 
+/** 玩家挨打按步骤归：各类伤害合计、打得最多的五个人。 */
+function SummarizeHits(hits) {
+  const bySteps = {};
+  for (const h of hits) {
+    const b = bySteps[h.step] ??= { lost: 0, bullet: 0, blast: 0, melee: 0, other: 0, hits: 0, who: {} };
+    b.lost += h.lost; b[h.kind] += h.lost; b.hits += 1;
+    if (h.who) b.who[h.who] = +((b.who[h.who] || 0) + h.lost).toFixed(1);
+  }
+  for (const b of Object.values(bySteps)) {
+    for (const k of ["lost", "bullet", "blast", "melee", "other"]) b[k] = +b[k].toFixed(1);
+    b.who = Object.fromEntries(Object.entries(b.who).sort((x, y) => y[1] - x[1]).slice(0, 5));
+  }
+  return { bySteps, hits };
+}
+
 function PrintReport(r) {
   console.log(`\n== enemy idle probe (${r.label}) stages ${r.stageFrom}-${r.stageTo}: ${r.samples} samples = ${r.seconds} s game time, wall ${r.wallS} s ==`);
   console.log("phase".padEnd(34), "sec".padStart(6), "men".padStart(4), "zero30".padStart(7), "idle4".padStart(6), "still4".padStart(7),
@@ -324,5 +360,8 @@ function PrintReport(r) {
   console.log("\n== most idle soldiers ==");
   for (const s of r.soldiers.slice(0, 12))
     console.log(`${s.mid || s.id} enc=${s.enc} grp=${s.grp} ${s.wk}${s.off ? " officer" : ""} ${s.seconds}s idle4=${Pct(s.idle4)} shots=${s.shots} amb=${s.ambient} steps=${s.steps.join(",")}`);
+  console.log("\n== player damage by step (hp lost; bullet / blast / melee; top shooters) ==");
+  for (const [step, b] of Object.entries(r.playerHits.bySteps))
+    console.log(`${step.padEnd(14)} lost=${b.lost} (${b.hits} hits)  bullet=${b.bullet} blast=${b.blast} melee=${b.melee} other=${b.other}  ${JSON.stringify(b.who)}`);
   if (r.driveError) console.log("\nDRIVE_ERROR", r.driveError);
 }

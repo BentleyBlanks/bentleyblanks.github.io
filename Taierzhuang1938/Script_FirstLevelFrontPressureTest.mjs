@@ -518,10 +518,10 @@ console.log("ok ③ brain: ambient pick/ownership/ledger, MG bursts, hesitation,
   while (r.spawnQueue.length) r.spawnQueue.shift()();
   Eq(spawned.length, BACKDROP_SQUADS.members.length);
   const ija = BACKDROP_SQUADS.members.filter((m) => m.side === "ija");
-  Eq(r.enemies.size, ija.length, "the Japanese join the mission's enemy table");
+  Eq(r.enemies.size, 0, "scripted runners stay out of the mission enemy table until the hand-off (the 01-02 roster snapshot never sees them)");
   Check(spawned.every((a) => a.scriptedNoncombatant), "backdrop men are scripted");
   Check(spawned.filter((a) => a.side === "nra").every((a) => a.missionUntargetable), "the far NRA answerers are not targets");
-  const runner = r.enemies.get("BackdropIjaA");
+  const runner = spawned.find((a) => a.missionId === "BackdropIjaA");
   r.time = 1; squads.Update();
   Check(moves.some(([id]) => id === "BackdropIjaA"), "the first man runs his route");
   Eq(runner.ambientFirePoints ?? null, null, "nobody fires on the run");
@@ -530,6 +530,7 @@ console.log("ok ③ brain: ambient pick/ownership/ledger, MG bursts, hesitation,
   Check(runner.order === "hold" && runner.ambientFirePoints?.length === firstStop.fire.length, "at the stop he kneels and fires at his authorised points");
   facts.add("rifleRecovered"); squads.Update();
   Check(ija.every((m) => defends.includes(m.id)) && !runner.scriptedNoncombatant, "hand-off: the Japanese become live local-area soldiers");
+  Eq(r.enemies.size, ija.length, "and from the hand-off on they are ordinary mission enemies (fire windows, stage counts)");
   r.flow.stage.id = "Support"; squads.Update();
   Eq(removed.length, spawned.length, "leaving 01-02 removes the whole backdrop");
   Eq(r.enemies.size, 0, "and nothing of it leaks into the 03 enemy table");

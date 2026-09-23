@@ -86,8 +86,10 @@ export class FirstLevelBackdropSquads {
       actor.reactionGroup = this.table.encounter;
       actor.manualGoalUntil = Infinity;
       // 川军还击者：日军不把他当目标（背景就是背景，别让前沿那批人隔着一百米把他们打光）。
+      // 日军背景兵**交接之前不进任务敌人表**（r.enemies）：交接前他们是剧本兵，一枪不对人打，
+      // 不需要开火窗口；进了表反而会被整关驾驶器 01–02 的名册快照当成「前沿预置兵」，
+      // 离开 01–02 撤场时算成「03 开场换了实体」（2026-09-23 实测 01→06 冷启动红在这条）。
       if (spec.side === "nra") actor.missionUntargetable = true;
-      else r.enemies.set(spec.id, actor);
       const m = { spec, actor, state: { index: 0, arrived: false, holdUntil: 0, startAt: this.startAt } };
       this.members.push(m);
       this.Drive(m);
@@ -144,6 +146,7 @@ export class FirstLevelBackdropSquads {
       const a = m.actor;
       if (!a.alive || m.spec.side !== "ija") continue;
       m.released = true;
+      r.enemies.set(m.spec.id, a);   // 从这一刻起是任务里的普通敌人：走开火窗口、进阶段统计
       a.scriptedNoncombatant = false;
       a.tacticalRadiusM = handoff.tacticalRadiusM;
       a.scriptAccuracyScale = a.missionAccuracyScale = R.frontAccuracyScale;
