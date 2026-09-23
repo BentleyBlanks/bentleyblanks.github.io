@@ -252,3 +252,41 @@ export const SAMPLES = Freeze({
   playerPelvisT: 0.95,
   playerKneeT: 0.50,
 });
+
+/**
+ * 环境射击（2026-09-23，docs/Data_EnemyAi.md §20）。
+ *
+ * 病根：第一关前沿的开火窗口（`Script_FirstLevelOpening.FireWindows`）只放 3 个人瞄玩家、
+ * 3 个人压玩家，其余人端着枪一发不打（09-23 实测 30 s 内 29 人里 14 人零发，
+ * 那挺前沿机枪 300 帧全在 FIRE、0 发）。这些人没有「合法目标」，却身处一场正在打的仗。
+ *
+ * 做法：关卡给一张**授权点**表（土坎顶、机枪胸墙、缺口两侧、阵位正面 —— **永远不是玩家的
+ * 实时位置**），没有合法目标 / 扳机被禁火挡住的人从表里挑一个点打过去。这一发走压制那条
+ * 分支：`Resolve(baseAccuracy 0)`、曳光、弹着、枪声、近失弹都有，**命中恒 false、不占射击令牌、
+ * 不进 TTK 账**。`soldier.ambientFirePoints` 为空（默认）时整条路径不存在，第一关以外逐位不变。
+ *
+ * dwellMinS/MaxS   一个点打多久再换（秒）。太短会像在扫射空气，太长一个人盯死一处。
+ * minRangeM        近于它的点不挑：贴脸的点通常在自己人堆里或同一道坎后面。
+ * maxRangeM        远于它的点不挑：步枪 150 m 外打一个土坎顶已经没有画面意义。
+ * facingConeRad    先挑落在「此刻面向 / 威胁方向」这么大半角内的点，挑不到才放宽到全向；
+ *                  一个人突然转身去打背后的点读起来像抽风。
+ * turnGateRad      枪口离这一点的偏角超过它不扣扳机（与 TryFire 的 0.34 同一条口径）。
+ * rifleIntervalScale  步枪环境射击比瞄准射击慢这么多倍：这是「战线在打」，不是「这个人在拼命」。
+ * mgIntervalScale  机枪点射之间的停顿倍率（BurstPlan 的 pauseS 乘它）。
+ * scatterM         授权点没写 r 时的弹着散布半径（米）。
+ * losRetries       挑点时最多试几个候选的通视（每试一个打一条射线）。
+ * pickEveryS       同一个人两次挑点的最小间隔（Think 1/6 分帧，这里再限一道）。
+ */
+export const AMBIENT_FIRE = Freeze({
+  dwellMinS: 3,
+  dwellMaxS: 7,
+  minRangeM: 8,
+  maxRangeM: 150,
+  facingConeRad: 1.1,
+  turnGateRad: 0.34,
+  rifleIntervalScale: 1.8,
+  mgIntervalScale: 1.6,
+  scatterM: 1.4,
+  losRetries: 2,
+  pickEveryS: 0.9,
+});

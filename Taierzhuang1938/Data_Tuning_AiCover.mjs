@@ -209,6 +209,10 @@ export const COVER_CYCLE = Freeze({
    *  2026-09-16 只给国军：日军的屋内伏击、开场追兵按原掩体周期调过节奏，
    *  三条一起对日军生效时 `--stage-from=8` 的伏击拍失序（改回原判定即通过）。 */
   refinedSides: ["nra"],
+  /** 任务侧开关（`AiDirector.missionCoverRules`）打开时改用这一份。2026-09-23 起第一关 01–06 的
+   *  任务相位打开它（`Script_FirstLevelFrontPressure`）：日军连探三次没看见人就换点、
+   *  被抄侧翼要持续 flankGraceS 才紧急换点。07 以后开关是关的，仍按 refinedSides。 */
+  missionRefinedSides: ["nra", "ija"],
   progressM: 0.35,
   /** 两次重选掩体的最小间隔（秒）。紧急失效改用 urgentReselectS，避免每次思考都重查。 */
   reselectMinS: 2.5,
@@ -263,4 +267,8 @@ export const DERIVED_COVER = Freeze({
   /** 哪些阵营的人会用派生点。只给国军：日军的开场追兵、屋内伏击等剧本拍按手工点调过，
    *  让他们也躲进派生点会把人藏到玩家找不到的地方（合入样条交通壕后开场卡在遮蔽点折角）。 */
   usableBy: ["nra"],
+  /** 任务侧开关（`AiDirector.missionCoverRules`）打开时改用这一份：第一关 01–06 的日军
+   *  也能躲进派生点（土坎、残墙没有手工登记点的那一大片）。当初排除日军的两条理由
+   *（开场追兵的遮蔽点折角、屋内伏击拍）都已下线；07 以后开关关着，行为不变。 */
+  missionUsableBy: ["nra", "ija"],
 });

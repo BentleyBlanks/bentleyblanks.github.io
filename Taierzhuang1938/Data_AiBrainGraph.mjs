@@ -60,7 +60,7 @@ export const BRAIN_GRAPH = Object.freeze({
     }),
     Object.freeze({
       id: "watch", label: "戒备", group: "react", x: 0.30, y: 0.06,
-      desc: "不在交战中也不站直：跪下（压制过 WATCH.proneSuppressionAt 就卧倒）、面向威胁 / 枪声来处、每 scanIntervalS 扫一次扇面，有掩体就缩在 hide 相位，**一枪不开**。推进中的人（还没走到 goal）不进这一格。",
+      desc: "不在交战中也不站直：跪下（压制过 WATCH.proneSuppressionAt 就卧倒）、面向威胁 / 枪声来处、每 scanIntervalS 扫一次扇面，有掩体就缩在 hide 相位，**一枪不开**。推进中的人（还没走到 goal）不进这一格。唯一例外（§20）：关卡给了授权点（`ambientFirePoints`，第一关 01–06）时朝授权点打环境射击 —— 命中恒 false、不占令牌、不进 TTK 账，永远不打玩家的实时位置。",
     }),
     Object.freeze({
       id: "reload", label: "换弹", group: "react", x: 0.30, y: 0.62,
@@ -232,6 +232,20 @@ export const BRAIN_GRAPH = Object.freeze({
       from: "cover_engage", to: "charge", priority: 11,
       when: "掩体对射中对方压进冲锋距离：committedCharge 覆盖掩体周期（已在冲的人有 +7 m / +10 m 余量 —— 一发近失弹不该打散端着刺刀的人）",
       keys: Object.freeze(["ENGAGE.defaultM", "ENGAGE.hysteresisM"]),
+    }),
+    // 【2026-09-23 §20】成组冲锋与跟冲（任务侧开关 missionReactions 打开时才有跟冲）。
+    Object.freeze({
+      from: "fire", to: "charge", priority: 11,
+      when: "关卡下令的成组冲锋（AiDirector.GroupCharge：领头的人 0 s、其余错峰 groupStaggerMaxS 内起身，冲 groupChargeS 秒，压制过 groupAbortSuppression 就散）；或身边 followRadiusM 内上了刺刀的战友起冲时，错峰 followDelayMin–Max 秒跟上（每次最多 maxFollowers 人）。不过个人的 ChargeOpportunity 门槛",
+      keys: Object.freeze(["CHARGE_FOLLOW.groupChargeS", "CHARGE_FOLLOW.groupStaggerMaxS", "CHARGE_FOLLOW.groupAbortSuppression",
+        "CHARGE_FOLLOW.followRadiusM", "CHARGE_FOLLOW.followDelayMinS", "CHARGE_FOLLOW.followDelayMaxS", "CHARGE_FOLLOW.maxFollowers"]),
+    }),
+    Object.freeze({
+      from: "charge", to: "fire", priority: 11,
+      when: "迟疑（任务侧开关）：尸体 witnessM 内的人加 witnessSuppression、愣 hesitateMin–Max 秒；军官阵亡时本组加 officerSuppression、愣 officerHesitateMin–Max 秒。迟疑中不走、不开枪、不起冲锋，正在冲的泄劲回到对射",
+      keys: Object.freeze(["SQUAD_REACTION.witnessM", "SQUAD_REACTION.witnessSuppression", "SQUAD_REACTION.hesitateMinS",
+        "SQUAD_REACTION.hesitateMaxS", "SQUAD_REACTION.officerSuppression", "SQUAD_REACTION.officerHesitateMinS",
+        "SQUAD_REACTION.officerHesitateMaxS"]),
     }),
 
     // --- 12 投弹 ----------------------------------------------------------
@@ -485,6 +499,7 @@ export const BRAIN_GRAPH = Object.freeze({
     PERCEPTION: "Data_Tuning_AiPerception",
 
     AIM: "Data_Tuning_AiShooting",
+    AMBIENT_FIRE: "Data_Tuning_AiShooting",
     CLOSE_RANGE: "Data_Tuning_AiShooting",
     SHOOTING: "Data_Tuning_AiShooting",
     BURST: "Data_Tuning_AiShooting",
@@ -499,5 +514,7 @@ export const BRAIN_GRAPH = Object.freeze({
     RETREAT: "Data_Tuning_AiTactics",
     INVESTIGATE: "Data_Tuning_AiTactics",
     BLACKBOARD: "Data_Tuning_AiTactics",
+    SQUAD_REACTION: "Data_Tuning_AiTactics",
+    CHARGE_FOLLOW: "Data_Tuning_AiTactics",
   }),
 });
