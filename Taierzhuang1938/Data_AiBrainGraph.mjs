@@ -236,13 +236,13 @@ export const BRAIN_GRAPH = Object.freeze({
     // 【2026-09-23 §20】成组冲锋与跟冲（任务侧开关 missionReactions 打开时才有跟冲）。
     Object.freeze({
       from: "fire", to: "charge", priority: 11,
-      when: "关卡下令的成组冲锋（AiDirector.GroupCharge：领头的人 0 s、其余错峰 groupStaggerMaxS 内起身，冲 groupChargeS 秒，压制过 groupAbortSuppression 就散）；或身边 followRadiusM 内上了刺刀的战友起冲时，错峰 followDelayMin–Max 秒跟上（每次最多 maxFollowers 人）。不过个人的 ChargeOpportunity 门槛",
+      when: "关卡下令的成组冲锋（AiDirector.GroupCharge：领头的人 0 s、其余错峰 groupStaggerMaxS 内起身，冲 groupChargeS 秒，压制过 groupAbortSuppression 就散）；或身边 followRadiusM 内同组、枪上带刺刀的战友起冲时，错峰 followDelayMin–Max 秒上刺刀跟上（每次最多 maxFollowers 人）。不过个人的 ChargeOpportunity 门槛",
       keys: Object.freeze(["CHARGE_FOLLOW.groupChargeS", "CHARGE_FOLLOW.groupStaggerMaxS", "CHARGE_FOLLOW.groupAbortSuppression",
         "CHARGE_FOLLOW.followRadiusM", "CHARGE_FOLLOW.followDelayMinS", "CHARGE_FOLLOW.followDelayMaxS", "CHARGE_FOLLOW.maxFollowers"]),
     }),
     Object.freeze({
       from: "charge", to: "fire", priority: 11,
-      when: "迟疑（任务侧开关）：尸体 witnessM 内的人加 witnessSuppression、愣 hesitateMin–Max 秒；军官阵亡时本组加 officerSuppression、愣 officerHesitateMin–Max 秒。迟疑中不走、不开枪、不起冲锋，正在冲的泄劲回到对射",
+      when: "迟疑（任务侧开关）——对所有状态都生效（迟疑中 Act 清掉走位与扳机），这里只画它唯一**改状态**的那一刀：正在冲的泄劲回到对射。尸体 witnessM 内的人加 witnessSuppression、愣 hesitateMin–Max 秒；军官阵亡时本组加 officerSuppression、愣 officerHesitateMin–Max 秒。迟疑中不走、不开枪、不起冲锋，正在冲的泄劲回到对射",
       keys: Object.freeze(["SQUAD_REACTION.witnessM", "SQUAD_REACTION.witnessSuppression", "SQUAD_REACTION.hesitateMinS",
         "SQUAD_REACTION.hesitateMaxS", "SQUAD_REACTION.officerSuppression", "SQUAD_REACTION.officerHesitateMinS",
         "SQUAD_REACTION.officerHesitateMaxS"]),
