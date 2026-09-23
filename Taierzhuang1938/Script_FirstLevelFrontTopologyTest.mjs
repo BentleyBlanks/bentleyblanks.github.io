@@ -12,6 +12,7 @@ import {FRONT_SORTIE as S,FRONT_SPACE as SP,FRONT_TANK_PATH as TP,FrontTankIndex
 import {FRONT_BATTLE_TUNING as B} from "./Data_Tuning_FirstLevelFront.mjs";
 import {FRONT_BREAKABLES,FRONT_UNBREAKABLE} from "./Data_FirstLevelFrontBreakables.mjs";
 import {MISSION_LAYOUT as L} from "./Data_FirstLevelMissionLayout.mjs";
+import {FRONT_GUARD_POSTS} from "./Data_FirstLevelMissionFront.mjs";
 import {SampleMissionTerrain as G,SampleMissionNaturalHeight as N} from "./Data_FirstLevelMissionTerrain.mjs";
 import {ProbeKeyframes,ProbeTank,ProbeRoutes,ProbeExposure,ProbeEnemyCover,ProbeCounts,ProbeEntries,ProbeSeparation,
   ProbeEngagement,RouteClearance,Sight,Eye,D,RouteLength,ProbeWireLanes} from "./Script_FirstLevelSpaceProbe.mjs";
@@ -107,6 +108,16 @@ console.log("ok keyframes "+keyframes.map(k=>`${k.id}${k.frameDeg?`(${k.spanDeg}
   for(const l of lanes)assert.equal(l.blocker,null,`${l.name}: clear of every block, terrain and wire roll (blocked by ${l.blocker})`);
   console.log(`ok runtime gap lanes clear of wire: ${lanes.length}`);
 }
+// The 05 cut-in pair is pre-placed at BunkerRescue (hold). From its posts it must not see the gap or the
+// backslope guards: FrontBattle.InfantryBlockade keeps the 03 withdrawal shut while any live enemy sees the gap.
+for(const e of S.enemies){
+  assert.equal(e.hold,true,`${e.id}: the cut-in pair holds its sap until 05`);
+  for(const h of [.9,1.35]){
+    assert.notEqual(Sight(Eye(e,h),Eye(S.gap,B.guardHeightM),{wire:true}),null,`${e.id} (eye ${h} m) cannot see the gap from its post`);
+    for(const g of FRONT_GUARD_POSTS)assert.notEqual(Sight(Eye(e,h),Eye(g,1.0)),null,`${e.id} cannot see guard post ${g.x},${g.z}`);
+  }
+}
+console.log(`ok 05 cut-in pair hidden from the gap and the backslope: ${S.enemies.length}`);
 
 // ---------------------------------------------------------------- enemies: cover, roles, budget, hidden entries
 {

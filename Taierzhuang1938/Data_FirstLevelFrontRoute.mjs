@@ -67,7 +67,9 @@ export const FRONT_SORTIE=Object.freeze({
   trenchBottomM:3.8,trenchDepthM:1.85,trenchBankM:1.6,
   // 05 cut-in pair: from the blocked south road through the road link into the ammo sap ahead of the player.
   // They slipped into the road link sap from the blocked south road during 04 (dug in, out of sight).
-  enemies:[{id:'BundleBendA',x:59.6,z:-128.4,hold:false,role:'cutIn'},{id:'BundleBendB',x:56.8,z:-127.4,hold:false,role:'cutIn'}],
+  // hold: they keep to the sap (peek/hide) and face the ammo-sap junction. Free to roam (hold:false) they walked
+  // west up the sap during 03, saw the gap across our backfield from 65 m and kept FrontBattle.InfantryBlockade on.
+  enemies:[{id:'BundleBendA',x:59.6,z:-128.4,hold:true,role:'cutIn',faceTo:{x:44.6,z:-125.6}},{id:'BundleBendB',x:56.8,z:-127.4,hold:true,role:'cutIn',faceTo:{x:44.6,z:-125.6}}],
   // Terrain road polyline = the tank path plus a 5 m dead-end stub at the berm-end crater.
   road:[...T.map(p=>Point(p.x,p.z)),Point(31,-166.4)],
   // Old keys, resolved by waypoint id (integration decision 2026-09-23: resolve, never renumber).
