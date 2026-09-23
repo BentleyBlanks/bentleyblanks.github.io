@@ -1598,7 +1598,7 @@ A 均值 4.52 ms / P95 7.6 ms，B 均值 4.41 ms / P95 7.3 ms —— 差在噪�
 | --- | --- |
 | `AiTacticsTest` / `AiCoverTest` / `AiPerceptionTest` / `AiShootingTest` | 276 / 121 条 / 12 项 / 全过 |
 | `AiBrainGraphTest` | 913 条（节点 17、边 59、表键 169、任务 8；新边「白刃卡死解扣」） |
-| `FirstLevelFrontPressureTest`（新，纯 node） | 581 条：数据、相位、让口子、回退、冲锋、环境射击账、扳机空转、白探头、挡死的点、冲刺卡死、白刃卡死、01 背景兵 |
+| `FirstLevelFrontPressureTest`（新，纯 node） | 576 条：数据、相位、让口子、回退、冲锋、环境射击账、扳机空转、白探头、挡死的点、冲刺卡死、白刃卡死、01 背景兵 |
 | `FirstLevelP012ActorTest` / `FirstLevelP012RuntimeTest`（沙箱） | 全过 |
 | `FirstLevelMissionTest` / `FirstLevelFrontTest` / `MissionGatesTest` / `TuningWriterTest` | 全过（TuningWriter 490 条） |
 | `ModuleGraphTest` / `TestRunnerTest` / `TextTest` | 全过（TextTest 1 条警告，基线同样 1 条） |
