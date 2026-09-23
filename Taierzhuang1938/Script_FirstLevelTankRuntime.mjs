@@ -234,7 +234,7 @@ export class FirstLevelTankRuntime {
     shot.impact = Plain(position);
     shot.playerDistance = r.player ? Distance(position, r.player.position) : null;
     for (const actor of r.squad || []) if (Distance(actor.position, position) < 12) r.ai.SetStance(actor, 2, 2, true);
-    if (!r.Has("tankPositionPressured") && Distance(position, S.nest) < 8) {
+    if (!r.Has("tankPositionPressured") && Distance(position, S.nest) < this.T.pressureRadiusM) {
       r.Record("tankPositionPressured", { x: position.x, z: position.z });
       r.Say("TankTerror");
     }

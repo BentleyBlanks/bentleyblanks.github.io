@@ -139,12 +139,13 @@ export const TANK = Object.freeze({
     damageScale: 0.65,
     // 点射：1.2 s 一串，歇 2.0–2.8 s。
     burstS: 1.2,
-    restMinS: 2.0,
-    restMaxS: 2.8,
+    restMinS: 2.4,
+    restMaxS: 3.4,
     // [需] 首次接触「走进来」：第一串从目标前 walkInStartM 处起，扫到目标，零伤害。
     walkInStartM: 9,
-    // 之后的点射：散布（米）。
+    // 之后的点射：散布（米）= spreadM + spreadPerM × 距离（车体机枪从观察窗里打，远了打不准）。
     spreadM: 1.0,
+    spreadPerM: 0.025,
     // 看不见后按 lastKnown 压制多久（掩体沿上起土）。
     suppressS: 5,
     // 第一次接触判定：这么久没看见过这个目标，再看见算「首次」。
@@ -233,6 +234,11 @@ export const TANK = Object.freeze({
     // 熄火：发动机咳嗽到停的时长（音频与排气读 rpm）。
     stallS: 1.8,
   }),
+
+  // --- 事实判据（运行时读） -------------------------------------------------------
+  // tankPositionPressured「炮弹实际命中右侧射位周边」：阵位四周的墙（东墙 6.5 m、北面残墙 5 m）
+  // 挡下的炮弹落在 7.5–9.5 m 上（2026-09-23 实跑），旧的 8 m 让玩家在阵位上多挨三发才放行撤退。
+  pressureRadiusM: 10,
 
   // --- 表现（运行时读） ----------------------------------------------------------
   view: Object.freeze({

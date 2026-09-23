@@ -620,8 +620,8 @@ export class TankBrain {
       let at;
       if (b.kind === "walkIn") at = { x: b.from.x + (b.point.x - b.from.x) * t, y: b.from.y + (b.point.y - b.from.y) * t, z: b.from.z + (b.point.z - b.from.z) * t };
       else {
-        const n = ++b.shots;
-        at = { x: b.point.x + Math.sin(n * 2.399) * M.spreadM, y: b.point.y + Math.cos(n * 1.79) * M.spreadM * 0.3, z: b.point.z + Math.cos(n * 2.399) * M.spreadM };
+        const n = ++b.shots, spread = M.spreadM + (M.spreadPerM || 0) * Dist(b.point, this);
+        at = { x: b.point.x + Math.sin(n * 2.399) * spread, y: b.point.y + Math.cos(n * 1.79) * spread * 0.3, z: b.point.z + Math.cos(n * 2.399) * spread };
       }
       this.fire.push({ weapon, at, kind: b.kind, target: b.id, damageScale: b.damage ? M.damageScale : 0 });
       slot.nextShot += M.shotIntervalS;
