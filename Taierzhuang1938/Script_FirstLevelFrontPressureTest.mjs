@@ -30,7 +30,7 @@ import { FrontAssaultLane } from "./Data_FirstLevelMissionFront.mjs";
 import { WEAPONS } from "./Data_Weapons.mjs";
 import { MISSION_DEFENSE_OBJECTS, MISSION_STAKE_FENCE } from "./Data_FirstLevelMissionFortifications.mjs";
 import { AMBIENT_FIRE } from "./Data_Tuning_AiShooting.mjs";
-import { SQUAD_REACTION, CHARGE_FOLLOW } from "./Data_Tuning_AiTactics.mjs";
+import { SQUAD_REACTION, CHARGE_FOLLOW, MELEE_STALL } from "./Data_Tuning_AiTactics.mjs";
 
 let checks = 0;
 const Check = (ok, message) => { assert.ok(ok, message); checks += 1; };
@@ -348,6 +348,26 @@ function Man(ai, side, x, z, options = {}) {
   s.targetFireAt = ai.time - 0.5;
   Check(!ai.AmbientBlocked(s), "a man whose suppression still gets out keeps suppressing");
   s.targetFireAt = -99; s.targetLostTime = 0; s.lkpConfidence = 0;
+  // §20.7 A visible target whose rounds never get out (the peek sees him, his parapet stops the round):
+  // the dry-trigger clock hands over to ambient after stalledTargetS, and the dwell hands the muzzle back.
+  {
+    // (his own man: the rounds of s are counted further down, so s.rnd must not move)
+    const d = Man(ai, "ija", 0, 0); d.yaw = 0; d.ambientFirePoints = [back, front];
+    d.target = { isPlayer: false, position: new THREE.Vector3(5, 0, -5), id: 99 }; d.targetVisible = true;
+    d.triggerDrySince = ai.time - 0.5;
+    Check(!ai.AmbientBlocked(d), "a visible target, trigger dry for half a second: TryFire keeps trying");
+    d.triggerDrySince = ai.time - AMBIENT_FIRE.stalledTargetS - 0.1;
+    Check(ai.AmbientBlocked(d), "visible but no round out for stalledTargetS: the trigger is stalled, ambient takes over");
+    d.ambientPickAt = -99; d.ambientUntil = -99; d.ambientFirePoint = null;
+    Check(ai.PickAmbientFire(d), "a stalled trigger picks an authorised point");
+    d.ambientUntil = ai.time - 0.01; d.ambientPickAt = -99;
+    Eq(ai.PickAmbientFire(d), null, "dwell over: the muzzle goes back to the target for another try");
+    Eq(d.triggerDrySince, -1, "the retry restarts the dry-trigger clock");
+    d.triggerDrySince = 3;
+    ai.SetTarget(d, { isPlayer: false, position: new THREE.Vector3(1, 0, -9), ref: {}, id: 55, stance: 0 });
+    Eq(d.triggerDrySince, -1, "a new target restarts the dry-trigger clock");
+    ai.soldiers.splice(ai.soldiers.indexOf(d), 1);
+  }
   // Waiting guards never come back as a memory target (their gunfire is heard).
   {
     const guard = { alive: true, missionUntargetable: true, position: new THREE.Vector3(0, 0, -12) };
@@ -484,7 +504,28 @@ function Man(ai, side, x, z, options = {}) {
   Check(!ai.RefinedCoverSide(s) && ai.RefinedCoverSide(Man(ai, "nra", 0, 0)), "by default only the NRA runs the refined cover cycle");
   ai.missionCoverRules = true; Check(ai.RefinedCoverSide(s), "the mission switch gives the Japanese the refined cover cycle");
 }
-console.log("ok ③ brain: ambient pick/ownership/ledger, MG bursts, hesitation, officer death, group charge, follow-ups, bark keys, cover switch");
+// §20.7 Melee stall: pulled into a bayonet fight across a parapet he cannot climb, a man stood there for 86 s.
+{
+  const { ai } = MakeDirector();
+  const m = Man(ai, "ija", 0, 0, { state: "charge" });
+  m.meleeCombat = { managed: true, state: "idle" };
+  Check(!ai.UpdateMeleeStall(m), "the first idle frame only anchors the stall clock");
+  ai.time += MELEE_STALL.stallS * 0.5; Check(!ai.UpdateMeleeStall(m), "half the stall window: still his fight");
+  m.position.x += MELEE_STALL.moveM + 0.1; ai.time += 0.1; ai.UpdateMeleeStall(m);
+  ai.time += MELEE_STALL.stallS - 0.2; Check(!ai.UpdateMeleeStall(m), "a man who stepped in re-anchors the clock");
+  m.meleeCombat = { managed: true, state: "attack" }; ai.time += 5; Check(!ai.UpdateMeleeStall(m), "a thrust is not a stall");
+  m.meleeCombat = { managed: true, state: "idle" }; ai.UpdateMeleeStall(m);
+  ai.time += MELEE_STALL.stallS + 0.1;
+  Check(ai.UpdateMeleeStall(m), "idle and rooted for stallS: released from the melee director");
+  Check(m.meleeDormant === true && m.meleeCombat === null, "released: meleeDormant, no melee pose");
+  Eq(m.state, "fire", "a released charger goes back to the firefight");
+  Check(m.chargeCooldownUntil > ai.time && m.groupChargeUntil < ai.time, "and does not charge the same parapet again at once");
+  Eq(ai.stats.meleeStallReleases, 1);
+  ai.time += MELEE_STALL.releaseS - 0.1; ai.UpdateMeleeStall(m); Check(m.meleeDormant, "stays out for releaseS");
+  ai.time += 0.2; ai.UpdateMeleeStall(m);
+  Check(m.meleeDormant === false && m.meleeStallDormantUntil === 0, "after releaseS the melee director may take him again");
+}
+console.log("ok ③ brain: ambient pick/ownership/ledger, dry trigger, MG bursts, hesitation, officer death, group charge, follow-ups, bark keys, cover switch, melee stall");
 
 // ---------------------------------------------------------------------------
 // ④ 01 背景兵

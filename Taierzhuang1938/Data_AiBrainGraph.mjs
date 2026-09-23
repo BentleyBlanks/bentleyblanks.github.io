@@ -247,6 +247,11 @@ export const BRAIN_GRAPH = Object.freeze({
         "SQUAD_REACTION.hesitateMaxS", "SQUAD_REACTION.officerSuppression", "SQUAD_REACTION.officerHesitateMinS",
         "SQUAD_REACTION.officerHesitateMaxS"]),
     }),
+    Object.freeze({
+      from: "charge", to: "fire", priority: 11,
+      when: "白刃卡死解扣（任务侧开关）：被白刃导演拉进白刃、却 stallS 秒一直是 idle 架势且位移不到 moveM（目标在翻不过去的胸墙 / 壕沿另一边），就放出白刃 releaseS 秒、冲锋冷却照记，回到对射",
+      keys: Object.freeze(["MELEE_STALL.stallS", "MELEE_STALL.moveM", "MELEE_STALL.releaseS"]),
+    }),
 
     // --- 12 投弹 ----------------------------------------------------------
     Object.freeze({
@@ -516,5 +521,6 @@ export const BRAIN_GRAPH = Object.freeze({
     BLACKBOARD: "Data_Tuning_AiTactics",
     SQUAD_REACTION: "Data_Tuning_AiTactics",
     CHARGE_FOLLOW: "Data_Tuning_AiTactics",
+    MELEE_STALL: "Data_Tuning_AiTactics",
   }),
 });

@@ -32,7 +32,7 @@ import { CLOSE_RANGE, AMBIENT_FIRE } from "./Data_Tuning_AiShooting.mjs";
 import { TacticsDirector, TASK, IsManeuverTask, CanManeuver, ManeuverAllowed, ChargeOpportunity } from "./Script_AiTactics.mjs";
 // 只读 TACTICS：压制射击的情报门槛与守区掩体余量。侧翼 / 投弹 / 查看的那几张表
 // 由 `TacticsDirector` 自己消费 —— 大脑只按 `task.kind` 选状态，不重复读它们的数。
-import { TACTICS, INVESTIGATE, SQUAD_REACTION, CHARGE_FOLLOW } from "./Data_Tuning_AiTactics.mjs";
+import { TACTICS, INVESTIGATE, SQUAD_REACTION, CHARGE_FOLLOW, MELEE_STALL } from "./Data_Tuning_AiTactics.mjs";
 // 断肢只借一个数：被卸掉肢体的那一下死亡推力乘多少（docs/Data_Dismemberment.md §8.1）。
 // 判定与执行都在 ctx.gore 那一层，这里不认识 three 以外的任何断肢概念。
 import { DEATH_PUSH_SCALE as GORE_DEATH_PUSH_SCALE } from "./Data_Tuning_Gore.mjs";
@@ -398,6 +398,13 @@ export class Soldier {
     this.ambientPickAt = -99;        // 上一次挑点的时刻（AMBIENT_FIRE.pickEveryS 限流）
     this.ambientShots = 0;           // 取证：这个人打了几发环境射击
     this.targetFireAt = -99;         // TryFire 上一次真对人打出去的时刻（环境射击判「扳机空转」）
+    /** 扳机从什么时候起「想打、弹在膛、有目标却一发没出去」（-1 = 没在空转；真打出一发 / 换目标清零）。 */
+    this.triggerDrySince = -1;
+    /** 白刃卡死判定（§20.7）：idle 架势的起点与那时的位置；解扣后 meleeDormant 到什么时候。 */
+    this.meleeStallAt = -1;
+    this.meleeStallX = 0;
+    this.meleeStallZ = 0;
+    this.meleeStallDormantUntil = 0;
     /** 迟疑到什么时候：看见身边的人倒下 / 军官阵亡。期间不走位、不开枪、不起冲锋。 */
     this.hesitateUntil = -99;
     /** 关卡下令的成组冲锋：什么时候起身、冲到什么时候（`AiDirector.GroupCharge`）。 */
@@ -751,7 +758,7 @@ export class AiDirector {
     this._ambientEye = { x: 0, y: 0, z: 0 };
     this._ambientTo = { x: 0, y: 0, z: 0 };
     this.stats = { suppressShots: 0, aimedShots: 0, coverPicks: 0, grenades: 0, peeks: 0, displaces: 0,
-      ambientShots: 0, groupCharges: 0, chargeFollows: 0, hesitations: 0 };
+      ambientShots: 0, groupCharges: 0, chargeFollows: 0, hesitations: 0, meleeStallReleases: 0 };
     /**
      * 任务侧开关（2026-09-23，docs/Data_EnemyAi.md §20）。**默认全关**：第一关以外逐位不变。
      * 第一关 01–06 的任务相位由 `Script_FirstLevelFrontPressure` 每帧写：
@@ -1424,6 +1431,10 @@ export class AiDirector {
       // 「想」分帧轮转：每帧只有六分之一的人重新决策。
       // 木桩兵（s.dummy，见 Soldier 构造器）不想：Act 照走 —— 重力、贴地、
       // 姿态动画、守点纪律都要，只是永远不会有目标、不会开火。
+      // 【§20.7】白刃卡死解扣：目标在翻不过去的墙那边时，白刃导演会让人贴墙站到天荒地老（Think 停转）。
+      if (s.meleeStallDormantUntil > 0 || (this.missionReactions && s.meleeCombat && !s.dummy)) {
+        if (this.UpdateMeleeStall) this.UpdateMeleeStall(s);
+      }
       if (i % 6 === slice && !s.dummy && !s.meleeCombat) {
         profiler?.B("ai/think");
         this.Think(s, dt * 6, player);
@@ -1754,6 +1765,7 @@ export class AiDirector {
     };
     s.targetLostTime = 0;
     s.targetVisible = true;
+    s.triggerDrySince = -1;
     s.targetLockUntil = this.time + 3.0 + s.rnd() * 0.8;
     if (candidate.isPlayer && !wasPlayer) s.playerLockAt = this.time;
     return true;
@@ -2257,6 +2269,45 @@ export class AiDirector {
     return n;
   }
 
+  /**
+   * 白刃卡死解扣（2026-09-24，docs/Data_EnemyAi.md §20.7，数在 `MELEE_STALL`）。
+   *
+   * 白刃导演按「engageM 内、视线通」接管一个人（`s.meleeCombat` 非空期间 Think 停转），视线却会从
+   * 胸墙 / 壕沿顶上过去：目标在翻不过去的墙那边时，人以 idle 架势贴墙站着，一发不打、压制爆表也不趴。
+   * 这里只认事实：白刃里 `stallS` 秒一直是 idle 架势、位移不到 `moveM` —— 就把他放出白刃
+   * `releaseS` 秒（`meleeDormant`，白刃导演自己的「这个人不参与」闸），冲锋冷却照记，回到对射。
+   * 只在任务侧开关 `missionReactions` 打开时判；已经放出去的人到点一定还原（开关中途关掉也还原）。
+   */
+  UpdateMeleeStall(s) {
+    const now = this.time, T = MELEE_STALL;
+    if (s.meleeStallDormantUntil > 0) {
+      if (now >= s.meleeStallDormantUntil || !s.alive) {
+        s.meleeDormant = false;
+        s.meleeStallDormantUntil = 0;
+        s.meleeStallAt = -1;
+      }
+      return false;
+    }
+    const pose = s.meleeCombat;
+    if (!pose || pose.state !== "idle") { s.meleeStallAt = -1; return false; }
+    const x = s.position.x, z = s.position.z;
+    if (s.meleeStallAt < 0 || Math.hypot(x - s.meleeStallX, z - s.meleeStallZ) > T.moveM) {
+      s.meleeStallAt = now; s.meleeStallX = x; s.meleeStallZ = z;
+      return false;
+    }
+    if (now - s.meleeStallAt < T.stallS) return false;
+    s.meleeDormant = true;
+    s.meleeStallDormantUntil = now + T.releaseS;
+    s.meleeCombat = null;
+    s.meleeStallAt = -1;
+    s.chargeCooldownUntil = now + TACTICS.chargeCooldownS;
+    s.autoChargeUntil = 0;
+    s.groupChargeUntil = -99;
+    if (s.state === STATE.CHARGE) s.state = STATE.FIRE;
+    this.stats.meleeStallReleases += 1;
+    return true;
+  }
+
   ChargePoint(s, ordered) {
     const point = this.ThreatPoint(s) || (ordered ? s.goal : null);
     // 成组冲锋由关卡授权越出守区（与玩家下的刺刀令同一条口径）。
@@ -2275,12 +2326,17 @@ export class AiDirector {
     const t = s.target;
     if (!t) return true;
     if (t.isPlayer && s.missionFireHold && !s.missionFireSuppressOnly) return true;
-    if (s.targetVisible) return false;
+    // 扳机空转（§20.7）：想打、弹在膛、有目标，却 stalledTargetS 内一发没对人打出去 —— 看得见也算：
+    // 掩体里探头那一下看见了壕里的人，弹道却被他那道胸墙挡死（ShotPathClear 不过），缩头、探头、
+    // 再看见……旧判据要「丢失视线满 2.5 s」，探头周期（hide 0.9–2.2 s）每轮都把它清零，
+    // 09-24 探针里 03 的「不动也不开枪」有一半是这批人。
+    const dry = s.triggerDrySince >= 0 && this.time - s.triggerDrySince > AMBIENT_FIRE.stalledTargetS;
+    if (s.targetVisible) return dry;
     if ((s.lkpConfidence || 0) < TACTICS.suppressConfidence) return true;
     // 目标只在可信的记忆里：先让 TryFire 朝记忆点压制。压制那一枪的弹道常被土坎 / 胸墙挡死
     //（ShotPathClear 不过、一发都出不去 —— 09-23 探针里前沿机枪 600 帧 FIRE、0 发就是这个），
     // 丢失视线且 stalledTargetS 内没真打出去一发，扳机就算空转，轮到授权点。
-    return s.targetLostTime > AMBIENT_FIRE.stalledTargetS && this.time - s.targetFireAt > AMBIENT_FIRE.stalledTargetS;
+    return dry || (s.targetLostTime > AMBIENT_FIRE.stalledTargetS && this.time - s.targetFireAt > AMBIENT_FIRE.stalledTargetS);
   }
 
   /**
@@ -2314,6 +2370,13 @@ export class AiDirector {
     if (!this.AmbientBlocked(s)) { s.ambientFirePoint = null; return null; }
     const now = this.time;
     if (s.ambientFirePoint && now < s.ambientUntil) return s.ambientFirePoint;
+    // 一段环境射击打完、手上还有目标：先把枪口还给对人射击，再给它 stalledTargetS 秒试一次
+    //（人可能已经从胸墙后面探出来了）；还是打不出去，AmbientBlocked 会再判空转、交回这里。
+    if (s.ambientFirePoint && s.target && s.triggerDrySince >= 0) {
+      s.triggerDrySince = -1;
+      s.ambientFirePoint = null;
+      if (!this.AmbientBlocked(s)) return null;
+    }
     if (now - s.ambientPickAt < AMBIENT_FIRE.pickEveryS) return s.ambientFirePoint;
     s.ambientPickAt = now;
     const threat = s.target?.position || ((s.lkpConfidence || 0) > 0 ? s.lkp : null);
@@ -4404,6 +4467,8 @@ export class AiDirector {
       });
     }
     if (s.fireTimer > 0 || !s.target || s.ammo <= 0) return;
+    // 【§20.7】从这一刻起「想打、能打」：到真打出一发为止都算扳机空转（环境射击据此接管）。
+    if (s.triggerDrySince < 0) s.triggerDrySince = this.time;
     s.aimTime += dt;
     // Authored fire windows hold the trigger, while cooling and acquiring aim
     // continue normally between bursts.
@@ -4505,6 +4570,7 @@ export class AiDirector {
     s.fireTimer = (s.burstIntervalS + (s.burstLeft > 0 ? 0 : s.burstPauseS)) * scriptFactors.interval;
     s.lastFire = this.time;
     s.targetFireAt = this.time;
+    s.triggerDrySince = -1;
     s.fireSequence += 1;
     s.aimTime = 0;
     this.fireCount += 1;              // 通关冒烟要的是"仗真的打起来了"的运行时证据

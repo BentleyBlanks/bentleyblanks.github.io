@@ -314,3 +314,21 @@ export const CHARGE_FOLLOW = Freeze({
   groupStaggerMaxS: 1.2,
   groupAbortSuppression: 0.7,
 });
+
+/**
+ * 白刃卡死解扣（2026-09-24，docs/Data_EnemyAi.md §20.7；任务侧开关 missionReactions 打开时才生效）。
+ *
+ * 白刃导演（`Script_MeleeCombat`）按「engageM 5.5 m 内、一条视线通」把人拉进白刃，而视线会从
+ * 胸墙 / 壕沿顶上过去：人被拉进白刃、贴着翻不过去的墙以 idle 架势站着，大脑的 Think 在白刃期间
+ * 整段停转 —— 09-24 探针里 03 有人以 CHARGE 状态贴着左前枪位胸墙站了 86 s，一发不打，压制爆表也不趴。
+ *
+ * stallS    白刃里连续这么久还是 idle 架势、位移不到 moveM，就算卡死。比 NpcThink 的出手间隔（1.25–1.5 s）
+ *           长一截，正常对峙、绕位、等别人先出手的人不会被误判。
+ * moveM     卡死判定的位移门槛（米）。
+ * releaseS  解扣后这么久不再被白刃导演接管（`meleeDormant`）；期间冲锋冷却照记，回到对射。
+ */
+export const MELEE_STALL = Freeze({
+  stallS: 2.5,
+  moveM: 0.3,
+  releaseS: 4,
+});
