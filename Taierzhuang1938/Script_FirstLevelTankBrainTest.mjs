@@ -535,6 +535,30 @@ function Run(brain, world, seconds, each = null) {
   ok(s05.length >= 2 && s05.every((f) => f.target === "attackLane" && f.kind === "cover"),
     `05: the main gun works the attack lane's cover lip (${s05.map((f) => `${f.target}/${f.kind}`).join(",")})`);
 
+  // 11d' 盯沟口：人还在取弹沟（沟线外）时放宽半径取沟口；默认半径照旧是 null。
+  const watchPt = LanePoint(lane, { x: 27, z: -115 }, lane.watch.rangeM);
+  ok(LanePoint(lane, { x: 27, z: -115 }) === null && watchPt && watchPt.s === 0 && Math.hypot(watchPt.x - lane.points[0].x, watchPt.z - lane.points[0].z) < 1e-6,
+    `watch: from the ammo trench the tank watches the lane mouth (${watchPt && `${watchPt.x},${watchPt.z}`})`);
+  // 11d'' 装填时照样摇炮塔：换了目标不等装填完才开始摇；下一发的瞄准停顿照旧 ≥ layMinS。
+  const bR = CreateTankBrain(TANK_TEMP_PATH, TANK, { seed: 36 });
+  bR.PlaceForStage("Tank");
+  const wR = World({ stage: "Tank", facts: new Set(["bundleTaken"]), targets: [lanes[1]], Los: () => false, Cover: () => null });
+  let firstShotAt = null;
+  for (let i = 0; i < 40 / DT && firstShotAt == null; i++) if (bR.Update(DT, wR).fire.some((f) => f.weapon === "main")) firstShotAt = bR.time;
+  ok(firstShotAt != null && bR.phase === "reload", `pre-traverse setup: first shell at the gap, loader busy (${bR.phase})`);
+  // 刚打完就换一个更值得打的区域目标（攻击支路）。
+  wR.targets = [lanes[1], lanes[2]];
+  const yaw0 = bR.turretYaw, reloadUntil = bR.reloadUntil;
+  let movedInReload = false;
+  const laysR = [];
+  Run(bR, wR, 20, (o, b) => {
+    if (b.time < reloadUntil && Math.abs(Wrap(b.turretYaw - yaw0)) > 0.05) movedInReload = true;
+    for (const f of o.fire) if (f.weapon === "main") laysR.push({ target: f.target, layS: f.layS });
+  });
+  ok(movedInReload, "the gunner cranks toward the new target while the loader reloads");
+  ok(laysR.length >= 1 && laysR[0].target === "attackLane" && laysR.every((l) => l.layS >= TANK.gunner.layMinS - 1e-6),
+    `the lay pause still precedes every shell after a pre-traverse (${laysR.map((l) => `${l.target}:${l.layS.toFixed(2)}`).join(",")})`);
+
   // 11e 事实口径 / 补弹 / 补刀。
   ok(TankClearFact({ brain: true }) === "tankFireDisabled" && TankClearFact({}) === "tankImmobilized", "clear fact: brain → tankFireDisabled, legacy → tankImmobilized");
   ok(BundleResupplyOpen({ brain: true, immobilized: true, fireDisabled: false }, true), "MobilityKill: the ammo house still hands out bundles");

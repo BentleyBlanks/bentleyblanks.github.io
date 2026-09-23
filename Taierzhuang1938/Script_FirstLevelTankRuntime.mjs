@@ -19,7 +19,7 @@
 //   · 大脑喊话按 TANK.barkCues 接 Say（节流）。
 // ===========================================================================
 import * as THREE from "three";
-import { CreateTankBrain, LuoFinishDue, LanePoint } from "./Script_FirstLevelTankBrain.mjs";
+import { CreateTankBrain, LuoFinishDue, LanePoint, TankClearFact } from "./Script_FirstLevelTankBrain.mjs";
 import { TANK, TANK_TEMP_PATH, FRONT_BREAKABLES_TEMP, TANK_BARK_CUES } from "./Data_Tuning_Tank.mjs";
 import { FRONT_SORTIE as S } from "./Data_FirstLevelFrontRoute.mjs";
 import { MISSION_ENCOUNTERS } from "./Data_FirstLevelMission.mjs";
@@ -150,12 +150,15 @@ export class FirstLevelTankRuntime {
       out.push({ id: "gapZone", kind: "zone", weight: 1, x: S.gap.x, z: S.gap.z, y: g + 1.2, ground: g, scatterM: [3, 5] });
     }
     // 区域火力（05 攻击支路）：玩家进了沟线 radiusM 以内，沿线离他最近的取整点就是区域目标（id 不变，只挪点）。
+    // 盯沟口（lane.watch）：领了集束弹、人还在沟外 watch.rangeM 以内（取弹沟 / 回程），车长先把炮塔摆向他要来的那段沟，
+    // 按节奏轰沟口的沟沿（看不见 → 打掩体沿，墙挡弹片只剩压制）；权重低一档。车已解决（TankClearFact）就不再盯。
     if (player?.Alive) for (const lane of this.path.lanes || []) {
       if (lane.stage !== stage || (lane.requireFact && !r.Has(lane.requireFact))) continue;
-      const at = LanePoint(lane, player.position);
+      let at = LanePoint(lane, player.position), weight = lane.weight;
+      if (!at && lane.watch && !r.Has(TankClearFact(r.tank))) { at = LanePoint(lane, player.position, lane.watch.rangeM); weight = lane.watch.weight; }
       if (!at) continue;
       const g = this.Ground(at.x, at.z);
-      out.push({ id: lane.id, kind: "zone", weight: lane.weight, x: at.x, z: at.z, y: g + 1.1, ground: g, scatterM: lane.scatterM });
+      out.push({ id: lane.id, kind: "zone", weight, x: at.x, z: at.z, y: g + 1.1, ground: g, scatterM: lane.scatterM });
     }
     return out;
   }

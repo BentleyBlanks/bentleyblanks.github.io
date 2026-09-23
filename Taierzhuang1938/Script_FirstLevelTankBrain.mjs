@@ -83,9 +83,9 @@ export function LuoFinishDue({ state, noBundleSince, now }, tuning = TANK) {
 }
 /**
  * 区域火力的落点（路点表 lanes[]）：玩家在沟线 radiusM 以内时，取沟线上离他最近、按 stepM 取整的那一点。
- * 不在沟边返回 null。返回 { x, z, s（沿线里程）, d（玩家到沟线的距离） }。
+ * 不在沟边返回 null。返回 { x, z, s（沿线里程）, d（玩家到沟线的距离） }。radiusM 可放宽（盯沟口：lane.watch.rangeM）。
  */
-export function LanePoint(lane, p) {
+export function LanePoint(lane, p, radiusM = lane?.radiusM ?? 4) {
   const P = lane.points || [];
   if (P.length < 2 || !p) return null;
   let best = null, run = 0;
@@ -98,7 +98,7 @@ export function LanePoint(lane, p) {
     segs.push({ a, dx, dz, len, from: run });
     run += len;
   }
-  if (best.d > (lane.radiusM ?? 4)) return null;
+  if (best.d > radiusM) return null;
   const step = lane.stepM || 0;
   const s = Clamp(step > 0 ? Math.round(best.s / step) * step : best.s, 0, run);
   const seg = segs.find((g) => s <= g.from + g.len + 1e-6) || segs.at(-1);
@@ -580,6 +580,10 @@ export class TankBrain {
         }
       }
       if (this.plan) { goal = YawTo(this, this.plan.at); rate = this.traverseRate || G.traverseMinRad; }
+      // 装填的时候炮手照样摇炮塔跟着目标走（装填手装弹、炮手摇手轮，两个人的活）：换了目标不必等装填完才开始摇。
+      // 预兆不变 —— 瞄准停顿（layMinS–layMaxS）只从装填完、这一发计划好、炮塔对准以后才开始算。
+      // 2026-09-24 探针：05 换到攻击支路以后炮塔在「reload」里干等 4 s 才开始摇，人已经走完那段沟了。
+      else if (this.phase === "reload" && weapons.main) { goal = YawTo(this, choice.memory); rate = G.traverseMinRad; }
     }
     // 摇炮塔（手摇：一次瞄准一个速度，转到位就停）。
     const before = this.turretYaw;

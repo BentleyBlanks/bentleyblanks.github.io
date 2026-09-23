@@ -512,6 +512,10 @@ export const TANK_TEMP_PATH = Object.freeze({
   lanes: Object.freeze([
     Object.freeze({ id: "attackLane", stage: "Tank", requireFact: "bundleTaken", radiusM: 3.5, stepM: 3, weight: 2.5,
       scatterM: Object.freeze([1.2, 2.6]),
+      // 盯沟口：领了集束弹、人在沟线 rangeM 以内（取弹沟 (27,−101…−126) 离沟口 ≤ 26 m）就先把炮塔摆过来、轰沟口。
+      // 权重 1.6 × zone 0.55 × 距离项（沟口离车 ≈ 20 m → 0.69）× 看不见 0.8 ≈ 0.49，压过当前的缺口（≈ 0.29）。[需]
+      // 2026-09-24 探针实测（没有这一条）：05 主炮 7 发全打缺口，人上了攻击支路炮塔才开始摇，被指着的时间只占 7.7 %。
+      watch: Object.freeze({ rangeM: 30, weight: 1.6 }),
       points: Object.freeze([Object.freeze({ x: 31, z: -127 }), Object.freeze({ x: 35, z: -127 }),
         Object.freeze({ x: 38, z: -134 }), Object.freeze({ x: 39, z: -140 })]) }),
   ]),
