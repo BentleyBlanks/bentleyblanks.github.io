@@ -575,6 +575,134 @@ window.Taierzhuang.Debug.BattleIntensity()
 
 ---
 
+## 二之三、第一关 01–05 声景（2026-09-23）
+
+用户原话：「01-05 应该在整体的战斗音效上有一个比较极致的沉浸感搭配」。对标 BF1 / CoD WWII /
+Hell Let Loose 的战场声。改之前查到的病根（`survey/Digest_audio.md` Part A）：
+交通壕判成开阔地（2.6 s 旷野混响）、01 远处前线要等 24 s 才出声、离图前线是 5 个固定点
+按固定间隔循环、压制下没有喘息心跳、耳鸣是一条 4 kHz 正弦、日军步枪只有一条变体。
+**只在 01–06 的任务相位里生效**，07 以后的离图前线、配乐、环境一个数没动。
+
+### 1. 壕沟与防炮洞的空间档（`AudioWiring.Zone` → `trench` / `dugout`）
+
+交通壕是 `Script_TrenchPlan` 在高度场上挖出来的，没有碰撞盒，`CountWalls` 一面墙也数不到。
+现在只看共享地面采样器（`battlefield.GroundHeight`），数在 `Data_Tuning_Audio.TRENCH_ZONE`：
+
+| 档 | 判据 |
+| --- | --- |
+| `trench` | 四条直径（东西、南北、两条对角）里有一条**两端都**比脚下高 ≥ 0.9 m。每一侧在 2.0 / 3.2 / 4.6 m 三圈里取最高（沟底宽 3.4 m、坡 1.1 m：站在中线上 2 m 那圈落在坡脚，贴着一侧沟壁时远的沟沿在 4.2 m 外） |
+| `dugout` | 头顶那一击离脚下地面 ≤ 2.9 m、横向两边都 ≥ 1.2 m，且八个方向里 ≥ 3 个比脚下高 0.9 m（陷在地下）。布设把洞顶碰撞盒标成 `dugoutRoof` 时直接判 dugout |
+
+判定顺序：dugout → interior（原屋顶判据）→ trench → courtyard / street / open。
+头顶没东西时只「快问」沟（找到一条两端都高的直径就停），实测真地形上 0.09 ms / 次
+（缓存 1 m 网格 0.5 s，与原探针同一套）；真地形 171 个沟中线采样点 76 % 判成 trench，
+其余是岔口与挖成大坑的阵位（四面都开着，不算沟是对的）。
+
+引擎侧（`Script_Audio`）：
+
+| 档 | IR | 枪尾 | 回声增益 |
+| --- | --- | --- | --- |
+| `trench` | 0.42 s，前 30 ms 八记硬反射（两壁往返约 20 ms），轻微吃高频 | 街巷那条 | 0.88 |
+| `dugout` | 0.30 s，反射贴耳、damp 0.12（约 1 kHz 一阶低通）—— 闷、近、低频堆着 | 室内那条 | 0.92 |
+
+`dugout` 与 `interior` 一样算「被围起来」：听者在洞里、声源在外（或反过来）叠 `ZONE_BOUNDARY_OCC`。
+取证：`Debug.AudioZone()` 多了 `trench:{rise, sunkDirs}` 与 `stress`。
+
+### 2. 防炮洞环境床（`AMBIENCE_PRESETS.firstLevelDugout`）
+
+床只留低频（层上新增 `cut`，单层低通，只在给了的层上多一个节点）：`shellingFar` 360 Hz、
+`battleFar` 480 Hz、`windPlain` 260 Hz；撒播是洞里的动静（`amb.debris` 顶上掉土、`amb.creak`
+圆木吱呀、`amb.cannonFar` 260 Hz 的闷炮）。不撒枪声 —— 远处交火由下一节按世界坐标放。
+切换由 `FirstLevelMissionBattleSound.UpdateDugout` 管：01 整段强制；02 与撤退段按听者空间档
+在 `firstLevelDugout ↔ firstLevelFront` 之间切，滞回 1.0 s、交叉淡 1.6 s
+（`Ambience(preset, { fadeS })` 是这一轮加的可选参数；不给仍是原来的硬切）。
+
+### 3. 远处前线：扇区化交火生成器（`Data_FirstLevelMissionBattleSound.front`）
+
+五个扇区，每个是一段「我方一线 ↔ 日方一线」的两个锚点，距前沿 300 m – 1.5 km、西北/北/东北/东/远西
+各一个。扇区空闲一段后起一场交火：
+
+| 写法 | 内容 |
+| --- | --- |
+| 步枪对射 | 一方 2–5 发、隔 0.7–2.2 s 另一方还击，来回 2–4 轮 |
+| 机枪对射 | 日军九二式/十一年式 8–15 发长点射 ↔ 捷克式 3–6 发，夹几发步枪，来回 2–3 轮 |
+| 炮击 | 日军炮兵阵地的炮口闷响 → 飞行 2.4–4.2 s → 落在我方一线（`explosionFar`），过后常有我方机枪回一梭子 |
+| 掷弹筒 | 日方一线 `launcherPop` → 1.3–2.3 s 后落在我方一线 |
+
+每一发在锚点周围 50–90 m 里另挑位置。引擎只留 1000 m 内的 `soundField`，更远的沿方向摆到 880 m、
+按反比律补上差的衰减，600 m 外再压一道高频（到 1.5 km 时 520 Hz）。
+
+- **01 立刻开始**：进 01–06 任一步，1.2 s 内第一声（旧口径是沿用军列的 24 s）。01 隔着土（airCut 450）、02 620。
+- **强度**：阶段基线 × 场上交火的让位 —— `AudioWiring` 的战场强度到 1 时，新交火频次 ×0.5、电平 ×0.65
+  （03–05 近处本来就吵，远处再满密度就糊）；对白播放时新交火频次 ×0.45（电平交给 Voice 包的侧链）。
+- **总线**：`bus: "sfx"`，全部在 45 m 以外 → 引擎自动归进**远声组 `farGain`**（玩家连射让路；
+  **Voice 包的对白侧链 dialogueDuck 请压这一组**）。旧版走 `ambience` 总线，而环境推子默认 10 %，
+  等于整条前线常年 −20 dB。
+- **预算**：前线同时 ≤ 5 条，场外炮击 ≤ 3 条（合计 ≤ 契约 §6 的 8），满了跳过不硬挤。
+- 取证：`missionRuntime.State().battleSound.front`（每个扇区打了几场、下一场几秒后、最近 12 声的距离/音量）。
+
+### 4. 场外近落弹（`Script_BattleArtillery`）
+
+落在 40–140 m 外划好的无人地带（`artillery.zones` 三个矩形，离任何活人 ≥ 10 m）。
+**不伤人、不改地形、不进压制账与 TTK**。一发的时间线：
+
+| 时刻 | 事件 |
+| --- | --- |
+| −1.15 s | 35 % 的炮弹先有来袭啸声 |
+| 0 | 画面 `vfx.Explosion`（先见） |
+| d/340 | 中/远档爆炸 + 一条压到 400 Hz 以下的 `shellImpact` 低频层（后闻）；震屏跟声音到（`CameraShake.Explosion`，reach 18 m，洞里 ×1.6） |
+| d/340 + 0.25–0.7 s | 听者在沟里：耳边沟壁沙沙落土；在洞里：头顶掉土（`debrisFall`，低通） |
+| 1.1–2.1 s | 75 m 以内那几发：土块从爆点那一侧砸回沟里 |
+
+每步密度（`artillery.stages`）：01 每分钟 2.2 发（75–140 m、隔着土 900 Hz，近爆 `bunkerCollapsed` 后 14 s 不落，
+黑屏与醒来留给剧本那一发），02 1.1、撤退段 2.0、03 1.8、04 1.2、05 0.8（战车有自己的炮）、06 1.0；
+对白播放时 ×0.4。
+
+### 5. 压制下的身体（`AudioWiring.SuppressionBody`，`SUPPRESSION_BODY`）
+
+`player.suppression` 0.55/s 就落完，所以先过一道快升（0.35 s）慢落（5.5 s）的包络 `stress`。
+stress ≥ 0.42 开始喘（`breathHeavy` 原速原调，0.26–0.5 随 stress），≥ 0.36 开始心跳（`heartbeat`
+单拍按 84–138 bpm 排、0.16–0.46），都带滞回。优先级：受伤喘息 > 冲刺喘息 > 压制喘息；
+血量低于濒死线时由 `Script_Player` 的濒死心跳接管，这里不叠第二条。
+
+### 6. 耳鸣（`Script_Audio.Deafen`，`TINNITUS`）
+
+双音拍频（两条差 5–7.5 Hz 的音一左一右、音高随时间略沉）+ 4.3–4.6 kHz 窄带嘶声（比音先退）
++ 总线低通**分段**往回爬（低频先回、高频最后回）。两档：`Deafen(seconds < 0.9)` 走战斗近爆
+（约 1.3 s 回到全频，鸣 2.2 s）；`Deafen(1.1)`（01 近爆、02 枪托击打）走剧情档：380 Hz 起、
+9 s 回到全频、鸣 9.5 s，与 [开场炮震](Data_OpeningShellshock.md)「视觉恢复不等于声音立刻恢复」同一口径。
+新一次耳鸣进来先收掉上一次的鸣响。起音期（0.13 s）照旧。
+
+### 7. 配乐让位与标点（`Data_FirstLevelMissionMusic.FIRST_LEVEL_MUSIC_COMBAT`）
+
+撤退段与 03–05：战场强度 0.35 → 0.9 时配乐线性压到 0.45 倍（按 0.05 取整，免得每帧写斜坡）；
+`tankPreviewed` / `tankImmobilized` / `tankFireDisabled` / `lastGuardsWithdrawn` 第一次出现后 6 s 不让位、
+抬到 1.15 倍，再 4 s 回到让位值。07 以后不变。
+
+### 8. 日军枪声变体（`Data_SfxSources.JapaneseGunfireVariants`）
+
+| cue | 改前 | 改后 |
+| --- | --- | --- |
+| `rifleIja` | 1（SeedAudio） | 5：SeedAudio + M1 Garand + M1903A3 ×3（包里本来就有的真枪实录，09-11 那一轮被清单挤掉了） |
+| `rifleIjaFar` | 1 | 4：SeedAudio + BAR 300 m + 50 m 建筑反射 ×2 |
+| `type11` | 1 | 3：SeedAudio + FN MINIMI 1 m 单发 ×2（原 BAR 0.1 m 两条 <40 Hz 占 98.7 %，可听部分低 19 dB，撤掉） |
+| `type11Far` | 1 | 3：BAR 300 m + MINIMI 50 m ×2 |
+| `type92` / `type92Far` | 3 / 2 | 不变 |
+
+**参考视频来源的许可债**（`SFX_LICENSES.refvideo`，发布前要换或取得授权）：`rifleNra_05–07`、`bolt_03`、
+`rifleHanYang`、`boltHanYang` 仍在轮播；`rifleIja_05`（三八大盖实录）这一轮起**不进轮播**。
+
+### 9. 这一节的闸
+
+- `Script_FirstLevelBattleSoundTest.mjs`（纯 Node）：生成器（01 首声 ≤ 1.2 s、双方来回、方位分散、声部上限、
+  让位、对白少起、07 回到旧声源）、近落弹（落点、避人、先见后闻、低频层、沟壁落土、啸声、01 静默窗与闷）、
+  防炮洞环境切换、壕沟/洞室判据、压制心跳与慢落、耳鸣两档、配乐让位与标点。
+- `Script_AudioWiringTest`：trench / dugout 两档与沟里声源送进 trench IR（浏览器）。
+- `Script_AudioTest`：六档 IR 与时长排序（洞 < 沟 0.3–0.5 s < 院子）。
+- `Script_FirstLevelMissionTest`：01 立刻有声、隔着土；03 双方对射；07 以后回到旧声源。
+
+---
+
 ## 三、新 cue 一览（合成回落 + 素材契约）
 
 素材由素材侧从 Sonniss 实录里切，**名字是契约**。素材落地之前走的是

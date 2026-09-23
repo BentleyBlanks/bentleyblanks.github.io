@@ -31,3 +31,5 @@ Death 阶段快速撤掉配乐，保留对白和战场声；Complete、玩家倒
 循环沿用 `LoopLayer` 的双播放头调度，新曲使用六秒交叉淡化。完整曲目从头播放，接近尾部时下一轮从头淡入，避免硬接缝；这不是可独立组合的乐器分轨。跨曲切换及对白让位均在组增益上进行。
 
 验证入口：`Script_FirstLevelMissionMusicTest.mjs` 检查全部阶段、源资产和电平；`Script_FirstLevelMissionMusicBrowserTest.mjs` 检查实际 WebAudio 输出、第一关阶段接线、对白、暂停恢复、三首缓存和异步竞态。该测试的阶段跳转是接线诊断，不作为正常通关证据。共享循环和旧音乐兼容由 `Script_AudioTest.mjs` 回归；正常任务行为继续走现有 `Script_FirstLevelMissionBrowserTest.mjs --campaign`。
+
+2026-09-23：撤退段与 03–05 的战斗配乐按战场强度让位（强度 0.35→0.9 压到 0.45 倍，按 0.05 取整），战车露面、战车失去行动/火力、余队通过这几个事实第一次出现时给一个标点（6 s 抬到 1.15 倍、再 4 s 回落）。数在 `Data_FirstLevelMissionMusic.FIRST_LEVEL_MUSIC_COMBAT`，口径与取证见 [音频接线](Data_AudioWiring.md)「二之三」第 7 条；07 以后不变。

@@ -350,7 +350,8 @@ export class AudioWiring {
     // = dugout；两侧土壁夹着 = trench。壕沟是高度场挖出来的，没有碰撞盒，只能看地面。
     const up = bf.Raycast({ x: position.x, y: position.y + 0.1, z: position.z },
       { x: 0, y: 1, z: 0 }, PROBE.ceilingProbeM, { terrain: false });
-    const sink = this.TrenchSink(position);
+    // 头顶有东西才要数八个方向（判洞室）；没有就只快问「是不是沟」。
+    const sink = this.TrenchSink(position, !!up?.box);
     if (this.IsDugoutRoof(up, position, sink)) {
       zone = "dugout";
     } else if (IsCeiling(up)) {
@@ -369,32 +370,44 @@ export class AudioWiring {
 
   /**
    * 这个位置陷在地面以下多少（壕沟 / 洞室的判据，只看共享地面采样器）。
+   *
+   * 两种问法：
+   *   · 快问（full = false，Zone 在头顶没有盖子时用）：一条直径一条直径地试，
+   *     某一侧几圈都够不到 minRise 就放弃这条直径，找到一条两端都高的立刻返回。
+   *     开阔地上 13 次采样（原来 25 次），沟里通常三五次就够。
+   *   · 全问（full = true，头顶有盖、要判是不是洞室时用）：八个方向全数，给 sunkDirs。
    * @returns {{ trench: boolean, sunkDirs: number, rise: number, ground: number|null }}
-   *   rise = 四条直径里「两端较低那一端」比中心高多少，取最大的那条直径。
+   *   rise = 两端都高的那条直径上较低一端比中心高多少（快问时找到即止，不一定是最大值）。
    */
-  TrenchSink(position) {
+  TrenchSink(position, full = true) {
     const bf = this.Battlefield;
     const none = { trench: false, sunkDirs: 0, rise: 0, ground: null };
     if (!bf || typeof bf.GroundHeight !== "function" || !position) return none;
     const ground = bf.GroundHeight(position.x, position.z);
     if (!Number.isFinite(ground)) return none;
     if (Number.isFinite(position.y) && position.y - ground > TRENCH_ZONE.maxAboveGroundM) return { ...none, ground };
+    const need = TRENCH_ZONE.minRiseM;
+    // 一侧：几圈里最高的那个；快问时够到 need 就停。
     const Side = (ux, uz) => {
       let best = -Infinity;
       for (const r of TRENCH_ZONE.radiiM) {
         const h = bf.GroundHeight(position.x + ux * r, position.z + uz * r);
         if (Number.isFinite(h)) best = Math.max(best, h - ground);
+        if (!full && best >= need) break;
       }
       return best;
     };
     let rise = 0, sunkDirs = 0;
     for (const [ux, uz] of TRENCH_AXES) {
-      const a = Side(ux, uz), b = Side(-ux, -uz);
-      if (a >= TRENCH_ZONE.minRiseM) sunkDirs += 1;
-      if (b >= TRENCH_ZONE.minRiseM) sunkDirs += 1;
+      const a = Side(ux, uz);
+      if (!full && a < need) continue;
+      const b = Side(-ux, -uz);
+      if (a >= need) sunkDirs += 1;
+      if (b >= need) sunkDirs += 1;
       rise = Math.max(rise, Math.min(a, b));
+      if (!full && rise >= need) break;
     }
-    return { trench: rise >= TRENCH_ZONE.minRiseM, sunkDirs, rise, ground };
+    return { trench: rise >= need, sunkDirs, rise, ground };
   }
 
   /** 头顶那一击是不是防炮洞的顶：布设标了 dugoutRoof，或低矮、够宽、且人陷在地下。 */
