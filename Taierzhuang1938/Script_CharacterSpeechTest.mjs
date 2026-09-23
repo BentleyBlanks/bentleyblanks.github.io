@@ -426,16 +426,23 @@ let faceTrackCount = 0;
   }
   assert.deepEqual(stale.filter(id => scope.has(id)), [], '01-06 takes re-recorded without re-alignment (run the voice aligner, then the face-track bake)');
   if (stale.length) console.log(`note: 07-18 takes skipped, alignment older than the take: ${stale.join(', ')}`);
-  assert.ok(chars > 300 && charsArticulated / chars >= .97, `01-06: ${charsArticulated}/${chars} aligned characters move the mouth`);
   // Per-line takes (Voice package): once Data_FirstLevelLineTimings.json exists every take in it has its own track.
+  // Since the 2026-09-24 voice merge the 01-06 dialogue lives in these per-line slices of whole-scene takes,
+  // so their aligned characters count toward the same 01-06 articulation gate as the whole-cue takes above.
   const lineTimings = new URL('./Audio/FirstLevel/Data_FirstLevelLineTimings.json', import.meta.url);
   if (fs.existsSync(lineTimings)) {
     for (const [sha, row] of Object.entries(JSON.parse(fs.readFileSync(lineTimings, 'utf8')))) {
       const track = FACE_TRACKS.tracks[sha];
       assert.ok(track?.kind === 'line' && track.id === row.lineId,
         `${row.lineId}: per-line face track baked (PYTHONUTF8=1 py -3.13 Taierzhuang1938/Script_FirstLevelFaceTrackBake.py --lines --prune)`);
+      for (const [, s, e] of track.chars || []) {
+        if (e - s < 60) continue;
+        chars++;
+        for (let ms = s; ms <= e; ms += 10) if (Articulated(SampleFaceTrack(sha, ms / 1000))) { charsArticulated++; break; }
+      }
     }
   }
+  assert.ok(chars > 300 && charsArticulated / chars >= .97, `01-06: ${charsArticulated}/${chars} aligned characters move the mouth`);
   if (below.length) console.log(`note: 07-18 takes under 80% (noisy whole-cue alignment): ${below.join(', ')}`);
   assert.ok(voiced > 0 && moving / voiced >= .95, `all takes: mouth moves on ${(moving / voiced).toFixed(3)} of speech frames`);
   assert.ok(open / gap <= .02, `all takes: open in ${(open / gap).toFixed(3)} of line gaps`);
