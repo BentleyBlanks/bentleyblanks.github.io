@@ -484,7 +484,10 @@ export class FirstLevelFrontPressure {
         if (Distance(a.position, S.gap) > B.blockadeRangeM) continue;
         if (!points.some((p) => r.Threatens(p, [a.missionId], B.guardHeightM, B.blockadeRangeM))) continue;
         a.yieldCheckAt = now + FRONT_PRESSURE_TICK.yieldRecheckS;
-        if (s.index <= 0 && s.mode === "hold") {
+        // 站在线上的人（hold）与在线上近距交火的人（contact）一样往回拉；拉的这几秒 UpdateAssault 不认近距交火。
+        const onLine = s.mode === "hold" || s.mode === "contact";
+        s.yieldUntil = now + FRONT_PRESSURE_TICK.yieldMoveS;
+        if (s.index <= 0 && onLine) {
           // 已经在第一条线上还看得见口子：退回他出发的地方（名册里的出生点，跃进线的起点），
           // 这一相位就停在那儿。下一相位 ApplyAssault 会把原来的跃进线还给他。
           const spec = SPAWNS.get(a.missionId);
@@ -496,7 +499,7 @@ export class FirstLevelFrontPressure {
           this.Note("yield", { id: a.missionId, line: -1 });
           continue;
         }
-        s.index = Math.max(0, Math.min(s.index, AssaultTop(s)) - (s.mode === "hold" ? 1 : 0));
+        s.index = Math.max(0, Math.min(s.index, AssaultTop(s)) - (onLine ? 1 : 0));
         s.maxIndex = s.index;
         s.mode = "rush"; s.hold = 0; s.shifts = 0;
         this.Note("yield", { id: a.missionId, line: s.index });

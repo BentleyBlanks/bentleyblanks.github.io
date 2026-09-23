@@ -1054,7 +1054,10 @@ export class FirstLevelMissionRuntime {
       }
       // A nearby visible opponent overrides the scheduled bound. The shared
       // combat brain owns cover, search and the physical melee handoff.
-      const contact=actor.tacticalRadiusM>0 && !actor.missionReserve && actor.targetVisible
+      // 压力表「让口子」刚把他往回拉（s.yieldUntil，Script_FirstLevelFrontPressure.YieldGap）：这几秒不认近距交火 ——
+      // 不然他在 contact 里原地 Defend，拉线改的 index 一步都不走（09-24 实测：左前枪位旁一挺轻机枪在 contact 里
+      // 看着撤退口，第二批守军过不了口，03→06 红在 lastGuardsWithdrawn）。
+      const contact=actor.tacticalRadiusM>0 && !actor.missionReserve && actor.targetVisible && !(this.time<(s.yieldUntil||0))
         && !actor.targetFromMemory && actor.target?.ref?.alive!==false
         && actor.target && Distance(actor.position,actor.target.position)<R.assaultContactRangeM;
       if(contact){

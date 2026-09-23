@@ -213,4 +213,6 @@ export const FRONT_PRESSURE_TICK = Object.freeze({
   yieldEveryS: 0.5,
   /** 让口子时，一个人被往回拉一条线之后多久才再查他一次（让他先跑到位）。 */
   yieldRecheckS: 3,
+  /** 被往回拉的人这么久之内不认近距交火（UpdateAssault 的 contact），先跑回去；过了还看得见口子就再拉一次。 */
+  yieldMoveS: 4,
 });

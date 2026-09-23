@@ -268,6 +268,17 @@ function MakeWorld(stage = "BunkerRescue") {
   Eq(a0.index, before - 1, "a man who can see the gap during a withdrawal gives one line back");
   Eq(a0.maxIndex, a0.index, "and may not come forward again this phase");
   Check(pressure.events.some((e) => e.kind === "yield" && e.id === "FrontRifleH"));
+  Check(a0.yieldUntil > r.time, "the pulled man ignores close contact while he runs back");
+  // A man fighting at close range on his line (contact) is pulled back the same way (09-24: an LMG in contact by the
+  // left gun kept the gap covered and the second batch never got out).
+  {
+    const g = enemies.get("FrontRifleG").missionAssault;
+    g.index = Math.min(2, AssaultTop(g)); g.mode = "contact"; const was = g.index;
+    enemies.get("FrontRifleG").yieldCheckAt = 0;
+    world.threats.add("FrontRifleG"); r.time = 3.5; pressure.Update();
+    Check(was >= 1 && g.index === was - 1 && g.mode === "rush" && g.yieldUntil > r.time, "a man in close contact who sees the gap gives a line back too");
+    world.threats.delete("FrontRifleG");
+  }
   const a1 = enemies.get("FrontRifleA").missionAssault; a1.index = 0; a1.mode = "hold";
   world.threats.add("FrontRifleA"); r.time = 4; pressure.Update();
   Eq([a1.points[0].x, a1.points[0].z, a1.index, a1.maxIndex], [23, -163, 0, 0],
