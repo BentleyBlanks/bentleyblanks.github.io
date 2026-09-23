@@ -279,7 +279,9 @@ def BuildKeys(lines, energy, ph, bake):
                 e = min(s + b["maxSyllableS"], natural + b["tailPadS"])
                 if nxt: e = min(e, max(s + .05, nxt["s"] - .03))
                 # Phrase-final: stay open while the voice actually continues.
-                frames = np.where(energy.Frames(e, min(s + b["maxSyllableS"], nxt["s"] - .05 if nxt else s + b["maxSyllableS"])))[0]
+                # Before a pause or at the end of a line: a held, shouted vowel (往——滕县——)
+                # stays open while the voice goes on, up to heldVowelS.
+                frames = np.where(energy.Frames(e, min(s + b["heldVowelS"], nxt["s"] - .05 if nxt else s + b["heldVowelS"])))[0]
                 for f in frames:
                     if not energy.speech[f]: break
                     e = energy.times[f] + b["hopS"] / 2
@@ -318,19 +320,27 @@ def BuildKeys(lines, energy, ph, bake):
                 keys.append((s, Scale(vis[body[0]], a) * b["boundaryDip"]))
             fractions = {1: [.45], 2: [.35, .85], 3: [.2, .55, .9]}[min(3, len(body))]
             nucleus = max(range(len(body)), key=lambda k: vis[body[k]][0]) if len(body) > 1 else 0
+            # A held vowel: shapes over a normal syllable length, the nucleus held, tails at the end.
+            shaped = min(e, t0 + b["maxSyllableS"])
+            held = e - shaped > .12
             for k, (v, f) in enumerate(zip(body, fractions)):
                 if x.get("fixed"):
                     value = vis[v]
                 else:
                     w = 1.0 if k == nucleus else (b["glideWeight"] if k < nucleus else b["tailWeight"])
                     value = Scale(vis[v], a * w)
-                keys.append((t0 + f * (e - t0), value))
+                if held and k > nucleus:
+                    keys.append((e - .05, value))
+                else:
+                    keys.append((t0 + f * (shaped - t0), value))
+                if held and k == nucleus:
+                    keys.append((e - (.1 if k + 1 < len(body) else .05), value))
             # Stress: loud local peak, spaced out.
             if (x["audible"] and median > 0 and x["energy"] >= b["stressRatio"] * median
                     and (prev is None or x["energy"] >= prev["energy"])
                     and (i + 1 >= len(syl) or x["energy"] >= syl[i + 1]["energy"])
                     and s - last_stress >= b["stressMinGapS"]):
-                t = t0 + fractions[nucleus] * (e - t0) - .03
+                t = t0 + fractions[nucleus] * (shaped - t0) - .03
                 stress.append(t); last_stress = s
         keys.append((syl[-1]["span"][1] + b["restTailS"], vis["REST"]))
     keys.sort(key=lambda k: k[0])

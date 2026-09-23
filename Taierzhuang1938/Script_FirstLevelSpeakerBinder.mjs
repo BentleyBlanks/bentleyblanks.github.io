@@ -16,7 +16,7 @@ import * as THREE from "three";
 import { MISSION_DIALOGUE, MISSION_VOICE_CAST } from "./Data_FirstLevelMissionDialogue.mjs";
 import { SPEAKER_HEAD } from "./Data_Tuning_CharacterSpeech.mjs";
 import { SpeakerHeadLayer } from "./Script_SpeakerHeadLayer.mjs";
-import { FaceTrackSpeech, LoadFaceTracks } from "./Script_FaceTrack.mjs";
+import { FaceTrackSpeech, LoadFaceTracks, SampleLineFaceTrack } from "./Script_FaceTrack.mjs";
 
 const CUES = new Map(MISSION_DIALOGUE.map(cue => [cue.id, cue]));
 // Roles that never have a body of their own on screen.
@@ -79,6 +79,8 @@ export class FirstLevelSpeakerBinder {
     loadFaceTracks = typeof location !== "undefined" } = {}) {
     this.voice = voice; this.soldiers = soldiers; this.listener = listener;
     if (loadFaceTracks) LoadFaceTracks();
+    // Per-line dialogue player (Voice package): its Speech(who) reads this hook first.
+    if (voice?.dialogue && !voice.dialogue.faceTrackSampler) voice.dialogue.faceTrackSampler = SampleLineFaceTrack;
     this.resolvers = [...resolvers];
     this.bound = new Map(); // soldier -> { whos:Set, facial, layer }
     this.speaking = [];     // [{ who, soldier, head }]

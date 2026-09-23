@@ -67,15 +67,19 @@ export const FACE_TRACK_BAKE = Object.freeze({
   // 03-06 takes measure >=.7 on vowels and .2-.5 on gunfire, rumble and hiss
   // (BorrowLight 0-1.3 s is up to +37 dB of ambience at ~.4 with single-frame spikes
   // to .8, then 兄 at 1.77 s reads .9+), so the strength is a running median over
-  // pitchMedianFrames before the threshold.
+  // pitchMedianFrames before the threshold. At 5 frames / .6 the falling-debris bed of
+  // MarchToTengxian and RoadBump still passed as speech in runs of 50-200 ms.
   voicedAboveNoiseDb: 8,
-  pitchBandLowHz: 70, pitchBandHighHz: 1000, pitchWindowS: .04, pitchMedianFrames: 5, pitchMin: .6,
+  pitchBandLowHz: 70, pitchBandHighHz: 1000, pitchWindowS: .04, pitchMedianFrames: 7, pitchMin: .7,
   speechReachS: .03,
   // Syllable openness: floor + (1-floor)*(energy/p90)^gamma; inaudible syllables
   // (aligned but under the voiced threshold) still move at quietSyllableAmp.
   ampFloor: .5, ampGamma: .7, quietSyllableAmp: .4,
   // Syllable span: continuous speech runs start-to-start; a syllable is 0.14-0.42 s.
   minSyllableS: .14, maxSyllableS: .42, tailPadS: .06,
+  // Before a pause or a line end a vowel may be held (called orders: 往——滕县——);
+  // it stays open while speech frames continue, up to this long.
+  heldVowelS: 1.5,
   // Closures (b/p/m/f and kana onsets) take the first 30 % of a syllable, at most 60 ms.
   onsetShare: .3, onsetS: .06,
   // Between syllables without a closure the jaw dips to this share of the next vowel,
