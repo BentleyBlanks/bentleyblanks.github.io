@@ -94,14 +94,21 @@ export async function DriveFrontBattle(ctx){
   await WaitFact("bundleReturned",90,true);
   await Route(S.attackRoute,"RoadsideAttackBranch",{stance:"crouch",fight:true,crawl:true});
   await WaitFact("attackPositionReached",60,true);
+  // 两段毁伤（战车大脑）：第一颗断履带（MobilityKill，炮塔机枪照样打），要再补一颗才彻底哑火。
+  // 旧路径（没有大脑）一颗同帧两样全记，break 条件与原来一致。
   for(let attempt=0;attempt<2;attempt++){
-    const thrown=await DriveBundleThrow(page);
+    const thrown=await DriveBundleThrow(page,{aim:"track"});
     await fs.writeFile(path.join(output,`Data_BundleThrow${attempt}.json`),JSON.stringify(thrown,null,2));
-    console.log("BUNDLE_THROW",JSON.stringify({alive:thrown.alive,miss:thrown.blastMiss,tank:thrown.mission.tank}));
+    const t=thrown.mission.tank;
+    console.log("BUNDLE_THROW",JSON.stringify({alive:thrown.alive,miss:thrown.blastMiss,state:t.damageState,immobilized:t.immobilized,fireDisabled:t.fireDisabled,
+      x:t.x,z:t.z,brainBlasts:thrown.mission.tankBrain?.log?.blasts?.slice(-1)}));
     assert.ok(thrown.alive);
-    if(thrown.mission.tank.immobilized)break;
+    if(t.fireDisabled||(!t.brain&&t.immobilized))break;
   }
-  state=await State();assert.ok(state.facts.includes("tankImmobilized"));assert.ok(state.facts.includes("tankFireDisabled"));
+  state=await State();
+  // 战车大脑取证（露面、每发主炮的预兆与落点、机枪、反应、毁伤序列、可破坏掩体）：证据目录，不断言。
+  if(state.tankBrain)await fs.writeFile(path.join(output,"Data_TankBrain.json"),JSON.stringify(state.tankBrain,null,2));
+  assert.ok(state.facts.includes("tankImmobilized"));assert.ok(state.facts.includes("tankFireDisabled"));
   await CaptureFocus("TankDisabled",state.tank);
   await Route([...S.attackRoute].reverse(),"AttackBranchRetreat",{stance:"crouch",fight:true,crawl:true});
   await WaitFact("lastGuardsWithdrawn",240,true);

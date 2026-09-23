@@ -378,4 +378,55 @@ function Run(brain, world, seconds, each = null) {
   ok(Dist(brain, { x: 39, z: -140 }) <= 9, "05: throw point within covered throw range");
 }
 
-console.log(`PASS FirstLevelTankBrain: ${checks} checks (drive, telegraph, targeting, scatter, MG walk-in, dead zone, reactions, escorts, two-stage damage, 03→05 temp path)`);
+// --- 10 可破坏掩体（运行时机制，Script_FirstLevelFrontBreakables）：分段、碰撞、接管静态块、永不可破 ------------
+{
+  const { registerHooks } = await import("node:module");
+  const fs = await import("node:fs");
+  const vendor = new URL("./vendor/three/", import.meta.url);
+  const hooks = registerHooks({
+    resolve(id, context, next) { if (id === "three") return { url: new URL("build/three.module.js", vendor).href, shortCircuit: true }; return next(id, context); },
+    load(url, context, next) { if (url.startsWith(vendor.href) && url.endsWith(".js")) return { format: "module", source: fs.readFileSync(new URL(url), "utf8"), shortCircuit: true }; return next(url, context); },
+  });
+  const THREE = await import("three");
+  const { FirstLevelFrontBreakables, NEVER_BREAKABLE, DistanceToWall } = await import("./Script_FirstLevelFrontBreakables.mjs");
+  hooks.deregister();
+  const block = { id: "TestWall", x: 10, z: -5, w: 4, d: 0.6, h: 1.6, y: 0.7, semantic: "Whitebox" };
+  // 静态合批里的这一块（24 个顶点）+ 旁边一块不相干的。
+  const box = new THREE.BoxGeometry(block.w, block.h, block.d).translate(block.x, block.y, block.z);
+  const other = new THREE.BoxGeometry(1, 1, 1).translate(20, 0.5, -5);
+  const merged = new THREE.BufferGeometry();
+  merged.setAttribute("position", new THREE.Float32BufferAttribute([...box.attributes.position.array, ...other.attributes.position.array], 3));
+  const mesh = new THREE.Mesh(merged); mesh.name = "FirstLevelWhitebox_StaticWhiteBoxes";
+  const staticCollider = { c: [block.x, block.y, block.z], h: [block.w / 2, block.h / 2, block.d / 2], _physicsHandle: 7 };
+  const solids = new Set([7]); let serial = 100;
+  const physics = { AddSolid: (b) => { b._physicsHandle = ++serial; solids.add(serial); }, RemoveSolid: (h) => solids.delete(h) };
+  const battlefield = { GroundHeight: () => 0, colliders: [staticCollider], meshes: [mesh], materials: new Map(), BuildCollisionGrid() {} };
+  const scene = new THREE.Scene();
+  const specs = [
+    { id: "TestBreak", block: "TestWall", hitRadiusM: 2, minDamage: 60, stages: [[[-2, 2, 1.5]], [[-2, 0, 1.5], [0, 2, 1.0]], [[-2, 2, 0.6]]] },
+    { id: "RearWallAttempt", block: "RightNestRearWall", stages: [[[-1, 1, 1]], [[-1, 1, 0.2]]] },
+  ];
+  const b = new FirstLevelFrontBreakables({ scene, battlefield, physics, layout: { blocks: [block, { id: "RightNestRearWall", x: 0, z: 0, w: 2, d: 1, h: 2, y: 1 }] } }, specs);
+  ok(NEVER_BREAKABLE.includes("RightNestRearWall") && b.items.length === 1, "the position rear wall is never breakable even if data lists it");
+  ok(!solids.has(7) && !battlefield.colliders.includes(staticCollider), "static collider of the taken-over block removed");
+  const pos = merged.attributes.position;
+  let collapsed = 0; for (let i = 0; i < 24; i++) if (Math.abs(pos.getY(i) - (block.y - block.h / 2)) < 1e-6 && Math.abs(pos.getX(i) - block.x) < 1e-6) collapsed++;
+  let untouched = 0; for (let i = 24; i < pos.count; i++) if (Math.abs(Math.abs(pos.getX(i) - 20) - 0.5) < 1e-6) untouched++;
+  ok(collapsed === 24 && untouched === pos.count - 24, "only the block's own vertices collapse");
+  ok(b.State()[0].stage === 0 && b.State()[0].colliders === 1 && battlefield.colliders.length === 1, "stage 0 rebuilds the intact wall as its own collider");
+  const top0 = Math.max(...battlefield.colliders.map((c) => c.max[1]));
+  ok(Math.abs(top0 - (block.y + block.h / 2)) < 0.02, "stage 0 top matches the original block top (the gun still rests on it)");
+  ok(b.OnBlast({ x: 10, y: 1, z: -2 }, { damage: 30, time: 1 }).length === 0, "weak blast breaks nothing");
+  ok(b.OnBlast({ x: 10, y: 1, z: -8 }, { damage: 85, time: 2 }).length === 0 || DistanceToWall(b.items[0].spec, { x: 10, z: -8 }) <= 2, "far blast breaks nothing");
+  const hit = b.OnBlast({ x: 11, y: 1, z: -4 }, { damage: 85, time: 3 });
+  ok(hit.length === 1 && hit[0].to === 1 && battlefield.colliders.length === 2, "a shell next to the wall knocks one stage off (two segments now)");
+  ok(b.OnBlast({ x: 11, y: 1, z: -4 }, { damage: 85, time: 3.1 }).length === 0, "one stage per blast (0.3 s guard)");
+  b.OnBlast({ x: 11, y: 1, z: -4 }, { damage: 85, time: 4 });
+  const top2 = Math.max(...battlefield.colliders.map((c) => c.max[1]));
+  ok(b.State()[0].stage === 2 && Math.abs(top2 - (block.y - block.h / 2 + 0.6 + 0.1)) < 0.05, "last stage is the low remnant");
+  ok(b.OnBlast({ x: 11, y: 1, z: -4 }, { damage: 85, time: 5 }).length === 0, "nothing below the last stage");
+  b.Dispose();
+  ok(battlefield.colliders.length === 0 && scene.children.length === 0, "dispose removes colliders and meshes");
+}
+
+console.log(`PASS FirstLevelTankBrain: ${checks} checks (drive, telegraph, targeting, scatter, MG walk-in, dead zone, reactions, escorts, two-stage damage, 03→05 temp path, breakable cover)`);

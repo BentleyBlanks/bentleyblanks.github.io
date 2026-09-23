@@ -1,13 +1,24 @@
 // Shared browser-side bundle throw driver. Both the full campaign and the stage-05
 // debug probe call this exact solver and input sequence.
-export async function DriveBundleThrow(page) {
-  return page.evaluate(async () => {
+// 2026-09-23 战车两段毁伤（Script_FirstLevelTankBrain）：大脑接管时（tank.brain）瞄的是**车体局部**的
+// 一个点 —— 默认朝玩家这一侧履带的后半段（车旁地面 = 断履带；落在车顶后甲板 = 炸发动机舱），
+// 不再瞄车中心。aim: "track"（默认）| "deck"；旧路径（没有大脑）照旧瞄车中心。
+export async function DriveBundleThrow(page, { aim: aimKind = "track" } = {}) {
+  return page.evaluate(async (aimKind) => {
   const { THROW } = await import("./Data_Tuning_Combat.mjs");
   const { JUMP } = await import("./Data_Tuning_Player.mjs");
   const { WEAPONS } = await import("./Data_Weapons.mjs");
   const g = window.Tengxian, tank = g.Debug.FirstLevelMission().tank, p = g.player.position;
   const kind = WEAPONS.GrenadeBundle;
-  g.player.yaw = Math.atan2(p.x - tank.x, p.z - tank.z);
+  let target = { x: tank.x, z: tank.z, rise: 0 };
+  if (tank.brain) {
+    const yaw = tank.hullYaw ?? Math.PI, c = Math.cos(yaw), s = Math.sin(yaw);
+    const side = c * (p.x - tank.x) - s * (p.z - tank.z) < 0 ? -1 : 1;
+    // 车体局部 → 世界：x 右、z 车尾。履带：外侧 0.45 m、车尾方向 0.7 m；后甲板：车顶（碰撞盒顶 2.56 m）。
+    const local = aimKind === "deck" ? { x: 0, z: 1.2, rise: 2.56 } : { x: side * 1.55, z: 0.7, rise: 0 };
+    target = { x: tank.x + c * local.x + s * local.z, z: tank.z - s * local.x + c * local.z, rise: local.rise };
+  }
+  g.player.yaw = Math.atan2(p.x - target.x, p.z - target.z);
   // Rifle recoil lives in a separate free-aim offset. The ballistic solver
   // owns the complete throw direction, so clear that residual before both
   // solving and releasing instead of silently adding the last gunfight.
@@ -16,8 +27,8 @@ export async function DriveBundleThrow(page) {
   // 目标比出手点高两米，弹道贴着沟沿过去，两发全砸在坎上（2026-09-20 实测）。
   // 这里按投掷模型（velocity = dir*speed，再加 speed*arcLift 的竖直分量）扫仰角，
   // 只收初速在蓄力区间内、而且整条弧线离地都有余量的那些解，取余量最大的一条。
-  const eye = g.player.EyePosition,rawDistance=Math.hypot(p.x-tank.x,p.z-tank.z);
-  const targetY=g.battlefield.GroundHeight(tank.x,tank.z);
+  const eye = g.player.EyePosition,rawDistance=Math.hypot(p.x-target.x,p.z-target.z);
+  const targetY=g.battlefield.GroundHeight(target.x,target.z)+target.rise;
   // Runtime physics uses 19.6 m/s² (JUMP.gravityMps2). The former 0.56 ratio
   // conflated several errors: a 9.81 m/s² solver, a flat muzzle offset instead
   // of Combat.Throw's 3-D advance, residual rifle free-aim, and a "landing"
@@ -40,10 +51,12 @@ export async function DriveBundleThrow(page) {
     let clearance = Infinity;
     for (let step = 1; step <= 20; step++) {
       const along = step / 21,travel=THROW.muzzleAheadM*cosine+distance*along,
-        x=p.x+(tank.x-p.x)*travel/rawDistance,z=p.z+(tank.z-p.z)*travel/rawDistance;
+        x=p.x+(target.x-p.x)*travel/rawDistance,z=p.z+(target.z-p.z)*travel/rawDistance;
       const t = distance * along / (speed * cosine);
       const y = originY + speed * vertical * t - halfGravity * t * t;
-      clearance = Math.min(clearance, y - g.battlefield.GroundHeight(x, z)-.055);
+      // 车顶那一发：最后一段落在车身上，按目标高度算余量（车体本身不是地面）。
+      const floor = target.rise > 0 && along > .8 ? targetY : g.battlefield.GroundHeight(x, z);
+      clearance = Math.min(clearance, y - floor-.055);
     }
     // 取**最平**的那条够用的弧线，不是余量最大的那条。仰到 1.2 rad 去吊射，
     // 水平分量只剩三分之一，初速差一点落点就差一半（实测解出 12.7 m、只飞了 6.5 m）。
@@ -98,7 +111,7 @@ export async function DriveBundleThrow(page) {
     g.StepFrames(1, 1 / 60, false);
   }
   const blast=g.Debug.FirstLevelMission().playerExplosions?.findLast(entry=>entry.explosiveId==="GrenadeBundle"&&entry.at>=releaseAt)||null;
-  return { before, after: g.state.bundles, alive: g.player.alive, mission: g.Debug.FirstLevelMission(),
+  return { before, after: g.state.bundles, alive: g.player.alive, mission: g.Debug.FirstLevelMission(), aimKind, target,
     aim: { pitch: +shot.pitch.toFixed(3), speed: +shot.speed.toFixed(2),
       clearance: shot.clearance == null ? null : +shot.clearance.toFixed(2),
       distance:+(shot.distance??rawDistance).toFixed(2),rise:+(shot.rise??(targetY-eye.y)).toFixed(2),solved:!!best },
@@ -106,5 +119,5 @@ export async function DriveBundleThrow(page) {
     blast:blast?{x:+blast.x.toFixed(2),y:+blast.y.toFixed(2),z:+blast.z.toFixed(2),
       trackDistance:+blast.trackDistance.toFixed(2)}:null,
     blastMiss:blast?+blast.trackDistance.toFixed(2):null };
-  });
+  }, aimKind);
 }
