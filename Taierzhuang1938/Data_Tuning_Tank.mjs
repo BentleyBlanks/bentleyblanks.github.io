@@ -418,18 +418,25 @@ export const TANK = Object.freeze({
     escortCoverRadiusM: 1.2,
   }),
 
-  // --- 大脑喊话 → 台词（契约 §2 第 7 条「靠声音、炮塔指向和罗班长喊话传达窗口」） ------------------
-  // 大脑发出的 bark id → Data_FirstLevelMissionDialogue 的 cue id。null = Voice 包还没出这句，只记日志。
-  // 同一条 cue 两次之间至少隔 barkCooldownS。
+  // --- 大脑喊话 → 战斗喊话（契约 §2 第 7 条「靠声音、炮塔指向和罗班长喊话传达窗口」） ------------------
+  // 2026-09-24 Front 包：这些是**战斗喊话**，不是剧情对白 —— 走 Script_Audio.Bark 按 key 点名（让剧情对白、受
+  // 节流闸管），中方是罗班长的本人版本（Data_FirstLevelVoiceCast 的 leader 一套，从他的位置喊），日方从车上喊。
+  //   { key: Data_Voice 的 key, kind: 那一行的 kind, who?: 班组谁喊（从他的位置）, side?: "ija" = 从炮塔喊 }
+  // null = 不喊（tankDisabled 由 05 的剧情对白「停了！口子能过！」交代；观察窗关上只有音效）。
+  // 同一个 key 两次之间至少隔 barkCooldownS。数量克制：中方三句、日方一句新录，护兵散开借现成的「伏せろ」。
   barkCues: Object.freeze({
-    turretTraverse: null,   // 罗班长：「炮塔转过来了！趴下！」（预兆链前两次）
-    trackCut: null,         // 罗班长：「履带断了！还在打！再补一捆！」（MobilityKill）
-    tankDisabled: null,     // 何有田：「哑了！」
-    hatchShout: null,       // 日军车长开舱盖喊护兵
-    escortScatter: null,    // 日军护兵：「车旁有人！」
+    turretTraverse: Object.freeze({ key: "tank_turret", kind: "tank", who: "luo" }),   // 预兆链前两次
+    tankWindow: Object.freeze({ key: "tank_window", kind: "tank", who: "luo" }),       // 05：炮塔在打缺口、玩家在攻击支路上
+    trackCut: Object.freeze({ key: "tank_track", kind: "tank", who: "luo" }),          // MobilityKill
+    tankDisabled: null,
+    hatchShout: Object.freeze({ key: "ija_tank_side", kind: "tank", side: "ija" }),    // 车长开舱盖喊护兵
+    escortScatter: Object.freeze({ key: "ija_warn_down", kind: "warn", side: "ija" }), // 近处爆炸，护兵散开
     visionSlit: null,
   }),
   barkCooldownS: 8,
+  // 「它在打口子！就现在！」的时机（接线层判，不是大脑）：05 领了集束弹、车还没解决、玩家在攻击支路的沟线上，
+  // 大脑正瞄着缺口（targetId "gapZone"）且炮塔偏离玩家方位超过 angleRad —— 这就是冲上去的空当。[需]
+  window: Object.freeze({ angleRad: 1.0, laneRadiusM: 4, cooldownS: 14 }),
 });
 
 /** 大脑喊话 → 台词表（上面 TANK.barkCues 的只读别名，接线层用）。 */

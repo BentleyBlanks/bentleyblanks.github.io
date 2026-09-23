@@ -518,6 +518,14 @@ const FakeAudio = () => {
   const expectedSquad = new Set(nraPicks.flatMap(({ kind, key }) => key ? [key]
     : nra.filter((line) => line.kind === kind && !line.event && !line.sample && line.key !== "hurt_down").map((line) => line.key)));
   assert.deepEqual([...SQUAD_BARK_KEYS.squad].sort(), [...expectedSquad].sort(), "班组 AI 会喊的中方口令每条都有本人版本");
+  // 罗班长那一套 = 班组那一套 + 战车接线层点名要他喊的中方句（Data_Tuning_Tank.barkCues 里 who:"luo" 的 key），不多不少。
+  const { TANK_BARK_CUES } = await import("./Data_Tuning_Tank.mjs");
+  const luoTank = Object.values(TANK_BARK_CUES).filter((c) => c && c.who === "luo").map((c) => c.key);
+  assert.deepEqual([...SQUAD_BARK_KEYS.leader].sort(), [...SQUAD_BARK_KEYS.squad, ...new Set(luoTank)].sort(), "罗班长的本人版本 = 班组口令 + 战车预兆喊话");
+  for (const c of Object.values(TANK_BARK_CUES).filter(Boolean)) {
+    const line = VOICE_LINES.find((l) => l.key === c.key);
+    assert.ok(line && (line.side || "nra") === (c.side || "nra") && line.kind === c.kind, "战车喊话点名的 " + c.key + " 在 Data_Voice 里、阵营与类别对得上");
+  }
   const orders = aiSource.slice(aiSource.indexOf("const ORDER_LINE"), aiSource.indexOf("};", aiSource.indexOf("const ORDER_LINE")));
   assert.deepEqual([...SQUAD_BARK_KEYS.player].sort(), [...new Set([...orders.matchAll(/: "(\w+)"/g)].map(([, key]) => key))].sort(),
     "玩家（顺子）下令喊的每条都有本人版本");

@@ -222,6 +222,7 @@ export class FirstLevelTankRuntime {
     const out = brain.Update(dt, this.World(stage));
     this.Apply(out, dt);
     this.CheckLuoFinish();
+    this.CheckWindow();
   }
   /** MobilityKill 以后玩家手里一捆也没有、僵了 luoFinishS 秒：罗班长往舱盖里塞一颗。 */
   CheckLuoFinish() {
@@ -280,13 +281,47 @@ export class FirstLevelTankRuntime {
       if (distance < V.rumbleRangeM) r.player.shake.Rumble?.(distance, t.load);
     }
   }
-  /** 大脑喊话 → 台词（TANK.barkCues；null 的只记日志）。同一条 cue 至少隔 barkCooldownS。 */
+  /**
+   * 大脑喊话 → 战斗喊话（TANK.barkCues；null 的只记日志）。同一个 key 至少隔 barkCooldownS。
+   * 中方点名班组某人（who）从他的位置喊、用他的本人版本；日方从炮塔喊。走 Audio.Bark：剧情对白在说时让路。
+   * （旧格式：字符串 = 剧情 cue id，照旧 r.Say。）
+   */
   SayBark(id) {
-    const r = this.r, cue = TANK_BARK_CUES?.[id];
-    if (!cue) return;
-    if (r.time - (this.barkSaidAt.get(cue) ?? -Infinity) < this.T.barkCooldownS) return;
-    this.barkSaidAt.set(cue, r.time);
-    r.Say(cue);
+    const r = this.r, spec = TANK_BARK_CUES?.[id];
+    if (!spec) return false;
+    const key = typeof spec === "string" ? spec : spec.key;
+    if (r.time - (this.barkSaidAt.get(key) ?? -Infinity) < this.T.barkCooldownS) return false;
+    if (typeof spec === "string") { this.barkSaidAt.set(key, r.time); r.Say(spec); return true; }
+    let position = null;
+    if (spec.who) {
+      const actor = r.companion?.Handle?.(spec.who);
+      if (!actor || !(actor.alive ?? actor.Alive)) return false;
+      position = actor.position;
+    } else {
+      const t = r.tank, groundY = r.view?.tank?.position.y ?? this.Ground(t.x, t.z);
+      position = { x: t.x, y: groundY + (this.T.audio?.turretY ?? 2.2) - 1.5, z: t.z };
+    }
+    const played = r.audio?.Bark?.(spec.kind, { key, who: spec.who ?? null, side: spec.side || "nra", position, priority: false,
+      seed: key.length }) ?? null;
+    if (!played) return false;
+    this.barkSaidAt.set(key, r.time);
+    this.log.barks.push({ t: r.time, id, key, said: true });
+    return true;
+  }
+  /**
+   * 05 的空当（TANK.window）：领了集束弹、车还没解决、玩家在攻击支路沟线上，大脑正瞄着缺口、炮塔偏开玩家方位 ——
+   * 罗班长喊「它在打口子！就现在！」。
+   */
+  CheckWindow() {
+    const r = this.r, b = this.brain, W = this.T.window, p = r.player;
+    if (!W || !b || r.flow.stage.id !== "Tank" || !r.Has("bundleTaken") || r.Has(TankClearFact(r.tank)) || !p?.Alive) return;
+    if (b.targetId !== "gapZone") return;
+    const lane = (this.path.lanes || []).find((l) => l.id === "attackLane");
+    if (!lane || !LanePoint(lane, p.position, W.laneRadiusM)) return;
+    const t = r.tank, bearing = Math.atan2(t.x - p.position.x, t.z - p.position.z);
+    if (Math.abs(Wrap(b.turretYaw - bearing)) < W.angleRad) return;
+    if (r.time - (this.windowAt ?? -Infinity) < W.cooldownS) return;
+    if (this.SayBark("tankWindow")) this.windowAt = r.time;
   }
   ApplyState(state, record) {
     const r = this.r, t = r.tank, b = this.brain, last = b.damageLog.at(-1);

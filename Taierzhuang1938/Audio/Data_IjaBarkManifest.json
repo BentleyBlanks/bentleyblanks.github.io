@@ -252,6 +252,15 @@
       "version": "20260924000001",
       "sha256": "c29aec068c44bce12516b741e074c4fbfaa9f832895be46dcab109254b4e27a1",
       "seconds": 1.71
+    },
+    "ija_tank_side": {
+      "file": "AudioVoice_IjaTankSide.mp3",
+      "text": "せんしゃのよこにてき！",
+      "voice": "ijaA",
+      "castSha256": "492914e2b35b932a8fea7f2cd9c137e8023b0b112d26bd0e683f53d953463f41",
+      "version": "20260924150000",
+      "sha256": "674389615593a541c31e6dd5d035bab6524f7f3e1fd0add1f12c8a1b15e62a82",
+      "seconds": 1.68
     }
   }
 }

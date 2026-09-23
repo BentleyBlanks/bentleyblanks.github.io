@@ -158,14 +158,19 @@ export const VOICE_LANG_RULE = Object.freeze({
 //   · player —— 玩家（顺子）下令时喊的（Script_Ai.IssueOrder 的 ORDER_LINE）
 // 声库键 `<key>@<who>`（SquadBarkKey）；Script_Audio.Bark 认出说话人后只在这个人的版本里挑，
 // 没有本人版本的 TTS 句不说（真人素材句照常可选），一条本人版本都没有才退回公用声库。
+const SQUAD_SET = Object.freeze(["spot_east", "spot_enemy", "spot_gap", "spot_wall", "move_cover", "move_flank", "move_go", "rally_charge", "warn_down",
+  "warn_grenade", "rally_shoot", "hurt_hit", "hurt_medic", "ammo_ask", "ammo_out", "ammo_reload"]);
+/** 战车预兆喊话（Data_Tuning_Tank.barkCues 点名的中方 key）：只有罗班长喊，所以只录进他那一套。 */
+export const LEADER_TANK_BARK_KEYS = Object.freeze(["tank_turret", "tank_window", "tank_track"]);
 export const SQUAD_BARK_KEYS = Object.freeze({
-  squad: Object.freeze(["spot_east", "spot_enemy", "spot_gap", "spot_wall", "move_cover", "move_flank", "move_go", "rally_charge", "warn_down",
-    "warn_grenade", "rally_shoot", "hurt_hit", "hurt_medic", "ammo_ask", "ammo_out", "ammo_reload"]),
+  squad: SQUAD_SET,
+  // 罗班长 = 班组那一套 + 03–05 战车预兆三句（2026-09-24 Front 包）。一人一次请求照旧：他的全部短句在同一条录音里念完。
+  leader: Object.freeze([...SQUAD_SET, ...LEADER_TANK_BARK_KEYS]),
   player: Object.freeze(["rally_follow", "move_go", "rally_charge", "rally_hold", "move_flank", "move_cover", "rally_shoot"]),
 });
 /** 谁录哪一套。老周只在 01–03（开场分镜认得他的那几段）能被认出来，之后退回公用声库。 */
 export const SQUAD_BARK_CAST = Object.freeze({
-  luo: "squad", yaowa: "squad", heyoutian: "squad", liuwencai: "squad", zhou: "squad", shunzi: "player",
+  luo: "leader", yaowa: "squad", heyoutian: "squad", liuwencai: "squad", zhou: "squad", shunzi: "player",
 });
 /**
  * 本人版本只在 01–06（MISSION_STAGES 从 Trapped 到 Orders）认人。07 以后的班组喊话仍走公用声库、照旧叠变调，
