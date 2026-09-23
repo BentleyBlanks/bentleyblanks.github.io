@@ -10,6 +10,9 @@ import {MISSION_ROUTES as R} from "./Data_FirstLevelMissionLayout.mjs";
 import {MISSION_STAGE_ROUTES as SR} from "./Data_FirstLevelMissionTopology.mjs";
 import {FRONT_SORTIE as S,FRONT_SPACE as SP,FRONT_TANK_PATH as TP,FrontTankIndex} from "./Data_FirstLevelFrontRoute.mjs";
 import {FRONT_BATTLE_TUNING as B} from "./Data_Tuning_FirstLevelFront.mjs";
+import {FRONT_BREAKABLES,FRONT_UNBREAKABLE} from "./Data_FirstLevelFrontBreakables.mjs";
+import {MISSION_LAYOUT as L} from "./Data_FirstLevelMissionLayout.mjs";
+import {SampleMissionTerrain as G,SampleMissionNaturalHeight as N} from "./Data_FirstLevelMissionTerrain.mjs";
 import {ProbeKeyframes,ProbeTank,ProbeRoutes,ProbeExposure,ProbeEnemyCover,ProbeCounts,ProbeEntries,ProbeSeparation,
   ProbeEngagement,RouteClearance,Sight,Eye,D,RouteLength} from "./Script_FirstLevelSpaceProbe.mjs";
 
@@ -136,6 +139,28 @@ console.log("ok keyframes "+keyframes.map(k=>`${k.id}${k.frameDeg?`(${k.spanDeg}
   const g=ProbeEngagement();
   assert.ok(g.in15to60/g.n>=0.5,`the main engagement band is 15-60 m: ${g.in15to60}/${g.n} ${JSON.stringify(g.bands)}`);
   console.log(`ok separation: ammo/backslope ${s.ammoVsBackslopeM} m, 01 corridor ${s.corridor01.minFriendlyM} m unseen, engagement bands ${JSON.stringify(g.bands)}`);
+}
+
+// ---------------------------------------------------------------- breakable cover (data for the Tank package mechanism)
+{
+  const Block=id=>L.blocks.find(b=>b.id===id);
+  for(const id of FRONT_UNBREAKABLE)assert.ok(Block(id),"unbreakable "+id+" exists");
+  for(const b of FRONT_BREAKABLES){
+    assert.ok(b.hits>=1&&b.stages.length===b.hits,b.id+": one stage per hit");
+    if(b.block){
+      const block=Block(b.block);assert.ok(block,b.id+" names a real block "+b.block);
+      assert.ok(!FRONT_UNBREAKABLE.includes(b.block),b.id+" is not on the unbreakable list");
+      let top=block.y+block.h/2-G(block.x,block.z);
+      for(const stage of b.stages){assert.ok(stage.topM<top,b.id+" goes down a stage at a time");top=stage.topM;}
+    } else {
+      let depth=N(b.terrain.x,b.terrain.z)-G(b.terrain.x,b.terrain.z);
+      for(const stage of b.stages){assert.ok(stage.depthM<depth,b.id+" gets shallower a stage at a time");depth=stage.depthM;}
+    }
+  }
+  for(const id of ["RightNestRearWest","RightNestRearEast","GapLastCover","RoadsideRuin"])assert.ok(FRONT_UNBREAKABLE.includes(id),id+" never breaks");
+  assert.equal(FRONT_BREAKABLES.filter(b=>/^RightNest/.test(b.block||"")).length,3,"three nest front parapet sections break");
+  assert.ok(FRONT_BREAKABLES.find(b=>b.block==="NorthRuinGable")?.visualOnly,"the bend occluder only changes its look");
+  console.log("ok breakables: "+FRONT_BREAKABLES.map(b=>b.id).join(",")+"; "+FRONT_UNBREAKABLE.length+" never break");
 }
 
 // ---------------------------------------------------------------- 03–06 entry, capture and batch logic
