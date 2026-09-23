@@ -6,8 +6,12 @@ import { BuildSpeechEnvelope, SampleSpeechEnvelope } from './Script_SpeechEnvelo
 import { FirstLevelMissionVoice } from './Script_FirstLevelMissionVoice.mjs';
 import { CharacterFacialAnimation } from './Script_CharacterFacialAnimation.mjs';
 import { FirstLevelSpeakerBinder, ParseLineId, WhoForLine, FIRST_LEVEL_SPEAKER_ROLES } from './Script_FirstLevelSpeakerBinder.mjs';
-import { SpeakerLookAngles } from './Script_SpeakerHeadLayer.mjs';
-import { FIRST_LEVEL_SPEAKING_CAST, SpeakingCastOptions } from './Data_FirstLevelSpeakingCast.mjs';
+import { SpeakerLookAngles, SpeakerHeadLayer } from './Script_SpeakerHeadLayer.mjs';
+import { FIRST_LEVEL_SPEAKING_CAST, SpeakingCastOptions, FIRST_LEVEL_FACE_STEPS, FIRST_LEVEL_WHOLE_LEVEL_SPEAKERS,
+  FACED_FRONT_GUARD_INDEX } from './Data_FirstLevelSpeakingCast.mjs';
+import { FIRST_LEVEL_STAGES } from './Data_FirstLevelMissionStages.mjs';
+import { FRONT_GUARD_POSTS } from './Data_FirstLevelMissionFront.mjs';
+import { FRONT_BATTLE_TUNING } from './Data_Tuning_FirstLevelFront.mjs';
 import { CHARACTER_MODEL_VARIANTS_BY_KIND } from './Data_CharacterSelection.mjs';
 import { MISSION_DIALOGUE } from './Data_FirstLevelMissionDialogue.mjs';
 import { CHARACTER_SPEECH as C, FACE_TRACK_BAKE } from './Data_Tuning_CharacterSpeech.mjs';
@@ -237,12 +241,62 @@ const jawAngle = (bone, rig) => 2 * Math.acos(Math.min(1, Math.abs(bone.quaterni
   assert.equal(a.actor.characterRig.facial.source, null, 'dead speaker released');
   binder.Dispose(); assert.equal(b.actor.characterRig.facial.source, null, 'dispose releases every face');
 }
+// ---- binder scope: full binding only in 01-06; after 06 the squad keeps mouths only ----
+{
+  const steps = FIRST_LEVEL_STAGES.filter(stage => stage.number <= 6).flatMap(stage => stage.steps);
+  assert.deepEqual([...FIRST_LEVEL_FACE_STEPS], steps, 'FIRST_LEVEL_FACE_STEPS are exactly the steps of phases 01-06');
+  assert.ok(FIRST_LEVEL_WHOLE_LEVEL_SPEAKERS.every(who => FIRST_LEVEL_SPEAKING_CAST[who]));
+  assert.ok(!FIRST_LEVEL_SPEAKER_ROLES.includes('bearer'), '06 bearer is a layout figure without a face');
+  // One faced front guard, in the second batch (it gathers next to the player at 04).
+  assert.ok(FACED_FRONT_GUARD_INDEX >= FRONT_BATTLE_TUNING.firstBatch && FACED_FRONT_GUARD_INDEX < FRONT_GUARD_POSTS.length);
+  const rig = definitions.LugouNra02;
+  const Soldier = (id, who) => { const {root} = FaceRoot(rig); const head = new THREE.Object3D(); root.add(head);
+    const facial = new CharacterFacialAnimation(root, rig, {seed: id});
+    return {id, alive: true, speakerRole: who, position: new THREE.Vector3(id, 0, 0),
+      actor: {root, characterRig: {facial, bones: {head}, root}}}; };
+  const luo = Soldier(1, 'luo'), guard = Soldier(2, 'guard');
+  let stage = 'MachineGun';
+  const voice = {Speech: who => ({active: true, who, jaw: .5, wide: 0, round: 0, close: 0, stress: 0})};
+  const binder = new FirstLevelSpeakerBinder({voice, soldiers: () => [luo, guard], listener: () => new THREE.Vector3(0, 1.6, 5),
+    resolvers: [who => (who === 'luo' ? luo : null)], active: () => FIRST_LEVEL_FACE_STEPS.includes(stage),
+    wholeLevelRoles: FIRST_LEVEL_WHOLE_LEVEL_SPEAKERS, loadFaceTracks: false});
+  const guardLine = {lines: [{who: 'guard'}]}, luoLine = {lines: [{who: 'luo'}]};
+  binder.Update();
+  assert.equal(binder.ActorForWho('guard'), guard); assert.ok(binder.HeadPosition(guardLine), '04: guard talks from his face');
+  assert.ok(binder.bound.get(luo).layer && luo.actor.characterRig.speakerHead, '01-06: head layer attached');
+  assert.ok(guard.actor.characterRig.facial.gaze, '01-06: eyes follow the talk');
+  stage = 'Village'; binder.Update();
+  assert.equal(binder.ActorForWho('guard'), null, "08's street guard line is never taken by a 01-06 guard body");
+  assert.equal(binder.HeadPosition(guardLine), null); assert.equal(binder.HeadPosition(luoLine), null, 'after 06 voice placement is untouched');
+  assert.equal(guard.actor.characterRig.facial.source, null, 'the 04 guard face is released after 06');
+  assert.ok(luo.actor.characterRig.facial.source()?.active, 'Luo keeps a talking mouth after 06 (as before this package)');
+  assert.equal(binder.bound.get(luo).layer, null); assert.equal(luo.actor.characterRig.speakerHead ?? null, null, 'no head layer after 06');
+  assert.equal(luo.actor.characterRig.facial.gaze, null, 'no gaze after 06');
+  stage = 'Orders'; binder.Update();
+  assert.ok(binder.bound.get(luo).layer && binder.ActorForWho('guard') === guard, 'back in 01-06 (debug jump): full binding again');
+  binder.Dispose();
+}
 // Shared look math: forward hemisphere clamp.
 {
   const out = SpeakerLookAngles(new THREE.Quaternion(), new THREE.Vector3(), new THREE.Vector3(-1, 0, -1));
   assert.ok(out.yaw > .5 && out.yaw <= .55 && Math.abs(out.pitch) < 1e-6);
   const behind = SpeakerLookAngles(new THREE.Quaternion(), new THREE.Vector3(), new THREE.Vector3(0, 0, 5));
   assert.ok(Math.abs(behind.yaw) <= .55, 'rearward talk is a glance, not a neck twist');
+}
+// Head layer on bones no clip keys: the turn is undone every frame, never stacked
+// (head is turned twice a frame: yaw, then pitch).
+{
+  const root = new THREE.Object3D(), neck = new THREE.Object3D(), head = new THREE.Object3D();
+  root.add(neck); neck.add(head); neck.position.y = 1.5; head.position.y = .1; root.updateMatrixWorld(true);
+  const layer = new SpeakerHeadLayer({bones: {head, neck}, actor: {root}, facial: {stress: 0}}, 7);
+  layer.lookAt = new THREE.Vector3(-20, 1.6, -1);
+  const Yaw = () => { const f = new THREE.Vector3(0, 0, -1).applyQuaternion(head.getWorldQuaternion(new THREE.Quaternion())); return Math.atan2(-f.x, -f.z); };
+  const yaws = [];
+  for (let i = 0; i < 600; i++) { layer.Apply(1 / 60, {}); root.updateMatrixWorld(true); if (i % 60 === 59) yaws.push(Yaw()); }
+  assert.ok(yaws.every(y => Math.abs(y) <= .55 + .03), `head yaw stays within the clamp, no build-up: ${yaws.map(y => y.toFixed(2))}`);
+  assert.ok(Math.abs(yaws.at(-1) - yaws.at(-5)) < .01, 'steady turn once converged');
+  layer.Dispose(); root.updateMatrixWorld(true);
+  assert.ok(Math.abs(Yaw()) < 1e-6 && neck.quaternion.angleTo(new THREE.Quaternion()) < 1e-6, 'dispose puts the rest pose back');
 }
 // ---- offline face tracks (Script_FirstLevelFaceTrackBake.py -> Script_FaceTrack) ----
 // Lip-shape tables: every spoken Han character has a reading, every kana a vowel, every
@@ -320,9 +374,15 @@ let faceTrackCount = 0;
   assert.ok(scope.has('BorrowLight') && scope.has('TakeOverGun') && !scope.has('SouthWhisper'));
   const below = [];
   let voiced = 0, moving = 0, gap = 0, open = 0;
+  const stale = [];
+  let chars = 0, charsArticulated = 0;
+  const Articulated = v => v.jaw >= FACE_TRACK_BAKE.openJaw || v.close >= .5
+    || v.wide >= FACE_TRACK_BAKE.shapeVisible || v.round >= FACE_TRACK_BAKE.shapeVisible;
   for (const [id, entry] of Object.entries(VOICE_MANIFEST.cues)) {
     const alignment = MISSION_VOICE_ALIGNMENT[id];
-    if (!cues.has(id) || alignment?.sha256 !== entry.sha256) continue;
+    if (!cues.has(id)) continue;
+    // A take whose alignment was not redone is skipped only outside 01-06; inside it is a failure.
+    if (alignment?.sha256 !== entry.sha256) { stale.push(id); continue; }
     const json = FACE_TRACKS.tracks[entry.sha256];
     assert.ok(json, `${id}: face track baked for the current take (run Script_FirstLevelFaceTrackBake.py --cues ${id})`);
     assert.equal(json.id, id);
@@ -344,6 +404,34 @@ let faceTrackCount = 0;
     for (let i = 1; i < track.lines.length; i++) {
       const a = track.lines[i - 1].end, b = track.lines[i].start;
       if (b - a > .3) assert.ok(SampleFaceTrack(entry.sha256, (a + b) / 2).jaw < .05, `${id}: closed between lines ${i} and ${i + 1}`);
+    }
+    // Independent of the baker's own stats: re-sample the gap figure with the runtime
+    // sampler (10 ms frames outside [start - 50 ms, end + 100 ms] of every line) ...
+    let gapFrames = 0, gapOpenFrames = 0;
+    for (let ms = 0; ms < json.seconds * 1000; ms += 10) {
+      if (json.lines.some(([s, e]) => ms >= s - 50 && ms < e + 100)) continue;
+      gapFrames++; if (SampleFaceTrack(entry.sha256, ms / 1000).jaw >= FACE_TRACK_BAKE.openJaw) gapOpenFrames++;
+    }
+    assert.ok(Math.abs(gapFrames - st.gapFrames) <= 3 && Math.abs((gapFrames ? gapOpenFrames / gapFrames : 0) - st.gapOpen) <= .01,
+      `${id}: runtime-sampled gaps ${gapOpenFrames}/${gapFrames} agree with the baked stats`);
+    // ... and every aligned 01-06 character of at least 60 ms moves the mouth at some
+    // point inside its own window (the alignment comes from the text, not the track).
+    if (scope.has(id)) for (const [, s, e] of json.chars) {
+      if (e - s < 60) continue;
+      chars++;
+      for (let ms = s; ms <= e; ms += 10) if (Articulated(SampleFaceTrack(entry.sha256, ms / 1000))) { charsArticulated++; break; }
+    }
+  }
+  assert.deepEqual(stale.filter(id => scope.has(id)), [], '01-06 takes re-recorded without re-alignment (run the voice aligner, then the face-track bake)');
+  if (stale.length) console.log(`note: 07-18 takes skipped, alignment older than the take: ${stale.join(', ')}`);
+  assert.ok(chars > 300 && charsArticulated / chars >= .97, `01-06: ${charsArticulated}/${chars} aligned characters move the mouth`);
+  // Per-line takes (Voice package): once Data_FirstLevelLineTimings.json exists every take in it has its own track.
+  const lineTimings = new URL('./Audio/FirstLevel/Data_FirstLevelLineTimings.json', import.meta.url);
+  if (fs.existsSync(lineTimings)) {
+    for (const [sha, row] of Object.entries(JSON.parse(fs.readFileSync(lineTimings, 'utf8')))) {
+      const track = FACE_TRACKS.tracks[sha];
+      assert.ok(track?.kind === 'line' && track.id === row.lineId,
+        `${row.lineId}: per-line face track baked (PYTHONUTF8=1 py -3.13 Taierzhuang1938/Script_FirstLevelFaceTrackBake.py --lines --prune)`);
     }
   }
   if (below.length) console.log(`note: 07-18 takes under 80% (noisy whole-cue alignment): ${below.join(', ')}`);

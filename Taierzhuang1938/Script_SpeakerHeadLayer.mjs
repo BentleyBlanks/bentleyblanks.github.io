@@ -14,8 +14,9 @@ const Clamp = (value, low, high) => Math.max(low, Math.min(high, value));
  * only: rearward talk is acknowledged with a glance, never a 180-degree neck twist.
  * rootQuaternion: the actor root's world rotation (actor front is local -Z).
  */
+const inverseScratch = new Quaternion();
 export function SpeakerLookAngles(rootQuaternion, origin, target, out = { yaw: 0, pitch: 0 }, scratch = new Vector3()) {
-  scratch.copy(target).sub(origin).applyQuaternion(rootQuaternion.clone().invert());
+  scratch.copy(target).sub(origin).applyQuaternion(inverseScratch.copy(rootQuaternion).invert());
   out.yaw = Clamp(Math.atan2(-scratch.x, -scratch.z), -H.maxYaw, H.maxYaw);
   out.pitch = Clamp(Math.atan2(scratch.y, Math.hypot(scratch.x, scratch.z)), H.minPitch, H.maxPitch);
   return out;
@@ -31,6 +32,7 @@ export class SpeakerHeadLayer {
     this.phase = ((Number(seed) || 0) % 997) * .013;
     this.clock = 0;
     this.written = new Map(); // bone -> [base, written] to undo on bones no clip keys
+    this.touched = new Set(); // bones turned this frame (base is taken before the first turn only)
     this.rootQ = new Quaternion(); this.parentQ = new Quaternion(); this.turnQ = new Quaternion();
     this.up = new Vector3(0, 1, 0); this.right = new Vector3(); this.axis = new Vector3();
     this.origin = new Vector3(); this.target = new Vector3(); this.scratch = new Vector3();
@@ -45,7 +47,9 @@ export class SpeakerHeadLayer {
   _Turn(bone, axis, angle) {
     if (!bone?.parent || !angle) return;
     const entry = this.written.get(bone) || [new Quaternion(), new Quaternion()];
-    entry[0].copy(bone.quaternion);
+    // The same bone may be turned twice a frame (yaw, then pitch): its base is the pose
+    // before the first turn, or _Restore would put back half of this frame's turn.
+    if (!this.touched.has(bone)) { entry[0].copy(bone.quaternion); this.touched.add(bone); }
     bone.parent.getWorldQuaternion(this.parentQ).invert();
     this.axis.copy(axis).applyQuaternion(this.parentQ).normalize();
     this.turnQ.setFromAxisAngle(this.axis, angle); bone.quaternion.premultiply(this.turnQ);
@@ -56,6 +60,7 @@ export class SpeakerHeadLayer {
   Apply(dt, state = {}) {
     const rig = this.rig, bones = rig.bones;
     this._Restore();
+    this.touched.clear();
     if (!this.enabled || !bones?.head || state.dead || rig.actor?.ragdollState) return;
     // The 01-03 storyboard director already acts this rig (same look math).
     if (rig.openingActorPerformanceState) return;

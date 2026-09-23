@@ -20,6 +20,7 @@ import { MISSION_TUNING as R } from "./Data_Tuning_FirstLevel.mjs";
 import { FRONT_TUNING as F, BORROW_LIGHT_BEATS } from "./Data_Tuning_FirstLevelFront.mjs";
 import { MISSION_ANCHORS as A, MISSION_ROUTES, MISSION_PLACEMENT as Place } from "./Data_FirstLevelMissionLayout.mjs";
 import { MissionRouteProjection, MissionCarryRoutePoint } from "./Script_FirstLevelMissionColumn.mjs";
+import { SpeakingCastOptions } from "./Data_FirstLevelSpeakingCast.mjs";
 
 /** 借火那一段的姿态顺序（State().borrow 按这个序列记，测试照它对账）。 */
 export const BORROW_POSE_ORDER = Object.freeze(["ask", "pat", "pocket", "offer", "light", "share", "wince"]);
@@ -136,9 +137,10 @@ export class FirstLevelCollection {
     if (this.runner?.actor?.alive) return this.runner.actor;
     const spot = Place.collection.runner;
     const actor = r.ai.Spawn("nra", spot.x, spot.z,
-      { weapon: "HanYang", scriptedNoncombatant: true, squadId: "MissionCollectionRunner" });
+      { weapon: "HanYang", scriptedNoncombatant: true, squadId: "MissionCollectionRunner", ...SpeakingCastOptions("runner") });
     if (!actor) return null;
     actor.missionId = "CollectionRunner";
+    actor.speakerRole = "runner"; // 06 Volunteer: the binder moves this face.
     actor.scriptEssential = true;
     actor.yaw = spot.yaw ?? 0;
     r.MoveActor(actor, actor.position, 0);

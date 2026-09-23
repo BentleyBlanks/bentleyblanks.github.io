@@ -7,6 +7,7 @@
 // geometry) to IJA01; 日兵丙/丁 are one IJA01 and one IJA02.
 // Keys are the dialogue `who` ids (Data_FirstLevelMissionDialogue.MISSION_VOICE_CAST);
 // captiveHelper/captiveWounded remain until the 09.23 opening replaces them with comrade.
+// Not here: 06 ZhouLift's bearer is a MissionPeople layout figure (no soldier body, no face).
 const Nra02 = Object.freeze({ actorKind: "nra", modelVariant: 1 });
 const Nra05 = Object.freeze({ actorKind: "nra", modelVariant: 4 });
 const Ija01 = Object.freeze({ actorKind: "ija", modelVariant: 0 });
@@ -19,7 +20,7 @@ export const FIRST_LEVEL_SPEAKING_CAST = Object.freeze({
   // The interpreter wears the NRA02 body re-dyed as dark civilian cloth
   // (Script_OpeningStoryboards); no approved civilian skin exists yet.
   interpreter: Nra02,
-  zhou: Nra02, relief: Nra02, keeper: Nra02, bearer: Nra02,
+  zhou: Nra02, relief: Nra02, keeper: Nra02,
   captiveHelper: Nra02, captiveWounded: Nra02,
   ijaA: Ija02, ijaB: Ija01, ijaC: Ija01, ijaD: Ija02,
   frontOfficer: Ija01,
@@ -30,3 +31,17 @@ export function SpeakingCastOptions(castId) {
   const spec = Object.hasOwn(FIRST_LEVEL_SPEAKING_CAST, castId) ? FIRST_LEVEL_SPEAKING_CAST[castId] : null;
   return spec ? { castId, modelVariant: spec.modelVariant } : {};
 }
+
+// Internal mission steps (Data_FirstLevelMissionStages phases 01-06) in which the speaker
+// binder moves faces and heads for every speaking role and dialogue plays from the
+// speaker's mouth. Later steps keep their own voice placement (08's street guard, the
+// bridge runner...) untouched.
+export const FIRST_LEVEL_FACE_STEPS = Object.freeze(["Trapped", "BunkerRescue", "RearTrench", "Support", "MachineGun", "Tank", "Orders"]);
+// After 06 only the named squad keeps a talking mouth (mouth only: no head turn, no gaze,
+// no voice position). Before this package Luo's face already followed his lines all level.
+export const FIRST_LEVEL_WHOLE_LEVEL_SPEAKERS = Object.freeze(["luo", "yaowa", "heyoutian", "liuwencai"]);
+// The withdrawing front guards (FRONT_GUARD_POSTS): one of them carries the guard face;
+// the others stay anonymous pooled bodies with random appearance. Index 2 is the first
+// man of the second batch, who holds the last covered line at 04 next to the player's
+// position and so is the one who points to the ammo house (BundleOrder).
+export const FACED_FRONT_GUARD_INDEX = 2;

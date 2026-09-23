@@ -264,7 +264,8 @@ const MODEL_FORWARD_YAW = Math.PI;
 // 新 clip（CarryStretcherFront/Rear、WoundedLimp）。十套模型的二进制都变了，
 // 戳不跟着走就会「新壳配旧芯」：清单是新的，浏览器缓存里的 GLB 还是旧的那批。
 // NRA eye maps and shoulder silhouettes: keep the manifest and GLBs on one revision.
-const MANIFEST_URL = "./Model/Character/Data_LugouCharacterManifest.json?v=202609061026";
+// 2026-09-23: facialUrl/facialVersion/facialCast for NRA02/IJA01/IJA02 (GLBs unchanged: ASSET_VERSION stays).
+const MANIFEST_URL = "./Model/Character/Data_LugouCharacterManifest.json?v=202609232000";
 const ASSET_VERSION = "202609061026";
 const DEATH_COLLAPSE_ASSET_VERSION = "202609151352";
 const DEATH_COLLAPSE_PLAYBACK_RATE = 1.6;

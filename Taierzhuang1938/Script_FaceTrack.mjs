@@ -53,11 +53,16 @@ export function RegisterFaceTracks(body) {
   return count;
 }
 
-/** Fetch and register the baked tracks once per url. Failure leaves the envelope fallback. */
+/**
+ * Fetch and register the baked tracks once per url. Failure leaves the envelope fallback.
+ * Revalidated like the voice manifest (no-cache, 15 s timeout): a re-recorded take gets a
+ * new sha256, and a stale cached file would silently drop every new mouth to the envelope.
+ */
 export function LoadFaceTracks(url = FACE_TRACKS_URL, fetchImpl = globalThis.fetch) {
   if (!loads.has(url)) {
+    const signal = globalThis.AbortSignal?.timeout?.(15000);
     loads.set(url, Promise.resolve()
-      .then(() => fetchImpl(url))
+      .then(() => fetchImpl(url, { cache: "no-cache", ...(signal ? { signal } : {}) }))
       .then(response => { if (!response.ok) throw new Error(`Face tracks HTTP ${response.status}`); return response.json(); })
       .then(RegisterFaceTracks)
       .catch(error => { console.warn("[FaceTrack] not loaded, mouths use the voice envelope:", error?.message || error); return 0; }));

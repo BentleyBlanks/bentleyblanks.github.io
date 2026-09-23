@@ -51,6 +51,15 @@ export const SPEAKER_HEAD = Object.freeze({
   breathRadians: .025, breathRate: 2.1,
 });
 
+// Who plays a speaking role when several bodies could (Script_FirstLevelSpeakerBinder).
+export const SPEAKER_BINDING = Object.freeze({
+  // 04 BundleOrder: the withdrawing guard with the talking face (FACED_FRONT_GUARD_INDEX)
+  // points to the ammo house when he is at most this much farther from the player than
+  // the nearest guard. The second batch gathers 1.35 m apart (FRONT_BATTLE_TUNING.gatherSpacingM,
+  // six men = 6.75 m), so a gathered faced guard always qualifies; a far one does not.
+  facedGuardSlackM: 8,
+});
+
 // Offline face tracks (Script_FirstLevelFaceTrackBake.py -> Audio/FirstLevel/
 // Data_FirstLevelFaceTracks.json). Timing from per-character / per-kana alignment,
 // shapes from Data_FaceTrackPhonemes, openness from speech-band energy after the

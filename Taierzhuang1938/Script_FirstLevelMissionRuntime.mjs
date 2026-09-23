@@ -81,7 +81,8 @@ import { FirstLevelStageTextId } from "./Script_TextIds.mjs";
 // Only for `emplaced`: a man married to a machine gun never carries throwables here.
 import { WEAPONS } from "./Data_Weapons.mjs";
 import { FirstLevelSpeakerBinder, FirstLevelSpeakerResolvers } from "./Script_FirstLevelSpeakerBinder.mjs";
-import { SpeakingCastOptions } from "./Data_FirstLevelSpeakingCast.mjs";
+import { SpeakingCastOptions, FIRST_LEVEL_FACE_STEPS, FIRST_LEVEL_WHOLE_LEVEL_SPEAKERS, FACED_FRONT_GUARD_INDEX } from "./Data_FirstLevelSpeakingCast.mjs";
+const FACE_STEPS = new Set(FIRST_LEVEL_FACE_STEPS);
 
 export function FirstLevelCheckpointVitals(point={},player={},tuning=R){
   const savedHealth=Number.isFinite(point.health)?point.health:player.health;
@@ -174,8 +175,10 @@ export class FirstLevelMissionRuntime {
       Clock: this.VoiceClock,
     });
     // Who is talking -> which face moves (01-06 speakers; Script_FirstLevelSpeakerBinder).
+    // Full binding only in the 01-06 steps; later steps keep the squad's mouths only.
     this.speakers = new FirstLevelSpeakerBinder({ voice: this.voice, soldiers: () => this.ai.soldiers,
-      listener: () => this.player.EyePosition, resolvers: FirstLevelSpeakerResolvers(this) });
+      listener: () => this.player.EyePosition, resolvers: FirstLevelSpeakerResolvers(this),
+      active: () => FACE_STEPS.has(this.flow?.stage?.id), wholeLevelRoles: FIRST_LEVEL_WHOLE_LEVEL_SPEAKERS });
     this.view = new FirstLevelMissionView({
       scene: this.scene,
       battlefield: this.battlefield,
@@ -314,7 +317,8 @@ export class FirstLevelMissionRuntime {
   // Intact dialogue recordings follow the current speaker; overlapping Luo
   // briefing keeps its own source. Unknown nearby voices stay in carriage space.
   VoicePosition(cue,line) {
-    // A speaker with a face talks from that face's head (same body the binder animates).
+    // 01-06: a speaker with a face talks from that face's head (same body the binder
+    // animates). The binder returns null outside those steps.
     const faced = this.speakers?.HeadPosition(cue, line);
     if (faced) return faced;
     const who = line?.who ?? cue.lines[0]?.who;
@@ -961,12 +965,17 @@ export class FirstLevelMissionRuntime {
     for (let i = 0; i < R.spawnPerFrame && this.spawnQueue.length; i++) this.spawnQueue.shift()();
   }
   SpawnEncounterActor(id, spec) {
+      // A speaking role wears its pinned face model (Data_FirstLevelSpeakingCast); an
+      // explicit spec.modelVariant still wins, with a warning when the two disagree.
+      const cast = SpeakingCastOptions(spec.castId);
+      if (spec.modelVariant != null && cast.modelVariant != null && spec.modelVariant !== cast.modelVariant)
+        console.warn(`[Mission] ${spec.id}: modelVariant ${spec.modelVariant} overrides the pinned ${spec.castId} model ${cast.modelVariant}`);
       const actor = this.ai.Spawn("ija", spec.x, spec.z, {
         weapon: spec.weapon || "Type38",
         squadId: `Mission_${id}${spec.team?"_"+spec.team:""}`,
         bayonetFixed: !!spec.bayonet,
-        modelVariant: spec.modelVariant,
-        ...SpeakingCastOptions(spec.castId),
+        ...cast,
+        modelVariant: spec.modelVariant ?? cast.modelVariant,
       });
       if (!actor) {this.spawnQueue.push(()=>this.SpawnEncounterActor(id,spec));return null;}
       actor.missionId = spec.id;InstallMissionSentry(actor);
@@ -1543,9 +1552,11 @@ export class FirstLevelMissionRuntime {
       const actor = this.ai.Spawn("nra", post.x, post.z, {
         weapon: "HanYang",
         squadId: "MissionWithdrawingGuard",
-        ...SpeakingCastOptions("guard"),
+        // One guard carries the talking face; the rest stay pooled bodies of random appearance.
+        ...(i === FACED_FRONT_GUARD_INDEX ? SpeakingCastOptions("guard") : {}),
       });
       if (actor) {
+        if (i === FACED_FRONT_GUARD_INDEX) actor.speakerRole = "guard";
         InstallMissionSentry(actor);this.Defend(actor,actor.position,0,0);
         actor.scriptedNoncombatant=true;
         this.ai.SetStance(actor,2,Infinity,true);

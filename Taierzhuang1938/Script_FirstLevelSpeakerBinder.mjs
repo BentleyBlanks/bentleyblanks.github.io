@@ -1,6 +1,6 @@
-// Who is talking -> which body, in one place for 01-06 (and later stages that reuse
-// the same speakers). The binder owns the link between a speaking role (`who` in
-// Data_FirstLevelMissionDialogue) and the live soldier who plays it:
+// Who is talking -> which body, in one place for 01-06. The binder owns the link
+// between a speaking role (`who` in Data_FirstLevelMissionDialogue) and the live
+// soldier who plays it:
 //   * ActorForWho(who) / ActorFor(sceneId, lineId): the soldier (resolvers first,
 //     then any live soldier carrying that castId);
 //   * every resolved soldier with a face rig gets facial.source = () => voice.Speech(who)
@@ -12,16 +12,26 @@
 //     the take it is playing (Script_FaceTrack, keyed by the take's sha256: the
 //     sample's own sha256, else the voice manifest's entry for its cue).
 // The runtime only adds resolvers, calls Update(dt) and asks HeadPosition first.
+//
+// Scope: all of the above only while host.active() is true (the runtime passes the
+// 01-06 steps, Data_FirstLevelSpeakingCast.FIRST_LEVEL_FACE_STEPS). Outside it the
+// binder keeps only the mouths of host.wholeLevelRoles (the named squad, resolved by
+// the resolvers alone): no head layer, no gaze, and HeadPosition returns null so the
+// later stages keep their own voice placement.
 import * as THREE from "three";
 import { MISSION_DIALOGUE, MISSION_VOICE_CAST } from "./Data_FirstLevelMissionDialogue.mjs";
 import { SPEAKER_HEAD } from "./Data_Tuning_CharacterSpeech.mjs";
 import { SpeakerHeadLayer } from "./Script_SpeakerHeadLayer.mjs";
+import { FIRST_LEVEL_SPEAKING_CAST } from "./Data_FirstLevelSpeakingCast.mjs";
 import { FaceTrackSpeech, LoadFaceTracks, SampleLineFaceTrack } from "./Script_FaceTrack.mjs";
 
 const CUES = new Map(MISSION_DIALOGUE.map(cue => [cue.id, cue]));
 // Roles that never have a body of their own on screen.
 const DISEMBODIED = new Set(["shunzi", "crowd"]);
-export const FIRST_LEVEL_SPEAKER_ROLES = Object.freeze(Object.keys(MISSION_VOICE_CAST).filter(who => !DISEMBODIED.has(who)));
+// The 01-06 speaking roles: the pinned speaking cast (every one of them has a voice).
+export const FIRST_LEVEL_SPEAKER_ROLES = Object.freeze(Object.keys(FIRST_LEVEL_SPEAKING_CAST)
+  .filter(who => !DISEMBODIED.has(who) && Object.hasOwn(MISSION_VOICE_CAST, who)));
+const ROLE_SET = new Set(FIRST_LEVEL_SPEAKER_ROLES);
 
 /** "<Scene>.<NN>" (one-based, contract section 5.2) or a zero-based index -> { scene, index }. */
 export function ParseLineId(sceneId, lineId) {
@@ -37,6 +47,8 @@ export function WhoForLine(sceneId, lineId) {
 }
 
 const OPENING_STAGES = new Set(["Trapped", "BunkerRescue", "RearTrench", "Support"]);
+// Steps in which the withdrawing front guards (runtime.guards) exist and one of them talks.
+const GUARD_STAGES = new Set(["Support", "MachineGun", "Tank", "Orders"]);
 const Distance2 = (a, b) => (a.x - b.x) ** 2 + (a.z - b.z) ** 2;
 
 /**
@@ -54,11 +66,13 @@ export function FirstLevelSpeakerResolvers(runtime) {
     who => (who === "keeper" ? r.bundleKeeper : null),
     who => (who === "relief" ? r.relief?.find(entry => entry?.actor?.alive && entry.actor.actor)?.actor : null),
     who => {
-      if (who !== "guard") return null;
+      if (who !== "guard" || !GUARD_STAGES.has(r.flow?.stage?.id)) return null;
       const chosen = r.frontShow?.bundleOrderGuard;
       if (chosen?.alive && chosen.actor) return chosen;
-      const at = r.player?.position;
       const guards = (r.guards || []).map(entry => entry.actor).filter(actor => actor?.alive && actor.actor);
+      const faced = guards.find(actor => actor.speakerRole === "guard");
+      if (faced) return faced;
+      const at = r.player?.position;
       return at ? guards.sort((a, b) => Distance2(a.position, at) - Distance2(b.position, at))[0] : guards[0];
     },
   ];
@@ -73,11 +87,14 @@ export class FirstLevelSpeakerBinder {
    *   soldiers   () => iterable of live soldiers (castId lookup)
    *   listener   () => Vector3 (player eye) the talker looks at by default
    *   resolvers  [(who) => soldier | null], asked in order before the castId scan
+   *   active     () => bool: full binding (faces, heads, gaze, voice position); default always
+   *   wholeLevelRoles  roles whose mouths stay bound (resolvers only) while not active
    *   loadFaceTracks  fetch Data_FirstLevelFaceTracks.json (default: in a browser)
    */
   constructor({ voice, soldiers = () => [], listener = () => null, resolvers = [],
-    loadFaceTracks = typeof location !== "undefined" } = {}) {
+    active = () => true, wholeLevelRoles = [], loadFaceTracks = typeof location !== "undefined" } = {}) {
     this.voice = voice; this.soldiers = soldiers; this.listener = listener;
+    this.active = active; this.wholeLevelRoles = Object.freeze([...wholeLevelRoles]);
     if (loadFaceTracks) LoadFaceTracks();
     // Per-line dialogue player (Voice package): its Speech(who) reads this hook first.
     if (voice?.dialogue && !voice.dialogue.faceTrackSampler) voice.dialogue.faceTrackSampler = SampleLineFaceTrack;
@@ -96,13 +113,22 @@ export class FirstLevelSpeakerBinder {
     return FaceTrackSpeech(speech, speech.sha256 ?? this.voice?.manifest?.cues?.[speech.cue]?.sha256);
   }
 
-  ActorForWho(who) {
+  get Active() { try { return !!this.active(); } catch { return false; } }
+
+  /**
+   * The live soldier playing `who`. While active: any 01-06 role, resolvers then a
+   * soldier carrying that speakerRole/castId. Otherwise: only wholeLevelRoles, and only
+   * through the resolvers (a stray castId carrier never takes over a later line).
+   */
+  ActorForWho(who, active = this.Active) {
     if (!who || DISEMBODIED.has(who)) return null;
+    if (!(active ? ROLE_SET.has(who) : this.wholeLevelRoles.includes(who))) return null;
     for (const resolve of this.resolvers) {
       let soldier = null;
       try { soldier = resolve(who); } catch { soldier = null; }
       if (Alive(soldier)) return soldier;
     }
+    if (!active) return null;
     for (const soldier of this.soldiers() || []) {
       if (Alive(soldier) && (soldier.speakerRole === who || soldier.castId === who || soldier.identity?.castId === who)) return soldier;
     }
@@ -111,28 +137,29 @@ export class FirstLevelSpeakerBinder {
 
   ActorFor(sceneId, lineId) { return this.ActorForWho(WhoForLine(sceneId, lineId)); }
 
-  /** World point at the resolved speaker's head, only when that body has a face rig. */
+  /** World point at the resolved speaker's head, only while active and when that body has a face rig. */
   HeadPosition(cue, line) {
+    if (!this.Active) return null;
     const who = line?.who ?? cue?.lines?.[0]?.who;
-    const soldier = this.ActorForWho(who);
+    const soldier = this.ActorForWho(who, true);
     const rig = soldier?.actor?.characterRig;
     if (!rig?.facial) return null;
     const head = rig.bones?.head;
     return head ? head.getWorldPosition(new THREE.Vector3()) : null;
   }
 
-  _Bind(soldier, who) {
+  _Bind(soldier, who, withHead = true) {
     const rig = soldier.actor.characterRig;
     let entry = this.bound.get(soldier);
-    if (!entry || entry.facial !== rig.facial) {
+    if (!entry || entry.facial !== rig.facial || entry.withHead !== withHead) {
       if (entry) this._Release(soldier);
-      entry = { whos: new Set(), facial: rig.facial, rig, layer: null };
+      entry = { whos: new Set(), facial: rig.facial, rig, layer: null, withHead };
       rig.facial.source = () => {
         if (!Alive(soldier)) return null;
         for (const role of entry.whos) { const speech = this.Speech(role); if (speech?.active) return speech; }
         return null;
       };
-      entry.layer = rig.speakerHead ||= new SpeakerHeadLayer(rig, soldier.id ?? 0);
+      if (withHead) entry.layer = rig.speakerHead ||= new SpeakerHeadLayer(rig, soldier.id ?? 0);
       this.bound.set(soldier, entry);
     }
     entry.whos.add(who);
@@ -149,20 +176,22 @@ export class FirstLevelSpeakerBinder {
 
   Update() {
     // Resolve every role; bind faces, drop bodies that lost their role or died.
+    const active = this.Active;
     const seen = new Map();
-    for (const who of FIRST_LEVEL_SPEAKER_ROLES) {
-      const soldier = this.ActorForWho(who);
+    for (const who of active ? FIRST_LEVEL_SPEAKER_ROLES : this.wholeLevelRoles) {
+      const soldier = this.ActorForWho(who, active);
       if (!soldier?.actor?.characterRig?.facial) continue;
       if (!seen.has(soldier)) seen.set(soldier, new Set());
       seen.get(soldier).add(who);
     }
     for (const soldier of [...this.bound.keys()]) if (!seen.has(soldier)) this._Release(soldier);
     for (const [soldier, whos] of seen) {
-      const entry = this._Bind(soldier, [...whos][0]);
+      const entry = this._Bind(soldier, [...whos][0], active);
       entry.whos = whos;
     }
     // Who is talking right now (sample drives the mouth, head and gaze).
     this.speaking.length = 0;
+    if (!active) return;
     for (const [soldier, entry] of this.bound) {
       const speech = entry.facial.source?.();
       if (speech?.active) {
@@ -176,8 +205,7 @@ export class FirstLevelSpeakerBinder {
       let target = null;
       if (talking) target = this._Nearest(soldier, this.speaking.filter(item => item.soldier !== soldier)) || listener;
       else target = this._Nearest(soldier, this.speaking);
-      entry.layer.speaking = !!talking;
-      entry.layer.lookAt = target;
+      if (entry.layer) { entry.layer.speaking = !!talking; entry.layer.lookAt = target; }
       entry.facial.gaze = target;
     }
   }
@@ -194,8 +222,8 @@ export class FirstLevelSpeakerBinder {
   /** Probe view: role -> bound soldier id / speaking flag. */
   State() {
     const bound = {};
-    for (const [soldier, entry] of this.bound) for (const who of entry.whos) bound[who] = { id: soldier.id, speaking: !!entry.facial.lastSpeech };
-    return { bound, speaking: this.speaking.map(item => item.who) };
+    for (const [soldier, entry] of this.bound) for (const who of entry.whos) bound[who] = { id: soldier.id, speaking: !!entry.facial.lastSpeech, head: !!entry.layer };
+    return { active: this.Active, bound, speaking: this.speaking.map(item => item.who) };
   }
 
   Dispose() { for (const soldier of [...this.bound.keys()]) this._Release(soldier); this.speaking.length = 0; }

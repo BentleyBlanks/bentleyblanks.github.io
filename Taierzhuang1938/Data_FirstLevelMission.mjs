@@ -163,9 +163,10 @@ export const MISSION_ENCOUNTERS = Object.freeze({
   // 起点取空间包的 MISSION_PLACEMENT.bunker.ijaStart（还在刺杀处以北 6 m，走进来才下刀）；
   // 下刀与转向门内的两组落点在 Script_FirstLevelOpening 里按 ijaKill / ijaDoor 走。
   bunkerAssault: [
-    { id: "BunkerExecutionerA", ...P.bunker.ijaStart[0], castId: "ijaA", modelVariant:1, weapon: "Type38", bayonet: true },
-    // 日兵乙改穿 IJA01：IJA03 的嘴是闭合几何，做不了口型（2026-09-23 契约 §5.1）。
-    { id: "BunkerExecutionerB", ...P.bunker.ijaStart[1], castId: "ijaB", modelVariant:0, weapon: "Type38", bayonet: true },
+    // 说话角色的外观只在 Data_FirstLevelSpeakingCast 钉死（日兵甲 IJA02、日兵乙 IJA01，
+    // 2026-09-23 契约 §5.1）；这里只写 castId，不再另写 modelVariant。
+    { id: "BunkerExecutionerA", ...P.bunker.ijaStart[0], castId: "ijaA", weapon: "Type38", bayonet: true },
+    { id: "BunkerExecutionerB", ...P.bunker.ijaStart[1], castId: "ijaB", weapon: "Type38", bayonet: true },
     // 跟进那两人站在行刑组后面，但仍在破口看得见的那一小片里（R.bunkerSightM）；
     // 与 ijaStart 拉开 3 m 以上，免得两个人叠在一格（胶囊之间不互撞）。
     { id: "BunkerFollowA", x: A.bunkerKilling.x - 4.5, z: A.bunkerKilling.z - 9, weapon: "Type38", bayonet: true },
