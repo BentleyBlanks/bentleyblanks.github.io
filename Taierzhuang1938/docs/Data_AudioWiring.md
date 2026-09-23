@@ -715,16 +715,15 @@ stress ≥ 0.42 开始喘（`breathHeavy` 原速原调，0.26–0.5 随 stress�
 
 ### 8. 日军枪声变体（`Data_SfxSources.JapaneseGunfireVariants`）
 
-| cue | 改前 | 改后 |
-| --- | --- | --- |
-| `rifleIja` | 1（SeedAudio） | 5：SeedAudio + M1 Garand + M1903A3 ×3（包里本来就有的真枪实录，09-11 那一轮被清单挤掉了） |
-| `rifleIjaFar` | 1 | 4：SeedAudio + BAR 300 m + 50 m 建筑反射 ×2 |
-| `type11` | 1 | 3：SeedAudio + FN MINIMI 1 m 单发 ×2（原 BAR 0.1 m 两条 <40 Hz 占 98.7 %，可听部分低 19 dB，撤掉） |
-| `type11Far` | 1 | 3：BAR 300 m + MINIMI 50 m ×2 |
-| `type92` / `type92Far` | 3 / 2 | 不变 |
+**2026-09-24 集成时撤回，日军枪声维持 09-11 的用户选定**：Sound 包曾把 `rifleIja` / `rifleIjaFar` / `type11` / `type11Far`
+扩成「SeedAudio 生成音 + 美制 M1 Garand / M1903A3 / FN MINIMI 实录」混播，并用同名文件覆盖了用户在 G09 试听选定的
+`AudioSfx_Type11_01/02`（BAR 近场）。这违反「挑过的素材原样播」与 09-11 用户要生成音的口径，且美制枪声当日军三八式/十一年式
+不合史实，已整体恢复为 09-11 的清单与原文件（`Data_SfxSources.mjs`、`Data_SfxManifest.json`、两条 Type11 原文件）。
+Sound 包实测的问题仍成立、留作后续：旧 BAR 近场两条 <40 Hz 能量占 98.7 %，没有低音炮的机器上几乎听不见；要补日军枪声变体，
+应走 `Script_SeedAudioGunfireBake` 同一配方多生成几条再由用户试听选定，而不是拿别国枪的实录顶。
 
 **参考视频来源的许可债**（`SFX_LICENSES.refvideo`，发布前要换或取得授权）：`rifleNra_05–07`、`bolt_03`、
-`rifleHanYang`、`boltHanYang` 仍在轮播；`rifleIja_05`（三八大盖实录）这一轮起**不进轮播**。
+`rifleHanYang`、`boltHanYang` 仍在轮播。
 
 ### 9. 这一节的闸
 
