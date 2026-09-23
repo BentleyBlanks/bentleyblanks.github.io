@@ -1,0 +1,26 @@
+{
+ "note": "01-06 rebuild guard: MISSION_LAYOUT.blocks, MISSION_TRENCH_PLACEMENTS, MISSION_AFTERMATH and SampleMissionTerrain south of z=-95 (07 onward) as of the pre-rebuild baseline. Regenerate only from that baseline (git archive f581ac7dd, then Script_FirstLevelSpaceProbe.SouthFingerprint over its modules).",
+ "baseline": "f581ac7dd",
+ "zMin": -95,
+ "blocks": {
+  "count": 1069,
+  "sha": "90cbd2d25c37da13"
+ },
+ "placements": {
+  "count": 2,
+  "sha": "56ca4306fdf3e102"
+ },
+ "bodies": {
+  "count": 191,
+  "sha": "b97f1a1cba28de6e"
+ },
+ "ground": {
+  "minX": -200,
+  "maxX": 250,
+  "minZ": -95,
+  "maxZ": 400,
+  "stepM": 2,
+  "count": 56048,
+  "sha": "215c2863718678c1"
+ }
+}

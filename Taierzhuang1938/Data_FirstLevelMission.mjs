@@ -193,7 +193,8 @@ export const MISSION_ENCOUNTERS = Object.freeze({
   // 02 pursuers: one base-of-fire man holds the fold F; three follow down the link sap to J and the
   // mouth (the player looks back and sees them on the spot he just left). None ever passes the bend M.
   bunkerPursuit: [
-    { id: "BunkerPursuitFold", role: "pursuitBase", ...A.bunkerFold, weapon: "Type38", hold: true, faceTo: A.bunkerRear },
+    // 1.35 m past the fold F along the sap (the fire step's far side): ijaC may still be standing on F itself.
+    { id: "BunkerPursuitFold", role: "pursuitBase", x: 19.2, z: -126.5, weapon: "Type38", hold: true, faceTo: A.bunkerRear },
     { id: "BunkerPursuitA", role: "pursuit", x: 27, z: -135.5, weapon: "Type38", route: [{x:23.5,z:-130},A.bunkerFold,A.bunkerJunction], delayS: 3 },
     { id: "BunkerPursuitB", role: "pursuit", x: 29.7, z: -141.5, weapon: "Type38", route: [{x:23.5,z:-130},A.bunkerJunction,{x:6.8,z:-124.2}], delayS: 7 },
     { id: "BunkerPursuitC", role: "pursuit", x: 33, z: -143.2, weapon: "Type38", route: [{x:27,z:-135.5},A.bunkerFold,{x:9.6,z:-125.1}], delayS: 11 },

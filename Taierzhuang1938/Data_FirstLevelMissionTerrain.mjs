@@ -94,6 +94,8 @@ export const MISSION_TERRAIN = Object.freeze({
     // Nest compound floor (x 24..37, z -145.6..-156.8), dug half a metre.
     {x:28.5,z:-152.2,radius:5.5,depth:.5},
     {...Sortie.leftSeat,radius:3,depth:.65},
+    // 03 observation fire step at the spur's end: floor 0.4 m below the field (spur 0.95 -> 0.4 ramp, ~23 deg).
+    {...Space.observation,radius:.7,depth:.4},
     // 01 dugout pit, dug into the outer (north-west) wall of the bend M; opens east onto the trench.
     {x:-0.4,z:-125.9,radius:1.9,depth:2.0},
     // Depth transitions (all under 45 deg): support sap -> right low trench, gap sap -> gap junction,

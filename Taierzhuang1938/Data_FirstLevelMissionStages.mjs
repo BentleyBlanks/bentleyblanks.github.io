@@ -55,7 +55,7 @@ export const FIRST_LEVEL_STAGE_ENCOUNTERS = Object.freeze([
   ["bunkerAssault"], ["bunkerAssault","front","frontFlank","frontOfficer","approach","machineGun","tank","bundleApproach"],
   ["front","frontFlank","frontOfficer","approach","machineGun","tank","bundleApproach","village","melee"],
   ["front","frontFlank","frontOfficer","approach","machineGun","tank","bundleApproach","village","melee"],
-  ["front","frontFlank","machineGun","approach","tank","village","melee","bundleApproach"],
+  ["front","frontFlank","frontOfficer","machineGun","approach","tank","village","melee","bundleApproach"],
   ["village","melee"], ["village","melee"], ["village","melee"], ["village","melee"],
   ["village","courtyard"], [], ["transfer"], ["air"], ["air"],
   [], [], [], [],

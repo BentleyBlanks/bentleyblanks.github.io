@@ -41,7 +41,7 @@ export const OPENING = Object.freeze({
   // A wounded gunner can end up on either side of it, so the handover
   // follows the open south edge of the traverse instead of cutting through
   // the crate with one diagonal move.
-  zhouExitBypass: [{x:-34,z:-147},{x:-31,z:-137}],
+  zhouExitBypass: [{x:-3.8,z:-122.5},{x:1.2,z:-122.5}],
   zhouExitWaypointRadiusM:.5,
   zhouWoundThreshold:95,
   zhouExitRadiusM:.65,

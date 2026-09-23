@@ -521,10 +521,14 @@ console.log("ok all mission gates require recorded gameplay facts and restore ex
   const supply=MISSION_SUPPLIES.find(spec=>spec.id==="Front"),radius=.34;
   const rect={minX:supply.x-MISSION_SUPPLY_COLLIDER.w/2-radius,maxX:supply.x+MISSION_SUPPLY_COLLIDER.w/2+radius,
     minZ:supply.z-MISSION_SUPPLY_COLLIDER.d/2-radius,maxZ:supply.z+MISSION_SUPPLY_COLLIDER.d/2+radius};
+  // 2026-09-23 01-06 rebuild: Zhou's gun is at the berm's west end (S.leftSeat); a wounded gunner may be
+  // displaced a little off the seat. The crate check below stays (the helper still routes around it), but
+  // the real question now is whether the runtime route is the access-trench polyline S.zhouExit: that is
+  // measured (capsule + 52 deg) in Script_FirstLevelSpaceTest and printed as TODO(Front/Opening) until wired.
   const starts=[
-    {id:"west failure",x:-3.0401633947848508,z:-123.90232699904317},
-    {id:"east",x:0,z:-123.9},
-    {id:"north",x:-2,z:-125.2},
+    {id:"seat",...S.leftSeat},
+    {id:"west of the seat",x:S.leftSeat.x-0.8,z:S.leftSeat.z+0.2},
+    {id:"south of the seat",x:S.leftSeat.x+0.2,z:S.leftSeat.z+0.8},
   ];
   for(const start of starts){
     const route=ZhouGunExitRoute(start,radius),points=[start,...route];

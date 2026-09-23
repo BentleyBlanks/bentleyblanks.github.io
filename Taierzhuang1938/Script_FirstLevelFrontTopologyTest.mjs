@@ -16,7 +16,8 @@ import {FRONT_GUARD_POSTS,FRONT_FLANK_GROUP,FrontAssaultLane} from "./Data_First
 import {MISSION_ENCOUNTERS as E} from "./Data_FirstLevelMission.mjs";
 import {SampleMissionTerrain as G,SampleMissionNaturalHeight as N} from "./Data_FirstLevelMissionTerrain.mjs";
 import {ProbeKeyframes,ProbeTank,ProbeRoutes,ProbeExposure,ProbeEnemyCover,ProbeCounts,ProbeEntries,ProbeSeparation,
-  ProbeEngagement,RouteClearance,Sight,Eye,D,RouteLength,ProbeWireLanes} from "./Script_FirstLevelSpaceProbe.mjs";
+  ProbeEngagement,RouteClearance,Sight,Eye,D,RouteLength,ProbeWireLanes,Bearing} from "./Script_FirstLevelSpaceProbe.mjs";
+import {MISSION_ENCOUNTER_ACTIVATION as ACTIVATION} from "./Data_FirstLevelMissionGates.mjs";
 
 // ---------------------------------------------------------------- K1–K11 (+K1i/K2b)
 const keyframes=ProbeKeyframes();
@@ -152,21 +153,44 @@ console.log(`ok 05 cut-in pair hidden from the gap and the backslope: ${S.enemie
     assert.ok(f.dist>=15&&f.dist<=35,`${f.id} last line is 15-35 m from the gap: ${f.dist}`);
     assert.ok(f.seatDist>=9,`${f.id} last line leaves the captured gun room to fire: ${f.seatDist}`);
   }
+  // Nest guards face the side the player comes from (south-west: right low trench, west door, rear junction),
+  // within 60 deg; the gunner's gun lies on the gap.
+  const Off=(a,b)=>{let d=a-b;while(d>180)d-=360;while(d<-180)d+=360;return Math.abs(d);};
   for(const g of c.nestFaces){
     assert.equal(g.onApproach,false,`${g.id} guards the nest, not the player's approach trench`);
     assert.ok(g.faceBearing!==null,`${g.id} has an authored facing`);
+    if(g.role==="nestGun")assert.ok(Off(g.faceBearing,Bearing(S.nest,S.gap))<=20,`${g.id} lays the gun on the gap: ${g.faceBearing}`);
+    else assert.ok(Off(g.faceBearing,-135)<=60,`${g.id} faces south-west (our side) within 60 deg: ${g.faceBearing}`);
   }
   for(const row of c.rows)assert.ok(row.role,`${row.group}/${row.id} carries a role`);
+  // Budget from the real spawn tables (MISSION_STEP_SPAWNS + activation facts + retire), contract §6.
   const n=ProbeCounts();
+  assert.deepEqual(n.unresolved,[],"every 01-05 enemy has a spawn stage and a leave stage");
   assert.ok(n.cumulative<=55,`01-05 cumulative enemies <= 55: ${n.cumulative}`);
-  assert.ok(n.alive04<=30&&n.alive05<=30,`03-05 worst-case alive <= 30: ${n.alive04}/${n.alive05}`);
+  assert.ok(n.alive03<=30&&n.alive04<=30&&n.alive05<=30,`03-05 worst-case alive <= 30: ${n.alive03}/${n.alive04}/${n.alive05}`);
+  for(const g of ["bunkerAssault","bunkerBackdrop","bunkerPursuit"]){
+    assert.ok(ACTIVATION[g].retire,`${g} declares how its survivors leave (retire)`);
+    assert.ok(!n.alive03ByGroup[g]&&!n.alive05ByGroup[g],`${g} is off the field before 03`);
+  }
+  // Where the pursuers retire to is out of sight of every 02-06 friendly spot (and of the 04/05 routes).
+  const ex=ProbeExposure();
+  assert.deepEqual(ex.fallbackSees,[],"the 02 pursuers' fallback (depth sap) is unseen from RJ, the 04/05 routes, SJ, RC and the collection");
+  assert.ok(!ex.rearRoute04.by?.pursuitFallback0&&!ex.rearRoute04.by?.pursuitFallback1,"RJ and the 04 rear route are hidden from the pursuit fallback");
+  // No two 01-05 starts share a spot (NPC capsules do not collide: two men spawned on one point merge into one).
+  {
+    const starts=["bunkerAssault","bunkerBackdrop","bunkerPursuit","approach","front","frontFlank","frontOfficer","machineGun","tank","frontReserve","bundleApproach"]
+      .flatMap(g=>E[g].map(s=>({id:g+"/"+s.id,x:s.x,z:s.z})));
+    const close=[];
+    for(let i=0;i<starts.length;i++)for(let j=i+1;j<starts.length;j++)if(D(starts[i],starts[j])<0.8)close.push(`${starts[i].id}~${starts[j].id}`);
+    assert.deepEqual(close,[],"01-05 starts are at least 0.8 m apart");
+  }
   for(const e of ProbeEntries()){
     const seen=e.rows.filter(r=>r.visible&&r.dist<60);
     assert.deepEqual(seen.map(r=>`${r.from}@${r.dist}`),[],`${e.id} enters out of sight (>= 60 m or hidden)`);
     if(/^MachineGunAttack|^waveCentre|^NorthWestPlateau/.test(e.id))
       assert.deepEqual(e.rows.filter(r=>r.visible).map(r=>r.from),[],`${e.id} is inside the jump-off trench, hidden from every friendly post`);
   }
-  console.log(`ok enemies: ${c.rows.length} starts covered, flank last line sees the gap, cumulative ${n.cumulative}, alive ${n.alive04}/${n.alive05}`);
+  console.log(`ok enemies: ${c.rows.length} starts covered, flank last line sees the gap, cumulative ${n.cumulative}, alive 02-05 ${n.alive["02"]}/${n.alive03}/${n.alive04}/${n.alive05}`);
 }
 
 // ---------------------------------------------------------------- separation, 01 corridor, flood fill, engagement

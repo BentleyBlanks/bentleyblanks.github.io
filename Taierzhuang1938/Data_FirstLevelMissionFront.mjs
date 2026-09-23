@@ -199,7 +199,8 @@ export const FRONT_APPROACH_ENEMIES=[
   // and the right low trench (south-west) from real cover, one holds the rear junction. hold keeps
   // them on their posts (peek/hide only); 03 capture is "take the compound", not "chase the guards".
   {id:"RightNestGuard",x:33.2,z:-149.2,hold:true,team:"Nest",role:"nestGuard",faceTo:Space.westDoor},
-  {id:"RightEntryGuard",x:26.6,z:-146.8,hold:true,team:"Nest",role:"nestGuard",faceTo:Space.westDoor},
+  // faceTo = the right low trench's last bend outside the west door (due west), not the door 3.8 m north of him.
+  {id:"RightEntryGuard",x:26.6,z:-146.8,hold:true,team:"Nest",role:"nestGuard",faceTo:{x:19,z:-146.8}},
   // The link guard holds the rear junction from inside the rear door (rear wall at his back-left is his
   // cover): he watches the link sap the vanguard used and the ammo sap mouth, and he is part of the
   // compound the 03 capture clears (outside the wall he was invisible from the west door and the seat).
@@ -217,7 +218,8 @@ export const APPROACH_TACTICS=Object.fromEntries([
 export const FRONT_DEFENDERS=[[-7.5,-112.4,"HanYang"],[-12,-111.8,"HanYang"]]
   .map(([x,z,weapon],i)=>({id:"FrontDefender"+i,x,z,weapon,stance:1}));
 // Backslope scrapes (0.55 m) at the berm's south foot; the first two are the ones nearest the gap.
-export const FRONT_GUARD_POSTS=[[-11,-156.3],[-5,-156.3],[-14.5,-156.4],[-1.5,-156.3],[-18,-156.4],[2,-156.2],[-22,-156.5],[-26,-156.5]]
+// Guard 1 sits 0.6 m west of the old -5 so the observation step's line to him passes south of GapLastCover (K3).
+export const FRONT_GUARD_POSTS=[[-11,-156.3],[-5.6,-156.3],[-14.5,-156.4],[-1.5,-156.3],[-18,-156.4],[2,-156.2],[-22,-156.5],[-26,-156.5]]
   .map(([x,z])=>({x,z}));
 // Breaches only ever RAISE a dug floor toward (natural - depth). Gap: the sap is shallowed to 0.5 m
 // for ~6 m (the one exposed crossing). Damaged lip: 1.1 m for ~6 m - crouched (eye 1.05) is below the
@@ -298,7 +300,8 @@ const clusters=[
   // (z -156), the lost east end is the right nest compound (kept to 8 so the seat, the doors and the
   // 04 short retreat read clearly), and the 01 dead lie along the link sap.
   // The observation step's foreground (z -126..-150, bearing 0-80 deg from it) is left empty: it is our side of the line.
-  [-22,-155.5,18,.3,4],[-8.5,-147.5,15,.4,3.5],[7,-155.8,21,.5,4.5],[30.5,-151,8,.7,4],[-29.2,-116.5,6,.1,1.8],[22,-129.5,9,.6,2.5],
+  // The gap sap stays readable: 4 dead just north-west of the gap (not 15 on the sap floor, the guards' only way out).
+  [-22,-155.5,18,.3,4],[-10.2,-152.6,4,.4,1.2],[7,-155.8,21,.5,4.5],[30.5,-151,8,.7,4],[-29.2,-116.5,6,.1,1.8],[22,-129.5,9,.6,2.5],
   // The killing ground north of the berm (moved 6 m north with it): assault waves that never reached it.
   [-36,-169,24,.85,6.5],[4,-176,27,.85,7],[43,-178,21,.8,5.5],[-14,-165,21,.9,5],[22,-167,21,.9,5],
   [-30,-182,18,.9,5.5],[10,-188,18,.9,5.5],[36,-184,15,.9,5],[-6,-196,15,.95,5],[26,-198,12,.95,4.5],
@@ -320,7 +323,11 @@ function OpeningRouteClear(body){
   }
   return true;
 }
-export const MISSION_AFTERMATH=clusters.flatMap(([x,z,count,ijaShare,spread],group)=>Array.from({length:count},(_,i)=>{
+// 07 onward keep the 09.22 bodies bit for bit: from the first south cluster on, the draws restart from the RNG state
+// the pre-rebuild baseline (f581ac7dd) had reached there, whatever the 01-06 clusters above consume
+// (Script_FirstLevelSpaceTest south fingerprint covers these bodies).
+const SOUTH_FIRST_GROUP=29, SOUTH_SEED=4046832604;
+export const MISSION_AFTERMATH=clusters.flatMap(([x,z,count,ijaShare,spread],group)=>{if(group===SOUTH_FIRST_GROUP)seed=SOUTH_SEED;return Array.from({length:count},(_,i)=>{
   const angle=Random()*Math.PI*2,r=Math.sqrt(Random())*spread;
   const ija=Random()<ijaShare;
   // Upper-layer ordering hint only. The load-time solver requires actual body
@@ -329,5 +336,5 @@ export const MISSION_AFTERMATH=clusters.flatMap(([x,z,count,ijaShare,spread],gro
   return {id:"Aftermath"+group+"_"+i,x:x+Math.cos(angle)*r,z:z+Math.sin(angle)*r,
     yaw:Random()*Math.PI*2,side:ija?"ija":"nra",pose:i%4,
     pile,scale:.94+Random()*.12,blood:.6+Random()*.75,opening:group<13};
-})).filter(body=>(!body.opening||(+body.id.split("_")[1]<2&&OpeningRouteClear(body)))&&
+});}).filter(body=>(!body.opening||(+body.id.split("_")[1]<2&&OpeningRouteClear(body)))&&
   musterPoints.every(point=>Math.hypot(body.x-point.x,body.z-point.z)>=musterBodyClearanceM));

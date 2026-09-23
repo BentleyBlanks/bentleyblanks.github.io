@@ -50,7 +50,10 @@ export const SPACE_KEYFRAMES = Object.freeze([
   { id: "K3", label: "03 observation step: guards, gap, burning nest", state: "BunkerIntact", frameDeg: 80,
     camera: { x: SP.observation.x, z: SP.observation.z, eyeM: 1.6 }, look: { x: -7.3, z: -154.6, h: 1.0 },
     targets: [
-      ...FRONT_GUARD_POSTS.map((p, i) => ({ name: `guard ${i} kneeling in the scrape`, at: p, heights: Kneel, need: 1 })),
+      // Every guard reads kneeling (both heights) AND lying (0.5 m, the AI's prone chest): 09.23 review found 7 of 8
+      // prone in the engine and hidden by the scrape lip.
+      ...FRONT_GUARD_POSTS.map((p, i) => ({ name: `guard ${i} kneeling in the scrape`, at: p, heights: Kneel, need: 2 })),
+      ...FRONT_GUARD_POSTS.map((p, i) => ({ name: `guard ${i} lying in the scrape`, at: p, heights: [0.5], need: 1 })),
       { name: "the gap (a man crossing, crouched)", at: S.gap, heights: Crouch, need: 2 },
       { name: "nest MG muzzle over the west wall", at: { x: 24.0, z: -153.9 }, heights: [1.55, 1.4], need: 1 },
       { name: "nest gable peak (landmark)", at: { x: 37, z: -151.2 }, heights: [5.2, 4.4], need: 1,

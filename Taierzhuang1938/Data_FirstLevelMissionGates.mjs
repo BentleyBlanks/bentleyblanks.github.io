@@ -75,15 +75,21 @@ export const MISSION_ENCOUNTER_ACTIVATION = Object.freeze({
     dormant: true,
     wake: Object.freeze({ kind: "scripted", step: "BunkerRescue", source: "FirstLevelBunkerShow.ReleaseCombat",
       text: "小队反扑时解除演出保护并交战；全部清场后才拖救还权" }),
-    note: "两名行刑兵与两名跟进兵；反扑时解除演出保护，由小队真实击杀四人后才拖救还权",
+    // Decision 1 lets the man behind the fold (ijaC) live through 02; he leaves with the pursuers.
+    retire: Object.freeze({ fact: "collectionPointSeen", route: "FRONT_SPACE.pursuitFallback", then: "despawn",
+      text: "活着的先头兵（折角后的日兵丙）跟追兵一起经 J 转入纵深支沟，走到尽头收走" }),
+    note: "两名行刑兵与两名跟进兵；反扑时解除演出保护，由小队真实击杀四人后才拖救还权。活下来的人在玩家望见集结处时经纵深支沟退场（retire）",
   }),
   bunkerBackdrop: Object.freeze({
     spawn: Object.freeze({ kind: "fact", fact: "bunkerCollapsed" }),
-    note: "01 背景：先头兵沿连接支沟经岔口 J 转入纵深支沟南下出视野（side:ija，按 delayS 依次走 route）；三名川军在后交通壕折角与支沟还击 fireAt 授权点（side:nra，不可被击中）。由 Ai 包的背景兵机制生成，通用生成器不建这组",
+    retire: Object.freeze({ atRouteEnd: true, then: "despawn", text: "日军背景兵走到纵深支沟尽头即收走；川军还击者随 02 结束（collectionPointSeen）收走" }),
+    note: "01 背景：先头兵沿连接支沟经岔口 J 转入纵深支沟南下出视野（side:ija，按 delayS 依次走 route，走到尽头收走，不留到 07）；三名川军在后交通壕折角与支沟还击 fireAt 授权点（side:nra，不可被击中）。由 Ai 包的背景兵机制生成，通用生成器不建这组",
   }),
   bunkerPursuit: Object.freeze({
     spawn: Object.freeze({ kind: "fact", fact: "rifleRecovered" }),
-    note: "02 追兵：一人据守折角 F 射击台阶，三人沿连接支沟追到 J 与洞口，都不越过弯角 M；03 夺点后沿连接支沟撤回（FRONT_SPACE.pursuitFallback）。由 Opening 包的后交通壕追兵生成",
+    retire: Object.freeze({ fact: "collectionPointSeen", route: "FRONT_SPACE.pursuitFallback", then: "despawn",
+      text: "玩家望见集结处时，活着的追兵经岔口 J 转入纵深支沟追主力，走到尽头收走（03 开场前场上已没有他们）" }),
+    note: "02 追兵：一人据守折角 F 射击台阶另一侧，三人沿连接支沟追到 J 与洞口，都不越过弯角 M；02 结束（collectionPointSeen）经纵深支沟退场收走，不回连接支沟（那是 04/05 的阵位后方）。由 Opening 包的后交通壕追兵生成",
   }),
   frontFlank: Object.freeze({
     spawn: Object.freeze({ kind: "step", step: "BunkerRescue" }),
@@ -97,7 +103,7 @@ export const MISSION_ENCOUNTER_ACTIVATION = Object.freeze({
   }),
   frontReserve: Object.freeze({
     spawn: Object.freeze({ kind: "fact", fact: "tankPositionPressured" }),
-    note: "04/05 增援：FRONT_RESERVE_ENTRIES 两个视线外入口（北侧出发壕西端、道路路堑），slotStages 定每人哪一阶段放出（04：2+2，05：2+1）。由 Front 包的前沿压力机制放出",
+    note: "04/05 增援：FRONT_RESERVE_ENTRIES 两个视线外入口（北侧出发壕西端、道路路堑），slotStages 定每人哪一阶段放出（04：2+2，05：1）。由 Front 包的前沿压力机制放出",
   }),
   approach: Object.freeze({
     spawn: Object.freeze({ kind: "step", step: "BunkerRescue" }),

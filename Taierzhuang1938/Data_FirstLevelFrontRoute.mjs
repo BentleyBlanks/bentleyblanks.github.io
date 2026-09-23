@@ -94,11 +94,20 @@ export const FRONT_SPACE=Object.freeze({
   // RC landmark: a timber frame (two posts + 2.2 m lintel) over the rear corner, read from the dugout mouth and from the collection side.
   rearCornerFrame:Object.freeze({x:-4,z:-113,ry:-.12}),
   // 03 opening: He Youtian + one NRA hold the 01 trench's west mouth at RC (the 02 pursuers stay at J/F;
-  // after the 03 capture they fall back up the link sap, never through RC).
+  // when the player reaches the collection they go on after their main body, never through RC).
   rcHold:[Point(-3.2,-114.6),Point(-5.6,-113.4)],
-  pursuitFallback:[Point(23.5,-130),Point(27,-135.5)],
-  observation:Point(-23.2,-129.2),          // 03 observation bay at the end of a 0.95 m spur (K3)
-  observationSpur:[Point(-23.4,-126.5),Point(-23.2,-129.4)],
+  // 02 -> 03 retirement (MISSION_ENCOUNTER_ACTIVATION.bunkerPursuit.retire): from J the pursuers (and a surviving
+  // ijaC) follow the vanguard's main body down the depth sap and are removed at the last point. Both points
+  // are dug 2 m and unseen from RJ, the 04 rear route, the ammo sap, the attack branch, SJ/RC and the
+  // collection (FrontTopologyTest). They never go back up the link sap: that is the 04/05 rear of the nest.
+  pursuitFallback:[Point(15.2,-118.5),Point(17.5,-111)],
+  // 03 observation step (K3): a 5 m spur off the support sap, 0.95 m deep at its mouth (vault up from the sap
+  // floor), ramping up to a fire step 0.4 m below the field at its end (terrain step) behind a low sandbag
+  // parapet: standing eye 1.2 m above the field sees the guards lying in the scrape (prone 0.5 m), the gap and
+  // the nest; crouched you are behind the parapet. (09.23 review: at the old 0.95 m bay 6 of 8 prone guards
+  // were hidden by the scrape's lip and the gap sap's spoil.)
+  observation:Point(-23.0,-131.0),
+  observationSpur:[Point(-23.4,-126.5),Point(-23.0,-131.5)],
   fold:Point(-19.2,-133.2),                 // support sap fold: the guards' safe zone is behind it
   safeZone:Point(-21.6,-126.6),            // hidden from the nest, the flank group's last line and every tank waypoint
   gapJunction:Point(-8,-140.6),
@@ -107,7 +116,8 @@ export const FRONT_SPACE=Object.freeze({
   // Road end stops 1.6 m west of EastRoadTimber (62,-129): the timber is the cut-in pair's cover, not a plug.
   roadMouth:Point(46.5,-163.5),             // where the link sap meets the road (01 entry, 05 cut-in seen)
   roadLink:[Point(60.2,-128.4),Point(55,-126.8),Point(48.5,-125.8),Point(44.6,-125.6)],
-  southRoad:[Point(60,-177),Point(62,-162),Point(63,-140),Point(61,-120),Point(58,-100),Point(55,-84)],
+  // Ends 9 m short of z=-95 (road flattening reaches 6 m): nothing south of the collection line changes.
+  southRoad:[Point(60,-177),Point(62,-162),Point(63,-140),Point(61,-120),Point(58.9,-104)],
   yard:Object.freeze({minX:38.8,maxX:54,minZ:-119,maxZ:-100}),
   // Around the berm's east end: the flank group's last line is on the SOUTH side of the end, where the
   // gap shows along the backslope; the two northern craters are its approach.

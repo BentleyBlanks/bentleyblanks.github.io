@@ -8,9 +8,11 @@
 //
 // 视线：两点连线每 0.1 m 采样，地面高于线或落进实心体块即挡。人物/战车自身不遮挡，沙袋按盒子包络。
 import fs from "node:fs";
+import crypto from "node:crypto";
 import { pathToFileURL } from "node:url";
 import { MISSION_LAYOUT as L, MISSION_ROUTES as R, MISSION_PLACEMENT as P } from "./Data_FirstLevelMissionLayout.mjs";
 import { MISSION_ENCOUNTERS as E } from "./Data_FirstLevelMission.mjs";
+import { MISSION_ENCOUNTER_ACTIVATION as ACTIVATION, MISSION_FACT_GATES } from "./Data_FirstLevelMissionGates.mjs";
 import { SampleMissionTerrain as G, SampleMissionNaturalHeight as N } from "./Data_FirstLevelMissionTerrain.mjs";
 import { MISSION_STAGE_ANCHORS as A, MISSION_STAGE_ROUTES as SR, MISSION_BUNKER_TRENCH,
   MISSION_BUNKER_FRONT_SAP } from "./Data_FirstLevelMissionTopology.mjs";
@@ -245,6 +247,9 @@ export function ProbeExposure() {
   const block = W("Block"), escorts = FRONT_TANK_ESCORT_SLOTS.map((s) => Threat(s.id, s, 1.4));
   const tank = [Threat("tankGun@Block", block, TH.gun), Threat("hullMg@Block", block, TH.hullMg), Threat("turretMg@Block", block, TH.turretMg)];
   const pursuers = [Threat("F", SP.bunkerFold, 1.5), Threat("J", SP.bunkerJunction, 1.5), Threat("killSpot", SP.bunkerKilling, 1.5)];
+  // The 02 pursuers retire down the depth sap before 03 (activation retire); their fallback points still count
+  // as threats on the 04/05 routes, so a later move of the fallback that exposes RJ fails here.
+  const fallback = SP.pursuitFallback.map((p, i) => Threat(`pursuitFallback${i}`, p, 1.5));
   const attackLen = RouteLength(S.attackRoute);
   const tail = Samples(S.attackRoute, 0.5).filter((p) => p.d >= attackLen - 4);
   let tailExposed = 0; for (const p of tail) if ([...tank, ...escorts].some((t) => Sight(t.eye, Eye(p, 1.0)) === null)) tailExposed++;
@@ -267,9 +272,13 @@ export function ProbeExposure() {
         ...FRONT_FLANK_GROUP.map((s) => ({ id: s.id + "@last", at: s.lane.at(-1), h: 1.0 }))]
         .filter((t) => Sight(Eye(p, 1.6), Eye(t.at, t.h)) === null).map((t) => t.id),
       crouchedSeen: E.approach.filter((s) => Sight(Eye(s, 1.4), Eye(p, 1.0)) === null).map((s) => s.id) })),
-    rearRoute04: Exposure(S.rearRoute, [Threat("tankGun@Pressure", W("Pressure"), TH.gun), Threat("tankGun@Block", block, TH.gun), ...escorts]),
+    rearRoute04: Exposure(S.rearRoute, [Threat("tankGun@Pressure", W("Pressure"), TH.gun), Threat("tankGun@Block", block, TH.gun), ...escorts, ...fallback]),
     bundle05: Exposure(R.bundle, [...tank, ...escorts, ...fireBase, Threat("cutInMouth", SP.roadLink[0], 1.5)]),
-    attack05: Exposure(S.attackRoute, [...tank, ...escorts, ...fireBase]),
+    attack05: Exposure(S.attackRoute, [...tank, ...escorts, ...fireBase, ...fallback]),
+    fallbackSees: fallback.flatMap((t) => [["RJ", S.rear], ...S.rearRoute.map((p, i) => [`rearRoute${i}`, p]),
+      ...R.bundle.slice(0, 2).map((p, i) => [`bundle${i}`, p]), ...S.attackRoute.slice(0, 3).map((p, i) => [`attack${i}`, p]),
+      ["collection", A.collection], ["SJ", SP.supportJunction], ["RC", SP.rearCorner], ...SP.rcHold.map((p, i) => [`rcHold${i}`, p])]
+      .filter(([, p]) => [1.0, 1.6].some((h) => Sight(t.eye, Eye(p, h), { state: "BunkerCollapsed" }) === null)).map(([k]) => `${t.name}->${k}`)),
     attackTail4m: { exposed: tailExposed, samples: tail.length },
   };
 }
@@ -314,21 +323,42 @@ export function ProbeEnemyCover() {
 function SegDist(p, a, b) { const dx = b.x - a.x, dz = b.z - a.z; const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.z - a.z) * dz) / (dx * dx + dz * dz || 1))); return Math.hypot(p.x - a.x - dx * t, p.z - a.z - dz * t); }
 
 // ---------------------------------------------------------------- 6. counts and budget (contract §6)
+// Alive per public stage (01-05) is derived from the real spawn tables, not from a hand model: each group
+// enters at its MISSION_STEP_SPAWNS step or its activation fact's step (frontReserve per member slotStages)
+// and leaves at its declared retire fact (retire.atRouteEnd: the stage after it spawned) or at the death the
+// flow itself requires. Worst case = nobody else dies: 02 needs ijaA/ijaB (saber) and ijaD (Liu) dead,
+// 03 needs the four nest men dead (capture). The translator (Opening cast) adds one in 01-02.
+const STAGE_OF_STEP = Object.freeze({ Trapped: 1, BunkerRescue: 2, RearTrench: 2, Support: 3, MachineGun: 4, Tank: 5 });
+const REQUIRED_DEATH_STAGE = Object.freeze({ ijaA: 2, ijaB: 2, ijaD: 2, nestGun: 3, nestGuard: 3, linkGuard: 3 });
+const FRONT_GROUPS = ["bunkerAssault", "bunkerBackdrop", "bunkerPursuit", "approach", "front", "frontFlank", "frontOfficer",
+  "machineGun", "tank", "frontReserve", "bundleApproach"];
 export function ProbeCounts() {
-  const n = (k) => (E[k] || []).filter((s) => s.side !== "nra").length;
-  const reserveBy = (stage) => FRONT_RESERVE_ENTRIES.reduce((a, e) => a + (e.stages[stage] || 0), 0);
-  const stage = {
-    "01": n("bunkerAssault") + n("bunkerBackdrop") + 1, // + the translator (Opening cast)
-    "02": n("bunkerPursuit"),
-    "03": n("approach") + n("front") + n("frontFlank") + n("frontOfficer"),
-    "04": n("tank") + n("machineGun") + reserveBy("MachineGun"),
-    "05": n("bundleApproach") + reserveBy("Tank"),
-  };
-  const cumulative = Object.values(stage).reduce((a, b) => a + b, 0);
-  // Worst case alive in 04/05: nobody but the nest team died in 03.
-  const alive04 = stage["03"] - n("approach") + stage["04"];
-  const alive05 = alive04 + stage["05"];
-  return { stage, cumulative, alive04, alive05, nraBackdrop: E.bunkerBackdrop.filter((s) => s.side === "nra").length };
+  const factStage = (f) => STAGE_OF_STEP[MISSION_FACT_GATES[f]?.step] ?? null;
+  const members = [];
+  for (const g of FRONT_GROUPS) {
+    const a = ACTIVATION[g];
+    const from0 = a.spawn.kind === "step" ? STAGE_OF_STEP[a.spawn.step] : factStage(a.spawn.fact);
+    for (const s of E[g]) {
+      if (s.side === "nra") continue;
+      const from = g === "frontReserve" ? STAGE_OF_STEP[s.stage] : from0;
+      let to = 5;
+      if (a.retire?.fact) to = Math.min(to, factStage(a.retire.fact));
+      if (a.retire?.atRouteEnd && s.route) to = Math.min(to, from + 1);
+      if (REQUIRED_DEATH_STAGE[s.role]) to = Math.min(to, REQUIRED_DEATH_STAGE[s.role]);
+      members.push({ g, id: s.id, from, to });
+    }
+  }
+  const unresolved = members.filter((m) => !(m.from >= 1 && m.from <= 5 && m.to >= m.from)).map((m) => m.id);
+  const alive = {}, entering = {};
+  for (let st = 1; st <= 5; st++) {
+    const k = "0" + st;
+    alive[k] = members.filter((m) => m.from <= st && st <= m.to).length + (st <= 2 ? 1 : 0);
+    entering[k] = members.filter((m) => m.from === st).length + (st === 1 ? 1 : 0);
+  }
+  const byGroup = (st) => Object.fromEntries(FRONT_GROUPS.map((g) => [g, members.filter((m) => m.g === g && m.from <= st && st <= m.to).length]).filter(([, v]) => v));
+  return { stage: entering, alive, cumulative: members.length + 1, alive03: alive["03"], alive04: alive["04"], alive05: alive["05"],
+    alive03ByGroup: byGroup(3), alive05ByGroup: byGroup(5), unresolved,
+    nraBackdrop: E.bunkerBackdrop.filter((s) => s.side === "nra").length };
 }
 
 // ---------------------------------------------------------------- 7. hidden entries
@@ -429,6 +459,24 @@ export function ProbeWireLanes() {
     ["05 tank muzzle at Squeeze -> gap 1.2", Eye(TP[FrontTankIndex("Squeeze")], TH.gun), Eye(S.gap, 1.2)],
   ];
   return lanes.map(([name, a, b]) => ({ name, blocker: Sight(a, b, { wire: true }) }));
+}
+
+// ---------------------------------------------------------------- 11. south of the collection must not move
+/** Fingerprint of everything the 01-06 rebuild promised not to touch (07 onward, z > zMin): layout blocks,
+ *  trench props, battlefield dead (MISSION_AFTERMATH) and the shared ground on a 2 m grid, rounded to 0.1 mm. `layout`/`sample` are passed in so the
+ *  baseline (f581ac7dd) can be fingerprinted from an exported copy of its modules. */
+export function SouthFingerprint({ blocks, placements, bodies = [], sample, zMin = -95 }) {
+  const R = (v) => Math.round((v || 0) * 1e4) / 1e4;
+  const Sha = (rows) => crypto.createHash("sha256").update(JSON.stringify(rows)).digest("hex").slice(0, 16);
+  const b = blocks.filter((q) => q.z > zMin).map((q) => [q.id, R(q.x), R(q.y), R(q.z), R(q.w), R(q.h), R(q.d), R(q.ry), q.semantic || null, q.solid !== false])
+    .sort((a, c) => (a[0] < c[0] ? -1 : a[0] > c[0] ? 1 : 0));
+  const p = placements.filter((q) => q.z > zMin).map((q) => [q.id, q.asset, R(q.x), R(q.z), R(q.ry)])
+    .sort((a, c) => (a[0] < c[0] ? -1 : a[0] > c[0] ? 1 : 0));
+  const c = bodies.filter((q) => q.z > zMin).map((q) => [q.id, R(q.x), R(q.z), R(q.yaw), q.side, q.pose, R(q.scale)])
+    .sort((a, e) => (a[0] < e[0] ? -1 : a[0] > e[0] ? 1 : 0));
+  const grid = { minX: -200, maxX: 250, minZ: zMin, maxZ: 400, stepM: 2 }, g = [];
+  for (let x = grid.minX; x <= grid.maxX; x += grid.stepM) for (let z = grid.minZ; z <= grid.maxZ; z += grid.stepM) g.push(R(sample(x, z)));
+  return { zMin, blocks: { count: b.length, sha: Sha(b) }, placements: { count: p.length, sha: Sha(p) }, bodies: { count: c.length, sha: Sha(c) }, ground: { ...grid, count: g.length, sha: Sha(g) } };
 }
 
 // ---------------------------------------------------------------- all

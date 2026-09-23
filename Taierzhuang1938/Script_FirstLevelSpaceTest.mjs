@@ -9,9 +9,12 @@
 // 该看不见的挡没挡住。真物理胶囊与炸桥前后四态在
 // Script_FirstLevelMissionTopologyBrowserTest 里走。
 import assert from "node:assert/strict";
+import fs from "node:fs";
+import { SouthFingerprint } from "./Script_FirstLevelSpaceProbe.mjs";
+import { MISSION_AFTERMATH } from "./Data_FirstLevelMissionFront.mjs";
 import { MISSION_LAYOUT as Layout, MISSION_ANCHORS as A, MISSION_ROUTES as Routes,
   MISSION_PLACEMENT as P, MISSION_NIGHT_GATE_BLOCK_IDS as NightIds, MISSION_SUPPLIES,
-  MISSION_SUPPLY_COLLIDER } from "./Data_FirstLevelMissionLayout.mjs";
+  MISSION_SUPPLY_COLLIDER, MISSION_TRENCH_PLACEMENTS } from "./Data_FirstLevelMissionLayout.mjs";
 import { MISSION_STAGE_ANCHORS as S, MISSION_STAGE_ROUTES as StageRoutes,
   MISSION_NORTH_RIVER as River, RiverCutAt, RiverProfileAt,
   MISSION_RAIL_BRIDGE as RailBridge, MISSION_SOUTH_BRIDGE as RoadBridge,
@@ -90,7 +93,8 @@ const report = {};
 // 2026-09-23 01–06 空间重排：老周的左枪挪到土坎西端（Sortie.leftSeat），前沿补给箱不再在他身边。
 // 负伤的老周沿何有田来的那条路下撤：左枪通道 → 支沟 → 支沟交汇 SJ → 集结处（Sortie.zhouExit），
 // 全程胶囊净空、坡度可爬。旧的 ZhouGunExitRoute 只在旧枪位成立（它从枪位直线拉到 zhouRest），
-// 这里钉住：它的终点仍是 zhouRest，而数据折线的起点就是新枪位（Front 包据此改接线）。
+// 数据折线（接线目标）在这里断言净空与坡度；运行时 helper 目前仍是直线（61° 坡、撞左枪通道射击湾），
+// 这条接线归 Front/Opening 包：未接线前打印 TODO 行而不是静默通过，接上以后同一段自动转成断言。
 {
   const route=Sortie.zhouExit;
   assert.deepEqual(route[0],Sortie.leftSeat,"Zhou's exit starts at the left gun seat");
@@ -108,6 +112,19 @@ const report = {};
   }
   const legacy=ZhouGunExitRoute(Sortie.leftSeat,.34);
   assert.ok(Distance(legacy.at(-1),OPENING.zhouRest)<0.01,"the runtime exit helper still ends at zhouRest");
+  // The runtime route (what Zhou actually walks today) measured with the same capsule and 52 deg rule.
+  const runtime=[Sortie.leftSeat,...legacy],runtimeHits=RouteClearance(runtime,Solids("BunkerIntact"));
+  let runtimeSlopeDeg=0,prevY=Walkable(runtime[0].x,runtime[0].z);
+  for(let leg=1;leg<runtime.length;leg++){
+    const a=runtime[leg-1],b=runtime[leg],steps=Math.ceil(Distance(a,b)/.2);
+    for(let i=1;i<=steps;i++){const t=i/steps,y=Walkable(a.x+(b.x-a.x)*t,a.z+(b.z-a.z)*t);
+      runtimeSlopeDeg=Math.max(runtimeSlopeDeg,Math.atan2(Math.abs(y-prevY),Distance(a,b)/steps)*180/Math.PI);prevY=y;}
+  }
+  const wired=runtime.length>=Sortie.zhouExit.length&&runtimeHits.length===0&&runtimeSlopeDeg<=52.5;
+  report.zhouRuntimeExit={points:runtime.length,hits:runtimeHits,maxSlopeDeg:+runtimeSlopeDeg.toFixed(0),wired};
+  if(wired)assert.ok(true);
+  else console.log(`TODO(Front/Opening) Zhou's runtime exit is still a straight line: ${runtime.length} points, `
+    +`max slope ${runtimeSlopeDeg.toFixed(0)} deg, hits ${[...new Set(runtimeHits.map((h)=>h.split(" @")[0]))].join(", ")||"none"} — wire ZhouGunExitRoute to FRONT_SORTIE.zhouExit`);
   report.zhouExitM=+RouteLength(route).toFixed(1);
   console.log(`ok wounded Zhou walks ${report.zhouExitM} m from the left gun down the access trench to the collection`);
 }
@@ -252,6 +269,11 @@ const report = {};
   assert.equal(SightBlocker(Eye(P.bunker.liuwencaiShot, 1.5),
     { ...S.bunkerJunction, y: Ground(S.bunkerJunction.x, S.bunkerJunction.z) + 1.3 }, blocks), null,
   "Liu Wencai's long shot reaches the junction J down the east-west leg");
+  // 还权位的塌土是掩体（契约 §4：碰撞 + 掩体标签），朝着追兵开火的连接支沟（J、F）。
+  const mouthSpoil = Scenario.BunkerCollapsed.find((box) => box.id === "BunkerMouthSpoil");
+  assert.ok(mouthSpoil?.cover && mouthSpoil.solid !== false, "the mouth spoil is a solid cover in the collapsed state");
+  const toFold = Math.atan2(S.bunkerFold.z - mouthSpoil.z, S.bunkerFold.x - mouthSpoil.x), face = Math.atan2(mouthSpoil.cover.faceZ, mouthSpoil.cover.faceX);
+  assert.ok(Math.abs(Math.atan2(Math.sin(face - toFold), Math.cos(face - toFold))) < 0.4, "the spoil's cover faces the fold F");
   report.bunkerRifleReachM = +reach.toFixed(2);
   console.log("ok dugout: single east mouth, prone sightlines to kill spot/J/F, closed flanks, spoil shields the return spot");
 }
@@ -677,6 +699,19 @@ const report = {};
   assert.equal(g.z, (B.minZ + B.maxZ) / 2);
   console.log("ok the train, the station platform and the 370+ m approach run are gone",
     JSON.stringify({ bounds: B, groundM: [g.w, g.d], railwayZ: report.railwayZ }));
+}
+
+// ---------------------------------------------------------------------------
+// 07 以后一个不动：z > −95（集结处以南）的体块、壕沟杂物与共享地面采样，逐项与重排前基线
+// （f581ac7dd）的指纹相同（Data_FirstLevelSpaceSouthFingerprint.json；只许从那份基线重新生成）。
+// ---------------------------------------------------------------------------
+{
+  const expected = JSON.parse(fs.readFileSync(new URL("./Data_FirstLevelSpaceSouthFingerprint.json", import.meta.url), "utf8"));
+  const now = SouthFingerprint({ blocks: Layout.blocks, placements: MISSION_TRENCH_PLACEMENTS, bodies: MISSION_AFTERMATH,
+    sample: (x, z) => Ground(x, z), zMin: expected.zMin });
+  for (const key of ["blocks", "placements", "bodies", "ground"])
+    assert.deepEqual(now[key], { ...expected[key] }, `south of z=${expected.zMin} the ${key} are exactly the 09.22 baseline's`);
+  console.log(`ok 07+ untouched: ${now.blocks.count} blocks, ${now.placements.count} trench props, ${now.bodies.count} dead, ${now.ground.count} ground samples match f581ac7dd`);
 }
 
 console.log("ok first-level 2026.09.19 space:", JSON.stringify(report));

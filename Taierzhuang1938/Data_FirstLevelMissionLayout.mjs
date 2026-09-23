@@ -226,6 +226,9 @@ TopBlock("AttackRuinA",39.9,-156.6,3.6,1.5,.7,"cover",{cover:Face(0,-1)});
 // of the lastCover line (z -155.2): FrontBattle gathers the second guard batch along that line eastward from
 // lastCover at 1.35 m spacing, and a stub across it pinned the second man (remainingGuardsGathered never fired).
 TopBlock("GapLastCover",-6.2,-153.4,.8,1.35,2.4,"cover",{cover:Face(1,0)});
+// 03 observation step parapet: sandbags on the step's front lip, top 0.55 m above the field (0.95 above the step):
+// standing you look over it at the guards, the gap and the nest; crouched you are behind it.
+TopBlock("ObservationParapet",-22.5,-132.3,2.4,.55,.7,"cover",{ry:-.52,cover:Face(.5,-.87)},{x:-22.5,z:-132.3});
 // Zhou's left gun at the berm's west end, parapet facing north-east along the berm's north face.
 TopBlock("LeftGunParapet",-32.4,-158.4,3.6,.95,.8,"cover",{ry:-.6,cover:Face(.6,-.8)});
 TopBlock("LeftGunSide",-35.4,-155.8,.7,1.9,4,"cover",{cover:Face(-1,0)});
@@ -1112,8 +1115,8 @@ function ScenarioBlock(id, x, z, w, h, d, semantic, y, extra = {}) {
 }
 const MISSION_SCENARIO = (() => {
   const g = BUNKER_GROUND, n = NIGHT_GROUND;
-  const B = (id, x, z, w, h, d, semantic, top) =>
-    ScenarioBlock(id, x, z, w, h, d, semantic, g + top - h / 2);
+  const B = (id, x, z, w, h, d, semantic, top, extra) =>
+    ScenarioBlock(id, x, z, w, h, d, semantic, g + top - h / 2, extra);
   // 2026-09-20 演出打磨：Notion 写的是「前沿交通壕旁的**小型**掩蔽部」，而原来这间
   // 8.5 × 12 m 的屋子把行刑处顶到 13.5 m 外 —— 720p 下门外的人只有约 70 像素高，
   // 「必须让玩家清楚看懂」读不出来。现在整间收成 7 × 7 m（外廓 x −43.5…−36.5、
@@ -1138,7 +1141,9 @@ const MISSION_SCENARIO = (() => {
   // (the 02 return-of-control cover), a roof beam sagged over Shunzi. From the lying eye
   // (-2.0,-126.3, floor+0.42) the kill spot, the junction J and the fold F stay in view (K1).
   const collapsed = [...shell,
-    B("BunkerMouthSpoil", 1.5, -122.6, 1.4, 1.4, 1.4, "earthDark", floor + 1.4),
+    // The 02 return-of-control cover (contract §4: collider + cover tag): it faces the link sap (J/F), where the
+    // pursuers shoot from. SetScenarioState must register scenario covers for the AI (see the Space doc §10).
+    B("BunkerMouthSpoil", 1.5, -122.6, 1.4, 1.4, 1.4, "earthDark", floor + 1.4, { cover: { faceX: 0.984, faceZ: -0.177 } }),
     B("BunkerMouthRubbleS", 1.3, -124.2, 0.9, 0.7, 0.8, "earthDark", floor + 0.7),
     // The sag hangs over Shunzi's legs (west), the pins sit either side of him: once they are lifted a
     // standing capsule at the pinned spot is clear (SpaceTest anchor check).

@@ -195,6 +195,12 @@ for (const [id, activation] of Object.entries(MISSION_ENCOUNTER_ACTIVATION)) {
   if (activation.spawn.kind === "threat") assert.ok(threatIds.has(activation.spawn.threat), `${id} 的威胁不在 MISSION_TRANSFER_THREATS`);
   if (activation.spawn.kind === "fact") assert.ok(MISSION_FACT_GATES[activation.spawn.fact], `${id} 的生成事实没有门`);
   if (activation.standbyUntil) assert.ok(MISSION_FACT_GATES[activation.standbyUntil], `${id} 的 standbyUntil 事实没有门`);
+  // retire：活下来的人怎么退场（01–02 组，2026-09-23 空间重排）。要么按事实退，要么走完 route 就收。
+  if (activation.retire) {
+    assert.ok(activation.retire.fact ? MISSION_FACT_GATES[activation.retire.fact] : activation.retire.atRouteEnd === true,
+      `${id} 的 retire 要么给有门的事实，要么 atRouteEnd`);
+    assert.equal(activation.retire.then, "despawn", `${id} 的 retire 只支持退场收走`);
+  }
   if (activation.dormant) {
     assert.ok(activation.wake, `${id} 装睡却没写怎么醒`);
     if (activation.wake.fact) assert.ok(MISSION_FACT_GATES[activation.wake.fact], `${id} 的苏醒事实没有门`);

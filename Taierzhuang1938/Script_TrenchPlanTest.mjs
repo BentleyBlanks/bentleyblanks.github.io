@@ -20,6 +20,8 @@ import {
   SetTrenchSegmentOverride, ClearTrenchSegmentOverrides,
 } from "./Script_TrenchPlan.mjs";
 import { MISSION_TRENCH_NETWORK } from "./Data_FirstLevelMissionTrenches.mjs";
+import { MISSION_TERRAIN, TrenchPlanFor, SampleMissionTerrain } from "./Data_FirstLevelMissionTerrain.mjs";
+import { TRAVERSAL } from "./Data_Traversal.mjs";
 
 // Sections 1-8 test the PLANNER (legacy equivalence, junction detection, berm sides, jitter bands,
 // dressing, corners, overrides) on a frozen fixture: the seven-segment network the contract was written
@@ -545,7 +547,7 @@ const GroundAt = (x, z) => NaturalAt(x, z) - plan.Depth(x, z);
   const bound = MISSION_TRENCH_NETWORK.segments.filter((s) => s.routeBound).map((s) => s.id);
   // 2026-09-23 01–06 空间重排：01 前沿交通壕、连接支沟、03 支沟与右侧低沟、左枪通道、缺口支沟、
   // 取弹沟、攻击支路的点都直接取自任务/AI 路线表（改点先改路线表）。
-  assert.deepEqual(bound, ["FrontCommunication", "BunkerTrench", "BunkerFrontSap", "SupportSap", "RightApproach",
+  assert.deepEqual(bound, ["FrontCommunication", "CollectionLink", "BunkerTrench", "BunkerFrontSap", "SupportSap", "RightApproach",
     "LeftGunAccess", "GuardWithdrawal", "BundleApproach", "RoadAttack", "WestEvacuation"],
     "routeBound 只属于点来自任务/AI 路线的那几条");
   for (const seg of MISSION_TRENCH_NETWORK.segments) {
@@ -576,6 +578,97 @@ const GroundAt = (x, z) => NaturalAt(x, z) - plan.Depth(x, z);
   assert.ok(!Touches("BundleApproach", "GuardBackslope") && !Touches("BundleApproach", "GuardWithdrawal"),
     "取弹沟不接背坡与缺口支沟");
   console.log(`ok 现行网络 ${live.segments.length} 段：人走的沟宽 ≥3.4，SJ/GJ/RJ/J 四个接口认得出，取弹沟不接背坡`);
+}
+
+// --- 11. 现行网络：宽/深/坡有界、圆角、沟底台阶只许出现在声明过的深浅相接处 --------
+// 第 1–8 节在冻结夹具上验规划层；这里把同样的几何规矩跑在现行网络上（2026-09-23 评审：
+// 夹具化之后现行网络的沟底台阶、宽深上下界、圆角都没人查了）。
+{
+  const flat = CompileTrenchNetwork(MISSION_TRENCH_NETWORK, { natural: () => 0 });
+  const nominalDepth = new Map(flat.segments.map((s) => [s.id, s.nominal.depth]));
+  // 深浅不同的段相接：并集取 min，浅段走进深段那一下是台阶——只在这些接口 4.5 m 内豁免，
+  // 而且真实地面（MISSION_TERRAIN.steps 做了过渡）上必须爬得上去（下面 11b）。
+  const depthJunctions = flat.junctions.filter((j) => {
+    const ds = j.members.map((m) => nominalDepth.get(m.id));
+    return Math.max(...ds) - Math.min(...ds) > 0.1;
+  });
+  const EXEMPT_M = 4.5, exempt = [];
+  let corners = 0;
+  for (const seg of flat.segments) {
+    const p = seg.params;
+    const loHalf = (seg.nominal.floorW / 2) * (1 - p.floorJitter) - (p.edgeJitterM ?? 0);
+    const hiHalf = (seg.nominal.floorW / 2) * (1 + p.floorJitter) + (p.edgeJitterM ?? 0);
+    const loBank = seg.nominal.bankW * (1 - p.bankJitter), hiBank = seg.nominal.bankW * (1 + p.bankJitter);
+    const loDepth = seg.nominal.depth * (1 - p.depthJitter) - p.floorRutM - 1e-9, hiDepth = seg.nominal.depth * (1 + p.depthJitter) + p.floorRutM + 1e-9;
+    let prev = null, worst = 0, worstAt = null;
+    for (let s = 0; s <= seg.path.length; s += 0.5) {
+      const at = seg.path.At(Math.min(s, seg.path.length));
+      const half = seg.HalfFloorAt(at.x, at.z), bank = seg.BankAt(at.x, at.z), depth = seg.DepthAt(at.x, at.z);
+      assert.ok(half >= loHalf - 1e-9 && half <= hiHalf + 1e-9, `${seg.id} 半沟底宽越界 ${half.toFixed(3)}`);
+      assert.ok(bank >= loBank - 1e-9 && bank <= hiBank + 1e-9, `${seg.id} 坡宽越界 ${bank.toFixed(3)}`);
+      assert.ok(depth >= loDepth && depth <= hiDepth, `${seg.id} 深度越界 ${depth.toFixed(3)} ∉ 标称 ${seg.nominal.depth}×(1±${p.depthJitter})±车辙 ${p.floorRutM}`);
+      const y = flat.Apply(at.x, at.z, 0, 0);
+      const near = depthJunctions.find((j) => Math.hypot(j.x - at.x, j.z - at.z) < EXEMPT_M);
+      if (prev !== null && !near && !prev.near) { const d = Math.abs(y - prev.y); if (d > worst) { worst = d; worstAt = [at.x.toFixed(1), at.z.toFixed(1)]; } }
+      if (near && !exempt.includes(near)) exempt.push(near);
+      prev = { y, near };
+    }
+    assert.ok(worst <= 0.08, `${seg.id} 沟底沿弧长出台阶 ${worst.toFixed(3)} m @ ${worstAt}（只有声明的深浅接口可以）`);
+    for (const corner of seg.corners) {
+      corners += 1;
+      const k = seg.control.findIndex((q) => Math.abs(q.x - corner.x) < 1e-9 && Math.abs(q.z - corner.z) < 1e-9);
+      assert.ok(k > 0 && k < seg.control.length - 1, `${seg.id} 圆角只出现在内角上`);
+      const a = seg.control[k - 1], b = seg.control[k], c = seg.control[k + 1];
+      assert.ok(corner.r <= 0.5 * Math.min(Math.hypot(b.x - a.x, b.z - a.z), Math.hypot(c.x - b.x, c.z - b.z)) + 1e-9, `${seg.id} 圆角半径夹持`);
+      assert.ok(Math.abs(corner.deviation - corner.r * (1 / Math.cos(corner.theta / 2) - 1)) < 1e-9, `${seg.id} 圆角偏离公式`);
+    }
+  }
+  assert.ok(corners >= 30, `现行网络要有足够多的角被圆掉（${corners}）`);
+  // 11b. 豁免的接口在真实地面上（含 MISSION_TERRAIN.steps 的过渡）必须爬得上去：沿每条相接段、
+  // 接口 ±EXEMPT_M 内每 0.2 m 的高差 ≤ tan52°×0.2 + 0.035（Rapier 爬坡上限 + 与路线净空同一余量）。
+  // 唯一例外是声明过的射台：从深沟翻上去（一次 ≤ TRAVERSAL.vaultMax 的翻越），不是走上去。
+  const FIRE_STEP_SEGMENTS = { ObservationSpur: "03 observation step: vault up from the support sap floor" };
+  const liveTerrain = TrenchPlanFor(MISSION_TERRAIN);
+  const TAN52 = Math.tan(52 * Math.PI / 180), bad = [];
+  for (const j of exempt) for (const m of j.members) {
+    const seg = liveTerrain.segments.find((s) => s.id === m.id);
+    const s0 = seg.path.ClosestS(j.x, j.z);
+    let prev = null, run = 0;
+    for (let s = Math.max(0, s0 - EXEMPT_M); s <= Math.min(seg.path.length, s0 + EXEMPT_M); s += 0.2) {
+      const at = seg.path.At(s), y = SampleMissionTerrain(at.x, at.z);
+      const steep = prev !== null && Math.abs(y - prev) > TAN52 * 0.2 + 0.035;
+      run = steep ? run + Math.abs(y - prev) : 0;
+      if (steep && (!FIRE_STEP_SEGMENTS[m.id] || run > TRAVERSAL.vaultMax))
+        bad.push(`${m.id}@${at.x.toFixed(1)},${at.z.toFixed(1)} Δ${(y - prev).toFixed(2)} run ${run.toFixed(2)}`);
+      prev = y;
+    }
+  }
+  assert.deepEqual(bad, [], "深浅相接处在真实地面上可攀爬");
+  console.log(`ok 现行网络 ${flat.segments.length} 段：宽/深/坡有界、${corners} 个圆角、沟底无台阶（豁免 ${exempt.length} 个深浅接口，真实地面均可攀爬）`);
+}
+
+// --- 12. frameLengthM：改尾巴不许把前面的布设重新洗牌 ---------------------------
+// 2026-09-23 01–06 重排把 FrontCommunication 的北端改短了；段写 frameLengthM=原弧长后，
+// 尾巴之前的每一站、每一块护壁/踏板/射击位/杂物都与原来逐位相同。
+{
+  const fc = PLANNER_FIXTURE.segments[0];
+  const full = CompileTrenchNetwork(PLANNER_FIXTURE, { natural: NaturalAt });
+  const L0 = full.segments[0].path.length;
+  const trimmedSpec = { ...PLANNER_FIXTURE, segments: [{ ...fc, points: fc.points.slice(0, -2), frameLengthM: L0 }, ...PLANNER_FIXTURE.segments.slice(1)] };
+  const trimmed = CompileTrenchNetwork(trimmedSpec, { natural: NaturalAt });
+  const cut = trimmed.segments[0].path.length - 8;   // 离新尾巴 8 m 以外（圆角与段端净空之外）
+  const a = full.segments[0].stations.filter((s) => s.s < cut), b = trimmed.segments[0].stations.filter((s) => s.s < cut);
+  // 逐位 = 到 1e-6 m（尾巴不同，折线累计弧长的最后一位浮点会差 1e-15）。
+  const Q = (v) => typeof v === "number" ? +v.toFixed(6) : v;
+  assert.deepEqual(b.map((s) => [s.s, s.x, s.z].map(Q)), a.map((s) => [s.s, s.x, s.z].map(Q)), "尾巴之前的站点逐位相同");
+  const Ground = (x, z) => NaturalAt(x, z);
+  const Before = (plan) => PlanTrenchDressing(plan, { groundAt: Ground }).blocks
+    .filter((q) => q.id.startsWith("FrontCommunication") && plan.segments[0].path.ClosestS(q.x, q.z) < cut)
+    .map((q) => JSON.stringify(Object.fromEntries(Object.entries(q).map(([k, v]) => [k, Q(v)]))));
+  assert.deepEqual(Before(trimmed), Before(full), "尾巴之前的护壁、踏板、射击位逐位相同");
+  const noFrame = CompileTrenchNetwork({ ...trimmedSpec, segments: [{ ...trimmedSpec.segments[0], frameLengthM: undefined }, ...trimmedSpec.segments.slice(1)] }, { natural: NaturalAt });
+  assert.notDeepEqual(Before(noFrame), Before(full), "不写 frameLengthM 时改尾巴确实会洗牌（这条断言保证上面那条不是空转）");
+  console.log(`ok frameLengthM：改尾巴后前 ${cut.toFixed(0)} m 的站点与布设逐位不变`);
 }
 
 console.log("TrenchPlanTest: 全部通过");

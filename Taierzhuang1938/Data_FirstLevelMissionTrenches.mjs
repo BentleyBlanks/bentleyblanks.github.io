@@ -28,7 +28,11 @@
 
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
 import { FRONT_SORTIE as Sortie, FRONT_SPACE as Space } from "./Data_FirstLevelFrontRoute.mjs";
-import { MISSION_REAR_ROUTES, MISSION_BUNKER_TRENCH, MISSION_BUNKER_FRONT_SAP, MISSION_BUNKER_DEPTH_SAP } from "./Data_FirstLevelMissionTopology.mjs";
+import { MISSION_REAR_ROUTES, MISSION_BUNKER_TRENCH, MISSION_BUNKER_FRONT_SAP, MISSION_BUNKER_DEPTH_SAP,
+  MISSION_FRONT_COLLECTION_ROUTE } from "./Data_FirstLevelMissionTopology.mjs";
+// OPENING.supportRoute ends with MISSION_FRONT_COLLECTION_ROUTE; FrontCommunication stops at its first point
+// (the collection) and the rest is its own segment, CollectionLink.
+const SUPPORT_TO_COLLECTION = OPENING.supportRoute.slice(1, OPENING.supportRoute.length - (MISSION_FRONT_COLLECTION_ROUTE.length - 1));
 
 export const MISSION_TRENCH_NETWORK = Object.freeze({
   version: 1,
@@ -36,10 +40,18 @@ export const MISSION_TRENCH_NETWORK = Object.freeze({
   segments: Object.freeze([
     {
       id: "FrontCommunication", preset: "communication", role: null,
-      points: [...OPENING.approachRoute.slice(1), ...OPENING.supportRoute.slice(1)],
-      source: "Data_FirstLevelOpening.OPENING.approachRoute.slice(1)+supportRoute.slice(1)（AI/任务路线共用，改点先改那边）",
+      points: [...OPENING.approachRoute.slice(1), ...SUPPORT_TO_COLLECTION],
+      // 2026-09-23 01-06 rebuild: the segment now ends at the collection (the old tail ran on to (6,-124)
+      // through the new 01-02 ground). frameLengthM pins the dressing layout to the 09.22 arc length
+      // (baseline f581ac7dd: 259.0877517 m), so every revetment, duckboard, bay and prop south of the
+      // collection stays exactly where it was (Script_FirstLevelSpaceTest: south fingerprint).
+      frameLengthM: 259.08775170336247,
+      source: "Data_FirstLevelOpening.OPENING.approachRoute.slice(1)+supportRoute 到集结处为止（AI/任务路线共用，改点先改那边）",
       routeBound: true,
     },
+    // 02 end / 03 start / 06: collection -> support junction SJ (MISSION_FRONT_COLLECTION_ROUTE).
+    {id:"CollectionLink",preset:"communication",role:null,points:MISSION_FRONT_COLLECTION_ROUTE,
+      source:"Data_FirstLevelMissionTopology.MISSION_FRONT_COLLECTION_ROUTE",routeBound:true},
     // ---- 2026-09-23 01-06 space rebuild (docs/Data_FirstLevelSpace0106_20260923.md) ----
     // 01-02 forward communication trench: SJ -> rear corner -> SSW leg -> bend M (dugout) -> J.
     {id:"BunkerTrench",preset:"communication",role:null,points:MISSION_BUNKER_TRENCH,
@@ -71,10 +83,13 @@ export const MISSION_TRENCH_NETWORK = Object.freeze({
       source:"Data_FirstLevelFrontRoute.FRONT_SORTIE.leftRoute from 2",routeBound:true},
     // Backslope scrapes at the foot of the berm's south slope: visible from our side, hidden from the north.
     {id:"GuardBackslope",preset:"communication",role:null,points:[{x:-27.2,z:-156.4},{x:4.5,z:-156.2}],
-      depth:.55,floorW:2.6,bankW:.8,bermH:.12,bermSide:"plus",
+      // Spoil thrown NORTH (minus = the berm side): the south lip stays at field level so the guards read from
+      // our side (K3); the berm slope already hides them from the north.
+      depth:.55,floorW:2.6,bankW:.8,bermH:.12,bermSide:"minus",
       source:"Data_FirstLevelMissionTrenches (own points, FRONT_GUARD_POSTS kneel in this shallow scrape)",routeBound:false},
     // The gap sap: last cover -> the one gap (shallowed by FRONT_BREACHES) -> gap junction.
-    {id:"GuardWithdrawal",preset:"communication",role:null,points:Sortie.guardRoute.slice(0,4),depth:1.1,
+    // No spoil ridges: the gap sap's berms stood between the observation step and the prone guards (K3).
+    {id:"GuardWithdrawal",preset:"communication",role:null,points:Sortie.guardRoute.slice(0,4),depth:1.1,bermH:0,
       source:"Data_FirstLevelFrontRoute.FRONT_SORTIE.guardRoute 0-3",routeBound:true},
     // 05 ammo sap: rear junction -> damaged lip -> yard gate (the last leg to the back door is inside the walled yard).
     {id:"BundleApproach",preset:"communication",role:null,points:Sortie.route.slice(0,5),
