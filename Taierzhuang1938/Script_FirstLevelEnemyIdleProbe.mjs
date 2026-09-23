@@ -15,7 +15,9 @@
 //
 // 按阶段 / 压力相位报：
 //   zero30    30 s 窗口里一发没打（含环境射击）的人占比           目标 < 20%
-//   idle4     连续 4 s 位移 < 0.3 m 且没开枪的人·帧占比            目标 ≤ 25%
+//   idle4     连续 4 s 位移 < 0.3 m、没开枪、也没在换弹 / 投弹 / 白刃的人·帧占比   目标 ≤ 25%
+//             （换弹是看得见、听得见的动作 —— 压桥夹、喊「換弾！」—— 不是「端枪不打」；
+//              旧口径「只看位移和开枪」照旧算出来，报成 idle4Strict）
 //   mgShots   轻/重机枪手打出的发数                               目标 > 0
 //   groupMove 相位切换后 15 s 内位移 ≥ 2 m 的组员占比（按组）
 //   nestCover 03 阵位步枪守卫在掩体里或在移动的帧占比
@@ -47,6 +49,8 @@ const G = Object.freeze({
 
 /** 每人每帧的数（采样器 rows 的步长）与环境射击闸码的名字。 */
 const ROW = 9;
+/** 看得见的动作：这些状态里站着不动不算「端枪不打」。白刃另由采样旗 4096 判。 */
+const BUSY_STATES = Object.freeze(["reload", "grenade"]);
 const GATE_NAMES = Object.freeze(["-", "noPoints", "legalTarget", "noPick", "notOwn", "ammo", "timer", "hidePhase", "turnAimLof"]);
 
 const Kit = await Load("Script_FirstLevelCampaignKit.mjs");
@@ -220,7 +224,7 @@ function AnalyzeEnemyIdle({ meta, states, ticks }) {
   const segs = new Map();
   const Seg = (key) => {
     if (!segs.has(key)) segs.set(key, { key, step: key.split("/")[0], phase: key.split("/")[1], ticks: 0, seconds: 0,
-      personTicks: 0, idle4: 0, still4: 0, zeroWin: 0, win: 0, shots: 0, ambient: 0, mgShots: 0,
+      personTicks: 0, idle4: 0, idle4Strict: 0, still4: 0, zeroWin: 0, win: 0, shots: 0, ambient: 0, mgShots: 0,
       hunterTicks: 0, hunterIds: new Set(), guardsMin: Infinity, soldiers: new Set(), idleWhy: new Map(),
       nestTicks: 0, nestBusy: 0 });
     return segs.get(key);
@@ -236,17 +240,21 @@ function AnalyzeEnemyIdle({ meta, states, ticks }) {
   for (const [i, ser] of series) {
     const m = meta[i];
     const idle = new Array(ser.length).fill(false), still = new Array(ser.length).fill(false);
+    const strict = new Array(ser.length).fill(false);
     for (let k = 0; k + W4 <= ser.length; k += 1) {
       const a = ser[k], b = ser[k + W4 - 1];
       if (!a || !b) continue;
-      let maxMove = 0, gap = false;
-      for (let j = k + 1; j < k + W4; j += 1) {
+      let maxMove = 0, gap = false, busy = false;
+      for (let j = k; j < k + W4; j += 1) {
         if (!ser[j]) { gap = true; break; }
-        maxMove = Math.max(maxMove, Math.hypot(ser[j].x - a.x, ser[j].z - a.z));
+        if (j > k) maxMove = Math.max(maxMove, Math.hypot(ser[j].x - a.x, ser[j].z - a.z));
+        if (BUSY_STATES.includes(ser[j].st) || (ser[j].f & 4096)) busy = true;
       }
       if (gap || maxMove >= G.idleMoveM) continue;
       for (let j = k; j < k + W4; j += 1) still[j] = true;
-      if (b.fs === a.fs) for (let j = k; j < k + W4; j += 1) idle[j] = true;
+      if (b.fs !== a.fs) continue;
+      for (let j = k; j < k + W4; j += 1) strict[j] = true;
+      if (!busy) for (let j = k; j < k + W4; j += 1) idle[j] = true;
     }
     let n = 0, idleN = 0, shots = 0, amb = 0, gatedN = 0, gatedIdle = 0;
     const gatedWhy = new Map();
@@ -262,6 +270,7 @@ function AnalyzeEnemyIdle({ meta, states, ticks }) {
         s.idleWhy.set(why, (s.idleWhy.get(why) || 0) + 1);
       }
       if (still[k]) s.still4 += 1;
+      if (strict[k]) s.idle4Strict += 1;
       if (G.gatedSteps.includes(ticks[k].step)) {
         gatedN += 1;
         if (idle[k]) {
@@ -322,6 +331,7 @@ function AnalyzeEnemyIdle({ meta, states, ticks }) {
     key: s.key, stage: stepNumber.get(s.step) ?? null, seconds: +s.seconds.toFixed(1), soldiers: s.soldiers.size,
     zero30: s.win ? +(s.zeroWin / s.win).toFixed(3) : null, windows: s.win,
     idle4: s.personTicks ? +(s.idle4 / s.personTicks).toFixed(3) : null,
+    idle4Strict: s.personTicks ? +(s.idle4Strict / s.personTicks).toFixed(3) : null,
     still4: s.personTicks ? +(s.still4 / s.personTicks).toFixed(3) : null,
     shots: s.shots, ambient: s.ambient, mgShots: s.mgShots,
     nestCover: s.nestTicks ? +(s.nestBusy / s.nestTicks).toFixed(2) : null,
@@ -335,6 +345,7 @@ function AnalyzeEnemyIdle({ meta, states, ticks }) {
     return { ticks: all.reduce((a, s) => a + s.ticks, 0), seconds: +all.reduce((a, s) => a + s.seconds, 0).toFixed(1),
       zero30: win ? +(all.reduce((a, s) => a + s.zeroWin, 0) / win).toFixed(3) : null, windows: win,
       idle4: pt ? +(all.reduce((a, s) => a + s.idle4, 0) / pt).toFixed(3) : null,
+      idle4Strict: pt ? +(all.reduce((a, s) => a + s.idle4Strict, 0) / pt).toFixed(3) : null,
       still4: pt ? +(all.reduce((a, s) => a + s.still4, 0) / pt).toFixed(3) : null,
       shots: all.reduce((a, s) => a + s.shots, 0), ambient: all.reduce((a, s) => a + s.ambient, 0),
       mgShots: all.reduce((a, s) => a + s.mgShots, 0),
@@ -368,18 +379,18 @@ function SummarizeHits(hits) {
 
 function PrintReport(r) {
   console.log(`\n== enemy idle probe (${r.label}) stages ${r.stageFrom}-${r.stageTo}: ${r.samples} samples = ${r.seconds} s game time, wall ${r.wallS} s ==`);
-  console.log("phase".padEnd(34), "sec".padStart(6), "men".padStart(4), "zero30".padStart(7), "idle4".padStart(6), "still4".padStart(7),
+  console.log("phase".padEnd(34), "sec".padStart(6), "men".padStart(4), "zero30".padStart(7), "idle4".padStart(6), "strict".padStart(7), "still4".padStart(7),
     "shots".padStart(6), "amb".padStart(5), "mg".padStart(5), "nest".padStart(5), "hunt".padStart(5), "guards".padStart(6));
   for (const p of r.phases)
     console.log(p.key.padEnd(34), String(p.seconds).padStart(6), String(p.soldiers).padStart(4), Pct(p.zero30).padStart(7),
-      Pct(p.idle4).padStart(6), Pct(p.still4).padStart(7), String(p.shots).padStart(6), String(p.ambient).padStart(5),
+      Pct(p.idle4).padStart(6), Pct(p.idle4Strict).padStart(7), Pct(p.still4).padStart(7), String(p.shots).padStart(6), String(p.ambient).padStart(5),
       String(p.mgShots).padStart(5), Pct(p.nestCover).padStart(5), String(p.hunterTicks).padStart(5),
       String(p.guardsMin ?? "-").padStart(6));
   console.log("\n== by public stage ==");
   for (const [n, s] of Object.entries(r.byStage))
-    console.log(`0${n}  ${s.seconds}s  zero30=${Pct(s.zero30)} (${s.windows} windows)  idle4=${Pct(s.idle4)}  still4=${Pct(s.still4)}  shots=${s.shots} (ambient ${s.ambient})  mg=${s.mgShots}  nestCover=${Pct(s.nestCover)}  hunters=${s.hunterTicks}`);
+    console.log(`0${n}  ${s.seconds}s  zero30=${Pct(s.zero30)} (${s.windows} windows)  idle4=${Pct(s.idle4)} (strict ${Pct(s.idle4Strict)})  still4=${Pct(s.still4)}  shots=${s.shots} (ambient ${s.ambient})  mg=${s.mgShots}  nestCover=${Pct(s.nestCover)}  hunters=${s.hunterTicks}`);
   const c = r.gated;
-  console.log(`\n== gated 03–05: zero30=${Pct(c.zero30)} idle4=${Pct(c.idle4)} mg=${c.mgShots} hunters=${c.hunterTicks} nestCover=${Pct(c.nestCover)} ==`);
+  console.log(`\n== gated 03–05: zero30=${Pct(c.zero30)} idle4=${Pct(c.idle4)} (strict ${Pct(c.idle4Strict)}, still ${Pct(c.still4)}) mg=${c.mgShots} hunters=${c.hunterTicks} nestCover=${Pct(c.nestCover)} ==`);
   console.log("\n== group movement within 15 s of a phase / step change (moved ≥ 2 m / present) ==");
   for (const t of r.transitions) console.log(`${String(t.at).padStart(7)}  ${t.from} -> ${t.to}  ${JSON.stringify(t.groups)}`);
   console.log("\n== top idle reasons per phase ==");
