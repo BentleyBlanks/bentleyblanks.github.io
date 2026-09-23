@@ -1961,7 +1961,10 @@ export class AiDirector {
       // 锁着的人这一拍没出现在候选里（跑出筛选半径 / 被更近的人挤掉槽位）：
       // 目标保住，位置退回记忆里的最后目击点，TryFire 那边会走压制射击。
       const ref = sense.track.ref;
-      const stillAlive = sense.track.isPlayer ? !!(player && player.Alive) : ref.alive !== false;
+      // 【§20】等待接应的守军（missionUntargetable）也不许从记忆里接回来：他开枪的声音会进听觉
+      // 记忆（NoteStimulus 带 ref），09-23 探针量到 03 里十几个人一直「锁着」趴在壕里的守军。
+      const stillAlive = sense.track.isPlayer ? !!(player && player.Alive)
+        : ref.alive !== false && !ref.missionUntargetable;
       if (stillAlive) {
         if (!s.target || s.target.id !== sense.trackId) {
           s.target = {
@@ -4318,6 +4321,7 @@ export class AiDirector {
       const t = mem.list[i];
       if (!t.ref) continue;
       if (t.isPlayer ? !(this.ctx.player && this.ctx.player.Alive) : t.ref.alive === false) continue;
+      if (!t.isPlayer && t.ref.missionUntargetable) continue;   // §20：等待接应的守军不从记忆里接
       if (s.target && t.id === s.target.id) { keep = t; continue; }
       if (t.confidence < TACTICS.suppressConfidence) continue;
       if (!best || t.confidence > best.confidence) best = t;

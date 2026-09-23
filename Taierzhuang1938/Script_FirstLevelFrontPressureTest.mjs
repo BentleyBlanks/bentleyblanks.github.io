@@ -340,6 +340,26 @@ function Man(ai, side, x, z, options = {}) {
   // A man with a real shot never takes ambient.
   s.target = { isPlayer: false, position: new THREE.Vector3(5, 0, -5), id: 99 }; s.targetVisible = true;
   Eq(ai.PickAmbientFire(s), null, "a visible, unheld target owns the trigger");
+  // A target only in (credible) memory: TryFire suppresses first; a stalled trigger hands over to ambient.
+  s.targetVisible = false; s.lkpConfidence = 0.9; s.targetLostTime = 0.5; s.targetFireAt = -99;
+  Check(!ai.AmbientBlocked(s), "a fresh memory target is suppressed by TryFire first");
+  s.targetLostTime = AMBIENT_FIRE.stalledTargetS + 0.1;
+  Check(ai.AmbientBlocked(s), "memory target, no real round for stalledTargetS: the trigger is stalled, ambient takes over");
+  s.targetFireAt = ai.time - 0.5;
+  Check(!ai.AmbientBlocked(s), "a man whose suppression still gets out keeps suppressing");
+  s.targetFireAt = -99; s.targetLostTime = 0; s.lkpConfidence = 0;
+  // Waiting guards never come back as a memory target (their gunfire is heard).
+  {
+    const guard = { alive: true, missionUntargetable: true, position: new THREE.Vector3(0, 0, -12) };
+    const m = Man(ai, "ija", 3, 0);
+    m.perception = { list: [{ ref: guard, id: 77, isPlayer: false, confidence: 0.9, stance: 2 }] };
+    m.lkpConfidence = 0.9; m.lkp = { x: 0, y: 0, z: -12 }; m.target = null;
+    Check(!ai.ReviveTargetFromMemory(m, null), "an untargetable guard is never revived from memory");
+    guard.missionUntargetable = false;
+    Check(ai.ReviveTargetFromMemory(m, null) && m.target.id === 77, "a released guard is fair game again");
+    ai.soldiers.splice(ai.soldiers.indexOf(m), 1);
+  }
+  s.target = { isPlayer: false, position: new THREE.Vector3(5, 0, -5), id: 99 }; s.targetVisible = true;
   // Held on the player (not the suppress rank): ambient.
   s.target = { isPlayer: true, position: new THREE.Vector3(0, 0, -20), id: -1 }; s.missionFireHold = true; s.missionFireSuppressOnly = false;
   s.ambientPickAt = -99; Check(ai.PickAmbientFire(s), "a held man fires at authorised points instead of standing there");
