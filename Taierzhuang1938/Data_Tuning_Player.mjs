@@ -335,6 +335,10 @@ export const CAMERA_SHAKE = Object.freeze({
   strafe: Object.freeze({ reachM: 14, traumaPerImpact: 0.14, maxTrauma: 0.5 }),
   hit: Object.freeze({ traumaScale: 0.45, rollKickRad: 0.09 }),
   dive: Object.freeze({ pitchKickRad: -0.42, rollKickRad: 0.24, riseKickM: -0.12, trauma: 0.55 }),
+  // 2026-09-23 战车隆隆（Script_CameraShake.Rumble，第一关战车包）：25 m 内按距离平方衰减，
+  // 怠速也有一点（idle），负载越大越抖；不进创伤桶，单独一层低频（8 Hz）小幅抖动 ——
+  // 「驶出路弯时地面在抖」，不能抖到瞄不准（俯仰上限 3 mrad ≈ 0.17°）。
+  rumble: Object.freeze({ rangeM: 25, idle: 0.35, hz: 8, pitchRad: 0.003, rollRad: 0.0015, riseM: 0.004, smoothS: 0.25 }),
 });
 
 /** Shared bullet-hit disorientation: brief sensory feedback, independent of HP and suppression.

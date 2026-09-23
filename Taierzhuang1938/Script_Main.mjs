@@ -7678,7 +7678,10 @@ function TryFire(dt, returningGrenade = false) {
   } else if (shot.wall) {
     const n = new THREE.Vector3(shot.wall.normal[0], shot.wall.normal[1], shot.wall.normal[2]);
     const surface = ImpactSurface(shot.wall.box, "brick");
-    vfx.Impact(_hitPoint, n, surface, { weaponKind: weapon.kind });
+    const tankHit = shot.wall.box?.tag === "missionTank";
+    vfx.Impact(_hitPoint, n, surface, { weaponKind: weapon.kind, hardSparks: tankHit });
+    // 打在第一关那辆战车上：火花 + 叮当照旧（metal 面），再告诉战车大脑（关观察窗 / 被牵一次注意）。
+    if (tankHit) missionRuntime?.OnTankHit?.(_hitPoint.clone(), player.position.clone());
     audio.Play(IMPACT_CUE[surface] || "impactBrick", { position: _hitPoint.clone(), volume: 0.55 });
     // 跳弹：打在硬面上四分之一的概率削飞出去。种子跟着射击序号走（不是 Math.random）——
     // 逐轮录音比对要可复现，与曳光按 playerShots 取模是同一条理由。
@@ -7718,7 +7721,9 @@ const _empTargets = [];
  */
 const EMPLACED_CONVERGE_M = 160;
 
-function FireVehicleBullet(from,direction,{weaponId="Type11",damageScale=1,sourceCollider=null}={}) {
+// gunCue / gunOpts：枪声用哪条 cue、带哪些 Play 选项。默认仍是旧的 type92（其它调用照旧）；
+// 第一关战车的车载机枪给 type11 + burst 1 + 车内低通（Data_Tuning_Tank.audio.mg*，战车包 2026-09-23）。
+function FireVehicleBullet(from,direction,{weaponId="Type11",damageScale=1,sourceCollider=null,gunCue="type92",gunOpts=null}={}) {
   const boxes=PlayerHitboxes(player.position,player.yaw,player.stance,[],player.LeanOffsetM);
   // isPlayer：给近失弹那条链认人用（Script_AudioWiring.BulletNearMissesForPlayer）。
   // 玩家在弹道链上从来不是本人，而是这个临时代理，所以标记只能挂在这儿。
@@ -7733,8 +7738,11 @@ function FireVehicleBullet(from,direction,{weaponId="Type11",damageScale=1,sourc
   vfx.MuzzleFlash(from,direction,{scale:1.1,kind:"hmg"});
   // 每发一条从枪口到弹着点的光束（不是步枪那种 1/5 的短曳光）：玩家要看得清火力从哪儿来、
   // 扫到了哪儿。口径见 Data_Tuning_BulletVisual。
-  vfx.TracerBeam(from,end,{kind:"ija"});audio.PlayGunshot("type92",{position:from,volume:.85});
-  if(result.soldier===playerTarget)player.TakeHit(weapon.damage*damageScale*(COMBAT.player?.bulletScale??.4),result.part,direction,{from,bullet:true});
+  vfx.TracerBeam(from,end,{kind:"ija"});audio.PlayGunshot(gunCue,{position:from,volume:.85,...(gunOpts||{})});
+  // damageScale 0 = 战车机枪首次接触「走进来」的那一串（Script_FirstLevelTankBrain）：弹道、近失压制、
+  // 曳光与弹着照旧，只是不伤人 —— 不能走 TakeHit(0)，那一下也会亮受击反馈。
+  if(result.soldier&&!(damageScale>0)){}
+  else if(result.soldier===playerTarget)player.TakeHit(weapon.damage*damageScale*(COMBAT.player?.bulletScale??.4),result.part,direction,{from,bullet:true});
   // 车载重机枪走 hmg 那一档（断肢概率比步枪高一个量级，见 SEVER_RULES）。
   else if(result.soldier){result.soldier.TakeHit(weapon.damage*damageScale,result.part,direction,
     {kind:"hmg",shapeId:result.shape?.id||null,weaponId,point:end.clone()});
@@ -7800,7 +7808,9 @@ function FireEmplacedShot(shot) {
   } else if (result.wall) {
     const n = new THREE.Vector3(result.wall.normal[0], result.wall.normal[1], result.wall.normal[2]);
     const surface = ImpactSurface(result.wall.box, "brick");
-    vfx.Impact(_hitPoint, n, surface, { weaponKind: mountedWeapon.kind });
+    const tankHit = result.wall.box?.tag === "missionTank";
+    vfx.Impact(_hitPoint, n, surface, { weaponKind: mountedWeapon.kind, hardSparks: tankHit });
+    if (tankHit) missionRuntime?.OnTankHit?.(_hitPoint.clone(), player.position.clone());
     audio.Play(IMPACT_CUE[surface] || "impactBrick", { position: _hitPoint.clone(), volume: 0.5 });
     audioWiring.Ricochet(_hitPoint, surface, shot.index);
     if (destruction && result.wall.box && result.wall.box.tag !== "dirt") {

@@ -799,9 +799,141 @@
       "seconds": 0.91,
       "credit": "汉阳造 88 式步枪第一发连续实录（枪响、开栓、抽壳、推弹、闭锁）· 参考视频实录",
       "license": "refvideo"
+    },
+    "tankEngine": {
+      "files": [
+        "AudioSfx_TankEngine_01.mp3",
+        "AudioSfx_TankEngine_02.mp3"
+      ],
+      "seconds": 11.2,
+      "loop": true,
+      "loopSpans": [
+        [
+          0.1,
+          8.1
+        ],
+        [
+          0.1,
+          11.1
+        ]
+      ],
+      "credit": "Pole Position Production · Panzer IV Ausf. G 车外怠速 / 稳态高转 · Sonniss GDC 2019",
+      "license": "sonniss"
+    },
+    "tankTracks": {
+      "files": [
+        "AudioSfx_TankTracks_01.mp3"
+      ],
+      "seconds": 6.7,
+      "loop": true,
+      "loopSpans": [
+        [
+          0.1,
+          6.6
+        ]
+      ],
+      "credit": "Pole Position Production · Panzer III Ausf. M 车上慢行履带近麦 · Sonniss GDC 2019",
+      "license": "sonniss"
+    },
+    "tankTurret": {
+      "files": [
+        "AudioSfx_TankTurret_01.mp3"
+      ],
+      "seconds": 9.4,
+      "loop": true,
+      "loopSpans": [
+        [
+          0.1,
+          9.299999999999999
+        ]
+      ],
+      "credit": "Pole Position Production · T-34-85 炮身高低机手摇拟音 · Sonniss GDC 2016",
+      "license": "sonniss"
+    },
+    "tankCannon": {
+      "files": [
+        "AudioSfx_TankCannon_01.mp3"
+      ],
+      "seconds": 3.7,
+      "credit": "Bluezone Corporation · 坦克炮射击（近） · Sonniss GDC 2020",
+      "license": "sonniss"
+    },
+    "tankCannonMid": {
+      "files": [
+        "AudioSfx_TankCannonMid_01.mp3"
+      ],
+      "seconds": 4.8,
+      "credit": "Pole Position · The Warfare Library 林地远处火炮（中） · Sonniss GDC 2017",
+      "license": "sonniss"
+    },
+    "tankCannonFar": {
+      "files": [
+        "AudioSfx_TankCannonFar_01.mp3"
+      ],
+      "seconds": 8.5,
+      "credit": "Pole Position · The Warfare Library 林地远处火炮（远，带林间回声） · Sonniss GDC 2017",
+      "license": "sonniss"
+    },
+    "tankStall": {
+      "files": [
+        "AudioSfx_TankStall_01.mp3"
+      ],
+      "seconds": 4.8,
+      "credit": "Pole Position Production · Stuart M5A1 车外发动机熄火 · Sonniss GDC 2018",
+      "license": "sonniss"
+    },
+    "tankHatch": {
+      "files": [
+        "AudioSfx_TankHatch_01.mp3",
+        "AudioSfx_TankHatch_02.mp3"
+      ],
+      "seconds": 1.8,
+      "credit": "Pole Position · Tiger II 舱盖摔合 / TKS 装填口关闭 · Sonniss GDC 2019/2020",
+      "license": "sonniss"
+    },
+    "tankArmorPing": {
+      "files": [
+        "AudioSfx_TankArmorPing_01.mp3",
+        "AudioSfx_TankArmorPing_02.mp3"
+      ],
+      "seconds": 1.231,
+      "credit": "Bluezone Heavy Metal Impact 中板升调 / Gamemaster 子弹打厚金属 · Sonniss GDC 2019/2017",
+      "license": "sonniss"
+    },
+    "tankTurretJam": {
+      "files": [
+        "AudioSfx_TankTurretJam_01.mp3"
+      ],
+      "seconds": 2.4,
+      "credit": "Alexander Kopeikin · Black Metal 干硬金属磨擦 · Sonniss GDC 2017",
+      "license": "sonniss"
+    },
+    "tankTrackSqueal": {
+      "files": [
+        "AudioSfx_TankTrackSqueal_01.mp3"
+      ],
+      "seconds": 0.918,
+      "credit": "Volcengine SeedAudio 1.0 · 履带尖啸（拟音替身：生锈重铁门铰链） · 2026-09-23",
+      "license": "volcengine"
+    },
+    "tankShellPass": {
+      "files": [
+        "AudioSfx_TankShellPass_01.mp3"
+      ],
+      "seconds": 0.848,
+      "credit": "Volcengine SeedAudio 1.0 · 低速炮弹掠过（拟音替身：粗铁棍甩过空气） · 2026-09-23",
+      "license": "volcengine"
+    },
+    "tankCoolTick": {
+      "files": [
+        "AudioSfx_TankCoolTick_01.mp3"
+      ],
+      "seconds": 1.42,
+      "credit": "Volcengine SeedAudio 1.0 · 熄火后金属冷却滴答（拟音替身：热铁皮冷却） · 2026-09-23",
+      "license": "volcengine"
     }
   },
-  "bakedAt": "2026-09-16",
+  "bakedAt": "2026-09-23",
   "normalization": {
     "normalizedAt": "2026-09-08",
     "tool": "Script_AudioNormalize.mjs",

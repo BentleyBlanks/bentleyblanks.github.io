@@ -87,6 +87,178 @@ export function ArchiveUrl(item, filePath) {
   return ARCHIVE + item + "/" + filePath.split("/").map(encodeURIComponent).join("/");
 }
 
+// ---------------------------------------------------------------------------
+// 第一关 03–05 那辆八九式中战车（甲）的声音（战车包 2026-09-23）
+//
+// 由 **Script_TankAudioBake.mjs** 烘（不是 Script_SfxBake）：三条常驻循环要做**接缝交叉淡化**
+// （SfxBake 的切法两头各淡 20 ms，循环一圈就是一个坑），一次性音顺手一起烘。
+// SfxBake 只在下面 SFX_SOURCES 末尾按 `prebaked` 把成品重新登记进清单（全量重烘不会丢）。
+//
+// 选材（Sonniss GDC 镜像 · Pole Position 等真车实录，免版税）：
+//   · 八九式甲是 **水冷汽油机**（契约 §2 第 7 条）。镜像里能做成「稳态循环」的汽油坦克实录
+//     只有 Pole Position 的四号坦克 G 型（Maybach HL120，同为水冷汽油机）那条「车外·起动·怠速·
+//     稳态·轰油」：16–26 s 是热车怠速、50–70 s 是稳态高转，两段都够长、电平平（逐秒 RMS 抖动
+//     < 1 dB），正好做怠速 / 负载两层交叉。霍奇基斯 H39（六缸汽油，吨位最接近）只有车外通过录音，
+//     距离一直在变，做不成循环 —— 记在这里，以后找到稳态段再换。
+//   · 履带：三号坦克「车上·慢行·履带右侧」近麦，50–56.5 s 是一段匀速行进；高通 180 Hz 把发动机
+//     那一层让给发动机循环。
+//   · 炮塔手摇：T-34-85「炮身高低机手摇」拟音 8–17.2 s 是一段匀速摇动（每秒 3–5 下咔嗒）。
+//     八九式的炮塔是手摇的（[史]），T-34 的高低机也是手轮 + 齿轮，同一类机构。
+//   · 主炮三层：近 = Bluezone「坦克炮射击」（设计过的近距离一发）；中 / 远 = Pole Position
+//     Warfare「林地·远处·火炮射击」里两发（16.0 s 那一发中频多、28.0 s 那一发只剩低频加 8 s 林间回声）。
+//     「远近是两条真的录音」这条硬标准照旧（本文件头注第 3 条）。
+//   · 熄火：斯图亚特 M5A1「车外·发动机熄火·再打火」14.0–18.8 s：还在转 → 两下咳嗽 → 停。
+//   · 舱盖 / 观察窗：虎 II 舱盖摔合、TKS 装填口关闭。
+//   · 弹打装甲：Gamemaster「子弹打厚金属」+ Bluezone 重金属中板升调变短 —— 步枪弹打钢板是一声「当」不是「哐」。
+//   · 炮塔卡死：Kopeikin「干硬金属磨擦」。
+//   · 履带尖啸、低速炮弹掠过、冷却滴答三样镜像里没有对口素材（全 12 个包按名字与频谱查过），
+//     用 SeedAudio 生成（拟音替身写法，见 docs/Data_AudioAssets.md），`--generate` 才调接口。
+//
+// 字段：source { item, path } | seedAudio { take, prompt, pick }（pick＝选定的第几条 take，缺省 1）；atS / durS 切段；loopXfadeS 有值 = 循环
+// （切 durS + loopXfadeS，尾巴等功率叠回开头）；hp / lp / rate 同 SfxBake；fadeOutS 一次性音的尾巴。
+// 所有成品对齐有声段 RMS −25 dBFS、峰值 ≤ −1 dBFS（Script_AudioNormalize 同一口径）；层间的相对电平
+// （怠速比高转轻多少）由 Data_Tuning_Tank.audio 在运行时复原，不烘进文件。
+// ---------------------------------------------------------------------------
+const GDC_MIRROR = "gameaudiogdc-part1through7";
+const TANK_SEED_COMMON = "用于写实第一人称二战游戏的独立单次音效，单声道。只有这一次事件，结尾自然衰减至安静。"
+  + "不要音乐、人声、口令、背景战场、录音底噪，也不要重复第二次。";
+export const TANK_SFX = [
+  {
+    cue: "tankEngine", loop: true,
+    credit: "Pole Position Production · Panzer IV Ausf. G 车外怠速 / 稳态高转 · Sonniss GDC 2019",
+    license: "sonniss",
+    // files[0] 怠速层、files[1] 负载层 —— 顺序是契约，Script_Audio 的战车循环配方按下标取。
+    files: [
+      { source: { item: GDC_MIRROR, path: "Sonniss.com - GDC 2019 - Game Audio Bundle/Pole Position - Panzer IV Ausf. G/panzer_iv_t10_ext_start_idle_steady_blips_main.mp3" },
+        atS: 17.0, durS: 8.0, loopXfadeS: 0.5, hp: 22 },
+      { source: { item: GDC_MIRROR, path: "Sonniss.com - GDC 2019 - Game Audio Bundle/Pole Position - Panzer IV Ausf. G/panzer_iv_t10_ext_start_idle_steady_blips_main.mp3" },
+        atS: 58.0, durS: 11.0, loopXfadeS: 0.6, hp: 22 },
+    ],
+  },
+  {
+    cue: "tankTracks", loop: true,
+    credit: "Pole Position Production · Panzer III Ausf. M 车上慢行履带近麦 · Sonniss GDC 2019",
+    license: "sonniss",
+    files: [
+      { source: { item: GDC_MIRROR, path: "Sonniss.com - GDC 2019 - Game Audio Bundle/Pole Position - Panzer III Ausf. M/panzer_iii_t3_onbrd_slow_drive_uneven_stop_tracks_right.mp3" },
+        atS: 50.0, durS: 6.5, loopXfadeS: 0.3, hp: 180 },
+    ],
+  },
+  {
+    cue: "tankTurret", loop: true,
+    credit: "Pole Position Production · T-34-85 炮身高低机手摇拟音 · Sonniss GDC 2016",
+    license: "sonniss",
+    files: [
+      { source: { item: GDC_MIRROR, path: "Sonniss.com - GDC 2016- Game Audio Bundle/Pole Position Production - T-34-85 Russian World War II Tank/T-34_foley_cannon_height_adjustment.mp3" },
+        atS: 8.0, durS: 9.2, loopXfadeS: 0.25, hp: 120 },
+    ],
+  },
+  {
+    cue: "tankCannon",
+    credit: "Bluezone Corporation · 坦克炮射击（近） · Sonniss GDC 2020",
+    license: "sonniss", bitrate: BITRATE_TRANSIENT,
+    files: [
+      { source: { item: GDC_MIRROR, path: "Sonniss.com - GDC 2020 - Game Audio Bundle/Bluezone - Tank - Explosion Sound Effects/Bluezone_BC0271_tank_artillery_cannon_shot_012.mp3" },
+        atS: 0.0, durS: 3.7, hp: 30, fadeOutS: 0.6 },
+    ],
+  },
+  {
+    cue: "tankCannonMid",
+    credit: "Pole Position · The Warfare Library 林地远处火炮（中） · Sonniss GDC 2017",
+    license: "sonniss", bitrate: BITRATE_TRANSIENT,
+    files: [
+      { source: { item: "sonniss-gdc-2017-game-audio-bundle-normalized", path: "Pole Position - The Warfare Library/warfare_t1b_cannon_firing_forest_distant_MKH8060_2.mp3" },
+        atS: 15.85, durS: 4.8, hp: 38, fadeOutS: 1.2 },
+    ],
+  },
+  {
+    cue: "tankCannonFar",
+    credit: "Pole Position · The Warfare Library 林地远处火炮（远，带林间回声） · Sonniss GDC 2017",
+    license: "sonniss", bitrate: BITRATE_TRANSIENT,
+    files: [
+      { source: { item: "sonniss-gdc-2017-game-audio-bundle-normalized", path: "Pole Position - The Warfare Library/warfare_t1b_cannon_firing_forest_distant_MKH8060_2.mp3" },
+        atS: 27.85, durS: 8.5, hp: 38, fadeOutS: 2.0 },
+    ],
+  },
+  {
+    cue: "tankStall",
+    credit: "Pole Position Production · Stuart M5A1 车外发动机熄火 · Sonniss GDC 2018",
+    license: "sonniss",
+    files: [
+      { source: { item: "sonniss-gdc-2018-game-audio-bundle-normalized", path: "Pole Position - Stuart M5A1 Light Tank/stuart_m5a1_t16_ext_engine_dies_attempt_to_start_MKH60.mp3" },
+        atS: 14.0, durS: 4.8, hp: 70, fadeOutS: 1.2 },
+    ],
+  },
+  {
+    cue: "tankHatch",
+    credit: "Pole Position · Tiger II 舱盖摔合 / TKS 装填口关闭 · Sonniss GDC 2019/2020",
+    license: "sonniss",
+    files: [
+      { source: { item: GDC_MIRROR, path: "Sonniss.com - GDC 2019 - Game Audio Bundle/Pole Position - Tiger II/tiger_ii_t29_var_sfx_hatch_close_slam_and_open_tracking_MKH60.mp3" },
+        atS: 0.45, durS: 1.8, hp: 60, fadeOutS: 0.5 },
+      { source: { item: GDC_MIRROR, path: "Sonniss.com - GDC 2020 - Game Audio Bundle/Pole Position - Tankietka TKS 1936/Tankietka_t8_Var_SFX_Reload_Hatch_Closing_MS_CMC6XT_MK41_MK8.mp3" },
+        atS: 0.45, durS: 1.3, hp: 80, fadeOutS: 0.4 },
+    ],
+  },
+  {
+    cue: "tankArmorPing",
+    credit: "Bluezone Heavy Metal Impact 中板升调 / Gamemaster 子弹打厚金属 · Sonniss GDC 2019/2017",
+    license: "sonniss",
+    files: [
+      { source: { item: GDC_MIRROR, path: "Sonniss.com - GDC 2019 - Game Audio Bundle/BlueZone - Heavy Metal Impact Sound Effects/Bluezone_BC0251_heavy_metal_impact_metal_plate_medium.mp3" },
+        atS: 0.0, durS: 1.6, rate: 1.3, hp: 200, fadeOutS: 0.5 },
+      { source: { item: "sonniss-gdc-2017-game-audio-bundle-normalized", path: "Gamemaster Audio -  Bullet Impact Sounds/bullet_impact_metal_heavy_08.mp3" },
+        atS: 0.0, durS: 0.8, hp: 200, fadeOutS: 0.3 },
+    ],
+  },
+  {
+    cue: "tankTurretJam",
+    credit: "Alexander Kopeikin · Black Metal 干硬金属磨擦 · Sonniss GDC 2017",
+    license: "sonniss",
+    files: [
+      { source: { item: "sonniss-gdc-2017-game-audio-bundle-normalized", path: "Alexander Kopeikin - Black Metal/dry hard metal grind 09.mp3" },
+        atS: 0.15, durS: 2.4, hp: 90, fadeOutS: 0.9 },
+    ],
+  },
+  {
+    cue: "tankTrackSqueal",
+    credit: "Volcengine SeedAudio 1.0 · 履带尖啸（拟音替身：生锈重铁门铰链） · 2026-09-23",
+    license: "volcengine",
+    files: [
+      { seedAudio: { take: "tankTrackSquealB", pick: 2, prompt: TANK_SEED_COMMON
+          // 第一轮（take "tankTrackSqueal"）照「履带被主动轮挤住的尖啸」直说，三条全塌成宽带隆隆声（频谱上没有一根
+          // 音调线）。改成拟音师真会录的那样东西：生锈的重铁门铰链 —— 尖啸的身份就是那几根会滑动的音调线。
+          + "一扇沉重的生锈铁门被猛地推开时，铁门铰链发出的一声尖锐刺耳的金属长吱嘎，音调先升高再降低，"
+          + "约一秒，干涩、尖利，带一点铁与铁摩擦的颤动，由强到弱消失。主体是一两千赫兹的尖啸音调，"
+          + "不是低沉的隆隆声，不要发动机，不要风声，不要撞击。" },
+        durS: 1.4, hp: 300, fadeOutS: 0.35 },
+    ],
+  },
+  {
+    cue: "tankShellPass",
+    credit: "Volcengine SeedAudio 1.0 · 低速炮弹掠过（拟音替身：粗铁棍甩过空气） · 2026-09-23",
+    license: "volcengine",
+    files: [
+      { seedAudio: { take: "tankShellPass", pick: 3, prompt: TANK_SEED_COMMON
+          + "一颗低速炮弹从听者头顶近处飞过：沉重粗糙的一声空气撕裂呼声，迅速逼近、贴近时最响、然后音调下降着远去，"
+          + "整个动作约零点六秒。像一根粗铁棍被全力甩过空气的低沉呜声，主体是中低频的呼啸，"
+          + "不是高频嘶嘶声，不是口哨，也不是爆炸或枪声。" },
+        durS: 0.9, hp: 90, fadeOutS: 0.2 },
+    ],
+  },
+  {
+    cue: "tankCoolTick",
+    credit: "Volcengine SeedAudio 1.0 · 熄火后金属冷却滴答（拟音替身：热铁皮冷却） · 2026-09-23",
+    license: "volcengine",
+    files: [
+      { seedAudio: { take: "tankCoolTick", pick: 1, whole: true, prompt: TANK_SEED_COMMON
+          + "发动机刚熄火后，灼热的钢板和排气管冷却收缩时发出的几下轻微金属滴答和叮声，稀疏而不规则，"
+          + "约两秒，很安静，像热铁皮冷下来时的咔、叮。不要引擎声，不要风声，不要持续的嗡声。" },
+        durS: 2.0, hp: 400, fadeOutS: 0.3 },
+    ],
+  },
+];
+
 /**
  * 素材组。一段素材可以切出好几个音（同一次下载）。
  * cuts[].cue 必须与 Script_Audio 的 RECIPES 同名 —— 同名才盖得上去。
@@ -1503,6 +1675,21 @@ export const SFX_SOURCES = [
       { cue: "bolt", exactAtS: 2.795, tail: 0.85, gain: 0.95, hp: 180, append: true, alignDbfs: -25 },
     ],
   },
+  // 战车那一批：成品由 Script_TankAudioBake.mjs 烘，这里只负责在全量 SfxBake 时把它们重新登记进清单。
+  ...TANK_SFX.map((entry) => ({
+    id: "Tank" + entry.cue.charAt(0).toUpperCase() + entry.cue.slice(1),
+    prebaked: true,
+    bake: "Script_TankAudioBake.mjs",
+    credit: entry.credit,
+    license: entry.license,
+    cuts: [{ cue: entry.cue, files: TankSfxFiles(entry), durS: Number((entry.files[0].durS / (entry.files[0].rate || 1)).toFixed(3)), ...(entry.loop ? { loop: true } : {}) }],
+  })),
 ];
+
+/** 战车成品的文件名（与 Script_TankAudioBake 同一条规矩：AudioSfx_<Cue>_NN.mp3）。 */
+export function TankSfxFiles(entry) {
+  const pascal = entry.cue.charAt(0).toUpperCase() + entry.cue.slice(1);
+  return entry.files.map((_, i) => `AudioSfx_${pascal}_${String(i + 1).padStart(2, "0")}.mp3`);
+}
 
 export default SFX_SOURCES;

@@ -1,4 +1,8 @@
 import { FirstLevelFrontBattle } from "./Script_FirstLevelFrontBattle.mjs";
+// 03–05 战车：纯规则大脑 + 接线层（战车包 2026-09-23）。开关 Data_Tuning_Tank.brainEnabled，关掉走下面旧的定时插值。
+import { FirstLevelTankRuntime } from "./Script_FirstLevelTankRuntime.mjs";
+import { BundleResupplyOpen } from "./Script_FirstLevelTankBrain.mjs";
+import { TANK } from "./Data_Tuning_Tank.mjs";
 import { FirstLevelTransition } from "./Script_FirstLevelTransition.mjs";
 import { FRONT_SORTIE as Sortie, SortieCrawlBlocked } from "./Data_FirstLevelFrontRoute.mjs";
 import { FirstLevelLeaderGuide } from "./Script_FirstLevelLeaderGuide.mjs";
@@ -160,6 +164,7 @@ export class FirstLevelMissionRuntime {
     // Enter 马上就会问它要门外那一拍。
     this.frontShow = new FirstLevelFrontShow(this);
     this.frontBattle = new FirstLevelFrontBattle(this);
+    this.tankRuntime = TANK.brainEnabled ? new FirstLevelTankRuntime(this) : null;
     // 08–10 村落改道、11–14 接运与空袭（第二波 Mid 包）。
     this.village = new FirstLevelVillageBlock(this);
     this.transferCart = new FirstLevelTransferCart(this);
@@ -1254,7 +1259,8 @@ export class FirstLevelMissionRuntime {
       "MissionBundle",
       A.bundle,
       () => this.Text("bundle"),
-      () => this.flow.stage.id === "Tank" && this.Has("bundleRouteTraversed") && (!this.tank.immobilized || !this.Has("bundleTaken")),
+      // 大脑接管时断履带（MobilityKill）还没解决：照样能回来补（否则两捆都没炸到位就卡死）。
+      () => this.flow.stage.id === "Tank" && this.Has("bundleRouteTraversed") && BundleResupplyOpen(this.tank, this.Has("bundleTaken")),
       () => {
         const missing = Math.max(0, R.bundleSupplyCount - this.Inventory().bundles);
         const bandages = Math.max(0, R.bundleSupplyBandages - this.player.bandages);
@@ -1570,7 +1576,8 @@ export class FirstLevelMissionRuntime {
     }
   }
   UpdateGuards(dt) { this.frontBattle.UpdateGuards(dt); }
-  OnBlast({ position, radius, damage, byPlayer, explosiveId }) {
+  OnBlast(event) {
+    const { position, radius, damage, byPlayer, explosiveId } = event;
     if (byPlayer) {
       (this.playerExplosions ||= []).push({
         at: this.time,
@@ -1589,6 +1596,7 @@ export class FirstLevelMissionRuntime {
       const hit = this.battlefield.Raycast(from, delta.normalize(), distance);
       return !hit || hit.t >= distance - 0.35;
     });
+    if (this.tankRuntime) { this.tankRuntime.OnBlast(event); return; }
     if (!this.Has("bundleTaken") || !this.tank.active || this.tank.immobilized || !byPlayer || explosiveId !== "GrenadeBundle") return;
     if (Distance(position, this.tank) > R.tankTrackRadiusM) return;
     const track = {
@@ -1772,7 +1780,10 @@ export class FirstLevelMissionRuntime {
     if(actors.every(actor=>!actor.alive||actor.missionRepelled))this.Record('frontAttackRepelled',{
       killed:losses,repelled:actors.filter(actor=>actor.alive&&actor.missionRepelled).length});
   }
+  /** 枪弹打在车体上（Script_Main 的弹道命中 missionTank）：火花 / 叮当在 Main，这里只告诉大脑。 */
+  OnTankHit(point, from) { return this.tankRuntime?.OnBulletHit(point, from) ?? null; }
   UpdateTank() {
+    if (this.tankRuntime) { this.tankRuntime.Update(this.delta); return; }
     const tank = this.tank;
     if (!tank.active || !["Support","MachineGun","Tank","Orders"].includes(this.flow.stage.id)) {
       if(this.tankDust!=null){this.vfx.RemoveSmokeSource(this.tankDust);this.tankDust=null;}
@@ -2641,6 +2652,7 @@ export class FirstLevelMissionRuntime {
       failed: this.failed,
       ordinaryCasualties:this.flow.log.filter(event=>event.id?.startsWith("ordinaryCasualty")).map(event=>event.detail),
       tank: { ...this.tank },
+      tankBrain: this.tankRuntime?.Debug() ?? null,
       playerExplosions: this.playerExplosions || [],
       column: this.column.State(),
       people:this.view.people.State(),aftermathCount:this.view.aftermath.count,aftermathTriangles:this.view.aftermath.triangles,
@@ -2692,6 +2704,7 @@ export class FirstLevelMissionRuntime {
     this.frontShow?.Dispose();
     this.squadMarch?.Dispose();
     if(this.tankDust!=null)this.vfx.RemoveSmokeSource(this.tankDust);
+    this.tankRuntime?.Dispose();
     this.voice.Dispose();
     this.music.Dispose();
     this.battleSound.Dispose();

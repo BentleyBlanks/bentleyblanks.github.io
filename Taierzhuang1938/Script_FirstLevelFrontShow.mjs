@@ -1,4 +1,5 @@
 import { FRONT_SORTIE } from "./Data_FirstLevelFrontRoute.mjs";
+import { TankClearFact } from "./Script_FirstLevelTankBrain.mjs";
 // ===========================================================================
 // Script_FirstLevelFrontShow.mjs —— 公开阶段 1–7 的演出总线（Front 玩法包）
 //
@@ -171,13 +172,15 @@ export class FirstLevelFrontShow {
       &&!r.BlocksSight(r.view.TankMuzzle(tank),r.Point(r.player.position,1.65),r.view.tankCollider))r.Say("BundleProne");
     // 返程：「班长！它往沟口挤了！」—— 战车比取弹那一刻又往南压了一段。
     if (r.Has("bundleTaken")) {
-      if (this.bundleTakenTankZ == null) { this.bundleTakenTankZ = tank.z; this.bundleTakenAt = r.time; }
+      if (this.bundleTakenTankZ == null) { this.bundleTakenTankZ = tank.z; this.bundleTakenTankX = tank.x; this.bundleTakenAt = r.time; }
+      // 战车大脑的挤压是往西推（缺口方向），不是往南：按挪动的水平距离算（旧路径只往南走，结果一样）。
+      const gained = tank.brain ? Math.hypot(tank.x - this.bundleTakenTankX, tank.z - this.bundleTakenTankZ) : tank.z - this.bundleTakenTankZ;
       if (!tank.immobilized &&
-        (tank.z - this.bundleTakenTankZ >= F.bundleReturnTankGainM || r.time - this.bundleTakenAt >= F.bundleReturnFallbackS))
+        (gained >= F.bundleReturnTankGainM || r.time - this.bundleTakenAt >= F.bundleReturnFallbackS))
         r.Say("BundleReturnCall");
     }
-    // 「停了！」—— 履带真的断了之后。
-    if (r.Has("tankImmobilized")) {
+    // 「停了！口子能过！」—— 车真的解决了之后（大脑接管时是彻底哑火 tankFireDisabled，断履带还在打）。
+    if (r.Has(TankClearFact(tank))) {
       this.tankStoppedAt ??= r.time;
       if (r.time - this.tankStoppedAt >= F.tankStoppedAfterS) r.Say("TankStopped");
     }

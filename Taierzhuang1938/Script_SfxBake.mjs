@@ -470,7 +470,9 @@ async function Main() {
     // SeedAudio 那几条（序章汽笛、白刃三音）是**人工试听选定**的成品，不由这个程序
     // 合成或重切；但每次重烘其他音效仍必须重新登记它们，否则全量 SfxBake 会悄悄把
     // cue 从 manifest 丢掉。一个 cue 可以挂多个变体文件（挥空就是三条）。
-    if (group.seedAudio) {
+    // `prebaked`：成品由别的烘焙脚本产出（战车那一批是 Script_TankAudioBake —— 循环要做接缝交叉淡化，
+    // 这里的切法做不了），与 SeedAudio 那几条同一条路：只登记、不重切。时长沿用清单里烘焙脚本量的实数。
+    if (group.seedAudio || group.prebaked) {
       for (const cut of group.cuts) {
         const files = cut.files || [cut.file || `AudioSfx_${Pascal(cut.cue)}_01.mp3`];
         const missing = files.filter((f) => !fs.existsSync(path.join(OUT_DIR, f)));
@@ -480,7 +482,10 @@ async function Main() {
           continue;
         }
         if (!report) {
-          manifest.cues[cut.cue] = { files, seconds: cut.durS,
+          const seconds = group.prebaked ? (manifest.cues[cut.cue]?.seconds ?? cut.durS) : cut.durS;
+          // prebaked 的清单条目由它自己的烘焙脚本写（战车循环带 loopSpans），这里只盖登记字段、不丢别的键。
+          manifest.cues[cut.cue] = { ...(group.prebaked ? manifest.cues[cut.cue] : {}), files, seconds,
+            ...(cut.loop ? { loop: true } : {}),
             credit: cut.credit || group.credit, license: group.license };
         }
         console.log(`  SeedAudio · ${cut.cue} ${cut.durS}s`

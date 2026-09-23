@@ -152,6 +152,8 @@ const PROPAGATION_MAX_S = 1.4;
 /** 除了枪与炸，还有哪些 cue 走延迟。 */
 const PROPAGATION_CUES = new Set([
   "shellImpact", "shellIncoming", "launcherPop", "amb.cannonFar",
+  // 第一关战车主炮三层：炮口焰先到、炮声后到（五六十米就是一百五十多毫秒）。
+  "tankCannon", "tankCannonMid", "tankCannonFar",
 ]);
 /** 枪类 cue 里 FAR_CUE / SAMPLE_BURST 覆盖不到的那几条。 */
 const GUN_EXTRA_CUES = new Set([
@@ -179,6 +181,9 @@ const DUCK_ON = {
   shellImpact: { seconds: 0.8, amount: 0.45, range: 55 },
   launcherPop: { seconds: 0.5, amount: 0.25, range: 30 },
   strafeNear: { seconds: 0.7, amount: 0.35, range: 40 },
+  // 战车主炮：近层与近炸同档，中层按中炸。远层（林间那一发）不压 —— 它本来就是背景里的一声。
+  tankCannon: { seconds: 1.0, amount: 0.5, range: 60 },
+  tankCannonMid: { seconds: 0.8, amount: 0.35, range: 110 },
 };
 /** 缩放之后低于这个量就不触发：压 3% 谁也听不出来，只是白改一次总线增益。 */
 const DUCK_MIN_AMOUNT = 0.06;
@@ -190,7 +195,7 @@ const DUCK_MIN_AMOUNT = 0.06;
  * **几百米外的一记闷响把玩家的耳朵震了**。耳鸣是「炸在脸上」的独有反馈，
  * 所以现在一律要过 DEAFEN_M 这道距离闸。
  */
-const DEAFEN_ON = { explosionNear: 0.42, explosionMid: 0.3, shellImpact: 0.3 };
+const DEAFEN_ON = { explosionNear: 0.42, explosionMid: 0.3, shellImpact: 0.3, tankCannon: 0.3 };
 /** 炸到这么近才耳鸣。12 m 是手榴弹的杀伤半径量级：再远只是很响，不是被震。 */
 const DEAFEN_M = 12;
 /**
@@ -1880,6 +1885,85 @@ const RECIPES = {
     };
   },
 
+  // --- 第一关战车（战车包 2026-09-23）：合成回落 -----------------------------------
+  // 实录采样见 Data_SfxSources.TANK_SFX（Script_TankAudioBake 烘）。三条常驻循环盖上采样后换成
+  // TankLoopSampleRecipe（不是 SampleRecipe）；控制全在 Script_TankAudio，这里只认 v.SetTank(p)。
+  tankEngine(A, v) { TankSynthLoop(A, v, "tankEngine"); },
+  tankTracks(A, v) { TankSynthLoop(A, v, "tankTracks"); },
+  tankTurret(A, v) { TankSynthLoop(A, v, "tankTurret"); },
+  // 九〇式 57 mm 短炮：低初速，炮口是一记闷而宽的「嗵」，不是步枪那种脆响。
+  tankCannon(A, v) {
+    const t = v.t;
+    Thud(v, t, 95, 32, 0.9, 0.95, 320);
+    const src = v.Noise("brown", 0.5), lp = v.Filter("lowpass", v.F(1600), 0.7), g = v.Gain(FLOOR);
+    Hit(g.gain, t, 0.7, 0.003, 0.4);
+    src.connect(lp).connect(g).connect(v.out);
+    v.Start(src, t, 0.5);
+    v.wetGain.gain.value = 0.5;
+  },
+  tankCannonMid(A, v) {
+    const t = v.t;
+    Thud(v, t, 70, 28, 1.2, 0.7, 240);
+    const src = v.Noise("brown", 1.4), lp = v.Filter("lowpass", v.F(700), 0.7), g = v.Gain(FLOOR);
+    Hit(g.gain, t, 0.45, 0.01, 1.2);
+    src.connect(lp).connect(g).connect(v.out);
+    v.Start(src, t, 1.4);
+    v.wetGain.gain.value = 0.6;
+  },
+  tankCannonFar(A, v) {
+    const t = v.t;
+    Thud(v, t, 55, 26, 1.6, 0.55, 180);
+    const src = v.Noise("brown", 2.4), lp = v.Filter("lowpass", v.F(320), 0.7), g = v.Gain(FLOOR);
+    Swell(g.gain, t, 0.35, 0.03, 0.2, 2.0);
+    src.connect(lp).connect(g).connect(v.out);
+    v.Start(src, t, 2.4);
+    v.wetGain.gain.value = 0.7;
+  },
+  // 履带尖啸：钢对钢挤出来的一两根滑动音调，由强到弱。
+  tankTrackSqueal(A, v) {
+    const t = v.t, dur = 0.8;
+    const o = v.Osc("sawtooth", v.F(1450)), band = v.Filter("bandpass", v.F(1600), 6), g = v.Gain(FLOOR);
+    Glide(o.frequency, t, v.F(1450), v.F(1150), dur);
+    Swell(g.gain, t, 0.35, 0.05, dur * 0.3, dur * 0.6);
+    o.connect(band).connect(g).connect(v.out);
+    v.Start(o, t, dur);
+    MetalScrape(v, t, dur, 900, 600, 0.2);
+  },
+  // 低速炮弹掠过：粗重的一声呼，贴近最响、音调往下走。
+  tankShellPass(A, v) {
+    const t = v.t, dur = 0.7;
+    const src = v.Noise("pink", dur), band = v.Filter("bandpass", v.F(900), 1.4), g = v.Gain(FLOOR);
+    Glide(band.frequency, t, v.F(900), v.F(260), dur);
+    Swell(g.gain, t, 0.8, dur * 0.45, 0.02, dur * 0.5);
+    src.connect(band).connect(g).connect(v.out);
+    v.Start(src, t, dur);
+  },
+  // 步枪弹打在装甲上：一声「当」，不是「哐」。
+  tankArmorPing(A, v) {
+    const t = v.t;
+    MetalClick(v, t, v.R(2200, 2800), 0.9, 0.28, 28);
+    MetalClick(v, t + 0.002, v.R(4800, 5600), 0.45, 0.12, 20);
+  },
+  tankHatch(A, v) {
+    const t = v.t;
+    Thud(v, t, 170, 60, 0.18, 0.7, 500);
+    MetalClick(v, t, 1700, 0.6, 0.2, 10);
+    MetalClick(v, t + 0.05, 3100, 0.25, 0.08, 12);
+  },
+  // 熄火：点火脉冲越来越稀、越来越低，两下咳嗽之后停住。
+  tankStall(A, v) {
+    const t = v.t, dur = 1.9;
+    const o = v.Osc("sawtooth", v.F(34)), lp = v.Filter("lowpass", v.F(180), 0.8), g = v.Gain(FLOOR);
+    Glide(o.frequency, t, v.F(34), v.F(9), dur);
+    Swell(g.gain, t, 0.55, 0.02, dur * 0.55, dur * 0.4);
+    o.connect(lp).connect(g).connect(v.out);
+    v.Start(o, t, dur);
+    Thud(v, t + dur * 0.5, 80, 40, 0.18, 0.5);
+    Thud(v, t + dur * 0.72, 70, 35, 0.2, 0.4);
+  },
+  tankTurretJam(A, v) { MetalScrape(v, v.t, 1.4, 700, 420, 0.5); },
+  tankCoolTick(A, v) { Ticks(v, v.t, 5, 1.6, 2600, 6200, 0.35, 0.02, 20); },
+
   // 空对地扫射（近）：航空机枪 ~900 rpm。**这条必须是一梭子**，
   // 不是一发 —— 一发就成了地面上有人在点射，扫射的身份全在射速上。
   // 逐发排会被节点预算吃掉一半，所以走 GunAuto（整条点射共用一套发声链）。
@@ -2520,9 +2604,16 @@ const OCCLUSION_MAX_VOICE = 0.5;
  *      的高频吃掉了。现在留一段起音期（见 Deafen 的 holdS）。
  */
 function IsBlastCue(name) {
-  return name === "explosionNear" || name === "explosionMid" || name === "shellImpact";
+  // 战车主炮的炮口声同理：大半能量在 120 Hz 以下，一堵院墙挡不住（战车包 2026-09-23）。
+  return name === "explosionNear" || name === "explosionMid" || name === "shellImpact" || name.startsWith("tankCannon");
 }
 const OCCLUSION_MAX_BLAST = 0.25;
+/**
+ * 战车常驻循环（发动机 / 履带 / 手摇）的遮挡封顶（战车包 2026-09-23）。
+ * 12 吨的车隔着一道土坎：高频被挡掉，隆隆声照样翻过来 —— 03「先闻其声」靠的就是这一层。
+ * 探针对整道高地后面的车给 1.0（实测），不封顶就是 −12 dB 干声 + 800 Hz 低通，两百米外等于没有。
+ */
+const OCCLUSION_MAX_TANK_LOOP = 0.5;
 
 /**
  * 喊话的嘴离脚底多高。与 `Data_Companions.COMPANION_TUNING.mouthY`（1.52）同值 ——
@@ -2625,6 +2716,10 @@ const NODE_COST = {
   painMoan: 7, hitGrunt: 7, planeDive: 7, flareOut: 6,
   // 会飞的引擎持续声：三个振荡器 + 拍频 LFO + 滤波 + 两个 gain，整条航线只有一条。
   planeDrone: 9,
+  // 第一关战车（合成回落那条路；采样盖上后由 LoadSfxPack 按层数重写）。三条循环常驻，合计 ≤ 20。
+  tankEngine: 9, tankTracks: 7, tankTurret: 7,
+  tankCannon: 10, tankCannonMid: 10, tankCannonFar: 10, tankTrackSqueal: 10, tankShellPass: 3,
+  tankArmorPing: 6, tankHatch: 12, tankStall: 11, tankTurretJam: 3, tankCoolTick: 3,
   // --- 接线批 INT4（2026-09-08）：照各自建了几个节点数出来，再往上留两格 -----
   // 这一档里 **bulletCrack 是要紧的那一条**：它按每一发结算，一梭子机枪能在
   // 100 ms 内请求三条（限速见 Data_Tuning_Audio.NEAR_MISS）。写小了会让弹啸挤掉枪声。
@@ -2728,7 +2823,7 @@ export const MUSIC_BASE = "Audio/Music/";
 // 2026-09-13：汉阳造 01 专用连续枪响＋枪机实录进入清单。
 // 2026-09-15：那一条拆成枪声 rifleHanYang（同文件名、内容变了）与枪机 boltHanYang。
 // 2026-09-17：大刀挥空从三条换成一条（AudioSfx_DadaoSwing_01 同文件名、内容变了）。
-export const SFX_PACK_VERSION = "20260924userpickedgunfire";
+export const SFX_PACK_VERSION = "20260924tankgunfire";
 export const AMB_PACK_VERSION = "20260912trainonly";
 export const MUSIC_PACK_VERSION = "5";
 
@@ -2910,6 +3005,12 @@ const SAMPLE_MIX = {
   // 枪尾在 PlayGunshot 里已按 0.55 追加，这里只做素材间的齐平。
   gunTailOpenRifle: 0.6, gunTailStreetRifle: 0.6, gunTailInteriorRifle: 0.6,
   gunTailOpenMg: 0.6, gunTailStreetMg: 0.6, gunTailInteriorMg: 0.6,
+  // 第一关战车。循环各层的相对电平由 Data_Tuning_Tank.audio 在 SetTank 里给，这里只是整条站多高。
+  // 主炮近层与 explosionNear 同档（一门炮在你面前开火不该比手榴弹轻）；中 / 远层按远射那一档往下压。
+  tankEngine: 1.1, tankTracks: 0.7, tankTurret: 0.75,
+  tankCannon: 1.0, tankCannonMid: 0.8, tankCannonFar: 0.62,
+  tankTrackSqueal: 0.5, tankShellPass: 0.9, tankArmorPing: 0.6, tankHatch: 0.7,
+  tankStall: 0.9, tankTurretJam: 0.6, tankCoolTick: 0.35,
 };
 
 /** 混响 send。远的、开阔的给多，贴身的小动作几乎不给。 */
@@ -2951,6 +3052,10 @@ const SAMPLE_WET = {
   gunTailOpenRifle: 0.8, gunTailOpenMg: 0.85,
   gunTailStreetRifle: 0.5, gunTailStreetMg: 0.55,
   gunTailInteriorRifle: 0.32, gunTailInteriorMg: 0.36,
+  // 战车：主炮远层素材自带林间回声，湿声反而少给；近层要房间。循环见 TankLoopVoice。
+  tankCannon: 0.5, tankCannonMid: 0.45, tankCannonFar: 0.3,
+  tankTrackSqueal: 0.3, tankShellPass: 0.15, tankArmorPing: 0.3, tankHatch: 0.25,
+  tankStall: 0.3, tankTurretJam: 0.2, tankCoolTick: 0.1,
 };
 
 /**
@@ -3069,6 +3174,102 @@ function SampleRecipe(buffers, name) {
     }
     if (wet !== undefined && v.wetGain) v.wetGain.gain.value = wet;
   };
+}
+
+// ===========================================================================
+// 第一关战车的三条常驻循环（战车包 2026-09-23）
+//
+// 一条 voice 就是一个会跟车走的声源（Script_TankAudio 每帧 MoveVoice）。**配方只管发声，不管映射**：
+// 转速 → 各层增益与变速、车速 → 履带、手摇速度 → 棘轮，这些映射全在 Script_TankAudio（纯逻辑、能在 node 里测），
+// 这里只暴露一个 `v.SetTank({ gains: [...], rates: [...], subHz, subGain }, tau)`，合成版与采样版同一个接口。
+//
+// 发动机那一条里多一层**次低频点火脉冲**（30–70 Hz，锯齿波过 120 Hz 低通）：音效总线不吃对白的侧链闪避，
+// 所以剧情对白压着的时候车还在地上「嗵嗵嗵」—— 那是压迫感的底座，不能跟着让路。
+//
+// 采样循环不从文件头尾接：烘焙时在一整圈后面多接了 0.2 s，清单 loopSpans 给出 [起, 止)，
+// 只在中间那一整圈里转（MP3 两头的编码器延迟永远对不齐，见 Script_TankAudioBake 的 LOOP_MARGIN_S）。
+// ===========================================================================
+const TANK_LOOP_CUES = new Set(["tankEngine", "tankTracks", "tankTurret"]);
+
+/** 发动机的次低频层。 */
+function TankSubLayer(v) {
+  const o = v.Osc("sawtooth", 32), lp = v.Filter("lowpass", 120, 0.7), g = v.Gain(FLOOR);
+  o.connect(lp).connect(g).connect(v.out);
+  o.start(v.t);
+  return { o, g };
+}
+
+/** 把 SetTank 的参数落到各层上。tau = 0：立即（第一次设值用，免得从默认值滑过去）。 */
+function TankApply(A, layers, sub, p, tau) {
+  const at = A.ctx.currentTime;
+  const Put = (param, value) => {
+    param.cancelScheduledValues(at);
+    if (tau > 0) param.setTargetAtTime(value, at, tau); else param.setValueAtTime(value, at);
+  };
+  layers.forEach((layer, i) => {
+    if (p.gains && Number.isFinite(p.gains[i])) Put(layer.g.gain, Math.max(FLOOR, p.gains[i]));
+    if (p.rates && Number.isFinite(p.rates[i])) layer.SetRate(Put, Clamp(p.rates[i], 0.25, 4));
+  });
+  if (sub) {
+    if (Number.isFinite(p.subHz)) Put(sub.o.frequency, Clamp(p.subHz, 20, 120));
+    if (Number.isFinite(p.subGain)) Put(sub.g.gain, Math.max(FLOOR, p.subGain));
+  }
+}
+
+function TankLoopVoice(A, v, name, layers, sub) {
+  v.loop = true;
+  v.tankLoop = name;
+  v.Live(3600);
+  v.SetTank = (p, tau = 0.08) => TankApply(A, layers, sub, p || {}, tau);
+  // 没人驱动时（编辑器试听、AudioTest 逐条播）的默认：怠速在转、履带与手摇各给一半，听得见是什么。
+  v.SetTank({ gains: layers.map((_, i) => (name === "tankEngine" ? (i === 0 ? 0.8 : 0.15) : 0.5)),
+    rates: layers.map(() => 1), subHz: 30, subGain: 0.25 }, 0);
+  v.wetGain.gain.value = name === "tankEngine" ? 0.3 : 0.2;
+}
+
+/** 采样版：每个文件一层（发动机两层：怠速 / 负载），各自在 loopSpans 那一圈里转，随机相位起播。 */
+function TankLoopSampleRecipe(buffers, name, spans) {
+  return (A, v) => {
+    const layers = buffers.map((buf, i) => {
+      const src = v.Own(A.ctx.createBufferSource());
+      src.buffer = buf;
+      src.loop = true;
+      const span = spans?.[i];
+      src.loopStart = span ? Math.min(span[0], buf.duration * 0.5) : Math.min(0.1, buf.duration * 0.1);
+      src.loopEnd = span ? Math.min(buf.duration, span[1]) : Math.max(src.loopStart + 0.05, buf.duration - 0.1);
+      const g = v.Gain(FLOOR);
+      src.connect(g).connect(v.out);
+      src.start(v.t, src.loopStart + v.rng() * (src.loopEnd - src.loopStart));
+      return { g, SetRate: (Put, r) => Put(src.playbackRate, r) };
+    });
+    TankLoopVoice(A, v, name, layers, name === "tankEngine" ? TankSubLayer(v) : null);
+  };
+}
+
+/** 合成回落：发动机两层锯齿、履带是被方波调幅的带通噪声、手摇是 4 Hz 的咔嗒。 */
+function TankSynthLoop(A, v, name) {
+  const layers = [];
+  if (name === "tankEngine") {
+    for (const [hz, cut] of [[46, 700], [92, 1400]]) {
+      const o = v.Osc("sawtooth", v.F(hz)), lp = v.Filter("lowpass", v.F(cut), 0.8), g = v.Gain(FLOOR);
+      o.connect(lp).connect(g).connect(v.out);
+      o.start(v.t);
+      layers.push({ g, SetRate: (Put, r) => Put(o.frequency, v.F(hz) * r) });
+    }
+  } else {
+    const src = v.Own(A.ctx.createBufferSource());
+    src.buffer = A.NoiseBuffer("white");
+    src.loop = true;
+    const band = v.Filter("bandpass", v.F(name === "tankTracks" ? 1100 : 2600), name === "tankTracks" ? 1.2 : 6);
+    const am = v.Gain(0.5), lfo = v.Osc("square", name === "tankTracks" ? 6 : 4), depth = v.Gain(0.5), g = v.Gain(FLOOR);
+    lfo.connect(depth).connect(am.gain);
+    src.connect(band).connect(am).connect(g).connect(v.out);
+    src.start(v.t);
+    lfo.start(v.t);
+    const base = lfo.frequency.value;
+    layers.push({ g, SetRate: (Put, r) => Put(lfo.frequency, base * r) });
+  }
+  TankLoopVoice(A, v, name, layers, name === "tankEngine" ? TankSubLayer(v) : null);
 }
 
 /**
@@ -4288,9 +4489,11 @@ export class AudioEngine {
           this.sampleCues.add("bugleCharge");
         } else {
           if (!RECIPES[cue]) throw new Error("没有同名配方，盖不上去");
-          RECIPES[cue] = SampleRecipe(buffers, cue);
+          // 战车三条常驻循环：多层、带 SetTank 接口（见 TankLoopSampleRecipe）。每层 2 个节点，发动机多 3 个次低频。
+          RECIPES[cue] = TANK_LOOP_CUES.has(cue) ? TankLoopSampleRecipe(buffers, cue, entry.loopSpans) : SampleRecipe(buffers, cue);
           MIX_GAIN[cue] = SAMPLE_MIX[cue] ?? 1;
-          NODE_COST[cue] = SAMPLE_BURST[cue] ? 8 : 2;
+          NODE_COST[cue] = TANK_LOOP_CUES.has(cue) ? buffers.length * 2 + (cue === "tankEngine" ? 3 : 0)
+            : SAMPLE_BURST[cue] ? 8 : 2;
           this.sampleCues.add(cue);
         }
         ok += 1;
@@ -5059,6 +5262,7 @@ export class AudioEngine {
       if (IsVoiceCue(name)) occ = Math.min(occ, OCCLUSION_MAX_VOICE);
       // 爆炸封顶（见 IsBlastCue）：一层木板挡不住冲击波，低频照样绕得过来。
       if (IsBlastCue(name)) occ = Math.min(occ, OCCLUSION_MAX_BLAST);
+      if (TANK_LOOP_CUES.has(name)) occ = Math.min(occ, OCCLUSION_MAX_TANK_LOOP);
       v.occ = occ;
       v.occAt = now;
       // 空气吸收：距离越远高频掉得越快。20 m 上还有 8 kHz，200 m 上只剩 1 kHz 出头。
@@ -5235,6 +5439,7 @@ export class AudioEngine {
         let occ = this.Occlusion(position, distance);
         if (this.ZoneBoundary(voice.reverbZone || this.space)) occ = Clamp01(occ + ZONE_BOUNDARY_OCC);
         if (IsVoiceCue(voice.name)) occ = Math.min(occ, OCCLUSION_MAX_VOICE);   // 与 Play 同一道封顶
+        if (TANK_LOOP_CUES.has(voice.name)) occ = Math.min(occ, OCCLUSION_MAX_TANK_LOOP);
         voice.occ = occ;
         // occGain 是起播那一刻按 occ > 0 才建的。起播时通透、飞到墙后面去的那种
         // 只能靠低通与湿声表达 —— 中途插节点要断开重接一条正在响的链，
