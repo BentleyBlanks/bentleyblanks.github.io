@@ -1,7 +1,8 @@
 # Approved character appearances
 
 User selection, 2026-09-11: NRA02 and NRA05 only; IJA01, IJA02 and IJA03 only.
-User approval, 2026-09-24: IJA06 (source index 5) joins the IJA list as the standard rifleman.
+User approval, 2026-09-24: IJA06 (source index 5) joins the IJA list as the standard rifleman,
+and NRA06 (source index 5) is approved as the interpreter's cast-only look.
 Luo uses NRA05. Young companions, train recruits and the cutscene protagonist use NRA02.
 NRA officers use NRA05; IJA officers use IJA01. Gameplay and the actor editor share
 `Data_CharacterSelection.mjs`; explicit rejected variants also resolve within this allowlist.
@@ -28,6 +29,33 @@ is `[5, 5, 5, 0, 0, 1, 2]`: IJA06 is the most frequent face and the other approv
 faces stay mixed in. 日兵甲 is pinned to IJA06 with its facial skin
 (`Model_LugouIja06Facial.glb`, [speaker faces](Data_CharacterSpeech.md)); IJA officers
 remain IJA01.
+
+## NRA06 interpreter (2026-09-24)
+
+The user asked for the interpreter's look after his second reference (the classic film
+collaborator interpreter): round fat face, small round wire spectacles, one protruding
+upper front tooth, raised anxious brows, a soft cap with a star, an open dark Chinese
+jacket over a white vest. `_import/Script_BuildLugouNra06.py` builds `Model_LugouNra06.glb`
+from NRA02 in Blender (BlenderMCP; source project
+`Blender/Taierzhuang1938/Characters_20260924/Scene_LugouNra06.blend`):
+
+- head reshaped without changing topology: puffed cheeks, wider jowls, a soft double
+  chin, brows lifted more at the inner ends; heavier brows painted on the face texture;
+- clothes re-dyed on the uniform atlas: dark jacket and trousers, near-black cap, collar
+  tabs, pips, brass buttons, name tag and cuffs gone, and a white vest painted down the
+  open jacket front (its normal map flattened there); the material is renamed
+  `Material_InterpreterGarb`, so neither the NRA uniform tint nor the opening's old
+  dark-cloth dye (both keyed on the uniform material name) touch it;
+- the cross strap, belt and hip tool primitives removed; the cap badge repainted as a pale
+  five-point star; round wire spectacles (874 triangles) added to the badge primitive,
+  rigid on the head bone;
+- the buck tooth is facial geometry (see [speaker faces](Data_CharacterSpeech.md)).
+
+The whole model is 10,321 triangles (NRA02: 9,917). It is not a soldier look: it is in
+`CHARACTER_CAST_VARIANTS_BY_KIND` (nra: [5]) and only spawns for a pinned speaking role
+that asks for it with its castId (`IsApprovedCharacterVariant`); anonymous pools, the kind
+lists and the actor editor never offer it. Skeleton and clips are NRA02's
+(`CHARACTER_CLIP_SOURCE_BY_MODEL`, `CHARACTER_INFANTRY_SOURCE_BY_MODEL`).
 
 Source GLBs and canonical animation references remain available for provenance.
 The NRA01 beard is present in the supplied NRA MAX source (`VITOH_d.mipmap.jpg`),

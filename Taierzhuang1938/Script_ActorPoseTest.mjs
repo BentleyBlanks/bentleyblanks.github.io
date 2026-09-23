@@ -293,6 +293,22 @@ try {
       }
       candidate.Dispose();
     }
+    // The interpreter's NRA06 (2026-09-24) is cast-only: a bare number never reaches it, its
+    // castId does, and its cloth is not the NRA uniform material (no uniform tint on it).
+    for (const seed of [0, 1, 2]) {
+      const bare = factory.Create("nra", {seed, modelVariant: 5, weapon: null});
+      check(bare.modelId !== "LugouNra06", `NRA06 without its castId: ${bare.modelId}`);
+      bare.Dispose();
+    }
+    const interpreter = factory.Create("nra", {seed: 3, modelVariant: 5, castId: "interpreter", weapon: null});
+    check(interpreter.modelId === "LugouNra06" && !!interpreter.characterRig.facial && !interpreter.pooled,
+      `interpreter wears the NRA06 facial skin: ${interpreter.modelId}`);
+    const garb = [];
+    interpreter.root.traverse(mesh => { if (mesh.isMesh) for (const m of [mesh.material].flat()) garb.push(m.name); });
+    check(garb.includes("Material_InterpreterGarb") && !garb.includes("Material #1721585337"), `interpreter cloth: ${[...new Set(garb)].join(",")}`);
+    check(!Cloth(interpreter), "no NRA uniform tint on the interpreter");
+    checkHeadHitbox(interpreter);
+    interpreter.Dispose();
     const protagonist = factory.Create("nra", { seed: "player", protagonist: true, weapon: null });
     check(protagonist.modelId === "LugouNra02",
       `protagonist should use LugouNra02, got ${protagonist.modelId}`);
