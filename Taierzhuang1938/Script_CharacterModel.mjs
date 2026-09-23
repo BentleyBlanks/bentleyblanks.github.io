@@ -4,7 +4,7 @@
 // 这里实例化。每名士兵只抽取获准外观；第一人称过场主角固定 Nra02。
 
 import * as THREE from "three";
-import { CHARACTER_MODEL_VARIANTS_BY_KIND, CHARACTER_PROTAGONIST_VARIANT, CHARACTER_INFANTRY_SOURCE_BY_MODEL, CHARACTER_RANDOM_VARIANTS_BY_KIND, CharacterClipModelId } from "./Data_CharacterSelection.mjs";
+import { CHARACTER_MODEL_VARIANTS_BY_KIND, CHARACTER_PROTAGONIST_VARIANT, CHARACTER_INFANTRY_SOURCE_BY_MODEL, CHARACTER_RANDOM_VARIANTS_BY_KIND, CharacterClipModelId, IsApprovedCharacterVariant } from "./Data_CharacterSelection.mjs";
 import { ApplyNraUniform, NraUniformPalette } from "./Script_UniformColors.mjs";
 import { DEATH_POSE } from "./Data_DeathPose.mjs";
 import { DEATH_CONTACT } from "./Data_Tuning_ActorDeath.mjs";
@@ -265,7 +265,8 @@ const MODEL_FORWARD_YAW = Math.PI;
 // 戳不跟着走就会「新壳配旧芯」：清单是新的，浏览器缓存里的 GLB 还是旧的那批。
 // NRA eye maps and shoulder silhouettes: keep the manifest and GLBs on one revision.
 // 2026-09-23: facialUrl/facialVersion/facialCast for NRA02/IJA01/IJA02 (GLBs unchanged: ASSET_VERSION stays).
-const MANIFEST_URL = "./Model/Character/Data_LugouCharacterManifest.json?v=202609232000";
+// 2026-09-24: IJA06 (standard rifleman) and NRA06 (interpreter) records.
+const MANIFEST_URL = "./Model/Character/Data_LugouCharacterManifest.json?v=202609240300";
 const ASSET_VERSION = "202609061026";
 const DEATH_COLLAPSE_ASSET_VERSION = "202609151352";
 const DEATH_COLLAPSE_PLAYBACK_RATE = 1.6;
@@ -1409,7 +1410,9 @@ export function CreateLugouCharacterRig(
   if (!variants.length) return null;
   const allowed = LUGOU_MODEL_VARIANTS_BY_KIND[kind] || LUGOU_MODEL_VARIANTS_BY_KIND[faction];
   const randomVariants = CHARACTER_RANDOM_VARIANTS_BY_KIND[kind] || allowed;
-  const explicit = Number.isInteger(options.modelVariant) && allowed.includes(options.modelVariant)
+  // A named speaking role may also wear its cast-only look (the interpreter's NRA06).
+  const explicit = Number.isInteger(options.modelVariant) && (allowed.includes(options.modelVariant)
+    || IsApprovedCharacterVariant(kind, options.modelVariant, options.castId))
     ? options.modelVariant : null;
   const index = options.protagonist && faction === "nra"
     ? CHARACTER_PROTAGONIST_VARIANT

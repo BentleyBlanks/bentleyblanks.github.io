@@ -46,6 +46,14 @@ MODELS = {
 # IJA06 (standard rifleman, 2026-09-24) is IJA02 reshaped by _import/Script_BuildLugouIja06.py:
 # same head topology, lip line kept in place; its upper lids sit 2 mm lower (narrower eyes).
 MODELS['Ija06'] = {**MODELS['Ija02'], 'base': 'Model_LugouIja06.glb', 'eyeOpening': (1.10, .40)}
+# NRA06, the interpreter (2026-09-24), is NRA02 rebuilt by _import/Script_BuildLugouNra06.py:
+# same head topology (rounder cheeks and chin, lids untouched); the strap and hip tool
+# primitives are gone, so the eyes are primitive 3 and the badge + spectacles 4. One
+# protruding upper front tooth (buckTooth, Head-local cm) rides the head with the upper
+# teeth and rests over the lower lip, so it shows even with the lips together.
+MODELS['Nra06'] = {**MODELS['Nra02'], 'base': 'Model_LugouNra06.glb', 'eyePrim': 3, 'rigidPrims': [2, 4],
+                   'buckTooth': {'offset': .30, 'width': .60, 'thickness': .20, 'root': .80, 'tip': .72,
+                                 'overLip': .12}}
 
 # Pose deltas in Head-local cm (up, forward, outward for paired bones) and jaw
 # degrees about Head +Z (opens). Values follow the NRA05 review rig's ranges
@@ -481,7 +489,8 @@ def Author(job):
               'skinVertices': len(skinObject.data.vertices), 'lipLine': um, 'lipFront': fm, 'halfWidth': lm['halfWidth'],
               'tmj': [round(float(x), 2) for x in lm['tmj']],
               'eyes': [[round(float(x), 2) for x in e['center']] + [round(e['radius'], 2)] for e in lm['eyes']],
-              'faceVertices': int(sum((v > .01).astype(int) for v in weights.values()).astype(bool).sum())}
+              'faceVertices': int(sum((v > .01).astype(int) for v in weights.values()).astype(bool).sum()),
+              'buckTooth': lm.get('buckTooth')}
     if job.get('preview'): report['previews'] = len(Preview(scene, rig, job['preview'], model, headMatrix, lm))
     if job.get('save'):
         bpy.data.libraries.write(job['save'], {scene, bpy.data.actions['Animation_%sFacialPoses' % model]},
@@ -584,6 +593,30 @@ def BuildOral(scene, rig, lm, spec, headMatrix, model):
                         offset=.05, segments=1, affect='EDGES')
         bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
         Object('Oral_%s_Teeth%s' % (model, label), bm, 'Teeth', lambda p, jaw=jaw: jaw)
+
+    # Buck tooth: one long upper incisor from behind the upper lip, through the lip line,
+    # its tip resting a little in front of the lower lip (head-rigid like the upper row).
+    bt = spec.get('buckTooth')
+    if bt:
+        z0 = mz + bt['offset']
+        welded = lm['welded']; side = lm['side'][:len(welded)] if len(lm['side']) >= len(welded) else lm['side']
+        tipX = um - bt['tip']
+        near = (np.abs(welded[:, 0] - tipX) < .45) & (np.abs(welded[:, 2] - z0) < .45) & (side > 0)
+        lowerFront = float(welded[near, 1].max()) if near.any() else fm - .3
+        rootX = um + bt['root']; rootF = RimFront(bt['offset']) - .30
+        tipF = lowerFront + bt['overLip'] + bt['thickness']
+        bm = bmesh.new()
+        for v in bmesh.ops.create_cube(bm, size=1.0)['verts']:
+            t = .5 - v.co.z                                        # 0 root .. 1 tip
+            front = rootF + (tipF - rootF) * t
+            width = bt['width'] * (1 - .12 * t)
+            v.co = Vector((rootX + (tipX - rootX) * t, front - bt['thickness'] * (.5 - v.co.y), z0 + v.co.x * width))
+        bmesh.ops.bevel(bm, geom=[e for e in bm.edges if abs(e.verts[0].co.x - e.verts[1].co.x) > .2],
+                        offset=.05, segments=1, affect='EDGES')
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+        Object('Oral_%s_TeethBuck' % model, bm, 'Teeth', lambda p: 0.0)
+        lm['buckTooth'] = {'tipX': round(tipX, 2), 'tipFront': round(tipF, 2), 'lowerLipFront': round(lowerFront, 2),
+                           'rootX': round(rootX, 2), 'rootFront': round(rootF, 2)}
 
     # Tongue: flattened ellipsoid resting behind the lower teeth.
     bm = bmesh.new()
@@ -721,7 +754,7 @@ def BakeJobs(repo):
               'poseMask': POSE_MASK, 'eyes': EYES}
     jobs = {}
     for model, head, folder in (('Nra02', 'Bip002 Head', 'FacialRigs_20260923'), ('Ija02', 'Bip001 Head', 'FacialRigs_20260923'),
-                                ('Ija06', 'Bip001 Head', 'Characters_20260924')):
+                                ('Ija06', 'Bip001 Head', 'Characters_20260924'), ('Nra06', 'Bip002 Head', 'Characters_20260924')):
         jobs[model] = {**common, 'scene': 'Scene_%sFacialTalk' % model, 'rig': 'Rig_%sFacial' % model,
                        'headBone': head, 'base': 'Model_Lugou%s.glb' % model, 'output': 'Model_Lugou%sFacial.glb' % model,
                        'action': 'Animation_%sFacialPoses' % model, 'poseFrames': POSE_FRAMES, 'weightMode': 'index',

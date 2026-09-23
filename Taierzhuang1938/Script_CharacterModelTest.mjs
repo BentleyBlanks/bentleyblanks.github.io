@@ -23,7 +23,7 @@
 // ===========================================================================
 
 import assert from "node:assert/strict";
-import { CHARACTER_MODEL_VARIANTS_BY_KIND, CHARACTER_PROTAGONIST_VARIANT, CHARACTER_RANDOM_VARIANTS_BY_KIND } from "./Data_CharacterSelection.mjs";
+import { CHARACTER_MODEL_VARIANTS_BY_KIND, CHARACTER_PROTAGONIST_VARIANT, CHARACTER_RANDOM_VARIANTS_BY_KIND, CHARACTER_CAST_VARIANTS_BY_KIND, IsApprovedCharacterVariant } from "./Data_CharacterSelection.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -84,12 +84,12 @@ const manifestPath = path.join(characterDir, "Data_LugouCharacterManifest.json")
 assert.ok(fs.existsSync(manifestPath), "character bake manifest exists");
 const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
 assert.equal(manifest.schema, 2);
-assert.equal(manifest.models.length, 11, "eleven character records (IJA06 added 2026-09-24)");
+assert.equal(manifest.models.length, 12, "twelve character records (IJA06 and the NRA06 interpreter added 2026-09-24)");
 assert.deepEqual(manifest.models.map((model) => model.id), [
   "LugouIja01", "LugouIja02", "LugouIja03", "LugouIja04", "LugouIja05", "LugouIja06",
-  "LugouNra01", "LugouNra02", "LugouNra03", "LugouNra04", "LugouNra05",
+  "LugouNra01", "LugouNra02", "LugouNra03", "LugouNra04", "LugouNra05", "LugouNra06",
 ]);
-assert.equal(manifest.models.filter((model) => model.faction === "nra").length, 5);
+assert.equal(manifest.models.filter((model) => model.faction === "nra").length, 6);
 assert.equal(manifest.models.filter((model) => model.faction === "ija").length, 6);
 
 const expectedDeathClips = ["DeathCollapseA", "DeathCollapseB", "DeathCollapseC", "DeathCollapseD"];
@@ -214,7 +214,7 @@ for (const model of manifest.models) {
 
 // A material can exist yet contain no iris (the white/black eye regression).
 // Check the shipped eye primitive and the UV at each forward-facing corneal pole.
-for (const id of ["LugouNra02", "LugouNra04"]) {
+for (const id of ["LugouNra02", "LugouNra04", "LugouNra06"]) {
   const glb = LoadGlb(path.join(characterDir, "Model_" + id + ".glb"));
   const materialIndex = glb.json.materials.findIndex(material => material.name === "Material_NraEyes");
   assert.ok(materialIndex >= 0, id + " has a textured eye material");
@@ -355,6 +355,25 @@ assert.match(editor, /IsLugouAnimationAllowed\(actor\.kind, this\.clipId\)/,
 assert.match(editor, /动作适用对象/, "editor reports the action's intended character type");
 assert.match(runtime, /LUGOU_MODEL_VARIANTS_BY_KIND/, "runtime records the approved appearance contract");
 assert.deepEqual(CHARACTER_MODEL_VARIANTS_BY_KIND, {nra:[1,4],nraDare:[1,4],nraOfficer:[4],ija:[0,1,2,5],ijaOfficer:[0]});
+// The interpreter (NRA06, 2026-09-24) is a cast-only look: a castId unlocks it, nothing else does.
+assert.deepEqual(CHARACTER_CAST_VARIANTS_BY_KIND, {nra:[5]});
+assert.equal(IsApprovedCharacterVariant("nra", 5), false, "no anonymous or numbered NRA06");
+assert.equal(IsApprovedCharacterVariant("nra", 5, "interpreter"), true, "the pinned interpreter wears NRA06");
+assert.equal(IsApprovedCharacterVariant("nraDare", 5, "interpreter"), false);
+assert.match(runtime, /IsApprovedCharacterVariant\(kind, options\.modelVariant, options\.castId\)/,
+  "rig creation accepts a cast-only look only with its castId");
+{
+  // NRA06: the interpreter's clothes are not the NRA uniform material (no uniform tint or
+  // opening dye), the webbing primitives are gone, and the badge primitive carries the spectacles.
+  const glb = LoadGlb(path.join(characterDir, "Model_LugouNra06.glb"));
+  const names = glb.json.materials.map(material => material.name);
+  assert.ok(names.includes("Material_InterpreterGarb") && !names.includes("Material #1721585337"), "interpreter cloth material renamed");
+  assert.equal(glb.json.meshes[0].primitives.length, 5, "NRA06: head, hands, clothes, eyes, badge+spectacles");
+  assert.equal(glb.json.extras?.lugouVariant?.id, "LugouNra06");
+  const record = manifest.models.find(model => model.id === "LugouNra06");
+  assert.deepEqual(record.facialCast, ["interpreter"]);
+  assert.ok(!manifest.models.find(model => model.id === "LugouNra02").facialCast.includes("interpreter"));
+}
 assert.equal(CHARACTER_PROTAGONIST_VARIANT, 1);
 for (const [kind, variants] of Object.entries(CHARACTER_RANDOM_VARIANTS_BY_KIND)) {
   assert.deepEqual([...new Set(variants)].sort(), [...CHARACTER_MODEL_VARIANTS_BY_KIND[kind]].sort(), "anonymous weighting retains exactly the approved models");
