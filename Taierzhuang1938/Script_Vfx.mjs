@@ -1375,6 +1375,8 @@ const MUZZLE_KINDS = {
   hmg: { size: 0.40, life: 0.050, smoke: 3, wisps: 2, spikes: 3 },
   pistol: { size: 0.19, life: 0.040, smoke: 1, wisps: 1, spikes: 2 },
   launcher: { size: 0.58, life: 0.075, smoke: 5, wisps: 4, spikes: 3 },
+  // 战车主炮（57 mm 短身管）：炮口一团大火、浓烟往前推一大截；地面那圈尘环另走 GroundDustRing。
+  cannon: { size: 1.05, life: 0.095, smoke: 9, wisps: 6, spikes: 4 },
 };
 
 const EXPLOSION_KINDS = {
@@ -1977,6 +1979,39 @@ export class VfxSystem {
    * 曳光/弹道。中方偏暖白、日方偏冷白 —— 这是玩家分辨"谁在朝我打"的唯一线索。
    * 拉伸长度按速度给：帧间位移约 8 m，streak 短了就变成一串虚线。
    */
+  /**
+   * 炮口冲击波掀起的地面尘环（战车主炮）。尘从炮口正下方的地面一圈往外推、慢慢升起，
+   * 1–1.5 s 里把车前那片遮住 —— 玩家冲出掩体的天然窗口，也是「刚开过炮」的读法。
+   * @param {THREE.Vector3} position 炮口投到地面上的点（y = 地面高）
+   * @param {THREE.Vector3} direction 炮口朝向（只用水平分量）：环往炮口前方偏
+   */
+  GroundDustRing(position, direction, { radius = 3.2, life = 1.3, count = 16 } = {}) {
+    const n = Math.max(6, Math.round(count * this.spawnScale));
+    const fx = direction?.x || 0, fz = direction?.z || 0, fl = Math.hypot(fx, fz) || 1;
+    for (let i = 0; i < n; i += 1) {
+      const a = (i / n) * Math.PI * 2 + this._Signed(0.2);
+      const cx = Math.cos(a), cz = Math.sin(a);
+      // 前半圈更猛：冲击波顺着炮口方向。
+      const bias = 0.55 + 0.45 * Math.max(0, (cx * fx + cz * fz) / fl);
+      const s = ResetSpawn();
+      s.x = position.x + cx * 0.4; s.y = position.y + 0.15; s.z = position.z + cz * 0.4;
+      const speed = radius * 2.4 * bias;
+      s.vx = cx * speed; s.vy = this._Range(0.35, 0.9); s.vz = cz * speed;
+      s.ax = this.wind.x * 0.4; s.ay = 0.25; s.az = this.wind.z * 0.4;
+      s.drag = 3.2;
+      s.life = life * this._Range(0.85, 1.15);
+      s.sizeStart = 0.35; s.sizeEnd = this._Range(1.3, 2.0) * bias;
+      s.opacity = 0.34; s.fadeIn = 0.04;
+      s.angle = this._Range(0, 6.283); s.spin = this._Signed(0.8);
+      s.colorA = VFX_PALETTE.soilAir; s.colorB = VFX_PALETTE.dust;
+      s.groundY = position.y;
+      s.seed = this.random();
+      this.pools.smoke.Spawn(s, this.time);
+    }
+    this.lastGroundRing = { x: position.x, y: position.y, z: position.z, count: n, radius, life };
+    return n;
+  }
+
   Tracer(from, to, { speed = 480, kind = "nra" } = {}) {
     TMP_A.copy(to).sub(from);
     const distance = TMP_A.length();

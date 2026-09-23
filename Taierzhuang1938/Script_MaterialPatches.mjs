@@ -772,6 +772,45 @@ ${DestructionShaderGlsl(destruction.maxVolumes)}`],
 }
 
 /**
+ * 贴图 u 向滚动（第一关战车履带，2026-09-23 战车包）。只在 `<uv_vertex>` 之后给已经算好的
+ * 各贴图 uv 加偏移，不动几何（运动矢量照旧由 matrixWorld 历史出，契约第 12 条）、不加采样器。
+ * `state` 是调用方持有的 `{ value: THREE.Vector2 }`：x = 整条履带的行进偏移（随车速累积），
+ * y = 原地转向时左右两条反向的差动量（按顶点 x 的正负分左右履带）。
+ * 只挂在克隆出来的那一份履带材质上（MissionView.BuildTank），别的战车 / 其他关不受影响。
+ * 履带贴图沿 u 周期平铺（Texture_Type89TrackBase 1024×256，横向 20 节），所以偏移无缝。
+ */
+export function MakeUvScrollPatch(state, { key = "uvScroll1" } = {}) {
+  if (!state) return null;
+  return MakePatch({
+    key,
+    uniforms: (uniforms) => { uniforms.uUvScroll = state; },
+    vertex: [
+      ["#include <common>", /* glsl */`
+        uniform vec2 uUvScroll;`],
+      ["#include <uv_vertex>", /* glsl */`
+        {
+          float uvScrollShift = uUvScroll.x + (position.x < 0.0 ? -uUvScroll.y : uUvScroll.y);
+          #ifdef USE_MAP
+            vMapUv.x += uvScrollShift;
+          #endif
+          #ifdef USE_NORMALMAP
+            vNormalMapUv.x += uvScrollShift;
+          #endif
+          #ifdef USE_ROUGHNESSMAP
+            vRoughnessMapUv.x += uvScrollShift;
+          #endif
+          #ifdef USE_METALNESSMAP
+            vMetalnessMapUv.x += uvScrollShift;
+          #endif
+          #ifdef USE_AOMAP
+            vAoMapUv.x += uvScrollShift;
+          #endif
+        }`],
+    ],
+  });
+}
+
+/**
  * 簇状前向光照的**局部光补丁**：替换 three 的点光/聚光循环。
  *
  * 它没有参数 —— 现役簇光系统是**全局单例**（`Script_ClusteredLights` 的

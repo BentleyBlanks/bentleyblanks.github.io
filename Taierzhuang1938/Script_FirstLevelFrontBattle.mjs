@@ -92,7 +92,8 @@ export class FirstLevelFrontBattle {
   }
   TankBlockade(){
     const r=this.r,t=r.tank;
-    if(!t.active||t.immobilized||t.fireDisabled||!r.Has("tankPositionPressured"))return false;
+    // 大脑接管时（t.brain）断履带不等于解围：MobilityKill 的炮塔与机枪照样封口，Disabled 才算。
+    if(!t.active||t.fireDisabled||(!t.brain&&t.immobilized)||!r.Has("tankPositionPressured"))return false;
     return !r.BlocksSight(r.view.TankMuzzle(t),r.Point(S.gap,B.guardHeightM),r.view.tankCollider);
   }
   Update(dt){
@@ -132,7 +133,8 @@ export class FirstLevelFrontBattle {
         r.Record("rightRearReached");r.Say("BundleOrder");
       }
     }
-    if((r.tank.roadProgress||0)>=this.RoadDistance(S.tankBlockIndex)-.2&&this.TankBlockade())r.Record("tankBlocksExit");
+    const atBlock=r.tank.brain?!!r.tank.atBlock:(r.tank.roadProgress||0)>=this.RoadDistance(S.tankBlockIndex)-.2;
+    if(atBlock&&this.TankBlockade())r.Record("tankBlocksExit");
   }
   UpdateSortie(){
     const r=this.r;

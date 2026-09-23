@@ -363,8 +363,9 @@ export class TankBrain {
       if (!world.Los || world.Los(from, point, t)) seen.add(t.id);
     }
     // 记忆：看见的刷新位置与速度；新暴露（离开视线超过 reexposeS）重置警告弹。
+    // 区域目标（阵位、缺口）是已知的地方，不用看见也记着；看没看见只决定打人还是打掩体沿。
     for (const t of candidates) {
-      if (!seen.has(t.id)) continue;
+      if (!seen.has(t.id) && t.kind !== "zone") continue;
       const m = this.memory.get(t.id);
       const fresh = !m || this.time - m.seenAt > G.reexposeS;
       const vx = m && this.time > m.seenAt ? (t.x - m.x) / Math.max(0.1, this.time - m.seenAt) : 0;
@@ -388,7 +389,7 @@ export class TankBrain {
       const age = this.time - m.seenAt;
       const visible = this.visible.has(t.id);
       if (!visible && age > G.memoryS) continue;
-      const score = this.Prior(t) * (visible ? 1 : G.unseenScale * (1 - age / G.memoryS));
+      const score = this.Prior(t) * (visible ? 1 : m.zone ? G.unseenZoneScale : G.unseenScale * (1 - age / G.memoryS));
       if (score > bestScore) { bestScore = score; best = { target: t, memory: m, visible }; }
     }
     return best;
@@ -420,7 +421,11 @@ export class TankBrain {
     const G = this.T.gunner, m = choice.memory, t = choice.target;
     const ground = this.GroundOf(m);
     let at, kind = "HE", warning = false;
-    if (m.zone) {
+    const lip = m.zone && !choice.visible ? world.Cover?.({ x: m.x, y: m.y, z: m.z }, from) : null;
+    if (lip) {
+      // 区域目标躲在实遮挡后面：轰那道掩体的沿（Script_FirstLevelFrontBreakables 一截截打掉）。
+      at = { ...lip }; kind = "cover";
+    } else if (m.zone) {
       const r = this.Range(t.scatterM?.[0] ?? G.zoneScatterMinM, t.scatterM?.[1] ?? G.zoneScatterMaxM) * Math.sqrt(this.rng());
       const a = this.rng() * Math.PI * 2;
       at = { x: m.x + Math.cos(a) * r, y: ground + 0.3, z: m.z + Math.sin(a) * r };

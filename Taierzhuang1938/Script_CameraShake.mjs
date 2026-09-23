@@ -50,6 +50,7 @@ export class CameraShake {
     this.pitch = 0; this.yaw = 0; this.roll = 0; this.rise = 0;
     this.diveSide = 1;              // 扑沟的侧滚左右交替，不然每次都往同一边栽
     this.events = { explosion: 0, nearMiss: 0, landing: 0, strafe: 0, hit: 0, dive: 0 };
+    this.rumble = 0; this.rumbleTarget = 0;
   }
 
   /** 往创伤桶里加。 */
@@ -138,6 +139,19 @@ export class CameraShake {
     return true;
   }
 
+  /**
+   * 战车隆隆：**每帧**喂一次（到车的水平距离、负载 0..1）。不进创伤桶（不和爆炸抢那一桶），
+   * 单独一层低频小抖；不喂就在 smoothS 里自己停。返回这一帧的隆隆量 0..1。
+   */
+  Rumble(distanceM, load01 = 0) {
+    const R = this.T.rumble;
+    if (!R) return 0;
+    const k = Clamp01(1 - Math.max(0, Number(distanceM) || 0) / R.rangeM);
+    const amount = k * k * (R.idle + (1 - R.idle) * Clamp01(load01));
+    this.rumbleTarget = Math.max(this.rumbleTarget, amount);
+    return amount;
+  }
+
   /** 每帧推进：创伤按秒漏，弹簧按子步积分，最后合成五个偏移。 */
   Update(dt) {
     const T = this.T;
@@ -157,15 +171,27 @@ export class CameraShake {
     this.yaw = amp * T.maxYawRad * n(11.7) + this.springs.yaw.x;
     this.roll = amp * T.maxRollRad * n(23.3) + this.springs.roll.x;
     this.rise = amp * T.maxRiseM * n(41.9) + this.springs.rise.x;
+    const R = T.rumble;
+    if (R) {
+      const fed = this.rumbleTarget > 0;
+      this.rumble += (this.rumbleTarget - this.rumble) * (1 - Math.exp(-step / R.smoothS));
+      this.rumbleTarget = 0;
+      if (fed || this.rumble > 1e-3) {
+        const r = (v) => (ValueNoise2(this.time * R.hz, v, this.seed) - 0.5) * 2;
+        this.pitch += this.rumble * R.pitchRad * r(57.1);
+        this.roll += this.rumble * R.rollRad * r(63.7);
+        this.rise += this.rumble * R.riseM * r(71.3);
+      } else this.rumble = 0;
+    }
   }
 
   /** 是否还在动（取证 / 测试用）。 */
   get Active() {
-    return this.trauma > 0 || Object.values(this.springs).some((s) => s.x !== 0 || s.v !== 0);
+    return this.trauma > 0 || this.rumble > 0 || Object.values(this.springs).some((s) => s.x !== 0 || s.v !== 0);
   }
 
   Reset() {
-    this.trauma = 0;
+    this.trauma = 0; this.rumble = 0; this.rumbleTarget = 0;
     for (const s of Object.values(this.springs)) s.Reset();
     this.pitch = 0; this.yaw = 0; this.roll = 0; this.rise = 0;
   }
@@ -173,7 +199,7 @@ export class CameraShake {
   /** 取证快照。 */
   State() {
     return {
-      trauma: this.trauma, pitch: this.pitch, yaw: this.yaw, roll: this.roll, rise: this.rise,
+      trauma: this.trauma, pitch: this.pitch, yaw: this.yaw, roll: this.roll, rise: this.rise, rumble: this.rumble,
       active: this.Active, events: { ...this.events },
     };
   }

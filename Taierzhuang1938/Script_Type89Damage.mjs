@@ -40,30 +40,41 @@ export class Type89Damage {
     object.position.set(V(0)*mirror,V(1),V(2));
     object.rotation.set(V(3),V(4)*mirror,V(5)*mirror);
   }
+  /**
+   * 两段毁伤（2026-09-23 战车包，Script_FirstLevelTankBrain）：履带断（trackCut）与发动机舱
+   * 炸穿（engineKilled）分开显示 —— 断履带只掉履带板、撕挡泥板、车体往断的一侧塌；炸穿
+   * 发动机舱才掀后甲板、冒黑烟。旧调用方不带 damageState（只有 immobilized）时两样一起上，
+   * 与原来一模一样。
+   */
   Update(time,tank) {
-    const damaged=!!tank.immobilized,visible=damaged&&!!(tank.present||tank.active);
+    const legacy=tank.damageState==null;
+    const trackCut=legacy?!!tank.immobilized:!!tank.trackCut;
+    const engine=legacy?!!tank.immobilized:!!tank.engineKilled;
+    const present=!!(tank.present||tank.active);
     const side=tank.damageSide===1?1:-1;
-    if(damaged && this.side!==side){
-      this.track.geometry.setIndex(this.cutTrack[side]);this.hull.geometry.setIndex(this.cutHull);this.side=side;
-    }else if(!damaged && this.side){
-      this.track.geometry.setIndex(this.trackIndex);this.hull.geometry.setIndex(this.hullIndex);this.side=0;
-    }
-    const elapsed=damaged?(Number.isFinite(tank.damageAt)?Math.max(0,time-tank.damageAt):D.duration):0;
-    if(damaged)this.Pose(this.model.root,D.hullFrames,elapsed,-side);
+    const trackKey=trackCut?side:0;
+    if(trackKey!==this.side){this.track.geometry.setIndex(trackKey?this.cutTrack[trackKey]:this.trackIndex);this.side=trackKey;}
+    if(engine!==!!this.engineCut){this.hull.geometry.setIndex(engine?this.cutHull:this.hullIndex);this.engineCut=engine;}
+    const Elapsed=at=>Number.isFinite(at)?Math.max(0,time-at):D.duration;
+    const trackElapsed=trackCut?Elapsed(tank.damageAt):0;
+    const engineElapsed=engine?Elapsed(legacy?tank.damageAt:(tank.engineAt??tank.damageAt)):0;
+    if(trackCut)this.Pose(this.model.root,D.hullFrames,trackElapsed,-side);
     else {this.model.root.position.set(0,0,0);this.model.root.rotation.set(0,0,0);}
     this.root.updateMatrixWorld(true);
     for(const {spec,mesh} of this.parts){
-      mesh.visible=visible;
-      if(!visible)continue;
+      const enginePart=spec.name==="EngineDeck"||spec.name==="EngineBay";
+      const show=present&&(enginePart?engine:trackCut);
+      mesh.visible=show;
+      if(!show)continue;
       const mirror=spec.mirror?-side:1;
-      mesh.scale.x=mirror;this.Pose(mesh,spec.frames,elapsed,mirror);
+      mesh.scale.x=mirror;this.Pose(mesh,spec.frames,enginePart?engineElapsed:trackElapsed,mirror);
       if(spec.attach==="ground"){
         this.point.copy(mesh.position);this.root.localToWorld(this.point);
         const floor=this.groundAt(this.point.x,this.point.z)+R.tankDamage.debrisClearanceM;
         if(this.point.y<floor){this.point.y=floor;this.root.worldToLocal(this.point);mesh.position.copy(this.point);}
       }
     }
-    if(visible && elapsed>=R.tankDamage.smokeDelayS){
+    if(present && engine && engineElapsed>=R.tankDamage.smokeDelayS){
       this.point.fromArray(R.tankDamage.engineOutlet);this.model.root.localToWorld(this.point);
       if(this.smoke==null)this.smoke=this.vfx?.SmokeSource(this.point,R.tankDamage.smoke)??null;
       else this.vfx?.MoveSmokeSource(this.smoke,this.point);

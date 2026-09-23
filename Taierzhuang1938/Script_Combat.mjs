@@ -757,6 +757,16 @@ export class CombatSystem {
     const player = this.host.player;
     if (player && player.Alive) {
       const at = player.position.clone(); at.y += BLAST.playerHitRiseM;
+      // 墙后近炸只给压制（见 BLAST.occludedSuppression*）：与伤害同一条遮挡判据，挡住了才走这支。
+      if (BLAST.occludedSuppressionIds?.includes(explosiveId)) {
+        const dist = at.distanceTo(from);
+        if (dist <= BLAST.occludedSuppressionM) {
+          const dir = this.tmpB.subVectors(at, from).divideScalar(dist || 1);
+          const hit = bf.Raycast(from, dir, dist, {terrain:true});
+          if (hit && hit.t < dist - BLAST.wallMarginM)
+            player.Suppress(BLAST.occludedSuppression * (1 - dist / BLAST.occludedSuppressionM), "blast");
+        }
+      }
       affect(at, (dmg, dir, falloff) => {
         player.Suppress(BLAST.playerSuppression * falloff, "blast");
         // 爆炸对玩家的口径也回数据层（COMBAT.player.blastScale）——

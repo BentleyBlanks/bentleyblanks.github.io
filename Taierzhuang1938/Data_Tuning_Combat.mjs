@@ -91,6 +91,12 @@ export const BLAST = Object.freeze({
   soldierSuppression: 0.8,
   playerSuppression: 0.9,     // 再乘距离衰减
   playerMinDamage: 4,         // 低于这个数只吃压制不掉血
+  // 2026-09-23 战车包：墙后 6 m 内挨一发战车炮，墙挡住了弹片（不掉血），但人照样被震住。
+  // 以前「有墙挡着」连压制一起取消，炮击掩体等于没打。只对列出的弹种生效（战车 57 mm），
+  // 别的炮击 / 手榴弹口径不变。压制量 = occludedSuppression × (1 − d / occludedSuppressionM)。
+  occludedSuppressionM: 6,
+  occludedSuppression: 0.6,
+  occludedSuppressionIds: Object.freeze(["Shell57"]),
   // 近/远两条**不同的录音**（城区爆炸 vs 远处爆炸），按**听者的距离**挑，
   // 不按爆炸半径挑：两百米外的一颗手榴弹不该拿贴脸那条 2.4 秒的城区爆炸播。
   nearAudioM: 60,

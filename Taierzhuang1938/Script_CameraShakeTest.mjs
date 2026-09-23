@@ -115,4 +115,25 @@ function Run(shake, seconds, dt = 1 / 60) {
   assert.ok(Number.isFinite(s.pitch) && Math.abs(s.pitch) < 1, "大步长不发散");
 }
 
-console.log("CameraShakeTest OK — 创伤漏光/弹簧回位/幅度封顶/距离与遮挡衰减/扑沟栽向下/确定性");
+// 战车隆隆：25 m 外没有、越近越抖、负载越大越抖；不进创伤桶；不喂就停；幅度小到不妨碍瞄准。
+{
+  const R = CAMERA_SHAKE.rumble;
+  const Peak = (distance, load) => {
+    const s = new CameraShake(CAMERA_SHAKE, 5);
+    let peak = 0;
+    for (let i = 0; i < 180; i += 1) { s.Rumble(distance, load); s.Update(1 / 60); peak = Math.max(peak, Math.abs(s.pitch)); }
+    assert.equal(s.trauma, 0, "隆隆不进创伤桶");
+    return { peak, s };
+  };
+  assert.equal(new CameraShake().Rumble(R.rangeM + 1, 1), 0, "范围外不抖");
+  const near = Peak(4, 1), far = Peak(18, 1), idle = Peak(4, 0);
+  assert.ok(near.peak > far.peak && far.peak > 0, `越近越抖 ${near.peak} > ${far.peak}`);
+  assert.ok(near.peak > idle.peak && idle.peak > 0, "负载越大越抖，怠速也有一点");
+  assert.ok(near.peak <= R.pitchRad + 1e-9, "俯仰不超过上限（不妨碍瞄准）");
+  const s = near.s;
+  for (let i = 0; i < 120; i += 1) s.Update(1 / 60);
+  assert.equal(s.rumble, 0, "不喂就停");
+  assert.ok(!s.Active, "停了以后不算在动");
+}
+
+console.log("CameraShakeTest OK — 创伤漏光/弹簧回位/幅度封顶/距离与遮挡衰减/扑沟栽向下/确定性/战车隆隆");

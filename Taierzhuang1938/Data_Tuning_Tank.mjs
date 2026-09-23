@@ -112,6 +112,8 @@ export const TANK = Object.freeze({
     inertia: 1.35,
     // 看不见的目标：记忆里还新鲜就按 lastKnown 的掩体打 HE，分数打这个折。
     unseenScale: 0.55,
+    // 区域目标（阵位 / 缺口）看不见时照样打（打它前面那道掩体的沿），分数打这个折。
+    unseenZoneScale: 0.8,
     // 保护：任何弹着点离 missionUntargetable / protect 的人至少这么远
     // （[旧] 弹片外沿 5 × BLAST.radiusScale 1.9 = 9.5 m，再留 0.3 m）。
     protectClearM: 9.8,
@@ -231,8 +233,8 @@ export const TANK = Object.freeze({
     trunnion: Object.freeze([0, 0.32, -0.6]),
     recoilM: 0.25,
     recoilReturnS: 0.45,
-    // 履带贴图滚动：每米车速对应的 uv 位移（[几] 履带贴图 v 向一圈约 9.6 m）。
-    trackUvPerM: 0.104,
+    // 履带贴图滚动：每米车速对应的 u 位移（[几] 履带网格 u 沿车长约 0.51 / m，贴图横向周期平铺）。
+    trackUvPerM: 0.51,
     // 履带扬尘：两条履带后方（车体局部），按速度调强度。
     trackDust: Object.freeze({
       offsets: Object.freeze([Object.freeze([-0.85, 0.2, 2.2]), Object.freeze([0.85, 0.2, 2.2])]),

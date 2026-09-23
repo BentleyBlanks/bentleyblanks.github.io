@@ -59,5 +59,26 @@ for(const side of [-1,1]){
   assert.deepEqual(model.root.position.toArray(),[0,0,0]);
 }
 damage.Update(100,{present:true,immobilized:true});assert.equal(sources.size,1);
+// 两段毁伤（Script_FirstLevelTankBrain）：只断履带 = 掉履带板、不掀后甲板、不冒烟；再炸发动机舱才掀甲板冒烟。
+{
+  const staged={present:true,active:true,damageState:"MobilityKill",immobilized:true,trackCut:true,engineKilled:false,damageAt:200,damageSide:1};
+  for(let i=0;i<=180;i++)damage.Update(200+i/60,staged);
+  assert.equal(damage.track.geometry.index.count,intact-3*D.cutTriangles["1"].length,"track cut on the struck side");
+  assert.equal(damage.hull.geometry.index,damage.hullIndex,"engine deck intact while only the track is cut");
+  assert.equal(sources.size,0,"no engine smoke for a mobility kill");
+  const byName=Object.fromEntries(damage.parts.map(p=>[p.spec.name,p.mesh]));
+  assert.ok(byName.TrackShoe_00.visible&&byName.TornFender.visible&&!byName.EngineDeck.visible&&!byName.EngineBay.visible);
+  Object.assign(staged,{damageState:"Disabled",engineKilled:true,engineAt:204});
+  for(let i=0;i<=120;i++)damage.Update(204+i/60,staged);
+  assert.notEqual(damage.hull.geometry.index,damage.hullIndex,"engine deck cut once the engine is killed");
+  assert.ok(byName.EngineDeck.visible&&byName.EngineBay.visible&&byName.TrackShoe_00.visible);
+  assert.equal(sources.size,1,"engine smoke only after the engine kill");
+  const engineOnly={present:true,active:true,damageState:"Disabled",immobilized:true,trackCut:false,engineKilled:true,damageAt:300,engineAt:300,damageSide:-1};
+  damage.Update(310,engineOnly);
+  assert.equal(damage.track.geometry.index,damage.trackIndex,"engine-only kill keeps both tracks");
+  assert.ok(!byName.TrackShoe_00.visible&&byName.EngineDeck.visible);
+  damage.Update(320,{present:true,active:true,damageState:"Intact"});
+  assert.equal(sources.size,0);assert.equal(damage.hull.geometry.index,damage.hullIndex);
+}
 damage.Dispose();assert.equal(sources.size,0);
-console.log("PASS Type89 damage: real source cut on both sides, 16 rigid parts, terrain contact, settle, reset, smoke lifecycle");
+console.log("PASS Type89 damage: real source cut on both sides, 16 rigid parts, terrain contact, settle, reset, smoke lifecycle, track-only vs engine stages");

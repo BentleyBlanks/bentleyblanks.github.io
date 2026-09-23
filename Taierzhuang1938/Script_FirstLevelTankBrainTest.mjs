@@ -154,6 +154,19 @@ function Run(brain, world, seconds, each = null) {
   ok(blind.some((f) => f.kind === "suppress"), "shells lastKnown cover when the target is unseen");
 }
 
+// --- 3b 区域目标躲在实遮挡后：轰掩体沿（给可破坏掩体一截截打掉） ---------------------------
+{
+  const brain = CreateTankBrain(StraightPath(), TANK, { seed: 13 });
+  brain.PlaceAt(1);
+  const zone = { id: "nestZone", kind: "zone", weight: 3, x: -25, y: 1.1, z: -72, ground: 0 };
+  const lip = { x: -24, y: 1.3, z: -70 };
+  const world = World({ targets: [zone], Los: () => false, Cover: () => ({ ...lip }) });
+  const shots = [];
+  Run(brain, world, 20, (o) => { for (const f of o.fire) if (f.weapon === "main") shots.push(f); });
+  ok(shots.length >= 2, "an unseen zone (nest behind its wall) is still shelled");
+  ok(shots.every((f) => f.kind === "cover" && Dist(f.at, lip) < 1e-6), "shells land on the cover lip in front of the zone");
+}
+
 // --- 4 视线预算：10 Hz、每 tick ≤ 6 条 ---------------------------------------------
 {
   const brain = CreateTankBrain(StraightPath(), TANK, { seed: 1 });

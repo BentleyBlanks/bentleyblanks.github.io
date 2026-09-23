@@ -11,6 +11,10 @@ import { ApplyShadowDepth, AttachShadowDepth } from "./Script_ShadowDepth.mjs";
 import { MISSION_PLACEMENT, MISSION_SUPPLIES, MISSION_SUPPLY_COLLIDER } from "./Data_FirstLevelMissionLayout.mjs";
 import { Type89Damage } from "./Script_Type89Damage.mjs";
 import { FRONT_BATTLE_TUNING } from "./Data_Tuning_FirstLevelFront.mjs";
+// 战车包（2026-09-23）：炮管运行时枢轴、履带滚动、按车体轴贴地、履带尘 / 排气。数值在 Data_Tuning_Tank.view。
+import { TANK } from "./Data_Tuning_Tank.mjs";
+import { CloneShadedMaterial } from "./Script_Materials.mjs";
+import { ApplyPatches, PatchesOf, MakeUvScrollPatch } from "./Script_MaterialPatches.mjs";
 export class FirstLevelMissionView {
   constructor({ scene, battlefield, physics, column, actorFactory, library, hud, vfx }) {
     Object.assign(this, { scene, battlefield, physics, column, actorFactory, library, vfx });
@@ -148,14 +152,30 @@ export class FirstLevelMissionView {
     this.tank.name = "MissionTankTrackDamage";
     this.root.add(this.tank);
     this.tank.visible = false;
+    // 履带用克隆出来的一份材质挂滚动补丁（Script_MaterialPatches.MakeUvScrollPatch）：
+    // 别处共用的那份 Type89Track 不动。
+    const trackMaterial=CloneShadedMaterial(this.library.Get("Type89Track",{side:THREE.DoubleSide}));
+    this.trackScroll={value:new THREE.Vector2()};
+    ApplyPatches(trackMaterial,[...(PatchesOf(trackMaterial)||[]),MakeUvScrollPatch(this.trackScroll,{key:"tankTrackScroll1"})]);
+    this.materials.push(trackMaterial);
     const materials = { type89Armor:this.library.Get("Type89Armor",{side:THREE.DoubleSide}),
       type89Barrel:this.library.Get("Type89Armor",{side:THREE.DoubleSide}),
-      type89Track:this.library.Get("Type89Track",{side:THREE.DoubleSide}) };
+      type89Track:trackMaterial };
     const model=this.actorFactory.ModelInstance("Type89Tank",materials);
     if(!model)throw new Error("First level requires the existing Type89Tank model");
     this.tankModel=model;this.tank.add(model.root);
     model.root.traverse(o=>{if(o.isMesh){o.castShadow=true;o.receiveShadow=true;}});
     this.turret=model.nodes.get("turret");
+    // 炮管枢轴：TZM 里炮管是炮塔下单独一块网格（type89Barrel），运行时挂到耳轴处的新节点上，
+    // 俯仰 / 后坐只转这个节点（不重导 TZM —— Type89DamageTest 断言源文件 sha）。炮口挂点跟着走。
+    const trunnion=new THREE.Vector3().fromArray(TANK.view.trunnion);
+    this.gun=new THREE.Group();this.gun.name="MissionTankGunTrunnion";this.gun.position.copy(trunnion);this.turret.add(this.gun);
+    this.gunRecoil=new THREE.Group();this.gunRecoil.name="MissionTankGunRecoil";this.gun.add(this.gunRecoil);
+    const barrel=model.meshes.find(m=>m.name.endsWith("_type89Barrel"));
+    if(barrel){this.gunRecoil.add(barrel);barrel.position.sub(trunnion);}
+    const gunMuzzle=model.nodes.get("gunMuzzle");
+    if(gunMuzzle){this.gunRecoil.add(gunMuzzle);gunMuzzle.position.sub(trunnion);}
+    this.tankFx={dust:[null,null],exhaust:null,puff:null,puffAt:-Infinity,time:null,point:new THREE.Vector3()};
     this.tankDamage=new Type89Damage({root:this.tank,model,materials,vfx:this.vfx,
       groundAt:(x,z)=>this.battlefield.GroundHeight(x,z)});
     this.tankCollider = {
@@ -168,14 +188,56 @@ export class FirstLevelMissionView {
     };
   }
   SyncTank(tank) {
-    const h=(x,z)=>this.battlefield.GroundHeight(x,z);
-    const front=h(tank.x,tank.z+1.8),rear=h(tank.x,tank.z-1.8);
-    const left=h(tank.x+1,tank.z),right=h(tank.x-1,tank.z);
-    this.tank.position.set(tank.x,(front+rear+left+right)/4,tank.z);
     const hullYaw=tank.hullYaw??Math.PI;
-    this.tank.rotation.set(Math.atan2(front-rear,3.6),hullYaw,Math.atan2(left-right,2),"YXZ");
+    // 一帧里 UpdateTank / 封锁判定 / 演出会问好几次炮口：位姿没变就不重算整棵树。
+    const key=`${tank.x}|${tank.z}|${hullYaw}|${tank.turretYaw}|${tank.gunPitch||0}|${tank.hullPitch||0}|${tank.recoil||0}`;
+    if(key===this.tankSyncKey)return;
+    this.tankSyncKey=key;
+    const h=(x,z)=>this.battlefield.GroundHeight(x,z);
+    // 按车体轴取地面（车头 −Z）：以前按世界 ±Z / ±X 取，车头朝西时前后左右全对不上。
+    const fx=-Math.sin(hullYaw),fz=-Math.cos(hullYaw),rx=Math.cos(hullYaw),rz=-Math.sin(hullYaw);
+    const front=h(tank.x+fx*1.8,tank.z+fz*1.8),rear=h(tank.x-fx*1.8,tank.z-fz*1.8);
+    const right=h(tank.x+rx,tank.z+rz),left=h(tank.x-rx,tank.z-rz);
+    this.tank.position.set(tank.x,(front+rear+left+right)/4,tank.z);
+    // rotation.x 为正 = 车头抬起；rotation.z 为正 = 右侧抬起。点头 / 后仰叠在地形俯仰上。
+    this.tank.rotation.set(Math.atan2(front-rear,3.6)+(tank.hullPitch||0),hullYaw,Math.atan2(right-left,2),"YXZ");
     this.turret.rotation.y=tank.turretYaw-hullYaw;
+    if(this.gun)this.gun.rotation.x=tank.gunPitch||0;
+    if(this.gunRecoil)this.gunRecoil.position.z=tank.recoil||0;
     this.tank.updateMatrixWorld(true);
+  }
+  /** 履带滚动、两条履带后的扬尘、排气（油门一脚一股烟）。只在大脑接管时跑（tank.brain）。 */
+  UpdateTankFx(time,tank) {
+    const V=TANK.view,fx=this.tankFx,dt=fx.time==null?0:Math.min(.1,Math.max(0,time-fx.time));fx.time=time;
+    const shown=this.tank.visible;
+    this.trackScroll.value.x=(this.trackScroll.value.x-(tank.speed||0)*dt*V.trackUvPerM)%64;
+    this.trackScroll.value.y=(this.trackScroll.value.y+(tank.pivotRate||0)*dt*.9*V.trackUvPerM)%64;
+    const dusty=shown&&!tank.immobilized&&(Math.abs(tank.speed||0)>=V.trackDust.minSpeedMps||Math.abs(tank.pivotRate||0)>.05);
+    for(let i=0;i<2;i++){
+      if(dusty){
+        fx.point.fromArray(V.trackDust.offsets[i]);this.tank.localToWorld(fx.point);
+        if(fx.dust[i]==null)fx.dust[i]=this.vfx?.SmokeSource(fx.point.clone(),V.trackDust.source)??null;
+        else this.vfx?.MoveSmokeSource(fx.dust[i],fx.point);
+      }else if(fx.dust[i]!=null){this.vfx?.RemoveSmokeSource(fx.dust[i]);fx.dust[i]=null;}
+    }
+    const running=shown&&(tank.rpm||0)>1;
+    fx.point.fromArray(V.exhaust.offset);this.tank.localToWorld(fx.point);
+    if(running){
+      if(fx.exhaust==null)fx.exhaust=this.vfx?.SmokeSource(fx.point.clone(),V.exhaust.source)??null;
+      else this.vfx?.MoveSmokeSource(fx.exhaust,fx.point);
+      if((tank.load||0)>=V.exhaust.puffLoad&&time-fx.puffAt>=V.exhaust.puffCooldownS){
+        fx.puffAt=time;if(fx.puff==null)fx.puff=this.vfx?.SmokeSource(fx.point.clone(),V.exhaust.puff)??null;
+      }
+    }else if(fx.exhaust!=null){this.vfx?.RemoveSmokeSource(fx.exhaust);fx.exhaust=null;}
+    if(fx.puff!=null){
+      if(!running||time-fx.puffAt>=V.exhaust.puffS){this.vfx?.RemoveSmokeSource(fx.puff);fx.puff=null;}
+      else this.vfx?.MoveSmokeSource(fx.puff,fx.point);
+    }
+  }
+  StopTankFx(){
+    const fx=this.tankFx;if(!fx)return;
+    for(const handle of [...fx.dust,fx.exhaust,fx.puff])if(handle!=null)this.vfx?.RemoveSmokeSource(handle);
+    fx.dust=[null,null];fx.exhaust=null;fx.puff=null;
   }
   TankMuzzle(tank,node="gunMuzzle") {
     this.SyncTank(tank);
@@ -441,6 +503,7 @@ export class FirstLevelMissionView {
       this.tank.visible = tank.present || tank.active;
       this.SyncTank(tank);
       this.tankDamage.Update(time,tank);
+      if(tank.brain)this.UpdateTankFx(time,tank);
       if (tank.present || tank.active) {
         const c = this.tankCollider;c.ry=tank.hullYaw??Math.PI;
         c.c = [tank.x, this.tank.position.y + 1.28, tank.z];
@@ -464,6 +527,7 @@ export class FirstLevelMissionView {
   Dispose() {
     if(this.frontBandage){this.frontBandage.removeFromParent();this.frontBandage.geometry.dispose();}
     this.tankDamage.Dispose();
+    this.StopTankFx();
     this.people.Dispose();this.aftermath.Dispose();
     for (const collider of this.colliders) {
       if (collider._physicsHandle != null) this.physics.RemoveSolid(collider._physicsHandle);
