@@ -32,6 +32,7 @@ import {
   GetLugouAnimationEntries,
   IsLugouAnimationAllowed,
 } from "./Script_CharacterModel.mjs";
+import { LoadDraftCartAssets, CreateDraftCartInstance } from "./Script_DraftCartModel.mjs";
 
 /** 人物 kind → 中文名。KIND_SPEC 的键在 Script_Actor 里，这里只做展示名。 */
 const KINDS = [
@@ -396,6 +397,11 @@ export class ActorEditor {
     this.towel = null;        // null = 按 kind 的默认
     this.manual = false;
     this.time = 0;
+    this.previewMode = "actor";
+    this.cartKind = "ox";
+    this.cartAction = "walk";
+    this.cartPreview = null;
+    this.cartBuildToken = 0;
 
     this.actors = [];
     this.gizmos = [];
@@ -428,6 +434,7 @@ export class ActorEditor {
   }
 
   Exit() {
+    this.cartBuildToken += 1;
     this.DisposeActors();
     if (this.panel) this.panel.root.remove();
     this.panel = null;
@@ -439,6 +446,19 @@ export class ActorEditor {
   // -------------------------------------------------------------------------
 
   BuildUi(body) {
+    const wholeBody = body;
+    const mode = Section(wholeBody, "预览对象");
+    Chips(mode, [
+      { value: "actor", label: "人物" },
+      { value: "cart", label: "牛马车" },
+    ], this.previewMode, (value) => {
+      this.previewMode = value;
+      this.UpdateModeUi();
+      this.Rebuild();
+    });
+    this.actorBody = document.createElement("div");
+    wholeBody.appendChild(this.actorBody);
+    body = this.actorBody;
     // --- 人物 ---
     const who = Section(body, "人物");
     this.kindList = ListBox(who, {
@@ -534,6 +554,37 @@ export class ActorEditor {
     const info = Section(body, "取证");
     this.facts = Facts(info, ["角色模型", "动作", "姿态校正", "时间"]);
 
+    const cartBody = document.createElement("div");
+    wholeBody.appendChild(cartBody);
+    this.cartBody = cartBody;
+    const cartSection = Section(cartBody, "牛马车模型与行走");
+    this.cartKindList = ListBox(cartSection, {
+      height: 88,
+      onPick: (kind) => { this.cartKind = kind; this.Rebuild(); },
+    });
+    this.cartKindList.Fill([
+      { id: "ox", name: "牛车 · 木轭与双轮板车" },
+      { id: "horse", name: "马车 · 同款民用板车" },
+    ]);
+    this.cartKindList.Select(this.cartKind);
+    Chips(cartSection, [
+      { value: "walk", label: "行走动画" },
+      { value: "idle", label: "停驻姿态" },
+    ], this.cartAction, (value) => { this.cartAction = value; this.time = 0; this.Step(0); });
+    ButtonRow(cartSection, [
+      { label: "▶ / ⏸", onClick: () => { this.playing = !this.playing; } },
+      { label: "重演", onClick: () => this.Rebuild() },
+      { label: "单帧", onClick: () => { this.playing = false; this.Step(1 / 30); } },
+    ]);
+    this.cartNote = Note(cartSection, "加载三件 Blender GLB：板车、耕牛、马匹。米格每格 1 米。");
+    this.cartFacts = Facts(Section(cartBody, "取证"), ["资产", "动作", "尺寸", "时间"]);
+    this.UpdateModeUi();
+
+  }
+
+  UpdateModeUi() {
+    if (this.actorBody) this.actorBody.style.display = this.previewMode === "actor" ? "" : "none";
+    if (this.cartBody) this.cartBody.style.display = this.previewMode === "cart" ? "" : "none";
   }
 
   FillActionList() {
@@ -640,6 +691,8 @@ export class ActorEditor {
   // -------------------------------------------------------------------------
 
   DisposeActors() {
+    this.cartBuildToken += 1;
+    if (this.cartPreview) { this.cartPreview.Dispose(); this.cartPreview = null; }
     for (const actor of this.actors) {
       if (actor.root.parent) actor.root.parent.remove(actor.root);
       actor.Dispose();
@@ -654,6 +707,27 @@ export class ActorEditor {
     this.DisposeActors();
     this.studio.ClearStand();
     this.time = 0;
+    if (this.previewMode === "cart") {
+      this.studio.Frame(2.4, 11);
+      this.studio.orbit.target.z = -2.1;
+      this.studio.ApplyCamera();
+      const token = this.cartBuildToken;
+      if (this.cartNote) this.cartNote.textContent = "正在加载牛马车模型与动画…";
+      LoadDraftCartAssets().then((assets) => {
+        if (token !== this.cartBuildToken || !this.panel || this.previewMode !== "cart") return;
+        const instance = CreateDraftCartInstance(assets, this.cartKind);
+        instance.cartRoot.position.y = 1;
+        instance.animalRoot.position.z = -4.8;
+        this.studio.stand.add(instance.root);
+        this.cartPreview = instance;
+        instance.SetMotion(0, this.cartAction === "walk");
+        if (this.cartNote) this.cartNote.textContent = "木板车 2.3 × 3.5 米；两只 1.44 米木辐条轮。行走时腿、头和车轮同步播放。";
+      }).catch((error) => {
+        if (token === this.cartBuildToken && this.cartNote)
+          this.cartNote.textContent = `模型加载失败：${error.message}`;
+      });
+      return;
+    }
     const factory = this.host.actorFactory;
     if (!factory) return;
     const faction = this.kind.startsWith("ija") ? "ija" : "nra";
@@ -695,6 +769,10 @@ export class ActorEditor {
   /** 推一帧姿态。playing=false 时 Update(dt) 里只走这一条（供单帧按钮用）。 */
   Step(dt) {
     this.time += dt;
+    if (this.previewMode === "cart") {
+      this.cartPreview?.SetMotion(this.time * 1.0, this.cartAction === "walk");
+      return;
+    }
     const clip = CLIPS.find((c) => c.id === this.clipId) || CLIPS[0];
     const activeWeaponId = this.actors[0]?.weaponId ?? this.weaponId;
     const ctx = { weapon: activeWeaponId ? WEAPONS[activeWeaponId] : null };
@@ -736,13 +814,21 @@ export class ActorEditor {
     // 摄影棚里一个影子都没有（而这恰恰是判断姿态对不对最有用的一条线索）
     if (this.host.lights) {
       this.host.lights.UpdateShadowFrustum(
-        new THREE.Vector3(0, 0.9, 0),
+        new THREE.Vector3(0, 0.9, this.previewMode === "cart" ? -2.1 : 0),
         new THREE.Vector3(0, 0, -1));
     }
     this.RefreshFacts();
   }
 
   RefreshFacts() {
+    if (this.previewMode === "cart") {
+      if (!this.cartFacts) return;
+      this.cartFacts.Set("资产", this.cartPreview ? `${this.cartKind === "ox" ? "耕牛" : "马匹"} + 木板车 GLB` : "加载中");
+      this.cartFacts.Set("动作", this.cartAction === "walk" ? "Blender Walk · 四腿与头颈，车轮按路程滚动" : "停驻");
+      this.cartFacts.Set("尺寸", "车板 2.3 × 3.5 m · 轮径 1.44 m");
+      this.cartFacts.Set("时间", `${this.time.toFixed(2)} s`);
+      return;
+    }
     const actor = this.actors[0];
     if (!actor || !this.facts) return;
     let meshes = 0;

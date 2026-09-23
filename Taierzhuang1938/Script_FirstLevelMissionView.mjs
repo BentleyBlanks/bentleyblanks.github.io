@@ -11,6 +11,7 @@ import { ApplyShadowDepth, AttachShadowDepth } from "./Script_ShadowDepth.mjs";
 import { MISSION_PLACEMENT, MISSION_SUPPLIES, MISSION_SUPPLY_COLLIDER } from "./Data_FirstLevelMissionLayout.mjs";
 import { Type89Damage } from "./Script_Type89Damage.mjs";
 import { FRONT_BATTLE_TUNING } from "./Data_Tuning_FirstLevelFront.mjs";
+import { DraftCartModels } from "./Script_DraftCartModel.mjs";
 export class FirstLevelMissionView {
   constructor({ scene, battlefield, physics, column, actorFactory, library, hud, vfx }) {
     Object.assign(this, { scene, battlefield, physics, column, actorFactory, library, vfx });
@@ -38,6 +39,7 @@ export class FirstLevelMissionView {
     // 这样上车、同行、停车和卸载近景里的车板与挂件都走普通 Mesh 的真实
     // matrixWorld 历史；其他远车仍留在实例桶里。
     this.stableCartParts = new Map();
+    this.draftCartModels = new DraftCartModels(this.root);
     this.personColor = new THREE.Color();
     for (const [key, geometry, color, count] of [
       ["fieldPack",new THREE.BoxGeometry(.32,.43,.21),0x857a56,4],
@@ -273,6 +275,7 @@ export class FirstLevelMissionView {
     for (const mesh of Object.values(this.parts)) mesh.count = 0;
     for (const mesh of this.rigidProps.values()) mesh.visible=false;
     for (const mesh of this.stableCartParts.values()) mesh.visible=false;
+    this.draftCartModels.Begin();
     this.UpdateSupplies(time);
     // 2026.09.19 第二波：车站卸车挨炸那一拍随军列开场下线（`column.stationBombed`
     // 已无人写入，MISSION_PLACEMENT.stationCasualties 也一并删了）。
@@ -360,59 +363,68 @@ export class FirstLevelMissionView {
       const y = this.battlefield.GroundHeight(cart.x, cart.z);
       this.SyncCartCollider(cart,y);
       const stable=cart.id===stableCartId;
-      if(stable)this.StableCartInstance("cart",cart,"deck",y,0,0,0);
-      else this.CartInstance("cart",cart,y,0,0,0);
       const c=Math.cos(cart.yaw),s=Math.sin(cart.yaw);
       const moving=!cart.overturned&&(cart.departed||cart.state==="approaching"||cart.id.startsWith("SouthCart"));
       const travel=(cart.progress||0)+(cart.approachProgress||0);
-      for(const side of [-1,1]){
-        if(stable){
-          this.StableCartInstance("cartRail",cart,`rail:${side}`,y,side*1.4,.45,0);
-          this.StableCartInstance("cartShaft",cart,`shaft:${side}`,y,side*.58,-.16,-3.75);
-        }else{
-          this.CartInstance("cartRail",cart,y,side*1.4,.45,0);
-          this.CartInstance("cartShaft",cart,y,side*.58,-.16,-3.75);
-        }
-      }
       const team=cart.boltedTeam;
-      if(!cart.overturned || team&&team.progress<team.length){
-        const yaw=team?.yaw??cart.yaw, mc=Math.cos(yaw),ms=Math.sin(yaw);
-        const mx=team?.x??cart.x-s*4.8,mz=team?.z??cart.z-c*4.8,my=this.battlefield.GroundHeight(mx,mz);
+      const animalYaw=team?.yaw??cart.yaw,mc=Math.cos(animalYaw),ms=Math.sin(animalYaw);
+      const mx=team?.x??cart.x-s*4.8,mz=team?.z??cart.z-c*4.8,my=this.battlefield.GroundHeight(mx,mz);
+      const animalVisible=!cart.overturned || !!(team&&team.progress<team.length);
+      if(this.draftCartModels.ready){
+        this.draftCartModels.Sync(cart,y,{x:mx,z:mz,ground:my,yaw:animalYaw,
+          visible:animalVisible,moving:moving||!!team,travel:team?.progress??travel},
+          stable?this.stableCartParts:null);
+      }else{
+        // Keep the existing whitebox as a loading/error fallback.
+        if(stable)this.StableCartInstance("cart",cart,"deck",y,0,0,0);
+        else this.CartInstance("cart",cart,y,0,0,0);
+        for(const side of [-1,1]){
+          if(stable){
+            this.StableCartInstance("cartRail",cart,`rail:${side}`,y,side*1.4,.45,0);
+            this.StableCartInstance("cartShaft",cart,`shaft:${side}`,y,side*.58,-.16,-3.75);
+          }else{
+            this.CartInstance("cartRail",cart,y,side*1.4,.45,0);
+            this.CartInstance("cartShaft",cart,y,side*.58,-.16,-3.75);
+          }
+        }
+        if(animalVisible){
         // 牛 / 马：同一对实例桶，按 Data_Tuning_FirstLevelMid.draft 的比例缩。
         const draft=MID.draft[cart.draft==="ox"?"ox":"horse"];
         const [bx,by,bz]=draft.bodyScale,[hx,hy,hz]=draft.headScale;
         const headY=my+1.5-draft.headDrop;
         if(stable){
-          this.StableInstance("muleBody",cart,"draftBody",mx,my+1*by,mz,yaw,bx,by,bz);
-          this.StableInstance("muleHead",cart,"draftHead",mx-ms*.8,headY,mz-mc*.8,yaw,hx,hy,hz);
+          this.StableInstance("muleBody",cart,"draftBody",mx,my+1*by,mz,animalYaw,bx,by,bz);
+          this.StableInstance("muleHead",cart,"draftHead",mx-ms*.8,headY,mz-mc*.8,animalYaw,hx,hy,hz);
         }else{
-          this.Instance("muleBody",mx,my+1*by,mz,yaw,bx,by,bz);
-          this.Instance("muleHead",mx-ms*.8,headY,mz-mc*.8,yaw,hx,hy,hz);
+          this.Instance("muleBody",mx,my+1*by,mz,animalYaw,bx,by,bz);
+          this.Instance("muleHead",mx-ms*.8,headY,mz-mc*.8,animalYaw,hx,hy,hz);
         }
         // 牛角：一对，挂在头两侧前上方，往外岔开。
         if(draft.horn)for(const side of [-1,1]){
           const horn=[mx-ms*(.8+MID.horn.forwardM)+mc*side*MID.horn.lateralM,
             headY+MID.horn.riseM,
             mz-mc*(.8+MID.horn.forwardM)-ms*side*MID.horn.lateralM];
-          if(stable)this.StableInstance("draftHorn",cart,`draftHorn:${side}`,...horn,yaw,1,1,1,0,side*MID.horn.tiltRad);
-          else this.Instance("draftHorn",...horn,yaw,1,1,1,0,side*MID.horn.tiltRad);
+          if(stable)this.StableInstance("draftHorn",cart,`draftHorn:${side}`,...horn,animalYaw,1,1,1,0,side*MID.horn.tiltRad);
+          else this.Instance("draftHorn",...horn,animalYaw,1,1,1,0,side*MID.horn.tiltRad);
         }
         for(const side of [-1,1])for(const end of [-1,1]){
           const swing=moving||team?Math.sin(time*(team?10:6)+side*end*Math.PI/2)*.32:0;
           const limb=[mx+mc*side*.21*bx-ms*end*.52*bz,my+.37*by,mz-ms*side*.21*bx-mc*end*.52*bz];
-          if(stable)this.StableInstance("limb",cart,`draftLimb:${side}:${end}`,...limb,yaw,.8,1.1*by,.8,swing);
-          else this.Instance("limb",...limb,yaw,.8,1.1*by,.8,swing);
+          if(stable)this.StableInstance("limb",cart,`draftLimb:${side}:${end}`,...limb,animalYaw,.8,1.1*by,.8,swing);
+          else this.Instance("limb",...limb,animalYaw,.8,1.1*by,.8,swing);
         }
-        this.Person(mx+mc*1.1,mz-ms*1.1,yaw,time,{id:cart.id+"Driver",kind:"medic",moving:moving||!!team});
-      }
-      for(const side of [-1,1])for(const end of [-1,1]){
-        if(stable)this.StableCartInstance("wheel",cart,`wheel:${side}:${end}`,y,side*1.55,-.51,-end*1.8,0,Math.PI/2);
-        else this.CartInstance("wheel",cart,y,side*1.55,-.51,-end*1.8,0,Math.PI/2);
-        for(const [phaseIndex,phase] of [0,Math.PI/2].entries()){
-          if(stable)this.StableCartInstance("spoke",cart,`spoke:${side}:${end}:${phaseIndex}`,y,side*1.635,-.51,-end*1.8,travel/.48+phase);
-          else this.CartInstance("spoke",cart,y,side*1.635,-.51,-end*1.8,travel/.48+phase);
+        }
+        for(const side of [-1,1])for(const end of [-1,1]){
+          if(stable)this.StableCartInstance("wheel",cart,`wheel:${side}:${end}`,y,side*1.55,-.51,-end*1.8,0,Math.PI/2);
+          else this.CartInstance("wheel",cart,y,side*1.55,-.51,-end*1.8,0,Math.PI/2);
+          for(const [phaseIndex,phase] of [0,Math.PI/2].entries()){
+            if(stable)this.StableCartInstance("spoke",cart,`spoke:${side}:${end}:${phaseIndex}`,y,side*1.635,-.51,-end*1.8,travel/.48+phase);
+            else this.CartInstance("spoke",cart,y,side*1.635,-.51,-end*1.8,travel/.48+phase);
+          }
         }
       }
+      if(animalVisible)this.Person(mx+mc*1.1,mz-ms*1.1,animalYaw,time,
+        {id:cart.id+"Driver",kind:"medic",moving:moving||!!team});
       if (cart.id.startsWith("SouthCart")) {
         for (const side of [-1, 1]) {
           this.people.Patient(cart.id+side,cart.x+c*side*.65,y+1.22,cart.z-s*side*.65,cart.yaw,time);
@@ -462,6 +474,7 @@ export class FirstLevelMissionView {
     bone.add(mesh);this.frontBandage=mesh;this.materials.push(material);
   }
   Dispose() {
+    this.draftCartModels.Dispose();
     if(this.frontBandage){this.frontBandage.removeFromParent();this.frontBandage.geometry.dispose();}
     this.tankDamage.Dispose();
     this.people.Dispose();this.aftermath.Dispose();

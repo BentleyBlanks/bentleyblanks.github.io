@@ -7,7 +7,7 @@
 //     走 matrixWorld 那一路，就是原来腊肉的那条路径）；
 //   · zhouKit                —— 担架上那件挎包（`RigidProp` 建的身份稳定普通 Mesh）；
 //   · cartDeck / rail / shaft / wheel / spoke / draft* —— 老周/玩家那辆车从预留到
-//     停车卸载始终复用的普通 Mesh。其余远车仍走实例桶。
+//     停车卸载始终复用的 Blender GLB 普通 Mesh。
 // 事故形态一模一样：**父物体在动、相机跟着动**（顺子坐在车板上，车沿 cartRide 走），
 // 判据一字不改 —— 同速时零屏幕位移、停下立刻归零、重新出现不许拿旧变换、
 // 纯相机运动要留得住、原有绘制回调不许被顶掉。画质仍然是 high、资产仍然是真的。
@@ -33,6 +33,9 @@ try{
   await page.evaluate(()=>window.Tengxian.StepFrames(48,1/60,true));
   // 跳到 12（掩护装载与离开）：车位上真的停着牛车与马车，老周的担架也真的在场。
   await page.evaluate(async()=>{await window.Tengxian.Debug.FirstLevelJump(12);window.Tengxian.StepFrames(30,1/60,true);});
+  await page.waitForFunction(()=>window.Tengxian?.Debug?.FirstLevelMissionRuntime()?.view?.draftCartModels?.ready,
+    null,{timeout:30000});
+  await page.evaluate(()=>window.Tengxian.StepFrames(2,1/60,true));
   await page.screenshot({path:path.join(output,'Scene_TransferCarts.png')});
   // 让老周那一副担架露出来（12 起它是可见的近景件），再拍一张车列。
   await page.evaluate(()=>{
@@ -56,13 +59,14 @@ try{
       .filter(mesh=>mesh.visible&&mesh.userData.missionCartPart?.cartId===stableCart.id);
     const live={stage:r.flow.stage.id,
       taa:g.post.taaEnabled,velocity:!!g.post.VelocityTexture,motionBlur:!!g.post.motionBlurPass.active,
-      // 四类人流里的两类：牛车与马车都在车位上（白盒变体，Data_Tuning_FirstLevelMid.draft）。
+      // 四类人流里的两类：牛车与马车都在车位上（Blender GLB 模型）。
       draft:r.column.vehicles.map(cart=>cart.draft),
       carts:r.column.vehicles.length,
-      deckInstances:r.view.parts.cart.count,
+      modelInstances:r.view.draftCartModels.instances.size,
       stableCartId:stableCart.id,
       stableDraft:stableCart.draft,
       stablePartIds:stableParts.map(mesh=>mesh.userData.missionCartPart.identity).sort(),
+      stableMeshCount:(()=>{let count=0;r.view.draftCartModels.instances.get(stableCart.id).root.traverse(o=>{if(o.isMesh&&!o.isInstancedMesh)count++});return count;})(),
       litterVisible:!!r.column.zhou.visible,
       kits:r.view.rigidParts.fieldPack.length};
     const pipeline={preset:{velocity:true,hzb:false},hdrCapable:true,hdrType:T.HalfFloatType,targets:{}};
@@ -88,13 +92,13 @@ try{
     // 车板、代表性挂件和担架件都取生产几何；它们必须是身份稳定的普通 Mesh。
     const sources=[
       {name:'cartDeck',source:Stable('deck')},
-      {name:'cartRail',source:Stable('rail:-1')},
-      {name:'cartShaft',source:Stable('shaft:-1')},
-      {name:'cartWheel',source:Stable('wheel:-1:-1')},
-      {name:'cartSpoke',source:Stable('spoke:-1:-1:0')},
+      {name:'cartRail',source:Stable('rail')},
+      {name:'cartShaft',source:Stable('shaft')},
+      {name:'cartWheel',source:Stable('wheel')},
+      {name:'cartSpoke',source:Stable('spoke')},
       {name:'draftBody',source:Stable('draftBody')},
       {name:'draftHead',source:Stable('draftHead')},
-      {name:'draftLimb',source:Stable('draftLimb:-1:-1')},
+      {name:'draftLimb',source:Stable('draftLimb')},
       {name:'stretcherBed',source:r.view.zhouBed},
       {name:'patient',source:r.view.zhouPatient},
       {name:'zhouKit',source:r.view.rigidProps.get('fieldPack:ZhouKit')},
@@ -141,14 +145,10 @@ try{
   assert.equal(result.live.stage,'Transfer','the subject is inspected at the actual loading stage');
   assert.ok(result.live.draft.includes('ox')&&result.live.draft.includes('horse'),
     'the transfer point really fields both ox and horse carts');
-  const expected=['deck','draftBody','draftHead',
-    ...[-1,1].flatMap(side=>[`rail:${side}`,`shaft:${side}`]),
-    ...[-1,1].flatMap(side=>[-1,1].flatMap(end=>[
-      `wheel:${side}:${end}`,`spoke:${side}:${end}:0`,`spoke:${side}:${end}:1`,`draftLimb:${side}:${end}`,
-    ])),
-    ...(result.live.stableDraft==='ox'?['draftHorn:-1','draftHorn:1']:[])].sort();
+  const expected=['deck','rail','shaft','wheel','spoke','draftBody','draftHead','draftLimb'].sort();
   assert.deepEqual(result.live.stablePartIds,expected,'the reserved player cart keeps every near-view piece on stable Mesh identity');
-  assert.ok(result.live.deckInstances>0,'other distant cart decks remain in the instanced bucket');
+  assert.ok(result.live.modelInstances>=result.live.carts,'every loading-bay cart uses the production Blender model');
+  assert.ok(result.live.stableMeshCount>=25,'the stable cart includes the full wooden chassis and articulated animal');
   assert.ok(result.live.kits>0,'the litter really carries a stable-identity near-camera prop');
   for(const s of result.samples){
     assert.ok(s.coMoving.pixels>100,`${s.name}: real mesh pixels are present`);

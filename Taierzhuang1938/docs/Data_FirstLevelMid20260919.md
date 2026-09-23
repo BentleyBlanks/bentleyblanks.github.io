@@ -69,9 +69,11 @@
 
 - **四类人流**：
   1. 牛车 / 2. 马车 —— `column.vehicles` / `column.traffic` 各带 `draft`，由
-     `MidDraftKind` 按 `oxBayIndices` / `oxTrafficIndices` 分。视觉是同一对实例桶
-     （`muleBody` / `muleHead`）按 `MID_TUNING.draft` 的比例缩：牛更矮更宽 + 一对
-     `draftHorn`，马更高更窄。**`draftHorn` 桶满了是静默截断**，容量按 `hornCapacity`(16) 给。
+     `MidDraftKind` 按 `oxBayIndices` / `oxTrafficIndices` 分。正常加载时共用
+     `Model_WoodenEvacCart.glb` 双轮板车，并按 `draft` 加载 `Model_WorkingOx.glb` 或
+     `Model_WorkingHorse.glb`；两种牲口都有 Blender `Walk` 动画，车轮按行进距离转动。
+     `Script_DraftCartModel.mjs` 同时供关卡和「人物动作」编辑器使用。三件模型由
+     `_blender/Script_OxCartBake.py` 重建；原白盒实例桶只在资产加载中或失败时保底。
   3. 人力担架 —— 后送队本身。
   4. 能走的伤员 —— `MidWalkingWounded()` 在接运点现场摆六个人三对（一个搀一个被搀）。
      后送队自己的 `walkingWoundedCount` 是 0（用户 2026-09-16 砍的是随队护送编制），
@@ -133,7 +135,11 @@
 `meleeCurseReachM` = `R.ambushBindReachM` + 0.4（与 `meleeEngaged` 同一把尺）、
 `loadAllowancePerThreat` = `R.transferBatchLoads`、
 `zhouCartDeparted` 用 `R.cartDepartedM`、担架步速用 `R.litterSpeedMps`。
-牛/马的缩放比例是相对现有 `muleBody` 0.62×0.72×1.5 与 `muleHead` 0.25×0.56×0.44 量的。
+新车板为 2.3 × 3.5 m、离地约 1.12 m，木辐条轮直径 1.44 m；保留原车位与装载座位偏移。
+历史造型参考为 1930 年前后中国牛车照片及山东地方交通资料；生图概念稿只作建模参考，
+可编辑 `.blend` 保存在仓库外的 `OneDrive/AI/Models/Blender/Taierzhuang1938/OxCart`。
+参考：[1930 年中国牛车照片](https://www.bridgemanimages.com/en-US/williams-maynard-owen/chinese-peasants-with-cart-pulled-by-an-ox-pass-a-city-gate-1930-photo/photograph/asset/8777732)、
+[烟台交易运输民俗中的木轮铁瓦和骡马牛牵引记载](https://dsyjy.yantai.gov.cn/art/2010/7/26/art_1335_378567.html)。
 
 ## 4. 新增的内部辅助事实
 
