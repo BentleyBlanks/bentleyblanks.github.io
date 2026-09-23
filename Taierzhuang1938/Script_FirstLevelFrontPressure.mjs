@@ -228,10 +228,10 @@ export class FirstLevelFrontPressure {
 
   EnterPhase(phase) {
     const r = this.r, previous = this.phase;
-    // 上一相位配了成组冲锋却没冲：把最后一次没冲的原因记下来（探针与驾驶器读 events）。
+    // 上一相位配了成组冲锋却没冲：把最后一次没冲的原因、以及各原因占了多少次评估记下来（探针读 events）。
     if (previous) for (const [groupId, cfg] of Object.entries(previous.groups || {})) {
       const pc = this.phaseCharge.get(groupId);
-      if (cfg.charge && !pc?.charged) this.Note("chargeNotDue", { group: groupId, why: pc?.why || "neverChecked" });
+      if (cfg.charge && !pc?.charged) this.Note("chargeNotDue", { group: groupId, why: pc?.why || "neverChecked", whys: { ...(pc?.whys || {}) } });
     }
     this.phase = phase;
     this.phaseAt = r.time;
@@ -381,10 +381,11 @@ export class FirstLevelFrontPressure {
       // 成组冲锋先于伤亡退线判（2026-09-24 审查：实机里 mgAttack 露面 34 s 就伤亡过半退了线，
       // 冲锋的 30 s 窗口一次都没凑上）。退过线的组这一相位不再冲。
       if (cfg.charge) {
-        const pc = this.phaseCharge.get(groupId) || { charged: false, why: null };
+        const pc = this.phaseCharge.get(groupId) || { charged: false, why: null, whys: {} };
         this.phaseCharge.set(groupId, pc);
         if (!pc.charged) {
           pc.why = st.fallbackDone ? "fellBack" : FrontChargeCheck(members, cfg.charge, now - this.phaseAt, r.player?.position);
+          if (pc.why) pc.whys[pc.why] = (pc.whys[pc.why] || 0) + 1;
           // 凑不出两个「眼里有玩家、上得了刺刀」的人：2 s 后再试（事件里记 chargeSkipped）。
           if (pc.why === null && now >= (pc.retryAt || 0)) {
             if (this.GroupCharge(groupId, members)) pc.charged = true;

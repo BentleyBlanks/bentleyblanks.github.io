@@ -2952,8 +2952,17 @@ export class AiDirector {
     const threat = this.ThreatPoint(s);
     if (!threat) { this.ReleaseCover(s); return false; }
     const now = this.time;
-    // 【§20.11】身边的掩体都打不出去（连换几次都是瞎探）：这段时间不选掩体，就地跪着打。
-    if (this.missionCoverRules && now < s.missionOpenUntil) { this.ReleaseCover(s); return false; }
+    // 【§20.11】身边的掩体都打不出去（连换几次都是瞎探）：这段时间不选掩体，就地跪着打；
+    // 在空地上真打出去了就续（missionOpenKeepS），被压得要趴了就立刻回去找掩体。
+    if (this.missionCoverRules && now < s.missionOpenUntil) {
+      if (s.suppression > COVER.suppressionProneAt) s.missionOpenUntil = -99;
+      else {
+        if (now - s.lastFire < COVER_CYCLE.missionOpenKeepS)
+          s.missionOpenUntil = Math.max(s.missionOpenUntil, now + COVER_CYCLE.missionOpenKeepS);
+        this.ReleaseCover(s);
+        return false;
+      }
+    }
     const task = s.task;
     const bounding = !!task && task.kind === TASK.BOUND;
     let cover = s.cover;

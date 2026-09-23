@@ -454,7 +454,7 @@ function SummarizeCharges(events) {
   for (const e of events) {
     if (e.kind === "phase") { current = e.to; continue; }
     if (e.kind === "groupCharge") phases.push({ phase: e.phase, group: e.group, charged: true, started: e.started, at: e.t });
-    else if (e.kind === "chargeNotDue") phases.push({ phase: e.phase, group: e.group, charged: false, why: e.why, at: e.t });
+    else if (e.kind === "chargeNotDue") phases.push({ phase: e.phase, group: e.group, charged: false, why: e.why, whys: e.whys, at: e.t });
   }
   const skipped = events.filter((e) => e.kind === "chargeSkipped").length;
   const fallbacks = events.filter((e) => e.kind === "fallback").map((e) => `${e.phase}/${e.group}@${e.t}`);

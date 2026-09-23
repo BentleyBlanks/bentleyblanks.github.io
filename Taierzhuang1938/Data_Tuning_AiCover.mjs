@@ -215,6 +215,10 @@ export const COVER_CYCLE = Freeze({
   missionOpenAfterMoves: 2,
   missionOpenWindowS: 30,
   missionOpenGroundS: 12,
+  /** 在空地上真打出去了（对人或授权点）就续：最近 missionOpenKeepS 秒内开过枪，空地时段至少再留这么久；
+   *  压制过 COVER.suppressionProneAt 立刻回去找掩体。09-24 探针 fix3：只给 12 s 的话，待命组一轮
+   *  「瞎探三次 → 换点 → 再瞎探三次」要 20 s 才换来 12 s 空地，03 的不动人·帧里仍有一半是他们。 */
+  missionOpenKeepS: 8,
   /** 当前掩体被判侧翼要**持续**这么久才紧急换点：目标在两侧敌人间来回切时单拍判定会翻。 */
   flankGraceS: 1.5,
   /** blindPeeksBeforeMove / flankGraceS / 按隐蔽位判侧翼这三条只对这些阵营生效。
