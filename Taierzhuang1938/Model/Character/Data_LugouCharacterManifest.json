@@ -3758,7 +3758,7 @@
     {
       "id": "LugouNra06",
       "facialUrl": "./Model/Character/Model_LugouNra06Facial.glb",
-      "facialVersion": "4848f4b5aab7c2b8",
+      "facialVersion": "b63c5facc9526d0a",
       "facialCast": [
         "interpreter"
       ],
@@ -3770,7 +3770,7 @@
       "vertices": 6730,
       "triangles": 10321,
       "limitedWeightVertices": 298,
-      "bytes": 5932020,
+      "bytes": 5934076,
       "boneRoles": {
         "head": "Bip002 Head",
         "neck": "Bip002 Neck",

@@ -292,11 +292,15 @@ def PaintGarb(atlas, posMap, mask, bones, headBone, M):
     # The painted name tag on the tunic breast (neutral white, so outside the blue mask).
     tag = front & (d >= 0) & (np.abs(x) < .20) & (y > 1.20) & (Luma(rgb) > .45) & (sat < .25)
     out = np.where(tag[..., None], t2 * .95, out)
+    # Turned-back sleeve cuffs (neutral grey in the source atlas) read as pale arm bands
+    # on a dark civilian jacket: dye them with the jacket.
+    cuff = mask & (np.abs(x) > .30) & (y > 1.2) & (sat < .25) & (Luma(rgb) > .25)
+    out = np.where(cuff[..., None], t2 * np.clip(Luma(rgb) / float(np.median(Luma(rgb)[cuff]) if cuff.any() else 1), .6, 1.3)[..., None], out)
     edge = front & (d >= 0) & (d < .010)
     out = np.where(edge[..., None], out * (.55 + .45 * Smooth(.004, .010, d))[..., None], out)
     report = {'clothTexels': int((cloth > .5).sum()), 'tabTexels': int((tabs > .5).sum()),
               'capTexels': int(cap.sum()), 'trouserTexels': int(trousers.sum()), 'vestTexels': int(vest.sum()),
-              'tagTexels': int(tag.sum())}
+              'tagTexels': int(tag.sum()), 'cuffTexels': int(cuff.sum())}
     return np.clip(out, 0, 1), report, vest
 
 
