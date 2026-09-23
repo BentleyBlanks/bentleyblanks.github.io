@@ -298,6 +298,28 @@ if(process.argv.includes("--opening-audio"))process.exit(0);
     if(survivors)assert.equal(facts.get("lastGuardsWithdrawn").survived,survivors);
     else assert.deepEqual(failures,["down","guards"],"all dead is failure, not an empty successful withdrawal");
   }
+  // 2026-09-24 (contract §2.9, Space §10.3): waiting guards kneel (not prone), and a released guard stays
+  // untargetable through the gap until he is in the safe zone.
+  {
+    const stances=[],route=[{x:-8,z:-155.2},{x:-8,z:-150},{x:-8,z:-145}];
+    const guards=Array.from({length:3},(_,i)=>({actor:{id:i,alive:true,position:{x:-8+i,z:-155.2}},progress:0,route:route.map(p=>({...p}))}));
+    const facts=new Set(["rightNestCaptured"]);
+    const r={flow:{stage:{id:"Support"}},guards,Has:id=>facts.has(id),Record:id=>facts.add(id),time:0,
+      OnPlayerDown(){},MissionFailure(){},Near:()=>false,
+      Defend(){},MoveActor(){},ai:{SetStance:(a,s)=>stances.push([a.id,s])}};
+    r.frontBattle=new FirstLevelFrontBattle(r);
+    r.frontBattle.InfantryBlockade=()=>false;r.frontBattle.TankBlockade=()=>false;
+    FirstLevelMissionRuntime.prototype.UpdateGuards.call(r,1/60);
+    assert.ok(stances.length&&stances.every(([,s])=>s===1),"guards waiting for the window kneel, never forced prone");
+    assert.ok(guards.every(g=>g.actor.missionUntargetable),"waiting guards are not AI targets");
+    facts.add("frontRifleDefense");stances.length=0;
+    FirstLevelMissionRuntime.prototype.UpdateGuards.call(r,1/60);
+    const first=guards[0];
+    assert.ok(first.crossing&&first.actor.missionUntargetable,"a released guard crossing the gap is still protected");
+    for(const p of route.slice(1)){first.actor.position={...p};FirstLevelMissionRuntime.prototype.UpdateGuards.call(r,1/60);}
+    FirstLevelMissionRuntime.prototype.UpdateGuards.call(r,1/60);
+    assert.ok(first.safe&&!first.actor.missionUntargetable,"the protection ends in the safe zone");
+  }
   {
     const voice=new FirstLevelMissionVoice({audio:{StopStoryVoice(){}},hud:{Say(){}}});
     const r=Object.create(FirstLevelMissionRuntime.prototype);

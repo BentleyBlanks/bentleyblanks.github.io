@@ -231,5 +231,8 @@ export const FRONT_BATTLE_TUNING=Object.freeze({
   arrivalM:1.0,leaderLeadM:3,captureRadiusM:4,rearArrivalM:3.5,attackArrivalM:3,
   firstBatch:2,assaultKills:3,assaultIds:["FrontRifleA","FrontRifleB","FrontRifleC","FrontRifleD","FrontRifleE","FrontRifleF"],
   guardHeightM:1.2,blockadeRangeM:85,gatherSpacingM:1.35,zhouHealth:80,
+  // Waiting guards kneel (1), they are not forced prone (2): prone they show 0.3 m above the scrape and the K3
+  // observation step cannot read them; kneeling they show 0.75-1.0 m (Space FrontTopologyTest K3, docs §10.2).
+  guardWaitStance:1,
   bandage:{radius:.087,height:.2,y:-.19,color:0xb6ac8b},
 });

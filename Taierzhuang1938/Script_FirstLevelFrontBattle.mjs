@@ -180,8 +180,11 @@ export class FirstLevelFrontBattle {
       // the combat brain, saw the prone guards, shared them on the blackboard and bayonet-charged them
       // before the player reached the nest (both batch guards dead by RightNestApproach, campaign
       // 03-06 red twice). Same authored protection as the near-tactic standby: the fight for these men
-      // starts when the player relieves them, not offscreen. Released (withdrawing) guards are fair game.
-      g.actor.missionUntargetable=g.actor.alive&&!released;
+      // starts when the player relieves them, not offscreen.
+      // 2026-09-24 (contract §2.9): the protection now lasts through the crossing until the man is in the safe zone.
+      // "Released guards are fair game" let the last bound line shoot the whole second batch in the gap (one of
+      // them with a bayonet charge at 1 m) -> guardBatchLost (Space package cold start, docs §10.3).
+      g.actor.missionUntargetable=g.actor.alive&&!g.safe;
       if(!g.actor.alive||g.progress>=g.route.length)continue;
       // The nearest man probes the visible breach once, then returns to his original cover.
       // This is real movement of the existing defender, with no scripted casualty or teleport.
@@ -201,8 +204,8 @@ export class FirstLevelFrontBattle {
         else if(gather&&g.progress<=1){
           const hold={x:S.lastCover.x+(i-B.firstBatch)*B.gatherSpacingM,z:S.lastCover.z};
           if(Distance(g.actor.position,hold)>B.arrivalM){r.ai.SetStance(g.actor,1,.5,true);r.MoveActor(g.actor,hold,R.guardSpeedMps);continue;}
-          g.gathered=true;r.Defend(g.actor,hold,0,0);r.ai.SetStance(g.actor,2,.5,true);continue;
-        }else {r.Defend(g.actor,g.actor.position,0,0);r.ai.SetStance(g.actor,2,.5,true);continue;}
+          g.gathered=true;r.Defend(g.actor,hold,0,0);r.ai.SetStance(g.actor,B.guardWaitStance,.5,true);continue;
+        }else {r.Defend(g.actor,g.actor.position,0,0);r.ai.SetStance(g.actor,B.guardWaitStance,.5,true);continue;}
       }
       if(!g.crossing){
         const ahead=r.guards.slice(0,i).some(other=>other.actor.alive&&other.crossing&&!other.safe);
