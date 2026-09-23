@@ -77,7 +77,9 @@ export const FRONT_SPACE=Object.freeze({
   roadLink:[Point(62,-129),Point(55,-126.8),Point(48.5,-125.8),Point(44.6,-125.6)],
   southRoad:[Point(60,-177),Point(62,-162),Point(63,-140),Point(61,-120),Point(58,-100),Point(55,-84)],
   yard:Object.freeze({minX:38.8,maxX:54,minZ:-119,maxZ:-100}),
-  bermEndCraters:[Point(17.5,-158.2),Point(20.5,-161.5),Point(15.5,-162.8),Point(21.8,-165.2)],
+  // Around the berm's east end: the flank group's last line is on the SOUTH side of the end, where the
+  // gap shows along the backslope; the two northern craters are its approach.
+  bermEndCraters:[Point(16.2,-158.4),Point(20.5,-161.5),Point(15.5,-162.8),Point(21.8,-165.2),Point(14.6,-157.6),Point(12.6,-156.9),Point(18.4,-159.6)],
   // Last-line craters for the two bounding corridors whose line-4 point has no cover row.
   boundCraters:[Point(16.8,-165.3),Point(-5.2,-165.4),Point(4.7,-165.4)],
   // Flank group craters (they kneel in them; craters never block a rush) and escort-slot craters.

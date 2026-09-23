@@ -216,10 +216,10 @@ export const FRONT_BREACHES=[{x:-22,z:8,radius:4,depth:1.05},{...Sortie.gap,radi
  *  crater to crater toward the berm's east end. Their last line is around the end, where the
  *  gap is visible along the berm's south side; the captured nest enfilades it at 8-14 m. */
 export const FRONT_FLANK_GROUP=Object.freeze([
-  {id:"FrontFlankA",x:50,z:-192.4,lane:[{x:45.4,z:-192.8},{x:40,z:-181.5},{x:31.5,z:-173.6},{x:24.5,z:-168.4},{x:17.2,z:-159.4}]},
-  {id:"FrontFlankB",x:53,z:-192.6,lane:[{x:45.2,z:-193.4},{x:38,z:-183.2},{x:29.6,z:-176.2},{x:22.6,z:-168.8},{x:20.3,z:-162.4}]},
-  {id:"FrontFlankC",x:56,z:-192.4,lane:[{x:45.6,z:-194},{x:42,z:-183.5},{x:33.5,z:-177.4},{x:26.4,z:-170.2},{x:15.4,z:-163.8}]},
-  {id:"FrontFlankD",x:59,z:-192.6,lane:[{x:45.8,z:-194.6},{x:41,z:-186},{x:32.2,z:-179},{x:25.6,z:-172.2},{x:21.8,z:-165.2}]},
+  {id:"FrontFlankA",x:50,z:-192.4,lane:[{x:45.4,z:-192.8},{x:40,z:-181.5},{x:31.5,z:-173.6},{x:24.5,z:-168.4},{x:20.5,z:-161.5},{x:16.2,z:-158.4}]},
+  {id:"FrontFlankB",x:53,z:-192.6,lane:[{x:45.2,z:-193.4},{x:38,z:-183.2},{x:29.6,z:-176.2},{x:22.6,z:-168.8},{x:21.8,z:-165.2},{x:14.6,z:-157.6}]},
+  {id:"FrontFlankC",x:56,z:-192.4,lane:[{x:45.6,z:-194},{x:42,z:-183.5},{x:33.5,z:-177.4},{x:26.4,z:-170.2},{x:15.5,z:-162.8},{x:12.6,z:-156.9}]},
+  {id:"FrontFlankD",x:59,z:-192.6,lane:[{x:45.8,z:-194.6},{x:41,z:-186},{x:32.2,z:-179},{x:25.6,z:-172.2},{x:18.4,z:-159.6}]},
 ].map(Object.freeze));
 /** One officer (IJA01, sword prop, pistol shelved). Leads the flank group one bound behind it. */
 export const FRONT_OFFICER=Object.freeze({id:"FrontOfficer",x:54.5,z:-193.6,modelVariant:1,sword:true,
