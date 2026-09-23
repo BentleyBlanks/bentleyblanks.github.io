@@ -164,3 +164,4 @@ world：{ tankPose, targets[], Los(a,b), Cover(at), lastKnown, facts, rng }   //
 
 - 2026-09-23 v1：首版（集成负责人）。
 - 2026-09-23 v1.1：06 以 Notion 现稿为准（与 09.19 转录逐字一致，用户确认无改动）；06 的三段对白随 Voice 包按新管线重录。并入同日另一会话的整关评估（只读）发现的三处卡死，交第二波：①06 `columnDeparted` 空判（担架初始进度已 ≥ litterSpacingM，与 `zhouOnLitter` 同帧切到 07，`Collection.UpdateOrders` 停跑，老周担架停在 fallen → 08「担架停进遮挡」永不成立）归 Front 包修；②05 先炸车则 `attackPositionReached` 永不记录（`Script_FirstLevelFrontBattle.UpdateSortie` 只查 `bundleTaken`）归 Front 包随毁伤两段一起修；③02 还权无超时兜底归 Opening 包（新门也要有兜底，不许死锁）。驾驶器总走理想顺序测不出这三处，第二波要各补一个非理想顺序的负例。
+- 2026-09-23 v1.2：空间比稿三方案（A 战斗空间优先 / B 关键帧优先 / C 系统优先），两位评审合计 A 胜（土坎两端交叉火力、「东头丢了」＝东端阵位被夺、战车路堑 hull-down + 路弯遮挡 + 坎线以北封口、05 攻击支路即先头兵来路）；嫁接 B 的战车车体/炮塔朝向拆分、右侧低沟射击踏台、后交通壕折角地标、北侧出发壕增援入口，C 的物理路障、横墙挡顺沟视线、旧键名兼容。**战车路点保留旧键名（tankPreviewIndex/Pressure/Block/End…），按路点 id 解析，不重新编号。**
