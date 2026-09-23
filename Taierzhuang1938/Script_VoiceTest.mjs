@@ -64,10 +64,11 @@ const r = await page.evaluate(() => {
     // 阵营两套并存：中方 side 缺省（兼容默认 nra），日方显式 side:"ija"
     nra: bank.filter((e) => (e.side || "nra") === "nra").length,
     ija: bank.filter((e) => e.side === "ija").length,
-    // 留档日语剧情保留假名；当前自动战斗口令按用户要求统一四川话。
+    // 日方剧情与自动战斗口令都用日语纯假名（2026-09-23 第一关 01–05 重构契约 §2.3「日军一律说日语」，
+    // 取代 09-15 把战斗口令改四川话的口径）；汉字写法在 kanji 字段，译文在 cn。
     ijaWithHanzi: bank.filter((e) => e.side === "ija" && e.kind === "story" && /[一-鿿]/.test(e.text))
       .map((e) => e.key),
-    ijaBarkDialectInvalid: bank.filter(e=>e.side==="ija"&&e.kind!=="story"&&(e.dialect!=="sichuan"||!/[一-鿿]/.test(e.text)||/[ぁ-ヿ]/.test(e.text))).map(e=>e.key),
+    ijaBarkNotKana: bank.filter(e=>e.side==="ija"&&e.kind!=="story"&&(e.dialect||!/^[ぁ-ヿ！？、。]+$/.test(e.text))).map(e=>e.key),
     ijaKinds: bank.filter((e) => e.side === "ija")
       .reduce((a, e) => { a[e.kind] = (a[e.kind] || 0) + 1; return a; }, {}),
     // 神剧红线：一句「バカヤロー」都不许有
@@ -232,9 +233,9 @@ Check("六类口令齐全（kill 那一类已删：喊「打中了」等于把 h
 // 当前战斗口令与留档剧情分别校验语言，双方声库都保留六类覆盖。
 Check("中日两套声库都在，且按 side 分开",
   r.nra >= 30 && r.ija >= 18, `中方 ${r.nra} 条 / 日方 ${r.ija} 条`);
-Check("敌军战斗口令使用四川话；留档日语剧情仍按原语言校验",
-  r.ijaBarkDialectInvalid.length===0&&r.ijaWithHanzi.length===0,
-  JSON.stringify({invalidSichuanBarks:r.ijaBarkDialectInvalid,invalidArchivedJapanese:r.ijaWithHanzi}));
+Check("敌军战斗口令与留档日语剧情都是日语纯假名（不带方言标记、不混汉字）",
+  r.ijaBarkNotKana.length===0&&r.ijaWithHanzi.length===0,
+  JSON.stringify({notKanaBarks:r.ijaBarkNotKana,invalidArchivedJapanese:r.ijaWithHanzi}));
 Check("日方六类齐全（少一类就会复读）",
   Object.keys(r.ijaKinds).length >= 6, JSON.stringify(r.ijaKinds));
 Check("没有「バカヤロー」及其变体（抗日神剧的头号标志，黑名单第一条）",

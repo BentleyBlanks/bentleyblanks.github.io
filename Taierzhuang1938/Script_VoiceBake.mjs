@@ -56,6 +56,16 @@ import { execFileSync, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { VOICE_LINES, VOICE_DELIVERY_MIX, STORY_CAST_IDS, IsIjaCast } from "./Data_Voice.mjs";
 import { ArchiveUrl } from "./Data_SfxSources.mjs";
+import { ReferencePayload } from "./Script_SeedAudioVoiceKit.mjs";
+
+// 日军战斗口令（side:"ija"，纯假名）挂固定日本兵嗓子：line.voice → 第一关定妆表选定的定妆音（references / @音频1），
+// 2026-09-23 起 2–3 个嗓子固定分给「分隊長 / 古兵 / 兵」三个角色，不再每条重新抽嗓子。
+const CAST_MANIFEST = path.join(path.dirname(fileURLToPath(import.meta.url)), "Audio", "FirstLevel", "Data_FirstLevelVoiceCastManifest.json");
+function CastVoiceFile(who) {
+  const entry = JSON.parse(fs.readFileSync(CAST_MANIFEST, "utf8")).cast?.[who];
+  if (!entry) throw new Error(`定妆音 ${who} 还没选定（Script_SeedAudioCastBake.mjs）`);
+  return { file: path.join(path.dirname(CAST_MANIFEST), entry.file), sha256: entry.sha256 };
+}
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const VOLCENGINE_URL = "https://openspeech.bytedance.com/api/v3/tts/create";
@@ -477,8 +487,9 @@ function SeedAudioPrompt(line) {
       ? "这是正面突击、贴脸交火中的口令：声音必须有胸腔爆发和压上去的狠劲，气息短、急、强，像在枪火里冲刺时喊出；接近战吼但咬字仍清楚。不是克制的操典朗读，不是平静报话，也不是拖长、沙哑或影视反派式咆哮。"
       : "语气短促、可信、有战场压力，但不舞台化。";
     return [
-      "生成一条单句、干净、孤立的1938年日本陆军战场男性口令配音。严格使用台词本身的日语，不要改词，也不要读成中文。",
-      `角色：${line.role || "兵"}。自然的成年日本男性嗓音。${delivery}`,
+      "生成一条单句、干净、孤立的1938年日本陆军战场男性口令配音。严格使用台词本身的日语（假名照日语念），不要改词，也不要读成中文。",
+      ...(line.voice ? ["@音频1 是这个日本兵本人的声音：严格保持 @音频1 的音色、年龄感，只按下面的交付改变情绪和音量。"] : []),
+      `角色：${line.role || "兵"}。日语母语的成年日本男性嗓音。${delivery}`,
       "不要音乐、不要旁白、不要环境声、不要音效、不要念角色名；开口前后只留极短静音。",
       `只说这一句原文：“${line.text}”`,
     ].join("\n");
@@ -504,6 +515,7 @@ async function GenerateSeedAudio(line, rawFile) {
       body: JSON.stringify({
         model: VOLCENGINE_MODEL,
         text_prompt: SeedAudioPrompt(line),
+        ...(line.voice ? { references: [{ audio_data: ReferencePayload(CastVoiceFile(line.voice).file) }] } : {}),
         audio_config: { format: "mp3", sample_rate: 48000, pitch_rate: 0, speech_rate: 0, loudness_rate: 0 },
         watermark: {},
       }),
@@ -737,6 +749,16 @@ for (const line of lines) {
     best = { ...best, floor: Math.round(dn.floor * 10) / 10, dur: Math.round(Duration(dst) * 100) / 100 };
   }
   durations.set(line.key, best.dur);
+  if(line.side === "ija" && line.kind !== "story" && line.voice){
+    // 日军战斗口令：记录挂的是哪条定妆音，门禁（Script_FirstLevelVoiceTest --audio）对它核 sha。
+    const recordFile=path.join(AUDIO_DIR,"Data_IjaBarkManifest.json");
+    const record=fs.existsSync(recordFile)?JSON.parse(fs.readFileSync(recordFile,"utf8")):{model:VOLCENGINE_MODEL,cues:{}};
+    record.cues[line.key]={file:line.file,text:line.text,voice:line.voice,castSha256:CastVoiceFile(line.voice).sha256,version:line.version,
+      sha256:crypto.createHash("sha256").update(fs.readFileSync(dst)).digest("hex"),seconds:best.dur};
+    fs.writeFileSync(recordFile,JSON.stringify(record,null,2)+"\n");
+    const sichuan=path.join(AUDIO_DIR,"Data_SichuanBarkManifest.json");
+    if(fs.existsSync(sichuan)){const old=JSON.parse(fs.readFileSync(sichuan,"utf8"));if(old.cues?.[line.key]){delete old.cues[line.key];fs.writeFileSync(sichuan,JSON.stringify(old,null,2)+"\n");}}
+  }
   if(line.dialect === "sichuan"){
     const recordFile=path.join(AUDIO_DIR,"Data_SichuanBarkManifest.json");
     const record=fs.existsSync(recordFile)?JSON.parse(fs.readFileSync(recordFile,"utf8")):{model:VOLCENGINE_MODEL,cues:{}};
