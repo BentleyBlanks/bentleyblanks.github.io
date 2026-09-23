@@ -34,7 +34,8 @@ export const MISSION_DEFENSE_OBJECTS = Object.freeze([
   // the MG seat and the captured gun from the east (z -150.3..-152.4), the tank at Block/Squeeze from the
   // north-east (z -151.3..-158) and the west door (K10, z -150.3) - and wire stakes and strands are ray
   // colliders. North of those lines (z -152.4, then tilted) it cut the seat line and then the tank line.
-  ...[-2.9,.3,3.5,6.7,9.9,13.1].map((x,i)=>({id:`BackslopeWire${i}`,asset:"battlefieldBarbedWire02",x,z:-149,ry:0,scale:1,solid:true})),
+  // The two east rolls sit 0.6 m further north to clear the right low trench's north-lip firing bay (11.3,-147.8).
+  ...[-2.9,.3,3.5,6.7,9.9,13.1].map((x,i)=>({id:`BackslopeWire${i}`,asset:"battlefieldBarbedWire02",x,z:x>8?-149.6:-149,ry:0,scale:1,solid:true})),
   ...[55,58.2,61.4,67.8,71.2,74.4].map((x,i)=>({id:`EastWire${i}`,asset:"battlefieldBarbedWire02",x,z:-137,ry:.12,scale:1,solid:true})),
   {id:"WestRoadTimber",asset:"battlefieldBeamObstacle01",x:-55,z:-139,ry:.3,scale:1,solid:true},
   {id:"EastRoadTimber",asset:"battlefieldBeamObstacle01",x:62,z:-129,ry:-.25,scale:1,solid:true},
