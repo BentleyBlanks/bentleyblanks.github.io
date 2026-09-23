@@ -4566,6 +4566,7 @@ export class AudioEngine {
     const speechChanged = voice.storySpeakerSpeaking !== speaking;
     voice.storySpeakerSpeaking = speaking;
     if (speechChanged && this.concussionAmount != null) this.SetConcussion(this.concussionAmount, this.concussionLowHz);
+    if (speechChanged) this.RefreshDeafFloor();
     if (centred) {
       voice.wetGain.gain.setTargetAtTime(0, t, tau);
       voice.distance = 0;
@@ -4584,6 +4585,7 @@ export class AudioEngine {
     this.storyVoice = null;
     this.storyVoiceKey = null;
     if(this.concussionAmount!=null)this.SetConcussion(this.concussionAmount,this.concussionLowHz);
+    this.RefreshDeafFloor();
     return stopped;
   }
 
@@ -5298,7 +5300,7 @@ export class AudioEngine {
   FreeVoice(v) {
     this.pendingVoices.delete(v);
     if(v===this.storyVoice){this.storyVoice=null;this.storyVoiceKey=null;this.storyDuck?.gain.setTargetAtTime(1,this.ctx.currentTime,.25);
-      if(this.concussionAmount!=null)this.SetConcussion(this.concussionAmount,this.concussionLowHz);}
+      if(this.concussionAmount!=null)this.SetConcussion(this.concussionAmount,this.concussionLowHz);this.RefreshDeafFloor();}
     this.activeVoices.delete(v);
     for (let i = 0; i < v.nodes.length; i += 1) {
       try { v.nodes[i].disconnect(); } catch (err) { /* 已断开 */ }
@@ -5484,30 +5486,38 @@ export class AudioEngine {
    *   · 两条差几赫兹的音一左一右，互相拍出起伏，音高随时间略往下沉；
    *   · 底下一层 4 kHz 上下的窄带嘶声，比音先退。
    * 起音期（holdS）照旧：触发它的那一声先完整过去，耳鸣是「之后」的事。
-   * 新一次耳鸣进来时先收掉上一次的鸣响，不叠两层。
+   *
+   * 【2026-09-24 审查后改】
+   *   · **只在 01–06 生效**：任务侧开关 `firstLevelSoundscape` 关着（07 以后、其它关卡）时
+   *     走 DeafenLegacy —— 一字不差的旧实现（TINNITUS.legacy）。
+   *   · 剧情台词正在说时，低通不低于 TINNITUS.speechFloorHz（与 SetConcussion 的对白保底同一条线）；
+   *     台词开始/停下由 RefreshDeafFloor 把剩下的曲线重排一遍。
+   *   · 新一次耳鸣顶掉上一次时，旧的淡出 replaceFadeS 后**立刻停掉并归还节点**（原来只淡出，
+   *     节点要等它自己那条 ReleaseVoice 到期，连续近爆时一直占着预算）；预算先把要归还的算进去再判，
+   *     判不过就保留旧的鸣响、只做闷响（原来是先收旧的再判，预算紧时一点耳鸣都没有）。
    */
   Deafen(seconds = 0.4, holdS = DEAFEN_ATTACK_HOLD_S) {
     if (!this.ctx) return;
+    if (!this.firstLevelSoundscape) { this.DeafenLegacy(seconds, holdS); return; }
     const ctx = this.ctx;
     const t = ctx.currentTime;
     const P = seconds >= TINNITUS.storyFromS ? TINNITUS.story : TINNITUS.combat;
     const f = this.deafFilter.frequency;
-    f.cancelScheduledValues(t);
-    f.setValueAtTime(Math.max(f.value, 200), t);
-    // 【2026-09-09】起音期：原来 30 ms 就压到 520 Hz，于是**触发这次耳鸣的那一声
-    // 自己**的高频先被吃掉了 —— 爆炸听着像隔壁的闷响，而耳鸣是「之后」的事。
-    // 先原样放过起音的那 0.13 s（一发炮弹的爆裂全在这一段里），再关门。
-    f.setValueAtTime(Math.max(f.value, 200), t + holdS);
-    f.exponentialRampToValueAtTime(P.lowHz, t + holdS + 0.05);
+    // 曲线：[时刻, Hz, 到这一点的方式]。起音期原样放过（触发这次耳鸣的那一声先完整过去），再关门。
+    const v0 = Math.max(f.value, 200);
     const recoverAt = t + holdS + seconds;
-    f.setValueAtTime(P.lowHz, recoverAt);
-    for (const [dt, hz] of P.recover) if (dt > 0) f.exponentialRampToValueAtTime(hz, recoverAt + dt);
+    const points = [[t, v0, "set"], [t + holdS, v0, "set"], [t + holdS + 0.05, P.lowHz, "exp"], [recoverAt, P.lowHz, "set"]];
+    for (const [dt, hz] of P.recover) if (dt > 0) points.push([recoverAt + dt, hz, "exp"]);
+    this.deafCurve = { points };
+    this.ScheduleDeafCurve(true);
     const back = P.recover[P.recover.length - 1][0];
     this.tinnitusState = { at: t, profile: P === TINNITUS.story ? "story" : "combat", clearAt: recoverAt + back };
 
-    this.StopTinnitus(0.06);
-    const cost = 8;
-    if (this.liveNodes + cost > this.nodeBudget) return;   // 预算紧就只做闷响
+    const cost = TINNITUS.nodes;
+    const old = this.tinnitus;
+    const returning = old?.nodes?.length || 0;
+    if (this.liveNodes - returning + cost > this.nodeBudget) return;   // 预算紧就只做闷响（旧的鸣响留着）
+    this.StopTinnitus(TINNITUS.replaceFadeS);
     const total = holdS + seconds + P.ringS;
     const on = t + holdS;
     const own = [];
@@ -5558,8 +5568,96 @@ export class AudioEngine {
     this.ReleaseVoice(handle, total + 0.1);
   }
 
-  /** 收掉正在响的耳鸣（新一次进来、或换关）。只淡出，节点由 ReleaseVoice 那条账回收。 */
-  StopTinnitus(fade = 0.06) {
+  /** f581ac7dd 之前的耳鸣（07 以后、其它关卡）：数在 TINNITUS.legacy，行为一字不差。 */
+  DeafenLegacy(seconds, holdS) {
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const L = TINNITUS.legacy;
+    this.deafCurve = null;
+    const f = this.deafFilter.frequency;
+    f.cancelScheduledValues(t);
+    f.setValueAtTime(Math.max(f.value, 200), t);
+    f.setValueAtTime(Math.max(f.value, 200), t + holdS);
+    f.exponentialRampToValueAtTime(L.lowHz, t + holdS + 0.05);
+    f.setValueAtTime(L.lowHz, t + holdS + seconds);
+    f.exponentialRampToValueAtTime(20000, t + holdS + seconds + L.recoverS);
+    this.tinnitusState = { at: t, profile: "legacy", clearAt: t + holdS + seconds + L.recoverS };
+
+    if (this.liveNodes + L.budgetNodes > this.nodeBudget) return;   // 预算紧就只做闷响
+    const osc = ctx.createOscillator();
+    osc.type = "sine";
+    osc.frequency.value = L.toneHz;
+    const g = ctx.createGain();
+    const total = holdS + seconds + L.ringS;
+    g.gain.setValueAtTime(FLOOR, t);
+    g.gain.setValueAtTime(FLOOR, t + holdS);
+    g.gain.linearRampToValueAtTime(L.toneLevel, t + holdS + 0.02);
+    g.gain.exponentialRampToValueAtTime(FLOOR, t + total);
+    osc.connect(g).connect(this.outGain);
+    osc.start(t);
+    osc.stop(t + total + 0.05);
+    this.liveNodes += 2;
+    this.ReleaseVoice({ nodes: [osc, g] }, total);
+  }
+
+  /** 耳鸣低通曲线在 time 时刻该在的值（set 段保持、exp 段指数插值）。 */
+  DeafCurveAt(time) {
+    const pts = this.deafCurve?.points;
+    if (!pts?.length) return 20000;
+    if (time <= pts[0][0]) return pts[0][1];
+    for (let i = 1; i < pts.length; i += 1) {
+      const [t1, v1, how] = pts[i], [t0, v0] = pts[i - 1];
+      if (time >= t1) continue;
+      if (how === "set" || t1 <= t0) return v0;
+      return v0 * Math.pow(v1 / v0, (time - t0) / (t1 - t0));
+    }
+    return pts[pts.length - 1][1];
+  }
+
+  /**
+   * 把耳鸣低通曲线（剩下的部分）排进 AudioParam，剧情台词正在说时抬到 speechFloorHz 以上。
+   * fresh = Deafen 刚排的整条；否则是台词开始/停下时从「现在」接着排（先用 speechFloorRampS 挪过去）。
+   */
+  ScheduleDeafCurve(fresh = false) {
+    const c = this.deafCurve;
+    if (!c || !this.ctx) return;
+    const t = this.ctx.currentTime;
+    const pts = c.points;
+    const f = this.deafFilter.frequency;
+    const floor = this.storyVoice?.storySpeakerSpeaking ? TINNITUS.speechFloorHz : 0;
+    const Hz = (v) => Math.max(v, floor);
+    f.cancelScheduledValues(t);
+    if (!fresh && t >= pts[pts.length - 1][0]) {
+      f.setValueAtTime(pts[pts.length - 1][1], t);
+      this.deafCurve = null;
+      return;
+    }
+    let from = t;
+    if (fresh) {
+      f.setValueAtTime(Hz(pts[0][1]), t);
+    } else {
+      const snap = t + TINNITUS.speechFloorRampS;
+      f.setValueAtTime(Math.max(20, f.value), t);
+      f.exponentialRampToValueAtTime(Hz(this.DeafCurveAt(snap)), snap);
+      from = snap;
+    }
+    for (const [at, hz, how] of pts) {
+      if (at <= from) continue;
+      if (how === "set") f.setValueAtTime(Hz(hz), at);
+      else f.exponentialRampToValueAtTime(Hz(hz), at);
+    }
+  }
+
+  /** 剧情台词开始/停下（说话状态变了）：耳鸣还在恢复就按新的保底重排剩下的曲线。 */
+  RefreshDeafFloor() {
+    if (this.deafCurve) this.ScheduleDeafCurve(false);
+  }
+
+  /**
+   * 收掉正在响的耳鸣（新一次进来、或换关）：淡出 fade 秒后停掉振荡/噪声并立刻归还节点
+   *（StopVoice → FreeVoice；那条 ReleaseVoice 到期时再释放一次是空操作）。
+   */
+  StopTinnitus(fade = TINNITUS.replaceFadeS) {
     const h = this.tinnitus;
     this.tinnitus = null;
     if (!h || !this.ctx) return;
@@ -5571,6 +5669,7 @@ export class AudioEngine {
         g.gain.linearRampToValueAtTime(FLOOR, t + Math.max(0.01, fade));
       } catch (err) { /* 已经拆了 */ }
     }
+    this.Later(Math.max(0.01, fade) * 1000, () => this.StopVoice(h, 0));
   }
 
   // --- 环境床 -------------------------------------------------------------
