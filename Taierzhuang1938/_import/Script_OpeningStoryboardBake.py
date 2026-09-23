@@ -171,18 +171,28 @@ def BakeRig(ctx):
         reach = ctx['armLen']
         p0 = p['pelvis']
         bend0 = p.get('bend', 0.0)
+        # Where each reaching hand is in the unassisted pose: a partial reach (weight < 1) blends
+        # from THIS point, not from the hand of the pose being corrected -- otherwise the goal
+        # would sink with the body and the assist would run to its limit in a single frame.
+        free = {side: ctx['GripPoint'](side).copy() for side in (p.get('grips') or {})}
         for _ in range(8):
             excess = Vector()
             for side, grip in (p.get('grips') or {}).items():
                 if grip is None:
                     continue
                 shoulder = Point(Bone(side + ' UpperArm'))
-                if (p.get('gripWeights') or {}).get(side, 1.0) < 1.0:
-                    continue
-                want = Vector(grip) - Vector((0, 0, solveState['lift'])) - shoulder
-                if want.length > reach * .97:
-                    excess += want.normalized() * (want.length - reach * .92)
-            if excess.length < .004:
+                # A hand still reaching (weight < 1) asks only for its blended target, so the
+                # assist ramps in with the reach instead of switching on at contact.
+                w = (p.get('gripWeights') or {}).get(side, 1.0)
+                goal = Vector(grip) - Vector((0, 0, solveState['lift']))
+                if w < 1.0:
+                    goal = free[side].lerp(goal, w)
+                want = goal - shoulder
+                # Continuous in the target distance (no on/off threshold), so neighbouring
+                # frames get neighbouring corrections and the pelvis never jumps.
+                if want.length > reach * .92:
+                    excess += want.normalized() * (want.length - reach * .92) * w
+            if excess.length < .0015:
                 break
             px, py, pz = p['pelvis']
             # Only ever sink toward a low grip; lifting the pelvis would pull the planted feet
@@ -213,7 +223,8 @@ def BakeRig(ctx):
             if grip is not None:
                 w = (p.get('gripWeights') or {}).get(side, 1.0)
                 target = ctx['GripPoint'](side).lerp(Vector(grip), w) if w < 1.0 else Vector(grip)
-                error = ArmSolve(side, target, p['armPoles'][side], p.get('palms', {}).get(side))
+                palm = (p.get('gripPalms') or {}).get(side) or p.get('palms', {}).get(side)
+                error = ArmSolve(side, target, p['armPoles'][side], palm)
                 if w >= 1.0:
                     errors[side] = error
         resolved = {'arm' + s for s in (p.get('grips') or {}) if p['grips'][s] is not None}
@@ -225,7 +236,9 @@ def BakeRig(ctx):
         return lift, errors
 
     clipsOut, reports, partnerDump = {}, [], {}
-    wanted = [name for name in specs if not selectedClips or name in selectedClips]
+    # A clip is baked only on the rigs its manifest row lists (legacy clips: all five).
+    onRig = [name for name in specs if modelId in (CLIPS[name].get('rigs') or MODELS)]
+    wanted = [name for name in onRig if not selectedClips or name in selectedClips]
     if PASS == 'partner':
         wanted = [name for name in wanted if name in library['PARTNER_SOURCES'].get(modelId, {})]
     arm.animation_data_create()
@@ -277,19 +290,22 @@ def BakeRig(ctx):
                 'toeL': Point(Bone('L Toe0'))[:], 'toeR': Point(Bone('R Toe0'))[:],
                 'gripL': ctx['GripPoint']('L')[:], 'gripR': ctx['GripPoint']('R')[:],
                 'pelvis': Point(Bone('Pelvis'))[:], 'head': Point(Bone('Head'))[:],
+                'left': (Point(Bone('L Thigh')) - Point(Bone('R Thigh')))[:],
                 'overreach': list(ctx['overreach']),
                 'targets': spec['check'](t) if spec.get('check') else None,
             })
             if os.environ.get('OPENING_DEBUG') and frame % int(os.environ.get("OPENING_DEBUG")) == 0:
                 c = spec['check'](t) if spec.get('check') else {}
-                print('DBG %s t=%.2f pelvis %s shL %s shR %s gripL %s gripR %s targets %s' % (clip, t,
-                      Round(Point(Bone('Pelvis'))[:], 2), Round(Point(Bone('L UpperArm'))[:], 2), Round(Point(Bone('R UpperArm'))[:], 2),
+                print('DBG %s t=%.2f lift %.3f footL %s footR %s pelvis %s shL %s shR %s gripL %s gripR %s targets %s' % (clip, t, lift,
+                      Round(Point(Bone('L Foot'))[:], 3), Round(Point(Bone('R Foot'))[:], 3), Round(Point(Bone('Pelvis'))[:], 2), Round(Point(Bone('L UpperArm'))[:], 2), Round(Point(Bone('R UpperArm'))[:], 2),
                       Round(ctx['GripPoint']('L')[:], 2), Round(ctx['GripPoint']('R')[:], 2),
                       {k: Round(v, 2) for k, v in c.items() if v}), flush=True)
             if frame in (0, count // 2, count - 1) or frame in review:
                 samples[-1]['regions'] = ctx['RegionLows']()
                 if spec.get('walls'):
                     samples[-1]['wall'] = WallPenetration(meshes, spec['walls'](t) if callable(spec['walls']) else spec['walls'])
+                    if os.environ.get('OPENING_DEBUG'):
+                        print('DBGWALL %s t=%.2f %.4f' % (clip, t, samples[-1]['wall']), flush=True)
             if frame in review:
                 RenderReview(clip, frame, t, spec, modelId)
             arm.animation_data.action = action
@@ -314,6 +330,14 @@ def BakeRig(ctx):
             row['referenceSpeedMps'] = meta['referenceSpeedMps']
         if props:
             row['props'] = {name: {'stride': 10, 'values': data} for name, data in props.items()}
+        if spec.get('player'):
+            # First-person partner (Shunzi): body points the director drives the camera and
+            # first-person arms with; runtime metres, three.js actor frame, 12 samples/s.
+            rows = {}
+            for i in range(int(round(duration * 12)) + 1):
+                for part, point in spec['player'](min(duration, i / 12)).items():
+                    rows.setdefault(part, []).extend(Round([-point[0] * scale, point[2] * scale, point[1] * scale], 4))
+            row['player'] = {'fps': 12, 'parts': rows}
         clipsOut[clip] = row
         if dump:
             partnerDump[clip] = {'fps': FPS, 'duration': duration, 'scale': scale, 'points': dump, 'skeleton': skeleton}
@@ -339,7 +363,7 @@ def BakeRig(ctx):
     if selectedClips and file.exists():
         merged = json.loads(file.read_text())['clips']
         merged.update(clipsOut)
-        clipsOut = {name: merged[name] for name in CLIPS if name in merged}
+        clipsOut = {name: merged[name] for name in CLIPS if name in merged and name in onRig}
     asset = {'schema': 2, 'modelId': modelId, 'fps': FPS, 'stride': 7, 'bones': names, 'clips': clipsOut,
              'contactPoints': contactPoints, 'originalModelSha256': Sha(source),
              'authoringTool': 'Blender ' + bpy.app.version_string + ' (bpy; headless or BlenderMCP exec)'}
@@ -350,7 +374,7 @@ def BakeRig(ctx):
     if selectedClips and reportFile.exists():
         old = {row['clip']: row for row in json.loads(reportFile.read_text())['clips']}
         old.update({row['clip']: row for row in reports})
-        reports = [old[name] for name in CLIPS if name in old]
+        reports = [old[name] for name in CLIPS if name in old and name in onRig]
     reportFile.write_text(json.dumps({'modelId': modelId, 'scale': scale, 'clips': reports}, indent=1), encoding='utf-8')
     blend = private / ('Scene_' + modelId + 'OpeningStoryboards.blend')
     if not SKIP_BLEND:
@@ -361,27 +385,34 @@ def BakeRig(ctx):
         scene['StoryboardSource'] = 'docs/Data_FirstLevelOpeningSource20260923.md'
         scene['runtimeCoordinatePolicy'] = 'Original GLB bone frames; runtime = (-X, Z, Y) * scale; every frame grounded'
         scene['reviewActions'] = 'Select an action on the original armature; NLA copies are muted for reference'
-        ctx['Op'](bpy.ops.file.pack_all)
-        ctx['Op'](bpy.ops.wm.save_as_mainfile, filepath=str(blend), compress=True)
+        Op = base['Op']                  # the captives module's GUI-context operator runner
+        Op(bpy.ops.file.pack_all)
+        Op(bpy.ops.wm.save_as_mainfile, filepath=str(blend), compress=True)
     print('OPENING_BAKED', modelId, len(clipsOut), str(file), flush=True)
     return {'id': modelId, 'file': file.name, 'sha256': Sha(file), 'originalModelSha256': asset['originalModelSha256'],
             'blend': str(blend), 'contactPoints': contactPoints,
-            'clips': [{k: row[k] for k in ('clip', 'frames', 'floorCorrectionMin', 'floorCorrectionMax',
-                                           'footSlideM', 'contactErrorM', 'gripSolveErrorM')} for row in reports]}
+            'clips': [{k: row.get(k) for k in ('clip', 'frames', 'floorCorrectionMin', 'floorCorrectionMax',
+                                               'footSlideM', 'contactErrorM', 'gripSolveErrorM', 'wallPenetrationM',
+                                               'pelvisMaxStepM', 'root', 'overreach')} for row in reports]}
 
 
 def WallPenetration(meshes, walls):
-    """Deepest skinned vertex behind any wall plane (point, inward normal), source metres."""
+    """Deepest skinned vertex behind any wall plane (point, inward normal), source metres.
+    A wall may carry an edge (edgePoint, edgeDir): it then exists only where
+    (q - edgePoint) . edgeDir >= 0 -- a corner the body leans past."""
     depsgraph = bpy.context.evaluated_depsgraph_get()
     worst = 0.0
-    planes = [(Vector(p), Vector(n).normalized()) for p, n in walls]
+    planes = [(Vector(w[0]), Vector(w[1]).normalized(),
+               (Vector(w[2]), Vector(w[3]).normalized()) if len(w) > 2 else None) for w in walls]
     for o in meshes:
         ev = o.evaluated_get(depsgraph)
         mesh = ev.to_mesh()
         m = ev.matrix_world
         for v in mesh.vertices:
             q = m @ v.co
-            for p, n in planes:
+            for p, n, edge in planes:
+                if edge is not None and (q - edge[0]).dot(edge[1]) < 0:
+                    continue
                 depth = -(q - p).dot(n)
                 if depth > worst:
                     worst = depth
@@ -428,6 +459,17 @@ def Validate(clip, spec, samples, lifts, gripErrors, seam, scale):
     walls = [s['wall'] for s in samples if 'wall' in s]
     if walls:
         report['wallPenetrationM'] = round(max(walls) * scale, 4)
+    def Root(s):
+        # Ground point under the pelvis and the hips' facing, runtime metres, three.js frame.
+        left = Vector(s['left'])
+        fx, fy = left.y, -left.x                    # forward = left x up, in the ground plane (Blender)
+        yaw = math.degrees(math.atan2(fx, -fy)) if abs(fx) + abs(fy) > 1e-6 else 0.0
+        return [round(-s['pelvis'][0] * scale, 4), round(s['pelvis'][1] * scale, 4), round(yaw, 2),
+                round(s['pelvis'][2] * scale, 4)]
+    report['root'] = {'start': Root(samples[0]), 'end': Root(samples[-1]),
+                      'note': '[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame'}
+    steps = [(Vector(b['pelvis']) - Vector(a['pelvis'])).length * scale for a, b in zip(samples, samples[1:])]
+    report['pelvisMaxStepM'] = round(max(steps), 4) if steps else 0.0
     report['finite'] = all(math.isfinite(v) for s in samples for v in s['pelvis'] + s['head'])
     return report
 
@@ -499,6 +541,15 @@ def WriteManifest(results):
             row['originalModelSha256'] = Sha(project / 'Model/Character' / ('Model_' + modelId + '.glb'))
             row['clipIds'] = list(asset['clips'])
             row['contactPoints'] = asset.get('contactPoints', {})
+            row.setdefault('blend', str(private / ('Scene_' + modelId + 'OpeningStoryboards.blend')))
+            # Validation numbers of the bake (runtime metres) from the private report, so the
+            # repository test can gate foot slide, contact error and pelvis continuity.
+            report = private / ('Data_' + modelId + 'OpeningValidation.json')
+            if report.exists():
+                keep = ('frames', 'footSlideM', 'contactErrorM', 'gripSolveErrorM', 'wallPenetrationM',
+                        'pelvisMaxStepM', 'floorCorrectionMin', 'floorCorrectionMax', 'root', 'finite')
+                row['clips'] = [dict({'clip': c['clip']}, **{k: c[k] for k in keep if k in c})
+                                for c in json.loads(report.read_text())['clips'] if c['clip'] in asset['clips']]
     manifest = {'schema': 2, 'version': VERSION, 'fps': FPS, 'actorForward': [0, 0, -1], 'blendSeconds': .12,
                 'floorClearanceM': CLEARANCE,
                 'coordinates': {

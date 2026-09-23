@@ -442,6 +442,10 @@ def Bake(modelId, probe=None):
 
         pelvis = Bone('Pelvis')
         Move(pelvis, L(p['pelvis']))
+        if framed and abs(frameYaw) > 1e-12:
+            # The frame turns the body itself: the hips (and everything the spine carries)
+            # yaw about the pelvis; the tilts below are then expressed in that turned frame.
+            TiltWorld(pelvis, z=frameYaw)
         tilt = p.get('pelvisTilt', (0, 0, 0))
         Tilt(pelvis, x=tilt[0], y=tilt[1], z=tilt[2])
         bend = p.get('bend', 0.0)

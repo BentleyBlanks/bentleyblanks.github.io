@@ -206,9 +206,13 @@ CONTACT_POINTS = {
 # ---------------------------------------------------------------------------------
 # weapons and props (REAL metres, model axes: -Z muzzle/blade, +Y up, origin at gripR)
 # ---------------------------------------------------------------------------------
+# gripL here is where the LEFT HAND goes (0.30 m ahead of the right grip, just forward of the
+# magazine), not the model's gripL mount (0.443 / 0.418): the native two-hand mount only
+# reads the direction right grip -> left grip, and the mount point is out of a shouldered
+# man's reach.
 WEAPONS = {
-    'Type38': {'butt': .255, 'gripL': .443, 'muzzle': 1.029},
-    'HanYang': {'butt': .255, 'gripL': .418, 'muzzle': 1.003},
+    'Type38': {'butt': .255, 'gripL': .30, 'muzzle': 1.029},
+    'HanYang': {'butt': .255, 'gripL': .30, 'muzzle': 1.003},
     # Dadao: origin 3 cm below gripR, pommel end +0.27, tip -0.626 (Model_Dadao.tzm.json).
     'Dadao': {'butt': .27, 'gripL': .125, 'muzzle': .626, 'blade': .625},
     # Hand-held Type30 bayonet: socket ring at origin, handle to +0.114, blade to -0.40.
@@ -231,6 +235,9 @@ PARTNER_SOURCES = {}
 # keeps working until the 0923 director (Opening package) replaces it.
 # ---------------------------------------------------------------------------------
 CLIPS = {}
+# env: walls the clip is authored against, RUNTIME metres from the clip root (NRA02/IJA02 scale):
+# wallBehindM / wallLeftM / wallRightM = distance from the root to the wall plane. The director
+# puts the root that far from the real trench/dugout wall.
 
 
 def Meta(name, duration, loop, hold, **extra):
@@ -269,7 +276,7 @@ ADDITIVE_ARM_R = ADDITIVE_UPPER + ['R UpperArm', 'R Forearm', 'R Hand', 'R Finge
 
 # -- 01 bunker banter / blast (comrade = LugouNra02) ------------------------------------
 Meta('WoundedSitRifleIdle', 4.0, True, 'track', role='comrade', rig='LugouNra02', props=['weapon'],
-     rootMotion=False, env={'wallBehindM': .30},
+     rootMotion=False, env={'wallBehindM': .35},
      contacts=[{'t': 0, 'limb': 'handR', 'action': 'hold', 'target': 'weapon', 'part': 'handguard'},
                {'t': 0, 'limb': 'butt', 'action': 'rest', 'target': 'ground'}],
      next=['BanterLaugh', 'BanterLookShoulder', 'BanterPatRifle', 'WoundedRiseWall'],
@@ -291,7 +298,7 @@ Meta('BanterPatRifle', 2.0, False, 'track', role='comrade', rig='LugouNra02', pr
      notes='"拿这个噻": lets go of the handguard, pats the rifle twice, closes the hand again. '
            'Starts and ends on WoundedSitRifleIdle frame 0.')
 Meta('WoundedRiseWall', 2.8, False, 'track', role='comrade', rig='LugouNra02', props=['weapon'], rootMotion=True,
-     env={'wallBehindM': .30},
+     env={'wallBehindM': .35, 'wallLeftM': .43},
      contacts=[{'t': .55, 'limb': 'handL', 'action': 'brace', 'target': 'wall'},
                {'t': 1.9, 'limb': 'handL', 'action': 'release', 'target': 'wall'},
                {'t': 2.1, 'limb': 'handL', 'action': 'grip', 'target': 'weapon', 'part': 'handguard'}],
@@ -300,7 +307,7 @@ Meta('WoundedRiseWall', 2.8, False, 'track', role='comrade', rig='LugouNra02', p
      notes='Pulls the feet in, braces the bandaged side on the wall, stalls with a sharp inhale when '
            'the shoulder pulls, rises into a hunched low-ceiling stance, clamps the rifle at port.')
 Meta('BlastSlamBuried', 1.5, False, 'track', role='comrade', rig='LugouNra02', props=['weapon'], rootMotion=True,
-     env={'wallLeftM': .75},
+     env={'wallLeftM': .55},
      events=[{'t': 0.0, 'kind': 'blastHit'}, {'t': .08, 'kind': 'weaponLost'}, {'t': .30, 'kind': 'wallImpact'},
              {'t': .62, 'kind': 'weaponLands'}],
      prev=['WoundedRiseWall'], next=['CaptiveDraggedFromDirt'], terminalPose='buried',
@@ -322,7 +329,7 @@ STAGES['captiveDrag'] = {
 STAGES['captiveWall'] = {
     'anchor': 'comrade', 'syncS': 0.0,
     'notes': 'Comrade root R3 = his kneel spot at the end of the drag (pelvis handoff in models[].roots); '
-             'the trench wall is 0.32 m on his left. ijaA stands square in front.',
+             'the trench wall is 0.49 m behind him (he was hauled round to face his right). ijaA stands square in front.',
     'actors': {
         'comrade': {'rig': 'LugouNra02', 'clip': 'CaptiveWallBrace', 'x': 0.0, 'z': 0.0, 'yawDeg': 0},
         'ijaA': {'rig': 'LugouIja02', 'clip': 'IjaShoveToWall', 'x': .02, 'z': -.60, 'yawDeg': 180},
@@ -336,7 +343,7 @@ Meta('CaptiveDraggedFromDirt', 4.4, False, 'free', role='comrade', rig='LugouNra
      stage='captiveDrag', env={'wallLeftM': .55},
      contacts=[{'t': .30, 'by': 'ijaA', 'part': 'collarBack', 'action': 'grab'},
                {'t': .28, 'by': 'ijaB', 'part': 'upperArmR', 'action': 'grab'},
-               {'t': .40, 'by': 'ijaB', 'part': 'wristR', 'action': 'grab'},
+               {'t': .62, 'by': 'ijaB', 'part': 'wristR', 'action': 'grab'},
                {'t': 2.75, 'limb': 'knees', 'action': 'land', 'target': 'ground'},
                {'t': 4.05, 'by': 'ijaB', 'part': 'upperArmR', 'action': 'release'}],
      events=[{'t': .35, 'kind': 'effort', 'what': 'groan'}, {'t': 1.25, 'kind': 'footPush'},
@@ -355,14 +362,14 @@ Meta('IjaDragCollarFromDirt', 4.4, False, 'track', role='ijaA', rig='LugouIja02'
 Meta('IjaPullArm', 4.4, False, 'track', role='ijaB', rig='LugouIja01', props=['weapon'], rootMotion=True,
      stage='captiveDrag', weaponState='slungBack',
      contacts=[{'t': .28, 'limb': 'handL', 'action': 'grab', 'partnerRole': 'comrade', 'part': 'upperArmR'},
-               {'t': .40, 'limb': 'handR', 'action': 'grab', 'partnerRole': 'comrade', 'part': 'wristR'},
+               {'t': .62, 'limb': 'handR', 'action': 'grab', 'partnerRole': 'comrade', 'part': 'wristR'},
                {'t': 3.20, 'limb': 'handsLR', 'action': 'yank', 'partnerRole': 'comrade'},
                {'t': 4.05, 'limb': 'handsLR', 'action': 'release'}],
      next=['IjaBayonetGuard', 'GuardTurn', 'IjaReadyRifle'],
      notes='Two-handed hold on the right upper arm and wrist, sidesteps back with the drag, '
            'wrenches the arm up at 3.2 s and lets go at 4.05 s.')
 Meta('CaptiveWallBrace', 2.0, False, 'free', role='comrade', rig='LugouNra02', rootMotion=True,
-     stage='captiveWall', env={'wallLeftM': .32},
+     stage='captiveWall', env={'wallBehindM': .49},
      contacts=[{'t': .34, 'by': 'ijaA', 'part': 'chestFront', 'action': 'shove'},
                {'t': .62, 'limb': 'handL', 'action': 'brace', 'target': 'wall'},
                {'t': 1.20, 'limb': 'shoulderBack', 'action': 'lean', 'target': 'wall'}],
@@ -377,7 +384,7 @@ Meta('IjaShoveToWall', 1.0, False, 'track', role='ijaA', rig='LugouIja02', props
      notes='Not in contract §5.4 (added): the shove the draft describes ("推到沟壁上") needs its own pair '
            'with CaptiveWallBrace. Short wind-up, lunge on the left foot, flat right palm to the chest.')
 Meta('CaptiveKneelMud', 3.0, True, 'free', role='comrade', rig='LugouNra02', rootMotion=False,
-     env={'wallLeftM': .32},
+     env={'wallBehindM': .49},
      prev=['CaptiveWallBrace'], next=['CaptiveHeadPulledBack'],
      notes='Interrogation idle: kneel-sitting in the mud against the wall, three hard breaths per loop, head '
            'lolling, right hand pressed on the bandage. Same root as CaptiveWallBrace.')
@@ -480,6 +487,17 @@ class Toolkit:
                             worldPole=f.get('armPole.' + s), worldPalm=(f.get('palmFw.' + s), f.get('palmNw.' + s)))
         p['post'] = Post
         p['resolved'] = tuple(s for s in rel if f.get('grip.' + s) is None)
+        # CurlFingers bends from the current finger pose: a hand the body-frame pass (Post)
+        # turns and curls must not be curled by ApplyPose first, or it closes twice as far
+        # (and a clip handing over from a world-space hand would jump by that much).
+        for s in rel:
+            p['palms'].pop(s, None)
+        if f.get('frameYaw') and p['grips']:
+            # Grips are pinned after ApplyPose in world space: their palm hints must be turned
+            # by the frame here (ApplyPose turns the ones it applies itself).
+            q = Quaternion((0, 0, 1), f['frameYaw'])
+            p['gripPalms'] = {s: (tuple(q @ Vector(p['palms'][s][0])), tuple(q @ Vector(p['palms'][s][1])))
+                              + tuple(p['palms'][s][2:]) for s in p['grips'] if s in p['palms']}
         return p
 
     def RelArm(self, side, offset, poleRel, palmF, palmN, curl, world=None, weight=1.0, worldPole=None, worldPalm=(None, None)):
@@ -732,14 +750,22 @@ def PartnerPoint(T, stage, selfRole, partnerRole, point, t, normalOffset=0.0):
 
 
 def Tracks(base, channels, lag=None, extraKeys=None):
-    """Per-channel key lists {channel: [(t, value), ...]} -> Anim."""
-    times = sorted({t for points in channels.values() for t, _ in points} | {0.0})
-    keys = {t: {} for t in times}
+    """Per-channel key lists {channel: [(t, value), ...]} -> Anim. Each channel is
+    interpolated through ITS OWN keys only (a carry-forward table would insert flat holds
+    at every other channel's key times and turn smooth paths into steps)."""
+    anim = Anim(base, [(0.0, {})] + (extraKeys or []), lag)
     for name, points in channels.items():
+        points = sorted(points, key=lambda p: p[0])
+        if points[0][0] > 0:
+            points = [(0.0, base.get(name, points[0][1]))] + points
+        dedup = []
         for t, v in points:
-            keys[t][name] = v
-    rows = [(t, keys[t]) for t in times]
-    return Anim(base, rows + (extraKeys or []), lag)
+            if dedup and abs(dedup[-1][0] - t) < 1e-9:
+                dedup[-1] = (t, v)
+            else:
+                dedup.append((t, v))
+        anim.channels[name] = Step(dedup) if any(v is None for _, v in dedup) else Channel(dedup)
+    return anim
 
 
 def StepPoints(start, steps, lift=.07):
@@ -1230,9 +1256,9 @@ def BuildBlastSlam(T, name):
 # 01: the comrade dragged out of the dirt, shoved to the wall, kneeling against it.
 # Victim root = BlastSlamBuried root for the drag; R3 (his kneel spot) afterwards.
 # ---------------------------------------------------------------------------------
-DRAG_END = (.08, -.50)          # victim kneel spot (R3 origin) in the drag root (source metres, Blender axes)
+DRAG_END = (.06, -.50)          # victim kneel spot (R3 origin) in the drag root (source metres, Blender axes)
 DRAG_TURN = -math.pi / 2        # hauled round to face his right: the trench wall ends up behind him
-WALL_R3_Y = .52                 # that wall, behind him in R3 (it is the same wall as WALL_LEFT_X)
+WALL_R3_Y = .54                 # that wall, behind him in R3 (it is the same wall as WALL_LEFT_X)
 
 
 def R3ToDrag(p):
@@ -1284,15 +1310,17 @@ def DragVictimKeys(T):
         (2.45, {'pelvis': (ex, ey, kz + .08), 'bend': .25, 'head': (.15, 0, .05), 'turn': -1.25}),
         (2.75, {'pelvis': kneel['pelvis'], 'ankle.L': kneel['ankle.L'], 'ankle.R': kneel['ankle.R'],
                 'legPole.L': kneel['legPole.L'], 'legPole.R': kneel['legPole.R'], 'turn': DRAG_TURN,
+                # The held right arm comes round with him (R3 = his own frame from here on).
+                'hand.R': R3ToDrag((-.20, -.30, .80)),
                 'pelvisTilt': (.12, 0, 0), 'bend': .32, 'head': (.35, .05, .08),
                 'neck': (.15, 0, 0), 'shrug': .08}),
         # The arm is wrenched up across the wound: sharp inhale, the face screws up.
-        (3.20, {'hand.R': (ex - .42, ey - .30, 1.05), 'twist': -.25, 'lean': -.10, 'shrug': .28,
+        (3.20, {'hand.R': R3ToDrag((-.42, -.30, 1.05)), 'twist': -.25, 'lean': -.10, 'shrug': .28,
                 'head': (-.18, -.15, -.10), 'bend': .20}),
-        (3.45, {'hand.R': (ex - .44, ey - .30, 1.10), 'head': (-.22, -.18, -.12), 'shrug': .32}),
-        (3.85, {'hand.R': (ex - .36, ey - .26, .82), 'twist': -.12, 'lean': -.04, 'shrug': .15,
+        (3.45, {'hand.R': R3ToDrag((-.44, -.30, 1.10)), 'head': (-.22, -.18, -.12), 'shrug': .32}),
+        (3.85, {'hand.R': R3ToDrag((-.36, -.26, .82)), 'twist': -.12, 'lean': -.04, 'shrug': .15,
                 'head': (.10, -.05, -.05), 'bend': .28}),
-        (4.15, {'hand.R': (ex - .30, ey - .14, .66)}),
+        (4.15, {'hand.R': R3ToDrag((-.30, -.14, .66))}),
         (4.40, {'hand.R': R3ToDrag((-.26, -.04, .45)), 'palmF.R': (0, -.2, -1), 'palmN.R': (1, 0, 0),
                 'head': (.32, .02, .02), 'bend': .30, 'twist': -.04, 'lean': 0.0}),
     ]
@@ -1314,10 +1342,14 @@ def BuildCaptiveDragged(T, name):
 
 
 def Standing(T, crouch=0.0, bend=.08):
+    """Stand() with the free arms hanging in the torso frame (they follow any bend or step);
+    a clip that wants a world-space hand sets handRelW.<side> = 0 for it."""
     f = T.Stand()
     p = f['pelvis']
     f['pelvis'] = (p[0], p[1], p[2] - crouch)
     f['bend'] = bend
+    f.update({'handRel.L': (.07, -.10, -.47), 'handRel.R': (-.07, -.10, -.47), 'handRelW.L': 1.0, 'handRelW.R': 1.0,
+              'palmF.L': (0, -.2, -1), 'palmN.L': (-1, 0, 0), 'palmF.R': (0, -.2, -1), 'palmN.R': (1, 0, 0)})
     return f
 
 
@@ -1419,7 +1451,11 @@ def BuildDragCollar(T, name):
     crouch = [(0.0, .06), (.30, .20), (.60, .16), (1.0, .12), (2.0, .12), (2.20, .02), (2.75, .08), (4.40, .06)]
     bend = [(0.0, .15), (.30, .62), (.60, .48), (1.0, .40), (2.0, .40), (2.20, .10), (2.35, .05), (2.75, .25), (4.40, .22)]
     tilt = [(0.0, (.05, 0, 0)), (.30, (.35, 0, .05)), (1.0, (.25, 0, .05)), (2.20, (-.08, 0, 0)), (2.75, (.12, 0, 0))]
-    schedule = [('R', .62, .90), ('L', .95, 1.25), ('R', 1.30, 1.58), ('L', 1.65, 1.95), ('R', 2.50, 2.72)]
+    # The haul starts at the grab (0.30 s) and moves the collar 0.6 m in 0.65 s: he backs off
+    # from the first pull, one short backward step every quarter second, then steps in on the
+    # jerk up at 2.2 s (the collar rises and comes forward) and settles.
+    schedule = [('R', .30, .55), ('L', .57, .82), ('R', .84, 1.08), ('L', 1.10, 1.36), ('R', 1.42, 1.70),
+                ('L', 1.74, 2.00), ('R', 2.06, 2.30), ('L', 2.52, 2.76)]
     stance = {'L': (H + .06, -.12, T.A), 'R': (-(H + .04), .16, T.A)}
     feet, plants = FollowSteps(PelvisXY, stance, schedule, 4.4)
     pelvis = [(t, (PelvisXY(t)[0], PelvisXY(t)[1], P - .04 - Channel(crouch)(t))) for t in times]
@@ -1453,7 +1489,11 @@ def BuildPullArm(T, name):
         return (c[0] - .05, c[1] + .50)
     crouch = [(0.0, .05), (.28, .18), (.60, .12), (2.0, .10), (2.75, .08), (3.20, .02), (3.45, .0), (4.40, .06)]
     bend = [(0.0, .12), (.28, .55), (.60, .40), (2.0, .38), (2.75, .30), (3.20, .08), (3.45, .02), (3.85, .15), (4.40, .15)]
-    schedule = [('L', .70, .98), ('R', 1.02, 1.30), ('L', 1.40, 1.68), ('R', 1.75, 2.02), ('L', 3.05, 3.25)]
+    # The arm travels 0.45 m to his right between 0.6 and 1.0 s, 0.25 m back by 1.2 s, another
+    # 0.25 m right-back by 2.0 s and swings 0.3 m back left on the jerk up (2.0-2.2 s): side
+    # steps lead with the foot on the side he travels to, so no planted leg is left behind.
+    schedule = [('R', .52, .76), ('L', .78, 1.02), ('R', 1.06, 1.28), ('L', 1.30, 1.52), ('R', 1.60, 1.84),
+                ('L', 2.02, 2.24), ('R', 2.28, 2.50), ('L', 3.05, 3.25), ('R', 3.95, 4.20)]
     stance = {'L': (H + .05, -.14, T.A), 'R': (-(H + .05), .14, T.A)}
     feet, plants = FollowSteps(PelvisXY, stance, schedule, 4.4)
     pelvis = [(t, (PelvisXY(t)[0], PelvisXY(t)[1], P - .04 - Channel(crouch)(t))) for t in times]
@@ -1470,7 +1510,7 @@ def BuildPullArm(T, name):
                              **{'armPole.L': [(0.0, (SX + .55, .10, P - .10))], 'armPole.R': [(0.0, (-(SX + .45), .25, P - .20))]}),
                   lag={'head': .05})
     grips = {'L': [(.28, 4.05, 'upperArmR', .045, (0, 0, -1), 1.0)],
-             'R': [(.40, 4.05, 'wristR', .04, (0, 0, -1), 1.0)]}
+             'R': [(.62, 4.05, 'wristR', .04, (0, 0, -1), 1.0)]}
     spec = AttackerSpec(T, stage, role, 'comrade', grips, anim, 4.4)
     props, review = SlungProps(T)
     spec.update({'props': props, 'plants': plants,
@@ -1533,7 +1573,7 @@ def BuildWallBrace(T, name):
     # The left arm was hanging in the body frame at the end of the drag: keep it there.
     start['handRel.L'], start['poleRel.L'], start['handRelW.L'] = (.06, -.10, -.50), (.40, .30, -.20), 1.0
     start['palmF.L'], start['palmN.L'] = (0, -.2, -1), (-1, 0, 0)
-    wallY = WALL_R3_Y - .03
+    wallY = WALL_R3_Y - .07          # wrist target: the palm and fingers lie on the wall in front of it
     rows = [
         (0.00, {}),
         (0.26, {'head': (.25, 0, .05)}),
@@ -1543,7 +1583,7 @@ def BuildWallBrace(T, name):
                 'pelvis': Add3(start['pelvis'], (0, .06, 0))}),
         # Toppling backward: the left hand shoots back for the wall.
         (0.48, {'pelvis': (.02, .10, kz - .06), 'bend': -.05, 'lean': .08, 'head': (.10, .05, .05),
-                'hand.L': (.24, wallY - .02, kz + .30), 'palmFw.L': (0, .2, 1), 'palmNw.L': (0, 1, 0), 'curl.L': .15,
+                'hand.L': (.24, wallY - .03, kz + .30), 'palmFw.L': (0, .2, 1), 'palmNw.L': (0, 1, 0), 'curl.L': .15,
                 'armPole.L': (.55, -.20, kz), 'handRelW.R': 0.0, 'handRelW.L': 0.0}),
         (0.62, {'hand.L': (.24, wallY, kz + .22)}),
         # The loose earth gives: the palm slides down, shoulders and back take the wall.
@@ -1551,7 +1591,9 @@ def BuildWallBrace(T, name):
                 'bend': .10, 'head': (.28, .08, .10)}),
         (1.35, {'handRelW.R': 1.0, 'handRelW.L': 0.0}),
         (1.70, {'handRelW.L': 1.0, 'curl.L': .5}),
-        (2.00, {k: end[k] for k in end if not k.startswith(('hand.', 'armPole.'))}),
+        # Every channel lands on KneelWallBase, the world hand/pole seeds too: the arm IK keeps
+        # the roll of its first solve, so the seeds decide the forearm twist the next clip starts on.
+        (2.00, dict(end)),
     ]
     anim = Keys(start, rows, lag={'head': .05, 'neck': .03})
     return {'pose': lambda t: T.Nest(anim(t)), 'walls': R3_WALL,
@@ -1587,7 +1629,8 @@ def BuildShoveToWall(T, name):
     H, P, A, SX, SZ = T.H, T.P, T.A, T.SX, T.SZ
     stage, role = 'captiveWall', 'ijaA'
     base = Standing(T)
-    base.update({'hand.R': (-(SX + .06), -.06, P + .02), 'palmF.R': (0, -.3, -1), 'palmN.R': (1, 0, 0), 'curl.R': .7,
+    base.update({'hand.R': (-(SX + .06), -.06, P + .02), 'palmFw.R': (0, -.3, -1), 'palmNw.R': (1, 0, 0), 'curl.R': .7,
+                 'handRelW.R': 0.0,
                  'handRel.L': (.08, -.10, -.47), 'palmF.L': (0, -.2, -1), 'palmN.L': (-1, 0, 0), 'curl.L': .6})
     feet = {'ankle.L': [(0.0, base['ankle.L']), (.12, base['ankle.L']), (.22, Add3(base['ankle.L'], (0, -.12, .06))),
                         (.32, Add3(base['ankle.L'], (0, -.32, 0)))],
@@ -1639,7 +1682,7 @@ PARTNER_SOURCES['LugouNra02'].update({
 })
 
 Meta('CaptiveHeadPulledBack', 1.8, False, 'free', role='comrade', rig='LugouNra02', rootMotion=False, stage='slashGrab',
-     env={'wallLeftM': .32},
+     env={'wallBehindM': .49},
      contacts=[{'t': .28, 'by': 'ijaA', 'part': 'hairBack', 'action': 'grab'}],
      prev=['CaptiveKneelMud', 'CaptiveWallBrace'], next=['CaptiveThroatCut'],
      notes='Fist in the hair, the head is torn back and the throat opened; both hands come up by reflex '
@@ -1670,7 +1713,7 @@ Meta('IjaThroatSlash', 4.0, False, 'track', role='ijaA', rig='LugouIja02', props
            'the throat 0.24 s). Keeps the hair and leans in to taunt; 1.0-4.0 s is a seamless hold loop '
            '(the director samples it in window until "日兵甲松手") with two hair shakes on the taunt lines.')
 Meta('CaptiveThroatCut', 1.0, False, 'free', role='comrade', rig='LugouNra02', rootMotion=True, stage='slashCut',
-     env={'wallLeftM': .32},
+     env={'wallBehindM': .49},
      contacts=[{'t': .24, 'by': 'ijaA', 'part': 'throat', 'action': 'cut'},
                {'t': .38, 'limb': 'handsLR', 'action': 'clutch', 'target': 'self.throat'},
                {'t': .52, 'limb': 'shoulderBack', 'action': 'slam', 'target': 'wall'}],
@@ -1679,14 +1722,14 @@ Meta('CaptiveThroatCut', 1.0, False, 'free', role='comrade', rig='LugouNra02', r
      notes='The cut lands: a full-body jolt, both hands fly to the throat, the trunk slams back into the wall; '
            'the head stays where the fist holds it.')
 Meta('CaptiveClutchThroat', 3.0, True, 'free', role='comrade', rig='LugouNra02', rootMotion=False, stage='slashTaunt',
-     env={'wallLeftM': .32},
+     env={'wallBehindM': .49},
      events=[{'t': .30, 'kind': 'spasm'}, {'t': 1.2, 'kind': 'spasm'}, {'t': 2.2, 'kind': 'spasm'},
              {'t': .60, 'kind': 'hairShake'}, {'t': 1.80, 'kind': 'hairShake'}],
      prev=['CaptiveThroatCut'], next=['CaptiveWallSlideTwitch'],
      notes='Hands clamped on the throat, choking spasms, head held back by the fist and shaken twice per loop '
            '(in step with IjaThroatSlash hold window).')
 Meta('CaptiveWallSlideTwitch', 3.2, False, 'free', role='comrade', rig='LugouNra02', rootMotion=True, stage='slashWipe',
-     env={'wallLeftM': .32}, terminal=True,
+     env={'wallBehindM': .49}, terminal=True,
      events=[{'t': 0.0, 'kind': 'released'}, {'t': 1.6, 'kind': 'twitch'}, {'t': 2.1, 'kind': 'twitch'},
              {'t': 2.5, 'kind': 'twitch'}, {'t': 3.2, 'kind': 'dead', 'fact': 'captivesKilled'}],
      prev=['CaptiveClutchThroat'], next=[],
@@ -2090,9 +2133,11 @@ def BuildWipeSheath(T, name):
                         (2.30, shoulderR), (2.40, shoulderR)])
     axes = Channel([(0.0, Unit((.30, -.92, -.20))), (.55, wipeAxis), (.85, wipeAxis), (1.20, Unit((.2, -.5, -.8))),
                     (1.50, sheathAxis), (2.40, sheathAxis)])
-    body = Keys(base, [(0.0, {}), (.55, {'bend': .62, 'pelvis': Add3(pel, (0, -.04, -T.R(.22))), 'head': (.40, 0, 0)}),
-                       (.85, {'bend': .58}), (1.30, {'bend': .20, 'pelvis': Add3(pel, (0, .02, -.03)), 'head': (.10, 0, .05)}),
-                       (1.62, {'twist': .12}), (2.40, {'twist': -.05, 'bend': .12, 'head': (.05, 0, -.10)})], lag={'head': .05})
+    # The victim's right shoulder is on his left: the hips shift onto the left foot and the
+    # trunk turns into the wipe so the right hand draws the blade across it within reach.
+    body = Keys(base, [(0.0, {}), (.55, {'bend': .62, 'pelvis': Add3(pel, (.14, -.04, -T.R(.22))), 'head': (.40, 0, .15), 'twist': .32}),
+                       (.85, {'bend': .58, 'twist': .30, 'pelvis': Add3(pel, (.14, -.02, -T.R(.20)))}), (1.30, {'bend': .20, 'twist': .08, 'pelvis': Add3(pel, (0, .02, -.03)), 'head': (.10, 0, .05)}),
+                       (1.62, {'twist': .26, 'bend': .26}), (2.40, {'twist': -.05, 'bend': .12, 'head': (.05, 0, -.10)})], lag={'head': .05})
 
     def BodyAt(t):
         f = body(t)
@@ -2116,6 +2161,8 @@ def BuildWipeSheath(T, name):
         out['bayonet'] = KnifeTrack(KnifeAt(t))
         return out
     spec.update({'props': Props, 'plants': [('R', 0, 2.4), ('L', 0, 2.4)],
+                 # The blade on the shoulder: where the fist must be while it wipes (0.55-0.85 s).
+                 'check': lambda t: {'R': handPath(t)} if .55 <= t <= .85 else {},
                  'reviewProps': lambda t: review(t) + KnifeProps(KnifeAt(t)) + PartnerGhost(T, 'slashWipe', 'ijaA', 'comrade', t)
                  + [('point', tuple(sh), None, .03)],
                  'reviewFrames': lambda n: [0, int(n * .23), int(n * .35), int(n * .66), n - 1]})
@@ -2180,3 +2227,1117 @@ def BuildReadyRifle(T, name):
             'reviewProps': lambda t: T.RifleProps(RifleAt(t)),
             'reviewFrames': lambda n: [0, int(n * .3), int(n * .53), int(n * .77), n - 1]}
     return AReview(spec)
+
+
+# =================================================================================
+# 01: front pass (ijaC corner fire, ijaD junction peek) and Shunzi found (ijaA).
+# Shunzi is the first-person player: his body points are authored here as a track the
+# Opening director follows with the camera and the first-person arms (`player` in the
+# clip metadata, runtime metres in the actor frame, sampled every 1/12 s).
+# =================================================================================
+PROPS.update({
+    'bayonet': {'model': 'BayonetType30', 'mesh': 'Model_BayonetType38.tzm.json',
+                'grip': 'handle centre 0.062 m behind the socket ring (model +Z), blade along model -Z',
+                'scabbard': 'left hip: pelvis + left 0.13 + forward 0.12 + up 0.04 (runtime metres), blade down-back',
+                'owner': 'ijaA', 'rifleBayonet': False,
+                'notes': 'ijaA carries his bayonet in the scabbard (roster must spawn his Type38 with bayonet:false); '
+                         'the prop track `bayonet` places it for every clip that touches it.'},
+    'beam': {'model': 'procedural', 'lengthM': 1.55, 'widthM': .13, 'heightM': .12, 'splinterM': .22,
+             'material': 'WoodBeam',
+             'states': {'pinned': 'across the pack of the prone player at the dugout mouth',
+                        'nudged': 'BayonetClearWood 0.9 s: rotated 12 deg about its far end',
+                        'kicked': 'IjaKickBeam 0.45 s: the `beam` track, rests 0.55 m further out'},
+             'collision': 'Space package (static collider per state; the kicked state frees the player)'},
+    'comradeRifle': {'model': 'HanYang (actor weapon)', 'track': 'weapon',
+                     'notes': 'WoundedSitRifleIdle/Banter*/WoundedRiseWall hold it through the `weapon` track; '
+                              'BlastSlamBuried throws it forward-right; last track frame = where it lies.'},
+})
+
+def SlungSideNominal(T):
+    """Where SlungRifle(T, 'side') puts the rifle on an upright stance (for key blending)."""
+    return T.Rifle((-.24, .06, T.P + .02), Unit((0, .12, .97)))
+
+
+Meta('IjaCornerFire', 2.6, True, 'track', role='ijaC', rig='LugouIja01', props=['weapon'], rootMotion=False,
+     events=[{'t': .10, 'kind': 'fire', 'weapon': 'Type38'}, {'t': .70, 'kind': 'boltUp'}, {'t': .82, 'kind': 'boltBack'},
+             {'t': .98, 'kind': 'boltForward'}],
+     notes='At the trench corner: bladed stance, cheek on the stock, one shot, recoil, bolt cycled with the right '
+           'hand while the butt stays in the shoulder, back on aim and breathing. Muzzle along actor -Z, 4 deg up.')
+Meta('IjaJunctionPeek', 3.2, True, 'track', role='ijaD', rig='LugouIja02', props=['weapon'], rootMotion=False,
+     env={'wallRightM': .32},
+     notes='Right shoulder on the junction wall, rifle at high port; leans out to the right past the corner, '
+           'scans, leans back and waits. The wall edge is 0.30 m to his right, its corner 0.25 m ahead.')
+Meta('IjaSlingRifle', .8, False, 'track', role='ijaA', rig='LugouIja02', props=['weapon'], rootMotion=False,
+     weaponState='twoHand->slungRight', endHold='slungRight',
+     prev=['IjaReadyRifle', 'IjaBayonetGuard'], next=['IjaCollarDragSnag', 'CollarDrag'],
+     notes='"把步枪甩到身侧": swings the rifle up and back onto the right shoulder by the sling, lets go, '
+           'hands free and stooping for the collar.')
+Meta('IjaCollarDragSnag', 2.2, False, 'track', role='ijaA', rig='LugouIja02', props=['weapon'], rootMotion=False,
+     weaponState='slungRight', player=True,
+     contacts=[{'t': .25, 'limb': 'handL', 'action': 'grab', 'partnerRole': 'shunzi', 'part': 'collarBack'}],
+     events=[{'t': .95, 'kind': 'packSnagged', 'target': 'beam'}, {'t': 1.12, 'kind': 'yank'}, {'t': 1.42, 'kind': 'yank'}],
+     prev=['IjaSlingRifle'], next=['IjaKickBeam'],
+     notes='Hooks the back of the collar, backs off two steps hauling; the pack snags on the beam at 0.95 s: '
+           'a dead stop that jerks him forward, two yanks, a look back at what holds.')
+Meta('IjaKickBeam', 1.2, False, 'track', role='ijaA', rig='LugouIja02', props=['weapon', 'beam'], rootMotion=False,
+     weaponState='slungRight', player=True,
+     contacts=[{'t': 0, 'limb': 'handL', 'action': 'hold', 'partnerRole': 'shunzi', 'part': 'collarBack'},
+               {'t': .45, 'limb': 'footR', 'action': 'kick', 'target': 'beam'}],
+     events=[{'t': .45, 'kind': 'beamKicked'}],
+     prev=['IjaCollarDragSnag'], next=['CollarDrag'],
+     notes='Keeps the collar in his left fist, stamps the loose beam off the pack with the right sole; the '
+           '`beam` track carries it clear (rests at 0.9 s).')
+Meta('IjaButtStrike', 1.0, False, 'track', role='ijaA', rig='LugouIja02', props=['weapon'], rootMotion=False,
+     weaponState='slungRight->twoHand', endHold='twoHand', player=True,
+     contacts=[{'t': .42, 'limb': 'butt', 'action': 'strike', 'partnerRole': 'shunzi', 'part': 'head'}],
+     events=[{'t': .42, 'kind': 'buttHit', 'fact': 'playerStruck'}],
+     prev=['CollarDrag'], next=['IjaBayonetGuard', 'IjaHoldCollarUp'],
+     notes='No warning: the rifle comes off the shoulder into both hands and the butt is driven straight down onto '
+           'the head of the man propping himself up (0.42 s), then back to low ready.')
+
+
+def AimRifle(T, pitchDeg=4.0, yawDeg=0.0, recoil=0.0):
+    """Shouldered Type38: butt in the right shoulder pocket, muzzle along -Y."""
+    SX, SZ = T.SX, T.SZ
+    p, y = math.radians(pitchDeg), math.radians(yawDeg)
+    axis = Vector((math.sin(y) * math.cos(p), -math.cos(y) * math.cos(p), math.sin(p)))
+    butt = Vector((-(SX - .05), -.10 + recoil * T.R(.035), SZ - .05))
+    return T.RifleFromButt(tuple(butt), tuple(axis))
+
+
+def AimStance(T):
+    H, P = T.H, T.P
+    f = Standing(T)
+    f.update({'ankle.L': (H + .02, -.16, T.A), 'ankle.R': (-(H + .04), .14, T.A), 'foot.L': (0, 10, 0), 'foot.R': (0, -35, 0),
+              'pelvis': (0, .0, P - .06), 'pelvisTilt': (.06, 0, -.45), 'twist': -.12, 'bend': .10,
+              'head': (.12, -.14, .42), 'neck': (.06, -.05, .20)})
+    return f
+
+
+@Builder('IjaCornerFire')
+def BuildCornerFire(T, name):
+    base = AimStance(T)
+    w = WEAPONS[T.gun]
+    recoil = Channel([(0.0, 0.0), (.10, 0.0), (.13, 1.0), (.22, .45), (.35, 0.0), (2.6, 0.0)])
+    pitch = Channel([(0.0, 4.0), (.10, 4.0), (.14, 10.0), (.30, 5.0), (.55, 4.0), (.75, 1.0), (1.10, 0.5), (1.40, 4.0), (2.6, 4.0)])
+    # Bolt: fist leaves the wrist of the stock, lifts, draws, drives home, turns down.
+    boltW = Channel([(0.0, 0.0), (.55, 0.0), (.68, 1.0), (1.12, 1.0), (1.30, 0.0), (2.6, 0.0)])
+    boltPath = Channel([(0.0, (0, 0, 0)), (.68, (0, 0, 0)), (.78, (0, 0, .03)), (.90, (0, .09, .03)), (1.00, (0, 0, .03)),
+                        (1.10, (0, 0, 0)), (2.6, (0, 0, 0))])
+
+    def RifleAt(t):
+        return AimRifle(T, pitch(t), 0.0, recoil(t))
+
+    def Pose(t):
+        f = dict(base)
+        phase = Tau * t / 2.6
+        breath = math.sin(phase)
+        k = recoil(t)
+        f['bend'] += .005 * breath - .05 * k
+        f['twist'] += .01 * breath
+        p = f['pelvis']
+        f['pelvis'] = (p[0], p[1] + .02 * k, p[2])
+        h = f['head']
+        f['head'] = (h[0] - .06 * k, h[1], h[2])
+        rifle = RifleAt(t)
+        palms = T.Palms(rifle['axis'])
+        a, o = Vector(rifle['axis']), Vector(rifle['origin'])
+        side = a.cross(Vector((0, 0, 1))).normalized()          # rifle's right side
+        bolt = o + a * T.R(.07) + side * T.R(.05) + Vector((0, 0, T.R(.03)))
+        b = boltW(t)
+        grip = o.lerp(bolt + Vector(boltPath(t)) * (1 / T.s) * .9, b)
+        f['grip.R'] = tuple(grip)
+        f['grip.L'] = rifle['gripL']
+        f['palmF.R'], f['palmN.R'], f['curl.R'] = palms['R'][0], palms['R'][1], Mix(.95, .55, b)
+        f['palmF.L'], f['palmN.L'], f['curl.L'] = palms['L'][0], palms['L'][1], .85
+        f['armPole.R'] = (-(T.SX + .45), .10, T.SZ - .35)
+        f['armPole.L'] = (T.SX + .30, -.40, T.SZ - .60)
+        return T.Nest(f)
+    spec = {'pose': Pose, 'props': lambda t: {'weapon': T.Track(RifleAt(t))},
+            'check': lambda t: {'L': RifleAt(t)['gripL']},
+            'plants': [('L', 0, 2.6), ('R', 0, 2.6)], 'reviewProps': lambda t: T.RifleProps(RifleAt(t)),
+            'reviewFrames': lambda n: [0, int(n * .05), int(n * .31), int(n * .36), int(n * .6)]}
+    return AReview(spec)
+
+
+@Builder('IjaJunctionPeek')
+def BuildJunctionPeek(T, name):
+    H, P, SX, SZ = T.H, T.P, T.SX, T.SZ
+    base = Standing(T)
+    base.update({'ankle.L': (H + .03, -.04, T.A), 'ankle.R': (-(H + .03), .06, T.A), 'foot.L': (0, 5, 0), 'foot.R': (0, -12, 0),
+                 'pelvis': (-.03, .02, P - .08), 'bend': .16, 'lean': -.04, 'twist': -.05})
+    port = T.Rifle((-(H + .02), -.18, P + .22), Unit((.30, -.35, .89)))
+    peek = T.Rifle((-(H + .08), -.26, P + .26), Unit((-.05, -.80, .60)))
+    # Leaning out: the hips come forward over the front foot so the head and shoulder pass the
+    # corner before they go right (nothing crosses into the wall behind the corner).
+    keys = [(0.0, {}), (.60, {}), (1.10, {'pelvis': (-.02, -.13, P - .12), 'lean': -.12, 'twist': -.30, 'bend': .40,
+                                           'head': (.06, -.15, -.35), 'neck': (0, -.05, -.10)}),
+            (1.45, {'head': (.04, -.15, -.20)}), (1.75, {'head': (.06, -.14, -.42)}),
+            (2.40, {'pelvis': (-.03, .02, P - .08), 'lean': -.04, 'twist': -.05, 'bend': .16, 'head': (0, 0, 0), 'neck': (0, 0, 0)}),
+            (3.20, {})]
+    body = Anim(base, keys, {'head': .06}, periodic=True)
+    out = Channel([(0.0, 0.0), (.60, 0.0), (1.10, 1.0), (1.90, 1.0), (2.40, 0.0), (3.2, 0.0)])
+
+    def RifleAt(t):
+        w = out(t)
+        return T.Rifle(Lerp3(port['origin'], peek['origin'], w), Unit(Lerp3(port['axis'], peek['axis'], w)))
+
+    def Pose(t):
+        f = body(t)
+        phase = Tau * t / 3.2
+        f['shrug'] += .02 * math.sin(2 * phase)
+        rifle = RifleAt(t)
+        palms = T.Palms(rifle['axis'])
+        f['grip.R'], f['grip.L'] = rifle['gripR'], rifle['gripL']
+        f['palmF.R'], f['palmN.R'], f['curl.R'] = palms['R'][0], palms['R'][1], .95
+        f['palmF.L'], f['palmN.L'], f['curl.L'] = palms['L'][0], palms['L'][1], .85
+        # Right elbow tucked down along the wall (not flared into it).
+        f['armPole.R'] = (-(SX + .06), .40, P - .10)
+        f['armPole.L'] = (SX + .30, -.30, P - .10)
+        return T.Nest(f)
+    spec = {'pose': Pose, 'props': lambda t: {'weapon': T.Track(RifleAt(t))}, 'plants': [('L', 0, 3.2), ('R', 0, 3.2)],
+            # The junction wall runs back from its corner at y = -0.15 (the review box).
+            'walls': [((-.34, 0, 0), (1, 0, 0), (0, -.15, 0), (0, 1, 0))],
+            'reviewProps': lambda t: T.RifleProps(RifleAt(t)) + [('box', (-.33, .30, .8), (.06, .9, 1.6), 0)],
+            'reviewFrames': lambda n: [0, int(n * .34), int(n * .5), int(n * .75)]}
+    return AReview(spec)
+
+
+@Builder('IjaSlingRifle')
+def BuildSlingRifle(T, name):
+    H, P, SX, SZ = T.H, T.P, T.SX, T.SZ
+    base = HairHoldPose(T)
+    base.update({'bend': .12, 'head': (.10, 0, 0), 'ankle.L': IjaABase(T)['ankle.L'], 'pelvis': IjaABase(T)['pelvis']})
+    ready = LowReady(T)
+    lifted = T.Rifle((-(SX + .06), -.10, P + .32), Unit((-.05, -.25, .97)))
+    w = WEAPONS[T.gun]
+    hung = SlungSideNominal(T)
+
+    def RifleAt(t):
+        if t <= .30:
+            u = Smooth(t / .30)
+            return T.Rifle(Lerp3(ready['origin'], lifted['origin'], u), Unit(Lerp3(ready['axis'], lifted['axis'], u)))
+        if t <= .50:
+            u = Smooth((t - .30) / .20)
+            return T.Rifle(Lerp3(lifted['origin'], hung['origin'], u), Unit(Lerp3(lifted['axis'], hung['axis'], u)))
+        return None
+
+    body = Keys(base, [(0.0, {}), (.30, {'twist': -.12, 'bend': .08}), (.50, {'twist': -.05}),
+                       (.80, {'twist': 0.0, 'bend': .42, 'pelvis': Add3(base['pelvis'], (0, -.03, -.08)), 'head': (.35, 0, 0)})],
+                lag={'head': .05})
+
+    def Pose(t):
+        f = body(t)
+        rifle = RifleAt(t)
+        if rifle:
+            palms = T.Palms(rifle['axis'])
+            f['grip.R'] = T.Along(rifle, Mix(w['butt'], .55, Smooth(t / .30)))
+            f['gripW.R'] = 1.0 if t <= .40 else 1 - Smooth((t - .40) / .10)
+            f['palmF.R'], f['palmN.R'], f['curl.R'] = palms['R'][0], palms['R'][1], .95
+            f['armPole.R'] = (-(SX + .45), .15, P + .15)
+            f['handRel.R'] = None
+            if t < .18:
+                f['grip.L'] = rifle['gripL']
+                f['gripW.L'] = 1 - Smooth(t / .18)
+                f['palmF.L'], f['palmN.L'], f['curl.L'] = palms['L'][0], palms['L'][1], .85
+        return T.Nest(f)
+
+    def Props(t):
+        rifle = RifleAt(t)
+        if rifle:
+            return {'weapon': T.Track(rifle)}
+        slung, up = SlungRifle(T, 'side')
+        return {'weapon': (slung['origin'], slung['axis'], up, True)}
+    spec = {'pose': Pose, 'props': Props, 'plants': [('L', 0, .8), ('R', 0, .8)],
+            'reviewProps': lambda t: T.RifleProps(RifleAt(t) or SlungRifle(T, 'side')[0]),
+            'reviewFrames': lambda n: [0, int(n * .4), n - 1]}
+    return AReview(spec)
+
+
+def PlayerCollarPath(T):
+    """Shunzi's back collar in ijaA's frame (source metres): prone under the beam, hauled 0.33 m, snagged."""
+    return Channel([(0.0, (-.02, -.62, .22)), (.25, (-.02, -.62, .22)), (.40, (-.02, -.57, .30)),
+                    (.95, (-.02, -.32, .38)), (1.00, (-.02, -.31, .38)), (1.12, (-.02, -.29, .40)),
+                    (1.25, (-.02, -.31, .38)), (1.42, (-.02, -.29, .40)), (1.55, (-.02, -.31, .38)), (2.2, (-.02, -.31, .38))])
+
+
+@Builder('IjaCollarDragSnag')
+def BuildCollarDragSnag(T, name):
+    H, P, SX = T.H, T.P, T.SX
+    collar = PlayerCollarPath(T)
+    base = IjaABase(T)
+
+    def PelvisXY(t):
+        c = collar(t)
+        return (c[0] + .04, c[1] + .58)
+    schedule = [('R', .40, .62), ('L', .66, .90)]
+    stance = {'L': (H + .06, -.22, T.A), 'R': (-(H + .04), .10, T.A)}
+    feet, plants = FollowSteps(PelvisXY, stance, schedule, 2.2)
+    times = [0.0, .25, .40, .66, .95, 1.00, 1.12, 1.25, 1.42, 1.55, 2.2]
+    lurch = Channel([(0.0, 0.0), (.95, 0.0), (1.00, 1.0), (1.10, .2), (1.12, .8), (1.25, .1), (1.42, .8), (1.55, 0.0), (2.2, 0.0)])
+    crouch = Channel([(0.0, .34), (.25, .38), (.40, .34), (.95, .28), (2.2, .28)])
+    pelvis = [(t, (PelvisXY(t)[0], PelvisXY(t)[1] - .05 * lurch(t), P - crouch(t) + .02 * lurch(t))) for t in times]
+    body = Tracks(base, dict(feet, pelvis=pelvis,
+                             bend=[(0.0, .80), (.25, .88), (.40, .82), (.95, .72), (1.00, .85), (1.55, .75), (2.2, .72)],
+                             pelvisTilt=[(0.0, (.25, 0, 0)), (.40, (.22, 0, 0)), (.95, (.18, 0, 0)), (1.0, (.28, 0, 0)), (2.2, (.20, 0, 0))],
+                             head=[(0.0, (.30, 0, 0)), (.95, (.20, 0, 0)), (1.05, (.35, 0, 0)), (1.60, (.05, .10, -.60)),
+                                   (1.95, (.05, .10, -.70)), (2.2, (.10, .05, -.55))],
+                             twist=[(0.0, 0.0), (1.6, -.20), (2.2, -.18)]),
+                  lag={'head': .06})
+
+    def Body(t):
+        f = body(t)
+        return f
+    grips = {'L': []}
+    spec = PlayerGripSpec(T, Body, {'L': [(.25, 2.2, collar, (0, 0, -1), 1.1)]})
+    props, review = SlungProps(T, 'side')
+    spec.update({'props': props, 'plants': plants,
+                 'reviewProps': lambda t: review(t) + [('point', collar(t), None, .04)] + PlayerGhost(T, collar(t)),
+                 'reviewFrames': lambda n: [0, int(n * .12), int(n * .43), int(n * .5), int(n * .8), n - 1]})
+    spec['player'] = lambda t: {'collar': collar(t)}
+    return AReview(spec)
+
+
+def PlayerGripSpec(T, body, grips):
+    """Hands on the first-person player's body points (channels of source-space points)."""
+    def Pose(t):
+        f = body(t)
+        for side, rows in grips.items():
+            for t0, t1, path, down, curl in rows:
+                if t0 - .18 <= t <= t1 + .18:
+                    point = Vector(path(Clamp(t, t0, t1)))
+                    w = 1.0 if t0 <= t <= t1 else Smooth(1 - (t0 - t) / .18) if t < t0 else Smooth(1 - (t - t1) / .18)
+                    palmF, palmN, _ = Grab((0, .6, .8), down)
+                    f['grip.' + side], f['gripW.' + side] = tuple(point), w
+                    f['palmF.' + side], f['palmN.' + side] = palmF, palmN
+                    f['curl.' + side] = curl
+                    f['handRel.' + side] = f.get('handRel.' + side) or (.06 if side == 'L' else -.06, -.14, -.45)
+                    break
+        return T.Nest(f)
+
+    def Check(t):
+        out = {}
+        for side, rows in grips.items():
+            for t0, t1, path, _, _ in rows:
+                if t0 <= t <= t1:
+                    out[side] = path(t)
+        return out
+    return {'pose': Pose, 'check': Check}
+
+
+def PlayerGhost(T, collar, lying=True):
+    """Rough stick body of the prone player for the review stills."""
+    c = Vector(collar)
+    head = c + Vector((0, -.10, .06))
+    hips = c + Vector((0, .55, -.08))
+    feet = hips + Vector((0, .80, -.05))
+    return [('cyl', tuple(head), tuple(hips), .06), ('cyl', tuple(hips), tuple(feet), .05), ('point', tuple(head), None, .10)]
+
+
+BEAM_PINNED = ((-.30, -.74, .20), (1, .12, .05))     # centre, axis (source, ijaA frame at IjaKickBeam)
+
+
+@Builder('IjaKickBeam')
+def BuildKickBeam(T, name):
+    H, P, SX = T.H, T.P, T.SX
+    collar = PlayerCollarPath(T)
+    hold = collar(2.2)
+    base = IjaABase(T)
+    stand = {'L': (hold[0] + .04 + H + .06, hold[1] + .58 - .22, T.A), 'R': (hold[0] + .04 - H - .04, hold[1] + .58 + .10, T.A)}
+    pel = (hold[0] + .04, hold[1] + .58, P - .28)
+    strike = (BEAM_PINNED[0][0] + .02, BEAM_PINNED[0][1] + .10, BEAM_PINNED[0][2] + .02)
+    body = Tracks(base, {
+        # The left fist stays on the collar through the kick: the wind-up loads the left leg and
+        # rolls the hips open rather than pulling the body back off the held man.
+        'pelvis': [(0.0, pel), (.30, Add3(pel, (.03, .0, .015))), (.45, Add3(pel, (-.02, -.05, -.01))), (.70, Add3(pel, (0, .01, 0))),
+                   (1.2, pel)],
+        'ankle.L': [(0.0, stand['L'])],
+        'ankle.R': [(0.0, stand['R']), (.15, stand['R']), (.32, (stand['R'][0] + .06, stand['R'][1] - .30, .36)),
+                    (.45, strike), (.60, (strike[0] + .08, strike[1] + .25, .30)), (.85, stand['R']), (1.2, stand['R'])],
+        'legPole.R': [(0.0, (-(H + .20), -.95, .45)), (.20, (-(H + .30), -1.1, 1.2)), (.60, (-(H + .30), -1.1, 1.2)), (.90, (-(H + .20), -.95, .45))],
+        'foot.R': [(0.0, (0, -14, 0)), (.30, (-25, -60, 0)), (.45, (-15, -80, 0)), (.70, (-10, -40, 0)), (.90, (0, -14, 0))],
+        'bend': [(0.0, .72), (.30, .70), (.45, .78), (.70, .72), (1.2, .72)],
+        'pelvisTilt': [(0.0, (.20, 0, 0)), (.30, (.14, -.08, -.12)), (.45, (.20, -.10, -.18)), (.80, (.20, 0, 0))],
+        'head': [(0.0, (.10, .05, -.50)), (.35, (.40, 0, -.25)), (.60, (.35, 0, -.15)), (1.2, (.30, 0, 0))],
+    }, lag={'head': .05})
+    spec = PlayerGripSpec(T, body, {'L': [(0.0, 1.2, lambda t: hold, (0, 0, -1), 1.1)]})
+    props, review = SlungProps(T, 'side')
+
+    def Beam(t):
+        c, a = Vector(BEAM_PINNED[0]), Vector(BEAM_PINNED[1]).normalized()
+        u = Smooth((t - .45) / .45) if t > .45 else 0.0
+        c = c + Vector((-.28, -.42, 0)) * u + Vector((0, 0, .10 * math.sin(math.pi * Clamp((t - .45) / .45))))
+        a = Quaternion((0, 0, 1), .9 * u) @ a
+        return c, a
+
+    def Props(t):
+        out = props(t)
+        c, a = Beam(t)
+        out['beam'] = (tuple(c), tuple(a), (0, 0, 1), True)
+        return out
+
+    def Review(t):
+        c, a = Beam(t)
+        half = a * T.R(.775)
+        return review(t) + [('cyl', tuple(c - half), tuple(c + half), .06), ('point', hold, None, .04)] + PlayerGhost(T, hold)
+    spec.update({'props': Props, 'plants': [('L', 0, 1.2), ('R', .85, 1.2)], 'reviewProps': Review,
+                 'reviewFrames': lambda n: [0, int(n * .27), int(n * .375), int(n * .55), n - 1]})
+    spec['player'] = lambda t: {'collar': hold}
+    return AReview(spec)
+
+
+def PlayerHeadPath():
+    """Shunzi propping himself up at the trench edge, then struck (source metres, ijaA frame)."""
+    return Channel([(0.0, (0, -.64, .30)), (.30, (0, -.63, .42)), (.42, (0, -.62, .44)), (.50, (.02, -.64, .30)),
+                    (1.0, (.03, -.66, .22))])
+
+
+@Builder('IjaButtStrike')
+def BuildButtStrike(T, name):
+    H, P, SX, SZ = T.H, T.P, T.SX, T.SZ
+    base = IjaABase(T)
+    head = PlayerHeadPath()
+    w = WEAPONS[T.gun]
+    ready = LowReady(T)
+    hit = Vector(head(.42)) + Vector((0, .02, T.R(.07)))
+    downAxis = Vector(Unit((0, .38, .92)))          # muzzle up and back toward him: the butt is the low end          # muzzle up-forward, butt driven down onto the head
+    rifles = [(0.0, SlungSideNominal(T)), (.12, T.Rifle((-(SX + .08), -.20, P + .30), Unit((-.05, -.30, .95)))),
+              (.30, T.RifleFromButt(tuple(hit + Vector((0, .10, T.R(.34)))), tuple(downAxis))),
+              (.42, T.RifleFromButt(tuple(hit), tuple(downAxis))),
+              (.58, T.RifleFromButt(tuple(hit + Vector((0, .04, T.R(.12)))), tuple(downAxis))),
+              (1.0, ready)]
+
+    def RifleAt(t):
+        for (t0, a), (t1, b) in zip(rifles, rifles[1:]):
+            if t <= t1:
+                u = Smooth((t - t0) / max(1e-6, t1 - t0))
+                return T.Rifle(Lerp3(a['origin'], b['origin'], u), Unit(Lerp3(a['axis'], b['axis'], u)))
+        return ready
+    body = Keys(base, [(0.0, {'bend': .30}), (.12, {'bend': .20}), (.30, {'bend': .10, 'pelvis': Add3(base['pelvis'], (0, .03, 0))}),
+                       (.42, {'bend': .50, 'pelvis': Add3(base['pelvis'], (0, -.06, -.08)), 'head': (.40, 0, 0)}),
+                       (.60, {'bend': .42}), (1.0, {'bend': .12, 'pelvis': base['pelvis'], 'head': (.12, 0, 0)})],
+                lag={'head': .04})
+
+    def Pose(t):
+        f = body(t)
+        rifle = RifleAt(t)
+        if rifle:
+            palms = T.Palms(rifle['axis'])
+            f['grip.R'], f['grip.L'] = rifle['gripR'], rifle['gripL']
+            f['gripW.R'] = f['gripW.L'] = Smooth(t / .12)
+            f['palmF.R'], f['palmN.R'], f['curl.R'] = palms['R'][0], palms['R'][1], .95
+            f['palmF.L'], f['palmN.L'], f['curl.L'] = palms['L'][0], palms['L'][1], .85
+            f['armPole.R'] = (-(SX + .45), .20, P + .15)
+            f['armPole.L'] = (SX + .40, -.20, P + .05)
+        return T.Nest(f)
+
+    def Props(t):
+        rifle = RifleAt(t)
+        if t < .02:
+            slung, up = SlungRifle(T, 'side')
+            return {'weapon': (slung['origin'], slung['axis'], up, True)}
+        return {'weapon': T.Track(rifle)}
+    spec = {'pose': Pose, 'props': Props, 'plants': [('L', 0, 1.0), ('R', 0, 1.0)],
+            'check': lambda t: {'R': RifleAt(t)['gripR']} if t > .14 and RifleAt(t) else {},
+            'reviewProps': lambda t: (T.RifleProps(RifleAt(t)) if RifleAt(t) else []) + [('point', head(t), None, .10)],
+            'reviewFrames': lambda n: [0, int(n * .3), int(n * .42), int(n * .6), n - 1]}
+    spec['player'] = lambda t: {'head': head(t)}
+    return AReview(spec)
+
+
+# =================================================================================
+# 02: interrogating Shunzi, the dadao counter-attack, drag to cover, "还能打不？".
+# Shunzi is the first-person player; each clip carries his body points (`player`).
+# Recommended layout around him (runtime metres, his frame: he lies on his left side at
+# the trench edge, head toward -z; x right): STAGES['rescueCircle'].
+# =================================================================================
+STAGES['rescueCircle'] = {
+    'anchor': 'shunzi', 'notes': 'Layout only (first-person player has no clip): ijaA crouched at his right holding the '
+    'front collar, the interpreter squatting in front, ijaB standing off his left aiming; each clip\'s `player` '
+    'track says where Shunzi\'s collar/head must be relative to that actor.',
+    'actors': {'shunzi': {'rig': None, 'clip': None, 'x': 0.0, 'z': 0.0, 'yawDeg': 0},
+               'ijaA': {'rig': 'LugouIja02', 'clip': 'IjaHoldCollarUp', 'x': .52, 'z': -.52, 'yawDeg': -105},
+               'interpreter': {'rig': 'LugouNra02', 'clip': 'InterpreterCrouchAsk', 'x': 0.0, 'z': -1.02, 'yawDeg': 180},
+               'ijaB': {'rig': 'LugouIja01', 'clip': 'IjaChoppedFallWall', 'x': -.80, 'z': -.72, 'yawDeg': 133}}}
+STAGES['chopRear'] = {'anchor': 'ijaB', 'notes': 'Luo steps in from ijaB\'s right-rear; the blade reaches the right side '
+                      'of his neck at 0.45 s in both clips.',
+                      'actors': {'ijaB': {'rig': 'LugouIja01', 'clip': 'IjaChoppedFallWall', 'x': 0.0, 'z': 0.0, 'yawDeg': 0},
+                                 'luo': {'rig': 'LugouNra05', 'clip': 'LuoDadaoChopRear', 'x': .42, 'z': .62, 'yawDeg': 34}}}
+STAGES['chopParry'] = {'anchor': 'ijaA', 'notes': 'ijaA root = his IjaHoldCollarUp root (crouched, facing Shunzi). He comes '
+                       'in behind his left; ijaA spins left onto him. Muzzle beaten aside at 0.40 s, the cut lands at 0.78 s.',
+                       'actors': {'ijaA': {'rig': 'LugouIja02', 'clip': 'IjaParriedChoppedFall', 'x': 0.0, 'z': 0.0, 'yawDeg': 0},
+                                  'heyoutian': {'rig': 'LugouNra02', 'clip': 'HeDadaoParryChop', 'x': -.30, 'z': 1.32,
+                                                'yawDeg': 12}}}
+PARTNER_SOURCES.setdefault('LugouIja01', {}).update({'IjaChoppedFallWall': ['neckSideR']})
+PARTNER_SOURCES.setdefault('LugouIja02', {}).update({'IjaParriedChoppedFall': ['neckSideL', 'muzzle']})
+
+Meta('IjaHoldCollarUp', 3.8, False, 'track', role='ijaA', rig='LugouIja02', props=['weapon'], rootMotion=False,
+     weaponState='slungRight', holdLoop=[.8, 3.8], player=True,
+     contacts=[{'t': .35, 'limb': 'handL', 'action': 'grab', 'partnerRole': 'shunzi', 'part': 'collarFront'},
+               {'t': .8, 'limb': 'handL', 'action': 'hold', 'partnerRole': 'shunzi', 'part': 'collarFront'}],
+     events=[{'t': 1.8, 'kind': 'shake'}, {'t': 3.0, 'kind': 'shake'}],
+     prev=['IjaButtStrike'], next=['IjaParriedChoppedFall'],
+     notes='Squats at his right, fists the front of his jacket and hauls the upper body out of the mud; 0.8-3.8 s is a '
+           'seamless hold loop (turns his head to the interpreter, two shakes).')
+Meta('InterpreterCrouchAsk', 3.2, True, 'free', role='interpreter', rig='LugouNra02', rootMotion=False, player=True,
+     notes='Squatting on his heels in front of Shunzi, leaning in, right hand turned up asking and jabbing, left '
+           'forearm on the left knee; the head searches his face.')
+Meta('InterpreterGrabCollar', 3.0, False, 'free', role='interpreter', rig='LugouNra02', rootMotion=False, player=True,
+     holdLoop=[.6, 3.0],
+     contacts=[{'t': .32, 'limb': 'handR', 'action': 'grab', 'partnerRole': 'shunzi', 'part': 'collarFront'}],
+     events=[{'t': .45, 'kind': 'shake', 'line': 'RescueInterrogation.06'}],
+     prev=['InterpreterCrouchAsk'], next=['InterpreterFlee'],
+     notes='"说话！": lunges from the squat, grabs the collar with the right hand and shakes once; 0.6-3.0 s holds.')
+Meta('InterpreterFlee', 1.6, False, 'free', role='interpreter', rig='LugouNra02', rootMotion=True,
+     events=[{'t': .05, 'kind': 'startle', 'line': 'RescueFlee.01'}, {'t': .40, 'kind': 'handsDown'},
+             {'t': 1.6, 'kind': 'handoff', 'to': 'locomotion.run'}],
+     prev=['InterpreterGrabCollar', 'InterpreterCrouchAsk'], next=[],
+     notes='Lets go, recoils onto his hands, scrambles up turning away and breaks into a run toward the front trench '
+           '(about 1.3 m inside the clip); the director hands him to the native run at the end.')
+Meta('LuoDadaoChopRear', 1.3, False, 'track', role='luo', rig='LugouNra05', props=['weapon'], rootMotion=True,
+     stage='chopRear', weapon='Dadao',
+     contacts=[{'t': .45, 'limb': 'blade', 'action': 'cut', 'partnerRole': 'ijaB', 'part': 'neckSideR'}],
+     events=[{'t': .45, 'kind': 'dadaoHit'}],
+     prev=['CreepDadao'], next=['LuoDragToCover'],
+     notes='From the right-rear: dadao cocked over the right shoulder, a step in on the left foot and one diagonal '
+           'two-handed cut down through the right side of the neck, follow-through low left, back to guard.')
+Meta('IjaChoppedFallWall', 2.2, False, 'track', role='ijaB', rig='LugouIja01', props=['weapon'], rootMotion=True,
+     stage='chopRear', env={'wallLeftM': .80}, terminal=True,
+     contacts=[{'t': .45, 'by': 'luo', 'part': 'neckSideR', 'action': 'cut'}, {'t': .92, 'limb': 'shoulderL', 'action': 'hit', 'target': 'wall'}],
+     events=[{'t': .45, 'kind': 'bloodSpray', 'at': 'neckSideR'}, {'t': .50, 'kind': 'weaponLost'}, {'t': 2.2, 'kind': 'dead'}],
+     prev=['IjaBayonetGuard', 'IjaReadyRifle'], next=[],
+     notes='Aiming down at Shunzi when the blade lands: neck snaps away, the rifle drops out of his hands, he '
+           'staggers left into the trench wall and slides down it. Frame 0 is his aim; last frame is the corpse.')
+Meta('HeDadaoParryChop', 1.5, False, 'track', role='heyoutian', rig='LugouNra02', props=['weapon'], rootMotion=True,
+     stage='chopParry', weapon='Dadao',
+     contacts=[{'t': .417, 'limb': 'blade', 'action': 'parry', 'partnerRole': 'ijaA', 'part': 'muzzle'},
+               {'t': .792, 'limb': 'blade', 'action': 'cut', 'partnerRole': 'ijaA', 'part': 'neckSideL'}],
+     events=[{'t': .417, 'kind': 'steelClash'}, {'t': .792, 'kind': 'dadaoHit'}],
+     prev=['CreepDadao'], next=['HeSwapDadaoRifle'],
+     notes='Runs the last step in, beats the turning muzzle aside with the flat of the dadao (0.40 s), and cuts down '
+           'into the left side of the neck (0.78 s). No pause between the two.')
+Meta('IjaParriedChoppedFall', 2.4, False, 'track', role='ijaA', rig='LugouIja02', props=['weapon'], rootMotion=True,
+     stage='chopParry', terminal=True,
+     contacts=[{'t': .417, 'by': 'heyoutian', 'part': 'muzzle', 'action': 'parry'},
+               {'t': .792, 'by': 'heyoutian', 'part': 'neckSideL', 'action': 'cut'}],
+     events=[{'t': .05, 'kind': 'releaseCollar'}, {'t': .792, 'kind': 'bloodSpray', 'at': 'neckSideL'}, {'t': 2.4, 'kind': 'dead'}],
+     prev=['IjaHoldCollarUp'], next=[],
+     notes='Lets go of Shunzi, comes up spinning left and swinging the rifle off his shoulder at the man behind him; '
+           'the muzzle is beaten aside, the cut drops him beside Shunzi. Last frame is the corpse.')
+Meta('LuoDragToCover', 2.6, False, 'free', role='luo', rig='LugouNra05', rootMotion=True, player=True, weapon='Dadao',
+     weaponState='dadaoInBelt',
+     contacts=[{'t': .30, 'limb': 'handsLR', 'action': 'grab', 'partnerRole': 'shunzi', 'part': 'collarBackAndStrap'},
+               {'t': 2.30, 'limb': 'handsLR', 'action': 'release'}],
+     prev=['LuoDadaoChopRear'], next=['LuoKneelCheck'],
+     notes='Crouches, fists the back of the collar and the pack strap, and hauls Shunzi backwards 1.4 m behind the '
+           'collapsed earth (first-person: Shunzi is the dragged one; `player` gives his collar).')
+Meta('HeSwapDadaoRifle', 1.6, False, 'track', role='heyoutian', rig='LugouNra02', props=['weapon', 'rifle'], rootMotion=False,
+     events=[{'t': .45, 'kind': 'dadaoPlanted'}, {'t': .90, 'kind': 'switchWeapon', 'to': 'HanYang'}],
+     endHold='twoHand',
+     prev=['HeDadaoParryChop'], next=[],
+     notes='Backs into the cover, drives the dadao point-down into the earth, pulls the rifle off his back over the '
+           'right shoulder and comes up at low ready. `weapon` = the dadao (planted), `rifle` = the rifle.')
+Meta('LuoKneelCheck', 3.4, False, 'free', role='luo', rig='LugouNra05', rootMotion=False, player=True, holdLoop=[.9, 2.6],
+     contacts=[{'t': .85, 'limb': 'handL', 'action': 'grip', 'partnerRole': 'shunzi', 'part': 'shoulderR'},
+               {'t': 2.6, 'limb': 'handL', 'action': 'release'}],
+     events=[{'t': 1.0, 'kind': 'line', 'line': 'RescueCheck.01'}],
+     prev=['LuoDragToCover'], next=['KickRifle'],
+     notes='Drops onto his right knee in front of Shunzi, left hand on his shoulder, looks him in the face (0.9-2.6 s '
+           'hold loop while "还能打不？" and the nod play), then stands for the kick.')
+
+
+# ---- 02 builders ---------------------------------------------------------------------
+def Squat(T, depth=1.0):
+    """Squatting on the heels (flat feet, knees forward), pelvis low."""
+    H, A = T.H, T.A
+    f = Standing(T)
+    f.update({'pelvis': (0, .10, .36 + (1 - depth) * .30), 'pelvisTilt': (.30, 0, 0), 'bend': .30,
+              'ankle.L': (H + .06, -.05, A), 'ankle.R': (-(H + .06), -.02, A),
+              'legPole.L': (H + .30, -1.2, .9), 'legPole.R': (-(H + .30), -1.2, .9), 'foot.L': (0, 18, 0), 'foot.R': (0, -18, 0)})
+    return f
+
+
+@Builder('IjaHoldCollarUp')
+def BuildHoldCollarUp(T, name):
+    H, P, SX = T.H, T.P, T.SX
+    base = Squat(T, .85)
+    base.update({'handRel.R': (-.05, -.30, -.35), 'palmF.R': (0, -.6, -.8), 'palmN.R': (0, 0, -1), 'curl.R': .6,
+                 'handRel.L': (.06, -.14, -.45), 'palmF.L': (0, -.2, -1), 'palmN.L': (-1, 0, 0), 'curl.L': .7})
+    collar = Channel([(0.0, (.04, -.62, .20)), (.35, (.04, -.62, .20)), (.80, (.04, -.52, .50)), (1.8, (.04, -.52, .50)),
+                      (1.86, (.05, -.49, .53)), (1.94, (.03, -.53, .49)), (2.02, (.04, -.52, .50)), (3.0, (.04, -.52, .50)),
+                      (3.06, (.05, -.49, .53)), (3.14, (.03, -.53, .49)), (3.22, (.04, -.52, .50)), (3.8, (.04, -.52, .50))])
+    head = lambda t: tuple(Vector(collar(t)) + Vector((0, -.04, .22)))
+    body = Keys(base, [(0.0, {'bend': .55}), (.35, {'bend': .70, 'head': (.30, 0, 0)}), (.80, {'bend': .42, 'head': (.15, 0, .05)}),
+                       (1.2, {'head': (.10, .05, .45)}), (1.6, {'head': (.12, 0, .10)}), (2.4, {'head': (.10, .05, .40)}),
+                       (3.2, {'head': (.14, 0, .08)}), (3.8, {'bend': .42, 'head': (.15, 0, .05)})], lag={'head': .05})
+    spec = PlayerGripSpec(T, body, {'L': [(.35, 3.8, collar, (0, .3, -1), 1.15)]})
+    props, review = SlungProps(T, 'side')
+    spec.update({'props': props, 'plants': [('L', 0, 3.8), ('R', 0, 3.8)], 'player': lambda t: {'collar': collar(t), 'head': head(t)},
+                 'reviewProps': lambda t: review(t) + [('point', collar(t), None, .04), ('point', head(t), None, .10)],
+                 'reviewFrames': lambda n: [0, int(n * .1), int(n * .22), int(n * .5), n - 1]})
+    return AReview(spec)
+
+
+def InterpreterBase(T):
+    H, SX = T.H, T.SX
+    f = Squat(T, 1.0)
+    f.update({'bend': .42, 'head': (-.05, 0, 0),
+              'handRel.L': (-.02, -.30, -.30), 'poleRel.L': (.40, .10, -.30), 'palmF.L': (-.2, -.8, -.4), 'palmN.L': (0, 0, -1), 'curl.L': .55,
+              'handRel.R': (.02, -.36, -.12), 'poleRel.R': (-.40, .10, -.35), 'palmF.R': (.1, -1, .1), 'palmN.R': (0, 0, 1), 'curl.R': .35})
+    return f
+
+
+def InterpreterPlayer():
+    return {'collar': (0, -.72, .52), 'head': (0, -.76, .74)}
+
+
+@Builder('InterpreterCrouchAsk')
+def BuildCrouchAsk(T, name):
+    base = InterpreterBase(T)
+
+    def Pose(t):
+        f = dict(base)
+        phase = Tau * t / 3.2
+        ask = math.sin(phase)
+        jab = max(0.0, math.sin(2 * phase)) ** 2
+        f['bend'] += .05 * jab + .01 * math.sin(4 * phase)
+        h = f['head']
+        f['head'] = (h[0] - .06 * jab, h[1] + .10 * ask, h[2] + .12 * math.sin(phase + 0.0))
+        r = f['handRel.R']
+        f['handRel.R'] = (r[0] + .03 * ask, r[1] - .08 * jab, r[2] + .06 * jab)
+        f['curl.R'] = .35 + .25 * jab
+        return T.Nest(f)
+    player = InterpreterPlayer()
+    return AReview({'pose': Pose, 'plants': [('L', 0, 3.2), ('R', 0, 3.2)], 'player': lambda t: player,
+                    'reviewProps': lambda t: [('point', player['collar'], None, .04), ('point', player['head'], None, .10)]})
+
+
+@Builder('InterpreterGrabCollar')
+def BuildGrabCollar(T, name):
+    base = InterpreterBase(T)
+    player = InterpreterPlayer()
+    collar = Channel([(0.0, player['collar']), (.40, player['collar']), (.46, Add3(player['collar'], (0, .04, .03))),
+                      (.52, Add3(player['collar'], (0, -.02, -.01))), (.60, player['collar']), (3.0, player['collar'])])
+    body = Keys(base, [(0.0, {}), (.25, {'bend': .62, 'pelvis': Add3(base['pelvis'], (0, -.08, .04))}),
+                       (.45, {'bend': .58, 'head': (-.10, 0, 0)}), (.60, {'bend': .60, 'head': (-.06, 0, 0)}),
+                       (1.8, {'head': (-.04, .05, .06)}), (3.0, {'bend': .60, 'head': (-.06, 0, 0)})], lag={'head': .05})
+    spec = PlayerGripSpec(T, body, {'R': [(.32, 3.0, collar, (0, .3, -1), 1.15)]})
+    spec.update({'plants': [('L', 0, 3.0), ('R', 0, 3.0)], 'player': lambda t: {'collar': collar(t), 'head': player['head']},
+                 'reviewProps': lambda t: [('point', collar(t), None, .04), ('point', player['head'], None, .10)],
+                 'reviewFrames': lambda n: [0, int(n * .1), int(n * .15), n - 1]})
+    return AReview(spec)
+
+
+@Builder('InterpreterFlee')
+def BuildFlee(T, name):
+    H, P, A, SX = T.H, T.P, T.A, T.SX
+    base = InterpreterBase(T)
+    base.update({'turn': 0.0})
+    run = Standing(T)
+    # Keys are in the actor's frame; `turn` spins the body left about the pelvis as he gets up.
+    rows = [
+        (0.00, {}),
+        (0.12, {'bend': .20, 'head': (-.30, 0, 0), 'pelvis': Add3(base['pelvis'], (0, .06, .02)),
+                'handRel.R': (.05, -.25, .15), 'handRel.L': (-.05, -.25, .15), 'palmF.R': (0, -.2, 1), 'palmN.R': (0, -1, 0),
+                'palmF.L': (0, -.2, 1), 'palmN.L': (0, -1, 0)}),
+        # Sits back on his hands.
+        (0.40, {'pelvis': (0, .30, .22), 'pelvisTilt': (-.30, 0, 0), 'bend': .10, 'head': (-.10, 0, 0),
+                'handRel.R': (-.10, .30, -.45), 'handRel.L': (.10, .30, -.45), 'palmF.R': (0, .3, -1), 'palmN.R': (0, 0, -1),
+                'palmF.L': (0, .3, -1), 'palmN.L': (0, 0, -1),
+                'ankle.L': (H + .08, -.25, A), 'ankle.R': (-(H + .05), -.30, A)}),
+        # Scrambles up turning away (left) toward the front trench.
+        (0.80, {'pelvis': (-.05, .55, P - .30), 'pelvisTilt': (.45, 0, 0), 'bend': .45, 'turn': 1.9, 'head': (.10, 0, .30),
+                'ankle.L': (H + .04, .40, A), 'ankle.R': (-(H + .02), .60, A + .08),
+                'handRel.R': (-.08, -.20, -.40), 'handRel.L': (.08, .05, -.42)}),
+        (1.05, {'pelvis': (-.10, .85, P - .14), 'pelvisTilt': (.30, 0, 0), 'bend': .30, 'turn': 3.0,
+                'ankle.L': (-.02, 1.05, A + .10), 'ankle.R': (-.18, .70, A), 'head': (.0, 0, .10)}),
+        (1.30, {'pelvis': (-.12, 1.15, P - .10), 'turn': 3.14, 'ankle.L': (0.0, 1.30, A), 'ankle.R': (-.25, 1.10, A + .12)}),
+        (1.60, {'pelvis': (-.14, 1.45, P - .08), 'turn': 3.14, 'bend': .25,
+                'ankle.L': (-.02, 1.30, A + .10), 'ankle.R': (-.26, 1.62, A),
+                'handRel.R': (-.06, .10, -.40), 'handRel.L': (.06, -.20, -.38)}),
+    ]
+    anim = Keys(base, rows, lag={'head': .05})
+
+    def Pose(t):
+        f = anim(t)
+        f = Turned(f, f['turn'])
+        return T.Nest(f)
+    spec = {'pose': Pose, 'reviewFrames': lambda n: [0, int(n * .25), int(n * .5), int(n * .8), n - 1],
+            'reviewViews': [('side', (-3.6, .6, 1.0), (0, .6, .6)), ('q', (-2.6, -2.2, 1.9), (0, .6, .6))], 'reviewScale': 3.2}
+    return spec
+
+
+def Dadao(T, grip, axis, up=(0, 0, 1)):
+    """Dadao held at `grip` (right fist), blade along `axis`."""
+    a = Vector(axis).normalized()
+    u = Vector(up)
+    u = (u - a * u.dot(a))
+    u = u.normalized() if u.length > 1e-6 else Vector((1, 0, 0))
+    g = Vector(grip)
+    origin = g + a * T.R(.03)
+    return {'origin': tuple(origin), 'axis': tuple(a), 'up': tuple(u), 'gripR': tuple(g),
+            'gripL': tuple(origin - a * T.R(.15)), 'tip': tuple(origin + a * T.R(.626)),
+            'mid': tuple(origin + a * T.R(.34)), 'pommel': tuple(origin - a * T.R(.27))}
+
+
+def DadaoTrack(d, visible=True):
+    return (d['origin'], d['axis'], d['up'], visible)
+
+
+def DadaoProps(d):
+    return [('cyl', d['pommel'], d['tip'], .02)]
+
+
+def DadaoPalms(axis, up):
+    """Both fists round the dadao grip; knuckles along the spine side."""
+    a = Vector(axis).normalized()
+    u = Vector(up)
+    fingers = a.cross(u).normalized()
+    return {'R': (tuple(fingers), tuple(-u.normalized()), 1.1), 'L': (tuple(fingers), tuple(-u.normalized()), 1.05)}
+
+
+def ChopSpec(T, stage, role, partner, point, contactT, keysBlade, body, duration, twoHand=True, contacts=None):
+    """Blade clip: the fists follow keyed grip points; at each contact key the blade middle is
+    solved onto the partner's patch (grip = patch - axis * mid). contacts: [(t, patch)]."""
+    contacts = contacts or [(contactT, point)]
+    solved = {}
+    for tk, grip, axis, up in keysBlade:
+        for tc, patch in contacts:
+            if abs(tk - tc) < 1e-6 and patch:
+                hit = PartnerPoint(T, stage, role, partner, patch, tk)
+                if hit is not None:
+                    solved[tk] = tuple(hit[0] - Vector(axis).normalized() * T.R(.37))
+
+    def BladeAt(t):
+        rows = [(tk, solved.get(tk, grip), axis, up) for tk, grip, axis, up in keysBlade]
+        g = Channel([(r[0], r[1]) for r in rows])(t)
+        a = Channel([(r[0], Unit(r[2])) for r in rows])(t)
+        u = Channel([(r[0], Unit(r[3])) for r in rows])(t)
+        return Dadao(T, g, a, u)
+
+    def Pose(t):
+        f = body(t)
+        d = BladeAt(t)
+        palms = DadaoPalms(d['axis'], d['up'])
+        f['grip.R'] = d['gripR']
+        f['palmF.R'], f['palmN.R'], f['curl.R'] = palms['R']
+        f['handRel.R'] = None
+        w = twoHand(t) if callable(twoHand) else (1.0 if twoHand else 0.0)
+        if w > 0:
+            # The left fist leaves the long grip for the reach of a one-handed extension
+            # and comes back on the recovery (twoHand is a weight curve).
+            f['grip.L'] = d['gripL']
+            f['gripW.L'] = w
+            f['palmF.L'], f['palmN.L'], f['curl.L'] = palms['L']
+            f['handRel.L'] = f.get('handRel.L') or (.07, -.20, -.30)
+        return T.Nest(f)
+
+    def Check(t):
+        out = {}
+        for tc, patch in contacts:
+            if abs(t - tc) >= .021 or not patch:
+                continue
+            hit = PartnerPoint(T, stage, role, partner, patch, t)
+            if hit is not None:
+                # Reported as a grip error: where the fist has to be for the blade middle to sit on the patch.
+                d = BladeAt(t)
+                out['R'] = tuple(hit[0] - Vector(d['axis']) * T.R(.37))
+        return out
+
+    def Review(t):
+        rows = DadaoProps(BladeAt(t)) + PartnerGhost(T, stage, role, partner, t)
+        hit = PartnerPoint(T, stage, role, partner, point, t) if point else None
+        if hit:
+            rows.append(('point', tuple(hit[0]), None, .035))
+        return rows
+    return {'pose': Pose, 'check': Check, 'reviewProps': Review, 'blade': BladeAt,
+            'props': lambda t: {'weapon': DadaoTrack(BladeAt(t))}}
+
+
+def AimDownRifle(T):
+    """IJA standing aim down at a man on the ground ~1.2 m ahead (butt in the shoulder)."""
+    return AimRifle(T, pitchDeg=-24.0, yawDeg=0.0)
+
+
+@Builder('IjaChoppedFallWall')
+def BuildChoppedFallWall(T, name):
+    H, P, A, SX = T.H, T.P, T.A, T.SX
+    base = AimStance(T)
+    base.update({'bend': .18, 'head': (.30, -.14, .42)})
+    rifle0 = AimDownRifle(T)
+    ground = T.Rifle((-.30, -.70, .035), Unit((.80, -.60, .02)))
+    wallX = .86
+    rows = [
+        (0.00, {}),
+        (0.45, {}),
+        # The blade lands on the right of the neck: head and neck thrown left, shoulders hunch.
+        (0.50, {'head': (.10, .35, .60), 'neck': (0.0, .20, .20), 'shrug': .30, 'bend': .08}),
+        (0.62, {'pelvis': (.12, -.10, P - .16), 'pelvisTilt': (.10, .20, -.20), 'lean': .20, 'bend': .25,
+                'ankle.L': (H + .18, -.30, A), 'foot.L': (0, 25, 0)}),
+        (0.78, {'pelvis': (.24, -.20, P - .22), 'ankle.R': (.05, -.15, A + .02), 'foot.R': (0, 10, 0)}),
+        # Left shoulder into the wall.
+        (0.92, {'pelvis': (.26, -.22, P - .25), 'lean': .28, 'bend': .30, 'head': (.30, .30, .30), 'ankle.R': (.08, -.18, A)}),
+        (1.40, {'pelvis': (.27, -.18, .55), 'bend': .50, 'lean': .20, 'head': (.45, .25, .20)}),
+        (1.80, {'pelvis': (.28, -.12, .25), 'bend': .65, 'lean': .15, 'head': (.50, .20, .20),
+                'ankle.L': (H + .30, -.60, A), 'ankle.R': (.05, -.55, A), 'foot.L': (0, 35, 0), 'foot.R': (0, -20, 0),
+                'legPole.L': (H + .60, -.9, .8), 'legPole.R': (-.10, -1.0, .8)}),
+        (2.20, {'pelvis': (.28, -.10, .14), 'bend': .70, 'head': (.55, .22, .22)}),
+    ]
+    anim = Keys(base, rows, lag={'head': .04, 'neck': .03})
+    hands = Keys({'handRel.R': (-.10, -.20, -.42), 'handRel.L': (.10, -.10, -.45)}, [(0.0, {}), (.6, {}),
+                  (1.2, {'handRel.L': (.17, .05, -.12)}), (2.2, {'handRel.R': (-.02, -.20, -.45), 'handRel.L': (.10, -.20, -.40)})])
+
+    def RifleAt(t):
+        if t <= .50:
+            return rifle0
+        u = Clamp((t - .50) / .45)
+        o = Lerp3(rifle0['origin'], ground['origin'], u)
+        o = (o[0], o[1], o[2] + .10 * math.sin(math.pi * u))
+        return T.Rifle(o, Unit(Lerp3(rifle0['axis'], ground['axis'], Smooth(u))))
+
+    def Pose(t):
+        f = anim(t)
+        if t <= .50:
+            r = rifle0
+            palms = T.Palms(r['axis'])
+            f['grip.R'], f['grip.L'] = r['gripR'], r['gripL']
+            f['palmF.R'], f['palmN.R'], f['curl.R'] = palms['R'][0], palms['R'][1], .95
+            f['palmF.L'], f['palmN.L'], f['curl.L'] = palms['L'][0], palms['L'][1], .85
+            f['armPole.R'] = (-(SX + .45), .10, T.SZ - .35)
+            f['armPole.L'] = (SX + .30, -.40, T.SZ - .60)
+        else:
+            h = hands(t)
+            f['handRel.R'], f['handRel.L'] = h['handRel.R'], h['handRel.L']
+            f['palmF.R'], f['palmN.R'], f['curl.R'] = (0, -.2, -1), (1, 0, 0), .35
+            f['palmF.L'], f['palmN.L'], f['curl.L'] = (0, .2, 1), (1, 0, 0), .25
+        return T.Nest(f)
+
+    spec = {'pose': Pose, 'props': lambda t: {'weapon': T.Track(RifleAt(t))}, 'plants': [('L', 0, .50), ('R', 0, .62), ('L', .62, 1.40), ('R', .92, 1.40)],  # feet slide out as he slumps (1.4-1.8 s)
+            'walls': [((wallX, 0, 0), (-1, 0, 0))],
+            'reviewProps': lambda t: T.RifleProps(RifleAt(t)) + [('box', (wallX + .03, 0, .7), (.06, 2.0, 1.4), 0)],
+            'reviewFrames': lambda n: [0, int(n * .2), int(n * .28), int(n * .42), int(n * .7), n - 1]}
+    return AReview(spec)
+
+
+@Builder('LuoDadaoChopRear')
+def BuildChopRear(T, name):
+    H, P, A, SX, SZ = T.H, T.P, T.A, T.SX, T.SZ
+    base = Standing(T)
+    base.update({'ankle.L': (H + .02, -.10, A), 'ankle.R': (-(H + .03), .14, A), 'foot.L': (0, 10, 0), 'foot.R': (0, -25, 0),
+                 'pelvis': (0, .02, P - .10), 'bend': .12})
+    blade = [
+        (0.00, (-(SX + .02), -.05, SZ + .10), (-.10, .45, .89), (-1, 0, 0)),     # cocked over the right shoulder
+        (0.25, (-(SX + .05), .02, SZ + .26), (-.15, .60, .79), (-1, 0, 0)),      # wind-up, weight back
+        (0.38, (-(SX - .05), -.25, SZ + .20), (.05, -.70, .71), (-.8, 0, -.2)),  # coming over
+        (0.45, (0, -.40, SZ - .10), (.35, -.80, -.48), (-.6, 0, -.8)),          # through the neck (solved)
+        (0.60, (SX - .02, -.28, P - .05), (.35, -.20, -.92), (-.2, -.2, -.95)),  # follow-through low left
+        (0.90, (-.05, -.22, P + .10), (.10, -.75, -.65), (-.3, 0, -.95)),
+        (1.30, (-(SX - .05), -.20, P + .25), (.05, -.80, .60), (-1, 0, 0)),      # guard
+    ]
+    body = Tracks(base, {
+        'ankle.L': [(0.0, base['ankle.L']), (.25, base['ankle.L']), (.35, Add3(base['ankle.L'], (-.02, -.16, .07))),
+                    (.45, Add3(base['ankle.L'], (-.04, -.30, 0)))],
+        'pelvis': [(0.0, base['pelvis']), (.25, Add3(base['pelvis'], (0, .06, .01))), (.45, Add3(base['pelvis'], (-.02, -.18, -.08))),
+                   (.60, Add3(base['pelvis'], (-.02, -.20, -.10))), (1.3, Add3(base['pelvis'], (0, -.16, -.06)))],
+        'twist': [(0.0, -.20), (.25, -.40), (.45, .25), (.60, .35), (1.3, 0.0)],
+        'bend': [(0.0, .12), (.25, .02), (.45, .35), (.60, .42), (1.3, .20)],
+        'head': [(0.0, (.10, 0, .20)), (.25, (.05, 0, .30)), (.45, (.30, 0, .05)), (1.3, (.15, 0, 0))],
+    }, lag={'head': .05})
+    both = Channel([(0.0, 1.0), (.36, 1.0), (.42, 0.0), (.62, 0.0), (.80, 1.0), (1.3, 1.0)])
+    spec = ChopSpec(T, 'chopRear', 'luo', 'ijaB', 'neckSideR', .45, blade, body, 1.3, twoHand=both)
+    spec.update({'plants': [('R', 0, 1.3), ('L', .45, 1.3)],
+                 'reviewFrames': lambda n: [0, int(n * .19), int(n * .3), int(n * .35), int(n * .46), n - 1]})
+    return AReview(spec)
+
+
+@Builder('IjaParriedChoppedFall')
+def BuildParriedFall(T, name):
+    H, P, A, SX, SZ = T.H, T.P, T.A, T.SX, T.SZ
+    hold = Squat(T, .85)
+    hold.update({'bend': .42, 'head': (.15, 0, .05), 'turn': 0.0,
+                 'handRel.R': (-.05, -.30, -.35), 'palmF.R': (0, -.6, -.8), 'palmN.R': (0, 0, -1), 'curl.R': .6,
+                 'handRel.L': (.06, -.14, -.45), 'palmF.L': (0, -.2, -1), 'palmN.L': (-1, 0, 0), 'curl.L': .7})
+    spin = 2.6                                      # turns left ~150 deg onto the man behind him
+    rows = [
+        (0.00, {}),
+        (0.10, {'head': (.0, 0, .60)}),
+        (0.30, {'pelvis': (.02, .12, P - .22), 'pelvisTilt': (.15, 0, 0), 'bend': .20, 'turn': spin * .55,
+                'ankle.L': (H + .10, .12, A), 'ankle.R': (-(H + .02), -.06, A), 'head': (.05, 0, .35)}),
+        # Spun round in a deep crouch with the rifle low: the hips stay down (a braced, sprung
+        # stance), so the hands keep the rifle without the reach assist and nothing pops up
+        # when the grip lets go at the cut.
+        (0.45, {'pelvis': (.02, .20, P - .27), 'turn': spin * .92, 'ankle.R': (-(H - .10), .10, A),
+                'foot.L': (0, 60, 0), 'foot.R': (0, 110, 0), 'head': (.10, 0, .10)}),
+        # The last 12 deg of the turn are in the hips: the planted feet counter-rotate so they stay put.
+        (0.60, {'pelvis': (0.0, .24, P - .30), 'turn': spin, 'bend': .18, 'twist': -.15,
+                'foot.L': (0, 60 - math.degrees(spin * .08), 0), 'foot.R': (0, 110 - math.degrees(spin * .08), 0)}),
+        # The cut: collapses at the knees, head thrown right, falls on his side beside Shunzi.
+        (0.78, {'turn': spin}),
+        (0.84, {'pelvis': (-.01, .21, P - .32), 'head': (.10, -.35, -.55), 'neck': (0, -.20, -.20), 'shrug': .30}),
+        (1.10, {'pelvis': (-.05, .06, .55), 'bend': .45, 'lean': -.25, 'pelvisTilt': (.20, -.25, 0)}),
+        (1.50, {'pelvis': (-.12, -.05, .25), 'bend': .60, 'lean': -.40, 'pelvisTilt': (.40, -.60, 0),
+                'ankle.L': (H + .15, .20, A + .05), 'ankle.R': (-(H - .05), .35, A + .02)}),
+        (2.40, {'pelvis': (-.18, -.10, .15), 'bend': .30, 'lean': -.60, 'pelvisTilt': (.60, -1.10, 0), 'head': (.20, -.40, -.30)}),
+    ]
+    anim = Keys(hold, rows, lag={'head': .04})
+    hung = SlungSideNominal(T)
+
+    def RifleAt(t, f=None):
+        # Swung off the shoulder into the hands pointing at He (local +Y after the spin), then dropped.
+        swung = T.Rifle((-(SX + .02), -.04, P + .10), Unit((.10, -.95, .30)))
+        if t <= .10:
+            return hung
+        if t <= .40:
+            u = Smooth((t - .10) / .30)
+            return T.Rifle(Lerp3(hung['origin'], swung['origin'], u), Unit(Lerp3(hung['axis'], swung['axis'], u)))
+        if t <= .60:
+            # Beaten aside to his right by the dadao.
+            u = Smooth((t - .40) / .20)
+            aside = T.Rifle((-(SX - .12), -.20, P - .04), Unit((-.40, -.90, .12)))
+            return T.Rifle(Lerp3(swung['origin'], aside['origin'], u), Unit(Lerp3(swung['axis'], aside['axis'], u)))
+        aside = T.Rifle((-(SX - .12), -.20, P - .04), Unit((-.40, -.90, .12)))
+        if t <= .80:
+            return aside
+        u = Clamp((t - .80) / .40)
+        down = T.Rifle((-.45, -.30, .035), Unit((-.70, -.70, .02)))
+        return T.Rifle(Lerp3(aside['origin'], down['origin'], u), Unit(Lerp3(aside['axis'], down['axis'], Smooth(u))))
+
+    def Pose(t):
+        f = anim(t)
+        rifle = RifleAt(t)
+        if .10 < t <= .80:
+            w = Smooth((t - .10) / .12)
+            palms = T.Palms(rifle['axis'])                     # body frame: Nest turns them for the grips
+            world = World(rifle, t)
+            f['grip.R'], f['gripW.R'] = world['gripR'], w
+            f['palmF.R'], f['palmN.R'], f['curl.R'] = palms['R'][0], palms['R'][1], .95
+            # The beat tears the forward hand off the handguard (0.40-0.52 s); the rifle is
+            # left in the right fist and the left arm is flung out.
+            wL = w if t <= .40 else w * (1 - Smooth((t - .40) / .12))
+            if wL > 1e-3:
+                f['grip.L'], f['gripW.L'] = world['gripL'], wL
+                f['palmF.L'], f['palmN.L'], f['curl.L'] = palms['L'][0], palms['L'][1], .85
+        if t > .40:
+            u = Smooth((t - .40) / .20)
+            f['handRel.L'] = Lerp3(hold['handRel.L'], (.26, -.18, -.28), u)
+            f['curl.L'] = Mix(.85, .35, u)
+        f = Turned(f, f['turn'])
+        return T.Nest(f)
+
+    def World(rifle, t):
+        """Rifle keys are written in the body frame of the squat (pelvis at hold['pelvis']); they
+        ride the authored pelvis and turn with the body about it."""
+        f = anim(t)
+        psi, c, c0 = f['turn'], f['pelvis'], hold['pelvis']
+        out = {}
+        for key in ('origin', 'gripR', 'gripL', 'muzzle', 'butt'):
+            p = rifle[key]
+            x, y = _Rot(p[0] - c0[0], p[1] - c0[1], psi)
+            out[key] = (x + c[0], y + c[1], p[2])
+        ax, ay = _Rot(rifle['axis'][0], rifle['axis'][1], psi)
+        out['axis'] = (ax, ay, rifle['axis'][2])
+        return out
+
+    def RifleWorld(t):
+        return World(RifleAt(t), t) if t > .10 else World(RifleAt(t), t)
+
+    def Props(t):
+        r = RifleWorld(t)
+        return {'weapon': (r['origin'], r['axis'], (0, 0, 1), True)}
+
+    def Points(t):
+        r = RifleWorld(t)
+        return {'muzzle': (Vector(r['muzzle']), Vector((0, 0, 1)))}
+    def Check(t):
+        if not (.22 < t <= .80):
+            return {}
+        w = World(RifleAt(t), t)
+        return {'R': w['gripR'], 'L': w['gripL']} if t <= .40 else {'R': w['gripR']}
+    spec = {'pose': Pose, 'props': Props, 'points': Points, 'plants': [('L', .45, .78), ('R', .45, .78)], 'check': Check,
+            'reviewProps': lambda t: [('cyl', RifleWorld(t)['butt'], RifleWorld(t)['muzzle'], .018)],
+            'reviewFrames': lambda n: [0, int(n * .12), int(n * .17), int(n * .25), int(n * .33), int(n * .6), n - 1]}
+    return AReview(spec)
+
+
+@Builder('HeDadaoParryChop')
+def BuildParryChop(T, name):
+    H, P, A, SX, SZ = T.H, T.P, T.A, T.SX, T.SZ
+    base = Standing(T)
+    base.update({'ankle.L': (H + .02, -.12, A), 'ankle.R': (-(H + .03), .16, A), 'foot.L': (0, 10, 0), 'foot.R': (0, -25, 0),
+                 'pelvis': (0, .02, P - .12), 'bend': .20})
+    # Parry: flat of the blade against the muzzle, driving it to He's left (ijaA's right).
+    blade = [
+        (0.00, (-(SX - .02), -.25, P + .30), (.10, -.70, .70), (-1, 0, 0)),        # low guard, running in
+        (0.28, (-(SX - .05), -.35, P + .40), (.45, -.70, .55), (-.9, 0, -.2)),
+        # Contact keys sit on frames (10/24 and 19/24 s) so a frame shows the steel touching.
+        (10 / 24, (-.02, -.45, P + .30), (.80, -.55, .20), (0, 0, 1)),            # beat (solved onto the muzzle)
+        (0.55, (-(SX + .05), -.05, SZ + .22), (-.10, .40, .91), (-1, 0, 0)),       # straight back up over the shoulder
+        (19 / 24, (0, -.42, SZ - .12), (-.30, -.80, -.50), (.6, 0, -.8)),         # cut into the left of the neck (solved)
+        (0.95, (-(SX - .05), -.30, P - .05), (-.30, -.25, -.92), (.2, -.2, -.95)),
+        (1.50, (-(SX - .05), -.22, P + .25), (.05, -.80, .60), (-1, 0, 0)),
+    ]
+    body = Tracks(base, {
+        'ankle.L': [(0.0, base['ankle.L']), (.12, base['ankle.L']), (.22, Add3(base['ankle.L'], (0, -.18, .07))),
+                    (.32, Add3(base['ankle.L'], (0, -.34, 0)))],
+        'ankle.R': [(0.0, base['ankle.R']), (.55, base['ankle.R']), (.66, Add3(base['ankle.R'], (0, -.14, .06))),
+                    (.76, Add3(base['ankle.R'], (0, -.24, 0)))],
+        'pelvis': [(0.0, base['pelvis']), (.32, Add3(base['pelvis'], (0, -.18, -.04))), (.55, Add3(base['pelvis'], (0, -.16, 0))),
+                   (.78, Add3(base['pelvis'], (0, -.30, -.10))), (1.5, Add3(base['pelvis'], (0, -.28, -.06)))],
+        'twist': [(0.0, 0.0), (.40, .30), (.55, -.05), (.78, .15), (.95, .30), (1.5, 0.0)],
+        'bend': [(0.0, .20), (.40, .25), (.55, .08), (.78, .35), (1.5, .20)],
+        'head': [(0.0, (.10, 0, 0)), (.40, (.20, 0, -.10)), (.78, (.30, 0, 0)), (1.5, (.15, 0, 0))],
+    }, lag={'head': .05})
+    # The left fist closes on the long grip at the top of the lift and leaves it as the blade
+    # drops past the shoulder (the cut itself is one-handed, the reach of the right arm).
+    both = Channel([(0.0, 0.0), (.50, 0.0), (.58, 1.0), (.64, 1.0), (.72, 0.0), (1.0, 0.0), (1.2, 1.0), (1.5, 1.0)])
+    spec = ChopSpec(T, 'chopParry', 'heyoutian', 'ijaA', 'neckSideL', 19 / 24, blade, body, 1.5, twoHand=both,
+                    contacts=[(10 / 24, 'muzzle'), (19 / 24, 'neckSideL')])
+
+    spec.update({'plants': [('R', 0, .55), ('L', .32, 1.5), ('R', .76, 1.5)],
+                 'reviewFrames': lambda n: [0, int(n * .27), int(n * .37), int(n * .52), int(n * .64), n - 1]})
+    return AReview(spec)
+
+
+@Builder('LuoDragToCover')
+def BuildLuoDrag(T, name):
+    H, P, A, SX = T.H, T.P, T.A, T.SX
+    base = Standing(T)
+    # Shunzi's back collar, relative to Luo's root: he is hauled 1.4 m back with Luo.
+    collar = Channel([(0.0, (0, -.66, .30)), (.30, (0, -.66, .30)), (.55, (0, -.52, .40)), (2.30, (0, .88, .40)), (2.6, (0, .88, .38))])
+
+    def PelvisXY(t):
+        c = collar(t)
+        return (c[0], c[1] + .55)
+    schedule = [('L', .60, .85), ('R', .90, 1.15), ('L', 1.20, 1.45), ('R', 1.50, 1.75), ('L', 1.80, 2.05), ('R', 2.10, 2.30)]
+    stance = {'L': (H + .10, -.18, A), 'R': (-(H + .10), .05, A)}
+    feet, plants = FollowSteps(PelvisXY, stance, schedule, 2.6)
+    times = [round(.1 * i, 2) for i in range(27)]
+    crouch = Channel([(0.0, .10), (.30, .40), (.55, .34), (2.3, .34), (2.6, .30)])
+    body = Tracks(base, dict(feet, pelvis=[(t, (PelvisXY(t)[0], PelvisXY(t)[1], P - crouch(t))) for t in times],
+                             bend=[(0.0, .30), (.30, .95), (.55, .75), (2.3, .72), (2.6, .60)],
+                             pelvisTilt=[(0.0, (.10, 0, 0)), (.30, (.35, 0, 0)), (2.6, (.30, 0, 0))],
+                             head=[(0.0, (.10, 0, 0)), (.30, (.20, 0, 0)), (.80, (-.25, 0, .60)), (1.50, (-.20, 0, -.50)),
+                                   (2.2, (-.10, 0, .40)), (2.6, (.10, 0, 0))]),
+                  lag={'head': .06})
+    grips = {'L': [(.30, 2.30, lambda t: tuple(Vector(collar(t)) + Vector((.07, 0, 0))), (0, 0, -1), 1.15)],
+             'R': [(.30, 2.30, lambda t: tuple(Vector(collar(t)) + Vector((-.14, .06, -.04))), (0, 0, -1), 1.15)]}
+    spec = PlayerGripSpec(T, body, grips)
+    spec.update({'plants': plants, 'player': lambda t: {'collar': collar(t)},
+                 'reviewProps': lambda t: [('point', collar(t), None, .04)] + PlayerGhost(T, collar(t)),
+                 'reviewViews': [('side', (-3.6, .4, 1.0), (0, .3, .5)), ('q', (-2.6, -2.2, 1.9), (0, .3, .5))], 'reviewScale': 3.4,
+                 'reviewFrames': lambda n: [0, int(n * .12), int(n * .5), n - 1]})
+    return spec
+
+
+@Builder('HeSwapDadaoRifle')
+def BuildSwap(T, name):
+    H, P, A, SX, SZ = T.H, T.P, T.A, T.SX, T.SZ
+    base = Standing(T)
+    base.update({'pelvis': (0, .04, P - .22), 'bend': .30, 'ankle.L': (H + .04, -.12, A), 'ankle.R': (-(H + .04), .12, A)})
+    blade = [(0.00, (-(SX - .05), -.22, P + .20), (.05, -.80, .60), (-1, 0, 0)),
+             (0.30, (-(SX - .02), -.35, P + .10), (0, -.25, -.97), (-1, 0, 0)),          # point down
+             (0.45, (-(SX - .02), -.36, T.R(.66)), (0, -.25, -.97), (-1, 0, 0))]          # driven into the earth
+    planted = Dadao(T, blade[2][1], blade[2][2], blade[2][3])
+    ready = T.Rifle((-(H + .02), -.16, P + .15), Unit((.16, -.90, -.40)))
+    backRifle = T.Rifle((.107, .20, P + .16), Unit((-.37, .05, .93)))
+    lifted = T.Rifle((-.20, .15, P + .25), Unit((-.20, -.35, .91)))
+    rifles = [(0.0, backRifle), (.70, backRifle), (.98, lifted), (1.30, ready), (1.6, ready)]
+
+    def RifleAt(t):
+        for (t0, a), (t1, b) in zip(rifles, rifles[1:]):
+            if t <= t1:
+                u = Smooth((t - t0) / max(1e-6, t1 - t0))
+                return T.Rifle(Lerp3(a['origin'], b['origin'], u), Unit(Lerp3(a['axis'], b['axis'], u)))
+        return ready
+    along = Channel([(0.0, .92), (.70, .92), (.98, .70), (1.15, .45), (1.35, WEAPONS[T.gun]['butt']), (1.6, WEAPONS[T.gun]['butt'])])
+
+    def BladeAt(t):
+        if t >= .45:
+            return planted
+        rows = blade
+        g = Channel([(r[0], r[1]) for r in rows])(t)
+        a = Channel([(r[0], Unit(r[2])) for r in rows])(t)
+        return Dadao(T, g, a, (-1, 0, 0))
+    body = Keys(base, [(0.0, {}), (.45, {'bend': .55, 'pelvis': Add3(base['pelvis'], (0, -.04, -.12))}),
+                       (.62, {'bend': .12, 'twist': -.20, 'pelvis': base['pelvis']}), (1.1, {'twist': .05}), (1.6, {'bend': .22, 'twist': 0.0})],
+                lag={'head': .05})
+
+    def Pose(t):
+        f = body(t)
+        if t < .50:
+            d = BladeAt(t)
+            palms = DadaoPalms(d['axis'], d['up'])
+            f['grip.R'] = d['gripR']
+            f['palmF.R'], f['palmN.R'], f['curl.R'] = palms['R']
+            f['handRel.L'] = (.08, -.14, -.45)
+        elif t < .70:
+            f['handRel.R'] = (-.10, .02, .05)
+            f['palmF.R'], f['palmN.R'], f['curl.R'] = (0, .3, 1), (0, 1, 0), .6
+        else:
+            rifle = RifleAt(t)
+            palms = T.Palms(rifle['axis'])
+            f['grip.R'] = T.Along(rifle, along(t))
+            f['palmF.R'], f['palmN.R'], f['curl.R'] = palms['R'][0], palms['R'][1], .95
+            f['gripW.R'] = Smooth((t - .70) / .06)
+            if t >= 1.05:
+                f['grip.L'] = rifle['gripL']
+                f['gripW.L'] = Smooth((t - 1.05) / .12)
+                f['palmF.L'], f['palmN.L'], f['curl.L'] = palms['L'][0], palms['L'][1], .85
+            f['handRel.R'] = None
+        f['armPole.R'] = (-(SX + .45), .20, P + .10)
+        return T.Nest(f)
+
+    def Props(t):
+        return {'weapon': DadaoTrack(BladeAt(t)), 'rifle': T.Track(RifleAt(t))}
+    spec = {'pose': Pose, 'props': Props, 'plants': [('L', 0, 1.6), ('R', 0, 1.6)],
+            'reviewProps': lambda t: DadaoProps(BladeAt(t)) + T.RifleProps(RifleAt(t)),
+            'reviewFrames': lambda n: [0, int(n * .28), int(n * .5), int(n * .7), n - 1]}
+    return AReview(spec)
+
+
+@Builder('LuoKneelCheck')
+def BuildKneelCheck(T, name):
+    H, P, A, SX, SZ = T.H, T.P, T.A, T.SX, T.SZ
+    K = T.K
+    stand = Standing(T)
+    kz = K['kneelPelvisZ']
+    kp = K['toeKneelPitch'] - K['toeStandPitch']
+    # Right knee down, left foot planted forward (the "genuflect").
+    ky = K['kneelPelvisY']
+    # Kneels in close and leans in over the knee to put the hand on the shoulder and his face
+    # level with Shunzi's (the hand reaches without stretching the arm straight).
+    kneel = {'pelvis': (0, ky - .08, kz + .16), 'ankle.L': (H + .08, ky - .56, A), 'legPole.L': (H + .30, -1.2, .9), 'foot.L': (0, 12, 0),
+             'ankle.R': K['kneelAnkle'](-1), 'legPole.R': K['kneelPole'](-1), 'foot.R': (kp, 0, 0),
+             'bend': .50, 'pelvisTilt': (.08, 0, 0), 'head': (-.20, 0, 0)}
+    shoulder = (.10, -.50, .58)              # Shunzi's right shoulder (sitting against the earth)
+    head = (.02, -.62, .80)
+    rows = [(0.0, {}), (.20, {'pelvis': Add3(stand['pelvis'], (0, 0, -.12)), 'bend': .25}),
+            (.60, kneel),
+            (.90, {'head': (-.25, 0, .05)}), (1.75, {'head': (-.24, .06, .02), 'bend': .52}), (2.60, {'head': (-.25, 0, .05), 'bend': .50}),
+            (3.40, {k: stand[k] for k in ('pelvis', 'ankle.L', 'ankle.R', 'legPole.L', 'legPole.R', 'foot.L', 'foot.R', 'bend',
+                                           'pelvisTilt', 'head')})]
+    body = Keys(dict(stand, **{'handRel.L': (.06, -.14, -.45), 'palmF.L': (0, -.2, -1), 'palmN.L': (-1, 0, 0),
+                               'handRel.R': (-.08, -.16, -.44), 'palmF.R': (0, -.2, -1), 'palmN.R': (1, 0, 0), 'curl.R': .7}),
+                rows, lag={'head': .05})
+    spec = PlayerGripSpec(T, body, {'L': [(.85, 2.60, lambda t: shoulder, (0, .3, -1), .75)]})
+    spec.update({'plants': [('L', .60, 2.6), ('R', .60, 2.6)], 'player': lambda t: {'shoulderR': shoulder, 'head': head},
+                 'reviewProps': lambda t: [('point', shoulder, None, .04), ('point', head, None, .10)],
+                 'reviewFrames': lambda n: [0, int(n * .18), int(n * .27), int(n * .6), n - 1]})
+    return AReview(spec)
+
+
+# =================================================================================
+# which rigs bake which clip (manifest `rigs`). Every 2026-09-23 clip is baked only on the
+# rigs its role can wear (contract §5.1: comrade/interpreter/He/Liu/yaowa = NRA02, Luo =
+# NRA05, ijaA = IJA02, ijaB = IJA01, ijaC/ijaD = IJA01 or IJA02); the legacy 0922 clips stay
+# on all five so the old director keeps working. A clip missing on a rig is not playable on
+# it (the runtime falls back to native animation), so the director must cast accordingly.
+# =================================================================================
+IJA_BOTH = ['LugouIja01', 'LugouIja02']
+RIGS_BY_ROLE = {'ijaA': ['LugouIja02'], 'ijaB': ['LugouIja01'], 'ijaC': IJA_BOTH, 'ijaD': IJA_BOTH,
+                'luo': ['LugouNra05']}
+SHARED_IJA = {'IjaReadyRifle'}          # ijaA and ijaB both ready their rifles
+for _name, _row in CLIPS.items():
+    if _row.get('legacy'):
+        continue
+    _row.setdefault('rigs', IJA_BOTH if _name in SHARED_IJA else RIGS_BY_ROLE.get(_row.get('role'), ['LugouNra02']))
