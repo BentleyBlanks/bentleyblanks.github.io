@@ -45,8 +45,11 @@ import { MISSION_RECEPTION_SPACE } from "./Data_FirstLevelMissionTopology.mjs";
 // 不进这张表的两类：
 //   · transferAlley —— 由 UpdateTransferThreats 在第一处威胁解除后放出。
 export const MISSION_STEP_SPAWNS = Object.freeze({
-  Trapped: Object.freeze(["bunkerAssault"]),
-  BunkerRescue: Object.freeze(["approach", "front", "machineGun", "tank", "bundleApproach"]),
+  // 2026-09-23 proposal A (docs/Data_FirstLevelLayoutProposalA.md §5): 01 backdrop, 02 pursuers,
+  // the 03 flank group and officer, and the 04/05 reserve from out-of-sight entries.
+  Trapped: Object.freeze(["bunkerAssault", "bunkerBackdrop"]),
+  BunkerRescue: Object.freeze(["bunkerPursuit", "approach", "front", "frontFlank", "frontOfficer", "machineGun", "tank", "bundleApproach"]),
+  MachineGun: Object.freeze(["frontReserve"]),
   Support: Object.freeze(["village", "melee"]),
   Village: Object.freeze(["village", "melee"]),
   Courtyard: Object.freeze(["courtyard"]),
@@ -71,6 +74,29 @@ export const MISSION_ENCOUNTER_ACTIVATION = Object.freeze({
     wake: Object.freeze({ kind: "scripted", step: "BunkerRescue", source: "FirstLevelBunkerShow.ReleaseCombat",
       text: "小队反扑时解除演出保护并交战；全部清场后才拖救还权" }),
     note: "两名行刑兵与两名跟进兵；反扑时解除演出保护，由小队真实击杀四人后才拖救还权",
+  }),
+  bunkerBackdrop: Object.freeze({
+    spawn: Object.freeze({ kind: "step", step: "Trapped" }),
+    note: "proposal A: vanguard files down the link sap into the depth sap (out of sight south); three distant NRA return fire at authorised points",
+  }),
+  bunkerPursuit: Object.freeze({
+    spawn: Object.freeze({ kind: "step", step: "BunkerRescue" }),
+    standbyUntil: "rifleRecovered",
+    note: "proposal A: one base of fire holds the fold F, three follow down the link sap to J and the mouth; none passes the bend M",
+  }),
+  frontFlank: Object.freeze({
+    spawn: Object.freeze({ kind: "step", step: "BunkerRescue" }),
+    standbyUntil: "frontBattleStarted",
+    note: "proposal A: the designated assault group; waits north of NorthRuin, bounds crater to crater to the berm's east end",
+  }),
+  frontOfficer: Object.freeze({
+    spawn: Object.freeze({ kind: "step", step: "BunkerRescue" }),
+    standbyUntil: "frontBattleStarted",
+    note: "proposal A: one officer one bound behind the flank group",
+  }),
+  frontReserve: Object.freeze({
+    spawn: Object.freeze({ kind: "step", step: "MachineGun" }),
+    note: "proposal A: FRONT_RESERVE_ENTRIES budgets (04: 2+2, 05: 2+1), entries 98 m+ from the nest seat",
   }),
   approach: Object.freeze({
     spawn: Object.freeze({ kind: "step", step: "BunkerRescue" }),
