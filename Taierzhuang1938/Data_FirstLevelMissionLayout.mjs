@@ -698,7 +698,10 @@ export const MISSION_ANCHORS = Object.freeze({
 });
 export const MISSION_ROUTES = Object.freeze({
   flank: [
-    { x: 69, z: -139 },
+    // 2026-09-23: start inside the 6.4 m gap of the east wire belt (EastWire2 x61.4 / EastWire3 x67.8,
+    // z -137) and cross it square before turning north-east; the old start went straight through EastWire3.
+    { x: 64.6, z: -139 },
+    { x: 64.6, z: -134 },
     { x: 80, z: -90 },
     { x: 89, z: -45 },
     { x: 91, z: -10 },
