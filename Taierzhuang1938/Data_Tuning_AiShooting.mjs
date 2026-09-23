@@ -282,6 +282,7 @@ export const SAMPLES = Freeze({
  *                  （压制弹道被土坎挡死、探头那一下看见了人弹道却被胸墙挡住、枪口转不过去……），
  *                  就改打授权点；打完一段（dwellMin–Max）再把枪口还给对人射击试一次。
  *                  太短会抢走本该压制记忆点的那一枪，太长就是端枪不打。
+ * blockedRetryS    一个点从枪口打过去被挡死之后，这么久之内这个人不再挑它（先换别的点）。
  * impactAboveM     没打到碰撞体的那一发，弹道末端离地不到这么高就算钻进了土（在地面溅一蓬土）：
  *                  土坎顶是高度函数、不在射线世界里，不这样算的话打土坎的子弹一发弹着都没有。
  */
@@ -299,4 +300,5 @@ export const AMBIENT_FIRE = Freeze({
   pickEveryS: 0.9,
   stalledTargetS: 2.5,
   impactAboveM: 1.2,
+  blockedRetryS: 4,
 });

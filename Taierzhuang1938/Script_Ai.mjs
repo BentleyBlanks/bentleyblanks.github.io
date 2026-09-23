@@ -28,7 +28,7 @@ import { LOCK as PERCEPTION_LOCK } from "./Data_Tuning_AiPerception.mjs";
 import { CoverRegistry } from "./Script_AiCover.mjs";
 import { COVER, COVER_CYCLE, DERIVED_COVER } from "./Data_Tuning_AiCover.mjs";
 import { ShootingModel, CloseRangeWeight } from "./Script_AiShooting.mjs";
-import { CLOSE_RANGE, AMBIENT_FIRE } from "./Data_Tuning_AiShooting.mjs";
+import { CLOSE_RANGE, AMBIENT_FIRE, SHOOTING } from "./Data_Tuning_AiShooting.mjs";
 import { TacticsDirector, TASK, IsManeuverTask, CanManeuver, ManeuverAllowed, ChargeOpportunity } from "./Script_AiTactics.mjs";
 // 只读 TACTICS：压制射击的情报门槛与守区掩体余量。侧翼 / 投弹 / 查看的那几张表
 // 由 `TacticsDirector` 自己消费 —— 大脑只按 `task.kind` 选状态，不重复读它们的数。
@@ -397,6 +397,8 @@ export class Soldier {
     this.ambientUntil = -99;         // 这个点打到什么时候换
     this.ambientPickAt = -99;        // 上一次挑点的时刻（AMBIENT_FIRE.pickEveryS 限流）
     this.ambientShots = 0;           // 取证：这个人打了几发环境射击
+    this.ambientBlockedId = null;    // 刚从枪口打过去被挡死的那个授权点（AMBIENT_FIRE.blockedRetryS 内不再挑）
+    this.ambientBlockedUntil = -99;
     this.targetFireAt = -99;         // TryFire 上一次真对人打出去的时刻（环境射击判「扳机空转」）
     /** 扳机从什么时候起「想打、弹在膛、有目标却一发没出去」（-1 = 没在空转；真打出一发 / 换目标清零）。 */
     this.triggerDrySince = -1;
@@ -2391,13 +2393,23 @@ export class AiDirector {
     const cosCone = Math.cos(AMBIENT_FIRE.facingConeRad);
     const bf = this.ctx.battlefield;
     const eye = this._ambientEye;
-    eye.x = s.position.x; eye.y = s.position.y + AiDirector.StanceEye(s.stance, s); eye.z = s.position.z;
+    // 【§20.7】通视从「开枪时枪口会在的地方」打：在掩体里是探头位（firePos）+ 探头姿态的眼高，
+    // 否则是此刻的姿态；都减去 muzzleDropM（枪口比眼低一截）。以前从此刻的眼高打，缩在掩体后面的人
+    // 挑到的点，探头时枪口过不去 —— 端着枪对着它站满一整段 dwell。
+    const c = s.cover;
+    const fromCover = !!(c && c.firePos);
+    const stance = fromCover && Number.isFinite(c.fireStance) ? c.fireStance : s.stance;
+    eye.x = fromCover ? c.firePos.x : s.position.x;
+    eye.z = fromCover ? c.firePos.z : s.position.z;
+    eye.y = s.position.y + AiDirector.StanceEye(stance, s) - SHOOTING.muzzleDropM;
+    const skipId = now < s.ambientBlockedUntil ? s.ambientBlockedId : null;
     const to = this._ambientTo;
     const n = list.length, start = Math.floor(s.rnd() * n);
     let tries = 0;
     for (let pass = 0; pass < 2; pass += 1) {
       for (let k = 0; k < n; k += 1) {
         const p = list[(start + k) % n];
+        if (skipId !== null && p.id === skipId) continue;
         const dx = p.x - s.position.x, dz = p.z - s.position.z;
         const d = Math.sqrt(dx * dx + dz * dz);
         if (d < AMBIENT_FIRE.minRangeM || d > AMBIENT_FIRE.maxRangeM) continue;
@@ -3674,6 +3686,8 @@ export class AiDirector {
     // 别对着它端满一整段 dwell —— 放掉，下一次 Think 重挑（【§20.7】探针里这类占不动人·帧一成）。
     if (!this.shooting.LineOfFireClear(from, aimV, this.FriendlyTorsos(s))
       || !this.shooting.ShotPathClear(from, aimV)) {
+      s.ambientBlockedId = p.id ?? null;
+      s.ambientBlockedUntil = this.time + AMBIENT_FIRE.blockedRetryS;
       s.ambientFirePoint = null;
       s.ambientUntil = -99;
       return false;

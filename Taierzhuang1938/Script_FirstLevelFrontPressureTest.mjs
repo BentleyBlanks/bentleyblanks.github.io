@@ -444,6 +444,19 @@ function Man(ai, side, x, z, options = {}) {
   b.ambientFirePoint = { x: 0, y: 0.5, z: -30, r: 1, id: "front" }; b.ambientUntil = blockedWorld.ai.time + 5; b.fireTimer = 0;
   Check(!blockedWorld.ai.TryAmbientFire(b, 0, true), "no round through the wall");
   Check(b.ambientFirePoint === null && b.ambientUntil < blockedWorld.ai.time, "the blocked point is let go for a fresh pick");
+  Eq(b.ambientBlockedId, "front", "and remembered as blocked");
+  {
+    const open = MakeDirector();
+    const o = Man(open.ai, "ija", 0, 0); o.yaw = 0; o.ambientFirePoints = [front];
+    o.ambientBlockedId = "front"; o.ambientBlockedUntil = open.ai.time + AMBIENT_FIRE.blockedRetryS;
+    Eq(open.ai.PickAmbientFire(o), null, "a point that was just blocked from his muzzle is not picked again at once");
+    open.ai.time += AMBIENT_FIRE.blockedRetryS + 0.1; o.ambientPickAt = -99;
+    Eq(open.ai.PickAmbientFire(o)?.id, "front", "after blockedRetryS it may be tried again");
+    o.cover = { id: "box", firePos: { x: 0.6, y: 0, z: 0 }, hidePos: { x: 0, y: 0, z: 0 }, fireStance: 0, hideStance: 1 };
+    o.stance = 1; o.ambientFirePoint = null; o.ambientPickAt = -99; open.ai.PickAmbientFire(o);
+    Check(Math.abs(open.ai._ambientEye.x - 0.6) < 1e-9, "in cover the sight line is taken from the peek position");
+    Check(Math.abs(open.ai._ambientEye.y - (1.5 - 0.15)) < 1e-6, "at the peek stance's muzzle height");
+  }
 }
 {
   // Squad reaction.
