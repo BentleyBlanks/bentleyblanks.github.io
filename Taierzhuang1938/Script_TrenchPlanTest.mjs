@@ -21,6 +21,31 @@ import {
 } from "./Script_TrenchPlan.mjs";
 import { MISSION_TRENCH_NETWORK } from "./Data_FirstLevelMissionTrenches.mjs";
 
+// Sections 1-8 test the PLANNER (legacy equivalence, junction detection, berm sides, jitter bands,
+// dressing, corners, overrides) on a frozen fixture: the seven-segment network the contract was written
+// against (Data_FirstLevelMissionTrenches at ea89f101d, 2026-09-19). The level data keeps changing
+// (2026-09-22 front rebuild, 2026-09-23 01-06 space rebuild); the planner contract does not. The live
+// network is checked in sections 9-10.
+const PLANNER_FIXTURE = Object.freeze({
+  version: MISSION_TRENCH_NETWORK.version, seed: MISSION_TRENCH_NETWORK.seed,
+  segments: Object.freeze([
+  { id: "FrontCommunication", preset: "communication", role: null, routeBound: true, source: "planner fixture (Data_FirstLevelMissionTrenches @ ea89f101d)",
+    points: [{ x: -62, z: 64 }, { x: -45, z: 41 }, { x: -45, z: 24 }, { x: -37, z: 24 }, { x: -37, z: 6 }, { x: -45, z: 6 }, { x: -45, z: -20 }, { x: -32, z: -20 }, { x: -32, z: -23 }, { x: -24, z: -23 }, { x: -24, z: -60 }, { x: -8, z: -78 }, { x: -8, z: -112 }, { x: 6, z: -124 }] },
+  { id: "FrontTraverse", preset: "fire", role: null, bermSide: "minus", routeBound: false, source: "planner fixture (Data_FirstLevelMissionTrenches @ ea89f101d)",
+    points: [{ x: -32, z: -124 }, { x: 0, z: -124 }, { x: 24, z: -124 }] },
+  { id: "BundleApproach", preset: "communication", role: null, routeBound: true, depth: 2, floorW: 3.6, bankW: 1.3, bermH: 0.2, source: "planner fixture (Data_FirstLevelMissionTrenches @ ea89f101d)",
+    points: [{ x: 6, z: -124 }, { x: 15, z: -111 }, { x: 25, z: -110 }, { x: 30, z: -117 }, { x: 49, z: -117 }, { x: 49, z: -135 }, { x: 55, z: -135 }, { x: 55, z: -152 }, { x: 49, z: -152 }, { x: 49, z: -170 }, { x: 55, z: -170 }, { x: 55, z: -184 }, { x: 45, z: -184 }, { x: 45, z: -203 }, { x: 40, z: -203 }, { x: 40, z: -213 }] },
+  { id: "WestEvacuation", preset: "evacuation", role: null, routeBound: true, source: "planner fixture (Data_FirstLevelMissionTrenches @ ea89f101d)",
+    points: [{ x: 54, z: 114 }, { x: 39, z: 116 }, { x: 32, z: 134 }, { x: 50, z: 150 }, { x: 56, z: 165 }, { x: 56, z: 184 }, { x: 56, z: 207 }] },
+  { id: "EntryCoverLoop", preset: "loop", role: "localLoop", routeBound: false, source: "planner fixture (Data_FirstLevelMissionTrenches @ ea89f101d)",
+    points: [{ x: -45, z: 41 }, { x: -52, z: 35 }, { x: -52, z: 27 }, { x: -45, z: 24 }] },
+  { id: "NorthCoverLoop", preset: "loop", role: "localLoop", routeBound: false, source: "planner fixture (Data_FirstLevelMissionTrenches @ ea89f101d)",
+    points: [{ x: -24, z: -44 }, { x: -31, z: -48 }, { x: -31, z: -56 }, { x: -24, z: -60 }] },
+  { id: "FlankBreachSap", preset: "sap", role: "enemyEntry", routeBound: false, source: "planner fixture (Data_FirstLevelMissionTrenches @ ea89f101d)",
+    points: [{ x: -22, z: 8 }, { x: -28, z: 8 }, { x: -37, z: 8 }] },
+  ]),
+});
+
 // --- 旧公式 oracle（Data_FirstLevelMissionTerrain 原样抄，不许"整理"）-------
 const Smooth = (value) => {
   const t = Math.max(0, Math.min(1, value));
@@ -49,7 +74,7 @@ const LEGACY_WIDTHS = {
 };
 const NaturalAt = (x, z) => 0.12 * Math.sin(x / 22) * Math.cos(z / 28)
   + 0.07 * Math.sin((x + z) / 12);
-const LEGACY_TRENCHES = MISSION_TRENCH_NETWORK.segments.map((seg) => ({
+const LEGACY_TRENCHES = PLANNER_FIXTURE.segments.map((seg) => ({
   id: seg.id, points: seg.points, depth: 2,
   bottom: LEGACY_WIDTHS[seg.id][0], bank: LEGACY_WIDTHS[seg.id][1],
 }));
@@ -65,8 +90,8 @@ function OldSampleTrenches(x, z) {
 }
 
 const LEGACY_SPEC = {
-  ...MISSION_TRENCH_NETWORK,
-  segments: MISSION_TRENCH_NETWORK.segments.map((seg) => ({
+  ...PLANNER_FIXTURE,
+  segments: PLANNER_FIXTURE.segments.map((seg) => ({
     ...seg, depth: 2,
     floorW: LEGACY_WIDTHS[seg.id][0], bankW: LEGACY_WIDTHS[seg.id][1],
   })),
@@ -84,7 +109,7 @@ function Rng(seed) {
   };
 }
 
-const plan = CompileTrenchNetwork(MISSION_TRENCH_NETWORK, { natural: NaturalAt });
+const plan = CompileTrenchNetwork(PLANNER_FIXTURE, { natural: NaturalAt });
 
 // --- 1. legacy 逐点等价 -----------------------------------------------------
 {
@@ -275,7 +300,7 @@ const plan = CompileTrenchNetwork(MISSION_TRENCH_NETWORK, { natural: NaturalAt }
 
 // --- 5. 宽度 / 深度随机有界，沟底不许出台阶 ---------------------------------
 {
-  const flat = CompileTrenchNetwork(MISSION_TRENCH_NETWORK, { natural: () => 0 });
+  const flat = CompileTrenchNetwork(PLANNER_FIXTURE, { natural: () => 0 });
   for (const seg of flat.segments) {
     const p = seg.params;
     // 宽度 = 9 m 一档的比例噪声 ± 3 m 一档的毛边（米）
@@ -303,7 +328,7 @@ const plan = CompileTrenchNetwork(MISSION_TRENCH_NETWORK, { natural: NaturalAt }
       `${seg.id} 沟底沿弧长不许出台阶（每 0.5 m 最大高差 ${worstStep.toFixed(3)} m）`);
   }
   // jitterScale=0 时退化为常量
-  const flatNoJitter = CompileTrenchNetwork(MISSION_TRENCH_NETWORK, { jitterScale: 0 });
+  const flatNoJitter = CompileTrenchNetwork(PLANNER_FIXTURE, { jitterScale: 0 });
   const seg0 = flatNoJitter.segments[0];
   assert.equal(seg0.HalfFloorAt(10, 10), seg0.nominal.floorW / 2, "jitterScale=0 宽度是常量");
   assert.equal(seg0.DepthAt(10, 10), seg0.nominal.depth, "jitterScale=0 深度是常量");
@@ -434,8 +459,8 @@ const GroundAt = (x, z) => NaturalAt(x, z) - plan.Depth(x, z);
 // --- 7. 圆角 ---------------------------------------------------------------
 {
   const sharp = CompileTrenchNetwork({
-    ...MISSION_TRENCH_NETWORK,
-    segments: MISSION_TRENCH_NETWORK.segments.map((s) => ({ ...s, cornerRadiusM: 0 })),
+    ...PLANNER_FIXTURE,
+    segments: PLANNER_FIXTURE.segments.map((s) => ({ ...s, cornerRadiusM: 0 })),
   }, { jitterScale: 0 });
   for (let i = 0; i < sharp.segments.length; i += 1) {
     const seg = sharp.segments[i];
@@ -487,7 +512,7 @@ const GroundAt = (x, z) => NaturalAt(x, z) - plan.Depth(x, z);
   assert.equal(TrenchPreset("communication").revetment.spacingM, 9);
   assert.equal(TrenchPreset("communication").revetment.slatLenM, 3.5, "嵌套覆盖只改指定键");
   assert.equal(TRENCH_PRESETS.communication.floorW, 3.4, "覆盖不许写回基线（基线在源码里）");
-  const wide = CompileTrenchNetwork(MISSION_TRENCH_NETWORK, { jitterScale: 0 });
+  const wide = CompileTrenchNetwork(PLANNER_FIXTURE, { jitterScale: 0 });
   assert.equal(wide.segments.find((s) => s.id === "FrontCommunication").nominal.floorW, 5.5);
   assert.equal(wide.revision, r1, "plan 带着编译时的 revision，C 拿它做缓存键");
   const r2 = ClearTrenchPresetOverrides();
@@ -497,7 +522,7 @@ const GroundAt = (x, z) => NaturalAt(x, z) - plan.Depth(x, z);
   const r3 = SetTrenchSegmentOverride("FrontTraverse", {
     points: [{ x: -10, z: -124 }, { x: 10, z: -124 }], widthScale: 2,
   });
-  const dragged = CompileTrenchNetwork(MISSION_TRENCH_NETWORK, { jitterScale: 0 });
+  const dragged = CompileTrenchNetwork(PLANNER_FIXTURE, { jitterScale: 0 });
   const ft = dragged.segments.find((s) => s.id === "FrontTraverse");
   assert.equal(ft.control.length, 2, "拖点要落到编译结果里");
   assert.ok(Math.abs(ft.path.length - 20) < 1e-9);
@@ -505,7 +530,7 @@ const GroundAt = (x, z) => NaturalAt(x, z) - plan.Depth(x, z);
   assert.equal(ft.nominal.bankW, TRENCH_PRESETS.fire.bankW, "widthScale 不动坡宽");
   const r4 = ClearTrenchSegmentOverrides();
   assert.ok(r4 > r3);
-  assert.equal(CompileTrenchNetwork(MISSION_TRENCH_NETWORK, { jitterScale: 0 })
+  assert.equal(CompileTrenchNetwork(PLANNER_FIXTURE, { jitterScale: 0 })
     .segments.find((s) => s.id === "FrontTraverse").control.length, 3, "清掉覆盖要回到基线");
   console.log("ok 预设/段级覆盖与 revision");
 }
@@ -518,13 +543,39 @@ const GroundAt = (x, z) => NaturalAt(x, z) - plan.Depth(x, z);
     assert.ok(seg.points.length >= 2);
   }
   const bound = MISSION_TRENCH_NETWORK.segments.filter((s) => s.routeBound).map((s) => s.id);
-  assert.deepEqual(bound, ["FrontCommunication", "BundleApproach", "WestEvacuation"],
-    "routeBound 只属于点来自任务/AI 路线的那三条");
+  // 2026-09-23 01–06 空间重排：01 前沿交通壕、连接支沟、03 支沟与右侧低沟、左枪通道、缺口支沟、
+  // 取弹沟、攻击支路的点都直接取自任务/AI 路线表（改点先改路线表）。
+  assert.deepEqual(bound, ["FrontCommunication", "BunkerTrench", "BunkerFrontSap", "SupportSap", "RightApproach",
+    "LeftGunAccess", "GuardWithdrawal", "BundleApproach", "RoadAttack", "WestEvacuation"],
+    "routeBound 只属于点来自任务/AI 路线的那几条");
   for (const seg of MISSION_TRENCH_NETWORK.segments) {
     if (seg.routeBound) assert.ok(/Data_FirstLevel\w+\./.test(seg.source),
       `${seg.id} routeBound 的 source 要指到具体文件字段`);
   }
   console.log("ok 数据来源标注与 routeBound");
+}
+
+// --- 10. 现行网络：01–06 前沿的连接与沟宽 ---------------------------------
+{
+  const live = CompileTrenchNetwork(MISSION_TRENCH_NETWORK, { jitterScale: 0 });
+  assert.equal(new Set(live.segments.map((s) => s.id)).size, live.segments.length, "段 id 不重复");
+  // 人要走的沟（routeBound）标称沟底不窄于 3.4（SquadMarchAi.CanPause 钉的下限，见 TRENCH_PRESETS 注释）。
+  for (const seg of live.segments.filter((s) => MISSION_TRENCH_NETWORK.segments.find((g) => g.id === s.id).routeBound))
+    assert.ok(seg.nominal.floorW >= 3.4 - 1e-9, `${seg.id} 标称沟底 ${seg.nominal.floorW} m，窄于 3.4`);
+  // 01–06 的关键接口必须被规划层认成接口（抛土、护壁、布设都让开它们）。
+  const JunctionAt = (x, z, ids) => live.junctions.find((j) => Math.hypot(j.x - x, j.z - z) < 1.5
+    && ids.every((id) => j.members.some((m) => m.id === id)));
+  for (const [label, x, z, ids] of [
+    ["支沟交汇 SJ", -29, -110, ["BunkerTrench", "SupportSap"]],
+    ["缺口交汇 GJ", -8, -140.6, ["SupportSap", "RightApproach", "GuardWithdrawal"]],
+    ["后墙岔口 RJ", 29.7, -141.5, ["BunkerFrontSap", "BundleApproach", "RoadAttack"]],
+    ["岔口 J", 14, -124.6, ["BunkerTrench", "BunkerFrontSap", "BunkerDepthSap"]],
+  ]) assert.ok(JunctionAt(x, z, ids), `${label} (${x},${z}) 要被认成 ${ids.join("/")} 的接口`);
+  // 取弹沟与守军背坡浅沟互不相接（契约 §4「取弹沟不连通守军背坡」在规划层的那一半）。
+  const Touches = (a, b) => live.junctions.some((j) => j.members.some((m) => m.id === a) && j.members.some((m) => m.id === b));
+  assert.ok(!Touches("BundleApproach", "GuardBackslope") && !Touches("BundleApproach", "GuardWithdrawal"),
+    "取弹沟不接背坡与缺口支沟");
+  console.log(`ok 现行网络 ${live.segments.length} 段：人走的沟宽 ≥3.4，SJ/GJ/RJ/J 四个接口认得出，取弹沟不接背坡`);
 }
 
 console.log("TrenchPlanTest: 全部通过");
