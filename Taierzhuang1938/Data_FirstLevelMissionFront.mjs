@@ -199,8 +199,10 @@ export const FRONT_APPROACH_ENEMIES=[
   // them on their posts (peek/hide only); 03 capture is "take the compound", not "chase the guards".
   {id:"RightNestGuard",x:33.2,z:-149.2,hold:true,team:"Nest",role:"nestGuard",faceTo:Space.westDoor},
   {id:"RightEntryGuard",x:26.6,z:-146.8,hold:true,team:"Nest",role:"nestGuard",faceTo:Space.westDoor},
-  // The link guard holds the rear junction: the link sap the vanguard used and the ammo sap mouth.
-  {id:"RightLinkGuard",x:32.3,z:-140.2,hold:true,team:"Nest",role:"linkGuard",faceTo:{x:23.5,z:-130}},
+  // The link guard holds the rear junction from inside the rear door (rear wall at his back-left is his
+  // cover): he watches the link sap the vanguard used and the ammo sap mouth, and he is part of the
+  // compound the 03 capture clears (outside the wall he was invisible from the west door and the seat).
+  {id:"RightLinkGuard",x:31.8,z:-146.7,hold:true,team:"Nest",role:"linkGuard",faceTo:{x:23.5,z:-130}},
 ];
 // Bounded approach routes end at the trench lip; shared tactical AI closes on observed targets.
 export const APPROACH_TACTICS=Object.fromEntries([
@@ -292,9 +294,10 @@ const clusters=[
   [-28,-23,15,.35,5],[-18,-41,18,.35,5.5],[-30,-56,15,.4,5],[-15,-72,21,.4,6],[-4,-92,18,.4,5.5],
   [-13,-107,18,.45,5.5],[-24,-119,15,.45,5],
   // 2026-09-23 space rebuild: the held line is now the backslope scrape at the berm's south foot
-  // (z -156), the lost east end is the right nest compound, and the 01 dead lie along the link sap.
+  // (z -156), the lost east end is the right nest compound (kept to 8 so the seat, the doors and the
+  // 04 short retreat read clearly), and the 01 dead lie along the link sap.
   // The observation step's foreground (z -126..-150, bearing 0-80 deg from it) is left empty: it is our side of the line.
-  [-22,-155.5,18,.3,4],[-8.5,-147.5,15,.4,3.5],[7,-155.8,21,.5,4.5],[30.5,-151,18,.7,4],[-29.2,-116.5,6,.1,1.8],[22,-129.5,9,.6,2.5],
+  [-22,-155.5,18,.3,4],[-8.5,-147.5,15,.4,3.5],[7,-155.8,21,.5,4.5],[30.5,-151,8,.7,4],[-29.2,-116.5,6,.1,1.8],[22,-129.5,9,.6,2.5],
   // The killing ground north of the berm (moved 6 m north with it): assault waves that never reached it.
   [-36,-169,24,.85,6.5],[4,-176,27,.85,7],[43,-178,21,.8,5.5],[-14,-165,21,.9,5],[22,-167,21,.9,5],
   [-30,-182,18,.9,5.5],[10,-188,18,.9,5.5],[36,-184,15,.9,5],[-6,-196,15,.95,5],[26,-198,12,.95,4.5],

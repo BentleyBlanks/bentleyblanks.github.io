@@ -182,7 +182,8 @@ TopBlock("RightNestRubble",31.8,-149.6,1.2,1.1,1.8,"cover",{cover:Face(-1,0)},ne
 TopBlock("RightEntryCrate",25.8,-147.6,1.0,1.0,1.1,"cover",{cover:Face(-.6,-.8)},nestRef);
 // Rest height follows the same floor and origin as the usable captured gun.
 const gunRestTop=SampleMissionTerrain(Sortie.nest.x,Sortie.nest.z)+1.45+.08-.12294;
-Block("MachineGunRest",Sortie.nest.x,Sortie.nest.z,.9,gunRestTop-SampleMissionTerrain(Sortie.nest.x,Sortie.nest.z),.7,"cover");
+// Keeps the 09.22 id: the 03-05 campaign driver checks the visible gun rests on RightNestFrontRest.
+Block("RightNestFrontRest",Sortie.nest.x,Sortie.nest.z,.9,gunRestTop-SampleMissionTerrain(Sortie.nest.x,Sortie.nest.z),.7,"cover");
 Block("MachineGunFiringStep",Sortie.seat.x+.3,Sortie.seat.z,1.9,.12,2.2,"timber",{y:SampleMissionTerrain(Sortie.seat.x,Sortie.seat.z)-.06});
 // The right low trench is 1.85 m deep with two fire steps (FRONT_FIRE_STEPS); it needs no parapet.
 // Rear corner (RC) landmark: a timber frame astride the rear trench - two posts on the lips and a
