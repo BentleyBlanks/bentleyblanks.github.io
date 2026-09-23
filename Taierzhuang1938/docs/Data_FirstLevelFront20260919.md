@@ -18,9 +18,9 @@
 
 | 文件 | 管什么 |
 | --- | --- |
-| `Script_FirstLevelBunker.mjs` | 01 门外行刑的整拍、缴下的步枪、后侧清理坍塌物的声音；02 掀木架那一拍的到位判定与何有田压制 |
+| ~~`Script_FirstLevelBunker.mjs`~~ | 2026-09-23 删除：从没被 import 过，01/02 的门外整拍在 `Script_OpeningStoryboards.FirstLevelBunkerShow` |
 | `Script_FirstLevelCollection.mjs` | 背坡伤员集结处的摆位（02 就在）、传令兵、06 借火戏、老周上担架 |
-| `Script_FirstLevelFrontShow.mjs` | 总线：按步骤分发，外加 02 的 `RescueOut`/`TrenchCurse`、04 的指弹药屋与接枪换位、05 的三条对白、07 的私语与路边指路 |
+| `Script_FirstLevelFrontShow.mjs` | 总线：按步骤分发，外加 02 的 `RescueOut`/`TrenchCurse`、05 的三条对白、07 的私语与路边指路（04 的指弹药屋与接枪换位是没有调用点的死代码，2026-09-23 删除） |
 | `Data_Tuning_FirstLevelFront.mjs` | 本段的全部数值与两张节拍表（`BUNKER_KILL_BEATS` / `BORROW_LIGHT_BEATS`） |
 | `Script_FirstLevelCampaignFront.mjs` | 阶段 1–7 的正常输入驾驶脚本（`--campaign` 的第一段） |
 | `Script_FirstLevelFrontTest.mjs` | 纯 Node 门禁 |

@@ -167,16 +167,18 @@ export const MISSION_TUNING = Object.freeze({
   // 十二人冲机枪位 ＋ 四名战车护卫 = 44。每一份名单只投一次、不复活、不补波。
   // （旧口径 67 里的 12 名车站地面 + 4 名进沟 + 5 名追到掩蔽处随军列开场一起下线。）
   openingEnemyBudget:32,
-  // Route attackers cover the exposed communication-trench approach; the separate front force
-  // owns the gun line. z=-145 is the defenders' waiting line and z=-140 is its last sheltered
-  // bound, so neither belongs to this screen. The first exposed withdrawal bound begins near -137.
-  approachFireSector:{minX:-22,maxX:42,minZ:-139,maxZ:-120,selfDefenseM:3},
+  // approachFireSector（开火扇区）2026-09-23 删掉：从来没有人把它写进 scriptFireSector（docs/Data_EnemyAi.md §20）。
   approachAccuracyScale:.35,
   approachTacticalRadiusM:24,
   approachContactM:18,
   approachContactRadiusM:6,
   approachAdvanceMps:2.8,
   approachBoundHoldS:2.8,
+  // 右侧阵位的三名步枪守卫（2026-09-23，docs/Data_EnemyAi.md §20）：不再是 hold 炮塔。局部战区 6–8 m
+  // 里找掩体、换位；玩家贴进 7 m（TACTICS.chargeContactM）就自发冲锋；每人一枚手榴弹 —— 右侧阵位
+  // 就三个人守，一人两枚会让 03 夺点变成吃弹比赛。固定机枪手仍 hold（离了枪那挺枪就哑了）。
+  nestGuardTacticalRadiusM:7,
+  nestGuardGrenades:1,
   frontReserveCount:0,
   frontReserveReleaseGapS:9,
   frontReservePlatoonSize:22,
@@ -300,7 +302,6 @@ export const MISSION_TUNING = Object.freeze({
   squadCatchupDistanceM: 18,
   squadWaitDistanceM:26,
   squadCatchupMps: 4.5,
-  flankSpeedMps: 2.8,
   reliefDelaySeconds: 1.6,
   reliefSpeedMps: 2.8,
   tacticalMoveMps: 1.85,

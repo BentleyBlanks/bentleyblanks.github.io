@@ -202,8 +202,27 @@ if(process.argv.includes("--opening-audio"))process.exit(0);
   {
     assert.deepEqual(MISSION_ENCOUNTERS.approach.map(a=>a.id),
       ["RightNestGunner","RightNestGuard","RightEntryGuard","RightLinkGuard"]);
-    assert.ok(MISSION_ENCOUNTERS.approach.every(a=>a.hold&&!MISSION_TACTICS[a.id]),
+    assert.ok(MISSION_ENCOUNTERS.approach.every(a=>!MISSION_TACTICS[a.id]),
       "03 captures four existing defenders; the retired approach assault cannot move them away");
+    // 2026-09-23 (docs/Data_EnemyAi.md §20): the nest is no longer four hold turrets. The pressure table
+    // keeps only the emplaced gunner on hold; the three riflemen get a local combat area, one grenade and
+    // the ordinary cover slack, so they take cover, shift and bayonet-charge a player who closes to 7 m.
+    const {FirstLevelFrontPressure}=await import("./Script_FirstLevelFrontPressure.mjs");
+    const {WEAPONS}=await import("./Data_Weapons.mjs");
+    const pressure=Object.create(FirstLevelFrontPressure.prototype);
+    let holding=0;
+    for(const spec of MISSION_ENCOUNTERS.approach){
+      const actor={alive:true,missionId:spec.id,weapon:WEAPONS[spec.weapon||"Type38"],scriptDefensive:!!spec.hold,
+        tacticalRadiusM:0,grenades:0,scriptCoverSlackM:R.defendHoldFixedSlackM,holdZone:{x:spec.x,z:spec.z,radius:.4}};
+      pressure.InitNestGuard(actor);
+      if(actor.scriptDefensive){holding++;assert.equal(spec.id,"RightNestGunner","only the emplaced gunner stays on hold");continue;}
+      assert.ok(actor.tacticalRadiusM>=6&&actor.tacticalRadiusM<=8,`${spec.id} fights inside a 6-8 m local area`);
+      assert.equal(actor.tacticalRadiusM,R.nestGuardTacticalRadiusM);
+      assert.equal(actor.grenades,1,`${spec.id} carries one grenade`);
+      assert.equal(actor.holdZone.radius,R.defendHoldRadiusM);
+      assert.equal(actor.scriptCoverSlackM,R.defendCoverSlackM,`${spec.id} may reach ordinary nearby cover`);
+    }
+    assert.equal(holding,1,"one hold gunner, three live riflemen");
   }
   {
     const exposed={health:R.checkpointUnsafeSaveHealth-1};
@@ -345,6 +364,25 @@ if(process.argv.includes("--opening-audio"))process.exit(0);
     assert.equal(moves.length,1,"the fall-back to the regroup line is the only script move");
     assert.equal(moves[0].speed,R.assaultRushMps);
     assert.deepEqual({...moves[0].point},{...s.points[R.assaultRegroupLine]},"he runs back to the regroup line itself");
+    // 2026-09-23 (docs/Data_EnemyAi.md §20): the pressure table owns "what next". Without it the old finite
+    // rhythm stops after assaultRegroupCycles; with s.loop the man keeps coming for as long as the phase
+    // lasts, a phase cap (maxIndex) pulls him back, and a charging man is never dragged by the script.
+    s.cycles=R.assaultRegroupCycles;s.index=s.points.length-1;s.mode="hold";s.shifts=R.assaultLateralShifts;s.hold=99;
+    actor.position={...s.points[s.index],y:0};
+    Step(1);
+    assert.equal(s.index,s.points.length-1,"no pressure table: the finite rhythm is spent and he settles");
+    s.loop=true;s.hold=99;Step(1);
+    assert.equal(s.index,R.assaultRegroupLine,"a looping phase always has a next step");
+    assert.equal(s.cycles,R.assaultRegroupCycles+1);
+    s.maxIndex=0;s.index=Math.max(1,s.index);s.mode="hold";actor.position={...s.points[s.index],y:0};
+    const movesBefore=moves.length;Step(1);
+    assert.equal(s.index,0,"a phase cap pulls the line back");
+    assert.equal(moves.length,movesBefore+1,"and the pull-back is one rush leg");
+    actor.state="charge";const chargeMoves=moves.length;Step(5);
+    assert.equal(moves.length,chargeMoves,"the brain owns a charging man's legs");
+    actor.state="fire";s.mode="charge";actor.position={x:s.points[0].x+.3,y:0,z:s.points[0].z};Step(1);
+    assert.equal(s.index,0,"after a charge he rejoins the nearest line he may hold");
+    assert.notEqual(s.mode,"charge");
   }
 
 }
