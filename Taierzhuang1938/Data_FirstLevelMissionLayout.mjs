@@ -206,6 +206,16 @@ Block("MachineGunFiringStep",Sortie.seat.x+.3,Sortie.seat.z,1.9,.12,2.2,"timber"
 // Nest interior baffle (collapsed roof beams): breaks the escorts' lines over the low north wall
 // into the compound, so the 04 short retreat has a covered middle.
 TopBlock("RightNestBaffle",30.4,-152.8,1.8,1.3,.8,"timber",{cover:Face(0,-1)},Sortie.nest);
+// Right low trench: its last leg points at the nest, so its MG (eye over the low west wall) could look
+// down the leg and across the corner into the previous one. A spoil-and-sandbag screen on the leg's
+// north lip closes that line (C's traverse finding: a 5.6 m-wide trench top leaks sight around bends).
+// Top is relative to NATURAL ground (the corner is dug out around it): a traverse island, not a lip parapet.
+{
+  const x=20.1,z=-150.2,w=3.0,d=1.1,ry=.72,c=Math.cos(ry),q=Math.sin(ry);
+  const top=SampleMissionNaturalHeight(x,z)+.55;let foot=Infinity;
+  for(const a of [-1,0,1])for(const b of [-1,0,1])foot=Math.min(foot,SampleMissionTerrain(x+(a*w/2)*c+(b*d/2)*q,z-(a*w/2)*q+(b*d/2)*c));
+  Block("RightApproachTraverse",x,z,w,top-(foot-.1),d,"cover",{ry,y:(top+foot-.1)/2,cover:Face(-.66,.75)});
+}
 // Attack branch cover beat: broken wall across the tank's line; the last 4.7 m to the throw spot are open.
 TopBlock("AttackRuinA",39.9,-156.6,3.6,1.5,.7,"cover",{cover:Face(0,-1)});
 // Gap last cover: sandbag stub on the gap mouth's east side (the tank and the nest are east).
@@ -213,6 +223,13 @@ TopBlock("GapLastCover",-6.2,-154.2,.8,1.35,2.4,"cover",{cover:Face(1,0)});
 // Zhou's left gun at the berm's west end, parapet facing north-east along the berm's north face.
 TopBlock("LeftGunParapet",-32.4,-158.4,3.6,.95,.8,"cover",{ry:-.6,cover:Face(.6,-.8)});
 TopBlock("LeftGunSide",-35.4,-155.8,.7,1.9,4,"cover",{cover:Face(-1,0)});
+// The backslope scrape stops short of Zhou's gun pit and an earth traverse closes the last metre, so the
+// guards' only way down is the gap (no bypass west along the scrape into the left gun access trench).
+{
+  const x=-29.4,z=-156.4,w=1.4,d=3.4,top=SampleMissionNaturalHeight(x,z)+.4;let foot=Infinity;
+  for(const a of [-1,1])for(const b of [-1,1])foot=Math.min(foot,SampleMissionTerrain(x+a*w/2,z+b*d/2));
+  Block("ScrapeWestTraverse",x,z,w,top-(foot-.1),d,"cover",{y:(top+foot-.1)/2,cover:Face(1,0)});
+}
 // Old yard (旧院) south-east of the nest, west of the blocked south road. Back door on the west.
 TopBlock("OldYardNorthWest",39.3,-119,1.0,2.4,.7,"plaster");
 TopBlock("OldYardNorthEast",48.3,-119,11.4,2.4,.7,"plaster");
@@ -742,7 +759,8 @@ export const MISSION_PLACEMENT = Object.freeze({
   // Each guard: scrape -> last cover -> the gap -> gap junction -> fold -> safe zone behind the fold,
   // spread along the support sap toward the observation step (all out of the nest's and the tank's lines).
   guardWithdrawalRoutes:Array.from({length:8},(_,i)=>[
-    FRONT_GUARD_POSTS[i],...Sortie.guardRoute,{x:-22.1-i*.5,z:-126.5+i*.02},
+    // Guards east of the gap pass behind (south of) the last-cover sandbags, not through them.
+    FRONT_GUARD_POSTS[i],...(FRONT_GUARD_POSTS[i].x>Sortie.gap.x?[{x:-6.3,z:-156.8}]:[]),...Sortie.guardRoute,{x:-22.1-i*.5,z:-126.5+i*.02},
   ]),
   kitchenInterior: {minX:53,maxX:63,minZ:-15,maxZ:-2},
   // ConnectedHouse（58,8，12×15）的可站区域：墙心 x 52/64、z 0.5/15.5，墙厚 0.6。

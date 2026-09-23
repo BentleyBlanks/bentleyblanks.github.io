@@ -53,7 +53,7 @@ export const testDefs = {
   FirstLevelMissionTopologyTest: {file:"Script_FirstLevelMissionTopologyTest.mjs",desc:"Notion September 19 four zones: southward progression, metric adjacency and sight rules"},
   FirstLevelMissionTopologyBrowserTest: {file:"Script_FirstLevelMissionTopologyBrowserTest.mjs",timeoutMs:300000,desc:"Real Rapier walks of every contract route, four bridge states, night slice and 720p views"},
   FirstLevelSpaceTest: {file:"Script_FirstLevelSpaceTest.mjs",desc:"September 19 whitebox space: anchors, capsule routes, bunker sightline, street gap, lane width, river and bridges"},
-  FirstLevelFrontTopologyTest:{file:"Script_FirstLevelFrontTopologyTest.mjs",desc:"03–06 connected front: clearance, real cover and physical withdrawal gates"},
+  FirstLevelFrontTopologyTest:{file:"Script_FirstLevelFrontTopologyTest.mjs",desc:"01–06 space: K1–K11 sightlines, tank lane, route clearance, exposure rhythm, covered enemy starts, hidden entries and withdrawal gates"},
   FirstLevelFrontTest: {file:"Script_FirstLevelFrontTest.mjs",desc:"第一关阶段 1–7：分镜契约、集结处、借火、南行与演出接线（纯 Node）"},
   OpeningStoryboardsTest: {file:"Script_OpeningStoryboardsTest.mjs",desc:"01–03 source rigs, baked animation hashes, normalized poses and V3 placement"},
   OpeningActorPerformanceBrowserTest: {file:"Script_OpeningActorPerformanceBrowserTest.mjs",timeoutMs:300000,desc:"Production-rig dialogue, idle, guard movement, planted feet and high-quality acting views"},
@@ -576,6 +576,8 @@ const changedDomainRules = [
   { domain: "render", pattern: /Script_Profile(Cli|r?Report)|Script_FrameProbeViews/i },
   { domain: "perf", pattern: /Script_ProfileCli/i },
   {domain:"firstLevel",pattern:/FirstLevelFrontRoute|FirstLevelFrontBattle|FirstLevelFrontTopology|FirstLevelTransition/},
+  // 2026-09-23 01–06 space rebuild: keyframe table and the static probe the space gate reads.
+  {domain:"firstLevel",pattern:/FirstLevelSpaceKeyframes|FirstLevelSpaceProbe/},
   {domain:"firstLevel",pattern:/FirstLevelZhouExit/},
   {domain:"missionGuide",pattern:/FirstLevelLeaderGuide|FirstLevelGuideDialogue|FirstLevelGuideVoiceAlignment|FirstLevelMissionRuntime|Script_FirstLevelMissionVoice|NpcMissionGuide|NpcGuideGesture|Tuning_MissionGuide/},
   { domain: "combat", pattern: /FirearmHandling|MuzzleFlash|Headshot/i },

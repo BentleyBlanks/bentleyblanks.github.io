@@ -35,7 +35,9 @@ export const FRONT_SORTIE=Object.freeze({
   approach:[Point(-29,-110),Point(-30,-118),Point(-26.5,-126),Point(-20.4,-126.8),Point(-19.2,-133.2),
     Point(-10.4,-134.2),Point(-9.4,-138.6),Point(-8,-140.6),
     Point(0,-141.6),Point(7,-143.5),Point(13,-144.2),Point(19,-146.8),Point(22.2,-149.6),Point(25.8,-150.4),Point(25.9,-153.9)],
-  nest:Point(24.9,-153.9), seat:Point(25.9,-153.9),leaderCover:Point(28.4,-151.6), rear:Point(29.7,-141.5),
+  // leaderCover: Luo's post inside the west door, 2.8 m from the gun (capture radius 4 - arrival 1) and 3 m
+  // from the seat (not in the player's frame); crouched, he fires out of the door at the gap.
+  nest:Point(24.9,-153.9), seat:Point(25.9,-153.9),leaderCover:Point(24.75,-151.1), rear:Point(29.7,-141.5),
   // 04 short withdrawal: seat -> rear-wall door -> rear junction (behind the never-breakable rear wall).
   rearRoute:[Point(25.9,-153.9),Point(29.6,-149.5),Point(29.7,-145.6),Point(29.7,-141.5)],
   // 05 ammo sap: rear junction -> damaged lip (road view) -> yard gate -> house back door.

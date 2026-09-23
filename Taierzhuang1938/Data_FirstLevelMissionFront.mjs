@@ -220,10 +220,13 @@ export const FRONT_GUARD_POSTS=[[-11,-156.3],[-5,-156.3],[-14.5,-156.4],[-1.5,-1
 // for ~6 m (the one exposed crossing). Damaged lip: 1.1 m for ~6 m - crouched (eye 1.05) is below the
 // natural ground and hidden from the tank, standing shows the road and the turret (graft from B's K8).
 // Attack tail: the last 4 m of the attack branch are 0.75 m (the risk window). Right low trench fire
-// steps: two 1.05 m platforms against the trench's north wall at its corners, off the walking line -
+// steps: two 1.05 m platforms against the trench's north wall, 1.3 m off the walking line -
 // crouch-walking the 1.85 m trench is hidden, stepping up and standing engages the nest guards
 // (graft from B: forced exposure becomes chosen exposure). Jump-off ramps: see FRONT_SPACE.jumpOff.
-export const FRONT_FIRE_STEPS=Object.freeze([{x:7.1,z:-144.8,radius:1.4,depth:1.05},{x:18.5,z:-148.0,radius:1.4,depth:1.05}]);
+// Step 0 (1.5,-143.4) looks over the berm end at the flank group's last two lines (16-24 m); step 1
+// (14.9,-146.4) also sees the nest gunner over the low west wall (10 m). Crouched on either, nobody in the
+// nest team sees the player (Script_FirstLevelSpaceProbe exposure.fireSteps).
+export const FRONT_FIRE_STEPS=Object.freeze([{x:1.5,z:-143.4,radius:1.4,depth:1.05},{x:14.9,z:-146.4,radius:1.4,depth:1.05}]);
 export const FRONT_BREACHES=[{x:-22,z:8,radius:4,depth:1.05},{...Sortie.gap,radius:3,depth:.5},
   {...Sortie.damagedLip,radius:3,depth:1.1},{x:43.2,z:-158.4,radius:2.2,depth:.75},
   ...FRONT_FIRE_STEPS,...Space.jumpOff.ramps];
@@ -243,14 +246,15 @@ export const FRONT_FLANK_GROUP=Object.freeze([
 export const FRONT_OFFICER=Object.freeze({id:"FrontOfficer",x:54.5,z:-193.6,modelVariant:1,sword:true,role:"officer",
   lane:[{x:45.8,z:-193.6},{x:41,z:-186.5},{x:33,z:-178.5},{x:27.4,z:-172.6}]});
 /** Reinforcement entries (contract §2.8): all 60 m+ from the nest seat and the observation step,
- *  or hidden below a crest. The count is the budget per stage (aliveCap per stage). */
+ *  or hidden below a crest. The count is the budget per stage: 04 gets 2+2, 05 gets 1, so the
+ *  worst case alive in 05 (nobody but the nest team dead in 03) is 30 = contract §6. */
 export const FRONT_RESERVE_ENTRIES=Object.freeze([
   // slots: where each man stands when the entry releases him (inside the trench / the cutting);
   // slotStages: the stage that releases that slot (the budget per stage is the count per stage).
-  {id:"NorthWestPlateau",x:-44,z:-222.2,hiddenBy:"west end of the 1.9 m north jump-off trench, 20 m behind the north crest",stages:{MachineGun:2,Tank:2},
-    slots:[{x:-45.2,z:-221.7},{x:-42.6,z:-222.7},{x:-40,z:-221.7},{x:-37.4,z:-222.7}],slotStages:["MachineGun","MachineGun","Tank","Tank"]},
-  {id:"RoadCutting",x:104,z:-214,hiddenBy:"road cutting walls + NorthRuin sector + 98 m",stages:{MachineGun:2,Tank:1},
-    slots:[{x:106.2,z:-217.4},{x:108.3,z:-221.2},{x:109.8,z:-224.6}],slotStages:["MachineGun","MachineGun","Tank"]},
+  {id:"NorthWestPlateau",x:-44,z:-222.2,hiddenBy:"west end of the 1.9 m north jump-off trench, 20 m behind the north crest",stages:{MachineGun:2,Tank:1},
+    slots:[{x:-45.2,z:-221.7},{x:-42.6,z:-222.7},{x:-40,z:-221.7}],slotStages:["MachineGun","MachineGun","Tank"]},
+  {id:"RoadCutting",x:104,z:-214,hiddenBy:"road cutting walls + NorthRuin sector + 98 m",stages:{MachineGun:2},
+    slots:[{x:106.2,z:-217.4},{x:108.3,z:-221.2}],slotStages:["MachineGun","MachineGun"]},
 ].map(Object.freeze));
 /** Tank escort slots at the block point (brain-owned, contract §5.7): two pairs in the road-side
  *  ditches, one pair 6-7 m ahead of the hull, one pair beside it. Shift with the tank's progress. */

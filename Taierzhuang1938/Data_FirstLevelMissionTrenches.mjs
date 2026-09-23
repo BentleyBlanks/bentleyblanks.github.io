@@ -70,7 +70,7 @@ export const MISSION_TRENCH_NETWORK = Object.freeze({
     {id:"LeftGunAccess",preset:"communication",role:null,points:Sortie.leftRoute.slice(2),depth:1.85,
       source:"Data_FirstLevelFrontRoute.FRONT_SORTIE.leftRoute from 2",routeBound:true},
     // Backslope scrapes at the foot of the berm's south slope: visible from our side, hidden from the north.
-    {id:"GuardBackslope",preset:"communication",role:null,points:[{x:-28.5,z:-156.4},{x:4.5,z:-156.2}],
+    {id:"GuardBackslope",preset:"communication",role:null,points:[{x:-27.2,z:-156.4},{x:4.5,z:-156.2}],
       depth:.55,floorW:2.6,bankW:.8,bermH:.12,bermSide:"plus",
       source:"Data_FirstLevelMissionTrenches (own points, FRONT_GUARD_POSTS kneel in this shallow scrape)",routeBound:false},
     // The gap sap: last cover -> the one gap (shallowed by FRONT_BREACHES) -> gap junction.
