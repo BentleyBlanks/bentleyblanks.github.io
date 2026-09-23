@@ -274,7 +274,9 @@ export const SAMPLES = Freeze({
  * rifleIntervalScale  步枪环境射击比瞄准射击慢这么多倍：这是「战线在打」，不是「这个人在拼命」。
  * mgIntervalScale  机枪点射之间的停顿倍率（BurstPlan 的 pauseS 乘它）。
  * scatterM         授权点没写 r 时的弹着散布半径（米）。
- * losRetries       挑点时最多试几个候选的通视（每试一个打一条射线）。
+ * losRetries       挑点时最多试几个候选的通视（每试一个打一条射线）。09-24 由 2 抬到 5：一个相位的
+ *                  授权点五到八个，只试两个的话掩体后面的人十有八九一个也挑不到（探针里「挑不到点」
+ *                  占 03–05 不动人·帧的两成多）；每人 pickEveryS 才挑一次，五条射线的账付得起。
  * pickEveryS       同一个人两次挑点的最小间隔（Think 1/6 分帧，这里再限一道）。
  * stalledTargetS   扳机空转判定（秒）：想开火、膛里有弹、有目标，却这么久一发没对人真打出去
  *                  （压制弹道被土坎挡死、探头那一下看见了人弹道却被胸墙挡住、枪口转不过去……），
@@ -293,7 +295,7 @@ export const AMBIENT_FIRE = Freeze({
   rifleIntervalScale: 1.8,
   mgIntervalScale: 1.6,
   scatterM: 1.4,
-  losRetries: 2,
+  losRetries: 5,
   pickEveryS: 0.9,
   stalledTargetS: 2.5,
   impactAboveM: 1.2,

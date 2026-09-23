@@ -203,6 +203,11 @@ export const COVER_CYCLE = Freeze({
   failedRetryS: 7,
   /** 连续这么多次探头都没看见目标，这个掩体就按失败处理（failedRetryS 内不再选）、换点。 */
   blindPeeksBeforeMove: 3,
+  /** 任务侧开关（`AiDirector.missionCoverRules`，第一关 01–06）打开时，「白探头」也算瞎探：
+   *  探出去看见了人、可一发都没打出去（弹道被他那道胸墙挡死、枪口转不过去）—— 连着
+   *  blindPeeksBeforeMove 次就换点。09-24 探针：03 的掩体里有人看得见左前枪位的老周、
+   *  36 m 外一发打不过去，缩头探头一整个相位。07 以后开关关着，仍只认「没看见」。 */
+  missionWastedPeekIsBlind: true,
   /** 当前掩体被判侧翼要**持续**这么久才紧急换点：目标在两侧敌人间来回切时单拍判定会翻。 */
   flankGraceS: 1.5,
   /** blindPeeksBeforeMove / flankGraceS / 按隐蔽位判侧翼这三条只对这些阵营生效。

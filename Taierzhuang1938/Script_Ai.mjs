@@ -452,6 +452,8 @@ export class Soldier {
     this.coverThreatX = 0;       // 上一次选点时威胁在哪（挪远了才值得重算）
     this.coverThreatZ = 0;
     this.peekCount = 0;          // hide→peek 循环次数（验收探针数它）
+    /** 这一次探头里真打出去过一发（对人或环境射击都算）；任务侧开关下「白探头」据此判。 */
+    this.peekFired = false;
     this.lastGrenadeAt = -99;
     this.grenades = 0;           // 携行手榴弹（第一关编成发弹，见 Data_Tuning_FirstLevel）
     // --- 第三波：戒备与换位（docs/Data_EnemyAi.md §15）------------------------
@@ -3083,7 +3085,10 @@ export class AiDirector {
       if (s.coverPhase === "peek") {
         // 探出去也看不见目标的掩体只是个藏身处：连着几次都这样就记失败、换点
         //（2026-09-16 接收院取证：队友在「挡得住、打不着」的墙后缩头探头一整场）。
-        s.blindPeeks = s.target && !s.peekSaw && this.RefinedCoverSide(s) ? (s.blindPeeks || 0) + 1 : 0;
+        // 【§20.7】任务侧开关（第一关 01–06）下，看见了却一发没打出去的探头也算瞎探。
+        const wasted = !s.peekSaw
+          || (this.missionCoverRules && COVER_CYCLE.missionWastedPeekIsBlind && !s.peekFired);
+        s.blindPeeks = s.target && wasted && this.RefinedCoverSide(s) ? (s.blindPeeks || 0) + 1 : 0;
         if (s.blindPeeks >= COVER_CYCLE.blindPeeksBeforeMove) {
           s.failedCoverId = c.id; s.failedCoverUntil = this.time + COVER_CYCLE.failedRetryS;
           this.ReleaseCover(s); s.coverPickAt = -99;
@@ -3098,6 +3103,7 @@ export class AiDirector {
           + COVER_CYCLE.peekMinS + s.rnd() * (COVER_CYCLE.peekMaxS - COVER_CYCLE.peekMinS);
         s.peekCount += 1;
         s.peekSaw = false;
+        s.peekFired = false;
         this.stats.peeks += 1;
         // 每次探头都是重新举枪：误差回到初值，探头本身有代价（§4.3）。
         if (s.target) this.shooting.BeginAim(s, s.target.id, { force: true });
@@ -3664,10 +3670,17 @@ export class AiDirector {
     if (s.muzzleWorld && typeof s.actor?.MuzzleDirection === "function"
         && (s.aimBlend < BRAIN.fireAimBlendMin
           || s.actor.MuzzleDirection(this.tmpMuzzle).dot(dir) < Math.cos(BRAIN.fireBarrelAngleRad))) return false;
-    if (!this.shooting.LineOfFireClear(from, aimV, this.FriendlyTorsos(s))) return false;
-    if (!this.shooting.ShotPathClear(from, aimV)) return false;
+    // 挑点时的通视是从眼高打的，枪口低一截、或者自己人走进了射击线：这个点现在打不了，
+    // 别对着它端满一整段 dwell —— 放掉，下一次 Think 重挑（【§20.7】探针里这类占不动人·帧一成）。
+    if (!this.shooting.LineOfFireClear(from, aimV, this.FriendlyTorsos(s))
+      || !this.shooting.ShotPathClear(from, aimV)) {
+      s.ambientFirePoint = null;
+      s.ambientUntil = -99;
+      return false;
+    }
 
     s.ammo -= 1;
+    s.peekFired = true;
     const scriptFactors = this.ScriptFireFactors(s);
     if (!(s.burstLeft > 0)) {
       const plan = this.shooting.BurstPlan(s.weapon, s.rnd);
@@ -4571,6 +4584,7 @@ export class AiDirector {
     s.lastFire = this.time;
     s.targetFireAt = this.time;
     s.triggerDrySince = -1;
+    s.peekFired = true;
     s.fireSequence += 1;
     s.aimTime = 0;
     this.fireCount += 1;              // 通关冒烟要的是"仗真的打起来了"的运行时证据

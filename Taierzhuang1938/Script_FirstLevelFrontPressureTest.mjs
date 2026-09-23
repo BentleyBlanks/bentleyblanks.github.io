@@ -440,6 +440,10 @@ function Man(ai, side, x, z, options = {}) {
   const blockedWorld = MakeDirector({ blocked: true });
   const b = Man(blockedWorld.ai, "ija", 0, 0); b.yaw = 0; b.ambientFirePoints = [front];
   Eq(blockedWorld.ai.PickAmbientFire(b), null, "a point behind a solid wall is never picked");
+  // §20.7 A point picked from eye height that the muzzle cannot reach is dropped at once, not stared at for the dwell.
+  b.ambientFirePoint = { x: 0, y: 0.5, z: -30, r: 1, id: "front" }; b.ambientUntil = blockedWorld.ai.time + 5; b.fireTimer = 0;
+  Check(!blockedWorld.ai.TryAmbientFire(b, 0, true), "no round through the wall");
+  Check(b.ambientFirePoint === null && b.ambientUntil < blockedWorld.ai.time, "the blocked point is let go for a fresh pick");
 }
 {
   // Squad reaction.
@@ -503,6 +507,23 @@ function Man(ai, side, x, z, options = {}) {
   ai.Bark(s, "advance"); Check(["ija_move_advance", "ija_move_forward"].includes(log.barks.at(-1).key));
   Check(!ai.RefinedCoverSide(s) && ai.RefinedCoverSide(Man(ai, "nra", 0, 0)), "by default only the NRA runs the refined cover cycle");
   ai.missionCoverRules = true; Check(ai.RefinedCoverSide(s), "the mission switch gives the Japanese the refined cover cycle");
+  // §20.7 Wasted peeks: he sees the man in the trench, but not one round gets past that parapet.
+  const Peek = (w, fired) => {
+    w.coverPhase = "peek"; w.coverPhaseUntil = ai.time - 0.01; w.peekSaw = true; w.peekFired = fired;
+    ai.UpdateCoverCycle(w, null);
+  };
+  const w = Man(ai, "ija", 0, 0, { state: "cover_engage" });
+  w.target = { isPlayer: false, position: new THREE.Vector3(0, 0, -30), id: 7 }; w.targetVisible = true;
+  const cover = { id: "parapetBox", hidePos: { x: 0, y: 0, z: 0 }, firePos: { x: 0.5, y: 0, z: 0 }, hideStance: 1, fireStance: 1 };
+  w.cover = cover;
+  ai.missionCoverRules = false;
+  for (let i = 0; i < 4; i++) Peek(w, false);
+  Check(w.cover === cover && w.blindPeeks === 0, "07+: a peek that saw the target is never blind, rounds or not");
+  ai.missionCoverRules = true;
+  Peek(w, true); Peek(w, false); Peek(w, false);
+  Check(w.cover === cover, "a peek that got a round out resets the count");
+  Peek(w, false);
+  Check(w.cover === null && w.failedCoverId === "parapetBox", "01-06: three peeks in a row that saw him but fired nothing: move to another cover");
 }
 // §20.7 Melee stall: pulled into a bayonet fight across a parapet he cannot climb, a man stood there for 86 s.
 {
@@ -525,7 +546,7 @@ function Man(ai, side, x, z, options = {}) {
   ai.time += 0.2; ai.UpdateMeleeStall(m);
   Check(m.meleeDormant === false && m.meleeStallDormantUntil === 0, "after releaseS the melee director may take him again");
 }
-console.log("ok ③ brain: ambient pick/ownership/ledger, dry trigger, MG bursts, hesitation, officer death, group charge, follow-ups, bark keys, cover switch, melee stall");
+console.log("ok ③ brain: ambient pick/ownership/ledger, dry trigger, MG bursts, hesitation, officer death, group charge, follow-ups, bark keys, cover switch, wasted peeks, blocked points, melee stall");
 
 // ---------------------------------------------------------------------------
 // ④ 01 背景兵
