@@ -238,15 +238,6 @@ export const SFX_SOURCES = [
     cuts: [{ cue: "zb26", tail: 0.9, gain: 0.9, minGap: 0.1, decay: [0.08, 1.2] }],
   },
   {
-    id: "BarClose",
-    item: "sonniss-gdc-2016-game-audio-bundle-normalized",
-    path: "Pole Position Production - M1918 Browning Automatic Rifle .30cal/M1918_Browning_Automatic_Rifle_.30cal_0.1m_to_right_Double_shots_x_1.mp3",
-    credit: "Pole Position Production · BAR .30cal 近场 · Sonniss GDC 2016",
-    license: "sonniss",
-    // 用户在 G09 试听中选定。只切末发、升调 12%；500 rpm 仍由引擎按史实排。
-    cuts: [{ cue: "type11", tail: 0.78, gain: 0.86, rate: 1.12, exactAtS: 0.67 }],
-  },
-  {
     id: "M1919A4Far200",
     item: "sonniss-gdc-2016-game-audio-bundle-normalized",
     path: "Pole Position Production - M1919A4 Browning Machine Gun .30cal/M1919A4_Browning_Machine_Gun_.30cal_200m_left_behind_blanks_Triple_shots_x_1.mp3",
@@ -908,19 +899,6 @@ export const SFX_SOURCES = [
       append: true, alignDbfs: -25 }],
   },
   // --- 轻机：十一年式（用 BAR 顶）-------------------------------------------
-  {
-    id: "Type11BarSecondShot",
-    item: "sonniss-gdc-2016-game-audio-bundle-normalized",
-    path: "Pole Position Production - M1918 Browning Automatic Rifle .30cal/M1918_Browning_Automatic_Rifle_.30cal_0.1m_to_right_Double_shots_x_1.mp3",
-    credit: "Pole Position Production · BAR .30cal 近场（同一次双发的第二发）· Sonniss GDC 2016",
-    license: "sonniss",
-    bitrate: BITRATE_TRANSIENT,
-    // 与 `_01` 同一条素材、同一次双发，但落刀在**第二发自己的起音**（0.501 s）上，
-    // 而 `_01` 落在 0.658 s —— 那是双发的共同尾巴。所以这两条不是同一份波形变调，
-    // 一条有冲头一条没有，轮播时听得出是两下不同的枪。
-    cuts: [{ cue: "type11", exactAtS: 0.501, tail: 0.78, gain: 0.86, rate: 1.12,
-      append: true, alignDbfs: -25 }],
-  },
   // --- 重机：九二式（M1919A4）------------------------------------------------
   {
     id: "Type92M1919Near5m",
@@ -1005,6 +983,33 @@ export const SFX_SOURCES = [
     // 别当没看见（三百米外一支步枪和一挺轻机本来也难分，真正的区别由引擎排的射速给）。
     cuts: [{ cue: "type11Far", exactAtS: 0.578, tail: 1.40, gain: 0.78, rate: 1.12,
       alignDbfs: -25 }],
+  },
+  // --- 轻机：十一年式（2026-09-23 换料）---------------------------------------
+  // 原来的 `BarClose` / `Type11BarSecondShot` 两组（BAR .30cal 0.1 m 双发）撤掉：
+  // 实测两条成品 <40 Hz 能量占 98.7 % / 98.8 %（麦克风贴着枪口吃进去的气流轰），
+  // 100 Hz—8 kHz 的可听部分比全带宽低 19 dB —— 没有低音炮的机器上等于不出声。
+  // 2026-09-11 起 type11 只剩一条 SeedAudio，这里补两条真枪：FN MINIMI（L110A2）
+  // 1 m 单发两发。5.56 与十一年式的 6.5×50 同属小口径、高膛压，机构同是开膛待击的
+  // 班用轻机；rate 0.95 往下压半档，hp 38 把次低频切掉（见记忆「40 Hz 以下偷电平」）。
+  {
+    id: "Type11MinimiSingles",
+    item: "sonniss-gdc-2016-game-audio-bundle-normalized",
+    path: "Pole Position Production - L110A2 LMG 5.56mm belt fed (FN MINIMI)/L110A2_LMG_5.56mm_belt_fed_1m_right_MKH8040_1_clean_Single_shots_x_2.mp3",
+    credit: "Pole Position Production · L110A2 LMG（FN MINIMI）5.56 单发（1 m）· Sonniss GDC 2016",
+    license: "sonniss",
+    bitrate: BITRATE_TRANSIENT,
+    cuts: [{ cue: "type11", tail: 0.78, gain: 0.86, rate: 0.95, variants: 2, minGap: 1.0, hp: 38, alignDbfs: -25 }],
+  },
+  {
+    id: "Type11FarMinimi50m",
+    item: "sonniss-gdc-2016-game-audio-bundle-normalized",
+    path: "Pole Position Production - L110A2 LMG 5.56mm belt fed (FN MINIMI)/L110A2_LMG_5.56mm_belt_fed_50m_behind_788_Schoeps_A_clean_Single_shots_x_2.mp3",
+    credit: "Pole Position Production · L110A2 LMG（FN MINIMI）5.56 单发（50 m 后方）· Sonniss GDC 2016",
+    license: "sonniss",
+    bitrate: BITRATE_TRANSIENT,
+    // `type11Far` 原来只有 BAR 300 m 一条（而且与 rifleIjaFar_01 同一发），补两条真的远场。
+    cuts: [{ cue: "type11Far", tail: 1.40, gain: 0.78, rate: 0.95, variants: 2, minGap: 1.0, hp: 38,
+      append: true, alignDbfs: -25 }],
   },
   {
     id: "Type92Far",
@@ -1501,6 +1506,36 @@ export const SFX_SOURCES = [
     cuts: [
       { cue: "rifleIja", exactAtS: 0.326, tail: 1.05, gain: 0.92, append: true, alignDbfs: -25 },
       { cue: "bolt", exactAtS: 2.795, tail: 0.85, gain: 0.95, hp: 180, append: true, alignDbfs: -25 },
+    ],
+  },
+  // === 日军枪声的最终变体表（2026-09-23，第一关 01–05 声景）==================
+  // 2026-09-11 那一轮（Script_SeedAudioGunfireBake）把 rifleIja / rifleIjaFar / type11
+  // 三条 cue 直接改写成**只有一条** SeedAudio 生成音，上面那几组真枪实录切好的变体
+  // 还在 Audio/Sfx 里、却不再被清单引用；而全量 SfxBake 又会反过来把 SeedAudio 那条丢掉。
+  // 这一组放在表尾，把三条 cue 的文件表钉死成「生成音 + 真枪实录」：
+  //   · rifleIja：SeedAudio 1 + M1 Garand 1 + M1903A3 3 = 5 条（_05 是参考视频实录，
+  //     许可未解决，**不进轮播**）；
+  //   · rifleIjaFar：SeedAudio 1 + BAR 300 m 1 + 50 m 建筑反射 2 = 4 条；
+  //   · type11：SeedAudio 1 + MINIMI 1 m 2 = 3 条（BAR 近场那两条是废素材，见上）。
+  // 只登记、不切割（seedAudio 组的语义）；上面那几组负责把文件烘出来。
+  // 许可：三条 cue 都混着火山引擎生成音与 Sonniss 免版税实录，逐文件的出处写在 credit。
+  {
+    id: "JapaneseGunfireVariants",
+    seedAudio: true,
+    license: "sonniss",
+    credit: "Volcengine SeedAudio 1.0（2026-09-11）＋ Sonniss GDC 实录",
+    cuts: [
+      { cue: "rifleIja", durS: 1.4,
+        files: ["AudioSfx_SeedAudioRifleIja_01.mp3", "AudioSfx_RifleIja_01.mp3", "AudioSfx_RifleIja_02.mp3",
+          "AudioSfx_RifleIja_03.mp3", "AudioSfx_RifleIja_04.mp3"],
+        credit: "Volcengine SeedAudio 1.0 · rifleIja · 2026-09-11 ／ Watson Wu · M1 Garand .30-06 近射 · Sonniss Game Audio Monthly #3 ／ Pole Position Production · 斯普林菲尔德 M1903A3 .30-06 连续实录 · Sonniss GDC 2020" },
+      { cue: "rifleIjaFar", durS: 1.8,
+        files: ["AudioSfx_SeedAudioRifleIjaFar_01.mp3", "AudioSfx_RifleIjaFar_01.mp3", "AudioSfx_RifleIjaFar_02.mp3",
+          "AudioSfx_RifleIjaFar_03.mp3"],
+        credit: "Volcengine SeedAudio 1.0 · rifleIjaFar · 2026-09-11 ／ Pole Position Production · BAR .30cal 300 m 正面 · Sonniss GDC 2016 ／ Pole Position Production · 50 m 外、经建筑反射的步枪射击 · Sonniss GDC 2018" },
+      { cue: "type11", durS: 0.82,
+        files: ["AudioSfx_SeedAudioType11_01.mp3", "AudioSfx_Type11_01.mp3", "AudioSfx_Type11_02.mp3"],
+        credit: "Volcengine SeedAudio 1.0 · type11 · 2026-09-11 ／ Pole Position Production · L110A2 LMG（FN MINIMI）5.56 单发（1 m）· Sonniss GDC 2016" },
     ],
   },
 ];

@@ -2728,7 +2728,7 @@ export const MUSIC_BASE = "Audio/Music/";
 // 2026-09-13：汉阳造 01 专用连续枪响＋枪机实录进入清单。
 // 2026-09-15：那一条拆成枪声 rifleHanYang（同文件名、内容变了）与枪机 boltHanYang。
 // 2026-09-17：大刀挥空从三条换成一条（AudioSfx_DadaoSwing_01 同文件名、内容变了）。
-export const SFX_PACK_VERSION = "20260917dadaoswingone";
+export const SFX_PACK_VERSION = "20260923japanesegunvariants";
 export const AMB_PACK_VERSION = "20260912trainonly";
 export const MUSIC_PACK_VERSION = "5";
 
