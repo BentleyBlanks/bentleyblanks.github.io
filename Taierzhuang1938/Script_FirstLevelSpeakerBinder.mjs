@@ -7,12 +7,16 @@
 //     (released when the soldier dies, is removed, or another body takes the role);
 //   * the shared head layer (Script_SpeakerHeadLayer) and the eyes look at whoever is
 //     talking; the talker looks at the listener (player by default);
-//   * HeadPosition(cue, line) gives the voice a position at the mouth that moves.
+//   * HeadPosition(cue, line) gives the voice a position at the mouth that moves;
+//   * a voice sample without baked channels gets them from the offline face track of
+//     the take it is playing (Script_FaceTrack, keyed by the take's sha256: the
+//     sample's own sha256, else the voice manifest's entry for its cue).
 // The runtime only adds resolvers, calls Update(dt) and asks HeadPosition first.
 import * as THREE from "three";
 import { MISSION_DIALOGUE, MISSION_VOICE_CAST } from "./Data_FirstLevelMissionDialogue.mjs";
 import { SPEAKER_HEAD } from "./Data_Tuning_CharacterSpeech.mjs";
 import { SpeakerHeadLayer } from "./Script_SpeakerHeadLayer.mjs";
+import { FaceTrackSpeech, LoadFaceTracks } from "./Script_FaceTrack.mjs";
 
 const CUES = new Map(MISSION_DIALOGUE.map(cue => [cue.id, cue]));
 // Roles that never have a body of their own on screen.
@@ -69,9 +73,12 @@ export class FirstLevelSpeakerBinder {
    *   soldiers   () => iterable of live soldiers (castId lookup)
    *   listener   () => Vector3 (player eye) the talker looks at by default
    *   resolvers  [(who) => soldier | null], asked in order before the castId scan
+   *   loadFaceTracks  fetch Data_FirstLevelFaceTracks.json (default: in a browser)
    */
-  constructor({ voice, soldiers = () => [], listener = () => null, resolvers = [] } = {}) {
+  constructor({ voice, soldiers = () => [], listener = () => null, resolvers = [],
+    loadFaceTracks = typeof location !== "undefined" } = {}) {
     this.voice = voice; this.soldiers = soldiers; this.listener = listener;
+    if (loadFaceTracks) LoadFaceTracks();
     this.resolvers = [...resolvers];
     this.bound = new Map(); // soldier -> { whos:Set, facial, layer }
     this.speaking = [];     // [{ who, soldier, head }]
@@ -79,6 +86,13 @@ export class FirstLevelSpeakerBinder {
   }
 
   AddResolver(resolver) { if (resolver) this.resolvers.push(resolver); return this; }
+
+  /** voice.Speech(who) with face-track channels merged in when the take has a track. */
+  Speech(who) {
+    const speech = this.voice?.Speech?.(who);
+    if (!speech?.active || Number.isFinite(speech.jaw)) return speech;
+    return FaceTrackSpeech(speech, speech.sha256 ?? this.voice?.manifest?.cues?.[speech.cue]?.sha256);
+  }
 
   ActorForWho(who) {
     if (!who || DISEMBODIED.has(who)) return null;
@@ -111,10 +125,9 @@ export class FirstLevelSpeakerBinder {
     if (!entry || entry.facial !== rig.facial) {
       if (entry) this._Release(soldier);
       entry = { whos: new Set(), facial: rig.facial, rig, layer: null };
-      const voice = this.voice;
       rig.facial.source = () => {
         if (!Alive(soldier)) return null;
-        for (const role of entry.whos) { const speech = voice?.Speech?.(role); if (speech?.active) return speech; }
+        for (const role of entry.whos) { const speech = this.Speech(role); if (speech?.active) return speech; }
         return null;
       };
       entry.layer = rig.speakerHead ||= new SpeakerHeadLayer(rig, soldier.id ?? 0);
