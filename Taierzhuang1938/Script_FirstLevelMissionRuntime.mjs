@@ -189,7 +189,7 @@ export class FirstLevelMissionRuntime {
       this.oldBlast?.(event);
       this.OnBlast(event);
     };
-    this.battleSound = new FirstLevelMissionBattleSound(this.audio);
+    this.battleSound = new FirstLevelMissionBattleSound(this.audio, this);
     this.music = new FirstLevelMissionMusic(this.audio);
     this.musicInitializing = true;
     this.view.interact = this.interact;
@@ -2572,7 +2572,7 @@ export class FirstLevelMissionRuntime {
   UpdateMusic(stage = this.flow.stage.id) {
     if (this.musicInitializing) return;
     this.music.Update(stage, { shellImpact: this.Has("bunkerCollapsed"),
-      speaking: this.voice.current?.phase === "playing", failed: this.failed });
+      speaking: this.voice.current?.phase === "playing", failed: this.failed, has: (id) => this.Has(id) });
   }
   ObjectiveProgress() {
     const progress = this.flow.ObjectiveProgress();

@@ -21,6 +21,7 @@ import { Mulberry32, Clamp, Clamp01 } from "./Script_Noise.mjs";
 import {
   PROBE, NEAR_MISS, RICOCHET, AI_FOLEY, PLAYER_STEP, BODY_FOLEY,
   GRENADE_FOLEY, BLAST_AUDIO, FIRE_SPOT, BATTLE_DENSITY, SUPPRESSION_DIRT,
+  TRENCH_ZONE, SUPPRESSION_BODY,
 } from "./Data_Tuning_Audio.mjs";
 
 /**
@@ -76,8 +77,12 @@ const WALL_TAGS = new Set([
 
 /** 屋顶 tag：向上那条射线撞到这些才算「在屋里」。 */
 const CEILING_TAGS = new Set([
-  "roof", "ceiling", "whiteboxCeiling", "floor", "platform", "bridge",
+  "roof", "ceiling", "whiteboxCeiling", "floor", "platform", "bridge", "dugoutRoof",
 ]);
+/** 洞顶 tag：撞到就是防炮洞，不再看高度（布设侧明说了的，比几何推断可靠）。 */
+const DUGOUT_TAGS = new Set(["dugoutRoof", "dugout"]);
+/** 四条直径（单位向量）：东西、南北、两条对角。壕沟判据要**一条直径两端都高**。 */
+const TRENCH_AXES = [[1, 0], [0, 1], [Math.SQRT1_2, Math.SQRT1_2], [Math.SQRT1_2, -Math.SQRT1_2]];
 
 /**
  * 头顶那一击算不算「屋顶」。
@@ -159,6 +164,12 @@ export class AudioWiring {
     this.breathCue = null;
     this.breathUntil = 0;
     this.breathHoldS = 0;
+    // --- 压制下的身体反应（Data_Tuning_Audio.SUPPRESSION_BODY）------------
+    this.stress = 0;               // 压制的快升慢落包络 0..1
+    this.stressBreath = false;     // 压制喘息的滞回状态
+    this.stressHeart = false;      // 压制心跳的滞回状态
+    this.heartNextAt = 0;
+    this.heartBeats = 0;           // 取证累计
 
     // --- 火焰点声源 -------------------------------------------------------
     this.fireVoices = new Map();      // vfx 烟源 handle → { voice, at, until }
@@ -206,6 +217,10 @@ export class AudioWiring {
     this.crackTimes.length = 0;
     this.StopAllFire();
     this.StopBreath(0);
+    this.stress = 0;
+    this.stressBreath = false;
+    this.stressHeart = false;
+    this.heartNextAt = 0;
     this.lastFootstepAt = 0;
     this.lastStance = null;
     this.sprintHeldS = 0;
@@ -311,7 +326,7 @@ export class AudioWiring {
 
   /**
    * 这个位置在什么空间里。引擎侧按它挑混响 IR 与枪尾录音。
-   * @returns {"interior"|"courtyard"|"street"|"open"}
+   * @returns {"dugout"|"interior"|"trench"|"courtyard"|"street"|"open"}
    */
   Zone(position) {
     const bf = this.Battlefield;
@@ -330,10 +345,18 @@ export class AudioWiring {
     // （`box.max[1] < position.y + 0.4` 那道闸）一起筛掉，街巷全变成开阔地 ——
     // 实测抬到 1.35 m 之后 40 个点里 7 个 street 直接掉成 open。
     // 坏的只有屋顶判据一条，别顺手改掉对的那两条。
+    //
+    // 【2026-09-23】前面再加两档（Data_Tuning_Audio.TRENCH_ZONE）：低矮洞顶 + 陷在地下
+    // = dugout；两侧土壁夹着 = trench。壕沟是高度场挖出来的，没有碰撞盒，只能看地面。
     const up = bf.Raycast({ x: position.x, y: position.y + 0.1, z: position.z },
       { x: 0, y: 1, z: 0 }, PROBE.ceilingProbeM, { terrain: false });
-    if (IsCeiling(up)) {
+    const sink = this.TrenchSink(position);
+    if (this.IsDugoutRoof(up, position, sink)) {
+      zone = "dugout";
+    } else if (IsCeiling(up)) {
       zone = "interior";
+    } else if (sink.trench) {
+      zone = "trench";
     } else {
       const walls = this.CountWalls(position);
       zone = walls >= PROBE.courtyardWalls ? "courtyard"
@@ -342,6 +365,48 @@ export class AudioWiring {
     if (this.zoneCache.size > PROBE.maxEntries) this.zoneCache.clear();
     this.zoneCache.set(key, { v: zone, at: this.time });
     return zone;
+  }
+
+  /**
+   * 这个位置陷在地面以下多少（壕沟 / 洞室的判据，只看共享地面采样器）。
+   * @returns {{ trench: boolean, sunkDirs: number, rise: number, ground: number|null }}
+   *   rise = 四条直径里「两端较低那一端」比中心高多少，取最大的那条直径。
+   */
+  TrenchSink(position) {
+    const bf = this.Battlefield;
+    const none = { trench: false, sunkDirs: 0, rise: 0, ground: null };
+    if (!bf || typeof bf.GroundHeight !== "function" || !position) return none;
+    const ground = bf.GroundHeight(position.x, position.z);
+    if (!Number.isFinite(ground)) return none;
+    if (Number.isFinite(position.y) && position.y - ground > TRENCH_ZONE.maxAboveGroundM) return { ...none, ground };
+    const Side = (ux, uz) => {
+      let best = -Infinity;
+      for (const r of TRENCH_ZONE.radiiM) {
+        const h = bf.GroundHeight(position.x + ux * r, position.z + uz * r);
+        if (Number.isFinite(h)) best = Math.max(best, h - ground);
+      }
+      return best;
+    };
+    let rise = 0, sunkDirs = 0;
+    for (const [ux, uz] of TRENCH_AXES) {
+      const a = Side(ux, uz), b = Side(-ux, -uz);
+      if (a >= TRENCH_ZONE.minRiseM) sunkDirs += 1;
+      if (b >= TRENCH_ZONE.minRiseM) sunkDirs += 1;
+      rise = Math.max(rise, Math.min(a, b));
+    }
+    return { trench: rise >= TRENCH_ZONE.minRiseM, sunkDirs, rise, ground };
+  }
+
+  /** 头顶那一击是不是防炮洞的顶：布设标了 dugoutRoof，或低矮、够宽、且人陷在地下。 */
+  IsDugoutRoof(hit, position, sink) {
+    const box = hit?.box;
+    if (!box || !box.min || !box.max) return false;
+    if (box.tag && DUGOUT_TAGS.has(box.tag)) return true;
+    if (!(sink.sunkDirs >= TRENCH_ZONE.dugoutSunkDirs) || sink.ground === null) return false;
+    const spanX = box.max[0] - box.min[0], spanZ = box.max[2] - box.min[2];
+    if (!(spanX >= TRENCH_ZONE.dugoutRoofMinSpanM && spanZ >= TRENCH_ZONE.dugoutRoofMinSpanM)) return false;
+    const roofAbove = position.y + 0.1 + (hit.t || 0) - sink.ground;
+    return roofAbove <= TRENCH_ZONE.dugoutRoofMaxM;
   }
 
   /** 六米内围着几面立面。矮过 wallMinHeightM 的不算 —— 田埂挡不住声音。 */
@@ -385,6 +450,10 @@ export class AudioWiring {
       listener: { x: +listener.x.toFixed(2), y: +listener.y.toFixed(2), z: +listener.z.toFixed(2) },
       zone: this.Zone(listener),
       walls: this.CountWalls(listener),
+      // 壕沟判据的原始数：四条直径里最好的那条两端都高出多少、几个方向比脚下高。
+      trench: (() => { const k = this.TrenchSink(listener);
+        return { rise: +k.rise.toFixed(2), sunkDirs: k.sunkDirs }; })(),
+      stress: +this.stress.toFixed(3),
       probesInstalled: !!audio?.probes,
       soldiers: near.map(({ s, d }) => ({
         id: s.missionId || s.id, side: s.side,
@@ -1027,8 +1096,41 @@ export class AudioWiring {
 
     this.Footsteps(surfaceByTag);
     this.Landing(surfaceByTag);
+    this.SuppressionBody(dt);
     this.BodyFoley(dt);
     this.FireSpots(dt);
+  }
+
+  /**
+   * 压制下的喘息与心跳（2026-09-23）。数在 Data_Tuning_Audio.SUPPRESSION_BODY。
+   *
+   * 读的是 stress（压制的快升慢落包络），不是 suppression 本身：后者 0.55/s 就落完，
+   * 机枪一换弹玩家就「不紧张了」。喘息交给 BodyFoley 那一条（它管优先级：受伤 > 冲刺
+   * > 压制），这里只定开关与电平；心跳自己排拍。
+   */
+  SuppressionBody(dt) {
+    const player = this.Player;
+    const audio = this.Audio;
+    const S = SUPPRESSION_BODY;
+    const sup = player?.Alive ? Clamp01(player.suppression || 0) : 0;
+    const tau = sup > this.stress ? S.attackS : S.releaseS;
+    this.stress += (sup - this.stress) * (1 - Math.exp(-Math.max(0, dt) / Math.max(1e-3, tau)));
+    if (!(this.stress > 1e-4)) this.stress = 0;
+    this.stressBreath = this.stressBreath ? this.stress > S.breathOff : this.stress >= S.breathOn;
+    this.stressHeart = this.stressHeart ? this.stress > S.heartOff : this.stress >= S.heartOn;
+    if (!player?.Alive || !this.stressHeart) { this.heartNextAt = 0; return; }
+    // 濒死心跳在跳（Script_Player.heartbeatTimer > 0）时让位：两条心跳叠在一起是乱拍。
+    if ((player.heartbeatTimer || 0) > 0) { this.heartNextAt = 0; return; }
+    const k = Clamp01((this.stress - S.heartOff) / Math.max(1e-3, 1 - S.heartOff));
+    if (this.time < this.heartNextAt) return;
+    const bpm = S.heartBpmMin + (S.heartBpmMax - S.heartBpmMin) * k;
+    this.heartNextAt = this.time + 60 / bpm;
+    this.heartBeats += 1;
+    // 非空间化、不给混响：这是自己的胸腔。priority —— 压制最凶的时候预算最紧，
+    // 而那正是这一声最该在的时候。
+    audio?.Play("heartbeat", {
+      volume: S.heartVolumeMin + (S.heartVolumeMax - S.heartVolumeMin) * k, priority: true,
+    });
   }
 
   Footsteps(surfaceByTag) {
@@ -1109,7 +1211,9 @@ export class AudioWiring {
     const hurt = player.Alive && player.health < 100 * BODY_FOLEY.breathHealthFrac;
     const winded = this.sprintHeldS > BODY_FOLEY.breathAfterSprintS;
     if (!player.Alive) { this.StopBreath(0.4); return; }
-    const requestedCue = hurt ? "breathInjured" : winded ? "breathHeavy" : null;
+    // 压制喘息排在最后：受伤喘息与冲刺喘息都在时让它们（见 SuppressionBody）。
+    const stressed = this.stressBreath && !winded && !hurt;
+    const requestedCue = hurt ? "breathInjured" : (winded || this.stressBreath) ? "breathHeavy" : null;
     if (requestedCue && requestedCue !== this.breathCue) {
       this.StopBreath(BODY_FOLEY.breathSwitchFadeS);
       this.breathCue = requestedCue;
@@ -1120,9 +1224,12 @@ export class AudioWiring {
       if (this.time >= this.breathUntil) {
         this.breathUntil = this.time + (this.breathCue === "breathInjured"
           ? BODY_FOLEY.breathInjuredLoopS : BODY_FOLEY.breathLoopS);
-        this.breathVoice = audio.Play(this.breathCue, {
-          volume: BODY_FOLEY.breathVolume, priority: true,
-        });
+        const S = SUPPRESSION_BODY;
+        const volume = stressed
+          ? S.breathVolumeMin + (S.breathVolumeMax - S.breathVolumeMin)
+            * Clamp01((this.stress - S.breathOff) / Math.max(1e-3, 1 - S.breathOff))
+          : BODY_FOLEY.breathVolume;
+        this.breathVoice = audio.Play(this.breathCue, { volume, priority: true });
       }
     } else if (this.breathCue) {
       this.StopBreath(0.4);

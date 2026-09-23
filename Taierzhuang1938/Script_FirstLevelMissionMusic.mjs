@@ -1,10 +1,24 @@
-import { FirstLevelMusicState } from "./Data_FirstLevelMissionMusic.mjs";
+import { FirstLevelMusicState, FIRST_LEVEL_MUSIC_COMBAT } from "./Data_FirstLevelMissionMusic.mjs";
 
 // Only the mission selects a cue. The shared audio engine owns loading, loops and pause.
+// 【2026-09-23】01–05 的战斗让位读引擎的战场强度；标点事实（facts.has）第一次出现的时刻
+// 记在这里（事实表只是一个集合，不带时间）。
 export class FirstLevelMissionMusic {
-  constructor(audio) { this.audio = audio; this.current = null; }
-  Update(stage, facts) {
-    const next = FirstLevelMusicState(stage, facts);
+  constructor(audio) { this.audio = audio; this.current = null; this.stingerSeen = new Map(); }
+  StingerAge(has) {
+    if (typeof has !== "function") return Infinity;
+    const now = this.audio.ctx?.currentTime ?? 0;
+    let age = Infinity;
+    for (const id of FIRST_LEVEL_MUSIC_COMBAT.stingers) {
+      if (!has(id)) { this.stingerSeen.delete(id); continue; }
+      if (!this.stingerSeen.has(id)) this.stingerSeen.set(id, now);
+      age = Math.min(age, now - this.stingerSeen.get(id));
+    }
+    return age;
+  }
+  Update(stage, facts = {}) {
+    const next = FirstLevelMusicState(stage, { ...facts,
+      intensity: facts.intensity ?? this.audio.battleIntensity ?? 0, stingerAgeS: this.StingerAge(facts.has) });
     if (!this.current || next.cue !== this.current.cue) this.audio.Music(next.cue, {
       fadeOut: next.fadeOut, levelScale: next.scale,
     });

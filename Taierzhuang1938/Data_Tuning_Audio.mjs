@@ -446,3 +446,140 @@ export const FIRE_SPOT = Object.freeze({
 
 // 2026-09-11: keep NPC reports audible across the combat field; near gun mix stays unchanged.
 export const GUN_AUDIBILITY = Object.freeze({ refDistanceM: 14 });
+
+/**
+ * 壕沟与防炮洞的空间档（2026-09-23，第一关 01–05 声景）。
+ *
+ * 病根：第一关的交通壕是 `Script_TrenchPlan` 在高度场上**挖**出来的，没有碰撞盒，
+ * `CountWalls` 一面墙都数不到，于是沟里判成 `open`，枪声拖着 2.6 s 的旷野混响 ——
+ * 人在两米深的土沟里，听感却是站在麦田中央。
+ *
+ * 判据只看地面高度（共享采样器 `battlefield.GroundHeight`），不看碰撞盒：
+ * 以查询点为圆心，在四条直径（东西、南北、两条对角）的两端各采 `radiiM` 几圈地面，
+ * 一条直径**两端都**比中心高出 `minRiseM` 以上 = 两侧土壁夹着 = `trench`。
+ * 只有一侧高的是坡脚或土坎背后，不算沟。
+ *
+ * 为什么是两圈（2.0 / 3.2 m）而不是简报里的一圈 ±2 m：交通壕沟底宽 3.4 m、
+ * 坡宽 1.1 m（docs/Data_TrenchSpline.md 断面表），站在沟中线上时 ±2 m 恰好落在
+ * 坡脚，只比沟底高 0.38 m；3.2 m 那一圈才落到沟沿上（高 2.0 m）。贴着一侧沟壁走时
+ * 2 m 那圈就够了。两圈取较高者。
+ *
+ * 防炮洞（`dugout`）：头顶有盖、盖子离脚下地面不高（低矮洞室），而且这个位置
+ * **陷在地面以下**（八个方向里至少 `dugoutSunkDirs` 个比中心高 `minRiseM`）。
+ * 布设侧把洞顶碰撞盒标成 `dugoutRoof` 时直接判 dugout，不再看高度。
+ */
+export const TRENCH_ZONE = Object.freeze({
+  radiiM: Object.freeze([2.0, 3.2]),
+  /** 两侧都要比中心地面高这么多才算沟。沟深 2.0 m，塌低段也还有 1 m 上下。 */
+  minRiseM: 0.9,
+  /** 查询点比脚下地面高出这么多就不算「在沟里」（飞机、屋顶上的东西）。 */
+  maxAboveGroundM: 3.2,
+  /** 洞顶离脚下地面不超过这么高才算低矮洞室；更高的是房子。 */
+  dugoutRoofMaxM: 2.9,
+  /** 洞顶那块盖子横向至少这么宽（两条边都要），一根横梁不算顶。 */
+  dugoutRoofMinSpanM: 1.2,
+  /** 八个方向里至少这么多个比中心高 minRiseM，才算「陷在地下」。 */
+  dugoutSunkDirs: 3,
+});
+
+/**
+ * 压制下的身体反应（2026-09-23）：喘息变急、心跳渐强，平滑消退。
+ *
+ * `player.suppression` 本身落得很快（0.55/s，满压制两秒不到就归零），
+ * 直接拿它开关喘息会「一放枪就不喘了」。这里先过一道快升慢落的包络（stress），
+ * 喘息与心跳都读它：被机枪按住的那几秒是满的，火力一停要五六秒才平下来。
+ *
+ * 心跳用的是 `heartbeat` 单拍素材（0.7 s），按 stress 排拍 —— 压得越狠拍子越密、
+ * 越响。**血量低于 `HIT_FEEDBACK.heartbeatBelowHp` 时由 Script_Player 的濒死心跳接管**，
+ * 这里不叠第二条。喘息复用 `breathHeavy`（用户认可的那一条，原速原调，不变调）；
+ * 受伤喘息与冲刺喘息优先，压制只在两者都不在时接手。
+ */
+export const SUPPRESSION_BODY = Object.freeze({
+  attackS: 0.35,             // 升：被压住的那一下就起
+  releaseS: 5.5,             // 落：火力停了还要缓五六秒
+  breathOn: 0.42,            // stress 过这条线开始喘
+  breathOff: 0.26,           // 回到这条线以下才停（滞回，免得在门槛上抖）
+  breathVolumeMin: 0.26,
+  breathVolumeMax: 0.5,      // 与冲刺喘息同一档上限（BODY_FOLEY.breathVolume）
+  heartOn: 0.36,
+  heartOff: 0.2,
+  heartBpmMin: 84,           // 刚被压住
+  heartBpmMax: 138,          // 被机枪按在土坎后面
+  heartVolumeMin: 0.16,
+  heartVolumeMax: 0.46,      // 比濒死心跳（0.5–1.0）低一档：这是紧张，不是快死了
+});
+
+/**
+ * 耳鸣（2026-09-23 重做）：双音拍频 + 窄带噪声，高频先失后回。
+ *
+ * 原来是一条 4 kHz 正弦 1.4 s 衰减完 —— 听着像测试音。被震过的耳鸣有三个特征：
+ * 两条靠得很近的音互相拍出「嗡—嗡」的起伏（左右耳不一样）、底下垫着一层嘶嘶的窄带噪声、
+ * 外界先整个变闷，再一段一段地回来（低频先回、高频最后回）。
+ *
+ * 两档：`combat` 给战斗中近爆（`Deafen(seconds < storyFromS)`，DEAFEN_ON 那几条），
+ * 短、一两秒就回来；`story` 给剧情里的炮震（01 近爆、02 枪托击打，调用方传 1.1 s），
+ * 长尾恢复，与 docs/Data_OpeningShellshock.md 的「视觉恢复不等于声音立刻恢复」同一口径。
+ * recover 是总线低通在恢复段的几个落点（相对 hold 结束的秒数 → Hz），按段指数插值。
+ */
+export const TINNITUS = Object.freeze({
+  storyFromS: 0.9,
+  combat: Object.freeze({
+    toneHz: 3950, beatHz: 7.5, toneLevel: 0.034, toneDriftHz: -140,
+    noiseHz: 4300, noiseQ: 9, noiseLevel: 0.05,
+    ringS: 2.2,
+    lowHz: 520,
+    recover: Object.freeze([[0.0, 520], [0.35, 1400], [0.8, 5200], [1.25, 20000]]),
+  }),
+  story: Object.freeze({
+    toneHz: 4150, beatHz: 5.2, toneLevel: 0.05, toneDriftHz: -260,
+    noiseHz: 4600, noiseQ: 7, noiseLevel: 0.07,
+    ringS: 9.5,
+    lowHz: 380,
+    recover: Object.freeze([[0.0, 380], [1.6, 700], [3.8, 1800], [6.5, 6200], [9.0, 20000]]),
+  }),
+});
+
+/**
+ * 场外近落弹的通用机制数（2026-09-23）。**落在哪、多密**是关卡数据
+ * （`Data_FirstLevelMissionBattleSound.artillery`），这里只放「一发落下来之后怎么响」。
+ *
+ * 口径：不伤人、不改地形、不进压制账 —— 它是「炮火就在附近」的氛围，不是威胁。
+ * 先见后闻：画面（`vfx.Explosion`）在落地那一刻，声音按 d/340 到（引擎的传播延迟），
+ * 震屏跟着声音到，落土再晚一拍。
+ */
+export const BATTLE_ARTILLERY = Object.freeze({
+  /** 落点离人至少这么远（不打玩家、不打任何活人）。 */
+  avoidSoldierM: 10,
+  /** 挑落点最多试几次，挑不到就这一发不落。 */
+  pickTries: 8,
+  /** 画面那一团的半径（米）：比真炮弹小一档，免得远处一团比打在脸上的还大。 */
+  vfxRadiusM: 7,
+  /** 近/中两档分界（与 BLAST_AUDIO.midM 同一条线：这之内用 explosionMid）。 */
+  midM: 70,
+  midVolume: 1.25,
+  farVolume: 1.0,
+  /** 低频冲击层：同一发再叠一条压到 400 Hz 以下的 shellImpact，胸口那一下。 */
+  thumpVolume: 0.55,
+  thumpAirCutHz: 400,
+  /** 来袭啸声：多少比例的炮弹先听得到飞过来（提前量是啸声素材自己的长度的一部分）。 */
+  incomingChance: 0.35,
+  incomingLeadS: 1.15,
+  incomingVolume: 0.42,
+  /** 震屏：交给 CameraShake.Explosion 的 reach（它自己再 × reachScale 3.2）。 */
+  shakeReachM: 18,
+  /** 洞里比沟里震得重（顶板在抖）。 */
+  dugoutShakeScale: 1.6,
+  /** 碎土雨：这么近以内，落地后一两秒土块砸回沟里。 */
+  dirtRainM: 75,
+  dirtRainDelayS: Object.freeze([1.1, 2.1]),
+  dirtRainVolume: 0.22,
+  dirtRainAirCutHz: 3200,
+  /** 沟壁/洞顶落土：听者在 trench / dugout 时，声音到达后再晚一点，耳边沙沙往下掉。 */
+  wallDirtDelayS: Object.freeze([0.25, 0.7]),
+  wallDirtVolume: 0.16,
+  wallDirtAirCutHz: 1900,
+  dugoutDirtVolume: 0.3,
+  dugoutDirtAirCutHz: 2600,
+  /** 同时在响的场外炮击声部上限（含低频层与落土）。 */
+  maxVoices: 3,
+});

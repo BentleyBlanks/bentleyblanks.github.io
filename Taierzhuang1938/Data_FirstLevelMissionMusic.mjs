@@ -47,14 +47,44 @@ export const FIRST_LEVEL_STAGE_MUSIC = Object.freeze({
   BridgeWithdraw: "TheSouthRoadBreaks", NightMarch: "TheLivingStillNeedUs", Complete: null,
 });
 
-export function FirstLevelMusicState(stage, { shellImpact = false, speaking = false, failed = false } = {}) {
+/**
+ * 【2026-09-23】01–05 的战斗配乐让位与标点（用户：「01-05 应该在整体的战斗音效上有一个
+ * 比较极致的沉浸感搭配」）。对标 BF1 / CoD WWII：交火最凶的时候配乐退到后面，让枪炮说话；
+ * 只在几个节点（战车露面、缺口重开、余队通过）把配乐推上来给一个标点。
+ *
+ *   · 让位：按 AudioWiring 的战场强度（0..1），从 fromIntensity 到 fullIntensity
+ *     线性压到 1 − depth。结果按 stepScale 取整 —— 强度每帧都在动，不取整的话
+ *     每帧都要写一条音量斜坡。
+ *   · 标点：stingers 里的事实第一次出现后 holdS 秒内不让位，并抬到 lift 倍，
+ *     之后 fadeS 秒内回到让位值（Script_FirstLevelMissionMusic 记事实出现的时刻）。
+ * 只对 stages 里的步骤生效；07 以后的配乐一个数都不变。
+ */
+export const FIRST_LEVEL_MUSIC_COMBAT = Object.freeze({
+  stages: Object.freeze(["RearTrench", "Support", "MachineGun", "Tank"]),
+  fromIntensity: 0.35, fullIntensity: 0.9, depth: 0.55, stepScale: 0.05,
+  stingers: Object.freeze(["tankPreviewed", "tankImmobilized", "tankFireDisabled", "lastGuardsWithdrawn"]),
+  holdS: 6, fadeS: 4, lift: 1.15,
+});
+
+export function FirstLevelMusicState(stage, { shellImpact = false, speaking = false, failed = false,
+  intensity = 0, stingerAgeS = Infinity } = {}) {
   const mix = FIRST_LEVEL_MUSIC_MIX;
   // 15A 与 17 是「静」：与失败、受困近爆同一条淡出（silenceS），不走 1.6 s 的常规过渡。
   const silent = failed || (stage === "Trapped" && shellImpact);
   const id = silent ? null : FIRST_LEVEL_STAGE_MUSIC[stage];
-  const scale = ({ RearTrench: mix.rearTrenchScale, Orders: mix.ordersScale,
+  let scale = ({ RearTrench: mix.rearTrenchScale, Orders: mix.ordersScale,
     Transfer: mix.transferScale, Handover: mix.handoverScale,
     WallPath: mix.wallPathScale, ReceptionGate: mix.wallPathScale })[stage] ?? 1;
+  const C = FIRST_LEVEL_MUSIC_COMBAT;
+  if (C.stages.includes(stage)) {
+    const u = Math.min(1, Math.max(0, (intensity - C.fromIntensity) / (C.fullIntensity - C.fromIntensity)));
+    let combat = 1 - C.depth * u;
+    if (stingerAgeS < C.holdS + C.fadeS) {
+      const w = stingerAgeS <= C.holdS ? 1 : 1 - (stingerAgeS - C.holdS) / C.fadeS;
+      combat = combat + (C.lift - combat) * Math.max(0, w);
+    }
+    scale *= Math.round(combat / C.stepScale) * C.stepScale;
+  }
   return { cue: id ? `firstLevel${id}` : null,
     scale: scale * (speaking ? mix.dialogueScale : 1),
     fadeOut: silent || ["Death", "Regroup"].includes(stage) ? mix.silenceS : mix.transitionS,

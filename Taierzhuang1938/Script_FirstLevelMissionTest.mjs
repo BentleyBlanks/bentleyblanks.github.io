@@ -975,34 +975,33 @@ assert.equal(new Set(MISSION_DIALOGUE.map((cue) => cue.id)).size, MISSION_DIALOG
 
 
 {
- const calls=[], sound=new FirstLevelMissionBattleSound({Play:(cue,options)=>{calls.push({cue,...options});return null;}});
- // 【2026-09-09 这一条改了口径】原来断言的是「车厢里一声前线都不许有」。
- // 实测下来那正是用户报的问题：整整一分钟的车厢里只有三句对白，然后第一发
- // 凭空炸在车边上。现在的口径是**由远及近**，闸门有三道，一道都不能松：
- //   1. 头 24 秒仍然一声不许有（车厢自己的动静与那顿饭的对话独占）；
- //   2. 之后只许是**闷的**（airCut ≤ 340 Hz —— 隔着木板与铁皮）；
- //   3. 头一段必须比后一段轻（军列在往前线开，不是前线在靠近）。
- for(let i=0;i<48;i++)sound.Update(.5,"Trapped");
- assert.equal(calls.length,0,"the collapsed bunker stays clear of front sound for the first 24s");
- for(let i=0;i<40;i++)sound.Update(.5,"Trapped");
+ const calls=[], sound=new FirstLevelMissionBattleSound({Play:(cue,options)=>{calls.push({cue,...options});return null;},
+   listenerPos:{x:0,y:1.6,z:-150}});
+ // 【2026-09-23 改了口径】原来断言「01 头 24 秒一声都不许有」—— 那是沿用军列的旧数，
+ // 正是用户报的「01 远处前线等 24 s 才出声」。现在 01 一进来远处就在打，但隔着土：
+ //   1. 1.2 s 内就有第一声（Data_FirstLevelMissionBattleSound.front.firstWithinS）；
+ //   2. 01 里的每一声都是闷的（airCut ≤ 450 Hz）、摆在三百米以外、走 sfx 总线进远声组；
+ //   3. 03 的前线是双方在对射（两边的枪都有），07 以后回到原来的固定声源，更轻。
+ // 生成器本身（扇区、交火来回、让位、炮击、防炮洞环境）的逐条断言在 Script_FirstLevelBattleSoundTest。
+ for(let i=0;i<3;i++)sound.Update(.4,"Trapped");
+ assert.ok(calls.length>0,"the front is already firing when 01 begins");
+ for(let i=0;i<120;i++)sound.Update(.5,"Trapped");
  const early=calls.slice();
- assert.ok(early.length>0,"the front creeps in through the earth before the near miss");
- assert.ok(early.every(c=>c.airCut<=340&&c.soundField&&c.bus==="ambience"),
-   "everything heard from under the collapse is muffled: "+JSON.stringify(early[0]));
- for(let i=0;i<40;i++)sound.Update(.5,"Trapped");
- const late=calls.slice(early.length), Loudest=(rows,cue)=>Math.max(0,...rows.filter(c=>c.cue===cue).map(c=>c.volume));
- assert.ok(Loudest(late,"amb.cannonFar")>Loudest(early,"amb.cannonFar"),
-   "the front grows while the man lies pinned: "+JSON.stringify({early:Loudest(early,"amb.cannonFar"),late:Loudest(late,"amb.cannonFar")}));
+ const front=early.filter(c=>c.soundField), shells=early.filter(c=>!c.soundField);
+ assert.ok(front.length>10&&front.every(c=>c.airCut<=450&&c.bus==="sfx"&&Math.hypot(c.position.x,c.position.z+150)>250),
+   "the distant front heard from inside the bunker is far and muffled: "+JSON.stringify(front.find(c=>!(c.airCut<=450))||front[0]));
+ assert.ok(shells.every(c=>c.airCut<=900&&Math.hypot(c.position.x,c.position.z+150)>=70),
+   "near shells in 01 stay outside and muffled: "+JSON.stringify(shells.find(c=>!(c.airCut<=900))||null));
  calls.length=0;
  for(let i=0;i<120;i++)sound.Update(.5,"Support");
- assert.ok(calls.some(c=>c.cue==="amb.cannonFar")&&calls.some(c=>c.cue==="type92")&&calls.some(c=>c.cue==="rifleNraFar"));
- assert.ok(calls.every(c=>c.position.z< -190&&c.soundField&&c.bus==="ambience"));
- const north=sound.sources.find(s=>s.spec.id==="NorthArtillery");
- assert.ok(north.count>=5,"sustained cannon pressure throughout the support trench");
- const supportVolume=calls.find(c=>c.cue==="rifleNraFar").volume, count=calls.length;
+ assert.ok(calls.some(c=>c.cue==="rifleNraFar")&&calls.some(c=>c.cue==="rifleIjaFar"),"both lines answer each other");
+ assert.ok(calls.some(c=>/^(type92Far|type11Far|zb26Far)$/.test(c.cue)),"machine guns in the distant exchange");
+ assert.ok(calls.some(c=>c.cue==="amb.cannonFar"||c.cue==="launcherPop"),"distant guns or mortars");
+ const supportVolume=Math.max(...calls.filter(c=>c.cue==="rifleNraFar").map(c=>c.volume)), count=calls.length;
  for(let i=0;i<120;i++)sound.Update(.5,"South",true);
  const south=calls.slice(count);
- assert.ok(south.length>8&&south.find(c=>c.cue==="rifleNraFar").volume<supportVolume);
+ assert.ok(south.length>8&&south.every(c=>c.bus==="ambience")&&south.find(c=>c.cue==="rifleNraFar").volume<supportVolume,
+   "07+ keeps the legacy fixed-source front, quieter than 03");
  const frozen=sound.State();sound.Update(10,"Complete");
  assert.deepEqual(sound.State(),frozen);
  console.log("ok directional sustained front combat, quieter south and no train/end leakage");
