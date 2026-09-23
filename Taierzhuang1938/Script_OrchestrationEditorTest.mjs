@@ -844,6 +844,40 @@ try {
     ["handoff", "download", "copy", "image"].every((id) => tabs.exports.includes(id)),
     tabs.exports.join(" "));
 
+  const imageExport = await page.evaluate(() => {
+    const tool = window.Taierzhuang.editor.overlays.get("orchestration");
+    const original = {
+      lastImage: tool.lastImage,
+      full: tool.map.ToFullPng,
+      snapshot: tool.SnapshotImage,
+      download: tool.DownloadPng,
+    };
+    let fullCalls = 0;
+    let snapshotCalls = 0;
+    const received = [];
+    try {
+      // 即使上一条批注留着旧截图，也必须走新的整图合成；连点两次也要各合成一次。
+      tool.lastImage = { id: "old-note", name: "old-note.png", data: "data:image/png;base64,b2xk" };
+      tool.map.ToFullPng = () => `data:image/png;base64,${fullCalls += 1}`;
+      tool.SnapshotImage = () => { snapshotCalls += 1; return "data:image/png;base64,old"; };
+      tool.DownloadPng = (name, data) => { received.push({ name, data }); return name; };
+      tool.DownloadImage();
+      tool.DownloadImage();
+      return { fullCalls, snapshotCalls, received };
+    } finally {
+      tool.lastImage = original.lastImage;
+      tool.map.ToFullPng = original.full;
+      tool.SnapshotImage = original.snapshot;
+      tool.DownloadPng = original.download;
+    }
+  });
+  Check("下载本图每次即时合成整张底图，不复用批注截图",
+    imageExport.fullCalls === 2 && imageExport.snapshotCalls === 0
+    && imageExport.received.length === 2
+    && imageExport.received[0].data !== imageExport.received[1].data
+    && imageExport.received.every((entry) => /_phase12_full\.png$/.test(entry.name)),
+    `整图 ${imageExport.fullCalls} 次，视口快照 ${imageExport.snapshotCalls} 次，文件 ${imageExport.received.map((entry) => entry.name).join("、")}`);
+
   const dialog = await page.evaluate(() => {
     const tool = window.Taierzhuang.editor.overlays.get("orchestration");
     const doc = tool.win.document;

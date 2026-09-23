@@ -746,22 +746,55 @@ try {
   // -------------------------------------------------------------------------
   // 4) ToPng：PNG dataURL 且 > 10 KB
   // -------------------------------------------------------------------------
-  const png = await page.evaluate(() => {
+  const png = await page.evaluate(async () => {
     const map = window.__map;
     map.SetPhase(12);
     map.FitBounds();
     const full = map.ToPng({ scale: 1 });
     const region = map.ToPng({ scale: 1, region: { minX: 20, maxX: 120, minZ: -20, maxZ: 60 } });
-    return { full, region, fullLen: full.length, regionLen: region.length };
+    const exportFull = map.ToFullPng();
+    const size = await new Promise((resolve) => {
+      const image = new Image();
+      image.onload = () => resolve({ width: image.naturalWidth, height: image.naturalHeight });
+      image.onerror = () => resolve({ width: 0, height: 0 });
+      image.src = exportFull;
+    });
+    const bounds = map.model.bounds;
+    const expected = {
+      width: Math.round((bounds.maxX - bounds.minX) * 2) + 48,
+      height: Math.round((bounds.maxZ - bounds.minZ) * 2) + 48,
+    };
+    // 整图导出不许跟编辑器镜头走；但图层和当前草图必须实时进合成图。
+    map.ZoomTo({ x: 80, z: 40 }, 20);
+    const sameAfterViewChange = exportFull === map.ToFullPng();
+    map.SetLayers({ routes: false });
+    const changedAfterLayerToggle = exportFull !== map.ToFullPng();
+    map.SetLayers({ routes: true });
+    map.SetSketch([{ type: "circle", x: 80, z: 40, r: 12 }]);
+    const changedAfterMarker = exportFull !== map.ToFullPng();
+    map.SetSketch([]);
+    return {
+      full, region, exportFull, size, expected, sameAfterViewChange, changedAfterLayerToggle, changedAfterMarker,
+      fullLen: full.length, regionLen: region.length, exportLen: exportFull.length,
+    };
   });
   SavePng("topng_full.png", png.full);
   SavePng("topng_region.png", png.region);
+  SavePng("topng_export_full_bounds.png", png.exportFull);
   Check("ToPng 返回 PNG dataURL 且 > 10 KB",
     png.full.startsWith("data:image/png") && png.fullLen > 10 * 1024,
     `${(png.fullLen / 1024).toFixed(0)} KB（dataURL 长度）`);
   Check("ToPng 带 region 也出图",
     png.region.startsWith("data:image/png") && png.regionLen > 10 * 1024 && png.regionLen !== png.fullLen,
     `${(png.regionLen / 1024).toFixed(0)} KB`);
+  Check("ToFullPng 按完整底图 bounds 出图，不受编辑器缩放和平移影响",
+    png.exportFull.startsWith("data:image/png") && png.exportLen > 10 * 1024
+    && png.size.width === png.expected.width && png.size.height === png.expected.height
+    && png.sameAfterViewChange,
+    `${png.size.width}×${png.size.height}（预期 ${png.expected.width}×${png.expected.height}）`);
+  Check("ToFullPng 逐次读取当前勾选图层与标记",
+    png.changedAfterLayerToggle && png.changedAfterMarker,
+    `图层变化=${png.changedAfterLayerToggle}，标记变化=${png.changedAfterMarker}`);
 
   // -------------------------------------------------------------------------
   // 5) 工具：circle 拖出圆 → onSketch；move 拖成员 → onMove（且不改模型）

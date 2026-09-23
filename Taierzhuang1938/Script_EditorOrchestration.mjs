@@ -1741,8 +1741,8 @@ export class OrchestrationEditor {
       .title = "把待处理的批注整理成一段文字，贴给 agent 就能开工";
     Button(more, "下载 JSON", () => this.DownloadJson(), { noteAction: "download" }, "ghost");
     Button(more, "复制 JSON", () => this.CopyJson(), { noteAction: "copy" }, "ghost");
-    Button(more, "下载本图", () => this.DownloadImage(), { noteAction: "image" }, "ghost")
-      .title = "把现在这张俯视图存成 PNG";
+    const imageButton = Button(more, "下载本图", () => this.DownloadImage(), { noteAction: "image" }, "ghost");
+    imageButton.title = "导出完整底图，并叠加当前勾选的图层、筛选结果和标记信息";
     Object.assign(this.ui, { list, notesHint: hint });
   }
 
@@ -2816,12 +2816,18 @@ export class OrchestrationEditor {
   DownloadJson() { return this.Download(`notes_${LEVEL}.json`, new Blob([JSON.stringify(this.notes, null, 2)], { type: "application/json" })); }
 
   DownloadImage() {
-    if (!this.lastImage) {
-      const data = this.SnapshotImage();
-      if (!data) { this.SetStatus("这张俯视图出不了 PNG", true); return null; }
-      this.lastImage = { id: null, name: `orchestration_${LEVEL}.png`, data, stored: false };
+    // 批注快照属于某一条批注，还是用户当时正在看的局部；不能复用 `lastImage`。
+    // 下载动作每次都按完整底图重新合成，这样刚切换的图层、筛选和新画的标记也在图里。
+    let data = "";
+    try {
+      data = this.map?.ToFullPng?.({ pixelsPerMeter: 2 }) || "";
+    } finally {
+      // 离屏合成会临时重算图标尺寸、刻度与标签缓存；重画一次把交互画布的派生状态还原。
+      this.map?.Redraw?.();
     }
-    return this.DownloadPng(this.lastImage.name, this.lastImage.data);
+    if (!IsPngData(data)) { this.SetStatus("完整俯视图出不了 PNG", true); return null; }
+    const phase = String(this.phaseNumber || 1).padStart(2, "0");
+    return this.DownloadPng(`orchestration_${LEVEL}_phase${phase}_full.png`, data);
   }
 
   /** 某一条批注自己那张图（存在 IndexedDB 里的本地草稿图）。 */
