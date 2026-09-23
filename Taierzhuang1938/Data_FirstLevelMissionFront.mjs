@@ -293,8 +293,8 @@ const clusters=[
   [-13,-107,18,.45,5.5],[-24,-119,15,.45,5],
   // 2026-09-23 space rebuild: the held line is now the backslope scrape at the berm's south foot
   // (z -156), the lost east end is the right nest compound, and the 01 dead lie along the link sap.
-  // The observation step's foreground (z -130..-150) is left empty: it is our side of the line.
-  [-22,-155.5,18,.3,4],[-8.5,-147.5,15,.4,3.5],[7,-155.8,21,.5,4.5],[30.5,-151,18,.7,4],[-19.8,-133.8,9,.2,2.5],[22,-129.5,9,.6,2.5],
+  // The observation step's foreground (z -126..-150, bearing 0-80 deg from it) is left empty: it is our side of the line.
+  [-22,-155.5,18,.3,4],[-8.5,-147.5,15,.4,3.5],[7,-155.8,21,.5,4.5],[30.5,-151,18,.7,4],[-29.2,-116.5,6,.1,1.8],[22,-129.5,9,.6,2.5],
   // The killing ground north of the berm (moved 6 m north with it): assault waves that never reached it.
   [-36,-169,24,.85,6.5],[4,-176,27,.85,7],[43,-178,21,.8,5.5],[-14,-165,21,.9,5],[22,-167,21,.9,5],
   [-30,-182,18,.9,5.5],[10,-188,18,.9,5.5],[36,-184,15,.9,5],[-6,-196,15,.95,5],[26,-198,12,.95,4.5],

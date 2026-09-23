@@ -102,8 +102,9 @@ export const FRONT_SPACE=Object.freeze({
   gapJunction:Point(-8,-140.6),
   westDoor:Point(25.8,-150.5),
   rearDoor:Point(29.7,-145.6),
+  // Road end stops 1.6 m west of EastRoadTimber (62,-129): the timber is the cut-in pair's cover, not a plug.
   roadMouth:Point(46.5,-163.5),             // where the link sap meets the road (01 entry, 05 cut-in seen)
-  roadLink:[Point(62,-129),Point(55,-126.8),Point(48.5,-125.8),Point(44.6,-125.6)],
+  roadLink:[Point(60.2,-128.4),Point(55,-126.8),Point(48.5,-125.8),Point(44.6,-125.6)],
   southRoad:[Point(60,-177),Point(62,-162),Point(63,-140),Point(61,-120),Point(58,-100),Point(55,-84)],
   yard:Object.freeze({minX:38.8,maxX:54,minZ:-119,maxZ:-100}),
   // Around the berm's east end: the flank group's last line is on the SOUTH side of the end, where the
