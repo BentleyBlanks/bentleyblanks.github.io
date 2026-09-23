@@ -208,7 +208,7 @@ export const FRONT_GUARD_POSTS=[[-11,-156.3],[-5,-156.3],[-14.5,-156.4],[-1.5,-1
 // Gap: the sap is shallowed to 0.5 m for ~6 m (the one exposed crossing). Damaged lip: 0.8 m for
 // ~6 m (crouch, road view). Attack tail: the last 4 m of the attack branch are 0.75 m (the risk window).
 export const FRONT_BREACHES=[{x:-22,z:8,radius:4,depth:1.05},{...Sortie.gap,radius:3,depth:.5},
-  {...Sortie.damagedLip,radius:3,depth:.8},{x:42.8,z:-157,radius:2.4,depth:.75}];
+  {...Sortie.damagedLip,radius:3,depth:.8},{x:43.2,z:-158.4,radius:2.2,depth:.75}];
 // ---------------------------------------------------------------------------
 // 2026-09-23 proposal A: enemy layers that are not bounding riflemen (docs/Data_FirstLevelLayoutProposalA.md §5)
 // ---------------------------------------------------------------------------

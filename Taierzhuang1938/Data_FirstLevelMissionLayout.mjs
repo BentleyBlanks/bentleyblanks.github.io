@@ -171,8 +171,8 @@ function TopBlock(id,x,z,w,top,d,semantic="cover",extra={},ref=null){
 const nestRef=Sortie.nest;
 TopBlock("RightNestWestLow",24,-154.3,.7,1.25,5,"cover",{cover:Face(-1,0)},nestRef);
 TopBlock("RightNestWestHigh",24,-147.2,.7,2.5,3.2,"cover",{cover:Face(-1,0)},nestRef);
-TopBlock("RightNestNorthLow",27.5,-156.8,7,1.2,.7,"cover",{cover:Face(0,-1)},nestRef);
-TopBlock("RightNestNorthHigh",34,-156.8,6,2.3,.7,"cover",{cover:Face(0,-1)},nestRef);
+TopBlock("RightNestNorthLow",28.25,-156.8,8.5,1.2,.7,"cover",{cover:Face(0,-1)},nestRef);
+TopBlock("RightNestNorthHigh",34.75,-156.8,4.5,2.3,.7,"cover",{cover:Face(0,-1)},nestRef);
 TopBlock("RightNestEastGable",37,-151.2,.8,3.2,11.2,"plaster",{},nestRef);
 Block("RightNestGablePeak",37,-151.2,.8,2.2,5,"plaster",{y:SampleMissionTerrain(nestRef.x,nestRef.z)+3.2+1.1});
 TopBlock("RightNestRearWest",26.4,-145.6,4.8,3.2,.8,"structure",{},nestRef);
@@ -225,7 +225,8 @@ Block("OldYardDeadTreeTrunk",36.0,-122.8,.42,5.6,.42,"timber");
 Detail("OldYardDeadTreeBranchA",36.5,-122.6,1.8,.18,.2,"timber",{y:SampleMissionTerrain(36,-122.8)+4.4,ry:.5});
 Detail("OldYardDeadTreeBranchB",35.5,-123.1,1.4,.16,.18,"timber",{y:SampleMissionTerrain(36,-122.8)+3.7,ry:-.7});
 // Attack position: broken road-side wall between the throw spot and the stopped tank (throw cover).
-TopBlock("RoadsideRuin",42.4,-161.2,3.4,1.3,.7,"cover",{ry:.616,cover:Face(-.578,-.816)});
+// Top ~0.7 m above ground level: covers a man crouched at the throw spot (floor 0.75 m down), a man standing there sees the tank's side over it.
+TopBlock("RoadsideRuin",42.33,-161.4,3.4,1.62,.7,"cover",{ry:.616,cover:Face(-.578,-.816)},Sortie.throw);
 // Fire base walls on the rising ground (in the cover columns, clear of the bounding corridors).
 for(const [id,x,w,h] of [["FireBaseRuinW",-24,7,1.4],["FireBaseRuinC",10,5,1.4],["FireBaseCraterCW",-9.8,3.5,1.1],["FireBaseRuinE",23,5,1.35]])
   TopBlock(id,x,-192.6,w,h,.7,"cover",{cover:Face(0,1)},{x,z:-193.8});
