@@ -45,7 +45,7 @@ import { FIRST_LEVEL_MUSIC_CUES, FIRST_LEVEL_MUSIC_MIX } from "./Data_FirstLevel
 import { HIT_DISORIENTATION } from "./Data_Tuning_Player.mjs";
 import { GUN_AUDIBILITY } from "./Data_Tuning_Audio.mjs";
 import { CARRIAGE_SOUND } from "./Data_FirstLevelCarriageSound.mjs";
-import { AUDIO_MIX_DEFAULTS, STORY_SPEECH } from "./Data_Tuning_Audio.mjs";
+import { AUDIO_MIX_DEFAULTS, STORY_SPEECH, TINNITUS } from "./Data_Tuning_Audio.mjs";
 import { BuildSpeechEnvelope } from "./Script_SpeechEnvelope.mjs";
 
 // 包络地板。低于这个值当作静音（见文件头坑 2）。
@@ -120,14 +120,20 @@ const OCCLUSION_REFRESH_S = 0.25;
  */
 const ZONE_BOUNDARY_OCC = 0.35;
 
-/** 四档空间。名字同时是 zone 探针的返回值域与 this.reverbs 的键。 */
-const REVERB_SPACES = ["interior", "courtyard", "street", "open"];
+/**
+ * 空间档。名字同时是 zone 探针的返回值域与 this.reverbs 的键。
+ * 【2026-09-23】加两档：`trench`（两侧土壁夹着的交通壕）与 `dugout`（低矮防炮洞）。
+ * 壕沟是高度场挖出来的，没有碰撞盒，原来一律落到 open（2.6 s 旷野尾巴）。
+ */
+const REVERB_SPACES = ["interior", "courtyard", "street", "open", "trench", "dugout"];
+/** 算作「被围起来」的空间：听者与声源分处两侧时叠 ZONE_BOUNDARY_OCC（见 ZoneBoundary）。 */
+const ENCLOSED_SPACES = new Set(["interior", "dugout"]);
 /**
  * 各档混响的回声总线增益。
  * 室内给得最高：小房间里混响占比本来就大（墙近、吸声面积小）。
  * street / open 两条**保持 2026-08-20 的原值**，不借这一轮顺手改平衡。
  */
-const REVERB_RETURN = { interior: 0.9, courtyard: 0.86, street: 0.85, open: 0.7 };
+const REVERB_RETURN = { interior: 0.9, courtyard: 0.86, street: 0.85, open: 0.7, trench: 0.88, dugout: 0.92 };
 /** 听者所在区的缓存寿命。zone 探针比射线便宜，但每条声音查一次仍然是白花。 */
 const ZONE_CACHE_S = 0.2;
 
@@ -315,7 +321,9 @@ const PEAK_LIMITER = { threshold: -1, knee: 12, ratio: 20, attack: 0.004, releas
  * courtyard 与 street 共用一条 —— 院墙与街墙是同一种反射面，
  * 分四套素材只会让素材量翻倍而听不出差别。
  */
-const GUN_TAIL_ZONE = { interior: "Interior", courtyard: "Street", street: "Street", open: "Open" };
+const GUN_TAIL_ZONE = { interior: "Interior", courtyard: "Street", street: "Street", open: "Open",
+  // 【2026-09-23】沟里的枪尾走街巷那条（两侧近墙、尾巴短而硬），洞里走室内那条。
+  trench: "Street", dugout: "Interior" };
 const GUN_TAIL_CLASS = { rifle: "Rifle", mg: "Mg" };
 /** 尾巴相对本体的电平。它是垫在本体后面的一层，站到本体前面就成了另一把枪。 */
 const GUN_TAIL_GAIN = 0.55;
@@ -387,7 +395,7 @@ function FillBrown(data, rng) {
 }
 
 // ---------------------------------------------------------------------------
-// 卷积混响的脉冲响应，现场算。**四档**，按声源所在的区选（见 AudioEngine.SourceZone）。
+// 卷积混响的脉冲响应，现场算。**六档**（2026-09-23 加 trench / dugout），按声源所在的区选（见 AudioEngine.SourceZone）。
 //
 // interior（屋里）：0.5 s。反射极密（墙就在两三米外）、高频掉得极快 ——
 //   土墙、泥顶、席子、麦秸，鲁南的民房几乎没有硬反射面。
@@ -411,6 +419,16 @@ const IMPULSE_KINDS = {
   street: { seconds: 0.95, density: 1.0, decay: 7.5, damp: 1,
     taps: [0.006, 0.011, 0.017, 0.023, 0.031, 0.038], tapLevel: 0.85, tapFall: 0.11 },
   open: { seconds: 2.60, density: 0.22, decay: 2.2, damp: 1, taps: null },
+  // 【2026-09-23】交通壕：两壁相距三米多、夯土，枪声在两壁之间来回拍 ——
+  //   早期反射**密而硬**（前 30 ms 里八记，隔约 3.4 m 往返 = 20 ms 的颤动），
+  //   尾巴短（0.42 s）、只轻微吃高频（土壁比砖墙软，比室内的席子硬）。
+  //   这一档与 open 的区别就是「尾巴短而硬」。
+  trench: { seconds: 0.42, density: 1.0, decay: 10.5, damp: 0.62,
+    taps: [0.004, 0.007, 0.010, 0.013, 0.017, 0.020, 0.024, 0.029], tapLevel: 0.95, tapFall: 0.1 },
+  // 防炮洞：一人多高的土洞，顶上是圆木和覆土。几乎没有尾巴，反射贴着耳朵，
+  //   高频被土整个吃掉 —— 剩下的是闷、近、低频堆着（damp 0.12 ≈ 1 kHz 的一阶低通）。
+  dugout: { seconds: 0.30, density: 1.0, decay: 13.0, damp: 0.12,
+    taps: [0.002, 0.004, 0.006, 0.009, 0.012], tapLevel: 1.0, tapFall: 0.15 },
 };
 
 function BuildImpulse(ctx, kind, seed) {
@@ -2710,7 +2728,7 @@ export const MUSIC_BASE = "Audio/Music/";
 // 2026-09-13：汉阳造 01 专用连续枪响＋枪机实录进入清单。
 // 2026-09-15：那一条拆成枪声 rifleHanYang（同文件名、内容变了）与枪机 boltHanYang。
 // 2026-09-17：大刀挥空从三条换成一条（AudioSfx_DadaoSwing_01 同文件名、内容变了）。
-export const SFX_PACK_VERSION = "20260917dadaoswingone";
+export const SFX_PACK_VERSION = "20260923japanesegunvariants";
 export const AMB_PACK_VERSION = "20260912trainonly";
 export const MUSIC_PACK_VERSION = "5";
 
@@ -3165,6 +3183,27 @@ export const AMBIENCE_PRESETS = {
       { name: "amb.dogFar", perMin: 0.8, volume: 0.26 },
     ],
   },
+  // 【2026-09-23】第一关 01–02 的防炮洞（前沿交通壕侧壁上的低矮洞室）。
+  // 原来 01–02 用的是关卡默认的 smokyDay：开阔冷风 + 乌鸦 + 飞机 —— 人埋在土洞里，
+  // 听到的却是站在城墙上的空气。这一档全部「隔着土」：
+  //   · 床只留低频（cut）：连绵的炮声是从地里传过来的闷雷，远处交火只剩一层嗡；
+  //   · 撒播是洞里自己的动静：顶上掉土、圆木吱呀、远炮的闷响；
+  //   · 枪声不撒 —— 远处那条交火由 Data_FirstLevelMissionBattleSound 按世界坐标
+  //     放（有方位、会被洞口挡），这里再撒一套就是两层。
+  // 听者在不在洞里由 FirstLevelMissionBattleSound 按 zone 探针切（洞里 ↔ firstLevelFront，交叉淡）。
+  firstLevelDugout: {
+    space: "dugout", fallbackWind: 0.03, fallbackCut: 220,
+    layers: [
+      { bed: "shellingFar", gain: 0.34, seg: 9, battle: true, cut: 360 },
+      { bed: "battleFar", gain: 0.2, seg: 11, battle: true, cut: 480 },
+      { bed: "windPlain", gain: 0.08, seg: 13, cut: 260 },
+    ],
+    events: [
+      { name: "amb.debris", perMin: 2.4, volume: 0.2, airCut: 2400 },
+      { name: "amb.creak", perMin: 1.3, volume: 0.18, airCut: 1600 },
+      { name: "amb.cannonFar", perMin: 2.6, volume: 0.5, airCut: 260, battle: true },
+    ],
+  },
 
   // 序章｜出川：车厢静止，窗外布景由过场时间轴移动。制动不是第二套环境系统，
   // 而是同一床上的明确事件 cue；新版 102 秒序章在 0:40—0:56 触发 trainBrake 一次。
@@ -3421,16 +3460,36 @@ class LoopLayer {
     this.battle = !!cfg.battle;
     this.group = null;
     this.levelScale = 1;
+    /**
+     * 【2026-09-23】这一层自己的低通（Hz，0 = 不滤）。防炮洞那一档要的是「隔着土」的床：
+     * 同一条 battleFar 在洞里只剩闷响，不另烘一套素材。只在给了 cut 的层上多一个节点。
+     */
+    this.cut = cfg.cut || 0;
+    this.filter = null;
   }
 
-  Start() {
+  /** @param {number} [fadeInS] 组增益从零淡进来的秒数（环境换档时的交叉，0 = 直接到位）。 */
+  Start(fadeInS = 0) {
     const ctx = this.engine.ctx;
     if (!ctx) return;
     // 组增益：一层一个常驻节点，所有播放头都接它。SetLevel 只动这一个。
     this.group = ctx.createGain();
     this.group.gain.value = Math.max(FLOOR, this.levelScale);
-    this.group.connect(this.engine.Bus(this.busName));
-    this.engine.liveNodes += 1;
+    if (fadeInS > 0) {
+      this.group.gain.setValueAtTime(FLOOR, ctx.currentTime);
+      this.group.gain.linearRampToValueAtTime(Math.max(FLOOR, this.levelScale), ctx.currentTime + fadeInS);
+    }
+    if (this.cut > 0) {
+      this.filter = ctx.createBiquadFilter();
+      this.filter.type = "lowpass";
+      this.filter.frequency.value = Clamp(this.cut, 80, 20000);
+      this.filter.Q.value = 0.7;
+      this.group.connect(this.filter).connect(this.engine.Bus(this.busName));
+      this.engine.liveNodes += 2;
+    } else {
+      this.group.connect(this.engine.Bus(this.busName));
+      this.engine.liveNodes += 1;
+    }
     this.nextAt = ctx.currentTime + 0.05;
     this.Spawn(true);
   }
@@ -3519,7 +3578,9 @@ class LoopLayer {
       if (!this.group) return;
       try { this.group.disconnect(); } catch (err) { /* ok */ }
       this.group = null;
-      this.engine.liveNodes = Math.max(0, this.engine.liveNodes - 1);
+      let freed = 1;
+      if (this.filter) { try { this.filter.disconnect(); } catch (err) { /* ok */ } this.filter = null; freed += 1; }
+      this.engine.liveNodes = Math.max(0, this.engine.liveNodes - freed);
     };
     if (fade > 0 && ctx) this.engine.Later(fade * 1000 + 200, DropGroup);
     else DropGroup();
@@ -3827,7 +3888,7 @@ export class AudioEngine {
    *        还没建好、查询抛了）—— 引擎会沿用上一次的缓存值，而不是当成通透。
    *        实现侧要自己保证便宜：引擎每帧最多问 OCCLUSION_RAYS_PER_FRAME 次，
    *        但同一格里的声源共用一次结果，所以真实频率还要低一档。
-   * @param {function} probes.zone (position) → "interior" | "courtyard" | "street" | "open"
+   * @param {function} probes.zone (position) → "interior" | "courtyard" | "street" | "open" | "trench" | "dugout"
    *        返回值不在这四个里就按当前全局档（this.space）处理，不报错。
    *        这条探针同时被用来判听者自己在哪儿（每 ZONE_CACHE_S 问一次）。
    *
@@ -4505,6 +4566,7 @@ export class AudioEngine {
     const speechChanged = voice.storySpeakerSpeaking !== speaking;
     voice.storySpeakerSpeaking = speaking;
     if (speechChanged && this.concussionAmount != null) this.SetConcussion(this.concussionAmount, this.concussionLowHz);
+    if (speechChanged) this.RefreshDeafFloor();
     if (centred) {
       voice.wetGain.gain.setTargetAtTime(0, t, tau);
       voice.distance = 0;
@@ -4523,6 +4585,7 @@ export class AudioEngine {
     this.storyVoice = null;
     this.storyVoiceKey = null;
     if(this.concussionAmount!=null)this.SetConcussion(this.concussionAmount,this.concussionLowHz);
+    this.RefreshDeafFloor();
     return stopped;
   }
 
@@ -4793,7 +4856,8 @@ export class AudioEngine {
   ZoneBoundary(sourceZone) {
     const lz = this.ListenerZone();
     if (!lz) return false;
-    return (lz === "interior") !== (sourceZone === "interior");
+    // 【2026-09-23】防炮洞与屋里一样是「被围起来」的：洞里听沟外那一枪同样隔着土与洞口。
+    return ENCLOSED_SPACES.has(lz) !== ENCLOSED_SPACES.has(sourceZone);
   }
 
   /**
@@ -5236,7 +5300,7 @@ export class AudioEngine {
   FreeVoice(v) {
     this.pendingVoices.delete(v);
     if(v===this.storyVoice){this.storyVoice=null;this.storyVoiceKey=null;this.storyDuck?.gain.setTargetAtTime(1,this.ctx.currentTime,.25);
-      if(this.concussionAmount!=null)this.SetConcussion(this.concussionAmount,this.concussionLowHz);}
+      if(this.concussionAmount!=null)this.SetConcussion(this.concussionAmount,this.concussionLowHz);this.RefreshDeafFloor();}
     this.activeVoices.delete(v);
     for (let i = 0; i < v.nodes.length; i += 1) {
       try { v.nodes[i].disconnect(); } catch (err) { /* 已断开 */ }
@@ -5411,41 +5475,201 @@ export class AudioEngine {
     this.concussionFilter.frequency.setValueAtTime(Math.max(cutoff,floor),this.ctx.currentTime);
   }
 
+  /**
+   * 【2026-09-23 重做】耳鸣 = 总线低通「先失后回」+ 双音拍频 + 窄带噪声。
+   * 数全在 Data_Tuning_Audio.TINNITUS：`seconds` ≥ storyFromS 走剧情炮震那一档
+   * （01 近爆、02 枪托，长尾恢复），其余走战斗近爆那一档（一两秒回来）。
+   *
+   * 旧版是一条 4 kHz 正弦 1.4 s 衰减完，外界 0.9 s 一口气恢复 —— 像测试音，
+   * 也不像「耳朵慢慢回来」。现在：
+   *   · 低通分段往回爬（recover 表）：低频先回，高频最后回；
+   *   · 两条差几赫兹的音一左一右，互相拍出起伏，音高随时间略往下沉；
+   *   · 底下一层 4 kHz 上下的窄带嘶声，比音先退。
+   * 起音期（holdS）照旧：触发它的那一声先完整过去，耳鸣是「之后」的事。
+   *
+   * 【2026-09-24 审查后改】
+   *   · **只在 01–06 生效**：任务侧开关 `firstLevelSoundscape` 关着（07 以后、其它关卡）时
+   *     走 DeafenLegacy —— 一字不差的旧实现（TINNITUS.legacy）。
+   *   · 剧情台词正在说时，低通不低于 TINNITUS.speechFloorHz（与 SetConcussion 的对白保底同一条线）；
+   *     台词开始/停下由 RefreshDeafFloor 把剩下的曲线重排一遍。
+   *   · 新一次耳鸣顶掉上一次时，旧的淡出 replaceFadeS 后**立刻停掉并归还节点**（原来只淡出，
+   *     节点要等它自己那条 ReleaseVoice 到期，连续近爆时一直占着预算）；预算先把要归还的算进去再判，
+   *     判不过就保留旧的鸣响、只做闷响（原来是先收旧的再判，预算紧时一点耳鸣都没有）。
+   */
   Deafen(seconds = 0.4, holdS = DEAFEN_ATTACK_HOLD_S) {
     if (!this.ctx) return;
+    if (!this.firstLevelSoundscape) { this.DeafenLegacy(seconds, holdS); return; }
     const ctx = this.ctx;
     const t = ctx.currentTime;
+    const P = seconds >= TINNITUS.storyFromS ? TINNITUS.story : TINNITUS.combat;
+    const f = this.deafFilter.frequency;
+    // 曲线：[时刻, Hz, 到这一点的方式]。起音期原样放过（触发这次耳鸣的那一声先完整过去），再关门。
+    const v0 = Math.max(f.value, 200);
+    const recoverAt = t + holdS + seconds;
+    const points = [[t, v0, "set"], [t + holdS, v0, "set"], [t + holdS + 0.05, P.lowHz, "exp"], [recoverAt, P.lowHz, "set"]];
+    for (const [dt, hz] of P.recover) if (dt > 0) points.push([recoverAt + dt, hz, "exp"]);
+    this.deafCurve = { points };
+    this.ScheduleDeafCurve(true);
+    const back = P.recover[P.recover.length - 1][0];
+    this.tinnitusState = { at: t, profile: P === TINNITUS.story ? "story" : "combat", clearAt: recoverAt + back };
+
+    const cost = TINNITUS.nodes;
+    const old = this.tinnitus;
+    const returning = old?.nodes?.length || 0;
+    if (this.liveNodes - returning + cost > this.nodeBudget) return;   // 预算紧就只做闷响（旧的鸣响留着）
+    this.StopTinnitus(TINNITUS.replaceFadeS);
+    const total = holdS + seconds + P.ringS;
+    const on = t + holdS;
+    const own = [];
+    const Own = (n) => { own.push(n); return n; };
+    // 两条音：一左一右、差 beatHz，一起随时间往下沉一点（耳鸣的音高会「落定」）。
+    const tone = Own(ctx.createGain());
+    tone.gain.setValueAtTime(FLOOR, t);
+    tone.gain.setValueAtTime(FLOOR, on);
+    tone.gain.linearRampToValueAtTime(P.toneLevel, on + 0.02);
+    tone.gain.setValueAtTime(P.toneLevel, on + seconds * 0.6);
+    tone.gain.exponentialRampToValueAtTime(FLOOR, t + total);
+    tone.connect(this.outGain);
+    for (const [hz, side] of [[P.toneHz, -0.45], [P.toneHz + P.beatHz, 0.45]]) {
+      const osc = Own(ctx.createOscillator());
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(hz, t);
+      osc.frequency.linearRampToValueAtTime(hz + P.toneDriftHz, t + total);
+      if (ctx.createStereoPanner) {
+        const pan = Own(ctx.createStereoPanner());
+        pan.pan.value = side;
+        osc.connect(pan).connect(tone);
+      } else osc.connect(tone);
+      osc.start(t);
+      osc.stop(t + total + 0.05);
+    }
+    // 窄带嘶声：比音先退（0.6 × total）。
+    const noise = Own(ctx.createBufferSource());
+    noise.buffer = this.NoiseBuffer("white");
+    noise.loop = true;
+    const band = Own(ctx.createBiquadFilter());
+    band.type = "bandpass";
+    band.frequency.value = P.noiseHz;
+    band.Q.value = P.noiseQ;
+    const hiss = Own(ctx.createGain());
+    hiss.gain.setValueAtTime(FLOOR, t);
+    hiss.gain.setValueAtTime(FLOOR, on);
+    hiss.gain.linearRampToValueAtTime(P.noiseLevel, on + 0.03);
+    hiss.gain.exponentialRampToValueAtTime(FLOOR, on + (total - holdS) * 0.6);
+    noise.connect(band).connect(hiss).connect(this.outGain);
+    noise.start(t);
+    noise.stop(t + total + 0.05);
+    // 接在耳鸣低通**之后**（outGain）—— 接在前面的话它自己也被压掉，就没有「脑子里那声」了。
+    this.liveNodes += own.length;
+    const handle = { nodes: own, tone, hiss };
+    this.tinnitus = handle;
+    // 借 voice 的账本回收：这样 Dispose 里的 pendingVoices 也能把它拆掉，
+    // 否则爆炸声正响着退出关卡，这些节点就永远挂在总线上了。
+    this.ReleaseVoice(handle, total + 0.1);
+  }
+
+  /** f581ac7dd 之前的耳鸣（07 以后、其它关卡）：数在 TINNITUS.legacy，行为一字不差。 */
+  DeafenLegacy(seconds, holdS) {
+    const ctx = this.ctx;
+    const t = ctx.currentTime;
+    const L = TINNITUS.legacy;
+    this.deafCurve = null;
     const f = this.deafFilter.frequency;
     f.cancelScheduledValues(t);
     f.setValueAtTime(Math.max(f.value, 200), t);
-    // 【2026-09-09】起音期：原来 30 ms 就压到 520 Hz，于是**触发这次耳鸣的那一声
-    // 自己**的高频先被吃掉了 —— 爆炸听着像隔壁的闷响，而耳鸣是「之后」的事。
-    // 先原样放过起音的那 0.13 s（一发炮弹的爆裂全在这一段里），再关门。
     f.setValueAtTime(Math.max(f.value, 200), t + holdS);
-    f.exponentialRampToValueAtTime(520, t + holdS + 0.05);
-    f.setValueAtTime(520, t + holdS + seconds);
-    f.exponentialRampToValueAtTime(20000, t + holdS + seconds + 0.9);
+    f.exponentialRampToValueAtTime(L.lowHz, t + holdS + 0.05);
+    f.setValueAtTime(L.lowHz, t + holdS + seconds);
+    f.exponentialRampToValueAtTime(20000, t + holdS + seconds + L.recoverS);
+    this.tinnitusState = { at: t, profile: "legacy", clearAt: t + holdS + seconds + L.recoverS };
 
-    if (this.liveNodes + 4 > this.nodeBudget) return;   // 预算紧就只做闷响
+    if (this.liveNodes + L.budgetNodes > this.nodeBudget) return;   // 预算紧就只做闷响
     const osc = ctx.createOscillator();
     osc.type = "sine";
-    osc.frequency.value = 4000;
+    osc.frequency.value = L.toneHz;
     const g = ctx.createGain();
-    const total = holdS + seconds + 1.4;
-    // 脑子里那声也等起音期过去再进来：它 0.055 的电平（−25 dB）本来就在
-    // 爆炸的量级上，压在爆裂那一瞬间等于给自己加了一层遮罩。
+    const total = holdS + seconds + L.ringS;
     g.gain.setValueAtTime(FLOOR, t);
     g.gain.setValueAtTime(FLOOR, t + holdS);
-    g.gain.linearRampToValueAtTime(0.055, t + holdS + 0.02);
+    g.gain.linearRampToValueAtTime(L.toneLevel, t + holdS + 0.02);
     g.gain.exponentialRampToValueAtTime(FLOOR, t + total);
-    // 接在耳鸣低通**之后** —— 接在前面的话它自己也被压掉，就没有「脑子里那声」了。
     osc.connect(g).connect(this.outGain);
     osc.start(t);
     osc.stop(t + total + 0.05);
     this.liveNodes += 2;
-    // 借 voice 的账本回收：这样 Dispose 里的 pendingVoices 也能把它拆掉，
-    // 否则爆炸声正响着退出关卡，这两个节点就永远挂在总线上了。
     this.ReleaseVoice({ nodes: [osc, g] }, total);
+  }
+
+  /** 耳鸣低通曲线在 time 时刻该在的值（set 段保持、exp 段指数插值）。 */
+  DeafCurveAt(time) {
+    const pts = this.deafCurve?.points;
+    if (!pts?.length) return 20000;
+    if (time <= pts[0][0]) return pts[0][1];
+    for (let i = 1; i < pts.length; i += 1) {
+      const [t1, v1, how] = pts[i], [t0, v0] = pts[i - 1];
+      if (time >= t1) continue;
+      if (how === "set" || t1 <= t0) return v0;
+      return v0 * Math.pow(v1 / v0, (time - t0) / (t1 - t0));
+    }
+    return pts[pts.length - 1][1];
+  }
+
+  /**
+   * 把耳鸣低通曲线（剩下的部分）排进 AudioParam，剧情台词正在说时抬到 speechFloorHz 以上。
+   * fresh = Deafen 刚排的整条；否则是台词开始/停下时从「现在」接着排（先用 speechFloorRampS 挪过去）。
+   */
+  ScheduleDeafCurve(fresh = false) {
+    const c = this.deafCurve;
+    if (!c || !this.ctx) return;
+    const t = this.ctx.currentTime;
+    const pts = c.points;
+    const f = this.deafFilter.frequency;
+    const floor = this.storyVoice?.storySpeakerSpeaking ? TINNITUS.speechFloorHz : 0;
+    const Hz = (v) => Math.max(v, floor);
+    f.cancelScheduledValues(t);
+    if (!fresh && t >= pts[pts.length - 1][0]) {
+      f.setValueAtTime(pts[pts.length - 1][1], t);
+      this.deafCurve = null;
+      return;
+    }
+    let from = t;
+    if (fresh) {
+      f.setValueAtTime(Hz(pts[0][1]), t);
+    } else {
+      const snap = t + TINNITUS.speechFloorRampS;
+      f.setValueAtTime(Math.max(20, f.value), t);
+      f.exponentialRampToValueAtTime(Hz(this.DeafCurveAt(snap)), snap);
+      from = snap;
+    }
+    for (const [at, hz, how] of pts) {
+      if (at <= from) continue;
+      if (how === "set") f.setValueAtTime(Hz(hz), at);
+      else f.exponentialRampToValueAtTime(Hz(hz), at);
+    }
+  }
+
+  /** 剧情台词开始/停下（说话状态变了）：耳鸣还在恢复就按新的保底重排剩下的曲线。 */
+  RefreshDeafFloor() {
+    if (this.deafCurve) this.ScheduleDeafCurve(false);
+  }
+
+  /**
+   * 收掉正在响的耳鸣（新一次进来、或换关）：淡出 fade 秒后停掉振荡/噪声并立刻归还节点
+   *（StopVoice → FreeVoice；那条 ReleaseVoice 到期时再释放一次是空操作）。
+   */
+  StopTinnitus(fade = TINNITUS.replaceFadeS) {
+    const h = this.tinnitus;
+    this.tinnitus = null;
+    if (!h || !this.ctx) return;
+    const t = this.ctx.currentTime;
+    for (const g of [h.tone, h.hiss]) {
+      try {
+        g.gain.cancelScheduledValues(t);
+        g.gain.setValueAtTime(Math.max(FLOOR, g.gain.value), t);
+        g.gain.linearRampToValueAtTime(FLOOR, t + Math.max(0.01, fade));
+      } catch (err) { /* 已经拆了 */ }
+    }
+    this.Later(Math.max(0.01, fade) * 1000, () => this.StopVoice(h, 0));
   }
 
   // --- 环境床 -------------------------------------------------------------
@@ -5459,7 +5683,14 @@ export class AudioEngine {
    * 采样载不到时退回一条合成的风（Fallback）—— 有底噪总比死寂强，
    * 但**不再合成虫和鸟**：那两样一听就是振荡器，而且三月的鲁南本来也没有虫。
    */
-  Ambience(preset) {
+  /**
+   * @param {string} preset
+   * @param {object} [opts]
+   * @param {number} [opts.fadeS] 【2026-09-23】换档交叉（秒）：旧床淡出、新床淡入。
+   *   不给就是原来的硬切 —— 换关与暂停恢复仍走硬切；钻进/爬出防炮洞这类
+   *   「人在走、空间在变」的换档要给，否则整片床在一帧里换掉。
+   */
+  Ambience(preset, { fadeS = 0 } = {}) {
     // 名字打错时退到 silence，但**要吭一声**：环境的失败是静默的，
     // 一关从头到尾没有环境音，冒烟测试照样全绿。
     if (preset && !AMBIENCE_PRESETS[preset]) console.warn("没有这一档环境：", preset);
@@ -5467,7 +5698,7 @@ export class AudioEngine {
     if(name!==this.ambiencePreset)this.ambienceLayerLevels.clear();
     this.ambiencePreset = name;
     if (!this.ctx) return;
-    this.StopAmbience();
+    this.StopAmbience(fadeS);
     const cfg = AMBIENCE_PRESETS[name];
     this.space = cfg.space || "street";
     if (name === "silence") return;
@@ -5482,7 +5713,7 @@ export class AudioEngine {
       // 否则新起的战斗床会先满音量响一下再被斜坡拉回去。
       if (inst.battle) inst.levelScale = this.battleBedApplied;
       if(this.ambienceLayerLevels.has(layer.bed))inst.levelScale=this.ambienceLayerLevels.get(layer.bed);
-      inst.Start();
+      inst.Start(fadeS);
       this.ambLayers.push(inst);
     }
     // 一条床都没有（整包没载到 / 还在下载）时才合成兜底。
@@ -5563,9 +5794,9 @@ export class AudioEngine {
     for(const layer of this.ambLayers)if(layer.bed===bed)layer.SetLevel(level,rampS);
   }
 
-  StopAmbience() {
+  StopAmbience(fadeS = 0) {
     if (this.ambienceTimer) { clearTimeout(this.ambienceTimer); this.timers.delete(this.ambienceTimer); this.ambienceTimer = 0; }
-    for (const layer of this.ambLayers) layer.Stop();
+    for (const layer of this.ambLayers) layer.Stop(fadeS);
     this.ambLayers.length = 0;
     for (const n of this.ambienceNodes) {
       try { if (n.stop) n.stop(); } catch (err) { /* 没 start 过 */ }

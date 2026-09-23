@@ -913,14 +913,72 @@ else if (!(chain.bus.ratio <= 2 && chain.bus.rel >= 0.5)) {
   Fail(`母线那只不「慢」了：ratio ${chain.bus.ratio} / release ${chain.bus.rel}（慢压缩要 ratio ≤ 2、release ≥ 0.5）`);
 } else if (!(chain.peak.ratio >= 12 && chain.peak.atk <= 0.006)) {
   Fail(`末端那只不「快」了：ratio ${chain.peak.ratio} / attack ${chain.peak.atk}`);
-} else if (chain.reverbs.join(",") !== "courtyard,interior,open,street") {
-  Fail(`混响不是四档：${chain.reverbs.join(" ")}`);
+} else if (chain.reverbs.join(",") !== "courtyard,dugout,interior,open,street,trench") {
+  // 【2026-09-23】四档 → 六档：交通壕（trench）与防炮洞（dugout）。
+  Fail(`混响不是六档：${chain.reverbs.join(" ")}`);
 } else if (!(chain.irSeconds.interior < chain.irSeconds.courtyard
     && chain.irSeconds.courtyard < chain.irSeconds.street
-    && chain.irSeconds.street < chain.irSeconds.open)) {
-  Fail(`四档 IR 的时长排序不对：${JSON.stringify(chain.irSeconds)}`);
+    && chain.irSeconds.street < chain.irSeconds.open
+    // 沟与洞都是「短」：洞最短（闷、近），沟 0.3–0.5 s（密集短反射），都比院子短。
+    && chain.irSeconds.dugout < chain.irSeconds.trench
+    && chain.irSeconds.trench >= 0.3 && chain.irSeconds.trench <= 0.5
+    && chain.irSeconds.trench < chain.irSeconds.courtyard)) {
+  Fail(`六档 IR 的时长排序不对：${JSON.stringify(chain.irSeconds)}`);
 } else Ok(`两级动态在位（母线 ${chain.bus.thr}/${chain.bus.ratio}:1/${chain.bus.rel}s ×${chain.makeup}，`
-  + `末端 ${chain.peak.thr}/${chain.peak.ratio}:1）；四档 IR ${JSON.stringify(chain.irSeconds)}`);
+  + `末端 ${chain.peak.thr}/${chain.peak.ratio}:1）；六档 IR ${JSON.stringify(chain.irSeconds)}`);
+
+// 耳鸣（2026-09-24 审查后）：任务侧开关关着（07 以后、其它关卡）走旧的单正弦 2 节点；
+// 开着（01–06）走双音拍频 8 节点；连续近爆时旧的鸣响立刻停掉归还节点、不攒；
+// 剧情台词正在说时低通不低于对白保底，台词一停曲线接着往回走。
+const deaf = await page.evaluate(async () => {
+  const a = window.Taierzhuang.audio;
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const saved = a.firstLevelSoundscape;
+  const Tinnitus = () => [...a.pendingVoices].filter((v) => v.tone && v.hiss && v.nodes.length > 0);
+  const New = (before) => [...a.pendingVoices].filter((v) => !before.has(v));
+  a.firstLevelSoundscape = false;
+  let before = new Set(a.pendingVoices);
+  a.Deafen(0.45);
+  const legacy = New(before).map((v) => v.nodes.length);
+  const legacyProfile = a.tinnitusState?.profile;
+  a.firstLevelSoundscape = true;
+  before = new Set(a.pendingVoices);
+  a.Deafen(0.45);
+  const combat = New(before).map((v) => v.nodes.length);
+  const combatProfile = a.tinnitusState?.profile;
+  for (let i = 0; i < 5; i += 1) { a.Deafen(0.45); await sleep(40); }
+  await sleep(250);
+  const ringing = Tinnitus().length;
+  // 台词说着：剧情档耳鸣的低通停在保底以上；台词停下，回到恢复曲线（此时仍在 380–700 Hz 那一段）。
+  const fakeLine = { storySpeakerSpeaking: true };
+  const prevStory = a.storyVoice;
+  a.storyVoice = fakeLine;
+  a.Deafen(1.1);
+  await sleep(900);
+  const speaking = a.deafFilter.frequency.value;
+  fakeLine.storySpeakerSpeaking = false;
+  a.RefreshDeafFloor();
+  await sleep(350);
+  const silent = a.deafFilter.frequency.value;
+  a.storyVoice = prevStory;
+  a.StopTinnitus(0.01);
+  a.deafCurve = null;
+  a.deafFilter.frequency.cancelScheduledValues(a.ctx.currentTime);
+  a.deafFilter.frequency.setValueAtTime(20000, a.ctx.currentTime);
+  a.firstLevelSoundscape = saved;
+  await sleep(100);
+  return { legacy, legacyProfile, combat, combatProfile, ringing, speaking: Math.round(speaking), silent: Math.round(silent) };
+});
+if (deaf.legacyProfile !== "legacy" || deaf.legacy.join(",") !== "2") {
+  Fail(`开关关着的耳鸣不是旧的单正弦：${JSON.stringify(deaf)}`);
+} else if (deaf.combatProfile !== "combat" || deaf.combat.join(",") !== "8") {
+  Fail(`01–06 的战斗档耳鸣没起来：${JSON.stringify(deaf)}`);
+} else if (deaf.ringing > 1) {
+  Fail(`连续近爆攒下 ${deaf.ringing} 份耳鸣节点（旧的没立刻归还）`);
+} else if (!(deaf.speaking >= 4000 && deaf.silent < 1500)) {
+  Fail(`剧情档耳鸣的对白保底不对：说话时 ${deaf.speaking} Hz（要 ≥ 4000）、停下后 ${deaf.silent} Hz（要回到恢复曲线 < 1500）`);
+} else Ok(`耳鸣：开关关着 2 节点旧版、开着 8 节点新版；连续近爆只剩 ${deaf.ringing} 份；`
+  + `台词说着 ${deaf.speaking} Hz → 停下 ${deaf.silent} Hz`);
 
 // Continuous audition regression: real AudioBufferSource nodes must stop, including
 // scheduled repeats and editor exit, without stopping an unrelated gameplay engine.

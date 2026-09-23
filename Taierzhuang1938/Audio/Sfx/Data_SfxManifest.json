@@ -25,6 +25,11 @@
       "name": "参考视频实录（B 站）",
       "terms": "**非免版税**：版权归原视频上传者，本项目未获授权。仅供原型阶段手感对齐；对外发布前必须替换或取得授权。",
       "via": "BV1cG411m7Vz（三八大盖有盖版实弹射击）· BV1GMojB3EFP（汉阳造 88 式步枪）"
+    },
+    "mixed": {
+      "name": "混合来源（逐文件见 credit）",
+      "terms": "按 credit 里每个文件各自的来源适用上面对应一家的条款；本类不含 refvideo",
+      "via": "local://Taierzhuang1938/Data_SfxSources.mjs"
     }
   },
   "cues": {
@@ -54,19 +59,26 @@
     },
     "rifleIja": {
       "files": [
-        "AudioSfx_SeedAudioRifleIja_01.mp3"
+        "AudioSfx_SeedAudioRifleIja_01.mp3",
+        "AudioSfx_RifleIja_01.mp3",
+        "AudioSfx_RifleIja_02.mp3",
+        "AudioSfx_RifleIja_03.mp3",
+        "AudioSfx_RifleIja_04.mp3"
       ],
       "seconds": 1.4,
-      "credit": "Volcengine SeedAudio 1.0 · rifleIja · 2026-09-11",
-      "license": "volcengine"
+      "credit": "Volcengine SeedAudio 1.0 · rifleIja · 2026-09-11 ／ Watson Wu · M1 Garand .30-06 近射 · Sonniss Game Audio Monthly #3 ／ Pole Position Production · 斯普林菲尔德 M1903A3 .30-06 连续实录 · Sonniss GDC 2020",
+      "license": "mixed"
     },
     "rifleIjaFar": {
       "files": [
-        "AudioSfx_SeedAudioRifleIjaFar_01.mp3"
+        "AudioSfx_SeedAudioRifleIjaFar_01.mp3",
+        "AudioSfx_RifleIjaFar_01.mp3",
+        "AudioSfx_RifleIjaFar_02.mp3",
+        "AudioSfx_RifleIjaFar_03.mp3"
       ],
       "seconds": 1.8,
-      "credit": "Volcengine SeedAudio 1.0 · rifleIjaFar · 2026-09-11",
-      "license": "volcengine"
+      "credit": "Volcengine SeedAudio 1.0 · rifleIjaFar · 2026-09-11 ／ Pole Position Production · BAR .30cal 300 m 正面 · Sonniss GDC 2016 ／ Pole Position Production · 50 m 外、经建筑反射的步枪射击 · Sonniss GDC 2018",
+      "license": "mixed"
     },
     "zb26": {
       "files": [
@@ -79,11 +91,13 @@
     },
     "type11": {
       "files": [
-        "AudioSfx_SeedAudioType11_01.mp3"
+        "AudioSfx_SeedAudioType11_01.mp3",
+        "AudioSfx_Type11_01.mp3",
+        "AudioSfx_Type11_02.mp3"
       ],
-      "seconds": 0.65,
-      "credit": "Volcengine SeedAudio 1.0 · type11 · 2026-09-11",
-      "license": "volcengine"
+      "seconds": 0.82,
+      "credit": "Volcengine SeedAudio 1.0 · type11 · 2026-09-11 ／ Pole Position Production · L110A2 LMG（FN MINIMI）5.56 单发（1 m）· Sonniss GDC 2016",
+      "license": "mixed"
     },
     "type92": {
       "files": [
@@ -520,10 +534,12 @@
     },
     "type11Far": {
       "files": [
-        "AudioSfx_Type11Far_01.mp3"
+        "AudioSfx_Type11Far_01.mp3",
+        "AudioSfx_Type11Far_02.mp3",
+        "AudioSfx_Type11Far_03.mp3"
       ],
       "seconds": 1.25,
-      "credit": "Pole Position Production · BAR .30cal 300 m 正面 · Sonniss GDC 2016",
+      "credit": "Pole Position Production · BAR .30cal 300 m 正面 · Sonniss GDC 2016 ／ Pole Position Production · L110A2 LMG（FN MINIMI）5.56 单发（50 m 后方）· Sonniss GDC 2016",
       "license": "sonniss"
     },
     "type92Far": {
@@ -801,7 +817,7 @@
       "license": "refvideo"
     }
   },
-  "bakedAt": "2026-09-16",
+  "bakedAt": "2026-09-23",
   "normalization": {
     "normalizedAt": "2026-09-08",
     "tool": "Script_AudioNormalize.mjs",
