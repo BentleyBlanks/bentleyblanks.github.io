@@ -1687,12 +1687,14 @@
     {
       "id": "LugouIja06",
       "facialUrl": "./Model/Character/Model_LugouIja06Facial.glb",
-      "facialVersion": "8d07656ea557d1cf",
+      "facialVersion": "1a9dd42fee076152",
       "facialCast": [
         "ijaA"
       ],
       "faction": "ija",
       "url": "./Model/Character/Model_LugouIja06.glb",
+      "version": "202609241600",
+      "scaleHeight": 1.774785,
       "source": "Model_LugouIja02.glb",
       "derivedFrom": "LugouIja02",
       "builder": "_import/Script_BuildLugouIja06.py",
@@ -1702,7 +1704,7 @@
       "vertices": 8909,
       "triangles": 14643,
       "limitedWeightVertices": 131,
-      "bytes": 5487780,
+      "bytes": 5485896,
       "boneRoles": {
         "head": "Bip001 Head",
         "neck": "Bip001 Neck",
@@ -1730,12 +1732,12 @@
         "max": [
           0.557658,
           0.217298,
-          1.747525
+          1.750172
         ],
         "size": [
           1.115316,
           0.434596,
-          1.747525
+          1.750172
         ]
       },
       "sockets": [
@@ -3758,19 +3760,22 @@
     {
       "id": "LugouNra06",
       "facialUrl": "./Model/Character/Model_LugouNra06Facial.glb",
-      "facialVersion": "b63c5facc9526d0a",
+      "facialVersion": "06a0160ac0211752",
       "facialCast": [
         "interpreter"
       ],
       "faction": "nra",
       "url": "./Model/Character/Model_LugouNra06.glb",
+      "version": "202609241600",
+      "scaleHeight": 1.817118,
+      "loadOnDemand": true,
       "source": "Model_LugouNra02.glb",
       "animationSource": "LugouNraCanonical",
       "animationSourceModel": "LugouNra01",
       "vertices": 6730,
       "triangles": 10321,
       "limitedWeightVertices": 298,
-      "bytes": 5934076,
+      "bytes": 5622932,
       "boneRoles": {
         "head": "Bip002 Head",
         "neck": "Bip002 Neck",

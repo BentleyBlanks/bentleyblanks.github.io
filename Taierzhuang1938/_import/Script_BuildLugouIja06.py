@@ -48,10 +48,19 @@ SHAPE = {
     'chinDrop': .75, 'jawNarrow': .10, 'faceNarrow': .035,
     'cheekHollow': .55, 'cheekbone': .32, 'browDown': .32, 'browForward': .28,
     'upperLidDown': .20, 'lowerLidUp': .06, 'crease': .14,
+    # Review 2026-09-24: the IJA02 nose bridge reads Western; press it back (tip less).
+    'noseBridgeBack': .38, 'noseTipBack': .14,
 }
 # Cap (cm, head frame).
-CAP = {'segments': 32, 'bandFront': 13.6, 'bandBack': 11.6, 'ease': .38, 'crownTop': 23.0,
-       'crownBackDrop': 2.3, 'flare': .05, 'visorLength': 5.0, 'visorDrop': 1.6, 'visorSpan': 68.0,
+# Review 2026-09-24: seen from the front the first cap read as a tall straight box (kepi).
+# The Type 98 cap's soft crown narrows towards the top, peaks at the front seam and slopes
+# down to the back and to the sides: taper instead of flare, side drop, pinch.
+# The back cannot come down much (skull top 21.9 cm), so the front seam goes up instead.
+# pinch is the most the side walls narrow at the top before they touch the skull (0.15 cm).
+CAP = {'segments': 32, 'bandFront': 13.6, 'bandBack': 11.6, 'ease': .38, 'crownTop': 23.4,
+       'crownBackDrop': 2.6, 'crownSideDrop': 1.1, 'flare': .02, 'pinch': .10,
+       'flares': (0.0, .012, .030, .030, .012, -.020), 'dome': (.22, .32, .36),
+       'visorLength': 5.0, 'visorDrop': 1.6, 'visorSpan': 68.0,
        'visorThickness': .22, 'starRadius': .95, 'starHeight': 1.7}
 
 
@@ -107,6 +116,8 @@ def Deform(L, s=SHAPE):
     out[:, 1] += s['browForward'] * brow
     d, _ = CreaseDistance(x, az)
     out += radial * (-s['crease'] * Gauss(d * d, .32) * (y > 7.0))[:, None]
+    nose = Smooth(1.3, .5, az) * Smooth(8.0, 9.6, y)                           # flatter nose bridge
+    out[:, 1] -= nose * (s['noseBridgeBack'] * Gauss((x - 8.6) ** 2, 1.1) + s['noseTipBack'] * Gauss((x - 6.4) ** 2, .8))
     for ex, ey, ez in EYES:                                                      # narrower eyes
         r = np.sqrt((x - ex) ** 2 + (z - ez) ** 2)
         near = Smooth(2.5, 1.3, r) * Smooth(ey - .2, ey + 1.0, y)
@@ -159,11 +170,16 @@ def BuildCap(head, c=CAP):
     r[-1] = r[0]; ring0[:, 1] = r
     skullTop = float(head[:, 0].max())
     levels = [0.0, .30, .55, .78, .93, 1.0]
-    flares = [0.0, .012, .040, .062, .050, .005]
-    wall = np.array([[(BandX(th) + (c['crownTop'] - c['crownBackDrop'] * (.5 - np.cos(th) * .5) - BandX(th)) * f,
-                       center[0] + ring0[k, 1] * (1 + fl + c['flare'] * f * (np.cos(th) * .5 + .5)) * math.cos(th),
-                       center[1] + ring0[k, 1] * (1 + fl + c['flare'] * f * (np.cos(th) * .5 + .5)) * math.sin(th))
-                      for k, th in enumerate(thetas)] for f, fl in zip(levels, flares)])
+    flares = c['flares']
+
+    def Top(th):  # crown height: highest at the front seam, lower at the sides and back
+        return c['crownTop'] - c['crownBackDrop'] * (.5 - np.cos(th) * .5) - c['crownSideDrop'] * np.sin(th) ** 2
+
+    def Wall(k, th, f, fl):
+        rr = ring0[k, 1] * (1 + fl + c['flare'] * f * (np.cos(th) * .5 + .5))
+        return (BandX(th) + (Top(th) - BandX(th)) * f, center[0] + rr * math.cos(th),
+                center[1] + rr * math.sin(th) * (1 - c['pinch'] * f * f))
+    wall = np.array([[Wall(k, th, f, fl) for k, th in enumerate(thetas)] for f, fl in zip(levels, flares)])
     # Clearance: every wall ring must stay outside the skull at its own height.
     worst = 99.0
     for li in range(1, len(levels)):
@@ -191,13 +207,13 @@ def BuildCap(head, c=CAP):
     reach = np.linalg.norm((edge - mid)[:, 1:], axis=1).max()
     tu, tv, tr = u0 + .075, v0 + .225, .062
     P, UV, T = [], [], []
-    rings = [(1.0, 0.0), (.62, .35), (.28, .55)]
+    rings = [(1.0, 0.0), (.62, c['dome'][0]), (.28, c['dome'][1])]
     for scale, lift in rings:
         for k in range(N):
             p = mid + (edge[k] - mid) * scale; p = p.copy(); p[0] += lift
             rel = (edge[k] - mid)[1:] / reach
             P.append(p); UV.append((tu + rel[1] * tr * scale, tv - rel[0] * tr * scale))
-    P.append(mid + np.array([.62, 0, 0])); UV.append((tu, tv))
+    P.append(mid + np.array([c['dome'][2], 0, 0])); UV.append((tu, tv))
     for ri in range(len(rings) - 1):
         for k in range(N):
             a, b = ri * N + k, ri * N + (k + 1) % N; cc, d = (ri + 1) * N + (k + 1) % N, (ri + 1) * N + k
@@ -338,7 +354,7 @@ def Dilate(rgb, mask, steps=6):
     return rgb, m
 
 
-def Sallow(rgb, amount=.45):
+def Sallow(rgb, amount=.28):
     lum = rgb @ np.array([.30, .59, .11], np.float32)
     return rgb * (1 - amount) + (lum[..., None] / .52) * np.array([.64, .49, .34], np.float32) * amount
 
@@ -349,25 +365,27 @@ def PaintFace(rgb, posMap, mask):
     x, y, z = posMap[..., 0], posMap[..., 1], posMap[..., 2]
     az = np.abs(z - MID_Z)
     base = Sallow(rgb)
-    base *= (.94 + .10 * (Noise((h, w), 7, 22) * .6 + Noise((h, w), 8, 5) * .4))[..., None]
+    base *= (1.00 + .08 * (Noise((h, w), 7, 22) * .6 + Noise((h, w), 8, 5) * .4))[..., None]
     base *= (.96 + .06 * Noise((h, w), 9, 1.6))[..., None]
     out = base
     for ex, ey, ez in EYES:  # eye sockets and under-brow shadow
         sock = np.exp(-(((x - ex) / 1.9) ** 2 + ((z - ez) / 2.3) ** 2) * 1.4) * (y > 5.0)
         under = np.exp(-(((x - (ex - 1.3)) / .75) ** 2 + ((z - ez) / 1.9) ** 2)) * (y > 5.0)
-        out = out * (1 - .26 * sock - .16 * under)[..., None]
+        out = out * (1 - .17 * sock - .10 * under)[..., None]
     hollow = np.exp(-(((x - 5.6) / 1.4) ** 2 + ((az - 4.6) / 1.5) ** 2)) * (y > 3.0)
-    out = out * (1 - .15 * hollow)[..., None]
+    out = out * (1 - .10 * hollow)[..., None]
     d, side = CreaseDistance(x, az)
     front = (y > 7.0)
-    out = out * (1 - .38 * np.exp(-(d / .16) ** 2) * front)[..., None]
+    out = out * (1 - .26 * np.exp(-(d / .16) ** 2) * front)[..., None]
     out = out * (1 + .06 * np.exp(-((d - .45) / .3) ** 2) * (side > 0) * front)[..., None]
     beard = (Smooth(7.2, 5.4, x) * Smooth(-5.5, -2.0, x) * Smooth(7.2, 5.8, az + (x - 3.0) * .25) * Smooth(-1.0, 3.0, y))
     lips = Smooth(1.0, .5, np.abs(x - LIP_LINE)) * Smooth(2.6, 1.9, az) * (y > 9.0)
     beard *= 1 - lips
-    dots = (Noise((h, w), 21, 1.2) > .58).astype(np.float32) * .6 + Noise((h, w), 22, 3.0) * .4
-    stubble = beard * (.30 + .30 * dots)
-    out = out * (1 - stubble[..., None]) + np.array([.19, .19, .20], np.float32) * stubble[..., None]
+    # Sparse stubble (review 2026-09-24: under engine light the first pass merged with the
+    # moustache into a full dark beard); the moustache below stays the one dark line.
+    dots = (Noise((h, w), 21, 1.2) > .66).astype(np.float32) * .7 + Noise((h, w), 22, 3.0) * .3
+    stubble = beard * (.06 + .16 * dots)
+    out = out * (1 - stubble[..., None]) + np.array([.30, .30, .32], np.float32) * stubble[..., None]
     # Thin line moustache along the upper lip, tapering to the mouth corners.
     lipTop = LIP_LINE + .45 + .10 * (az / 2.2) ** 2
     thick = .62 * (1 - .55 * (az / 2.3) ** 2)

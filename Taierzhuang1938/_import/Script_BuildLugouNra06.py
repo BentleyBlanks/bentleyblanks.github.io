@@ -43,6 +43,7 @@ HEAD_PRIM, UNIFORM_PRIM, EYE_PRIM, BADGE_PRIM = 0, 2, 5, 6
 DROP_PRIMS = (3, 4)                       # cross strap + belt, hip tool
 FACE_MATERIAL, UNIFORM_MATERIAL, BADGE_MATERIAL = 'Material #9', 'Material #1721585337', 'Material #1721585500'
 GARB_MATERIAL = 'Material_InterpreterGarb'
+GARB_FINISH = {'roughness': .92, 'specular': .25}   # matte cotton (the uniform's gloss map is dropped)
 
 # Head-local landmarks of the NRA02 head (Script_AuthorCharacterFacial.Landmarks).
 LIP_LINE, LIP_FRONT, MID_Z = 8.06, 13.32, -0.55
@@ -485,14 +486,21 @@ def Build(job):
     # --- remove webbing, rename the cloth material, prune
     for i in sorted(DROP_PRIMS, reverse=True): del prims[i]
     for m in doc['materials']:
-        if m.get('name') == UNIFORM_MATERIAL: m['name'] = GARB_MATERIAL
+        if m.get('name') != UNIFORM_MATERIAL: continue
+        m['name'] = GARB_MATERIAL
+        # Review 2026-09-24: the uniform's gloss map and 0.8 specular made the dark jacket
+        # read as leather in the engine. Matte cotton: no gloss map, flat roughness.
+        pbr = m['pbrMetallicRoughness']
+        pbr.pop('metallicRoughnessTexture', None)
+        pbr['metallicFactor'] = 0.0; pbr['roughnessFactor'] = GARB_FINISH['roughness']
+        m.setdefault('extensions', {}).setdefault('KHR_materials_specular', {})['specularFactor'] = GARB_FINISH['specular']
     report['pruned'] = PruneMaterials(doc)
     for node in doc['nodes']:
         if node.get('name') == 'Character_LugouNra02': node['name'] = 'Character_' + MODEL_ID
     glb.Compact()
     doc.setdefault('extras', {})['lugouVariant'] = {
         'id': MODEL_ID, 'role': 'interpreter', 'derivedFrom': BASE, 'builder': '_import/Script_BuildLugouNra06.py',
-        'approved': '2026-09-24', 'shape': SHAPE, 'cloth': CLOTH, 'spectacles': SPECTACLES}
+        'approved': '2026-09-24', 'shape': SHAPE, 'cloth': CLOTH, 'finish': GARB_FINISH, 'spectacles': SPECTACLES}
     report['triangles'] = int(sum(doc['accessors'][p['indices']]['count'] for p in prims) // 3)
     report['vertices'] = int(sum(doc['accessors'][p['attributes']['POSITION']]['count'] for p in prims))
     if job.get('write', True):
