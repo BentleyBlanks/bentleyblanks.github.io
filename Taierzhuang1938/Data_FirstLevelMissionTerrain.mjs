@@ -2,7 +2,7 @@ import { FRONT_SORTIE as Sortie, FRONT_SPACE as Space } from "./Data_FirstLevelF
 import { MISSION_RECEPTION_SPACE, MISSION_NORTH_RIVER, RiverCutAt } from "./Data_FirstLevelMissionTopology.mjs";
 // Authored soil, metres: natural ground, roads, rail berm and excavated trenches.
 // This function is baked once into the shared rendered/physical heightfield.
-import { FRONT_BREACHES } from "./Data_FirstLevelMissionFront.mjs";
+import { FRONT_BREACHES, FRONT_BOUND_CRATERS } from "./Data_FirstLevelMissionFront.mjs";
 import { MISSION_TRENCH_NETWORK } from "./Data_FirstLevelMissionTrenches.mjs";
 import { CompileTrenchNetwork, TrenchRevision } from "./Script_TrenchPlan.mjs";
 const Smooth = (value) => {
@@ -94,6 +94,9 @@ export const MISSION_TERRAIN = Object.freeze({
     // Nest compound floor (x 24..37, z -145.6..-156.8), dug half a metre.
     {x:28.5,z:-152.2,radius:5.5,depth:.5},
     {...Sortie.leftSeat,radius:3,depth:.65},
+    // 03 tank preview (K5): the switchback top is a 3 m pad 0.6 m above the road floor, so the cutting lip hides
+    // the hull but not the turret (FRONT_TANK_PATH HullDown).
+    {x:49.5,z:-202.4,radius:3,depth:2.05},
     // 03 observation fire step at the spur's end: floor 0.4 m below the field (spur 0.95 -> 0.4 ramp, ~23 deg).
     {...Space.observation,radius:.7,depth:.4},
     // 01 dugout pit, dug into the outer (north-west) wall of the bend M; opens east onto the trench.
@@ -110,7 +113,7 @@ export const MISSION_TERRAIN = Object.freeze({
     {x:41.3,z:-119.9,radius:1.2,depth:1.0},{x:41.2,z:-118.3,radius:1.0,depth:.4},
     // Berm-end craters: explain the tank's sight lane past the berm's east end and give the flank group its last line.
     ...Space.bermEndCraters.map((p,i)=>({...p,radius:[1.4,1.4,1.5,1.4,1.3,1.2,1.2][i],depth:[.7,.6,.6,.6,.6,.6,.6][i]})),
-    ...Space.boundCraters.map((p)=>({...p,radius:1.3,depth:.6})),
+    ...FRONT_BOUND_CRATERS.map((p)=>({...p,radius:1.3,depth:.6})),
     ...Space.flankCraters.map((p)=>({x:p.x,z:p.z,radius:p.r,depth:.7})),
     ...Space.escortCraters.map((p)=>({x:p.x,z:p.z,radius:p.r,depth:.55})),
     // South-road roadblock crater just past the fork (FRONT_SPACE.roadblock): cuts the road the tank would need.

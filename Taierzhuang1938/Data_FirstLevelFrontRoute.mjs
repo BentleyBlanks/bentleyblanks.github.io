@@ -5,6 +5,15 @@
 // the north-east plateau, bends behind NorthRuin and runs west along the front to a stop point
 // north of the berm line. Every key below is still the one the 03-05 code reads.
 const Point=(x,z)=>Object.freeze({x,z});
+/** Organic front field (09.23 review: four dead-straight rows of equal blocks and four same-z bound lines read
+ *  like a range). Bound line i and the cover row south of it bend together with the ground: one smooth z offset
+ *  (±amp m) that is the same for the line and its row at any x, so a man on the line keeps his 1.6-2.5 m to the
+ *  cover in front of him. Slope <= 0.3 m per m. i = 0..3 (Bank/-193, Mound/-181.5, Ridge/-173, Stub/-166.5). */
+// [amp, phase, bias]: bias 1 = the bend only ever goes south (the Bank row must stay clear of the fire-base walls
+// on z -192.6 behind it), bias 0 = both ways.
+const FIELD_BEND=[[2.2,.7,1],[2.0,2.9,0],[1.7,4.4,0],[1.2,1.6,0]];
+export const FrontFieldBend=(i,x)=>{const [amp,phase,bias]=FIELD_BEND[i],w=.7*Math.sin(x/11.5+phase)+.3*Math.sin(x/5.3+phase*1.7);
+  return bias?amp*(.5+.5*w):amp*w;};
 // Semantic tank waypoints (contract §5.7). holdS=0 on block = hold until disabled.
 // id is the stable name: FRONT_SORTIE's old tank*Index keys resolve through it (never renumber).
 // faceTo = where the HULL points when it stops; turretTo = where the turret (main gun + coax) is
@@ -13,11 +22,17 @@ const Point=(x,z)=>Object.freeze({x,z});
 // throw spot is ~105 deg off the nose - the rear quarter K9 needs). Names: FRONT_SPACE.tankTargets.
 const Way=(id,x,z,kind,extra={})=>Object.freeze({id,x,z,kind,...extra});
 export const FRONT_TANK_PATH=Object.freeze([
-  Way("Start",112,-229,"cruise",{note:"start: plateau road cutting, 114 m from the nest seat, inside NorthRuin's shadow sector"}),
+  Way("Start",112,-229,"cruise",{note:"start: plateau road cutting, 114 m from the nest seat, out of sight"}),
   Way("Cutting",106,-214,"cruise"),
-  Way("HullDown",97,-205,"hullDown",{faceTo:"nest",turretTo:"nest",holdS:15,note:"03 preview (K5): the road runs across the view here, the 2.2 m cutting's lip hides the hull, the turret shows"}),
-  Way("Shadow",81,-204,"cruise",{note:"leaves the preview westward, already inside NorthRuin's shadow sector"}),
-  Way("Bend",64,-189.5,"cruise",{note:"the bend, behind NorthRuin (seen from the seat the ruin covers bearings 31-50 deg)"}),
+  // 09.23 review: at the old 88 m preview the turret was ~6 px on a dark slope. The road now runs west along
+  // the plateau edge in a cutting (behind NorthRuin for most of it), and the preview is the switchback's top
+  // WEST of the ruin, 55 m from the seat: the cutting's south lip hides the hull, the whole turret stands
+  // above the crest against the sky. Then the road doubles back east down the slope behind the ruin to the bend.
+  Way("CrestEast",92,-206.5,"cruise",{note:"far end of the plateau-edge road (turret glimpsed at 80+ m before the ruin hides it)"}),
+  Way("Shadow",72,-204.5,"cruise",{note:"behind NorthRuin (seen from the seat the ruin covers bearings 31-50 deg)"}),
+  Way("HullDown",49.5,-202.4,"hullDown",{faceTo:"nest",turretTo:"nest",holdS:15,note:"03 preview (K5): switchback top on the crest, 55 m; hull hidden by the cutting lip, turret on the skyline"}),
+  Way("Descent",60.5,-199.8,"cruise",{note:"doubles back east down the slope, into the ruin's shadow again"}),
+  Way("Bend",64,-189.5,"cruise",{note:"the bend, behind NorthRuin"}),
   Way("BendExit",60,-177,"cruise",{note:"04 emerges from the bend (K6); the south road forks here and is cut by the crater roadblock 9 m on"}),
   Way("Pressure",51,-172.5,"firePoint",{faceTo:"nest",turretTo:"nest",holdS:14,note:"04 pressure: HE + hull MG on the nest front seat, 31 m"}),
   Way("Approach",44.5,-169,"cruise"),
@@ -107,6 +122,9 @@ export const FRONT_SPACE=Object.freeze({
   // the nest; crouched you are behind the parapet. (09.23 review: at the old 0.95 m bay 6 of 8 prone guards
   // were hidden by the scrape's lip and the gap sap's spoil.)
   observation:Point(-23.0,-131.0),
+  // 05->06 return beat (09.24 review: 80 m of the 104 m return had nothing happening): He Youtian and the rest of
+  // the line meet the player behind the fold in the safe zone. Trigger point for the Front/Voice packages.
+  returnMeet:Object.freeze({x:-21.6,z:-126.6,radiusM:4}),
   observationSpur:[Point(-23.4,-126.5),Point(-23.0,-131.5)],
   fold:Point(-19.2,-133.2),                 // support sap fold: the guards' safe zone is behind it
   safeZone:Point(-21.6,-126.6),            // hidden from the nest, the flank group's last line and every tank waypoint
@@ -122,10 +140,9 @@ export const FRONT_SPACE=Object.freeze({
   // Around the berm's east end: the flank group's last line is on the SOUTH side of the end, where the
   // gap shows along the backslope; the two northern craters are its approach.
   bermEndCraters:[Point(16.2,-158.4),Point(20.5,-161.5),Point(15.5,-162.8),Point(21.8,-165.2),Point(14.6,-157.6),Point(12.6,-156.9),Point(18.4,-159.6)],
-  // Last-line craters for the two bounding corridors whose line-4 point has no cover row.
-  boundCraters:[Point(16.8,-165.3),Point(-5.2,-165.4),Point(4.7,-165.4)],
   // Flank group craters (they kneel in them; craters never block a rush) and escort-slot craters.
-  flankCraters:[[40.6,-181.6,2.2],[40.4,-185.4,1.6],[31.6,-174.6,2.2],[32.8,-178.4,1.8],[24.2,-169,2.2],[26,-171.9,1.6]].map(([x,z,r])=>Object.freeze({x,z,r})),
+  flankCraters:[[40.6,-181.6,2.2],[40.4,-185.4,1.6],[40.8,-178.8,1.3],[40.2,-175.2,2.0],[42.6,-174.2,1.4],
+    [39.7,-163.6,1.9]].map(([x,z,r])=>Object.freeze({x,z,r})),
   escortCraters:[[31.8,-163.8,1.4],[37.4,-163,1.3],[36.8,-172.4,1.3]].map(([x,z,r])=>Object.freeze({x,z,r})),
   // Named tank aim points for FRONT_TANK_PATH faceTo/turretTo (y = metres above the shared ground).
   tankTargets:Object.freeze({

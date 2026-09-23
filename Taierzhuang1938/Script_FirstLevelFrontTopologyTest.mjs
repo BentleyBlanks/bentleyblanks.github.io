@@ -13,6 +13,7 @@ import {FRONT_BATTLE_TUNING as B} from "./Data_Tuning_FirstLevelFront.mjs";
 import {FRONT_BREAKABLES,FRONT_UNBREAKABLE} from "./Data_FirstLevelFrontBreakables.mjs";
 import {MISSION_LAYOUT as L} from "./Data_FirstLevelMissionLayout.mjs";
 import {FRONT_GUARD_POSTS,FRONT_FLANK_GROUP,FrontAssaultLane} from "./Data_FirstLevelMissionFront.mjs";
+import {TANK_HEIGHTS as TH} from "./Data_FirstLevelSpaceKeyframes.mjs";
 import {MISSION_ENCOUNTERS as E} from "./Data_FirstLevelMission.mjs";
 import {SampleMissionTerrain as G,SampleMissionNaturalHeight as N} from "./Data_FirstLevelMissionTerrain.mjs";
 import {ProbeKeyframes,ProbeTank,ProbeRoutes,ProbeExposure,ProbeEnemyCover,ProbeCounts,ProbeEntries,ProbeSeparation,
@@ -51,6 +52,18 @@ console.log("ok keyframes "+keyframes.map(k=>`${k.id}${k.frameDeg?`(${k.spanDeg}
   assert.ok(wp.BendExit.hullSeen&&wp.Pressure.hullSeen,"the tank comes out of the bend in full view");
   const hidden=t.turretTransitions.find(x=>!x.seen),back=t.turretTransitions.find(x=>x.seen&&x.s>(hidden?.s??0));
   assert.ok(hidden&&back&&back.s-hidden.s>=20,`the ruin hides the tank for a real stretch of road: ${JSON.stringify(t.turretTransitions)}`);
+  // K6: after the preview the tank drops out of sight for 20 m+ and reappears coming out of the bend.
+  const sHull=wp.HullDown.s,sExit=wp.BendExit.s;
+  const gone=t.turretTransitions.find(x=>!x.seen&&x.s>sHull),reappear=t.turretTransitions.find(x=>x.seen&&x.s>(gone?.s??1e9));
+  assert.ok(gone&&reappear&&reappear.s-gone.s>=20&&reappear.s<=sExit,`after HullDown the ruin hides 20 m+ and the tank reappears at the bend exit: ${JSON.stringify(t.turretTransitions)}`);
+  // K5 (09.23 review): the preview reads on screen. The whole turret (hull top up) shows over the cutting lip,
+  // its upper part stands against the sky, and it is at most 60 m from the seat: >= 10.5 px tall at 720p / 55 deg
+  // (>= 15 px aiming down the sights). 20 px at 55 deg would need the tank within 30 m - not a far-road preview.
+  const v=t.hullDownView;
+  assert.ok(v.distM<=60,`HullDown is within 60 m of the seat: ${v.distM}`);
+  assert.ok(v.shownFromM!==null&&v.shownFromM<=TH.hullTop+0.05,`the whole turret shows over the lip: from ${v.shownFromM} m`);
+  assert.ok(v.skyFromM!==null&&TH.turretTop-v.skyFromM>=0.6,`the turret stands against the sky: sky behind from ${v.skyFromM} m`);
+  assert.ok(v.px720>=10.5&&v.px720Ads>=15,`K5 turret on screen: ${v.px720} px (ADS ${v.px720Ads} px) at 720p`);
   assert.equal(t.gapLast21m.seen,t.gapLast21m.n,"the gun holds the gap over the last 21 m of the path (a stable lane, not one edge)");
   assert.ok(t.gapGridBlock.ok>=6&&t.gapGridSqueeze.ok>=6,`Block/Squeeze see the gap over ±1 m x 4 heights: ${t.gapGridBlock.ok}/${t.gapGridSqueeze.ok} of 12`);
   assert.ok(t.blockNorthOfCrestM>=5&&t.squeezeNorthOfCrestM>=5,"the tank stops north of the berm line, never in our depth");
@@ -67,7 +80,7 @@ console.log("ok keyframes "+keyframes.map(k=>`${k.id}${k.frameDeg?`(${k.spanDeg}
     `the turret MG covers the attack branch's last 4.7 m (risk window): ${JSON.stringify(t.tailTurret)}`);
   assert.ok(t.roadblock.length===2&&t.roadblock.every(b=>b.roadDistM<=3),"the cart and the felled pole sit across the south road");
   assert.ok(t.roadblockCraterDepth>=1,"the roadblock crater cuts the south road");
-  console.log(`ok tank path ${t.lengthM} m: hidden start, hull-down at ${wp.HullDown.seatDist} m, ruin hides ${back.s-hidden.s} m, `
+  console.log(`ok tank path ${t.lengthM} m: hidden start, hull-down at ${wp.HullDown.seatDist} m (${v.px720} px, ADS ${v.px720Ads} px, skyline from ${v.skyFromM} m), ruin hides ${back.s-hidden.s}/${reappear.s-gone.s} m, `
     +`gap lane ${t.gapLast21m.seen}/${t.gapLast21m.n}, block ${t.blockNorthOfCrestM} m north of the crest, rear quarter ${t.throwRelDeg} deg`);
 }
 
@@ -84,6 +97,17 @@ console.log("ok keyframes "+keyframes.map(k=>`${k.id}${k.frameDeg?`(${k.spanDeg}
   // No single straight leg of the 03 approach runs longer than 10 m.
   const longest=Math.max(...S.approach.slice(1).map((p,i)=>D(p,S.approach[i])));
   assert.ok(longest<=10,`03 approach legs stay short (cover rhythm): ${longest.toFixed(1)} m`);
+  // 05 -> 06 return (104 m): no stretch longer than 60 m without a beat - K10 at the west door, He and the rest of the
+  // line meeting in the safe zone (FRONT_SPACE.returnMeet), the collection. (09.24 review: 80 m of nothing.)
+  {
+    const r=SR.collectionReturn,At=(p)=>{let best=1e9,bs=0,acc=0;for(let i=1;i<r.length;i++){const a=r[i-1],b=r[i],L=D(a,b),
+      t=Math.max(0,Math.min(1,((p.x-a.x)*(b.x-a.x)+(p.z-a.z)*(b.z-a.z))/(L*L))),d=D(p,{x:a.x+(b.x-a.x)*t,z:a.z+(b.z-a.z)*t});
+      if(d<best){best=d;bs=acc+L*t;}acc+=L;}return {s:bs,off:best};};
+    const beats=[{s:0},At(SP.westDoor),At(SP.returnMeet),{s:RouteLength(r)}];
+    assert.ok(At(SP.returnMeet).off<=SP.returnMeet.radiusM,"the return beat lies on the 05->06 route");
+    const gaps=beats.slice(1).map((b,i)=>b.s-beats[i].s);
+    assert.ok(Math.max(...gaps)<=60,`05->06 return has a beat every 60 m: ${gaps.map(g=>g.toFixed(0)).join("/")}`);
+  }
   console.log(`ok ${Object.keys(routes).length} routes clear a 0.35 m capsule and climb under 52 deg; 02 retreat ${retreat.toFixed(1)} m`);
 }
 
@@ -92,7 +116,9 @@ console.log("ok keyframes "+keyframes.map(k=>`${k.id}${k.frameDeg?`(${k.spanDeg}
   const e=ProbeExposure();
   assert.equal(e.support03.crouchedExposed,0,"03 support sap: crouched is covered from every threat");
   assert.ok(e.rightTrenchVsNest.longestCrouchedRunM<=4,`03 right low trench: the nest can see a crouched man for at most 4 m running: ${e.rightTrenchVsNest.longestCrouchedRunM}`);
-  assert.ok(e.fireSteps[0].standingSees.filter(id=>id.endsWith("@last")).length>=3,"fire step 0 engages the flank group's last line");
+  // 2026-09-24: the flank group's last line is north-east of the nest now; fire step 0 catches its bounds across the field.
+  assert.ok(new Set(e.fireSteps[0].standingSees.filter(id=>id.startsWith("FrontFlank")).map(id=>id.split("@")[0])).size>=3,
+    `fire step 0 engages the flank group while it bounds (<= 60 m): ${e.fireSteps[0].standingSees.join(",")}`);
   assert.ok(e.fireSteps[1].standingSees.includes("RightNestGunner"),"fire step 1 engages the nest gunner over the low west wall");
   assert.ok(e.fireSteps.every(f=>f.crouchedSeen.length===0),"crouched on a fire step nobody in the nest sees you");
   assert.equal(e.retreat02FromFold.sswLegStandingExposed,0,"02: the fold F cannot shoot down the intact south-south-west leg");
@@ -150,8 +176,9 @@ console.log(`ok 05 cut-in pair hidden from the gap and the backslope: ${S.enemie
   assert.deepEqual(c.uncovered,[],"every enemy start (and every bound's last line) has real cover or is dug in");
   for(const f of c.flankGap){
     assert.ok(f.seesGap,`${f.id}'s last line sees the gap`);
-    assert.ok(f.dist>=15&&f.dist<=35,`${f.id} last line is 15-35 m from the gap: ${f.dist}`);
-    assert.ok(f.seatDist>=9,`${f.id} last line leaves the captured gun room to fire: ${f.seatDist}`);
+    // 2026-09-24 review: the captured gun meets them at 15-25 m (not point blank); they hold the gap at rifle range.
+    assert.ok(f.dist>=15&&f.dist<=55,`${f.id} last line is 15-55 m from the gap: ${f.dist}`);
+    assert.ok(f.seatDist>=15&&f.seatDist<=25,`${f.id} last line is 15-25 m from the captured gun: ${f.seatDist}`);
   }
   // Nest guards face the side the player comes from (south-west: right low trench, west door, rear junction),
   // within 60 deg; the gunner's gun lies on the gap.

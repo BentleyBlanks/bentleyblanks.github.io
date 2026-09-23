@@ -184,13 +184,24 @@ export function ProbeTank() {
   const roadblock = ["RoadblockCart", "RoadblockPole"].map((id) => L.blocks.find((b) => b.id === id)).filter(Boolean)
     .map((b) => { let best = 1e9; const road = SP.southRoad; for (let i = 1; i < road.length; i++) { const a = road[i - 1], c = road[i], dx = c.x - a.x, dz = c.z - a.z; const t = Math.max(0, Math.min(1, ((b.x - a.x) * dx + (b.z - a.z) * dz) / (dx * dx + dz * dz))); best = Math.min(best, Math.hypot(b.x - a.x - dx * t, b.z - a.z - dz * t)); } return { id: b.id, roadDistM: Round(best) }; });
   const roadblockCraterDepth = Round(N(SP.roadblock.crater.x, SP.roadblock.crater.z) - G(SP.roadblock.crater.x, SP.roadblock.crater.z), 2);
+  // K5 as the player sees it: how much of the tank shows over the cutting lip at HullDown, how much of that
+  // stands against the sky (the ray past it never meets the ground again), and its height on a 720p screen at
+  // the game's 55 deg vertical FOV (and x0.72 when aiming down the sights).
+  const hd = W("HullDown"), hdR = D(S.seat, hd), shown = [];
+  for (let y = 0.2; y <= TH.turretTop + 1e-6; y += 0.05) if (Sight(seatEye, Eye(hd, y)) === null) shown.push(Round(y, 2));
+  const SkyBehind = (h) => { const tg = Eye(hd, h); for (let d = hdR + 0.5; d < hdR + 250; d += 0.5) { const q = d / hdR, x = S.seat.x + (hd.x - S.seat.x) * q, z = S.seat.z + (hd.z - S.seat.z) * q; if (G(x, z) > seatEye.y + (tg.y - seatEye.y) * q) return false; } return true; };
+  const skyFrom = shown.find((h) => SkyBehind(h)) ?? null;
+  const Px = (m, fovDeg) => Round(m / hdR * 360 / Math.tan(fovDeg / 2 * Math.PI / 180), 1);
+  const shownM = shown.length ? TH.turretTop - shown[0] : 0;
+  const hullDownView = { distM: Round(hdR), shownFromM: shown[0] ?? null, skyFromM: skyFrom, shownM: Round(shownM, 2),
+    px720: Px(shownM, 55), px720Ads: Px(shownM, 55 * 0.72), skylinePx720: skyFrom === null ? 0 : Px(TH.turretTop - skyFrom, 55) };
   return {
     lengthM: Round(len), waypoints, turretTransitions: transitions, footprintHits: [...footprint].map(([k, v]) => `${k}@s${v}`),
     maxPitchDeg: Round(maxPitchDeg), gapGridBlock: gapGrid(block), gapGridSqueeze: gapGrid(squeeze), gapFirstS,
     gapLast21m: lastRun, blockNorthOfCrestM: Round(-160 - block.z), squeezeNorthOfCrestM: Round(-160 - squeeze.z),
     blockToGapM: Round(D(block, S.gap)), pressureSeesSeat: seeFrom(pressure, S.seat, 1.25), pressureSeatM: Round(D(pressure, S.seat)),
     denies, throwRelDeg: Rel(S.throw), attackRelDeg: S.attackRoute.map(Rel), tailTurret, tailHullMg,
-    roadblock, roadblockCraterDepth,
+    roadblock, roadblockCraterDepth, hullDownView,
   };
 }
 
@@ -269,8 +280,8 @@ export function ProbeExposure() {
     rightTrenchVsNest: Exposure(S.approach.slice(7, 13), nest),
     fireSteps: FRONT_FIRE_STEPS.map((p) => ({ x: p.x, z: p.z,
       standingSees: [...E.approach.map((s) => ({ id: s.id, at: s, h: s.role === "nestGun" ? 1.5 : 1.3 })),
-        ...FRONT_FLANK_GROUP.map((s) => ({ id: s.id + "@last", at: s.lane.at(-1), h: 1.0 }))]
-        .filter((t) => Sight(Eye(p, 1.6), Eye(t.at, t.h)) === null).map((t) => t.id),
+        ...FRONT_FLANK_GROUP.flatMap((s) => s.lane.map((p, i) => ({ id: `${s.id}@${i === s.lane.length - 1 ? "last" : "bound" + i}`, at: p, h: 1.0 })))]
+        .filter((t) => D(p, t.at) <= 60 && Sight(Eye(p, 1.6), Eye(t.at, t.h)) === null).map((t) => t.id),
       crouchedSeen: E.approach.filter((s) => Sight(Eye(s, 1.4), Eye(p, 1.0)) === null).map((s) => s.id) })),
     rearRoute04: Exposure(S.rearRoute, [Threat("tankGun@Pressure", W("Pressure"), TH.gun), Threat("tankGun@Block", block, TH.gun), ...escorts, ...fallback]),
     bundle05: Exposure(R.bundle, [...tank, ...escorts, ...fireBase, Threat("cutInMouth", SP.roadLink[0], 1.5)]),

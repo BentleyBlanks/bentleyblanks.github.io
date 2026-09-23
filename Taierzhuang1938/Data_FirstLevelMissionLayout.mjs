@@ -1,4 +1,4 @@
-import { FRONT_SORTIE as Sortie, FRONT_SPACE as Space, FRONT_TANK_PATH } from "./Data_FirstLevelFrontRoute.mjs";
+import { FRONT_SORTIE as Sortie, FRONT_SPACE as Space, FRONT_TANK_PATH, FrontFieldBend } from "./Data_FirstLevelFrontRoute.mjs";
 import { MISSION_REAR_ANCHORS, MISSION_REAR_ROUTES, MISSION_RECEPTION_SPACE, MISSION_SOUTH_BRIDGE, MISSION_RAIL_BRIDGE, MISSION_STAGE_ANCHORS, MISSION_STAGE_ROUTES, MISSION_NORTH_RIVER, RiverProfileAt, RiverCutAt } from "./Data_FirstLevelMissionTopology.mjs";
 import { MISSION_TRENCH_COVER as TC } from "./Data_FirstLevelMissionTrenchCover.mjs";
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
@@ -658,17 +658,21 @@ for(const [id,x,z,length] of [['WestFieldFence',-58,-120,36],['VillageFieldFence
 // rush lanes are pushed out of, so no bank can ever stand across a bound. Anything that would
 // land inside an existing building, ruin or authored firing position is dropped - NorthFarm,
 // FieldRuin0 and FieldRuin1 are the cover on those stretches already.
-function FieldCover(id, x, z, w, h, d) {
+function FieldCover(id, x, z, w, h, d, semantic = "cover", ry = 0) {
   const top = SampleMissionTerrain(x, z) + h;
+  const c = Math.cos(ry), q = Math.sin(ry);
   let base = Infinity;
   for (const a of [-1, 0, 1]) for (const b of [-1, 0, 1])
-    base = Math.min(base, SampleMissionTerrain(x + a * w / 2, z + b * d / 2));
+    base = Math.min(base, SampleMissionTerrain(x + (a * w / 2) * c + (b * d / 2) * q, z - (a * w / 2) * q + (b * d / 2) * c));
   base -= 0.06;
+  // A piece next to a shell crater (FRONT_BOUND_CRATERS) digs its foot into the crater's rim: keep the whole
+  // block under 1.5 m so it stays a crouch-and-hide cover (COVER.tallM 1.55), never a wall.
+  const cap = Math.min(top, base + 1.5);
   // The foot is dug to the lowest corner so no bank floats over a field swell; h is therefore the
   // registered cover height (0.06 m taller than the authored clear height, still inside the band).
   // faceZ points south, at the Chinese line: Script_AiCover reads a cover normal as an unsigned
   // wall axis (its header), so the sign documents intent and only |dot| ever scores.
-  return Block(id, x, z, w, top - base, d, "cover", { y: (top + base) / 2, cover: { faceX: 0, faceZ: 1 } });
+  return Block(id, x, z, w, cap - base, d, semantic, { y: (cap + base) / 2, ry, cover: { faceX: -q, faceZ: c } });
 }
 {
   const existing = blocks.slice();
@@ -677,21 +681,32 @@ function FieldCover(id, x, z, w, h, d) {
       && Math.abs(block.z - z) < (block.d + d) / 2 + 0.45
       && block.y + block.h / 2 > SampleMissionTerrain(x, z) + 0.3)
     || FRONT_FIELD_MEN.some((man) => Math.abs(man.x - x) < w / 2 + 0.9 && Math.abs(man.z - z) < d / 2 + 0.9);
-  for (const row of FRONT_COVER.rows) for (const column of FRONT_COVER.columns) {
+  // Deterministic per-piece variety (FRONT_COVER.vary), hashed from the piece id.
+  const V = FRONT_COVER.vary, Hash = (s) => { let h = 2166136261; for (const ch of s) h = Math.imul(h ^ ch.charCodeAt(0), 16777619) >>> 0; return () => ((h = (Math.imul(h, 1664525) + 1013904223) >>> 0) / 4294967296); };
+  for (const [rowIndex, row] of FRONT_COVER.rows.entries()) for (const column of FRONT_COVER.columns) {
     if (column.rows && !column.rows.includes(row.id)) continue;
+    if (row.skip?.includes(column.id)) continue;
     const build = column.coverX || column.x;
     const span = build[1] - build[0] - FRONT_COVER.insetM * 2;
     const count = Math.max(1, Math.floor((span - row.w) / FRONT_COVER.pitchM) + 1);
     const used = (count - 1) * FRONT_COVER.pitchM + row.w;
     const first = build[0] + FRONT_COVER.insetM + (span - used) / 2 + row.w / 2;
     for (let i = 0; i < count; i++) {
-      const x = first + i * FRONT_COVER.pitchM;
+      const id = `FrontCover${row.id}${column.id}${i}`, rnd = Hash(id);
+      const w = Math.min(FRONT_COVER.pitchM - .2, row.w + V.wAddM[0] + rnd() * (V.wAddM[1] - V.wAddM[0]));
+      const h = Math.max(V.hBandM[0], Math.min(V.hBandM[1], row.h + V.hAddM[0] + rnd() * (V.hAddM[1] - V.hAddM[0])));
+      rnd(); const x = first + i * FRONT_COVER.pitchM; // pitch stays exact: neighbours keep COVER.minAllySpacingM
+      // The extra offset only ever goes south (away from the line), so no piece crowds the man kneeling behind it.
+      const z = row.z + FrontFieldBend(rowIndex, x) + rnd() * V.zJitterM, ry = (rnd() * 2 - 1) * V.yawRad;
+      const kind = V.kinds[Math.floor(rnd() * V.kinds.length) % V.kinds.length];
+      // Rotated footprint as an axis-aligned box for the lane and clash checks.
+      const bw = Math.abs(Math.cos(ry)) * w + Math.abs(Math.sin(ry)) * row.d, bd = Math.abs(Math.sin(ry)) * w + Math.abs(Math.cos(ry)) * row.d;
       // A man authored inside the one-metre slack of a bound line skips that line and rushes
       // straight through the row behind it. Columns cannot help there - the lane runs down the
       // column - so the bank gives way instead of the route gate failing on it.
-      if (Taken(x, row.z, row.w, row.d) || FrontAssaultLaneCuts(x, row.z, row.w, row.d)) continue;
-      if(MissionPathDistance({x,z:row.z},Sortie.route)<row.w/2+1.0)continue;
-      FieldCover(`FrontCover${row.id}${column.id}${i}`, x, row.z, row.w, row.h, row.d);
+      if (Taken(x, z, bw, bd) || FrontAssaultLaneCuts(x, z, bw, bd)) continue;
+      if(MissionPathDistance({x,z},Sortie.route)<w/2+1.0)continue;
+      FieldCover(id, x, z, w, h, row.d, kind, ry);
     }
   }
 }
@@ -942,6 +957,9 @@ export const MISSION_SUPPLIES = Object.freeze([
   // and the front crates. Kept on the recess floor, clear of its entry lane and posts.
   {id:"Shelter",x:-34.2,z:-18.3,supportHeight:null},
   {id:"Front",x:33.8,z:-147.6,supportHeight:null},
+  // 03: a crate against the right low trench's south wall, 2 m short of fire step 1 (09.24 review: the 03-06 cold
+  // start reached the nest with 0 bandages). Off the walking line by 1.47 m.
+  {id:"RightTrench",x:12.8,z:-142.7,supportHeight:null},
   {id:"Orders",x:Sortie.orders.x-1.5,z:Sortie.orders.z,supportHeight:null},
   {id:"Courtyard",x:50,z:33.05,supportHeight:null},
   {id:"Transfer",x:93,z:110,supportHeight:1.15},

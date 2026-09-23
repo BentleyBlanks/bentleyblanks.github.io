@@ -1,6 +1,6 @@
 import { MISSION_TUNING as FIRST_LEVEL_TUNING } from "./Data_Tuning_FirstLevel.mjs";
 import { MISSION_TRAIN } from "./Data_FirstLevelMissionTrain.mjs";
-import { FRONT_SORTIE as Sortie, FRONT_SPACE as Space, FRONT_TANK_PATH } from "./Data_FirstLevelFrontRoute.mjs";
+import { FRONT_SORTIE as Sortie, FRONT_SPACE as Space, FRONT_TANK_PATH, FrontFieldBend } from "./Data_FirstLevelFrontRoute.mjs";
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
 // Authored squads and persistent aftermath. Historical dead do not affect live combat counts.
 // 2026-09-09: the Center squad's fifth man moved 12,-188 -> 12,-190. At -188 he was inside the
@@ -48,11 +48,17 @@ export const FRONT_COVER=Object.freeze({
     // 2026-09-23 proposal A: everything 6 m north with the berm (crest z=-160); the last row sits
     // 1 m north of the berm's north foot, 4.5 m short of the crest.
     // Bank/Mound sit on the rising ground: taller so a man kneeling uphill of them is still covered.
-    Object.freeze({id:"Bank", line:-193,   z:-191.2, w:1.5, h:1.35, d:.6}),
-    Object.freeze({id:"Mound",line:-181.5, z:-179.3, w:1.6, h:1.15, d:.6}),
-    Object.freeze({id:"Ridge",line:-173,   z:-171,   w:1.5, h:.94,  d:.6}),
-    Object.freeze({id:"Stub", line:-166.5, z:-164.6, w:1.7, h:1.08, d:.6}),
+    // line/z are the nominal values: both bend with FrontFieldBend(index). skip = columns this row leaves
+    // bare (an exposed stretch the bounders have to cross: 09.23 review, "每行跳掉 1–2 列").
+    Object.freeze({id:"Bank", line:-193,   z:-191.2, w:1.5, h:1.35, d:.6, skip:Object.freeze(["CenterEast"])}),
+    Object.freeze({id:"Mound",line:-181.5, z:-179.3, w:1.6, h:1.15, d:.6, skip:Object.freeze(["CenterWest"])}),
+    Object.freeze({id:"Ridge",line:-173,   z:-171,   w:1.5, h:.94,  d:.6, skip:Object.freeze(["Center"])}),
+    Object.freeze({id:"Stub", line:-166.5, z:-164.6, w:1.7, h:1.08, d:.6, skip:Object.freeze(["WestGrave"])}),
   ]),
+  /** Per-piece variety (deterministic in the piece id): size, a small extra z offset, a yaw of up to ±15 deg and
+   *  what it is - a sandbagged stub (cover), a field bank / grave mound (earthDark) or a wall stub (structure). */
+  vary:Object.freeze({wAddM:[-.3,.9],hAddM:[-.2,.15],hBandM:[.75,1.3],zJitterM:.35,yawRad:.26,
+    kinds:Object.freeze(["cover","earthDark","earthDark","structure"])}),
   columns:Object.freeze([
     // NorthFarm stands on the Bank row here, so only the three southern rows are built.
     Object.freeze({id:"WestFarm",  x:Object.freeze([-60.5,-42.5]),rows:Object.freeze(["Ridge","Stub"])}),
@@ -88,9 +94,9 @@ export const FRONT_RIFLEMEN=Object.freeze([
   // Bounding group (跃进组): two teams of three, crater to crater down the corridors between
   // the cover columns, last line 6.5 m short of the crest (under Zhou's enfilade).
   // They start on the first bound line (z -193.4), kneeling behind the Bank row, and bound three times.
-  {id:"FrontRifleA",x:-34.9,z:-192.6,role:"bound"},{id:"FrontRifleB",x:-29.4,z:-192.6,role:"bound"},
-  {id:"FrontRifleC",x:-18.9,z:-192.6,role:"bound"},{id:"FrontRifleD",x:-3.6,z:-192.6,role:"bound"},
-  {id:"FrontRifleE",x:3.6,z:-192.6,role:"bound"},{id:"FrontRifleF",x:18.9,z:-192.6,role:"bound"},
+  // z = 0.4 m south of the first line where it bends past them (FrontFieldBend).
+  ...[["A",-34.9],["B",-29.4],["C",-18.9],["D",-3.6],["E",3.6],["F",18.9]].map(([k,x])=>
+    ({id:"FrontRifle"+k,x,z:+(-192.6+FrontFieldBend(0,x)).toFixed(2),role:"bound"})),
 ]);
 /** Every man the front stages put on this field. The cover rows never build on one of these
  *  firing positions - a bank standing on a man is a man standing in a bank. */
@@ -151,9 +157,10 @@ export const ClearLaneX=(x,baseX)=>{
 /** Bound points for a rifleman starting at (x,z): every line still south of him, laterally jittered but out of cover columns. Deterministic in (x,z). */
 export function FrontAssaultLane(x,z){
   const Random=LaneRandom(x,z),points=[];
-  for(const line of FRONT_ASSAULT.lines){
-    if(line<=z+1)continue;
-    points.push({x:ClearLaneX(x+(Random()*2-1)*FRONT_ASSAULT.lateralM,x),z:line});
+  for(const [i,line] of FRONT_ASSAULT.lines.entries()){
+    if(line+FrontFieldBend(i,x)<=z+1)continue;
+    const px=ClearLaneX(x+(Random()*2-1)*FRONT_ASSAULT.lateralM,x);
+    points.push({x:px,z:+(line+FrontFieldBend(i,px)).toFixed(3)});
   }
   // Men already south of the last line keep their authored cover position (no lane).
   return points;
@@ -186,6 +193,12 @@ export function FrontAssaultLaneCuts(x,z,w,d,slackM=.4){
   }
   return false;
 }
+/** One shell crater just south of every bounder's last bound point (kneeling cover where the lane leaves the
+ *  cover columns; replaces the 09.22 hand-placed three, which assumed straight lines). Terrain digs them. */
+export const FRONT_BOUND_CRATERS=Object.freeze(FRONT_RIFLEMEN.filter(s=>s.role==="bound").flatMap(s=>{
+  const last=FrontAssaultLane(s.x,s.z).at(-1);
+  // ...and one under each bounder's start on the first line: he kneels in a shell hole, not behind a row.
+  return [Object.freeze({x:s.x,z:s.z}),Object.freeze({x:+last.x.toFixed(2),z:+(last.z+1.15).toFixed(2)})];}));
 /** Authored (non-derived) front lanes: the flank group and the officer, start point first. */
 export function FrontExplicitLanes(){
   return [...FRONT_FLANK_GROUP,FRONT_OFFICER].map(spec=>[{x:spec.x,z:spec.z},...spec.lane]);
@@ -241,15 +254,19 @@ export const FRONT_BREACHES=[{x:-22,z:8,radius:4,depth:1.05},{...Sortie.gap,radi
 /** Flank group (侧翼组 = the designated assault group of 03): from behind NorthRuin's west wall,
  *  crater to crater toward the berm's east end. Their last line is around the end, where the
  *  gap is visible along the berm's south side; the captured nest enfilades it at 8-14 m. */
+// 2026-09-24 (review): the last line moved from the berm's south-east corner (9-14 m from the captured gun,
+// on the scrape's axis) out to a crater cluster north-east of the nest, 15-18 m from the seat: from there the
+// gap shows along the berm's south slope (46-51 m), and it is clear of the tank's Block/Squeeze hull and of
+// the escort slots. Every bound ends in a crater (FRONT_SPACE.flankCraters).
 export const FRONT_FLANK_GROUP=Object.freeze([
-  {id:"FrontFlankA",x:50,z:-192.4,role:"flank",lane:[{x:45.4,z:-192.8},{x:40,z:-181.5},{x:31.5,z:-173.6},{x:24.5,z:-168.4},{x:20.5,z:-161.5},{x:16.2,z:-158.4}]},
-  {id:"FrontFlankB",x:53,z:-192.6,role:"flank",lane:[{x:45.2,z:-193.4},{x:38,z:-183.2},{x:29.6,z:-176.2},{x:22.6,z:-168.8},{x:21.8,z:-165.2},{x:14.6,z:-157.6}]},
-  {id:"FrontFlankC",x:56,z:-192.4,role:"flank",lane:[{x:45.6,z:-194},{x:42,z:-183.5},{x:33.5,z:-177.4},{x:26.4,z:-170.2},{x:15.5,z:-162.8},{x:12.6,z:-156.9}]},
-  {id:"FrontFlankD",x:59,z:-192.6,role:"flank",lane:[{x:45.8,z:-194.6},{x:41,z:-186},{x:32.2,z:-179},{x:25.6,z:-172.2},{x:18.4,z:-159.6}]},
+  {id:"FrontFlankA",x:50,z:-192.4,role:"flank",lane:[{x:45.4,z:-192.8},{x:40.6,z:-181.6},{x:39.4,z:-174.6},{x:39.2,z:-162.2}]},
+  {id:"FrontFlankB",x:53,z:-192.6,role:"flank",lane:[{x:45.2,z:-193.4},{x:40.4,z:-185.4},{x:41,z:-175.8},{x:40.8,z:-162.6}]},
+  {id:"FrontFlankC",x:56,z:-192.4,role:"flank",lane:[{x:45.6,z:-194},{x:42.2,z:-183.4},{x:42.6,z:-174.2},{x:40.6,z:-164.8}]},
+  {id:"FrontFlankD",x:59,z:-192.6,role:"flank",lane:[{x:45.8,z:-194.6},{x:41,z:-186},{x:39.8,z:-176.6},{x:38.6,z:-165}]},
 ].map(Object.freeze));
 /** One officer (IJA01, sword prop, pistol shelved). Leads the flank group one bound behind it. */
 export const FRONT_OFFICER=Object.freeze({id:"FrontOfficer",x:54.5,z:-193.6,modelVariant:1,sword:true,role:"officer",
-  lane:[{x:45.8,z:-193.6},{x:41,z:-186.5},{x:33,z:-178.5},{x:27.4,z:-172.6}]});
+  lane:[{x:45.8,z:-193.6},{x:41,z:-186.5},{x:40.8,z:-178.8}]});
 /** Reinforcement entries (contract §2.8): all 60 m+ from the nest seat and the observation step,
  *  or hidden below a crest. The count is the budget per stage: 04 gets 2+2, 05 gets 1, so the
  *  worst case alive in 05 (nobody but the nest team dead in 03) is 30 = contract §6. */

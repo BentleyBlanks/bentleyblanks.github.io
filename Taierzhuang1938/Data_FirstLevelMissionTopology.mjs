@@ -185,8 +185,10 @@ export const MISSION_FRONT_COLLECTION_ROUTE = Object.freeze([
   S.collection,{x:-33,z:-106},Space.supportJunction,
 ]);
 /** 01-02 forward communication trench, west to east: SJ -> RC -> SSW leg -> bend M -> J. */
+// RC -> SJ zigzags (two 21 deg jogs, 09.24 review: a 25 m dead-straight trench is not how a communication trench
+// is dug); the 02 retreat still walks it as one straight leg inside the 3.4 m floor (<= 1.1 m off the centre).
 export const MISSION_BUNKER_TRENCH = Object.freeze([
-  Space.supportJunction,{x:-17,z:-111},Space.rearCorner,{x:-1,z:-118.5},Space.bunkerBend,Space.bunkerJunction,
+  Space.supportJunction,{x:-21,z:-109.9},{x:-14,z:-112.6},Space.rearCorner,{x:-1,z:-118.5},Space.bunkerBend,Space.bunkerJunction,
 ]);
 /** The link sap the 01 vanguard came down (from the lost east end, past the nest's rear junction). */
 export const MISSION_BUNKER_FRONT_SAP = Object.freeze([

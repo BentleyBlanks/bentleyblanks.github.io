@@ -35,7 +35,9 @@ export const MISSION_DEFENSE_OBJECTS = Object.freeze([
   // north-east (z -151.3..-158) and the west door (K10, z -150.3) - and wire stakes and strands are ray
   // colliders. North of those lines (z -152.4, then tilted) it cut the seat line and then the tank line.
   // The two east rolls sit 0.6 m further north to clear the right low trench's north-lip firing bay (11.3,-147.8).
-  ...[-2.9,.3,3.5,6.7,9.9,13.1].map((x,i)=>({id:`BackslopeWire${i}`,asset:"battlefieldBarbedWire02",x,z:x>8?-149.6:-149,ry:0,scale:1,solid:true})),
+  // 09.24 review (K10): the four west rolls sit 1.2 m further south (z -147.8) so that, seen from the west door and
+  // the seat, their stakes stand clear of a man crossing the gap instead of on top of him.
+  ...[-2.9,.3,3.5,6.7,9.9,13.1].map((x,i)=>({id:`BackslopeWire${i}`,asset:"battlefieldBarbedWire02",x,z:x>8?-149.6:-147.8,ry:0,scale:1,solid:true})),
   ...[55,58.2,61.4,67.8,71.2,74.4].map((x,i)=>({id:`EastWire${i}`,asset:"battlefieldBarbedWire02",x,z:-137,ry:.12,scale:1,solid:true})),
   {id:"WestRoadTimber",asset:"battlefieldBeamObstacle01",x:-55,z:-139,ry:.3,scale:1,solid:true},
   {id:"EastRoadTimber",asset:"battlefieldBeamObstacle01",x:62,z:-129,ry:-.25,scale:1,solid:true},

@@ -5,6 +5,7 @@ import { MissionVoiceTimeline } from "./Data_FirstLevelMissionVoiceTiming.mjs";
 import { MISSION_CIVILIAN_AFTERMATH } from "./Data_FirstLevelMissionCivilianAftermath.mjs";
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
 import { FirstLevelOpening, OpeningRecoveryTime, SampleOpeningPerception, ZhouGunExitRoute } from "./Script_FirstLevelOpening.mjs";
+import { FrontFieldBend } from "./Data_FirstLevelFrontRoute.mjs";
 import { MISSION_AFTERMATH, FRONT_BREACHES, FRONT_ASSAULT, FRONT_COVER, FRONT_FIELD_MEN, FRONT_RESERVES, FRONT_ASSAULT_STARTS, FrontAssaultLane, FrontReserveLane } from "./Data_FirstLevelMissionFront.mjs";
 import { COVER } from "./Data_Tuning_AiCover.mjs";
 import { STANCE } from "./Data_Tuning_Player.mjs";
@@ -630,7 +631,9 @@ const reserveLanes=Object.fromEntries(FRONT_RESERVES.map(spec=>[spec.id,[spec,..
 assert.equal(Object.keys(reserveLanes).length,R.frontReserveCount);
 const assaultLanes=Object.fromEntries(FRONT_ASSAULT_STARTS.map(start=>
   ["Assault"+start.id,[start,...FrontAssaultLane(start.x,start.z)]]));
-assert.ok(Object.values(assaultLanes).every(route=>route.length>=2&&route.at(-1).z===FRONT_ASSAULT.lines.at(-1)),"every assault lane ends on the last bound line");
+// 2026-09-24: the bound lines bend with the field (FrontFieldBend) - "on the last line" means on its bent z at that x.
+const LineZ=(i,x)=>FRONT_ASSAULT.lines[i]+FrontFieldBend(i,x);
+assert.ok(Object.values(assaultLanes).every(route=>route.length>=2&&Math.abs(route.at(-1).z-LineZ(3,route.at(-1).x))<.01),"every assault lane ends on the last bound line");
 assert.ok(Object.keys(assaultLanes).length>=24,"most front riflemen and every wave drop point get a bounding lane: "+Object.keys(assaultLanes).length);
 // 接防班（UpdateRelief）真正要走的那几条：契约路线 collectionReturn 反向的前五点，
 // 到前沿交通壕口之后沿 z≈-123 横到各自阵位。空间包把沿线几何建完之后这几条
@@ -737,6 +740,8 @@ console.log("ok authored capsule routes clear walls, crates and gun supports");
   for(const column of FRONT_COVER.columns)for(const row of FRONT_COVER.rows){
     if(column.rows&&!column.rows.includes(row.id))continue;
     const prefix="FrontCover"+row.id+column.id;
+    // 2026-09-24: each row leaves one column bare on purpose (an exposed stretch to cross).
+    if(row.skip?.includes(column.id)){assert.ok(!frontCover.some(block=>block.id.startsWith(prefix)&&/^\d+$/.test(block.id.slice(prefix.length))),prefix+" is left bare");continue;}
     assert.ok(frontCover.some(block=>block.id.startsWith(prefix)&&/^\d+$/.test(block.id.slice(prefix.length))),
       "the "+row.id+" row is built in the "+column.id+" column");
   }
@@ -746,9 +751,14 @@ console.log("ok authored capsule routes clear walls, crates and gun supports");
     assert.ok(block.h>=COVER.minUsefulM,block.id+" registers as a usable cover point");
     assert.ok(block.cover&&block.d/2<COVER.standoffM-.2,block.id+" is thin enough that its hide position clears the face");
   }
-  for(const row of FRONT_COVER.rows){
+  for(const [rowIndex,row] of FRONT_COVER.rows.entries()){
     assert.ok(row.z>row.line&&row.z-row.line<=2.5,`the ${row.id} row sits 0-2.5 m south of its line, between the man and the Chinese line`);
-    const xs=points.filter(point=>Math.abs(point.z-row.z)<.6).map(point=>point.x).sort((a,b)=>a-b);
+    // Each piece bends with its line (plus up to zJitterM further south): it stays south of the line at its own x.
+    for(const block of frontCover.filter(b=>b.id.startsWith("FrontCover"+row.id))){
+      const off=block.z-LineZ(rowIndex,block.x);
+      assert.ok(off>0&&off<=2.5+FRONT_COVER.vary.zJitterM,`${block.id} sits south of its bent line: ${off.toFixed(2)} m`);
+    }
+    const xs=frontCover.filter(block=>block.id.startsWith("FrontCover"+row.id)).map(point=>point.x).sort((a,b)=>a-b);
     for(let i=1;i<xs.length;i++)assert.ok(xs[i]-xs[i-1]>=COVER.minAllySpacingM,
       `${row.id} cover points stay minAllySpacingM apart so a squad line can hold neighbours: ${(xs[i]-xs[i-1]).toFixed(2)}`);
   }
@@ -757,12 +767,12 @@ console.log("ok authored capsule routes clear walls, crates and gun supports");
   // 2 of 31 live Japanese in the 46-74 m band holding a cover point at all.
   const registered=MISSION_LAYOUT.blocks.filter(block=>block.cover&&block.h>=COVER.minUsefulM);
   let covered=0,samples=0;
-  for(const line of FRONT_ASSAULT.lines){
-    const near=registered.filter(block=>Math.abs(block.z-line)<=R.assaultCoverSearchM);
+  for(const [lineIndex,line] of FRONT_ASSAULT.lines.entries()){
+    const near=registered.filter(block=>Math.abs(block.z-line)<=R.assaultCoverSearchM+3);
     let hit=0,count=0;
     for(let x=FRONT_ASSAULT.xRange[0];x<=FRONT_ASSAULT.xRange[1];x+=1){
       count++;
-      if(near.some(block=>Math.hypot(block.x-x,block.z-line)<=R.assaultCoverSearchM))hit++;
+      if(near.some(block=>Math.hypot(block.x-x,block.z-LineZ(lineIndex,x))<=R.assaultCoverSearchM))hit++;
     }
     covered+=hit;samples+=count;
     assert.ok(hit/count>=.7,`bound line ${line} has cover within assaultCoverSearchM over 70% of its span: ${(hit/count*100).toFixed(1)}%`);

@@ -60,11 +60,19 @@ export const SPACE_KEYFRAMES = Object.freeze([
         ignore: ["RightNestGablePeak", "RightNestEastGable"] },
       { name: "Zhou at the left gun (turn left, not in the frame)", at: S.leftSeat, heights: [1.1, 0.9], need: 1, frame: false },
     ] },
-  { id: "K4", label: "03 after capture: MG seat over the gap, the flank group and the road", state: "BunkerIntact",
+  // K4 is three looks from the captured gun, not one frame (gap west, flank group north-east, far road north-east:
+  // 120 deg apart): K4 the gap, K4b the flank group's last line, K4c the road far segment.
+  { id: "K4", label: "03 after capture: MG seat over the gap", state: "BunkerIntact", frameDeg: 40,
     camera: { x: S.seat.x, z: S.seat.z, eyeM: 1.5 }, look: { ...S.gap, h: 1.0 },
     targets: [
       { name: "the gap (crossing man)", at: S.gap, heights: Crouch, need: 2 },
-      ...FRONT_FLANK_GROUP.map((s) => ({ name: `${s.id} last line`, at: s.lane.at(-1), heights: Crouch, need: 1 })),
+    ] },
+  { id: "K4b", label: "03 after capture: MG seat on the flank group's last line", state: "BunkerIntact", frameDeg: 40,
+    camera: { x: S.seat.x, z: S.seat.z, eyeM: 1.5 }, look: { x: 39.6, z: -163.6, h: 1.0 },
+    targets: FRONT_FLANK_GROUP.map((s) => ({ name: `${s.id} last line`, at: s.lane.at(-1), heights: Crouch, need: 1 })) },
+  { id: "K4c", label: "03 after capture: MG seat on the far road", state: "BunkerIntact",
+    camera: { x: S.seat.x, z: S.seat.z, eyeM: 1.5 }, look: { ...W("HullDown"), h: 2.0 },
+    targets: [
       { name: "road far segment (HullDown turret)", at: W("HullDown"), heights: [T.turretTop, T.turret], need: 1 },
     ] },
   { id: "K5", label: "03 tank hull-down on the far road", state: "BunkerIntact",
@@ -94,6 +102,9 @@ export const SPACE_KEYFRAMES = Object.freeze([
     camera: { x: S.damagedLip.x, z: S.damagedLip.z, eyeM: 1.6 }, look: { ...W("Block"), h: 2.0 },
     targets: [
       { name: "tank at Block, turret", at: W("Block"), heights: [T.turretTop, T.turret], need: 1 },
+      // Recognising the same tank needs more than a turret corner: the upper hull shows along 4 m of its length
+      // (AttackRuinA, the attack branch's cover, hides the lower hull from here; that is the price of the 05 cover beat).
+      ...[-1.2, 0, 1.2, 2.4].map((dx) => ({ name: `upper hull at ${dx} m along`, at: { x: W("Block").x + dx, z: W("Block").z }, heights: [T.hullTop + 0.1], need: 1 })),
     ] },
   { id: "K9", label: "05 attack position: the tank's rear quarter", state: "BunkerIntact",
     camera: { x: S.throw.x, z: S.throw.z, eyeM: 1.5 }, look: { ...W("Block"), h: 1.2 },
@@ -103,12 +114,15 @@ export const SPACE_KEYFRAMES = Object.freeze([
       { name: "tank after the 05 squeeze", at: W("Squeeze"), heights: [1.2, 1.5], need: 2 },
     ] },
   { id: "K10", label: "05 the gap reopens, the rest of the line crosses", state: "BunkerIntact",
-    camera: { x: SP.westDoor.x, z: SP.westDoor.z, eyeM: 1.6 }, look: { ...S.gap, h: 1.2 },
+    // 1 m north of the door's middle: the backslope wire's stakes fall clear below-left of the crossing man.
+    camera: { x: SP.westDoor.x, z: SP.westDoor.z - 1.0, eyeM: 1.6 }, look: { ...S.gap, h: 1.2 },
     targets: [
       { name: "the gap (guard crossing, standing)", at: S.gap, heights: [1.4, 1.0], need: 2 },
     ] },
   { id: "K11", label: "06 back at the collection, borrowing a light", state: "BunkerIntact",
-    camera: { x: -36.5, z: -98.5, eyeM: 1.6 }, look: { x: -36.4, z: -95.9, h: 0.9 },
+    // Look 30 deg east of Zhou: he sits right of centre at the wall's east end; the litter wall runs off the right
+    // edge instead of filling half the frame, the collection and its litters fill the left.
+    camera: { x: -36.5, z: -98.5, eyeM: 1.6 }, look: { x: -34.9, z: -95.9, h: 0.9 },
     targets: [
       { name: "Zhou sitting at the litter wall", at: { x: -36.4, z: -95.9 }, heights: [1.0, 0.8], need: 2 },
     ] },
