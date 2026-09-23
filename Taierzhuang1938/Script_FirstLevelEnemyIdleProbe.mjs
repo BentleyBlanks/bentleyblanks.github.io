@@ -45,6 +45,10 @@ const G = Object.freeze({
   groupMoveS: 15, groupMoveM: 2,
 });
 
+/** 每人每帧的数（采样器 rows 的步长）与环境射击闸码的名字。 */
+const ROW = 9;
+const GATE_NAMES = Object.freeze(["-", "noPoints", "legalTarget", "noPick", "notOwn", "ammo", "timer", "hidePhase", "turnAimLof"]);
+
 const Kit = await Load("Script_FirstLevelCampaignKit.mjs");
 const { Drive: DriveFront } = await Load("Script_FirstLevelCampaignFront.mjs");
 const { FIRST_LEVEL_STAGES } = await Load("Data_FirstLevelMissionStages.mjs");
@@ -57,7 +61,7 @@ const { page } = ctx;
 let driveError = null;
 
 // ---------------------------------------------------------------------------
-// 页内采样器：挂在 ai.Update 后面，每 0.1 s 游戏时间记一帧（紧凑数组，8 个数一人）。
+// 页内采样器：挂在 ai.Update 后面，每 0.1 s 游戏时间记一帧（紧凑数组，ROW=9 个数一人，末位是环境射击闸码）。
 // ---------------------------------------------------------------------------
 await page.evaluate(({ rangeM, sampleS }) => {
   const g = window.Tengxian, ai = g.ai;
@@ -66,6 +70,18 @@ await page.evaluate(({ rangeM, sampleS }) => {
     let c = P.stateIndex.get(st);
     if (c === undefined) { c = P.states.length; P.states.push(st); P.stateIndex.set(st, c); }
     return c;
+  };
+  // 环境射击这一帧卡在哪道闸（没有 AmbientBlocked 的旧树一律 0）。
+  const Gate = (s) => {
+    if (typeof ai.AmbientBlocked !== "function") return 0;
+    if (!s.ambientFirePoints || !s.ambientFirePoints.length) return 1;
+    if (!ai.AmbientBlocked(s)) return 2;
+    if (!s.ambientFirePoint) return 3;
+    if (!ai.AmbientOwnsAim(s)) return 4;
+    if (s.ammo <= 0) return 5;
+    if (s.fireTimer > 0) return 6;
+    if (s.state === "cover_engage" && s.coverPhase !== "peek") return 7;
+    return 8;
   };
   const Sample = () => {
     const rt = g.Debug.FirstLevelMissionRuntime?.();
@@ -91,7 +107,7 @@ await page.evaluate(({ rangeM, sampleS }) => {
       if (s.actor?.root && s.actor.root.visible === false) f |= 2048; if (s.meleeCombat) f |= 4096;
       if (s.ambientFirePoints && s.ambientFirePoints.length) f |= 8192;
       rows.push(i, Math.round(s.position.x * 10), Math.round(s.position.z * 10), s.fireSequence | 0, s.ambientShots | 0, f,
-        StateCode(s.state), s.stance | 0);
+        StateCode(s.state), s.stance | 0, Gate(s));
       if (tg && !tg.isPlayer) {
         const guard = guards.get(tg.id);
         // 「放行前」＝守军身上还挂着 missionUntargetable（FrontBattle.UpdateGuards 每帧写）。
@@ -194,11 +210,11 @@ function AnalyzeEnemyIdle({ meta, states, ticks }) {
   // 每人的逐帧序列（按全局帧号对齐，不在场的帧是空位）。
   const series = new Map();
   ticks.forEach((t, k) => {
-    for (let j = 0; j < t.rows.length; j += 8) {
+    for (let j = 0; j < t.rows.length; j += ROW) {
       const i = t.rows[j];
       if (!series.has(i)) series.set(i, new Array(ticks.length));
       series.get(i)[k] = { x: t.rows[j + 1] / 10, z: t.rows[j + 2] / 10, fs: t.rows[j + 3], amb: t.rows[j + 4],
-        f: t.rows[j + 5], st: states[t.rows[j + 6]], sn: t.rows[j + 7] };
+        f: t.rows[j + 5], st: states[t.rows[j + 6]], sn: t.rows[j + 7], gate: t.rows[j + 8] ?? 0 };
     }
   });
   const segs = new Map();
@@ -232,7 +248,8 @@ function AnalyzeEnemyIdle({ meta, states, ticks }) {
       for (let j = k; j < k + W4; j += 1) still[j] = true;
       if (b.fs === a.fs) for (let j = k; j < k + W4; j += 1) idle[j] = true;
     }
-    let n = 0, idleN = 0, shots = 0, amb = 0;
+    let n = 0, idleN = 0, shots = 0, amb = 0, gatedN = 0, gatedIdle = 0;
+    const gatedWhy = new Map();
     const nest = m.enc === "approach" && !IsMg(m);
     for (let k = 0; k < ser.length; k += 1) {
       const r = ser[k];
@@ -241,10 +258,18 @@ function AnalyzeEnemyIdle({ meta, states, ticks }) {
       s.personTicks += 1; s.soldiers.add(i); n += 1;
       if (idle[k]) {
         s.idle4 += 1; idleN += 1;
-        const why = `${r.st} s${r.sn}${r.f & 1 ? " cover" : " open"}${r.f & 64 ? (r.f & 128 ? " tgtPlayer" : " tgtOther") : " noTgt"}${r.f & 256 ? " seen" : ""}${r.f & 4 ? " fireHold" : ""}${r.f & 8 ? " standby" : ""}${r.f & 2 ? " noncombat" : ""}${r.f & 16 ? " guided" : ""}${r.f & 32 ? " hold" : ""}${r.f & 8192 ? " ambPts" : ""}${r.f & 2048 ? " culled" : ""}`;
+        const why = `${GATE_NAMES[r.gate] || r.gate} ${r.st} s${r.sn}${r.f & 1 ? " cover" : " open"}${r.f & 64 ? (r.f & 128 ? " tgtPlayer" : " tgtOther") : " noTgt"}${r.f & 256 ? " seen" : ""}${r.f & 4 ? " fireHold" : ""}${r.f & 8 ? " standby" : ""}${r.f & 2 ? " noncombat" : ""}${r.f & 16 ? " guided" : ""}${r.f & 32 ? " hold" : ""}${r.f & 8192 ? " ambPts" : ""}${r.f & 2048 ? " culled" : ""}`;
         s.idleWhy.set(why, (s.idleWhy.get(why) || 0) + 1);
       }
       if (still[k]) s.still4 += 1;
+      if (G.gatedSteps.includes(ticks[k].step)) {
+        gatedN += 1;
+        if (idle[k]) {
+          gatedIdle += 1;
+          const key = `${GATE_NAMES[r.gate] || r.gate}/${r.st}`;
+          gatedWhy.set(key, (gatedWhy.get(key) || 0) + 1);
+        }
+      }
       const prev = k > 0 ? ser[k - 1] : null;
       if (prev) {
         const d = r.fs - prev.fs, da = r.amb - prev.amb;
@@ -259,6 +284,8 @@ function AnalyzeEnemyIdle({ meta, states, ticks }) {
     }
     perSoldier.push({ id: m.id, mid: m.mid, enc: m.enc, grp: m.grp, wk: m.wk, off: m.off, seconds: +(n * G.sampleS).toFixed(1),
       shots, ambient: amb, idle4: n ? +(idleN / n).toFixed(2) : 0,
+      gatedS: +(gatedN * G.sampleS).toFixed(1), gatedIdleS: +(gatedIdle * G.sampleS).toFixed(1),
+      gatedWhy: [...gatedWhy].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => `${k}:${(v * G.sampleS).toFixed(0)}s`),
       steps: [...new Set(ser.map((r, k) => r ? ticks[k].step : null).filter(Boolean))] });
   }
   // 30 s 窗口：全局按时间切，窗口归中点所在的阶段 / 相位；在场 ≥ 90% 的人才进分母。
@@ -360,6 +387,9 @@ function PrintReport(r) {
   console.log("\n== most idle soldiers ==");
   for (const s of r.soldiers.slice(0, 12))
     console.log(`${s.mid || s.id} enc=${s.enc} grp=${s.grp} ${s.wk}${s.off ? " officer" : ""} ${s.seconds}s idle4=${Pct(s.idle4)} shots=${s.shots} amb=${s.ambient} steps=${s.steps.join(",")}`);
+  console.log("\n== 03–05 idle seconds per soldier (top 15; reason = ambient gate / state) ==");
+  for (const s of [...r.soldiers].sort((a, b) => b.gatedIdleS - a.gatedIdleS).slice(0, 15))
+    if (s.gatedIdleS > 0) console.log(`${(s.mid || String(s.id)).padEnd(22)} ${String(s.grp).padEnd(12)} ${String(s.wk).padEnd(9)} idle ${String(s.gatedIdleS).padStart(6)}s / ${s.gatedS}s  ${s.gatedWhy.join("  ")}`);
   console.log("\n== player damage by step (hp lost; bullet / blast / melee; top shooters) ==");
   for (const [step, b] of Object.entries(r.playerHits.bySteps))
     console.log(`${step.padEnd(14)} lost=${b.lost} (${b.hits} hits)  bullet=${b.bullet} blast=${b.blast} melee=${b.melee} other=${b.other}  ${JSON.stringify(b.who)}`);
