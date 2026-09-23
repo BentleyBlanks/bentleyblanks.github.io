@@ -9,7 +9,7 @@
 | `Script_FirstLevelTankBrain.mjs` | 纯规则大脑（无 three，node 可跑）：驾驶 / 炮手 / 机枪 / 反应 / 护兵槽 / 两段毁伤 |
 | `Data_Tuning_Tank.mjs` | 全部数值（带出处）+ 临时路点 `TANK_TEMP_PATH`（现布局）+ 开关 `brainEnabled` |
 | `Script_FirstLevelTankRuntime.mjs` | 接线层：世界 → 大脑（目标、视线、掩体沿、车体挂点、事实、许不许开火、护兵名单），大脑 → 世界（位姿、开火、护兵走位、事实、震屏、可破坏掩体） |
-| `Script_FirstLevelFrontBreakables.mjs` | 可破坏掩体机制（分段体块）+ 临时数据 `FRONT_BREAKABLES_TEMP` |
+| `Script_FirstLevelFrontBreakables.mjs` | 可破坏掩体机制（分段体块）；临时数据 `FRONT_BREAKABLES_TEMP` 与永不可破规则 `NEVER_BREAKABLE_RULES` 在 `Data_Tuning_Tank.mjs` |
 | `Script_Type89Damage.mjs` | 毁伤表现分两段：`trackCut`（掉履带板、撕挡泥板、车体塌向断侧）与 `engineKilled`（掀后甲板、冒黑烟）；不带 `damageState` 的旧调用两样一起上 |
 
 运行时只留钩子：`Runtime.UpdateTank()` 第一行、`Runtime.OnBlast(event)`、`Runtime.OnTankHit(point, from)`（Main 的玩家 / 架设机枪弹道命中 `missionTank` 时调用）、`FrontBattle.TankBlockade / UpdatePressure` 各一处。`Data_Tuning_Tank.brainEnabled = false` 回到旧的定时插值路径。
@@ -32,7 +32,7 @@
 - 位姿按车体轴取地面（旧版按世界 ±Z/±X，车头朝西时前后左右对不上）。
 - VFX：主炮 `MUZZLE_KINDS.cannon` + `GroundDustRing`（地面尘环 1.3 s）；两条履带后方扬尘（车体局部）；排气常开 + 负载 ≥ 0.55 时一股黑烟。
 - 震屏：`CameraShake.Rumble(distance, load)`（25 m 内，不进创伤桶，俯仰 ≤ 3 mrad）；30 m 内开炮一记俯仰冲击。
-- 战斗：`Combat.Blast` 对 `Shell57`（战车 57 mm）墙后 6 m 内只给压制不掉血（`BLAST.occludedSuppression*`）。
+- 战斗：战车主炮这一发带 `FireShell(..., { occludedSuppression: true })`，`Combat.Blast` 对带开关的那一发墙后 6 m 内只给压制不掉血（`BLAST.occludedSuppression*`）。不按弹种认：别的关卡的九七式同样打 57 mm，口径不变。
 
 ## 声音（Step 2）
 
@@ -59,10 +59,28 @@
 
 数据格式见 `Script_FirstLevelFrontBreakables.mjs` 文件头。每块墙预建各段网格；炮弹（伤害 ≥ `minDamage`）落在离墙面 `hitRadiusM` 内打掉一段：换可见性 + `AddSolid/RemoveSolid`，碎块走 `vfx.Impact`。布局里标 `dynamic:true` 的块不进静态合批（首选）；没标时运行时把静态合批里那块的顶点塌到墙脚、摘掉碰撞（临时演示用）。永远不可破坏：`RightNestRearWall`、`RightNestEastWall`、支沟、守军安全区（`NEVER_BREAKABLE`）。临时数据：`RightNestFrontRest` 西半段三段（缴获机枪架在正中，不悬空），`RightNestNorthRuin` 两段。`GAMEPLAY_DESTRUCTION_ENABLED` 仍为 false。
 
+## 2026-09-24 审查修复
+
+两位审查者的发现逐条核过；改动都在本包文件与已有薄钩子里。
+
+- **断履带以后不卡关**：`BundleResupplyOpen(tank, bundleTaken)`（大脑模块导出）—— 大脑接管时 `MobilityKill` 以后弹药屋照样能领集束弹（旧判据 `!immobilized` 会在第一颗断履带后把屋子关掉，两捆都没炸到位就死锁）。兜底：`MobilityKill` 且玩家手里 0 捆僵 `damage.luoFinishS`（30 s）→ 罗班长补刀：舱盖上一团零伤害的爆炸 + `ForceDisable("luoHatch")`（`LuoFinishDue`）。
+- **「车解决了没有」一个判据**：`TankClearFact(tank)`（大脑接管 = `tankFireDisabled`，旧路径 = `tankImmobilized`）。`FrontBattle.UpdateSortie` 的带路人撤退腿、`FrontShow` 的「停了！口子能过！」都用它 —— 断履带时带路人留在攻击位、不喊「能过」。`BundleReturnCall` 的挤压判据改按水平位移（新挤压往西推，旧判据只认往南）。
+- **05 的真实威胁**：打不死的剧情人物（`scriptEssential`）进目标表带 `essential`，权重 × `gunner.essentialScale`（0.12）—— 原来 05 的主炮全打 60–80 m 外守左机枪的何有田。攻击支路做成区域目标：路点表 `lanes[]`（`attackLane`：`FRONT_SORTIE.attackRoute` 起点东挪 4 m，领过集束弹才算），玩家进沟线 3.5 m 以内，沿线离他最近、按 3 m 取整的点就是区域目标（`LanePoint`），看不见轰沟沿（墙挡弹片只剩压制），站起来被看见就直接打人；预兆链不变。区域目标进了主炮最小射程就不再规划。
+- **04 撤离不再被主炮打死**：剧本撤离窗口（04 `tankPositionPressured` 以后、`rightRearReached` 以前）玩家目标带 `damageCap = gunner.retreatDamageScale`（0.2）与 `weightScale 0.5`，落在他弹片范围（9.8 m）里的每一发只按上限伤人。目标离上一发瞄准时的位置挪开 `gunner.moveResetM`（4 m）以上，散布回到第一发（不再越打越准地追着撤退的人）。
+- **掩体真被一截截打掉**：主炮开火带 `coverDamage`（整发 85）—— 警告弹 / 撤离窗口只是不要人命，墙沿照样掉一截。
+- **可破坏掩体**：永不可破改成按体块名 + 按区域（`NEVER_BREAKABLE_RULES.zones = ["rightRear", "withdrawalGap"]`，`MISSION_LAYOUT.zones` 的语义 id；原名单里 `SapTrench / GuardSafeZone` 两个名字布局里根本没有）。临时数据挪到 `Data_Tuning_Tank.FRONT_BREAKABLES_TEMP`。`Dispose()` 把 `TakeOverStatic` 塌掉的静态顶点与摘掉的碰撞盒还回去（读档重建任务运行时而战场不重建时墙不会永久消失）。
+- **开炮尘环**：两圈（外圈铺开、内圈堆高）、34 粒（下限 22，低画质也减不没）、不透明 0.55、终态 2.4–3.4 m，数值在 `view.groundRing`。
+- **进场闸** `TANK.entry`：临时路线起点离阵位 130 m、**有视线**（能不能看见全靠雾，原注释「高地后面看不见」是错的）；阵位夺下后只在起点对玩家没视线、或在他朝向 ±1.15 rad 以外（屏幕外）时开进图，最多等 30 s。
+- **开销**：`Disabled` 熄火完以后不再每帧拼世界（`World / Targets` 与三次炮口取点），只让大脑走时钟；护兵锚点挪 1.5 m 才重下 `Defend`（原 0.4 m ≈ 巡航时每人 5 Hz）；停车时锚点推到 `ai.covers.Nearby` 的路边掩体点。
+- **喊话接口**：`TANK.barkCues`（bark id → 台词 cue，同一条隔 8 s）；现在全是 `null`，等 Voice 包出「炮塔转过来了！」「履带断了！还在打！再补一捆！」等 cue 后只填表。
+- **驱动器**：`DriveBundleThrow` 默认 `aim:"farTrack"` —— 越过车顶扔到远侧履带边（车体挡弹片；近侧那一版爆点离投掷者 4 m，每颗自伤 40–52 血），弧线余量按「车体外廓内 = 车顶」算；`"deck"` 扔上后甲板。返回 `selfBlast`，campaign 断言 ≤ 10。后甲板部位 `engineDeck` 顶到 2.62 m：车的碰撞盒是一整只 2.56 m 高的盒子，扔上车顶的那捆停在盒顶。
+- **探针**：`options.tankProbe` 下断履带后在攻击位蹲 9 s 记车在 `MobilityKill` 里朝投掷者开了几次火，第二颗扔上后甲板验发动机那一路；新断言：玩家真在攻击支路上的那段时间里他脚下那段沟被炮塔 / 车体机枪指着 ≥ 25%、05 主炮打剧情人物 ≤ 1 发、05 车体机枪 ≥ 1 串、04 至少打掉一段掩体、第二颗 = 发动机部位；卡住时写 `Data_TankProbeStuck.json`（按键、姿态、速度、周围实体与人、附近弹坑）。`--frame-ab`：同页交替 A/B（大脑 vs 旧路径）量帧时间与音频节点。
+
 ## 给第二波
 
 - Space 的新路点换掉 `TANK_TEMP_PATH`（`new FirstLevelTankRuntime(runtime, { path, breakables })`）；新 `Data_FirstLevelFrontBreakables` 换掉 `FRONT_BREAKABLES_TEMP`。
 - 护兵名单读 `MISSION_ENCOUNTERS.tank`（现在 2 人，槽位 4 个）；要满编需在名册里补到 4 人。
-- 大脑的 `barks`（`turretTraverse / hatchShout / escortScatter / visionSlit / trackCut / tankDisabled`）现在只记进日志、没有台词 cue（`visionSlit / hatchShout` 已有机械声）；罗班长的预兆喊话、日军「车旁有人」需要 Voice 包出 cue 再接。
+- 大脑的 `barks`（`turretTraverse / hatchShout / escortScatter / visionSlit / trackCut / tankDisabled`）经 `TANK.barkCues` 接 `Say`，表里现在全是 `null`（`visionSlit / hatchShout` 已有机械声）；Voice 包出 cue 后只填表。
+- 换路以后：`lanes[]`（区域火力沟线）、`scan[]`、`entry`（起点要真有遮挡再加断言）都跟新路一起换；`NEVER_BREAKABLE_RULES.zones` 按 `MISSION_LAYOUT.zones` 的语义 id 认，zone id 不变就跟着新布局走。
 - 换路以后：`OffstagePoint()` 取新路的第一个路点，03 的「先闻其声」自动跟着走；新路起点离玩家的距离决定能不能听见（现路线 130–196 m）。
 - 取证：`Debug.FirstLevelMission().tankBrain`（大脑快照、主炮每发的预兆时长与落点、机枪点射、反应、毁伤序列、掩体段数、露面时刻）。

@@ -141,7 +141,9 @@ export class FirstLevelTankRuntime {
     // 区域目标：04 先压阵位（保证 tankPositionPressured 有真炮弹兑现），压住以后封缺口。
     if (stage === "MachineGun" && !r.Has("tankPositionPressured")) {
       const g = this.Ground(S.nest.x, S.nest.z);
-      out.push({ id: "nestZone", kind: "zone", weight: 3, x: S.nest.x, z: S.nest.z, y: g + 1.1, ground: g, scatterM: [1.2, 2.6] });
+      // 权重 6：玩家离开阵位（躲雷、乱跑）时也要先压阵位 —— 否则炮手一直追着人打、这一拍永远兑现不了
+      // （2026-09-24 探针实测：玩家跑到阵位东边 15 m，100 s 里 13 发全打人、tankPositionPressured 没记，04 卡住）。
+      out.push({ id: "nestZone", kind: "zone", weight: this.T.nestZoneWeight, x: S.nest.x, z: S.nest.z, y: g + 1.1, ground: g, scatterM: [1.2, 2.6] });
     }
     if (r.Has("tankPositionPressured") && !r.Has("lastGuardsWithdrawn")) {
       const g = this.Ground(S.gap.x, S.gap.z);

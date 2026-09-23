@@ -479,7 +479,7 @@ export class TankBrain {
     } else if (m.zone) {
       const r = this.Range(t.scatterM?.[0] ?? G.zoneScatterMinM, t.scatterM?.[1] ?? G.zoneScatterMaxM) * Math.sqrt(this.rng());
       const a = this.rng() * Math.PI * 2;
-      at = { x: m.x + Math.cos(a) * r, y: ground + 0.3, z: m.z + Math.sin(a) * r };
+      at = { x: m.x + Math.cos(a) * r, y: ground + G.burstRiseM, z: m.z + Math.sin(a) * r };
       kind = "zone";
     } else if (!choice.visible) {
       // 看不见：按 lastKnown 的掩体打（掩体沿，没有就地面）。
@@ -510,7 +510,7 @@ export class TankBrain {
       const n = t.id === this.targetId ? this.shotsOnTarget : 0;
       const scatter = Math.max(G.scatterMinM, G.scatterFirstM * G.scatterShrink ** n);
       const r = scatter * Math.sqrt(this.rng()), a = this.rng() * Math.PI * 2;
-      at = { x: m.x + lx + Math.cos(a) * r, y: ground + 0.5, z: m.z + lz + Math.sin(a) * r };
+      at = { x: m.x + lx + Math.cos(a) * r, y: ground + G.burstRiseM, z: m.z + lz + Math.sin(a) * r };
     }
     const cleared = this.ClearOfProtected(at, world);
     if (!cleared) return null;
@@ -666,6 +666,9 @@ export class TankBrain {
       }
     }
     if (!pick) return false;
+    // 撤离窗口（目标带 damageCap）：机枪这一串也只按上限伤人（压制照旧）。
+    const capped = (world.targets || []).find((t) => t.id === pick.id && t.damageCap != null);
+    if (capped && pick.damage) pick.cap = capped.damageCap;
     slot.burst = { ...pick, start: this.time, shots: 0 };
     slot.phase = "burst"; slot.until = this.time + M.burstS; slot.nextShot = this.time;
     this.telemetry.bursts.push({ t: this.time, weapon, kind: pick.kind, target: pick.id, damage: pick.damage });
@@ -682,7 +685,7 @@ export class TankBrain {
         const n = ++b.shots, spread = M.spreadM + (M.spreadPerM || 0) * Dist(b.point, this);
         at = { x: b.point.x + Math.sin(n * 2.399) * spread, y: b.point.y + Math.cos(n * 1.79) * spread * 0.3, z: b.point.z + Math.cos(n * 2.399) * spread };
       }
-      this.fire.push({ weapon, at, kind: b.kind, target: b.id, damageScale: b.damage ? M.damageScale : 0 });
+      this.fire.push({ weapon, at, kind: b.kind, target: b.id, damageScale: b.damage ? M.damageScale * (b.cap ?? 1) : 0 });
       slot.nextShot += M.shotIntervalS;
     }
     if (this.time >= slot.until) { slot.phase = "rest"; slot.until = this.time + this.Range(M.restMinS, M.restMaxS); slot.burst = null; }

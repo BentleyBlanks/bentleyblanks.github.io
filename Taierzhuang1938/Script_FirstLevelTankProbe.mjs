@@ -3,6 +3,7 @@
 //   node Taierzhuang1938/Script_FirstLevelTankProbe.mjs               # 03→06 真实输入跑一趟（开声音）+ 关键画面
 //   node Taierzhuang1938/Script_FirstLevelTankProbe.mjs --no-photos   # 只跑数据
 //   node Taierzhuang1938/Script_FirstLevelTankProbe.mjs --photos-only # 只拍关键画面（摆位，不跑战斗）
+//   node Taierzhuang1938/Script_FirstLevelTankProbe.mjs --frame-ab    # 契约 §6：同页交替 A/B（大脑接管 vs 旧路径）量帧时间与音频节点
 //
 // 记下（_shots/FirstLevelTankProbe/Data_TankProbe.json）：
 //   · 露面：玩家第一次看见炮塔的时刻 / 阶段 / 距离；那一刻玩家在不在车的视线里；引擎声比露面早多少秒响起；
@@ -26,7 +27,8 @@ import { TANK, TANK_TEMP_PATH } from "./Data_Tuning_Tank.mjs";
 import { LanePoint, YawTo } from "./Script_FirstLevelTankBrain.mjs";
 
 const argv = process.argv;
-const photos = !argv.includes("--no-photos");
+const frameAb = argv.includes("--frame-ab");
+const photos = !argv.includes("--no-photos") && !frameAb;
 const photosOnly = argv.includes("--photos-only");
 const Wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 const Round = (v, n = 2) => (Number.isFinite(v) ? Number(v.toFixed(n)) : v);
@@ -283,5 +285,66 @@ async function Photos() {
   }
 }
 
-if (!photosOnly) await RunCampaign();
-if (photos || photosOnly) await Photos();
+/**
+ * 契约 §6 帧时间 / 音频节点：同一页里交替跑「大脑接管」(A) 与「旧的定时插值路径」(B，等同 brainEnabled=false)，
+ * 每块 blockFrames 帧、交替 rounds 轮，量 StepFrames(1)+gl.finish() 的整帧耗时与 audio.liveNodes 峰值。
+ * 两处：04 刚进来（车在火力点压阵位，≈ campaign 的 FirstBatchSafe 取样时刻）与 04 封口（车在封口点、区域目标换成缺口，
+ * ≈ campaign 的 MachineGun 取样时刻）。开声音（menu=0）。只做记录，阈值断言在 §6（p95 ≤ 基线 ×1.2）。
+ */
+async function FrameAb() {
+  const options = ParseCampaignArgs(["node", "x", "--campaign", "--stage-from=3", "--stage-to=6", "--audio"]);
+  options.suite = "FirstLevelTankProbe";
+  const ctx = await OpenCampaign(options);
+  const { page, output } = ctx;
+  const results = {};
+  try {
+    await Unlock(page);
+    await page.evaluate(async () => { const g = window.Tengxian; await g.Debug.FirstLevelJump(4); g.player.TakeHit = () => {}; });
+    const Measure = (label, rounds = 8, blockFrames = 30) => page.evaluate(({ rounds, blockFrames }) => {
+      const g = window.Tengxian, R = g.Debug.FirstLevelMissionRuntime(), tr = R.tankRuntime, gl = g.renderer.getContext();
+      const out = { A: [], B: [], nodesA: 0, nodesB: 0, tankMsA: [], stateA: null };
+      const update = tr.Update.bind(tr);
+      let tankMs = 0;
+      tr.Update = (dt) => { const s = performance.now(); update(dt); tankMs = performance.now() - s; };
+      for (let round = 0; round < rounds; round++) {
+        for (const mode of round % 2 ? ["B", "A"] : ["A", "B"]) {
+          R.tankRuntime = mode === "A" ? tr : null;
+          if (mode === "B") tr.sound?.Stop();
+          g.StepFrames(4, 1 / 60, true);   // 换路径的头几帧不算
+          for (let i = 0; i < blockFrames; i++) {
+            tankMs = 0;
+            const start = performance.now(); g.StepFrames(1, 1 / 60, true); gl.finish();
+            out[mode].push(performance.now() - start);
+            if (mode === "A") out.tankMsA.push(tankMs);
+            out["nodes" + mode] = Math.max(out["nodes" + mode], g.audio?.liveNodes ?? 0);
+          }
+        }
+      }
+      R.tankRuntime = tr; tr.Update = update;
+      const Stats = (list) => { const s = [...list].sort((a, b) => a - b); return { n: s.length, p50: +s[Math.floor(s.length * 0.5)].toFixed(2),
+        p95: +s[Math.floor(s.length * 0.95)].toFixed(2), mean: +(s.reduce((a, b) => a + b, 0) / s.length).toFixed(2) }; };
+      return { A: Stats(out.A), B: Stats(out.B), ratioP95: +(Stats(out.A).p95 / Stats(out.B).p95).toFixed(3),
+        tankUpdateMsA: Stats(out.tankMsA), nodes: { A: out.nodesA, B: out.nodesB },
+        tank: { state: R.tank.damageState, x: +R.tank.x.toFixed(1), z: +R.tank.z.toFixed(1), waypoint: R.tank.waypoint } };
+    }, { rounds, blockFrames });
+    // 04 刚进来：车走到火力点、开始压阵位。
+    await page.evaluate(() => window.Tengxian.StepFrames(60 * 14, 1 / 60, false));
+    results.MachineGunEntry = await Measure("MachineGunEntry");
+    console.log("FRAME_AB MachineGunEntry", JSON.stringify(results.MachineGunEntry));
+    // 04 封口：压住了阵位，车开到封口点，目标换成缺口。
+    await page.evaluate(() => { const g = window.Tengxian, R = g.Debug.FirstLevelMissionRuntime();
+      R.Record("tankPositionPressured", { probe: true }); g.StepFrames(60 * 16, 1 / 60, false); });
+    results.MachineGunBlock = await Measure("MachineGunBlock");
+    console.log("FRAME_AB MachineGunBlock", JSON.stringify(results.MachineGunBlock));
+    await fs.writeFile(path.join(output, "Data_TankFrameAb.json"), JSON.stringify({ method: "same page, alternating A (brain) / B (legacy path) blocks of 30 frames × 8 rounds, StepFrames(1)+gl.finish(), audio on", results }, null, 2));
+    assert.deepEqual(ctx.errors, [], "no page errors during the A/B");
+  } finally {
+    await CloseCampaign(ctx);
+  }
+}
+
+if (frameAb) await FrameAb();
+else {
+  if (!photosOnly) await RunCampaign();
+  if (photos || photosOnly) await Photos();
+}

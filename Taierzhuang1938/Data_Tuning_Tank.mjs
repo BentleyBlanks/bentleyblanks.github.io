@@ -92,6 +92,10 @@ export const TANK = Object.freeze({
     // [旧] 炮弹：半径 5 m、伤害 85（与原 FireShell 一致）。
     shellRadiusM: 5,
     shellDamage: 85,
+    // HE 瞄点离地高度：要贴着地面，炮弹才在瞄点炸（FireShell 只在碰到地面 / 实体时起爆）。
+    // 2026-09-24 实测：原来瞄离地 0.5 m，打人的弹从瞄点上方飞过去、落在 17 m 外 —— 04 撤回后墙的路上
+    // (34–36, −124) 一串弹坑就是这么来的。
+    burstRiseM: 0.05,
     // 散布：第一发 3.2 m，同一目标每连发一发 ×0.62，下限 0.7 m（「越打越准」）。
     scatterFirstM: 3.2,
     scatterShrink: 0.62,
@@ -340,6 +344,8 @@ export const TANK = Object.freeze({
   // tankPositionPressured「炮弹实际命中右侧射位周边」：阵位四周的墙（东墙 6.5 m、北面残墙 5 m）
   // 挡下的炮弹落在 7.5–9.5 m 上（2026-09-23 实跑），旧的 8 m 让玩家在阵位上多挨三发才放行撤退。
   pressureRadiusM: 10,
+  // 04 阵位区域目标的权重（× gunner.weights.zone 0.55）：高过玩家 / 机枪手，保证「先压阵位」一定兑现。
+  nestZoneWeight: 6,
 
   // --- 表现（运行时读） ----------------------------------------------------------
   view: Object.freeze({
