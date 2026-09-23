@@ -25,7 +25,9 @@ const CAPSULE_R = 0.35;
 const walkable = new Set(L.walkableSurfaces.map((s) => s.id));
 const scenario = Object.fromEntries(L.scenario.states.map((s) => [s.id, s.blocks.filter((b) => b.solid !== false)]));
 const base = L.blocks.filter((b) => b.solid !== false && !walkable.has(b.id));
-// Wire rolls block movement (native ~3.2 x 0.9 x 1.28 m), never sight.
+// Wire rolls block movement (native ~3.2 x 0.9 x 1.28 m). For sight they are mostly open, but their stakes and
+// strands are ray colliders in the runtime (tag "fence"), so the lanes the runtime itself asserts on (seat and
+// gun onto the gap) are measured with `wire: true` against the whole roll envelope (ProbeWireLanes).
 const wire = MISSION_DEFENSE_OBJECTS.filter((o) => o.solid && /Wire/.test(o.asset))
   .map((o) => ({ id: o.id, x: o.x, z: o.z, w: 3.2, d: 0.9, h: 1.28, y: G(o.x, o.z) + 0.64, ry: o.ry || 0 }));
 export const SpaceSolids = (state = "BunkerIntact") => [...base, ...(scenario[state] || [])];
@@ -40,8 +42,8 @@ const Inside = (s, x, y, z, margin = 0) => {
     && y > s.y - s.h / 2 && y < s.y + s.h / 2;
 };
 /** null when the segment is clear; otherwise "terrain@x,z" or the blocking block id. */
-export function Sight(a, b, { state = "BunkerIntact", ignore = [], endM = 0.05 } = {}) {
-  const len = D(a, b), solids = SpaceSolids(state);
+export function Sight(a, b, { state = "BunkerIntact", ignore = [], endM = 0.05, wire: withWire = false } = {}) {
+  const len = D(a, b), solids = withWire ? [...SpaceSolids(state), ...wire] : SpaceSolids(state);
   const near = solids.filter((s) => {
     if (ignore.includes(s.id)) return false;
     const r = Math.hypot(s.w, s.d) / 2 + 0.1;
@@ -411,10 +413,25 @@ export function ProbeEngagement() {
   return { pairs: out, bands, n: all.length, in15to60: all.filter((d) => d >= 15 && d < 60).length };
 }
 
+// ---------------------------------------------------------------- 10. lanes the runtime raycasts (wire included)
+/** Rays the 03-05 campaign driver and the gun logic cast through the rendered world (BlocksSight hits wire
+ *  stakes and strands), so the whole wire roll counts as a blocker here. */
+export function ProbeWireLanes() {
+  const k = (id) => SPACE_KEYFRAMES.find((f) => f.id === id).camera;
+  const lanes = [
+    ["03/04 seat eye 1.65 -> gap 1.2 (campaign driver)", Eye(S.seat, 1.65), Eye(S.gap, 1.2)],
+    ["03/04 nest gun 1.45 -> gap 1.2 (campaign driver)", Eye(S.nest, 1.45), Eye(S.gap, 1.2)],
+    ["K4 seat eye 1.5 -> gap 1.2", Eye(S.seat, 1.5), Eye(S.gap, 1.2)],
+    ["K10 west door 1.6 -> gap 1.2", Eye(k("K10"), 1.6), Eye(S.gap, 1.2)],
+    ["K3 observation 1.6 -> gap 1.2", Eye(k("K3"), 1.6), Eye(S.gap, 1.2)],
+  ];
+  return lanes.map(([name, a, b]) => ({ name, blocker: Sight(a, b, { wire: true }) }));
+}
+
 // ---------------------------------------------------------------- all
 export function RunSpaceProbe() {
   return { keyframes: ProbeKeyframes(), tank: ProbeTank(), routes: ProbeRoutes(), exposure: ProbeExposure(),
-    cover: ProbeEnemyCover(), counts: ProbeCounts(), entries: ProbeEntries(), separation: ProbeSeparation(), engagement: ProbeEngagement() };
+    cover: ProbeEnemyCover(), counts: ProbeCounts(), entries: ProbeEntries(), separation: ProbeSeparation(), engagement: ProbeEngagement(), wireLanes: ProbeWireLanes() };
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {

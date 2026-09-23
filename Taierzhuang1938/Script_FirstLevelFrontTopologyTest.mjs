@@ -14,7 +14,7 @@ import {FRONT_BREAKABLES,FRONT_UNBREAKABLE} from "./Data_FirstLevelFrontBreakabl
 import {MISSION_LAYOUT as L} from "./Data_FirstLevelMissionLayout.mjs";
 import {SampleMissionTerrain as G,SampleMissionNaturalHeight as N} from "./Data_FirstLevelMissionTerrain.mjs";
 import {ProbeKeyframes,ProbeTank,ProbeRoutes,ProbeExposure,ProbeEnemyCover,ProbeCounts,ProbeEntries,ProbeSeparation,
-  ProbeEngagement,RouteClearance,Sight,Eye,D,RouteLength} from "./Script_FirstLevelSpaceProbe.mjs";
+  ProbeEngagement,RouteClearance,Sight,Eye,D,RouteLength,ProbeWireLanes} from "./Script_FirstLevelSpaceProbe.mjs";
 
 // ---------------------------------------------------------------- K1–K11 (+K1i/K2b)
 const keyframes=ProbeKeyframes();
@@ -99,6 +99,13 @@ console.log("ok keyframes "+keyframes.map(k=>`${k.id}${k.frameDeg?`(${k.spanDeg}
   assert.ok(e.attack05.longestCrouchedRunM<=4,`05 attack branch before the tail keeps cover beats: ${e.attack05.longestCrouchedRunM} m`);
   assert.ok(e.rearRoute04.longestCrouchedRunM<=8,`04 short withdrawal exposure: ${e.rearRoute04.longestCrouchedRunM} m`);
   console.log(`ok exposure: 03 sap 0 m, right trench ${e.rightTrenchVsNest.longestCrouchedRunM} m, 02 ${e.retreat02.longestCrouchedRunM} m, 05 tail ${e.attackTail4m.exposed}/${e.attackTail4m.samples}`);
+}
+
+// ---------------------------------------------------------------- lanes the runtime raycasts (wire stakes/strands are ray colliders)
+{
+  const lanes=ProbeWireLanes();
+  for(const l of lanes)assert.equal(l.blocker,null,`${l.name}: clear of every block, terrain and wire roll (blocked by ${l.blocker})`);
+  console.log(`ok runtime gap lanes clear of wire: ${lanes.length}`);
 }
 
 // ---------------------------------------------------------------- enemies: cover, roles, budget, hidden entries
