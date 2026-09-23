@@ -174,14 +174,20 @@ export const FRONT_PRESSURE_PHASES = Object.freeze([
 /**
  * 05 侧沟那两人（bundleApproach 组）的切沟战术，覆盖 APPROACH_TACTICS 里的同名条目
  *（`Data_FirstLevelMission.MISSION_TACTICS` 按这个顺序展开，后写的赢）。
- * 原条目 BundleBendB 从 (44,−120) 正西直穿 SupplyRoadScreen（x=41、z −121…−107 的路侧挡墙）——
- * 当年它被 MISSION_TACTICS 的过滤整条滤掉，这条穿墙路线也就从没被净空检查量到过。
- * 这里绕过挡墙南端再切进沟；放行点与半径（玩家到阵位后墙岔口 20 m 内）照旧。临时坐标，归 Front 包定稿。
+ *
+ * 两处改动：
+ *   · 原条目 BundleBendB 从 (44,−120) 正西直穿 SupplyRoadScreen（x=41、z −121…−107 的路侧挡墙）——
+ *     当年它被 MISSION_TACTICS 的过滤整条滤掉，这条穿墙路线也就从没被净空检查量到过。这里绕过挡墙南端。
+ *   · 放行从「玩家到阵位后墙岔口 20 m 内」（near，放行前是装睡的剧本兵）改成**事实门** `fact:"bundleTaken"`
+ *    （运行时 UpdateTactics 认 plan.fact）：03 的接近路线离那个岔口只有 5 m，near 会让这两人在 03 夺点时
+ *     就从侧后切进沟；而放行前装睡又会让他们在路上当两根木桩。事实门之前他们是普通的守路活人，
+ *     玩家取到集束弹之后才切进取弹沟 —— 玩家回程正好撞上（05「切进沟里」那一拍）。
+ * 临时坐标，归 Front 包定稿。
  */
 export const FRONT_PRESSURE_TACTICS = Object.freeze({
-  BundleBendA: Object.freeze({ near: S.rear, nearM: 20, delay: 0,
+  BundleBendA: Object.freeze({ fact: "bundleTaken", delay: 0,
     points: Object.freeze([{ x: 40, z: -125 }, { x: 35, z: -123 }, { x: 29, z: -120 }]) }),
-  BundleBendB: Object.freeze({ near: S.rear, nearM: 20, delay: 2,
+  BundleBendB: Object.freeze({ fact: "bundleTaken", delay: 2,
     points: Object.freeze([{ x: 43, z: -123.2 }, { x: 40, z: -124.5 }, { x: 35, z: -123 }, { x: 29, z: -120 }]) }),
 });
 

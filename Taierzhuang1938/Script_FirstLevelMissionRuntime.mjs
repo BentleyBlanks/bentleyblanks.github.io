@@ -1628,12 +1628,18 @@ export class FirstLevelMissionRuntime {
         if(actor.missionTacticStandby){actor.missionTacticStandby=false;actor.scriptedNoncombatant=false;}
         actor.tacticalRadiusM=actor.missionTacticalRadiusM;actor.scriptDefensive=false;
       }
+      // Fact-gated tactics (2026-09-23, docs/Data_EnemyAi.md §20): the man stays an ordinary live defender
+      // at his post until the mission fact is recorded, then runs the authored points. No standby, no Near.
+      if(plan.fact && !state.released){
+        if(!this.Has(plan.fact))continue;
+        state.released=true;state.elapsed=0;
+      }
       if(actor.scriptedNoncombatant)continue;
       state.distance += Distance(actor.position, state.last);
       state.last = { x: actor.position.x, z: actor.position.z };
       state.elapsed += dt;
       // Let shared AI finish throws, fight/charge visible close threats and search after the final bound.
-      if(plan.near && (actor.actor?.pendingGrenadeThrow || actor.actor?.characterRig?.infantry?.IsThrowing() || actor.state==="grenade" ||
+      if((plan.near || plan.fact) && (actor.actor?.pendingGrenadeThrow || actor.actor?.characterRig?.infantry?.IsThrowing() || actor.state==="grenade" ||
         (actor.targetVisible && actor.target && Distance(actor.position,actor.target.position)<R.approachContactM) ||
         state.index>=plan.points.length)){
         if(state.mode!=="contact"){actor.tacticalRadiusM=R.approachContactRadiusM;this.Defend(actor,actor.position);state.mode="contact";}

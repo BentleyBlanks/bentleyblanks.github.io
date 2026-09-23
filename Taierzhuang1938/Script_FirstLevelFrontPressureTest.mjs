@@ -103,6 +103,7 @@ Eq([RouteIndex(-1, 3), RouteIndex(-2, 3), RouteIndex(5, 3), RouteIndex(-9, 3)], 
 }
 for (const [id, plan] of Object.entries(FRONT_PRESSURE_TACTICS)) {
   Check(MISSION_TACTICS[id] === plan, `MISSION_TACTICS keeps the pressure-table route for ${id}`);
+  Check(facts.has(plan.fact) && !plan.near, `${id} is released by a real mission fact, never a standby proximity gate`);
   RouteClear(`tactic ${id}`, [roster.get(id), ...plan.points]);
 }
 for (const spec of BACKDROP_SQUADS.members) {
