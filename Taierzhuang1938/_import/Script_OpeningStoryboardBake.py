@@ -166,8 +166,12 @@ def BakeRig(ctx):
         # Reach assist: a grip the arm cannot make pulls the pelvis toward it (feet stay
         # planted, the knees and hips absorb it) -- the body follows the hand, never the
         # other way round. Uses the previous frame's lift for the post-ground target.
-        reach = ctx['armLen'] + .06
-        for _ in range(6):
+        # Shoulder-to-grip reach with a grasping (not pointing) hand: the finger-root centroid
+        # sits off the forearm line, so the usable reach is about the bare arm length.
+        reach = ctx['armLen']
+        p0 = p['pelvis']
+        bend0 = p.get('bend', 0.0)
+        for _ in range(8):
             excess = Vector()
             for side, grip in (p.get('grips') or {}).items():
                 if grip is None:
@@ -176,13 +180,21 @@ def BakeRig(ctx):
                 if (p.get('gripWeights') or {}).get(side, 1.0) < 1.0:
                     continue
                 want = Vector(grip) - Vector((0, 0, solveState['lift'])) - shoulder
-                if want.length > reach * .93:
-                    excess += want.normalized() * (want.length - reach * .88)
+                if want.length > reach * .97:
+                    excess += want.normalized() * (want.length - reach * .92)
             if excess.length < .004:
                 break
             px, py, pz = p['pelvis']
-            # Only ever sink toward a low grip; lifting the pelvis would pull the planted feet up.
-            p['pelvis'] = (px + excess.x, py + excess.y, pz + min(0.0, excess.z) * .6)
+            # Only ever sink toward a low grip; lifting the pelvis would pull the planted feet
+            # up, and more than ~10 cm of sideways travel straightens the planted legs.
+            moved = Vector((px, py, 0)) - Vector((p0[0], p0[1], 0)) + Vector((excess.x, excess.y, 0))
+            if moved.length > .10:
+                # The hips have gone as far as the planted feet allow: lean the trunk into
+                # the rest (up to +0.25 rad of bend), which is what a man reaching does.
+                over = moved.length - .10
+                moved = moved.normalized() * .10
+                p['bend'] = min(bend0 + .25, p.get('bend', 0.0) + over / .45)
+            p['pelvis'] = (p0[0] + moved.x, p0[1] + moved.y, max(p0[2] - .15, pz + min(0.0, excess.z) * .6))
             Reset()
             ctx['ApplyPose'](p, 0.0)
             if p.get('post'):
