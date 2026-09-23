@@ -43,6 +43,8 @@ rope = Material('HempRope', (.53, .45, .29))
 leather = Material('WornLeather', (.19, .12, .08))
 ox_coat = Material('OxBrownCoat', (.35, .22, .14))
 ox_light = Material('OxMuzzle', (.43, .31, .24))
+ox_ear = Material('OxEarInterior', (.29, .17, .14))
+ox_socket = Material('OxEyeSocket', (.27, .16, .10))
 horse_coat = Material('HorseBayCoat', (.36, .18, .11))
 horse_dark = Material('HorseMane', (.09, .07, .06))
 hoof = Material('HornAndHoof', (.19, .17, .14))
@@ -160,6 +162,85 @@ def LoftZ(name, stations, mat, col, parent=None, sides=14):
     col.objects.link(obj)
     return Finish(obj,name,mat,col,parent)
 
+
+def LoftX(name, stations, mat, col, parent=None, sides=12):
+    """Pointed, flattened ear rooted in the skull rather than a floating oval."""
+    vertices, faces = [], []
+    direction = 1 if stations[-1][0] > stations[0][0] else -1
+    for x, center_y, center_z, radius_y, radius_z in stations:
+        for step in range(sides):
+            angle = 2*math.pi*step/sides
+            vertices.append((x, center_y+radius_y*math.cos(angle),
+                             center_z+radius_z*math.sin(angle)))
+    for station in range(len(stations)-1):
+        for step in range(sides):
+            next_step = (step+1)%sides
+            face = (station*sides+step,(station+1)*sides+step,
+                    (station+1)*sides+next_step,station*sides+next_step)
+            faces.append(face if direction > 0 else tuple(reversed(face)))
+    faces.extend((tuple(reversed(range(sides))),
+                  tuple((len(stations)-1)*sides+step for step in range(sides))))
+    mesh = bpy.data.meshes.new(name+'Mesh')
+    mesh.from_pydata(vertices, [], faces)
+    mesh.update()
+    for polygon in mesh.polygons: polygon.use_smooth = True
+    obj = bpy.data.objects.new(name, mesh)
+    col.objects.link(obj)
+    return Finish(obj, name, mat, col, parent)
+
+
+def TaperCurve(name, stations, mat, col, parent=None, sides=10):
+    """Closed tapering tube for the swept horns and hanging tail."""
+    points = [Vector(item[:3]) for item in stations]
+    vertices, faces = [], []
+    for index, (point, station) in enumerate(zip(points, stations)):
+        tangent = (points[min(index+1,len(points)-1)] -
+                   points[max(index-1,0)]).normalized()
+        axis = tangent.cross(Vector((0,1,0))).normalized()
+        other = tangent.cross(axis).normalized()
+        for step in range(sides):
+            angle = 2*math.pi*step/sides
+            vertex = point + station[3]*(math.cos(angle)*axis + math.sin(angle)*other)
+            vertices.append(vertex[:])
+    for station in range(len(stations)-1):
+        for step in range(sides):
+            next_step = (step+1)%sides
+            faces.append((station*sides+step,(station+1)*sides+step,
+                          (station+1)*sides+next_step,station*sides+next_step))
+    faces.extend((tuple(reversed(range(sides))),
+                  tuple((len(stations)-1)*sides+step for step in range(sides))))
+    mesh = bpy.data.meshes.new(name+'Mesh')
+    mesh.from_pydata(vertices, [], faces)
+    mesh.update()
+    for polygon in mesh.polygons: polygon.use_smooth = True
+    obj = bpy.data.objects.new(name,mesh)
+    col.objects.link(obj)
+    return Finish(obj,name,mat,col,parent)
+
+
+def HoofDigit(name, center_x, foot_y, direction, mat, col, parent):
+    """One flat grounded toe with a forward wall and a narrow central cleft."""
+    vertices, faces = [], []
+    sections = [(-.09,.060,.018,.148),(.015,.069,.008,.151),
+                (.115,.069,.008,.125),(.205,.057,.012,.090)]
+    for offset_y, half_width, bottom, top in sections:
+        x = center_x + direction*(.008 if offset_y > .1 else 0)
+        y = foot_y + offset_y
+        vertices.extend([(x-half_width,y,bottom),(x+half_width,y,bottom),
+                         (x+half_width,y,top),(x-half_width,y,top)])
+    for station in range(len(sections)-1):
+        for edge_index in range(4):
+            next_edge = (edge_index+1)%4
+            faces.append((station*4+edge_index,station*4+next_edge,
+                          (station+1)*4+next_edge,(station+1)*4+edge_index))
+    faces.extend(((3,2,1,0),(12,13,14,15)))
+    mesh = bpy.data.meshes.new(name+'Mesh')
+    mesh.from_pydata(vertices, [], faces)
+    mesh.update()
+    obj = bpy.data.objects.new(name,mesh)
+    col.objects.link(obj)
+    return Finish(obj,name,mat,col,parent,.008)
+
 def Cylinder(name, center, radius, depth, mat, col, parent=None, vertices=12, axis='Z'):
     bpy.ops.mesh.primitive_cylinder_add(vertices=vertices, radius=radius, depth=depth, location=center)
     obj = bpy.context.view_layer.objects.active
@@ -254,7 +335,8 @@ def BuildAnimal(kind):
         # The withers rise out of the whole forequarter.  The deep brisket,
         # narrower waist and rounded pelvic end belong to the same skin mesh.
         ox_profile = [
-            (3.06,.19,1.57,1.11),(3.24,.46,1.80,.92),
+            (2.96,.035,1.53,1.43),(3.04,.26,1.68,1.08),
+            (3.24,.46,1.80,.92),
             (3.45,.57,1.84,.79),(3.70,.59,1.79,.77),
             (3.96,.57,1.75,.75),(4.19,.59,1.82,.70),
             (4.40,.65,1.96,.68),(4.56,.67,2.04,.67),
@@ -281,8 +363,9 @@ def BuildAnimal(kind):
     if is_ox:
         neck_stations = [(4.70,.33,1.44,.37),(4.90,.35,1.51,.39),
                          (5.13,.30,1.58,.34),(5.29,.20,1.61,.23)]
-        skull_stations = [(5.05,.19,1.62,.19),(5.25,.30,1.66,.30),
-                          (5.46,.30,1.56,.27),(5.64,.25,1.43,.20)]
+        skull_stations = [(5.05,.19,1.62,.19),(5.25,.31,1.67,.29),
+                          (5.42,.31,1.59,.27),(5.56,.26,1.51,.21),
+                          (5.68,.17,1.44,.13)]
     else:
         neck_stations = [(4.64,.28,1.59,.34),(4.83,.30,1.73,.41),
                          (5.02,.27,1.89,.38),(5.18,.21,2.05,.29),
@@ -292,19 +375,49 @@ def BuildAnimal(kind):
                           (5.70,.13,1.70,.12)]
     LoftY(kind+'Neck',neck_stations,coat,col,head_pivot)
     LoftY(kind+'Skull',skull_stations,coat,col,head_pivot)
-    Ellipsoid(kind+'Muzzle',(0,5.72,1.38 if is_ox else 1.68),
-              (.27,.18,.16) if is_ox else (.17,.14,.12),
-              ox_light if is_ox else horse_dark,col,head_pivot,16,10)
+    if is_ox:
+        LoftY('OxNoseBridge',[(5.46,.19,1.47,.13),(5.60,.19,1.44,.13),
+                             (5.75,.15,1.40,.11)],coat,col,head_pivot,16)
+        Ellipsoid('OxMuzzle',(0,5.79,1.34),(.29,.18,.145),
+                  ox_light,col,head_pivot,18,12)
+        Ellipsoid('OxLowerLip',(0,5.905,1.235),(.16,.060,.035),
+                  ox_light,col,head_pivot,16,8)
+    else:
+        Ellipsoid(kind+'Muzzle',(0,5.72,1.68),(.17,.14,.12),
+                  horse_dark,col,head_pivot,16,10)
     for side in (-1,1):
-        Ellipsoid(kind+f'Ear{side}',(side*(.30 if is_ox else .18),5.31 if is_ox else 5.26,
-                                   1.84 if is_ox else 2.43),
-                  (.19,.11,.075) if is_ox else (.09,.09,.16),coat,col,head_pivot)
-        Ellipsoid(kind+f'Eye{side}',(side*(.292 if is_ox else .195),5.52 if is_ox else 5.46,
-                                     1.69 if is_ox else 2.07),
-                  (.031,.024,.029),eye,col,head_pivot,8,6)
         if is_ox:
-            Curve(f'OxHorn{side}',[(side*.27,5.27,1.84),(side*.44,5.25,1.91),(side*.58,5.26,2.04)],.064,horn,col,head_pivot)
+            LoftX(f'OxEar{side}',[(side*.24,5.29,1.80,.035,.04),
+                  (side*.35,5.29,1.81,.09,.07),(side*.49,5.28,1.82,.13,.075),
+                  (side*.62,5.27,1.84,.10,.055),(side*.69,5.27,1.85,.008,.008)],
+                  coat,col,head_pivot)
+            LoftX(f'OxEarInterior{side}',[(side*.33,5.348,1.824,.01,.012),
+                  (side*.46,5.365,1.836,.067,.038),
+                  (side*.60,5.338,1.846,.055,.025),
+                  (side*.66,5.295,1.85,.005,.005)],ox_ear,col,head_pivot,10)
+            Ellipsoid(f'OxEyeSocket{side}',(side*.305,5.47,1.66),
+                      (.036,.087,.062),ox_socket,col,head_pivot,12,8)
+            Ellipsoid(f'OxEye{side}',(side*.336,5.487,1.668),
+                      (.025,.046,.032),eye,col,head_pivot,12,8)
+            Curve(f'OxBrow{side}',[(side*.30,5.40,1.716),
+                  (side*.34,5.46,1.728),(side*.31,5.54,1.703)],
+                  .022,coat,col,head_pivot)
+            Ellipsoid(f'OxNostrilRim{side}',(side*.17,5.929,1.399),
+                      (.054,.024,.035),ox_socket,col,head_pivot,12,8)
+            Ellipsoid(f'OxNostril{side}',(side*.17,5.950,1.401),
+                      (.032,.014,.021),eye,col,head_pivot,12,8)
+            Ellipsoid(f'OxHornRoot{side}',(side*.255,5.24,1.89),
+                      (.095,.085,.075),coat,col,head_pivot,12,8)
+            TaperCurve(f'OxHorn{side}',[(side*.275,5.235,1.89,.082),
+                       (side*.375,5.245,1.955,.069),
+                       (side*.505,5.265,2.035,.047),
+                       (side*.595,5.285,2.145,.027),
+                       (side*.625,5.305,2.22,.003)],horn,col,head_pivot)
         else:
+            Ellipsoid(kind+f'Ear{side}',(side*.18,5.26,2.43),
+                      (.09,.09,.16),coat,col,head_pivot)
+            Ellipsoid(kind+f'Eye{side}',(side*.195,5.46,2.07),
+                      (.031,.024,.029),eye,col,head_pivot,8,6)
             Beam(f'HorseEarTip{side}',(side*.18,5.26,2.47),(side*.19,5.32,2.63),.055,.055,horse_dark,col,head_pivot)
         # Four articulated legs, with each upper leg pivot at the shoulder/hip.
     leg_pivots=[]
@@ -347,11 +460,26 @@ def BuildAnimal(kind):
             else:
                 TaperBone(name+'Lower',(x,knee_y,joint),(x,foot_y,.18),
                           .085,.06,coat,col,knee)
-            Ellipsoid(name+'Hoof',(x,foot_y+.07,.105),
-                      (.16,.23,.10) if is_ox else (.135,.17,.11),hoof,col,knee,12,8)
+            if is_ox:
+                # Two grounded toes leave a visible cleft at the front.
+                for digit in (-1,1):
+                    HoofDigit(name+f'HoofDigit{digit}',x+digit*.076,
+                              foot_y,digit,hoof,col,knee)
+            else:
+                Ellipsoid(name+'Hoof',(x,foot_y+.07,.105),
+                          (.135,.17,.11),hoof,col,knee,12,8)
             leg_pivots.append((pivot,knee,side,front))
-    tail=Empty(kind+'TailPivot',(0,3.32,1.55 if is_ox else 1.78),col,root)
-    Curve(kind+'Tail',[(0,3.33,1.5),(0,3.13,1.17),(0,3.10,.96)],.035,coat if is_ox else horse_dark,col,tail)
+    tail=Empty(kind+'TailPivot',(0,3.06 if is_ox else 3.32,
+                                 1.55 if is_ox else 1.78),col,root)
+    if is_ox:
+        TaperCurve('OxTail',[(0,3.01,1.56,.052),(0,2.92,1.40,.047),
+                   (0,2.86,1.18,.035),(0,2.85,.98,.025)],coat,col,tail)
+        TaperCurve('OxTailTuft',[(0,2.85,1.01,.029),
+                   (0,2.84,.89,.065),(0,2.83,.75,.085),
+                   (0,2.82,.66,.005)],horse_dark,col,tail)
+    else:
+        Curve(kind+'Tail',[(0,3.33,1.5),(0,3.13,1.17),(0,3.10,.96)],
+              .035,horse_dark,col,tail)
     # Rope halter, collar and cross-yoke sit at the actual shaft height.
     if is_ox:
         nose_points=[(-.26,5.64,1.48),(-.29,5.72,1.41),(0,5.78,1.32),
