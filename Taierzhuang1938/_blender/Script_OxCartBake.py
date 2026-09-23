@@ -39,6 +39,7 @@ wood = Material('WeatheredElm', (.31, .23, .15))
 edge = Material('WornWoodEdges', (.43, .32, .21))
 dark_wood = Material('AxleWood', (.22, .16, .11))
 iron = Material('BlackenedIron', (.16, .17, .16), .55)
+tire_iron = Material('ForgedWheelTire', (.075, .078, .073), .62)
 rope = Material('HempRope', (.53, .45, .29))
 leather = Material('WornLeather', (.19, .12, .08))
 ox_coat = Material('OxBrownCoat', (.35, .22, .14))
@@ -281,6 +282,81 @@ def Curve(name, points, radius, mat, col, parent=None):
         obj.matrix_parent_inverse = parent.matrix_world.inverted()
     return obj
 
+
+def WheelArc(name, center, inner_radius, outer_radius, width, start, end,
+             mat, col, parent, divisions=4):
+    """A square-section felloe or iron tire; X is the wheel axle."""
+    x, y, z = center
+    vertices, faces = [], []
+    for step in range(divisions+1):
+        angle = start + (end-start)*step/divisions
+        along_y, along_z = math.sin(angle), math.cos(angle)
+        vertices.extend([
+            (x-width/2, y+inner_radius*along_y, z+inner_radius*along_z),
+            (x-width/2, y+outer_radius*along_y, z+outer_radius*along_z),
+            (x+width/2, y+outer_radius*along_y, z+outer_radius*along_z),
+            (x+width/2, y+inner_radius*along_y, z+inner_radius*along_z),
+        ])
+    for step in range(divisions):
+        for edge_index in range(4):
+            next_edge = (edge_index+1) % 4
+            faces.append((step*4+edge_index, step*4+next_edge,
+                          (step+1)*4+next_edge, (step+1)*4+edge_index))
+    faces.extend(((3,2,1,0), tuple(divisions*4+index for index in range(4))))
+    mesh = bpy.data.meshes.new(name+'Mesh')
+    mesh.from_pydata(vertices, [], faces)
+    mesh.update()
+    obj = bpy.data.objects.new(name, mesh)
+    col.objects.link(obj)
+    return Finish(obj, name, mat, col, parent)
+
+
+def WheelSpoke(name, center, angle, mat, col, parent):
+    """Tapered rectangular wood spoke, seated in both hub and felloe."""
+    x, y, z = center
+    radial_y, radial_z = math.sin(angle), math.cos(angle)
+    tangent_y, tangent_z = math.cos(angle), -math.sin(angle)
+    vertices = []
+    for radius, half_width, half_depth in ((.13,.055,.052),(.625,.033,.042)):
+        for axial, tangent in ((-1,-1),(1,-1),(1,1),(-1,1)):
+            vertices.append((x+axial*half_depth,
+                             y+radius*radial_y+tangent*half_width*tangent_y,
+                             z+radius*radial_z+tangent*half_width*tangent_z))
+    faces = [(3,2,1,0),(4,5,6,7)]
+    faces.extend((index,(index+1)%4,(index+1)%4+4,index+4) for index in range(4))
+    mesh = bpy.data.meshes.new(name+'Mesh')
+    mesh.from_pydata(vertices, [], faces)
+    mesh.update()
+    obj = bpy.data.objects.new(name, mesh)
+    col.objects.link(obj)
+    return Finish(obj, name, mat, col, parent, .004)
+
+
+def WheelHub(name, center, mat, col, parent):
+    """Barrel-shaped timber hub with shoulders for the spoke tenons."""
+    x, y, z = center
+    stations = ((-.15,.125),(-.105,.17),(.105,.17),(.15,.125))
+    vertices, faces = [], []
+    for offset, radius in stations:
+        for step in range(16):
+            angle = 2*math.pi*step/16
+            vertices.append((x+offset,y+radius*math.sin(angle),
+                             z+radius*math.cos(angle)))
+    for station in range(len(stations)-1):
+        for step in range(16):
+            next_step = (step+1)%16
+            faces.append((station*16+step,station*16+next_step,
+                          (station+1)*16+next_step,(station+1)*16+step))
+    faces.extend((tuple(reversed(range(16))),
+                  tuple((len(stations)-1)*16+step for step in range(16))))
+    mesh = bpy.data.meshes.new(name+'Mesh')
+    mesh.from_pydata(vertices, [], faces)
+    mesh.update()
+    obj = bpy.data.objects.new(name, mesh)
+    col.objects.link(obj)
+    return Finish(obj, name, mat, col, parent)
+
+
 cart_col = bpy.data.collections.new('Cart'); scene.collection.children.link(cart_col)
 cart_root = Empty('CartRoot', (0,0,0), cart_col)
 deck = Empty('CartDeck', (0,0,0), cart_col, cart_root)
@@ -292,36 +368,55 @@ for x in (-.98,.98):
     Beam(f'LongitudinalBeam{x}', (x,-1.72,.89), (x,1.74,.89), .13,.13,dark_wood,cart_col,deck)
 for y in (-1.55,-.4,.72,1.58):
     Cube(f'CrossMember{y}',(0,y,.86),(2.33,.13,.16),dark_wood,cart_col,deck)
+# Paired axle saddles transfer the deck load into the fixed timber axle.
+for x in (-.89,.89):
+    Cube(f'AxleSaddle{x}',(x,-.18,.805),(.23,.39,.21),dark_wood,cart_col,deck,.012)
+    for y in (-.355,-.005):
+        Cube(f'AxleClamp{x}_{y}',(x,y,.805),(.025,.032,.29),iron,cart_col,deck,.003)
+    Cube(f'AxleClampTop{x}',(x,-.18,.951),(.027,.38,.025),iron,cart_col,deck,.002)
 for x in (-1.1,1.1):
     for y in (-1.58,1.58):
         Cube(f'CornerPost{x}_{y}',(x,y,1.29),(.10,.11,.48),edge,cart_col,deck)
-    for z in (1.31,1.5):
-        Cube(f'SideRail{x}_{z}',(x,0,z),(.075,3.35,.075),wood,cart_col,deck)
+        Cube(f'PostFoot{x}_{y}',(x,y,1.13),(.15,.17,.16),dark_wood,cart_col,deck,.005)
+        Cylinder(f'PostPeg{x}_{y}',(x+(.079 if x>0 else -.079),y,1.33),
+                 .016,.011,dark_wood,cart_col,deck,8,'X')
+    Cube(f'SideBoard{x}',(x,0,1.235),(.064,3.32,.20),wood,cart_col,deck,.005)
+    Cube(f'SideRail{x}',(x,0,1.50),(.075,3.35,.075),edge,cart_col,deck)
 for y in (-1.68,1.68):
-    Cube(f'EndRail{y}',(0,y,1.31),(2.1,.08,.12),edge,cart_col,deck)
+    Cube(f'EndBoard{y}',(0,y,1.22),(2.1,.075,.18),wood,cart_col,deck,.005)
+    Cube(f'EndRail{y}',(0,y,1.50),(2.1,.08,.08),edge,cart_col,deck)
 for x in (-.52,.52):
     Beam(f'DraftShaft{x}',(x,1.12,.82),(x,4.82,.99),.105,.105,edge,cart_col,deck)
     for y in (1.73,3.2):
         Curve(f'ShaftBinding{x}_{y}',[(x-.07,y,.84),(x-.07,y,.98),(x+.07,y,1.04),(x+.07,y,.85)],.017,rope,cart_col,deck)
 for x in (-.45,.45):
     Cube(f'FrontIronStrap{x}',(x,1.8,.97),(.085,.28,.025),iron,cart_col,deck,.004)
-axle = Cylinder('TimberAxle',(0,-.18,.72),.11,2.83,dark_wood,cart_col,deck,12,'X')
+axle = Cylinder('TimberAxle',(0,-.18,.72),.11,3.00,dark_wood,cart_col,deck,12,'X')
 wheel_pivots = []
 for side in (-1,1):
     x=side*1.32
     pivot=Empty('WheelLeft' if side<0 else 'WheelRight',(x,-.18,.72),cart_col,cart_root)
     wheel_pivots.append(pivot)
-    # Spoked 1.44 m wheels with an iron rim. Wheel axle is X.
-    Cylinder(f'WheelHub{side}',(x,-.18,.72),.15,.17,dark_wood,cart_col,pivot,12,'X')
+    # The 0.72 m rolling radius meets the ground at z=0; the wheel turns around X.
+    center = (x,-.18,.72)
+    WheelHub(f'WheelHub{side}',center,dark_wood,cart_col,pivot)
     for step in range(12):
         angle=2*math.pi*step/12
-        dy,dz=math.sin(angle),math.cos(angle)
-        Beam(f'Spoke{side}_{step}',(x,-.18,.72),(x,-.18+dy*.64,.72+dz*.64),.06,.09,edge,cart_col,pivot)
-    for radius, bevel, material in ((.68,.077,edge),(.718,.038,iron)):
-        bpy.ops.mesh.primitive_torus_add(major_segments=32,minor_segments=6,location=(x,-.18,.72),
-            rotation=(0,math.pi/2,0),major_radius=radius,minor_radius=bevel)
-        Finish(bpy.context.view_layer.objects.active,f'WheelRim{side}_{radius}',material,cart_col,pivot)
-    Cylinder(f'IronAxleCap{side}',(x+side*.1,-.18,.72),.088,.024,iron,cart_col,pivot,10,'X')
+        WheelSpoke(f'Spoke{side}_{step}',center,angle,edge,cart_col,pivot)
+        gap = .011
+        WheelArc(f'WheelRimFelloe{side}_{step}',center,.605,.691,.145,
+                 angle-math.pi/12+gap,angle+math.pi/12-gap,
+                 wood if step%3 else edge,cart_col,pivot)
+        bolt_angle = angle+math.pi/12
+        Cylinder(f'WheelRimPeg{side}_{step}',
+                 (x+side*.079,-.18+.65*math.sin(bolt_angle),.72+.65*math.cos(bolt_angle)),
+                 .013,.012,iron,cart_col,pivot,8,'X')
+    WheelArc(f'WheelTire{side}',center,.691,.72,.153,0,2*math.pi,
+             tire_iron,cart_col,pivot,divisions=72)
+    for offset in (-.108,.108):
+        Cylinder(f'WheelHubBand{side}_{offset}',(x+offset,-.18,.72),
+                 .149,.024,iron,cart_col,pivot,16,'X')
+    Cylinder(f'IronAxleCap{side}',(x+side*.171,-.18,.72),.073,.027,iron,cart_col,pivot,12,'X')
 
 def BuildAnimal(kind):
     is_ox = kind == 'Ox'
@@ -551,11 +646,11 @@ def Consolidate(col):
         name=obj.name
         if name.startswith('DeckPlank'): group='DeckSurface'
         elif name.startswith(('DraftShaft','ShaftBinding','FrontIronStrap')): group='Shaft'
-        elif name.startswith(('SideRail','CornerPost','EndRail')): group='Rail'
+        elif name.startswith(('SideRail','SideBoard','CornerPost','PostFoot','PostPeg','EndRail','EndBoard')): group='Rail'
         elif name.startswith('Spoke'): group='Spokes'
-        elif name.startswith('WheelRim'): group='Rim'
+        elif name.startswith(('WheelRim','WheelTire')): group='Rim'
         elif name.startswith(('WheelHub','IronAxleCap')): group='Hub'
-        elif name.startswith(('LongitudinalBeam','CrossMember','TimberAxle')): group='Frame'
+        elif name.startswith(('LongitudinalBeam','CrossMember','TimberAxle','AxleSaddle','AxleClamp')): group='Frame'
         elif 'Leg' in name or 'Front' in name or 'Rear' in name: group='Leg'
         elif any(piece in name for piece in ('Torso','Chest','Haunch','Dewlap','Mane')): group='Body'
         elif any(piece in name for piece in ('Neck','Skull','Muzzle','Ear','Eye','Horn')): group='Head'

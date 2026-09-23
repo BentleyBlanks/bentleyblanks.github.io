@@ -4,7 +4,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
 import { AttachShadowDepth } from "./Script_ShadowDepth.mjs";
 
-const VERSION = "20260924044800";
+const VERSION = "20260924054300";
 const loader = new GLTFLoader();
 let assetsPromise = null;
 
@@ -58,9 +58,9 @@ export function CreateDraftCartInstance(assets, kind) {
   mixer.clipAction(clip).play();
   const parts = {
     deck: MeshByPrefix(cartModel, "CartDeckSurface"),
-    rail: MeshByPrefix(cartModel, "CartRail"),
+    rail: MeshByPrefix(cartModel, "CartRailWeatheredElm"),
     shaft: MeshByPrefix(cartModel, "CartShaftWornWoodEdges"),
-    wheel: MeshByPrefix(cartModel, "CartRim"),
+    wheel: MeshByPrefix(cartModel, "CartRimForgedWheelTire"),
     spoke: MeshByPrefix(cartModel, "CartSpokes"),
     draftBody: MeshByPrefix(animalModel, `${kind === "ox" ? "Ox" : "Horse"}Body`),
     draftHead: MeshByPrefix(animalModel, kind === "ox" ? "OxHeadOxBrownCoat" : "HorseHeadHorseBayCoat"),
