@@ -153,6 +153,11 @@ export class FirstLevelFrontBattle {
       if(r.Near(S.throw,B.attackArrivalM)&&Distance(this.Leader.position,S.throw)<B.rearArrivalM){r.Record("attackPositionReached");r.Say("BundleAttack");}
       return;
     }
+    // Contract v1.1 deadlock ②: the tank can be finished before the pair both stand on the attack position (the player
+    // throws from the branch, or ahead of a lagging Luo). The beat is over, not pending - record it as skipped instead of
+    // waiting forever for an attack position nobody needs any more.
+    if(!r.Has("attackPositionReached"))r.Record("attackPositionReached",{skipped:true,reason:"tankClearedFirst",
+      playerAtThrow:r.Near(S.throw,B.attackArrivalM),leaderAtThrow:Distance(this.Leader.position,S.throw)<B.rearArrivalM});
     if(r.Near(S.rear,B.rearArrivalM))r.Record("attackRetreated");
     if(!r.Has("lastGuardsWithdrawn")){this.SetLeg("retreat",[...S.attackRoute].reverse());return;}
     this.SetLeg("disengage",Routes.orders.slice(S.attackRoute.length-1));

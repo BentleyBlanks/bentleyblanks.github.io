@@ -23,7 +23,7 @@ import path from "node:path";
 import { ParseCampaignArgs, OpenCampaign, CloseCampaign, CaptureFailure, InstallInputDriver } from "./Script_FirstLevelCampaignKit.mjs";
 import { Drive as DriveFront } from "./Script_FirstLevelCampaignFront.mjs";
 import { FRONT_SORTIE } from "./Data_FirstLevelFrontRoute.mjs";
-import { TANK, TANK_TEMP_PATH } from "./Data_Tuning_Tank.mjs";
+import { TANK, FRONT_TANK_BRAIN_PATH } from "./Data_Tuning_Tank.mjs";
 import { LanePoint, YawTo } from "./Script_FirstLevelTankBrain.mjs";
 
 const argv = process.argv;
@@ -117,8 +117,8 @@ function Metrics(samples, debug) {
     return { point: q, threatenedShare: Round(covered, 3), safeWindows: Windows(tankStage, (s) => !threatened(s), 2).map(([a, b]) => [Round(a, 1), Round(b, 1)]) };
   });
   // 玩家真在攻击支路上的那段时间里（离沟线 ≤ radiusM、领过集束弹、车还没哑）：他脚下那段沟被炮塔 / 车体机枪指着的占比，
-  // 以及 ≥ 2 s 的安全窗口（公平：要有能冲的空当）。沟线与取点口径同运行时（TANK_TEMP_PATH.lanes + LanePoint）。
-  const laneSpec = (TANK_TEMP_PATH.lanes || []).find((l) => l.id === "attackLane");
+  // 以及 ≥ 2 s 的安全窗口（公平：要有能冲的空当）。沟线与取点口径同运行时（FRONT_TANK_BRAIN_PATH.lanes + LanePoint）。
+  const laneSpec = (FRONT_TANK_BRAIN_PATH.lanes || []).find((l) => l.id === "attackLane");
   const Aimed = (yaw, from, q) => Math.abs(Wrap(yaw - YawTo(from, q)));
   const onLane = laneSpec ? tankStage.map((s) => {
     const q = s.player?.alive ? LanePoint(laneSpec, s.player) : null;
@@ -237,13 +237,13 @@ async function RunCampaign() {
   }
 }
 
-/** 摆位拍关键画面：车按临时路点摆，玩家摆到对应位置、视线对准车、渲几帧、截图。 */
+/** 摆位拍关键画面：车按 Space 路点（FRONT_TANK_BRAIN_PATH）摆，玩家摆到对应位置、视线对准车、渲几帧、截图。 */
 async function Photos() {
   const options = ParseCampaignArgs(["node", "x", "--campaign", "--stage-from=3", "--stage-to=6"]);
   options.suite = "FirstLevelTankProbe";
   const ctx = await OpenCampaign(options);
   const { page, output } = ctx;
-  const W = TANK_TEMP_PATH.waypoints;
+  const W = FRONT_TANK_BRAIN_PATH.waypoints;
   const index = (pred) => W.findIndex(pred);
   const Shot = async (name, { tankAt, player, crouch = false, look = 1.6, settleS = 1.2, before = null }) => {
     await page.evaluate(({ tankAt, player, crouch, look, settleS, before }) => {
@@ -272,11 +272,10 @@ async function Photos() {
   try {
     const nest = FRONT_SORTIE.nest;
     await Shot("Preview", { tankAt: index((w) => w.preview), player: { x: nest.x, z: nest.z + 1 }, look: 2.0 });
-    // 驶出路弯：阵位里看路弯被北面残墙挡住，从阵位东侧的沟沿看（约 30 m）。
-    await Shot("DriveOut", { tankAt: index((w) => Math.abs(w.x - 62.8) < 0.01), player: { x: 42, z: -150 }, look: 1.4, settleS: 0.3 });
-    // 开炮尘环：阵位里看火力点只露炮塔（hull-down），炮口下的尘环被墙挡着；从东侧沟沿斜看（约 17 m）才拍得到
-    //「一炮掀起一圈土」。炮弹打在玩家身边 6 m 的土上。
-    await Shot("CannonDust", { tankAt: index((w) => w.kind === "firePoint"), player: { x: 41, z: -148 }, look: 1.4, before: "fire" });
+    // 驶出路弯（K6）：Space 路的 BendExit，从夺下的机枪座看（41 m，整车）。
+    await Shot("DriveOut", { tankAt: index((w) => w.id === "BendExit"), player: { x: nest.x, z: nest.z + 1 }, look: 1.4, settleS: 0.3 });
+    // 开炮尘环：Pressure 火力点从机枪座看是整车（31 m，炮口直视座位）。炮弹打在玩家身边 6 m 的土上。
+    await Shot("CannonDust", { tankAt: index((w) => w.id === "Pressure"), player: { x: nest.x, z: nest.z + 1 }, look: 1.4, before: "fire" });
     await Shot("AttackSide", { tankAt: index((w) => w.kind === "block"), player: { x: FRONT_SORTIE.throw.x, z: FRONT_SORTIE.throw.z }, crouch: true, look: 1.2 });
     await Shot("Disabled", { tankAt: index((w) => w.kind === "block"), player: { x: FRONT_SORTIE.throw.x - 4, z: FRONT_SORTIE.throw.z + 3 }, look: 1.4, settleS: 4, before: "disable" });
     assert.deepEqual(ctx.errors, [], "no page errors while posing");

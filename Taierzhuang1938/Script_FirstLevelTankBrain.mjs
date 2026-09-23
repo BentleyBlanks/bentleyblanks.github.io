@@ -116,6 +116,14 @@ export class TankBrain {
     this.cum = [0];
     for (let i = 1; i < this.points.length; i++) this.cum.push(this.cum[i - 1] + Dist(this.points[i - 1], this.points[i]));
     this.length = this.cum.at(-1);
+    // 折返点（相邻两段夹角超过 drive.reversalRad，例如 FRONT_TANK_PATH 的 HullDown 折返顶）：切线不跨它磨圆，
+    // 否则在折返点上求出的「切线」指向两段之间的横向，车离开停车点时横着滑（2026-09-24 Front 包换新路时实测 83°）。
+    this.reversals = [];
+    const R = tuning.drive.reversalRad ?? Math.PI;
+    for (let i = 1; i < this.points.length - 1; i++) {
+      const a = YawTo(this.points[i - 1], this.points[i]), b = YawTo(this.points[i], this.points[i + 1]);
+      if (Math.abs(Wrap(b - a)) > R) this.reversals.push(i);
+    }
     this.rng = rng || SeededRng(seed);
     this.time = 0;
     // 驾驶
@@ -205,6 +213,11 @@ export class TankBrain {
   /** 行进方向（磨圆了尖角的路线切线）。 */
   TangentYaw(s) {
     const span = this.T.drive.tangentSpanM;
+    for (const i of this.reversals) {
+      if (Math.abs(s - this.cum[i]) > span) continue;
+      // 折返点前取来路那一段、到了（含）折返点取去路那一段：原地掉头由驾驶的 pivot 负责。
+      return s < this.cum[i] - 1e-6 ? YawTo(this.points[i - 1], this.points[i]) : YawTo(this.points[i], this.points[i + 1]);
+    }
     const a = this.PointAt(Math.min(s - span, this.length - 2 * span)), b = this.PointAt(Math.max(s + span, 2 * span));
     return YawTo(a, b);
   }
@@ -827,6 +840,9 @@ export class TankBrain {
     const f = Forward(this.hullYaw), r = Right(this.hullYaw);
     const mode = this.escortMode && this.time < this.escortMode.until ? this.escortMode : null;
     const holding = !this.moving && this.holdIndex >= 0 && ["firePoint", "hullDown", "block", "squeeze"].includes(this.points[this.holdIndex].kind);
+    // 路点自带护兵槽（FRONT_TANK_PATH 的 Block/Squeeze → FRONT_TANK_ESCORT_SLOTS，Space 包量过：都在车北侧/西侧弹坑里、
+    // 看不见缺口）：停在这儿时护兵去这几个绝对位置，不按车体相对槽往路边推（那样会有人顺土坎南坡看见缺口）。
+    const fixed = holding ? this.points[this.holdIndex].escortSlots : null;
     const out = [];
     for (const [i, slot] of E.slots.entries()) {
       const id = ids[i];
@@ -842,6 +858,10 @@ export class TankBrain {
         const toward = { x: mode.point.x - this.x, z: mode.point.z - this.z }, d = Math.hypot(toward.x, toward.z) || 1;
         anchor = { x: this.x + toward.x / d * 3 + r.x * slot.side * 1.5, z: this.z + toward.z / d * 3 + r.z * slot.side * 1.5 };
         radius = E.rallyRadiusM; slack = E.moveSlackM;
+      }
+      if (fixed?.[i] && mode?.kind !== "rally") {
+        out.push({ id, slot: fixed[i].id ?? slot.id, anchor: { x: fixed[i].x, z: fixed[i].z }, radius: E.slotRadiusM, slack: E.slotSlackM, mode: "slot" });
+        continue;
       }
       out.push({ id, slot: slot.id, anchor, radius, slack, mode: mode?.kind || (holding ? "hold" : "move") });
     }

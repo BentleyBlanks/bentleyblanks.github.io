@@ -8,7 +8,12 @@
 import assert from "node:assert/strict";
 import { CreateTankBrain, SeededRng, YawTo, Forward, Right, HullLocal,
   TankClearFact, BundleResupplyOpen, LuoFinishDue, LanePoint } from "./Script_FirstLevelTankBrain.mjs";
-import { TANK, TANK_TEMP_PATH, NEVER_BREAKABLE_RULES } from "./Data_Tuning_Tank.mjs";
+import { TANK, FRONT_TANK_BRAIN_PATH, NEVER_BREAKABLE_RULES } from "./Data_Tuning_Tank.mjs";
+import { FRONT_TANK_PATH, FRONT_SORTIE, FRONT_SPACE, FrontTankIndex } from "./Data_FirstLevelFrontRoute.mjs";
+import { FRONT_TANK_ESCORT_SLOTS } from "./Data_FirstLevelMissionFront.mjs";
+import { FRONT_BREAKABLES, FRONT_UNBREAKABLE } from "./Data_FirstLevelFrontBreakables.mjs";
+import { MISSION_LAYOUT } from "./Data_FirstLevelMissionLayout.mjs";
+import { SampleMissionTerrain } from "./Data_FirstLevelMissionTerrain.mjs";
 import { TankAudio, TankLoopParams, CannonLayerWeights, ShellPassPoint } from "./Script_TankAudio.mjs";
 import { TANK_SFX, TankSfxFiles } from "./Data_SfxSources.mjs";
 import { SOUND_NAMES } from "./Script_Audio.mjs";
@@ -360,39 +365,62 @@ function Run(brain, world, seconds, each = null) {
   ok(brain.telemetry.states.length >= 1, "state log kept");
 }
 
-// --- 9 现布局临时路线：03→05 全程 ---------------------------------------------------------
+// --- 9 Space 包的战车路（FRONT_TANK_PATH + 节奏字段）：03→05 全程 --------------------------------------
 {
-  const brain = CreateTankBrain(TANK_TEMP_PATH, TANK, { seed: 21 });
+  const P = FRONT_TANK_BRAIN_PATH, W = P.waypoints, I = (id) => FrontTankIndex(id);
+  ok(W.length === FRONT_TANK_PATH.length && W.every((w, i) => w.id === FRONT_TANK_PATH[i].id && w.x === FRONT_TANK_PATH[i].x
+    && w.z === FRONT_TANK_PATH[i].z && w.kind === FRONT_TANK_PATH[i].kind), "the brain drives Space's waypoints, same ids, coordinates and kinds");
+  ok(W[I("HullDown")].preview && W[I("HullDown")].holdS === 15 && W[I("Pressure")].holdUntil === "tankPositionPressured"
+    && W[I("Block")].holdUntil === "stage:Tank" && W[I("Squeeze")].stage === "Tank", "pace: preview at HullDown, pressure before block, squeeze in 05");
+  ok(Dist(W[I("HullDown")].faceTo, FRONT_SPACE.tankTargets.nest) < 1e-9 && Dist(W[I("Block")].faceTo, FRONT_SPACE.tankTargets.gap) < 1e-9,
+    "faceTo names resolve to FRONT_SPACE.tankTargets");
+  ok(W[I("Block")].escortSlots === FRONT_TANK_ESCORT_SLOTS && FRONT_TANK_ESCORT_SLOTS.length === 4, "block escorts take Space's four crater slots");
+  const brain = CreateTankBrain(P, TANK, { seed: 21 });
+  ok(brain.reversals.includes(I("HullDown")) && brain.reversals.length === 1, "HullDown is the one switchback (tangent never smoothed across it)");
   const facts = new Set();
-  const nest = { id: "player", kind: "mannedMg", x: 27, y: 1.65, z: -141, ground: 0 };
+  const nest = { id: "player", kind: "mannedMg", x: FRONT_SORTIE.seat.x, y: 1.5, z: FRONT_SORTIE.seat.z, ground: 0 };
   const world = World({ stage: "Support", facts, targets: [nest], weaponsFree: { main: false, mg: false } });
   const stops = [];
-  let t = 0, previewAt = null, pressuredAt = null, firstShellAt = null;
+  let t = 0, previewAt = null, firstShellAt = null, crab = 0, departedHullDown = null, last = null;
   const step = (seconds, fn) => Run(brain, world, seconds, (o, b) => {
     t += DT;
     for (const e of o.events) if (e.id === "stop") stops.push({ index: e.index, t });
     if (o.drive.waypoint?.preview && previewAt == null) previewAt = t;
     for (const f of o.fire) if (f.weapon === "main" && firstShellAt == null) firstShellAt = t;
+    // Moving: the hull points along the road (no sideways slide), including off the switchback.
+    // Measured against the real motion (frame-to-frame displacement), not the path ahead.
+    if (last && b.moving && b.speed > 0.3 && Dist(last, b) > 1e-3) crab = Math.max(crab, Math.abs(Wrap(YawTo(last, b) - b.hullYaw)));
+    last = { x: b.x, z: b.z };
+    if (departedHullDown == null && b.departed === I("HullDown") && b.moving) departedHullDown = { t, yaw: b.hullYaw };
     fn?.(o, b);
   });
+  step(45);
+  ok(previewAt != null && previewAt < 45, `03: reaches the hull-down preview on the switchback (${previewAt?.toFixed(1)} s)`);
   step(40);
-  ok(brain.holdIndex === 2, "03: waits off-map until the first rifle batch is withdrawn");
-  facts.add("rifleWithdrawalResolved");
-  step(40);
-  ok(previewAt != null, "03: reaches the hull-down preview");
-  ok(brain.holdIndex === 6, "03: holds at preview until 04");
+  ok(brain.holdIndex === I("Bend") && stops.some((s) => s.index === I("HullDown")), "03: after the preview it waits behind NorthRuin at the bend for 04");
+  ok(departedHullDown && Math.abs(Wrap(departedHullDown.yaw - YawTo(W[I("HullDown")], W[I("Descent")]))) < TANK.drive.pivotThresholdRad,
+    "03: it turns round on the spot before leaving the switchback (≈160°)");
+  // Sharp bends are taken at speed with a turn-rate-limited hull (35° at Descent, hidden behind NorthRuin; the old temp
+  // path peaked at 27°). The switchback is what this guards: before the reversal fix the tank left HullDown 83° sideways.
+  ok(crab < 0.7, `03: never slides sideways along the road (max ${(crab * 180 / Math.PI).toFixed(0)}°)`);
   world.stage = "MachineGun"; world.weaponsFree = { main: true, mg: true };
-  step(20, (o) => {
-    for (const f of o.fire) if (f.weapon === "main" && Dist(f.at, nest) < 8) facts.add("tankPositionPressured");
+  step(40, (o) => {
+    for (const f of o.fire) if (f.weapon === "main" && Dist(f.at, nest) < TANK.pressureRadiusM) facts.add("tankPositionPressured");
   });
-  ok(firstShellAt != null, "04: first shell fired at the nest from the firePoint");
-  ok(stops.some((s) => s.index === 7), "04: stopped on the firePoint before firing");
-  step(30);
-  ok(brain.holdIndex === 9, "04: advances to block after the nest is pressured");
+  ok(firstShellAt != null, "04: first shell fired at the nest from the Pressure fire point");
+  ok(stops.some((s) => s.index === I("Pressure")), "04: stopped on Pressure before firing");
+  step(40);
+  ok(brain.holdIndex === I("Block") && brain.reached === I("Block"), "04: advances to Block after the nest is pressured");
   world.stage = "Tank";
-  step(60);
-  ok(brain.holdIndex === 11 || brain.reached >= 10, "05: squeezes toward the gap");
-  ok(Dist(brain, { x: 39, z: -140 }) <= 9, "05: throw point within covered throw range");
+  step(40);
+  ok(brain.reached === I("Squeeze"), "05: squeezes toward the gap");
+  ok(Dist(brain, FRONT_SORTIE.throw) < 12, `05: attack position within bundle reach of the hull (${Dist(brain, FRONT_SORTIE.throw).toFixed(1)} m)`);
+  // Block escorts: absolute crater slots, not road-side pushes.
+  const held = CreateTankBrain(P, TANK, { seed: 22 });
+  held.PlaceAt(I("Block"));
+  const escorts = held.Update(DT, World({ stage: "MachineGun", escortIds: ["A", "B", "C", "D"] })).escorts;
+  ok(escorts.length === 4 && escorts.every((e, i) => e.mode === "slot" && Dist(e.anchor, FRONT_TANK_ESCORT_SLOTS[i]) < 1e-9),
+    "holding at Block/Squeeze the escorts go to FRONT_TANK_ESCORT_SLOTS");
 }
 
 // --- 10 可破坏掩体（运行时机制，Script_FirstLevelFrontBreakables）：分段、碰撞、接管静态块、永不可破 ------------
@@ -421,10 +449,11 @@ function Run(brain, world, seconds, each = null) {
   const scene = new THREE.Scene();
   const specs = [
     { id: "TestBreak", block: "TestWall", hitRadiusM: 2, minDamage: 60, stages: [[[-2, 2, 1.5]], [[-2, 0, 1.5], [0, 2, 1.0]], [[-2, 2, 0.6]]] },
-    { id: "RearWallAttempt", block: "RightNestRearWall", stages: [[[-1, 1, 1]], [[-1, 1, 0.2]]] },
+    { id: "RearWallAttempt", block: "RightNestRearWest", stages: [[[-1, 1, 1]], [[-1, 1, 0.2]]] },
   ];
-  const b = new FirstLevelFrontBreakables({ scene, battlefield, physics, layout: { blocks: [block, { id: "RightNestRearWall", x: 0, z: 0, w: 2, d: 1, h: 2, y: 1 }] } }, specs);
-  ok(NEVER_BREAKABLE.includes("RightNestRearWall") && b.items.length === 1, "the position rear wall is never breakable even if data lists it");
+  const b = new FirstLevelFrontBreakables({ scene, battlefield, physics, layout: { blocks: [block, { id: "RightNestRearWest", x: 0, z: 0, w: 2, d: 1, h: 2, y: 1 }] } }, specs);
+  ok(NEVER_BREAKABLE.includes("RightNestRearWest") && FRONT_UNBREAKABLE.every((id) => NEVER_BREAKABLE.includes(id)) && b.items.length === 1,
+    "the position rear wall (Space's never-break list) is never breakable even if data lists it");
   ok(!solids.has(7) && !battlefield.colliders.includes(staticCollider), "static collider of the taken-over block removed");
   const pos = merged.attributes.position;
   let collapsed = 0; for (let i = 0; i < 24; i++) if (Math.abs(pos.getY(i) - (block.y - block.h / 2)) < 1e-6 && Math.abs(pos.getX(i) - block.x) < 1e-6) collapsed++;
@@ -459,6 +488,29 @@ function Run(brain, world, seconds, each = null) {
   ok(zoned.items.length === 1 && zoned.items[0].id === "FarAway" && zoned.rejected.map((r) => r.why).join() === "zone:rightRear,zone:withdrawalGap",
     "breakables inside / touching a protected zone (sap trench, guard safe area) are refused by region, not by name");
   zoned.Dispose();
+  // Space data (Data_FirstLevelFrontBreakables) → mechanism specs: stage 0 = the block's own top above the shared ground,
+  // then one stage per hit down to topM; terrain lips are not this mechanism's job; visualOnly keeps the static collider.
+  const { SpaceBreakableSpecs } = await import("./Script_FirstLevelFrontBreakables.mjs");
+  const { specs: spaceSpecs, skipped } = SpaceBreakableSpecs(FRONT_BREAKABLES, MISSION_LAYOUT, SampleMissionTerrain);
+  ok(spaceSpecs.length + skipped.length === FRONT_BREAKABLES.length && skipped.every((s) => s.why === "terrain"),
+    `every Space breakable is built or knowingly skipped (${skipped.map((s) => s.id).join()})`);
+  for (const spec of spaceSpecs) {
+    const raw = FRONT_BREAKABLES.find((r) => r.id === spec.id), blk = MISSION_LAYOUT.blocks.find((x) => x.id === raw.block);
+    ok(spec.stages.length === raw.stages.length + 1 && spec.stages.length - 1 === raw.hits, `${spec.id}: one stage per hit (${raw.hits})`);
+    const top0 = spec.stages[0][0][2];
+    ok(Math.abs(top0 - (blk.y + blk.h / 2 - SampleMissionTerrain(blk.x, blk.z))) < 1e-9 && spec.stages.slice(1).every((s, k) => s[0][2] === raw.stages[k].topM && s[0][2] < top0),
+      `${spec.id}: intact top, then lower each hit`);
+    ok(!FRONT_UNBREAKABLE.includes(spec.block), `${spec.id} is not on the never-break list`);
+  }
+  const lintelBlock = { id: "Lintel", x: 0, z: 30, w: 4, d: 0.6, h: 1, y: 3.5, semantic: "Whitebox" };
+  const lintelCollider = { c: [0, 3.5, 30], h: [2, 0.5, 0.3], _physicsHandle: 55 };
+  solids.add(55);
+  const vis = new FirstLevelFrontBreakables({ scene, battlefield: { ...battlefield, colliders: [lintelCollider], meshes: [] }, physics,
+    layout: { blocks: [lintelBlock] } }, [{ id: "LintelBreak", block: "Lintel", visualOnly: true, stages: [[[-2, 2, 4]], [[-2, 2, 3.3]]] }]);
+  ok(vis.items.length === 1 && solids.has(55) && vis.State()[0].colliders === 0, "visualOnly: the static collider stays, the segments add none");
+  vis.OnBlast({ x: 0, y: 3, z: 30.5 }, { damage: 85, time: 1 });
+  ok(vis.State()[0].stage === 1 && vis.State()[0].colliders === 0 && solids.has(55), "visualOnly: a hit only swaps the look (the bend occluder is never shot through)");
+  vis.Dispose();
 }
 
 // --- 11 审查修复（2026-09-24）：打不死的不打、撤离窗口、挪窝重来、攻击支路区域火力、补弹与补刀、后甲板 -------------
@@ -508,11 +560,13 @@ function Run(brain, world, seconds, each = null) {
   ok(moved.includes(0), `moved ${TANK.gunner.moveResetM + 2} m: the next planned shell is back to first-shot scatter (${moved.join(",")})`);
 
   // 11d 攻击支路区域火力：LanePoint 取整、沟外为 null；区域目标进了最小射程不再规划。
-  const lane = TANK_TEMP_PATH.lanes[0];
-  const lp = LanePoint(lane, { x: 35.4, z: -128.2 });
+  const lane = FRONT_TANK_BRAIN_PATH.lanes[0];
+  ok(lane.points.length === FRONT_SORTIE.attackRoute.length && lane.points.every((p, i) => Dist(p, FRONT_SORTIE.attackRoute[i]) < 1e-9),
+    "the attack lane is FRONT_SORTIE.attackRoute (rear junction → road-side attack position)");
+  const lp = LanePoint(lane, { x: 39.6, z: -147.2 });
   ok(lp && Math.abs(lp.s % lane.stepM) < 1e-6 && lp.d < 2, `lane point snaps to ${lane.stepM} m steps (s=${lp?.s})`);
-  ok(LanePoint(lane, { x: 27, z: -110 }) === null, "off the lane → no zone target");
-  ok(LanePoint(lane, { x: 27, z: -127 }) === null, "the rear rally point (27,−127) is not part of the lane");
+  ok(LanePoint(lane, { x: 42.4, z: -111 }) === null, "off the lane (the ammo house) → no zone target");
+  ok(LanePoint(lane, FRONT_SORTIE.seat) === null, "the nest seat is not part of the lane");
   const zoneBrain = CreateTankBrain(StraightPath(), TANK, { seed: 34 });
   zoneBrain.PlaceAt(1);
   const near = { id: "attackLane", kind: "zone", weight: 2.5, x: zoneBrain.x + 6, y: 1.1, z: zoneBrain.z, ground: 0 };
@@ -520,12 +574,12 @@ function Run(brain, world, seconds, each = null) {
   Run(zoneBrain, World({ targets: [near] }), 15, (o) => { nearShots += o.fire.filter((f) => f.weapon === "main").length; });
   ok(nearShots === 0 && zoneBrain.targetId == null, "a zone inside the main gun's minimum range is dropped, not re-planned every frame");
   // 05 现布局：玩家在攻击支路上、车停在挤压点 → 炮塔转向他脚下那段沟并开炮（沟沿），不是 60 m 外的何有田。
-  const b05 = CreateTankBrain(TANK_TEMP_PATH, TANK, { seed: 35 });
+  const b05 = CreateTankBrain(FRONT_TANK_BRAIN_PATH, TANK, { seed: 35 });
   b05.PlaceForStage("Tank");
-  const lanePt = LanePoint(lane, { x: 33, z: -127.5 });
+  const lanePt = LanePoint(lane, { x: 41.4, z: -154 });
   const lanes = [
-    { id: "heyoutian", kind: "leftGun", x: -31, y: 1.2, z: -150, ground: 0, essential: true },
-    { id: "gapZone", kind: "zone", weight: 1, x: -8, y: 1.2, z: -139, ground: 0 },
+    { id: "heyoutian", kind: "leftGun", x: FRONT_SORTIE.leftSeat.x, y: 1.2, z: FRONT_SORTIE.leftSeat.z, ground: 0, essential: true },
+    { id: "gapZone", kind: "zone", weight: 1, x: FRONT_SORTIE.gap.x, y: 1.2, z: FRONT_SORTIE.gap.z, ground: 0 },
     { id: "attackLane", kind: "zone", weight: lane.weight, x: lanePt.x, y: 1.1, z: lanePt.z, ground: 0, scatterM: lane.scatterM },
   ];
   const lip = { x: lanePt.x + 0.6, y: 0.4, z: lanePt.z - 0.8 };
@@ -536,11 +590,13 @@ function Run(brain, world, seconds, each = null) {
     `05: the main gun works the attack lane's cover lip (${s05.map((f) => `${f.target}/${f.kind}`).join(",")})`);
 
   // 11d' 盯沟口：人还在取弹沟（沟线外）时放宽半径取沟口；默认半径照旧是 null。
-  const watchPt = LanePoint(lane, { x: 27, z: -115 }, lane.watch.rangeM);
-  ok(LanePoint(lane, { x: 27, z: -115 }) === null && watchPt && watchPt.s === 0 && Math.hypot(watchPt.x - lane.points[0].x, watchPt.z - lane.points[0].z) < 1e-6,
+  // The ammo sap leaves the rear junction north-east; from its first bend the nearest stretch of the lane is its mouth leg.
+  const inAmmoSap = FRONT_SORTIE.route[1];
+  const watchPt = LanePoint(lane, inAmmoSap, lane.watch.rangeM);
+  ok(LanePoint(lane, inAmmoSap) === null && watchPt && watchPt.s <= Dist(lane.points[0], lane.points[1]) + 1e-6,
     `watch: from the ammo trench the tank watches the lane mouth (${watchPt && `${watchPt.x},${watchPt.z}`})`);
   // 11d'' 装填时照样摇炮塔：换了目标不等装填完才开始摇；下一发的瞄准停顿照旧 ≥ layMinS。
-  const bR = CreateTankBrain(TANK_TEMP_PATH, TANK, { seed: 36 });
+  const bR = CreateTankBrain(FRONT_TANK_BRAIN_PATH, TANK, { seed: 36 });
   bR.PlaceForStage("Tank");
   const wR = World({ stage: "Tank", facts: new Set(["bundleTaken"]), targets: [lanes[1]], Los: () => false, Cover: () => null });
   let firstShotAt = null;
@@ -695,4 +751,4 @@ function Run(brain, world, seconds, each = null) {
   ok(TANK_SFX.filter((e) => e.loop).length <= 3, "contract §6: at most 3 resident tank loops");
 }
 
-console.log(`PASS FirstLevelTankBrain: ${checks} checks (drive, telegraph, targeting, scatter, MG walk-in, dead zone, reactions, escorts, two-stage damage, 03→05 temp path, breakable cover, tank audio)`);
+console.log(`PASS FirstLevelTankBrain: ${checks} checks (drive, telegraph, targeting, scatter, MG walk-in, dead zone, reactions, escorts, two-stage damage, 03→05 Space path, breakable cover, tank audio)`);

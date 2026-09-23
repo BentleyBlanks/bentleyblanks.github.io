@@ -7,7 +7,8 @@
 // Runtime.UpdateTank / OnBlast 与 Main 的车体中弹只各留一行钩子（开关 Data_Tuning_Tank.brainEnabled）。
 //
 // 事实口径（契约 §5.7）：tankImmobilized = 进入 MobilityKill 或 Disabled；tankFireDisabled = Disabled。
-// 路点：临时路线 Data_Tuning_Tank.TANK_TEMP_PATH（现布局）；第二波 Front 包换成 Space 的新路。
+// 路点：Data_Tuning_Tank.FRONT_TANK_BRAIN_PATH（Space 包 FRONT_TANK_PATH + 节奏字段，Front 包 09-24 接上）；
+// 可破坏掩体：Space 包 Data_FirstLevelFrontBreakables（SpaceBreakableSpecs 换格式）。
 //
 // 2026-09-24 审查修复：
 //   · 打不死的剧情人物（scriptEssential）进目标表时带 essential，大脑按 essentialScale 压权重；
@@ -20,11 +21,12 @@
 // ===========================================================================
 import * as THREE from "three";
 import { CreateTankBrain, LuoFinishDue, LanePoint, TankClearFact } from "./Script_FirstLevelTankBrain.mjs";
-import { TANK, TANK_TEMP_PATH, FRONT_BREAKABLES_TEMP, TANK_BARK_CUES } from "./Data_Tuning_Tank.mjs";
+import { TANK, FRONT_TANK_BRAIN_PATH, TANK_BARK_CUES } from "./Data_Tuning_Tank.mjs";
+import { FRONT_BREAKABLES } from "./Data_FirstLevelFrontBreakables.mjs";
 import { FRONT_SORTIE as S } from "./Data_FirstLevelFrontRoute.mjs";
 import { MISSION_ENCOUNTERS } from "./Data_FirstLevelMission.mjs";
 import { MISSION_LAYOUT } from "./Data_FirstLevelMissionLayout.mjs";
-import { FirstLevelFrontBreakables } from "./Script_FirstLevelFrontBreakables.mjs";
+import { FirstLevelFrontBreakables, SpaceBreakableSpecs } from "./Script_FirstLevelFrontBreakables.mjs";
 import { TankAudio } from "./Script_TankAudio.mjs";
 
 const TANK_STAGES = Object.freeze(["Support", "MachineGun", "Tank", "Orders"]);
@@ -33,7 +35,7 @@ const Plain = (v) => ({ x: v.x, y: v.y, z: v.z });
 const Wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 
 export class FirstLevelTankRuntime {
-  constructor(runtime, { path = TANK_TEMP_PATH, tuning = TANK, breakables = FRONT_BREAKABLES_TEMP } = {}) {
+  constructor(runtime, { path = FRONT_TANK_BRAIN_PATH, tuning = TANK, breakables = FRONT_BREAKABLES } = {}) {
     this.r = runtime;
     this.path = path;
     this.T = tuning;
@@ -87,8 +89,10 @@ export class FirstLevelTankRuntime {
   EnsureBreakables() {
     const r = this.r;
     if (this.breakables || !r.scene || !r.battlefield) return;
+    const { specs, skipped } = SpaceBreakableSpecs(this.breakableSpecs, MISSION_LAYOUT, (x, z) => this.Ground(x, z));
     this.breakables = new FirstLevelFrontBreakables({ scene: r.scene, battlefield: r.battlefield, physics: r.physics,
-      vfx: r.vfx, audio: r.audio, layout: MISSION_LAYOUT }, this.breakableSpecs);
+      vfx: r.vfx, audio: r.audio, layout: MISSION_LAYOUT }, specs);
+    this.breakables.skipped = skipped;
   }
   /**
    * 进场闸（TANK.entry）：起点对玩家没有视线、或在玩家朝向 ±offViewRad 以外（屏幕外）才开进图；
@@ -199,7 +203,8 @@ export class FirstLevelTankRuntime {
     if (!TANK_STAGES.includes(stage)) { if (this.sound) this.sound.Stop(); return; }
     // 03：阵位夺下以前车还没开进图（北面路线起点）—— 看不见，但引擎已经在那儿怠速了。
     // 夺下以后还要过进场闸：起点在玩家视野里就再等等，别凭空冒出来。
-    if (stage === "Support" && !this.brain && (!r.Has("rightNestCaptured") || !this.EntryClear())) {
+    const entryFact = this.T.entry?.fact || "rightNestCaptured";
+    if (stage === "Support" && !this.brain && (!r.Has("rightNestCaptured") || !r.Has(entryFact) || !this.EntryClear())) {
       t.active = false; t.present = false;
       this.Sound?.Offstage(dt, this.OffstagePoint());
       return;
@@ -430,6 +435,7 @@ export class FirstLevelTankRuntime {
       this.escortAnchors.set(e.id, { anchor: { ...e.anchor }, mode: e.mode, cover: anchor !== e.anchor });
       r.Defend(actor, anchor, radius, e.slack);
       if (e.mode === "move" || e.mode === "rally") r.ai.SetStance(actor, e.mode === "rally" ? 0 : 1, 0.5, true);
+      else if (e.mode === "slot") r.ai.SetStance(actor, 1, 0.5, true);
     }
   }
 
@@ -473,7 +479,8 @@ export class FirstLevelTankRuntime {
     return result;
   }
   Debug() {
-    return { brain: this.brain?.Debug() || null, breakables: this.breakables?.State() || [], log: this.log, audio: this.sound?.State() ?? null,
+    return { brain: this.brain?.Debug() || null, breakables: this.breakables?.State() || [], breakablesSkipped: this.breakables?.skipped || [],
+      log: this.log, audio: this.sound?.State() ?? null,
       telemetry: this.brain ? { shots: this.brain.telemetry.shots.slice(-24), bursts: this.brain.telemetry.bursts.slice(-48),
         reactions: this.brain.telemetry.reactions.slice(), states: this.brain.telemetry.states.slice() } : null };
   }
