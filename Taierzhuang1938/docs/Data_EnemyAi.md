@@ -1661,10 +1661,9 @@ A 均值 4.52 ms / P95 7.6 ms，B 均值 4.41 ms / P95 7.3 ms —— 差在噪�
      被禁火的人平时「先打能打的」，眼里多半是壕里的国军）；
    - 跟冲从「此刻已经 bayonetFixed」（只有冲过锋的人才有）改成「这支枪能上刺刀」，跟的时候上刺刀；
    - 临时数据 `tankShown.mgAttack.charge` 改成 `{ afterS 12, minAlive 3, playerWithinM 80, lastLineShare 0.34 }`。
-   **实机仍然一次都没冲成**：fix6 / fix7 两趟 03→06 的 `whys` 是 tooEarly 48 / playerFar 102 / fellBack 247 和
-   tooEarly 48 / tooFew 113 / fellBack 232 —— 机枪攻击组露面后 40–60 s 就被玩家在机枪上打掉一半、退线，凑不出
-   「3 个以上活人、离玩家 80 m 内、三分之一压到最远线」的窗口。这是节奏与名册的事（Front 包），机制与取证都在。
-   自发冲锋喊「突撃」每趟 5–9 次；跟冲实测 fix6 那趟 1 次。
+   **实机里冲成过一次**：最终代码 3 趟 03→06 探针里 fix8b 那趟 `tankShown` 相位 163.9 s 成组冲锋 2 人（`groupCharges` 1、
+   `chargeFollows` 1）；另两趟没冲成，`whys` 是 tooEarly 48 / notForward 33 / fellBack 230 这一类 —— 机枪攻击组露面后
+   40–60 s 就被玩家在机枪上打掉一半、退线，窗口很窄。时机与名册归 Front 包定稿，机制与取证都在。自发冲锋喊「突撃」每趟 5–9 次。
 6. **01 背景兵撤场不当面消失**：离开 01–02 时立刻退出任务敌人表（驾驶器的名册快照照旧看不见他们），交接过的日军变回剧本兵
    （不再对人开枪），**人等出了玩家视锥（半角 + 12°）、或离玩家 70 m 以上再移除**，90 s 兜底（`BACKDROP_SQUADS.leave`）。
 7. **阵位守卫的后撤锚点**（临时数据，归 Space 包定稿）：原锚点 (31, −146) 离机枪位只有 5 m、掩体余量 6 m，退下来的人蹲在
@@ -1681,6 +1680,10 @@ A 均值 4.52 ms / P95 7.6 ms，B 均值 4.41 ms / P95 7.3 ms —— 差在噪�
      「30 m」是实测来的：不设这道距离时玩家来路上的阵位守卫也去空地，03→06 冷启动在 RightNestApproach 卡死，关掉这条就过。
 9. `BARK_LINES.follow`（没有调用点）、`chargeFollowTargetId`（只写不读）删了；错位的 JSDoc 挪回 `NearestLineIndex`；
    `Data_AiBrainGraph` 的跟冲 / 迟疑两条边的文字按上面改。
+11. **让口子也拉近距交火的人**：`YieldGap` 把在线上近距交火（`UpdateAssault` 的 contact）的人与站在线上的人一样往回拉一条线，
+    并写 `s.yieldUntil`（`FRONT_PRESSURE_TICK.yieldMoveS` 4 s）：这几秒 `UpdateAssault` 不认近距交火、先跑回去。实测一趟
+    03→06 红在 `lastGuardsWithdrawn`：机枪攻击组一挺轻机枪在左前枪位旁 contact 里原地 Defend，看着撤退口 40 多秒，拉线改的
+    index 一步没走（scratchpad `block_trace` 逐秒记下是谁在封口）。
 10. **驾驶器**（`Script_FirstLevelCampaignKit`，共享测试夹具，一个条件）：躲手榴弹之后，人仍在走廊上（投影 ≤ 1 m）但被带回到
     上一个拐角之前时，也回到走廊再走 —— 改前直线穿壕壁去找原来的下一个拐角，站死在墙上（阵位守卫的手榴弹第一次全员都有，
     03 冷启动就撞上了）。
@@ -1698,27 +1701,35 @@ A 均值 4.52 ms / P95 7.6 ms，B 均值 4.41 ms / P95 7.3 ms —— 差在噪�
 
 **数字（实测，03 冷启动 `--stage-from=3 --stage-to=6 --gate`，本轮代码）**
 
-| 口径 | fix6（dad6c199a） | fix7（d20b9ebc8，最终） |
-| --- | --- | --- |
-| 03 zero30 / idle4 / idle4Strict | 5% / 18% / 28% | 3% / 15% / 25% |
-| 04（人数）zero30 / idle4 | （6 人）17% / 22% | （2 人，不判）0% / 21% |
-| 05（人数）zero30 / idle4 | （6 人）3% / 5% | （2 人，不判）0% / 3% |
-| 03–05 合并 zero30 / idle4 / idle4Strict | 5% / 15% / 27% | 2% / 14% / 25% |
-| 机枪发数（03–05） | 1633 | 1685 |
-| 放行前以守军为目标（人·帧） | 0 | 0 |
-| 阵位步枪守卫在掩体里或在动 | 53% | 52% |
-| 跃进喊话调用（全程） | 31 | 37 |
+最终代码（07208287b）三趟，另附上一版（d20b9ebc8，只差第 11 条）一趟：
+
+| 口径 | d20b9ebc8 fix7 | 最终 fix8 | 最终 fix8b | 最终 fix8c |
+| --- | --- | --- | --- | --- |
+| 结果 | 过 | **红**：玩家上枪时只剩 10 血，117 s 阵亡（驾驶器） | 过 | 过 |
+| 03 zero30 / idle4 / idle4Strict | 3% / 15% / 25% | 0% / 19% / 29%（只到 117 s） | 8% / 16% / 26% | 2% / 17% / 28% |
+| 04（人数）zero30 / idle4 | （2 人，不判）0% / 21% | — | （4 人、4 个窗，只判 idle4）50% / 13% | （5 人、5 个窗，只判 idle4）0% / 12% |
+| 05（人数）zero30 / idle4 | （2 人，不判）0% / 3% | — | （3 人，不判）13% / 8% | （5 人）3% / 6% |
+| 03–05 合并 zero30 / idle4 / idle4Strict | 2% / 14% / 25% | — | 10% / 15% / 26% | 3% / 15% / 26% |
+| 机枪发数（03–05） | 1685 | 779 | 1118 | 1723 |
+| 放行前以守军为目标（人·帧） | 0 | 0 | 0 | 0 |
+| 阵位步枪守卫在掩体里或在动 | 52% | 52% | 52% | 52% |
+| 跃进喊话调用（全程） | 37 | 28 | 31 | 27 |
+| 成组冲锋 / 跟冲 | 0 / 0 | 0 / 0 | **1 / 1** | 0 / 0 |
+
+fix8 那一趟：玩家挨的四下全来自阵位组 —— RightEntryGuard 23.8（51 s，每趟都有）、RightNestGunner 10.9、退到锚点的
+RightNestGuard 从 14.5 m 外 23.8、一枚手榴弹 18.9 —— 上枪时 10 血，之后流血死在等 MachineGun 的路上。这是「阵位守卫全员
+是活的」（第 2 条）之后阵位这一仗变难了，驾驶器不会躲也不会先包扎；基线树上审查者也见过一跑玩家死在 MachineGun 前。
+要不要给阵位守卫降一点（比如退下来的人只压制不瞄准），由集成负责人 / Front 包定。
 
 同一轮里没过的几跑（都已修掉、写在上面）：fix1 03 idle4 28%（白刃 idle 计入之后）；fix2 04 只有 3 个 30 s 窗、zero30 33%
 （→ 人窗下限）；fix3 驾驶器在 05 SameBranchReturn 打光了子弹、停在线点 1.2 m 处（没单独定因，之后的代码上没再出现）；
 fix4 驾驶器躲手榴弹后卡在 RightNestApproach 的壕壁上（→ 第 8 条的 30 m、第 10 条）；fix5 玩家在枪位上等 `rightNestCaptured`
 被炸死（→ 第 7 条）。
 
-`FirstLevelMissionBrowserTest --campaign --stage-from=3 --stage-to=6 --probe-front-gun`：最终代码（d20b9ebc8）绿，
-`rightNestCaptured` 98.2 s、`frontDisengaged` 508.8 s，`guards` 遥测 `targets.guard` 全程 0，玩家血量最低 14.4（05 取弹沟
-AmmoHouseCoveredBranch，BundleBend 两人按 Step 1 的设计在 bundleTaken 后切进沟里）；锚点还在 (31, −152.5) 的 49f990681 也绿
-（91.8 / 478.8 s，最低 90）。驾驶是逐帧手动推进的，同一份代码重跑是同一条轨迹（本轮 trace 两次逐位相同），所以「多跑几次」
-量不出偶发性，只能换代码量。
+`FirstLevelMissionBrowserTest --campaign --stage-from=3 --stage-to=6 --probe-front-gun`：最终代码两跑都绿
+（`rightNestCaptured` 95.9 / 92.0 s，`frontDisengaged` 476.2 / 484.2 s，`guards` 遥测 `targets.guard` 全程 0，玩家血量最低 90 / 83）。
+上一版 d20b9ebc8 一绿一红：绿的那跑最低 14.4 血（05 取弹沟，BundleBend 两人按 Step 1 的设计在 bundleTaken 后切进沟里），
+红的那跑就是第 11 条。同一份代码两跑轨迹并不总相同（有实时钟成分），所以一跑绿不等于稳。
 `DamageTest` 25/25（三人 25 m 对射 TTK 16.9 s）；`AiEditorTest` 32/32。
 
 **没改、理由**
