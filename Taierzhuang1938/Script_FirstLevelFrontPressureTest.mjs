@@ -28,6 +28,7 @@ import { MISSION_LAYOUT } from "./Data_FirstLevelMissionLayout.mjs";
 import { SampleMissionTerrain } from "./Data_FirstLevelMissionTerrain.mjs";
 import { FrontAssaultLane } from "./Data_FirstLevelMissionFront.mjs";
 import { WEAPONS } from "./Data_Weapons.mjs";
+import { MISSION_DEFENSE_OBJECTS, MISSION_STAKE_FENCE } from "./Data_FirstLevelMissionFortifications.mjs";
 import { AMBIENT_FIRE } from "./Data_Tuning_AiShooting.mjs";
 import { SQUAD_REACTION, CHARGE_FOLLOW } from "./Data_Tuning_AiTactics.mjs";
 
@@ -72,7 +73,12 @@ for (const [id, p] of [...Object.entries(FRONT_FIRE_POINTS), ...Object.entries(B
   Check(p.x > bounds.minX && p.x < bounds.maxX && p.z > bounds.minZ && p.z < bounds.maxZ, `fire point ${id} is on the map`);
   Check(p.h >= 0 && p.h <= 2 && p.r > 0 && p.r <= 5, `fire point ${id} height/scatter are sane`);
 }
-// Every authored leg this package adds must clear solid blocks (same capsule test as FirstLevelMissionTest).
+// Every authored leg this package adds must clear solid blocks (same capsule test as FirstLevelMissionTest)
+// and the solid battlefield obstacles (barbed-wire stake fences are not in MISSION_LAYOUT.blocks: the first
+// 01 backdrop draft ran three men straight into WestWire at z = -147 and they stood there).
+const OBSTACLES = MISSION_DEFENSE_OBJECTS.filter((o) => o.solid).map((o) => o.asset === "battlefieldBarbedWire02"
+  ? { id: o.id, x: o.x, z: o.z, ry: o.ry || 0, w: 2 * MISSION_STAKE_FENCE.wireHalfLength * (o.scale || 1), d: 0.1 }
+  : { id: o.id, x: o.x, z: o.z, ry: o.ry || 0, w: 3, d: 3 });
 function RouteClear(name, route) {
   for (let i = 1; i < route.length; i++) {
     const a = route[i - 1], b = route[i], distance = Math.hypot(a.x - b.x, a.z - b.z);
@@ -84,6 +90,11 @@ function RouteClear(name, route) {
         const blocked = Math.abs(dx * c - dz * s) < box.w / 2 + 0.35 && Math.abs(dx * s + dz * c) < box.d / 2 + 0.35
           && box.y + box.h / 2 > y + 0.3 && box.y - box.h / 2 < y + 1.7;
         assert.equal(blocked, false, `${name} crosses ${box.id} at ${x.toFixed(1)},${z.toFixed(1)}`);
+      }
+      for (const o of OBSTACLES) {
+        const dx = x - o.x, dz = z - o.z, c = Math.cos(o.ry), s = Math.sin(o.ry);
+        const hit = Math.abs(dx * c - dz * s) < o.w / 2 + 0.35 && Math.abs(dx * s + dz * c) < o.d / 2 + 0.35;
+        assert.equal(hit, false, `${name} runs into ${o.id} at ${x.toFixed(1)},${z.toFixed(1)}`);
       }
     }
   }
@@ -109,6 +120,7 @@ for (const [id, plan] of Object.entries(FRONT_PRESSURE_TACTICS)) {
 for (const spec of BACKDROP_SQUADS.members) {
   RouteClear(`backdrop ${spec.id}`, [spec, ...spec.route]);
   for (const stop of spec.route) for (const id of stop.fire) Check(!!BACKDROP_FIRE_POINTS[id], `backdrop ${spec.id} fire ${id}`);
+  Check(spec.route.at(-1).fire.length > 0, `backdrop ${spec.id} ends on a firing stop`);
 }
 console.log(`ok ① pressure / backdrop data: ${FRONT_PRESSURE_PHASES.length} phases, facts real, routes clear, every assault phase loops`);
 
@@ -372,6 +384,12 @@ function Man(ai, side, x, z, options = {}) {
   s.coverPhase = "peek"; Check(ai.TryAmbientFire(s, 0, true), "peeking from cover: ambient fire");
   // Turned away: no shot.
   s.fireTimer = 0; s.state = "fire"; s.yaw = Math.PI; Check(!ai.TryAmbientFire(s, 0, true), "the muzzle must face the point");
+  // A scripted man holding his stop reloads in place (nobody else will).
+  s.state = "advance"; s.order = "hold"; s.yaw = 0; s.ammo = 0; s.fireTimer = 0; s.reloadTimer = 0;
+  Check(!ai.TryAmbientFire(s, 0.1, false), "an empty rifle does not fire");
+  for (let i = 0; i < 40 && s.ammo === 0; i++) ai.TryAmbientFire(s, 0.1, false);
+  Eq(s.ammo, s.weapon.magazine, "a scripted backdrop man presses in a fresh clip and keeps firing");
+  s.state = "fire";
   // Machine gun: short bursts.
   const gun = Man(ai, "ija", 4, 0, { weapon: "Type11" }); gun.yaw = 0; gun.ambientFirePoints = [front];
   ai.PickAmbientFire(gun); let bursts = 0;
@@ -487,8 +505,9 @@ console.log("ok ③ brain: ambient pick/ownership/ledger, MG bursts, hesitation,
   r.time = 1; squads.Update();
   Check(moves.some(([id]) => id === "BackdropIjaA"), "the first man runs his route");
   Eq(runner.ambientFirePoints ?? null, null, "nobody fires on the run");
-  runner.position = { x: -44, y: 0, z: -146 }; squads.Update();
-  Check(runner.order === "hold" && runner.ambientFirePoints?.length === 2, "at the stop he kneels and fires at his authorised points");
+  const firstStop = BACKDROP_SQUADS.members.find((m) => m.id === "BackdropIjaA").route[0];
+  runner.position = { x: firstStop.x, y: 0, z: firstStop.z }; squads.Update();
+  Check(runner.order === "hold" && runner.ambientFirePoints?.length === firstStop.fire.length, "at the stop he kneels and fires at his authorised points");
   facts.add("rifleRecovered"); squads.Update();
   Check(ija.every((m) => defends.includes(m.id)) && !runner.scriptedNoncombatant, "hand-off: the Japanese become live local-area soldiers");
   r.flow.stage.id = "Support"; squads.Update();

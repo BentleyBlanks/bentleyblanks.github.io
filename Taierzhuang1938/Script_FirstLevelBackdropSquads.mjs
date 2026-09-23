@@ -16,6 +16,7 @@ const ARRIVE_M = 0.8;
 const firePointCache = new Map();
 export function BackdropFirePoints(stop, points = BACKDROP_FIRE_POINTS) {
   if (firePointCache.has(stop)) return firePointCache.get(stop);
+  if (!stop.fire.length) { firePointCache.set(stop, null); return null; }
   const list = Object.freeze(stop.fire.map((id) => {
     const p = points[id];
     if (!p) throw new Error(`BackdropSquads: unknown fire point ${id}`);
@@ -114,8 +115,8 @@ export class FirstLevelBackdropSquads {
       r.MoveActor(a, stop, m.spec.speedMps);
       return;
     }
-    // hold：停点上蹲着打（WatchScripted 给戒备姿态，PickAmbientFire 挑点）。
-    if (a.ambientFirePoints !== BackdropFirePoints(stop)) a.ambientFirePoints = BackdropFirePoints(stop);
+    // hold：停点上蹲着打（WatchScripted 给戒备姿态，PickAmbientFire 挑点）。fire 为空的停点只是过路点。
+    if (a.ambientFirePoints !== BackdropFirePoints(stop)) { a.ambientFirePoints = BackdropFirePoints(stop); a.ambientFirePoint = null; }
   }
 
   /** 停在这儿：守区 + order hold + 没有剧本速度（WatchScripted 认这三条才给戒备姿态）。 */

@@ -3560,7 +3560,20 @@ export class AiDirector {
     if (!ticked) s.fireTimer -= dt;
     if (s.order === "covert" && this.time < s.covertUntil) return false;
     if (this.time < s.coolUntil || this.time < (s.scriptShelterUntil || 0)) return false;
-    if (s.fireTimer > 0 || s.ammo <= 0) return false;
+    // 剧本兵（01 背景兵，原地待命的 ADVANCE）不走状态机，没人给他换弹：打空了就在这儿原地压弹。
+    // 其余状态的人打空了由 Think / ApplyScriptDefense 转 RELOAD，那时 AmbientOwnsAim 已经放手。
+    if (s.ammo <= 0) {
+      if (s.state === STATE.ADVANCE) {
+        if (!(s.reloadTimer > 0)) {
+          s.reloadTimer = s.weapon.reloadTimeS || 3.2;
+          this.ctx?.audioWiring?.AiReload(s, s.weapon.kind);
+        }
+        s.reloadTimer -= dt;
+        if (s.reloadTimer <= 0) { s.reloadTimer = 0; s.ammo = s.weapon.magazine || 5; }
+      }
+      return false;
+    }
+    if (s.fireTimer > 0) return false;
     // 掩体里只在探头相位开火（与 COVER_ENGAGE 的主路径同一条规矩）。
     if (s.state === STATE.COVER_ENGAGE && s.coverPhase !== "peek") return false;
     const yawTo = Math.atan2(-(p.x - s.position.x), -(p.z - s.position.z));
