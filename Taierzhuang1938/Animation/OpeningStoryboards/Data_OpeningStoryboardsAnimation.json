@@ -402,7 +402,7 @@
      "action": "grab"
     },
     {
-     "t": 0.28,
+     "t": 0.7,
      "by": "ijaB",
      "part": "upperArmR",
      "action": "grab"
@@ -509,7 +509,7 @@
    "weaponState": "slungBack",
    "contacts": [
     {
-     "t": 0.28,
+     "t": 0.7,
      "limb": "handL",
      "action": "grab",
      "partnerRole": "comrade",
@@ -2043,7 +2043,7 @@
   {
    "id": "LugouNra02",
    "file": "Animation_LugouNra02OpeningStoryboards.json",
-   "sha256": "30ff1a30dc2b9163a87c41bf413e1218586c68c603fd812be0b017d85d8ae66b",
+   "sha256": "1577aabf135c1fad6e3c7bb509f97e0ed1262901aaa9d0c1e678c0ebd9af9287",
    "originalModelSha256": "39c08ca82148e140ee2952caffdd0dee99750fb734038a5263d216c9a7345225",
    "clipIds": [
     "SupplyReceive",
@@ -4266,7 +4266,7 @@
   {
    "id": "LugouIja01",
    "file": "Animation_LugouIja01OpeningStoryboards.json",
-   "sha256": "0e19a3ba57dbfefae6335bb6348da4f6ae8f323f60241bf77bb4e2a4669e31a8",
+   "sha256": "7adafd402c71bcf075b032ed7fb6f05f94636b7dc76e946f70813acba33496c1",
    "originalModelSha256": "23fa4ef88891bd14d49dfb9a3e61b9f0dcaf45b8956a720aab24d9c4c23eb9c7",
    "clipIds": [
     "SupplyReceive",
@@ -4998,22 +4998,22 @@
     {
      "clip": "IjaPullArm",
      "frames": 107,
-     "footSlideM": 0.0,
+     "footSlideM": 0.0066,
      "contactErrorM": 0.0,
      "gripSolveErrorM": 0.0,
-     "pelvisMaxStepM": 0.1303,
+     "pelvisMaxStepM": 0.1322,
      "floorCorrectionMin": -0.0,
      "floorCorrectionMax": 0.0,
      "root": {
       "start": [
        -0.224,
-       -0.1934,
+       0.0093,
        -0.0,
        0.7246
       ],
       "end": [
        0.1164,
-       0.0059,
+       0.0243,
        0.97,
        0.7154
       ],
@@ -5082,23 +5082,23 @@
      "clip": "IjaReadyRifle",
      "frames": 28,
      "footSlideM": 0.0,
-     "contactErrorM": 0.0245,
-     "gripSolveErrorM": 0.02445,
-     "pelvisMaxStepM": 0.0749,
+     "contactErrorM": 0.0107,
+     "gripSolveErrorM": 0.01071,
+     "pelvisMaxStepM": 0.0928,
      "floorCorrectionMin": -0.0,
      "floorCorrectionMax": 0.0,
      "root": {
       "start": [
-       -0.0006,
-       -0.0145,
+       -0.0,
+       -0.0276,
        -0.97,
        0.7477
       ],
       "end": [
-       0.0452,
-       -0.0883,
+       0.0517,
+       -0.1039,
        -0.0,
-       0.705
+       0.6965
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
@@ -5247,7 +5247,7 @@
   {
    "id": "LugouIja02",
    "file": "Animation_LugouIja02OpeningStoryboards.json",
-   "sha256": "288d8549289439a6b13d4c186f8e465b5f6fe1e84ecae90e3b438bb8d98c4f0e",
+   "sha256": "5ac9c01a84316b5dc65c3cc260f4f46d921d1d12a12a0fbe158e554358509d4c",
    "originalModelSha256": "8c4860ec2d4dd3076b06ff7e593e5dcfd4d23aefe2fedf6f9fdec3b0e12cc9aa",
    "clipIds": [
     "SupplyReceive",
@@ -5989,24 +5989,24 @@
     {
      "clip": "IjaDragCollarFromDirt",
      "frames": 107,
-     "footSlideM": 0.0029,
+     "footSlideM": 0.0096,
      "contactErrorM": 0.0,
      "gripSolveErrorM": 0.0,
-     "pelvisMaxStepM": 0.1004,
-     "floorCorrectionMin": -0.00196,
-     "floorCorrectionMax": 0.00186,
+     "pelvisMaxStepM": 0.1006,
+     "floorCorrectionMin": -0.01372,
+     "floorCorrectionMax": 0.00033,
      "root": {
       "start": [
        0.0221,
        -0.3783,
        -0.0,
-       0.7091
+       0.7088
       ],
       "end": [
-       -0.0058,
-       0.294,
+       -0.0057,
+       0.2942,
        -0.0,
-       0.6993
+       0.6988
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
@@ -6105,12 +6105,12 @@
     {
      "clip": "IjaHairGrabPull",
      "frames": 25,
-     "footSlideM": 0.0015,
-     "contactErrorM": 0.018,
-     "gripSolveErrorM": 0.01797,
-     "pelvisMaxStepM": 0.0371,
-     "floorCorrectionMin": -0.00066,
-     "floorCorrectionMax": 0.00192,
+     "footSlideM": 0.0009,
+     "contactErrorM": 0.0221,
+     "gripSolveErrorM": 0.02205,
+     "pelvisMaxStepM": 0.0383,
+     "floorCorrectionMin": -0.00069,
+     "floorCorrectionMax": 0.00107,
      "root": {
       "start": [
        -0.0,
@@ -6119,10 +6119,10 @@
        0.7684
       ],
       "end": [
-       0.0016,
-       -0.0318,
+       0.0246,
+       -0.1114,
        -0.0,
-       0.7422
+       0.7388
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
@@ -6143,24 +6143,24 @@
     {
      "clip": "IjaDrawBayonet",
      "frames": 21,
-     "footSlideM": 0.0013,
-     "contactErrorM": 0.0184,
-     "gripSolveErrorM": 0.01842,
-     "pelvisMaxStepM": 0.0963,
-     "floorCorrectionMin": 2e-05,
-     "floorCorrectionMax": 0.00152,
+     "footSlideM": 0.0005,
+     "contactErrorM": 0.021,
+     "gripSolveErrorM": 0.02101,
+     "pelvisMaxStepM": 0.1105,
+     "floorCorrectionMin": 5e-05,
+     "floorCorrectionMax": 0.00065,
      "root": {
       "start": [
-       0.0045,
-       -0.0404,
+       0.0246,
+       -0.1114,
        -0.0,
-       0.7418
+       0.7388
       ],
       "end": [
-       0.0023,
-       -0.0336,
+       0.0243,
+       -0.104,
        -0.78,
-       0.742
+       0.7391
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
@@ -6181,24 +6181,24 @@
     {
      "clip": "IjaThroatSlash",
      "frames": 97,
-     "footSlideM": 0.0009,
-     "contactErrorM": 0.0169,
-     "gripSolveErrorM": 0.02308,
-     "pelvisMaxStepM": 0.033,
-     "floorCorrectionMin": 0.00049,
-     "floorCorrectionMax": 0.00174,
+     "footSlideM": 0.0004,
+     "contactErrorM": 0.0198,
+     "gripSolveErrorM": 0.02289,
+     "pelvisMaxStepM": 0.0254,
+     "floorCorrectionMin": 0.00026,
+     "floorCorrectionMax": 0.00107,
      "root": {
       "start": [
-       0.0046,
-       -0.0398,
+       0.0259,
+       -0.1099,
        -0.0,
-       0.7419
+       0.739
       ],
       "end": [
-       0.0266,
-       -0.0771,
+       0.0384,
+       -0.1102,
        -0.0,
-       0.7405
+       0.7366
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
@@ -6219,16 +6219,16 @@
     {
      "clip": "IjaWipeSheathBayonet",
      "frames": 59,
-     "footSlideM": 0.0013,
+     "footSlideM": 0.0012,
      "contactErrorM": 0.0,
-     "gripSolveErrorM": 0.03395,
+     "gripSolveErrorM": 0.03469,
      "pelvisMaxStepM": 0.0567,
-     "floorCorrectionMin": -0.00033,
+     "floorCorrectionMin": -0.00032,
      "floorCorrectionMax": 0.00142,
      "root": {
       "start": [
-       -0.0157,
-       -0.1173,
+       -0.0135,
+       -0.1177,
        -0.0,
        0.6039
       ],
@@ -6257,24 +6257,24 @@
     {
      "clip": "IjaReadyRifle",
      "frames": 28,
-     "footSlideM": 0.0012,
-     "contactErrorM": 0.0237,
-     "gripSolveErrorM": 0.02374,
-     "pelvisMaxStepM": 0.0758,
-     "floorCorrectionMin": 0.00057,
-     "floorCorrectionMax": 0.00189,
+     "footSlideM": 0.0008,
+     "contactErrorM": 0.0138,
+     "gripSolveErrorM": 0.01384,
+     "pelvisMaxStepM": 0.092,
+     "floorCorrectionMin": 0.00049,
+     "floorCorrectionMax": 0.00154,
      "root": {
       "start": [
-       -0.0007,
-       -0.0081,
+       -0.0,
+       -0.0274,
        -0.97,
-       0.7425
+       0.742
       ],
       "end": [
-       0.0458,
-       -0.0895,
+       0.0509,
+       -0.1031,
        -0.0,
-       0.6978
+       0.6889
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
@@ -6372,18 +6372,18 @@
     {
      "clip": "IjaSlingRifle",
      "frames": 21,
-     "footSlideM": 0.0006,
+     "footSlideM": 0.0007,
      "contactErrorM": 0.0,
      "gripSolveErrorM": 0.0,
-     "pelvisMaxStepM": 0.0805,
-     "floorCorrectionMin": -0.00034,
-     "floorCorrectionMax": 0.00033,
+     "pelvisMaxStepM": 0.0762,
+     "floorCorrectionMin": -0.00043,
+     "floorCorrectionMax": 0.00032,
      "root": {
       "start": [
-       0.0496,
-       -0.0584,
+       0.0474,
+       -0.0597,
        -0.0,
-       0.6966
+       0.6853
       ],
       "end": [
        -0.0,
