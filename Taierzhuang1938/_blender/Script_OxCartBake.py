@@ -7,6 +7,7 @@ Blender +Y becomes glTF -Z, the game's agreed forward direction.
 """
 import bpy
 import math
+import random
 from pathlib import Path
 from mathutils import Vector
 
@@ -40,8 +41,9 @@ edge = Material('WornWoodEdges', (.43, .32, .21))
 dark_wood = Material('AxleWood', (.22, .16, .11))
 iron = Material('BlackenedIron', (.16, .17, .16), .55)
 tire_iron = Material('ForgedWheelTire', (.075, .078, .073), .62)
+worn_iron = Material('IronContactWear', (.19, .18, .16), .55)
 rope = Material('HempRope', (.53, .45, .29))
-leather = Material('WornLeather', (.19, .12, .08))
+leather = Material('WornLeather', (.12, .075, .046))
 ox_coat = Material('OxBrownCoat', (.35, .22, .14))
 ox_light = Material('OxMuzzle', (.43, .31, .24))
 ox_ear = Material('OxEarInterior', (.29, .17, .14))
@@ -51,6 +53,38 @@ horse_dark = Material('HorseMane', (.09, .07, .06))
 hoof = Material('HornAndHoof', (.19, .17, .14))
 horn = Material('OxHorn', (.68, .62, .49))
 eye = Material('DarkEye', (.025, .019, .016))
+
+
+def PaintedMaterial(mat, name, base, seed, grain=False):
+    """Small deterministic colour maps survive the GLB export without a shader patch."""
+    rng = random.Random(seed)
+    size = 256
+    image = bpy.data.images.new(name, width=size, height=size, alpha=True)
+    pixels = []
+    for row in range(size):
+        for column in range(size):
+            u, v = column / size, row / size
+            if grain:
+                wave = math.sin(2*math.pi*(v*19 + .075*math.sin(u*17)))
+                fine = math.sin(2*math.pi*(v*57 + .04*math.sin(u*31)))
+                value = .075*wave + .025*fine + rng.uniform(-.024,.024)
+            else:
+                broad = math.sin(2*math.pi*(u*3.2 + .12*math.sin(v*9)))
+                fine = rng.uniform(-1,1)
+                hair = -.075 if rng.random() < .024 else 0
+                value = .037*broad + .026*fine + hair
+            pixels.extend((*[max(.015,min(.95,channel*(1+value))) for channel in base], 1))
+    image.pixels.foreach_set(pixels)
+    image.pack()
+    nodes = mat.node_tree.nodes
+    tex = nodes.new('ShaderNodeTexImage')
+    tex.image = image
+    mat.node_tree.links.new(tex.outputs['Color'], nodes.get('Principled BSDF').inputs['Base Color'])
+
+
+PaintedMaterial(wood, 'WeatheredElmGrain', (.31,.23,.15), 1938, True)
+PaintedMaterial(edge, 'WornElmGrain', (.43,.32,.21), 1939, True)
+PaintedMaterial(ox_coat, 'OxCoatMottle', (.35,.22,.14), 1940)
 
 def InCollection(obj, col):
     for old in list(obj.users_collection): old.objects.unlink(obj)
@@ -116,6 +150,16 @@ def LoftY(name, stations, mat, col, parent=None, sides=18):
     mesh = bpy.data.meshes.new(name+'Mesh')
     mesh.from_pydata(vertices, [], faces)
     mesh.update()
+    uv = mesh.uv_layers.new(name='CoatUV')
+    span = max(.001,stations[-1][0]-stations[0][0])
+    for polygon in mesh.polygons:
+        for loop_index in polygon.loop_indices:
+            vertex_index = mesh.loops[loop_index].vertex_index
+            station, side = divmod(vertex_index,sides)
+            seam = side == 0 and any(mesh.loops[i].vertex_index % sides == sides-1
+                                     for i in polygon.loop_indices)
+            uv.data[loop_index].uv = (1 if seam else side/sides,
+                                      (stations[station][0]-stations[0][0])/span)
     for polygon in mesh.polygons: polygon.use_smooth = True
     obj = bpy.data.objects.new(name, mesh)
     col.objects.link(obj)
@@ -158,6 +202,16 @@ def LoftZ(name, stations, mat, col, parent=None, sides=14):
     mesh = bpy.data.meshes.new(name+'Mesh')
     mesh.from_pydata(vertices, [], faces)
     mesh.update()
+    uv = mesh.uv_layers.new(name='CoatUV')
+    span = max(.001,stations[0][0]-stations[-1][0])
+    for polygon in mesh.polygons:
+        for loop_index in polygon.loop_indices:
+            vertex_index = mesh.loops[loop_index].vertex_index
+            station, side = divmod(vertex_index,sides)
+            seam = side == 0 and any(mesh.loops[i].vertex_index % sides == sides-1
+                                     for i in polygon.loop_indices)
+            uv.data[loop_index].uv = (1 if seam else side/sides,
+                                      (stations[0][0]-stations[station][0])/span)
     for polygon in mesh.polygons: polygon.use_smooth = True
     obj = bpy.data.objects.new(name,mesh)
     col.objects.link(obj)
@@ -385,12 +439,27 @@ for x in (-1.1,1.1):
 for y in (-1.68,1.68):
     Cube(f'EndBoard{y}',(0,y,1.22),(2.1,.075,.18),wood,cart_col,deck,.005)
     Cube(f'EndRail{y}',(0,y,1.50),(2.1,.08,.08),edge,cart_col,deck)
-for x in (-.52,.52):
-    Beam(f'DraftShaft{x}',(x,1.12,.82),(x,4.82,.99),.105,.105,edge,cart_col,deck)
-    for y in (1.73,3.2):
-        Curve(f'ShaftBinding{x}_{y}',[(x-.07,y,.84),(x-.07,y,.98),(x+.07,y,1.04),(x+.07,y,.85)],.017,rope,cart_col,deck)
-for x in (-.45,.45):
-    Cube(f'FrontIronStrap{x}',(x,1.8,.97),(.085,.28,.025),iron,cart_col,deck,.004)
+for side in (-1,1):
+    # The shaft bows outside the ox's 0.67 m shoulder, then rises to a real
+    # harness attachment. Its rear tenon runs beneath the deck crossmember.
+    shaft_at = lambda y: (side*(.62+.15*(y-1.12)/3.76),
+                           .82+.38*(y-1.12)/3.76)
+    x0,z0 = shaft_at(1.12)
+    x1,z1 = shaft_at(4.88)
+    Beam(f'DraftShaft{side}',(x0,1.12,z0),(x1,4.88,z1),
+         .115,.115,edge,cart_col,deck)
+    Cube(f'ShaftSocket{side}',(side*.63,1.73,.87),(.18,.30,.16),dark_wood,cart_col,deck,.008)
+    for y in (1.73,3.16):
+        x,z = shaft_at(y)
+        Curve(f'ShaftBinding{side}_{y}',[(x-.073,y,z-.063),(x-.073,y,z+.063),
+              (x+.073,y,z+.063),(x+.073,y,z-.063),(x-.073,y,z-.063)],
+              .014,rope,cart_col,deck)
+    x,z = shaft_at(4.66)
+    # A forged eye at each tip is the load path for the hanging yoke strap.
+    Curve(f'ShaftIronEye{side}',[(x,4.66+.074*math.cos(step*math.pi/8),
+          z+.074*math.sin(step*math.pi/8)) for step in range(17)],
+          .014,iron,cart_col,deck)
+    Cube(f'FrontIronStrap{side}',(side*.64,1.82,.96),(.09,.26,.025),iron,cart_col,deck,.004)
 axle = Cylinder('TimberAxle',(0,-.18,.72),.11,3.00,dark_wood,cart_col,deck,12,'X')
 wheel_pivots = []
 for side in (-1,1):
@@ -413,6 +482,14 @@ for side in (-1,1):
                  .013,.012,iron,cart_col,pivot,8,'X')
     WheelArc(f'WheelTire{side}',center,.691,.72,.153,0,2*math.pi,
              tire_iron,cart_col,pivot,divisions=72)
+    # Short burnished marks on the exposed iron side; the dark forging stays
+    # dominant and the contact radius remains exactly 0.72 m.
+    for step in range(12):
+        angle = step*2*math.pi/12
+        WheelArc(f'WheelIronWear{side}_{step}',
+                 (x+side*.079,-.18,.72),.701,.708,.006,
+                 angle+.045,angle+2*math.pi/12-.065,
+                 worn_iron,cart_col,pivot,divisions=3)
     for offset in (-.108,.108):
         Cylinder(f'WheelHubBand{side}_{offset}',(x+offset,-.18,.72),
                  .149,.024,iron,cart_col,pivot,16,'X')
@@ -575,7 +652,8 @@ def BuildAnimal(kind):
     else:
         Curve(kind+'Tail',[(0,3.33,1.5),(0,3.13,1.17),(0,3.10,.96)],
               .035,horse_dark,col,tail)
-    # Rope halter, collar and cross-yoke sit at the actual shaft height.
+    # Head halter stays with the animated head; the load-bearing harness is
+    # anchored to the body and meets the cart's two iron shaft eyes.
     if is_ox:
         nose_points=[(-.26,5.64,1.48),(-.29,5.72,1.41),(0,5.78,1.32),
                      (.29,5.72,1.41),(.26,5.64,1.48)]
@@ -588,9 +666,41 @@ def BuildAnimal(kind):
                  if is_ox else
                  [(side*.16,5.70,1.76),(side*.20,5.42,2.10),(side*.30,4.86,1.72)])
         Curve(kind+f'CheekRope{side}',cheek,.016,rope,col,root)
-        Curve(kind+f'ShaftTrace{side}',[(side*.53,4.67,1.11),(side*.53,4.4,.99),(side*.52,3.43,.89)],.018,leather,col,root)
-    Curve(kind+'ShoulderHarness',[(-.51,4.62,1.50),(0,4.58,1.81 if is_ox else 1.98),(.51,4.62,1.50)],.055,leather,col,root)
-    Beam(kind+'Yoke',(-.77,4.82,1.84 if is_ox else 1.9),(.77,4.82,1.84 if is_ox else 1.9),.10,.12,edge,col,root)
+        yoke_z = 2.10 if is_ox else 2.07
+        shoulder_x = .72 if is_ox else .56
+        Curve(kind+f'YokeDrop{side}',[(side*.75,4.95,yoke_z),
+              (side*.77,4.89,1.76 if is_ox else 1.91),
+              (side*.77,4.76,1.43 if is_ox else 1.55),
+              (side*.75,4.66,1.20)],.035,leather,col,root)
+        Curve(kind+f'BreastTrace{side}',[(side*shoulder_x,4.94,1.46 if is_ox else 1.61),
+              (side*.75,4.64,1.25),(side*.73,3.83,1.11),
+              (side*.70,3.16,1.03)],.027,leather,col,root)
+        Curve(kind+f'TraceBinding{side}',[(side*.65,3.16,1.04),
+              (side*.70,3.13,1.09),(side*.76,3.16,1.04)],
+              .013,rope,col,root)
+        if is_ox:
+            Cylinder(kind+f'YokePin{side}',(side*.79,4.95,yoke_z),
+                     .037,.028,iron,col,root,10,'X')
+    if is_ox:
+        Beam(kind+'Yoke',(-.82,4.95,2.10),(.82,4.95,2.10),
+             .13,.14,edge,col,root)
+    else:
+        # The horse pulls on a breast collar, not an ox's timber cross-yoke.
+        Curve('HorseCollarCrest',[(-.73,4.87,2.07),(-.42,4.78,2.18),
+              (0,4.73,2.23),(.42,4.78,2.18),(.73,4.87,2.07)],
+              .048,leather,col,root)
+    Curve(kind+'ShoulderHarness',[(-.72 if is_ox else -.56,4.54,1.38 if is_ox else 1.60),
+          (-.68 if is_ox else -.45,4.54,1.91 if is_ox else 1.96),
+          (0,4.54,2.14 if is_ox else 2.08),
+          (.68 if is_ox else .45,4.54,1.91 if is_ox else 1.96),
+          (.72 if is_ox else .56,4.54,1.38 if is_ox else 1.60)],
+          .038,leather,col,body)
+    Curve(kind+'BreastCollar',[(-.70 if is_ox else -.54,4.97,1.48 if is_ox else 1.64),
+          (-.48 if is_ox else -.38,5.07,1.24 if is_ox else 1.44),
+          (0,5.13,1.10 if is_ox else 1.37),
+          (.48 if is_ox else .38,5.07,1.24 if is_ox else 1.44),
+          (.70 if is_ox else .54,4.97,1.48 if is_ox else 1.64)],
+          .04,leather,col,root)
     # One metre per gait cycle: paired support legs alternate, slight torso and head motion.
     animated=[body,head_pivot,tail,*[entry[0] for entry in leg_pivots],*[entry[1] for entry in leg_pivots]]
     for obj in animated:
