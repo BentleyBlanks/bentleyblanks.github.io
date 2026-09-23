@@ -1521,6 +1521,7 @@ f581ac7dd 布局配的临时数据**。
   - 另报：每人 03–05 的不动秒数与主因（环境射击卡在哪道闸 × 状态），玩家按步骤挨了多少、谁打的。
 - 落盘：`_shots/FirstLevelEnemyIdleProbe/Data_EnemyIdleProbe_<label>_s<from>-<to>.json`；`--root=<另一棵树>`
   用那棵树的游戏与驾驶脚本量改前基线。
+- **2026-09-24 审查后改了口径**（白刃 idle 计入不动、03 / 04 / 05 逐阶段过闸、人数与人窗下限、喊话与冲锋记录）：见 20.11。
 
 ### 20.7 实机之后补的五处（2026-09-24）
 
@@ -1611,8 +1612,9 @@ A 均值 4.52 ms / P95 7.6 ms，B 均值 4.41 ms / P95 7.3 ms —— 差在噪�
 1. **白刃导演的视线判据**（`Script_MeleeCombat.Closest` / `Visible`，不是本包文件）：5.5 m 内、一条视线通就把人
    拉进白刃，视线会从胸墙顶上过去。20.7 ② 只在任务侧开关下解扣；病根该在白刃导演里加「够得着」（导航可达 /
    高差 / 中间没有翻不过去的碰撞体）。07 以后没有解扣，同样的站桩会出现在别的壕沟。
-2. **后撤锚点与掩体点朝向**（Space 包）：阵位守卫伤亡 2 人后退到后撤锚点（临时 (31, −146)），那里要有朝南 /
-   西南的掩体点；没有的话他们退过去是跪在空地上。
+2. **后撤锚点与掩体点朝向**（Space 包）：阵位守卫伤亡 2 人后退到后撤锚点（临时 (25, −152.5)，见 20.11 第 7 条：
+   离枪 7 m 以外、又要看得见打得着 —— `rightNestCaptured` 要三名守卫都死）。定稿时那里要有朝南 / 西南的掩体点，
+   但掩体不能让他们从枪位和接近沟都看不见。
 3. **组名册**（Space / Front / Opening 包）：契约 §5.8 的 `frontOfficer`、`frontReserve`、`bunkerPursuit` 本包没建；
    建好后把 id 填进 `FRONT_PRESSURE_GROUPS`（中路军官现在临时借 `FrontRifleC`）或 `BACKDROP_SQUADS`。
 4. **待命掩体打不出去**：02 待命的机枪攻击组有一批人蹲的掩体从探头位对任何授权点都没有通视（探针主因
@@ -1630,3 +1632,104 @@ A 均值 4.52 ms / P95 7.6 ms，B 均值 4.41 ms / P95 7.3 ms —— 差在噪�
    03 冷启动都红在夺点（驾驶器吃了阵位步枪手 47–63 点血、`rightNestCaptured` 不来），已撤回（2fcf94015）。
    这挺枪该打哪儿、玩家来路上要不要近失压制，要 Front 包结合 03 的夺点节奏定。
 9. 06（Orders）里还有 3–4 个日军一动不动（没有授权点、压力表只管到 Tank）：06 不在本包的闸里。
+
+### 20.11 审查之后的一轮（2026-09-24）
+
+两位独立审查者各跑了一遍本包（结论：机制都在，有条件放行）。下面逐条是核实后的处理；「实测」是本轮在本包分支上跑出来的，
+「沿用」是审查者的数。
+
+**改了的（机制）**
+
+1. **伤亡退线每组整关只退一次**（审查者用纯 Node 复现过：一个伤亡过半的组之后每进一个相位都立刻再退一次、再喊一次）。
+   `FirstLevelFrontPressure.groupState` 改成按组 id 跨相位保留（只在 Dispose 清），切相位只清这一相位的冲锋账
+   `phaseCharge`。另外**建账那一刻已经死了的人不算这个组的伤亡**（`deadAtStart`）：机枪攻击组在 03 待命时就会被打掉几个，
+   04 一露面按全名单算已经「过半」，实测露面 0.1 s 就退了线。
+2. **相位配置补给晚生成的人**：`ApplyMember` 每人每相位一次（`actor.pressurePhaseId`），`EnterPhase` 给当时在场的人写，
+   `UpdateGroups`（0.25 s）补给分帧生成、冷启动、增援的人。改前 02 里阵位守卫大多没拿到非 hold 配置（仍是炮塔）——
+   **这条一修，阵位守卫第一次全员是活的**，于是暴露了下面第 7 条的后撤锚点问题。`hold` 角色落在上一相位还是跃进组的人身上
+   （disengage 的西侧两人）时停在他此刻的线上、不再无限循环；从没被配过跃进的 hold 组（东侧守点）不动。
+3. **冲刺卡死**：迟疑（军官阵亡 3–5 s）、换弹、投弹是「自己停下」，不累计（`RushPaused`）；卡住时只在这一轮借他站的地方
+   当线点（`s.stallTarget`），**不再改写 `s.points`**，线一换或换相位就作废。
+4. **「散開！前へ！」刷屏**：改前在状态机刚写下 BOUND 那一下喊，同一次 Think 里 `UpdateMoveOrder` 会把「没有下一个掩体」的
+   BOUND 改回 FIRE / WATCH，下一拍又写 BOUND —— 审查者 01→06 一趟数到 10 542 次调用。现在按 **Think 结束时**的状态判
+   （`AiDirector.AdvanceBark`：这一拍结束在 BOUND、上一拍结束不在），待命 / 走剧本战术 / 剧本非战斗员不喊，同一个人
+   `SQUAD_REACTION.advanceBarkCooldownS`（12 s）最多一次。实测 03→06 一趟 26–44 次调用，最多的人每分钟 2–3 次。
+5. **成组冲锋与跟冲**（审查者三个实机场景里都是 0 次）：
+   - 冲锋时机先于伤亡退线判；「压上来了」改成上到或正冲向这一相位最远线（旧判据要在最远线上站定，loop 跃进的人待不满一轮）；
+     没冲成的原因切相位时记进事件 `chargeNotDue { why, whys }`（`whys` = 各原因占了多少次评估）；
+   - 冲锋的人：眼里是玩家，**或者从他站的地方看得见玩家**（后者冲之前 `AiDirector.TargetPlayerForCharge` 把目标换成玩家 ——
+     被禁火的人平时「先打能打的」，眼里多半是壕里的国军）；
+   - 跟冲从「此刻已经 bayonetFixed」（只有冲过锋的人才有）改成「这支枪能上刺刀」，跟的时候上刺刀；
+   - 临时数据 `tankShown.mgAttack.charge` 改成 `{ afterS 12, minAlive 3, playerWithinM 80, lastLineShare 0.34 }`。
+   **实机仍然一次都没冲成**：fix6 / fix7 两趟 03→06 的 `whys` 是 tooEarly 48 / playerFar 102 / fellBack 247 和
+   tooEarly 48 / tooFew 113 / fellBack 232 —— 机枪攻击组露面后 40–60 s 就被玩家在机枪上打掉一半、退线，凑不出
+   「3 个以上活人、离玩家 80 m 内、三分之一压到最远线」的窗口。这是节奏与名册的事（Front 包），机制与取证都在。
+   自发冲锋喊「突撃」每趟 5–9 次；跟冲实测 fix6 那趟 1 次。
+6. **01 背景兵撤场不当面消失**：离开 01–02 时立刻退出任务敌人表（驾驶器的名册快照照旧看不见他们），交接过的日军变回剧本兵
+   （不再对人开枪），**人等出了玩家视锥（半角 + 12°）、或离玩家 70 m 以上再移除**，90 s 兜底（`BACKDROP_SQUADS.leave`）。
+7. **阵位守卫的后撤锚点**（临时数据，归 Space 包定稿）：原锚点 (31, −146) 离机枪位只有 5 m、掩体余量 6 m，退下来的人蹲在
+   枪位旁 1.5 m、玩家上枪时被贴身刺刀（03→06 冷启动红在 04 上枪那一下）；挪到 17 m 外又打不着，而 03 的
+   `rightNestCaptured` 要三名守卫都死（`FrontBattle.UpdateCapture`）—— 玩家在枪位上等着、被手榴弹炸死。现在锚点
+   (25, −152.5)：浏览器侦察挑的空地（3 m 内静态掩体 0 个，枪位两处眼位与接近沟两处眼位都通视），离枪 10.7 m；
+   后撤时掩体余量只给 `Data_Tuning_FirstLevel.nestFallbackCoverSlackM`（1 m）。
+8. **木桩剩下的主因：待命区掩体打不出去**（`noPick cover_engage … standby`）。挑点侦察（scratchpad `los_scout`）：03 待命区
+   掩体里的人探头位对任何授权点都不通，同一片空地上的人几乎全通。两处机制：
+   - 挑点时一个点被挡就按 `AMBIENT_FIRE.raiseStepsM`（0 / 0.8 / 1.6 m）抬高重试（越过土坎的高弹，与原来的高偏弹一个样子，
+     什么都不溅）；`losRetries` 5 → 8，每一档一条射线；
+   - 任务侧开关下、手上有授权点、**离玩家 30 m 以上**的人，30 s 内因瞎探 / 白探头连换 2 个掩体，就 12 s 不选掩体、就地跪着打；
+     在空地上真打出去了就续（8 s），压制过 `COVER.suppressionProneAt` 立刻回去找掩体（`COVER_CYCLE.missionOpen*`）。
+     「30 m」是实测来的：不设这道距离时玩家来路上的阵位守卫也去空地，03→06 冷启动在 RightNestApproach 卡死，关掉这条就过。
+9. `BARK_LINES.follow`（没有调用点）、`chargeFollowTargetId`（只写不读）删了；错位的 JSDoc 挪回 `NearestLineIndex`；
+   `Data_AiBrainGraph` 的跟冲 / 迟疑两条边的文字按上面改。
+10. **驾驶器**（`Script_FirstLevelCampaignKit`，共享测试夹具，一个条件）：躲手榴弹之后，人仍在走廊上（投影 ≤ 1 m）但被带回到
+    上一个拐角之前时，也回到走廊再走 —— 改前直线穿壕壁去找原来的下一个拐角，站死在墙上（阵位守卫的手榴弹第一次全员都有，
+    03 冷启动就撞上了）。
+
+**探针口径（待集成负责人认可）**
+
+- `idle4` 仍排除「换弹 / 投弹 / 白刃出招」，但**白刃里 idle 架势站桩照算不动**（审查：那正是白刃卡死那一类木桩）；
+  旧口径照报 `idle4Strict`。
+- **逐阶段过闸**（契约 §7.4 写的是「每阶段」）：03、04、05 各自判 zero30 < 20%、idle4 ≤ 25%，合并数也判。110 m 内见过的
+  日军不足 4 人的阶段报「人数不足」、不判；30 s 人窗不足 8 个的阶段 zero30 只报不判（三四个窗里一个零发就是 33%）。
+  04 / 05 现在常常只有 2 个日军在 110 m 内（兵力归 Space / Front 包）。
+- 另报并判：跃进喊话每人每分钟调用数 ≤ 60 / advanceBarkCooldownS + 1；配了成组冲锋的相位要么冲了、要么记了没冲的原因。
+  另报：进入「被压制」的次数、中弹踉跄秒数、白刃 idle 秒数、`ai.stats`（含 `groupCharges` / `chargeFollows` / `openGround`）。
+- 探针只登记在 firstLevel 域（30 min 真实驾驶），ai 域只带纯 Node 的 `FirstLevelFrontPressureTest`。
+
+**数字（实测，03 冷启动 `--stage-from=3 --stage-to=6 --gate`，本轮代码）**
+
+| 口径 | fix6（dad6c199a） | fix7（d20b9ebc8，最终） |
+| --- | --- | --- |
+| 03 zero30 / idle4 / idle4Strict | 5% / 18% / 28% | 3% / 15% / 25% |
+| 04（人数）zero30 / idle4 | （6 人）17% / 22% | （2 人，不判）0% / 21% |
+| 05（人数）zero30 / idle4 | （6 人）3% / 5% | （2 人，不判）0% / 3% |
+| 03–05 合并 zero30 / idle4 / idle4Strict | 5% / 15% / 27% | 2% / 14% / 25% |
+| 机枪发数（03–05） | 1633 | 1685 |
+| 放行前以守军为目标（人·帧） | 0 | 0 |
+| 阵位步枪守卫在掩体里或在动 | 53% | 52% |
+| 跃进喊话调用（全程） | 31 | 37 |
+
+同一轮里没过的几跑（都已修掉、写在上面）：fix1 03 idle4 28%（白刃 idle 计入之后）；fix2 04 只有 3 个 30 s 窗、zero30 33%
+（→ 人窗下限）；fix3 驾驶器在 05 SameBranchReturn 打光了子弹、停在线点 1.2 m 处（没单独定因，之后的代码上没再出现）；
+fix4 驾驶器躲手榴弹后卡在 RightNestApproach 的壕壁上（→ 第 8 条的 30 m、第 10 条）；fix5 玩家在枪位上等 `rightNestCaptured`
+被炸死（→ 第 7 条）。
+
+`FirstLevelMissionBrowserTest --campaign --stage-from=3 --stage-to=6 --probe-front-gun`：最终代码（d20b9ebc8）绿，
+`rightNestCaptured` 98.2 s、`frontDisengaged` 508.8 s，`guards` 遥测 `targets.guard` 全程 0，玩家血量最低 14.4（05 取弹沟
+AmmoHouseCoveredBranch，BundleBend 两人按 Step 1 的设计在 bundleTaken 后切进沟里）；锚点还在 (31, −152.5) 的 49f990681 也绿
+（91.8 / 478.8 s，最低 90）。驾驶是逐帧手动推进的，同一份代码重跑是同一条轨迹（本轮 trace 两次逐位相同），所以「多跑几次」
+量不出偶发性，只能换代码量。
+`DamageTest` 25/25（三人 25 m 对射 TTK 16.9 s）；`AiEditorTest` 32/32。
+
+**没改、理由**
+
+- `priority` 喊话（冲锋、军官倒下）会穿过章节的自主喊话静音闸：这正是契约 §5 对白导演那一段写的「非 priority 的自主喊话让路」，
+  priority 的战术喊话不让路；让路本身由 Voice 包在 `Script_Audio.Bark` 做。合并顺序无所谓 —— 现在的 `Audio.Bark` 已经是这个语义。
+- `Data_FirstLevelMissionGates` 里 `frontAttackRepelled` 的 `source` 仍写 `UpdateFrontAttack`（已删）：表归 Space 包，
+  应改成 `FirstLevelFrontPressure.UpdateGroups`；`FRONT_SORTIE.retreat*`、`MISSION_ROUTES.flank` 同样是 Space / Front 包的遗留。
+- 「让口子」只拉跃进组：注释已更正（不保证封锁一定解开）；hold 组、阵位守卫、护兵、侧沟两人看得见撤退口时仍要被压住或打掉，
+  他们的位置由 Space / Front 包摆。
+- 军官「指向」动作：没有可用的 clip。
+- ai 桶对 f581ac7dd 基线的同页 A/B 没做：审查者按本包的开关全关 / 全开同页交替量过（+0.1 / +0.2 ms，契约线 +1.0 / +2.0 ms）；
+  开关关着也在跑的只有 `AssignFire` 每帧遍历前沿日军与 `TryFire` 的一行记账。
+- 阵位步枪守卫 `RightEntryGuard` 在 03 仍几乎不开枪、右侧阵位机枪对授权点不通视：见 20.10 第 8 条（Front / Space 包）。
