@@ -1,14 +1,15 @@
 import { MISSION_TUNING } from "./Data_Tuning_FirstLevel.mjs";
 import { MissionVoiceTimeline } from "./Data_FirstLevelMissionVoiceTiming.mjs";
 import { MISSION_DIALOGUE, MISSION_VOICE_CAST, MissionVoiceSubtitle } from "./Data_FirstLevelMissionDialogue.mjs";
-import { FIRST_LEVEL_DIALOGUE_DIRECTION, LineDirection } from "./Data_FirstLevelDialogueDirection.mjs";
+import { FIRST_LEVEL_DIALOGUE_DIRECTION, LineDirection, PlaybackOffset } from "./Data_FirstLevelDialogueDirection.mjs";
 import { FIRST_LEVEL_VOICE_CAST } from "./Data_FirstLevelVoiceCast.mjs";
 import { Localize } from "./Script_Text.mjs";
 import { FirstLevelVoiceTextId, FirstLevelCastTextId } from "./Script_TextIds.mjs";
 import { SampleSpeechEnvelope } from "./Script_SpeechEnvelope.mjs";
 import { DialoguePlayer } from "./Script_DialoguePlayer.mjs";
 // 两种格式并存（契约 docs/Data_FirstLevel0105Refactor20260923Contract.md §2.2 / §5.5）：
-//   · 逐句（cue.perLine）：01–06。每句一条干声，DialoguePlayer 按导演时间轴排、每句挂在说话人头上、
+//   · 逐句（cue.perLine）：01–06。整段一次生成、按句切开的片段，DialoguePlayer 默认按整段录音里的原始间隔
+//     排（清单 lines[id].gapBeforeS），导演表只覆盖等动作 / 截断 / 压尾音的几处；每句挂在说话人头上、
 //     可重叠、侧链让路。入口 PlayScene / PlayLine（导演直接调，可并行）与 Say/Enqueue（排队，兼容旧调用）。
 //     逐句录音还没烘完的 cue：若旧整段录音还在就先走旧整段（03–06 过渡期），否则按估时走字幕。
 //   · 整段（旧格式）：07–18 与待 Opening 包下线的 09.21 旧 cue，行为不变。
@@ -103,7 +104,8 @@ export class FirstLevelMissionVoice {
         speaker: Localize(FirstLevelCastTextId(line.who), MISSION_VOICE_CAST[line.who]?.[0] || line.who),
         text: Localize(FirstLevelVoiceTextId(cue.id, index), MissionVoiceSubtitle(cue, index)),
         subtitle: cue.subtitles === false ? false : true,
-        direction: only ? Object.freeze({ ...direction, after: "start", offsetS: 0 }) : direction,
+        direction: only ? Object.freeze({ ...direction, after: "start", offsetS: 0 })
+          : Object.freeze({ ...direction, offsetS: PlaybackOffset(direction, entry?.gapBeforeS) }),
       };
     }).filter(Boolean);
     return { id: cue.id, priority: FIRST_LEVEL_DIALOGUE_DIRECTION[cue.id]?.priority ?? true, lines };

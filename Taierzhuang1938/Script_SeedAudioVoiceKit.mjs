@@ -236,6 +236,169 @@ export function MasterLine(raw, output, { targetDb, padS = 0.06, ceilingDb = -1,
 
 export const Sha256 = (file) => crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex");
 
+// ============================================================================
+// 整段一次生成 → 切句（2026-09-23 用户口径：同一段对白一次生成，保证同一个声学环境）
+// ============================================================================
+
+/**
+ * 整段母带：去首尾静音（各留 padS）→ 整段有声段 RMS 拉到 targetDb（整段只拉这一次）→ 限幅（真峰值留
+ * 0.5 dB 余量）→ 44.1 kHz 单声道 f32 wav。切句从这条 wav 上切，整段 mp3 也从它编，电平关系一丝不动。
+ * extraDb：切出来的某句编码后真峰值超了时，整段再统一降这么多重做（不单独动某一句）。
+ */
+export function MasterSceneWav(raw, wav, { targetDb, padS = 0.08, ceilingDb = -1, extraDb = 0 }) {
+  const before = MeasureVoice(raw);
+  const start = Math.max(0, before.leadS - padS);
+  const end = Math.min(before.seconds, before.seconds - before.tailS + padS);
+  const gainDb = targetDb - before.activeRmsDb + extraDb;
+  const limit = 10 ** ((ceilingDb - 0.5) / 20);
+  const length = end - start;
+  const filter = [
+    `atrim=start=${start.toFixed(3)}:end=${end.toFixed(3)}`, "asetpts=PTS-STARTPTS",
+    `volume=${gainDb.toFixed(2)}dB`, "apad=pad_dur=0.1",
+    `alimiter=limit=${limit.toFixed(4)}:attack=1:release=40:level=false:latency=true`,
+    `atrim=duration=${length.toFixed(4)}`, "asetpts=PTS-STARTPTS",
+  ].join(",");
+  const rendered = spawnSync(ffmpeg, ["-y", "-v", "error", "-i", raw, "-map_metadata", "-1", "-af", filter,
+    "-ac", "1", "-ar", "44100", "-c:a", "pcm_f32le", wav], { encoding: "utf8", windowsHide: true });
+  if (rendered.status !== 0) throw new Error(`Unable to master scene ${path.basename(wav)}: ${rendered.stderr?.slice(0, 200)}`);
+  return { trimStartS: +start.toFixed(3), gainDb: +gainDb.toFixed(2), seconds: +length.toFixed(3), rawMeasure: before };
+}
+
+/** 从 wav 的 [startS, endS] 编一段 mp3（两端各 fadeS 淡入淡出；整段就传 0 与全长）。 */
+export function EncodeSegment(wav, output, { startS = 0, endS = null, fadeS = 0.01, bitrate = "96k" } = {}) {
+  const parts = [];
+  if (startS > 0 || endS != null) parts.push(`atrim=start=${startS.toFixed(4)}${endS != null ? `:end=${endS.toFixed(4)}` : ""}`, "asetpts=PTS-STARTPTS");
+  if (fadeS > 0) parts.push(`afade=t=in:d=${fadeS}`, "areverse", `afade=t=in:d=${fadeS}`, "areverse");
+  const temp = output + ".tmp.mp3";
+  const args = ["-y", "-v", "error", "-i", wav, "-map_metadata", "-1", ...(parts.length ? ["-af", parts.join(",")] : []),
+    "-ac", "1", "-ar", "44100", "-b:a", bitrate, temp];
+  const encoded = spawnSync(ffmpeg, args, { encoding: "utf8", windowsHide: true });
+  if (encoded.status !== 0) throw new Error(`Unable to encode ${path.basename(output)}: ${encoded.stderr?.slice(0, 200)}`);
+  fs.renameSync(temp, output);
+  return output;
+}
+
+/** 10 ms 一帧的 RMS（16 kHz 解码）。 */
+export function FrameRms(file, hopS = 0.01) {
+  const sr = 16000, hop = Math.round(sr * hopS), pcm = DecodePcm(file, sr);
+  const frames = new Float32Array(Math.floor(pcm.length / hop));
+  for (let f = 0; f < frames.length; f++) {
+    let e = 0;
+    for (let i = f * hop; i < (f + 1) * hop; i++) e += pcm[i] * pcm[i];
+    frames[f] = Math.sqrt(e / hop);
+  }
+  return { hopS, frames, seconds: pcm.length / sr };
+}
+
+/** 原始 take 里满幅（|x| ≥ 0.999）连续 ≥ 3 个采样的段数 —— 真削波，不是单个峰值碰顶。 */
+export function ClipRuns(file) {
+  const pcm = DecodePcm(file, 44100);
+  let runs = 0, run = 0;
+  for (let i = 0; i < pcm.length; i++) {
+    if (Math.abs(pcm[i]) >= 0.999) { run++; if (run === 3) runs++; } else run = 0;
+  }
+  return runs;
+}
+
+const FoldKana = (c) => {
+  const code = c.codePointAt(0);
+  return code >= 0x30a1 && code <= 0x30f6 ? String.fromCodePoint(code - 0x60) : c.toLowerCase();
+};
+const CharsOf = (text) => [...String(text)].filter((c) => /[\p{L}\p{N}]/u.test(c)).map(FoldKana);
+
+/**
+ * 把 SeedAudio 的逐字时间戳（subtitle.sentences[].words[]，毫秒）对到稿里的逐句上。
+ * 编辑距离对齐：稿面字（带句号）对字幕字；替换也算对上（同音字），多出来的字归到它前一个对上的字那一句。
+ * 返回每句 { start, end, chars:[[c,s,e]], matched, total, coverage }（秒，原始 take 时间轴）。
+ */
+export function MapSubtitleToLines(spokenLines, subtitle) {
+  const T = [];
+  for (const w of (subtitle?.sentences || []).flatMap((s) => s.words || [])) {
+    const chars = CharsOf(w.text);
+    if (!chars.length) continue;
+    const s = w.start_time / 1000, e = w.end_time / 1000, step = (e - s) / chars.length;
+    chars.forEach((c, k) => T.push({ c, s: s + k * step, e: s + (k + 1) * step }));
+  }
+  const S = spokenLines.flatMap((text, line) => CharsOf(text).map((c) => ({ c, line })));
+  const n = S.length, m = T.length;
+  const D = Array.from({ length: n + 1 }, (_, i) => { const row = new Int32Array(m + 1); row[0] = i; return row; });
+  for (let j = 0; j <= m; j++) D[0][j] = j;
+  for (let i = 1; i <= n; i++) for (let j = 1; j <= m; j++) {
+    D[i][j] = Math.min(D[i - 1][j] + 1, D[i][j - 1] + 1, D[i - 1][j - 1] + (S[i - 1].c === T[j - 1].c ? 0 : 1));
+  }
+  const owner = new Array(m).fill(-1), exact = new Array(m).fill(false);
+  for (let i = n, j = m; i > 0 || j > 0;) {
+    if (i > 0 && j > 0 && D[i][j] === D[i - 1][j - 1] + (S[i - 1].c === T[j - 1].c ? 0 : 1)) {
+      owner[j - 1] = S[i - 1].line; exact[j - 1] = S[i - 1].c === T[j - 1].c; i--; j--;
+    } else if (j > 0 && D[i][j] === D[i][j - 1] + 1) { j--; }
+    else i--;
+  }
+  // 多出来的字：归前一个有主的字；开头就多出来的归后一个。
+  for (let j = 0; j < m; j++) if (owner[j] < 0 && j > 0) owner[j] = owner[j - 1];
+  for (let j = m - 1; j >= 0; j--) if (owner[j] < 0 && j + 1 < m) owner[j] = owner[j + 1];
+  return spokenLines.map((text, line) => {
+    const mine = T.map((t, j) => ({ ...t, j })).filter((t) => owner[t.j] === line);
+    const total = CharsOf(text).length, matched = mine.filter((t) => exact[t.j]).length;
+    return {
+      start: mine.length ? Math.min(...mine.map((t) => t.s)) : null,
+      end: mine.length ? Math.max(...mine.map((t) => t.e)) : null,
+      chars: mine.map((t) => [t.c, +t.s.toFixed(3), +t.e.toFixed(3)]),
+      matched, total, coverage: total ? +(matched / total).toFixed(3) : 1,
+    };
+  });
+}
+
+/**
+ * 在整段母带上定切点。lines[i] = { start, end, effortBefore, effortAfter }（母带时间轴，秒）。
+ * 两句之间：先找静音段（比整段有声 RMS 低 silenceDb 以上、至少 20 ms）——句前有非台词人声（笑、喘）的
+ * 切在最早那段静音、句后有的切在最晚那段、否则切在最长那段的正中；找不到静音就切在能量最低那一帧（tight）。
+ * 再把每句两头多余的静音剪掉，只留 padS。返回 [{ startS, endS, gapBeforeS, tightStart, tightEnd, edgeDb:[a,b] }]。
+ */
+export function SliceScene(framesInfo, lines, { activeRmsDb, silenceDb = 30, padS = 0.06 }) {
+  const { hopS, frames, seconds } = framesInfo;
+  const quiet = 10 ** ((activeRmsDb - silenceDb) / 20);
+  const F = (t) => Math.max(0, Math.min(frames.length - 1, Math.round(t / hopS)));
+  const cuts = [];
+  for (let i = 0; i + 1 < lines.length; i++) {
+    const a = lines[i], b = lines[i + 1];
+    const lo = F(Math.min(a.end, b.start) - 0.04), hi = F(Math.max(a.end, b.start) + 0.04);
+    const runs = [];
+    for (let f = lo; f <= hi; f++) {
+      if (frames[f] >= quiet) continue;
+      const from = f;
+      while (f + 1 <= hi && frames[f + 1] < quiet) f++;
+      if (f - from + 1 >= 2) runs.push([from, f]);
+    }
+    let cut, tight = false;
+    if (runs.length) {
+      const run = b.effortBefore ? runs[0] : a.effortAfter ? runs.at(-1)
+        : runs.reduce((best, r) => (r[1] - r[0]) > (best[1] - best[0]) ? r : best);
+      cut = (run[0] + run[1] + 1) / 2 * hopS;
+    } else {
+      let min = lo;
+      for (let f = lo; f <= hi; f++) if (frames[f] < frames[min]) min = f;
+      cut = (min + 0.5) * hopS; tight = true;
+    }
+    cuts.push({ at: cut, tight });
+  }
+  const loud = (f) => frames[f] >= quiet;
+  const slices = lines.map((_, i) => {
+    let s = i ? cuts[i - 1].at : 0, e = i < cuts.length ? cuts[i].at : seconds;
+    const tightStart = i ? cuts[i - 1].tight : false, tightEnd = i < cuts.length ? cuts[i].tight : false;
+    if (!tightStart) { let f = F(s); while (f < F(e) && !loud(f)) f++; s = Math.max(s, f * hopS - padS); }
+    if (!tightEnd) { let f = F(e) - 1; while (f > F(s) && !loud(f)) f--; e = Math.min(e, (f + 1) * hopS + padS); }
+    const edge = (t0, t1) => {
+      let peak = 0;
+      for (let f = F(t0); f <= F(t1); f++) peak = Math.max(peak, frames[f]);
+      return +(Db(peak) - activeRmsDb).toFixed(1);
+    };
+    return { startS: +s.toFixed(3), endS: +e.toFixed(3), tightStart, tightEnd,
+      edgeDb: [edge(s, s + 0.02), edge(e - 0.02, e)] };
+  });
+  slices.forEach((sl, i) => { sl.gapBeforeS = i ? +(sl.startS - slices[i - 1].endS).toFixed(3) : 0; });
+  return slices;
+}
+
 /**
  * 音色向量（py3.10 + 本机 Qwen3-TTS 说话人编码器）。拿不到返回 null，调用方退回别的指标。
  */
