@@ -23,7 +23,7 @@ export function LoadOpeningStoryboardAnimation(){
 export function UpdateOpeningStoryboardCorpse(soldier){
   const actor=soldier?.actor,rig=actor?.characterRig,pose=soldier?.openingStoryboardPose;
   if(soldier?.alive||!rig||pose?.clip!=="ShotCollapse"||soldier.deadTime<=.9||soldier.corpse)return;
-  const duration=library?.models.get(rig.modelId)?.clips[pose.clip]?.duration;
+  const duration=library?.models.get(rig.clipModelId||rig.modelId)?.clips[pose.clip]?.duration;
   if(!(duration>0))return;
   const shown=rig.openingStoryboardState;
   if(shown?.clipId===pose.clip&&shown.seconds>=duration&&shown.blend>=1)return;
@@ -55,7 +55,7 @@ export function InstallOpeningStoryboardAnimation(soldier){
     acting.Restore();
     performer?.Restore();
     clock+=dt;
-    const record=library?.models.get(rig.modelId);
+    const record=library?.models.get(rig.clipModelId||rig.modelId);
     let pose=ResolveOpeningActorPose(soldier,soldier.openingStoryboardPose,clock,record);
     if(pose&&record&&!record.clips[pose.clip]&&pose.clip!=="DadaoAmbush")pose=null;
     const nativeCombat=soldier.openingStoryboardTravel==null&&(state.firing||state.fire>0||state.aim>.6

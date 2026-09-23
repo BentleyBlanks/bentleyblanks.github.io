@@ -4,7 +4,7 @@
 // 这里实例化。每名士兵只抽取获准外观；第一人称过场主角固定 Nra02。
 
 import * as THREE from "three";
-import { CHARACTER_MODEL_VARIANTS_BY_KIND, CHARACTER_PROTAGONIST_VARIANT, CHARACTER_INFANTRY_SOURCE_BY_MODEL, CHARACTER_RANDOM_VARIANTS_BY_KIND } from "./Data_CharacterSelection.mjs";
+import { CHARACTER_MODEL_VARIANTS_BY_KIND, CHARACTER_PROTAGONIST_VARIANT, CHARACTER_INFANTRY_SOURCE_BY_MODEL, CHARACTER_RANDOM_VARIANTS_BY_KIND, CharacterClipModelId, IsApprovedCharacterVariant } from "./Data_CharacterSelection.mjs";
 import { ApplyNraUniform, NraUniformPalette } from "./Script_UniformColors.mjs";
 import { DEATH_POSE } from "./Data_DeathPose.mjs";
 import { DEATH_CONTACT } from "./Data_Tuning_ActorDeath.mjs";
@@ -265,7 +265,9 @@ const MODEL_FORWARD_YAW = Math.PI;
 // 戳不跟着走就会「新壳配旧芯」：清单是新的，浏览器缓存里的 GLB 还是旧的那批。
 // NRA eye maps and shoulder silhouettes: keep the manifest and GLBs on one revision.
 // 2026-09-23: facialUrl/facialVersion/facialCast for NRA02/IJA01/IJA02 (GLBs unchanged: ASSET_VERSION stays).
-const MANIFEST_URL = "./Model/Character/Data_LugouCharacterManifest.json?v=202609232000";
+// 2026-09-24: IJA06 (standard rifleman) and NRA06 (interpreter) records; review fixes add
+// per-record version, scaleHeight and loadOnDemand (NRA06 is not a boot download).
+const MANIFEST_URL = "./Model/Character/Data_LugouCharacterManifest.json?v=202609241600";
 const ASSET_VERSION = "202609061026";
 const DEATH_COLLAPSE_ASSET_VERSION = "202609151352";
 const DEATH_COLLAPSE_PLAYBACK_RATE = 1.6;
@@ -347,8 +349,26 @@ function FactionForKind(kind) {
   return null;
 }
 
-function VersionedUrl(url) {
-  return `${url}${url.includes("?") ? "&" : "?"}v=${ASSET_VERSION}`;
+// A record may carry its own `version` (models rebuilt after ASSET_VERSION was cut).
+function VersionedUrl(url, version = ASSET_VERSION) {
+  return `${url}${url.includes("?") ? "&" : "?"}v=${version || ASSET_VERSION}`;
+}
+
+/** Model id of a Lugou appearance slot (`LugouIja06` = ija, modelVariant 5). */
+export function LugouCharacterModelId(kind, modelVariant) {
+  const faction = FactionForKind(kind);
+  if (!faction || !Number.isInteger(modelVariant)) return null;
+  return `Lugou${faction === "nra" ? "Nra" : "Ija"}${String(modelVariant + 1).padStart(2, "0")}`;
+}
+
+/**
+ * Height the rig is normalised by. A model derived from another (same skeleton, other
+ * headgear: IJA06's field cap is lower than IJA02's helmet) keeps its source's height
+ * (manifest scaleHeight), so both bodies come out the same size and the shared
+ * storyboard/captive clips meet their contact points.
+ */
+export function CharacterScaleHeight(record) {
+  return Number(record?.scaleHeight) || Number(record?.bounds?.size?.[2]) || 0;
 }
 
 function LoadDeathLibrary(faction) {
@@ -450,7 +470,7 @@ export function IsFacialCastId(library, castId) {
 
 async function LoadAsset(record) {
   try {
-    const gltf = await LOADER.loadAsync(VersionedUrl(record.url));
+    const gltf = await LOADER.loadAsync(VersionedUrl(record.url, record.version));
     const death = RetargetAnimationLibrary(await LoadDeathLibrary(record.faction), gltf.scene);
     let infantry = null;
     const infantrySource = CHARACTER_INFANTRY_SOURCE_BY_MODEL[record.id] || record.id;
@@ -503,7 +523,9 @@ export async function LoadLugouCharacterAssets() {
       const response = await fetch(MANIFEST_URL, { cache: "no-store" });
       if (!response.ok) throw new Error(`manifest HTTP ${response.status}`);
       const manifest = await response.json();
-      const loaded = await Promise.all((manifest.models || []).map(LoadAsset));
+      // loadOnDemand records (cast-only looks: the interpreter's NRA06) are not part of
+      // the boot download; LoadLugouCastModels fetches them for the level that uses them.
+      const loaded = await Promise.all((manifest.models || []).filter((record) => !record.loadOnDemand).map(LoadAsset));
       const byFaction = { nra: [], ija: [] };
       for (const asset of loaded) {
         if (asset.gltf && byFaction[asset.record.faction]) byFaction[asset.record.faction].push(asset);
@@ -516,6 +538,8 @@ export async function LoadLugouCharacterAssets() {
           requested: loaded.length,
           loaded: loaded.filter((asset) => asset.gltf).length,
           missing: loaded.filter((asset) => !asset.gltf).map((asset) => asset.record.id),
+          onDemand: (manifest.models || []).filter((record) => record.loadOnDemand).map((record) => record.id),
+          onDemandLoaded: [],
           animations: LUGOU_ANIMATION_IDS.length,
           ready: true,
         },
@@ -530,6 +554,36 @@ export async function LoadLugouCharacterAssets() {
     }
   })();
   return loadPromise;
+}
+
+const onDemandLoads = new Map();
+
+/**
+ * Fetch the loadOnDemand models a level's pinned cast wears (specs: [{actorKind,
+ * modelVariant}], e.g. Object.values(FIRST_LEVEL_SPEAKING_CAST)) into the loaded
+ * library. Boot models are skipped; each on-demand model is fetched once. A failed
+ * download leaves the slot empty, which spawns resolve like any missing model.
+ * @returns {Promise<string[]>} ids of the on-demand models now present
+ */
+export async function LoadLugouCastModels(library, specs) {
+  const records = library?.manifest?.models || [];
+  const wanted = new Set((specs || []).map((spec) => LugouCharacterModelId(spec?.actorKind, spec?.modelVariant)).filter(Boolean));
+  const present = [];
+  await Promise.all(records.filter((record) => record.loadOnDemand && wanted.has(record.id)).map(async (record) => {
+    if (!onDemandLoads.has(record.id)) {
+      onDemandLoads.set(record.id, LoadAsset(record).then((asset) => {
+        const list = library.byFaction?.[record.faction];
+        if (asset.gltf && list && !list.some((entry) => entry.record?.id === record.id)) {
+          list.push(asset);
+          list.sort((a, b) => a.record.id.localeCompare(b.record.id));
+          library.report?.onDemandLoaded?.push(record.id);
+        }
+        return asset;
+      }));
+    }
+    if ((await onDemandLoads.get(record.id)).gltf) present.push(record.id);
+  }));
+  return present.sort();
 }
 
 // 按 3A 人物碰撞的配置方式写成“部位代理表”：所有尺寸是资产的局部米制，端点
@@ -703,6 +757,8 @@ export class LugouCharacterRig {
     this.kind = kind;
     this.variantIndex = variantIndex;
     this.modelId = asset.record.id;
+    // Per-model clip libraries are keyed by this id (IJA06 plays IJA02's: same skeleton).
+    this.clipModelId = CharacterClipModelId(this.modelId);
     // 一具人七个分件共用一份 Skeleton（见 Script_SkinnedClone 的抬头）。
     this.root = CloneSkinnedRig(asset.gltf.scene);
     this.facial = asset.gltf.userData?.facialRig
@@ -719,7 +775,7 @@ export class LugouCharacterRig {
     this.headVisible = true;
     this.disposed = false;
 
-    const sourceHeight = Number(asset.record.bounds?.size?.[2]) || Number(targetHeight) || 1.68;
+    const sourceHeight = CharacterScaleHeight(asset.record) || Number(targetHeight) || 1.68;
     this.modelScale = (Number(targetHeight) || sourceHeight) / sourceHeight;
     this.root.scale.setScalar(this.modelScale);
     // 资产正面 +Z → Actor 契约的正面 −Z。写在 root 上（不是 Attach 里）：挂点、
@@ -1407,7 +1463,9 @@ export function CreateLugouCharacterRig(
   if (!variants.length) return null;
   const allowed = LUGOU_MODEL_VARIANTS_BY_KIND[kind] || LUGOU_MODEL_VARIANTS_BY_KIND[faction];
   const randomVariants = CHARACTER_RANDOM_VARIANTS_BY_KIND[kind] || allowed;
-  const explicit = Number.isInteger(options.modelVariant) && allowed.includes(options.modelVariant)
+  // A named speaking role may also wear its cast-only look (the interpreter's NRA06).
+  const explicit = Number.isInteger(options.modelVariant) && (allowed.includes(options.modelVariant)
+    || IsApprovedCharacterVariant(kind, options.modelVariant, options.castId))
     ? options.modelVariant : null;
   const index = options.protagonist && faction === "nra"
     ? CHARACTER_PROTAGONIST_VARIANT
@@ -1415,7 +1473,7 @@ export function CreateLugouCharacterRig(
       ? explicit
       : randomVariants[HashString(`${faction}:${options.seed ?? 0}:model`) % randomVariants.length];
   // Loaded arrays omit failed downloads; numeric slots must never change model identity.
-  const modelId = `Lugou${faction === "nra" ? "Nra" : "Ija"}${String(index + 1).padStart(2, "0")}`;
+  const modelId = LugouCharacterModelId(kind, index);
   const asset = variants.find(candidate => candidate.record?.id === modelId);
   if (!asset?.gltf) return null;
   // Face rig: the cast list in the manifest (named speakers), or an explicit

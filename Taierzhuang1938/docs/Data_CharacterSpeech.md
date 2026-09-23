@@ -8,10 +8,12 @@ section 2 item 4 and section 5.6. Morph targets are not used (MotionVector contr
 
 | Model | Facial skin | Size | Cast (`facialCast` in the manifest) |
 | --- | --- | --- | --- |
-| NRA02 | `Model_LugouNra02Facial.glb` | 0.70 MB | yaowa, heyoutian, liuwencai, comrade, runner, guard, shouter, interpreter, zhou, relief, keeper, bearer, captiveHelper, captiveWounded |
+| NRA02 | `Model_LugouNra02Facial.glb` | 0.70 MB | yaowa, heyoutian, liuwencai, comrade, runner, guard, shouter, zhou, relief, keeper, bearer, captiveHelper, captiveWounded |
+| NRA06 | `Model_LugouNra06Facial.glb` | 0.70 MB | interpreter |
 | NRA05 | `Model_LugouNra05Facial.glb` | 0.53 MB | luo |
 | IJA01 | `Model_LugouIja01Facial.glb` | 0.94 MB | ijaB, ijaC, frontOfficer |
-| IJA02 | `Model_LugouIja02Facial.glb` | 1.03 MB | ijaA, ijaD |
+| IJA02 | `Model_LugouIja02Facial.glb` | 1.03 MB | ijaD |
+| IJA06 | `Model_LugouIja06Facial.glb` | 1.08 MB | ijaA |
 
 Each facial skin is the shipped body GLB plus 13 `Face_*` joints under the head
 (jaw, lower/upper lip, two corners, two brows, four lids, two eyes), new skin weights
@@ -22,7 +24,9 @@ GLB's material of the same name (one program, one set of GPU textures) and reuse
 base clips. The NRA05 skin used to embed every texture again (6.35 MB, loaded at boot).
 
 Pinned appearances: `Data_FirstLevelSpeakingCast.mjs` (approved variants only). 日兵乙
-moved from IJA03, whose mouth is closed geometry, to IJA01. Spawn points pass
+moved from IJA03, whose mouth is closed geometry, to IJA01. 日兵甲 wears the standard
+IJA06 and the interpreter the cast-only NRA06 (user, 2026-09-24;
+[selection](Data_CharacterSelection.md)). Spawn points pass
 `SpeakingCastOptions(role)`; a castId in any `facialCast` never takes a pooled body.
 
 ## Poses and conventions
@@ -128,6 +132,16 @@ scene plus eye bones, the four added poses and one-segment tooth bevels).
 3. Bake: `FACIAL_BAKE = {'repo': <worktree>, 'model': 'Nra02'|'Ija02'|'Ija01'|'Nra05'}`
    with the same script (job table `BakeJobs`); it calls `_import/Script_BakeCharacterFacial.py`.
    IJA01 is carried from the IJA02 scene (same head mesh, vertex order and triangles).
+   IJA06 (reshaped IJA02 head, same topology) is authored on its own shipped GLB
+   (`'model': 'Ija06'`, source `Characters_20260924/Animation_Ija06FacialTalk.blend`);
+   rebuild `Model_LugouIja06.glb` first when the base changes. NRA06 (the interpreter,
+   reshaped NRA02 head, same topology) likewise: `'model': 'Nra06'`, source
+   `Characters_20260924/Animation_Nra06FacialTalk.blend`, after `_import/Script_BuildLugouNra06.py`
+   (`NRA06_BUILD`). Its spec adds `buckTooth`: one long upper incisor, head-rigid like
+   the upper row, from behind the upper lip to 1.2 mm in front of the lower lip, so it
+   shows with the lips together and fully when the jaw opens. The spectacles live in the
+   base GLB (badge primitive, head bone only); the nearest face vertex stays 3.4 mm away
+   from them in all nine poses (measured in the authoring scene).
    The baker's legacy job reproduces the 2026-09-13 NRA05 file byte for byte.
 4. Put the new sha256 prefix in `facialVersion` (manifest) and run the tests below.
 5. `node scripts/Script_BlenderMcp.mjs stop`

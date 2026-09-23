@@ -84,9 +84,18 @@ try {
     const leader = factory.Create("nra", {modelVariant: 1, castId: "luo", weapon: null});
     const regular = factory.Create("nra", {modelVariant: 1, weapon: null});
     const green = factory.Create("nra", {modelVariant: 4, weapon: null});
-    check(leader.pooled && Cloth(leader)?.userData.nraUniformPalette === "leader", "pooled leader receives his uniform");
+    // Luo is a facial cast (Data_CharacterSpeech): a named speaker never takes a pooled body
+    // (Face package, 2026-09-23), and still gets his own dye.
+    check(!leader.pooled && Cloth(leader)?.userData.nraUniformPalette === "leader", "named leader (face rig, never pooled) receives his uniform");
     check(Cloth(regular)?.userData.nraUniformPalette === "grayBlue" && Cloth(green)?.userData.nraUniformPalette === "leader", "soldier palettes remain independent");
     check(Cloth(leader) !== Cloth(regular) && Cloth(leader).map === Cloth(regular).map, "leader dye preserves the shared atlas without changing other soldiers");
+    // A pooled body re-dyed on Create (no face rig involved): the officer's leader palette.
+    factory.Prewarm("nraOfficer", 1, {modelVariant: 4});
+    const pooledOfficer = factory.Create("nraOfficer", {modelVariant: 4, weapon: null});
+    check(pooledOfficer.pooled && Cloth(pooledOfficer)?.userData.nraUniformPalette === "leader"
+      && Cloth(pooledOfficer).map === Cloth(green).map,
+      `pooled body re-dyed on Create keeps the shared atlas: pooled=${pooledOfficer.pooled} palette=${Cloth(pooledOfficer)?.userData.nraUniformPalette}`);
+    pooledOfficer.Dispose();
     for (const candidate of [leader, regular, green]) {
       check(PatchKeysOf(Cloth(candidate)).some(key => key.startsWith("nraUniformCloth1")), "cloth patch survives lighting setup");
       candidate.Dispose();
@@ -277,7 +286,7 @@ try {
     // Explicit rejected numbers and deterministic/random seeds cannot restore a banned face.
     for (const kind of ["nra", "nraDare", "ija"]) for (let number = 0; number < 8; number++) {
       const candidate = factory.Create(kind, {seed:number,modelVariant:number % 5,weapon:null});
-      const allowed = kind.startsWith("nra") ? ["LugouNra02","LugouNra05"] : ["LugouIja01","LugouIja02","LugouIja03"];
+      const allowed = kind.startsWith("nra") ? ["LugouNra02","LugouNra05"] : ["LugouIja01","LugouIja02","LugouIja03","LugouIja06"];
       check(allowed.includes(candidate.modelId), `banned appearance ${candidate.modelId}`);
       if (candidate.modelId === "LugouNra05") {
         for (const id of ["RifleCrouchAdvance","StandToKneel","KneelHold","KneelToStand","GrenadeThrow"]) {
@@ -291,13 +300,47 @@ try {
       }
       candidate.Dispose();
     }
+    // The interpreter's NRA06 (2026-09-24) is cast-only: a bare number never reaches it, its
+    // castId does, and its cloth is not the NRA uniform material (no uniform tint on it).
+    // It is not a boot download (manifest loadOnDemand; the first level fetches it).
+    const { LoadLugouCastModels } = await import("/Taierzhuang1938/Script_CharacterModel.mjs");
+    check(!factory.characterAssets.byFaction.nra.some(asset => asset.record.id === "LugouNra06"), "NRA06 is not a boot download");
+    const castLoaded = await LoadLugouCastModels(factory.characterAssets, [{actorKind: "nra", modelVariant: 5}]);
+    check(castLoaded.join() === "LugouNra06", `cast-only look fetched on demand: ${castLoaded.join()}`);
+    for (const seed of [0, 1, 2]) {
+      const bare = factory.Create("nra", {seed, modelVariant: 5, weapon: null});
+      check(bare.modelId !== "LugouNra06", `NRA06 without its castId: ${bare.modelId}`);
+      bare.Dispose();
+    }
+    const interpreter = factory.Create("nra", {seed: 3, modelVariant: 5, castId: "interpreter", weapon: null});
+    check(interpreter.modelId === "LugouNra06" && !!interpreter.characterRig.facial && !interpreter.pooled,
+      `interpreter wears the NRA06 facial skin: ${interpreter.modelId}`);
+    const garb = [];
+    interpreter.root.traverse(mesh => { if (mesh.isMesh) for (const m of [mesh.material].flat()) garb.push(m.name); });
+    check(garb.includes("Material_InterpreterGarb") && !garb.includes("Material #1721585337"), `interpreter cloth: ${[...new Set(garb)].join(",")}`);
+    check(!Cloth(interpreter), "no NRA uniform tint on the interpreter");
+    const borrowed = factory.Create("nra", {seed: 4, modelVariant: 5, castId: "yaowa", weapon: null});
+    check(borrowed.modelId !== "LugouNra06", `another named role cannot wear NRA06: ${borrowed.modelId}`);
+    borrowed.Dispose();
+    // Derived models are normalised by their source's height (manifest scaleHeight): the
+    // shared clip libraries meet the same contact points on both bodies.
+    for (const [kind, derived, source] of [["nra", {modelVariant: 5, castId: "interpreter"}, {modelVariant: 1}],
+      ["ija", {modelVariant: 5}, {modelVariant: 1}]]) {
+      const a = factory.Create(kind, {seed: 5, weapon: null, noPool: true, ...derived});
+      const b = factory.Create(kind, {seed: 5, weapon: null, noPool: true, ...source});
+      check(Math.abs(a.characterRig.modelScale - b.characterRig.modelScale) < 1e-9,
+        `${a.modelId} scale ${a.characterRig.modelScale} equals ${b.modelId} ${b.characterRig.modelScale}`);
+      a.Dispose(); b.Dispose();
+    }
+    checkHeadHitbox(interpreter);
+    interpreter.Dispose();
     const protagonist = factory.Create("nra", { seed: "player", protagonist: true, weapon: null });
     check(protagonist.modelId === "LugouNra02",
       `protagonist should use LugouNra02, got ${protagonist.modelId}`);
     protagonist.Dispose();
     for (const [kind, prefix] of [["nra", "LugouNra"], ["ija", "LugouIja"]]) {
       const variants = [];
-      for (const modelVariant of kind === "nra" ? [1,4] : [0,1,2]) {
+      for (const modelVariant of kind === "nra" ? [1,4] : [0,1,2,5]) {
         const candidate = factory.Create(kind, { seed: `${kind}:${modelVariant}`, modelVariant, weapon: null });
         variants.push(candidate.modelId);
         checkHeadHitbox(candidate);
@@ -307,7 +350,7 @@ try {
         CheckIjaBackpackHelmet(candidate);
         candidate.Dispose();
       }
-      check(variants.join(",") === (kind === "nra" ? [2,5] : [1,2,3]).map((n) => `${prefix}0${n}`).join(","),
+      check(variants.join(",") === (kind === "nra" ? [2,5] : [1,2,3,6]).map((n) => `${prefix}0${n}`).join(","),
         `${kind} approved lineup mismatch: ${variants.join(",")}`);
       const officer = factory.Create(`${kind}Officer`, { seed: `${kind}:officer`, modelVariant: 4, weapon: null });
       check(officer.modelId === `${prefix}0${kind === "nra" ? 5 : 1}`, `${kind} officer model mismatch: ${officer.modelId}`);
@@ -379,7 +422,7 @@ try {
         `civilian ${variant} height out of range: ${civilian.height}`);
     }
     // Imported pose axes must drive the actual barrel in world space, at every stance.
-    for (const modelVariant of [0,1,2]) {
+    for (const modelVariant of [0,1,2,5]) {
       const gunner = factory.Create("ija", { seed: 410 + modelVariant, modelVariant, weapon: "Type38" });
       gunner.root.rotation.y = 1.1;
       const expected = new THREE.Vector3(), actual = new THREE.Vector3();
@@ -613,7 +656,7 @@ try {
     }
 
     for (const item of [actor, armed, ija, baselineA, baselineB, seatTest, seatedArmed]) item.Dispose();
-    return "5 套获准军人外观, 16 动作, 11 骨骼命中体, 主角国军 02, 程序化动作兼容, 百姓男女分身, seated legs, weapon-palm clearance; bayonet vertices " + bayonetMeshes.join(", ");
+    return "6 套获准军人外观, 16 动作, 11 骨骼命中体, 主角国军 02, 程序化动作兼容, 百姓男女分身, seated legs, weapon-palm clearance; bayonet vertices " + bayonetMeshes.join(", ");
   });
   console.log(`ActorPoseTest: PASS (${result})`);
 } finally {

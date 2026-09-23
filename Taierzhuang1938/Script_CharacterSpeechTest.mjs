@@ -12,7 +12,7 @@ import { FIRST_LEVEL_SPEAKING_CAST, SpeakingCastOptions, FIRST_LEVEL_FACE_STEPS,
 import { FIRST_LEVEL_STAGES } from './Data_FirstLevelMissionStages.mjs';
 import { FRONT_GUARD_POSTS } from './Data_FirstLevelMissionFront.mjs';
 import { FRONT_BATTLE_TUNING } from './Data_Tuning_FirstLevelFront.mjs';
-import { CHARACTER_MODEL_VARIANTS_BY_KIND } from './Data_CharacterSelection.mjs';
+import { IsApprovedCharacterVariant } from './Data_CharacterSelection.mjs';
 import { MISSION_DIALOGUE } from './Data_FirstLevelMissionDialogue.mjs';
 import { CHARACTER_SPEECH as C, FACE_TRACK_BAKE } from './Data_Tuning_CharacterSpeech.mjs';
 import { MissionVoiceAlignmentCues } from './Data_FirstLevelMissionDialogue.mjs';
@@ -76,7 +76,7 @@ const LEGACY_BONES = ['Face_Jaw', 'Face_LipLower', 'Face_LipUpper', 'Face_Corner
   'Face_LidUpperL', 'Face_LidLowerL', 'Face_BrowR', 'Face_LidUpperR', 'Face_LidLowerR'];
 const POSES = ['Rest', 'Open', 'Wide', 'Round', 'Close', 'Blink', 'BrowUp', 'Snarl', 'DeadSlack'];
 const faced = MANIFEST.models.filter(record => record.facialUrl);
-assert.deepEqual(faced.map(r => r.id).sort(), ['LugouIja01', 'LugouIja02', 'LugouNra02', 'LugouNra05']);
+assert.deepEqual(faced.map(r => r.id).sort(), ['LugouIja01', 'LugouIja02', 'LugouIja06', 'LugouNra02', 'LugouNra05', 'LugouNra06']);
 const definitions = {};
 for (const record of faced) {
   const face = Glb(record.facialUrl), source = Glb(record.url);
@@ -132,7 +132,7 @@ for (const record of faced) {
 
 // ---- speaking cast: pinned approved appearance with a face for every 01-06 speaker ----
 for (const [castId, spec] of Object.entries(FIRST_LEVEL_SPEAKING_CAST)) {
-  assert.ok(CHARACTER_MODEL_VARIANTS_BY_KIND[spec.actorKind].includes(spec.modelVariant), `${castId}: approved appearance`);
+  assert.ok(IsApprovedCharacterVariant(spec.actorKind, spec.modelVariant, castId), `${castId}: approved appearance`);
   const id = `Lugou${spec.actorKind === 'nra' ? 'Nra' : 'Ija'}${String(spec.modelVariant + 1).padStart(2, '0')}`;
   const record = MANIFEST.models.find(r => r.id === id);
   assert.ok(record?.facialCast?.includes(castId), `${castId} is in ${id}.facialCast`);
@@ -142,6 +142,8 @@ for (const record of faced) for (const castId of record.facialCast) assert.ok(FI
 for (const who of ['luo', 'yaowa', 'heyoutian', 'liuwencai', 'comrade', 'runner', 'shouter', 'guard', 'interpreter',
   'ijaA', 'ijaB', 'ijaC', 'ijaD', 'zhou', 'relief', 'keeper']) assert.ok(FIRST_LEVEL_SPEAKING_CAST[who], `01-06 speaker ${who} has a pinned face`);
 assert.equal(FIRST_LEVEL_SPEAKING_CAST.ijaB.modelVariant, 0, '日兵乙 wears IJA01 (IJA03 mouth is closed geometry)');
+assert.deepEqual(FIRST_LEVEL_SPEAKING_CAST.interpreter, {actorKind: 'nra', modelVariant: 5}, 'the interpreter wears NRA06 (user, 2026-09-24)');
+assert.deepEqual(FIRST_LEVEL_SPEAKING_CAST.ijaA, {actorKind: 'ija', modelVariant: 5}, '日兵甲 wears the standard IJA06 (user, 2026-09-24)');
 assert.deepEqual(SpeakingCastOptions('nobody'), {});
 
 // ---- face controller on the real NRA02 rig definition ----
