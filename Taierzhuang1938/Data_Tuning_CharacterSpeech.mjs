@@ -50,3 +50,56 @@ export const SPEAKER_HEAD = Object.freeze({
   listenRangeM: 9,
   breathRadians: .025, breathRate: 2.1,
 });
+
+// Offline face tracks (Script_FirstLevelFaceTrackBake.py -> Audio/FirstLevel/
+// Data_FirstLevelFaceTracks.json). Timing from per-character / per-kana alignment,
+// shapes from Data_FaceTrackPhonemes, openness from speech-band energy after the
+// noise measured in the aligned gaps is subtracted. Set on the 03-06 whole-cue
+// takes (2026-09-23), whose ambience is baked into the same mp3.
+export const FACE_TRACK_BAKE = Object.freeze({
+  // Analysis frames: 25 ms Hann window every 10 ms at 16 kHz; speech band only.
+  hopS: .01, windowS: .025, bandLowHz: 250, bandHighHz: 3500,
+  // Spectral subtraction of the gap noise (over-subtract, keep a little floor).
+  noiseOverSubtract: 1.5, noiseFloorKeep: .05, noiseGapPadS: .12, noiseMinFrames: 20,
+  // A frame is speech when its denoised band energy is this far over the noise AND a
+  // voiced (pitched) frame is within speechReachS. Pitch strength is the normalised
+  // autocorrelation peak at 80-400 Hz lags of the 70-1000 Hz band over 40 ms: the
+  // 03-06 takes measure >=.7 on vowels and .2-.5 on gunfire, rumble and hiss
+  // (BorrowLight 0-1.3 s is up to +37 dB of ambience at ~.4 with single-frame spikes
+  // to .8, then 兄 at 1.77 s reads .9+), so the strength is a running median over
+  // pitchMedianFrames before the threshold.
+  voicedAboveNoiseDb: 8,
+  pitchBandLowHz: 70, pitchBandHighHz: 1000, pitchWindowS: .04, pitchMedianFrames: 5, pitchMin: .6,
+  speechReachS: .03,
+  // Syllable openness: floor + (1-floor)*(energy/p90)^gamma; inaudible syllables
+  // (aligned but under the voiced threshold) still move at quietSyllableAmp.
+  ampFloor: .5, ampGamma: .7, quietSyllableAmp: .4,
+  // Syllable span: continuous speech runs start-to-start; a syllable is 0.14-0.42 s.
+  minSyllableS: .14, maxSyllableS: .42, tailPadS: .06,
+  // Closures (b/p/m/f and kana onsets) take the first 30 % of a syllable, at most 60 ms.
+  onsetShare: .3, onsetS: .06,
+  // Between syllables without a closure the jaw dips to this share of the next vowel,
+  // so every syllable is its own opening (the old envelope opened 2-3 times a second).
+  boundaryDip: .35,
+  // A silence longer than this between two syllables closes the mouth.
+  pauseGapS: .16, restLeadS: .06, restTailS: .04,
+  glideWeight: .7, tailWeight: .75,
+  // Stress events (brow lift, head nod, blink): a syllable this much louder than the
+  // cue median and a local peak, at least stressMinGapS apart; sampled as a pulse.
+  stressRatio: 1.35, stressMinGapS: .5, stressPulseS: .16,
+  // Per-line alignment windows around the existing line intervals.
+  lineWindowPadS: .25,
+  // Whisper sometimes parks the first word of a shouted line at the window start, a
+  // second or more before the rest (FrontRelief 这 at 0.0 s, 批过了 at 1.88 s). Inside
+  // one phrase (no punctuation) a silence this long is not speech: the smaller side
+  // is packed against the larger, each character keeping its aligned length clamped
+  // to phraseCharMinS..phraseCharMaxS.
+  phraseGapS: .45, phraseCharMinS: .07, phraseCharMaxS: .16,
+  // The voice module only asks for a line inside its interval; the mouth closes this
+  // long after the interval ends even when the aligned syllable runs on.
+  lineEndPadS: .04,
+  // Stats: "open" means jaw >= openJaw; "moving" also counts a visible lip shape
+  // (wide or round >= shapeVisible, lips pressed close >= .5) within +-movingWindowS:
+  // an "i" or a b/p/m closure is articulation, not a still mouth.
+  openJaw: .1, shapeVisible: .25, movingWindowS: .04,
+});
