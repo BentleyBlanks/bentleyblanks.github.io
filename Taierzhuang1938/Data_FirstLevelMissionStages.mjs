@@ -50,10 +50,12 @@ export const FIRST_LEVEL_STAGE_CLEARED_ENEMIES = Object.freeze({
 // 下标对齐 FIRST_LEVEL_STAGES（第 n 阶段读 [n-1]）。这里写的是**跳到该阶段时仍活着**的组，
 // 没列进来又已经开始过的组会被登记成 spawned（不再重建）。
 export const FIRST_LEVEL_STAGE_ENCOUNTERS = Object.freeze([
-  ["bunkerAssault","bunkerBackdrop"], ["bunkerAssault","bunkerPursuit","front","frontFlank","frontOfficer","approach","machineGun","tank","bundleApproach"],
+  // bunkerBackdrop / bunkerPursuit / frontReserve are fact-activated (their owning mechanism spawns
+  // them, see MISSION_ENCOUNTER_ACTIVATION), so a jump never recreates them through the generic spawner.
+  ["bunkerAssault"], ["bunkerAssault","front","frontFlank","frontOfficer","approach","machineGun","tank","bundleApproach"],
   ["front","frontFlank","frontOfficer","approach","machineGun","tank","bundleApproach","village","melee"],
-  ["front","frontFlank","frontOfficer","frontReserve","approach","machineGun","tank","bundleApproach","village","melee"],
-  ["front","frontFlank","frontReserve","machineGun","approach","tank","village","melee","bundleApproach"],
+  ["front","frontFlank","frontOfficer","approach","machineGun","tank","bundleApproach","village","melee"],
+  ["front","frontFlank","machineGun","approach","tank","village","melee","bundleApproach"],
   ["village","melee"], ["village","melee"], ["village","melee"], ["village","melee"],
   ["village","courtyard"], [], ["transfer"], ["air"], ["air"],
   [], [], [], [],

@@ -40,7 +40,7 @@ export const MISSION_TRENCH_NETWORK = Object.freeze({
       source: "Data_FirstLevelOpening.OPENING.approachRoute.slice(1)+supportRoute.slice(1)（AI/任务路线共用，改点先改那边）",
       routeBound: true,
     },
-    // ---- 2026-09-23 proposal A: 01-06 front (docs/Data_FirstLevelLayoutProposalA.md) ----
+    // ---- 2026-09-23 01-06 space rebuild (docs/Data_FirstLevelSpace0106_20260923.md) ----
     // 01-02 forward communication trench: SJ -> rear corner -> SSW leg -> bend M (dugout) -> J.
     {id:"BunkerTrench",preset:"communication",role:null,points:MISSION_BUNKER_TRENCH,
       source:"Data_FirstLevelMissionTopology.MISSION_BUNKER_TRENCH",routeBound:true},
@@ -60,10 +60,12 @@ export const MISSION_TRENCH_NETWORK = Object.freeze({
     // K3 observation bay: a 0.95 m spur off the support sap (eye ~0.65 m above the field).
     {id:"ObservationSpur",preset:"communication",role:null,points:Space.observationSpur,depth:.95,floorW:2.6,bankW:.9,bermH:.1,bermSide:"minus",
       source:"Data_FirstLevelFrontRoute.FRONT_SPACE.observationSpur",routeBound:false},
-    // 03 right low trench: gap junction -> nest west door. 1.35 m: crouched is covered, standing shows.
+    // 03 right low trench: gap junction -> nest west door. 1.85 m deep: crouched AND standing are
+    // hidden from the nest while walking; the two fire steps (Data_FirstLevelMissionFront.FRONT_FIRE_STEPS)
+    // against its north wall are where the player chooses to come up and engage the nest guards.
     {id:"RightApproach",preset:"communication",role:null,points:Sortie.approach.slice(7,13),
-      depth:1.5,bermH:.25,bermSide:"minus",
-      source:"Data_FirstLevelFrontRoute.FRONT_SORTIE.approach -",routeBound:true},
+      depth:1.85,bermH:.25,bermSide:"minus",
+      source:"Data_FirstLevelFrontRoute.FRONT_SORTIE.approach 7-12",routeBound:true},
     // He / Zhou / relief: observation -> left gun at the berm's west end.
     {id:"LeftGunAccess",preset:"communication",role:null,points:Sortie.leftRoute.slice(2),depth:1.85,
       source:"Data_FirstLevelFrontRoute.FRONT_SORTIE.leftRoute from 2",routeBound:true},
@@ -84,6 +86,14 @@ export const MISSION_TRENCH_NETWORK = Object.freeze({
     // Road link: the blocked south road -> ammo sap (05 cut-in pair; seen from the damaged lip).
     {id:"RoadLinkSap",preset:"sap",role:"enemyEntry",points:Space.roadLink,depth:1.5,
       source:"Data_FirstLevelFrontRoute.FRONT_SPACE.roadLink",routeBound:false},
+    // North jump-off trench: the hidden entry of the 04 push, the replacement waves and the west
+    // reserve, 20 m behind the north crest; its two wide exit saps ramp up to the crest
+    // (FRONT_SPACE.jumpOff.ramps are breaches). The east-west leg shields the saps from the south.
+    {id:"NorthJumpOff",preset:"sap",role:"enemyEntry",points:Space.jumpOff.trench,depth:1.9,floorW:3.4,
+      source:"Data_FirstLevelFrontRoute.FRONT_SPACE.jumpOff.trench",routeBound:false},
+    ...Space.jumpOff.exits.map((points,i)=>({id:"NorthJumpOffExit"+i,preset:"sap",role:"enemyEntry",points,depth:1.9,
+      floorW:Space.jumpOff.exitFloorW,bankW:1.4,bermH:0,
+      source:"Data_FirstLevelFrontRoute.FRONT_SPACE.jumpOff.exits "+i,routeBound:false})),
     {
       id: "WestEvacuation", preset: "evacuation", role: null,
       // 只取到 index 6 (56,207)：15B 起沟就到头了，接上去的是靠院墙的夹道

@@ -2,7 +2,8 @@
 // X east, Z south, metres. The sketch fixes adjacency and direction; the metres below are the
 // whitebox calibration the space package owns. Key names are the cross-package contract.
 import { FRONT_SORTIE as Sortie, FRONT_SPACE as Space } from "./Data_FirstLevelFrontRoute.mjs";
-export const MISSION_TOPOLOGY_VERSION = "first-level-20260923-space-proposal-a";
+// 2026-09-23 01-06 space rebuild (docs/Data_FirstLevelSpace0106_20260923.md).
+export const MISSION_TOPOLOGY_VERSION = "first-level-20260923-space-0106";
 export const MISSION_REAR_ANCHORS = Object.freeze({
   ditchMouth: {x:53,z:114}, ditch: {x:39,z:116},
   // retreatA (=15A 收拢点) moved 6 m north of its old z=140: the North Sha He channel now
@@ -148,11 +149,11 @@ export const MISSION_STAGE_ANCHORS = Object.freeze({
   // 行刑处在门外 3.9 m。原来它在受困位 18 m 外、第一轮打磨挪到 13.5 m，
   // 720p 下人还是只有约 70 像素高；现在 8.5 m 处一个站着的人有约 150 像素
   // （受困期间 FOV 收到 50°），「必须让玩家清楚看懂」才读得出来。
-  bunkerKilling: {x:6.5,z:-123.6},
+  bunkerKilling: Space.bunkerKilling,
   // bunkerRear keeps its key but is now the 02 return-of-control spot behind the mouth spoil.
   bunkerRear: {x:-0.2,z:-122.2}, rearCorner: Space.rearCorner, collection: {x:-37,z:-101},
-  bunkerBend: {x:3,z:-124.4}, bunkerJunction: {x:14,z:-124.6}, bunkerFold: {x:19,z:-125.8},
-  bunkerCrater: {x:2.8,z:-120.4}, shunziDragged: {x:3.8,z:-123.2},
+  bunkerBend: Space.bunkerBend, bunkerJunction: Space.bunkerJunction, bunkerFold: Space.bunkerFold,
+  bunkerCrater: Space.bunkerCrater, shunziDragged: Space.shunziDragged,
   supportJunction: Space.supportJunction, frontObservation: Space.observation,
   guardSafeZone: Space.safeZone, gapJunction: Space.gapJunction,
   // B 村落：主街障碍北侧、担架等待遮挡、东巷、障碍南侧接回主街
@@ -185,15 +186,15 @@ export const MISSION_FRONT_COLLECTION_ROUTE = Object.freeze([
 ]);
 /** 01-02 forward communication trench, west to east: SJ -> RC -> SSW leg -> bend M -> J. */
 export const MISSION_BUNKER_TRENCH = Object.freeze([
-  Space.supportJunction,{x:-17,z:-111},Space.rearCorner,{x:-1,z:-118.5},{x:3,z:-124.4},{x:14,z:-124.6},
+  Space.supportJunction,{x:-17,z:-111},Space.rearCorner,{x:-1,z:-118.5},Space.bunkerBend,Space.bunkerJunction,
 ]);
 /** The link sap the 01 vanguard came down (from the lost east end, past the nest's rear junction). */
 export const MISSION_BUNKER_FRONT_SAP = Object.freeze([
-  {x:14,z:-124.6},{x:19,z:-125.8},{x:23.5,z:-130},{x:27,z:-135.5},Sortie.rear,
+  Space.bunkerJunction,Space.bunkerFold,{x:23.5,z:-130},{x:27,z:-135.5},Sortie.rear,
 ]);
 /** Where the vanguard's forward elements went on into depth (south, toward the village). */
 export const MISSION_BUNKER_DEPTH_SAP = Object.freeze([
-  {x:14,z:-124.6},{x:15.2,z:-118.5},{x:17.5,z:-111},{x:20.5,z:-102},
+  Space.bunkerJunction,{x:15.2,z:-118.5},{x:17.5,z:-111},{x:20.5,z:-102},
 ]);
 export const MISSION_STAGE_ROUTES = Object.freeze({
   // 02：后壁破口 → 背坡土坎的缺口（折角）→ 途经伤员集结处 → 接回前沿交通壕
@@ -201,7 +202,10 @@ export const MISSION_STAGE_ROUTES = Object.freeze({
   // 压在 TrenchBoundFrontLeft 的护墙上（沟里那对错身掩体）。
   // 02: return spot behind the mouth spoil -> crater (low wall) -> intact SSW leg -> rear corner ->
   // west along the rear trench -> support junction -> collection (06 same place).
-  rearTrench: [S.bunkerRear,{x:-1,z:-118.5},S.rearCorner,{x:-17,z:-111},Space.supportJunction,
+  // RC -> SJ is one straight leg along the rear trench floor (0.4 m off its centre line at x=-17), so
+  // the first four points end at SJ: Script_FirstLevelFrontBattle.FrontEntryRoute joins slice(0,4)
+  // onto the 03 support route, and SJ is where that route turns north.
+  rearTrench: [S.bunkerRear,{x:-1,z:-118.5},S.rearCorner,Space.supportJunction,
     {x:-33,z:-106},S.collection],
   // 05→06：炸停战车之后原路退回集结处
   // 05->06: rear junction -> rear door -> through the nest -> west door -> right low trench ->

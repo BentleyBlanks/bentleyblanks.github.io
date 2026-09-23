@@ -89,7 +89,7 @@ export const MISSION_TERRAIN = Object.freeze({
   // 参数之后 revision 一抬，下一次读就得是新的那份。
   get trenches() { return TrenchPlanFor(this).trenches; },
   steps: [
-    // 2026-09-23 proposal A (docs/Data_FirstLevelLayoutProposalA.md). A step sets the ground to
+    // 2026-09-23 01-06 space rebuild (docs/Data_FirstLevelSpace0106_20260923.md). A step sets the ground to
     // natural-depth inside its radius: it digs pits and raises trench floors alike.
     // Nest compound floor (x 24..37, z -145.6..-156.8), dug half a metre.
     {x:28.5,z:-152.2,radius:5.5,depth:.5},
@@ -111,6 +111,8 @@ export const MISSION_TERRAIN = Object.freeze({
     ...Space.boundCraters.map((p)=>({...p,radius:1.3,depth:.6})),
     ...Space.flankCraters.map((p)=>({x:p.x,z:p.z,radius:p.r,depth:.7})),
     ...Space.escortCraters.map((p)=>({x:p.x,z:p.z,radius:p.r,depth:.55})),
+    // South-road roadblock crater just past the fork (FRONT_SPACE.roadblock): cuts the road the tank would need.
+    {x:Space.roadblock.crater.x,z:Space.roadblock.crater.z,radius:Space.roadblock.crater.r,depth:Space.roadblock.crater.depth},
   ],
   pads: [
     { x: -71, z: 74, w: 13, d: 50 },

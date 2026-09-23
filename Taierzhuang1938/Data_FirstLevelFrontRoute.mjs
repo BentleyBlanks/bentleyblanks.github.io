@@ -6,20 +6,27 @@
 // north of the berm line. Every key below is still the one the 03-05 code reads.
 const Point=(x,z)=>Object.freeze({x,z});
 // Semantic tank waypoints (contract §5.7). holdS=0 on block = hold until disabled.
-const Way=(x,z,kind,extra={})=>Object.freeze({x,z,kind,...extra});
+// id is the stable name: FRONT_SORTIE's old tank*Index keys resolve through it (never renumber).
+// faceTo = where the HULL points when it stops; turretTo = where the turret (main gun + coax) is
+// laid. At Block/Squeeze the hull stays nose-to-gap (its hull MG seals the gap) and only the turret
+// swings: in 05 it tracks the attack branch's last metres, which the hull MG cannot reach (the
+// throw spot is ~105 deg off the nose - the rear quarter K9 needs). Names: FRONT_SPACE.tankTargets.
+const Way=(id,x,z,kind,extra={})=>Object.freeze({id,x,z,kind,...extra});
 export const FRONT_TANK_PATH=Object.freeze([
-  Way(112,-229,"cruise",{note:"start: plateau road cutting, 114 m from the nest seat, inside NorthRuin's shadow sector"}),
-  Way(106,-214,"cruise"),
-  Way(97,-205,"hullDown",{faceTo:"nest",holdS:15,note:"03 preview (K5): the road runs across the view here, the 2.2 m cutting's lip hides the hull, the turret shows"}),
-  Way(81,-204,"cruise",{note:"leaves the preview westward, already inside NorthRuin's shadow sector"}),
-  Way(64,-189.5,"cruise",{note:"the bend, behind NorthRuin (seen from the seat the ruin covers bearings 31-50 deg)"}),
-  Way(60,-177,"cruise",{note:"04 emerges from the bend (K6); the blocked south road forks here"}),
-  Way(51,-172.5,"firePoint",{faceTo:"nest",holdS:14,note:"04 pressure: HE + hull MG on the nest front seat, 31 m"}),
-  Way(44.5,-169,"cruise"),
-  Way(38,-167.5,"block",{faceTo:"gap",holdS:0,note:"04-05 blockade, 7.5 m north of the berm line"}),
-  Way(35.5,-167,"squeeze",{faceTo:"gap",holdS:0,note:"05 push, +2.6 m"}),
+  Way("Start",112,-229,"cruise",{note:"start: plateau road cutting, 114 m from the nest seat, inside NorthRuin's shadow sector"}),
+  Way("Cutting",106,-214,"cruise"),
+  Way("HullDown",97,-205,"hullDown",{faceTo:"nest",turretTo:"nest",holdS:15,note:"03 preview (K5): the road runs across the view here, the 2.2 m cutting's lip hides the hull, the turret shows"}),
+  Way("Shadow",81,-204,"cruise",{note:"leaves the preview westward, already inside NorthRuin's shadow sector"}),
+  Way("Bend",64,-189.5,"cruise",{note:"the bend, behind NorthRuin (seen from the seat the ruin covers bearings 31-50 deg)"}),
+  Way("BendExit",60,-177,"cruise",{note:"04 emerges from the bend (K6); the south road forks here and is cut by the crater roadblock 9 m on"}),
+  Way("Pressure",51,-172.5,"firePoint",{faceTo:"nest",turretTo:"nest",holdS:14,note:"04 pressure: HE + hull MG on the nest front seat, 31 m"}),
+  Way("Approach",44.5,-169,"cruise"),
+  Way("Block",38,-167.5,"block",{faceTo:"gap",turretTo:"gap",holdS:0,note:"04-05 blockade, 7.5 m north of the berm line"}),
+  Way("Squeeze",35.5,-167,"squeeze",{faceTo:"gap",turretTo:"attackTail",holdS:0,note:"05 push, +2.6 m; hull still on the gap, turret on the attack branch's last 4.7 m"}),
 ]);
 const T=FRONT_TANK_PATH;
+/** Index of a named tank waypoint; FRONT_SORTIE's old tank*Index keys are resolved through it. */
+export const FrontTankIndex=(id)=>{const i=T.findIndex(w=>w.id===id);if(i<0)throw new Error("unknown tank waypoint "+id);return i;};
 export const FRONT_SORTIE=Object.freeze({
   // 03: collection/support junction -> support sap -> observation step -> fold -> gap junction ->
   // right low trench -> nest west door. The first point is the support junction SJ.
@@ -54,18 +61,34 @@ export const FRONT_SORTIE=Object.freeze({
   trenchBottomM:3.8,trenchDepthM:1.85,trenchBankM:1.6,
   // 05 cut-in pair: from the blocked south road through the road link into the ammo sap ahead of the player.
   // They slipped into the road link sap from the blocked south road during 04 (dug in, out of sight).
-  enemies:[{id:'BundleBendA',x:59.6,z:-128.4,hold:false},{id:'BundleBendB',x:56.8,z:-127.4,hold:false}],
+  enemies:[{id:'BundleBendA',x:59.6,z:-128.4,hold:false,role:'cutIn'},{id:'BundleBendB',x:56.8,z:-127.4,hold:false,role:'cutIn'}],
   // Terrain road polyline = the tank path plus a 5 m dead-end stub at the berm-end crater.
   road:[...T.map(p=>Point(p.x,p.z)),Point(31,-166.4)],
-  tankPreviewIndex:2,tankPressureIndex:6,tankBlockIndex:8,tankEndIndex:9,
+  // Old keys, resolved by waypoint id (integration decision 2026-09-23: resolve, never renumber).
+  tankPath:T,
+  tankPreviewIndex:FrontTankIndex("HullDown"),tankPressureIndex:FrontTankIndex("Pressure"),
+  tankBlockIndex:FrontTankIndex("Block"),tankEndIndex:FrontTankIndex("Squeeze"),
   tankRoadX:38,tankNorthZ:-228,tankSouthZ:-166,tankLeadM:6,
   retreatCasualtyFraction:.5,retreatSuppression:.72,retreatSuppressionS:3,
   retreatDistanceM:12,retreatArrivalM:2,
 });
 // Everything else the proposal places (single source for the map, the sight script and the doc).
 export const FRONT_SPACE=Object.freeze({
+  // ---- 01-02 forward communication trench (west to east) ----
+  bunkerBend:Point(3,-124.4),               // bend M: the trench turns from east-west to south-south-west; the dugout is in its outer wall
+  bunkerKilling:Point(6.5,-123.6),          // interrogation / kill spot outside the mouth
+  bunkerJunction:Point(14,-124.6),          // junction J: link sap (north-east) and depth sap (south) join here
+  bunkerFold:Point(18.2,-125.6),            // fold F: the link sap's first fold (fire step), ijaC stops here (11.9 m from the kill spot)
+  bunkerCrater:Point(2.8,-120.4),           // near-miss crater on the bend's inner corner = "沟壁塌低段"
+  shunziDragged:Point(3.8,-123.2),          // where ijaA drags Shunzi to (K2 eye, kneeling)
   supportJunction:Point(-29,-110),          // 02 end / 03 start (the collection is 9 m south-west)
   rearCorner:Point(-4,-113),               // "后交通壕折角": Luo appears here in K2; He holds it in 03
+  // RC landmark: a timber frame (two posts + 2.2 m lintel) over the rear corner, read from the dugout mouth and from the collection side.
+  rearCornerFrame:Object.freeze({x:-4,z:-113,ry:-.12}),
+  // 03 opening: He Youtian + one NRA hold the 01 trench's west mouth at RC (the 02 pursuers stay at J/F;
+  // after the 03 capture they fall back up the link sap, never through RC).
+  rcHold:[Point(-3.2,-114.6),Point(-5.6,-113.4)],
+  pursuitFallback:[Point(23.5,-130),Point(27,-135.5)],
   observation:Point(-23.2,-129.2),          // 03 observation bay at the end of a 0.95 m spur (K3)
   observationSpur:[Point(-23.4,-126.5),Point(-23.2,-129.4)],
   fold:Point(-19.2,-133.2),                 // support sap fold: the guards' safe zone is behind it
@@ -85,6 +108,28 @@ export const FRONT_SPACE=Object.freeze({
   // Flank group craters (they kneel in them; craters never block a rush) and escort-slot craters.
   flankCraters:[[40.6,-181.6,2.2],[40.4,-185.4,1.6],[31.6,-174.6,2.2],[32.8,-178.4,1.8],[24.2,-169,2.2],[26,-171.9,1.6]].map(([x,z,r])=>Object.freeze({x,z,r})),
   escortCraters:[[31.8,-163.8,1.4],[37.4,-163,1.3],[36.8,-172.4,1.3]].map(([x,z,r])=>Object.freeze({x,z,r})),
+  // Named tank aim points for FRONT_TANK_PATH faceTo/turretTo (y = metres above the shared ground).
+  tankTargets:Object.freeze({
+    nest:Object.freeze({x:25.9,z:-153.9,y:1.25}),            // the right nest's MG seat
+    gap:Object.freeze({x:-8,z:-150,y:.9}),                   // the one gap in the backslope
+    attackTail:Object.freeze({x:43.4,z:-159.1,y:1.0}),       // the attack branch's last 4.7 m (05 risk window)
+  }),
+  // The south road forks at BendExit and is cut 9 m on: a shell crater across it, an overturned cart
+  // and a felled telegraph pole. The tank physically cannot turn south into our depth; infantry can
+  // still pick through (the 05 cut-in pair comes that way).
+  roadblock:Object.freeze({crater:Object.freeze({x:61.5,z:-168,r:2.8,depth:1.3}),
+    cart:Object.freeze({x:62.6,z:-164.4,ry:.35}),pole:Object.freeze({x:59.4,z:-165.6,ry:1.2})}),
+  // North jump-off trench (hidden entry for the 04 push, the replacement waves and the west reserve):
+  // an east-west trench 20 m behind the north crest, with two wide exit saps that ramp up to the crest.
+  jumpOff:Object.freeze({
+    trench:[Point(-47,-222.2),Point(-8,-222.2)],
+    // Exit saps are 9 m wide (a replacement squad stands 8 m abreast) and centred 0.8 m east of the
+    // wave centres (FRONT_ASSAULT.waveCentersX -36/-14: offsets run -3.2..+4.8). Ramps raise the floor to
+    // 0.15 m over 9 m at the crest end, so a bound leaves the sap walking.
+    exitFloorW:9,
+    exits:[[Point(-35.2,-222.2),Point(-35.2,-205)],[Point(-13.2,-222.2),Point(-13.2,-205)]],
+    ramps:[Object.freeze({x:-35.2,z:-204.5,radius:9,depth:.15}),Object.freeze({x:-13.2,z:-204.5,radius:9,depth:.15})],
+  }),
 });
 export function SortieCrawlBlocked(position,next,stance){
   if(stance==='prone')return false;

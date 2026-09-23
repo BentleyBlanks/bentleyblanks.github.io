@@ -45,11 +45,13 @@ import { MISSION_RECEPTION_SPACE } from "./Data_FirstLevelMissionTopology.mjs";
 // 不进这张表的两类：
 //   · transferAlley —— 由 UpdateTransferThreats 在第一处威胁解除后放出。
 export const MISSION_STEP_SPAWNS = Object.freeze({
-  // 2026-09-23 proposal A (docs/Data_FirstLevelLayoutProposalA.md §5): 01 backdrop, 02 pursuers,
-  // the 03 flank group and officer, and the 04/05 reserve from out-of-sight entries.
-  Trapped: Object.freeze(["bunkerAssault", "bunkerBackdrop"]),
-  BunkerRescue: Object.freeze(["bunkerPursuit", "approach", "front", "frontFlank", "frontOfficer", "machineGun", "tank", "bundleApproach"]),
-  MachineGun: Object.freeze(["frontReserve"]),
+  // 2026-09-23 space rebuild (docs/Data_FirstLevelSpace0106_20260923.md §5): the 03 flank group
+  // and its officer are preplaced with the other front groups. The 01 backdrop, the 02 pursuers
+  // and the 04/05 reserve are NOT step spawns: their activation is a fact, and the mechanism that
+  // owns them (Ai backdrop squads / Opening rear-trench pursuit / Front pressure) spawns them -
+  // the generic spawner would create the backdrop's NRA members as Japanese.
+  Trapped: Object.freeze(["bunkerAssault"]),
+  BunkerRescue: Object.freeze(["approach", "front", "frontFlank", "frontOfficer", "machineGun", "tank", "bundleApproach"]),
   Support: Object.freeze(["village", "melee"]),
   Village: Object.freeze(["village", "melee"]),
   Courtyard: Object.freeze(["courtyard"]),
@@ -76,27 +78,26 @@ export const MISSION_ENCOUNTER_ACTIVATION = Object.freeze({
     note: "两名行刑兵与两名跟进兵；反扑时解除演出保护，由小队真实击杀四人后才拖救还权",
   }),
   bunkerBackdrop: Object.freeze({
-    spawn: Object.freeze({ kind: "step", step: "Trapped" }),
-    note: "proposal A: vanguard files down the link sap into the depth sap (out of sight south); three distant NRA return fire at authorised points",
+    spawn: Object.freeze({ kind: "fact", fact: "bunkerCollapsed" }),
+    note: "01 背景：先头兵沿连接支沟经岔口 J 转入纵深支沟南下出视野（side:ija，按 delayS 依次走 route）；三名川军在后交通壕折角与支沟还击 fireAt 授权点（side:nra，不可被击中）。由 Ai 包的背景兵机制生成，通用生成器不建这组",
   }),
   bunkerPursuit: Object.freeze({
-    spawn: Object.freeze({ kind: "step", step: "BunkerRescue" }),
-    standbyUntil: "rifleRecovered",
-    note: "proposal A: one base of fire holds the fold F, three follow down the link sap to J and the mouth; none passes the bend M",
+    spawn: Object.freeze({ kind: "fact", fact: "rifleRecovered" }),
+    note: "02 追兵：一人据守折角 F 射击台阶，三人沿连接支沟追到 J 与洞口，都不越过弯角 M；03 夺点后沿连接支沟撤回（FRONT_SPACE.pursuitFallback）。由 Opening 包的后交通壕追兵生成",
   }),
   frontFlank: Object.freeze({
     spawn: Object.freeze({ kind: "step", step: "BunkerRescue" }),
     standbyUntil: "frontBattleStarted",
-    note: "proposal A: the designated assault group; waits north of NorthRuin, bounds crater to crater to the berm's east end",
+    note: "03 指定进攻组（侧翼）：在北残院北侧待命，沿 lane 逐坑跃进到土坎东端，末线四人都看得见缺口",
   }),
   frontOfficer: Object.freeze({
     spawn: Object.freeze({ kind: "step", step: "BunkerRescue" }),
     standbyUntil: "frontBattleStarted",
-    note: "proposal A: one officer one bound behind the flank group",
+    note: "前沿军官一名：跟在侧翼组后一跳（lane）",
   }),
   frontReserve: Object.freeze({
-    spawn: Object.freeze({ kind: "step", step: "MachineGun" }),
-    note: "proposal A: FRONT_RESERVE_ENTRIES budgets (04: 2+2, 05: 2+1), entries 98 m+ from the nest seat",
+    spawn: Object.freeze({ kind: "fact", fact: "tankPositionPressured" }),
+    note: "04/05 增援：FRONT_RESERVE_ENTRIES 两个视线外入口（北侧出发壕西端、道路路堑），slotStages 定每人哪一阶段放出（04：2+2，05：2+1）。由 Front 包的前沿压力机制放出",
   }),
   approach: Object.freeze({
     spawn: Object.freeze({ kind: "step", step: "BunkerRescue" }),

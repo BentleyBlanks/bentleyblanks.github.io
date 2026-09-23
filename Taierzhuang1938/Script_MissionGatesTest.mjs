@@ -28,6 +28,7 @@ import {
   FirstLevelStageForStep,
 } from "./Data_FirstLevelMissionStages.mjs";
 import { MISSION_ANCHORS, MISSION_PLACEMENT } from "./Data_FirstLevelMissionLayout.mjs";
+import { MISSION_TRENCH_NETWORK } from "./Data_FirstLevelMissionTrenches.mjs";
 import { MISSION_DIALOGUE } from "./Data_FirstLevelMissionDialogue.mjs";
 import {
   MISSION_STEP_SPAWNS,
@@ -306,7 +307,11 @@ Check(model.transferThreats.every((threat, index) => threat.order === index + 1
 for (const name of ["pursuit", "sortie", "sortieReturn", "approach", "supportTrench", "flank", "village", "evacuation", "exit"])
   Check(model.routes[name]?.length, `routes 里要有 ${name}`);
 Check(model.layout.blocks.length > 500 && model.layout.gates.length > 0, "layout 带上了体块与门");
-Check(model.layout.roads.length > 0 && model.layout.trenches.length === 13, "layout 带上了道路与 13 段壕沟，包括新版前沿六段连接");
+// 2026-09-23 空间重排后壕沟段数随网络走（不再钉死 13）；01–06 前沿的每一段都要进工作台。
+Check(model.layout.roads.length > 0 && model.layout.trenches.length === MISSION_TRENCH_NETWORK.segments.length
+  && ["BunkerTrench", "BunkerFrontSap", "SupportSap", "RightApproach", "GuardBackslope", "GuardWithdrawal", "LeftGunAccess",
+    "BundleApproach", "RoadAttack", "NorthJumpOff"].every((id) => model.layout.trenches.some((t) => t.id === id)),
+"layout 带上了道路与全部壕沟段，包括 01–06 前沿各段");
 Check(model.layout.railway.points.length > 0 && !!model.layout.bridge, "layout 带上了铁路与桥");
 Check(typeof model.layout.SampleGroundColor === "function", "layout 带上了地表取色函数");
 Check(Object.keys(model.layout.semanticColors).length > 5, "layout 带上了语义色");

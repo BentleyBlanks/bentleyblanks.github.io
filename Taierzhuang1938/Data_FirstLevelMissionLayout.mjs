@@ -151,7 +151,7 @@ GroundedBlock("CollectionBackslopeWest",-45,-115.5,22,3,2.5);
 // 集结处南缘的低土壁：担架排在它北边，老周就靠这堵墙等担架（06 的借火戏）。
 GroundedWall("CollectionLitterWall",-40,-95,9,1.1,0.7);
 // ---------------------------------------------------------------------------
-// 2026-09-23 proposal A: 01-06 front (docs/Data_FirstLevelLayoutProposalA.md)
+// 2026-09-23 01-06 space rebuild (docs/Data_FirstLevelSpace0106_20260923.md)
 // ---------------------------------------------------------------------------
 const Face=(x,z)=>{const l=Math.hypot(x,z);return {faceX:x/l,faceZ:z/l};};
 /** Grounded block whose top is at `top` metres above the ground at (tx,tz) (default: its own
@@ -184,14 +184,24 @@ TopBlock("RightEntryCrate",25.8,-147.6,1.0,1.0,1.1,"cover",{cover:Face(-.6,-.8)}
 const gunRestTop=SampleMissionTerrain(Sortie.nest.x,Sortie.nest.z)+1.45+.08-.12294;
 Block("MachineGunRest",Sortie.nest.x,Sortie.nest.z,.9,gunRestTop-SampleMissionTerrain(Sortie.nest.x,Sortie.nest.z),.7,"cover");
 Block("MachineGunFiringStep",Sortie.seat.x+.3,Sortie.seat.z,1.9,.12,2.2,"timber",{y:SampleMissionTerrain(Sortie.seat.x,Sortie.seat.z)-.06});
-// Right low trench parapet: spoil + sandbags on the lip facing the nest, so its MG cannot look
-// into the approach (crouched is covered, standing shows over it).
+// The right low trench is 1.85 m deep with two fire steps (FRONT_FIRE_STEPS); it needs no parapet.
+// Rear corner (RC) landmark: a timber frame astride the rear trench - two posts on the lips and a
+// 2.2 m lintel - the 02 end marker seen from the dugout mouth and the K2 eye.
 {
-  const legs=[[Sortie.approach[8],Sortie.approach[9]],[Sortie.approach[9],Sortie.approach[10]],[Sortie.approach[10],Sortie.approach[11]]];
-  legs.forEach(([a,b],i)=>{const l=Math.hypot(b.x-a.x,b.z-a.z),dx=(b.x-a.x)/l,dz=(b.z-a.z)/l;
-    const x=(a.x+b.x)/2+dz*2.9,z=(a.z+b.z)/2-dx*2.9;
-    TopBlock("RightApproachParapet"+i,x,z,l-.6,.65,.9,"cover",{ry:Math.asin(-dz),cover:Face(dz,-dx)},{x,z:z+0});
-  });
+  const f=Space.rearCornerFrame,c=Math.cos(f.ry),q=Math.sin(f.ry);
+  for(const [id,side] of [["RearCornerFrameA",-1],["RearCornerFrameB",1]]){
+    const x=f.x+q*side*2.9,z=f.z+c*side*2.9;
+    Block(id,x,z,.26,2.6,.26,"timber",{y:SampleMissionTerrain(x,z)+1.3-.2});
+  }
+  const lintelY=Math.max(SampleMissionTerrain(f.x+q*2.9,f.z+c*2.9),SampleMissionTerrain(f.x-q*2.9,f.z-c*2.9))+2.2;
+  Detail("RearCornerLintel",f.x,f.z,.24,.24,6.4,"timber",{y:lintelY,ry:f.ry});
+}
+// South-road roadblock right after the fork (graft from space proposal C): shell crater (terrain
+// step), an overturned cart and a felled telegraph pole. The tank cannot turn south into our depth.
+{
+  const b=Space.roadblock;
+  TopBlock("RoadblockCart",b.cart.x,b.cart.z,2.2,1.5,3.8,"timber",{ry:b.cart.ry,cover:Face(0,-1)});
+  TopBlock("RoadblockPole",b.pole.x,b.pole.z,.3,.45,7,"timber",{ry:b.pole.ry});
 }
 // Nest interior baffle (collapsed roof beams): breaks the escorts' lines over the low north wall
 // into the compound, so the 04 short retreat has a covered middle.
@@ -221,9 +231,11 @@ TopBlock("BundleSupplyHouseSouth",47.5,-104,9.6,2.9,.6,"structure");
 Block("BundleSupplyHouseRoof",45.3,-109,4,.22,10,"structure",{y:SampleMissionTerrain(47.5,-109)+3.05});
 Block("BundleCrate",Sortie.bundle.x,Sortie.bundle.z,1.2,.5,.8,"missionRoute");
 // Landmark: the old yard's dead tree at the collapsed north-west corner (the sap climbs out beside it).
-Block("OldYardDeadTreeTrunk",36.0,-122.8,.42,5.6,.42,"timber");
-Detail("OldYardDeadTreeBranchA",36.5,-122.6,1.8,.18,.2,"timber",{y:SampleMissionTerrain(36,-122.8)+4.4,ry:.5});
-Detail("OldYardDeadTreeBranchB",35.5,-123.1,1.4,.16,.18,"timber",{y:SampleMissionTerrain(36,-122.8)+3.7,ry:-.7});
+// 7 m: its crown clears the nest's rear wall and reads from the observation step and the rear junction.
+Block("OldYardDeadTreeTrunk",36.0,-122.8,.42,7,.42,"timber");
+Detail("OldYardDeadTreeBranchA",36.5,-122.6,1.8,.18,.2,"timber",{y:SampleMissionTerrain(36,-122.8)+5.6,ry:.5});
+Detail("OldYardDeadTreeBranchB",35.5,-123.1,1.4,.16,.18,"timber",{y:SampleMissionTerrain(36,-122.8)+4.7,ry:-.7});
+Detail("OldYardDeadTreeBranchC",36.2,-123.4,1.2,.14,.16,"timber",{y:SampleMissionTerrain(36,-122.8)+6.3,ry:1.4});
 // Attack position: broken road-side wall between the throw spot and the stopped tank (throw cover).
 // Top ~0.7 m above ground level: covers a man crouched at the throw spot (floor 0.75 m down), a man standing there sees the tank's side over it.
 TopBlock("RoadsideRuin",42.33,-161.4,3.4,1.62,.7,"cover",{ry:.616,cover:Face(-.578,-.816)},Sortie.throw);
@@ -242,9 +254,12 @@ for(const [i,x,z,w,h] of [[0,-26,-170.4,8,.8],[1,30.2,-169.6,4,1.1],[2,70,-164,6
     const dx=(g.b.x-g.a.x)/g.l,dz=(g.b.z-g.a.z)/g.l;
     // left of travel = south/south-east side of the road (the friendly side)
     const x=g.a.x+dx*g.l*t-dz*4.6,z=g.a.z+dz*g.l*t+dx*4.6;
-    Block('FrontRoadPole'+k,x,z,.22,6,.22,'timber',k===2?{lean:.28}:{});
+    Block('FrontRoadPole'+k,x,z,.22,6,.22,'timber');
     Detail('FrontRoadPoleArm'+k,x,z,2.4,.14,.16,'timber',{y:SampleMissionTerrain(x,z)+5.35,ry:Math.atan2(dx,dz)+Math.PI/2});
   }
+  // The fork (BendExit) gets the one leaning pole (路口一根斜杆).
+  Block('FrontRoadPoleFork',56.6,-179.8,.22,6,.22,'timber',{lean:.3});
+  Detail('FrontRoadPoleForkArm',56.6,-179.8,2.4,.14,.16,'timber',{y:SampleMissionTerrain(56.6,-179.8)+5.3,ry:.9});
 }
 // The village route passes through a kitchen, inner courtyard and connected rooms.
 Room("Kitchen", 58, -9, 12, 15, { northDoor: true, southDoor: true });
@@ -771,7 +786,12 @@ export const MISSION_PLACEMENT = Object.freeze({
   bunker: {
     player: { x: -1.3, z: -126.2, yaw: Math.PI / 2 },    // lying, facing east out of the mouth
     playerEyeM: 0.42,
-    rifle: { x: 1.4, z: -125.6, yaw: 0.3 },              // in the mouth, butt half-buried, out of reach
+    // Where the rifle lies for the pick-up interaction: in the mouth passage, 1.45 m from the pinned
+    // eye (the pinning beams keep it out of reach in 01). The Opening package may stage the 01 prop
+    // at rifleMouth ("枪托半埋在洞口松土里") and kick it here in 02.
+    rifle: { x: 0.1, z: -125.7, yaw: 0.3 },
+    rifleMouth: { x: 1.4, z: -125.6, yaw: 0.3 },
+    dragged: { x: 3.8, z: -123.2, yaw: Math.PI / 2 },   // Shunzi after the drag, K2 eye (kneel 0.9)
     pinnedFrame: [{ x: -2.6, z: -125.4 }, { x: -1.4, z: -126.8 }],
     captives: [
       { id: "comrade", x: 6.5, z: -123.6, yaw: Math.PI },   // dragged from the north wall to the kill spot
@@ -793,7 +813,7 @@ export const MISSION_PLACEMENT = Object.freeze({
     litters: [{ x: -40.5, z: -99.2, yaw: 0 }, { x: -38, z: -98.6, yaw: 0 },
       { x: -35.5, z: -99.4, yaw: 0 }, { x: -33, z: -98.8, yaw: 0 }],
     wounded: [{ x: -43, z: -102.4 }, { x: -42.2, z: -105 }, { x: -30.6, z: -103.2 },
-      { x: -29.4, z: -100.2 }, { x: -33.8, z: -105.8 }],
+      { x: -29.4, z: -100.2 }, { x: -39.2, z: -103.6 }],   // [4] moved off the collection->SJ trench floor (2026-09-23)
     // 2026-09-20 演出打磨：原来 (-37.2,-97) 与 (-34.2,-97.2) 两个搬运人员正好堵在
     // 玩家来向（集结处锚点 (-37,-101)）与老周 (-36.4,-95.9) 之间 —— 实拍里借火那一拍
     // 整个画面是两张后背，老周根本不在画里。四个人都退到担架那一侧，
