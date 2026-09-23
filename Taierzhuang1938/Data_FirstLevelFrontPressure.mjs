@@ -141,7 +141,8 @@ export const FRONT_PRESSURE_PHASES = Object.freeze([
   // 04 战车露面：冲机枪位的十二人上来（MISSION_ENCOUNTER_ACTIVATION.machineGun.standbyUntil = tankPreviewed）。
   // 这一相位唯一一次脚本化成组冲锋；伤亡过半就退两条线，退完记 frontAttackRepelled。
   // 冲锋时机（2026-09-24 审查后）：实机 01→06 里这组露面 34 s 就伤亡过半退了线，旧的「30 s 后、
-  // 半数在最远线上站定」一次都没凑上。改成 12 s 后、3 人以上、三分之一压到最远线就冲（临时，Front 包定稿）。
+  // 半数在最远线上站定」一次都没凑上。改成 12 s 后、3 人以上、三分之一压到最远线就冲；fix6 探针里 397 次评估有 102 次卡在「组心离玩家超过 60 m」（playerFar），
+  // 放到 80 m（临时，Front 包定稿）。
   Object.freeze({ id: "tankShown", when: "tankPreviewed", stages: Object.freeze(["Support", "MachineGun", "Tank"]),
     bark: "advance",
     fire: Object.freeze([...BANK, "leftGunParapet", "nestFront", "nestWest", "gapWest", "gapEast"]),
@@ -150,7 +151,7 @@ export const FRONT_PRESSURE_PHASES = Object.freeze([
       eastHold: Object.freeze({ role: "hold" }),
       mgAttack: Object.freeze({ role: "assault", maxLine: -1, regroupLine: 1, loop: true,
         fallback: Object.freeze({ casualtyFraction: 0.5, backLines: 2, holdS: 15, repelledFact: "frontAttackRepelled" }),
-        charge: Object.freeze({ afterS: 12, minAlive: 3, playerWithinM: 60, lastLineShare: 0.34 }) }) }) }),
+        charge: Object.freeze({ afterS: 12, minAlive: 3, playerWithinM: 80, lastLineShare: 0.34 }) }) }) }),
   // 战车压阵位：玩家往阵位后墙撤，沟沿开始挨环境射击。
   Object.freeze({ id: "tankPressure", when: "tankPositionPressured", stages: Object.freeze(["MachineGun", "Tank"]),
     fire: Object.freeze([...BANK, "leftGunParapet", "nestFront", "nestWest", "rearLane", "gapWest", "gapEast"]),
