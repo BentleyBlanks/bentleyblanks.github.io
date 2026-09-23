@@ -239,9 +239,10 @@ export const TANK = Object.freeze({
   // 素材与许可见 Data_SfxSources.TANK_SFX。烘焙时每条都对齐到有声段 −25 dBFS，层与层之间原本的
   // 响度差（怠速比高转轻多少）在这里还原 —— 不烘进文件，调手感不用重烘。
   audio: Object.freeze({
-    // 声源尺寸（Play 的 sourceSizeM → panner refDistance）：[史] 车长 5.7 m，一台发动机 + 两条履带
-    // 不是一个点。给 5 m：贴近时不会「一步一个台阶」地变响。
-    sourceSizeM: 5,
+    // 声源尺寸（Play 的 sourceSizeM → panner refDistance）：[史] 车长 5.7 m，一台 118 hp 汽油机 + 两条钢履带
+    // 不是一个点，也不是一个人那么响。给 10 m：130 m 外（03 夺点处到路线起点）比 5 m 口径亮 8 dB，
+    // 仍按距离衰减（先闻其声、听得出方向，但不盖过身边的枪）。2026-09-23 实测：5 m 时 196 m 外有效电平 0.031。
+    sourceSizeM: 10,
     // 挂点高度（车体局部 y，米）：发动机 / 履带在车体中部偏下，手摇在炮塔里。
     engineY: 1.1,
     turretY: 1.8,

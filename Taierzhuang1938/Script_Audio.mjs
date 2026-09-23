@@ -2590,6 +2590,12 @@ function IsBlastCue(name) {
   return name === "explosionNear" || name === "explosionMid" || name === "shellImpact" || name.startsWith("tankCannon");
 }
 const OCCLUSION_MAX_BLAST = 0.25;
+/**
+ * 战车常驻循环（发动机 / 履带 / 手摇）的遮挡封顶（战车包 2026-09-23）。
+ * 12 吨的车隔着一道土坎：高频被挡掉，隆隆声照样翻过来 —— 03「先闻其声」靠的就是这一层。
+ * 探针对整道高地后面的车给 1.0（实测），不封顶就是 −12 dB 干声 + 800 Hz 低通，两百米外等于没有。
+ */
+const OCCLUSION_MAX_TANK_LOOP = 0.5;
 
 /**
  * 喊话的嘴离脚底多高。与 `Data_Companions.COMPANION_TUNING.mouthY`（1.52）同值 ——
@@ -5192,6 +5198,7 @@ export class AudioEngine {
       if (IsVoiceCue(name)) occ = Math.min(occ, OCCLUSION_MAX_VOICE);
       // 爆炸封顶（见 IsBlastCue）：一层木板挡不住冲击波，低频照样绕得过来。
       if (IsBlastCue(name)) occ = Math.min(occ, OCCLUSION_MAX_BLAST);
+      if (TANK_LOOP_CUES.has(name)) occ = Math.min(occ, OCCLUSION_MAX_TANK_LOOP);
       v.occ = occ;
       v.occAt = now;
       // 空气吸收：距离越远高频掉得越快。20 m 上还有 8 kHz，200 m 上只剩 1 kHz 出头。
@@ -5368,6 +5375,7 @@ export class AudioEngine {
         let occ = this.Occlusion(position, distance);
         if (this.ZoneBoundary(voice.reverbZone || this.space)) occ = Clamp01(occ + ZONE_BOUNDARY_OCC);
         if (IsVoiceCue(voice.name)) occ = Math.min(occ, OCCLUSION_MAX_VOICE);   // 与 Play 同一道封顶
+        if (TANK_LOOP_CUES.has(voice.name)) occ = Math.min(occ, OCCLUSION_MAX_TANK_LOOP);
         voice.occ = occ;
         // occGain 是起播那一刻按 occ > 0 才建的。起播时通透、飞到墙后面去的那种
         // 只能靠低通与湿声表达 —— 中途插节点要断开重接一条正在响的链，
