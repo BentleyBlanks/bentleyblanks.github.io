@@ -219,6 +219,10 @@ export const COVER_CYCLE = Freeze({
    *  压制过 COVER.suppressionProneAt 立刻回去找掩体。09-24 探针 fix3：只给 12 s 的话，待命组一轮
    *  「瞎探三次 → 换点 → 再瞎探三次」要 20 s 才换来 12 s 空地，03 的不动人·帧里仍有一半是他们。 */
   missionOpenKeepS: 8,
+  /** 离玩家这么近的人不去空地（去了的也立刻回来）：这条规矩是给远处打不出去的待命组的；玩家来路上的
+   *  阵位守卫走到空地上会把驾驶器（和真玩家）的接近路线打乱 —— 09-24 03→06 冷启动在 RightNestApproach
+   *  卡死，关掉这条就过。 */
+  missionOpenMinPlayerM: 30,
   /** 当前掩体被判侧翼要**持续**这么久才紧急换点：目标在两侧敌人间来回切时单拍判定会翻。 */
   flankGraceS: 1.5,
   /** blindPeeksBeforeMove / flankGraceS / 按隐蔽位判侧翼这三条只对这些阵营生效。

@@ -611,7 +611,7 @@ function Man(ai, side, x, z, options = {}) {
 }
 {
   // Bark keys and the mission switches.
-  const { ai, log } = MakeDirector();
+  const { ai, ctx, log } = MakeDirector();
   const s = Man(ai, "ija", 0, 0);
   ai.Bark(s, "spot"); Eq(log.barks.at(-1).key ?? null, null, "07+: the Japanese spot line is still drawn from the pool");
   ai.missionReactions = true; ai.Bark(s, "spot");
@@ -673,6 +673,15 @@ function Man(ai, side, x, z, options = {}) {
     Check(o.missionOpenUntil > ai.time && ai.stats.openGround === 1, "two bad covers inside the window: he kneels in the open for a while");
     o.task = null; o.suppression = 0; o.position.set(0, 0, 0);
     Check(ai.UpdateCover(o) === false && o.cover == null, "while it lasts he picks no cover");
+    ctx.player = { Alive: true, position: new THREE.Vector3(0, 0, -20) };
+    const n = Man(ai, "ija", 1, 0, { state: "cover_engage" });
+    n.target = o.target; n.targetVisible = true; n.ambientFirePoints = o.ambientFirePoints;
+    for (const id of ["n1", "n2"]) { n.cover = { ...cover, id }; for (let i = 0; i < COVER_CYCLE.blindPeeksBeforeMove; i++) Peek(n, false); }
+    Check(!(n.missionOpenUntil > ai.time), "a man near the player never goes out into the open");
+    ctx.player.position.set(0, 0, 0);
+    ai.UpdateCover(o);
+    Check(!(o.missionOpenUntil > ai.time), "and one already out comes back when the player gets close");
+    ctx.player = undefined;
     const p = Man(ai, "ija", 2, 0, { state: "cover_engage" });
     p.target = o.target; p.targetVisible = true;
     for (const id of ["c1", "c2"]) { p.cover = { ...cover, id }; for (let i = 0; i < COVER_CYCLE.blindPeeksBeforeMove; i++) Peek(p, false); }

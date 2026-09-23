@@ -2262,6 +2262,12 @@ export class AiDirector {
     return this.BeginCharge(s, true);
   }
 
+  /** 玩家在这个人 radiusM 内（水平距离；没有玩家算不在）。 */
+  NearPlayer(s, radiusM) {
+    const p = this.ctx.player?.position;
+    return !!p && Math.hypot(p.x - s.position.x, p.z - s.position.z) < radiusM;
+  }
+
   /**
    * 【§20】关卡下令的成组冲锋前，把一个人的目标换成玩家：被禁火的人「先打能打的」（玩家的距离乘
    * heldTargetRank），眼睛里多半是壕里的国军 —— 那条规矩管的是扳机，冲锋是冲着玩家来的。
@@ -2955,7 +2961,7 @@ export class AiDirector {
     // 【§20.11】身边的掩体都打不出去（连换几次都是瞎探）：这段时间不选掩体，就地跪着打；
     // 在空地上真打出去了就续（missionOpenKeepS），被压得要趴了就立刻回去找掩体。
     if (this.missionCoverRules && now < s.missionOpenUntil) {
-      if (s.suppression > COVER.suppressionProneAt) s.missionOpenUntil = -99;
+      if (s.suppression > COVER.suppressionProneAt || this.NearPlayer(s, COVER_CYCLE.missionOpenMinPlayerM)) s.missionOpenUntil = -99;
       else {
         if (now - s.lastFire < COVER_CYCLE.missionOpenKeepS)
           s.missionOpenUntil = Math.max(s.missionOpenUntil, now + COVER_CYCLE.missionOpenKeepS);
@@ -3164,7 +3170,8 @@ export class AiDirector {
           s.failedCoverId = c.id; s.failedCoverUntil = this.time + COVER_CYCLE.failedRetryS;
           this.ReleaseCover(s); s.coverPickAt = -99;
           // 【§20.11】有授权点的人短时间里连换几个掩体都打不出去：去空地上跪着打一阵。
-          if (this.missionCoverRules && s.ambientFirePoints && s.ambientFirePoints.length) {
+          if (this.missionCoverRules && s.ambientFirePoints && s.ambientFirePoints.length
+            && !this.NearPlayer(s, COVER_CYCLE.missionOpenMinPlayerM)) {
             s.blindMoves = this.time - s.blindMoveAt <= COVER_CYCLE.missionOpenWindowS ? s.blindMoves + 1 : 1;
             s.blindMoveAt = this.time;
             if (s.blindMoves >= COVER_CYCLE.missionOpenAfterMoves) {
