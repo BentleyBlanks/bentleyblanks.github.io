@@ -559,7 +559,7 @@ def WriteManifest(results):
                     'values': 'glTF node-local bone transforms (p xyz, q xyzw), stride 7',
                     'props': 'glTF scene space = rig.root local, source metres: origin xyz, axis xyz, up xyz, visible',
                     'stages': 'runtime metres in the anchor actor frame (+x right, +y up, -z forward); yawDeg + = turn left',
-                    'contacts': 'clip seconds; partner parts are contactPoints names'},
+                    'contacts': 'clip seconds; partner parts are contactPoints names; standoffM = runtime metres along the patch normal where the knuckle centroid (finger roots) sits'},
                 'clips': CLIPS, 'stages': library['STAGES'], 'props': library['PROPS'],
                 'models': [rows[m] for m in MODELS if m in rows]}
     existing.write_text(json.dumps(manifest, indent=1), encoding='utf-8')

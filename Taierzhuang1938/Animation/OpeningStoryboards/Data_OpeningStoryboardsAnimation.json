@@ -13,7 +13,7 @@
   "values": "glTF node-local bone transforms (p xyz, q xyzw), stride 7",
   "props": "glTF scene space = rig.root local, source metres: origin xyz, axis xyz, up xyz, visible",
   "stages": "runtime metres in the anchor actor frame (+x right, +y up, -z forward); yawDeg + = turn left",
-  "contacts": "clip seconds; partner parts are contactPoints names"
+  "contacts": "clip seconds; partner parts are contactPoints names; standoffM = runtime metres along the patch normal where the knuckle centroid (finger roots) sits"
  },
  "clips": {
   "SupplyReceive": {
@@ -476,7 +476,8 @@
      "limb": "handR",
      "action": "grab",
      "partnerRole": "comrade",
-     "part": "collarBack"
+     "part": "collarBack",
+     "standoffM": 0.035
     }
    ],
    "events": [
@@ -512,14 +513,16 @@
      "limb": "handL",
      "action": "grab",
      "partnerRole": "comrade",
-     "part": "upperArmR"
+     "part": "upperArmR",
+     "standoffM": 0.045
     },
     {
      "t": 0.62,
      "limb": "handR",
      "action": "grab",
      "partnerRole": "comrade",
-     "part": "wristR"
+     "part": "wristR",
+     "standoffM": 0.04
     },
     {
      "t": 3.2,
@@ -605,7 +608,8 @@
      "limb": "handR",
      "action": "shove",
      "partnerRole": "comrade",
-     "part": "chestFront"
+     "part": "chestFront",
+     "standoffM": 0.04
     },
     {
      "t": 0.56,
@@ -661,7 +665,7 @@
     {
      "t": 0.28,
      "by": "ijaA",
-     "part": "hairBack",
+     "part": "crown",
      "action": "grab"
     }
    ],
@@ -695,7 +699,8 @@
      "limb": "handL",
      "action": "grab",
      "partnerRole": "comrade",
-     "part": "hairBack"
+     "part": "crown",
+     "standoffM": 0.03
     },
     {
      "t": 0.42,
@@ -731,7 +736,8 @@
      "limb": "handL",
      "action": "hold",
      "partnerRole": "comrade",
-     "part": "hairBack"
+     "part": "crown",
+     "standoffM": 0.03
     },
     {
      "t": 0.22,
@@ -795,7 +801,16 @@
      "limb": "handL",
      "action": "hold",
      "partnerRole": "comrade",
-     "part": "hairBack"
+     "part": "crown",
+     "standoffM": 0.03
+    },
+    {
+     "t": 1.0,
+     "limb": "handL",
+     "action": "hold",
+     "partnerRole": "comrade",
+     "part": "crown",
+     "standoffM": 0.03
     }
    ],
    "events": [
@@ -1752,7 +1767,7 @@
      "clip": "IjaPullArm",
      "x": 0.48,
      "z": -0.24,
-     "yawDeg": 122
+     "yawDeg": 95
     }
    }
   },
@@ -2028,7 +2043,7 @@
   {
    "id": "LugouNra02",
    "file": "Animation_LugouNra02OpeningStoryboards.json",
-   "sha256": "9a2e80071059931750ee2afd2355b471faf564efd2fd1bb9e6ca18b2a6d119dd",
+   "sha256": "30ff1a30dc2b9163a87c41bf413e1218586c68c603fd812be0b017d85d8ae66b",
    "originalModelSha256": "39c08ca82148e140ee2952caffdd0dee99750fb734038a5263d216c9a7345225",
    "clipIds": [
     "SupplyReceive",
@@ -4251,7 +4266,7 @@
   {
    "id": "LugouIja01",
    "file": "Animation_LugouIja01OpeningStoryboards.json",
-   "sha256": "7b321eec04a9c329d9abc4445d5202fb67eba1f3f0f793b090828be82762f712",
+   "sha256": "0e19a3ba57dbfefae6335bb6348da4f6ae8f323f60241bf77bb4e2a4669e31a8",
    "originalModelSha256": "23fa4ef88891bd14d49dfb9a3e61b9f0dcaf45b8956a720aab24d9c4c23eb9c7",
    "clipIds": [
     "SupplyReceive",
@@ -4984,21 +4999,21 @@
      "clip": "IjaPullArm",
      "frames": 107,
      "footSlideM": 0.0,
-     "contactErrorM": 0.014,
-     "gripSolveErrorM": 0.01399,
-     "pelvisMaxStepM": 0.1316,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.1303,
      "floorCorrectionMin": -0.0,
      "floorCorrectionMax": 0.0,
      "root": {
       "start": [
-       0.1023,
-       -0.2447,
+       -0.224,
+       -0.1934,
        -0.0,
        0.7246
       ],
       "end": [
-       0.3152,
-       0.0873,
+       0.1164,
+       0.0059,
        0.97,
        0.7154
       ],
@@ -5009,21 +5024,21 @@
       [
        "L",
        0.0,
-       0.78
+       0.72
       ],
       [
        "L",
-       1.02,
+       0.96,
        1.3
       ],
       [
        "L",
        1.52,
-       2.02
+       1.98
       ],
       [
        "L",
-       2.24,
+       2.18,
        3.05
       ],
       [
@@ -5034,11 +5049,11 @@
       [
        "R",
        0.0,
-       0.52
+       0.5
       ],
       [
        "R",
-       0.76,
+       0.72,
        1.06
       ],
       [
@@ -5049,11 +5064,11 @@
       [
        "R",
        1.84,
-       2.28
+       2.18
       ],
       [
        "R",
-       2.5,
+       2.4,
        3.95
       ],
       [
@@ -5232,7 +5247,7 @@
   {
    "id": "LugouIja02",
    "file": "Animation_LugouIja02OpeningStoryboards.json",
-   "sha256": "4241e49885bec17a169c95c59bb00e1bf4733c183fa9884a8f302e348c977d39",
+   "sha256": "288d8549289439a6b13d4c186f8e465b5f6fe1e84ecae90e3b438bb8d98c4f0e",
    "originalModelSha256": "8c4860ec2d4dd3076b06ff7e593e5dcfd4d23aefe2fedf6f9fdec3b0e12cc9aa",
    "clipIds": [
     "SupplyReceive",
@@ -6090,12 +6105,12 @@
     {
      "clip": "IjaHairGrabPull",
      "frames": 25,
-     "footSlideM": 0.0009,
-     "contactErrorM": 0.0179,
-     "gripSolveErrorM": 0.01785,
+     "footSlideM": 0.0015,
+     "contactErrorM": 0.018,
+     "gripSolveErrorM": 0.01797,
      "pelvisMaxStepM": 0.0371,
      "floorCorrectionMin": -0.00066,
-     "floorCorrectionMax": 0.00049,
+     "floorCorrectionMax": 0.00192,
      "root": {
       "start": [
        -0.0,
@@ -6107,7 +6122,7 @@
        0.0016,
        -0.0318,
        -0.0,
-       0.741
+       0.7422
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
@@ -6128,24 +6143,24 @@
     {
      "clip": "IjaDrawBayonet",
      "frames": 21,
-     "footSlideM": 0.0001,
-     "contactErrorM": 0.0183,
-     "gripSolveErrorM": 0.01832,
-     "pelvisMaxStepM": 0.0941,
-     "floorCorrectionMin": 0.00032,
-     "floorCorrectionMax": 0.00044,
+     "footSlideM": 0.0013,
+     "contactErrorM": 0.0184,
+     "gripSolveErrorM": 0.01842,
+     "pelvisMaxStepM": 0.0963,
+     "floorCorrectionMin": 2e-05,
+     "floorCorrectionMax": 0.00152,
      "root": {
       "start": [
        0.0045,
-       -0.0403,
+       -0.0404,
        -0.0,
-       0.7409
+       0.7418
       ],
       "end": [
        0.0023,
        -0.0336,
        -0.78,
-       0.741
+       0.742
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
@@ -6166,24 +6181,24 @@
     {
      "clip": "IjaThroatSlash",
      "frames": 97,
-     "footSlideM": 0.0004,
-     "contactErrorM": 0.0168,
-     "gripSolveErrorM": 0.02241,
-     "pelvisMaxStepM": 0.0376,
-     "floorCorrectionMin": -5e-05,
-     "floorCorrectionMax": 0.00039,
+     "footSlideM": 0.0009,
+     "contactErrorM": 0.0169,
+     "gripSolveErrorM": 0.02308,
+     "pelvisMaxStepM": 0.033,
+     "floorCorrectionMin": 0.00049,
+     "floorCorrectionMax": 0.00174,
      "root": {
       "start": [
        0.0046,
        -0.0398,
        -0.0,
-       0.7409
+       0.7419
       ],
       "end": [
-       0.0521,
-       -0.074,
+       0.0266,
+       -0.0771,
        -0.0,
-       0.6192
+       0.7405
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
@@ -6204,24 +6219,24 @@
     {
      "clip": "IjaWipeSheathBayonet",
      "frames": 59,
-     "footSlideM": 0.0006,
+     "footSlideM": 0.0013,
      "contactErrorM": 0.0,
-     "gripSolveErrorM": 0.0335,
-     "pelvisMaxStepM": 0.0562,
-     "floorCorrectionMin": -0.00031,
-     "floorCorrectionMax": 0.00048,
+     "gripSolveErrorM": 0.03395,
+     "pelvisMaxStepM": 0.0567,
+     "floorCorrectionMin": -0.00033,
+     "floorCorrectionMax": 0.00142,
      "root": {
       "start": [
        -0.0157,
        -0.1173,
        -0.0,
-       0.6036
+       0.6039
       ],
       "end": [
        -0.0,
        -0.0091,
        -0.97,
-       0.7137
+       0.7142
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
@@ -6242,24 +6257,24 @@
     {
      "clip": "IjaReadyRifle",
      "frames": 28,
-     "footSlideM": 0.0003,
+     "footSlideM": 0.0012,
      "contactErrorM": 0.0237,
-     "gripSolveErrorM": 0.02372,
-     "pelvisMaxStepM": 0.0756,
-     "floorCorrectionMin": 0.00015,
-     "floorCorrectionMax": 0.00048,
+     "gripSolveErrorM": 0.02374,
+     "pelvisMaxStepM": 0.0758,
+     "floorCorrectionMin": 0.00057,
+     "floorCorrectionMax": 0.00189,
      "root": {
       "start": [
        -0.0007,
-       -0.0076,
+       -0.0081,
        -0.97,
-       0.7412
+       0.7425
       ],
       "end": [
-       0.0456,
-       -0.0893,
+       0.0458,
+       -0.0895,
        -0.0,
-       0.6975
+       0.6978
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },

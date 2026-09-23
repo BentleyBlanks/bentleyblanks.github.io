@@ -324,7 +324,9 @@ STAGES['captiveDrag'] = {
     'actors': {
         'comrade': {'rig': 'LugouNra02', 'clip': 'CaptiveDraggedFromDirt', 'x': 0.0, 'z': 0.0, 'yawDeg': 0},
         'ijaA': {'rig': 'LugouIja02', 'clip': 'IjaDragCollarFromDirt', 'x': .05, 'z': -.58, 'yawDeg': 156},
-        'ijaB': {'rig': 'LugouIja01', 'clip': 'IjaPullArm', 'x': .48, 'z': -.24, 'yawDeg': 122},
+        # ijaB works from his right side (yaw 95, was 122): at 122 both soldiers stooped into the
+        # same space in front of him and ijaB's head went through ijaA's chest at the grab.
+        'ijaB': {'rig': 'LugouIja01', 'clip': 'IjaPullArm', 'x': .48, 'z': -.24, 'yawDeg': 95},
     }}
 STAGES['captiveWall'] = {
     'anchor': 'comrade', 'syncS': 0.0,
@@ -354,15 +356,15 @@ Meta('CaptiveDraggedFromDirt', 4.4, False, 'free', role='comrade', rig='LugouNra
            'the arm is wrenched up across the wound (gasp). Frame 0 = BlastSlamBuried last frame.')
 Meta('IjaDragCollarFromDirt', 4.4, False, 'track', role='ijaA', rig='LugouIja02', props=['weapon'], rootMotion=True,
      stage='captiveDrag', weaponState='slungBack',
-     contacts=[{'t': .30, 'limb': 'handR', 'action': 'grab', 'partnerRole': 'comrade', 'part': 'collarBack'}],
+     contacts=[{'t': .30, 'limb': 'handR', 'action': 'grab', 'partnerRole': 'comrade', 'part': 'collarBack', 'standoffM': .035}],
      events=[{'t': 2.20, 'kind': 'jerkUp', 'line': 'CaptiveDragged.02'}],
      next=['IjaShoveToWall'],
      notes='Stoops, hooks the back collar with the right hand, backs up three steps hauling; the '
            'jerk on "立て！" straightens him. Rifle slung across the back.')
 Meta('IjaPullArm', 4.4, False, 'track', role='ijaB', rig='LugouIja01', props=['weapon'], rootMotion=True,
      stage='captiveDrag', weaponState='slungBack',
-     contacts=[{'t': .28, 'limb': 'handL', 'action': 'grab', 'partnerRole': 'comrade', 'part': 'upperArmR'},
-               {'t': .62, 'limb': 'handR', 'action': 'grab', 'partnerRole': 'comrade', 'part': 'wristR'},
+     contacts=[{'t': .28, 'limb': 'handL', 'action': 'grab', 'partnerRole': 'comrade', 'part': 'upperArmR', 'standoffM': .045},
+               {'t': .62, 'limb': 'handR', 'action': 'grab', 'partnerRole': 'comrade', 'part': 'wristR', 'standoffM': .04},
                {'t': 3.20, 'limb': 'handsLR', 'action': 'yank', 'partnerRole': 'comrade'},
                {'t': 4.05, 'limb': 'handsLR', 'action': 'release'}],
      next=['IjaBayonetGuard', 'GuardTurn', 'IjaReadyRifle'],
@@ -378,7 +380,7 @@ Meta('CaptiveWallBrace', 2.0, False, 'free', role='comrade', rig='LugouNra02', r
            'earth, he ends kneel-sitting with shoulder and back on the wall, right hand on the torn bandage.')
 Meta('IjaShoveToWall', 1.0, False, 'track', role='ijaA', rig='LugouIja02', props=['weapon'], rootMotion=True,
      stage='captiveWall', weaponState='slungBack', extra=True,
-     contacts=[{'t': .34, 'limb': 'handR', 'action': 'shove', 'partnerRole': 'comrade', 'part': 'chestFront'},
+     contacts=[{'t': .34, 'limb': 'handR', 'action': 'shove', 'partnerRole': 'comrade', 'part': 'chestFront', 'standoffM': .04},
                {'t': .56, 'limb': 'handR', 'action': 'release'}],
      prev=['IjaDragCollarFromDirt'], next=['InterrogateCrouch', 'IjaHairGrabPull'],
      notes='Not in contract §5.4 (added): the shove the draft describes ("推到沟壁上") needs its own pair '
@@ -1282,6 +1284,12 @@ def DragVictimKeys(T):
     kneelMid = KneelFlat(T, .27, -.20)
     kp = kneelMid['foot.L']
     ex, ey = DRAG_END
+    # The right arm is hauled towards ijaB, who faces it from his right (IjaPullArm keeps its
+    # pelvis 0.5 m out along that line): each key puts the wrist 0.38 m (~75 % reach) from where
+    # the right shoulder is at that time, along (right .96, ahead .10, up .25),
+    # the elbow hanging down-out. (It trailed behind the shoulder, folded to 7-9 cm shoulder-
+    # wrist, and flipped the elbow for a frame at 2.04 s.)
+    armBase = BuriedBase(T)['armPole.R']
     rows = [
         (0.00, {'turn': 0.0, 'handRel.L': (.06, -.10, -.50), 'poleRel.L': (.40, .30, -.20), 'handRelW.L': 0.0,
                 'palmFw.L': (-.4, -.6, -.6), 'palmNw.L': (-.3, 0, -1), 'palmF.L': (0, -.2, -1), 'palmN.L': (-1, 0, 0)}),
@@ -1290,26 +1298,30 @@ def DragVictimKeys(T):
         # Hauled up by the collar and the right arm: trunk lifts, head hangs.
         (0.60, {'pelvis': (.30, .10, .22), 'pelvisTilt': (.30, .05, .12), 'bend': .45, 'lean': .05, 'twist': -.05,
                 'head': (.45, .05, .10), 'neck': (.25, 0, .05),
-                'hand.R': (.02, -.20, .62), 'palmF.R': (0, -.7, .7), 'palmN.R': (-.5, 0, -.8), 'curl.R': .4,
+                'hand.R': (-.097, -.196, .72), 'armPole.R': armBase,
+                'palmF.R': (0, -.7, .7), 'palmN.R': (-.5, 0, -.8), 'curl.R': .4,
                 'hand.L': (.36, .02, .08)}),
         # Dragged: knees in the dirt behind him, feet trailing on their insteps.
         (1.00, {'pelvis': (.28, -.16, .34), 'pelvisTilt': (.55, 0, .05), 'bend': .42,
                 'ankle.L': kneelMid['ankle.L'], 'ankle.R': kneelMid['ankle.R'],
                 'legPole.L': kneelMid['legPole.L'], 'legPole.R': kneelMid['legPole.R'], 'foot.L': kp, 'foot.R': kp,
-                'hand.R': (.04, -.40, .74), 'handRelW.L': 1.0}),
+                'hand.R': (-.267, -.546, 1.004), 'armPole.R': (-.001, -.508, .458), 'handRelW.L': 1.0}),
         # One foot gets under him and shoves -- and goes out again.
         (1.25, {'ankle.R': (.27 - H - .02, -.46, A), 'legPole.R': (.27 - H - .10, -1.2, .6), 'foot.R': (0, -8, 0),
-                'pelvis': (.27, -.28, .42)}),
-        (1.45, {'ankle.R': (.27 - H - .02, -.46, A), 'pelvis': (.27, -.34, .50), 'bend': .35}),
+                'pelvis': (.27, -.28, .42), 'hand.R': (-.278, -.667, 1.034), 'armPole.R': (-.012, -.629, .488)}),
+        (1.45, {'ankle.R': (.27 - H - .02, -.46, A), 'pelvis': (.27, -.34, .50), 'bend': .35,
+                'hand.R': (-.277, -.711, 1.063), 'armPole.R': (-.011, -.673, .517)}),
         (1.70, {'ankle.R': kneelMid['ankle.R'], 'legPole.R': kneelMid['legPole.R'], 'foot.R': kp,
-                'pelvis': (.26, -.38, .36), 'bend': .45}),
-        (2.00, {'pelvis': (ex, ey - .02, .36), 'hand.R': (ex - .20, ey - .30, .80), 'turn': 0.0}),
+                'pelvis': (.26, -.38, .36), 'bend': .45, 'hand.R': (-.287, -.774, 1.010), 'armPole.R': (-.021, -.736, .464)}),
+        (2.00, {'pelvis': (ex, ey - .02, .36), 'hand.R': (-.488, -.915, .934), 'armPole.R': (-.222, -.877, .388), 'turn': 0.0}),
         # "立て！" -- jerked up and round by the collar; the head snaps back, the legs do not hold.
         (2.20, {'pelvis': (ex, ey, kz + .16), 'pelvisTilt': (.10, 0, 0), 'bend': .18, 'turn': -.55,
-                'head': (-.12, 0, 0), 'neck': (-.05, 0, 0), 'shrug': .20}),
-        (2.45, {'pelvis': (ex, ey, kz + .08), 'bend': .25, 'head': (.15, 0, .05), 'turn': -1.25}),
+                'head': (-.12, 0, 0), 'neck': (-.05, 0, 0), 'shrug': .20,
+                'hand.R': (-.340, -.672, .984), 'armPole.R': (-.22, -.458, .76)}),
+        (2.45, {'pelvis': (ex, ey, kz + .08), 'bend': .25, 'head': (.15, 0, .05), 'turn': -1.25,
+                'hand.R': (-.302, -.525, .898), 'armPole.R': (-.161, -.354, .687)}),
         (2.75, {'pelvis': kneel['pelvis'], 'ankle.L': kneel['ankle.L'], 'ankle.R': kneel['ankle.R'],
-                'legPole.L': kneel['legPole.L'], 'legPole.R': kneel['legPole.R'], 'turn': DRAG_TURN,
+                'legPole.L': kneel['legPole.L'], 'legPole.R': kneel['legPole.R'], 'turn': DRAG_TURN, 'armPole.R': armBase,
                 # The held right arm comes round with him (R3 = his own frame from here on).
                 'hand.R': R3ToDrag((-.20, -.30, .80)),
                 'pelvisTilt': (.12, 0, 0), 'bend': .32, 'head': (.35, .05, .08),
@@ -1492,8 +1504,8 @@ def BuildPullArm(T, name):
     # The arm travels 0.45 m to his right between 0.6 and 1.0 s, 0.25 m back by 1.2 s, another
     # 0.25 m right-back by 2.0 s and swings 0.3 m back left on the jerk up (2.0-2.2 s): side
     # steps lead with the foot on the side he travels to, so no planted leg is left behind.
-    schedule = [('R', .52, .76), ('L', .78, 1.02), ('R', 1.06, 1.28), ('L', 1.30, 1.52), ('R', 1.60, 1.84),
-                ('L', 2.02, 2.24), ('R', 2.28, 2.50), ('L', 3.05, 3.25), ('R', 3.95, 4.20)]
+    schedule = [('R', .50, .72), ('L', .72, .96), ('R', 1.06, 1.28), ('L', 1.30, 1.52), ('R', 1.60, 1.84),
+                ('L', 1.98, 2.18), ('R', 2.18, 2.40), ('L', 3.05, 3.25), ('R', 3.95, 4.20)]
     stance = {'L': (H + .05, -.14, T.A), 'R': (-(H + .05), .14, T.A)}
     feet, plants = FollowSteps(PelvisXY, stance, schedule, 4.4)
     pelvis = [(t, (PelvisXY(t)[0], PelvisXY(t)[1], P - .04 - Channel(crouch)(t))) for t in times]
@@ -1683,19 +1695,19 @@ PARTNER_SOURCES['LugouNra02'].update({
 
 Meta('CaptiveHeadPulledBack', 1.8, False, 'free', role='comrade', rig='LugouNra02', rootMotion=False, stage='slashGrab',
      env={'wallBehindM': .49},
-     contacts=[{'t': .28, 'by': 'ijaA', 'part': 'hairBack', 'action': 'grab'}],
+     contacts=[{'t': .28, 'by': 'ijaA', 'part': 'crown', 'action': 'grab'}],
      prev=['CaptiveKneelMud', 'CaptiveWallBrace'], next=['CaptiveThroatCut'],
      notes='Fist in the hair, the head is torn back and the throat opened; both hands come up by reflex '
            'and stay half-raised while the bayonet is drawn (covers IjaHairGrabPull + IjaDrawBayonet).')
 Meta('IjaHairGrabPull', 1.0, False, 'track', role='ijaA', rig='LugouIja02', props=['weapon'], rootMotion=False,
      stage='slashGrab', weaponState='slungBack',
-     contacts=[{'t': .28, 'limb': 'handL', 'action': 'grab', 'partnerRole': 'comrade', 'part': 'hairBack'},
+     contacts=[{'t': .28, 'limb': 'handL', 'action': 'grab', 'partnerRole': 'comrade', 'part': 'crown', 'standoffM': .03},
                {'t': .42, 'limb': 'handL', 'action': 'yank', 'partnerRole': 'comrade'}],
      next=['IjaDrawBayonet'],
      notes='Half step in, left fist into the hair, yanks the head back hard. No pause before the draw.')
 Meta('IjaDrawBayonet', .8, False, 'track', role='ijaA', rig='LugouIja02', props=['weapon', 'bayonet'], rootMotion=False,
      stage='slashDraw', weaponState='slungBack',
-     contacts=[{'t': 0, 'limb': 'handL', 'action': 'hold', 'partnerRole': 'comrade', 'part': 'hairBack'},
+     contacts=[{'t': 0, 'limb': 'handL', 'action': 'hold', 'partnerRole': 'comrade', 'part': 'crown', 'standoffM': .03},
                {'t': .22, 'limb': 'handR', 'action': 'grip', 'target': 'bayonet', 'part': 'handle'},
                {'t': .30, 'limb': 'handR', 'action': 'draw', 'target': 'bayonet'}],
      events=[{'t': .30, 'kind': 'bayonetDraw', 'sound': 'bladeScrape'}],
@@ -1705,7 +1717,9 @@ Meta('IjaDrawBayonet', .8, False, 'track', role='ijaA', rig='LugouIja02', props=
 Meta('IjaThroatSlash', 4.0, False, 'track', role='ijaA', rig='LugouIja02', props=['weapon', 'bayonet'], rootMotion=False,
      stage='slashCut', weaponState='slungBack', holdLoop=[1.0, 4.0],
      contacts=[{'t': .24, 'limb': 'bayonet', 'action': 'cut', 'partnerRole': 'comrade', 'part': 'throat'},
-               {'t': 0, 'limb': 'handL', 'action': 'hold', 'partnerRole': 'comrade', 'part': 'hairBack'}],
+               {'t': 0, 'limb': 'handL', 'action': 'hold', 'partnerRole': 'comrade', 'part': 'crown', 'standoffM': .03},
+               # the taunt hold (stage slashTaunt, against CaptiveClutchThroat)
+               {'t': 1.0, 'limb': 'handL', 'action': 'hold', 'partnerRole': 'comrade', 'part': 'crown', 'standoffM': .03}],
      events=[{'t': .24, 'kind': 'throatCut'}, {'t': 1.6, 'kind': 'hairShake', 'line': 'CaptiveTaunt.01'},
              {'t': 2.8, 'kind': 'hairShake', 'line': 'CaptiveTaunt.02'}],
      prev=['IjaDrawBayonet'], next=['IjaWipeSheathBayonet'],
@@ -1972,8 +1986,8 @@ def BuildHairGrab(T, name):
     H, P = T.H, T.P
     base = IjaABase(T)
     anim = Tracks(base, {
-        'ankle.L': [(0.0, base['ankle.L']), (.06, base['ankle.L']), (.13, Add3(base['ankle.L'], (0, -.07, .05))),
-                    (.20, Add3(base['ankle.L'], (0, -.14, 0)))],
+        'ankle.L': [(0.0, base['ankle.L']), (.06, base['ankle.L']), (.13, Add3(base['ankle.L'], (.075, -.07, .05))),
+                    (.20, HairHoldPose(T)['ankle.L'])],
         'pelvis': [(0.0, base['pelvis']), (.20, Add3(base['pelvis'], (0, -.10, -.04))), (.30, Add3(base['pelvis'], (0, -.11, -.05))),
                    (.44, Add3(base['pelvis'], (0, -.03, -.03))), (1.0, Add3(base['pelvis'], (0, -.05, -.03)))],
         'bend': [(0.0, .08), (.28, .46), (.44, .34), (1.0, .38)],
@@ -1997,7 +2011,9 @@ def DrawBase(T):
 
 def HairHoldPose(T):
     base = IjaABase(T)
-    base.update({'ankle.L': Add3(base['ankle.L'], (0, -.14, 0)), 'pelvis': Add3(base['pelvis'], (0, -.05, -.03)),
+    # The half step plants the left foot beside his right knee (0.15 m out to the left), not
+    # between his thighs: straddling, the shin clears the kneeling man.
+    base.update({'ankle.L': Add3(base['ankle.L'], (.15, -.14, 0)), 'pelvis': Add3(base['pelvis'], (0, -.05, -.03)),
                  'bend': .38, 'pelvisTilt': (.12, 0, 0), 'head': (.12, 0, 0)})
     return base
 
@@ -2061,8 +2077,10 @@ def SlashKnifePath(T):
         (0.08, (-T.R(.30), T.R(.30), T.R(.00)), Unit((.40, -.88, .25))),      # cock
         (0.24, tuple(atCut), tuple(cutAxis)),                                # through the throat
         (0.36, (T.R(.12), T.R(.32), -T.R(.10)), Unit((.75, -.60, -.20))),     # follow-through
-        (0.70, (-T.R(.05), T.R(.42), -T.R(.28)), Unit((.30, -.90, -.25))),
-        (1.00, (-T.R(.12), T.R(.40), -T.R(.30)), Unit((.30, -.92, -.20))),
+        # Knife held low at the right hip -- but inside the arm's reach: lower (it was -.28/-.30)
+        # the reach assist sank the pelvis 13 cm and pressed his face into the victim's.
+        (0.70, (-T.R(.05), T.R(.40), -T.R(.17)), Unit((.30, -.90, -.25))),
+        (1.00, (-T.R(.12), T.R(.36), -T.R(.16)), Unit((.30, -.92, -.20))),
     ]
 
 
