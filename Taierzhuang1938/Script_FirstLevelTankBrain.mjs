@@ -463,7 +463,14 @@ export class TankBrain {
     }
     const cleared = this.ClearOfProtected(at, world);
     if (!cleared) return null;
-    return { targetId: t.id, targetKind: m.kind, at: cleared, kind, warning, visible: choice.visible, plannedAt: this.time };
+    // 落点贴着一个还没被警告过的玩家（区域弹轰他面前的掩体也算）：这一发就是他的警告弹。
+    let warns = warning ? [t.id] : [];
+    for (const p of world.targets || []) {
+      if (p.kind !== "player" && p.kind !== "mannedMg") continue;
+      const pm = this.memory.get(p.id);
+      if (Dist(cleared, p) < G.warningRadiusM && !(pm?.warned)) { warning = true; if (!warns.includes(p.id)) warns.push(p.id); }
+    }
+    return { targetId: t.id, targetKind: m.kind, at: cleared, kind, warning, warns, visible: choice.visible, plannedAt: this.time };
   }
   Gunner(dt, world) {
     const G = this.T.gunner, R = this.T.react, Z = this.T.deadZone;
@@ -550,11 +557,15 @@ export class TankBrain {
       if (range >= G.minRangeM) {
         const plan = this.plan;
         this.fire.push({ weapon: "main", at: { ...plan.at }, kind: plan.kind, target: plan.targetId, warning: plan.warning,
-          flight: range / G.shellSpeedMps, radius: G.shellRadiusM, damage: G.shellDamage,
+          flight: range / G.shellSpeedMps, radius: G.shellRadiusM, damage: G.shellDamage * (plan.warning ? G.warningDamageScale : 1),
           layS: this.time - this.layStartedAt });
         this.telemetry.shots.push({ t: this.time, target: plan.targetId, kind: plan.kind, at: { ...plan.at },
           layS: this.time - this.layStartedAt, turretYaw: this.turretYaw, x: this.x, z: this.z });
-        const m = this.memory.get(plan.targetId); if (m && plan.warning) m.warned = true;
+        for (const id of plan.warns || []) {
+          const w = this.memory.get(id);
+          if (w) w.warned = true;
+          else this.memory.set(id, { id, kind: "player", x: plan.at.x, y: plan.at.y, z: plan.at.z, seenAt: -Infinity, warned: true, contactAt: -Infinity });
+        }
         this.shotsOnTarget++; this.lastShotAt = this.time;
         // 节奏按「这一发到下一发」算：装填时间 = 间隔 − 预计的摇炮塔与瞄准停顿。
         const interval = G.intervalMidS + (this.rng() * 2 - 1) * G.intervalJitterS;

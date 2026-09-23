@@ -103,6 +103,8 @@ function Run(brain, world, seconds, each = null) {
   }
   ok(shots[0].warning && shots[0].kind === "warning", "first shell at a newly exposed player is a warning");
   ok(Dist(shots[0].at, player) >= 2, "warning shell lands short of the player, not on him");
+  ok(Math.abs(shots[0].damage - TANK.gunner.shellDamage * TANK.gunner.warningDamageScale) < 1e-9 && shots[1].damage === TANK.gunner.shellDamage,
+    "warning shell carries reduced damage, the next ones are real");
   const gaps = shots.slice(1).map((s, i) => s.t - shots[i].t);
   ok(gaps.every((g) => g >= 4.5 && g <= 10.5), `cadence 6–9 s ±1.5 (${gaps.map((g) => g.toFixed(1)).join(",")})`);
   ok(shots.every((s) => s.target === "player"), "untargetable guard is never the target");
@@ -165,6 +167,14 @@ function Run(brain, world, seconds, each = null) {
   Run(brain, world, 20, (o) => { for (const f of o.fire) if (f.weapon === "main") shots.push(f); });
   ok(shots.length >= 2, "an unseen zone (nest behind its wall) is still shelled");
   ok(shots.every((f) => f.kind === "cover" && Dist(f.at, lip) < 1e-6), "shells land on the cover lip in front of the zone");
+  // 同一堵墙后面站着还没被警告过的玩家：第一发区域弹按警告弹算（减伤），之后才是真的。
+  const warned = CreateTankBrain(StraightPath(), TANK, { seed: 13 });
+  warned.PlaceAt(1);
+  const man = { id: "player", kind: "mannedMg", x: -24.5, y: 1.6, z: -71, ground: 0 };
+  const zw = World({ targets: [zone, man], Los: () => false, Cover: () => ({ ...lip }) });
+  const zshots = [];
+  Run(warned, zw, 20, (o) => { for (const f of o.fire) if (f.weapon === "main") zshots.push(f); });
+  ok(zshots[0].warning && zshots[0].damage < TANK.gunner.shellDamage && !zshots[1].warning, "first zone shell beside an unwarned player is his warning");
 }
 
 // --- 4 视线预算：10 Hz、每 tick ≤ 6 条 ---------------------------------------------
