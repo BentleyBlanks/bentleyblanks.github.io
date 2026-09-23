@@ -299,7 +299,7 @@ export function Transcribe(jobs) {
     { encoding: "utf8", windowsHide: true, maxBuffer: 1 << 26, env: { ...process.env, PYTHONUTF8: "1" } });
   fs.rmSync(input, { force: true });
   if (result.status !== 0 || !fs.existsSync(output)) {
-    console.warn(`Transcribe unavailable: ${(result.stderr || "").slice(-300)}`);
+    console.warn(`Transcribe unavailable (status ${result.status}, signal ${result.signal}, ${result.error?.message || "no spawn error"}): ${(result.stderr || "").slice(-300)}`);
     return null;
   }
   const raw = JSON.parse(fs.readFileSync(output, "utf8"));

@@ -66,12 +66,14 @@ try {
   const left={x:-6,y:1.6,z:-1};
   const handle=voice.PlayScene(selfId,{speakers:new Proxy({},{get:()=>left})});
   const own={e:0,d:0,n:0},world={e:0,d:0,n:0};let ownRoute=null,worldRoute=null,duckDuring=null,farDuring=null,barkDuring=null,routeSwitch=false;
-  const firstRoute=new Map();
+  const firstRoute=new Map();let lastWorld=-1e9;
   while(!handle.done){await Wait(12);
     const live=[...a.activeVoices].filter(v=>v.dialogueLine&&!v.stopping);
     for(const v of live){const fp=v.storySelfGain.gain.value>.5;if(firstRoute.has(v)&&firstRoute.get(v)!==fp)routeSwitch=true;firstRoute.set(v,fp);}
     const m=window.Meter();
-    if(live.length===1&&live[0].storySpeakerFirstPerson){own.e+=m.e;own.d+=m.d;own.n+=m.n;ownRoute??={self:live[0].storySelfGain.gain.value,world:live[0].storyWorldGain.gain.value,wet:live[0].wetGain?.gain.value??0};}
+    // 别人那句的混响尾巴会拖进紧接着的顺子那句：世界声源停了 0.8 s 以后才量「居中」。
+    if(live.some(v=>!v.storySpeakerFirstPerson))lastWorld=a.ctx.currentTime;
+    if(live.length===1&&live[0].storySpeakerFirstPerson&&a.ctx.currentTime-lastWorld>.8){own.e+=m.e;own.d+=m.d;own.n+=m.n;ownRoute??={self:live[0].storySelfGain.gain.value,world:live[0].storyWorldGain.gain.value,wet:live[0].wetGain?.gain.value??0};}
     if(live.length===1&&!live[0].storySpeakerFirstPerson){world.e+=m.e;world.d+=m.d;world.n+=m.n;worldRoute??={self:live[0].storySelfGain.gain.value,world:live[0].storyWorldGain.gain.value,distance:live[0].distance};}
     if(live.length&&duckDuring==null){await Wait(300);duckDuring=a.dialogueDuck.gain.value;farDuring=a.dialogueFarDuck.gain.value;
       const before=a.drops.dialogue;a.voicesReady=true;a.Bark('rally',{position:{x:3,y:0,z:-3},seed:1});barkDuring=a.drops.dialogue-before;}

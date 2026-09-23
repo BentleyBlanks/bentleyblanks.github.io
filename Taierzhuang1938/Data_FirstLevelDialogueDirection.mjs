@@ -53,7 +53,7 @@ export const FIRST_LEVEL_DIALOGUE_DIRECTION = Object.freeze({
     "11": D("prev", 0.25, "low", 0.45, { delivery: "阴阳怪气" }),
     "12": D("prev", 0.3, "normal", 0.5, { delivery: "一本正经地发狠" }),
     "13": D("prev", 0.2, "normal", 0.5, { delivery: "好奇地追问" }),
-    "14": D("prev", 0.6, "normal", 0.55, { context: "拍了拍自己的枪", delivery: "得意，说完几个人短促地笑一声", emit: [{ id: "BanterPatRifle", at: "start" }] }),
+    "14": D("prev", 0.6, "normal", 0.55, { context: "拍了拍自己的枪", delivery: "得意，嘴角带笑，说完就停", emit: [{ id: "BanterPatRifle", at: "start" }] }),
   }),
   BunkerOrders: Scene(true, {
     "01": D("start", 0, "shout", 0.85, { context: "跑到洞口扶住木撑", delivery: "话几乎和喘气挤在一起" }),

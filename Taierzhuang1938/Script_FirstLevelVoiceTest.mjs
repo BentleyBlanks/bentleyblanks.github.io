@@ -453,6 +453,9 @@ if (process.argv.includes("--audio")) {
   const manifest = JSON.parse(Read("./Audio/FirstLevel/Data_FirstLevelVoiceManifest.json"));
   const timings = fs.existsSync(new URL("./Audio/FirstLevel/Data_FirstLevelLineTimings.json", import.meta.url))
     ? JSON.parse(Read("./Audio/FirstLevel/Data_FirstLevelLineTimings.json")) : {};
+  const reviews = fs.existsSync(new URL("./Audio/FirstLevel/Data_FirstLevelVoiceTranscriptReview.json", import.meta.url))
+    ? JSON.parse(Read("./Audio/FirstLevel/Data_FirstLevelVoiceTranscriptReview.json")).lines || {} : {};
+  const usedReviews = new Set();
   manifest.lines ||= {};
   // 逐句录音还没烘的 01–06 场景（Step 2 全量生成后清空）。**只许变短**。
   const PENDING_PER_LINE_BAKE = new Set(perLine.map((cue) => cue.id).filter((id) => !byId.get(id).lines.every((line) => manifest.lines[line.id])));
@@ -472,8 +475,18 @@ if (process.argv.includes("--audio")) {
         assert.equal(entry.promptHash, Hash(LinePrompt(cue, index)), line.id + " 录音对应当前提示词");
         const ref = CastReference(line.who);
         assert.ok(ref && entry.castSha256 === ref.sha256, line.id + " 用的是当前选定的定妆音（" + CastVoiceOwner(line.who) + "）");
-        assert.deepEqual(entry.flagged, [], line.id + " 选中的 take 不许带扣分项：" + entry.flagged.join("；"));
-        assert.ok(entry.metrics.cer <= LINE_PICK.maxCer, `${line.id} 转写字错率 ${entry.metrics.cer}`);
+        // null <= 0.34 在 JS 里是 true：转写/音色没跑出来的 take 不许混过去。
+        assert.ok(Number.isFinite(entry.metrics.cer) && Number.isFinite(entry.metrics.speakerCos), line.id + " 选优时转写与音色都量过");
+        // 唯一的放行：只超了字错率、且逐字核过转写只差同音/近音字（whisper 把四川话按普通话写），
+        // 核对记录绑定这一条成品的 sha256 与转写原文——重录就失效。其他扣分项一律不许。
+        const review = reviews[line.id];
+        if (entry.flagged.length) {
+          assert.ok(entry.flagged.every((why) => why.startsWith("CER ")), line.id + " 选中的 take 不许带扣分项：" + entry.flagged.join("；"));
+          assert.ok(review && review.sha256 === entry.sha256 && review.transcript === entry.metrics.transcript && review.note,
+            `${line.id} 字错率 ${entry.metrics.cer} 超门槛，又没有绑定这条录音的人工核对记录（Data_FirstLevelVoiceTranscriptReview.json）`);
+          assert.ok(entry.metrics.cer <= LINE_PICK.reviewedMaxCer, `${line.id} 核过也不许超 ${LINE_PICK.reviewedMaxCer}（实测 ${entry.metrics.cer}）`);
+          usedReviews.add(line.id);
+        } else assert.ok(entry.metrics.cer <= LINE_PICK.maxCer, `${line.id} 转写字错率 ${entry.metrics.cer}`);
         assert.ok(entry.metrics.speakerCos >= LINE_PICK.minSpeakerCos, `${line.id} 与定妆音音色余弦 ${entry.metrics.speakerCos}`);
         const m = MeasureVoice(url.pathname.replace(/^\/([A-Za-z]:)/, "$1"));
         const tp = TruePeakDb(url.pathname.replace(/^\/([A-Za-z]:)/, "$1"));
@@ -516,6 +529,7 @@ if (process.argv.includes("--audio")) {
     assert.ok(Math.max(...values) - Math.min(...values) <= 2, `${key} 电平散布 ${(Math.max(...values) - Math.min(...values)).toFixed(2)} dB`);
   for (const id of Object.keys(manifest.cues)) assert.ok(byId.has(id), "清单里有已下线的 cue：" + id);
   for (const id of Object.keys(manifest.lines)) assert.ok(perLine.some((cue) => cue.lines.some((line) => line.id === id)), "清单里有已下线的句：" + id);
+  for (const id of Object.keys(reviews)) assert.ok(usedReviews.has(id), "转写核对记录已过期（录音换了或不再超门槛），删掉：" + id);
   const files = new Set(MISSION_DIALOGUE.filter((cue) => manifest.cues[cue.id]).map((cue) => cue.file));
   for (const name of fs.readdirSync(new URL("./Audio/FirstLevel/", import.meta.url)))
     if (name.endsWith(".mp3")) assert.ok(files.has(name), "Audio/FirstLevel 里有已下线的录音：" + name);

@@ -69,7 +69,8 @@ def Normalize(text):
     return "".join(chr(ord(c)-0x60) if "ァ"<=c<="ヶ" else c for c in text if c not in PUNCT)
 
 def Cer(hyp, ref):
-    a,b=Normalize(hyp),Normalize(ref)
+    # 句末的促音/长音符只是收气（whisper 把「はい！」的急收写成「はいっ」），不算一个字。
+    a,b=Normalize(hyp).rstrip("っッーｰ"),Normalize(ref).rstrip("っッーｰ")
     if not b: return 0.0 if not a else 1.0
     prev=list(range(len(b)+1))
     for i,ca in enumerate(a,1):
@@ -100,7 +101,10 @@ def Lines(model, jobs_path, result_path):
             condition_on_previous_text=False,without_timestamps=True,initial_prompt=prompt,max_new_tokens=limit)
         text="".join(seg.text for seg in segments).strip()
         reference=job.get("reference") or job["text"]
-        row={"text":text,"cer":round(Cer(text,reference),4)}
+        # 日语：稿面汉字与送 TTS 的假名各比一次取小——whisper 把「何と言った」写成「なんと言った」是写法不同，不是念错。
+        cer=Cer(text,reference)
+        if lang=="ja" and job.get("text"): cer=min(cer,Cer(text,job["text"]))
+        row={"text":text,"cer":round(cer,4)}
         # Forced alignment of the intended text: one entry per spoken character.
         try:
             tokenizer=Tokenizer(model.hf_tokenizer,model.model.is_multilingual,task="transcribe",language=lang)

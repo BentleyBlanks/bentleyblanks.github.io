@@ -46,6 +46,9 @@
 3. **母带**（`Script_SeedAudioVoiceKit.MasterLine`）：去首尾静音、各留 60 ms → 有声段 RMS 拉到 projection 档（`PROJECTION_DB`：喊 −16、平常 −19、低声 −23、气声 −27 dBFS）→ 限幅到真峰值 ≤ −1 dBTP（4 倍过采样测）→ 单声道 44.1 kHz 96 kbps。两个坑：一步直出 mp3 真峰值会冒到 0 dBTP 以上，要先出 wav 再编；alimiter 在流尾会把前瞻缓冲里没处理的几毫秒原样吐出，要先补 0.1 s 静音、开延迟补偿、再剪回原长。
 4. **逐字时间**：优先 SeedAudio 自带的逐字时间戳（平移掉母带剪掉的开头），没有就用 whisper 对意图文本的强制对齐；写 `Audio/FirstLevel/Data_FirstLevelLineTimings.json`，**以成品 sha256 为键**（Face 包的口型轨读它）。
 5. 逐句录齐的场景用 `--prune` 删掉旧整段录音与清单条目。
+6. **选不出干净 take 时**：`--takes=N`（上限 9）只给「选中的 take 还带扣分项」的句子补抽缺的那几条，已有 take 复用。转写或音色任一路没跑出来（机器满载时 whisper 子进程会被杀）就整批不选、退出码 1，take 留在 `tmp/voice/lines`，之后 `--rescore` 重打分——没有字错率的 take 曾被当成「没扣分」选中过。
+7. **字错率怎么算**：标点、空白去掉；片假名折成平假名；句末的促音/长音符（`はいっ`）不算字；日语行对稿面汉字和送 TTS 的假名各算一次取小（`なんと言った` 对 `何と言った` 是写法不同）。中文没有办法在本机做拼音比对（没装拼音库、不许新装），whisper medium 会把四川话按普通话同音字写（`拿啥子谢`→`那啥子写`、`妈卖批`→`妈买皮`），短句一个同音字就是 0.25–0.5。不到 1 秒的 take，whisper 还会凭空写出「谢谢！」「谢谢大家！」（2026-09-23 `BunkerBanter.14` 实测 6 条里 3 条）；拿台词当 whisper 的提示词也不行——它会照抄提示词，念错的 take（「闭嘴」）也转成 0 字错率。
+8. **人工核对放行**：只超了字错率、其他扣分项全无的句子，逐字核对转写**只差同音字、近音字或四川话的口语读法**（`哈`＝`下`、`事`读 `si`、`咯`＝`了`）之后，写进 `Audio/FirstLevel/Data_FirstLevelVoiceTranscriptReview.json`：`lines[<句 id>] = { sha256, transcript, note }`，sha256 与转写原文都要和清单里选中的那条一致（重录即失效，门禁会要求删掉过期记录），字错率仍不许超 `LINE_PICK.reviewedMaxCer`（0.6）。念错词、漏词、加词的一律重抽，不许核对放行。需要换用分数不是最高的那条 take 时用 `--pick=<句 id>:<n>`（清单记 `pickedBy: "manual"`）。
 
 ### 0.4 对白导演时间轴（`Data_FirstLevelDialogueDirection.mjs`）
 

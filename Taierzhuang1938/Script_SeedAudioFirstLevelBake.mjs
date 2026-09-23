@@ -12,7 +12,8 @@
 //
 //   --only=a,b    只处理这几条 cue          --lines=...  只处理这几句（逐句格式）
 //   --takes=N     逐句每句生成几条 take（默认 3）        --rescore  不发请求，只对已有 take 重新打分选优
-//                 选中 take 带扣分项的句子，--takes 大于已有条数时只补抽缺的那几条
+//                 选中 take 带扣分项的句子，--takes 大于已有条数时只补抽缺的那几条（上限 9）
+//   --pick=A.01:4,B.03:2  人工指定用第几条 take（先逐字核过转写；只超字错率的还要写核对记录，见 VoiceSync §0.3）
 //   --dry         只列清单，不发请求          --force      无视 promptHash 重摇
 //   --jobs=N      并发（默认 2，上限 2：本机还有别的包在调）
 //   --prune       删掉台词表里已经不存在的 cue / 句的成品与清单条目；逐句录齐的 cue 删掉旧整段
@@ -45,7 +46,12 @@ const dry = process.argv.includes("--dry"),
   prune = process.argv.includes("--prune"),
   rescore = process.argv.includes("--rescore");
 const jobs = Math.min(2, Math.max(1, Number.parseInt(Arg("jobs") ?? "2", 10) || 2));
-const takesPerLine = Math.min(6, Math.max(1, Number.parseInt(Arg("takes") ?? "3", 10) || 3));
+const takesPerLine = Math.min(9, Math.max(1, Number.parseInt(Arg("takes") ?? "3", 10) || 3));
+// 人工指定某句用第几条 take（逐字核过转写之后用；清单里记 pickedBy: "manual"）。
+const forcedPicks = new Map((Arg("pick")?.split(",") || []).filter(Boolean).map((p) => {
+  const at = p.lastIndexOf(":");
+  return [p.slice(0, at), Number(p.slice(at + 1))];
+}));
 const model = SEED_AUDIO_MODEL,
   endpoint = "https://openspeech.bytedance.com/api/v3/tts/create";
 const attempts = 3, backoffMs = [6000, 20000, 60000];
@@ -61,6 +67,7 @@ const workDir = path.join(path.dirname(here), "tmp", "voice", "lines");
 /** 逐句选优的门槛（纯客观；我们听不见）。 */
 export const LINE_PICK = Object.freeze({
   maxCer: 0.34,          // 转写字错率上限（四川话被 whisper 当普通话转写，天然有误差）
+  reviewedMaxCer: 0.6,   // 超 maxCer 但逐字核过「只差同音/近音字」的放行上限（核对记录见 Data_FirstLevelVoiceTranscriptReview.json）
   minSpeakerCos: 0.35,   // 与本人定妆音的音色余弦下限（去中心后；同一嗓子的不同句一般 0.5–0.9）
   minSnrDb: 30,          // 干声信噪比下限
   clipDb: -0.3,          // 原始 take 峰值高于这个就算削波
@@ -118,7 +125,8 @@ function LineUpToDate(job, manifest) {
   const ref = CastReference(job.line.who);
   // 选中的 take 带扣分项、且已有 take 少于这次要的条数：补抽（已有 take 复用，只发缺的那几条）。
   const shortOfTakes = entry?.flagged?.length > 0 && (entry.takes?.length ?? 0) < takesPerLine;
-  return !force && !shortOfTakes && entry && ref && entry.promptHash === Hash(LinePrompt(job.cue, job.index))
+  const repick = forcedPicks.has(job.line.id) && entry?.take !== forcedPicks.get(job.line.id);
+  return !force && !shortOfTakes && !repick && entry && ref && entry.promptHash === Hash(LinePrompt(job.cue, job.index))
     && entry.castSha256 === ref.sha256 && fs.existsSync(path.join(out, job.line.file));
 }
 
@@ -161,8 +169,15 @@ async function BakeLines(manifest) {
     const mastered = TakeRaw(job, n).replace(/\.raw\.mp3$/, ".mp3");
     const rawPeak = PeakDb(TakeRaw(job, n));
     const rawMeasure = MeasureVoice(TakeRaw(job, n));
-    const master = MasterLine(TakeRaw(job, n), mastered, { targetDb: PROJECTION_DB[direction.projection] ?? PROJECTION_DB.normal,
-      padS: LINE_MASTER.padS, ceilingDb: LINE_MASTER.ceilingDb });
+    let master;
+    try {
+      master = MasterLine(TakeRaw(job, n), mastered, { targetDb: PROJECTION_DB[direction.projection] ?? PROJECTION_DB.normal,
+        padS: LINE_MASTER.padS, ceilingDb: LINE_MASTER.ceilingDb });
+    } catch (error) {
+      // 偶尔生成的 take 找不出有声段（母带剪裁算出负时长）：这条作废，别让整批停下。
+      console.warn(`${job.line.id}#${n}: unusable take (${String(error.message).slice(0, 120)})`);
+      continue;
+    }
     takes.push({ job, n, meta, file: mastered, rawPeak, rawTailS: rawMeasure.tailS, ...master });
   }
   if (!takes.length) return;
@@ -171,6 +186,12 @@ async function BakeLines(manifest) {
   const texts = Transcribe(takes.map((t) => ({ file: t.file, lang: t.job.line.lang === "ja" ? "ja" : "zh",
     text: MissionVoiceSpoken(t.job.cue, t.job.index),
     reference: t.job.line.lang === "ja" ? JAPANESE_SPEECH[t.job.line.id]?.kanji : MissionVoiceSpoken(t.job.cue, t.job.index) })));
+  // 转写或音色任一路没跑出来就不选：没有字错率的 take 会被当成「没扣分」选中（2026-09-23 实测踩过一次）。
+  if (!texts || !vectors) {
+    console.error(`per-line pick aborted: ${!texts ? "whisper transcription" : "speaker embedding"} unavailable; takes kept in tmp, rerun with --rescore`);
+    process.exitCode = 1;
+    return;
+  }
   for (const t of takes) {
     const ref = CastReference(t.job.line.who);
     t.speakerCos = vectors?.[t.file] && vectors?.[ref.file] ? +CenteredCosine(vectors[t.file], vectors[ref.file]).toFixed(3) : null;
@@ -193,7 +214,9 @@ async function BakeLines(manifest) {
   for (const job of bakeable) {
     const mine = takes.filter((t) => t.job === job).sort((a, b) => (a.why.length - b.why.length) || (a.score - b.score));
     if (!mine.length) { console.warn(`${job.line.id}: no usable take`); continue; }
-    const best = mine[0];
+    const forced = forcedPicks.has(job.line.id) ? mine.find((t) => t.n === forcedPicks.get(job.line.id)) : null;
+    if (forcedPicks.has(job.line.id) && !forced) { console.warn(`${job.line.id}: take ${forcedPicks.get(job.line.id)} not found, picking by score`); }
+    const best = forced || mine[0];
     const target = path.join(out, job.line.file);
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.copyFileSync(best.file, target);
@@ -203,7 +226,7 @@ async function BakeLines(manifest) {
       file: job.line.file, scene: job.cue.id, index: job.index, who: job.line.who, lang: job.line.lang || "zh",
       projection: direction.projection, seconds: best.measure.seconds, bytes: fs.statSync(target).size, sha256,
       promptHash: Hash(LinePrompt(job.cue, job.index)), castSha256: best.meta.castSha256, castOwner: CastVoiceOwner(job.line.who),
-      take: best.n, flagged: best.why,
+      take: best.n, pickedBy: forced ? "manual" : "score", flagged: best.why,
       metrics: { activeRmsDb: best.measure.activeRmsDb, truePeakDb: best.measure.truePeakDb, snrDb: best.measure.snrDb,
         leadS: best.measure.leadS, tailS: best.measure.tailS, lowShare: best.measure.lowShare, f0: best.measure.f0,
         cer: best.cer, speakerCos: best.speakerCos, transcript: best.transcript, gainDb: best.gainDb },

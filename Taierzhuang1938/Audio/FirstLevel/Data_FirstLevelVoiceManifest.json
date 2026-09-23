@@ -1167,7 +1167,7 @@
       "mastering": "MonoBeforeLoudnessTruePeakMinus3"
     }
   },
-  "updatedAt": "2026-09-23T11:15:33.337Z",
+  "updatedAt": "2026-09-23T15:15:41.363Z",
   "lines": {
     "BunkerBanter.01": {
       "file": "Lines/AudioVoice_FirstLevelBunkerBanter_01.mp3",
@@ -1176,35 +1176,48 @@
       "who": "shunzi",
       "lang": "zh",
       "projection": "low",
-      "seconds": 4,
-      "bytes": 48946,
-      "sha256": "e780a046172a2bb4b56d532470b2baf426c644b6e314786e61802e984ada4dbc",
+      "seconds": 4.964,
+      "bytes": 60544,
+      "sha256": "3ddda210701bc618d4c2bd60d8f778df7496c81cb7a963a00b37e7ea7b52a9b8",
       "promptHash": "f2fa5f9a65be9c47ef3a9a23fea144bab3968977fc018ddcfe7dfbf55e9aac7b",
       "castSha256": "ba5421f080c82d311cd3d2d56220fbe482276957443e46b135ca0d55a3c28e54",
       "castOwner": "shunzi",
-      "take": 3,
+      "take": 7,
+      "pickedBy": "score",
       "flagged": [
         "CER 0.3529"
       ],
       "metrics": {
-        "activeRmsDb": -23.44,
-        "truePeakDb": -5.12,
-        "snrDb": 34.52,
+        "activeRmsDb": -23.45,
+        "truePeakDb": -4.13,
+        "snrDb": 36.73,
         "leadS": 0.06,
-        "tailS": 0.06,
-        "lowShare": 0.345,
+        "tailS": 0.044,
+        "lowShare": 0.321,
         "f0": {
-          "median": 134,
-          "p10": 109,
-          "p90": 186,
-          "frames": 42
+          "median": 126,
+          "p10": 96,
+          "p90": 193,
+          "frames": 48
         },
         "cer": 0.3529,
-        "speakerCos": 0.852,
-        "transcript": "妈买皮?老子还没买,粉头涂鲜给我盖起了。",
-        "gainDb": 2.14
+        "speakerCos": 0.856,
+        "transcript": "妈,买皮。老子还没买,分头图先给我改起了。",
+        "gainDb": 1.03
       },
       "takes": [
+        {
+          "n": 7,
+          "score": 4.393,
+          "cer": 0.3529,
+          "speakerCos": 0.856,
+          "snrDb": 36.73,
+          "rawPeakDb": -4.7,
+          "seconds": 4.964,
+          "flagged": [
+            "CER 0.3529"
+          ]
+        },
         {
           "n": 3,
           "score": 4.417,
@@ -1218,6 +1231,30 @@
           ]
         },
         {
+          "n": 6,
+          "score": 4.934,
+          "cer": 0.4118,
+          "speakerCos": 0.864,
+          "snrDb": 37.66,
+          "rawPeakDb": -5.83,
+          "seconds": 4.52,
+          "flagged": [
+            "CER 0.4118"
+          ]
+        },
+        {
+          "n": 9,
+          "score": 5.078,
+          "cer": 0.4118,
+          "speakerCos": 0.84,
+          "snrDb": 38.48,
+          "rawPeakDb": -6.29,
+          "seconds": 4.38,
+          "flagged": [
+            "CER 0.4118"
+          ]
+        },
+        {
           "n": 2,
           "score": 5.084,
           "cer": 0.4118,
@@ -1227,6 +1264,42 @@
           "seconds": 4.24,
           "flagged": [
             "CER 0.4118"
+          ]
+        },
+        {
+          "n": 8,
+          "score": 5.786,
+          "cer": 0.4706,
+          "speakerCos": 0.82,
+          "snrDb": 86.13,
+          "rawPeakDb": -4.76,
+          "seconds": 5.58,
+          "flagged": [
+            "CER 0.4706"
+          ]
+        },
+        {
+          "n": 4,
+          "score": 6.748,
+          "cer": 0.4706,
+          "speakerCos": 0.743,
+          "snrDb": 32.34,
+          "rawPeakDb": -10.05,
+          "seconds": 5.701,
+          "flagged": [
+            "CER 0.4706"
+          ]
+        },
+        {
+          "n": 5,
+          "score": 6.818,
+          "cer": 0.5882,
+          "speakerCos": 0.844,
+          "snrDb": 33.6,
+          "rawPeakDb": -7.44,
+          "seconds": 4.537,
+          "flagged": [
+            "CER 0.5882"
           ]
         },
         {
@@ -1252,35 +1325,64 @@
       "who": "yaowa",
       "lang": "zh",
       "projection": "normal",
-      "seconds": 3.892,
-      "bytes": 47378,
-      "sha256": "ba941eff464da951db8ed69be3c5ff1b6371383774e0be26c27a58589269dd65",
+      "seconds": 3.74,
+      "bytes": 45811,
+      "sha256": "8bfb1a516415cc91b2a9ae26f74380b56d68679f55074a878e486fc3e07b4cc5",
       "promptHash": "cdf87c6190691ea632e4b269ca92f215493c96ebce31e9fd0e6d03a4500b1851",
       "castSha256": "1778334c9732edf78b7210e09c7d4137a7e7ee7e4ac832a9ca27a57eab55c706",
       "castOwner": "yaowa",
-      "take": 2,
-      "flagged": [
-        "CER 0.4167"
-      ],
+      "take": 7,
+      "pickedBy": "score",
+      "flagged": [],
       "metrics": {
-        "activeRmsDb": -19.44,
-        "truePeakDb": -1.98,
-        "snrDb": 88.05,
+        "activeRmsDb": -19.45,
+        "truePeakDb": -1.71,
+        "snrDb": 87.34,
         "leadS": 0.06,
-        "tailS": 0.032,
-        "lowShare": 0.11,
+        "tailS": 0.06,
+        "lowShare": 0.117,
         "f0": {
-          "median": 190,
-          "p10": 133,
-          "p90": 271,
-          "frames": 58
+          "median": 182,
+          "p10": 134,
+          "p90": 258,
+          "frames": 71
         },
-        "cer": 0.4167,
-        "speakerCos": 0.874,
-        "transcript": "生死是啥,等它死了都不用挖坑。",
-        "gainDb": 0.94
+        "cer": 0.3333,
+        "speakerCos": 0.86,
+        "transcript": "生死塞,等他死了都不用挖坑。",
+        "gainDb": 0.47
       },
       "takes": [
+        {
+          "n": 7,
+          "score": 4.173,
+          "cer": 0.3333,
+          "speakerCos": 0.86,
+          "snrDb": 87.34,
+          "rawPeakDb": -1.73,
+          "seconds": 3.74,
+          "flagged": []
+        },
+        {
+          "n": 8,
+          "score": 4.221,
+          "cer": 0.3333,
+          "speakerCos": 0.852,
+          "snrDb": 90.31,
+          "rawPeakDb": -2.58,
+          "seconds": 3,
+          "flagged": []
+        },
+        {
+          "n": 9,
+          "score": 4.227,
+          "cer": 0.3333,
+          "speakerCos": 0.851,
+          "snrDb": 87.8,
+          "rawPeakDb": -0.5,
+          "seconds": 4.032,
+          "flagged": []
+        },
         {
           "n": 2,
           "score": 4.923,
@@ -1289,6 +1391,18 @@
           "snrDb": 88.05,
           "rawPeakDb": -2.47,
           "seconds": 3.892,
+          "flagged": [
+            "CER 0.4167"
+          ]
+        },
+        {
+          "n": 5,
+          "score": 5.031,
+          "cer": 0.4167,
+          "speakerCos": 0.856,
+          "snrDb": 89.18,
+          "rawPeakDb": -2.49,
+          "seconds": 3.48,
           "flagged": [
             "CER 0.4167"
           ]
@@ -1306,6 +1420,18 @@
           ]
         },
         {
+          "n": 4,
+          "score": 5.277,
+          "cer": 0.4167,
+          "speakerCos": 0.815,
+          "snrDb": 86.96,
+          "rawPeakDb": -2.7,
+          "seconds": 3.2,
+          "flagged": [
+            "CER 0.4167"
+          ]
+        },
+        {
           "n": 3,
           "score": 5.792,
           "cer": 0.5,
@@ -1313,6 +1439,18 @@
           "snrDb": 67.94,
           "rawPeakDb": -3.76,
           "seconds": 3.151,
+          "flagged": [
+            "CER 0.5"
+          ]
+        },
+        {
+          "n": 6,
+          "score": 5.882,
+          "cer": 0.5,
+          "speakerCos": 0.853,
+          "snrDb": 76.61,
+          "rawPeakDb": -2.93,
+          "seconds": 3.8,
           "flagged": [
             "CER 0.5"
           ]
@@ -1399,33 +1537,34 @@
       "who": "comrade",
       "lang": "zh",
       "projection": "normal",
-      "seconds": 5.34,
-      "bytes": 64933,
-      "sha256": "b963922f73d051962f6da26203cb1d6b1017d7f5a46d4f10e48bd2fa3af23c28",
+      "seconds": 4.36,
+      "bytes": 53021,
+      "sha256": "94bdfb36ec1e87e0715f385068240945e74559958dd27799b161aed11485ebf3",
       "promptHash": "eab9c076ff604a8c5aac76da10132e48eb291e338036b370ea340c1b280c72f9",
       "castSha256": "88ea21974f852139dccfc866d01e0d325830fd2225752fe96c4c8508a3480341",
       "castOwner": "comrade",
-      "take": 1,
+      "take": 9,
+      "pickedBy": "manual",
       "flagged": [
-        "CER 0.3571"
+        "CER 0.5714"
       ],
       "metrics": {
-        "activeRmsDb": -20.7,
-        "truePeakDb": -1.09,
-        "snrDb": 45.9,
+        "activeRmsDb": -19.44,
+        "truePeakDb": -1.12,
+        "snrDb": 45.18,
         "leadS": 0.06,
         "tailS": 0.06,
-        "lowShare": 0.345,
+        "lowShare": 0.352,
         "f0": {
-          "median": 126,
-          "p10": 98,
-          "p90": 163,
-          "frames": 64
+          "median": 147,
+          "p10": 103,
+          "p90": 190,
+          "frames": 75
         },
-        "cer": 0.3571,
-        "speakerCos": 0.897,
-        "transcript": "别说了。山东的土老子睡不惯。",
-        "gainDb": 2.89
+        "cer": 0.5714,
+        "speakerCos": 0.864,
+        "transcript": "模式咋二撒,山东的兔老子谁不管。",
+        "gainDb": 3.52
       },
       "takes": [
         {
@@ -1441,6 +1580,42 @@
           ]
         },
         {
+          "n": 7,
+          "score": 4.833,
+          "cer": 0.3571,
+          "speakerCos": 0.873,
+          "snrDb": 42.19,
+          "rawPeakDb": -3.23,
+          "seconds": 4.497,
+          "flagged": [
+            "CER 0.3571"
+          ]
+        },
+        {
+          "n": 4,
+          "score": 4.857,
+          "cer": 0.3571,
+          "speakerCos": 0.869,
+          "snrDb": 43.3,
+          "rawPeakDb": -5.61,
+          "seconds": 4.837,
+          "flagged": [
+            "CER 0.3571"
+          ]
+        },
+        {
+          "n": 5,
+          "score": 5.15,
+          "cer": 0.4286,
+          "speakerCos": 0.856,
+          "snrDb": 33.91,
+          "rawPeakDb": -4.71,
+          "seconds": 3.42,
+          "flagged": [
+            "CER 0.4286"
+          ]
+        },
+        {
           "n": 3,
           "score": 5.69,
           "cer": 0.5,
@@ -1450,6 +1625,42 @@
           "seconds": 3.94,
           "flagged": [
             "CER 0.5"
+          ]
+        },
+        {
+          "n": 8,
+          "score": 6.19,
+          "cer": 0.5,
+          "speakerCos": 0.885,
+          "snrDb": 46.33,
+          "rawPeakDb": -3.86,
+          "seconds": 6.288,
+          "flagged": [
+            "CER 0.5"
+          ]
+        },
+        {
+          "n": 6,
+          "score": 6.304,
+          "cer": 0.5,
+          "speakerCos": 0.866,
+          "snrDb": 30.27,
+          "rawPeakDb": -1.53,
+          "seconds": 4.757,
+          "flagged": [
+            "CER 0.5"
+          ]
+        },
+        {
+          "n": 9,
+          "score": 6.53,
+          "cer": 0.5714,
+          "speakerCos": 0.864,
+          "snrDb": 45.18,
+          "rawPeakDb": -4.21,
+          "seconds": 4.36,
+          "flagged": [
+            "CER 0.5714"
           ]
         },
         {
@@ -1902,71 +2113,101 @@
       "who": "shunzi",
       "lang": "zh",
       "projection": "low",
-      "seconds": 0.92,
-      "bytes": 11956,
-      "sha256": "4bddc2895fd94a9bc787b43a08618a6d740603ce7f861410a873657da727b1f0",
+      "seconds": 3.118,
+      "bytes": 38288,
+      "sha256": "2b3e92762d935c7f88719332952dd212f0d6885a3c688d584cfb48031c242969",
       "promptHash": "3c0f2b142f32532cb978e009baf2623c17d4134fd4753a966249ff0019da95d1",
       "castSha256": "ba5421f080c82d311cd3d2d56220fbe482276957443e46b135ca0d55a3c28e54",
       "castOwner": "shunzi",
-      "take": 3,
-      "flagged": [
-        "CER 0.4286"
-      ],
+      "take": 6,
+      "pickedBy": "score",
+      "flagged": [],
       "metrics": {
-        "activeRmsDb": -23.41,
-        "truePeakDb": -5.23,
-        "snrDb": 40.05,
+        "activeRmsDb": -23.98,
+        "truePeakDb": -1.33,
+        "snrDb": 34.92,
         "leadS": 0.06,
-        "tailS": 0.06,
-        "lowShare": 0.21,
+        "tailS": 0.018,
+        "lowShare": 0.366,
         "f0": {
-          "median": 119,
-          "p10": 109,
-          "p90": 130,
-          "frames": 11
+          "median": 121,
+          "p10": 105,
+          "p90": 143,
+          "frames": 30
         },
-        "cer": 0.4286,
-        "speakerCos": 0.573,
-        "transcript": "那你还得学习它。",
-        "gainDb": 6.67
+        "cer": 0,
+        "speakerCos": 0.613,
+        "transcript": "那你还得谢谢他。",
+        "gainDb": 3.52
       },
       "takes": [
         {
+          "n": 6,
+          "score": 2.822,
+          "cer": 0,
+          "speakerCos": 0.613,
+          "snrDb": 34.92,
+          "rawPeakDb": -4.19,
+          "seconds": 3.118,
+          "flagged": []
+        },
+        {
           "n": 3,
-          "score": 6.848,
-          "cer": 0.4286,
-          "speakerCos": 0.573,
-          "snrDb": 40.05,
-          "rawPeakDb": -11.3,
-          "seconds": 0.92,
-          "flagged": [
-            "CER 0.4286"
-          ]
+          "score": 3.486,
+          "cer": 0,
+          "speakerCos": 0.419,
+          "snrDb": 32.92,
+          "rawPeakDb": -9.53,
+          "seconds": 1.84,
+          "flagged": []
         },
         {
           "n": 1,
-          "score": 7.376,
+          "score": 2.766,
+          "cer": 0,
+          "speakerCos": 0.7,
+          "snrDb": 27.67,
+          "rawPeakDb": -5.65,
+          "seconds": 1.905,
+          "flagged": [
+            "SNR 27.67"
+          ]
+        },
+        {
+          "n": 5,
+          "score": 6.806,
           "cer": 0.4286,
-          "speakerCos": 0.485,
-          "snrDb": 63.63,
-          "rawPeakDb": -11.45,
-          "seconds": 0.82,
+          "speakerCos": 0.58,
+          "snrDb": 33.75,
+          "rawPeakDb": -11.32,
+          "seconds": 1.44,
           "flagged": [
             "CER 0.4286"
           ]
         },
         {
           "n": 2,
-          "score": 9.78,
+          "score": 7.01,
           "cer": 0.4286,
-          "speakerCos": 0.314,
-          "snrDb": 23.11,
-          "rawPeakDb": -2.61,
-          "seconds": 2.76,
+          "speakerCos": 0.546,
+          "snrDb": 73.86,
+          "rawPeakDb": -7.02,
+          "seconds": 1.04,
           "flagged": [
-            "CER 0.4286",
-            "音色 0.314",
-            "SNR 23.11"
+            "CER 0.4286"
+          ]
+        },
+        {
+          "n": 4,
+          "score": 9.075,
+          "cer": 0.1429,
+          "speakerCos": 0.408,
+          "snrDb": 24.53,
+          "rawPeakDb": 1.52,
+          "seconds": 1.76,
+          "flagged": [
+            "削波 1.52 dBFS",
+            "SNR 24.53"
           ]
         }
       ],
@@ -2046,35 +2287,48 @@
       "who": "yaowa",
       "lang": "zh",
       "projection": "normal",
-      "seconds": 2.009,
-      "bytes": 24809,
-      "sha256": "34b4bef4b6574e9214e65ce62fea0039aea8bbd1e59557df57090d93f42b977c",
+      "seconds": 1,
+      "bytes": 12897,
+      "sha256": "4ad5b25d722aebaf209ff2bfbcbbcb0c37e96fa1496a40caa77fc905a2ce3c8a",
       "promptHash": "8bb57e49786471425438e55b2ed66c56a2d6557764692639c25c07f00aa2a787",
       "castSha256": "1778334c9732edf78b7210e09c7d4137a7e7ee7e4ac832a9ca27a57eab55c706",
       "castOwner": "yaowa",
-      "take": 2,
+      "take": 5,
+      "pickedBy": "score",
       "flagged": [
         "CER 0.5"
       ],
       "metrics": {
-        "activeRmsDb": -19.58,
-        "truePeakDb": -1.77,
-        "snrDb": 87.81,
+        "activeRmsDb": -20.07,
+        "truePeakDb": -1.21,
+        "snrDb": 62.43,
         "leadS": 0.06,
-        "tailS": 0.009,
-        "lowShare": 0.091,
+        "tailS": 0.06,
+        "lowShare": 0.081,
         "f0": {
-          "median": 162,
-          "p10": 136,
-          "p90": 213,
-          "frames": 14
+          "median": 203,
+          "p10": 97,
+          "p90": 239,
+          "frames": 11
         },
         "cer": 0.5,
-        "speakerCos": 0.76,
-        "transcript": "那啥子些?",
-        "gainDb": 0.77
+        "speakerCos": 0.726,
+        "transcript": "那啥子写?",
+        "gainDb": 1.04
       },
       "takes": [
+        {
+          "n": 5,
+          "score": 6.644,
+          "cer": 0.5,
+          "speakerCos": 0.726,
+          "snrDb": 62.43,
+          "rawPeakDb": -1.8,
+          "seconds": 1,
+          "flagged": [
+            "CER 0.5"
+          ]
+        },
         {
           "n": 2,
           "score": 6.94,
@@ -2088,6 +2342,55 @@
           ]
         },
         {
+          "n": 7,
+          "score": 7.234,
+          "cer": 0.5,
+          "speakerCos": 0.711,
+          "snrDb": 43.97,
+          "rawPeakDb": -3.83,
+          "seconds": 1.011,
+          "flagged": [
+            "CER 0.5"
+          ]
+        },
+        {
+          "n": 6,
+          "score": 7.468,
+          "cer": 0.5,
+          "speakerCos": 0.672,
+          "snrDb": 32.48,
+          "rawPeakDb": -2.91,
+          "seconds": 0.789,
+          "flagged": [
+            "CER 0.5"
+          ]
+        },
+        {
+          "n": 9,
+          "score": 9.536,
+          "cer": 0.75,
+          "speakerCos": 0.744,
+          "snrDb": 86.55,
+          "rawPeakDb": -2.36,
+          "seconds": 2.009,
+          "flagged": [
+            "CER 0.75"
+          ]
+        },
+        {
+          "n": 4,
+          "score": 8.618,
+          "cer": 0.5,
+          "speakerCos": 0.665,
+          "snrDb": 24.46,
+          "rawPeakDb": -3.34,
+          "seconds": 0.849,
+          "flagged": [
+            "CER 0.5",
+            "SNR 24.46"
+          ]
+        },
+        {
           "n": 1,
           "score": 9.924,
           "cer": 0.5,
@@ -2098,6 +2401,19 @@
           "flagged": [
             "CER 0.5",
             "SNR 18.8"
+          ]
+        },
+        {
+          "n": 8,
+          "score": 10.096,
+          "cer": 0.5,
+          "speakerCos": 0.734,
+          "snrDb": 86.94,
+          "rawPeakDb": -0.19,
+          "seconds": 2.089,
+          "flagged": [
+            "CER 0.5",
+            "削波 -0.19 dBFS"
           ]
         },
         {
@@ -2123,70 +2439,106 @@
       "who": "comrade",
       "lang": "zh",
       "projection": "normal",
-      "seconds": 2.609,
-      "bytes": 32018,
-      "sha256": "dc76fccb60a8fab4040d01ecdee3052f534c567e705a8da6027ed7e15b3b3a1c",
-      "promptHash": "c8a3260ec47c32df43e34a87a0890702374a460ae6068c371f810b062df8768f",
+      "seconds": 1.82,
+      "bytes": 22614,
+      "sha256": "e2b26f06a3c50ff467e969bdb2468013d962cdfab2227cc3f7bcddd133eb5c13",
+      "promptHash": "900826d206b0f624bad6dc7972ae377f2a35045d65c7902fadb81e9911ff3866",
       "castSha256": "88ea21974f852139dccfc866d01e0d325830fd2225752fe96c4c8508a3480341",
       "castOwner": "comrade",
-      "take": 2,
+      "take": 5,
+      "pickedBy": "score",
       "flagged": [
-        "CER 0.5"
+        "CER 1"
       ],
       "metrics": {
-        "activeRmsDb": -21.09,
-        "truePeakDb": -1.2,
-        "snrDb": 48.23,
+        "activeRmsDb": -21.69,
+        "truePeakDb": -1.1,
+        "snrDb": 45.32,
         "leadS": 0.06,
-        "tailS": 0.029,
-        "lowShare": 0.282,
+        "tailS": 0.06,
+        "lowShare": 0.234,
         "f0": {
-          "median": 163,
-          "p10": 95,
-          "p90": 281,
-          "frames": 17
+          "median": 113,
+          "p10": 93,
+          "p90": 119,
+          "frames": 19
         },
-        "cer": 0.5,
-        "speakerCos": 0.758,
-        "transcript": "那这个是……",
-        "gainDb": 0.4
+        "cer": 1,
+        "speakerCos": 0.806,
+        "transcript": "哪里的?",
+        "gainDb": 4.31
       },
       "takes": [
         {
-          "n": 2,
-          "score": 6.952,
-          "cer": 0.5,
-          "speakerCos": 0.758,
-          "snrDb": 48.23,
-          "rawPeakDb": -1.21,
-          "seconds": 2.609,
+          "n": 5,
+          "score": 11.164,
+          "cer": 1,
+          "speakerCos": 0.806,
+          "snrDb": 45.32,
+          "rawPeakDb": -4.98,
+          "seconds": 1.82,
           "flagged": [
-            "CER 0.5"
+            "CER 1"
+          ]
+        },
+        {
+          "n": 2,
+          "score": 11.602,
+          "cer": 1,
+          "speakerCos": 0.733,
+          "snrDb": 52.09,
+          "rawPeakDb": -0.72,
+          "seconds": 1.4,
+          "flagged": [
+            "CER 1"
           ]
         },
         {
           "n": 3,
-          "score": 9.854,
-          "cer": 0.75,
-          "speakerCos": 0.691,
-          "snrDb": 40.89,
-          "rawPeakDb": -1.83,
-          "seconds": 1.649,
+          "score": 11.776,
+          "cer": 1,
+          "speakerCos": 0.704,
+          "snrDb": 32.36,
+          "rawPeakDb": -1.88,
+          "seconds": 2.669,
           "flagged": [
-            "CER 0.75"
+            "CER 1"
+          ]
+        },
+        {
+          "n": 4,
+          "score": 14.426,
+          "cer": 1.25,
+          "speakerCos": 0.679,
+          "snrDb": 46.56,
+          "rawPeakDb": -4.6,
+          "seconds": 0.76,
+          "flagged": [
+            "CER 1.25"
+          ]
+        },
+        {
+          "n": 6,
+          "score": 14.56,
+          "cer": 1.25,
+          "speakerCos": 0.74,
+          "snrDb": 38.81,
+          "rawPeakDb": -1.04,
+          "seconds": 2.109,
+          "flagged": [
+            "CER 1.25"
           ]
         },
         {
           "n": 1,
-          "score": 12.77,
-          "cer": 1,
-          "speakerCos": 0.687,
-          "snrDb": 28.04,
-          "rawPeakDb": -2.29,
-          "seconds": 1.949,
+          "score": 26.236,
+          "cer": 2.5,
+          "speakerCos": 0.794,
+          "snrDb": 43.88,
+          "rawPeakDb": -4.46,
+          "seconds": 2.14,
           "flagged": [
-            "CER 1",
-            "SNR 28.04"
+            "CER 2.5"
           ]
         }
       ],
@@ -2275,9 +2627,7 @@
       "castSha256": "f1e182a63005682c8f8e6f4d14ed9ea19926b59a9ad85d42e235e79a36f7634d",
       "castOwner": "interpreter",
       "take": 1,
-      "flagged": [
-        "CER 0.5"
-      ],
+      "flagged": [],
       "metrics": {
         "activeRmsDb": -19.44,
         "truePeakDb": -5.1,
@@ -2291,7 +2641,7 @@
           "p90": 327,
           "frames": 2
         },
-        "cer": 0.5,
+        "cer": 0,
         "speakerCos": 0.605,
         "transcript": "はいっ",
         "gainDb": 3.72
@@ -2299,14 +2649,34 @@
       "takes": [
         {
           "n": 1,
-          "score": 7.37,
-          "cer": 0.5,
+          "score": 2.37,
+          "cer": 0,
           "speakerCos": 0.605,
           "snrDb": 81.43,
           "rawPeakDb": -8.4,
           "seconds": 0.42,
+          "flagged": []
+        },
+        {
+          "n": 4,
+          "score": 3.272,
+          "cer": 0,
+          "speakerCos": 0.538,
+          "snrDb": 51.76,
+          "rawPeakDb": -9.97,
+          "seconds": 0.309,
+          "flagged": []
+        },
+        {
+          "n": 6,
+          "score": 12.058,
+          "cer": 1,
+          "speakerCos": 0.657,
+          "snrDb": 88.29,
+          "rawPeakDb": -8.92,
+          "seconds": 1.1,
           "flagged": [
-            "CER 0.5"
+            "CER 1"
           ]
         },
         {
@@ -2319,6 +2689,18 @@
           "seconds": 1.549,
           "flagged": [
             "CER 1.5"
+          ]
+        },
+        {
+          "n": 5,
+          "score": 21.014,
+          "cer": 2,
+          "speakerCos": 0.831,
+          "snrDb": 88.12,
+          "rawPeakDb": -8.27,
+          "seconds": 1.41,
+          "flagged": [
+            "CER 2"
           ]
         },
         {
@@ -2412,35 +2794,67 @@
       "who": "comrade",
       "lang": "zh",
       "projection": "breath",
-      "seconds": 1.929,
-      "bytes": 23868,
-      "sha256": "0113e46ab3ccd73618a413a25e6e3ffdc6f4f8411411aba460954d420d90d21a",
+      "seconds": 2.552,
+      "bytes": 31391,
+      "sha256": "b47a736ab82fd9a181b2e4f13f702961c5a6cb8511f90bb16650fa1ab8835132",
       "promptHash": "3eb3ad2cdb87f1c453e76841d1e1f1f1858f88b3677c45f2b51392fc44bc68ed",
       "castSha256": "88ea21974f852139dccfc866d01e0d325830fd2225752fe96c4c8508a3480341",
       "castOwner": "comrade",
-      "take": 1,
-      "flagged": [
-        "CER 0.5"
-      ],
+      "take": 4,
+      "flagged": [],
       "metrics": {
-        "activeRmsDb": -27.45,
-        "truePeakDb": -4.68,
-        "snrDb": 33.75,
+        "activeRmsDb": -27.43,
+        "truePeakDb": -11.19,
+        "snrDb": 46.06,
         "leadS": 0.06,
-        "tailS": 0.029,
-        "lowShare": 0.253,
+        "tailS": 0.012,
+        "lowShare": 0.394,
         "f0": {
-          "median": 113,
-          "p10": 98,
-          "p90": 123,
-          "frames": 12
+          "median": 128,
+          "p10": 86,
+          "p90": 152,
+          "frames": 15
         },
-        "cer": 0.5,
-        "speakerCos": 0.68,
-        "transcript": "傻子。",
-        "gainDb": 1.15
+        "cer": 0,
+        "speakerCos": 0.722,
+        "transcript": "啥子?",
+        "gainDb": -1.71
       },
       "takes": [
+        {
+          "n": 4,
+          "score": 2.168,
+          "cer": 0,
+          "speakerCos": 0.722,
+          "snrDb": 46.06,
+          "rawPeakDb": -8.99,
+          "seconds": 2.552,
+          "flagged": []
+        },
+        {
+          "n": 5,
+          "score": 6.884,
+          "cer": 0.5,
+          "speakerCos": 0.686,
+          "snrDb": 35.87,
+          "rawPeakDb": -13,
+          "seconds": 1.75,
+          "flagged": [
+            "CER 0.5"
+          ]
+        },
+        {
+          "n": 6,
+          "score": 7.22,
+          "cer": 0.5,
+          "speakerCos": 0.63,
+          "snrDb": 30.56,
+          "rawPeakDb": -3.09,
+          "seconds": 2.572,
+          "flagged": [
+            "CER 0.5"
+          ]
+        },
         {
           "n": 1,
           "score": 7.42,
@@ -2695,73 +3109,97 @@
       "who": "ijaA",
       "lang": "ja",
       "projection": "shout",
-      "seconds": 1.965,
-      "bytes": 24495,
-      "sha256": "2ef7b8e942de6f6d19b9c42c291bc295f1c67f5e90049c6ac76349611fed171b",
+      "seconds": 1.925,
+      "bytes": 23868,
+      "sha256": "f2e0d80a434d3721abadf180fde647c5be97a6235431ad4afc5cc41b335ae4dc",
       "promptHash": "3d22444b19908acdc5b08a45cba027d3884f63f6ce97c9584b205d90373389ca",
       "castSha256": "492914e2b35b932a8fea7f2cd9c137e8023b0b112d26bd0e683f53d953463f41",
       "castOwner": "ijaA",
-      "take": 3,
-      "flagged": [
-        "CER 0.4"
-      ],
+      "take": 4,
+      "flagged": [],
       "metrics": {
-        "activeRmsDb": -16.44,
-        "truePeakDb": -2.84,
-        "snrDb": 41.56,
+        "activeRmsDb": -16.45,
+        "truePeakDb": -2.34,
+        "snrDb": 42.5,
         "leadS": 0.06,
         "tailS": 0.005,
-        "lowShare": 0.304,
+        "lowShare": 0.24,
         "f0": {
-          "median": 200,
-          "p10": 167,
-          "p90": 276,
-          "frames": 21
+          "median": 193,
+          "p10": 172,
+          "p90": 320,
+          "frames": 23
         },
-        "cer": 0.4,
-        "speakerCos": 0.787,
-        "transcript": "なんと言った",
-        "gainDb": 6.49
+        "cer": 0,
+        "speakerCos": 0.764,
+        "transcript": "なんといった",
+        "gainDb": 5.72
       },
       "takes": [
         {
+          "n": 4,
+          "score": 1.916,
+          "cer": 0,
+          "speakerCos": 0.764,
+          "snrDb": 42.5,
+          "rawPeakDb": -7.48,
+          "seconds": 1.925,
+          "flagged": []
+        },
+        {
+          "n": 6,
+          "score": 3.071,
+          "cer": 0.1667,
+          "speakerCos": 0.766,
+          "snrDb": 44.64,
+          "rawPeakDb": -6.9,
+          "seconds": 1.56,
+          "flagged": []
+        },
+        {
+          "n": 5,
+          "score": 3.215,
+          "cer": 0.1667,
+          "speakerCos": 0.742,
+          "snrDb": 35.5,
+          "rawPeakDb": -8.72,
+          "seconds": 0.98,
+          "flagged": []
+        },
+        {
           "n": 3,
-          "score": 5.778,
-          "cer": 0.4,
+          "score": 3.445,
+          "cer": 0.1667,
           "speakerCos": 0.787,
           "snrDb": 41.56,
           "rawPeakDb": -8.95,
           "seconds": 1.965,
-          "flagged": [
-            "CER 0.4"
-          ]
-        },
-        {
-          "n": 2,
-          "score": 12.636,
-          "cer": 0.4,
-          "speakerCos": 0.644,
-          "snrDb": 44.31,
-          "rawPeakDb": 2.7,
-          "seconds": 2.009,
-          "flagged": [
-            "CER 0.4",
-            "削波 2.70 dBFS",
-            "真峰值 -0.29 dBTP"
-          ]
+          "flagged": []
         },
         {
           "n": 1,
-          "score": 14.558,
-          "cer": 0.6,
+          "score": 8.558,
+          "cer": 0,
           "speakerCos": 0.657,
           "snrDb": 32.88,
           "rawPeakDb": 1.73,
           "seconds": 0.866,
           "flagged": [
-            "CER 0.6",
             "削波 1.73 dBFS",
             "真峰值 0.61 dBTP"
+          ]
+        },
+        {
+          "n": 2,
+          "score": 10.303,
+          "cer": 0.1667,
+          "speakerCos": 0.644,
+          "snrDb": 44.31,
+          "rawPeakDb": 2.7,
+          "seconds": 2.009,
+          "flagged": [
+            "削波 2.70 dBFS",
+            "真峰值 -0.29 dBTP"
           ]
         }
       ],
