@@ -30,9 +30,11 @@ export const MISSION_DEFENSE_OBJECTS = Object.freeze([
   // 2026-09-23 proposal A: the west flank belt moved north with the berm (west of Zhou's gun).
   ...[-63,-59.8,-56.6,-53.4,-46.8,-43.6,-40.4].map((x,i)=>({id:`WestWire${i}`,asset:"battlefieldBarbedWire02",x,z:-153,ry:0,scale:1,solid:true})),
   // Backslope belt east of the gap: the guards on the scrapes can only come down through the gap.
-  // Tilted 0.073 rad (east end 1.4 m further north): the MG seat's line onto the gap runs almost parallel to
-  // the belt and crossed its east roll at x 12.9; stakes and strands are ray colliders, so the gun lost the gap.
-  ...[-2.9,.3,3.5,6.7,9.9,13.1].map((x,i)=>({id:`BackslopeWire${i}`,asset:"battlefieldBarbedWire02",x,z:+(-152.4-.073*(x+2.9)).toFixed(2),ry:.073,scale:1,solid:true})),
+  // It runs 1 m SOUTH of the gap point (z -149): every line the runtime casts onto the gap converges there -
+  // the MG seat and the captured gun from the east (z -150.3..-152.4), the tank at Block/Squeeze from the
+  // north-east (z -151.3..-158) and the west door (K10, z -150.3) - and wire stakes and strands are ray
+  // colliders. North of those lines (z -152.4, then tilted) it cut the seat line and then the tank line.
+  ...[-2.9,.3,3.5,6.7,9.9,13.1].map((x,i)=>({id:`BackslopeWire${i}`,asset:"battlefieldBarbedWire02",x,z:-149,ry:0,scale:1,solid:true})),
   ...[55,58.2,61.4,67.8,71.2,74.4].map((x,i)=>({id:`EastWire${i}`,asset:"battlefieldBarbedWire02",x,z:-137,ry:.12,scale:1,solid:true})),
   {id:"WestRoadTimber",asset:"battlefieldBeamObstacle01",x:-55,z:-139,ry:.3,scale:1,solid:true},
   {id:"EastRoadTimber",asset:"battlefieldBeamObstacle01",x:62,z:-129,ry:-.25,scale:1,solid:true},

@@ -424,6 +424,9 @@ export function ProbeWireLanes() {
     ["K4 seat eye 1.5 -> gap 1.2", Eye(S.seat, 1.5), Eye(S.gap, 1.2)],
     ["K10 west door 1.6 -> gap 1.2", Eye(k("K10"), 1.6), Eye(S.gap, 1.2)],
     ["K3 observation 1.6 -> gap 1.2", Eye(k("K3"), 1.6), Eye(S.gap, 1.2)],
+    // FrontBattle.TankBlockade: the tank muzzle at Block/Squeeze must see the gap for tankBlocksExit.
+    ["04 tank muzzle at Block -> gap 1.2 (tankBlocksExit)", Eye(TP[FrontTankIndex("Block")], TH.gun), Eye(S.gap, 1.2)],
+    ["05 tank muzzle at Squeeze -> gap 1.2", Eye(TP[FrontTankIndex("Squeeze")], TH.gun), Eye(S.gap, 1.2)],
   ];
   return lanes.map(([name, a, b]) => ({ name, blocker: Sight(a, b, { wire: true }) }));
 }
