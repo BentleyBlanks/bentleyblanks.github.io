@@ -55,6 +55,62 @@ the brows). `extras.facialRig.eyes` names the eye bones and their yaw/pitch axes
   released on death, removal or recasting.
 - `Script_OpeningStoryboardAnimation` excludes `Face_*` bones from its pose blending.
 
+## Face tracks (offline mouth shapes)
+
+The runtime envelope follows loudness, and every whole-cue take has ambience and
+gunfire baked in: measured on the 03-06 takes it held the mouth open in 60-85 % of the
+silence between lines and opened 2-3 times a second against 3-6 spoken syllables.
+Mouth shapes therefore come from the text, baked offline per take.
+
+- Baker: `PYTHONUTF8=1 py -3.13 Taierzhuang1938/Script_FirstLevelFaceTrackBake.py`
+  - `--cues all|A,B`: whole-cue takes (today's 01-18 recordings). Each line is aligned
+    inside its interval from `Data_FirstLevelMissionVoiceAlignment` with the same whisper
+    cross-attention alignment as `Script_FirstLevelVoiceAlign.py` (faster-whisper
+    medium, CPU int8, about 1.5 min per cue on a busy machine). Japanese lines are
+    aligned against their kana. The raw per-character times are stored in the track
+    and reused on the next run (`--realign` forces a new alignment).
+  - `--lines [Data_FirstLevelLineTimings.json]`: per-line dry takes from the Voice
+    package (`Lines/AudioVoice_FirstLevel<Scene>_<NN>.mp3`, timings keyed by the take's
+    sha256, `{lineId, who, lang, chars:[[text, startS, endS]]}`; word entries are split
+    evenly into characters, punctuation starts a new phrase).
+  - `--prune`: drop tracks whose take is in neither the voice manifest nor the line
+    timings. Exit code 2 and a `MISSING` line when a spoken character has no shape.
+- Output: `Audio/FirstLevel/Data_FirstLevelFaceTracks.json`, keyed by the sha256 of the
+  mp3 (a re-recorded take never plays an old mouth). Per track: `lines [[startMs,
+  endMs, who]]`, `keys [tMs, jaw, wide, round, close, ...]` (channels 0-100, the Open /
+  Wide / Round / Close pose weights), `stress [tMs]`, `chars [[char, startMs, endMs]]`
+  (raw alignment), `stats`.
+- Shapes: `Data_FaceTrackPhonemes.mjs`, hand-written (no pinyin package): Han character
+  -> toneless Mandarin syllable (Sichuan reading where it changes the mouth: 噻 sai,
+  喃 nan) -> initial (b/p/m press the lips, f bites the lower lip, zh/ch/sh/r push
+  them out) + final -> vowel shapes a/o/e/i/u/ü; kana -> vowel, with ん/っ/ー and small
+  kana. `Script_CharacterSpeechTest` fails when a spoken character is missing.
+- Openness: speech-band (250-3500 Hz) energy per syllable after subtracting the noise
+  spectrum measured outside the lines. A frame only counts as speech when it is 8 dB
+  over that noise and pitched (autocorrelation peak at 80-400 Hz, 7-frame median >= .7):
+  gunfire and rumble in the 03-06 takes read .2-.5, vowels .7-.99.
+- Fixes on top of the alignment: whisper parks the first word of a shouted line at the
+  window start a second or more early (FrontRelief 这, TakeOverGun 何, BorrowLight 兄);
+  inside one phrase a silence over 0.45 s is closed by packing the smaller side against
+  the larger. Syllables never run past their line's interval (+40 ms).
+- Keys: a rest key before and after each line and around pauses over 0.16 s; per
+  syllable the onset (closure or consonant), then the vowel shapes of the final (glides
+  and tails weaker than the nucleus), scaled by the syllable's loudness; between
+  syllables without a closure the jaw dips to 35 % of the next vowel, so each syllable
+  is its own opening. Stress: a syllable 1.35 x louder than the take's median and a
+  local peak, at least 0.5 s apart. All numbers: `Data_Tuning_CharacterSpeech.FACE_TRACK_BAKE`.
+- Runtime: `Script_FaceTrack.mjs` (pure). `LoadFaceTracks()` once (the speaker binder
+  starts it in the browser); `SampleFaceTrack(sha256, seconds)` -> `{jaw, wide, round,
+  close, stress, line}` with the baker's smoothstep between keys and `stress` a
+  triangular pulse 0.16 s wide; `SampleLineFaceTrack(line, seconds)` is the per-line
+  player's `faceTrackSampler` (`line.sha256`, else the track baked for `line.id`);
+  `FaceTrackSpeech(speech, sha256)` merges the channels into an envelope-only voice
+  sample. The binder's `Speech(who)` does that for whole-cue takes by looking the take up
+  in the voice manifest (`manifest.cues[cue].sha256`), so faces use the tracks without
+  any change to `Script_FirstLevelMissionVoice`.
+  When the voice has the per-line player (`voice.dialogue`), the binder also sets its
+  `faceTrackSampler = SampleLineFaceTrack` (the player reads that before its envelope).
+
 ## Rebuilding
 
 Blender sources: `OneDrive/AI/Models/Blender/Taierzhuang1938/FacialRigs_20260923/`
@@ -82,11 +138,20 @@ scene plus eye bones, the four added poses and one-segment tooth bevels).
   GLB contracts (13 bones, 9 poses, masks, shared materials by name, <= 1.5 MB,
   version = file hash); pinned cast vs `facialCast` and the approved list; controller
   (additive shapes, closure, stress-only brows, fallback, release, DeadSlack, gaze,
-  seeded blinks); binder (isolation, listener gaze, release on death/dispose).
+  seeded blinks); binder (isolation, listener gaze, release on death/dispose); face
+  tracks (lip-shape tables cover every spoken character and kana; sampler semantics;
+  per-line hook; every recorded take has a track keyed by its sha256 with the aligned
+  line intervals; 01-06 takes articulate on >= 80 % of speech frames, every take >= 70 %,
+  all takes together >= 95 %; open on <= 10 % of the silence between lines per take,
+  <= 2 % overall).
 - `Script_CharacterSpeechBrowserTest.mjs`: live Luo speaks his own line while Yaowa
   (listener) keeps a closed mouth and looks at him; pause/replay; castId creations get
   the right facial skin, never pooled; close-ups of all four skins at 0.75-1.2 m through
-  the production chain; motion vectors at the mouth (moving jaw > 0.5 px, still 0).
+  the production chain; motion vectors at the mouth (moving jaw > 0.5 px, still 0);
+  TakeOverGun (03-05 take, Luo and Zhou alternate) on its face track: each face follows
+  the track on >= 80 % of articulating frames, opens >= 2 times a second, is shut
+  between lines and while the other one talks; the same take on the envelope is
+  recorded next to it for comparison, with close-ups of both faces mid-word.
   Evidence: `_shots/CharacterSpeech`.
 - Shared gates: `Script_MotionVectorContractTest`, `Script_SamplerBudgetTest`,
   `Script_AssetStandardsTest`, `Script_CharacterModelTest`.

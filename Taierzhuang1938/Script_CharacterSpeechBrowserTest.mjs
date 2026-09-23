@@ -103,7 +103,11 @@ try {
         return {before,source,level:p.face.level,angle:p.control.bone.quaternion.angleTo(p.control.quaternion),
           debug:{time:p.face.time,jaw:p.face.jaw,wide:p.face.wide,round:p.face.round,close:p.face.close,speaking:p.face.speaking,weights:p.face.weights,src:!!p.face.source}};
       });
-      assert.ok(pauseReceipt.before>.3);
+      // The mouth was open when captured. (Face tracks open per syllable, so by the time
+      // the screenshot is written the jaw may already be between syllables; the old
+      // envelope held it open through whole phrases, which is what the tracks remove.)
+      pauseReceipt.captureLevel=sample.level;
+      assert.ok(sample.angle>.075&&sample.level>.1,`captured mid-syllable (jaw ${sample.angle} rad, weight ${sample.level})`);
       assert.ok(pauseReceipt.angle<SILENT_JAW_RADIANS,`pause closes the mouth (${pauseReceipt.angle})`);
       await page.screenshot({path:path.join(output,'Scene_LuoPaused.png')});
       const resumeSource=await page.evaluate(()=>{const p=window.SpeechProbe;p.r.voice.Resume();return p.r.voice.current.clockSource;});
@@ -128,6 +132,114 @@ try {
   });
   assert.equal(resumed.phase,'playing');assert.equal(resumed.source,0);
   await page.evaluate(()=>{const p=window.SpeechProbe;p.r.voice.Pause();});
+
+  // Offline face track on a 03-06 take where Luo and Zhou alternate (TakeOverGun):
+  // each face opens per syllable on its own lines, shuts between lines, the other face
+  // stays closed. Same take again on the old envelope for comparison. The take runs on
+  // simulation time (audio context suspended, voice clock off) so every 1/60 s frame
+  // is sampled no matter how slow the machine is.
+  const trackRun=await page.evaluate(async()=>{
+    const p=window.SpeechProbe,g=p.g,r=p.r,T=p.T;
+    const ft=await import('./Script_FaceTrack.mjs'),{SpeakingCastOptions}=await import('./Data_FirstLevelSpeakingCast.mjs');
+    await ft.LoadFaceTracks();
+    const cueId='TakeOverGun',key=r.voice.manifest.cues[cueId]?.sha256;
+    const zhou=g.actorFactory.Create('nra',{...SpeakingCastOptions('zhou'),seed:61,weapon:null});
+    const luoRoot=p.luo.actor.root,side=new T.Vector3(1,0,0).transformDirection(luoRoot.matrixWorld);
+    zhou.root.position.copy(luoRoot.getWorldPosition(new T.Vector3())).addScaledVector(side,-1.1);
+    zhou.root.rotation.y=luoRoot.rotation.y;g.scene.add(zhou.root);
+    const zface=zhou.characterRig.facial;zface.source=()=>r.speakers.Speech('zhou');
+    const Jaw=face=>{const c=face.controls.find(c=>c.name==='Face_Jaw');return c.bone.quaternion.angleTo(c.quaternion);};
+    const Moving=face=>face.weights.Open>=.1||face.weights.Wide>=.25||face.weights.Round>=.25||face.weights.Close>=.5;
+    p.zhou=zhou;
+    const Run=async(useTrack,shots)=>{
+      if(!useTrack)ft.ClearFaceTracks();else await ft.LoadFaceTracks();
+      const clock=r.voice.Clock;r.voice.Clock=()=>NaN;await g.audio.ctx.suspend();
+      const Restore=async()=>{r.voice.Clock=clock;await g.audio.ctx.resume();};
+      // Start from closed mouths (a previous pass may have stopped mid-word).
+      r.voice.Pause();for(let i=0;i<20;i++){g.StepFrames(1,1/60,false);zhou.Update(1/60,{});}
+      r.voice.Replay(cueId);r.voice.Update(0);
+      const rows=[];const seconds=r.voice.manifest.cues[cueId].seconds;
+      while(r.voice.current?.cue.id===cueId&&r.voice.State().playbackPhase==='playing'&&rows.length<2400){
+        g.StepFrames(1,1/60,false);zhou.Update(1/60,{});
+        const luo=r.speakers.Speech('luo'),zs=r.speakers.Speech('zhou');
+        const row={t:r.voice.current?.sourceTime??seconds,luo:!!luo?.active,zhou:!!zs?.active,
+          luoTarget:luo?.jaw??null,zhouTarget:zs?.jaw??null,luoJaw:Jaw(p.face),zhouJaw:Jaw(zface),
+          luoMoving:Moving(p.face),zhouMoving:Moving(zface)};
+        rows.push(row);
+        for(const who of ['luo','zhou'])if(shots&&!shots[who]&&row[who]&&row[`${who}Jaw`]>.1){
+          // Hold this mouth (the track sample of this frame) while the post chain
+          // settles over a few rendered frames; released after the screenshot.
+          const face=who==='luo'?p.face:zface,held={...(who==='luo'?luo:zs)},source=face.source;
+          face.source=()=>held;window.TrackUnfreeze=()=>{face.source=source;};
+          shots[who]=row.t;p.focus=who==='luo'?p.rig:zhou.characterRig;p.distance=1.2;p.faceOn=true;
+          g.post.NotifyCameraCut();for(let i=0;i<10;i++){g.StepFrames(1,1/60,true);zhou.Update(1/60,{});}
+          shots[`${who}Jaw`]=Jaw(face);await Restore();return {rows,shot:who};
+        }
+      }
+      await Restore();
+      return {rows,shot:null,hasTrack:ft.HasFaceTrack(key)};
+    };
+    window.TrackRun=Run;
+    return {key,hasTrack:ft.HasFaceTrack(key),zhouModel:zhou.characterRig.modelId,zhouFace:!!zface};
+  });
+  assert.ok(trackRun.hasTrack,`TakeOverGun has a baked face track (${trackRun.key})`);
+  assert.equal(trackRun.zhouModel,'LugouNra02');assert.ok(trackRun.zhouFace);
+  // Pass 1: close-ups of Luo and Zhou mid-word (1.2 m), then the full measured pass.
+  const shots={};
+  for(let i=0;i<2;i++){
+    const part=await page.evaluate(async shots=>{const out=await window.TrackRun(true,shots);return {shot:out.shot,shots};},shots);
+    if(!part.shot)break;Object.assign(shots,part.shots);
+    await page.screenshot({path:path.join(output,`Track_${part.shot}_MidWord.png`)});
+    await page.evaluate(()=>window.TrackUnfreeze?.());
+    if(shots.luo!=null&&shots.zhou!=null)break;
+    // Continue from where the voice is: the next call replays, so skip what was shot.
+  }
+  await page.evaluate(()=>{const p=window.SpeechProbe;p.focus=p.rig;p.distance=.74;p.faceOn=false;p.r.voice.Pause();});
+  const Measure=rows=>{
+    const stats={};
+    // A face gets SETTLE_S after its own line to close (the pause test allows 8 frames).
+    const SETTLE_S=.15;
+    for(const [who,other] of [['luo','zhou'],['zhou','luo']]){
+      let spoke=-1e9;for(const r of rows){if(r[who])spoke=r.t;r[`${who}Settled`]=r.t-spoke>SETTLE_S;}
+      const talk=rows.filter(r=>r[who]),silent=rows.filter(r=>!r.luo&&!r.zhou&&r[`${who}Settled`]);
+      const articulating=talk.filter(r=>r[`${who}Target`]==null||r[`${who}Target`]>=.1);
+      let opens=0,low=1;for(let i=1;i<talk.length-1;i++){const a=talk[i][`${who}Jaw`];low=Math.min(low,a);
+        if(a>=talk[i-1][`${who}Jaw`]&&a>talk[i+1][`${who}Jaw`]&&a>=.06&&a-low>=.04){opens++;low=a;}}
+      const talkSeconds=talk.length?talk.reduce((s,r,i)=>s+(i?Math.max(0,Math.min(.1,r.t-talk[i-1].t)):0),0):0;
+      stats[who]={frames:talk.length,moving:talk.length?talk.filter(r=>r[`${who}Moving`]).length/talk.length:0,
+        following:articulating.length?articulating.filter(r=>r[`${who}Moving`]).length/articulating.length:0,
+        gapFrames:silent.length,gapOpen:silent.length?silent.filter(r=>r[`${who}Jaw`]>SILENT_JAW_RADIANS).length/silent.length:0,
+        listeningOpen:rows.filter(r=>r[other]&&!r[who]&&r[`${who}Settled`]&&r[`${who}Jaw`]>SILENT_JAW_RADIANS).length,
+        opensPerS:talkSeconds>0?opens/talkSeconds:0};
+    }
+    return stats;
+  };
+  const trackPass=await page.evaluate(()=>window.TrackRun(true,null));
+  const envelopePass=await page.evaluate(()=>window.TrackRun(false,null));
+  await page.evaluate(async()=>{const p=window.SpeechProbe;p.r.voice.Pause();p.zhou.root.removeFromParent();p.zhou.Dispose();
+    const ft=await import('./Script_FaceTrack.mjs');await ft.LoadFaceTracks();});
+  const trackStats=Measure(trackPass.rows),envelopeStats=Measure(envelopePass.rows);
+  // Both passes step the same 1/60 s frames, so row i is the same moment of the take. Where
+  // the track rests inside a speaker's own line (a pause or the lead-in before the voice)
+  // the mouth should be shut; the old envelope keeps it open on the baked-in ambience.
+  for(const [stats,rows] of [[trackStats,trackPass.rows],[envelopeStats,envelopePass.rows]])for(const who of ['luo','zhou']){
+    const silent=rows.filter((r,i)=>trackPass.rows[i]?.[who]&&trackPass.rows[i][`${who}Target`]<.05);
+    stats[who].lineSilenceFrames=silent.length;
+    stats[who].lineSilenceOpen=silent.length?silent.filter(r=>r[`${who}Jaw`]>.03).length/silent.length:0;
+  }
+  await fs.writeFile(path.join(output,'Data_FaceTrackRun.json'),JSON.stringify({key:trackRun.key,shots,track:trackStats,envelope:envelopeStats,
+    trackRows:trackPass.rows,envelopeRows:envelopePass.rows},null,1));
+  assert.ok(trackPass.rows.length>100,`sampled ${trackPass.rows.length} frames`);
+  for(const who of ['luo','zhou']){
+    const s=trackStats[who];
+    assert.ok(s.frames>20,`${who} spoke in the sample (${s.frames} frames)`);
+    assert.ok(s.following>=.8,`${who}: face follows the track on >=80% of articulating frames (${s.following.toFixed(2)})`);
+    assert.ok(s.gapOpen<=.1,`${who}: open on <=10% of frames between lines (${s.gapOpen.toFixed(2)})`);
+    assert.equal(s.listeningOpen,0,`${who}: mouth shut while the other one talks`);
+    assert.ok(s.opensPerS>=2,`${who}: opens per syllable, not per phrase (${s.opensPerS.toFixed(2)}/s)`);
+    if(s.lineSilenceFrames>=30)assert.ok(s.lineSilenceOpen<=.15,`${who}: shut in the pauses of its own lines (${s.lineSilenceOpen.toFixed(2)})`);
+  }
+  assert.ok(shots.luo!=null&&shots.zhou!=null,'close-ups of both speakers mid-word');
 
   // Close-ups of every facial skin, rest and mid-word, through the production chain.
   const closeups=[];
@@ -218,10 +330,12 @@ try {
   assert.ok(velocity.silent.mouth.max<.05,`still mouth writes none (${velocity.silent.mouth.max.toFixed(3)} px)`);
   assert.ok(velocity.held.mouth.max<.05,'history settles once the jaw stops');
   assert.ok(velocity.speaking.forehead.max<.05,'only the jaw region moves');
-  await fs.writeFile(path.join(output,'Data_CharacterSpeech.json'),JSON.stringify({initial,samples,pauseReceipt,pause,resumed,closeups,velocity,errors},null,2));
+  await fs.writeFile(path.join(output,'Data_CharacterSpeech.json'),JSON.stringify({initial,samples,pauseReceipt,pause,resumed,closeups,velocity,
+    faceTrack:{key:trackRun.key,shots,track:trackStats,envelope:envelopeStats,trackRows:trackPass.rows,envelopeRows:envelopePass.rows},errors},null,2));
   assert.deepEqual(errors,[]);
   console.log(`ok live faces: Luo speaks with his own line, Yaowa listens closed-mouthed; ${closeups.length} close-ups of 4 facial skins; `
-    +`mouth velocity ${velocity.speaking.mouth.max.toFixed(2)} px talking / ${velocity.silent.mouth.max.toFixed(3)} px still`);
+    +`mouth velocity ${velocity.speaking.mouth.max.toFixed(2)} px talking / ${velocity.silent.mouth.max.toFixed(3)} px still; `
+    +`TakeOverGun track ${JSON.stringify(trackStats)} vs envelope ${JSON.stringify(envelopeStats)}`);
 } catch(error){
   await page.screenshot({path:path.join(output,'Scene_Failure.png')}).catch(()=>{});
   console.error(await page.evaluate(()=>({boot:document.querySelector('#bootText')?.textContent,errors:window.Tengxian?.Debug.FirstLevelMissionRuntime()?.voice?.errors})).catch(()=>null));

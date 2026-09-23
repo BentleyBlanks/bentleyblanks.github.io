@@ -10,7 +10,12 @@ import { SpeakerLookAngles } from './Script_SpeakerHeadLayer.mjs';
 import { FIRST_LEVEL_SPEAKING_CAST, SpeakingCastOptions } from './Data_FirstLevelSpeakingCast.mjs';
 import { CHARACTER_MODEL_VARIANTS_BY_KIND } from './Data_CharacterSelection.mjs';
 import { MISSION_DIALOGUE } from './Data_FirstLevelMissionDialogue.mjs';
-import { CHARACTER_SPEECH as C } from './Data_Tuning_CharacterSpeech.mjs';
+import { CHARACTER_SPEECH as C, FACE_TRACK_BAKE } from './Data_Tuning_CharacterSpeech.mjs';
+import { MissionVoiceAlignmentCues } from './Data_FirstLevelMissionDialogue.mjs';
+import { MISSION_VOICE_ALIGNMENT } from './Data_FirstLevelMissionVoiceAlignment.mjs';
+import { HanReadings, FINAL_VISEMES, INITIAL_ONSET, KANA_VOWELS, KANA_SMALL, KANA_SPECIAL, KANA_ONSET, KANA_VOWEL_VISEME,
+  VISEMES } from './Data_FaceTrackPhonemes.mjs';
+import { ClearFaceTracks, FaceTrack, FaceTrackSpeech, RegisterFaceTracks, SampleFaceTrack, SampleLineFaceTrack } from './Script_FaceTrack.mjs';
 
 // ---- runtime envelope fallback and the voice clock (unchanged contract) ----
 const sampleRate = 16000, samples = new Float32Array(sampleRate * 2);
@@ -239,5 +244,113 @@ const jawAngle = (bone, rig) => 2 * Math.acos(Math.min(1, Math.abs(bone.quaterni
   const behind = SpeakerLookAngles(new THREE.Quaternion(), new THREE.Vector3(), new THREE.Vector3(0, 0, 5));
   assert.ok(Math.abs(behind.yaw) <= .55, 'rearward talk is a glance, not a neck twist');
 }
+// ---- offline face tracks (Script_FirstLevelFaceTrackBake.py -> Script_FaceTrack) ----
+// Lip-shape tables: every spoken Han character has a reading, every kana a vowel, every
+// shape a [jaw, wide, round, close] weight in 0-1.
+{
+  const readings = HanReadings(), han = /[一-鿿]/;
+  const kana = new Set([...Object.values(KANA_VOWELS).join(''), ...Object.keys(KANA_SMALL), ...Object.keys(KANA_SPECIAL)]);
+  const missing = new Set(), missingKana = new Set();
+  for (const cue of MissionVoiceAlignmentCues()) for (const line of cue.lines) for (const ch of line.text) {
+    if (line.lang === 'ja') {
+      const hira = ch >= 'ァ' && ch <= 'ヶ' ? String.fromCharCode(ch.charCodeAt(0) - 0x60) : ch;
+      if (/[぀-ゟ]/.test(hira) && !kana.has(hira)) missingKana.add(ch);
+      assert.ok(!han.test(ch), `${cue.id}: Japanese line aligned against kana, not kanji (${ch})`);
+    } else if (han.test(ch) && !readings.has(ch)) missing.add(ch);
+  }
+  assert.equal([...missing].join(''), '', 'Data_FaceTrackPhonemes.HAN_PINYIN covers every spoken character');
+  assert.equal([...missingKana].join(''), '', 'Data_FaceTrackPhonemes covers every spoken kana');
+  for (const [name, weights] of Object.entries(VISEMES)) {
+    assert.ok(weights.length === 4 && weights.every(w => w >= 0 && w <= 1), `viseme ${name} is [jaw, wide, round, close] in 0-1`);
+  }
+  for (const [final, shapes] of Object.entries(FINAL_VISEMES)) for (const s of shapes) assert.ok(VISEMES[s], `${final}: ${s}`);
+  for (const s of [...Object.values(INITIAL_ONSET), ...Object.keys(KANA_ONSET), ...Object.values(KANA_VOWEL_VISEME)]) assert.ok(VISEMES[s], s);
+  assert.deepEqual(VISEMES.MB, [0, 0, 0, 1], 'b/p/m press the lips shut');
+}
+// Sampler semantics on a hand-made track: smoothstep between keys, rest outside,
+// stress a triangular pulse stressPulseS wide, line index from the track.
+{
+  ClearFaceTracks();
+  RegisterFaceTracks({format: 1, tracks: {fake: {id: 'Fake', kind: 'cue', seconds: .4,
+    lines: [[0, 200, 'luo'], [250, 400, 'yaowa']], keys: [0, 0, 0, 0, 0, 100, 100, 50, 0, 0, 200, 0, 0, 0, 100], stress: [100]}}});
+  const at = t => SampleFaceTrack('fake', t);
+  assert.equal(at(.1).jaw, 1); assert.equal(at(.1).wide, .5);
+  assert.ok(Math.abs(at(.05).jaw - .5) < 1e-6, 'smoothstep midpoint');
+  assert.ok(Math.abs(at(.15).close - .5) < 1e-6 && at(.19).close > .9, 'lips press toward the closing key');
+  assert.equal(at(.1).stress, 1); assert.equal(at(.1 + FACE_TRACK_BAKE.stressPulseS / 2 + .001).stress, 0);
+  assert.ok(at(.1 + FACE_TRACK_BAKE.stressPulseS / 4).stress > .45, 'the pulse is wide enough to be seen at 60 fps');
+  assert.equal(at(.1).line, 0); assert.equal(at(.22).line, -1); assert.equal(at(.3).line, 1);
+  assert.equal(at(-1).jaw, 0); assert.equal(at(9).jaw, 0); assert.equal(SampleFaceTrack('none', .1), null);
+  const envelopeOnly = {active: true, who: 'luo', cue: 'Fake', sourceTime: .1, level: .2, brightness: .9};
+  assert.equal(FaceTrackSpeech(envelopeOnly, 'fake').jaw, 1, 'envelope sample gains the track channels');
+  assert.equal(FaceTrackSpeech(envelopeOnly, 'unknown'), envelopeOnly, 'no track: the envelope fallback stays');
+  const baked = {active: true, jaw: .3};
+  assert.equal(FaceTrackSpeech(baked, 'fake'), baked, 'a sample the voice already baked is left alone');
+  // The binder looks the take up in the voice manifest by cue.
+  const voice = {manifest: {cues: {Fake: {sha256: 'fake'}}}, Speech: who => (who === 'luo' ? {...envelopeOnly} : null)};
+  const binder = new FirstLevelSpeakerBinder({voice, loadFaceTracks: false});
+  assert.equal(binder.Speech('luo').jaw, 1); assert.equal(binder.Speech('yaowa'), null);
+  const facial = new CharacterFacialAnimation(FaceRoot(definitions.LugouNra02).root, definitions.LugouNra02, {seed: 3});
+  facial.source = () => binder.Speech('luo');
+  for (let i = 0; i < 20; i++) facial.Update(1 / 60);
+  assert.ok(facial.jaw > .6, `face follows the track's jaw: ${facial.jaw.toFixed(2)}`);
+  // Per-line takes (contract 5.2): the dialogue player's faceTrackSampler(line, t).
+  RegisterFaceTracks({format: 1, tracks: {lineSha: {id: 'Scene.01', kind: 'line', seconds: .3, lines: [[0, 300, 'luo']],
+    keys: [0, 0, 0, 0, 0, 150, 80, 0, 0, 0, 300, 0, 0, 0, 0], stress: []}}});
+  assert.ok(Math.abs(SampleLineFaceTrack({id: 'Scene.01', sha256: 'lineSha'}, .15).jaw - .8) < 1e-6);
+  assert.ok(Math.abs(SampleLineFaceTrack({id: 'Scene.01'}, .15).jaw - .8) < 1e-6, 'no sha on the line: the track baked for that line id');
+  assert.equal(SampleLineFaceTrack({id: 'Scene.01'}, .15).line, 'Scene.01', 'a per-line take reports its line id (line-start blink)');
+  assert.equal(SampleLineFaceTrack({id: 'Scene.02'}, .15), null);
+  const player = {};
+  new FirstLevelSpeakerBinder({voice: {dialogue: player, Speech: () => null}, loadFaceTracks: false});
+  assert.equal(player.faceTrackSampler, SampleLineFaceTrack, 'binder injects the sampler into the per-line player');
+  ClearFaceTracks();
+}
+// The baked file: one track per recorded take (keyed by that mp3's sha256), line
+// intervals equal the voice alignment, mouth moves on speech and is shut between lines.
+const FACE_TRACKS = JSON.parse(fs.readFileSync(new URL('./Audio/FirstLevel/Data_FirstLevelFaceTracks.json', import.meta.url), 'utf8'));
+const VOICE_MANIFEST = JSON.parse(fs.readFileSync(new URL('./Audio/FirstLevel/Data_FirstLevelVoiceManifest.json', import.meta.url), 'utf8'));
+let faceTrackCount = 0;
+{
+  assert.equal(FACE_TRACKS.format, 1);
+  faceTrackCount = RegisterFaceTracks(FACE_TRACKS);
+  const cues = new Map(MissionVoiceAlignmentCues().map(cue => [cue.id, cue]));
+  // 01-06 (this refactor's scope) is every mission cue before 07's SouthWhisper.
+  const order = MISSION_DIALOGUE.map(cue => cue.id), scope = new Set(order.slice(0, order.indexOf('SouthWhisper')));
+  assert.ok(scope.has('BorrowLight') && scope.has('TakeOverGun') && !scope.has('SouthWhisper'));
+  const below = [];
+  let voiced = 0, moving = 0, gap = 0, open = 0;
+  for (const [id, entry] of Object.entries(VOICE_MANIFEST.cues)) {
+    const alignment = MISSION_VOICE_ALIGNMENT[id];
+    if (!cues.has(id) || alignment?.sha256 !== entry.sha256) continue;
+    const json = FACE_TRACKS.tracks[entry.sha256];
+    assert.ok(json, `${id}: face track baked for the current take (run Script_FirstLevelFaceTrackBake.py --cues ${id})`);
+    assert.equal(json.id, id);
+    assert.deepEqual(json.lines.map(([s, e]) => [s / 1000, e / 1000]), alignment.lines, `${id}: line intervals follow the alignment`);
+    assert.deepEqual(json.lines.map(l => l[2]), cues.get(id).lines.map(l => l.who), `${id}: speakers`);
+    const track = FaceTrack(entry.sha256);
+    for (let i = 1; i < track.times.length; i++) assert.ok(track.times[i] >= track.times[i - 1], `${id}: keys in time order`);
+    assert.ok(track.values.every(v => v >= 0 && v <= 1));
+    const st = json.stats;
+    if (st.voicedFrames >= 30) {
+      if (scope.has(id)) assert.ok(st.voicedMoving >= .8, `${id}: mouth moves on >=80% of speech frames (${st.voicedMoving})`);
+      else if (st.voicedMoving < .8) below.push(`${id} ${st.voicedMoving}`);
+      assert.ok(st.voicedMoving >= .7, `${id}: mouth moves on >=70% of speech frames (${st.voicedMoving})`);
+      voiced += st.voicedFrames; moving += st.voicedMoving * st.voicedFrames;
+    }
+    assert.ok(st.gapOpen <= .1, `${id}: mouth open in <=10% of the silence between lines (${st.gapOpen})`);
+    gap += st.gapFrames; open += st.gapOpen * st.gapFrames;
+    // Runtime sampler agrees: shut in the middle of every pause longer than 0.3 s.
+    for (let i = 1; i < track.lines.length; i++) {
+      const a = track.lines[i - 1].end, b = track.lines[i].start;
+      if (b - a > .3) assert.ok(SampleFaceTrack(entry.sha256, (a + b) / 2).jaw < .05, `${id}: closed between lines ${i} and ${i + 1}`);
+    }
+  }
+  if (below.length) console.log(`note: 07-18 takes under 80% (noisy whole-cue alignment): ${below.join(', ')}`);
+  assert.ok(voiced > 0 && moving / voiced >= .95, `all takes: mouth moves on ${(moving / voiced).toFixed(3)} of speech frames`);
+  assert.ok(open / gap <= .02, `all takes: open in ${(open / gap).toFixed(3)} of line gaps`);
+  ClearFaceTracks();
+}
 console.log(`ok speech envelope/clock/isolation; ${faced.length} facial skins (13 bones, 9 poses, shared textures/clips, <=1.5 MB); `
-  + `${Object.keys(FIRST_LEVEL_SPEAKING_CAST).length} pinned speakers; additive face controller, seeded blinks, gaze, binder`);
+  + `${Object.keys(FIRST_LEVEL_SPEAKING_CAST).length} pinned speakers; additive face controller, seeded blinks, gaze, binder; `
+  + `${faceTrackCount} baked face tracks (phoneme tables cover the script)`);
