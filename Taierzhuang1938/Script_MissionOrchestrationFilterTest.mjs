@@ -142,7 +142,8 @@ Check(fresh.friendlies.size === 0, "这个预设也只看敌军");
 // 5) 眼睛开关：从 null 关掉一个 → 全集减一；关到只剩空集；开回全集 → null
 // ---------------------------------------------------------------------------
 const groupIds = layout.encounters.map((encounter) => encounter.id);
-Check(groupIds.length === 13, `这一关十三组（实际 ${groupIds.length}）`);
+// 2026-09-23 01–05 重构契约 §8：新增 bunkerBackdrop / bunkerPursuit / frontFlank / frontOfficer / frontReserve 五组。
+Check(groupIds.length === 18, `这一关十八组（实际 ${groupIds.length}）`);
 let toggled = ToggleFilterItem(base, "encounter", "transfer", groupIds);
 Check(toggled.encounters.size === groupIds.length - 1 && !toggled.encounters.has("transfer"),
   "关掉一组 = 全集减那一组");

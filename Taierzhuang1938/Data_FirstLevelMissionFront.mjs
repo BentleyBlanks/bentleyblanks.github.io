@@ -83,7 +83,8 @@ export const FRONT_RIFLEMEN=Object.freeze([
   {id:"FrontGunner",x:10,z:-193.8,weapon:"Type11",hold:true,role:"fireBase"},
   {id:"FrontSupportGunner",x:-24,z:-193.8,weapon:"Type11",hold:true,role:"fireBase"},
   {id:"FrontRifleG",x:-9.8,z:-193.8,hold:true,role:"fireBase"},
-  {id:"FrontRifleH",x:23,z:-193.8,hold:true,role:"fireBase"},
+  // East fire-base man 6.7 m from the east bounder FrontRifleF: 4.3 m read as one marker on the orchestration map.
+  {id:"FrontRifleH",x:25.5,z:-193.8,hold:true,role:"fireBase"},
   // Bounding group (跃进组): two teams of three, crater to crater down the corridors between
   // the cover columns, last line 6.5 m short of the crest (under Zhou's enfilade).
   // They start on the first bound line (z -193.4), kneeling behind the Bank row, and bound three times.
