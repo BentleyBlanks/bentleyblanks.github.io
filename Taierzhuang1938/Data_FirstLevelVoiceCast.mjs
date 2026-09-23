@@ -142,3 +142,37 @@ export const VOICE_LANG_RULE = Object.freeze({
   "zh-north": "必须讲鲁南一带的北方官话（山东口音），绝不说四川话；说日语时带很重的中国北方口音。",
   ja: "日语母语者，只说给出的日语，用日语发音，不说中文。",
 });
+
+// ---------------------------------------------------------------------------
+// 班组战斗短句（自主喊话）用各人自己的嗓子（2026-09-24）
+// ---------------------------------------------------------------------------
+// Data_Voice 的中方战斗口令是「谁喊都行」的一套公用嗓子；01–06 里罗班长、幺娃、何有田、刘文才、老周与
+// 玩家顺子都有定妆音，同一个人刚在对白里是这个嗓子、一开枪喊话就换成别人，听得出来。这里给他们每人
+// 录一份自己的版本：同一个人的全部短句**一次请求**念完（带本人定妆音作参考），按句切开、逐句齐平
+// 到战斗口令的同一档电平（喊话彼此独立，音量只该由距离与遮挡决定）。
+//
+// 文本一字不改，取自 Data_Voice（中方口令）；只录运行时真会从这个人嘴里出来的那几条：
+//   · squad  —— 班组 AI（Script_Ai）自己喊的：spot（非 event 的 4 条）、move_cover / move_flank、
+//               warn_grenade、rally_shoot、hurt（hurt_hit / hurt_medic；hurt_down 是旁人喊阵亡者，
+//               hurt_scream 是真人素材、不分人）、ammo（非 event 的 3 条）
+//   · player —— 玩家（顺子）下令时喊的（Script_Ai.IssueOrder 的 ORDER_LINE）
+// 声库键 `<key>@<who>`（SquadBarkKey）；Script_Audio.Bark 认出说话人后只在这个人的版本里挑，
+// 没有本人版本的 TTS 句不说（真人素材句照常可选），一条本人版本都没有才退回公用声库。
+export const SQUAD_BARK_KEYS = Object.freeze({
+  squad: Object.freeze(["spot_east", "spot_enemy", "spot_gap", "spot_wall", "move_cover", "move_flank",
+    "warn_grenade", "rally_shoot", "hurt_hit", "hurt_medic", "ammo_ask", "ammo_out", "ammo_reload"]),
+  player: Object.freeze(["rally_follow", "move_go", "rally_charge", "rally_hold", "move_flank", "move_cover", "rally_shoot"]),
+});
+/** 谁录哪一套。老周只在 01–03（开场分镜认得他的那几段）能被认出来，之后退回公用声库。 */
+export const SQUAD_BARK_CAST = Object.freeze({
+  luo: "squad", yaowa: "squad", heyoutian: "squad", liuwencai: "squad", zhou: "squad", shunzi: "player",
+});
+export const SquadBarkKey = (key, who) => `${key}@${who}`;
+const Pascal = (text) => String(text).split("_").map((p) => p.charAt(0).toUpperCase() + p.slice(1)).join("");
+/** 相对 Audio/FirstLevel/ 的文件名。 */
+export const SquadBarkFile = (key, who) => `Barks/AudioVoice_FirstLevelBark${Pascal(who)}${Pascal(key)}.mp3`;
+/** [{ who, key, bank, file }]，按 SQUAD_BARK_CAST 的顺序。 */
+export function SquadBarkEntries() {
+  return Object.entries(SQUAD_BARK_CAST).flatMap(([who, set]) => SQUAD_BARK_KEYS[set].map((key) =>
+    ({ who, key, bank: SquadBarkKey(key, who), file: SquadBarkFile(key, who) })));
+}

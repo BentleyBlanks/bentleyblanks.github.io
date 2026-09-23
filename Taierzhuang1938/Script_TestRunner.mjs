@@ -623,11 +623,11 @@ const changedDomainRules = [
   // 「改了 AudioEngine 的声库装载分叉却不跑 VoiceTest」就是这么漏过去的
   //（04 关中过场整条语音通道静音那一次）。这两条把交叉的一半补上。
   { domain: "audio", pattern: /Script_Audio\.mjs|Script_AudioWiring|Data_Voice|Data_SfxSources|Data_AmbSources|Data_Tuning_Audio/ },
-  { domain: "voice", pattern: /Script_Audio\.mjs|Data_Voice|Script_VoiceBake|Script_FirstLevelMissionVoice|Script_DialoguePlayer|FirstLevelDialogueDirection|SeedAudioCastBake|SeedAudioVoiceKit/ },
+  { domain: "voice", pattern: /Script_Audio\.mjs|Data_Voice|Script_VoiceBake|Script_FirstLevelMissionVoice|Script_DialoguePlayer|FirstLevelDialogueDirection|SeedAudioCastBake|SeedAudioSquadBarkBake|SeedAudioVoiceKit/ },
   // 2026.09.19 第三波：`FirstLevelMeal`（腊肉分食）与 `CarriageSoundscape`（车厢试听导出）
   // 两个关键词随模块删除一并摘掉。`BaconHandoff` / `FirstLevelTrain` / `FirstLevelCarriage`
   // 留着 —— 那几个名字下面还有保留的资产包与离线作者脚本。
-  {domain:'firstLevel',pattern:/MissionReturn|BaconHandoff|FirstLevelOpening|FirstLevelMachineGun|FirstLevelFrontPresence|FirstLevelBunker|FirstLevelCollection|FirstLevelFrontShow|FirstLevelFrontTest|FirstLevelMission|FirstLevelTrain|FirstLevelCarriage|FirstLevelVoice|FirstLevelGuideDialogue|FirstLevelGuideVoiceAlignment|FirstLevelJapaneseSpeech|SeedAudioFirstLevel|SeedAudioCarriage|DialoguePlayer|FirstLevelDialogueDirection|SeedAudioCastBake|SeedAudioVoiceKit|Audio\/FirstLevel|Audio\/Amb\/AudioAmb_Carriage/},
+  {domain:'firstLevel',pattern:/MissionReturn|BaconHandoff|FirstLevelOpening|FirstLevelMachineGun|FirstLevelFrontPresence|FirstLevelBunker|FirstLevelCollection|FirstLevelFrontShow|FirstLevelFrontTest|FirstLevelMission|FirstLevelTrain|FirstLevelCarriage|FirstLevelVoice|FirstLevelGuideDialogue|FirstLevelGuideVoiceAlignment|FirstLevelJapaneseSpeech|SeedAudioFirstLevel|SeedAudioCarriage|DialoguePlayer|FirstLevelDialogueDirection|SeedAudioCastBake|SeedAudioSquadBarkBake|SeedAudioVoiceKit|Audio\/FirstLevel|Audio\/Amb\/AudioAmb_Carriage/},
   // 静态分件的图集合批：第一关尸体层与担架伤员用它（firstLevel 那一串里的
   // 尸体 / 演出门禁），而它动的是材质与提交量，所以 render 域的开机 / 采样器 /
   // 材质门禁也要跟着跑。
@@ -739,7 +739,7 @@ const prepushGateRules = [
   // 台词表 / 录音 / 强制对齐一动，推送前连整段录音的严格门一起跑（纯 Node，秒级）。
   {
     tests: ["FirstLevelVoiceAudioTest"],
-    pattern: /FirstLevelMissionDialogue|FirstLevelGuideDialogue|FirstLevelJapaneseSpeech|FirstLevelVoice|SeedAudioFirstLevel|FirstLevelDialogueDirection|SeedAudioCastBake|SeedAudioVoiceKit|Audio\/FirstLevel/,
+    pattern: /FirstLevelMissionDialogue|FirstLevelGuideDialogue|FirstLevelJapaneseSpeech|FirstLevelVoice|SeedAudioFirstLevel|FirstLevelDialogueDirection|SeedAudioCastBake|SeedAudioSquadBarkBake|SeedAudioVoiceKit|Audio\/FirstLevel/,
   },
 ];
 

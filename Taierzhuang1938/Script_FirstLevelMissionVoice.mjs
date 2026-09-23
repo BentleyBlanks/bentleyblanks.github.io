@@ -2,7 +2,7 @@ import { MISSION_TUNING } from "./Data_Tuning_FirstLevel.mjs";
 import { MissionVoiceTimeline } from "./Data_FirstLevelMissionVoiceTiming.mjs";
 import { MISSION_DIALOGUE, MISSION_VOICE_CAST, MissionVoiceSubtitle } from "./Data_FirstLevelMissionDialogue.mjs";
 import { FIRST_LEVEL_DIALOGUE_DIRECTION, LineDirection, PlaybackOffset } from "./Data_FirstLevelDialogueDirection.mjs";
-import { FIRST_LEVEL_VOICE_CAST } from "./Data_FirstLevelVoiceCast.mjs";
+import { FIRST_LEVEL_VOICE_CAST, SQUAD_BARK_CAST } from "./Data_FirstLevelVoiceCast.mjs";
 import { Localize } from "./Script_Text.mjs";
 import { FirstLevelVoiceTextId, FirstLevelCastTextId } from "./Script_TextIds.mjs";
 import { SampleSpeechEnvelope } from "./Script_SpeechEnvelope.mjs";
@@ -36,6 +36,11 @@ function PerLineCurrent(cue, scene) {
     get index() { return scene.lines.findLastIndex((l) => l.state === "playing"); },
   };
 }
+
+/** 认人用的假 cue：VoicePosition 各分支都按 cue.id 点名，这个 id 谁也不认，只会走「按 who 找人」那条通路。 */
+const BARK_CUE = Object.freeze({ id: "SquadBark", lines: Object.freeze([]) });
+/** 喊话位置与某人位置的水平距离不超过它，才算是这个人在喊（米）。Script_Ai 给的是脚底、VoicePosition 给头，站姿差不到这么多。 */
+export const BARK_SPEAKER_MATCH_M = 0.6;
 
 export class FirstLevelMissionVoice {
   constructor({ audio, hud, Position, Listener, Done, Event, Ready, Clock }) {
@@ -96,6 +101,58 @@ export class FirstLevelMissionVoice {
       this.loaded = true;
     } catch (error) {
       this.errors.push(error.message);
+    }
+    // 班组短句不挡对白与关卡开场（voiceReady 之后才跳关、起音乐）：另起一路，装好之前喊话用公用声库。
+    this.squadBarksReady ??= this.LoadSquadBarks();
+  }
+  /**
+   * 班组战斗短句的本人版本（Data_FirstLevelVoiceCast.SQUAD_BARK_*）：声库键 `<key>@<who>`，带 barkOf。
+   * 装上认人钩子 audio.barkSpeaker；Script_Audio.Bark 认出是谁在喊就只在他自己的版本里挑。
+   */
+  async LoadSquadBarks() {
+    try {
+      const response = await fetch(new URL("./Audio/FirstLevel/Data_FirstLevelSquadBarkManifest.json", import.meta.url),
+        { cache: "no-cache", signal: AbortSignal.timeout(15000) });
+      if (!response.ok) throw new Error(`Squad bark manifest HTTP ${response.status}`);
+      const manifest = await response.json();
+      const entries = Object.entries(manifest.barks || {}).map(([bank, entry]) => ({
+        key: bank, file: entry.file, kind: entry.kind || null, side: "nra", barkOf: entry.who, base: entry.key, gain: 1, version: entry.sha256,
+      }));
+      await this.audio.LoadVoices(new URL("./Audio/FirstLevel/", import.meta.url).href, entries);
+      this.squadBarks = entries.length;
+      if (this.disposed) return;
+      this.barkSpeakerHook = (query) => this.BarkSpeaker(query);
+      this.audio.barkSpeaker = this.barkSpeakerHook;
+    } catch (error) {
+      this.errors.push(error.message);
+    }
+  }
+  /**
+   * 这一嗓子是谁喊的（Script_Audio.Bark 的认人钩子）。Script_Ai 只给阵营、种子（士兵 id）和脚底位置，
+   * 这里拿位置去对：玩家下令（种子 0、priority）对玩家本人；其余对班组每个人现在的位置（VoicePosition
+   * 按 who 找人的那条通路），水平距离 ≤ BARK_SPEAKER_MATCH_M 的最近那个。VoicePosition 找不到人时
+   * 退回的是玩家身边那一点，先量出这一点，等于它的一律当「没找到」。认不出返回 null（用公用声库）。
+   */
+  BarkSpeaker({ seed = 0, side = "nra", position = null, priority = false } = {}) {
+    if (side !== "nra" || !position) return null;
+    const Flat = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
+    try {
+      if (!seed && priority) {
+        const listener = this.Listener?.();
+        return listener && SQUAD_BARK_CAST.shunzi && Flat(listener, position) <= BARK_SPEAKER_MATCH_M ? "shunzi" : null;
+      }
+      const fallback = this.Position(BARK_CUE, { who: "__nobody__" });
+      let best = null, bestDistance = BARK_SPEAKER_MATCH_M;
+      for (const who of Object.keys(SQUAD_BARK_CAST)) {
+        if (who === "shunzi") continue;
+        const at = this.Position(BARK_CUE, { who });
+        if (!at || (fallback && at.distanceTo(fallback) < 1e-3)) continue;
+        const distance = Flat(at, position);
+        if (distance <= bestDistance) { best = who; bestDistance = distance; }
+      }
+      return best;
+    } catch {
+      return null;
     }
   }
   LineKey(lineId) { return `Mission${lineId.replace(".", "_")}`; }
@@ -490,6 +547,8 @@ export class FirstLevelMissionVoice {
     };
   }
   Dispose() {
+    this.disposed = true;
+    if (this.barkSpeakerHook && this.audio.barkSpeaker === this.barkSpeakerHook) this.audio.barkSpeaker = null;
     this.StopParallel();
     this.audio.StopStoryVoice();
     this.dialogue.StopAll();

@@ -4390,9 +4390,15 @@ export class AudioEngine {
    *   · 全局 0.55 s —— 任何时刻场上最多一句人声压着另一句的尾巴
    *   · 同类 4.5 s  —— 同一句话不会连着来第二遍
    * 玩家自己那句（priority）不受全局闸限制，但仍受同类闸限制。
+   *
+   * 认得出是谁在喊时（`who`，或第一关装的 `barkSpeaker` 按位置认人，见
+   * Script_FirstLevelMissionVoice.BarkSpeaker）只在这个人自己的版本里挑：声库键 `<key>@<who>`
+   * （Data_FirstLevelVoiceCast.SQUAD_BARK_*，用他的定妆音录的）。没有本人版本的 TTS 句不说
+   *（那是别人的嗓子），真人素材句（`sample`）照常可选；一条本人版本都没有才退回公用声库。
+   * 本人版本不叠 ±4% 变调 —— 那是给公用嗓子摊成一个班用的，调一动就不是他了。
    */
   Bark(kind, { position = null, volume = 1, priority = false, seed = 0, key = null,
-    side = "nra" } = {}) {
+    side = "nra", who = null } = {}) {
     // 章节可压低自主闲聊；具名脚本对白走 PlayStoryVoice，优先战术提示不受此闸影响。
     if (!priority && this.allowAutonomousBark?.() === false) return null;
     // 01–06 剧情对白正在说：自主喊话让路（契约 §5.5）。只有逐句对白播放器会置这一位，07 以后不受影响。
@@ -4414,8 +4420,10 @@ export class AudioEngine {
     const kindKey = side + ":" + kind;
     if (now - (this.lastBarkKindAt.get(kindKey) || -99) < 4.5) return null;
 
-    const pool = [];
+    let pool = [];
     for (const e of this.voiceBank.values()) {
+      // 某个人自己的版本（`<key>@<who>`）只在认出是他时挑，不进公用池子。
+      if (e.barkOf) continue;
       // 阵营先过滤。声库里中日两套并存，挑错阵营就是日本兵喊中文（或反过来），
       // 那比没有配音更糟。未标 side 的一律按中方处理（旧条目的兼容默认）。
       if ((e.side || "nra") !== side) continue;
@@ -4434,13 +4442,24 @@ export class AudioEngine {
       if (e.kind === kind) pool.push(e);
     }
     if (!pool.length) return null;
+    const speaker = who ?? this.barkSpeaker?.({ seed, side, position, priority, kind, key }) ?? null;
+    let named = false;
+    if (speaker) {
+      const own = [];
+      for (const e of pool) {
+        const mine = this.voiceBank.get(e.key + "@" + speaker);
+        if (mine) own.push(mine);
+        else if (e.sample) own.push(e);
+      }
+      if (own.some((e) => e.barkOf)) { pool = own; named = true; }
+    }
     // 确定性挑选：种子给调用方（通常是士兵 id），同一个人倾向于喊同样的话，
     // 但不同的人不一样 —— 这比纯随机更像一个班。
     const rng = Mulberry32((HashString(kind) ^ Math.imul(seed + this.barkCounter, 2654435761)) >>> 0);
     this.barkCounter += 1;
     const pick = pool[Math.floor(rng() * pool.length) % pool.length];
     // ±4% 变调：把 6 个音色摊成一个班。种子固定 => 同一个兵的嗓子是稳定的。
-    const pitch = 0.96 + Mulberry32((seed * 2654435761) >>> 0)() * 0.08;
+    const pitch = named && pick.barkOf ? 1 : 0.96 + Mulberry32((seed * 2654435761) >>> 0)() * 0.08;
 
     this.lastBarkAt = now;
     this.lastBarkKindAt.set(kindKey, now);
