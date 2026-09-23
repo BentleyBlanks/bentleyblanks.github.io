@@ -106,8 +106,10 @@ const Dist = (c, L) => Math.hypot(c.position.x - L.x, c.position.z - L.z);
   const audio = FakeAudio();
   const sound = new FirstLevelMissionBattleSound(audio, null);
   Run(sound, audio, "Support", 20);
+  assert.equal(audio.firstLevelSoundscape, true, "01–06：声景开关打开（壕沟/洞/压制身体反应）");
   const before = audio.calls.length;
   Run(sound, audio, "South", 60);
+  assert.equal(audio.firstLevelSoundscape, false, "07：声景开关关上");
   const south = audio.calls.slice(before);
   const ids = new Set(D.sources.map((s) => s.cue));
   assert.ok(south.length > 5 && south.every((c) => ids.has(c.cue) && c.bus === "ambience"), "07：只剩旧的固定声源");
@@ -199,7 +201,8 @@ const Dist = (c, L) => Math.hypot(c.position.x - L.x, c.position.z - L.z);
     Raycast: () => roof,
     NearbyColliders: () => [],
   };
-  const w = new AudioWiring({ battlefield: bf, audio: null, player: null });
+  const gate = { firstLevelSoundscape: true };
+  const w = new AudioWiring({ battlefield: bf, audio: gate, player: null });
   const Z = (x, y, z) => { w.zoneCache.clear(); return w.Zone({ x, y, z }); };
   assert.equal(Z(0, -2 + 1.6, 0), "trench", "站在沟中线上 → trench");
   assert.equal(Z(0, -2 + 1.6, 1.4), "trench", "贴着一侧沟壁 → trench");
@@ -209,19 +212,24 @@ const Dist = (c, L) => Math.hypot(c.position.x - L.x, c.position.z - L.z);
   roof = { t: 0.5, box: { tag: "whiteboxWall", min: [-2, -0.2, -2], max: [2, 0.1, 2] } };
   assert.equal(Z(0, -2 + 0.9, 0), "dugout", "沟里低矮的顶 → dugout");
   roof = { t: 2.4, box: { tag: "roof", min: [-4, 3.5, -4], max: [4, 3.9, 4] } };
-  const flat = new AudioWiring({ battlefield: { ...bf, GroundHeight: () => 0 }, audio: null, player: null });
+  const flat = new AudioWiring({ battlefield: { ...bf, GroundHeight: () => 0 }, audio: gate, player: null });
   flat.zoneCache.clear();
   assert.equal(flat.Zone({ x: 0, y: 1.0, z: 0 }), "interior", "平地上的屋顶 → interior（没被抢成 dugout）");
   roof = { t: 3, box: { tag: "dugoutRoof", min: [-1, 2, -1], max: [1, 2.3, 1] } };
   assert.equal(Z(0, -1, 30), "dugout", "布设标了 dugoutRoof → 直接 dugout");
+  // 任务侧开关关着（07 以后、其它关卡）：沟与洞都回到这一轮之前的四档。
+  gate.firstLevelSoundscape = false;
+  assert.equal(Z(0, -1, 30), "interior", "开关关着：dugoutRoof 退回 interior");
   roof = null;
+  assert.equal(Z(0, -2 + 1.6, 0), "open", "开关关着：沟里仍判 open（07 以后行为不变）");
+  gate.firstLevelSoundscape = true;
   const sink = w.TrenchSink({ x: 0, y: -0.4, z: 0 });
   assert.ok(sink.rise >= TRENCH_ZONE.minRiseM && sink.sunkDirs >= 4, `沟中线：两侧高出 ${sink.rise.toFixed(2)} m，${sink.sunkDirs} 个方向高`);
   Ok(`壕沟/洞室判据：沟中线高出 ${sink.rise.toFixed(2)} m → trench，低顶 → dugout，平地屋顶仍是 interior`);
 }
 {
   const plays = [];
-  const audio = { Play: (cue, o) => { plays.push({ t: clock, cue, ...o }); return { cue }; }, StopVoice() {}, SetBattleIntensity() {} };
+  const audio = { firstLevelSoundscape: true, Play: (cue, o) => { plays.push({ t: clock, cue, ...o }); return { cue }; }, StopVoice() {}, SetBattleIntensity() {} };
   let clock = 0;
   const player = { Alive: true, health: 100, suppression: 0, stance: "stand", sprint: 0, heartbeatTimer: 0, position: { x: 0, y: 0, z: 0 } };
   const w = new AudioWiring({ audio, player, battlefield: null });
@@ -247,6 +255,11 @@ const Dist = (c, L) => Math.hypot(c.position.x - L.x, c.position.z - L.z);
   player.heartbeatTimer = 0.5; const n = plays.length;
   Step(3, 0.95);
   assert.equal(plays.slice(n).filter((p) => p.cue === "heartbeat").length, 0, "濒死心跳接管时不叠第二条");
+  // 任务侧开关关着：压住了也不喘不跳（07 以后行为不变）。
+  player.heartbeatTimer = 0; audio.firstLevelSoundscape = false; const m = plays.length;
+  Step(6, 0.95);
+  assert.equal(plays.slice(m).filter((p) => p.cue === "heartbeat" || p.cue === "breathHeavy").length, 0, "开关关着：压制不触发喘息心跳");
+  assert.equal(w.stress, 0, "开关关着：压制包络清零");
   Ok(`压制：心跳 ${bpm.toFixed(0)} bpm，停火后慢落，濒死心跳时让位`);
 }
 

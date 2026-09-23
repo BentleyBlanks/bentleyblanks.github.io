@@ -583,6 +583,12 @@ Hell Let Loose 的战场声。改之前查到的病根（`survey/Digest_audio.md
 按固定间隔循环、压制下没有喘息心跳、耳鸣是一条 4 kHz 正弦、日军步枪只有一条变体。
 **只在 01–06 的任务相位里生效**，07 以后的离图前线、配乐、环境一个数没动。
 
+任务侧开关：`FirstLevelMissionBattleSound.Update` 每帧按步骤把 `audio.firstLevelSoundscape` 写成
+「当前步骤在 01–06 的前线表里」（Dispose 时写 false）。接线层 `AudioWiring.SoundscapeOn` 读它：
+关着时 `Zone` 不判 trench / dugout（也不花那几次地面采样），`SuppressionBody` 直接清零不喘不跳，
+与这一轮之前逐条相同。第 1 节的空间档与第 5 节的压制身体反应都受这个开关管；
+混响的六条 IR 常驻（多两只 Convolver），开关关着时那两条没人送。
+
 ### 1. 壕沟与防炮洞的空间档（`AudioWiring.Zone` → `trench` / `dugout`）
 
 交通壕是 `Script_TrenchPlan` 在高度场上挖出来的，没有碰撞盒，`CountWalls` 一面墙也数不到。

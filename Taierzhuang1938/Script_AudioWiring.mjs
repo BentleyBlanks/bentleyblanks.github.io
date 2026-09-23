@@ -82,6 +82,8 @@ const CEILING_TAGS = new Set([
 /** 洞顶 tag：撞到就是防炮洞，不再看高度（布设侧明说了的，比几何推断可靠）。 */
 const DUGOUT_TAGS = new Set(["dugoutRoof", "dugout"]);
 /** 四条直径（单位向量）：东西、南北、两条对角。壕沟判据要**一条直径两端都高**。 */
+/** 开关关着时的壕沟判据：什么都不陷（Zone 回到四档）。 */
+const NO_SINK = Object.freeze({ trench: false, sunkDirs: 0, rise: 0, ground: null });
 const TRENCH_AXES = [[1, 0], [0, 1], [Math.SQRT1_2, Math.SQRT1_2], [Math.SQRT1_2, -Math.SQRT1_2]];
 
 /**
@@ -206,6 +208,13 @@ export class AudioWiring {
   get Audio() { return this.host.audio || null; }
   get Battlefield() { return this.host.battlefield || null; }
   get Player() { return this.host.player || null; }
+  /**
+   * 第一关 01–06 的声景开关（任务侧，2026-09-23）。壕沟/防炮洞两档空间与压制喘息心跳
+   * 只在这个开关打开时生效；开关由 Script_FirstLevelMissionBattleSound 在 01–06 的步骤里
+   * 写到引擎实例上（`audio.firstLevelSoundscape`），07 以后与其它关卡它是 false，
+   * 行为与这一轮之前逐条相同（契约 §7 第 5 条：共享系统的改动用任务侧开关限定在 01–06）。
+   */
+  get SoundscapeOn() { return !!this.host.audio?.firstLevelSoundscape; }
 
   /** 每次换关调一次：缓存里存的是上一张地图的墙。 */
   Reset() {
@@ -351,8 +360,9 @@ export class AudioWiring {
     const up = bf.Raycast({ x: position.x, y: position.y + 0.1, z: position.z },
       { x: 0, y: 1, z: 0 }, PROBE.ceilingProbeM, { terrain: false });
     // 头顶有东西才要数八个方向（判洞室）；没有就只快问「是不是沟」。
-    const sink = this.TrenchSink(position, !!up?.box);
-    if (this.IsDugoutRoof(up, position, sink)) {
+    const sunken = this.SoundscapeOn;
+    const sink = sunken ? this.TrenchSink(position, !!up?.box) : NO_SINK;
+    if (sunken && this.IsDugoutRoof(up, position, sink)) {
       zone = "dugout";
     } else if (IsCeiling(up)) {
       zone = "interior";
@@ -1125,6 +1135,10 @@ export class AudioWiring {
     const player = this.Player;
     const audio = this.Audio;
     const S = SUPPRESSION_BODY;
+    if (!this.SoundscapeOn) {
+      this.stress = 0; this.stressBreath = false; this.stressHeart = false; this.heartNextAt = 0;
+      return;
+    }
     const sup = player?.Alive ? Clamp01(player.suppression || 0) : 0;
     const tau = sup > this.stress ? S.attackS : S.releaseS;
     this.stress += (sup - this.stress) * (1 - Math.exp(-Math.max(0, dt) / Math.max(1e-3, tau)));

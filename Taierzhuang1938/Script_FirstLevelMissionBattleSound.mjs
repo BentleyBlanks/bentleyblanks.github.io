@@ -49,6 +49,9 @@ export class FirstLevelMissionBattleSound {
   }
 
   Update(dt,stage,speaking=false) {
+    // 01–06 声景的任务侧开关：接线层（Script_AudioWiring.SoundscapeOn）读它决定
+    // 要不要判壕沟/防炮洞、要不要压制喘息心跳。07 以后写 false，行为回到这一轮之前。
+    this.SetSoundscape(!!D.front.stages[stage]);
     if (D.front.stages[stage]) { this.UpdateFront(dt, stage, speaking); return; }
     if (this.frontStage !== null) this.LeaveFront();
     this.UpdateLegacy(dt, stage, speaking);
@@ -106,6 +109,10 @@ export class FirstLevelMissionBattleSound {
       s.nextAt = i === 0 ? now + this.R(0.15, F.firstWithinS) : now + F.firstWithinS + this.R(0.8, F.gapS[1]);
     });
     this.frontStage = stage;
+  }
+
+  SetSoundscape(on) {
+    if (this.audio && this.audio.firstLevelSoundscape !== on) this.audio.firstLevelSoundscape = on;
   }
 
   LeaveFront() {
@@ -301,5 +308,6 @@ export class FirstLevelMissionBattleSound {
     for(const e of this.frontVoices)this.audio.FreeVoice?.(e.v);this.frontVoices=[];
     this.frontQueue.length=0;
     this.artillery.Dispose();
+    this.SetSoundscape(false);
   }
 }

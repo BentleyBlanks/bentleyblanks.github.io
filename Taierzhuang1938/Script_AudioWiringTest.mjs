@@ -308,6 +308,9 @@ const zones = await page.evaluate(() => {
   // （沟底宽 3.4、坡 1.1、深 2.0，与 TrenchPlan 交通壕同断面），头顶什么都没有 = trench；
   // 再盖一块低矮的顶 = dugout。引擎侧挑的混响也要跟着换。
   const realGround = bf.GroundHeight.bind(bf);
+  // 这两档只在第一关 01–06 的任务侧开关打开时生效（Script_AudioWiring.SoundscapeOn）。
+  const gateWas = T.audio.firstLevelSoundscape;
+  T.audio.firstLevelSoundscape = true;
   // 沟底摆在听者眼睛下面 1.6 m（站在沟里），沟沿比沟底高 2 m。
   const floor = L.y - 1.6;
   const Smooth = (t) => { const x = Math.min(1, Math.max(0, t)); return x * x * (3 - 2 * x); };
@@ -321,6 +324,7 @@ const zones = await page.evaluate(() => {
   const v = T.audio.Play("impactDirt", { position: { x: L.x + 0.5, y: floor + 0.05, z: L.z }, priority: true });
   const trenchIr = !!v && v.reverbNode === T.audio.reverbs.trench;
   bf.GroundHeight = realGround;
+  T.audio.firstLevelSoundscape = gateWas;
   bf.Raycast = realRaycast;
   bf.NearbyColliders = realNearby;
   T.audioWiring.zoneCache.clear(); T.audio.listenerZone = null;
