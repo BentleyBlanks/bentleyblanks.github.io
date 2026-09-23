@@ -223,9 +223,13 @@ export const FRONT_TUNING_SOURCES = Object.freeze({
 });
 
 // Notion 2026-09-22 front whitebox calibration: proximity is physical, all deaths are observed.
+// assaultIds (03 withdrawal window, "指定进攻组击杀阈值"): the six bounders FrontRifleA-F, threshold 3 -
+// the 2026-09-23 space rebuild makes the bounding group the attack wave: Zhou's left gun enfilades its west
+// half, the captured nest its east half. The fire base (FrontGunner...) holds 43 m north and never rushes, so
+// it is not part of the wave (Space package 03->06 cold starts, docs/Data_FirstLevelSpace0106_20260923.md §10.3).
 export const FRONT_BATTLE_TUNING=Object.freeze({
   arrivalM:1.0,leaderLeadM:3,captureRadiusM:4,rearArrivalM:3.5,attackArrivalM:3,
-  firstBatch:2,assaultKills:3,assaultIds:["FrontGunner","FrontRifleA","FrontRifleB","FrontRifleC","FrontRifleD"],
+  firstBatch:2,assaultKills:3,assaultIds:["FrontRifleA","FrontRifleB","FrontRifleC","FrontRifleD","FrontRifleE","FrontRifleF"],
   guardHeightM:1.2,blockadeRangeM:85,gatherSpacingM:1.35,zhouHealth:80,
   bandage:{radius:.087,height:.2,y:-.19,color:0xb6ac8b},
 });

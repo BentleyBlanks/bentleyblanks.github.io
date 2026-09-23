@@ -3,7 +3,7 @@ import { FirstLevelFrontBattle } from "./Script_FirstLevelFrontBattle.mjs";
 import { FirstLevelTankRuntime } from "./Script_FirstLevelTankRuntime.mjs";
 import { BundleResupplyOpen } from "./Script_FirstLevelTankBrain.mjs";
 import { TANK } from "./Data_Tuning_Tank.mjs";
-import { FirstLevelFrontPressure, AssaultRoundEnd, AssaultTop, NearestLineIndex, RushStalled, RushPaused } from "./Script_FirstLevelFrontPressure.mjs";
+import { FirstLevelFrontPressure, AssaultRoundEnd, AssaultTop, NearestLineIndex, RushStalled, RushPaused, AssaultState } from "./Script_FirstLevelFrontPressure.mjs";
 import { FirstLevelBackdropSquads } from "./Script_FirstLevelBackdropSquads.mjs";
 import { FirstLevelTransition } from "./Script_FirstLevelTransition.mjs";
 import { FRONT_SORTIE as Sortie, SortieCrawlBlocked } from "./Data_FirstLevelFrontRoute.mjs";
@@ -1046,16 +1046,15 @@ export class FirstLevelMissionRuntime {
       return actor;
   }
   MakeAssault(x, z) {
-    const points = FrontAssaultLane(x, z);
-    if (!points.length) return null;
-    // Hold times are scaled per man (0.6-1.4) so the field never moves in lockstep.
-    const jitter = .6 + ((Math.abs(Math.round(x * 3 + z * 7)) % 17) / 16) * .8;
+    // Hold times are scaled per man (0.6-1.4) so the field never moves in lockstep. The state object is built in
+    // one place (FrontPressure.AssaultState) - the pressure table gives lane-less men (flank group, officer,
+    // reserves) their authored lane through the same constructor.
     // shifts/volley (2026-09-23, docs/Data_EnemyAi.md §15): on the last line `shifts` counts **finished
     // rounds**, it does not move anyone. A round ends when the man has fired assaultVolleyShots rounds or
     // held assaultFinalHoldS seconds; after assaultLateralShifts rounds he falls back to
     // assaultRegroupLine and comes again. volley is the fireSequence snapshot taken when the round began.
     // walk is the per-line budget of "walking into cover does not count as holding the line".
-    return { points, index: 0, hold: 0, walk: 0, pinned: 0, cycles: 0, shifts: 0, volley: 0, mode: "rush", jitter };
+    return AssaultState(x, z, FrontAssaultLane(x, z));
   }
   UpdateAssault(dt) {
     const active = ["Support", "MachineGun", "Tank"].includes(this.flow.stage.id);

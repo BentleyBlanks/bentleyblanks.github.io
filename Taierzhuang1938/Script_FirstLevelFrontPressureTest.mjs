@@ -15,12 +15,15 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import {
   FRONT_PRESSURE_PHASES, FRONT_PRESSURE_GROUPS, FRONT_FIRE_POINTS, FRONT_PRESSURE_STAGES, FRONT_PRESSURE_TACTICS,
+  FRONT_RESERVE_ROAD_LANE, FRONT_PRESSURE_TICK,
 } from "./Data_FirstLevelFrontPressure.mjs";
 import {
   FirstLevelFrontPressure, FrontPressurePhase, FrontFirePoints, FrontGroupMembers, AssaultRoundEnd, AssaultTop,
   NearestLineIndex, GroupFallbackDue, FrontChargeDue, FrontChargeCheck, FIRST_LEVEL_AI_RULE_STEPS, PressureRoute, RouteIndex,
-  RushStalled, RushPaused,
+  RushStalled, RushPaused, AssaultState, LanePoints, RunBackSeconds, StalemateDue, ReserveDue,
 } from "./Script_FirstLevelFrontPressure.mjs";
+import { Sight, Eye } from "./Script_FirstLevelSpaceProbe.mjs";
+import { FRONT_SORTIE, FRONT_SPACE } from "./Data_FirstLevelFrontRoute.mjs";
 import { BACKDROP_SQUADS, BACKDROP_FIRE_POINTS } from "./Data_FirstLevelBackdropSquads.mjs";
 import { FirstLevelBackdropSquads, BackdropStep, BackdropFirePoints, InCameraView } from "./Script_FirstLevelBackdropSquads.mjs";
 import { MISSION_STAGES, MISSION_ENCOUNTERS, MISSION_TACTICS, MISSION_TUNING as R } from "./Data_FirstLevelMission.mjs";
@@ -101,6 +104,24 @@ function RouteClear(name, route) {
     }
   }
   checks += 1;
+}
+// Lanes the table hands out (Front 2026-09-24): the flank group / officer own lanes, the jump-off reserve field lanes,
+// the road reserve down the tank road. Checked once per distinct (man, lane).
+{
+  const walked = new Set();
+  for (const phase of FRONT_PRESSURE_PHASES) for (const [groupId, cfg] of Object.entries(phase.groups || {})) {
+    if (!cfg.lane) continue;
+    for (const id of FRONT_PRESSURE_GROUPS[groupId].ids || []) {
+      const key = `${id}:${typeof cfg.lane === "string" ? cfg.lane : "road"}`;
+      if (walked.has(key)) continue;
+      walked.add(key);
+      const spec = roster.get(id), lane = LanePoints(spec, cfg.lane);
+      Check(Array.isArray(lane) && lane.length >= 2, `${groupId}/${id} gets a lane of at least two bounds`);
+      RouteClear(`lane ${groupId}/${id}`, [spec, ...lane]);
+    }
+  }
+  Check(walked.size >= FRONT_PRESSURE_GROUPS.flank.ids.length + FRONT_PRESSURE_GROUPS.reserveWest.ids.length + FRONT_PRESSURE_GROUPS.reserveRoad.ids.length,
+    "every flank man, the officer and every reserve got a lane checked");
 }
 for (const phase of FRONT_PRESSURE_PHASES) for (const [groupId, cfg] of Object.entries(phase.groups || {})) {
   if (!cfg.points) continue;
@@ -194,34 +215,38 @@ console.log(`ok ① pressure / backdrop data: ${FRONT_PRESSURE_PHASES.length} ph
   const back = (i) => ({ ...line(i), missionAssault: { mode: "hold", index: 1, points: s.points } });
   Eq(FrontChargeCheck([0, 1, 2, 3].map(back), rule, 31, { x: 0, z: -142 }), "notForward");
 }
+const PRESSURE_ENCOUNTERS = ["approach", "front", "frontFlank", "frontOfficer", "machineGun", "tank", "bundleApproach", "village"];
+function MakeActor(encounter, spec) {
+  const weapon = WEAPONS[spec.weapon || "Type38"];
+  const points = ["front", "machineGun"].includes(encounter) && !spec.hold ? FrontAssaultLane(spec.x, spec.z) : [];
+  return {
+    missionId: spec.id, missionEncounter: encounter, alive: true, weapon, weaponId: spec.weapon || "Type38",
+    position: { x: spec.x, y: 0, z: spec.z }, holdZone: { x: spec.x, z: spec.z, radius: spec.hold ? 0.4 : 2 },
+    scriptDefensive: !!spec.hold, tacticalRadiusM: spec.hold ? 0 : R.infantryTacticalRadiusM, grenades: 0, fireSequence: 0,
+    missionFrontStandby: encounter === "machineGun", target: { isPlayer: true },
+    missionAssault: points.length ? AssaultState(spec.x, spec.z, points) : null,
+  };
+}
 function MakeWorld(stage = "BunkerRescue") {
-  const world = { facts: new Set(), barks: [], charges: [], defends: [], threats: new Set(), records: [] };
+  const world = { facts: new Set(), barks: [], charges: [], defends: [], threats: new Set(), records: [], spawned: [] };
   const enemies = new Map();
   for (const [encounter, list] of Object.entries(MISSION_ENCOUNTERS)) {
-    if (!["approach", "front", "machineGun", "tank", "bundleApproach", "village"].includes(encounter)) continue;
-    for (const spec of list) {
-      const weapon = WEAPONS[spec.weapon || "Type38"];
-      const points = ["front", "machineGun"].includes(encounter) && !spec.hold ? FrontAssaultLane(spec.x, spec.z) : [];
-      enemies.set(spec.id, {
-        missionId: spec.id, missionEncounter: encounter, alive: true, weapon, weaponId: spec.weapon || "Type38",
-        position: { x: spec.x, y: 0, z: spec.z }, holdZone: { x: spec.x, z: spec.z, radius: spec.hold ? 0.4 : 2 },
-        scriptDefensive: !!spec.hold, tacticalRadiusM: spec.hold ? 0 : R.infantryTacticalRadiusM, grenades: 0, fireSequence: 0,
-        missionFrontStandby: encounter === "machineGun", target: { isPlayer: true },
-        missionAssault: points.length ? { points, index: 0, hold: 0, walk: 0, pinned: 0, cycles: 0, shifts: 0, volley: 0, mode: "rush", jitter: 1 } : null,
-      });
-    }
+    if (!PRESSURE_ENCOUNTERS.includes(encounter)) continue;
+    for (const spec of list) enemies.set(spec.id, MakeActor(encounter, spec));
   }
   const r = {
-    flow: { stage: { id: stage } }, time: 0, enemies, guards: [],
+    flow: { stage: { id: stage } }, time: 0, enemies, guards: [], spawnQueue: [],
     Has: (id) => world.facts.has(id), Record: (id, detail) => { world.facts.add(id); world.records.push([id, detail]); },
     ai: { missionCoverRules: false, missionReactions: false, time: 0,
       Bark: (a, kind) => world.barks.push([a.missionId, kind]),
       GroupCharge: (members, opts) => { world.charges.push({ ids: members.map((a) => a.missionId), leader: opts.leader?.missionId ?? null }); return members.length; } },
-    player: { position: { x: 27, z: -142 } },
+    player: { position: { x: 25.9, z: -153.9 } },
     Defend: (a, p, radius, slack) => { world.defends.push([a.missionId, p.x, p.z, radius, slack]); a.holdZone = { x: p.x, z: p.z, radius }; a.scriptDefensive = !(a.tacticalRadiusM > 0); },
     Threatens: (point, ids) => world.threats.has(ids[0]),
+    SpawnEncounterActor: (id, spec) => { const a = MakeActor(id, spec); enemies.set(spec.id, a); world.spawned.push(spec.id); return a; },
   };
-  return { r, world, enemies, pressure: new FirstLevelFrontPressure(r) };
+  const Drain = () => { while (r.spawnQueue.length) r.spawnQueue.shift()(); };
+  return { r, world, enemies, Drain, pressure: new FirstLevelFrontPressure(r) };
 }
 {
   const { r, world, enemies, pressure } = MakeWorld("Trapped");
@@ -232,6 +257,7 @@ function MakeWorld(stage = "BunkerRescue") {
   Eq(pressure.phase?.id, "standby");
   const front = enemies.get("FrontRifleA"), village = enemies.get("VillageCorner");
   Check(Array.isArray(front.ambientFirePoints) && front.ambientFirePoints.length > 0, "02 front riflemen get authorised points");
+  Check(Array.isArray(enemies.get("FrontFlankA").ambientFirePoints), "02 the flank group fires on authorised points too (no man on the front stands idle)");
   Eq(village.ambientFirePoints ?? null, null, "a village enemy never gets front fire points");
   const gunner = enemies.get("RightNestGunner"), guard = enemies.get("RightNestGuard");
   Check(gunner.scriptDefensive && !(gunner.tacticalRadiusM > 0), "the nest gunner stays on hold");
@@ -241,16 +267,21 @@ function MakeWorld(stage = "BunkerRescue") {
   // 03 opens.
   r.flow.stage.id = "Support"; world.facts.add("frontBattleStarted"); r.time = 1; pressure.Update();
   Eq(pressure.phase.id, "assault");
-  const centre = FrontGroupMembers("center", enemies);
-  Check(centre.every((a) => a.reactionGroup === "center" && a.missionFireGroup === "center"), "centre men carry their group tags");
-  Check(enemies.get("FrontRifleC").aiOfficer && !enemies.get("FrontRifleA").aiOfficer, "the group officer is marked");
-  Check(centre.filter((a) => a.missionAssault).every((a) => a.missionAssault.loop && a.missionAssault.maxIndex === a.missionAssault.points.length - 1),
-    "the assault phase lets the centre push to its last line and loop");
-  const flank = enemies.get("FrontRifleE").missionAssault;
-  Check(flank.points.at(-1).x === -45 && flank.points.at(-2).z === -166 && flank.index === 0,
-    "the west flank men bound down their own lane to -166 and slide west behind the farm column");
-  Eq(flank.regroupLine, flank.points.length - 2, "the flank post regroups on the via line");
-  Check(world.barks.some(([id, kind]) => id === "FrontRifleC" && kind === "advance"), "the officer shouts the advance on the phase change");
+  const west = FrontGroupMembers("boundWest", enemies), east = FrontGroupMembers("boundEast", enemies);
+  Eq([west.length, east.length], [3, 3], "two bounding teams of three");
+  Check(west.every((a) => a.reactionGroup === "boundWest" && a.missionFireGroup === "boundWest"), "bounders carry their group tags");
+  Check([...west, ...east].every((a) => a.missionAssault.loop && a.missionAssault.maxIndex === a.missionAssault.points.length - 1),
+    "the assault phase lets both teams push to their last line and loop");
+  Check(west.every((a) => a.missionAssault.regroupLine === 1) && east.every((a) => a.missionAssault.regroupLine === 2),
+    "the teams regroup on different lines, so one is always forward while the other comes again");
+  // Flank group: the table gives them the lane from the roster (they spawn without one).
+  const flankA = enemies.get("FrontFlankA").missionAssault, flankSpec = roster.get("FrontFlankA");
+  Eq(flankA.points, flankSpec.lane.map((p) => ({ x: p.x, z: p.z })), "the flank men bound crater to crater down their own lane");
+  Check(flankA.index === 0 && flankA.loop && flankA.regroupLine === flankSpec.lane.length - 2, "from the first crater, looping from the second-to-last");
+  const officer = enemies.get("FrontOfficer");
+  Check(officer.aiOfficer && officer.missionAssault?.points.length === roster.get("FrontOfficer").lane.length
+    && !enemies.get("FrontFlankA").aiOfficer, "the officer leads the flank group one bound behind, marked as the officer");
+  Check(world.barks.some(([id, kind]) => id === "FrontOfficer" && kind === "advance"), "the officer shouts the advance on the phase change");
   // Gap discipline.
   Check(front.ambientFirePoints.some((p) => p.id === "gapWest"), "gap sides are authorised while nobody crosses");
   r.guards = [{ actor: { alive: true }, crossing: true, safe: false }]; pressure.Update();
@@ -258,45 +289,57 @@ function MakeWorld(stage = "BunkerRescue") {
   Check(pressure.events.some((e) => e.kind === "evacuationOpen"));
   r.guards = [];
   // Withdrawal: cap and yield.
-  for (const a of centre) if (a.missionAssault) { a.missionAssault.index = a.missionAssault.points.length - 1; a.missionAssault.mode = "hold"; }
+  for (const a of [...west, ...east]) { a.missionAssault.index = a.missionAssault.points.length - 1; a.missionAssault.mode = "hold"; }
   world.facts.add("rightNestCaptured"); world.facts.add("frontRifleDefense"); r.time = 2; pressure.Update();
   Eq(pressure.phase.id, "firstWithdrawal");
-  Check(centre.filter((a) => a.missionAssault).every((a) => a.missionAssault.index <= 2), "the withdrawal phase pulls the centre off the last line");
-  const a0 = enemies.get("FrontRifleH").missionAssault; a0.mode = "hold"; const before = a0.index;
-  Check(before >= 1, "fixture: H holds a line beyond the first");
-  world.threats.add("FrontRifleH"); r.time = 3; pressure.Update();
+  Check([...west, ...east].every((a) => a.missionAssault.index <= 2), "the withdrawal phase pulls the bounders off the last line");
+  Check(flankA.maxIndex === flankA.points.length - 2, "the flank men stop one crater short of the one that sees the gap");
+  const e0 = enemies.get("FrontRifleE"), a0 = e0.missionAssault; a0.mode = "hold"; const before = a0.index;
+  e0.position = { ...a0.points[a0.index], y: 0 };
+  Check(before >= 1, "fixture: E holds a line beyond the first");
+  world.threats.add("FrontRifleE"); r.time = 3; pressure.Update();
   Eq(a0.index, before - 1, "a man who can see the gap during a withdrawal gives one line back");
   Eq(a0.maxIndex, a0.index, "and may not come forward again this phase");
-  Check(pressure.events.some((e) => e.kind === "yield" && e.id === "FrontRifleH"));
-  Check(a0.yieldUntil > r.time, "the pulled man ignores close contact while he runs back");
+  Check(pressure.events.some((e) => e.kind === "yield" && e.id === "FrontRifleE"));
+  Check(a0.yieldUntil >= r.time + RunBackSeconds(e0.position, a0.points[a0.index], 0) - 1e-9 && a0.yieldUntil >= r.time + FRONT_PRESSURE_TICK.yieldMoveS,
+    "the pulled man ignores close contact until he can have reached the line (never less than yieldMoveS)");
   // A man fighting at close range on his line (contact) is pulled back the same way (09-24: an LMG in contact by the
   // left gun kept the gap covered and the second batch never got out).
   {
-    const g = enemies.get("FrontRifleG").missionAssault;
+    const g = enemies.get("FrontRifleD").missionAssault;
     g.index = Math.min(2, AssaultTop(g)); g.mode = "contact"; const was = g.index;
-    enemies.get("FrontRifleG").yieldCheckAt = 0;
-    world.threats.add("FrontRifleG"); r.time = 3.5; pressure.Update();
+    enemies.get("FrontRifleD").yieldCheckAt = 0;
+    world.threats.add("FrontRifleD"); r.time = 3.5; pressure.Update();
     Check(was >= 1 && g.index === was - 1 && g.mode === "rush" && g.yieldUntil > r.time, "a man in close contact who sees the gap gives a line back too");
-    world.threats.delete("FrontRifleG");
+    world.threats.delete("FrontRifleD");
   }
   const a1 = enemies.get("FrontRifleA").missionAssault; a1.index = 0; a1.mode = "hold";
   world.threats.add("FrontRifleA"); r.time = 4; pressure.Update();
-  Eq([a1.points[0].x, a1.points[0].z, a1.index, a1.maxIndex], [23, -163, 0, 0],
+  const specA = roster.get("FrontRifleA");
+  Eq([a1.points[0].x, a1.points[0].z, a1.index, a1.maxIndex], [specA.x, specA.z, 0, 0],
     "a man already on his first line who still sees the gap goes back to where he started");
   world.threats.clear();
   // Casualty fallback.
   world.facts.add("rifleWithdrawalResolved"); r.time = 4.5; pressure.Update();
   Eq(pressure.phase.id, "firstDone");
-  Check(a1.points.length === 1 && a1.route == null, "the next phase gives the yielded man his own lane back");
+  Check(a1.points.length === FrontAssaultLane(specA.x, specA.z).length && a1.route == null, "the next phase gives the yielded man his own lane back");
   const tops = new Map();
-  for (const a of centre) if (a.missionAssault) { a.missionAssault.index = AssaultTop(a.missionAssault); a.missionAssault.mode = "hold"; tops.set(a, a.missionAssault.index); }
-  enemies.get("FrontRifleA").alive = false; enemies.get("FrontRifleB").alive = false; enemies.get("FrontRifleG").alive = false;
+  for (const a of west) { a.missionAssault.index = AssaultTop(a.missionAssault); a.missionAssault.mode = "hold"; tops.set(a, a.missionAssault.index); }
+  enemies.get("FrontRifleA").alive = false; enemies.get("FrontRifleB").alive = false;
   r.time = 5; world.barks.length = 0; pressure.Update();
-  Check(centre.filter((a) => a.alive && a.missionAssault).every((a) => a.missionAssault.index === Math.max(0, tops.get(a) - 1)
-    && a.missionAssault.holdUntil > r.time), "half the group down: the survivors fall back one line and hold it for holdS");
-  Check(world.barks.some(([id, kind]) => id === "FrontRifleC" && kind === "fallback"), "the officer calls the fall back");
+  Check(west.filter((a) => a.alive).every((a) => a.missionAssault.index === Math.max(0, tops.get(a) - 1)
+    && a.missionAssault.holdUntil > r.time), "half the team down: the survivor falls back one line and holds it for holdS");
+  Check(world.barks.some(([id, kind]) => id === "FrontRifleC" && kind === "fallback"), "the survivor calls the fall back");
   // 2026-09-24 review: a group past half casualties used to fall back again on every later phase change.
-  const fallbacksBefore = pressure.events.filter((e) => e.kind === "fallback" && e.group === "center").length;
+  const fallbacksBefore = pressure.events.filter((e) => e.kind === "fallback" && e.group === "boundWest").length;
+  // Flank group: two down, the rest go two craters back (out of the gap's sight: 03 "压下去了").
+  {
+    const flank = FrontGroupMembers("flank", enemies).filter((a) => a.missionId !== "FrontOfficer");
+    for (const a of flank) { a.missionAssault.index = AssaultTop(a.missionAssault); a.missionAssault.mode = "hold"; }
+    flank[0].alive = false; flank[1].alive = false; r.time = 5.3; pressure.Update();
+    Check(flank.slice(2).every((a) => a.missionAssault.index === AssaultTop(a.missionAssault) - 2),
+      "two flank men down: the other two fall back two craters");
+  }
   // Machine-gun attack: charge once, then repelled.
   world.facts.add("tankPreviewed"); r.time = 6; pressure.Update();
   Eq(pressure.phase.id, "tankShown");
@@ -304,28 +347,50 @@ function MakeWorld(stage = "BunkerRescue") {
   const mgWait = FrontGroupMembers("mgAttack", enemies);
   Check(pressure.groupState.get("mgAttack").total === mgWait.length, "fixture: nobody of the attack died in standby here");
   r.time = 6.3; pressure.Update();
-  Eq(pressure.events.filter((e) => e.kind === "fallback" && e.group === "center").length, fallbacksBefore,
+  Eq(pressure.events.filter((e) => e.kind === "fallback" && e.group === "boundWest").length, fallbacksBefore,
     "a group that already fell back does not fall back again on the next phase");
   const mg = FrontGroupMembers("mgAttack", enemies);
   for (const a of mg) { a.missionFrontStandby = false; a.missionAssault.index = a.missionAssault.points.length - 1; a.missionAssault.mode = "hold"; a.position = { ...a.missionAssault.points.at(-1), y: 0 }; }
-  r.player.position = { x: 0, z: -150 };
+  r.player.position = { x: -20, z: -150 };
   const chargeRule = FRONT_PRESSURE_PHASES.find((p) => p.id === "tankShown").groups.mgAttack.charge;
   r.time = 6 + chargeRule.afterS - 1; pressure.Update(); Eq(world.charges.length, 0, "no charge before afterS");
   r.time = 6 + chargeRule.afterS + 1; pressure.Update();
   Eq(world.charges.length, 1, "one scripted group charge in the phase");
   Eq(world.charges[0].leader, FRONT_PRESSURE_GROUPS.mgAttack.officer, "the officer leads it");
-  Check(world.charges[0].ids.length >= 4 && mg.filter((a) => a.weapon.bayonet).every((a) => a.missionAssault.mode === "charge")
+  Check(world.charges[0].ids.length >= 2 && mg.filter((a) => a.weapon.bayonet).every((a) => a.missionAssault.mode === "charge")
     && mg.filter((a) => !a.weapon.bayonet).every((a) => a.missionAssault.mode !== "charge"), "bayonet men are released from the script, machine gunners stay");
   r.time = 60; pressure.Update(); Eq(world.charges.length, 1, "never a second charge in the same phase");
+  // Stalemate (Front 2026-09-24): a man in close contact with a man who cannot die gives a line back after essentialS;
+  // against the player he keeps fighting up to contactS.
+  {
+    const rule = FRONT_PRESSURE_PHASES.find((p) => p.id === "tankShown").groups.mgAttack.stalemate;
+    const gunnerMg = mg.find((a) => !a.weapon.bayonet), s = gunnerMg.missionAssault;
+    s.mode = "contact"; s.index = AssaultTop(s); s.contactS = 0;
+    gunnerMg.position = { ...s.points[s.index], y: 0 };
+    gunnerMg.target = { isPlayer: false, ref: { scriptEssential: true } };
+    const top = s.index;
+    for (let t = 60.25; t < 60 + rule.essentialS - 0.5; t += 0.25) { r.time = t; pressure.Update(); }
+    Eq(s.index, top, "not yet: the stand-off is younger than essentialS");
+    for (let t = 60 + rule.essentialS - 0.5; t < 60 + rule.essentialS + 0.6; t += 0.25) { r.time = t; pressure.Update(); }
+    Check(s.index === top - rule.backLines && s.mode === "rush" && s.yieldUntil > r.time,
+      "a stand-off with an unkillable man (He Youtian at the left gun) is broken off one line back");
+    Check(pressure.events.some((e) => e.kind === "stalemate" && e.id === gunnerMg.missionId && e.essential));
+    s.mode = "contact"; s.contactS = 0; s.index = AssaultTop(s); gunnerMg.target = { isPlayer: true, ref: {} };
+    const t0 = r.time;
+    for (let t = t0 + 0.25; t < t0 + rule.essentialS + 1; t += 0.25) { r.time = t; pressure.Update(); }
+    Eq(s.index, AssaultTop(s), "against the player the same man keeps fighting past essentialS");
+    Check(StalemateDue(rule.contactS, false, rule) && !StalemateDue(rule.contactS - 0.1, false, rule), "contactS is the ordinary stand-off limit");
+    s.mode = "hold";
+  }
   for (const a of mg) a.alive = false;
-  r.time = 61; pressure.Update();
+  r.time += 1; pressure.Update();
   Check(world.facts.has("frontAttackRepelled"), "a destroyed machine-gun attack still records frontAttackRepelled");
   // A man who spawns after the phase change still gets this phase's orders (split-frame spawns, reinforcements).
-  const late = { ...enemies.get("FrontRifleH"), missionId: "FrontRifleH", alive: true, pressurePhaseId: null, reactionGroup: null,
-    missionAssault: { ...enemies.get("FrontRifleH").missionAssault, maxIndex: undefined, loop: false } };
-  enemies.set("FrontRifleH", late);
-  r.time = 61.5; pressure.Update();
-  Check(late.reactionGroup === "center" && late.missionAssault.loop === true && late.pressurePhaseId === "tankShown",
+  const late = { ...enemies.get("FrontRifleF"), missionId: "FrontRifleF", alive: true, pressurePhaseId: null, reactionGroup: null,
+    missionAssault: { ...enemies.get("FrontRifleF").missionAssault, maxIndex: undefined, loop: false } };
+  enemies.set("FrontRifleF", late);
+  r.time += 0.5; pressure.Update();
+  Check(late.reactionGroup === "boundEast" && late.missionAssault.loop === true && late.pressurePhaseId === "tankShown",
     "a late spawn picks up the phase config on the next group tick");
   // Nest fallback: two of four down.
   const { r: r2, world: w2, enemies: e2, pressure: p2 } = MakeWorld("BunkerRescue");
@@ -334,9 +399,14 @@ function MakeWorld(stage = "BunkerRescue") {
   const nestTo = FRONT_PRESSURE_PHASES[0].groups.nest.fallback.to;
   Check(w2.defends.some(([id, x, z, , slack]) => id === "RightNestGuard" && x === nestTo.x && z === nestTo.z && slack === R.nestFallbackCoverSlackM),
     "two nest casualties send the rest to the rear anchor, covers only right by it");
-  const anchorToGun = Math.hypot(nestTo.x - 27, nestTo.z + 142);
+  const anchorToGun = Math.hypot(nestTo.x - FRONT_SORTIE.nest.x, nestTo.z - FRONT_SORTIE.nest.z);
   Check(anchorToGun - R.defendHoldRadiusM - R.nestFallbackCoverSlackM >= 7 && anchorToGun <= 14,
-    "the rear anchor keeps the fallen-back guards out of bayonet reach of the gun, but in rifle reach (all three must die for the capture)");
+    "the rear anchor keeps the fallen-back guards out of bayonet reach of the gun, but in rifle reach (all four must die for the capture)");
+  // ... and in sight: the seat (sitting 1.5, crouched 1.0), the west door (standing) and Luo's post (crouched) all see
+  // a man standing, kneeling or crouching there (Space probe, same ray rule the runtime capture relies on).
+  for (const [name, eye] of [["seat sitting", Eye(FRONT_SORTIE.seat, 1.5)], ["seat crouched", Eye(FRONT_SORTIE.seat, 1.0)],
+    ["west door", Eye(FRONT_SPACE.westDoor, 1.55)], ["leader post", Eye(FRONT_SORTIE.leaderCover, 1.0)]])
+    for (const h of [0.6, 1.0, 1.4]) Eq(Sight(eye, Eye(nestTo, h)), null, `the nest fallback anchor is in sight from the ${name} at ${h} m`);
   Check(w2.barks.some(([, kind]) => kind === "fallback"));
   // A group that lost men before its first phase counts casualties from the men it went in with.
   {
@@ -355,6 +425,26 @@ function MakeWorld(stage = "BunkerRescue") {
     r4.time = 2.6; p4.Update();
     Check(p4.events.some((e) => e.kind === "fallback" && e.group === "mgAttack"), "half of the men it went in with: now it falls back");
   }
+  // Reinforcements (contract §2.8 / §6): nobody before the tank has pressed the nest; 2+2 in 04, 1 more in 05, never twice.
+  {
+    const { r: r5, world: w5, enemies: e5, Drain, pressure: p5 } = MakeWorld("MachineGun");
+    for (const f of ["frontBattleStarted", "rightNestCaptured", "frontRifleDefense", "rifleWithdrawalResolved", "tankPreviewed"]) w5.facts.add(f);
+    r5.time = 1; p5.Update(); Drain();
+    Eq(w5.spawned.length, 0, "no reserve before tankPositionPressured");
+    w5.facts.add("tankPositionPressured"); r5.time = 2; p5.Update(); Drain();
+    const byEntry = (entry) => w5.spawned.filter((id) => roster.get(id).entry === entry).length;
+    Eq([byEntry("NorthWestPlateau"), byEntry("RoadCutting")], [2, 2], "04 releases two from each hidden entry");
+    r5.time = 2.5; p5.Update(); Drain(); Eq(w5.spawned.length, 4, "the same man is never queued twice");
+    const westMan = e5.get(w5.spawned.find((id) => roster.get(id).entry === "NorthWestPlateau"));
+    const roadMan = e5.get(w5.spawned.find((id) => roster.get(id).entry === "RoadCutting"));
+    const westSpec = roster.get(westMan.missionId);
+    Eq(westMan.missionAssault?.points, FrontAssaultLane(westSpec.x, westSpec.z), "the jump-off reserve bounds down the field lanes");
+    Eq(roadMan.missionAssault?.points, FRONT_RESERVE_ROAD_LANE.map((p) => ({ x: p.x, z: p.z })), "the road reserve comes down the tank road");
+    Check([westMan, roadMan].every((a) => a.reactionGroup?.startsWith("reserve") && a.ambientFirePoints?.length), "reserves carry group tags and fire points");
+    r5.flow.stage.id = "Tank"; r5.time = 3; p5.Update(); Drain();
+    Eq(w5.spawned.length, 5, "05 releases the last one");
+    Eq(ReserveDue(MISSION_ENCOUNTERS.frontReserve, "Support").length, 0, "03 never releases a reserve");
+  }
   // Phase exit logs why a configured charge never happened; a hold phase freezes a former assault man in place.
   {
     const { r: r3, world: w3, enemies: e3, pressure: p3 } = MakeWorld("Support");
@@ -365,23 +455,22 @@ function MakeWorld(stage = "BunkerRescue") {
     Eq(p3.phase.id, "tankPressure");
     const notDue = p3.events.find((e) => e.kind === "chargeNotDue" && e.group === "mgAttack");
     Check(notDue && notDue.why === "tooEarly", "the skipped charge is logged with its reason");
-    const west = e3.get("FrontRifleE").missionAssault;
-    west.index = 1;
+    const bounder = e3.get("FrontRifleE").missionAssault;
+    bounder.index = 1;
     w3.facts.add("bundleTaken"); w3.facts.add("tankImmobilized"); w3.facts.add("lastGuardsWithdrawn"); r3.time = 4; p3.Update();
     Eq(p3.phase.id, "disengage");
-    Check(west.maxIndex === 1 && west.loop === false && west.index === 1, "disengage holds the west pair on the line they are on");
-    const east = e3.get("FrontRifleD").missionAssault;
-    Check(!east || !Number.isFinite(east.maxIndex), "a hold man the table never sent forward keeps his own rhythm");
+    Check(bounder.maxIndex === 1 && bounder.loop === false && bounder.index === 1, "disengage holds a bounder on the line he is on");
+    Check(!e3.get("FrontGunner").missionAssault, "a fire-base man the table never sent forward keeps his post");
   }
   // Out of 02-05.
-  r.flow.stage.id = "Orders"; r.time = 70; pressure.Update();
+  r.flow.stage.id = "Orders"; r.time = 200; pressure.Update();
   Eq(pressure.phase, null);
   Check([...enemies.values()].every((a) => !a.ambientFirePoints), "06 takes every authorised point back");
   r.flow.stage.id = "South"; pressure.Update();
   Check(!r.ai.missionCoverRules && !r.ai.missionReactions, "07 closes the mission AI switches");
   r.ai.missionReactions = true; pressure.Dispose(); Check(!r.ai.missionReactions, "Dispose closes the switches");
 }
-console.log("ok ② pressure runtime: switches, phases, gap discipline, yield, fallback, single charge, repelled fact, nest guards");
+console.log("ok ② pressure runtime: switches, phases, lanes, gap discipline, yield, fallback, stalemate, reserves, single charge, repelled fact, nest guards");
 
 // ---------------------------------------------------------------------------
 // ③ 大脑（Script_Ai 的真实方法）
@@ -744,7 +833,10 @@ console.log("ok ③ brain: ambient pick/ownership/ledger, dry trigger, MG bursts
   Eq(BackdropStep(spec, st, 4).kind, "hold");
   const next = BackdropStep(spec, st, 5.1); Eq([next.kind, next.index], ["run", 1], "after holdS he runs on");
   st.arrived = true; st.holdUntil = 5.1; Eq(BackdropStep(spec, st, 99).kind, "hold", "the last stop holds for good");
-  const stop = BACKDROP_SQUADS.members[0].route[0];
+  // Fixture ids come from the data (the roster is Space's MISSION_ENCOUNTERS.bunkerBackdrop since 2026-09-24).
+  const FIRST_IJA = BACKDROP_SQUADS.members.find((m) => m.side === "ija").id;
+  const stop = BACKDROP_SQUADS.members.find((m) => m.side === "ija").route[0];
+  Check(stop.fire.length > 0, "fixture: the first Japanese runner fires at his first stop");
   Check(BackdropFirePoints(stop) === BackdropFirePoints(stop) && BackdropFirePoints(stop).length === stop.fire.length, "stop point lists are stable references");
 
   const facts = new Set(), spawned = [], removed = [], moves = [], defends = [];
@@ -767,11 +859,11 @@ console.log("ok ③ brain: ambient pick/ownership/ledger, dry trigger, MG bursts
   Eq(r.enemies.size, 0, "scripted runners stay out of the mission enemy table until the hand-off (the 01-02 roster snapshot never sees them)");
   Check(spawned.every((a) => a.scriptedNoncombatant), "backdrop men are scripted");
   Check(spawned.filter((a) => a.side === "nra").every((a) => a.missionUntargetable), "the far NRA answerers are not targets");
-  const runner = spawned.find((a) => a.missionId === "BackdropIjaA");
+  const runner = spawned.find((a) => a.missionId === FIRST_IJA);
   r.time = 1; squads.Update();
-  Check(moves.some(([id]) => id === "BackdropIjaA"), "the first man runs his route");
+  Check(moves.some(([id]) => id === FIRST_IJA), "the first man runs his route");
   Eq(runner.ambientFirePoints ?? null, null, "nobody fires on the run");
-  const firstStop = BACKDROP_SQUADS.members.find((m) => m.id === "BackdropIjaA").route[0];
+  const firstStop = BACKDROP_SQUADS.members.find((m) => m.id === FIRST_IJA).route[0];
   runner.position = { x: firstStop.x, y: 0, z: firstStop.z }; squads.Update();
   Check(runner.order === "hold" && runner.ambientFirePoints?.length === firstStop.fire.length, "at the stop he kneels and fires at his authorised points");
   facts.add("rifleRecovered"); squads.Update();
@@ -799,7 +891,7 @@ console.log("ok ③ brain: ambient pick/ownership/ledger, dry trigger, MG bursts
     facts.add("bunkerCollapsed");
     q.Update(); while (r2.spawnQueue.length) r2.spawnQueue.shift()();
     q.Update();
-    const seen = sp2.find((a) => a.missionId === "BackdropIjaA");
+    const seen = sp2.find((a) => a.missionId === FIRST_IJA);
     seen.position = { x: -40, y: 0, z: -150 };           // 10 m straight ahead of the camera
     for (const a of sp2) if (a !== seen) a.position = { x: -40, y: 0, z: -120 };   // behind the player
     q.Update();   // hand-off already recorded (rifleRecovered)

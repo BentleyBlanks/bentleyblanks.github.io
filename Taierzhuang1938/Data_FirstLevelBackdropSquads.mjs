@@ -13,6 +13,12 @@
 // 日军不会把枪口转过去。第二波 Opening 包可以把日军这几个人接成 02 的 `bunkerPursuit` 连续进攻：
 // handoff 给了 fact 就在那个事实记下时交接（mode "combat" = 放成普通守区 AI；"hold" = 原地继续打）。
 //
+// 2026-09-24 Front 包：名册与路线改由 Space 包的 MISSION_ENCOUNTERS.bunkerBackdrop 单一来源派生（下方 members），
+// 授权点取 Space 的 FRONT_FIRE_POINTS.Trapped（后交通壕折角 RC 胸墙、支沟唇、岔口 J、折角 F）。01–02 新布局里
+// 这些人都在沟里：日军沿连接支沟下来、过 J 转进纵深支沟，看不见我方后沟 —— 开枪靠 Ai 的抬高重试（高弹越沟沿，
+// 背景里听得见一直在打）；川军在 RC 与支沟朝 J/F 还击。rifleRecovered 照旧交成守区 AI（那时人已在
+// 纵深支沟尽头、视线外），02 结束随 leave 收走（Space 的 retire 口径）。Opening 包要改 01 编排时改这里。
+// 以下是旧说明（09-22 布局）：
 // **坐标是临时的**（按 f581ac7dd 的 01 布局：掩蔽部 (−40,−126) 门朝北，洞外是 x −70…−34 的平地；
 // z = −147 横着一道西侧铁丝网（东头贴着左前枪位的侧墙 LeftGunSide，x −34 一线） WestWire0–6（Data_FirstLevelMissionFortifications），只在 x −51.8…−48.4
 // 与 x > −38.4 留口 —— 跑位要么停在网北侧，要么从东头的口子过），
@@ -29,45 +35,51 @@
 //     members[]    { id, side:"ija"|"nra", weapon, x, z, delayS, speedMps, route:[{ x, z, holdS, fire:[点名…] }] }
 //                  route 按顺序跑；每个停点蹲下打 holdS 秒（最后一个停点一直打）；fire 是这个停点的授权点
 // ===========================================================================
+import { MISSION_ENCOUNTERS } from "./Data_FirstLevelMission.mjs";
+import { FRONT_SPACE as SP } from "./Data_FirstLevelFrontRoute.mjs";
+
 const P = (x, z, h, r) => Object.freeze({ x, z, h, r });
 
+/** Space FRONT_FIRE_POINTS.Trapped：前两个日军打（我方后沟），后两个川军打（敌方来路）。h 从沟底 / 地面算。 */
 export const BACKDROP_FIRE_POINTS = Object.freeze({
-  // 西侧远处川军的位置（日军朝这儿打）。x −78…−72 那一带从网北侧的日军停点看过去是通的（浏览器实测通视：
-  // 更近的 x −66…−55 被 WestRoadTimber 路障、铁丝网与掩蔽部外墙挡掉大半）。
-  westNorth: P(-74, -156, 1.0, 2.2),
-  westMid: P(-76, -150, 1.0, 2.4),
-  westSouth: P(-77, -146, 1.0, 2.2),
-  // 日军停下的地方（川军朝这儿还击）。
-  ijaEast: P(-38.5, -151, 0.9, 1.8),
-  ijaMid: P(-45.5, -150, 0.9, 2.2),
-  ijaWest: P(-56, -151, 0.9, 2.4),
+  rcParapet: P(-4, -111.8, 0.4, 1.6),
+  supportLip: P(-26.5, -124.2, 0.4, 1.8),
+  rcTurn: P(-1, -118.5, 0.6, 1.4),
+  junction: P(SP.bunkerJunction.x, -126.6, 0.6, 1.6),
+  fold: P(18.4, -127.3, 0.6, 1.6),
 });
 
 const Stop = (x, z, holdS, fire) => Object.freeze({ x, z, holdS, fire: Object.freeze(fire) });
+const Same = (a, b) => Math.hypot(a.x - b.x, a.z - b.z) < 0.05;
+/**
+ * 日军路线上的开火停点：一进连接支沟先停 2.5 s 打一阵（我方后沟方向，高弹越沟沿）、折角 F 停 4 s、岔口 J 停 3 s，
+ * 纵深支沟尽头一直打（视线外，只闻其声）。
+ */
+function IjaRoute(route) {
+  return Object.freeze(route.map((p, i) => {
+    if (i === route.length - 1) return Stop(p.x, p.z, 0, ["rcParapet", "supportLip"]);
+    if (i === 0) return Stop(p.x, p.z, 2.5, ["rcParapet", "supportLip"]);
+    if (Same(p, SP.bunkerFold)) return Stop(p.x, p.z, 4, ["rcTurn", "rcParapet"]);
+    if (Same(p, SP.bunkerJunction)) return Stop(p.x, p.z, 3, ["rcTurn"]);
+    return Stop(p.x, p.z, 0, []);
+  }));
+}
+const NRA_FIRE = (at) => Same(at, SP.bunkerJunction) ? ["junction", "fold"] : ["fold", "junction"];
+const ROSTER = MISSION_ENCOUNTERS.bunkerBackdrop;
 
 export const BACKDROP_SQUADS = Object.freeze({
   encounter: "bunkerBackdrop",
   // 炮弹把洞口埋了（Blast）之后，前沿才被突破 —— 在那之前背景里没有日军。
   spawnFact: "bunkerCollapsed",
   steps: Object.freeze(["Trapped", "BunkerRescue", "RearTrench"]),
-  // 临时：玩家拾回步枪（02 还权）时把日军这几个交成普通守区 AI。Opening 包接 bunkerPursuit 时改这里。
+  // 玩家拾回步枪（02 还权）时把日军这几个交成普通守区 AI。新布局里那时他们已在纵深支沟尽头、玩家视线外，
+  // 02 结束随 leave 收走（Space 的 retire 口径）。
   handoff: Object.freeze({ fact: "rifleRecovered", mode: "combat", tacticalRadiusM: 8 }),
   // 2026-09-24 审查：交接后的日军在 02 结束时还活着、离 03 起点不远，进 03 那一帧凭空消失。
   leave: Object.freeze({ removeBeyondM: 70, viewMarginDeg: 12, maxS: 90 }),
-  members: Object.freeze([
-    Object.freeze({ id: "BackdropIjaA", side: "ija", weapon: "Type38", x: -36, z: -155, delayS: 0, speedMps: 3.2,
-      route: Object.freeze([Stop(-44, -150.5, 6, ["westMid", "westNorth"]), Stop(-47, -149.5, 0, ["westMid", "westSouth"])]) }),
-    Object.freeze({ id: "BackdropIjaB", side: "ija", weapon: "Type38", x: -40, z: -155.5, delayS: 3, speedMps: 3.0,
-      route: Object.freeze([Stop(-38.2, -150.6, 5, ["westNorth", "westMid"]), Stop(-41.5, -152, 0, ["westMid", "westSouth"])]) }),
-    Object.freeze({ id: "BackdropIjaC", side: "ija", weapon: "Type11", x: -48, z: -155, delayS: 6, speedMps: 2.8,
-      route: Object.freeze([Stop(-56, -151, 0, ["westNorth", "westMid", "westSouth"])]) }),
-    Object.freeze({ id: "BackdropIjaD", side: "ija", weapon: "Type38", x: -36, z: -155, delayS: 10, speedMps: 3.2,
-      route: Object.freeze([Stop(-36.2, -151.4, 7, ["westNorth"]), Stop(-36.3, -149.3, 0, ["westMid", "westSouth"])]) }),
-    Object.freeze({ id: "BackdropNraA", side: "nra", weapon: "HanYang", x: -77, z: -146, delayS: 2, speedMps: 0,
-      route: Object.freeze([Stop(-77, -146, 0, ["ijaMid", "ijaEast"])]) }),
-    Object.freeze({ id: "BackdropNraB", side: "nra", weapon: "HanYang", x: -76, z: -150, delayS: 4, speedMps: 0,
-      route: Object.freeze([Stop(-76, -150, 0, ["ijaMid", "ijaWest", "ijaEast"])]) }),
-    Object.freeze({ id: "BackdropNraC", side: "nra", weapon: "Zb26", x: -74, z: -156, delayS: 5, speedMps: 0,
-      route: Object.freeze([Stop(-74, -156, 0, ["ijaWest", "ijaMid"])]) }),
-  ]),
+  members: Object.freeze(ROSTER.map((spec) => spec.side === "nra"
+    ? Object.freeze({ id: spec.id, side: "nra", weapon: spec.weapon, x: spec.x, z: spec.z, delayS: 2 + ROSTER.indexOf(spec) % 3 * 1.5,
+      speedMps: 0, route: Object.freeze([Stop(spec.x, spec.z, 0, NRA_FIRE(spec.fireAt))]) })
+    : Object.freeze({ id: spec.id, side: "ija", weapon: spec.weapon, x: spec.x, z: spec.z, delayS: spec.delayS ?? 0,
+      speedMps: spec.weapon === "Type11" ? 2.8 : 3.1, route: IjaRoute(spec.route) }))),
 });

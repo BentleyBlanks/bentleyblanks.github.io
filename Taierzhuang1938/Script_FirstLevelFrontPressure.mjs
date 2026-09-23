@@ -11,21 +11,64 @@
 //   3. 相位切换：给每组写跃进范围（maxIndex / regroupLine / loop）或侧翼路线、阵位守卫改非 hold、
 //      军官与反应组标记、切相位时喊一声；
 //   4. 组规则（0.25 s 一评）：伤亡过半全组退线（可记 frontAttackRepelled）、阵位守卫伤亡够数退后墙、
-//      每相位最多一次的成组冲锋、守军过口窗口里「看得见口子的人往回拉」。
+//      每相位最多一次的成组冲锋、守军过口窗口里「看得见口子的人往回拉」、近距交火僵持太久往回拉；
+//   5. 增援（Front 包 09-24）：带 reserve 的相位按名册 slotStages 从视线外入口放出 frontReserve；
+//      侧翼组 / 军官 / 增援这些生成时没有跃进线的人，按相位配置的 lane 给一条。
 // 冲刺那一段腿（MoveActor）仍只在 `UpdateAssault` 里 —— 一个人的腿只有一个主人（§19）。
 // ===========================================================================
 import {
   FRONT_PRESSURE_PHASES, FRONT_PRESSURE_GROUPS, FRONT_FIRE_POINTS, FRONT_PRESSURE_STAGES,
-  FRONT_PRESSURE_FIRE_ENCOUNTERS, FRONT_PRESSURE_TICK,
+  FRONT_PRESSURE_FIRE_ENCOUNTERS, FRONT_PRESSURE_TICK, FRONT_RESERVE_RELEASE,
 } from "./Data_FirstLevelFrontPressure.mjs";
 import { MISSION_TUNING as R } from "./Data_Tuning_FirstLevel.mjs";
 import { FRONT_BATTLE_TUNING as B } from "./Data_Tuning_FirstLevelFront.mjs";
 import { FRONT_SORTIE as S } from "./Data_FirstLevelFrontRoute.mjs";
 import { MISSION_ENCOUNTERS } from "./Data_FirstLevelMission.mjs";
+import { FrontAssaultLane } from "./Data_FirstLevelMissionFront.mjs";
 
 const Distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 /** 名册里每个人的出生点（让口子退到第一条线之外时回这里）。 */
 const SPAWNS = new Map(Object.values(MISSION_ENCOUNTERS).flat().map((spec) => [spec.id, spec]));
+
+/**
+ * 一个人的跃进状态（`missionAssault`）。运行时 `MakeAssault`（按出生点现算的跃进线）和这里的 lane
+ *（侧翼组 / 军官 / 增援）共用同一个构造，字段只在这一处写。
+ * jitter：每人的停留时长系数 0.6–1.4（按出生点定），前沿不会齐步走。
+ */
+export function AssaultState(x, z, points) {
+  if (!points?.length) return null;
+  const jitter = .6 + ((Math.abs(Math.round(x * 3 + z * 7)) % 17) / 16) * .8;
+  return { points: points.map((p) => ({ x: p.x, z: p.z })), index: 0, hold: 0, walk: 0, pinned: 0, cycles: 0, shifts: 0, volley: 0,
+    mode: "rush", jitter };
+}
+/** 相位配置的 lane 解析成点列（见 Data_FirstLevelFrontPressure 头注 lane）。 */
+export function LanePoints(spec, lane) {
+  if (!spec || !lane) return null;
+  if (lane === "own") return spec.lane || null;
+  if (lane === "field") return FrontAssaultLane(spec.x, spec.z);
+  return Array.isArray(lane) ? lane : null;
+}
+/**
+ * 往回跑的这段路上不认近距交火多久：到目标线的距离按冲刺速度跑完再加 1 s，且不少于 minS。
+ * （固定 4 s 跑不完二十多米，半路又和何有田对上，拉线等于白拉 —— Tank 包 campaign_10。）
+ */
+export function RunBackSeconds(position, target, minS) {
+  return Math.max(minS, (target ? Distance(position, target) : 0) / R.assaultRushMps + 1);
+}
+/**
+ * 近距交火僵持判定（纯函数）：这个人在 contact 里呆了多久、对手打不打得死。
+ * @returns {boolean} 该往回拉了
+ */
+export function StalemateDue(contactS, essential, rule) {
+  if (!rule) return false;
+  return contactS >= (essential ? rule.essentialS : rule.contactS);
+}
+/** 增援名册里这一步该放出来的人（stage 在当前步骤及以前）。 */
+export function ReserveDue(specs, stage, order = FRONT_RESERVE_RELEASE.stageOrder) {
+  const rank = order.indexOf(stage);
+  if (rank < 0) return [];
+  return specs.filter((spec) => { const r = order.indexOf(spec.stage); return r >= 0 && r <= rank; });
+}
 
 /** 01–06 的内部步骤：日军完整掩体周期、派生掩体与反应层只在这些步骤里开（契约 §2 第 8 条）。 */
 export const FIRST_LEVEL_AI_RULE_STEPS = Object.freeze(["Trapped", "BunkerRescue", "RearTrench", "Support", "MachineGun", "Tank", "Orders"]);
@@ -197,6 +240,8 @@ export class FirstLevelFrontPressure {
     this.groupTickAt = 0;
     this.yieldTickAt = 0;
     this.evacuating = false;
+    /** 已排进生成队列的增援（missionId）：同一个人只排一次。 */
+    this.reserveQueued = new Set();
     /** 取证：相位切换、退线、冲锋、让口子（驾驶器与探针读 State()）。 */
     this.events = [];
   }
@@ -210,6 +255,7 @@ export class FirstLevelFrontPressure {
     const phase = FrontPressurePhase(stage, (id) => r.Has(id));
     if (phase !== this.phase) this.EnterPhase(phase);
     if (!phase) return;
+    if (phase.reserve) this.ReleaseReserves(stage);
     this.AssignFire();
     if (r.time >= this.groupTickAt) {
       this.groupTickAt = r.time + FRONT_PRESSURE_TICK.groupEveryS;
@@ -317,6 +363,11 @@ export class FirstLevelFrontPressure {
 
   /** 相位给跃进组的配置：推进上限、退回线、是否无限循环、侧翼的显式路线。 */
   ApplyAssault(actor, cfg) {
+    // 生成时没有跃进线的人（侧翼组、军官、增援）：按相位配置的 lane 给一条，从出生点起跳。
+    if (!actor.missionAssault && cfg.lane) {
+      const spec = SPAWNS.get(actor.missionId);
+      actor.missionAssault = AssaultState(spec?.x ?? actor.position.x, spec?.z ?? actor.position.z, LanePoints(spec, cfg.lane));
+    }
     const s = actor.missionAssault;
     if (!s) return;
     // 冲刺卡死时本轮借用的站位（`UpdateAssault`）不跨相位：换相位一律回到原线点。
@@ -418,6 +469,45 @@ export class FirstLevelFrontPressure {
           r.Record(rule.repelledFact, { killed: st.total - alive.length, repelled: alive.length });
         }
       }
+      if (cfg.stalemate) this.Stalemate(groupId, cfg.stalemate, members, FRONT_PRESSURE_TICK.groupEveryS);
+    }
+  }
+
+  /**
+   * 近距交火僵持退线（Data_FirstLevelFrontPressure 头注 stalemate）：在 contact 里呆够时长就往回拉 backLines 条线，
+   * 往回跑的路上不认近距交火（s.yieldUntil，UpdateAssault 读）。冲锋、白刃中的人不拽。
+   */
+  Stalemate(groupId, rule, members, dt) {
+    const r = this.r, now = r.time;
+    for (const a of members) {
+      const s = a.missionAssault;
+      if (!a.alive || !s || a.missionFrontStandby || a.meleeCombat || s.mode === "charge") continue;
+      if (s.mode !== "contact") { s.contactS = 0; continue; }
+      s.contactS = (s.contactS || 0) + dt;
+      const foe = a.target?.ref;
+      const essential = !!(foe && !a.target.isPlayer && (foe.scriptEssential || foe.missionUntargetable));
+      if (!StalemateDue(s.contactS, essential, rule)) continue;
+      const line = Math.max(0, NearestLineIndex(s, a.position) - (rule.backLines ?? 1));
+      s.index = line; s.mode = "rush"; s.hold = 0; s.shifts = 0; s.contactS = 0;
+      s.yieldUntil = now + RunBackSeconds(a.position, s.points[line], rule.clearS ?? FRONT_PRESSURE_TICK.yieldMoveS);
+      this.Note("stalemate", { group: groupId, id: a.missionId, line, essential });
+    }
+  }
+
+  /**
+   * 增援（FRONT_RESERVE_RELEASE）：名册里 stage 在当前步骤及以前的 frontReserve 排进生成队列（分帧生成，
+   * 与通用生成器同一个 SpawnEncounterActor）。已经在场或排过的人不再排。
+   */
+  ReleaseReserves(stage) {
+    const r = this.r;
+    const specs = MISSION_ENCOUNTERS[FRONT_RESERVE_RELEASE.encounter] || [];
+    for (const spec of ReserveDue(specs, stage)) {
+      if (this.reserveQueued.has(spec.id) || r.enemies.has(spec.id)) continue;
+      if (typeof r.SpawnEncounterActor !== "function") continue;
+      this.reserveQueued.add(spec.id);
+      const Spawn = () => r.SpawnEncounterActor(FRONT_RESERVE_RELEASE.encounter, spec);
+      if (Array.isArray(r.spawnQueue)) r.spawnQueue.push(Spawn); else Spawn();
+      this.Note("reserve", { id: spec.id, entry: spec.entry, stage: spec.stage });
     }
   }
 
@@ -486,7 +576,6 @@ export class FirstLevelFrontPressure {
         a.yieldCheckAt = now + FRONT_PRESSURE_TICK.yieldRecheckS;
         // 站在线上的人（hold）与在线上近距交火的人（contact）一样往回拉；拉的这几秒 UpdateAssault 不认近距交火。
         const onLine = s.mode === "hold" || s.mode === "contact";
-        s.yieldUntil = now + FRONT_PRESSURE_TICK.yieldMoveS;
         if (s.index <= 0 && onLine) {
           // 已经在第一条线上还看得见口子：退回他出发的地方（名册里的出生点，跃进线的起点），
           // 这一相位就停在那儿。下一相位 ApplyAssault 会把原来的跃进线还给他。
@@ -496,12 +585,15 @@ export class FirstLevelFrontPressure {
           s.points = [{ x: spec.x, z: spec.z }, ...s.points];
           s.route = "yield";
           s.index = 0; s.maxIndex = 0; s.mode = "rush"; s.hold = 0; s.shifts = 0;
+          s.yieldUntil = now + RunBackSeconds(a.position, s.points[0], FRONT_PRESSURE_TICK.yieldMoveS);
           this.Note("yield", { id: a.missionId, line: -1 });
           continue;
         }
         s.index = Math.max(0, Math.min(s.index, AssaultTop(s)) - (onLine ? 1 : 0));
         s.maxIndex = s.index;
         s.mode = "rush"; s.hold = 0; s.shifts = 0;
+        // 拉的这一路不认近距交火：按到那条线的距离算，至少 yieldMoveS（Front 包 09-24）。
+        s.yieldUntil = now + RunBackSeconds(a.position, s.points[s.index], FRONT_PRESSURE_TICK.yieldMoveS);
         this.Note("yield", { id: a.missionId, line: s.index });
       }
     }
@@ -512,6 +604,7 @@ export class FirstLevelFrontPressure {
       phase: this.phase?.id ?? null,
       phaseAt: this.phaseAt,
       evacuating: this.evacuating,
+      reserves: [...this.reserveQueued],
       groups: Object.fromEntries([...this.groupState].map(([id, st]) => [id, { ...st, ...(this.phaseCharge.get(id) || {}) }])),
       events: this.events.slice(-24),
     };
@@ -522,6 +615,7 @@ export class FirstLevelFrontPressure {
     if (ai) { ai.missionCoverRules = false; ai.missionReactions = false; }
     this.groupState.clear();
     this.phaseCharge.clear();
+    this.reserveQueued.clear();
     for (const a of this.r.enemies?.values?.() || []) { a.ambientFirePoints = null; a.ambientFirePoint = null; }
   }
 }
