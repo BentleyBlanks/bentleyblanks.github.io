@@ -21,6 +21,7 @@ import { MissionRouteProjection, MissionCarryRoutePoint } from "./Script_FirstLe
 import { FirstLevelBunkerShow } from "./Script_OpeningStoryboards.mjs";
 import { OPENING_STORYBOARDS } from "./Data_OpeningStoryboards.mjs";
 import { FirstLevelCollection } from "./Script_FirstLevelCollection.mjs";
+import { SPEAKER_BINDING } from "./Data_Tuning_CharacterSpeech.mjs";
 
 const Distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 /** 本包接上触发点的四条 cue（`Script_FirstLevelVoiceTest` 的未触发名单里删掉的那四条）。 */
@@ -130,10 +131,15 @@ export class FirstLevelFrontShow {
     const r = this.r;
     if (!r.Has("frontAttackRepelled")) return;
     // 指出北头弹药屋的那个守军：还活着的撤退守军里离玩家最近的一个，朝弹药屋指。
-    if (!this.bundleOrderGuard?.alive)
-      this.bundleOrderGuard = r.guards.map((guard) => guard.actor)
+    if (!this.bundleOrderGuard?.alive) {
+      const alive = r.guards.map((guard) => guard.actor)
         .filter((actor) => actor?.alive)
-        .sort((a, b) => Distance(a.position, r.player.position) - Distance(b.position, r.player.position))[0] || null;
+        .sort((a, b) => Distance(a.position, r.player.position) - Distance(b.position, r.player.position));
+      // The guard with the talking face (speakerRole "guard") takes the line when he is about as near.
+      const faced = alive.find((actor) => actor.speakerRole === "guard");
+      this.bundleOrderGuard = faced && Distance(faced.position, r.player.position)
+        - Distance(alive[0].position, r.player.position) <= SPEAKER_BINDING.facedGuardSlackM ? faced : alive[0] || null;
+    }
     if (this.bundleOrderGuard?.alive) {
       this.bundleOrderGuard.watchYaw = Math.atan2(this.bundleOrderGuard.position.x - A.bundle.x,
         this.bundleOrderGuard.position.z - A.bundle.z);

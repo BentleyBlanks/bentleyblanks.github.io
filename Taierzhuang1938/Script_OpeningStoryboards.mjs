@@ -7,6 +7,7 @@ import { CloneShadedMaterial } from "./Script_Materials.mjs";
 import { ApplyPatches, MakePatch, PatchesOf } from "./Script_MaterialPatches.mjs";
 import { WEAPONS } from "./Data_Weapons.mjs";
 import { NRA_UNIFORM_COLORS } from "./Data_Tuning_Materials.mjs";
+import { SpeakingCastOptions } from "./Data_FirstLevelSpeakingCast.mjs";
 const S=C.positions;
 const Clamp=v=>Math.max(0,Math.min(1,v));
 const Smooth=v=>{v=Clamp(v);return v*v*(3-2*v);};
@@ -60,7 +61,7 @@ export class FirstLevelBunkerShow {
       this.Hide(this.cast.BunkerRunner);
       // The wounded collection's reporting guard is present on the first visit;
       // the evacuation messenger remains a separate, later (06) arrival.
-      if(!this.cast.CollectionRearGuard)this.Spawn("CollectionRearGuard","nra",P.collection.runner,{modelVariant:1});
+      if(!this.cast.CollectionRearGuard)this.Spawn("CollectionRearGuard","nra",P.collection.runner,SpeakingCastOptions("guard"));
     }
   }
   Set(phase){
@@ -77,14 +78,14 @@ export class FirstLevelBunkerShow {
   Spawn(id,side,point,options={}){
     const actor=this.r.ai.Spawn(side,point.x,point.z,{weapon:"HanYang",scriptedNoncombatant:true,squadId:"OpeningStoryboard",...options});
     if(!actor)throw Error(`Opening storyboard spawn failed: ${id}`);
-    actor.missionId=id;actor.scriptEssential=true;actor.missionDormant=false;
+    actor.missionId=id;actor.scriptEssential=true;actor.missionDormant=false;if(options.castId)actor.speakerRole=options.castId;
     this.r.MoveActor(actor,actor.position,0);InstallOpeningStoryboardAnimation(actor);return this.cast[id]=actor;
   }
   Setup(){
     if(this.setup)return;this.setup=true;
-    this.captives=[this.Spawn("BunkerCaptiveHelper","nra",S.captiveStart,{unarmed:true,modelVariant:1})];
-    this.Spawn("BunkerInterpreter","ija",S.interpreter,{unarmed:true,actorKind:"nra",modelVariant:1});
-    this.Spawn("BunkerRunner","nra",{x:S.runner.x,z:S.runner.z-4},{modelVariant:4});
+    this.captives=[this.Spawn("BunkerCaptiveHelper","nra",S.captiveStart,{unarmed:true,...SpeakingCastOptions("captiveHelper")})];
+    this.Spawn("BunkerInterpreter","ija",S.interpreter,{unarmed:true,actorKind:"nra",...SpeakingCastOptions("interpreter")});
+    this.Spawn("BunkerRunner","nra",{x:S.runner.x,z:S.runner.z-4},SpeakingCastOptions("runner"));
     // The interpreter is recognizable as an unarmed dark-clothed guide, never a
     // friendly faction marker. Preserve registered shader patches on cloned cloth.
     this.cast.BunkerInterpreter.actor.root.traverse(node=>{

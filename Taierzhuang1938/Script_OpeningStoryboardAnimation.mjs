@@ -41,7 +41,9 @@ export function InstallOpeningStoryboardAnimation(soldier){
   rig.openingStoryboardInstalled=true;
   const original=actor.Update;
   let performer,clock=0,blendFrom,blendAt=0,lastKey,travelClock=0,wasRescueReady=false,rescueHandoff=false;
-  const bones=[];rig.root.traverse(node=>{if(node.isBone)bones.push(node);});
+  // Face_* bones belong to the face layer (CharacterFacialAnimation), which runs inside
+  // original Update; snapshot-blending them here would freeze the mouth mid-word.
+  const bones=[];rig.root.traverse(node=>{if(node.isBone&&!node.name.startsWith("Face_"))bones.push(node);});
   const Allocate=()=>bones.map(bone=>({p:bone.position.clone(),q:bone.quaternion.clone()}));
   const shownBuffer=Allocate(),baseBuffer=Allocate(),blendBuffer=Allocate();
   const RescueHandoffBone=bone=>/Pelvis|Spine|Neck|Head|UpperArm|Forearm|Hand|Finger|Clavicle/.test(bone.name);

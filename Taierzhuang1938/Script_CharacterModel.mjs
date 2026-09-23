@@ -264,7 +264,8 @@ const MODEL_FORWARD_YAW = Math.PI;
 // 新 clip（CarryStretcherFront/Rear、WoundedLimp）。十套模型的二进制都变了，
 // 戳不跟着走就会「新壳配旧芯」：清单是新的，浏览器缓存里的 GLB 还是旧的那批。
 // NRA eye maps and shoulder silhouettes: keep the manifest and GLBs on one revision.
-const MANIFEST_URL = "./Model/Character/Data_LugouCharacterManifest.json?v=202609061026";
+// 2026-09-23: facialUrl/facialVersion/facialCast for NRA02/IJA01/IJA02 (GLBs unchanged: ASSET_VERSION stays).
+const MANIFEST_URL = "./Model/Character/Data_LugouCharacterManifest.json?v=202609232000";
 const ASSET_VERSION = "202609061026";
 const DEATH_COLLAPSE_ASSET_VERSION = "202609151352";
 const DEATH_COLLAPSE_PLAYBACK_RATE = 1.6;
@@ -413,6 +414,40 @@ function RetargetAnimationLibrary(library, targetRoot) {
   }) };
 }
 
+/**
+ * Facial skins ship without textures or clips (Script_BakeCharacterFacial strips
+ * them): bind each surface to the base GLB's material of the same name, so both
+ * skins share one material, one program and one set of GPU textures, and reuse
+ * the base clips (same node names). Oral parts keep their own material.
+ */
+export function AdoptBaseFacialResources(facial, base) {
+  const rig = facial?.userData?.facialRig;
+  if (!rig || !base) return facial;
+  if (rig.materialsFrom === "base") {
+    const byName = new Map();
+    base.scene.traverse((node) => {
+      if (node.isMesh && node.material && !Array.isArray(node.material)) byName.set(node.material.name, node.material);
+    });
+    facial.scene.traverse((node) => {
+      if (!node.isMesh || Array.isArray(node.material)) return;
+      const shared = byName.get(node.material?.name);
+      if (!shared || shared === node.material) return;
+      node.material.dispose();
+      node.material = shared;
+    });
+  }
+  return rig.animationsFrom === "base" ? { ...facial, animations: base.animations } : facial;
+}
+
+/** A named speaker whose skin has a face rig must not be served from the actor pool. */
+export function IsFacialCastId(library, castId) {
+  if (!castId) return false;
+  for (const variants of Object.values(library?.byFaction || {})) {
+    for (const asset of variants) if (asset?.facial && asset.record?.facialCast?.includes(castId)) return true;
+  }
+  return false;
+}
+
 async function LoadAsset(record) {
   try {
     const gltf = await LOADER.loadAsync(VersionedUrl(record.url));
@@ -451,7 +486,7 @@ async function LoadAsset(record) {
     }
     let facial = null;
     if (record.facialUrl) {
-      try { facial = await LOADER.loadAsync(`${record.facialUrl}?v=${record.facialVersion}`); }
+      try { facial = AdoptBaseFacialResources(await LOADER.loadAsync(`${record.facialUrl}?v=${record.facialVersion}`), gltf); }
       catch (error) { console.warn("[CharacterModel] facial model unavailable", record.id, String(error)); }
     }
     return { record, gltf, infantry, death, facial, error: null };
@@ -671,7 +706,10 @@ export class LugouCharacterRig {
     // 一具人七个分件共用一份 Skeleton（见 Script_SkinnedClone 的抬头）。
     this.root = CloneSkinnedRig(asset.gltf.scene);
     this.facial = asset.gltf.userData?.facialRig
-      ? new CharacterFacialAnimation(this.root, asset.gltf.userData.facialRig) : null;
+      ? new CharacterFacialAnimation(this.root, asset.gltf.userData.facialRig, { seed }) : null;
+    // Shared speaker head layer (Script_SpeakerHeadLayer); the speaker binder
+    // attaches it to rigs that talk or listen, never to anonymous soldiers.
+    this.speakerHead = null;
     this.root.name = `Rigged_${this.modelId}`;
     this.actor = null;
     this.forcedClip = null;
@@ -916,6 +954,8 @@ export class LugouCharacterRig {
   }
 
   PoseDeath(t) {
+    // The face goes slack with the body (DeadSlack), then holds still.
+    this.facial?.Update(0, { dead: true, deathBlend: t });
     if (!this.deathClipState && !this.deathPose) return;
     if (this.deathClipState) {
       // Drive the mixer forward by the normalized delta. AnimationMixer.setTime
@@ -1228,6 +1268,7 @@ export class LugouCharacterRig {
     // the head bone after mixer evaluation instead.  Doing it before mixer.update
     // would be overwritten by the clip's sampled scale track on the same frame.
     if (!this.headVisible && this.bones.head) this.bones.head.scale.setScalar(0.001);
+    this.speakerHead?.Apply(dt, state);
     this.facial?.Update(dt, state);
   }
 
@@ -1377,8 +1418,11 @@ export function CreateLugouCharacterRig(
   const modelId = `Lugou${faction === "nra" ? "Nra" : "Ija"}${String(index + 1).padStart(2, "0")}`;
   const asset = variants.find(candidate => candidate.record?.id === modelId);
   if (!asset?.gltf) return null;
-  const selected = asset.record.facialCast?.includes(options.castId) && asset.facial
-    ? { ...asset, gltf: asset.facial } : asset;
+  // Face rig: the cast list in the manifest (named speakers), or an explicit
+  // options.facial for a speaking extra; options.facial === false forces the plain skin.
+  const wantsFace = options.facial === true
+    || (options.facial !== false && asset.record.facialCast?.includes(options.castId));
+  const selected = wantsFace && asset.facial ? { ...asset, gltf: asset.facial } : asset;
   return new LugouCharacterRig(selected, {
     kind, targetHeight, seed: options.seed ?? 0, variantIndex: index, materialLibrary,
   });

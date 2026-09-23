@@ -8,6 +8,7 @@ import { MISSION_ENCOUNTERS, FRONT_BATTLE_OBJECTIVES as Objectives } from "./Dat
 import { MissionRouteProjection, MissionRoutePoint, MissionRouteLength, MissionRouteLookahead } from "./Script_FirstLevelMissionColumn.mjs";
 import { InstallMissionSentry } from "./Script_FirstLevelMissionPeople.mjs";
 import { FRONT_DEFENDERS } from "./Data_FirstLevelMissionFront.mjs";
+import { SpeakingCastOptions } from "./Data_FirstLevelSpeakingCast.mjs";
 const Distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const AliveBatch=batch=>batch.filter(g=>g.actor.alive);
 export function BatchRecovered(batch){return batch.length>0&&AliveBatch(batch).length>0&&AliveBatch(batch).every(g=>g.safe&&g.progress>=g.route.length);}
@@ -259,7 +260,7 @@ export class FirstLevelFrontBattle {
     const r=this.r;if(!r.Has("lastGuardsWithdrawn")||!["Tank","Orders"].includes(r.flow.stage.id))return;
     if(!r.relief){
       r.relief=P.reliefPositions.map((post,i)=>{
-        const actor=r.ai.Spawn("nra",A.collection.x+i*1.5,A.collection.z,{weapon:i?"HanYang":"Zb26",squadId:"MissionRelief"});
+        const actor=r.ai.Spawn("nra",A.collection.x+i*1.5,A.collection.z,{weapon:i?"HanYang":"Zb26",squadId:"MissionRelief",...(i?{}:SpeakingCastOptions("relief"))});
         if(!actor)return null;InstallMissionSentry(actor);actor.missionId=`Relief${i}`;
         this.SetWalk(actor,[...MISSION_FRONT_COLLECTION_ROUTE,...(i?[post]:S.leftRoute.slice(1))]);
         return {actor,arrived:false,index:0,distance:0,delay:0,route:this.walks.get(actor.id).route};

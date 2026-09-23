@@ -33,6 +33,7 @@ import { LoadRiggedAssets } from "./Script_RiggedModel.mjs";
 import { SetShadowSkip } from "./Script_ShadowSkip.mjs";
 import {
   CreateLugouCharacterRig,
+  IsFacialCastId,
   LoadLugouCharacterAssets,
 } from "./Script_CharacterModel.mjs";
 import { RaycastCapsule, RaycastShapes } from "./Script_CharacterHitboxMath.mjs";
@@ -3726,6 +3727,9 @@ export class ActorFactory {
     const pool = this.pool.get(kind);
     if (!pool || !pool.length || options.noPool) return null;
     if (options.rank || options.variant || options.actorVariant) return null;
+    // Named speakers with a face rig are built with their facial skin; a pooled
+    // body was prewarmed without one (castId is only known at Create).
+    if (options.facial || IsFacialCastId(this.characterAssets, options.castId)) return null;
     // 钉死缩放的（过场演员）不从池里拿：池里的人身高是预建时抽的，取用时改 root.scale
     // 就等于在已经算好挂点换算量的人身上改比例。七个人现造一遍是几毫秒的事。
     if (Number.isFinite(Number(options.sizeScale))) return null;

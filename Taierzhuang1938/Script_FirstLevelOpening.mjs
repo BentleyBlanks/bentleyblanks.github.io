@@ -3,6 +3,7 @@ import { MISSION_TUNING as R, OPENING_PERCEPTION as P } from "./Data_Tuning_Firs
 import { MISSION_ANCHORS as A, MISSION_PLACEMENT as Place, MISSION_SUPPLIES,
   MISSION_SUPPLY_COLLIDER } from "./Data_FirstLevelMissionLayout.mjs";
 import { CLOSE_RANGE } from "./Data_Tuning_AiShooting.mjs";
+import { SpeakingCastOptions } from "./Data_FirstLevelSpeakingCast.mjs";
 const Distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const Smooth=t=>{t=Math.max(0,Math.min(1,t));return t*t*(3-2*t)};
 // 一条 [[秒, 值], ...] 曲线在 t 处的取样：段内 smoothstep，两端夹住。
@@ -193,7 +194,7 @@ export class FirstLevelOpening {
   SpawnZhou(){
     const r=this.r;
     if(this.zhou)return;
-    this.zhou=r.ai.Spawn("nra",C.zhouGunSeat.x,C.zhouGunSeat.z,{weapon:"Zb26",squadId:"MissionZhouGun"});
+    this.zhou=r.ai.Spawn("nra",C.zhouGunSeat.x,C.zhouGunSeat.z,{weapon:"Zb26",squadId:"MissionZhouGun",...SpeakingCastOptions("zhou")});
     if(!this.zhou)return; // A temporarily unavailable physical spawn retries next frame.
     this.zhou.missionId=r.column.zhou.id;this.zhou.castId="zhou";
     this.zhou.scriptEssential=true;
@@ -202,10 +203,10 @@ export class FirstLevelOpening {
     r.emplacement.NpcOccupy(r.leftGunId,this.zhou);
     r.view.BandageZhou(this.zhou);
   }
-  SpawnMessenger(id,route,weapon){
-    const r=this.r,actor=r.ai.Spawn("nra",route[0].x,route[0].z,{weapon,scriptedNoncombatant:true,squadId:id});
+  SpawnMessenger(id,route,weapon,role="runner"){
+    const r=this.r,actor=r.ai.Spawn("nra",route[0].x,route[0].z,{weapon,scriptedNoncombatant:true,squadId:id,...SpeakingCastOptions(role)});
     if(!actor)return null;
-    actor.missionId=id;actor.scriptEssential=true;
+    actor.missionId=id;actor.scriptEssential=true;actor.speakerRole=role;
     r.MoveActor(actor,actor.position,0);return {actor,route,index:1};
   }
   Messenger(entry,speed){
