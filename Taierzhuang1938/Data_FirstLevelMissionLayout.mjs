@@ -178,7 +178,10 @@ Block("RightNestGablePeak",37,-151.2,.8,2.2,5,"plaster",{y:SampleMissionTerrain(
 TopBlock("RightNestRearWest",26.4,-145.6,4.8,3.2,.8,"structure",{},nestRef);
 TopBlock("RightNestRearEast",33.8,-145.6,6.4,3.2,.8,"structure",{},nestRef);
 // Nest guards' cover faces the west door and the right low trench (south-west), not the north.
-TopBlock("RightNestRubble",31.8,-149.6,1.2,1.1,1.8,"cover",{cover:Face(-1,0)},nestRef);
+// The rubble sits 2 m in front of the east guard and covers only his line to the west door (the 03
+// entry); his line to the MG seat passes 0.3 m north of it, so whoever takes the gun can finish the
+// compound (the 03 capture needs all four defenders dead; a full-width heap hid him from the seat).
+TopBlock("RightNestRubble",31.2,-149.4,.8,1.1,1.0,"cover",{cover:Face(-1,0)},nestRef);
 TopBlock("RightEntryCrate",25.8,-147.6,1.0,1.0,1.1,"cover",{cover:Face(-.6,-.8)},nestRef);
 // Rest height follows the same floor and origin as the usable captured gun.
 const gunRestTop=SampleMissionTerrain(Sortie.nest.x,Sortie.nest.z)+1.45+.08-.12294;
