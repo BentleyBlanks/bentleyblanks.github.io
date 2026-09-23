@@ -18,11 +18,12 @@
 
 - 路点 `{x, z, kind, stage?, holdUntil?, holdS?, faceTo?, preview?}`：`kind` 为 `cruise | hullDown | firePoint | squeeze | block`；`stage` = 最早哪一步能到（阶段拴绳）；`holdUntil` = 到了要等的事实，`"stage:<Id>"` 表示等进入那一步；`preview` 标出 03 的露面点（记 `tankPreviewed`）。
 - 驾驶：加速 0.6、减速 1.2 m/s²；车头与切线差 > 0.3 rad 先停车原地转（≤ 0.32 rad/s），走着转向率 = 车速 / 5.5 m；停车按 `faceTo` 摆车头；躲弹后倒 1.5–3 m，不越过本阶段进入时的里程，投掷者仍在 9 m 投掷距离内；退完缓 6 s 再往前挤。输出 `load / rpm / pitch`（点头 / 后仰）。
-- 炮手：10 Hz 感知、每 tick ≤ 6 条视线；打分 = 权重 × 1/(1+d/45) × 惯性 1.35；`untargetable / protect` 的人不打，且任何弹着点离他们 ≥ 9.8 m。预兆链：手摇 0.22–0.30 rad/s → 停摇 1.2–1.8 s（只在停车点、主炮许可时计）→ 开炮；节奏 7.5 ± 1.5 s。新暴露的玩家第一发打掩体沿（`Cover()`），没有掩体打在他前面 4.5 m（太近就打身旁）；同一目标散布 3.2 m × 0.62ⁿ（下限 0.7 m）；移动目标有提前量；看不见按 lastKnown 的掩体沿打；区域目标（`kind:"zone"`，阵位 / 缺口）看不见也照打它前面那道掩体的沿。
+- 炮手：10 Hz 感知、每 tick ≤ 6 条视线；打分 = 权重 × 1/(1+d/45) × 惯性 1.35；`untargetable / protect` 的人不打，且任何弹着点离他们 ≥ 9.8 m。预兆链：手摇 0.22–0.30 rad/s → 停摇 1.2–1.8 s（只在停车点、主炮许可时计）→ 开炮；节奏 7.5 ± 1.5 s。新暴露的玩家第一发打掩体沿（`Cover()`），没有掩体打在他前面 4.5 m（太近就打身旁）；同一目标散布 3.2 m × 0.62ⁿ（下限 0.7 m）；移动目标有提前量；看不见按 lastKnown 的掩体沿打；区域目标（`kind:"zone"`，阵位 / 缺口）看不见也照打它前面那道掩体的沿。警告弹伤害 ×0.2（只砸土不要命）；落点离还没被警告过的玩家 < 4.5 m 的任何一发都按警告弹算。
 - 机枪：车体机枪 ±0.45 rad；首次接触第一串从目标前 9 m「走」到目标、零伤害（`damageScale 0`，Main 的 `FireVehicleBullet` 不结算伤害）；之后正常点射；看不见压 lastKnown 5 s。死角（< 10 m、在车体机枪射界外）：炮塔掉头，≥ 6 s 后塔后机枪才开火；开舱盖喊人（护兵往那一侧收）。
 - 反应：≤ 8 m 的中方爆炸 → 后倒、炮塔甩向投掷者（0.42 rad/s）、机枪压 2 s、护兵散开；枪弹打车体 → 观察窗关 1.6 s，每 15 s 最多被牵一次注意；每 10–14 s 朝 `path.scan` 看 3 s（05 起）。
 - 毁伤：只有 `GrenadeBundle` 伤车。车体局部坐标判部位：履带（车旁地面，≥35 → 约 3.2 m 内）→ `MobilityKill`；发动机后甲板 / 格栅 / 炮塔座圈（≥400 → 约 0.8 m 内，即落在车顶）→ `Disabled`；`MobilityKill` 之后任何一颗有效集束弹 → `Disabled`。`ForceDisable()` 给剧本补刀（罗班长）。
-- 事实：进入 `MobilityKill` 或 `Disabled` 记 `tankImmobilized`；`Disabled` 记 `tankFireDisabled`。`TankBlockade` 在 `MobilityKill` 时仍然成立（停驶不等于解围）。
+- 护兵：车开到离他 30 m 内才接过来跟车（03 车在图外时护兵留在原处打仗）。
+- 事实：`tankPositionPressured` = 主炮落点离阵位 < 10 m（阵位四周的墙把炮弹挡在 7.5–9.5 m 上）；进入 `MobilityKill` 或 `Disabled` 记 `tankImmobilized`；`Disabled` 记 `tankFireDisabled`。`TankBlockade` 在 `MobilityKill` 时仍然成立（停驶不等于解围）。
 
 ## 表现
 
