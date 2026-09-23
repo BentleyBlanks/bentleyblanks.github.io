@@ -281,8 +281,11 @@ export const FRONT_RESERVE_ENTRIES=Object.freeze([
 /** Tank escort slots at the block point (brain-owned, contract §5.7): two pairs in the road-side
  *  ditches, one pair 6-7 m ahead of the hull, one pair beside it. Shift with the tank's progress. */
 export const FRONT_TANK_ESCORT_SLOTS=Object.freeze([
-  {id:"TankEscortA",x:31.8,z:-164.2,role:"escort"},{id:"TankEscortB",x:31.2,z:-170.8,role:"escort"},
-  {id:"TankEscortC",x:37.4,z:-163.4,role:"escort"},{id:"TankEscortD",x:36.8,z:-172,role:"escort"},
+  // 2026-09-24: A and C moved off the tank's south side. From there they looked along the berm's south slope at the
+  // gap (42/47 m), so while they lived FrontBattle.InfantryBlockade kept the gap shut after the tank was disabled
+  // (03-06 cold start stuck on lastGuardsWithdrawn). The tank seals the gap; its escorts guard the tank.
+  {id:"TankEscortA",x:28.8,z:-171.4,role:"escort"},{id:"TankEscortB",x:31.2,z:-170.8,role:"escort"},
+  {id:"TankEscortC",x:39.4,z:-172.2,role:"escort"},{id:"TankEscortD",x:36.8,z:-172,role:"escort"},
 ].map(Object.freeze));
 /** Ambient-fire authorised points per stage (contract §2.9: never the player's live position,
  *  baseAccuracy 0, no TTK). y is metres above the shared ground at (x,z). gap:true points are

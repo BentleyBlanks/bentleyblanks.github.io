@@ -143,7 +143,7 @@ export const FRONT_SPACE=Object.freeze({
   // Flank group craters (they kneel in them; craters never block a rush) and escort-slot craters.
   flankCraters:[[40.6,-181.6,2.2],[40.4,-185.4,1.6],[40.8,-178.8,1.3],[40.2,-175.2,2.0],[42.6,-174.2,1.4],
     [39.7,-163.6,1.9]].map(([x,z,r])=>Object.freeze({x,z,r})),
-  escortCraters:[[31.8,-163.8,1.4],[37.4,-163,1.3],[36.8,-172.4,1.3]].map(([x,z,r])=>Object.freeze({x,z,r})),
+  escortCraters:[[28.8,-171.4,1.3],[39.4,-172.2,1.3],[36.8,-172.4,1.3]].map(([x,z,r])=>Object.freeze({x,z,r})),
   // Named tank aim points for FRONT_TANK_PATH faceTo/turretTo (y = metres above the shared ground).
   tankTargets:Object.freeze({
     nest:Object.freeze({x:25.9,z:-153.9,y:1.25}),            // the right nest's MG seat

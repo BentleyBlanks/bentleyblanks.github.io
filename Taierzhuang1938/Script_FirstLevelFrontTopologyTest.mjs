@@ -12,7 +12,7 @@ import {FRONT_SORTIE as S,FRONT_SPACE as SP,FRONT_TANK_PATH as TP,FrontTankIndex
 import {FRONT_BATTLE_TUNING as B} from "./Data_Tuning_FirstLevelFront.mjs";
 import {FRONT_BREAKABLES,FRONT_UNBREAKABLE} from "./Data_FirstLevelFrontBreakables.mjs";
 import {MISSION_LAYOUT as L} from "./Data_FirstLevelMissionLayout.mjs";
-import {FRONT_GUARD_POSTS,FRONT_FLANK_GROUP,FrontAssaultLane} from "./Data_FirstLevelMissionFront.mjs";
+import {FRONT_GUARD_POSTS,FRONT_FLANK_GROUP,FrontAssaultLane,FRONT_TANK_ESCORT_SLOTS} from "./Data_FirstLevelMissionFront.mjs";
 import {TANK_HEIGHTS as TH} from "./Data_FirstLevelSpaceKeyframes.mjs";
 import {MISSION_ENCOUNTERS as E} from "./Data_FirstLevelMission.mjs";
 import {SampleMissionTerrain as G,SampleMissionNaturalHeight as N} from "./Data_FirstLevelMissionTerrain.mjs";
@@ -146,6 +146,11 @@ for(const e of S.enemies){
   }
 }
 console.log(`ok 05 cut-in pair hidden from the gap and the backslope: ${S.enemies.length}`);
+// The tank seals the gap; its escorts guard the tank. An escort slot that sees the gap keeps InfantryBlockade on after the
+// tank is disabled, and the last guards never withdraw (03-06 cold start 09.24: stuck on lastGuardsWithdrawn).
+for(const e of FRONT_TANK_ESCORT_SLOTS)for(const p of [S.gap,{x:S.gap.x,z:S.gap.z-2},{x:S.gap.x,z:S.gap.z+2}])for(const h of [.9,1.35])
+  assert.notEqual(Sight(Eye(e,h),Eye(p,B.guardHeightM),{wire:true}),null,`escort slot ${e.id} (eye ${h} m) cannot see the gap point ${p.x},${p.z}`);
+console.log(`ok tank escort slots hidden from the gap: ${FRONT_TANK_ESCORT_SLOTS.length}`);
 // The backslope scrape must not be enfiladed: no planned enemy start or lane point (front, flank group, 04 push)
 // sees a kneeling guard on it. The flank group's last line sits south of the berm's east end, on the scrape's
 // axis; without ScrapeEastTraverse it killed the whole second batch in the 03-06 cold start (guardBatchLost).
