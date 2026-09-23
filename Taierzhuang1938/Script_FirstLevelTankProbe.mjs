@@ -23,6 +23,7 @@ import { ParseCampaignArgs, OpenCampaign, CloseCampaign, CaptureFailure, Install
 import { Drive as DriveFront } from "./Script_FirstLevelCampaignFront.mjs";
 import { FRONT_SORTIE } from "./Data_FirstLevelFrontRoute.mjs";
 import { TANK, TANK_TEMP_PATH } from "./Data_Tuning_Tank.mjs";
+import { LanePoint, YawTo } from "./Script_FirstLevelTankBrain.mjs";
 
 const argv = process.argv;
 const photos = !argv.includes("--no-photos");
@@ -62,7 +63,7 @@ async function InstallSampler(page, lane) {
       probe.samples.push({
         t: Number(time.toFixed(2)), stage: R.flow.stage.id, present,
         tank: present ? { x: +t.x.toFixed(2), z: +t.z.toFixed(2), state: t.damageState, speed: +(t.speed || 0).toFixed(2),
-          rpm: Math.round(t.rpm || 0), load: +(t.load || 0).toFixed(2), turretYaw: +(t.turretYaw || 0).toFixed(3),
+          rpm: Math.round(t.rpm || 0), load: +(t.load || 0).toFixed(2), turretYaw: +(t.turretYaw || 0).toFixed(3), hullYaw: +(t.hullYaw || 0).toFixed(3),
           cranking: !!t.cranking, phase: t.gunPhase || null, target: t.target || null } : null,
         player: p ? { x: +p.position.x.toFixed(2), z: +p.position.z.toFixed(2), alive: p.Alive, health: Math.round(p.health) } : null,
         seen, hull, aimed, hullAimed,
@@ -113,8 +114,20 @@ function Metrics(samples, debug) {
     const covered = tankStage.filter(threatened).length / Math.max(1, tankStage.length);
     return { point: q, threatenedShare: Round(covered, 3), safeWindows: Windows(tankStage, (s) => !threatened(s), 2).map(([a, b]) => [Round(a, 1), Round(b, 1)]) };
   });
+  // 玩家真在攻击支路上的那段时间里（离沟线 ≤ radiusM、领过集束弹、车还没哑）：他脚下那段沟被炮塔 / 车体机枪指着的占比，
+  // 以及 ≥ 2 s 的安全窗口（公平：要有能冲的空当）。沟线与取点口径同运行时（TANK_TEMP_PATH.lanes + LanePoint）。
+  const laneSpec = (TANK_TEMP_PATH.lanes || []).find((l) => l.id === "attackLane");
+  const Aimed = (yaw, from, q) => Math.abs(Wrap(yaw - YawTo(from, q)));
+  const onLane = laneSpec ? tankStage.map((s) => {
+    const q = s.player?.alive ? LanePoint(laneSpec, s.player) : null;
+    return q ? { t: s.t, threatened: Aimed(s.tank.turretYaw, s.tank, q) < 0.35 || Aimed(s.tank.hullYaw ?? s.tank.turretYaw, s.tank, q) < 0.45 } : null;
+  }).filter(Boolean) : [];
+  const onLaneThreat = { samples: onLane.length, seconds: Round(onLane.length * 0.1, 1),
+    threatenedShare: Round(onLane.filter((s) => s.threatened).length / Math.max(1, onLane.length), 3),
+    safeWindows: Windows(onLane, (s) => !s.threatened, 2).map(([a, b]) => [Round(a, 1), Round(b, 1)]) };
   const reactions = {};
   for (const r of tel.reactions || []) reactions[r.kind] = (reactions[r.kind] || 0) + 1;
+  const stageAt = (t) => samples.find((x) => x.t >= t)?.stage ?? null;
   const disabledAt = log.states.find((s) => s.state === "Disabled")?.t ?? null;
   const afterDisable = disabledAt == null ? [] : samples.filter((s) => s.t > disabledAt + 3 && s.audio);
   const audioSamples = samples.filter((s) => s.audio);
@@ -139,6 +152,11 @@ function Metrics(samples, debug) {
       byStage: Object.fromEntries(["Support", "MachineGun", "Tank"].map((st) => [st, bursts.filter((b) => {
         const s = samples.find((x) => x.t >= b.t); return s?.stage === st; }).length])) },
     laneThreat,
+    onLaneThreat,
+    tankStageShots: { total: shots.filter((s) => s.stage === "Tank").length,
+      byTarget: shots.filter((s) => s.stage === "Tank").reduce((o, s) => ({ ...o, [s.target]: (o[s.target] || 0) + 1 }), {}) },
+    breaks: (log.breaks || []).map((b) => ({ ...b, t: Round(b.t), stage: b.stage ?? stageAt(b.t) })),
+    entry: log.entry, luoFinish: log.luoFinish, frames: log.frames,
     reactions,
     states: log.states.map((s) => ({ ...s, t: Round(s.t) })),
     audio: { maxLiveLoops: Math.max(0, ...audioSamples.map((s) => s.audio.live)), byStage,
@@ -150,6 +168,7 @@ function Metrics(samples, debug) {
 async function RunCampaign() {
   const options = ParseCampaignArgs(["node", "x", "--campaign", "--stage-from=3", "--stage-to=6", "--audio", "--probe-front-gun"]);
   options.suite = "FirstLevelTankProbe";
+  options.tankProbe = true;
   const ctx = await OpenCampaign(options);
   const { page, output } = ctx;
   try {
@@ -174,8 +193,41 @@ async function RunCampaign() {
     assert.ok(metrics.states.some((s) => s.state === "MobilityKill") && metrics.states.some((s) => s.state === "Disabled"),
       "two-stage damage: MobilityKill then Disabled");
     assert.ok(metrics.audio.loopsAfterDisable === 0, "no tank loop keeps running after the engine dies");
+    // 05 压迫感（审查 2026-09-24）：攻击支路上真有威胁、也真有空当；主炮不再白打打不死的剧情人物；机枪在 05 开火。
+    assert.ok(metrics.onLaneThreat.samples >= 30, `the probe spent time on the attack lane (${metrics.onLaneThreat.seconds} s)`);
+    assert.ok(metrics.onLaneThreat.threatenedShare >= 0.25,
+      `05: the tank covers the player's stretch of the attack lane ≥ 25% of the time (${metrics.onLaneThreat.threatenedShare})`);
+    assert.ok(metrics.onLaneThreat.safeWindows.length >= 1 || metrics.onLaneThreat.threatenedShare < 1,
+      "05: there is a ≥ 2 s window to move on the attack lane");
+    const essentialShots = ["heyoutian", "luo", "liuwencai", "zhou"].reduce((n, id) => n + (metrics.tankStageShots.byTarget[id] || 0), 0);
+    assert.ok(essentialShots <= 1, `05: main gun no longer wastes shells on script-essential companions (${JSON.stringify(metrics.tankStageShots.byTarget)})`);
+    assert.ok(metrics.mg.byStage.Tank >= 1, `05: the hull MG fires (${metrics.mg.byStage.Tank} bursts)`);
+    // 04：打掩体真把墙打掉一截（临时数据 RightNestFrontRest / RightNestNorthRuin）。
+    assert.ok(metrics.breaks.some((b) => b.stage === "MachineGun"), `04: at least one cover segment is shot away (${JSON.stringify(metrics.breaks)})`);
+    // 断履带以后还会打；第二颗扔上后甲板 = 炸发动机舱。
+    const disabled = metrics.states.find((s) => s.state === "Disabled");
+    assert.ok(/^engine|^turretRing/.test(disabled?.zone || ""), `second bundle on the engine deck disables through the engine (${disabled?.zone})`);
     console.log(`ok tank probe: ${metrics.shots.length} shots, ${metrics.mg.bursts} MG bursts, appearance at ${metrics.appearance.stage} ${metrics.appearance.distance} m (heard ${metrics.appearance.heardBeforeSeenS} s earlier)`);
   } catch (error) {
+    // 卡住的诊断（审查 2026-09-24：05 取弹沟 (27,−120) 连续两次「三个 chunk 没挪窝」）：
+    // 按键、躲雷、速度、姿态、周围 1.5 m 的实体与人、附近弹坑，先分清是物理挡住还是驾驶器逻辑。
+    const stuck = await page.evaluate(() => {
+      const g = window.Tengxian, p = g.player, r = g.Debug.FirstLevelMissionRuntime(), at = p.position;
+      const near = (x, z, m) => Math.hypot(x - at.x, z - at.z) < m;
+      const colliders = (g.battlefield.colliders || []).filter((b) => b?.c && b?.h && Math.abs(b.c[0] - at.x) < b.h[0] + b.h[2] + 1.5
+        && Math.abs(b.c[2] - at.z) < b.h[0] + b.h[2] + 1.5).slice(0, 12)
+        .map((b) => ({ id: b.id || null, tag: b.tag || null, c: b.c.map((v) => +v.toFixed(2)), h: b.h.map((v) => +v.toFixed(2)), ry: b.ry || 0 }));
+      const people = g.ai.soldiers.filter((s) => s.alive && near(s.position.x, s.position.z, 2.5))
+        .map((s) => ({ id: s.missionId || s.castId || s.id, side: s.side, x: +s.position.x.toFixed(2), z: +s.position.z.toFixed(2) }));
+      return { position: at.toArray().map((v) => +v.toFixed(2)), velocity: p.velocity?.toArray?.().map((v) => +v.toFixed(2)) ?? null,
+        stance: p.stance, onGround: p.onGround ?? null, health: p.health, bleeding: p.bleeding, bandages: p.bandages,
+        keys: [...(g.Debug.KeysDown?.() || [])], evading: !!window.MissionInputDriver?.EvadeGrenade?.(), routeBot: window.routeBot
+          ? { index: window.routeBot.index, target: window.routeBot.points?.[window.routeBot.index], stalled: window.routeBot.stalled } : null,
+        ground: g.battlefield.GroundHeight(at.x, at.z), colliders, people,
+        craters: (r.tank.impacts || []).filter((i) => near(i.x, i.z, 4)), breakables: r.tankRuntime?.breakables?.State?.() ?? null };
+    }).catch((e) => ({ error: String(e) }));
+    await fs.writeFile(path.join(output, "Data_TankProbeStuck.json"), JSON.stringify(stuck, null, 2)).catch(() => {});
+    console.log("STUCK_DIAG", JSON.stringify(stuck).slice(0, 3000));
     await CaptureFailure(ctx);
     throw error;
   } finally {

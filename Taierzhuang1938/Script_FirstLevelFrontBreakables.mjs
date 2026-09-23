@@ -6,7 +6,7 @@
 // 只做**数据驱动的分段体块**：每个可破坏物预先建好每一段状态的网格，炮弹落在近旁就
 // 切到下一段 —— 换可见性 + 物理 AddSolid/RemoveSolid，碎块走 VFX 池。
 //
-// 数据（Space 包的 Data_FirstLevelFrontBreakables.mjs 会取代下面的 FRONT_BREAKABLES_TEMP）：
+// 数据（Space 包的 Data_FirstLevelFrontBreakables.mjs 会取代 Data_Tuning_Tank.FRONT_BREAKABLES_TEMP）：
 //   {
 //     id,                 // 唯一名
 //     block?,             // 接管 MISSION_LAYOUT.blocks 里的哪一块（布局里最好标 dynamic:true，
@@ -21,37 +21,15 @@
 //     hitRadiusM,         // 炮弹落点离墙面这么近才算打到（米）
 //     minDamage?,         // 炮弹伤害不到这个数不算（手榴弹默认不够）
 //   }
-// 永远不可破坏：阵位后墙、支沟、守军安全区（NEVER_BREAKABLE；数据里写了也拒绝）。
+// 永远不可破坏：阵位后墙、支沟、守军安全区（Data_Tuning_Tank.NEVER_BREAKABLE_RULES：按体块名 + 按区域；
+// 数据里写了也拒绝）。
 // ===========================================================================
 import * as THREE from "three";
+import { FRONT_BREAKABLES_TEMP, NEVER_BREAKABLE_RULES } from "./Data_Tuning_Tank.mjs";
 
-/** 这几块写进数据也不许破：阵位后墙（挡战车直射的唯一实遮挡）、东墙、支沟与守军安全区。 */
-export const NEVER_BREAKABLE = Object.freeze(["RightNestRearWall", "RightNestEastWall", "SapTrench", "GuardSafeZone"]);
-
-/**
- * 现布局上的临时数据（2026-09-23 战车包演示用）。Space 包重排后换成 Data_FirstLevelFrontBreakables。
- * RightNestFrontRest：右阵位胸墙 3.4 m，缴获的机枪架在正中（x 27）—— 缺口只开在**西半段**，
- *   机枪托不会悬空；1.5 → 1.1 → 0.7 m 三段。
- * RightNestNorthRuin：阵位北面那截残墙（挡着战车看阵位的那一块），两段。
- */
-export const FRONT_BREAKABLES_TEMP = Object.freeze([
-  Object.freeze({
-    id: "RightNestFrontRestBreak", block: "RightNestFrontRest", hitRadiusM: 2.4, minDamage: 60,
-    stages: Object.freeze([
-      Object.freeze([[-1.7, 1.7, 1.5]]),
-      Object.freeze([[-1.7, -0.6, 1.1], [-0.6, 1.7, 1.5]]),
-      Object.freeze([[-1.7, -1.1, 0.7], [-1.1, -0.6, 1.0], [-0.6, 1.7, 1.5]]),
-    ]),
-  }),
-  Object.freeze({
-    id: "RightNestNorthRuinBreak", block: "RightNestNorthRuin", hitRadiusM: 2.6, minDamage: 60,
-    stages: Object.freeze([
-      Object.freeze([[-2, 2, 1.2]]),
-      Object.freeze([[-2, 0, 1.2], [0, 2, 0.6]]),
-      Object.freeze([[-2, -0.8, 0.8], [-0.8, 2, 0.45]]),
-    ]),
-  }),
-]);
+export { FRONT_BREAKABLES_TEMP, NEVER_BREAKABLE_RULES };
+/** 按体块名的那一半（兼容旧名字）。 */
+export const NEVER_BREAKABLE = NEVER_BREAKABLE_RULES.ids;
 
 const Clamp = (x, a, b) => Math.max(a, Math.min(b, x));
 
@@ -83,27 +61,41 @@ export class FirstLevelFrontBreakables {
    * @param {object} host { scene, battlefield, physics, vfx, audio?, layout? }
    * @param {Array} specs 见文件头
    */
-  constructor({ scene, battlefield, physics, vfx = null, audio = null, layout = null }, specs = FRONT_BREAKABLES_TEMP) {
-    Object.assign(this, { scene, battlefield, physics, vfx, audio, layout });
+  constructor({ scene, battlefield, physics, vfx = null, audio = null, layout = null }, specs = FRONT_BREAKABLES_TEMP,
+    rules = NEVER_BREAKABLE_RULES) {
+    Object.assign(this, { scene, battlefield, physics, vfx, audio, layout, rules });
     this.root = new THREE.Group();
     this.root.name = "FirstLevelFrontBreakables";
     scene.add(this.root);
     this.items = [];
     this.geometries = [];
     this.log = [];
+    this.rejected = [];
     for (const raw of specs) {
-      if (NEVER_BREAKABLE.includes(raw.id) || NEVER_BREAKABLE.includes(raw.block)) {
-        console.warn(`[FrontBreakables] ${raw.id} 在永不可破坏名单里，跳过`);
-        continue;
-      }
       const item = this.Build(raw);
       if (item) this.items.push(item);
     }
+  }
+  /** 永不可破坏：按体块名，或外廓碰到受保护区域（layout.zones 的语义 id）。返回理由，可破就返回 null。 */
+  Protected(raw, spec) {
+    const ids = this.rules?.ids || [];
+    if (ids.includes(raw.id) || (raw.block && ids.includes(raw.block))) return "id";
+    for (const zoneId of this.rules?.zones || []) {
+      const zone = this.layout?.zones?.find((z) => z.id === zoneId);
+      if (zone && DistanceToWall(spec, zone) <= (zone.radius ?? 0)) return `zone:${zoneId}`;
+    }
+    return null;
   }
   Build(raw) {
     const block = raw.block ? this.layout?.blocks?.find((b) => b.id === raw.block) : null;
     if (raw.block && !block) { console.warn(`[FrontBreakables] 找不到体块 ${raw.block}`); return null; }
     const spec = { ...raw, x: raw.x ?? block.x, z: raw.z ?? block.z, w: raw.w ?? block.w, d: raw.d ?? block.d, ry: raw.ry ?? block?.ry ?? 0 };
+    const why = this.Protected(raw, spec);
+    if (why) {
+      this.rejected.push({ id: raw.id, why });
+      console.warn(`[FrontBreakables] ${raw.id} 永不可破坏（${why}），跳过`);
+      return null;
+    }
     const base = raw.base ?? (block ? block.y - block.h / 2 : this.battlefield.GroundHeight(spec.x, spec.z) - 0.1);
     // 墙脚到原块顶的高度：数据里的 top 按「离地」写，地面低于墙脚时补上这段。
     const ground = this.battlefield.GroundHeight(spec.x, spec.z);
@@ -145,6 +137,8 @@ export class FirstLevelFrontBreakables {
     };
     let vertices = 0;
     const floor = block.y - block.h / 2;
+    // 记下原样：Dispose（读档 / 重建任务运行时而战场不重建）时把顶点和碰撞盒还回去。
+    const saved = { vertices: [], colliders: [] };
     for (const mesh of this.battlefield.meshes || []) {
       if (mesh.name !== "FirstLevelWhitebox_StaticWhiteBoxes" || !mesh.geometry?.attributes?.position) continue;
       const position = mesh.geometry.attributes.position;
@@ -156,6 +150,7 @@ export class FirstLevelFrontBreakables {
         v.fromBufferAttribute(position, i);
         if (!identity) v.applyMatrix4(mesh.matrixWorld);
         if (!Inside(v.x, v.y, v.z)) continue;
+        saved.vertices.push({ position, i, x: position.getX(i), y: position.getY(i), z: position.getZ(i), mesh });
         // 塌到墙脚（埋在土里）：三角形退化，不画。
         v.set(block.x, floor, block.z);
         if (!identity) v.applyMatrix4(mesh.matrixWorld.clone().invert());
@@ -171,11 +166,30 @@ export class FirstLevelFrontBreakables {
       const same = Math.abs(box.c[0] - block.x) < eps && Math.abs(box.c[1] - block.y) < eps && Math.abs(box.c[2] - block.z) < eps
         && Math.abs(box.h[0] - block.w / 2) < eps && Math.abs(box.h[1] - block.h / 2) < eps && Math.abs(box.h[2] - block.d / 2) < eps;
       if (!same) continue;
-      if (box._physicsHandle != null) this.physics?.RemoveSolid(box._physicsHandle);
+      const hadHandle = box._physicsHandle != null;
+      if (hadHandle) this.physics?.RemoveSolid(box._physicsHandle);
       list.splice(i, 1); removed++;
+      saved.colliders.push({ box, index: i, hadHandle });
     }
     this.RefreshQueries();
+    this.takeovers ||= [];
+    this.takeovers.push(saved);
     return { vertices, colliders: removed };
+  }
+  /** 把 TakeOverStatic 塌掉的顶点、摘掉的碰撞盒还回去。 */
+  RestoreStatic() {
+    const list = this.battlefield.colliders || [];
+    for (const saved of (this.takeovers || []).reverse()) {
+      const touched = new Set();
+      for (const v of saved.vertices) { v.position.setXYZ(v.i, v.x, v.y, v.z); touched.add(v.mesh); }
+      for (const mesh of touched) { mesh.geometry.attributes.position.needsUpdate = true; mesh.geometry.computeBoundingSphere(); }
+      for (const { box, index, hadHandle } of saved.colliders.reverse()) {
+        // 只把当初真从物理世界里摘掉的那块加回去（没有 handle 的本来就不在物理世界里，别凭空多一块）。
+        if (hadHandle) this.physics?.AddSolid(box);
+        list.splice(Math.min(index, list.length), 0, box);
+      }
+    }
+    this.takeovers = [];
   }
   RefreshQueries() {
     this.physics?.RefreshStaticQueries?.();
@@ -251,5 +265,7 @@ export class FirstLevelFrontBreakables {
     for (const geometry of this.geometries) geometry.dispose();
     this.scene.remove(this.root);
     this.items = [];
+    this.RestoreStatic();
+    this.RefreshQueries();
   }
 }

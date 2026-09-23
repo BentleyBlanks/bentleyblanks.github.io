@@ -244,7 +244,7 @@ export class CombatSystem {
   FireShell(from, target, { flight = SHELL.flightFallbackS, kind = "Shell75",
     radius = SHELL.radiusFallbackM, damage = SHELL.damageFallback,
     OnImpact = null, byPlayer = false, sourceCollider = null,
-    incoming = true, report = false, Elapsed = null } = {}) {
+    incoming = true, report = false, Elapsed = null, occludedSuppression = false } = {}) {
     // 一发炮弹的三声里的前两声（第三声是落地，走 Blast）。**写在这儿而不是调用点**：
     // 见 SHELL.incomingCue 的抬头 —— 原来只有序章那两处自己补了啸声，
     // 第一关的军列炮击、前沿弹着点、战车主炮全程是哑的。
@@ -265,7 +265,8 @@ export class CombatSystem {
     const velocity = target.clone().sub(from).divideScalar(flight);
     velocity.y += GRAVITY * flight * 0.5;
     const shell = { id: ++this.shellSerial, from: from.clone(), target: target.clone(), position: from.clone(),
-      velocity, initialVelocity: velocity.clone(), age: 0, flight, kind: ExplosiveIdFor(kind), radius, damage, OnImpact, byPlayer, sourceCollider, Elapsed };
+      velocity, initialVelocity: velocity.clone(), age: 0, flight, kind: ExplosiveIdFor(kind), radius, damage, OnImpact, byPlayer, sourceCollider, Elapsed,
+      occludedSuppression };
     this.shellVisuals.Create(shell);
     this.shells.push(shell); return shell;
   }
@@ -313,7 +314,8 @@ export class CombatSystem {
         this.shellVisuals.Retire(shell); this.shells.splice(i, 1); continue;
       }
       if (!impact) continue;
-      this.Blast(impact, shell.radius, shell.damage, "shell", null, shell.byPlayer, null, shell.kind);
+      this.Blast(impact, shell.radius, shell.damage, "shell", null, shell.byPlayer, null, shell.kind, null,
+        shell.occludedSuppression ? { occludedSuppression: true } : null);
       shell.OnImpact?.(impact); this.shellVisuals.Retire(shell); this.shells.splice(i, 1);
     }
   }
@@ -661,7 +663,7 @@ export class CombatSystem {
    * 伤害按距离平方衰减，并且**被墙挡住就不吃伤害** —— 隔一堵墙互相扔手榴弹是
    * 台儿庄巷战的标准打法，如果墙不挡弹片，那堵墙就白存在了。
    */
-  Blast(position, radius, damage, kind, hurtSide = null, byPlayer = false, onHit = null, explosiveId = kind, ownerId = null) {
+  Blast(position, radius, damage, kind, hurtSide = null, byPlayer = false, onHit = null, explosiveId = kind, ownerId = null, options = null) {
     this.host.onBlast?.({position:position.clone(),radius,damage,kind,hurtSide,byPlayer,explosiveId,ownerId});
     if (this.host.vfx) this.host.vfx.Explosion(position, { radius, kind });
     // 先改场景拓扑、再算人物遮挡：爆压把墙打穿的同一瞬间，洞口后面的人应该吃到
@@ -758,7 +760,9 @@ export class CombatSystem {
     if (player && player.Alive) {
       const at = player.position.clone(); at.y += BLAST.playerHitRiseM;
       // 墙后近炸只给压制（见 BLAST.occludedSuppression*）：与伤害同一条遮挡判据，挡住了才走这支。
-      if (BLAST.occludedSuppressionIds?.includes(explosiveId)) {
+      // 只有调用方显式带了开关的那一发（第一关战车主炮，Script_FirstLevelTankRuntime.Fire）才走 ——
+      // 不按弹种认，别的关卡同样打 57 mm 的九七式口径不变。
+      if (options?.occludedSuppression) {
         const dist = at.distanceTo(from);
         if (dist <= BLAST.occludedSuppressionM) {
           const dir = this.tmpB.subVectors(at, from).divideScalar(dist || 1);

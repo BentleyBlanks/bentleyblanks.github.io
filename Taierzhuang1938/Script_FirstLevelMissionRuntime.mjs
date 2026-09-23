@@ -1,6 +1,7 @@
 import { FirstLevelFrontBattle } from "./Script_FirstLevelFrontBattle.mjs";
 // 03–05 战车：纯规则大脑 + 接线层（战车包 2026-09-23）。开关 Data_Tuning_Tank.brainEnabled，关掉走下面旧的定时插值。
 import { FirstLevelTankRuntime } from "./Script_FirstLevelTankRuntime.mjs";
+import { BundleResupplyOpen } from "./Script_FirstLevelTankBrain.mjs";
 import { TANK } from "./Data_Tuning_Tank.mjs";
 import { FirstLevelTransition } from "./Script_FirstLevelTransition.mjs";
 import { FRONT_SORTIE as Sortie, SortieCrawlBlocked } from "./Data_FirstLevelFrontRoute.mjs";
@@ -1244,7 +1245,8 @@ export class FirstLevelMissionRuntime {
       "MissionBundle",
       A.bundle,
       () => this.Text("bundle"),
-      () => this.flow.stage.id === "Tank" && this.Has("bundleRouteTraversed") && (!this.tank.immobilized || !this.Has("bundleTaken")),
+      // 大脑接管时断履带（MobilityKill）还没解决：照样能回来补（否则两捆都没炸到位就卡死）。
+      () => this.flow.stage.id === "Tank" && this.Has("bundleRouteTraversed") && BundleResupplyOpen(this.tank, this.Has("bundleTaken")),
       () => {
         const missing = Math.max(0, R.bundleSupplyCount - this.Inventory().bundles);
         const bandages = Math.max(0, R.bundleSupplyBandages - this.player.bandages);

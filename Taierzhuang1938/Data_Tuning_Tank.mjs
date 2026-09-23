@@ -107,6 +107,16 @@ export const TANK = Object.freeze({
     warningRadiusM: 4.5,
     // 「新暴露」：玩家离开视线超过这么久再露头，下一发重新从警告弹开始。
     reexposeS: 6,
+    // 目标离上一发瞄准时的位置挪开这么远（跑动、换掩体）：散布回到 scatterFirstM 重新收敛。
+    // 2026-09-24 审查实测：04 撤离途中一直在视线里往后撤的玩家吃到越来越准的满伤害炮弹（落点 11.4 / 2.6 / 7.2 m）。
+    moveResetM: 4,
+    // 剧本撤离窗口（04 阵位被压住以后、玩家回到阵位后墙 rightRearReached 以前）：战车照样开炮、照样砸土，
+    // 但落在玩家弹片范围里的那一发只按这个比例伤人，权重也降一档（先封缺口）。「退后墙！」是命令，不是陷阱。
+    retreatDamageScale: 0.2,
+    retreatWeightScale: 0.5,
+    // 打不死的剧情人物（scriptEssential：何有田、罗班长…血量托底到 1）：权重乘这个数。
+    // 2026-09-24 审查实测：05 里主炮 11 发全打 60–80 m 外守左机枪的何有田，玩家那条攻击支路 3–10% 的时间被指着。
+    essentialScale: 0.12,
     // 目标权重（× 可见度 × 距离项 + 惯性）。被人操作的缴获机枪最高。
     weights: Object.freeze({
       mannedMg: 1.7, player: 1.0, leftGun: 1.25, luo: 0.9, guard: 0.75, squad: 0.6, zone: 0.55,
@@ -227,12 +237,18 @@ export const TANK = Object.freeze({
     zones: Object.freeze([
       Object.freeze({ id: "trackL", min: [-1.075, 0, -2.15], max: [-0.62, 1.1, 2.15], kind: "track", side: -1 }),
       Object.freeze({ id: "trackR", min: [0.62, 0, -2.15], max: [1.075, 1.1, 2.15], kind: "track", side: 1 }),
-      Object.freeze({ id: "engineDeck", min: [-0.75, 1.2, 0.4], max: [0.75, 1.75, 2.1], kind: "engine" }),
+      // 后甲板：模型里的甲板在 1.2–1.75 m；但车的碰撞盒是一整只 2.56 m 高的盒子（MissionView.tankCollider），
+      // 扔上车顶的那捆停在盒顶 2.56 m 上 —— 顶到 2.62 才认得出「落在后甲板上」。[几]
+      Object.freeze({ id: "engineDeck", min: [-0.75, 1.2, 0.4], max: [0.75, 2.62, 2.1], kind: "engine" }),
       Object.freeze({ id: "engineGrille", min: [-0.8, 0.3, 2.0], max: [0.8, 1.5, 2.2], kind: "engine" }),
       Object.freeze({ id: "turretRing", min: [-0.75, 1.55, -1.47], max: [0.75, 1.95, 0.03], kind: "ring" }),
     ]),
     // 熄火：发动机咳嗽到停的时长（音频与排气读 rpm）。
     stallS: 1.8,
+    // 罗班长补刀（契约 §2 第 7 条「必须再投或罗班长补一枚」）：断了履带、玩家手里一捆集束弹都没有了，
+    // 这样僵了这么久，由他往舱盖里塞一颗（Disabled，zone "luoHatch"）。兜底卡关，不是常规路线：
+    // 常规是回弹药屋再领（MobilityKill 以后弹药屋照样开）。
+    luoFinishS: 30,
   }),
 
   // --- 声音（Script_TankAudio 读；Step 2 · 2026-09-23） -------------------------------
@@ -353,19 +369,93 @@ export const TANK = Object.freeze({
     }),
     // 开炮：炮口焰 cannon 档 + 地面尘环（1–1.5 s 遮蔽 = 天然窗口）。
     cannonMuzzleScale: 1,
-    groundRing: Object.freeze({ radiusM: 3.2, lifeS: 1.3 }),
+    // 2026-09-24 审查：原 16 粒 / 不透明 0.34 / 终态 1.3–2.0 m 在截图里「只在车脚边一点土」，挡不住车前视线。
+    // 两圈（外圈铺开、内圈堆高）、粒子数有下限（低画质 spawnScale 也减不没）、终态 2.4–3.4 m、不透明 0.55。
+    groundRing: Object.freeze({ radiusM: 3.6, lifeS: 1.4, count: 34, minCount: 22, opacity: 0.55, sizeStart: 0.5,
+      sizeEnd: Object.freeze([2.4, 3.4]), rise: Object.freeze([0.5, 1.2]), rings: 2 }),
     // 震屏：25 m 内隆隆（按负载）；30 m 内开炮一记俯仰冲击。
     rumbleRangeM: 25,
     fireKickRangeM: 30,
     fireKickPitchRad: -0.035,
   }),
+
+  // --- 进场闸（运行时读） ---------------------------------------------------------
+  // 03 阵位夺下（rightNestCaptured）那一刻车才开进图。2026-09-24 实测：临时路线起点离阵位 130 m、有视线，
+  // 能不能看见全靠雾 —— 雾挡不住的机位下车会凭空冒出来。所以只在「起点不在玩家视野里」时才进场：
+  // 没有视线，或者不在玩家朝向 ±offViewRad 以内（屏幕外）。等太久（maxWaitS）照样进，不卡流程。
+  entry: Object.freeze({ offViewRad: 1.15, maxWaitS: 30, lookY: 2.2 }),
+
+  // --- 运行时开销（契约 §6） -----------------------------------------------------------
+  perf: Object.freeze({
+    // 护兵锚点：模式没变时，锚点挪了这么远才重下一次 Defend（原 0.4 m ⇒ 巡航时每人约 5 Hz）。
+    escortRecommandM: 1.5,
+    // 停车推到路边掩体（AiCover）：在大脑给的锚点这么远以内找掩体点。
+    escortCoverSearchM: 5,
+    escortCoverRadiusM: 1.2,
+  }),
+
+  // --- 大脑喊话 → 台词（契约 §2 第 7 条「靠声音、炮塔指向和罗班长喊话传达窗口」） ------------------
+  // 大脑发出的 bark id → Data_FirstLevelMissionDialogue 的 cue id。null = Voice 包还没出这句，只记日志。
+  // 同一条 cue 两次之间至少隔 barkCooldownS。
+  barkCues: Object.freeze({
+    turretTraverse: null,   // 罗班长：「炮塔转过来了！趴下！」（预兆链前两次）
+    trackCut: null,         // 罗班长：「履带断了！还在打！再补一捆！」（MobilityKill）
+    tankDisabled: null,     // 何有田：「哑了！」
+    hatchShout: null,       // 日军车长开舱盖喊护兵
+    escortScatter: null,    // 日军护兵：「车旁有人！」
+    visionSlit: null,
+  }),
+  barkCooldownS: 8,
+});
+
+/** 大脑喊话 → 台词表（上面 TANK.barkCues 的只读别名，接线层用）。 */
+export const TANK_BARK_CUES = TANK.barkCues;
+
+// ---------------------------------------------------------------------------
+// 可破坏掩体：临时数据（2026-09-23 战车包在现布局上演示用；Space 包的 Data_FirstLevelFrontBreakables 会取代）。
+// 字段见 Script_FirstLevelFrontBreakables 文件头。
+// RightNestFrontRest：右阵位胸墙 3.4 m，缴获的机枪架在正中（x 27）—— 缺口只开在**西半段**，
+//   机枪托不会悬空；1.5 → 1.1 → 0.7 m 三段。
+// RightNestNorthRuin：阵位北面那截残墙（挡着战车看阵位的那一块），两段。
+// ---------------------------------------------------------------------------
+export const FRONT_BREAKABLES_TEMP = Object.freeze([
+  Object.freeze({
+    id: "RightNestFrontRestBreak", block: "RightNestFrontRest", hitRadiusM: 2.4, minDamage: 60,
+    stages: Object.freeze([
+      Object.freeze([[-1.7, 1.7, 1.5]]),
+      Object.freeze([[-1.7, -0.6, 1.1], [-0.6, 1.7, 1.5]]),
+      Object.freeze([[-1.7, -1.1, 0.7], [-1.1, -0.6, 1.0], [-0.6, 1.7, 1.5]]),
+    ]),
+  }),
+  Object.freeze({
+    id: "RightNestNorthRuinBreak", block: "RightNestNorthRuin", hitRadiusM: 2.6, minDamage: 60,
+    stages: Object.freeze([
+      Object.freeze([[-2, 2, 1.2]]),
+      Object.freeze([[-2, 0, 1.2], [0, 2, 0.6]]),
+      Object.freeze([[-2, -0.8, 0.8], [-0.8, 2, 0.45]]),
+    ]),
+  }),
+]);
+
+/**
+ * 永远不可破坏（任务书：阵位后墙、支沟、守军安全区）。数据里写了也拒绝。
+ *   ids   —— 按体块名：阵位后墙 / 东墙（挡战车直射的唯一实遮挡）、守军安全区的横墙。
+ *   zones —— 按区域（MISSION_LAYOUT.zones 的语义 id）：可破坏物外廓的任何一点落在区里就拒绝。
+ *            rightRear = 阵位后墙南侧的支沟岔口（后交通壕安全区）；withdrawalGap = 缺口与守军撤离安全区。
+ *            Space 重排后只要 zone 语义 id 不变，这条保护就跟着新布局走（不靠体块名对上）。
+ */
+export const NEVER_BREAKABLE_RULES = Object.freeze({
+  ids: Object.freeze(["RightNestRearWall", "RightNestEastWall", "GuardSafeTraverse"]),
+  zones: Object.freeze(["rightRear", "withdrawalGap"]),
 });
 
 // ---------------------------------------------------------------------------
 // 临时路点（现有布局）。Space 包正在重排 03–05，第二波 Front 包会换成新路；
 // 这里只为在现布局上跑通「露面 → 驶出 → 预兆 → 先压阵位 → 封口 → 05 挤压」。
 // [几] 2026-09-23 按 MISSION_LAYOUT.blocks + SampleMissionTerrain 扫过：全程车体外廓不碰实体；
-//   · 起点在北面约 60 m 外的高地后面（阶段 03 看不见，只听得见）；
+//   · 起点 (71,−265)：离阵位约 130 m。**不是**被地形挡住 —— 2026-09-24 探针实测阵位对起点有视线，
+//     03 里能不能看见全靠雾（用户定过不动雾）。所以运行时加了进场闸 TANK.entry：只在起点不在玩家
+//     视野里（没视线或在屏幕外）时开进来。Space 换新路时要把起点放到真有遮挡的地方，并加断言；
 //   · 绕开 NorthRuin 东墙（x ≥ 68.5）与 FieldRuin2（x ≥ 62.3 过 z −174）；
 //   · preview (55,−167)：阵位站姿只看得见炮塔、看不见车体（hull-down 剪影），炮口也够得着阵位；
 //   · firePointNest (50,−162)：同样 hull-down，炮口对站姿阵位有视线；
@@ -403,6 +493,17 @@ export const TANK_TEMP_PATH = Object.freeze({
     Object.freeze({ x: 27, z: -119, stage: "Tank" }),
     Object.freeze({ x: 35, z: -127, stage: "Tank" }),
     Object.freeze({ x: 38, z: -134, stage: "Tank" }),
+  ]),
+  // 区域火力（05）：攻击支路。车长知道这条沟（扫描点就是它），玩家一进这条沟的 radiusM 以内，
+  // 沿线离他最近、按 stepM 取整的那一点就成了区域目标（kind "zone"）：看不见就轰沟沿（泥土砸下来、
+  // 墙挡弹片只剩压制），站起来被看见就直接打人。预兆链照旧（手摇 → 瞄准停顿 → 开炮）。
+  // requireFact：领到集束弹以后才算（取弹前在后面等的人不挨）。点取自 FRONT_SORTIE.attackRoute，
+  // 起点往东挪 4 m 让开阵位后的集合点 (27,−127)。
+  lanes: Object.freeze([
+    Object.freeze({ id: "attackLane", stage: "Tank", requireFact: "bundleTaken", radiusM: 3.5, stepM: 3, weight: 2.5,
+      scatterM: Object.freeze([1.2, 2.6]),
+      points: Object.freeze([Object.freeze({ x: 31, z: -127 }), Object.freeze({ x: 35, z: -127 }),
+        Object.freeze({ x: 38, z: -134 }), Object.freeze({ x: 39, z: -140 })]) }),
   ]),
   stageOrder: Object.freeze(["Support", "MachineGun", "Tank", "Orders"]),
 });

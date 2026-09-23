@@ -8,6 +8,7 @@ import { MISSION_ENCOUNTERS, FRONT_BATTLE_OBJECTIVES as Objectives } from "./Dat
 import { MissionRouteProjection, MissionRoutePoint, MissionRouteLength, MissionRouteLookahead } from "./Script_FirstLevelMissionColumn.mjs";
 import { InstallMissionSentry } from "./Script_FirstLevelMissionPeople.mjs";
 import { FRONT_DEFENDERS } from "./Data_FirstLevelMissionFront.mjs";
+import { TankClearFact } from "./Script_FirstLevelTankBrain.mjs";
 const Distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const AliveBatch=batch=>batch.filter(g=>g.actor.alive);
 export function BatchRecovered(batch){return batch.length>0&&AliveBatch(batch).length>0&&AliveBatch(batch).every(g=>g.safe&&g.progress>=g.route.length);}
@@ -145,7 +146,8 @@ export class FirstLevelFrontBattle {
       if(r.Near(S.rear,B.rearArrivalM)&&Distance(this.Leader.position,S.rear)<B.rearArrivalM)r.Record("bundleReturned");
       return;
     }
-    if(!r.Has("tankImmobilized")){
+    // 大脑接管时断履带不算解决（炮塔机枪还活着、还封口）：带路人留在攻击位，Disabled 以后才撤。
+    if(!r.Has(TankClearFact(r.tank))){
       this.SetLeg("attack",S.attackRoute);
       if(r.Near(S.throw,B.attackArrivalM)&&Distance(this.Leader.position,S.throw)<B.rearArrivalM){r.Record("attackPositionReached");r.Say("BundleAttack");}
       return;

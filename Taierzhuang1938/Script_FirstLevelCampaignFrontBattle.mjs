@@ -94,15 +94,37 @@ export async function DriveFrontBattle(ctx){
   await WaitFact("bundleReturned",90,true);
   await Route(S.attackRoute,"RoadsideAttackBranch",{stance:"crouch",fight:true,crawl:true});
   await WaitFact("attackPositionReached",60,true);
-  // 两段毁伤（战车大脑）：第一颗断履带（MobilityKill，炮塔机枪照样打），要再补一颗才彻底哑火。
-  // 旧路径（没有大脑）一颗同帧两样全记，break 条件与原来一致。
-  for(let attempt=0;attempt<2;attempt++){
-    const thrown=await DriveBundleThrow(page,{aim:"track"});
+  // 两段毁伤（战车大脑）：第一颗越过车顶扔到远侧履带边（断履带 MobilityKill，车体挡弹片），炮塔机枪照样打，
+  // 要再补一颗才彻底哑火。旧路径（没有大脑）一颗同帧两样全记，break 条件与原来一致。
+  // 战车探针（ctx.options.tankProbe）：断履带以后在攻击位上蹲 ≥ 8 s，记下车在 MobilityKill 里有没有朝投掷者开火；
+  // 第二颗扔上车顶后甲板（aim "deck"），验发动机舱那一路。
+  const aims=ctx.options.tankProbe?["farTrack","deck"]:["farTrack","farTrack"];
+  for(let attempt=0;attempt<aims.length;attempt++){
+    if(attempt>0&&ctx.options.tankProbe){
+      const hold=await page.evaluate(()=>{
+        const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime(),tr=r.tankRuntime,start=r.time;
+        const shots0=tr?.log.shots.length??0,bursts0=tr?.brain?.telemetry.bursts.length??0;
+        if(g.player.stance==="stand")g.Debug.Key("KeyC");
+        for(let f=0;f<9*60&&g.player.alive&&r.tank.damageState==="MobilityKill";f++){
+          if(g.player.bleeding&&g.player.health<80)g.Debug.Key("KeyB");
+          g.StepFrames(1,1/60,false);
+        }
+        const bursts=(tr?.brain?.telemetry.bursts||[]).slice(bursts0),shots=(tr?.log.shots||[]).slice(shots0);
+        return {heldS:r.time-start,state:r.tank.damageState,alive:g.player.alive,health:g.player.health,shots,
+          bursts,atPlayer:bursts.filter(b=>b.target==="player"||b.target==="thrower").length+shots.filter(s=>s.target==="player").length};
+      });
+      await fs.writeFile(path.join(output,"Data_MobilityKillHold.json"),JSON.stringify(hold,null,2));
+      console.log("MOBILITY_KILL_HOLD",JSON.stringify({heldS:hold.heldS,state:hold.state,health:hold.health,atPlayer:hold.atPlayer,bursts:hold.bursts.length,shots:hold.shots.length}));
+      assert.ok(hold.alive,"player survives the MobilityKill hold");
+    }
+    const thrown=await DriveBundleThrow(page,{aim:aims[attempt]});
     await fs.writeFile(path.join(output,`Data_BundleThrow${attempt}.json`),JSON.stringify(thrown,null,2));
     const t=thrown.mission.tank;
-    console.log("BUNDLE_THROW",JSON.stringify({alive:thrown.alive,miss:thrown.blastMiss,state:t.damageState,immobilized:t.immobilized,fireDisabled:t.fireDisabled,
-      x:t.x,z:t.z,brainBlasts:thrown.mission.tankBrain?.log?.blasts?.slice(-1)}));
+    console.log("BUNDLE_THROW",JSON.stringify({aim:thrown.aimKind,alive:thrown.alive,health:thrown.health,selfBlast:thrown.selfBlast,miss:thrown.blastMiss,
+      state:t.damageState,immobilized:t.immobilized,fireDisabled:t.fireDisabled,x:t.x,z:t.z,land:thrown.land,brainBlasts:thrown.mission.tankBrain?.log?.blasts?.slice(-1)}));
     assert.ok(thrown.alive);
+    // 集束弹不该炸到扔它的人（车体挡着）：基线瞄车中心是 0；这里给 10 的余量（同一段时间里的步兵擦伤不算在内）。
+    if(t.brain)assert.ok(thrown.selfBlast<=10,`bundle ${aims[attempt]} must not blast the thrower (${thrown.selfBlast} HP)`);
     if(t.fireDisabled||(!t.brain&&t.immobilized))break;
   }
   state=await State();

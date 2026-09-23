@@ -62,6 +62,50 @@ export function SeededRng(seed = 1) {
 
 export function CreateTankBrain(pathData, tuning = TANK, options = {}) { return new TankBrain(pathData, tuning, options); }
 
+/**
+ * 「车解决了没有」看哪个事实：大脑接管时（tank.brain）断履带（MobilityKill）炮塔机枪还活着、还封着口，
+ * 要到 tankFireDisabled 才算；旧路径一颗弹同帧两样全记，仍看 tankImmobilized。
+ * 补弹、带路人撤退、「停了！」这几处都用它，不各写一套。
+ */
+export function TankClearFact(tank) { return tank?.brain ? "tankFireDisabled" : "tankImmobilized"; }
+/** 弹药屋还能不能再领集束弹：没领过，或车还没解决（大脑下 MobilityKill 以后照样能回去补）。 */
+export function BundleResupplyOpen(tank, bundleTaken) {
+  if (!bundleTaken) return true;
+  return tank?.brain ? !tank.fireDisabled : !tank?.immobilized;
+}
+/**
+ * 罗班长补刀（契约 §2 第 7 条「必须再投或罗班长补一枚」）：断了履带、玩家手里已经没有集束弹、
+ * 这样僵了 luoFinishS 秒 —— 由他往舱盖里塞一颗。兜底，防 MobilityKill 以后卡关。
+ * @param {{state:string, noBundleSince:number|null, now:number}} s
+ */
+export function LuoFinishDue({ state, noBundleSince, now }, tuning = TANK) {
+  return state === "MobilityKill" && noBundleSince != null && now - noBundleSince >= tuning.damage.luoFinishS;
+}
+/**
+ * 区域火力的落点（路点表 lanes[]）：玩家在沟线 radiusM 以内时，取沟线上离他最近、按 stepM 取整的那一点。
+ * 不在沟边返回 null。返回 { x, z, s（沿线里程）, d（玩家到沟线的距离） }。
+ */
+export function LanePoint(lane, p) {
+  const P = lane.points || [];
+  if (P.length < 2 || !p) return null;
+  let best = null, run = 0;
+  const segs = [];
+  for (let i = 1; i < P.length; i++) {
+    const a = P[i - 1], b = P[i], dx = b.x - a.x, dz = b.z - a.z, len = Math.hypot(dx, dz) || 1e-6;
+    const t = Clamp(((p.x - a.x) * dx + (p.z - a.z) * dz) / (len * len), 0, 1);
+    const d = Math.hypot(p.x - (a.x + dx * t), p.z - (a.z + dz * t));
+    if (!best || d < best.d) best = { d, s: run + t * len };
+    segs.push({ a, dx, dz, len, from: run });
+    run += len;
+  }
+  if (best.d > (lane.radiusM ?? 4)) return null;
+  const step = lane.stepM || 0;
+  const s = Clamp(step > 0 ? Math.round(best.s / step) * step : best.s, 0, run);
+  const seg = segs.find((g) => s <= g.from + g.len + 1e-6) || segs.at(-1);
+  const t = Clamp((s - seg.from) / seg.len, 0, 1);
+  return { x: seg.a.x + seg.dx * t, z: seg.a.z + seg.dz * t, s, d: best.d };
+}
+
 export class TankBrain {
   constructor(pathData, tuning = TANK, { rng = null, seed = 7 } = {}) {
     this.T = tuning;
@@ -109,6 +153,7 @@ export class TankBrain {
     this.plan = null;           // 当前这一发的计划 { targetId, at, warning, kind }
     this.targetId = null;
     this.shotsOnTarget = 0;
+    this.lastAim = null;        // 上一发瞄的是谁、那时他在哪（目标挪开 moveResetM 以上 → 散布从头收敛）
     this.memory = new Map();    // id → { x, y, z, ground, vx, vz, seenAt, exposedSince, warned, contactAt, kind }
     this.nextPerceive = 0;
     this.visible = new Set();
@@ -337,13 +382,17 @@ export class TankBrain {
       if (t.alive === false || t.untargetable || t.protect) continue;
       const d = Dist(this, t);
       if (d > G.rangeM) continue;
+      // 区域目标进了最小射程：主炮够不着，也不值得每帧重新规划一遍。
+      if (t.kind === "zone" && d < G.minRangeM) continue;
       out.push(t);
     }
     return out;
   }
   Prior(t) {
     const G = this.T.gunner;
-    const weight = (t.weight ?? 1) * (G.weights[t.kind] ?? G.weights.squad);
+    // 打不死的剧情人物（scriptEssential，血量托底到 1）不值得一发炮弹：权重乘一个很小的系数。
+    const weight = (t.weight ?? 1) * (G.weights[t.kind] ?? G.weights.squad) * (t.essential ? G.essentialScale : 1)
+      * (t.weightScale ?? 1);
     const d = Dist(this, t);
     return weight / (1 + d / G.distanceFalloffM) * (t.id === this.targetId ? G.inertia : 1);
   }
@@ -456,6 +505,8 @@ export class TankBrain {
       let lx = (m.vx || 0) * flight, lz = (m.vz || 0) * flight;
       const lead = Math.hypot(lx, lz);
       if (lead > G.leadMaxM) { lx *= G.leadMaxM / lead; lz *= G.leadMaxM / lead; }
+      // 目标挪了窝（离上一发瞄的位置 moveResetM 以上，跑动 / 换掩体）：散布回到第一发，不接着收敛。
+      if (this.lastAim && this.lastAim.targetId === t.id && Dist(m, this.lastAim) > G.moveResetM) this.shotsOnTarget = 0;
       const n = t.id === this.targetId ? this.shotsOnTarget : 0;
       const scatter = Math.max(G.scatterMinM, G.scatterFirstM * G.scatterShrink ** n);
       const r = scatter * Math.sqrt(this.rng()), a = this.rng() * Math.PI * 2;
@@ -464,13 +515,16 @@ export class TankBrain {
     const cleared = this.ClearOfProtected(at, world);
     if (!cleared) return null;
     // 落点贴着一个还没被警告过的玩家（区域弹轰他面前的掩体也算）：这一发就是他的警告弹。
-    let warns = warning ? [t.id] : [];
+    // 落点在弹片够得着的范围里、而玩家这会儿带着伤害上限（剧本撤离窗口）：这一发按上限打。
+    let warns = warning ? [t.id] : [], damageScale = 1;
     for (const p of world.targets || []) {
       if (p.kind !== "player" && p.kind !== "mannedMg") continue;
       const pm = this.memory.get(p.id);
       if (Dist(cleared, p) < G.warningRadiusM && !(pm?.warned)) { warning = true; if (!warns.includes(p.id)) warns.push(p.id); }
+      if (p.damageCap != null && Dist(cleared, p) < G.protectClearM) damageScale = Math.min(damageScale, p.damageCap);
     }
-    return { targetId: t.id, targetKind: m.kind, at: cleared, kind, warning, warns, visible: choice.visible, plannedAt: this.time };
+    return { targetId: t.id, targetKind: m.kind, at: cleared, kind, warning, warns, damageScale, visible: choice.visible, plannedAt: this.time,
+      aimedAt: { x: m.x, z: m.z } };
   }
   Gunner(dt, world) {
     const G = this.T.gunner, R = this.T.react, Z = this.T.deadZone;
@@ -556,11 +610,16 @@ export class TankBrain {
       const range = Math.hypot(this.plan.at.x - this.x, this.plan.at.z - this.z);
       if (range >= G.minRangeM) {
         const plan = this.plan;
+        // 人吃的伤害：警告弹 ×warningDamageScale、撤离窗口按上限；打掩体的力道（coverDamage）始终是整发炮弹 ——
+        // 警告弹也照样把墙沿打掉一截（「第一发打在你掩体的沿上、泥土砸下来」）。
+        const scale = Math.min(plan.warning ? G.warningDamageScale : 1, plan.damageScale ?? 1);
         this.fire.push({ weapon: "main", at: { ...plan.at }, kind: plan.kind, target: plan.targetId, warning: plan.warning,
-          flight: range / G.shellSpeedMps, radius: G.shellRadiusM, damage: G.shellDamage * (plan.warning ? G.warningDamageScale : 1),
+          flight: range / G.shellSpeedMps, radius: G.shellRadiusM, damage: G.shellDamage * scale, coverDamage: G.shellDamage,
           layS: this.time - this.layStartedAt });
+        this.lastAim = { targetId: plan.targetId, x: plan.aimedAt?.x ?? plan.at.x, z: plan.aimedAt?.z ?? plan.at.z };
         this.telemetry.shots.push({ t: this.time, target: plan.targetId, kind: plan.kind, at: { ...plan.at },
-          layS: this.time - this.layStartedAt, turretYaw: this.turretYaw, x: this.x, z: this.z });
+          layS: this.time - this.layStartedAt, turretYaw: this.turretYaw, x: this.x, z: this.z, damageScale: scale,
+          spreadStep: this.shotsOnTarget });
         for (const id of plan.warns || []) {
           const w = this.memory.get(id);
           if (w) w.warned = true;

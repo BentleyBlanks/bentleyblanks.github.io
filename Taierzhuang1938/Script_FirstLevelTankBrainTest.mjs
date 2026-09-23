@@ -6,8 +6,9 @@
 // 炮塔甩向投掷者、机枪压制、护兵散开、诱饵冷却）；护兵槽；两段毁伤（履带 / 发动机）；
 // 视线预算。口径：docs/Data_FirstLevel0105Refactor20260923Contract.md §5.7。
 import assert from "node:assert/strict";
-import { CreateTankBrain, SeededRng, YawTo, Forward, Right, HullLocal } from "./Script_FirstLevelTankBrain.mjs";
-import { TANK, TANK_TEMP_PATH } from "./Data_Tuning_Tank.mjs";
+import { CreateTankBrain, SeededRng, YawTo, Forward, Right, HullLocal,
+  TankClearFact, BundleResupplyOpen, LuoFinishDue, LanePoint } from "./Script_FirstLevelTankBrain.mjs";
+import { TANK, TANK_TEMP_PATH, NEVER_BREAKABLE_RULES } from "./Data_Tuning_Tank.mjs";
 import { TankAudio, TankLoopParams, CannonLayerWeights, ShellPassPoint } from "./Script_TankAudio.mjs";
 import { TANK_SFX, TankSfxFiles } from "./Data_SfxSources.mjs";
 import { SOUND_NAMES } from "./Script_Audio.mjs";
@@ -442,7 +443,125 @@ function Run(brain, world, seconds, each = null) {
   ok(b.State()[0].stage === 2 && Math.abs(top2 - (block.y - block.h / 2 + 0.6 + 0.1)) < 0.05, "last stage is the low remnant");
   ok(b.OnBlast({ x: 11, y: 1, z: -4 }, { damage: 85, time: 5 }).length === 0, "nothing below the last stage");
   b.Dispose();
-  ok(battlefield.colliders.length === 0 && scene.children.length === 0, "dispose removes colliders and meshes");
+  // Dispose 把接管时塌掉的静态顶点、摘掉的静态碰撞盒还回去（读档重建任务运行时而战场不重建时，墙不会永久消失）。
+  ok(scene.children.length === 0, "dispose removes the segment meshes");
+  ok(battlefield.colliders.length === 1 && battlefield.colliders[0] === staticCollider && staticCollider._physicsHandle != null
+    && solids.has(staticCollider._physicsHandle), "dispose restores the taken-over static collider (list + physics)");
+  let restored = 0; for (let i = 0; i < 24; i++) if (Math.abs(pos.getX(i) - block.x) > 1e-6 || Math.abs(pos.getY(i) - (block.y - block.h / 2)) > 1e-6) restored++;
+  ok(restored === 24, "dispose restores the taken-over static vertices");
+  // 永不可破坏也按区域认：外廓碰到受保护区域（layout.zones 的语义 id）就拒绝，不靠体块名对上。
+  const zoned = new FirstLevelFrontBreakables({ scene, battlefield: { ...battlefield, colliders: [], meshes: [] }, physics,
+    layout: { blocks: [], zones: [{ id: "rightRear", x: 0, z: 0, radius: 8 }, { id: "withdrawalGap", x: 100, z: 0, radius: 8 }] } }, [
+    { id: "InsideRear", x: 5, z: 0, w: 2, d: 0.6, base: 0, stages: [[[-1, 1, 1]], [[-1, 1, 0.3]]] },
+    { id: "EdgeTouchesGap", x: 91, z: 0, w: 2.4, d: 0.6, base: 0, stages: [[[-1, 1, 1]], [[-1, 1, 0.3]]] },
+    { id: "FarAway", x: 50, z: 0, w: 2, d: 0.6, base: 0, stages: [[[-1, 1, 1]], [[-1, 1, 0.3]]] },
+  ], NEVER_BREAKABLE_RULES);
+  ok(zoned.items.length === 1 && zoned.items[0].id === "FarAway" && zoned.rejected.map((r) => r.why).join() === "zone:rightRear,zone:withdrawalGap",
+    "breakables inside / touching a protected zone (sap trench, guard safe area) are refused by region, not by name");
+  zoned.Dispose();
+}
+
+// --- 11 审查修复（2026-09-24）：打不死的不打、撤离窗口、挪窝重来、攻击支路区域火力、补弹与补刀、后甲板 -------------
+{
+  // 11a 打不死的剧情人物（scriptEssential）权重压到 essentialScale：同样看得见，炮手打普通兵 / 玩家。
+  const brain = CreateTankBrain(StraightPath(), TANK, { seed: 31 });
+  brain.PlaceAt(1);
+  const he = { id: "heyoutian", kind: "leftGun", x: -20, y: 1.2, z: -75, ground: 0, essential: true };
+  const player = { id: "player", kind: "player", x: 20, y: 1.65, z: -85, ground: 0 };
+  const world = World({ targets: [he, player] });
+  const shots = [];
+  Run(brain, world, 30, (o) => { for (const f of o.fire) if (f.weapon === "main") shots.push(f); });
+  ok(shots.length >= 2 && shots.every((f) => f.target === "player"), `essential companion is not worth a shell (${shots.map((f) => f.target).join(",")})`);
+  const alone = CreateTankBrain(StraightPath(), TANK, { seed: 31 });
+  alone.PlaceAt(1);
+  const loneShots = [];
+  Run(alone, World({ targets: [he] }), 20, (o) => { for (const f of o.fire) if (f.weapon === "main") loneShots.push(f); });
+  ok(loneShots.length >= 1, "an essential target is still shot at when nothing else is there (weight is scaled, not zeroed)");
+
+  // 11b 撤离窗口：带 damageCap 的玩家，落在他弹片范围里的每一发都只按上限伤人；打墙的力道仍是整发。
+  const retreat = CreateTankBrain(StraightPath(), TANK, { seed: 32 });
+  retreat.PlaceAt(1);
+  const runner = { id: "player", kind: "player", x: -15, y: 1.65, z: -70, ground: 0, damageCap: TANK.gunner.retreatDamageScale, weightScale: TANK.gunner.retreatWeightScale };
+  const capped = [];
+  Run(retreat, World({ targets: [runner] }), 40, (o) => { for (const f of o.fire) if (f.weapon === "main") capped.push(f); });
+  ok(capped.length >= 3 && capped.every((f) => f.damage <= TANK.gunner.shellDamage * TANK.gunner.retreatDamageScale + 1e-9),
+    `retreat window: every shell near the player is capped (${capped.map((f) => f.damage.toFixed(0)).join(",")})`);
+  ok(capped.every((f) => f.coverDamage === TANK.gunner.shellDamage), "cover still takes the full shell (warning / capped shells break walls too)");
+
+  // 11c 挪窝：目标离上一发瞄的位置 > moveResetM，散布回到第一发（不接着收敛）。
+  const mover = CreateTankBrain(StraightPath(), TANK, { seed: 33 });
+  mover.PlaceAt(1);
+  const target = { id: "player", kind: "player", x: -15, y: 1.65, z: -75, ground: 0 };
+  const steps = [];
+  Run(mover, World({ targets: [target] }), 40, (o, b) => { for (const f of o.fire) if (f.weapon === "main") steps.push(b.telemetry.shots.at(-1).spreadStep); });
+  ok(steps.at(-1) >= 3, `static target: scatter keeps converging (steps ${steps.join(",")})`);
+  target.x += TANK.gunner.moveResetM + 2;
+  const moved = [];
+  Run(mover, World({ targets: [target] }), 25, (o, b) => { for (const f of o.fire) if (f.weapon === "main") moved.push(b.telemetry.shots.at(-1).spreadStep); });
+  ok(moved.includes(0), `moved ${TANK.gunner.moveResetM + 2} m: the next planned shell is back to first-shot scatter (${moved.join(",")})`);
+
+  // 11d 攻击支路区域火力：LanePoint 取整、沟外为 null；区域目标进了最小射程不再规划。
+  const lane = TANK_TEMP_PATH.lanes[0];
+  const lp = LanePoint(lane, { x: 35.4, z: -128.2 });
+  ok(lp && Math.abs(lp.s % lane.stepM) < 1e-6 && lp.d < 2, `lane point snaps to ${lane.stepM} m steps (s=${lp?.s})`);
+  ok(LanePoint(lane, { x: 27, z: -110 }) === null, "off the lane → no zone target");
+  ok(LanePoint(lane, { x: 27, z: -127 }) === null, "the rear rally point (27,−127) is not part of the lane");
+  const zoneBrain = CreateTankBrain(StraightPath(), TANK, { seed: 34 });
+  zoneBrain.PlaceAt(1);
+  const near = { id: "attackLane", kind: "zone", weight: 2.5, x: zoneBrain.x + 6, y: 1.1, z: zoneBrain.z, ground: 0 };
+  let nearShots = 0;
+  Run(zoneBrain, World({ targets: [near] }), 15, (o) => { nearShots += o.fire.filter((f) => f.weapon === "main").length; });
+  ok(nearShots === 0 && zoneBrain.targetId == null, "a zone inside the main gun's minimum range is dropped, not re-planned every frame");
+  // 05 现布局：玩家在攻击支路上、车停在挤压点 → 炮塔转向他脚下那段沟并开炮（沟沿），不是 60 m 外的何有田。
+  const b05 = CreateTankBrain(TANK_TEMP_PATH, TANK, { seed: 35 });
+  b05.PlaceForStage("Tank");
+  const lanePt = LanePoint(lane, { x: 33, z: -127.5 });
+  const lanes = [
+    { id: "heyoutian", kind: "leftGun", x: -31, y: 1.2, z: -150, ground: 0, essential: true },
+    { id: "gapZone", kind: "zone", weight: 1, x: -8, y: 1.2, z: -139, ground: 0 },
+    { id: "attackLane", kind: "zone", weight: lane.weight, x: lanePt.x, y: 1.1, z: lanePt.z, ground: 0, scatterM: lane.scatterM },
+  ];
+  const lip = { x: lanePt.x + 0.6, y: 0.4, z: lanePt.z - 0.8 };
+  const w05 = World({ stage: "Tank", facts: new Set(["bundleTaken"]), targets: lanes, Los: () => false, Cover: () => ({ ...lip }) });
+  const s05 = [];
+  Run(b05, w05, 40, (o) => { for (const f of o.fire) if (f.weapon === "main") s05.push(f); });
+  ok(s05.length >= 2 && s05.every((f) => f.target === "attackLane" && f.kind === "cover"),
+    `05: the main gun works the attack lane's cover lip (${s05.map((f) => `${f.target}/${f.kind}`).join(",")})`);
+
+  // 11e 事实口径 / 补弹 / 补刀。
+  ok(TankClearFact({ brain: true }) === "tankFireDisabled" && TankClearFact({}) === "tankImmobilized", "clear fact: brain → tankFireDisabled, legacy → tankImmobilized");
+  ok(BundleResupplyOpen({ brain: true, immobilized: true, fireDisabled: false }, true), "MobilityKill: the ammo house still hands out bundles");
+  ok(!BundleResupplyOpen({ brain: true, immobilized: true, fireDisabled: true }, true), "Disabled: no more bundles");
+  ok(!BundleResupplyOpen({ immobilized: true }, true) && BundleResupplyOpen({ immobilized: false }, true) && BundleResupplyOpen({ immobilized: true }, false),
+    "legacy path unchanged");
+  ok(!LuoFinishDue({ state: "MobilityKill", noBundleSince: 10, now: 10 + TANK.damage.luoFinishS - 0.1 })
+    && LuoFinishDue({ state: "MobilityKill", noBundleSince: 10, now: 10 + TANK.damage.luoFinishS })
+    && !LuoFinishDue({ state: "Intact", noBundleSince: 10, now: 100 }) && !LuoFinishDue({ state: "MobilityKill", noBundleSince: null, now: 100 }),
+    "Luo finishes the tank only after MobilityKill with no bundles for luoFinishS");
+  // 断履带、手里零捆：没有别的办法也能到 Disabled（补刀），而且只到一次。
+  const stuck = CreateTankBrain(StraightPath(), TANK, { seed: 36 });
+  stuck.PlaceAt(2); stuck.hullYaw = 1.7;
+  const rr = Right(stuck.hullYaw);
+  stuck.OnBlast({ x: stuck.x + rr.x * 1.9, y: 0.25, z: stuck.z + rr.z * 1.9, explosiveId: "GrenadeBundle", damage: 620, radius: 4.2, byPlayer: true }, World());
+  ok(stuck.damageState === "MobilityKill", "first bundle: MobilityKill");
+  // 普通手榴弹补不了（只认集束弹）：
+  stuck.OnBlast({ x: stuck.x + rr.x * 1.2, y: 0.25, z: stuck.z + rr.z * 1.2, explosiveId: "Grenade", damage: 160, radius: 4, byPlayer: true }, World());
+  ok(stuck.damageState === "MobilityKill", "a plain grenade does not finish it");
+  stuck.ForceDisable("luoHatch");
+  ok(stuck.damageState === "Disabled" && stuck.damageLog.at(-1).zone === "luoHatch", "Luo's hatch grenade (ForceDisable) reaches Disabled");
+
+  // 11f 扔上车顶的那捆停在碰撞盒顶 2.56 m：认得出是后甲板（发动机舱）。
+  const top = CreateTankBrain(StraightPath(), TANK, { seed: 37 });
+  top.PlaceAt(2); top.hullYaw = 1.7;
+  const aft = Forward(top.hullYaw + Math.PI);
+  const onDeck = top.OnBlast({ x: top.x + aft.x * 1.2, y: 2.56, z: top.z + aft.z * 1.2, explosiveId: "GrenadeBundle", damage: 620, radius: 4.2, byPlayer: true }, World());
+  ok(onDeck.zone === "engineDeck" && onDeck.state === "Disabled" && top.engineKilled, `bundle resting on the collider top over the engine = engineDeck (${onDeck.zone})`);
+  // 远侧履带边（越过车顶扔过去）：断履带，不是发动机。
+  const farSide = CreateTankBrain(StraightPath(), TANK, { seed: 38 });
+  farSide.PlaceAt(2); farSide.hullYaw = 1.7;
+  const fr = Right(farSide.hullYaw), fb = Forward(farSide.hullYaw + Math.PI);
+  const across = farSide.OnBlast({ x: farSide.x - fr.x * 1.6 + fb.x * 0.7, y: 0.1, z: farSide.z - fr.z * 1.6 + fb.z * 0.7, explosiveId: "GrenadeBundle", damage: 620, radius: 4.2, byPlayer: true }, World());
+  ok(across.zone === "trackL" && across.state === "MobilityKill", `bundle beside the far track = MobilityKill (${across.zone})`);
 }
 
 // --- 声音（Step 2）：映射是纯函数，控制器配一个假引擎 ---------------------------------
