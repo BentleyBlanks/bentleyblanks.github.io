@@ -152,7 +152,7 @@ DrawMap(document.getElementById("main"),{minX:-62,maxX:118,minZ:-233,maxZ:-94},6
     [S.nest,"右侧阵位（残墙院）",-8,-12],[S.rear,"后墙岔口 RJ",8,14],[S.damagedLip,"受损沟沿 DL",8,-6],[S.house,"旧院·弹药屋",8,-6],[S.throw,"攻击位",8,4],
     [A.bunkerBend,"01 防炮洞",-10,-10]],
   notes:[[-29,-163.8,"前沿土坎 z=−160，x −30…12，顶 +2.1 m","#f0d070"],[46,-196.5,"NorthRuin（路弯遮挡）","#ffd0a0"],[-24,-188.3,"火力基地（坡上残墙）","#ffb080"],
-    [66,-207,"路堑（车体低于堑沿）","#ffb0b0"],[16,-171,"侧翼组→土坎东端弹坑","#ffc080"],[30,-126,"01 前沟（日军从东头下来）","#ff9090"],[18,-104,"纵深支沟（先头兵南下）","#ff9090"],
+    [70,-208,"台地边路堑→折返顶（车体低于堑沿）","#ffb0b0"],[33,-176,"侧翼组→阵位东北弹坑群","#ffc080"],[30,-126,"01 前沟（日军从东头下来）","#ff9090"],[18,-104,"纵深支沟（先头兵南下）","#ff9090"],
     [66,-150,"南段道路（岔口后弹坑+翻车+倒杆截断）","#d8c592"],[-44,-228,"北侧出发壕（04 推进/补员/西侧增援，视线外）","#ff9a80"],[-29,-152,"浅刮沟西头横墙（守军只能走缺口）","#9fd0ff"],[6,-139,"右侧低沟 1.85 m + 两处射击踏台 + 折角横墙","#caffb0"]]});
 DrawMap(document.getElementById("insetA"),{minX:-32,maxX:28,minZ:-134,maxZ:-97},12,{scen:true,big:true,opening:true,labels:false,tankLabels:false,kframes:["K1","K2","K3","K11"],coneM:6,scaleBar:5,grid:5,font:12,
   anchors:[[A.bunker,"顺子（洞内低处）",-8,16],[A.bunkerKilling,"K 杀俘位",6,14],[A.bunkerJunction,"J 岔口（丁探头）",6,16],[A.bunkerFold,"F 折角（丙射击）",6,-8],
@@ -177,7 +177,7 @@ document.getElementById("legend").innerHTML=`
 <span class="sw" style="background:#b01818"></span>战车语义路点 ${L.tank} m（id + kind；Block/Squeeze 车体朝缺口、炮塔另指）<br>
 <b>敌军</b><span class="sw" style="background:#ff2020"></span>✕ 01 甲乙丙丁 <span class="sw" style="background:#c0304a"></span>01 背景先头兵（沿前沟→岔口→纵深支沟） <span class="sw" style="background:#ff4070"></span>○ 02 追兵
 <span class="sw" style="background:#ff2020"></span>◇ 阵位组 4（枪手+2 院内守卫朝西门+连接口守卫） <span class="sw" style="background:#ff5a3a"></span>■ 火力基地 4 <span class="sw" style="background:#ff7050;border-radius:6px"></span>● 跃进组 6（细红线=三次跃进）
-<span class="sw" style="background:#ff9a30"></span>▲ 侧翼组 4 = 03 指定进攻组（橙虚线→土坎东端弹坑，最后一线看得见缺口） <span class="sw" style="background:#ffd400"></span>★ 军官
+<span class="sw" style="background:#ff9a30"></span>▲ 侧翼组 4 = 03 指定进攻组（橙虚线→阵位东北弹坑群，最后一线看得见缺口） <span class="sw" style="background:#ffd400"></span>★ 军官
 <span class="sw" style="background:#ff3050"></span>■ 04 推进 4（北侧出发壕出口，细红线=跃进） <span class="sw" style="background:#b050ff"></span>战车护兵 4（● 路堑出发点，○ 封口时的路侧弹坑槽位） <span class="sw" style="background:#ff60b0"></span>05 切入 2（道路连接支沟） ○ 增援入口 2 处（出发壕西端 3 人 / 路堑 2 人，视线外）<br>
 <b>友军</b><span class="sw" style="background:#1e7bff;border-radius:6px"></span>第一批守军 2 <span class="sw" style="background:#6fb0ff;border-radius:6px"></span>其余守军 6 · ■ 后沟步枪手 · ★ 老周左枪位 · <span class="sw" style="background:#4fa0ff;border-radius:6px"></span>01 远处还击的川军<br>
 <b>其他</b> 黄虚框=前沿土坎（高度函数）· 白虚线=壕沟中心线（TrenchPlan）· 白点线=铁丝网 · 土黄点=路边电线杆（每 26 m，岔口一根斜杆）· 绿菱=射击踏台 · 黄方=路障 · 棕菱=RC 木框· 青色扇形=关键帧机位与 70° 视锥 · 红扇=战车车体机枪 ±26° · 绿扇=夺点机枪射界 · 青扇=老周侧射<br>

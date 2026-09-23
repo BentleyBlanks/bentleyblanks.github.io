@@ -240,15 +240,15 @@
 
 | 命令 | 内容 |
 | --- | --- |
-| `node Taierzhuang1938/Script_FirstLevelFrontTopologyTest.mjs` | K1–K11 + K1i/K2b、运行时要断言的 7 条缺口视线（含铁丝网整卷，含战车 Block/Squeeze 炮口）、05 切入组守位且看不到缺口与背坡、战车路（id 解析旧键、hull-down、路弯遮挡 ≥20 m、稳定射界、坎线以北、侧后、炮塔窗口、路障、车体净空）、48 条路线净空、暴露节奏、62 个初始掩体、侧翼组末线看得见缺口、预算、视线外入口、分离与 01 通道、背坡洪泛、交战距离、可破坏数据、03–06 分批与夺点判定 |
-| `node Taierzhuang1938/Script_FirstLevelSpaceTest.mjs` | 锚点站得住人、老周下撤折线、防炮洞（单口、三眼高躺姿视线、封闭侧向、塌土挡还权位、救援来路）、集结处反坡等（07–18 原有断言不动） |
+| `node Taierzhuang1938/Script_FirstLevelFrontTopologyTest.mjs` | K1–K11（K4 三个朝向）+ K1i/K2b（K3 守军跪姿 2/2 且卧姿 0.5 m 1/1）、运行时要断言的 7 条缺口视线（含铁丝网整卷，含战车 Block/Squeeze 炮口）、05 切入组守位且看不到缺口与背坡、战车路（id 解析旧键、hull-down ≤60 m 整座炮塔露出且衬天空、屏幕 ≥10.5/15 px、预告后北残院再挡 ≥20 m 到路弯出口、稳定射界、坎线以北、侧后、炮塔窗口、路障、车体净空）、48 条路线净空、05→06 每 60 m 一个节拍、暴露节奏、62 个初始掩体、阵位守卫朝西南 ±60°、侧翼组末线看得见缺口且离座位 15–25 m、预算（按生成表与退场）、01–02 组有退场、追兵撤退点从 RJ/04–05 路线/SJ/RC/集结处都看不见、01–05 起点两两 ≥0.8 m、视线外入口、分离与 01 通道、背坡洪泛、交战距离、可破坏数据、03–06 分批与夺点判定 |
+| `node Taierzhuang1938/Script_FirstLevelSpaceTest.mjs` | 锚点站得住人、老周下撤折线（运行时 helper 未接线时打印 TODO）、防炮洞（单口、三眼高躺姿视线、封闭侧向、塌土挡还权位且带掩体标签、救援来路）、集结处反坡等（07–18 原有断言不动）；**07 以后一个不动**：z > −95 的体块、壕沟杂物、战场尸体、共享地面与 f581ac7dd 的指纹（`Data_FirstLevelSpaceSouthFingerprint.json`）逐项相同 |
 | `node Taierzhuang1938/Script_FirstLevelMissionTopologyTest.mjs` | 拓扑版本、02 止于集结处且 03 从同处起步、SJ 与集结处相邻 |
-| `node Taierzhuang1938/Script_TrenchPlanTest.mjs` | 规划层契约跑在冻结夹具上（09.19 的七段网络），现行网络另查：人走的沟宽 ≥3.4、SJ/GJ/RJ/J 接口、取弹沟不接背坡 |
+| `node Taierzhuang1938/Script_TrenchPlanTest.mjs` | 规划层契约跑在冻结夹具上（09.19 的七段网络）；`frameLengthM` 改尾巴不洗牌；现行网络另查：宽/深/坡上下界、圆角、沟底台阶（只豁免深浅不同的段相接处，且这些接口在真实地面上爬得上去，观察射台按翻越算）、人走的沟宽 ≥3.4、SJ/GJ/RJ/J 接口、取弹沟不接背坡 |
 | `node Taierzhuang1938/Script_FirstLevelSpaceProbe.mjs [--json out]` | 量尺本身，打印全部数字 |
 
-交战距离（玩家所在位置 → 他要打的敌人，60 对）：0–15 m 20 / 15–30 m 16 / 30–45 m 14 / 45–60 m 5 / 60 m+ 5。15 m 以内都是刻意的近战拍（02 塌土边追兵、夺下机枪对土坎东端侧翼组 9–14 m、04 护兵、05 切入组、攻击位对战车与护兵）；正面主力（火力基地 40–64 m、跃进组 21–65 m、老周对跃进线 10–53 m）都在 15–60 m。
+交战距离（玩家所在位置 → 他要打的敌人，60 对）：0–15 m 17 / 15–30 m 19 / 30–45 m 14 / 45–60 m 5 / 60 m+ 5。15 m 以内都是刻意的近战拍（02 塌土边追兵、04 护兵、05 切入组、攻击位对战车与护兵、老周对跃进末线）；夺下的机枪对侧翼组末线 15.7–18.3 m；正面主力（火力基地 40–64 m、跃进组 22–65 m）都在 15–60 m。
 
-路线长度：02 撤退 47.3 · 03 接近 96.7 · 04 短撤 13.8 · 05 取弹 39.3 · 05 攻击 26.3 · 05→06 返回 103.7 · 左枪通道 48.6 · 老周下撤 61.8 · 守军撤退 41.8–60.2 · 战车 107 · 07 南行 135.4（未改）。
+路线长度：02 撤退 47.3 · 03 接近 96.7 · 04 短撤 13.8 · 05 取弹 39.3 · 05 攻击 26.3 · 05→06 返回 103.7（节拍在 10.5 m 西门 K10、70 m 安全区汇合、终点集结处，最长 59 m 无事）· 左枪通道 48.6 · 老周下撤 61.8 · 守军撤退 41.8–60.2 · 战车 136.7 · 07 南行 135.4（未改）。
 
 ---
 
@@ -260,14 +260,15 @@
 - 新增组 id：`frontFlank`（03 指定进攻组）；`bunkerBackdrop`、`bunkerPursuit`、`frontOfficer`、`frontReserve` 按契约 §5.8。组 id 表写回契约 §8。
 - 新增锚点键：`bunkerBend / bunkerJunction / bunkerFold / bunkerCrater / shunziDragged / supportJunction / frontObservation / guardSafeZone / gapJunction`；`bunkerRear` 语义改为「还权位」。
 - `MISSION_TOPOLOGY_VERSION` = `first-level-20260923-space-0106`。
-- 壕沟段 13 → 21（`MissionGatesTest` 改为对 `MISSION_TRENCH_NETWORK.segments` 计数）。
+- 壕沟段 13 → 22（`MissionGatesTest` 改为对 `MISSION_TRENCH_NETWORK.segments` 计数；第 22 段是 09.24 从 `FrontCommunication` 拆出的 `CollectionLink`）。
+- 09.24 新增（请集成负责人确认）：`MISSION_ENCOUNTER_ACTIVATION.<组>.retire`（`{fact, route, then:"despawn"}` 或 `{atRouteEnd:true, then:"despawn"}`，`MissionGatesTest` 校验）；战车路点新增 id `CrestEast`、`Descent`（旧键照旧按 id 解析）；关键帧 `K4b`、`K4c`；`FRONT_SPACE.returnMeet`；补给点 `RightTrench`；TrenchPlan 段参数 `frameLengthM`。
 
 ### 10.2 各包要接的线
 
-- **Opening（第二波）**：导演坐标全换成 §3；演员直线插值要走沟里的折线（南南西段、连接支沟都有折角）；`exitLane`、`rescueRoute` 已给；`bunkerPursuit` 由你们在 `rifleRecovered` 时生成。`Data_OpeningStoryboards` 里 09.21 的绝对坐标（`positions`、`coverRoutes`、`pullReturnWaypoints`）仍在旧掩蔽部 x≈−40，需要重写。
-- **Front（第二波）**：`frontReserve` 在 `tankPositionPressured` 后按 `slotStages` 放出；`frontFlank`/`frontOfficer` 目前只是在北残院待命并正常交火，跃进要按 `lane` 接（`FrontExplicitLanes()` 给出折线）；老周下撤改走 `FRONT_SORTIE.zhouExit`（`ZhouGunExitRoute` 仍是旧枪位时代的直线）；03 夺点判定见 §10.3 第 1 条。
-- **Tank**：直接读 `FRONT_TANK_PATH`（id/kind/faceTo/turretTo/holdS）与 `FRONT_SPACE.tankTargets`；护兵槽 `FRONT_TANK_ESCORT_SLOTS`；可破坏数据见 §8；路障是体块 + 地形弹坑，不需要大脑判断「别往南开」。
-- **Ai**：背景兵 `bunkerBackdrop`（含 3 名川军）在 `bunkerCollapsed` 时由你们生成；阵位守卫与机枪手 `hold`（守点，只探头/缩回）；每人 `role` 与 `faceTo` 已给；环境射击点 `FRONT_FIRE_POINTS`。
+- **Opening（第二波）**：导演坐标全换成 §3；演员直线插值要走沟里的折线（南南西段、连接支沟都有折角）；`exitLane`、`rescueRoute` 已给；`bunkerPursuit` 由你们在 `rifleRecovered` 时生成，**`collectionPointSeen` 时让活着的追兵和日兵丙经 J 走 `FRONT_SPACE.pursuitFallback`，到末点收走**（`retire`；03–05 的 30 人预算靠这一条）。`Data_OpeningStoryboards` 里 09.21 的绝对坐标（`positions`、`coverRoutes`、`pullReturnWaypoints`）仍在旧掩蔽部 x≈−40，需要重写。老周下撤：`Script_FirstLevelOpening.ZhouGunExitRoute(leftSeat)` 现在返回一条到 zhouRest 的直线（坡度 61°、撞左枪通道射击湾和集结处背坡墙），要改成走 `FRONT_SORTIE.zhouExit`；SpaceTest 在接线前打印 `TODO(Front/Opening)`，接上后同一段自动变成断言。
+- **Front（第二波）**：`Data_Tuning_FirstLevelFront.assaultIds` 见 §10.3；`frontReserve` 在 `tankPositionPressured` 后按 `slotStages` 放出（04 放 2+2，05 放 1）；`frontFlank`/`frontOfficer` 目前只是在北残院待命并正常交火，跃进要按 `lane` 接（`FrontExplicitLanes()` 给出折线，末线在阵位东北的弹坑群）；05→06 返回路上在 `FRONT_SPACE.returnMeet`（安全区）接何有田与余队汇合的对白；03 守军请取跪姿（至少缺口附近 3 人）：K3 在引擎里 8 人离地 0.5 m 以上都通视（`BlocksSight` 实测），但卧姿的人只露 0.3 m，读不出来；座位暴露：坐姿眼高 1.5 m 时田里 13 个跃进点、侧翼组 16 个跳点、04 推进 6 个点、4 个护兵槽和火力基地 FrontRifleG 看得见座位，蹲下（1.0）一个都看不见——夺点后的受伤主要看命中率与压制口径，空间侧已在右低沟放了补给箱。
+- **Tank**：直接读 `FRONT_TANK_PATH`（id/kind/faceTo/turretTo/holdS）与 `FRONT_SPACE.tankTargets`；**HullDown 是折返顶**：到点后停 15 s，再原路掉头约 160° 驶向 `Descent`（履带车原地转向即可，路面 7 m 宽）；护兵槽 `FRONT_TANK_ESCORT_SLOTS`；可破坏数据见 §8；路障是体块 + 地形弹坑，不需要大脑判断「别往南开」。车体机枪只管缺口、05 风险窗口交给炮塔机枪（§6）是空间侧的分工建议，请集成负责人确认。
+- **Ai**：背景兵 `bunkerBackdrop`（含 3 名川军）在 `bunkerCollapsed` 时由你们生成，日军走到路线尽头收走、川军随 02 结束收走（`retire`）；阵位守卫与机枪手 `hold`（守点，只探头/缩回）；**有 `faceTo` 的是阵位组、切入组和 02 追兵据守者**，正面、侧翼、军官、04 推进、护兵、增援没有 `faceTo`（默认朝南，掩体判定按朝南算）；环境射击点 `FRONT_FIRE_POINTS`。掩蔽部塌方态的 `BunkerMouthSpoil` 带 `cover`，但 `Script_FirstLevelWhiteboxField.SetScenarioState` 只加网格与碰撞、不调 `sink.Cover`，场景态体块的掩体不会进 AI 掩体表——需要在那里加一个薄钩子（共享文件，请集成负责人指派）。
 - **Sound**：土洞、交通壕、院落、路堑四种声学空间位置见 §2；路堑与北残院适合放「只闻其声」的发动机回响。
 
 ### 10.3 03→06 冷启动结果（`Script_FirstLevelMissionBrowserTest.mjs --campaign --stage-from=3 --stage-to=6 --probe-front-gun`）
@@ -279,7 +280,7 @@
 | 1 | `rightNestCaptured` 永不成立 | 连接口守卫在后墙外，西门和机枪座都看不见；东侧守卫被 1.8 m 碎砖堆整个挡住 | 本包：守卫挪进后门内侧；碎砖堆缩小挪到他身前 2 m（引擎 `BlocksSight` 实测四人对机枪座全部 2/2） |
 | 2 | 夺点后「player can observe the actual breach」 | 背坡铁丝网东卷压在机枪座→缺口的线上，桩和线是射线碰撞体 | 本包：铁丝网挪到缺口点以南；量尺加「运行时缺口视线按整卷铁丝网算」（机枪座、枪、西门、观察射台、战车 Block/Squeeze 炮口共 7 条） |
 | 3 | 等 `MachineGun` 超时：`frontRifleDefense` 不记 | 05 切入组不守位，03 里顺连接支沟西行，从 65 m 外看到缺口，`InfantryBlockade` 常亮 | 本包：切入组 `hold`；断言岗位看不到缺口和背坡 |
-| 4 | 同上，`frontRifleDefense` 仍不记 | `Data_Tuning_FirstLevelFront.assaultIds`（FrontGunner、FrontRifleA–D）要死 3 个才开撤离窗口；新布局里机枪座看不到 A–D（土坎挡，由老周侧射），FrontGunner 在北坡火力基地谁也看不到。诊断：夺点后 80 s 缺口无人威胁（封锁已灭），名单里只死了 A、B | **交 Front 包**：名单改成夺下的机枪真正打得到的人（静态实测：FrontRifleE/F 与侧翼组四人，机枪座对它们末线可见），或把判定改成「名单里死几个 + 缺口无人威胁」。本包试过只换名单（E、F + 侧翼组四人，未提交），侧翼组还在北残院待命、不按 `lane` 跃进，仍凑不满 3 个——侧翼组的跃进接线也要一起做 |
+| 4 | 同上，`frontRifleDefense` 仍不记 | `Data_Tuning_FirstLevelFront.assaultIds`（FrontGunner、FrontRifleA–D）要死 3 个才开撤离窗口。（09.24 更正：座位眼高 1.5 m 时，A 与 C 的起点、D 的第一二跳、E/F 的前几跳是看得见的，但 A–D 跳过一两次后就被土坎挡住，交老周侧射；FrontGunner 是定点火力基地，43 m，不冲锋。上一版写「座位看不到 A–D、FrontGunner 谁也打不到」说过头了。）诊断：夺点后 80 s 缺口无人威胁（封锁已灭），名单里只死了 A、B | **交 Front 包**：名单改成夺下的机枪真正打得到的人（静态实测：FrontRifleE/F 与侧翼组四人，机枪座对它们末线可见），或把判定改成「名单里死几个 + 缺口无人威胁」。本包试过只换名单（E、F + 侧翼组四人，未提交），侧翼组还在北残院待命、不按 `lane` 跃进，仍凑不满 3 个——侧翼组的跃进接线也要一起做 |
 
 之后在本地把 `assaultIds` 临时换成六名跃进兵 FrontRifleA–F（**未提交**，这是 Front 包的数据）继续往下跑，又撞出三处，都在本包数据里修掉了：
 
@@ -291,7 +292,7 @@
 
 三处修完后（仍用临时名单 A–F）最后一次冷启动：03 夺点 → 04 第一批撤离、战车压阵位、封口（`tankBlocksExit`）、第二批集合 → 进 `Tank` 阶段 → 05 取弹沟、切入组、取弹、原路返回（`bundleReturned`）全部走通；在攻击支路第一段（后墙岔口 RJ 附近 32.3,−141.6）玩家死亡：此前取弹一路打到只剩 13 血、0 发子弹、0 卷绷带，最后是 2.9 m 的近身战，驱动器 0/2 次检查点重试没用上。这一处是难度/补给/检查点的事，交 Front 包；日志 `tmp/campaign_0306_trial4.log`。
 
-**给 Front 包的建议（本包实测过，未提交）**：`Data_Tuning_FirstLevelFront.assaultIds` 改成六名跃进兵 `FrontRifleA–F`（阈值 3 不变）。新布局里正面跃进组就是「进攻波」，老周打西半、夺下的机枪打东半，03 的撤离窗口按它开是对的；火力基地 FrontGunner 在北坡，谁也打不到，不该在名单里。
+**给 Front 包的建议（本包实测过，未提交）**：`Data_Tuning_FirstLevelFront.assaultIds` 改成六名跃进兵 `FrontRifleA–F`（阈值 3 不变）。新布局里正面跃进组就是「进攻波」，老周打西半、夺下的机枪打东半，03 的撤离窗口按它开是对的；火力基地 FrontGunner 定点压制、不冲锋，不该算进攻波。
 
 - 已确认成立的：03 右低沟＋西门冷启动能走通、夺点、「机枪座看得到缺口」「枪有真实射界」、班长站位离玩家与座位各 ≥1.5 m、枪架在枪下（`RightNestFrontRest`）、F 上枪连射再 F 下枪。
 - 顺带看到（交 Ai 包）：诊断里跃进组 FrontRifleF 最后躲进了已被我方夺回的阵位院子（26.4,−153.6）找掩体——掩体搜索没排除我方占住的阵位。
@@ -319,6 +320,28 @@
 
 最终实现另外修掉的（03→06 冷启动逐个撞出来的三处也在内）：连接口守卫原在后墙外 (32.3,−140.2)，西门和机枪座都看不见，夺点永远不成立——挪进后门内侧；东侧守卫被 1.8 m 长的碎砖堆整个挡住（对机枪座也 0/2）——碎砖堆缩成 0.8×1.0 挪到他身前 2 m；背坡铁丝网东头压在机枪座看缺口的线上（引擎射线打在铁丝网桩上），斜过去以后又切断了战车炮口从 Block 看缺口的线（`tankBlocksExit` 不记）——最后整条挪到缺口点以南，量尺加「运行时要断言的 7 条缺口视线按整卷铁丝网算」；东侧火力基地的人与残墙东移 2.5 m（和东端跃进兵只隔 4.3 m，编排工作台上并成一枚）；枪架体块沿用 09.22 的 id `RightNestFrontRest`；05 切入组原先不守位（`hold:false`），03 里就顺连接支沟往西走、从 65 m 外隔着后方空地看到缺口，`FrontBattle.InfantryBlockade` 一直亮着，03 的撤离窗口永远不开——改成守位，并加断言「从岗位看不到缺口和背坡守军」；阵位院内尸体 18→8；旧的东侧 `MISSION_ROUTES.flank` 起点压着 `EastWire3`（基线就红的 FortificationsTest）——起点挪进铁丝网缺口。此外：守军刮沟西头与左枪通道连通（守军可以不走缺口，已加横墙截断）；三名守军撤退线穿过最后遮挡沙袋；05 最坏同时存活 32 人（超 30，05 增援降到 1 人）；班长位离枪 4.2 m 过不了夺点半径；压梁压住受困位导致站起来卡住；右低沟末腿指向阵位被顺沟看穿。
 
+### 11.1 2026-09-24 两位评审的逐条处理
+
+| 评审点 | 处理 | 守门 |
+| --- | --- | --- |
+| 02 追兵撤退点正对 RJ（6.6 m 通视） | 追兵在 `collectionPointSeen` 时经 J 转入纵深支沟、末点收走；撤退点两点从 RJ、04 短撤线、取弹沟前两点、攻击支路前三点、SJ、RC、集结处都看不见 | FrontTopologyTest（`fallbackSees` 为空、04/05 在场名单里没有 01–02 组） |
+| 「03–05 ≤30」的计数模型与生成表对不上 | `ProbeCounts` 改为读 `MISSION_STEP_SPAWNS` + 激活事实 + `retire` + 流程必死的人：03/04/05 = 29/29/30；01–02 三组都写了退场 | 同上（`unresolved` 为空、三组有 `retire`）；`MissionGatesTest` 校验 `retire` 字段 |
+| 老周运行时下撤是 57 m 直线 | 数据折线断言不变；运行时路线实测（61°、撞两块）打印 TODO 交 Front/Opening；MissionTest 的用例起点换成新枪位；`zhouExitBypass` 恢复基线（空间包不再动它） | SpaceTest TODO 行 |
+| 日兵丙与追兵据守者同点生成 | 据守者挪到 F 另一侧 1.35 m | 01–05 起点两两 ≥0.8 m |
+| 07 以后布设被连带移动 | `FrontCommunication` 止于集结处 + `frameLengthM` 钉住弧长；南路止于 z −104；战场尸体南段续用基线随机数状态 | SpaceTest 南区指纹；TrenchPlanTest §12 |
+| 洞口塌土没有掩体标签 | 加 `cover`（朝 J/F）；`SetScenarioState` 登记掩体交集成负责人 | SpaceTest |
+| 越界改动 | Stages 第 5 阶段补上 `frontOfficer`；`zhouExitBypass` 退回基线；其余（Stages 的起始表、Opening 的 `frontPosts`、`openingEnemyBudget`、编排组名）在报告里列给集成负责人认领 | — |
+| TrenchPlanTest 夹具化后现行网络没人查 | 现行网络补宽/深/坡上下界、圆角、沟底台阶（只豁免深浅相接处，且这些接口真实地面可攀爬） | TrenchPlanTest §11 |
+| 阵位守卫朝向 | 入口守卫改朝右低沟末折；断言与西南夹角 ≤60°，机枪手枪口对缺口 ±20° | FrontTopologyTest |
+| K3 卧姿守军看不见 | 刮沟抛土改堆北沿、缺口支沟不堆土、观察射台改成离地 −0.4 m 的射台加胸墙、第二人挪 0.6 m；静态 8/8 跪姿 2/2、卧姿 0.5 m 1/1，引擎 `BlocksSight` 8/8（0.5/0.75/1.0 m）；卧姿身体只露 0.3 m 仍难读，请 Front/Ai 让守军跪姿 | FrontTopologyTest K3 |
+| K5 炮塔 6 px、暗压暗 | 折返顶 hull-down，53.9 m、炮塔衬天空、11/16 px（开镜）；20 px 需 ≤30 m，没照做，见 §6 | FrontTopologyTest（距离、整座炮塔、天际线、像素） |
+| 实拍视场与姿态 | 全部 55°（K5ads 另拍开镜）；K4 三帧用真实上枪相机；K10 机位北移 1 m + 西四卷铁丝网南移 1.2 m；K11 往东看 30°；K8 静态加上车体断言（引擎里看得到炮塔与上车体一条，下车体被 `AttackRuinA` 挡住——那是 05 攻击支路的掩护，没拿掉） | Script_FirstLevelSpaceShots |
+| 03→06 冷启动 | 见 §10.3 | — |
+| 正面掩体像靶场 | 线和掩体行一起随地面弯，块块不同，每行空一列，跃进兵起止在弹坑 | MissionTest（按弯过的线量间距、覆盖率、行在线南） |
+| 交战距离、05→06 空走 | 侧翼组末线挪到阵位东北 15.7–18.3 m；返回路安全区加节拍点 | FrontTopologyTest |
+| 缺口尸体簇、RC→SJ 直沟 | 缺口簇 15→4 挪出撤离线；RC→SJ 两道折 | — |
+| VehicleTracerTest 引用已删的 `FrontParapet15` | 未改（不归本包，浏览器测试基线就红）；列入基线红清单 | — |
+
 ---
 
 ## 12. 复现
@@ -330,4 +353,4 @@ node Taierzhuang1938/Script_FirstLevelSpaceTest.mjs
 node Taierzhuang1938/Script_FirstLevelMissionBrowserTest.mjs --campaign --stage-from=3 --stage-to=6 --probe-front-gun
 ```
 
-俯视图 `node Taierzhuang1938/Script_FirstLevelSpaceMap.mjs`（模板 `Tool_FirstLevelSpaceMap.html`），实拍 `node Taierzhuang1938/Script_FirstLevelSpaceShots.mjs [--only=K1,K3]`；只读数据表与量尺，产物写 `Taierzhuang1938/_shots/Space0106/`（不进仓库）。
+俯视图 `node Taierzhuang1938/Script_FirstLevelSpaceMap.mjs`（模板 `Tool_FirstLevelSpaceMap.html`），实拍 `node Taierzhuang1938/Script_FirstLevelSpaceShots.mjs [--only=K1,K3]`（全部 55° 视场；K4/K4b/K4c 在 04 阶段坐上夺下的机枪拍；K3zoom 是 20° 的辨认用放大，不是玩家视角）；只读数据表与量尺，产物写 `Taierzhuang1938/_shots/Space0106/`（不进仓库）。南区指纹只许从基线重新生成：`git archive f581ac7dd` 导出模块后，用 `Script_FirstLevelSpaceProbe.SouthFingerprint` 算一遍写回 `Data_FirstLevelSpaceSouthFingerprint.json`。
