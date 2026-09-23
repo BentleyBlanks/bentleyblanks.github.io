@@ -329,7 +329,7 @@
 - **Ai**：`FRONT_FIRE_POINTS` 按阶段；跃进组三跳；侧翼组显式车道 `lane`；军官；增援入口 `FRONT_RESERVE_ENTRIES`；阵位守卫的 `faceTo` 与掩体都朝西门/西南。
 - **Sound**：沟、土洞、院落三种声学空间位置都在 §2；路堑与 NorthRuin 适合放「只闻其声」的发动机回响。
 - **冻结名字变更提议**（写给集成负责人，不自改契约）：新增组 id `frontFlank`（契约里说「03–05 其余组 id 以 Space 包重排后的名册为准」）；新增锚点键 `bunkerBend/bunkerJunction/bunkerFold/bunkerCrater/shunziDragged/supportJunction/frontObservation/guardSafeZone/gapJunction`；`bunkerRear` 语义改为「还权位」；`MISSION_TOPOLOGY_VERSION` = `first-level-20260923-space-proposal-a`。
-- **测试**：本原型下 `Script_FirstLevelFrontTest`、`Script_TextTest` 通过；`TrenchPlanTest`、`FirstLevelSpaceTest`、`FirstLevelMissionTopologyTest` 仍是基线红；新红：`FirstLevelFrontTopologyTest`（FrontEntryRoute 硬编码旧点）、`FirstLevelMissionTest`（断言旧的四名 hold 守卫与旧路线）、`MissionGatesTest`（生成表已登记，余下只剩「恰好 13 段壕沟」这条计数断言，本方案是 17 段）。这些是原型不修逻辑的预期结果，最终实现包按新数据改断言。
+- **测试**：本原型下 `Script_FirstLevelFrontTest`、`Script_TextTest` 通过；`TrenchPlanTest`、`FirstLevelSpaceTest`、`FirstLevelMissionTopologyTest` 仍是基线红；新红：`FirstLevelFrontTopologyTest`（FrontEntryRoute 硬编码旧点）、`FirstLevelMissionTest`（断言旧的四名 hold 守卫与旧路线）、`MissionGatesTest`（新组已登记进生成表与阶段表，现在第一处红是「恰好 13 段壕沟」的计数断言，本方案是 17 段）。这些是原型不修逻辑的预期结果，最终实现包按新数据改断言。
 
 ---
 
