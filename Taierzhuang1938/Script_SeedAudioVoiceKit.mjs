@@ -200,22 +200,38 @@ export function MasterLine(raw, output, { targetDb, padS = 0.06, ceilingDb = -1,
   const start = Math.max(0, before.leadS - padS);
   const end = Math.min(before.seconds, before.seconds - before.tailS + padS);
   const gainDb = targetDb - before.activeRmsDb;
-  const temp = output + ".tmp.mp3";
-  // alimiter 的 limit 是线性幅度；它按采样点工作，真峰值再留 0.5 dB 余量。
-  const limit = 10 ** ((ceilingDb - 0.5) / 20);
-  const filter = [
-    `atrim=start=${start.toFixed(3)}:end=${end.toFixed(3)}`, "asetpts=PTS-STARTPTS",
-    `afade=t=in:d=0.012`, `areverse,afade=t=in:d=0.03,areverse`,
-    `volume=${gainDb.toFixed(2)}dB`,
-    `alimiter=limit=${limit.toFixed(4)}:attack=1:release=40:level=disabled`,
-  ].join(",");
-  const encoded = spawnSync(ffmpeg, ["-y", "-v", "error", "-i", raw, "-map_metadata", "-1", "-af", filter,
-    "-ac", "1", "-ar", "44100", "-b:a", bitrate, temp], { encoding: "utf8", windowsHide: true });
-  if (encoded.status !== 0) throw new Error(`Unable to master ${path.basename(output)}: ${encoded.stderr?.slice(0, 200)}`);
+  const wav = output + ".tmp.wav", temp = output + ".tmp.mp3";
+  // 先滤到 wav 再编 mp3：一步直出 mp3 时实测真峰值会冒到 0 dBTP 以上（同一条链先出 wav 是 −2.5）。
+  // alimiter 的 limit 是线性幅度、level=false 关掉自动电平；真峰值再留 0.5 dB 余量。
+  // 编码后仍超 ceilingDb（很少见）就按超出量整体再降一次，最多三轮。
+  let trim = 0, measure = null;
+  for (let round = 0; round < 3; round++) {
+    const limit = 10 ** ((ceilingDb - 0.5) / 20);
+    // alimiter 在流尾会把前瞻缓冲里没处理的几毫秒原样吐出来（实测峰值就落在最后 50 ms），
+    // 所以先补 0.1 s 静音、开延迟补偿，限完再按原长剪回，淡入淡出放在最后。
+    const length = end - start;
+    const filter = [
+      `atrim=start=${start.toFixed(3)}:end=${end.toFixed(3)}`, "asetpts=PTS-STARTPTS",
+      `volume=${(gainDb + trim).toFixed(2)}dB`, "apad=pad_dur=0.1",
+      `alimiter=limit=${limit.toFixed(4)}:attack=1:release=40:level=false:latency=true`,
+      `atrim=duration=${length.toFixed(4)}`, "asetpts=PTS-STARTPTS",
+      "afade=t=in:d=0.012", "areverse,afade=t=in:d=0.03,areverse",
+    ].join(",");
+    const rendered = spawnSync(ffmpeg, ["-y", "-v", "error", "-i", raw, "-map_metadata", "-1", "-af", filter,
+      "-ac", "1", "-ar", "44100", "-c:a", "pcm_f32le", wav], { encoding: "utf8", windowsHide: true });
+    if (rendered.status !== 0) throw new Error(`Unable to master ${path.basename(output)}: ${rendered.stderr?.slice(0, 200)}`);
+    const encoded = spawnSync(ffmpeg, ["-y", "-v", "error", "-i", wav, "-map_metadata", "-1", "-ac", "1", "-ar", "44100",
+      "-b:a", bitrate, temp], { encoding: "utf8", windowsHide: true });
+    if (encoded.status !== 0) throw new Error(`Unable to encode ${path.basename(output)}: ${encoded.stderr?.slice(0, 200)}`);
+    const tp = TruePeakDb(temp);
+    if (tp <= ceilingDb) break;
+    trim -= tp - ceilingDb + 0.2;
+  }
+  fs.rmSync(wav, { force: true });
   fs.renameSync(temp, output);
-  const measure = MeasureVoice(output);
+  measure = MeasureVoice(output);
   measure.truePeakDb = +TruePeakDb(output).toFixed(2);
-  return { trimStartS: +start.toFixed(3), gainDb: +gainDb.toFixed(2), measure };
+  return { trimStartS: +start.toFixed(3), gainDb: +(gainDb + trim).toFixed(2), measure };
 }
 
 export const Sha256 = (file) => crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex");

@@ -28,7 +28,7 @@ import { MISSION_DIALOGUE, MISSION_VOICE_CAST, MissionVoicePrompt, MissionVoiceS
 import { JAPANESE_SPEECH } from "./Data_FirstLevelJapaneseSpeech.mjs";
 import { FIRST_LEVEL_VOICE_CAST, DRY_VOICE_RULE, VOICE_LANG_RULE, CastVoiceOwner } from "./Data_FirstLevelVoiceCast.mjs";
 import { PROJECTION_DB, LINE_MASTER, LineDirection } from "./Data_FirstLevelDialogueDirection.mjs";
-import { SeedAudioSpeak, MasterLine, SpeakerEmbed, CenteredCosine, Transcribe, Sha256, Pool, requestStats, SEED_AUDIO_MODEL }
+import { SeedAudioSpeak, MasterLine, MeasureVoice, SpeakerEmbed, CenteredCosine, Transcribe, Sha256, Pool, requestStats, SEED_AUDIO_MODEL }
   from "./Script_SeedAudioVoiceKit.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url)),
@@ -157,9 +157,10 @@ async function BakeLines(manifest) {
     const direction = LineDirection(job.cue, job.index);
     const mastered = TakeRaw(job, n).replace(/\.raw\.mp3$/, ".mp3");
     const rawPeak = PeakDb(TakeRaw(job, n));
+    const rawMeasure = MeasureVoice(TakeRaw(job, n));
     const master = MasterLine(TakeRaw(job, n), mastered, { targetDb: PROJECTION_DB[direction.projection] ?? PROJECTION_DB.normal,
       padS: LINE_MASTER.padS, ceilingDb: LINE_MASTER.ceilingDb });
-    takes.push({ job, n, meta, file: mastered, rawPeak, ...master });
+    takes.push({ job, n, meta, file: mastered, rawPeak, rawTailS: rawMeasure.tailS, ...master });
   }
   if (!takes.length) return;
   const refs = [...new Set(takes.map((t) => CastReference(t.job.line.who).file))];
@@ -179,6 +180,9 @@ async function BakeLines(manifest) {
     if (t.speakerCos != null) { score += (1 - t.speakerCos) * 6; if (t.speakerCos < LINE_PICK.minSpeakerCos) why.push(`音色 ${t.speakerCos}`); }
     if (t.rawPeak > LINE_PICK.clipDb) { score += 3; why.push(`削波 ${t.rawPeak.toFixed(2)} dBFS`); }
     if (m.snrDb < LINE_PICK.minSnrDb) { score += (LINE_PICK.minSnrDb - m.snrDb) / 5; why.push(`SNR ${m.snrDb}`); }
+    if (m.truePeakDb > LINE_MASTER.ceilingDb + 0.05) { score += 3; why.push(`真峰值 ${m.truePeakDb} dBTP`); }
+    // 生成的 take 尾静音 < 30 ms：句尾可能被截掉。很常见，只扣分不否决。
+    if (t.rawTailS < 0.03) score += 0.5;
     t.score = +score.toFixed(3); t.why = why;
   }
   const manifestLines = (manifest.lines ||= {});

@@ -22,7 +22,7 @@
 export const FIRST_LEVEL_VOICE_CAST = Object.freeze({
   shunzi: Object.freeze({
     faction: "nra", lang: "zh", projection: "normal", f0: [110, 175],
-    persona: "二十多岁四川男兵，嘴硬、精明，爱挖苦人；害怕时说话急，但不是喜剧腔；第一人称主角，声音贴耳",
+    persona: "二十出头的四川男兵，嗓音偏亮偏薄、鼻音轻，语速快，带点油滑的痞气；嘴硬、精明，爱挖苦人；害怕时说话急，但不是喜剧腔；和班长的低沉沙哑、川军的粗沙嗓明显不同",
     sample: "哎，你们晓得不，我屋头那条街，一到落雨天就全是泥巴，走一步陷半只脚。我老汉儿天天骂，说我这辈子就是个挑担子的命。挑就挑嘛，挑担子也比在这儿蹲起挨炮强噻。等哈回去，我先睡他个三天三夜，哪个喊我都不起来。",
   }),
   yaowa: Object.freeze({

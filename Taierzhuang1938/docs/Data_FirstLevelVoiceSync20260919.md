@@ -1,10 +1,70 @@
-# 第一关配音同步 · 2026-09-19 重构版
+# 第一关配音同步 · 2026-09-19 重构版（2026-09-23 起 01–06 改逐句干声，见 §0）
 
 需求来源：[Notion 2026.09.19 采用稿转录](Data_FirstLevelRebuildSource20260919.md)（台词一字不改）。
 接口冻结在 [分包契约](Data_FirstLevelRebuild20260919Contract.md) §5。
 本页取代 [2026-09-14 配音同步](Data_FirstLevelVoiceSyncSeptember14.md) 与 [屋内伏击配音同步](Data_FirstLevelVoiceSyncRoomAmbush.md)：那两页的 cue、录音、对齐已全部下线。
 
-## 1. 一句话口径
+## 0. 2026-09-23 逐句干声管线（01–06）
+
+**适用范围**：第一关 01–06 的全部剧情对白（台词表里 `perLine: true` 的 32 场、109 句）。本页第 1–7 节的「一段对白 = 一次请求 = 一条 mp3」旧口径**只适用于 07–18**，以及契约 §5.2 已宣布下线、但旧 01–02 导演还在用的七条 09.21 cue（`BunkerKilling` `ShunziCurse` `RescueCall` `RescueLift` `RescueOut` `TrenchCurse` `CornerCheck`，Opening 包接上新导演后删）。契约见 [01–05 重构分包契约](Data_FirstLevel0105Refactor20260923Contract.md) §2.2、§5.2、§5.5。
+
+为什么换：用户反馈「台词各说各的」。查下来是五个原因叠在一起——请求里没有参考音色，同一角色每段重新抽嗓子；提示词要求把环境声录进对白，整条单声道 take 跟着说话人跳位置；整条 loudnorm，同段电平差到 13 dB；剧情对白时 AI 自主喊话不让路；整段格式表达不了插话和重叠。
+
+### 0.1 SeedAudio 接口（2026-09-23 实测）
+
+| 项 | 结论 | 证据 |
+| --- | --- | --- |
+| 参考音 | `references: [{ audio_data: <base64 音频> }]`，最多 3 条；服务端先「注册音色」再合成。提示词里用 `@音频1`…`@音频3` 指代。 | 坏 base64 回 400 `[45001001] decode audio base64`；空音频回 500 `[55001307] clone speaker register failed`；带参考的 take 与参考音的音色余弦显著升高（下表） |
+| 逐字时间戳 | `audio_config.enable_subtitle: true` → 响应带 `subtitle.sentences[].words[]`（毫秒，约 40 ms 粒度），假名也逐字给。放在请求顶层**不生效**。 | 探针请求 |
+| 多 take | 同一提示词每次结果都不同（没有固定种子），多抽几条选优直接重复请求即可。 | 同提示词两次 sha 不同 |
+| 单次时长 | 定妆独白 10–21 s 一次成功；未测 120 s 上限。 | — |
+
+### 0.2 试点：逐句 vs 整段（5 个角色，2026-09-23）
+
+角色 `luo` `yaowa` `comrade` `ijaA` `interpreter`，各 3 条定妆候选，按客观指标选定后，每人 3 句剧情句。三种做法：
+
+- **A 逐句带参考**：每句一次请求，`references` = 本人定妆音，每句 2 条 take；
+- **B 一来一回整段带参考**：一次请求念 3–4 句（2–3 条参考音、`@音频N` 指派说话人），再按逐字时间戳切成逐句；
+- **C 逐句不带参考**（对照）：只靠人设提示词。
+
+音色用本机 Qwen3-TTS 1.7B Base 自带的说话人编码器（ECAPA-TDNN，`Script_FirstLevelVoiceSpeaker.py`，py3.10 + torch，只读 safetensors 里的 76 个张量）求 2048 维向量，减去固定背景均值（旧声库 135 条，`Audio/FirstLevel/Data_FirstLevelVoiceSpeakerCenter.json`）后算余弦。转写用 faster-whisper medium（`Script_FirstLevelVoiceAlign.py --lines`）。
+
+| 做法 | take 数 | 与本人定妆音余弦 均值（最低） | 按最近定妆音认对说话人 | 同一人不同句之间 | 不同人之间 | 转写字错率 | 原始首静音 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| **A 逐句带参考** | 30 | **0.805**（0.463） | **30/30** | **0.739** | 0.375 | 0.41 | 0.52 s |
+| B 整段带参考再切 | 14 | 0.582（0.230） | 8/14 | 0.516 | 0.459 | 0.25 | 0.19 s |
+| C 逐句不带参考 | 15 | 0.460（0.078） | 9/15 | 0.396 | 0.253 | 0.38 | 0.28 s |
+
+（对照：09.19 整段录音跨段认对说话人只有 20%，调研 `survey/Digest_audio.md`，MFCC 粗指标。）
+
+结论与选择：**A**。B 在三人一段（日兵甲、翻译、川军）里把嗓子分错了人——川军那句与别人的定妆音余弦 0.82、与自己只有 0.35——参考音没法可靠地逐人绑定；C 同一角色的嗓子每句都在漂。A 的字错率偏高主要是 whisper 把四川话当普通话转写（「顺哥」→「孙哥」、「噻」→「塞」），偶尔模型会在句前多念几个字，靠多 take 选优（字错率进门槛）挡掉。轮替与插话的自然感不靠模型一次演完，交给导演时间轴（§0.4）。
+
+### 0.3 生成与母带
+
+1. **定妆音**（`Data_FirstLevelVoiceCast.mjs` 人设与定妆台词 → `node Taierzhuang1938/Script_SeedAudioCastBake.mjs --only=<who> --takes=3`）：15–25 s 干声独白，非剧情台词。候选按 F0 是否落在人设区间、信噪比、转写字错率、与同阵营已选角色的音色余弦（> 0.55 扣分）打分；`--pick=who:n` 选定，写 `Audio/FirstLevel/Cast/AudioVoiceCast_<Who>.mp3` 与 `Data_FirstLevelVoiceCastManifest.json`（sha256、指标、理由）。龙套可 `sharesWith` 共用群演嗓子，但同一场景不许撞嗓。
+2. **逐句干声**（`node Taierzhuang1938/Script_SeedAudioFirstLevelBake.mjs --only=<Scene> [--takes=3]`）：提示词 = 干声规矩（没有任何环境声、音效、音乐、混响和其他人声）+ `@音频1` 参考 + 人设 + 语言规矩（川军四川话；翻译鲁南北方官话，说日语带重北方口音；日兵日语母语）+ 导演表的此刻情境、表演、音量档、情绪强度 + 上一句（不念）+ 只念这一句。每句多 take；打分：字错率（门槛 0.34）、与定妆音余弦（门槛 0.35）、原始 take 削波、信噪比（≥ 30 dB）、母带后真峰值。带否决项的 take 不选；选中的写 `Audio/FirstLevel/Lines/AudioVoice_FirstLevel<Scene>_<NN>.mp3`、`manifest.lines[<Scene>.<NN>]`（sha256、promptHash、castSha256、全部 take 的指标）。
+3. **母带**（`Script_SeedAudioVoiceKit.MasterLine`）：去首尾静音、各留 60 ms → 有声段 RMS 拉到 projection 档（`PROJECTION_DB`：喊 −16、平常 −19、低声 −23、气声 −27 dBFS）→ 限幅到真峰值 ≤ −1 dBTP（4 倍过采样测）→ 单声道 44.1 kHz 96 kbps。两个坑：一步直出 mp3 真峰值会冒到 0 dBTP 以上，要先出 wav 再编；alimiter 在流尾会把前瞻缓冲里没处理的几毫秒原样吐出，要先补 0.1 s 静音、开延迟补偿、再剪回原长。
+4. **逐字时间**：优先 SeedAudio 自带的逐字时间戳（平移掉母带剪掉的开头），没有就用 whisper 对意图文本的强制对齐；写 `Audio/FirstLevel/Data_FirstLevelLineTimings.json`，**以成品 sha256 为键**（Face 包的口型轨读它）。
+5. 逐句录齐的场景用 `--prune` 删掉旧整段录音与清单条目。
+
+### 0.4 对白导演时间轴（`Data_FirstLevelDialogueDirection.mjs`）
+
+每句 `{ after: "prev"|"start"|"event:<名>"|"gate", offsetS, projection, intensity, spatial: "self"|"head"|"offscreen", cutAtS?, cutEvent?, stopOn?, emit?, context?, delivery? }`。`after: "prev"` + 负 `offsetS` = 压住上一句的尾音（`BunkerSearch.02` 丁压丙、`CaptiveInterrogation.06` 日兵乙压着翻译骂进来）；`cutAtS` + `cutEvent` = 被动作打断（`BunkerIncoming.01` 句尾前 0.35 s 硬掐并发 `BunkerBlast`，导演也可提前 `Signal("Blast")`）；`event:ThroatCut` = 等导演（割喉后才嘲弄）；`gate` = 等导演的 gate 函数（「说话！」等顺子看见班长之后）；`emit` = 给玩法包对动作（借火两处空当沿用 `BorrowLightMatchesPocketed` / `BorrowLightCigaretteOffered`）。
+
+### 0.5 运行时（`Script_DialoguePlayer.mjs` + `Script_FirstLevelMissionVoice`）
+
+- 每句一个独立声源（`AudioEngine.PlayDialogueLine`），挂在说话人头骨上（`speakers[who]` = 演员 / 函数 / 坐标；缺的人退回运行时 `VoicePosition`），一句从头到尾只走一路：顺子（`spatial: "self"`）走居中干声，其余走带 HRTF / 遮挡 / 距离的世界声源；视线外且解析不到位置的人非定位播放、再降 4 dB。
+- 两句可以同时响（剧情语音同时 ≤ 3 路，契约 §6）。字幕逐句起止（`hud.SayLines`，先开口的那句作 aside 叠在上面），句尾多挂 0.35 s。
+- 侧链（`AudioEngine.SetDialogueDuck`）：priority 场景有句子在响（含句尾 0.6 s hold），环境床 + 音乐那一路压 −6 dB（`dialogueDuck` 节点）、远处战斗压 −3 dB（`dialogueFarDuck`，接在 `farGain` 后面，不跟开枪闪避抢节点）、SFX 不压；同时非 priority 的自主喊话让路（`drops.dialogue` 计数）。只有逐句播放器会置这一位，07 以后行为不变。
+- 震荡低通在有逐句对白在响时保住 4.2 kHz 辅音（与整段单槽同一个下限）。
+- 接口（契约 §5.5）：`voice.PlayScene(sceneId, { speakers, gate, onLine, onEnd, priority }) → handle { Pause, Resume, Stop, Skip, Signal, lineId, playing, done }`；`voice.PlayLine("<Scene>.<NN>", speaker)`；`voice.Signal(name)` 转给所有在播场景；`voice.Speech(who)` 先读 `dialogue.faceTrackSampler`（Face 包注入），否则按这句干声的实时包络给 `{ jaw, wide, round, close, stress, active, level, brightness }`；`voice.Say/Enqueue(cueId)` 兼容旧入口——逐句 cue 排队用默认时间轴播放、`voice.current.cue.id` 照旧可读，07–18 旧 cue 行为不变。每句开口发 `Line` 事件（`{ who, index, lineId, start, end }`，与旧整段同形）。
+- 逐句 cue 的录音还没烘齐时：旧整段录音还在（03–06 过渡期）就先播旧整段；否则按字数估时走字幕与事件（不静默）。
+
+### 0.6 门禁
+
+`node Taierzhuang1938/Script_FirstLevelVoiceTest.mjs`：01–02 逐字对 09.23 新稿（解析 `> **名字：**“…”` 与 `「…」` + `> **中文：**“…”`，切到「## 分镜参考」）、说话人与契约 §5.2 一致、18 句日语纯假名、导演表逐句覆盖且字段合法、播放器行为（重叠、各挂各的头、截断事件、等事件/gate、暂停续播、Skip、侧链与让路、口型只给说话人）。`--audio`：逐句干声的哈希/提示词/定妆音 sha、真峰值 ≤ −1 dBTP、有声段 RMS 与档位差 ≤ 1.5 dB、首尾静音、信噪比 ≥ 30 dB、字错率与音色余弦门槛、逐字时间、同场同档电平散布 ≤ 2 dB；旧整段的对齐与哈希照旧。`node Taierzhuang1938/Script_FirstLevelVoicePerspectiveTest.mjs`：真 WebAudio 下量第一人称居中、世界声源方向、重叠两句两个声源、侧链增益与喊话让路、震荡低通下限，证据在 `_shots/FirstLevelVoicePerspective/`（字幕截图、输出录音 webm、JSON）。
+
+## 1. 一句话口径（旧整段格式：07–18 与待下线的 09.21 旧 cue）
 
 - 一段连续多人对白 = **一个 cue = 一次 SeedAudio 请求 = 一条 mp3**。动作打断处不拆音频，在提示词里写明停顿时长让模型留空当，再用 `VoiceTiming` 的事件把动作对上去。
 - 全部剧情 cue 65 条、罗班长带路短命令 28 条（沿用 18 + 新增 10），共 93 条录音。
