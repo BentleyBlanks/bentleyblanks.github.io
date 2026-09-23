@@ -1,0 +1,412 @@
+// 01–02 开场动作库的浏览器审片：正式 GLB（五套骨架）+ 运行时装载链（InstallOpeningStoryboardAnimation）
+// 逐条播放 2026-09-23 新做的 clip，量四样东西：
+//   1) 脚滑：bake 声明的着地窗口（manifest models[].clips[].plants）里，脚踝与脚尖离窗口起点的最大位移 ≤ 2 cm；
+//   2) 手部接触：成对 stage 按 manifest 的相对站位摆好双方，在 clip 声明的接触时刻量
+//      施动者的握点（四根手指根的中心，与运行时 BuildHandGrip 同一个点）到对方皮肤接触点（沿法线外推
+//      clip 元数据里的 standoffM：拳头指根离皮肤的厚度）的距离 ≤ 3 cm；
+//      刀口类接触（刺刀割喉、大刀砍颈）量刀身网格到接触点的最近距离；
+//   3) 骨长不变：每根骨头到父骨的世界距离 ÷ 绑定姿态距离，整条 clip 上与全身中位数相差 ≤ 1%；
+//   4) 没有 NaN：骨骼世界矩阵、武器与道具的世界矩阵全是有限数。
+//   5) 成对 stage 里人与人不穿插：粗胶囊（躯干、头、四肢，手不算）两两量最深的交叠；躯干/头对躯干/头 ≤ 3 cm，
+//      带四肢的 ≤ 8 cm（胶囊把袖子裤腿都包进去了）。clip 声明了手去碰对方的那条胳膊，前臂不跟对方算。
+// 用法：node Taierzhuang1938/Script_OpeningClipsBrowserTest.mjs [--shots] [--clip=名字,名字]
+//   --shots 另存审片图到 <仓库>/tmp/OpeningClipsReview/（每条 clip 三帧 × 侧面/45° 俯视，每个 stage 的关键时刻），不进仓库。
+// 演员一律 sizeScale:1（过场站位按原尺寸算到厘米；导演摆成对动作时也必须钉死 sizeScale）。
+// 这里只放 clip 本身（不挂导演的表演层 SetOpeningActorPerformance），回答「动作资产在正式骨架上对不对」。
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
+import { ServeRoot } from "./Script_DevServer.mjs";
+
+const projectDir = path.dirname(fileURLToPath(import.meta.url));
+const rootDir = path.resolve(projectDir, "..");
+const shots = process.argv.includes("--shots");
+const only = (process.argv.find(arg => arg.startsWith("--clip="))?.slice(7) || "").split(",").filter(Boolean);
+const outDir = path.join(rootDir, "tmp", "OpeningClipsReview");
+if (shots) fs.mkdirSync(outDir, { recursive: true });
+// overlap: torso/head against torso/head ≤ 3 cm; anything with a limb ≤ 8 cm (limb capsules carry
+// the sleeve and trouser cloth and are round where a limb is not, so a hand-to-hand struggle reads
+// a few cm deep without anything passing through).
+const LIMIT = { footM: .02, contactM: .03, boneRatio: .01, coreOverlapM: .03, limbOverlapM: .08 };
+
+const server = await ServeRoot(rootDir, 0);
+const browser = await LaunchBrowser();
+const W = 520, H = 600;
+const page = await browser.newPage({ viewport: { width: W * 2, height: H * 2 }, deviceScaleFactor: 1 });
+const Shot = async (name) => { if (shots) await page.screenshot({ path: path.join(outDir, name + ".png"), clip: { x: 0, y: 0, width: W * 2, height: H * 2 } }); };
+let failed = 0;
+try {
+  const port = server.address().port;
+  await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&poseShot=1&phase=0&quality=high`, { waitUntil: "load", timeout: 120000 });
+  await page.waitForFunction(() => window.Taierzhuang?.actorFactory, null, { timeout: 300000 });
+  const plan = await page.evaluate(async ({ W, H }) => {
+    const T = window.Taierzhuang, THREE = await import("three");
+    const api = await import("./Script_OpeningStoryboardAnimation.mjs");
+    const library = await api.LoadOpeningStoryboardAnimation();
+    T.actorFactory.SetBatcher?.(null);
+    T.state.menu = false; T.state.running = false;
+    for (const id of ["hud", "menu", "boot"]) document.getElementById(id)?.style.setProperty("display", "none", "important");
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x202226);
+    scene.add(new THREE.HemisphereLight(0xdad6cc, 0x2a2a30, 2.4));
+    const key = new THREE.DirectionalLight(0xfff0dc, 3.2); key.position.set(-3, 6, 4); scene.add(key);
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(8, 8), new THREE.MeshStandardMaterial({ color: 0x4a443c, roughness: 1 }));
+    floor.rotation.x = -Math.PI / 2; scene.add(floor);
+    const grid = new THREE.GridHelper(8, 32, 0x6a655c, 0x57524a); grid.position.y = .001; scene.add(grid);
+    const wallMat = new THREE.MeshStandardMaterial({ color: 0x6d6a64, roughness: 1, transparent: true, opacity: .55 });
+    const walls = new THREE.Group(); scene.add(walls);
+    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, .05, 30);
+    const N = s => String(s).toLowerCase().replace(/[^a-z0-9]/g, "");
+    const V = () => new THREE.Vector3();
+    const state = window.openingClipsReview = { T, THREE, api, library, scene, camera, walls, wallMat, actors: [] };
+    state.Make = (rig, role, clip) => {
+      const kind = rig.startsWith("LugouIja") ? "ija" : "nra", modelVariant = Number(rig.slice(-2)) - 1;
+      const meta = api.OpeningClipMeta(clip) || {};
+      const armed = (meta.props || []).includes("weapon");
+      const weapon = !armed ? null : kind === "ija" ? "Type38" : (role === "luo" || role === "heyoutian") ? "Dadao" : "HanYang";
+      const actor = T.actorFactory.Create(kind, { modelVariant, weapon, seed: 5100 + modelVariant, sizeScale: 1 });
+      const soldier = { actor, id: role, alive: true, openingStoryboardPose: { clip, seconds: 0 } };
+      api.InstallOpeningStoryboardAnimation(soldier);
+      scene.add(actor.root); actor.root.visible = true;
+      const bones = []; actor.characterRig.root.traverse(node => { if (node.isBone) bones.push(node); });
+      const byName = new Map(bones.map(b => [N(b.name), b]));
+      const skinned = []; actor.root.traverse(o => { if (o.isSkinnedMesh) skinned.push(o); });
+      const skeleton = skinned[0]?.skeleton;
+      // Bind-pose distance to the parent bone (skeleton space), for the length check.
+      const bind = new Map();
+      if (skeleton) skeleton.bones.forEach((b, i) => bind.set(b, new THREE.Matrix4().copy(skeleton.boneInverses[i]).invert()));
+      const pairs = [];
+      for (const b of bones) {
+        const parent = b.parent;
+        if (!parent?.isBone || !bind.has(b) || !bind.has(parent)) continue;
+        const rest = V().setFromMatrixPosition(bind.get(b)).distanceTo(V().setFromMatrixPosition(bind.get(parent)));
+        if (rest > .01) pairs.push({ bone: b, parent, rest });
+      }
+      const fingers = {};
+      fingers.L = bones.filter(b => /lfinger[1-4]$/.test(N(b.name)) && !/nub/.test(N(b.name)));
+      fingers.R = bones.filter(b => /rfinger[1-4]$/.test(N(b.name)) && !/nub/.test(N(b.name)));
+      const toes = { L: bones.find(b => /ltoe0$/.test(N(b.name))), R: bones.find(b => /rtoe0$/.test(N(b.name))) };
+      const row = library.config.models.find(r => r.id === rig);
+      const contactPoints = row?.contactPoints || {};
+      const entry = { rig, role, clip, actor, soldier, bones, byName, pairs, fingers, toes, contactPoints, clock: 0 };
+      state.actors.push(entry);
+      return entry;
+    };
+    state.Clear = () => {
+      for (const e of state.actors) { scene.remove(e.actor.root); e.actor.Dispose?.(); }
+      state.actors = []; walls.clear();
+    };
+    state.Grip = (e, side) => {
+      const out = V(); for (const b of e.fingers[side]) out.add(b.getWorldPosition(V()));
+      return out.divideScalar(Math.max(1, e.fingers[side].length));
+    };
+    // Skin patch in world space, pushed `standoff` metres out along its normal (the authored
+    // knuckle standoff: a fist in the hair or on a collar cannot sit inside the skin).
+    state.Contact = (e, part, standoff = 0) => {
+      const row = e.contactPoints[part]; if (!row) return null;
+      const bone = e.byName.get(N(row.bone)); if (!bone) return null;
+      const point = bone.localToWorld(V().fromArray(row.offset));
+      const normal = V().fromArray(row.normal).transformDirection(bone.matrixWorld);
+      return point.addScaledVector(normal, standoff);
+    };
+    // Closest distance from a point to the visible (non-skinned) triangles of a prop or weapon.
+    state.MeshDistance = (object, point) => {
+      let best = Infinity; const tri = new THREE.Triangle(), q = V();
+      object?.updateWorldMatrix(true, true);
+      object?.traverse(o => {
+        if (!o.isMesh || !o.visible || o.isSkinnedMesh) return;
+        const a = o.geometry.getAttribute("position"), index = o.geometry.getIndex();
+        const count = index ? index.count : a.count;
+        const P = i => V().fromBufferAttribute(a, index ? index.getX(i) : i).applyMatrix4(o.matrixWorld);
+        for (let i = 0; i + 2 < count; i += 3) {
+          tri.set(P(i), P(i + 1), P(i + 2)); tri.closestPointToPoint(point, q);
+          best = Math.min(best, q.distanceTo(point));
+        }
+      });
+      return best;
+    };
+    // Blade against the partner's rifle (a parry): closest rifle vertex to the blade triangles.
+    state.MeshGap = (blade, other) => {
+      let best = Infinity; const p = V();
+      other?.updateWorldMatrix(true, true);
+      other?.traverse(o => {
+        if (!o.isMesh || !o.visible || o.isSkinnedMesh) return;
+        const a = o.geometry.getAttribute("position"), step = Math.max(1, Math.floor(a.count / 400));
+        for (let i = 0; i < a.count; i += step) best = Math.min(best, state.MeshDistance(blade, p.fromBufferAttribute(a, i).applyMatrix4(o.matrixWorld).clone()));
+      });
+      return best;
+    };
+    // Rough body capsules (runtime metres) for the between-actor overlap measure. Hands are left
+    // out: they are meant to touch.
+    const CAPSULES = [["pelvis", "neck", .13, "torso"], ["head", "headTop", .10, "head"],
+      ["lthigh", "lcalf", .075, "thighL"], ["rthigh", "rcalf", .075, "thighR"], ["lcalf", "lfoot", .055, "calfL"], ["rcalf", "rfoot", .055, "calfR"],
+      ["lfoot", "ltoe0", .045, "footL"], ["rfoot", "rtoe0", .045, "footR"], ["lupperarm", "lforearm", .05, "upperArmL"], ["rupperarm", "rforearm", .05, "upperArmR"],
+      ["lforearm", "lhand", .04, "forearmL"], ["rforearm", "rhand", .04, "forearmR"]];
+    state.Capsules = (e) => {
+      const at = key => {
+        if (key === "headTop") {
+          const head = at("head"), neck = at("neck");
+          return head.clone().add(head.clone().sub(neck).setLength(.13));
+        }
+        const bone = e.bones.find(b => N(b.name).endsWith(key) && !/nub/.test(N(b.name)) && (key !== "neck" || !/neck\d/.test(N(b.name))));
+        return bone ? bone.getWorldPosition(V()) : null;
+      };
+      return CAPSULES.map(([a, b, r, name]) => ({ a: at(a), b: at(b), r, name })).filter(c => c.a && c.b);
+    };
+    const SegmentDistance = (p1, q1, p2, q2) => {
+      const d1 = q1.clone().sub(p1), d2 = q2.clone().sub(p2), r = p1.clone().sub(p2);
+      const a = d1.dot(d1), e = d2.dot(d2), f = d2.dot(r);
+      let s = 0, t = 0;
+      if (a <= 1e-9 && e <= 1e-9) return p1.distanceTo(p2);
+      if (a <= 1e-9) t = Math.min(1, Math.max(0, f / e));
+      else {
+        const c = d1.dot(r);
+        if (e <= 1e-9) s = Math.min(1, Math.max(0, -c / a));
+        else {
+          const b = d1.dot(d2), den = a * e - b * b;
+          s = den > 1e-9 ? Math.min(1, Math.max(0, (b * f - c * e) / den)) : 0;
+          t = (b * s + f) / e;
+          if (t < 0) { t = 0; s = Math.min(1, Math.max(0, -c / a)); } else if (t > 1) { t = 1; s = Math.min(1, Math.max(0, (b - c) / a)); }
+        }
+      }
+      return p1.clone().addScaledVector(d1, s).distanceTo(p2.clone().addScaledVector(d2, t));
+    };
+    // Deepest capsule overlap between two actors: { depth, pair }.
+    const CORE = new Set(["torso", "head"]);
+    state.Overlap = (one, two, skipOne = [], skipTwo = []) => {
+      let best = { depth: -Infinity, pair: null, core: -Infinity, corePair: null };
+      const A = state.Capsules(one).filter(c => !skipOne.includes(c.name)), B = state.Capsules(two).filter(c => !skipTwo.includes(c.name));
+      for (const a of A) for (const b of B) {
+        const depth = a.r + b.r - SegmentDistance(a.a, a.b, b.a, b.b);
+        if (depth > best.depth) { best.depth = depth; best.pair = `${a.name}/${b.name}`; }
+        if (CORE.has(a.name) && CORE.has(b.name) && depth > best.core) { best.core = depth; best.corePair = `${a.name}/${b.name}`; }
+      }
+      return best;
+    };
+    // Pose every actor at stage time `at` (clip seconds = at - offsetS, clamped at 0), after a
+    // warm-up that takes each actor through its pose blend so the sample is the clip itself.
+    state.Pose = (at, warm = false) => {
+      for (const e of state.actors) {
+        const seconds = Math.max(0, at - (e.offsetS || 0));
+        e.soldier.openingStoryboardPose = { clip: e.clip, seconds };
+        const steps = warm ? 30 : 1;
+        for (let i = 0; i < steps; i++) { e.clock += 1 / 60; e.actor.Update(1 / 60, { elapsed: e.clock, moveSpeed: 0, aim: 0 }); }
+      }
+      scene.updateMatrixWorld(true);
+    };
+    // Four views: left side, right side, front, and a 45-degree top view from the front-left
+    // (the top view comes from the right when a wall stands on the left).
+    state.Render = (target, span, env) => {
+      const r = T.renderer, size = new THREE.Vector2(); r.getSize(size);
+      r.setScissorTest(true);
+      const flip = env?.wallLeftM ? -1 : 1;
+      const views = [[new THREE.Vector3(-3.4, 1.1, 0), 0], [new THREE.Vector3(3.4, 1.1, 0), 1],
+        [new THREE.Vector3(0, 1.1, -3.4), 2], [new THREE.Vector3(-2.3 * flip, 2.1, -2.6), 3]];
+      for (const [offset, slot] of views) {
+        camera.left = -span * W / H / 2; camera.right = span * W / H / 2; camera.top = span * .62; camera.bottom = -span * .38;
+        camera.updateProjectionMatrix();
+        camera.position.copy(target).add(offset); camera.lookAt(target.x, target.y + .0, target.z); camera.updateMatrixWorld(true);
+        const x = (slot % 2) * W, y = size.y - H * (1 + (slot >> 1));
+        r.setViewport(x, y, W, H); r.setScissor(x, y, W, H);
+        r.render(scene, camera);
+      }
+      r.setScissorTest(false); r.setViewport(0, 0, size.x, size.y);
+    };
+    state.Walls = (env, yaw = 0, at = V()) => {
+      walls.clear();
+      const add = (x, z, sx, sz) => {
+        const m = new THREE.Mesh(new THREE.BoxGeometry(sx, 1.4, sz), wallMat);
+        m.position.set(x, .7, z).applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw).add(at); m.rotation.y = yaw; walls.add(m);
+      };
+      if (env?.wallBehindM) add(0, env.wallBehindM + .03, 2.0, .06);
+      if (env?.wallLeftM) add(-(env.wallLeftM + .03), 0, .06, 2.0);
+      if (env?.wallRightM) add(env.wallRightM + .03, 0, .06, 2.0);
+    };
+    const clips = Object.entries(library.config.clips).filter(([, m]) => !m.legacy && m.rig).map(([name, m]) => ({ name, rig: m.rig, role: m.role, duration: m.duration,
+      contacts: m.contacts || [], env: m.env || null, stage: m.stage || null }));
+    return { clips, stages: library.config.stages, fps: library.config.fps };
+  }, { W, H });
+
+  // ---- 1/3/4: every authored clip alone on its canonical rig --------------------------------
+  const clipRows = [];
+  for (const clip of plan.clips) {
+    if (only.length && !only.includes(clip.name)) continue;
+    const row = await page.evaluate(({ clip, fps }) => {
+      const s = window.openingClipsReview, { THREE } = s;
+      s.Clear();
+      const e = s.Make(clip.rig, clip.role, clip.name);
+      const plants = (s.library.config.models.find(r => r.id === clip.rig)?.clips || []).find(c => c.clip === clip.name)?.plants || [];
+      const frames = Math.round(clip.duration * fps) + 1;
+      const feet = [], ratios = [];
+      let finite = true;
+      s.Pose(0, true);
+      for (let f = 0; f < frames; f++) {
+        const t = Math.min(clip.duration, f / fps);
+        s.Pose(t);
+        const b = e.actor.characterRig.bones;
+        feet.push({ t, L: [b.footL.getWorldPosition(new THREE.Vector3()), e.toes.L?.getWorldPosition(new THREE.Vector3())],
+          R: [b.footR.getWorldPosition(new THREE.Vector3()), e.toes.R?.getWorldPosition(new THREE.Vector3())] });
+        const frameRatios = e.pairs.map(p => p.bone.getWorldPosition(new THREE.Vector3()).distanceTo(p.parent.getWorldPosition(new THREE.Vector3())) / p.rest);
+        ratios.push(frameRatios);
+        e.actor.root.traverse(o => { if (!o.matrixWorld.elements.every(Number.isFinite)) finite = false; });
+      }
+      let footM = 0, footAt = null;
+      for (const [side, t0, t1] of plants) {
+        const win = feet.filter(r => r.t >= t0 - 1e-6 && r.t <= t1 + 1e-6);
+        for (let k = 0; k < 2; k++) {
+          const a = win[0]?.[side][k]; if (!a) continue;
+          for (const r of win) { const d = r[side][k].distanceTo(a); if (d > footM) { footM = d; footAt = `${side}${k ? "toe" : "ankle"}@${r.t.toFixed(2)}`; } }
+        }
+      }
+      const all = ratios.flat().sort((a, b) => a - b), median = all[all.length >> 1] || 1;
+      let boneDev = 0, boneAt = null;
+      ratios.forEach((row, f) => row.forEach((r, i) => { const d = Math.abs(r / median - 1); if (d > boneDev) { boneDev = d; boneAt = `${e.pairs[i].bone.name}@${(f / fps).toFixed(2)}`; } }));
+      return { clip: clip.name, rig: clip.rig, frames, plants: plants.length, footM, footAt, boneDev, boneAt, finite };
+    }, { clip, fps: plan.fps });
+    clipRows.push(row);
+    const bad = row.footM > LIMIT.footM || row.boneDev > LIMIT.boneRatio || !row.finite;
+    if (bad) failed++;
+    console.log(`${bad ? "FAIL" : "ok  "} ${row.clip.padEnd(24)} ${row.rig} foot ${(row.footM * 100).toFixed(2)} cm (${row.plants} plants, ${row.footAt || "-"}) bone ${(row.boneDev * 100).toFixed(2)}% (${row.boneAt || "-"}) finite ${row.finite}`);
+    if (shots) {
+      const d = clip.duration, times = [0, d * .5, d];
+      for (const c of clip.contacts) if (c.t > .05 && c.t < d - .05) { times[1] = c.t; break; }
+      for (const [i, t] of times.entries()) {
+        await page.evaluate(({ t, env }) => {
+          const s = window.openingClipsReview; s.Walls(env); s.Pose(t);
+          const pelvis = s.actors[0].actor.characterRig.bones.pelvis.getWorldPosition(new s.THREE.Vector3());
+          s.Render(new s.THREE.Vector3(pelvis.x, .75, pelvis.z), 2.6, env);
+        }, { t, env: clip.env });
+        await Shot(`Clip_${clip.name}_${i}_${t.toFixed(2)}`);
+      }
+    }
+  }
+
+  // ---- 2: paired stages, both actors placed from the manifest ------------------------------
+  const contactRows = [], overlapRows = [];
+  for (const [name, stage] of Object.entries(plan.stages)) {
+    const actors = Object.entries(stage.actors).filter(([, a]) => a.rig && a.clip);
+    if (only.length && !actors.some(([, a]) => only.includes(a.clip))) continue;
+    const checks = [];
+    for (const [role, a] of actors) {
+      const meta = plan.clips.find(c => c.name === a.clip);
+      for (const c of meta?.contacts || []) {
+        const partner = stage.actors[c.partnerRole];
+        if (!c.partnerRole || !partner?.rig || !c.part) continue;
+        if (!/^hand[LR]$|^bayonet$|^blade$/.test(c.limb)) continue;
+        const at = c.t + (a.offsetS || 0);
+        // Only while the partner's clip is running in this stage (a clip shared by two stages
+        // carries the contacts of both; the other stage's partner has not started yet).
+        if (at < (partner.offsetS || 0) - 1e-6) continue;
+        // A grab/hold is kept until the same hand's next release, the end of this clip or
+        // the end of the partner's clip, sampled on every second baked frame (1/12 s). Between
+        // two baked frames both bodies are interpolated independently; in the fastest beat (the
+        // jerk-up of CaptiveDraggedFromDirt at 2.0 s) that adds up to ~1.7 cm on top.
+        // Holds start on the first baked frame at/after the contact time (a fist that closes
+        // between two frames is still travelling on the earlier one).
+        let from = at, until = at;
+        if (c.action === "grab" || c.action === "hold") {
+          from = Math.ceil(at * plan.fps - 1e-6) / plan.fps;
+          const release = (meta.contacts || []).find(o => (o.limb === c.limb || o.limb === "handsLR") && o.t > c.t && o.action === "release");
+          const partnerEnd = (plan.clips.find(p => p.name === partner.clip)?.duration || 0) + (partner.offsetS || 0);
+          until = Math.min(release ? release.t + (a.offsetS || 0) : meta.duration + (a.offsetS || 0), partnerEnd);
+        }
+        for (let t = from; t <= Math.max(from, until) + 1e-6; t += 2 / plan.fps)
+          checks.push({ role, clip: a.clip, limb: c.limb, action: c.action, partner: c.partnerRole, part: c.part, standoff: c.standoffM || 0,
+            contactT: at, at: Math.round(t * 1000) / 1000 });
+      }
+    }
+    const times = [...new Set([0, ...checks.map(c => c.at)])].sort((a, b) => a - b);
+    const rows = await page.evaluate(({ stage, actors, checks, times }) => {
+      const s = window.openingClipsReview, { THREE } = s;
+      s.Clear();
+      const byRole = {};
+      for (const [role, a] of actors) {
+        const e = s.Make(a.rig, role, a.clip);
+        e.offsetS = a.offsetS || 0;
+        e.actor.root.position.set(a.x, 0, a.z); e.actor.root.rotation.set(0, a.yawDeg * Math.PI / 180, 0);
+        byRole[role] = e;
+      }
+      const out = [];
+      s.Pose(0, true);
+      for (const at of times) {
+        s.Pose(at, true);
+        for (const c of checks.filter(c => Math.abs(c.at - at) < 1e-6)) {
+          const me = byRole[c.role], other = byRole[c.partner];
+          if (c.part === "muzzle") { out.push({ ...c, error: s.MeshGap(me.actor.weaponGroup, other.actor.weaponGroup) }); continue; }
+          const target = s.Contact(other, c.part, c.standoff);
+          if (!target) { out.push({ ...c, missing: true }); continue; }
+          let error;
+          if (c.limb === "bayonet") error = s.MeshDistance(me.actor.characterRig.openingProps?.items.get("bayonet")?.object, target);
+          else if (c.limb === "blade") error = s.MeshDistance(me.actor.weaponGroup, target);
+          else error = s.Grip(me, c.limb.slice(-1)).distanceTo(target);
+          out.push({ ...c, error });
+        }
+      }
+      return out;
+    }, { stage, actors, checks, times });
+    // Between-actor body overlap (capsules, hands excluded) while every clip of the stage is
+    // running, 12 samples/s. An arm that has a declared contact on the other actor in this stage
+    // (a fist in the hair, a hand on the collar) may lie on that body: its forearm is left out.
+    const end = Math.max(...actors.map(([, a]) => (plan.clips.find(c => c.name === a.clip)?.duration || 0) + (a.offsetS || 0)));
+    const start = Math.max(...actors.map(([, a]) => a.offsetS || 0));
+    const reach = {};
+    for (const [role, a] of actors) for (const c of plan.clips.find(p => p.name === a.clip)?.contacts || [])
+      if (c.partnerRole && /^hand[LR]$/.test(c.limb)) (reach[`${role}>${c.partnerRole}`] ||= []).push("forearm" + c.limb.slice(-1));
+    const overlaps = await page.evaluate(({ start, end, reach }) => {
+      const s = window.openingClipsReview, worst = {};
+      for (let t = start; t <= end + 1e-6; t += 1 / 12) {
+        s.Pose(t, true);
+        for (let i = 0; i < s.actors.length; i++) for (let j = i + 1; j < s.actors.length; j++) {
+          const one = s.actors[i], two = s.actors[j], key = `${one.role}/${two.role}`;
+          const o = s.Overlap(one, two, reach[`${one.role}>${two.role}`] || [], reach[`${two.role}>${one.role}`] || []);
+          const w = worst[key] ||= { depth: -Infinity, core: -Infinity };
+          if (o.depth > w.depth) Object.assign(w, { depth: o.depth, pair: o.pair, at: t });
+          if (o.core > w.core) Object.assign(w, { core: o.core, corePair: o.corePair, coreAt: t });
+        }
+      }
+      return worst;
+    }, { start, end, reach });
+    for (const [pair, o] of Object.entries(overlaps)) {
+      overlapRows.push({ stage: name, pair, ...o });
+      const bad = o.depth > LIMIT.limbOverlapM || o.core > LIMIT.coreOverlapM;
+      if (bad) failed++;
+      console.log(`${bad ? "FAIL" : "ok  "} stage ${name.padEnd(12)} overlap ${pair}: deepest ${(Math.max(0, o.depth) * 100).toFixed(1)} cm (${o.pair} @${o.at.toFixed(2)}s),`
+        + ` torso/head ${(Math.max(0, o.core) * 100).toFixed(1)} cm${o.corePair ? ` (${o.corePair} @${o.coreAt.toFixed(2)}s)` : ""}`);
+    }
+    const groups = new Map();
+    for (const row of rows) {
+      const k = `${row.clip}.${row.limb}.${row.action}.${row.part}@${row.contactT}`;
+      const g = groups.get(k);
+      if (!g || row.missing || row.error > g.error) groups.set(k, { ...row, samples: (g?.samples || 0) + 1, worstAt: row.at });
+      else g.samples++;
+    }
+    for (const row of groups.values()) {
+      contactRows.push({ stage: name, ...row });
+      const bad = row.missing || !(row.error <= LIMIT.contactM);
+      if (bad) failed++;
+      console.log(`${bad ? "FAIL" : "ok  "} stage ${name.padEnd(12)} ${row.clip}.${row.limb} ${row.action} -> ${row.partner}.${row.part} @${row.contactT.toFixed(2)}s`
+        + ` ${row.missing ? "contact point missing" : `max ${(row.error * 100).toFixed(1)} cm over ${row.samples} samples (worst @${row.worstAt.toFixed(2)}s)`}`);
+    }
+    if (shots) {
+      const keys = [...new Set([0, ...checks.map(c => c.contactT), end * .6, end].map(t => Math.round(t * 100) / 100))].sort((a, b) => a - b);
+      for (const t of keys) {
+        await page.evaluate(({ t, env }) => {
+          const s = window.openingClipsReview; s.Walls(env); s.Pose(t, true);
+          const c = new s.THREE.Vector3(); for (const e of s.actors) c.add(e.actor.characterRig.bones.pelvis.getWorldPosition(new s.THREE.Vector3()));
+          c.divideScalar(s.actors.length); s.Render(new s.THREE.Vector3(c.x, .75, c.z), 2.4, env);
+        }, { t, env: plan.clips.find(c => c.name === stage.actors[stage.anchor]?.clip)?.env || null });
+        await Shot(`Stage_${name}_${t.toFixed(2)}`);
+      }
+    }
+  }
+  if (shots) fs.writeFileSync(path.join(outDir, "Data_OpeningClipsReview.json"), JSON.stringify({ clips: clipRows, contacts: contactRows, overlaps: overlapRows }, null, 2));
+  assert.ok(clipRows.length > 0, "no authored clip was reviewed");
+  assert.equal(failed, 0, `${failed} opening clip checks failed`);
+  console.log(`ok opening clips browser review: ${clipRows.length} clips, ${contactRows.length} paired contacts on production rigs`);
+} finally {
+  await page.close().catch(() => {});
+  await browser.close().catch(() => {});
+  await new Promise(resolve => server.close(resolve));
+}

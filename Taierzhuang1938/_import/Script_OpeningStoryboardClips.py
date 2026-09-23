@@ -1286,7 +1286,8 @@ def DragVictimKeys(T):
     ex, ey = DRAG_END
     # The right arm is hauled towards ijaB, who faces it from his right (IjaPullArm keeps its
     # pelvis 0.5 m out along that line): each key puts the wrist 0.38 m (~75 % reach) from where
-    # the right shoulder is at that time, along (right .96, ahead .10, up .25),
+    # the right shoulder is at that time, along (right .98, ahead .10, down .14) -- held at
+    # ijaB's belt, not up into his face,
     # the elbow hanging down-out. (It trailed behind the shoulder, folded to 7-9 cm shoulder-
     # wrist, and flipped the elbow for a frame at 2.04 s.)
     armBase = BuriedBase(T)['armPole.R']
@@ -1298,28 +1299,28 @@ def DragVictimKeys(T):
         # Hauled up by the collar and the right arm: trunk lifts, head hangs.
         (0.60, {'pelvis': (.30, .10, .22), 'pelvisTilt': (.30, .05, .12), 'bend': .45, 'lean': .05, 'twist': -.05,
                 'head': (.45, .05, .10), 'neck': (.25, 0, .05),
-                'hand.R': (-.097, -.196, .72), 'armPole.R': armBase,
+                'hand.R': (-.101, -.196, .646), 'armPole.R': armBase,
                 'palmF.R': (0, -.7, .7), 'palmN.R': (-.5, 0, -.8), 'curl.R': .4,
                 'hand.L': (.36, .02, .08)}),
         # Dragged: knees in the dirt behind him, feet trailing on their insteps.
         (1.00, {'pelvis': (.28, -.16, .34), 'pelvisTilt': (.55, 0, .05), 'bend': .42,
                 'ankle.L': kneelMid['ankle.L'], 'ankle.R': kneelMid['ankle.R'],
                 'legPole.L': kneelMid['legPole.L'], 'legPole.R': kneelMid['legPole.R'], 'foot.L': kp, 'foot.R': kp,
-                'hand.R': (-.267, -.546, 1.004), 'armPole.R': (-.001, -.508, .458), 'handRelW.L': 1.0}),
+                'hand.R': (-.275, -.546, .855), 'armPole.R': (-.001, -.508, .458), 'handRelW.L': 1.0}),
         # One foot gets under him and shoves -- and goes out again.
         (1.25, {'ankle.R': (.27 - H - .02, -.46, A), 'legPole.R': (.27 - H - .10, -1.2, .6), 'foot.R': (0, -8, 0),
-                'pelvis': (.27, -.28, .42), 'hand.R': (-.278, -.667, 1.034), 'armPole.R': (-.012, -.629, .488)}),
+                'pelvis': (.27, -.28, .42), 'hand.R': (-.286, -.667, .885), 'armPole.R': (-.012, -.629, .488)}),
         (1.45, {'ankle.R': (.27 - H - .02, -.46, A), 'pelvis': (.27, -.34, .50), 'bend': .35,
-                'hand.R': (-.277, -.711, 1.063), 'armPole.R': (-.011, -.673, .517)}),
+                'hand.R': (-.285, -.711, .914), 'armPole.R': (-.011, -.673, .517)}),
         (1.70, {'ankle.R': kneelMid['ankle.R'], 'legPole.R': kneelMid['legPole.R'], 'foot.R': kp,
-                'pelvis': (.26, -.38, .36), 'bend': .45, 'hand.R': (-.287, -.774, 1.010), 'armPole.R': (-.021, -.736, .464)}),
-        (2.00, {'pelvis': (ex, ey - .02, .36), 'hand.R': (-.488, -.915, .934), 'armPole.R': (-.222, -.877, .388), 'turn': 0.0}),
+                'pelvis': (.26, -.38, .36), 'bend': .45, 'hand.R': (-.295, -.774, .861), 'armPole.R': (-.021, -.736, .464)}),
+        (2.00, {'pelvis': (ex, ey - .02, .36), 'hand.R': (-.496, -.915, .785), 'armPole.R': (-.222, -.877, .388), 'turn': 0.0}),
         # "立て！" -- jerked up and round by the collar; the head snaps back, the legs do not hold.
         (2.20, {'pelvis': (ex, ey, kz + .16), 'pelvisTilt': (.10, 0, 0), 'bend': .18, 'turn': -.55,
                 'head': (-.12, 0, 0), 'neck': (-.05, 0, 0), 'shrug': .20,
-                'hand.R': (-.340, -.672, .984), 'armPole.R': (-.22, -.458, .76)}),
+                'hand.R': (-.316, -.645, .944), 'armPole.R': (-.22, -.458, .76)}),
         (2.45, {'pelvis': (ex, ey, kz + .08), 'bend': .25, 'head': (.15, 0, .05), 'turn': -1.25,
-                'hand.R': (-.302, -.525, .898), 'armPole.R': (-.161, -.354, .687)}),
+                'hand.R': (-.284, -.510, .871), 'armPole.R': (-.161, -.354, .687)}),
         (2.75, {'pelvis': kneel['pelvis'], 'ankle.L': kneel['ankle.L'], 'ankle.R': kneel['ankle.R'],
                 'legPole.L': kneel['legPole.L'], 'legPole.R': kneel['legPole.R'], 'turn': DRAG_TURN, 'armPole.R': armBase,
                 # The held right arm comes round with him (R3 = his own frame from here on).
@@ -1456,26 +1457,31 @@ def BuildDragCollar(T, name):
     stage, role = 'captiveDrag', 'ijaA'
     times = [0.0, .30, .60, 1.00, 1.45, 2.00, 2.20, 2.75, 3.20, 3.85, 4.40]
     collar = PartnerPath(T, stage, role, 'comrade', 'collarBack', times)
-    # Pelvis rides 0.50 m behind the collar (his own +Y), height by how far down he reaches.
+    # Pelvis rides 0.52 m behind the collar (his own +Y), height by how far down he reaches;
+    # 0.62 m while he jerks the man up (2.0-2.6 s) so the rising head does not meet his chest.
+    back = [(0.0, .52), (1.75, .52), (2.05, .62), (2.25, .64), (2.8, .58), (4.4, .58)]
+
     def PelvisXY(t):
         c = Channel(collar)(t)
-        return (c[0] * .85, c[1] + .52)
+        return (c[0] * .85, c[1] + Channel(back)(t))
     crouch = [(0.0, .06), (.30, .20), (.60, .16), (1.0, .12), (2.0, .12), (2.20, .02), (2.75, .08), (4.40, .06)]
     bend = [(0.0, .15), (.30, .62), (.60, .48), (1.0, .40), (2.0, .40), (2.20, .10), (2.35, .05), (2.75, .25), (4.40, .22)]
     tilt = [(0.0, (.05, 0, 0)), (.30, (.35, 0, .05)), (1.0, (.25, 0, .05)), (2.20, (-.08, 0, 0)), (2.75, (.12, 0, 0))]
     # The haul starts at the grab (0.30 s) and moves the collar 0.6 m in 0.65 s: he backs off
     # from the first pull, one short backward step every quarter second, then steps in on the
     # jerk up at 2.2 s (the collar rises and comes forward) and settles.
-    schedule = [('R', .30, .55), ('L', .57, .82), ('R', .84, 1.08), ('L', 1.10, 1.36), ('R', 1.42, 1.70),
+    schedule = [('R', .30, .50), ('L', .50, .74), ('R', .84, 1.08), ('L', 1.10, 1.36), ('R', 1.42, 1.70),
                 ('L', 1.74, 2.00), ('R', 2.06, 2.30), ('L', 2.52, 2.76)]
-    # Left foot 10 cm further back than a square stance: it stood on the sitting man's shin.
-    stance = {'L': (H + .06, -.02, T.A), 'R': (-(H + .04), .16, T.A)}
+    # Left foot 20 cm further out and 10 cm back, knee turned out: square, his stooping left
+    # knee went into the sitting man's raised right knee.
+    stance = {'L': (H + .26, -.02, T.A), 'R': (-(H + .04), .16, T.A)}
     feet, plants = FollowSteps(PelvisXY, stance, schedule, 4.4)
     pelvis = [(t, (PelvisXY(t)[0], PelvisXY(t)[1], P - .04 - Channel(crouch)(t))) for t in times]
     base = Standing(T)
     # The free left fist is kept in front of his belly (hanging at his side it swung into ijaB,
     # who works on that side).
-    base.update({'handRel.L': (-.02, -.26, -.34), 'palmF.L': (0, -.3, -1), 'palmN.L': (-1, 0, 0), 'curl.L': .9})
+    base.update({'handRel.L': (-.02, -.26, -.34), 'palmF.L': (0, -.3, -1), 'palmN.L': (-1, 0, 0), 'curl.L': .9,
+                 'legPole.L': (H + .60, -.80, .45)})
     anim = Tracks(base, dict(feet, pelvis=pelvis, bend=bend, pelvisTilt=tilt,
                              head=[(0.0, (.10, 0, 0)), (.30, (.25, 0, .05)), (2.20, (-.15, 0, 0)), (2.75, (.05, 0, .10)),
                                    (3.20, (.0, 0, -.35)), (3.85, (.05, 0, .05))],
@@ -1502,7 +1508,7 @@ def BuildPullArm(T, name):
     # 0.72 m off the arm (closing to 0.52 m for the wrench on his knees) and down in a squat, not stooped over it; and he closes in only once
     # ijaA has hauled the man up and backed off (wrist 0.62 s, upper arm 0.70 s): grabbing at
     # 0.28 s with ijaA put his head through ijaA's chest (both reached for the same shoulder).
-    stand = [(0.0, .72), (1.0, .72), (2.4, .60), (2.8, .52), (4.4, .52)]
+    stand = [(0.0, .72), (.6, .80), (1.8, .80), (2.1, .66), (2.4, .62), (2.8, .58), (4.4, .58)]
 
     def PelvisXY(t):
         c = Channel(arm)(t)
@@ -1698,7 +1704,7 @@ PARTNER_SOURCES['LugouNra02'].update({
     'CaptiveHeadPulledBack': ['crown', 'hairBack', 'throat'],
     'CaptiveThroatCut': ['crown', 'hairBack', 'throat'],
     'CaptiveClutchThroat': ['crown', 'hairBack', 'throat'],
-    'CaptiveWallSlideTwitch': ['shoulderR', 'hairBack'],
+    'CaptiveWallSlideTwitch': ['shoulderR', 'shoulderL', 'hairBack'],
 })
 
 Meta('CaptiveHeadPulledBack', 1.8, False, 'free', role='comrade', rig='LugouNra02', rootMotion=False, stage='slashGrab',
@@ -1759,7 +1765,7 @@ Meta('CaptiveWallSlideTwitch', 3.2, False, 'free', role='comrade', rig='LugouNra
            'the legs jerk three times and stop. Last frame is the corpse (hold it; replaces ShotCollapse).')
 Meta('IjaWipeSheathBayonet', 2.4, False, 'track', role='ijaA', rig='LugouIja02', props=['weapon', 'bayonet'], rootMotion=False,
      stage='slashWipe', weaponState='slungBack',
-     contacts=[{'t': .55, 'limb': 'bayonet', 'action': 'wipe', 'partnerRole': 'comrade', 'part': 'shoulderR'},
+     contacts=[{'t': .55, 'limb': 'bayonet', 'action': 'wipe', 'partnerRole': 'comrade', 'part': 'shoulderL'},
                {'t': .85, 'limb': 'bayonet', 'action': 'lift'},
                {'t': 1.50, 'limb': 'bayonet', 'action': 'sheathe', 'target': 'scabbard'},
                {'t': 2.30, 'limb': 'handR', 'action': 'grip', 'target': 'weapon', 'part': 'barrel'}],
@@ -1842,11 +1848,11 @@ def HeadPulledBackKeys(T):
         (0.42, {'head': (-.34, .05, .10), 'neck': (-.06, 0, .04), 'bend': .16, 'shrug': .24, 'twist': -.26,
                 'pelvis': Add3(base['pelvis'], (0, -.02, .05)),
                 # Both hands fly up at the fist in his hair (forehead high), not out into ijaA's belly.
-                'handRel.R': (.10, -.13, .27), 'palmF.R': (.1, -.2, 1), 'palmN.R': (0, -1, .1), 'curl.R': .35,
-                'handRel.L': (-.08, -.11, .25), 'palmF.L': (-.1, -.2, 1), 'palmN.L': (0, -1, .1), 'curl.L': .35}),
+                'handRel.R': (.07, -.06, .31), 'palmF.R': (.1, -.2, 1), 'palmN.R': (0, -1, .1), 'curl.R': .35,
+                'handRel.L': (-.05, -.05, .29), 'palmF.L': (-.1, -.2, 1), 'palmN.L': (0, -1, .1), 'curl.L': .35}),
         (0.62, {'head': (-.30, .08, .08), 'shrug': .20}),
-        (0.95, {'head': (-.35, .02, .12), 'handRel.R': (.13, -.15, .29), 'curl.R': .7}),
-        (1.25, {'head': (-.31, .07, .09), 'handRel.L': (-.10, -.13, .27), 'curl.L': .6}),
+        (0.95, {'head': (-.35, .02, .12), 'handRel.R': (.09, -.07, .33), 'curl.R': .7}),
+        (1.25, {'head': (-.31, .07, .09), 'handRel.L': (-.06, -.06, .31), 'curl.L': .6}),
         (1.55, {'head': (-.34, .04, .11), 'shrug': .23}),
         (1.80, {'head': (-.33, .05, .10)}),
     ]
@@ -1953,22 +1959,25 @@ def SlideKeys(T):
         (0.18, {'head': (.10, .05, .05), 'neck': (0.0, 0, 0)}),
         (0.40, {'head': (.35, -.05, -.05), 'neck': (.18, 0, 0), 'bend': base['bend'] + .10}),
         # Down the wall: the seat slips off the heels to his right, the trunk sags that way.
-        (1.10, {'pelvis': Add3(base['pelvis'], (-.02, .05, -.10)), 'lean': -.12, 'pelvisTilt': (-.10, -.10, -.06),
-                'bend': .40}),
+        # He sags down the wall and over to his right: folding forward (bend .70) put his head
+        # into the legs of ijaA, who still stands over him. (ijaA wipes on his LEFT shoulder,
+        # the one left clear.)
+        (1.10, {'pelvis': Add3(base['pelvis'], (-.02, .05, -.10)), 'lean': -.18, 'pelvisTilt': (-.10, -.10, -.06),
+                'bend': .30}),
         (1.20, {'handRel.R': (.08, -.20, -.30), 'palmF.R': (0, -.5, -.9), 'palmN.R': (0, 0, -1), 'curl.R': .4}),
-        (1.60, {'pelvis': endPelvis, 'lean': -.30, 'pelvisTilt': (.05, -.18, -.12), 'bend': .70, 'twist': -.08,
+        (1.60, {'pelvis': endPelvis, 'lean': -.42, 'pelvisTilt': (.05, -.18, -.12), 'bend': .44, 'twist': -.08,
                 'head': (.45, -.18, -.15)}),
         (1.64, {'ankle.R': ar}),
         (1.72, {'ankle.R': Add3(ar, (0, .02, .035)), 'shrug': base['shrug'] + .06}),        # twitch 1
         (1.84, {'ankle.R': ar, 'handRel.L': (-.12, -.18, .06)}),
         (2.10, {'ankle.L': al}),
-        (2.18, {'ankle.L': Add3(al, (0, .02, .025)), 'bend': .74}),                          # twitch 2
-        (2.30, {'ankle.L': al, 'bend': .70, 'handRel.L': (-.05, -.18, -.28), 'palmF.L': (0, -.5, -.9),
+        (2.18, {'ankle.L': Add3(al, (0, .02, .025)), 'bend': .48}),                          # twitch 2
+        (2.30, {'ankle.L': al, 'bend': .44, 'handRel.L': (-.05, -.18, -.28), 'palmF.L': (0, -.5, -.9),
                 'palmN.L': (0, 0, -1), 'curl.L': .45}),
         (2.50, {'ankle.R': ar}),
         (2.56, {'ankle.R': Add3(ar, (0, .01, .015))}),                                     # twitch 3, smaller
         (2.70, {'ankle.R': ar, 'head': (.50, -.20, -.16)}),
-        (3.20, {'head': (.52, -.20, -.16), 'bend': .72, 'shrug': 0.0}),
+        (3.20, {'head': (.52, -.20, -.16), 'bend': .46, 'shrug': 0.0}),
     ]
     return Keys(base, rows, lag={'head': .08, 'neck': .05})
 
@@ -1995,8 +2004,11 @@ def BuildHairGrab(T, name):
     H, P = T.H, T.P
     base = IjaABase(T)
     anim = Tracks(base, {
-        'ankle.L': [(0.0, base['ankle.L']), (.06, base['ankle.L']), (.13, Add3(base['ankle.L'], (.075, -.07, .05))),
-                    (.20, HairHoldPose(T)['ankle.L'])],
+        # Starts with the left foot already out beside his right knee (a square stance at this
+        # spot stands on it); the half step goes forward from there.
+        'ankle.L': [(0.0, Add3(base['ankle.L'], (.12, 0, 0))), (.06, Add3(base['ankle.L'], (.12, 0, 0))),
+                    (.13, Add3(base['ankle.L'], (.16, -.06, .05))), (.20, HairHoldPose(T)['ankle.L'])],
+        'legPole.L': [(0.0, base['legPole.L']), (.20, HairHoldPose(T)['legPole.L'])],
         'pelvis': [(0.0, base['pelvis']), (.20, Add3(base['pelvis'], (0, -.10, -.04))), (.30, Add3(base['pelvis'], (0, -.11, -.05))),
                    (.44, Add3(base['pelvis'], (0, -.03, -.03))), (1.0, Add3(base['pelvis'], (0, -.05, -.03)))],
         'bend': [(0.0, .08), (.28, .32), (.44, .18), (1.0, .20)],
@@ -2020,11 +2032,13 @@ def DrawBase(T):
 
 def HairHoldPose(T):
     base = IjaABase(T)
-    # The half step plants the left foot beside his right knee (0.15 m out to the left), not
+    # The half step plants the left foot beside his right knee (0.20 m out to the left, the
+    # knee turned out), not
     # between his thighs: straddling, the shin clears the kneeling man.
     # Tall over the kneeling man, looking down at him with the arm out to the hair -- stooped
     # (bend .38) his face ended up against the victim's.
-    base.update({'ankle.L': Add3(base['ankle.L'], (.15, -.14, 0)), 'pelvis': Add3(base['pelvis'], (0, -.05, -.03)),
+    base.update({'ankle.L': Add3(base['ankle.L'], (.20, -.12, 0)), 'legPole.L': Add3(base['legPole.L'], (.25, .05, 0)),
+                 'pelvis': Add3(base['pelvis'], (0, -.05, -.03)),
                  'bend': .20, 'pelvisTilt': (.06, 0, 0), 'head': (.22, 0, 0)})
     return base
 
@@ -2163,10 +2177,15 @@ def BuildWipeSheath(T, name):
     P = T.P
 
     def Shoulder():
-        hit = PartnerPoint(T, 'slashWipe', 'ijaA', 'comrade', 'shoulderR', 0.0)
+        # His left shoulder (on ijaA's right): the right hand wipes without reaching across the
+        # slumped head (the right shoulder put ijaA's forearm through it).
+        try:
+            hit = PartnerPoint(T, 'slashWipe', 'ijaA', 'comrade', 'shoulderL', 0.0)
+        except KeyError:   # partner track dumped before shoulderL was listed
+            hit = None
         return (hit[0] + hit[1] * T.R(.02)) if hit else Vector((0, -T.R(.6), .6))
     sh = Shoulder()
-    wipeAxis = Unit((.10, -.60, -.80))
+    wipeAxis = Unit((-.10, -.60, -.80))
     mid = T.R(.057 + .18)
     startH = tuple(sh - Vector(wipeAxis) * mid + Vector((0, -T.R(.03), 0)))
     endH = tuple(sh - Vector(wipeAxis) * mid + Vector((0, T.R(.13), T.R(.03))))
@@ -2179,10 +2198,10 @@ def BuildWipeSheath(T, name):
                         (2.30, shoulderR), (2.40, shoulderR)])
     axes = Channel([(0.0, Unit((.30, -.92, -.20))), (.55, wipeAxis), (.85, wipeAxis), (1.20, Unit((.2, -.5, -.8))),
                     (1.50, sheathAxis), (2.40, sheathAxis)])
-    # The victim's right shoulder is on his left: the hips shift onto the left foot and the
-    # trunk turns into the wipe so the right hand draws the blade across it within reach.
-    body = Keys(base, [(0.0, {}), (.55, {'bend': .62, 'pelvis': Add3(pel, (.14, -.04, -T.R(.22))), 'head': (.40, 0, .15), 'twist': .32}),
-                       (.85, {'bend': .58, 'twist': .30, 'pelvis': Add3(pel, (.14, -.02, -T.R(.20)))}), (1.30, {'bend': .20, 'twist': .08, 'pelvis': Add3(pel, (0, .02, -.03)), 'head': (.10, 0, .05)}),
+    # The victim's left shoulder is in front of his right hand: he drops his hips a little over
+    # to the right and bends in so the right hand draws the blade across it within reach.
+    body = Keys(base, [(0.0, {}), (.55, {'bend': .62, 'pelvis': Add3(pel, (-.04, -.04, -T.R(.22))), 'head': (.40, 0, -.10), 'twist': -.10}),
+                       (.85, {'bend': .58, 'twist': -.08, 'pelvis': Add3(pel, (-.04, -.02, -T.R(.20)))}), (1.30, {'bend': .20, 'twist': .08, 'pelvis': Add3(pel, (0, .02, -.03)), 'head': (.10, 0, .05)}),
                        (1.62, {'twist': .26, 'bend': .26}), (2.40, {'twist': -.05, 'bend': .12, 'head': (.05, 0, -.10)})], lag={'head': .05})
 
     def BodyAt(t):
