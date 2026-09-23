@@ -4,6 +4,13 @@
   "models": [
     {
       "id": "LugouIja01",
+      "facialUrl": "./Model/Character/Model_LugouIja01Facial.glb",
+      "facialVersion": "34d4c2d53466106a",
+      "facialCast": [
+        "ijaB",
+        "ijaC",
+        "frontOfficer"
+      ],
       "faction": "ija",
       "url": "./Model/Character/Model_LugouIja01.glb",
       "source": "Model_LugouIja01.fbx",
@@ -338,6 +345,12 @@
     },
     {
       "id": "LugouIja02",
+      "facialUrl": "./Model/Character/Model_LugouIja02Facial.glb",
+      "facialVersion": "f4387f3ffac89d90",
+      "facialCast": [
+        "ijaA",
+        "ijaD"
+      ],
       "faction": "ija",
       "url": "./Model/Character/Model_LugouIja02.glb",
       "source": "Model_LugouIja02.fbx",
@@ -2015,6 +2028,24 @@
     },
     {
       "id": "LugouNra02",
+      "facialUrl": "./Model/Character/Model_LugouNra02Facial.glb",
+      "facialVersion": "09844abcfe9ca50f",
+      "facialCast": [
+        "yaowa",
+        "heyoutian",
+        "liuwencai",
+        "comrade",
+        "runner",
+        "guard",
+        "shouter",
+        "interpreter",
+        "zhou",
+        "relief",
+        "keeper",
+        "bearer",
+        "captiveHelper",
+        "captiveWounded"
+      ],
       "faction": "nra",
       "url": "./Model/Character/Model_LugouNra02.glb",
       "source": "Model_LugouNra02.fbx",
@@ -3042,8 +3073,10 @@
     {
       "id": "LugouNra05",
       "facialUrl": "./Model/Character/Model_LugouNra05Facial.glb",
-      "facialVersion": "930c4170b5b0cab9",
-      "facialCast": ["luo"],
+      "facialVersion": "b6f429eb54024d18",
+      "facialCast": [
+        "luo"
+      ],
       "faction": "nra",
       "url": "./Model/Character/Model_LugouNra05.glb",
       "source": "Model_LugouNra05.fbx",

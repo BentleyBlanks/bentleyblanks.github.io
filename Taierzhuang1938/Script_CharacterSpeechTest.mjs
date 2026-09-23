@@ -1,8 +1,18 @@
 import assert from 'node:assert/strict';
+import crypto from 'node:crypto';
 import fs from 'node:fs';
+import * as THREE from 'three';
 import { BuildSpeechEnvelope, SampleSpeechEnvelope } from './Script_SpeechEnvelope.mjs';
 import { FirstLevelMissionVoice } from './Script_FirstLevelMissionVoice.mjs';
+import { CharacterFacialAnimation } from './Script_CharacterFacialAnimation.mjs';
+import { FirstLevelSpeakerBinder, ParseLineId, WhoForLine, FIRST_LEVEL_SPEAKER_ROLES } from './Script_FirstLevelSpeakerBinder.mjs';
+import { SpeakerLookAngles } from './Script_SpeakerHeadLayer.mjs';
+import { FIRST_LEVEL_SPEAKING_CAST, SpeakingCastOptions } from './Data_FirstLevelSpeakingCast.mjs';
+import { CHARACTER_MODEL_VARIANTS_BY_KIND } from './Data_CharacterSelection.mjs';
+import { MISSION_DIALOGUE } from './Data_FirstLevelMissionDialogue.mjs';
+import { CHARACTER_SPEECH as C } from './Data_Tuning_CharacterSpeech.mjs';
 
+// ---- runtime envelope fallback and the voice clock (unchanged contract) ----
 const sampleRate = 16000, samples = new Float32Array(sampleRate * 2);
 for (let i = sampleRate / 4; i < sampleRate * .8; i++) samples[i] = .2 * Math.sin(i * Math.PI * 400 / sampleRate);
 for (let i = sampleRate * 1.2; i < sampleRate * 1.7; i++) samples[i] = .12 * Math.sin(i * Math.PI * 2400 / sampleRate);
@@ -32,21 +42,202 @@ audio.voiceMute = false;parallel.reclaimed = true;assert.equal(director.Speech('
 director.current.parallel = [];director.current.phase = 'waiting';clock = 10.5;
 assert.equal(director.Speech('luo'), null, 'event-gated segment waits stay closed');
 
-function Glb(file) { const b = fs.readFileSync(new URL('./Model/Character/' + file, import.meta.url)); return JSON.parse(b.subarray(20, 20 + b.readUInt32LE(12))); }
-const source = Glb('Model_LugouNra05.glb'), face = Glb('Model_LugouNra05Facial.glb');
-assert.equal(face.skins[0].joints.length, source.skins[0].joints.length + 11);
-assert.deepEqual(face.animations, source.animations, 'all existing body clips preserved');
-for (let i = 0; i < source.nodes.length; i++) {
-  const original = {...source.nodes[i]}, updated = {...face.nodes[i]};
-  delete original.children;delete updated.children;delete original.extras;delete updated.extras;
-  assert.deepEqual(updated, original, 'original bone/socket/mesh transforms preserved: ' + original.name);
-  assert.deepEqual((face.nodes[i].children || []).filter(n => n < source.nodes.length), source.nodes[i].children || []);
+// ---- facial GLB contracts (Script_BakeCharacterFacial.py output) ----
+const MANIFEST = JSON.parse(fs.readFileSync(new URL('./Model/Character/Data_LugouCharacterManifest.json', import.meta.url), 'utf8'));
+function Glb(file) {
+  const b = fs.readFileSync(new URL(file.replace(/^\.\//, './'), import.meta.url));
+  const length = b.readUInt32LE(12);
+  return {bytes: b, doc: JSON.parse(b.subarray(20, 20 + length)), bin: b.subarray(28 + length)};
 }
-for (let i = 0; i < source.meshes[0].primitives.length; i++) {
-  for (const key of ['POSITION', 'NORMAL', 'TEXCOORD_0'])
-    assert.equal(face.meshes[0].primitives[i].attributes[key], source.meshes[0].primitives[i].attributes[key]);
+function Read(glb, index) {
+  const a = glb.doc.accessors[index], v = glb.doc.bufferViews[a.bufferView];
+  const n = {SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16}[a.type], ctor = {5126: Float32Array, 5123: Uint16Array, 5125: Uint32Array, 5121: Uint8Array}[a.componentType];
+  const stride = v.byteStride || ctor.BYTES_PER_ELEMENT * n, out = new Float64Array(a.count * n);
+  const view = new DataView(glb.bin.buffer, glb.bin.byteOffset + (v.byteOffset || 0) + (a.byteOffset || 0));
+  const scale = a.normalized ? {5121: 255, 5123: 65535}[a.componentType] : 1;
+  for (let i = 0; i < a.count; i++) for (let c = 0; c < n; c++) {
+    const o = i * stride + c * ctor.BYTES_PER_ELEMENT;
+    const value = ctor === Float32Array ? view.getFloat32(o, true) : ctor === Uint16Array ? view.getUint16(o, true)
+      : ctor === Uint32Array ? view.getUint32(o, true) : view.getUint8(o);
+    out[i * n + c] = value / scale;
+  }
+  return {values: out, n, count: a.count};
 }
-assert.equal(face.meshes[0].primitives.length, source.meshes[0].primitives.length + 3, 'oral surfaces batched into three material primitives');
-assert.deepEqual(face.images, source.images, 'original face and uniform textures retained');
-assert.equal(face.extras.facialRig.bones.length, 11);
-console.log('ok speech energy, silence, audio clock, parallel speaker isolation, pause/cancel and original body/skin asset contracts');
+const LEGACY_BONES = ['Face_Jaw', 'Face_LipLower', 'Face_LipUpper', 'Face_CornerL', 'Face_CornerR', 'Face_BrowL',
+  'Face_LidUpperL', 'Face_LidLowerL', 'Face_BrowR', 'Face_LidUpperR', 'Face_LidLowerR'];
+const POSES = ['Rest', 'Open', 'Wide', 'Round', 'Close', 'Blink', 'BrowUp', 'Snarl', 'DeadSlack'];
+const faced = MANIFEST.models.filter(record => record.facialUrl);
+assert.deepEqual(faced.map(r => r.id).sort(), ['LugouIja01', 'LugouIja02', 'LugouNra02', 'LugouNra05']);
+const definitions = {};
+for (const record of faced) {
+  const face = Glb(record.facialUrl), source = Glb(record.url);
+  const label = record.id;
+  assert.ok(face.bytes.length <= 1.5 * 1024 * 1024, `${label} facial GLB within 1.5 MB (contract section 6): ${face.bytes.length}`);
+  assert.equal(crypto.createHash('sha256').update(face.bytes).digest('hex').slice(0, 16), record.facialVersion, `${label} facialVersion is the file hash`);
+  assert.ok(!face.doc.images && !face.doc.textures, `${label}: no duplicated textures (rebound to the base GLB by material name)`);
+  assert.ok(!face.doc.animations, `${label}: body clips come from the base GLB`);
+  const rig = face.doc.extras.facialRig;
+  definitions[label] = rig;
+  assert.equal(rig.schema, 2); assert.equal(rig.materialsFrom, 'base'); assert.equal(rig.animationsFrom, 'base');
+  for (const bone of [...LEGACY_BONES, 'Face_EyeL', 'Face_EyeR']) assert.ok(rig.bones.includes(bone), `${label} has ${bone}`);
+  assert.equal(face.doc.skins[0].joints.length, source.doc.skins[0].joints.length + rig.bones.length);
+  for (const pose of POSES) assert.ok(rig.poses[pose], `${label} pose ${pose}`);
+  assert.deepEqual(rig.eyes.bones, ['Face_EyeL', 'Face_EyeR']);
+  // Original bones, sockets and mesh node untouched; face joints appended under the head.
+  for (let i = 0; i < source.doc.nodes.length; i++) {
+    const original = {...source.doc.nodes[i]}, updated = {...face.doc.nodes[i]};
+    for (const key of ['children', 'extras']) { delete original[key]; delete updated[key]; }
+    assert.deepEqual(updated, original, `${label} original node preserved: ${original.name}`);
+  }
+  // Every body surface material exists by name in the base GLB (runtime rebinding).
+  const baseMaterials = new Set(source.doc.materials.map(m => m.name));
+  const prims = face.doc.meshes[0].primitives, basePrims = source.doc.meshes[0].primitives;
+  assert.equal(prims.length, basePrims.length + 1, `${label}: one merged oral primitive`);
+  for (let i = 0; i < basePrims.length; i++) {
+    assert.ok(baseMaterials.has(face.doc.materials[prims[i].material].name), `${label} prim ${i} material rebinds by name`);
+    assert.equal(face.doc.materials[prims[i].material].name, source.doc.materials[basePrims[i].material].name);
+    const a = Read(face, prims[i].attributes.POSITION), b = Read(source, basePrims[i].attributes.POSITION);
+    if (a.count === b.count) {
+      let error = 0; for (let k = 0; k < a.values.length; k++) error = Math.max(error, Math.abs(a.values[k] - b.values[k]));
+      assert.ok(error < 1e-6, `${label} prim ${i} positions unchanged`);
+    } else {
+      // The lip cut duplicates a few seam vertices of the head (sealed lips).
+      assert.ok(a.count > b.count && a.count - b.count < 16, `${label} prim ${i} lip cut adds a few vertices`);
+    }
+  }
+  const oral = prims.at(-1);
+  assert.equal(face.doc.materials[oral.material].name, 'Material_FacialOral');
+  assert.ok(oral.attributes.COLOR_0 !== undefined && oral.indices !== undefined, `${label} oral: indexed, vertex coloured`);
+  const oralTriangles = face.doc.accessors[oral.indices].count / 3;
+  assert.ok(oralTriangles < 2300, `${label} oral triangles ${oralTriangles}`);
+  // Pose masks: blinking never opens the jaw, opening the mouth never lifts the brows.
+  const moved = (pose, bone) => {
+    const a = rig.poses[pose][bone], r = rig.poses.Rest[bone];
+    return Math.hypot(...a.translation.map((x, k) => x - r.translation[k])) > 1e-4
+      || Math.abs(Math.abs(a.rotation.reduce((s, x, k) => s + x * r.rotation[k], 0)) - 1) > 1e-6;
+  };
+  assert.ok(moved('Open', 'Face_Jaw') && !moved('Open', 'Face_BrowL'), `${label} Open: jaw only-mouth`);
+  assert.ok(moved('Blink', 'Face_LidUpperL') && !moved('Blink', 'Face_Jaw'), `${label} Blink: lids only`);
+  assert.ok(moved('DeadSlack', 'Face_Jaw') && moved('BrowUp', 'Face_BrowR') && moved('Close', 'Face_LipLower'));
+}
+
+// ---- speaking cast: pinned approved appearance with a face for every 01-06 speaker ----
+for (const [castId, spec] of Object.entries(FIRST_LEVEL_SPEAKING_CAST)) {
+  assert.ok(CHARACTER_MODEL_VARIANTS_BY_KIND[spec.actorKind].includes(spec.modelVariant), `${castId}: approved appearance`);
+  const id = `Lugou${spec.actorKind === 'nra' ? 'Nra' : 'Ija'}${String(spec.modelVariant + 1).padStart(2, '0')}`;
+  const record = MANIFEST.models.find(r => r.id === id);
+  assert.ok(record?.facialCast?.includes(castId), `${castId} is in ${id}.facialCast`);
+  assert.deepEqual(SpeakingCastOptions(castId), {castId, modelVariant: spec.modelVariant});
+}
+for (const record of faced) for (const castId of record.facialCast) assert.ok(FIRST_LEVEL_SPEAKING_CAST[castId], `${castId} pinned`);
+for (const who of ['luo', 'yaowa', 'heyoutian', 'liuwencai', 'comrade', 'runner', 'shouter', 'guard', 'interpreter',
+  'ijaA', 'ijaB', 'ijaC', 'ijaD', 'zhou', 'relief', 'keeper']) assert.ok(FIRST_LEVEL_SPEAKING_CAST[who], `01-06 speaker ${who} has a pinned face`);
+assert.equal(FIRST_LEVEL_SPEAKING_CAST.ijaB.modelVariant, 0, '日兵乙 wears IJA01 (IJA03 mouth is closed geometry)');
+assert.deepEqual(SpeakingCastOptions('nobody'), {});
+
+// ---- face controller on the real NRA02 rig definition ----
+function FaceRoot(rig) {
+  const root = new THREE.Group(), head = new THREE.Object3D(); head.name = 'Head'; root.add(head);
+  const byName = {};
+  for (const name of rig.bones) {
+    const bone = new THREE.Bone(); bone.name = name;
+    bone.position.fromArray(rig.poses.Rest[name].translation); bone.quaternion.fromArray(rig.poses.Rest[name].rotation);
+    byName[name] = bone;
+  }
+  for (const name of rig.bones) (name === 'Face_LipLower' ? byName.Face_Jaw : head).add(byName[name]);
+  root.updateMatrixWorld(true);
+  return {root, byName};
+}
+const jawAngle = (bone, rig) => 2 * Math.acos(Math.min(1, Math.abs(bone.quaternion.dot(new THREE.Quaternion().fromArray(rig.poses.Rest.Face_Jaw.rotation))))) * 180 / Math.PI;
+{
+  const rig = definitions.LugouNra02, {root, byName} = FaceRoot(rig);
+  const face = new CharacterFacialAnimation(root, rig, {seed: 7});
+  // Silence: lips closed, only a tiny breathing drift.
+  let maxSilentJaw = 0;
+  for (let i = 0; i < 300; i++) { face.Update(1 / 60, {}); maxSilentJaw = Math.max(maxSilentJaw, jawAngle(byName.Face_Jaw, rig)); }
+  assert.ok(maxSilentJaw < 1.0, `silent jaw stays nearly closed (${maxSilentJaw.toFixed(2)} deg)`);
+  // Baked face track channels drive the jaw and lip shapes additively.
+  for (let i = 0; i < 20; i++) face.Update(1 / 60, {speech: {active: true, jaw: .9, wide: 0, round: .8, close: 0, stress: 0}});
+  const open = jawAngle(byName.Face_Jaw, rig);
+  assert.ok(open > 8, `face track opens the jaw (${open.toFixed(1)} deg)`);
+  const cornerRound = byName.Face_CornerL.position.clone();
+  for (let i = 0; i < 20; i++) face.Update(1 / 60, {speech: {active: true, jaw: .9, wide: 1, round: 0, close: 0, stress: 0}});
+  assert.ok(byName.Face_CornerL.position.distanceTo(cornerRound) > .2, 'wide and round are different mouth shapes');
+  // A closure (m/b/p) presses the lips with the jaw shut.
+  for (let i = 0; i < 20; i++) face.Update(1 / 60, {speech: {active: true, jaw: 0, wide: 0, round: 0, close: 1, stress: 0}});
+  assert.ok(jawAngle(byName.Face_Jaw, rig) < 1 && face.close > .9, 'closure keeps the jaw shut');
+  // Stress lifts the brows (only stress does), then settles.
+  const browRest = byName.Face_BrowL.position.clone();
+  for (let i = 0; i < 20; i++) face.Update(1 / 60, {speech: {active: true, jaw: .5, wide: .3, round: 0, close: 0, stress: 0}});
+  assert.ok(byName.Face_BrowL.position.distanceTo(browRest) < .02, 'an open jaw alone does not lift the brows');
+  face.Update(1 / 60, {speech: {active: true, jaw: .6, wide: .3, round: 0, close: 0, stress: 1}});
+  assert.ok(face.brow > .5 && face.stress > .5, 'stress event lifts the brows and feeds the nod');
+  // Envelope fallback still works (no face track yet).
+  for (let i = 0; i < 20; i++) face.Update(1 / 60, {speech: {active: true, level: .9, brightness: .1}});
+  assert.ok(jawAngle(byName.Face_Jaw, rig) > 8 && face.round > face.wide, 'envelope fallback: dark voice rounds the lips');
+  // Voice stops: mouth closes within a few frames.
+  for (let i = 0; i < 12; i++) face.Update(1 / 60, {speech: null});
+  assert.ok(jawAngle(byName.Face_Jaw, rig) < 1.5, 'mouth closes when the line ends');
+  // Death: slack jaw, still afterwards.
+  face.Update(0, {dead: true, deathBlend: 1});
+  const slack = jawAngle(byName.Face_Jaw, rig); const held = byName.Face_Jaw.quaternion.clone();
+  face.Update(0, {dead: true, deathBlend: 1});
+  assert.ok(slack > 5 && byName.Face_Jaw.quaternion.equals(held), `DeadSlack drops the jaw (${slack.toFixed(1)} deg) and holds`);
+  // Eyes follow a gaze target within limits.
+  face.Update(0, {}); face.dead = 0;
+  const eye = byName.Face_EyeL, restEye = eye.quaternion.clone();
+  face.gaze = new THREE.Vector3(0, 50, 30); // head frame of this test rig: Y forward, Z left
+  for (let i = 0; i < 60; i++) face.Update(1 / 60, {});
+  const eyeTurn = 2 * Math.acos(Math.min(1, Math.abs(eye.quaternion.dot(restEye)))) * 180 / Math.PI;
+  assert.ok(eyeTurn > 5 && eyeTurn <= Math.hypot(C.gazeMaxYawDeg + C.saccadeDeg, C.gazeMaxPitchDeg + C.saccadeDeg) + 1, `eyes turn toward the gaze (${eyeTurn.toFixed(1)} deg)`);
+}
+// Blinks: seeded per actor, 2.5-6 s apart.
+{
+  const rig = definitions.LugouIja02;
+  const Blinks = seed => { const {root} = FaceRoot(rig), face = new CharacterFacialAnimation(root, rig, {seed}); const at = [];
+    let was = false; for (let i = 0; i < 60 * 30; i++) { face.Update(1 / 60, {}); const now = face.weights.Blink > .5; if (now && !was) at.push(i / 60); was = now; } return at; };
+  const a = Blinks(1), b = Blinks(2);
+  assert.notDeepEqual(a.map(x => x.toFixed(2)), b.map(x => x.toFixed(2)), 'different actors blink at different times');
+  const gaps = a.slice(1).map((t, i) => t - a[i]);
+  assert.ok(a.length >= 4 && gaps.every(g => g > C.blinkMinS - .1 && g < C.blinkMaxS + .2), `blink gaps ${gaps.map(g => g.toFixed(1))}`);
+}
+
+// ---- speaker binder: who -> face, isolation, release ----
+{
+  assert.deepEqual(ParseLineId('BunkerBanter', 'BunkerBanter.02'), {scene: 'BunkerBanter', index: 1});
+  assert.deepEqual(ParseLineId('X', 3), {scene: 'X', index: 3});
+  const cue = MISSION_DIALOGUE.find(c => c.lines.length >= 2 && c.lines[0].who !== c.lines[1].who
+    && FIRST_LEVEL_SPEAKER_ROLES.includes(c.lines[0].who) && FIRST_LEVEL_SPEAKER_ROLES.includes(c.lines[1].who));
+  const [whoA, whoB] = [cue.lines[0].who, cue.lines[1].who];
+  assert.equal(WhoForLine(cue.id, `${cue.id}.01`), whoA);
+  const rig = definitions.LugouNra02;
+  const Soldier = (id, who) => { const {root} = FaceRoot(rig); const head = new THREE.Object3D(); root.add(head);
+    const facial = new CharacterFacialAnimation(root, rig, {seed: id});
+    return {id, alive: true, speakerRole: who, position: new THREE.Vector3(id, 0, 0),
+      actor: {root, characterRig: {facial, bones: {head}, root}}}; };
+  const a = Soldier(1, whoA), b = Soldier(2, whoB);
+  let talking = whoA;
+  const voice = {Speech: who => (who === talking ? {active: true, who, jaw: .8, wide: .2, round: 0, close: 0, stress: 0} : null)};
+  const binder = new FirstLevelSpeakerBinder({voice, soldiers: () => [a, b], listener: () => new THREE.Vector3(0, 1.6, 5)});
+  binder.Update();
+  assert.equal(binder.ActorFor(cue.id, `${cue.id}.01`), a);
+  assert.equal(binder.ActorForWho(whoB), b);
+  assert.ok(a.actor.characterRig.facial.source()?.active, 'speaker face bound to its own line');
+  assert.equal(b.actor.characterRig.facial.source(), null, 'listener face stays closed');
+  assert.ok(b.actor.characterRig.facial.gaze, 'listener looks at the talker');
+  assert.ok(binder.HeadPosition(cue, cue.lines[0]), 'voice position comes from the face that moves');
+  talking = whoB; binder.Update();
+  assert.equal(a.actor.characterRig.facial.source(), null); assert.ok(b.actor.characterRig.facial.source()?.active);
+  a.alive = false; binder.Update();
+  assert.equal(a.actor.characterRig.facial.source, null, 'dead speaker released');
+  binder.Dispose(); assert.equal(b.actor.characterRig.facial.source, null, 'dispose releases every face');
+}
+// Shared look math: forward hemisphere clamp.
+{
+  const out = SpeakerLookAngles(new THREE.Quaternion(), new THREE.Vector3(), new THREE.Vector3(-1, 0, -1));
+  assert.ok(out.yaw > .5 && out.yaw <= .55 && Math.abs(out.pitch) < 1e-6);
+  const behind = SpeakerLookAngles(new THREE.Quaternion(), new THREE.Vector3(), new THREE.Vector3(0, 0, 5));
+  assert.ok(Math.abs(behind.yaw) <= .55, 'rearward talk is a glance, not a neck twist');
+}
+console.log(`ok speech envelope/clock/isolation; ${faced.length} facial skins (13 bones, 9 poses, shared textures/clips, <=1.5 MB); `
+  + `${Object.keys(FIRST_LEVEL_SPEAKING_CAST).length} pinned speakers; additive face controller, seeded blinks, gaze, binder`);

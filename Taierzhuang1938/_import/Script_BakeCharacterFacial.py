@@ -33,6 +33,7 @@ Job keys
                 weights of the nearest face-weighted skin vertex (beard/moustache cards)
   stripImages, stripAnimations  booleans
   eyes          optional runtime gaze description written to extras.facialRig.eyes
+  poseMask      {pose: [bone name prefixes]}: other bones take the Rest value in that pose
   source        source project label written to extras
 """
 import bpy, json, struct, math, os
@@ -179,6 +180,12 @@ def Bake(job):
     rig.animation_data.action = None
     for bone in rig.pose.bones: bone.matrix_basis.identity()
     bpy.context.view_layer.update()
+    # A pose only moves the bones it is about (the NRA05 talk clip's Blink frame also
+    # had the jaw ajar; its Open frame lifted the brows): the rest keep their Rest value.
+    for label, prefixes in (job.get('poseMask') or {}).items():
+        if label in poses and 'Rest' in poses:
+            for n in names:
+                if not any(n.startswith(p) for p in prefixes): poses[label][n] = dict(poses['Rest'][n])
 
     glb = Glb(os.path.join(directory, job['base'])); doc = glb.doc
     skin = doc['skins'][0]
@@ -257,11 +264,30 @@ def Bake(job):
             primitive = primitives[int(obj['glbPrim'])]
             points = glb.Read(primitive['attributes']['POSITION'])
             joints = glb.Read(primitive['attributes']['JOINTS_0']); weights = glb.Read(primitive['attributes']['WEIGHTS_0'])
-            indices = obj.data.attributes['glbIndex'].data
-            assert len(indices) == len(points), ('Vertex count differs from GLB prim', obj.name, len(indices), len(points))
-            js = list(joints); ws = list(weights)
+            order = [d.value for d in obj.data.attributes['glbIndex'].data]
+            sourceTriangles = len(glb.Read(primitive['indices'])) // 3 if 'indices' in primitive else len(points) // 3
+            # Authoring may cut the sealed lips (extra vertices) or drop interior faces:
+            # then every attribute is re-emitted in Blender vertex order and the
+            # triangles come from the Blender faces (winding preserved).
+            rebuild = len(order) != len(points) or len(obj.data.polygons) != sourceTriangles
+            if rebuild:
+                for key, accessor in list(primitive['attributes'].items()):
+                    if key in ('JOINTS_0', 'WEIGHTS_0'): continue
+                    rows = glb.Read(accessor)
+                    primitive['attributes'][key] = glb.Write([rows[i] for i in order], doc['accessors'][accessor]['type'])
+                triangles = []
+                for poly in obj.data.polygons:
+                    assert len(poly.vertices) == 3, ('Non-triangle face', obj.name, poly.index)
+                    triangles.extend((v,) for v in poly.vertices)
+                primitive['indices'] = glb.Write(triangles, 'SCALAR', 5123 if len(order) < 65536 else 5125, target=34963)
+                js = [joints[i] for i in order]; ws = [weights[i] for i in order]
+                stats['rebuiltPrim%d' % int(obj['glbPrim'])] = {'vertices': len(order), 'triangles': len(triangles) // 3,
+                                                                'sourceVertices': len(points), 'sourceTriangles': sourceTriangles}
+            else:
+                assert order == list(range(len(points))), ('Vertex order differs from GLB prim', obj.name)
+                js = list(joints); ws = list(weights)
             for vertex in obj.data.vertices:
-                i = indices[vertex.index].value
+                i = order[vertex.index]; k = vertex.index if rebuild else i
                 distance = ((toMesh @ obj.matrix_world @ vertex.co) - Vector(points[i])).length
                 stats['maxVertexMatchDistance'] = max(stats['maxVertexMatchDistance'], distance)
                 # Transfers (IJA02 -> IJA01) share the head mesh within a few millimetres.
@@ -270,7 +296,7 @@ def Bake(job):
                 face = GroupWeights(obj, vertex, faceOnly=True)
                 if not face: continue
                 stats['faceVertices'] += 1
-                js[i], ws[i] = Blend(face, list(zip(joints[i], weights[i])))
+                js[k], ws[k] = Blend(face, list(zip(joints[i], weights[i])))
                 facePoints.append((headInverse @ Vector(points[i]), face))
             primitive['attributes']['JOINTS_0'] = glb.Write(js, 'VEC4', 5123)
             primitive['attributes']['WEIGHTS_0'] = glb.Write(ws, 'VEC4')

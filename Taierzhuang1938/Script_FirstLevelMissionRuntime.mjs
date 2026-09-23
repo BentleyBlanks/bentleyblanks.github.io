@@ -80,6 +80,8 @@ import { ActionKeyGlyph } from "./Script_Input.mjs";
 import { FirstLevelStageTextId } from "./Script_TextIds.mjs";
 // Only for `emplaced`: a man married to a machine gun never carries throwables here.
 import { WEAPONS } from "./Data_Weapons.mjs";
+import { FirstLevelSpeakerBinder, FirstLevelSpeakerResolvers } from "./Script_FirstLevelSpeakerBinder.mjs";
+import { SpeakingCastOptions } from "./Data_FirstLevelSpeakingCast.mjs";
 
 export function FirstLevelCheckpointVitals(point={},player={},tuning=R){
   const savedHealth=Number.isFinite(point.health)?point.health:player.health;
@@ -171,6 +173,9 @@ export class FirstLevelMissionRuntime {
       Ready: (id) => this.Has(id),
       Clock: this.VoiceClock,
     });
+    // Who is talking -> which face moves (01-06 speakers; Script_FirstLevelSpeakerBinder).
+    this.speakers = new FirstLevelSpeakerBinder({ voice: this.voice, soldiers: () => this.ai.soldiers,
+      listener: () => this.player.EyePosition, resolvers: FirstLevelSpeakerResolvers(this) });
     this.view = new FirstLevelMissionView({
       scene: this.scene,
       battlefield: this.battlefield,
@@ -309,6 +314,9 @@ export class FirstLevelMissionRuntime {
   // Intact dialogue recordings follow the current speaker; overlapping Luo
   // briefing keeps its own source. Unknown nearby voices stay in carriage space.
   VoicePosition(cue,line) {
+    // A speaker with a face talks from that face's head (same body the binder animates).
+    const faced = this.speakers?.HeadPosition(cue, line);
+    if (faced) return faced;
     const who = line?.who ?? cue.lines[0]?.who;
     let fieldSpeaker;
     if(cue.id==="FrontRelief"&&who==="relief")
@@ -405,11 +413,6 @@ export class FirstLevelMissionRuntime {
   }
   PlaceSquad() {
     this.squad = ["luo", "yaowa", "heyoutian", "liuwencai"].map(id => this.companion.Handle(id)).filter(Boolean);
-    const luo = this.companion.Handle("luo");
-    if (luo?.actor?.characterRig?.facial) {
-      this.speakingFace = luo.actor.characterRig.facial;
-      this.speakingFace.source = () => luo.alive ? this.voice.Speech("luo") : null;
-    }
     for (const actor of this.squad) actor.scriptEssential = OPENING.requiredSquadCast.includes(actor.castId);
     // 2026.09.19：开局不再有军列。班里人就在掩蔽部与它后侧的交通壕里，
     // missionTrainReady 这个旗标沿用（UpdateSquad 拿它当「这个人已经归行军层管」）。
@@ -963,9 +966,11 @@ export class FirstLevelMissionRuntime {
         squadId: `Mission_${id}${spec.team?"_"+spec.team:""}`,
         bayonetFixed: !!spec.bayonet,
         modelVariant: spec.modelVariant,
+        ...SpeakingCastOptions(spec.castId),
       });
       if (!actor) {this.spawnQueue.push(()=>this.SpawnEncounterActor(id,spec));return null;}
       actor.missionId = spec.id;InstallMissionSentry(actor);
+      if (spec.castId) actor.speakerRole = spec.castId;
       actor.missionEncounter=id;
       // Local right-position defenders use their actual geometry and line of sight.
       actor.missionReserve=!!spec.reserve;
@@ -1538,6 +1543,7 @@ export class FirstLevelMissionRuntime {
       const actor = this.ai.Spawn("nra", post.x, post.z, {
         weapon: "HanYang",
         squadId: "MissionWithdrawingGuard",
+        ...SpeakingCastOptions("guard"),
       });
       if (actor) {
         InstallMissionSentry(actor);this.Defend(actor,actor.position,0,0);
@@ -1714,7 +1720,7 @@ export class FirstLevelMissionRuntime {
   }
   EnsureBundleKeeper(){
     if(this.bundleKeeper)return;
-    const actor=this.ai.Spawn('nra',Sortie.keeper.x,Sortie.keeper.z,{weapon:'HanYang',squadId:'MissionBundleSupply'});
+    const actor=this.ai.Spawn('nra',Sortie.keeper.x,Sortie.keeper.z,{weapon:'HanYang',squadId:'MissionBundleSupply',...SpeakingCastOptions('keeper')});
     if(actor){
       this.bundleKeeper=actor;actor.missionId='BundleKeeper';actor.scriptEssential=true;
       InstallMissionSentry(actor);this.Defend(actor,Sortie.keeper,0,0);this.ai.SetStance(actor,1,Infinity,true);
@@ -2251,6 +2257,7 @@ export class FirstLevelMissionRuntime {
     const prof = this.profiler?.on ? this.profiler : null;
     prof?.B("story/mission/voice");
     this.voice.Update(dt);
+    this.speakers.Update();
     this.UpdateMusic();
     this.battleSound.Update(dt,this.flow.stage.id,this.voice.current?.phase==="playing");
     prof?.E("story/mission/voice");
@@ -2665,7 +2672,7 @@ export class FirstLevelMissionRuntime {
     this.RemoveBunkerRifle();
     this.leaderGuide?.Dispose();
     this.ClearReturnWarning();
-    this.speakingFace?.Reset();
+    this.speakers?.Dispose();
     if(this.ai.ctx.onSoldierDeath===this.soldierDeath)this.ai.ctx.onSoldierDeath=this.oldSoldierDeath;
     this.transition.Dispose();
     this.extras.Clear();

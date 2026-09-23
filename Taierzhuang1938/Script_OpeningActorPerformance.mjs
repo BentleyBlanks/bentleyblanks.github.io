@@ -2,6 +2,7 @@
 // roots, blocking and contact beats; this layer owns attention and free gestures.
 import { Quaternion, Vector3 } from "three";
 import { OpeningActorAnatomy, SolveOpeningActorArm, CurlOpeningActorFingers, OpeningActorPalm } from "./Script_OpeningFirstPerson.mjs";
+import { SpeakerLookAngles } from "./Script_SpeakerHeadLayer.mjs";
 
 const Clamp=(value,low=0,high=1)=>Math.max(low,Math.min(high,value));
 const Smooth=value=>{value=Clamp(value);return value*value*(3-2*value);};
@@ -120,7 +121,7 @@ export class OpeningActorPerformance {
     this.saved=new Map();this.pool=[];this.clock=0;this.speech=0;this.lookYaw=0;this.lookPitch=0;
     this.rootQ=new Quaternion();this.parentQ=new Quaternion();this.turnQ=new Quaternion();
     this.axis=new Vector3();this.right=new Vector3();this.forward=new Vector3();this.up=new Vector3(0,1,0);
-    this.origin=new Vector3();this.target=new Vector3();this.local=new Vector3();
+    this.origin=new Vector3();this.target=new Vector3();this.local=new Vector3();this.lookAngles={yaw:0,pitch:0};
     this.phase=(Hash(soldier.missionId||soldier.id||this.rig.modelId)%997)/157;
   }
   Restore(){for(const [bone,q] of this.saved){bone.quaternion.copy(q);this.pool.push(q);}this.saved.clear();}
@@ -153,7 +154,9 @@ export class OpeningActorPerformance {
     const interrogating=["Captive","Interrogate","Creep","Black"].includes(context.phase);
     const breath=Math.sin(time*(captive?3.4:2.1));
     const sway=Math.sin(time*.93)*Math.sin(time*.37);
-    const emphasis=(.5-.5*Math.cos(lineAge*4.6))*this.speech;
+    // Faces with a rig nod on the stressed syllables of their face track; the
+    // synthetic beat remains only for bodies without a face.
+    const emphasis=(this.rig.facial?(this.rig.facial.stress||0):(.5-.5*Math.cos(lineAge*4.6)))*this.speech;
     this.actor.root.getWorldQuaternion(this.rootQ);
     this.right.set(1,0,0).applyQuaternion(this.rootQ);
     this.forward.set(0,0,-1).applyQuaternion(this.rootQ);
@@ -168,12 +171,9 @@ export class OpeningActorPerformance {
     let pitch=.02*breath;
     if(context.lookAt&&bones.head){
       bones.head.getWorldPosition(this.origin);
-      this.target.set(context.lookAt.x,context.lookAt.y??this.origin.y,context.lookAt.z).sub(this.origin);
-      this.local.copy(this.target).applyQuaternion(this.parentQ.copy(this.rootQ).invert());
-      // Only turn toward targets in the actor's forward hemisphere. Rearward
-      // dialogue is acknowledged with a glance, never a 180-degree neck twist.
-      yaw=Clamp(Math.atan2(-this.local.x,-this.local.z),-.55,.55);
-      pitch=Clamp(Math.atan2(this.local.y,Math.hypot(this.local.x,this.local.z)),-.25,.32);
+      this.target.set(context.lookAt.x,context.lookAt.y??this.origin.y,context.lookAt.z);
+      // Shared look math (Script_SpeakerHeadLayer): forward hemisphere only.
+      ({yaw,pitch}=SpeakerLookAngles(this.rootQ,this.origin,this.target,this.lookAngles,this.local));
       if(guard&&!talking)yaw=Clamp(yaw*.35+.18*Math.sin(time*.57),-.38,.38);
     }
     const gazeMix=1-Math.exp(-dt*4);
