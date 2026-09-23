@@ -64,7 +64,9 @@ export const FIRST_LEVEL_VOICE_CAST = Object.freeze({
     faction: "nra", lang: "zh", projection: "shout", f0: [110, 190],
     persona: "四川成年男兵，在洞外沟里，隔着炮声拼命示警，声音拉长破音",
     sample: "喂！前头的！把头埋下去！听到没得？莫探出来！那边有冷枪，刚才已经伤了两个了！等炮停了再动！都趴好！",
-    sharesWith: null,
+    // 2026-09-23：两条候选一条与罗班长撞嗓（0.78）、一条基频 356 Hz 低频只占 3%（像女声/童声），都不用；
+    // 他只在 BunkerIncoming 喊一句、不和传令兵同场，共用传令兵的嗓子（少抽卡）。
+    sharesWith: "runner",
   }),
   guard: Object.freeze({
     faction: "nra", lang: "zh", projection: "shout", f0: [110, 185],
@@ -81,6 +83,9 @@ export const FIRST_LEVEL_VOICE_CAST = Object.freeze({
     faction: "nra", lang: "zh", projection: "normal", f0: [95, 160],
     persona: "守弹药屋的四川老兵，嗓子哑，交代东西干脆",
     sample: "这几箱是手榴弹，那边是子弹，莫搞混了。拿的时候轻点，箱子底下有潮气。要好多拿好多，拿完了跟我说一声，我好记账。",
+    // 2026-09-23：两条候选与罗班长的音色余弦都在 0.84 以上，而他唯一的场景 BundleSupply 就是跟罗班长对话；
+    // 共用担架员的嗓子（与罗班长 0.57，两人不同场）。
+    sharesWith: "bearer",
   }),
   bearer: Object.freeze({
     faction: "nra", lang: "zh", projection: "normal", f0: [100, 170],
@@ -106,7 +111,7 @@ export const FIRST_LEVEL_VOICE_CAST = Object.freeze({
   }),
   ijaC: Object.freeze({
     faction: "ija", lang: "ja", projection: "shout", f0: [110, 185],
-    persona: "1938年日本陆军步兵，年轻些，嗓子尖而响，在前沟边跑边喊；只说日语",
+    persona: "1938年日本陆军步兵，二十出头的成年男性，嗓音比甲年轻、偏亮、响，但仍是有胸腔共鸣的成年男声，不是尖细的嗓子；在前沟边跑边喊；只说日语",
     sample: "こっちだ、こっちだ！みんなついてこい！ここはあんぜんだ。もっとまえへいくぞ。たまをわすれるな！おくれるな！",
     sampleRef: "こっちだ、こっちだ！みんなついてこい！ここは安全だ。もっと前へ行くぞ。弾を忘れるな！遅れるな！",
     sharesWith: null,
