@@ -280,6 +280,8 @@ export const BLACKBOARD = Freeze({
  * officerSuppression  军官（`s.aiOfficer`）阵亡时本组每人加的压制。
  * officerHesitateMinS/MaxS  军官阵亡时本组的迟疑。
  * leaderDownBarkM     军官阵亡后，离他这么近的一个组员喊「分队长殿がやられた」。
+ * advanceBarkCooldownS  同一个人两次喊「散開！前へ！」至少隔这么久（2026-09-24 审查：没有这道闸时
+ *                     01→06 一趟调了一万多次；跃进一轮 = 冲刺 + 站定打两轮，约 10–20 s，所以取 12 s）。
  */
 export const SQUAD_REACTION = Freeze({
   witnessM: 6,
@@ -290,6 +292,7 @@ export const SQUAD_REACTION = Freeze({
   officerHesitateMinS: 3,
   officerHesitateMaxS: 5,
   leaderDownBarkM: 30,
+  advanceBarkCooldownS: 12,
 });
 
 /**

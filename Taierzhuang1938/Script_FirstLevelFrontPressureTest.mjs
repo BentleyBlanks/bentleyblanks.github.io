@@ -18,10 +18,11 @@ import {
 } from "./Data_FirstLevelFrontPressure.mjs";
 import {
   FirstLevelFrontPressure, FrontPressurePhase, FrontFirePoints, FrontGroupMembers, AssaultRoundEnd, AssaultTop,
-  NearestLineIndex, GroupFallbackDue, FrontChargeDue, FIRST_LEVEL_AI_RULE_STEPS, PressureRoute, RouteIndex, RushStalled,
+  NearestLineIndex, GroupFallbackDue, FrontChargeDue, FrontChargeCheck, FIRST_LEVEL_AI_RULE_STEPS, PressureRoute, RouteIndex,
+  RushStalled, RushPaused,
 } from "./Script_FirstLevelFrontPressure.mjs";
 import { BACKDROP_SQUADS, BACKDROP_FIRE_POINTS } from "./Data_FirstLevelBackdropSquads.mjs";
-import { FirstLevelBackdropSquads, BackdropStep, BackdropFirePoints } from "./Script_FirstLevelBackdropSquads.mjs";
+import { FirstLevelBackdropSquads, BackdropStep, BackdropFirePoints, InCameraView } from "./Script_FirstLevelBackdropSquads.mjs";
 import { MISSION_STAGES, MISSION_ENCOUNTERS, MISSION_TACTICS, MISSION_TUNING as R } from "./Data_FirstLevelMission.mjs";
 import { MISSION_FACT_GATES } from "./Data_FirstLevelMissionGates.mjs";
 import { MISSION_LAYOUT } from "./Data_FirstLevelMissionLayout.mjs";
@@ -169,6 +170,10 @@ console.log(`ok ① pressure / backdrop data: ${FRONT_PRESSURE_PHASES.length} ph
     Check(!RushStalled(r, { x: 0, z: -178.9 }, line, R.assaultRushStallS - 0.2, R), "less than assaultRushProgressM is not progress, but the clock is not up yet");
     Check(RushStalled(r, { x: 0, z: -178.9 }, line, 0.3, R), "no progress for assaultRushStallS: stalled");
     r.index = 2; Check(!RushStalled(r, { x: 0, z: -178.9 }, { x: 0, z: -166 }, 10, R), "a new line restarts the clock");
+    // 2026-09-24 review: an officer's death froze his men for 3-5 s and the rush clock called that a stall.
+    Check(SQUAD_REACTION.officerHesitateMaxS > R.assaultRushStallS, "fixture: a long hesitation outlasts the stall window");
+    Check(RushPaused({ hesitateUntil: 10 }, 9) && RushPaused({ state: "reload" }, 0) && RushPaused({ state: "grenade" }, 0)
+      && !RushPaused({ hesitateUntil: 10, state: "advance" }, 10.01), "hesitating / reloading / throwing is a pause, not a stall");
   }
   const people = [1, 2, 3, 4].map((i) => ({ alive: i > 2 }));
   Check(GroupFallbackDue(people, 4, { casualtyFraction: 0.5 }), "half dead trips the fallback");
@@ -181,6 +186,12 @@ console.log(`ok ① pressure / backdrop data: ${FRONT_PRESSURE_PHASES.length} ph
   Check(FrontChargeDue([0, 1, 2, 3].map(line), rule, 31, { x: 0, z: -142 }), "charge once the group holds its last line near the player");
   Check(!FrontChargeDue([0, 1, 2, 3].map(line), rule, 31, { x: 0, z: -60 }), "no charge at a far player");
   Check(!FrontChargeDue([0, 1, 2].map(line), rule, 31, { x: 0, z: -142 }), "no charge below minAlive");
+  Eq([FrontChargeCheck([0, 1, 2, 3].map(line), rule, 10, { x: 0, z: -142 }), FrontChargeCheck([0, 1, 2].map(line), rule, 31, { x: 0, z: -142 }),
+    FrontChargeCheck([0, 1, 2, 3].map(line), rule, 31, { x: 0, z: -60 })], ["tooEarly", "tooFew", "playerFar"], "a missed charge names its reason");
+  const rushing = (i) => ({ ...line(i), missionAssault: { mode: "rush", index: 3, points: s.points } });
+  Check(FrontChargeDue([0, 1, 2, 3].map(rushing), rule, 31, { x: 0, z: -142 }), "men still running up to the last line count as pressed forward");
+  const back = (i) => ({ ...line(i), missionAssault: { mode: "hold", index: 1, points: s.points } });
+  Eq(FrontChargeCheck([0, 1, 2, 3].map(back), rule, 31, { x: 0, z: -142 }), "notForward");
 }
 function MakeWorld(stage = "BunkerRescue") {
   const world = { facts: new Set(), barks: [], charges: [], defends: [], threats: new Set(), records: [] };
@@ -272,14 +283,20 @@ function MakeWorld(stage = "BunkerRescue") {
   Check(centre.filter((a) => a.alive && a.missionAssault).every((a) => a.missionAssault.index === Math.max(0, tops.get(a) - 1)
     && a.missionAssault.holdUntil > r.time), "half the group down: the survivors fall back one line and hold it for holdS");
   Check(world.barks.some(([id, kind]) => id === "FrontRifleC" && kind === "fallback"), "the officer calls the fall back");
+  // 2026-09-24 review: a group past half casualties used to fall back again on every later phase change.
+  const fallbacksBefore = pressure.events.filter((e) => e.kind === "fallback" && e.group === "center").length;
   // Machine-gun attack: charge once, then repelled.
   world.facts.add("tankPreviewed"); r.time = 6; pressure.Update();
   Eq(pressure.phase.id, "tankShown");
+  r.time = 6.3; pressure.Update();
+  Eq(pressure.events.filter((e) => e.kind === "fallback" && e.group === "center").length, fallbacksBefore,
+    "a group that already fell back does not fall back again on the next phase");
   const mg = FrontGroupMembers("mgAttack", enemies);
   for (const a of mg) { a.missionFrontStandby = false; a.missionAssault.index = a.missionAssault.points.length - 1; a.missionAssault.mode = "hold"; a.position = { ...a.missionAssault.points.at(-1), y: 0 }; }
   r.player.position = { x: 0, z: -150 };
-  r.time = 20; pressure.Update(); Eq(world.charges.length, 0, "no charge before afterS");
-  r.time = 40; pressure.Update();
+  const chargeRule = FRONT_PRESSURE_PHASES.find((p) => p.id === "tankShown").groups.mgAttack.charge;
+  r.time = 6 + chargeRule.afterS - 1; pressure.Update(); Eq(world.charges.length, 0, "no charge before afterS");
+  r.time = 6 + chargeRule.afterS + 1; pressure.Update();
   Eq(world.charges.length, 1, "one scripted group charge in the phase");
   Eq(world.charges[0].leader, FRONT_PRESSURE_GROUPS.mgAttack.officer, "the officer leads it");
   Check(world.charges[0].ids.length >= 4 && mg.filter((a) => a.weapon.bayonet).every((a) => a.missionAssault.mode === "charge")
@@ -288,12 +305,37 @@ function MakeWorld(stage = "BunkerRescue") {
   for (const a of mg) a.alive = false;
   r.time = 61; pressure.Update();
   Check(world.facts.has("frontAttackRepelled"), "a destroyed machine-gun attack still records frontAttackRepelled");
+  // A man who spawns after the phase change still gets this phase's orders (split-frame spawns, reinforcements).
+  const late = { ...enemies.get("FrontRifleH"), missionId: "FrontRifleH", alive: true, pressurePhaseId: null, reactionGroup: null,
+    missionAssault: { ...enemies.get("FrontRifleH").missionAssault, maxIndex: undefined, loop: false } };
+  enemies.set("FrontRifleH", late);
+  r.time = 61.5; pressure.Update();
+  Check(late.reactionGroup === "center" && late.missionAssault.loop === true && late.pressurePhaseId === "tankShown",
+    "a late spawn picks up the phase config on the next group tick");
   // Nest fallback: two of four down.
   const { r: r2, world: w2, enemies: e2, pressure: p2 } = MakeWorld("BunkerRescue");
   p2.Update(); e2.get("RightNestGunner").alive = false; e2.get("RightEntryGuard").alive = false;
   r2.time = 1; p2.Update();
   Check(w2.defends.some(([id, x, z]) => id === "RightNestGuard" && x === 31 && z === -146), "two nest casualties send the rest to the rear anchor");
   Check(w2.barks.some(([, kind]) => kind === "fallback"));
+  // Phase exit logs why a configured charge never happened; a hold phase freezes a former assault man in place.
+  {
+    const { r: r3, world: w3, enemies: e3, pressure: p3 } = MakeWorld("Support");
+    for (const f of ["frontBattleStarted", "tankPreviewed"]) w3.facts.add(f);
+    r3.time = 1; p3.Update(); Eq(p3.phase.id, "tankShown");
+    r3.time = 2; p3.Update();
+    w3.facts.add("tankPositionPressured"); r3.flow.stage.id = "Tank"; r3.time = 3; p3.Update();
+    Eq(p3.phase.id, "tankPressure");
+    const notDue = p3.events.find((e) => e.kind === "chargeNotDue" && e.group === "mgAttack");
+    Check(notDue && notDue.why === "tooEarly", "the skipped charge is logged with its reason");
+    const west = e3.get("FrontRifleE").missionAssault;
+    west.index = 1;
+    w3.facts.add("bundleTaken"); w3.facts.add("tankImmobilized"); w3.facts.add("lastGuardsWithdrawn"); r3.time = 4; p3.Update();
+    Eq(p3.phase.id, "disengage");
+    Check(west.maxIndex === 1 && west.loop === false && west.index === 1, "disengage holds the west pair on the line they are on");
+    const east = e3.get("FrontRifleD").missionAssault;
+    Check(!east || !Number.isFinite(east.maxIndex), "a hold man the table never sent forward keeps his own rhythm");
+  }
   // Out of 02-05.
   r.flow.stage.id = "Orders"; r.time = 70; pressure.Update();
   Eq(pressure.phase, null);
@@ -507,10 +549,13 @@ function Man(ai, side, x, z, options = {}) {
   // Follow-ups from a spontaneous charge.
   const { ai: ai2 } = MakeDirector();
   ai2.missionReactions = true;
-  const lead = Man(ai2, "ija", 0, 0), mate = Man(ai2, "ija", 2, 0), stranger = Man(ai2, "ija", 9, 0), noBayonet = Man(ai2, "ija", 1, 1);
+  const lead = Man(ai2, "ija", 0, 0), mate = Man(ai2, "ija", 2, 0), stranger = Man(ai2, "ija", 9, 0);
+  const noBayonet = Man(ai2, "ija", 1, 1, { weapon: "Type11" });
   for (const s of [lead, mate, stranger, noBayonet]) { s.reactionGroup = "g"; s.target = { isPlayer: true, position: new THREE.Vector3(0, 0, -8), id: -1 }; s.targetVisible = true; }
-  mate.bayonetFixed = true; stranger.bayonetFixed = true; noBayonet.bayonetFixed = false;
-  Eq(ai2.RallyCharge(lead), 1, "only the bayonet-armed mate within 3 m follows");
+  // 2026-09-24 review: requiring a bayonet already fixed meant nobody ever followed (only chargers have one fixed).
+  Check(!mate.bayonetFixed, "fixture: the mate has not fixed his bayonet yet");
+  Eq(ai2.RallyCharge(lead), 1, "only the rifleman within 3 m follows (the gunner has no bayonet, the stranger is too far)");
+  Check(mate.bayonetFixed && !noBayonet.bayonetFixed, "the follower fixes his bayonet as he gets up");
   Check(mate.chargeFollowAt >= ai2.time + CHARGE_FOLLOW.followDelayMinS && mate.chargeFollowAt <= ai2.time + CHARGE_FOLLOW.followDelayMaxS);
   Check(!ai2.UpdateChargeIntent(mate), "not before his stagger");
   ai2.time = mate.chargeFollowAt + 0.01;
@@ -527,6 +572,28 @@ function Man(ai, side, x, z, options = {}) {
     ai.Bark(s, kind); Eq(log.barks.at(-1).key, key, `bark ${kind}`);
   }
   ai.Bark(s, "advance"); Check(["ija_move_advance", "ija_move_forward"].includes(log.barks.at(-1).key));
+  Eq(ai.Bark(s, "follow"), null, "the unused follow line is gone");
+  // 2026-09-24 review: 'advance' fired on every Think that re-wrote BOUND (10 542 calls in one 01->06 drive).
+  {
+    const b = Man(ai, "ija", 3, 3, { state: "bound" });
+    const count = () => log.barks.filter((x) => ["ija_move_advance", "ija_move_forward"].includes(x.key)).length;
+    const n0 = count();
+    Check(ai.AdvanceBark(b), "a man who ends his Think in BOUND for the first time shouts the advance");
+    Check(!ai.AdvanceBark(b), "still bounding next Think: no second shout");
+    b.state = "fire"; ai.AdvanceBark(b); b.state = "bound";
+    Check(!ai.AdvanceBark(b), "BOUND -> FIRE -> BOUND flicker inside the cooldown stays quiet");
+    ai.time += SQUAD_REACTION.advanceBarkCooldownS + 0.1; b.state = "fire"; ai.AdvanceBark(b); b.state = "bound";
+    Check(ai.AdvanceBark(b), "after the cooldown a new bound is a new shout");
+    const waiting = Man(ai, "ija", 4, 4, { state: "bound" }); waiting.missionFrontStandby = true;
+    const scripted = Man(ai, "ija", 5, 4, { state: "bound" }); scripted.missionTacticStandby = true;
+    Check(!ai.AdvanceBark(waiting) && !ai.AdvanceBark(scripted), "standby and scripted-tactic men never shout the advance");
+    Eq(count() - n0, 2);
+    // Over a simulated minute of flicker (Think every 0.1 s) one man shouts at most 60 / cooldown times.
+    const f = Man(ai, "ija", 6, 6, { state: "bound" });
+    let shouts = 0;
+    for (let i = 0; i < 600; i++) { ai.time += 0.1; f.state = i % 2 ? "bound" : "fire"; if (ai.AdvanceBark(f)) shouts++; }
+    Check(shouts <= Math.ceil(60 / SQUAD_REACTION.advanceBarkCooldownS), "flicker for a minute: " + shouts + " shouts");
+  }
   Check(!ai.RefinedCoverSide(s) && ai.RefinedCoverSide(Man(ai, "nra", 0, 0)), "by default only the NRA runs the refined cover cycle");
   ai.missionCoverRules = true; Check(ai.RefinedCoverSide(s), "the mission switch gives the Japanese the refined cover cycle");
   // §20.7 Wasted peeks: he sees the man in the trench, but not one round gets past that parapet.
@@ -616,8 +683,40 @@ console.log("ok ③ brain: ambient pick/ownership/ledger, dry trigger, MG bursts
   Check(ija.every((m) => defends.includes(m.id)) && !runner.scriptedNoncombatant, "hand-off: the Japanese become live local-area soldiers");
   Eq(r.enemies.size, ija.length, "and from the hand-off on they are ordinary mission enemies (fire windows, stage counts)");
   r.flow.stage.id = "Support"; squads.Update();
-  Eq(removed.length, spawned.length, "leaving 01-02 removes the whole backdrop");
+  Eq(removed.length, spawned.length, "leaving 01-02 with nobody watching removes the whole backdrop");
   Eq(r.enemies.size, 0, "and nothing of it leaks into the 03 enemy table");
+  // 2026-09-24 review: handed-over men still fighting near the 03 start vanished in front of the player.
+  {
+    // Camera at the origin looking down -Z (three's default), 70 deg vertical fov.
+    const Cam = (yawDeg, x = 0, z = 0) => {
+      const y = (yawDeg * Math.PI) / 180;
+      return { fov: 70, aspect: 16 / 9, matrixWorld: { elements: [Math.cos(y), 0, -Math.sin(y), 0, 0, 1, 0, 0, Math.sin(y), 0, Math.cos(y), 0, x, 1.6, z, 1] } };
+    };
+    Check(InCameraView(Cam(0), { x: 0, y: 1.6, z: -20 }) && !InCameraView(Cam(0), { x: 0, y: 1.6, z: 20 }), "in front is seen, behind is not");
+    Check(!InCameraView(null, { x: 0, y: 0, z: -5 }), "no camera: nobody is watching");
+    Check(InCameraView(Cam(180), { x: 0, y: 1.6, z: 20 }), "turn round and the man behind is in view");
+    const sp2 = [], rm2 = [];
+    const r2 = { ...r, flow: { stage: { id: "Trapped" } }, time: 0, enemies: new Map(), spawnQueue: [],
+      player: { position: { x: -40, y: 0, z: -140 } }, camera: Cam(0, -40, -140),
+      ai: { ...r.ai, Spawn: (side, x, z, opts) => { const a = { side, alive: true, position: { x, y: 0, z }, goal: { set() {} }, opts }; sp2.push(a); return a; },
+        Remove: (a) => rm2.push(a) } };
+    const q = new FirstLevelBackdropSquads(r2);
+    facts.add("bunkerCollapsed");
+    q.Update(); while (r2.spawnQueue.length) r2.spawnQueue.shift()();
+    q.Update();
+    const seen = sp2.find((a) => a.missionId === "BackdropIjaA");
+    seen.position = { x: -40, y: 0, z: -150 };           // 10 m straight ahead of the camera
+    for (const a of sp2) if (a !== seen) a.position = { x: -40, y: 0, z: -120 };   // behind the player
+    q.Update();   // hand-off already recorded (rifleRecovered)
+    r2.flow.stage.id = "Support"; r2.time = 1; q.Update();
+    Eq(r2.enemies.size, 0, "the enemy table is cleared at once");
+    Check(!rm2.includes(seen) && rm2.length === sp2.length - 1, "a man in plain view is not removed yet; the rest are");
+    Check(seen.scriptedNoncombatant === true && seen.target == null, "and he is back to a scripted backdrop man (no shots at people)");
+    r2.time = 5; q.Update(); Check(!rm2.includes(seen), "still in view: still there");
+    r2.camera = Cam(180, -40, -140); r2.time = 6; q.Update();
+    Check(rm2.includes(seen), "once the player looks away he is removed");
+    Eq(q.State().leaving, 0);
+  }
 }
 console.log("ok ④ 01 backdrop: wait-run-hold rhythm, stop fire lists, hand-off, clean removal on leaving 01-02");
 console.log(`FirstLevelFrontPressureTest 通过：${checks} 条断言`);

@@ -3,7 +3,7 @@
 //   node Taierzhuang1938/Script_FirstLevelEnemyIdleProbe.mjs                     01 → 06 整段（默认）
 //   node …  --stage-from=3                                                       从 03 冷启动（missionStage=3，不是调试跳转）
 //   node …  --stage-to=3                                                         只走到 03 结束
-//   node …  --gate                                                               03–05 数字不达标就退出码 1（TestRunner 用）
+//   node …  --gate                                                               03、04、05 逐阶段和合并的数字不达标就退出码 1（TestRunner 用）
 //   node …  --root=<另一棵树>                                                     用另一棵树的游戏与驾驶脚本跑（量改前基线）
 //
 // 口径（为什么这样量，§19 的教训）：
@@ -15,9 +15,16 @@
 //
 // 按阶段 / 压力相位报：
 //   zero30    30 s 窗口里一发没打（含环境射击）的人占比           目标 < 20%
-//   idle4     连续 4 s 位移 < 0.3 m、没开枪、也没在换弹 / 投弹 / 白刃的人·帧占比   目标 ≤ 25%
+//   idle4     连续 4 s 位移 < 0.3 m、没开枪、也没在换弹 / 投弹 / 白刃出招的人·帧占比   目标 ≤ 25%
 //             （换弹是看得见、听得见的动作 —— 压桥夹、喊「換弾！」—— 不是「端枪不打」；
-//              旧口径「只看位移和开枪」照旧算出来，报成 idle4Strict）
+//              白刃里只有**正在出招**（架势不是 idle）才算忙，白刃里 idle 架势站桩照算不动 ——
+//              2026-09-24 审查：那正是白刃卡死那一类木桩，不能剔掉；
+//              旧口径「只看位移和开枪」照旧算出来，报成 idle4Strict；**这个口径待集成负责人认可**）
+//   逐阶段    03、04、05 各自过闸（契约 §7.4「每阶段」）；110 m 内见过的日军不足 minMen 人的阶段
+//             报「人数不足」—— 不算通过也不算红（兵力归 Space / Front 包），合并数仍要过闸
+//   flinch    进入「被压制」状态的次数（缩头 / 卧倒）、中弹踉跄的人·帧 —— 被压制时的反应真的在触发
+//   barks     每人每分钟「散開！前へ！」调用数：上限 60 / advanceBarkCooldownS + 1（审查：曾一趟一万多次）
+//   charge    配了成组冲锋的相位：要么真冲了（groupCharge 事件），要么切相位时记了没冲的原因（chargeNotDue）
 //   mgShots   轻/重机枪手打出的发数                               目标 > 0
 //   groupMove 相位切换后 15 s 内位移 ≥ 2 m 的组员占比（按组）
 //   nestCover 03 阵位步枪守卫在掩体里或在移动的帧占比
@@ -41,8 +48,9 @@ const label = Arg("label", treeRoot === ownRoot ? "current" : path.basename(tree
 
 /** 探针阈值（口径见文件头）。 */
 const G = Object.freeze({
-  zero30Max: 0.20, idle4Max: 0.25, mgShotsMin: 1, huntersMax: 0,
+  zero30Max: 0.20, idle4Max: 0.25, mgShotsMin: 1, huntersMax: 0, minMen: 4,
   gatedSteps: Object.freeze(["Support", "MachineGun", "Tank"]),
+  gatedStages: Object.freeze([3, 4, 5]),
   rangeM: 110, sampleS: 0.1, idleWindowS: 4, idleMoveM: 0.3, zeroWindowS: 30, zeroPresence: 0.9,
   groupMoveS: 15, groupMoveM: 2,
 });
@@ -53,6 +61,8 @@ const ROW = 9;
 const BUSY_STATES = Object.freeze(["reload", "grenade"]);
 const GATE_NAMES = Object.freeze(["-", "noPoints", "legalTarget", "noPick", "notOwn", "ammo", "timer", "hidePhase", "turnAimLof"]);
 
+const { SQUAD_REACTION } = await import(pathToFileURL(path.join(here, "Data_Tuning_AiTactics.mjs")).href);
+const advanceBarkMaxPerMin = 60 / SQUAD_REACTION.advanceBarkCooldownS + 1;
 const Kit = await Load("Script_FirstLevelCampaignKit.mjs");
 const { Drive: DriveFront } = await Load("Script_FirstLevelCampaignFront.mjs");
 const { FIRST_LEVEL_STAGES } = await Load("Data_FirstLevelMissionStages.mjs");
@@ -108,8 +118,10 @@ await page.evaluate(({ rangeM, sampleS }) => {
       if (s.p012Guided && Number.isFinite(s.scriptMoveSpeedMps)) f |= 16; if (s.holdZone) f |= 32;
       if (tg) f |= 64; if (tg && tg.isPlayer) f |= 128; if (s.targetVisible) f |= 256;
       if ((s.hesitateUntil ?? -99) > now) f |= 512; if ((s.chargeUntil ?? 0) > now) f |= 1024;
-      if (s.actor?.root && s.actor.root.visible === false) f |= 2048; if (s.meleeCombat) f |= 4096;
+      // 白刃：只有正在出招（架势不是 idle）才算「忙」；idle 架势站着 = 白刃卡死，照算不动。
+      if (s.actor?.root && s.actor.root.visible === false) f |= 2048; if (s.meleeCombat && s.meleeCombat.state !== "idle") f |= 4096;
       if (s.ambientFirePoints && s.ambientFirePoints.length) f |= 8192;
+      if ((s.hurtPose || 0) > 0.05) f |= 16384; if (s.meleeCombat && s.meleeCombat.state === "idle") f |= 32768;
       rows.push(i, Math.round(s.position.x * 10), Math.round(s.position.z * 10), s.fireSequence | 0, s.ambientShots | 0, f,
         StateCode(s.state), s.stance | 0, Gate(s));
       if (tg && !tg.isPlayer) {
@@ -143,9 +155,30 @@ await page.evaluate(({ rangeM, sampleS }) => {
     } catch (error) { P.error = P.error || String(error); }
     return out;
   };
+  // 喊话调用（Script_Ai.Bark，在声音层的节流之前数）与压力表事件（每条都留，不受 events 64 条上限）。
+  P.barks = [];
+  const bark = ai.Bark.bind(ai);
+  ai.Bark = function (s, kind) {
+    try { if (s && s.side === "ija") P.barks.push([+ai.time.toFixed(2), s.id, kind]); } catch (error) { P.error = P.error || String(error); }
+    return bark(s, kind);
+  };
+  P.pressure = [];
+  let hooked = null;
+  const HookPressure = () => {
+    const fp = g.Debug.FirstLevelMissionRuntime?.()?.frontPressure;
+    if (!fp || fp === hooked) return;
+    hooked = fp;
+    const note = fp.Note.bind(fp);
+    fp.Note = function (kind, detail = {}) {
+      const out = note(kind, detail);
+      P.pressure.push({ t: +ai.time.toFixed(2), kind, phase: fp.phase?.id ?? null, ...detail });
+      return out;
+    };
+  };
   const original = ai.Update;
   ai.Update = function (dt, camera) {
     const out = original.call(this, dt, camera);
+    try { HookPressure(); } catch (error) { P.error = P.error || String(error); }
     P.acc += dt;
     if (P.acc >= sampleS - 1e-9) {
       P.acc -= sampleS;
@@ -170,8 +203,9 @@ const wallS = (Date.now() - startedAt) / 1000;
 // 拉回 Node 分析（分块，免得一次 evaluate 太大）。
 // ---------------------------------------------------------------------------
 const head = await page.evaluate(() => {
-  const P = window.EnemyIdleProbe;
-  return { meta: P.meta, states: P.states, count: P.ticks.length, error: P.error, hits: P.hits };
+  const P = window.EnemyIdleProbe, ai = window.Tengxian.ai;
+  return { meta: P.meta, states: P.states, count: P.ticks.length, error: P.error, hits: P.hits,
+    barks: P.barks, pressure: P.pressure, stats: { ...ai.stats } };
 });
 const ticks = [];
 for (let at = 0; at < head.count; at += 1500)
@@ -181,6 +215,10 @@ await Kit.CloseCampaign(ctx);
 
 const report = AnalyzeEnemyIdle({ meta: head.meta, states: head.states, ticks });
 report.playerHits = SummarizeHits(head.hits);
+report.aiStats = head.stats;
+report.barks = SummarizeBarks(head.barks, ticks, head.meta);
+report.charges = SummarizeCharges(head.pressure);
+report.pressureEvents = head.pressure;
 Object.assign(report, { label, root: treeRoot, stageFrom, stageTo, wallS: +wallS.toFixed(0), samplerError: head.error, facts,
   driveError: driveError ? String(driveError.message || driveError).slice(0, 600) : null });
 PrintReport(report);
@@ -198,7 +236,20 @@ if (gate) {
   assert.ok(c.idle4 <= G.idle4Max, `03–05 4 s 不动也不开枪 ${Pct(c.idle4)} ≤ ${Pct(G.idle4Max)}`);
   assert.ok(c.mgShots >= G.mgShotsMin, `03–05 机枪真的开了火：${c.mgShots} 发`);
   assert.ok(c.hunterTicks <= G.huntersMax, `放行前没有日军以守军为目标：${c.hunterTicks} 人·帧 ${JSON.stringify(c.hunterIds)}`);
-  console.log("ok enemy idle gates for 03–05");
+  // 逐阶段（契约 §7.4「每阶段」）：人数够的阶段各自过闸，人数不足的阶段只报。
+  for (const n of G.gatedStages) {
+    const s = report.byStage[n];
+    if (!s || !s.ticks) continue;
+    if (s.men < G.minMen) { console.log(`WARN 0${n} 110 m 内只见过 ${s.men} 名日军（< ${G.minMen}）：人数不足，这一阶段不判（兵力归 Space / Front 包）`); continue; }
+    if (s.windows) assert.ok(s.zero30 < G.zero30Max, `0${n} 30 s 一发没打的人占比 ${Pct(s.zero30)} < ${Pct(G.zero30Max)}`);
+    assert.ok(s.idle4 <= G.idle4Max, `0${n} 4 s 不动也不开枪 ${Pct(s.idle4)} ≤ ${Pct(G.idle4Max)}`);
+  }
+  const loud = report.barks.advanceWorst;
+  assert.ok(!loud || loud.perMin <= advanceBarkMaxPerMin,
+    `跃进喊话不刷屏：最多的人每分钟 ${loud?.perMin} 次 ≤ ${advanceBarkMaxPerMin.toFixed(1)}（${loud?.id}）`);
+  for (const ch of report.charges.phases)
+    assert.ok(ch.charged || ch.why, `配了成组冲锋的相位 ${ch.phase}/${ch.group} 要么冲了、要么记了没冲的原因`);
+  console.log("ok enemy idle gates for 03, 04, 05 and combined");
 }
 if (driveError) throw driveError;
 
@@ -226,7 +277,7 @@ function AnalyzeEnemyIdle({ meta, states, ticks }) {
     if (!segs.has(key)) segs.set(key, { key, step: key.split("/")[0], phase: key.split("/")[1], ticks: 0, seconds: 0,
       personTicks: 0, idle4: 0, idle4Strict: 0, still4: 0, zeroWin: 0, win: 0, shots: 0, ambient: 0, mgShots: 0,
       hunterTicks: 0, hunterIds: new Set(), guardsMin: Infinity, soldiers: new Set(), idleWhy: new Map(),
-      nestTicks: 0, nestBusy: 0 });
+      nestTicks: 0, nestBusy: 0, suppressedEntries: 0, hurtTicks: 0, meleeIdleTicks: 0 });
     return segs.get(key);
   };
   ticks.forEach((t, k) => {
@@ -280,6 +331,9 @@ function AnalyzeEnemyIdle({ meta, states, ticks }) {
         }
       }
       const prev = k > 0 ? ser[k - 1] : null;
+      if (r.f & 16384) s.hurtTicks += 1;
+      if (r.f & 32768) s.meleeIdleTicks += 1;
+      if (prev && r.st === "suppressed" && prev.st !== "suppressed") s.suppressedEntries += 1;
       if (prev) {
         const d = r.fs - prev.fs, da = r.amb - prev.amb;
         if (d > 0) { s.shots += d; shots += d; if (IsMg(m)) s.mgShots += d; }
@@ -337,6 +391,7 @@ function AnalyzeEnemyIdle({ meta, states, ticks }) {
     nestCover: s.nestTicks ? +(s.nestBusy / s.nestTicks).toFixed(2) : null,
     hunterTicks: s.hunterTicks, hunterIds: [...s.hunterIds], guardsMin: Number.isFinite(s.guardsMin) ? s.guardsMin : null,
     idleWhy: [...s.idleWhy].sort((a, b) => b[1] - a[1]).slice(0, 6),
+    suppressedEntries: s.suppressedEntries, hurtTicks: s.hurtTicks, meleeIdleTicks: s.meleeIdleTicks,
   }));
   const Sum = (list) => {
     const all = list.map((p) => segs.get(p.key));
@@ -351,7 +406,11 @@ function AnalyzeEnemyIdle({ meta, states, ticks }) {
       mgShots: all.reduce((a, s) => a + s.mgShots, 0),
       nestCover: nt ? +(all.reduce((a, s) => a + s.nestBusy, 0) / nt).toFixed(2) : null,
       hunterTicks: all.reduce((a, s) => a + s.hunterTicks, 0),
-      hunterIds: [...new Set(all.flatMap((s) => [...s.hunterIds]))] };
+      hunterIds: [...new Set(all.flatMap((s) => [...s.hunterIds]))],
+      men: new Set(all.flatMap((s) => [...s.soldiers])).size,
+      suppressedEntries: all.reduce((a, s) => a + s.suppressedEntries, 0),
+      hurtS: +(all.reduce((a, s) => a + s.hurtTicks, 0) * G.sampleS).toFixed(1),
+      meleeIdleS: +(all.reduce((a, s) => a + s.meleeIdleTicks, 0) * G.sampleS).toFixed(1) };
   };
   const byStage = {};
   for (const n of [...new Set(phases.map((p) => p.stage))].sort((a, b) => a - b))
@@ -360,6 +419,44 @@ function AnalyzeEnemyIdle({ meta, states, ticks }) {
   perSoldier.sort((a, b) => b.idle4 - a.idle4);
   return { gates: G, samples: ticks.length, seconds: +(ticks.length * G.sampleS).toFixed(1), phases, byStage, gated,
     transitions, soldiers: perSoldier };
+}
+
+/**
+ * 喊话调用按类数；「散開！前へ！」再按人算每分钟调用数（分母是这个人在 110 m 内被采到的时长，
+ * 至少按 1 分钟算，免得露一面就喊一声的人被放大）。
+ */
+function SummarizeBarks(barks, ticks, meta) {
+  const byKind = {};
+  for (const [, , kind] of barks) byKind[kind] = (byKind[kind] || 0) + 1;
+  const present = new Map();
+  const idOf = new Map(meta.map((m, i) => [i, m.id]));
+  for (const t of ticks) for (let j = 0; j < t.rows.length; j += ROW) {
+    const id = idOf.get(t.rows[j]);
+    present.set(id, (present.get(id) || 0) + G.sampleS);
+  }
+  const per = new Map();
+  for (const [, id, kind] of barks) if (kind === "advance") per.set(id, (per.get(id) || 0) + 1);
+  let worst = null;
+  for (const [id, n] of per) {
+    const minutes = Math.max(1, (present.get(id) || 0) / 60);
+    const perMin = +(n / minutes).toFixed(2);
+    if (!worst || perMin > worst.perMin) worst = { id, calls: n, perMin, mid: meta.find((m) => m.id === id)?.mid ?? null };
+  }
+  return { byKind, advanceCalls: per.size ? [...per.values()].reduce((a, b) => a + b, 0) : 0, advanceWorst: worst };
+}
+
+/** 配了成组冲锋的相位 / 组：冲了没有，没冲的原因（压力表的 groupCharge / chargeSkipped / chargeNotDue 事件）。 */
+function SummarizeCharges(events) {
+  const phases = [];
+  let current = null;
+  for (const e of events) {
+    if (e.kind === "phase") { current = e.to; continue; }
+    if (e.kind === "groupCharge") phases.push({ phase: e.phase, group: e.group, charged: true, started: e.started, at: e.t });
+    else if (e.kind === "chargeNotDue") phases.push({ phase: e.phase, group: e.group, charged: false, why: e.why, at: e.t });
+  }
+  const skipped = events.filter((e) => e.kind === "chargeSkipped").length;
+  const fallbacks = events.filter((e) => e.kind === "fallback").map((e) => `${e.phase}/${e.group}@${e.t}`);
+  return { phases, skipped, fallbacks, lastPhase: current };
 }
 
 /** 玩家挨打按步骤归：各类伤害合计、打得最多的五个人。 */
@@ -388,9 +485,12 @@ function PrintReport(r) {
       String(p.guardsMin ?? "-").padStart(6));
   console.log("\n== by public stage ==");
   for (const [n, s] of Object.entries(r.byStage))
-    console.log(`0${n}  ${s.seconds}s  zero30=${Pct(s.zero30)} (${s.windows} windows)  idle4=${Pct(s.idle4)} (strict ${Pct(s.idle4Strict)})  still4=${Pct(s.still4)}  shots=${s.shots} (ambient ${s.ambient})  mg=${s.mgShots}  nestCover=${Pct(s.nestCover)}  hunters=${s.hunterTicks}`);
+    console.log(`0${n}  ${s.seconds}s  men=${s.men}  zero30=${Pct(s.zero30)} (${s.windows} windows)  idle4=${Pct(s.idle4)} (strict ${Pct(s.idle4Strict)})  still4=${Pct(s.still4)}  shots=${s.shots} (ambient ${s.ambient})  mg=${s.mgShots}  nestCover=${Pct(s.nestCover)}  hunters=${s.hunterTicks}  suppressedEntries=${s.suppressedEntries}  hurt=${s.hurtS}s  meleeIdle=${s.meleeIdleS}s`);
   const c = r.gated;
   console.log(`\n== gated 03–05: zero30=${Pct(c.zero30)} idle4=${Pct(c.idle4)} (strict ${Pct(c.idle4Strict)}, still ${Pct(c.still4)}) mg=${c.mgShots} hunters=${c.hunterTicks} nestCover=${Pct(c.nestCover)} ==`);
+  console.log(`\n== ai stats: ${JSON.stringify(r.aiStats)}`);
+  console.log(`== barks (Script_Ai.Bark calls, before audio throttling): ${JSON.stringify(r.barks.byKind)}; advance worst ${JSON.stringify(r.barks.advanceWorst)}`);
+  console.log(`== charges: ${JSON.stringify(r.charges.phases)}; chargeSkipped=${r.charges.skipped}; fallbacks=${JSON.stringify(r.charges.fallbacks)}`);
   console.log("\n== group movement within 15 s of a phase / step change (moved ≥ 2 m / present) ==");
   for (const t of r.transitions) console.log(`${String(t.at).padStart(7)}  ${t.from} -> ${t.to}  ${JSON.stringify(t.groups)}`);
   console.log("\n== top idle reasons per phase ==");

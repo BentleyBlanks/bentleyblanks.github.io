@@ -99,7 +99,7 @@ export const testDefs = {
   FirstLevelMissionTest: {file:'Script_FirstLevelMissionTest.mjs',desc:'新版第一关完整事实门、共享地形、实际担架队列和往返撤离'},
   FirstLevelEndTest: {file:'Script_FirstLevelEndTest.mjs',desc:'第一关 15–18：降压段无战斗、换手与静默行走、院门盘问与入院、门槛与最后一句、死亡段与接收处继续工作、尾队过桥与爆破清场、夜景与天空还原（纯 Node，毫秒级）'},
   MissionGatesTest: {file:'Script_MissionGatesTest.mjs',desc:'第一关编排表：事实门覆盖、按表生成与激活规则、运行时源码对账、编排模型'},
-  FirstLevelEnemyIdleProbe: {file:'Script_FirstLevelEnemyIdleProbe.mjs',args:['--stage-from=3','--stage-to=6','--gate'],timeoutMs:1800000,desc:'03–06 冷启动真实驾驶：30 s 零发者 <20%、4 s 不动 ≤25%、机枪开火、放行前不打守军（docs/Data_EnemyAi.md §20）'},
+  FirstLevelEnemyIdleProbe: {file:'Script_FirstLevelEnemyIdleProbe.mjs',args:['--stage-from=3','--stage-to=6','--gate'],timeoutMs:1800000,desc:'03–06 冷启动真实驾驶：03/04/05 逐阶段与合并的 30 s 零发者 <20%、4 s 不动 ≤25%，机枪开火、放行前不打守军、跃进喊话不刷屏、成组冲锋有记录（docs/Data_EnemyAi.md §20）'},
   FirstLevelFrontPressureTest: {file:'Script_FirstLevelFrontPressureTest.mjs',desc:'第一关敌军不当木桩：压力表数据与运行时、环境射击的账、迟疑/成组冲锋/军官、01 背景兵（纯 Node）'},
   FirstLevelMidTest: {file:'Script_FirstLevelMidTest.mjs',desc:'第一关 08–14（Mid 包）：担架停进遮挡、连屋近战先手、内院放行计数、两处威胁与装载联动、上车/停车/卸人时序、空袭目标与扑沟'},
   FirstLevelVoiceTest: {file:'Script_FirstLevelVoiceTest.mjs',desc:'第一关台词表：契约 cue 清单/句数、与 Notion 转录逐字对账、日语行假名与中文字幕、具名事件、缺录音兜底（纯 Node，毫秒级）'},
@@ -517,7 +517,9 @@ export const domains = {
     label: "AI 与战场内容预算",
     // 具名同伴（罗班长、幺娃…）是从 nra 名额里出的人，goal 直接写进 AiDirector，
     // 所以碰 AI 或撒兵的改动要连着 MissionHooksTest 一起跑。
-    tests: ["AiBehaviorTest", "AiBrainGraphTest", "AiEditorTest", "AiCombatBrowserTest", "AiCloseRangeTest", "AiInitiativeBrowserTest", "AiPerceptionTest", "AiCoverTest", "AiCrowdTest", "AiShootingTest", "AiTacticsTest", "FirstLevelFrontPressureTest", "FirstLevelEnemyIdleProbe",
+    // 第一关敌军探针（30 min 真实驾驶）只登记在 firstLevel 域：改 Script_Ai 的包跑 ai 域时带纯 Node 的
+    // FirstLevelFrontPressureTest 就够了（2026-09-24 审查）。
+    tests: ["AiBehaviorTest", "AiBrainGraphTest", "AiEditorTest", "AiCombatBrowserTest", "AiCloseRangeTest", "AiInitiativeBrowserTest", "AiPerceptionTest", "AiCoverTest", "AiCrowdTest", "AiShootingTest", "AiTacticsTest", "FirstLevelFrontPressureTest",
       "VisibilityTest", "ActorCrowdTest", "EmplacementTest", "FlareTest", "MissionHooksTest", "MissionSetpiecesTest",
       "FirstLevelP012OpeningTest", "FirstLevelP012FamilyTest", "FirstLevelP012RestingTest", "FirstLevelP012AnimationTest", "FirstLevelP012MarchTest", "FirstLevelP012TrainColumnTest", "FirstLevelP012ArrivalTest", "FirstLevelP012VillageLifeTest", "FirstLevelP012CastTest"],
   },
@@ -583,7 +585,7 @@ const changedDomainRules = [
   {domain:"firstLevel",pattern:/FirstLevelZhouExit/},
   // 02–05 前沿压力表与 01 背景兵（docs/Data_EnemyAi.md §20）：改它们既要跑第一关整关，也要跑 AI 那一串。
   {domain:"firstLevel",pattern:/FirstLevelFrontPressure|FirstLevelBackdropSquads|FirstLevelEnemyIdleProbe/},
-  {domain:"ai",pattern:/FirstLevelFrontPressure|FirstLevelBackdropSquads|FirstLevelEnemyIdleProbe/},
+  {domain:"ai",pattern:/FirstLevelFrontPressure|FirstLevelBackdropSquads/},
   {domain:"missionGuide",pattern:/FirstLevelLeaderGuide|FirstLevelGuideDialogue|FirstLevelGuideVoiceAlignment|FirstLevelMissionRuntime|Script_FirstLevelMissionVoice|NpcMissionGuide|NpcGuideGesture|Tuning_MissionGuide/},
   { domain: "combat", pattern: /FirearmHandling|MuzzleFlash|Headshot/i },
   {domain:"firstLevel",pattern:/Type89Damage/},

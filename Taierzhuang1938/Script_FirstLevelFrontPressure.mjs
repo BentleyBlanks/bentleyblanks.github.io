@@ -110,11 +110,11 @@ export function AssaultRoundEnd(actor, s, tuning, last, now = 0) {
   return "settled";
 }
 
-/** 离他最近、又不超过 top 的那条线（成组冲锋散了之后接回跃进用）。 */
 /**
  * 冲刺段有没有卡死（`UpdateAssault` 在 rush 相位每帧调）：这一趟冲刺里离目标线最近的距离
  * `tuning.assaultRushStallS` 秒没再缩短 `tuning.assaultRushProgressM`，就是卡死了。
  * 换了目标线（s.index 变了）重新计。纯函数，Node 测试直接调。
+ * 迟疑 / 换弹 / 投弹这些「自己停下」的时候调用方先把 s.rushBest 置 NaN（不累计，见 `RushPaused`）。
  */
 export function RushStalled(s, position, target, dt, tuning) {
   const d = Distance(position, target);
@@ -126,6 +126,15 @@ export function RushStalled(s, position, target, dt, tuning) {
   return s.rushStuck >= tuning.assaultRushStallS;
 }
 
+/**
+ * 这一帧是不是「自己停下来的」（不算冲刺卡死）：迟疑中（军官阵亡 3–5 s、看见战友倒下 0.6–1.5 s，
+ * Act 把速度清零）、在换弹、在投弹。审查 2026-09-24：迟疑 4 s 以上的人曾被当成卡死。
+ */
+export function RushPaused(actor, aiTime) {
+  return aiTime < (actor.hesitateUntil ?? -99) || actor.state === "reload" || actor.state === "grenade";
+}
+
+/** 离他最近、又不超过 top 的那条线（成组冲锋散了之后接回跃进用）。 */
 export function NearestLineIndex(s, position, top = AssaultTop(s)) {
   let best = 0, bestD = Infinity;
   for (let i = 0; i <= top; i++) {
@@ -146,18 +155,28 @@ export function GroupFallbackDue(members, total, rule) {
 
 /**
  * 成组冲锋的时机（纯判定）：相位开始 afterS 秒后、活着的（不在待命、有跃进线）≥ minAlive、
- * 组心离玩家 ≤ playerWithinM、守在最远线上的人占比 ≥ lastLineShare。
+ * 组心离玩家 ≤ playerWithinM、已经上到（或正冲向）这一相位最远线的人占比 ≥ lastLineShare。
+ * @returns {string|null} 不到时机的原因（取证写进事件 chargeNotDue）；null = 该冲了
  */
-export function FrontChargeDue(members, rule, phaseAgeS, player) {
-  if (!rule || phaseAgeS < rule.afterS || !player) return false;
+export function FrontChargeCheck(members, rule, phaseAgeS, player) {
+  if (!rule) return "noRule";
+  if (!player) return "noPlayer";
+  if (phaseAgeS < rule.afterS) return "tooEarly";
   const ready = members.filter((a) => a.alive && !a.missionFrontStandby && a.missionAssault);
-  if (ready.length < rule.minAlive) return false;
+  if (ready.length < rule.minAlive) return "tooFew";
   let cx = 0, cz = 0;
   for (const a of ready) { cx += a.position.x; cz += a.position.z; }
   cx /= ready.length; cz /= ready.length;
-  if (Math.hypot(cx - player.x, cz - player.z) > rule.playerWithinM) return false;
-  const onLast = ready.filter((a) => a.missionAssault.mode === "hold" && a.missionAssault.index >= AssaultTop(a.missionAssault)).length;
-  return onLast >= rule.lastLineShare * ready.length;
+  if (Math.hypot(cx - player.x, cz - player.z) > rule.playerWithinM) return "playerFar";
+  // 2026-09-24 审查：旧判据要「在最远线上、而且已经站定（hold）」，loop 跃进的人在最远线上待不满
+  // 一轮就退回 regroupLine，实机 01→06 一次都没凑够；冲向最远线的那一段也算「压上来了」。
+  const onLast = ready.filter((a) => a.missionAssault.index >= AssaultTop(a.missionAssault)).length;
+  return onLast >= rule.lastLineShare * ready.length ? null : "notForward";
+}
+
+/** `FrontChargeCheck` 的布尔版（该冲了 = true）。 */
+export function FrontChargeDue(members, rule, phaseAgeS, player) {
+  return FrontChargeCheck(members, rule, phaseAgeS, player) === null;
 }
 
 // ------------------------------------------------------------------ 运行时
@@ -166,7 +185,14 @@ export class FirstLevelFrontPressure {
     this.r = runtime;
     this.phase = null;
     this.phaseAt = 0;
+    /**
+     * 组的**整关**账（按组 id，跨相位保留，只在 Dispose 清）：total 见过的最多人数、fallbackDone
+     * 伤亡退线做过没有。2026-09-24 审查：以前每次切相位都清，一个伤亡过半的组之后每进一个
+     * 相位都会立刻再退一次线、再喊一次「一旦下がれ」。
+     */
     this.groupState = new Map();
+    /** 这一相位的成组冲锋账（按组 id，切相位清）：charged 冲过没有、why 最近一次没冲的原因。 */
+    this.phaseCharge = new Map();
     this.fire = { full: null, noGap: null };
     this.groupTickAt = 0;
     this.yieldTickAt = 0;
@@ -202,9 +228,14 @@ export class FirstLevelFrontPressure {
 
   EnterPhase(phase) {
     const r = this.r, previous = this.phase;
+    // 上一相位配了成组冲锋却没冲：把最后一次没冲的原因记下来（探针与驾驶器读 events）。
+    if (previous) for (const [groupId, cfg] of Object.entries(previous.groups || {})) {
+      const pc = this.phaseCharge.get(groupId);
+      if (cfg.charge && !pc?.charged) this.Note("chargeNotDue", { group: groupId, why: pc?.why || "neverChecked" });
+    }
     this.phase = phase;
     this.phaseAt = r.time;
-    this.groupState.clear();
+    this.phaseCharge.clear();
     this.Note("phase", { from: previous?.id ?? null, to: phase?.id ?? null });
     if (!phase) {
       // 出了 02–05：授权点一律收回（不收的话 06 以后前沿的人还在朝空土坎打）。
@@ -216,17 +247,8 @@ export class FirstLevelFrontPressure {
     this.fire.noGap = FrontFirePoints(phase, true);
     for (const [groupId, cfg] of Object.entries(phase.groups || {})) {
       const members = FrontGroupMembers(groupId, r.enemies);
-      const officerId = FRONT_PRESSURE_GROUPS[groupId]?.officer || null;
-      for (const actor of members) {
-        actor.reactionGroup = groupId;
-        // 开火窗口按组分瞄准名额（Script_FirstLevelOpening.FireWindows 早就认 missionFireGroup，
-        // 只是从没有人写过它）：两组都看得见玩家时，各拿一个窗口，大组不会把小组饿死。
-        actor.missionFireGroup = groupId;
-        actor.aiOfficer = !!officerId && actor.missionId === officerId;
-        if (cfg.role === "assault") this.ApplyAssault(actor, cfg);
-        else if (cfg.role === "nestGuard") this.InitNestGuard(actor);
-      }
-      this.groupState.set(groupId, { total: members.length, fallbackDone: false, charged: false });
+      for (const actor of members) this.ApplyMember(actor, groupId, cfg);
+      this.GroupState(groupId, members);
       if (previous && phase.bark) {
         const speaker = this.Speaker(groupId, members);
         if (speaker) r.ai.Bark(speaker, phase.bark);
@@ -245,10 +267,52 @@ export class FirstLevelFrontPressure {
     return alive.sort((a, b) => Distance(a.position, p) - Distance(b.position, p))[0] || null;
   }
 
+  /** 组的整关账（没有就建）；total 取见过的最多人数（死人不让分母变小，晚生成的人让它变大）。 */
+  GroupState(groupId, members) {
+    let st = this.groupState.get(groupId);
+    if (!st) { st = { total: members.length, fallbackDone: false, fallbackUntil: 0 }; this.groupState.set(groupId, st); }
+    st.total = Math.max(st.total, members.length);
+    return st;
+  }
+
+  /**
+   * 把这一相位的组配置写到一个人身上，**每人每相位一次**（`actor.pressurePhaseId` 记着）。
+   * EnterPhase 给当时已生成的人写；UpdateGroups 每 0.25 s 补给晚生成的人（分帧生成、冷启动、
+   * 增援）—— 2026-09-24 审查：以前只在切相位那一帧写，02 里阵位守卫大多没拿到非 hold 配置。
+   */
+  ApplyMember(actor, groupId, cfg) {
+    if (!actor.alive || actor.pressurePhaseId === this.phase.id) return;
+    actor.pressurePhaseId = this.phase.id;
+    const officerId = FRONT_PRESSURE_GROUPS[groupId]?.officer || null;
+    actor.reactionGroup = groupId;
+    // 开火窗口按组分瞄准名额（Script_FirstLevelOpening.FireWindows 早就认 missionFireGroup，
+    // 只是从没有人写过它）：两组都看得见玩家时，各拿一个窗口，大组不会把小组饿死。
+    actor.missionFireGroup = groupId;
+    actor.aiOfficer = !!officerId && actor.missionId === officerId;
+    if (cfg.role === "assault") this.ApplyAssault(actor, cfg);
+    else if (cfg.role === "nestGuard") this.InitNestGuard(actor);
+    else if (cfg.role === "hold") this.HoldAssault(actor);
+  }
+
+  /**
+   * hold 角色落在**上一相位还是跃进组**的人身上（例如 disengage 的西侧两人）：停在他此刻的线上，
+   * 不再进、不再无限循环（旧口径的有限节奏打完就 settled）。从没被压力表配过跃进的人（没有
+   * maxIndex，比如东侧守点）什么都不改 —— hold 的原意是「不改走位」。
+   */
+  HoldAssault(actor) {
+    const s = actor.missionAssault;
+    if (!s || !Number.isFinite(s.maxIndex)) return;
+    const line = Math.max(0, Math.min(AssaultTop(s), s.index));
+    s.maxIndex = line; s.regroupLine = line; s.loop = false; s.cycles = 0; s.holdUntil = 0;
+    s.index = line;
+  }
+
   /** 相位给跃进组的配置：推进上限、退回线、是否无限循环、侧翼的显式路线。 */
   ApplyAssault(actor, cfg) {
     const s = actor.missionAssault;
     if (!s) return;
+    // 冲刺卡死时本轮借用的站位（`UpdateAssault`）不跨相位：换相位一律回到原线点。
+    s.stallTarget = null;
     if (cfg.points) {
       if (s.route !== cfg.points) {
         s.basePoints ||= s.points;
@@ -302,18 +366,32 @@ export class FirstLevelFrontPressure {
     for (const [groupId, cfg] of Object.entries(this.phase.groups || {})) {
       const members = FrontGroupMembers(groupId, r.enemies);
       if (!members.length) continue;
-      const st = this.groupState.get(groupId) || { total: members.length, fallbackDone: false, charged: false };
-      st.total = Math.max(st.total, members.length);
-      this.groupState.set(groupId, st);
+      for (const actor of members) this.ApplyMember(actor, groupId, cfg);
+      const st = this.GroupState(groupId, members);
       if (cfg.role === "nestGuard") { this.NestFallback(groupId, cfg, members, st); continue; }
       if (cfg.role !== "assault") continue;
+      // 成组冲锋先于伤亡退线判（2026-09-24 审查：实机里 mgAttack 露面 34 s 就伤亡过半退了线，
+      // 冲锋的 30 s 窗口一次都没凑上）。退过线的组这一相位不再冲。
+      if (cfg.charge) {
+        const pc = this.phaseCharge.get(groupId) || { charged: false, why: null };
+        this.phaseCharge.set(groupId, pc);
+        if (!pc.charged) {
+          pc.why = st.fallbackDone ? "fellBack" : FrontChargeCheck(members, cfg.charge, now - this.phaseAt, r.player?.position);
+          // 凑不出两个「眼里有玩家、上得了刺刀」的人：2 s 后再试（事件里记 chargeSkipped）。
+          if (pc.why === null && now >= (pc.retryAt || 0)) {
+            if (this.GroupCharge(groupId, members)) pc.charged = true;
+            else { pc.why = "noChargers"; pc.retryAt = now + 2; }
+          }
+        }
+      }
       const rule = cfg.fallback;
       if (rule && !st.fallbackDone && GroupFallbackDue(members, st.total, rule)) {
         st.fallbackDone = true;
         st.fallbackUntil = now + (rule.holdS || 0);
         for (const a of members) {
           const s = a.missionAssault;
-          if (!a.alive || !s || a.missionFrontStandby) continue;
+          // 正在成组冲锋的人不拽（冲完 UpdateAssault 接回最近的线）。
+          if (!a.alive || !s || a.missionFrontStandby || s.mode === "charge") continue;
           s.index = Math.max(0, Math.min(AssaultTop(s), s.index) - (rule.backLines || 1));
           s.mode = "rush"; s.hold = 0; s.shifts = 0; s.cycles = 0;
           s.holdUntil = st.fallbackUntil;
@@ -330,10 +408,6 @@ export class FirstLevelFrontPressure {
         if (!alive.length || (st.fallbackDone && settled)) {
           r.Record(rule.repelledFact, { killed: st.total - alive.length, repelled: alive.length });
         }
-      }
-      if (cfg.charge && !st.charged && FrontChargeDue(members, cfg.charge, now - this.phaseAt, r.player?.position)) {
-        st.charged = true;
-        this.GroupCharge(groupId, members);
       }
     }
   }
@@ -377,7 +451,12 @@ export class FirstLevelFrontPressure {
   /**
    * 守军过口的窗口：跃进组里对撤退口有通视的人（与 FrontBattle.InfantryBlockade 同一判据 ——
    * 85 m 内、没被压住、看得见口子那三个点）往回拉一条线，并把这一相位的推进上限压到那条线，
-   * 直到断了视线或退回第一条线。这样 InfantryBlockade 一定解得开，而不是靠玩家把人打光。
+   * 直到断了视线或退回第一条线（再看得见就退回出生点）。
+   *
+   * **只管跃进组**：hold 组（火力基地、东侧守点）、阵位守卫、战车护兵、05 侧沟两人不在这里拉 ——
+   * 他们看得见口子时 InfantryBlockade 仍要等他们被压住或打掉。所以这一步**不保证**封锁一定解开，
+   * 只保证「跃进组不会因为跃进把口子封死」；Space / Front 包摆 hold 组的位置时要让他们对撤退口断视线
+   *（2026-09-24 审查更正了旧注释「一定解得开」）。
    */
   YieldGap() {
     const r = this.r, now = r.time;
@@ -415,7 +494,7 @@ export class FirstLevelFrontPressure {
       phase: this.phase?.id ?? null,
       phaseAt: this.phaseAt,
       evacuating: this.evacuating,
-      groups: Object.fromEntries([...this.groupState].map(([id, st]) => [id, { ...st }])),
+      groups: Object.fromEntries([...this.groupState].map(([id, st]) => [id, { ...st, ...(this.phaseCharge.get(id) || {}) }])),
       events: this.events.slice(-24),
     };
   }
@@ -423,6 +502,8 @@ export class FirstLevelFrontPressure {
   Dispose() {
     const ai = this.r.ai;
     if (ai) { ai.missionCoverRules = false; ai.missionReactions = false; }
+    this.groupState.clear();
+    this.phaseCharge.clear();
     for (const a of this.r.enemies?.values?.() || []) { a.ambientFirePoints = null; a.ambientFirePoint = null; }
   }
 }

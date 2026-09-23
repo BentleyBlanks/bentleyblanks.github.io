@@ -3,7 +3,8 @@
 //
 // 数据与格式：Data_FirstLevelBackdropSquads.mjs 头注。运行时里只有构造 / Update / Dispose / State 四个钩子。
 // 这些人是剧本兵：本模块只管「跑到哪、在哪停」，开枪是大脑的环境射击（`ambientFirePoints`），
-// 这里一发子弹都不自己打。离开 steps（含调试跳关、回跳）整组撤场 —— 01 的背景不许漏到 03 的统计里。
+// 这里一发子弹都不自己打。离开 steps（含调试跳关、回跳）整组撤场 —— 01 的背景不许漏到 03 的统计里：
+// 立刻退出任务敌人表，但人要等出了玩家视野（或离远了）才移除，不当着玩家的面凭空消失。
 // ===========================================================================
 import { BACKDROP_SQUADS, BACKDROP_FIRE_POINTS } from "./Data_FirstLevelBackdropSquads.mjs";
 import { MISSION_TUNING as R } from "./Data_Tuning_FirstLevel.mjs";
@@ -11,6 +12,25 @@ import { InstallMissionSentry } from "./Script_FirstLevelMissionPeople.mjs";
 
 const Distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 const ARRIVE_M = 0.8;
+
+/**
+ * 这个点在不在相机视锥里（只看方向，不看遮挡 —— 宁可多留一会儿）。纯函数：camera 只读
+ * matrixWorld.elements / fov / aspect；没有相机当作看不见。
+ */
+export function InCameraView(camera, point, marginDeg = 0) {
+  const e = camera?.matrixWorld?.elements;
+  if (!e) return false;
+  const dx = point.x - e[12], dy = (point.y ?? 0) - e[13], dz = point.z - e[14];
+  const len = Math.hypot(dx, dy, dz);
+  if (len < 1e-3) return true;
+  const fx = -e[8], fy = -e[9], fz = -e[10];
+  const flen = Math.hypot(fx, fy, fz) || 1;
+  const cos = (dx * fx + dy * fy + dz * fz) / (len * flen);
+  const vHalf = ((Number.isFinite(camera.fov) ? camera.fov : 70) * Math.PI) / 360;
+  const hHalf = Math.atan(Math.tan(vHalf) * (Number.isFinite(camera.aspect) ? camera.aspect : 16 / 9));
+  const half = Math.min(Math.PI, Math.max(vHalf, hHalf) + (marginDeg * Math.PI) / 180);
+  return cos >= Math.cos(half);
+}
 
 /** 一个停点的授权点表（带 id，冻结；同一停点多次调用返回同一份，好让大脑按引用判断「换没换」）。 */
 const firePointCache = new Map();
@@ -47,6 +67,7 @@ export class FirstLevelBackdropSquads {
     this.r = runtime;
     this.table = table;
     this.members = [];          // { spec, actor, state }
+    this.leaving = [];          // 撤场中、还在玩家视野里的人：{ actor, since }
     this.started = false;
     this.handedOff = false;
     this.queued = 0;
@@ -56,7 +77,11 @@ export class FirstLevelBackdropSquads {
 
   Update() {
     const r = this.r;
-    if (!this.Active) { if (this.members.length || this.started) this.Clear(); return; }
+    if (!this.Active) {
+      if (this.members.length || this.started) this.Clear();
+      this.UpdateLeaving();
+      return;
+    }
     if (!this.started) {
       if (this.table.spawnFact && !r.Has(this.table.spawnFact)) return;
       this.started = true;
@@ -156,26 +181,48 @@ export class FirstLevelBackdropSquads {
     }
   }
 
-  /** 离开 01–02：整组撤场（活人移除、名单清空），调试跳关与回跳也走这里。 */
+  /**
+   * 离开 01–02：整组撤场，调试跳关与回跳也走这里。名单与任务敌人表立刻清空（03 的统计、
+   * 驾驶器的名册快照都看不见他们）；人进 `leaving`，交接过的日军变回剧本兵（不再对人开枪，
+   * 授权点照打），等出了玩家视野再移除（`UpdateLeaving`）。
+   */
   Clear() {
     const r = this.r;
     for (const m of this.members) {
       r.enemies.delete(m.spec.id);
-      if (m.actor.alive || m.actor.actor) r.ai.Remove(m.actor);
+      const a = m.actor;
+      if (!a.alive && !a.actor) continue;
+      if (a.alive) { a.scriptedNoncombatant = true; a.target = null; }
+      this.leaving.push({ actor: a, since: r.time });
     }
     this.members = [];
     this.started = false;
     this.handedOff = false;
+    this.UpdateLeaving();
+  }
+
+  /** 撤场中的人：不在视锥里、或离玩家够远、或撤场超过 maxS，就移除。 */
+  UpdateLeaving() {
+    if (!this.leaving.length) return;
+    const r = this.r, L = this.table.leave || { removeBeyondM: 0, viewMarginDeg: 0, maxS: 0 };
+    const p = r.player?.position;
+    this.leaving = this.leaving.filter(({ actor, since }) => {
+      const far = !p || Distance(actor.position, p) > L.removeBeyondM;
+      const seen = InCameraView(r.camera, { x: actor.position.x, y: (actor.position.y || 0) + 1.2, z: actor.position.z }, L.viewMarginDeg);
+      if (!far && seen && r.time - since < L.maxS) return true;
+      r.ai.Remove(actor);
+      return false;
+    });
   }
 
   State() {
     return {
-      started: this.started, handedOff: this.handedOff, queued: this.queued,
+      started: this.started, handedOff: this.handedOff, queued: this.queued, leaving: this.leaving.length,
       members: this.members.map((m) => ({ id: m.spec.id, side: m.spec.side, alive: m.actor.alive,
         x: +m.actor.position.x.toFixed(2), z: +m.actor.position.z.toFixed(2), stop: m.state.index,
         arrived: m.state.arrived, shots: m.actor.ambientShots || 0, released: !!m.released })),
     };
   }
 
-  Dispose() { this.members = []; }
+  Dispose() { this.members = []; this.leaving = []; }
 }

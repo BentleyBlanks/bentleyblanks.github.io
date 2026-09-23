@@ -129,7 +129,6 @@ const BARK_LINES = Object.freeze({
     nra: { kind: "warn", key: "warn_down" },
     ija: { kind: "warn", key: "ija_warn_down" },
   },
-  follow: { ija: { kind: "rally", key: "ija_rally_follow" } },
 });
 
 function AngleDelta(from, to) {
@@ -412,9 +411,11 @@ export class Soldier {
     /** 关卡下令的成组冲锋：什么时候起身、冲到什么时候（`AiDirector.GroupCharge`）。 */
     this.groupChargeAt = -99;
     this.groupChargeUntil = -99;
-    /** 被身边起冲的战友带起来的跟冲：什么时候起身、跟谁的目标。 */
+    /** 被身边起冲的战友带起来的跟冲：什么时候起身（冲的是他自己的目标）。 */
     this.chargeFollowAt = -99;
-    this.chargeFollowTargetId = null;
+    /** 跃进喊话（§20）：上一次 Think 结束时的状态、上一次喊「前へ」的时刻。 */
+    this.thinkEndState = null;
+    this.advanceBarkAt = -99;
     /** 军官（分队长）：阵亡时本组压制 + 迟疑，旁人喊「分队长殿がやられた」。由关卡置位。 */
     this.aiOfficer = false;
     /** 反应层认的「本组」键（压力表的组 id）；空串时退回 squadId。 */
@@ -762,7 +763,7 @@ export class AiDirector {
     this._ambientEye = { x: 0, y: 0, z: 0 };
     this._ambientTo = { x: 0, y: 0, z: 0 };
     this.stats = { suppressShots: 0, aimedShots: 0, coverPicks: 0, grenades: 0, peeks: 0, displaces: 0,
-      ambientShots: 0, groupCharges: 0, chargeFollows: 0, hesitations: 0, meleeStallReleases: 0 };
+      ambientShots: 0, groupCharges: 0, chargeFollows: 0, hesitations: 0, meleeStallReleases: 0, advanceBarks: 0 };
     /**
      * 任务侧开关（2026-09-23，docs/Data_EnemyAi.md §20）。**默认全关**：第一关以外逐位不变。
      * 第一关 01–06 的任务相位由 `Script_FirstLevelFrontPressure` 每帧写：
@@ -2149,11 +2150,12 @@ export class AiDirector {
       if (s.state === STATE.COVER_ENGAGE) this.Bark(s, "cover");
       else if (s.state === STATE.FLANK) this.Bark(s, "flank");
       else if (s.state === STATE.SUPPRESS) this.Bark(s, "suppress");
-      // 【§20】反应层补的三个挂点（任务侧开关打开时）：跃进「散開！前へ！」、
-      // 散伙后撤「一旦下がれ！」、被压得趴下「伏せろ！」。
+      // 【§20】反应层补的挂点（任务侧开关打开时）：散伙后撤「一旦下がれ！」、被压得趴下「伏せろ！」。
+      // 跃进「散開！前へ！」不在这里喊 —— 这里判的是状态机刚写下的状态，同一次 Think 里
+      // UpdateMoveOrder 还会把「没有下一个掩体」的 BOUND 改回 FIRE / WATCH，下一拍又写 BOUND，
+      // 每 0.1 s 就算一次「状态换了」（2026-09-24 审查：01→06 调了一万多次）。见 Think 末尾 `AdvanceBark`。
       else if (this.missionReactions) {
-        if (s.state === STATE.BOUND) this.Bark(s, "advance");
-        else if (s.state === STATE.RETREAT) this.Bark(s, "fallback");
+        if (s.state === STATE.RETREAT) this.Bark(s, "fallback");
         else if (s.state === STATE.SUPPRESSED && s.stance === 2) this.Bark(s, "down");
       }
     }
@@ -2195,6 +2197,25 @@ export class AiDirector {
     this.UpdateMoveOrder(s, task);
     // 【§20】没有合法目标 / 扳机被禁火挡住的人朝关卡授权点打（没有授权点就是一次属性检查）。
     if (this.PickAmbientFire) this.PickAmbientFire(s);
+    // 【§20】跃进喊话按 Think **结束时**的状态判（可缺省调用：P012ActorTest 的沙箱没有这个方法）。
+    if (this.missionReactions && this.AdvanceBark) this.AdvanceBark(s);
+  }
+
+  /**
+   * 跃进喊话「散開！前へ！」（2026-09-24，任务侧开关 `missionReactions`）：这一次 Think 结束时真在
+   * BOUND、上一次 Think 结束时不在 BOUND，才算「起跑」；原地待命 / 走剧本战术 / 剧本非战斗员不喊；
+   * 同一个人 `SQUAD_REACTION.advanceBarkCooldownS` 内最多喊一次。
+   */
+  AdvanceBark(s) {
+    const was = s.thinkEndState;
+    s.thinkEndState = s.state;
+    if (s.state !== STATE.BOUND || was === STATE.BOUND) return false;
+    if (s.missionFrontStandby || s.missionTacticStandby || s.scriptedNoncombatant) return false;
+    if (this.time - s.advanceBarkAt < SQUAD_REACTION.advanceBarkCooldownS) return false;
+    s.advanceBarkAt = this.time;
+    this.stats.advanceBarks += 1;
+    this.Bark(s, "advance");
+    return true;
   }
 
   /** Commit a visible local charge, and cancel it when contact or support is lost. */
@@ -2249,8 +2270,10 @@ export class AiDirector {
   }
 
   /**
-   * 一人起冲，身边 `CHARGE_FOLLOW.followRadiusM` 内**已上刺刀**的同组战友错峰 0.3–0.8 s 跟上，
-   * 领头的人喊「突撃！一気に行け！」。跟的人仍要自己能机动（剧本守点的不跟）。
+   * 一人起冲，身边 `CHARGE_FOLLOW.followRadiusM` 内**枪上带刺刀**的同组战友错峰 0.3–0.8 s 跟上
+   *（跟的时候上刺刀），领头的人喊「突撃！一気に行け！」。跟的人仍要自己能机动（剧本守点的不跟）。
+   * 2026-09-24 审查：旧判据要「此刻已经 bayonetFixed」，而 bayonetFixed 只有冲过锋的人才有，
+   * 实机跟冲一次都没发生；日军步枪（三八式）一律带刺刀，按「这支枪能上刺刀」判。
    */
   RallyCharge(s) {
     const F = CHARGE_FOLLOW, now = this.time;
@@ -2258,14 +2281,14 @@ export class AiDirector {
     let n = 0;
     for (const o of this.soldiers) {
       if (n >= F.maxFollowers) break;
-      if (o === s || !o.alive || o.side !== s.side || o.unarmed || !o.bayonetFixed) continue;
+      if (o === s || !o.alive || o.side !== s.side || o.unarmed || !o.weapon?.bayonet) continue;
       if (o.state === STATE.CHARGE || o.chargeFollowAt > now || !o.target) continue;
       if (group && (o.reactionGroup || o.squadId || "") !== group) continue;
       const dx = o.position.x - s.position.x, dz = o.position.z - s.position.z;
       if (dx * dx + dz * dz > F.followRadiusM * F.followRadiusM) continue;
       if (!CanManeuver(o, now)) continue;
       o.chargeFollowAt = now + F.followDelayMinS + o.rnd() * (F.followDelayMaxS - F.followDelayMinS);
-      o.chargeFollowTargetId = s.target ? s.target.id : null;
+      o.bayonetFixed = true;
       n += 1;
     }
     this.stats.chargeFollows += n;

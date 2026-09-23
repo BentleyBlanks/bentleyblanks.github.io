@@ -21,7 +21,10 @@
 //   BACKDROP_SQUADS
 //     encounter    遭遇组 id（日军进 runtime.enemies，missionEncounter 取它）
 //     spawnFact    这个事实记下才开始（null = 进步骤就开始）
-//     steps        在这些步骤里活着；离开这些步骤（含回跳、调试跳关）整组撤场
+//     steps        在这些步骤里活着；离开这些步骤（含回跳、调试跳关）整组撤场：立刻退出任务敌人表、
+//                  交接过的日军变回剧本兵（不再对人开枪），**人等到出了玩家视野再移除**
+//     leave        { removeBeyondM, viewMarginDeg, maxS } 撤场时：离玩家超过 removeBeyondM、或不在相机视锥
+//                  （半角 + viewMarginDeg）里就移除；maxS 秒后不论在不在视野里都移除（兜底，防漏）
 //     handoff      { fact, mode:"combat"|"hold", tacticalRadiusM } 交接给连续进攻
 //     members[]    { id, side:"ija"|"nra", weapon, x, z, delayS, speedMps, route:[{ x, z, holdS, fire:[点名…] }] }
 //                  route 按顺序跑；每个停点蹲下打 holdS 秒（最后一个停点一直打）；fire 是这个停点的授权点
@@ -49,6 +52,8 @@ export const BACKDROP_SQUADS = Object.freeze({
   steps: Object.freeze(["Trapped", "BunkerRescue", "RearTrench"]),
   // 临时：玩家拾回步枪（02 还权）时把日军这几个交成普通守区 AI。Opening 包接 bunkerPursuit 时改这里。
   handoff: Object.freeze({ fact: "rifleRecovered", mode: "combat", tacticalRadiusM: 8 }),
+  // 2026-09-24 审查：交接后的日军在 02 结束时还活着、离 03 起点不远，进 03 那一帧凭空消失。
+  leave: Object.freeze({ removeBeyondM: 70, viewMarginDeg: 12, maxS: 90 }),
   members: Object.freeze([
     Object.freeze({ id: "BackdropIjaA", side: "ija", weapon: "Type38", x: -36, z: -155, delayS: 0, speedMps: 3.2,
       route: Object.freeze([Stop(-44, -150.5, 6, ["westMid", "westNorth"]), Stop(-47, -149.5, 0, ["westMid", "westSouth"])]) }),
