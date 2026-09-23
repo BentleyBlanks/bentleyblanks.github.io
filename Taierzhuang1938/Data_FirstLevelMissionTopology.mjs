@@ -144,13 +144,13 @@ export const MISSION_STAGE_ANCHORS = Object.freeze({
   // 2026-09-23 proposal A: the dugout is dug into the north-west (outer) wall of the bend M
   // (3,-124.4) where the forward communication trench turns from east-west to south-south-west.
   // Its single mouth looks east straight down the trench: kill spot, junction J, fold F (K1).
-  bunker: {x:-2.8,z:-126.6}, bunkerDoor: {x:2.2,z:-125.2},
+  bunker: {x:-1.3,z:-126.2}, bunkerDoor: {x:2.2,z:-125.2},
   // 行刑处在门外 3.9 m。原来它在受困位 18 m 外、第一轮打磨挪到 13.5 m，
   // 720p 下人还是只有约 70 像素高；现在 8.5 m 处一个站着的人有约 150 像素
   // （受困期间 FOV 收到 50°），「必须让玩家清楚看懂」才读得出来。
   bunkerKilling: {x:6.5,z:-123.6},
   // bunkerRear keeps its key but is now the 02 return-of-control spot behind the mouth spoil.
-  bunkerRear: {x:0.3,z:-122.3}, rearCorner: Space.rearCorner, collection: {x:-37,z:-101},
+  bunkerRear: {x:-0.2,z:-122.2}, rearCorner: Space.rearCorner, collection: {x:-37,z:-101},
   bunkerBend: {x:3,z:-124.4}, bunkerJunction: {x:14,z:-124.6}, bunkerFold: {x:19,z:-125.8},
   bunkerCrater: {x:2.8,z:-120.4}, shunziDragged: {x:3.8,z:-123.2},
   supportJunction: Space.supportJunction, frontObservation: Space.observation,

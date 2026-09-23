@@ -184,7 +184,7 @@ export function FrontAssaultLaneCuts(x,z,w,d,slackM=.4){
 export const FRONT_APPROACH_ENEMIES=[
   {id:"RightNestGunner",...Sortie.nest,weapon:"Type11",hold:true,team:"Nest",role:"nestGun",faceTo:Sortie.gap},
   // Guards face the west door and the right low trench (south-west), behind real cover.
-  {id:"RightNestGuard",x:31.4,z:-149.4,team:"Nest",role:"nestGuard",faceTo:Space.westDoor},
+  {id:"RightNestGuard",x:33.2,z:-149.2,team:"Nest",role:"nestGuard",faceTo:Space.westDoor},
   {id:"RightEntryGuard",x:26.6,z:-146.8,team:"Nest",role:"nestGuard",faceTo:Space.westDoor},
   // The link guard holds the rear junction: the link sap the vanguard used and the ammo sap mouth.
   {id:"RightLinkGuard",x:32.3,z:-140.2,team:"Nest",role:"linkGuard",faceTo:{x:23.5,z:-130}},

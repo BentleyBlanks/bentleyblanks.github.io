@@ -8,11 +8,12 @@ const Point=(x,z)=>Object.freeze({x,z});
 // Semantic tank waypoints (contract §5.7). holdS=0 on block = hold until disabled.
 const Way=(x,z,kind,extra={})=>Object.freeze({x,z,kind,...extra});
 export const FRONT_TANK_PATH=Object.freeze([
-  Way(110,-227,"cruise",{note:"start: plateau road cutting, 118 m from the nest seat, behind NorthRuin's sector"}),
-  Way(104,-212,"cruise"),
-  Way(92,-200,"hullDown",{faceTo:"nest",holdS:15,note:"03 preview (K5): 2.2 m cutting, turret above the lip, hull below it"}),
-  Way(66,-189,"cruise",{note:"the bend, behind NorthRuin (seen from the seat the ruin covers bearings 33-53 deg)"}),
-  Way(58,-178,"cruise",{note:"04 emerges from the bend (K6); the blocked south road forks here"}),
+  Way(112,-229,"cruise",{note:"start: plateau road cutting, 114 m from the nest seat, inside NorthRuin's shadow sector"}),
+  Way(106,-214,"cruise"),
+  Way(97,-205,"hullDown",{faceTo:"nest",holdS:15,note:"03 preview (K5): the road runs across the view here, the 2.2 m cutting's lip hides the hull, the turret shows"}),
+  Way(81,-204,"cruise",{note:"leaves the preview westward, already inside NorthRuin's shadow sector"}),
+  Way(64,-189.5,"cruise",{note:"the bend, behind NorthRuin (seen from the seat the ruin covers bearings 31-50 deg)"}),
+  Way(60,-177,"cruise",{note:"04 emerges from the bend (K6); the blocked south road forks here"}),
   Way(51,-172.5,"firePoint",{faceTo:"nest",holdS:14,note:"04 pressure: HE + hull MG on the nest front seat, 31 m"}),
   Way(44.5,-169,"cruise"),
   Way(38,-167.5,"block",{faceTo:"gap",holdS:0,note:"04-05 blockade, 7.5 m north of the berm line"}),
@@ -22,8 +23,11 @@ const T=FRONT_TANK_PATH;
 export const FRONT_SORTIE=Object.freeze({
   // 03: collection/support junction -> support sap -> observation step -> fold -> gap junction ->
   // right low trench -> nest west door. The first point is the support junction SJ.
-  approach:[Point(-29,-110),Point(-30,-118),Point(-27,-127),Point(-18,-134),Point(-8,-140),
-    Point(0,-141.5),Point(7,-143.5),Point(13,-144.2),Point(19,-146.8),Point(25.8,-150.3),Point(25.9,-153.9)],
+  // The support sap zigzags: every leg is at least 25 deg off the east-north-east fire axis of the
+  // nest and the tank's stop point, so neither can shoot along it (docs §4.2).
+  approach:[Point(-29,-110),Point(-30,-118),Point(-26.5,-126),Point(-20.4,-126.8),Point(-19.2,-133.2),
+    Point(-10.4,-134.2),Point(-9.4,-138.6),Point(-8,-140.6),
+    Point(0,-141.6),Point(7,-143.5),Point(13,-144.2),Point(19,-146.8),Point(22.2,-149.6),Point(25.8,-150.4),Point(25.9,-153.9)],
   nest:Point(24.9,-153.9), seat:Point(25.9,-153.9),leaderCover:Point(28.4,-151.6), rear:Point(29.7,-141.5),
   // 04 short withdrawal: seat -> rear-wall door -> rear junction (behind the never-breakable rear wall).
   rearRoute:[Point(25.9,-153.9),Point(29.6,-149.5),Point(29.7,-145.6),Point(29.7,-141.5)],
@@ -35,10 +39,11 @@ export const FRONT_SORTIE=Object.freeze({
   throw:Point(43.6,-159.6),orders:Point(-34,-99),
   leftGun:Point(-33.8,-157.6),leftSeat:Point(-33.6,-156.4),
   // He / relief / Zhou use the support sap's first leg and then the left gun access trench.
-  leftRoute:[Point(-29,-110),Point(-30,-118),Point(-27,-127),Point(-31,-137),Point(-34,-147),Point(-33.6,-156.4)],
+  leftRoute:[Point(-29,-110),Point(-30,-118),Point(-26.5,-126),Point(-31,-136),Point(-34,-147),Point(-33.6,-156.4)],
   gap:Point(-8,-150),lastCover:Point(-8,-155.2),
   // Backslope scrape -> the one gap -> gap junction -> fold -> safe zone behind the fold.
-  guardRoute:[Point(-8,-155.2),Point(-8,-150),Point(-8,-144.5),Point(-8,-140),Point(-18,-134),Point(-22.5,-131)],
+  guardRoute:[Point(-8,-155.2),Point(-8,-150),Point(-8,-145),Point(-8,-140.6),Point(-9.4,-138.6),Point(-10.4,-134.2),
+    Point(-19.2,-133.2),Point(-20.4,-126.8),Point(-21.6,-126.6)],
   // Exposure at the damaged lip rewards crouching; there is no artificial ceiling.
   crawl:[],damagedLip:Point(41,-129.5),
   crawlClearanceM:.96,crawlRoofM:1.1,crawlRadiusM:3.8,crawlEntryMarginM:.75,
@@ -48,7 +53,7 @@ export const FRONT_SORTIE=Object.freeze({
   enemies:[{id:'BundleBendA',x:63,z:-133,hold:false},{id:'BundleBendB',x:62,z:-138,hold:false}],
   // Terrain road polyline = the tank path plus a 5 m dead-end stub at the berm-end crater.
   road:[...T.map(p=>Point(p.x,p.z)),Point(31,-166.4)],
-  tankPreviewIndex:2,tankPressureIndex:5,tankBlockIndex:7,tankEndIndex:8,
+  tankPreviewIndex:2,tankPressureIndex:6,tankBlockIndex:8,tankEndIndex:9,
   tankRoadX:38,tankNorthZ:-228,tankSouthZ:-166,tankLeadM:6,
   retreatCasualtyFraction:.5,retreatSuppression:.72,retreatSuppressionS:3,
   retreatDistanceM:12,retreatArrivalM:2,
@@ -57,16 +62,16 @@ export const FRONT_SORTIE=Object.freeze({
 export const FRONT_SPACE=Object.freeze({
   supportJunction:Point(-29,-110),          // 02 end / 03 start (the collection is 9 m south-west)
   rearCorner:Point(-4,-113),               // "后交通壕折角": Luo appears here in K2; He holds it in 03
-  observation:Point(-26.4,-127.6),          // 03 observation fire step (K3)
-  observationStepDepthM:.62,
-  fold:Point(-18,-134),                     // support sap fold: the guards' safe zone is behind it
-  safeZone:Point(-22.5,-131),
-  gapJunction:Point(-8,-140),
+  observation:Point(-23.2,-129.2),          // 03 observation bay at the end of a 0.95 m spur (K3)
+  observationSpur:[Point(-23.4,-126.5),Point(-23.2,-129.4)],
+  fold:Point(-19.2,-133.2),                 // support sap fold: the guards' safe zone is behind it
+  safeZone:Point(-21.6,-126.6),            // hidden from the nest, the flank group's last line and every tank waypoint
+  gapJunction:Point(-8,-140.6),
   westDoor:Point(25.8,-150.5),
   rearDoor:Point(29.7,-145.6),
   roadMouth:Point(46.5,-163.5),             // where the link sap meets the road (01 entry, 05 cut-in seen)
   roadLink:[Point(62,-129),Point(55,-126.5),Point(47.5,-124.5),Point(41.5,-123)],
-  southRoad:[Point(58,-178),Point(62,-162),Point(63,-140),Point(61,-120),Point(58,-100),Point(55,-84)],
+  southRoad:[Point(60,-177),Point(62,-162),Point(63,-140),Point(61,-120),Point(58,-100),Point(55,-84)],
   yard:Object.freeze({minX:38.8,maxX:54,minZ:-119,maxZ:-100}),
   bermEndCraters:[Point(17.5,-158.2),Point(20.5,-161.5),Point(15.5,-162.8)],
 });

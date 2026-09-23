@@ -92,12 +92,15 @@ export const MISSION_TERRAIN = Object.freeze({
     // 2026-09-23 proposal A (docs/Data_FirstLevelLayoutProposalA.md). A step sets the ground to
     // natural-depth inside its radius: it digs pits and raises trench floors alike.
     // Nest compound floor (x 24..37, z -145.6..-156.8), dug half a metre.
-    {x:30.5,z:-151.2,radius:5.2,depth:.5},
+    {x:28.5,z:-152.2,radius:5.5,depth:.5},
     {...Sortie.leftSeat,radius:3,depth:.65},
-    // 03 observation fire step inside the support sap (K3).
-    {...Space.observation,radius:1.3,depth:Space.observationStepDepthM},
     // 01 dugout pit, dug into the outer (north-west) wall of the bend M; opens east onto the trench.
-    {x:-2.4,z:-126.4,radius:1.9,depth:2.0},
+    {x:-0.4,z:-125.9,radius:1.9,depth:2.0},
+    // Depth transitions (all under 45 deg): support sap -> right low trench, gap sap -> gap junction,
+    // right low trench -> nest west door.
+    {x:-5.6,z:-140.9,radius:1.0,depth:1.65},{x:-8,z:-142.6,radius:.9,depth:1.5},{x:23.4,z:-149.9,radius:.9,depth:.95},
+    // Rear junction -> rear door ramp (trench floor -2 up to the nest floor -0.5).
+    {x:29.7,z:-143.9,radius:1.1,depth:1.25},{x:29.7,z:-145.0,radius:.8,depth:.8},
     // The near-miss crater at the bend's inner corner: the SSW leg's east wall is down to 1.05 m
     // for ~4 m ("沟壁塌低段"), exposed to the fold F and the junction J.
     {x:2.8,z:-120.4,radius:1.7,depth:1.05},

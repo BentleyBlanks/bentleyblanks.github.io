@@ -44,6 +44,9 @@ export const MISSION_TRENCH_NETWORK = Object.freeze({
     // 01-02 forward communication trench: SJ -> rear corner -> SSW leg -> bend M (dugout) -> J.
     {id:"BunkerTrench",preset:"communication",role:null,points:MISSION_BUNKER_TRENCH,
       source:"Data_FirstLevelMissionTopology.MISSION_BUNKER_TRENCH",routeBound:true},
+    // The dugout's single mouth: a 2.6 m passage from the pit to the bend (the only opening).
+    {id:"BunkerMouth",preset:"communication",role:null,points:[{x:-0.8,z:-126.0},{x:2.6,z:-124.9}],floorW:2.6,bankW:.8,bermH:0,
+      source:"Data_FirstLevelMissionTrenches（自有点；洞口）",routeBound:false},
     // The link sap the 01 vanguard came down from the lost east end; its first fold F is where
     // ijaC stops (K1), its upper end is the nest's rear junction.
     {id:"BunkerFrontSap",preset:"communication",role:"enemyEntry",points:MISSION_BUNKER_FRONT_SAP,
@@ -52,12 +55,15 @@ export const MISSION_TRENCH_NETWORK = Object.freeze({
     {id:"BunkerDepthSap",preset:"sap",role:"enemyEntry",points:MISSION_BUNKER_DEPTH_SAP,
       source:"Data_FirstLevelMissionTopology.MISSION_BUNKER_DEPTH_SAP",routeBound:false},
     // 03 support sap: SJ -> observation step -> fold (guard safe zone behind it) -> gap junction.
-    {id:"SupportSap",preset:"communication",role:null,points:Sortie.approach.slice(0,5),
-      source:"Data_FirstLevelFrontRoute.FRONT_SORTIE.approach[0..4]",routeBound:true},
+    {id:"SupportSap",preset:"communication",role:null,points:Sortie.approach.slice(0,8),
+      source:"Data_FirstLevelFrontRoute.FRONT_SORTIE.approach[0..7]",routeBound:true},
+    // K3 observation bay: a 0.95 m spur off the support sap (eye ~0.65 m above the field).
+    {id:"ObservationSpur",preset:"communication",role:null,points:Space.observationSpur,depth:.95,floorW:2.6,bankW:.9,bermH:.1,bermSide:"minus",
+      source:"Data_FirstLevelFrontRoute.FRONT_SPACE.observationSpur",routeBound:false},
     // 03 right low trench: gap junction -> nest west door. 1.35 m: crouched is covered, standing shows.
-    {id:"RightApproach",preset:"communication",role:null,points:[...Sortie.approach.slice(4,10),{x:23,z:-149.3}],
+    {id:"RightApproach",preset:"communication",role:null,points:Sortie.approach.slice(7,13),
       depth:1.35,bermH:.2,bermSide:"minus",
-      source:"Data_FirstLevelFrontRoute.FRONT_SORTIE.approach[4..9]",routeBound:true},
+      source:"Data_FirstLevelFrontRoute.FRONT_SORTIE.approach[7..12]",routeBound:true},
     // He / Zhou / relief: observation -> left gun at the berm's west end.
     {id:"LeftGunAccess",preset:"communication",role:null,points:Sortie.leftRoute.slice(2),depth:1.85,
       source:"Data_FirstLevelFrontRoute.FRONT_SORTIE.leftRoute[2..]",routeBound:true},
@@ -66,7 +72,7 @@ export const MISSION_TRENCH_NETWORK = Object.freeze({
       depth:.55,floorW:2.6,bankW:.8,bermH:.12,bermSide:"plus",
       source:"Data_FirstLevelMissionTrenches（自有点；FRONT_GUARD_POSTS 站在这条浅刮沟里）",routeBound:false},
     // The gap sap: last cover -> the one gap (shallowed by FRONT_BREACHES) -> gap junction.
-    {id:"GuardWithdrawal",preset:"communication",role:null,points:Sortie.guardRoute.slice(0,4),depth:1.6,
+    {id:"GuardWithdrawal",preset:"communication",role:null,points:Sortie.guardRoute.slice(0,4),depth:1.1,
       source:"Data_FirstLevelFrontRoute.FRONT_SORTIE.guardRoute[0..3]",routeBound:true},
     // 05 ammo sap: rear junction -> damaged lip -> yard gate (the last leg to the back door is inside the walled yard).
     {id:"BundleApproach",preset:"communication",role:null,points:Sortie.route.slice(0,-1),
