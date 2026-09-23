@@ -234,6 +234,15 @@ TopBlock("LeftGunSide",-35.4,-155.8,.7,1.9,4,"cover",{cover:Face(-1,0)});
   for(const a of [-1,0,1])for(const b of [-1,0,1])foot=Math.min(foot,SampleMissionTerrain(x+a*w/2,z+b*d/2));
   Block("ScrapeWestTraverse",x,z,w,top-(foot-.1),d,"cover",{y:(top+foot-.1)/2,cover:Face(1,0)});
 }
+// East end: the flank group's last line sits south of the berm's east end (x 12.6..18.4) - straight down the
+// scrape's axis, so it enfiladed every guard on it (the 03-06 cold start lost the whole second batch there).
+// A spoil traverse on the scrape's east end closes that axis (guard lines cross x 5.9 at z -156.5..-157.4; it stands just past the scrape's end so the scrape still walks end to end)
+// and leaves the flank group's and the tank's lines onto the gap open (they cross x 5.9 at z -154.5..-155.2).
+{
+  const x=5.9,z=-156.9,w=1.4,d=1.4,top=SampleMissionNaturalHeight(x,z)+1.3;let foot=Infinity;
+  for(const a of [-1,0,1])for(const b of [-1,0,1])foot=Math.min(foot,SampleMissionTerrain(x+a*w/2,z+b*d/2));
+  Block("ScrapeEastTraverse",x,z,w,top-(foot-.1),d,"cover",{y:(top+foot-.1)/2,cover:Face(1,0)});
+}
 // Old yard (旧院) south-east of the nest, west of the blocked south road. Back door on the west.
 TopBlock("OldYardNorthWest",39.3,-119,1.0,2.4,.7,"plaster");
 TopBlock("OldYardNorthEast",48.3,-119,11.4,2.4,.7,"plaster");

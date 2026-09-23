@@ -12,7 +12,8 @@ import {FRONT_SORTIE as S,FRONT_SPACE as SP,FRONT_TANK_PATH as TP,FrontTankIndex
 import {FRONT_BATTLE_TUNING as B} from "./Data_Tuning_FirstLevelFront.mjs";
 import {FRONT_BREAKABLES,FRONT_UNBREAKABLE} from "./Data_FirstLevelFrontBreakables.mjs";
 import {MISSION_LAYOUT as L} from "./Data_FirstLevelMissionLayout.mjs";
-import {FRONT_GUARD_POSTS} from "./Data_FirstLevelMissionFront.mjs";
+import {FRONT_GUARD_POSTS,FRONT_FLANK_GROUP,FrontAssaultLane} from "./Data_FirstLevelMissionFront.mjs";
+import {MISSION_ENCOUNTERS as E} from "./Data_FirstLevelMission.mjs";
 import {SampleMissionTerrain as G,SampleMissionNaturalHeight as N} from "./Data_FirstLevelMissionTerrain.mjs";
 import {ProbeKeyframes,ProbeTank,ProbeRoutes,ProbeExposure,ProbeEnemyCover,ProbeCounts,ProbeEntries,ProbeSeparation,
   ProbeEngagement,RouteClearance,Sight,Eye,D,RouteLength,ProbeWireLanes} from "./Script_FirstLevelSpaceProbe.mjs";
@@ -118,6 +119,18 @@ for(const e of S.enemies){
   }
 }
 console.log(`ok 05 cut-in pair hidden from the gap and the backslope: ${S.enemies.length}`);
+// The backslope scrape must not be enfiladed: no planned enemy start or lane point (front, flank group, 04 push)
+// sees a kneeling guard on it. The flank group's last line sits south of the berm's east end, on the scrape's
+// axis; without ScrapeEastTraverse it killed the whole second batch in the 03-06 cold start (guardBatchLost).
+{
+  const who=[...FRONT_FLANK_GROUP.flatMap(f=>[f,...f.lane]),
+    ...[...E.front,...E.machineGun].flatMap(s=>[s,...(s.hold?[]:FrontAssaultLane(s.x,s.z))])];
+  const enfilade=[];
+  for(const w of who)for(const g of FRONT_GUARD_POSTS)if([1.0,1.35].some(h=>Sight(Eye(w,h),Eye(g,.8))===null))enfilade.push(`${w.id||"lane"}@${w.x},${w.z}->${g.x}`);
+  assert.deepEqual(enfilade,[],"no enemy start or lane point enfilades the backslope scrape");
+  for(const f of FRONT_FLANK_GROUP)assert.equal(Sight(Eye(f.lane.at(-1),1.0),Eye(S.gap,1.2)),null,`${f.id} last line still sees the gap over ScrapeEastTraverse`);
+  console.log(`ok backslope scrape not enfiladed from ${who.length} enemy points`);
+}
 
 // ---------------------------------------------------------------- enemies: cover, roles, budget, hidden entries
 {
