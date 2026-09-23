@@ -21,7 +21,8 @@
 //              2026-09-24 审查：那正是白刃卡死那一类木桩，不能剔掉；
 //              旧口径「只看位移和开枪」照旧算出来，报成 idle4Strict；**这个口径待集成负责人认可**）
 //   逐阶段    03、04、05 各自过闸（契约 §7.4「每阶段」）；110 m 内见过的日军不足 minMen 人的阶段
-//             报「人数不足」—— 不算通过也不算红（兵力归 Space / Front 包），合并数仍要过闸
+//             报「人数不足」—— 不算通过也不算红（兵力归 Space / Front 包），合并数仍要过闸；
+//             30 s 人窗不足 minWindows 个的阶段 zero30 只报不判（三四个窗里一个零发就是 33%）
 //   flinch    进入「被压制」状态的次数（缩头 / 卧倒）、中弹踉跄的人·帧 —— 被压制时的反应真的在触发
 //   barks     每人每分钟「散開！前へ！」调用数：上限 60 / advanceBarkCooldownS + 1（审查：曾一趟一万多次）
 //   charge    配了成组冲锋的相位：要么真冲了（groupCharge 事件），要么切相位时记了没冲的原因（chargeNotDue）
@@ -48,7 +49,7 @@ const label = Arg("label", treeRoot === ownRoot ? "current" : path.basename(tree
 
 /** 探针阈值（口径见文件头）。 */
 const G = Object.freeze({
-  zero30Max: 0.20, idle4Max: 0.25, mgShotsMin: 1, huntersMax: 0, minMen: 4,
+  zero30Max: 0.20, idle4Max: 0.25, mgShotsMin: 1, huntersMax: 0, minMen: 4, minWindows: 8,
   gatedSteps: Object.freeze(["Support", "MachineGun", "Tank"]),
   gatedStages: Object.freeze([3, 4, 5]),
   rangeM: 110, sampleS: 0.1, idleWindowS: 4, idleMoveM: 0.3, zeroWindowS: 30, zeroPresence: 0.9,
@@ -241,7 +242,8 @@ if (gate) {
     const s = report.byStage[n];
     if (!s || !s.ticks) continue;
     if (s.men < G.minMen) { console.log(`WARN 0${n} 110 m 内只见过 ${s.men} 名日军（< ${G.minMen}）：人数不足，这一阶段不判（兵力归 Space / Front 包）`); continue; }
-    if (s.windows) assert.ok(s.zero30 < G.zero30Max, `0${n} 30 s 一发没打的人占比 ${Pct(s.zero30)} < ${Pct(G.zero30Max)}`);
+    if (s.windows >= G.minWindows) assert.ok(s.zero30 < G.zero30Max, `0${n} 30 s 一发没打的人占比 ${Pct(s.zero30)} < ${Pct(G.zero30Max)}`);
+    else console.log(`WARN 0${n} 只有 ${s.windows} 个 30 s 人窗（< ${G.minWindows}）：zero30 样本不足，这一阶段只判 idle4`);
     assert.ok(s.idle4 <= G.idle4Max, `0${n} 4 s 不动也不开枪 ${Pct(s.idle4)} ≤ ${Pct(G.idle4Max)}`);
   }
   const loud = report.barks.advanceWorst;

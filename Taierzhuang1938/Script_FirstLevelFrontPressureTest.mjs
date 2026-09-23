@@ -573,7 +573,7 @@ function Man(ai, side, x, z, options = {}) {
 }
 {
   // Group charge and follow-ups.
-  const { ai, log } = MakeDirector();
+  const { ai, ctx, log } = MakeDirector();
   ai.missionReactions = true;
   const squad = [0, 1, 2, 3].map((i) => Man(ai, "ija", i * 1.5, 0));
   for (const s of squad) { s.reactionGroup = "mgAttack"; s.target = { isPlayer: true, position: new THREE.Vector3(0, 0, -20), id: -1 }; s.targetVisible = true; }
@@ -583,6 +583,17 @@ function Man(ai, side, x, z, options = {}) {
   Check(squad.every((s) => s.groupChargeAt <= ai.time + CHARGE_FOLLOW.groupStaggerMaxS && s.bayonetFixed), "the rest follow within the stagger, bayonets fixed");
   Check(log.barks.some((b) => b.key === "ija_rally_storm" && b.priority === true), "the leader shouts the storm");
   Eq(ai.stats.groupCharges, 1);
+  // A held man looking at an NRA soldier is turned on the player before a group charge.
+  {
+    const h = Man(ai, "ija", 20, 0);
+    h.target = { isPlayer: false, position: new THREE.Vector3(20, 0, -10), id: 42 };
+    ctx.player = { Alive: true, Protected: false, stance: "crouch", position: new THREE.Vector3(20, 0, -25) };
+    Check(ai.TargetPlayerForCharge(h) && h.target.isPlayer && h.target.stance === 1, "the charger's target becomes the player");
+    ctx.player.Protected = true; h.target = null;
+    Check(!ai.TargetPlayerForCharge(h) && !h.target, "a protected (spawn-shielded) player is never made a target");
+    ctx.player = undefined;
+    ai.soldiers.splice(ai.soldiers.indexOf(h), 1);
+  }
   // Follow-ups from a spontaneous charge.
   const { ai: ai2 } = MakeDirector();
   ai2.missionReactions = true;

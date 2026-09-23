@@ -442,9 +442,15 @@ export class FirstLevelFrontPressure {
   GroupCharge(groupId, members) {
     const r = this.r;
     const officerId = FRONT_PRESSURE_GROUPS[groupId]?.officer;
+    // 冲锋的人：上得了刺刀、不在白刃里，并且眼里是玩家、或者从他站的地方看得见玩家（后者冲之前把目标
+    // 换成玩家 —— 禁火的人平时「先打能打的」，眼里多半是壕里的国军）。
+    const eye = r.player?.EyePosition;
+    const SeesPlayer = (a) => !!eye && typeof r.BlocksSight === "function" && typeof r.Point === "function"
+      && !r.BlocksSight(eye, r.Point(a.position, 1.3));
     const chargers = members.filter((a) => a.alive && !a.missionFrontStandby && a.missionAssault
-      && a.target?.isPlayer && a.weapon?.bayonet && !a.meleeCombat);
+      && a.weapon?.bayonet && !a.meleeCombat && (a.target?.isPlayer || SeesPlayer(a)));
     if (chargers.length < 2) { this.Note("chargeSkipped", { group: groupId, ready: chargers.length }); return 0; }
+    for (const a of chargers) if (!a.target?.isPlayer && typeof r.ai.TargetPlayerForCharge === "function") r.ai.TargetPlayerForCharge(a);
     for (const a of chargers) {
       if (!(a.tacticalRadiusM > 0)) a.tacticalRadiusM = R.infantryTacticalRadiusM;
       r.Defend(a, a.position, R.defendHoldRadiusM, R.assaultCoverSearchM);

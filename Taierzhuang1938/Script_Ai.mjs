@@ -2263,6 +2263,19 @@ export class AiDirector {
   }
 
   /**
+   * 【§20】关卡下令的成组冲锋前，把一个人的目标换成玩家：被禁火的人「先打能打的」（玩家的距离乘
+   * heldTargetRank），眼睛里多半是壕里的国军 —— 那条规矩管的是扳机，冲锋是冲着玩家来的。
+   * 2026-09-24 探针：机枪攻击组每次凑冲锋都只有不到两个人「目标是玩家」，一次都没冲成。
+   */
+  TargetPlayerForCharge(s) {
+    const player = this.ctx.player;
+    if (!player || !player.Alive || player.Protected || !s.alive) return false;
+    const st = player.stance === "prone" ? 2 : player.stance === "crouch" ? 1 : 0;
+    this.SetTarget(s, { isPlayer: true, position: player.position, ref: player, id: PLAYER_TRACK_ID, stance: st });
+    return true;
+  }
+
+  /**
    * 冲锋起身那一下（自发 / 跟冲 / 成组三条路都走这里）。`lead` = 这是自己起的头：
    * 任务侧开关打开时喊「突撃！」并把身边上了刺刀的战友带起来（`RallyCharge`）。
    */
