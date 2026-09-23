@@ -71,6 +71,13 @@ export const SFX_LICENSES = {
       + "对外发布前必须替换或取得授权。",
     via: "BV1cG411m7Vz（三八大盖有盖版实弹射击）· BV1GMojB3EFP（汉阳造 88 式步枪）",
   },
+  // 2026-09-24：一条 cue 里混着上面两家以上来源的文件（例：日军枪声变体 = 火山引擎生成音 +
+  // Sonniss 实录）。单一 license 字段写不准，逐文件的出处写在该 cue 的 credit 里（顺序与 files 一致）。
+  mixed: {
+    name: "混合来源（逐文件见 credit）",
+    terms: "按 credit 里每个文件各自的来源适用上面对应一家的条款；本类不含 refvideo",
+    via: "local://Taierzhuang1938/Data_SfxSources.mjs",
+  },
 };
 
 /**
@@ -1518,11 +1525,12 @@ export const SFX_SOURCES = [
   //   · rifleIjaFar：SeedAudio 1 + BAR 300 m 1 + 50 m 建筑反射 2 = 4 条；
   //   · type11：SeedAudio 1 + MINIMI 1 m 2 = 3 条（BAR 近场那两条是废素材，见上）。
   // 只登记、不切割（seedAudio 组的语义）；上面那几组负责把文件烘出来。
-  // 许可：三条 cue 都混着火山引擎生成音与 Sonniss 免版税实录，逐文件的出处写在 credit。
+  // 许可：三条 cue 都混着火山引擎生成音与 Sonniss 免版税实录 → license "mixed"（2026-09-24 审查后改，
+  // 原来写 sonniss 不准），逐文件的出处写在 credit。
   {
     id: "JapaneseGunfireVariants",
     seedAudio: true,
-    license: "sonniss",
+    license: "mixed",
     credit: "Volcengine SeedAudio 1.0（2026-09-11）＋ Sonniss GDC 实录",
     cuts: [
       { cue: "rifleIja", durS: 1.4,
