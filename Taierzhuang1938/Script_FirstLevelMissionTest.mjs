@@ -542,14 +542,32 @@ console.log("ok all mission gates require recorded gameplay facts and restore ex
 // Zhou's former scripted shell wound is retired: he arrives bandaged in 03.
 assert.ok(!fs.readFileSync(new URL("./Script_FirstLevelOpening.mjs",import.meta.url),"utf8").includes("combat.FireShell"));
 const terrain = CreateP012Terrain(MISSION_LAYOUT);
-for (const trench of MISSION_TERRAIN.trenches) assert.ok(trench.depth >= 1.83, trench.id + " full-cover excavation depth");
-for (const [x,z] of [[-24,-53],[-45,30],[-10,-124]]) {
+// 2026-09-23 01–06 空间重排：以下几段是**故意**浅的（docs/Data_FirstLevelSpace0106_20260923.md §2），
+// 其余一律全遮蔽深度。浅段也不许浅到蹲下都藏不住（≥0.5 m）。
+const INTENDED_SHALLOW = { ObservationSpur: "03 observation step", GuardBackslope: "guards' backslope scrape",
+  GuardWithdrawal: "the one gap sap", RoadAttack: "05 attack branch (last 4 m risk window)", RoadLinkSap: "05 enemy cut-in sap" };
+for (const trench of MISSION_TERRAIN.trenches) {
+  if (INTENDED_SHALLOW[trench.id]) assert.ok(trench.depth >= 0.5, trench.id + " is shallow on purpose but still a trench");
+  else assert.ok(trench.depth >= 1.83, trench.id + " full-cover excavation depth");
+}
+// (-14.8,-133.7) is the 03 support sap, (8,-124.5) the 01 forward trench (the 09.22 FrontTraverse at z=-124 is gone).
+for (const [x,z] of [[-24,-53],[-45,30],[-14.8,-133.7],[8,-124.5]]) {
   assert.ok(terrain.SampleHeight(x,z) < -1.8, "rendered/physical full-cover floor at " + x + "," + z);
 }
-assert.equal(MISSION_TERRAIN.trenches.find(t=>t.id==='BundleApproach').depth, MISSION_TERRAIN.steps[0].depth, 'supply house floor remains level with trench');
+// 2026-09-23: the ammo house stands in the old yard on natural ground; the ammo sap climbs out through the
+// yard's north gate on two authored treads, so the whole 05 ammo route rises and falls under the 52 deg limit.
+{
+  const house=MISSION_ROUTES.bundle.at(-1);
+  assert.ok(Math.abs(SampleMissionTerrain(house.x,house.z)-SampleMissionNaturalHeight(house.x,house.z))<.15,'the ammo house floor is the yard ground, not a pit');
+  const r=MISSION_ROUTES.bundle;let prev=null;
+  for(let i=1;i<r.length;i++){const a=r[i-1],b=r[i],n=Math.ceil(Math.hypot(b.x-a.x,b.z-a.z)/.2);
+    for(let k=0;k<=n;k++){const x=a.x+(b.x-a.x)*k/n,z=a.z+(b.z-a.z)*k/n,y=SampleMissionTerrain(x,z);
+      if(prev)assert.ok(Math.abs(y-prev.y)<=Math.tan(52*Math.PI/180)*Math.hypot(x-prev.x,z-prev.z)+.035,'ammo route climbs out of the sap walking at '+x.toFixed(1)+','+z.toFixed(1));
+      prev={x,y,z};}}
+}
 for (const [x, z] of [
   [-24, -53],
-  [-11, -108],
+  [-11, -112],
   [12, -124],
   [A.retreatA.x, A.retreatA.z],
 ])
@@ -653,9 +671,9 @@ for (const [name, route] of Object.entries({ ...MISSION_ROUTES, ...Object.fromEn
   const bunker=P.bunker;
   const {OPENING_STORYBOARDS:storyboards}=await import("./Data_OpeningStoryboards.mjs");
   const lanes={
-    BunkerExit:[{x:bunker.player.x,z:bunker.player.z},
-      {x:(bunker.luoLift.x+bunker.yaowaLift.x)/2,z:(bunker.luoLift.z+bunker.yaowaLift.z)/2},
-      {x:bunker.luoEntry.x,z:bunker.luoEntry.z},A.bunkerRear,MISSION_STAGE_ROUTES.rearTrench[1]],
+    // 2026-09-23 dugout: out through the east mouth, round the spoil, back to the return spot and up the rear leg.
+    BunkerExit:bunker.exitLane,
+    BunkerRescue:bunker.rescueRoute,
     BunkerAssault:[bunker.ijaStart[0],bunker.ijaKill[0],bunker.ijaDoor[0],A.bunkerDoor],
     BunkerAssaultB:[bunker.ijaStart[1],bunker.ijaKill[1],bunker.ijaDoor[1],A.bunkerDoor],
     CoverHe:[storyboards.positions.heRear,...storyboards.coverRoutes.heyoutian],
@@ -678,7 +696,10 @@ for (const [name, route] of Object.entries({ ...MISSION_ROUTES, ...Object.fromEn
   console.log("ok both bunker lanes stay walkable in every scenario state");
 }
 const frontCover=MISSION_LAYOUT.blocks.filter(block=>block.id.startsWith("FrontCover"));
-for(const wall of [...["RightNestRearWall","RightNestEastWall","SupplyRoadScreen","GuardEastFlank"]
+// 2026-09-23 01–06 space rebuild: the right nest compound, the old yard screen, the gap's last cover,
+// the attack-branch walls and the two earth traverses are the hand-built cover now.
+for(const wall of [...["RightNestRearWest","RightNestRearEast","RightNestEastGable","RightNestWestLow","RightNestNorthLow",
+  "OldYardCartScreen","GapLastCover","AttackRuinA","RoadsideRuin","RightApproachTraverse","ScrapeWestTraverse"]
   .map(id=>{const found=MISSION_LAYOUT.blocks.find(b=>b.id===id);assert.ok(found,"hand-built cover survives generic route cleanup: "+id);return found;}),...frontCover]){
   for(const x of [-1,0,1])for(const z of [-1,0,1])assert.ok(wall.y-wall.h/2<=SampleMissionTerrain(wall.x+x*wall.w/2,wall.z+z*wall.d/2),"cover foundations follow the slope: "+wall.id);
 }
@@ -707,7 +728,15 @@ console.log("ok authored capsule routes clear walls, crates and gun supports");
   }
   // Every bank is a crouch-and-hide cover: too tall to walk over, too low to hide a standing man.
   const points=frontCover.map(block=>({x:block.x,z:block.z,h:block.h}));
-  assert.ok(points.length>=90,"the four rows are actually built: "+points.length);
+  // 2026-09-23: the assault span shrank to x -63..28 (x 30..70 is the tank road, its escorts and the flank
+  // group), so the old ">= 90 banks" count no longer applies. Every column x row the table asks for is built.
+  for(const column of FRONT_COVER.columns)for(const row of FRONT_COVER.rows){
+    if(column.rows&&!column.rows.includes(row.id))continue;
+    const prefix="FrontCover"+row.id+column.id;
+    assert.ok(frontCover.some(block=>block.id.startsWith(prefix)&&/^\d+$/.test(block.id.slice(prefix.length))),
+      "the "+row.id+" row is built in the "+column.id+" column");
+  }
+  assert.ok(points.length>=60,"the four rows are actually built: "+points.length);
   for(const block of frontCover){
     assert.ok(block.h>TRAVERSAL.stepMax&&block.h<COVER.tallM,`${block.id} stays in the crouch-and-hide band: ${block.h.toFixed(2)}`);
     assert.ok(block.h>=COVER.minUsefulM,block.id+" registers as a usable cover point");
@@ -1082,7 +1111,9 @@ assert.equal(new Set(MISSION_DIALOGUE.map((cue) => cue.id)).size, MISSION_DIALOG
       }
     }
   }
-  assert.ok(Math.hypot(routes[0][10].x-routes[1][10].x,routes[0][10].z-routes[1][10].z)>.9,"soldiers occupy distinct lanes instead of one exact line");
+  // 2026-09-23: the shared collection leg is now collection -> SJ (13 m), so compare mid-route, not point 10.
+  const mid=Math.floor(Math.min(routes[0].length,routes[1].length)/2);
+  assert.ok(Math.hypot(routes[0][mid].x-routes[1][mid].x,routes[0][mid].z-routes[1][mid].z)>.9,"soldiers occupy distinct lanes instead of one exact line");
   const sample={speed:3,slot:0,yaw:0,target:{x:0,z:-10},position:{x:0,z:0},gap:Infinity,previous:2,dt:.1};
   assert.ok(MissionSquadPace({...sample,yaw:Math.PI/2})<MissionSquadPace(sample),"turning slows actual travel");
   assert.equal(MissionSquadPace({...sample,gap:1}),0,"personal space wins over catching up");
@@ -1098,7 +1129,9 @@ console.log("ok individual trench lanes, rounded corners, safe spacing and varia
   assert.equal(MISSION_ENCOUNTERS.bunkerAssault.length+MISSION_ENCOUNTERS.front.length
     +MISSION_ENCOUNTERS.machineGun.length+MISSION_ENCOUNTERS.approach.length+MISSION_ENCOUNTERS.tank.length,
     R.openingEnemyBudget,"finite opening/front roster agrees with budget; no replacement waves");
-  assert.equal(MISSION_ENCOUNTERS.machineGun.length,12,"the gun handover owns a separate finite attack");
+  // 2026-09-23: two pairs from the hidden jump-off trench (the 30-alive budget also pays for the flank group,
+  // the officer and the reserve; contract §6).
+  assert.equal(MISSION_ENCOUNTERS.machineGun.length,4,"the gun handover owns a separate finite attack");
   assert.ok(MISSION_ENCOUNTERS.machineGun.every(actor=>FrontAssaultLane(actor.x,actor.z).length>=3),"machine-gun attackers cross multiple physical bounds");
   assert.equal(MISSION_ENCOUNTERS.approach.length,4,"the captured right position has four finite defenders");
   assert.ok(MISSION_ENCOUNTERS.approach.every(a=>a.hold),"capture defenders hold their real posts");

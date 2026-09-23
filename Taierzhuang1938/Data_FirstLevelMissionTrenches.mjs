@@ -91,7 +91,7 @@ export const MISSION_TRENCH_NETWORK = Object.freeze({
     // (FRONT_SPACE.jumpOff.ramps are breaches). The east-west leg shields the saps from the south.
     {id:"NorthJumpOff",preset:"sap",role:"enemyEntry",points:Space.jumpOff.trench,depth:1.9,floorW:3.4,
       source:"Data_FirstLevelFrontRoute.FRONT_SPACE.jumpOff.trench",routeBound:false},
-    ...Space.jumpOff.exits.map((points,i)=>({id:"NorthJumpOffExit"+i,preset:"sap",role:"enemyEntry",points,depth:1.9,
+    ...Space.jumpOff.exits.map((points,i)=>({id:"NorthJumpOffExit"+["West","East"][i],preset:"sap",role:"enemyEntry",points,depth:1.9,
       floorW:Space.jumpOff.exitFloorW,bankW:1.4,bermH:0,
       source:"Data_FirstLevelFrontRoute.FRONT_SPACE.jumpOff.exits "+i,routeBound:false})),
     {

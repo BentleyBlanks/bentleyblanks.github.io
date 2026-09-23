@@ -52,6 +52,10 @@ export const FRONT_SORTIE=Object.freeze({
   leftGun:Point(-33.8,-157.6),leftSeat:Point(-33.6,-156.4),
   // He / relief / Zhou use the support sap's first leg and then the left gun access trench.
   leftRoute:[Point(-29,-110),Point(-30,-118),Point(-26.5,-126),Point(-31,-136),Point(-34,-147),Point(-33.6,-156.4)],
+  // Wounded Zhou leaves the left gun the way He came in: left gun access -> support sap -> SJ -> collection rest.
+  // (Script_FirstLevelOpening.ZhouGunExitRoute still draws a straight line from the gun to zhouRest: the Front
+  // package switches it to this polyline; the line is only valid for the retired 09.22 gun position.)
+  zhouExit:[Point(-33.6,-156.4),Point(-34,-147),Point(-31,-136),Point(-26.5,-126),Point(-30,-118),Point(-29,-110),Point(-33,-106),Point(-36,-99)],
   gap:Point(-8,-150),lastCover:Point(-8,-155.2),
   // Backslope scrape -> the one gap -> gap junction -> fold -> safe zone behind the fold.
   guardRoute:[Point(-8,-155.2),Point(-8,-150),Point(-8,-145),Point(-8,-140.6),Point(-9.4,-138.6),Point(-10.4,-134.2),

@@ -227,7 +227,7 @@ TopBlock("LeftGunSide",-35.4,-155.8,.7,1.9,4,"cover",{cover:Face(-1,0)});
 // guards' only way down is the gap (no bypass west along the scrape into the left gun access trench).
 {
   const x=-29.4,z=-156.4,w=1.4,d=3.4,top=SampleMissionNaturalHeight(x,z)+.4;let foot=Infinity;
-  for(const a of [-1,1])for(const b of [-1,1])foot=Math.min(foot,SampleMissionTerrain(x+a*w/2,z+b*d/2));
+  for(const a of [-1,0,1])for(const b of [-1,0,1])foot=Math.min(foot,SampleMissionTerrain(x+a*w/2,z+b*d/2));
   Block("ScrapeWestTraverse",x,z,w,top-(foot-.1),d,"cover",{y:(top+foot-.1)/2,cover:Face(1,0)});
 }
 // Old yard (旧院) south-east of the nest, west of the blocked south road. Back door on the west.
@@ -810,7 +810,7 @@ export const MISSION_PLACEMENT = Object.freeze({
     rifle: { x: 0.1, z: -125.7, yaw: 0.3 },
     rifleMouth: { x: 1.4, z: -125.6, yaw: 0.3 },
     dragged: { x: 3.8, z: -123.2, yaw: Math.PI / 2 },   // Shunzi after the drag, K2 eye (kneel 0.9)
-    pinnedFrame: [{ x: -2.6, z: -125.4 }, { x: -1.4, z: -126.8 }],
+    pinnedFrame: [{ x: -2.6, z: -125.4 }, { x: -1.2, z: -127.5 }],
     captives: [
       { id: "comrade", x: 6.5, z: -123.6, yaw: Math.PI },   // dragged from the north wall to the kill spot
       { id: "shouter", x: 8.6, z: -122.9, yaw: 2.2 },       // the soldier outside the mouth, killed by the blast
@@ -822,9 +822,16 @@ export const MISSION_PLACEMENT = Object.freeze({
     luoEntry: { x: -1.2, z: -118.8, yaw: Math.PI },        // up the SSW leg from the rear corner
     luoLift: { x: 3.2, z: -122.3, yaw: Math.PI },
     yaowaLift: { x: -3, z: -114, yaw: Math.PI },
-    heyoutianFire: { x: 0.2, z: -121.4, yaw: Math.PI },
-    liuwencaiShot: { x: -2.2, z: -117.2, yaw: 2.6 },       // 17.8 m to the junction J over the crater lip
+    // He comes down the SSW leg and past the mouth spoil on its crater (east) side; from there he
+    // reaches the kill spot. rescueRoute is the rescuers' collapsed-state path RC -> kill spot.
+    heyoutianFire: { x: 3.0, z: -121.3, yaw: 2.2 },
+    rescueRoute: [{ x: -4, z: -113 }, { x: -1, z: -118.5 }, { x: 1.2, z: -120.2 }, { x: 3.0, z: -121.3 }, { x: 4.4, z: -122.8 }, { x: 6.5, z: -123.6 }],
+    liuwencaiShot: { x: -1.0, z: -121.0, yaw: 2.0 },       // 15.4 m down the east-west leg to the junction J
     returnSpot: { x: -0.2, z: -122.2, yaw: Math.PI / 2 },   // behind the mouth spoil (02 还权位)
+    // Shunzi out of the dugout: mouth -> dragged spot -> round the mouth spoil on its crater side -> return
+    // spot -> up the south-south-west leg. Clear in every scenario state (MissionTest bunker lanes).
+    exitLane: [{ x: -1.3, z: -126.2 }, { x: 1.9, z: -125.3 }, { x: 3.8, z: -123.2 }, { x: 3.0, z: -121.3 }, { x: 1.2, z: -120.2 },
+      { x: -0.2, z: -122.2 }, { x: -1, z: -118.5 }],
   },
   // 06 背坡伤员集结处。
   collection: {
@@ -1115,9 +1122,11 @@ const MISSION_SCENARIO = (() => {
   const collapsed = [...shell,
     B("BunkerMouthSpoil", 1.5, -122.6, 1.4, 1.4, 1.4, "earthDark", floor + 1.4),
     B("BunkerMouthRubbleS", 1.3, -124.2, 0.9, 0.7, 0.8, "earthDark", floor + 0.7),
-    B("BunkerRoofSag", -0.7, -125.3, 2.2, 0.3, 1.6, "timber", floor + 1.55),
+    // The sag hangs over Shunzi's legs (west), the pins sit either side of him: once they are lifted a
+    // standing capsule at the pinned spot is clear (SpaceTest anchor check).
+    B("BunkerRoofSag", -2.45, -126.2, 1.0, 0.3, 1.6, "timber", floor + 1.55),
     B("BunkerBeamPinWest", -2.6, -125.4, 0.7, 0.55, 0.9, "timber", floor + 0.55),
-    B("BunkerBeamPinEast", -1.4, -126.8, 0.6, 0.5, 0.8, "timber", floor + 0.5),
+    B("BunkerBeamPinEast", -1.2, -127.5, 0.6, 0.5, 0.8, "timber", floor + 0.5),
   ];
   const N = (id, x, z, w, h, d, semantic, top) =>
     ScenarioBlock(id, x, z, w, h, d, semantic, n + top - h / 2);

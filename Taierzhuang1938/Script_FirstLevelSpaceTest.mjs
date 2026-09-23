@@ -20,7 +20,9 @@ import { SampleMissionTerrain as Ground } from "./Data_FirstLevelMissionTerrain.
 import { TRAVERSAL } from "./Data_Traversal.mjs";
 import { END_TUNING as END } from "./Data_Tuning_FirstLevelEnd.mjs";
 import { ZhouGunExitRoute } from "./Script_FirstLevelOpening.mjs";
-import { OPENING_STORYBOARDS } from "./Data_OpeningStoryboards.mjs";
+import { OPENING } from "./Data_FirstLevelOpening.mjs";
+import { FRONT_SORTIE as Sortie, FRONT_SPACE as Space } from "./Data_FirstLevelFrontRoute.mjs";
+import { SampleMissionNaturalHeight as Natural } from "./Data_FirstLevelMissionTerrain.mjs";
 
 const TAN52 = Math.tan(52 * Math.PI / 180);   // Script_Physics: setMaxSlopeClimbAngle(52°)
 const CAPSULE_R = 0.35;                        // 路线净空半径（MakeCharacter 的 0.34 + 余量）
@@ -85,32 +87,29 @@ const RouteLength = (route) => route.slice(1)
   .reduce((sum, p, i) => sum + Distance(route[i], p), 0);
 const report = {};
 
-// The wounded gunner must walk around the runtime supply collider from every
-// physically plausible side. This also samples the one-metre trench-to-step
-// rise; the open south detour must climb it as a slope, not a vertical lip.
+// 2026-09-23 01–06 空间重排：老周的左枪挪到土坎西端（Sortie.leftSeat），前沿补给箱不再在他身边。
+// 负伤的老周沿何有田来的那条路下撤：左枪通道 → 支沟 → 支沟交汇 SJ → 集结处（Sortie.zhouExit），
+// 全程胶囊净空、坡度可爬。旧的 ZhouGunExitRoute 只在旧枪位成立（它从枪位直线拉到 zhouRest），
+// 这里钉住：它的终点仍是 zhouRest，而数据折线的起点就是新枪位（Front 包据此改接线）。
 {
-  const spec=MISSION_SUPPLIES.find(entry=>entry.id==="Front"),size=MISSION_SUPPLY_COLLIDER;
-  const supply={id:"MissionSupplyFront",x:spec.x,z:spec.z,w:size.w,h:size.h,d:size.d,
-    y:Ground(spec.x,spec.z)+size.h/2};
-  for(const start of [
-    {id:"west",x:-3.0401633947848508,z:-123.90232699904317},
-    {id:"east",x:0,z:-123.9},
-    {id:"north",x:-2,z:-125.2},
-  ]){
-    const route=[start,...ZhouGunExitRoute(start,.34)];
-    assert.deepEqual(RouteClearance(route,[...Solids(),supply]),[],`${start.id} Zhou exit route is physically clear`);
-    let previous=Walkable(route[0].x,route[0].z);
-    for(let leg=1;leg<route.length;leg++){
-      const a=route[leg-1],b=route[leg],length=Distance(a,b),steps=Math.ceil(length/.2);
-      for(let i=1;i<=steps;i++){
-        const t=i/steps,y=Walkable(a.x+(b.x-a.x)*t,a.z+(b.z-a.z)*t);
-        assert.ok(y-previous<=TAN52*(length/steps)+.03,
-          `${start.id} Zhou exit climbs a passable slope (${previous.toFixed(2)} -> ${y.toFixed(2)})`);
-        previous=y;
-      }
+  const route=Sortie.zhouExit;
+  assert.deepEqual(route[0],Sortie.leftSeat,"Zhou's exit starts at the left gun seat");
+  assert.ok(Distance(route.at(-1),OPENING.zhouRest)<0.01,"Zhou's exit ends at his rest by the collection");
+  assert.deepEqual(RouteClearance(route,Solids("BunkerIntact")),[],"wounded Zhou's exit route is physically clear");
+  let previous=Walkable(route[0].x,route[0].z);
+  for(let leg=1;leg<route.length;leg++){
+    const a=route[leg-1],b=route[leg],length=Distance(a,b),steps=Math.ceil(length/.2);
+    for(let i=1;i<=steps;i++){
+      const t=i/steps,y=Walkable(a.x+(b.x-a.x)*t,a.z+(b.z-a.z)*t);
+      assert.ok(Math.abs(y-previous)<=TAN52*(length/steps)+.03,
+        `Zhou exit climbs a passable slope (${previous.toFixed(2)} -> ${y.toFixed(2)})`);
+      previous=y;
     }
   }
-  console.log("ok wounded Zhou routes around the front supply and climbs the real south-side slope");
+  const legacy=ZhouGunExitRoute(Sortie.leftSeat,.34);
+  assert.ok(Distance(legacy.at(-1),OPENING.zhouRest)<0.01,"the runtime exit helper still ends at zhouRest");
+  report.zhouExitM=+RouteLength(route).toFixed(1);
+  console.log(`ok wounded Zhou walks ${report.zhouExitM} m from the left gun down the access trench to the collection`);
 }
 
 // ---------------------------------------------------------------------------
@@ -188,72 +187,73 @@ const report = {};
 }
 
 // ---------------------------------------------------------------------------
-// 3. 掩蔽部：小型（7 × 7 m）、躺姿视线到门外 2–12 m，行刑处整个人都在视野里
+// 3. 01 防炮洞：交通壕弯角外侧的单口低矮洞室，躺姿从洞里看出去是一条东向走廊
+//    （杀俘位 8 m、岔口 J 15 m、折角 F 20 m），洞口塌土挡住 02 的还权位
 // ---------------------------------------------------------------------------
 {
   const blocks = Solids("BunkerCollapsed");
-  // 2026-09-20 演出打磨：屋子从 12 m 进深收到 7 m，前墙在 z=-128。
-  const doorZ = -128, band = [];
-  // 受困位到前门 4–5 m、到行刑处 ≤ 9 m（Notion 01「必须让玩家清楚看懂」）。
-  report.bunkerDepthM = +(Math.abs(S.bunker.z - doorZ)).toFixed(2);
   report.bunkerKillingM = +Distance(S.bunker, S.bunkerKilling).toFixed(2);
-  assert.ok(report.bunkerDepthM >= 1.5 && report.bunkerDepthM <= 3,
-    "the new wounded viewpoint is close to the wide dugout mouth");
-  assert.ok(report.bunkerKillingM <= 9,
-    `the killing ground reads at a glance: ${report.bunkerKillingM} m from the pinned spot`);
+  report.bunkerMouthM = +Distance(S.bunker, S.bunkerDoor).toFixed(2);
+  assert.ok(report.bunkerKillingM >= 6 && report.bunkerKillingM <= 9,
+    `the kill spot reads at a glance: ${report.bunkerKillingM} m from the pinned spot`);
+  assert.ok(report.bunkerMouthM >= 1.5 && report.bunkerMouthM <= 4, `a low dugout, the mouth is close: ${report.bunkerMouthM} m`);
+  // 洞是挖进地里的坑，不是房子：洞底比自然地面低 1.8 m 以上，顶板压在自然地面上。
+  const pit = Natural(S.bunker.x, S.bunker.z) - Ground(S.bunker.x, S.bunker.z);
+  assert.ok(pit >= 1.8, `the dugout floor is dug into the trench wall: ${pit.toFixed(2)} m below natural`);
+  const roof = Scenario.BunkerCollapsed.find((box) => box.id === "BunkerRoof");
+  assert.ok(roof && Math.abs(roof.x - S.bunker.x) < 1.5 && Math.abs(roof.z - S.bunker.z) < 1.5, "a timber roof covers the dugout");
+  // 躺姿三个眼高都看得见：杀俘位、岔口 J、折角 F（站着的人胸口 1.2）。
+  const band = [];
   for (const eyeH of [0.35, 0.42, 0.50]) {
     const eye = Eye(S.bunker, eyeH);
-    for (const [label, target] of [["killing", S.bunkerKilling], ["8m", { x: S.bunker.x, z: doorZ - 8 }],
-      ["12m", { x: S.bunker.x, z: doorZ - 12 }]]) {
-      // 看的是站着的人的胸口，不是脚底：门槛的碎砖本来就该挡掉一截地面。
-      const to = { x: target.x, z: target.z, y: Ground(target.x, target.z) + 1.2 };
-      const blocker = SightBlocker(eye, to, blocks);
+    for (const [label, target] of [["killing", S.bunkerKilling], ["junction", S.bunkerJunction], ["fold", S.bunkerFold]]) {
+      const blocker = SightBlocker(eye, { x: target.x, z: target.z, y: Ground(target.x, target.z) + 1.2 }, blocks);
       band.push({ eyeH, label, blocker });
-      assert.equal(blocker, null, `prone eye ${eyeH} cannot see ${label} outside the bunker door`);
+      assert.equal(blocker, null, `prone eye ${eyeH} cannot see ${label} from the dugout (blocked by ${blocker})`);
     }
   }
   report.bunkerSight = band;
-  // 「两名川军和两名日兵」的**全身**（膝到头顶）都不许被中隔墙裁掉。
-  // 脚底那一档（0.05）允许被门槛碎砖挡住 —— 那正是「门框与尘土遮住创口」的一部分，
-  // 但挡住它的只许是门口那一带，绝不能是中隔墙。
+  // 行刑的人（两名日兵落点、被拖到杀俘位的川军）全身都在视野里。
   report.bunkerFullBody = [];
   for (const eyeH of [0.35, 0.42, 0.50]) {
     const eye = Eye(S.bunker, eyeH);
-    for (const [label, point] of [["captive", OPENING_STORYBOARDS.positions.captive],
-      ["interpreter", OPENING_STORYBOARDS.positions.interpreter],
-      ["ijaA", OPENING_STORYBOARDS.positions.controller], ["ijaB", OPENING_STORYBOARDS.positions.guard]]) {
+    for (const [label, point] of [["comrade", P.bunker.captives[0]], ["ijaA", P.bunker.ijaKill[0]], ["ijaB", P.bunker.ijaKill[1]]]) {
       for (const h of [0.35, 0.9, 1.75]) {
         const blocker = SightBlocker(eye, { x: point.x, z: point.z, y: Ground(point.x, point.z) + h }, blocks);
-        assert.equal(blocker, null,
-          `prone eye ${eyeH} sees ${label} at ${h} m (blocked by ${blocker})`);
+        assert.equal(blocker, null, `prone eye ${eyeH} sees ${label} at ${h} m (blocked by ${blocker})`);
       }
-      const feet = SightBlocker(eye, { x: point.x, z: point.z, y: Ground(point.x, point.z) + 0.05 }, blocks);
-      assert.ok(!/Partition/.test(feet || ""), `the partition never crops ${label}`);
-      if (eyeH === 0.42) report.bunkerFullBody.push({ label, d: +Distance(S.bunker, point).toFixed(2), feet });
+      if (eyeH === 0.42) report.bunkerFullBody.push({ label, d: +Distance(S.bunker, point).toFixed(2) });
     }
   }
-  // 门框与碎砖必须真的遮住一部分（不然「破口」就是一扇敞开的门）。
+  // 单口：洞口朝东。向北、向南、向西看出去都是洞壁（坑壁地形或护壁），只有东向那条走廊开着。
   const eye = Eye(S.bunker, 0.42);
-  // 门框把视野切成一条缝：刺杀处正前方看得见，左右两侧被门垛与塌方堆挡住；
-  // 门框立柱本身再挡掉当中一条（行刑处 z=-131.9 这一档，缝是 x -42.59…-37.41，
-  // 立柱的射影落在 -38.80…-38.24）。
-  report.bunkerOcclusion = [-47, -34].map((x) => ({ x,
-    blocker: SightBlocker(eye, { x, z: S.bunkerKilling.z, y: Ground(x, S.bunkerKilling.z) + 1.2 }, blocks) }));
-  for (const row of report.bunkerOcclusion)
-    assert.ok(row.blocker, `the doorway must occlude x=${row.x} outside the bunker`);
-  // 步枪落在够不到的地方。
+  report.bunkerOcclusion = [["north", { x: S.bunker.x + 1, z: S.bunker.z - 8 }], ["south", { x: S.bunker.x + 1, z: S.bunker.z + 8 }],
+    ["west", { x: S.bunker.x - 8, z: S.bunker.z }], ["north-east off the trench", { x: S.bunkerKilling.x, z: S.bunkerKilling.z - 7 }]]
+    .map(([label, target]) => ({ label, blocker: SightBlocker(eye, { x: target.x, z: target.z, y: Ground(target.x, target.z) + 1.2 }, blocks) }));
+  for (const row of report.bunkerOcclusion) assert.ok(row.blocker, `the dugout walls must close the ${row.label} view`);
+  // 02 还权位：塌土挡住折角 F 与岔口 J 的直射。
+  for (const [label, target] of [["fold", S.bunkerFold], ["junction", S.bunkerJunction]])
+    assert.ok(SightBlocker(Eye(S.bunkerRear, 1.0), { ...target, y: Ground(target.x, target.z) + 1.5 }, blocks),
+      `the mouth spoil shields the return spot from the ${label}`);
+  const spoil = Scenario.BunkerCollapsed.find((box) => box.id === "BunkerMouthSpoil");
+  assert.ok(spoil && spoil.solid !== false, "the mouth spoil is a real collider");
+  // 步枪在够得着的地方（木架压住时够不着，是木架的事）。
   const reach = Distance(P.bunker.player, P.bunker.rifle);
   assert.ok(reach < 1.5, `the kicked rifle is within reach: ${reach.toFixed(2)} m`);
-  // 压手的木架是实心小块。
   for (const pin of P.bunker.pinnedFrame)
     assert.ok(Scenario.BunkerCollapsed.some((box) => box.solid !== false
       && Math.abs(box.x - pin.x) < 1 && Math.abs(box.z - pin.z) < 1), "pinning frame is a real solid");
-  // 何有田从后侧交通壕能打到门外刺杀处（绕过掩蔽部西墙）。
+  // 何有田从弯角内侧（塌低段后）能打到杀俘位；刘文财的远射位隔着弹坑唇看得见岔口 J。
   assert.equal(SightBlocker(Eye(P.bunker.heyoutianFire, 1.1),
     { ...S.bunkerKilling, y: Ground(S.bunkerKilling.x, S.bunkerKilling.z) + 1.2 }, blocks), null,
-  "He Youtian's rear-trench position can fire at the killing ground");
+  "He Youtian's position can fire at the kill spot");
+  assert.deepEqual(RouteClearance(P.bunker.rescueRoute, blocks), [],
+    "Luo and He come down from the rear corner past the mouth spoil to the kill spot");
+  assert.equal(SightBlocker(Eye(P.bunker.liuwencaiShot, 1.5),
+    { ...S.bunkerJunction, y: Ground(S.bunkerJunction.x, S.bunkerJunction.z) + 1.3 }, blocks), null,
+  "Liu Wencai's long shot reaches the junction J down the east-west leg");
   report.bunkerRifleReachM = +reach.toFixed(2);
-  console.log("ok dugout: prone full-body sightlines, occluded far flanks, kicked rifle reachable");
+  console.log("ok dugout: single east mouth, prone sightlines to kill spot/J/F, closed flanks, spoil shields the return spot");
 }
 
 // ---------------------------------------------------------------------------
