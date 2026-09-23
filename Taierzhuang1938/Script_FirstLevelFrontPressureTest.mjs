@@ -321,9 +321,11 @@ function MakeWorld(stage = "BunkerRescue") {
   p2.Update(); e2.get("RightNestGunner").alive = false; e2.get("RightEntryGuard").alive = false;
   r2.time = 1; p2.Update();
   const nestTo = FRONT_PRESSURE_PHASES[0].groups.nest.fallback.to;
-  Check(w2.defends.some(([id, x, z]) => id === "RightNestGuard" && x === nestTo.x && z === nestTo.z), "two nest casualties send the rest to the rear anchor");
-  Check(Math.hypot(nestTo.x - 27, nestTo.z + 142) - R.defendHoldRadiusM - R.defendCoverSlackM >= 7,
-    "the rear anchor keeps the fallen-back guards out of bayonet reach of the gun the player is taking");
+  Check(w2.defends.some(([id, x, z, , slack]) => id === "RightNestGuard" && x === nestTo.x && z === nestTo.z && slack === R.nestFallbackCoverSlackM),
+    "two nest casualties send the rest to the rear anchor, covers only right by it");
+  const anchorToGun = Math.hypot(nestTo.x - 27, nestTo.z + 142);
+  Check(anchorToGun - R.defendHoldRadiusM - R.nestFallbackCoverSlackM >= 7 && anchorToGun <= 14,
+    "the rear anchor keeps the fallen-back guards out of bayonet reach of the gun, but in rifle reach (all three must die for the capture)");
   Check(w2.barks.some(([, kind]) => kind === "fallback"));
   // A group that lost men before its first phase counts casualties from the men it went in with.
   {

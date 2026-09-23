@@ -86,11 +86,12 @@ export const FRONT_PRESSURE_GROUPS = Object.freeze({
 });
 
 /**
- * 阵位守卫的临时后撤锚点：往日军自己一侧（南）退，离机枪位约 17 m。朝向南/西南的掩体点归 Space 包。
- * 2026-09-24：原锚点 (31,−146) 离机枪位只有 5 m，守区半径 + 掩体余量 8 m 让退下来的人正好蹲在枪位旁
- *（实测 1.5 m），玩家上枪时被他贴身刺刀 —— 03→06 冷启动红在 04 上枪那一下。
+ * 阵位守卫的临时后撤锚点：往日军自己一侧（南）退到枪位身后约 11 m 的地方，掩体余量只给 nestFallbackCoverSlackM
+ *（2 m），离枪 7 m 以外（刺刀够不着上枪的人），又看得见、打得着（03 的 rightNestCaptured 要三名守卫都死）。
+ * 2026-09-24：原锚点 (31,−146) 离枪位 5 m、余量 6 m，退下来的人蹲在枪旁 1.5 m 贴身刺刀上枪的玩家；
+ * 挪到 17 m 外又打不着，rightNestCaptured 等不来。朝南 / 西南的掩体点归 Space 包。
  */
-const NEST_FALLBACK = Object.freeze({ casualties: 2, to: Object.freeze({ x: 31, z: -159 }) });
+const NEST_FALLBACK = Object.freeze({ casualties: 2, to: Object.freeze({ x: 31, z: -152.5 }) });
 const NEST = Object.freeze({ role: "nestGuard", fallback: NEST_FALLBACK });
 // 西侧两人去土坎西端外：先沿自己的跃进线到 −166 那条线，再沿线横移到西侧农田那一列掩体后面
 //（离左前枪位约 20 m：再近就会和老周贴脸，守军过口时也更难让出视线）。

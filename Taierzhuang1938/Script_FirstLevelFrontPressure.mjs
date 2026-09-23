@@ -429,7 +429,7 @@ export class FirstLevelFrontPressure {
     const r = this.r;
     for (const a of members) {
       if (!a.alive || a.weapon?.rpm) continue;
-      r.Defend(a, rule.to, R.defendHoldRadiusM, R.defendCoverSlackM);
+      r.Defend(a, rule.to, R.defendHoldRadiusM, R.nestFallbackCoverSlackM);
     }
     const speaker = this.Speaker(groupId, members.filter((a) => !a.weapon?.rpm));
     if (speaker) r.ai.Bark(speaker, "fallback");
