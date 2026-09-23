@@ -70,7 +70,7 @@
 
 - 项目离线生成的音乐、BGM、环境音、音效、对白与人声统一使用 Volcengine，禁止使用 Lovart。模型为 `seed-audio-1.0`；音乐参考 `Taierzhuang1938/Script_SeedAudioMusicBake.mjs`，对白和音效使用对应 SeedAudio baker。
 - 密钥只从 `VOLCENGINE_API_KEY` 环境变量读取，在运行时经 `X-Api-Key` 头发送到 `https://openspeech.bytedance.com/api/v3/tts/create`。密钥不得进入源码、提示词文件、输出、日志或 Git。
-- 连续对白范围整段放进同一 `text_prompt`，返回音频保留为一个 cue，不逐句生成后拼接。
+- 对白有两种格式，按子项目口径选：**逐句干声**（台儿庄第一关 01–06，2026-09-23 起）——每个开口角色先定一条定妆参考音，之后每句单独请求、带 `references` 参考音、提示词禁止环境声与音效，成品一句一条，由对白导演时间轴排轮替/重叠、运行时每句挂在说话人头上；**整段录音**（其余旧 cue）——连续对白整段放进同一 `text_prompt`，返回音频保留为一个 cue，不逐句生成后拼接。两种都不做「逐句生成再拼成一条」。细则见 `Taierzhuang1938/docs/Data_FirstLevelVoiceSync20260919.md`。
 - 子项目明确保留的 WebAudio 现场合成契约继续适用；不要把资产生成规则误读为必须替换现有运行时声音系统。
 
 ## 生成图片

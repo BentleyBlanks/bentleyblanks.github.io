@@ -1,121 +1,199 @@
-// 第一关 2026.09.19 台词配音门禁（纯 Node）。
+// 第一关台词配音门禁（纯 Node）。
 //
-//   node Taierzhuang1938/Script_FirstLevelVoiceTest.mjs            数据侧：契约对账 + 播放器
-//   node Taierzhuang1938/Script_FirstLevelVoiceTest.mjs --audio    再加录音资产与强制对齐的严格门
+//   node Taierzhuang1938/Script_FirstLevelVoiceTest.mjs            数据侧：原文对账、导演表、播放器
+//   node Taierzhuang1938/Script_FirstLevelVoiceTest.mjs --audio    再加录音资产（逐句干声指标 + 旧整段哈希/对齐）
 //
-// 这一份从 Script_FirstLevelMissionTest 里把配音那一段搬了过来并按新数据模型调整：
-// 对齐哈希绑定录音、逐句覆盖、区间单调、continuous/requests===1、speechRate、
-// scriptSha256、文件字节/哈希、promptHash、敌军自动口令川话清单。
-// 新增的是「跟契约与 Notion 原文逐字对账」和缺录音兜底。
+// 两种格式并存（docs/Data_FirstLevel0105Refactor20260923Contract.md §2.2 / §5）：
+//   · 逐句干声（perLine）：01–06。01–02 逐字对 09.23 新稿（「## 分镜参考」之前），03–05 对 09.22 稿，
+//     06 对 09.19 稿；每句一条干声、带定妆参考音、导演时间轴、多声部播放器。
+//   · 整段录音：07–18 与待 Opening 包下线的 09.21 旧 cue，旧断言原样保留。
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import crypto from "node:crypto";
 import {
   MISSION_DIALOGUE, MISSION_VOICE_CAST, MissionVoicePrompt, MissionVoiceSpoken,
-  MissionVoiceSubtitle, MissionVoiceScriptJson, MissionVoiceSoundscape,
+  MissionVoiceSubtitle, MissionVoiceScriptJson, MissionVoiceSoundscape, MissionLineId, MissionLineFile,
 } from "./Data_FirstLevelMissionDialogue.mjs";
 import { JAPANESE_SPEECH } from "./Data_FirstLevelJapaneseSpeech.mjs";
 import { MISSION_VOICE_ALIGNMENT } from "./Data_FirstLevelMissionVoiceAlignment.mjs";
 import { MissionVoiceTimeline } from "./Data_FirstLevelMissionVoiceTiming.mjs";
+import { FIRST_LEVEL_DIALOGUE_DIRECTION, PROJECTION_DB, DIALOGUE_DUCK, LineDirection } from "./Data_FirstLevelDialogueDirection.mjs";
+import { FIRST_LEVEL_VOICE_CAST, CastVoiceOwner } from "./Data_FirstLevelVoiceCast.mjs";
 import { FirstLevelMissionVoice } from "./Script_FirstLevelMissionVoice.mjs";
+import { DialoguePlayer } from "./Script_DialoguePlayer.mjs";
 import { MISSION_VOICE_FACTS } from "./Data_FirstLevelMissionGates.mjs";
 import { MISSION_STAGES } from "./Data_FirstLevelMission.mjs";
 import { MISSION_LEADER_STAGES, MISSION_GUIDE_TRANSFERS } from "./Data_FirstLevelLeaderGuide.mjs";
 
 const Read = (name) => fs.readFileSync(new URL(name, import.meta.url), "utf8");
 const contract = Read("./docs/Data_FirstLevelRebuild20260919Contract.md");
+const contract0923 = Read("./docs/Data_FirstLevel0105Refactor20260923Contract.md");
 const previousSource = Read("./docs/Data_FirstLevelRebuildSource20260919.md");
-const openingSource=Read("./docs/Data_FirstLevelOpeningSource20260921.md");
-const source=openingSource.slice(0,openingSource.indexOf("# 03｜"))+Read("./docs/Data_FirstLevelFrontSource20260922.md")+previousSource.slice(previousSource.indexOf("# 06｜"));
+const opening0921 = Read("./docs/Data_FirstLevelOpeningSource20260921.md");
+const opening0923 = Read("./docs/Data_FirstLevelOpeningSource20260923.md");
+const frontSource = Read("./docs/Data_FirstLevelFrontSource20260922.md");
 const story = MISSION_DIALOGUE.filter((cue) => !cue.guidance);
 const guide = MISSION_DIALOGUE.filter((cue) => cue.guidance);
+const perLine = MISSION_DIALOGUE.filter((cue) => cue.perLine);
 const byId = new Map(MISSION_DIALOGUE.map((cue) => [cue.id, cue]));
+// 09.21 旧稿里、契约 §5.2 已宣布下线、但旧导演还在 Say 的整段 cue。Opening 包接新导演后删掉；**只许变短**。
+const RETIRE_PENDING = ["BunkerKilling", "ShunziCurse", "RescueCall", "RescueLift", "RescueOut", "TrenchCurse", "CornerCheck"];
 
-// 1. id 唯一、文件名推导一致、说话人都在演员表里。
+// 1. id 唯一、文件名推导一致、说话人都在演员表里；逐句 cue 每句有契约格式的 id 与文件名。
 assert.equal(new Set(MISSION_DIALOGUE.map((cue) => cue.id)).size, MISSION_DIALOGUE.length, "cue id 去重");
 for (const cue of MISSION_DIALOGUE) {
   assert.ok(cue.lines.length > 0, cue.id + " 至少一句");
   assert.equal(cue.file, `AudioVoice_FirstLevel${cue.id}.mp3`, cue.id + " 文件名由 id 推导");
-  for (const line of cue.lines) assert.ok(MISSION_VOICE_CAST[line.who], cue.id + " 的说话人不在演员表：" + line.who);
+  cue.lines.forEach((line, index) => {
+    assert.ok(MISSION_VOICE_CAST[line.who], cue.id + " 的说话人不在演员表：" + line.who);
+    if (!cue.perLine) return;
+    assert.equal(line.id, MissionLineId(cue.id, index), cue.id + " 逐句 id 形如 <Scene>.<NN>");
+    assert.equal(line.id, `${cue.id}.${String(index + 1).padStart(2, "0")}`);
+    assert.equal(line.file, MissionLineFile(cue.id, index));
+    assert.equal(line.file, `Lines/AudioVoice_FirstLevel${cue.id}_${String(index + 1).padStart(2, "0")}.mp3`, line.id + " 文件名按契约 §5.2");
+    assert.ok(FIRST_LEVEL_VOICE_CAST[line.who], line.id + " 的说话人没有定妆条目：" + line.who);
+  });
 }
-console.log(`ok ${MISSION_DIALOGUE.length} cues（剧情 ${story.length} + 带路 ${guide.length}）id 唯一、演员齐全`);
+console.log(`ok ${MISSION_DIALOGUE.length} cues（剧情 ${story.length} + 带路 ${guide.length}；逐句 ${perLine.length} 场 ${perLine.reduce((n, c) => n + c.lines.length, 0)} 句）id 唯一、演员齐全`);
 
-// 2. 契约 §5 的 cue 清单与句数：一条不多、一条不少、句数一致。
+// 2a. 09.23 契约 §5.2：01–02 的 13 个场景、逐句说话人与句数。
+const table0923 = contract0923.slice(contract0923.indexOf("### 5.2"), contract0923.indexOf("### 5.3"));
+const scenes0923 = [...table0923.matchAll(/^\| `([A-Za-z]+)` \| (.+) \|$/gm)].map(([, id, body]) =>
+  [id, [...body.matchAll(/(?<!\d)(\d\d) ([a-zA-Z]+)\s/g)].map(([, n, who]) => [Number(n), who])]);
+assert.equal(scenes0923.length, 13, "契约 §5.2 解析出 13 个场景");
+for (const [id, rows] of scenes0923) {
+  const cue = byId.get(id);
+  assert.ok(cue?.perLine, `契约 §5.2 的场景 ${id} 必须是逐句格式`);
+  assert.deepEqual(rows.map(([n]) => n), rows.map((_, i) => i + 1), id + " 契约序号连续");
+  assert.deepEqual(cue.lines.map((line) => line.who), rows.map(([, who]) => who), id + " 逐句说话人与契约一致");
+}
+const retired = [...table0923.matchAll(/下线：(.+?)（/g)][0]?.[1] || "";
+const retiredIds = [...retired.matchAll(/`([A-Za-z]+)`/g)].map(([, id]) => id);
+assert.deepEqual([...retiredIds].sort(), [...RETIRE_PENDING].sort(), "待下线名单就是契约 §5.2 的下线清单（Opening 包接上新导演后一并删掉）");
+for (const id of RETIRE_PENDING) assert.ok(byId.has(id) && !byId.get(id).perLine, id + " 仍是旧整段 cue（旧导演还在用）");
+const ORDER0923 = scenes0923.map(([id]) => id);
+// 2b. 其余剧情 cue 对 09.19 契约 §5（01–02 的旧条目换成上面两张名单）。
 const contractSection = contract.slice(contract.indexOf("## 5. 对白 cue"), contract.indexOf("## 6. 分包与文件归属"));
-const contractCues = [...contractSection.matchAll(/`([A-Za-z]+)`\((\d+)[^)]*\)/g)].map(
-  ([, id, count]) => [id, Number(count)],
-);
-assert.ok(contractCues.length >= 60, "契约 §5 至少解析出 60 条 cue，实际 " + contractCues.length);
+const contractCues = [...contractSection.matchAll(/`([A-Za-z]+)`\((\d+)[^)]*\)/g)].map(([, id, count]) => [id, Number(count)])
+  .filter(([id]) => !ORDER0923.includes(id) && !RETIRE_PENDING.includes(id));
+assert.ok(contractCues.length >= 55, "契约 §5 至少解析出 55 条 03 以后的 cue，实际 " + contractCues.length);
 for (const [id, count] of contractCues) {
   const cue = byId.get(id);
   assert.ok(cue, "契约 §5 的 cue 不在台词表：" + id);
   assert.equal(cue.lines.length, count, id + " 句数应与契约一致");
 }
-assert.deepEqual(
-  story.map((cue) => cue.id).filter((id) => !contractCues.some(([name]) => name === id)),
-  [], "剧情 cue 不许多出契约之外的条目",
-);
-assert.equal(story.length, contractCues.length, "剧情 cue 总数与契约一致");
-console.log(`ok 契约 §5 的 ${contractCues.length} 条 cue 全部存在且句数一致`);
+const expectedStory = new Set([...ORDER0923, ...RETIRE_PENDING, ...contractCues.map(([id]) => id)]);
+assert.deepEqual(story.map((cue) => cue.id).filter((id) => !expectedStory.has(id)), [], "剧情 cue 不许多出契约之外的条目");
+assert.equal(story.length, expectedStory.size, "剧情 cue 总数与两份契约一致");
+// 01–06 全部逐句；07 以后全部整段。
+const ORDER0305 = ["FrontBlockade", "FrontApproach", "FrontAttack", "FrontWithdraw", "TakeOverGun", "TankRoadContact", "TankTerror",
+  "BundleOrder", "BundleGo", "BundleProne", "BundleSupply", "BundleReturnCall", "BundleAttack", "BundleRetreat", "TankStopped", "FrontRelief"];
+const ORDER06 = ["Volunteer", "BorrowLight", "ZhouLift"];
+assert.deepEqual(perLine.map((cue) => cue.id).sort(), [...new Set([...ORDER0923, ...ORDER0305, ...ORDER06])].sort(),
+  "01–06 的剧情 cue 全部是逐句格式，07 以后没有");
+console.log(`ok 契约对账：01–02 新 13 场、03 以后 ${contractCues.length} 条、待下线旧 cue ${RETIRE_PENDING.length} 条`);
 
-// 3. 台词与 Notion 转录逐字一致（含破折号、省略号）。
-// 转录里以 "> " 开头、带中文引号的行才是台词；单独一行的 "……" 是停顿不是台词。
-const transcript = [];
-for (const raw of source.split(/\r?\n/)) {
-  if (!raw.startsWith("> ")) continue;
-  const quoted = /“([^”]*)”(?:（([^）]*)）)?/.exec(raw);
-  if (!quoted) continue;
-  transcript.push({ text: quoted[1], translation: quoted[2] });
+// 3. 台词逐字对账。
+// 3a. 09.23 新稿：> **名字：**“中文” / > **名字：**「日语」 + > **中文：**“译文”；切到「## 分镜参考」为止。
+const NAME = { 顺子: "shunzi", 幺娃: "yaowa", 川军: "comrade", 传令兵: "runner", 罗班长: "luo", 洞外士兵: "shouter", 日兵甲: "ijaA",
+  日兵乙: "ijaB", 日兵丙: "ijaC", 日兵丁: "ijaD", 翻译: "interpreter", 守军: "guard" };
+const new0923 = [];
+for (const raw of opening0923.slice(0, opening0923.indexOf("## 分镜参考")).split(/\r?\n/)) {
+  const m = /^> \*\*(.+?)：\*\*(.*)$/.exec(raw);
+  if (!m) continue;
+  const name = m[1].replace(/（.*?）/g, ""), body = m[2].trim();
+  if (name === "中文") { const zh = /^“([^”]*)”$/.exec(body); assert.ok(zh && new0923.at(-1)?.lang === "ja", "「中文：」只跟在日语行后面"); new0923.at(-1).translation = zh[1]; continue; }
+  const ja = /^「([^」]*)」$/.exec(body), zh = /^“([^”]*)”$/.exec(body);
+  assert.ok(ja || zh, "09.23 新稿台词行格式：" + raw);
+  assert.ok(NAME[name], "09.23 新稿出现未登记的说话人：" + name);
+  new0923.push({ who: NAME[name], text: (ja || zh)[1], lang: ja ? "ja" : "zh" });
 }
-const authored = story.flatMap((cue) => cue.lines.map((line, index) => ({ cue, line, index })));
-assert.equal(authored.length, transcript.length,
-  `台词行数应与 Notion 转录一致（表里 ${authored.length}，转录 ${transcript.length}）`);
-authored.forEach(({ cue, line, index }, position) => {
-  const entry = transcript[position];
-  const where = `${cue.id}[${index}]`;
-  if (line.lang === "ja") {
-    const japanese = JAPANESE_SPEECH[`${cue.id}:${index}`];
-    assert.ok(japanese, where + " 日语行缺少假名/汉字写法");
-    assert.equal(entry.text, japanese.kanji, where + " 日语汉字写法与转录不一致");
-    assert.equal(line.text, entry.translation, where + " 字幕应是转录括号里的中文译文");
-    assert.equal(MissionVoiceSpoken(cue, index), japanese.kana, where + " 送 TTS 的应是纯假名");
-    assert.ok(!/[一-鿿]/.test(japanese.kana), where + " 假名里不许残留汉字");
+const authored0923 = ORDER0923.flatMap((id) => byId.get(id).lines.map((line, index) => ({ cue: byId.get(id), line, index })));
+assert.equal(authored0923.length, new0923.length, `01–02 台词句数与 09.23 新稿一致（表 ${authored0923.length}，稿 ${new0923.length}）`);
+let japanese = 0;
+authored0923.forEach(({ cue, line, index }, i) => {
+  const entry = new0923[i], where = line.id;
+  assert.equal(line.who, entry.who, where + " 说话人与新稿一致");
+  assert.equal(line.lang || "zh", entry.lang, where + " 语言与新稿一致");
+  if (entry.lang === "ja") {
+    japanese++;
+    const speech = JAPANESE_SPEECH[line.id];
+    assert.ok(speech, where + " 日语行缺少假名/汉字写法");
+    assert.equal(speech.kanji, entry.text, where + " 日语汉字写法与新稿一致");
+    assert.equal(line.text, entry.translation, where + " 字幕是新稿「中文：」那一行");
+    assert.equal(MissionVoiceSpoken(cue, index), speech.kana, where + " 送 TTS 的是纯假名");
+    assert.ok(!/[一-鿿]/.test(speech.kana), where + " 假名里不许残留汉字");
   } else {
-    assert.equal(line.text, entry.text, where + " 台词与 Notion 转录逐字不一致");
+    assert.equal(line.text, entry.text, where + " 台词与新稿逐字一致");
     assert.equal(MissionVoiceSpoken(cue, index), line.text, where + " 中文行送 TTS 的就是原文");
   }
   assert.equal(MissionVoiceSubtitle(cue, index), line.text, where + " 字幕默认取 line.text");
 });
-const japaneseLines = authored.filter(({ line }) => line.lang === "ja");
-assert.equal(japaneseLines.length, Object.keys(JAPANESE_SPEECH).length, "假名侧表与日语行一一对应");
-console.log(`ok ${authored.length} 句台词与 Notion 转录逐字一致（其中 ${japaneseLines.length} 句日语走假名 + 中文字幕）`);
+assert.equal(japanese, 18, "01–02 新稿日语 18 句");
+// 3b. 03–05 对 09.22 稿、06 以后对 09.19 稿（旧口径：带中文引号的 > 行）。
+const Quoted = (text) => text.split(/\r?\n/).filter((raw) => raw.startsWith("> ")).map((raw) => /“([^”]*)”(?:（([^）]*)）)?/.exec(raw))
+  .filter(Boolean).map((m) => ({ text: m[1], translation: m[2] }));
+const rest = [...Quoted(frontSource), ...Quoted(previousSource.slice(previousSource.indexOf("# 06｜")))];
+const restAuthored = story.filter((cue) => !ORDER0923.includes(cue.id) && !RETIRE_PENDING.includes(cue.id))
+  .flatMap((cue) => cue.lines.map((line, index) => ({ cue, line, index })));
+assert.equal(restAuthored.length, rest.length, `03 以后台词句数与原文一致（表 ${restAuthored.length}，原文 ${rest.length}）`);
+restAuthored.forEach(({ cue, line, index }, i) => {
+  assert.equal(line.text, rest[i].text, `${cue.id}[${index}] 台词与原文逐字不一致`);
+  assert.equal(MissionVoiceSpoken(cue, index), line.text);
+});
+// 3c. 待下线的 09.21 旧 cue：每条都是 09.21 稿里连续的一段。
+const old0921 = Quoted(opening0921.slice(0, opening0921.indexOf("# 03｜")));
+for (const id of RETIRE_PENDING) {
+  const cue = byId.get(id);
+  const texts = cue.lines.map((line, index) => line.lang === "ja" ? JAPANESE_SPEECH[`${id}:${index}`]?.kanji : line.text);
+  const start = old0921.findIndex((entry, i) => texts.every((text, k) => old0921[i + k]?.text === text));
+  assert.ok(start >= 0, id + " 是 09.21 稿里连续的一段");
+  cue.lines.forEach((line, index) => { if (line.lang === "ja") assert.equal(line.text, old0921[start + index].translation, `${id}[${index}] 字幕是译文`); });
+}
+const legacyJa = RETIRE_PENDING.flatMap((id) => byId.get(id).lines.map((line, index) => line.lang === "ja" ? `${id}:${index}` : null)).filter(Boolean);
+assert.deepEqual(Object.keys(JAPANESE_SPEECH).sort(), [...authored0923.filter(({ line }) => line.lang === "ja").map(({ line }) => line.id), ...legacyJa].sort(),
+  "假名侧表与日语行一一对应");
+console.log(`ok 台词逐字对账：01–02 ${authored0923.length} 句（日语 ${japanese}）、03 以后 ${restAuthored.length} 句、旧 cue ${RETIRE_PENDING.length} 条`);
 
 // 4. 假名不许出现在会被界面字表扫到的台词表里。
 const dialogueSource = Read("./Data_FirstLevelMissionDialogue.mjs");
-assert.ok(!/[぀-ヿ]/.test(dialogueSource),
-  "假名只能待在 Data_FirstLevelJapaneseSpeech.mjs（Font/Script_FontChars 会扫台词表）");
+assert.ok(!/[぀-ヿ]/.test(dialogueSource), "假名只能待在 Data_FirstLevelJapaneseSpeech.mjs（Font/Script_FontChars 会扫台词表）");
 const fontChars = Read("./Font/Script_FontChars.mjs");
 assert.ok(!fontChars.includes("Data_FirstLevelJapaneseSpeech"), "假名侧表不许登记进 UI 字表");
+assert.ok(!fontChars.includes("Data_FirstLevelVoiceCast") && !fontChars.includes("Data_FirstLevelDialogueDirection"),
+  "定妆表与导演表是提示词数据，不进 UI 字表");
 console.log("ok 假名留在侧表，界面字表不受影响");
 
-// 5. 提示词：每句真正念的内容都在里面，单次请求、长度不超限。
+// 5. 提示词。整段：逐句覆盖、单次请求、要环境声（旧口径）。逐句：干声、带参考、只念这一句。
+const { LinePrompt } = await import("./Script_SeedAudioFirstLevelBake.mjs");
 for (const cue of MISSION_DIALOGUE) {
+  if (cue.perLine) {
+    cue.lines.forEach((line, index) => {
+      const prompt = LinePrompt(cue, index);
+      assert.ok(prompt.length <= 3000, line.id + " 提示词超过 3000 字符");
+      assert.ok(prompt.includes(`“${MissionVoiceSpoken(cue, index)}”`), line.id + " 提示词里有这句要念的原文");
+      assert.ok(prompt.includes("@音频1"), line.id + " 提示词引用定妆参考音");
+      assert.ok(prompt.includes("没有任何环境声") && !prompt.includes("环境声必须录进"), line.id + " 逐句干声禁止烘环境声");
+      if (line.lang !== "ja" && FIRST_LEVEL_VOICE_CAST[line.who].lang === "zh") assert.ok(prompt.includes("四川话"), line.id + " 川军说四川话");
+      if (FIRST_LEVEL_VOICE_CAST[line.who].lang === "zh-north") assert.ok(prompt.includes("北方"), line.id + " 翻译是北方口音");
+      if (line.lang === "ja") assert.ok(prompt.includes("只说给出的日语"), line.id + " 日语行口径");
+    });
+    continue;
+  }
   const prompt = MissionVoicePrompt(cue);
   assert.ok(prompt.length <= 3000, cue.id + " 提示词超过 3000 字符");
-  cue.lines.forEach((line, index) =>
-    assert.ok(prompt.includes(MissionVoiceSpoken(cue, index)), cue.id + " 提示词缺少第 " + index + " 句"));
+  cue.lines.forEach((line, index) => assert.ok(prompt.includes(MissionVoiceSpoken(cue, index)), cue.id + " 提示词缺少第 " + index + " 句"));
   assert.ok(prompt.includes("四川"), cue.id + " 提示词要写明四川话表演");
-  if (cue.lines.some((line) => line.lang === "ja"))
-    assert.ok(prompt.includes("日军角色只念稿中给出的日语"), cue.id + " 混合语言段要交代日语口径");
+  if (cue.lines.some((line) => line.lang === "ja")) assert.ok(prompt.includes("日军角色只念稿中给出的日语"), cue.id + " 混合语言段要交代日语口径");
 }
-console.log("ok 提示词逐句覆盖、单条不超 3000 字符");
+console.log("ok 提示词：整段逐句覆盖；逐句干声带参考音、禁环境声、只念一句");
 
-// 6. 环境声：剧情 cue 各有归属，带路短命令统一落默认那条。
+// 6. 环境声分区只管整段录音；带路短命令统一落默认那条。
 const fallback = MissionVoiceSoundscape("GuideFollow");
 for (const cue of guide) assert.equal(MissionVoiceSoundscape(cue.id), fallback, cue.id + " 带路命令用默认环境声");
-for (const cue of story)
+for (const cue of story.filter((c) => !c.perLine))
   assert.ok(cue.soundscape || MissionVoiceSoundscape(cue.id) !== fallback, cue.id + " 缺少分区环境声");
-console.log("ok 环境声按新 cue 分区，带路命令不受影响");
+console.log("ok 整段录音的环境声分区不变");
 
 // 7. 带路短命令按契约增删。
 const guideLine = /下线 (.+?)；新增 (.+?)；其余沿用/.exec(contractSection.replace(/\n/g, ""));
@@ -130,8 +208,7 @@ for (const cue of guide) {
 }
 console.log(`ok 带路短命令按契约重排：下线 ${Ids(guideLine[1]).length} 条、新增 ${Ids(guideLine[2]).length} 条`);
 
-// 8. MISSION_VOICE_FACTS：直接对运行时那张表，不再对契约正文的清单。
-//    契约列出的每一对都必须在表里；表可以多，但多出来的那一条要说得出理由。
+// 8. MISSION_VOICE_FACTS 对 09.19 契约的映射清单。
 const factPairs = [...contractSection.matchAll(/`([A-Za-z]+)→([A-Za-z]+)`/g)].map(([, cue, fact]) => [cue, fact]);
 assert.ok(factPairs.length >= 20, "契约 §5 的播完记事实清单可解析，实际 " + factPairs.length);
 for (const [cue, fact] of factPairs) {
@@ -139,178 +216,280 @@ for (const [cue, fact] of factPairs) {
   assert.equal(MISSION_VOICE_FACTS[cue], fact, `${cue} 播完应记 ${fact}`);
 }
 for (const cue of Object.keys(MISSION_VOICE_FACTS)) assert.ok(byId.has(cue), "编排表引用了不存在的 cue：" + cue);
-// 运行时比契约多的那一条：06 老周上担架（ZhouLift→zhouOnLitter）本来就写在 §2 的
-// requirements 里，只是 §5 的映射清单漏列。
-assert.deepEqual(
-  Object.keys(MISSION_VOICE_FACTS).filter((cue) => !factPairs.some(([id]) => id === cue)),
+assert.deepEqual(Object.keys(MISSION_VOICE_FACTS).filter((cue) => !factPairs.some(([id]) => id === cue)),
   ["ZhouLift"], "编排表比契约多出来的「播完记事实」只有 ZhouLift 这一条");
 console.log(`ok MISSION_VOICE_FACTS 的 ${Object.keys(MISSION_VOICE_FACTS).length} 条与契约逐条对上`);
 
 // 8b. 运行时源码里引用的每一个 cue id 都必须在台词表里。
-//     Enqueue 对未知 cue 只警告不抛异常（有意如此），所以改表改漏不会在运行时炸，
-//     只会变成「那句话再也不响了」—— 那就得在这里红。
 {
   const RUNTIME_SOURCES = [
     "./Script_FirstLevelMissionRuntime.mjs", "./Script_FirstLevelOpening.mjs",
     "./Script_FirstLevelLeaderGuide.mjs", "./Data_FirstLevelLeaderGuide.mjs",
     "./Data_FirstLevelMission.mjs", "./Data_FirstLevelMissionGates.mjs",
-    // 第二波玩法包：运行时只留薄钩子，08–14 的 Say 在这两个模块里。
     "./Script_FirstLevelVillageBlock.mjs", "./Script_FirstLevelTransferCart.mjs",
-    // 第二波把演出搬进各玩法包的新模块，运行时只留薄钩子 —— 扫描范围跟着走，
-    // 否则「哪条 cue 已经有触发点了」会静默地对不上（契约 §8 的分包约定）。
     "./Script_FirstLevelQuietMarch.mjs", "./Script_FirstLevelReception.mjs",
     "./Script_FirstLevelBridge.mjs", "./Script_FirstLevelNightGate.mjs",
-    // 第二波 Front 包（公开阶段 1–7）：01/02 的门外演出与 03–07 的对白落点。
     "./Script_OpeningStoryboards.mjs", "./Script_FirstLevelCollection.mjs",
     "./Script_FirstLevelFrontShow.mjs", "./Script_FirstLevelFrontBattle.mjs",
   ];
   const referenced = new Map();
   for (const name of RUNTIME_SOURCES) {
+    if (!fs.existsSync(new URL(name, import.meta.url))) continue;
     const text = Read(name);
-    // Say("X") / Enqueue("X") / Replay("X") / Cancel(["X","Y"]) / voice.played.has("X")
-    for (const [, id] of text.matchAll(/\b(?:Say|Enqueue|Replay|Guidance)\(\s*["']([A-Za-z][A-Za-z0-9]*)["']/g))
+    for (const [, id] of text.matchAll(/\b(?:Say|Enqueue|Replay|Guidance|PlayScene)\(\s*["']([A-Za-z][A-Za-z0-9]*)["']/g))
       referenced.set(id, name);
+    for (const [, id] of text.matchAll(/\bPlayLine\(\s*["']([A-Za-z][A-Za-z0-9]*)\.\d\d["']/g)) referenced.set(id, name);
     for (const [, list] of text.matchAll(/\bCancel\(\s*\[([^\]]*)\]/g))
       for (const [, id] of list.matchAll(/["']([A-Za-z][A-Za-z0-9]*)["']/g)) referenced.set(id, name);
     for (const [, id] of text.matchAll(/voice\.(?:played|finished)\.has\(\s*["']([A-Za-z][A-Za-z0-9]*)["']/g))
       referenced.set(id, name);
   }
-  // MISSION_STAGES 的每一步 cue 与带路编排里的 cue（数据，不是字面量）。
   for (const stage of MISSION_STAGES) if (stage.cue) referenced.set(stage.cue, "MISSION_STAGES");
   for (const spec of [...Object.values(MISSION_LEADER_STAGES), ...Object.values(MISSION_GUIDE_TRANSFERS)])
     referenced.set(spec.cue, "MISSION_LEADER_STAGES");
   assert.ok(referenced.size >= 40, "静态扫描至少应找到 40 个 cue 引用，实际 " + referenced.size);
   const missing = [...referenced].filter(([id]) => !byId.has(id));
   assert.deepEqual(missing, [], "运行时引用了台词表里没有的 cue：" + JSON.stringify(missing));
-  // 反过来：已经烘好、但运行时还没有触发点的剧情 cue。第二波玩法包一条条接上，
-  // 接完这张表就空了。**只许变短**：出现表外的新条目说明又有一段演出被摘掉了。
-  // 2026.09.20 End 包（阶段 15–18）接完了自己那七条：CartAbandon / RoadBump /
-  // HandsShake / WardGuide / PlaceLitter / NextLitter / NorthGate。名单只许变短。
+  // 09.23 新场景的触发点由第二波 Opening 包（新 01–02 导演）接上。**只许变短**。
   const SECOND_WAVE_UNWIRED = new Set([
-    // 08/09 的 KitchenDetour / MeleeCurse / WindowOrder 已由第二波 Mid 包接上触发点
-    //（Script_FirstLevelVillageBlock），2026-09-20 从这张名单里划掉。
-    // 15–18 的七条已由第二波 End 包接上触发点，2026-09-20 同日划掉。
-    // Front 包（阶段 1–7）名下的四条已在第二波接上触发点，从这张表里删了：
-    // RescueOut / TrenchCurse（02）、BundleProne / BundleReturnCall（05）。
+    "BunkerOrders", "BunkerIncoming", "CaptiveDragged", "CaptiveInterrogation", "CaptiveTaunt", "ShunziFound",
+    "RescueInterrogation", "RescueFlee", "RescueCheck", "CollectionMeet",
   ]);
   const unwired = story.map((cue) => cue.id).filter((id) => !referenced.has(id));
   for (const id of unwired) assert.ok(SECOND_WAVE_UNWIRED.has(id), "这条剧情 cue 没有任何触发点：" + id);
-  console.log(`ok 运行时 ${referenced.size} 处 cue 引用全部落在台词表里（还有 ${unwired.length} 条等第二波接触发点）`);
+  console.log(`ok 运行时 ${referenced.size} 处 cue 引用全部落在台词表里（还有 ${unwired.length} 场等 Opening 包接触发点）`);
 }
 
-// 9. 具名事件：玩法包按名字接动作。
-const Events = (id, seconds) => {
-  const cue = byId.get(id);
-  return (MissionVoiceTimeline(cue, seconds).segments[0].events || []).map((event) => event.id);
-};
-assert.ok(Events("BunkerBanter", 20).includes("BunkerBlast"), "BunkerBanter 末句要打 BunkerBlast");
-assert.ok(!Events("RescueLift", 12).includes("RescueHeave"), "新版近身反扑不触发旧掀木架事件");
-assert.ok(Events("AircraftReturn", 8).includes("AircraftDiveOrder"), "AircraftReturn 要沿用 AircraftDiveOrder");
-assert.deepEqual(Events("BorrowLight", 40),
-  ["BorrowLightMatchesPocketed", "BorrowLightCigaretteOffered"], "借火的两处动作空当各有事件");
-assert.ok(Events("ZhouDeath", 30).includes("ZhouNoAnswer"), "ZhouDeath 的「……」要有事件");
+// 9. 导演表：每个逐句场景都有、每句都有、字段合法；具名事件齐全。
 {
-  const cue = byId.get("BunkerBanter"), plan = MissionVoiceTimeline(cue, 20);
-  const blast = plan.segments[0].events.find((event) => event.id === "BunkerBlast");
-  assert.equal(blast.at, plan.lines.at(-1)[1], "BunkerBlast 打在末句结束的那一刻");
-}
-for (const cue of MISSION_DIALOGUE) {
-  const plan = MissionVoiceTimeline(cue, Math.max(2, cue.lines.length * 2));
-  assert.equal(plan.segments.length, 1, cue.id + " 一条录音只有一个区间，不许拆段");
-  assert.equal(plan.lines.length, cue.lines.length, cue.id + " 每句一个区间");
-}
-console.log("ok 具名事件齐全，整段录音不拆段");
-{
-  const cue=byId.get("ShunziCurse"),plan=MissionVoiceTimeline(cue,12.5);
-  assert.equal(plan.segments.length,1);
-  assert.equal(plan.segments[0].start,plan.lines[0][0]-.35,
-    "discovery enters the intact Japanese take just before speech, not seven seconds of leading effects");
-  assert.equal(plan.lines[0][0],MISSION_VOICE_ALIGNMENT.ShunziCurse.lines[0][0],
-    "speech keeps original source-relative timestamps after the entry offset");
+  const AFTER = /^(prev|start|gate|event:[A-Za-z]+)$/;
+  for (const cue of MISSION_DIALOGUE) {
+    const scene = FIRST_LEVEL_DIALOGUE_DIRECTION[cue.id];
+    if (!cue.perLine) { assert.ok(!scene, cue.id + " 整段录音不进逐句导演表"); continue; }
+    assert.ok(scene, cue.id + " 缺导演时间轴");
+    assert.deepEqual(Object.keys(scene.lines).sort(), cue.lines.map((_, i) => String(i + 1).padStart(2, "0")), cue.id + " 导演表逐句覆盖");
+    cue.lines.forEach((line, index) => {
+      const d = LineDirection(cue, index);
+      assert.match(d.after, AFTER, line.id + " after 合法");
+      assert.ok(Number.isFinite(d.offsetS) && d.offsetS >= -1.2 && d.offsetS <= 4, line.id + " offsetS 在 −1.2–4 s");
+      assert.ok(PROJECTION_DB[d.projection] != null, line.id + " projection 合法");
+      assert.ok(d.intensity >= 0 && d.intensity <= 1, line.id + " intensity 0–1");
+      assert.ok(["self", "head", "offscreen"].includes(d.spatial), line.id + " spatial 合法");
+      if (line.who === "shunzi") assert.equal(d.spatial, "self", line.id + " 顺子是第一人称");
+      if (index === 0) assert.ok(d.after !== "prev", line.id + " 第一句不能等上一句");
+    });
+  }
+  for (const id of Object.keys(FIRST_LEVEL_DIALOGUE_DIRECTION)) assert.ok(byId.get(id)?.perLine, "导演表里有不存在或非逐句的场景：" + id);
+  const Emits = (id) => Object.values(FIRST_LEVEL_DIALOGUE_DIRECTION[id].lines).flatMap((d) => [...(d.emit || []).map((e) => e.id), d.cutEvent].filter(Boolean));
+  assert.deepEqual(Emits("BunkerIncoming"), ["BunkerBlast"], "「炮弹！趴下——！」被爆炸截断的那一刻发 BunkerBlast");
+  assert.ok(LineDirection(byId.get("BunkerIncoming"), 0).cutAtS < 0, "截断点在句尾之前");
+  assert.deepEqual(Emits("BorrowLight"), ["BorrowLightMatchesPocketed", "BorrowLightCigaretteOffered"], "借火两处动作空当各有事件");
+  assert.ok(LineDirection(byId.get("BorrowLight"), 5).offsetS >= 1.8 && LineDirection(byId.get("BorrowLight"), 6).offsetS >= 2.8, "借火两处空当约 2 s 与 3 s");
+  assert.ok(LineDirection(byId.get("BunkerSearch"), 1).offsetS < 0, "日兵丁压住丙的尾音（重叠）");
+  assert.ok(LineDirection(byId.get("CaptiveInterrogation"), 5).offsetS < 0, "日兵乙压着翻译的话骂进来（重叠）");
+  assert.equal(LineDirection(byId.get("CaptiveTaunt"), 0).after, "event:ThroatCut", "割喉后才嘲弄");
+  assert.equal(LineDirection(byId.get("RescueInterrogation"), 5).after, "gate", "「说话！」等导演");
+  // 旧整段 cue 的事件照旧（07 以后与待下线的旧 cue）。
+  const Events = (id, seconds) => (MissionVoiceTimeline(byId.get(id), seconds).segments[0].events || []).map((event) => event.id);
+  assert.ok(Events("AircraftReturn", 8).includes("AircraftDiveOrder"), "AircraftReturn 要沿用 AircraftDiveOrder");
+  assert.ok(Events("ZhouDeath", 30).includes("ZhouNoAnswer"), "ZhouDeath 的「……」要有事件");
+  for (const cue of MISSION_DIALOGUE.filter((c) => !c.perLine)) {
+    const plan = MissionVoiceTimeline(cue, Math.max(2, cue.lines.length * 2));
+    assert.equal(plan.segments.length, 1, cue.id + " 一条录音只有一个区间，不许拆段");
+    assert.equal(plan.lines.length, cue.lines.length, cue.id + " 每句一个区间");
+  }
+  console.log("ok 导演表逐句覆盖、字段合法；截断/重叠/等事件/等 gate 各有实例；整段录音不拆段");
 }
 
-// Speaker routing changes perspective without restarting a continuous take.
-{
-  const routes=[],plays=[];
-  const audio={
-    PlayStoryVoice(key,options){const voice={key};this.storyVoice=voice;plays.push({key,options,voice});return {voice};},
-    StopStoryVoice(){this.storyVoice=null;},
-    SetStoryVoiceSpeaker(voice,options){routes.push({voice,...options});},
+// 10. 多声部播放器（假音频引擎：只记账）。
+const FakeAudio = () => {
+  const audio = {
+    plays: [], stops: [], moves: [], duck: [], voiceBank: new Map(), t: 0,
+    PlayDialogueLine(key, opts) { const voice = { key, ...opts, t: audio.t }; audio.plays.push(voice); return voice; },
+    MoveVoice(voice, at) { audio.moves.push({ key: voice.key, at }); },
+    StopVoice(voice) { audio.stops.push(voice.key); return true; },
+    SetDialogueDuck(active, duck) { audio.duck.push({ active, at: audio.t, ...duck }); audio.dialogueYield = active; },
+    PlayStoryVoice() { throw new Error("逐句场景不许走整段单槽"); }, StopStoryVoice() {},
   };
-  const voice=new FirstLevelMissionVoice({audio,hud:{Say(){}},Position:()=>({x:8,y:1.6,z:0})});
-  voice.manifest={cues:{BunkerBanter:{seconds:24.2}}};
-  voice.Enqueue("BunkerBanter");
-  for(let i=0;i<1400;i++)voice.Update(1/60);
-  assert.equal(plays.length,1,"speaker changes must not split or restart the whole take");
-  assert.ok(plays[0].options.dialogue,"whole takes opt into switchable dialogue routes");
-  assert.ok(routes.some(row=>row.who==="shunzi"&&row.firstPerson),"own lines use the first-person route");
-  assert.ok(routes.some(row=>row.who==="runner"&&!row.firstPerson),"the runner remains a world source");
-  assert.ok(routes.every(row=>row.voice===plays[0].voice),"every speaker uses the same source handle");
-  const gap={cue:byId.get("RescueCall"),plan:MissionVoiceTimeline(byId.get("RescueCall"),10.8),sourceTime:8.5};
-  assert.equal(voice.Speaker(gap).who,"shunzi","a pause after the player's line must not move the take back to its first speaker");
-  console.log("ok whole-cue speaker routing preserves source and first-person ownership");
-}
-
-// 10. 播放器：缺录音照走字幕与事件、未知 cue 不抛异常。
+  return audio;
+};
 {
-  const events = [], lines = [], said = [], done = [], warnings = [];
+  // 10a. 一场有录音的对白：每句一个声源、各挂各的头、顺子居中、日兵丁压丙的尾音、侧链与让路。
+  const audio = FakeAudio(), rows = [], events = [];
+  for (const [i, s] of [[1, 1.3], [2, 1.0]]) audio.voiceBank.set(`MissionBunkerSearch_0${i}`, { duration: s, speechEnvelope: null });
+  const voice = new FirstLevelMissionVoice({ audio, hud: { SayLines: (r) => rows.push(r.map((x) => x.text)), Say() {} },
+    Event: (id, cue, detail) => events.push({ id, cue, ...detail }), Clock: () => audio.t });
+  voice.manifest = { cues: {}, lines: { "BunkerSearch.01": { sha256: "a", seconds: 1.3 }, "BunkerSearch.02": { sha256: "b", seconds: 1.0 } } };
+  const heads = { ijaC: { x: 10, y: 1.6, z: 0 }, ijaD: { x: 14, y: 1.6, z: 3 } };
+  const handle = voice.PlayScene("BunkerSearch", { speakers: heads });
+  const Step = (seconds) => { for (let i = 0; i < Math.round(seconds * 60); i++) { audio.t += 1 / 60; voice.Update(1 / 60); } };
+  Step(0.05);
+  assert.deepEqual(audio.plays.map((p) => p.key), ["MissionBunkerSearch_01"], "第一句单独起播");
+  assert.deepEqual(audio.plays[0].position, heads.ijaC, "丙的声音挂在丙头上");
+  assert.ok(audio.duck.at(-1).active && audio.dialogueYield, "开口即侧链压低、自主喊话让路");
+  assert.equal(audio.duck.at(-1).ambienceDb, DIALOGUE_DUCK.ambienceDb);
+  Step(1.1);
+  assert.equal(audio.plays.length, 2, "丁在丙说完前 0.3 s 开口（重叠）");
+  assert.deepEqual(audio.plays[1].position, heads.ijaD, "丁的声音挂在丁头上，不跟着丙跳");
+  assert.ok(handle.playing.length === 2, "两句同时在响");
+  assert.ok(rows.some((r) => r.length === 2), "重叠时两行字幕同时在");
+  assert.deepEqual(events.filter((e) => e.id === "Line").map((e) => e.lineId), ["BunkerSearch.01", "BunkerSearch.02"]);
+  Step(0.95);
+  assert.ok(handle.done && voice.finished.has("BunkerSearch"), "场景走完记 Done");
+  assert.ok(audio.duck.at(-1).active, "句间与句尾 holdS 内不放");
+  Step(DIALOGUE_DUCK.holdS + 0.1);
+  assert.equal(audio.duck.at(-1).active, false, "说完 holdS 后侧链放回、喊话恢复");
+  console.log("ok 多声部：每句独立声源挂各自头上、可重叠、逐句字幕、侧链与喊话让路");
+}
+{
+  // 10b. 截断事件、等事件、等 gate、顺子第一人称、暂停续播偏移、Skip。
+  const audio = FakeAudio(), events = [];
+  const player = new DialoguePlayer({ audio, Event: (id, scene, detail) => events.push(id), Clock: () => audio.t });
+  const L = (id, who, duration, direction) => ({ id, index: Number(id.slice(-2)) - 1, who, key: "K" + id, duration, speaker: who, text: id, direction });
+  const scene = { id: "T", priority: true, lines: [
+    L("T.01", "shunzi", 1, { after: "start", offsetS: 0, spatial: "self" }),
+    L("T.02", "shouter", 2, { after: "prev", offsetS: 0.2, spatial: "offscreen", cutAtS: -0.5, cutEvent: "Boom" }),
+    L("T.03", "ijaA", 1, { after: "event:Cut", offsetS: 0.5, spatial: "head" }),
+    L("T.04", "ijaB", 1, { after: "gate", offsetS: 0, spatial: "head" }),
+  ] };
+  let gateOpen = false;
+  const handle = player.Play(scene, { speakers: { ijaA: () => ({ x: 1, y: 1.5, z: 1 }), ijaB: { position: { x: 2, y: 0, z: 2 } } }, gate: () => gateOpen });
+  const Step = (seconds) => { for (let i = 0; i < Math.round(seconds * 60); i++) { audio.t += 1 / 60; player.Update(1 / 60); } };
+  Step(0.02);
+  assert.equal(audio.plays[0].firstPerson, true, "顺子走第一人称居中干声");
+  assert.equal(audio.plays[0].position, null);
+  Step(1.3);
+  assert.equal(audio.plays[1].key, "KT.02");
+  assert.ok(audio.plays[1].volume < 1 && audio.plays[1].position == null, "视线外解析不到位置的人：非定位 + 降电平");
+  handle.Pause(); const paused = handle.lines[1].t; Step(3);
+  assert.equal(handle.lines[1].t, paused, "暂停不推进句内时间");
+  handle.Resume();
+  assert.ok(Math.abs(audio.plays.at(-1).offset - paused) < 1e-9, "续播从保留的源偏移接上");
+  Step(1.6);
+  assert.ok(events.includes("Boom"), "截断点到了发 cutEvent");
+  assert.equal(handle.lines[1].reason, "cut");
+  Step(2);
+  assert.equal(handle.lines[2].state, "pending", "等事件的句子不会自己开口");
+  handle.Signal("Cut"); Step(0.4);
+  assert.equal(handle.lines[2].state, "pending", "事件后还要等 offsetS");
+  Step(0.2);
+  assert.equal(handle.lines[2].state, "playing");
+  assert.deepEqual(audio.plays.at(-1).position, { x: 1, y: 1.5, z: 1 }, "说话人可以是返回坐标的函数");
+  Step(1.2);
+  assert.equal(handle.lines[3].state, "pending", "gate 关着就等");
+  gateOpen = true; Step(0.05);
+  assert.equal(handle.lines[3].state, "playing");
+  assert.deepEqual(audio.plays.at(-1).position, { x: 2, y: 1.5, z: 2 }, "演员没有头骨时退到脚底 + 1.5 m");
+  handle.Skip(); Step(0.05);
+  assert.ok(handle.done, "Skip 掐掉最后一句，场景结束");
+  // Speech：只有正在说话的人张嘴。
+  audio.voiceBank.set("KS.01", { speechEnvelope: { duration: 2 } });
+  const speaking = player.Play({ id: "S", priority: true, lines: [L("S.01", "luo", 2, { after: "start", offsetS: 0 })] }, {});
+  Step(0.5);
+  assert.equal(player.Speech("luo", () => ({ level: 0.7, brightness: 0.5 })).active, true);
+  assert.equal(player.Speech("luo", () => ({ level: 0.7, brightness: 0.5 })).jaw, 0.7);
+  assert.equal(player.Speech("yaowa", () => ({ level: 1 })), null, "不说话的人不张嘴");
+  player.faceTrackSampler = (line, t) => ({ jaw: 0.25, wide: 0.1, round: 0.2, close: 0.3, stress: 1 });
+  assert.equal(player.Speech("luo").jaw, 0.25, "注入口型轨后优先读口型轨");
+  speaking.Stop(); Step(0.1);
+  console.log("ok 截断事件、等事件、等 gate、第一人称、视线外降电平、暂停续播、Skip、口型只给说话人");
+}
+{
+  // 10c. 缺录音：逐句场景按估时走字幕与 Line 事件并 Done；旧整段 cue 照旧；未知 cue 只警告。
+  const lines = [], done = [], warnings = [], said = [];
   const original = console.warn;
   console.warn = (message) => warnings.push(message);
   let voice;
   try {
     voice = new FirstLevelMissionVoice({
-      audio: { PlayStoryVoice() { throw new Error("缺录音时不许碰音频引擎"); }, StopStoryVoice() {} },
+      audio: { PlayStoryVoice() { throw new Error("缺录音时不许碰音频引擎"); }, StopStoryVoice() {}, SetDialogueDuck() {} },
       hud: { Say: (speaker, text) => said.push(`${speaker}：${text}`) },
       Done: (id) => done.push(id),
-      Event: (id, cue, detail) => (id === "Line" ? lines.push({ cue, ...detail }) : events.push(id)),
+      Event: (id, cue, detail) => { if (id === "Line") lines.push({ cue, ...detail }); },
     });
-    voice.manifest = { cues: {} };
+    voice.manifest = { cues: {}, lines: {} };
     assert.equal(voice.Enqueue("NoSuchCueAtAll"), false, "未知 cue 不入队");
     voice.Guidance("NoSuchCueAtAll"); voice.Cancel(["NoSuchCueAtAll"]); voice.Replay("NoSuchCueAtAll");
-    assert.ok(voice.Enqueue("BorrowLight"), "台词表里的 cue 照常入队");
-    for (let i = 0; i < 6000 && !done.length; i++) voice.Update(1 / 60);
-    assert.ok(voice.Enqueue("BunkerBanter"), "缺录音的掩蔽部闲谈也走估时时间轴");
-    for (let i = 0; i < 6000 && done.length < 2; i++) voice.Update(1 / 60);
-    assert.ok(voice.Enqueue("BunkerKilling"), "缺录音的行刑对白也走估时时间轴");
-    for (let i = 0; i < 6000 && done.length < 3; i++) voice.Update(1 / 60);
-  } finally {
-    console.warn = original;
-  }
-  assert.deepEqual(done, ["BorrowLight", "BunkerBanter", "BunkerKilling"], "缺录音的 cue 也要走完并 Done");
-  assert.equal(lines.filter((line) => line.cue === "BorrowLight").length, 9, "借火九句都发了 Line 事件");
-  assert.deepEqual(lines.filter((line) => line.cue === "BorrowLight").map((line) => line.index),
-    [0, 1, 2, 3, 4, 5, 6, 7, 8], "Line 事件按句序");
-  assert.equal(lines[0].who, "zhou", "Line 事件带说话人");
-  assert.equal(said.length, 22, "三条缺录音对白的二十二句字幕都照出");
-  assert.ok(events.includes("BorrowLightMatchesPocketed"), "缺录音时具名事件照发");
-  assert.ok(events.includes("BunkerBlast"), "缺录音估时时间轴仍在闲谈末句发 BunkerBlast");
-  assert.deepEqual(lines.filter((line) => line.cue === "BunkerKilling").map((line) => line.index),
-    [0, 1, 2, 3, 4, 5], "缺录音审问对白仍逐句发 Line，动作可从真实 line 0 起拍");
-  assert.equal(warnings.filter((text) => text.includes("BorrowLight")).length, 1, "缺录音只警告一次");
-  assert.ok(warnings.some((text) => text.includes("NoSuchCueAtAll")), "未知 cue 警告一次");
-  assert.deepEqual(voice.State().missing, ["BorrowLight", "BunkerBanter", "BunkerKilling"]);
-  assert.deepEqual(voice.State().unknown, ["NoSuchCueAtAll"]);
-  console.log("ok 缺录音兜底：字幕、Line 事件与 Done 照常，未知 cue 只警告不抛异常");
-}
-// 11. 日语行的字幕显示中文译文。
-{
-  const said = [];
-  const voice = new FirstLevelMissionVoice({
-    audio: { PlayStoryVoice: () => ({}), StopStoryVoice() {} },
-    hud: { Say: (speaker, text) => said.push(`${speaker}：${text}`) },
-  });
-  voice.manifest = { cues: { BunkerKilling: { seconds: 12 } } };
-  voice.Enqueue("BunkerKilling");
-  for (let i = 0; i < 2000; i++) voice.Update(1 / 60);
-  assert.ok(said.includes("日兵甲：别动，混蛋！"), "日语行的字幕是中文译文：" + said.join(" / "));
+    for (const id of ["BorrowLight", "CaptiveInterrogation", "BunkerKilling"]) {
+      assert.ok(voice.Enqueue(id), id + " 入队");
+      for (let i = 0; i < 9000 && !done.includes(id); i++) voice.Update(1 / 60);
+    }
+  } finally { console.warn = original; }
+  assert.deepEqual(done, ["BorrowLight", "CaptiveInterrogation", "BunkerKilling"], "缺录音的 cue 也要走完并 Done");
+  assert.deepEqual(lines.filter((l) => l.cue === "BorrowLight").map((l) => l.index), [0, 1, 2, 3, 4, 5, 6, 7, 8], "借火九句按句序发 Line");
+  assert.ok(lines.filter((l) => l.cue === "BorrowLight").every((l) => l.lineId?.startsWith("BorrowLight.")), "逐句 Line 事件带 lineId");
+  assert.deepEqual(lines.filter((l) => l.cue === "BunkerKilling").map((l) => l.index), [0, 1, 2, 3, 4, 5], "旧整段审问仍逐句发 Line");
+  assert.ok(said.includes("日兵甲：他们的部队往哪儿撤了！问他！"), "日语行字幕是中文译文");
+  assert.ok(said.includes("日兵甲：别动，混蛋！"), "旧整段的日语行也是译文");
   assert.ok(said.every((row) => !/[぀-ヿ]/.test(row)), "字幕里不许出现假名");
-  console.log("ok 日语行字幕显示中文译文");
+  assert.ok(warnings.some((text) => text.includes("NoSuchCueAtAll")), "未知 cue 警告一次");
+  assert.deepEqual(voice.State().unknown, ["NoSuchCueAtAll"]);
+  console.log("ok 缺录音兜底：逐句按估时、旧整段照旧，字幕/Line/Done 齐全，未知 cue 只警告");
+}
+{
+  // 10d. 旧整段录音的说话人路由不变（待下线的 09.21 cue）。
+  const routes = [], plays = [];
+  const audio = {
+    PlayStoryVoice(key, options) { const voice = { key }; this.storyVoice = voice; plays.push({ key, options, voice }); return { voice }; },
+    StopStoryVoice() { this.storyVoice = null; },
+    SetStoryVoiceSpeaker(voice, options) { routes.push({ voice, ...options }); },
+  };
+  const voice = new FirstLevelMissionVoice({ audio, hud: { Say() {} }, Position: () => ({ x: 8, y: 1.6, z: 0 }) });
+  voice.manifest = { cues: { RescueCall: { seconds: 10.8 } }, lines: {} };
+  voice.Enqueue("RescueCall");
+  for (let i = 0; i < 700; i++) voice.Update(1 / 60);
+  assert.equal(plays.length, 1, "整段录音换说话人不拆条");
+  assert.ok(plays[0].options.dialogue);
+  assert.ok(routes.some((row) => row.who === "shunzi" && row.firstPerson), "顺子走第一人称");
+  assert.ok(routes.some((row) => row.who === "interpreter" && !row.firstPerson), "翻译是世界声源");
+  const gap = { cue: byId.get("RescueCall"), plan: MissionVoiceTimeline(byId.get("RescueCall"), 10.8), sourceTime: 8.5 };
+  assert.equal(voice.Speaker(gap).who, "shunzi");
+  console.log("ok 旧整段录音的说话人路由不变");
 }
 
 if (process.argv.includes("--audio")) {
+  const { MeasureVoice, TruePeakDb } = await import("./Script_SeedAudioVoiceKit.mjs");
+  const { CastReference, LINE_PICK } = await import("./Script_SeedAudioFirstLevelBake.mjs");
   const manifest = JSON.parse(Read("./Audio/FirstLevel/Data_FirstLevelVoiceManifest.json"));
-  let seconds = 0;
+  const timings = fs.existsSync(new URL("./Audio/FirstLevel/Data_FirstLevelLineTimings.json", import.meta.url))
+    ? JSON.parse(Read("./Audio/FirstLevel/Data_FirstLevelLineTimings.json")) : {};
+  manifest.lines ||= {};
+  // 逐句录音还没烘的 01–06 场景（Step 2 全量生成后清空）。**只许变短**。
+  const PENDING_PER_LINE_BAKE = new Set(perLine.map((cue) => cue.id).filter((id) => !byId.get(id).lines.every((line) => manifest.lines[line.id])));
+  const Hash = (text) => crypto.createHash("sha256").update(text).digest("hex");
+  let seconds = 0, lineCount = 0;
+  const levels = new Map();
   for (const cue of MISSION_DIALOGUE) {
+    const recorded = cue.perLine && cue.lines.every((line) => manifest.lines[line.id]);
+    if (recorded) {
+      assert.ok(!manifest.cues[cue.id], cue.id + " 逐句录齐后旧整段条目要 --prune 掉");
+      cue.lines.forEach((line, index) => {
+        const entry = manifest.lines[line.id], url = new URL("./Audio/FirstLevel/" + line.file, import.meta.url);
+        assert.ok(fs.existsSync(url), line.id + " 干声文件存在");
+        const bytes = fs.readFileSync(url);
+        assert.equal(bytes.length, entry.bytes, line.id + " 字节数");
+        assert.equal(Hash(bytes), entry.sha256, line.id + " 内容哈希");
+        assert.equal(entry.promptHash, Hash(LinePrompt(cue, index)), line.id + " 录音对应当前提示词");
+        const ref = CastReference(line.who);
+        assert.ok(ref && entry.castSha256 === ref.sha256, line.id + " 用的是当前选定的定妆音（" + CastVoiceOwner(line.who) + "）");
+        assert.deepEqual(entry.flagged, [], line.id + " 选中的 take 不许带扣分项：" + entry.flagged.join("；"));
+        assert.ok(entry.metrics.cer <= LINE_PICK.maxCer, `${line.id} 转写字错率 ${entry.metrics.cer}`);
+        assert.ok(entry.metrics.speakerCos >= LINE_PICK.minSpeakerCos, `${line.id} 与定妆音音色余弦 ${entry.metrics.speakerCos}`);
+        const m = MeasureVoice(url.pathname.replace(/^\/([A-Za-z]:)/, "$1"));
+        const tp = TruePeakDb(url.pathname.replace(/^\/([A-Za-z]:)/, "$1"));
+        const target = PROJECTION_DB[LineDirection(cue, index).projection];
+        assert.ok(tp <= -0.9, `${line.id} 真峰值 ${tp.toFixed(2)} dBTP ≤ −1`);
+        assert.ok(Math.abs(m.activeRmsDb - target) <= 1.5, `${line.id} 有声段 RMS ${m.activeRmsDb} 与 ${target} 相差 ≤ 1.5 dB`);
+        assert.ok(m.leadS <= 0.12 && m.tailS <= 0.2, `${line.id} 首尾静音 ${m.leadS}/${m.tailS} s`);
+        assert.ok(m.snrDb >= LINE_PICK.minSnrDb, `${line.id} 信噪比 ${m.snrDb} dB（干声不许带底噪/环境声）`);
+        assert.ok(timings[entry.sha256]?.lineId === line.id && timings[entry.sha256].chars.length > 0, line.id + " 有逐字时间");
+        const key = `${cue.id}:${LineDirection(cue, index).projection}`;
+        levels.set(key, [...(levels.get(key) || []), m.activeRmsDb]);
+        seconds += entry.seconds; lineCount++;
+      });
+      continue;
+    }
+    if (cue.perLine && !manifest.cues[cue.id]) { assert.ok(PENDING_PER_LINE_BAKE.has(cue.id)); continue; }
     const entry = manifest.cues[cue.id];
     assert.ok(entry, cue.id + " 没有录音条目");
     const aligned = MISSION_VOICE_ALIGNMENT[cue.id];
@@ -325,25 +504,29 @@ if (process.argv.includes("--audio")) {
     assert.ok(entry.continuous && entry.requests === 1 && entry.seconds > 0.5, cue.id + " 必须是一次请求的整段录音");
     assert.equal(entry.lineCount, cue.lines.length, cue.id + " 清单句数");
     assert.equal(entry.speechRate ?? 0, cue.speechRate ?? 0, cue.id + " 生成语速与台词表一致");
-    assert.equal(aligned.scriptSha256, crypto.createHash("sha256").update(MissionVoiceScriptJson(cue)).digest("hex"),
-      cue.id + " 对齐用的是当前完整台词");
+    assert.equal(aligned.scriptSha256, Hash(MissionVoiceScriptJson(cue)), cue.id + " 对齐用的是当前完整台词");
     const bytes = fs.readFileSync(new URL("./Audio/FirstLevel/" + cue.file, import.meta.url));
     assert.equal(bytes.length, entry.bytes, cue.id + " 字节数");
-    assert.equal(crypto.createHash("sha256").update(bytes).digest("hex"), entry.sha256, cue.id + " 内容哈希");
-    assert.equal(crypto.createHash("sha256").update(MissionVoicePrompt(cue)).digest("hex"), entry.promptHash,
-      cue.id + " 录音对应的是当前提示词");
+    assert.equal(Hash(bytes), entry.sha256, cue.id + " 内容哈希");
+    if (!cue.perLine) assert.equal(Hash(MissionVoicePrompt(cue)), entry.promptHash, cue.id + " 录音对应的是当前提示词");
     seconds += entry.seconds;
   }
-  // 台词表里没有的 cue 不许留在清单里（--prune 的结果）。
+  // 同一场景同一档位的电平散布 ≤ 2 dB（09.23 之前同段最大差 13 dB）。
+  for (const [key, values] of levels) if (values.length > 1)
+    assert.ok(Math.max(...values) - Math.min(...values) <= 2, `${key} 电平散布 ${(Math.max(...values) - Math.min(...values)).toFixed(2)} dB`);
   for (const id of Object.keys(manifest.cues)) assert.ok(byId.has(id), "清单里有已下线的 cue：" + id);
-  const files = new Set(MISSION_DIALOGUE.map((cue) => cue.file));
+  for (const id of Object.keys(manifest.lines)) assert.ok(perLine.some((cue) => cue.lines.some((line) => line.id === id)), "清单里有已下线的句：" + id);
+  const files = new Set(MISSION_DIALOGUE.filter((cue) => manifest.cues[cue.id]).map((cue) => cue.file));
   for (const name of fs.readdirSync(new URL("./Audio/FirstLevel/", import.meta.url)))
     if (name.endsWith(".mp3")) assert.ok(files.has(name), "Audio/FirstLevel 里有已下线的录音：" + name);
-  // 17 是第一人称、不切特写的一段确认，语速慢、含一处三秒空当：按七句 + 停顿定窗口。
+  const lineDir = new URL("./Audio/FirstLevel/Lines/", import.meta.url);
+  if (fs.existsSync(lineDir)) {
+    const lineFiles = new Set(Object.values(manifest.lines).map((entry) => entry.file.replace(/^Lines\//, "")));
+    for (const name of fs.readdirSync(lineDir)) assert.ok(lineFiles.has(name), "Lines 里有清单外的录音：" + name);
+  }
   const death = manifest.cues.ZhouDeath;
-  assert.ok(death.seconds >= 12 && death.seconds <= 34,
-    `整段确认死亡的录音应在 12—34 秒（七句短对白约 14—20 秒，外加第一句后约三秒空当与慢语速余量），实际 ${death.seconds}`);
-  console.log(`ok ${MISSION_DIALOGUE.length} 条整段录音、当前台词/文件哈希、对齐绑定，总长 ${seconds.toFixed(1)} 秒`);
+  assert.ok(death.seconds >= 12 && death.seconds <= 34, `整段确认死亡的录音应在 12—34 秒，实际 ${death.seconds}`);
+  console.log(`ok 录音：逐句 ${lineCount} 句 + 整段 ${Object.keys(manifest.cues).length} 条，总长 ${seconds.toFixed(1)} 秒；待烘逐句场景 ${PENDING_PER_LINE_BAKE.size} 个：${[...PENDING_PER_LINE_BAKE].join(",")}`);
 
   const { VOICE_LINES } = await import("./Data_Voice.mjs");
   const barks = VOICE_LINES.filter((line) => line.side === "ija" && line.kind !== "story");
@@ -354,10 +537,9 @@ if (process.argv.includes("--audio")) {
     assert.equal(line.dialect, "sichuan", line.key + " 敌军自动口令也用指定方言");
     assert.equal(entry.text, line.text); assert.equal(entry.version, line.version);
     assert.equal(entry.dialect, line.dialect); assert.equal(entry.seconds, line.dur);
-    assert.equal(entry.sha256,
-      crypto.createHash("sha256").update(fs.readFileSync(new URL("./Audio/" + line.file, import.meta.url))).digest("hex"));
+    assert.equal(entry.sha256, Hash(fs.readFileSync(new URL("./Audio/" + line.file, import.meta.url))));
   }
-  console.log(`ok all ${barks.length} autonomous enemy barks use current Sichuan recordings`);
+  console.log(`ok all ${barks.length} autonomous enemy barks use current recordings（日语化在 Step 2）`);
 } else {
   console.log("ok 台词数据侧全绿；录音资产需要 --audio 验收");
 }

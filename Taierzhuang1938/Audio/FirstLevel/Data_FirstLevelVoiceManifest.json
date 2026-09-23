@@ -2,18 +2,6 @@
   "model": "seed-audio-1.0",
   "provider": "Volcengine",
   "cues": {
-    "SupportOrder": {
-      "file": "AudioVoice_FirstLevelSupportOrder.mp3",
-      "seconds": 13.035,
-      "bytes": 157093,
-      "promptHash": "46cef1ce5893e30e4cf11fad7c24c8e1a2adeead560a209298de90030cc50cf3",
-      "sha256": "dea0306d4c456735b90f7fa32b5389345f3979bc0a7db45766a0d972669b3191",
-      "lineCount": 4,
-      "requests": 1,
-      "speechRate": 0,
-      "continuous": true,
-      "mastering": "MonoBeforeLoudnessTruePeakMinus3"
-    },
     "TankTerror": {
       "file": "AudioVoice_FirstLevelTankTerror.mp3",
       "seconds": 3.944,
@@ -398,18 +386,6 @@
       "continuous": true,
       "mastering": "MonoBeforeLoudnessTruePeakMinus3"
     },
-    "BunkerSearch": {
-      "file": "AudioVoice_FirstLevelBunkerSearch.mp3",
-      "seconds": 3.318,
-      "bytes": 40482,
-      "promptHash": "00b028f4ceecaec82ae4c1a980f41e35694c143bbe1d5a914045c55b3c12cd75",
-      "sha256": "753fa8e59a58b02d4703c2eb6acd94a38ddfaa1be2e0fddf296a3ab28601db30",
-      "lineCount": 2,
-      "requests": 1,
-      "speechRate": 0,
-      "continuous": true,
-      "mastering": "MonoBeforeLoudnessTruePeakMinus3"
-    },
     "BunkerKilling": {
       "file": "AudioVoice_FirstLevelBunkerKilling.mp3",
       "seconds": 16.039,
@@ -429,18 +405,6 @@
       "promptHash": "2b8ce3c8eaa15c21c23a802c6f21e5490e2ba2b5b6724a06dc51e5c939510eeb",
       "sha256": "b9cabe18c827d6ac68a85ea91a61eaf5e76bb05fcf9d802b9054479ccc832d54",
       "lineCount": 1,
-      "requests": 1,
-      "speechRate": 0,
-      "continuous": true,
-      "mastering": "MonoBeforeLoudnessTruePeakMinus3"
-    },
-    "BunkerBanter": {
-      "file": "AudioVoice_FirstLevelBunkerBanter.mp3",
-      "seconds": 24.137,
-      "bytes": 290317,
-      "promptHash": "28f42c95c748837bd4797adf7085f0ae4fdade3c842694e23968201cdc7f2c85",
-      "sha256": "14b03c2f6a204fc150ebb467a97aee51932cbe0f30e0d1c389904074f2579c99",
-      "lineCount": 7,
       "requests": 1,
       "speechRate": 0,
       "continuous": true,
@@ -1203,5 +1167,6 @@
       "mastering": "MonoBeforeLoudnessTruePeakMinus3"
     }
   },
-  "updatedAt": "2026-09-22T15:13:53.994Z"
+  "updatedAt": "2026-09-23T09:29:37.044Z",
+  "lines": {}
 }
