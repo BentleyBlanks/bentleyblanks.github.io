@@ -21,7 +21,7 @@ import { FIRST_LEVEL_DIALOGUE_DIRECTION, DIALOGUE_DUCK } from './Data_FirstLevel
 const here=path.dirname(fileURLToPath(import.meta.url));
 const manifest=JSON.parse(fss.readFileSync(path.join(here,'Audio/FirstLevel/Data_FirstLevelVoiceManifest.json'),'utf8'));
 const Recorded=cue=>cue.perLine&&cue.lines.every(line=>manifest.lines?.[line.id]);
-const HasOverlap=cue=>Object.values(FIRST_LEVEL_DIALOGUE_DIRECTION[cue.id]?.lines||{}).some(d=>d.after==='prev'&&d.offsetS<0);
+const HasOverlap=cue=>Object.values(FIRST_LEVEL_DIALOGUE_DIRECTION[cue.id]?.lines||{}).some(d=>(d.after??'prev')==='prev'&&d.offsetS<0);
 const wanted=process.argv.find(a=>a.startsWith('--scene='))?.slice(8);
 const selfScene=MISSION_DIALOGUE.find(cue=>Recorded(cue)&&cue.lines.some(line=>line.who==='shunzi')&&cue.lines.some(line=>line.who!=='shunzi'));
 const overlapScene=MISSION_DIALOGUE.find(cue=>(wanted?cue.id===wanted:HasOverlap(cue))&&Recorded(cue));
