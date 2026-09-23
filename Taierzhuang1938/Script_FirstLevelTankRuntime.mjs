@@ -184,6 +184,7 @@ export class FirstLevelTankRuntime {
     if (b.trackSide) t.damageSide = b.trackSide;
     if (state !== "Intact") { t.moving = false; t.damageAt ??= r.time; }
     if (t.engineKilled) t.engineAt ??= r.time;
+    if (state === "Disabled") t.disabledAt ??= r.time;
     this.log.states.push({ t: r.time, state, zone: last?.zone || null });
     if (!record) return;
     if (state !== "Intact") r.Record("tankImmobilized", { state, zone: last?.zone || null });

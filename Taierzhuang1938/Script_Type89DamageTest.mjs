@@ -77,6 +77,11 @@ damage.Update(100,{present:true,immobilized:true});assert.equal(sources.size,1);
   damage.Update(310,engineOnly);
   assert.equal(damage.track.geometry.index,damage.trackIndex,"engine-only kill keeps both tracks");
   assert.ok(!byName.TrackShoe_00.visible&&byName.EngineDeck.visible);
+  // 两颗都落在履带上的 Disabled：没有掀甲板，但照样冒烟（熄了火）。
+  const trackTwice={present:true,active:true,damageState:"Disabled",immobilized:true,fireDisabled:true,trackCut:true,engineKilled:false,damageAt:400,disabledAt:405,damageSide:1};
+  damage.Update(406,trackTwice);
+  assert.equal(damage.hull.geometry.index,damage.hullIndex,"no deck cut for a second track hit");
+  assert.equal(sources.size,1,"a knocked-out tank smokes even without an engine-deck hit");
   damage.Update(320,{present:true,active:true,damageState:"Intact"});
   assert.equal(sources.size,0);assert.equal(damage.hull.geometry.index,damage.hullIndex);
 }

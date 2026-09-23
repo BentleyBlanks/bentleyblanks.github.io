@@ -74,7 +74,10 @@ export class Type89Damage {
         if(this.point.y<floor){this.point.y=floor;this.root.worldToLocal(this.point);mesh.position.copy(this.point);}
       }
     }
-    if(present && engine && engineElapsed>=R.tankDamage.smokeDelayS){
+    // 黑烟：发动机舱炸穿，或者两颗都落在履带上彻底哑火（Disabled）—— 熄了火的车要读得出来。
+    const smoking=engine||(!legacy&&!!tank.fireDisabled);
+    const smokeElapsed=engine?engineElapsed:Elapsed(tank.disabledAt??tank.damageAt);
+    if(present && smoking && smokeElapsed>=R.tankDamage.smokeDelayS){
       this.point.fromArray(R.tankDamage.engineOutlet);this.model.root.localToWorld(this.point);
       if(this.smoke==null)this.smoke=this.vfx?.SmokeSource(this.point,R.tankDamage.smoke)??null;
       else this.vfx?.MoveSmokeSource(this.smoke,this.point);
