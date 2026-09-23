@@ -37,7 +37,7 @@ import { JAPANESE_SPEECH } from "./Data_FirstLevelJapaneseSpeech.mjs";
 import { FIRST_LEVEL_VOICE_CAST, DRY_VOICE_RULE, VOICE_LANG_RULE, CastVoiceOwner } from "./Data_FirstLevelVoiceCast.mjs";
 import { PROJECTION_DB, LINE_MASTER, LineDirection, FIRST_LEVEL_DIALOGUE_DIRECTION } from "./Data_FirstLevelDialogueDirection.mjs";
 import { SeedAudioSpeak, MasterLine, MeasureVoice, SpeakerEmbed, CenteredCosine, Transcribe, Sha256, Pool, requestStats,
-  SEED_AUDIO_MODEL, MasterSceneWav, EncodeSegment, FrameRms, ClipRuns, MapSubtitleToLines, SliceScene, TruePeakDb }
+  SEED_AUDIO_MODEL, MasterSceneWav, EncodeSegment, FrameRms, ClipRuns, MapSubtitleToLines, SliceScene, IslandLines, TruePeakDb }
   from "./Script_SeedAudioVoiceKit.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url)),
@@ -212,6 +212,7 @@ async function GenerateAttempt(cue, n) {
   const prompt = ScenePrompt(cue), refs = SceneReferences(cue);
   if (prompt.length > 3000) throw new Error(`${cue.id}: scene prompt exceeds 3000 characters (${prompt.length})`);
   const result = await SeedAudioSpeak({ prompt, references: refs.map((r) => r.file), label: `${cue.id}#${n}` });
+  fs.rmSync(AttemptDir(cue, n), { recursive: true, force: true });   // 同号旧生成（旧提示词）的切片与打分作废
   fs.writeFileSync(AttemptRaw(cue, n), result.bytes);
   fs.writeFileSync(AttemptMeta(cue, n), JSON.stringify({ promptHash: Hash(prompt), castKey: refs.map((r) => r.sha256).join(","),
     references: refs.map((r) => ({ who: r.who, owner: r.owner, castSha256: r.sha256 })), subtitle: result.subtitle,
@@ -230,20 +231,38 @@ function Cut(cue, n) {
   const mapped = MapSubtitleToLines(spoken, meta.subtitle);
   const hard = [], flags = [];
   const clip = ClipRuns(raw);
-  if (clip) hard.push(`削波 ${clip} 处`);
+  // 满幅连续 ≥ 3 个采样算一处削波；一两处是单个峰顶碰了满幅（母带限幅后已压到 −1 dBTP 以下），三处以上才算爆音。
+  if (clip >= 3) hard.push(`削波 ${clip} 处`);
+  else if (clip) flags.push(`原始 take 有 ${clip} 处满幅峰顶（母带已限幅）`);
   const subtitleChars = mapped.reduce((t, m) => t + m.chars.length, 0), scriptChars = mapped.reduce((t, m) => t + m.total, 0);
   if (!meta.subtitle?.sentences?.length) hard.push("没有逐字时间戳");
   if (subtitleChars > scriptChars * (1 + SCENE_CHECK.extraChars) + 2) hard.push(`多念（时间戳 ${subtitleChars} 字 / 稿 ${scriptChars} 字）`);
   mapped.forEach((m, i) => { if (m.start == null || m.coverage < SCENE_CHECK.minCoverage) hard.push(`漏句 ${cue.lines[i].id}（对上 ${m.matched}/${m.total} 字）`); });
   if (hard.some((h) => h.startsWith("漏句") || h === "没有逐字时间戳")) return { cue, n, hard, flags, mapped, slices: null };
-  let extraDb = 0, master, slices, files;
+  let extraDb = 0, master, slices, files, cutMethod = "subtitle";
   for (let round = 0; round < 3; round++) {
     master = MasterSceneWav(raw, wav, { targetDb: SceneTargetDb(cue), ceilingDb: LINE_MASTER.ceilingDb, extraDb });
     const measure = MeasureVoice(wav);
     const shift = master.trimStartS;
-    const lines = mapped.map((m, i) => ({ start: m.start - shift, end: m.end - shift,
-      effortBefore: !!LineDirection(cue, i).effort?.before, effortAfter: !!LineDirection(cue, i).effort?.after }));
-    slices = SliceScene(FrameRms(wav), lines, { activeRmsDb: measure.activeRmsDb, padS: LINE_MASTER.padS });
+    const effort = (i) => ({ effortBefore: !!LineDirection(cue, i).effort?.before, effortAfter: !!LineDirection(cue, i).effort?.after });
+    const framesInfo = FrameRms(wav);
+    const lines = mapped.map((m, i) => ({ start: m.start - shift, end: m.end - shift, ...effort(i) }));
+    slices = SliceScene(framesInfo, lines, { activeRmsDb: measure.activeRmsDb, padS: LINE_MASTER.padS });
+    // 逐字时间戳偶尔不可信（后几句的字被挤进一两百毫秒）：任何一句切出来太短、或时间戳给的字速快得不像人话，
+    // 就改用「只看静音 + 预计时长占比」的切法；切得对不对由后面的逐句转写与嗓子检查兜底。
+    const tooFast = mapped.some((m) => m.total >= 3 && (m.end - m.start) < 0.06 * m.total);
+    const tooShort = slices.some((s, i) => s.endS - s.startS < Math.min(0.35, 0.1 + 0.05 * mapped[i].total));
+    cutMethod = "subtitle";
+    if (tooFast || tooShort) {
+      const weights = cue.lines.map((line, i) => Math.max(0.25, [...MissionVoiceSpoken(cue, i)].filter((c) => /[\p{L}\p{N}]/u.test(c)).length / (line.lang === "ja" ? 7.5 : 4.6)));
+      const pauses = cue.lines.map((_, i) => LineDirection(cue, i).pauseBeforeS || 0);
+      const islands = IslandLines(framesInfo, weights, { activeRmsDb: measure.activeRmsDb, pauses });
+      if (islands) {
+        slices = SliceScene(framesInfo, islands.map((l, i) => ({ ...l, ...effort(i) })), { activeRmsDb: measure.activeRmsDb, padS: LINE_MASTER.padS });
+        cutMethod = "silence";
+        flags.push(`逐字时间戳不可信（${tooFast ? "字速过快" : "切出过短的片段"}），改按静音与预计时长切`);
+      } else hard.push("逐字时间戳不可信，静音段也不够切");
+    }
     const sceneMp3 = EncodeSegment(wav, path.join(dir, "scene.mp3"), { fadeS: 0 });
     files = slices.map((s, i) => EncodeSegment(wav, path.join(dir, `line_${String(i + 1).padStart(2, "0")}.mp3`),
       { startS: s.startS, endS: s.endS, fadeS: LINE_MASTER.crossfadeS }));
@@ -255,6 +274,7 @@ function Cut(cue, n) {
     extraDb -= worst - LINE_MASTER.ceilingDb + 0.2;
   }
   master.targetDb = SceneTargetDb(cue);
+  master.cutMethod = cutMethod;
   slices.forEach((s, i) => {
     if (s.tightStart || s.tightEnd) flags.push(`${cue.lines[i].id} 与邻句贴着，在能量最低处切（10 ms 淡入淡出）`);
     s.file = files[i];
@@ -284,6 +304,7 @@ function Judge(results) {
     s.measure.truePeakDb = r.master.slicePeaks[i];
     s.cer = texts[s.file]?.cer ?? null;
     s.transcript = texts[s.file]?.text ?? null;
+    if (r.master.cutMethod === "silence" && texts[s.file]?.chars?.length) { s.chars = texts[s.file].chars; s.charSource = "whisper-forced"; }
     const own = CastReference(line.who);
     s.speakerCos = own && vectors[s.file] && vectors[own.file] ? +CenteredCosine(vectors[s.file], vectors[own.file]).toFixed(3) : null;
     const others = [...new Set(r.cue.lines.map((l) => l.who))].filter((who) => CastVoiceOwner(who) !== CastVoiceOwner(line.who))
@@ -339,7 +360,10 @@ async function BakeScenes(manifest) {
   }
   if (missingCast.length) console.warn(`cast voice missing for ${missingCast.join(",")}: those speakers go in by persona only`);
   fs.mkdirSync(sceneWork, { recursive: true });
-  const pending = cues.filter((cue) => !SceneUpToDate(cue, manifest) || rescore || forcedScenePicks.has(cue.id));
+  // 装上的整段还带没处理的硬错误、且这次允许再多生成一次的场景，也要重抽。
+  const unresolved = (cue) => (manifest.scenes?.[cue.id]?.hard || []).some((why) => !(manifest.scenes[cue.id].patched || []).some((id) => why.startsWith(id)))
+    && (manifest.scenes[cue.id].attempts?.length || 0) < maxAttempt;
+  const pending = cues.filter((cue) => !SceneUpToDate(cue, manifest) || unresolved(cue) || rescore || forcedScenePicks.has(cue.id));
   // 1) 生成：每场只补到「最新一次生成有硬错误、且还没到 maxAttempt」为止。
   if (!rescore) {
     const todo = [];
@@ -396,10 +420,16 @@ function Install(cue, best, all, manifestLines, scenes, timings, manifest, picke
   fs.copyFileSync(best.sceneFile, sceneTarget);
   const sceneSha = Sha256(sceneTarget);
   const refs = SceneReferences(cue);
-  // 这一场旧的逐字时间（以旧片段 sha 为键）全部作废。
-  for (const [sha, t] of Object.entries(timings)) if (cue.lines.some((l) => l.id === t.lineId)) delete timings[sha];
+  // 已经单独补录过、且补录替换的正是这次这一片的句子：补录保留（重新打分不会把补录冲掉）。
+  const kept = new Set(cue.lines.filter((line, i) => {
+    const old = manifestLines[line.id];
+    return old?.source === "patch" && old.patch?.replacedSha256 === Sha256(best.slices[i].file);
+  }).map((line) => line.id));
+  // 这一场旧的逐字时间（以旧片段 sha 为键）作废；保留的补录句除外。
+  for (const [sha, t] of Object.entries(timings)) if (cue.lines.some((l) => l.id === t.lineId && !kept.has(l.id))) delete timings[sha];
   cue.lines.forEach((line, i) => {
     const s = best.slices[i];
+    if (kept.has(line.id)) { Object.assign(manifestLines[line.id], { sceneSha256: sceneSha }); return; }
     const target = path.join(out, line.file);
     fs.mkdirSync(path.dirname(target), { recursive: true });
     fs.copyFileSync(s.file, target);
@@ -410,7 +440,7 @@ function Install(cue, best, all, manifestLines, scenes, timings, manifest, picke
       file: line.file, scene: cue.id, index: i, who: line.who, lang: line.lang || "zh", projection: d.projection,
       seconds: s.measure.seconds, bytes: fs.statSync(target).size, sha256, source: "scene",
       sceneSha256: sceneSha, sceneStartS: s.startS, sceneEndS: s.endS, gapBeforeS: s.gapBeforeS,
-      tight: [!!s.tightStart, !!s.tightEnd], edgeDb: s.edgeDb,
+      tight: [!!s.tightStart, !!s.tightEnd], edgeDb: s.edgeDb, cutMethod: best.master.cutMethod || "subtitle",
       castOwner: CastVoiceOwner(line.who), castSha256: own?.sha256 || null, referenced: RefIndex(refs, line.who) >= 0,
       metrics: { activeRmsDb: s.measure.activeRmsDb, truePeakDb: s.measure.truePeakDb, snrDb: s.measure.snrDb,
         voicedS: s.measure.voicedS, lowShare: s.measure.lowShare, f0: s.measure.f0, cer: s.cer, transcript: s.transcript,
@@ -419,15 +449,15 @@ function Install(cue, best, all, manifestLines, scenes, timings, manifest, picke
       mastering: "SliceOfWholeSceneMaster",
     };
     timings[sha256] = { lineId: line.id, who: line.who, lang: line.lang || "zh", seconds: s.measure.seconds,
-      source: "seedaudio-subtitle", chars: s.chars };
+      source: s.charSource || "seedaudio-subtitle", chars: s.chars };
   });
   delete manifest.cues?.[cue.id];   // 旧的带环境声整段（03–06）作废
-  const requests = all.length;
+  const requests = all.length + [...kept].reduce((n, id) => n + (manifestLines[id].patch?.takes || 0), 0);
   scenes[cue.id] = {
     file: cue.file, sha256: sceneSha, seconds: best.master.measure.seconds, bytes: fs.statSync(sceneTarget).size,
     promptHash: Hash(ScenePrompt(cue)), castKey: refs.map((r) => r.sha256).join(","),
     references: refs.map((r) => ({ who: r.who, owner: r.owner, castSha256: r.sha256 })),
-    lines: cue.lines.map((l) => l.id), attempt: best.n, pickedBy, requests,
+    lines: cue.lines.map((l) => l.id), attempt: best.n, pickedBy, requests, ...(kept.size ? { patched: [...kept] } : {}),
     attempts: all.map((r) => ({ n: r.n, hard: r.hard, flags: r.flags.length })),
     hard: best.hard, flags: best.flags,
     targetDb: best.master.targetDb, gainDb: best.master.gainDb, trimStartS: best.master.trimStartS,

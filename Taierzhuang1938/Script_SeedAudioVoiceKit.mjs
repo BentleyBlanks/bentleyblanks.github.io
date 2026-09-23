@@ -349,6 +349,54 @@ export function MapSubtitleToLines(spokenLines, subtitle) {
 }
 
 /**
+ * 逐字时间戳不可信时的切法（2026-09-23 实测：带长停顿、喘气的场景，SeedAudio 偶尔把后面几句的字挤进
+ * 一两百毫秒里，按它切出来的片段只有 55 ms）。只看声音本身：找出整段里所有 ≥ minRunS 的静音段，
+ * 从里面挑 N−1 个作切点，让每个切点之前的有声时长占比最接近「这之前各句的预计时长」占比，
+ * 越长的静音越优先（动态规划）。weights[i] = 这一句的预计说话时长（字数 / 语速）。
+ * 返回与 SliceScene 相同的 lines 形状：[{ start, end }]（切点两侧），交给 SliceScene 去剪静音。
+ */
+export function IslandLines(framesInfo, weights, { activeRmsDb, silenceDb = 30, minRunS = 0.12, pauses = [] }) {
+  const { hopS, frames } = framesInfo;
+  const quiet = 10 ** ((activeRmsDb - silenceDb) / 20);
+  const loudPrefix = new Float64Array(frames.length + 1);
+  for (let f = 0; f < frames.length; f++) loudPrefix[f + 1] = loudPrefix[f] + (frames[f] >= quiet ? 1 : 0);
+  const first = [...frames].findIndex((v) => v >= quiet);
+  let last = frames.length - 1;
+  while (last > 0 && frames[last] < quiet) last--;
+  const runs = [];
+  for (let f = first; f <= last; f++) {
+    if (frames[f] >= quiet) continue;
+    const from = f;
+    while (f + 1 <= last && frames[f + 1] < quiet) f++;
+    if ((f - from + 1) * hopS >= minRunS) runs.push({ a: from, b: f, mid: (from + f + 1) / 2, len: (f - from + 1) * hopS });
+  }
+  const n = weights.length, R = runs.length, total = loudPrefix[frames.length];
+  if (n < 2) return [{ start: first * hopS, end: (last + 1) * hopS }];
+  if (R < n - 1) return null;
+  const wSum = weights.reduce((t, w) => t + w, 0);
+  const target = []; let acc = 0;
+  for (let k = 0; k < n - 1; k++) { acc += weights[k]; target.push(acc / wSum); }
+  const frac = runs.map((r) => loudPrefix[Math.round(r.mid)] / total);
+  // cost[k][j]：第 k 个切点用第 j 段静音。
+  const INF = 1e18, cost = Array.from({ length: n - 1 }, () => new Float64Array(R).fill(INF)), from = Array.from({ length: n - 1 }, () => new Int32Array(R).fill(-1));
+  const Local = (k, j) => 40 * (frac[j] - target[k]) ** 2 - 0.6 * Math.log(runs[j].len / minRunS) - (pauses[k + 1] ? 1.2 * Math.min(runs[j].len, pauses[k + 1]) : 0);
+  for (let j = 0; j < R; j++) cost[0][j] = Local(0, j);
+  for (let k = 1; k < n - 1; k++) for (let j = k; j < R; j++) {
+    let best = INF, arg = -1;
+    for (let i = k - 1; i < j; i++) if (cost[k - 1][i] < best) { best = cost[k - 1][i]; arg = i; }
+    if (arg >= 0) { cost[k][j] = best + Local(k, j); from[k][j] = arg; }
+  }
+  let j = -1, best = INF;
+  for (let x = 0; x < R; x++) if (cost[n - 2][x] < best) { best = cost[n - 2][x]; j = x; }
+  const pick = [];
+  for (let k = n - 2; k >= 0; k--) { pick.unshift(runs[j]); j = from[k][j]; }
+  return Array.from({ length: n }, (_, i) => ({
+    start: i ? pick[i - 1].b * hopS + hopS : first * hopS,
+    end: i < n - 1 ? pick[i].a * hopS : (last + 1) * hopS,
+  }));
+}
+
+/**
  * 在整段母带上定切点。lines[i] = { start, end, effortBefore, effortAfter }（母带时间轴，秒）。
  * 两句之间：先找静音段（比整段有声 RMS 低 silenceDb 以上、至少 20 ms）——句前有非台词人声（笑、喘）的
  * 切在最早那段静音、句后有的切在最晚那段、否则切在最长那段的正中；找不到静音就切在能量最低那一帧（tight）。

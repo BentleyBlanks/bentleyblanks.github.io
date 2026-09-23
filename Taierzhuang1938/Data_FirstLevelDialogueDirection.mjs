@@ -84,7 +84,7 @@ export const FIRST_LEVEL_DIALOGUE_DIRECTION = Object.freeze({
     "02": P("shout", 0.8, { spatial: "offscreen", delivery: "从后面压上来催", offsetS: -0.3 }),
   }),
   CaptiveDragged: Scene(true, "两名日兵把被炸得神志不清的受伤川军从松土里拽出来，贴身拉扯；另一名日兵在前面十几米外喊", {
-    "01": P("low", 0.3, { context: "被从松土里拽出来，头歪着，神志不清", delivery: "含糊、虚弱的骂，中间断气", effort: { before: "先闷哼一声" } }),
+    "01": P("low", 0.3, { context: "被从松土里拽出来，头歪着，神志不清", delivery: "虚弱、断断续续地骂，中间断气，但每个字都要念出来、听得清", effort: { before: "先闷哼一声" } }),
     "02": P("shout", 0.8, { context: "抓住后领猛地一提", delivery: "短促粗暴" }),
     "03": P("low", 0.35, { context: "胳膊被扯到伤处", delivery: "从牙缝里挤出来，一字一顿", pauseBeforeS: 1.2, effort: { before: "猛吸一口气" } }),
     "04": P("shout", 0.8, { spatial: "offscreen", context: "前方枪声又起", delivery: "远处的急喊", pauseBeforeS: 1 }),
