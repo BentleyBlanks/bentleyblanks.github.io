@@ -217,6 +217,8 @@ export class TankBrain {
       if (this.StageRank(w.stage ?? this.stageOrder[0]) > rank) {
         return i > 0 && i - 1 > this.departed && i - 1 !== this.holdIndex && this.cum[i - 1] >= this.progress - D.arriveM ? i - 1 : null;
       }
+      // 只是「等某件事」的 hull-down（没有停留时长、不摆车头）：那件事已经发生了就不停，直接开过去。
+      if (w.kind === "hullDown" && w.holdS == null && !w.faceTo && i < n - 1 && this.HoldSatisfied(i, world)) continue;
       if (STOP_KINDS.has(w.kind) || i === n - 1) return i;
     }
     return null;
