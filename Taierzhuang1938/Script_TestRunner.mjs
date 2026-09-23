@@ -577,7 +577,7 @@ const changedDomainRules = [
   { domain: "perf", pattern: /Script_ProfileCli/i },
   {domain:"firstLevel",pattern:/FirstLevelFrontRoute|FirstLevelFrontBattle|FirstLevelFrontTopology|FirstLevelTransition/},
   // 2026-09-23 01–06 space rebuild: keyframe table and the static probe the space gate reads.
-  {domain:"firstLevel",pattern:/FirstLevelSpaceKeyframes|FirstLevelSpaceProbe|Data_FirstLevelFrontBreakables/},
+  {domain:"firstLevel",pattern:/FirstLevelSpaceKeyframes|FirstLevelSpaceProbe|FirstLevelSpaceMap|FirstLevelSpaceShots|Data_FirstLevelFrontBreakables/},
   {domain:"firstLevel",pattern:/FirstLevelZhouExit/},
   {domain:"missionGuide",pattern:/FirstLevelLeaderGuide|FirstLevelGuideDialogue|FirstLevelGuideVoiceAlignment|FirstLevelMissionRuntime|Script_FirstLevelMissionVoice|NpcMissionGuide|NpcGuideGesture|Tuning_MissionGuide/},
   { domain: "combat", pattern: /FirearmHandling|MuzzleFlash|Headshot/i },
