@@ -1,7 +1,11 @@
 import { MISSION_GUIDE_DIALOGUE } from "./Data_FirstLevelGuideDialogue.mjs";
 import { JAPANESE_SPEECH } from "./Data_FirstLevelJapaneseSpeech.mjs";
-// 第一关 2026.09.19 重构版台词表。一段连续多人对白 = 一个 cue = 一次 SeedAudio 请求 = 一条音频。
-// 台词逐字取自 docs/Data_FirstLevelRebuildSource20260919.md（Notion 采用稿），不许改字改标点。
+// 第一关台词表（cue id 的唯一来源）。两种录音格式并存（契约 docs/Data_FirstLevel0105Refactor20260923Contract.md §2.2）：
+//   · 逐句干声（perLine: true）——01–06：每句一条干声 Audio/FirstLevel/Lines/AudioVoice_FirstLevel<Scene>_<NN>.mp3，
+//     同一角色都带定妆参考音生成；对白时间轴在 Data_FirstLevelDialogueDirection.mjs，播放器 Script_DialoguePlayer。
+//     01–02 台词逐字取自 docs/Data_FirstLevelOpeningSource20260923.md；03–06 取自 09.22 稿，id 与台词不变。
+//   · 整段录音（旧格式）——07–18：一段连续多人对白 = 一个 cue = 一次 SeedAudio 请求 = 一条音频。
+//     台词逐字取自 docs/Data_FirstLevelRebuildSource20260919.md（Notion 采用稿），不许改字改标点。
 // 行的形状：{ who, text, tts?, subtitle?, lang? }
 //   · text     台词正文，同时是屏幕字幕的默认文本。日语行这里放 Notion 括号里的中文译文。
 //   · tts      送 SeedAudio 的写法（缺省 = text）。日语行的假名不写在这里，见下。
@@ -20,6 +24,10 @@ export const MISSION_VOICE_CAST = Object.freeze({
   interpreter: ["翻译", "鲁南本地成年男性，北方官话，粗暴急促，绝不说四川话；在日兵旁传话"],
   ijaA: ["日兵甲", "1938年日本陆军步兵，成年男性，短促粗暴的日语命令，只说稿中日语假名，不说中文"],
   ijaB: ["日兵乙", "1938年日本陆军步兵，成年男性，比甲更闷更沉的日语吼叫，只说稿中日语假名，不说中文"],
+  ijaC: ["日兵丙", "1938年日本陆军步兵，年轻些，嗓子尖而响，在前沟边跑边喊，只说日语"],
+  ijaD: ["日兵丁", "1938年日本陆军步兵，中等嗓音，警觉，短促催促，只说日语"],
+  comrade: ["川军", "肩膀挂彩的四川男兵，豁达嘴硬爱开玩笑，嗓子偏沙"],
+  shouter: ["洞外士兵", "四川成年男兵，在洞外沟里隔着炮声拼命示警"],
   captiveWounded: ["伤兵", "腿骨断了的四川伤兵，疼得发抖还嘴硬，从牙缝里骂出来，与老周声音不同"],
   captiveHelper: ["扶人川军", "四川成年男兵，拖着同伴已经脱力，被枪托砸倒后还挣扎出声"],
   guard: ["守军", "四川前沿守军，跑动后气喘，隔着枪声喊话要让人听清"],
@@ -41,13 +49,21 @@ const Cue = (id, lines, extra = {}) =>
   Object.freeze({
     id,
     file: `AudioVoice_FirstLevel${id}.mp3`,
-    lines: lines.map(([who, text, more]) => Object.freeze({ who, text, ...(more || {}) })),
+    lines: lines.map(([who, text, more], index) => Object.freeze({ who, text, ...(more || {}),
+      ...(extra.perLine ? { id: MissionLineId(id, index), file: MissionLineFile(id, index) } : {}) })),
     ...extra,
   });
+/** 逐句 id：`<Scene>.<NN>`（契约 §5.2）。 */
+export const MissionLineId = (cueId, index) => `${cueId}.${String(index + 1).padStart(2, "0")}`;
+/** 逐句干声文件（相对 Audio/FirstLevel/）。 */
+export const MissionLineFile = (cueId, index) => `Lines/AudioVoice_FirstLevel${cueId}_${String(index + 1).padStart(2, "0")}.mp3`;
+// 01–06 逐句格式的场景（对白导演表 Data_FirstLevelDialogueDirection 里每一个都要有）。
+const PerLine = (id, lines, extra = {}) => Cue(id, lines, { ...extra, perLine: true });
+const JA = { lang: "ja" };
 /** 送 TTS 的写法：日语行取假名侧表，其余取 line.tts ?? line.text。 */
 export function MissionVoiceSpoken(cue, index) {
   const line = cue.lines[index];
-  return JAPANESE_SPEECH[`${cue.id}:${index}`]?.kana ?? line.tts ?? line.text;
+  return JAPANESE_SPEECH[line.id]?.kana ?? JAPANESE_SPEECH[`${cue.id}:${index}`]?.kana ?? line.tts ?? line.text;
 }
 /** 屏幕字幕文本（日语行显示中文译文）。 */
 export const MissionVoiceSubtitle = (cue, index) => cue.lines[index].subtitle ?? cue.lines[index].text;
@@ -71,22 +87,83 @@ export function MissionVoiceAlignmentCues() {
   }));
 }
 export const MISSION_DIALOGUE = Object.freeze([
-  // 2026.09.21 Notion 01–02；每一段连续交流仍是一次完整录音。
-  Cue("BunkerBanter", [
-    ["yaowa", "顺哥，给我两个桥夹！"],
-    ["shunzi", "没得好多了！"],
-    ["runner", "班长！鬼子的先头兵上来了！贴着炮往前拱，东头遭咬住了！"],
-    ["luo", "妈卖批……来得好快。莫磨蹭！弹装起，准备撤后沟！"],
-    ["shunzi", "早他妈该走了！"],
-    ["luo", "闭嘴！拿枪！"],
-    ["crowd", "低头——！"],
-  ], {soundscape:"前沿交通壕侧壁的低矮土木防炮洞。黑暗中连续闷炮，顶棚落土，桥夹装弹与装备碰撞；洞外传令兵跑近，近距离步枪混入，末尾低头喊声后近失弹冲击、木料震动与短促耳鸣。不是房屋爆毁。",
-    delivery:"幺娃和顺子一边急促补弹一边接话；传令兵喘着气赶来，罗班长转头吼命令。最后有人急喊低头，立刻被爆声截断，不加音乐。"}),
-  Cue("BunkerSearch", [
-    ["ijaA", "往前！快！", {lang:"ja"}],
-    ["ijaB", "别停！", {lang:"ja"}],
-  ], {soundscape:"炮火已经移向后方而变稀，近处日军先头兵沿交通壕纵深前出的脚步，步枪短促射击、装备声。",
-    delivery:"远处日语短促命令，边跑边喊，不停下来表演。"}),
+  // —— 2026.09.23 新稿 01–02（契约 §5.2），逐句干声。台词逐字，不改字。
+  PerLine("BunkerBanter", [
+    ["shunzi", "妈卖批。老子还没埋，坟头土先给我盖起了。"],
+    ["yaowa", "省事噻，等哈死了都不用挖坑。"],
+    ["shunzi", "滚。"],
+    ["comrade", "莫死这儿噻，山东的土老子睡不惯。"],
+    ["yaowa", "死人还挑地方？"],
+    ["comrade", "咋个不挑，老子要死也滚回四川死。"],
+    ["shunzi", "你想得还多，先把今天混过去。"],
+    ["comrade", "那肯定，老子命硬得很。"],
+    ["yaowa", "命硬还挨一枪？"],
+    ["comrade", "龟儿子枪法撇了噻。"],
+    ["shunzi", "那你还得谢谢他。"],
+    ["comrade", "等哈碰到，老子当面谢。"],
+    ["yaowa", "拿啥子谢？"],
+    ["comrade", "拿这个噻。"],
+  ]),
+  PerLine("BunkerOrders", [
+    ["runner", "班长！东头破了！鬼子的先头兵贴着炮上来了！"],
+    ["luo", "弹装起！往后沟撤！跟紧！"],
+  ]),
+  PerLine("BunkerIncoming", [["shouter", "炮弹！趴下——！"]]),
+  PerLine("BunkerSearch", [
+    ["ijaC", "往前！快！", JA],
+    ["ijaD", "别停！", JA],
+  ]),
+  PerLine("CaptiveDragged", [
+    ["comrade", "狗日的……你妈的……"],
+    ["ijaA", "起来！", JA],
+    ["comrade", "日你……先人……"],
+    ["ijaC", "右边！开火！", JA],
+  ]),
+  PerLine("CaptiveInterrogation", [
+    ["ijaA", "他们的部队往哪儿撤了！问他！", JA],
+    ["interpreter", "是！", JA],
+    ["interpreter", "你们的人往哪儿撤了？"],
+    ["comrade", "……啥子？"],
+    ["interpreter", "你们大队！往哪儿撤了！"],
+    ["ijaB", "你这支那混蛋！快说！", JA],
+    ["comrade", "滚……二鬼子。"],
+    ["ijaA", "他说什么！", JA],
+    ["interpreter", "他什么也不肯说！光在骂人！", JA],
+    ["comrade", "老子骂的就是你们……狗日的。"],
+    ["comrade", "小日本。"],
+  ]),
+  PerLine("CaptiveTaunt", [
+    ["ijaA", "怎么了，支那混蛋！", JA],
+    ["ijaA", "用你那张嘴，再骂啊！", JA],
+    ["ijaB", "蠢货。", JA],
+    ["ijaC", "往前！快！", JA],
+  ]),
+  PerLine("ShunziFound", [["ijaA", "还藏着一个，支那混蛋。", JA]]),
+  PerLine("RescueInterrogation", [
+    ["ijaA", "这个也问！", JA],
+    ["interpreter", "是！", JA],
+    ["interpreter", "醒醒！你们的人往哪儿撤了？"],
+    ["interpreter", "听见没有？你们长官在哪儿？"],
+    ["ijaB", "快点！", JA],
+    ["interpreter", "说话！"],
+  ]),
+  PerLine("RescueFlee", [["interpreter", "有敌人！", JA]]),
+  PerLine("RescueCheck", [["luo", "还能打不？"]]),
+  PerLine("CollectionMeet", [
+    ["yaowa", "顺哥！你脸咋了？"],
+    ["shunzi", "还能走。"],
+    ["luo", "莫堵到！"],
+  ]),
+  PerLine("SupportOrder", [
+    ["guard", "东头丢了！西边机枪还在顶，前头那几个下不来！"],
+    ["luo", "老周喃？"],
+    ["guard", "还在前头！机枪压到起的！"],
+    ["luo", "何有田守后头！顺子，跟老子走！"],
+    ["shunzi", "不是撤了？"],
+    ["luo", "先把那几个接下来！"],
+  ]),
+  // —— 09.21 旧稿整段 cue：**待 Opening 包下线**（契约 §5.2 列为下线；旧导演 Script_OpeningStoryboards /
+  // Script_FirstLevelBunker / Script_FirstLevelFrontShow / 运行时还在 Say 它们，先保留文件与表项，别删）。
   Cue("BunkerKilling", [
     ["captiveHelper", "放开老子！日你先人！"],
     ["ijaA", "别动，混蛋！", {lang:"ja"}],
@@ -133,31 +210,25 @@ export const MISSION_DIALOGUE = Object.freeze([
     ["shunzi", "老子早说该走！硬是要等鬼子摸到裤裆底下才晓得跑！"],
     ["luo", "闭到你的臭嘴！跑！"],
   ], {delivery:"在后沟折角仍边跑边说，幺娃从侧后追上回看，顺子又急又怕地骂，班长催跑打断，不停在原地。"}),
-  Cue("SupportOrder", [
-    ["guard", "东头丢了！西边机枪还在顶，前头那几个下不来！"],
-    ["luo", "老周喃？"],
-    ["guard", "还在前头！机枪压到起的！"],
-    ["luo", "何有田守后头！顺子，跟老子走！"],
-  ], {delivery:"撤回守军从前方冲来，喘气报告并指路。班长先问老周，再指后沟安排何有田警戒，喊顺子回头接应。"}),
   // Notion 2026-09-22: stages 03–05, verbatim source and complete exchanges.
-  Cue("FrontBlockade", [["zhou", "右边破墙！冒火那个口子！把路封死了！"], ["luo", "周哥，顶一下！我们去拿右边！"], ["luo", "顺子，跟紧！莫走外头！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
-  Cue("FrontApproach", [["luo", "贴这道墙！前头有人！"], ["luo", "口子压住了，进！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
-  Cue("FrontAttack", [["luo", "土坎前头那一伙！莫让他们压到口子上！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
-  Cue("FrontWithdraw", [["luo", "压下去了！前头的，下来！往沟里走！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
-  Cue("TakeOverGun", [["luo", "何有田，接周哥那边！幺娃，扶他下去！"], ["zhou", "外头还有人！"], ["luo", "看到了！这边有人接，你先下去！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
-  Cue("TankRoadContact", [["heyoutian", "右边路上！战车出来了！"], ["luo", "先看住跟车的！前头还有人没下来！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
-  Cue("TankTerror", [["luo", "下来！莫站枪口上！退后墙！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
-  Cue("BundleOrder", [["guard", "外边旧弹药屋还有集束弹！后沟能过去！"], ["luo", "文财，看住沟口！何有田，前头交给你！"], ["luo", "顺子，跟我走后沟，去拿弹！"], ["shunzi", "前头还咋个过？"], ["luo", "莫走路上！跟到老子！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
-  Cue("BundleGo", [["heyoutian", "班长，快点！这边老子顶到！"], ["luo", "顺子，下沟！屋在墙后头！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
-  Cue("BundleProne", [["luo", "低点！上头看得到！"], ["luo", "前头岔口！有人下沟了！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
-  Cue("BundleSupply", [["keeper", "里头那个箱子！就剩这些！"], ["luo", "拿起！沿刚才的沟回！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
-  Cue("BundleReturnCall", [["heyoutian", "它又往前挤了！前头的人还卡到起！"], ["luo", "听到了！顺子，跟紧！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
-  Cue("BundleAttack", [["luo", "就这边！莫上大路！"], ["luo", "顺子，拿弹！旁边的人我看到！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
-  Cue("BundleRetreat", [["luo", "回来！低头！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
-  Cue("TankStopped", [["heyoutian", "停了！口子能过！"], ["luo", "前头的，下来！莫堵沟口！"], ["liuwencai", "还有人！后头跟上！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
-  Cue("FrontRelief", [["liuwencai", "这批过了！"], ["relief", "这里我们接！你们先下！"], ["luo", "走！回伤员那边！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
+  PerLine("FrontBlockade", [["zhou", "右边破墙！冒火那个口子！把路封死了！"], ["luo", "周哥，顶一下！我们去拿右边！"], ["luo", "顺子，跟紧！莫走外头！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
+  PerLine("FrontApproach", [["luo", "贴这道墙！前头有人！"], ["luo", "口子压住了，进！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
+  PerLine("FrontAttack", [["luo", "土坎前头那一伙！莫让他们压到口子上！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
+  PerLine("FrontWithdraw", [["luo", "压下去了！前头的，下来！往沟里走！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
+  PerLine("TakeOverGun", [["luo", "何有田，接周哥那边！幺娃，扶他下去！"], ["zhou", "外头还有人！"], ["luo", "看到了！这边有人接，你先下去！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
+  PerLine("TankRoadContact", [["heyoutian", "右边路上！战车出来了！"], ["luo", "先看住跟车的！前头还有人没下来！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
+  PerLine("TankTerror", [["luo", "下来！莫站枪口上！退后墙！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
+  PerLine("BundleOrder", [["guard", "外边旧弹药屋还有集束弹！后沟能过去！"], ["luo", "文财，看住沟口！何有田，前头交给你！"], ["luo", "顺子，跟我走后沟，去拿弹！"], ["shunzi", "前头还咋个过？"], ["luo", "莫走路上！跟到老子！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
+  PerLine("BundleGo", [["heyoutian", "班长，快点！这边老子顶到！"], ["luo", "顺子，下沟！屋在墙后头！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
+  PerLine("BundleProne", [["luo", "低点！上头看得到！"], ["luo", "前头岔口！有人下沟了！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
+  PerLine("BundleSupply", [["keeper", "里头那个箱子！就剩这些！"], ["luo", "拿起！沿刚才的沟回！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
+  PerLine("BundleReturnCall", [["heyoutian", "它又往前挤了！前头的人还卡到起！"], ["luo", "听到了！顺子，跟紧！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
+  PerLine("BundleAttack", [["luo", "就这边！莫上大路！"], ["luo", "顺子，拿弹！旁边的人我看到！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
+  PerLine("BundleRetreat", [["luo", "回来！低头！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
+  PerLine("TankStopped", [["heyoutian", "停了！口子能过！"], ["luo", "前头的，下来！莫堵沟口！"], ["liuwencai", "还有人！后头跟上！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
+  PerLine("FrontRelief", [["liuwencai", "这批过了！"], ["relief", "这里我们接！你们先下！"], ["luo", "走！回伤员那边！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
   // 06 回到伤员集结处，接下后送
-  Cue("Volunteer", [
+  PerLine("Volunteer", [
     ["runner", "这里有人接！你们班护着伤员往南，送到桥头接运点！"],
     ["luo", "交完人去哪？"],
     ["runner", "有人再给你们指路！"],
@@ -166,7 +237,7 @@ export const MISSION_DIALOGUE = Object.freeze([
   ], {
     delivery: "传令兵跑过来传令，气还没匀；罗班长问得干脆；顺子那句是主动争取，说得比平时快半拍，还想显得随口；罗班长不接他的茬，直接排人。",
   }),
-  Cue("BorrowLight", [
+  PerLine("BorrowLight", [
     ["zhou", "兄弟，有火没得？"],
     ["shunzi", "烟喃？"],
     ["zhou", "嘴里不是嗦。"],
@@ -179,7 +250,7 @@ export const MISSION_DIALOGUE = Object.freeze([
   ], {
     delivery: "老周靠在土壁边等担架，嘴里叼着一根没点着的纸烟，腿伤让他动一下就抽气。两人是刚混个脸熟的陌生人，互相占便宜、都不肯吃亏，语气是懒洋洋的斗嘴，不是温情。**这条录音里要留两处动作空当**：第五句之后停约两秒（顺子把火柴往兜里一收），第六句之后停约三秒（老周瞪他一眼，从衣襟里摸出压扁的纸烟包，又抽出一根递过去）。停顿里只有环境声和衣料摩擦，不许有台词、不许有笑声。最后一句轻描淡写地认栽。",
   }),
-  Cue("ZhouLift", [
+  PerLine("ZhouLift", [
     ["bearer", "周哥，走了！"],
     ["zhou", "等哈，烟才点起。"],
     ["bearer", "上担架再抽！"],

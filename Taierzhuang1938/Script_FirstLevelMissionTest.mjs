@@ -34,14 +34,15 @@ import { FirstLevelMissionVoice } from "./Script_FirstLevelMissionVoice.mjs";
 // Exercise the real dynamic voice recipes and admission rules. Only WebAudio's
 // device nodes/decoder are stand-ins; LoadVoices, Play, SetListener, movement and
 // the story dialogue slot run their production implementations.
+// 2026.09.23：01–06 改逐句干声（多声部播放器另有 VoiceTest 覆盖），这里改用 07/08 的整段录音。
 // 2026.09.19：军列开场下线，`TrainPack` / `TrainBanter` 那对并行轨随之没有数据了
 //（MissionVoiceTimeline 不再产出 parallel）。这一节改用现役的整段录音，
 // 覆盖的仍是同三件事：距离闸、预算闸、暂停/继续保留源偏移。
 {
   const {AudioEngine}=await import("./Script_Audio.mjs");
   const manifest=JSON.parse(fs.readFileSync(new URL("./Audio/FirstLevel/Data_FirstLevelVoiceManifest.json",import.meta.url)));
-  const cues=MISSION_DIALOGUE.filter(cue=>["BunkerBanter","SupportOrder"].includes(cue.id));
-  assert.equal(cues.length,2,"01 的黑屏对白与 03 的支援命令都还在台词表里");
+  const cues=MISSION_DIALOGUE.filter(cue=>["SouthWhisper","StreetBlocked"].includes(cue.id));
+  assert.equal(cues.length,2,"07 的沟内私语与 08 的主街受阻仍是整段录音（01–06 已改逐句，见 Script_FirstLevelVoiceTest）");
   const buffers=new Map(cues.map(cue=>[manifest.cues[cue.id].sha256,
     {duration:manifest.cues[cue.id].seconds,key:`Mission${cue.id}`} ]));
   const Param=()=>({value:0,setValueAtTime(value){this.value=value;},setTargetAtTime(value){this.value=value;},
@@ -68,7 +69,7 @@ import { FirstLevelMissionVoice } from "./Script_FirstLevelMissionVoice.mjs";
   // 掩蔽部里说话的人。听者留在上一帧渲染完的位置上 —— 那台相机还在一百四十米外。
   const position={x:A.bunker.x,y:.5,z:A.bunker.z};
   audio.SetListener(Camera(A.bunker.x,2.8,A.bunker.z+140));
-  assert.equal(audio.Play("voice.MissionSupportOrder",{position,priority:true}),null,
+  assert.equal(audio.Play("voice.MissionStreetBlocked",{position,priority:true}),null,
     "a listener left at the old rendered frame reproduces the missing shout");
   assert.equal(audio.drops.distance,1,"the real voice distance rule, not decoding or node budget, rejects it");
   audio.SetListener(Camera(A.bunker.x,1,A.bunker.z+.6));
@@ -77,20 +78,20 @@ import { FirstLevelMissionVoice } from "./Script_FirstLevelMissionVoice.mjs";
   const voice=new FirstLevelMissionVoice({audio,Clock:()=>ctx.currentTime,Position:()=>position,
     hud:{SayLines(){},Say(){}}});voice.manifest=manifest;
   try{
-    voice.Enqueue("BunkerBanter");voice.Update(0);
+    voice.Enqueue("SouthWhisper");voice.Update(0);
     const Step=count=>{for(let i=0;i<count;i++){ctx.currentTime+=1/60;voice.Update(1/60);}};
     Step(300);
     const main=audio.storyVoice;
     assert.ok(main,"the complete recording acquires a real AudioEngine voice handle");
     assert.ok(audio.activeVoices.has(main),"and keeps the story slot for the whole exchange");
-    assert.deepEqual(sources.map(source=>source.buffer.key),["MissionBunkerBanter"]);
+    assert.deepEqual(sources.map(source=>source.buffer.key),["MissionSouthWhisper"]);
     assert.ok(sources.every(source=>source.started&&source.playbackRate.value===1),
       "the loaded recipe schedules a source without changing pitch");
     assert.ok(main.distance<2&&main.panner,"the exchange stays spatial at the current listener");
     assert.ok(audio.stats.priorityOverBudget>0&&audio.drops.starved===0,
       "priority protects the dialogue from budget rejection");
     const before=voice.State();
-    assert.ok(before.sourceTime>4&&before.sourceTime<manifest.cues.BunkerBanter.seconds,
+    assert.ok(before.sourceTime>4&&before.sourceTime<manifest.cues.SouthWhisper.seconds,
       "five seconds in, the exchange is genuinely mid-recording");
     voice.Pause();ctx.currentTime+=10;voice.Update(10);
     assert.equal(voice.State().sourceTime,before.sourceTime);

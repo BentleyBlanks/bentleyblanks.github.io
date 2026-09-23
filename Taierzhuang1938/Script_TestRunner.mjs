@@ -58,7 +58,7 @@ export const testDefs = {
   OpeningStoryboardsTest: {file:"Script_OpeningStoryboardsTest.mjs",desc:"01–03 source rigs, baked animation hashes, normalized poses and V3 placement"},
   OpeningActorPerformanceBrowserTest: {file:"Script_OpeningActorPerformanceBrowserTest.mjs",timeoutMs:300000,desc:"Production-rig dialogue, idle, guard movement, planted feet and high-quality acting views"},
   OpeningFirstPersonTest: {file:"Script_OpeningFirstPersonTest.mjs",desc:"Production-arm anatomy, wrist twist and fixed bone lengths across 2000 poses"},
-  FirstLevelVoicePerspectiveTest: {file:"Script_FirstLevelVoicePerspectiveTest.mjs",timeoutMs:120000,desc:"Actual WebAudio self/world perspective, continuous cue source and audible dialogue filtering"},
+  FirstLevelVoicePerspectiveTest: {file:"Script_FirstLevelVoicePerspectiveTest.mjs",timeoutMs:120000,desc:"Actual WebAudio per-line dialogue: centred self line, spatial NPC lines, overlapping sources, dialogue sidechain, bark yield, concussion speech floor"},
   CarriagePropVelocityTest: {file:'Script_CarriagePropVelocityTest.mjs',timeoutMs:300000,desc:'Real cart/stretcher GPU velocities with moving camera, stop and reappearance; high-quality transfer scene'},
   MotionVectorContractTest: {file:'Script_MotionVectorContractTest.mjs',timeoutMs:120000,desc:'GPU admission contract for new rigid/skinned renderers, bone attachments, foreground inheritance and history lifecycle'},
   HitDisorientationTest: {file:"Script_HitDisorientationTest.mjs",timeoutMs:420000,desc:"Shared bullet disorientation: real GPU/audio, decay and lifecycle"},
@@ -100,8 +100,8 @@ export const testDefs = {
   FirstLevelEndTest: {file:'Script_FirstLevelEndTest.mjs',desc:'第一关 15–18：降压段无战斗、换手与静默行走、院门盘问与入院、门槛与最后一句、死亡段与接收处继续工作、尾队过桥与爆破清场、夜景与天空还原（纯 Node，毫秒级）'},
   MissionGatesTest: {file:'Script_MissionGatesTest.mjs',desc:'第一关编排表：事实门覆盖、按表生成与激活规则、运行时源码对账、编排模型'},
   FirstLevelMidTest: {file:'Script_FirstLevelMidTest.mjs',desc:'第一关 08–14（Mid 包）：担架停进遮挡、连屋近战先手、内院放行计数、两处威胁与装载联动、上车/停车/卸人时序、空袭目标与扑沟'},
-  FirstLevelVoiceTest: {file:'Script_FirstLevelVoiceTest.mjs',desc:'第一关台词表：契约 cue 清单/句数、与 Notion 转录逐字对账、日语行假名与中文字幕、具名事件、缺录音兜底（纯 Node，毫秒级）'},
-  FirstLevelVoiceAudioTest: {file:'Script_FirstLevelVoiceTest.mjs',args:['--audio'],desc:'第一关配音资产严格门：整段录音、当前提示词/台词哈希、强制对齐区间、清单无残留、敌军自动口令川话清单'},
+  FirstLevelVoiceTest: {file:'Script_FirstLevelVoiceTest.mjs',desc:'第一关台词表：01–02 对 09.23 新稿逐字、契约 cue/句数、日语假名与中文字幕、对白导演表、多声部播放器（重叠/截断/等事件/侧链）、缺录音兜底（纯 Node）'},
+  FirstLevelVoiceAudioTest: {file:'Script_FirstLevelVoiceTest.mjs',args:['--audio'],desc:'第一关配音资产严格门：01–06 逐句干声（定妆音/提示词哈希、真峰值、档位电平、信噪比、字错率、音色余弦、逐字时间）+ 07–18 整段录音哈希与对齐'},
   FirstLevelMissionBrowserTest: {file:'Script_FirstLevelMissionBrowserTest.mjs',args:['--campaign','--audio'],timeoutMs:1800000,desc:'新版第一关真实输入、掩蔽部、壕沟路线、作战与通关'},
   TextGatherCheck: { file: "Script_TextGather.mjs", args: ["--check"], desc: "内容文本清单：id 全局唯一、无空文本、与运行时 Localize 同一口径（纯 Node，毫秒级）" },
   TextTest: { file: "Script_TextTest.mjs", desc: "文本数据驱动闸门：语言表键/占位符、T() 静态引用、闸门模块零中文字面量（纯 Node，毫秒级）" },
@@ -635,11 +635,11 @@ const changedDomainRules = [
   { domain: "audio", pattern: /Script_Audio\.mjs|Script_AudioWiring|Data_Voice|Data_SfxSources|Data_AmbSources|Data_Tuning_Audio|BattleArtillery|FirstLevelMissionBattleSound|FirstLevelBattleSound/ },
   // 2026-09-23：场外近落弹与离图前线也要拉上第一关域（它们只在 01–06 的任务相位里开）。
   { domain: "firstLevel", pattern: /BattleArtillery|FirstLevelBattleSound/ },
-  { domain: "voice", pattern: /Script_Audio\.mjs|Data_Voice|Script_VoiceBake|Script_FirstLevelMissionVoice/ },
+  { domain: "voice", pattern: /Script_Audio\.mjs|Data_Voice|Script_VoiceBake|Script_FirstLevelMissionVoice|Script_DialoguePlayer|FirstLevelDialogueDirection|SeedAudioCastBake|SeedAudioSquadBarkBake|SeedAudioVoiceKit/ },
   // 2026.09.19 第三波：`FirstLevelMeal`（腊肉分食）与 `CarriageSoundscape`（车厢试听导出）
   // 两个关键词随模块删除一并摘掉。`BaconHandoff` / `FirstLevelTrain` / `FirstLevelCarriage`
   // 留着 —— 那几个名字下面还有保留的资产包与离线作者脚本。
-  {domain:'firstLevel',pattern:/MissionReturn|BaconHandoff|FirstLevelOpening|FirstLevelMachineGun|FirstLevelFrontPresence|FirstLevelBunker|FirstLevelCollection|FirstLevelFrontShow|FirstLevelFrontTest|FirstLevelMission|FirstLevelTrain|FirstLevelCarriage|FirstLevelVoice|FirstLevelGuideDialogue|FirstLevelGuideVoiceAlignment|FirstLevelJapaneseSpeech|SeedAudioFirstLevel|SeedAudioCarriage|Audio\/FirstLevel|Audio\/Amb\/AudioAmb_Carriage/},
+  {domain:'firstLevel',pattern:/MissionReturn|BaconHandoff|FirstLevelOpening|FirstLevelMachineGun|FirstLevelFrontPresence|FirstLevelBunker|FirstLevelCollection|FirstLevelFrontShow|FirstLevelFrontTest|FirstLevelMission|FirstLevelTrain|FirstLevelCarriage|FirstLevelVoice|FirstLevelGuideDialogue|FirstLevelGuideVoiceAlignment|FirstLevelJapaneseSpeech|SeedAudioFirstLevel|SeedAudioCarriage|DialoguePlayer|FirstLevelDialogueDirection|SeedAudioCastBake|SeedAudioSquadBarkBake|SeedAudioVoiceKit|Audio\/FirstLevel|Audio\/Amb\/AudioAmb_Carriage/},
   // 静态分件的图集合批：第一关尸体层与担架伤员用它（firstLevel 那一串里的
   // 尸体 / 演出门禁），而它动的是材质与提交量，所以 render 域的开机 / 采样器 /
   // 材质门禁也要跟着跑。
@@ -751,7 +751,7 @@ const prepushGateRules = [
   // 台词表 / 录音 / 强制对齐一动，推送前连整段录音的严格门一起跑（纯 Node，秒级）。
   {
     tests: ["FirstLevelVoiceAudioTest"],
-    pattern: /FirstLevelMissionDialogue|FirstLevelGuideDialogue|FirstLevelJapaneseSpeech|FirstLevelVoice|SeedAudioFirstLevel|Audio\/FirstLevel/,
+    pattern: /FirstLevelMissionDialogue|FirstLevelGuideDialogue|FirstLevelJapaneseSpeech|FirstLevelVoice|SeedAudioFirstLevel|FirstLevelDialogueDirection|SeedAudioCastBake|SeedAudioSquadBarkBake|SeedAudioVoiceKit|Audio\/FirstLevel/,
   },
 ];
 

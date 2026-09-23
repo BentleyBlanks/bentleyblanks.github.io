@@ -178,6 +178,9 @@ export class FirstLevelMissionRuntime {
       Event: (id,cueId,detail) => this.VoiceEvent(id,cueId,detail),
       Ready: (id) => this.Has(id),
       Clock: this.VoiceClock,
+      // 班组喊话认人（Voice 包薄钩子）：只在 01–06 生效、不认已阵亡的人。
+      Stage: () => this.flow?.stage?.id,
+      Alive: (who) => this.companion?.Handle(who)?.alive !== false,
     });
     // Who is talking -> which face moves (01-06 speakers; Script_FirstLevelSpeakerBinder).
     // Full binding only in the 01-06 steps; later steps keep the squad's mouths only.

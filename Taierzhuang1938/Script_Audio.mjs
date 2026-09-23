@@ -3828,7 +3828,8 @@ export class AudioEngine {
      * `budget` 留成 starved 的别名，老取证脚本与编辑器面板还在读它。
      */
     this.drops = {
-      dedupe: 0, distance: 0, stolen: 0, starved: 0,
+      // dialogue：01–06 逐句对白窗口里被让掉的自主喊话（Bark 非 priority）。
+      dedupe: 0, distance: 0, stolen: 0, starved: 0, dialogue: 0,
       get budget() { return this.starved; },
     };
     /**
@@ -3901,6 +3902,9 @@ export class AudioEngine {
     // 剧情语音**单槽**：同一时刻只许有一条对白在响（见 PlayStoryVoice）。
     this.storyVoice = null;          // 正在响的那条的 Voice 句柄
     this.storyVoiceKey = null;       // 它的 key（取证与编辑器用）
+    // 01–06 逐句对白（Script_DialoguePlayer）：每句一个独立声源，不占上面的单槽。
+    // dialogueYield 为真时非 priority 的自主喊话让路（Bark），由 SetDialogueDuck 写。
+    this.dialogueYield = false;
     // --- 实录音效采样。盖不上去就用合成的那套，同样不影响任何其他功能 ---
     this.sampleCues = new Set();     // 已经被采样盖住的配方名
     this.sfxErrors = [];
@@ -4042,10 +4046,14 @@ export class AudioEngine {
     // 有了这一组，玩家开枪时才能只压「远处那一片」而不动身边的脚步与喊话
     // （见 DuckAmbience）。混响回声**不接这里** —— 尾巴让路会听出「空间在闪」。
     this.farGain = ctx.createGain();
-    this.farGain.connect(this.sfxBus);
+    // 对白侧链（SetDialogueDuck）：远处战斗在说话窗口里让 −3 dB。独立节点，不跟开枪闪避抢 farGain。
+    this.dialogueFarDuck = ctx.createGain();
+    this.farGain.connect(this.dialogueFarDuck).connect(this.sfxBus);
     this.duckGain = ctx.createGain();
     this.storyDuck = ctx.createGain();
-    this.duckGain.connect(this.storyDuck).connect(this.masterGain);
+    // 对白侧链的环境床 + 音乐那一路（−6 dB）。storyDuck 仍归旧整段录音的 environmentGain。
+    this.dialogueDuck = ctx.createGain();
+    this.duckGain.connect(this.storyDuck).connect(this.dialogueDuck).connect(this.masterGain);
     this.musicBus = ctx.createGain();
     // 常数。每段曲子的配平在 MUSIC_CUES[cue].level 上，由 LoopLayer 施加 ——
     // 上一版是 Music() 去 ramp 这条总线，于是「切 cue」和「调音量」用的是同一个旋钮。
@@ -4298,6 +4306,7 @@ export class AudioEngine {
       this.sfxBus.disconnect();
       this.sfxUser.disconnect();
       this.farGain.disconnect();
+      this.dialogueFarDuck?.disconnect();
       this.musicBus.disconnect();
       this.musicUser.disconnect();
       this.ambienceBus.disconnect();
@@ -4305,6 +4314,7 @@ export class AudioEngine {
       this.ambienceUser.disconnect();
       this.duckGain.disconnect();
       this.storyDuck.disconnect();
+      this.dialogueDuck?.disconnect();
       this.masterGain.disconnect();
       this.busComp.disconnect();
       this.busMakeup.disconnect();
@@ -4644,11 +4654,19 @@ export class AudioEngine {
    *   · 全局 0.55 s —— 任何时刻场上最多一句人声压着另一句的尾巴
    *   · 同类 4.5 s  —— 同一句话不会连着来第二遍
    * 玩家自己那句（priority）不受全局闸限制，但仍受同类闸限制。
+   *
+   * 认得出是谁在喊时（`who`，或第一关 01–06 装的 `barkSpeaker` 按位置认人、不认已阵亡的人，见
+   * Script_FirstLevelMissionVoice.BarkSpeaker）只在这个人自己的版本里挑：声库键 `<key>@<who>`
+   * （Data_FirstLevelVoiceCast.SQUAD_BARK_*，用他的定妆音录的）。没有本人版本的 TTS 句不说
+   *（那是别人的嗓子），真人素材句（`sample`）照常可选；一条本人版本都没有才退回公用声库。
+   * 本人版本不叠 ±4% 变调 —— 那是给公用嗓子摊成一个班用的，调一动就不是他了。
    */
   Bark(kind, { position = null, volume = 1, priority = false, seed = 0, key = null,
-    side = "nra" } = {}) {
+    side = "nra", who = null } = {}) {
     // 章节可压低自主闲聊；具名脚本对白走 PlayStoryVoice，优先战术提示不受此闸影响。
     if (!priority && this.allowAutonomousBark?.() === false) return null;
+    // 01–06 剧情对白正在说：自主喊话让路（契约 §5.5）。只有逐句对白播放器会置这一位，07 以后不受影响。
+    if (!priority && this.dialogueYield) { this.drops.dialogue += 1; return null; }
     if (!this.ctx || this.disposed || !this.voicesReady || this.voiceMute) return null;
     // 太远的那一嗓子直接不算数 —— **要在两道节流闸之前判**：
     // 否则四百米外一个兵张个嘴就把 0.55 s 的全局闸占掉了，
@@ -4666,8 +4684,10 @@ export class AudioEngine {
     const kindKey = side + ":" + kind;
     if (now - (this.lastBarkKindAt.get(kindKey) || -99) < 4.5) return null;
 
-    const pool = [];
+    let pool = [];
     for (const e of this.voiceBank.values()) {
+      // 某个人自己的版本（`<key>@<who>`）只在认出是他时挑，不进公用池子。
+      if (e.barkOf) continue;
       // 阵营先过滤。声库里中日两套并存，挑错阵营就是日本兵喊中文（或反过来），
       // 那比没有配音更糟。未标 side 的一律按中方处理（旧条目的兼容默认）。
       if ((e.side || "nra") !== side) continue;
@@ -4686,13 +4706,24 @@ export class AudioEngine {
       if (e.kind === kind) pool.push(e);
     }
     if (!pool.length) return null;
+    const speaker = who ?? this.barkSpeaker?.({ seed, side, position, priority, kind, key }) ?? null;
+    let named = false;
+    if (speaker) {
+      const own = [];
+      for (const e of pool) {
+        const mine = this.voiceBank.get(e.key + "@" + speaker);
+        if (mine) own.push(mine);
+        else if (e.sample) own.push(e);
+      }
+      if (own.some((e) => e.barkOf)) { pool = own; named = true; }
+    }
     // 确定性挑选：种子给调用方（通常是士兵 id），同一个人倾向于喊同样的话，
     // 但不同的人不一样 —— 这比纯随机更像一个班。
     const rng = Mulberry32((HashString(kind) ^ Math.imul(seed + this.barkCounter, 2654435761)) >>> 0);
     this.barkCounter += 1;
     const pick = pool[Math.floor(rng() * pool.length) % pool.length];
     // ±4% 变调：把 6 个音色摊成一个班。种子固定 => 同一个兵的嗓子是稳定的。
-    const pitch = 0.96 + Mulberry32((seed * 2654435761) >>> 0)() * 0.08;
+    const pitch = named && pick.barkOf ? 1 : 0.96 + Mulberry32((seed * 2654435761) >>> 0)() * 0.08;
 
     this.lastBarkAt = now;
     this.lastBarkKindAt.set(kindKey, now);
@@ -4778,6 +4809,52 @@ export class AudioEngine {
       this.MoveVoice(voice, position);
     }
     return true;
+  }
+
+  /**
+   * 01–06 逐句对白的一句（Script_DialoguePlayer 调）。与 PlayStoryVoice 的区别：
+   *   · **不占单槽**：两句可以同时响（插话、压尾音），各自挂在各自说话人头上；
+   *   · 一句从头到尾只属于一个人：第一人称（顺子）或解析不到位置的句子走居中干声，
+   *     其余只走带 HRTF / 遮挡 / 距离的世界声，中途不在两路之间切换。
+   * 调用方逐帧 MoveVoice 跟头；停用 StopVoice。
+   * @returns {object|null} Voice 句柄；没有这条录音或静音时 null（调用方照走字幕）。
+   */
+  PlayDialogueLine(key, { position = null, firstPerson = false, volume = 1, offset = 0 } = {}) {
+    if (!this.ctx || this.disposed || this.voiceMute) return null;
+    if (!key || !this.voiceBank.get(key)) return null;
+    let at = position;
+    if (at) {
+      const dx = at.x - this.listenerPos.x, dy = at.y - this.listenerPos.y, dz = at.z - this.listenerPos.z;
+      if (dx * dx + dy * dy + dz * dz > VOICE_CULL_M * VOICE_CULL_M) at = null;
+    }
+    const centred = firstPerson || !at;
+    const voice = this.Play("voice." + key, { position: at || this.listenerPos, volume, offset, pitch: 1,
+      priority: true, storySpeech: true });
+    if (!voice) return null;
+    voice.dialogueLine = true;
+    voice.storySpeakerFirstPerson = centred;
+    // 有逐句对白在响时，震荡低通保住辅音（与整段单槽同一个下限，见 SetConcussion）。
+    (this.dialogueVoices ||= new Set()).add(voice);
+    if (this.concussionAmount != null) this.SetConcussion(this.concussionAmount, this.concussionLowHz);
+    if (voice.storySelfGain) {
+      voice.storySelfGain.gain.value = centred ? 1 : 0;
+      voice.storyWorldGain.gain.value = centred ? 0 : 1;
+      if (centred && voice.wetGain) voice.wetGain.gain.value = 0;
+    }
+    return voice;
+  }
+
+  /**
+   * 对白侧链：说话窗口内环境床与音乐压 ambienceDb、远声组压 farDb，SFX 不压；同时让自主喊话让路。
+   * active 由 Script_DialoguePlayer 按「当前有没有 priority 场景的句子在响（含句间 holdS）」写。
+   * 读数（取证）：dialogueDuck.gain / dialogueFarDuck.gain 的 value，drops.dialogue。
+   */
+  SetDialogueDuck(active, { ambienceDb = -6, farDb = -3, attackS = 0.08, releaseS = 0.45 } = {}) {
+    this.dialogueYield = !!active;
+    if (!this.ctx || !this.dialogueDuck || !this.dialogueFarDuck) return;
+    const t = this.ctx.currentTime, tau = Math.max(0.005, (active ? attackS : releaseS) / 3);
+    this.dialogueDuck.gain.setTargetAtTime(active ? DbGain(ambienceDb) : 1, t, tau);
+    this.dialogueFarDuck.gain.setTargetAtTime(active ? DbGain(farDb) : 1, t, tau);
   }
 
   /** 掐掉正在响的剧情台词（换关、切过场、被下一条顶掉时）。 */
@@ -5504,6 +5581,8 @@ export class AudioEngine {
 
   FreeVoice(v) {
     this.pendingVoices.delete(v);
+    if (v.dialogueLine && this.dialogueVoices?.delete(v) && this.concussionAmount != null)
+      this.SetConcussion(this.concussionAmount, this.concussionLowHz);
     if(v===this.storyVoice){this.storyVoice=null;this.storyVoiceKey=null;this.storyDuck?.gain.setTargetAtTime(1,this.ctx.currentTime,.25);
       if(this.concussionAmount!=null)this.SetConcussion(this.concussionAmount,this.concussionLowHz);this.RefreshDeafFloor();}
     this.activeVoices.delete(v);
@@ -5676,7 +5755,7 @@ export class AudioEngine {
     const cutoff=20000*Math.pow(Math.max(200,lowHz)/20000,Clamp01(amount));
     // Keep the concussion's muffled perspective, but preserve the consonants of
     // an active story line. Outside audible dialogue the authored curve resumes.
-    const floor=this.storyVoice?.storySpeakerSpeaking?STORY_SPEECH.concussionSpeechFloorHz:0;
+    const floor=(this.storyVoice?.storySpeakerSpeaking||this.dialogueVoices?.size)?STORY_SPEECH.concussionSpeechFloorHz:0;
     this.concussionFilter.frequency.setValueAtTime(Math.max(cutoff,floor),this.ctx.currentTime);
   }
 

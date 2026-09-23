@@ -25,7 +25,7 @@
 ## 2. 本轮定下的决定（集成负责人拍板，不再问）
 
 1. **02 还权门槛按 09.23 新稿**：日兵甲、乙必须被大刀真实砍死；岔口那名日兵被刘文财真实击倒；折角后的日兵与追兵**活着**也照样还权。取代 AGENTS.md 里「四名先头兵清场后才还权」的 09-23 现场口径（新稿编辑时间晚于那次反馈，且原文写明「不以NPC先清空四名日兵为前提」）。翻译逃向前沟，不设必杀。
-2. **配音管线改为「定妆参考音 + 逐句干声分轨 + 对白导演时间轴」**，只用于 01–06 的 cue；07–18 暂保留整段录音，两种格式并存。旧规矩「一段对白 = 一次请求 = 一条 mp3」在根 AGENTS.md、项目 AGENTS.md、VoiceSync 文档里同步改写（Voice 包负责）。干声分轨里**不许烘环境声**；环境与动作声交给游戏事件与声景。
+2. **配音管线改为「定妆参考音 + 场景整段一次生成 → 按句切开 → 各自定位播放 + 对白导演表」**，只用于 01–06 的 cue；07–18 暂保留整段录音、整条播放。（2026-09-23 23:40 用户改口径：「同一段对白尽量能一次生成而不是分开，这样能保证听起来像是一个环境，尽量少抽卡」——取代本条原先的「逐句干声分轨」；一个场景 = 一次请求 = 一条整段干声录音，带最多 3 条定妆参考音，只有硬错误才整段重抽，同场最多 3 次；整段一次母带后按逐字时间戳在句间静音处切成逐句片段，播放默认沿用录音里的原始间隔。）根 AGENTS.md、项目 AGENTS.md、VoiceSync 文档 §0 同步改写（Voice 包负责）。干声分轨里**不许烘环境声**；环境与动作声交给游戏事件与声景。
 3. **日军一律说日语**（台词与自主喊话）：`side:"ija"` 的喊话恢复为纯假名并用 2–3 个固定日本兵嗓子重录；翻译说日语时带北方口音、谄媚。班组（顺子/幺娃/罗/何/刘/老周）的战斗短句改用各自定妆音。
 4. **口型走骨骼，不用 morph**（守 MotionVector 契约第 12 条）：新做 NRA02、IJA02 面部 rig（IJA01 与 IJA02 头部同网格同顶点序，按顶点序拷权重），复用 NRA05；日兵乙从嘴闭合的 IJA03 改用 IJA01（均在批准选模清单内）。驱动用离线口型轨（逐句干声的语音能量 + 文本逐字/逐假名时间 → jaw/wide/round/close + 重音事件），运行时包络只做兜底。不下载新 Python 包：汉字到韵母的口形表手写（本关台词字数有限），假名直接映射元音。
 5. **空间以 3A 线性关卡为准重排 01–06**：拓扑图只作关系参考；硬约束见 §4。战车停在土坎线以北、不开进我方纵深；守军背坡改成土坎南坡的浅掩体（从我方一侧看得见）；03 起点设观察射台（先看清「人在哪、口子在哪、谁在封」）；右侧口袋向东扩开，取弹沟与接近沟分离。
@@ -71,7 +71,7 @@
 
 ### 5.2 01–02 对白场景（cue id）与逐句 id
 
-逐句 id = `<Scene>.<NN>`（两位序号，按原文顺序）。干声文件 `Audio/FirstLevel/Lines/AudioVoice_FirstLevel<Scene>_<NN>.mp3`。台词逐字取自新稿，不改字。
+逐句 id = `<Scene>.<NN>`（两位序号，按原文顺序）。逐句片段 `Audio/FirstLevel/Lines/AudioVoice_FirstLevel<Scene>_<NN>.mp3`（场景整段一次生成后按句切出；整段原录音 `Audio/FirstLevel/AudioVoice_FirstLevel<Scene>.mp3` 保留作来源与回退）。台词逐字取自新稿，不改字。
 
 | Scene | 行（who：原文，日语给「」原文，字幕为中文译文） |
 | --- | --- |
@@ -89,8 +89,8 @@
 | `CollectionMeet` | 01 yaowa 顺哥！你脸咋了？02 shunzi 还能走。03 luo 莫堵到！ |
 | `SupportOrder` | 01 guard 东头丢了！西边机枪还在顶，前头那几个下不来！02 luo 老周喃？03 guard 还在前头！机枪压到起的！04 luo 何有田守后头！顺子，跟老子走！05 shunzi 不是撤了？06 luo 先把那几个接下来！ |
 
-下线：`TrenchCurse`、`RescueLift`、`RescueOut`、`BunkerKilling`、`ShunziCurse`、`CornerCheck`、`RescueCall`（及其 VoiceTiming 特判）。非台词人声（笑、闷哼、吸气、割喉后的窒息、拖拽时的喘）作为 `effort` 类干声另出（Voice 包决定生成方式，禁用刺耳的 TTS 惨叫，见记忆「短喊话的音频闸」），挂在对应角色头上播放。
-03–06 的 cue id 与台词不变，但全部按新管线重录成逐句干声（同一 id 下的逐句文件）。
+下线：`TrenchCurse`、`RescueLift`、`RescueOut`、`BunkerKilling`、`ShunziCurse`、`CornerCheck`、`RescueCall`（及其 VoiceTiming 特判）。非台词人声（笑、闷哼、吸气、拖拽时的喘、冷笑）写进整段提示词的舞台说明、和台词一起演进同一条录音（导演表 `effort` 字段），切句时归到对应那一句、跟着那句挂在说话人头上播放；不做刺耳的 TTS 惨叫（割喉后的窒息交给 Sound 包的合成/素材，见记忆「短喊话的音频闸」）。
+03–06 的 cue id 与台词不变，但全部按新管线整段重录、切成逐句片段（同一 id 下的逐句文件）。
 
 ### 5.3 01–02 导演 phase（Opening 包实现；Anim 包按此出 clip）
 
@@ -115,7 +115,7 @@ voice.Speech(who) → { jaw, wide, round, close, stress, active }   // 口型驱
 voice.Say(cueId)  // 兼容旧入口：新格式 cue 用默认时间轴播放；07–18 旧 cue 仍是整段
 ```
 
-每句一个独立声源，挂在说话人头骨（第一人称顺子走居中干声），允许按时间轴重叠；字幕按每句自己的起止；对白窗口内对 ambience/music/远处战斗做侧链压低，非 priority 的自主喊话让路。时间轴数据 `Data_FirstLevelDialogueDirection.mjs`：每句 `{ after: "prev"|"event:<name>"|"gate", offsetS, projection: "shout"|"normal"|"low"|"breath", intensity, spatial }`。
+每句一个独立声源，挂在说话人头骨（第一人称顺子走居中干声），默认按整段录音里的原始间隔排（清单 `lines[id].gapBeforeS`），导演表只覆盖等动作/gate/截断/压尾音的几句，允许重叠；字幕按每句自己的起止；对白窗口内对 ambience/music/远处战斗做侧链压低，非 priority 的自主喊话让路。时间轴数据 `Data_FirstLevelDialogueDirection.mjs`：每句 `{ after: "prev"|"event:<name>"|"gate", offsetS（缺省 null = 沿用录音间隔）, projection: "shout"|"normal"|"low"|"breath", intensity, spatial }`，另有只进整段提示词的 `context/delivery/effort/pauseBeforeS`。
 
 ### 5.6 口型接口（Face 包）
 

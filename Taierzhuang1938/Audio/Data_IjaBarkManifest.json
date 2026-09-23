@@ -1,0 +1,257 @@
+{
+  "model": "seed-audio-1.0",
+  "cues": {
+    "ija_rally_charge": {
+      "file": "AudioVoice_IjaRallyCharge.mp3",
+      "text": "とつげき！",
+      "voice": "ijaA",
+      "castSha256": "492914e2b35b932a8fea7f2cd9c137e8023b0b112d26bd0e683f53d953463f41",
+      "version": "20260924000001",
+      "sha256": "f347fbba443c679b884f4d880af09228e3184a3358eee68392783006781aef6c",
+      "seconds": 0.51
+    },
+    "ija_rally_bayonet": {
+      "file": "AudioVoice_IjaRallyBayonet.mp3",
+      "text": "ちゃっけん！いそげ！",
+      "voice": "ijaB",
+      "castSha256": "f9ba276de41ef0e4b9e6b98c1c10b7fb83d110825ad44cfe23ec3b61b7ff6040",
+      "version": "20260924000001",
+      "sha256": "f353cdce3b594b0809fef4010fd9948085b07c17755569a40bbefc5a2179cf01",
+      "seconds": 1.17
+    },
+    "ija_rally_fire": {
+      "file": "AudioVoice_IjaRallyFire.mp3",
+      "text": "うちかたはじめ！",
+      "voice": "ijaA",
+      "castSha256": "492914e2b35b932a8fea7f2cd9c137e8023b0b112d26bd0e683f53d953463f41",
+      "version": "20260924000001",
+      "sha256": "d7d385952b047b43fc039303fdcc888e7b7d8ca403868afca0dede771c84cafb",
+      "seconds": 0.94
+    },
+    "ija_rally_follow": {
+      "file": "AudioVoice_IjaRallyFollow.mp3",
+      "text": "われにつづけ！",
+      "voice": "ijaA",
+      "castSha256": "492914e2b35b932a8fea7f2cd9c137e8023b0b112d26bd0e683f53d953463f41",
+      "version": "20260924000001",
+      "sha256": "59e576f765b72429e3405809c78f276567b3463aa3818842df451e5a9f258442",
+      "seconds": 0.88
+    },
+    "ija_rally_push": {
+      "file": "AudioVoice_IjaRallyPush.mp3",
+      "text": "おせ！おくれるな！",
+      "voice": "ijaA",
+      "castSha256": "492914e2b35b932a8fea7f2cd9c137e8023b0b112d26bd0e683f53d953463f41",
+      "version": "20260924000001",
+      "sha256": "9acb3033b6103d73e34931830f6a851f99b7b0b47ec7b4e42b1645d7911141e4",
+      "seconds": 1.55
+    },
+    "ija_rally_storm": {
+      "file": "AudioVoice_IjaRallyStorm.mp3",
+      "text": "とつげき！いっきにいけ！",
+      "voice": "ijaA",
+      "castSha256": "492914e2b35b932a8fea7f2cd9c137e8023b0b112d26bd0e683f53d953463f41",
+      "version": "20260924000001",
+      "sha256": "267c1822f83b9064f548b2d600f11697700ea89d7fbec01b0a0e9218619599f2",
+      "seconds": 1.98
+    },
+    "ija_rally_suppress": {
+      "file": "AudioVoice_IjaRallySuppress.mp3",
+      "text": "うて！うちつづけろ！",
+      "voice": "ijaA",
+      "castSha256": "492914e2b35b932a8fea7f2cd9c137e8023b0b112d26bd0e683f53d953463f41",
+      "version": "20260924000001",
+      "sha256": "c200984302645680cf50d9af9096a201f3a20b1beb8371fb3437a30b882cf5ab",
+      "seconds": 2.22
+    },
+    "ija_spot_enemy": {
+      "file": "AudioVoice_IjaSpotEnemy.mp3",
+      "text": "てきだ！ひだり！ひだりだ！",
+      "voice": "ijaD",
+      "castSha256": "1247b77d6d7c7dae8a1043b5ae247c5cf5c3bcd34f049a7d6df9c884b60b039a",
+      "version": "20260924000001",
+      "sha256": "86788fcc83ffdc79913a22ec7fac477a28766e9fc6fbfa5f6d82a78cf32a9114",
+      "seconds": 2.35
+    },
+    "ija_spot_roof": {
+      "file": "AudioVoice_IjaSpotRoof.mp3",
+      "text": "おくじょうにてき！",
+      "voice": "ijaD",
+      "castSha256": "1247b77d6d7c7dae8a1043b5ae247c5cf5c3bcd34f049a7d6df9c884b60b039a",
+      "version": "20260924000001",
+      "sha256": "248fb64c497ad8c776434f0206a1e65dd4b5cd8dfe252f98caadb3b5b6d79469",
+      "seconds": 2.03
+    },
+    "ija_spot_mg": {
+      "file": "AudioVoice_IjaSpotMg.mp3",
+      "text": "きかんじゅう！まえだ！",
+      "voice": "ijaD",
+      "castSha256": "1247b77d6d7c7dae8a1043b5ae247c5cf5c3bcd34f049a7d6df9c884b60b039a",
+      "version": "20260924000001",
+      "sha256": "5d8d6b54a49b72853b8027b898b6e66cb418b469443aac20f281b992a21ae2f1",
+      "seconds": 1.69
+    },
+    "ija_spot_shina": {
+      "file": "AudioVoice_IjaSpotShina.mp3",
+      "text": "しなへいだ！まだいるぞ！",
+      "voice": "ijaB",
+      "castSha256": "f9ba276de41ef0e4b9e6b98c1c10b7fb83d110825ad44cfe23ec3b61b7ff6040",
+      "version": "20260924000001",
+      "sha256": "0a15450ac67b751b2d439f88a97bced4d2809ef17a265ebf87a9777b38e8dc15",
+      "seconds": 2
+    },
+    "ija_spot_target": {
+      "file": "AudioVoice_IjaSpotTarget.mp3",
+      "text": "もくひょう！みぎぜんぽう！",
+      "voice": "ijaA",
+      "castSha256": "492914e2b35b932a8fea7f2cd9c137e8023b0b112d26bd0e683f53d953463f41",
+      "version": "20260924000001",
+      "sha256": "567d72364ac5f440e578ce545f580164f67dcb3bab8e53386b23bbab645d8120",
+      "seconds": 1.6
+    },
+    "ija_spot_wall": {
+      "file": "AudioVoice_IjaSpotWall.mp3",
+      "text": "じょうへきにてきへい！",
+      "voice": "ijaD",
+      "castSha256": "1247b77d6d7c7dae8a1043b5ae247c5cf5c3bcd34f049a7d6df9c884b60b039a",
+      "version": "20260924000001",
+      "sha256": "680900b7ac2cb0441f5c2b3385dc78f3c9f87671770dc35b1e10e92602a23d1a",
+      "seconds": 1.41
+    },
+    "ija_warn_down": {
+      "file": "AudioVoice_IjaWarnDown.mp3",
+      "text": "ふせろ！うごくな！",
+      "voice": "ijaB",
+      "castSha256": "f9ba276de41ef0e4b9e6b98c1c10b7fb83d110825ad44cfe23ec3b61b7ff6040",
+      "version": "20260924000001",
+      "sha256": "28753ecaf880b6d8114ae49e22d8cf2f74428be27a48f1a2ed1a49774c5a7fb6",
+      "seconds": 1.01
+    },
+    "ija_warn_cover": {
+      "file": "AudioVoice_IjaWarnCover.mp3",
+      "text": "かくれろ！あたまをさげろ！",
+      "voice": "ijaB",
+      "castSha256": "f9ba276de41ef0e4b9e6b98c1c10b7fb83d110825ad44cfe23ec3b61b7ff6040",
+      "version": "20260924000001",
+      "sha256": "4b5ccde62498640150e69159963d1dc759483f33912c0c83db2791da1291a72f",
+      "seconds": 2.35
+    },
+    "ija_warn_grenade": {
+      "file": "AudioVoice_IjaWarnGrenade.mp3",
+      "text": "てりゅうだん！ふせろ！",
+      "voice": "ijaD",
+      "castSha256": "1247b77d6d7c7dae8a1043b5ae247c5cf5c3bcd34f049a7d6df9c884b60b039a",
+      "version": "20260924000001",
+      "sha256": "309b99c32452e568519e6a8b4deeb4899a3def0935c8e57e613aaa8f546f8c0e",
+      "seconds": 1.86
+    },
+    "ija_warn_shell": {
+      "file": "AudioVoice_IjaWarnShell.mp3",
+      "text": "ほうげき！たいひ！",
+      "voice": "ijaA",
+      "castSha256": "492914e2b35b932a8fea7f2cd9c137e8023b0b112d26bd0e683f53d953463f41",
+      "version": "20260924000001",
+      "sha256": "8981173d0d2312ea7daa7f91e69e13148a7b1700de7e933324315d32dbe76c55",
+      "seconds": 1.06
+    },
+    "ija_ammo_out": {
+      "file": "AudioVoice_IjaAmmoOut.mp3",
+      "text": "だんやくをよこせ！",
+      "voice": "ijaD",
+      "castSha256": "1247b77d6d7c7dae8a1043b5ae247c5cf5c3bcd34f049a7d6df9c884b60b039a",
+      "version": "20260924000001",
+      "sha256": "9438a6be9f8dd60c52467c6ada200edbe3dfe59791c402a68add0650957de891",
+      "seconds": 1.41
+    },
+    "ija_ammo_reload": {
+      "file": "AudioVoice_IjaAmmoReload.mp3",
+      "text": "そうてんちゅう！えんごたのむ！",
+      "voice": "ijaD",
+      "castSha256": "1247b77d6d7c7dae8a1043b5ae247c5cf5c3bcd34f049a7d6df9c884b60b039a",
+      "version": "20260924000001",
+      "sha256": "6d176ff76ce109e1680b2dacc877ac46bb65b47b86be6ee21aa02e2bae414619",
+      "seconds": 2.34
+    },
+    "ija_ammo_pass": {
+      "file": "AudioVoice_IjaAmmoPass.mp3",
+      "text": "だんやく！はやくまわせ！",
+      "voice": "ijaD",
+      "castSha256": "1247b77d6d7c7dae8a1043b5ae247c5cf5c3bcd34f049a7d6df9c884b60b039a",
+      "version": "20260924000001",
+      "sha256": "096a8cf5b429575528c660c6e67f273ad2a1c52a15e6f3f9a7e2865689763975",
+      "seconds": 2.24
+    },
+    "ija_hurt_hit": {
+      "file": "AudioVoice_IjaHurtHit.mp3",
+      "text": "うでをやられた！",
+      "voice": "ijaD",
+      "castSha256": "1247b77d6d7c7dae8a1043b5ae247c5cf5c3bcd34f049a7d6df9c884b60b039a",
+      "version": "20260924000001",
+      "sha256": "e76463a51321e0c4f27b069796a2c52b07fb7d77db723bf7a685ee31c68fb43a",
+      "seconds": 0.95
+    },
+    "ija_hurt_leg": {
+      "file": "AudioVoice_IjaHurtLeg.mp3",
+      "text": "あしをやられた！",
+      "voice": "ijaD",
+      "castSha256": "1247b77d6d7c7dae8a1043b5ae247c5cf5c3bcd34f049a7d6df9c884b60b039a",
+      "version": "20260924000001",
+      "sha256": "269f2e4168404e02323a4eb71e059224a6cb6ba2d5e1f186aa204acd22845bb3",
+      "seconds": 1.09
+    },
+    "ija_hurt_leader": {
+      "file": "AudioVoice_IjaHurtLeader.mp3",
+      "text": "ぶんたいちょうどのがやられた！",
+      "voice": "ijaD",
+      "castSha256": "1247b77d6d7c7dae8a1043b5ae247c5cf5c3bcd34f049a7d6df9c884b60b039a",
+      "version": "20260924000001",
+      "sha256": "9f5cc381bcea0ecc8d15997d9b75b32fa6edaf0fb9120d4b540482e0140decfd",
+      "seconds": 2.35
+    },
+    "ija_hurt_medic": {
+      "file": "AudioVoice_IjaHurtMedic.mp3",
+      "text": "えいせいへい！こっちだ！",
+      "voice": "ijaD",
+      "castSha256": "1247b77d6d7c7dae8a1043b5ae247c5cf5c3bcd34f049a7d6df9c884b60b039a",
+      "version": "20260924000001",
+      "sha256": "1b3b492cdd1ce3da779483ac73a158b375ff456f2f285dc9a3e2b3e8db9b77b4",
+      "seconds": 2.02
+    },
+    "ija_move_advance": {
+      "file": "AudioVoice_IjaMoveAdvance.mp3",
+      "text": "さんかい！まえへ！",
+      "voice": "ijaA",
+      "castSha256": "492914e2b35b932a8fea7f2cd9c137e8023b0b112d26bd0e683f53d953463f41",
+      "version": "20260924000001",
+      "sha256": "b2e89772eebcd5ec995adaa002d06aea70f2afc4ac7a37cc529e75175e4af543",
+      "seconds": 1.31
+    },
+    "ija_move_back": {
+      "file": "AudioVoice_IjaMoveBack.mp3",
+      "text": "いったんさがれ！",
+      "voice": "ijaA",
+      "castSha256": "492914e2b35b932a8fea7f2cd9c137e8023b0b112d26bd0e683f53d953463f41",
+      "version": "20260924000001",
+      "sha256": "5777d38dc8f00f001deb99d27424bf867ebd7e2d9094b0d44d2072feedb85ee5",
+      "seconds": 1.05
+    },
+    "ija_move_flank": {
+      "file": "AudioVoice_IjaMoveFlank.mp3",
+      "text": "そくめんにまわれ！",
+      "voice": "ijaA",
+      "castSha256": "492914e2b35b932a8fea7f2cd9c137e8023b0b112d26bd0e683f53d953463f41",
+      "version": "20260924000001",
+      "sha256": "64c77e26d4198c632332b270d036bbe966134e8fab3a32a76d78cbd067b54187",
+      "seconds": 1.11
+    },
+    "ija_move_forward": {
+      "file": "AudioVoice_IjaMoveForward.mp3",
+      "text": "まえへでろ！おせ！",
+      "voice": "ijaA",
+      "castSha256": "492914e2b35b932a8fea7f2cd9c137e8023b0b112d26bd0e683f53d953463f41",
+      "version": "20260924000001",
+      "sha256": "c29aec068c44bce12516b741e074c4fbfaa9f832895be46dcab109254b4e27a1",
+      "seconds": 1.71
+    }
+  }
+}

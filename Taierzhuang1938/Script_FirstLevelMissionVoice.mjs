@@ -1,12 +1,66 @@
 import { MISSION_TUNING } from "./Data_Tuning_FirstLevel.mjs";
 import { MissionVoiceTimeline } from "./Data_FirstLevelMissionVoiceTiming.mjs";
 import { MISSION_DIALOGUE, MISSION_VOICE_CAST, MissionVoiceSubtitle } from "./Data_FirstLevelMissionDialogue.mjs";
+import { FIRST_LEVEL_DIALOGUE_DIRECTION, LineDirection, PlaybackOffset } from "./Data_FirstLevelDialogueDirection.mjs";
+import { FIRST_LEVEL_VOICE_CAST, SQUAD_BARK_CAST, SQUAD_BARK_STAGES } from "./Data_FirstLevelVoiceCast.mjs";
 import { Localize } from "./Script_Text.mjs";
 import { FirstLevelVoiceTextId, FirstLevelCastTextId } from "./Script_TextIds.mjs";
 import { SampleSpeechEnvelope } from "./Script_SpeechEnvelope.mjs";
+import { DialoguePlayer } from "./Script_DialoguePlayer.mjs";
+// 两种格式并存（契约 docs/Data_FirstLevel0105Refactor20260923Contract.md §2.2 / §5.5）：
+//   · 逐句（cue.perLine）：01–06。整段一次生成、按句切开的片段，DialoguePlayer 默认按整段录音里的原始间隔
+//     排（清单 lines[id].gapBeforeS），导演表只覆盖等动作 / 截断 / 压尾音的几处；每句挂在说话人头上、
+//     可重叠、侧链让路。入口 PlayScene / PlayLine（导演直接调，可并行）与 Say/Enqueue（排队，兼容旧调用）。
+//     逐句录音还没烘完的 cue：若旧整段录音还在就先走旧整段（03–06 过渡期），否则按估时走字幕。
+//   · 整段（旧格式）：07–18 与待 Opening 包下线的 09.21 旧 cue，行为不变。
+const CHARS_PER_SECOND = Object.freeze({ zh: 4.6, ja: 7.5 });
+/** 缺录音时按字数估一句的时长（秒）。 */
+export function EstimateLineSeconds(line) {
+  const chars = String(line.text || "").replace(/[\s，。！？、；：…—“”‘’「」（）,.!?]/g, "").length;
+  return Math.max(0.6, chars / (CHARS_PER_SECOND[line.lang === "ja" ? "ja" : "zh"]) + 0.25);
+}
+/**
+ * 排队播放的逐句场景也给旧读法一个 current：`plan.lines[i] = [开口时刻, 结束时刻]`（场景时钟，还没开口的是
+ * [Infinity, Infinity]）、`sourceTime` = 场景时钟、`index` = 正在说的那句。开场分镜、驾驶脚本按这三样找「谁在说」。
+ */
+function PerLineCurrent(cue, scene) {
+  const Plan = () => ({
+    lines: scene.lines.map((l) => l.state === "pending" || l.startAt == null ? [Infinity, Infinity]
+      : [l.startAt, l.state === "done" ? l.endAt : l.startAt + l.playLength]),
+    segments: [{ start: 0, end: Infinity }], parallel: [],
+  });
+  return {
+    cue, scene, phase: "playing", time: 0, parallel: [], events: new Set(),
+    get plan() { return Plan(); },
+    get sourceTime() { return scene.time; },
+    get index() { return scene.lines.findLastIndex((l) => l.state === "playing"); },
+  };
+}
+
+/** 认人用的假 cue：VoicePosition 各分支都按 cue.id 点名，这个 id 谁也不认，只会走「按 who 找人」那条通路。 */
+const BARK_CUE = Object.freeze({ id: "SquadBark", lines: Object.freeze([]) });
+/** 喊话位置与某人位置的水平距离不超过它，才算是这个人在喊（米）。Script_Ai 给的是脚底、VoicePosition 给头，站姿差不到这么多。 */
+export const BARK_SPEAKER_MATCH_M = 0.6;
+
 export class FirstLevelMissionVoice {
-  constructor({ audio, hud, Position, Listener, Done, Event, Ready, Clock }) {
-    Object.assign(this, { audio, hud, Position, Listener, Done, Event, Ready, Clock });
+  /**
+   * Stage() → 当前关卡步骤 id；Alive(who) → 这个班组成员还活着没有（缺省当活着）。两者只给班组喊话认人用：
+   * 认人只在 SQUAD_BARK_STAGES（01–06）里生效，没注入 Stage 就一律不认；死人不认（阵亡那一声是旁边的人喊的）。
+   */
+  constructor({ audio, hud, Position, Listener, Done, Event, Ready, Clock, Stage, Alive }) {
+    Object.assign(this, { audio, hud, Position, Listener, Done, Event, Ready, Clock, Stage, Alive });
+    this.dialogue = new DialoguePlayer({
+      audio,
+      Clock,
+      Listener,
+      Subtitles: (rows, seconds) => {
+        if (this.hud?.SayLines) this.hud.SayLines(rows, seconds);
+        else for (const row of rows) if (row.started) this.hud?.Say?.(row.speaker, row.text, row.seconds);
+      },
+      Event: (id, sceneId, detail) => this.DialogueEvent(id, sceneId, detail),
+    });
+    /** 导演直接开的场景（PlayScene / PlayLine），不经队列。 */
+    this.scenes = new Map();
     this.queue = [];
     this.played = new Set();
     this.finished = new Set();
@@ -27,7 +81,18 @@ export class FirstLevelMissionVoice {
       );
       if (!response.ok) throw new Error(`Voice manifest HTTP ${response.status}`);
       this.manifest = await response.json();
-      const entries = MISSION_DIALOGUE.filter((cue) => this.manifest.cues[cue.id]).map((cue) => ({
+      this.manifest.cues ||= {};
+      this.manifest.lines ||= {};
+      const lineEntries = MISSION_DIALOGUE.filter((cue) => this.PerLineRecorded(cue)).flatMap((cue) => cue.lines.map((line) => ({
+        key: this.LineKey(line.id),
+        file: line.file,
+        kind: "story",
+        side: FIRST_LEVEL_VOICE_CAST[line.who]?.faction === "ija" ? "ija" : "nra",
+        gain: 1,
+        version: this.manifest.lines[line.id].sha256,
+        analyzeSpeech: true,
+      })));
+      const entries = MISSION_DIALOGUE.filter((cue) => this.manifest.cues[cue.id] && !this.PerLineRecorded(cue)).map((cue) => ({
         key: `Mission${cue.id}`,
         file: cue.file,
         kind: "story",
@@ -36,11 +101,138 @@ export class FirstLevelMissionVoice {
         version: this.manifest.cues[cue.id].sha256,
         analyzeSpeech: true,
       }));
-      await this.audio.LoadVoices(new URL("./Audio/FirstLevel/", import.meta.url).href, entries);
+      await this.audio.LoadVoices(new URL("./Audio/FirstLevel/", import.meta.url).href, [...entries, ...lineEntries]);
       this.loaded = true;
     } catch (error) {
       this.errors.push(error.message);
     }
+    // 班组短句不挡对白与关卡开场（voiceReady 之后才跳关、起音乐）：另起一路，装好之前喊话用公用声库。
+    this.squadBarksReady ??= this.LoadSquadBarks();
+  }
+  /**
+   * 班组战斗短句的本人版本（Data_FirstLevelVoiceCast.SQUAD_BARK_*）：声库键 `<key>@<who>`，带 barkOf。
+   * 装上认人钩子 audio.barkSpeaker；Script_Audio.Bark 认出是谁在喊就只在他自己的版本里挑。
+   */
+  async LoadSquadBarks() {
+    try {
+      const response = await fetch(new URL("./Audio/FirstLevel/Data_FirstLevelSquadBarkManifest.json", import.meta.url),
+        { cache: "no-cache", signal: AbortSignal.timeout(15000) });
+      if (!response.ok) throw new Error(`Squad bark manifest HTTP ${response.status}`);
+      const manifest = await response.json();
+      const entries = Object.entries(manifest.barks || {}).map(([bank, entry]) => ({
+        key: bank, file: entry.file, kind: entry.kind || null, side: "nra", barkOf: entry.who, base: entry.key, gain: 1, version: entry.sha256,
+      }));
+      await this.audio.LoadVoices(new URL("./Audio/FirstLevel/", import.meta.url).href, entries);
+      this.squadBarks = entries.length;
+      if (this.disposed) return;
+      this.barkSpeakerHook = (query) => this.BarkSpeaker(query);
+      this.audio.barkSpeaker = this.barkSpeakerHook;
+    } catch (error) {
+      this.errors.push(error.message);
+    }
+  }
+  /**
+   * 这一嗓子是谁喊的（Script_Audio.Bark 的认人钩子）。Script_Ai 只给阵营、种子（士兵 id）和脚底位置，
+   * 这里拿位置去对：玩家下令（种子 0、priority）对玩家本人；其余对班组每个人现在的位置（VoicePosition
+   * 按 who 找人的那条通路），水平距离 ≤ BARK_SPEAKER_MATCH_M 的最近那个。VoicePosition 找不到人时
+   * 退回的是玩家身边那一点，先量出这一点，等于它的一律当「没找到」。认不出返回 null（用公用声库）。
+   * 只在 01–06（SQUAD_BARK_STAGES）认人，07 以后行为不变；已阵亡的人不认——Script_Ai.Kill 在阵亡处喊的
+   * hurt 是旁边的人喊的，不能认成死者自己（那样「班长哦！班长！」就再也挑不到了）。
+   */
+  BarkSpeaker({ seed = 0, side = "nra", position = null, priority = false } = {}) {
+    if (side !== "nra" || !position) return null;
+    const Flat = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
+    try {
+      if (!SQUAD_BARK_STAGES.includes(this.Stage?.())) return null;
+      if (!seed && priority) {
+        const listener = this.Listener?.();
+        return listener && SQUAD_BARK_CAST.shunzi && Flat(listener, position) <= BARK_SPEAKER_MATCH_M ? "shunzi" : null;
+      }
+      const fallback = this.Position(BARK_CUE, { who: "__nobody__" });
+      let best = null, bestDistance = BARK_SPEAKER_MATCH_M;
+      for (const who of Object.keys(SQUAD_BARK_CAST)) {
+        if (who === "shunzi") continue;
+        if (this.Alive && !this.Alive(who)) continue;
+        const at = this.Position(BARK_CUE, { who });
+        if (!at || (fallback && at.distanceTo(fallback) < 1e-3)) continue;
+        const distance = Flat(at, position);
+        if (distance <= bestDistance) { best = who; bestDistance = distance; }
+      }
+      return best;
+    } catch {
+      return null;
+    }
+  }
+  LineKey(lineId) { return `Mission${lineId.replace(".", "_")}`; }
+  /** 这条逐句 cue 的每一句都有干声录音。 */
+  PerLineRecorded(cue) {
+    return !!cue?.perLine && cue.lines.every((line) => this.manifest.lines?.[line.id]);
+  }
+  /** 走逐句播放器：逐句录音齐了，或旧整段录音不存在（那就按估时走字幕）。 */
+  UsesDialoguePlayer(cue) {
+    return !!cue?.perLine && (this.PerLineRecorded(cue) || !this.manifest.cues?.[cue.id]);
+  }
+  /** 把台词表 + 导演表 + 清单拼成播放器要的场景。 */
+  BuildScene(cue, only = null) {
+    const lines = cue.lines.map((line, index) => {
+      if (only && line.id !== only) return null;
+      const key = this.LineKey(line.id), bank = this.audio?.voiceBank?.get(key);
+      const entry = this.manifest.lines?.[line.id];
+      const direction = LineDirection(cue, index);
+      return {
+        id: line.id, index, who: line.who, lang: line.lang || "zh",
+        key: bank ? key : null,
+        duration: bank?.duration || entry?.seconds || EstimateLineSeconds(line),
+        sha256: entry?.sha256 || null,
+        speaker: Localize(FirstLevelCastTextId(line.who), MISSION_VOICE_CAST[line.who]?.[0] || line.who),
+        text: Localize(FirstLevelVoiceTextId(cue.id, index), MissionVoiceSubtitle(cue, index)),
+        subtitle: cue.subtitles === false ? false : true,
+        direction: only ? Object.freeze({ ...direction, after: "start", offsetS: 0 })
+          : Object.freeze({ ...direction, offsetS: PlaybackOffset(direction, entry?.gapBeforeS) }),
+      };
+    }).filter(Boolean);
+    return { id: cue.id, priority: FIRST_LEVEL_DIALOGUE_DIRECTION[cue.id]?.priority ?? true, lines };
+  }
+  /**
+   * 契约 §5.5：导演直接开一场对白（不排队，可与别的场景并行）。
+   * speakers[who] = 演员 | () => Vector3 | Vector3；缺的人退回运行时的 VoicePosition。
+   */
+  PlayScene(sceneId, { speakers = {}, gate = null, onLine = null, onEnd = null, priority } = {}) {
+    const cue = MISSION_DIALOGUE.find((entry) => entry.id === sceneId);
+    if (!cue?.perLine) {
+      if (!this.unknown.has(sceneId)) { this.unknown.add(sceneId); console.warn(`FirstLevelMissionVoice: ${sceneId} is not a per-line scene`); }
+      return null;
+    }
+    this.scenes.get(sceneId)?.Stop();
+    const handle = this.dialogue.Play(this.BuildScene(cue), {
+      speakers, gate, priority,
+      Position: (line) => this.Position?.(cue, cue.lines[line.index]),
+      onLine, onEnd: (h) => { this.scenes.delete(sceneId); this.finished.add(sceneId); this.Done?.(sceneId); onEnd?.(h); },
+    });
+    this.played.add(sceneId);
+    this.scenes.set(sceneId, handle);
+    return handle;
+  }
+  /** 单独播一句（lineId = "<Scene>.<NN>"）。 */
+  PlayLine(lineId, speaker = null, { onEnd = null, priority } = {}) {
+    const sceneId = String(lineId).split(".")[0];
+    const cue = MISSION_DIALOGUE.find((entry) => entry.id === sceneId);
+    const line = cue?.lines.find((entry) => entry.id === lineId);
+    if (!line) { console.warn(`FirstLevelMissionVoice: unknown line ${lineId}`); return null; }
+    return this.dialogue.Play(this.BuildScene(cue, lineId), {
+      speakers: speaker ? { [line.who]: speaker } : {}, priority,
+      Position: () => this.Position?.(cue, line), onEnd,
+    });
+  }
+  /** 导演事件（如 ThroatCut / Blast）：转给所有在播的逐句场景（after:event / stopOn 用）。 */
+  Signal(name) {
+    for (const handle of this.scenes.values()) handle.Signal(name);
+    if (this.current?.scene) this.current.scene.Signal(name);
+  }
+  /** 播放器发的事件：Line 与具名事件原样转给运行时（与旧整段的 Line 事件同形）。 */
+  DialogueEvent(id, sceneId, detail) {
+    if (id === "SceneEnd") return;
+    this.Event?.(id, sceneId, detail);
   }
   Enqueue(id, { urgent = false } = {}) {
     if (!id || this.played.has(id) || this.queue.includes(id)) return false;
@@ -55,6 +247,7 @@ export class FirstLevelMissionVoice {
     if (urgent) {
       this.StopParallel();
       this.audio.StopStoryVoice();
+      this.current?.scene?.Stop();
       this.current = null;
       this.queue = [];
     }
@@ -76,6 +269,13 @@ export class FirstLevelMissionVoice {
   Finish() {
     if (!this.current) return;
     const id = this.current.cue.id;
+    if (this.current.scene) {
+      this.current.scene.Stop();
+      this.finished.add(id);
+      this.current = null;
+      this.Done?.(id);
+      return;
+    }
     this.DialogueLine(this.current, -1);
     this.StopParallel();
     this.audio.StopStoryVoice();
@@ -93,18 +293,24 @@ export class FirstLevelMissionVoice {
   Cancel(ids) {
     this.queue=this.queue.filter(id=>!ids.includes(id));
     for(const id of ids)this.played.add(id);
+    for(const id of ids){this.scenes.get(id)?.Stop();this.scenes.delete(id);}
     if(this.current&&ids.includes(this.current.cue.id)){
-      this.DialogueLine(this.current,-1);this.StopParallel();this.audio.StopStoryVoice();this.current=null;
+      if(this.current.scene)this.current.scene.Stop();
+      else{this.DialogueLine(this.current,-1);this.StopParallel();this.audio.StopStoryVoice();}
+      this.current=null;
     }
   }
   Pause() {
     this.paused = true;
     this.StopParallel();
     this.audio.StopStoryVoice();
+    this.dialogue.PauseAll();
   }
   Resume() {
     if (!this.paused) return;
     this.paused = false;
+    this.dialogue.ResumeAll();
+    if (this.current?.scene) return;
     if (this.current?.phase === "playing") this.PlaySegment();
     for (const track of this.current?.parallel || []) if (!track.finished) this.PlayParallel(track);
     if (this.current) this.current.index = -1;
@@ -227,9 +433,27 @@ export class FirstLevelMissionVoice {
   }
   Update(dt) {
     if (this.paused) return;
+    this.dialogue.Update(dt);
+    if (this.current?.scene) {
+      if (this.current.scene.done) {
+        const id = this.current.cue.id;
+        this.current = null;
+        this.finished.add(id);
+        this.Done?.(id);
+      }
+      return;
+    }
     if (!this.current && this.queue.length) {
       const id=this.queue.shift(), cue=MISSION_DIALOGUE.find(cue=>cue.id===id);
       if (!cue) return;
+      if (this.UsesDialoguePlayer(cue)) {
+        const scene = this.dialogue.Play(this.BuildScene(cue), {
+          Position: (line) => this.Position?.(cue, cue.lines[line.index]),
+        });
+        this.current = PerLineCurrent(cue, scene);
+        this.played.add(cue.id);
+        return;
+      }
       const total=this.Duration(cue);
       const plan=MissionVoiceTimeline(cue,total);
       const recorded=!!this.manifest.cues[cue.id];
@@ -294,7 +518,10 @@ export class FirstLevelMissionVoice {
     }
   }
   Speech(who) {
-    if (this.paused || this.audio.voiceMute || !this.current) return null;
+    if (this.paused || this.audio.voiceMute) return null;
+    const line = this.dialogue.Speech(who, SampleSpeechEnvelope);
+    if (line) return line;
+    if (!this.current || this.current.scene) return null;
     for (const track of [this.current, ...(this.current.parallel || [])]) {
       if (track.finished || (track === this.current && track.phase !== "playing") || !track.voice
           || track.voice.reclaimed || track.voice.stopping) continue;
@@ -316,18 +543,24 @@ export class FirstLevelMissionVoice {
   State() {
     return {
       loaded:this.loaded,paused:this.paused,available:Object.keys(this.manifest.cues).length,
+      availableLines:Object.keys(this.manifest.lines||{}).length,dialogue:this.dialogue.State(),
+      scenes:[...this.scenes.keys()],
       required:MISSION_DIALOGUE.length,played:[...this.played],finished:[...this.finished],
       missing:[...this.missing],unknown:[...this.unknown],
       current:this.current?.cue.id||null,queue:[...this.queue],errors:[...this.errors],
-      segment:this.current?.plan.segments[this.current.segmentIndex]?.id||null,
+      segment:this.current?.plan?.segments[this.current.segmentIndex]?.id||null,
       playbackPhase:this.current?.phase||null,sourceTime:this.current?.sourceTime||0,
       parallel:(this.current?.parallel||[]).map(track=>({id:track.cue.id,sourceTime:track.sourceTime,
         total:track.total,finished:track.finished,speaker:track.index>=0?track.cue.lines[track.index].who:null})),
     };
   }
   Dispose() {
+    this.disposed = true;
+    if (this.barkSpeakerHook && this.audio.barkSpeaker === this.barkSpeakerHook) this.audio.barkSpeaker = null;
     this.StopParallel();
     this.audio.StopStoryVoice();
+    this.dialogue.StopAll();
+    this.scenes.clear();
     this.queue=[];
     this.current=null;
   }

@@ -3,10 +3,9 @@ import { MISSION_VOICE_ALIGNMENT } from "./Data_FirstLevelMissionVoiceAlignment.
 // 2026-09-19 重构：军列相关的 gate / parallel / 事件全部下线。
 export const MISSION_VOICE_TIMING = Object.freeze({});
 // 具名事件（玩法包按这些名字接动作；每句开始另有通用的 "Line" 事件）：
-//   BunkerBlast                01 BunkerBanter 末句被近爆打断的那一刻（录音在此戛然而止）
+//   （01–06 已改逐句干声：BunkerBlast 由导演表 BunkerIncoming.01 的截断点发，见 Data_FirstLevelDialogueDirection）
 //   RescueHeave                02 RescueLift「一、二——起！」的「起」
-//   BorrowLightMatchesPocketed 06 BorrowLight 第一处动作空当：顺子把火柴往兜里一收
-//   BorrowLightCigaretteOffered06 BorrowLight 第二处动作空当：老周摸出烟包递一根过去
+//   BorrowLight 两处动作空当（整段录音过渡期；逐句后由导演表 emit 发同名事件）
 //   AircraftDiveOrder          14 AircraftReturn「先下沟！莫停车边！」句首（沿用旧 id）
 //   ZhouNoAnswer               17 ZhouDeath 第一句之后那段「……」，没人应声
 export function MissionVoiceTimeline(cue, total) {
@@ -27,7 +26,6 @@ export function MissionVoiceTimeline(cue, total) {
   if (cue.id === "ShunziCurse" && fits) segment.start = Math.max(0, lines[0][0] - .35);
   const tail = 0;
   const Late = (index, fraction) => lines[index][0] + (lines[index][1] - lines[index][0]) * fraction;
-  if (cue.id === "BunkerBanter") segment.events = [{ at: lines.at(-1)[1], id: "BunkerBlast" }];
   if (cue.id === "BorrowLight") segment.events = [
     { at: lines[4][1], id: "BorrowLightMatchesPocketed" },
     { at: lines[5][1], id: "BorrowLightCigaretteOffered" },
