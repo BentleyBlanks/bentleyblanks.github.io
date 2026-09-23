@@ -275,6 +275,7 @@ export const testDefs = {
   SamplePointTest: { file: "Script_SamplePointTest.mjs", desc: "县城采样点覆盖率与位姿口径（纯 Node）" },
   HeightmapVerify: { file: "Script_HeightmapCli.mjs", args: ["verify"], desc: "SRTM 高度数据完整性（需先 download 过）" },
   FirstLevelMissionMusicTest: { file: "Script_FirstLevelMissionMusicTest.mjs", desc: "Seven first-level score assets, story transitions and silence rules" },
+  FirstLevelBattleSoundTest: { file: "Script_FirstLevelBattleSoundTest.mjs", desc: "第一关 01–05 声景：远处扇区交火、场外近落弹、防炮洞环境、壕沟/洞室判据、压制喘息心跳、耳鸣两档、配乐让位（纯 Node）" },
   FirstLevelMissionMusicBrowserTest: { file: "Script_FirstLevelMissionMusicBrowserTest.mjs", timeoutMs: 600000, desc: "First-level score playback, stage jumps, dialogue mix and lazy-load races" },
   AudioTest: { file: "Script_AudioTest.mjs", desc: "音频资产与烘焙管线" },
   AudioWiringTest: { file: "Script_AudioWiringTest.mjs",
@@ -433,6 +434,7 @@ export const tier0Fast = [
   "PlayerHitboxTest",
   "PlayerActorBlockTest",
   "CameraShakeTest",
+  "FirstLevelBattleSoundTest",
   "FractureBakeTest",
   "CutsceneControlTest",
   "RoadPathTest",
@@ -530,7 +532,7 @@ export const domains = {
     // 所以也挂在这个域下。
     tests: ["CarryTest", "EmplacementTest", "HudPromptTest", "HudPromptBrowserTest", "WeaponPickupTest", "TelegraphTest", "MissionHooksTest", "MissionSetpiecesTest"],
   },
-  audio: { label: "音效/音乐/环境声", tests: ["FirstLevelVoicePerspectiveTest","FirstLevelMissionMusicTest", "FirstLevelMissionMusicBrowserTest", "AudioTest", "AudioWiringTest", "MachineGunCutsceneAudioTest"] },
+  audio: { label: "音效/音乐/环境声", tests: ["FirstLevelVoicePerspectiveTest","FirstLevelMissionMusicTest", "FirstLevelBattleSoundTest", "FirstLevelMissionMusicBrowserTest", "AudioTest", "AudioWiringTest", "MachineGunCutsceneAudioTest"] },
   // 「声库装没装进去」与「输出端有没有电平」是两件事，后者只有 MachineGunCutsceneAudioTest
   // 在真入口上量：VoiceTest 验的是资产与交付档，量不到 AudioEngine 的装载分叉。
   voice: { label: "语音", tests: ["VoiceTest", "MachineGunCutsceneAudioTest"] },
@@ -622,7 +624,9 @@ const changedDomainRules = [
   // **选不中 voice**，`Data_Voice.mjs` 选得中 voice、**选不中 audio**。
   // 「改了 AudioEngine 的声库装载分叉却不跑 VoiceTest」就是这么漏过去的
   //（04 关中过场整条语音通道静音那一次）。这两条把交叉的一半补上。
-  { domain: "audio", pattern: /Script_Audio\.mjs|Script_AudioWiring|Data_Voice|Data_SfxSources|Data_AmbSources|Data_Tuning_Audio/ },
+  { domain: "audio", pattern: /Script_Audio\.mjs|Script_AudioWiring|Data_Voice|Data_SfxSources|Data_AmbSources|Data_Tuning_Audio|BattleArtillery|FirstLevelMissionBattleSound|FirstLevelBattleSound/ },
+  // 2026-09-23：场外近落弹与离图前线也要拉上第一关域（它们只在 01–06 的任务相位里开）。
+  { domain: "firstLevel", pattern: /BattleArtillery|FirstLevelBattleSound/ },
   { domain: "voice", pattern: /Script_Audio\.mjs|Data_Voice|Script_VoiceBake|Script_FirstLevelMissionVoice/ },
   // 2026.09.19 第三波：`FirstLevelMeal`（腊肉分食）与 `CarriageSoundscape`（车厢试听导出）
   // 两个关键词随模块删除一并摘掉。`BaconHandoff` / `FirstLevelTrain` / `FirstLevelCarriage`

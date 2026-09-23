@@ -913,14 +913,19 @@ else if (!(chain.bus.ratio <= 2 && chain.bus.rel >= 0.5)) {
   Fail(`母线那只不「慢」了：ratio ${chain.bus.ratio} / release ${chain.bus.rel}（慢压缩要 ratio ≤ 2、release ≥ 0.5）`);
 } else if (!(chain.peak.ratio >= 12 && chain.peak.atk <= 0.006)) {
   Fail(`末端那只不「快」了：ratio ${chain.peak.ratio} / attack ${chain.peak.atk}`);
-} else if (chain.reverbs.join(",") !== "courtyard,interior,open,street") {
-  Fail(`混响不是四档：${chain.reverbs.join(" ")}`);
+} else if (chain.reverbs.join(",") !== "courtyard,dugout,interior,open,street,trench") {
+  // 【2026-09-23】四档 → 六档：交通壕（trench）与防炮洞（dugout）。
+  Fail(`混响不是六档：${chain.reverbs.join(" ")}`);
 } else if (!(chain.irSeconds.interior < chain.irSeconds.courtyard
     && chain.irSeconds.courtyard < chain.irSeconds.street
-    && chain.irSeconds.street < chain.irSeconds.open)) {
-  Fail(`四档 IR 的时长排序不对：${JSON.stringify(chain.irSeconds)}`);
+    && chain.irSeconds.street < chain.irSeconds.open
+    // 沟与洞都是「短」：洞最短（闷、近），沟 0.3–0.5 s（密集短反射），都比院子短。
+    && chain.irSeconds.dugout < chain.irSeconds.trench
+    && chain.irSeconds.trench >= 0.3 && chain.irSeconds.trench <= 0.5
+    && chain.irSeconds.trench < chain.irSeconds.courtyard)) {
+  Fail(`六档 IR 的时长排序不对：${JSON.stringify(chain.irSeconds)}`);
 } else Ok(`两级动态在位（母线 ${chain.bus.thr}/${chain.bus.ratio}:1/${chain.bus.rel}s ×${chain.makeup}，`
-  + `末端 ${chain.peak.thr}/${chain.peak.ratio}:1）；四档 IR ${JSON.stringify(chain.irSeconds)}`);
+  + `末端 ${chain.peak.thr}/${chain.peak.ratio}:1）；六档 IR ${JSON.stringify(chain.irSeconds)}`);
 
 // Continuous audition regression: real AudioBufferSource nodes must stop, including
 // scheduled repeats and editor exit, without stopping an unrelated gameplay engine.

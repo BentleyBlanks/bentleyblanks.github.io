@@ -304,17 +304,37 @@ const zones = await page.evaluate(() => {
   // 一根电线杆不算屋顶（横向不到 2.5 m）—— 少了这一条，站在街心也会被判成在屋里
   const pole = Ask({ t: 3, normal: [0, -1, 0],
     box: { tag: "prop", min: [L.x - 0.2, L.y + 2, L.z - 0.2], max: [L.x + 0.2, L.y + 2.4, L.z + 0.2] } }, []);
+  // 【2026-09-23】壕沟 / 防炮洞：只看共享地面采样器。把听者脚下挖一条东西向的沟
+  // （沟底宽 3.4、坡 1.1、深 2.0，与 TrenchPlan 交通壕同断面），头顶什么都没有 = trench；
+  // 再盖一块低矮的顶 = dugout。引擎侧挑的混响也要跟着换。
+  const realGround = bf.GroundHeight.bind(bf);
+  // 沟底摆在听者眼睛下面 1.6 m（站在沟里），沟沿比沟底高 2 m。
+  const floor = L.y - 1.6;
+  const Smooth = (t) => { const x = Math.min(1, Math.max(0, t)); return x * x * (3 - 2 * x); };
+  bf.GroundHeight = (x, z) => floor + 2 * Smooth((Math.abs(z - L.z) - 1.7) / 1.1);
+  const trench = Ask(null, []);
+  const dugout = Ask({ t: 0.4, normal: [0, -1, 0],
+    box: { tag: "whiteboxWall", min: [L.x - 2, L.y + 0.4, L.z - 2], max: [L.x + 2, L.y + 0.7, L.z + 2] } }, []);
+  // 引擎侧：沟里的声源送进 trench 那条 IR。
+  bf.Raycast = () => null;
+  T.audioWiring.zoneCache.clear(); T.audio.occCache?.clear?.(); T.audio.listenerZone = null;
+  const v = T.audio.Play("impactDirt", { position: { x: L.x + 0.5, y: floor + 0.05, z: L.z }, priority: true });
+  const trenchIr = !!v && v.reverbNode === T.audio.reverbs.trench;
+  bf.GroundHeight = realGround;
   bf.Raycast = realRaycast;
   bf.NearbyColliders = realNearby;
-  T.audioWiring.zoneCache.clear();
-  return { interior, courtyard, street, open, pole, real: T.Debug.AudioZone().zone };
+  T.audioWiring.zoneCache.clear(); T.audio.listenerZone = null;
+  return { interior, courtyard, street, open, pole, trench, dugout, trenchIr, real: T.Debug.AudioZone().zone };
 });
 Check("头顶有屋顶 → interior", zones.interior === "interior", zones.interior);
 Check("三面墙围着 → courtyard", zones.courtyard === "courtyard", zones.courtyard);
 Check("一面墙 → street", zones.street === "street", zones.street);
 Check("四下无遮 → open", zones.open === "open", zones.open);
 Check("头顶只有一根杆子不算屋里", zones.pole === "open", zones.pole);
-Check("真地图上的空间档取得到值", ["interior", "courtyard", "street", "open"].includes(zones.real),
+Check("两侧土壁夹着 → trench（高度场挖的沟没有碰撞盒）", zones.trench === "trench", zones.trench);
+Check("沟里一块低矮的顶 → dugout", zones.dugout === "dugout", zones.dugout);
+Check("沟里的声源送进 trench 那条 IR", zones.trenchIr, String(zones.trenchIr));
+Check("真地图上的空间档取得到值", ["interior", "courtyard", "street", "open", "trench", "dugout"].includes(zones.real),
   `第一关出生点：${zones.real}`);
 
 // ---------------------------------------------------------------------------
