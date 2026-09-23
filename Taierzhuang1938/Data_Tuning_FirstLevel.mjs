@@ -147,6 +147,12 @@ export const MISSION_TUNING = Object.freeze({
   assaultRegroupLine:1,
   assaultRegroupCycles:3,
   assaultArrivalM:.9,
+  // 冲刺段卡死（2026-09-24，docs/Data_EnemyAi.md §20.7）：MoveActor 是直线目标 + 锁走廊（不绕），
+  // 线点被墙 / 胸墙 / 别人挡住时人会站着原地跑到天荒地老 —— 01→06 探针里中路一人以站姿在 ADVANCE
+  // 里停了 88 s。assaultRushStallS 秒内离这条线没近 assaultRushProgressM，就在原地转守（Defend），
+  // 这条线算到了；下一轮照常由 AssaultRoundEnd 决定进退。
+  assaultRushStallS:4,
+  assaultRushProgressM:.5,
   assaultPinnedS:7,
   // Enemy AI integration (2026-09-08, docs/Data_EnemyAi.md §6). Defend() no longer means "pinned to a point with no
   // cover": it is an anchor plus a radius. The soldier may take any cover whose hide position falls inside
@@ -170,16 +176,22 @@ export const MISSION_TUNING = Object.freeze({
   // approach 4 + tank escorts 4 = 26. The other 01–05 groups (backdrop, pursuit, flank, officer, reserve,
   // cut-in) are counted against contract §6 (<= 55 cumulative, <= 30 alive) in Script_FirstLevelFrontTopologyTest.
   openingEnemyBudget:26,
-  // Route attackers cover the exposed communication-trench approach; the separate front force
-  // owns the gun line. z=-145 is the defenders' waiting line and z=-140 is its last sheltered
-  // bound, so neither belongs to this screen. The first exposed withdrawal bound begins near -137.
-  approachFireSector:{minX:-22,maxX:42,minZ:-139,maxZ:-120,selfDefenseM:3},
+  // approachFireSector（开火扇区）2026-09-23 删掉：从来没有人把它写进 scriptFireSector（docs/Data_EnemyAi.md §20）。
   approachAccuracyScale:.35,
   approachTacticalRadiusM:24,
   approachContactM:18,
   approachContactRadiusM:6,
   approachAdvanceMps:2.8,
   approachBoundHoldS:2.8,
+  // 右侧阵位的三名步枪守卫（2026-09-23，docs/Data_EnemyAi.md §20）：不再是 hold 炮塔。局部战区 6–8 m
+  // 里找掩体、换位；玩家贴进 7 m（TACTICS.chargeContactM）就自发冲锋；每人一枚手榴弹 —— 右侧阵位
+  // 就三个人守，一人两枚会让 03 夺点变成吃弹比赛。固定机枪手仍 hold（离了枪那挺枪就哑了）。
+  nestGuardTacticalRadiusM:7,
+  nestGuardGrenades:1,
+  // 阵位守卫伤亡 2 人后退到后撤锚点时的掩体余量（米）：普通守区的 defendCoverSlackM（6 m）会让退下来的人
+  // 挑到枪位旁边的掩体（09-24 实测离枪 1.5 m，玩家上枪被贴身刺刀）；退就是退，只在锚点身边找遮挡。
+  // 还得留在看得见、打得着的地方 —— 03 的 rightNestCaptured 要三名守卫都死（FrontBattle.UpdateCapture）。
+  nestFallbackCoverSlackM:1,
   frontReserveCount:0,
   frontReserveReleaseGapS:9,
   frontReservePlatoonSize:22,
@@ -303,7 +315,6 @@ export const MISSION_TUNING = Object.freeze({
   squadCatchupDistanceM: 18,
   squadWaitDistanceM:26,
   squadCatchupMps: 4.5,
-  flankSpeedMps: 2.8,
   reliefDelaySeconds: 1.6,
   reliefSpeedMps: 2.8,
   tacticalMoveMps: 1.85,

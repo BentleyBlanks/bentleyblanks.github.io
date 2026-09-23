@@ -1,6 +1,7 @@
 import { FRONT_SORTIE as Sortie } from "./Data_FirstLevelFrontRoute.mjs";
 import { MISSION_TOPOLOGY_VERSION } from "./Data_FirstLevelMissionTopology.mjs";
 import { FRONT_FIELD_MEN, FRONT_RESERVES, FRONT_MACHINE_GUN_ATTACK, FRONT_APPROACH_ENEMIES, APPROACH_TACTICS, FRONT_FLANK_GROUP, FRONT_OFFICER, FRONT_RESERVE_ENTRIES } from "./Data_FirstLevelMissionFront.mjs";
+import { FRONT_PRESSURE_TACTICS } from "./Data_FirstLevelFrontPressure.mjs";
 import { CHAPTER } from "./Data_MissionCh1.mjs";
 import { MISSION_LAYOUT, MISSION_ANCHORS as A, MISSION_ROUTES, MISSION_PLACEMENT as P } from "./Data_FirstLevelMissionLayout.mjs";
 export const MISSION_VERSION = MISSION_TOPOLOGY_VERSION;
@@ -294,11 +295,16 @@ export const MISSION_GUIDANCE = Object.freeze({
   NightMarch:{label:'northGate',route:'nightMarch'},
 });
 // Front riflemen no longer use point tactics: they bound between FRONT_ASSAULT lines (runtime UpdateAssault).
-const APPROACH_IDS = new Set(FRONT_APPROACH_ENEMIES.map((spec) => spec.id));
+// 2026-09-23（docs/Data_EnemyAi.md §20）：过滤按「真在某个遭遇组里的人」取，不再只认 approach 组 ——
+// 只认 approach 的那一版把 bundleApproach 的 BundleBendA/B 的切沟战术整条滤掉了，
+// 那两个人从 02 起就站在路上一动不动（05「切进沟里」那一拍从没发生过）。
+const TACTIC_MEMBER_IDS = new Set([...FRONT_APPROACH_ENEMIES, ...Sortie.enemies].map((spec) => spec.id));
 export const MISSION_TACTICS = Object.freeze({
   // APPROACH_TACTICS 里还带着旧开场那支 surface 突进队的条目（那一组随军列开场下线了），
-  // 只取 approach 组真有的人 —— 不然战术表里会留下一批不属于任何组的孤儿。
-  ...Object.fromEntries(Object.entries(APPROACH_TACTICS).filter(([id]) => APPROACH_IDS.has(id))),
+  // 只取名册里真有的人 —— 不然战术表里会留下一批不属于任何组的孤儿。
+  ...Object.fromEntries(Object.entries(APPROACH_TACTICS).filter(([id]) => TACTIC_MEMBER_IDS.has(id))),
+  // 压力表给的切沟路线覆盖同名条目（原 BundleBendB 那条穿路侧挡墙，见 FRONT_PRESSURE_TACTICS 头注）。
+  ...FRONT_PRESSURE_TACTICS,
   CourtyardPursuerA: { delay: 1, points: [{x:86,z:37},{x:62,z:40},{x:53,z:38}] },
   CourtyardPursuerB: { delay: 12, points: [{x:89,z:39},{x:66,z:43},{x:59,z:40}] },
   CourtyardPursuerC: { delay: 25, points: [{x:91,z:41},{x:70,z:44},{x:64,z:40}] },

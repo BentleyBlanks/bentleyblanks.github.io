@@ -252,3 +252,58 @@ export const SAMPLES = Freeze({
   playerPelvisT: 0.95,
   playerKneeT: 0.50,
 });
+
+/**
+ * 环境射击（2026-09-23，docs/Data_EnemyAi.md §20）。
+ *
+ * 病根：第一关前沿的开火窗口（`Script_FirstLevelOpening.FireWindows`）只放 3 个人瞄玩家、
+ * 3 个人压玩家，其余人端着枪一发不打（09-23 实测 30 s 内 29 人里 14 人零发，
+ * 那挺前沿机枪 300 帧全在 FIRE、0 发）。这些人没有「合法目标」，却身处一场正在打的仗。
+ *
+ * 做法：关卡给一张**授权点**表（土坎顶、机枪胸墙、缺口两侧、阵位正面 —— **永远不是玩家的
+ * 实时位置**），没有合法目标 / 扳机被禁火挡住的人从表里挑一个点打过去。这一发走压制那条
+ * 分支：`Resolve(baseAccuracy 0)`、曳光、弹着、枪声、近失弹都有，**命中恒 false、不占射击令牌、
+ * 不进 TTK 账**。`soldier.ambientFirePoints` 为空（默认）时整条路径不存在，第一关以外逐位不变。
+ *
+ * dwellMinS/MaxS   一个点打多久再换（秒）。太短会像在扫射空气，太长一个人盯死一处。
+ * minRangeM        近于它的点不挑：贴脸的点通常在自己人堆里或同一道坎后面。
+ * maxRangeM        远于它的点不挑：步枪 150 m 外打一个土坎顶已经没有画面意义。
+ * facingConeRad    先挑落在「此刻面向 / 威胁方向」这么大半角内的点，挑不到才放宽到全向；
+ *                  一个人突然转身去打背后的点读起来像抽风。
+ * turnGateRad      枪口离这一点的偏角超过它不扣扳机（与 TryFire 的 0.34 同一条口径）。
+ * rifleIntervalScale  步枪环境射击比瞄准射击慢这么多倍：这是「战线在打」，不是「这个人在拼命」。
+ * mgIntervalScale  机枪点射之间的停顿倍率（BurstPlan 的 pauseS 乘它）。
+ * scatterM         授权点没写 r 时的弹着散布半径（米）。
+ * losRetries       挑点时最多试几个候选的通视（每试一个打一条射线）。09-24 由 2 抬到 5：一个相位的
+ *                  授权点五到八个，只试两个的话掩体后面的人十有八九一个也挑不到（探针里「挑不到点」
+ *                  占 03–05 不动人·帧的两成多）；每人 pickEveryS 才挑一次，五条射线的账付得起。
+ * pickEveryS       同一个人两次挑点的最小间隔（Think 1/6 分帧，这里再限一道）。
+ * stalledTargetS   扳机空转判定（秒）：想开火、膛里有弹、有目标，却这么久一发没对人真打出去
+ *                  （压制弹道被土坎挡死、探头那一下看见了人弹道却被胸墙挡住、枪口转不过去……），
+ *                  就改打授权点；打完一段（dwellMin–Max）再把枪口还给对人射击试一次。
+ *                  太短会抢走本该压制记忆点的那一枪，太长就是端枪不打。
+ * blockedRetryS    一个点从枪口打过去被挡死之后，这么久之内这个人不再挑它（先换别的点）。
+ * impactAboveM     没打到碰撞体的那一发，弹道末端离地不到这么高就算钻进了土（在地面溅一蓬土）：
+ *                  土坎顶是高度函数、不在射线世界里，不这样算的话打土坎的子弹一发弹着都没有。
+ * raiseStepsM      挑点时一个点按这几档抬高重试通视（米，加在点的 h 上）：土坎顶本身被自己面前的
+ *                  沟沿 / 胸墙挡住时，抬高一档就是「越过土坎打过去」的高弹（弹道末端在空中，什么都
+ *                  不溅，与原来的高偏弹同一个样子）。2026-09-24 实机挑点侦察：03 待命区掩体里的探头位
+ *                  对土坎顶多半不通、抬 0.8 m 就通的有一批；每一档算一条射线，受 losRetries 约束。
+ */
+export const AMBIENT_FIRE = Freeze({
+  dwellMinS: 3,
+  dwellMaxS: 7,
+  minRangeM: 8,
+  maxRangeM: 150,
+  facingConeRad: 1.1,
+  turnGateRad: 0.34,
+  rifleIntervalScale: 1.8,
+  mgIntervalScale: 1.6,
+  scatterM: 1.4,
+  losRetries: 8,
+  raiseStepsM: Object.freeze([0, 0.8, 1.6]),
+  pickEveryS: 0.9,
+  stalledTargetS: 2.5,
+  impactAboveM: 1.2,
+  blockedRetryS: 4,
+});

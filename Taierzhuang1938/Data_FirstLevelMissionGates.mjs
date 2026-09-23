@@ -283,7 +283,7 @@ export const MISSION_FACT_GATES = Object.freeze({
     text: "老周既有腿伤，经己方沟道实际撤到集结处",
   }),
   frontAttackRepelled: Gate({
-    kind: "combat", step: "MachineGun", encounter: "machineGun", source: "UpdateFrontAttack",
+    kind: "combat", step: "MachineGun", encounter: "machineGun", source: "FirstLevelFrontPressure.UpdateGroups",
     text: "machineGun 组全部阵亡或被打退（退到 retreatDistanceM 之外）",
   }),
   guardWithdrawalResolved: Gate({

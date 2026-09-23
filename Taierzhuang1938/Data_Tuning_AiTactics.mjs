@@ -266,3 +266,72 @@ export const BLACKBOARD = Freeze({
   switchRatio: 1.3,
   maxEnemies: 8,
 });
+
+/**
+ * 班组对伤亡的反应（2026-09-23，docs/Data_EnemyAi.md §20）。
+ *
+ * 改前 `NotifyDeath` 只回收资源：身边的人倒下，旁边两米的战友照打不误 —— 「木桩」的
+ * 另一半就在这里。对标 CoD WaW 的日军：死一个人，身边的人缩头、愣一下；分队长倒了，
+ * 全组压低、迟疑好几秒才重新组织。
+ *
+ * witnessM            尸体这么近的同侧活人算「亲眼看见」。
+ * witnessSuppression  看见的人加这么多压制（0.25 ≈ 两发近失弹，够蹲下，不够卧倒）。
+ * hesitateMinS/MaxS   看见的人迟疑多久：这段时间里不走位、不开枪、不起冲锋。
+ * officerSuppression  军官（`s.aiOfficer`）阵亡时本组每人加的压制。
+ * officerHesitateMinS/MaxS  军官阵亡时本组的迟疑。
+ * leaderDownBarkM     军官阵亡后，离他这么近的一个组员喊「分队长殿がやられた」。
+ * advanceBarkCooldownS  同一个人两次喊「散開！前へ！」至少隔这么久（2026-09-24 审查：没有这道闸时
+ *                     01→06 一趟调了一万多次；跃进一轮 = 冲刺 + 站定打两轮，约 10–20 s，所以取 12 s）。
+ */
+export const SQUAD_REACTION = Freeze({
+  witnessM: 6,
+  witnessSuppression: 0.25,
+  hesitateMinS: 0.6,
+  hesitateMaxS: 1.5,
+  officerSuppression: 0.35,
+  officerHesitateMinS: 3,
+  officerHesitateMaxS: 5,
+  leaderDownBarkM: 30,
+  advanceBarkCooldownS: 12,
+});
+
+/**
+ * 成组冲锋（2026-09-23，docs/Data_EnemyAi.md §20）。
+ *
+ * 改前冲锋是一个人一个人起的（`ChargeOpportunity` 每人独立判、每个目标最多 2 人），
+ * 没有喊、没有跟：画面上是一个兵忽然站起来跑，身边的人照旧趴着。
+ *
+ * followRadiusM     一人起冲时，身边这么近、**已上刺刀**的同组战友跟着起。
+ * followDelayMinS/MaxS  跟上的错峰（秒）：一排人同一帧站起来像被同一根线拽起来。
+ * maxFollowers      每次起冲最多带几个人。
+ * groupChargeS      关卡下令的成组冲锋（`AiDirector.GroupCharge`）一次持续多久。
+ * groupStaggerMaxS  成组冲锋里最后一个人最迟晚多少秒起身（领头的人 0 s）。
+ * groupAbortSuppression  成组冲锋中压制超过它就散（比自发冲锋的 0.5 高：喊着冲出去的人更难压住）。
+ */
+export const CHARGE_FOLLOW = Freeze({
+  followRadiusM: 3,
+  followDelayMinS: 0.3,
+  followDelayMaxS: 0.8,
+  maxFollowers: 3,
+  groupChargeS: 7,
+  groupStaggerMaxS: 1.2,
+  groupAbortSuppression: 0.7,
+});
+
+/**
+ * 白刃卡死解扣（2026-09-24，docs/Data_EnemyAi.md §20.7；任务侧开关 missionReactions 打开时才生效）。
+ *
+ * 白刃导演（`Script_MeleeCombat`）按「engageM 5.5 m 内、一条视线通」把人拉进白刃，而视线会从
+ * 胸墙 / 壕沿顶上过去：人被拉进白刃、贴着翻不过去的墙以 idle 架势站着，大脑的 Think 在白刃期间
+ * 整段停转 —— 09-24 探针里 03 有人以 CHARGE 状态贴着左前枪位胸墙站了 86 s，一发不打，压制爆表也不趴。
+ *
+ * stallS    白刃里连续这么久还是 idle 架势、位移不到 moveM，就算卡死。比 NpcThink 的出手间隔（1.25–1.5 s）
+ *           长一截，正常对峙、绕位、等别人先出手的人不会被误判。
+ * moveM     卡死判定的位移门槛（米）。
+ * releaseS  解扣后这么久不再被白刃导演接管（`meleeDormant`）；期间冲锋冷却照记，回到对射。
+ */
+export const MELEE_STALL = Freeze({
+  stallS: 2.5,
+  moveM: 0.3,
+  releaseS: 4,
+});

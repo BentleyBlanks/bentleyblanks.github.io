@@ -3,6 +3,8 @@ import { FirstLevelFrontBattle } from "./Script_FirstLevelFrontBattle.mjs";
 import { FirstLevelTankRuntime } from "./Script_FirstLevelTankRuntime.mjs";
 import { BundleResupplyOpen } from "./Script_FirstLevelTankBrain.mjs";
 import { TANK } from "./Data_Tuning_Tank.mjs";
+import { FirstLevelFrontPressure, AssaultRoundEnd, AssaultTop, NearestLineIndex, RushStalled, RushPaused } from "./Script_FirstLevelFrontPressure.mjs";
+import { FirstLevelBackdropSquads } from "./Script_FirstLevelBackdropSquads.mjs";
 import { FirstLevelTransition } from "./Script_FirstLevelTransition.mjs";
 import { FRONT_SORTIE as Sortie, SortieCrawlBlocked } from "./Data_FirstLevelFrontRoute.mjs";
 import { FirstLevelLeaderGuide } from "./Script_FirstLevelLeaderGuide.mjs";
@@ -165,6 +167,10 @@ export class FirstLevelMissionRuntime {
     this.frontShow = new FirstLevelFrontShow(this);
     this.frontBattle = new FirstLevelFrontBattle(this);
     this.tankRuntime = TANK.brainEnabled ? new FirstLevelTankRuntime(this) : null;
+    // 02–05 前沿压力表（docs/Data_EnemyAi.md §20）：相位、环境射击点、组规则与任务侧 AI 开关。
+    this.frontPressure = new FirstLevelFrontPressure(this);
+    // 01 背景兵（bunkerBackdrop，docs/Data_EnemyAi.md §20）：洞口外一直在推进、一直在交火的那几个人。
+    this.backdrop = new FirstLevelBackdropSquads(this);
     // 08–10 村落改道、11–14 接运与空袭（第二波 Mid 包）。
     this.village = new FirstLevelVillageBlock(this);
     this.transferCart = new FirstLevelTransferCart(this);
@@ -431,7 +437,7 @@ export class FirstLevelMissionRuntime {
     for (const [i, actor] of this.squad.entries()) {
       actor.missionTrainReady = true;
       // 01 是玩家受困时的行刑演出。班里人此刻只在后侧挖掘；真正开火必须等
-      // doorSearchStarted 把流程推进 02，再由 FirstLevelBunker.UpdateSuppression
+      // doorSearchStarted 把流程推进 02，再由 FirstLevelBunkerShow（Script_OpeningStoryboards）
       // 单独放开何有田。否则通用 AI 会让全班提前射杀两名行刑兵。
       actor.scriptedNoncombatant = true;
       this.PlaceActor(actor, this.opening.BunkerPost(i));
@@ -998,8 +1004,7 @@ export class FirstLevelMissionRuntime {
       // Finite front teams remain ordinary alert AI before the assault starts.
       // Only the later tank-flank group waits for its authored release.
       const standbyFact=MISSION_ENCOUNTER_ACTIVATION[id]?.standbyUntil;
-      const standby=!!standbyFact&&!spec.id.startsWith("Flank")&&!this.Has(standbyFact);
-      if(id==="tank"&&spec.id.startsWith("Flank"))actor.scriptedNoncombatant=true;
+      const standby=!!standbyFact&&!this.Has(standbyFact);
       actor.missionFrontStandby=standby;
       if(standby)this.ai.SetStance(actor,1,4+actor.id%3,true);
       actor.scriptAccuracyScale = actor.missionAccuracyScale = ["front","machineGun","approach"].includes(id)?R.frontAccuracyScale:.5;
@@ -1054,11 +1059,16 @@ export class FirstLevelMissionRuntime {
   }
   UpdateAssault(dt) {
     const active = ["Support", "MachineGun", "Tank"].includes(this.flow.stage.id);
+    const aiTime = this.ai?.time ?? 0;
     for (const actor of this.enemies.values()) {
       const s = actor.missionAssault;
       // 待命的人（missionFrontStandby）不走跃进脚本 —— 他的 AI 照常跑，只是还没轮到他上。
-      if (!s || !actor.alive || actor.missionRepelRoute || actor.scriptedNoncombatant || actor.missionFrontStandby) continue;
+      if (!s || !actor.alive || actor.scriptedNoncombatant || actor.missionFrontStandby) continue;
       if(actor.meleeCombat)continue;
+      // 冲锋归大脑（成组冲锋 / 自发冲锋，docs/Data_EnemyAi.md §20）：冲的这几秒脚本一步都不拽他。
+      // 冲完（散了）接回离他最近的那条线，而不是跑回冲锋前的线上去。
+      if (actor.state === "charge" || aiTime < (actor.groupChargeUntil ?? -99)) continue;
+      if (s.mode === "charge") { s.index = NearestLineIndex(s, actor.position); s.mode = "rush"; s.hold = 0; }
       if(actor.missionReserve && this.time-(this.frontBattleAt??this.time)<actor.missionReleaseDelayS)continue;
       if (!active) {
         if (s.mode !== "settled") { this.Defend(actor, actor.position); s.mode = "settled"; }
@@ -1066,7 +1076,10 @@ export class FirstLevelMissionRuntime {
       }
       // A nearby visible opponent overrides the scheduled bound. The shared
       // combat brain owns cover, search and the physical melee handoff.
-      const contact=actor.tacticalRadiusM>0 && !actor.missionReserve && actor.targetVisible
+      // 压力表「让口子」刚把他往回拉（s.yieldUntil，Script_FirstLevelFrontPressure.YieldGap）：这几秒不认近距交火 ——
+      // 不然他在 contact 里原地 Defend，拉线改的 index 一步都不走（09-24 实测：左前枪位旁一挺轻机枪在 contact 里
+      // 看着撤退口，第二批守军过不了口，03→06 红在 lastGuardsWithdrawn）。
+      const contact=actor.tacticalRadiusM>0 && !actor.missionReserve && actor.targetVisible && !(this.time<(s.yieldUntil||0))
         && !actor.targetFromMemory && actor.target?.ref?.alive!==false
         && actor.target && Distance(actor.position,actor.target.position)<R.assaultContactRangeM;
       if(contact){
@@ -1087,7 +1100,13 @@ export class FirstLevelMissionRuntime {
         continue;
       }
       s.pinned = 0;
-      const target = s.points[s.index];
+      // 这一相位最远推进到哪条线由压力表写（s.maxIndex，Script_FirstLevelFrontPressure）；
+      // 没有压力表时就是最后一条线，与改前逐位相同。
+      const top = AssaultTop(s);
+      if (s.index > top) { s.index = top; s.mode = "rush"; s.hold = 0; }
+      // 冲刺卡死借用的站位只对这一轮这条线有效：线一换（进 / 退 / 退线 / 让口子）就作废。
+      if (s.stallTarget && s.stallTarget.index !== s.index) s.stallTarget = null;
+      let target = s.stallTarget || s.points[s.index];
       // Arrival is hysteretic (2026-09-09, docs/Data_EnemyAi.md §15). Entering the line still needs
       // assaultArrivalM, but a man who has **settled** on it may wander the whole anchor + cover slack
       // without being dragged back: the AI walks him up to assaultCoverSearchM to reach a cover point and
@@ -1095,6 +1114,15 @@ export class FirstLevelMissionRuntime {
       // line" and re-issued MoveActor - which clears scriptDefensive and holdZone and hauls him back to the
       // bare spot. That single line is why the front knelt in the open with cover two steps away.
       const settleM = R.defendHoldRadiusM + R.assaultCoverSearchM;
+      // 冲刺卡死（§20.7）：线点过不去就在原地转守 —— 这一轮这条线就算到了（借他站的地方当线点，
+      // 存在 s.stallTarget，**不改写** s.points：下一轮回到这条线还是去原来的线点）。
+      // 迟疑 / 换弹 / 投弹是自己停下的，不累计（2026-09-24 审查：军官阵亡的 3–5 s 迟疑曾被当成卡死）。
+      if (s.mode === "rush" && RushPaused(actor, aiTime)) s.rushBest = NaN;
+      else if (s.mode === "rush" && RushStalled(s, actor.position, target, dt, R)) {
+        s.stallTarget = { index: s.index, x: actor.position.x, z: actor.position.z };
+        target = s.stallTarget;
+        s.rushBest = NaN;
+      }
       if (Distance(actor.position, target) > (s.mode === "hold" ? settleM : R.assaultArrivalM)) {
         s.mode = "rush";
         this.ai.SetStance(actor, 0, .4, true);
@@ -1117,7 +1145,7 @@ export class FirstLevelMissionRuntime {
         // the 03-06 campaign never reaches lastGuardsWithdrawn without this cap).
         if (actor.cover && actor.coverPhase === "approach" && s.walk < R.assaultCoverWalkS) s.walk += dt;
         else s.hold += dt;
-        const last = s.index === s.points.length - 1;
+        const last = s.index >= top;
         if(last && actor.missionReserve)continue;
         // One system owns a man's legs. On the last line the script only counts rounds - fire
         // assaultVolleyShots rounds or hold assaultFinalHoldS seconds and the round is over - and the
@@ -1127,15 +1155,13 @@ export class FirstLevelMissionRuntime {
         // up and knelt again every few seconds instead of reaching anything. After assaultLateralShifts
         // rounds he still falls back to assaultRegroupLine and comes again - same round count as before,
         // one walk into cover (assaultCoverWalkS) longer per line.
+        // What happens after a round - advance, another round, fall back to the regroup line and come
+        // again - is the pressure table's call (`AssaultRoundEnd`, docs/Data_EnemyAi.md §20): per phase it
+        // sets how far a group may push (maxIndex), where it regroups and whether it loops for as long as
+        // the phase lasts. Without it the old finite rhythm (assaultRegroupCycles) is unchanged.
         const spent = last && actor.fireSequence - s.volley >= R.assaultVolleyShots;
-        if (s.hold >= (last ? R.assaultFinalHoldS : R.assaultHoldS) * s.jitter || spent) {
-          if (!last) { s.index++; s.hold = 0; s.mode = "rush"; }
-          else if (s.shifts < R.assaultLateralShifts) { s.shifts++; s.hold = 0; s.volley = actor.fireSequence; }
-          else if (s.cycles < R.assaultRegroupCycles) {
-            s.index = Math.max(0, Math.min(s.points.length - 1, R.assaultRegroupLine));
-            s.cycles++; s.shifts = 0; s.hold = 0; s.mode = "rush";
-          }
-        }
+        if (s.hold >= (last ? R.assaultFinalHoldS : R.assaultHoldS) * s.jitter || spent)
+          AssaultRoundEnd(actor, s, R, last, this.time);
       }
     }
   }
@@ -1622,34 +1648,8 @@ export class FirstLevelMissionRuntime {
     // Acquisition remains the actual house interaction, never inferred from a blast.
     this.Record("tankImmobilized", { position: { x: position.x, z: position.z }, explosiveId });
     this.Say("TankStopped");
-    // 2026.09.19：侧翼那两条（JapaneseFlank / FlankWarning）随采用稿下线，
-    // 侧翼动作本身照旧 —— 只是不再配台词。
-    for (const id of ["FlankA", "FlankB"]) {
-      const actor = this.enemies.get(id);
-      if (actor) {
-        actor.missionFlank = true;
-        actor.scriptedNoncombatant = false;
-        actor.missionFlankIndex = 0;
-      }
-    }
-  }
-  UpdateFlank() {
-    for (const actor of this.enemies.values()) {
-      if (!actor.alive || !actor.missionFlank) continue;
-      const route = MISSION_ROUTES.flank;
-      while (
-        actor.missionFlankIndex < route.length &&
-        Distance(actor.position, route[actor.missionFlankIndex]) < 1.4
-      )
-        actor.missionFlankIndex++;
-      if (actor.missionFlankIndex < route.length)
-        this.MoveActor(actor, route[actor.missionFlankIndex], R.flankSpeedMps);
-      else {
-        actor.missionFlank = false;
-        this.Defend(actor, route.at(-1));
-      }
-      actor.scriptedNoncombatant = this.flow.stage.id === "South";
-    }
+    // 2026-09-23：战车趴窝后放出 FlankA/B 走 MISSION_ROUTES.flank 的那段（连同 UpdateFlank）删了 ——
+    // 名册里早就没有 Flank* 这两个人（docs/Data_EnemyAi.md §20）。侧翼压力改由压力表的组给。
   }
   /**
    * 接防人员（契约 §2 的 reliefInPosition）。2026.09.19 起他们不再是军列上下来的人：
@@ -1670,12 +1670,18 @@ export class FirstLevelMissionRuntime {
         if(actor.missionTacticStandby){actor.missionTacticStandby=false;actor.scriptedNoncombatant=false;}
         actor.tacticalRadiusM=actor.missionTacticalRadiusM;actor.scriptDefensive=false;
       }
+      // Fact-gated tactics (2026-09-23, docs/Data_EnemyAi.md §20): the man stays an ordinary live defender
+      // at his post until the mission fact is recorded, then runs the authored points. No standby, no Near.
+      if(plan.fact && !state.released){
+        if(!this.Has(plan.fact))continue;
+        state.released=true;state.elapsed=0;
+      }
       if(actor.scriptedNoncombatant)continue;
       state.distance += Distance(actor.position, state.last);
       state.last = { x: actor.position.x, z: actor.position.z };
       state.elapsed += dt;
       // Let shared AI finish throws, fight/charge visible close threats and search after the final bound.
-      if(plan.near && (actor.actor?.pendingGrenadeThrow || actor.actor?.characterRig?.infantry?.IsThrowing() || actor.state==="grenade" ||
+      if((plan.near || plan.fact) && (actor.actor?.pendingGrenadeThrow || actor.actor?.characterRig?.infantry?.IsThrowing() || actor.state==="grenade" ||
         (actor.targetVisible && actor.target && Distance(actor.position,actor.target.position)<R.approachContactM) ||
         state.index>=plan.points.length)){
         if(state.mode!=="contact"){actor.tacticalRadiusM=R.approachContactRadiusM;this.Defend(actor,actor.position);state.mode="contact";}
@@ -1758,31 +1764,8 @@ export class FirstLevelMissionRuntime {
       Sortie.crawl.every(crawl=>this.Has(`bundleCrawl${crawl.id}`)))this.Record('bundleRouteTraversed');
     if(this.Near(Sortie.house,Sortie.supplierRangeM))this.Say('BundleSupply');
   }
-  UpdateFrontAttack(){
-    const roster=MISSION_ENCOUNTERS.machineGun;
-    // Spawning is budgeted across frames. A partly spawned wave cannot resolve early.
-    if(!roster.every(spec=>this.enemies.has(spec.id)))return;
-    const actors=roster.map(spec=>this.enemies.get(spec.id));
-    const losses=actors.filter(actor=>!actor.alive).length;
-    for(const actor of actors){
-      if(!actor.alive || actor.missionRepelled)continue;
-      actor.missionPinnedTime=actor.suppression>=Sortie.retreatSuppression?(actor.missionPinnedTime||0)+this.delta:0;
-      if(!actor.missionRepelRoute && (losses>=actors.length*Sortie.retreatCasualtyFraction || actor.missionPinnedTime>=Sortie.retreatSuppressionS)){
-        const spec=roster.find(spec=>spec.id===actor.missionId);
-        actor.missionRepelRoute=[...(actor.missionAssault?.points||[]).filter(point=>point.z<actor.position.z).reverse(),
-          {x:spec.x,z:spec.z-Sortie.retreatDistanceM}];
-      }
-      if(!actor.missionRepelRoute)continue;
-      while(actor.missionRepelRoute.length && Distance(actor.position,actor.missionRepelRoute[0])<Sortie.retreatArrivalM)actor.missionRepelRoute.shift();
-      if(actor.missionRepelRoute.length){
-        this.ai.SetStance(actor,0,.5,true);this.MoveActor(actor,actor.missionRepelRoute[0],R.assaultRushMps);
-      }else{
-        actor.missionRepelled=true;this.Defend(actor,actor.position,0,0);
-      }
-    }
-    if(actors.every(actor=>!actor.alive||actor.missionRepelled))this.Record('frontAttackRepelled',{
-      killed:losses,repelled:actors.filter(actor=>actor.alive&&actor.missionRepelled).length});
-  }
+  // UpdateFrontAttack（机枪组伤亡过半 / 被压住就沿跃进线退回、全组退完记 frontAttackRepelled）从来没有调用点：
+  // 2026-09-23 起由压力表的 mgAttack 组规则接管（fallback.repelledFact，Script_FirstLevelFrontPressure）。
   /** 枪弹打在车体上（Script_Main 的弹道命中 missionTank）：火花 / 叮当在 Main，这里只告诉大脑。 */
   OnTankHit(point, from) { return this.tankRuntime?.OnBulletHit(point, from) ?? null; }
   UpdateTank() {
@@ -2300,12 +2283,13 @@ export class FirstLevelMissionRuntime {
     }
     this.UpdateSquad();
     this.UpdateFront();
+    this.frontPressure.Update(dt);
+    this.backdrop.Update(dt);
     this.UpdateTactics(dt);
     this.UpdateAssault(dt);
     this.UpdateWaves();
     this.UpdateRelief(dt);
     this.UpdateTank();
-    this.UpdateFlank();
     this.UpdateAir(dt);
     this.UpdateCarry();
     this.UpdateCart(dt);
@@ -2628,6 +2612,8 @@ export class FirstLevelMissionRuntime {
       opening:this.opening.State(),
       front:this.frontShow?.State() || null,
       frontBattle:this.frontBattle.State(),
+      pressure:this.frontPressure?.State() || null,
+      backdrop:this.backdrop?.State() || null,
       ...this.flow.State(),
       missionVersion: MISSION_VERSION,
       returnWarning: this.missionReturn.result,
@@ -2705,6 +2691,8 @@ export class FirstLevelMissionRuntime {
     this.nightLights?.Dispose();
     this.opening.Dispose();
     this.frontShow?.Dispose();
+    this.frontPressure?.Dispose();
+    this.backdrop?.Dispose();
     this.squadMarch?.Dispose();
     if(this.tankDust!=null)this.vfx.RemoveSmokeSource(this.tankDust);
     this.tankRuntime?.Dispose();

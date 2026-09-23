@@ -203,12 +203,36 @@ export const COVER_CYCLE = Freeze({
   failedRetryS: 7,
   /** 连续这么多次探头都没看见目标，这个掩体就按失败处理（failedRetryS 内不再选）、换点。 */
   blindPeeksBeforeMove: 3,
+  /** 任务侧开关（`AiDirector.missionCoverRules`，第一关 01–06）打开时，「白探头」也算瞎探：
+   *  探出去看见了人、可一发都没打出去（弹道被他那道胸墙挡死、枪口转不过去）—— 连着
+   *  blindPeeksBeforeMove 次就换点。09-24 探针：03 的掩体里有人看得见左前枪位的老周、
+   *  36 m 外一发打不过去，缩头探头一整个相位。07 以后开关关着，仍只认「没看见」。 */
+  missionWastedPeekIsBlind: true,
+  /** 任务侧开关下、手上有关卡授权点（`ambientFirePoints`）的人：missionOpenWindowS 秒内因为瞎探 /
+   *  白探头连换 missionOpenAfterMoves 次掩体，说明身边的掩体探头位都打不出去 —— 接下来
+   *  missionOpenGroundS 秒不选掩体，就地跪着打（空地上的探头位对授权点大多是通的）。
+   *  2026-09-24 实机挑点侦察：03 待命区掩体里的人对任何授权点都不通，同一片空地上的人全通。 */
+  missionOpenAfterMoves: 2,
+  missionOpenWindowS: 30,
+  missionOpenGroundS: 12,
+  /** 在空地上真打出去了（对人或授权点）就续：最近 missionOpenKeepS 秒内开过枪，空地时段至少再留这么久；
+   *  压制过 COVER.suppressionProneAt 立刻回去找掩体。09-24 探针 fix3：只给 12 s 的话，待命组一轮
+   *  「瞎探三次 → 换点 → 再瞎探三次」要 20 s 才换来 12 s 空地，03 的不动人·帧里仍有一半是他们。 */
+  missionOpenKeepS: 8,
+  /** 离玩家这么近的人不去空地（去了的也立刻回来）：这条规矩是给远处打不出去的待命组的；玩家来路上的
+   *  阵位守卫走到空地上会把驾驶器（和真玩家）的接近路线打乱 —— 09-24 03→06 冷启动在 RightNestApproach
+   *  卡死，关掉这条就过。 */
+  missionOpenMinPlayerM: 30,
   /** 当前掩体被判侧翼要**持续**这么久才紧急换点：目标在两侧敌人间来回切时单拍判定会翻。 */
   flankGraceS: 1.5,
   /** blindPeeksBeforeMove / flankGraceS / 按隐蔽位判侧翼这三条只对这些阵营生效。
    *  2026-09-16 只给国军：日军的屋内伏击、开场追兵按原掩体周期调过节奏，
    *  三条一起对日军生效时 `--stage-from=8` 的伏击拍失序（改回原判定即通过）。 */
   refinedSides: ["nra"],
+  /** 任务侧开关（`AiDirector.missionCoverRules`）打开时改用这一份。2026-09-23 起第一关 01–06 的
+   *  任务相位打开它（`Script_FirstLevelFrontPressure`）：日军连探三次没看见人就换点、
+   *  被抄侧翼要持续 flankGraceS 才紧急换点。07 以后开关是关的，仍按 refinedSides。 */
+  missionRefinedSides: ["nra", "ija"],
   progressM: 0.35,
   /** 两次重选掩体的最小间隔（秒）。紧急失效改用 urgentReselectS，避免每次思考都重查。 */
   reselectMinS: 2.5,
@@ -263,4 +287,8 @@ export const DERIVED_COVER = Freeze({
   /** 哪些阵营的人会用派生点。只给国军：日军的开场追兵、屋内伏击等剧本拍按手工点调过，
    *  让他们也躲进派生点会把人藏到玩家找不到的地方（合入样条交通壕后开场卡在遮蔽点折角）。 */
   usableBy: ["nra"],
+  /** 任务侧开关（`AiDirector.missionCoverRules`）打开时改用这一份：第一关 01–06 的日军
+   *  也能躲进派生点（土坎、残墙没有手工登记点的那一大片）。当初排除日军的两条理由
+   *（开场追兵的遮蔽点折角、屋内伏击拍）都已下线；07 以后开关关着，行为不变。 */
+  missionUsableBy: ["nra", "ija"],
 });

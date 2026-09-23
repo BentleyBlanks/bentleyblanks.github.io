@@ -195,7 +195,8 @@ export function MeasureVoice(file) {
  * 母带：去首尾静音（各留 padS）→ 有声段 RMS 拉到 targetDb → 真峰值限到 ceilingDb → 单声道 mp3。
  * 返回 { trimStartS, gainDb, measure }。trimStartS 用来把 API 的逐字时间戳平移到成品上。
  */
-export function MasterLine(raw, output, { targetDb, padS = 0.06, ceilingDb = -1, bitrate = "96k" }) {
+// tempo > 1：不变调压快（atempo），只给「超出时长上限一点点」的单句用（Script_SeedAudioSquadBarkBake）。
+export function MasterLine(raw, output, { targetDb, padS = 0.06, ceilingDb = -1, bitrate = "96k", tempo = 1 }) {
   const before = MeasureVoice(raw);
   const start = Math.max(0, before.leadS - padS);
   const end = Math.min(before.seconds, before.seconds - before.tailS + padS);
@@ -209,9 +210,10 @@ export function MasterLine(raw, output, { targetDb, padS = 0.06, ceilingDb = -1,
     const limit = 10 ** ((ceilingDb - 0.5) / 20);
     // alimiter 在流尾会把前瞻缓冲里没处理的几毫秒原样吐出来（实测峰值就落在最后 50 ms），
     // 所以先补 0.1 s 静音、开延迟补偿，限完再按原长剪回，淡入淡出放在最后。
-    const length = end - start;
+    const length = (end - start) / tempo;
     const filter = [
       `atrim=start=${start.toFixed(3)}:end=${end.toFixed(3)}`, "asetpts=PTS-STARTPTS",
+      ...(tempo !== 1 ? [`atempo=${tempo.toFixed(4)}`] : []),
       `volume=${(gainDb + trim).toFixed(2)}dB`, "apad=pad_dur=0.1",
       `alimiter=limit=${limit.toFixed(4)}:attack=1:release=40:level=false:latency=true`,
       `atrim=duration=${length.toFixed(4)}`, "asetpts=PTS-STARTPTS",

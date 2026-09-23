@@ -104,8 +104,9 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
 - `Script_FirstLevelMissionRuntime` / `Flow` / `Checkpoint` / `StageJump` / `Column` / `View` / `People` /
   `Transition` / `LeaderGuide`：装配、事实记录、担架队与车、实例化人群。运行时对各玩法包**只留薄钩子**
   （自己步骤的 `Enter` 分支与 `Update` 段那几行）。
-- 阶段 1–7（[说明](Data_FirstLevelFront20260919.md)）：`Script_FirstLevelBunker`（01/02 掩蔽部整拍）、
-  `Script_FirstLevelCollection`（背坡集结处、借火戏、上担架）、`Script_FirstLevelFrontShow`（总线）、
+- 阶段 1–7（[说明](Data_FirstLevelFront20260919.md)）：`Script_OpeningStoryboards`（01/02 掩蔽部整拍，
+  `FirstLevelBunkerShow`）、`Script_FirstLevelCollection`（背坡集结处、借火戏、上担架）、`Script_FirstLevelFrontShow`（总线）、
+  `Script_FirstLevelFrontPressure` + `Data_FirstLevelFrontPressure`（02–05 前沿压力表，[敌军 AI §20](Data_EnemyAi.md)）、
   `Data_Tuning_FirstLevelFront`、`Script_FirstLevelFrontTest`、`Script_FirstLevelCampaignFront`。
 - 阶段 8–14（[说明](Data_FirstLevelMid20260919.md)）：`Script_FirstLevelVillageBlock`（08/09/10）、
   `Script_FirstLevelTransferCart`（11–14 的分流、装载额度、上车与卸担架）、`Data_Tuning_FirstLevelMid`、

@@ -128,42 +128,10 @@ export class FirstLevelFrontShow {
   }
 
   // --- 04 接替火力 -----------------------------------------------------------
-  UpdateMachineGun() {
-    const r = this.r;
-    if (!r.Has("frontAttackRepelled")) return;
-    // 指出北头弹药屋的那个守军：还活着的撤退守军里离玩家最近的一个，朝弹药屋指。
-    if (!this.bundleOrderGuard?.alive) {
-      const alive = r.guards.map((guard) => guard.actor)
-        .filter((actor) => actor?.alive)
-        .sort((a, b) => Distance(a.position, r.player.position) - Distance(b.position, r.player.position));
-      // The guard with the talking face (speakerRole "guard") takes the line when he is about as near.
-      const faced = alive.find((actor) => actor.speakerRole === "guard");
-      this.bundleOrderGuard = faced && Distance(faced.position, r.player.position)
-        - Distance(alive[0].position, r.player.position) <= SPEAKER_BINDING.facedGuardSlackM ? faced : alive[0] || null;
-    }
-    if (this.bundleOrderGuard?.alive) {
-      this.bundleOrderGuard.watchYaw = Math.atan2(this.bundleOrderGuard.position.x - A.bundle.x,
-        this.bundleOrderGuard.position.z - A.bundle.z);
-      this.bundleOrderGuard.watchUntil = r.ai.time + F.bundleOrderPointS;
-    }
-    if (!r.Has("bundleOrderHeard")) return;
-    // 「何有田接枪！文财看沟口！」—— 两个人真的换位置。
-    this.PostHandover();
-  }
-  /** 何有田守机枪位、刘文财看前沿交通壕口（04 命令下达之后，一路保持到 05 结束）。 */
-  PostHandover() {
-    const r = this.r;
-    const he = r.companion.Handle("heyoutian"), wen = r.companion.Handle("liuwencai");
-    if (he?.alive && !he.missionSortie) {
-      r.Defend(he, A.gun, R.contactRadiusM, R.companionCoverSlackM);
-      if (Distance(he.position, A.gun) > R.contactRadiusM) r.MoveActor(he, A.gun, R.squadSpeedMps);
-    }
-    if (wen?.alive && !wen.missionSortie) {
-      r.Defend(wen, F.trenchMouthWatch, R.contactRadiusM, R.companionCoverSlackM);
-      if (Distance(wen.position, F.trenchMouthWatch) > R.contactRadiusM)
-        r.MoveActor(wen, F.trenchMouthWatch, R.squadSpeedMps);
-    }
-  }
+  // UpdateMachineGun / PostHandover（机枪组被打退后指弹药屋、何有田守右阵位机枪）从来没有调用点，
+  // 2026-09-23 删掉（docs/Data_EnemyAi.md §20）：09.22 稿里何有田接的是左前枪位（FrontBattle.UpdateCapture 的
+  // leftGunHandover），弹药屋由罗班长在阵位后墙下令（UpdatePressure 的 BundleOrder）。bundleOrderGuard 仍是
+  // 运行时 VoicePosition 记下的「报告的那个守军」，保留。
 
   // --- 05 取弹炸车 -----------------------------------------------------------
   UpdateTank() {

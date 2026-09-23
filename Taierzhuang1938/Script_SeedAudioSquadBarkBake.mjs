@@ -42,6 +42,7 @@ export const CHECK = Object.freeze({
   targetRmsDb: -16.1,     // 战斗口令同一档（Script_VoiceBake.TARGET_RMS）
   rmsTolDb: 0.6,          // 逐句齐平后允许的偏差
   maxSeconds: 2.6,        // Script_VoiceTest：战斗 Bark 0.3–2.6 s
+  maxTempo: 1.08,         // 单句超长 ≤ 8% 时不变调压快，而不是整条重抽
   minSeconds: 0.3,
   noiseMaxDb: -48,        // 原始录音句间静音的底噪上限（Script_VoiceBake.FLOOR_MAX）
   minCoverage: 0.5,       // 逐字时间戳对上稿面的字少于一半 = 漏句
@@ -186,7 +187,14 @@ function Cut(who, n) {
     Run(["-y", "-v", "error", "-i", wav, "-af", `atrim=start=${s.startS.toFixed(4)}:end=${s.endS.toFixed(4)},asetpts=PTS-STARTPTS`,
       "-c:a", "pcm_f32le", seg], `cut ${who} ${lines[i].key}`);
     s.file = path.join(dir, `${lines[i].key}.mp3`);
-    const mastered = MasterLine(seg, s.file, { targetDb: CHECK.targetRmsDb, padS: LINE_MASTER.padS, ceilingDb: LINE_MASTER.ceilingDb });
+    let mastered = MasterLine(seg, s.file, { targetDb: CHECK.targetRmsDb, padS: LINE_MASTER.padS, ceilingDb: LINE_MASTER.ceilingDb });
+    // 只超上限一点（≤ CHECK.maxTempo）就把这一句不变调压快到上限内，不为一句整条重抽（少抽卡）。
+    const over = mastered.measure.seconds / (CHECK.maxSeconds - 0.04);
+    if (over > 1 && over <= CHECK.maxTempo) {
+      mastered = MasterLine(seg, s.file, { targetDb: CHECK.targetRmsDb, padS: LINE_MASTER.padS, ceilingDb: LINE_MASTER.ceilingDb, tempo: over });
+      s.tempo = +over.toFixed(3);
+      flags.push(`${lines[i].key} 超长，不变调压快 ${((over - 1) * 100).toFixed(1)}%`);
+    }
     fs.rmSync(seg, { force: true });
     s.gainDb = mastered.gainDb;
     s.measure = mastered.measure;
@@ -263,7 +271,7 @@ function Install(r, manifest, attempts) {
     fs.copyFileSync(s.file, dest);
     barks[line.bank] = { who: r.who, key: line.key, file: line.file, sha256: Sha256(dest), text: line.text,
       seconds: s.measure.seconds, voicedS: s.measure.voicedS, activeRmsDb: s.measure.activeRmsDb, truePeakDb: s.measure.truePeakDb,
-      noiseDb: s.measure.noiseDb, lowShare: s.measure.lowShare, f0: s.measure.f0.median, gainDb: s.gainDb,
+      noiseDb: s.measure.noiseDb, lowShare: s.measure.lowShare, f0: s.measure.f0.median, gainDb: s.gainDb, ...(s.tempo ? { tempo: s.tempo } : {}),
       takeStartS: s.startS, takeEndS: s.endS, tight: !!(s.tightStart || s.tightEnd),
       speakerCos: s.speakerCos, nearestOther: s.nearestOther, cer: s.cer, transcript: s.transcript };
   }
