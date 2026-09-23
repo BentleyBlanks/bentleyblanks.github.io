@@ -385,12 +385,32 @@ export class FirstLevelTankRuntime {
   Escorts(out) {
     const r = this.r, P = this.T.perf;
     if (out.releaseEscorts) {
+      // 车彻底哑火：护兵沿来路往回撤（倒着走战车路点，到路线起点再交还普通 AI 就地防守）。
+      // 2026-09-24 实测：就地交还（Defend 在原地）时，喊人收过来的护兵停在阵位边 (27.7,−136.8)，
+      // 看得见缺口、没被压制 → FrontBattle.InfantryBlockade 一直成立，最后一批守军等 240 s 也撤不出去（03→06 两次红）；
+      // 关掉大脑的旧路径护兵在车后路上，同一流程通过。车没了，步兵护兵退回出发线是常态，不是剧本特例。
+      const E = this.T.escorts;
       if (!this.escortsReleased) {
         this.escortsReleased = true;
+        this.escortRetreat = new Map();
+        const W = this.path.waypoints;
         for (const id of MISSION_ENCOUNTERS.tank.map((s) => s.id)) {
           const actor = r.enemies.get(id);
-          if (actor?.alive) r.Defend(actor, actor.position);
+          if (!actor?.alive) continue;
+          let near = 0;
+          for (let i = 1; i < W.length; i++) if (Distance(W[i], actor.position) < Distance(W[near], actor.position)) near = i;
+          this.escortRetreat.set(id, W.slice(0, near + 1).reverse().map((w) => ({ x: w.x, z: w.z })));
         }
+      }
+      for (const [id, route] of this.escortRetreat) {
+        const actor = r.enemies.get(id);
+        if (!actor?.alive || !route.length) continue;
+        while (route.length > 1 && Distance(actor.position, route[0]) < E.retreatArrivalM) route.shift();
+        if (route.length === 1 && Distance(actor.position, route[0]) < E.retreatArrivalM) {
+          r.Defend(actor, route[0], E.holdRadiusM); route.length = 0; continue;
+        }
+        r.ai.SetStance(actor, 0, 0.5, true);
+        r.MoveActor(actor, route[0], E.retreatSpeedMps);
       }
       return;
     }

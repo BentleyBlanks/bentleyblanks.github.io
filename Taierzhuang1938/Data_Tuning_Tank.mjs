@@ -230,6 +230,9 @@ export const TANK = Object.freeze({
     rallyRadiusM: 3,
     // 车还在远处（03 从图外开进来）时，护兵照旧打自己的仗；车开到离他这么近才接过来跟车。
     joinRangeM: 30,
+    // 车彻底哑火以后护兵沿来路（倒着走战车路点）撤回路线起点：到一个路点算 retreatArrivalM，跑步速度。[需]
+    retreatArrivalM: 4,
+    retreatSpeedMps: 3.2,
   }),
 
   // --- 毁伤 --------------------------------------------------------------------
