@@ -258,6 +258,8 @@ export class FirstLevelTankRuntime {
       const actor = r.enemies.get(e.id);
       if (!actor?.alive) continue;
       const previous = this.escortAnchors.get(e.id);
+      // 还没接过来的护兵：车离他远就不管（03 车在图外时他们留在原处打仗）。
+      if (!previous && Distance(actor.position, e.anchor) > this.T.escorts.joinRangeM) continue;
       if (previous && previous.mode === e.mode && Distance(previous.anchor, e.anchor) < 0.4) continue;
       this.escortAnchors.set(e.id, { anchor: { ...e.anchor }, mode: e.mode });
       r.Defend(actor, e.anchor, e.radius, e.slack);
