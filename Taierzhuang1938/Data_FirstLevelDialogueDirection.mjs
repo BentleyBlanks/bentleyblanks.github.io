@@ -35,6 +35,13 @@ export const PROJECTION_DB = Object.freeze({ shout: -16, normal: -19, low: -23, 
 /** 真峰值上限（dBTP）与切句时句首句尾保留的静音（秒）；两句贴得比 2×padS 还紧时在能量最低点切、各 10 ms 淡入淡出。 */
 export const LINE_MASTER = Object.freeze({ ceilingDb: -1, padS: 0.06, padMinS: 0.04, padMaxS: 0.08, crossfadeS: 0.01 });
 export const PROJECTION_OFFSCREEN_DB = -4;
+/**
+ * 剧情语音同时最多几路（契约 §6 音频节点预算：剧情语音同时 ≤ 3 路）。计的是真在出声的句子：
+ * 各场景正在响的逐句声源 + 旧整段单槽。满了再开口时，最早开口的那句淡出让位（播放器 stats.budgetCuts 记账）。
+ */
+export const MAX_LIVE_DIALOGUE_LINES = 3;
+/** 让位的那句淡出多久（秒）。 */
+export const BUDGET_FADE_S = 0.12;
 /** 录音间隔缺失（还没烘出整段）时的兜底间隔。 */
 export const FALLBACK_GAP_S = 0.3;
 

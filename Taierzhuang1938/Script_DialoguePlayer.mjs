@@ -17,7 +17,7 @@
 //   { id, priority, lines: [{ id, index, who, key, duration, speaker, text, direction, sha256? }] }
 //   key       voiceBank 键（"Mission<Scene>_<NN>"）；缺录音时为 null，照走字幕与事件（按估算时长）
 //   direction 见 Data_FirstLevelDialogueDirection 顶部注释
-import { DIALOGUE_DUCK, PROJECTION_OFFSCREEN_DB } from "./Data_FirstLevelDialogueDirection.mjs";
+import { DIALOGUE_DUCK, PROJECTION_OFFSCREEN_DB, MAX_LIVE_DIALOGUE_LINES, BUDGET_FADE_S } from "./Data_FirstLevelDialogueDirection.mjs";
 
 const DbGain = (db) => Math.pow(10, db / 20);
 /** 字幕在句尾多挂这么久再撤（读完最后几个字）。 */
@@ -127,8 +127,9 @@ export class DialogueHandle {
 }
 
 export class DialoguePlayer {
-  constructor({ audio, Subtitles = null, Event = null, Clock = null, Listener = null, duck = DIALOGUE_DUCK } = {}) {
-    Object.assign(this, { audio, Subtitles, Event, Clock, Listener, duck });
+  constructor({ audio, Subtitles = null, Event = null, Clock = null, Listener = null, duck = DIALOGUE_DUCK,
+    maxLive = MAX_LIVE_DIALOGUE_LINES } = {}) {
+    Object.assign(this, { audio, Subtitles, Event, Clock, Listener, duck, maxLive });
     this.handles = new Set();
     this.duckActive = false;
     this.lastSpeechAt = -1e9;
@@ -136,7 +137,28 @@ export class DialoguePlayer {
     this.subtitleSignature = "";
     /** 口型轨采样器（Face 包的 Script_FaceTrack 注入）：(line, seconds) → {jaw,wide,round,close,stress} | null */
     this.faceTrackSampler = null;
-    this.stats = { lines: 0, overlaps: 0, maxConcurrent: 0, cuts: 0 };
+    this.stats = { lines: 0, overlaps: 0, maxConcurrent: 0, cuts: 0, budgetCuts: 0 };
+  }
+
+  /** 真在出声的句子（有声源的；暂停的场景已经停了声源，不算）。 */
+  SoundingLines() {
+    const rows = [];
+    for (const h of this.handles) for (const l of h.lines) if (l.state === "playing" && l.voice) rows.push([h, l]);
+    return rows;
+  }
+
+  /**
+   * 契约 §6：剧情语音同时 ≤ maxLive 路（旧整段单槽也算一路）。要开新的一句而已经满了，
+   * 就让最早开口的那句淡出（EndLine 照常发它的句尾事件，玩法不会卡在等它说完）。
+   */
+  EnforceBudget() {
+    const legacy = this.audio?.storyVoice ? 1 : 0;
+    const sounding = this.SoundingLines().sort((a, b) => a[1].startedNow - b[1].startedNow);
+    while (sounding.length && sounding.length + legacy >= this.maxLive) {
+      const [h, l] = sounding.shift();
+      this.EndLine(h, l, "budget");
+      this.stats.budgetCuts++;
+    }
   }
 
   Play(scene, opts = {}) {
@@ -224,13 +246,16 @@ export class DialoguePlayer {
   }
 
   StartLine(handle, l) {
+    if (l.line.key) this.EnforceBudget();
     l.state = "playing";
     l.t = 0;
+    l.startedNow = this.now;
     this.stats.lines++;
     const concurrent = [...this.handles].reduce((n, h) => n + h.lines.filter((x) => x.state === "playing").length, 0);
     if (concurrent > 1) this.stats.overlaps++;
     this.stats.maxConcurrent = Math.max(this.stats.maxConcurrent, concurrent);
     this.StartVoice(handle, l);
+    this.stats.maxSounding = Math.max(this.stats.maxSounding || 0, this.SoundingLines().length + (this.audio?.storyVoice ? 1 : 0));
     const line = l.line;
     handle.opts.onLine?.(line.id, line.who, handle);
     this.Event?.("Line", handle.id, { who: line.who, index: line.index, lineId: line.id,
@@ -250,7 +275,7 @@ export class DialoguePlayer {
 
   EndLine(handle, l, reason, { silent = false } = {}) {
     if (l.state !== "playing") return;
-    if (l.voice) this.audio?.StopVoice?.(l.voice, reason === "cut" || reason === "stopOn" ? 0 : 0.04);
+    if (l.voice) this.audio?.StopVoice?.(l.voice, reason === "cut" || reason === "stopOn" ? 0 : reason === "budget" ? BUDGET_FADE_S : 0.04);
     l.voice = null;
     l.state = "done";
     l.endAt = handle.time;
