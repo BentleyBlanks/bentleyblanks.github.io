@@ -264,7 +264,17 @@
 
 ### 10.3 03→06 冷启动结果（`Script_FirstLevelMissionBrowserTest.mjs --campaign --stage-from=3 --stage-to=6 --probe-front-gun`）
 
-见最终报告里的实跑记录；断点交第二波 Front 包，本包不改 `Script_FirstLevelFrontBattle` 逻辑。
+2026-09-24 在本分支连跑 6 次（日志在 worktree 的 `tmp/campaign_0306_*.log`，不进仓库）。新布局撞出来的前三处都在本包数据里修掉了，第四处是 Front 包的名单数据：
+
+| 次序 | 断点 | 原因 | 处理 |
+| --- | --- | --- | --- |
+| 1 | `rightNestCaptured` 永不成立 | 连接口守卫在后墙外，西门和机枪座都看不见；东侧守卫被 1.8 m 碎砖堆整个挡住 | 本包：守卫挪进后门内侧；碎砖堆缩小挪到他身前 2 m（引擎 `BlocksSight` 实测四人对机枪座全部 2/2） |
+| 2 | 夺点后「player can observe the actual breach」 | 背坡铁丝网东卷压在机枪座→缺口的线上，桩和线是射线碰撞体 | 本包：铁丝网带斜 0.073 rad；量尺加「运行时缺口视线按整卷铁丝网算」 |
+| 3 | 等 `MachineGun` 超时：`frontRifleDefense` 不记 | 05 切入组不守位，03 里顺连接支沟西行，从 65 m 外看到缺口，`InfantryBlockade` 常亮 | 本包：切入组 `hold`；断言岗位看不到缺口和背坡 |
+| 4 | 同上，`frontRifleDefense` 仍不记 | `Data_Tuning_FirstLevelFront.assaultIds`（FrontGunner、FrontRifleA–D）要死 3 个才开撤离窗口；新布局里机枪座看不到 A–D（土坎挡，由老周侧射），FrontGunner 在北坡火力基地谁也看不到。诊断：夺点后 80 s 缺口无人威胁（封锁已灭），名单里只死了 A、B | **交 Front 包**：名单改成夺下的机枪真正打得到的人（静态实测：FrontRifleE/F 与侧翼组四人，机枪座对它们末线可见），或把判定改成「名单里死几个 + 缺口无人威胁」。本包试过只换名单（E、F + 侧翼组四人，未提交），侧翼组还在北残院待命、不按 `lane` 跃进，仍凑不满 3 个——侧翼组的跃进接线也要一起做 |
+
+- 已确认成立的：03 右低沟＋西门冷启动能走通、夺点、「机枪座看得到缺口」「枪有真实射界」、班长站位离玩家与座位各 ≥1.5 m、枪架在枪下（`RightNestFrontRest`）、F 上枪连射再 F 下枪。
+- 顺带看到（交 Ai 包）：诊断里跃进组 FrontRifleF 最后躲进了已被我方夺回的阵位院子（26.4,−153.6）找掩体——掩体搜索没排除我方占住的阵位。
 
 ---
 
