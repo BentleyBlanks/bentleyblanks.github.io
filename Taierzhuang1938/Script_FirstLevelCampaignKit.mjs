@@ -489,7 +489,12 @@ export function CampaignActions(ctx) {
             else if(b.wasEvading){
               b.wasEvading=false;
               const projection=MissionRouteProjection(b.corridor,p);
-              if(projection.distance>arrivalM+.2){
+              const next=b.corridor[MissionRouteNextIndex(b.corridor,p)];
+              // Also when the dodge carried us back past a corner while staying on the corridor
+              // (2026-09-24: a nest guard's grenade sent the bot 10 m back west in the 03 approach
+              // trench, still within 1 m of the corridor, and the straight line to the old next
+              // corner cut through the trench wall - stuck for good).
+              if(projection.distance>arrivalM+.2||b.points[b.index]!==next){
                 // Re-enter the checked corridor using normal movement before
                 // resuming the next corner; a grenade may leave us behind a wall.
                 b.points=[MissionRoutePoint(b.corridor,projection.progress),

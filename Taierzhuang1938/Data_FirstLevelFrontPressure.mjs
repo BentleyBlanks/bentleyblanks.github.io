@@ -85,8 +85,12 @@ export const FRONT_PRESSURE_GROUPS = Object.freeze({
     officer: FRONT_MACHINE_GUN_ATTACK.find((spec) => spec.weapon !== "Type11")?.id ?? null }),
 });
 
-/** 阵位守卫的临时后撤锚点：阵位北侧院内（远离玩家来路）。朝向南/西南的掩体点归 Space 包。 */
-const NEST_FALLBACK = Object.freeze({ casualties: 2, to: Object.freeze({ x: 31, z: -146 }) });
+/**
+ * 阵位守卫的临时后撤锚点：往日军自己一侧（南）退，离机枪位约 17 m。朝向南/西南的掩体点归 Space 包。
+ * 2026-09-24：原锚点 (31,−146) 离机枪位只有 5 m，守区半径 + 掩体余量 8 m 让退下来的人正好蹲在枪位旁
+ *（实测 1.5 m），玩家上枪时被他贴身刺刀 —— 03→06 冷启动红在 04 上枪那一下。
+ */
+const NEST_FALLBACK = Object.freeze({ casualties: 2, to: Object.freeze({ x: 31, z: -159 }) });
 const NEST = Object.freeze({ role: "nestGuard", fallback: NEST_FALLBACK });
 // 西侧两人去土坎西端外：先沿自己的跃进线到 −166 那条线，再沿线横移到西侧农田那一列掩体后面
 //（离左前枪位约 20 m：再近就会和老周贴脸，守军过口时也更难让出视线）。
