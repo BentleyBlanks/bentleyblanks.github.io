@@ -400,6 +400,7 @@ export class ActorEditor {
     this.previewMode = "actor";
     this.cartKind = "ox";
     this.cartAction = "walk";
+    this.cartView = "quarter";
     this.cartPreview = null;
     this.cartBuildToken = 0;
 
@@ -422,6 +423,8 @@ export class ActorEditor {
 
   Enter(root) {
     this.studio.Open(this.host.hideInStudio);
+    this.actorPadMaterial = this.studio.pad.material;
+    this.cartPadMaterial = new THREE.MeshStandardMaterial({ color: 0x777779, roughness: 1 });
     this.studio.Frame(1.7, 3.4);
     this.panel = Panel({
       title: "人物动作编辑器", sub: "",
@@ -436,6 +439,9 @@ export class ActorEditor {
   Exit() {
     this.cartBuildToken += 1;
     this.DisposeActors();
+    this.studio.pad.material = this.actorPadMaterial;
+    this.cartPadMaterial?.dispose();
+    this.cartPadMaterial = null;
     if (this.panel) this.panel.root.remove();
     this.panel = null;
     this.studio.Close();
@@ -568,6 +574,12 @@ export class ActorEditor {
     ]);
     this.cartKindList.Select(this.cartKind);
     Chips(cartSection, [
+      { value: "quarter", label: "斜侧" },
+      { value: "side", label: "正侧" },
+      { value: "front", label: "正面" },
+      { value: "rear", label: "车后" },
+    ], this.cartView, (value) => { this.cartView = value; this.FrameCart(); });
+    Chips(cartSection, [
       { value: "walk", label: "行走动画" },
       { value: "idle", label: "停驻姿态" },
     ], this.cartAction, (value) => { this.cartAction = value; this.time = 0; this.Step(0); });
@@ -585,6 +597,21 @@ export class ActorEditor {
   UpdateModeUi() {
     if (this.actorBody) this.actorBody.style.display = this.previewMode === "actor" ? "" : "none";
     if (this.cartBody) this.cartBody.style.display = this.previewMode === "cart" ? "" : "none";
+    this.studio.pad.material = this.previewMode === "cart" ? this.cartPadMaterial : this.actorPadMaterial;
+  }
+
+  FrameCart() {
+    const view = {
+      quarter: { yaw: Math.PI + 0.55, pitch: 0.18, dist: 9.8 },
+      side: { yaw: Math.PI / 2, pitch: 0.12, dist: 15.6 },
+      front: { yaw: Math.PI, pitch: 0.17, dist: 13.2 },
+      rear: { yaw: 0, pitch: 0.17, dist: 13.2 },
+    }[this.cartView];
+    this.studio.Frame(2.4, view.dist);
+    this.studio.orbit.target.z = -2.15;
+    this.studio.orbit.yaw = view.yaw;
+    this.studio.orbit.pitch = view.pitch;
+    this.studio.ApplyCamera();
   }
 
   FillActionList() {
@@ -708,9 +735,7 @@ export class ActorEditor {
     this.studio.ClearStand();
     this.time = 0;
     if (this.previewMode === "cart") {
-      this.studio.Frame(2.4, 11);
-      this.studio.orbit.target.z = -2.1;
-      this.studio.ApplyCamera();
+      this.FrameCart();
       const token = this.cartBuildToken;
       if (this.cartNote) this.cartNote.textContent = "正在加载牛马车模型与动画…";
       LoadDraftCartAssets().then((assets) => {
@@ -762,6 +787,8 @@ export class ActorEditor {
       this.gizmos.push(gizmo);
     });
     if (this.towel != null) this.ApplyTowel();
+    this.studio.orbit.yaw = Math.PI + 0.55;
+    this.studio.orbit.pitch = 0.20;
     this.studio.Frame(1.75, this.lineup ? 6.4 : 3.4);
     this.Step(0);
   }

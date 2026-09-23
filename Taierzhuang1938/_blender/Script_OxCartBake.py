@@ -80,21 +80,46 @@ def Finish(obj, name, mat, col, parent=None, bevel=0):
 
 def Cube(name, center, size, mat, col, parent=None, bevel=.015):
     bpy.ops.mesh.primitive_cube_add(size=1, location=center)
-    obj = bpy.context.object
+    obj = bpy.context.view_layer.objects.active
     obj.dimensions = size
     bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
     return Finish(obj, name, mat, col, parent, bevel)
 
 def Ellipsoid(name, center, scale, mat, col, parent=None, segments=12, rings=8):
     bpy.ops.mesh.primitive_uv_sphere_add(segments=segments, ring_count=rings, location=center)
-    obj = bpy.context.object
+    obj = bpy.context.view_layer.objects.active
     obj.scale = scale
     bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+    for polygon in obj.data.polygons: polygon.use_smooth = True
+    return Finish(obj, name, mat, col, parent)
+
+def LoftY(name, stations, mat, col, parent=None, sides=18):
+    """Continuous rib and shoulder silhouette from measured cross sections."""
+    vertices = []
+    faces = []
+    for y, half_width, center_z, half_height in stations:
+        for step in range(sides):
+            angle = 2 * math.pi * step / sides
+            vertices.append((half_width * math.cos(angle), y,
+                             center_z + half_height * math.sin(angle)))
+    for station in range(len(stations) - 1):
+        for step in range(sides):
+            next_step = (step + 1) % sides
+            faces.append((station*sides+step, (station+1)*sides+step,
+                          (station+1)*sides+next_step, station*sides+next_step))
+    faces.extend((tuple(reversed(range(sides))),
+                  tuple((len(stations)-1)*sides+step for step in range(sides))))
+    mesh = bpy.data.meshes.new(name+'Mesh')
+    mesh.from_pydata(vertices, [], faces)
+    mesh.update()
+    for polygon in mesh.polygons: polygon.use_smooth = True
+    obj = bpy.data.objects.new(name, mesh)
+    col.objects.link(obj)
     return Finish(obj, name, mat, col, parent)
 
 def Cylinder(name, center, radius, depth, mat, col, parent=None, vertices=12, axis='Z'):
     bpy.ops.mesh.primitive_cylinder_add(vertices=vertices, radius=radius, depth=depth, location=center)
-    obj = bpy.context.object
+    obj = bpy.context.view_layer.objects.active
     if axis == 'X': obj.rotation_euler[1] = math.pi / 2
     if axis == 'Y': obj.rotation_euler[0] = math.pi / 2
     return Finish(obj, name, mat, col, parent, .005)
@@ -104,6 +129,16 @@ def Beam(name, start, end, width, depth, mat, col, parent=None):
     obj = Cube(name, (a+b)/2, (width, depth, (b-a).length), mat, col, parent, .008)
     obj.rotation_euler = (b-a).to_track_quat('Z', 'Y').to_euler()
     return obj
+
+def TaperBone(name, start, end, upper_radius, lower_radius, mat, col, parent=None):
+    a, b = Vector(start), Vector(end)
+    bpy.ops.mesh.primitive_cone_add(vertices=14, radius1=upper_radius,
+                                   radius2=lower_radius, depth=(b-a).length,
+                                   location=(a+b)/2)
+    obj = bpy.context.view_layer.objects.active
+    obj.rotation_euler = (b-a).to_track_quat('Z', 'Y').to_euler()
+    for polygon in obj.data.polygons: polygon.use_smooth = True
+    return Finish(obj, name, mat, col, parent)
 
 def Curve(name, points, radius, mat, col, parent=None):
     data = bpy.data.curves.new(name, 'CURVE')
@@ -161,63 +196,99 @@ for side in (-1,1):
     for radius, bevel, material in ((.68,.077,edge),(.718,.038,iron)):
         bpy.ops.mesh.primitive_torus_add(major_segments=32,minor_segments=6,location=(x,-.18,.72),
             rotation=(0,math.pi/2,0),major_radius=radius,minor_radius=bevel)
-        Finish(bpy.context.object,f'WheelRim{side}_{radius}',material,cart_col,pivot)
+        Finish(bpy.context.view_layer.objects.active,f'WheelRim{side}_{radius}',material,cart_col,pivot)
     Cylinder(f'IronAxleCap{side}',(x+side*.1,-.18,.72),.088,.024,iron,cart_col,pivot,10,'X')
 
 def BuildAnimal(kind):
     is_ox = kind == 'Ox'
     col = bpy.data.collections.new(kind); scene.collection.children.link(col)
     root = Empty(kind+'Root',(0,0,0),col)
-    body = Empty(kind+'BodyPivot',(0,4.15,1.25 if is_ox else 1.45),col,root)
+    body = Empty(kind+'BodyPivot',(0,4.15,1.31 if is_ox else 1.50),col,root)
     coat = ox_coat if is_ox else horse_coat
-    Ellipsoid(kind+'Torso',(0,4.15,1.28 if is_ox else 1.45),
-              (.56,.97,.58) if is_ox else (.43,.91,.48),coat,col,body)
-    Ellipsoid(kind+'Chest',(0,4.75,1.32 if is_ox else 1.43),
-              (.54,.45,.54) if is_ox else (.43,.38,.46),coat,col,body)
-    Ellipsoid(kind+'Haunch',(0,3.46,1.29 if is_ox else 1.46),
-              (.55,.44,.48) if is_ox else (.44,.4,.4),coat,col,body)
+    # The body is one tapered surface: a draft ox has a deep, heavy forequarter;
+    # the horse has longer legs, a tucked barrel and a higher withers line.
+    if is_ox:
+        torso_stations = [
+            (3.10,.17,1.30,.24),(3.28,.45,1.30,.43),(3.55,.56,1.31,.52),
+            (3.90,.57,1.29,.54),(4.24,.58,1.30,.56),(4.54,.62,1.33,.60),
+            (4.78,.56,1.35,.59),(4.98,.38,1.34,.45),(5.08,.20,1.35,.25)]
+        Ellipsoid('OxShoulderHump',(0,4.57,1.81),(.45,.34,.23),coat,col,body,18,10)
+    else:
+        torso_stations = [
+            (3.12,.16,1.50,.22),(3.30,.38,1.48,.39),(3.56,.46,1.48,.46),
+            (3.89,.43,1.46,.44),(4.18,.40,1.45,.42),(4.47,.45,1.50,.48),
+            (4.72,.48,1.54,.54),(4.90,.32,1.54,.43),(5.00,.16,1.53,.23)]
+    LoftY(kind+'Torso',torso_stations,coat,col,body)
     if is_ox:
         Ellipsoid('OxDewlap',(0,4.65,.9),(.26,.32,.29),ox_light,col,body)
     else:
-        Curve('HorseMane',[(0,4.86,1.91),(0,5.12,1.84),(0,5.32,1.63)],.09,horse_dark,col,body)
-    head_pivot=Empty(kind+'HeadPivot',(0,4.82,1.61 if is_ox else 1.77),col,root)
-    neck_end=(0,5.14,1.6 if is_ox else 1.84)
-    Ellipsoid(kind+'Neck',neck_end,(.32,.43,.4),coat,col,head_pivot)
-    Ellipsoid(kind+'Skull',(0,5.42,1.62 if is_ox else 1.82),
-              (.31,.38,.30) if is_ox else (.22,.42,.31),coat,col,head_pivot)
-    Ellipsoid(kind+'Muzzle',(0,5.72,1.43 if is_ox else 1.55),
-              (.30,.24,.19) if is_ox else (.22,.26,.16),ox_light if is_ox else horse_dark,col,head_pivot)
+        Curve('HorseMane',[(0,4.69,1.94),(0,4.87,2.15),(0,5.04,2.27),(0,5.23,2.33)],
+              .075,horse_dark,col,body)
+    head_pivot=Empty(kind+'HeadPivot',(0,4.82,1.61 if is_ox else 1.72),col,root)
+    if is_ox:
+        neck_stations = [(4.70,.33,1.44,.37),(4.90,.35,1.51,.39),
+                         (5.13,.30,1.58,.34),(5.29,.20,1.61,.23)]
+        skull_stations = [(5.05,.19,1.62,.19),(5.25,.30,1.66,.30),
+                          (5.46,.30,1.56,.27),(5.64,.25,1.43,.20)]
+    else:
+        neck_stations = [(4.64,.28,1.59,.34),(4.83,.30,1.73,.41),
+                         (5.02,.27,1.89,.38),(5.18,.21,2.05,.29),
+                         (5.29,.15,2.15,.18)]
+        skull_stations = [(5.17,.15,2.15,.19),(5.30,.21,2.13,.30),
+                          (5.47,.20,1.99,.28),(5.62,.16,1.82,.20),
+                          (5.70,.13,1.70,.12)]
+    LoftY(kind+'Neck',neck_stations,coat,col,head_pivot)
+    LoftY(kind+'Skull',skull_stations,coat,col,head_pivot)
+    Ellipsoid(kind+'Muzzle',(0,5.72,1.38 if is_ox else 1.68),
+              (.27,.18,.16) if is_ox else (.17,.14,.12),
+              ox_light if is_ox else horse_dark,col,head_pivot,16,10)
     for side in (-1,1):
-        Ellipsoid(kind+f'Ear{side}',(side*(.30 if is_ox else .20),5.31,1.84 if is_ox else 2.03),
-                  (.19,.11,.075),coat,col,head_pivot)
-        Ellipsoid(kind+f'Eye{side}',(side*(.292 if is_ox else .215),5.52,1.69 if is_ox else 1.88),
+        Ellipsoid(kind+f'Ear{side}',(side*(.30 if is_ox else .18),5.31 if is_ox else 5.26,
+                                   1.84 if is_ox else 2.43),
+                  (.19,.11,.075) if is_ox else (.09,.09,.16),coat,col,head_pivot)
+        Ellipsoid(kind+f'Eye{side}',(side*(.292 if is_ox else .195),5.52 if is_ox else 5.46,
+                                     1.69 if is_ox else 2.07),
                   (.031,.024,.029),eye,col,head_pivot,8,6)
         if is_ox:
             Curve(f'OxHorn{side}',[(side*.27,5.27,1.84),(side*.44,5.25,1.91),(side*.58,5.26,2.04)],.064,horn,col,head_pivot)
         else:
-            Beam(f'HorseEarTip{side}',(side*.15,5.28,1.99),(side*.22,5.41,2.16),.07,.07,horse_dark,col,head_pivot)
+            Beam(f'HorseEarTip{side}',(side*.18,5.26,2.47),(side*.19,5.32,2.63),.055,.055,horse_dark,col,head_pivot)
         # Four articulated legs, with each upper leg pivot at the shoulder/hip.
     leg_pivots=[]
     for side in (-1,1):
         for front in (True,False):
             x=side*(.33 if is_ox else .28)
             y=4.72 if front else 3.48
-            upper_z=1.19 if is_ox else 1.42
-            joint=.58 if is_ox else .68
+            upper_z=1.22 if is_ox else 1.48
+            joint=.58 if is_ox else .72
+            knee_y=y+(.06 if front else -.18)
+            foot_y=y+(.10 if front else .06)
             name=f'{kind}{"Front" if front else "Rear"}{"Left" if side<0 else "Right"}'
             pivot=Empty(name+'Pivot',(x,y,upper_z),col,root)
-            Ellipsoid(name+'Upper',(x,y,(upper_z+joint)/2),(.16,.19,(upper_z-joint)/2+.07),coat,col,pivot)
-            knee=Empty(name+'KneePivot',(x,y,joint),col,pivot)
-            Beam(name+'Lower',(x,y,joint),(x,y-.025,.18),.12,.14,coat,col,knee)
-            Ellipsoid(name+'Hoof',(x,y+.075,.105),(.16,.23,.10),hoof,col,knee,10,6)
+            TaperBone(name+'Upper',(x,y,upper_z),(x,knee_y,joint),
+                      .19 if is_ox else (.155 if front else .19),
+                      .12 if is_ox else .095,coat,col,pivot)
+            knee=Empty(name+'KneePivot',(x,knee_y,joint),col,pivot)
+            TaperBone(name+'Lower',(x,knee_y,joint),(x,foot_y,.18),
+                      .11 if is_ox else .085,.075 if is_ox else .06,coat,col,knee)
+            Ellipsoid(name+'Hoof',(x,foot_y+.07,.105),
+                      (.16,.23,.10) if is_ox else (.135,.17,.11),hoof,col,knee,12,8)
             leg_pivots.append((pivot,knee,side,front))
     tail=Empty(kind+'TailPivot',(0,3.32,1.55 if is_ox else 1.78),col,root)
     Curve(kind+'Tail',[(0,3.33,1.5),(0,3.13,1.17),(0,3.10,.96)],.035,coat if is_ox else horse_dark,col,tail)
     # Rope halter, collar and cross-yoke sit at the actual shaft height.
-    for z in (1.72 if is_ox else 1.9,):
-        Curve(kind+'NoseBand',[(-.26,5.64,1.48),(-.29,5.72,1.41),(0,5.78,1.32),(.29,5.72,1.41),(.26,5.64,1.48)],.018,rope,col,head_pivot)
+    if is_ox:
+        nose_points=[(-.26,5.64,1.48),(-.29,5.72,1.41),(0,5.78,1.32),
+                     (.29,5.72,1.41),(.26,5.64,1.48)]
+    else:
+        nose_points=[(-.16,5.66,1.77),(-.18,5.74,1.70),(0,5.79,1.62),
+                     (.18,5.74,1.70),(.16,5.66,1.77)]
+    Curve(kind+'NoseBand',nose_points,.018,rope,col,head_pivot)
     for side in (-1,1):
-        Curve(kind+f'CheekRope{side}',[(side*.24,5.7,1.47),(side*.28,5.44,1.7),(side*.36,4.85,1.38)],.016,rope,col,root)
+        cheek = ([(side*.24,5.7,1.47),(side*.28,5.44,1.7),(side*.36,4.85,1.38)]
+                 if is_ox else
+                 [(side*.16,5.70,1.76),(side*.20,5.42,2.10),(side*.30,4.86,1.72)])
+        Curve(kind+f'CheekRope{side}',cheek,.016,rope,col,root)
         Curve(kind+f'ShaftTrace{side}',[(side*.53,4.67,1.11),(side*.53,4.4,.99),(side*.52,3.43,.89)],.018,leather,col,root)
     Curve(kind+'ShoulderHarness',[(-.51,4.62,1.50),(0,4.58,1.81 if is_ox else 1.98),(.51,4.62,1.50)],.055,leather,col,root)
     Beam(kind+'Yoke',(-.77,4.82,1.84 if is_ox else 1.9),(.77,4.82,1.84 if is_ox else 1.9),.10,.12,edge,col,root)
@@ -234,7 +305,7 @@ def BuildAnimal(kind):
         for frame in (1,8,16,24,31):
             phase=2*math.pi*(frame-1)/30
             if obj == body:
-                obj.location.z=(1.25 if is_ox else 1.45)+.025*math.cos(2*phase)
+                obj.location.z=(1.31 if is_ox else 1.50)+.025*math.cos(2*phase)
             elif obj == head_pivot:
                 obj.rotation_euler[0]=.055*math.sin(phase-.4)
             elif obj == tail:

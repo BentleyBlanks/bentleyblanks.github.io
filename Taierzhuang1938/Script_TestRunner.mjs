@@ -713,6 +713,7 @@ const changedDomainRules = [
 ];
 
 const ignoredChangeRules = [
+  /\/Script_OxCartIterationGate\.mjs$/i, // Local scheduled-session lock; never loaded by the game.
   /\/Animation\/FirstPerson\/Data_FirstPersonSource\.json$/i, // Blender measurements; never loaded by the game.
   /\/docs\//i,
   /\/(?:AGENTS|README)[^/]*\.md$/i,

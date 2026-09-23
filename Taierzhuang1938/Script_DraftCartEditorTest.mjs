@@ -52,12 +52,26 @@ try {
   assert.ok(Math.abs(after.wheel-before.wheel) > .1, "the cart wheel really rolls");
   assert.match(after.fact, /Blender Walk/);
   await page.screenshot({ path: path.join(shots, "Texture_OxCartEditor.png") });
+  let previousCamera = await page.evaluate(() => window.Taierzhuang.camera.position.toArray());
+  for (const [view, label] of [["side", "正侧"], ["front", "正面"], ["rear", "车后"]]) {
+    await page.locator(".edChip").filter({ hasText: new RegExp(`^${label}$`) }).click();
+    await page.evaluate(() => window.Taierzhuang.StepFrames(12));
+    assert.equal(await page.evaluate(() => window.Taierzhuang.editor.active.cartView), view);
+    const camera = await page.evaluate(() => window.Taierzhuang.camera.position.toArray());
+    assert.notDeepEqual(camera, previousCamera, `${view} has a distinct inspection camera`);
+    previousCamera = camera;
+    await page.screenshot({ path: path.join(shots, `Texture_OxCart_${view}.png`) });
+  }
+  await page.locator(".edChip").filter({ hasText: /^斜侧$/ }).click();
 
   await page.locator(".edPanel .it").filter({ hasText: /马车 · 同款民用板车/ }).click();
   await page.waitForFunction(() => window.Taierzhuang.editor.active?.cartPreview?.animalRoot
     .getObjectByName("HorseFrontLeftPivot"), null, { timeout: 30000 });
   await page.evaluate(() => window.Taierzhuang.StepFrames(15));
   await page.screenshot({ path: path.join(shots, "Texture_HorseCartEditor.png") });
+  await page.locator(".edChip").filter({ hasText: /^正侧$/ }).click();
+  await page.evaluate(() => window.Taierzhuang.StepFrames(12));
+  await page.screenshot({ path: path.join(shots, "Texture_HorseCart_side.png") });
   const horse = await page.evaluate(() => ({ kind: window.Taierzhuang.editor.active.cartKind,
     meshes: Object.values(window.Taierzhuang.editor.active.cartPreview.parts).every((mesh) => mesh.isMesh) }));
   assert.deepEqual(horse, { kind: "horse", meshes: true });

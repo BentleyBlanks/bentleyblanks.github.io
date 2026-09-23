@@ -4,7 +4,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
 import { AttachShadowDepth } from "./Script_ShadowDepth.mjs";
 
-const VERSION = "20260924";
+const VERSION = "20260924020100";
 const loader = new GLTFLoader();
 let assetsPromise = null;
 
