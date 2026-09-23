@@ -7,7 +7,12 @@
 //
 //   await LoadFaceTracks()                  // once; later calls share the same promise
 //   SampleFaceTrack(sha256, seconds)        // -> {jaw, wide, round, close, stress, line} | null
+//   SampleLineFaceTrack(line, seconds)      // per-line player: line = {id, sha256?}; the
+//                                           // injection point for dialogue.faceTrackSampler
 //   FaceTrackSpeech(speech, sha256)         // envelope sample -> same sample + track channels
+//
+// `line` in a sample is the line index inside a whole-cue take, or the line id
+// ("<Scene>.<NN>") of a per-line take, so a new line always reads as a line start.
 //
 // Channels are 0-1 weights of the Open / Wide / Round / Close face poses relative to
 // Rest (Script_CharacterFacialAnimation). Between keys the value follows the same
@@ -20,6 +25,7 @@ export const FACE_TRACKS_URL = new URL("./Audio/FirstLevel/Data_FirstLevelFaceTr
 export const FACE_TRACK_FORMAT = 1;
 
 const tracks = new Map(); // sha256 -> compiled track
+const lineTracks = new Map(); // "<Scene>.<NN>" -> sha256 of its per-line take (latest registered)
 const loads = new Map();  // url -> Promise<number>
 
 /** JSON track -> typed arrays (seconds, 0-1). */
@@ -40,7 +46,10 @@ export function CompileFaceTrack(track) {
 export function RegisterFaceTracks(body) {
   if (!body || body.format !== FACE_TRACK_FORMAT) throw new Error(`Face tracks: unsupported format ${body?.format}`);
   let count = 0;
-  for (const [key, track] of Object.entries(body.tracks || {})) { tracks.set(key, CompileFaceTrack(track)); count++; }
+  for (const [key, track] of Object.entries(body.tracks || {})) {
+    tracks.set(key, CompileFaceTrack(track)); count++;
+    if (track.kind === "line" && track.id) lineTracks.set(track.id, key);
+  }
   return count;
 }
 
@@ -60,7 +69,7 @@ export const HasFaceTrack = key => !!key && tracks.has(key);
 export const FaceTrack = key => (key && tracks.get(key)) || null;
 export const FaceTrackCount = () => tracks.size;
 /** Test hook: forget every registered track and load. */
-export function ClearFaceTracks() { tracks.clear(); loads.clear(); }
+export function ClearFaceTracks() { tracks.clear(); lineTracks.clear(); loads.clear(); }
 
 function Upper(times, t) {
   let lo = 0, hi = times.length;
@@ -91,8 +100,18 @@ export function SampleFaceTrack(key, seconds, out = {}) {
     stress = Math.max(stress, 1 - Math.abs(seconds - track.stress[k]) / half);
   }
   out.stress = stress;
-  out.line = track.lines.findIndex(line => seconds >= line.start && seconds < line.end);
+  out.line = track.kind === "line" ? track.id : track.lines.findIndex(line => seconds >= line.start && seconds < line.end);
   return out;
+}
+
+/**
+ * Per-line dialogue player hook: `line` is the player's line ({id, sha256?}). The take's
+ * sha256 decides; without one the per-line track baked for that line id is used (the
+ * baker prunes tracks whose take left Data_FirstLevelLineTimings.json).
+ */
+export function SampleLineFaceTrack(line, seconds) {
+  const key = line?.sha256 || (line?.id != null ? lineTracks.get(line.id) : null);
+  return key ? SampleFaceTrack(key, seconds) : null;
 }
 
 /**

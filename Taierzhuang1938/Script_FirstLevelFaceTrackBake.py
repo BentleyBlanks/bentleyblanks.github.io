@@ -207,6 +207,32 @@ class Energy:
         return (self.times >= start) & (self.times < end)
 
 
+def PlaceLongChars(rows, energy, bake, label):
+    """rows [(c, s, e, brk)] -> same, characters spanning over longCharS put where the voice is."""
+    b = bake
+    rows = [list(r) for r in rows]
+    i = len(rows) - 1
+    while i >= 0:
+        if rows[i][2] - rows[i][1] <= b["longCharS"]:
+            i -= 1; continue
+        j = i
+        while j > 0 and not rows[j][3] and rows[j - 1][2] - rows[j - 1][1] > b["longCharS"]: j -= 1
+        start, end, count = rows[j][1], rows[i][2], i - j + 1
+        span = min(end - start, count * b["phraseCharMaxS"])
+        # Slide a span-long window over the character's range; most speech frames wins.
+        best, t = -1, end - span
+        for offset in np.arange(end - span, start - 1e-6, -b["hopS"]):
+            voiced = int(energy.speech[energy.Frames(offset, offset + span)].sum())
+            if voiced > best: best, t = voiced, float(offset)
+        placed = t
+        for k in range(j, i + 1):
+            rows[k][1] = t; t += span / count; rows[k][2] = t
+        print("LONG", label, "".join(rows[k][0] for k in range(j, i + 1)), f"{start:.2f}-{end:.2f}s -> {placed:.2f}s",
+              flush=True)
+        i = j - 1
+    return [tuple(r) for r in rows]
+
+
 def CollapsePhrases(rows, bake, label):
     """rows [(c, s, e, brk)] of one line -> same, with long silences inside a phrase closed."""
     b = bake
@@ -458,7 +484,7 @@ def BakeCue(cue, align_row, data, ph, aligner, cached):
             # Keep syllables inside the interval the voice module treats as this line.
             s = min(max(s, start), end - .04); e = min(max(e, s + .02), end)
             rows.append((c, s, e, brk))
-        rows = CollapsePhrases(rows, b, f"{cue['id']}:{index}")
+        rows = CollapsePhrases(PlaceLongChars(rows, energy, b, f"{cue['id']}:{index}"), b, f"{cue['id']}:{index}")
         lines.append(dict(who=line["who"], start=start, end=end, syllables=ph.Syllables(rows, line["lang"])))
     keys, stress, _ = BuildKeys(lines, energy, ph, b)
     track = {"id": cue["id"], "kind": "cue", "file": cue["file"], "seconds": round(seconds, 3),
@@ -475,20 +501,30 @@ def BakeLine(digest, row, lines_dir, data, ph):
         print("SKIP", row["lineId"], "no matching per-line file", flush=True); return None
     samples = decode_audio(str(path), sampling_rate=SR)
     seconds = len(samples) / SR
-    raw = [(c, float(s), float(e)) for c, s, e in row.get("chars") or []]
+    # Entries may be words (SeedAudio subtitles) with punctuation attached: split them
+    # evenly into spoken characters; punctuation, or a silence over 1.5 x pauseGapS,
+    # starts a new phrase.
+    raw, rows, punct = [], [], False
+    for text, s, e in row.get("chars") or []:
+        s, e = float(s), float(e)
+        pieces = Spoken(text)
+        if not pieces:
+            punct = True; continue
+        step = (e - s) / len(pieces)
+        for k, (c, brk) in enumerate(pieces):
+            cs, ce = s + k * step, s + (k + 1) * step
+            gap = bool(rows) and cs - rows[-1][2] > b["pauseGapS"] * 1.5
+            rows.append((c, cs, ce, bool(rows) and (punct or brk or gap)))
+            raw.append((c, cs, ce)); punct = False
+        punct = any(ch in PUNCT for ch in text[-1:])
     if not raw:
         print("SKIP", row["lineId"], "no character timings", flush=True); return None
-    # Line timings carry no punctuation: a silence over pauseGapS counts as a break.
-    rows = []
-    for i, (c, s, e) in enumerate(raw):
-        brk = i > 0 and s - raw[i - 1][2] > b["pauseGapS"] * 1.5
-        rows.append((c, s, e, brk))
     lang = row.get("lang", "zh")
     start, end = raw[0][1], max(raw[-1][2], raw[-1][1] + b["minSyllableS"])
-    rows = CollapsePhrases(rows, b, row["lineId"])
-    lines = [dict(who=row.get("who"), start=start, end=min(seconds, end + b["tailPadS"]), syllables=ph.Syllables(rows, lang))]
     energy = Energy(samples, b)
     energy.Denoise(np.zeros(len(energy.times), bool), "quietest10")
+    rows = CollapsePhrases(PlaceLongChars(rows, energy, b, row["lineId"]), b, row["lineId"])
+    lines = [dict(who=row.get("who"), start=start, end=min(seconds, end + b["tailPadS"]), syllables=ph.Syllables(rows, lang))]
     keys, stress, _ = BuildKeys(lines, energy, ph, b)
     chars = [[c, s, e] for c, s, e in raw]
     text_sha = hashlib.sha256("".join(c for c, _, _ in raw).encode()).hexdigest()

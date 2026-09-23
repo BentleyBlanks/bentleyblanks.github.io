@@ -89,12 +89,15 @@ export const FACE_TRACK_BAKE = Object.freeze({
   stressRatio: 1.35, stressMinGapS: .5, stressPulseS: .16,
   // Per-line alignment windows around the existing line intervals.
   lineWindowPadS: .25,
-  // Whisper sometimes parks the first word of a shouted line at the window start, a
-  // second or more before the rest (FrontRelief 这 at 0.0 s, 批过了 at 1.88 s). Inside
-  // one phrase (no punctuation) a silence this long is not speech: the smaller side
-  // is packed against the larger, each character keeping its aligned length clamped
-  // to phraseCharMinS..phraseCharMaxS.
-  phraseGapS: .45, phraseCharMinS: .07, phraseCharMaxS: .16,
+  // Whisper parks the first word of a line at the window start: either as a word that
+  // spans the whole lead-in silence (BorrowLight 兄 0.0-1.88 s, its voice at 1.77 s) or
+  // as a short word a second before the rest (FrontRelief 这 at 0.0 s, 批过了 at 1.88 s).
+  // A character longer than longCharS is placed where its span holds the most speech
+  // frames (the latest such place on a tie); then inside one phrase (no
+  // punctuation) a silence over phraseGapS is closed by packing the smaller side
+  // against the larger. Moved characters keep their aligned length clamped to
+  // phraseCharMinS..phraseCharMaxS.
+  longCharS: .5, phraseGapS: .45, phraseCharMinS: .07, phraseCharMaxS: .16,
   // The voice module only asks for a line inside its interval; the mouth closes this
   // long after the interval ends even when the aligned syllable runs on.
   lineEndPadS: .04,
