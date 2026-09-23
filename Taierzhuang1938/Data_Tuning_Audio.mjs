@@ -538,6 +538,23 @@ export const TINNITUS = Object.freeze({
     lowHz: 380,
     recover: Object.freeze([[0.0, 380], [1.6, 700], [3.8, 1800], [6.5, 6200], [9.0, 20000]]),
   }),
+  /**
+   * 【2026-09-24 审查后加】07 以后与其它关卡（任务侧开关 audio.firstLevelSoundscape 关着）
+   * 仍走这一轮之前的旧耳鸣：一条 toneHz 正弦、ringS 衰减完、低通 lowHz 停满 seconds 后
+   * recoverS 一口气回到全频，2 个节点。数与 f581ac7dd 的 Script_Audio.Deafen 一字不差。
+   */
+  legacy: Object.freeze({ toneHz: 4000, toneLevel: 0.055, ringS: 1.4, lowHz: 520, recoverS: 0.9, budgetNodes: 4 }),
+  /** 新两档一次建几个节点（两条音 + 两个声像 + 一个音量 + 噪声、带通、噪声音量）。 */
+  nodes: 8,
+  /**
+   * 耳鸣闷总线时剧情台词正在说 → 低通不低于这个频率（与 STORY_SPEECH.concussionSpeechFloorHz
+   * 同一条线：保住辅音）。台词一停，恢复曲线从当时该在的位置接着走。
+   */
+  speechFloorHz: 4200,
+  /** 台词开始/停下时低通挪到新位置用多久（秒），免得一步跳变出「咔」。 */
+  speechFloorRampS: 0.06,
+  /** 新一次耳鸣顶掉上一次时，旧的鸣响淡出多久再停、归还节点（秒）。 */
+  replaceFadeS: 0.06,
 });
 
 /**
@@ -551,6 +568,11 @@ export const TINNITUS = Object.freeze({
 export const BATTLE_ARTILLERY = Object.freeze({
   /** 落点离人至少这么远（不打玩家、不打任何活人）。 */
   avoidSoldierM: 10,
+  /**
+   * 离战车至少这么远（2026-09-24 审查后加：EastField 落区把 tankStart 包在里面，
+   * 炮弹落在 89 式几米外却对车毫无影响，正好在「战车要有存在感」的 03–05）。
+   */
+  avoidVehicleM: 25,
   /** 挑落点最多试几次，挑不到就这一发不落。 */
   pickTries: 8,
   /** 画面那一团的半径（米）：比真炮弹小一档，免得远处一团比打在脸上的还大。 */
@@ -568,23 +590,67 @@ export const BATTLE_ARTILLERY = Object.freeze({
   incomingChance: 0.35,
   incomingLeadS: 1.15,
   incomingVolume: 0.42,
-  /** 震屏：交给 CameraShake.Explosion 的 reach（它自己再 × reachScale 3.2）。 */
-  shakeReachM: 18,
+  /** 啸声摆在落点上空多高（米）。 */
+  incomingHeightM: 18,
+  /**
+   * 震屏：跟着声音到的一记**轻**震，直接往 CameraShake 的创伤桶里加（AddTrauma），
+   * 不走 CameraShake.Explosion —— 那条按「伤害半径 × 3.2」算，还有 0.05 的门槛，
+   * 40–140 m 外一律算成 0（2026-09-24 审查用真 CameraShake 量出来：沟里 45 m 起、洞里 75 m 起
+   * 一次都不震）。这里按距离在 near–far 两点之间线性插值；幅度 = 创伤²，
+   * 0.4 → 满幅的 16%（俯仰约 0.44°），0.2 → 4%（约 0.1°）：是「脚下一沉」，不是挨炸。
+   */
+  shakeNearM: 40,
+  shakeFarM: 140,
+  shakeTraumaNear: 0.4,
+  shakeTraumaFar: 0.2,
   /** 洞里比沟里震得重（顶板在抖）。 */
-  dugoutShakeScale: 1.6,
+  dugoutShakeScale: 1.35,
   /** 碎土雨：这么近以内，落地后一两秒土块砸回沟里。 */
   dirtRainM: 75,
   dirtRainDelayS: Object.freeze([1.1, 2.1]),
   dirtRainVolume: 0.22,
   dirtRainAirCutHz: 3200,
+  /** 土块落在听者朝爆点方向多远处（米）、比耳朵低多少。 */
+  dirtRainAtM: Object.freeze([2, 5]),
+  dirtRainDropM: 0.8,
+  /** 碎土雨音量随距离：near 时 1、dirtRainM 处 dirtRainFarShare。 */
+  dirtRainFarShare: 0.45,
   /** 沟壁/洞顶落土：听者在 trench / dugout 时，声音到达后再晚一点，耳边沙沙往下掉。 */
   wallDirtDelayS: Object.freeze([0.25, 0.7]),
   wallDirtVolume: 0.16,
   wallDirtAirCutHz: 1900,
+  /** 沟壁落土在耳边哪儿：水平离耳朵多远、比耳朵高多少（负 = 低）。 */
+  wallDirtOffsetM: 1.3,
+  wallDirtRiseM: -0.3,
   dugoutDirtVolume: 0.3,
   dugoutDirtAirCutHz: 2600,
-  /** 同时在响的场外炮击声部上限（含低频层与落土）。满了这一发不落。 */
-  maxVoices: 3,
+  /** 洞顶落土：头顶正上方偏一点。 */
+  dugoutDirtOffsetM: 0.6,
+  dugoutDirtRiseM: 0.9,
+  /**
+   * 同时在响的场外炮击声部上限（啸声、爆炸本体、低频层、沟壁落土、碎土雨都算）。
+   * 【2026-09-24 审查后改】原来只在起新一发时看这条，一发自己的五条声音不查，实测峰值 5。
+   * 现在每一条登记前都查：落一发要先留得出爆炸本体 + 低频层两条（有啸声的那一发从啸声起就留），
+   * 沟壁落土与碎土雨到点时有空才放。与前线合计另有一条 ≤ 8 的总账，见
+   * Data_FirstLevelMissionBattleSound.front.sharedMaxVoices（炮击优先，前线让）。
+   */
+  maxVoices: 4,
   /** 一条炮击声部「还在响」算多久（秒）：爆炸本体长度，不含引擎回收要等的混响尾巴。 */
   voiceActiveS: 2.8,
+  /** 落土那一条（debrisFall 素材 2.2 s）。啸声只算到落地那一刻（incomingLeadS）。 */
+  debrisActiveS: 2.2,
+  /**
+   * 画面：近处的一团用 vfxRadiusM；远一些的放大一点，免得 60 m 外只剩几个像素
+   *（radius = vfxRadiusM + vfxRadiusPerM × (d − vfxGrowFromM)，封顶 vfxRadiusMaxM）。
+   */
+  vfxGrowFromM: 50,
+  vfxRadiusPerM: 0.05,
+  vfxRadiusMaxM: 10,
+  /**
+   * 土柱：一个短命的尘土烟源，只喷 emitS 秒，烟团以 rise m/s 往上走、活 life 秒 ——
+   * 最高到二十来米，**越得过沟沿与白盒房顶**。2026-09-24 审查逐帧出图：只有火球与尘环时，
+   * 站在 03 沟里看 66 m 外那一发三帧什么都没有（火球和尘环都在沟沿以下）。
+   * 数与 Script_Vfx.SmokeSource 的参数同名（终速 = rise，见那里 BUOYANT_DRAG 的注释）。
+   */
+  column: Object.freeze({ emitS: 1.0, rate: 36, radius: 1.6, rise: 7, sizeStart: 1.6, sizeEnd: 8, life: 3.4, opacity: 0.62 }),
 });

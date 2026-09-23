@@ -75,13 +75,21 @@ export const MISSION_BATTLE_SOUND = Object.freeze({
       { id: "EastFlank", nra: { x: 620, z: -60 }, ija: { x: 1050, z: -180 }, spreadM: 70, weight: 0.9 },
       { id: "FarWest", nra: { x: -900, z: -120 }, ija: { x: -1250, z: -520 }, spreadM: 90, weight: 0.6 },
     ]),
-    /** 日军炮兵阵地（炮口闷响从这里来，落点在各扇区我方一线）。 */
+    /** 日军炮兵阵地（炮口闷响从这里来，落点在各扇区我方一线）。gunSpreadM：每一门在阵地里的散布。 */
     guns: Object.freeze([{ x: -220, z: -1480 }, { x: 980, z: -1180 }]),
-    /** 交火的写法：选中的概率 weight；数字对是 [最小, 最大]。 */
+    gunSpreadM: 80,
+    /**
+     * 交火的写法：选中的概率 weight；数字对是 [最小, 最大]。
+     * ijaFirst：日方先开火的概率（进攻方多半先开）。
+     * mgDuel 里点射时顺带几支步枪：rifleShots 支，落在点射开始后 rifleAfterS 到「点射时长 + rifleTailS」之间。
+     * barrage 之后我方机枪回击：answerDelayS 秒后、answerBurst 发。
+     */
     exchanges: Object.freeze({
-      rifleSkirmish: { weight: 1.0, rounds: [2, 4], shots: [2, 5], shotGapS: [0.25, 1.3], replyS: [0.7, 2.2] },
-      mgDuel: { weight: 0.75, rounds: [2, 3], ijaBurst: [8, 15], nraBurst: [3, 6], rifleChance: 0.55, replyS: [0.9, 2.4] },
-      barrage: { weight: 0.3, shells: [2, 4], shellGapS: [1.4, 3.2], flightS: [2.4, 4.2], answerChance: 0.6 },
+      rifleSkirmish: { weight: 1.0, ijaFirst: 0.55, rounds: [2, 4], shots: [2, 5], shotGapS: [0.25, 1.3], replyS: [0.7, 2.2] },
+      mgDuel: { weight: 0.75, ijaFirst: 0.6, rounds: [2, 3], ijaBurst: [8, 15], nraBurst: [3, 6], rifleChance: 0.55,
+        rifleShots: [1, 3], rifleAfterS: 0.1, rifleTailS: 0.6, replyS: [0.9, 2.4] },
+      barrage: { weight: 0.3, shells: [2, 4], shellGapS: [1.4, 3.2], flightS: [2.4, 4.2], answerChance: 0.6,
+        answerDelayS: [1, 2.5], answerBurst: [3, 6] },
       mortar: { weight: 0.35, shells: [1, 3], shellGapS: [1.0, 2.2], flightS: [1.3, 2.3] },
     }),
     /** 两边用什么声音。机枪数组按次挑（九二式重机 / 十一年式轻机）。 */
@@ -100,10 +108,27 @@ export const MISSION_BATTLE_SOUND = Object.freeze({
     }),
     /** 引擎只保留 1000 m 内的 soundField；更远的摆到这里并按反比律补衰减（见 Place）。 */
     placeMaxM: 880,
+    /** 摆位比耳朵高多少（米）：远处的声音贴地会被引擎的地面遮挡判定吃掉。 */
+    placeRiseM: 3,
+    /**
+     * soundField 那一档 panner 的 inverse 衰减参数（照抄 Script_Audio 的 soundField 距离模型：
+     * refDistance 64、rolloff 0.9）。只用来给摆到 placeMaxM 的远声补回两段距离之差。
+     */
+    fieldRefM: 64, fieldRolloff: 0.9,
     /** 远于 airCutFromM 的再压一道高频（引擎的空气低通到 700 Hz 就不往下了）。 */
     airCutFromM: 600, airCutAtFarHz: 520, airCutFarM: 1500,
-    /** 同时在响的前线声部上限（与炮击的 3 条合计 ≤ 契约 §6 的 8）。 */
+    /** 同时在响的前线声部上限。 */
     maxVoices: 5,
+    /**
+     * 【2026-09-24 审查后加】前线 + 场外炮击合计的上限（契约 §6「场外炮击/前线床 ≤ 8」）。
+     * 炮击优先（近、稀、要一发不落地响完），前线只拿剩下的。
+     */
+    sharedMaxVoices: 8,
+    /**
+     * 屏幕上打得凶（引擎 battleIntensity 过 hotAbove）时前线声部再收到 maxVoicesHot：
+     * 03–04 的节点峰值本来就贴着 NODE_BUDGET 120，远处这一层最该让。
+     */
+    hotAbove: 0.6, maxVoicesHot: 3,
     /**
      * 每一声「还在响」算多久（秒）：直达声本体的长度，不含引擎回收要等的混响尾巴与传播延迟。
      * 机枪另加 发数 × 每发间隔（九二式 200 rpm、其余 500 rpm）。
@@ -130,6 +155,10 @@ export const MISSION_BATTLE_SOUND = Object.freeze({
    * 离任何活人 ≥ avoidSoldierM。perMin 是平均每分钟几发。
    * quietAfter：某个事实发生后这么多秒内不落（01 近爆之后的黑屏与醒来，交给剧本那一发）。
    * airCut：这一步每一声再压一道高频（Hz），给「整段隔着土」的步骤用。
+   * listenerZone：这一步听者**一定**在哪个空间档（洞顶掉土、洞里震得重按它算，不等接线层判）。
+   *   01 整段躺在洞里：旧布设的小屋判不成 dugout（判 courtyard），新洞室合入前靠它保底。
+   * 落区矩形避开的是「有人的地方」（活人 avoidSoldierM、在场的战车 avoidVehicleM，都在运行时查）；
+   * 矩形本身按 2026-09-23 之前的布设画的，Space 包重排无人地带后要跟着改。
    */
   artillery: Object.freeze({
     zones: Object.freeze([
@@ -139,7 +168,8 @@ export const MISSION_BATTLE_SOUND = Object.freeze({
     ]),
     stages: Object.freeze({
       // 01 整段在洞里：隔着土与洞口，落弹只剩闷响（airCut）与洞顶掉土。
-      Trapped: { perMin: 2.2, minM: 75, maxM: 140, airCut: 900, quietAfter: { fact: "bunkerCollapsed", seconds: 14 } },
+      Trapped: { perMin: 2.2, minM: 75, maxM: 140, airCut: 900, listenerZone: "dugout",
+        quietAfter: { fact: "bunkerCollapsed", seconds: 14 } },
       BunkerRescue: { perMin: 1.1, minM: 70, maxM: 130 },
       RearTrench: { perMin: 2.4, minM: 45, maxM: 120 },
       Support: { perMin: 2.2, minM: 45, maxM: 120 },

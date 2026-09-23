@@ -987,11 +987,16 @@ assert.equal(new Set(MISSION_DIALOGUE.map((cue) => cue.id)).size, MISSION_DIALOG
  assert.ok(calls.length>0,"the front is already firing when 01 begins");
  for(let i=0;i<120;i++)sound.Update(.5,"Trapped");
  const early=calls.slice();
- const front=early.filter(c=>c.soundField), shells=early.filter(c=>!c.soundField);
+ // 洞顶掉土（debrisFall）是洞里的声音，不算「外面的炮弹」：01 整段按洞里算（artillery.stages.Trapped.listenerZone），
+ // 每一发落地之后头顶上掉一次土。【2026-09-24 审查后】原来这条夹具没给空间档，01 一次土都不掉。
+ const front=early.filter(c=>c.soundField), ceiling=early.filter(c=>c.cue==="debrisFall"),
+   shells=early.filter(c=>!c.soundField&&c.cue!=="debrisFall");
  assert.ok(front.length>10&&front.every(c=>c.airCut<=450&&c.bus==="sfx"&&Math.hypot(c.position.x,c.position.z+150)>250),
    "the distant front heard from inside the bunker is far and muffled: "+JSON.stringify(front.find(c=>!(c.airCut<=450))||front[0]));
- assert.ok(shells.every(c=>c.airCut<=900&&Math.hypot(c.position.x,c.position.z+150)>=70),
+ assert.ok(shells.length>0&&shells.every(c=>c.airCut<=900&&Math.hypot(c.position.x,c.position.z+150)>=70),
    "near shells in 01 stay outside and muffled: "+JSON.stringify(shells.find(c=>!(c.airCut<=900))||null));
+ assert.ok(ceiling.length>0&&ceiling.every(c=>c.position.y>1.6&&Math.hypot(c.position.x,c.position.z+150)<2),
+   "dirt trickles from the bunker roof overhead after near shells: "+JSON.stringify(ceiling[0]||null));
  calls.length=0;
  for(let i=0;i<120;i++)sound.Update(.5,"Support");
  assert.ok(calls.some(c=>c.cue==="rifleNraFar")&&calls.some(c=>c.cue==="rifleIjaFar"),"both lines answer each other");

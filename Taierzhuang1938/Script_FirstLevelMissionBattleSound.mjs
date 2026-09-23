@@ -14,15 +14,22 @@ import { BATTLE_ARTILLERY } from './Data_Tuning_Audio.mjs';
 import { BattleArtillery } from './Script_BattleArtillery.mjs';
 import { Mulberry32 } from './Script_Noise.mjs';
 
-/** panner inverse（refDistance 64、rolloff 0.9，soundField 那一档）在 r 米处的衰减。 */
-function FieldFalloff(r) { return 64 / (64 + 0.9 * Math.max(0, r - 64)); }
+/** panner inverse（soundField 那一档，参数见 front.fieldRefM / fieldRolloff）在 r 米处的衰减。 */
+function FieldFalloff(r) { const F = D.front; return F.fieldRefM / (F.fieldRefM + F.fieldRolloff * Math.max(0, r - F.fieldRefM)); }
 
 export class FirstLevelMissionBattleSound {
-  constructor(audio, host = null) {
+  /**
+   * @param {object} audio
+   * @param {object|null} [host]
+   * @param {number|null} [seed] 测试注入固定种子；缺省时没有宿主（夹具）用固定种子、
+   *   有宿主（正式运行时）每个实例另抽一个 —— 否则每次新开一局都重放同一串落点。
+   */
+  constructor(audio, host = null, seed = null) {
     this.audio=audio;this.host=host;this.elapsed=0;this.voices=[];this.events=[];this.startedAt=null;
     this.sources=D.sources.map(spec=>({spec,next:spec.first,count:0}));
     // --- 01–06 新声景 -------------------------------------------------------
-    this.rng = Mulberry32(0x19380923);
+    this.seed = (seed ?? (host ? Math.floor(Math.random() * 0x100000000) : 0x19380923)) >>> 0;
+    this.rng = Mulberry32(this.seed);
     this.frontTime = 0;
     this.frontStage = null;
     this.frontSectors = D.front.sectors.map((spec) => ({ spec, nextAt: null, exchanges: 0, plays: 0 }));
@@ -35,17 +42,54 @@ export class FirstLevelMissionBattleSound {
     this.dugoutWant = null;
     this.dugoutSince = 0;
     this.dugoutSwitches = 0;
+    this.columns = [];          // 场外炮弹的土柱烟源：{ handle, until }（frontTime）
+    this.frontPeakShared = 0;   // 取证：前线 + 炮击合计的峰值
     this.artillery = new BattleArtillery({
       audio,
       Listener: () => audio?.listenerPos || null,
       Ground: (x, z) => host?.battlefield?.GroundHeight?.(x, z) ?? 0,
       Zone: () => audio?.ListenerZone?.() || null,
-      Visual: (at, radius) => host?.vfx?.Explosion?.({ x: at.x, y: at.y + 0.15, z: at.z },
-        { radius, kind: "shell", groundY: at.y }),
-      Shake: (d, reach) => host?.player?.shake?.Explosion?.(d, reach, false),
-      Blocked: (at) => (host?.ai?.soldiers || []).some((s) => s.alive
-        && Math.hypot(s.position.x - at.x, s.position.z - at.z) < BATTLE_ARTILLERY.avoidSoldierM),
+      Visual: (at, radius) => this.ShellVisual(at, radius),
+      // 轻震：直接往创伤桶里加（CameraShake.Explosion 的门槛在 40 m 外一律算成 0）。
+      Shake: (trauma) => host?.player?.shake?.AddTrauma?.(trauma),
+      Blocked: (at) => this.ShellBlocked(at),
+      SharedRoom: (n) => this.frontVoices.length + this.artillery.Busy() + n <= D.front.sharedMaxVoices,
+    }, (this.seed ^ 0x5eed1938) >>> 0);
+  }
+
+  /** 场外炮弹不许落的地方：活人身边、在场的战车身边。 */
+  ShellBlocked(at) {
+    const A = BATTLE_ARTILLERY, host = this.host;
+    if ((host?.ai?.soldiers || []).some((s) => s.alive
+      && Math.hypot(s.position.x - at.x, s.position.z - at.z) < A.avoidSoldierM)) return true;
+    const tank = host?.tank;
+    return !!(tank?.present && Number.isFinite(tank.x) && Number.isFinite(tank.z)
+      && Math.hypot(tank.x - at.x, tank.z - at.z) < A.avoidVehicleM);
+  }
+
+  /** 画面：火球与尘环（vfx.Explosion）+ 一根越得过沟沿的短命土柱（SmokeSource，emitS 后撤源）。 */
+  ShellVisual(at, radius) {
+    const vfx = this.host?.vfx;
+    if (!vfx) return;
+    vfx.Explosion?.({ x: at.x, y: at.y + 0.15, z: at.z }, { radius, kind: "shell", groundY: at.y });
+    const C = BATTLE_ARTILLERY.column;
+    if (!C || typeof vfx.SmokeSource !== "function") return;
+    const handle = vfx.SmokeSource({ x: at.x, y: at.y + 0.3, z: at.z }, {
+      kind: "dust", rate: C.rate, radius: C.radius, rise: C.rise, sizeStart: C.sizeStart, sizeEnd: C.sizeEnd,
+      life: C.life, opacity: C.opacity, light: false,
     });
+    if (handle != null) this.columns.push({ handle, until: this.frontTime + C.emitS });
+  }
+
+  /** 到点撤掉土柱的烟源（已经喷出去的烟团自己活完）。all = 全撤（离开 01–06 / 销毁）。 */
+  UpdateColumns(all = false) {
+    if (!this.columns.length) return;
+    const keep = [];
+    for (const c of this.columns) {
+      if (all || this.frontTime >= c.until) this.host?.vfx?.RemoveSmokeSource?.(c.handle);
+      else keep.push(c);
+    }
+    this.columns = keep;
   }
 
   Update(dt,stage,speaking=false) {
@@ -71,6 +115,7 @@ export class FirstLevelMissionBattleSound {
     // 引擎要等混响尾巴与传播延迟都过去才回收（远处一枪常常五六秒），拿它数声部
     // 会把一秒一两声的交火卡成五秒一声。
     this.frontVoices = this.frontVoices.filter((e) => now < e.until && this.audio?.pendingVoices?.has?.(e.v) !== false);
+    this.UpdateColumns();
     const live = Math.max(0, Math.min(1, this.audio?.battleIntensity || 0));
     const rate = P.intensity * (1 - F.rateYield * live) * (speaking ? F.speechRate : 1);
     if (stage !== this.frontStage) this.EnterFront(stage);
@@ -96,6 +141,7 @@ export class FirstLevelMissionBattleSound {
     }
     this.artillery.Update(dt, AP ? { ...AP, firstAfterS: A.firstAfterS, firstSpreadS: A.firstSpreadS } : null,
       { zones: A.zones, rateScale: speaking ? A.speechRate : 1, quiet, stage });
+    this.frontPeakShared = Math.max(this.frontPeakShared, this.frontVoices.length + this.artillery.voices.length);
     this.UpdateDugout(stage);
   }
 
@@ -117,6 +163,7 @@ export class FirstLevelMissionBattleSound {
 
   LeaveFront() {
     this.frontStage = null;
+    this.UpdateColumns(true);
     this.frontQueue.length = 0;
     for (const s of this.frontSectors) s.nextAt = null;
     this.dugoutWant = null;
@@ -151,13 +198,13 @@ export class FirstLevelMissionBattleSound {
     const push = (at, side, cue, burst = null) => this.frontQueue.push({
       at: t0 + at, sector: spec.id, kind, side, cue, burst,
       pos: this.Jitter(side === "gun" ? F.guns[Math.floor(this.rng() * F.guns.length)] : spec[side === "impact" ? "nra" : side],
-        side === "gun" ? 80 : spec.spreadM),
+        side === "gun" ? F.gunSpreadM : spec.spreadM),
     });
     const other = (side) => (side === "ija" ? "nra" : "ija");
     const mgOf = (side) => S[side].mg[Math.floor(this.rng() * S[side].mg.length)];
     let t = 0;
     if (kind === "rifleSkirmish") {
-      let side = this.rng() < 0.55 ? "ija" : "nra";
+      let side = this.rng() < X.ijaFirst ? "ija" : "nra";
       const rounds = this.RI(X.rounds);
       for (let r = 0; r < rounds; r += 1) {
         const shots = this.RI(X.shots);
@@ -166,17 +213,17 @@ export class FirstLevelMissionBattleSound {
         side = other(side);
       }
     } else if (kind === "mgDuel") {
-      let side = this.rng() < 0.6 ? "ija" : "nra";
+      let side = this.rng() < X.ijaFirst ? "ija" : "nra";
       const rounds = this.RI(X.rounds);
       for (let r = 0; r < rounds; r += 1) {
         const burst = this.RI(side === "ija" ? X.ijaBurst : X.nraBurst);
         const cue = mgOf(side);
         push(t, side, cue, burst);
-        // 点射本身占的时长：九二式 200 rpm、其余 500 rpm。
-        const span = burst * (cue === "type92Far" ? 0.3 : 0.12);
+        // 点射本身占的时长：每发间隔读 mgShotS（九二式 200 rpm、其余 500 rpm），与 DrainFront 同一张表。
+        const span = burst * (F.mgShotS[cue] ?? F.mgShotS.default);
         if (this.rng() < X.rifleChance) {
-          const n = 1 + Math.floor(this.rng() * 3);
-          for (let i = 0; i < n; i += 1) push(t + this.R(0.1, span + 0.6), side, S[side].rifle);
+          const n = this.RI(X.rifleShots);
+          for (let i = 0; i < n; i += 1) push(t + this.R(X.rifleAfterS, span + X.rifleTailS), side, S[side].rifle);
         }
         t += span + this.R(X.replyS[0], X.replyS[1]);
         side = other(side);
@@ -190,7 +237,9 @@ export class FirstLevelMissionBattleSound {
         push(t + flight, "impact", S.ija.impact);
         t += this.R(X.shellGapS[0], X.shellGapS[1]);
       }
-      if (kind === "barrage" && this.rng() < X.answerChance) push(t + this.R(1, 2.5), "nra", mgOf("nra"), this.RI([3, 6]));
+      if (kind === "barrage" && this.rng() < X.answerChance) {
+        push(t + this.R(X.answerDelayS[0], X.answerDelayS[1]), "nra", mgOf("nra"), this.RI(X.answerBurst));
+      }
     }
     sector.exchanges += 1;
     this.frontExchanges += 1;
@@ -211,7 +260,7 @@ export class FirstLevelMissionBattleSound {
       const u = Math.min(1, (d - F.airCutFromM) / (F.airCutFarM - F.airCutFromM));
       airCut = 700 + (F.airCutAtFarHz - 700) * u;
     }
-    return { position: { x: L.x + dx * k, y: L.y + 3, z: L.z + dz * k }, gain: extra, airCut, distance: d };
+    return { position: { x: L.x + dx * k, y: L.y + F.placeRiseM, z: L.z + dz * k }, gain: extra, airCut, distance: d };
   }
 
   DrainFront(P, live) {
@@ -221,8 +270,11 @@ export class FirstLevelMissionBattleSound {
     if (!due.length) return;
     this.frontQueue = this.frontQueue.filter((e) => e.at > this.frontTime);
     const volumeScale = (P.gain ?? 1) * (1 - F.volumeYield * live);
+    // 声部上限：屏幕上打得凶时收紧；与场外炮击合计不过 sharedMaxVoices（炮击留的位也算）。
+    const cap = live > F.hotAbove ? Math.min(F.maxVoices, F.maxVoicesHot) : F.maxVoices;
     for (const e of due) {
-      if (this.frontVoices.length >= F.maxVoices) { this.frontSkipped += 1; continue; }
+      if (this.frontVoices.length >= cap
+        || this.frontVoices.length + this.artillery.Busy() >= F.sharedMaxVoices) { this.frontSkipped += 1; continue; }
       const place = this.Place(e.pos);
       const jitter = this.R(F.jitterVolume[0], F.jitterVolume[1]);
       const volume = (F.cueVolume[e.cue] ?? 0.5) * volumeScale * place.gain * jitter;
@@ -300,13 +352,15 @@ export class FirstLevelMissionBattleSound {
         skipped:this.frontSkipped,queued:this.frontQueue.length,voices:this.frontVoices.length,
         sectors:this.frontSectors.map(s=>({id:s.spec.id,exchanges:s.exchanges,plays:s.plays,
           nextInS:s.nextAt===null?null:+(s.nextAt-this.frontTime).toFixed(2)})),
-        recent:this.frontRecent.slice(-12),dugoutSwitches:this.dugoutSwitches},
+        recent:this.frontRecent.slice(-12),dugoutSwitches:this.dugoutSwitches,peakShared:this.frontPeakShared,
+        columns:this.columns.length},
       artillery:this.artillery.State()};
   }
   Dispose(){
     for(const voice of this.voices)this.audio.FreeVoice?.(voice);this.voices=[];
     for(const e of this.frontVoices)this.audio.FreeVoice?.(e.v);this.frontVoices=[];
     this.frontQueue.length=0;
+    this.UpdateColumns(true);
     this.artillery.Dispose();
     this.SetSoundscape(false);
   }

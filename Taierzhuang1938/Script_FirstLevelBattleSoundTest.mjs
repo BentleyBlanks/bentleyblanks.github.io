@@ -4,6 +4,10 @@
 // 07 以后回到旧声源）、场外近落弹（落点、避人、先见后闻、震屏跟声音、沟里落土、近爆后静默、
 // 洞里闷）、防炮洞环境床切换（强制 / 按空间档带滞回）、接线层的壕沟/洞室判据与压制喘息心跳、
 // 耳鸣两档数据、01–05 配乐让位与标点。
+// 2026-09-24 审查后补：真 CameraShake 量轻震（45/75/140 m、沟里/洞里都要震得到）、
+// 炮击每一条声音都进声部账（本层 ≤ maxVoices、与前线合计 ≤ 8，各跑 15 分钟量峰值）、
+// 避开在场的战车、越得过沟沿的土柱、01 按洞里算落土、进步骤头一发不抽稀、
+// 运行时每局换种子、配乐标点冷启动不误触发。
 // 浏览器侧（真 AudioContext、混响六档、耳鸣节点）在 Script_AudioTest / Script_AudioWiringTest。
 import assert from "node:assert/strict";
 import { MISSION_BATTLE_SOUND as D } from "./Data_FirstLevelMissionBattleSound.mjs";
@@ -13,6 +17,7 @@ import { AudioWiring } from "./Script_AudioWiring.mjs";
 import { TINNITUS, BATTLE_ARTILLERY, SUPPRESSION_BODY, TRENCH_ZONE } from "./Data_Tuning_Audio.mjs";
 import { FirstLevelMusicState, FIRST_LEVEL_MUSIC_COMBAT } from "./Data_FirstLevelMissionMusic.mjs";
 import { FirstLevelMissionMusic } from "./Script_FirstLevelMissionMusic.mjs";
+import { CameraShake } from "./Script_CameraShake.mjs";
 
 let passed = 0;
 function Ok(name) { passed += 1; console.log(`ok  ${name}`); }
@@ -129,7 +134,7 @@ const Dist = (c, L) => Math.hypot(c.position.x - L.x, c.position.z - L.z);
   const art = new BattleArtillery({
     audio, Ground: () => 0, Zone: () => audio.zone,
     Visual: (p) => visuals.push({ t: audio.clock, ...p }),
-    Shake: (d, r) => shakes.push({ t: audio.clock, d, r }),
+    Shake: (trauma, d) => shakes.push({ t: audio.clock, d, trauma }),
     Blocked: (p) => soldiers.some((s) => Math.hypot(s.position.x - p.x, s.position.z - p.z) < BATTLE_ARTILLERY.avoidSoldierM),
   }, 7);
   const profile = { perMin: 12, minM: 45, maxM: 120, firstAfterS: 0 };
@@ -146,9 +151,137 @@ const Dist = (c, L) => Math.hypot(c.position.x - L.x, c.position.z - L.z);
   const thumps = audio.calls.filter((c) => c.cue === BATTLE_ARTILLERY.thumpCue && c.airCut <= 400 && c.delay > 0.022);
   assert.ok(booms.length === visuals.length && thumps.length === visuals.length,
     `每一发都有爆炸声与压到 400 Hz 以下、错开去重窗的低频层（${booms.length}/${thumps.length}/${visuals.length}）`);
-  assert.ok(audio.calls.filter((c) => c.cue === "debrisFall").length >= visuals.length, "沟里：每一发之后耳边沟壁落土");
+  // 这里是每分钟 12 发的加压档（真实档 1–2.4 发/分钟，两发之间至少八秒多，互不重叠）：
+  // 声部满了的附属层按账丢掉、记在 layersDropped；真实档每一发都有落土，见下一段。
+  const debris = audio.calls.filter((c) => c.cue === "debrisFall").length;
+  assert.ok(debris + art.layersDropped >= visuals.length && art.peakVoices <= BATTLE_ARTILLERY.maxVoices,
+    `加压档：落土 ${debris} 条 + 满了丢掉 ${art.layersDropped} 条 ≥ ${visuals.length} 发，本层峰值 ${art.peakVoices} ≤ ${BATTLE_ARTILLERY.maxVoices}`);
   assert.ok(audio.calls.some((c) => c.cue === "shellIncoming"), "有一部分炮弹先听到啸声");
   Ok(`近落弹 ${art.shells} 发：落点、避人、先见后闻、低频层、沟壁落土、啸声`);
+
+  // 真实档：每一发都有爆炸本体、低频层、沟壁落土，一条附属层都不丢。
+  {
+    const a4 = FakeAudio({ zone: "trench" }), vis4 = [];
+    const art4 = new BattleArtillery({ audio: a4, Ground: () => 0, Zone: () => "trench",
+      Visual: (p) => vis4.push(p), Shake() {}, Blocked: () => false }, 11);
+    const P = { ...D.artillery.stages.RearTrench, firstAfterS: 0 };
+    for (let t = 0; t < 900; t += 1 / 30) { a4.Tick(1 / 30); art4.Update(1 / 30, P, { zones: D.artillery.zones, stage: "RearTrench" }); }
+    const n = vis4.length;
+    assert.ok(n >= 20 && art4.layersDropped === 0
+      && a4.calls.filter((c) => c.cue === "debrisFall").length >= n
+      && a4.calls.filter((c) => c.cue === BATTLE_ARTILLERY.thumpCue && c.airCut <= 400).length === n,
+    `真实档 15 分钟 ${n} 发：每一发都有低频层与沟壁落土，丢层 ${art4.layersDropped}`);
+    Ok(`真实档 ${n} 发，附属层一条不丢`);
+  }
+
+  // 声部总账：各步骤 15 分钟，炮击 ≤ maxVoices、前线 ≤ maxVoices、合计 ≤ sharedMaxVoices。
+  {
+    const rows = [];
+    for (const stage of ["Trapped", "BunkerRescue", "RearTrench", "Support", "MachineGun", "Tank"]) {
+      const a5 = FakeAudio({ zone: "trench", life: 4 });
+      const s5 = new FirstLevelMissionBattleSound(a5, null);
+      let peakA = 0, peakF = 0, peakSum = 0;
+      for (let t = 0; t < 900; t += 1 / 30) {
+        a5.Tick(1 / 30); s5.Update(1 / 30, stage, false);
+        const art = s5.artillery.voices.length, fr = s5.frontVoices.length;
+        peakA = Math.max(peakA, art); peakF = Math.max(peakF, fr); peakSum = Math.max(peakSum, art + fr);
+      }
+      assert.ok(peakA <= BATTLE_ARTILLERY.maxVoices && peakF <= D.front.maxVoices && peakSum <= D.front.sharedMaxVoices,
+        `${stage}：炮击峰值 ${peakA}/${BATTLE_ARTILLERY.maxVoices}、前线 ${peakF}/${D.front.maxVoices}、合计 ${peakSum}/${D.front.sharedMaxVoices}`);
+      assert.ok(s5.artillery.shells > 0, `${stage}：15 分钟里落过炮弹`);
+      rows.push(`${stage} ${peakA}+${peakF}→${peakSum}`);
+    }
+    // 场上打得凶：前线收到 maxVoicesHot。
+    const a6 = FakeAudio({ life: 30 }); a6.battleIntensity = 1;
+    const s6 = new FirstLevelMissionBattleSound(a6, null);
+    let hot = 0;
+    for (let t = 0; t < 120; t += 1 / 30) { a6.Tick(1 / 30); s6.Update(1 / 30, "Support"); hot = Math.max(hot, s6.frontVoices.length); }
+    assert.ok(hot <= D.front.maxVoicesHot, `激战时前线声部 ${hot} ≤ ${D.front.maxVoicesHot}`);
+    Ok(`声部总账（炮击+前线→合计）：${rows.join("，")}；激战前线 ${hot}`);
+  }
+
+  // 真 CameraShake：45 / 75 / 140 m、沟里与洞里，每一发都震得到，而且是轻震。
+  {
+    const rows = [];
+    for (const zone of ["trench", "dugout"]) {
+      for (const d of [45, 75, 140]) {
+        const cam = new CameraShake();
+        const a7 = FakeAudio({ zone });
+        const art7 = new BattleArtillery({ audio: a7, Ground: () => 0, Zone: () => zone, Visual() {},
+          Shake: (trauma) => cam.AddTrauma(trauma), Blocked: () => false }, 3);
+        art7.Impact({ x: a7.listenerPos.x + d, y: 0, z: a7.listenerPos.z });
+        let peak = 0, moved = 0;
+        for (let t = 0; t < 1.5; t += 1 / 60) {
+          art7.time += 1 / 60; art7.RunPending(); cam.Update(1 / 60);
+          peak = Math.max(peak, cam.trauma); moved = Math.max(moved, Math.abs(cam.pitch) + Math.abs(cam.yaw));
+        }
+        assert.ok(peak > 0.1 && peak < 0.6 && moved > 0, `${zone} ${d} m：创伤 ${peak.toFixed(3)}（要 0.1–0.6 的轻震），镜头动了 ${moved.toExponential(1)} rad`);
+        rows.push(`${zone}${d}m ${peak.toFixed(2)}`);
+      }
+    }
+    Ok(`轻震：${rows.join(" / ")}`);
+  }
+
+  // 避开在场的战车；画面带一根越得过沟沿的土柱，到点撤源。
+  {
+    const a8 = FakeAudio({ zone: "trench", listener: { x: 60, y: 1.6, z: -150 } });
+    const tank = { present: true, x: 110, z: -190 };
+    const sources = [], removed = [], booms = [];
+    const vfx = { Explosion: (p, o) => booms.push({ ...p, ...o }), SmokeSource: (p, o) => { sources.push({ ...p, ...o }); return sources.length; },
+      RemoveSmokeSource: (h) => removed.push(h) };
+    const s8 = new FirstLevelMissionBattleSound(a8, { tank, vfx, battlefield: { GroundHeight: () => 0 } }, 5);
+    for (let t = 0; t < 900; t += 1 / 30) { a8.Tick(1 / 30); s8.Update(1 / 30, "MachineGun", false); }
+    const near = booms.filter((b) => Math.hypot(b.x - tank.x, b.z - tank.z) < BATTLE_ARTILLERY.avoidVehicleM);
+    assert.ok(booms.length >= 8 && near.length === 0, `战车在场：${booms.length} 发没有一发落在车 ${BATTLE_ARTILLERY.avoidVehicleM} m 内`);
+    assert.ok(s8.ShellBlocked({ x: tank.x + 5, z: tank.z }) && !s8.ShellBlocked({ x: tank.x + 40, z: tank.z }), "避车半径生效");
+    tank.present = false;
+    assert.ok(!s8.ShellBlocked({ x: tank.x + 5, z: tank.z }), "战车没进场时不占地");
+    const C = BATTLE_ARTILLERY.column;
+    assert.ok(sources.length === booms.length && sources.every((c) => c.rise * c.life >= 10),
+      `每一发都有土柱，升得到 ${(C.rise * C.life).toFixed(1)} m（越过 2 m 沟沿）`);
+    assert.ok(removed.length >= sources.length - 1, `土柱到点撤源（${removed.length}/${sources.length}）`);
+    assert.ok(booms.every((b) => b.radius >= BATTLE_ARTILLERY.vfxRadiusM && b.radius <= BATTLE_ARTILLERY.vfxRadiusMaxM),
+      "远的那几发画面放大一点、有封顶");
+    s8.Dispose();
+    assert.equal(removed.length, sources.length, "销毁时土柱全撤");
+    Ok(`避车 + 土柱：${booms.length} 发，土柱 ${sources.length} 根`);
+  }
+
+  // 01 整段在洞里：接线层判不成 dugout（旧布设判 courtyard）时，落土仍按洞顶算、震得更重。
+  {
+    const a9 = FakeAudio({ zone: "courtyard" });
+    const s9 = new FirstLevelMissionBattleSound(a9, { Has: () => false, battlefield: { GroundHeight: () => 0 } });
+    Run(s9, a9, "Trapped", 240);
+    const dirt = a9.calls.filter((c) => c.cue === "debrisFall");
+    assert.ok(dirt.length > 0 && dirt.every((c) => c.position.y > a9.listenerPos.y && c.airCut === BATTLE_ARTILLERY.dugoutDirtAirCutHz),
+      `01：洞顶掉土 ${dirt.length} 次，都在头顶上`);
+    assert.ok(s9.artillery.State().recent.every((e) => e.zone === "dugout"), "01 的每一发都按洞里算");
+    Ok(`01 洞顶掉土 ${dirt.length} 次（接线层判 courtyard 也照掉）`);
+  }
+
+  // 进步骤那一刻起就一直在说话：头一发也不抽稀。
+  {
+    const firsts = [1, 2, 3, 4, 5, 6, 7, 8].map((seed) => {
+      const a10 = FakeAudio({ zone: "trench" }), times = [];
+      const art10 = new BattleArtillery({ audio: a10, Ground: () => 0, Zone: () => "trench",
+        Visual: () => times.push(a10.clock), Shake() {}, Blocked: () => false }, seed);
+      const P = { ...D.artillery.stages.Support, firstAfterS: D.artillery.firstAfterS, firstSpreadS: D.artillery.firstSpreadS };
+      for (let t = 0; t < 12; t += 1 / 30) { a10.Tick(1 / 30); art10.Update(1 / 30, P, { zones: D.artillery.zones, stage: "Support", rateScale: D.artillery.speechRate }); }
+      return times[0] ?? Infinity;
+    });
+    assert.ok(firsts.every((t) => t <= D.artillery.firstAfterS + D.artillery.firstSpreadS + 0.1),
+      `说着话进步骤，头一发仍在 ${D.artillery.firstAfterS + D.artillery.firstSpreadS} s 内（${firsts.map((t) => t.toFixed(1)).join("/")}）`);
+    Ok(`对白中进步骤：头一发 ${Math.max(...firsts).toFixed(1)} s 内`);
+  }
+
+  // 运行时（有宿主）每局换种子；夹具（无宿主）固定种子可复现。
+  {
+    const host = { battlefield: { GroundHeight: () => 0 } };
+    const seeds = new Set([0, 1, 2, 3].map(() => new FirstLevelMissionBattleSound(FakeAudio(), host).seed));
+    assert.ok(seeds.size >= 3, `四局四个种子（${seeds.size} 个不同）`);
+    assert.equal(new FirstLevelMissionBattleSound(FakeAudio(), null).seed, new FirstLevelMissionBattleSound(FakeAudio(), null).seed, "夹具固定种子");
+    Ok("种子：运行时每局另抽，夹具固定");
+  }
 
   // 进步骤时正在说话：头一发不能被推到一分钟以后（2026-09-23 实机 01–05 五个 25 s 窗口一发没落）。
   // 对白只按 rateScale 抽稀到点的那一发；话一停，下一发按本档频次来。
@@ -332,7 +465,14 @@ const Dist = (c, L) => Math.hypot(c.position.x - L.x, c.position.z - L.z);
   music.Update("Tank", { has: (id) => tank && id === FIRST_LEVEL_MUSIC_COMBAT.stingers[0] });
   tank = true; music.Update("Tank", { has: (id) => tank && id === FIRST_LEVEL_MUSIC_COMBAT.stingers[0] });
   assert.ok(levels.at(-1) > 1, "战车露面那一刻配乐抬起来");
-  Ok(`配乐：静 ${base} / 激战 ${hot} / 标点 ${sting}`);
+  // 冷启动：新建的配乐第一次看事实表时事实已经在（阶段跳转进 04、读档），不补标点。
+  const cold = [];
+  const music2 = new FirstLevelMissionMusic({ ctx: { currentTime: 50 }, battleIntensity: 1, Music() {}, SetMusicLevel: (s) => cold.push(s) });
+  const has2 = (id) => id === FIRST_LEVEL_MUSIC_COMBAT.stingers[0];
+  music2.Update("Tank", { has: has2 });
+  music2.Update("Tank", { has: has2 });
+  assert.ok(!(music2.current.scale > 1) && cold.every((s) => s <= 1), `冷启动时事实已在：不补标点（${music2.current.scale}）`);
+  Ok(`配乐：静 ${base} / 激战 ${hot} / 标点 ${+sting.toFixed(3)}`);
 }
 
 console.log(`FirstLevelBattleSoundTest：${passed} 组通过`);
