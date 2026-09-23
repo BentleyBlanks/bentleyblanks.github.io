@@ -86,7 +86,9 @@ import { DeathTime, DeathReveal, DeathDof } from "./Script_PlayerDeath.mjs";
 import { PLAYER_DEATH } from "./Data_Tuning_PlayerDeath.mjs";
 import { AiDirector, MakeSoldierIdentity, STATE as AI_STATE, CAPSULE as AI_CAPSULE } from "./Script_Ai.mjs";
 import { ActorFactory } from "./Script_Actor.mjs";
-import { GetLugouCharacterVariantEntries } from "./Script_CharacterModel.mjs";
+import { GetLugouCharacterVariantEntries, LoadLugouCastModels, LugouCharacterModelId } from "./Script_CharacterModel.mjs";
+import { CHARACTER_CAST_VARIANTS_BY_KIND } from "./Data_CharacterSelection.mjs";
+import { FIRST_LEVEL_SPEAKING_CAST } from "./Data_FirstLevelSpeakingCast.mjs";
 import { ActorBatcher } from "./Script_ActorBatch.mjs";
 import { Viewmodel } from "./Script_Viewmodel.mjs";
 import { FirstPersonSelfShadow } from "./Script_FirstPersonSelfShadow.mjs";
@@ -4124,6 +4126,13 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT, stageJump
   checkpoint?.Reset("enterLevel");
   checkpoint?.Save();
 
+  // 只给具名角色穿的外观（翻译的 NRA06）不进开机下载（清单 loadOnDemand），第一关进关时
+  // 按说话人钉死表拉下来 —— 放在人物预热之前，这样它的材质也在加载画面后面编掉。
+  if (FIRST_LEVEL_P012_WHITEBOX && actorFactory?.characterAssets) {
+    try { await LoadLugouCastModels(actorFactory.characterAssets, Object.values(FIRST_LEVEL_SPEAKING_CAST)); }
+    catch (error) { console.warn("[Main] 具名角色外观下载失败（该角色退回缺模型的兜底）", error); }
+  }
+
   // 人物材质预热（见 WarmActorShaders 的抬头）：加载画面还盖着，在这里把全阵营
   // 每个模型号的 program 先编出来，换人 / 某个模型号第一次进画面就不再冻那一两秒。
   // 过场承载章不撒兵、预览不进玩法，两条都跳过。
@@ -4489,6 +4498,30 @@ async function WarmActorShaders(phase, onStep = null) {
       actor.root.position.set((i - count * 0.5) * 1.2, 0, -4);
       group.add(actor.root);
       proxies.push(actor);
+    }
+  }
+  // 只给具名角色穿的外观（翻译 NRA06，Data_CharacterSelection.CHARACTER_CAST_VARIANTS_BY_KIND）
+  // 不在批准名单里，上面那一轮摆不到；它的布料材质不走国军调色补丁，是一份别人没有的
+  // program。已经下载了（第一关）就各摆一个：带脸的皮（castId）和基础皮各一具。
+  const loadedModels = new Set(Object.values(actorFactory.characterAssets.byFaction || {})
+    .flat().map((asset) => asset.record?.id));
+  for (const kind of kinds) {
+    for (const [variantText, castIds] of Object.entries(CHARACTER_CAST_VARIANTS_BY_KIND[kind] || {})) {
+      const modelVariant = Number(variantText);
+      if (!loadedModels.has(LugouCharacterModelId(kind, modelVariant))) continue;
+      for (const facial of [true, false]) {
+        serial += 1;
+        try {
+          const actor = actorFactory.Create(kind, {
+            seed: 90001 + serial * 37, modelVariant, castId: castIds[0], facial, weapon: null, noPool: true,
+          });
+          actor.root.position.set(serial * 0.3, 0, -6);
+          group.add(actor.root);
+          proxies.push(actor);
+        } catch (error) {
+          console.warn(`[Main] 人物预热：造 ${kind}#${modelVariant} 具名外观代理失败`, error);
+        }
+      }
     }
   }
   // 断肢块用的是**同一批人物材质的非蒙皮克隆**，那是一份新 program（skinning

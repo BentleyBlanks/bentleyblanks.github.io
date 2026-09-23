@@ -15,6 +15,8 @@
 //      再把镜头转一圈 —— program 总数仍不涨。这一条保证预热覆盖的是**全部**模型号，
 //      不是碰巧撒兵撒到的那几个。
 //   3. 页面没有 pageerror / console.error。
+//   4. 具名角色外观（翻译 NRA06，只在第一关下载）：另开 ?whitebox=p012 一页，进关预热之后
+//      把带脸皮与基础皮各摆一具到镜头前，人物 program 一个都不新建（--no-cast 跳过）。
 //
 // 用法：node Taierzhuang1938/Script_RespawnShaderWarmTest.mjs [--query="phase=2"] [--deaths=3]
 //       默认 query 为 phase=2（正片切片），--query="explosions=1" 走爆炸测试场。
@@ -35,6 +37,7 @@ const Arg = (name, fallback) => {
 const QUERY = Arg("query", "phase=2");
 const DEATHS = Math.max(1, parseInt(Arg("deaths", "3"), 10) || 3);
 const MAX_FRAME_MS = 50;
+const CAST_SWEEP = !process.argv.includes("--no-cast");
 
 const server = await ServeRoot(rootDir, 0);
 const browser = await LaunchBrowser();
@@ -227,6 +230,59 @@ try {
   Report(sweep.bornCharacter.length === 0, "镜头转一圈不新建人物 program",
     sweep.bornCharacter.length ? `新建：${sweep.bornCharacter.join(", ")}` : `programs=${sweep.programs}（人物材质 ${sweep.characterMaterials} 种）`);
   if (sweep.bornOther.length) console.log(`     转一圈另有首次出画的非人物材质（城里陈设，另一笔账）：${sweep.bornOther.join(", ")}`);
+
+  if (CAST_SWEEP) {
+    // --- 具名角色外观（第一关） -------------------------------------------------
+    // NRA06 不在批准名单里，也不进开机下载：第一关进关时 LoadLugouCastModels 拉下来、
+    // WarmActorShaders 的具名外观那一轮把它编掉。这里在进关预热结束之后才造人，
+    // 所以任何新 program 都会是「导演 Start 后翻译第一次出画」那一帧的现编。
+    await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?whitebox=p012&manual=1&quality=medium&scale=small`,
+      { waitUntil: "load", timeout: 120000 });
+    await page.waitForFunction(() => window.Taierzhuang?.state?.ready, null, { timeout: 180000 });
+    await page.locator("#bootStart").click();
+    await page.waitForFunction(() => window.Taierzhuang.state.running, null, { timeout: 60000 });
+    const cast = await page.evaluate(async () => {
+      const T = window.Taierzhuang, THREE = await import("three");
+      const Programs = () => T.renderer.info.programs.map((program) => ({ name: program.name, key: program.cacheKey }));
+      T.player.SetDebugOptions?.({ invincible: true });
+      T.StepFrames(12, 1 / 60, true);
+      const before = Programs();
+      const forward = new THREE.Vector3(); T.camera.getWorldDirection(forward); forward.y = 0; forward.normalize();
+      const right = new THREE.Vector3(-forward.z, 0, forward.x);
+      const eye = T.camera.getWorldPosition(new THREE.Vector3());
+      const actors = [], materials = new Set();
+      for (const [i, facial] of [[0, true], [1, false]]) {
+        const actor = T.actorFactory.Create("nra", { seed: 31 + i, modelVariant: 5, castId: "interpreter", facial, weapon: null, noPool: true });
+        actor.root.position.copy(eye).addScaledVector(forward, 3.2).addScaledVector(right, (i - 0.5) * 1.1);
+        actor.root.position.y = eye.y - 1.6;
+        T.scene.add(actor.root);
+        actor.root.traverse((object) => {
+          for (const material of [object.material].flat()) if (material?.name) materials.add(material.name);
+        });
+        actors.push({ actor, facial });
+      }
+      T.StepFrames(4, 1 / 60, true);
+      const known = new Set(before.map((program) => program.key));
+      const born = Programs().filter((program) => !known.has(program.key)).map((program) => program.name);
+      const result = {
+        warm: T.state.actorShaderWarm || null,
+        models: actors.map(({ actor, facial }) => ({ id: actor.modelId, facial, face: !!actor.characterRig?.facial,
+          attached: !!actor.root.parent })),
+        bornCharacter: born.filter((name) => materials.has(name)),
+        bornOther: born.filter((name) => !materials.has(name)),
+        programs: T.renderer.info.programs.length,
+      };
+      for (const { actor } of actors) actor.Dispose();
+      return result;
+    });
+    const wantedCast = cast.models.length === 2 && cast.models.every((model) => model.id === "LugouNra06" && model.face === model.facial);
+    Report(!!cast.warm && wantedCast, "第一关具名外观（翻译 NRA06）摆到镜头前",
+      `${cast.models.map((model) => `${model.id}${model.face ? "+脸" : ""}`).join(", ")}`
+      + ` · 进关预热 ${cast.warm ? `${cast.warm.proxies} 人 · programs ${cast.warm.programsBefore}→${cast.warm.programs}` : "缺失"}`);
+    Report(cast.bornCharacter.length === 0, "翻译第一次出画不新建人物 program",
+      cast.bornCharacter.length ? `新建：${cast.bornCharacter.join(", ")}` : `programs=${cast.programs}`);
+    if (cast.bornOther.length) console.log(`     同几帧另有首次出画的非人物材质：${cast.bornOther.join(", ")}`);
+  }
 
   if (errors.length) {
     failed = true;

@@ -23,7 +23,7 @@
 // ===========================================================================
 
 import assert from "node:assert/strict";
-import { CHARACTER_MODEL_VARIANTS_BY_KIND, CHARACTER_PROTAGONIST_VARIANT, CHARACTER_RANDOM_VARIANTS_BY_KIND, CHARACTER_CAST_VARIANTS_BY_KIND, IsApprovedCharacterVariant } from "./Data_CharacterSelection.mjs";
+import { CHARACTER_MODEL_VARIANTS_BY_KIND, CHARACTER_PROTAGONIST_VARIANT, CHARACTER_RANDOM_VARIANTS_BY_KIND, CHARACTER_CAST_VARIANTS_BY_KIND, CHARACTER_CLIP_SOURCE_BY_MODEL, CHARACTER_CROWD_VARIANT_BY_KIND, IsApprovedCharacterVariant } from "./Data_CharacterSelection.mjs";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -263,6 +263,7 @@ for (const [id, reference] of Object.entries(shoulderReference)) {
 }
 
 const runtime = fs.readFileSync(path.join(here, "Script_CharacterModel.mjs"), "utf8");
+const mainSource = fs.readFileSync(path.join(here, "Script_Main.mjs"), "utf8");
 // 2026-09-10：命中体表本体搬去 Data_CharacterHitbox.mjs（纯数据、零 three），
 // 断肢规则层与它的纯 Node 测试要按 shape id 与 Data_Tuning_Gore.LIMBS 互核。
 // Script_CharacterModel 仍 import + re-export 同一个冻结数组，运行时口径不变；
@@ -356,10 +357,35 @@ assert.match(editor, /动作适用对象/, "editor reports the action's intended
 assert.match(runtime, /LUGOU_MODEL_VARIANTS_BY_KIND/, "runtime records the approved appearance contract");
 assert.deepEqual(CHARACTER_MODEL_VARIANTS_BY_KIND, {nra:[1,4],nraDare:[1,4],nraOfficer:[4],ija:[0,1,2,5],ijaOfficer:[0]});
 // The interpreter (NRA06, 2026-09-24) is a cast-only look: a castId unlocks it, nothing else does.
-assert.deepEqual(CHARACTER_CAST_VARIANTS_BY_KIND, {nra:[5]});
+assert.deepEqual(CHARACTER_CAST_VARIANTS_BY_KIND, {nra:{5:["interpreter"]}});
 assert.equal(IsApprovedCharacterVariant("nra", 5), false, "no anonymous or numbered NRA06");
 assert.equal(IsApprovedCharacterVariant("nra", 5, "interpreter"), true, "the pinned interpreter wears NRA06");
+assert.equal(IsApprovedCharacterVariant("nra", 5, "yaowa"), false, "another named role cannot borrow the interpreter's look");
 assert.equal(IsApprovedCharacterVariant("nraDare", 5, "interpreter"), false);
+// Cast-only looks are not boot downloads (loadOnDemand; Script_Main fetches the first
+// level's cast models before the actor shader warm-up); every standard soldier is.
+for (const record of manifest.models) {
+  const faction = record.faction, variant = Number(record.id.slice(-2)) - 1;
+  const castOnly = Object.hasOwn(CHARACTER_CAST_VARIANTS_BY_KIND[faction] || {}, variant);
+  assert.equal(record.loadOnDemand === true, castOnly, `${record.id}: loadOnDemand exactly for cast-only looks`);
+}
+assert.match(runtime, /filter\(\(record\) => !record\.loadOnDemand\)\.map\(LoadAsset\)/, "boot load skips loadOnDemand records");
+assert.match(mainSource, /FIRST_LEVEL_P012_WHITEBOX && actorFactory\?\.characterAssets\)[\s\S]*?LoadLugouCastModels\(actorFactory\.characterAssets, Object\.values\(FIRST_LEVEL_SPEAKING_CAST\)\)[\s\S]*?await WarmActorShaders\(/,
+  "the first level fetches its cast-only looks before the actor shader warm-up");
+assert.match(mainSource, /CHARACTER_CAST_VARIANTS_BY_KIND\[kind\][\s\S]*?for \(const facial of \[true, false\]\)/,
+  "the warm-up also places every loaded cast-only look (facial and base skin)");
+// A derived model (same skeleton, other headgear) is normalised by its source's height,
+// so shared clip libraries meet the same contact points on both bodies.
+for (const [id, sourceId] of Object.entries(CHARACTER_CLIP_SOURCE_BY_MODEL)) {
+  const record = manifest.models.find(model => model.id === id), source = manifest.models.find(model => model.id === sourceId);
+  assert.equal(record.scaleHeight, source.bounds.size[2], `${id} scales like ${sourceId}`);
+}
+assert.match(runtime, /CharacterScaleHeight\(asset\.record\) \|\| Number\(targetHeight\)/, "rig scale reads scaleHeight first");
+// The distant crowd bakes IJA01 for ija (lightest skin, as before the IJA06 pool change).
+assert.deepEqual(CHARACTER_CROWD_VARIANT_BY_KIND, {ija:0});
+assert.ok(Object.entries(CHARACTER_CROWD_VARIANT_BY_KIND).every(([kind, variant]) => CHARACTER_MODEL_VARIANTS_BY_KIND[kind].includes(variant)));
+assert.match(fs.readFileSync(path.join(here, "Script_ActorCrowd.mjs"), "utf8"), /CHARACTER_CROWD_VARIANT_BY_KIND\[kind\]/,
+  "the crowd layer bakes the pinned skin");
 assert.match(runtime, /IsApprovedCharacterVariant\(kind, options\.modelVariant, options\.castId\)/,
   "rig creation accepts a cast-only look only with its castId");
 {
@@ -368,6 +394,10 @@ assert.match(runtime, /IsApprovedCharacterVariant\(kind, options\.modelVariant, 
   const glb = LoadGlb(path.join(characterDir, "Model_LugouNra06.glb"));
   const names = glb.json.materials.map(material => material.name);
   assert.ok(names.includes("Material_InterpreterGarb") && !names.includes("Material #1721585337"), "interpreter cloth material renamed");
+  // Matte cotton, not the uniform's gloss map (review 2026-09-24: it read as leather).
+  const garb = glb.json.materials.find(material => material.name === "Material_InterpreterGarb");
+  assert.ok(!garb.pbrMetallicRoughness.metallicRoughnessTexture && garb.pbrMetallicRoughness.roughnessFactor >= .9
+    && garb.extensions.KHR_materials_specular.specularFactor <= .3, `interpreter cloth is matte: ${JSON.stringify(garb.pbrMetallicRoughness)}`);
   assert.equal(glb.json.meshes[0].primitives.length, 5, "NRA06: head, hands, clothes, eyes, badge+spectacles");
   assert.equal(glb.json.extras?.lugouVariant?.id, "LugouNra06");
   const record = manifest.models.find(model => model.id === "LugouNra06");

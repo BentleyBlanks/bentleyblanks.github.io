@@ -23,10 +23,23 @@ soldier (日兵甲 `ijaA`), and to use it as the standard IJA soldier from then 
   and a front star (574 triangles, in the helmet's atlas texels; the whole model is
   14,643 triangles, 60 fewer than IJA02).
 
+Review pass (2026-09-24): in the engine the first build read as a dark, full-bearded Western
+face under a tall straight cap. The rebuild lightens the skin (less sallow, lighter sockets
+and folds), thins the stubble to sparse dots so the moustache is the one dark line, presses
+the nose bridge back 3.8 mm (tip 1.4 mm), and reshapes the cap: the crown narrows towards
+the top, peaks at the front seam and drops 1.1 cm at the sides and 2.6 cm at the back.
+The back cannot come lower (skull top), so the front seam rises to 23.4 cm head height; the
+narrowing is capped by the 1.5 mm skull clearance. Still open for the user: the IJA02 base
+skull and nose stay long, so the face reads gaunt rather than flat.
+
 Skeleton, uniform and equipment are IJA02's, so IJA06 plays IJA02's clip libraries
 (`CHARACTER_CLIP_SOURCE_BY_MODEL`, `CharacterRig.clipModelId`). Anonymous IJA sampling
 is `[5, 5, 5, 0, 0, 1, 2]`: IJA06 is the most frequent face and the other approved
-faces stay mixed in. 日兵甲 is pinned to IJA06 with its facial skin
+faces stay mixed in (mean anonymous IJA 12,719 -> 13,774 triangles). The distant crowd
+layer does not follow the pool: `CHARACTER_CROWD_VARIANT_BY_KIND` pins its ija bake to
+IJA01 (the skin it baked before, lightest per instance). IJA06 is normalised by IJA02's
+height (manifest `scaleHeight`): its cap is lower than the helmet, and normalising by its
+own bounds made the body 1.56 % larger than IJA02 on the same clips. 日兵甲 is pinned to IJA06 with its facial skin
 (`Model_LugouIja06Facial.glb`, [speaker faces](Data_CharacterSpeech.md)); IJA officers
 remain IJA01.
 
@@ -51,10 +64,16 @@ from NRA02 in Blender (BlenderMCP; source project
   rigid on the head bone;
 - the buck tooth is facial geometry (see [speaker faces](Data_CharacterSpeech.md)).
 
-The whole model is 10,321 triangles (NRA02: 9,917). It is not a soldier look: it is in
-`CHARACTER_CAST_VARIANTS_BY_KIND` (nra: [5]) and only spawns for a pinned speaking role
-that asks for it with its castId (`IsApprovedCharacterVariant`); anonymous pools, the kind
-lists and the actor editor never offer it. Skeleton and clips are NRA02's
+The whole model is 10,321 triangles (NRA02: 9,917). The jacket material is matte cotton
+(no gloss map, roughness 0.92, specular 0.25; review 2026-09-24: the uniform's gloss read as
+leather). It is not a soldier look: `CHARACTER_CAST_VARIANTS_BY_KIND` (nra: {5:
+['interpreter']}) lets only the interpreter's castId wear it (`IsApprovedCharacterVariant`);
+anonymous pools, the kind lists, other named roles and the actor editor never get it.
+It is not a boot download either: its manifest record is `loadOnDemand`, and
+`Script_Main` fetches the first level's cast looks (`LoadLugouCastModels` over
+`FIRST_LEVEL_SPEAKING_CAST`) before the actor shader warm-up, which also places each
+loaded cast-only look (facial and base skin) so the interpreter's first appearance
+compiles nothing (`Script_RespawnShaderWarmTest` cast sweep). Skeleton and clips are NRA02's
 (`CHARACTER_CLIP_SOURCE_BY_MODEL`, `CHARACTER_INFANTRY_SOURCE_BY_MODEL`).
 
 Source GLBs and canonical animation references remain available for provenance.

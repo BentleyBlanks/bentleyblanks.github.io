@@ -89,6 +89,13 @@ try {
     check(!leader.pooled && Cloth(leader)?.userData.nraUniformPalette === "leader", "named leader (face rig, never pooled) receives his uniform");
     check(Cloth(regular)?.userData.nraUniformPalette === "grayBlue" && Cloth(green)?.userData.nraUniformPalette === "leader", "soldier palettes remain independent");
     check(Cloth(leader) !== Cloth(regular) && Cloth(leader).map === Cloth(regular).map, "leader dye preserves the shared atlas without changing other soldiers");
+    // A pooled body re-dyed on Create (no face rig involved): the officer's leader palette.
+    factory.Prewarm("nraOfficer", 1, {modelVariant: 4});
+    const pooledOfficer = factory.Create("nraOfficer", {modelVariant: 4, weapon: null});
+    check(pooledOfficer.pooled && Cloth(pooledOfficer)?.userData.nraUniformPalette === "leader"
+      && Cloth(pooledOfficer).map === Cloth(green).map,
+      `pooled body re-dyed on Create keeps the shared atlas: pooled=${pooledOfficer.pooled} palette=${Cloth(pooledOfficer)?.userData.nraUniformPalette}`);
+    pooledOfficer.Dispose();
     for (const candidate of [leader, regular, green]) {
       check(PatchKeysOf(Cloth(candidate)).some(key => key.startsWith("nraUniformCloth1")), "cloth patch survives lighting setup");
       candidate.Dispose();
@@ -295,6 +302,11 @@ try {
     }
     // The interpreter's NRA06 (2026-09-24) is cast-only: a bare number never reaches it, its
     // castId does, and its cloth is not the NRA uniform material (no uniform tint on it).
+    // It is not a boot download (manifest loadOnDemand; the first level fetches it).
+    const { LoadLugouCastModels } = await import("/Taierzhuang1938/Script_CharacterModel.mjs");
+    check(!factory.characterAssets.byFaction.nra.some(asset => asset.record.id === "LugouNra06"), "NRA06 is not a boot download");
+    const castLoaded = await LoadLugouCastModels(factory.characterAssets, [{actorKind: "nra", modelVariant: 5}]);
+    check(castLoaded.join() === "LugouNra06", `cast-only look fetched on demand: ${castLoaded.join()}`);
     for (const seed of [0, 1, 2]) {
       const bare = factory.Create("nra", {seed, modelVariant: 5, weapon: null});
       check(bare.modelId !== "LugouNra06", `NRA06 without its castId: ${bare.modelId}`);
@@ -307,6 +319,19 @@ try {
     interpreter.root.traverse(mesh => { if (mesh.isMesh) for (const m of [mesh.material].flat()) garb.push(m.name); });
     check(garb.includes("Material_InterpreterGarb") && !garb.includes("Material #1721585337"), `interpreter cloth: ${[...new Set(garb)].join(",")}`);
     check(!Cloth(interpreter), "no NRA uniform tint on the interpreter");
+    const borrowed = factory.Create("nra", {seed: 4, modelVariant: 5, castId: "yaowa", weapon: null});
+    check(borrowed.modelId !== "LugouNra06", `another named role cannot wear NRA06: ${borrowed.modelId}`);
+    borrowed.Dispose();
+    // Derived models are normalised by their source's height (manifest scaleHeight): the
+    // shared clip libraries meet the same contact points on both bodies.
+    for (const [kind, derived, source] of [["nra", {modelVariant: 5, castId: "interpreter"}, {modelVariant: 1}],
+      ["ija", {modelVariant: 5}, {modelVariant: 1}]]) {
+      const a = factory.Create(kind, {seed: 5, weapon: null, noPool: true, ...derived});
+      const b = factory.Create(kind, {seed: 5, weapon: null, noPool: true, ...source});
+      check(Math.abs(a.characterRig.modelScale - b.characterRig.modelScale) < 1e-9,
+        `${a.modelId} scale ${a.characterRig.modelScale} equals ${b.modelId} ${b.characterRig.modelScale}`);
+      a.Dispose(); b.Dispose();
+    }
     checkHeadHitbox(interpreter);
     interpreter.Dispose();
     const protagonist = factory.Create("nra", { seed: "player", protagonist: true, weapon: null });
