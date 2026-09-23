@@ -99,6 +99,7 @@ export const testDefs = {
   FirstLevelMissionTest: {file:'Script_FirstLevelMissionTest.mjs',desc:'新版第一关完整事实门、共享地形、实际担架队列和往返撤离'},
   FirstLevelEndTest: {file:'Script_FirstLevelEndTest.mjs',desc:'第一关 15–18：降压段无战斗、换手与静默行走、院门盘问与入院、门槛与最后一句、死亡段与接收处继续工作、尾队过桥与爆破清场、夜景与天空还原（纯 Node，毫秒级）'},
   MissionGatesTest: {file:'Script_MissionGatesTest.mjs',desc:'第一关编排表：事实门覆盖、按表生成与激活规则、运行时源码对账、编排模型'},
+  FirstLevelFrontPressureTest: {file:'Script_FirstLevelFrontPressureTest.mjs',desc:'第一关敌军不当木桩：压力表数据与运行时、环境射击的账、迟疑/成组冲锋/军官、01 背景兵（纯 Node）'},
   FirstLevelMidTest: {file:'Script_FirstLevelMidTest.mjs',desc:'第一关 08–14（Mid 包）：担架停进遮挡、连屋近战先手、内院放行计数、两处威胁与装载联动、上车/停车/卸人时序、空袭目标与扑沟'},
   FirstLevelVoiceTest: {file:'Script_FirstLevelVoiceTest.mjs',desc:'第一关台词表：契约 cue 清单/句数、与 Notion 转录逐字对账、日语行假名与中文字幕、具名事件、缺录音兜底（纯 Node，毫秒级）'},
   FirstLevelVoiceAudioTest: {file:'Script_FirstLevelVoiceTest.mjs',args:['--audio'],desc:'第一关配音资产严格门：整段录音、当前提示词/台词哈希、强制对齐区间、清单无残留、敌军自动口令川话清单'},
@@ -442,6 +443,7 @@ export const tier0Fast = [
   "FirstLevelSpaceTest",
   "FirstLevelFrontTopologyTest",
   "FirstLevelFrontTest",
+  "FirstLevelFrontPressureTest",
   "OpeningStoryboardsTest",
 ];
 
@@ -469,7 +471,7 @@ export const domains = {
   propVelocity: {label:'近景刚体道具速度与移动清晰度',tests:['CarriagePropVelocityTest']},
   squadMarch: {label:"通用小队行进",tests:["SquadMarchCoverTest","SquadMarchCoverBrowserTest","SquadMarchTest","SquadMarchAiTest","SquadMarchEditorTest","SquadMarchNavigationTest","FirstLevelSquadMarchTest","EditorLauncherTest"]},
   firstLevelTail: {label:"第一关降压段至结尾定向续接",tests:["FirstLevelMissionStageRegroupTest","FirstLevelMissionStageTailTest"]},
-  firstLevel: {label:'新版第一关完整任务',tests:['FirstLevelFrontTopologyTest','FirstLevelEndTest','MachineGunCutsceneAudioTest','Type89DamageTest','FirstLevelFrontRouteBrowserTest','FirstLevelMissionTopologyTest','FirstLevelMissionTopologyBrowserTest','FirstLevelSpaceTest','MissionReturnTest','FirstLevelMissionReturnBrowserTest','FirstLevelCasualtyBrowserTest','FirstLevelMissionTest','MissionGatesTest','FirstLevelVoiceTest','FirstLevelVoiceAudioTest','FirstLevelFrontPresenceTest','FirstLevelMachineGunTest','FirstLevelZhouExitBrowserTest','FirstLevelMachineGunCutsceneTest','FirstLevelMissionAftermathTest','FirstLevelMissionFortificationsTest','FirstLevelMissionBrowserTest','FirstLevelMissionStageJumpTest','FirstLevelMissionStageContinueTest','FirstLevelMissionPresentationTest','FirstLevelMidTest','FirstLevelFrontTest']},
+  firstLevel: {label:'新版第一关完整任务',tests:['FirstLevelFrontTopologyTest','FirstLevelEndTest','MachineGunCutsceneAudioTest','Type89DamageTest','FirstLevelFrontRouteBrowserTest','FirstLevelMissionTopologyTest','FirstLevelMissionTopologyBrowserTest','FirstLevelSpaceTest','MissionReturnTest','FirstLevelMissionReturnBrowserTest','FirstLevelCasualtyBrowserTest','FirstLevelMissionTest','MissionGatesTest','FirstLevelVoiceTest','FirstLevelVoiceAudioTest','FirstLevelFrontPresenceTest','FirstLevelMachineGunTest','FirstLevelZhouExitBrowserTest','FirstLevelMachineGunCutsceneTest','FirstLevelMissionAftermathTest','FirstLevelMissionFortificationsTest','FirstLevelMissionBrowserTest','FirstLevelMissionStageJumpTest','FirstLevelMissionStageContinueTest','FirstLevelMissionPresentationTest','FirstLevelMidTest','FirstLevelFrontTest','FirstLevelFrontPressureTest']},
   text: { label: "玩家文本 / 数值表（数据驱动闸门）", tests: ["TextTest", "TextGatherCheck"] },
   animation: { label: '独立动画资产验收', tests: ['ActorLocomotionTest','BackRifleRunTest','MeleeAnimationTest','DadaoSwingTest','GrenadeThrowTest','InfantryAnimationTest','DeathCollapseTest'] },
   explosives: { label: "爆炸白盒与通用地形形变/返掷", tests: ["ExplosionRulesTest", "ExplosionRangeTest", "CraterSurfaceTest"] },
@@ -513,7 +515,7 @@ export const domains = {
     label: "AI 与战场内容预算",
     // 具名同伴（罗班长、幺娃…）是从 nra 名额里出的人，goal 直接写进 AiDirector，
     // 所以碰 AI 或撒兵的改动要连着 MissionHooksTest 一起跑。
-    tests: ["AiBehaviorTest", "AiBrainGraphTest", "AiEditorTest", "AiCombatBrowserTest", "AiCloseRangeTest", "AiInitiativeBrowserTest", "AiPerceptionTest", "AiCoverTest", "AiCrowdTest", "AiShootingTest", "AiTacticsTest",
+    tests: ["AiBehaviorTest", "AiBrainGraphTest", "AiEditorTest", "AiCombatBrowserTest", "AiCloseRangeTest", "AiInitiativeBrowserTest", "AiPerceptionTest", "AiCoverTest", "AiCrowdTest", "AiShootingTest", "AiTacticsTest", "FirstLevelFrontPressureTest",
       "VisibilityTest", "ActorCrowdTest", "EmplacementTest", "FlareTest", "MissionHooksTest", "MissionSetpiecesTest",
       "FirstLevelP012OpeningTest", "FirstLevelP012FamilyTest", "FirstLevelP012RestingTest", "FirstLevelP012AnimationTest", "FirstLevelP012MarchTest", "FirstLevelP012TrainColumnTest", "FirstLevelP012ArrivalTest", "FirstLevelP012VillageLifeTest", "FirstLevelP012CastTest"],
   },
@@ -577,6 +579,9 @@ const changedDomainRules = [
   { domain: "perf", pattern: /Script_ProfileCli/i },
   {domain:"firstLevel",pattern:/FirstLevelFrontRoute|FirstLevelFrontBattle|FirstLevelFrontTopology|FirstLevelTransition/},
   {domain:"firstLevel",pattern:/FirstLevelZhouExit/},
+  // 02–05 前沿压力表与 01 背景兵（docs/Data_EnemyAi.md §20）：改它们既要跑第一关整关，也要跑 AI 那一串。
+  {domain:"firstLevel",pattern:/FirstLevelFrontPressure|FirstLevelBackdropSquads/},
+  {domain:"ai",pattern:/FirstLevelFrontPressure|FirstLevelBackdropSquads/},
   {domain:"missionGuide",pattern:/FirstLevelLeaderGuide|FirstLevelGuideDialogue|FirstLevelGuideVoiceAlignment|FirstLevelMissionRuntime|Script_FirstLevelMissionVoice|NpcMissionGuide|NpcGuideGesture|Tuning_MissionGuide/},
   { domain: "combat", pattern: /FirearmHandling|MuzzleFlash|Headshot/i },
   {domain:"firstLevel",pattern:/Type89Damage/},

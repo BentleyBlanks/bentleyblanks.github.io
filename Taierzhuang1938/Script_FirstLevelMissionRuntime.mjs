@@ -1,5 +1,6 @@
 import { FirstLevelFrontBattle } from "./Script_FirstLevelFrontBattle.mjs";
 import { FirstLevelFrontPressure, AssaultRoundEnd, AssaultTop, NearestLineIndex } from "./Script_FirstLevelFrontPressure.mjs";
+import { FirstLevelBackdropSquads } from "./Script_FirstLevelBackdropSquads.mjs";
 import { FirstLevelTransition } from "./Script_FirstLevelTransition.mjs";
 import { FRONT_SORTIE as Sortie, SortieCrawlBlocked } from "./Data_FirstLevelFrontRoute.mjs";
 import { FirstLevelLeaderGuide } from "./Script_FirstLevelLeaderGuide.mjs";
@@ -160,6 +161,8 @@ export class FirstLevelMissionRuntime {
     this.frontBattle = new FirstLevelFrontBattle(this);
     // 02–05 前沿压力表（docs/Data_EnemyAi.md §20）：相位、环境射击点、组规则与任务侧 AI 开关。
     this.frontPressure = new FirstLevelFrontPressure(this);
+    // 01 背景兵（bunkerBackdrop，docs/Data_EnemyAi.md §20）：洞口外一直在推进、一直在交火的那几个人。
+    this.backdrop = new FirstLevelBackdropSquads(this);
     // 08–10 村落改道、11–14 接运与空袭（第二波 Mid 包）。
     this.village = new FirstLevelVillageBlock(this);
     this.transferCart = new FirstLevelTransferCart(this);
@@ -2229,6 +2232,7 @@ export class FirstLevelMissionRuntime {
     this.UpdateSquad();
     this.UpdateFront();
     this.frontPressure.Update(dt);
+    this.backdrop.Update(dt);
     this.UpdateTactics(dt);
     this.UpdateAssault(dt);
     this.UpdateWaves();
@@ -2557,6 +2561,7 @@ export class FirstLevelMissionRuntime {
       front:this.frontShow?.State() || null,
       frontBattle:this.frontBattle.State(),
       pressure:this.frontPressure?.State() || null,
+      backdrop:this.backdrop?.State() || null,
       ...this.flow.State(),
       missionVersion: MISSION_VERSION,
       returnWarning: this.missionReturn.result,
@@ -2634,6 +2639,7 @@ export class FirstLevelMissionRuntime {
     this.opening.Dispose();
     this.frontShow?.Dispose();
     this.frontPressure?.Dispose();
+    this.backdrop?.Dispose();
     this.squadMarch?.Dispose();
     if(this.tankDust!=null)this.vfx.RemoveSmokeSource(this.tankDust);
     this.voice.Dispose();

@@ -22,10 +22,12 @@
 //   角色配置（role）：
 //     hold       原地守（不改走位，只给环境射击点）；
 //     assault    沿自己的跃进线推进（运行时 UpdateAssault 执行冲刺段）：
-//                  maxLine    这一相位最多推进到第几条线（-1 = 最后一条）；拉回来也是它
-//                  regroupLine 最后一线打完 assaultLateralShifts 轮退回哪一条再上
+//                  maxLine    这一相位最多推进到第几条线（负数从末尾数：-1 = 最后一条）；拉回来也是它
+//                  regroupLine 最后一线打完 assaultLateralShifts 轮退回哪一条再上（负数同上）
 //                  loop       是否无限循环（true = 相位不切就一直「退回再上」，不会坐死）
-//                  points     给了就换成这条显式路线（侧翼组去土坎端头）
+//                  points     给了就换成这条显式路线（侧翼组去土坎端头）；viaLine 给了的话，
+//                             先沿**自己的**跃进线跑到那条线（跃进线是净空检查过的走廊），
+//                             再沿那条线横移到 points —— 线本身离掩体排 1.6–2.5 m，横移不穿掩体
 //                  fallback   { casualtyFraction, backLines, holdS, repelledFact? }：本组伤亡过这个比例
 //                             就全组退 backLines 条线、喊「一旦下がれ」，holdS 秒后照常再上；
 //                             repelledFact 给了的话，退完（或全灭）记这个事实（旧 frontAttackRepelled 门）
@@ -76,15 +78,19 @@ export const FRONT_PRESSURE_GROUPS = Object.freeze({
   flankWest: Object.freeze({ ids: Object.freeze(["FrontRifleE", "FrontRifleF"]) }),
   eastHold: Object.freeze({ ids: Object.freeze(["FrontRifleD"]) }),
   nest: Object.freeze({ encounter: "approach" }),
+  // 军官取第一个步枪手（机枪手上不了刺刀，也带不了冲锋）。临时，frontOfficer 到位后换。
   mgAttack: Object.freeze({ ids: Object.freeze(FRONT_MACHINE_GUN_ATTACK.map((spec) => spec.id)),
-    officer: FRONT_MACHINE_GUN_ATTACK[0]?.id ?? null }),
+    officer: FRONT_MACHINE_GUN_ATTACK.find((spec) => spec.weapon !== "Type11")?.id ?? null }),
 });
 
 /** 阵位守卫的临时后撤锚点：阵位北侧院内（远离玩家来路）。朝向南/西南的掩体点归 Space 包。 */
 const NEST_FALLBACK = Object.freeze({ casualties: 2, to: Object.freeze({ x: 31, z: -146 }) });
 const NEST = Object.freeze({ role: "nestGuard", fallback: NEST_FALLBACK });
-// 西侧两人去土坎西端外（离左前枪位 ≥ 15 m：再近就会和老周贴脸，守军过口时也更难让出视线）。
-const FLANK_WEST_POINTS = Object.freeze([Object.freeze({ x: -45, z: -171 }), Object.freeze({ x: -41, z: -166 })]);
+// 西侧两人去土坎西端外：先沿自己的跃进线到 −166 那条线，再沿线横移到西侧农田那一列掩体后面
+//（离左前枪位约 20 m：再近就会和老周贴脸，守军过口时也更难让出视线）。
+const FLANK_WEST_POINTS = Object.freeze([Object.freeze({ x: -45, z: -166 })]);
+const FLANK_WEST = (extra = {}) => Object.freeze({ role: "assault", viaLine: -166, points: FLANK_WEST_POINTS,
+  loop: true, regroupLine: -2, ...extra });
 const CENTER = (extra = {}) => Object.freeze({ role: "assault", maxLine: -1, regroupLine: 1, loop: true,
   fallback: Object.freeze({ casualtyFraction: 0.5, backLines: 1, holdS: 10 }), ...extra });
 
@@ -100,28 +106,27 @@ export const FRONT_PRESSURE_PHASES = Object.freeze([
     bark: "advance",
     fire: Object.freeze([...BANK, "leftGunParapet", "guardParapet", "gapWest", "gapEast"]),
     groups: Object.freeze({ fireBase: Object.freeze({ role: "hold" }), center: CENTER(),
-      flankWest: Object.freeze({ role: "assault", points: FLANK_WEST_POINTS, loop: true, regroupLine: 0 }),
-      eastHold: Object.freeze({ role: "hold" }), nest: NEST }) }),
+      flankWest: FLANK_WEST(), eastHold: Object.freeze({ role: "hold" }), nest: NEST }) }),
   // 右侧阵位丢了：玩家上了那挺机枪。土坎、撤退口之外开始打阵位胸墙。
   Object.freeze({ id: "nestLost", when: "rightNestCaptured", stages: Object.freeze(["Support", "MachineGun", "Tank"]),
     bark: "mg",
     fire: Object.freeze([...BANK, "leftGunParapet", "nestFront", "nestWest", "gapWest", "gapEast"]),
     groups: Object.freeze({ fireBase: Object.freeze({ role: "hold" }), center: CENTER(),
-      flankWest: Object.freeze({ role: "assault", points: FLANK_WEST_POINTS, loop: true, regroupLine: 0 }),
+      flankWest: FLANK_WEST(),
       eastHold: Object.freeze({ role: "hold" }) }) }),
   // 第一批守军过口：中路退到第三条线（-166，土坎北侧断视线），侧翼退回第一点；看得见口子的人一条条往回拉。
   Object.freeze({ id: "firstWithdrawal", when: "frontRifleDefense", stages: Object.freeze(["Support", "MachineGun", "Tank"]),
     yield: true, bark: "fallback",
     fire: Object.freeze([...BANK, "leftGunParapet", "nestFront", "nestWest"]),
     groups: Object.freeze({ fireBase: Object.freeze({ role: "hold" }), center: CENTER({ maxLine: 2 }),
-      flankWest: Object.freeze({ role: "assault", points: FLANK_WEST_POINTS, maxLine: 0, loop: true, regroupLine: 0 }),
+      flankWest: FLANK_WEST({ maxLine: -2 }),
       eastHold: Object.freeze({ role: "hold" }) }) }),
   // 第一批撤完：中路重新压上来。
   Object.freeze({ id: "firstDone", when: "rifleWithdrawalResolved", stages: Object.freeze(["Support", "MachineGun", "Tank"]),
     bark: "advance",
     fire: Object.freeze([...BANK, "leftGunParapet", "nestFront", "nestWest", "gapWest", "gapEast"]),
     groups: Object.freeze({ fireBase: Object.freeze({ role: "hold" }), center: CENTER(),
-      flankWest: Object.freeze({ role: "assault", points: FLANK_WEST_POINTS, loop: true, regroupLine: 0 }),
+      flankWest: FLANK_WEST(),
       eastHold: Object.freeze({ role: "hold" }) }) }),
   // 04 战车露面：冲机枪位的十二人上来（MISSION_ENCOUNTER_ACTIVATION.machineGun.standbyUntil = tankPreviewed）。
   // 这一相位唯一一次脚本化成组冲锋；伤亡过半就退两条线，退完记 frontAttackRepelled。
@@ -129,7 +134,7 @@ export const FRONT_PRESSURE_PHASES = Object.freeze([
     bark: "advance",
     fire: Object.freeze([...BANK, "leftGunParapet", "nestFront", "nestWest", "gapWest", "gapEast"]),
     groups: Object.freeze({ fireBase: Object.freeze({ role: "hold" }), center: CENTER(),
-      flankWest: Object.freeze({ role: "assault", points: FLANK_WEST_POINTS, loop: true, regroupLine: 0 }),
+      flankWest: FLANK_WEST(),
       eastHold: Object.freeze({ role: "hold" }),
       mgAttack: Object.freeze({ role: "assault", maxLine: -1, regroupLine: 1, loop: true,
         fallback: Object.freeze({ casualtyFraction: 0.5, backLines: 2, holdS: 15, repelledFact: "frontAttackRepelled" }),
@@ -138,7 +143,7 @@ export const FRONT_PRESSURE_PHASES = Object.freeze([
   Object.freeze({ id: "tankPressure", when: "tankPositionPressured", stages: Object.freeze(["MachineGun", "Tank"]),
     fire: Object.freeze([...BANK, "leftGunParapet", "nestFront", "nestWest", "rearLane", "gapWest", "gapEast"]),
     groups: Object.freeze({ fireBase: Object.freeze({ role: "hold" }), center: CENTER(),
-      flankWest: Object.freeze({ role: "assault", points: FLANK_WEST_POINTS, loop: true, regroupLine: 0 }),
+      flankWest: FLANK_WEST(),
       eastHold: Object.freeze({ role: "hold" }),
       mgAttack: Object.freeze({ role: "assault", maxLine: -1, regroupLine: 1, loop: true,
         fallback: Object.freeze({ casualtyFraction: 0.5, backLines: 2, holdS: 15, repelledFact: "frontAttackRepelled" }) }) }) }),
@@ -146,7 +151,7 @@ export const FRONT_PRESSURE_PHASES = Object.freeze([
   Object.freeze({ id: "bundle", when: "bundleTaken", stages: Object.freeze(["Tank"]),
     fire: Object.freeze([...BANK, "leftGunParapet", "nestFront", "attackLane", "gapWest", "gapEast"]),
     groups: Object.freeze({ fireBase: Object.freeze({ role: "hold" }), center: CENTER(),
-      flankWest: Object.freeze({ role: "assault", points: FLANK_WEST_POINTS, loop: true, regroupLine: 0 }),
+      flankWest: FLANK_WEST(),
       eastHold: Object.freeze({ role: "hold" }),
       mgAttack: Object.freeze({ role: "assault", maxLine: -1, regroupLine: 1, loop: true,
         fallback: Object.freeze({ casualtyFraction: 0.5, backLines: 2, holdS: 15, repelledFact: "frontAttackRepelled" }) }) }) }),
@@ -155,7 +160,7 @@ export const FRONT_PRESSURE_PHASES = Object.freeze([
     yield: true, bark: "fallback",
     fire: Object.freeze([...BANK, "leftGunParapet", "nestFront", "attackLane"]),
     groups: Object.freeze({ fireBase: Object.freeze({ role: "hold" }), center: CENTER({ maxLine: 1 }),
-      flankWest: Object.freeze({ role: "assault", points: FLANK_WEST_POINTS, maxLine: 0, loop: true, regroupLine: 0 }),
+      flankWest: FLANK_WEST({ maxLine: -2 }),
       eastHold: Object.freeze({ role: "hold" }),
       mgAttack: Object.freeze({ role: "assault", maxLine: 1, regroupLine: 0, loop: true }) }) }),
   // 守军撤完、玩家离开前沿：零星的土坎火力，跃进停在原地。

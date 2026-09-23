@@ -21,8 +21,11 @@ import {
 import { MISSION_TUNING as R } from "./Data_Tuning_FirstLevel.mjs";
 import { FRONT_BATTLE_TUNING as B } from "./Data_Tuning_FirstLevelFront.mjs";
 import { FRONT_SORTIE as S } from "./Data_FirstLevelFrontRoute.mjs";
+import { MISSION_ENCOUNTERS } from "./Data_FirstLevelMission.mjs";
 
 const Distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
+/** 名册里每个人的出生点（让口子退到第一条线之外时回这里）。 */
+const SPAWNS = new Map(Object.values(MISSION_ENCOUNTERS).flat().map((spec) => [spec.id, spec]));
 
 /** 01–06 的内部步骤：日军完整掩体周期、派生掩体与反应层只在这些步骤里开（契约 §2 第 8 条）。 */
 export const FIRST_LEVEL_AI_RULE_STEPS = Object.freeze(["Trapped", "BunkerRescue", "RearTrench", "Support", "MachineGun", "Tank", "Orders"]);
@@ -60,6 +63,21 @@ export function FrontGroupMembers(groupId, enemies, groups = FRONT_PRESSURE_GROU
   if (g.ids) return g.ids.map((id) => enemies.get(id)).filter(Boolean);
   if (g.encounter) return [...enemies.values()].filter((a) => a.missionEncounter === g.encounter);
   return [];
+}
+
+/** 负数下标从末尾数（-1 = 最后一个），再夹进 [0, length-1]。 */
+export function RouteIndex(index, length) {
+  const i = index < 0 ? length + index : index;
+  return Math.max(0, Math.min(length - 1, i));
+}
+
+/**
+ * 相位给的显式路线：viaLine 给了就先取这个人**自己的**跃进线里 z ≤ viaLine 的那几点
+ *（北边的线 z 更小），再接 points。跃进线是净空检查过的走廊，线与线之间横移离掩体排 1.6–2.5 m。
+ */
+export function PressureRoute(lanePoints, cfg) {
+  const via = Number.isFinite(cfg.viaLine) ? lanePoints.filter((p) => p.z <= cfg.viaLine + 0.01) : [];
+  return [...via, ...cfg.points].map((p) => ({ x: p.x, z: p.z }));
 }
 
 /** 这个人这一相位最远推进到第几条线（maxIndex 夹在路线长度内）。 */
@@ -219,7 +237,7 @@ export class FirstLevelFrontPressure {
     if (cfg.points) {
       if (s.route !== cfg.points) {
         s.basePoints ||= s.points;
-        s.points = cfg.points.map((p) => ({ x: p.x, z: p.z }));
+        s.points = PressureRoute(s.basePoints, cfg);
         s.route = cfg.points;
         s.index = 0; s.mode = "rush"; s.hold = 0; s.shifts = 0;
       }
@@ -227,9 +245,9 @@ export class FirstLevelFrontPressure {
       s.points = s.basePoints; s.basePoints = null; s.route = null;
       s.index = Math.min(s.index, s.points.length - 1); s.mode = "rush"; s.hold = 0;
     }
-    const last = s.points.length - 1;
-    s.maxIndex = !Number.isFinite(cfg.maxLine) || cfg.maxLine < 0 ? last : Math.min(last, cfg.maxLine);
-    s.regroupLine = Math.max(0, Math.min(s.maxIndex, Number.isFinite(cfg.regroupLine) ? cfg.regroupLine : R.assaultRegroupLine));
+    const length = s.points.length;
+    s.maxIndex = Number.isFinite(cfg.maxLine) ? RouteIndex(cfg.maxLine, length) : length - 1;
+    s.regroupLine = Math.min(s.maxIndex, RouteIndex(Number.isFinite(cfg.regroupLine) ? cfg.regroupLine : R.assaultRegroupLine, length));
     s.loop = cfg.loop === true;
     s.cycles = 0;
     s.holdUntil = 0;
@@ -357,7 +375,18 @@ export class FirstLevelFrontPressure {
         if (Distance(a.position, S.gap) > B.blockadeRangeM) continue;
         if (!points.some((p) => r.Threatens(p, [a.missionId], B.guardHeightM, B.blockadeRangeM))) continue;
         a.yieldCheckAt = now + FRONT_PRESSURE_TICK.yieldRecheckS;
-        if (s.index <= 0 && s.mode === "hold") continue;
+        if (s.index <= 0 && s.mode === "hold") {
+          // 已经在第一条线上还看得见口子：退回他出发的地方（名册里的出生点，跃进线的起点），
+          // 这一相位就停在那儿。下一相位 ApplyAssault 会把原来的跃进线还给他。
+          const spec = SPAWNS.get(a.missionId);
+          if (!spec || s.route === "yield") continue;
+          s.basePoints ||= s.points;
+          s.points = [{ x: spec.x, z: spec.z }, ...s.points];
+          s.route = "yield";
+          s.index = 0; s.maxIndex = 0; s.mode = "rush"; s.hold = 0; s.shifts = 0;
+          this.Note("yield", { id: a.missionId, line: -1 });
+          continue;
+        }
         s.index = Math.max(0, Math.min(s.index, AssaultTop(s)) - (s.mode === "hold" ? 1 : 0));
         s.maxIndex = s.index;
         s.mode = "rush"; s.hold = 0; s.shifts = 0;

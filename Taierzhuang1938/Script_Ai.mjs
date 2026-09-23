@@ -1830,7 +1830,9 @@ export class AiDirector {
     // Physics, suppression accounting, wounded poses and death remain on the normal path.
     if (s.scriptedNoncombatant) {
       s.target = null; s.targetVisible = false; s.bayonetFixed = false;
-      s.state = STATE.ADVANCE; s.aimBlend = 0;
+      // 有授权点的剧本兵（01 背景兵，§20）停下来要举枪朝外打：别每拍把据枪清零，
+      // 不然 aimBlend 永远爬不到 fireAimBlendMin，一发都开不出去。
+      s.state = STATE.ADVANCE; if (!s.ambientFirePoints) s.aimBlend = 0;
       this.ReleaseCover(s);
       // 【2026-09-09 §15】原来这里每拍 `ForgetAll` —— 听觉刚写进去的记忆立刻被抹掉，
       // 于是村里那批（village / melee 遭遇编成、`missionDormant`）日军在正片打了
@@ -3627,7 +3629,7 @@ export class AiDirector {
         ? "wood" : (tag === "kan" || tag === "embankment" || tag === "grave") ? "dirt" : "brick";
     } else if (bf?.GroundHeight) {
       const g = bf.GroundHeight(end.x, end.z);
-      if (end.y <= g + 0.6) { end.y = g; impact = end; normal = new THREE.Vector3(0, 1, 0); }
+      if (end.y <= g + AMBIENT_FIRE.impactAboveM) { end.y = g; impact = end; normal = new THREE.Vector3(0, 1, 0); }
     }
     if (vfx) {
       vfx.MuzzleFlash(fromV, dir, { scale: s.weapon.kind === "lmg" ? 1.15 : 1, kind: s.weapon.kind });
