@@ -397,6 +397,7 @@ export class Soldier {
     this.ambientUntil = -99;         // 这个点打到什么时候换
     this.ambientPickAt = -99;        // 上一次挑点的时刻（AMBIENT_FIRE.pickEveryS 限流）
     this.ambientShots = 0;           // 取证：这个人打了几发环境射击
+    this.targetFireAt = -99;         // TryFire 上一次真对人打出去的时刻（环境射击判「扳机空转」）
     /** 迟疑到什么时候：看见身边的人倒下 / 军官阵亡。期间不走位、不开枪、不起冲锋。 */
     this.hesitateUntil = -99;
     /** 关卡下令的成组冲锋：什么时候起身、冲到什么时候（`AiDirector.GroupCharge`）。 */
@@ -2271,7 +2272,12 @@ export class AiDirector {
     const t = s.target;
     if (!t) return true;
     if (t.isPlayer && s.missionFireHold && !s.missionFireSuppressOnly) return true;
-    return !s.targetVisible && (s.lkpConfidence || 0) < TACTICS.suppressConfidence;
+    if (s.targetVisible) return false;
+    if ((s.lkpConfidence || 0) < TACTICS.suppressConfidence) return true;
+    // 目标只在可信的记忆里：先让 TryFire 朝记忆点压制。压制那一枪的弹道常被土坎 / 胸墙挡死
+    //（ShotPathClear 不过、一发都出不去 —— 09-23 探针里前沿机枪 600 帧 FIRE、0 发就是这个），
+    // 丢失视线且 stalledTargetS 内没真打出去一发，扳机就算空转，轮到授权点。
+    return s.targetLostTime > AMBIENT_FIRE.stalledTargetS && this.time - s.targetFireAt > AMBIENT_FIRE.stalledTargetS;
   }
 
   /**
@@ -4494,6 +4500,7 @@ export class AiDirector {
     s.burstLeft -= 1;
     s.fireTimer = (s.burstIntervalS + (s.burstLeft > 0 ? 0 : s.burstPauseS)) * scriptFactors.interval;
     s.lastFire = this.time;
+    s.targetFireAt = this.time;
     s.fireSequence += 1;
     s.aimTime = 0;
     this.fireCount += 1;              // 通关冒烟要的是"仗真的打起来了"的运行时证据

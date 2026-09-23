@@ -276,6 +276,8 @@ export const SAMPLES = Freeze({
  * scatterM         授权点没写 r 时的弹着散布半径（米）。
  * losRetries       挑点时最多试几个候选的通视（每试一个打一条射线）。
  * pickEveryS       同一个人两次挑点的最小间隔（Think 1/6 分帧，这里再限一道）。
+ * stalledTargetS   目标只在可信记忆里时，丢失视线且这么久没对人真打出去一发（压制弹道被土坎挡死），
+ *                  扳机算空转、改打授权点。太短会抢走本该压制记忆点的那一枪，太长就是端枪不打。
  * impactAboveM     没打到碰撞体的那一发，弹道末端离地不到这么高就算钻进了土（在地面溅一蓬土）：
  *                  土坎顶是高度函数、不在射线世界里，不这样算的话打土坎的子弹一发弹着都没有。
  */
@@ -291,5 +293,6 @@ export const AMBIENT_FIRE = Freeze({
   scatterM: 1.4,
   losRetries: 2,
   pickEveryS: 0.9,
+  stalledTargetS: 2.5,
   impactAboveM: 1.2,
 });
