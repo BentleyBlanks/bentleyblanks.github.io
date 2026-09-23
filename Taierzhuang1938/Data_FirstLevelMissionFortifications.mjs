@@ -27,7 +27,10 @@ export const MISSION_DEFENSE_ASSETS = Object.freeze([
 // Wire protects the flanks, with broken lanes; no belt across the tank or withdrawal route.
 // Individual obstacles keep their measured native dimensions. No filled OBB around an open nest.
 export const MISSION_DEFENSE_OBJECTS = Object.freeze([
-  ...[-63,-59.8,-56.6,-53.4,-46.8,-43.6,-40.4].map((x,i)=>({id:`WestWire${i}`,asset:"battlefieldBarbedWire02",x,z:-147,ry:0,scale:1,solid:true})),
+  // 2026-09-23 proposal A: the west flank belt moved north with the berm (west of Zhou's gun).
+  ...[-63,-59.8,-56.6,-53.4,-46.8,-43.6,-40.4].map((x,i)=>({id:`WestWire${i}`,asset:"battlefieldBarbedWire02",x,z:-153,ry:0,scale:1,solid:true})),
+  // Backslope belt east of the gap: the guards on the scrapes can only come down through the gap.
+  ...[-2.9,.3,3.5,6.7,9.9,13.1].map((x,i)=>({id:`BackslopeWire${i}`,asset:"battlefieldBarbedWire02",x,z:-152.4,ry:0,scale:1,solid:true})),
   ...[55,58.2,61.4,67.8,71.2,74.4].map((x,i)=>({id:`EastWire${i}`,asset:"battlefieldBarbedWire02",x,z:-137,ry:.12,scale:1,solid:true})),
   {id:"WestRoadTimber",asset:"battlefieldBeamObstacle01",x:-55,z:-139,ry:.3,scale:1,solid:true},
   {id:"EastRoadTimber",asset:"battlefieldBeamObstacle01",x:62,z:-129,ry:-.25,scale:1,solid:true},
@@ -37,7 +40,7 @@ export const MISSION_DEFENSE_OBJECTS = Object.freeze([
   // 封死在自己家门口（TransferAlley* 的出击折线从 x≈96 的巷口往西走）。
   {id:"TransferWireSouth",asset:"battlefieldBarbedWire02",x:106,z:133,ry:Math.PI/2,scale:1,solid:true},
   {id:"StationReserveStores",asset:"battlefieldSupplyBox",x:-57,z:61,ry:.2,scale:1,solid:true},
-  {id:"FrontAmmunition",asset:"battlefieldCompartmentCrate",x:-29,z:-120,ry:.15,scale:1,solid:true},
+  {id:"FrontAmmunition",asset:"battlefieldCompartmentCrate",x:-24.2,z:-104.6,ry:.15,scale:1,solid:true},
   {id:"TransferReserveStores",asset:"battlefieldSupplyBox",x:102,z:108,ry:.4,scale:1,solid:true},
   {id:"StationCanvas",asset:"battlefieldCanvasCover01",x:-56,z:62.5,ry:.2,scale:1,solid:false},
 ]);

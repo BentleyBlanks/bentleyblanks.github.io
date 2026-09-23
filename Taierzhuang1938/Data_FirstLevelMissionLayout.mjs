@@ -1,4 +1,4 @@
-import { FRONT_SORTIE as Sortie } from "./Data_FirstLevelFrontRoute.mjs";
+import { FRONT_SORTIE as Sortie, FRONT_SPACE as Space, FRONT_TANK_PATH } from "./Data_FirstLevelFrontRoute.mjs";
 import { MISSION_REAR_ANCHORS, MISSION_REAR_ROUTES, MISSION_RECEPTION_SPACE, MISSION_SOUTH_BRIDGE, MISSION_RAIL_BRIDGE, MISSION_STAGE_ANCHORS, MISSION_STAGE_ROUTES, MISSION_NORTH_RIVER, RiverProfileAt, RiverCutAt } from "./Data_FirstLevelMissionTopology.mjs";
 import { MISSION_TRENCH_COVER as TC } from "./Data_FirstLevelMissionTrenchCover.mjs";
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
@@ -144,44 +144,94 @@ GroundedWall("OpeningShelterEast",-28,-18,.8,2.4,5);
 GroundedWall("OpeningShelterEastNorth",-28,-25.5,.8,2.4,2);
 GroundedWall("OpeningShelterWest",-36,-17,.8,2.4,4);
 GroundedWall("OpeningShelterWestNorth",-36,-24,.8,2.4,4);
-// Defensive parapets are small sandbag stacks above genuine excavated soil.
-for (const x of [-25, 0, 15]) {
-  if(x!==-25)Wall(`FrontParapet${x}`, x, -131, 6, 0.55, 0.9);
-  if(x!==-25)Wall(`FrontTraverseCover${x}`, x + 3.6, -119.4, 0.8, 0.65, 2);
-}
-// 06 背坡伤员集结处的那道反坡（2026.09.19 契约 §3）。不是「掩体」是地形：
-// 集结处在它南边，站在担架旁边看不见机枪位、看不见掩蔽部门外、看不见北边来敌。
-// 缺口留在 x -44..-40（rearCorner 的折角），02 的队伍从那儿穿过去。
-GroundedBlock("CollectionBackslopeWest",-50,-115.5,12,3,2.5);
-GroundedBlock("CollectionBackslopeEast",-27,-115.5,26,3,2.5);
+// 06 背坡伤员集结处的那道反坡（2026.09.19 契约 §3）。2026-09-23 proposal A: only the west half
+// stays; the east half would sit across the support sap and the rear trench, which now shield the
+// collection from the north themselves.
+GroundedBlock("CollectionBackslopeWest",-45,-115.5,22,3,2.5);
 // 集结处南缘的低土壁：担架排在它北边，老周就靠这堵墙等担架（06 的借火戏）。
-// 不往东摆第二道：那边是 02/05→06 进出集结处的走廊。
 GroundedWall("CollectionLitterWall",-40,-95,9,1.1,0.7);
-Room("BundleSupplyHouse",Sortie.house.x,Sortie.house.z,9,10,{northDoor:false});
-Block("BundleCrate",Sortie.bundle.x,Sortie.bundle.z,1.2,.5,.8,"missionRoute");
-GroundedWall("RightNestRearWall",28.5,-135,9,3.2,.8);
-GroundedWall("RightNestEastWall",33.5,-136,.8,3.0,8);
-GroundedWall("RightNestWestStub",20,-142,.8,.35,5);
-GroundedWall("RightNestFrontRest",27,-142.75,3.4,1.5,.75);
-GroundedWall("RightNestNorthRuin",31.5,-147,4,1.2,.7);
-GroundedWall("RightApproachTraverse",18.8,-124,.7,2.8,9);
-GroundedWall("RightApproachOuter",25.5,-121,.65,1.05,3.5);
-GroundedWall("RoadAttackScreen",41.8,-135.4,.75,2.8,6);
-GroundedWall("RoadAttackRearWall",32,-131,4.5,2.6,.75);
-GroundedWall("SupplyRoadScreen",41,-114,.8,3.5,14);
-GroundedWall("SupplyCourtSouth",39,-100,4,2.3,.7);
-GroundedWall("SupplyCourtWest",24.8,-109,.7,2.7,9);
-GroundedWall("GuardSafeTraverse",-5,-129,5.5,3,.8);
-// An unbroken high flank prevents a free bypass from the trapped men into the ammunition sap.
-GroundedBlock("GuardEastFlank",16,-147,2.2,3.0,9);
-GroundedWall("LeftGunParapet",-31,-152,4.5,.7,.8);
-GroundedWall("LeftGunSide",-34,-149,.7,2,5);
+// ---------------------------------------------------------------------------
+// 2026-09-23 proposal A: 01-06 front (docs/Data_FirstLevelLayoutProposalA.md)
+// ---------------------------------------------------------------------------
+const Face=(x,z)=>{const l=Math.hypot(x,z);return {faceX:x/l,faceZ:z/l};};
+/** Grounded block whose top is at `top` metres above the ground at (tx,tz) (default: its own
+ *  centre), foot dug to the lowest corner; optional ry and cover face. */
+function TopBlock(id,x,z,w,top,d,semantic="cover",extra={},ref=null){
+  const ry=extra.ry||0,c=Math.cos(ry),q=Math.sin(ry);
+  const topY=SampleMissionTerrain(ref?ref.x:x,ref?ref.z:z)+top;
+  let base=Infinity;
+  for(const a of [-1,0,1])for(const b of [-1,0,1])
+    base=Math.min(base,SampleMissionTerrain(x+(a*w/2)*c+(b*d/2)*q,z-(a*w/2)*q+(b*d/2)*c));
+  base-=.1;
+  return Block(id,x,z,w,topY-base,d,semantic,{...extra,y:(topY+base)/2});
+}
+// Right MG nest: ruined compound x 24..37, z -145.6..-156.8 at the berm's east end, west of the road.
+// Low west/north-west walls let the MG traverse from the gap (W) through the front (N) to the road
+// (NE); the rear wall (never breakable) shields the rear junction; the east gable is the landmark.
+const nestRef=Sortie.nest;
+TopBlock("RightNestWestLow",24,-154.3,.7,1.25,5,"cover",{cover:Face(-1,0)},nestRef);
+TopBlock("RightNestWestHigh",24,-147.2,.7,2.5,3.2,"cover",{cover:Face(-1,0)},nestRef);
+TopBlock("RightNestNorthLow",27.5,-156.8,7,1.2,.7,"cover",{cover:Face(0,-1)},nestRef);
+TopBlock("RightNestNorthHigh",34,-156.8,6,2.3,.7,"cover",{cover:Face(0,-1)},nestRef);
+TopBlock("RightNestEastGable",37,-151.2,.8,3.2,11.2,"plaster",{},nestRef);
+Block("RightNestGablePeak",37,-151.2,.8,2.2,5,"plaster",{y:SampleMissionTerrain(nestRef.x,nestRef.z)+3.2+1.1});
+TopBlock("RightNestRearWest",26.4,-145.6,4.8,3.2,.8,"structure",{},nestRef);
+TopBlock("RightNestRearEast",33.8,-145.6,6.4,3.2,.8,"structure",{},nestRef);
+// Nest guards' cover faces the west door and the right low trench (south-west), not the north.
+TopBlock("RightNestRubble",30.2,-149.8,1.2,1.1,1.8,"cover",{cover:Face(-1,0)},nestRef);
+TopBlock("RightEntryCrate",25.8,-147.6,1.0,1.0,1.1,"cover",{cover:Face(-.6,-.8)},nestRef);
 // Rest height follows the same floor and origin as the usable captured gun.
 const gunRestTop=SampleMissionTerrain(Sortie.nest.x,Sortie.nest.z)+1.45+.08-.12294;
-Block("MachineGunRest",27,-142.6,1.18,gunRestTop-SampleMissionTerrain(27,-142.6),.7,"cover");
-Block("MachineGunFiringStep",27,-141,2.2,.12,1.9,"timber",{y:SampleMissionTerrain(27,-141)-.06});
-for(const [i,x,z,w] of [[0,-26,-164,10],[1,28,-169,7],[2,58,-174,6],[3,35,-82,14]])
-  Wall(`FieldRuin${i}`,x,z,w,i<2?.8:1.3,.7);
+Block("MachineGunRest",Sortie.nest.x,Sortie.nest.z,.9,gunRestTop-SampleMissionTerrain(Sortie.nest.x,Sortie.nest.z),.7,"cover");
+Block("MachineGunFiringStep",Sortie.seat.x+.3,Sortie.seat.z,1.9,.12,2.2,"timber",{y:SampleMissionTerrain(Sortie.seat.x,Sortie.seat.z)-.06});
+// The right low trench's earth bank: hides the approach from the berm-end craters (flank group).
+TopBlock("RightApproachBank",16.8,-150.4,9.5,1.25,1.8,"earthDark",{ry:.408});
+// Gap last cover: sandbag stub on the gap mouth's east side (the tank and the nest are east).
+TopBlock("GapLastCover",-6.2,-154.2,.8,1.35,2.4,"cover",{cover:Face(1,0)});
+// Zhou's left gun at the berm's west end, parapet facing north-east along the berm's north face.
+TopBlock("LeftGunParapet",-32.4,-158.4,3.6,.95,.8,"cover",{ry:-.6,cover:Face(.6,-.8)});
+TopBlock("LeftGunSide",-35.4,-155.8,.7,1.9,4,"cover",{cover:Face(-1,0)});
+// Old yard (旧院) south-east of the nest, west of the blocked south road. Back door on the west.
+TopBlock("OldYardNorthEast",48.8,-119,10.4,2.4,.7,"plaster");
+TopBlock("OldYardWest",38.8,-108.5,.7,2.5,17,"plaster");
+TopBlock("OldYardEastNorth",54,-115,.7,2.5,8,"plaster");
+TopBlock("OldYardEastSouth",54,-103.5,.7,2.5,7,"plaster");
+TopBlock("OldYardSouth",46.4,-100,15.2,2.3,.7,"plaster");
+TopBlock("BundleSupplyHouseWestNorth",43,-112.9,.6,2.9,2.2,"structure");
+TopBlock("BundleSupplyHouseWestSouth",43,-107.1,.6,2.9,6.2,"structure");
+TopBlock("BundleSupplyHouseEastNorth",52,-112.4,.6,2.9,3.2,"structure");
+TopBlock("BundleSupplyHouseEastSouth",52,-105.8,.6,2.9,3.6,"structure");
+TopBlock("BundleSupplyHouseNorth",47.5,-114,9.6,2.9,.6,"structure");
+TopBlock("BundleSupplyHouseSouth",47.5,-104,9.6,2.9,.6,"structure");
+Block("BundleSupplyHouseRoof",45.3,-109,4,.22,10,"structure",{y:SampleMissionTerrain(47.5,-109)+3.05});
+Block("BundleCrate",Sortie.bundle.x,Sortie.bundle.z,1.2,.5,.8,"missionRoute");
+// Landmark: the old yard's dead tree at the collapsed north-west corner (the sap climbs out beside it).
+Block("OldYardDeadTreeTrunk",37.4,-120.8,.42,5.6,.42,"timber");
+Detail("OldYardDeadTreeBranchA",37.9,-120.6,1.8,.18,.2,"timber",{y:SampleMissionTerrain(37.4,-120.8)+4.4,ry:.5});
+Detail("OldYardDeadTreeBranchB",36.9,-121.1,1.4,.16,.18,"timber",{y:SampleMissionTerrain(37.4,-120.8)+3.7,ry:-.7});
+// Attack position: broken road-side wall between the throw spot and the stopped tank (throw cover).
+TopBlock("RoadsideRuin",42.4,-161.2,3.4,1.3,.7,"cover",{ry:.616,cover:Face(-.578,-.816)});
+// Fire base walls on the rising ground (in the cover columns, clear of the bounding corridors).
+for(const [id,x,w,h] of [["FireBaseRuinW",-24,7,1.25],["FireBaseRuinC",10,5,1.25],["FireBaseCraterCW",-9.8,3.5,.95],["FireBaseRuinE",23,5,1.2]])
+  Wall(id,x,-192.6,w,h,.7);
+// Flank group cover: crater lips and a field ruin on the way to the berm's east end.
+for(const [id,x,z,w,h] of [["FlankLip0",40,-180,5.5,.85],["FlankLip1",41,-184.6,3,.8],["FlankLip2",24.6,-166.8,4.5,.85]])
+  Wall(id,x,z,w,h,.7);
+for(const [i,x,z,w,h] of [[0,-26,-170.4,8,.8],[1,31.5,-171.8,5.5,1.1],[2,70,-164,6,1.3],[3,35,-82,14,1.3]])
+  Wall(`FieldRuin${i}`,x,z,w,h,.7);
+// Telegraph poles every 26 m along the tank road's south shoulder; the one at the bend leans.
+{
+  const road=Sortie.road;const seg=[];let acc=0;
+  for(let i=1;i<road.length;i++){const a=road[i-1],b=road[i],l=Math.hypot(b.x-a.x,b.z-a.z);seg.push({a,b,l,s0:acc});acc+=l;}
+  for(let k=0,sPos=8;sPos<acc-6;sPos+=26,k++){
+    const g=seg.find(q=>sPos<=q.s0+q.l)||seg.at(-1),t=(sPos-g.s0)/g.l;
+    const dx=(g.b.x-g.a.x)/g.l,dz=(g.b.z-g.a.z)/g.l;
+    // left of travel = south/south-east side of the road (the friendly side)
+    const x=g.a.x+dx*g.l*t-dz*4.6,z=g.a.z+dz*g.l*t+dx*4.6;
+    Block('FrontRoadPole'+k,x,z,.22,6,.22,'timber',k===2?{lean:.28}:{});
+    Detail('FrontRoadPoleArm'+k,x,z,2.4,.14,.16,'timber',{y:SampleMissionTerrain(x,z)+5.35,ry:Math.atan2(dx,dz)+Math.PI/2});
+  }
+}
 // The village route passes through a kitchen, inner courtyard and connected rooms.
 Room("Kitchen", 58, -9, 12, 15, { northDoor: true, southDoor: true });
 Room("ConnectedHouse", 58, 8, 12, 15, { northDoor: true, southDoor: true, eastWindow: true });
@@ -477,7 +527,14 @@ function FarmSilhouette(id,x,z,w,d,h=3.8) {
   for(const side of [-1,1]) Detail(id+'RoofEave'+side,x+side*w*.42,z,w*.18,.25,d+.7,'roof',{y:ground+3.25});
 }
 FarmSilhouette('NorthFarm',-51,-184,15,11,4.3);
-FarmSilhouette('NorthRuin',59,-192,16,9,4);
+// 2026-09-23 proposal A: NorthRuin is the tank's bend occluder. No doors (a door on the seat's
+// sight line would show the tank through the ruin); seen from the nest seat it covers bearings 33-53 deg.
+{
+  Room('NorthRuin',56,-186,12,9,{southDoor:false,northDoor:false});
+  const ground=SampleMissionTerrain(56,-186);
+  Block('NorthRuinGable',56,-186,12*.36,1.6,9,'plaster',{y:ground+3.1+.8});
+  Detail('NorthRuinRoofRidge',56,-186,.3,.28,9.6,'roof',{y:ground+4.6});
+}
 FarmSilhouette('EastFarm',110,-169,17,12,5);
 FarmSilhouette('VillageEdgeHouse',106,40,16,12,4.4);
 FarmSilhouette('VillageRearHouse',39,65,13,11,4);
@@ -603,7 +660,8 @@ export const MISSION_ROUTES = Object.freeze({
   opening: OPENING.approachRoute,
   // The rebuilt 03 entry comes from the casualty collection point. Keep only
   // that live communication-trench leg; the station-side head is retired.
-  support: [...MISSION_STAGE_ROUTES.rearTrench.slice(4),...Sortie.approach.slice(1)],
+  // 03: collection -> support junction -> support sap -> observation -> gap junction -> right low trench -> nest.
+  support: [MISSION_STAGE_ANCHORS.collection,{x:-33,z:-106},...Sortie.approach],
   rightRear:Sortie.rearRoute,attack:Sortie.attackRoute,
   bundle: Sortie.route,
   bundleReturn: [...Sortie.route].reverse(),
@@ -649,10 +707,13 @@ export const MISSION_ROUTES = Object.freeze({
 import { FRONT_GUARD_POSTS, FRONT_COVER, FRONT_FIELD_MEN, FrontAssaultLaneCuts, APPROACH_TACTICS } from "./Data_FirstLevelMissionFront.mjs";
 export const MISSION_PLACEMENT = Object.freeze({
   squadFrontPositions:OPENING.frontPosts,
-  reliefApproach:MISSION_STAGE_ROUTES.rearTrench.slice(4),
-  reliefPositions:[Sortie.leftSeat,{x:-18,z:-123}],
+  reliefApproach:[MISSION_STAGE_ANCHORS.collection,{x:-33,z:-106},...Sortie.approach.slice(0,3)],
+  // Relief: one team to Zhou's left gun, one to hold the gap junction.
+  reliefPositions:[Sortie.leftSeat,{x:-6.6,z:-141.6}],
+  // Each guard: scrape -> last cover -> the gap -> gap junction -> fold -> safe zone behind the fold,
+  // spread along the support sap toward the observation step (all out of the nest's and the tank's lines).
   guardWithdrawalRoutes:Array.from({length:8},(_,i)=>[
-    FRONT_GUARD_POSTS[i],...Sortie.guardRoute,{x:-18+i*1.5,z:-124},
+    FRONT_GUARD_POSTS[i],...Sortie.guardRoute,{x:-23.4-i*.42,z:-130.2+i*.32},
   ]),
   kitchenInterior: {minX:53,maxX:63,minZ:-15,maxZ:-2},
   // ConnectedHouse（58,8，12×15）的可站区域：墙心 x 52/64、z 0.5/15.5，墙厚 0.6。
@@ -672,9 +733,9 @@ export const MISSION_PLACEMENT = Object.freeze({
   wardInterior: MISSION_RECEPTION_SPACE.ward,
   tankStart: Sortie.road[0],
   tankTargets: [
-    { x: -24, z: -130 },
-    { x: 16, z: -131 },
-    { x: 2, z: -132 },
+    { x: Sortie.seat.x, z: Sortie.seat.z },
+    { x: Sortie.gap.x, z: Sortie.gap.z },
+    { x: Sortie.leftSeat.x, z: Sortie.leftSeat.z },
   ],
   // 车位挪到装载区东半边，排成两列：旧的 (86,141) 落在北沙河的北坡上，(86,132)
   // 也贴着河口。**四个车位全在 cartRide 的出场道以东** —— 牛车的碰撞盒是
@@ -691,33 +752,27 @@ export const MISSION_PLACEMENT = Object.freeze({
   // -------------------------------------------------------------------------
   // 01—02 掩蔽部。玩家侧躺在后半间，视线穿中隔墙缺口与前门低处破口看门外 8.5 m 的刺杀处。
   // 2026-09-20 演出打磨：整间从 8.5 × 12 收到 7 × 7，屋里屋外的摆位全部跟着前移。
+  // 01—02 (2026-09-23 proposal A; the Opening package re-stages these — values are the proposal's
+  // suggested marks). Dugout pit at the bend's outer corner, mouth looking east down the trench.
   bunker: {
-    player: { x: -40, z: -126, yaw: 0 },    // 面朝北，近入口的地面视角
+    player: { x: -2.0, z: -126.3, yaw: Math.PI / 2 },    // lying, facing east out of the mouth
     playerEyeM: 0.42,
-    // 够不到：离玩家 2.6 m。离东墙、后墙的内表面都留出约 0.8 m，让同源 HanYang
-    // 地枪模型完整躺在屋内，不把枪身插进墙里。
-    rifle: { x: -39.6, z: -127.15, yaw: 0.15 },
-    pinnedFrame: [{ x: -41.15, z: -123.4 }, { x: -38.85, z: -123.6 }],
-    // 门外这一片全部落在破口的射影里：眼睛 (-40,-123.4,+0.42) 穿 x −41.4…−38.6
-    // 那道 2.8 m 的缝，8.5 m 处开出 x −42.59…−37.41，当中门框立柱再挡掉
-    // −38.80…−38.24 一条。四个人（两名川军、两名日兵）都摆在主缝里。
+    rifle: { x: 1.4, z: -125.6, yaw: 0.3 },              // in the mouth, butt half-buried, out of reach
+    pinnedFrame: [{ x: -2.6, z: -125.4 }, { x: -1.4, z: -126.8 }],
     captives: [
-      { id: "captiveWounded", x: -40.9, z: -131.3, yaw: 0.3 },
-      { id: "captiveHelper", x: -39.8, z: -132.0, yaw: 2.6 },
+      { id: "comrade", x: 6.5, z: -123.6, yaw: Math.PI },   // dragged from the north wall to the kill spot
+      { id: "shouter", x: 8.6, z: -122.9, yaw: 2.2 },       // the soldier outside the mouth, killed by the blast
     ],
-    // 缴下来的两支枪落在两人**几米外**（Notion：「已经落在数米外」），而且都还在破口的
-    // 射影里；踢开那一支往门口这边滑，滑完也不许被门垛吃掉。
-    captiveRifles: [{ x: -42.0, z: -133.6 }, { x: -37.9, z: -132.9 }],
-    // A 去右侧的 ijaKill[1]、B 去左侧的 ijaKill[0]：起点同侧且离落点 3–4 m，
-    // 近爆黑视的 4.6 s 内能走到，不再交叉相撞后隔空触发第一拍。
-    ijaStart: [{ x: -38.4, z: -135.8, yaw: Math.PI }, { x: -41.2, z: -136.0, yaw: Math.PI }],
-    ijaKill: [{ x: -40.8, z: -132.4, yaw: Math.PI }, { x: -39.9, z: -133.2, yaw: Math.PI }],
-    ijaDoor: [{ x: -40.3, z: -130.3, yaw: Math.PI }, { x: -38.9, z: -130.6, yaw: Math.PI }],
-    luoEntry: { x: -40, z: -119.6, yaw: Math.PI },  // 从后壁破口挤进来
-    luoLift: { x: -40.5, z: -122.3, yaw: Math.PI },
-    yaowaLift: { x: -39.5, z: -122.2, yaw: Math.PI },
-    // 绕过掩蔽部西墙，射线到刺杀处（西墙现在只到 z=−128，线从它北边过去）。
-    heyoutianFire: { x: -42.65, z: -129.5, yaw: 0 },
+    captiveRifles: [{ x: 4.6, z: -126.0 }, { x: 9.6, z: -125.8 }],
+    ijaStart: [{ x: 12.4, z: -124.2, yaw: -Math.PI / 2 }, { x: 13.4, z: -125.6, yaw: -Math.PI / 2 }],
+    ijaKill: [{ x: 6.8, z: -124.6, yaw: 0 }, { x: 5.2, z: -124.4, yaw: 0.4 }],
+    ijaDoor: [{ x: 1.8, z: -125.7, yaw: -Math.PI / 2 }, { x: 3.6, z: -124.7, yaw: -Math.PI / 2 }],
+    luoEntry: { x: -1.2, z: -118.8, yaw: Math.PI },        // up the SSW leg from the rear corner
+    luoLift: { x: 3.2, z: -122.3, yaw: Math.PI },
+    yaowaLift: { x: -3, z: -114, yaw: Math.PI },
+    heyoutianFire: { x: 0.2, z: -121.4, yaw: Math.PI },
+    liuwencaiShot: { x: -2.2, z: -117.2, yaw: 2.6 },       // 17.8 m to the junction J over the crater lip
+    returnSpot: { x: 0.6, z: -123.2, yaw: Math.PI / 2 },   // behind the mouth spoil (02 还权位)
   },
   // 06 背坡伤员集结处。
   collection: {
@@ -806,7 +861,7 @@ export const MISSION_SUPPLIES = Object.freeze([
   // 2026-09-15: the shelter corner is now a fight of its own, between the trench
   // and the front crates. Kept on the recess floor, clear of its entry lane and posts.
   {id:"Shelter",x:-34.2,z:-18.3,supportHeight:null},
-  {id:"Front",x:29.5,z:-128,supportHeight:null},
+  {id:"Front",x:33.8,z:-147.6,supportHeight:null},
   {id:"Orders",x:Sortie.orders.x-1.5,z:Sortie.orders.z,supportHeight:null},
   {id:"Courtyard",x:50,z:33.05,supportHeight:null},
   {id:"Transfer",x:93,z:110,supportHeight:1.15},
@@ -820,8 +875,8 @@ export const MISSION_SUPPLIES = Object.freeze([
 const TRENCH_TRAFFIC_LANES = [
   // 增援班从交通壕口沿 z=-123 散开到各自的射击位（测试里的 Relief<i> 路线）。
   // 这条腿整段躺在 FrontTraverse 的沟里，偏中线 1 m 左右。
-  ...MISSION_PLACEMENT.reliefPositions.map((point) => [
-    MISSION_PLACEMENT.reliefApproach.at(-1), { x: point.x, z: -123 }, point]),
+  [...MISSION_PLACEMENT.reliefApproach, ...Sortie.leftRoute.slice(3)],
+  [...MISSION_PLACEMENT.reliefApproach, { x: -18, z: -134 }, MISSION_PLACEMENT.reliefPositions[1]],
   // 后院那三个追兵贴着撤离壕 (26,215) 的拐角外侧下来
   //（Data_FirstLevelMission.MISSION_TACTICS.YardPursuerA/B/C，三条同线）。
   [{ x: 27, z: 224 }, MISSION_REAR_ROUTES.evacuation[7], MISSION_REAR_ANCHORS.retreatC],
@@ -973,7 +1028,7 @@ for (let i = blocks.length - 1; i >= 0; i--) {
  * 为什么不进 `blocks`：坍塌/完好两套墙同时存在没有意义，而 gate 是「一块一个网格」，
  * 四十块各自一个 draw call。scenario 走 BuildSink 合批，切态只重建这一个 sink。
  */
-const BUNKER_GROUND = SampleMissionTerrain(-40, -124.5);
+const BUNKER_GROUND = SampleMissionNaturalHeight(-0.8, -125.8);
 const NIGHT_GROUND = SampleMissionTerrain(-160, 334);
 function ScenarioBlock(id, x, z, w, h, d, semantic, y, extra = {}) {
   return { id, x, y, z, w, h, d, semantic, tag: "whiteboxWall", ...extra };
@@ -990,58 +1045,27 @@ const MISSION_SCENARIO = (() => {
   // 两态共用的壳：西/东侧墙、前墙两垛、后墙两垛、中隔墙两垛。
   // 前门缺口 x −41.4…−38.6（2.8 m）、中隔墙缺口与后壁缺口都是 x −41.6…−38.4（3.2 m）
   // —— 三道口子**同轴**，躺在后半间正对着看出去，门外那一片不会被中隔墙裁掉。
+  // 2026-09-23 proposal A: the dugout is a pit in the terrain (Data_FirstLevelMissionTerrain steps,
+  // centre (-0.8,-125.8), floor = natural - 2.0) with a timber roof, a south revetment that keeps the
+  // single mouth single, and door posts. `top` here is metres above NATURAL ground (g).
+  const floor = -2.0;
   const shell = [
-    // 2026.09.21 storyboard: a covered recess off a timber-revetted trench.
-    // Banks hide the surface battlefield from the ground-level opening camera.
-    ...Array.from({length:10},(_,i)=>{
-      const z=-129.4-i*2,ground=SampleMissionTerrain(-40,z);
-      return [-1,1].flatMap(side=>{
-        const x=-40+side*4.35,h=1.8+(i%3)*.11;
-        return [ScenarioBlock(`OpeningBank${side}_${i}`,x,z,1.8,h,2.1,"OpeningEarth",ground+h/2),
-          ...[.35,.72,1.09,1.46].map((rise,j)=>ScenarioBlock(`OpeningRevetment${side}_${i}_${j}`,x-side*.91,z,.14,.22,2.06,"OpeningWood",ground+rise)),
-          ScenarioBlock(`OpeningPost${side}_${i}`,x-side*1.03,z-.87,.18,1.7,.2,"OpeningWood",ground+.85)];
-      });
-    }).flat(),
-    B("BunkerWest", -43.25, -124.5, 0.5, 2.2, 7, "earthDark", 2.2),
-    B("BunkerEast", -36.75, -124.5, 0.5, 2.2, 7, "earthDark", 2.2),
-    B("BunkerFrontWest", -43, -128, 1, 2.2, 0.5, "earthDark", 2.2),
-    B("BunkerFrontEast", -37, -128, 1, 2.2, 0.5, "earthDark", 2.2),
-    B("BunkerRearWest", -42.55, -121, 1.9, 2.2, 0.5, "earthDark", 2.2),
-    B("BunkerRearEast", -37.45, -121, 1.9, 2.2, 0.5, "earthDark", 2.2),
-    B("BunkerPartitionWest", -42.55, -124.5, 1.9, 2.2, 0.5, "timber", 2.2),
-    B("BunkerPartitionEast", -37.45, -124.5, 1.9, 2.2, 0.5, "timber", 2.2),
+    B("BunkerRoof", -1.15, -126.0, 4.1, 0.5, 4.2, "timber", 0.35),
+    B("BunkerSouthRevetment", -1.0, -123.75, 3.6, 2.2, 0.4, "timber", 0.2),
+    B("BunkerMouthPostN", 1.05, -127.5, 0.25, 2.0, 0.3, "timber", floor + 2.0),
+    B("BunkerMouthPostS", 1.05, -124.3, 0.25, 2.0, 0.3, "timber", floor + 2.0),
+    B("BunkerMouthLintel", 1.05, -125.9, 0.3, 0.22, 3.4, "timber", floor + 1.95),
   ];
-  const intact = [...shell,
-    B("BunkerDoorLintel", -40, -128, 5, 0.2, 0.5, "timber", 2.2),
-    B("BunkerRearLintel", -40, -121, 3.2, 0.2, 0.5, "timber", 2.2),
-    B("BunkerPartitionLintel", -40, -124.5, 3.2, 0.2, 0.5, "timber", 2.2),
-    B("BunkerRoof", -40, -124.5, 7, 0.3, 7, "timber", 2.5),
-  ];
-  // 坍塌态：前半间塌了，前门只剩 0–1.35 m 的低处破口。躺姿眼高 0.35–0.50 m
-  // 从后半间 (-40,-123.4) 看出去，门外 2–12 m 一个站着的人（头顶 1.75）整个在视野里：
-  // 破口上沿 1.35 m 在 4.6 m 处，射到 8.5 m 的头顶那条线只走到 1.14 m，从沿下过去。
-  // 门槛的碎砖与门框立柱各遮住一部分，创口仍由门框、尘土与人物身体挡着。
+  const intact = [...shell];
+  // Collapsed: the near miss outside the mouth buried its south side and threw soil into the bend
+  // (the 02 return-of-control cover), a roof beam sagged over Shunzi. From the lying eye
+  // (-2.0,-126.3, floor+0.42) the kill spot, the junction J and the fold F stay in view (K1).
   const collapsed = [...shell,
-    B("BunkerFrontLintel", -40, -128, 5, 0.2, 0.5, "timber", 2.2),
-    B("BunkerDoorRubble", -37.7, -128, 0.9, 0.22, 0.7, "earthDark", 0.22),
-    B("BunkerDoorPost", -42.5, -128, 0.25, 2.2, 0.45, "timber", 2.2),
-    B("BunkerPartitionSill", -40, -124.5, 3.2, 0.18, 0.5, "earthDark", 0.18),
-    B("BunkerRoofRear", -40, -122.75, 7, 0.3, 3.5, "timber", 2.5),
-    // 塌下来的顶板悬在前半间当中：底面 1.35 m，正好压在破口上沿那条线上，
-    // 从躺姿看过去它在视线**上方**（3 m 处那条线才 0.89 m），只把天光压掉。
-    B("BunkerRoofSlab", -40, -125.6, 7, 0.3, 3.2, "timber", 2.5),
-    // 前半间两角的塌方堆。都退到破口射影之外（4.3 m 处那条锥只有 x −41.31…−38.69），
-    // 不许啃掉门外那一片的左右边。
-    B("BunkerRubbleA", -42.3, -126.4, 1.4, 1.1, 2.6, "earthDark", 1.1),
-    B("BunkerRubbleB", -37.7, -126.8, 1.4, 0.85, 1.8, "earthDark", 0.85),
-    B("BunkerBeamPinWest", -41.15, -123.4, 0.7, 0.55, 0.9, "timber", 0.55),
-    B("BunkerBeamPinEast", -38.85, -123.6, 0.6, 0.5, 0.8, "timber", 0.5),
-    // 杂物堆靠西墙放。原来摆在 x=-40，正好压在后壁破口那道 3.2 m 门里：
-    // 两边各只剩 0.7 m，人的胶囊（直径 0.84）过不去 —— 罗班长进不来、玩家也出不去，
-    // 实拍出来是「02 永远不开始」。scenario 的体块不在 MISSION_LAYOUT.blocks 里，
-    // 所有既有的净空检查都扫不到它，所以 Script_FirstLevelMissionTest 另加了一条。
-    // 屋子收小之后它也跟着收：x −42.95…−41.85，整块留在后壁缺口（x −41.6 起）以西。
-    B("BunkerClutter", -42.4, -122, 1.1, 0.5, 0.8, "timber", 0.5),
+    B("BunkerMouthSpoil", 2.4, -123.6, 1.6, 1.4, 1.6, "earthDark", floor + 1.4),
+    B("BunkerMouthRubbleS", 1.3, -124.2, 0.9, 0.7, 0.8, "earthDark", floor + 0.7),
+    B("BunkerRoofSag", -0.7, -125.3, 2.2, 0.3, 1.6, "timber", floor + 1.55),
+    B("BunkerBeamPinWest", -2.6, -125.4, 0.7, 0.55, 0.9, "timber", floor + 0.55),
+    B("BunkerBeamPinEast", -1.4, -126.8, 0.6, 0.5, 0.8, "timber", floor + 0.5),
   ];
   const N = (id, x, z, w, h, d, semantic, top) =>
     ScenarioBlock(id, x, z, w, h, d, semantic, n + top - h / 2);

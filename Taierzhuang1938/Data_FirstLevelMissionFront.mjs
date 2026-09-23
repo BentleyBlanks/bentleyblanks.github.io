@@ -1,6 +1,6 @@
 import { MISSION_TUNING as FIRST_LEVEL_TUNING } from "./Data_Tuning_FirstLevel.mjs";
 import { MISSION_TRAIN } from "./Data_FirstLevelMissionTrain.mjs";
-import { FRONT_SORTIE as Sortie } from "./Data_FirstLevelFrontRoute.mjs";
+import { FRONT_SORTIE as Sortie, FRONT_SPACE as Space, FRONT_TANK_PATH } from "./Data_FirstLevelFrontRoute.mjs";
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
 // Authored squads and persistent aftermath. Historical dead do not affect live combat counts.
 // 2026-09-09: the Center squad's fifth man moved 12,-188 -> 12,-190. At -188 he was inside the
@@ -45,14 +45,16 @@ export const FRONT_COVER=Object.freeze({
    *  "crouch to hide, kneel up to fire" band. d stays 0.6 like every other authored cover wall -
    *  COVER.standoffM (0.65) is measured from the registered point, i.e. the block centre. */
   rows:Object.freeze([
-    Object.freeze({id:"Bank", line:-187,   z:-185.3, w:1.5, h:1.06, d:.6}),
-    Object.freeze({id:"Mound",line:-175.5, z:-173,   w:1.6, h:1.02, d:.6}),
-    Object.freeze({id:"Ridge",line:-166,   z:-164,   w:1.5, h:.94,  d:.6}),
-    Object.freeze({id:"Stub", line:-159.5, z:-158,   w:1.7, h:1.08, d:.6}),
+    // 2026-09-23 proposal A: everything 6 m north with the berm (crest z=-160); the last row sits
+    // 1 m north of the berm's north foot, 4.5 m short of the crest.
+    Object.freeze({id:"Bank", line:-193,   z:-191.2, w:1.5, h:1.06, d:.6}),
+    Object.freeze({id:"Mound",line:-181.5, z:-179.3, w:1.6, h:1.02, d:.6}),
+    Object.freeze({id:"Ridge",line:-173,   z:-171,   w:1.5, h:.94,  d:.6}),
+    Object.freeze({id:"Stub", line:-166.5, z:-164.6, w:1.7, h:1.08, d:.6}),
   ]),
   columns:Object.freeze([
     // NorthFarm stands on the Bank row here, so only the three southern rows are built.
-    Object.freeze({id:"WestFarm",  x:Object.freeze([-60.5,-42.5]),rows:Object.freeze(["Mound","Ridge","Stub"])}),
+    Object.freeze({id:"WestFarm",  x:Object.freeze([-60.5,-42.5]),rows:Object.freeze(["Ridge","Stub"])}),
     Object.freeze({id:"WestGrave", x:Object.freeze([-40.5,-33.5]),rows:null}),
     // FieldRuin0 already fills the western half of this column's Ridge row.
     Object.freeze({id:"Ruin",      x:Object.freeze([-31.5,-16.9]),rows:null}),
@@ -60,13 +62,11 @@ export const FRONT_COVER=Object.freeze({
     Object.freeze({id:"Center",    x:Object.freeze([-2.6,2.6]),   rows:null}),
     Object.freeze({id:"CenterEast",x:Object.freeze([7.3,12.8]),   rows:null}),
     // FieldRuin1 already fills the eastern half of this column's Stub row.
-    Object.freeze({id:"East",      x:Object.freeze([17.4,28.9]),  rows:null}),
-    // coverX is the build span, narrower than the lane span: the tank's advance from tankStart to
-    // tankFirstFireZ leans east when it tracks a target near the grenade-bundle anchor, and it
-    // moves by interpolation with no collision response, so nothing may stand in that swing.
-    Object.freeze({id:"FarEast",   x:Object.freeze([39.8,47]),    rows:null, coverX:Object.freeze([42,47])}),
-    // NorthRuin: a building east of the assault span, no authored cover of its own.
-    Object.freeze({id:"NorthRuin", x:Object.freeze([50,68]),      rows:Object.freeze([])}),
+    // The East column's two southern rows would stand in the flank group's lane and in the tank's
+    // sight lane past the berm's east end; the berm-end craters and FieldRuin1 replace them.
+    Object.freeze({id:"East",      x:Object.freeze([17.4,28.9]),  rows:Object.freeze(["Bank","Mound"])}),
+    // FarEast / NorthRuin columns are gone: x 30..70 is the tank road, its escorts and the flank
+    // group's approach (docs/Data_FirstLevelLayoutProposalA.md §4).
   ]),
 });
 // The corridor left open between East and FarEast carries the field road (x 33-37 across these
@@ -77,12 +77,17 @@ export const FRONT_COVER=Object.freeze({
 // starts on this field, and a roster split across two files drifts. `Data_FirstLevelMission`
 // spreads this straight into MISSION_ENCOUNTERS.front.
 export const FRONT_RIFLEMEN=Object.freeze([
-  {id:"FrontGunner",x:17,z:-161,weapon:"Type11",hold:true},
-  {id:"FrontRifleA",x:23,z:-163},{id:"FrontRifleB",x:28,z:-167},
-  {id:"FrontRifleC",x:15,z:-170},{id:"FrontRifleD",x:33,z:-158},
-  {id:"FrontRifleE",x:-30,z:-169},{id:"FrontRifleF",x:-18,z:-179},
-  {id:"FrontRifleG",x:-9,z:-173},{id:"FrontRifleH",x:4,z:-183},
-  {id:"FrontSupportGunner",x:-23,z:-184,weapon:"Type11",hold:true},
+  // Fire base (火力基地): holds on the rising ground 34-40 m north of the berm, behind the
+  // FireBaseRuin* walls, never bounds. Suppresses the crest; after 03 capture, the nest.
+  {id:"FrontGunner",x:10,z:-195,weapon:"Type11",hold:true,role:"fireBase"},
+  {id:"FrontSupportGunner",x:-24,z:-195.2,weapon:"Type11",hold:true,role:"fireBase"},
+  {id:"FrontRifleG",x:-9.8,z:-195.4,hold:true,role:"fireBase"},
+  {id:"FrontRifleH",x:23,z:-195,hold:true,role:"fireBase"},
+  // Bounding group (跃进组): two teams of three, crater to crater down the corridors between
+  // the cover columns, last line 6.5 m short of the crest (under Zhou's enfilade).
+  {id:"FrontRifleA",x:-32.5,z:-199,role:"bound"},{id:"FrontRifleB",x:-14.7,z:-199.5,role:"bound"},
+  {id:"FrontRifleC",x:-4.8,z:-200,role:"bound"},{id:"FrontRifleD",x:5,z:-199,role:"bound"},
+  {id:"FrontRifleE",x:15,z:-199.5,role:"bound"},{id:"FrontRifleF",x:-14.5,z:-202.5,role:"bound"},
 ]);
 /** Every man the front stages put on this field. The cover rows never build on one of these
  *  firing positions - a bank standing on a man is a man standing in a bank. */
@@ -104,17 +109,18 @@ export const FrontReserveLane=(x,z)=>[{x,z:z+FIRST_LEVEL_TUNING.frontReserveAdva
 // cut through; lanes are pushed out of them (the AI has no vault on the rush path).
 // waveCentersX are the rotating squad drop points on the northern edge for reinforcement waves.
 export const FRONT_ASSAULT=Object.freeze({
-  lines:[-187,-175.5,-166,-159.5],
-  xRange:[-63,49],
+  lines:[-193,-181.5,-173,-166.5],
+  xRange:[-63,28],
   blockedX:FRONT_COVER.columns.map(column=>column.x),
   lateralM:2.4,
-  spawnZ:-199,
-  waveCentersX:[-36,12,38,-18,44,-6],
+  // Wave drop points sit on the plateau beyond the north bank's crest, 60+ m from the nest seat.
+  spawnZ:-207,
+  waveCentersX:[-36,-14,6,-24,16,-4],
 });
 // A separate finite attack enters only at the machine-gun handover. Rifle-stage
 // casualties cannot spend it early; its starts share the validated reinforcement lanes.
-export const FRONT_MACHINE_GUN_ATTACK=Object.freeze(FRONT_ASSAULT.waveCentersX.slice(0,3).flatMap((cx,squad)=>
-  Array.from({length:4},(_,i)=>Object.freeze({id:`MachineGunAttack${squad}_${i}`,team:`Gun${squad}`,
+export const FRONT_MACHINE_GUN_ATTACK=Object.freeze(FRONT_ASSAULT.waveCentersX.slice(0,2).flatMap((cx,squad)=>
+  Array.from({length:3},(_,i)=>Object.freeze({id:`MachineGunAttack${squad}_${i}`,team:`Gun${squad}`,
     x:cx+((i%3)-1)*3.2+(i>=3?1.6:0),z:FRONT_ASSAULT.spawnZ-(i>=3?2.5:0),
     weapon:i===0?"Type11":"Type38",bayonet:true}))));
 const LaneRandom=(x,z)=>{let s=(Math.round(x*7+z*13)*2654435761)>>>0;return ()=>{s=(Math.imul(s,1664525)+1013904223)>>>0;return s/4294967296;};};
@@ -176,10 +182,12 @@ export function FrontAssaultLaneCuts(x,z,w,d,slackM=.4){
 // trench. Keep a finite north / north-east screen on that live leg; the retired
 // station-side west/east teams were never encountered after the 2026.09.19 cut.
 export const FRONT_APPROACH_ENEMIES=[
-  {id:"RightNestGunner",...Sortie.nest,weapon:"Type11",hold:true,team:"Nest"},
-  {id:"RightNestGuard",x:30,z:-142,hold:true,team:"Nest"},
-  {id:"RightEntryGuard",x:22,z:-136,hold:true,team:"Nest"},
-  {id:"RightLinkGuard",x:25,z:-131,hold:true,team:"Nest"},
+  {id:"RightNestGunner",...Sortie.nest,weapon:"Type11",hold:true,team:"Nest",role:"nestGun",faceTo:Sortie.gap},
+  // Guards face the west door and the right low trench (south-west), behind real cover.
+  {id:"RightNestGuard",x:31.4,z:-149.4,team:"Nest",role:"nestGuard",faceTo:Space.westDoor},
+  {id:"RightEntryGuard",x:26.6,z:-146.8,team:"Nest",role:"nestGuard",faceTo:Space.westDoor},
+  // The link guard holds the rear junction: the link sap the vanguard used and the ammo sap mouth.
+  {id:"RightLinkGuard",x:32.3,z:-140.2,team:"Nest",role:"linkGuard",faceTo:{x:23.5,z:-130}},
 ];
 // Bounded approach routes end at the trench lip; shared tactical AI closes on observed targets.
 export const APPROACH_TACTICS=Object.fromEntries([
@@ -187,14 +195,61 @@ export const APPROACH_TACTICS=Object.fromEntries([
     near:{x:-52,z:50},nearM:18,delay:(i%3)*2,
     points:[{x:s.x+(s.team==="Rail"?8:-6),z:s.z},{x:s.x+(s.team==="Rail"?14:-12),z:s.z}],
   }]),
-  ...Sortie.enemies.map((s,i)=>[s.id,{near:Sortie.rear,nearM:20,delay:i*2,
-    points:[{x:40,z:s.z},{x:35,z:-123},{x:29,z:-120}]}]),
+  ...Sortie.enemies.map((s,i)=>[s.id,{near:Sortie.damagedLip,nearM:22,delay:i*2.5,
+    points:[Space.roadLink[0],Space.roadLink[1],{x:47.5-i*1.6,z:-124.5}]}]),
 ]);
-export const FRONT_DEFENDERS=[[-19,-125,"HanYang"],[-26,-132,"HanYang"]]
+export const FRONT_DEFENDERS=[[-7.5,-112.4,"HanYang"],[-12,-111.8,"HanYang"]]
   .map(([x,z,weapon],i)=>({id:"FrontDefender"+i,x,z,weapon,stance:1}));
-export const FRONT_GUARD_POSTS=[[-12,-148],[-16,-148],[-21,-148],[-24,-148],[0,-148],[4,-148],[9,-148],[13,-148]]
+// Backslope scrapes (0.55 m) at the berm's south foot; the first two are the ones nearest the gap.
+export const FRONT_GUARD_POSTS=[[-11,-156.3],[-5,-156.3],[-14.5,-156.4],[-1.5,-156.3],[-18,-156.4],[2,-156.2],[-22,-156.5],[-26,-156.5]]
   .map(([x,z])=>({x,z}));
-export const FRONT_BREACHES=[{x:-22,z:8,radius:4,depth:1.05},{...Sortie.gap,radius:3.2,depth:.35},{...Sortie.damagedLip,radius:3,depth:.8}];
+// Gap: the sap is shallowed to 0.5 m for ~6 m (the one exposed crossing). Damaged lip: 0.8 m for
+// ~6 m (crouch, road view). Attack tail: the last 4 m of the attack branch are 0.75 m (the risk window).
+export const FRONT_BREACHES=[{x:-22,z:8,radius:4,depth:1.05},{...Sortie.gap,radius:3,depth:.5},
+  {...Sortie.damagedLip,radius:3,depth:.8},{x:42.8,z:-157,radius:2.4,depth:.75}];
+// ---------------------------------------------------------------------------
+// 2026-09-23 proposal A: enemy layers that are not bounding riflemen (docs/Data_FirstLevelLayoutProposalA.md §5)
+// ---------------------------------------------------------------------------
+/** Flank group (侧翼组 = the designated assault group of 03): from behind NorthRuin's west wall,
+ *  crater to crater toward the berm's east end. Their last line is around the end, where the
+ *  gap is visible along the berm's south side; the captured nest enfilades it at 8-14 m. */
+export const FRONT_FLANK_GROUP=Object.freeze([
+  {id:"FrontFlankA",x:47,z:-191,lane:[{x:40,z:-181.5},{x:31.5,z:-173.6},{x:24.5,z:-168.4},{x:17.2,z:-159.4}]},
+  {id:"FrontFlankB",x:44.5,z:-193.5,lane:[{x:38,z:-183.2},{x:29.6,z:-176.2},{x:22.6,z:-168.8},{x:20.3,z:-162.4}]},
+  {id:"FrontFlankC",x:49.5,z:-194.5,lane:[{x:42,z:-183.5},{x:33.5,z:-177.4},{x:26.4,z:-170.2},{x:15.4,z:-163.8}]},
+  {id:"FrontFlankD",x:46,z:-197,lane:[{x:41,z:-186},{x:32.2,z:-179},{x:25.6,z:-172.2},{x:18.8,z:-165.6}]},
+].map(Object.freeze));
+/** One officer (IJA01, sword prop, pistol shelved). Leads the flank group one bound behind it. */
+export const FRONT_OFFICER=Object.freeze({id:"FrontOfficer",x:48,z:-196.5,modelVariant:1,sword:true,
+  lane:[{x:41,z:-186.5},{x:33,z:-178.5},{x:27.4,z:-172.6}]});
+/** Reinforcement entries (contract §2.8): all 60 m+ from the nest seat and the observation step,
+ *  or hidden below a crest. The count is the budget per stage (aliveCap per stage). */
+export const FRONT_RESERVE_ENTRIES=Object.freeze([
+  {id:"NorthWestPlateau",x:-44,z:-224,hiddenBy:"north bank crest + 99 m",stages:{MachineGun:2,Tank:2}},
+  {id:"RoadCutting",x:104,z:-214,hiddenBy:"road cutting walls + NorthRuin sector + 98 m",stages:{MachineGun:2,Tank:1}},
+].map(Object.freeze));
+/** Tank escort slots at the block point (brain-owned, contract §5.7): two pairs in the road-side
+ *  ditches, one pair 6-7 m ahead of the hull, one pair beside it. Shift with the tank's progress. */
+export const FRONT_TANK_ESCORT_SLOTS=Object.freeze([
+  {id:"TankEscortA",x:31.8,z:-164.2},{id:"TankEscortB",x:31.2,z:-170.8},
+  {id:"TankEscortC",x:37.4,z:-163.4},{id:"TankEscortD",x:36.8,z:-172},
+].map(Object.freeze));
+/** Ambient-fire authorised points per stage (contract §2.9: never the player's live position,
+ *  baseAccuracy 0, no TTK). y is metres above the shared ground at (x,z). gap:true points are
+ *  switched off inside a withdrawal window. */
+const Crest=(x)=>({x,z:-160.3,y:2.25});
+export const FRONT_FIRE_POINTS=Object.freeze({
+  Trapped:[{x:-4,z:-111.8,y:.3},{x:-26.5,z:-124.2,y:.3},{x:14,z:-126.6,y:-.6},{x:19,z:-127.6,y:-.6}],
+  BunkerRescue:[{x:-4,z:-111.8,y:.3},{x:14,z:-126.6,y:-.6},{x:19,z:-127.6,y:-.6}],
+  RearTrench:[{x:-4,z:-111.8,y:.3},{x:3,z:-126.2,y:-.4}],
+  Support:[...[-26,-20,-14,-2,4,8].map(Crest),{x:-32.6,z:-158.7,y:.9},
+    {x:-9.6,z:-150.3,y:.2,gap:true},{x:-6.4,z:-150.3,y:.2,gap:true},{x:-8,z:-142.3,y:.2,gap:true}],
+  MachineGun:[...[-26,-14,-2,8].map(Crest),{x:27.5,z:-157.1,y:1.1},{x:24,z:-154,y:1.1},{x:37,z:-151.2,y:3.2},
+    {x:-9.6,z:-150.3,y:.2,gap:true},{x:-6.4,z:-150.3,y:.2,gap:true}],
+  Tank:[...[-20,-8,4].map(Crest),{x:27.5,z:-157.1,y:1.1},{x:45.3,z:-162.6,y:1.3},
+    {x:-9.6,z:-150.3,y:.2,gap:true},{x:-6.4,z:-150.3,y:.2,gap:true}],
+});
+export { FRONT_TANK_PATH };
 export const FRONT_SHELLS=[
   {trigger:{x:-46,z:37},impact:{x:-37,z:22}},
   {trigger:{x:-24,z:-28},impact:{x:-31,z:-45}},

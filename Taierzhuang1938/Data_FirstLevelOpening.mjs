@@ -33,14 +33,15 @@ export const OPENING = Object.freeze({
   // Clear the middle of the trench for the player and late-arriving companions.
   trenchCoverPosts: [{x:-43.55,z:36.15},{x:-46.45,z:32.15},{x:-43.55,z:37.85},{x:-46.45,z:33.85}],
   trenchContactRoute: [{x:-66,z:66},{x:-62,z:64},{x:-45,z:41},{x:-45,z:24},{x:-37,z:24},{x:-37,z:18}],
-  frontPosts: [{x:25,z:-141},{x:-25,z:-100},Sortie.leftSeat,{x:-18,z:-123}],
+  // 2026-09-23 proposal A: nest leader post, collection, left gun, rear corner (He/Liu hold it).
+  frontPosts: [{x:28.4,z:-151.6},{x:-25,z:-100},Sortie.leftSeat,{x:-4.6,z:-112.8}],
   zhouGunSeat: Sortie.leftSeat,
   zhouRest: {x:-36,z:-99},
   // The front supply crate sits between the firing step and the rest point.
   // A wounded gunner can end up on either side of it, so the handover
   // follows the open south edge of the traverse instead of cutting through
   // the crate with one diagonal move.
-  zhouExitBypass: [{x:-3.8,z:-122.5},{x:1.2,z:-122.5}],
+  zhouExitBypass: [{x:-34,z:-147},{x:-31,z:-137}],
   zhouExitWaypointRadiusM:.5,
   zhouWoundThreshold:95,
   zhouExitRadiusM:.65,

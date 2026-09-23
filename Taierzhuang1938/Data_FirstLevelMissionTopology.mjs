@@ -1,8 +1,8 @@
 // Notion: 空间、流程拓扑图 / 2026.09.19 采用稿（docs/Data_FirstLevelRebuild20260919Contract.md §3）。
 // X east, Z south, metres. The sketch fixes adjacency and direction; the metres below are the
 // whitebox calibration the space package owns. Key names are the cross-package contract.
-import { FRONT_SORTIE as Sortie } from "./Data_FirstLevelFrontRoute.mjs";
-export const MISSION_TOPOLOGY_VERSION = "first-level-20260922-front-topology-r1";
+import { FRONT_SORTIE as Sortie, FRONT_SPACE as Space } from "./Data_FirstLevelFrontRoute.mjs";
+export const MISSION_TOPOLOGY_VERSION = "first-level-20260923-space-proposal-a";
 export const MISSION_REAR_ANCHORS = Object.freeze({
   ditchMouth: {x:53,z:114}, ditch: {x:39,z:116},
   // retreatA (=15A 收拢点) moved 6 m north of its old z=140: the North Sha He channel now
@@ -141,12 +141,20 @@ export const MISSION_STAGE_ANCHORS = Object.freeze({
   // bunkerDoor 落在门外 1.35 m 而不是门框那一格：锚点要站得住人（「不被体块埋」）。
   // 2026-09-20 演出打磨：掩蔽部整间从 12 m 进深收到 7 m（前墙 z=−128、后墙 z=−121），
   // 受困位跟着前移到 −123.4 —— 到前门 4.6 m，到行刑处 8.5 m。
-  bunker: {x:-40,z:-126.0}, bunkerDoor: {x:-40,z:-129.6},
+  // 2026-09-23 proposal A: the dugout is dug into the north-west (outer) wall of the bend M
+  // (3,-124.4) where the forward communication trench turns from east-west to south-south-west.
+  // Its single mouth looks east straight down the trench: kill spot, junction J, fold F (K1).
+  bunker: {x:-2.8,z:-126.6}, bunkerDoor: {x:2.2,z:-125.2},
   // 行刑处在门外 3.9 m。原来它在受困位 18 m 外、第一轮打磨挪到 13.5 m，
   // 720p 下人还是只有约 70 像素高；现在 8.5 m 处一个站着的人有约 150 像素
   // （受困期间 FOV 收到 50°），「必须让玩家清楚看懂」才读得出来。
-  bunkerKilling: {x:-40,z:-131.9},
-  bunkerRear: {x:-40,z:-119}, rearCorner: {x:-42,z:-113}, collection: {x:-37,z:-101},
+  bunkerKilling: {x:6.5,z:-123.6},
+  // bunkerRear keeps its key but is now the 02 return-of-control spot behind the mouth spoil.
+  bunkerRear: {x:0.3,z:-122.3}, rearCorner: Space.rearCorner, collection: {x:-37,z:-101},
+  bunkerBend: {x:3,z:-124.4}, bunkerJunction: {x:14,z:-124.6}, bunkerFold: {x:19,z:-125.8},
+  bunkerCrater: {x:2.8,z:-120.4}, shunziDragged: {x:3.8,z:-123.2},
+  supportJunction: Space.supportJunction, frontObservation: Space.observation,
+  guardSafeZone: Space.safeZone, gapJunction: Space.gapJunction,
   // B 村落：主街障碍北侧、担架等待遮挡、东巷、障碍南侧接回主街
   streetBlock: {x:76.65,z:15}, litterHold: {x:66,z:-20}, eastAlley: {x:88,z:11},
   streetRejoin: {x:77,z:34},
@@ -169,18 +177,37 @@ export const MISSION_STAGE_ANCHORS = Object.freeze({
 const S=MISSION_STAGE_ANCHORS;
 // 03 从伤员集结处接回前沿、06 再沿同一交通壕返回。这里是两趟共用的唯一中心线；
 // FrontCommunication 的挖沟数据也直接引用它，避免平面路点改了而地形仍留着旧沟。
+// 2026-09-23 proposal A: the shared leg is collection -> support junction SJ. From SJ the 03 route
+// takes the support sap north (Sortie.approach) and the 01-02 forward communication trench runs
+// east (rear corner RC -> bend M -> junction J).
 export const MISSION_FRONT_COLLECTION_ROUTE = Object.freeze([
-  S.collection,{x:-26,z:-100},{x:-14,z:-104},{x:-8,z:-112},{x:6,z:-124},
+  S.collection,{x:-33,z:-106},Space.supportJunction,
+]);
+/** 01-02 forward communication trench, west to east: SJ -> RC -> SSW leg -> bend M -> J. */
+export const MISSION_BUNKER_TRENCH = Object.freeze([
+  Space.supportJunction,{x:-17,z:-111},Space.rearCorner,{x:-1,z:-118.5},{x:3,z:-124.4},{x:14,z:-124.6},
+]);
+/** The link sap the 01 vanguard came down (from the lost east end, past the nest's rear junction). */
+export const MISSION_BUNKER_FRONT_SAP = Object.freeze([
+  {x:14,z:-124.6},{x:19,z:-125.8},{x:23.5,z:-130},{x:27,z:-135.5},Sortie.rear,
+]);
+/** Where the vanguard's forward elements went on into depth (south, toward the village). */
+export const MISSION_BUNKER_DEPTH_SAP = Object.freeze([
+  {x:14,z:-124.6},{x:15.2,z:-118.5},{x:17.5,z:-111},{x:20.5,z:-102},
 ]);
 export const MISSION_STAGE_ROUTES = Object.freeze({
   // 02：后壁破口 → 背坡土坎的缺口（折角）→ 途经伤员集结处 → 接回前沿交通壕
   // 接回 FrontCommunication 走 (-14,-104)→(-8,-112) 这一折：直接沿 x=-8 北上会
   // 压在 TrenchBoundFrontLeft 的护墙上（沟里那对错身掩体）。
-  rearTrench: [S.bunkerRear,{x:-42,z:-116},S.rearCorner,{x:-40,z:-106},
-    ...MISSION_FRONT_COLLECTION_ROUTE],
+  // 02: return spot behind the mouth spoil -> crater (low wall) -> intact SSW leg -> rear corner ->
+  // west along the rear trench -> support junction -> collection (06 same place).
+  rearTrench: [S.bunkerRear,{x:-1,z:-118.5},S.rearCorner,{x:-17,z:-111},Space.supportJunction,
+    {x:-33,z:-106},S.collection],
   // 05→06：炸停战车之后原路退回集结处
-  collectionReturn: [Sortie.rear,{x:22,z:-129},{x:22,z:-119},{x:14,z:-116},
-    ...[...MISSION_FRONT_COLLECTION_ROUTE].reverse()],
+  // 05->06: rear junction -> rear door -> through the nest -> west door -> right low trench ->
+  // gap junction -> fold -> observation -> support junction -> collection (the 03 approach, reversed).
+  collectionReturn: [Sortie.rear,Space.rearDoor,{x:27.4,z:-149.6},...[...Sortie.approach].reverse().slice(1),
+    {x:-33,z:-106},S.collection],
   // 07：沿沟南行，终点是村北口。2026.09.19 第二波把 188 m 收到 135 m ——
   // 契约要的是 45–75 秒，旧线按行军配速要两分多钟，多出来的全在两个大折返上：
   // 旧线先西折到 (-8,-78) 再折回 x=-24 直下 42 m，最后从 (0,0) 往**北**倒回
