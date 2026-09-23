@@ -40,7 +40,7 @@ export function ReferencePayload(file) {
  * 一次合成。返回 { bytes, subtitle, seconds }。references 是文件路径数组（最多 3 条）。
  * 429 / 5xx / 超时 / 网络错误退避重试；4xx 直接抛。
  */
-export async function SeedAudioSpeak({ prompt, references = [], subtitle = true, speechRate = 0, label = "take",
+export async function SeedAudioSpeak({ prompt, references = [], subtitle = true, speechRate = 0, loudnessRate = 0, label = "take",
   attempts = 4, backoffMs = [5000, 15000, 40000] }) {
   const apiKey = process.env.VOLCENGINE_API_KEY;
   if (!apiKey) throw new Error("VOLCENGINE_API_KEY is required in the environment; do not store credentials in files");
@@ -49,7 +49,7 @@ export async function SeedAudioSpeak({ prompt, references = [], subtitle = true,
     model: SEED_AUDIO_MODEL,
     text_prompt: prompt,
     ...(references.length ? { references: references.map((file) => ({ audio_data: ReferencePayload(file) })) } : {}),
-    audio_config: { format: "mp3", sample_rate: 44100, pitch_rate: 0, speech_rate: speechRate, loudness_rate: 0,
+    audio_config: { format: "mp3", sample_rate: 44100, pitch_rate: 0, speech_rate: speechRate, loudness_rate: loudnessRate,
       enable_subtitle: !!subtitle },
     watermark: {},
   });

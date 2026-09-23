@@ -1,7 +1,7 @@
 // 第一关班组战斗短句：每人用自己的定妆音录一份（Data_FirstLevelVoiceCast.SQUAD_BARK_*）。
 //
 //   node Taierzhuang1938/Script_SeedAudioSquadBarkBake.mjs [--only=luo,yaowa] [--attempts=N] [--dry]
-//        [--rescore] [--pick=who:n] [--jobs=2]
+//        [--rescore] [--pick=who:n] [--jobs=2] [--loudness=-N]
 //
 // 一个人 = 一次请求 = 一条录音：这个人要喊的全部短句在同一次生成里念完（带本人定妆音作 @音频1 参考），
 // 句间留约 1 秒停顿，再按逐字时间戳（不可信时按静音）切开。少抽卡：每人只生成 1 次；只有硬错误
@@ -57,6 +57,9 @@ const Arg = (name) => process.argv.find((arg) => arg.startsWith(`--${name}=`))?.
 const selected = Arg("only")?.split(",").filter(Boolean);
 const dry = process.argv.includes("--dry"), rescore = process.argv.includes("--rescore");
 const allowAttempts = Math.min(CHECK.maxAttempts, Math.max(1, Number.parseInt(Arg("attempts") ?? "1", 10) || 1));
+// --loudness=N：送 audio_config.loudness_rate（默认 0）。嗓门大的人（何有田）整条出来峰值冲过满幅，重抽时压一点音量再生成；
+// 成品电平逐句另外齐平，这个数只管「生成时别冲顶」。记在每次生成的记录里。
+const loudnessRate = Math.max(-50, Math.min(0, Number.parseInt(Arg("loudness") ?? "0", 10) || 0));
 const jobs = Math.min(2, Math.max(1, Number.parseInt(Arg("jobs") ?? "2", 10) || 2));
 const forcedPicks = new Map((Arg("pick")?.split(",") || []).filter(Boolean).map((p) => {
   const [who, n] = p.split(":"); return [who, Number(n)];
@@ -126,10 +129,10 @@ function ValidAttempts(who) {
 async function Generate(who, n) {
   const prompt = BarkPrompt(who), ref = CastReference(who);
   if (prompt.length > 3000) throw new Error(`${who}: prompt exceeds 3000 characters (${prompt.length})`);
-  const result = await SeedAudioSpeak({ prompt, references: [ref.file], label: `bark ${who}#${n}` });
+  const result = await SeedAudioSpeak({ prompt, references: [ref.file], loudnessRate, label: `bark ${who}#${n}` });
   fs.rmSync(AttemptDir(who, n), { recursive: true, force: true });
   fs.writeFileSync(AttemptRaw(who, n), result.bytes);
-  fs.writeFileSync(AttemptMeta(who, n), JSON.stringify({ promptHash: Hash(prompt), castSha256: ref.sha256,
+  fs.writeFileSync(AttemptMeta(who, n), JSON.stringify({ promptHash: Hash(prompt), castSha256: ref.sha256, loudnessRate,
     subtitle: result.subtitle, seconds: result.seconds, generatedAt: new Date().toISOString() }, null, 1));
   console.log(`bark ${who}#${n}: ${result.bytes.length} bytes`);
 }
@@ -265,7 +268,7 @@ function Install(r, manifest, attempts) {
       speakerCos: s.speakerCos, nearestOther: s.nearestOther, cer: s.cer, transcript: s.transcript };
   }
   manifest.people[r.who] = { set: SQUAD_BARK_CAST[r.who], lines: r.lines.length, requests: attempts.length, picked: r.n,
-    attempts: attempts.map((a) => ({ n: a.n, hard: a.hard, flags: a.flags })), cutMethod: r.cutMethod, raw: r.raw,
+    attempts: attempts.map((a) => ({ n: a.n, hard: a.hard, flags: a.flags })), cutMethod: r.cutMethod, raw: r.raw, loudnessRate: ReadJson(AttemptMeta(r.who, r.n))?.loudnessRate ?? 0,
     promptHash: Hash(BarkPrompt(r.who)), castSha256: CastReference(r.who).sha256, rawSha256: Sha256(AttemptRaw(r.who, r.n)) };
 }
 
