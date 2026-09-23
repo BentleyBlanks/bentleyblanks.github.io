@@ -111,6 +111,21 @@ export function AssaultRoundEnd(actor, s, tuning, last, now = 0) {
 }
 
 /** 离他最近、又不超过 top 的那条线（成组冲锋散了之后接回跃进用）。 */
+/**
+ * 冲刺段有没有卡死（`UpdateAssault` 在 rush 相位每帧调）：这一趟冲刺里离目标线最近的距离
+ * `tuning.assaultRushStallS` 秒没再缩短 `tuning.assaultRushProgressM`，就是卡死了。
+ * 换了目标线（s.index 变了）重新计。纯函数，Node 测试直接调。
+ */
+export function RushStalled(s, position, target, dt, tuning) {
+  const d = Distance(position, target);
+  if (s.rushIndex !== s.index || !Number.isFinite(s.rushBest) || d < s.rushBest - tuning.assaultRushProgressM) {
+    s.rushIndex = s.index; s.rushBest = d; s.rushStuck = 0;
+    return false;
+  }
+  s.rushStuck += dt;
+  return s.rushStuck >= tuning.assaultRushStallS;
+}
+
 export function NearestLineIndex(s, position, top = AssaultTop(s)) {
   let best = 0, bestD = Infinity;
   for (let i = 0; i <= top; i++) {

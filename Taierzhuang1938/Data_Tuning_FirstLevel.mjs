@@ -147,6 +147,12 @@ export const MISSION_TUNING = Object.freeze({
   assaultRegroupLine:1,
   assaultRegroupCycles:3,
   assaultArrivalM:.9,
+  // 冲刺段卡死（2026-09-24，docs/Data_EnemyAi.md §20.7）：MoveActor 是直线目标 + 锁走廊（不绕），
+  // 线点被墙 / 胸墙 / 别人挡住时人会站着原地跑到天荒地老 —— 01→06 探针里中路一人以站姿在 ADVANCE
+  // 里停了 88 s。assaultRushStallS 秒内离这条线没近 assaultRushProgressM，就在原地转守（Defend），
+  // 这条线算到了；下一轮照常由 AssaultRoundEnd 决定进退。
+  assaultRushStallS:4,
+  assaultRushProgressM:.5,
   assaultPinnedS:7,
   // Enemy AI integration (2026-09-08, docs/Data_EnemyAi.md §6). Defend() no longer means "pinned to a point with no
   // cover": it is an anchor plus a radius. The soldier may take any cover whose hide position falls inside

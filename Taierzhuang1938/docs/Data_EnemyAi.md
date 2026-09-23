@@ -1081,9 +1081,13 @@ draw call 多的那 55–77 次是远景层的姿势桶（每档 7 个材质桶�
 用户 2026-09-09 选了 A：**150 这个数保留，待命的人要真的有 AI**。
 
 - 待命只保留 `missionFrontStandby`，不再设 `scriptedNoncombatant`（Flank 那几个是后面
-  才登场的侧翼脚本，仍然冻着）。
+  才登场的侧翼脚本，仍然冻着；【2026-09-24】名册里其实没有 `Flank*`，见 19.1 第 4 条的更正）。
 - `UpdateAssault` 与 `Threatens` 改成认 `missionFrontStandby`：他不走跃进脚本，
   对友军通路也仍然不算威胁 —— 因为他在 WATCH 里一枪都不开。
+  **【2026-09-24 更正，§20】** 这半句只对了一半：`UpdateAssault` 确实跳过待命的人，
+  `Threatens`（`Script_FirstLevelMissionRuntime`）**从来没有**认 `missionFrontStandby` ——
+  它只排除 `scriptedNoncombatant` / `missionSurfaceRest` / 被压制的人。所以待命的人只要看得见
+  那个点，照样算「有威胁」。§20 没改这一条（改了会动撤退闸的时序），只把文档改对。
 - 超出交战距离（74 m）的人由 §15 的 `STATE.WATCH` 接手：跪下、面向枪声、隔
   `scanIntervalS` 扫一次扇面、有掩体就进掩体。这正是「待命」该有的样子，不用另写一套。
 
@@ -1295,6 +1299,7 @@ prepush 时 `FirstLevelOpeningBrowserTest` 卡在 ShelterRegroup，基线通过�
 2. **守点单位的姿态没人管。** `Think` 的 `scriptDefensive` 分支直接 return，`ApplyScriptDefense` 给 FIRE 却从不调 `FireStance`：22 m 外的机枪手站姿 FIRE 了整整 30 s。§15 只补了「没目标时 WATCH」，有目标时仍是上次什么姿势就什么姿势。
 3. **对射规则偏爱站姿。** `FireStance` 没掩体、没压制、目标 ≥ 26 m 就站着打（2026-08 的取向「远距离站姿射击本来就是这场仗里最常见的样子」）。46 m 内 54% 的人·帧是站姿。
 4. **冻结的侧翼组。** `Flank*` 四人 `scriptedNoncombatant`，跪在 64–73 m 处玩家视野里 30 s 一动不动、无目标，占「干站」人·帧的一半。本轮**没动**（关卡内容的账，见 19.6）。
+   **【2026-09-24 更正，§20.1】** 这四个人不是 `Flank*`：按坐标 (−38.4,−135.8)、(−41.2,−136)、(−46.5,−142.5)、(−37.5,−143.5) 与 `nc:true`，是 01 生出的掩蔽部突击组（`bunkerAssault`）—— 探针用 `Debug.FirstLevelJump(4)` 跳关，而调试跳转不清已生出的组。名册里根本没有 `Flank*`（`UpdateFlank` 与 `OnBlast` 的 FlankA/B 是死代码，§20 已删）。所以这一半「干站」是探针造出来的，不是正常推进里的样子；§20.6 的新探针走正常驾驶，不再有这个污染。
 
 **「反复蹲起」三个来源**：
 
@@ -1358,7 +1363,7 @@ prepush 时 `FirstLevelOpeningBrowserTest` 卡在 ShelterRegroup，基线通过�
 
 - 「站着不动」这一类基本没了：站姿只剩跑动的人；机枪手跪下了；有掩体的人多了四成。
 - 蹲起**总次数没降但成分换了**：脚本拽人造成的空地蹲起和 COVER_ENGAGE ↔ SUPPRESS 互换下去，掩体里的缩头—探头周期上来。后者是要的节奏（`COVER_CYCLE` 的 hide 0.9–2.2 s / peek 0.7–1.6 s），门禁口径 `AiBehaviorTest`「12 s 内单兵最多切换」仍是 4 次（闸门 6）。要再压就得放慢 `COVER_CYCLE` 的节拍，那是另一个题。
-- 「4 s 既不动也不开枪」**涨到 45%**：一半是冻结的侧翼四人（1200 人·帧，本轮没动），另一半是跪着守线、被禁火、目标只在记忆里的人 —— 跪在线上等一个射击窗口，画面上是「守着」而不是「干站着」。打向玩家的弹数 18 → 18 没变，TTK 账没动（`DamageTest` 25/25，TTK 16.1 s）。
+- 「4 s 既不动也不开枪」**涨到 45%**：一半是冻结的侧翼四人（1200 人·帧，本轮没动；**2026-09-24 更正：其实是调试跳关遗留的 `bunkerAssault` 四人，见 19.1 第 4 条的更正**），另一半是跪着守线、被禁火、目标只在记忆里的人 —— 跪在线上等一个射击窗口，画面上是「守着」而不是「干站着」。打向玩家的弹数 18 → 18 没变，TTK 账没动（`DamageTest` 25/25，TTK 16.1 s）。
 
 ### 19.4 门禁（集成后的树，直接 node 跑）
 
@@ -1376,7 +1381,7 @@ prepush 时 `FirstLevelOpeningBrowserTest` 卡在 ShelterRegroup，基线通过�
 
 ### 19.5 留给下一轮
 
-1. **冻结的侧翼四人**（`Flank*`，`scriptedNoncombatant`）仍跪在 64–73 m 处一动不动：改成 `missionFrontStandby`（§16 给那 143 人做过）或摆到视野外，是关卡内容的账。
+1. **冻结的侧翼四人**（`Flank*`，`scriptedNoncombatant`）仍跪在 64–73 m 处一动不动：改成 `missionFrontStandby`（§16 给那 143 人做过）或摆到视野外，是关卡内容的账。**【2026-09-24 已结】** 没有这四个人（见 19.1 第 4 条的更正）；探针口径的第 4 条由 §20.6 的新探针接走。
 2. **开火窗口与掩体周期不同步**：`FireWindows` 的候选要求这一帧对玩家有通视，缩头的人拿不到窗口，探头那 1 s 里又轮不到他。要提火力密度，可把窗口做成「拿到就保留到打出 N 发」，或者把 `playerSuppressLimit` 从 3 抬到 5–6（压制档不进 TTK 账）。
 3. `COVER_CYCLE.refinedSides` 仍只有国军：日军连续探头看不见目标也不换点。当初排除日军的理由（屋内伏击拍失序）已随伏击拍下线，可以重新评估。
 4. 把 19.1 的探针口径（0 发人数、4 s 干站占比、蹲起次数，**分母含走剧本路线的人**）加进 `AiCombatBrowserTest`；现有 ⑨ 只量「4 秒挪没挪窝」。

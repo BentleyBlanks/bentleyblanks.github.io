@@ -18,7 +18,7 @@ import {
 } from "./Data_FirstLevelFrontPressure.mjs";
 import {
   FirstLevelFrontPressure, FrontPressurePhase, FrontFirePoints, FrontGroupMembers, AssaultRoundEnd, AssaultTop,
-  NearestLineIndex, GroupFallbackDue, FrontChargeDue, FIRST_LEVEL_AI_RULE_STEPS, PressureRoute, RouteIndex,
+  NearestLineIndex, GroupFallbackDue, FrontChargeDue, FIRST_LEVEL_AI_RULE_STEPS, PressureRoute, RouteIndex, RushStalled,
 } from "./Script_FirstLevelFrontPressure.mjs";
 import { BACKDROP_SQUADS, BACKDROP_FIRE_POINTS } from "./Data_FirstLevelBackdropSquads.mjs";
 import { FirstLevelBackdropSquads, BackdropStep, BackdropFirePoints } from "./Script_FirstLevelBackdropSquads.mjs";
@@ -161,6 +161,15 @@ console.log(`ok ① pressure / backdrop data: ${FRONT_PRESSURE_PHASES.length} ph
   s.holdUntil = 50; s.index = 0; Eq(AssaultRoundEnd(actor, s, R, false, 10), "wait", "a group that just fell back waits out holdS");
   Eq(s.index, 0);
   delete s.maxIndex; Eq(NearestLineIndex(s, { x: 0, z: -167 }), 2);
+  // §20.7 A rush into a wall: no progress for assaultRushStallS and the line counts as reached where he stands.
+  {
+    const r = { index: 1 }, line = { x: 0, z: -175.5 };
+    Check(!RushStalled(r, { x: 0, z: -180 }, line, 0.1, R), "the first frame of a rush only sets the mark");
+    Check(!RushStalled(r, { x: 0, z: -179 }, line, R.assaultRushStallS - 0.2, R), "real progress resets the stall clock");
+    Check(!RushStalled(r, { x: 0, z: -178.9 }, line, R.assaultRushStallS - 0.2, R), "less than assaultRushProgressM is not progress, but the clock is not up yet");
+    Check(RushStalled(r, { x: 0, z: -178.9 }, line, 0.3, R), "no progress for assaultRushStallS: stalled");
+    r.index = 2; Check(!RushStalled(r, { x: 0, z: -178.9 }, { x: 0, z: -166 }, 10, R), "a new line restarts the clock");
+  }
   const people = [1, 2, 3, 4].map((i) => ({ alive: i > 2 }));
   Check(GroupFallbackDue(people, 4, { casualtyFraction: 0.5 }), "half dead trips the fallback");
   Check(!GroupFallbackDue(people.map(() => ({ alive: true })), 4, { casualtyFraction: 0.5 }));

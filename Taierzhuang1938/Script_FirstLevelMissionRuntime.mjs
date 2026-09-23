@@ -1,5 +1,5 @@
 import { FirstLevelFrontBattle } from "./Script_FirstLevelFrontBattle.mjs";
-import { FirstLevelFrontPressure, AssaultRoundEnd, AssaultTop, NearestLineIndex } from "./Script_FirstLevelFrontPressure.mjs";
+import { FirstLevelFrontPressure, AssaultRoundEnd, AssaultTop, NearestLineIndex, RushStalled } from "./Script_FirstLevelFrontPressure.mjs";
 import { FirstLevelBackdropSquads } from "./Script_FirstLevelBackdropSquads.mjs";
 import { FirstLevelTransition } from "./Script_FirstLevelTransition.mjs";
 import { FRONT_SORTIE as Sortie, SortieCrawlBlocked } from "./Data_FirstLevelFrontRoute.mjs";
@@ -1079,7 +1079,7 @@ export class FirstLevelMissionRuntime {
       // 没有压力表时就是最后一条线，与改前逐位相同。
       const top = AssaultTop(s);
       if (s.index > top) { s.index = top; s.mode = "rush"; s.hold = 0; }
-      const target = s.points[s.index];
+      let target = s.points[s.index];
       // Arrival is hysteretic (2026-09-09, docs/Data_EnemyAi.md §15). Entering the line still needs
       // assaultArrivalM, but a man who has **settled** on it may wander the whole anchor + cover slack
       // without being dragged back: the AI walks him up to assaultCoverSearchM to reach a cover point and
@@ -1087,6 +1087,12 @@ export class FirstLevelMissionRuntime {
       // line" and re-issued MoveActor - which clears scriptDefensive and holdZone and hauls him back to the
       // bare spot. That single line is why the front knelt in the open with cover two steps away.
       const settleM = R.defendHoldRadiusM + R.assaultCoverSearchM;
+      // 冲刺卡死（§20.7）：线点过不去就在原地转守 —— 这条线就算到了（线点改成他站的地方）。
+      if (s.mode === "rush" && RushStalled(s, actor.position, target, dt, R)) {
+        s.points[s.index] = { x: actor.position.x, z: actor.position.z };
+        target = s.points[s.index];
+        s.rushBest = NaN;
+      }
       if (Distance(actor.position, target) > (s.mode === "hold" ? settleM : R.assaultArrivalM)) {
         s.mode = "rush";
         this.ai.SetStance(actor, 0, .4, true);
