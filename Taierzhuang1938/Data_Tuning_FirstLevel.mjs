@@ -188,7 +188,7 @@ export const MISSION_TUNING = Object.freeze({
   // 阵位守卫伤亡 2 人后退到后撤锚点时的掩体余量（米）：普通守区的 defendCoverSlackM（6 m）会让退下来的人
   // 挑到枪位旁边的掩体（09-24 实测离枪 1.5 m，玩家上枪被贴身刺刀）；退就是退，只在锚点身边找遮挡。
   // 还得留在看得见、打得着的地方 —— 03 的 rightNestCaptured 要三名守卫都死（FrontBattle.UpdateCapture）。
-  nestFallbackCoverSlackM:2,
+  nestFallbackCoverSlackM:1,
   frontReserveCount:0,
   frontReserveReleaseGapS:9,
   frontReservePlatoonSize:22,

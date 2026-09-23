@@ -86,12 +86,15 @@ export const FRONT_PRESSURE_GROUPS = Object.freeze({
 });
 
 /**
- * 阵位守卫的临时后撤锚点：往日军自己一侧（南）退到枪位身后约 11 m 的地方，掩体余量只给 nestFallbackCoverSlackM
- *（2 m），离枪 7 m 以外（刺刀够不着上枪的人），又看得见、打得着（03 的 rightNestCaptured 要三名守卫都死）。
- * 2026-09-24：原锚点 (31,−146) 离枪位 5 m、余量 6 m，退下来的人蹲在枪旁 1.5 m 贴身刺刀上枪的玩家；
- * 挪到 17 m 外又打不着，rightNestCaptured 等不来。朝南 / 西南的掩体点归 Space 包。
+ * 阵位守卫的临时后撤锚点：往日军自己一侧（南）退到枪位身后约 11 m、一片**没有掩体的空地**上，掩体余量只给
+ * nestFallbackCoverSlackM（1 m）：离枪 7 m 以外（刺刀够不着上枪的人），又从枪位和接近沟都看得见、打得着 ——
+ * 03 的 rightNestCaptured 要三名守卫都死（FrontBattle.UpdateCapture）。
+ * 2026-09-24 三次实测：原锚点 (31,−146) 离枪 5 m、余量 6 m，退下来的人蹲在枪旁 1.5 m 贴身刺刀上枪的玩家；
+ * (31,−159) 看不见，(31,−152.5) 身边有掩体、从枪位看不见 —— 两次都等不来 rightNestCaptured，玩家在枪位上被手榴弹炸死。
+ * 这一点是浏览器侦察挑的（scratchpad anchor_scout：3 m 内静态掩体 0 个，枪位两处眼位与接近沟两处眼位都通视）。
+ * 朝南 / 西南的掩体点与最终锚点归 Space 包。
  */
-const NEST_FALLBACK = Object.freeze({ casualties: 2, to: Object.freeze({ x: 31, z: -152.5 }) });
+const NEST_FALLBACK = Object.freeze({ casualties: 2, to: Object.freeze({ x: 25, z: -152.5 }) });
 const NEST = Object.freeze({ role: "nestGuard", fallback: NEST_FALLBACK });
 // 西侧两人去土坎西端外：先沿自己的跃进线到 −166 那条线，再沿线横移到西侧农田那一列掩体后面
 //（离左前枪位约 20 m：再近就会和老周贴脸，守军过口时也更难让出视线）。
