@@ -39,7 +39,16 @@ faces stay mixed in (mean anonymous IJA 12,719 -> 13,774 triangles). The distant
 layer does not follow the pool: `CHARACTER_CROWD_VARIANT_BY_KIND` pins its ija bake to
 IJA01 (the skin it baked before, lightest per instance). IJA06 is normalised by IJA02's
 height (manifest `scaleHeight`): its cap is lower than the helmet, and normalising by its
-own bounds made the body 1.56 % larger than IJA02 on the same clips. 日兵甲 is pinned to IJA06 with its facial skin
+own bounds made the body 1.56 % larger than IJA02 on the same clips.
+
+Frame-time check of the pool change (2026-09-24, contract section 6, same page, blocks
+alternated 8 rounds x 40 frames, `StepFrames` + `gl.finish`, p012 MachineGun stage, quality
+high, headless Edge on a loaded machine): 24 extra anonymous IJA placed 14-60 m in view,
+once from the old pool (A) and once from the new (B), same seeds and places. Overlay
+triangles 599,928 (A) vs 635,238 (B), +5.9 %. p95 frame: MachineGun 84.4 ms (A) vs 85.7 ms
+(B); FirstBatchSafe 95.1 ms (A) vs 88.4 ms (B): inside the x1.2 budget, differences within
+block noise. Scene triangles with the overlay 5.21 M / 5.74 M, without it 3.44 M / 3.96 M
+(limit per screenshot 7.5 M). 日兵甲 is pinned to IJA06 with its facial skin
 (`Model_LugouIja06Facial.glb`, [speaker faces](Data_CharacterSpeech.md)); IJA officers
 remain IJA01.
 
