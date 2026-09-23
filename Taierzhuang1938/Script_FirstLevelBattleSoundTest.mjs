@@ -150,6 +150,27 @@ const Dist = (c, L) => Math.hypot(c.position.x - L.x, c.position.z - L.z);
   assert.ok(audio.calls.some((c) => c.cue === "shellIncoming"), "有一部分炮弹先听到啸声");
   Ok(`近落弹 ${art.shells} 发：落点、避人、先见后闻、低频层、沟壁落土、啸声`);
 
+  // 进步骤时正在说话：头一发不能被推到一分钟以后（2026-09-23 实机 01–05 五个 25 s 窗口一发没落）。
+  // 对白只按 rateScale 抽稀到点的那一发；话一停，下一发按本档频次来。
+  const Shells = (speakUntil, seconds, seed) => {
+    const a3 = FakeAudio({ zone: "trench" }), times = [];
+    const art3 = new BattleArtillery({ audio: a3, Ground: () => 0, Zone: () => "trench",
+      Visual: () => times.push(a3.clock), Shake() {}, Blocked: () => false }, seed);
+    const P = { ...D.artillery.stages.Support, firstAfterS: D.artillery.firstAfterS, firstSpreadS: D.artillery.firstSpreadS };
+    for (let t = 0; t < seconds; t += 1 / 30) { a3.Tick(1 / 30);
+      art3.Update(1 / 30, P, { zones: D.artillery.zones, stage: "Support", rateScale: a3.clock < speakUntil ? D.artillery.speechRate : 1 }); }
+    return times;
+  };
+  const firstShots = [1, 2, 3, 4, 5, 6].map((seed) => Shells(0, 30, seed)[0]);
+  assert.ok(firstShots.every((t) => t <= D.artillery.firstAfterS + D.artillery.firstSpreadS + 0.1),
+    `不说话时进步骤 ${D.artillery.firstAfterS}–${D.artillery.firstAfterS + D.artillery.firstSpreadS} s 内先落一发（${firstShots.map((t) => t.toFixed(1)).join("/")}）`);
+  const meanGap = 60 / D.artillery.stages.Support.perMin;
+  const afterTalk = [1, 2, 3, 4, 5, 6].map((seed) => (Shells(40, 40 + meanGap * 2.3, seed).find((t) => t > 40) ?? Infinity) - 40);
+  assert.ok(afterTalk.every((t) => t <= meanGap * 2.2 + 0.1), `说了 40 s 话、一停下来，下一发在本档最长间隔内（${afterTalk.map((t) => t.toFixed(1)).join("/")} s）`);
+  const quietCount = Shells(0, 1200, 9).length, talkCount = Shells(1200, 1200, 9).length;
+  assert.ok(talkCount < quietCount * 0.7 && talkCount > quietCount * 0.2, `对白期间抽稀：20 分钟 ${quietCount} → ${talkCount} 发`);
+  Ok(`近落弹起落：头一发 ${Math.max(...firstShots).toFixed(1)} s 内，话停后 ${Math.max(...afterTalk).toFixed(1)} s 内，对白抽稀 ${quietCount}→${talkCount}`);
+
   // 01 近爆之后那 14 s 不落（黑屏与醒来留给剧本那一发）；01 的每一声都闷。
   const a2 = FakeAudio({ zone: "dugout" });
   let collapsed = false;

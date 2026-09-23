@@ -45,6 +45,7 @@ export class BattleArtillery {
     this.voices = [];
     this.shells = 0;            // 取证：落了几发
     this.skipped = 0;           // 取证：挑不到落点 / 声部满了跳过几发
+    this.thinned = 0;           // 取证：对白期间按 rateScale 抽掉的几发
     this.events = [];           // 最近几发（取证）
     this.stage = null;
   }
@@ -69,15 +70,22 @@ export class BattleArtillery {
     // 声部按可听时长算（activeS），不等引擎回收（见 FirstLevelMissionBattleSound 同一条注释）。
     this.voices = this.voices.filter((e) => this.time < e.until && this.host.audio?.pendingVoices?.has?.(e.v) !== false);
     this.RunPending();
+    // 【2026-09-23 取证后改】进一步头一发落在 firstAfterS + [0, firstSpreadS) 里。
+    // 原来是 firstAfterS + 半个间隔，而且间隔按「这一刻在不在说话」放大：进步骤时
+    // 正好有对白，头一发就被推到四五十秒以后 —— 实机 01–05 五个 25 s 窗口一发没落。
     if (stage !== this.stage) {
       this.stage = stage;
-      this.nextAt = profile ? this.time + (profile.firstAfterS ?? 0) + this.NextGap(profile, rateScale) * 0.5 : null;
+      this.nextAt = profile ? this.time + (profile.firstAfterS ?? 0) + this.R(0, profile.firstSpreadS ?? 0) : null;
     }
     if (!profile || !(profile.perMin > 0)) { this.nextAt = null; return; }
-    if (this.nextAt === null) this.nextAt = this.time + this.NextGap(profile, rateScale);
+    if (this.nextAt === null) this.nextAt = this.time + this.NextGap(profile);
     if (this.time < this.nextAt) return;
-    this.nextAt = this.time + this.NextGap(profile, rateScale);
+    // 间隔一律按本档的频次排；对白只在「到点这一发落不落」上抽稀（泊松抽稀：
+    // 留下的概率 = rateScale）。这样说话时密度 × rateScale，话一停就回到本档，
+    // 不会因为排间隔那一刻正在说话而空一分钟。
+    this.nextAt = this.time + this.NextGap(profile);
     if (quiet) return;
+    if (rateScale < 1 && this.rng() >= rateScale) { this.thinned += 1; return; }
     this.Fire(profile, zones);
   }
 
@@ -202,7 +210,7 @@ export class BattleArtillery {
   }
 
   State() {
-    return { shells: this.shells, skipped: this.skipped, pending: this.pending.length,
+    return { shells: this.shells, skipped: this.skipped, thinned: this.thinned, pending: this.pending.length,
       voices: this.voices.length, nextInS: this.nextAt === null ? null : +(this.nextAt - this.time).toFixed(2),
       recent: this.events.slice(-6) };
   }

@@ -94,7 +94,7 @@ export class FirstLevelMissionBattleSound {
         quiet = now - this.factSeenAt[fact] < AP.quietAfter.seconds;
       } else delete this.factSeenAt[fact];
     }
-    this.artillery.Update(dt, AP ? { ...AP, firstAfterS: A.firstAfterS } : null,
+    this.artillery.Update(dt, AP ? { ...AP, firstAfterS: A.firstAfterS, firstSpreadS: A.firstSpreadS } : null,
       { zones: A.zones, rateScale: speaking ? A.speechRate : 1, quiet, stage });
     this.UpdateDugout(stage);
   }

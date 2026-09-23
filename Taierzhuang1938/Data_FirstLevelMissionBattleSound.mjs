@@ -151,6 +151,8 @@ export const MISSION_BATTLE_SOUND = Object.freeze({
     speechRate: 0.4,
     /** 头一发最早多久落（进阶段先让前线床铺开，再来近的）。 */
     firstAfterS: 4,
+    /** 头一发在 firstAfterS 之后多少秒内随机落（进一步 4–9 s 先来一发，之后按本档频次）。 */
+    firstSpreadS: 5,
   }),
 
   /**
