@@ -131,6 +131,17 @@ console.log(`ok 05 cut-in pair hidden from the gap and the backslope: ${S.enemie
   for(const f of FRONT_FLANK_GROUP)assert.equal(Sight(Eye(f.lane.at(-1),1.0),Eye(S.gap,1.2)),null,`${f.id} last line still sees the gap over ScrapeEastTraverse`);
   console.log(`ok backslope scrape not enfiladed from ${who.length} enemy points`);
 }
+// FrontBattle gathers the second guard batch at lastCover + k*gatherSpacingM along lastCover.z and walks each man
+// there in a straight line from his post: every hold and every walk must be capsule-clear (GapLastCover once
+// stood across the line and pinned the second man; remainingGuardsGathered never fired in the 03-06 cold start).
+{
+  const holds=FRONT_GUARD_POSTS.slice(B.firstBatch).map((p,k)=>({post:p,hold:{x:S.lastCover.x+k*B.gatherSpacingM,z:S.lastCover.z}}));
+  for(const {post,hold} of holds){
+    const walk=RouteClearance([post,hold]);
+    assert.deepEqual(walk.hits,[],`guard ${post.x},${post.z} walks clear to its gather hold ${hold.x.toFixed(2)},${hold.z}`);
+  }
+  console.log(`ok second-batch gather line clear: ${holds.length} holds`);
+}
 
 // ---------------------------------------------------------------- enemies: cover, roles, budget, hidden entries
 {

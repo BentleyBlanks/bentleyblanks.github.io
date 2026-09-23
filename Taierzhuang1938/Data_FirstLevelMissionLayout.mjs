@@ -222,8 +222,10 @@ TopBlock("RightNestBaffle",30.4,-152.8,1.8,1.3,.8,"timber",{cover:Face(0,-1)},So
 }
 // Attack branch cover beat: broken wall across the tank's line; the last 4.7 m to the throw spot are open.
 TopBlock("AttackRuinA",39.9,-156.6,3.6,1.5,.7,"cover",{cover:Face(0,-1)});
-// Gap last cover: sandbag stub on the gap mouth's east side (the tank and the nest are east).
-TopBlock("GapLastCover",-6.2,-154.2,.8,1.35,2.4,"cover",{cover:Face(1,0)});
+// Gap last cover: sandbag stub on the gap mouth's east side (the tank and the nest are east). It stands south
+// of the lastCover line (z -155.2): FrontBattle gathers the second guard batch along that line eastward from
+// lastCover at 1.35 m spacing, and a stub across it pinned the second man (remainingGuardsGathered never fired).
+TopBlock("GapLastCover",-6.2,-153.4,.8,1.35,2.4,"cover",{cover:Face(1,0)});
 // Zhou's left gun at the berm's west end, parapet facing north-east along the berm's north face.
 TopBlock("LeftGunParapet",-32.4,-158.4,3.6,.95,.8,"cover",{ry:-.6,cover:Face(.6,-.8)});
 TopBlock("LeftGunSide",-35.4,-155.8,.7,1.9,4,"cover",{cover:Face(-1,0)});
