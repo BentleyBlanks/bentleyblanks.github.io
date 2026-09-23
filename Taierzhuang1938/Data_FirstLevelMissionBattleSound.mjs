@@ -104,6 +104,15 @@ export const MISSION_BATTLE_SOUND = Object.freeze({
     airCutFromM: 600, airCutAtFarHz: 520, airCutFarM: 1500,
     /** 同时在响的前线声部上限（与炮击的 3 条合计 ≤ 契约 §6 的 8）。 */
     maxVoices: 5,
+    /**
+     * 每一声「还在响」算多久（秒）：直达声本体的长度，不含引擎回收要等的混响尾巴与传播延迟。
+     * 机枪另加 发数 × 每发间隔（九二式 200 rpm、其余 500 rpm）。
+     */
+    cueActiveS: Object.freeze({
+      rifleNraFar: 1.4, rifleIjaFar: 1.4, zb26Far: 1.0, type92Far: 1.1, type11Far: 1.0,
+      "amb.cannonFar": 2.2, explosionFar: 2.6, launcherPop: 0.9,
+    }),
+    mgShotS: Object.freeze({ type92Far: 0.3, default: 0.12 }),
     /** 扇区空闲间隔（秒），除以 stage intensity × 让位。 */
     gapS: [5, 13],
     /** 首场交火最迟多久起（进阶段就要听得见，不许再等二十四秒）。 */
@@ -132,16 +141,16 @@ export const MISSION_BATTLE_SOUND = Object.freeze({
       // 01 整段在洞里：隔着土与洞口，落弹只剩闷响（airCut）与洞顶掉土。
       Trapped: { perMin: 2.2, minM: 75, maxM: 140, airCut: 900, quietAfter: { fact: "bunkerCollapsed", seconds: 14 } },
       BunkerRescue: { perMin: 1.1, minM: 70, maxM: 130 },
-      RearTrench: { perMin: 2.0, minM: 45, maxM: 120 },
-      Support: { perMin: 1.8, minM: 45, maxM: 120 },
-      MachineGun: { perMin: 1.2, minM: 55, maxM: 120 },
-      Tank: { perMin: 0.8, minM: 60, maxM: 120 },
+      RearTrench: { perMin: 2.4, minM: 45, maxM: 120 },
+      Support: { perMin: 2.2, minM: 45, maxM: 120 },
+      MachineGun: { perMin: 1.6, minM: 55, maxM: 120 },
+      Tank: { perMin: 1.0, minM: 60, maxM: 120 },
       Orders: { perMin: 1.0, minM: 70, maxM: 140 },
     }),
     /** 对白播放时的频次倍率。 */
     speechRate: 0.4,
     /** 头一发最早多久落（进阶段先让前线床铺开，再来近的）。 */
-    firstAfterS: 6,
+    firstAfterS: 4,
   }),
 
   /**

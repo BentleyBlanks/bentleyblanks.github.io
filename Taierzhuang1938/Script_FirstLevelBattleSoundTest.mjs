@@ -140,9 +140,10 @@ const Dist = (c, L) => Math.hypot(c.position.x - L.x, c.position.z - L.z);
   const pairs = shakes.map((s, i) => ({ s, v: visuals[i] })).filter((p) => p.v);
   assert.ok(pairs.length && pairs.every(({ s, v }) => s.t - v.t >= Math.hypot(v.x - L.x, v.y - L.y, v.z - L.z) / 340 - 0.05),
     "震屏跟着声音到（画面之后 d/340）");
-  const booms = audio.calls.filter((c) => c.cue === "explosionMid" || c.cue === "explosionFar");
-  assert.ok(booms.length === visuals.length && audio.calls.filter((c) => c.cue === "shellImpact").every((c) => c.airCut <= 400),
-    "每一发都有爆炸声与压到 400 Hz 以下的低频层");
+  const booms = audio.calls.filter((c) => (c.cue === "explosionMid" || c.cue === "explosionFar") && !(c.airCut <= 400));
+  const thumps = audio.calls.filter((c) => c.cue === BATTLE_ARTILLERY.thumpCue && c.airCut <= 400 && c.delay > 0.022);
+  assert.ok(booms.length === visuals.length && thumps.length === visuals.length,
+    `每一发都有爆炸声与压到 400 Hz 以下、错开去重窗的低频层（${booms.length}/${thumps.length}/${visuals.length}）`);
   assert.ok(audio.calls.filter((c) => c.cue === "debrisFall").length >= visuals.length, "沟里：每一发之后耳边沟壁落土");
   assert.ok(audio.calls.some((c) => c.cue === "shellIncoming"), "有一部分炮弹先听到啸声");
   Ok(`近落弹 ${art.shells} 发：落点、避人、先见后闻、低频层、沟壁落土、啸声`);
@@ -153,7 +154,7 @@ const Dist = (c, L) => Math.hypot(c.position.x - L.x, c.position.z - L.z);
   const bs = new FirstLevelMissionBattleSound(a2, { Has: (id) => id === "bunkerCollapsed" && collapsed, battlefield: { GroundHeight: () => 0 } });
   bs.artillery.T = { ...BATTLE_ARTILLERY };
   Run(bs, a2, "Trapped", 200);
-  const trappedShells = a2.calls.filter((c) => !c.soundField && /explosion|shellImpact/.test(c.cue));
+  const trappedShells = a2.calls.filter((c) => !c.soundField && /explosion/.test(c.cue));
   assert.ok(trappedShells.length > 0 && trappedShells.every((c) => c.airCut <= D.artillery.stages.Trapped.airCut), "01 的近落弹全部隔着土");
   collapsed = true;
   const mark = a2.calls.length, t0 = a2.clock;

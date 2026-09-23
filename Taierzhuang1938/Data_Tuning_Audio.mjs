@@ -559,9 +559,11 @@ export const BATTLE_ARTILLERY = Object.freeze({
   midM: 70,
   midVolume: 1.25,
   farVolume: 1.0,
-  /** 低频冲击层：同一发再叠一条压到 400 Hz 以下的 shellImpact，胸口那一下。 */
-  thumpVolume: 0.55,
+  /** 低频冲击层：同一发再叠一条压到 400 Hz 以下的远爆，胸口那一下。 */
+  thumpCue: "explosionFar",
+  thumpVolume: 0.7,
   thumpAirCutHz: 400,
+  thumpDelayS: 0.03,
   /** 来袭啸声：多少比例的炮弹先听得到飞过来（提前量是啸声素材自己的长度的一部分）。 */
   incomingChance: 0.35,
   incomingLeadS: 1.15,
@@ -581,6 +583,8 @@ export const BATTLE_ARTILLERY = Object.freeze({
   wallDirtAirCutHz: 1900,
   dugoutDirtVolume: 0.3,
   dugoutDirtAirCutHz: 2600,
-  /** 同时在响的场外炮击声部上限（含低频层与落土）。 */
+  /** 同时在响的场外炮击声部上限（含低频层与落土）。满了这一发不落。 */
   maxVoices: 3,
+  /** 一条炮击声部「还在响」算多久（秒）：爆炸本体长度，不含引擎回收要等的混响尾巴。 */
+  voiceActiveS: 2.8,
 });

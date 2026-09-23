@@ -7,7 +7,7 @@
 // 一发的时间线（t = 落地那一刻）：
 //   t − incomingLeadS  来袭啸声（一部分炮弹才有）
 //   t                  画面：vfx.Explosion（先见）
-//   t + d/340          声音：中/远档爆炸 + 一条压到 400 Hz 以下的低频冲击（后闻，引擎按距离延迟）
+//   t + d/340          声音：中/远档爆炸 + 一条压到 400 Hz 以下的低频冲击层（后闻，引擎按距离延迟）
 //   t + d/340          震屏：CameraShake.Explosion（跟着声音到，不跟着画面）；洞里更重
 //   t + d/340 + 0.3 s  听者在沟里/洞里：耳边沟壁/洞顶沙沙落土
 //   t + 1.1–2.1 s      近的那几发：土块砸回沟里（碎土雨）
@@ -66,7 +66,8 @@ export class BattleArtillery {
     this.time += Math.max(0, dt);
     // 这一步整体隔着什么（01 在洞里）：给了 airCut 的档，每一声再压一道高频。
     this.airCut = profile?.airCut || 0;
-    this.voices = this.voices.filter((v) => this.host.audio?.pendingVoices?.has?.(v));
+    // 声部按可听时长算（activeS），不等引擎回收（见 FirstLevelMissionBattleSound 同一条注释）。
+    this.voices = this.voices.filter((e) => this.time < e.until && this.host.audio?.pendingVoices?.has?.(e.v) !== false);
     this.RunPending();
     if (stage !== this.stage) {
       this.stage = stage;
@@ -142,9 +143,11 @@ export class BattleArtillery {
       position: pos, volume: d < T.midM ? T.midVolume : T.farVolume, sourceSizeM: T.vfxRadiusM,
       airCut: cut(0),
     }));
-    // 低频冲击层：同一发的胸口那一下（shellImpact 压到 400 Hz 以下）。
-    this.Voice(audio?.Play?.("shellImpact", {
+    // 低频冲击层：同一发的胸口那一下（远爆那条压到 400 Hz 以下；9 个节点，shellImpact 要 19 个）。
+    // 晚 30 ms 起：同名 cue 在 22 ms 去重窗里只活得下来一条（远档那一发本身就是 explosionFar）。
+    this.Voice(audio?.Play?.(T.thumpCue, {
       position: pos, volume: T.thumpVolume, airCut: cut(T.thumpAirCutHz), sourceSizeM: T.vfxRadiusM,
+      delay: T.thumpDelayS,
     }));
     this.pending.push({ at: this.time + arrive, kind: "shake", d });
     const zone = this.host.Zone?.(L) || null;
@@ -158,7 +161,7 @@ export class BattleArtillery {
     if (this.events.length > 12) this.events.shift();
   }
 
-  Voice(v) { if (v) this.voices.push(v); return v; }
+  Voice(v) { if (v) this.voices.push({ v, until: this.time + this.T.voiceActiveS }); return v; }
 
   RunPending() {
     if (!this.pending.length) return;
@@ -205,7 +208,7 @@ export class BattleArtillery {
   }
 
   Dispose() {
-    for (const v of this.voices) this.host.audio?.FreeVoice?.(v);
+    for (const e of this.voices) this.host.audio?.FreeVoice?.(e.v);
     this.voices = [];
     this.pending = [];
   }

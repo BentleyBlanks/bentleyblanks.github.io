@@ -64,7 +64,10 @@ export class FirstLevelMissionBattleSound {
     const F = D.front, P = F.stages[stage];
     this.frontTime += Math.max(0, dt);
     const now = this.frontTime;
-    this.frontVoices = this.frontVoices.filter((v) => this.audio?.pendingVoices?.has?.(v));
+    // 「同时在响」按每一声自己的可听时长算（cueActiveS），不按引擎的回收时刻：
+    // 引擎要等混响尾巴与传播延迟都过去才回收（远处一枪常常五六秒），拿它数声部
+    // 会把一秒一两声的交火卡成五秒一声。
+    this.frontVoices = this.frontVoices.filter((e) => now < e.until && this.audio?.pendingVoices?.has?.(e.v) !== false);
     const live = Math.max(0, Math.min(1, this.audio?.battleIntensity || 0));
     const rate = P.intensity * (1 - F.rateYield * live) * (speaking ? F.speechRate : 1);
     if (stage !== this.frontStage) this.EnterFront(stage);
@@ -221,7 +224,12 @@ export class FirstLevelMissionBattleSound {
         airCut: Math.min(place.airCut, P.airCut ?? 20000),
         burst: e.burst ?? undefined,
       });
-      if (voice) { this.frontVoices.push(voice); this.frontPlays += 1; }
+      if (voice) {
+        const shot = F.mgShotS[e.cue] ?? F.mgShotS.default;
+        const active = (F.cueActiveS[e.cue] ?? 1.5) + (e.burst ? e.burst * shot : 0);
+        this.frontVoices.push({ v: voice, until: this.frontTime + active });
+        this.frontPlays += 1;
+      }
       const sector = this.frontSectors.find((s) => s.spec.id === e.sector);
       if (sector && voice) sector.plays += 1;
       this.frontRecent.push({ at: +this.frontTime.toFixed(2), sector: e.sector, kind: e.kind, side: e.side, cue: e.cue,
@@ -290,7 +298,7 @@ export class FirstLevelMissionBattleSound {
   }
   Dispose(){
     for(const voice of this.voices)this.audio.FreeVoice?.(voice);this.voices=[];
-    for(const voice of this.frontVoices)this.audio.FreeVoice?.(voice);this.frontVoices=[];
+    for(const e of this.frontVoices)this.audio.FreeVoice?.(e.v);this.frontVoices=[];
     this.frontQueue.length=0;
     this.artillery.Dispose();
   }
