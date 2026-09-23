@@ -8,6 +8,12 @@
 import assert from "node:assert/strict";
 import { CreateTankBrain, SeededRng, YawTo, Forward, Right, HullLocal } from "./Script_FirstLevelTankBrain.mjs";
 import { TANK, TANK_TEMP_PATH } from "./Data_Tuning_Tank.mjs";
+import { TankAudio, TankLoopParams, CannonLayerWeights, ShellPassPoint } from "./Script_TankAudio.mjs";
+import { TANK_SFX, TankSfxFiles } from "./Data_SfxSources.mjs";
+import { SOUND_NAMES } from "./Script_Audio.mjs";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 
 const DT = 1 / 60;
 const Wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
@@ -439,4 +445,104 @@ function Run(brain, world, seconds, each = null) {
   ok(battlefield.colliders.length === 0 && scene.children.length === 0, "dispose removes colliders and meshes");
 }
 
-console.log(`PASS FirstLevelTankBrain: ${checks} checks (drive, telegraph, targeting, scatter, MG walk-in, dead zone, reactions, escorts, two-stage damage, 03→05 temp path, breakable cover)`);
+// --- 声音（Step 2）：映射是纯函数，控制器配一个假引擎 ---------------------------------
+{
+  const A = TANK.audio, D = TANK.drive;
+  const base = { idleRpm: D.idleRpm, maxRpm: D.maxRpm, cruiseMps: D.cruiseMps, pivotMaxRad: D.pivotRadS };
+  const idle = TankLoopParams({ ...base, rpm: D.idleRpm, load: 0 }, A);
+  const full = TankLoopParams({ ...base, rpm: D.maxRpm, load: 1, speed: D.cruiseMps }, A);
+  const mid = TankLoopParams({ ...base, rpm: (D.idleRpm + D.maxRpm) / 2, load: 0.5, speed: 1 }, A);
+  ok(idle.running && idle.engine.gains[0] > 0.3 && idle.engine.gains[1] < 1e-6, "idle: only the idle layer sounds");
+  ok(full.engine.gains[1] > full.engine.gains[0] && full.engine.gains[0] < 1e-6, "full revs: only the load layer sounds");
+  const power = (p) => (p.engine.gains[0] / A.idleGain) ** 2 + (p.engine.gains[1] / A.loadGain) ** 2;
+  ok(Math.abs(power(TankLoopParams({ ...base, rpm: 1200, load: 0 }, A)) - 1) < 1e-6, "idle/load crossfade is equal-power");
+  for (const p of [idle, mid, full]) for (const r of p.engine.rates) ok(r >= A.rateMin - 1e-9 && r <= A.rateMax + 1e-9, `engine rate ${r.toFixed(3)} inside ±12%`);
+  ok(idle.engine.subHz === 30 && full.engine.subHz === 70 && mid.engine.subHz > 30 && mid.engine.subHz < 70,
+    `ignition sub-bass 30→70 Hz follows rpm/20 (idle ${idle.engine.subHz}, mid ${mid.engine.subHz.toFixed(1)}, full ${full.engine.subHz})`);
+  ok(full.engine.subGain > idle.engine.subGain, "sub layer grows with load");
+  ok(idle.tracks.gains[0] < 1e-6 && full.tracks.gains[0] > 0.5, "tracks silent at a standstill, loud at cruise");
+  ok(TankLoopParams({ ...base, rpm: D.idleRpm, pivotRate: D.pivotRadS }, A).tracks.gains[0] > 0.3, "pivoting in place still clanks the tracks");
+  ok(TankLoopParams({ ...base, rpm: D.idleRpm, turretRate: 0.26, cranking: false }, A).turret.gains[0] === 0, "turret crank silent when not cranking");
+  const crank = TankLoopParams({ ...base, rpm: D.idleRpm, turretRate: 0.26, cranking: true }, A).turret;
+  ok(crank.gains[0] > 0.5 && crank.rates[0] > 0.95 && crank.rates[0] < 1.05, "hand crank at 0.26 rad/s plays at ~1x");
+  const stalled = TankLoopParams({ ...base, rpm: 0, load: 0 }, A);
+  ok(!stalled.running && stalled.engine.gains.every((g) => g === 0) && stalled.engine.subGain === 0, "rpm 0: engine and sub fully silent");
+  const dying = TankLoopParams({ ...base, rpm: D.idleRpm * 0.4 }, A);
+  ok(dying.engine.gains[0] < idle.engine.gains[0] && dying.engine.rates[0] < idle.engine.rates[0], "stalling engine sinks in level and pitch");
+
+  const Sq = (w) => w.reduce((s, x) => s + x * x, 0);
+  for (const d of [0, 20, 40, 60, 85, 110, 200]) ok(Math.abs(Sq(CannonLayerWeights(d, A)) - 1) < 1e-9, `cannon layers equal-power at ${d} m`);
+  ok(CannonLayerWeights(10, A)[0] === 1 && CannonLayerWeights(200, A)[2] === 1 && CannonLayerWeights(60, A)[1] > 0.99, "near / mid / far land on the right recordings");
+
+  const from = { x: 0, y: 2, z: 0 }, at = { x: 0, y: 1, z: -60 };
+  const pass = ShellPassPoint(from, at, { x: 3, y: 1.6, z: -30 }, 0.17, A);
+  ok(pass && Math.abs(pass.t - 0.085) < 0.01 && pass.miss < 3.2, "a shell flying 3 m past the listener gets a pass-by at the closest point");
+  ok(!ShellPassPoint(from, at, { x: 0.5, y: 1.6, z: -59 }, 0.17, A), "a shell landing at the listener's feet is not a pass-by");
+  ok(!ShellPassPoint(from, at, { x: 15, y: 1.6, z: -30 }, 0.17, A), "15 m off the line: no pass-by");
+  ok(!ShellPassPoint(from, at, { x: 2, y: 1.6, z: 10 }, 0.17, A), "listener behind the muzzle: no pass-by");
+
+  // 假引擎：只记 Play / MoveVoice / StopVoice。
+  const fake = { ctx: {}, disposed: false, listenerPos: { x: 0, y: 1.6, z: 0 }, played: [], moved: 0, stopped: 0,
+    SourceZone: () => "open",
+    Play(name, opts) {
+      this.played.push({ name, opts });
+      const v = { name, nodes: [1, 2], distance: 0, effectiveGain: 0.5, calls: [] };
+      if (["tankEngine", "tankTracks", "tankTurret"].includes(name)) v.SetTank = (p, tau) => v.calls.push({ p, tau });
+      return v;
+    },
+    MoveVoice() { this.moved++; return true; },
+    StopVoice(v) { v.nodes = []; this.stopped++; return true; },
+  };
+  const s = new TankAudio(fake, A, D);
+  for (let i = 0; i < 60; i++) s.Offstage(1 / 30, { x: 0, y: 0, z: -120 });
+  ok(s.State().liveLoops === 1 && s.loops.tankEngine && !s.loops.tankTracks, "03 offstage: only the engine idles behind the ridge");
+  ok(s.loops.tankEngine.calls[0].tau === 0, "first SetTank is immediate (no slide from the audition default)");
+  ok(s.fadeIn > 0.35 && s.fadeIn < 0.45, `offstage engine fades in over ${A.offstageFadeInS} s (2 s → ${s.fadeIn.toFixed(2)})`);
+  const T = (over = {}) => ({ x: 0, z: -40, groundY: 0, rpm: D.idleRpm, load: 0, speed: 0, pivotRate: 0, turretRate: 0, cranking: false, damageState: "Intact", ...over });
+  s.Update(1 / 60, T({ speed: 2, rpm: 1400, load: 0.8 }));
+  ok(s.State().liveLoops === 3 && fake.played.filter((p) => p.name === "tankEngine").length === 1, "in view: ≤ 3 resident loops, the engine voice is the same one (no restart)");
+  ok(fake.played.every((p) => !["tankEngine", "tankTracks", "tankTurret"].includes(p.name) || p.opts.priority), "resident loops are priority (never stolen)");
+  s.Update(1 / 60, T({ turretRate: 0.26, cranking: true }));
+  const crankCall = s.loops.tankTurret.calls.at(-1);
+  s.Update(1 / 60, T({ turretRate: 0, cranking: false }));
+  const stopCall = s.loops.tankTurret.calls.at(-1);
+  ok(crankCall.p.gains[0] > 0.5 && stopCall.p.gains[0] === 0 && stopCall.tau <= 0.06, "crank stops within 60 ms of the turret stopping (the telegraph)");
+  fake.played.length = 0;
+  s.OnCannon({ x: 0, y: 2, z: -40 }, { x: 0, y: 1, z: 20 }, 0.18);
+  const layers = fake.played.filter((p) => p.name.startsWith("tankCannon")).map((p) => p.name);
+  ok(layers.length === 2 && layers.includes("tankCannon") && layers.includes("tankCannonMid"), `40 m away: near + mid layers (${layers.join(",")})`);
+  ok(fake.played.some((p) => p.name === "gunTailOpenMg" && p.opts.pitch < 1), "cannon gets a pitched-down zone tail");
+  ok(s.pending.length === 1, "shell through the listener's lane schedules a pass-by");
+  s.Update(0.2, T());
+  ok(fake.played.some((p) => p.name === "tankShellPass"), "pass-by plays once its time comes");
+  fake.played.length = 0;
+  s.OnEvent("halt", { x: 0, y: 0, z: -40 }); s.OnEvent("start", { x: 0, y: 0, z: -40 });
+  ok(fake.played.filter((p) => p.name === "tankTrackSqueal").length === 1, "track squeal is throttled");
+  s.OnBulletHit({ x: 0, y: 1, z: -40 }); s.OnBulletHit({ x: 0, y: 1, z: -40 });
+  ok(fake.played.filter((p) => p.name === "tankArmorPing").length === 1, "armor ping throttled inside one burst");
+  s.OnBark("visionSlit", { x: 0, y: 1.8, z: -40 });
+  ok(fake.played.some((p) => p.name === "tankHatch" && p.opts.pitch > 1), "vision slit shuts with a small clack");
+  s.OnState("MobilityKill", { x: 0, y: 0, z: -40 });
+  ok(!fake.played.some((p) => p.name === "tankStall"), "tracks cut: engine keeps running");
+  s.OnState("Disabled", { x: 0, y: 0, z: -40 });
+  ok(fake.played.some((p) => p.name === "tankStall") && fake.played.some((p) => p.name === "tankTurretJam"), "disabled: stall + turret jam");
+  for (let i = 0; i < 30 * 12; i++) s.Update(1 / 30, T({ rpm: 0, damageState: "Disabled" }));
+  ok(s.State().liveLoops === 0, "loops released after the stall");
+  ok(fake.played.filter((p) => p.name === "tankCoolTick").length >= 2, "cooling ticks after the engine dies");
+  s.Stop();
+  ok(s.State().liveLoops === 0 && s.pending.length === 0, "Stop clears everything");
+
+  // 素材：清单、文件、循环区间、配方名三方对齐。
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const manifest = JSON.parse(fs.readFileSync(path.join(here, "Audio/Sfx/Data_SfxManifest.json"), "utf8"));
+  for (const e of TANK_SFX) {
+    const entry = manifest.cues[e.cue];
+    ok(entry && JSON.stringify(entry.files) === JSON.stringify(TankSfxFiles(e)), `${e.cue} registered in the SFX manifest`);
+    ok(SOUND_NAMES.includes(e.cue), `${e.cue} has a synth fallback recipe (samples can override it)`);
+    for (const f of entry.files) ok(fs.existsSync(path.join(here, "Audio/Sfx", f)), `${f} exists`);
+    if (e.loop) ok(entry.loopSpans?.length === e.files.length && entry.loopSpans.every(([a, b]) => a > 0.05 && b > a + 1), `${e.cue} carries loop spans`);
+  }
+  ok(TANK_SFX.filter((e) => e.loop).length <= 3, "contract §6: at most 3 resident tank loops");
+}
+
+console.log(`PASS FirstLevelTankBrain: ${checks} checks (drive, telegraph, targeting, scatter, MG walk-in, dead zone, reactions, escorts, two-stage damage, 03→05 temp path, breakable cover, tank audio)`);

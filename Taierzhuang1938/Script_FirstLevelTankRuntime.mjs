@@ -16,6 +16,7 @@ import { FRONT_SORTIE as S } from "./Data_FirstLevelFrontRoute.mjs";
 import { MISSION_ENCOUNTERS } from "./Data_FirstLevelMission.mjs";
 import { MISSION_LAYOUT } from "./Data_FirstLevelMissionLayout.mjs";
 import { FirstLevelFrontBreakables, FRONT_BREAKABLES_TEMP } from "./Script_FirstLevelFrontBreakables.mjs";
+import { TankAudio } from "./Script_TankAudio.mjs";
 
 const TANK_STAGES = Object.freeze(["Support", "MachineGun", "Tank", "Orders"]);
 const Distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
@@ -38,6 +39,18 @@ export class FirstLevelTankRuntime {
     this.from = new THREE.Vector3();
     this.to = new THREE.Vector3();
     this.log = { shots: [], bursts: 0, walkInShots: 0, mgShots: 0, barks: [], events: [], blasts: [], hits: [], states: [], breaks: [], appearedAt: null };
+    this.sound = null;
+  }
+
+  /** 声音（Script_TankAudio）：第一次用到时建；没有音频引擎（node 测试）就一直是 null。 */
+  get Sound() {
+    if (!this.sound && this.r.audio) this.sound = new TankAudio(this.r.audio, this.T.audio, this.T.drive);
+    return this.sound;
+  }
+  /** 03「先闻其声」：车还没开进图时，引擎在路线起点（北面高地后面）怠速。 */
+  OffstagePoint() {
+    const w = this.path.waypoints[0];
+    return { x: w.x, y: this.Ground(w.x, w.z), z: w.z };
   }
 
   /** 第一次用到时建大脑；读档 / 跳关时摆到这一步开头该在的停车点。 */
@@ -134,9 +147,13 @@ export class FirstLevelTankRuntime {
   // --- 一帧 ------------------------------------------------------------------
   Update(dt) {
     const r = this.r, t = r.tank, stage = r.flow.stage.id;
-    if (!TANK_STAGES.includes(stage)) return;
-    // 03：阵位夺下以前车还没开进图（北面高地后面，声音也没有）。
-    if (stage === "Support" && !r.Has("rightNestCaptured")) { t.active = false; t.present = false; return; }
+    if (!TANK_STAGES.includes(stage)) { if (this.sound) this.sound.Stop(); return; }
+    // 03：阵位夺下以前车还没开进图（北面高地后面）—— 看不见，但引擎已经在那儿怠速了。
+    if (stage === "Support" && !r.Has("rightNestCaptured")) {
+      t.active = false; t.present = false;
+      this.Sound?.Offstage(dt, this.OffstagePoint());
+      return;
+    }
     t.active = true; t.present = true;
     const brain = this.EnsureBrain(stage);
     this.EnsureBreakables();
@@ -162,6 +179,14 @@ export class FirstLevelTankRuntime {
     if (r.flow.stage.id === "Support" && this.previewIndex >= 0 && this.brain.holdIndex === this.previewIndex) r.Record("tankPreviewed");
     if (out.state !== this.lastState) { this.lastState = out.state; this.ApplyState(out.state, true); }
     r.view.SyncTank(t);
+    const sound = this.Sound, groundY = r.view.tank.position.y;
+    sound?.Update(dt, { x: t.x, z: t.z, groundY, rpm: t.rpm, load: t.load, speed: t.speed, pivotRate: t.pivotRate,
+      turretRate: t.turretRate, cranking: t.cranking, damageState: t.damageState });
+    if (sound) {
+      const at = { x: t.x, y: groundY + 0.4, z: t.z }, turretAt = { x: t.x, y: groundY + this.T.audio.turretY, z: t.z };
+      for (const e of out.events) sound.OnEvent(e.id, at);
+      for (const b of out.barks) sound.OnBark(b.id, turretAt);
+    }
     for (const f of out.fire) this.Fire(f);
     this.Escorts(out);
     for (const b of out.barks) this.log.barks.push({ t: r.time, ...b });
@@ -186,6 +211,10 @@ export class FirstLevelTankRuntime {
     if (t.engineKilled) t.engineAt ??= r.time;
     if (state === "Disabled") t.disabledAt ??= r.time;
     this.log.states.push({ t: r.time, state, zone: last?.zone || null });
+    // 声音：真打出来的才熄火 / 卡死 / 冷却滴答；读档跳到 06 的（record=false）只记下状态，不补放。
+    const sound = this.Sound;
+    if (sound && record) sound.OnState(state, { x: t.x, y: r.view.tank?.position.y ?? this.Ground(t.x, t.z), z: t.z });
+    else if (sound) sound.state = state;
     if (!record) return;
     if (state !== "Intact") r.Record("tankImmobilized", { state, zone: last?.zone || null });
     if (state === "Disabled") r.Record("tankFireDisabled", { zone: last?.zone || null });
@@ -205,10 +234,14 @@ export class FirstLevelTankRuntime {
       }
       const shot = { t: r.time, kind: f.kind, target: f.target, warning: !!f.warning, layS: f.layS, at: { ...f.at }, from: Plain(from), impact: null };
       this.log.shots.push(shot);
+      const flight = Math.max(0.06, from.distanceTo(at) / G.shellSpeedMps);
+      // 炮口声：有 TankAudio 就走它的近 / 中 / 远三层（Combat 的 report 是借来的 explosionMid，不再叠）。
+      const sound = this.Sound;
+      if (sound) sound.OnCannon(Plain(from), { ...f.at }, flight);
       r.combat.FireShell(from, at, {
-        flight: Math.max(0.06, from.distanceTo(at) / G.shellSpeedMps),
+        flight,
         kind: "Shell57",
-        report: true,
+        report: !sound,
         sourceCollider: view.tankCollider,
         radius: f.radius,
         damage: f.damage,
@@ -222,7 +255,10 @@ export class FirstLevelTankRuntime {
     if (elevation < -M.downRad || elevation > M.upRad) return;
     this.log.mgShots++;
     if (f.kind === "walkIn") this.log.walkInShots++;
-    t.lastMgShot = r.FireVehicleBullet(from, dir, { weaponId: "Type11", damageScale: f.damageScale, sourceCollider: view.tankCollider });
+    // 车载机枪：机枪类 cue、逐发一声（burst 1）、隔着钢板的车内低通。
+    const A = this.T.audio;
+    t.lastMgShot = r.FireVehicleBullet(from, dir, { weaponId: "Type11", damageScale: f.damageScale, sourceCollider: view.tankCollider,
+      gunCue: A.mgCue, gunOpts: { volume: A.mgVolume, burst: 1, airCut: A.mgAirCutHz, weaponClass: "mg" } });
   }
   OnImpact(position, f, shot) {
     const r = this.r, t = r.tank;
@@ -301,14 +337,15 @@ export class FirstLevelTankRuntime {
   OnBulletHit(point, from) {
     if (!this.brain) return null;
     const result = this.brain.OnBulletHit({ from: from ? Plain(from) : null, shooterId: "player" });
+    if (point) this.Sound?.OnBulletHit(Plain(point));
     this.log.hits.push({ t: this.r.time, decoy: result.decoy, x: point?.x, z: point?.z });
     if (this.log.hits.length > 32) this.log.hits.shift();
     return result;
   }
   Debug() {
-    return { brain: this.brain?.Debug() || null, breakables: this.breakables?.State() || [], log: this.log,
+    return { brain: this.brain?.Debug() || null, breakables: this.breakables?.State() || [], log: this.log, audio: this.sound?.State() ?? null,
       telemetry: this.brain ? { shots: this.brain.telemetry.shots.slice(-24), bursts: this.brain.telemetry.bursts.slice(-48),
         reactions: this.brain.telemetry.reactions.slice(), states: this.brain.telemetry.states.slice() } : null };
   }
-  Dispose() { this.breakables?.Dispose(); this.breakables = null; }
+  Dispose() { this.breakables?.Dispose(); this.breakables = null; this.sound?.Stop(); this.sound = null; }
 }

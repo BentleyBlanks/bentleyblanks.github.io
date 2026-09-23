@@ -235,6 +235,90 @@ export const TANK = Object.freeze({
     stallS: 1.8,
   }),
 
+  // --- 声音（Script_TankAudio 读；Step 2 · 2026-09-23） -------------------------------
+  // 素材与许可见 Data_SfxSources.TANK_SFX。烘焙时每条都对齐到有声段 −25 dBFS，层与层之间原本的
+  // 响度差（怠速比高转轻多少）在这里还原 —— 不烘进文件，调手感不用重烘。
+  audio: Object.freeze({
+    // 声源尺寸（Play 的 sourceSizeM → panner refDistance）：[史] 车长 5.7 m，一台发动机 + 两条履带
+    // 不是一个点。给 5 m：贴近时不会「一步一个台阶」地变响。
+    sourceSizeM: 5,
+    // 挂点高度（车体局部 y，米）：发动机 / 履带在车体中部偏下，手摇在炮塔里。
+    engineY: 1.1,
+    turretY: 1.8,
+    // 发动机两层等功率交叉：x = (rpm − 怠速) / (满转 − 怠速)。
+    // [素] 四号 G 型原录音里怠速段比稳态高转段轻约 9.5 dB（−24.3 vs −14.9 dBFS 有声段），烘焙对齐之后在这里还原。
+    idleGain: 0.34,
+    loadGain: 1.0,
+    // 负载（踩油门、挤压、原地转）再抬一点：同样的转速，吃力的时候更「闷」更响。[需] 手感值。
+    loadBoostDb: 3,
+    // [需] 任务书：发动机 ±12% 变速。怠速层与负载层各自在自己的转速区间里变。
+    rateMin: 0.88,
+    rateMax: 1.12,
+    // 次低频点火脉冲：[史] 八九式甲为直列六缸四冲程，点火频率 = rpm × 6 / 120 = rpm / 20
+    //（600 rpm → 30 Hz）。[需] 夹在 30–70 Hz。
+    subHzPerRpm: 1 / 20,
+    subMinHz: 30,
+    subMaxHz: 70,
+    subGain: 0.28,
+    subLoadGain: 0.22,
+    // 引擎还「活着」的门槛：rpm 低于这个就当熄火了（大脑熄火时 rpm 在 stallS 里掉到 0）。
+    runningRpm: 60,
+    // 履带：增益 = (|车速| / 巡航)^0.7 + 原地转向项；变速随车速。
+    tracksGain: 0.9,
+    tracksPivotGain: 0.6,
+    tracksRateMin: 0.7,
+    tracksRateMax: 1.15,
+    // 手摇炮塔：摇的时候响、停摇就停（「棘轮声停了 = 要开炮了」，任务书）。
+    // 变速随转速：0.22–0.30 rad/s 手摇在 0.9–1.1 之间，甩炮塔（0.42）到 1.25。
+    crankGain: 0.85,
+    crankRateRefRad: 0.26,
+    crankRateMin: 0.8,
+    crankRateMax: 1.25,
+    // 起 / 停的时间常数（秒）：停要快，预兆才读得出来。
+    crankAttackS: 0.03,
+    crankReleaseS: 0.05,
+    // 一般参数的平滑（秒）。
+    smoothS: 0.12,
+    // 03「先闻其声」：车还没开进图（阵位没夺下）时，引擎已在路线起点怠速，音量从零渐起。
+    offstageFadeInS: 5,
+    // 主炮三层按距离等功率交叉（米）：≤ nearM 只有近层；nearM–midM 近→中；midM–farM 中→远；≥ farM 只有远层。
+    // [素] 近层是近距离设计音，中 / 远层录于林地远处（估计 100 m 上下）。
+    cannonNearM: 25,
+    cannonMidM: 60,
+    cannonFarM: 110,
+    cannonVolume: 1,
+    // 区域尾音：借枪尾那套（按声源所在区挑），降调当炮用。
+    tailGain: 0.6,
+    tailPitch: 0.62,
+    // 低速炮弹掠过：弹道离听者最近处 ≤ passRadiusM、且落点在听者身后（沿弹道再往前 ≥ passBeyondM）才算「飞过去了」。
+    // 落在脚边的那发交给爆炸本身。
+    passRadiusM: 7,
+    passBeyondM: 3,
+    passVolume: 0.9,
+    // 一次性音节流（秒）。
+    squealCooldownS: 2.5,
+    pingCooldownS: 0.08,
+    // 履带尖啸：起步 / 刹车 / 原地转 / 倒车各多响。
+    squealVolume: Object.freeze({ start: 0.55, halt: 0.9, pivot: 0.7, reverse: 0.65 }),
+    pingVolume: 0.7,
+    slitVolume: 0.45,
+    slitPitch: 1.25,
+    hatchVolume: 0.8,
+    stallVolume: 1,
+    jamVolume: 0.8,
+    // 车载机枪：[史] 九一式车载机枪（十一年式的车载版）→ 机枪类 cue；枪在车体里，隔着钢板与观察孔，
+    // 车外听是闷的：低通 2.6 kHz。
+    mgCue: "type11",
+    mgAirCutHz: 2600,
+    mgVolume: 0.8,
+    // 熄火之后：冷却滴答（延迟、间隔、持续多久、渐弱）。
+    coolDelayS: 4,
+    coolEveryMinS: 1.8,
+    coolEveryMaxS: 4.5,
+    coolForS: 50,
+    coolVolume: 0.8,
+  }),
+
   // --- 事实判据（运行时读） -------------------------------------------------------
   // tankPositionPressured「炮弹实际命中右侧射位周边」：阵位四周的墙（东墙 6.5 m、北面残墙 5 m）
   // 挡下的炮弹落在 7.5–9.5 m 上（2026-09-23 实跑），旧的 8 m 让玩家在阵位上多挨三发才放行撤退。
