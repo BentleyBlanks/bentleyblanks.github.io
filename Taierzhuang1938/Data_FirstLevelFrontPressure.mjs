@@ -63,6 +63,9 @@ export const FRONT_FIRE_POINTS = Object.freeze({
   nestWest: P(S.nest.x - 3.8, S.nest.z - 0.5, 0.9, 1.2),
   // 04 后撤到阵位后墙那一段、05 攻击支路：玩家要走的沟沿（近失弹压人，不打人）。
   rearLane: P(24, -134, 0.5, 2.0),
+  // 右侧阵位那挺机枪（日军占着、枪口朝西北）夺下之前唯一看得见的一段：玩家来路西侧 4–5 m 的沟沿。
+  //（09-24 探针：这挺枪在 02–03 对表里其余每一个点都没有通视，整段一发不打 —— 最显眼的「端枪不打」。）
+  nestField: P(18, -135, 0.5, 1.6),
   attackLane: P(37.5, -133, 0.5, 2.0),
 });
 
@@ -99,12 +102,12 @@ export const FRONT_PRESSURE_STAGES = Object.freeze(["BunkerRescue", "RearTrench"
 export const FRONT_PRESSURE_PHASES = Object.freeze([
   // 02：前沿已在远处交火，推进要等 03 frontBattleStarted（MISSION_ENCOUNTER_ACTIVATION.standbyUntil）。
   Object.freeze({ id: "standby", when: null, stages: Object.freeze(["BunkerRescue", "RearTrench"]),
-    fire: Object.freeze([...BANK, "leftGunParapet", "guardParapet"]),
+    fire: Object.freeze([...BANK, "leftGunParapet", "guardParapet", "nestField"]),
     groups: Object.freeze({ nest: NEST }) }),
   // 03 开战：中路跃进、火力基地压土坎与左前枪位、两人去土坎西端外。
   Object.freeze({ id: "assault", when: "frontBattleStarted", stages: Object.freeze(["Support", "MachineGun", "Tank"]),
     bark: "advance",
-    fire: Object.freeze([...BANK, "leftGunParapet", "guardParapet", "gapWest", "gapEast"]),
+    fire: Object.freeze([...BANK, "leftGunParapet", "guardParapet", "nestField", "gapWest", "gapEast"]),
     groups: Object.freeze({ fireBase: Object.freeze({ role: "hold" }), center: CENTER(),
       flankWest: FLANK_WEST(), eastHold: Object.freeze({ role: "hold" }), nest: NEST }) }),
   // 右侧阵位丢了：玩家上了那挺机枪。土坎、撤退口之外开始打阵位胸墙。
