@@ -174,9 +174,12 @@ export const MISSION_ENCOUNTERS = Object.freeze({
   // 01 background: the vanguard's forward elements pass J into the depth sap (out of sight south);
   // three distant NRA return fire from the rear corner and the support sap (never hit, fire points).
   bunkerBackdrop: [
-    ...[[31,-143],[33.4,-145.2],[36.4,-147.6],[39,-150.8],[40.8,-154.2],[42.4,-157.4]].map(([x,z],i)=>
+    // They come down the upper link (the later attack branch) past the captured nest's rear
+    // junction and the link sap, then turn south into the depth sap at J.
+    ...[[36.4,-142.9],[39.4,-146],[39.7,-148.8],[40.6,-152],[41.5,-154.2],[43,-158]].map(([x,z],i)=>
       ({ id: `BunkerBackdropIja${i}`, side: "ija", x, z, weapon: i===3?"Type11":"Type38",
-        route: [{x:27,z:-135.5},{x:23.5,z:-130},{x:19,z:-125.8},{x:14,z:-124.6},{x:15.2,z:-118.5},{x:17.5,z:-111},{x:20.5,z:-102}],
+        route: [...(i>=2?[{x:39.8,z:-150}]:[]),...(i>=1?[{x:39.4,z:-144.2}]:[]),{x:35,z:-142.5},{x:29.7,z:-141.5},
+          {x:27,z:-135.5},{x:23.5,z:-130},{x:19,z:-125.8},{x:14,z:-124.6},{x:15.2,z:-118.5},{x:17.5,z:-111},{x:20.5,z:-102}],
         delayS: 2.2*i })),
     { id: "BunkerBackdropNra0", side: "nra", x: -5.6, z: -112, weapon: "HanYang", fireAt: A.bunkerJunction },
     { id: "BunkerBackdropNra1", side: "nra", x: -9.4, z: -111.4, weapon: "HanYang", fireAt: A.bunkerFold },

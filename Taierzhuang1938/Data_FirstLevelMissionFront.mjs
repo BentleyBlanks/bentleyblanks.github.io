@@ -47,8 +47,9 @@ export const FRONT_COVER=Object.freeze({
   rows:Object.freeze([
     // 2026-09-23 proposal A: everything 6 m north with the berm (crest z=-160); the last row sits
     // 1 m north of the berm's north foot, 4.5 m short of the crest.
-    Object.freeze({id:"Bank", line:-193,   z:-191.2, w:1.5, h:1.06, d:.6}),
-    Object.freeze({id:"Mound",line:-181.5, z:-179.3, w:1.6, h:1.02, d:.6}),
+    // Bank/Mound sit on the rising ground: taller so a man kneeling uphill of them is still covered.
+    Object.freeze({id:"Bank", line:-193,   z:-191.2, w:1.5, h:1.35, d:.6}),
+    Object.freeze({id:"Mound",line:-181.5, z:-179.3, w:1.6, h:1.15, d:.6}),
     Object.freeze({id:"Ridge",line:-173,   z:-171,   w:1.5, h:.94,  d:.6}),
     Object.freeze({id:"Stub", line:-166.5, z:-164.6, w:1.7, h:1.08, d:.6}),
   ]),
@@ -79,15 +80,16 @@ export const FRONT_COVER=Object.freeze({
 export const FRONT_RIFLEMEN=Object.freeze([
   // Fire base (火力基地): holds on the rising ground 34-40 m north of the berm, behind the
   // FireBaseRuin* walls, never bounds. Suppresses the crest; after 03 capture, the nest.
-  {id:"FrontGunner",x:10,z:-195,weapon:"Type11",hold:true,role:"fireBase"},
-  {id:"FrontSupportGunner",x:-24,z:-195.2,weapon:"Type11",hold:true,role:"fireBase"},
-  {id:"FrontRifleG",x:-9.8,z:-195.4,hold:true,role:"fireBase"},
-  {id:"FrontRifleH",x:23,z:-195,hold:true,role:"fireBase"},
+  {id:"FrontGunner",x:10,z:-193.8,weapon:"Type11",hold:true,role:"fireBase"},
+  {id:"FrontSupportGunner",x:-24,z:-193.8,weapon:"Type11",hold:true,role:"fireBase"},
+  {id:"FrontRifleG",x:-9.8,z:-193.8,hold:true,role:"fireBase"},
+  {id:"FrontRifleH",x:23,z:-193.8,hold:true,role:"fireBase"},
   // Bounding group (跃进组): two teams of three, crater to crater down the corridors between
   // the cover columns, last line 6.5 m short of the crest (under Zhou's enfilade).
-  {id:"FrontRifleA",x:-32.5,z:-199,role:"bound"},{id:"FrontRifleB",x:-14.7,z:-199.5,role:"bound"},
-  {id:"FrontRifleC",x:-4.8,z:-200,role:"bound"},{id:"FrontRifleD",x:5,z:-199,role:"bound"},
-  {id:"FrontRifleE",x:15,z:-199.5,role:"bound"},{id:"FrontRifleF",x:-14.5,z:-202.5,role:"bound"},
+  // They start on the first bound line (z -193.4), kneeling behind the Bank row, and bound three times.
+  {id:"FrontRifleA",x:-34.9,z:-192.6,role:"bound"},{id:"FrontRifleB",x:-29.4,z:-192.6,role:"bound"},
+  {id:"FrontRifleC",x:-18.9,z:-192.6,role:"bound"},{id:"FrontRifleD",x:-3.6,z:-192.6,role:"bound"},
+  {id:"FrontRifleE",x:3.6,z:-192.6,role:"bound"},{id:"FrontRifleF",x:18.9,z:-192.6,role:"bound"},
 ]);
 /** Every man the front stages put on this field. The cover rows never build on one of these
  *  firing positions - a bank standing on a man is a man standing in a bank. */
@@ -120,7 +122,7 @@ export const FRONT_ASSAULT=Object.freeze({
 // A separate finite attack enters only at the machine-gun handover. Rifle-stage
 // casualties cannot spend it early; its starts share the validated reinforcement lanes.
 export const FRONT_MACHINE_GUN_ATTACK=Object.freeze(FRONT_ASSAULT.waveCentersX.slice(0,2).flatMap((cx,squad)=>
-  Array.from({length:3},(_,i)=>Object.freeze({id:`MachineGunAttack${squad}_${i}`,team:`Gun${squad}`,
+  Array.from({length:2},(_,i)=>Object.freeze({id:`MachineGunAttack${squad}_${i}`,team:`Gun${squad}`,
     x:cx+((i%3)-1)*3.2+(i>=3?1.6:0),z:FRONT_ASSAULT.spawnZ-(i>=3?2.5:0),
     weapon:i===0?"Type11":"Type38",bayonet:true}))));
 const LaneRandom=(x,z)=>{let s=(Math.round(x*7+z*13)*2654435761)>>>0;return ()=>{s=(Math.imul(s,1664525)+1013904223)>>>0;return s/4294967296;};};
@@ -214,14 +216,14 @@ export const FRONT_BREACHES=[{x:-22,z:8,radius:4,depth:1.05},{...Sortie.gap,radi
  *  crater to crater toward the berm's east end. Their last line is around the end, where the
  *  gap is visible along the berm's south side; the captured nest enfilades it at 8-14 m. */
 export const FRONT_FLANK_GROUP=Object.freeze([
-  {id:"FrontFlankA",x:47,z:-191,lane:[{x:40,z:-181.5},{x:31.5,z:-173.6},{x:24.5,z:-168.4},{x:17.2,z:-159.4}]},
-  {id:"FrontFlankB",x:44.5,z:-193.5,lane:[{x:38,z:-183.2},{x:29.6,z:-176.2},{x:22.6,z:-168.8},{x:20.3,z:-162.4}]},
-  {id:"FrontFlankC",x:49.5,z:-194.5,lane:[{x:42,z:-183.5},{x:33.5,z:-177.4},{x:26.4,z:-170.2},{x:15.4,z:-163.8}]},
-  {id:"FrontFlankD",x:46,z:-197,lane:[{x:41,z:-186},{x:32.2,z:-179},{x:25.6,z:-172.2},{x:18.8,z:-165.6}]},
+  {id:"FrontFlankA",x:50,z:-192.4,lane:[{x:45.4,z:-192.8},{x:40,z:-181.5},{x:31.5,z:-173.6},{x:24.5,z:-168.4},{x:17.2,z:-159.4}]},
+  {id:"FrontFlankB",x:53,z:-192.6,lane:[{x:45.2,z:-193.4},{x:38,z:-183.2},{x:29.6,z:-176.2},{x:22.6,z:-168.8},{x:20.3,z:-162.4}]},
+  {id:"FrontFlankC",x:56,z:-192.4,lane:[{x:45.6,z:-194},{x:42,z:-183.5},{x:33.5,z:-177.4},{x:26.4,z:-170.2},{x:15.4,z:-163.8}]},
+  {id:"FrontFlankD",x:59,z:-192.6,lane:[{x:45.8,z:-194.6},{x:41,z:-186},{x:32.2,z:-179},{x:25.6,z:-172.2},{x:21.8,z:-165.2}]},
 ].map(Object.freeze));
 /** One officer (IJA01, sword prop, pistol shelved). Leads the flank group one bound behind it. */
-export const FRONT_OFFICER=Object.freeze({id:"FrontOfficer",x:48,z:-196.5,modelVariant:1,sword:true,
-  lane:[{x:41,z:-186.5},{x:33,z:-178.5},{x:27.4,z:-172.6}]});
+export const FRONT_OFFICER=Object.freeze({id:"FrontOfficer",x:54.5,z:-193.6,modelVariant:1,sword:true,
+  lane:[{x:45.8,z:-193.6},{x:41,z:-186.5},{x:33,z:-178.5},{x:27.4,z:-172.6}]});
 /** Reinforcement entries (contract §2.8): all 60 m+ from the nest seat and the observation step,
  *  or hidden below a crest. The count is the budget per stage (aliveCap per stage). */
 export const FRONT_RESERVE_ENTRIES=Object.freeze([

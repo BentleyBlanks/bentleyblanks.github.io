@@ -62,7 +62,7 @@ export const MISSION_TRENCH_NETWORK = Object.freeze({
       source:"Data_FirstLevelFrontRoute.FRONT_SPACE.observationSpur",routeBound:false},
     // 03 right low trench: gap junction -> nest west door. 1.35 m: crouched is covered, standing shows.
     {id:"RightApproach",preset:"communication",role:null,points:Sortie.approach.slice(7,13),
-      depth:1.35,bermH:.2,bermSide:"minus",
+      depth:1.5,bermH:.25,bermSide:"minus",
       source:"Data_FirstLevelFrontRoute.FRONT_SORTIE.approach[7..12]",routeBound:true},
     // He / Zhou / relief: observation -> left gun at the berm's west end.
     {id:"LeftGunAccess",preset:"communication",role:null,points:Sortie.leftRoute.slice(2),depth:1.85,
@@ -75,8 +75,8 @@ export const MISSION_TRENCH_NETWORK = Object.freeze({
     {id:"GuardWithdrawal",preset:"communication",role:null,points:Sortie.guardRoute.slice(0,4),depth:1.1,
       source:"Data_FirstLevelFrontRoute.FRONT_SORTIE.guardRoute[0..3]",routeBound:true},
     // 05 ammo sap: rear junction -> damaged lip -> yard gate (the last leg to the back door is inside the walled yard).
-    {id:"BundleApproach",preset:"communication",role:null,points:Sortie.route.slice(0,-1),
-      depth:Sortie.trenchDepthM,floorW:Sortie.trenchBottomM,bankW:Sortie.trenchBankM,bermH:.2,
+    {id:"BundleApproach",preset:"communication",role:null,points:Sortie.route.slice(0,5),
+      depth:Sortie.trenchDepthM,floorW:Sortie.trenchBottomM,bankW:Sortie.trenchBankM,bermH:.55,bermSide:"minus",
       source:"Data_FirstLevelFrontRoute.FRONT_SORTIE.route（宽/深/坡取 trenchBottomM/trenchDepthM/trenchBankM）",routeBound:true},
     // 05 attack branch (upper link sap): rear junction -> road-side ruin; its last 4 m are shallowed.
     {id:"RoadAttack",preset:"communication",role:null,points:Sortie.attackRoute,depth:1.6,

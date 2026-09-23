@@ -104,10 +104,13 @@ export const MISSION_TERRAIN = Object.freeze({
     // The near-miss crater at the bend's inner corner: the SSW leg's east wall is down to 1.05 m
     // for ~4 m ("沟壁塌低段"), exposed to the fold F and the junction J.
     {x:2.8,z:-120.4,radius:1.7,depth:1.05},
-    // Ammo sap climbs out at the yard gate (two treads).
-    {x:41.2,z:-119.6,radius:1.4,depth:1.0},{x:40.9,z:-117.2,radius:1.3,depth:.35},
+    // Ammo sap climbs out at the yard's north gate (two treads).
+    {x:41.3,z:-119.9,radius:1.2,depth:1.0},{x:41.2,z:-118.3,radius:1.0,depth:.4},
     // Berm-end craters: explain the tank's sight lane past the berm's east end and give the flank group its last line.
-    ...Space.bermEndCraters.map((p,i)=>({...p,radius:[1.6,1.4,1.5][i],depth:[.7,.6,.6][i]})),
+    ...Space.bermEndCraters.map((p,i)=>({...p,radius:[1.6,1.4,1.5,1.4][i],depth:[.7,.6,.6,.6][i]})),
+    ...Space.boundCraters.map((p)=>({...p,radius:1.3,depth:.6})),
+    ...Space.flankCraters.map((p)=>({x:p.x,z:p.z,radius:p.r,depth:.7})),
+    ...Space.escortCraters.map((p)=>({x:p.x,z:p.z,radius:p.r,depth:.55})),
   ],
   pads: [
     { x: -71, z: 74, w: 13, d: 50 },

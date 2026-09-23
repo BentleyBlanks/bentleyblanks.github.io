@@ -32,9 +32,12 @@ export const FRONT_SORTIE=Object.freeze({
   // 04 short withdrawal: seat -> rear-wall door -> rear junction (behind the never-breakable rear wall).
   rearRoute:[Point(25.9,-153.9),Point(29.6,-149.5),Point(29.7,-145.6),Point(29.7,-141.5)],
   // 05 ammo sap: rear junction -> damaged lip (road view) -> yard gate -> house back door.
-  route:[Point(29.7,-141.5),Point(34,-136),Point(41,-129.5),Point(41.5,-123),Point(40.8,-117.5),Point(42.4,-111)],
+  // ... up out of the sap through the yard's north gate (2-3 m in the tank's view at 50 m), left
+  // behind the cart screen and along the house's west side to the back door.
+  route:[Point(29.7,-141.5),Point(34,-136.4),Point(40.6,-130.6),Point(44.6,-125.6),Point(41.6,-120.8),Point(41.2,-118.6),
+    Point(39.6,-117.4),Point(39.6,-114.2),Point(41.4,-112.6),Point(42.4,-111)],
   // 05 attack branch = the upper link sap the 01 Japanese came down: rear junction -> road-side ruin.
-  attackRoute:[Point(29.7,-141.5),Point(35,-142.5),Point(39.5,-147),Point(41.5,-153),Point(43.6,-159.6)],
+  attackRoute:[Point(29.7,-141.5),Point(35,-142.5),Point(39.4,-144.2),Point(39.8,-150),Point(41.8,-154.8),Point(43.6,-159.6)],
   house:Point(47.5,-109),bundle:Point(49,-110.2),keeper:Point(46.2,-106.4),
   throw:Point(43.6,-159.6),orders:Point(-34,-99),
   leftGun:Point(-33.8,-157.6),leftSeat:Point(-33.6,-156.4),
@@ -45,12 +48,13 @@ export const FRONT_SORTIE=Object.freeze({
   guardRoute:[Point(-8,-155.2),Point(-8,-150),Point(-8,-145),Point(-8,-140.6),Point(-9.4,-138.6),Point(-10.4,-134.2),
     Point(-19.2,-133.2),Point(-20.4,-126.8),Point(-21.6,-126.6)],
   // Exposure at the damaged lip rewards crouching; there is no artificial ceiling.
-  crawl:[],damagedLip:Point(41,-129.5),
+  crawl:[],damagedLip:Point(40.6,-130.6),
   crawlClearanceM:.96,crawlRoofM:1.1,crawlRadiusM:3.8,crawlEntryMarginM:.75,
   checkpointRadiusM:3.2,supplierRangeM:7,leaderArrivalM:3,leaderWaitM:10,leaderCrawlMps:1.1,
   trenchBottomM:3.8,trenchDepthM:1.85,trenchBankM:1.6,
   // 05 cut-in pair: from the blocked south road through the road link into the ammo sap ahead of the player.
-  enemies:[{id:'BundleBendA',x:63,z:-133,hold:false},{id:'BundleBendB',x:62,z:-138,hold:false}],
+  // They slipped into the road link sap from the blocked south road during 04 (dug in, out of sight).
+  enemies:[{id:'BundleBendA',x:59.6,z:-128.4,hold:false},{id:'BundleBendB',x:56.8,z:-127.4,hold:false}],
   // Terrain road polyline = the tank path plus a 5 m dead-end stub at the berm-end crater.
   road:[...T.map(p=>Point(p.x,p.z)),Point(31,-166.4)],
   tankPreviewIndex:2,tankPressureIndex:6,tankBlockIndex:8,tankEndIndex:9,
@@ -70,10 +74,15 @@ export const FRONT_SPACE=Object.freeze({
   westDoor:Point(25.8,-150.5),
   rearDoor:Point(29.7,-145.6),
   roadMouth:Point(46.5,-163.5),             // where the link sap meets the road (01 entry, 05 cut-in seen)
-  roadLink:[Point(62,-129),Point(55,-126.5),Point(47.5,-124.5),Point(41.5,-123)],
+  roadLink:[Point(62,-129),Point(55,-126.8),Point(48.5,-125.8),Point(44.6,-125.6)],
   southRoad:[Point(60,-177),Point(62,-162),Point(63,-140),Point(61,-120),Point(58,-100),Point(55,-84)],
   yard:Object.freeze({minX:38.8,maxX:54,minZ:-119,maxZ:-100}),
-  bermEndCraters:[Point(17.5,-158.2),Point(20.5,-161.5),Point(15.5,-162.8)],
+  bermEndCraters:[Point(17.5,-158.2),Point(20.5,-161.5),Point(15.5,-162.8),Point(21.8,-165.2)],
+  // Last-line craters for the two bounding corridors whose line-4 point has no cover row.
+  boundCraters:[Point(16.8,-165.3),Point(-5.2,-165.4),Point(4.7,-165.4)],
+  // Flank group craters (they kneel in them; craters never block a rush) and escort-slot craters.
+  flankCraters:[[40.6,-181.6,2.2],[40.4,-185.4,1.6],[31.6,-174.6,2.2],[32.8,-178.4,1.8],[24.2,-169,2.2],[26,-171.9,1.6]].map(([x,z,r])=>Object.freeze({x,z,r})),
+  escortCraters:[[31.8,-163.8,1.4],[37.4,-163,1.3],[36.8,-172.4,1.3]].map(([x,z,r])=>Object.freeze({x,z,r})),
 });
 export function SortieCrawlBlocked(position,next,stance){
   if(stance==='prone')return false;

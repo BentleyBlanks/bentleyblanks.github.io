@@ -184,14 +184,31 @@ TopBlock("RightEntryCrate",25.8,-147.6,1.0,1.0,1.1,"cover",{cover:Face(-.6,-.8)}
 const gunRestTop=SampleMissionTerrain(Sortie.nest.x,Sortie.nest.z)+1.45+.08-.12294;
 Block("MachineGunRest",Sortie.nest.x,Sortie.nest.z,.9,gunRestTop-SampleMissionTerrain(Sortie.nest.x,Sortie.nest.z),.7,"cover");
 Block("MachineGunFiringStep",Sortie.seat.x+.3,Sortie.seat.z,1.9,.12,2.2,"timber",{y:SampleMissionTerrain(Sortie.seat.x,Sortie.seat.z)-.06});
+// Right low trench parapet: spoil + sandbags on the lip facing the nest, so its MG cannot look
+// into the approach (crouched is covered, standing shows over it).
+{
+  const legs=[[Sortie.approach[8],Sortie.approach[9]],[Sortie.approach[9],Sortie.approach[10]],[Sortie.approach[10],Sortie.approach[11]]];
+  legs.forEach(([a,b],i)=>{const l=Math.hypot(b.x-a.x,b.z-a.z),dx=(b.x-a.x)/l,dz=(b.z-a.z)/l;
+    const x=(a.x+b.x)/2+dz*2.9,z=(a.z+b.z)/2-dx*2.9;
+    TopBlock("RightApproachParapet"+i,x,z,l-.6,.65,.9,"cover",{ry:Math.asin(-dz),cover:Face(dz,-dx)},{x,z:z+0});
+  });
+}
+// Nest interior baffle (collapsed roof beams): breaks the escorts' lines over the low north wall
+// into the compound, so the 04 short retreat has a covered middle.
+TopBlock("RightNestBaffle",30.4,-152.8,1.8,1.3,.8,"timber",{cover:Face(0,-1)},Sortie.nest);
+// Attack branch cover beat: broken wall across the tank's line; the last 4.7 m to the throw spot are open.
+TopBlock("AttackRuinA",39.9,-156.6,3.6,1.5,.7,"cover",{cover:Face(0,-1)});
 // Gap last cover: sandbag stub on the gap mouth's east side (the tank and the nest are east).
 TopBlock("GapLastCover",-6.2,-154.2,.8,1.35,2.4,"cover",{cover:Face(1,0)});
 // Zhou's left gun at the berm's west end, parapet facing north-east along the berm's north face.
 TopBlock("LeftGunParapet",-32.4,-158.4,3.6,.95,.8,"cover",{ry:-.6,cover:Face(.6,-.8)});
 TopBlock("LeftGunSide",-35.4,-155.8,.7,1.9,4,"cover",{cover:Face(-1,0)});
 // Old yard (旧院) south-east of the nest, west of the blocked south road. Back door on the west.
-TopBlock("OldYardNorthEast",48.8,-119,10.4,2.4,.7,"plaster");
-TopBlock("OldYardWest",38.8,-108.5,.7,2.5,17,"plaster");
+TopBlock("OldYardNorthWest",39.3,-119,1.0,2.4,.7,"plaster");
+TopBlock("OldYardNorthEast",48.3,-119,11.4,2.4,.7,"plaster");
+TopBlock("OldYardWest",38.8,-109.5,.7,2.5,19,"plaster");
+// Cart screen just inside the north gate: step left behind it and the tank loses you.
+TopBlock("OldYardCartScreen",41.4,-116.1,2.4,1.4,1.2,"timber",{cover:Face(0,-1)});
 TopBlock("OldYardEastNorth",54,-115,.7,2.5,8,"plaster");
 TopBlock("OldYardEastSouth",54,-103.5,.7,2.5,7,"plaster");
 TopBlock("OldYardSouth",46.4,-100,15.2,2.3,.7,"plaster");
@@ -204,18 +221,16 @@ TopBlock("BundleSupplyHouseSouth",47.5,-104,9.6,2.9,.6,"structure");
 Block("BundleSupplyHouseRoof",45.3,-109,4,.22,10,"structure",{y:SampleMissionTerrain(47.5,-109)+3.05});
 Block("BundleCrate",Sortie.bundle.x,Sortie.bundle.z,1.2,.5,.8,"missionRoute");
 // Landmark: the old yard's dead tree at the collapsed north-west corner (the sap climbs out beside it).
-Block("OldYardDeadTreeTrunk",37.4,-120.8,.42,5.6,.42,"timber");
-Detail("OldYardDeadTreeBranchA",37.9,-120.6,1.8,.18,.2,"timber",{y:SampleMissionTerrain(37.4,-120.8)+4.4,ry:.5});
-Detail("OldYardDeadTreeBranchB",36.9,-121.1,1.4,.16,.18,"timber",{y:SampleMissionTerrain(37.4,-120.8)+3.7,ry:-.7});
+Block("OldYardDeadTreeTrunk",36.0,-122.8,.42,5.6,.42,"timber");
+Detail("OldYardDeadTreeBranchA",36.5,-122.6,1.8,.18,.2,"timber",{y:SampleMissionTerrain(36,-122.8)+4.4,ry:.5});
+Detail("OldYardDeadTreeBranchB",35.5,-123.1,1.4,.16,.18,"timber",{y:SampleMissionTerrain(36,-122.8)+3.7,ry:-.7});
 // Attack position: broken road-side wall between the throw spot and the stopped tank (throw cover).
 TopBlock("RoadsideRuin",42.4,-161.2,3.4,1.3,.7,"cover",{ry:.616,cover:Face(-.578,-.816)});
 // Fire base walls on the rising ground (in the cover columns, clear of the bounding corridors).
-for(const [id,x,w,h] of [["FireBaseRuinW",-24,7,1.25],["FireBaseRuinC",10,5,1.25],["FireBaseCraterCW",-9.8,3.5,.95],["FireBaseRuinE",23,5,1.2]])
-  Wall(id,x,-192.6,w,h,.7);
+for(const [id,x,w,h] of [["FireBaseRuinW",-24,7,1.4],["FireBaseRuinC",10,5,1.4],["FireBaseCraterCW",-9.8,3.5,1.1],["FireBaseRuinE",23,5,1.35]])
+  TopBlock(id,x,-192.6,w,h,.7,"cover",{cover:Face(0,1)},{x,z:-193.8});
 // Flank group cover: crater lips and a field ruin on the way to the berm's east end.
-for(const [id,x,z,w,h] of [["FlankLip0",40,-180,5.5,.85],["FlankLip1",41,-184.6,3,.8],["FlankLip2",24.6,-166.8,4.5,.85]])
-  Wall(id,x,z,w,h,.7);
-for(const [i,x,z,w,h] of [[0,-26,-170.4,8,.8],[1,31.5,-171.8,5.5,1.1],[2,70,-164,6,1.3],[3,35,-82,14,1.3]])
+for(const [i,x,z,w,h] of [[0,-26,-170.4,8,.8],[1,30.2,-169.6,4,1.1],[2,70,-164,6,1.3],[3,35,-82,14,1.3]])
   Wall(`FieldRuin${i}`,x,z,w,h,.7);
 // Telegraph poles every 26 m along the tank road's south shoulder; the one at the bend leans.
 {
@@ -528,10 +543,10 @@ FarmSilhouette('NorthFarm',-51,-184,15,11,4.3);
 // 2026-09-23 proposal A: NorthRuin is the tank's bend occluder. No doors (a door on the seat's
 // sight line would show the tank through the ruin); seen from the nest seat it covers bearings 33-53 deg.
 {
-  Room('NorthRuin',54,-186.5,12,9,{southDoor:false,northDoor:false});
-  const ground=SampleMissionTerrain(54,-186.5);
-  Block('NorthRuinGable',54,-186.5,12*.36,1.6,9,'plaster',{y:ground+3.1+.8});
-  Detail('NorthRuinRoofRidge',54,-186.5,.3,.28,9.6,'roof',{y:ground+4.6});
+  Room('NorthRuin',53,-186.5,12,9,{southDoor:false,northDoor:false});
+  const ground=SampleMissionTerrain(53,-186.5);
+  Block('NorthRuinGable',53,-186.5,12*.36,1.6,9,'plaster',{y:ground+3.1+.8});
+  Detail('NorthRuinRoofRidge',53,-186.5,.3,.28,9.6,'roof',{y:ground+4.6});
 }
 FarmSilhouette('EastFarm',110,-169,17,12,5);
 FarmSilhouette('VillageEdgeHouse',106,40,16,12,4.4);
