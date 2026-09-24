@@ -85,10 +85,45 @@ def PaintedMaterial(mat, name, base, seed, grain=False):
     mat.node_tree.links.new(tex.outputs['Color'], nodes.get('Principled BSDF').inputs['Base Color'])
 
 
-PaintedMaterial(wood, 'WeatheredElmGrain', (.31,.23,.15), 1938, True)
 PaintedMaterial(edge, 'WornElmGrain', (.43,.32,.21), 1939, True)
-PaintedMaterial(ox_coat, 'OxCoatMottle', (.35,.22,.14), 1940)
-PaintedMaterial(horse_coat, 'HorseBayMottle', (.27,.12,.068), 1941)
+
+
+def PbrMaterial(mat, material_name):
+    """Use aligned imagegen-derived maps; glTF embeds their compact PNGs."""
+    texture_dir = project / 'Texture' / 'OxCart'
+    nodes = mat.node_tree.nodes
+    links = mat.node_tree.links
+    shader = nodes.get('Principled BSDF')
+
+    def image_node(suffix, non_color=False):
+        image = bpy.data.images.load(str(texture_dir / f'Texture_{material_name}{suffix}.png'), check_existing=False)
+        image.pack()
+        if non_color:
+            image.colorspace_settings.name = 'Non-Color'
+        node = nodes.new('ShaderNodeTexImage')
+        node.image = image
+        return node
+
+    base_color = image_node('BaseColor')
+    links.new(base_color.outputs['Color'], shader.inputs['Base Color'])
+    metal_rough = image_node('MetallicRoughness', True)
+    channels = nodes.new('ShaderNodeSeparateColor')
+    links.new(metal_rough.outputs['Color'], channels.inputs['Color'])
+    links.new(channels.outputs['Green'], shader.inputs['Roughness'])
+    links.new(channels.outputs['Blue'], shader.inputs['Metallic'])
+    normal_image = image_node('Normal', True)
+    normal_map = nodes.new('ShaderNodeNormalMap')
+    normal_map.inputs['Strength'].default_value = .55
+    links.new(normal_image.outputs['Color'], normal_map.inputs['Color'])
+    links.new(normal_map.outputs['Normal'], shader.inputs['Normal'])
+
+
+for material, name in (
+    (wood, 'Elm'), (iron, 'ForgedIron'), (tire_iron, 'ForgedIron'),
+    (leather, 'HarnessLeather'), (ox_coat, 'OxCoat'),
+    (horse_coat, 'HorseCoat'),
+):
+    PbrMaterial(material, name)
 
 def InCollection(obj, col):
     for old in list(obj.users_collection): old.objects.unlink(obj)
@@ -711,16 +746,17 @@ def BuildAnimal(kind):
                 LoftZ(name+'Lower',SmoothStations(lower_stations,2),horse_leg,col,knee)
                 Ellipsoid(name+'Fetlock',(x,foot_y,.195),
                           (.092,.105,.07),horse_leg,col,knee,12,8)
+            hoof_pivot=Empty(name+'HoofPivot',(x,foot_y,0),col,knee)
             if is_ox:
                 # Two grounded toes leave a visible cleft at the front.
                 for digit in (-1,1):
                     HoofDigit(name+f'HoofDigit{digit}',x+digit*.076,
-                              foot_y,digit,hoof,col,knee)
+                              foot_y,digit,hoof,col,hoof_pivot)
             else:
-                HorseHoof(name+'Hoof',x,foot_y,hoof,col,knee)
+                HorseHoof(name+'Hoof',x,foot_y,hoof,col,hoof_pivot)
                 Cube(name+'Coronet',(x,foot_y+.015,.167),
-                     (.19,.19,.032),coat,col,knee,.014)
-            leg_pivots.append((pivot,knee,side,front))
+                     (.19,.19,.032),coat,col,hoof_pivot,.014)
+            leg_pivots.append((pivot,knee,hoof_pivot,side,front,y,knee_y,foot_y,upper_z,joint))
     tail=Empty(kind+'TailPivot',(0,3.06 if is_ox else 3.32,
                                  1.55 if is_ox else 1.78),col,root)
     if is_ox:
@@ -819,8 +855,39 @@ def BuildAnimal(kind):
           (.48 if is_ox else .38,5.07,1.24 if is_ox else 1.44),
           (.70 if is_ox else .54,4.97,1.48 if is_ox else 1.64)],
           .04,leather,col,root)
-    # One metre per gait cycle: paired support legs alternate, slight torso and head motion.
-    animated=[body,head_pivot,tail,*[entry[0] for entry in leg_pivots],*[entry[1] for entry in leg_pivots]]
+    # Four-beat walk: each planted hoof tracks backwards at road speed for
+    # 62% of the cycle, then lifts and returns. The lowered root gives the
+    # almost straight rest legs enough reach without stretching geometry.
+    def leg_angles(entry, step, root_height):
+        _, _, _, side, front, hip_y, knee_y, foot_y, hip_z, knee_z = entry
+        phase_offset = ({(-1, False): 0, (-1, True): .25,
+                         (1, False): .50, (1, True): .75})[(side, front)]
+        gait = (step + phase_offset) % 1
+        stance = .62
+        if gait < stance:
+            target_y = foot_y + .25 - .50 * gait / stance
+            lift = 0
+        else:
+            progress = (gait - stance) / (1 - stance)
+            eased = progress * progress * (3 - 2 * progress)
+            target_y = foot_y - .25 + .50 * eased
+            lift = .13 * math.sin(math.pi * progress)
+        target_z = -root_height + lift
+        upper_y, upper_z = knee_y - hip_y, knee_z - hip_z
+        lower_y, lower_z = foot_y - knee_y, -knee_z
+        upper_length = math.hypot(upper_y, upper_z)
+        lower_length = math.hypot(lower_y, lower_z)
+        reach_y, reach_z = target_y - hip_y, target_z - hip_z
+        reach_square = reach_y * reach_y + reach_z * reach_z
+        cosine = (reach_square - upper_length**2 - lower_length**2) / (2 * upper_length * lower_length)
+        bend = math.acos(max(-1, min(1, cosine)))
+        aim = math.atan2(reach_z, reach_y) - math.atan2(
+            lower_length * math.sin(bend), upper_length + lower_length * math.cos(bend))
+        upper_rest = math.atan2(upper_z, upper_y)
+        lower_rest = math.atan2(lower_z, lower_y)
+        return aim - upper_rest, bend - (lower_rest - upper_rest)
+
+    animated=[root,body,head_pivot,tail,*[entry[index] for entry in leg_pivots for index in (0,1,2)]]
     for obj in animated:
         obj.animation_data_create()
     # Blender's shared action cannot animate multiple objects with one slot in newer versions;
@@ -829,23 +896,25 @@ def BuildAnimal(kind):
         obj.animation_data.action = None
         act=bpy.data.actions.new(kind+'Walk_'+obj.name)
         obj.animation_data.action=act
-        for frame in (1,8,16,24,31):
-            phase=2*math.pi*(frame-1)/30
-            if obj == body:
-                obj.location.z=(1.31 if is_ox else 1.50)+.025*math.cos(2*phase)
+        for frame in range(1, 32):
+            step=(frame-1)/30
+            phase=2*math.pi*step
+            root_height=-.045+.008*math.cos(2*phase)
+            if obj == root:
+                obj.location.z=root_height
+            elif obj == body:
+                obj.location.z=1.31 if is_ox else 1.50
             elif obj == head_pivot:
                 obj.rotation_euler[0]=.055*math.sin(phase-.4)
             elif obj == tail:
                 obj.rotation_euler[1]=.11*math.sin(phase)
             else:
-                entry=next(e for e in leg_pivots if e[0] == obj or e[1] == obj)
-                _,knee,side,front=entry
-                offset=(0 if front else math.pi)+(0 if side<0 else math.pi)
-                if obj == knee:
-                    obj.rotation_euler[0]=.22*max(0,math.sin(phase+offset))
-                else:
-                    obj.rotation_euler[0]=.25*math.sin(phase+offset)
-            obj.keyframe_insert(data_path='location' if obj==body else 'rotation_euler',frame=frame)
+                entry=next(e for e in leg_pivots if obj in e[:3])
+                upper_angle, lower_angle = leg_angles(entry, step, root_height)
+                if obj == entry[0]: obj.rotation_euler[0]=upper_angle
+                elif obj == entry[1]: obj.rotation_euler[0]=lower_angle
+                else: obj.rotation_euler[0]=-(upper_angle+lower_angle)
+            obj.keyframe_insert(data_path='location' if obj in (root,body) else 'rotation_euler',frame=frame)
         track=obj.animation_data.nla_tracks.new();track.name=kind+'Walk'
         strip=track.strips.new(kind+'Walk',1,act)
         strip.action_frame_start=1;strip.action_frame_end=31

@@ -75,12 +75,36 @@ try {
   const horse = await page.evaluate(() => ({ kind: window.Taierzhuang.editor.active.cartKind,
     meshes: Object.values(window.Taierzhuang.editor.active.cartPreview.parts).every((mesh) => mesh.isMesh) }));
   assert.deepEqual(horse, { kind: "horse", meshes: true });
+  const wheelAtStop = await page.evaluate(() => window.Taierzhuang.editor.active.cartPreview.cartRoot
+    .getObjectByName("WheelLeft").rotation.x);
   await page.locator(".edChip").filter({ hasText: /^停驻姿态$/ }).click();
   await page.evaluate(() => window.Taierzhuang.StepFrames(15));
   const stopped = await page.evaluate(() => ({ wheel: window.Taierzhuang.editor.active.cartPreview.cartRoot
     .getObjectByName("WheelLeft").rotation.x, action: window.Taierzhuang.editor.active.cartAction }));
   assert.equal(stopped.action, "idle");
-  assert.ok(Math.abs(stopped.wheel) < 1e-6, "the parked cart wheel does not roll");
+  assert.ok(Math.abs(stopped.wheel - wheelAtStop) < 1e-6, "the parked cart wheel holds its last angle");
+  const contact = await page.evaluate(() => {
+    const instance = window.Taierzhuang.editor.active.cartPreview;
+    const hoof = instance.animalRoot.getObjectByName("HorseFrontLeftHoofPivot");
+    const position = () => {
+      instance.root.updateMatrixWorld(true);
+      return { height: hoof.matrixWorld.elements[13], forward: hoof.matrixWorld.elements[14] };
+    };
+    instance.SetMotion(0, true);
+    const first = position();
+    instance.SetMotion(.2, true);
+    const second = position();
+    instance.SetMotion(.2, false);
+    const parked = instance.cartRoot.getObjectByName("WheelLeft").rotation.x;
+    instance.SetMotion(.2, false);
+    return { first, second, parked,
+      parkedAgain: instance.cartRoot.getObjectByName("WheelLeft").rotation.x };
+  });
+  assert.ok(Math.abs(contact.first.height-contact.second.height) < .02,
+    "a horse support hoof remains at road height during stance");
+  assert.ok(Math.abs(Math.abs(contact.first.forward-contact.second.forward)-.2) < .04,
+    "a horse support hoof tracks the cart's .2 m travel");
+  assert.equal(contact.parked, contact.parkedAgain, "a stationary wheel does not keep turning");
   await page.locator(".edChip").filter({ hasText: /^人物$/ }).click();
   await page.waitForFunction(() => window.Taierzhuang.editor.active?.actors?.[0]?.meshSource,
     null, { timeout: 30000 });

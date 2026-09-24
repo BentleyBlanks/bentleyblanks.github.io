@@ -65,6 +65,7 @@ scene.frame_set(1)
 views = {
     'Side': ((12, 2.0, 3.0), (0, 2.0, 1.1)),
     'Front': ((0, 13, 3.0), (0, 2.0, 1.1)),
+    'Top': ((0, 2.0, 14.0), (0, 2.0, 0.0)),
     'Quarter': ((9, 10, 5.0), (0, 2.0, 1.1)),
     'Rear': ((0, -10, 3.0), (0, 2.0, 1.1)),
 }
@@ -81,7 +82,7 @@ for kind in animals:
         position, target = views[angle]
         camera.location = position
         camera.rotation_euler = (Vector(target) - camera.location).to_track_quat('-Z', 'Y').to_euler()
-        camera_data.ortho_scale = 9.9 if angle in ('Side', 'Quarter') else 6.4
+        camera_data.ortho_scale = 15.5 if angle == 'Top' else 9.9 if angle in ('Side', 'Quarter') else 6.4
         scene.render.filepath = str(output_dir / f'{tag}_{kind}_{angle}.png')
         bpy.ops.render.render(write_still=True)
         print('Review:', scene.render.filepath)

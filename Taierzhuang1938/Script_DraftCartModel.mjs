@@ -4,7 +4,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
 import { AttachShadowDepth } from "./Script_ShadowDepth.mjs";
 
-const VERSION = "20260924083700";
+const VERSION = "20260924122322";
 const loader = new GLTFLoader();
 let assetsPromise = null;
 
@@ -56,6 +56,7 @@ export function CreateDraftCartInstance(assets, kind) {
   const mixer = new THREE.AnimationMixer(animalModel);
   const clip = source.animations.find((entry) => entry.name === `${kind === "ox" ? "Ox" : "Horse"}Walk`);
   mixer.clipAction(clip).play();
+  let lastTravelM = 0;
   const parts = {
     deck: MeshByPrefix(cartModel, "CartDeckSurface"),
     rail: MeshByPrefix(cartModel, "CartRailWeatheredElm"),
@@ -71,9 +72,9 @@ export function CreateDraftCartInstance(assets, kind) {
   return {
     root, cartRoot, animalRoot, parts,
     SetMotion(distanceM, moving) {
-      const travel = moving ? Math.max(0, distanceM) : 0;
-      for (const wheel of wheels) wheel.rotation.x = -travel / .72;
-      mixer.setTime(moving ? travel / .95 : 0);
+      if (moving) lastTravelM = Math.max(0, distanceM);
+      for (const wheel of wheels) wheel.rotation.x = -lastTravelM / .72;
+      mixer.setTime(lastTravelM / .80);
     },
     Dispose() { mixer.stopAllAction(); root.removeFromParent(); },
   };
