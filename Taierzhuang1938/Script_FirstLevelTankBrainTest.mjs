@@ -417,6 +417,9 @@ function Run(brain, world, seconds, each = null) {
   world.stage = "Tank";
   step(40);
   ok(brain.holdIndex === I("Block") && brain.reached === I("Block"), "05: holds Block (never squeezes out of the deck throw's reach)");
+  ok(brain.OutsideKeepOut({ x: 30.8, z: -145.1 }) === null && brain.OutsideKeepOut({ x: 29.7, z: -141.5 }) === null
+    && brain.OutsideKeepOut({ x: 24.9, z: -153.9 }) && brain.OutsideKeepOut({ x: 35.6, z: -145.2 }),
+    "no shell on the nest's rear-door ramp tiles; the seat parapet and the attack lane east of them still take shells");
   // Two-stage damage needs the second bundle on the engine deck (hull top 2.56 m, 1.2 m aft of centre). With the
   // throw model of Script_FirstLevelBundleThrowDriver (THROW.arcLift, muzzle advance, gravity 19.6) the slowest
   // throw that lands there from the attack position must stay under the bundle's top speed.
