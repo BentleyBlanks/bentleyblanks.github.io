@@ -793,8 +793,16 @@ stress ≥ 0.42 开始喘（`breathHeavy` 原速原调，0.26–0.5 随 stress�
 判不过就保留旧的鸣响只做闷响。起音期（0.13 s）照旧。
 
 【2026-09-24 审查后】
-- **只在 01–06**：任务侧开关关着（07 以后、其它关卡）时 `Deafen` 走 `DeafenLegacy`，
-  与 f581ac7dd 一字不差的旧版（4 kHz 单正弦 1.4 s、520 Hz、0.9 s 回满、2 个节点；数在 `TINNITUS.legacy`）。
+- **只在 01–06**：任务侧开关关着（07 以后、其它关卡）时 `Deafen` 走 `DeafenShared` —— 2026-09-24 合并 master 的通用近爆耳鸣
+  （`BLAST_HEARING`，一条复用的 3 节点振荡器，见 [通用近爆反馈](Data_BlastFeedback.md)）。原来的 `DeafenLegacy` / `TINNITUS.legacy` 已退役。
+- **过场独占**：剧情档（01 近爆、02 枪托，导演直接 `Deafen(1.1)`）没恢复完之前，`Play` → `Reactions` 请求的战斗档不顶掉它。
+- **两套不叠**（2026-09-25）：开关翻过来的那一刻（06→07、跳关或检查点回到 01–06）另一套的鸣响可能还在响。
+  `DeafenFirstLevel` 起来时先 `StopSharedRing` 收掉通用那条；`DeafenShared` 起来时先收掉两档那条的鸣响并丢掉它的低通曲线
+  （不然台词一起一停 `RefreshDeafFloor` 会把旧曲线排回来）。淡出都是 `TINNITUS.replaceFadeS`（60 ms），节点随后归还。
+  验收：`Script_AudioTest.mjs` 的「两套耳鸣不叠」。
+  实机取证（2026-09-25，p012 实时推进，读两套鸣响各自的音量）：01 近失弹、紧接着的 02 枪托（从开机一路跑到第 151 s）、
+  04（1–9 m 的近爆共 11 次战斗档耳鸣，其中 2 次预算紧只做闷响不另起鸣响）、05（战车在 26 m，落点 16–27 m 且隔着掩体，距离闸不给耳鸣）都只有一套在响，
+  通用那条一次都没响过；01 那发真炮弹落地时请求的战斗档（强度 0.13）被剧情档挡下。
 - **对白保底**：总线低通在耳鸣恢复段里遇到剧情台词正在说（`storyVoice.storySpeakerSpeaking`）时不低于 4.2 kHz
   （`TINNITUS.speechFloorHz`，与 `SetConcussion` 的对白保底同一条线），台词一停从曲线当时该在的位置接着往回走
   （`RefreshDeafFloor`，挂在说话状态变化的三处）。原来剧情档会让 02 枪托之后约 5 s 的审问台词压在 2 kHz 以下。
