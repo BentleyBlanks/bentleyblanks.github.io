@@ -237,6 +237,9 @@ export const FRONT_BATTLE_TUNING=Object.freeze({
   // ---- 03-06 pacing (contract §2.6, 2026-09-24 Front package step 2) ----
   // 03 ends when He has the left gun and Zhou is this far off it (was: Zhou back at the collection, ~100 s of waiting).
   zhouLeftGunM:10,
+  // 05/03 crossing: the next guard leaves cover once the man ahead is this far past the gap point (the gap sap
+  // behind it is 0.5 m deep for ~5 m, then the full trench: GuardWithdrawal -> gap junction).
+  gapClearM:6,
   // Zhou lets go of the gun only once He stands this close to the seat (the gun is never left empty).
   handoverReadyM:3,
   // FrontBlockade (Zhou/Luo shouting across) fires when the player is this close to the observation spur mouth or the fold (K3).

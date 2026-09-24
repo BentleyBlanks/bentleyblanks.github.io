@@ -23,6 +23,13 @@ export function SplitRoute(route,point){
   head.push({x:at.x,z:at.z});
   return [head,tail];
 }
+/** The guard is safe, or at least B.gapClearM beyond the gap along his withdrawal route (in covered trench). */
+export function GuardClearOfGap(g,gap=S.gap){
+  if(g.safe)return true;
+  const i=g.route.findIndex(p=>Distance(p,gap)<.01);if(i<0)return false;
+  const {progress}=MissionRouteProjection(g.route,g.actor.position),at=MissionRouteLength(g.route.slice(0,i+1));
+  return progress>=at+B.gapClearM;
+}
 /** Every live guard of the batch is safe or already past the gap (contract §2.6: 05 relief and return run in parallel). */
 export function BatchPastGap(batch,gap=S.gap){
   return AliveBatch(batch).every(g=>{
@@ -285,7 +292,10 @@ export class FirstLevelFrontBattle {
         }else {r.Defend(g.actor,g.actor.position,0,0);r.ai.SetStance(g.actor,B.guardWaitStance,.5,true);continue;}
       }
       if(!g.crossing){
-        const ahead=r.guards.slice(0,i).some(other=>other.actor.alive&&other.crossing&&!other.safe);
+        // One man in the exposed gap at a time, but the next one goes as soon as the man ahead is gapClearM past
+        // the gap (the trench behind it is covered). Waiting until he was in the safe zone 40-60 m on made the
+        // six-man batch cross in ~90 s (Step 2 campaign run 2: tankFireDisabled 313 s -> last man past the gap ~400 s).
+        const ahead=r.guards.slice(0,i).some(other=>other.actor.alive&&other.crossing&&!other.safe&&!GuardClearOfGap(other));
         if(ahead)continue;
       }
       g.crossing=true;g.actor.scriptedNoncombatant=false;

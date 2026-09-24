@@ -16,7 +16,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { FirstLevelFrontBattle, ColumnDeparture, BatchPastGap, SplitRoute } from "./Script_FirstLevelFrontBattle.mjs";
+import { FirstLevelFrontBattle, ColumnDeparture, BatchPastGap, SplitRoute, GuardClearOfGap } from "./Script_FirstLevelFrontBattle.mjs";
 import { FirstLevelFrontScenes, FRONT_SCENE_IDS, FrontSceneSpeakers } from "./Script_FirstLevelFrontScenes.mjs";
 import { FRONT_SORTIE as S, FRONT_SPACE as Space, FRONT_TANK_PATH } from "./Data_FirstLevelFrontRoute.mjs";
 import { FRONT_BATTLE_TUNING as B } from "./Data_Tuning_FirstLevelFront.mjs";
@@ -301,6 +301,16 @@ const Ok = (label) => console.log(`ok ${label}`);
   assert.ok(battle.includes('r.Record("breachReopened")'), "FrontBattle records breachReopened");
   checks += zones.length * 3 + 2;
   Ok(`⑥ ${zones.length} artillery zones clear of the tank road, the jump-off trench and our side; breachReopened stinger`);
+}
+
+// The next guard starts when the man ahead is gapClearM past the gap, not when he is in the safe zone.
+{
+  const route = P.guardWithdrawalRoutes[0], gapI = route.findIndex((p) => Dist(p, S.gap) < 0.01);
+  const g = { safe: false, route, actor: { position: { ...S.gap } } };
+  assert.ok(!GuardClearOfGap(g), "a man in the gap blocks the next one");
+  g.actor.position = { x: S.gap.x, z: S.gap.z + B.gapClearM + 0.3 };
+  assert.ok(gapI > 0 && GuardClearOfGap(g), "gapClearM past the gap (toward the trench) frees it");
+  checks += 2;
 }
 
 // Routes the legs are cut from actually pass the named points.
