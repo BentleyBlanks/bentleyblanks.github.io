@@ -45,7 +45,7 @@ export async function Drive(ctx) {
   }
 
   if(ctx.stageFrom===1)await DriveOpening(ctx);
-  await DriveFrontBattle(ctx);
+  if(ctx.stageFrom<=3)await DriveFrontBattle(ctx);
   if(ctx.stageFrom===1)await CheckOpeningActing(ctx);
   if(ctx.stageTo===3)return;
 
@@ -103,6 +103,9 @@ export async function Drive(ctx) {
     "借火戏七个姿态按 BorrowLight 的句子与两处动作空当逐个对上：" + JSON.stringify(orders.front.collection.borrow));
   assert.ok(orders.front.collection.borrowSaid, "借火是走到老周跟前触发的（不是进 06 就自动排队）");
   assert.ok(orders.front.collection.zhouLifted, "担架员真的把老周抬上了担架");
+  assert.ok(orders.front.collection.zhouLiftComplete, "06 完整起架后才准许后送队离开");
+  assert.notEqual(orders.column.litters.find(litter => litter.zhou)?.state, "fallen",
+    "老周进入07时已由正常担架队列接管，不留在集结处");
   assert.ok(orders.front.collection.runner, "传令兵在集结处");
   assert.equal(orders.stage, "South", "后送队起行把 06 推到 07");
   console.log("ok 06 orders: volunteered, matches pocketed, cigarette offered and lit, Zhou on the litter, column away");

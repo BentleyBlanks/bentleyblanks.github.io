@@ -4,6 +4,8 @@
 接口契约（步骤 id、事实名、锚点、遭遇组、cue id 一律以它为准）：[分包契约](Data_FirstLevelRebuild20260919Contract.md)。
 本文件只讲**这一段怎么实装的**：谁在什么时候真的做了什么，数值从哪儿来，怎么验收。
 
+2026-09-24空间迭代见[概念/拓扑对应与验收](Data_FirstLevelWhitebox20260924.md)：主街东窗与侧间院口是两处真实射位，沿用现有敌人名册和事实门。
+
 ## 1. 文件
 
 | 文件 | 管什么 |
@@ -28,8 +30,8 @@
 - **街那一头真的有人**：`VILLAGE_BYSTANDERS` 按空间包的 `MISSION_PLACEMENT.streetBlock.frontParty`
   与 `withdrawnGuards` 生出四个 NRA（`scriptEssential`、`scriptedNoncombatant`：只站位与喊话）。
   `streetBlockSeen`（距离门，锚点 `streetBlock` 22 m）落下时喊 `StreetBlocked`。
-- **东巷窗口**：`village` 组的 `VillageGunner` 占住能打主街的窗位；遮挡判定用
-  `P.streetBlock.windowShooter` 作为射线起点。
+- **东巷窗口**：`village` 组的 `RearWindow` 占住主街东窗，实际摆位与遮挡判定共同读取
+  `P.streetBlock.windowShooter`；`VillageGunner` 则占侧间朝向内院的射位。
 - **担架队真的停进遮挡**：`MidLitterHoldSlots` 按 `litterWait` 三个点派生车位（多于三副按行往北排），
   `column.UpdateHold` 把每一副担架/每一个民夫从后送线上横着走过去、走到就钉住（`litter.held`）。
   `littersInCover` 要求**全部活着的担架都停到位**，而且窗口射手与主街缺口**两条射线都被

@@ -1,4 +1,4 @@
-import { MISSION_ANCHORS as A } from "./Data_FirstLevelMissionLayout.mjs";
+import { MISSION_ANCHORS as A, MISSION_PLACEMENT as P } from "./Data_FirstLevelMissionLayout.mjs";
 const Entry = (mode, cue, target = null, extra = {}) => Object.freeze({mode, cue: `Guide${cue}`, target, ...extra});
 // Physical actor is the destination while travelling; combat/interaction destinations
 // switch to the thing the leader ordered, so a player on the gun is not told to leave it.
@@ -14,7 +14,7 @@ export const MISSION_LEADER_STAGES = Object.freeze({
   South: Entry("follow", "South", null, {story: true, rejoinRoute: true}),
   Village: Entry("move", "Kitchen", {x:58,z:-9}, {story: true}),
   Melee: Entry("clear", "Melee", A.melee),
-  Courtyard: Entry("clear", "Gate", {x:43,z:8}),
+  Courtyard: Entry("clear", "Gate", P.sideRoomGunner),
   TransferApproach: Entry("follow", "Follow", null, {rejoinRoute: true}),
   Transfer: Entry("cover", "Transfer", A.transfer, {story: true}),
   CartRide: Entry("move", "Cart", A.cartBoard, {story: true}),

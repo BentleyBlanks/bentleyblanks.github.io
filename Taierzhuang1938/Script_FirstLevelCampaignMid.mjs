@@ -136,11 +136,16 @@ export async function Drive(ctx) {
 
     // --- 10 打开内院，放行担架 ---------------------------------------------------
     if (await page.evaluate(() => window.Tengxian.Debug.FirstLevelMissionRuntime().enemies.get("VillageGunner")?.alive)) {
-      await Route([{ x: 58, z: 4.6 }, { x: 58, z: -9 }, { x: 58, z: -20 }, { x: 48, z: -20 },
-        { x: 58, z: -20 }, { x: 58, z: -9 }, { x: 58, z: 4.6 }], "CourtyardWindowGun", { fight: true });
+      // The adopted topology gives this shot to the connected house's east side
+      // room. Walk through its real doorway and engage across the east alley.
+      await Route([{ x: 58, z: 8.5 }, { x: 62.5, z: 8.5 }, { x: 65.5, z: 8.5 },
+        { x: 70, z: 10 }], "CourtyardWindowGun", { fight: true });
+      await FightUntilFact(page, "villageGunSilent", 90);
       assert.ok(await page.evaluate(() =>
         !window.Tengxian.Debug.FirstLevelMissionRuntime().enemies.get("VillageGunner").alive),
       "窗口那挺机枪是真打掉的");
+      await Route([{ x: 65.5, z: 8.5 }, { x: 62.5, z: 8.5 }, { x: 58, z: 8.5 }],
+        "SideRoomReturn", { fight: true });
     }
     await Route([{ x: 58, z: 8 }, { x: 58, z: 18 }, { x: 53, z: 24 }, { x: 53, z: 32.8 }],
       "CourtyardGate", { fight: true });

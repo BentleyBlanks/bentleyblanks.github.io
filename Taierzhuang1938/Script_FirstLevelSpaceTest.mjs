@@ -22,6 +22,10 @@ import { END_TUNING as END } from "./Data_Tuning_FirstLevelEnd.mjs";
 import { ZhouGunExitRoute } from "./Script_FirstLevelOpening.mjs";
 import { OPENING_STORYBOARDS } from "./Data_OpeningStoryboards.mjs";
 
+// Scope selection for the 06–18 refactor. The default still exercises every
+// original front/opening assertion, including the retired gunner-exit fixture.
+const rearOnly = process.argv.includes("--rear-only");
+
 const TAN52 = Math.tan(52 * Math.PI / 180);   // Script_Physics: setMaxSlopeClimbAngle(52°)
 const CAPSULE_R = 0.35;                        // 路线净空半径（MakeCharacter 的 0.34 + 余量）
 const Scenario = Object.fromEntries(Layout.scenario.states.map((state) => [state.id, state.blocks]));
@@ -88,7 +92,7 @@ const report = {};
 // The wounded gunner must walk around the runtime supply collider from every
 // physically plausible side. This also samples the one-metre trench-to-step
 // rise; the open south detour must climb it as a slope, not a vertical lip.
-{
+if (!rearOnly) {
   const spec=MISSION_SUPPLIES.find(entry=>entry.id==="Front"),size=MISSION_SUPPLY_COLLIDER;
   const supply={id:"MissionSupplyFront",x:spec.x,z:spec.z,w:size.w,h:size.h,d:size.d,
     y:Ground(spec.x,spec.z)+size.h/2};
@@ -190,7 +194,7 @@ const report = {};
 // ---------------------------------------------------------------------------
 // 3. 掩蔽部：小型（7 × 7 m）、躺姿视线到门外 2–12 m，行刑处整个人都在视野里
 // ---------------------------------------------------------------------------
-{
+if (!rearOnly) {
   const blocks = Solids("BunkerCollapsed");
   // 2026-09-20 演出打磨：屋子从 12 m 进深收到 7 m，前墙在 z=-128。
   const doorZ = -128, band = [];
@@ -679,4 +683,24 @@ const report = {};
     JSON.stringify({ bounds: B, groundM: [g.w, g.d], railwayZ: report.railwayZ }));
 }
 
-console.log("ok first-level 2026.09.19 space:", JSON.stringify(report));
+// 16–17 are a roofed wing in the same ordinary receiving courtyard. Sample the
+// working floor, not one known roof ID, so a narrow cut-away strip cannot pass.
+{
+  const solids = Solids();
+  const roomSamples = [-30, -26, -22].flatMap(x => [227, 231, 235, 239, 241].map(z => ({x,z})));
+  for (const p of roomSamples) {
+    const floor = Ground(p.x, p.z);
+    const roof = solids.find(b => Math.abs(p.x-b.x)<b.w/2 && Math.abs(p.z-b.z)<b.d/2
+      && b.y-b.h/2>floor+2.4 && b.y-b.h/2<floor+4.2);
+    assert.ok(roof, `the ward floor at ${p.x},${p.z} has actual overhead cover`);
+  }
+  assert.deepEqual(RouteClearance(Routes.reception, solids, {margin:.625,ceiling:1.9}), [],
+    "two bearers can take the litter through the receiving yard and into the roofed ward");
+  for (const state of Layout.scenario.states) {
+    const ids=[...Layout.blocks,...state.blocks].map(b=>b.id);
+    assert.equal(new Set(ids).size,ids.length,`${state.id} has no duplicate whitebox block identifiers`);
+  }
+  report.wardCoveredSamples=roomSamples.length;
+  console.log("ok 16–17 roof covers the working floor and the two-bearer reception route stays clear");
+}
+console.log(rearOnly ? "ok first-level 06–18 space:" : "ok first-level 2026.09.19 space:", JSON.stringify(report));

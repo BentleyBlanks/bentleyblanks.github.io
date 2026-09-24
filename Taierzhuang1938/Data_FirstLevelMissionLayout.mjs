@@ -5,6 +5,9 @@ import { OPENING } from "./Data_FirstLevelOpening.mjs";
 import { MISSION_DEFENSE_POSTS } from "./Data_FirstLevelMissionFortifications.mjs";
 import { MISSION_TERRAIN, SampleMissionTerrain, SampleMissionNaturalHeight, MissionPathDistance, SampleMissionGroundColor, SampleMissionGroundSurface, TrenchPlanFor } from "./Data_FirstLevelMissionTerrain.mjs";
 import { PlanTrenchDressing } from "./Script_TrenchPlan.mjs";
+import { BuildVillageWhitebox } from "./Data_FirstLevelWhiteboxVillage.mjs";
+import { BuildTransferWhitebox } from "./Data_FirstLevelWhiteboxTransfer.mjs";
+import { BuildRearWhitebox } from "./Data_FirstLevelWhiteboxRear.mjs";
 // 2026.09.19 第二波：这一关的**边界**。军列与车站下线之后，旧的 z 到 743
 // （进站跑道尽头）有一半是空地 —— 地形高度场每格点都要烘，纯白烧。
 // z 北到 -232：最北的实体是弹药屋北墙 z=-219.3，北侧那道 3.1 m 地形墙在
@@ -752,6 +755,9 @@ export const MISSION_PLACEMENT = Object.freeze({
       { x: 62.4, z: -21.2, yaw: 0 }],
     windowShooter: { x: 83.2, z: 5, yaw: -1.57 },   // 东侧那户人家的窗后
   },
+  // Topology_09: a second gun controls the inner yard from the connected
+  // house's east side room. It is distinct from the main-street east window.
+  sideRoomGunner: { x: 68, z: 13.2 },
   // 12 牛车。座位是相对车体的偏移（+x 右、+z 车尾）。
   cartRide: {
     playerSeat: { dx: 0.62, dz: 0.95 },
@@ -906,6 +912,18 @@ const TRENCH_TRAFFIC_LANES = [
 // 所以第一遍照常吃全部路线；踏板和杂物摆在沟底中线附近，吃同一套路线的结果是
 // **一件都不剩** —— 而踏板本来就是给人踩的，杂物是不带碰撞的箱子。
 // 两遍用同一个种子，件的位置逐位相同，差的只是筛掉了哪些。
+// Notion 06–18 concept/topology refactor. Resolve authored replacements before
+// trench dressing so both automatic keep-outs and runtime collision see the
+// same final buildings. Scenario-only night geometry is attached separately.
+const whiteboxPackages = [BuildVillageWhitebox, BuildTransferWhitebox, BuildRearWhitebox]
+  .map(build => build(SampleMissionTerrain));
+for (const part of whiteboxPackages) {
+  const replaced = new Set(part.replaceBlockIds);
+  for (let index = blocks.length - 1; index >= 0; index -= 1)
+    if (replaced.has(blocks[index].id)) blocks.splice(index, 1);
+  blocks.push(...part.blocks);
+}
+export const MISSION_WHITEBOX_VERSION = "first-level-20260924-whitebox-06-18-r1";
 export const MISSION_TRENCH_PLACEMENTS = (() => {
   const shared = { groundAt: SampleMissionTerrain, laneCuts: FrontAssaultLaneCuts };
   const handPlaced = blocks.filter((block) => block.solid !== false)
@@ -1064,6 +1082,7 @@ const MISSION_SCENARIO = (() => {
   for (const [i, p] of [[-166, 326.6], [-154, 327.2], [-165.4, 344.8], [-154.6, 345.4]].entries())
     night.push(ScenarioBlock(`NightBrazier${i}`, p[0], p[1], 0.8, 0.7, 0.8, "metal",
       SampleMissionTerrain(p[0], p[1]) + 0.35));
+  night.push(...whiteboxPackages.flatMap(part => part.nightBlocks || []));
   return Object.freeze({
     replaceBlockIds: [],
     states: [

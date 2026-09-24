@@ -47,6 +47,10 @@ const browserLockWriteGraceMs = 10 * 1000;
 // 七章通关链不再存在）。expectedFailures 基线机制保留在 AssessResult 里，现在没有测试登记基线。
 
 export const testDefs = {
+  FirstLevelWhiteboxVillageTest: {file:"Script_FirstLevelWhiteboxVillageTest.mjs",desc:"06–10 referenced village buildings, kitchen link, real alley entry and sheltered litter detour"},
+  FirstLevelWhiteboxTransferTest: {file:"Script_FirstLevelWhiteboxTransferTest.mjs",desc:"11–14 loading yard, crouched cover, two fire lanes, open cart road and litter escape"},
+  FirstLevelRearSpaceTest: {file:"Script_FirstLevelSpaceTest.mjs",args:["--rear-only"],desc:"06–18 geometry scope with full route, litter, cart, roof, river and bridge checks"},
+  FirstLevelRearTopologyTest: {file:"Script_FirstLevelMissionTopologyTest.mjs",args:["--rear-only"],desc:"06–18 adopted topology and whitebox version, directions, distances and lifecycle"},
   FirstLevelFrontRouteBrowserTest:{file:"Script_FirstLevelFrontRouteBrowserTest.mjs",timeoutMs:1200000,desc:"Continuous 03–06 capture, optional gun, shared breach, supply sortie and collection return"},
   FirstLevelLeaderGuideTest: {file:"Script_FirstLevelLeaderGuideTest.mjs",desc:"Leader rendezvous, route progress, stage cues and story-first reminder scheduling"},
   FirstLevelLeaderGuideBrowserTest: {file:"Script_FirstLevelLeaderGuideBrowserTest.mjs",timeoutMs:600000,desc:"Real leader waiting/resuming, reachable stops, physical gesture and single COD-style marker"},
@@ -471,7 +475,7 @@ export const domains = {
   propVelocity: {label:'近景刚体道具速度与移动清晰度',tests:['CarriagePropVelocityTest','DraftCartEditorTest']},
   squadMarch: {label:"通用小队行进",tests:["SquadMarchCoverTest","SquadMarchCoverBrowserTest","SquadMarchTest","SquadMarchAiTest","SquadMarchEditorTest","SquadMarchNavigationTest","FirstLevelSquadMarchTest","EditorLauncherTest"]},
   firstLevelTail: {label:"第一关降压段至结尾定向续接",tests:["FirstLevelMissionStageRegroupTest","FirstLevelMissionStageTailTest"]},
-  firstLevel: {label:'新版第一关完整任务',tests:['FirstLevelFrontTopologyTest','FirstLevelEndTest','MachineGunCutsceneAudioTest','Type89DamageTest','FirstLevelFrontRouteBrowserTest','FirstLevelMissionTopologyTest','FirstLevelMissionTopologyBrowserTest','FirstLevelSpaceTest','MissionReturnTest','FirstLevelMissionReturnBrowserTest','FirstLevelCasualtyBrowserTest','FirstLevelMissionTest','MissionGatesTest','FirstLevelVoiceTest','FirstLevelVoiceAudioTest','FirstLevelFrontPresenceTest','FirstLevelMachineGunTest','FirstLevelZhouExitBrowserTest','FirstLevelMachineGunCutsceneTest','FirstLevelMissionAftermathTest','FirstLevelMissionFortificationsTest','FirstLevelMissionBrowserTest','FirstLevelMissionStageJumpTest','FirstLevelMissionStageContinueTest','FirstLevelMissionPresentationTest','FirstLevelMidTest','FirstLevelFrontTest']},
+  firstLevel: {label:'新版第一关完整任务',tests:['FirstLevelWhiteboxVillageTest','FirstLevelWhiteboxTransferTest','FirstLevelRearSpaceTest','FirstLevelRearTopologyTest','FirstLevelFrontTopologyTest','FirstLevelEndTest','MachineGunCutsceneAudioTest','Type89DamageTest','FirstLevelFrontRouteBrowserTest','FirstLevelMissionTopologyTest','FirstLevelMissionTopologyBrowserTest','FirstLevelSpaceTest','MissionReturnTest','FirstLevelMissionReturnBrowserTest','FirstLevelCasualtyBrowserTest','FirstLevelMissionTest','MissionGatesTest','FirstLevelVoiceTest','FirstLevelVoiceAudioTest','FirstLevelFrontPresenceTest','FirstLevelMachineGunTest','FirstLevelZhouExitBrowserTest','FirstLevelMachineGunCutsceneTest','FirstLevelMissionAftermathTest','FirstLevelMissionFortificationsTest','FirstLevelMissionBrowserTest','FirstLevelMissionStageJumpTest','FirstLevelMissionStageContinueTest','FirstLevelMissionPresentationTest','FirstLevelMidTest','FirstLevelFrontTest']},
   text: { label: "玩家文本 / 数值表（数据驱动闸门）", tests: ["TextTest", "TextGatherCheck"] },
   animation: { label: '独立动画资产验收', tests: ['ActorLocomotionTest','BackRifleRunTest','MeleeAnimationTest','DadaoSwingTest','GrenadeThrowTest','InfantryAnimationTest','DeathCollapseTest'] },
   explosives: { label: "爆炸白盒与通用地形形变/返掷", tests: ["ExplosionRulesTest", "ExplosionRangeTest", "CraterSurfaceTest"] },
@@ -569,6 +573,7 @@ export const domains = {
 };
 
 const changedDomainRules = [
+  {domain:"firstLevel",pattern:/FirstLevelWhitebox(Village|Transfer|Rear)/},
   {domain:"menu",pattern:/PlayerDeath/},
   {domain:"combat",pattern:/PlayerDeath/},
   {domain:"openingStoryboards",pattern:/OpeningStoryboards|OpeningStoryboardAnimation|OpeningStoryboardBake|OpeningActorPerformance|OpeningFirstPerson|FirstLevelCampaignOpening/},

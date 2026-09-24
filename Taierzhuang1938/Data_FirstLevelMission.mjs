@@ -178,10 +178,10 @@ export const MISSION_ENCOUNTERS = Object.freeze({
   bundleApproach: Sortie.enemies,
   tank: [{id:"TankEscortA",x:53,z:-180},{id:"TankEscortB",x:55,z:-176}],
   village: [
-    { id: "VillageGunner", x: 43, z: 8, weapon: "Type11", hold: true },
+    { id: "VillageGunner", ...P.sideRoomGunner, weapon: "Type11", hold: true },
     { id: "VillageCorner", x: 54, z: -12 },
     { id: "KitchenGuard", x: 58, z: -7 },
-    { id: "RearWindow", x: 66, z: 16 },
+    { id: "RearWindow", ...P.streetBlock.windowShooter, hold: true },
     { id: "SideYard", x: 40, z: 27 },
   ],
   // 09：日军从与东巷相通的连屋出来，不再预埋伏击位（契约 §4）。玩家先手打掉就没有僵持。

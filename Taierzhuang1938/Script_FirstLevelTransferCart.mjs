@@ -287,13 +287,21 @@ export class FirstLevelTransferCart {
       .slice(0, 2);
     // 这两个人这段时间归卸车用：让 column 的行进循环别再按队列把他们拖走。
     for (const bearer of bearers) bearer.treating = true;
-    this.unload = { cart, target, bearers, seconds: 0, lowered: false };
+    // A reserved cart may already carry another wounded man. Unload those
+    // passengers first, then Zhou: his existing fact cannot strand anyone aboard.
+    const passengers = column.litters.filter(litter => cart.load.includes(litter.id)
+      && litter.health > 0 && !litter.evacuated && !litter.zhou);
+    passengers.push(column.zhou);
+    const queue = passengers.map((litter, index) => ({ litter,
+      // Keep additional litters north of Zhou, away from the river-bank descent.
+      target: { x: target.x, z: target.z - (passengers.length - 1 - index) * 2 * R.litterSpacingM } }));
+    this.unload = { cart, target: queue[0].target, queue, index: 0, bearers, seconds: 0, lowered: false };
   }
 
   UpdateUnload(dt) {
     const unload = this.unload;
     if (!unload || unload.lowered) return;
-    const r = this.r, zhou = r.column.zhou;
+    const r = this.r, litter = unload.queue[unload.index].litter;
     let ready = true;
     for (const [i, bearer] of unload.bearers.entries()) {
       const slot = { x: unload.target.x + (i ? 0.9 : -0.9), z: unload.target.z };
@@ -307,20 +315,31 @@ export class FirstLevelTransferCart {
       }
     }
     if (!ready) return;
-    if (!unload.started) { unload.started = true; r.column.BeginZhouUnload(unload.target); }
+    if (!unload.started) {
+      unload.started = true;
+      unload.from = { x: litter.x, z: litter.z };
+      r.column.BeginLitterUnload(litter, unload.target);
+    }
     unload.seconds += dt;
     const fraction = Math.min(1, unload.seconds / M.unloadSeconds);
-    zhou.liftFraction = 1 - fraction;
-    zhou.x = unload.cart.x + (unload.target.x - unload.cart.x) * fraction;
-    zhou.z = unload.cart.z + (unload.target.z - unload.cart.z) * fraction;
+    litter.liftFraction = 1 - fraction;
+    litter.x = unload.from.x + (unload.target.x - unload.from.x) * fraction;
+    litter.z = unload.from.z + (unload.target.z - unload.from.z) * fraction;
     if (fraction < 1) return;
+    litter.liftFraction = 0;
+    litter.state = "waiting";
+    if (!litter.zhou) {
+      unload.index++;
+      unload.target = unload.queue[unload.index].target;
+      unload.started = false;
+      unload.seconds = 0;
+      return;
+    }
     unload.lowered = true;
     for (const bearer of unload.bearers) bearer.treating = false;
-    zhou.liftFraction = 0;
-    zhou.state = "waiting";
-    zhou.health = Math.min(zhou.health, 45);
-    zhou.bearers = [Math.max(1, zhou.bearers[0]), Math.max(1, zhou.bearers[1])];
-    r.Record("zhouUnloaded", { x: zhou.x, z: zhou.z });
+    litter.health = Math.min(litter.health, 45);
+    litter.bearers = [Math.max(1, litter.bearers[0]), Math.max(1, litter.bearers[1])];
+    r.Record("zhouUnloaded", { x: litter.x, z: litter.z });
     r.Say("WestDitchOrder");
   }
 

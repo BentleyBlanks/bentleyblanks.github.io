@@ -30,6 +30,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
+import { MISSION_ENCOUNTERS } from "./Data_FirstLevelMission.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(projectDir, "..");
@@ -623,7 +624,7 @@ try {
     `阶段3 ${p3?.enemy} px vs 阶段12 ${p12?.enemy} px`);
 
   // -------------------------------------------------------------------------
-  // 3) PickAt：点得中 VillageGunner (43, 8)
+  // 3) PickAt：点得中当前编排的 VillageGunner
   // -------------------------------------------------------------------------
   const pick = await page.evaluate(() => {
     const map = window.__map;
@@ -634,11 +635,12 @@ try {
         if (member.id === "VillageGunner") truth = { x: member.x, z: member.z, encounter: encounter.id };
       }
     }
+    window.__GunnerPoint = { x: truth.x, z: truth.z };
     const hits = [];
     for (const phase of model.phases) {
       map.SetPhase(phase.number);
-      map.ZoomTo({ x: 43, z: 8 }, 40);
-      const screen = map.WorldToScreen(43, 8);
+      map.ZoomTo(truth, 40);
+      const screen = map.WorldToScreen(truth.x, truth.z);
       const sel = map.PickAt(screen.x, screen.y);
       if (sel && sel.id === "VillageGunner") hits.push({ phase: phase.number, sel, screen });
       // 空地上点一下必须什么也点不到 —— 否则 PickAt 就是个「永远返回最近的东西」
@@ -647,8 +649,9 @@ try {
     }
     return { truth, hits: hits.slice(0, 4), count: hits.length, leaky: hits.some((h) => h.leaky) };
   });
-  Check("模型里 VillageGunner 就在 (43, 8)",
-    !!pick.truth && pick.truth.x === 43 && pick.truth.z === 8,
+  const authoredGunner=MISSION_ENCOUNTERS.village.find(member=>member.id==="VillageGunner");
+  Check("模型里 VillageGunner 与当前关卡编排坐标一致",
+    !!pick.truth && pick.truth.x === authoredGunner.x && pick.truth.z === authoredGunner.z,
     pick.truth ? `${pick.truth.encounter} 组 @ (${pick.truth.x}, ${pick.truth.z})` : "没找到这个人");
   Check("PickAt 点得中 VillageGunner", pick.count > 0 && pick.hits[0]?.sel?.kind === "member",
     `${pick.count} 个阶段命中；首个 = 阶段 ${pick.hits[0]?.phase}，encounterId=${pick.hits[0]?.sel?.encounterId}`);
@@ -844,12 +847,12 @@ try {
     let phase = null;
     for (const p of model.phases) {
       map.SetPhase(p.number);
-      map.ZoomTo({ x: 43, z: 8 }, 40);
-      const screen = map.WorldToScreen(43, 8);
+      map.ZoomTo(before, 40);
+      const screen = map.WorldToScreen(before.x, before.z);
       if (map.PickAt(screen.x, screen.y)?.id === "VillageGunner") { phase = p.number; break; }
     }
     map.SetTool("select");
-    const screen = map.WorldToScreen(43, 8);
+    const screen = map.WorldToScreen(before.x, before.z);
     window.__Mouse("mousedown", screen.x, screen.y);
     window.__Mouse("mouseup", screen.x, screen.y);
     const selected = map.selection;
@@ -880,14 +883,14 @@ try {
     map.SetTool("select");
     map.SetSelection(null);
     map.SetHover(null);
-    map.ZoomTo({ x: 43, z: 8 }, 40);
+    map.ZoomTo(window.__GunnerPoint, 40);
     const base = window.__Count([]).sum;
-    const screen = map.WorldToScreen(43, 8);
+    const screen = map.WorldToScreen(window.__GunnerPoint.x, window.__GunnerPoint.z);
     const before = window.__events.hover.length;
     window.__Mouse("mousemove", screen.x, screen.y);
     const hovered = window.__Count([]).sum;
     const sel = map.hover;
-    map.SetSelection({ kind: "member", id: "VillageGunner", x: 43, z: 8 });
+    map.SetSelection({ kind: "member", id: "VillageGunner", ...window.__GunnerPoint });
     const selected = window.__Count(["select"]);
     return {
       sel, added: window.__events.hover.length - before,
@@ -1122,8 +1125,8 @@ try {
       ? ["members", "routes", "zones", "friendlies", "anchors", "notes"].every((k) => map.filter[k] === null)
       : false;
     // 被过滤掉的人也不该再点得中。
-    map.ZoomTo({ x: 43, z: 8 }, 40);
-    const gunner = map.WorldToScreen(43, 8);
+    map.ZoomTo(window.__GunnerPoint, 40);
+    const gunner = map.WorldToScreen(window.__GunnerPoint.x, window.__GunnerPoint.z);
     const pickFiltered = map.PickAt(gunner.x, gunner.y);
     map.SetFilter(null);
     const pickBack = map.PickAt(gunner.x, gunner.y);
@@ -1342,13 +1345,13 @@ try {
     map.SetHover(null);
     map.SetPhase(12);
     map.SetClusterGap(0);                 // 逐个人画，免得点到的是一撮人
-    map.ZoomTo({ x: 43, z: 8 }, 60);      // VillageGunner 就在 (43, 8)
+    map.ZoomTo(window.__GunnerPoint, 60);      // 当前编排中的 VillageGunner
     const shapes = [
       { type: "circle", x: 0, z: 0, r: 12 },
       { type: "arrow", from: { x: 20, z: -30 }, to: { x: 60, z: -30 } },
       { type: "path", points: [{ x: -20, z: 40 }, { x: 0, z: 50 }, { x: 20, z: 40 }] },
       { type: "label", x: 60, z: 20, text: "这里太早" },
-      { type: "ghost", x: 43, z: 8, memberId: "TransferGunner" },       // 正压在一个人身上
+      { type: "ghost", ...window.__GunnerPoint, memberId: "TransferGunner" },       // 正压在一个人身上
       { type: "ghost", x: 95, z: -34, memberId: "TransferGunner" },     // 空地上的那一枚
     ];
     const emptySpot = map.WorldToScreen(95, -34);
@@ -1360,7 +1363,7 @@ try {
     const arrowA = S(20, -30), arrowB = S(60, -30);
     const pathMid = S(-10, 45);
     const label = S(60, 20);
-    const onMan = S(43, 8);
+    const onMan = S(window.__GunnerPoint.x, window.__GunnerPoint.z);
     const picks = {
       circleCentre: map.PickAt(centre.x, centre.y),
       circleRim: map.PickAt(rim.x, rim.y),
@@ -1424,7 +1427,7 @@ try {
     const map = window.__map;
     const events = window.__events;
     map.SetPhase(12);
-    map.ZoomTo({ x: 43, z: 8 }, 60);
+    map.ZoomTo(window.__GunnerPoint, 60);
     map.SetSketch([{ type: "ghost", x: 95, z: -34, memberId: "TransferGunner" }]);
     map.SetTool("move");
     const from = map.WorldToScreen(95, -34);
@@ -1458,8 +1461,8 @@ try {
     map.SetLive(null);
     map.SetClusterGap(0);
     map.SetPhase(12);
-    map.ZoomTo({ x: 43, z: 8 }, 40);
-    const on = map.WorldToScreen(43, 8);
+    map.ZoomTo(window.__GunnerPoint, 40);
+    const on = map.WorldToScreen(window.__GunnerPoint.x, window.__GunnerPoint.z);
     const empty = { x: on.x + 260, y: on.y + 240 };
     const out = {};
     const Counts = () => ({ mention: events.mention.length, select: events.select.length });

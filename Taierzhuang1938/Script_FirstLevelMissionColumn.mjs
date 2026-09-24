@@ -321,13 +321,17 @@ export class FirstLevelMissionColumn {
   }
   /** 13 卸回担架：先从车上摘下来，位置交给卸人那一段（有过程，不是瞬间）。 */
   BeginZhouUnload(target) {
-    const cart = this.zhouRideCart, zhou = this.zhou;
-    if (!zhou) return false;
-    if (cart) cart.load = cart.load.filter((id) => id !== zhou.id);
-    zhou.loaded = false;
-    zhou.state = "unloading";
-    zhou.unloadTarget = { ...target };
-    zhou.unloadedFromCart = true;   // 位置由 TransferCart.UpdateUnload 自己插值
+    return this.BeginLitterUnload(this.zhou, target);
+  }
+  /** Every passenger on the stopped cart uses the same physical unloading handoff. */
+  BeginLitterUnload(litter, target) {
+    if (!litter) return false;
+    const cart = this.vehicles.find(entry => entry.load.includes(litter.id));
+    if (cart) cart.load = cart.load.filter(id => id !== litter.id);
+    litter.loaded = false;
+    litter.state = "unloading";
+    litter.unloadTarget = { ...target };
+    litter.unloadedFromCart = true; // TransferCart owns the lowering interpolation.
     return true;
   }
   /**

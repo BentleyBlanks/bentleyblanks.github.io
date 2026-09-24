@@ -69,8 +69,8 @@ import { FirstLevelMissionVoice } from "./Script_FirstLevelMissionVoice.mjs";
 import { FirstLevelMissionMusic } from "./Script_FirstLevelMissionMusic.mjs";
 // 15–18（End 包）：运行时只留薄钩子，演出与判定在这几个模块里。
 import { EndExtras, EndDressing } from "./Script_FirstLevelEndCast.mjs";
-import { FirstLevelQuietMarch } from "./Script_FirstLevelQuietMarch.mjs";
-import { FirstLevelReception, ReceptionBedGuideRoute } from "./Script_FirstLevelReception.mjs";
+import { FirstLevelQuietMarch, WallPathGuideRoute } from "./Script_FirstLevelQuietMarch.mjs";
+import { FirstLevelReception, ReceptionBedGuideRoute, ReceptionBedGuideArrivalM, ReceptionDepartureRoute } from "./Script_FirstLevelReception.mjs";
 import { FirstLevelBridge } from "./Script_FirstLevelBridge.mjs";
 import { FirstLevelNightGate } from "./Script_FirstLevelNightGate.mjs";
 import { FirstLevelNightLights } from "./Script_FirstLevelNightLights.mjs";
@@ -791,8 +791,13 @@ export class FirstLevelMissionRuntime {
       if (this.reception.HasWalk(actor.id)) { actor.scriptedNoncombatant = true; continue; }
       if (actor === this.bedGuide?.actor && ["Handover", "Death"].includes(stage)) {
         const route = this.bedGuide.route;
-        while (route.length && Distance(actor.position, route[0]) < 0.7) route.shift();
-        if (route.length) this.MoveActor(actor, route[0], R.rescuerApproachMps);
+        while (route.length && Distance(actor.position, route[0]) < ReceptionBedGuideArrivalM(route)) route.shift();
+        if (route.length) {
+          this.ai.SetStance(actor, 0, 0.5, true);
+          this.MoveActor(actor, route[0], R.rescuerApproachMps);
+          // MoveActor 的通用停步半径较大；AI 也须继续走入最终点容差。
+          if (route.length === 1) actor.scriptArrivalRadius = ReceptionBedGuideArrivalM(route) * 0.5;
+        }
         else {
           this.MoveActor(actor, actor.position, 0);
           this.ai.SetStance(actor, stage === "Death" ? 1 : 0, 0.5, true);
@@ -1470,7 +1475,7 @@ export class FirstLevelMissionRuntime {
         break;
       case "WallPath":
         this.column.zhou.health = 12;
-        this.Guide(MISSION_STAGE_ROUTES.wallPath);
+        this.Guide(WallPathGuideRoute());
         this.quietMarch.Enter("WallPath");
         break;
       case "ReceptionGate":
@@ -1483,18 +1488,17 @@ export class FirstLevelMissionRuntime {
         this.column.zhou.state = "waiting";
         this.bedGuide = {
           actor: this.companion.Handle("yaowa"),
-          route: ReceptionBedGuideRoute("Handover"),
+          route: ReceptionBedGuideRoute("Handover", this.companion.Handle("yaowa")?.position),
         };
         if (this.bedGuide.actor) this.squadRoutes.set(this.bedGuide.actor.id, []);
         this.EnsureYardCast();
         this.reception.Enter("Handover");
         break;
       case "Death":
-        // 16 的长接收路线可能还剩中间点；17 只保留床边这一段，避免幺娃被旧路线
-        // 拉回门外，导致他永远够不到覆盖物。正常流程仍由 MoveActor 真走到侧位。
+        // 已在屋内才收束到床边；屋外的幺娃继续经真实门洞进入。
         this.bedGuide = {
           actor: this.companion.Handle("yaowa"),
-          route: ReceptionBedGuideRoute("Death"),
+          route: ReceptionBedGuideRoute("Death", this.companion.Handle("yaowa")?.position, this.bedGuide?.route),
         };
         if (this.bedGuide.actor) this.squadRoutes.set(this.bedGuide.actor.id, []);
         this.EnsureYardCast();
@@ -1504,7 +1508,13 @@ export class FirstLevelMissionRuntime {
         this.reception.EndBedsideCare();
         this.guideRoute = null;
         this.audio.Ambience("firstLevelFront");
-        this.Guide(MISSION_STAGE_ROUTES.toBridge);
+        this.Guide(MISSION_STAGE_ROUTES.toBridge, { fromStart: true });
+        for (const actor of this.squad) {
+          const endPost = this.squadRoutes.get(actor.id)?.at(-1);
+          this.squadRoutes.set(actor.id, ReceptionDepartureRoute(actor.position, endPost));
+        }
+        this.leaderGuide?.Plan(this.squadRoutes.get(this.squad[GUIDE.leaderIndex]?.id));
+        this.RebuildSquadMarch(MISSION_STAGE_ROUTES.toBridge);
         this.bridge.Enter("BridgeOrders");
         break;
       case "BridgeCover":
@@ -2331,8 +2341,10 @@ export class FirstLevelMissionRuntime {
       // Notion 06 是老周「看见顺子经过」才开口，触发与担架员的走位在
       // Script_FirstLevelCollection.UpdateOrders 里（玩家走到他跟前、脸朝着他）。
       if(this.GateNear("ordersReached")){this.Record("ordersReached");this.Say("Volunteer");}
-      // 后送队真实起行：担架队离开集结处，队首走出 litterSpacingM 以上。
-      if(this.Has("zhouOnLitter")&&this.column.litters.some(litter=>litter.progress>=R.litterSpacingM))
+      // Keep Orders updating until Zhou's lift really reaches the route. Other
+      // litters may already be ahead when the ZhouLift voice finishes.
+      if(this.Has("zhouOnLitter")&&this.frontShow.collection.ZhouLiftComplete()
+        &&this.column.litters.some(litter=>litter.progress>=R.litterSpacingM))
         this.Record("columnDeparted",{lead:Math.max(...this.column.litters.map(litter=>litter.progress))});
     }
     if(stage==="South"){
@@ -2443,6 +2455,7 @@ export class FirstLevelMissionRuntime {
     }
     // 15A 收拢：无战斗。空袭后的追兵由警戒兵在车路方向接住，沟壁折角切断射线。
     if (stage === "Regroup") {
+      maxProgress = this.quietMarch.ColumnLimit();
       safe = !this.Threatens(A.retreatA);
       safeAt = point => !this.Threatens(point);
       for (const [id, actor] of this.enemies)

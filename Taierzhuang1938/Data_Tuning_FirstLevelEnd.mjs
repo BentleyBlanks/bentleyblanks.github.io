@@ -95,6 +95,16 @@ export const END_TUNING = Object.freeze({
   // -------------------------------------------------------------------------
   // 16 Handover —— 完成交接
   // -------------------------------------------------------------------------
+  // 有限接驳点：院北外沿绕东端、院门、街房南门与厢房南门。
+  // 不假设班里人已经跟到玩家身旁；从演员真实位置检验可走线段。
+  receptionApproach: Object.freeze([
+    { x: -25, z: 216 }, { x: -1, z: 216 }, { x: 6, z: 216 },
+    { x: 6, z: 240 }, { x: -5, z: 240 }, { x: -5, z: 234 },
+    { x: -13, z: 240 }, { x: -13, z: 249 }, { x: -26, z: 249 },
+    { x: -26, z: 246 }, { x: -26, z: 241 },
+  ].map(point => Object.freeze(point))),
+  receptionWalkerRadiusM: 0.34,
+  receptionWalkArrivalM: 0.25,
   // 军医：常位是 MISSION_PLACEMENT.receptionYard.surgeon (−27.4,241.2)，在厢房里。
   // 放置点是**锚点** A.zhouDrop (−25,242)（不是 receptionYard.zhouPlaced，那一点是
   // 空间包给布景用的）。「这副放这里」时他站到放置点西北角指位置，
@@ -132,6 +142,8 @@ export const END_TUNING = Object.freeze({
   nextLitterReachM: 2.6,
   // 幺娃把覆盖物拉正：蹲在老周身边这么久（纯演出，不是闸）。
   coverStraightenS: 2.6,
+  // 最后床边点必须走实：目标本身距老周约 1.96 m，通用 0.7 m 容差可能停在护理范围外。
+  bedsideArrivalM: 0.2,
   // 何有田经过门边看一眼又转向外面。
   heDoorLook: Object.freeze([{ x: -26, z: 244.6 }, { x: -26, z: 246.8 }, { x: -21, z: 247.4 }]),
 
