@@ -36,7 +36,7 @@ export const OPENING_STORYBOARDS = Object.freeze({
   // Kept for the dadao ambush adapter in Script_OpeningStoryboardAnimation (legacy DadaoHeavy).
   ambushS:1.1,
   // Move speeds of the director's walks along trench polylines (m/s).
-  speed:Object.freeze({ walk:1.5, creep:1.15, run:3.2, drag:1.25, flee:3.4, stroll:1.1 }),
+  speed:Object.freeze({ walk:1.5, brisk:2.3, creep:1.15, run:3.2, drag:1.25, flee:3.4, stroll:1.1 }),
   arriveM:.12,
   // Hard timeouts (s since the phase began, or since the named wait began). A timeout never
   // skips a physical beat that the flow needs: it forces the beat (a late walker runs, a
@@ -76,7 +76,7 @@ export const OPENING_STORYBOARDS = Object.freeze({
   ija:Object.freeze({
     // ijaA/ijaB come down the link sap to J, then west along the trench to the buried comrade.
     walkIn:Route([23.5,-130],[18.2,-125.6],[14,-124.6],[9,-124.8]),
-    walkInDelayS:Object.freeze({ ijaA:3.5, ijaB:4.4 }),
+    walkInDelayS:Object.freeze({ ijaA:2.2, ijaB:3.0 }),   // after the eyes open (Wake)
     // After the throat cut ijaB turns to the front (east) until the Found drag begins.
     ijaBWatch:P(6.4,-125.1),
     // Found: ijaA's path from the kill spot back in through the mouth to Shunzi.
@@ -101,6 +101,7 @@ export const OPENING_STORYBOARDS = Object.freeze({
     ijaBGuard:Object.freeze([-.55,-1.25]),  // ijaB aims at him from the left front, then kicks
     ijaBWatch:P(5.25,-125.82,-.96),       // ...then turns to the front at the north wall (wall 0.7 m on his left)
     kickM:.62,
+    creepAfterAskS:1.2,             // Luo comes round RC this long after the interpreter's first question
     // Luo and He creep from RC down the SSW leg, over the crater step, to their marks.
     luoRoute:Route([-4,-113],[-1,-118.5],[1.2,-120.4],[3.1,-121.3],[4.7,-122.6],[5.25,-123.7]),
     heRoute:Route([-4,-113],[-1,-118.5],[1.2,-120.4],[3.1,-121.3],[4.9,-121.9]),
@@ -118,7 +119,7 @@ export const OPENING_STORYBOARDS = Object.freeze({
   // ---- 02 withdrawal (RearTrench) --------------------------------------------------------
   withdraw:Object.freeze({
     // The player's way out: mouth -> bend -> crater step (exposed to F) -> SSW leg -> RC.
-    lane:Route([.3,-125.1],[1.7,-125.3],[3.3,-124.2],[3.3,-122.2],[3.1,-121.3],[1.4,-120.8],[-.3,-120.6],[-1,-118.5],[-4,-113]),
+    lane:Route([.3,-125.1],[1.7,-125.3],[3.3,-124.2],[3.3,-122.2],[3.1,-121.3],[1.4,-120.8],[-.6,-120.4],[-1,-118.5],[-4,-113]),
     luoCover:P(-.6,-120.4),                // first intact wall past the low section, turned back to cover
     luoCorner:P(-7.2,-111.8),              // beyond RC, waiting for the player
     heBound:Route([-.2,-121.9],[-1.2,-118.2]),

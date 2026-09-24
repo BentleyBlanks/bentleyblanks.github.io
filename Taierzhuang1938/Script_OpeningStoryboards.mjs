@@ -106,7 +106,7 @@ export class FirstLevelBunkerShow {
     this.Spawn("runner","nra",b.runnerRoute[0],SpeakingCastOptions("runner"));
     this.Spawn("shouter","nra",b.shouter,SpeakingCastOptions("shouter"));
     // NRA06 wears the interpreter's own plain clothes (no uniform tint to override).
-    this.Spawn("interpreter","ija",C.ija.interpreterEnter[0],{unarmed:true,...SpeakingCastOptions("interpreter")});
+    this.Spawn("interpreter","ija",C.ija.interpreterEnter[0],{unarmed:true,actorKind:"nra",...SpeakingCastOptions("interpreter")});
     for(const actor of r.squad){InstallOpeningStoryboardAnimation(actor);if(["luo","heyoutian"].includes(actor.castId))PinOpeningScale(actor);}
     this.AdoptAssault();
     this.playerBody=r.actorFactory.Create("nra",{weapon:null,modelVariant:1,seed:101});
@@ -194,6 +194,37 @@ export class FirstLevelBunkerShow {
     beam.position.set(x,this.r.battlefield.GroundHeight(x,z)+centre[1],z);
     beam.quaternion.setFromUnitVectors(new THREE.Vector3(1,0,0),new THREE.Vector3(d.x,axis[1],d.z).normalize());
     beam.visible=true;beam.updateMatrixWorld(true);
+  }
+  /**
+   * Furrows in the mud (drag marks behind the knees, claw marks under the fingers): thin ribbons that
+   * follow the shared ground sampler, one merged mesh per call, removed on Dispose.
+   */
+  MudMarks(route,{offsets=[-.17,.17],width=.07,lift=.012}={}){
+    const r=this.r,positions=[],index=[];
+    for(const offset of offsets){
+      const base=positions.length/3;
+      for(let i=0;i<route.length;i++){
+        const a=route[Math.max(0,i-1)],b=route[Math.min(route.length-1,i+1)],dx=b.x-a.x,dz=b.z-a.z,l=Math.hypot(dx,dz)||1;
+        const nx=-dz/l,nz=dx/l,cx=route[i].x+nx*offset,cz=route[i].z+nz*offset;
+        for(const side of [-1,1]){const x=cx+nx*width*.5*side,z=cz+nz*width*.5*side;positions.push(x,r.battlefield.GroundHeight(x,z)+lift,z);}
+        if(i)index.push(base+(i-1)*2,base+i*2,base+(i-1)*2+1,base+(i-1)*2+1,base+i*2,base+i*2+1);
+      }
+    }
+    if(!index.length)return null;
+    const geometry=new THREE.BufferGeometry();geometry.setAttribute("position",new THREE.Float32BufferAttribute(positions,3));
+    geometry.setIndex(index);geometry.computeVertexNormals();
+    this.mudMaterial??=new THREE.MeshStandardMaterial({color:0x2a231c,roughness:.95,metalness:0,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2});
+    if(!this.owned.includes(this.mudMaterial))this.owned.push(this.mudMaterial);
+    const mesh=new THREE.Mesh(geometry,this.mudMaterial);mesh.name="OpeningMudMarks";mesh.receiveShadow=true;
+    r.scene.add(mesh);this.ownedGeometry.push(geometry);(this.marks??=[]).push(mesh);
+    return mesh;
+  }
+  /** Sample a polyline every `step` metres (for the furrows). */
+  Densify(route,step=.25){
+    const out=[];
+    for(let i=1;i<route.length;i++){const a=route[i-1],b=route[i],n=Math.max(1,Math.ceil(Distance(a,b)/step));
+      for(let k=i===1?0:1;k<=n;k++)out.push({x:a.x+(b.x-a.x)*k/n,z:a.z+(b.z-a.z)*k/n});}
+    return out;
   }
   MoveRifle(point,instant=false){
     const item=this.r.bunkerRifle;if(!item?.view)return;
@@ -528,6 +559,12 @@ export class FirstLevelBunkerShow {
     this.Pose(this.Comrade,"BlastSlamBuried");
     this.VanguardFront(this.flags.vanguardAt);
     if(age>=1.0&&!this.scenes.BunkerSearch)this.Scene("BunkerSearch",r.voice?.PlayScene("BunkerSearch",{speakers:this.Speakers()}));
+    // 「手指在泥里抓出一道痕」: four short furrows under his right hand, in front of the eye.
+    if(age>=2&&!this.flags.clawed){
+      this.flags.clawed=true;const t=C.shunzi.trap,f={x:-Math.sin(t.yaw),z:-Math.cos(t.yaw)},side={x:-f.z,z:f.x};
+      const start={x:t.x+f.x*.38+side.x*.16,z:t.z+f.z*.38+side.z*.16};
+      this.MudMarks([start,{x:start.x-f.x*.22,z:start.z-f.z*.22}],{offsets:[-.03,-.01,.01,.03],width:.012,lift:.006});
+    }
     if(age>=C.timeouts.wakeS)this.Stage("FrontPass");
   }
   /** Where ijaA / ijaB stand when the drag starts (manifest stage captiveDrag, comrade anchor). */
@@ -542,13 +579,21 @@ export class FirstLevelBunkerShow {
     let ready=0;
     for(const role of ["ijaA","ijaB"]){
       const actor=this.Ija(role);if(!actor)continue;
-      if(age<C.ija.walkInDelayS[role]){this.Hide(actor);continue;}
+      if(r.time-this.flags.vanguardAt<C.ija.walkInDelayS[role]){this.Hide(actor);continue;}
       const mark=marks[role];
-      if(this.Follow(actor,"walkIn",[...C.ija.walkIn,mark],age>C.timeouts.walkInS?C.speed.run:C.speed.walk,null,mark.yaw)){
+      if(this.Follow(actor,"walkIn",[...C.ija.walkIn,mark],age>C.timeouts.walkInS?C.speed.run:C.speed.brisk,null,mark.yaw)){
         if(this.Hold(actor,mark,null))ready++;
       }
     }
     if(ready===2||age>C.timeouts.frontPassS&&ready===2)this.Stage("CaptiveDragged");
+  }
+  /** The interpreter squeezes in from the junction while the comrade is dragged and shoved. */
+  InterpreterIn(m=this.InterrogationMarks()){
+    const interp=this.cast.interpreter;if(!interp)return true;
+    if(this.flags.interpIn){this.Hold(interp,m.interpreter,"InterpreterCrouchAsk");return true;}
+    this.Show(interp);
+    if(this.Follow(interp,"enter",[...C.ija.interpreterEnter,m.interpreter],C.speed.walk,null,m.interpreter.yaw)){this.flags.interpIn=true;}
+    return !!this.flags.interpIn;
   }
   PhaseCaptiveDragged(age){
     const r=this.r,comrade=this.Comrade,ijaA=this.Ija("ijaA"),ijaB=this.Ija("ijaB"),marks=this.DragMarks();
@@ -560,6 +605,7 @@ export class FirstLevelBunkerShow {
     }
     this.VanguardFront(this.flags.vanguardAt);
     const t=r.time-this.flags.dragStart;
+    this.InterpreterIn();
     if(t<0){this.Pose(comrade,"BlastSlamBuried");this.Hold(ijaA,marks.ijaA,null);this.Hold(ijaB,marks.ijaB,null);return;}
     this.Put(comrade,C.banter.comradeBlast);this.Pose(comrade,"CaptiveDraggedFromDirt",{seconds:t});
     this.Put(ijaA,marks.ijaA);this.Pose(ijaA,"IjaDragCollarFromDirt",{seconds:t});
@@ -578,10 +624,8 @@ export class FirstLevelBunkerShow {
     this.VanguardFront(this.flags.vanguardAt);
     if(age<2)this.Pose(comrade,"CaptiveWallBrace");else this.Pose(comrade,"CaptiveKneelMud");
     if(age<1)this.Pose(ijaA,"IjaShoveToWall");else this.Hold(ijaA,m.ijaAHold,"CollarControl");
-    this.Hold(ijaB,m.ijaB,null,{speed:C.speed.walk});
-    this.Show(interp);
-    const interpIn=this.Follow(interp,"enter",[...C.ija.interpreterEnter,m.interpreter],C.speed.walk,null,m.interpreter.yaw);
-    if(interpIn)this.Hold(interp,m.interpreter,"InterpreterCrouchAsk");
+    this.Hold(ijaB,m.ijaB,age<1.1?"IjaReadyRifle":null,{speed:C.speed.walk,seconds:age<1.1?age:undefined});
+    const interpIn=this.InterpreterIn(m);
     if(age>=2&&this.SceneDone("CaptiveDragged")&&(interpIn||age>C.timeouts.walkInS))this.Stage("Interrogation");
   }
   PhaseInterrogation(age){
@@ -595,7 +639,7 @@ export class FirstLevelBunkerShow {
     this.Pose(comrade,"CaptiveKneelMud");
     this.Hold(ijaA,m.ijaAHold,"CollarControl");
     this.Hold(ijaB,m.ijaB,null);
-    this.Hold(interp,m.interpreter,"InterpreterCrouchAsk",{speed:C.speed.walk});
+    this.InterpreterIn(m);
     if(this.SceneDone("CaptiveInterrogation")||age>this.interrogationLength+C.timeouts.interrogationExtraS)this.Stage("Slash");
   }
   /** Hair grab, draw, cut (stages slashGrab/slashDraw/slashCut share the comrade's wall root). */
@@ -725,7 +769,11 @@ export class FirstLevelBunkerShow {
     ijaA.openingStoryboardContact=()=>this.CollarContact(ijaA);
     const arrived=this.Follow(ijaA,"dragOut",C.ija.dragOutRoute,C.speed.drag,"CollarDrag");
     this.dragOutProgress=Clamp(age/Math.max(.1,RouteLength(C.ija.dragOutRoute)/C.speed.drag));
-    if(arrived||age>C.timeouts.dragOutS){ijaA.openingStoryboardContact=null;this.Stage("Butt");}
+    if(arrived||age>C.timeouts.dragOutS){
+      ijaA.openingStoryboardContact=null;
+      this.MudMarks(this.Densify([C.shunzi.trap,...C.ija.dragOutRoute].map((p,i,all)=>i===all.length-1?C.shunzi.dragged:p)));
+      this.Stage("Butt");
+    }
   }
   /** ijaA's butt-strike root: Shunzi's head is the clip's `head` track point. */
   ButtRoot(){
@@ -776,9 +824,15 @@ export class FirstLevelBunkerShow {
       this.flags.rescuersPlaced=true;
       this.Put(luo,R.luoStart);this.Put(he,R.heStart);this.Put(liu,R.liuStart);
     }
+    // They come round RC only once the questioning is under way: at the glimpse Luo is on the
+    // south-south-west leg, over the interpreter's shoulder (K2), not already behind the circle.
+    const go=this.flags.askAt!=null?this.r.time-this.flags.askAt-C.rescue.creepAfterAskS:age-C.timeouts.holdLineS;
+    if(go<0&&!luoFast){for(const actor of [luo,he,liu])this.Hide(actor);return;}
     if(!this.flags.luoChopAt)this.Follow(luo,"rescue",[...R.luoRoute,chop.luo],luoFast?C.speed.run:C.speed.creep,"CreepDadao",chop.luo.yaw);
-    if(!this.flags.heChopAt&&age>.8)this.Follow(he,"rescue",[...R.heRoute,chop.he],heFast?C.speed.run:C.speed.creep,"CreepDadao",chop.he.yaw);
-    if(!this.flags.liuReleased&&age>1.6){if(this.Follow(liu,"rescue",[...R.liuRoute,R.liuShot],C.speed.creep,null,R.liuShot.yaw))this.Pose(liu,null,{face:Face(R.liuShot,A.bunkerJunction)});}
+    if(!this.flags.heChopAt&&(go>.8||heFast))this.Follow(he,"rescue",[...R.heRoute,chop.he],heFast?C.speed.run:C.speed.creep,"CreepDadao",chop.he.yaw);
+    else if(!this.flags.heChopAt)this.Hide(he);
+    if(!this.flags.liuReleased&&go>1.6){if(this.Follow(liu,"rescue",[...R.liuRoute,R.liuShot],C.speed.creep,null,R.liuShot.yaw))this.Pose(liu,null,{face:Face(R.liuShot,A.bunkerJunction)});}
+    else if(!this.flags.liuReleased)this.Hide(liu);
   }
   ChopMarks(m=this.CircleMarks()){
     const luo=this.StageRoot("chopRear","luo",m.ijaBWatch),he=this.StageRoot("chopParry","heyoutian",m.ijaA);
@@ -960,6 +1014,7 @@ export class FirstLevelBunkerShow {
     const arrived=this.Follow(luo,"dragCover",[...C.rescue.dragCoverRoute,C.rescue.luoCheck],C.speed.drag,"CollarDrag");
     if(arrived||age>C.timeouts.dragOutS){
       luo.openingStoryboardContact=null;
+      this.MudMarks(this.Densify([C.shunzi.dragged,...C.rescue.dragCoverRoute,C.shunzi.cover]),{offsets:[-.12,.12],width:.09});
       this.Stage("LongShot");
     }
   }
@@ -1193,7 +1248,14 @@ export class FirstLevelBunkerShow {
       const w=this.withdraw||(this.withdraw={step:0,at:r.time});
       const luo=this.Squad("luo"),he=this.Squad("heyoutian"),liu=this.Squad("liuwencai"),W=C.withdraw,p=r.player.position;
       const Post=(actor,point,face)=>{if(actor?.alive){actor.missionCoverWaiting=true;r.Defend(actor,point,.5,.6);if(face)actor.watchYaw=Face(point,face);}};
-      if(w.step===0){Post(luo,W.luoCover,A.bunkerFold);Post(he,C.rescue.heCover,A.bunkerFold);Post(liu,C.rescue.liuShot,A.bunkerJunction);
+      if(w.step===0){
+        // Luo goes first: out of the mouth, over the crater step, to the first intact wall (the mouth is
+        // walled off from the rear leg, so this leg is walked on the lane, not left to local steering).
+        if(luo?.alive&&!w.luoAtCover){
+          const lane=W.lane.slice(0,W.lane.findIndex(p=>p.x===W.luoCover.x&&p.z===W.luoCover.z)+1);
+          if(this.Follow(luo,"withdraw",lane.length>1?lane:[...W.lane.slice(0,7),W.luoCover],C.speed.run,null,Face(W.luoCover,A.bunkerFold))){
+            w.luoAtCover=true;luo.openingStoryboardPose=null;luo.openingStoryboardTravel=null;luo.openingStoryboardLast=null;luo.scriptedNoncombatant=false;}
+        }else Post(luo,W.luoCover,A.bunkerFold);Post(he,C.rescue.heCover,A.bunkerFold);Post(liu,C.rescue.liuShot,A.bunkerJunction);
         if(Distance(p,W.luoCover)<3.2||r.Has("cornerReached"))w.step=1,w.at=r.time;}
       else if(w.step===1){Post(luo,W.luoCorner,W.luoCover);Post(he,W.heBound[1],A.bunkerFold);Post(liu,C.rescue.liuShot,A.bunkerJunction);
         if(r.time-w.at>4||Distance(p,W.luoCorner)<6)w.step=2,w.at=r.time;}
@@ -1254,13 +1316,21 @@ export class FirstLevelBunkerShow {
       target=Head(ijaA)||At({x:1.5,z:-125.9},1.3);
       if(p==="Snag")roll=.05*Math.sin(a*20)*Math.exp(-a*3);
     }
-    else if(p==="DragOut"){const pt=this.PlayerPoint();eye=pt;height=.34+.04*Math.sin(r.time*9);target=Head(comrade)&&a<this.DragOutHalf()?Head(comrade):At(C.shunzi.dragged,.5);}
+    else if(p==="DragOut"){
+      const pt=this.PlayerPoint();eye=pt;height=.34+.04*Math.sin(r.time*9);
+      // Face down the drag at ijaA's legs; passing the comrade, the eyes drift over him.
+      const corpse=comrade?.position,near=corpse&&Distance(pt,corpse)<2.2;
+      target=near?At(corpse,.45):ijaA?At(ijaA.position,.55):At(C.shunzi.dragged,.5);
+    }
     else if(p==="Butt"){eye=S.dragged;height=.5;target=Head(ijaA)||At(S.dragged,1.2);if(this.strikeAt)roll=.22*Smooth((r.time-this.strikeAt)/.12);}
     else if(p==="Boots"){eye=S.dragged;height=.3;target=At(this.CircleMarks().ijaBGuard,.15);roll=.18;}
     else if(["Hold","Ask","KickShunzi","Glimpse","Collar","Chop","Parry"].includes(p)){
       const h=this.TrackPoint(ijaA,"head");eye=S.dragged;height=h?h.h:.66;
+      // 「他缓慢抬起眼睛……视线越过他的肩膀」: the head comes up enough to clear the crater step (K2 is 0.9).
+      if(["Glimpse","Collar"].includes(p))height=Math.max(height,.66+(.92-.66)*Smooth((p==="Glimpse"?a:1)/1.2));
       if(h&&["Hold","Ask","KickShunzi"].includes(p))eye={x:h.x,z:h.z};
-      target=["Glimpse","Collar"].includes(p)?(Head(luo)||At(A.rearCorner,1.3)):p==="Chop"?At(this.CircleMarks().ijaBWatch,1.1):p==="Parry"?(Head(ijaA)||At(S.dragged,1)):(Head(interp)||At(S.dragged,1));
+      const past=Head(luo)&&Head(interp)?Head(luo).clone().lerp(Head(interp),.3):Head(luo);
+      target=["Glimpse","Collar"].includes(p)?(past||At(A.rearCorner,1.3)):p==="Chop"?At(this.CircleMarks().ijaBWatch,1.1):p==="Parry"?(Head(ijaA)||At(S.dragged,1)):(Head(interp)||At(S.dragged,1));
       if(this.flags.kicked&&r.time-this.flags.kicked<.5)roll=.12*(1-(r.time-this.flags.kicked)/.5);
       if(this.flags.collarReleasedAt)height=Math.max(.34,height-(height-.34)*Smooth((r.time-this.flags.collarReleasedAt)/.4));
     }
@@ -1269,7 +1339,7 @@ export class FirstLevelBunkerShow {
     else if(p==="LongShot"){eye=S.cover;height=.62;target=At(A.bunkerJunction,1.2);}
     else if(p==="Check"){const h=this.TrackPoint(luo,"head");eye=h?{x:h.x,z:h.z}:S.cover;height=h?h.h:.73;target=Head(luo)||At(C.rescue.luoCheck,1);
       if(this.flags.checkLineAt!=null){const n=r.time-this.flags.checkLineAt;target=target.clone?target.clone():target;if(n<.8)target.y-=.18*Math.sin(Math.PI*n/.8);}}
-    else if(p==="KickRifle"){eye=S.cover;height=.7;target=At(C.rescue.rifleKicked,.1);}
+    else if(p==="KickRifle"){eye=S.cover;height=.72;const k=C.rescue.kickFrom,f=C.rescue.rifleKicked;target=At({x:(k.x+f.x)/2,z:(k.z+f.z)/2},.35);}
     return {eye,height,target,roll};
   }
   DragOutHalf(){return RouteLength(C.ija.dragOutRoute)/C.speed.drag*.6;}
@@ -1385,7 +1455,7 @@ export class FirstLevelBunkerShow {
     this.ReleaseMeleeDormancy();
     for(const actor of this.performanceActors||[])ClearOpeningActorPerformance(actor);this.performanceActors?.clear();
     this.r.hud.SetStoryBlood?.(0);this.supplyRoot?.removeFromParent();this.playerBody?.root.removeFromParent();this.playerBody?.Dispose?.();
-    this.beam?.removeFromParent();this.leftBeam?.removeFromParent();
+    this.beam?.removeFromParent();this.leftBeam?.removeFromParent();for(const mesh of this.marks||[])mesh.removeFromParent();this.marks=[];this.mudMaterial=null;
     for(const prop of this.rifleProps)prop.removeFromParent();this.rifleProps=[];
     for(const material of this.owned)material.dispose();for(const geometry of this.ownedGeometry||[])geometry.dispose();this.owned=[];this.ownedGeometry=[];
   }

@@ -201,7 +201,7 @@ export function ApplyOpeningRescueReady(actor,clock){
 // Step 2 of the Opening package replaces these with the draft's per-beat hand work.
 const PHASE_HANDS=Object.freeze({Banter:"Supply",Incoming:"Orders",Boots:"Black",
   Wake:"Advance",FrontPass:"Advance",CaptiveDragged:"Advance",CaptiveWall:"Advance",Interrogation:"Advance",Slash:"Advance",
-  Taunt:"Advance",Wipe:"Advance",Reach:"Advance",Found:"Advance",Snag:"Drag",KickBeam:"Drag",DragOut:"Drag",DragCover:"Drag",
+  Taunt:"Advance",Wipe:"Advance",Reach:"Advance",Found:"Advance",Snag:"Drag",KickBeam:"Drag",DragOut:"Drag",DragCover:"Interrogate",
   Hold:"Interrogate",Ask:"Interrogate",KickShunzi:"Interrogate",Glimpse:"Interrogate",Collar:"Interrogate",Chop:"Interrogate",
   Parry:"Interrogate",Flee:"Interrogate",LongShot:"Interrogate",Check:"Interrogate",KickRifle:"Kick"});
 /** The actor holding Shunzi's collar in a drag beat (ijaA in 01, Luo in 02). */
