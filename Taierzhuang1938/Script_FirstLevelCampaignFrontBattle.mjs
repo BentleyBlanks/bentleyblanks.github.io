@@ -238,7 +238,10 @@ export async function DriveFrontBattle(ctx){
   // (FRONT_SPACE.returnMeet: Liu, He and the relief NCO), and on to the collection.
   const back=MISSION_STAGE_ROUTES.collectionReturn,door=back.findIndex(p=>Math.hypot(p.x-Space.westDoor.x,p.z-Space.westDoor.z)<.5);
   assert.ok(door>0,"the collection return passes the nest's west door");
-  await Route(back.slice(0,door+1),"WestDoorGapWatch",{stance:"crouch",fight:true,crawl:true});
+  // Walk through the compound without stopping to trade shots: at the top of the rear-door ramp (29.9,−143.8) the
+  // bot's crawl-range target (28 m) finds an escort or the east pair behind cover it cannot hit and never moves
+  // again (09-24: three probe drives stalled there, keys up, no collider in the way). The watch itself fights below.
+  await Route(back.slice(0,door+1),"WestDoorGapWatch",{stance:"crouch",fight:false,crawl:true});
   await CaptureFocus("BreachReopened",S.gap);
   await WaitFact("lastGuardsWithdrawn",240,true);
   const meet=back.findIndex(p=>p.x===S.approach[2].x&&p.z===S.approach[2].z);
