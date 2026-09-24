@@ -98,6 +98,12 @@ const AUTOSTEP_PROBE_M = 0.14;
 // 同样给解析地表 0.45 m 的吸附距离，才不会走下坡时逐帧「离地—落下」。
 const ANALYTIC_GROUND_SNAP_M = 0.45;
 const CHARACTER_CONTACT_SKIN_M = 0.02;
+// 弹坑地形块（heightfield）的外沿压在坡上时，胶囊底球从解析地表那一侧走过去会**搁在块的边上**：
+// 边比脚下的解析地表高出几厘米，Rapier 只报碰撞不报站住，接缝那一侧没有别的实体。旧口径（离地首帧只认 2 cm 蒙皮）
+// 接不住它：grounded 一丢，重力逐帧累加（实测 −44 m/s），整块下落量被坡面法线投成「往回推」，人就钉在接缝上。
+// 2026-09-24：第一关阵位后门坡道 (29.9,−143.8)，弹坑块 3,−19 的北沿，03→06 驾驶十余趟停在同一点。
+// 碰到的是地形块时，吸附上限放到底球搁在 0.47 坡度的边上最多能被抬起的高度（半径 0.34 × 0.47 ≈ 0.16，取 0.18）。
+const TERRAIN_TILE_EDGE_SNAP_M = 0.18;
 
 const _q = { x: 0, y: 0, z: 0, w: 1 };
 /** 绕 Y 轴 ry 的四元数（这座城里所有旋转都只有偏航）。 */
@@ -902,8 +908,16 @@ export class CharacterBody {
     // authoritative analytic surface remains immediately beneath the feet.
     // Accept that skin-sized landing too; otherwise gravity accumulates while
     // the capsule is resting on the edge and cancels slow prone movement.
-    const snapAnalytic = !hasPhysicsGround && dy <= 0 && my <= 1e-4
+    let snapAnalytic = !hasPhysicsGround && dy <= 0 && my <= 1e-4
       && analyticGap >= 0 && analyticGap <= (wasGrounded ? ANALYTIC_GROUND_SNAP_M : CHARACTER_CONTACT_SKIN_M);
+    // 离地首帧以外：搁在弹坑地形块外沿上的也算站住（见 TERRAIN_TILE_EDGE_SNAP_M）。只在这一种窄情形下翻碰撞表。
+    if (!snapAnalytic && !hasPhysicsGround && dy <= 0 && my <= 1e-4 && analyticGap > CHARACTER_CONTACT_SKIN_M
+      && analyticGap <= TERRAIN_TILE_EDGE_SNAP_M && pw.terrainTiles.size) {
+      for (let i = 0; i < this.hitCount && !snapAnalytic; i++) {
+        const hit = cc.computedCollision(i);
+        snapAnalytic = !!hit?.collider && pw.recordByHandle.get(hit.collider.handle)?.terrain === true;
+      }
+    }
     if (this.position.y < g || snapAnalytic) {
       this.position.y = g;
       this.grounded = true;
