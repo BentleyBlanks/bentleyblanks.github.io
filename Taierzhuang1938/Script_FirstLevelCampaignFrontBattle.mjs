@@ -40,7 +40,10 @@ export async function DriveFrontBattle(ctx){
     const off=await page.evaluate(({x,z})=>{const p=window.Tengxian.player.position;return {d:Math.hypot(p.x-x,p.z-z),x:p.x,z:p.z,alive:window.Tengxian.player.alive};},S.seat);
     if(!off.alive||off.d<=3)return;
     // 东墙（x 33.5，z −140…−132）外面的人从墙南头绕回来（他也是从那儿被甩出去的）。
-    await Route(off.x>32.5?[{x:off.x,z:-141.8},{x:30,z:-141.8},S.seat]:[S.seat],label,{stance:"crouch",fight:true,recoverAfterEvade:true});
+    // 西墙（RightNestWestLow，x 23.65…24.35，z −156.8…−151.8）外面的人从西门回来（09-24 探针：躲雷甩到 (23.3,−153.9)，
+    // 直线回座位顶在那道矮墙上三个 chunk 不动）。
+    const west=off.x<24.4&&off.z<-151.2;
+    await Route(off.x>32.5?[{x:off.x,z:-141.8},{x:30,z:-141.8},S.seat]:west?[{x:off.x,z:Space.westDoor.z},Space.westDoor,S.seat]:[S.seat],label,{stance:"crouch",fight:true,recoverAfterEvade:true});
   }
   async function HoldNest({stage=null,fact=null},seconds,label){
     let state;
@@ -68,7 +71,44 @@ export async function DriveFrontBattle(ctx){
     assert.ok(state.alive,`${what}: player survives in the nest`);assert.ok(state.done,`${what}: reached while holding the nest`);
     return state;
   }
+  // Who hit the player (a cold start at 03 skips the 01 hook in Script_FirstLevelMissionBrowserTest): every Capture
+  // writes the last 12 into its Data_*.json (CampaignKit), so a death on a leg says which shooter did it.
+  await page.evaluate(()=>{
+    if(window.missionDamage)return;
+    const g=window.Tengxian,original=g.player.TakeHit.bind(g.player);window.missionDamage=[];
+    g.player.TakeHit=(damage,part,direction,info)=>{
+      const before=g.player.health,result=original(damage,part,direction,info),from=info?.from;let who=null,best=2.5;
+      if(from)for(const s of g.ai.soldiers){const d=Math.hypot(s.position.x-from.x,s.position.z-from.z);if(s.side==="ija"&&d<best){best=d;who=s.missionId||String(s.id);}}
+      window.missionDamage.push({time:+(g.Debug.FirstLevelMission()?.time??0).toFixed(1),stage:g.Debug.FirstLevelMission()?.stage,lost:+(before-g.player.health).toFixed(1),
+        who,blast:!!info?.blast,bullet:!!info?.bullet,from:from?.toArray?.().map(v=>+v.toFixed(1)),at:g.player.position.toArray().map(v=>+v.toFixed(1))});
+      if(window.missionDamage.length>120)window.missionDamage.shift();
+      return result;
+    };
+  });
   assert.equal((await State()).stage,"Support");
+  try{await DriveLegs();}
+  catch(error){
+    // Where the body stood when a leg failed: colliders and people within reach, keys, the route bot, the damage log
+    // (09-24: two idle-probe drives stalled 1.8 m short of the nest's rear door on WestDoorGapWatch).
+    const stuck=await page.evaluate(()=>{
+      const g=window.Tengxian,p=g.player,at=p.position,near=(x,z,m)=>Math.hypot(x-at.x,z-at.z)<m;
+      const colliders=(g.battlefield.colliders||[]).filter(b=>b?.c&&b?.h&&Math.abs(b.c[0]-at.x)<b.h[0]+b.h[2]+1.5&&Math.abs(b.c[2]-at.z)<b.h[0]+b.h[2]+1.5).slice(0,16)
+        .map(b=>({id:b.id||null,tag:b.tag||null,c:b.c.map(v=>+v.toFixed(2)),h:b.h.map(v=>+v.toFixed(2)),ry:b.ry||0}));
+      const people=g.ai.soldiers.filter(s=>near(s.position.x,s.position.z,2.5)).map(s=>({id:s.missionId||s.castId||s.id,side:s.side,alive:s.alive,x:+s.position.x.toFixed(2),z:+s.position.z.toFixed(2)}));
+      return {position:at.toArray().map(v=>+v.toFixed(2)),stance:p.stance,health:p.health,keys:[...(g.Debug.KeysDown?.()||[])],
+        routeBot:window.routeBot?{index:window.routeBot.index,target:window.routeBot.points?.[window.routeBot.index],stalled:window.routeBot.stalled}:null,
+        ground:g.battlefield.GroundHeight(at.x,at.z),colliders,people,damage:window.missionDamage?.slice(-20),
+        impacts:(g.Debug.FirstLevelMissionRuntime().tank?.impacts||[]).filter(i=>near(i.x,i.z,5)),
+        profile:(()=>{const t=window.routeBot?.points?.[window.routeBot.index];if(!t)return null;const out=[];
+          for(let k=0;k<=8;k++){const x=at.x+(t.x-at.x)*k/8,z=at.z+(t.z-at.z)*k/8;out.push([+x.toFixed(2),+z.toFixed(2),+g.battlefield.GroundHeight(x,z).toFixed(2)]);}return out;})(),
+        fragments:(()=>{const out=[],m=new (g.player.position.constructor)();g.scene.traverse(o=>{if(!o.isInstancedMesh||!/Fragment|Debris|Rubble/i.test(o.name+(o.parent?.name||'')))return;
+          const M=new (o.matrixWorld.constructor)();for(let i=0;i<o.count;i++){o.getMatrixAt(i,M);m.setFromMatrixPosition(M).applyMatrix4(o.matrixWorld);if(near(m.x,m.z,2.5))out.push([o.name,+m.x.toFixed(2),+m.y.toFixed(2),+m.z.toFixed(2)]);}});return out.slice(0,20);})()};
+    }).catch(e=>({error:String(e)}));
+    await fs.writeFile(path.join(output,"Data_FrontStuck.json"),JSON.stringify(stuck,null,2)).catch(()=>{});
+    console.log("FRONT_STUCK",JSON.stringify(stuck).slice(0,3000));
+    throw error;
+  }
+  async function DriveLegs(){
   await Route(Routes.support,"RightNestApproach",{stance:"crouch",fight:true,crawl:true,recoverAfterEvade:true});
   await WaitFact("rightNestCaptured",90,true);
   const sight=await page.evaluate(async()=>{
@@ -211,4 +251,5 @@ export async function DriveFrontBattle(ctx){
   for(const fact of ["attackRetreated","reliefInPosition","collectionReturned"])assert.ok(end.mission.facts.includes(fact));
   assert.ok(end.mission.guards.filter(g=>g.alive).every(g=>g.safe));
   await fs.writeFile(path.join(output,"Data_FrontTopologyContinuous.json"),JSON.stringify({guardIds,state:end.mission},null,2));
+  }
 }
