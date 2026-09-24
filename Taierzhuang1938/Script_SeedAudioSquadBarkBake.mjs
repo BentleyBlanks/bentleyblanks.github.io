@@ -79,6 +79,8 @@ const KEY_NOTES = Object.freeze({
   rally_follow: "招呼弟兄跟上自己", rally_charge: "带头冲锋，吼出来", rally_hold: "咬着牙叫弟兄顶住",
   hurt_hit: "刚中了枪，疼得咬牙，声音发紧", hurt_medic: "替挂彩的弟兄喊担架兵", ammo_ask: "子弹快打完了，找弟兄要桥夹",
   ammo_out: "子弹打光了，急着喊", ammo_reload: "边压子弹边喊弟兄掩护",
+  tank_turret: "看见战车的炮塔朝这边转过来，急着叫弟兄低头", tank_window: "看准战车的炮正打别处，催顺子趁这个空当冲上去",
+  tank_track: "战车履带炸断了却还在开火，急着叫顺子再补一捆集束弹",
 });
 
 export function CastReference(who) {

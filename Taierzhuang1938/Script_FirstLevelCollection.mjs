@@ -17,10 +17,11 @@
 // ===========================================================================
 import * as THREE from "three";
 import { MISSION_TUNING as R } from "./Data_Tuning_FirstLevel.mjs";
-import { FRONT_TUNING as F, BORROW_LIGHT_BEATS } from "./Data_Tuning_FirstLevelFront.mjs";
+import { FRONT_TUNING as F, BORROW_LIGHT_BEATS, FRONT_BATTLE_TUNING as B } from "./Data_Tuning_FirstLevelFront.mjs";
 import { MISSION_ANCHORS as A, MISSION_ROUTES, MISSION_PLACEMENT as Place } from "./Data_FirstLevelMissionLayout.mjs";
 import { MissionRouteProjection, MissionCarryRoutePoint } from "./Script_FirstLevelMissionColumn.mjs";
 import { SpeakingCastOptions } from "./Data_FirstLevelSpeakingCast.mjs";
+import { MISSION_VOICE_CAST } from "./Data_FirstLevelMissionDialogue.mjs";
 
 /** 借火那一段的姿态顺序（State().borrow 按这个序列记，测试照它对账）。 */
 export const BORROW_POSE_ORDER = Object.freeze(["ask", "pat", "pocket", "offer", "light", "share", "wince"]);
@@ -87,6 +88,9 @@ export class FirstLevelCollection {
     }));
     this.bearerCloseAt = null;
     this.borrowSaid = false;
+    // 06 老周：坐在土壁边的活人身体（带脸），抬上担架时换回烘焙躺姿（见 SeatZhou）。
+    this.seated = null;
+    this.seatSwapAt = null;
   }
 
   // --- 摆位 -----------------------------------------------------------------
@@ -148,6 +152,94 @@ export class FirstLevelCollection {
     this.runner = { actor, route: [spot], index: 1 };
     r.opening.runner = this.runner;
     return actor;
+  }
+
+  // --- 06 坐着的老周 ---------------------------------------------------------
+  /**
+   * 担架上的老周是烘焙的实例化躺姿，没有骨架，嘴动不了（调研缺口 G9）；06 他有 BorrowLight 五句、ZhouLift 两句。
+   * 所以 06 从一开始（玩家还在 60 m 外的前沿往回走）就在土壁边换成一个活人：NRA02 带脸那一副
+   *（SpeakingCastOptions("zhou")，castId + speakerRole = zhou，说话人绑定按 castId 认他），剧本旗、不可被瞄，
+   * 不拿枪，背靠土壁坐在一只弹药箱上（lifePose.sit 是凳面高度的坐姿，所以要一件东西垫着，见 SeatBox）。
+   * 烘焙的那一副这期间不画（column.zhou.liveSeated，MissionView 读）。
+   * 担架员来抬（zhouOnLitter）那一刻玩家闭一下眼（SeatSwapClosure → runtime.Perception），全黑那一帧换回担架。
+   */
+  /**
+   * 坐着的老周脸朝玩家借火站的地方（Place.collection.borrowStand），背靠土壁。演员根节点 yaw=0 时脸朝 −Z，
+   * 转 θ 后朝 (−sin θ, −cos θ)（与 zhouWall.yaw 那套担架朝向不是一回事，所以现算）。
+   */
+  static SeatYaw() {
+    const spot = Place.collection.zhouWall, stand = Place.collection.borrowStand;
+    return Math.atan2(-(stand.x - spot.x), -(stand.z - spot.z));
+  }
+  SeatZhou() {
+    const r = this.r, spot = Place.collection.zhouWall;
+    if (this.seated?.alive) return this.seated;
+    const soldier = r.ai.Spawn("nra", spot.x, spot.z,
+      { weapon: "HanYang", scriptedNoncombatant: true, squadId: "MissionCollectionZhou", ...SpeakingCastOptions("zhou") });
+    if (!soldier) return null;
+    soldier.missionId = "CollectionZhou";
+    soldier.speakerRole = "zhou";
+    soldier.scriptEssential = true;
+    soldier.missionUntargetable = true;
+    soldier.yaw = FirstLevelCollection.SeatYaw();
+    // 准星认人读 identity.name / age：他是「老周」（字幕同一张表），年龄与 03–05 枪上那一副同一个数（B.zhouAge）。
+    soldier.identity = { ...soldier.identity, name: MISSION_VOICE_CAST.zhou?.[0] ?? soldier.identity?.name, age: B.zhouAge };
+    // Spawn 的找空位会把人从贴着土壁的座位挪开一米多（站姿胶囊的净空）；他是坐着的，放回座位上。
+    const ground = r.battlefield.GroundHeight(spot.x, spot.z);
+    soldier.position.set(spot.x, ground, spot.z); soldier.body?.Teleport(spot.x, ground, spot.z);
+    r.MoveActor(soldier, soldier.position, 0);
+    const body = soldier.actor, original = body.Update, yaw = soldier.yaw;
+    // 姿态只在演员这一层改：AI 照常给它一帧的状态（位置、朝向、受击），这里把走、举枪、蹲卧一律压掉，
+    // 换成坐姿；枪不画（他的枪在 04 就交给了何有田）。
+    body.Update = function (dt, state = {}) {
+      this.root.rotation.y = yaw;
+      const result = original.call(this, dt, { ...state, moveSpeed: 0, strafe: 0, aim: 0, firing: false, fire: 0,
+        crouch: 0, prone: 0, kneel: 0, reach: 0, throwing: 0, melee: 0, lifePose: { sit: 1 }, idleLife: false });
+      if (this.weaponGroup) this.weaponGroup.visible = false;
+      if (this.characterRig?.openingSlungRifle) this.characterRig.openingSlungRifle.visible = false;
+      return result;
+    };
+    this.seated = soldier;
+    r.column.zhou.liveSeated = true;
+    this.SeatBox(true);
+    return soldier;
+  }
+  /**
+   * 他坐的那只箱子（只在他坐着时显示）。材质借白盒场同一张「timber」语义材质（MeshStandard，走 GTAO / GI / 画质表、
+   * 着色器开机已编好）：自建 Lambert 受光和周围白盒对不上，06 第一次看见时还要现编一个着色器（2026-09-24 审查）。
+   */
+  SeatBox(on) {
+    const r = this.r, spot = Place.collection.zhouWall, size = F.zhouSeatBoxM;
+    if (on && !this.seatBox && r.scene) {
+      const shared = r.battlefield?.materials?.get?.("timber") || null;
+      this.seatBoxOwnMaterial = !shared;
+      this.seatBox = new THREE.Mesh(new THREE.BoxGeometry(size[0], size[1], size[2]),
+        shared || new THREE.MeshStandardMaterial({ color: 0x7d6a4f, roughness: 0.85, metalness: 0 }));
+      this.seatBox.name = "MissionZhouSeatBox";
+      this.seatBox.castShadow = true; this.seatBox.receiveShadow = true;
+      // 箱子在人的胯下、略往土壁那边靠（坐姿把胯往后送 0.06H；背后 = (sin θ, cos θ)）。
+      const back = 0.12, yaw = FirstLevelCollection.SeatYaw();
+      this.seatBox.position.set(spot.x + Math.sin(yaw) * back, r.battlefield.GroundHeight(spot.x, spot.z) + size[1] / 2, spot.z + Math.cos(yaw) * back);
+      this.seatBox.rotation.y = yaw;
+      r.scene.add(this.seatBox);
+    }
+    if (this.seatBox) this.seatBox.visible = !!on;
+  }
+  /** 活人老周下场：从 AI 里收走（不是阵亡），烘焙的那一副重新画出来。 */
+  UnseatZhou() {
+    const r = this.r;
+    if (this.seated) { r.ai.Remove(this.seated); this.seated = null; }
+    if (r.column?.zhou) r.column.zhou.liveSeated = false;
+    this.SeatBox(false);
+  }
+  /** 换身体那一下的合眼量（0 睁 … 1 全闭）；runtime.Perception 取它与开场那一套的较大值。 */
+  SeatSwapClosure() {
+    if (this.seatSwapAt == null) return 0;
+    const t = this.r.time - this.seatSwapAt, close = F.zhouSeatSwapCloseS, hold = F.zhouSeatSwapHoldS, open = F.zhouSeatSwapOpenS;
+    if (t < 0) return 0;
+    if (t < close) return t / close;
+    if (t < close + hold) return 1;
+    return Math.max(0, 1 - (t - close - hold) / open);
   }
 
   // --- 06 借火 ---------------------------------------------------------------
@@ -234,6 +326,12 @@ export class FirstLevelCollection {
       // 老周还没上担架：他靠在土壁边等（state "fallen" 不参与队列前进）。
       this.zhouParked = true;
       Object.assign(zhou, { ...Place.collection.zhouWall, state: "fallen", visible: true });
+      this.SeatZhou();
+    }
+    // 抬上担架：先合眼，全黑那一刻才把活人换回担架上的烘焙躺姿。
+    if (r.Has("zhouOnLitter") && this.seated) {
+      this.seatSwapAt ??= r.time;
+      if (r.time - this.seatSwapAt >= F.zhouSeatSwapCloseS) this.UnseatZhou();
     }
     // View 平时会从 column.zhou 自动画出这一副担架自己的两名担架员；借火期间
     // 改由 Draw 用同一组 id 报告等待位，避免正式抬架位与等待位同时出现四个人。
@@ -251,7 +349,9 @@ export class FirstLevelCollection {
       this.ShowMatch(false);
     }
     // 老周嘴上那根烟跟着担架走；火柴在顺子手里。
-    if (this.smoke?.visible)
+    const rig = this.seated?.alive ? this.seated.actor?.characterRig : null, head = rig?.bones?.head;
+    if (this.smoke?.visible && head) this.PlaceSmokeAtMouth(rig, head);
+    else if (this.smoke?.visible)
       this.smoke.position.set(zhou.x, r.battlefield.GroundHeight(zhou.x, zhou.z) + 0.72, zhou.z);
     if (this.match?.visible) {
       // 跟随俯仰放在右手侧、视线下方：递火时仍读得到，但不会盖住对面人物。
@@ -282,8 +382,30 @@ export class FirstLevelCollection {
     void dt;
   }
 
+  /**
+   * 坐着的活人：烟叼在两片嘴唇中间，往脸前探出半截（F 没有这条数：烟长 9 cm，探出一半 4 cm）。
+   * 脸朝向取「头骨 → 嘴」的水平方向（头会转向玩家，身体朝向不跟着转）。没有面部骨骼时退回头骨往前 12 cm。
+   * 2026-09-24 审查：旧写法按头骨往下 9 cm、按身体朝向往前 10 cm，烟飘在下巴 / 领口高度（06 老周头骨在颈根附近）。
+   */
+  PlaceSmokeAtMouth(rig, head) {
+    const controls = rig.facial?.controls || [];
+    const upper = controls.find((c) => c.name === "Face_LipUpper")?.bone, lower = controls.find((c) => c.name === "Face_LipLower")?.bone;
+    const h = head.getWorldPosition(this.smokeHead ??= new THREE.Vector3());
+    const p = this.smoke.position;
+    if (upper && lower) {
+      const l = lower.getWorldPosition(this.smokeLip ??= new THREE.Vector3());
+      upper.getWorldPosition(p); p.add(l).multiplyScalar(0.5);
+    } else {
+      p.copy(h); p.x -= Math.sin(this.seated.yaw) * 0.12; p.z -= Math.cos(this.seated.yaw) * 0.12;
+    }
+    const fx = p.x - h.x, fz = p.z - h.z, f = Math.hypot(fx, fz) || 1;
+    p.x += fx / f * 0.04; p.z += fz / f * 0.04; p.y -= 0.005;
+    this.smoke.rotation.y = Math.atan2(fx, fz);
+  }
+
   /** 07 起行之后集结处那一带的收尾：小道具收掉，摆位留着。 */
   Leave() {
+    this.UnseatZhou();
     if (this.r.column?.zhou) this.r.column.zhou.borrowBearersStaged = false;
     this.ShowMatch(false);
     this.ShowSmoke(false);
@@ -308,22 +430,27 @@ export class FirstLevelCollection {
       liftBearers: this.liftBearers.map((bearer) => ({ id: bearer.id, x: +bearer.x.toFixed(2), z: +bearer.z.toFixed(2) })),
       zhouParked: this.zhouParked,
       zhouLifted: this.zhouLiftAt != null,
+      zhouSeated: this.seated?.alive ? { id: this.seated.id, x: +this.seated.position.x.toFixed(2), z: +this.seated.position.z.toFixed(2),
+        model: this.seated.actor?.characterRig?.modelId ?? null, face: !!this.seated.actor?.characterRig?.facial } : null,
+      seatSwapAt: this.seatSwapAt,
     };
   }
   Dispose() {
+    this.UnseatZhou();
     for (const prop of this.props) {
       prop.group.parent?.remove(prop.group);
       for (const geometry of prop.geometries) geometry.dispose();
     }
     if (this.props.length) for (const material of this.props[0].materials) material.dispose();
     this.props = [];
-    for (const mesh of [this.smoke, this.match]) {
+    for (const mesh of [this.smoke, this.match, this.seatBox]) {
       if (!mesh) continue;
       mesh.parent?.remove(mesh);
       mesh.geometry.dispose();
-      mesh.material.dispose();
+      // 箱子借的是白盒场的共享材质，不归这里释放。
+      if (mesh !== this.seatBox || this.seatBoxOwnMaterial) mesh.material.dispose();
     }
-    this.smoke = this.match = null;
+    this.smoke = this.match = this.seatBox = null;
   }
 }
 

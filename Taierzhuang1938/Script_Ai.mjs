@@ -29,7 +29,7 @@ import { CoverRegistry } from "./Script_AiCover.mjs";
 import { COVER, COVER_CYCLE, DERIVED_COVER } from "./Data_Tuning_AiCover.mjs";
 import { ShootingModel, CloseRangeWeight } from "./Script_AiShooting.mjs";
 import { CLOSE_RANGE, AMBIENT_FIRE, SHOOTING } from "./Data_Tuning_AiShooting.mjs";
-import { TacticsDirector, TASK, IsManeuverTask, CanManeuver, ManeuverAllowed, ChargeOpportunity } from "./Script_AiTactics.mjs";
+import { TacticsDirector, TASK, IsManeuverTask, CanManeuver, ManeuverAllowed, ChargeOpportunity, ClearTask } from "./Script_AiTactics.mjs";
 // 只读 TACTICS：压制射击的情报门槛与守区掩体余量。侧翼 / 投弹 / 查看的那几张表
 // 由 `TacticsDirector` 自己消费 —— 大脑只按 `task.kind` 选状态，不重复读它们的数。
 import { TACTICS, INVESTIGATE, SQUAD_REACTION, CHARGE_FOLLOW, MELEE_STALL } from "./Data_Tuning_AiTactics.mjs";
@@ -4229,6 +4229,12 @@ export class AiDirector {
     if (actor.pendingGrenadeThrow || actor.characterRig?.infantry?.IsThrowing()) return;
     // 瞄点：目标此刻的位置（看得见）或最后目击位置。抛物线的落点由 Combat 自己解。
     const at = s.targetVisible || !s.lkp ? s.target.position : s.lkp;
+    // 任务侧投弹否决（TacticsDirector.grenadeVeto，默认 null）：派弹时按 lkp 问过一次，脱手前按真实瞄点再问一次；
+    // 否决就把这张投弹任务结掉，不在 GRENADE 与 FIRE 之间逐帧来回。
+    if (this.tactics?.grenadeVeto?.(s, at.x, at.z)) {
+      if (s.task && s.task.kind === TASK.GRENADE) ClearTask(s, this.time);
+      s.state = STATE.FIRE; return;
+    }
     const dir = this.tmpD.set(at.x - s.position.x, 0, at.z - s.position.z);
     if (dir.lengthSq() < 1e-4) { s.state = STATE.FIRE; return; }
     dir.normalize();

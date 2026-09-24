@@ -526,10 +526,22 @@ const FakeAudio = () => {
   const expectedSquad = new Set(nraPicks.flatMap(({ kind, key }) => key ? [key]
     : nra.filter((line) => line.kind === kind && !line.event && !line.sample && line.key !== "hurt_down").map((line) => line.key)));
   assert.deepEqual([...SQUAD_BARK_KEYS.squad].sort(), [...expectedSquad].sort(), "班组 AI 会喊的中方口令每条都有本人版本");
+  // 罗班长那一套 = 班组那一套 + 战车接线层点名要他喊的中方句（Data_Tuning_Tank.barkCues 里 who:"luo" 的 key），不多不少。
+  const { TANK_BARK_CUES } = await import("./Data_Tuning_Tank.mjs");
+  const luoTank = Object.values(TANK_BARK_CUES).filter((c) => c && c.who === "luo").map((c) => c.key);
+  assert.deepEqual([...SQUAD_BARK_KEYS.leader].sort(), [...SQUAD_BARK_KEYS.squad, ...new Set(luoTank)].sort(), "罗班长的本人版本 = 班组口令 + 战车预兆喊话");
+  for (const c of Object.values(TANK_BARK_CUES).filter(Boolean)) {
+    const line = VOICE_LINES.find((l) => l.key === c.key);
+    assert.ok(line && (line.side || "nra") === (c.side || "nra") && line.kind === c.kind, "战车喊话点名的 " + c.key + " 在 Data_Voice 里、阵营与类别对得上");
+    // 战车专属的句子（kind "tank"）都有前提（有车、炮塔在转、在打口子、履带刚断）：标 event，没点名的 Bark 抽不中。
+    if (c.kind === "tank") assert.ok(line.event === true, "战车喊话 " + c.key + " 标 event（有前提的句子只许点名喊）");
+  }
   const orders = aiSource.slice(aiSource.indexOf("const ORDER_LINE"), aiSource.indexOf("};", aiSource.indexOf("const ORDER_LINE")));
   assert.deepEqual([...SQUAD_BARK_KEYS.player].sort(), [...new Set([...orders.matchAll(/: "(\w+)"/g)].map(([, key]) => key))].sort(),
     "玩家（顺子）下令喊的每条都有本人版本");
-  for (const { key } of SquadBarkEntries()) assert.ok(nra.some((line) => line.key === key && !line.event), key + " 是 Data_Voice 里的中方非 event 口令（文本一字不改）");
+  // 本人版本录的是会被随机喊到的口令（非 event）；罗班长的战车预兆句例外：它们只由战车接线层点名，本来就标 event。
+  for (const { key } of SquadBarkEntries()) assert.ok(nra.some((line) => line.key === key && (!line.event || luoTank.includes(key))),
+    key + " 是 Data_Voice 里的中方口令（非 event，或罗班长点名的战车句；文本一字不改）");
   for (const who of Object.keys(SQUAD_BARK_CAST)) assert.ok(FIRST_LEVEL_VOICE_CAST[who] && !FIRST_LEVEL_VOICE_CAST[who].sharesWith, who + " 有自己的定妆音");
   assert.equal(new Set(SquadBarkEntries().map((e) => e.file)).size, SquadBarkEntries().length, "文件名不撞");
 

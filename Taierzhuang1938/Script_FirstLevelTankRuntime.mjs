@@ -7,7 +7,8 @@
 // Runtime.UpdateTank / OnBlast 与 Main 的车体中弹只各留一行钩子（开关 Data_Tuning_Tank.brainEnabled）。
 //
 // 事实口径（契约 §5.7）：tankImmobilized = 进入 MobilityKill 或 Disabled；tankFireDisabled = Disabled。
-// 路点：临时路线 Data_Tuning_Tank.TANK_TEMP_PATH（现布局）；第二波 Front 包换成 Space 的新路。
+// 路点：Data_Tuning_Tank.FRONT_TANK_BRAIN_PATH（Space 包 FRONT_TANK_PATH + 节奏字段，Front 包 09-24 接上）；
+// 可破坏掩体：Space 包 Data_FirstLevelFrontBreakables（SpaceBreakableSpecs 换格式）。
 //
 // 2026-09-24 审查修复：
 //   · 打不死的剧情人物（scriptEssential）进目标表时带 essential，大脑按 essentialScale 压权重；
@@ -20,11 +21,12 @@
 // ===========================================================================
 import * as THREE from "three";
 import { CreateTankBrain, LuoFinishDue, LanePoint, TankClearFact } from "./Script_FirstLevelTankBrain.mjs";
-import { TANK, TANK_TEMP_PATH, FRONT_BREAKABLES_TEMP, TANK_BARK_CUES } from "./Data_Tuning_Tank.mjs";
+import { TANK, FRONT_TANK_BRAIN_PATH, TANK_BARK_CUES } from "./Data_Tuning_Tank.mjs";
+import { FRONT_BREAKABLES } from "./Data_FirstLevelFrontBreakables.mjs";
 import { FRONT_SORTIE as S } from "./Data_FirstLevelFrontRoute.mjs";
 import { MISSION_ENCOUNTERS } from "./Data_FirstLevelMission.mjs";
 import { MISSION_LAYOUT } from "./Data_FirstLevelMissionLayout.mjs";
-import { FirstLevelFrontBreakables } from "./Script_FirstLevelFrontBreakables.mjs";
+import { FirstLevelFrontBreakables, SpaceBreakableSpecs } from "./Script_FirstLevelFrontBreakables.mjs";
 import { TankAudio } from "./Script_TankAudio.mjs";
 
 const TANK_STAGES = Object.freeze(["Support", "MachineGun", "Tank", "Orders"]);
@@ -33,7 +35,7 @@ const Plain = (v) => ({ x: v.x, y: v.y, z: v.z });
 const Wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 
 export class FirstLevelTankRuntime {
-  constructor(runtime, { path = TANK_TEMP_PATH, tuning = TANK, breakables = FRONT_BREAKABLES_TEMP } = {}) {
+  constructor(runtime, { path = FRONT_TANK_BRAIN_PATH, tuning = TANK, breakables = FRONT_BREAKABLES } = {}) {
     this.r = runtime;
     this.path = path;
     this.T = tuning;
@@ -51,6 +53,8 @@ export class FirstLevelTankRuntime {
     this.entryWaitSince = null;
     this.noBundleSince = null;
     this.barkSaidAt = new Map();
+    /** 被对白让路、待补喊的战斗喊话：id → 截止时间（TANK.barkRetryS）。 */
+    this.pendingBarks = new Map();
     this.log = { shots: [], bursts: 0, walkInShots: 0, mgShots: 0, barks: [], events: [], blasts: [], hits: [], states: [], breaks: [],
       appearedAt: null, entry: null, luoFinish: null, frames: { full: 0, idle: 0 } };
     this.sound = null;
@@ -87,8 +91,10 @@ export class FirstLevelTankRuntime {
   EnsureBreakables() {
     const r = this.r;
     if (this.breakables || !r.scene || !r.battlefield) return;
+    const { specs, skipped } = SpaceBreakableSpecs(this.breakableSpecs, MISSION_LAYOUT, (x, z) => this.Ground(x, z));
     this.breakables = new FirstLevelFrontBreakables({ scene: r.scene, battlefield: r.battlefield, physics: r.physics,
-      vfx: r.vfx, audio: r.audio, layout: MISSION_LAYOUT }, this.breakableSpecs);
+      vfx: r.vfx, audio: r.audio, layout: MISSION_LAYOUT }, specs);
+    this.breakables.skipped = skipped;
   }
   /**
    * 进场闸（TANK.entry）：起点对玩家没有视线、或在玩家朝向 ±offViewRad 以外（屏幕外）才开进图；
@@ -199,12 +205,15 @@ export class FirstLevelTankRuntime {
     if (!TANK_STAGES.includes(stage)) { if (this.sound) this.sound.Stop(); return; }
     // 03：阵位夺下以前车还没开进图（北面路线起点）—— 看不见，但引擎已经在那儿怠速了。
     // 夺下以后还要过进场闸：起点在玩家视野里就再等等，别凭空冒出来。
-    if (stage === "Support" && !this.brain && (!r.Has("rightNestCaptured") || !this.EntryClear())) {
+    const entryFact = this.T.entry?.fact || "rightNestCaptured";
+    if (stage === "Support" && !this.brain && (!r.Has("rightNestCaptured") || !r.Has(entryFact) || !this.EntryClear())) {
       t.active = false; t.present = false;
+      this.EscortsOffstage(true);
       this.Sound?.Offstage(dt, this.OffstagePoint());
       return;
     }
     t.active = true; t.present = true;
+    this.EscortsOffstage(false);
     const brain = this.EnsureBrain(stage);
     this.EnsureBreakables();
     // 彻底哑火、熄火也熄完了：不再每帧拼世界（三次炮口取点、目标表、视线），只让大脑走完它的时钟。
@@ -217,6 +226,21 @@ export class FirstLevelTankRuntime {
     const out = brain.Update(dt, this.World(stage));
     this.Apply(out, dt);
     this.CheckLuoFinish();
+    this.CheckWindow();
+  }
+  /**
+   * 车进场以前，护兵跟车一起待在图外的路堑里（北面路线起点）：装睡（missionDormant + scriptedNoncombatant）——
+   * 不参战、不算前沿在场的人；车进场那一帧醒过来接走位（Escorts）。09-24 空转探针：03 里他们在 (101,−208)
+   * 离座位 92 m 站了一百多秒，对任何授权点都不通视，占了 03「一发没打」的一成多。
+   */
+  EscortsOffstage(waiting) {
+    if (!waiting && this.escortsWoken) return;
+    if (!waiting) this.escortsWoken = true;
+    for (const spec of MISSION_ENCOUNTERS.tank) {
+      const actor = this.r.enemies.get(spec.id);
+      if (!actor?.alive || actor.missionDormant === waiting) continue;
+      actor.missionDormant = waiting; actor.scriptedNoncombatant = waiting;
+    }
   }
   /** MobilityKill 以后玩家手里一捆也没有、僵了 luoFinishS 秒：罗班长往舱盖里塞一颗。 */
   CheckLuoFinish() {
@@ -265,7 +289,8 @@ export class FirstLevelTankRuntime {
     }
     for (const f of out.fire) this.Fire(f);
     this.Escorts(out);
-    for (const b of out.barks) { this.log.barks.push({ t: r.time, ...b }); this.SayBark(b.id); }
+    for (const b of out.barks) { this.log.barks.push({ t: r.time, ...b }); if (!this.SayBark(b.id)) this.QueueBark(b.id); }
+    this.RetryBarks();
     for (const e of out.events) this.log.events.push({ t: r.time, id: e.id });
     if (this.log.barks.length > 64) this.log.barks.splice(0, this.log.barks.length - 64);
     if (this.log.events.length > 128) this.log.events.splice(0, this.log.events.length - 128);
@@ -275,13 +300,79 @@ export class FirstLevelTankRuntime {
       if (distance < V.rumbleRangeM) r.player.shake.Rumble?.(distance, t.load);
     }
   }
-  /** 大脑喊话 → 台词（TANK.barkCues；null 的只记日志）。同一条 cue 至少隔 barkCooldownS。 */
+  /**
+   * 大脑喊话 → 战斗喊话（TANK.barkCues；null 的只记日志）。同一个 key 至少隔 barkCooldownS。
+   * 中方点名班组某人（who）从他的位置喊、用他的本人版本；日方从炮塔喊。走 Audio.Bark：剧情对白在说时让路。
+   * （旧格式：字符串 = 剧情 cue id，照旧 r.Say。）
+   */
   SayBark(id) {
-    const r = this.r, cue = TANK_BARK_CUES?.[id];
-    if (!cue) return;
-    if (r.time - (this.barkSaidAt.get(cue) ?? -Infinity) < this.T.barkCooldownS) return;
-    this.barkSaidAt.set(cue, r.time);
-    r.Say(cue);
+    const r = this.r, spec = TANK_BARK_CUES?.[id];
+    if (!spec) return false;
+    const key = typeof spec === "string" ? spec : spec.key;
+    if (r.time - (this.barkSaidAt.get(key) ?? -Infinity) < this.T.barkCooldownS) return false;
+    if (typeof spec === "string") { this.barkSaidAt.set(key, r.time); r.Say(spec); return true; }
+    let position = null;
+    if (spec.who) {
+      const actor = r.companion?.Handle?.(spec.who);
+      if (!actor || !(actor.alive ?? actor.Alive)) return false;
+      position = actor.position;
+    } else {
+      const t = r.tank, groundY = r.view?.tank?.position.y ?? this.Ground(t.x, t.z);
+      position = { x: t.x, y: groundY + (this.T.audio?.turretY ?? 2.2) - 1.5, z: t.z };
+    }
+    // 这几句是契约 §2 第 7 条的「窗口」提示（不加 HUD，靠罗班长喊）：按优先战术提示喊（priority，不给剧情对白让路、
+    // 不吃 0.55 s 全局闸）—— 只有点名的那个人自己正在说剧情台词时才排队等他说完（不许一个人两张嘴）。
+    // 2026-09-25：非优先时「履带断了」排了 6 s 队，一次都没喊出来（对白与班组喊话把让路闸和全局闸占满）。
+    const own = spec.who ? r.voice?.Speech?.(spec.who) : null;
+    if (own && own.active !== false) return false;
+    const played = r.audio?.Bark?.(spec.kind, { key, who: spec.who ?? null, side: spec.side || "nra", position, priority: true,
+      seed: key.length }) ?? null;
+    if (!played) return false;
+    this.barkSaidAt.set(key, r.time);
+    this.barkSoundingUntil = r.time + (this.T.barkHoldS ?? 2.5);
+    this.log.barks.push({ t: r.time, id, key, said: true });
+    return true;
+  }
+  /** 补喊排着队、或刚喊出口（TANK.barkHoldS）：前沿对白的下一场先等一等（Script_FirstLevelFrontScenes.Update）。 */
+  HoldsDialogue() {
+    return this.pendingBarks.size > 0 || this.r.time < (this.barkSoundingUntil ?? -Infinity);
+  }
+  /** 这一句没喊出来（多半是剧情对白正在说）：按 TANK.barkRetryS 排队补喊。 */
+  QueueBark(id) {
+    const retry = this.T.barkRetryS?.[id];
+    if (!retry || this.pendingBarks.has(id)) return;
+    // 「履带断了！还在打！再补一捆！」顶掉还没开口的「回来！低头！」（同一次投弹触发的，意思相反）。
+    if (id === "trackCut") this.r.frontScenes?.Drop?.("BundleRetreat");
+    this.pendingBarks.set(id, this.r.time + retry);
+    this.log.barks.push({ t: this.r.time, id, queued: true });
+  }
+  /** 补喊：对白一让开就喊；过期、或这句已不成立（trackCut 在 Disabled 之后）就丢。 */
+  RetryBarks() {
+    if (!this.pendingBarks.size) return;
+    const r = this.r;
+    for (const [id, until] of this.pendingBarks) {
+      const spec = TANK_BARK_CUES?.[id], who = spec?.who ? r.companion?.Handle?.(spec.who) : null;
+      // Disabled 以后「再补一捆」不成立；点名的人没了也不再等（不许为一句喊话把对白一直压着）。
+      const stale = (id === "trackCut" && r.tank.damageState === "Disabled") || (spec?.who && !(who && (who.alive ?? who.Alive)));
+      if (stale || r.time > until) { this.pendingBarks.delete(id); this.log.barks.push({ t: r.time, id, dropped: stale ? "stale" : "expired" }); continue; }
+      if (this.SayBark(id)) this.pendingBarks.delete(id);
+    }
+  }
+  /**
+   * 05 的空当（TANK.window）：领了集束弹、车还没解决、玩家在攻击支路沟线上，大脑正瞄着缺口、炮塔偏开玩家方位 ——
+   * 罗班长喊「它在打口子！就现在！」。
+   */
+  CheckWindow() {
+    const r = this.r, b = this.brain, W = this.T.window, p = r.player;
+    if (!W || !b || r.flow.stage.id !== "Tank" || !r.Has("bundleTaken") || r.Has(TankClearFact(r.tank)) || !p?.Alive) return;
+    if (b.targetId !== "gapZone") return;
+    const lane = (this.path.lanes || []).find((l) => l.id === "attackLane");
+    if (!lane || !LanePoint(lane, p.position, W.laneRadiusM)) return;
+    const t = r.tank, bearing = Math.atan2(t.x - p.position.x, t.z - p.position.z);
+    if (Math.abs(Wrap(b.turretYaw - bearing)) < W.angleRad) return;
+    if (r.time - (this.windowAt ?? -Infinity) < W.cooldownS) return;
+    if (this.SayBark("tankWindow")) this.windowAt = r.time;
+    else if (!this.pendingBarks.has("tankWindow")) { this.windowAt = r.time; this.QueueBark("tankWindow"); }
   }
   ApplyState(state, record) {
     const r = this.r, t = r.tank, b = this.brain, last = b.damageLog.at(-1);
@@ -303,11 +394,43 @@ export class FirstLevelTankRuntime {
     if (state !== "Intact") r.Record("tankImmobilized", { state, zone: last?.zone || null });
     if (state === "Disabled") r.Record("tankFireDisabled", { zone: last?.zone || null });
   }
+  /**
+   * 契约 §2.9 的保护落到真炸点上（TANK.gunner.protectPullM 头注）：大脑只核对瞄点，弹道半路撞上的沟沿 / 墙
+   * 它看不见。按 Combat 同一条抛物线算真炸点，离受保护的人不够 protectClearM 就把瞄点往炮口收；
+   * 收 protectPullSteps 次还不够返回 null（这一发不打）。
+   */
+  SafeShellAim(from, at) {
+    const r = this.r, G = this.T.gunner;
+    const list = r.combat?.PredictShellImpact ? this.brain.ProtectedPoints({ targets: this.Targets(r.flow.stage.id) }) : [];
+    const Flight = (p) => Math.max(0.06, from.distanceTo(p) / G.shellSpeedMps);
+    if (!list.length) return { at, flight: Flight(at), pulled: 0 };
+    const aim = at.clone();
+    // Overshoot along the line of fire past the aim point being tried (G.overshootMaxM), on the ground plane: a pulled
+    // aim that sails over the lip lands on the far side just the same (09-25 cold starts: aim pulled to (−0.9, −147.7),
+    // burst at (−11.4, −142.7) by the gap junction, 11.5 m on).
+    const fx = at.x - from.x, fz = at.z - from.z, fd = Math.hypot(fx, fz) || 1;
+    const Over = (impact) => ((impact.x - aim.x) * fx + (impact.z - aim.z) * fz) / fd;
+    for (let pulled = 0; pulled <= G.protectPullSteps; pulled++) {
+      const flight = Flight(aim);
+      const impact = r.combat.PredictShellImpact(from, aim, { flight, sourceCollider: r.view.tankCollider });
+      const clear = !impact || list.every((p) => Math.hypot(impact.x - p.x, impact.z - p.z) >= G.protectClearM);
+      if (clear && (!impact || !(Over(impact) > (G.overshootMaxM ?? Infinity)))) return { at: aim.clone(), flight, pulled, impact };
+      const dx = from.x - aim.x, dz = from.z - aim.z, d = Math.hypot(dx, dz);
+      if (d <= G.protectPullM + G.minRangeM) break;
+      const lift = aim.y - this.Ground(aim.x, aim.z);
+      aim.x += dx / d * G.protectPullM; aim.z += dz / d * G.protectPullM;
+      aim.y = this.Ground(aim.x, aim.z) + lift;
+    }
+    return null;
+  }
   Fire(f) {
     const r = this.r, t = r.tank, view = r.view, V = this.T.view, G = this.T.gunner, M = this.T.mg;
     if (f.weapon === "main") {
       const from = view.TankMuzzle(t);
-      const at = new THREE.Vector3(f.at.x, f.at.y, f.at.z), dir = at.clone().sub(from).normalize();
+      const safe = this.SafeShellAim(from, new THREE.Vector3(f.at.x, f.at.y, f.at.z));
+      if (!safe) { this.log.withheld = (this.log.withheld || 0) + 1; return; }
+      if (safe.pulled) this.log.pulled = (this.log.pulled || 0) + 1;
+      const at = safe.at, dir = at.clone().sub(from).normalize();
       r.vfx.MuzzleFlash(from, dir, { scale: V.cannonMuzzleScale, kind: "cannon" });
       const R = V.groundRing;
       r.vfx.GroundDustRing?.(new THREE.Vector3(from.x, this.Ground(from.x, from.z), from.z), dir,
@@ -318,13 +441,14 @@ export class FirstLevelTankRuntime {
         const distance = Distance(r.player.position, t);
         if (distance < V.fireKickRangeM) r.player.shake.Impulse({ pitch: V.fireKickPitchRad * (1 - distance / V.fireKickRangeM) });
       }
-      const shot = { t: r.time, kind: f.kind, target: f.target, warning: !!f.warning, layS: f.layS, damage: f.damage, at: { ...f.at },
-        from: Plain(from), impact: null };
+      const shot = { t: r.time, kind: f.kind, target: f.target, warning: !!f.warning, layS: f.layS, damage: f.damage, at: Plain(at),
+        from: Plain(from), impact: null, ...(safe.pulled ? { pulled: safe.pulled, plannedAt: { ...f.at } } : {}) };
       this.log.shots.push(shot);
-      const flight = Math.max(0.06, from.distanceTo(at) / G.shellSpeedMps);
+      const flight = safe.flight;
       // 炮口声：有 TankAudio 就走它的近 / 中 / 远三层（Combat 的 report 是借来的 explosionMid，不再叠）。
       const sound = this.Sound;
-      if (sound) sound.OnCannon(Plain(from), { ...f.at }, flight);
+      // 来袭啸声放在真炸点（收过瞄点的那一发不再从原计划落点啸过来）。
+      if (sound) sound.OnCannon(Plain(from), Plain(safe.impact || at), flight);
       r.combat.FireShell(from, at, {
         flight,
         kind: "Shell57",
@@ -358,6 +482,9 @@ export class FirstLevelTankRuntime {
     if (t.impacts.length > 8) t.impacts.shift();
     shot.impact = Plain(position);
     shot.playerDistance = r.player ? Distance(position, r.player.position) : null;
+    // Nearest protected man at the real burst (SafeShellAim's promise; TankProbe gates it).
+    const guarded = this.brain.ProtectedPoints({ targets: this.Targets(r.flow.stage.id) });
+    shot.protectedMinM = guarded.length ? Math.min(...guarded.map((p) => Math.hypot(position.x - p.x, position.z - p.z))) : null;
     for (const actor of r.squad || []) if (Distance(actor.position, position) < 12) r.ai.SetStance(actor, 2, 2, true);
     if (!r.Has("tankPositionPressured") && Distance(position, S.nest) < this.T.pressureRadiusM) {
       r.Record("tankPositionPressured", { x: position.x, z: position.z });
@@ -418,6 +545,12 @@ export class FirstLevelTankRuntime {
       const actor = r.enemies.get(e.id);
       if (!actor?.alive) continue;
       const previous = this.escortAnchors.get(e.id);
+      // The roaming circle (tacticalRadiusM) around his hold point stays TANK.escorts.throwKeepOutM off the attack position
+      // (see the tuning note). Every frame: an escort released from offstage gets his radius back after his last Defend.
+      if (previous && actor.tacticalRadiusM > 0) {
+        actor.escortRadiusBaseM ??= actor.tacticalRadiusM;
+        actor.tacticalRadiusM = Math.max(2, Math.min(actor.escortRadiusBaseM, Distance(previous.at || previous.anchor, S.throw) - this.T.escorts.throwKeepOutM));
+      }
       // 还没接过来的护兵：车离他远就不管（03 车在图外时他们留在原处打仗）。
       if (!previous && Distance(actor.position, e.anchor) > this.T.escorts.joinRangeM) continue;
       if (previous && previous.mode === e.mode && Distance(previous.anchor, e.anchor) < P.escortRecommandM) continue;
@@ -427,9 +560,10 @@ export class FirstLevelTankRuntime {
         const cover = this.CoverNear(e.anchor, actor);
         if (cover) { anchor = cover; radius = P.escortCoverRadiusM; }
       }
-      this.escortAnchors.set(e.id, { anchor: { ...e.anchor }, mode: e.mode, cover: anchor !== e.anchor });
+      this.escortAnchors.set(e.id, { anchor: { ...e.anchor }, mode: e.mode, cover: anchor !== e.anchor, at: { x: anchor.x, z: anchor.z } });
       r.Defend(actor, anchor, radius, e.slack);
       if (e.mode === "move" || e.mode === "rally") r.ai.SetStance(actor, e.mode === "rally" ? 0 : 1, 0.5, true);
+      else if (e.mode === "slot") r.ai.SetStance(actor, 1, 0.5, true);
     }
   }
 
@@ -473,7 +607,8 @@ export class FirstLevelTankRuntime {
     return result;
   }
   Debug() {
-    return { brain: this.brain?.Debug() || null, breakables: this.breakables?.State() || [], log: this.log, audio: this.sound?.State() ?? null,
+    return { brain: this.brain?.Debug() || null, breakables: this.breakables?.State() || [], breakablesSkipped: this.breakables?.skipped || [],
+      log: this.log, audio: this.sound?.State() ?? null,
       telemetry: this.brain ? { shots: this.brain.telemetry.shots.slice(-24), bursts: this.brain.telemetry.bursts.slice(-48),
         reactions: this.brain.telemetry.reactions.slice(), states: this.brain.telemetry.states.slice() } : null };
   }

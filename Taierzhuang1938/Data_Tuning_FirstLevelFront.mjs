@@ -132,6 +132,15 @@ export const FRONT_TUNING = Object.freeze({
   // 担架员把老周抬上担架（ZhouLift 播完 → zhouOnLitter）之后，
   // 他从土壁挪回队列那一小段的时长，走 litterSpeedMps 的量级。
   zhouLiftMoveS: 2.6,
+  // 06 老周坐在土壁边的那副活人身体（有脸、会说话）换回担架上的烘焙躺姿：玩家闭一下眼盖住这一下替换。
+  // 合眼 / 全黑停留 / 睁眼，秒。[需] 集成负责人 2026-09-24 第 9 条（NotifyCameraCut 或淡入淡出盖住切换）；
+  // 数值按一次正常眨眼放慢到读得出「顺子眨了下眼」的量级（眨眼 0.1–0.4 s）。
+  zhouSeatSwapCloseS: 0.22,
+  zhouSeatSwapHoldS: 0.12,
+  zhouSeatSwapOpenS: 0.3,
+  // 他坐的那只弹药箱（宽 × 高 × 深，米）。Actor 的 sit 是凳面坐姿：胯落到「大腿长 + 0.045 身高」≈ 0.5 m，
+  // 箱面比它低 5 cm 让胯坐实。[几] 木制子弹箱量级。
+  zhouSeatBoxM: Object.freeze([0.56, 0.44, 0.36]),
 
   // =========================================================================
   // 07 沿沟南行
@@ -223,9 +232,69 @@ export const FRONT_TUNING_SOURCES = Object.freeze({
 });
 
 // Notion 2026-09-22 front whitebox calibration: proximity is physical, all deaths are observed.
+// assaultIds (03 withdrawal window, "指定进攻组击杀阈值"): the six bounders FrontRifleA-F, threshold 3 -
+// the 2026-09-23 space rebuild makes the bounding group the attack wave: Zhou's left gun enfilades its west
+// half, the captured nest its east half. The fire base (FrontGunner...) holds 43 m north and never rushes, so
+// it is not part of the wave (Space package 03->06 cold starts, docs/Data_FirstLevelSpace0106_20260923.md §10.3).
 export const FRONT_BATTLE_TUNING=Object.freeze({
   arrivalM:1.0,leaderLeadM:3,captureRadiusM:4,rearArrivalM:3.5,attackArrivalM:3,
-  firstBatch:2,assaultKills:3,assaultIds:["FrontGunner","FrontRifleA","FrontRifleB","FrontRifleC","FrontRifleD"],
+  firstBatch:2,assaultKills:3,assaultIds:["FrontRifleA","FrontRifleB","FrontRifleC","FrontRifleD","FrontRifleE","FrontRifleF"],
   guardHeightM:1.2,blockadeRangeM:85,gatherSpacingM:1.35,zhouHealth:80,
+  // Zhou's age on the crosshair card (both bodies: 03-05 at the gun, 06 seated). The random identity pool gave him
+  // 17 / 29 / 32 across runs ("老周 17 岁"); the cast note says 三十多岁 (Data_FirstLevelMissionDialogue MISSION_VOICE_CAST.zhou).
+  zhouAge:34,
+  // Waiting guards kneel (1), they are not forced prone (2): prone they show 0.3 m above the scrape and the K3
+  // observation step cannot read them; kneeling they show 0.75-1.0 m (Space FrontTopologyTest K3, docs §10.2).
+  guardWaitStance:1,
+  // ---- 03-06 pacing (contract §2.6, 2026-09-24 Front package step 2) ----
+  // 03 ends when He has the left gun and Zhou is this far off it (was: Zhou back at the collection, ~100 s of waiting).
+  zhouLeftGunM:10,
+  // 05/03 crossing: the next guard leaves cover once the man ahead is this far past the gap point (the gap sap
+  // behind it is 0.5 m deep for ~5 m, then the full trench: GuardWithdrawal -> gap junction).
+  gapClearM:6,
+  // Zhou lets go of the gun only once He stands this close to the seat (the gun is never left empty).
+  handoverReadyM:3,
+  // FrontBlockade (Zhou/Luo shouting across) fires when the player is this close to the observation spur mouth or the fold (K3).
+  observationCallM:6,
+  // FrontApproach ("贴这道墙！前头有人！") fires 5 m around this FRONT_SORTIE.approach point: (13,-144.2) in the right
+  // low trench, 13 m short of the nest's west door (the old index 3 now sits at the observation step).
+  frontApproachCallIndex:10,
+  // 05->06: at the safe zone (FRONT_SPACE.returnMeet) Luo waits for FrontRelief at most this long before going on.
+  returnMeetMaxWaitS:20,
+  // Posts on the support sap floor around returnMeet (probed: 2.0 m deep, >= 1.25 m from the sap wall). The relief
+  // NCO receives the batch there; He comes down from the left gun to it; Liu holds the sap mouth there from 03 on
+  // ("文财，看住沟口！") - his old post (-18,-123) was on open ground beside the sap.
+  reliefLeadPost:Object.freeze({x:-21.2,z:-126}),
+  heMeetPost:Object.freeze({x:-24.8,z:-125.6}),
+  liuMeetPost:Object.freeze({x:-19.5,z:-129}),
+  // The relief gunner stops this far short of the left gun's seat (back along FRONT_SORTIE.leftRoute's last leg) and
+  // steps in only after He has left it. Walking onto the occupied seat, the two bodies pushed each other 1.4 m apart
+  // and neither came within arrivalM (1.0): reliefInPosition never fired and 05 hung before Orders (09-24 Step 3
+  // chain Q, Ideal2, relief walk 7/8 at t 370-600 s).
+  reliefGunStandbyM:2,
+  // ---- stall fallbacks (2026-09-24 Front package review: two cold starts hung on one unreachable waypoint) ----
+  // FrontBattle.Walk: a walker who has not come walkStallProgressM closer to his current point for walkStallS
+  // (and is not waiting for the player) skips an intermediate point, or counts a final point reached within
+  // arrivalM x walkStallArrivalScale. Seen: Luo held 200 s beside the captured gun's seat (the gun block between
+  // him and rearRoute[0], rightRearReached never came), the relief gunner held 70 s on the leftRoute leg.
+  // 6 s is about three times the longest grenade evade and crowd shove seen in the 03-06 drives.
+  walkStallS:6,walkStallProgressM:.3,walkStallArrivalScale:2,
+  // 04: the player has held the rear junction this long out of the tank's sight and Luo is still not there ->
+  // rightRearReached anyway (Luo walks on behind him). Two stall skips plus the 5 m walk from his cover.
+  rearLeaderGraceS:15,
+  // 03-05: no hand grenade is thrown at a point this close to a protected waiting guard (missionUntargetable,
+  // contract §2.9): Grenade radiusM 6.5 (Data_Weapons) + ~3.5 m of throw scatter and roll. 09-24 review: one
+  // Japanese grenade killed three of the gathered second batch, the next one two more -> guardBatchLost.
+  guardGrenadeShieldM:10,
+  // 03 preview / 04 before the pressure the guide points at the tank (brief item 5), but beside it on the ground:
+  // guideTankLeadM toward the player and guideTankSideM to the player's right of it. On the tank itself the diamond
+  // and its distance label (1.15 m above the ground, Script_FirstLevelLeaderGuide) sat right on the ~11 px turret
+  // 56 m out (09-24 review, TankProbe Scene_TankPreview); moved only toward the player (10 m) it still projected onto
+  // the turret (09-25 retake). 6 m to the side at 50 m is ~80 px on a 1280 px frame.
+  guideTankLeadM:4,guideTankSideM:6,
+  // After rightNestCaptured an assault man's close-contact circle (his line, tacticalRadiusM) is cut so it stays this far
+  // from the captured gun's seat (FRONT_SORTIE.seat): brief item 11 ④, and 09-25 idle-probe drives where bound man F and
+  // the flank group came up to the nest's north wall in contact and shot the player on the gun from 1-4 m, twice in a row.
+  capturedGunKeepOutM:6,
   bandage:{radius:.087,height:.2,y:-.19,color:0xb6ac8b},
 });

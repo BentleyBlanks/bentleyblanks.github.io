@@ -1,9 +1,10 @@
-import { FirstLevelFrontBattle } from "./Script_FirstLevelFrontBattle.mjs";
+import { FirstLevelFrontBattle, ColumnDeparture } from "./Script_FirstLevelFrontBattle.mjs";
+import { FirstLevelFrontScenes } from "./Script_FirstLevelFrontScenes.mjs";
 // 03–05 战车：纯规则大脑 + 接线层（战车包 2026-09-23）。开关 Data_Tuning_Tank.brainEnabled，关掉走下面旧的定时插值。
 import { FirstLevelTankRuntime } from "./Script_FirstLevelTankRuntime.mjs";
 import { BundleResupplyOpen } from "./Script_FirstLevelTankBrain.mjs";
 import { TANK } from "./Data_Tuning_Tank.mjs";
-import { FirstLevelFrontPressure, AssaultRoundEnd, AssaultTop, NearestLineIndex, RushStalled, RushPaused } from "./Script_FirstLevelFrontPressure.mjs";
+import { FirstLevelFrontPressure, AssaultRoundEnd, AssaultTop, NearestLineIndex, RushStalled, RushPaused, AssaultState, FIRST_LEVEL_AI_RULE_STEPS } from "./Script_FirstLevelFrontPressure.mjs";
 import { FirstLevelBackdropSquads } from "./Script_FirstLevelBackdropSquads.mjs";
 import { FirstLevelTransition } from "./Script_FirstLevelTransition.mjs";
 import { FRONT_SORTIE as Sortie, SortieCrawlBlocked } from "./Data_FirstLevelFrontRoute.mjs";
@@ -12,6 +13,7 @@ import { CompactGuideRoute } from "./Script_NpcMissionGuide.mjs";
 import { MISSION_GUIDE_TUNING as GUIDE } from "./Data_Tuning_MissionGuide.mjs";
 import { MissionReturn } from "./Script_MissionReturn.mjs";
 import { MISSION_RETURN } from "./Data_Tuning_FirstLevel.mjs";
+import { FRONT_BATTLE_TUNING as FB } from "./Data_Tuning_FirstLevelFront.mjs";
 import { MISSION_RETURN_ROUTES, MISSION_RETURN_PERSON_STAGES, MISSION_RETURN_SQUAD_STAGES, MISSION_RETURN_DISABLED_STAGES } from "./Data_FirstLevelMissionReturn.mjs";
 import { MISSION_TRENCH_COVER as TC } from "./Data_FirstLevelMissionTrenchCover.mjs";
 import { SquadCoverRoute, SquadCoverBounds, SquadCoverThreat } from "./Script_SquadMarchCover.mjs";
@@ -166,6 +168,8 @@ export class FirstLevelMissionRuntime {
     // Enter 马上就会问它要门外那一拍。
     this.frontShow = new FirstLevelFrontShow(this);
     this.frontBattle = new FirstLevelFrontBattle(this);
+    // 03–06 对白走 voice.PlayScene、说话人由 binder 绑到真人头上（Front 包，契约 §5.5）。
+    this.frontScenes = new FirstLevelFrontScenes(this);
     this.tankRuntime = TANK.brainEnabled ? new FirstLevelTankRuntime(this) : null;
     // 02–05 前沿压力表（docs/Data_EnemyAi.md §20）：相位、环境射击点、组规则与任务侧 AI 开关。
     this.frontPressure = new FirstLevelFrontPressure(this);
@@ -303,6 +307,7 @@ export class FirstLevelMissionRuntime {
    */
   Say(id, options) {
     if (!id) return;
+    if (this.frontScenes?.Owns(id)) { this.frontScenes.Say(id); return; }
     if (CUE_IDS.has(id)) { this.voice.Enqueue(id, options); return; }
     if (this.missingCues.includes(id)) return;
     this.missingCues.push(id);
@@ -316,7 +321,7 @@ export class FirstLevelMissionRuntime {
       stage:this.flow.stage.id}))return;
     // The death pipeline already removes this soldier's fire, cover and tokens.
     // A living squadmate may react locally; never stop or refill the mission.
-    if(this.voice.current || this.time<(this.nextCasualtyReactionAt||0)
+    if(this.voice.current || this.frontScenes?.Busy || this.time<(this.nextCasualtyReactionAt||0)
       || Distance(actor.position,this.player.position)>R.casualtyWitnessM)return;
     const witness=this.ai.soldiers.find(other=>other!==actor&&other.alive&&other.side==="nra"
       && actor.squadId && other.squadId===actor.squadId
@@ -1046,16 +1051,15 @@ export class FirstLevelMissionRuntime {
       return actor;
   }
   MakeAssault(x, z) {
-    const points = FrontAssaultLane(x, z);
-    if (!points.length) return null;
-    // Hold times are scaled per man (0.6-1.4) so the field never moves in lockstep.
-    const jitter = .6 + ((Math.abs(Math.round(x * 3 + z * 7)) % 17) / 16) * .8;
+    // Hold times are scaled per man (0.6-1.4) so the field never moves in lockstep. The state object is built in
+    // one place (FrontPressure.AssaultState) - the pressure table gives lane-less men (flank group, officer,
+    // reserves) their authored lane through the same constructor.
     // shifts/volley (2026-09-23, docs/Data_EnemyAi.md §15): on the last line `shifts` counts **finished
     // rounds**, it does not move anyone. A round ends when the man has fired assaultVolleyShots rounds or
     // held assaultFinalHoldS seconds; after assaultLateralShifts rounds he falls back to
     // assaultRegroupLine and comes again. volley is the fireSequence snapshot taken when the round began.
     // walk is the per-line budget of "walking into cover does not count as holding the line".
-    return { points, index: 0, hold: 0, walk: 0, pinned: 0, cycles: 0, shifts: 0, volley: 0, mode: "rush", jitter };
+    return AssaultState(x, z, FrontAssaultLane(x, z));
   }
   UpdateAssault(dt) {
     const active = ["Support", "MachineGun", "Tank"].includes(this.flow.stage.id);
@@ -1074,6 +1078,16 @@ export class FirstLevelMissionRuntime {
         if (s.mode !== "settled") { this.Defend(actor, actor.position); s.mode = "settled"; }
         continue;
       }
+      // The captured nest is ours (brief item 11 ④): once rightNestCaptured, the circle the combat brain may roam around
+      // a man's line (tacticalRadiusM - it bounds his movement in hold as well as in contact) is cut so it stays
+      // FB.capturedGunKeepOutM off the gun's seat. Every frame, every mode: 09-25 idle-probe drives had bound man F
+      // (holding his last line 15.6 m from the seat) and the flank group walk up to the nest's north wall and shoot
+      // the player on the gun from 1-4 m, three times in a row.
+      if(actor.tacticalRadiusM>0&&this.Has("rightNestCaptured")){
+        const line=s.points[Math.min(s.index,s.points.length-1)];
+        actor.contactRadiusBaseM??=actor.tacticalRadiusM;
+        if(line)actor.tacticalRadiusM=Math.max(2,Math.min(actor.contactRadiusBaseM,Distance(line,Sortie.seat)-FB.capturedGunKeepOutM));
+      }
       // A nearby visible opponent overrides the scheduled bound. The shared
       // combat brain owns cover, search and the physical melee handoff.
       // 压力表「让口子」刚把他往回拉（s.yieldUntil，Script_FirstLevelFrontPressure.YieldGap）：这几秒不认近距交火 ——
@@ -1083,7 +1097,12 @@ export class FirstLevelMissionRuntime {
         && !actor.targetFromMemory && actor.target?.ref?.alive!==false
         && actor.target && Distance(actor.position,actor.target.position)<R.assaultContactRangeM;
       if(contact){
-        if(s.mode!=="contact")this.Defend(actor,actor.position,R.defendHoldRadiusM,R.assaultCoverSearchM);
+        // Anchored on his current line, not where he stands: the combat brain then fights within tacticalRadiusM of
+        // the line. Re-anchoring on his own position at every new contact let a man creep contact by contact -
+        // 09-25 03-06 cold starts: flank man A went from his last line north of the nest (33,-158) through the
+        // abandoned nest to the rear-door ramp (30,-143) in 04 and bayoneted the player waiting there, three runs of three.
+        const line=s.points[Math.min(s.index,s.points.length-1)]||actor.position;
+        if(s.mode!=="contact")this.Defend(actor,line,R.defendHoldRadiusM,R.assaultCoverSearchM);
         s.mode="contact";continue;
       }
       if (actor.suppression >= R.tacticalSuppression) {
@@ -1987,7 +2006,9 @@ export class FirstLevelMissionRuntime {
    * 2026.09.19 起整关只有掩蔽部那一处重击，曲线在 FirstLevelOpening 里采样。
    */
   Perception() {
-    return { eyeClosure: this.opening.eyeClosure || 0, concussion: this.opening.concussion || null };
+    // 06 老周从坐着的活人换回担架躺姿时玩家闭一下眼（FirstLevelCollection.SeatSwapClosure）。
+    const swap = this.frontShow?.collection?.SeatSwapClosure?.() || 0;
+    return { eyeClosure: Math.max(this.opening.eyeClosure || 0, swap), concussion: this.opening.concussion || null };
   }
   /**
    * 控制锁算视线用的眼位。被枪托砸翻躺在地上的时候（旧的屋内伏击）真正的眼位在地板上方
@@ -2265,9 +2286,10 @@ export class FirstLevelMissionRuntime {
     const prof = this.profiler?.on ? this.profiler : null;
     prof?.B("story/mission/voice");
     this.voice.Update(dt);
+    this.frontScenes.Update();
     this.speakers.Update();
     this.UpdateMusic();
-    this.battleSound.Update(dt,this.flow.stage.id,this.voice.current?.phase==="playing");
+    this.battleSound.Update(dt,this.flow.stage.id,this.StorySpeaking);
     prof?.E("story/mission/voice");
     prof?.B("story/mission/other");
     this.opening.Update(dt);
@@ -2284,6 +2306,10 @@ export class FirstLevelMissionRuntime {
     this.UpdateSquad();
     this.UpdateFront();
     this.frontPressure.Update(dt);
+    // 弹坑地形块外沿算站住（Script_Physics.TERRAIN_TILE_EDGE_SNAP_M）：任务侧开关，只在 01–06 打开。
+    if(this.physics)this.physics.terrainTileEdgeRest=FIRST_LEVEL_AI_RULE_STEPS.includes(this.flow.stage.id);
+    // 03–05 投弹否决（Script_AiTactics grenadeVeto）：受保护的待撤守军身边不落手榴弹（契约 §2 第 9 条）。
+    if(this.ai.tactics)this.ai.tactics.grenadeVeto=this.frontBattle.Active?this.frontBattle.grenadeVeto:null;
     this.backdrop.Update(dt);
     this.UpdateTactics(dt);
     this.UpdateAssault(dt);
@@ -2349,9 +2375,13 @@ export class FirstLevelMissionRuntime {
       // Notion 06 是老周「看见顺子经过」才开口，触发与担架员的走位在
       // Script_FirstLevelCollection.UpdateOrders 里（玩家走到他跟前、脸朝着他）。
       if(this.GateNear("ordersReached")){this.Record("ordersReached");this.Say("Volunteer");}
-      // 后送队真实起行：担架队离开集结处，队首走出 litterSpacingM 以上。
-      if(this.Has("zhouOnLitter")&&this.column.litters.some(litter=>litter.progress>=R.litterSpacingM))
-        this.Record("columnDeparted",{lead:Math.max(...this.column.litters.map(litter=>litter.progress))});
+      // 后送队真实起行：老周的担架已经回到队列（不再是 fallen），而且队伍从那一刻起真的往前走了
+      // litterSpacingM 以上（ColumnDeparture；担架一开始就按间距排开，旧判据在 zhouOnLitter 同帧成立）。
+      if(this.Has("zhouOnLitter")){
+        const departure=ColumnDeparture(this.columnDepartureBase,this.column.litters,R.litterSpacingM);
+        this.columnDepartureBase=departure.baseline;
+        if(departure.departed)this.Record("columnDeparted",{lead:+departure.lead.toFixed(2)});
+      }
     }
     if(stage==="South"){
       this.Say("SouthWhisper");
@@ -2590,7 +2620,11 @@ export class FirstLevelMissionRuntime {
   UpdateMusic(stage = this.flow.stage.id) {
     if (this.musicInitializing) return;
     this.music.Update(stage, { shellImpact: this.Has("bunkerCollapsed"),
-      speaking: this.voice.current?.phase === "playing", failed: this.failed, has: (id) => this.Has(id) });
+      speaking: this.StorySpeaking, failed: this.failed, has: (id) => this.Has(id) });
+  }
+  /** A story line is sounding: the queued cue, or a 03–06 scene played through voice.PlayScene. */
+  get StorySpeaking() {
+    return this.voice.current?.phase === "playing" || !!(this.frontScenes?.handle && !this.frontScenes.handle.done);
   }
   ObjectiveProgress() {
     const progress = this.flow.ObjectiveProgress();
@@ -2614,6 +2648,7 @@ export class FirstLevelMissionRuntime {
       opening:this.opening.State(),
       front:this.frontShow?.State() || null,
       frontBattle:this.frontBattle.State(),
+      frontScenes:this.frontScenes.State(),
       pressure:this.frontPressure?.State() || null,
       backdrop:this.backdrop?.State() || null,
       ...this.flow.State(),
@@ -2694,6 +2729,8 @@ export class FirstLevelMissionRuntime {
     this.opening.Dispose();
     this.frontShow?.Dispose();
     this.frontPressure?.Dispose();
+    if(this.physics)this.physics.terrainTileEdgeRest=false;
+    if(this.ai.tactics?.grenadeVeto===this.frontBattle?.grenadeVeto)this.ai.tactics.grenadeVeto=null;
     this.backdrop?.Dispose();
     this.squadMarch?.Dispose();
     if(this.tankDust!=null)this.vfx.RemoveSmokeSource(this.tankDust);

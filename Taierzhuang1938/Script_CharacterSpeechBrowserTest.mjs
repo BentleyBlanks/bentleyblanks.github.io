@@ -142,7 +142,11 @@ try {
     const p=window.SpeechProbe,g=p.g,r=p.r,T=p.T;
     const ft=await import('./Script_FaceTrack.mjs'),{SpeakingCastOptions}=await import('./Data_FirstLevelSpeakingCast.mjs');
     await ft.LoadFaceTracks();
-    const cueId='TakeOverGun',key=r.voice.manifest.cues[cueId]?.sha256;
+    // 03-06 lines are per-line takes cut from one scene take (Voice package): the tracks are keyed by the line
+    // sha256s; a legacy whole-cue take (manifest.cues) keeps its own key.
+    const cueId='TakeOverGun',take=r.voice.manifest.cues[cueId]??r.voice.manifest.scenes?.[cueId],key=take?.sha256;
+    const lineKeys=Object.values(r.voice.manifest.lines||{}).filter(line=>line.scene===cueId).map(line=>line.sha256);
+    const HasTrack=()=>ft.HasFaceTrack(key)||(lineKeys.length>0&&lineKeys.every(k=>ft.HasFaceTrack(k)));
     const zhou=g.actorFactory.Create('nra',{...SpeakingCastOptions('zhou'),seed:61,weapon:null});
     const luoRoot=p.luo.actor.root,side=new T.Vector3(1,0,0).transformDirection(luoRoot.matrixWorld);
     zhou.root.position.copy(luoRoot.getWorldPosition(new T.Vector3())).addScaledVector(side,-1.1);
@@ -158,7 +162,7 @@ try {
       // Start from closed mouths (a previous pass may have stopped mid-word).
       r.voice.Pause();for(let i=0;i<20;i++){g.StepFrames(1,1/60,false);zhou.Update(1/60,{});}
       r.voice.Replay(cueId);r.voice.Update(0);
-      const rows=[];const seconds=r.voice.manifest.cues[cueId].seconds;
+      const rows=[];const seconds=take?.seconds??0;
       while(r.voice.current?.cue.id===cueId&&r.voice.State().playbackPhase==='playing'&&rows.length<2400){
         g.StepFrames(1,1/60,false);zhou.Update(1/60,{});
         const luo=r.speakers.Speech('luo'),zs=r.speakers.Speech('zhou');
@@ -177,10 +181,10 @@ try {
         }
       }
       await Restore();
-      return {rows,shot:null,hasTrack:ft.HasFaceTrack(key)};
+      return {rows,shot:null,hasTrack:HasTrack()};
     };
     window.TrackRun=Run;
-    return {key,hasTrack:ft.HasFaceTrack(key),zhouModel:zhou.characterRig.modelId,zhouFace:!!zface};
+    return {key,lineKeys:lineKeys.length,hasTrack:HasTrack(),zhouModel:zhou.characterRig.modelId,zhouFace:!!zface};
   });
   assert.ok(trackRun.hasTrack,`TakeOverGun has a baked face track (${trackRun.key})`);
   assert.equal(trackRun.zhouModel,'LugouNra02');assert.ok(trackRun.zhouFace);
@@ -330,12 +334,81 @@ try {
   assert.ok(velocity.silent.mouth.max<.05,`still mouth writes none (${velocity.silent.mouth.max.toFixed(3)} px)`);
   assert.ok(velocity.held.mouth.max<.05,'history settles once the jaw stops');
   assert.ok(velocity.speaking.forehead.max<.05,'only the jaw region moves');
-  await fs.writeFile(path.join(output,'Data_CharacterSpeech.json'),JSON.stringify({initial,samples,pauseReceipt,pause,resumed,closeups,velocity,
+
+  // 06: Zhou waits for the stretcher sitting against the earth wall as a live NRA02 body with a face
+  // (Script_FirstLevelCollection.SeatZhou; the baked litter patient has no skeleton). BorrowLight on
+  // simulation time: his jaw follows his own five lines and stays shut while Shunzi talks.
+  const seat06=await page.evaluate(async()=>{
+    const p=window.SpeechProbe,g=p.g;p.r.voice.Pause();
+    await g.Debug.FirstLevelJump(6);
+    const r=g.Debug.FirstLevelMissionRuntime();await r.voiceReady;
+    for(let i=0;i<20&&!r.frontShow.collection.seated;i++)g.StepFrames(3,1/60,false);
+    const zhou=r.frontShow.collection.seated,rig=zhou?.actor?.characterRig,face=rig?.facial;
+    if(!face)return {error:'no seated live Zhou with a face',state:r.frontShow.collection.State(),stage:r.flow.stage.id};
+    // Stand where the player borrows the light (Place.collection.borrowStand), facing him, so he is a
+    // full-rate near actor (AI animation cadence and culling go by the camera, as in play).
+    const {MISSION_PLACEMENT}=await import('./Data_FirstLevelMissionLayout.mjs'),stand=MISSION_PLACEMENT.collection.borrowStand;
+    const y=g.battlefield.GroundHeight(stand.x,stand.z);g.player.position.set(stand.x,y,stand.z);g.player.body?.Teleport(stand.x,y,stand.z);
+    g.player.yaw=Math.atan2(stand.x-zhou.position.x,stand.z-zhou.position.z);g.player.pitch=-.12;
+    p.focus=rig;p.distance=2.6;p.faceOn=true;g.post.NotifyCameraCut();g.StepFrames(6,1/60,true);
+    const Jaw=()=>{const c=face.controls.find(c=>c.name==='Face_Jaw');return c.bone.quaternion.angleTo(c.quaternion);};
+    const Moving=()=>face.weights.Open>=.1||face.weights.Wide>=.25||face.weights.Round>=.25||face.weights.Close>=.5;
+    const hip=rig.bones.pelvis||rig.bones.hips||rig.bones.hip,T=p.T;
+    const pose={bound:r.speakers.ActorForWho('zhou')===zhou,model:rig.modelId,sit:zhou.actor.lifePose?.sit??null,
+      hipY:hip?+(hip.getWorldPosition(new T.Vector3()).y-g.battlefield.GroundHeight(zhou.position.x,zhou.position.z)).toFixed(3):null,
+      headY:+(rig.bones.head.getWorldPosition(new T.Vector3()).y-g.battlefield.GroundHeight(zhou.position.x,zhou.position.z)).toFixed(3),
+      weaponShown:!!zhou.actor.weaponGroup?.visible,baked:r.column.zhou.liveSeated===true};
+    const clock=r.voice.Clock;r.voice.Clock=()=>NaN;await g.audio.ctx.suspend();
+    r.voice.Pause();for(let i=0;i<20;i++)g.StepFrames(1,1/60,false);
+    r.voice.Replay('BorrowLight');r.voice.Update(0);
+    const rows=[];let shot=null;
+    while(r.voice.current?.cue.id==='BorrowLight'&&r.voice.State().playbackPhase==='playing'&&rows.length<3000){
+      g.StepFrames(1,1/60,rows.length%3===0);
+      const zs=r.speakers.Speech('zhou');
+      const row={t:r.voice.current?.sourceTime??0,zhou:!!zs?.active,other:!zs?.active&&!!r.voice.Speech?.('shunzi')?.active,
+        target:zs?.jaw??null,jaw:Jaw(),moving:Moving(),visible:!!zhou.actor.root.visible,lod:zhou.renderLod??null};
+      rows.push(row);
+      if(!shot&&row.zhou&&row.jaw>.1){shot=row.t;window.Seat06Shot={rig,held:{...zs},source:face.source};}
+    }
+    r.voice.Clock=clock;await g.audio.ctx.resume();
+    return {pose,rows,shot};
+  });
+  assert.ok(!seat06.error,`06: ${seat06.error} ${JSON.stringify(seat06.state)} ${seat06.stage}`);
+  assert.ok(seat06.pose.bound,'06: the speaker binder plays zhou on the seated live body');
+  assert.equal(seat06.pose.model,'LugouNra02','06: seated Zhou keeps his NRA02 face');
+  assert.equal(seat06.pose.sit,1,'06: Zhou sits (lifePose.sit)');
+  // Actor.sit is a bench pose (Zhou sits on an ammo box against the wall): standing heads are ~1.6 m.
+  assert.ok(seat06.pose.headY<1.42,`06: his head is at sitting height (${seat06.pose.headY} m above the ground)`);
+  assert.equal(seat06.pose.weaponShown,false,'06: no rifle on the seated Zhou');
+  {
+    const SETTLE_S=.15;let spoke=-1e9;
+    for(const row of seat06.rows){if(row.zhou)spoke=row.t;row.settled=row.t-spoke>SETTLE_S;}
+    const talk=seat06.rows.filter(row=>row.zhou),articulating=talk.filter(row=>row.target==null||row.target>=.1);
+    const following=articulating.length?articulating.filter(row=>row.moving).length/articulating.length:0;
+    const listeningOpen=seat06.rows.filter(row=>row.other&&row.settled&&row.jaw>SILENT_JAW_RADIANS).length;
+    const listening=seat06.rows.filter(row=>row.other&&row.settled).length;
+    seat06.stats={frames:seat06.rows.length,talk:talk.length,following,listening,listeningOpen};
+    assert.ok(talk.length>60,`06: Zhou's BorrowLight lines drive his face (${talk.length} frames)`);
+    assert.ok(following>=.8,`06: face follows his track on >=80% of articulating frames (${following.toFixed(2)})`);
+    assert.ok(listening>30,`06: Shunzi's lines were sampled (${listening} frames)`);
+    assert.equal(listeningOpen,0,'06: Zhou keeps his mouth shut while Shunzi talks');
+  }
+  // Close-up (mid-word) and a wider look at the seated pose, through the production chain.
+  if(seat06.shot!=null){
+    await page.evaluate(()=>{const p=window.SpeechProbe,s=window.Seat06Shot;s.rig.facial.source=()=>s.held;
+      p.focus=s.rig;p.distance=1.2;p.faceOn=true;p.g.post.NotifyCameraCut();p.g.StepFrames(10,1/60,true);});
+    await page.screenshot({path:path.join(output,'Scene_ZhouSeated06_MidWord.png')});
+    await page.evaluate(()=>{const p=window.SpeechProbe;p.distance=2.6;p.g.post.NotifyCameraCut();p.g.StepFrames(6,1/60,true);});
+    await page.screenshot({path:path.join(output,'Scene_ZhouSeated06_Pose.png')});
+    await page.evaluate(()=>{const s=window.Seat06Shot;s.rig.facial.source=s.source;});
+  }
+  seat06.rows=seat06.rows.filter((_,i)=>i%4===0);
+  await fs.writeFile(path.join(output,'Data_CharacterSpeech.json'),JSON.stringify({initial,samples,pauseReceipt,pause,resumed,closeups,velocity,seat06,
     faceTrack:{key:trackRun.key,shots,track:trackStats,envelope:envelopeStats,trackRows:trackPass.rows,envelopeRows:envelopePass.rows},errors},null,2));
   assert.deepEqual(errors,[]);
   console.log(`ok live faces: Luo speaks with his own line, Yaowa listens closed-mouthed; ${closeups.length} close-ups of 6 facial skins; `
     +`mouth velocity ${velocity.speaking.mouth.max.toFixed(2)} px talking / ${velocity.silent.mouth.max.toFixed(3)} px still; `
-    +`TakeOverGun track ${JSON.stringify(trackStats)} vs envelope ${JSON.stringify(envelopeStats)}`);
+    +`TakeOverGun track ${JSON.stringify(trackStats)} vs envelope ${JSON.stringify(envelopeStats)}; 06 seated Zhou ${JSON.stringify(seat06.stats)}`);
 } catch(error){
   await page.screenshot({path:path.join(output,'Scene_Failure.png')}).catch(()=>{});
   console.error(await page.evaluate(()=>({boot:document.querySelector('#bootText')?.textContent,errors:window.Tengxian?.Debug.FirstLevelMissionRuntime()?.voice?.errors})).catch(()=>null));

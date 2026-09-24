@@ -278,9 +278,10 @@ const Cue = (id) => MISSION_DIALOGUE.find((cue) => cue.id === id);
     Trapped: ["bunkerCollapsed", "captivesKilled", "doorSearchStarted"],
     BunkerRescue: ["rescueCallHeard", "luoRescueComplete", "rifleRecovered"],
     RearTrench: ["rearTrenchEntered", "cornerReached", "collectionPointSeen", "supportOrdersHeard"],
-    Support: ["frontReached", "rightNestCaptured", "frontContact", "frontRifleDefense", "rifleWithdrawalResolved", "zhouGunWounded", "tankPreviewed"],
+    // 契约 §2.6（Front 包 09-24）：03 等「何有田接枪 + 老周离枪 ≥10 m」，zhouGunWounded 挪到 05 的背景条件。
+    Support: ["frontReached", "rightNestCaptured", "frontContact", "frontRifleDefense", "rifleWithdrawalResolved", "leftGunHandover", "zhouLeftGun", "tankPreviewed"],
     MachineGun: ["tankPositionPressured", "remainingGuardsGathered", "tankBlocksExit", "rightRearReached", "bundleOrderHeard"],
-    Tank: ["bundleRouteTraversed", "bundleTaken", "bundleReturned", "attackPositionReached", "tankImmobilized", "tankFireDisabled", "attackRetreated", "lastGuardsWithdrawn", "frontDisengaged", "reliefInPosition", "collectionReturned"],
+    Tank: ["bundleRouteTraversed", "bundleTaken", "bundleReturned", "attackPositionReached", "tankImmobilized", "tankFireDisabled", "attackRetreated", "lastGuardsWithdrawn", "frontDisengaged", "reliefInPosition", "collectionReturned", "zhouGunWounded"],
     Orders: ["ordersReached", "volunteerHeard", "lightShared", "zhouOnLitter", "columnDeparted"],
     South: ["southWhisperHeard", "villageMouthReached", "mainStreetPointed"],
   };

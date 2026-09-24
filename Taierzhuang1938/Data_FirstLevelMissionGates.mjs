@@ -261,6 +261,9 @@ export const MISSION_FACT_GATES = Object.freeze({
     ["rightNestCaptured","Support","阵位守卫已清除，玩家与班长实际占据右侧阵位"],
     ["tankPreviewed","Support","同一辆战车行至东北道路远段"],
     ["leftGunHandover","Support","何有田接替左侧枪位"],
+    ["zhouLeftGun","Support","老周被扶离左侧枪位 10 m 以上（何有田已到枪边）"],
+    ["breachReopened","Tank","战车失去封锁火力、缺口前无直接威胁：撤口重新打开（配乐标点）"],
+    ["returnMet","Tank","回撤路上在安全区与余队、刘文财、接防班长汇合"],
     ["tankPositionPressured","MachineGun","战车炮弹实际命中右侧射位周边"],
     ["remainingGuardsGathered","MachineGun","既有余队收拢至最后遮挡"],
     ["rightRearReached","MachineGun","玩家与班长抵达后墙实遮挡"],
@@ -290,10 +293,6 @@ export const MISSION_FACT_GATES = Object.freeze({
     text: "第一批存活守军全部撤入安全位置，至少一人存活",
   }),
   // --- MachineGun --------------------------------------------------------
-  zhouGunWounded: Gate({
-    kind: "scripted", step: "Support", source: "FirstLevelFrontBattle.UpdateZhou",
-    text: "老周既有腿伤，经己方沟道实际撤到集结处",
-  }),
   frontAttackRepelled: Gate({
     kind: "combat", step: "MachineGun", encounter: "machineGun", source: "FirstLevelFrontPressure.UpdateGroups",
     text: "machineGun 组全部阵亡或被打退（退到 retreatDistanceM 之外）",
@@ -308,6 +307,11 @@ export const MISSION_FACT_GATES = Object.freeze({
   }),
   bundleOrderHeard: Gate({ kind: "voice", step: "MachineGun", cue: "BundleOrder", source: "VoiceDone" }),
   // --- Tank --------------------------------------------------------------
+  // 契约 §2.6：03 只等老周离枪 ≥10 m（zhouLeftGun）；他走回集结处是 06 之前（05）的背景条件。
+  zhouGunWounded: Gate({
+    kind: "scripted", step: "Tank", source: "FirstLevelFrontBattle.UpdateZhou",
+    text: "老周既有腿伤，经己方沟道实际撤到集结处",
+  }),
   bundleRouteTraversed: Gate({
     kind: "scripted", step: "Tank", source: "UpdateSortie",
     requires: Object.freeze(["bundleRoutePoint"]),

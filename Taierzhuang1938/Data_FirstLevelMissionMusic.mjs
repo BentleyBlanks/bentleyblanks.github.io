@@ -62,7 +62,8 @@ export const FIRST_LEVEL_STAGE_MUSIC = Object.freeze({
 export const FIRST_LEVEL_MUSIC_COMBAT = Object.freeze({
   stages: Object.freeze(["RearTrench", "Support", "MachineGun", "Tank"]),
   fromIntensity: 0.35, fullIntensity: 0.9, depth: 0.55, stepScale: 0.05,
-  stingers: Object.freeze(["tankPreviewed", "tankImmobilized", "tankFireDisabled", "lastGuardsWithdrawn"]),
+  // breachReopened（Front 包 09-24）：战车哑火、缺口前没人再封 —— 撤口重新打开那一刻。
+  stingers: Object.freeze(["tankPreviewed", "tankImmobilized", "tankFireDisabled", "breachReopened", "lastGuardsWithdrawn"]),
   holdS: 6, fadeS: 4, lift: 1.15,
 });
 

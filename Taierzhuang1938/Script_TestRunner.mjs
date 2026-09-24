@@ -105,6 +105,9 @@ export const testDefs = {
   FirstLevelEndTest: {file:'Script_FirstLevelEndTest.mjs',desc:'第一关 15–18：降压段无战斗、换手与静默行走、院门盘问与入院、门槛与最后一句、死亡段与接收处继续工作、尾队过桥与爆破清场、夜景与天空还原（纯 Node，毫秒级）'},
   MissionGatesTest: {file:'Script_MissionGatesTest.mjs',desc:'第一关编排表：事实门覆盖、按表生成与激活规则、运行时源码对账、编排模型'},
   FirstLevelEnemyIdleProbe: {file:'Script_FirstLevelEnemyIdleProbe.mjs',args:['--stage-from=3','--stage-to=6','--gate'],timeoutMs:1800000,desc:'03–06 冷启动真实驾驶：03/04/05 逐阶段与合并的 30 s 零发者 <20%、4 s 不动 ≤25%，机枪开火、放行前不打守军、跃进喊话不刷屏、成组冲锋有记录（docs/Data_EnemyAi.md §20）'},
+  FirstLevelFrontBattleBrowserTest: {file:'Script_FirstLevelMissionBrowserTest.mjs',args:['--campaign','--stage-from=3','--stage-to=6','--probe-front-gun'],timeoutMs:1800000,desc:'03–06 冷启动真实输入一趟：夺点、接枪、战车露面/压阵位/封口、05 取弹投弹两段毁伤、并行撤离、安全区汇合、06 借火与起行（零页面错误、零检查点重试）'},
+  FirstLevelFrontBombFirstTest: {file:'Script_FirstLevelMissionBrowserTest.mjs',args:['--campaign','--stage-from=3','--stage-to=6','--bomb-first'],timeoutMs:1800000,desc:'03–06 非理想顺序：05 在攻击支路离攻击位一个弯处先炸车，attackPositionReached 记 skipped、流程照常走完 06（契约 v1.1 卡死②）'},
+  FirstLevelFrontPacingTest: {file:"Script_FirstLevelFrontPacingTest.mjs",desc:"03–06 节奏：何有田接枪/老周离枪 10 m、05 先炸车与并行撤离、安全区汇合、06 起行判据、PlayScene 说话人、指引指向战车、落弹区（纯 Node）"},
   FirstLevelFrontPressureTest: {file:'Script_FirstLevelFrontPressureTest.mjs',desc:'第一关敌军不当木桩：压力表数据与运行时、环境射击的账、迟疑/成组冲锋/军官、01 背景兵（纯 Node）'},
   FirstLevelMidTest: {file:'Script_FirstLevelMidTest.mjs',desc:'第一关 08–14（Mid 包）：担架停进遮挡、连屋近战先手、内院放行计数、两处威胁与装载联动、上车/停车/卸人时序、空袭目标与扑沟'},
   FirstLevelVoiceTest: {file:'Script_FirstLevelVoiceTest.mjs',desc:'第一关台词表：01–02 对 09.23 新稿逐字、契约 cue/句数、日语假名与中文字幕、对白导演表、多声部播放器（重叠/截断/等事件/侧链）、缺录音兜底（纯 Node）'},
@@ -388,6 +391,8 @@ export const browserTests = new Set([
   "FirstLevelMissionPresentationTest",
   "FirstLevelMissionBrowserTest",
   "FirstLevelEnemyIdleProbe",
+  "FirstLevelFrontBattleBrowserTest",
+  "FirstLevelFrontBombFirstTest",
   "MachineGunCaptivesAnimationTest",
   "CarriagePropVelocityTest",
   "MotionVectorContractTest",
@@ -458,6 +463,7 @@ export const tier0Fast = [
   "FirstLevelFrontTest",
   "FirstLevelTankBrainTest",
   "FirstLevelFrontPressureTest",
+  "FirstLevelFrontPacingTest",
   "OpeningStoryboardsTest",
 ];
 
@@ -486,7 +492,7 @@ export const domains = {
   propVelocity: {label:'近景刚体道具速度与移动清晰度',tests:['CarriagePropVelocityTest']},
   squadMarch: {label:"通用小队行进",tests:["SquadMarchCoverTest","SquadMarchCoverBrowserTest","SquadMarchTest","SquadMarchAiTest","SquadMarchEditorTest","SquadMarchNavigationTest","FirstLevelSquadMarchTest","EditorLauncherTest"]},
   firstLevelTail: {label:"第一关降压段至结尾定向续接",tests:["FirstLevelMissionStageRegroupTest","FirstLevelMissionStageTailTest"]},
-  firstLevel: {label:'新版第一关完整任务',tests:['FirstLevelFrontTopologyTest','FirstLevelEndTest','MachineGunCutsceneAudioTest','Type89DamageTest','FirstLevelTankBrainTest','FirstLevelTankProbeTest','FirstLevelFrontRouteBrowserTest','FirstLevelMissionTopologyTest','FirstLevelMissionTopologyBrowserTest','FirstLevelSpaceTest','MissionReturnTest','FirstLevelMissionReturnBrowserTest','FirstLevelCasualtyBrowserTest','FirstLevelMissionTest','MissionGatesTest','FirstLevelVoiceTest','FirstLevelVoiceAudioTest','FirstLevelFrontPresenceTest','FirstLevelMachineGunTest','FirstLevelZhouExitBrowserTest','FirstLevelMachineGunCutsceneTest','FirstLevelMissionAftermathTest','FirstLevelMissionFortificationsTest','FirstLevelMissionBrowserTest','FirstLevelMissionStageJumpTest','FirstLevelMissionStageContinueTest','FirstLevelMissionPresentationTest','FirstLevelMidTest','FirstLevelFrontTest','FirstLevelFrontPressureTest','FirstLevelEnemyIdleProbe']},
+  firstLevel: {label:'新版第一关完整任务',tests:['FirstLevelFrontTopologyTest','FirstLevelEndTest','MachineGunCutsceneAudioTest','Type89DamageTest','FirstLevelTankBrainTest','FirstLevelTankProbeTest','FirstLevelFrontRouteBrowserTest','FirstLevelMissionTopologyTest','FirstLevelMissionTopologyBrowserTest','FirstLevelSpaceTest','MissionReturnTest','FirstLevelMissionReturnBrowserTest','FirstLevelCasualtyBrowserTest','FirstLevelMissionTest','MissionGatesTest','FirstLevelVoiceTest','FirstLevelVoiceAudioTest','FirstLevelFrontPresenceTest','FirstLevelMachineGunTest','FirstLevelZhouExitBrowserTest','FirstLevelMachineGunCutsceneTest','FirstLevelMissionAftermathTest','FirstLevelMissionFortificationsTest','FirstLevelMissionBrowserTest','FirstLevelMissionStageJumpTest','FirstLevelMissionStageContinueTest','FirstLevelMissionPresentationTest','FirstLevelMidTest','FirstLevelFrontTest','FirstLevelFrontPressureTest','FirstLevelFrontPacingTest','FirstLevelEnemyIdleProbe','FirstLevelFrontBattleBrowserTest','FirstLevelFrontBombFirstTest']},
   text: { label: "玩家文本 / 数值表（数据驱动闸门）", tests: ["TextTest", "TextGatherCheck"] },
   animation: { label: '独立动画资产验收', tests: ['ActorLocomotionTest','BackRifleRunTest','MeleeAnimationTest','DadaoSwingTest','GrenadeThrowTest','InfantryAnimationTest','DeathCollapseTest'] },
   explosives: { label: "爆炸白盒与通用地形形变/返掷", tests: ["ExplosionRulesTest", "ExplosionRangeTest", "CraterSurfaceTest"] },
@@ -594,7 +600,7 @@ const changedDomainRules = [
   // 归 render（ProfilerTest 在那一串里）；命令行自己的冒烟在 tier 2 的 perf 档。
   { domain: "render", pattern: /Script_Profile(Cli|r?Report)|Script_FrameProbeViews/i },
   { domain: "perf", pattern: /Script_ProfileCli/i },
-  {domain:"firstLevel",pattern:/FirstLevelFrontRoute|FirstLevelFrontBattle|FirstLevelFrontTopology|FirstLevelTransition/},
+  {domain:"firstLevel",pattern:/FirstLevelFrontRoute|FirstLevelFrontBattle|FirstLevelFrontScenes|FirstLevelFrontPacing|FirstLevelFrontTopology|FirstLevelTransition/},
   // 2026-09-23 01–06 space rebuild: keyframe table and the static probe the space gate reads.
   {domain:"firstLevel",pattern:/FirstLevelSpaceKeyframes|FirstLevelSpaceProbe|FirstLevelSpaceMap|FirstLevelSpaceShots|FirstLevelSpaceSouthFingerprint|Data_FirstLevelFrontBreakables/},
   {domain:"firstLevel",pattern:/FirstLevelZhouExit/},

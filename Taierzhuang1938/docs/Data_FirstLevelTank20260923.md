@@ -7,9 +7,9 @@
 | 文件 | 作用 |
 | --- | --- |
 | `Script_FirstLevelTankBrain.mjs` | 纯规则大脑（无 three，node 可跑）：驾驶 / 炮手 / 机枪 / 反应 / 护兵槽 / 两段毁伤 |
-| `Data_Tuning_Tank.mjs` | 全部数值（带出处）+ 临时路点 `TANK_TEMP_PATH`（现布局）+ 开关 `brainEnabled` |
+| `Data_Tuning_Tank.mjs` | 全部数值（带出处）+ 战车路 `FRONT_TANK_BRAIN_PATH`（Space 包 `FRONT_TANK_PATH` 加节奏字段；2026-09-24 Front 包取代临时路点 `TANK_TEMP_PATH`）+ 开关 `brainEnabled` |
 | `Script_FirstLevelTankRuntime.mjs` | 接线层：世界 → 大脑（目标、视线、掩体沿、车体挂点、事实、许不许开火、护兵名单），大脑 → 世界（位姿、开火、护兵走位、事实、震屏、可破坏掩体） |
-| `Script_FirstLevelFrontBreakables.mjs` | 可破坏掩体机制（分段体块）；临时数据 `FRONT_BREAKABLES_TEMP` 与永不可破规则 `NEVER_BREAKABLE_RULES` 在 `Data_Tuning_Tank.mjs` |
+| `Script_FirstLevelFrontBreakables.mjs` | 可破坏掩体机制（分段体块）；数据是 Space 包的 `Data_FirstLevelFrontBreakables.mjs`（`SpaceBreakableSpecs` 换格式），永不可破规则 `NEVER_BREAKABLE_RULES` 在 `Data_Tuning_Tank.mjs`（体块名取 Space 的 `FRONT_UNBREAKABLE`）；旧临时数据 `FRONT_BREAKABLES_TEMP` 已删 |
 | `Script_Type89Damage.mjs` | 毁伤表现分两段：`trackCut`（掉履带板、撕挡泥板、车体塌向断侧）与 `engineKilled`（掀后甲板、冒黑烟）；不带 `damageState` 的旧调用两样一起上 |
 
 运行时只留钩子：`Runtime.UpdateTank()` 第一行、`Runtime.OnBlast(event)`、`Runtime.OnTankHit(point, from)`（Main 的玩家 / 架设机枪弹道命中 `missionTank` 时调用）、`FrontBattle.TankBlockade / UpdatePressure` 各一处。`Data_Tuning_Tank.brainEnabled = false` 回到旧的定时插值路径。
@@ -18,7 +18,7 @@
 
 - 路点 `{x, z, kind, stage?, holdUntil?, holdS?, faceTo?, preview?}`：`kind` 为 `cruise | hullDown | firePoint | squeeze | block`；`stage` = 最早哪一步能到（阶段拴绳）；`holdUntil` = 到了要等的事实，`"stage:<Id>"` 表示等进入那一步；`preview` 标出 03 的露面点（记 `tankPreviewed`）。
 - 驾驶：加速 0.6、减速 1.2 m/s²；车头与切线差 > 0.3 rad 先停车原地转（≤ 0.32 rad/s），走着转向率 = 车速 / 5.5 m；停车按 `faceTo` 摆车头；躲弹后倒 1.5–3 m，不越过本阶段进入时的里程，投掷者仍在 9 m 投掷距离内；退完缓 6 s 再往前挤。输出 `load / rpm / pitch`（点头 / 后仰）。
-- 炮手：10 Hz 感知、每 tick ≤ 6 条视线；打分 = 权重 × 1/(1+d/45) × 惯性 1.35；`untargetable / protect` 的人不打，且任何弹着点离他们 ≥ 9.8 m。预兆链：手摇 0.22–0.30 rad/s → 停摇 1.2–1.8 s（只在停车点、主炮许可时计）→ 开炮；节奏 7.5 ± 1.5 s。新暴露的玩家第一发打掩体沿（`Cover()`），没有掩体打在他前面 4.5 m（太近就打身旁）；同一目标散布 3.2 m × 0.62ⁿ（下限 0.7 m）；移动目标有提前量；看不见按 lastKnown 的掩体沿打；区域目标（`kind:"zone"`，阵位 / 缺口）看不见也照打它前面那道掩体的沿。警告弹伤害 ×0.2（只砸土不要命）；落点离还没被警告过的玩家 < 4.5 m 的任何一发都按警告弹算。
+- 炮手：10 Hz 感知、每 tick ≤ 6 条视线；打分 = 权重 × 1/(1+d/45) × 惯性 1.35；`untargetable / protect` 的人不打，且任何弹着点离他们 ≥ 9.8 m——量的是**真炸点**：开炮时 Script_FirstLevelTankRuntime.SafeShellAim 用 Script_Combat.PredictShellImpact 按同一条抛物线算弹道先撞上哪儿（沟沿、墙），不够远就把瞄点往炮口收 3 m 再算（最多 4 次），还不够这一发不打（2026-09-24：封缺口的区域弹瞄点在 9.8 m 外，却先撞上缺口南沿、炸在待撤守军 5.8–8.6 m 处，一趟把第二批六人全磨死）；TankProbe 断言每发的 protectedMinM。预兆链：手摇 0.22–0.30 rad/s → 停摇 1.2–1.8 s（只在停车点、主炮许可时计）→ 开炮；节奏 7.5 ± 1.5 s。新暴露的玩家第一发打掩体沿（`Cover()`），没有掩体打在他前面 4.5 m（太近就打身旁）；同一目标散布 3.2 m × 0.62ⁿ（下限 0.7 m）；移动目标有提前量；看不见按 lastKnown 的掩体沿打；区域目标（`kind:"zone"`，阵位 / 缺口）看不见也照打它前面那道掩体的沿。警告弹伤害 ×0.2（只砸土不要命）；落点离还没被警告过的玩家 < 4.5 m 的任何一发都按警告弹算。
 - 机枪：车体机枪 ±0.45 rad；首次接触第一串从目标前 9 m「走」到目标、零伤害（`damageScale 0`，Main 的 `FireVehicleBullet` 不结算伤害）；之后正常点射；看不见压 lastKnown 5 s。死角（< 10 m、在车体机枪射界外）：炮塔掉头，≥ 6 s 后塔后机枪才开火；开舱盖喊人（护兵往那一侧收）。
 - 反应：≤ 8 m 的中方爆炸 → 后倒、炮塔甩向投掷者（0.42 rad/s）、机枪压 2 s、护兵散开；枪弹打车体 → 观察窗关 1.6 s，每 15 s 最多被牵一次注意；每 10–14 s 朝 `path.scan` 看 3 s（05 起）。
 - 毁伤：只有 `GrenadeBundle` 伤车。车体局部坐标判部位：履带（车旁地面，≥35 → 约 3.2 m 内）→ `MobilityKill`；发动机后甲板 / 格栅 / 炮塔座圈（≥400 → 约 0.8 m 内，即落在车顶）→ `Disabled`；`MobilityKill` 之后任何一颗有效集束弹 → `Disabled`。`ForceDisable()` 给剧本补刀（罗班长）。
@@ -87,9 +87,22 @@
 
 ## 给第二波
 
-- Space 的新路点换掉 `TANK_TEMP_PATH`（`new FirstLevelTankRuntime(runtime, { path, breakables })`）；新 `Data_FirstLevelFrontBreakables` 换掉 `FRONT_BREAKABLES_TEMP`。
+- （已做，2026-09-24 Front 包）Space 的新路点换掉了 `TANK_TEMP_PATH`：运行时读 `FRONT_TANK_BRAIN_PATH`；可破坏掩体读 Space 的 `Data_FirstLevelFrontBreakables`，`FRONT_BREAKABLES_TEMP` 已删。仍走 `TakeOverStatic` 接管静态合批块（布局没标 dynamic：白盒场碰到 dynamic 会整块跳过，02–03 的胸墙与 AI 掩体点会跟着消失），受损沟沿是地形、这套机制做不了，跳过并记进 `breakablesSkipped`。
 - 护兵名单读 `MISSION_ENCOUNTERS.tank`（现在 2 人，槽位 4 个）；要满编需在名册里补到 4 人。
 - 大脑的 `barks`（`turretTraverse / hatchShout / escortScatter / visionSlit / trackCut / tankDisabled`）经 `TANK.barkCues` 接 `Say`，表里现在全是 `null`（`visionSlit / hatchShout` 已有机械声）；Voice 包出 cue 后只填表。
 - 换路以后：`lanes[]`（区域火力沟线）、`scan[]`、`entry`（起点要真有遮挡再加断言）都跟新路一起换；`NEVER_BREAKABLE_RULES.zones` 按 `MISSION_LAYOUT.zones` 的语义 id 认，zone id 不变就跟着新布局走。
 - 换路以后：`OffstagePoint()` 取新路的第一个路点，03 的「先闻其声」自动跟着走；新路起点离玩家的距离决定能不能听见（现路线 130–196 m）。
 - 取证：`Debug.FirstLevelMission().tankBrain`（大脑快照、主炮每发的预兆时长与落点、机枪点射、反应、毁伤序列、掩体段数、露面时刻）。
+
+## 2026-09-25 Front 包审查修复
+
+- **窗口喊话按优先战术提示喊**（`SayBark` 传 `priority: true`）：不给剧情对白让路、不吃 0.55 s 全局闸；只有点名的人自己正在说剧情
+  台词时排队（`QueueBark`，`TANK.barkRetryS`：trackCut 12 s、hatchShout 6 s、tankWindow 4 s；Disabled 以后的 trackCut、点名的人没了
+  的一律丢）。排队或刚喊出口的 `barkHoldS` 2.5 s 里，前沿对白的下一场先等（`FirstLevelFrontScenes` 读 `HoldsDialogue()`）；
+  「履带断了！还在打！再补一捆！」顶掉同一次投弹触发、还没开口的「回来！低头！」（`BundleRetreat`，意思相反）。
+  战车探针（开声音）：`trackCut` 在 MobilityKill 同一帧喊出（said:true）。
+- **打过头**：`SafeShellAim` 同一个收瞄循环里，真炸点沿射向越过这一次试的瞄点超过 `overshootMaxM` 6 m 也往炮口收；收
+  `protectPullSteps` 次都过头（或保护不够）这一发不打。改前缺口区的弹常越过缺口 8–12 m 落进后沟 (−16, −140) 一带；
+  先试过「照打过头最少的那一发」，战车探针 16 发里仍有 2 发炸在 (−11.4, −142.7)、(−15.6, −141.2)。TankProbe 断言每发过头 ≤ 6.5 m。
+- 来袭啸声放在真炸点（`sound.OnCannon(from, safe.impact || at, …)`）。
+- 03 预告 / 04 压阵位前的指引标记不压炮塔：放在车旁地上（朝玩家 4 m、玩家右手 6 m，`FRONT_BATTLE_TUNING.guideTankLeadM / SideM`）。

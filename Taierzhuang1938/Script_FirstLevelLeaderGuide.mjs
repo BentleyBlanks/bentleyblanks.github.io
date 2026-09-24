@@ -173,7 +173,8 @@ export class FirstLevelLeaderGuide {
     // 15B 末段按采用稿留一段真实无对白行走：HUD 指引照常，重复的带路语音让路。
     // CancelGuidance 只撤 guidance cue，不会抢断 HandsShake / GateChallenge 等剧情对白。
     if(r.quietMarch?.QuietWindowActive?.()){r.voice.CancelGuidance();return;}
-    const busy=r.voice.current&&!r.voice.current.cue.guidance || r.voice.queue.some(id=>!id.startsWith("Guide"));
+    // 03–06 scenes play through voice.PlayScene (Script_FirstLevelFrontScenes), not the queue: they count as story too.
+    const busy=r.voice.current&&!r.voice.current.cue.guidance || r.voice.queue.some(id=>!id.startsWith("Guide")) || !!r.frontScenes?.Busy;
     if(busy)this.lastStoryAt=r.time;
     if(view.waiting)this.waitSince??=r.time;else this.waitSince=null;
     if(view.lead&&this.rule.PlayerLead(this.Leader.position,r.player.position)>=G.aheadM)this.aheadSince??=r.time;else this.aheadSince=null;

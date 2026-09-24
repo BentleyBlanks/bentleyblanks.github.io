@@ -271,6 +271,34 @@ export class CombatSystem {
     this.shells.push(shell); return shell;
   }
 
+  /**
+   * 一发炮弹实际会炸在哪：与 StepShells 同一条抛物线、同一种射线（瞄点前面的沟沿 / 墙先把它接住），
+   * 打空的照样往前飞到 expireAfterFlightS。没撞上任何东西返回 null（半空过期，不起爆）。
+   * 第一关战车拿它核对「弹着点离受保护的人够远」（Script_FirstLevelTankRuntime.SafeShellAim）。
+   */
+  PredictShellImpact(from, target, { flight, sourceCollider = null, stepS = 1 / 30 } = {}) {
+    const bf = this.host.battlefield;
+    const velocity = target.clone().sub(from).divideScalar(flight);
+    velocity.y += GRAVITY * flight * 0.5;
+    const previous = from.clone(), next = new THREE.Vector3(), delta = new THREE.Vector3();
+    const end = flight + SHELL.expireAfterFlightS, steps = Math.max(1, Math.ceil(end / stepS));
+    for (let i = 1; i <= steps; i++) {
+      const age = Math.min(end, i * stepS);
+      next.copy(from).addScaledVector(velocity, age);
+      next.y -= GRAVITY * age * age * 0.5;
+      delta.subVectors(next, previous);
+      const distance = delta.length();
+      if (distance > 1e-9) {
+        const hit = bf.Raycast(previous, delta.clone().divideScalar(distance), distance, { terrain: true, excludeCollider: sourceCollider });
+        if (hit) return previous.addScaledVector(delta, hit.t / distance);
+      }
+      const ground = bf.GroundHeight(next.x, next.z);
+      if (next.y <= ground) return next.clone().setY(ground);
+      previous.copy(next);
+    }
+    return null;
+  }
+
   StepShells(dt) {
     this.shellVisuals.Step(dt);
     for (let i = this.shells.length - 1; i >= 0; i--) {

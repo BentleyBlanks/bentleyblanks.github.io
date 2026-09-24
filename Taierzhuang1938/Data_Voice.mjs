@@ -219,6 +219,13 @@ const BATTLE_LINES = [
   { key: "spot_gap",        kind: "spot",   file: "AudioVoice_SpotGap.mp3", dur: 2.35,  role: "普通兵",   pitch: 0,                   speed: 1.1, text: "缺口！鬼子钻进来了！" },
   { key: "spot_plane",      kind: "spot",   file: "AudioVoice_SpotPlane.mp3", dur: 2.30,  role: "普通兵",   pitch: 0,   event: true,  text: "飞机！快躲起！" },
   { key: "spot_tank",       kind: "spot",   file: "AudioVoice_SpotTank.mp3", dur: 2.36,  role: "新兵",    pitch: 0,   event: true,  speed: 1.15, text: "战车！战车碾拢来了！" },
+  // 第一关 03–05 战车的预兆喊话（契约 §2 第 7 条「不加 HUD 标记，靠声音、炮塔指向和罗班长喊话传达窗口」；
+  // 台词取自 Front 包任务书的罗班长三句）。kind "tank" 没有任何 AI 会随机喊（Script_Ai 的 BARK_LINES 里没有这一类），
+  // 只由战车接线层按 key 点名（Data_Tuning_Tank.barkCues）；罗班长的本人版本见 Data_FirstLevelVoiceCast 的 leader 一套。
+// 三句都有前提（有战车、炮塔在转 / 在打口子 / 履带刚断），标 event：没点名的 Bark("tank") 不会抽中它们。
+  { key: "tank_turret",     kind: "tank",   file: "AudioVoice_TankTurret.mp3", dur: 0.86,  role: "老兵",    pitch: -4,  event: true,  text: "炮塔转过来了！" },
+  { key: "tank_window",     kind: "tank",   file: "AudioVoice_TankWindow.mp3", dur: 2.35,  role: "老兵",    pitch: -4,  event: true,  text: "它在打口子！就现在！" },
+  { key: "tank_track",      kind: "tank",   file: "AudioVoice_TankTrack.mp3", dur: 2.36,   role: "老兵",    pitch: -4,  event: true,  text: "履带断了！还在打！再补一捆！" },
   { key: "spot_wall",       kind: "spot",   file: "AudioVoice_SpotWall.mp3", dur: 2.34,  role: "普通兵",   pitch: 0,                   speed: 1.1, text: "墙上！鬼子爬上墙了！" },
   { key: "warn_down",       kind: "warn",   file: "AudioVoice_WarnDown.mp3", dur: 1.84,  role: "老兵",    pitch: -4,                  text: "趴倒！趴倒！" },
   { key: "warn_grenade",    kind: "warn",   file: "AudioVoice_WarnGrenade.mp3", dur: 1.91,  role: "普通兵",   pitch: 0,                   text: "手榴弹！闪！" },
@@ -291,6 +298,8 @@ const BATTLE_LINES = [
   { key: "ija_spot_shina",      kind: "spot",   file: "AudioVoice_IjaSpotShina.mp3", dur: 2.00,  role: "古兵",    pitch: -4,  side: "ija", event: true,  text: "しなへいだ！まだいるぞ！", voice: "ijaB", version: "20260924000001", kanji: "支那兵だ！まだ居るぞ！", cn: "支那兵！他们还在！" },
   { key: "ija_spot_target",     kind: "spot",   file: "AudioVoice_IjaSpotTarget.mp3", dur: 1.60,  role: "分隊長",   pitch: -2,  side: "ija",                 text: "もくひょう！みぎぜんぽう！", voice: "ijaA", version: "20260924000001", kanji: "目標！右前方！", cn: "目标！右前方！" },
   { key: "ija_spot_wall",       kind: "spot",   file: "AudioVoice_IjaSpotWall.mp3", dur: 1.41,  role: "兵",     pitch: 0,   side: "ija", event: true,  text: "じょうへきにてきへい！", voice: "ijaD", version: "20260924000001", kanji: "城壁に敵兵！", cn: "城墙上有敌兵！" },
+  // 八九式车长开舱盖喊护兵（战车大脑 hatchShout：有人摸进车体机枪打不到的死角）。只由战车接线层按 key 点名。
+  { key: "ija_tank_side",       kind: "tank",   file: "AudioVoice_IjaTankSide.mp3", dur: 1.68,  role: "分隊長",   pitch: -2,  side: "ija", event: true,  text: "せんしゃのよこにてき！", voice: "ijaA", version: "20260924150000", kanji: "戦車の横に敵！", cn: "战车旁边有敌人！" },
   { key: "ija_warn_down",       kind: "warn",   file: "AudioVoice_IjaWarnDown.mp3", dur: 1.01,  role: "古兵",    pitch: -4,  side: "ija",                 text: "ふせろ！うごくな！", voice: "ijaB", version: "20260924000001", kanji: "伏せろ！動くな！", cn: "卧倒！别动！" },
   { key: "ija_warn_cover",      kind: "warn",   file: "AudioVoice_IjaWarnCover.mp3", dur: 2.35,  role: "古兵",    pitch: -4,  side: "ija", delivery: "assault", text: "かくれろ！あたまをさげろ！", voice: "ijaB", version: "20260924000001", kanji: "隠れろ！頭を下げろ！", cn: "隐蔽！低下头！" },
   { key: "ija_warn_grenade",    kind: "warn",   file: "AudioVoice_IjaWarnGrenade.mp3", dur: 1.86,  role: "兵",     pitch: 0,   side: "ija",                 text: "てりゅうだん！ふせろ！", voice: "ijaD", version: "20260924000001", kanji: "手榴弾！伏せろ！", cn: "手榴弹！卧倒！" },

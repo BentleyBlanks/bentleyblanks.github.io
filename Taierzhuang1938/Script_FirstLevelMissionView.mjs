@@ -347,6 +347,8 @@ export class FirstLevelMissionView {
             ? 0.22
             : .76 + (litter.liftFraction || 0) * .44;
       const yaw = litter.yaw || 0;
+      // 06 老周坐在土壁边时是活人身体（Script_FirstLevelCollection.SeatZhou），这一副担架连人都不画。
+      if (litter.zhou && litter.liveSeated) { this.zhouRoot.visible = false; continue; }
       if (litter.zhou) {
         this.zhouRoot.visible = true;
         this.zhouRoot.position.set(litter.x, ground + height, litter.z);

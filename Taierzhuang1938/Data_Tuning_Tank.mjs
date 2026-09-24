@@ -14,6 +14,9 @@
 //   [旧] 沿用 Data_Tuning_FirstLevel 里既有 tank* 值（实拍过的射界、弹速、伤害）。
 //   [几] 按现有布局量出来的（几何扫描；Space 包重排后要重量）。
 // ===========================================================================
+import { FRONT_TANK_PATH, FRONT_SPACE, FRONT_SORTIE } from "./Data_FirstLevelFrontRoute.mjs";
+import { FRONT_TANK_ESCORT_SLOTS } from "./Data_FirstLevelMissionFront.mjs";
+import { FRONT_UNBREAKABLE } from "./Data_FirstLevelFrontBreakables.mjs";
 
 /** 大脑开关：false 时 Runtime / FrontBattle 走旧的定时插值路径（可回退）。 */
 export const TANK_BRAIN_ENABLED = true;
@@ -40,6 +43,8 @@ export const TANK = Object.freeze({
     pivotDoneRad: 0.04,
     // 路线切线用前后各这么远的两个点求（把折线的尖角磨圆）。
     tangentSpanM: 2.2,
+    // 相邻两段夹角超过这个就是折返点（HullDown 折返顶约 160°）：切线不跨它磨圆，离开时先原地掉头。[几]
+    reversalRad: 1.75,
     // 到点判定与「停在语义路点上」的容差。
     arriveM: 0.15,
     // [需] 阶段内躲弹后倒上限。
@@ -140,6 +145,18 @@ export const TANK = Object.freeze({
     // 保护：任何弹着点离 missionUntargetable / protect 的人至少这么远
     // （[旧] 弹片外沿 5 × BLAST.radiusScale 1.9 = 9.5 m，再留 0.3 m）。
     protectClearM: 9.8,
+    // 上面那条量的是**真炸点**，不只是瞄点（Script_FirstLevelTankRuntime.SafeShellAim）：瞄点推到 9.8 m 外，
+    // 弹道却先撞上半路的沟沿 / 墙，照样炸在人跟前。2026-09-24 Front 探针实测：05 封缺口的区域弹瞄在缺口北面
+    // (−8, −145)，从东南的 Block 打过来先撞 z ≈ −149 的沟沿，离最后一道掩体后待撤的守军 5.8–8.6 m，
+    // 一趟 6 发把他们磨到 17–45 血，另一趟六人全灭（guardBatchLost，任务失败）。
+    // 真炸点不够远：瞄点往炮口方向收 protectPullM 再算，最多 protectPullSteps 次；还不够这一发不打。
+    protectPullM: 3,
+    protectPullSteps: 4,
+    // 同一个收瞄循环顺带管「打过头」：真炸点沿射向越过这一次试的瞄点超过 overshootMaxM，也往炮口收一步再算。
+    // 2026-09-24 Front 包审查：缺口区的弹常越过缺口 8–12 m，落进我方后沟 (−16, −140) 一带 —— 05 玩家回撤、守军过缺口后
+    // 走的就是那里。收 protectPullSteps 次都过头（或保护不够）这一发不打（09-25 战车探针：16 发里 2 发只有过头 11 m 的选项，
+    // 炸在缺口交汇 (−11.4, −142.7) 与后沟 (−15.6, −141.2)）。
+    overshootMaxM: 6,
     // 区域目标（缺口封锁）默认散布 3–5 m。
     zoneScatterMinM: 3,
     zoneScatterMaxM: 5,
@@ -230,6 +247,14 @@ export const TANK = Object.freeze({
     rallyRadiusM: 3,
     // 车还在远处（03 从图外开进来）时，护兵照旧打自己的仗；车开到离他这么近才接过来跟车。
     joinRangeM: 30,
+    // 路点自带的绝对护兵槽（Block/Squeeze → FRONT_TANK_ESCORT_SLOTS，弹坑）：守区半径与掩体余量都小 ——
+    // 余量一大 AI 会挑坑外的掩体，从那儿顺土坎南坡看得见缺口（Space 包 09-24 实测）。[几]
+    slotRadiusM: 1.2,
+    slotSlackM: 0.8,
+    // 护兵从守位能跑开的圈（AI 的 tacticalRadiusM，14 m）截到离攻击位（FRONT_SORTIE.throw）至少这么远：弹坑槽离攻击位 13 m，
+    // 不截的话白刃 / 近距交火把护兵一路带到投弹人身边。2026-09-25 03–06 冷启动：护兵 C 从 2 m 外两枪加一颗手榴弹，
+    // 玩家在攻击位还没投就死了（此前 TankProbe run R 也是他，1.8 m 开枪加刺刀）。他们照样从槽里打攻击位。[几]
+    throwKeepOutM: 7,
     // 车彻底哑火以后护兵沿来路（倒着走战车路点）撤回路线起点：到一个路点算 retreatArrivalM，跑步速度。[需]
     retreatArrivalM: 4,
     retreatSpeedMps: 3.2,
@@ -396,7 +421,9 @@ export const TANK = Object.freeze({
   // 03 阵位夺下（rightNestCaptured）那一刻车才开进图。2026-09-24 实测：临时路线起点离阵位 130 m、有视线，
   // 能不能看见全靠雾 —— 雾挡不住的机位下车会凭空冒出来。所以只在「起点不在玩家视野里」时才进场：
   // 没有视线，或者不在玩家朝向 ±offViewRad 以内（屏幕外）。等太久（maxWaitS）照样进，不卡流程。
-  entry: Object.freeze({ offViewRad: 1.15, maxWaitS: 30, lookY: 2.2 }),
+  // fact：车开进图要等的事实（Front 包 09-24）。Notion 03「第一批撤退尾声，右前方道路远段传来发动机和履带声」——
+  // 第一批开始撤（frontRifleDefense）时起步，路堑起点到 HullDown 75 m ≈ 36 s，正好撤退尾声露炮塔。
+  entry: Object.freeze({ fact: "frontRifleDefense", offViewRad: 1.15, maxWaitS: 30, lookY: 2.2 }),
 
   // --- 运行时开销（契约 §6） -----------------------------------------------------------
   perf: Object.freeze({
@@ -407,48 +434,40 @@ export const TANK = Object.freeze({
     escortCoverRadiusM: 1.2,
   }),
 
-  // --- 大脑喊话 → 台词（契约 §2 第 7 条「靠声音、炮塔指向和罗班长喊话传达窗口」） ------------------
-  // 大脑发出的 bark id → Data_FirstLevelMissionDialogue 的 cue id。null = Voice 包还没出这句，只记日志。
-  // 同一条 cue 两次之间至少隔 barkCooldownS。
+  // --- 大脑喊话 → 战斗喊话（契约 §2 第 7 条「靠声音、炮塔指向和罗班长喊话传达窗口」） ------------------
+  // 2026-09-24 Front 包：这些是**战斗喊话**，不是剧情对白 —— 走 Script_Audio.Bark 按 key 点名（让剧情对白、受
+  // 节流闸管），中方是罗班长的本人版本（Data_FirstLevelVoiceCast 的 leader 一套，从他的位置喊），日方从车上喊。
+  //   { key: Data_Voice 的 key, kind: 那一行的 kind, who?: 班组谁喊（从他的位置）, side?: "ija" = 从炮塔喊 }
+  // null = 不喊（tankDisabled 由 05 的剧情对白「停了！口子能过！」交代；观察窗关上只有音效）。
+  // 同一个 key 两次之间至少隔 barkCooldownS。数量克制：中方三句、日方一句新录，护兵散开借现成的「伏せろ」。
   barkCues: Object.freeze({
-    turretTraverse: null,   // 罗班长：「炮塔转过来了！趴下！」（预兆链前两次）
-    trackCut: null,         // 罗班长：「履带断了！还在打！再补一捆！」（MobilityKill）
-    tankDisabled: null,     // 何有田：「哑了！」
-    hatchShout: null,       // 日军车长开舱盖喊护兵
-    escortScatter: null,    // 日军护兵：「车旁有人！」
+    turretTraverse: Object.freeze({ key: "tank_turret", kind: "tank", who: "luo" }),   // 预兆链前两次
+    tankWindow: Object.freeze({ key: "tank_window", kind: "tank", who: "luo" }),       // 05：炮塔在打缺口、玩家在攻击支路上
+    trackCut: Object.freeze({ key: "tank_track", kind: "tank", who: "luo" }),          // MobilityKill
+    tankDisabled: null,
+    hatchShout: Object.freeze({ key: "ija_tank_side", kind: "tank", side: "ija" }),    // 车长开舱盖喊护兵
+    escortScatter: Object.freeze({ key: "ija_warn_down", kind: "warn", side: "ija" }), // 近处爆炸，护兵散开
     visionSlit: null,
   }),
   barkCooldownS: 8,
+  // 被剧情对白让路（Audio.Bark 在 dialogueYield 下返回 null）的喊话在这么多秒内补喊，过期或不再成立就丢。
+  // 2026-09-24 Front 包审查：「履带断了！还在打！再补一捆！」正落在投弹那一刻开播的 BundleRetreat 场景里，一次都没播出来；
+  // 日军车长那句同理。trackCut 在车已 Disabled 后不再补（「再补一捆」已经不成立）。
+  barkRetryS: Object.freeze({ trackCut: 12, hatchShout: 6, tankWindow: 4 }),
+  // 补喊排着队、或刚喊出口的这么多秒里，下一场前沿对白先不开口（Script_FirstLevelFrontScenes 读 HoldsDialogue）：
+  // 战车喊话最长一句 2.36 s（Data_Voice tank_track）。「回来！低头！」（BundleRetreat）还没开口时履带就断了，
+  // 那一句直接让给「再补一捆」—— 两句意思相反。
+  barkHoldS: 2.5,
+  // 「它在打口子！就现在！」的时机（接线层判，不是大脑）：05 领了集束弹、车还没解决、玩家在攻击支路的沟线上，
+  // 大脑正瞄着缺口（targetId "gapZone"）且炮塔偏离玩家方位超过 angleRad —— 这就是冲上去的空当。[需]
+  window: Object.freeze({ angleRad: 1.0, laneRadiusM: 4, cooldownS: 14 }),
 });
 
 /** 大脑喊话 → 台词表（上面 TANK.barkCues 的只读别名，接线层用）。 */
 export const TANK_BARK_CUES = TANK.barkCues;
 
-// ---------------------------------------------------------------------------
-// 可破坏掩体：临时数据（2026-09-23 战车包在现布局上演示用；Space 包的 Data_FirstLevelFrontBreakables 会取代）。
-// 字段见 Script_FirstLevelFrontBreakables 文件头。
-// RightNestFrontRest：右阵位胸墙 3.4 m，缴获的机枪架在正中（x 27）—— 缺口只开在**西半段**，
-//   机枪托不会悬空；1.5 → 1.1 → 0.7 m 三段。
-// RightNestNorthRuin：阵位北面那截残墙（挡着战车看阵位的那一块），两段。
-// ---------------------------------------------------------------------------
-export const FRONT_BREAKABLES_TEMP = Object.freeze([
-  Object.freeze({
-    id: "RightNestFrontRestBreak", block: "RightNestFrontRest", hitRadiusM: 2.4, minDamage: 60,
-    stages: Object.freeze([
-      Object.freeze([[-1.7, 1.7, 1.5]]),
-      Object.freeze([[-1.7, -0.6, 1.1], [-0.6, 1.7, 1.5]]),
-      Object.freeze([[-1.7, -1.1, 0.7], [-1.1, -0.6, 1.0], [-0.6, 1.7, 1.5]]),
-    ]),
-  }),
-  Object.freeze({
-    id: "RightNestNorthRuinBreak", block: "RightNestNorthRuin", hitRadiusM: 2.6, minDamage: 60,
-    stages: Object.freeze([
-      Object.freeze([[-2, 2, 1.2]]),
-      Object.freeze([[-2, 0, 1.2], [0, 2, 0.6]]),
-      Object.freeze([[-2, -0.8, 0.8], [-0.8, 2, 0.45]]),
-    ]),
-  }),
-]);
+// 可破坏掩体的数据在 Space 包的 Data_FirstLevelFrontBreakables.mjs（运行时经 Script_FirstLevelFrontBreakables.SpaceBreakableSpecs
+// 换格式）；Tank 包在旧布局上的临时数据 FRONT_BREAKABLES_TEMP 已删（2026-09-24 Front 包）。
 
 /**
  * 永远不可破坏（任务书：阵位后墙、支沟、守军安全区）。数据里写了也拒绝。
@@ -458,69 +477,59 @@ export const FRONT_BREAKABLES_TEMP = Object.freeze([
  *            Space 重排后只要 zone 语义 id 不变，这条保护就跟着新布局走（不靠体块名对上）。
  */
 export const NEVER_BREAKABLE_RULES = Object.freeze({
-  ids: Object.freeze(["RightNestRearWall", "RightNestEastWall", "GuardSafeTraverse"]),
+  // 2026-09-24：体块名取 Space 包的永不破坏表（阵位后墙两段、东山墙、西门高墙、最后遮挡、攻击支路掩护、横墙、旧院与弹药屋）。
+  ids: Object.freeze([...FRONT_UNBREAKABLE]),
   zones: Object.freeze(["rightRear", "withdrawalGap"]),
 });
 
 // ---------------------------------------------------------------------------
-// 临时路点（现有布局）。Space 包正在重排 03–05，第二波 Front 包会换成新路；
-// 这里只为在现布局上跑通「露面 → 驶出 → 预兆 → 先压阵位 → 封口 → 05 挤压」。
-// [几] 2026-09-23 按 MISSION_LAYOUT.blocks + SampleMissionTerrain 扫过：全程车体外廓不碰实体；
-//   · 起点 (71,−265)：离阵位约 130 m。**不是**被地形挡住 —— 2026-09-24 探针实测阵位对起点有视线，
-//     03 里能不能看见全靠雾（用户定过不动雾）。所以运行时加了进场闸 TANK.entry：只在起点不在玩家
-//     视野里（没视线或在屏幕外）时开进来。Space 换新路时要把起点放到真有遮挡的地方，并加断言；
-//   · 绕开 NorthRuin 东墙（x ≥ 68.5）与 FieldRuin2（x ≥ 62.3 过 z −174）；
-//   · preview (55,−167)：阵位站姿只看得见炮塔、看不见车体（hull-down 剪影），炮口也够得着阵位；
-//   · firePointNest (50,−162)：同样 hull-down，炮口对站姿阵位有视线；
-//   · block (44.6,−146)：对缺口、阵位、攻击支路全通视；两次挤压往缺口方向推 2.5 m + 1.7 m，
-//     投掷位 (39,−140) 到车 4.7–7.5 m（< bundleCoveredThrowRangeM 9）。
-// 字段：kind 语义（cruise/hullDown/firePoint/squeeze/block）、stage（最早哪一步能到）、
-//   holdUntil（到了这个点要等哪个事实才继续；"stage:<Id>" 表示等进入那一步）、holdS、
-//   faceTo（停车时车头对着哪）。
+// 战车路（Front 包 2026-09-24 接 Space 包的 FRONT_TANK_PATH，取代 Tank 包在旧布局上的临时路点 TANK_TEMP_PATH）。
+// 空间事实（坐标、kind、faceTo/turretTo、holdS、可见性）全在 Data_FirstLevelFrontRoute.FRONT_TANK_PATH 与
+// docs/Data_FirstLevelSpace0106_20260923.md §6；这里只加大脑要的**节奏**字段：
+//   stage      最早哪一步能到（大脑按步骤拴住：03 停在路弯后 Bend 等 04，04 停在 Block 等 05）；
+//   holdUntil  到了这个点要等哪个事实才继续（"stage:<Id>" 表示等进入那一步）；
+//   preview    03 的露面点（HullDown 折返顶，停 holdS=15 s 记 tankPreviewed）；
+//   escortSlots 停在这儿时护兵去的绝对位置（FRONT_TANK_ESCORT_SLOTS）。
+// faceTo 按 FRONT_SPACE.tankTargets 的名字换成坐标。HullDown 是折返顶：停完原地掉头约 160° 驶向 Descent
+// （drive.reversalRad，大脑不跨折返点磨圆切线）。开进图的时机见 entry.fact。
 // ---------------------------------------------------------------------------
-const W = (x, z, kind = "cruise", extra = {}) => Object.freeze({ x, z, kind, ...extra });
-const NEST = Object.freeze({ x: 27, z: -142 });
-const GAP = Object.freeze({ x: -8, z: -139 });
-export const TANK_TEMP_PATH = Object.freeze({
-  id: "TempExistingLayout20260923",
-  waypoints: Object.freeze([
-    W(71, -265, "cruise", { stage: "Support" }),
-    W(70.5, -215, "cruise", { stage: "Support" }),
-    // 离图外等：阵位夺下以后引擎声已经能听见，前排守军撤下来（rifleWithdrawalResolved）才驶出。
-    W(69.6, -203, "hullDown", { stage: "Support", holdUntil: "rifleWithdrawalResolved" }),
-    W(69.6, -186, "cruise", { stage: "Support" }),
-    W(66.5, -177.5, "cruise", { stage: "Support" }),
-    W(62.8, -171.2, "cruise", { stage: "Support" }),
-    // K5 露炮塔：03 的预告点。只转炮塔看阵位，不开火（03 主炮不许开，见运行时 weaponsFree）。
-    W(55, -167, "hullDown", { stage: "Support", faceTo: NEST, holdUntil: "stage:MachineGun", preview: true }),
-    // 04：驶出路弯 → hull-down 火力点压阵位，压住了（tankPositionPressured）才往前封口。
-    W(50, -162, "firePoint", { stage: "MachineGun", faceTo: NEST, holdS: 10, holdUntil: "tankPositionPressured" }),
-    W(46.5, -153.5, "cruise", { stage: "MachineGun" }),
-    W(44.6, -146, "block", { stage: "MachineGun", faceTo: GAP, holdUntil: "stage:Tank" }),
-    // 05：往缺口挤两次（每次都有油门、履带尖啸、排气）。
-    W(42.3, -145.2, "squeeze", { stage: "Tank", faceTo: GAP, holdS: 14 }),
-    W(40.6, -144.8, "squeeze", { stage: "Tank", faceTo: GAP }),
-  ]),
-  // 关注扫描点：取弹沟、攻击支路（05 才看）。
-  scan: Object.freeze([
-    Object.freeze({ x: 27, z: -119, stage: "Tank" }),
-    Object.freeze({ x: 35, z: -127, stage: "Tank" }),
-    Object.freeze({ x: 38, z: -134, stage: "Tank" }),
-  ]),
-  // 区域火力（05）：攻击支路。车长知道这条沟（扫描点就是它），玩家一进这条沟的 radiusM 以内，
-  // 沿线离他最近、按 stepM 取整的那一点就成了区域目标（kind "zone"）：看不见就轰沟沿（泥土砸下来、
-  // 墙挡弹片只剩压制），站起来被看见就直接打人。预兆链照旧（手摇 → 瞄准停顿 → 开炮）。
-  // requireFact：领到集束弹以后才算（取弹前在后面等的人不挨）。点取自 FRONT_SORTIE.attackRoute，
-  // 起点往东挪 4 m 让开阵位后的集合点 (27,−127)。
+const TankTarget = (name) => name ? Object.freeze({ x: FRONT_SPACE.tankTargets[name].x, z: FRONT_SPACE.tankTargets[name].z }) : undefined;
+const TANK_PACE = Object.freeze({
+  Start: { stage: "Support" }, Cutting: { stage: "Support" }, CrestEast: { stage: "Support" }, Shadow: { stage: "Support" },
+  HullDown: { stage: "Support", preview: true },
+  Descent: { stage: "Support" },
+  // 03 露面以后退回北残院后面，在路弯里等 04（从机枪座看不见）。
+  Bend: { stage: "Support" },
+  BendExit: { stage: "MachineGun" },
+  // 04：驶出路弯 → 压阵位，压住了（tankPositionPressured）才往前封口。
+  Pressure: { stage: "MachineGun", holdUntil: "tankPositionPressured" },
+  Approach: { stage: "MachineGun" },
+  // 05 也停在 Block，不再往 Squeeze 挤：Squeeze 离攻击位 11 m，后甲板（发动机舱，车顶 2.56 m）要初速 13.2 m/s 才够得着，
+  // 集束弹上限 13 —— 两段毁伤的第二颗扔不上去（09-24 战车探针：第二颗落在近侧履带边，Disabled 记成 trackL；
+  // 05 车体机枪也一串没打）。Block 离攻击位 9.7 m，后甲板要 12.6 m/s。车断了履带（tankImmobilized）也就走不了了。
+  Block: { stage: "MachineGun", holdUntil: "tankImmobilized", escortSlots: FRONT_TANK_ESCORT_SLOTS },
+  // Squeeze 现在到不了（Block 一直等到 tankImmobilized，断了履带也就走不了）：Space 的语义路点照留、大脑不再走到这里；
+  // Space 文档 §6「05 前挤到 Squeeze」与此不符，删不删这个路点由 Space 包 / 集成负责人定（2026-09-25 Front 包审查）。
+  Squeeze: { stage: "Tank", escortSlots: FRONT_TANK_ESCORT_SLOTS },
+});
+const Seg = (a, b, stage) => Object.freeze({ x: a.x, z: a.z, stage });
+export const FRONT_TANK_BRAIN_PATH = Object.freeze({
+  id: "FrontTankPath20260923",
+  waypoints: Object.freeze(FRONT_TANK_PATH.map((w) => {
+    const pace = TANK_PACE[w.id];
+    if (!pace) throw new Error(`Data_Tuning_Tank: no pace for tank waypoint ${w.id}`);
+    return Object.freeze({ id: w.id, x: w.x, z: w.z, kind: w.kind, ...(w.faceTo ? { faceTo: TankTarget(w.faceTo) } : {}),
+      ...(w.turretTo ? { turretTo: TankTarget(w.turretTo) } : {}), ...(w.holdS ? { holdS: w.holdS } : {}), ...pace });
+  })),
+  // 关注扫描点（05 才看）：取弹沟受损沟沿、后墙岔口、攻击支路中段。
+  scan: Object.freeze([Seg(FRONT_SORTIE.damagedLip, null, "Tank"), Seg(FRONT_SORTIE.rear, null, "Tank"),
+    Seg(FRONT_SORTIE.attackRoute[3], null, "Tank")]),
+  // 区域火力（05）：攻击支路（FRONT_SORTIE.attackRoute，后墙岔口 → 路边攻击位）。玩家进了沟线 radiusM 以内，
+  // 沿线离他最近、按 stepM 取整的那一点就是区域目标；领了集束弹、人在 watch.rangeM 以内（取弹沟回程）先盯沟口。
   lanes: Object.freeze([
     Object.freeze({ id: "attackLane", stage: "Tank", requireFact: "bundleTaken", radiusM: 3.5, stepM: 3, weight: 2.5,
-      scatterM: Object.freeze([1.2, 2.6]),
-      // 盯沟口：领了集束弹、人在沟线 rangeM 以内（取弹沟 (27,−101…−126) 离沟口 ≤ 26 m）就先把炮塔摆过来、轰沟口。
-      // 权重 1.6 × zone 0.55 × 距离项（沟口离车 ≈ 20 m → 0.69）× 看不见 0.8 ≈ 0.49，压过当前的缺口（≈ 0.29）。[需]
-      // 2026-09-24 探针实测（没有这一条）：05 主炮 7 发全打缺口，人上了攻击支路炮塔才开始摇，被指着的时间只占 7.7 %。
-      watch: Object.freeze({ rangeM: 30, weight: 1.6 }),
-      points: Object.freeze([Object.freeze({ x: 31, z: -127 }), Object.freeze({ x: 35, z: -127 }),
-        Object.freeze({ x: 38, z: -134 }), Object.freeze({ x: 39, z: -140 })]) }),
+      scatterM: Object.freeze([1.2, 2.6]), watch: Object.freeze({ rangeM: 30, weight: 1.6 }),
+      points: Object.freeze(FRONT_SORTIE.attackRoute.map((p) => Object.freeze({ x: p.x, z: p.z }))) }),
   ]),
   stageOrder: Object.freeze(["Support", "MachineGun", "Tank", "Orders"]),
 });

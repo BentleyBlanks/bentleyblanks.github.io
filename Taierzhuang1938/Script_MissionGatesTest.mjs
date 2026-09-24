@@ -99,7 +99,8 @@ for (const stage of MISSION_STAGES)
     assert.equal(gate.step, stage.id, `${factId} 的 step 应当是 ${stage.id}，实际 ${gate.step}`);
   }
 checks += 1;
-Check(requirementFacts.length === 96, `requirements 事实共 96 条，实际 ${requirementFacts.length}`);
+// 98 = 96 + leftGunHandover、zhouLeftGun（契约 §2.6：03 改为「何有田接枪 + 老周离枪 ≥10 m」，zhouGunWounded 挪到 05）。
+Check(requirementFacts.length === 98, `requirements 事实共 98 条，实际 ${requirementFacts.length}`);
 
 const KINDS = new Set(["proximity", "proximityFamily", "interior", "voice", "interaction",
   "combat", "column", "cutscene", "scripted", "timer"]);

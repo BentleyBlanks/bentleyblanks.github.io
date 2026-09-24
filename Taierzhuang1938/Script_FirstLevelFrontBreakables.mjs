@@ -6,7 +6,7 @@
 // 只做**数据驱动的分段体块**：每个可破坏物预先建好每一段状态的网格，炮弹落在近旁就
 // 切到下一段 —— 换可见性 + 物理 AddSolid/RemoveSolid，碎块走 VFX 池。
 //
-// 数据（Space 包的 Data_FirstLevelFrontBreakables.mjs 会取代 Data_Tuning_Tank.FRONT_BREAKABLES_TEMP）：
+// 数据格式（Space 包的 Data_FirstLevelFrontBreakables.mjs 经 SpaceBreakableSpecs 换成这个格式；旧的临时数据已删）：
 //   {
 //     id,                 // 唯一名
 //     block?,             // 接管 MISSION_LAYOUT.blocks 里的哪一块（布局里最好标 dynamic:true，
@@ -23,11 +23,37 @@
 //   }
 // 永远不可破坏：阵位后墙、支沟、守军安全区（Data_Tuning_Tank.NEVER_BREAKABLE_RULES：按体块名 + 按区域；
 // 数据里写了也拒绝）。
+//
+// 2026-09-24 Front 包：运行时改读 Space 包的 Data_FirstLevelFrontBreakables（{ block, stages:[{ topM }], hits,
+// visualOnly?, terrain? }），由 SpaceBreakableSpecs 换成上面的格式：第 0 段 = 体块原顶（离地），之后每段整段降到
+// topM（一发打掉一段，hits = 段数）；visualOnly（北残院过梁）只换外观、碰撞与遮挡原样不动；terrain（受损沟沿）
+// 这套体块机制做不了（要改地形），跳过并记进 skipped。
 // ===========================================================================
 import * as THREE from "three";
-import { FRONT_BREAKABLES_TEMP, NEVER_BREAKABLE_RULES } from "./Data_Tuning_Tank.mjs";
+import { NEVER_BREAKABLE_RULES } from "./Data_Tuning_Tank.mjs";
 
-export { FRONT_BREAKABLES_TEMP, NEVER_BREAKABLE_RULES };
+/**
+ * Space 包可破坏数据 → 本机制的 specs（纯函数，Node 测试直接调）。
+ * @param {Array} list Data_FirstLevelFrontBreakables.FRONT_BREAKABLES
+ * @param {{blocks:Array}} layout MISSION_LAYOUT
+ * @param {(x:number,z:number)=>number} groundAt 共享地面采样
+ * @returns {{ specs:Array, skipped:Array<{id,why}> }}
+ */
+export function SpaceBreakableSpecs(list, layout, groundAt, { hitRadiusM = 2.2, minDamage = 60 } = {}) {
+  const specs = [], skipped = [];
+  for (const raw of list || []) {
+    if (!raw.block) { skipped.push({ id: raw.id, why: raw.terrain ? "terrain" : "noBlock" }); continue; }
+    const block = layout?.blocks?.find((b) => b.id === raw.block);
+    if (!block) { skipped.push({ id: raw.id, why: "missingBlock" }); continue; }
+    const half = block.w / 2, top0 = block.y + block.h / 2 - groundAt(block.x, block.z);
+    const stages = [top0, ...raw.stages.map((s) => s.topM)].map((top) => Object.freeze([Object.freeze([-half, half, top])]));
+    specs.push(Object.freeze({ id: raw.id, block: raw.block, kind: raw.kind, stages: Object.freeze(stages), hitRadiusM, minDamage,
+      visualOnly: !!raw.visualOnly }));
+  }
+  return { specs, skipped };
+}
+
+export { NEVER_BREAKABLE_RULES };
 /** 按体块名的那一半（兼容旧名字）。 */
 export const NEVER_BREAKABLE = NEVER_BREAKABLE_RULES.ids;
 
@@ -61,7 +87,7 @@ export class FirstLevelFrontBreakables {
    * @param {object} host { scene, battlefield, physics, vfx, audio?, layout? }
    * @param {Array} specs 见文件头
    */
-  constructor({ scene, battlefield, physics, vfx = null, audio = null, layout = null }, specs = FRONT_BREAKABLES_TEMP,
+  constructor({ scene, battlefield, physics, vfx = null, audio = null, layout = null }, specs = [],
     rules = NEVER_BREAKABLE_RULES) {
     Object.assign(this, { scene, battlefield, physics, vfx, audio, layout, rules });
     this.root = new THREE.Group();
@@ -120,8 +146,9 @@ export class FirstLevelFrontBreakables {
       return { group, boxes, colliders: [] };
     });
     const item = { id: raw.id, spec, base, lift, stages, stage: -1, hitRadiusM: raw.hitRadiusM ?? 2.2,
-      minDamage: raw.minDamage ?? 60, takeover: null, lastBreakAt: -Infinity };
-    if (block && !block.dynamic) item.takeover = this.TakeOverStatic(block);
+      minDamage: raw.minDamage ?? 60, takeover: null, lastBreakAt: -Infinity, visualOnly: !!raw.visualOnly };
+    // visualOnly：只接管外观（顶点），静态碰撞盒原样留着 —— 路弯遮挡不许被炮打穿（Space §8）。
+    if (block && !block.dynamic) item.takeover = this.TakeOverStatic(block, { keepColliders: item.visualOnly });
     this.SetStage(item, 0);
     return item;
   }
@@ -129,7 +156,7 @@ export class FirstLevelFrontBreakables {
    * 布局里没标 dynamic 的静态块：把静态合批里属于它的顶点塌到墙脚、摘掉它的碰撞盒。
    * 只动名为 FirstLevelWhitebox_StaticWhiteBoxes 的合批（地面块不碰），按外廓内的顶点认。
    */
-  TakeOverStatic(block) {
+  TakeOverStatic(block, { keepColliders = false } = {}) {
     const eps = 1e-3, ry = block.ry || 0, c = Math.cos(ry), s = Math.sin(ry);
     const Inside = (x, y, z) => {
       const dx = x - block.x, dz = z - block.z, lx = c * dx - s * dz, lz = s * dx + c * dz;
@@ -159,7 +186,7 @@ export class FirstLevelFrontBreakables {
       if (touched) { position.needsUpdate = true; mesh.geometry.computeBoundingSphere(); }
     }
     let removed = 0;
-    const list = this.battlefield.colliders || [];
+    const list = keepColliders ? [] : this.battlefield.colliders || [];
     for (let i = list.length - 1; i >= 0; i--) {
       const box = list[i];
       if (!box?.c || !box?.h) continue;
@@ -210,7 +237,7 @@ export class FirstLevelFrontBreakables {
     }
     const next = item.stages[stage];
     next.group.visible = true;
-    next.colliders = next.boxes.map((box, i) => Collider(box, `${item.id}_${stage}_${i}`));
+    next.colliders = item.visualOnly ? [] : next.boxes.map((box, i) => Collider(box, `${item.id}_${stage}_${i}`));
     for (const box of next.colliders) { this.physics?.AddSolid(box); list.push(box); }
     item.stage = stage;
     this.RefreshQueries();

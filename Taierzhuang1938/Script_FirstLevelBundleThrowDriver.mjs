@@ -5,7 +5,12 @@
 //   "farTrack"（默认）—— 越过车顶扔到**远侧**履带外 1.9 m：断履带，车体挡住弹片（2026-09-24 审查：瞄近侧履带
 //                        的那一版爆点离投掷者只有 4 m，每颗自伤 40–52 血）；
 //   "deck"            —— 扔上车顶后甲板（碰撞盒顶 2.56 m）：炸发动机舱 = 彻底哑火；
-//   "track"           —— 近侧履带（只留作对照，会自伤）。
+//   "track"           —— 近侧履带（只留作对照，会自伤）；
+//   "nearTrack"       —— 近侧履带、离投掷者较远的那一头（车体外 0.5 m）：车停在 Block 时攻击位离它 7.8–8.9 m，
+//                        落在集束弹的伤人外沿（radiusM 4.2 × BLAST.radiusScale 1.9 ≈ 8 m）上，不用越过车顶；
+//   "auto"            —— 近侧那一头离投掷者 ≥ 7.5 m 就扔 nearTrack，否则 farTrack。2026-09-24 Step 3：车停在 Block
+//                        以后 farTrack 离攻击位 12.6 m，蓄满力也只剩高吊的弧线，擦着车顶落在后甲板上一颗哑火，
+//                        两段毁伤被跳过（战车探针「MobilityKill then Disabled」红）。
 // 弧线余量按「车体外廓内的地面 = 车顶」算，越过车顶的那条弧线不会擦着车身。
 // 返回里 selfBlast = 这一颗炸到玩家自己的掉血（按 TakeHit 前后血量差，来源在爆点 1 m 以内的爆炸）。
 export async function DriveBundleThrow(page, { aim: aimKind = "farTrack" } = {}) {
@@ -13,19 +18,33 @@ export async function DriveBundleThrow(page, { aim: aimKind = "farTrack" } = {})
   const { THROW } = await import("./Data_Tuning_Combat.mjs");
   const { JUMP } = await import("./Data_Tuning_Player.mjs");
   const { WEAPONS } = await import("./Data_Weapons.mjs");
-  const g = window.Tengxian, tank = g.Debug.FirstLevelMission().tank, p = g.player.position;
+  const g = window.Tengxian;
+  // Stand up to throw, like a player does. The route arrives crouched (or prone after a dodge), and the attack
+  // branch floor dips 0.5 m within a metre of the attack position: 2026-09-24 run 3 of the 03-06 campaign threw from
+  // (42.8, -160.4) with the hand 0.5 m lower than runs 1-2 and the bundle hit the lip in front of it at 0.05 s and
+  // killed the thrower. The throw returns to cover (crouch) right after the release, below.
+  const stanceBefore = g.player.stance;
+  for (let i = 0; i < 2 && g.player.stance !== "stand"; i++) {
+    g.Debug.Key(g.player.stance === "prone" ? "KeyZ" : "KeyC"); g.StepFrames(12, 1 / 60, false);
+  }
+  const tank = g.Debug.FirstLevelMission().tank, p = g.player.position;
   const kind = WEAPONS.GrenadeBundle;
   let target = { x: tank.x, z: tank.z, rise: 0 };
   const yaw = tank.hullYaw ?? Math.PI, c = Math.cos(yaw), s = Math.sin(yaw);
   const HullTop = 2.56, tankGround = g.battlefield.GroundHeight(tank.x, tank.z);
+  let resolved = aimKind;
   if (tank.brain) {
     const side = c * (p.x - tank.x) - s * (p.z - tank.z) < 0 ? -1 : 1;
+    // 近侧履带离投掷者远的那一头（车体局部 z 与投掷者反号）。
+    const nearEnd = { x: side * 1.6, z: (s * (p.x - tank.x) + c * (p.z - tank.z)) > 0 ? -1.9 : 1.9, rise: 0 };
+    const nearDistance = Math.hypot(tank.x + c * nearEnd.x + s * nearEnd.z - p.x, tank.z - s * nearEnd.x + c * nearEnd.z - p.z);
+    if (aimKind === "auto") resolved = nearDistance >= 7.5 ? "nearTrack" : "farTrack";
     // 车体局部 → 世界：x 右、z 车尾。履带：外侧 0.45 m、车尾方向 0.7 m；后甲板：车顶（碰撞盒顶 2.56 m）。
-    const local = aimKind === "deck" ? { x: 0, z: 1.2, rise: HullTop }
+    const local = resolved === "deck" ? { x: 0, z: 1.2, rise: HullTop } : resolved === "nearTrack" ? nearEnd
       // 远侧：离车体外沿 1.9 m（离履带区 ≈ 1.9 m，620 × (1 − 1.9/4.2)² ≈ 185 ≥ trackMinDamage 35，照样断履带）。
       // 2026-09-24 实测离 0.5 m、1.2 m 两版都有弧线擦着远侧车顶边落在后甲板上（3 次里 2 次），一颗直接哑火、跳过断履带：
       // 最平的那条弧线下降段太缓，过车顶边时离顶只有几厘米；离远一点，下降段有地方落下来。
-      : aimKind === "track" ? { x: side * 1.55, z: 0.7, rise: 0 } : { x: -side * 3.0, z: 0.7, rise: 0 };
+      : resolved === "track" ? { x: side * 1.55, z: 0.7, rise: 0 } : { x: -side * 3.0, z: 0.7, rise: 0 };
     target = { x: tank.x + c * local.x + s * local.z, z: tank.z - s * local.x + c * local.z, rise: local.rise };
   }
   // 车体外廓（碰撞盒 2.15 × 4.30，四周留 0.25 m）里的采样点按车顶算地面。
@@ -107,7 +126,7 @@ export async function DriveBundleThrow(page, { aim: aimKind = "farTrack" } = {})
   const launch=Initial(launched),requested={pitch:+g.player.pitch.toFixed(3),aimPitch:+g.player.aimPitch.toFixed(3),
     yaw:+g.player.yaw.toFixed(3),aimYaw:+g.player.aimYaw.toFixed(3),
     direction:[+requestedDirection.x.toFixed(3),+requestedDirection.y.toFixed(3),+requestedDirection.z.toFixed(3)],
-    power:+power.toFixed(3),chargeFrames};
+    power:+power.toFixed(3),chargeFrames,stance:g.player.stance};
   g.StepFrames(1, 1 / 60, false);
   if (g.player.stance === "stand") g.Debug.Key("KeyC");
   // 跟着这一发看它落在哪儿：炸不停的时候，落点比任何推断都说明问题。
@@ -128,14 +147,19 @@ export async function DriveBundleThrow(page, { aim: aimKind = "farTrack" } = {})
       previousVelocity=current;
     }
     if (g.player.bleeding) g.Debug.Key("KeyB");
+    // Someone closing in while the bundle flies (09-24 run L2: a tank escort bayoneted the thrower three times on
+    // the attack position during this watch): answer him like a player, same input driver as the routes.
+    const close = window.MissionInputDriver?.Target?.(6);
+    if (close) window.MissionInputDriver.Shoot(close); else { g.Debug.Mouse(0, false); g.Debug.Mouse(2, false); }
     g.StepFrames(1, 1 / 60, false);
   }
+  g.Debug.Mouse(0, false); g.Debug.Mouse(2, false);
   const blast=g.Debug.FirstLevelMission().playerExplosions?.findLast(entry=>entry.explosiveId==="GrenadeBundle"&&entry.at>=releaseAt)||null;
   g.player.TakeHit = TakeHit;
   const selfBlast = blast ? hits.filter((h) => h.blast && h.from && Math.hypot(h.from.x - blast.x, h.from.y - blast.y, h.from.z - blast.z) < 1)
     .reduce((sum, h) => sum + Math.max(0, h.loss), 0) : 0;
   return { before, after: g.state.bundles, alive: g.player.alive, health: g.player.health, selfBlast: +selfBlast.toFixed(1),
-    mission: g.Debug.FirstLevelMission(), aimKind, target,
+    mission: g.Debug.FirstLevelMission(), aimKind: resolved, requestedAim: aimKind, target, stanceBefore, stanceAtRelease: requested.stance,
     aim: { pitch: +shot.pitch.toFixed(3), speed: +shot.speed.toFixed(2),
       clearance: shot.clearance == null ? null : +shot.clearance.toFixed(2),
       distance:+(shot.distance??rawDistance).toFixed(2),rise:+(shot.rise??(targetY-eye.y)).toFixed(2),solved:!!best },

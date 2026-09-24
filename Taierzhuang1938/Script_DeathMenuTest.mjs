@@ -212,13 +212,16 @@ try {
     g.Debug.Pause();
   });
   assert.deepEqual(await page.locator(".mnPauseCondition").evaluateAll(rows => rows.map(row => row.dataset.condition)),
-    ["frontReached", "rightNestCaptured", "frontContact", "frontRifleDefense", "rifleWithdrawalResolved", "zhouGunWounded", "tankPreviewed"]);
-  assert.equal(await page.locator(".mnPauseCondition").count(), 7);
+    ["frontReached", "rightNestCaptured", "frontContact", "frontRifleDefense", "rifleWithdrawalResolved", "leftGunHandover", "zhouLeftGun", "tankPreviewed"]);
+  assert.equal(await page.locator(".mnPauseCondition").count(), 8);
   assert.equal(await page.locator(".mnPauseCondition.complete").count(), 2);
-  assert.equal(await page.locator(".mnPauseProgressSummary").textContent(), "已达成 2 / 7 项");
+  assert.equal(await page.locator(".mnPauseProgressSummary").textContent(), "已达成 2 / 8 项");
   assert.match(await page.locator('[data-condition="frontRifleDefense"]').textContent(), /击退进攻组并解除撤退缺口的直接火力/);
-  assert.equal(await page.locator('[data-condition="zhouGunWounded"]').count(), 1,
-    "current adopted Support stage includes Zhou's wound before the withdrawal");
+  // 契约 §2.6：03 只等老周被扶离枪位；他走回集结处（zhouGunWounded）是 05 的背景条件。
+  assert.equal(await page.locator('[data-condition="zhouLeftGun"]').count(), 1,
+    "Support ends once Zhou is helped off the left gun");
+  assert.equal(await page.locator('[data-condition="zhouGunWounded"]').count(), 0,
+    "Zhou reaching the collection is no longer a Support condition");
   await page.screenshot({path:path.join(out,"Scene_MissionProgressDesktop.png")});
   for (const viewport of [{width:390,height:844},{width:844,height:390}]) {
     await page.setViewportSize(viewport);

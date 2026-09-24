@@ -98,6 +98,16 @@ const AUTOSTEP_PROBE_M = 0.14;
 // 同样给解析地表 0.45 m 的吸附距离，才不会走下坡时逐帧「离地—落下」。
 const ANALYTIC_GROUND_SNAP_M = 0.45;
 const CHARACTER_CONTACT_SKIN_M = 0.02;
+// 弹坑地形块（heightfield）的外沿压在坡上时，胶囊底球从解析地表那一侧走过去会**搁在块的边上**：
+// 边比脚下的解析地表高出几厘米，Rapier 只报碰撞不报站住，接缝那一侧没有别的实体。旧口径（离地首帧只认 2 cm 蒙皮）
+// 接不住它：grounded 一丢，重力逐帧累加（实测 −44 m/s），整块下落量被坡面法线投成「往回推」，人就钉在接缝上。
+// 2026-09-24：第一关阵位后门坡道 (29.9,−143.8)，弹坑块 3,−19 的北沿，03→06 驾驶十余趟停在同一点。
+// 碰到的是地形块、且离解析地表不超过底球搁在 0.47 坡度的边上最多能被抬起的高度（半径 0.34 × 0.47 ≈ 0.16，取 0.18）时，
+// 记为站住（grounded，调用方据此清零下落速度），**高度留在块的边上、不往解析地表拉**：拉下去会把底球按进块里，
+// 下一帧再被 Rapier 推出来，弹坑边沿与跳跃落地会抖。
+// 只在 PhysicsWorld.terrainTileEdgeRest 打开时生效：第一关任务运行时在 01–06 每帧打开、其余时间关着
+// （契约 §7.5：共享系统的改动用任务侧开关限定；2026-09-24 Front 包审查）。
+const TERRAIN_TILE_EDGE_SNAP_M = 0.18;
 
 const _q = { x: 0, y: 0, z: 0, w: 1 };
 /** 绕 Y 轴 ry 的四元数（这座城里所有旋转都只有偏航）。 */
@@ -134,6 +144,8 @@ export class PhysicsWorld {
     /** collider.handle -> 建关时那条碰撞盒记录（子弹要读 tag 判材质音效）。 */
     this.recordByHandle = new Map();
     this.terrainTiles = new Map();
+    /** 搁在弹坑地形块外沿上算不算站住（见 TERRAIN_TILE_EDGE_SNAP_M）。任务侧开关，默认关。 */
+    this.terrainTileEdgeRest = false;
 
     this.controller = this.world.createCharacterController(CHARACTER_CONTACT_SKIN_M);
     // 自动上台阶：马道的八级台阶、门槛、瓦砾堆全靠它。
@@ -907,6 +919,13 @@ export class CharacterBody {
     if (this.position.y < g || snapAnalytic) {
       this.position.y = g;
       this.grounded = true;
+    } else if (pw.terrainTileEdgeRest && !hasPhysicsGround && dy <= 0 && my <= 1e-4
+      && analyticGap > CHARACTER_CONTACT_SKIN_M && analyticGap <= TERRAIN_TILE_EDGE_SNAP_M && pw.terrainTiles.size) {
+      // 搁在弹坑地形块外沿上：站住，但高度留在边上（见 TERRAIN_TILE_EDGE_SNAP_M）。只在这一种窄情形下翻碰撞表。
+      for (let i = 0; i < this.hitCount && !this.grounded; i++) {
+        const hit = cc.computedCollision(i);
+        this.grounded = !!hit?.collider && pw.recordByHandle.get(hit.collider.handle)?.terrain === true;
+      }
     }
 
     this.SyncCollider();
