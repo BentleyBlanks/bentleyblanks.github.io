@@ -386,7 +386,7 @@ Sonniss 的许可不要求署名，但 `Data_SfxSources.mjs` 仍然逐条记着�
 | `rifleIja` | 4 | 1.05 s | 50.7 KB | Watson Wu · M1 Garand .30-06 近射 · Game Audio Monthly #3 ／ Pole Position · M1903A3 .30-06 连续实录（另外三发）· GDC 2020 |
 | `rifleIjaFar` | 3 | 1.39 s | 51.6 KB | Pole Position · BAR .30cal 300 m ／ 50 m 外经建筑反射的步枪射击 · GDC 2016 / 2018 |
 | `zb26` | 2 | 0.90 s | 21.6 KB | Pole Position · L7A2 GPMG 7.62×51 单发 ／ Enfield L86 LSW（弹匣供弹轻机，1 m）· GDC 2016 |
-| `type11` | 2 | 0.70 s | 16.4 KB | Pole Position · BAR .30cal 近场（同一次双发的两发）· Sonniss GDC 2016 |
+| `type11` | 3 | 0.65–0.82 s | 34.1 KB | **2026-09-24 起**：SeedAudio 生成音 1 ／ Pole Position · L110A2（FN MINIMI）5.56 单发 1 m ×2 · Sonniss GDC 2016（license `mixed`；原 BAR 0.1 m 两条已撤，见 `Data_AudioWiring.md`「二之三」§8） |
 | `type92` | 3 | 1.17 s | 40.4 KB | Pole Position · M1919A4 .30cal 200 m ／ 5 m ／ 枪架 1 m · Sonniss GDC 2016 |
 | `shellDrop` | 3 | 0.99 s | 24.6 KB | SculpTunes · 弹壳落在水泥地上（户外）· Sonniss GDC 2020 |
 | `bolt` | 2 | 1.25 s | 17.4 KB | Pole Position Production · M1903A3 拉栓 ／ 莫辛纳甘 M38 拉栓 · Sonniss GDC 2020 |
@@ -1258,8 +1258,8 @@ Audio native levels are aligned.
 | --- | ---: | ---: | --- |
 | `gunTailStreetMg` | ≥2 | **0** | 镜像里唯一带 `Urban_Exterior` 的枪声是 SoundMorph INTERVENTION 一条 3.8 s 的 9 mm 冲锋枪点射（还是设计库）。重机枪的街道尾音用 9 mm SMG 是**错的材料**，宁可空着。Pole Position 的 Outdoor Gun Acoustics 只录了开阔地 / 山谷树林 / 森林公路三种，没有城市街道。 |
 | `zb26` | ≥3 | 2 | L7A2 GPMG 那条 1 m 素材整整 7.5 s 里**只有一发**（前 4 s 是数字静音），抽样只给这一条；全库再没有第二条 7.92 级别的弹匣供弹轻机近录。第二变体已经是妥协（L86 LSW 5.56 mm，机构对得上、口径不对）。 |
-| `type11` | ≥3 | 2 | BAR 0.1 m 那条是「双发」，两发只隔 94 ms，第一发的尾巴整个压在第二发上 —— 只能各取一次起音，切不出第三条。 |
-| `type11Far` | ≥2 | 1 | BAR 300 m 同理只有一次双发。**而且 `rifleIjaFar_01` 与 `type11Far_01` 出自这条素材的同一发**，只差变速（1.08 对 1.12）。镜像里没有第二条 300 m 的全威力自动武器实录。三百米外一支步枪和一挺轻机本来也难分，真正的区别由引擎排的射速给 —— 但这一笔要记着。 |
+| `type11` | ≥3 | 2 | BAR 0.1 m 那条是「双发」，两发只隔 94 ms，第一发的尾巴整个压在第二发上 —— 只能各取一次起音，切不出第三条。**2026-09-24 已换**：BAR 两条撤掉，改为 SeedAudio 1 + MINIMI 1 m 2 = 3 条。 |
+| `type11Far` | ≥2 | 1 | BAR 300 m 同理只有一次双发。**而且 `rifleIjaFar_01` 与 `type11Far_01` 出自这条素材的同一发**，只差变速（1.08 对 1.12）。镜像里没有第二条 300 m 的全威力自动武器实录。三百米外一支步枪和一挺轻机本来也难分，真正的区别由引擎排的射速给 —— 但这一笔要记着。**2026-09-24**：补了 MINIMI 50 m 后方 2 条（`_02` / `_03`），BAR 300 m 那条与 `rifleIjaFar_01` 的重复仍在。 |
 | `breathHeavy` | ≥2 | 1 | 镜像里成年男性的**持续喘息**实录只有 Gamemaster 那一个 3 s 文件。另两条候选不合格：Funky Rustic 的是女声；Eiravaein 的 ASMR 呼吸整段 RMS −51…−57 dBFS，抬到 −25 会把底噪一起抬 27 dB。 |
 | `type92` 的距离不齐 | — | 待定夺 | 三条变体分别是 200 m（`_01`，用户 G11 试听选定）、5 m、枪架 1 m。同一挺枪同一批录音，但距离感不一致；四文件抽样里没有第二条同距离的可用发。要么把 `_01` 换成 5 m 那一档，要么接受这组的散布 —— **这是设计决定，等人工试听。** |
 | `gunTailInteriorMg` 的口径 | — | 妥协 | 用的是 .50 cal（仓库里那挺 M2），比九二式大一档。这一层只承担空间，枪本身由 `type92` 出。 |
@@ -1339,7 +1339,7 @@ Audio native levels are aligned.
 ```bash
 # 补变体的十三组（append，重复跑会把变体追加成 _05/_06，重跑前先还原清单与成品）
 node Taierzhuang1938/Script_SfxBake.mjs RifleNraK98kTakes RifleIjaSpringfieldTakes \
-  Zb26L86Lsw Type11BarSecondShot Type92M1919Near5m Type92M1919Turret1m \
+  Zb26L86Lsw Type92M1919Near5m Type92M1919Turret1m \
   RifleNraFarNagant50m RifleIjaFarBuildings FootstepDirtLoop \
   ExplosionFarHowitzer ExplosionFarCannon BoltCycleM38 StripperLoadK98kSecond
 

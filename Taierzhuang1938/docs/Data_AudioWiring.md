@@ -713,14 +713,50 @@ stress ≥ 0.42 开始喘（`breathHeavy` 原速原调，0.26–0.5 随 stress�
 抬到 1.15 倍，再 4 s 回到让位值。07 以后不变。配乐对象第一次看事实表时已经为真的事实（阶段跳转进 04/05、读档）
 算「很久以前」，不补标点（2026-09-24）。任务书里的「缺口重开」标点还没有：事实名要等 Front 包定下来再加进 `stingers`。
 
-### 8. 日军枪声变体（`Data_SfxSources.JapaneseGunfireVariants`）
+### 8. 日军枪声变体（十一年式：`Data_SfxSources.Type11Variants`）
 
-**2026-09-24 集成时撤回，日军枪声维持 09-11 的用户选定**：Sound 包曾把 `rifleIja` / `rifleIjaFar` / `type11` / `type11Far`
-扩成「SeedAudio 生成音 + 美制 M1 Garand / M1903A3 / FN MINIMI 实录」混播，并用同名文件覆盖了用户在 G09 试听选定的
-`AudioSfx_Type11_01/02`（BAR 近场）。这违反「挑过的素材原样播」与 09-11 用户要生成音的口径，且美制枪声当日军三八式/十一年式
-不合史实，已整体恢复为 09-11 的清单与原文件（`Data_SfxSources.mjs`、`Data_SfxManifest.json`、两条 Type11 原文件）。
-Sound 包实测的问题仍成立、留作后续：旧 BAR 近场两条 <40 Hz 能量占 98.7 %，没有低音炮的机器上几乎听不见；要补日军枪声变体，
-应走 `Script_SeedAudioGunfireBake` 同一配方多生成几条再由用户试听选定，而不是拿别国枪的实录顶。
+**先后两步，别混：**
+
+1. **2026-09-24 凌晨集成时撤回**（`76d985de6`）：Sound 包曾把 `rifleIja` / `rifleIjaFar` / `type11` / `type11Far`
+   扩成「SeedAudio 生成音 + 美制 M1 Garand / M1903A3 / FN MINIMI 实录」混播，并用同名文件覆盖了 G09 试听选定的
+   `AudioSfx_Type11_01/02`（BAR 近场）。当时按「挑过的素材原样播」整体恢复成 09-11 的清单与原文件。
+2. **2026-09-24 用户拍板「枪声换」，只恢复十一年式两条**：用户看过「旧 BAR 近场两条 <40 Hz 能量占 98 % 上下、
+   100 Hz—8 kHz 的可听部分比全带宽低十几 dB、没有低音炮的机器上等于不出声」这个结论后决定换掉。
+   **步枪 `rifleIja` / `rifleIjaFar` 不动**，仍是 09-11 的 SeedAudio 单条（美制步枪实录不恢复，用户没要）。
+
+| cue | 现在 | 来源 |
+| --- | --- | --- |
+| `type11` | 3 条：`AudioSfx_SeedAudioType11_01` + `AudioSfx_Type11_01/02` | SeedAudio（09-11）＋ Pole Position L110A2（FN MINIMI）5.56 1 m 单发 ×2，rate 0.95、hp 38 Hz；license `mixed` |
+| `type11Far` | 3 条：`AudioSfx_Type11Far_01` + `_02/_03` | BAR .30cal 300 m（原有）＋ 同一挺 MINIMI 50 m 后方单发 ×2；全是 Sonniss，license `sonniss` |
+
+`AudioSfx_Type11_01/02` 同文件名、内容从 BAR 换成 MINIMI（与 Sound 包那一版逐字节相同——同一配方、同一素材重烘出来的）；
+`SFX_PACK_VERSION` 抬到 `20260924type11minimi`。配方撤掉了 `BarClose` / `Type11BarSecondShot` 两组，原因写在
+`Data_SfxSources.mjs`「轻机：十一年式」注释里。
+
+**客观数字**（实测，整段 FFT；有声段 RMS 用 20 ms 帧、最响帧 10 % 门限，与 `Script_AudioNormalize` 同口径）：
+
+| 文件 | 时长 | 真峰值 | 有声段 RMS | <40 Hz | <500 Hz | 100 Hz–8 kHz 比全带宽 | 最后 50 ms |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| SeedAudioType11_01 | 0.65 s | −10.8 dBTP | −24.93 | 2.6 % | 54.6 % | −1.3 dB | −56 dB |
+| Type11_01（MINIMI） | 0.82 s | −8.2 dBTP | −25.00 | 8.6 % | 58.5 % | −2.0 dB | −55 dB |
+| Type11_02（MINIMI） | 0.82 s | −7.5 dBTP | −25.02 | 8.1 % | 62.0 % | −2.0 dB | −59 dB |
+| Type11Far_02（MINIMI 50 m） | 1.47 s | −8.8 dBTP | −24.98 | 0.3 % | 21.6 % | −0.3 dB | −74 dB |
+| Type11Far_03（MINIMI 50 m） | 1.47 s | −8.9 dBTP | −25.13 | 0.2 % | 23.0 % | −0.4 dB | −66 dB |
+| 旧 Type11_01（BAR，已换掉） | 0.70 s | −16.9 dBTP | −25.44 | 98.3 % | 99.5 % | −17.9 dB | −34 dB |
+| 旧 Type11_02（BAR，已换掉） | 0.70 s | −12.1 dBTP | −25.00 | 87.7 % | 93.8 % | −9.7 dB | −27 dB |
+
+（旧两条的 <40 Hz 在 Sound 包那次量的是 98.7 % / 98.8 %，口径不同，结论一样。）新文件起音都在开头 20–30 ms 内。
+素材 5.5 s 里只有两发（0.09 s / 4.07 s，相隔 4 s），每条只切一发，**没有第二发枪声**；但四条 MINIMI 在起音后约 0.33 s
+都有一个以 <500 Hz 为主的鼓包（近场比峰值低 8–9 dB，远场与峰值齐平），两个机位、两发都在同一时刻出现——推断是靶场
+远处的回声，不是枪机动作（枪机声 <500 Hz 只占个位数）。**单发时会不会听成「砰—嘭」两下，要人耳判断**；点射 500 rpm
+（0.12 s 一发）时它会被后面几发盖住。
+
+**轮播**：`type11` / `type11Far` 不在 `SAMPLE_CYCLE` 里，走默认那套——每发在所有变体里随机挑一条、叠 ±3 % 变调
+（与 `zb26` / `type92` 同一待遇）。三条都会被挑到；没有按顺序轮。这次没有改引擎（这三条不是人工逐条试听选定的，
+「原样播、按顺序轮」那条规矩原本针对的是人工选定的音）。要不要把 `type11` 放进 `SAMPLE_CYCLE`，等试听后再定。
+
+**仍需人耳试听**：MINIMI（5.56 mm）当十一年式（6.5×50 mm）用在音色上像不像；生成音与实录混在一梭子里会不会听出两种声音；
+上面那个 0.33 s 回声鼓包。
 
 **参考视频来源的许可债**（`SFX_LICENSES.refvideo`，发布前要换或取得授权）：`rifleNra_05–07`、`bolt_03`、
 `rifleHanYang`、`boltHanYang` 仍在轮播。
