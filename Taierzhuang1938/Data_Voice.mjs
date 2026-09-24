@@ -222,9 +222,10 @@ const BATTLE_LINES = [
   // 第一关 03–05 战车的预兆喊话（契约 §2 第 7 条「不加 HUD 标记，靠声音、炮塔指向和罗班长喊话传达窗口」；
   // 台词取自 Front 包任务书的罗班长三句）。kind "tank" 没有任何 AI 会随机喊（Script_Ai 的 BARK_LINES 里没有这一类），
   // 只由战车接线层按 key 点名（Data_Tuning_Tank.barkCues）；罗班长的本人版本见 Data_FirstLevelVoiceCast 的 leader 一套。
-  { key: "tank_turret",     kind: "tank",   file: "AudioVoice_TankTurret.mp3", dur: 0.86,  role: "老兵",    pitch: -4,  text: "炮塔转过来了！" },
-  { key: "tank_window",     kind: "tank",   file: "AudioVoice_TankWindow.mp3", dur: 2.35,  role: "老兵",    pitch: -4,  text: "它在打口子！就现在！" },
-  { key: "tank_track",      kind: "tank",   file: "AudioVoice_TankTrack.mp3", dur: 2.36,   role: "老兵",    pitch: -4,  text: "履带断了！还在打！再补一捆！" },
+// 三句都有前提（有战车、炮塔在转 / 在打口子 / 履带刚断），标 event：没点名的 Bark("tank") 不会抽中它们。
+  { key: "tank_turret",     kind: "tank",   file: "AudioVoice_TankTurret.mp3", dur: 0.86,  role: "老兵",    pitch: -4,  event: true,  text: "炮塔转过来了！" },
+  { key: "tank_window",     kind: "tank",   file: "AudioVoice_TankWindow.mp3", dur: 2.35,  role: "老兵",    pitch: -4,  event: true,  text: "它在打口子！就现在！" },
+  { key: "tank_track",      kind: "tank",   file: "AudioVoice_TankTrack.mp3", dur: 2.36,   role: "老兵",    pitch: -4,  event: true,  text: "履带断了！还在打！再补一捆！" },
   { key: "spot_wall",       kind: "spot",   file: "AudioVoice_SpotWall.mp3", dur: 2.34,  role: "普通兵",   pitch: 0,                   speed: 1.1, text: "墙上！鬼子爬上墙了！" },
   { key: "warn_down",       kind: "warn",   file: "AudioVoice_WarnDown.mp3", dur: 1.84,  role: "老兵",    pitch: -4,                  text: "趴倒！趴倒！" },
   { key: "warn_grenade",    kind: "warn",   file: "AudioVoice_WarnGrenade.mp3", dur: 1.91,  role: "普通兵",   pitch: 0,                   text: "手榴弹！闪！" },

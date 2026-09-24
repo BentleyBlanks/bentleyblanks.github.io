@@ -281,11 +281,6 @@ export const MISSION_FACT_GATES = Object.freeze({
     text: "第一批存活守军全部撤入安全位置，至少一人存活",
   }),
   // --- MachineGun --------------------------------------------------------
-  // 契约 §2.6：03 只等老周离枪 ≥10 m（zhouLeftGun）；他走回集结处是 06 之前（05）的背景条件。
-  zhouGunWounded: Gate({
-    kind: "scripted", step: "Tank", source: "FirstLevelFrontBattle.UpdateZhou",
-    text: "老周既有腿伤，经己方沟道实际撤到集结处",
-  }),
   frontAttackRepelled: Gate({
     kind: "combat", step: "MachineGun", encounter: "machineGun", source: "FirstLevelFrontPressure.UpdateGroups",
     text: "machineGun 组全部阵亡或被打退（退到 retreatDistanceM 之外）",
@@ -300,6 +295,11 @@ export const MISSION_FACT_GATES = Object.freeze({
   }),
   bundleOrderHeard: Gate({ kind: "voice", step: "MachineGun", cue: "BundleOrder", source: "VoiceDone" }),
   // --- Tank --------------------------------------------------------------
+  // 契约 §2.6：03 只等老周离枪 ≥10 m（zhouLeftGun）；他走回集结处是 06 之前（05）的背景条件。
+  zhouGunWounded: Gate({
+    kind: "scripted", step: "Tank", source: "FirstLevelFrontBattle.UpdateZhou",
+    text: "老周既有腿伤，经己方沟道实际撤到集结处",
+  }),
   bundleRouteTraversed: Gate({
     kind: "scripted", step: "Tank", source: "UpdateSortie",
     requires: Object.freeze(["bundleRoutePoint"]),

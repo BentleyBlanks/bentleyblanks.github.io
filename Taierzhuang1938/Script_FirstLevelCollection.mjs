@@ -17,7 +17,7 @@
 // ===========================================================================
 import * as THREE from "three";
 import { MISSION_TUNING as R } from "./Data_Tuning_FirstLevel.mjs";
-import { FRONT_TUNING as F, BORROW_LIGHT_BEATS } from "./Data_Tuning_FirstLevelFront.mjs";
+import { FRONT_TUNING as F, BORROW_LIGHT_BEATS, FRONT_BATTLE_TUNING as B } from "./Data_Tuning_FirstLevelFront.mjs";
 import { MISSION_ANCHORS as A, MISSION_ROUTES, MISSION_PLACEMENT as Place } from "./Data_FirstLevelMissionLayout.mjs";
 import { MissionRouteProjection, MissionCarryRoutePoint } from "./Script_FirstLevelMissionColumn.mjs";
 import { SpeakingCastOptions } from "./Data_FirstLevelSpeakingCast.mjs";
@@ -182,8 +182,8 @@ export class FirstLevelCollection {
     soldier.scriptEssential = true;
     soldier.missionUntargetable = true;
     soldier.yaw = FirstLevelCollection.SeatYaw();
-    // 准星认人读 identity.name：他是「老周」（字幕同一张表），不是随机抽的名字。
-    soldier.identity = { ...soldier.identity, name: MISSION_VOICE_CAST.zhou?.[0] ?? soldier.identity?.name };
+    // 准星认人读 identity.name / age：他是「老周」（字幕同一张表），年龄与 03–05 枪上那一副同一个数（B.zhouAge）。
+    soldier.identity = { ...soldier.identity, name: MISSION_VOICE_CAST.zhou?.[0] ?? soldier.identity?.name, age: B.zhouAge };
     // Spawn 的找空位会把人从贴着土壁的座位挪开一米多（站姿胶囊的净空）；他是坐着的，放回座位上。
     const ground = r.battlefield.GroundHeight(spot.x, spot.z);
     soldier.position.set(spot.x, ground, spot.z); soldier.body?.Teleport(spot.x, ground, spot.z);
@@ -204,11 +204,17 @@ export class FirstLevelCollection {
     this.SeatBox(true);
     return soldier;
   }
-  /** 他坐的那只箱子（白盒体块，常驻集结处道具那一路；只在他坐着时显示）。 */
+  /**
+   * 他坐的那只箱子（只在他坐着时显示）。材质借白盒场同一张「timber」语义材质（MeshStandard，走 GTAO / GI / 画质表、
+   * 着色器开机已编好）：自建 Lambert 受光和周围白盒对不上，06 第一次看见时还要现编一个着色器（2026-09-24 审查）。
+   */
   SeatBox(on) {
     const r = this.r, spot = Place.collection.zhouWall, size = F.zhouSeatBoxM;
     if (on && !this.seatBox && r.scene) {
-      this.seatBox = new THREE.Mesh(new THREE.BoxGeometry(size[0], size[1], size[2]), new THREE.MeshLambertMaterial({ color: 0x7d6a4f }));
+      const shared = r.battlefield?.materials?.get?.("timber") || null;
+      this.seatBoxOwnMaterial = !shared;
+      this.seatBox = new THREE.Mesh(new THREE.BoxGeometry(size[0], size[1], size[2]),
+        shared || new THREE.MeshStandardMaterial({ color: 0x7d6a4f, roughness: 0.85, metalness: 0 }));
       this.seatBox.name = "MissionZhouSeatBox";
       this.seatBox.castShadow = true; this.seatBox.receiveShadow = true;
       // 箱子在人的胯下、略往土壁那边靠（坐姿把胯往后送 0.06H；背后 = (sin θ, cos θ)）。
@@ -343,14 +349,9 @@ export class FirstLevelCollection {
       this.ShowMatch(false);
     }
     // 老周嘴上那根烟跟着担架走；火柴在顺子手里。
-    const head = this.seated?.alive ? this.seated.actor?.characterRig?.bones?.head : null;
-    if (this.smoke?.visible && head) {
-      // 坐着的活人：烟叼在嘴上（头骨下 9 cm、往脸前 10 cm）。
-      head.getWorldPosition(this.smoke.position);
-      const yaw = this.seated.yaw;
-      this.smoke.position.x -= Math.sin(yaw) * 0.1; this.smoke.position.z -= Math.cos(yaw) * 0.1; this.smoke.position.y -= 0.09;
-      this.smoke.rotation.y = yaw;
-    } else if (this.smoke?.visible)
+    const rig = this.seated?.alive ? this.seated.actor?.characterRig : null, head = rig?.bones?.head;
+    if (this.smoke?.visible && head) this.PlaceSmokeAtMouth(rig, head);
+    else if (this.smoke?.visible)
       this.smoke.position.set(zhou.x, r.battlefield.GroundHeight(zhou.x, zhou.z) + 0.72, zhou.z);
     if (this.match?.visible) {
       // 跟随俯仰放在右手侧、视线下方：递火时仍读得到，但不会盖住对面人物。
@@ -379,6 +380,27 @@ export class FirstLevelCollection {
       if (t >= 1 && zhou.state === "fallen") { zhou.state = "waiting"; this.ShowSmoke(false); }
     }
     void dt;
+  }
+
+  /**
+   * 坐着的活人：烟叼在两片嘴唇中间，往脸前探出半截（F 没有这条数：烟长 9 cm，探出一半 4 cm）。
+   * 脸朝向取「头骨 → 嘴」的水平方向（头会转向玩家，身体朝向不跟着转）。没有面部骨骼时退回头骨往前 12 cm。
+   * 2026-09-24 审查：旧写法按头骨往下 9 cm、按身体朝向往前 10 cm，烟飘在下巴 / 领口高度（06 老周头骨在颈根附近）。
+   */
+  PlaceSmokeAtMouth(rig, head) {
+    const controls = rig.facial?.controls || [];
+    const upper = controls.find((c) => c.name === "Face_LipUpper")?.bone, lower = controls.find((c) => c.name === "Face_LipLower")?.bone;
+    const h = head.getWorldPosition(this.smokeHead ??= new THREE.Vector3());
+    const p = this.smoke.position;
+    if (upper && lower) {
+      const l = lower.getWorldPosition(this.smokeLip ??= new THREE.Vector3());
+      upper.getWorldPosition(p); p.add(l).multiplyScalar(0.5);
+    } else {
+      p.copy(h); p.x -= Math.sin(this.seated.yaw) * 0.12; p.z -= Math.cos(this.seated.yaw) * 0.12;
+    }
+    const fx = p.x - h.x, fz = p.z - h.z, f = Math.hypot(fx, fz) || 1;
+    p.x += fx / f * 0.04; p.z += fz / f * 0.04; p.y -= 0.005;
+    this.smoke.rotation.y = Math.atan2(fx, fz);
   }
 
   /** 07 起行之后集结处那一带的收尾：小道具收掉，摆位留着。 */
@@ -425,7 +447,8 @@ export class FirstLevelCollection {
       if (!mesh) continue;
       mesh.parent?.remove(mesh);
       mesh.geometry.dispose();
-      mesh.material.dispose();
+      // 箱子借的是白盒场的共享材质，不归这里释放。
+      if (mesh !== this.seatBox || this.seatBoxOwnMaterial) mesh.material.dispose();
     }
     this.smoke = this.match = this.seatBox = null;
   }

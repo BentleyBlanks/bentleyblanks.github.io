@@ -152,6 +152,10 @@ export const TANK = Object.freeze({
     // 真炸点不够远：瞄点往炮口方向收 protectPullM 再算，最多 protectPullSteps 次；还不够这一发不打。
     protectPullM: 3,
     protectPullSteps: 4,
+    // 同一个收瞄循环顺带管「打过头」：真炸点沿射向越过计划瞄点超过 overshootMaxM，也往炮口收一步再算。
+    // 2026-09-24 Front 包审查：缺口区的弹常越过缺口 8–12 m，落进我方后沟 (−16, −140) 一带 —— 05 玩家回撤、守军过缺口后
+    // 走的就是那里。只有保护够了而过头收不回来时，照打保护够的那一发（不因过头少打）。
+    overshootMaxM: 6,
     // 区域目标（缺口封锁）默认散布 3–5 m。
     zoneScatterMinM: 3,
     zoneScatterMaxM: 5,
@@ -441,6 +445,10 @@ export const TANK = Object.freeze({
     visionSlit: null,
   }),
   barkCooldownS: 8,
+  // 被剧情对白让路（Audio.Bark 在 dialogueYield 下返回 null）的喊话在这么多秒内补喊，过期或不再成立就丢。
+  // 2026-09-24 Front 包审查：「履带断了！还在打！再补一捆！」正落在投弹那一刻开播的 BundleRetreat 场景里，一次都没播出来；
+  // 日军车长那句同理。trackCut 在车已 Disabled 后不再补（「再补一捆」已经不成立）。
+  barkRetryS: Object.freeze({ trackCut: 12, hatchShout: 6, tankWindow: 4 }),
   // 「它在打口子！就现在！」的时机（接线层判，不是大脑）：05 领了集束弹、车还没解决、玩家在攻击支路的沟线上，
   // 大脑正瞄着缺口（targetId "gapZone"）且炮塔偏离玩家方位超过 angleRad —— 这就是冲上去的空当。[需]
   window: Object.freeze({ angleRad: 1.0, laneRadiusM: 4, cooldownS: 14 }),
@@ -449,31 +457,8 @@ export const TANK = Object.freeze({
 /** 大脑喊话 → 台词表（上面 TANK.barkCues 的只读别名，接线层用）。 */
 export const TANK_BARK_CUES = TANK.barkCues;
 
-// ---------------------------------------------------------------------------
-// 可破坏掩体：临时数据（2026-09-23 战车包在现布局上演示用；Space 包的 Data_FirstLevelFrontBreakables 会取代）。
-// 字段见 Script_FirstLevelFrontBreakables 文件头。
-// RightNestFrontRest：右阵位胸墙 3.4 m，缴获的机枪架在正中（x 27）—— 缺口只开在**西半段**，
-//   机枪托不会悬空；1.5 → 1.1 → 0.7 m 三段。
-// RightNestNorthRuin：阵位北面那截残墙（挡着战车看阵位的那一块），两段。
-// ---------------------------------------------------------------------------
-export const FRONT_BREAKABLES_TEMP = Object.freeze([
-  Object.freeze({
-    id: "RightNestFrontRestBreak", block: "RightNestFrontRest", hitRadiusM: 2.4, minDamage: 60,
-    stages: Object.freeze([
-      Object.freeze([[-1.7, 1.7, 1.5]]),
-      Object.freeze([[-1.7, -0.6, 1.1], [-0.6, 1.7, 1.5]]),
-      Object.freeze([[-1.7, -1.1, 0.7], [-1.1, -0.6, 1.0], [-0.6, 1.7, 1.5]]),
-    ]),
-  }),
-  Object.freeze({
-    id: "RightNestNorthRuinBreak", block: "RightNestNorthRuin", hitRadiusM: 2.6, minDamage: 60,
-    stages: Object.freeze([
-      Object.freeze([[-2, 2, 1.2]]),
-      Object.freeze([[-2, 0, 1.2], [0, 2, 0.6]]),
-      Object.freeze([[-2, -0.8, 0.8], [-0.8, 2, 0.45]]),
-    ]),
-  }),
-]);
+// 可破坏掩体的数据在 Space 包的 Data_FirstLevelFrontBreakables.mjs（运行时经 Script_FirstLevelFrontBreakables.SpaceBreakableSpecs
+// 换格式）；Tank 包在旧布局上的临时数据 FRONT_BREAKABLES_TEMP 已删（2026-09-24 Front 包）。
 
 /**
  * 永远不可破坏（任务书：阵位后墙、支沟、守军安全区）。数据里写了也拒绝。

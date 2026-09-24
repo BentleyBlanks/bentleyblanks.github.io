@@ -525,11 +525,15 @@ const FakeAudio = () => {
   for (const c of Object.values(TANK_BARK_CUES).filter(Boolean)) {
     const line = VOICE_LINES.find((l) => l.key === c.key);
     assert.ok(line && (line.side || "nra") === (c.side || "nra") && line.kind === c.kind, "战车喊话点名的 " + c.key + " 在 Data_Voice 里、阵营与类别对得上");
+    // 战车专属的句子（kind "tank"）都有前提（有车、炮塔在转、在打口子、履带刚断）：标 event，没点名的 Bark 抽不中。
+    if (c.kind === "tank") assert.ok(line.event === true, "战车喊话 " + c.key + " 标 event（有前提的句子只许点名喊）");
   }
   const orders = aiSource.slice(aiSource.indexOf("const ORDER_LINE"), aiSource.indexOf("};", aiSource.indexOf("const ORDER_LINE")));
   assert.deepEqual([...SQUAD_BARK_KEYS.player].sort(), [...new Set([...orders.matchAll(/: "(\w+)"/g)].map(([, key]) => key))].sort(),
     "玩家（顺子）下令喊的每条都有本人版本");
-  for (const { key } of SquadBarkEntries()) assert.ok(nra.some((line) => line.key === key && !line.event), key + " 是 Data_Voice 里的中方非 event 口令（文本一字不改）");
+  // 本人版本录的是会被随机喊到的口令（非 event）；罗班长的战车预兆句例外：它们只由战车接线层点名，本来就标 event。
+  for (const { key } of SquadBarkEntries()) assert.ok(nra.some((line) => line.key === key && (!line.event || luoTank.includes(key))),
+    key + " 是 Data_Voice 里的中方口令（非 event，或罗班长点名的战车句；文本一字不改）");
   for (const who of Object.keys(SQUAD_BARK_CAST)) assert.ok(FIRST_LEVEL_VOICE_CAST[who] && !FIRST_LEVEL_VOICE_CAST[who].sharesWith, who + " 有自己的定妆音");
   assert.equal(new Set(SquadBarkEntries().map((e) => e.file)).size, SquadBarkEntries().length, "文件名不撞");
 

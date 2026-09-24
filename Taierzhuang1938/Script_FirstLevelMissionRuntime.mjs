@@ -4,7 +4,7 @@ import { FirstLevelFrontScenes } from "./Script_FirstLevelFrontScenes.mjs";
 import { FirstLevelTankRuntime } from "./Script_FirstLevelTankRuntime.mjs";
 import { BundleResupplyOpen } from "./Script_FirstLevelTankBrain.mjs";
 import { TANK } from "./Data_Tuning_Tank.mjs";
-import { FirstLevelFrontPressure, AssaultRoundEnd, AssaultTop, NearestLineIndex, RushStalled, RushPaused, AssaultState } from "./Script_FirstLevelFrontPressure.mjs";
+import { FirstLevelFrontPressure, AssaultRoundEnd, AssaultTop, NearestLineIndex, RushStalled, RushPaused, AssaultState, FIRST_LEVEL_AI_RULE_STEPS } from "./Script_FirstLevelFrontPressure.mjs";
 import { FirstLevelBackdropSquads } from "./Script_FirstLevelBackdropSquads.mjs";
 import { FirstLevelTransition } from "./Script_FirstLevelTransition.mjs";
 import { FRONT_SORTIE as Sortie, SortieCrawlBlocked } from "./Data_FirstLevelFrontRoute.mjs";
@@ -2290,6 +2290,10 @@ export class FirstLevelMissionRuntime {
     this.UpdateSquad();
     this.UpdateFront();
     this.frontPressure.Update(dt);
+    // 弹坑地形块外沿算站住（Script_Physics.TERRAIN_TILE_EDGE_SNAP_M）：任务侧开关，只在 01–06 打开。
+    if(this.physics)this.physics.terrainTileEdgeRest=FIRST_LEVEL_AI_RULE_STEPS.includes(this.flow.stage.id);
+    // 03–05 投弹否决（Script_AiTactics grenadeVeto）：受保护的待撤守军身边不落手榴弹（契约 §2 第 9 条）。
+    if(this.ai.tactics)this.ai.tactics.grenadeVeto=this.frontBattle.Active?this.frontBattle.grenadeVeto:null;
     this.backdrop.Update(dt);
     this.UpdateTactics(dt);
     this.UpdateAssault(dt);
@@ -2604,8 +2608,6 @@ export class FirstLevelMissionRuntime {
   get StorySpeaking() {
     return this.voice.current?.phase === "playing" || !!(this.frontScenes?.handle && !this.frontScenes.handle.done);
   }
-  /** Story dialogue is playing or waiting its turn (reminders and casualty reactions hold off). */
-  get StoryVoiceBusy() { return !!this.voice.current || !!this.frontScenes?.Busy; }
   ObjectiveProgress() {
     const progress = this.flow.ObjectiveProgress();
     progress.conditions = progress.conditions.map(condition => {
@@ -2709,6 +2711,8 @@ export class FirstLevelMissionRuntime {
     this.opening.Dispose();
     this.frontShow?.Dispose();
     this.frontPressure?.Dispose();
+    if(this.physics)this.physics.terrainTileEdgeRest=false;
+    if(this.ai.tactics?.grenadeVeto===this.frontBattle?.grenadeVeto)this.ai.tactics.grenadeVeto=null;
     this.backdrop?.Dispose();
     this.squadMarch?.Dispose();
     if(this.tankDust!=null)this.vfx.RemoveSmokeSource(this.tankDust);

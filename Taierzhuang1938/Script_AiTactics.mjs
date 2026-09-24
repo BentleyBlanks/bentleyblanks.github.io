@@ -554,6 +554,13 @@ export class TacticsDirector {
     this.fallbackNow = 0;
 
     this.squads = new Map();
+    /**
+     * 任务侧投弹否决（默认 null = 不否决，07 以后与其它关卡行为不变）：`(soldier, x, z) => true` 表示「这一点不许扔」。
+     * 第一关 03–05 由 Script_FirstLevelFrontBattle 装上：落点半径内有受保护的待撤守军（missionUntargetable）就不扔
+     *（契约 §2 第 9 条；2026-09-24 审查：日军手榴弹一颗炸死聚拢的第二批三人、再一颗两人 → guardBatchLost）。
+     * ShouldGrenade 按目标的 lkp 问一次，Script_Ai.TryGrenade 脱手前按真实瞄点再问一次。
+     */
+    this.grenadeVeto = null;
 
     // --- 攻击令牌 ---------------------------------------------------------
     // holders 是稠密数组（遍历不产生迭代器），holderBySoldier 做 O(1) 查，
@@ -1431,6 +1438,7 @@ export class TacticsDirector {
 
     const lkpTime = enemy.lkp && Number.isFinite(enemy.lkp.time) ? enemy.lkp.time : now;
     if (now - lkpTime > GRENADE.lkpMaxAgeS) return false;                      // ⑦
+    if (this.grenadeVeto && this.grenadeVeto(soldier, ex, ez)) return false;   // ⑧ 任务侧否决
     return true;
   }
 

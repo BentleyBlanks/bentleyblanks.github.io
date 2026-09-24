@@ -10,6 +10,7 @@ import { InstallMissionSentry } from "./Script_FirstLevelMissionPeople.mjs";
 import { FRONT_DEFENDERS } from "./Data_FirstLevelMissionFront.mjs";
 import { SpeakingCastOptions } from "./Data_FirstLevelSpeakingCast.mjs";
 import { TankClearFact } from "./Script_FirstLevelTankBrain.mjs";
+import { MISSION_VOICE_CAST } from "./Data_FirstLevelMissionDialogue.mjs";
 const Distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const AliveBatch=batch=>batch.filter(g=>g.actor.alive);
 /** Route split at the point nearest to `point`: [head ending there, tail starting there]. */
@@ -71,7 +72,18 @@ export function FrontEntryRoute(position,route){
 function ReliefGunStandby(){const a=S.leftRoute.at(-2),b=S.leftSeat,d=Math.hypot(a.x-b.x,a.z-b.z),k=Math.min(1,B.reliefGunStandbyM/Math.max(d,1e-6));return {x:b.x+(a.x-b.x)*k,z:b.z+(a.z-b.z)*k};}
 
 export class FirstLevelFrontBattle {
-  constructor(runtime){this.r=runtime;this.walks=new Map();this.leg=null;this.blocked=true;}
+  constructor(runtime){
+    this.r=runtime;this.walks=new Map();this.leg=null;this.blocked=true;
+    /** Walk stall skips (probes read State().stalls): {id,index,total,final,x,z,at}. */
+    this.stalls=[];
+    /** Task-side grenade veto (Script_AiTactics TacticsDirector.grenadeVeto), installed by the runtime while Active. */
+    this.grenadeVeto=(soldier,x,z)=>this.GuardInBlast(x,z);
+  }
+  /** A protected (missionUntargetable) guard is within B.guardGrenadeShieldM of (x,z): no grenade there (contract §2.9). */
+  GuardInBlast(x,z){
+    for(const g of this.r.guards||[]){const a=g.actor;if(a?.alive&&a.missionUntargetable&&Math.hypot(a.position.x-x,a.position.z-z)<B.guardGrenadeShieldM)return true;}
+    return false;
+  }
   get Active(){return ["Support","MachineGun","Tank"].includes(this.r.flow.stage.id);}
   get Leader(){return this.r.companion.Handle("luo");}
   SetWalk(actor,route){if(!actor)return;this.walks.set(actor.id,{route:route.map(p=>({...p})),index:0});this.r.squadRoutes.set(actor.id,route.map(p=>({...p})));}
@@ -83,16 +95,34 @@ export class FirstLevelFrontBattle {
     const Arrival=()=>w.index<w.route.length-1?B.arrivalM*.25:B.arrivalM;
     const previousIndex=w.index;
     while(w.index<w.route.length&&Distance(actor.position,w.route[w.index])<Arrival())w.index++;
-    if(w.index!==previousIndex)w.rejoin=null;
+    if(w.index!==previousIndex){w.rejoin=null;w.best=Infinity;w.bestAt=r.time;}
     if(w.index>=w.route.length){r.Defend(actor,w.route.at(-1),0,.4);r.ai.SetStance(actor,1,.5,true);r.squadRoutes.set(actor.id,[]);return true;}
-    if(r.RespondToGrenade(actor))return false;
+    if(r.RespondToGrenade(actor)){w.bestAt=r.time;return false;}
     const ahead=MissionRouteProjection(w.route,actor.position).progress>MissionRouteProjection(w.route,r.player.position).progress+B.leaderLeadM;
     const wait=follow&&ahead&&Distance(actor.position,r.player.position)>S.leaderWaitM;
+    // Stall fallback: intermediate points only count within 0.25 m, so a man shoved off the line (a gun block, a
+    // crowd, a crater edge) could hold one point for good - Luo 200 s beside the captured gun's seat, the relief
+    // gunner 70 s on the leftRoute leg (09-24 review). No progress for B.walkStallS -> skip the point, or take a
+    // final point as reached within arrivalM x walkStallArrivalScale.
+    const d=Distance(actor.position,w.route[w.index]);
+    if(!(w.best<Infinity)||w.bestAt==null){w.best=d;w.bestAt=r.time;}
+    if(wait||d<w.best-B.walkStallProgressM){w.best=Math.min(w.best,d);w.bestAt=r.time;}
+    else if(r.time-w.bestAt>=B.walkStallS){
+      const final=w.index===w.route.length-1;
+      if(!final||d<B.arrivalM*B.walkStallArrivalScale){
+        this.stalls.push({id:actor.missionId||actor.castId||actor.id,index:w.index,total:w.route.length,final,
+          x:+actor.position.x.toFixed(1),z:+actor.position.z.toFixed(1),at:+r.time.toFixed(1)});
+        if(this.stalls.length>24)this.stalls.shift();
+        // No rejoin point on the next segment: its foot is where he was stuck, it would pull him straight back.
+        w.index++;w.rejoin=null;w.noRejoin=w.index;w.best=Infinity;w.bestAt=r.time;
+        if(w.index>=w.route.length){r.Defend(actor,w.route.at(-1),0,.4);r.ai.SetStance(actor,1,.5,true);r.squadRoutes.set(actor.id,[]);return true;}
+      }else w.bestAt=r.time;
+    }
     // Crowd pressure or a grenade evade can leave an actor beside the checked
     // corridor. Keep one fixed return point until reached, so the next waypoint
     // cannot pull him back into the same cover every other frame.
     if(w.rejoin&&Distance(actor.position,w.rejoin)<B.arrivalM*.25)w.rejoin=null;
-    if(!w.rejoin&&w.index>0){
+    if(!w.rejoin&&w.index>0&&w.noRejoin!==w.index){
       const segment=[w.route[w.index-1],w.route[w.index]],projection=MissionRouteProjection(segment,actor.position);
       if(projection.distance>B.arrivalM*.5)w.rejoin=MissionRoutePoint(segment,projection.progress);
     }
@@ -138,7 +168,9 @@ export class FirstLevelFrontBattle {
   StartHandover(say=true){
     if(this.handoverStarted)return;
     const r=this.r,he=r.companion.Handle("heyoutian");if(!he)return;
-    this.handoverStarted=true;this.SetWalk(he,[...S.leftRoute.slice(-2)]);if(say)r.Say("TakeOverGun");
+    // A 04 checkpoint places He on the seat already: do not send him 9 m up the access trench and back.
+    const onSeat=Distance(he.position,S.leftSeat)<B.handoverReadyM;
+    this.handoverStarted=true;this.SetWalk(he,onSeat?[S.leftSeat]:[...S.leftRoute.slice(-2)]);if(say)r.Say("TakeOverGun");
   }
   UpdateHandover(){
     const r=this.r,he=r.companion.Handle("heyoutian");
@@ -192,10 +224,20 @@ export class FirstLevelFrontBattle {
   UpdatePressure(){
     const r=this.r;
     if(r.Has("tankPositionPressured")){
-      this.SetLeg("rear",S.rearRoute);
-      if(r.Near(S.rear,B.rearArrivalM)&&Distance(this.Leader.position,S.rear)<B.rearArrivalM
-        &&r.BlocksSight(r.view.TankMuzzle(r.tank),r.player.EyePosition,r.view.tankCollider)){
-        r.Record("rightRearReached");r.Say("BundleOrder");
+      // rearRoute[0] is the captured gun's seat (the player's way back from it). Luo holds his cover north of the gun:
+      // walking to the seat from there puts the gun block between him and the point (09-24 review: 200 s at
+      // (23.3,-153.8), 2.6 m short, rightRearReached never came). He starts at the next corner instead.
+      this.SetLeg("rear",S.rearRoute.slice(1));
+      const playerHere=r.Near(S.rear,B.rearArrivalM)&&r.BlocksSight(r.view.TankMuzzle(r.tank),r.player.EyePosition,r.view.tankCollider);
+      if(!playerHere)this.playerAtRearAt=null;
+      else {
+        this.playerAtRearAt??=r.time;
+        const leaderHere=Distance(this.Leader.position,S.rear)<B.rearArrivalM;
+        // Fallback: the player has held the junction B.rearLeaderGraceS and Luo is still on his way - go on anyway.
+        if(leaderHere||r.time-this.playerAtRearAt>=B.rearLeaderGraceS){
+          r.Record("rightRearReached",leaderHere?undefined:{leaderLate:true,leader:{x:+this.Leader.position.x.toFixed(1),z:+this.Leader.position.z.toFixed(1)}});
+          r.Say("BundleOrder");
+        }
       }
     }
     const atBlock=r.tank.brain?!!r.tank.atBlock:(r.tank.roadProgress||0)>=this.RoadDistance(S.tankBlockIndex)-.2;
@@ -315,7 +357,17 @@ export class FirstLevelFrontBattle {
   UpdateZhou(){
     const r=this.r,a=r.opening.zhou;if(!a||r.Has("zhouGunWounded"))return;
     if(!a.alive){r.Record("zhouGunKilled");r.OnPlayerDown();r.MissionFailure?.("zhou");return;}
-    if(!a.frontWoundEstablished){a.frontWoundEstablished=true;a.health=Math.min(a.health,B.zhouHealth);a.wounded=true;a.woundedWalk=1;}
+    if(!a.frontWoundEstablished){a.frontWoundEstablished=true;a.health=Math.min(a.health,B.zhouHealth);a.wounded=true;a.woundedWalk=1;
+      a.identity={...a.identity,name:MISSION_VOICE_CAST.zhou?.[0]??a.identity?.name,age:B.zhouAge};}
+    // Checkpoint start at 04 (the 03 facts carry zhouLeftGun, but no walk of his exists in this runtime): the
+    // handover is history. Zhou (respawned on the seat by Opening.Update) starts down the access trench past the
+    // 10 m line with Yaowa, instead of sharing the seat with He, whom the checkpoint also puts there (09-24 review).
+    if(r.Has("zhouLeftGun")&&!this.walks.has(a.id)){
+      const at=S.zhouExit[2],yaowa=r.companion.Handle("yaowa"),route=[...S.zhouExit.slice(3),P.collection.zhouWall];
+      r.emplacement.NpcVacate(r.leftGunId,"checkpoint");r.PlaceActor(a,at);this.SetWalk(a,route);
+      if(yaowa){r.PlaceActor(yaowa,{x:at.x+1,z:at.z+1.2});this.SetWalk(yaowa,route);}
+      this.zhouEscortDispatched=true;
+    }
     if(!r.Has("rifleWithdrawalResolved")){r.Defend(a,S.leftSeat,0,.4);return;}
     const yaowa=r.companion.Handle("yaowa");
     if(!this.zhouEscortDispatched){this.zhouEscortDispatched=true;this.SetWalk(yaowa,S.leftRoute.slice(-3));}
@@ -372,6 +424,7 @@ export class FirstLevelFrontBattle {
     if(!["Tank","Orders"].includes(stage))return;
     // Contract §2.6: the relief comes up as soon as the tank is silenced, in parallel with the last batch and the pair's return.
     if(!r.relief&&(stage==="Orders"||r.Has(TankClearFact(r.tank)))){
+      // Built once here (the roster used to be rebuilt every frame for a length check).
       r.relief=this.ReliefRoster().map((spec,i)=>{
         const actor=r.ai.Spawn("nra",A.collection.x+i*1.5,A.collection.z,{weapon:spec.weapon,squadId:"MissionRelief",...(spec.speaking?SpeakingCastOptions("relief"):{})});
         if(!actor)return null;InstallMissionSentry(actor);actor.missionId=`Relief${i}`;
@@ -381,7 +434,8 @@ export class FirstLevelFrontBattle {
     }
     if(!r.relief)return;
     for(const e of r.relief){e.arrived=this.Walk(e.actor);e.index=this.walks.get(e.actor.id)?.index||0;}
-    if(r.relief.length===this.ReliefRoster().length&&r.relief.every(e=>e.actor.alive&&e.arrived)){
+    // Every live man of the relief is on his post (a spawn that failed or a man killed on the way does not hang 05).
+    if(r.relief.every(e=>!e.actor.alive||e.arrived)){
       r.Record("reliefInPosition");
       if(!this.postsRelieved){
         this.postsRelieved=true;r.emplacement.NpcVacate(r.leftGunId,"relief");
@@ -419,7 +473,12 @@ export class FirstLevelFrontBattle {
     const stage=r.flow.stage.id;
     // Brief item 5: while the tank shows itself (03 preview) and until it has shelled the nest (04), the guide points
     // at the tank, not at the gap - the new threat is what the player has to read.
-    const tank=r.tank?.present?{x:r.tank.x,z:r.tank.z}:null;
+    // The marker stands B.guideTankLeadM in front of the tank toward the player, so it does not cover the turret.
+    let tank=null;
+    if(r.tank?.present){
+      const dx=r.player.position.x-r.tank.x,dz=r.player.position.z-r.tank.z,d=Math.hypot(dx,dz),k=d>B.guideTankLeadM*2?B.guideTankLeadM/d:0;
+      tank={x:r.tank.x+dx*k,z:r.tank.z+dz*k};
+    }
     if(stage==="Support"){
       if(!r.Has("rightNestCaptured"))return {target:MissionRouteLookahead(Routes.support,r.player.position),label:"support",objective:Objectives.capture};
       return tank&&r.Has("tankPreviewed")?{target:tank,label:"tank",objective:Objectives.coverFirst}:{target:S.gap,label:"front",objective:Objectives.coverFirst};
@@ -431,5 +490,5 @@ export class FirstLevelFrontBattle {
     const labels={supply:"bundle",return:"bundle",attack:"throw",retreat:"front",gapWatch:"front",disengage:"orders",home:"orders"};
     return {target:!r.Has("bundleTaken")&&r.Near(S.house,S.supplierRangeM)?A.bundle:MissionRouteLookahead(this.leaderRoute||Routes.bundle,r.player.position),label:labels[this.leg]||"bundle",objective:Objectives[{gapWatch:"retreat",home:"disengage"}[this.leg]||this.leg]||Objectives.supply};
   }
-  State(){return {leg:this.leg,blocked:this.blocked,gapWatched:!!this.gapWatched,returnMeetDone:!!this.returnMeetDone,handoverStarted:!!this.handoverStarted,roadProgress:this.r.tank.roadProgress||0,walks:[...this.walks].map(([id,w])=>({id,index:w.index,total:w.route.length}))};}
+  State(){return {leg:this.leg,blocked:this.blocked,gapWatched:!!this.gapWatched,returnMeetDone:!!this.returnMeetDone,handoverStarted:!!this.handoverStarted,roadProgress:this.r.tank.roadProgress||0,walks:[...this.walks].map(([id,w])=>({id,index:w.index,total:w.route.length})),stalls:this.stalls.slice()};}
 }

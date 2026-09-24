@@ -6,7 +6,7 @@
 // 只做**数据驱动的分段体块**：每个可破坏物预先建好每一段状态的网格，炮弹落在近旁就
 // 切到下一段 —— 换可见性 + 物理 AddSolid/RemoveSolid，碎块走 VFX 池。
 //
-// 数据（Space 包的 Data_FirstLevelFrontBreakables.mjs 会取代 Data_Tuning_Tank.FRONT_BREAKABLES_TEMP）：
+// 数据格式（Space 包的 Data_FirstLevelFrontBreakables.mjs 经 SpaceBreakableSpecs 换成这个格式；旧的临时数据已删）：
 //   {
 //     id,                 // 唯一名
 //     block?,             // 接管 MISSION_LAYOUT.blocks 里的哪一块（布局里最好标 dynamic:true，
@@ -30,7 +30,7 @@
 // 这套体块机制做不了（要改地形），跳过并记进 skipped。
 // ===========================================================================
 import * as THREE from "three";
-import { FRONT_BREAKABLES_TEMP, NEVER_BREAKABLE_RULES } from "./Data_Tuning_Tank.mjs";
+import { NEVER_BREAKABLE_RULES } from "./Data_Tuning_Tank.mjs";
 
 /**
  * Space 包可破坏数据 → 本机制的 specs（纯函数，Node 测试直接调）。
@@ -53,7 +53,7 @@ export function SpaceBreakableSpecs(list, layout, groundAt, { hitRadiusM = 2.2, 
   return { specs, skipped };
 }
 
-export { FRONT_BREAKABLES_TEMP, NEVER_BREAKABLE_RULES };
+export { NEVER_BREAKABLE_RULES };
 /** 按体块名的那一半（兼容旧名字）。 */
 export const NEVER_BREAKABLE = NEVER_BREAKABLE_RULES.ids;
 
@@ -87,7 +87,7 @@ export class FirstLevelFrontBreakables {
    * @param {object} host { scene, battlefield, physics, vfx, audio?, layout? }
    * @param {Array} specs 见文件头
    */
-  constructor({ scene, battlefield, physics, vfx = null, audio = null, layout = null }, specs = FRONT_BREAKABLES_TEMP,
+  constructor({ scene, battlefield, physics, vfx = null, audio = null, layout = null }, specs = [],
     rules = NEVER_BREAKABLE_RULES) {
     Object.assign(this, { scene, battlefield, physics, vfx, audio, layout, rules });
     this.root = new THREE.Group();

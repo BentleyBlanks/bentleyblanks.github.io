@@ -242,11 +242,17 @@ export async function InstallInputDriver(ctx) {
               // Mobile enemies now reach real bayonet contact. The campaign maps V
               // to the equipped melee slot (Dadao), so keep that weapon out through
               // contact instead of switching back to the rifle on every frame.
-              // A swing the scenery keeps catching (the nest gunner crouched behind his gun block: every cut ends
-              // "Obstructed") is a wall, like a shot that hits one: use the rifle on him for 4 s instead (09-24 Front idle
-              // probe U1: 16 s of blocked dadao cuts at 0.8 m, empty rifle never reloaded, killed by the link guard).
+              // A swing the scenery catches (the nest gunner crouched behind his gun block: every cut ends in the
+              // melee director's "environment" event) is a wall, like a shot that hits one: use the rifle on this foe
+              // for 4 s instead (09-24 Front idle probe U1: 16 s of blocked dadao cuts at 0.8 m, empty rifle never
+              // reloaded, killed by the link guard). Only the scenery counts - a WeaponClash / body block / charge
+              // fatigue is ordinary bayonet fighting and stays a bayonet fight (07+ melee suites drive it) - and only
+              // the player's own swing at this foe (the latest environment event, while he staggers from it).
               this.obstructed ||= new Map();
-              if(fighter?.state==="stagger"&&(fighter.clip==="Obstructed"||fighter.clip==="WeaponClash"))this.obstructed.set(foe.id,g.ai.time+4);
+              const wall=g.meleeCombat.events?.findLast?.((e)=>e.kind==="environment"&&e.actor==="Player");
+              if(wall&&wall.serial!==this.wallSerial&&fighter?.state==="stagger"&&fighter.clip==="Obstructed"&&g.meleeCombat.time-wall.time<1){
+                this.wallSerial=wall.serial;this.obstructed.set(foe.id,g.ai.time+4);
+              }
               if(distance<3 && Math.abs(gap)<.2 && !((this.obstructed.get(foe.id)||0)>g.ai.time)){
                 g.Debug.Mouse(2,false);
                 if(g.state.activeSlot!=="melee"){g.Debug.Key("KeyV");return;}

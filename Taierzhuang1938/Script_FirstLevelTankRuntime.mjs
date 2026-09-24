@@ -53,6 +53,8 @@ export class FirstLevelTankRuntime {
     this.entryWaitSince = null;
     this.noBundleSince = null;
     this.barkSaidAt = new Map();
+    /** 被对白让路、待补喊的战斗喊话：id → 截止时间（TANK.barkRetryS）。 */
+    this.pendingBarks = new Map();
     this.log = { shots: [], bursts: 0, walkInShots: 0, mgShots: 0, barks: [], events: [], blasts: [], hits: [], states: [], breaks: [],
       appearedAt: null, entry: null, luoFinish: null, frames: { full: 0, idle: 0 } };
     this.sound = null;
@@ -287,7 +289,8 @@ export class FirstLevelTankRuntime {
     }
     for (const f of out.fire) this.Fire(f);
     this.Escorts(out);
-    for (const b of out.barks) { this.log.barks.push({ t: r.time, ...b }); this.SayBark(b.id); }
+    for (const b of out.barks) { this.log.barks.push({ t: r.time, ...b }); if (!this.SayBark(b.id)) this.QueueBark(b.id); }
+    this.RetryBarks();
     for (const e of out.events) this.log.events.push({ t: r.time, id: e.id });
     if (this.log.barks.length > 64) this.log.barks.splice(0, this.log.barks.length - 64);
     if (this.log.events.length > 128) this.log.events.splice(0, this.log.events.length - 128);
@@ -324,6 +327,23 @@ export class FirstLevelTankRuntime {
     this.log.barks.push({ t: r.time, id, key, said: true });
     return true;
   }
+  /** 这一句没喊出来（多半是剧情对白正在说）：按 TANK.barkRetryS 排队补喊。 */
+  QueueBark(id) {
+    const retry = this.T.barkRetryS?.[id];
+    if (!retry || this.pendingBarks.has(id)) return;
+    this.pendingBarks.set(id, this.r.time + retry);
+    this.log.barks.push({ t: this.r.time, id, queued: true });
+  }
+  /** 补喊：对白一让开就喊；过期、或这句已不成立（trackCut 在 Disabled 之后）就丢。 */
+  RetryBarks() {
+    if (!this.pendingBarks.size) return;
+    const r = this.r;
+    for (const [id, until] of this.pendingBarks) {
+      const stale = id === "trackCut" && r.tank.damageState === "Disabled";
+      if (stale || r.time > until) { this.pendingBarks.delete(id); this.log.barks.push({ t: r.time, id, dropped: stale ? "stale" : "expired" }); continue; }
+      if (this.SayBark(id)) this.pendingBarks.delete(id);
+    }
+  }
   /**
    * 05 的空当（TANK.window）：领了集束弹、车还没解决、玩家在攻击支路沟线上，大脑正瞄着缺口、炮塔偏开玩家方位 ——
    * 罗班长喊「它在打口子！就现在！」。
@@ -338,6 +358,7 @@ export class FirstLevelTankRuntime {
     if (Math.abs(Wrap(b.turretYaw - bearing)) < W.angleRad) return;
     if (r.time - (this.windowAt ?? -Infinity) < W.cooldownS) return;
     if (this.SayBark("tankWindow")) this.windowAt = r.time;
+    else if (!this.pendingBarks.has("tankWindow")) { this.windowAt = r.time; this.QueueBark("tankWindow"); }
   }
   ApplyState(state, record) {
     const r = this.r, t = r.tank, b = this.brain, last = b.damageLog.at(-1);
@@ -370,17 +391,23 @@ export class FirstLevelTankRuntime {
     const Flight = (p) => Math.max(0.06, from.distanceTo(p) / G.shellSpeedMps);
     if (!list.length) return { at, flight: Flight(at), pulled: 0 };
     const aim = at.clone();
+    // Overshoot along the line of fire past the planned aim point (G.overshootMaxM): measured on the ground plane.
+    const fx = at.x - from.x, fz = at.z - from.z, fd = Math.hypot(fx, fz) || 1;
+    const Over = (impact) => ((impact.x - at.x) * fx + (impact.z - at.z) * fz) / fd;
+    let safeFallback = null;
     for (let pulled = 0; pulled <= G.protectPullSteps; pulled++) {
       const flight = Flight(aim);
       const impact = r.combat.PredictShellImpact(from, aim, { flight, sourceCollider: r.view.tankCollider });
-      if (!impact || list.every((p) => Math.hypot(impact.x - p.x, impact.z - p.z) >= G.protectClearM)) return { at: aim, flight, pulled, impact };
+      const clear = !impact || list.every((p) => Math.hypot(impact.x - p.x, impact.z - p.z) >= G.protectClearM);
+      if (clear && (!impact || !(Over(impact) > (G.overshootMaxM ?? Infinity)))) return { at: aim.clone(), flight, pulled, impact };
+      if (clear && !safeFallback) safeFallback = { at: aim.clone(), flight, pulled, impact, overshoot: +Over(impact).toFixed(1) };
       const dx = from.x - aim.x, dz = from.z - aim.z, d = Math.hypot(dx, dz);
       if (d <= G.protectPullM + G.minRangeM) break;
       const lift = aim.y - this.Ground(aim.x, aim.z);
       aim.x += dx / d * G.protectPullM; aim.z += dz / d * G.protectPullM;
       aim.y = this.Ground(aim.x, aim.z) + lift;
     }
-    return null;
+    return safeFallback;
   }
   Fire(f) {
     const r = this.r, t = r.tank, view = r.view, V = this.T.view, G = this.T.gunner, M = this.T.mg;
@@ -406,7 +433,8 @@ export class FirstLevelTankRuntime {
       const flight = safe.flight;
       // 炮口声：有 TankAudio 就走它的近 / 中 / 远三层（Combat 的 report 是借来的 explosionMid，不再叠）。
       const sound = this.Sound;
-      if (sound) sound.OnCannon(Plain(from), { ...f.at }, flight);
+      // 来袭啸声放在真炸点（收过瞄点的那一发不再从原计划落点啸过来）。
+      if (sound) sound.OnCannon(Plain(from), Plain(safe.impact || at), flight);
       r.combat.FireShell(from, at, {
         flight,
         kind: "Shell57",

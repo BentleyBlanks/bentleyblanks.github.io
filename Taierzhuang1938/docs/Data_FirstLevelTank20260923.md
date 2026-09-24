@@ -7,9 +7,9 @@
 | 文件 | 作用 |
 | --- | --- |
 | `Script_FirstLevelTankBrain.mjs` | 纯规则大脑（无 three，node 可跑）：驾驶 / 炮手 / 机枪 / 反应 / 护兵槽 / 两段毁伤 |
-| `Data_Tuning_Tank.mjs` | 全部数值（带出处）+ 临时路点 `TANK_TEMP_PATH`（现布局）+ 开关 `brainEnabled` |
+| `Data_Tuning_Tank.mjs` | 全部数值（带出处）+ 战车路 `FRONT_TANK_BRAIN_PATH`（Space 包 `FRONT_TANK_PATH` 加节奏字段；2026-09-24 Front 包取代临时路点 `TANK_TEMP_PATH`）+ 开关 `brainEnabled` |
 | `Script_FirstLevelTankRuntime.mjs` | 接线层：世界 → 大脑（目标、视线、掩体沿、车体挂点、事实、许不许开火、护兵名单），大脑 → 世界（位姿、开火、护兵走位、事实、震屏、可破坏掩体） |
-| `Script_FirstLevelFrontBreakables.mjs` | 可破坏掩体机制（分段体块）；临时数据 `FRONT_BREAKABLES_TEMP` 与永不可破规则 `NEVER_BREAKABLE_RULES` 在 `Data_Tuning_Tank.mjs` |
+| `Script_FirstLevelFrontBreakables.mjs` | 可破坏掩体机制（分段体块）；数据是 Space 包的 `Data_FirstLevelFrontBreakables.mjs`（`SpaceBreakableSpecs` 换格式），永不可破规则 `NEVER_BREAKABLE_RULES` 在 `Data_Tuning_Tank.mjs`（体块名取 Space 的 `FRONT_UNBREAKABLE`）；旧临时数据 `FRONT_BREAKABLES_TEMP` 已删 |
 | `Script_Type89Damage.mjs` | 毁伤表现分两段：`trackCut`（掉履带板、撕挡泥板、车体塌向断侧）与 `engineKilled`（掀后甲板、冒黑烟）；不带 `damageState` 的旧调用两样一起上 |
 
 运行时只留钩子：`Runtime.UpdateTank()` 第一行、`Runtime.OnBlast(event)`、`Runtime.OnTankHit(point, from)`（Main 的玩家 / 架设机枪弹道命中 `missionTank` 时调用）、`FrontBattle.TankBlockade / UpdatePressure` 各一处。`Data_Tuning_Tank.brainEnabled = false` 回到旧的定时插值路径。
@@ -87,7 +87,7 @@
 
 ## 给第二波
 
-- Space 的新路点换掉 `TANK_TEMP_PATH`（`new FirstLevelTankRuntime(runtime, { path, breakables })`）；新 `Data_FirstLevelFrontBreakables` 换掉 `FRONT_BREAKABLES_TEMP`。
+- （已做，2026-09-24 Front 包）Space 的新路点换掉了 `TANK_TEMP_PATH`：运行时读 `FRONT_TANK_BRAIN_PATH`；可破坏掩体读 Space 的 `Data_FirstLevelFrontBreakables`，`FRONT_BREAKABLES_TEMP` 已删。仍走 `TakeOverStatic` 接管静态合批块（布局没标 dynamic：白盒场碰到 dynamic 会整块跳过，02–03 的胸墙与 AI 掩体点会跟着消失），受损沟沿是地形、这套机制做不了，跳过并记进 `breakablesSkipped`。
 - 护兵名单读 `MISSION_ENCOUNTERS.tank`（现在 2 人，槽位 4 个）；要满编需在名册里补到 4 人。
 - 大脑的 `barks`（`turretTraverse / hatchShout / escortScatter / visionSlit / trackCut / tankDisabled`）经 `TANK.barkCues` 接 `Say`，表里现在全是 `null`（`visionSlit / hatchShout` 已有机械声）；Voice 包出 cue 后只填表。
 - 换路以后：`lanes[]`（区域火力沟线）、`scan[]`、`entry`（起点要真有遮挡再加断言）都跟新路一起换；`NEVER_BREAKABLE_RULES.zones` 按 `MISSION_LAYOUT.zones` 的语义 id 认，zone id 不变就跟着新布局走。

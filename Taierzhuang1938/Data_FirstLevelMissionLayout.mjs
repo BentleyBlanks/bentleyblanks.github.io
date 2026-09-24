@@ -275,10 +275,7 @@ Detail("OldYardDeadTreeBranchC",36.2,-123.4,1.2,.14,.16,"timber",{y:SampleMissio
 // Top ~0.7 m above ground level: covers a man crouched at the throw spot (floor 0.75 m down), a man standing there sees the tank's side over it.
 TopBlock("RoadsideRuin",42.33,-161.4,3.4,1.62,.7,"cover",{ry:.616,cover:Face(-.578,-.816)},Sortie.throw);
 // Fire base walls on the rising ground (in the cover columns, clear of the bounding corridors).
-// 1.1 m like the crater wall: a man crouched behind it (eye 1.0) is hidden, standing up to fire (eye 1.42) clears it.
-// The 1.4 / 1.35 m walls were taller than a standing eye on the down-slope side: the three men behind them never
-// had one clear line to the berm, the left gun or the nest and fired 0 rounds in 410 s (Front package 09-24 idle probe).
-for(const [id,x,w,h] of [["FireBaseRuinW",-24,7,1.1],["FireBaseRuinC",10,5,1.1],["FireBaseCraterCW",-9.8,3.5,1.1],["FireBaseRuinE",25.5,5,1.1]])
+for(const [id,x,w,h] of [["FireBaseRuinW",-24,7,1.4],["FireBaseRuinC",10,5,1.4],["FireBaseCraterCW",-9.8,3.5,1.1],["FireBaseRuinE",25.5,5,1.35]])
   TopBlock(id,x,-192.6,w,h,.7,"cover",{cover:Face(0,1)},{x,z:-193.8});
 // Flank group cover: crater lips and a field ruin on the way to the berm's east end.
 for(const [i,x,z,w,h] of [[0,-26,-170.4,8,.8],[1,30.2,-169.6,4,1.1],[2,70,-164,6,1.3],[3,35,-82,14,1.3]])

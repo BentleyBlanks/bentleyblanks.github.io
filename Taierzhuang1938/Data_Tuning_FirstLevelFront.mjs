@@ -240,6 +240,9 @@ export const FRONT_BATTLE_TUNING=Object.freeze({
   arrivalM:1.0,leaderLeadM:3,captureRadiusM:4,rearArrivalM:3.5,attackArrivalM:3,
   firstBatch:2,assaultKills:3,assaultIds:["FrontRifleA","FrontRifleB","FrontRifleC","FrontRifleD","FrontRifleE","FrontRifleF"],
   guardHeightM:1.2,blockadeRangeM:85,gatherSpacingM:1.35,zhouHealth:80,
+  // Zhou's age on the crosshair card (both bodies: 03-05 at the gun, 06 seated). The random identity pool gave him
+  // 17 / 29 / 32 across runs ("老周 17 岁"); the cast note says 三十多岁 (Data_FirstLevelMissionDialogue MISSION_VOICE_CAST.zhou).
+  zhouAge:34,
   // Waiting guards kneel (1), they are not forced prone (2): prone they show 0.3 m above the scrape and the K3
   // observation step cannot read them; kneeling they show 0.75-1.0 m (Space FrontTopologyTest K3, docs §10.2).
   guardWaitStance:1,
@@ -269,5 +272,23 @@ export const FRONT_BATTLE_TUNING=Object.freeze({
   // and neither came within arrivalM (1.0): reliefInPosition never fired and 05 hung before Orders (09-24 Step 3
   // chain Q, Ideal2, relief walk 7/8 at t 370-600 s).
   reliefGunStandbyM:2,
+  // ---- stall fallbacks (2026-09-24 Front package review: two cold starts hung on one unreachable waypoint) ----
+  // FrontBattle.Walk: a walker who has not come walkStallProgressM closer to his current point for walkStallS
+  // (and is not waiting for the player) skips an intermediate point, or counts a final point reached within
+  // arrivalM x walkStallArrivalScale. Seen: Luo held 200 s beside the captured gun's seat (the gun block between
+  // him and rearRoute[0], rightRearReached never came), the relief gunner held 70 s on the leftRoute leg.
+  // 6 s is about three times the longest grenade evade and crowd shove seen in the 03-06 drives.
+  walkStallS:6,walkStallProgressM:.3,walkStallArrivalScale:2,
+  // 04: the player has held the rear junction this long out of the tank's sight and Luo is still not there ->
+  // rightRearReached anyway (Luo walks on behind him). Two stall skips plus the 5 m walk from his cover.
+  rearLeaderGraceS:15,
+  // 03-05: no hand grenade is thrown at a point this close to a protected waiting guard (missionUntargetable,
+  // contract §2.9): Grenade radiusM 6.5 (Data_Weapons) + ~3.5 m of throw scatter and roll. 09-24 review: one
+  // Japanese grenade killed three of the gathered second batch, the next one two more -> guardBatchLost.
+  guardGrenadeShieldM:10,
+  // 03 preview / 04 before the pressure the guide points at the tank (brief item 5), but this far in front of it on
+  // the ground toward the player: on the tank itself the diamond and its distance label (1.15 m above the ground,
+  // Script_FirstLevelLeaderGuide) sat right on the ~11 px turret 56 m out (09-24 review, TankProbe Scene_TankPreview).
+  guideTankLeadM:10,
   bandage:{radius:.087,height:.2,y:-.19,color:0xb6ac8b},
 });

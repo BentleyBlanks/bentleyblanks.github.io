@@ -9,6 +9,9 @@
 //   ④ 03–06 对白走 voice.PlayScene、一次一场、说话人按 binder 找到的真人
 //   ⑤ 指引：战车露面、压阵位之前指向战车
 //   ⑥ 场外落弹区离战车路线、出发壕、我方沟网足够远
+//   ⑦ 卡住兜底（2026-09-24 审查的两次冷启动卡死）：走路卡在一个中间点不动 → 跳点；接防班长期卡住、有人阵亡
+//      也照样记 reliefInPosition；罗班长被枪座挡住 → 玩家在后墙岔口等够 rearLeaderGraceS 照样 rightRearReached；
+//      受保护的待撤守军身边不落手榴弹（任务侧投弹否决）
 //
 // 跑法：node Taierzhuang1938/Script_FirstLevelFrontPacingTest.mjs
 // ===========================================================================
@@ -262,10 +265,13 @@ const Ok = (label) => console.log(`ok ${label}`);
   assert.equal(battle.Guide().label, "front", "03 before the preview: the gap");
   facts.add("tankPreviewed");
   let g = battle.Guide();
-  assert.ok(g.label === "tank" && g.target.x === 49.5 && g.target.z === -202.4, "03 preview: the tank");
+  const lead = (t) => Dist(t, r.player.position) - Dist(g.target, r.player.position);
+  assert.ok(g.label === "tank" && Math.abs(lead({ x: 49.5, z: -202.4 }) - B.guideTankLeadM) < 0.01
+    && Math.abs(Dist(g.target, { x: 49.5, z: -202.4 }) - B.guideTankLeadM) < 0.01,
+    "03 preview: the tank (the marker guideTankLeadM in front of it toward the player, off the turret)");
   r.flow.stage.id = "MachineGun"; r.tank.x = 60; r.tank.z = -177;
   g = battle.Guide();
-  assert.ok(g.label === "tank" && g.target.x === 60, "04 before the pressure: the tank coming out of the bend");
+  assert.ok(g.label === "tank" && Math.abs(Dist(g.target, { x: 60, z: -177 }) - B.guideTankLeadM) < 0.01, "04 before the pressure: the tank coming out of the bend");
   facts.add("tankPositionPressured");
   assert.equal(battle.Guide().label, "bundle", "04 after the pressure: back to the rear wall");
   const text = Read("Data_Text_FirstLevel.mjs");
@@ -321,6 +327,143 @@ const Ok = (label) => console.log(`ok ${label}`);
   const [toMeet] = SplitRoute(tail, Space.returnMeet);
   assert.ok(Dist(toMeet.at(-1), Space.returnMeet) < Space.returnMeet.radiusM, "... and returnMeet");
   checks += 2;
+}
+
+// ---------------------------------------------------------------------------
+// ⑦ stall fallbacks and the grenade veto (09-24 review: two cold starts hung, one lost the second batch)
+// ---------------------------------------------------------------------------
+function WalkRuntime(extra = {}) {
+  const facts = new Map(), said = [], moves = [];
+  const r = { time: 0, squadRoutes: new Map(), player: { position: { x: 0, z: 0 } }, guards: [],
+    flow: { stage: { id: "MachineGun" } }, voice: { played: new Set(), finished: new Set() },
+    Has: (id) => facts.has(id), Record: (id, d) => { if (facts.has(id)) return false; facts.set(id, d ?? true); return true; },
+    Near: (p, m) => Near(r.player.position, p, m), Say: (id) => said.push(id),
+    RespondToGrenade: () => false, Defend() {}, MoveActor: (a, p, speed) => moves.push({ id: a.id, x: p.x, z: p.z, speed }),
+    ai: { ReleaseCover() {}, SetStance() {} }, BlocksSight: () => true, view: { TankMuzzle: () => ({}), tankCollider: null },
+    tank: {}, ...extra };
+  return { r, facts, said, moves };
+}
+{
+  // A walker held 0.6 m off an intermediate corner (the old V / Ideal3 stalls): no progress for walkStallS -> skip it.
+  const { r, moves } = WalkRuntime();
+  const battle = new FirstLevelFrontBattle(r);
+  const actor = { id: 7, missionId: "Relief1", alive: true, position: { x: 0.6, z: 0 }, scriptArrivalRadius: 1 };
+  battle.SetWalk(actor, [{ x: 0, z: 0 }, { x: 0, z: -5 }, { x: 0, z: -10 }]);
+  for (let t = 0; t < B.walkStallS - 0.5; t += 0.5) { r.time = t; battle.Walk(actor); }
+  assert.equal(battle.walks.get(actor.id).index, 0, "under walkStallS without progress: still on the first corner");
+  r.time = B.walkStallS + 0.1; battle.Walk(actor);
+  assert.equal(battle.walks.get(actor.id).index, 1, "walkStallS without progress: the corner is skipped");
+  assert.ok(battle.State().stalls.some((s) => s.id === "Relief1" && s.index === 0 && !s.final), "the skip is logged for probes");
+  assert.deepEqual(moves.at(-1), { id: 7, x: 0, z: -5, speed: R.squadSpeedMps }, "and he walks on to the next point");
+  // Real progress resets the clock.
+  const b2 = new FirstLevelFrontBattle(r), mover = { id: 8, alive: true, position: { x: 0, z: 2 }, scriptArrivalRadius: 1 };
+  b2.SetWalk(mover, [{ x: 0, z: -3 }, { x: 0, z: -10 }]);
+  r.time = 0;
+  for (let t = 0; t <= B.walkStallS * 2; t += 0.5) { r.time = t; mover.position.z -= 0.2; b2.Walk(mover); }
+  assert.equal(b2.walks.get(mover.id).index, 1, "a man still closing in is never skipped (only the real arrival advanced him)");
+  assert.equal(b2.stalls.length, 0, "no stall logged for a moving walker");
+  // A final point: taken as reached within arrivalM x walkStallArrivalScale, never from further off.
+  const b3 = new FirstLevelFrontBattle(r), near = { id: 9, alive: true, position: { x: B.arrivalM * 1.6, z: 0 }, scriptArrivalRadius: 1 };
+  const far = { id: 10, alive: true, position: { x: B.arrivalM * 3, z: 0 }, scriptArrivalRadius: 1 };
+  b3.SetWalk(near, [{ x: 0, z: 0 }]); b3.SetWalk(far, [{ x: 0, z: 0 }]);
+  let nearDone = false, farDone = false;
+  for (let t = 0; t <= B.walkStallS * 3; t += 0.5) { r.time = 100 + t; nearDone = b3.Walk(near) || nearDone; farDone = b3.Walk(far) || farDone; }
+  assert.ok(nearDone && !farDone, "final point: 1.6 m off counts after the stall, 3 m off never does");
+  checks += 7;
+}
+{
+  // Relief: the gunner stuck on the leftRoute leg for 70 s (probe V) and one man killed on the way -> still in position.
+  const { r, facts } = WalkRuntime({ flow: { stage: { id: "Tank" } }, tank: { brain: {}, fireDisabled: true },
+    companion: { Handle: () => null }, emplacement: { NpcVacate() {}, NpcOccupy() {} } });
+  const spawned = [];
+  r.ai.Spawn = (side, x, z, opts) => { const a = { id: 600 + spawned.length, alive: true, position: { x, z }, opts, scriptArrivalRadius: 1 }; spawned.push(a); return a; };
+  facts.set("tankFireDisabled", true);
+  const battle = new FirstLevelFrontBattle(r);
+  battle.UpdateRelief(0.1);
+  const [nco, gunner, holder] = r.relief;
+  // Everybody but the gunner is on his post; the gunner is held 0.8 m beside a corner of the access trench.
+  for (const e of [nco, holder]) { const w = battle.walks.get(e.actor.id); w.index = w.route.length - 1; e.actor.position = { ...w.route.at(-1) }; }
+  const gw = battle.walks.get(gunner.actor.id);
+  gw.index = 6; gunner.actor.position = { x: gw.route[6].x + 0.8, z: gw.route[6].z };
+  holder.actor.alive = false;
+  let t = 0;
+  for (; t < 60 && !facts.has("reliefInPosition"); t += 0.5) {
+    r.time = t;
+    battle.UpdateRelief(0.5);
+    // The stuck man only moves once he has been sent past the corner: then he really walks to each point.
+    const w = battle.walks.get(gunner.actor.id);
+    if (w.index > 6 && w.index < w.route.length) gunner.actor.position = { ...w.route[w.index] };
+  }
+  assert.ok(facts.has("reliefInPosition"), `the stuck gunner is sent past the corner and the relief is in position (t ${t.toFixed(1)} s)`);
+  assert.ok(t <= B.walkStallS + 3, `within one stall window, not never (${t} s)`);
+  assert.ok(!holder.actor.alive, "... with one relief man dead on the way");
+  checks += 3;
+}
+{
+  // 04: Luo held beside the captured gun (the block between him and the seat) while the player waits at the rear junction.
+  const luo = { id: 1, alive: true, position: { x: 23.29, z: -153.8 }, scriptArrivalRadius: 1 };
+  const { r, facts, said } = WalkRuntime({ companion: { Handle: (who) => (who === "luo" ? luo : null) } });
+  facts.set("tankPositionPressured", true);
+  const battle = new FirstLevelFrontBattle(r);
+  battle.UpdatePressure();
+  assert.ok(Dist(battle.walks.get(luo.id).route[0], S.rearRoute[1]) < 0.01, "Luo's rear leg starts at the corner after the seat, not on the gun's seat");
+  r.player.position = { ...S.rear };
+  for (let t = 0; t < B.rearLeaderGraceS - 0.5; t += 0.5) { r.time = t; battle.UpdatePressure(); }
+  assert.ok(!facts.has("rightRearReached"), "the player alone at the junction: Luo still gets rearLeaderGraceS to arrive");
+  r.time = B.rearLeaderGraceS + 0.1; battle.UpdatePressure();
+  assert.ok(facts.get("rightRearReached")?.leaderLate && said.includes("BundleOrder"), "after rearLeaderGraceS: rightRearReached (leaderLate) and the order");
+  // The ideal order still records at once.
+  const { r: r2, facts: f2 } = WalkRuntime({ companion: { Handle: () => ({ id: 1, alive: true, position: { ...S.rear } }) } });
+  f2.set("tankPositionPressured", true); r2.player.position = { ...S.rear };
+  new FirstLevelFrontBattle(r2).UpdatePressure();
+  assert.ok(f2.has("rightRearReached") && f2.get("rightRearReached") === true, "both at the junction: recorded at once, no leaderLate");
+  checks += 4;
+}
+{
+  // Grenade veto: a protected waiting guard within guardGrenadeShieldM of the aim point.
+  const guard = { alive: true, missionUntargetable: true, position: { x: -8, z: -155.2 } };
+  const { r } = WalkRuntime();
+  r.guards = [{ actor: guard }];
+  const battle = new FirstLevelFrontBattle(r);
+  assert.ok(battle.grenadeVeto({ side: "ija" }, -8 + B.guardGrenadeShieldM - 0.5, -155.2), "aim point inside the shield: vetoed");
+  assert.ok(!battle.grenadeVeto({ side: "ija" }, -8 + B.guardGrenadeShieldM + 0.5, -155.2), "outside the shield: allowed");
+  guard.missionUntargetable = false;
+  assert.ok(!battle.grenadeVeto({ side: "ija" }, -8, -155.2), "a guard already in the safe zone (not protected) does not veto");
+  assert.ok(B.guardGrenadeShieldM >= 6.5 + 2, "the shield covers the grenade's 6.5 m radius plus scatter");
+  const tactics = Read("Script_AiTactics.mjs"), ai = Read("Script_Ai.mjs"), runtime = Read("Script_FirstLevelMissionRuntime.mjs");
+  assert.ok(/this\.grenadeVeto && this\.grenadeVeto\(soldier, ex, ez\)\) return false/.test(tactics), "ShouldGrenade asks the veto at the lkp");
+  assert.ok(ai.includes("this.tactics?.grenadeVeto?.(s, at.x, at.z)"), "TryGrenade asks it again at the real aim point");
+  assert.ok(runtime.includes("this.ai.tactics.grenadeVeto=this.frontBattle.Active?this.frontBattle.grenadeVeto:null"),
+    "the runtime installs it only while the front battle (03-05) is active");
+  checks += 7;
+  Ok("⑦ stall fallbacks: corner skip, relief with a stuck and a dead man, Luo late at the rear junction; grenade veto");
+}
+{
+  // 04 checkpoint: the 03 facts carry zhouLeftGun; Opening respawns Zhou on the seat and the checkpoint puts He there too.
+  const facts = new Map([["rifleWithdrawalResolved", true], ["leftGunHandover", true], ["zhouLeftGun", { distance: 10.2 }]]), placed = [];
+  const he = { id: 3, alive: true, position: { ...S.leftSeat } };
+  const yaowa = { id: 2, alive: true, position: { x: -25, z: -100 } };
+  const zhou = { id: 54, alive: true, health: 80, position: { ...S.leftSeat } };
+  const gun = { npc: zhou };
+  const r = { opening: { zhou }, column: { zhou: {} }, squadRoutes: new Map(), time: 0,
+    companion: { Handle: (who) => ({ heyoutian: he, yaowa })[who] },
+    Has: (id) => facts.has(id), Record: (id, d) => { if (facts.has(id)) return false; facts.set(id, d ?? true); return true; },
+    Defend() {}, OnPlayerDown() {}, Say() {}, PlaceActor: (a, p) => { a.position = { ...p }; placed.push(a.id); },
+    emplacement: { guns: new Map([["Left", gun]]), NpcVacate: () => { gun.npc = null; }, NpcOccupy: (_, a) => { gun.npc = a; } },
+    leftGunId: "Left", ai: { Remove() {} } };
+  const battle = new FirstLevelFrontBattle(r);
+  battle.Walk = () => false;
+  battle.StartHandover(false);
+  assert.deepEqual(battle.walks.get(he.id).route, [{ ...S.leftSeat }], "He already on the seat: no walk up the access trench and back");
+  battle.UpdateZhou();
+  assert.ok(Dist(zhou.position, S.leftSeat) >= B.zhouLeftGunM && Dist(zhou.position, S.zhouExit[2]) < 0.01,
+    "Zhou starts past the 10 m line on zhouExit, not on the seat He was put on");
+  assert.ok(battle.walks.has(zhou.id) && battle.walks.get(zhou.id).route.at(-1).x === P.collection.zhouWall.x, "... walking on to the collection wall");
+  assert.ok(battle.walks.has(yaowa.id) && Dist(yaowa.position, zhou.position) < 2, "Yaowa escorts him from there");
+  battle.UpdateHandover();
+  assert.ok(gun.npc === he, "He takes the gun Zhou's checkpoint body left");
+  checks += 5;
+  Ok("⑦b 04 checkpoint: Zhou already off the gun, He on it, no shared spawn");
 }
 
 console.log(`FirstLevelFrontPacingTest 通过：${checks} 条断言`);
