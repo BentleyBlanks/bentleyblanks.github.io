@@ -132,22 +132,33 @@ export async function CheckVoiceAssets(ctx, ids = null) {
   const { page } = ctx;
   await page.locator("#bootStart").click();
   await page.waitForFunction(() => window.Tengxian.audio.ctx?.state === "running", null, { timeout: 15000 });
+  // 2026-09-24 起 01–06 的对白是「整场一次生成 → 切句」：这类 cue 在声库里是逐句的键
+  // （Script_FirstLevelMissionVoice.LineKey：Mission<句 id，点换下划线>），没有整段文件。
+  // 逐句录音齐了的 cue 逐句解码、逐句试播；其余仍按旧的整段录音验。开机时 Script_Main 已等过 voiceReady。
   const voices = await page.evaluate(async ids => {
     const g = window.Tengxian, { MISSION_DIALOGUE } = await import("./Data_FirstLevelMissionDialogue.mjs");
+    const manifest = await (await fetch("./Audio/FirstLevel/Data_FirstLevelVoiceManifest.json", { cache: "no-cache" })).json();
+    const PerLine = (cue) => !!cue.perLine && cue.lines.every((line) => manifest.lines?.[line.id]);
+    const Try = (id, key, line) => {
+      const played = g.audio.PlayStoryVoice(key);
+      g.audio.StopStoryVoice();
+      return { id, key, line, decoded: !!g.audio.voiceBank.get(key), seconds: played?.duration || 0, started: !!played?.voice };
+    };
     g.audio.Unlock();
-    const cues = MISSION_DIALOGUE.filter(cue=>!ids||ids.includes(cue.id)).map((cue) => {
-      const played = g.audio.PlayStoryVoice(`Mission${cue.id}`);
-      return { id: cue.id, decoded: !!g.audio.voiceBank.get(`Mission${cue.id}`),
-        seconds: played?.duration || 0, started: !!played?.voice };
-    });
+    const selected = MISSION_DIALOGUE.filter(cue=>!ids||ids.includes(cue.id));
+    const cues = selected.flatMap((cue) => PerLine(cue)
+      ? cue.lines.map((line) => Try(line.id, `Mission${line.id.replace(".", "_")}`, true))
+      : [Try(cue.id, `Mission${cue.id}`, false)]);
     g.audio.StopStoryVoice();
-    return { context: g.audio.ctx?.state, cues };
+    return { context: g.audio.ctx?.state, cueCount: selected.length, perLineCues: selected.filter(PerLine).length, cues };
   },ids);
   assert.equal(voices.context, "running", "The real start button unlocks the audio context");
-  assert.equal(voices.cues.length, ids?.length||MISSION_DIALOGUE.length, "every selected cue is checked");
-  assert.ok(voices.cues.every((cue) => cue.decoded && cue.started && cue.seconds > 0.5),
-    "Every whole Seed Audio cue must decode and create a real playback source: "
-    + JSON.stringify(voices.cues.filter((cue) => !(cue.decoded && cue.started && cue.seconds > 0.5))));
+  assert.equal(voices.cueCount, ids?.length||MISSION_DIALOGUE.length, "every selected cue is checked");
+  // 逐句片段可以很短（「立て！」0.24 s），整段录音照旧要 0.5 s 以上。
+  const Playable = (cue) => cue.decoded && cue.started && cue.seconds > (cue.line ? 0.15 : 0.5);
+  assert.ok(voices.cues.every(Playable),
+    "Every Seed Audio cue (whole take, or every line of a per-line scene) must decode and create a real playback source: "
+    + JSON.stringify(voices.cues.filter((cue) => !Playable(cue))));
   await fs.writeFile(path.join(ctx.output,"Data_VoicePlayback.json"),JSON.stringify(voices,null,2));
   console.log("ok selected first-level voice assets decoded and played in the real audio engine");
   // Ambience loads on its own schedule; wait for the shipped loader, inject nothing.
