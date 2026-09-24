@@ -481,5 +481,16 @@ function WalkRuntime(extra = {}) {
   checks += 5;
   Ok("⑦b 04 checkpoint: Zhou already off the gun, He on it, no shared spawn");
 }
+{
+  // Close contact is anchored on the man's line, and after the capture its circle stops short of the captured gun.
+  const runtime = Read("Script_FirstLevelMissionRuntime.mjs");
+  assert.ok(/const line=s\.points\[Math\.min\(s\.index,s\.points\.length-1\)\]\|\|actor\.position;\s*\n\s*this\.Defend\(actor,line,/.test(runtime),
+    "contact re-anchors on the current line, not on where the man stands (no creeping contact by contact)");
+  assert.ok(runtime.includes("Distance(line,Sortie.seat)-FB.capturedGunKeepOutM"), "after the capture the contact circle keeps capturedGunKeepOutM off the gun seat");
+  // The east bounders' and the flank's last lines are 15-16 m from the seat: their circles end >= keep-out short of it.
+  const seat = S.seat, lastF = { x: 16.8, z: -166.57 }, lastFlankA = { x: 39.2, z: -162.2 };
+  for (const line of [lastF, lastFlankA]) assert.ok(Dist(line, seat) - B.capturedGunKeepOutM >= 2, "a last line leaves room for a >= 2 m contact circle");
+  checks += 4;
+}
 
 console.log(`FirstLevelFrontPacingTest 通过：${checks} 条断言`);

@@ -13,6 +13,7 @@ import { CompactGuideRoute } from "./Script_NpcMissionGuide.mjs";
 import { MISSION_GUIDE_TUNING as GUIDE } from "./Data_Tuning_MissionGuide.mjs";
 import { MissionReturn } from "./Script_MissionReturn.mjs";
 import { MISSION_RETURN } from "./Data_Tuning_FirstLevel.mjs";
+import { FRONT_BATTLE_TUNING as FB } from "./Data_Tuning_FirstLevelFront.mjs";
 import { MISSION_RETURN_ROUTES, MISSION_RETURN_PERSON_STAGES, MISSION_RETURN_SQUAD_STAGES, MISSION_RETURN_DISABLED_STAGES } from "./Data_FirstLevelMissionReturn.mjs";
 import { MISSION_TRENCH_COVER as TC } from "./Data_FirstLevelMissionTrenchCover.mjs";
 import { SquadCoverRoute, SquadCoverBounds, SquadCoverThreat } from "./Script_SquadMarchCover.mjs";
@@ -1091,7 +1092,11 @@ export class FirstLevelMissionRuntime {
         // 09-25 03-06 cold starts: flank man A went from his last line north of the nest (33,-158) through the
         // abandoned nest to the rear-door ramp (30,-143) in 04 and bayoneted the player waiting there, three runs of three.
         if(s.mode!=="contact"){const line=s.points[Math.min(s.index,s.points.length-1)]||actor.position;
-          this.Defend(actor,line,R.defendHoldRadiusM,R.assaultCoverSearchM);}
+          this.Defend(actor,line,R.defendHoldRadiusM,R.assaultCoverSearchM);
+          // The captured nest is ours: the circle stops FB.capturedGunKeepOutM short of the gun's seat.
+          actor.contactRadiusBaseM??=actor.tacticalRadiusM;
+          actor.tacticalRadiusM=this.Has("rightNestCaptured")
+            ?Math.max(2,Math.min(actor.contactRadiusBaseM,Distance(line,Sortie.seat)-FB.capturedGunKeepOutM)):actor.contactRadiusBaseM;}
         s.mode="contact";continue;
       }
       if (actor.suppression >= R.tacticalSuppression) {

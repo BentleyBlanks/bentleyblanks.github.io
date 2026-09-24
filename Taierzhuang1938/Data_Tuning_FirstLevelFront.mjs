@@ -292,5 +292,9 @@ export const FRONT_BATTLE_TUNING=Object.freeze({
   // 56 m out (09-24 review, TankProbe Scene_TankPreview); moved only toward the player (10 m) it still projected onto
   // the turret (09-25 retake). 6 m to the side at 50 m is ~80 px on a 1280 px frame.
   guideTankLeadM:4,guideTankSideM:6,
+  // After rightNestCaptured an assault man's close-contact circle (his line, tacticalRadiusM) is cut so it stays this far
+  // from the captured gun's seat (FRONT_SORTIE.seat): brief item 11 ④, and 09-25 idle-probe drives where bound man F and
+  // the flank group came up to the nest's north wall in contact and shot the player on the gun from 1-4 m, twice in a row.
+  capturedGunKeepOutM:6,
   bandage:{radius:.087,height:.2,y:-.19,color:0xb6ac8b},
 });
