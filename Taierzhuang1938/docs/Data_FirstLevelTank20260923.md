@@ -59,6 +59,8 @@
 
 数据格式见 `Script_FirstLevelFrontBreakables.mjs` 文件头。每块墙预建各段网格；炮弹（伤害 ≥ `minDamage`）落在离墙面 `hitRadiusM` 内打掉一段：换可见性 + `AddSolid/RemoveSolid`，碎块走 `vfx.Impact`。布局里标 `dynamic:true` 的块不进静态合批（首选）；没标时运行时把静态合批里那块的顶点塌到墙脚、摘掉碰撞（临时演示用）。永远不可破坏：`RightNestRearWall`、`RightNestEastWall`、支沟、守军安全区（`NEVER_BREAKABLE`）。临时数据：`RightNestFrontRest` 西半段三段（缴获机枪架在正中，不悬空），`RightNestNorthRuin` 两段。`GAMEPLAY_DESTRUCTION_ENABLED` 仍为 false。
 
+**现状（2026-09-25 对照代码，上一段是 Step 1 初版）**：数据已换成 Space 包的 `Data_FirstLevelFrontBreakables.FRONT_BREAKABLES`，上面的临时数据已删；布局**不标** `dynamic`（契约 §8 v1.7 ③：标了会让白盒场整块跳过、丢掉掩体点），一律由 `TakeOverStatic` 接管静态合批块；永不可破规则是 `Data_Tuning_Tank.NEVER_BREAKABLE_RULES`（体块名取 Space 的 `FRONT_UNBREAKABLE`，另按区域 `rightRear` / `withdrawalGap` 保护）。
+
 ## 2026-09-24 审查修复
 
 两位审查者的发现逐条核过；改动都在本包文件与已有薄钩子里。

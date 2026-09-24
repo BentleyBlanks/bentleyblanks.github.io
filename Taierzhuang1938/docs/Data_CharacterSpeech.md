@@ -169,3 +169,16 @@ scene plus eye bones, the four added poses and one-segment tooth bevels).
   Evidence: `_shots/CharacterSpeech`.
 - Shared gates: `Script_MotionVectorContractTest`, `Script_SamplerBudgetTest`,
   `Script_AssetStandardsTest`, `Script_CharacterModelTest`.
+
+## 范围与测试口径（2026-09-25 补，集成负责人认可见契约 §8 v1.9）
+
+- **范围**：绑定器只在 `Data_FirstLevelSpeakingCast.FIRST_LEVEL_FACE_STEPS`（Trapped…Orders，即 01–06）里给每个说话人动脸、转头、看人、
+  把声音放到嘴上。这些步骤之外只留 `FIRST_LEVEL_WHOLE_LEVEL_SPEAKERS`（罗班长、幺娃、何有田、刘文财）的嘴随自己的台词动：不转头、不看人，
+  声音位置不变（改动前罗班长就是这样）。保留这一条，用户有异议再改。
+- **暂停闭嘴**：`Script_CharacterSpeechBrowserTest` 暂停后推 8 帧，下颌角 < 0.02 rad（`SILENT_JAW_RADIANS`）算闭上。原来要求 2 帧内
+  < 1e-6 rad；不说话的脸有呼吸起伏，嘴大约 0.1 s 合上，所以放宽成这样。截「说到一半」那一帧要求下颌角 > 0.075 rad 且口型权重 > 0.1。
+- **「脸跟着口型轨 ≥ 80%」的分母**是口型轨里正在发音（嘴张开）的帧，不是整句的帧。
+- **口型轨认人声的门槛**：比噪声高 8 dB 且有音高，音高强度取 7 帧中位数 ≥ 0.7（`FACE_TRACK_BAKE.pitchMedianFrames` / `pitchMin`，
+  原来 5 帧 / 0.6）。放宽时 07–18 的落土声会被算成人声；收紧后气声、耳语的句子（RoadBump、ZhouCheck）最多少算 40% 的人声帧，
+  07–18 的 RoadBump、MarchToTengxian 覆盖率不到 80%。`Script_CharacterSpeechTest` 对 01–06 的录音按 80% 查，07–18 低于 80% 的只列出来，
+  所有录音都不许低于 70%。

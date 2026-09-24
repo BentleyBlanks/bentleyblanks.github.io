@@ -1502,6 +1502,11 @@ f581ac7dd 布局配的临时数据**。
   剧本兵沿授权路线跑、停下朝西开环境射击，3 名远处川军还击（`missionUntargetable`）；`rifleRecovered` 时日军
   交成普通守区 AI、并进 `runtime.enemies`；一离开 01–02 整组撤场。数据格式见文件头；可被 Opening 包接成
   `bunkerPursuit` 的连续进攻。
+  **现状以 2026-09-24 Opening 包的数据为准**（合并时取它，契约 §8 v1.7 ⑤；上面的「4 名」「一离开 01–02」是本包初版）：人与路线直接取
+  Space 名册 `MISSION_ENCOUNTERS.bunkerBackdrop`（日军 6 人、川军 3 人）；日军沿连接支沟下到岔口 J、转入纵深支沟南下，走完路线且出了
+  玩家视野就收走（`retire`，最迟 `retireMaxS` 25 s）；离开 Trapped / BunkerRescue / RearTrench 整组撤场，人等出了视野再移除（`leave`，
+  兜底 90 s）。02 的连续进攻是 Opening 包另外生成的 `bunkerPursuit`，`handoff` 只兜住还没走完的人。回归口 `Script_FirstLevelFrontPressureTest`
+  （含 retire 用例）。
 
 ### 20.6 探针口径（`Script_FirstLevelEnemyIdleProbe.mjs`，TestRunner `FirstLevelEnemyIdleProbe`，`--gate`）
 

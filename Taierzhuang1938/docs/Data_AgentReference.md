@@ -114,6 +114,12 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
   `FirstLevelBunkerShow`）、`Script_FirstLevelCollection`（背坡集结处、借火戏、上担架）、`Script_FirstLevelFrontShow`（总线）、
   `Script_FirstLevelFrontPressure` + `Data_FirstLevelFrontPressure`（02–05 前沿压力表，[敌军 AI §20](Data_EnemyAi.md)）、
   `Data_Tuning_FirstLevelFront`、`Script_FirstLevelFrontTest`、`Script_FirstLevelCampaignFront`。
+- 01–06 重构（2026-09-23 起，契约 [01–05 重构契约](Data_FirstLevel0105Refactor20260923Contract.md)；每个系统的口径文档与回归口在项目 AGENTS.md
+  「当前入口」那一条）：03–05 导演 `Script_FirstLevelFrontBattle`、前沿对白场景 `Script_FirstLevelFrontScenes`；01 背景兵
+  `Script_FirstLevelBackdropSquads`；战车 `Script_FirstLevelTankBrain` / `Script_FirstLevelTankRuntime` / `Script_TankAudio` / `Data_Tuning_Tank`
+  （[战车](Data_FirstLevelTank20260923.md)）与可破坏掩体 `Script_FirstLevelFrontBreakables`；声景 `Script_FirstLevelMissionBattleSound` +
+  `Script_BattleArtillery`（[音频接线](Data_AudioWiring.md)「二之三」）；开场动作库 `Script_OpeningStoryboardAnimation` / `Script_OpeningProps`
+  （[开场动作库](Data_OpeningClipLibrary20260923.md)）。
 - 阶段 8–14（[说明](Data_FirstLevelMid20260919.md)）：`Script_FirstLevelVillageBlock`（08/09/10）、
   `Script_FirstLevelTransferCart`（11–14 的分流、装载额度、上车与卸担架）、`Data_Tuning_FirstLevelMid`、
   `Script_FirstLevelMidTest`、`Script_FirstLevelCampaignMid`。
@@ -123,8 +129,8 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
   `Data_Tuning_FirstLevelEnd`、`Script_FirstLevelEndTest`、`Script_FirstLevelCampaignEnd`。
 - 驾驶脚本公共层 `Script_FirstLevelCampaignKit`：`ParseCampaignArgs` / `OpenCampaign` / `CloseCampaign` /
   `CaptureFailure` / `CheckVoiceAssets` / `InstallInputDriver` / `CampaignActions(ctx)`（`JumpStage` `Capture`
-  `CaptureFocus` `WaitOutCutscene` `Route` `Interact` `RetryCampaign` `WaitStage`）。`--stage-from` 只收 8 / 11 / 15 / 18，
-  `--stage-to` 只收 7 / 14 / 18。
+  `CaptureFocus` `WaitOutCutscene` `Route` `Interact` `RetryCampaign` `WaitStage`）。允许的起止以 `ParseCampaignArgs` 为准
+  （2026-09-25：连续驾驶从 1 / 3 / 6 起，8 / 11 / 15 / 18 只配 `--stage-jumps`；`--stage-to` 收 `CAMPAIGN_SEGMENT_ENDS` = 2 / 3 / 6 / 7 / 14 / 18）。
 
 **人群、遗体与外观**
 
@@ -152,7 +158,11 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
 - 烘焙 `Script_SeedAudioFirstLevelBake`（密钥只从 `VOLCENGINE_API_KEY` 读，每段一个请求一条 mp3，
   `--dry` 审清单、`--prune` 删下线 cue）；对齐 `Script_FirstLevelVoiceAlign.py`。
   门禁 `Script_FirstLevelVoiceTest`（加 `--audio` 验实际资产）。
-- 班长面部蒙皮与语音节奏走 `Script_CharacterFacialAnimation` / `Script_SpeechEnvelope`，见 [面部对白说明](Data_CharacterSpeech.md)。
+- 01–06（2026-09-23 起）整段录音按句切开、各句从说话人位置播：定妆参考音 `Data_FirstLevelVoiceCast` + `Script_SeedAudioCastBake`，
+  导演表 `Data_FirstLevelDialogueDirection`，多声部播放器 `Script_DialoguePlayer`（`voice.PlayScene / PlayLine / Speech`）；班组本人喊话
+  `Script_SeedAudioSquadBarkBake`（声库键 `<key>@<who>`）。口径 [配音同步 §0](Data_FirstLevelVoiceSync20260919.md)。
+- 说话人的脸：01–06 每个说话人都有骨骼面部（`Model_Lugou*Facial.glb`），口型读离线口型轨，`Script_FirstLevelSpeakerBinder` 管「谁在说 → 哪具身体」，
+  驱动在 `Script_CharacterFacialAnimation` / `Script_SpeakerHeadLayer`，没有口型轨时退回 `Script_SpeechEnvelope`。见 [说话人面部](Data_CharacterSpeech.md)。
 
 **帧取证与入口**
 
@@ -328,6 +338,9 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
   （悬空的人不会陷进地里）。姿态闸现在是「逐 clip 量骨盆高度」，且
   `Script_CharacterModelTest` 直接解析 GLB 现量（`_import/Script_LugouGlbPose.mjs`），
   不看烘焙自报的清单数。那次的离线修复留在 `_import/Script_RestoreLugouPelvisTracks.mjs`。
+- IJA06（标准日军）与 NRA06（翻译）是 Blender 里从 IJA02 / NRA02 改出来的派生模型（`_import/Script_BuildLugouIja06.py` /
+  `_import/Script_BuildLugouNra06.py`），骨架与动作库沿用源模型：`Data_CharacterSelection.CHARACTER_CLIP_SOURCE_BY_MODEL`，
+  按模型取动作一律 `rig.clipModelId || rig.modelId`。见 [选模清单](Data_CharacterSelection.md)。
 - 先读：`_blender/Verify.mjs` 头注；改模型只重建那一件，别跑全量 BuildAll。
 - 日军 03 的脸部与备用钢盔修复见 [模型修复记录](Data_Ija03HeadRepair.md)；重新烘焙后运行 `_import/Script_RepairLugouIja03.mjs`。钢盔挂在背包对应的 Spine2，不能重新挂到 Head。
 - **视频转骨骼**（AI 视频 → RTMW3D → Biped clip）：`_import/Script_MocapVideoExtract.py`
