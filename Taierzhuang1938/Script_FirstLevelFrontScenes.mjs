@@ -61,6 +61,14 @@ export class FirstLevelFrontScenes {
     this.pending.push(id);
     return true;
   }
+  /** Take a scene that has not started yet off the queue (a combat call supersedes it). True when it was pending. */
+  Drop(id) {
+    const i = this.pending.indexOf(id);
+    if (i < 0) return false;
+    this.pending.splice(i, 1);
+    this.log.push({ id, t: this.r.time ?? 0, dropped: true });
+    return true;
+  }
   /** A front scene is playing or waiting its turn (the leader's reminders and casualty barks stay quiet). */
   get Busy() { return this.pending.length > 0 || (!!this.handle && !this.handle.done); }
   Body(who) {
@@ -74,6 +82,9 @@ export class FirstLevelFrontScenes {
     if (this.handle && !this.handle.done) return;
     this.handle = null;
     if (!this.pending.length || !voice || voice.paused) return;
+    // A tank call held back by the last scene (「履带断了！还在打！再补一捆！」) goes first, and is not talked over
+    // (Script_FirstLevelTankRuntime.HoldsDialogue: a queued call, or one still sounding; 2026-09-24 review).
+    if (r.tankRuntime?.HoldsDialogue?.()) return;
     // A reminder never holds up a story line; any other queued story (none are expected in 03–06) finishes first.
     voice.CancelGuidance?.();
     if (voice.current || voice.queue?.length) return;

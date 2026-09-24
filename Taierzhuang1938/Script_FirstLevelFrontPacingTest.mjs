@@ -250,7 +250,20 @@ const Ok = (label) => console.log(`ok ${label}`);
   assert.deepEqual(he.heyoutian(), { x: -30, y: 1.5, z: -150 }, "「右边路上！战车出来了！」 comes from He's own position");
   const guide = Read("Script_FirstLevelLeaderGuide.mjs");
   assert.ok(guide.includes("r.frontScenes?.Busy"), "the leader's reminders treat a playing front scene as story");
-  checks += 12;
+  // A tank call held back by a scene goes first and supersedes a BundleRetreat that has not started (09-24 review:
+  // 「履带断了！还在打！再补一捆！」 never played, BundleRetreat's opposite 「回来！低头！」 took its slot).
+  handles[1].done = true; scenes.Update();
+  scenes.Say("BundleRetreat"); scenes.Say("TankStopped");
+  let hold = true; r.tankRuntime = { HoldsDialogue: () => hold };
+  assert.ok(scenes.Drop("BundleRetreat") && !scenes.Drop("BundleRetreat"), "Drop takes a pending scene off the queue once");
+  scenes.Update();
+  assert.equal(played.length, 2, "a queued / sounding tank call holds the next scene");
+  hold = false; scenes.Update();
+  assert.deepEqual(played.slice(2), ["TankStopped"], "then the queue goes on without the dropped scene");
+  const tankRt = Read("Script_FirstLevelTankRuntime.mjs");
+  assert.ok(tankRt.includes('if (id === "trackCut") this.r.frontScenes?.Drop?.("BundleRetreat")') && tankRt.includes("RetryBarks()"),
+    "the tank runtime queues a call the dialogue held back and drops BundleRetreat for the track call");
+  checks += 16;
   Ok(`④ ${FRONT_SCENE_IDS.length} scenes through PlayScene: routing, one at a time, live speakers, fallback`);
 }
 

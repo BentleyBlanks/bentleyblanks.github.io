@@ -324,13 +324,20 @@ export class FirstLevelTankRuntime {
       seed: key.length }) ?? null;
     if (!played) return false;
     this.barkSaidAt.set(key, r.time);
+    this.barkSoundingUntil = r.time + (this.T.barkHoldS ?? 2.5);
     this.log.barks.push({ t: r.time, id, key, said: true });
     return true;
+  }
+  /** 补喊排着队、或刚喊出口（TANK.barkHoldS）：前沿对白的下一场先等一等（Script_FirstLevelFrontScenes.Update）。 */
+  HoldsDialogue() {
+    return this.pendingBarks.size > 0 || this.r.time < (this.barkSoundingUntil ?? -Infinity);
   }
   /** 这一句没喊出来（多半是剧情对白正在说）：按 TANK.barkRetryS 排队补喊。 */
   QueueBark(id) {
     const retry = this.T.barkRetryS?.[id];
     if (!retry || this.pendingBarks.has(id)) return;
+    // 「履带断了！还在打！再补一捆！」顶掉还没开口的「回来！低头！」（同一次投弹触发的，意思相反）。
+    if (id === "trackCut") this.r.frontScenes?.Drop?.("BundleRetreat");
     this.pendingBarks.set(id, this.r.time + retry);
     this.log.barks.push({ t: this.r.time, id, queued: true });
   }
@@ -339,7 +346,9 @@ export class FirstLevelTankRuntime {
     if (!this.pendingBarks.size) return;
     const r = this.r;
     for (const [id, until] of this.pendingBarks) {
-      const stale = id === "trackCut" && r.tank.damageState === "Disabled";
+      const spec = TANK_BARK_CUES?.[id], who = spec?.who ? r.companion?.Handle?.(spec.who) : null;
+      // Disabled 以后「再补一捆」不成立；点名的人没了也不再等（不许为一句喊话把对白一直压着）。
+      const stale = (id === "trackCut" && r.tank.damageState === "Disabled") || (spec?.who && !(who && (who.alive ?? who.Alive)));
       if (stale || r.time > until) { this.pendingBarks.delete(id); this.log.barks.push({ t: r.time, id, dropped: stale ? "stale" : "expired" }); continue; }
       if (this.SayBark(id)) this.pendingBarks.delete(id);
     }

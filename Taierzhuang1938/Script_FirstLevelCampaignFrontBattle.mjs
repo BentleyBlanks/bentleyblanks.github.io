@@ -210,11 +210,16 @@ export async function DriveFrontBattle(ctx){
       const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime();
       for(let f=0;f<20*60&&g.player.alive&&r.flow.stage.id!=="Tank";f++){
         const evading=window.MissionInputDriver.EvadeGrenade();
-        if(!evading){g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);}
+        // Anyone who walks up to the junction is answered like a player would (09-25 TankProbe: flank man A came
+        // through the abandoned nest to the rear door, 1.1 m off, and bled the waiting bot out while it only watched).
+        const close=evading?null:window.MissionInputDriver.Target?.(8);
+        if(close)window.MissionInputDriver.Shoot(close);
+        else if(!evading){g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);}
         if(g.player.bleeding&&g.player.health<80)g.Debug.Key("KeyB");
         g.StepFrames(1,1/60,false);
         if(!evading&&Math.hypot(g.player.position.x-x,g.player.position.z-z)>2.5)break;
       }
+      g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);if(g.state.activeSlot!=="primary")g.Debug.Key("Digit1");
       const p=g.player.position;
       return {stage:r.flow.stage.id,alive:g.player.alive,d:Math.hypot(p.x-x,p.z-z),at:[+p.x.toFixed(2),+p.z.toFixed(2)]};
     },S.rear);

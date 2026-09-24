@@ -449,6 +449,10 @@ export const TANK = Object.freeze({
   // 2026-09-24 Front 包审查：「履带断了！还在打！再补一捆！」正落在投弹那一刻开播的 BundleRetreat 场景里，一次都没播出来；
   // 日军车长那句同理。trackCut 在车已 Disabled 后不再补（「再补一捆」已经不成立）。
   barkRetryS: Object.freeze({ trackCut: 12, hatchShout: 6, tankWindow: 4 }),
+  // 补喊排着队、或刚喊出口的这么多秒里，下一场前沿对白先不开口（Script_FirstLevelFrontScenes 读 HoldsDialogue）：
+  // 战车喊话最长一句 2.36 s（Data_Voice tank_track）。「回来！低头！」（BundleRetreat）还没开口时履带就断了，
+  // 那一句直接让给「再补一捆」—— 两句意思相反。
+  barkHoldS: 2.5,
   // 「它在打口子！就现在！」的时机（接线层判，不是大脑）：05 领了集束弹、车还没解决、玩家在攻击支路的沟线上，
   // 大脑正瞄着缺口（targetId "gapZone"）且炮塔偏离玩家方位超过 angleRad —— 这就是冲上去的空当。[需]
   window: Object.freeze({ angleRad: 1.0, laneRadiusM: 4, cooldownS: 14 }),
