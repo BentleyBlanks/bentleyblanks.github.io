@@ -197,8 +197,46 @@ export function ApplyOpeningRescueReady(actor,clock){
   return true;
 }
 
+// ---- 2026-09-23 hand beats (item 2 of the Opening package) ----------------------------------
+// Data_OpeningStoryboards.firstPerson.hands: named RIGHT-hand poses (the left hand mirrors x) and,
+// per director phase, [t, left, right] keys eased with smoothstep. A beat may count its keys from a
+// director flag (`clock`) instead of the phase age. Frames: "cam" camera-local, "body" the eye with
+// yaw-only axes, "ground" body axes with y measured up from the ground under the hand.
+const HANDS=C.firstPerson.hands;
+const SUPPLY_PHASES=new Set(["Banter","Orders","Incoming"]);
+const HAND_BLEND_S=.5;
+/** Most the solved palm may turn in one 1/60 s frame (the continuity gate is 12°). */
+const HAND_TURN_DEG=10;
+function Mirror(pose,side){
+  if(!pose)return null;
+  if(side==="r")return pose;
+  const x=v=>[-v[0],v[1],v[2]];
+  return {...pose,p:x(pose.p),f:x(pose.f),n:x(pose.n)};
+}
+/** The pair of keys around `t` and the eased mix between them. */
+function SampleKeys(keys,t){
+  if(!keys?.length)return null;
+  if(!(t>keys[0][0]))return {a:keys[0],b:keys[0],mix:0};
+  for(let i=1;i<keys.length;i++)if(t<keys[i][0])return {a:keys[i-1],b:keys[i],mix:Smooth((t-keys[i-1][0])/Math.max(1e-6,keys[i][0]-keys[i-1][0]))};
+  return {a:keys.at(-1),b:keys.at(-1),mix:0};
+}
+/** Director flag clocks: seconds since the flag (or before the first key while it is unset). */
+function BeatClock(show,beat){
+  if(!beat.clock)return show.Age;
+  const at=show.flags?.[beat.clock],now=Number.isFinite(show.r?.time)?show.r.time:show.Age;
+  return at==null?-Infinity:now-at;
+}
+/** The beat of `phase` at the show's clock: { l:{pose,...}, r:{...} } with world targets resolved later. */
+export function OpeningHandBeat(show,phase=show.phase){
+  const beat=HANDS.beats[phase];if(!beat)return null;
+  const t=BeatClock(show,beat),s=SampleKeys(beat.keys,t);if(!s)return null;
+  return {t,mix:s.mix,l:[HANDS.poses[s.a[1]],HANDS.poses[s.b[1]]],r:[HANDS.poses[s.a[2]],HANDS.poses[s.b[2]]],
+    names:{l:s.mix<.5?s.a[1]:s.b[1],r:s.mix<.5?s.a[2]:s.b[2]}};
+}
+/** The actor holding Shunzi's collar in a drag beat (ijaA in 01). */
+function DragPartner(show){return (show.Ija?.("ijaA")||show.Executioner?.(0))?.actor;}
 export class OpeningFirstPerson{
-  constructor(show){this.show=show;this.rig=Anatomy(show.playerBody);this.phase=null;this.lastTargets={};this.lastFrames={};this.lastPartners={};this.partnerReleases={};this.report={};}
+  constructor(show){this.show=show;this.rig=Anatomy(show.playerBody);this.phase=null;this.lastTargets={};this.lastFrames={};this.lastPartners={};this.partnerReleases={};this.report={};this.previousFrameFrames={};this.previousFramePartners={};}
   ReleasePartner(side,entry,clock,dt){
     const previous=this.previousFramePartners[side];
     if(!previous||previous.mode==="released")return;
@@ -220,6 +258,33 @@ export class OpeningFirstPerson{
     this.lastPartners[side]={rig,rigSide,phase:this.show.phase,mode:mix>=1&&frame.angleTo(native.frame)<1e-4?"released":"release",frame,
       shoulder:native.shoulder.clone(),elbow:result.elbow.clone(),palm:result.palm.clone(),fingers:rig.fingerBones[rigSide].map(bone=>bone.quaternion.clone())};
   }
+  /** World target / finger direction / back-of-hand normal / curl of one named pose. */
+  Resolve(pose,side,frames,clock){
+    const {cam,bodyQ,Ground}=frames;
+    const p=[...pose.p];
+    if(pose.osc)p[2]+=pose.osc[0]*Math.sin(clock*Math.PI*2*pose.osc[1]+(side==="l"?Math.PI:0));
+    let target,forward,normal;
+    if(pose.in==="cam"){
+      target=V(...p).applyQuaternion(cam.quaternion).add(cam.position);
+      forward=V(...pose.f).applyQuaternion(cam.quaternion);normal=V(...pose.n).applyQuaternion(cam.quaternion);
+    }else{
+      target=V(...p).applyQuaternion(bodyQ).add(cam.position);
+      if(pose.in==="ground")target.y=Ground(target.x,target.z)+p[1];
+      forward=V(...pose.f).applyQuaternion(bodyQ);normal=V(...pose.n).applyQuaternion(bodyQ);
+    }
+    if(pose.to==="rifle"){
+      const rifle=this.show.r.bunkerRifle?.view;
+      if(rifle){const at=rifle.getWorldPosition(V());at.y+=.05;target.lerp(at,1);}
+    }
+    return {target,frame:FrameQuaternion(forward.normalize(),normal.normalize()),curl:pose.c};
+  }
+  /** Beat pose for one hand: the two keys resolved and eased. */
+  BeatPose(beat,side,frames,clock){
+    const [a,b]=beat[side].map(pose=>Mirror(pose,side));
+    const A=this.Resolve(a,side,frames,clock),B=b===a?A:this.Resolve(b,side,frames,clock),mix=beat.mix;
+    return {target:A.target.lerp(B.target,mix),frame:A.frame.slerp(B.frame,mix),curl:A.curl.map((v,i)=>v+(B.curl[i]-v)*mix),
+      grasp:(mix<.5?a:b).grasp===true};
+  }
   Update(dt=1/60){
     const s=this.show,r=s.r,p=s.phase,a=s.Age,cam=r.player.camera,fp=C.firstPerson;
     this.rig ||= Anatomy(s.playerBody);
@@ -229,49 +294,69 @@ export class OpeningFirstPerson{
       this.report=s.firstPersonState={available:false,reason:"missingOpeningArmSkeleton",phase:p,age:a,hands:{}};
       return;
     }
-    const supply=p==="Supply"||p==="Orders",body=s.playerBody.root;
+    const now=Number.isFinite(r.time)?r.time:a;
+    // The loading rifle is in his hands until the near miss throws it out of them (Blast +0.12 s).
+    const supply=SUPPLY_PHASES.has(p)||p==="Blast"&&a<.12,body=s.playerBody.root;
     body.visible=s.ready;body.position.copy(cam.position);body.quaternion.copy(cam.quaternion);body.updateWorldMatrix(true,true);
     const Local=(x,y,z)=>V(x,y,z).applyQuaternion(cam.quaternion).add(cam.position);
     const Direction=(x,y,z)=>V(x,y,z).applyQuaternion(cam.quaternion).normalize();
-    const frameClock=Number.isFinite(r.time)?r.time:a;
+    const look=V(0,0,-1).applyQuaternion(cam.quaternion),camUp=V(0,1,0).applyQuaternion(cam.quaternion);
+    // Heading that stays defined at any pitch: look*cos(pitch) - up*sin(pitch) is the level forward.
+    const level=look.clone().multiplyScalar(camUp.y).addScaledVector(camUp,-look.y);
+    const bodyQ=Q().setFromAxisAngle(V(0,1,0),Math.atan2(-level.x,-level.z));
+    const eyeGround=cam.position.y-C.shunzi.lieEyeM;
+    const Ground=(x,z)=>{const y=r.battlefield?.GroundHeight?.(x,z);return Number.isFinite(y)?y:eyeGround;};
+    const frames={cam,bodyQ,Ground};
+    const frameClock=now;
     if(this.frameClock!==frameClock){this.frameClock=frameClock;this.previousFrameFrames=Object.fromEntries(Object.entries(this.lastFrames).map(([side,q])=>[side,q.clone()]));this.previousFramePartners={...this.lastPartners};}
-    const poseKey=p==="Pull"&&a>C.pullS?"PullReleased":p;
+    const poseKey=supply?"Supply":p;
     if(this.phase!==poseKey){this.phase=poseKey;this.partnerEntryFrom={};this.transitionAt=frameClock;this.transitionFrom=Object.fromEntries(Object.entries(this.lastTargets).map(([side,v])=>[side,v.clone()]));
       this.transitionFrames=Object.fromEntries(Object.entries(this.lastFrames).map(([side,q])=>[side,q.clone()]));}
     const transitionAge=Math.max(0,frameClock-this.transitionAt);
-    this.report={available:true,phase:p,age:a,hands:{}};
+    const beat=supply?null:OpeningHandBeat(s,p);
+    this.report={available:true,phase:p,pose:poseKey,age:a,beat:beat?.names||null,hands:{}};
+    // Supply overlays (Banter: dirt in the collar; Orders: the bolt pushed home).
+    const flags=s.flags||{};
+    const dig=supply&&flags.dirtAt!=null?now-flags.dirtAt:null;
+    const digWeight=dig==null?0:Smooth((dig-.2)/.6)*(1-Smooth((dig-1.7)/.6));
+    const bolt=supply&&p!=="Banter"&&flags.exitAt!=null?now-flags.exitAt:null;
+    const boltWeight=bolt==null?0:Smooth(bolt/.25)*(1-Smooth((bolt-.75)/.3));
+    const loading=p==="Banter"||p==="Orders"&&bolt==null;
     for(const side of ["l","r"]){
       const sign=side==="l"?-1:1,shoulder=Local(sign*fp.shoulderHalfWidthM,-fp.shoulderDropM,fp.shoulderBackM);
-      let target=Local(sign*.18,-.46,-.15),forward=Direction(0,-.4,-1),normal=Direction(sign*.25,.65,.1),curl=[14,24,14];
+      let target=Local(sign*.18,-.46,-.15),forward=Direction(0,-.4,-1),normal=Direction(sign*.25,.65,.1),curl=[14,24,14],grasp=false;
       const pole=Local(sign*.43,-.51,.1);
       if(supply){
-        const cycle=(Math.sin(a*2.2)+1)*.5;
+        const cycle=loading?(Math.sin(a*2.2)+1)*.5:.5;
         target=Local(sign*.13,side==="l"?-.18:-.11+.025*cycle,-.35);
+        if(side==="l"&&boltWeight>0)target.lerp(this.Resolve(HANDS.poses.boltRifle,"r",frames,now).target,boltWeight);
         forward=Direction(side==="l"?.55:-.3,.68,-.2);normal=Direction(0,-.3,1);
         curl=side==="l"?[45,67,37]:[39,51,31];
-      }else if(p==="Blast"||p==="Butt"){
-        const protect=p==="Blast"?Math.exp(-Math.max(0,a-.4)*1.3):Smooth((a-.28)/.5);
-        target=Local(sign*(.18+.06*protect),-.39+.28*protect,-.21-.07*protect);
-        forward=Direction(0,.7,-.6);normal=Direction(0,0,1);curl=[11,23,15];
-      }else if(["Advance","Captive","CaptiveShot","Discover"].includes(p)&&side==="l"){
-        target=Local(-.17,-.32,-.3);forward=Direction(0,-.1,-1);normal=Direction(0,1,0);curl=[17,26,16];
+        // 「伸手往外掏」 / 「推上枪栓」 layered on the loading hand, each with its own weight.
+        for(const [w,t,keys] of [[digWeight,dig-.25,[[0,"digCollar"],[.8,"digCollar"],[1.3,"dig"]]],[boltWeight,bolt,[[0,"boltGrip"],[.3,"boltPush"],[.5,"boltDown"]]]]){
+          if(side!=="r"||!(w>0))continue;
+          const k=SampleKeys(keys.map(([at,name])=>[at,name,name]),t);
+          const over=this.BeatPose({r:[HANDS.poses[k.a[1]],HANDS.poses[k.b[1]]],mix:k.mix},"r",frames,now);
+          target.lerp(over.target,w);
+          const frame=FrameQuaternion(forward,normal).slerp(over.frame,w);
+          forward=V(0,0,1).applyQuaternion(frame);normal=V(0,1,0).applyQuaternion(frame);
+          curl=curl.map((v,i)=>v+(over.curl[i]-v)*w);
+        }
+      }else if(beat){
+        const pose=this.BeatPose(beat,side,frames,now);
+        target=pose.target;forward=V(0,0,1).applyQuaternion(pose.frame);normal=V(0,1,0).applyQuaternion(pose.frame);curl=pose.curl;grasp=pose.grasp;
       }
       let otherRig,otherSide,otherShoulder;
-      if(p==="Drag"&&side==="l"){
-        otherRig=Anatomy(s.Executioner(0).actor);otherSide="l";
-        target=Local(-.12,-.14,-.30);forward=Direction(0,0,-1);normal=Direction(0,1,0);curl=[44,66,42];
-      }else if(p==="Pull"&&a<=C.pullS){
-        otherRig=Anatomy(r.companion.Handle("luo").actor);otherSide=side==="l"?"r":"l";
-        target=Local(sign*.14,-.19,-.32);forward=Direction(0,0,-1);normal=Direction(sign,0,0);curl=[48,65,42];
-      }
-      if(this.transitionFrom?.[side]&&transitionAge<.35)target.lerpVectors(this.transitionFrom[side],target,Smooth(transitionAge/.35));
+      if(grasp&&side==="l"){otherRig=Anatomy(DragPartner(s));otherSide="l";if(!otherRig)grasp=false;}
+      // A new beat eases in over HAND_BLEND_S from where the hand was (position and palm frame).
+      if(this.transitionFrom?.[side]&&transitionAge<HAND_BLEND_S)target.lerpVectors(this.transitionFrom[side],target,Smooth(transitionAge/HAND_BLEND_S));
       // The solver must receive the same orthogonal palm basis both during and
       // after blending. Returning to the raw normal at the blend boundary can
       // change wrist-limit projection and produce a one-frame hand turn.
       const desiredFrame=FrameQuaternion(forward,normal);
       forward=V(0,0,1).applyQuaternion(desiredFrame);normal=V(0,1,0).applyQuaternion(desiredFrame);
-      if(this.transitionFrames?.[side]&&transitionAge<.35){
-        const frame=this.transitionFrames[side].clone().slerp(desiredFrame,Smooth(transitionAge/.35));
+      if(this.transitionFrames?.[side]&&transitionAge<HAND_BLEND_S){
+        const frame=this.transitionFrames[side].clone().slerp(desiredFrame,Smooth(transitionAge/HAND_BLEND_S));
         forward=V(0,0,1).applyQuaternion(frame);normal=V(0,1,0).applyQuaternion(frame);
       }
       if(otherRig){
@@ -280,11 +365,20 @@ export class OpeningFirstPerson{
         const shared=Shared(target.clone(),shoulder,Reach(this.rig,side),otherShoulder,Reach(otherRig,otherSide));
         target.lerp(shared,Smooth(transitionAge/.25));
       }
-      const player=Solve(this.rig,side,shoulder,target,forward,normal,pole);
+      let player=Solve(this.rig,side,shoulder,target,forward,normal,pole);
+      const shown=this.previousFrameFrames[side],turnCap=HAND_TURN_DEG/Degrees*Math.min(3,Math.max(.1,dt*60));
+      if(shown&&player){
+        const solved=FrameQuaternion(player.forward,player.dorsal);
+        if(shown.angleTo(solved)>turnCap){
+          const limited=shown.clone().rotateTowards(solved,turnCap);
+          player=Solve(this.rig,side,shoulder,target,V(0,0,1).applyQuaternion(limited),V(0,1,0).applyQuaternion(limited),pole,true,true)||player;
+        }
+      }
       Fingers(this.rig,side,curl);
       const entry={contactError:player.contactError,wristBend:player.wristBend,wristTwist:player.wristTwist,reachRatio:player.reachRatio,
         upperLength:player.upperLength,lowerLength:player.lowerLength,shoulderBehind:cam.worldToLocal(shoulder.clone()).z,
-        palm:player.palm.toArray(),wrist:player.wrist.toArray(),elbow:player.elbow.toArray(),dorsal:player.dorsal.toArray(),forward:player.forward.toArray()};
+        palm:player.palm.toArray(),wrist:player.wrist.toArray(),elbow:player.elbow.toArray(),dorsal:player.dorsal.toArray(),forward:player.forward.toArray(),
+        pose:supply?"supply":beat?.names?.[side]||"rest"};
       const currentFrame=FrameQuaternion(player.forward,player.dorsal);
       entry.rotationStepDegrees=this.previousFrameFrames[side]?this.previousFrameFrames[side].angleTo(currentFrame)*Degrees:0;
       entry.frameQuaternion=currentFrame.toArray();
@@ -296,7 +390,11 @@ export class OpeningFirstPerson{
         // Using the player's side sign here folds both elbows through the torso.
         const otherPole=otherShoulder.clone().add(Direction(otherSide==="l"?.4:-.4,-.45,.18));
         let previous=this.previousFramePartners[side];
-        if(previous?.rig!==otherRig||previous?.phase!==p)previous=this.partnerEntryFrom[side] ||= {
+        // A grasp carried over a phase change (Drag -> Snag -> KickBeam, same hand on the same collar) goes on
+        // from the palm frame shown last frame; only a new grasp starts from the partner's own clip hand
+        // (restarting from the clip at KickBeam turned ijaA's palm 132 deg in one frame, 09-24 run).
+        const carried=previous?.rig===otherRig&&previous?.mode==="grasp";
+        if(!carried&&(previous?.rig!==otherRig||previous?.phase!==p))previous=this.partnerEntryFrom[side] ||= {
           rig:otherRig,phase:p,shoulder:otherShoulder.clone(),elbow:Pos(otherRig.bones[otherSide].forearm),palm:Palm(otherRig,otherSide),
           frame:otherRig.bones[otherSide].hand.getWorldQuaternion(Q()).multiply(otherRig.anatomy[otherSide].frame.quaternion)};
         const reaching=transitionAge<.35,stepScale=Math.min(3,Math.max(.1,dt*60));
@@ -306,11 +404,12 @@ export class OpeningFirstPerson{
         }
         let partner=Solve(otherRig,otherSide,otherShoulder,otherTarget,player.forward.clone().negate(),player.dorsal.clone().negate(),otherPole,true);
         let partnerFrame=FrameQuaternion(partner.forward,partner.dorsal);
-        // A not-yet-reachable grasp has no fixed palm plane. Follow the previous
-        // presented hand frame through that interval instead of switching wrist
-        // limit branches as soon as the desired plane becomes feasible.
-        if(reaching&&previous.frame.angleTo(partnerFrame)>10/Degrees*stepScale){
-          const limited=previous.frame.clone().rotateTowards(partnerFrame,10/Degrees*stepScale);
+        // A not-yet-reachable grasp has no fixed palm plane, and a held grasp can switch wrist-limit
+        // branches when the partner's own clip swings his arm (ijaA's kick in KickBeam turned the palm
+        // 132 deg in one frame, 09-24 run): the partner's palm turns at most HAND_TURN_DEG a frame, as
+        // the player's does.
+        if(previous.frame.angleTo(partnerFrame)>HAND_TURN_DEG/Degrees*stepScale){
+          const limited=previous.frame.clone().rotateTowards(partnerFrame,HAND_TURN_DEG/Degrees*stepScale);
           partner=Solve(otherRig,otherSide,otherShoulder,otherTarget,V(0,0,1).applyQuaternion(limited),V(0,1,0).applyQuaternion(limited),otherPole,true,true);
           partnerFrame=FrameQuaternion(partner.forward,partner.dorsal);
         }
@@ -328,10 +427,12 @@ export class OpeningFirstPerson{
     if(supply){
       s.loadingRifle.quaternion.copy(cam.quaternion).multiply(Q().setFromAxisAngle(V(0,1,0),Math.PI/2));
       s.loadingRifle.position.copy(Palm(this.rig,"l")).sub(s.loadingRifleGrip.clone().applyQuaternion(s.loadingRifle.quaternion));
+      // The clips are loaded by the end of the orders; the right hand leaves its clip to dig at the collar.
+      s.clips[0].visible=loading&&digWeight<.05;
       s.clips[0].position.copy(Palm(this.rig,"r"));s.clips[0].quaternion.copy(cam.quaternion);
       s.clips[0].position.add(Direction(0,.027,0).multiplyScalar(.027));
-      const yaowa=r.companion.Handle("yaowa")?.actor?.characterRig?.bones?.handL;
-      s.clips[1].visible=!!yaowa;
+      const yaowa=r.companion?.Handle?.("yaowa")?.actor?.characterRig?.bones?.handL;
+      s.clips[1].visible=!!yaowa&&loading;
       if(yaowa){yaowa.getWorldPosition(s.clips[1].position);s.clips[1].position.y+=.04;}
     }
     body.updateWorldMatrix(true,true);s.firstPersonState=this.report;

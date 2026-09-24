@@ -25,8 +25,9 @@ import { FirstLevelCollection } from "./Script_FirstLevelCollection.mjs";
 import { SPEAKER_BINDING } from "./Data_Tuning_CharacterSpeech.mjs";
 
 const Distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
-/** 本包接上触发点的四条 cue（`Script_FirstLevelVoiceTest` 的未触发名单里删掉的那四条）。 */
-export const FRONT_WIRED_CUES = Object.freeze(["RescueOut", "TrenchCurse", "BundleProne", "BundleReturnCall"]);
+/** 本包接上触发点的 cue（`Script_FirstLevelVoiceTest` 的未触发名单里删掉的那几条）。
+ *  09.21 的 RescueOut / TrenchCurse 已随契约 §5.2 下线（Opening 包 2026-09-24）。 */
+export const FRONT_WIRED_CUES = Object.freeze(["BundleProne", "BundleReturnCall"]);
 
 /** 07 路边指路的人站哪儿：村口以北 southPointerBackM 米、偏出路面 southPointerSideM 米。 */
 export function SouthPointerSpot(route = MISSION_ROUTES.southWalk, anchor = A.village) {
@@ -101,7 +102,6 @@ export class FirstLevelFrontShow {
   Update(dt) {
     const stage = this.r.flow.stage.id;
     this.bunker.Update(dt);
-    if (stage === "RearTrench") this.UpdateRearTrench();
     // Right-position capture, handover and retreat are driven by the persistent battlefield.
     if (stage === "Tank") this.UpdateTank();
     if (stage === "Orders") this.collection.UpdateOrders(dt);
@@ -113,18 +113,6 @@ export class FirstLevelFrontShow {
     const r = this.r;
     if (this.southAt != null && r.view?.Person)
       r.view.Person(this.pointer.x, this.pointer.z, this.pointer.yaw, time, { id: "SouthRoadPointer", kind: "bearer" });
-  }
-
-  // --- 02 后交通壕 -----------------------------------------------------------
-  UpdateRearTrench() {
-    const r = this.r;
-    this.trenchAt ??= r.time;
-    if (!r.Has("rearTrenchEntered") || r.voice?.played?.has?.("TrenchCurse")) return;
-    // 探头挨骂：人在沟里站直够久，何有田就骂回来。一直趴着走的也补一次。
-    const standing = r.player.stance === "stand";
-    if (standing) this.peekSince ??= r.time; else this.peekSince = null;
-    const peeked = this.peekSince != null && r.time - this.peekSince >= F.trenchPeekS;
-    if (peeked || r.time - this.trenchAt >= F.trenchCurseFallbackS) r.Say("TrenchCurse");
   }
 
   // --- 04 接替火力 -----------------------------------------------------------

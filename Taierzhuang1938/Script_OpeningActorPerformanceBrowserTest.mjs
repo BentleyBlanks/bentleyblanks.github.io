@@ -126,24 +126,25 @@ try{
   }
   console.log("ok freely controlled Luo/Zhou aim=1: audible-line head acting preserves hands, torso and weapon; idle melee is not protected");
   const cases=[
-    {role:"yaowa",phase:"Supply",kind:"nra",variant:1,clip:"SupplyReceive",freeHand:"handR",minHandM:.04},
+    {role:"yaowa",phase:"Banter",kind:"nra",variant:1,clip:"SupplyReceive",freeHand:"handR",minHandM:.04},
     {role:"luo",phase:"Orders",kind:"nra",variant:4,clip:"PointBlockade",freeHand:"handL",minHandM:.07},
     {role:"runner",phase:"Orders",kind:"nra",variant:4,clip:"IjaBayonetGuard",freeHand:"handL",minHandM:.07},
     {role:"heyoutian",phase:"Orders",kind:"nra",variant:1,clip:"IjaBayonetGuard",minHeadRad:.1},
     {role:"liuwencai",phase:"Orders",kind:"nra",variant:4,clip:"IjaBayonetGuard",minHeadRad:.1},
-    {role:"interpreter",phase:"Interrogate",kind:"nra",variant:1,clip:"InterpreterPoint",freeHand:"handR",minHandM:.10},
-    {role:"ijaA",phase:"Interrogate",kind:"ija",variant:0,clip:"InterrogateCrouch",freeHand:"handR",minHandM:.07},
-    {role:"ijaB",phase:"Interrogate",kind:"ija",variant:1,clip:"IjaBayonetGuard",minHeadRad:.1},
-    {role:"guard",phase:"Captive",kind:"ija",variant:2,clip:"IjaBayonetGuard",minHeadRad:.1},
-    {role:"captiveHelper",phase:"Captive",kind:"nra",variant:1,clip:"CaptiveHeld",freeHand:"handL",minHandM:.1},
-    {role:"ijaA",caseName:"ButtStrike",phase:"Butt",kind:"ija",variant:0,clip:"ButtThreat",onceDuration:1.4,minHeadRad:.1},
+    // Contract §5.1 (v1.3): the interpreter is NRA06 and ijaA is IJA06 (IJA02's clip library), ijaB is IJA01.
+    {role:"interpreter",phase:"Interrogation",kind:"nra",variant:5,castId:"interpreter",clip:"InterpreterPoint",freeHand:"handR",minHandM:.10},
+    {role:"ijaA",phase:"Interrogation",kind:"ija",variant:5,castId:"ijaA",clip:"InterrogateCrouch",freeHand:"handR",minHandM:.07},
+    {role:"ijaB",phase:"Interrogation",kind:"ija",variant:0,clip:"IjaBayonetGuard",minHeadRad:.1},
+    {role:"guard",phase:"Interrogation",kind:"ija",variant:2,clip:"IjaBayonetGuard",minHeadRad:.1},
+    {role:"comrade",phase:"Interrogation",kind:"nra",variant:1,clip:"CaptiveHeld",freeHand:"handL",minHandM:.1},
+    {role:"ijaA",caseName:"ButtStrike",phase:"Butt",kind:"ija",variant:5,castId:"ijaA",clip:"ButtThreat",onceDuration:1.4,minHeadRad:.1},
   ];
   const receipts=[];
   for(const spec of cases){
     await page.evaluate(spec=>{
       const p=window.openingActorPerformanceProbe;
       if(p.soldier){p.g.scene.remove(p.soldier.actor.root);p.soldier.actor.Dispose();}
-      const actor=p.g.actorFactory.Create(spec.kind,{modelVariant:spec.variant,weapon:spec.role==="interpreter"||spec.role==="captiveHelper"?null:"HanYang",seed:271});
+      const actor=p.g.actorFactory.Create(spec.kind,{modelVariant:spec.variant,castId:spec.castId,weapon:spec.role==="interpreter"||spec.role==="captiveHelper"?null:"HanYang",seed:271});
       actor.root.position.copy(p.r.Point({x:-40,z:-119.5}));p.g.scene.add(actor.root);
       p.soldier={actor,id:spec.role,alive:true,openingStoryboardTravel:0,openingStoryboardPose:{clip:spec.clip,seconds:0}};
       p.api.InstallOpeningStoryboardAnimation(p.soldier);p.spec=spec;p.time=0;p.samples=[];
@@ -205,41 +206,44 @@ try{
     console.log(`ok ${spec.role} ${receipt.model}: hand ${receipt.handRange.toFixed(3)} m, head ${receipt.headRange.toFixed(3)} rad, sole ${receipt.soleRange.toFixed(4)} m`);
   }
   }
+  // 09.23 draft: the comrade dies at the throat cut and the authored CaptiveWallSlideTwitch (3.2 s) plays
+  // on past the AI's corpse freeze until he sits slumped against the wall (pelvis 0.16 m, clip root data).
   const corpse=await page.evaluate(()=>{
     const p=window.openingActorPerformanceProbe,{g,r,T}=p;
     if(p.soldier){p.soldier.actor.Dispose();p.soldier=null;}
     g.post.Render=p.render;
     const scene=r.frontShow.bunker,samples=[];
-    for(let frame=0;frame<12000;frame++){
+    for(let frame=0;frame<14000;frame++){
       g.StepFrames(1,1/60,false);
-      const soldier=scene.Helper;if(!scene.shotFired)continue;
+      const soldier=scene.Comrade;if(!soldier||soldier.alive)continue;
       const actor=soldier.actor,rig=actor.characterRig;
-      if(soldier.deadTime<2.5||frame%60===0){
+      if(soldier.deadTime<3.6||frame%60===0){
         rig.root.updateMatrixWorld(true);
         const Pos=bone=>bone.getWorldPosition(new T.Vector3()).sub(actor.root.position).toArray();
-        samples.push({time:soldier.deadTime,shown:rig.openingStoryboardState?.seconds,
-          head:Pos(rig.bones.head),chest:Pos(rig.bones.chest),root:actor.root.position.toArray()});
+        samples.push({time:soldier.deadTime,shown:rig.openingStoryboardState?.seconds,clip:soldier.openingStoryboardPose?.clip||null,
+          head:Pos(rig.bones.head),chest:Pos(rig.bones.chest),pelvis:Pos(rig.bones.pelvis),root:actor.root.position.toArray()});
       }
-      if(scene.phase==="Interrogate"&&scene.Age>2){g.StepFrames(3,1/60,true);break;}
+      if(scene.phase==="Reach"&&scene.Age>1){g.StepFrames(3,1/60,true);break;}
     }
-    return {samples,phase:scene.phase,alive:scene.Helper.alive};
+    return {samples,phase:scene.phase,alive:scene.Comrade?.alive};
   });
   await fs.writeFile(path.join(output,"Data_CaptiveCollapse.json"),JSON.stringify(corpse,null,2));
   await page.screenshot({path:path.join(output,"Scene_CaptiveCollapseTerminal.png")});
-  assert.equal(corpse.alive,false,"the normal opening actually shoots the captive");
-  assert.equal(corpse.phase,"Interrogate","the normal opening continues through discovery and the butt strike");
-  const falling=corpse.samples.filter(sample=>sample.time>.91&&sample.time<1.65);
-  assert.ok(falling.length>20&&falling.at(-1).shown>=1.6,"settled corpse must finish the authored 1.6-second collapse beyond native AI's 0.9-second freeze");
-  const terminal=corpse.samples.filter(sample=>sample.time>2);
-  assert.ok(terminal.length>3,"observe the corpse over several seconds after its fall");
+  assert.equal(corpse.alive,false,"the normal opening actually kills the comrade at the wall");
+  assert.equal(corpse.phase,"Reach","the normal opening continues past the cut to Shunzi's reach for the rifle");
+  const sliding=corpse.samples.filter(sample=>sample.time>.91&&sample.time<3.25);
+  assert.ok(sliding.length>20&&sliding.every(sample=>sample.clip==="CaptiveWallSlideTwitch")&&sliding.at(-1).shown>=3.1,
+    "the corpse finishes the authored 3.2-second slide down the wall beyond native AI's 0.9-second freeze");
+  const terminal=corpse.samples.filter(sample=>sample.time>3.5);
+  assert.ok(terminal.length>3,"observe the corpse over several seconds after the slide");
   for(const sample of terminal){
-    assert.ok(sample.head[1]<.22&&sample.chest[1]<.22,`dead captive head/chest lie down instead of supporting a kneeling push-up (${sample.head[1]}, ${sample.chest[1]})`);
+    assert.ok(sample.pelvis[1]<.25,`dead comrade sits slumped in the mud instead of kneeling (${sample.pelvis[1]})`);
     assert.ok(Math.hypot(...sample.head.map((n,i)=>n-terminal[0].head[i]))<.001,"terminal corpse remains still without replaying the death");
   }
   let maxStep=0;
-  for(let i=1;i<falling.length;i++)maxStep=Math.max(maxStep,Math.hypot(...falling[i].head.map((n,j)=>n-falling[i-1].head[j])));
-  assert.ok(maxStep<.04,`the remaining collapse advances continuously (${maxStep} m/frame)`);
-  console.log("ok normal captive shot: authored collapse completes after AI corpse freeze, rests face down and never replays");
+  for(let i=1;i<sliding.length;i++)maxStep=Math.max(maxStep,Math.hypot(...sliding[i].head.map((n,j)=>n-sliding[i-1].head[j])));
+  assert.ok(maxStep<.04,`the slide advances continuously (${maxStep} m/frame)`);
+  console.log("ok normal comrade death: the authored wall slide completes after the AI corpse freeze, rests slumped and never replays");
   assert.deepEqual(ctx.errors,[]);
   if(!process.argv.includes("--corpse-only"))console.log("ok five production rigs, dialogue gestures, idle attention, planted soles, clear lifecycle and high-quality rendered frames");
 }finally{await CloseCampaign(ctx);}

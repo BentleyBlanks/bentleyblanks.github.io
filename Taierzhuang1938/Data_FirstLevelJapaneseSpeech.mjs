@@ -9,7 +9,7 @@
 //   · kana   送 SeedAudio 的写法。汉字会被当中文念，所以一律纯假名。
 //   · kanji  稿面写法，只作注释与验收比对（whisper 转写的字错率对它算），不进任何提示词。
 //   · 屏幕字幕是稿里「中文：」那一行，写在台词表的 line.text 上。
-// 键：09.23 逐句格式用逐句 id「<Scene>.<NN>」；旧整段格式（待 Opening 包下线的 cue）用「cue id:行下标」。
+// 键：09.23 逐句格式用逐句 id「<Scene>.<NN>」（09.21 旧整段 cue 已随 Opening 包 2026-09-24 下线）。
 const J = (kana, kanji) => Object.freeze({ kana, kanji });
 export const JAPANESE_SPEECH = Object.freeze({
   // —— 2026-09-23 新稿，18 句
@@ -31,7 +31,4 @@ export const JAPANESE_SPEECH = Object.freeze({
   "RescueInterrogation.02": J("はい！", "はい！"),
   "RescueInterrogation.05": J("はやくしろ！", "早くしろ！"),
   "RescueFlee.01": J("てきだ！", "敵だ！"),
-  // —— 09.21 旧整段 cue（待 Opening 包下线；旧导演仍在引用）
-  "BunkerKilling:1": J("うごくな、ばかやろう！", "動くな、馬鹿野郎！"),
-  "ShunziCurse:0": J("でろ！このやろう！", "出ろ！この野郎！"),
 });

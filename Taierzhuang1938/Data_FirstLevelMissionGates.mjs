@@ -74,11 +74,11 @@ export const MISSION_ENCOUNTER_ACTIVATION = Object.freeze({
     spawn: Object.freeze({ kind: "step", step: "Trapped" }),
     dormant: true,
     wake: Object.freeze({ kind: "scripted", step: "BunkerRescue", source: "FirstLevelBunkerShow.ReleaseCombat",
-      text: "小队反扑时解除演出保护并交战；全部清场后才拖救还权" }),
+      text: "02 反扑：甲、乙被大刀真实砍死，岔口的丁被刘文财真实击倒后才还权；折角的丙活着也还权，随后交还战斗 AI（契约 §2 第 1 条）" }),
     // Decision 1 lets the man behind the fold (ijaC) live through 02; he leaves with the pursuers.
     retire: Object.freeze({ fact: "collectionPointSeen", route: "FRONT_SPACE.pursuitFallback", then: "despawn",
       text: "活着的先头兵（折角后的日兵丙）跟追兵一起经 J 转入纵深支沟，走到尽头收走" }),
-    note: "两名行刑兵与两名跟进兵；反扑时解除演出保护，由小队真实击杀四人后才拖救还权。活下来的人在玩家望见集结处时经纵深支沟退场（retire）",
+    note: "甲乙（审问、割喉、拖人）与丙丁（折角、岔口）；02 甲乙被大刀砍死、丁被刘文财击倒才还权，丙可以活着。活下来的人在玩家望见集结处时经纵深支沟退场（retire）",
   }),
   bunkerBackdrop: Object.freeze({
     spawn: Object.freeze({ kind: "fact", fact: "bunkerCollapsed" }),
@@ -161,7 +161,6 @@ export const MISSION_ENCOUNTER_ACTIVATION = Object.freeze({
 // 3. 对白播完即记的事实（契约 §5 的映射表，一字不改）
 // ---------------------------------------------------------------------------
 export const MISSION_VOICE_FACTS = Object.freeze({
-  RescueCall: "rescueCallHeard",
   SupportOrder: "supportOrdersHeard",
   BundleOrder: "bundleOrderHeard",
   Volunteer: "volunteerHeard",
@@ -211,22 +210,35 @@ const Gate = (entry) => Object.freeze(entry);
 export const MISSION_FACT_GATES = Object.freeze({
   // --- Trapped -----------------------------------------------------------
   bunkerCollapsed: Gate({
-    kind: "scripted", step: "Trapped", source: "FirstLevelOpening.UpdateBunker",
-    text: "黑屏对白被近爆打断，掩蔽部塌下来把人压住（控制接管 trapped）",
+    kind: "scripted", step: "Trapped", source: "FirstLevelOpening.BunkerBlast",
+    text: "洞外士兵「炮弹！趴下——！」被近失弹截断，防炮洞口局部塌方把顺子压住（控制接管 trapped）",
   }),
   captivesKilled: Gate({
-    kind: "scripted", step: "Trapped", source: "FirstLevelOpening.UpdateBunker",
-    text: "透过前门低处破口看见门外两名失去抵抗能力的川军被刺杀",
+    kind: "scripted", step: "Trapped", source: "FirstLevelBunkerShow.PhaseWipe",
+    text: "肩伤川军被日兵甲割喉后顺着沟壁真实倒地",
   }),
   doorSearchStarted: Gate({
-    kind: "scripted", step: "Trapped", source: "FirstLevelOpening.UpdateBunker",
-    text: "门外的日兵转向门内，后侧同时响起清理坍塌物的声音",
+    kind: "scripted", step: "Trapped", source: "FirstLevelBunkerShow.PhaseFound",
+    text: "日兵甲听见断木错动，回身走到洞口拨开木料，发现顺子",
   }),
   // --- BunkerRescue ------------------------------------------------------
-  rescueCallHeard: Gate({ kind: "voice", step: "BunkerRescue", cue: "RescueCall", source: "VoiceDone" }),
+  // 2026-09-23 contract §5.3: recorded by the director when RescueInterrogation starts (the 09.21
+  // RescueCall cue and its VoiceDone mapping were retired 2026-09-24 with the rest of §5.2's list).
+  rescueCallHeard: Gate({
+    kind: "scripted", step: "BunkerRescue", source: "FirstLevelBunkerShow.PhaseHold",
+    text: "日兵甲拽起顺子的前襟，逼翻译「这个也问！」——第二场逼问开始",
+  }),
+  vanguardMeleeResolved: Gate({
+    kind: "scripted", step: "BunkerRescue", source: "FirstLevelBunkerShow.PhaseParry", encounter: "bunkerAssault",
+    text: "日兵乙被罗班长、日兵甲被何有田用大刀真实砍死（接触后仍没死就补成致命伤）",
+  }),
+  junctionShot: Gate({
+    kind: "scripted", step: "BunkerRescue", source: "FirstLevelBunkerShow.LongShotTick", member: "BunkerFollowB",
+    text: "岔口回身举枪的日兵丁被刘文财真实击倒（打偏就由何有田、罗班长补枪，最后兜底致死）",
+  }),
   luoRescueComplete: Gate({
-    kind: "cutscene", step: "BunkerRescue", source: "Update/controls(rescue)",
-    text: "罗班长掀开木架、幺娃拉背包，把顺子拖出坍塌的掩蔽部那一段演完",
+    kind: "cutscene", step: "BunkerRescue", source: "FirstLevelBunkerShow.PhaseLongShot", requires: Object.freeze(["vanguardMeleeResolved"]),
+    text: "罗班长把顺子倒拖进洞口塌土与门柱后面（甲乙已死）",
   }),
   rifleRecovered: Gate({
     kind: "interaction", step: "BunkerRescue", interaction: "MissionRifle", anchor: "bunkerDoor",

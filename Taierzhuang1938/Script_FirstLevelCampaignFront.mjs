@@ -45,6 +45,8 @@ export async function Drive(ctx) {
   }
 
   if(ctx.stageFrom===1)await DriveOpening(ctx);
+  // --stage-to=2: 01–02 through the collection hand-over only (03 is the front battle's).
+  if(ctx.stageTo===2){await CheckOpeningActing(ctx);return;}
   await DriveFrontBattle(ctx);
   if(ctx.stageFrom===1)await CheckOpeningActing(ctx);
   if(ctx.stageTo===3)return;

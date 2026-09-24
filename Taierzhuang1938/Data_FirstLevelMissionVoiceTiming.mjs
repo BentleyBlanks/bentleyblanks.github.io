@@ -4,7 +4,6 @@ import { MISSION_VOICE_ALIGNMENT } from "./Data_FirstLevelMissionVoiceAlignment.
 export const MISSION_VOICE_TIMING = Object.freeze({});
 // 具名事件（玩法包按这些名字接动作；每句开始另有通用的 "Line" 事件）：
 //   （01–06 已改逐句干声：BunkerBlast 由导演表 BunkerIncoming.01 的截断点发，见 Data_FirstLevelDialogueDirection）
-//   RescueHeave                02 RescueLift「一、二——起！」的「起」
 //   BorrowLight 两处动作空当（整段录音过渡期；逐句后由导演表 emit 发同名事件）
 //   AircraftDiveOrder          14 AircraftReturn「先下沟！莫停车边！」句首（沿用旧 id）
 //   ZhouNoAnswer               17 ZhouDeath 第一句之后那段「……」，没人应声
@@ -20,10 +19,6 @@ export function MissionVoiceTimeline(cue, total) {
     const start = cursor; cursor += total * weight / sum; return [start, cursor];
   });
   const segment = { id: "WholeExchange", start: 0, end: total, wait: 0 };
-  // This take has seven seconds of effects before the actual Japanese command.
-  // Enter the same intact recording just before its first line; timestamps stay
-  // source-relative so speech, subtitle and the discovery action agree.
-  if (cue.id === "ShunziCurse" && fits) segment.start = Math.max(0, lines[0][0] - .35);
   const tail = 0;
   const Late = (index, fraction) => lines[index][0] + (lines[index][1] - lines[index][0]) * fraction;
   if (cue.id === "BorrowLight") segment.events = [

@@ -254,22 +254,36 @@ for(const id of ["CaptiveDraggedFromDirt","CaptiveWallBrace","CaptiveKneelMud","
 // The sheathed bayonet rides ijaA's pelvis between clips (rig asset propMounts).
 assert.ok(["origin","axis","up"].every(k=>ijaA.propMounts?.bayonet?.[k]?.length===3&&ijaA.propMounts.bayonet[k].every(Number.isFinite)),"LugouIja02: bayonet scabbard mount");
 
-const p=C.positions;
-assert.ok(p.interrogator.x<p.interrogated.x&&p.interpreterNear.x>p.interrogated.x,"V3: interrogator left, interpreter right");
-assert.ok(p.march.every(point=>Number.isFinite(point.x)&&Number.isFinite(point.z)));
-assert.ok(p.march[2].z>p.march[0].z,"follow-up enemies advance south toward the dugout");
-assert.ok(Math.hypot(p.guardNear.x-p.luoAmbush.x,p.guardNear.z-p.luoAmbush.z)<1,"dadao ambush within physical reach");
-assert.ok(Math.hypot(p.rifleEnd.x-p.rescued.x,p.rifleEnd.z-p.rescued.z)<1.5,"kicked rifle within pickup reach");
-const returnRoute=[p.pullEnd,...C.pullReturnWaypoints,p.luoPull];
-let progress=0,minimum=Infinity;
-for(let i=1;i<returnRoute.length;i++){
-  const a=returnRoute[i-1],b=returnRoute[i],length=Math.hypot(b.x-a.x,b.z-a.z);
-  for(let d=0;d<=length;d+=.02){
-    const t=d/length,distance=Math.hypot(a.x+(b.x-a.x)*t-p.rescued.x,a.z+(b.z-a.z)*t-p.rescued.z);
-    assert.ok(distance>=Math.hypot(p.pullEnd.x-p.rescued.x,p.pullEnd.z-p.rescued.z)-.001,"release never moves the leader closer through the player");
-    if(progress+d>=C.walkMps*.2)minimum=Math.min(minimum,distance);
-  }
-  progress+=length;
+// ---- 2026-09-23 director data (contract §5.3, space §2.1/§3) --------------------------------
+assert.deepEqual([...C.phases.Trapped],["Banter","Orders","Incoming","Blast","Black","Wake","FrontPass","CaptiveDragged","CaptiveWall",
+  "Interrogation","Slash","Taunt","Wipe","Reach","Found","Drag","Snag","KickBeam","DragOut","Butt","Boots"],"contract §5.3 Trapped phases");
+assert.deepEqual([...C.phases.BunkerRescue],["Hold","Ask","KickShunzi","Glimpse","Collar","Chop","Parry","Flee","DragCover","LongShot",
+  "Check","KickRifle","Released"],"contract §5.3 BunkerRescue phases");
+assert.deepEqual([...C.phases.RearTrench],["Withdraw","Corner","Collection","SupportOrder"],"contract §5.3 RearTrench phases");
+{
+  const {MISSION_PLACEMENT:Place,MISSION_ANCHORS:Anchor}=await import("./Data_FirstLevelMissionLayout.mjs");
+  const {MISSION_TUNING:Tune}=await import("./Data_Tuning_FirstLevel.mjs");
+  const D=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
+  assert.ok(D(C.shunzi.trap,Place.bunker.player)<.01,"Shunzi is pinned where the space puts him (bunker.player)");
+  assert.ok(D(C.shunzi.dragged,Anchor.shunziDragged)<.01,"ijaA drags him to the K2 eye (shunziDragged)");
+  assert.ok(D(C.rescue.rifleMouth,Place.bunker.rifleMouth)<.01,"the rifle is half-buried at the space's mouth mark");
+  assert.ok(D(C.rescue.rifleKicked,C.shunzi.cover)<Tune.interactionRangeM-1,"Luo's kick leaves the rifle within easy reach of the cover");
+  assert.ok(D(C.rescue.liuShot,Place.bunker.liuwencaiShot)<.01,"Liu Wencai shoots from the space's mark");
+  for(const [name,route] of [["runner",C.banter.runnerRoute],["exit",C.banter.exitRoute],["walkIn",C.ija.walkIn],["found",C.ija.foundRoute],
+    ["dragOut",C.ija.dragOutRoute],["luo",C.rescue.luoRoute],["he",C.rescue.heRoute],["dragCover",C.rescue.dragCoverRoute],["withdraw",C.withdraw.lane]])
+    assert.ok(route.length>=2&&route.every(p=>Number.isFinite(p.x)&&Number.isFinite(p.z)),`${name} route is a finite polyline`);
+  // Every director wait has a finite timeout (the show can never stall).
+  assert.ok(Object.values(C.timeouts).every(v=>Number.isFinite(v)&&v>0),"all director timeouts are finite and positive");
+  assert.deepEqual([...C.vanguardIds].sort(),["BunkerExecutionerA","BunkerExecutionerB","BunkerFollowB"],"hand-back waits for ijaA, ijaB and ijaD only");
 }
-assert.ok(minimum>.7,"after the first 0.2s of release, the return path keeps the two body capsules separate");
-console.log(`ok opening storyboards: five original rigs, ${clipCount} rig clips (${NEW.length} authored 2026-09-23, ${paired} paired contacts cross-checked, ${chains} same-root hand-overs, ${seams} hold-loop seams), ${frames} normalized frames, V3 cast and pickup placement`);
+// Two methods of one name in a class: the later silently replaces the earlier (09-24 review: the corner
+// man's rifle shot had become the camera's Shot and his loop fired without sound, flash or tracer).
+{
+  const source=fs.readFileSync(new URL("./Script_OpeningStoryboards.mjs",import.meta.url),"utf8");
+  const names=[...source.matchAll(/^  (?:static )?(?:async )?([A-Za-z_]\w*)\([^)]*\)\{/gm)].map(m=>m[1]);
+  const twice=names.filter((name,i)=>names.indexOf(name)!==i);
+  assert.deepEqual(twice,[],"the director class has no duplicate method names");
+  assert.match(source,/CornerFire\([^)]*\)\{[\s\S]*?this\.FireRifle\(/,"the corner man's loop fires a real rifle shot");
+  assert.ok(Object.values(C.pursuit).every(v=>Number.isFinite(v)&&v>0),"pursuit tuning is finite");
+}
+console.log(`ok opening storyboards: five original rigs, ${clipCount} rig clips (${NEW.length} authored 2026-09-23, ${paired} paired contacts cross-checked, ${chains} same-root hand-overs, ${seams} hold-loop seams), ${frames} normalized frames, director phase table and marks`);

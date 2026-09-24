@@ -162,54 +162,6 @@ export const MISSION_DIALOGUE = Object.freeze([
     ["shunzi", "不是撤了？"],
     ["luo", "先把那几个接下来！"],
   ]),
-  // —— 09.21 旧稿整段 cue：**待 Opening 包下线**（契约 §5.2 列为下线；旧导演 Script_OpeningStoryboards /
-  // Script_FirstLevelBunker / Script_FirstLevelFrontShow / 运行时还在 Say 它们，先保留文件与表项，别删）。
-  Cue("BunkerKilling", [
-    ["captiveHelper", "放开老子！日你先人！"],
-    ["ijaA", "别动，混蛋！", {lang:"ja"}],
-    ["interpreter", "别他妈动！问你话呢！"],
-    ["interpreter", "你们大队往哪儿撤了？后头还有多少人？"],
-    ["captiveHelper", "你个狗日的二鬼子。"],
-    ["interpreter", "少他妈废话！说！"],
-  ], {soundscape:"洞口外交通壕，揪领、衣料扯紧、枪托与靴子短促控制声；后景部队仍向前推进，末句后一次近距离步枪声，受俘者倒地。",
-    delivery:"短促而粗暴的审问。川军肩部负伤仍拒绝回答，日兵只说日语，翻译北方官话呵斥。不能拉长审讯，不加音乐。"}),
-  Cue("ShunziCurse", [["ijaA", "出来！混蛋！", {lang:"ja"}]], {
-    soundscape:"刺刀拨开洞口断木，木头刮擦掉土，日兵抓住衣领拖人，伤者痛喘、抓臂挣扎，枪托击打后短暂耳鸣。",
-    delivery:`只有一个日本男兵，日语母语，大声吼出完整的『${JAPANESE_SPEECH["ShunziCurse:0"].kana}』。必须让这句人声清晰压过环境声；吼声约两秒，不要解说、不要预告旁白。`}),
-  Cue("RescueCall", [
-    ["interpreter", "装什么死！醒醒！"],
-    ["interpreter", "问你话。你们的人往哪儿撤了？"],
-    ["interpreter", "说！你们长官在哪儿？"],
-    ["shunzi", "你龟儿听得懂老子说话不？"],
-    ["interpreter", "什么？"],
-    ["shunzi", "老子问你——"],
-  ], {soundscape:"交通壕边低处，负伤者近处喘息，近处日兵揪领和装备声；远处脚步枪声仍推进。",
-    delivery:"日兵主导控制，旁侧翻译用北方官话传话逼问。顺子害怕、观察逃跑机会，用四川话顶嘴，最后半句突然中断，不泄露情报，不加英雄音乐。"}),
-  Cue("RescueLift", [
-    ["interpreter", "有人——！"],
-    ["heyoutian", "趴下！"],
-    ["luo", "妈卖批！还躺起搞啥子！"],
-  ], {soundscape:"极短的近身反扑，大刀挥动、身体撞击、步枪脱手落泥，另一支枪走火击入沟壁，后交通壕步枪压制。",
-    delivery:"翻译突然惊叫被打断，何有田四川话短促大吼，罗班长用力反扑后吼顺子。实时速度，不慢动作，不加任何音乐。"}),
-  Cue("RescueOut", [
-    ["luo", "还活到起没？！"],
-    ["shunzi", "差点遭你拖死！"],
-    ["luo", "那就是没死！拿枪！"],
-  ], {soundscape:"班长猛拖顺子，衣料拉扯、身体擦泥，靴子把掉落步枪踢过来，后沟步枪掩护和逃跑脚步。",
-    delivery:"班长边拉人边吼，顺子被拖痛了气喘顶嘴，末句拿枪是紧急命令。全段四川话、连续演完。"}),
-  Cue("TrenchCurse", [
-    ["heyoutian", "班长！又上来一伙！"],
-    ["luo", "刚才那几个就是先头的！"],
-    ["heyoutian", "后头全他妈跟上来了！"],
-    ["luo", "走！后沟！快！"],
-  ], {delivery:"何有田探头确认后续攻击兵力，声音急；班长立刻催撤。密集脚步与日语不可辨识喊声从远处逼近，说明仅抢出短暂窗口。"}),
-  Cue("CornerCheck", [
-    ["yaowa", "顺哥！老子还以为你遭埋了！"],
-    ["shunzi", "差点！"],
-    ["yaowa", "快点！鬼子追上来了！"],
-    ["shunzi", "老子早说该走！硬是要等鬼子摸到裤裆底下才晓得跑！"],
-    ["luo", "闭到你的臭嘴！跑！"],
-  ], {delivery:"在后沟折角仍边跑边说，幺娃从侧后追上回看，顺子又急又怕地骂，班长催跑打断，不停在原地。"}),
   // Notion 2026-09-22: stages 03–05, verbatim source and complete exchanges.
   PerLine("FrontBlockade", [["zhou", "右边破墙！冒火那个口子！把路封死了！"], ["luo", "周哥，顶一下！我们去拿右边！"], ["luo", "顺子，跟紧！莫走外头！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
   PerLine("FrontApproach", [["luo", "贴这道墙！前头有人！"], ["luo", "口子压住了，进！"]], {delivery:"四川前沿官兵在枪炮声中短促交代，按实际距离与角色区别演绎；老周已有包扎腿伤，动作吃力；不作播音腔。"}),
@@ -602,9 +554,8 @@ const SOUNDSCAPES = Object.freeze({
   night: "夜里滕县北门外：成队的脚步踩在土路上、弹药箱与器材搬动、车轮木响、许多人低声说话和零星口令；城墙把声音兜住，没有欢呼。",
 });
 const SOUNDSCAPE_ZONES = Object.freeze({
-  BunkerBanter: "bunker", BunkerKilling: "bunker", BunkerSearch: "bunker", ShunziCurse: "bunker",
-  RescueCall: "rescue", RescueLift: "rescue", RescueOut: "rescue",
-  TrenchCurse: "trench", CornerCheck: "trench", SupportOrder: "trench",
+  BunkerBanter: "bunker", BunkerSearch: "bunker",
+  SupportOrder: "trench",
   FrontApproach:"front",FrontAttack:"front",FrontWithdraw:"front",TankRoadContact:"front",BundleAttack:"bundle",BundleRetreat:"bundle",FrontRelief:"front",
   FrontBlockade: "front", TakeOverGun: "front", TankTerror: "front", BundleOrder: "front",
   BundleGo: "bundle", BundleProne: "bundle", BundleSupply: "bundle", BundleReturnCall: "bundle", TankStopped: "bundle",

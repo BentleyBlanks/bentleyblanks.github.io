@@ -93,7 +93,21 @@ export class FirstLevelBackdropSquads {
     for (const m of this.members) {
       if (!m.actor.alive || m.released) continue;
       this.Drive(m);
+      if (m.spec.retire && m.state.index === m.spec.route.length - 1 && m.state.arrived) this.Retire(m);
     }
+    if (this.members.some((m) => m.retired)) this.members = this.members.filter((m) => !m.retired);
+  }
+
+  /** A man at the end of a `retire` route leaves out of sight (or after retireMaxS). */
+  Retire(m) {
+    const r = this.r, a = m.actor;
+    m.retireAt ??= r.time;
+    const L = this.table.leave || { viewMarginDeg: 0 };
+    const seen = InCameraView(r.camera, { x: a.position.x, y: (a.position.y || 0) + 1.2, z: a.position.z }, L.viewMarginDeg);
+    if (seen && r.time - m.retireAt < (this.table.retireMaxS ?? 25)) return;
+    r.enemies.delete(m.spec.id);
+    r.ai.Remove(a);
+    m.retired = true;
   }
 
   Queue(spec) {

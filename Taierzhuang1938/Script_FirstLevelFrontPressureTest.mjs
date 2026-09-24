@@ -812,6 +812,30 @@ console.log("ok ③ brain: ambient pick/ownership/ledger, dry trigger, MG bursts
     Check(rm2.includes(seen), "once the player looks away he is removed");
     Eq(q.State().leaving, 0);
   }
+  // 2026-09-24 review: a Japanese backdrop man with `retire` leaves at the end of his route only out of view.
+  {
+    const Cam = (yawDeg, x = 0, z = 0) => {
+      const y = (yawDeg * Math.PI) / 180;
+      return { fov: 70, aspect: 16 / 9, matrixWorld: { elements: [Math.cos(y), 0, -Math.sin(y), 0, 0, 1, 0, 0, Math.sin(y), 0, Math.cos(y), 0, x, 1.6, z, 1] } };
+    };
+    const facts3 = new Set(["bunkerCollapsed"]), sp3 = [], rm3 = [];
+    const r3 = { flow: { stage: { id: "Trapped" } }, time: 0, enemies: new Map(), spawnQueue: [], camera: null, Has: (id) => facts3.has(id),
+      ai: { Spawn: (side, x, z, opts) => { const a = { side, alive: true, position: { x, y: 0, z }, goal: { set() {} }, opts }; sp3.push(a); return a; },
+        Remove: (a) => rm3.push(a), SetStance() {} },
+      MoveActor: (a) => { a.order = "advance"; }, Defend: (a) => { a.order = "hold"; } };
+    const q3 = new FirstLevelBackdropSquads(r3);
+    q3.Update(); while (r3.spawnQueue.length) r3.spawnQueue.shift()();
+    const spec = BACKDROP_SQUADS.members.find((m) => m.retire), man = sp3.find((a) => a.missionId === spec.id);
+    const m3 = q3.members.find((m) => m.actor === man), end = spec.route.at(-1), last = spec.route.length - 1;
+    r3.camera = Cam(0, end.x, end.z + 10);    // looking north at the end of his route, 10 m off
+    for (let t = 1; t < 600 && !rm3.includes(man) && !(m3.state.index === last && m3.state.arrived); t++) {
+      r3.time = t; const stop = spec.route[m3.state.index]; man.position = { x: stop.x, y: 0, z: stop.z }; q3.Update();
+    }
+    Check(m3.state.index === last && m3.state.arrived && !rm3.includes(man), "a retire man reaches the end of his route and, in plain view, stays");
+    r3.time += 1; q3.Update(); Check(!rm3.includes(man), "still in view: still there");
+    r3.camera = Cam(180, end.x, end.z + 10); r3.time += 1; q3.Update();
+    Check(rm3.includes(man) && !q3.members.includes(m3), "out of view at the end of his route he is removed (retire)");
+  }
 }
 console.log("ok ④ 01 backdrop: wait-run-hold rhythm, stop fire lists, hand-off, clean removal on leaving 01-02");
 console.log(`FirstLevelFrontPressureTest 通过：${checks} 条断言`);

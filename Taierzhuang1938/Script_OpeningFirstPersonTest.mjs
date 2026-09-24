@@ -7,7 +7,8 @@ import fs from "node:fs";
 import path from "node:path";
 import {fileURLToPath} from "node:url";
 import * as THREE from "three";
-import {OpeningFirstPerson,OpeningActorAnatomy,SolveOpeningActorArm} from "./Script_OpeningFirstPerson.mjs";
+import {OpeningFirstPerson,OpeningActorAnatomy,SolveOpeningActorArm,OpeningHandBeat} from "./Script_OpeningFirstPerson.mjs";
+import {OPENING_STORYBOARDS as C} from "./Data_OpeningStoryboards.mjs";
 
 const here=path.dirname(fileURLToPath(import.meta.url));
 const manifest=JSON.parse(fs.readFileSync(path.join(here,"Model/Character/Data_LugouCharacterManifest.json"),"utf8"));
@@ -41,17 +42,40 @@ for(const unavailable of [undefined,{root:new THREE.Group()},{root:new THREE.Gro
 const missingFinger=Actor("LugouNra02");
 missingFinger.characterRig.root.traverse(node=>{if(node.name.endsWith("L Finger1"))node.name="UnavailableDigit";});
 assert.equal(OpeningActorAnatomy(missingFinger),null,"incomplete hands cannot use uncalibrated palm frames");
-let samples=0,maxBend=0,maxTwist=0,maxRotation=0;
+// Every hand beat of the 2026-09-23 director (contract §5.3 phases): all poses and keys exist.
+const PHASES=[...C.phases.Trapped,...C.phases.BunkerRescue].filter(phase=>phase!=="Released");
+const POSES=new Set(Object.keys(C.firstPerson.hands.poses));
+for(const [phase,beat] of Object.entries(C.firstPerson.hands.beats)){
+  assert.ok(PHASES.includes(phase),`hand beat ${phase} is a director phase`);
+  for(let i=0;i<beat.keys.length;i++){
+    assert.ok(beat.keys[i].slice(1).every(name=>POSES.has(name)),`${phase} key ${i} names known poses`);
+    if(i)assert.ok(beat.keys[i][0]>beat.keys[i-1][0],`${phase} keys are in time order`);
+  }
+}
+for(const phase of PHASES)assert.ok(C.firstPerson.hands.beats[phase]||["Banter","Orders","Incoming"].includes(phase),`${phase} has hands (or holds the loading rifle)`);
+let samples=0,maxBend=0,maxTwist=0,maxRotation=0,groundContacts=0,maxGroundError=0;
+// Hands resting on the mud must really touch it: the ground under the eye is 0.42 m down here.
+const GROUND_POSES=new Set(["flat","push","clawIn","clawOut","sit","brace","limp","scrape"]);
 for(const model of ["LugouNra01","LugouNra02"]){
   const playerBody=Actor(model),other=Actor("LugouNra02");
   other.root.position.set(-40,-.5,-126.9);other.root.updateMatrixWorld(true);
-  const show={playerBody,ready:true,phase:"Supply",Age:0,supplyRoot:new THREE.Group(),loadingRifle:new THREE.Group(),loadingRifleGrip:new THREE.Vector3(),clips:[new THREE.Group(),new THREE.Group()],
-    r:{player:{camera},companion:{Handle:()=>({actor:other})}}};
+  const r={player:{camera},companion:{Handle:()=>({actor:other})},time:0};
+  const show={playerBody,ready:true,phase:"Banter",Age:0,flags:{},supplyRoot:new THREE.Group(),loadingRifle:new THREE.Group(),loadingRifleGrip:new THREE.Vector3(),clips:[new THREE.Group(),new THREE.Group()],
+    r,Ija:()=>({actor:other})};
   const firstPerson=new OpeningFirstPerson(show),lengths={};
-  for(const phase of ["Supply","Orders","Blast","Advance","Captive","Discover","Butt","Black","Interrogate","Pull","Kick"]){
+  for(const phase of PHASES){
     show.phase=phase;
-    for(let frame=0;frame<(phase==="Pull"?190:50);frame++){
-      show.Age=frame/60;firstPerson.Update(1/60);
+    const start=r.time,beat=C.firstPerson.hands.beats[phase];
+    // Flag clocks start with the phase; supply overlays (dirt, bolt) likewise.
+    show.flags={dirtAt:phase==="Banter"?start:null,exitAt:phase==="Orders"?start:null,buttAt:start,collarReleasedAt:start,checkLineAt:start,kickRifleAt:start};
+    // Banter covers the collar/dig overlay; Orders the bolt (the director leaves ≥3 s before Incoming).
+    const frames=Math.max(50,Math.ceil(((beat?.keys.at(-1)[0]||0)+.6)*60),phase==="Banter"?150:0,phase==="Orders"?90:0);
+    for(let frame=0;frame<frames;frame++){
+      show.Age=frame/60;r.time=start+frame/60;firstPerson.Update(1/60);
+      if(frame===frames-1)for(const [side,hand] of Object.entries(firstPerson.report.hands))if(GROUND_POSES.has(hand.pose)){
+        assert.ok(hand.contactError<.02,`${model} ${phase} ${side} ${hand.pose} palm reaches the mud (${hand.contactError})`);
+        groundContacts++;maxGroundError=Math.max(maxGroundError,hand.contactError);
+      }
       for(const [side,hand] of Object.entries(firstPerson.report.hands)){
         lengths[side]??=[hand.upperLength,hand.lowerLength];
         assert.ok(hand.upperLength>.15&&hand.upperLength<.35&&hand.lowerLength>.15&&hand.lowerLength<.35,`${model} uses metre-scale production arm lengths`);
@@ -60,11 +84,20 @@ for(const model of ["LugouNra01","LugouNra02"]){
         assert.ok(Math.abs(hand.wristTwist)<.1,`${phase} ${side} wrist twist ${hand.wristTwist}`);
         assert.ok(hand.reachRatio<=.971,`${phase} ${side} arm reach ${hand.reachRatio}`);
         assert.ok(hand.shoulderBehind>.08,`${phase} keeps the sleeve root behind the camera`);
-        assert.ok(hand.rotationStepDegrees<20,`${phase} at ${show.Age} ${side} changes hand orientation continuously (${hand.rotationStepDegrees} degrees/frame)`);
+        assert.ok(hand.rotationStepDegrees<12,`${phase} at ${show.Age} ${side} changes hand orientation continuously (${hand.rotationStepDegrees} degrees/frame)`);
         maxBend=Math.max(maxBend,hand.wristBend);maxTwist=Math.max(maxTwist,Math.abs(hand.wristTwist));maxRotation=Math.max(maxRotation,hand.rotationStepDegrees);samples++;
       }
     }
+    r.time+=.5;
   }
+}
+assert.ok(groundContacts>=20,"ground beats were sampled at rest ("+groundContacts+")");
+// Flag clocks: an unset flag holds the first key; the key after the flag follows it.
+{
+  const show={phase:"Butt",Age:3,flags:{},r:{time:10}};
+  assert.equal(OpeningHandBeat(show).names.r,"flat","before ijaA reaches his mark Shunzi lies flat");
+  show.flags.buttAt=9.8;assert.equal(OpeningHandBeat(show).names.r,"push","he pushes up before the stock lands");
+  show.flags.buttAt=9;assert.equal(OpeningHandBeat(show).names.r,"rest","after the strike the arms go slack");
 }
 // A helper approaching from the side must meet a clasp's palm plane even when
 // the preferred elbow pole would make the wrist-flexion clamp roll that plane.
@@ -99,5 +132,5 @@ for(const model of ["LugouNra01","LugouNra02"])for(const side of ["l","r"]){
     freeReachSamples++;maxFreeFrameError=Math.max(maxFreeFrameError,frameError);
   }
 }
-console.log(JSON.stringify({samples,maxBend,maxTwist,maxRotation,claspSamples,maxClaspError,minClaspAlignment,maxClaspBend,freeReachSamples,maxFreeFrameError}));
+console.log(JSON.stringify({samples,maxBend,maxTwist,maxRotation,groundContacts,maxGroundError,claspSamples,maxClaspError,minClaspAlignment,maxClaspBend,freeReachSamples,maxFreeFrameError}));
 console.log("ok production opening arms preserve anatomical length, wrist axes and hidden shoulder roots");

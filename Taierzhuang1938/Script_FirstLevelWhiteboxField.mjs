@@ -450,6 +450,15 @@ export class FirstLevelWhiteboxField {
       sink.Add(block.semantic, PlaceGeometry(MakeBox(block.w, block.h, block.d, 1, block.id), block));
       if (block.solid !== false) sink.Solid(block.x, block.y, block.z, block.w / 2, block.h / 2, block.d / 2, block.tag, block.ry || 0,
         WhiteboxSurface(block, this.layout));
+      // Scenario covers (the 02 mouth spoil) join the AI cover table like static blocks do.
+      if (block.cover) for (const point of block.cover.points || [block]) sink.Cover(point.x, point.z, block.h, block.cover.faceX, block.cover.faceZ);
+    }
+    // A new array only when the scenario covers really change: the AI rebuilds its cover registry
+    // (and drops its validation cache) whenever the reference changes (Script_Ai.UpdateFront).
+    const was = this.scenarioCovers || [], Key = (c) => `${c.x},${c.z},${c.height},${c.faceX},${c.faceZ}`;
+    if (was.length !== sink.covers.length || was.some((cover, i) => Key(cover) !== Key(sink.covers[i]))) {
+      this.covers = [...(this.covers || []).filter((cover) => !was.includes(cover)), ...sink.covers];
+      this.scenarioCovers = sink.covers.slice();
     }
     this.scenarioMeshes = sink.Flush(this.scene, { Get: key => {
       if(key==="OpeningEarth")return this.library.Get("Adobe",{color:0x777064,repeat:2});

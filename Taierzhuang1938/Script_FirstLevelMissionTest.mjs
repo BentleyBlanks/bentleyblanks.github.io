@@ -143,22 +143,12 @@ if(process.argv.includes("--opening-audio"))process.exit(0);
     show.r.enemies.delete(C.vanguardIds[0]);assert.equal(show.VanguardCleared(),false,"missing actor is not proof of a kill");
     show.playerMeleeDormancy=false;show.savedMeleeDormancy=true;show.ReleaseMeleeDormancy();
     assert.equal(show.r.player.meleeDormant,false,"melee eligibility returns after captive camera control");
-    console.log("ok rescue waits for every original vanguard casualty and restores player melee eligibility");
-    const coverActors=new Map(Object.keys(C.coverPosts).map((id,i)=>[id,{alive:true,position:{...(i?{x:-40,z:-118}:C.positions.heRear)},...(i?{}:{moveArriveM:.63})}]));
-    show.r.companion={Handle:id=>coverActors.get(id)};show.r.ai={ReleaseCover(){}};
-    show.r.MoveActor=(actor,point)=>{actor.next={...point};};show.r.Defend=(actor,point)=>{actor.defended={...point};};
-    show.UpdateSuppression();
-    for(const [id,actor] of coverActors){assert.deepEqual(actor.next,C.coverRoutes[id][0]);assert.ok(actor.moveArriveM<C.coverWaypointArrivalM);}
-    show.ReleaseSuppressionMovement();
-    assert.equal(coverActors.get("heyoutian").moveArriveM,.63,"temporary exact corner arrival restores the preceding movement contract");
-    assert.equal(Object.hasOwn(coverActors.get("liuwencai"),"moveArriveM"),false,"an absent arrival override stays absent after interruption");
-    for(let step=0;step<8;step++){
-      show.UpdateSuppression();for(const actor of coverActors.values())if(actor.next)Object.assign(actor.position,actor.next);
-    }
-    for(const [id,actor] of coverActors){assert.deepEqual(actor.defended,C.coverPosts[id]);assert.equal(show.coverWalks[id].ownsArrival,false);}
-    assert.equal(coverActors.get("heyoutian").moveArriveM,.63);
-    assert.equal(Object.hasOwn(coverActors.get("liuwencai"),"moveArriveM"),false);
-    console.log("ok both covering actors visit their door waypoints and release temporary movement ownership");
+    console.log("ok rescue waits for the cut-down and shot vanguard and restores player melee eligibility");
+    // 2026-09-23 hand-back rule (contract §2.1): only ijaA, ijaB (dadao) and ijaD (the junction, Liu's shot) gate it.
+    assert.deepEqual([...C.vanguardIds].sort(),["BunkerExecutionerA","BunkerExecutionerB","BunkerFollowB"]);
+    // A root chained across a clip change keeps the pelvis where it was (drag -> wall).
+    const chained=show.ChainRoot.call({},{x:0,z:0,yaw:0},"LugouNra02","CaptiveDraggedFromDirt","CaptiveWallBrace");
+    assert.ok(Number.isFinite(chained.x)&&Number.isFinite(chained.z)&&Number.isFinite(chained.yaw),"root chaining without a loaded library falls back to the same root");
   }
   {
     const actor={alive:true,missionFrontStandby:true,position:new Vector3(0,0,-10),stance:0,suppression:0};
@@ -722,9 +712,16 @@ for (const [name, route] of Object.entries({ ...MISSION_ROUTES, ...Object.fromEn
     BunkerRescue:bunker.rescueRoute,
     BunkerAssault:[bunker.ijaStart[0],bunker.ijaKill[0],bunker.ijaDoor[0],A.bunkerDoor],
     BunkerAssaultB:[bunker.ijaStart[1],bunker.ijaKill[1],bunker.ijaDoor[1],A.bunkerDoor],
-    CoverHe:[storyboards.positions.heRear,...storyboards.coverRoutes.heyoutian],
-    CoverWen:[{x:-40,z:-118},...storyboards.coverRoutes.liuwencai],
-    PullReturn:[storyboards.positions.pullEnd,...storyboards.pullReturnWaypoints,storyboards.positions.luoPull],
+    // 2026-09-23 director (Data_OpeningStoryboards): every leg its actors walk, in every scenario state.
+    OrdersRunner:storyboards.banter.runnerRoute,
+    OrdersExit:storyboards.banter.exitRoute,
+    FoundIn:[...storyboards.ija.foundRoute],
+    DragOut:storyboards.ija.dragOutRoute,
+    RescueLuo:storyboards.rescue.luoRoute,
+    RescueHe:storyboards.rescue.heRoute,
+    RescueLiu:[...storyboards.rescue.liuRoute,storyboards.rescue.liuShot],
+    DragCover:[...storyboards.rescue.dragCoverRoute,storyboards.rescue.luoCheck],
+    Withdraw:storyboards.withdraw.lane,
   };
   for(const state of MISSION_LAYOUT.scenario.states)for(const [name,lane] of Object.entries(lanes)){
     for(let i=1;i<lane.length;i++){
@@ -1044,13 +1041,13 @@ assert.equal(new Set(MISSION_DIALOGUE.map((cue) => cue.id)).size, MISSION_DIALOG
     audio:{PlayStoryVoice:(_key,options)=>{offsets.push(options.offset||0);return {duration:1};},StopStoryVoice(){}},
     hud:{Say(){}},Done:id=>done.push(id),
   });
-  voice.manifest={cues:{TrenchCurse:{seconds:3.109},CornerCheck:{seconds:2.429}}};
-  voice.Enqueue("TrenchCurse");voice.Enqueue("CornerCheck");
+  voice.manifest={cues:{SouthWhisper:{seconds:3.109},VillagePointer:{seconds:2.429}}};
+  voice.Enqueue("SouthWhisper");voice.Enqueue("VillagePointer");
   voice.Update(0);voice.Update(.3);voice.Pause();voice.Update(10);
   assert.equal(voice.current.time,.3);
   voice.Resume();
   for(let i=0;i<400;i++)voice.Update(1/60);
-  assert.deepEqual(done,["TrenchCurse","CornerCheck"]);
+  assert.deepEqual(done,["SouthWhisper","VillagePointer"]);
   assert.deepEqual(offsets,[0,.3,0]);
 }
 

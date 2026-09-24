@@ -1,7 +1,7 @@
 import { CutscenePerformer, LoadMachineGunCaptivesAnimation } from "./Script_CutscenePerformance.mjs";
 import { OPENING_STORYBOARDS as C } from "./Data_OpeningStoryboards.mjs";
 import { LoadMeleeAnimations } from "./Script_MeleeAnimationData.mjs";
-import { Quaternion } from "three";
+import { Quaternion, Matrix4, Vector3 } from "three";
 import { OpeningActorPerformance, ResolveOpeningActorPose, CorrectOpeningActorGrips, SettleOpeningCaptive } from "./Script_OpeningActorPerformance.mjs";
 import { ApplyOpeningRescueReady } from "./Script_OpeningFirstPerson.mjs";
 import { OpeningPropSet, ApplyOpeningWeaponTrack, BlendWeaponFrom, OpeningHoldTime } from "./Script_OpeningProps.mjs";
@@ -17,6 +17,25 @@ const Quat = new Quaternion(), QuatRef = new Quaternion(), QuatAdd = new Quatern
 export function OpeningClipMeta(clip){return library?.config.clips?.[clip]||null;}
 /** Paired staging (runtime metres, anchor frame) and prop definitions from the manifest. */
 export function OpeningStage(name){return library?.config.stages?.[name]||null;}
+/** Prop definitions (beam poses, bayonet mount) from the manifest. */
+export function OpeningPropConfig(name){return library?.config.props?.[name]||null;}
+/** Pelvis at a clip's first/last frame for one rig ([x, z, yawDeg, pelvisHeight], anchor frame):
+ * the director chains roots with it when a clip was baked on a new root (drag -> wall). */
+export function OpeningClipRoot(modelId,clip){
+  const row=library?.config.models?.find(model=>model.id===modelId);
+  const index=row?.clipIds?.indexOf(clip);
+  return index>=0?row.clips[index]?.root||null:null;
+}
+/** A point of the first-person player's body (clip `player` track: collar / head / shoulderR)
+ * in the actor's anchor frame (+x right, +y up, -z forward, runtime metres) at `seconds`. */
+export function OpeningPlayerPoint(modelId,clip,part,seconds){
+  const track=library?.models.get(modelId)?.clips[clip]?.player,values=track?.parts?.[part];
+  if(!values?.length)return null;
+  const count=values.length/3,at=Math.max(0,Math.min(count-1,(Number(seconds)||0)*(track.fps||12)));
+  const a=Math.floor(at),b=Math.min(count-1,a+1),t=at-a;
+  return {x:values[a*3]+(values[b*3]-values[a*3])*t,y:values[a*3+1]+(values[b*3+1]-values[a*3+1])*t,
+    z:values[a*3+2]+(values[b*3+2]-values[a*3+2])*t};
+}
 
 /** A clip with a `holdLoop` window keeps sampling inside it once the playhead passes its end,
  * so a director can hold "fist in the hair" or "kneeling, hand on shoulder" for as long as
@@ -105,10 +124,40 @@ export function InstallOpeningStoryboardAnimation(soldier){
   const blendTarget=new Quaternion();
   const Snapshot=out=>{for(let i=0;i<bones.length;i++){out[i].p.copy(bones[i].position);out[i].q.copy(bones[i].quaternion);}return out;};
   let displayed;
+  // The skeleton root bone (GroundRoot) as last shown, in world space: a blend that starts after the director
+  // moved or turned the root (a re-root at a clip hand-over) starts from the pelvis where it was seen.
+  const rootBone=bones.findIndex(bone=>!bone.parent?.isBone),displayedRootWorld=new Matrix4(),reroot=new Matrix4(),rerootScale=new Vector3();
+  let displayedParentValid=false;
+  const KeepDisplayedPelvis=()=>{
+    if(rootBone<0||!displayedParentValid||!displayed)return;
+    const bone=bones[rootBone];bone.parent.updateWorldMatrix(true,false);
+    reroot.copy(bone.parent.matrixWorld).invert().multiply(displayedRootWorld).decompose(blendFrom[rootBone].p,blendFrom[rootBone].q,rerootScale);
+  };
+  // A root the AI has taken out of the scene (culled) is not refreshed by the scene's matrix update: bring the
+  // parent chain up to date here, or the remembered matrix is from the last frame he was shown and a re-root
+  // against it slides him back to where he was last seen (09-24: ijaB 1.4 m, Liu 6.8 m).
+  const RememberDisplayedParent=()=>{if(rootBone>=0){const bone=bones[rootBone];bone.updateWorldMatrix(true,false);displayedRootWorld.copy(bone.matrixWorld);displayedParentValid=true;}};
+  // The frame's last word on where the body stands is the director's (it moves and turns roots -- and keeps the
+  // shown skeleton across a Put -- after the AI has animated them, and the AI turns them its own way in between):
+  // the director calls this once it is done for the frame (FirstLevelBunkerShow.MarkNotShown / BeforeRender), so
+  // a re-root blend starts from the pelvis actually shown (09-24: Liu's pelvis hopped 0.15 m at the MessengerReport
+  // hand-over after the AI had turned his root).
+  rig.openingRememberShown=RememberDisplayedParent;
+  // The top bone (GroundRoot) carries no track in the opening clips: the director's KeepSkeleton writes
+  // the displayed pelvis into it for one frame at a re-root, and it must go back to rest before the next
+  // sample, or that offset stays for good (09-24 review: ijaA's head sank 10 m below ground over 02).
+  // The blend still starts where the body was seen (KeepDisplayedPelvis moves blendFrom, not the bone).
+  const rootRest=rootBone>=0?{p:bones[rootBone].position.clone(),q:bones[rootBone].quaternion.clone()}:null;
   actor.Update=function(dt,state){
     const acting=rig.openingActorPerformance ||= new OpeningActorPerformance(soldier);
     acting.Restore();
     performer?.Restore();
+    // Not shown last frame (the AI culled him and skipped this layer): what was remembered as displayed is from
+    // the last frame he was on screen, somewhere else; blend from the pose, never re-root against that place
+    // (09-24: ijaB slid 1.4 m, Liu 6.8 m from where they were last seen when the camera turned to them).
+    const freshShow=!!soldier.openingNotShown;
+    if(freshShow){soldier.openingNotShown=false;displayedParentValid=false;displayed=null;}
+    if(rootRest){bones[rootBone].position.copy(rootRest.p);bones[rootBone].quaternion.copy(rootRest.q);}
     clock+=dt;
     const record=library?.models.get(rig.clipModelId||rig.modelId);
     let pose=ResolveOpeningActorPose(soldier,soldier.openingStoryboardPose,clock,record);
@@ -148,9 +197,11 @@ export function InstallOpeningStoryboardAnimation(soldier){
     const rescueReady=context?.role==="luo"&&!actor.weaponId&&((context.phase==="Pull"&&pose?.clip!=="PullComrade")||context.phase==="Kick");
     if(wasRescueReady&&!rescueReady)rescueHandoff=true;
     wasRescueReady=rescueReady;
-    if(key!==lastKey){
+    const rerooted=soldier.openingRerooted,noBlend=soldier.openingNoBlend;
+    soldier.openingRerooted=false;soldier.openingNoBlend=false;
+    if(key!==lastKey||rerooted){
       blendFrom=blendBuffer;
-      if(displayed)for(let i=0;i<bones.length;i++){blendFrom[i].p.copy(displayed[i].p);blendFrom[i].q.copy(displayed[i].q);}
+      if(displayed){for(let i=0;i<bones.length;i++){blendFrom[i].p.copy(displayed[i].p);blendFrom[i].q.copy(displayed[i].q);}KeepDisplayedPelvis();}
       else Snapshot(blendFrom);
       // Weapon and extra props ease from where they were displayed, in step with the bones --
       // a weapon/prop track would otherwise jump to the new clip's first frame at once.
@@ -158,8 +209,12 @@ export function InstallOpeningStoryboardAnimation(soldier){
       weaponEase=!!(shownWeapon.p&&shownWeapon.group===actor.weaponGroup&&(before?.props?.weapon||after?.props?.weapon));
       if(weaponEase){weaponFrom.p=shownWeapon.p.clone();weaponFrom.q=shownWeapon.q.clone();weaponFrom.group=shownWeapon.group;}
       rig.openingProps?.BeginBlend();
-      blendAt=clock;lastKey=key;travelClock=0;
+      blendAt=clock;if(key!==lastKey)travelClock=0;lastKey=key;
+      if(noBlend){blendFrom=null;displayed=null;}
     }
+    // First frame back on screen: nobody saw the pose he had, so show the current one outright (a blend from
+    // the pose he had when culled moved the pelvis 0.15 m in a frame, 09-24 run).
+    if(freshShow){blendFrom=null;lastKey=key;}
     const locomotion=Snapshot(baseBuffer);
     if(pose&&record&&pose.clip!=="DadaoAmbush"){
     performer ||= new CutscenePerformer(actor,record,library.config);
@@ -182,6 +237,7 @@ export function InstallOpeningStoryboardAnimation(soldier){
     if(pose.additive)ApplyOpeningAdditive(performer,record,pose.additive);
     }else{rig.openingStoryboardState=null;}
     const blend=nativeCombat?1:Math.min(1,(clock-blendAt)/C.poseBlendS),mix=blend*blend*(3-2*blend);
+    rig.openingBlendState={key,mix:blendFrom?mix:1,rerooted:!!rerooted,noBlend:!!noBlend};
     if(blendFrom&&blend<1)for(let i=0;i<bones.length;i++){
       if(rescueHandoff&&RescueHandoffBone(bones[i]))continue;
       bones[i].position.lerpVectors(blendFrom[i].p,bones[i].position,mix);
@@ -189,7 +245,7 @@ export function InstallOpeningStoryboardAnimation(soldier){
       bones[i].quaternion.slerpQuaternions(blendFrom[i].q,blendTarget,mix);
     }
     SettleOpeningCaptive(soldier,pose);
-    if(!rescueHandoff)displayed=Snapshot(shownBuffer);rig.root.updateMatrixWorld(true);
+    if(!rescueHandoff)displayed=Snapshot(shownBuffer);rig.root.updateMatrixWorld(true);if(!rescueHandoff)RememberDisplayedParent();
     acting.Apply(dt,state,pose);
     CorrectOpeningActorGrips(soldier,pose);
     let rescueHandoffApplied=false;
