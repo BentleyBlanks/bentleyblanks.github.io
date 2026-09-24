@@ -521,6 +521,8 @@ export class FirstLevelBunkerShow {
    */
   MarkNotShown(){
     for(const actor of [...Object.values(this.cast),...this.r.squad,...this.r.enemies.values()]){
+      // The director is done moving roots for this frame: remember the parent as it will be shown.
+      if(actor&&!actor.openingStoryboardHidden)actor.actor?.characterRig?.openingRememberShown?.();
       if(!actor?.renderLod||actor.renderLod==="detail")continue;
       const posed=actor.alive&&!actor.openingStoryboardHidden&&(actor.openingStoryboardPose||actor.openingStoryboardTravel!=null);
       if(posed)actor.actor.root.visible=true;else actor.openingNotShown=true;
@@ -1329,8 +1331,10 @@ export class FirstLevelBunkerShow {
     actor.actor._UpdateRiggedWeaponMount();actor.actor.weaponTwoHanded=twoHanded;
   }
   BeforeRender(){
-    for(const actor of [...Object.values(this.cast),...this.r.squad,...this.r.enemies.values()])
+    for(const actor of [...Object.values(this.cast),...this.r.squad,...this.r.enemies.values()]){
       if(actor.openingStoryboardHidden)actor.actor.root.visible=false;
+      else actor.actor?.characterRig?.openingRememberShown?.();
+    }
   }
   /** An enemy rifle shot from the muzzle: flash, tracer, dirt where it meets the trench wall, report. */
   FireRifle(actor,target,wall=false){
@@ -1765,6 +1769,10 @@ export class FirstLevelBunkerShow {
     // centred in frame). Cull again against the shot actually shown.
     r.ai?.CullActors?.(cam);
     this.MarkNotShown();
+    // The HUD's incoming-fire arcs point relative to the player's own yaw, not to the director's shot, and the
+    // player cannot act on them here: near misses in 01–02 showed a white arc over the frame (09-24 review:
+    // "天空里浮着一个白色弧形"). They are cleared while the director owns the view.
+    if(r.player?.hitMarks?.length)r.player.hitMarks.length=0;
     const opening=r.opening;
     const fade=p==="Banter"?1-Smooth((r.time-(this.started??r.time))/C.fadeInS):0;
     // 「泥土落下来。顺子闭了一下眼，再睁开时……」

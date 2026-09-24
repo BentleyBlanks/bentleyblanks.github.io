@@ -246,7 +246,9 @@ export const OPENING_STORYBOARDS = Object.freeze({
     dragCoverRoute:Route([3.2,-124.25],[2.3,-124.95],[1.35,-125.05]),
     luoCheck:P(.5,-125.05),
     rifleMouth:P(1.4,-125.6,.3),          // bunker.rifleMouth: stock half-buried in the mouth (01 prop)
-    rifleKicked:P(.56,-124.68,1.25),      // at his hand after Luo's kick (0.34 m, a seated reach), clear of the post; the pickup follows the prop
+    // At his hand after Luo's kick (0.34 m, a seated reach); muzzle to the west into the dugout, clear of the south
+    // post and the mouth rubble (turned east, its muzzle lay inside BunkerMouthRubbleS). The pickup follows the prop.
+    rifleKicked:P(.3,-124.66,1.1+Math.PI),
     kickFrom:P(1.85,-125.55),
   }),
   // ---- 02 pursuit (bunkerPursuit, contract §5.8) -----------------------------------------
@@ -260,7 +262,7 @@ export const OPENING_STORYBOARDS = Object.freeze({
     luoCover:P(-.6,-120.4),                // first intact wall past the low section, turned back to cover
     luoCorner:P(-7.2,-111.8),              // beyond RC, waiting for the player
     heBound:Route([-.2,-121.9],[-1.2,-118.2]),
-    liuBound:Route([-1,-121],[-3.3,-114.6]),
+    liuBound:Route([-1,-121],[-5.3,-112.4]),   // the second bound is round the corner, off the look-back line up the leg
     pursuitBaseFaceTo:P(-.2,-122.2),
   }),
 });

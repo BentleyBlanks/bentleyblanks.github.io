@@ -88,6 +88,10 @@ async function InstallProbe(page) {
     P.Sample = () => {
       const r = g.Debug.FirstLevelMissionRuntime(), s = r.frontShow.bunker, cam = g.player.camera;
       P.frames++;
+      // Continuity is measured between consecutive frames only: frames stepped without sampling (the walked
+      // withdrawal, the look-back) leave a gap, and a step across it is not a jump anyone saw in one frame.
+      if (P.lastTime != null && r.time - P.lastTime > 1.5 / 60) { P.previous = {}; P.camera = null; P.cameraRotation = null; }
+      P.lastTime = r.time;
       P.minHealth = Math.min(P.minHealth, g.player.health);
       // Lethal hits on the vanguard: how, in which phase.
       for (const id of C.vanguardIds) {
@@ -437,7 +441,7 @@ export async function CheckOpeningActing(ctx){
     assert.ok(rearActing[key].turn>.03,`${key}: actual visible 03 speaker visibly turns/nods`);
   }
   assert.deepEqual(ctx.errors,[]);
-  console.log("ok 01–03 normal progression, continuous hands and visible dialogue performances",JSON.stringify(visible));
+  console.log(`ok 01–0${ctx.stageTo>=3?3:2} normal progression, continuous hands and visible dialogue performances`,JSON.stringify(visible));
 }
 
 // ---- non-ideal hand-back orders (contract v1.1 ③: 02 must never stall) -------------------------

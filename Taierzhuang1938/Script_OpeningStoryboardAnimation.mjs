@@ -124,22 +124,25 @@ export function InstallOpeningStoryboardAnimation(soldier){
   const blendTarget=new Quaternion();
   const Snapshot=out=>{for(let i=0;i<bones.length;i++){out[i].p.copy(bones[i].position);out[i].q.copy(bones[i].quaternion);}return out;};
   let displayed;
-  // The skeleton root bone's parent as displayed: a blend that starts after the director moved or
-  // turned the root (a re-root at a clip hand-over) starts from the pelvis where it was seen.
-  const rootBone=bones.findIndex(bone=>!bone.parent?.isBone),displayedParent=new Matrix4(),reroot=new Matrix4(),rerootLocal=new Matrix4(),rerootScale=new Vector3();
+  // The skeleton root bone (GroundRoot) as last shown, in world space: a blend that starts after the director
+  // moved or turned the root (a re-root at a clip hand-over) starts from the pelvis where it was seen.
+  const rootBone=bones.findIndex(bone=>!bone.parent?.isBone),displayedRootWorld=new Matrix4(),reroot=new Matrix4(),rerootScale=new Vector3();
   let displayedParentValid=false;
   const KeepDisplayedPelvis=()=>{
     if(rootBone<0||!displayedParentValid||!displayed)return;
     const bone=bones[rootBone];bone.parent.updateWorldMatrix(true,false);
-    reroot.copy(bone.parent.matrixWorld).invert().multiply(displayedParent);
-    const e=reroot.elements;let off=0;for(let i=0;i<16;i++)off=Math.max(off,Math.abs(e[i]-(i%5===0?1:0)));
-    if(off<1e-6)return;
-    rerootLocal.compose(blendFrom[rootBone].p,blendFrom[rootBone].q,bone.scale).premultiply(reroot).decompose(blendFrom[rootBone].p,blendFrom[rootBone].q,rerootScale);
+    reroot.copy(bone.parent.matrixWorld).invert().multiply(displayedRootWorld).decompose(blendFrom[rootBone].p,blendFrom[rootBone].q,rerootScale);
   };
   // A root the AI has taken out of the scene (culled) is not refreshed by the scene's matrix update: bring the
   // parent chain up to date here, or the remembered matrix is from the last frame he was shown and a re-root
   // against it slides him back to where he was last seen (09-24: ijaB 1.4 m, Liu 6.8 m).
-  const RememberDisplayedParent=()=>{if(rootBone>=0){bones[rootBone].parent.updateWorldMatrix(true,false);displayedParent.copy(bones[rootBone].parent.matrixWorld);displayedParentValid=true;}};
+  const RememberDisplayedParent=()=>{if(rootBone>=0){const bone=bones[rootBone];bone.updateWorldMatrix(true,false);displayedRootWorld.copy(bone.matrixWorld);displayedParentValid=true;}};
+  // The frame's last word on where the body stands is the director's (it moves and turns roots -- and keeps the
+  // shown skeleton across a Put -- after the AI has animated them, and the AI turns them its own way in between):
+  // the director calls this once it is done for the frame (FirstLevelBunkerShow.MarkNotShown / BeforeRender), so
+  // a re-root blend starts from the pelvis actually shown (09-24: Liu's pelvis hopped 0.15 m at the MessengerReport
+  // hand-over after the AI had turned his root).
+  rig.openingRememberShown=RememberDisplayedParent;
   // The top bone (GroundRoot) carries no track in the opening clips: the director's KeepSkeleton writes
   // the displayed pelvis into it for one frame at a re-root, and it must go back to rest before the next
   // sample, or that offset stays for good (09-24 review: ijaA's head sank 10 m below ground over 02).
