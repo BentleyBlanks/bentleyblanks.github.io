@@ -2823,7 +2823,9 @@ export const MUSIC_BASE = "Audio/Music/";
 // 2026-09-13：汉阳造 01 专用连续枪响＋枪机实录进入清单。
 // 2026-09-15：那一条拆成枪声 rifleHanYang（同文件名、内容变了）与枪机 boltHanYang。
 // 2026-09-17：大刀挥空从三条换成一条（AudioSfx_DadaoSwing_01 同文件名、内容变了）。
-export const SFX_PACK_VERSION = "20260924tankgunfire";
+// 2026-09-24：十一年式换枪声（用户拍板）：type11 = SeedAudio 1 + MINIMI 1 m 2，type11Far 补 MINIMI 50 m 2；
+// AudioSfx_Type11_01/02 同文件名、内容变了（BAR 0.1 m → MINIMI），不抬戳就还是缓存里的 BAR。
+export const SFX_PACK_VERSION = "20260924type11minimi";
 export const AMB_PACK_VERSION = "20260912trainonly";
 export const MUSIC_PACK_VERSION = "5";
 
