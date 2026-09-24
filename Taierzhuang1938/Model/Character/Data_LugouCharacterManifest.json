@@ -5,7 +5,7 @@
     {
       "id": "LugouIja01",
       "facialUrl": "./Model/Character/Model_LugouIja01Facial.glb",
-      "facialVersion": "855ea2e30f62def6",
+      "facialVersion": "3f4cc32f420957d5",
       "facialCast": [
         "ijaB",
         "ijaC",
@@ -346,7 +346,7 @@
     {
       "id": "LugouIja02",
       "facialUrl": "./Model/Character/Model_LugouIja02Facial.glb",
-      "facialVersion": "686ba4ba94fe0847",
+      "facialVersion": "92ec06cab27b9e63",
       "facialCast": [
         "ijaD"
       ],
@@ -1687,7 +1687,7 @@
     {
       "id": "LugouIja06",
       "facialUrl": "./Model/Character/Model_LugouIja06Facial.glb",
-      "facialVersion": "1a9dd42fee076152",
+      "facialVersion": "8bd6fe408cd99d1a",
       "facialCast": [
         "ijaA"
       ],
@@ -2372,7 +2372,7 @@
     {
       "id": "LugouNra02",
       "facialUrl": "./Model/Character/Model_LugouNra02Facial.glb",
-      "facialVersion": "0443aa409c778f6e",
+      "facialVersion": "fc26f1d4f8a4de83",
       "facialCast": [
         "yaowa",
         "heyoutian",
@@ -3414,7 +3414,7 @@
     {
       "id": "LugouNra05",
       "facialUrl": "./Model/Character/Model_LugouNra05Facial.glb",
-      "facialVersion": "9c412374eff28e10",
+      "facialVersion": "9af2eac259227a64",
       "facialCast": [
         "luo"
       ],
@@ -3760,7 +3760,7 @@
     {
       "id": "LugouNra06",
       "facialUrl": "./Model/Character/Model_LugouNra06Facial.glb",
-      "facialVersion": "06a0160ac0211752",
+      "facialVersion": "b8831a839ba278bc",
       "facialCast": [
         "interpreter"
       ],

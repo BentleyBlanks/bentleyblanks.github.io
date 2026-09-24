@@ -74,7 +74,9 @@ function Read(glb, index) {
 }
 const LEGACY_BONES = ['Face_Jaw', 'Face_LipLower', 'Face_LipUpper', 'Face_CornerL', 'Face_CornerR', 'Face_BrowL',
   'Face_LidUpperL', 'Face_LidLowerL', 'Face_BrowR', 'Face_LidUpperR', 'Face_LidLowerR'];
-const POSES = ['Rest', 'Open', 'Wide', 'Round', 'Close', 'Blink', 'BrowUp', 'Snarl', 'DeadSlack'];
+const POSES = ['Rest', 'Open', 'Wide', 'Round', 'Close', 'Blink', 'BrowUp', 'Snarl', 'DeadSlack',
+  // 2026-09-25 expressions (01-03 storyboard contract section 4.2).
+  'Shock', 'Pain', 'Shout', 'Grit'];
 const faced = MANIFEST.models.filter(record => record.facialUrl);
 assert.deepEqual(faced.map(r => r.id).sort(), ['LugouIja01', 'LugouIja02', 'LugouIja06', 'LugouNra02', 'LugouNra05', 'LugouNra06']);
 const definitions = {};
@@ -128,6 +130,22 @@ for (const record of faced) {
   assert.ok(moved('Open', 'Face_Jaw') && !moved('Open', 'Face_BrowL'), `${label} Open: jaw only-mouth`);
   assert.ok(moved('Blink', 'Face_LidUpperL') && !moved('Blink', 'Face_Jaw'), `${label} Blink: lids only`);
   assert.ok(moved('DeadSlack', 'Face_Jaw') && moved('BrowUp', 'Face_BrowR') && moved('Close', 'Face_LipLower'));
+  // Lip shapes readable at 1 m (2026-09-25): the corners travel >= 6 mm for Wide/Round
+  // (09-23: 1.8-4.2 mm, under 2 px in the game view), the snarl lifts the upper lip.
+  const travel = (pose, bone) => Math.hypot(...rig.poses[pose][bone].translation.map((x, k) => x - rig.poses.Rest[bone].translation[k]));
+  const turn = (pose, bone) => 2 * Math.acos(Math.min(1, Math.abs(rig.poses[pose][bone].rotation.reduce((s, x, k) => s + x * rig.poses.Rest[bone].rotation[k], 0)))) / Math.PI * 180;
+  for (const bone of ['Face_CornerL', 'Face_CornerR']) {
+    assert.ok(travel('Wide', bone) >= .6 && travel('Round', bone) >= .6, `${label} ${bone}: Wide/Round corner travel >= 6 mm`);
+  }
+  assert.ok(travel('Snarl', 'Face_LipUpper') >= .6, `${label} Snarl lifts the upper lip >= 6 mm`);
+  assert.ok(turn('Snarl', 'Face_Jaw') < 3 && turn('Grit', 'Face_Jaw') < .5, `${label} Snarl/Grit keep the teeth together`);
+  assert.ok(turn('Shout', 'Face_Jaw') > 15 && turn('Shock', 'Face_Jaw') > 5, `${label} Shout/Shock drop the jaw`);
+  assert.ok(travel('Shock', 'Face_BrowL') > .4 && turn('Pain', 'Face_BrowL') > 10 && turn('Snarl', 'Face_BrowR') > 10,
+    `${label} expression brows: Shock raises, Pain/Snarl tilt`);
+  for (const pose of ['Snarl', 'Shock', 'Pain', 'Shout', 'Grit']) {
+    assert.ok(!moved(pose, 'Face_EyeL') && !moved(pose, 'Face_EyeR'), `${label} ${pose} leaves the eyeballs to the gaze layer`);
+  }
+  assert.ok(!moved('Shout', 'Face_LidUpperL') && !moved('Grit', 'Face_LidUpperL'), `${label} Shout/Grit keep the upper lids (blinks stay readable)`);
 }
 
 // ---- speaking cast: pinned approved appearance with a face for every 01-06 speaker ----
@@ -448,6 +466,6 @@ let faceTrackCount = 0;
   assert.ok(open / gap <= .02, `all takes: open in ${(open / gap).toFixed(3)} of line gaps`);
   ClearFaceTracks();
 }
-console.log(`ok speech envelope/clock/isolation; ${faced.length} facial skins (13 bones, 9 poses, shared textures/clips, <=1.5 MB); `
+console.log(`ok speech envelope/clock/isolation; ${faced.length} facial skins (13 bones, ${POSES.length} poses, lip travel >= 6 mm, shared textures/clips, <=1.5 MB); `
   + `${Object.keys(FIRST_LEVEL_SPEAKING_CAST).length} pinned speakers; additive face controller, seeded blinks, gaze, binder; `
   + `${faceTrackCount} baked face tracks (phoneme tables cover the script)`);

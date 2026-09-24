@@ -8,12 +8,12 @@ section 2 item 4 and section 5.6. Morph targets are not used (MotionVector contr
 
 | Model | Facial skin | Size | Cast (`facialCast` in the manifest) |
 | --- | --- | --- | --- |
-| NRA02 | `Model_LugouNra02Facial.glb` | 0.70 MB | yaowa, heyoutian, liuwencai, comrade, runner, guard, shouter, zhou, relief, keeper, bearer, captiveHelper, captiveWounded |
-| NRA06 | `Model_LugouNra06Facial.glb` | 0.70 MB | interpreter |
-| NRA05 | `Model_LugouNra05Facial.glb` | 0.53 MB | luo |
-| IJA01 | `Model_LugouIja01Facial.glb` | 0.94 MB | ijaB, ijaC, frontOfficer |
-| IJA02 | `Model_LugouIja02Facial.glb` | 1.03 MB | ijaD |
-| IJA06 | `Model_LugouIja06Facial.glb` | 1.08 MB | ijaA |
+| NRA02 | `Model_LugouNra02Facial.glb` | 0.71 MB | yaowa, heyoutian, liuwencai, comrade, runner, guard, shouter, zhou, relief, keeper, bearer, captiveHelper, captiveWounded |
+| NRA06 | `Model_LugouNra06Facial.glb` | 0.71 MB | interpreter |
+| NRA05 | `Model_LugouNra05Facial.glb` | 0.54 MB | luo |
+| IJA01 | `Model_LugouIja01Facial.glb` | 0.95 MB | ijaB, ijaC, frontOfficer |
+| IJA02 | `Model_LugouIja02Facial.glb` | 1.04 MB | ijaD |
+| IJA06 | `Model_LugouIja06Facial.glb` | 1.09 MB | ijaA |
 
 Each facial skin is the shipped body GLB plus 13 `Face_*` joints under the head
 (jaw, lower/upper lip, two corners, two brows, four lids, two eyes), new skin weights
@@ -34,8 +34,25 @@ IJA06 and the interpreter the cast-only NRA06 (user, 2026-09-24;
 All bones and poses are in the GLB head frame (Biped: X up, Y forward, Z to the
 character's left; centimetres), the convention of the reviewed 2026-09-13 NRA05 rig.
 Poses (`extras.facialRig.poses`): Rest, Open, Wide, Round, Close, Blink, BrowUp, Snarl,
-DeadSlack. A pose only moves its own bones (Blink never opens the jaw, Open never lifts
-the brows). `extras.facialRig.eyes` names the eye bones and their yaw/pitch axes.
+DeadSlack, and since 2026-09-25 the expressions Shock, Pain, Shout, Grit
+([01-03 storyboard contract](Data_FirstLevelStoryboard0103Contract.md) section 4.2). A pose
+only moves its own bones (Blink never opens the jaw, Open never lifts the brows; no
+expression moves the eyeballs, Shout/Grit leave the upper lids to the blinks).
+`extras.facialRig.eyes` names the eye bones and their yaw/pitch axes.
+
+Shapes (2026-09-25, set in Blender on close-up and 1 m game-view renders of every rig;
+values in `_import/Script_AuthorCharacterFacial.POSES`): Wide pulls the corners out and
+back (mouth about 13 mm wider), Round pulls them in and pushes both lips forward (about
+8 mm narrower), Close presses the lips; the corners travel at least 6 mm (the 09-23
+shapes moved them 1.8-4.2 mm, under 2 px at 1 m). Snarl (龇牙怒目) keeps the teeth nearly
+together and bares both rows, brows down, knitted and tilted inner-end-down; Shock raises
+the brows and upper lids and drops the jaw 8 deg; Pain tilts the inner brows up, squints
+and pulls the corners down; Shout drops the jaw 19 deg with brows down; Grit clenches with
+the lips drawn back. `BrowTilt` turns the brow bones about the head's forward axis.
+IJA heads: the lip weights are centred on the red of the lips (the upper-lip margin used
+to carry 4-6 % of LipUpper), the teeth rows sit 7 mm lower on the lip seam, and the lid
+skin band is 1.5 mm (a blink no longer drags the painted brow). NRA05 keeps its reviewed
+Open/Wide/Round jaw and gets the same lip/corner shapes added on top (`LayerNra05Lips`).
 
 ## Runtime
 
@@ -117,9 +134,11 @@ Mouth shapes therefore come from the text, baked offline per take.
 
 ## Rebuilding
 
-Blender sources: `OneDrive/AI/Models/Blender/Taierzhuang1938/FacialRigs_20260923/`
-(`Animation_{Nra02,Ija02,Nra05}FacialTalk.blend`; NRA05 is the reviewed 2026-09-13
-scene plus eye bones, the four added poses and one-segment tooth bevels).
+Blender sources: `OneDrive/AI/Models/Blender/Taierzhuang1938/FacialRigs_20260925/`
+(`Animation_{Nra02,Ija02,Ija06,Nra06,Nra05}FacialTalk.blend`; NRA05 is the reviewed
+2026-09-13 scene plus eye bones, the added poses, the lip layer and one-segment tooth
+bevels; `UpgradeNra05` can be re-run on an upgraded scene). The 2026-09-23 sources stay in
+`FacialRigs_20260923/` and `Characters_20260924/`.
 
 1. `node scripts/Script_BlenderMcp.mjs start --task FacialRigs`
 2. Author (NRA02/IJA02): exec a wrapper that sets
@@ -133,10 +152,10 @@ scene plus eye bones, the four added poses and one-segment tooth bevels).
    with the same script (job table `BakeJobs`); it calls `_import/Script_BakeCharacterFacial.py`.
    IJA01 is carried from the IJA02 scene (same head mesh, vertex order and triangles).
    IJA06 (reshaped IJA02 head, same topology) is authored on its own shipped GLB
-   (`'model': 'Ija06'`, source `Characters_20260924/Animation_Ija06FacialTalk.blend`);
+   (`'model': 'Ija06'`, source `FacialRigs_20260925/Animation_Ija06FacialTalk.blend`);
    rebuild `Model_LugouIja06.glb` first when the base changes. NRA06 (the interpreter,
    reshaped NRA02 head, same topology) likewise: `'model': 'Nra06'`, source
-   `Characters_20260924/Animation_Nra06FacialTalk.blend`, after `_import/Script_BuildLugouNra06.py`
+   `FacialRigs_20260925/Animation_Nra06FacialTalk.blend`, after `_import/Script_BuildLugouNra06.py`
    (`NRA06_BUILD`). Its spec adds `buckTooth`: one long upper incisor, head-rigid like
    the upper row, from behind the upper lip to 1.2 mm in front of the lower lip, so it
    shows with the lips together and fully when the jaw opens. The spectacles live in the

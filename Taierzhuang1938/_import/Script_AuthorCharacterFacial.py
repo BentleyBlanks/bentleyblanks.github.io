@@ -20,28 +20,44 @@ Run through Blender (`node scripts/Script_BlenderMcp.mjs exec --file <wrapper>`)
     FACIAL_AUTHOR = {'repo': <worktree>, 'model': 'Nra02', 'save': <.blend path or None>,
                      'preview': <png dir or None>}
     exec(compile(open(path).read(), path, 'exec'))
-Source projects live in OneDrive/AI/Models/Blender/Taierzhuang1938/FacialRigs_20260923.
+Source projects live in OneDrive/AI/Models/Blender/Taierzhuang1938/FacialRigs_20260925
+(2026-09-23 rigs: FacialRigs_20260923 and Characters_20260924).
 """
 import bpy, bmesh, json, math, os, struct, importlib.util
 import numpy as np
 from mathutils import Matrix, Vector, Quaternion
 
 POSE_FRAMES = {'Rest': 1, 'Open': 10, 'Wide': 20, 'Round': 30, 'Close': 40, 'Blink': 50,
-               'BrowUp': 60, 'Snarl': 70, 'DeadSlack': 80}
+               'BrowUp': 60, 'Snarl': 70, 'DeadSlack': 80,
+               # 2026-09-25 expressions (01-03 storyboard round, contract section 4.2).
+               'Shock': 90, 'Pain': 100, 'Shout': 110, 'Grit': 120}
 
 # Per-model inputs. Hints are GLB world metres (measured from the shipped files);
 # everything else is derived from the mesh.
 MODELS = {
     'Nra02': {'base': 'Model_LugouNra02.glb', 'head': 'Bip002 Head', 'skinPrim': 0,
               'mouthHint': (-0.003, 1.603, 0.115), 'eyePrim': 5, 'eyeHintY': 1.680,
-              'rigidPrims': [2, 6], 'eyeOpening': (1.35, 0.58)},
+              'rigidPrims': [2, 6], 'eyeOpening': (1.35, 0.58),
+              # NRA lips overlap (no cut): the upper-lip margin carries ~.42 of LipUpper, so
+              # drawn-back lips need more travel to bare the clenched teeth (2026-09-25).
+              'poseScale': {'Grit': {'LipUpper': 1.5, 'LipLower': 1.4}}},
     'Ija02': {'base': 'Model_LugouIja02.glb', 'head': 'Bip001 Head', 'skinPrim': 0,
               'mouthHint': (-0.002, 1.566, 0.109), 'eyePrim': 0, 'eyeHintY': 1.621,
-              'rigidPrims': [2, 3], 'eyeOpening': (1.10, 0.44), 'lidSkin': .30,
+              # lidSkin .30 -> .15 (2026-09-25): the painted brow's lower edge sits on the lid
+              # crease, and a blink dragged it down with the lid.
+              'rigidPrims': [2, 3], 'eyeOpening': (1.10, 0.44), 'lidSkin': .15,
               'mouth': (4.40, 2.20),
               # The IJA head already carries a dark mouth tube behind the lips; it opens with
               # the split, so only teeth and tongue are added, set deeper inside it.
-              'cavity': False, 'teethBack': .45},  # sealed lips: lip line and half width, Head-local cm
+              'cavity': False, 'teethBack': .45,  # sealed lips: lip line and half width, Head-local cm
+              # The IJA upper lip's red spans 3.6-4.5 cm (seam at 3.64, under the measured 4.4
+              # lip line): the default upper-lip bump (+.55 cm, width .8) gave its margin 4-6 %
+              # weight, so it never lifted off the teeth. Centre both lip bumps on the red
+              # (measured in Blender, 2026-09-25).
+              'lipUpperUp': -.45, 'lipUpperWidth': .60, 'lipLowerUp': -1.0,
+              # ...and the teeth rows sat on the 4.4 line, behind the upper lip: lips drawn
+              # back (Grit, Snarl) showed a dark slot. Moved down onto the seam.
+              'teethUp': -.70, 'teethSpan': .70},
 }
 # IJA06 (standard rifleman, 2026-09-24) is IJA02 reshaped by _import/Script_BuildLugouIja06.py:
 # same head topology, lip line kept in place; its upper lids sit 2 mm lower (narrower eyes).
@@ -56,19 +72,89 @@ MODELS['Nra06'] = {**MODELS['Nra02'], 'base': 'Model_LugouNra06.glb', 'eyePrim':
                                  'overLip': .12}}
 
 # Pose deltas in Head-local cm (up, forward, outward for paired bones) and jaw
-# degrees about Head +Z (opens). Values follow the NRA05 review rig's ranges
-# (jaw 10.3 deg, corners 1.8-2.4 mm, lids 6.7 mm) with the added expressions.
+# degrees about Head +Z (opens). BrowTilt is degrees about Head +Y (forward) with
+# the inner end of each brow up (+, worry/pain) or down (-, anger).
+# 2026-09-25 (01-03 storyboard round): the 09-23 lip shapes moved the corners 1-4 mm,
+# under 2 px at 1 m in the game view, so Wide/Round/Close read as the same mouth. The
+# shapes below were set in Blender (BlenderMCP, close-up and 1 m game-view renders of
+# every rig) so that a 1 m view tells 咧 (Wide: corners out and back), 圆 (Round:
+# corners in, both lips pushed forward) and 抿 (Close: lips pressed, corners in) apart.
 POSES = {
-    'Open':  {'Jaw': 13.0, 'LipUpper': (.12, .05, 0), 'LipLower': (-.08, .08, 0), 'Corner': (-.10, .04, -.12)},
-    'Wide':  {'Jaw': 4.0, 'LipUpper': (.10, -.03, 0), 'LipLower': (-.05, -.03, 0), 'Corner': (.12, -.12, .34)},
-    'Round': {'Jaw': 6.0, 'LipUpper': (.04, .30, 0), 'LipLower': (.04, .28, 0), 'Corner': (.02, .28, -.42)},
-    'Close': {'LipUpper': (-.10, .04, 0), 'LipLower': (.16, .05, 0), 'Corner': (0, .02, -.04)},
+    'Open':  {'Jaw': 14.0, 'LipUpper': (.18, .06, 0), 'LipLower': (-.12, .10, 0), 'Corner': (-.12, .02, -.22)},
+    'Wide':  {'Jaw': 4.0, 'LipUpper': (.26, -.10, 0), 'LipLower': (-.20, -.10, 0), 'Corner': (.14, -.30, .70)},
+    'Round': {'Jaw': 5.0, 'LipUpper': (.06, .45, 0), 'LipLower': (.02, .42, 0), 'Corner': (.02, .30, -.70)},
+    'Close': {'LipUpper': (-.14, -.02, 0), 'LipLower': (.22, .02, 0), 'Corner': (-.02, -.06, -.10)},
     'Blink': {'LidUpper': 'blink', 'LidLower': (.16, .04, 0)},
     'BrowUp': {'Brow': (.36, .05, .03), 'LidUpper': (.07, 0, 0)},
-    'Snarl': {'Jaw': 3.0, 'Brow': (-.26, .08, -.20), 'LipUpper': (.26, .05, 0), 'Corner': (-.04, -.05, .16),
-              'LidLower': (.12, .02, 0)},
+    # 龇牙怒目 (日兵甲, SB04/SB04A/SB05): teeth almost together and bared top and bottom
+    # (lips drawn off them, corners back), brows down, in and knitted, lower lids up.
+    'Snarl': {'Jaw': 1.5, 'Brow': (-.50, .10, -.30), 'BrowTilt': -18, 'LipUpper': (.80, .12, 0),
+              'LipLower': (-.45, -.02, 0), 'Corner': (0, -.26, .45), 'LidLower': (.22, .03, 0), 'LidUpper': (.04, 0, 0)},
     'DeadSlack': {'Jaw': 9.0, 'LidUpper': 'half', 'Corner': (-.14, -.03, .02), 'LipLower': (-.05, 0, 0)},
+    # 惊愕 (日兵甲 at the chop, SB05A): brows high, upper lids wide, jaw dropped a little.
+    'Shock': {'Jaw': 8.0, 'Brow': (.60, .06, .04), 'BrowTilt': 6, 'LidUpper': (.24, .03, 0), 'LidLower': (-.08, 0, 0),
+              'LipUpper': (.08, .04, 0), 'LipLower': (-.10, .06, 0), 'Corner': (-.08, .06, -.25)},
+    # 痛苦 (the wounded comrade dragged out, SB03): inner brows up and knitted, squint,
+    # upper lip raised, corners pulled down and out.
+    'Pain': {'Jaw': 3.0, 'Brow': (-.12, .08, -.22), 'BrowTilt': 22, 'LidUpper': (-.22, .04, 0), 'LidLower': (.20, .03, 0),
+             'LipUpper': (.45, .02, 0), 'LipLower': (-.14, 0, 0), 'Corner': (-.28, -.12, .30)},
+    # 喊 (runner, 「敵だ」): big square mouth, brows down.
+    'Shout': {'Jaw': 19.0, 'Brow': (-.34, .08, -.22), 'BrowTilt': -10, 'LidLower': (.10, .02, 0),
+              'LipUpper': (.30, .06, 0), 'LipLower': (-.22, .10, 0), 'Corner': (-.18, -.08, .32)},
+    # 咬牙 (罗班长 at the chop): teeth together, lips drawn back off them, brows down.
+    'Grit': {'Brow': (-.30, .08, -.20), 'BrowTilt': -8, 'LidLower': (.14, .02, 0),
+             'LipUpper': (.55, -.04, 0), 'LipLower': (-.55, -.02, 0), 'Corner': (-.06, -.28, .55)},
 }
+PAIRED = ('Corner', 'Brow', 'LidUpper', 'LidLower')
+
+
+def PoseChannels(spec, label, poses=None):
+    """[(bone, location Head-local cm or None, rotation Head-local Quaternion or None)]
+    for one pose; per-model factors come from spec['poseScale'][label][key]."""
+    A, B = spec.get('eyeOpening', (1.1, .44))
+    scale = (spec.get('poseScale') or {}).get(label, {})
+    channels = []
+    for key, value in (poses or POSES).get(label, {}).items():
+        factor = scale.get(key, 1.0)
+        if key == 'Jaw':
+            channels.append(('Face_Jaw', None, Quaternion((0, 0, 1), math.radians(value * factor)))); continue
+        if key == 'BrowTilt':
+            for side, sign in (('L', -1), ('R', 1)):  # +: inner end (toward the midline) up
+                channels.append(('Face_Brow' + side, None, Quaternion((0, 1, 0), math.radians(value * factor * sign))))
+            continue
+        if value == 'blink': value = (-2 * B * 1.12, .30, 0)
+        elif value == 'half': value = (-2 * B * .55, .16, 0)
+        up, fwd, out = (x * factor for x in value)
+        if key in PAIRED:
+            for side, sign in (('L', 1), ('R', -1)): channels.append(('Face_' + key + side, Vector((up, fwd, out * sign)), None))
+        else:
+            channels.append(('Face_' + key, Vector((up, fwd, out)), None))
+    return channels
+
+
+def KeyPoses(rig, action, spec, frames=None, poses=None, toBone=None):
+    """Key every pose frame of the action from PoseChannels. toBone(bone) -> 3x3 matrix
+    from Head-local axes into the bone's rest frame (identity for authored rigs)."""
+    rig.animation_data_create(); rig.animation_data.action = action
+    faceBones = [b for b in rig.pose.bones if b.name.startswith('Face_')]
+    merged = {}
+    for label, frame in (frames or POSE_FRAMES).items():
+        for bone in faceBones:
+            bone.rotation_mode = 'QUATERNION'; bone.location = (0, 0, 0); bone.rotation_quaternion = (1, 0, 0, 0)
+        for name, location, rotation in PoseChannels(spec, label, poses):
+            bone = rig.pose.bones.get(name)
+            if not bone: continue
+            M = toBone(bone) if toBone else None
+            if location is not None: bone.location = M @ location if M else location
+            if rotation is not None:
+                if M:
+                    axis, angle = rotation.to_axis_angle(); rotation = Quaternion(M @ axis, angle)
+                bone.rotation_quaternion = rotation
+        for bone in faceBones:
+            bone.keyframe_insert('location', frame=frame); bone.keyframe_insert('rotation_quaternion', frame=frame)
+        merged[label] = frame
+    rig.animation_data.action = None
+    return merged
 
 
 def Baker(repo):
@@ -294,8 +380,9 @@ def FaceWeights(L, lm, spec, isEyeball=None, lower=None):
         jaw = zone * lower + (1 - zone) * jaw
     jaw *= Smooth(tmj[1] + .5, tmj[1] + 3.5, f)
     jaw *= Smooth(um - 8.0, um - 5.8, u)
-    lipLower = np.exp(-(l / (w * .95)) ** 4 - ((u - (um - .5)) / .75) ** 2) * front * (jaw > .5)
-    lipUpper = np.exp(-(l / (w * .95)) ** 4 - ((u - (um + .55)) / .80) ** 2) * front * (jaw < .5)
+    lipLower = np.exp(-(l / (w * .95)) ** 4 - ((u - (um + spec.get('lipLowerUp', -.5))) / .75) ** 2) * front * (jaw > .5)
+    lipUpper = (np.exp(-(l / (w * .95)) ** 4 - ((u - (um + spec.get('lipUpperUp', .55))) / spec.get('lipUpperWidth', .80)) ** 2)
+                * front * (jaw < .5))
     out = {}
     for side, sign in (('L', 1), ('R', -1)):
         corner = lm['corners'][0 if sign > 0 else 1]
@@ -362,7 +449,7 @@ def PreviewMaterial(src, primMaterial, folder, cache):
 def Author(job):
     repo = job['repo']; model = job['model']; spec = MODELS[model]
     folder = job.get('folder') or os.path.join(os.path.expanduser('~'), 'OneDrive', 'AI', 'Models', 'Blender',
-                                               'Taierzhuang1938', 'FacialRigs_20260923')
+                                               'Taierzhuang1938', 'FacialRigs_20260925')
     os.makedirs(folder, exist_ok=True)
     src = Source(repo, spec); src.glb_path = spec['base']
     lm = Landmarks(src, spec)
@@ -461,27 +548,8 @@ def Author(job):
     BuildOral(scene, rig, lm, spec, headMatrix, model)
 
     # Poses.
-    lid = {'blink': None, 'half': None}
     action = bpy.data.actions.new('Animation_%sFacialPoses' % model)
-    rig.animation_data_create(); rig.animation_data.action = action
-    A, B = spec['eyeOpening']
-    for label, frame in POSE_FRAMES.items():
-        for bone in rig.pose.bones:
-            bone.rotation_mode = 'QUATERNION'; bone.location = (0, 0, 0); bone.rotation_quaternion = (1, 0, 0, 0)
-        for key, value in POSES.get(label, {}).items():
-            if key == 'Jaw':
-                rig.pose.bones['Face_Jaw'].rotation_quaternion = Quaternion((0, 0, 1), math.radians(value)); continue
-            if value == 'blink': value = (-2 * B * 1.12, .30, 0)
-            if value == 'half': value = (-2 * B * .55, .16, 0)
-            for side, sign in (('L', 1), ('R', -1)):
-                name = 'Face_' + key + (side if key in ('Corner', 'Brow', 'LidUpper', 'LidLower') else '')
-                if name not in rig.pose.bones: continue
-                up, fwd, out = value
-                rig.pose.bones[name].location = (up, fwd, out * sign)
-                if not name.endswith(('L', 'R')): break
-        for bone in rig.pose.bones:
-            bone.keyframe_insert('location', frame=frame); bone.keyframe_insert('rotation_quaternion', frame=frame)
-    rig.animation_data.action = None
+    KeyPoses(rig, action, spec)
     scene.frame_start = 1; scene.frame_end = max(POSE_FRAMES.values()); scene.frame_set(1)
     scene['facialLandmarks'] = json.dumps({'lipLine': um, 'lipFront': fm, 'halfWidth': lm['halfWidth'],
         'tmj': [float(x) for x in lm['tmj']], 'eyes': [[float(x) for x in e['center']] + [e['radius']] for e in lm['eyes']]})
@@ -579,9 +647,10 @@ def BuildOral(scene, rig, lm, spec, headMatrix, model):
         if rimPoints is None: return lm['frontAt'](l) - .65
         d = np.abs(rimPoints[:, 2] - mz - l)
         return float(rimPoints[np.argsort(d)[:4], 1].min())
-    for label, top, bottom, back, jaw in (('Upper', um + .72, um - .30, 0.0, 0.0), ('Lower', um - .04, um - .66, .16, 1.0)):
+    tu = spec.get('teethUp', 0.0)
+    for label, top, bottom, back, jaw in (('Upper', um + .72 + tu, um - .30 + tu, 0.0, 0.0), ('Lower', um - .04 + tu, um - .66 + tu, .16, 1.0)):
         bm = bmesh.new()
-        teeth = 10; span = w * .78
+        teeth = 10; span = w * spec.get('teethSpan', .78)
         for i in range(teeth):
             z = -span + (2 * span) * (i + .5) / teeth
             width = (2 * span / teeth) * .86 * (1.12 if abs(z) < span * .25 else 1.0)
@@ -622,7 +691,7 @@ def BuildOral(scene, rig, lm, spec, headMatrix, model):
     bm = bmesh.new()
     bmesh.ops.create_uvsphere(bm, u_segments=12, v_segments=6, radius=1.0)
     for v in bm.verts:
-        v.co = Vector((um - .85 + v.co.z * .40, rimF - 1.95 - spec.get('teethBack', 0) + v.co.y * 1.5, mz + v.co.x * w * .60))
+        v.co = Vector((um - .85 + tu + v.co.z * .40, rimF - 1.95 - spec.get('teethBack', 0) + v.co.y * 1.5, mz + v.co.x * w * .60))
     Object('Oral_%s_Tongue' % model, bm, 'Tongue', lambda p: 1.0)
 
 
@@ -655,13 +724,46 @@ if 'FACIAL_AUTHOR' in globals():
 # ---------------------------------------------------------------- NRA05 upgrade
 
 NRA05_POSE_FRAMES = {'Rest': 1, 'Open': 140, 'Wide': 44, 'Round': 55, 'Blink': 74,
-                     'Close': 300, 'BrowUp': 310, 'Snarl': 320, 'DeadSlack': 330}
+                     'Close': 300, 'BrowUp': 310, 'Snarl': 320, 'DeadSlack': 330,
+                     'Shock': 340, 'Pain': 350, 'Shout': 360, 'Grit': 370}
+# The reviewed 2026-09-13 Open/Wide/Round keep their jaw; the 2026-09-25 lip and corner
+# shapes of POSES are added on top (the reviewed corners moved 1.8-2.4 mm).
+NRA05_LIP_LAYER = ('Open', 'Wide', 'Round')
+
+
+def Nra05ToBone(rig, headName='Bip002 Head'):
+    """Head-local axes -> each NRA05 bone's rest frame (the reviewed rig's bones are not
+    aligned with the head)."""
+    headRotation = rig.data.bones[headName].matrix_local.to_3x3().normalized()
+    return lambda bone: bone.bone.matrix_local.to_3x3().normalized().inverted() @ headRotation
+
+
+def LayerNra05Lips(scene, rig, action, toBone):
+    """Add the non-jaw part of POSES Open/Wide/Round to the reviewed NRA05 frames. The
+    reviewed locations are stored on the scene the first time, so re-running is idempotent."""
+    stored = json.loads(scene.get('facialReviewedLips', '{}'))
+    faceBones = [b for b in rig.pose.bones if b.name.startswith('Face_')]
+    rig.animation_data.action = action
+    for label in NRA05_LIP_LAYER:
+        frame = NRA05_POSE_FRAMES[label]
+        scene.frame_set(frame)
+        if label not in stored: stored[label] = {b.name: list(b.location) for b in faceBones}
+        for bone in faceBones: bone.location = stored[label][bone.name]
+        layer = {k: v for k, v in POSES[label].items() if k != 'Jaw'}
+        for name, location, _ in PoseChannels({}, label, {label: layer}):
+            bone = rig.pose.bones.get(name)
+            if bone and location is not None: bone.location = Vector(bone.location) + toBone(bone) @ location
+        for bone in faceBones:
+            bone.keyframe_insert('location', frame=frame); bone.keyframe_insert('rotation_quaternion', frame=frame)
+    scene['facialReviewedLips'] = json.dumps(stored)
+    rig.animation_data.action = None
 
 
 def UpgradeNra05(job):
-    """Bring the reviewed NRA05 scene (Nra05FacialTalk_20260913) to the 2026-09-23 rig:
-    eye bones, the four added poses, one-segment tooth bevels. The reviewed file is
-    not overwritten; the scene is written to FacialRigs_20260923."""
+    """Bring the reviewed NRA05 scene (Nra05FacialTalk_20260913) to the current rig:
+    eye bones, the added poses, the lip layer, one-segment tooth bevels. The reviewed
+    file is not overwritten; the scene is written to FacialRigs_<date>. Re-running on
+    an upgraded scene (FacialRigs_20260923) gives the same result."""
     scene = bpy.data.scenes['Scene_Nra05FacialTalk']
     if bpy.context.window: bpy.context.window.scene = scene
     rig = scene.objects['Rig_LugouCharacter']; body = scene.objects['John_Body003']
@@ -697,33 +799,15 @@ def UpgradeNra05(job):
         if obj.name.startswith('Mesh_Tooth'):
             for m in obj.modifiers:
                 if m.type == 'BEVEL': m.segments = 1
-    # Added poses, Head-local deltas converted to each bone's rest frame.
+    # Added poses, Head-local deltas converted to each bone's rest frame (2026-09-23:
+    # Close/BrowUp/Snarl/DeadSlack; 2026-09-25: Shock/Pain/Shout/Grit and the lip layer).
     action = bpy.data.actions['Animation_Nra05Speaking']
-    rig.animation_data.action = action
-    headRotation = head.matrix_local.to_3x3().normalized()
+    toBone = Nra05ToBone(rig)
     lid = (-.67, .23, 0)  # the reviewed Blink lid travel
-    extra = {'Close': POSES['Close'], 'BrowUp': POSES['BrowUp'], 'Snarl': POSES['Snarl'],
-             'DeadSlack': {**POSES['DeadSlack'], 'LidUpper': (lid[0] * .55, lid[1] * .6, 0)}}
-    faceBones = [b for b in rig.pose.bones if b.name.startswith('Face_')]
-    for label, pose in extra.items():
-        frame = NRA05_POSE_FRAMES[label]
-        for bone in faceBones:
-            bone.rotation_mode = 'QUATERNION'; bone.location = (0, 0, 0); bone.rotation_quaternion = (1, 0, 0, 0)
-        for key, value in pose.items():
-            for side, sign in (('L', 1), ('R', -1)):
-                name = 'Face_' + key + (side if key in ('Corner', 'Brow', 'LidUpper', 'LidLower') else '')
-                bone = rig.pose.bones.get(name)
-                if not bone: continue
-                toBone = bone.bone.matrix_local.to_3x3().normalized().inverted() @ headRotation
-                if key == 'Jaw':
-                    bone.rotation_quaternion = Quaternion(toBone @ Vector((0, 0, 1)), math.radians(value))
-                else:
-                    up, fwd, out = value
-                    bone.location = toBone @ Vector((up, fwd, out * sign))
-                if name[-1] not in 'LR': break
-        for bone in faceBones:
-            bone.keyframe_insert('location', frame=frame); bone.keyframe_insert('rotation_quaternion', frame=frame)
-    rig.animation_data.action = None
+    extra = {label: POSES[label] for label in ('Close', 'BrowUp', 'Snarl', 'Shock', 'Pain', 'Shout', 'Grit')}
+    extra['DeadSlack'] = {**POSES['DeadSlack'], 'LidUpper': (lid[0] * .55, lid[1] * .6, 0)}
+    KeyPoses(rig, action, MODELS.get('Nra05', {}), {label: NRA05_POSE_FRAMES[label] for label in extra}, extra, toBone)
+    LayerNra05Lips(scene, rig, action, toBone)
     for bone in rig.pose.bones: bone.matrix_basis.identity()
     scene.frame_end = max(scene.frame_end, max(NRA05_POSE_FRAMES.values()))
     report = {'eyeCenters': {k: [round(float(x), 3) for x in v] for k, v in centers.items()},
@@ -741,8 +825,12 @@ MOUTH_BONES = ['Face_Jaw', 'Face_Lip', 'Face_Corner']
 POSE_MASK = {  # which bones a pose may move; the rest stay at Rest (e.g. no brow-follows-jaw)
     'Open': MOUTH_BONES, 'Wide': MOUTH_BONES, 'Round': MOUTH_BONES, 'Close': MOUTH_BONES,
     'Blink': ['Face_Lid'], 'BrowUp': ['Face_Brow', 'Face_LidUpper'],
-    'Snarl': MOUTH_BONES + ['Face_Brow', 'Face_LidLower'],
+    'Snarl': MOUTH_BONES + ['Face_Brow', 'Face_Lid'],
     'DeadSlack': MOUTH_BONES + ['Face_Lid'],
+    'Shock': MOUTH_BONES + ['Face_Brow', 'Face_Lid'],
+    'Pain': MOUTH_BONES + ['Face_Brow', 'Face_Lid'],
+    'Shout': MOUTH_BONES + ['Face_Brow', 'Face_LidLower'],
+    'Grit': MOUTH_BONES + ['Face_Brow', 'Face_LidLower'],
 }
 EYES = {'bones': ['Face_EyeL', 'Face_EyeR'], 'frame': 'parent',
         # Head frame: X up, Y forward, Z to the character's left.
@@ -753,8 +841,8 @@ def BakeJobs(repo):
     common = {'repo': repo, 'oralMode': 'merged', 'stripImages': True, 'stripAnimations': True,
               'poseMask': POSE_MASK, 'eyes': EYES}
     jobs = {}
-    for model, head, folder in (('Nra02', 'Bip002 Head', 'FacialRigs_20260923'), ('Ija02', 'Bip001 Head', 'FacialRigs_20260923'),
-                                ('Ija06', 'Bip001 Head', 'Characters_20260924'), ('Nra06', 'Bip002 Head', 'Characters_20260924')):
+    folder = 'FacialRigs_20260925'
+    for model, head in (('Nra02', 'Bip002 Head'), ('Ija02', 'Bip001 Head'), ('Ija06', 'Bip001 Head'), ('Nra06', 'Bip002 Head')):
         jobs[model] = {**common, 'scene': 'Scene_%sFacialTalk' % model, 'rig': 'Rig_%sFacial' % model,
                        'headBone': head, 'base': 'Model_Lugou%s.glb' % model, 'output': 'Model_Lugou%sFacial.glb' % model,
                        'action': 'Animation_%sFacialPoses' % model, 'poseFrames': POSE_FRAMES, 'weightMode': 'index',
@@ -762,12 +850,12 @@ def BakeJobs(repo):
     # IJA01 shares IJA02's head mesh, vertex order and triangles: weights, cut lips,
     # bones and oral parts are carried over rigidly in the head frame.
     jobs['Ija01'] = {**jobs['Ija02'], 'base': 'Model_LugouIja01.glb', 'output': 'Model_LugouIja01Facial.glb',
-                     'transferFrom': 'Model_LugouIja02.glb', 'source': 'FacialRigs_20260923/Ija02->Ija01'}
+                     'transferFrom': 'Model_LugouIja02.glb', 'source': 'FacialRigs_20260925/Ija02->Ija01'}
     jobs['Nra05'] = {**common, 'scene': 'Scene_Nra05FacialTalk', 'rig': 'Rig_LugouCharacter', 'headBone': 'Bip002 Head',
                      'base': 'Model_LugouNra05.glb', 'output': 'Model_LugouNra05Facial.glb',
                      'action': 'Animation_Nra05Speaking', 'poseFrames': NRA05_POSE_FRAMES,
                      'weightMode': 'kdtree', 'body': 'John_Body003', 'legacyOralNames': True,
-                     'source': 'Nra05FacialTalk_20260913+FacialRigs_20260923', 'sourceFile': 'Animation_Nra05FacialTalk.blend'}
+                     'source': 'Nra05FacialTalk_20260913+FacialRigs_20260925', 'sourceFile': 'Animation_Nra05FacialTalk.blend'}
     return jobs
 
 
