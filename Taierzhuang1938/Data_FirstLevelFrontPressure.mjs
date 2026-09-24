@@ -71,6 +71,9 @@ export const FRONT_FIRE_POINTS = Object.freeze({
   nestGable: P(37, -151.2, 2.0, 1.2),
   // 05 攻击位的路边残墙顶（玩家蹲在它后面：近失弹压人，不打人）。
   attackRuin: P(45.3, -162.6, 1.3, 1.2),
+  // 取弹沟与道路连接支沟的交汇口（05 切入组要切进来的地方）：东头守位的两人 03/04 唯一打得到的点
+  //（09-24 探针：他们对土坎、左枪、缺口全不通视，214 s 里一发没打）。环境射击不命中，只是近失弹与曳光。
+  eastLink: P(44.6, -125.6, 0.8, 1.2),
 });
 
 const CREST = Object.freeze(["crestA", "crestB", "crestC", "crestD", "crestE", "crestF"]);
@@ -154,11 +157,25 @@ export const FRONT_RESERVE_RELEASE = Object.freeze({ encounter: "frontReserve",
 
 export const FRONT_PRESSURE_STAGES = Object.freeze(["BunkerRescue", "RearTrench", "Support", "MachineGun", "Tank"]);
 
-const FIRE_03 = Object.freeze([...CREST, "leftGunParapet", ...GAP]);
-const FIRE_03_NEST = Object.freeze([...CREST, "leftGunParapet", ...NEST_WALLS, ...GAP]);
+const FIRE_03 = Object.freeze([...CREST, "leftGunParapet", "eastLink", ...GAP]);
+const FIRE_03_NEST = Object.freeze([...CREST, "leftGunParapet", ...NEST_WALLS, "eastLink", ...GAP]);
 const FIRE_05 = Object.freeze([...CREST_05, "leftGunParapet", "nestNorth", "attackRuin", ...GAP]);
 const NoGap = (list) => Object.freeze(list.filter((id) => !GAP.includes(id)));
 const HOLD = Object.freeze({ role: "hold" });
+/**
+ * 火力基地自己的点名表（组配置的 `fire` 盖过相位表）。北坡残墙后 33–67 m：土坎顶、左枪胸墙、夺下后的阵位北墙与西墙
+ * 打得到；缺口两侧、缺口交汇、东头交汇口从那儿一个都不通视（09-24 引擎射线逐点量过）。相位表里混着这些点时，
+ * 挑点的射线预算（AMBIENT_FIRE.losRetries）常常耗在它们身上、一轮挑不出点 —— 四个人 410 s 里一半时间端着枪不打。
+ */
+/**
+ * fireStance：不在掩体循环里（FIRE / SUPPRESS / WATCH）的火力基地兵站着隔墙打。残墙 1.1 m 挡得住蹲姿（枪口 0.92 m）
+ * 挡不住站姿（1.42 m）—— 09-24 探针里轻机枪手 FrontGunner 不进掩体循环、蹲在墙后「开火」，挑点射线全被墙挡死。
+ * 掩体循环（COVER_ENGAGE）自己有探头姿态，不管；压制值到 fireStanceMaxSuppression 就随 AI 趴下，不硬拉起来。
+ */
+const FIRE_BASE = (fire) => Object.freeze({ role: "hold", fire: Object.freeze(fire), fireStance: 0, fireStanceMaxSuppression: 0.5 });
+const FB_03 = FIRE_BASE([...CREST, "leftGunParapet"]);
+const FB_NEST = FIRE_BASE([...CREST, "leftGunParapet", "nestNorth", "nestWest"]);
+const FB_05 = FIRE_BASE([...CREST_05, "leftGunParapet", "nestNorth"]);
 
 export const FRONT_PRESSURE_PHASES = Object.freeze([
   // 02：前沿已在远处交火，推进要等 03 frontBattleStarted（MISSION_ENCOUNTER_ACTIVATION.standbyUntil）。
@@ -168,46 +185,46 @@ export const FRONT_PRESSURE_PHASES = Object.freeze([
   // 03 开战：两队交替跃进、侧翼组逐坑摸到阵位东北、火力基地压土坎与左枪。
   Object.freeze({ id: "assault", when: "frontBattleStarted", stages: Object.freeze(["Support", "MachineGun", "Tank"]),
     bark: "advance", fire: FIRE_03,
-    groups: Object.freeze({ fireBase: HOLD, boundWest: BOUND(), boundEast: BOUND_EAST(), flank: FLANK(), nest: NEST }) }),
+    groups: Object.freeze({ fireBase: FB_03, boundWest: BOUND(), boundEast: BOUND_EAST(), flank: FLANK(), nest: NEST }) }),
   // 右侧阵位丢了：玩家上了那挺机枪。土坎、撤退口之外开始打阵位的墙。
   Object.freeze({ id: "nestLost", when: "rightNestCaptured", stages: Object.freeze(["Support", "MachineGun", "Tank"]),
     bark: "mg", fire: FIRE_03_NEST,
-    groups: Object.freeze({ fireBase: HOLD, boundWest: BOUND(), boundEast: BOUND_EAST(), flank: FLANK() }) }),
+    groups: Object.freeze({ fireBase: FB_NEST, boundWest: BOUND(), boundEast: BOUND_EAST(), flank: FLANK() }) }),
   // 第一批守军过口：跃进组退到第三条线（土坎北侧断视线），侧翼退到倒数第二跳；看得见口子的人一条条往回拉。
   Object.freeze({ id: "firstWithdrawal", when: "frontRifleDefense", stages: Object.freeze(["Support", "MachineGun", "Tank"]),
     yield: true, bark: "fallback", fire: NoGap(FIRE_03_NEST),
-    groups: Object.freeze({ fireBase: HOLD, boundWest: BOUND({ maxLine: 2 }), boundEast: BOUND_EAST({ maxLine: 2 }),
+    groups: Object.freeze({ fireBase: FB_NEST, boundWest: BOUND({ maxLine: 2 }), boundEast: BOUND_EAST({ maxLine: 2 }),
       flank: FLANK({ maxLine: -2 }) }) }),
   // 第一批撤完：重新压上来。
   Object.freeze({ id: "firstDone", when: "rifleWithdrawalResolved", stages: Object.freeze(["Support", "MachineGun", "Tank"]),
     bark: "advance", fire: FIRE_03_NEST,
-    groups: Object.freeze({ fireBase: HOLD, boundWest: BOUND(), boundEast: BOUND_EAST(), flank: FLANK() }) }),
+    groups: Object.freeze({ fireBase: FB_NEST, boundWest: BOUND(), boundEast: BOUND_EAST(), flank: FLANK() }) }),
   // 04 战车露面：出发壕里的推进组上来（MISSION_ENCOUNTER_ACTIVATION.machineGun.standbyUntil = tankPreviewed）。
   // 这一相位唯一一次脚本化成组冲锋；伤亡过半就退两条线，退完记 frontAttackRepelled。
   Object.freeze({ id: "tankShown", when: "tankPreviewed", stages: Object.freeze(["Support", "MachineGun", "Tank"]),
     bark: "advance", fire: FIRE_03_NEST,
-    groups: Object.freeze({ fireBase: HOLD, boundWest: BOUND(), boundEast: BOUND_EAST(), flank: FLANK(),
+    groups: Object.freeze({ fireBase: FB_NEST, boundWest: BOUND(), boundEast: BOUND_EAST(), flank: FLANK(),
       mgAttack: MG_ATTACK({ charge: Object.freeze({ afterS: 12, minAlive: 3, playerWithinM: 80, lastLineShare: 0.34 }) }) }) }),
   // 战车压阵位：玩家往阵位后墙撤；视线外入口放出第一批增援（04：2+2）。
   Object.freeze({ id: "tankPressure", when: "tankPositionPressured", stages: Object.freeze(["MachineGun", "Tank"]),
     fire: FIRE_03_NEST, reserve: true,
-    groups: Object.freeze({ fireBase: HOLD, boundWest: BOUND(), boundEast: BOUND_EAST(), flank: FLANK(),
+    groups: Object.freeze({ fireBase: FB_NEST, boundWest: BOUND(), boundEast: BOUND_EAST(), flank: FLANK(),
       mgAttack: MG_ATTACK(), reserveWest: RESERVE_WEST(), reserveRoad: RESERVE_ROAD() }) }),
   // 05 取到集束弹：火力追着攻击位走（05 的那一名增援进 05 就放，不等取弹）。
   Object.freeze({ id: "bundle", when: "bundleTaken", stages: Object.freeze(["Tank"]),
     fire: FIRE_05, reserve: true,
-    groups: Object.freeze({ fireBase: HOLD, boundWest: BOUND(), boundEast: BOUND_EAST(), flank: FLANK(),
+    groups: Object.freeze({ fireBase: FB_05, boundWest: BOUND(), boundEast: BOUND_EAST(), flank: FLANK(),
       mgAttack: MG_ATTACK(), reserveWest: RESERVE_WEST(), reserveRoad: RESERVE_ROAD() }) }),
   // 战车趴窝，第二批守军过口：所有跃进组让出口子（退到第二条线，看得见口子的继续往回拉）。
   Object.freeze({ id: "secondWithdrawal", when: "tankImmobilized", stages: Object.freeze(["Tank"]),
     yield: true, bark: "fallback", fire: NoGap(FIRE_05), reserve: true,
-    groups: Object.freeze({ fireBase: HOLD, boundWest: BOUND({ maxLine: 1 }), boundEast: BOUND_EAST({ maxLine: 1 }),
+    groups: Object.freeze({ fireBase: FB_05, boundWest: BOUND({ maxLine: 1 }), boundEast: BOUND_EAST({ maxLine: 1 }),
       flank: FLANK({ maxLine: 1 }), mgAttack: MG_ATTACK({ maxLine: 1, regroupLine: 0 }),
       reserveWest: RESERVE_WEST({ maxLine: 1, regroupLine: 0 }), reserveRoad: RESERVE_ROAD({ maxLine: 4, regroupLine: 3 }) }) }),
   // 守军撤完、玩家离开前沿：零星的土坎火力，跃进停在原地。
   Object.freeze({ id: "disengage", when: "lastGuardsWithdrawn", stages: Object.freeze(["Tank"]),
     fire: CREST_05,
-    groups: Object.freeze({ fireBase: HOLD, boundWest: HOLD, boundEast: HOLD, flank: HOLD,
+    groups: Object.freeze({ fireBase: FIRE_BASE(CREST_05), boundWest: HOLD, boundEast: HOLD, flank: HOLD,
       mgAttack: MG_ATTACK({ maxLine: 1, regroupLine: 0 }), reserveWest: HOLD, reserveRoad: HOLD }) }),
 ]);
 

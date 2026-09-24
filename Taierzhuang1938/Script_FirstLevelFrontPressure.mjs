@@ -86,7 +86,10 @@ export function FrontPressurePhase(stage, Has, phases = FRONT_PRESSURE_PHASES) {
   return pick;
 }
 
-/** 相位的授权点表（带 id 的新数组）。`evacuating` = 守军正在过口：去掉 gapPath 的点。 */
+/**
+ * 相位的授权点表（带 id 的新数组）。`evacuating` = 守军正在过口：去掉 gapPath 的点。
+ * 组配置带 `fire`（点名表）的，用 `FrontFirePoints({ id, fire: cfg.fire }, …)` 得到那一组自己的表。
+ */
 export function FrontFirePoints(phase, evacuating = false, points = FRONT_FIRE_POINTS) {
   if (!phase) return null;
   const out = [];
@@ -291,6 +294,12 @@ export class FirstLevelFrontPressure {
     }
     this.fire.full = FrontFirePoints(phase, false);
     this.fire.noGap = FrontFirePoints(phase, true);
+    // 组自己的点名表（火力基地：只点它从残墙后打得到的点，不让挑点的射线预算耗在缺口、东头那些它看不见的点上）。
+    this.fire.groups = {};
+    for (const [groupId, cfg] of Object.entries(phase.groups || {})) if (cfg.fire) {
+      const own = { id: `${phase.id}/${groupId}`, fire: cfg.fire };
+      this.fire.groups[groupId] = { full: FrontFirePoints(own, false), noGap: FrontFirePoints(own, true) };
+    }
     for (const [groupId, cfg] of Object.entries(phase.groups || {})) {
       const members = FrontGroupMembers(groupId, r.enemies);
       for (const actor of members) this.ApplyMember(actor, groupId, cfg);
@@ -416,8 +425,17 @@ export class FirstLevelFrontPressure {
     const list = evacuating ? this.fire.noGap : this.fire.full;
     for (const a of r.enemies.values()) {
       if (!a.alive || !FRONT_PRESSURE_FIRE_ENCOUNTERS.includes(a.missionEncounter)) continue;
-      if (a.ambientFirePoints !== list) { a.ambientFirePoints = list; a.ambientFirePoint = null; }
+      const own = a.reactionGroup ? this.fire.groups?.[a.reactionGroup] : null;
+      const mine = own ? (evacuating ? own.noGap : own.full) : list;
+      if (a.ambientFirePoints !== mine) { a.ambientFirePoints = mine; a.ambientFirePoint = null; }
     }
+  }
+
+  /** 组配置的射击姿态（火力基地站着隔墙打，见 Data_FirstLevelFrontPressure.FIRE_BASE）。掩体循环与重压制交给 AI。 */
+  FireStance(actor, cfg) {
+    if (!actor.alive || actor.stance === cfg.fireStance || actor.state === "cover_engage") return;
+    if ((actor.suppression || 0) >= cfg.fireStanceMaxSuppression) return;
+    this.r.ai.SetStance(actor, cfg.fireStance, 0.9, true);
   }
 
   UpdateGroups() {
@@ -426,6 +444,7 @@ export class FirstLevelFrontPressure {
       const members = FrontGroupMembers(groupId, r.enemies);
       if (!members.length) continue;
       for (const actor of members) this.ApplyMember(actor, groupId, cfg);
+      if (Number.isInteger(cfg.fireStance)) for (const actor of members) this.FireStance(actor, cfg);
       const st = this.GroupState(groupId, members);
       if (cfg.role === "nestGuard") { this.NestFallback(groupId, cfg, members, st); continue; }
       if (cfg.role !== "assault") continue;

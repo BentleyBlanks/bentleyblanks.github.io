@@ -67,6 +67,9 @@ for (const phase of FRONT_PRESSURE_PHASES) {
     Check(["hold", "assault", "nestGuard"].includes(cfg.role), `phase ${phase.id} ${groupId} role ${cfg.role}`);
     // 「跃进不能在 60–90 s 后停摆：每相位都有下一步」—— 每个跃进组在每个相位都是循环的。
     if (cfg.role === "assault") Check(cfg.loop === true, `phase ${phase.id} ${groupId} always has a next step (loop)`);
+    // A group's own fire list (the fire base): known points only, never the withdrawal gap it cannot see anyway.
+    if (cfg.fire) Check(cfg.fire.length > 0 && cfg.fire.every((id) => FRONT_FIRE_POINTS[id] && !FRONT_FIRE_POINTS[id].gapPath),
+      `phase ${phase.id} ${groupId} fire list names known non-gap points`);
     if (cfg.charge) charges += 1;
     if (cfg.fallback?.repelledFact) Check(facts.has(cfg.fallback.repelledFact), `${cfg.fallback.repelledFact} is a mission fact`);
   }
@@ -239,6 +242,7 @@ function MakeWorld(stage = "BunkerRescue") {
     Has: (id) => world.facts.has(id), Record: (id, detail) => { world.facts.add(id); world.records.push([id, detail]); },
     ai: { missionCoverRules: false, missionReactions: false, time: 0,
       Bark: (a, kind) => world.barks.push([a.missionId, kind]),
+      SetStance: (a, stance) => { a.stance = stance; (world.stances ||= []).push([a.missionId, stance]); },
       GroupCharge: (members, opts) => { world.charges.push({ ids: members.map((a) => a.missionId), leader: opts.leader?.missionId ?? null }); return members.length; } },
     player: { position: { x: 25.9, z: -153.9 } },
     Defend: (a, p, radius, slack) => { world.defends.push([a.missionId, p.x, p.z, radius, slack]); a.holdZone = { x: p.x, z: p.z, radius }; a.scriptDefensive = !(a.tacticalRadiusM > 0); },
@@ -267,6 +271,20 @@ function MakeWorld(stage = "BunkerRescue") {
   // 03 opens.
   r.flow.stage.id = "Support"; world.facts.add("frontBattleStarted"); r.time = 1; pressure.Update();
   Eq(pressure.phase.id, "assault");
+  // The fire base fires from its own list (crest and left gun only); the bounders keep the phase list.
+  const fbIds = (enemies.get("FrontGunner").ambientFirePoints || []).map((p) => p.id);
+  const assaultPhase = FRONT_PRESSURE_PHASES.find((p) => p.id === "assault");
+  Eq(fbIds, [...assaultPhase.groups.fireBase.fire], "the fire base picks from its own list");
+  Eq((enemies.get("FrontRifleA").ambientFirePoints || []).map((p) => p.id), [...assaultPhase.fire], "the bounders keep the phase list");
+  // Fire base stance: out of the cover cycle they stand to fire over the 1.1 m wall; the cover cycle and heavy
+  // suppression stay with the AI.
+  {
+    const fg = enemies.get("FrontGunner"), fs = enemies.get("FrontSupportGunner"), fh = enemies.get("FrontRifleH");
+    Object.assign(fg, { state: "fire", stance: 1, suppression: 0 }); Object.assign(fs, { state: "cover_engage", stance: 1, suppression: 0 });
+    Object.assign(fh, { state: "suppress", stance: 2, suppression: 0.8 });
+    r.time += 1; pressure.Update();
+    Check(fg.stance === 0 && fs.stance === 1 && fh.stance === 2, "the fire base stands to fire over its wall, except in the cover cycle or pinned down");
+  }
   const west = FrontGroupMembers("boundWest", enemies), east = FrontGroupMembers("boundEast", enemies);
   Eq([west.length, east.length], [3, 3], "two bounding teams of three");
   Check(west.every((a) => a.reactionGroup === "boundWest" && a.missionFireGroup === "boundWest"), "bounders carry their group tags");

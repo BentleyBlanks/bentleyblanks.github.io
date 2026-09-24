@@ -206,10 +206,12 @@ export class FirstLevelTankRuntime {
     const entryFact = this.T.entry?.fact || "rightNestCaptured";
     if (stage === "Support" && !this.brain && (!r.Has("rightNestCaptured") || !r.Has(entryFact) || !this.EntryClear())) {
       t.active = false; t.present = false;
+      this.EscortsOffstage(true);
       this.Sound?.Offstage(dt, this.OffstagePoint());
       return;
     }
     t.active = true; t.present = true;
+    this.EscortsOffstage(false);
     const brain = this.EnsureBrain(stage);
     this.EnsureBreakables();
     // 彻底哑火、熄火也熄完了：不再每帧拼世界（三次炮口取点、目标表、视线），只让大脑走完它的时钟。
@@ -223,6 +225,20 @@ export class FirstLevelTankRuntime {
     this.Apply(out, dt);
     this.CheckLuoFinish();
     this.CheckWindow();
+  }
+  /**
+   * 车进场以前，护兵跟车一起待在图外的路堑里（北面路线起点）：装睡（missionDormant + scriptedNoncombatant）——
+   * 不参战、不算前沿在场的人；车进场那一帧醒过来接走位（Escorts）。09-24 空转探针：03 里他们在 (101,−208)
+   * 离座位 92 m 站了一百多秒，对任何授权点都不通视，占了 03「一发没打」的一成多。
+   */
+  EscortsOffstage(waiting) {
+    if (!waiting && this.escortsWoken) return;
+    if (!waiting) this.escortsWoken = true;
+    for (const spec of MISSION_ENCOUNTERS.tank) {
+      const actor = this.r.enemies.get(spec.id);
+      if (!actor?.alive || actor.missionDormant === waiting) continue;
+      actor.missionDormant = waiting; actor.scriptedNoncombatant = waiting;
+    }
   }
   /** MobilityKill 以后玩家手里一捆也没有、僵了 luoFinishS 秒：罗班长往舱盖里塞一颗。 */
   CheckLuoFinish() {
