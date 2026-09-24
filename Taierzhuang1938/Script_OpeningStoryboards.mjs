@@ -1131,8 +1131,10 @@ export class FirstLevelBunkerShow {
     const Try=(shooter,id,at)=>{
       if(this.flags["shot:"+id]||t<at||!shooter)return;
       this.flags["shot:"+id]=r.time;
-      const hit=this.ShootAt(shooter,ijaD,t>=C.timeouts.longShotForceS);
-      if(hit)this.flags.junctionBy=id;
+      const force=t>=C.timeouts.longShotForceS,clear=!r.BlocksSight(this.HeadPoint(shooter)||r.Point(shooter.position,1.3),r.Point(ijaD.position,1.2));
+      const hit=this.ShootAt(shooter,ijaD,force);
+      // A hit only the timeout made (no line to him: he hid) is credited to the timeout, not the shooter.
+      if(hit)this.flags.junctionBy=clear||!force?id:"forced";
     };
     // Liu fires from his step (a late walker is covered by the two fallbacks below).
     if(this.flags.liuAt!=null)Try(liu,"liu",Math.max(1.2,this.flags.liuAt-this.flags.longShotAt+.6));
