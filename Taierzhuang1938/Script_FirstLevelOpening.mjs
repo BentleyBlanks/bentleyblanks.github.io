@@ -135,11 +135,11 @@ export class FirstLevelOpening {
   UpdateBunker(){
     const r=this.r,bunker=this.bunker;
     if(!bunker)return;
-    const age=r.time-(r.frontShow?.bunker.started??bunker.started);
-    // 正常录音和缺录音的估时字幕都会在末句结束发 BunkerBlast。8 秒只救一个
-    // 根本没有可推进 BunkerBanter 时间轴的异常态，不能抢在 16.744 秒录音前炸。
-    if(r.frontShow?.bunker.voiceStarted&&bunker.blastAt==null&&age>=R.bunkerBanterFallbackS
-      &&r.voice.current?.cue?.id!=="BunkerBanter")this.BunkerBlast();
+    // 2026-09-23: the opening director owns the near miss. BunkerIncoming.01 is cut by it (voice
+    // event BunkerBlast) and the director fires it itself when that event is late
+    // (Data_OpeningStoryboards.timeouts.blastEventS). Only a runtime without a director keeps the
+    // old banter-length fallback.
+    if(!r.frontShow?.bunker&&bunker.blastAt==null&&r.time-bunker.started>=R.bunkerBanterFallbackS)this.BunkerBlast();
     if(bunker.blastAt==null)return;
     r.frontShow?.bunker.UpdateBunker(bunker);
   }

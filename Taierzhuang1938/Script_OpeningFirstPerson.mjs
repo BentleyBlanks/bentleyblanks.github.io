@@ -197,6 +197,18 @@ export function ApplyOpeningRescueReady(actor,clock){
   return true;
 }
 
+// 2026-09-23 director phases (contract §5.3) -> the hand poses this module already solves.
+// Step 2 of the Opening package replaces these with the draft's per-beat hand work.
+const PHASE_HANDS=Object.freeze({Banter:"Supply",Incoming:"Orders",Boots:"Black",
+  Wake:"Advance",FrontPass:"Advance",CaptiveDragged:"Advance",CaptiveWall:"Advance",Interrogation:"Advance",Slash:"Advance",
+  Taunt:"Advance",Wipe:"Advance",Reach:"Advance",Found:"Advance",Snag:"Drag",KickBeam:"Drag",DragOut:"Drag",DragCover:"Drag",
+  Hold:"Interrogate",Ask:"Interrogate",KickShunzi:"Interrogate",Glimpse:"Interrogate",Collar:"Interrogate",Chop:"Interrogate",
+  Parry:"Interrogate",Flee:"Interrogate",LongShot:"Interrogate",Check:"Interrogate",KickRifle:"Kick"});
+/** The actor holding Shunzi's collar in a drag beat (ijaA in 01, Luo in 02). */
+function DragPartner(show){
+  if(show.phase==="DragCover")return show.r.companion?.Handle?.("luo")?.actor;
+  return (show.Ija?.("ijaA")||show.Executioner?.(0))?.actor;
+}
 export class OpeningFirstPerson{
   constructor(show){this.show=show;this.rig=Anatomy(show.playerBody);this.phase=null;this.lastTargets={};this.lastFrames={};this.lastPartners={};this.partnerReleases={};this.report={};}
   ReleasePartner(side,entry,clock,dt){
@@ -221,7 +233,7 @@ export class OpeningFirstPerson{
       shoulder:native.shoulder.clone(),elbow:result.elbow.clone(),palm:result.palm.clone(),fingers:rig.fingerBones[rigSide].map(bone=>bone.quaternion.clone())};
   }
   Update(dt=1/60){
-    const s=this.show,r=s.r,p=s.phase,a=s.Age,cam=r.player.camera,fp=C.firstPerson;
+    const s=this.show,r=s.r,p=PHASE_HANDS[s.phase]||s.phase,a=s.Age,cam=r.player.camera,fp=C.firstPerson;
     this.rig ||= Anatomy(s.playerBody);
     if(!this.rig){
       if(s.playerBody?.root)s.playerBody.root.visible=false;
@@ -258,7 +270,7 @@ export class OpeningFirstPerson{
       }
       let otherRig,otherSide,otherShoulder;
       if(p==="Drag"&&side==="l"){
-        otherRig=Anatomy(s.Executioner(0).actor);otherSide="l";
+        otherRig=Anatomy(DragPartner(s));otherSide="l";
         target=Local(-.12,-.14,-.30);forward=Direction(0,0,-1);normal=Direction(0,1,0);curl=[44,66,42];
       }else if(p==="Pull"&&a<=C.pullS){
         otherRig=Anatomy(r.companion.Handle("luo").actor);otherSide=side==="l"?"r":"l";

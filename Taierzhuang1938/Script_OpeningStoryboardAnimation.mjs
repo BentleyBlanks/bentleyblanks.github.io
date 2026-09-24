@@ -17,6 +17,25 @@ const Quat = new Quaternion(), QuatRef = new Quaternion(), QuatAdd = new Quatern
 export function OpeningClipMeta(clip){return library?.config.clips?.[clip]||null;}
 /** Paired staging (runtime metres, anchor frame) and prop definitions from the manifest. */
 export function OpeningStage(name){return library?.config.stages?.[name]||null;}
+/** Prop definitions (beam poses, bayonet mount) from the manifest. */
+export function OpeningPropConfig(name){return library?.config.props?.[name]||null;}
+/** Pelvis at a clip's first/last frame for one rig ([x, z, yawDeg, pelvisHeight], anchor frame):
+ * the director chains roots with it when a clip was baked on a new root (drag -> wall). */
+export function OpeningClipRoot(modelId,clip){
+  const row=library?.config.models?.find(model=>model.id===modelId);
+  const index=row?.clipIds?.indexOf(clip);
+  return index>=0?row.clips[index]?.root||null:null;
+}
+/** A point of the first-person player's body (clip `player` track: collar / head / shoulderR)
+ * in the actor's anchor frame (+x right, +y up, -z forward, runtime metres) at `seconds`. */
+export function OpeningPlayerPoint(modelId,clip,part,seconds){
+  const track=library?.models.get(modelId)?.clips[clip]?.player,values=track?.parts?.[part];
+  if(!values?.length)return null;
+  const count=values.length/3,at=Math.max(0,Math.min(count-1,(Number(seconds)||0)*(track.fps||12)));
+  const a=Math.floor(at),b=Math.min(count-1,a+1),t=at-a;
+  return {x:values[a*3]+(values[b*3]-values[a*3])*t,y:values[a*3+1]+(values[b*3+1]-values[a*3+1])*t,
+    z:values[a*3+2]+(values[b*3+2]-values[a*3+2])*t};
+}
 
 /** A clip with a `holdLoop` window keeps sampling inside it once the playhead passes its end,
  * so a director can hold "fist in the hair" or "kneeling, hand on shoulder" for as long as
