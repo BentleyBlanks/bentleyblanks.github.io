@@ -161,10 +161,18 @@ export const MISSION_BATTLE_SOUND = Object.freeze({
    * 矩形本身按 2026-09-23 之前的布设画的，Space 包重排无人地带后要跟着改。
    */
   artillery: Object.freeze({
+    // 2026-09-24 Front 包按 01–06 新空间重画（Data_FirstLevelSpace0106_20260923）：旧的 NorthSlope / EastField
+    // 把战车整条路（东北台地路堑 → 路弯 → 坎线以北封口）和北侧出发壕都罩在里面。现在五块都离战车路线每一段
+    // ≥ 12 m、离出发壕 ≥ 10 m、不碰我方沟网与旧院（Script_FirstLevelFrontPacingTest ⑥ 量）；「离活人 ≥ 10 m」
+    // 仍由 Script_BattleArtillery 逐发判。矩形只画到 03–05 听者 140 m 上下：PickPoint 随机挑块再挑点、只试 8 次，
+    // 大块里够不着的面积会让整发落空（第一版画到 x ±200，Support 档在缺口处一次命中率只有 16%，旧表 28%，
+    // 这一版 62%；观察射台 12% → 49%、集结处 7% → 36%）。
     zones: Object.freeze([
-      { id: "NorthSlope", xMin: -150, xMax: 150, zMin: -330, zMax: -205 },
-      { id: "EastField", xMin: 60, xMax: 200, zMin: -250, zMax: -90 },
-      { id: "WestField", xMin: -200, xMax: -80, zMin: -250, zMax: -120 },
+      { id: "NorthSlopeWest", xMin: -100, xMax: 20, zMin: -275, zMax: -233 },   // 北侧出发壕（z −222）以北
+      { id: "NorthSlopeEast", xMin: 20, xMax: 120, zMin: -275, zMax: -245 },    // 台地路堑起点（z −229）以北
+      { id: "EastDepth", xMin: 78, xMax: 150, zMin: -165, zMax: -95 },          // 南路（x ≤ 63）、旧院与路弯出口以东
+      { id: "WestField", xMin: -125, xMax: -80, zMin: -225, zMax: -110 },       // 老周左枪位（x −34）以西
+      { id: "NoMansLandWest", xMin: -80, xMax: -50, zMin: -212, zMax: -172 },   // 土坎西端外的田：左枪位外 22 m 起
     ]),
     stages: Object.freeze({
       // 01 整段在洞里：隔着土与洞口，落弹只剩闷响（airCut）与洞顶掉土。
