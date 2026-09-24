@@ -285,6 +285,11 @@ function MakeWorld(stage = "BunkerRescue") {
   const fbIds = (enemies.get("FrontGunner").ambientFirePoints || []).map((p) => p.id);
   const assaultPhase = FRONT_PRESSURE_PHASES.find((p) => p.id === "assault");
   Eq(fbIds, [...assaultPhase.groups.fireBase.fire], "the fire base picks from its own list");
+  {
+    const fg = enemies.get("FrontGunner"), post = assaultPhase.groups.fireBase.posts?.FrontGunner;
+    Check(post && fg.holdZone && Math.hypot(fg.holdZone.x - post.x, fg.holdZone.z - post.z) < 1e-6,
+      "the fire base LMG holds its measured post at the west end of its wall (not behind the wall's middle)");
+  }
   Eq((enemies.get("FrontRifleA").ambientFirePoints || []).map((p) => p.id), [...assaultPhase.fire], "the bounders keep the phase list");
   // Fire base stance: out of the cover cycle they stand to fire over the 1.1 m wall; the cover cycle and heavy
   // suppression stay with the AI.

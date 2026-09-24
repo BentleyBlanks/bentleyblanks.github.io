@@ -76,6 +76,10 @@ export const FRONT_FIRE_POINTS = Object.freeze({
   eastLink: P(44.6, -125.6, 0.8, 1.2),
   // 受损沟沿（取弹沟东段）顶上：东头那两人的第二个点（只有一个点时，枪口那条线一挡就要等 blockedRetryS 才重挑）。
   eastLip: P(40.6, -130.6, 1.4, 1.0),
+  // 右侧接近低沟、阵位西门外那一段（玩家 03 摸向阵位的路，FRONT_SORTIE.approach[11]）：阵位入口守卫 RightEntryGuard
+  // 蹲在掩体里唯一打得到的点（2026-09-24 审查后引擎射线量过：他对土坎顶站姿 9/12、蹲姿 0/12，对这一点站蹲都通）。
+  // 只在 nest 组自己的点名表里。环境射击不命中：玩家摸过来时头顶上的近失弹与曳光。
+  westApproach: P(19, -146.8, 0.8, 1.2),
 });
 
 const CREST = Object.freeze(["crestA", "crestB", "crestC", "crestD", "crestE", "crestF"]);
@@ -124,7 +128,14 @@ export const FRONT_PRESSURE_GROUPS = Object.freeze({
  * 旧锚点 (25,−152.5) 是按 09-22 布局挑的，新布局里离机枪只有 1.4 m。
  */
 const NEST_FALLBACK = Object.freeze({ casualties: 2, to: Object.freeze({ x: 32.2, z: -146.8 }) });
-const NEST = Object.freeze({ role: "nestGuard", fallback: NEST_FALLBACK });
+/**
+ * nest 组自己的点名表（夺点前）：土坎、左枪、东头两点，加西门外的接近沟 westApproach。2026-09-24 审查（任务书第 11 项 ②）
+ * 引擎射线逐人量过：阵位机枪手坐着对土坎顶站姿 11/12、蹲姿只剩 eastLink / eastLip（照样挑得到、打得出）；入口守卫
+ * 蹲姿对相位表 0/12，只有 westApproach 通；院里的 RightNestGuard / RightLinkGuard 被院墙围着，对哪一点都不通视 ——
+ * 他们守的是院子，玩家进院才交火，这里不硬给点（给了也只会把挑点的射线预算耗在墙上）。
+ */
+const NEST_FIRE = Object.freeze([...CREST, "leftGunParapet", "eastLink", "eastLip", "westApproach"]);
+const NEST = Object.freeze({ role: "nestGuard", fallback: NEST_FALLBACK, fire: NEST_FIRE });
 
 /**
  * 僵持退线（见头注 stalemate）。essentialS：一轮跃进在最后一线要打 assaultFinalHoldS 量级的时间，
@@ -175,11 +186,18 @@ const HOLD = Object.freeze({ role: "hold" });
  * 挑点的射线预算（AMBIENT_FIRE.losRetries）常常耗在它们身上、一轮挑不出点 —— 四个人 410 s 里一半时间端着枪不打。
  */
 /**
- * fireStance：不在掩体循环里（FIRE / SUPPRESS / WATCH）的火力基地兵站着隔墙打。残墙 1.1 m 挡得住蹲姿（枪口 0.92 m）
- * 挡不住站姿（1.42 m）—— 09-24 探针里轻机枪手 FrontGunner 不进掩体循环、蹲在墙后「开火」，挑点射线全被墙挡死。
- * 掩体循环（COVER_ENGAGE）自己有探头姿态，不管；压制值到 fireStanceMaxSuppression 就随 AI 趴下，不硬拉起来。
+ * fireStance：不在掩体循环里（FIRE / SUPPRESS / WATCH）的火力基地兵站着隔墙打（残墙是 Space 的 1.35–1.4 m：
+ * 蹲姿枪口 0.92 m 全被挡，站姿 1.42 m 在墙后下坡一侧刚好越过墙顶）—— 09-24 探针里轻机枪手 FrontGunner 不进掩体循环、
+ * 蹲在墙后「开火」，挑点射线全被墙挡死。掩体循环（COVER_ENGAGE）自己有探头姿态，不管；压制值到
+ * fireStanceMaxSuppression 就随 AI 趴下，不硬拉起来。
+ *
+ * posts：组里个别人的射位（盖过出生点的守点圈）。FrontGunner 出生在 FireBaseRuinC（1.4 m）正后方，AI 挪进墙根的掩体后
+ * (9.5, −193.3) 站、蹲、趴对土坎顶 / 左枪 / 阵位 9 个点一个都不通视；墙的西头 (6.7, −193.0) 三种姿态都通 8/9
+ *（2026-09-24 Front 包审查后引擎射线逐点量过，scratchpad PostLos）。以前的办法是把 Space 的墙降到 1.1 m（越界改布局，已退回）。
  */
-const FIRE_BASE = (fire) => Object.freeze({ role: "hold", fire: Object.freeze(fire), fireStance: 0, fireStanceMaxSuppression: 0.5 });
+const FIRE_BASE_POSTS = Object.freeze({ FrontGunner: P(6.7, -193.0, 0, 0.4) });
+const FIRE_BASE = (fire) => Object.freeze({ role: "hold", fire: Object.freeze(fire), fireStance: 0, fireStanceMaxSuppression: 0.5,
+  posts: FIRE_BASE_POSTS });
 const FB_03 = FIRE_BASE([...CREST, "leftGunParapet"]);
 const FB_NEST = FIRE_BASE([...CREST, "leftGunParapet", "nestNorth", "nestWest"]);
 const FB_05 = FIRE_BASE([...CREST_05, "leftGunParapet", "nestNorth"]);

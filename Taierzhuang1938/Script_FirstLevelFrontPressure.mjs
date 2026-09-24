@@ -380,6 +380,12 @@ export class FirstLevelFrontPressure {
     // 只是从没有人写过它）：两组都看得见玩家时，各拿一个窗口，大组不会把小组饿死。
     actor.missionFireGroup = groupId;
     actor.aiOfficer = !!officerId && actor.missionId === officerId;
+    // 组配置点名的射位（cfg.posts，火力基地的轻机枪手）：守点圈挪到那儿，守点半径用那一点的 r。
+    const post = cfg.posts?.[actor.missionId];
+    if (post && actor.holdZone) {
+      actor.holdZone = { ...actor.holdZone, x: post.x, z: post.z, radius: Number.isFinite(post.r) ? post.r : actor.holdZone.radius };
+      actor.goal?.set?.(post.x, 0, post.z);
+    }
     if (cfg.role === "assault") this.ApplyAssault(actor, cfg);
     else if (cfg.role === "nestGuard") this.InitNestGuard(actor);
     else if (cfg.role === "hold") this.HoldAssault(actor);
