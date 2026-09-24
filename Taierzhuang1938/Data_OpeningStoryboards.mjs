@@ -77,7 +77,14 @@ export const OPENING_STORYBOARDS = Object.freeze({
       // K2 「视线越过他的肩膀」: the interpreter crouches on the crater step 0.6 m above Shunzi's knees, square
       // between him and the SSW leg; the head comes up and leans aside so the leg (Luo) clears his shoulder
       // (09-24 composition probe: 0.25 m aside, eye 1.0 m keeps the interpreter's face at the right third).
-      glimpseAsideM:.25, glimpseEyeM:1.0, glimpseInterpreterPull:.15 }),
+      glimpseAsideM:.25, glimpseEyeM:1.0, glimpseInterpreterPull:.15,
+      // LongShot: lean [dx, dz] (m) from the cover seat past the south mouth post, eye height over the rubble.
+      longShotLean:Object.freeze([.05,-.34]), longShotEyeM:.8,
+      // Check: sit back from Luo's kneel, eye no lower than this, look at his eyes rather than the chin.
+      checkBackM:.14, checkEyeM:.8, checkLookUpM:.06,
+      // Parry: the eye steps this far aside from ijaA's back so He (behind ijaA) is seen, and holds the
+      // duel this long after the cut before following the interpreter.
+      duelAsideM:.4, duelHoldS:.45 }),
     hands:Object.freeze({
       poses:Object.freeze({
         rest:H("cam",[.18,-.46,-.15],[0,-.4,-1],[.25,.65,.1],[14,24,14]),
@@ -128,7 +135,7 @@ export const OPENING_STORYBOARDS = Object.freeze({
         // 「日兵甲抓住他的前襟，把上身从泥里拽起来」: the left hand at his own collar until it is let go.
         Hold:K([0,"rest","rest"],[1,"collar","rest"]), Ask:K([0,"collar","rest"]), KickShunzi:K([0,"collar","rest"]),
         Glimpse:K([0,"collar","rest"]), Collar:K([0,"collar","rest"]), Chop:K([0,"collar","rest"]),
-        Parry:KC("collarReleasedAt",[-1,"collar","rest"],[0,"collar","rest"],[.6,"flat","flat"]),
+        Parry:KC("collarReleasedAt",[-1,"collar","rest"],[0,"collar","rest"],[.75,"collar","rest"],[1.15,"flat","flat"]),
         Flee:K([0,"flat","flat"]),
         DragCover:K([0,"flat","flat"],[.4,"trail","trail"]),
         LongShot:K([0,"sit","sit"]),
@@ -217,14 +224,19 @@ export const OPENING_STORYBOARDS = Object.freeze({
     facing:P(-1,-118.5),                 // Shunzi looks up the SSW leg past the interpreter (K2)
     facingOffsetDeg:10,
     interpreter:Object.freeze([.28,-.95,180]),
-    ijaAHoldBearingDeg:70,               // ijaA crouches east of him holding the front collar (He comes from behind ijaA)
+    // ijaA crouches east of him holding the front collar; He comes in behind ijaA. At 70° He's chopParry
+    // mark fell 0.9 m up the south trench wall (inside its mesh: the parry was never seen, 09-24 probe);
+    // at 115° it is on the trench floor (5.6, -123.8).
+    ijaAHoldBearingDeg:115,
     ijaBGuard:Object.freeze([-.55,-1.25]),  // ijaB aims at him from the left front, then kicks
     ijaBWatch:P(5.25,-125.82,-.96),       // ...then turns to the front at the north wall (wall 0.7 m on his left)
     kickM:.62,
+    bootsInterpreterS:1.8,               // Boots: the interpreter walks in only after the two soldiers' boots
     // Luo and He creep from RC down the SSW leg, over the crater step, to their marks.
     luoRoute:Route([-4,-113],[-1,-118.5],[1.2,-120.4],[3.1,-121.3],[4.7,-122.6],[5.25,-123.7]),
     heRoute:Route([-4,-113],[-1,-118.5],[1.2,-120.4],[3.1,-121.3],[4.9,-121.9]),
     luoStart:P(-4.6,-112.8), heStart:P(-5.9,-112.3), liuStart:P(-7.2,-111.8),   // just round the rear corner
+    heTrailM:1.5,                        // He closes up (brisk) when he is this much further from his mark than Luo from his
     liuRoute:Route([-4,-113],[-1.6,-117.2]),
     liuShot:P(-1,-121,2.0),               // bunker.liuwencaiShot: 15.4 m down the trench to J
     heCover:P(.05,-121.45),               // behind the mouth spoil's west face after the swap
@@ -232,9 +244,13 @@ export const OPENING_STORYBOARDS = Object.freeze({
     dragCoverRoute:Route([3.2,-124.25],[2.3,-124.95],[1.35,-125.05]),
     luoCheck:P(.5,-125.05),
     rifleMouth:P(1.4,-125.6,.3),          // bunker.rifleMouth: stock half-buried in the mouth (01 prop)
-    rifleKicked:P(.66,-124.64,1.1),       // at his hand after Luo's kick (0.36 m, a seated reach); the pickup follows the prop
+    rifleKicked:P(.56,-124.68,1.25),      // at his hand after Luo's kick (0.34 m, a seated reach), clear of the post; the pickup follows the prop
     kickFrom:P(1.85,-125.55),
   }),
+  // ---- 02 pursuit (bunkerPursuit, contract §5.8) -----------------------------------------
+  // The roster's delayS (Space) are scaled so the three followers are in the trench the player just left
+  // while he looks back from the rear corner (review 09-24: at delayS as authored one man showed, 12 m off).
+  pursuit:Object.freeze({ delayScale:.35, speedMps:3.2, retireMps:3, retireMaxS:40 }),
   // ---- 02 withdrawal (RearTrench) --------------------------------------------------------
   withdraw:Object.freeze({
     // The player's way out: mouth -> bend -> crater step (exposed to F) -> SSW leg -> RC.

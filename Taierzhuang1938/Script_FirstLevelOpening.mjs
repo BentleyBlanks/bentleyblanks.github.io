@@ -1,6 +1,7 @@
 import { OPENING as C } from "./Data_FirstLevelOpening.mjs";
 import { MISSION_TUNING as R, OPENING_PERCEPTION as P } from "./Data_Tuning_FirstLevel.mjs";
-import { MISSION_ANCHORS as A, MISSION_PLACEMENT as Place } from "./Data_FirstLevelMissionLayout.mjs";
+import { MISSION_ANCHORS as A, MISSION_PLACEMENT as Place, MISSION_LAYOUT as Layout } from "./Data_FirstLevelMissionLayout.mjs";
+import { SampleMissionTerrain as Ground } from "./Data_FirstLevelMissionTerrain.mjs";
 import { CLOSE_RANGE } from "./Data_Tuning_AiShooting.mjs";
 import { SpeakingCastOptions } from "./Data_FirstLevelSpeakingCast.mjs";
 import { FRONT_SORTIE } from "./Data_FirstLevelFrontRoute.mjs";
@@ -35,14 +36,31 @@ const SegmentDistance=(p,a,b)=>{
  * The wounded gunner's way back (2026-09-23 space §10.2): the way He came in, as the access-trench
  * polyline FRONT_SORTIE.zhouExit (left gun access -> support sap -> SJ -> collection rest), which
  * Script_FirstLevelSpaceTest checks for capsule clearance and a climbable slope. A gunner displaced
- * off the seat joins it after the leg nearest to him instead of walking back to the seat first.
- * `radius` is kept for callers; the clearance is the polyline's.
+ * off the seat joins it after the leg nearest to him instead of walking back to the seat first -- but
+ * only over a clear first leg (a capsule of `radius` against the solid blocks, the SpaceTest rule): a
+ * gunner pushed off the line by the AI steps back to the earlier corner first instead of cutting a wall.
+ * Not wired yet: the runtime walk is Script_FirstLevelFrontBattle.UpdateZhou (Front package).
  */
+const ZHOU_SOLIDS=Layout.blocks.filter(block=>block.solid!==false&&!(Layout.walkableSurfaces||[]).some(surface=>surface.id===block.id));
+function ZhouLegClear(a,b,radius){
+  const length=Distance(a,b);
+  // From one radius out: where he already stands is not a new obstruction.
+  for(let d=Math.min(radius,length);d<=length;d+=.2){
+    const t=length?d/length:0,x=a.x+(b.x-a.x)*t,z=a.z+(b.z-a.z)*t,y=Ground(x,z);
+    for(const box of ZHOU_SOLIDS){
+      const c=Math.cos(box.ry||0),s=Math.sin(box.ry||0),dx=x-box.x,dz=z-box.z;
+      if(Math.abs(dx*c-dz*s)<box.w/2+radius&&Math.abs(dx*s+dz*c)<box.d/2+radius&&box.y+box.h/2>y+.3&&box.y-box.h/2<y+1.7)return false;
+    }
+  }
+  return true;
+}
 export function ZhouGunExitRoute(start,radius=.34){
   const route=FRONT_SORTIE.zhouExit;
   let join=1,best=Infinity;
   for(let i=1;i<route.length;i++){const d=SegmentDistance(start,route[i-1],route[i]);if(d<best-1e-9){best=d;join=i;}}
-  return route.slice(join).map(point=>({x:point.x,z:point.z}));
+  // Blocked straight to the join point: go back along the polyline to a corner he can reach.
+  while(join>0&&!ZhouLegClear(start,route[join],radius))join--;
+  return route.slice(Math.max(0,join)).map(point=>({x:point.x,z:point.z}));
 }
 
 // 2026.09.19 重构（docs/Data_FirstLevelRebuild20260919Contract.md §2）：

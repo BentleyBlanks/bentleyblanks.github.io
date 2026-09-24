@@ -18,6 +18,8 @@ const ContactClips=new Set(["DuckBlast","BayonetClearWood","CollarDrag","ButtThr
 const Guards=new Set(["ijaA","ijaB","guard","heyoutian","liuwencai"]);
 const Hash=value=>[...String(value)].reduce((sum,char)=>(sum*31+char.charCodeAt(0))>>>0,7);
 const HandClips=new Set(["ButtThreat","InterrogateCrouch","InterpreterPoint","MessengerReport","PointBlockade"]);
+// Phases in which the interpreter questions a prisoner (01 comrade, 02 Shunzi), 09.23 phase table.
+const Interrogating=new Set(["CaptiveWall","Interrogation","Slash","Taunt","Hold","Ask","KickShunzi","Glimpse","Collar"]);
 
 export function SettleOpeningCaptive(soldier,pose){
   if(soldier.alive!==false||pose?.clip!=="ShotCollapse")return;
@@ -102,7 +104,8 @@ export function ResolveOpeningActorPose(soldier,pose,clock,record){
   if(!context||soldier.alive===false||ContactClips.has(pose?.clip))return pose;
   const speaking=context.speaker===context.role;
   const stationary=(soldier.openingStoryboardTravel||0)<.1;
-  const opening=["Supply","Orders"].includes(context.phase);
+  // 2026-09-23 director phases (Data_OpeningStoryboards.phases): Banter/Orders are the dugout talk.
+  const opening=["Banter","Orders"].includes(context.phase);
   let resolved=pose;
   if(opening&&stationary&&context.role==="luo")resolved={clip:speaking?"PointBlockade":"MessengerReport",seconds:clock};
   if(opening&&stationary&&context.role==="runner")resolved={clip:"MessengerReport",seconds:clock};
@@ -158,8 +161,9 @@ export class OpeningActorPerformance {
     const desired=talking?Smooth(lineAge/.22)*voice:0;
     this.speech+=(desired-this.speech)*(1-Math.exp(-dt*9));
     const moving=(this.soldier.openingStoryboardTravel||Math.abs(state.moveSpeed||0)*4.2)>.1;
-    const guard=Guards.has(context.role),captive=context.role==="captiveHelper";
-    const interrogating=["Captive","Interrogate","Creep","Black"].includes(context.phase);
+    // The wounded comrade is "comrade" in the 09.23 cast (captiveHelper was the 09.21 name).
+    const guard=Guards.has(context.role),captive=context.role==="captiveHelper"||context.role==="comrade";
+    const interrogating=Interrogating.has(context.phase);
     const breath=Math.sin(time*(captive?3.4:2.1));
     const sway=Math.sin(time*.93)*Math.sin(time*.37);
     // Faces with a rig nod on the stressed syllables of their face track; the
@@ -199,7 +203,7 @@ export class OpeningActorPerformance {
     // Free hands give the line a beginning, emphasis and release. Rifle hands
     // stay attached; their entire chest/weapon follows the same breathing turn.
     if(!moving&&!headOnly){
-      if(context.role==="yaowa"&&["Supply","Orders"].includes(context.phase)){
+      if(context.role==="yaowa"&&["Banter","Orders"].includes(context.phase)){
         this.Turn(bones.upperArmR,this.right,-.16+.32*emphasis);
         this.Turn(bones.forearmR,this.forward,.10*this.speech*Math.sin(lineAge*2.4));
       }else if(context.role==="interpreter"&&interrogating){

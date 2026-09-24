@@ -137,10 +137,16 @@ export function InstallOpeningStoryboardAnimation(soldier){
     rerootLocal.compose(blendFrom[rootBone].p,blendFrom[rootBone].q,bone.scale).premultiply(reroot).decompose(blendFrom[rootBone].p,blendFrom[rootBone].q,rerootScale);
   };
   const RememberDisplayedParent=()=>{if(rootBone>=0){displayedParent.copy(bones[rootBone].parent.matrixWorld);displayedParentValid=true;}};
+  // The top bone (GroundRoot) carries no track in the opening clips: the director's KeepSkeleton writes
+  // the displayed pelvis into it for one frame at a re-root, and it must go back to rest before the next
+  // sample, or that offset stays for good (09-24 review: ijaA's head sank 10 m below ground over 02).
+  // The blend still starts where the body was seen (KeepDisplayedPelvis moves blendFrom, not the bone).
+  const rootRest=rootBone>=0?{p:bones[rootBone].position.clone(),q:bones[rootBone].quaternion.clone()}:null;
   actor.Update=function(dt,state){
     const acting=rig.openingActorPerformance ||= new OpeningActorPerformance(soldier);
     acting.Restore();
     performer?.Restore();
+    if(rootRest){bones[rootBone].position.copy(rootRest.p);bones[rootBone].quaternion.copy(rootRest.q);}
     clock+=dt;
     const record=library?.models.get(rig.clipModelId||rig.modelId);
     let pose=ResolveOpeningActorPose(soldier,soldier.openingStoryboardPose,clock,record);

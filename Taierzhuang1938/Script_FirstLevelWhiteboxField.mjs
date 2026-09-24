@@ -453,9 +453,13 @@ export class FirstLevelWhiteboxField {
       // Scenario covers (the 02 mouth spoil) join the AI cover table like static blocks do.
       if (block.cover) for (const point of block.cover.points || [block]) sink.Cover(point.x, point.z, block.h, block.cover.faceX, block.cover.faceZ);
     }
-    // A new array: the AI rebuilds its cover registry when the reference changes (Script_Ai.UpdateFront).
-    this.covers = [...(this.covers || []).filter((cover) => !(this.scenarioCovers || []).includes(cover)), ...sink.covers];
-    this.scenarioCovers = sink.covers.slice();
+    // A new array only when the scenario covers really change: the AI rebuilds its cover registry
+    // (and drops its validation cache) whenever the reference changes (Script_Ai.UpdateFront).
+    const was = this.scenarioCovers || [], Key = (c) => `${c.x},${c.z},${c.height},${c.faceX},${c.faceZ}`;
+    if (was.length !== sink.covers.length || was.some((cover, i) => Key(cover) !== Key(sink.covers[i]))) {
+      this.covers = [...(this.covers || []).filter((cover) => !was.includes(cover)), ...sink.covers];
+      this.scenarioCovers = sink.covers.slice();
+    }
     this.scenarioMeshes = sink.Flush(this.scene, { Get: key => {
       if(key==="OpeningEarth")return this.library.Get("Adobe",{color:0x777064,repeat:2});
       if(key==="OpeningWood")return this.library.Get("WoodBeam",{color:0x706351,repeat:2});
