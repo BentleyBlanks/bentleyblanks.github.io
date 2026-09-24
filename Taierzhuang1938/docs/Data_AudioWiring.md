@@ -650,7 +650,7 @@ Hell Let Loose 的战场声。改之前查到的病根（`survey/Digest_audio.md
 - **预算**：前线同时 ≤ 5 条（场上战场强度过 0.6 时收到 3 条），场外炮击 ≤ 4 条，两者合计 ≤ 契约 §6 的 8
   （`front.sharedMaxVoices`；炮击优先，前线只拿剩下的，炮击替还没落地的那一发留的两条也算进去），满了跳过不硬挤。
   2026-09-24 审查前炮击的上限只挡新一发、不挡一发自己的五条声音，假引擎 15 分钟实测炮击峰值 5、合计 9–10；
-  现在 `Script_FirstLevelBattleSoundTest` 各步骤 15 分钟量峰值断言合计 ≤ 8。「同时在响」按每一声本体的可听时长算（`cueActiveS`），不按引擎回收时刻（那要等混响尾巴与传播延迟，远处一枪常常五六秒）。节点上它们全是远处的低优先级声：`liveNodes` 过 120 × 0.62 就先饿它们，近处的枪声与对白不受影响 —— 场上打得凶时远处这一层自然变稀。
+  现在 `Script_FirstLevelBattleSoundTest` 各步骤 15 分钟量峰值断言合计 ≤ 8。「同时在响」按每一声本体的可听时长算（`cueActiveS`），不按引擎回收时刻（那要等混响尾巴与传播延迟，远处一枪常常五六秒）。节点上：前线每一声带 `selfCapped`（2026-09-25，见 3b），按整份预算进门，不再套「远 = 低优先级」的 120 × 0.62；它们仍是最先让位的那一类 —— 近处新来的声音比它们近、比它们响，`StealVoices` 照偷，所以近处的枪声与对白不受影响。场外炮击（`Script_BattleArtillery`）没改，仍按距离归档。
 - 取证：`missionRuntime.State().battleSound.front`（每个扇区打了几场、下一场几秒后、最近 12 声的距离/音量）。
 
 ### 3a. 01 被压着时前线渐强（`front.stages.Trapped.swell`，2026-09-24 恢复）
@@ -694,7 +694,56 @@ volume ÷ 它的 `cueVolume`，含距离补偿与 ±10 % 抖动）：
 
 swell 倍率读数：5 s 0.41/0.31、15 s 0.49/0.36、30 s 0.66/0.51、40 s 0.82/0.69、45 s 0.90/0.82、
 49.9 s 1.00/1.00（intensity / gain 倍率）。50–60 s 那 16 声没被收下的都落在 Black 黑屏那 2.6 s 里，是引擎侧的拒绝
-（原因没查，这一轮没动它）。这些是数字，不是试听。
+—— 根因与修法见下面 3b（2026-09-25 修掉，表里是修前的数）。这些是数字，不是试听。
+
+### 3b. 01 黑屏里前线被饿死（2026-09-25 修）
+
+**现象**：上表 50–60 s 排出 31 声只收下 15 声，没收下的都在近爆后 Black 黑屏那 2.6 s 里。
+
+**根因**（浏览器实测，p012 `quality=low` 实时跑 01，拦 `DrainFront` 里发出的每一声，记 `drops` 哪一项动了、当时
+`liveNodes`，再每 0.1 s 按发声体拆账）：不是黑屏把音频上下文挂起（`ctx.state` 一直 running）、不是去重窗、
+不是前线自己的声部上限（`frontVoices` 2–3 条 < 5）、也不是 BlastHearing / 剧情耳鸣吞的 —— 被拒的每一声都是
+`drops.starved`。前线的声源在 500–900 m，一律过 `FAR_LOW_PRIORITY_M` 45 m，被按低优先级套 `nodeBudget × 0.62`
+= 74.4 的天花板。近爆那一刻起账面被这些顶在 71–81：
+
+| 占用 | 节点 |
+| --- | --- |
+| 近爆本体 `explosionNear`（priority） | 6 |
+| 近处落土 `debrisFall` 四五条 + 洞里 `amb.debris` | 约 28–38 |
+| 心跳 / 喘息（priority，非位置音） | 3–9 |
+| 剧情耳鸣（`DeafenFirstLevel` story 档） | 8 |
+| 环境床三层（shellingFar / battleFar / windPlain） | 14–16 |
+
+前线一声 `NODE_COST` 14（rifle*Far）起，一加就过 74.4；`StealVoices` 只偷**比新声更远、更轻**的，而场上的都在
+身边（落土 1–13 m、心跳 0 m），一条都偷不到，于是饿死。黑屏一过，落土播完，账面掉回 50 以下，前线又进得来。
+
+**判断**：是 bug，不是「黑屏 = 被震聋」的设计。设计要的是前线还在、被闷住：所有总线都过 `concussionFilter` →
+`deafFilter`，实测黑屏里收下的前线声起播时 `deafFilter` 380–745 Hz、`concussionFilter` 650 Hz，剧情曲线自己会压它们；
+丢掉它们等于在耳鸣底下挖一个洞，醒来（Wake）时前线又凭空冒出来。
+
+**修法**：`Script_Audio.Play` 加一个参数 `selfCapped`：调用方自己管声部数的远处声场，按整份预算进门，不再按
+距离归进低优先级。`DrainFront` 每一声都带它（前线同时 ≤ 5 条、激战 3 条、与炮击合计 ≤ 8，已经是封顶的）。
+它们仍是最先让位的：近处新来的声音比它们近、比它们响，照偷。只动前线，场外炮击与 07 以后的旧声源（`UpdateLegacy`）不变。
+
+**统计口径**：`State().battleSound.front` 多一项 `refused`（排出了、`audio.Play` 返回空的声数：预算 / 去重 / 距离闸），
+与 `skipped`（自己的声部上限）分开；`plays` 只数收下的。
+
+**实测**（同一份代码，探针里把 `selfCapped` 抹掉作对照，cap / nocap / cap / nocap 交替各跑一次 66 s）：
+
+| 臂 | 近爆 → Wake 之间 排出 / 收下 | 50–60 s | 全程 | 拒收原因 | liveNodes 峰值 |
+| --- | --- | --- | --- | --- | --- |
+| 修后 ① | 5 / 5 | 16 / 16 | 79 / 79 | — | 95 |
+| 对照 ① | 1 / 1 | 15 / 13 | 93 / 91 | starved ×2 | 88 |
+| 修后 ② | 0 / 0 | 10 / 10 | 81 / 80 | dedupe ×1 | 101 |
+| 对照 ② | 10 / 5 | 29 / 18 | 106 / 93 | starved ×13 | 83 |
+
+每局的声数随实时时钟与随机种子浮动（黑屏里排出 0–10 声不等），所以按「拒收原因」看：修后两局拒收只剩 1 声，是
+22 ms 去重窗（同名同一刻，设计如此）；对照两局 15 声全是 starved。账面峰值多了十来个节点（95–101，仍在 120 以内；
+整体节点预算见 Sound 包 Step 4）。探针 `REL/附件/r2_work/sound/s2/Probe_BlackSnap.mjs`（带 `nocap` 参数跑对照）。
+
+闸：`Script_AudioTest`「selfCapped」一条（同一同步块里把预算压到「整份装得下、0.62 装不下」，新声摆在 990 m
+使偷无可偷：不带的必须饿死、带的必须收下；把引擎里的 `!selfCapped` 拿掉就红）；`Script_FirstLevelBattleSoundTest`
+「前线每一声都带 selfCapped；拒收单独记账」（DrainFront 不传就红）。
 
 ### 4. 场外近落弹（`Script_BattleArtillery`）
 
@@ -862,6 +911,9 @@ stress ≥ 0.42 开始喘（`breathHeavy` 原速原调，0.26–0.5 随 stress�
   `R(gapS) / (intensity × 渐强倍率 × 扇区权重)`（光看声数分不出来——把 rate 上的渐强倍率拿掉，靠首场后摊与
   等待缩短，16 种子声数照样 26.4 → 37.6）；近爆早到时 `catchUpS` 内补到顶；近爆后再进 01 **逐帧**都在顶上，
   16 种子头 2 s 每声相对音量 ≥ 5–30 s 的 0.8 倍（现在 0.683 / 0.715，改前 0.341 / 0.712）；其余步骤倍率恒为 1。
+- 2026-09-25（3b，黑屏里前线被饿死）：`Script_AudioTest`「selfCapped」—— 不带的卡在 0.62 天花板上饿死、带的按整份预算收下；
+  `Script_FirstLevelBattleSoundTest`「前线每一声都带 selfCapped；拒收单独记账」—— `front.refused` 与 `skipped` 分开、
+  `plays + refused` = 排出的声数。
 
 ---
 

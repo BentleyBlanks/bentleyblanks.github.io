@@ -39,6 +39,7 @@ export class FirstLevelMissionBattleSound {
     this.frontVoices = [];
     this.frontPlays = 0;
     this.frontSkipped = 0;
+    this.frontRefused = 0;      // 取证：DrainFront 排出、audio.Play 返回空（预算/去重/距离闸）的声数
     this.frontExchanges = 0;
     this.frontRecent = [];
     this.dugoutWant = null;
@@ -324,6 +325,9 @@ export class FirstLevelMissionBattleSound {
       const volume = (F.cueVolume[e.cue] ?? 0.5) * volumeScale * place.gain * jitter;
       const voice = this.audio?.Play?.(e.cue, {
         position: place.position, volume, soundField: true, bus: "sfx",
+        // 声部数由上面的 cap / sharedMaxVoices 管着，不再让引擎按「远 = 低优先级」再砍一道
+        //（Script_Audio.Play 的 selfCapped；01 黑屏里前线整段被饿死就是这一道）。
+        selfCapped: true,
         airCut: Math.min(place.airCut, P.airCut ?? 20000),
         burst: e.burst ?? undefined,
       });
@@ -332,7 +336,7 @@ export class FirstLevelMissionBattleSound {
         const active = (F.cueActiveS[e.cue] ?? 1.5) + (e.burst ? e.burst * shot : 0);
         this.frontVoices.push({ v: voice, until: this.frontTime + active });
         this.frontPlays += 1;
-      }
+      } else this.frontRefused += 1;   // 排出了、引擎没收（与 frontSkipped「自己的声部上限」分开记）
       const sector = this.frontSectors.find((s) => s.spec.id === e.sector);
       if (sector && voice) sector.plays += 1;
       this.frontRecent.push({ at: +this.frontTime.toFixed(2), sector: e.sector, kind: e.kind, side: e.side, cue: e.cue,
@@ -393,7 +397,7 @@ export class FirstLevelMissionBattleSound {
   State(){
     return {elapsed:this.elapsed,sources:this.sources.map(s=>({id:s.spec.id,count:s.count})),recent:this.events.slice(-12),
       front:{stage:this.frontStage,time:+this.frontTime.toFixed(2),exchanges:this.frontExchanges,plays:this.frontPlays,
-        skipped:this.frontSkipped,queued:this.frontQueue.length,voices:this.frontVoices.length,
+        skipped:this.frontSkipped,refused:this.frontRefused,queued:this.frontQueue.length,voices:this.frontVoices.length,
         stageTime:this.frontStage===null?null:+(this.frontTime-(this.frontStageAt??this.frontTime)).toFixed(2),
         swell:this.swellScale?{u:+this.swellScale.u.toFixed(3),intensity:+this.swellScale.intensity.toFixed(3),
           gain:+this.swellScale.gain.toFixed(3),factAt:this.swellFactAt==null?null:+(this.swellFactAt-(this.frontStageAt??0)).toFixed(2)}:null,

@@ -5219,7 +5219,7 @@ export class AudioEngine {
 
   Play(name, { position = null, volume = 1, pitch = 1, delay = 0, offset = 0, maxDuration = Infinity, pan = 0, burst = null, priority = false,
     bus = "sfx", airCut = 0, soundField = false, firstPerson = false, occlusion = null,
-    weaponClass = null, sourceSizeM = 0, storySpeech = false,
+    weaponClass = null, sourceSizeM = 0, storySpeech = false, selfCapped = false,
     blastRadiusM = BLAST_HEARING.referenceRadiusM, blastOccluded = false } = {}) {
     // priority：玩家自己的枪永远要响。实测 59 个兵在打时 liveNodes 峰值 118/120，
     // AI 枪声丢 40.4%，**玩家自己的枪也丢了 8.3%** —— 因为玩家和 59 个兵共用
@@ -5299,8 +5299,19 @@ export class AudioEngine {
     // 【2026-09-08】超了不再直接丢新的：先试着从活着的声部里**偷**一条更轻更远的
     // （见 StealVoices）。「丢新的」这条策略在听感上是反的 —— 玩家注意的永远是
     // 刚发生的那件事，而被丢掉的恰恰就是它。
+    //
+    // 【2026-09-25】`selfCapped`：调用方**自己管着声部数**的远处声场（01–06 前线生成器
+    // `DrainFront`：maxVoices 5、打得凶时 3，与场外炮击合计 ≤ 8）不再按「远 = 低优先级」
+    // 套 0.62 那道天花板，按普通声音的整份预算进门。前线一律在 45 m 外（几百米），
+    // 所以原来永远只能用 74 个节点里剩下的那点位置 —— 实测 01 近爆后黑屏那 2.6 s 里，
+    // 近爆本体（priority，6）+ 四五条近处落土 debrisFall（约 28）+ 心跳/喘息（priority）
+    // + 剧情耳鸣 8 + 环境床 14–16 把账面顶在 71–81，前线每一声（6–16 个节点、500–900 m）
+    // 都卡在 74.4 上被饿死（drops.starved）；能偷的只有比它更远更轻的，一条都没有。
+    // 结果是黑屏里前线整段消失，而设计要的是「被耳鸣与闷音压着、还在」
+    // （所有总线都过 deafFilter，剧情曲线自然会把它们闷住）。
+    // 它们仍是最先让位的那一类：近处新来的声音比它们近、比它们响，StealVoices 照偷。
     const cost = NODE_COST[name] ?? DEFAULT_COST;
-    const far = position && distance > FAR_LOW_PRIORITY_M;
+    const far = position && distance > FAR_LOW_PRIORITY_M && !selfCapped;
     const budget = this.nodeBudget;
     const ceiling = priority ? budget * 1.15
       : (far || LOW_PRIORITY.has(name)) ? budget * LOW_PRIORITY_HEADROOM : budget;

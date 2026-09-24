@@ -1006,6 +1006,39 @@ if (steal.fired !== steal.total) {
 } else Ok(`预算打满：玩家 ${steal.fired}/${steal.total} 枪全响，偷了 ${steal.stolen} 条`
   + `（超支放行 ${steal.over} 次，饿死 ${steal.starved} 条）`);
 
+// 【2026-09-25】selfCapped：自己管声部数的远处声场（01–06 前线 DrainFront）按整份预算进门，
+// 不再被「远 = 低优先级」那道 0.62 天花板饿死。回归背景：01 近爆后黑屏 2.6 s 里账面 71–81，
+// 前线每一声都卡在 74.4 上（浏览器实测一次 10 声收 5 声，全是 drops.starved），黑屏里前线整段消失。
+//
+// 同一个同步块里算账、压预算、发声：liveNodes 只在计时器回调里变，块内它是定值，场上的 AI 插不进来。
+// 新声摆在 990 m（soundField 的 1000 m 闸以内）—— StealVoices 只偷比新声更远的，990 m 外没有东西可偷，
+// 于是不带 selfCapped 的那一声**必然**饿死，这一条量的是天花板，不是 voice stealing 的运气。
+// 两声用两个不同的 cue：同名同位置同一刻会被 22 ms 去重窗吃掉。
+const selfCap = await page.evaluate(() => {
+  const a = window.Taierzhuang.audio;
+  const saved = a.nodeBudget;
+  const L = a.listenerPos;
+  const pos = { x: L.x + 990, y: L.y, z: L.z };
+  const Arm = (cue, selfCapped) => {
+    const live = a.liveNodes, cost = 14;       // NODE_COST.rifleNraFar / rifleIjaFar
+    a.nodeBudget = live + cost + 2;            // 整份预算装得下；0.62 那一档装不下
+    const starved = a.drops.starved;
+    const v = a.Play(cue, { position: pos, volume: 0.02, soundField: true, bus: "sfx", selfCapped });
+    const out = { played: !!v, starved: a.drops.starved - starved, live, budget: a.nodeBudget,
+      lowCeiling: +(a.nodeBudget * 0.62).toFixed(1) };
+    a.nodeBudget = saved;
+    return out;
+  };
+  return { without: Arm("rifleIjaFar", false), with: Arm("rifleNraFar", true) };
+});
+if (selfCap.without.played || selfCap.without.starved !== 1) {
+  Fail(`远处声场不带 selfCapped 时应当卡在 0.62 天花板上饿死（${JSON.stringify(selfCap.without)}）—— 这条断言没测到东西`);
+} else if (!selfCap.with.played || selfCap.with.starved !== 0) {
+  Fail(`带 selfCapped 的前线声在整份预算装得下时被引擎拒了（${JSON.stringify(selfCap.with)}）`
+    + ` —— 01 黑屏里前线会整段消失`);
+} else Ok(`selfCapped：账面 ${selfCap.with.live}+14 / 预算 ${selfCap.with.budget}（低优先级天花板 ${selfCap.with.lowCeiling}），`
+  + `不带的饿死、带的收下`);
+
 // 两级动态：母线慢压 + 末端快限，参数不许被谁顺手改回单级。
 // 抽泵深度的实测（10.08 → 8.91 dB）在 Script_Audio 的 BUS_COMP 抬头与
 // docs/Data_AudioEngine.md 里，那是离线渲染量的，不在这条冒烟的成本里。
