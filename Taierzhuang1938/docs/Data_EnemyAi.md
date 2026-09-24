@@ -1744,3 +1744,18 @@ fix4 驾驶器躲手榴弹后卡在 RightNestApproach 的壕壁上（→ 第 8 �
 - ai 桶对 f581ac7dd 基线的同页 A/B 没做：审查者按本包的开关全关 / 全开同页交替量过（+0.1 / +0.2 ms，契约线 +1.0 / +2.0 ms）；
   开关关着也在跑的只有 `AssignFire` 每帧遍历前沿日军与 `TryFire` 的一行记账。
 - 阵位步枪守卫 `RightEntryGuard` 在 03 仍几乎不开枪、右侧阵位机枪对授权点不通视：见 20.10 第 8 条（Front / Space 包）。
+
+### 20.12 Front 包审查修复里动到敌军行为的几处（2026-09-25）
+
+1. **投弹否决（任务侧开关）**：`TacticsDirector.grenadeVeto`（默认 null，07 以后与其它关卡不变），`ShouldGrenade` 按目标 lkp 问一次、
+   `Script_Ai.TryGrenade` 脱手前按真实瞄点再问一次，否决就 `ClearTask` 结掉投弹任务。第一关 03–05 由
+   `FirstLevelFrontBattle.GuardInBlast` 装上：落点 `guardGrenadeShieldM`（10 m = 手榴弹 6.5 m 半径 + 抛投散布）内有受保护的
+   待撤守军（`missionUntargetable`）就不扔。起因：一颗日军手榴弹炸死聚拢的第二批三人、下一颗两人 → `guardBatchLost`。
+2. **近距交火的锚点落在他自己的线上**（`Runtime.UpdateAssault` 的 contact 分支）：以前每次进 contact 都 `Defend(actor.position)`，
+   `tacticalRadiusM` 14 m 从脚下重新算，人可以一次一次往前蹭；三趟 03–06 冷启动里侧翼兵 A 从阵位北面的末线
+   (39.2, −162.2) 穿过已放弃的阵位走到后门坡道 (30, −143)，把在后墙岔口等的玩家捅死。现在锚在 `s.points[s.index]`，白刃与
+   找掩体都在那条线 14 m 以内。空转探针（`--gate`，同日最终代码）03 7% / 21%、04 15% / 10%、05 4% / 10%，hunters 0。
+3. **火力基地射位**（`FRONT_PRESSURE_PHASES` 的 `fireBase.posts`）：三堵残墙回到 Space 的 1.35–1.4 m 后，墙根掩体里站蹲趴
+   对 9 个授权点都是 0/9；三个人的守点圈挪到各自那堵墙的端头（引擎射线量过，见数据文件头注）。
+4. **nest 组点名表**加西门外接近沟 `westApproach`：入口守卫蹲姿对相位表 0/12，只有这一点通（20.10 第 8 条遗留的一半）；
+   院里两名守卫对哪一点都不通视，不硬给点。

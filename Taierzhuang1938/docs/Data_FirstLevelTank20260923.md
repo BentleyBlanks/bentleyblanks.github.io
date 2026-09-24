@@ -93,3 +93,15 @@
 - 换路以后：`lanes[]`（区域火力沟线）、`scan[]`、`entry`（起点要真有遮挡再加断言）都跟新路一起换；`NEVER_BREAKABLE_RULES.zones` 按 `MISSION_LAYOUT.zones` 的语义 id 认，zone id 不变就跟着新布局走。
 - 换路以后：`OffstagePoint()` 取新路的第一个路点，03 的「先闻其声」自动跟着走；新路起点离玩家的距离决定能不能听见（现路线 130–196 m）。
 - 取证：`Debug.FirstLevelMission().tankBrain`（大脑快照、主炮每发的预兆时长与落点、机枪点射、反应、毁伤序列、掩体段数、露面时刻）。
+
+## 2026-09-25 Front 包审查修复
+
+- **窗口喊话按优先战术提示喊**（`SayBark` 传 `priority: true`）：不给剧情对白让路、不吃 0.55 s 全局闸；只有点名的人自己正在说剧情
+  台词时排队（`QueueBark`，`TANK.barkRetryS`：trackCut 12 s、hatchShout 6 s、tankWindow 4 s；Disabled 以后的 trackCut、点名的人没了
+  的一律丢）。排队或刚喊出口的 `barkHoldS` 2.5 s 里，前沿对白的下一场先等（`FirstLevelFrontScenes` 读 `HoldsDialogue()`）；
+  「履带断了！还在打！再补一捆！」顶掉同一次投弹触发、还没开口的「回来！低头！」（`BundleRetreat`，意思相反）。
+  战车探针（开声音）：`trackCut` 在 MobilityKill 同一帧喊出（said:true）。
+- **打过头**：`SafeShellAim` 同一个收瞄循环里，真炸点沿射向越过这一次试的瞄点超过 `overshootMaxM` 6 m 也往炮口收；都收不短时
+  打保护够、过头最少的那一发（不因此少打）。改前缺口区的弹常越过缺口 8–12 m 落进后沟 (−16, −140) 一带。
+- 来袭啸声放在真炸点（`sound.OnCannon(from, safe.impact || at, …)`）。
+- 03 预告 / 04 压阵位前的指引标记不压炮塔：放在车旁地上（朝玩家 4 m、玩家右手 6 m，`FRONT_BATTLE_TUNING.guideTankLeadM / SideM`）。
