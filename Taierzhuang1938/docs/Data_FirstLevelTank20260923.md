@@ -101,7 +101,8 @@
   的一律丢）。排队或刚喊出口的 `barkHoldS` 2.5 s 里，前沿对白的下一场先等（`FirstLevelFrontScenes` 读 `HoldsDialogue()`）；
   「履带断了！还在打！再补一捆！」顶掉同一次投弹触发、还没开口的「回来！低头！」（`BundleRetreat`，意思相反）。
   战车探针（开声音）：`trackCut` 在 MobilityKill 同一帧喊出（said:true）。
-- **打过头**：`SafeShellAim` 同一个收瞄循环里，真炸点沿射向越过这一次试的瞄点超过 `overshootMaxM` 6 m 也往炮口收；都收不短时
-  打保护够、过头最少的那一发（不因此少打）。改前缺口区的弹常越过缺口 8–12 m 落进后沟 (−16, −140) 一带。
+- **打过头**：`SafeShellAim` 同一个收瞄循环里，真炸点沿射向越过这一次试的瞄点超过 `overshootMaxM` 6 m 也往炮口收；收
+  `protectPullSteps` 次都过头（或保护不够）这一发不打。改前缺口区的弹常越过缺口 8–12 m 落进后沟 (−16, −140) 一带；
+  先试过「照打过头最少的那一发」，战车探针 16 发里仍有 2 发炸在 (−11.4, −142.7)、(−15.6, −141.2)。TankProbe 断言每发过头 ≤ 6.5 m。
 - 来袭啸声放在真炸点（`sound.OnCannon(from, safe.impact || at, …)`）。
 - 03 预告 / 04 压阵位前的指引标记不压炮塔：放在车旁地上（朝玩家 4 m、玩家右手 6 m，`FRONT_BATTLE_TUNING.guideTankLeadM / SideM`）。

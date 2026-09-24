@@ -410,21 +410,18 @@ export class FirstLevelTankRuntime {
     // burst at (−11.4, −142.7) by the gap junction, 11.5 m on).
     const fx = at.x - from.x, fz = at.z - from.z, fd = Math.hypot(fx, fz) || 1;
     const Over = (impact) => ((impact.x - aim.x) * fx + (impact.z - aim.z) * fz) / fd;
-    let safeFallback = null;
     for (let pulled = 0; pulled <= G.protectPullSteps; pulled++) {
       const flight = Flight(aim);
       const impact = r.combat.PredictShellImpact(from, aim, { flight, sourceCollider: r.view.tankCollider });
       const clear = !impact || list.every((p) => Math.hypot(impact.x - p.x, impact.z - p.z) >= G.protectClearM);
       if (clear && (!impact || !(Over(impact) > (G.overshootMaxM ?? Infinity)))) return { at: aim.clone(), flight, pulled, impact };
-      // No try short enough: fire the protected-clear one that overshoots least (never fewer shells for it).
-      if (clear && (!safeFallback || Over(impact) < safeFallback.overshoot)) safeFallback = { at: aim.clone(), flight, pulled, impact, overshoot: +Over(impact).toFixed(1) };
       const dx = from.x - aim.x, dz = from.z - aim.z, d = Math.hypot(dx, dz);
       if (d <= G.protectPullM + G.minRangeM) break;
       const lift = aim.y - this.Ground(aim.x, aim.z);
       aim.x += dx / d * G.protectPullM; aim.z += dz / d * G.protectPullM;
       aim.y = this.Ground(aim.x, aim.z) + lift;
     }
-    return safeFallback;
+    return null;
   }
   Fire(f) {
     const r = this.r, t = r.tank, view = r.view, V = this.T.view, G = this.T.gunner, M = this.T.mg;

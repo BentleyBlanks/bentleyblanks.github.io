@@ -104,7 +104,10 @@ function Metrics(samples, debug) {
     const sample = before.at(-1);
     return { t: Round(shot.t), stage: sample?.stage, kind: shot.kind, target: shot.target, warning: shot.warning,
       layS: Round(shot.layS), crankStopToFireS: lastCrank ? Round(shot.t - lastCrank.t) : null,
-      playerDistance: Round(shot.playerDistance ?? null), protectedMinM: Round(shot.protectedMinM ?? null), pulled: shot.pulled || 0, impact: shot.impact ? { x: Round(shot.impact.x, 1), z: Round(shot.impact.z, 1) } : null };
+      playerDistance: Round(shot.playerDistance ?? null), protectedMinM: Round(shot.protectedMinM ?? null), pulled: shot.pulled || 0, impact: shot.impact ? { x: Round(shot.impact.x, 1), z: Round(shot.impact.z, 1) } : null,
+      // Past the aim it was fired at, along the line of fire (SafeShellAim's overshoot rule; only guarded while protected men exist).
+      overshootM: shot.impact && shot.from && shot.protectedMinM != null ? Round((() => { const fx = shot.at.x - shot.from.x, fz = shot.at.z - shot.from.z, fd = Math.hypot(fx, fz) || 1;
+        return ((shot.impact.x - shot.at.x) * fx + (shot.impact.z - shot.at.z) * fz) / fd; })(), 1) : null };
   });
   const bursts = tel.bursts || [];
   const byKind = {};
@@ -208,6 +211,9 @@ async function RunCampaign() {
     // the waiting guards and one run lost the whole batch). 0.5 m slack for men moving during the ~0.3 s flight.
     const nearProtected = metrics.shots.filter((s) => s.protectedMinM != null && s.protectedMinM < TANK.gunner.protectClearM - 0.5);
     assert.deepEqual(nearProtected, [], `no main-gun burst lands within ${TANK.gunner.protectClearM} m of a protected man`);
+    // 2026-09-25 Front review: gap shells sailed over the gap into our rear trench (−16, −140). None past its aim by more than overshootMaxM.
+    const overshot = metrics.shots.filter((s) => s.overshootM != null && s.overshootM > TANK.gunner.overshootMaxM + 0.5);
+    assert.deepEqual(overshot, [], `no main-gun burst lands more than ${TANK.gunner.overshootMaxM} m past its aim while protected men are about`);
     // 04：打掩体真把墙打掉一截（临时数据 RightNestFrontRest / RightNestNorthRuin）。
     assert.ok(metrics.breaks.some((b) => b.stage === "MachineGun"), `04: at least one cover segment is shot away (${JSON.stringify(metrics.breaks)})`);
     // 断履带以后还会打；第二颗扔上后甲板 = 炸发动机舱。
