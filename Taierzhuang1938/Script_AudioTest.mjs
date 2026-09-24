@@ -1140,6 +1140,48 @@ if (deaf.legacyProfile !== "shared" || deaf.legacy.join(",") !== "3") {
 } else Ok(`耳鸣：开关关着走通用 3 节点、开着 8 节点新版；连续近爆只剩 ${deaf.ringing} 份；`
   + `台词说着 ${deaf.speaking} Hz → 停下 ${deaf.silent} Hz；剧情档不被战斗档顶掉；强度 0.3 落点 ${deaf.weakLowHz} Hz`);
 
+// 两套耳鸣不叠（2026-09-25）：任务侧开关翻过来的那一刻（06→07、跳关回到 01–06），
+// 另一套的鸣响若还在响，新的一套起来时要把它收掉 —— 同一时刻只许一条耳鸣在响，收掉的那条节点归还。
+const flip = await page.evaluate(async () => {
+  const a = window.Taierzhuang.audio;
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const saved = a.firstLevelSoundscape;
+  a.ResetDeafen();
+  await sleep(150);
+  const Ringing = () => ({
+    firstLevel: !!a.tinnitus && a.tinnitus.tone.gain.value > 1e-3,
+    shared: !!a.deafenVoice && a.deafenVoice.g.gain.value > 1e-3,
+    firstLevelPending: [...a.pendingVoices].filter((v) => v.tone && v.hiss).length,
+    sharedPending: [...a.pendingVoices].filter((v) => v.osc && v.user && v.g).length,
+  });
+  // 通用那条在响 → 开关翻到 01–06 → 战斗档近爆。
+  a.firstLevelSoundscape = false;
+  a.Deafen(0.45);
+  await sleep(300);
+  const sharedBefore = Ringing();
+  a.firstLevelSoundscape = true;
+  a.DeafenFirstLevel(0.42, 0.13, 1, "combat");
+  await sleep(300);
+  const toFirstLevel = Ringing();
+  // 01–06 的战斗档在响 → 开关翻到 07 以后 → 通用近爆。
+  a.firstLevelSoundscape = false;
+  a.Deafen(0.45);
+  await sleep(300);
+  const toShared = { ...Ringing(), deafCurve: !!a.deafCurve, profile: a.tinnitusState?.profile ?? null };
+  a.ResetDeafen();
+  a.firstLevelSoundscape = saved;
+  await sleep(200);
+  return { sharedBefore, toFirstLevel, toShared };
+});
+if (!flip.sharedBefore.shared) {
+  Fail(`前置没建起来：开关关着时通用耳鸣没响 ${JSON.stringify(flip)}`);
+} else if (!(flip.toFirstLevel.firstLevel && !flip.toFirstLevel.shared && flip.toFirstLevel.sharedPending === 0)) {
+  Fail(`开关翻到 01–06 后通用耳鸣没收掉，两套叠在一起响：${JSON.stringify(flip)}`);
+} else if (!(flip.toShared.shared && !flip.toShared.firstLevel && flip.toShared.firstLevelPending === 0
+  && !flip.toShared.deafCurve && flip.toShared.profile === null)) {
+  Fail(`开关翻到 07 以后，01–06 那一档没收掉（鸣响或低通曲线还在）：${JSON.stringify(flip)}`);
+} else Ok(`两套耳鸣不叠：开关翻到 01–06 时通用那条收掉、翻回去时两档那条和它的低通曲线收掉，被收掉的那条节点都已归还`);
+
 // Continuous audition regression: real AudioBufferSource nodes must stop, including
 // scheduled repeats and editor exit, without stopping an unrelated gameplay engine.
 const preview = await page.evaluate(async () => {

@@ -5846,6 +5846,8 @@ export class AudioEngine {
     if (P !== TINNITUS.story && running?.profile === "story" && t < running.clearAt) return;   // 过场由导演曲线独占
     const level = Clamp01(strength);
     if (!(level > 0)) return;
+    // 两套耳鸣不叠（2026-09-25）：任务侧开关刚翻过来时（跳关、检查点回到 01–06）通用那条可能还在响，先收掉它。
+    if (this.deafenVoice) this.StopSharedRing(TINNITUS.replaceFadeS);
     // 越远越浅：低通落点在 20 kHz 与 P.lowHz 之间按 level 取几何插值（与 DeafenShared 同一条式子）。
     const lowHz = 20000 * Math.pow(P.lowHz / 20000, level);
     const f = this.deafFilter.frequency;
@@ -5924,6 +5926,9 @@ export class AudioEngine {
     const residual = active ? this.deafenStrength * Clamp01((this.deafenUntil + H.recoveryS - t) / H.recoveryS) : 0;
     const level = Math.max(Clamp01(strength), residual || 0);
     if (!(level > 0)) return;
+    // 两套耳鸣不叠（2026-09-25）：06→07 那一刻 01–06 的两档可能还在响 —— 收掉它的鸣响，也丢掉它的低通曲线，
+    // 免得台词一起一停 RefreshDeafFloor 又把那条曲线排回来、盖住这里的包络。
+    if (this.tinnitus || this.deafCurve) { this.StopTinnitus(TINNITUS.replaceFadeS); this.deafCurve = null; this.tinnitusState = null; }
     const until = Math.max(active ? this.deafenUntil : t,
       t + holdS + Clamp(seconds, H.attackS, H.maxHoldS));
     this.deafenUntil = until;
@@ -5966,6 +5971,27 @@ export class AudioEngine {
     // 接在耳鸣低通**之后** —— 接在前面的话它自己也被压掉，就没有「脑子里那声」了。
     if (this.deafenTimer) { clearTimeout(this.deafenTimer); this.timers.delete(this.deafenTimer); }
     this.deafenTimer = this.Later((until + H.recoveryS - t) * 1000 + 220, () => this.ResetDeafen(true));
+  }
+
+  /**
+   * 收掉通用那条耳鸣的鸣响，不碰总线低通（调用方 DeafenFirstLevel 接着排自己的曲线）。
+   * 与 StopTinnitus 同一个淡出时长；节点在淡出之后立刻归还。
+   */
+  StopSharedRing(fade = TINNITUS.replaceFadeS) {
+    if (this.deafenTimer) { clearTimeout(this.deafenTimer); this.timers.delete(this.deafenTimer); }
+    this.deafenTimer = null;
+    this.deafenUntil = 0; this.deafenStrength = 0;
+    const v = this.deafenVoice;
+    this.deafenVoice = null;
+    if (!v || !this.ctx) return;
+    const t = this.ctx.currentTime, end = t + Math.max(0.01, fade);
+    try {
+      v.g.gain.cancelScheduledValues(t);
+      v.g.gain.setValueAtTime(Math.max(FLOOR, v.g.gain.value), t);
+      v.g.gain.linearRampToValueAtTime(FLOOR, end);
+      v.osc.stop(end + 0.02);
+    } catch (err) { /* 已经拆了 */ }
+    this.Later(Math.max(0.01, fade) * 1000 + 40, () => this.FreeVoice(v));
   }
 
   SyncDeafenVolume() {
