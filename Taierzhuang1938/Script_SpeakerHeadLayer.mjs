@@ -4,8 +4,11 @@
 // a slow breath. Extracted from Script_OpeningActorPerformance (the 01-03 director
 // layer keeps its gestures and calls the same look math). Runs after the body
 // mixer, before the face (eyes read the turned head).
+// It owns the 03-06 arm gestures (Script_SpeakerGestureLayer, rig.speakerGesture):
+// the arm is posed before the head turn, a reach to the mouth after it.
 import { Quaternion, Vector3 } from "three";
 import { SPEAKER_HEAD as H } from "./Data_Tuning_CharacterSpeech.mjs";
+import { SpeakerGestureLayer } from "./Script_SpeakerGestureLayer.mjs";
 
 const Clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 
@@ -37,6 +40,8 @@ export class SpeakerHeadLayer {
     this.up = new Vector3(0, 1, 0); this.right = new Vector3(); this.axis = new Vector3();
     this.origin = new Vector3(); this.target = new Vector3(); this.scratch = new Vector3();
     this.angles = { yaw: 0, pitch: 0 };
+    // Arm gestures for the lines in Data_FirstLevelSpeakerGestures (only where this layer exists: 01-06).
+    this.gesture = rig.speakerGesture = new SpeakerGestureLayer(rig, this);
   }
 
   _Restore() {
@@ -58,9 +63,15 @@ export class SpeakerHeadLayer {
   }
 
   Apply(dt, state = {}) {
-    const rig = this.rig, bones = rig.bones;
     this._Restore();
     this.touched.clear();
+    this.gesture?.Apply(dt, state);
+    this._ApplyHead(dt, state);
+    this.gesture?.AfterHead();
+  }
+
+  _ApplyHead(dt, state) {
+    const rig = this.rig, bones = rig.bones;
     if (!this.enabled || !bones?.head || state.dead || rig.actor?.ragdollState) return;
     // The 01-03 storyboard director already acts this rig (same look math).
     if (rig.openingActorPerformanceState) return;
@@ -92,5 +103,9 @@ export class SpeakerHeadLayer {
     }
   }
 
-  Dispose() { this._Restore(); this.written.clear(); this.lookAt = null; }
+  Dispose() {
+    this._Restore(); this.written.clear(); this.lookAt = null;
+    this.gesture?.Dispose();
+    if (this.rig.speakerGesture === this.gesture) this.rig.speakerGesture = null;
+  }
 }

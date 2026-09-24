@@ -51,6 +51,34 @@ export const SPEAKER_HEAD = Object.freeze({
   breathRadians: .025, breathRate: 2.1,
 });
 
+// 03-06 speaker gestures (Script_SpeakerGestureLayer; rows in Data_FirstLevelSpeakerGestures, design in
+// docs/Data_CharacterSpeech.md "Speaker gestures (03-06)"). User decision 2026-09-25; numbers set on the
+// 2026-09-25 browser review of the 03-06 lines.
+export const SPEAKER_GESTURE = Object.freeze({
+  enabled: true,
+  // Stroke on the first stress: after the lift the arm waits `strokeLeadS` before the stroke until the line's
+  // first stressed syllable (the face-track stress pulse, whose rising edge is FACE_TRACK_BAKE.stressPulseS / 2
+  // = .08 s early), for at most `stressWaitS` of line time; then the clip runs on without waiting.
+  strokeLeadS: .12, stressWaitS: .9,
+  // A line longer than the clip repeats the hold window, at most this long in total, then releases anyway
+  // (a pointing arm frozen through a 4 s line reads as a statue).
+  maxHoldS: 2.4,
+  // Line over (or cut): the clip plays on to its release when that is at most `maxTailS` away; otherwise the
+  // pose freezes and the arm eases back to the body over `releaseS`.
+  maxTailS: .45, releaseS: .35,
+  // Busy (firing, aim > maxAim, melee, carrying, prone > maxProne, faster than a walk): the arm yields over
+  // fadeS and the head layer keeps acting. moveSpeed 1 = 4.2 m/s (Script_Actor); .45 is about 1.9 m/s.
+  fadeS: .15, maxAim: .35, maxMoveSpeed: .45, maxProne: .3,
+  // A further stress during the hold dips the forearm (the arm's version of the head nod).
+  beatRadians: .16, beatS: .26,
+  // Aimed clips: the upper arm turns from the clip's stroke direction to the target, limited to a cone around
+  // the body's front (degrees; `out` = toward the gesture hand's side, `in` = across the chest).
+  aimStrength: 1, coneOutDeg: 100, coneInDeg: 40, coneUpDeg: 35, coneDownDeg: 30,
+  // Ground anchors are pointed at this high above the ground (a man-high point, not the dirt); the tank at
+  // its hull; 'south' is southM due south at the speaker's ground height plus pointRiseM.
+  pointRiseM: 1.0, tankRiseM: 1.6, southM: 30,
+});
+
 // Who plays a speaking role when several bodies could (Script_FirstLevelSpeakerBinder).
 export const SPEAKER_BINDING = Object.freeze({
   // 04 BundleOrder: the withdrawing guard with the talking face (FACED_FRONT_GUARD_INDEX)

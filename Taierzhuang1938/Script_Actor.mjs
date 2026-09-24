@@ -1637,7 +1637,8 @@ export class Actor {
     if (this.weaponTwoHanded && this.weaponGripFront.lengthSq() > 1e-8) {
       const leftSocket = this.characterRig.Grip("weaponL");
       if (leftSocket) {
-        leftSocket.getWorldPosition(SOCKET_TARGET_WORLD);
+        // 03–06 说话手势抬起左手时，枪按手势前的左握点摆（Script_SpeakerGestureLayer.HeldLeftGrip）。
+        if (!this.characterRig.speakerGesture?.HeldLeftGrip(SOCKET_TARGET_WORLD)) leftSocket.getWorldPosition(SOCKET_TARGET_WORLD);
         hasTarget = true;
         SOCKET_SOURCE_AXIS.copy(this.weaponGripFront);
       }

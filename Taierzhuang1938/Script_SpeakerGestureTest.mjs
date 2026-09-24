@@ -18,6 +18,10 @@ import { FRONT_SORTIE, FRONT_SPACE } from "./Data_FirstLevelFrontRoute.mjs";
 import {
   LoadSpeakerGestureClips, SpeakerGestureClip, SampleSpeakerGesture, SpeakerGestureFirstFrame, ResetSpeakerGestureClips,
 } from "./Script_SpeakerGestureClips.mjs";
+import * as THREE from "three";
+import { SpeakerGestureLayer, SpeakerGestureBusy, SpeakerGestureTargetPoint, SetSpeakerGestureWorld } from "./Script_SpeakerGestureLayer.mjs";
+import { SpeakerHeadLayer } from "./Script_SpeakerHeadLayer.mjs";
+import { SPEAKER_GESTURE as GT } from "./Data_Tuning_CharacterSpeech.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const animationDir = path.join(projectDir, SPEAKER_GESTURE_ASSET.animationBase);
@@ -163,4 +167,142 @@ for (const modelId of rigs) for (const name of Object.keys(SPEAKER_GESTURE_CLIPS
   assert.ok(record.spine.filter(Boolean).length === 3, `${modelId} ${name}: three spine bones`);
 }
 
-console.log(`ok speaker gestures: ${lines} lines, ${gestures} gesture (${Math.round(ratio * 100)} %), ${Object.keys(SPEAKER_GESTURE_CLIPS).length} clips x ${rigs.length} rigs, ${totalBytes} bytes`);
+// ---- runtime layer on a stub Biped (weights, stroke on stress, suppression, restore, rifle hold, aim) -----------
+// The stub's bone lengths are made up; the layer's clock, weights and bone bookkeeping do not depend on them, and
+// the aim is checked against the stub's own FK. The production-rig check is Script_SpeakerGestureLayerBrowserTest.
+function StubRig(modelId, { armed = false } = {}) {
+  const root = new THREE.Group(), bone = (name, parent, x, y, z) => {
+    const b = new THREE.Bone(); b.name = name.replace(/ /g, "_"); b.position.set(x, y, z); parent.add(b); return b;
+  };
+  const pelvis = bone("Bip002 Pelvis", root, 0, .95, 0), spine = bone("Bip002 Spine", pelvis, 0, .1, 0);
+  const spine1 = bone("Bip002 Spine1", spine, 0, .12, 0), spine2 = bone("Bip002 Spine2", spine1, 0, .12, 0);
+  const neck = bone("Bip002 Neck", spine2, 0, .16, 0), head = bone("Bip002 Head", neck, 0, .1, 0);
+  const sides = {};
+  for (const [s, x] of [["L", -1], ["R", 1]]) {
+    const clav = bone(`Bip002 ${s} Clavicle`, neck, .03 * x, -.03, 0), upper = bone(`Bip002 ${s} UpperArm`, clav, .15 * x, 0, 0);
+    const fore = bone(`Bip002 ${s} Forearm`, upper, .28 * x, 0, 0), hand = bone(`Bip002 ${s} Hand`, fore, .25 * x, 0, 0);
+    for (let f = 0; f <= 4; f++) {
+      let parent = hand;
+      for (const suffix of ["", "1", "2"]) parent = bone(`Bip002 ${s} Finger${f}${suffix}`, parent, .03 * x, 0, (f - 2) * .01);
+    }
+    const grip = new THREE.Object3D(); grip.position.set(.06 * x, 0, 0); hand.add(grip);
+    sides[s] = { clav, upper, fore, hand, grip };
+  }
+  root.updateMatrixWorld(true);
+  const rig = { root, modelId, clipModelId: modelId, bones: { head, neck, pelvis }, facial: { lastSpeech: null, stress: 0 },
+    Grip: role => (role === "weaponL" ? sides.L.grip : role === "weaponR" ? sides.R.grip : null), sides };
+  rig.actor = { root, weaponGroup: armed ? { visible: true } : null, weaponTwoHanded: armed, weaponData: armed ? { kind: "boltRifle" } : null };
+  rig.rest = new Map(); root.traverse(o => { if (o.isBone) rig.rest.set(o, o.quaternion.clone()); });
+  return rig;
+}
+// One frame of a driven line: speech from `line` (null = silent), state from `busy`.
+function RunLine(layer, rig, { lineId, who, lengthS, stressAt = [], seconds, busyFrom = Infinity, state = {} }) {
+  const out = [], dt = 1 / 60;
+  for (let f = 0; f < Math.round(seconds / dt); f++) {
+    const t = f * dt, live = t < lengthS;
+    const stress = Math.max(0, ...stressAt.map(s => 1 - Math.abs(t - s) / .08));
+    rig.facial.lastSpeech = live ? { active: true, who, lineId, cue: lineId.split(".")[0], sourceTime: t, stress } : null;
+    layer.Apply(dt, t >= busyFrom ? { ...state, firing: true } : state);
+    layer.AfterHead();
+    out.push({ ...layer.state, clipT: layer.state.t, t });   // t: line time; clipT: the clip's clock
+  }
+  return out;
+}
+{
+  // Luo points at the right position (FrontBlockade.02, GesturePointL) with a rifle in both hands.
+  const rig = StubRig("LugouNra05", { armed: true }), layer = new SpeakerGestureLayer(rig, { lookAt: new THREE.Vector3(0, 1.6, 5) });
+  rig.root.position.set(FRONT_SORTIE.nest.x - 30, 0, FRONT_SORTIE.nest.z);   // 30 m west of the nest
+  rig.root.rotation.y = -Math.PI / 2;            // front (-Z) turned to +X: facing the nest
+  rig.root.updateMatrixWorld(true);
+  const leftBefore = rig.sides.L.grip.getWorldPosition(new THREE.Vector3());
+  const leftInRight = rig.sides.R.grip.worldToLocal(leftBefore.clone());   // the rifle's two grips, rigid
+  const rows = RunLine(layer, rig, { lineId: "FrontBlockade.02", who: "luo", lengthS: 1.6, stressAt: [.7], seconds: 4 });
+  const spec = SPEAKER_GESTURE_CLIPS.GesturePointL;
+  const up = rows.filter(r => r.weight > .5);
+  assert.ok(up.length >= 40, `point: weight > .5 on ${up.length} frames while the line plays`);
+  assert.ok(rows.every(r => r.clip === null || r.clip === "GesturePointL"));
+  // Stroke on the stress: the arm waits lifted until the stress edge (pulse over .5 from .66 s), then strikes.
+  const stroke = rows.find(r => r.clip && r.phase === "hold");
+  assert.ok(stroke && stroke.t >= .66 - 1e-6 && stroke.t < .66 + .2, `point: stroke after the stress edge (hold from ${stroke?.t.toFixed(2)} s)`);
+  assert.ok(rows.some(r => r.phase === "wait" && r.t > .3), "point: the lifted arm waited for the stress");
+  // Released after the line: weight 0 and the arm back on the rest pose within tail + release.
+  const after = rows.filter(r => r.t > 1.6 + spec.duration);
+  assert.ok(after.length && after.every(r => r.weight === 0 && r.clip === null), "point: arm back after the line");
+  layer.Apply(1 / 60, {});
+  for (const [b, q] of rig.rest) assert.ok(b.quaternion.angleTo(q) < 1e-6, `restore: ${b.name} back on its base`);
+  // Aim: pointed at the nest (in the cone), shoulder -> hand within a few degrees of it at the hold.
+  const aimed = rows.filter(r => r.phase === "hold" && r.aimError !== null);
+  assert.ok(aimed.length && Math.min(...aimed.map(r => r.aimError)) < 4, `point: aim error ${Math.min(...aimed.map(r => r.aimError))} deg`);
+  assert.ok(aimed.every(r => !r.clamped), "point: the nest is inside the cone");
+  assert.ok(layer.lines["FrontBlockade.02"].gestureFrames >= 40, "per-line gestureFrames");
+  // Rifle: the held left grip keeps its place relative to the right grip (the spine lean moves both hands; the
+  // rifle goes with the right hand, never with the gesturing left one).
+  rig.facial.lastSpeech = { active: true, who: "luo", lineId: "FrontBlockade.01x", sourceTime: 0, stress: 0 };
+  const layer2 = new SpeakerGestureLayer(rig, null);
+  const rows2 = RunLine(layer2, rig, { lineId: "FrontBlockade.02", who: "luo", lengthS: 1.6, stressAt: [.4], seconds: .9 });
+  assert.ok(rows2.at(-1).weight > .5);
+  const held = new THREE.Vector3();
+  assert.ok(layer2.HeldLeftGrip(held), "two-handed: the layer holds the left grip");
+  const heldInRight = rig.sides.R.grip.worldToLocal(held.clone());
+  assert.ok(heldInRight.distanceTo(leftInRight) < 1e-4, `held left grip ${heldInRight.distanceTo(leftInRight)} m off the rifle's grip pair`);
+  assert.ok(rig.sides.L.grip.getWorldPosition(new THREE.Vector3()).distanceTo(leftBefore) > .05, "the left hand itself moved");
+  layer2.Dispose();
+  // Firing from the start: no gesture at all; firing mid-gesture: gone within fadeS.
+  const layer3 = new SpeakerGestureLayer(rig, null);
+  const firing = RunLine(layer3, rig, { lineId: "FrontBlockade.02", who: "luo", lengthS: 1.6, stressAt: [.4], seconds: 2, busyFrom: 0 });
+  assert.ok(firing.every(r => r.weight === 0), "firing: weight 0 throughout");
+  assert.equal(layer3.lines["FrontBlockade.02"].gestureFrames, 0);
+  assert.ok(firing.some(r => r.suppressed === "firing"), "firing: reported as suppressed");
+  const layer4 = new SpeakerGestureLayer(rig, null);
+  const cut = RunLine(layer4, rig, { lineId: "FrontBlockade.02", who: "luo", lengthS: 1.6, stressAt: [.4], seconds: 2, busyFrom: .8 });
+  assert.ok(cut.some(r => r.t < .8 && r.weight > .9), "busy later: gesture up before");
+  assert.ok(cut.filter(r => r.t >= .8 + GT.fadeS + 1 / 60).every(r => r.weight === 0), "busy later: weight 0 after fadeS");
+  // A line without a gesture row, and another speaker's line: nothing.
+  const layer5 = new SpeakerGestureLayer(rig, null);
+  assert.ok(RunLine(layer5, rig, { lineId: "FrontBlockade.03", who: "luo", lengthS: 1.2, seconds: 1.4 }).every(r => r.weight === 0));
+  assert.ok(RunLine(layer5, rig, { lineId: "FrontBlockade.01", who: "luo", lengthS: 1.2, seconds: 1.4 }).every(r => r.weight === 0),
+    "a row for zhou does not play on luo");
+}
+{
+  // Seated Zhou offers the cigarette (BorrowLight.07, GestureOfferR, aimed at the listener); a long line holds the
+  // arm at most maxHoldS, then releases while he still talks. Armed: the right hand is on the rifle, refused.
+  const rig = StubRig("LugouNra02"), listener = new THREE.Vector3(1.2, 1.5, -2);
+  const layer = new SpeakerGestureLayer(rig, { lookAt: () => listener });
+  const rows = RunLine(layer, rig, { lineId: "BorrowLight.07", who: "zhou", lengthS: 6, stressAt: [.5, 1.4, 2.3], seconds: 7 });
+  const spec = SPEAKER_GESTURE_CLIPS.GestureOfferR;
+  assert.ok(rows.filter(r => r.weight > .5).length >= 60, "offer: gesture up");
+  const lastUp = rows.filter(r => r.weight > 0).at(-1);
+  assert.ok(lastUp.t < 6, `offer: released before the 6 s line ended (last weight at ${lastUp.t.toFixed(2)} s)`);
+  assert.ok(lastUp.t > spec.strokeS + GT.maxHoldS - .2, "offer: held about maxHoldS");
+  assert.ok(rows.filter(r => r.phase === "hold" && r.aimError !== null).some(r => r.aimError < 6), "offer: aimed at the listener");
+  const armed = StubRig("LugouNra02", { armed: true }), layer2 = new SpeakerGestureLayer(armed, null);
+  const refused = RunLine(layer2, armed, { lineId: "BorrowLight.07", who: "zhou", lengthS: 2, seconds: 2.2 });
+  assert.ok(refused.every(r => r.weight === 0) && layer2.state.suppressed === "rightHandOnWeapon", "right-hand clip refused with a rifle");
+  // The reach clip lands on the head anchor (the stub has no face; only that it runs and reports a distance).
+  const layer3 = new SpeakerGestureLayer(rig, null);
+  const mouth = RunLine(layer3, rig, { lineId: "BorrowLight.03", who: "zhou", lengthS: 1.6, stressAt: [.3], seconds: 1.2 });
+  assert.ok(mouth.some(r => r.clip === "GestureToMouthR" && r.weight > .9) && Number.isFinite(layer3.state.reachError), "to-mouth: reach ran");
+}
+{
+  // Busy reasons, targets and the head layer owning the gesture layer.
+  const rig = { actor: {}, infantry: null };
+  assert.equal(SpeakerGestureBusy(rig, {}), null);
+  for (const [state, why] of [[{ firing: true }, "firing"], [{ aim: .5 }, "aiming"], [{ meleeCombat: {} }, "melee"],
+    [{ carryRole: "front" }, "carrying"], [{ prone: 1 }, "prone"], [{ moveSpeed: .8 }, "moving"], [{ dead: true }, "dead"]]) {
+    assert.equal(SpeakerGestureBusy(rig, state), why);
+  }
+  assert.equal(SpeakerGestureBusy({ openingActorPerformanceState: {} }, {}), "director");
+  const root = new THREE.Object3D(); root.position.set(5, 2, 7); root.updateMatrixWorld(true);
+  SetSpeakerGestureWorld({ ground: () => 3, tank: () => ({ x: 40, z: -120 }) });
+  assert.deepEqual(SpeakerGestureTargetPoint("rightNest", { root }).toArray(), [FRONT_SORTIE.nest.x, 3 + GT.pointRiseM, FRONT_SORTIE.nest.z]);
+  assert.deepEqual(SpeakerGestureTargetPoint("south", { root }).toArray(), [5, 2 + GT.pointRiseM, 7 + GT.southM]);
+  assert.deepEqual(SpeakerGestureTargetPoint("tank", { root }).toArray(), [40, 3 + GT.tankRiseM, -120]);
+  SetSpeakerGestureWorld({});
+  assert.equal(SpeakerGestureTargetPoint("tank", { root }), null, "no tank provider: no tank point");
+  const stub = StubRig("LugouNra02"), head = new SpeakerHeadLayer(stub, 3);
+  assert.ok(stub.speakerGesture instanceof SpeakerGestureLayer && head.gesture === stub.speakerGesture, "head layer owns rig.speakerGesture");
+  head.Dispose();
+  assert.equal(stub.speakerGesture, null, "disposed with the head layer");
+}
+
+console.log(`ok speaker gestures: ${lines} lines, ${gestures} gesture (${Math.round(ratio * 100)} %), ${Object.keys(SPEAKER_GESTURE_CLIPS).length} clips x ${rigs.length} rigs, ${totalBytes} bytes; runtime layer on a stub rig`);

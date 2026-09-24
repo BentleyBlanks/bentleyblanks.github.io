@@ -89,6 +89,7 @@ import { FirstLevelStageTextId } from "./Script_TextIds.mjs";
 // Only for `emplaced`: a man married to a machine gun never carries throwables here.
 import { WEAPONS } from "./Data_Weapons.mjs";
 import { FirstLevelSpeakerBinder, FirstLevelSpeakerResolvers } from "./Script_FirstLevelSpeakerBinder.mjs";
+import { SetSpeakerGestureWorld } from "./Script_SpeakerGestureLayer.mjs";
 import { SpeakingCastOptions, FIRST_LEVEL_FACE_STEPS, FIRST_LEVEL_WHOLE_LEVEL_SPEAKERS, FACED_FRONT_GUARD_INDEX } from "./Data_FirstLevelSpeakingCast.mjs";
 const FACE_STEPS = new Set(FIRST_LEVEL_FACE_STEPS);
 
@@ -197,6 +198,8 @@ export class FirstLevelMissionRuntime {
     this.speakers = new FirstLevelSpeakerBinder({ voice: this.voice, soldiers: () => this.ai.soldiers,
       listener: () => this.player.EyePosition, resolvers: FirstLevelSpeakerResolvers(this),
       active: () => FACE_STEPS.has(this.flow?.stage?.id), wholeLevelRoles: FIRST_LEVEL_WHOLE_LEVEL_SPEAKERS });
+    // 03–06 说话手势指向的活目标（Gesture 包薄钩子）：战车位置与地面高度。
+    SetSpeakerGestureWorld({ tank: () => (this.tank.present ? this.tank : null), ground: (x, z) => this.battlefield.GroundHeight(x, z) });
     this.view = new FirstLevelMissionView({
       scene: this.scene,
       battlefield: this.battlefield,
