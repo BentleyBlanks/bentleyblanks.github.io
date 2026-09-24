@@ -147,8 +147,13 @@ export async function DriveBundleThrow(page, { aim: aimKind = "farTrack" } = {})
       previousVelocity=current;
     }
     if (g.player.bleeding) g.Debug.Key("KeyB");
+    // Someone closing in while the bundle flies (09-24 run L2: a tank escort bayoneted the thrower three times on
+    // the attack position during this watch): answer him like a player, same input driver as the routes.
+    const close = window.MissionInputDriver?.Target?.(6);
+    if (close) window.MissionInputDriver.Shoot(close); else { g.Debug.Mouse(0, false); g.Debug.Mouse(2, false); }
     g.StepFrames(1, 1 / 60, false);
   }
+  g.Debug.Mouse(0, false); g.Debug.Mouse(2, false);
   const blast=g.Debug.FirstLevelMission().playerExplosions?.findLast(entry=>entry.explosiveId==="GrenadeBundle"&&entry.at>=releaseAt)||null;
   g.player.TakeHit = TakeHit;
   const selfBlast = blast ? hits.filter((h) => h.blast && h.from && Math.hypot(h.from.x - blast.x, h.from.y - blast.y, h.from.z - blast.z) < 1)

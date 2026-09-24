@@ -7,7 +7,7 @@ import { MISSION_ROUTES as Routes, MISSION_ANCHORS as A } from "./Data_FirstLeve
 import { MISSION_STAGE_ROUTES } from "./Data_FirstLevelMissionTopology.mjs";
 import { CampaignActions } from "./Script_FirstLevelCampaignKit.mjs";
 import { DriveBundleThrow } from "./Script_FirstLevelBundleThrowDriver.mjs";
-import { FRONT_TUNING as F } from "./Data_Tuning_FirstLevelFront.mjs";
+import { FRONT_BATTLE_TUNING as B } from "./Data_Tuning_FirstLevelFront.mjs";
 
 export async function DriveFrontBattle(ctx){
   const {page,output}=ctx,{Route,Interact,WaitStage,CaptureFocus}=CampaignActions(ctx);
@@ -194,7 +194,7 @@ export async function DriveFrontBattle(ctx){
   await ReturnToSeat("ReturnToNestAfterEvade");
   await HoldNest({fact:"tankPositionPressured"},120,"ReturnToNestAfterEvade");
   await Route(S.rearRoute,"RightNestShortRetreat",{stance:"crouch",fight:false});
-  // rightRearReached needs the player at the junction (F.rearArrivalM) out of the gun's sight. Wait there like a
+  // rightRearReached needs the player at the junction (B.rearArrivalM) out of the gun's sight. Wait there like a
   // player: dodge a grenade, then walk back. 2026-09-24 step 3: a dodge during the wait carried the bot 13 m north to
   // (36.6,-130.7), it stood there for 180 s and 04 never ended.
   for(let round=0;round<9;round++){
@@ -215,7 +215,7 @@ export async function DriveFrontBattle(ctx){
       console.log("RIGHT_REAR_REJOIN",JSON.stringify(wait));
       // Back the way the dodge went: along the ammo-house trench (S.route starts at the junction), from its nearest corner.
       const near=S.route.reduce((best,q,i)=>Math.hypot(q.x-wait.at[0],q.z-wait.at[1])<Math.hypot(S.route[best].x-wait.at[0],S.route[best].z-wait.at[1])?i:best,0);
-      await Route(S.route.slice(0,near+1).reverse(),"RightRearRejoin",{stance:"crouch",fight:false,arrivalM:Math.min(1,F.rearArrivalM)});
+      await Route(S.route.slice(0,near+1).reverse(),"RightRearRejoin",{stance:"crouch",fight:false,arrivalM:Math.min(1,B.rearArrivalM)});
     }
   }
   await WaitStage("Tank",180);
@@ -234,6 +234,10 @@ export async function DriveFrontBattle(ctx){
   const throwFrom=bombFirst?S.attackRoute.findIndex(p=>Math.hypot(p.x-S.throw.x,p.z-S.throw.z)<6)+1:S.attackRoute.length;
   assert.ok(throwFrom>1&&throwFrom<S.attackRoute.length+(bombFirst?0:1),"the attack branch has a throwing point short of the attack position");
   await Route(S.attackRoute.slice(0,throwFrom),"RoadsideAttackBranch",{stance:"crouch",fight:true,crawl:true});
+  // Bomb-first: that corner is 5.9 m short, beyond a bundle's reach of the tank at Block (both throws of run L4 fell
+  // 4.4 m short, tank intact, no Luo finish without a cut track). Creep on toward the attack position and stop just
+  // outside its radius (B.attackArrivalM), where the fact still cannot be recorded.
+  if(bombFirst)await Route([S.throw],"BombFirstCreep",{stance:"crouch",fight:true,crawl:true,arrivalM:B.attackArrivalM+.6});
   if(!bombFirst)await WaitFact("attackPositionReached",60,true);
   else{
     const short=await page.evaluate(({x,z})=>{const g=window.Tengxian,p=g.player.position;
@@ -281,7 +285,11 @@ export async function DriveFrontBattle(ctx){
   if(state.tankBrain)await fs.writeFile(path.join(output,"Data_TankBrain.json"),JSON.stringify(state.tankBrain,null,2));
   // Thrown from 5-6 m further back, both bundles can land short of the far track (09-24: 3.8 m, MobilityKill only);
   // with none left Luo pushes one into the hatch (TANK.luoFinishS). That is the game's own answer, not a driver shortcut.
-  if(bombFirst&&!state.facts.includes("tankFireDisabled"))state=await WaitFact("tankFireDisabled",90,true);
+  if(bombFirst&&!state.facts.includes("tankFireDisabled")){
+    // Waiting for Luo in the open got the thrower bayoneted by a reserve (09-24 J chain): wait a bend back in the branch.
+    await Route([S.attackRoute[Math.max(1,throwFrom-2)]],"BombFirstCover",{stance:"crouch",fight:true,crawl:true});
+    state=await WaitFact("tankFireDisabled",90,true);
+  }
   assert.ok(state.facts.includes("tankImmobilized"));assert.ok(state.facts.includes("tankFireDisabled"));
   if(bombFirst){
     // One runtime step lets UpdateSortie see the cleared tank; the beat must be closed as skipped, not waited for.
@@ -292,7 +300,10 @@ export async function DriveFrontBattle(ctx){
     assert.ok(skip?.skipped&&skip.reason==="tankClearedFirst"&&!skip.playerAtThrow,"bomb-first: attackPositionReached recorded as skipped");
   }
   await CaptureFocus("TankDisabled",state.tank);
-  await Route([...S.attackRoute].reverse(),"AttackBranchRetreat",{stance:"crouch",fight:true,crawl:true});
+  // Back along the branch from wherever the body is now (the bomb-first wait already stands a bend back).
+  const retreat=[...S.attackRoute].reverse(),here=await page.evaluate(()=>({x:window.Tengxian.player.position.x,z:window.Tengxian.player.position.z}));
+  const from=retreat.reduce((best,p,i)=>Math.hypot(p.x-here.x,p.z-here.z)<Math.hypot(retreat[best].x-here.x,retreat[best].z-here.z)?i:best,0);
+  await Route(retreat.slice(from),"AttackBranchRetreat",{stance:"crouch",fight:true,crawl:true});
   // Contract §2.6 (Front package step 2): the last batch crosses while the pair walks back. Like Luo, cover the
   // gap from the nest's west door (K10) until the batch is home, then go down the right low trench to the safe zone
   // (FRONT_SPACE.returnMeet: Liu, He and the relief NCO), and on to the collection.
