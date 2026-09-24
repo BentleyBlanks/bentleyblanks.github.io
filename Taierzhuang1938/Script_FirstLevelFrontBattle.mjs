@@ -473,11 +473,15 @@ export class FirstLevelFrontBattle {
     const stage=r.flow.stage.id;
     // Brief item 5: while the tank shows itself (03 preview) and until it has shelled the nest (04), the guide points
     // at the tank, not at the gap - the new threat is what the player has to read.
-    // The marker stands B.guideTankLeadM in front of the tank toward the player, so it does not cover the turret.
+    // The marker stands beside the tank on the ground (B.guideTankLeadM toward the player, B.guideTankSideM to his
+    // right of it), so the diamond and its label do not cover the turret.
     let tank=null;
     if(r.tank?.present){
-      const dx=r.player.position.x-r.tank.x,dz=r.player.position.z-r.tank.z,d=Math.hypot(dx,dz),k=d>B.guideTankLeadM*2?B.guideTankLeadM/d:0;
-      tank={x:r.tank.x+dx*k,z:r.tank.z+dz*k};
+      const dx=r.player.position.x-r.tank.x,dz=r.player.position.z-r.tank.z,d=Math.hypot(dx,dz);
+      if(d>(B.guideTankLeadM+B.guideTankSideM)*2){const ux=dx/d,uz=dz/d;
+        // Facing the tank the player looks along -u; his right hand is (uz,-ux) in this X-east / Z-south world.
+        tank={x:r.tank.x+ux*B.guideTankLeadM+uz*B.guideTankSideM,z:r.tank.z+uz*B.guideTankLeadM-ux*B.guideTankSideM};}
+      else tank={x:r.tank.x,z:r.tank.z};
     }
     if(stage==="Support"){
       if(!r.Has("rightNestCaptured"))return {target:MissionRouteLookahead(Routes.support,r.player.position),label:"support",objective:Objectives.capture};

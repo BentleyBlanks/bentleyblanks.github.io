@@ -278,13 +278,16 @@ const Ok = (label) => console.log(`ok ${label}`);
   assert.equal(battle.Guide().label, "front", "03 before the preview: the gap");
   facts.add("tankPreviewed");
   let g = battle.Guide();
-  const lead = (t) => Dist(t, r.player.position) - Dist(g.target, r.player.position);
-  assert.ok(g.label === "tank" && Math.abs(lead({ x: 49.5, z: -202.4 }) - B.guideTankLeadM) < 0.01
-    && Math.abs(Dist(g.target, { x: 49.5, z: -202.4 }) - B.guideTankLeadM) < 0.01,
-    "03 preview: the tank (the marker guideTankLeadM in front of it toward the player, off the turret)");
+  const beside = Math.hypot(B.guideTankLeadM, B.guideTankSideM);
+  // Bearing from the player: the marker sits off the tank's line by guideTankSideM (not on the turret).
+  const OffLine = (t, m) => { const p = r.player.position, ax = t.x - p.x, az = t.z - p.z, bx = m.x - p.x, bz = m.z - p.z;
+    return Math.abs(ax * bz - az * bx) / Math.hypot(ax, az); };
+  assert.ok(g.label === "tank" && Math.abs(Dist(g.target, { x: 49.5, z: -202.4 }) - beside) < 0.01
+    && OffLine({ x: 49.5, z: -202.4 }, g.target) > B.guideTankSideM * 0.8,
+    "03 preview: the tank (the marker beside it on the ground, off the turret's line of sight)");
   r.flow.stage.id = "MachineGun"; r.tank.x = 60; r.tank.z = -177;
   g = battle.Guide();
-  assert.ok(g.label === "tank" && Math.abs(Dist(g.target, { x: 60, z: -177 }) - B.guideTankLeadM) < 0.01, "04 before the pressure: the tank coming out of the bend");
+  assert.ok(g.label === "tank" && Math.abs(Dist(g.target, { x: 60, z: -177 }) - beside) < 0.01, "04 before the pressure: the tank coming out of the bend");
   facts.add("tankPositionPressured");
   assert.equal(battle.Guide().label, "bundle", "04 after the pressure: back to the rear wall");
   const text = Read("Data_Text_FirstLevel.mjs");

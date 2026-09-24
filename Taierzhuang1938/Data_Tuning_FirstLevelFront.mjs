@@ -286,9 +286,11 @@ export const FRONT_BATTLE_TUNING=Object.freeze({
   // contract §2.9): Grenade radiusM 6.5 (Data_Weapons) + ~3.5 m of throw scatter and roll. 09-24 review: one
   // Japanese grenade killed three of the gathered second batch, the next one two more -> guardBatchLost.
   guardGrenadeShieldM:10,
-  // 03 preview / 04 before the pressure the guide points at the tank (brief item 5), but this far in front of it on
-  // the ground toward the player: on the tank itself the diamond and its distance label (1.15 m above the ground,
-  // Script_FirstLevelLeaderGuide) sat right on the ~11 px turret 56 m out (09-24 review, TankProbe Scene_TankPreview).
-  guideTankLeadM:10,
+  // 03 preview / 04 before the pressure the guide points at the tank (brief item 5), but beside it on the ground:
+  // guideTankLeadM toward the player and guideTankSideM to the player's right of it. On the tank itself the diamond
+  // and its distance label (1.15 m above the ground, Script_FirstLevelLeaderGuide) sat right on the ~11 px turret
+  // 56 m out (09-24 review, TankProbe Scene_TankPreview); moved only toward the player (10 m) it still projected onto
+  // the turret (09-25 retake). 6 m to the side at 50 m is ~80 px on a 1280 px frame.
+  guideTankLeadM:4,guideTankSideM:6,
   bandage:{radius:.087,height:.2,y:-.19,color:0xb6ac8b},
 });

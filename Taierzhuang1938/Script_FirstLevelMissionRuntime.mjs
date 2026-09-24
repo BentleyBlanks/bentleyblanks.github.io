@@ -1086,7 +1086,12 @@ export class FirstLevelMissionRuntime {
         && !actor.targetFromMemory && actor.target?.ref?.alive!==false
         && actor.target && Distance(actor.position,actor.target.position)<R.assaultContactRangeM;
       if(contact){
-        if(s.mode!=="contact")this.Defend(actor,actor.position,R.defendHoldRadiusM,R.assaultCoverSearchM);
+        // Anchored on his current line, not where he stands: the combat brain then fights within tacticalRadiusM of
+        // the line. Re-anchoring on his own position at every new contact let a man creep contact by contact -
+        // 09-25 03-06 cold starts: flank man A went from his last line north of the nest (33,-158) through the
+        // abandoned nest to the rear-door ramp (30,-143) in 04 and bayoneted the player waiting there, three runs of three.
+        if(s.mode!=="contact"){const line=s.points[Math.min(s.index,s.points.length-1)]||actor.position;
+          this.Defend(actor,line,R.defendHoldRadiusM,R.assaultCoverSearchM);}
         s.mode="contact";continue;
       }
       if (actor.suppression >= R.tacticalSuppression) {
