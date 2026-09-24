@@ -1041,13 +1041,13 @@ assert.equal(new Set(MISSION_DIALOGUE.map((cue) => cue.id)).size, MISSION_DIALOG
     audio:{PlayStoryVoice:(_key,options)=>{offsets.push(options.offset||0);return {duration:1};},StopStoryVoice(){}},
     hud:{Say(){}},Done:id=>done.push(id),
   });
-  voice.manifest={cues:{TrenchCurse:{seconds:3.109},CornerCheck:{seconds:2.429}}};
-  voice.Enqueue("TrenchCurse");voice.Enqueue("CornerCheck");
+  voice.manifest={cues:{SouthWhisper:{seconds:3.109},VillagePointer:{seconds:2.429}}};
+  voice.Enqueue("SouthWhisper");voice.Enqueue("VillagePointer");
   voice.Update(0);voice.Update(.3);voice.Pause();voice.Update(10);
   assert.equal(voice.current.time,.3);
   voice.Resume();
   for(let i=0;i<400;i++)voice.Update(1/60);
-  assert.deepEqual(done,["TrenchCurse","CornerCheck"]);
+  assert.deepEqual(done,["SouthWhisper","VillagePointer"]);
   assert.deepEqual(offsets,[0,.3,0]);
 }
 

@@ -2337,10 +2337,12 @@ export class FirstLevelMissionRuntime {
     }
     if (stage === "RearTrench") {
       if (this.GateNear("rearTrenchEntered")) this.Record("rearTrenchEntered");
-      if (this.GateNear("cornerReached")) { this.Record("cornerReached"); this.Say("CornerCheck"); }
+      if (this.GateNear("cornerReached")) this.Record("cornerReached");
       if (this.GateNear("collectionPointSeen")) this.Record("collectionPointSeen");
-      // 撤回的守军指路：走到集结处就起这一段（对白播完记 supportOrdersHeard）。
-      if (this.Has("collectionPointSeen")) this.Say("SupportOrder");
+      // 集结处的 CollectionMeet / SupportOrder 由开场导演按人到位来放（守军从支沟跑来报告，
+      // FirstLevelBunkerShow.Aftermath）；播完照旧由 VoiceDone 记 supportOrdersHeard。
+      // 没有导演的运行时（测试桩）才在这里直接起 SupportOrder。
+      if (this.Has("collectionPointSeen") && !this.frontShow?.bunker) this.Say("SupportOrder");
     }
     if(stage==="Orders"){
       // 2026-09-20 演出打磨：借火与担架员催的两段不再随 ordersReached 一起排进队 ——

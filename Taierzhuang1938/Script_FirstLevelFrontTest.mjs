@@ -31,16 +31,18 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const Read = (name) => fs.readFileSync(path.join(here, name), "utf8");
 const Cue = (id) => MISSION_DIALOGUE.find((cue) => cue.id === id);
 
-// 01–03 now follow the 2026-09-21 storyboard revision. Asset-level checks live
-// in Script_OpeningStoryboardsTest; normal controls run in CampaignOpening.
+// 01–02 follow the 2026-09-23 draft (contract §5.2/§5.3). Phase tables and marks live in
+// Script_OpeningStoryboardsTest; normal controls run in CampaignOpening.
 {
-  assert.equal(Cue("BunkerKilling").lines.length,6);
-  assert.equal(Cue("RescueCall").lines.length,6);
+  for(const id of ["BunkerKilling","ShunziCurse","RescueCall","RescueLift","RescueOut","TrenchCurse","CornerCheck"])
+    assert.equal(Cue(id),undefined,id+" is retired (contract §5.2)");
+  assert.equal(Cue("CaptiveInterrogation").lines.length,11);
+  assert.equal(Cue("RescueInterrogation").lines.length,6);
   const opening=Read("Script_OpeningStoryboards.mjs");
-  assert.ok(opening.includes('this.captives=[this.Spawn("BunkerCaptiveHelper"'));
-  for(const beat of ["CaptiveShot","Drag","Butt","Interrogate","Ambush","Deflect","Pull","Kick"])
-    assert.ok(opening.includes('"'+beat+'"'),beat);
-  assert.ok(opening.includes('r.meleeCombat.Damage(two,luo,200,"heavy")'));
+  assert.ok(opening.includes('this.captives=[this.cast.comrade]'));
+  for(const scene of ["BunkerOrders","CaptiveInterrogation","RescueInterrogation","RescueCheck","CollectionMeet","SupportOrder"])
+    assert.ok(opening.includes('PlayScene("'+scene+'"'),scene);
+  assert.ok(opening.includes('this.r.meleeCombat?.Damage(victim,attacker,200,"heavy")'));
   assert.ok(opening.includes('r.Record("luoRescueComplete")'));
   const support=MISSION_STAGES.find(stage=>stage.id==="Support");
   assert.ok(JSON.stringify(support).includes("rifleWithdrawalResolved"));
@@ -203,7 +205,7 @@ const Cue = (id) => MISSION_DIALOGUE.find((cue) => cue.id === id);
   for (const cue of FRONT_WIRED_CUES)
     assert.ok(!new RegExp(`"${cue}"`).test(test.split("SECOND_WAVE_UNWIRED")[1].split("]")[0]),
       `${cue} 已经从「还没有触发点」的名单里删掉`);
-  console.log("ok 四条 cue 接上触发点：" + FRONT_WIRED_CUES.join(" "));
+  console.log("ok Front 包的 cue 接上触发点：" + FRONT_WIRED_CUES.join(" "));
 }
 
 // ---------------------------------------------------------------------------

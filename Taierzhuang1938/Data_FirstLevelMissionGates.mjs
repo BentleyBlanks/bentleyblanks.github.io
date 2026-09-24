@@ -161,7 +161,6 @@ export const MISSION_ENCOUNTER_ACTIVATION = Object.freeze({
 // 3. 对白播完即记的事实（契约 §5 的映射表，一字不改）
 // ---------------------------------------------------------------------------
 export const MISSION_VOICE_FACTS = Object.freeze({
-  RescueCall: "rescueCallHeard",
   SupportOrder: "supportOrdersHeard",
   BundleOrder: "bundleOrderHeard",
   Volunteer: "volunteerHeard",
@@ -223,9 +222,12 @@ export const MISSION_FACT_GATES = Object.freeze({
     text: "日兵甲听见断木错动，回身走到洞口拨开木料，发现顺子",
   }),
   // --- BunkerRescue ------------------------------------------------------
-  // 2026-09-23: the director records it when RescueInterrogation starts (FirstLevelBunkerShow.PhaseHold);
-  // the old RescueCall voice mapping stays until that cue is retired with the contract's §5 table.
-  rescueCallHeard: Gate({ kind: "voice", step: "BunkerRescue", cue: "RescueCall", source: "VoiceDone" }),
+  // 2026-09-23 contract §5.3: recorded by the director when RescueInterrogation starts (the 09.21
+  // RescueCall cue and its VoiceDone mapping were retired 2026-09-24 with the rest of §5.2's list).
+  rescueCallHeard: Gate({
+    kind: "scripted", step: "BunkerRescue", source: "FirstLevelBunkerShow.PhaseHold",
+    text: "日兵甲拽起顺子的前襟，逼翻译「这个也问！」——第二场逼问开始",
+  }),
   vanguardMeleeResolved: Gate({
     kind: "scripted", step: "BunkerRescue", source: "FirstLevelBunkerShow.PhaseParry", encounter: "bunkerAssault",
     text: "日兵乙被罗班长、日兵甲被何有田用大刀真实砍死（接触后仍没死就补成致命伤）",

@@ -41,8 +41,10 @@ const story = MISSION_DIALOGUE.filter((cue) => !cue.guidance);
 const guide = MISSION_DIALOGUE.filter((cue) => cue.guidance);
 const perLine = MISSION_DIALOGUE.filter((cue) => cue.perLine);
 const byId = new Map(MISSION_DIALOGUE.map((cue) => [cue.id, cue]));
-// 09.21 旧稿里、契约 §5.2 已宣布下线、但旧导演还在 Say 的整段 cue。Opening 包接新导演后删掉；**只许变短**。
-const RETIRE_PENDING = ["BunkerKilling", "ShunziCurse", "RescueCall", "RescueLift", "RescueOut", "TrenchCurse", "CornerCheck"];
+// 09.21 旧稿里、契约 §5.2 宣布下线的整段 cue：Opening 包 2026-09-24 接上新导演后已删掉（录音与清单一并 --prune）。
+// 还没删的（待下线）名单只许变短，现在是空的。
+const RETIRE_PENDING = [];
+const RETIRED_0923 = ["BunkerKilling", "ShunziCurse", "RescueCall", "RescueLift", "RescueOut", "TrenchCurse", "CornerCheck"];
 
 // 1. id 唯一、文件名推导一致、说话人都在演员表里；逐句 cue 每句有契约格式的 id 与文件名。
 assert.equal(new Set(MISSION_DIALOGUE.map((cue) => cue.id)).size, MISSION_DIALOGUE.length, "cue id 去重");
@@ -74,13 +76,17 @@ for (const [id, rows] of scenes0923) {
 }
 const retired = [...table0923.matchAll(/下线：(.+?)（/g)][0]?.[1] || "";
 const retiredIds = [...retired.matchAll(/`([A-Za-z]+)`/g)].map(([, id]) => id);
-assert.deepEqual([...retiredIds].sort(), [...RETIRE_PENDING].sort(), "待下线名单就是契约 §5.2 的下线清单（Opening 包接上新导演后一并删掉）");
-for (const id of RETIRE_PENDING) assert.ok(byId.has(id) && !byId.get(id).perLine, id + " 仍是旧整段 cue（旧导演还在用）");
+assert.deepEqual([...retiredIds].sort(), [...RETIRED_0923].sort(), "下线名单就是契约 §5.2 的下线清单");
+for (const id of RETIRED_0923) {
+  assert.ok(!byId.has(id), id + " 已下线：台词表里不许再有");
+  assert.ok(!fs.existsSync(new URL(`./Audio/FirstLevel/AudioVoice_FirstLevel${id}.mp3`, import.meta.url)), id + " 的整段录音已删");
+}
+assert.deepEqual(RETIRE_PENDING, [], "待下线名单已清空");
 const ORDER0923 = scenes0923.map(([id]) => id);
 // 2b. 其余剧情 cue 对 09.19 契约 §5（01–02 的旧条目换成上面两张名单）。
 const contractSection = contract.slice(contract.indexOf("## 5. 对白 cue"), contract.indexOf("## 6. 分包与文件归属"));
 const contractCues = [...contractSection.matchAll(/`([A-Za-z]+)`\((\d+)[^)]*\)/g)].map(([, id, count]) => [id, Number(count)])
-  .filter(([id]) => !ORDER0923.includes(id) && !RETIRE_PENDING.includes(id));
+  .filter(([id]) => !ORDER0923.includes(id) && !RETIRE_PENDING.includes(id) && !RETIRED_0923.includes(id));
 assert.ok(contractCues.length >= 55, "契约 §5 至少解析出 55 条 03 以后的 cue，实际 " + contractCues.length);
 for (const [id, count] of contractCues) {
   const cue = byId.get(id);
@@ -218,7 +224,9 @@ for (const cue of guide) {
 console.log(`ok 带路短命令按契约重排：下线 ${Ids(guideLine[1]).length} 条、新增 ${Ids(guideLine[2]).length} 条`);
 
 // 8. MISSION_VOICE_FACTS 对 09.19 契约的映射清单。
-const factPairs = [...contractSection.matchAll(/`([A-Za-z]+)→([A-Za-z]+)`/g)].map(([, cue, fact]) => [cue, fact]);
+// 09.23 契约 §5.2 下线的 cue（RescueCall→rescueCallHeard）不再「播完记事实」：那条事实改由导演记。
+const factPairs = [...contractSection.matchAll(/`([A-Za-z]+)→([A-Za-z]+)`/g)].map(([, cue, fact]) => [cue, fact])
+  .filter(([cue]) => !RETIRED_0923.includes(cue));
 assert.ok(factPairs.length >= 20, "契约 §5 的播完记事实清单可解析，实际 " + factPairs.length);
 for (const [cue, fact] of factPairs) {
   assert.ok(byId.has(cue), `MISSION_VOICE_FACTS 的 cue 不存在：${cue}（→${fact}）`);
@@ -260,9 +268,8 @@ console.log(`ok MISSION_VOICE_FACTS 的 ${Object.keys(MISSION_VOICE_FACTS).lengt
   const missing = [...referenced].filter(([id]) => !byId.has(id));
   assert.deepEqual(missing, [], "运行时引用了台词表里没有的 cue：" + JSON.stringify(missing));
   // 09.23 新场景的触发点由第二波 Opening 包（新 01–02 导演）接上。**只许变短**。
+  // Opening 包（2026-09-24）已把 01–02 的 13 场全部接到导演的 PlayScene 上，名单清空。
   const SECOND_WAVE_UNWIRED = new Set([
-    "BunkerOrders", "BunkerIncoming", "CaptiveDragged", "CaptiveInterrogation", "CaptiveTaunt", "ShunziFound",
-    "RescueInterrogation", "RescueFlee", "RescueCheck", "CollectionMeet",
   ]);
   const unwired = story.map((cue) => cue.id).filter((id) => !referenced.has(id));
   for (const id of unwired) assert.ok(SECOND_WAVE_UNWIRED.has(id), "这条剧情 cue 没有任何触发点：" + id);
@@ -454,17 +461,17 @@ const FakeAudio = () => {
     voice.manifest = { cues: {}, lines: {} };
     assert.equal(voice.Enqueue("NoSuchCueAtAll"), false, "未知 cue 不入队");
     voice.Guidance("NoSuchCueAtAll"); voice.Cancel(["NoSuchCueAtAll"]); voice.Replay("NoSuchCueAtAll");
-    for (const id of ["BorrowLight", "CaptiveInterrogation", "BunkerKilling"]) {
+    for (const id of ["BorrowLight", "CaptiveInterrogation", "SouthWhisper"]) {
       assert.ok(voice.Enqueue(id), id + " 入队");
       for (let i = 0; i < 9000 && !done.includes(id); i++) voice.Update(1 / 60);
     }
   } finally { console.warn = original; }
-  assert.deepEqual(done, ["BorrowLight", "CaptiveInterrogation", "BunkerKilling"], "缺录音的 cue 也要走完并 Done");
+  assert.deepEqual(done, ["BorrowLight", "CaptiveInterrogation", "SouthWhisper"], "缺录音的 cue 也要走完并 Done");
   assert.deepEqual(lines.filter((l) => l.cue === "BorrowLight").map((l) => l.index), [0, 1, 2, 3, 4, 5, 6, 7, 8], "借火九句按句序发 Line");
   assert.ok(lines.filter((l) => l.cue === "BorrowLight").every((l) => l.lineId?.startsWith("BorrowLight.")), "逐句 Line 事件带 lineId");
-  assert.deepEqual(lines.filter((l) => l.cue === "BunkerKilling").map((l) => l.index), [0, 1, 2, 3, 4, 5], "旧整段审问仍逐句发 Line");
+  // 07 以后仍是整段录音（09.21 的 01–02 整段 cue 已下线，换 07 的 SouthWhisper 测整段）。
+  assert.deepEqual(lines.filter((l) => l.cue === "SouthWhisper").map((l) => l.index), [0, 1, 2, 3, 4, 5], "07 以后的整段 cue 仍逐句发 Line");
   assert.ok(said.includes("日兵甲：他们的部队往哪儿撤了！问他！"), "日语行字幕是中文译文");
-  assert.ok(said.includes("日兵甲：别动，混蛋！"), "旧整段的日语行也是译文");
   assert.ok(said.every((row) => !/[぀-ヿ]/.test(row)), "字幕里不许出现假名");
   assert.ok(warnings.some((text) => text.includes("NoSuchCueAtAll")), "未知 cue 警告一次");
   assert.deepEqual(voice.State().unknown, ["NoSuchCueAtAll"]);
@@ -487,7 +494,7 @@ const FakeAudio = () => {
   console.log("ok 排队的逐句场景兼容旧读法：current.plan.lines / sourceTime / index");
 }
 {
-  // 10d. 旧整段录音的说话人路由不变（待下线的 09.21 cue）。
+  // 10d. 整段录音（07 以后）的说话人路由不变。
   const routes = [], plays = [];
   const audio = {
     PlayStoryVoice(key, options) { const voice = { key }; this.storyVoice = voice; plays.push({ key, options, voice }); return { voice }; },
@@ -495,14 +502,15 @@ const FakeAudio = () => {
     SetStoryVoiceSpeaker(voice, options) { routes.push({ voice, ...options }); },
   };
   const voice = new FirstLevelMissionVoice({ audio, hud: { Say() {} }, Position: () => ({ x: 8, y: 1.6, z: 0 }) });
-  voice.manifest = { cues: { RescueCall: { seconds: 10.8 } }, lines: {} };
-  voice.Enqueue("RescueCall");
+  voice.manifest = { cues: { SouthWhisper: { seconds: 10.8 } }, lines: {} };
+  voice.Enqueue("SouthWhisper");
   for (let i = 0; i < 700; i++) voice.Update(1 / 60);
   assert.equal(plays.length, 1, "整段录音换说话人不拆条");
   assert.ok(plays[0].options.dialogue);
   assert.ok(routes.some((row) => row.who === "shunzi" && row.firstPerson), "顺子走第一人称");
-  assert.ok(routes.some((row) => row.who === "interpreter" && !row.firstPerson), "翻译是世界声源");
-  const gap = { cue: byId.get("RescueCall"), plan: MissionVoiceTimeline(byId.get("RescueCall"), 10.8), sourceTime: 8.5 };
+  assert.ok(routes.some((row) => row.who === "yaowa" && !row.firstPerson), "幺娃是世界声源");
+  const plan = MissionVoiceTimeline(byId.get("SouthWhisper"), 10.8), last = plan.lines.at(-1);
+  const gap = { cue: byId.get("SouthWhisper"), plan, sourceTime: (last[0] + last[1]) / 2 };
   assert.equal(voice.Speaker(gap).who, "shunzi");
   console.log("ok 旧整段录音的说话人路由不变");
 }

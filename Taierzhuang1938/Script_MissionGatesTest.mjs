@@ -60,9 +60,8 @@ const cueIds = new Set(MISSION_DIALOGUE.map((cue) => cue.id));
 // 契约 §5 冻结的 cue id。台词表归并行的 Voice 包，合并之前这些 cue 还不在
 // MISSION_DIALOGUE 里 —— 所以 voice 门先对契约表，已经到位的再对台词表。
 const CONTRACT_CUES = new Set([
-  "BunkerBanter","BunkerKilling","BunkerSearch","ShunziCurse",
-  "RescueCall","RescueLift","RescueOut",
-  "TrenchCurse","CornerCheck","SupportOrder",
+  "BunkerBanter","BunkerSearch",
+  "SupportOrder",
   "FrontBlockade",
   "TakeOverGun","TankTerror","BundleOrder",
   "BundleGo","BundleProne","BundleSupply","BundleReturnCall","TankStopped",
@@ -156,7 +155,9 @@ for (const [cue, factId] of Object.entries(MISSION_VOICE_FACTS)) {
   assert.equal(MISSION_FACT_GATES[factId].cue, cue, `${factId} 的 cue 与表不一致`);
 }
 checks += 1;
-Check(Object.keys(MISSION_VOICE_FACTS).length === 23, "对白事实共 23 条（契约 §5）");
+// 09.19 契约 §5 的 23 条减去 09.23 契约 §5.2 下线的 RescueCall（rescueCallHeard 改由导演记）。
+Check(Object.keys(MISSION_VOICE_FACTS).length === 22, "对白事实共 22 条（契约 §5，RescueCall 已下线）");
+Check(MISSION_FACT_GATES.rescueCallHeard?.kind === "scripted" && !("RescueCall" in MISSION_VOICE_FACTS), "rescueCallHeard 由开场导演记");
 
 // ---------------------------------------------------------------------------
 // 2. 生成表与激活表
