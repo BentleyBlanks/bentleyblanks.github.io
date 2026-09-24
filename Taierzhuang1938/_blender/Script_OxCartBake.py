@@ -49,6 +49,9 @@ ox_light = Material('OxMuzzle', (.43, .31, .24))
 ox_ear = Material('OxEarInterior', (.29, .17, .14))
 ox_socket = Material('OxEyeSocket', (.27, .16, .10))
 horse_coat = Material('HorseBayCoat', (.36, .18, .11))
+horse_leg = Material('HorseLowerLeg', (.16, .085, .055))
+horse_light = Material('HorseFetlockAndBlaze', (.70, .57, .42))
+horse_muzzle = Material('HorseMuzzle', (.23, .17, .15))
 horse_dark = Material('HorseMane', (.09, .07, .06))
 hoof = Material('HornAndHoof', (.19, .17, .14))
 horn = Material('OxHorn', (.68, .62, .49))
@@ -85,6 +88,7 @@ def PaintedMaterial(mat, name, base, seed, grain=False):
 PaintedMaterial(wood, 'WeatheredElmGrain', (.31,.23,.15), 1938, True)
 PaintedMaterial(edge, 'WornElmGrain', (.43,.32,.21), 1939, True)
 PaintedMaterial(ox_coat, 'OxCoatMottle', (.35,.22,.14), 1940)
+PaintedMaterial(horse_coat, 'HorseBayMottle', (.27,.12,.068), 1941)
 
 def InCollection(obj, col):
     for old in list(obj.users_collection): old.objects.unlink(obj)
@@ -295,6 +299,24 @@ def HoofDigit(name, center_x, foot_y, direction, mat, col, parent):
     obj = bpy.data.objects.new(name,mesh)
     col.objects.link(obj)
     return Finish(obj,name,mat,col,parent,.008)
+
+
+def HorseHoof(name, center_x, foot_y, mat, col, parent):
+    """A single flat-bottomed hoof, wider at the toe than the coronet."""
+    vertices = []
+    for z, half_width, back, front in ((.012,.132,-.105,.205),
+                                        (.155,.105,-.075,.105)):
+        vertices.extend([(center_x-half_width,foot_y+back,z),
+                         (center_x+half_width,foot_y+back,z),
+                         (center_x+half_width,foot_y+front,z),
+                         (center_x-half_width,foot_y+front,z)])
+    mesh = bpy.data.meshes.new(name+'Mesh')
+    mesh.from_pydata(vertices, [], [(3,2,1,0),(4,5,6,7),
+        (0,1,5,4),(1,2,6,5),(2,3,7,6),(3,0,4,7)])
+    mesh.update()
+    obj = bpy.data.objects.new(name,mesh)
+    col.objects.link(obj)
+    return Finish(obj,name,mat,col,parent,.014)
 
 def Cylinder(name, center, radius, depth, mat, col, parent=None, vertices=12, axis='Z'):
     bpy.ops.mesh.primitive_cylinder_add(vertices=vertices, radius=radius, depth=depth, location=center)
@@ -517,10 +539,17 @@ def BuildAnimal(kind):
         torso_stations = [(y,width,(top+bottom)/2,(top-bottom)/2)
                           for y,width,top,bottom in SmoothStations(ox_profile)]
     else:
-        torso_stations = [
-            (3.12,.16,1.50,.22),(3.30,.38,1.48,.39),(3.56,.46,1.48,.46),
-            (3.89,.43,1.46,.44),(4.18,.40,1.45,.42),(4.47,.45,1.50,.48),
-            (4.72,.48,1.54,.54),(4.90,.32,1.54,.43),(5.00,.16,1.53,.23)]
+        # Croup, tucked flank, sloping shoulder and withers are independent of
+        # the ox's deep cylindrical barrel. Values are metres above ground.
+        horse_profile = [
+            (3.04,.04,1.67,1.60),(3.15,.27,1.82,1.27),
+            (3.34,.39,1.90,1.19),(3.57,.43,1.87,1.16),
+            (3.82,.39,1.82,1.13),(4.07,.37,1.82,1.15),
+            (4.28,.41,1.90,1.17),(4.47,.44,2.05,1.16),
+            (4.62,.43,2.08,1.10),(4.78,.38,1.95,1.17),
+            (4.94,.24,1.76,1.30),(5.02,.04,1.57,1.50)]
+        torso_stations = [(y,width,(top+bottom)/2,(top-bottom)/2)
+                          for y,width,top,bottom in SmoothStations(horse_profile)]
     LoftY(kind+'Torso',torso_stations,coat,col,body)
     if is_ox:
         # A ventral fold under the neck and broad chest, instead of a ball.
@@ -529,8 +558,18 @@ def BuildAnimal(kind):
             (4.72,.24,.94,.29),(4.92,.20,1.04,.27),
             (5.14,.09,1.17,.15)]),coat,col,body,14)
     else:
-        Curve('HorseMane',[(0,4.69,1.94),(0,4.87,2.15),(0,5.04,2.27),(0,5.23,2.33)],
-              .075,horse_dark,col,body)
+        TaperCurve('HorseManeCrest',[(0,4.60,2.04,.055),
+                   (0,4.79,2.16,.105),(0,4.98,2.27,.11),
+                   (0,5.18,2.36,.075),(0,5.29,2.39,.005)],horse_dark,col,body)
+        for index in range(8):
+            y = 4.65 + index*.079
+            z = 2.07 + index*.046
+            for side in (-1,1):
+                TaperCurve(f'HorseManeTuft{index}_{side}',
+                           [(side*.035,y,z,.047),
+                            (side*.10,y-.055,z-.065,.041),
+                            (side*.15,y-.105,z-.135,.004)],
+                           horse_dark,col,body,8)
     head_pivot=Empty(kind+'HeadPivot',(0,4.82,1.61 if is_ox else 1.72),col,root)
     if is_ox:
         neck_stations = [(4.70,.33,1.44,.37),(4.90,.35,1.51,.39),
@@ -539,12 +578,14 @@ def BuildAnimal(kind):
                           (5.42,.31,1.59,.27),(5.56,.26,1.51,.21),
                           (5.68,.17,1.44,.13)]
     else:
-        neck_stations = [(4.64,.28,1.59,.34),(4.83,.30,1.73,.41),
-                         (5.02,.27,1.89,.38),(5.18,.21,2.05,.29),
-                         (5.29,.15,2.15,.18)]
-        skull_stations = [(5.17,.15,2.15,.19),(5.30,.21,2.13,.30),
-                          (5.47,.20,1.99,.28),(5.62,.16,1.82,.20),
-                          (5.70,.13,1.70,.12)]
+        neck_stations = SmoothStations([
+            (4.64,.31,1.62,.38),(4.82,.30,1.77,.40),
+            (5.02,.265,1.94,.37),(5.20,.20,2.11,.31),
+            (5.34,.115,2.24,.18)],2)
+        skull_stations = SmoothStations([
+            (5.19,.14,2.17,.18),(5.32,.205,2.13,.265),
+            (5.44,.205,2.02,.285),(5.57,.16,1.87,.25),
+            (5.71,.115,1.73,.16)],2)
     LoftY(kind+'Neck',neck_stations,coat,col,head_pivot)
     LoftY(kind+'Skull',skull_stations,coat,col,head_pivot)
     if is_ox:
@@ -555,8 +596,17 @@ def BuildAnimal(kind):
         Ellipsoid('OxLowerLip',(0,5.905,1.235),(.16,.060,.035),
                   ox_light,col,head_pivot,16,8)
     else:
-        Ellipsoid(kind+'Muzzle',(0,5.72,1.68),(.17,.14,.12),
-                  horse_dark,col,head_pivot,16,10)
+        Ellipsoid('HorseJaw',(0,5.38,1.79),(.205,.20,.155),
+                  coat,col,head_pivot,18,10)
+        LoftY('HorseNoseBridge',[(5.53,.14,1.84,.16),
+              (5.68,.12,1.72,.14),(5.79,.13,1.64,.095)],
+              coat,col,head_pivot,16)
+        Ellipsoid('HorseMuzzle',(0,5.83,1.60),(.18,.15,.115),
+                  horse_muzzle,col,head_pivot,18,10)
+        Ellipsoid('HorseLowerLip',(0,5.94,1.525),(.115,.065,.036),
+                  horse_muzzle,col,head_pivot,14,8)
+        Curve('HorseBlaze',[(0,5.48,2.17),(0,5.55,2.09),
+              (0,5.63,1.97),(0,5.71,1.83)],.025,horse_light,col,head_pivot)
     for side in (-1,1):
         if is_ox:
             LoftX(f'OxEar{side}',[(side*.24,5.29,1.80,.035,.04),
@@ -586,11 +636,21 @@ def BuildAnimal(kind):
                        (side*.595,5.285,2.145,.027),
                        (side*.625,5.305,2.22,.003)],horn,col,head_pivot)
         else:
-            Ellipsoid(kind+f'Ear{side}',(side*.18,5.26,2.43),
-                      (.09,.09,.16),coat,col,head_pivot)
-            Ellipsoid(kind+f'Eye{side}',(side*.195,5.46,2.07),
-                      (.031,.024,.029),eye,col,head_pivot,8,6)
-            Beam(f'HorseEarTip{side}',(side*.18,5.26,2.47),(side*.19,5.32,2.63),.055,.055,horse_dark,col,head_pivot)
+            TaperCurve(f'HorseEar{side}',[(side*.15,5.29,2.29,.069),
+                       (side*.17,5.28,2.43,.055),
+                       (side*.20,5.31,2.60,.020),
+                       (side*.215,5.34,2.67,.002)],coat,col,head_pivot,10)
+            TaperCurve(f'HorseEarInterior{side}',[(side*.19,5.334,2.40,.021),
+                       (side*.21,5.348,2.53,.013),
+                       (side*.22,5.35,2.61,.002)],horse_dark,col,head_pivot,8)
+            Ellipsoid(f'HorseEyeSocket{side}',(side*.203,5.45,2.055),
+                      (.031,.068,.058),horse_muzzle,col,head_pivot,12,8)
+            Ellipsoid(f'HorseEye{side}',(side*.225,5.47,2.063),
+                      (.021,.035,.028),eye,col,head_pivot,12,8)
+            Ellipsoid(f'HorseEyeGlint{side}',(side*.241,5.486,2.075),
+                      (.006,.008,.006),horse_light,col,head_pivot,8,6)
+            Ellipsoid(f'HorseNostril{side}',(side*.125,5.943,1.634),
+                      (.024,.018,.034),eye,col,head_pivot,12,8)
         # Four articulated legs, with each upper leg pivot at the shoulder/hip.
     leg_pivots=[]
     for side in (-1,1):
@@ -619,8 +679,21 @@ def BuildAnimal(kind):
                      (joint,x,knee_y,.125,.15)])
                 LoftZ(name+'Upper',SmoothStations(upper_stations,2),coat,col,pivot)
             else:
-                TaperBone(name+'Upper',(x,y,upper_z),(x,knee_y,joint),
-                          .155 if front else .19,.095,coat,col,pivot)
+                if front:
+                    upper_stations = [(1.81,side*.29,y-.08,.105,.14),
+                        (1.58,side*.29,y-.03,.19,.21),
+                        (1.35,x,y+.025,.17,.18),
+                        (1.08,x,y+.04,.115,.13),
+                        (.80,x,knee_y,.088,.102),
+                        (joint,x,knee_y,.105,.115)]
+                else:
+                    upper_stations = [(1.78,side*.28,3.36,.12,.15),
+                        (1.55,side*.32,3.35,.22,.25),
+                        (1.28,x,3.30,.23,.25),
+                        (1.00,x,3.20,.15,.17),
+                        (.78,x,knee_y-.04,.108,.13),
+                        (joint,x,knee_y,.10,.115)]
+                LoftZ(name+'Upper',SmoothStations(upper_stations,2),coat,col,pivot)
             knee=Empty(name+'KneePivot',(x,knee_y,joint),col,pivot)
             if is_ox:
                 lower_stations = [
@@ -630,16 +703,23 @@ def BuildAnimal(kind):
                     (.17,x,foot_y,.12,.12)]
                 LoftZ(name+'Lower',SmoothStations(lower_stations,2),coat,col,knee)
             else:
-                TaperBone(name+'Lower',(x,knee_y,joint),(x,foot_y,.18),
-                          .085,.06,coat,col,knee)
+                lower_stations = [
+                    (joint+.04,x,knee_y,.102,.114),
+                    (.56,x,knee_y+(.015 if front else .055),.071,.087),
+                    (.33,x,foot_y-.025,.061,.069),
+                    (.20,x,foot_y,.078,.09)]
+                LoftZ(name+'Lower',SmoothStations(lower_stations,2),horse_leg,col,knee)
+                Ellipsoid(name+'Fetlock',(x,foot_y,.195),
+                          (.092,.105,.07),horse_leg,col,knee,12,8)
             if is_ox:
                 # Two grounded toes leave a visible cleft at the front.
                 for digit in (-1,1):
                     HoofDigit(name+f'HoofDigit{digit}',x+digit*.076,
                               foot_y,digit,hoof,col,knee)
             else:
-                Ellipsoid(name+'Hoof',(x,foot_y+.07,.105),
-                          (.135,.17,.11),hoof,col,knee,12,8)
+                HorseHoof(name+'Hoof',x,foot_y,hoof,col,knee)
+                Cube(name+'Coronet',(x,foot_y+.015,.167),
+                     (.19,.19,.032),coat,col,knee,.014)
             leg_pivots.append((pivot,knee,side,front))
     tail=Empty(kind+'TailPivot',(0,3.06 if is_ox else 3.32,
                                  1.55 if is_ox else 1.78),col,root)
@@ -650,45 +730,83 @@ def BuildAnimal(kind):
                    (0,2.84,.89,.065),(0,2.83,.75,.085),
                    (0,2.82,.66,.005)],horse_dark,col,tail)
     else:
-        Curve(kind+'Tail',[(0,3.33,1.5),(0,3.13,1.17),(0,3.10,.96)],
-              .035,horse_dark,col,tail)
+        TaperCurve('HorseTailDock',[(0,3.16,1.75,.085),
+                   (0,2.99,1.58,.09),(0,2.85,1.42,.065)],coat,col,tail)
+        TaperCurve('HorseTailMass',[(0,2.88,1.50,.065),
+                   (0,2.76,1.30,.13),(0,2.72,1.03,.15),
+                   (0,2.71,.76,.12),(0,2.70,.59,.008)],horse_dark,col,tail,12)
+        for index in range(5):
+            spread = (index-2)*.045
+            TaperCurve(f'HorseTailStrand{index}',[
+                (spread*.5,2.75,1.22,.025),
+                (spread,2.68-(index%2)*.03,.94,.034),
+                (spread*1.4,2.67-(index%2)*.03,.61+(index%3)*.04,.002)],
+                horse_dark,col,tail,8)
     # Head halter stays with the animated head; the load-bearing harness is
     # anchored to the body and meets the cart's two iron shaft eyes.
     if is_ox:
         nose_points=[(-.26,5.64,1.48),(-.29,5.72,1.41),(0,5.78,1.32),
                      (.29,5.72,1.41),(.26,5.64,1.48)]
     else:
-        nose_points=[(-.16,5.66,1.77),(-.18,5.74,1.70),(0,5.79,1.62),
-                     (.18,5.74,1.70),(.16,5.66,1.77)]
-    Curve(kind+'NoseBand',nose_points,.018,rope,col,head_pivot)
+        nose_points=[(-.17,5.80,1.68),(-.18,5.88,1.61),(0,5.92,1.51),
+                     (.18,5.88,1.61),(.17,5.80,1.68)]
+    Curve(kind+'NoseBand',nose_points,.018,rope if is_ox else leather,
+          col,head_pivot)
     for side in (-1,1):
-        cheek = ([(side*.24,5.7,1.47),(side*.28,5.44,1.7),(side*.36,4.85,1.38)]
-                 if is_ox else
-                 [(side*.16,5.70,1.76),(side*.20,5.42,2.10),(side*.30,4.86,1.72)])
-        Curve(kind+f'CheekRope{side}',cheek,.016,rope,col,root)
-        yoke_z = 2.10 if is_ox else 2.07
-        shoulder_x = .72 if is_ox else .56
-        Curve(kind+f'YokeDrop{side}',[(side*.75,4.95,yoke_z),
-              (side*.77,4.89,1.76 if is_ox else 1.91),
-              (side*.77,4.76,1.43 if is_ox else 1.55),
-              (side*.75,4.66,1.20)],.035,leather,col,root)
-        Curve(kind+f'BreastTrace{side}',[(side*shoulder_x,4.94,1.46 if is_ox else 1.61),
-              (side*.75,4.64,1.25),(side*.73,3.83,1.11),
-              (side*.70,3.16,1.03)],.027,leather,col,root)
+        if is_ox:
+            Curve(kind+f'CheekRope{side}',
+                  [(side*.24,5.7,1.47),(side*.28,5.44,1.7),
+                   (side*.36,4.85,1.38)],.016,rope,col,root)
+            Curve(kind+f'YokeDrop{side}',[(side*.75,4.95,2.10),
+                  (side*.77,4.89,1.76),(side*.77,4.76,1.43),
+                  (side*.75,4.66,1.20)],.035,leather,col,root)
+            trace_points=[(side*.72,4.94,1.46),(side*.75,4.64,1.25),
+                          (side*.73,3.83,1.11),(side*.70,3.16,1.03)]
+        else:
+            # Bridle follows the nodding head; metal bit and reins are legible
+            # without a wooden cross-yoke hovering above the horse's poll.
+            Curve(f'HorseCheekStrap{side}',[(side*.17,5.82,1.67),
+                  (side*.20,5.52,1.94),(side*.22,5.33,2.19),
+                  (side*.18,5.29,2.36)],.022,leather,col,head_pivot)
+            Cylinder(f'HorseBitRing{side}',(side*.19,5.84,1.60),
+                     .044,.025,iron,col,head_pivot,12,'X')
+            Curve(f'HorseRein{side}',[(side*.19,5.84,1.60),
+                  (side*.34,5.34,1.82),(side*.47,4.60,1.70),
+                  (side*.44,4.20,1.72)],.010,rope,col,head_pivot)
+            trace_points=[(side*.43,5.04,1.49),
+                          (side*.75,4.66,1.20),(side*.73,3.83,1.11),
+                          (side*.70,3.16,1.03)]
+            Curve(f'HorseShaftLoop{side}',[(side*.46,4.46,2.04),
+                  (side*.57,4.52,1.71),(side*.75,4.66,1.20)],
+                  .030,leather,col,root)
+            Curve(f'HorseBreeching{side}',[(side*.34,3.11,1.62),
+                  (side*.45,3.20,1.49),(side*.57,3.49,1.34),
+                  (side*.69,3.73,1.12)],.042,leather,col,root)
+            Cylinder(f'HorseTraceRing{side}',(side*.75,4.66,1.20),
+                     .046,.022,iron,col,root,12,'X')
+        Curve(kind+f'BreastTrace{side}',trace_points,.027,leather,col,root)
         Curve(kind+f'TraceBinding{side}',[(side*.65,3.16,1.04),
               (side*.70,3.13,1.09),(side*.76,3.16,1.04)],
               .013,rope,col,root)
         if is_ox:
-            Cylinder(kind+f'YokePin{side}',(side*.79,4.95,yoke_z),
+            Cylinder(kind+f'YokePin{side}',(side*.79,4.95,2.10),
                      .037,.028,iron,col,root,10,'X')
     if is_ox:
         Beam(kind+'Yoke',(-.82,4.95,2.10),(.82,4.95,2.10),
              .13,.14,edge,col,root)
     else:
-        # The horse pulls on a breast collar, not an ox's timber cross-yoke.
-        Curve('HorseCollarCrest',[(-.73,4.87,2.07),(-.42,4.78,2.18),
-              (0,4.73,2.23),(.42,4.78,2.18),(.73,4.87,2.07)],
-              .048,leather,col,root)
+        Curve('HorseBrowband',[(-.20,5.37,2.26),(0,5.41,2.31),
+              (.20,5.37,2.26)],.022,leather,col,head_pivot)
+        Curve('HorseSaddlePad',[(-.45,4.42,1.89),(-.30,4.43,2.04),
+              (0,4.43,2.10),(.30,4.43,2.04),(.45,4.42,1.89)],
+              .052,leather,col,body)
+        Curve('HorseBellyGirth',[(-.45,4.38,1.70),(-.36,4.38,1.27),
+              (0,4.38,1.10),(.36,4.38,1.27),(.45,4.38,1.70)],
+              .036,leather,col,body)
+        # The collar lies across the breast and transfers pull into two traces.
+        Curve('HorseCollarCrest',[(-.45,4.82,2.07),(-.28,4.72,2.20),
+              (0,4.68,2.25),(.28,4.72,2.20),(.45,4.82,2.07)],
+              .035,leather,col,root)
     Curve(kind+'ShoulderHarness',[(-.72 if is_ox else -.56,4.54,1.38 if is_ox else 1.60),
           (-.68 if is_ox else -.45,4.54,1.91 if is_ox else 1.96),
           (0,4.54,2.14 if is_ox else 2.08),
