@@ -4,7 +4,7 @@ import { LoadMeleeAnimations } from "./Script_MeleeAnimationData.mjs";
 import { Quaternion } from "three";
 import { OpeningActorPerformance, ResolveOpeningActorPose, CorrectOpeningActorGrips, SettleOpeningCaptive } from "./Script_OpeningActorPerformance.mjs";
 import { ApplyOpeningRescueReady } from "./Script_OpeningFirstPerson.mjs";
-import { OpeningPropSet, ApplyOpeningWeaponTrack } from "./Script_OpeningProps.mjs";
+import { OpeningPropSet, ApplyOpeningWeaponTrack, BlendWeaponFrom, OpeningHoldTime } from "./Script_OpeningProps.mjs";
 export { SetOpeningActorPerformance, ClearOpeningActorPerformance } from "./Script_OpeningActorPerformance.mjs";
 let library, pending;
 // Reused straight from the machine-gun captives library (contract §5.4 reuse list plus the
@@ -20,12 +20,37 @@ export function OpeningStage(name){return library?.config.stages?.[name]||null;}
 
 /** A clip with a `holdLoop` window keeps sampling inside it once the playhead passes its end,
  * so a director can hold "fist in the hair" or "kneeling, hand on shoulder" for as long as
- * the dialogue runs without freezing the body. */
-export function OpeningHoldSeconds(clip,seconds){
-  const hold=OpeningClipMeta(clip)?.holdLoop;
-  if(!hold||!(seconds>hold[1]))return seconds;
-  const span=hold[1]-hold[0];
-  return span>1e-6?hold[0]+((seconds-hold[0])%span):hold[1];
+ * the dialogue runs without freezing the body. `holdUntil` (pose.holdUntil, clip seconds on
+ * the director's clock) lets go: the clip then plays on from the loop to its end (LuoKneelCheck
+ * lets go of the shoulder and rises at 2.6-3.4 s only after it). See OpeningHoldTime. */
+export function OpeningHoldSeconds(clip,seconds,holdUntil){
+  const meta=OpeningClipMeta(clip);
+  return OpeningHoldTime(meta?.holdLoop,meta?.duration??Infinity,seconds,holdUntil);
+}
+/** Leave the actor's hand weapon in the world where `fromClip`'s weapon track ends (default:
+ * the playing clip's manifest `weaponDropFrom`), relative to the actor's current root, and keep
+ * the hand weapon hidden until SetWeapon gives him a new one. BlastSlamBuried's rifle and
+ * HeSwapDadaoRifle's planted dadao. Returns the object left in the world, or null. */
+export function DropOpeningWeapon(soldier,fromClip){
+  const actor=soldier?.actor,rig=actor?.characterRig,record=library?.models.get(rig?.modelId);
+  if(!rig||!actor?.weaponGroup)return null;
+  rig.openingProps ||= NewPropSet(actor,record);
+  if(rig.openingProps.WeaponDropped())return rig.openingProps.droppedObject||null;
+  const row=fromClip?record?.clips[fromClip]:null;
+  if(row?.props?.weapon)ApplyOpeningWeaponTrack(actor,row,row.duration);
+  return rig.openingProps.DropWeapon();
+}
+/** Carry an opening prop between clips (ijaA's bayonet in its scabbard before the draw). */
+export function OwnOpeningProp(soldier,name){
+  const actor=soldier?.actor,rig=actor?.characterRig;
+  if(!rig)return;
+  rig.openingProps ||= NewPropSet(actor,library?.models.get(rig.modelId));
+  rig.openingProps.Own(name);
+}
+function NewPropSet(actor,record){
+  const set=new OpeningPropSet(actor,library?.config.props||{});
+  set.mounts=record?.propMounts||{};
+  return set;
 }
 /** Terminal clips end on the corpse; the frozen-corpse logic lets them finish their frames. */
 export function IsOpeningTerminalClip(clip){return clip==="ShotCollapse"||OpeningClipMeta(clip)?.terminal===true;}
@@ -63,7 +88,14 @@ export function InstallOpeningStoryboardAnimation(soldier){
   if(!rig||rig.openingStoryboardInstalled)return;
   rig.openingStoryboardInstalled=true;
   const original=actor.Update;
+  const originalDispose=rig.Dispose;
+  // The prop set (and any weapon left in the world) goes with the rig.
+  rig.Dispose=function(...args){rig.openingProps?.Dispose();rig.openingProps=null;return originalDispose?.apply(this,args);};
   let performer,clock=0,blendFrom,blendAt=0,lastKey,travelClock=0,wasRescueReady=false,rescueHandoff=false;
+  // The hand weapon as displayed at the end of the last frame (the native Update re-mounts it
+  // before this layer runs): the start of the weapon's blend and of a drop.
+  const shownWeapon={p:null,q:null,group:null},weaponFrom={p:null,q:null,group:null};
+  let weaponEase=false;
   const bones=[];rig.root.traverse(node=>{if(node.isBone)bones.push(node);});
   const Allocate=()=>bones.map(bone=>({p:bone.position.clone(),q:bone.quaternion.clone()}));
   const shownBuffer=Allocate(),baseBuffer=Allocate(),blendBuffer=Allocate();
@@ -79,7 +111,7 @@ export function InstallOpeningStoryboardAnimation(soldier){
     const record=library?.models.get(rig.modelId);
     let pose=ResolveOpeningActorPose(soldier,soldier.openingStoryboardPose,clock,record);
     if(pose&&record&&!record.clips[pose.clip]&&pose.clip!=="DadaoAmbush")pose=null;
-    if(pose&&OpeningClipMeta(pose.clip)?.holdLoop)pose={...pose,seconds:OpeningHoldSeconds(pose.clip,pose.seconds)};
+    if(pose&&OpeningClipMeta(pose.clip)?.holdLoop)pose={...pose,seconds:OpeningHoldSeconds(pose.clip,pose.seconds,pose.holdUntil)};
     const nativeCombat=soldier.openingStoryboardTravel==null&&(state.firing||state.fire>0||state.aim>.6
       ||state.meleeCombat?.state==="attack"||state.meleeCombat?.state==="bind");
     // Front commands can occur while moving and firing. An explicit pointing
@@ -118,6 +150,12 @@ export function InstallOpeningStoryboardAnimation(soldier){
       blendFrom=blendBuffer;
       if(displayed)for(let i=0;i<bones.length;i++){blendFrom[i].p.copy(displayed[i].p);blendFrom[i].q.copy(displayed[i].q);}
       else Snapshot(blendFrom);
+      // Weapon and extra props ease from where they were displayed, in step with the bones --
+      // a weapon/prop track would otherwise jump to the new clip's first frame at once.
+      const before=lastKey&&record?.clips[lastKey],after=pose&&record?.clips[pose.clip];
+      weaponEase=!!(shownWeapon.p&&shownWeapon.group===actor.weaponGroup&&(before?.props?.weapon||after?.props?.weapon));
+      if(weaponEase){weaponFrom.p=shownWeapon.p.clone();weaponFrom.q=shownWeapon.q.clone();weaponFrom.group=shownWeapon.group;}
+      rig.openingProps?.BeginBlend();
       blendAt=clock;lastKey=key;travelClock=0;
     }
     const locomotion=Snapshot(baseBuffer);
@@ -182,21 +220,34 @@ export function InstallOpeningStoryboardAnimation(soldier){
       rig.openingRescueHandoff={active:rescueHandoff,remaining};
     }
     const clipRow=pose?record?.clips[pose.clip]:null;
-    if(rescueHandoffApplied||pose?.nativeArms)actor._UpdateRiggedWeaponMount?.();
-    else if(clipRow?.props?.weapon&&!pose.weaponHold)ApplyOpeningWeaponTrack(actor,clipRow,pose.seconds);
-    else if(pose&&pose.clip!=="DadaoAmbush")performer?._AimWeapon(pose.weaponHold||clipRow?.weaponHold);
-    else if(soldier.openingActorPerformance&&!rig.openingActorPerformanceState?.headOnly&&!rig.openingActorPerformanceState?.protected)
-      actor._UpdateRiggedWeaponMount?.();
+    // A clip whose manifest weaponState is "dropped" (the comrade after the blast) has no weapon
+    // in the hands: the weapon is left where `weaponDropFrom`'s track ends and stays hidden.
+    const dropFrom=pose&&/^dropped/.test(OpeningClipMeta(pose.clip)?.weaponState||"")?OpeningClipMeta(pose.clip)?.weaponDropFrom:null;
+    if(dropFrom&&actor.weaponGroup&&!rig.openingProps?.WeaponDropped())DropOpeningWeapon(soldier,dropFrom);
+    const weaponDropped=!!rig.openingProps?.WeaponDropped();
+    if(!weaponDropped){
+      if(rescueHandoffApplied||pose?.nativeArms)actor._UpdateRiggedWeaponMount?.();
+      else if(clipRow?.props?.weapon&&!pose.weaponHold)ApplyOpeningWeaponTrack(actor,clipRow,pose.seconds);
+      else if(pose&&pose.clip!=="DadaoAmbush")performer?._AimWeapon(pose.weaponHold||clipRow?.weaponHold);
+      else if(soldier.openingActorPerformance&&!rig.openingActorPerformanceState?.headOnly&&!rig.openingActorPerformanceState?.protected)
+        actor._UpdateRiggedWeaponMount?.();
+    }
+    if(!weaponDropped&&weaponEase&&mix<1&&weaponFrom.group===actor.weaponGroup)BlendWeaponFrom(actor.weaponGroup,weaponFrom,mix);
     if(clipRow?.props||rig.openingProps){
-      rig.openingProps ||= new OpeningPropSet(actor,library?.config.props||{});
-      rig.openingProps.Update(clipRow,pose?.seconds||0,rig.root);
+      rig.openingProps ||= NewPropSet(actor,record);
+      rig.openingProps.Update(clipRow,pose?.seconds||0,rig.root,blendFrom?mix:1);
     }
     soldier.openingStoryboardContact?.();
     if(actor.weaponGroup){
       const slung=pose?.clip==="InterrogateCrouch";
       // A clip with a `weapon` track decides visibility itself (a rifle thrown away, a
-      // planted dadao); everything else keeps the 0922 slung-rifle rule.
-      if(!clipRow?.props?.weapon)actor.weaponGroup.visible=!slung;
+      // planted dadao); a dropped weapon stays hidden; everything else keeps the 0922
+      // slung-rifle rule.
+      if(weaponDropped)actor.weaponGroup.visible=false;
+      else if(!clipRow?.props?.weapon)actor.weaponGroup.visible=!slung;
+      shownWeapon.group=actor.weaponGroup;
+      (shownWeapon.p ||= actor.weaponGroup.position.clone()).copy(actor.weaponGroup.position);
+      (shownWeapon.q ||= actor.weaponGroup.quaternion.clone()).copy(actor.weaponGroup.quaternion);
       if(slung&&!rig.openingSlungRifle){
         const prop=rig.openingSlungRifle=actor.weaponGroup.clone();
         actor.root.add(prop);

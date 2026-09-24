@@ -3,7 +3,9 @@
 // origin xyz, axis xyz, up xyz, visible — in glTF scene space, i.e. the local frame
 // of the rig root (source metres; the rig root carries the model scale and the π yaw).
 // `weapon` drives the actor's own hand weapon (its mount is bypassed for that clip);
-// `bayonet`, `beam` and `rifle` are extra props this module builds and owns.
+// `bayonet`, `beam` and `rifle` are extra props this module builds and owns. Props follow the
+// 0.28 s pose blend when a clip changes (BeginBlend + mix), an owned bayonet rides its scabbard
+// mount between clips, and a weapon a clip throws away can be left in the world (DropWeapon).
 import * as THREE from "three";
 
 const Clamp = (value, low, high) => Math.max(low, Math.min(high, value));
@@ -159,6 +161,60 @@ function RifleMesh(actor, weaponId = "HanYang") {
 const MODEL_AXIS = { bayonet: new THREE.Vector3(0, 0, -1), beam: new THREE.Vector3(1, 0, 0) };
 const MODEL_UP = new THREE.Vector3(0, 1, 0);
 const SAMPLE = new Float64Array(10);
+const MOUNT_SAMPLE = new Float64Array(10);
+const BONE_MATRIX = new THREE.Matrix4();
+const ROOT_INVERSE = new THREE.Matrix4();
+const MOUNT_POINT = new THREE.Vector3();
+const MOUNT_AXIS = new THREE.Vector3();
+const MOUNT_UP = new THREE.Vector3();
+const BLEND_Q = new THREE.Quaternion();
+const BLEND_P = new THREE.Vector3();
+
+/**
+ * Clip time of a clip with a `holdLoop` window [h0, h1] (clip seconds). Past h1 the playhead
+ * wraps inside the window, so a director can hold "fist in the hair" or "kneeling, hand on
+ * the shoulder" for as long as the dialogue runs. `holdUntil` (clip seconds on the director's
+ * clock, optional) lets go of the loop: from that moment the playhead carries on from wherever
+ * the loop was, through h1 to the end of the clip (e.g. LuoKneelCheck's 2.6-3.4 s release and
+ * rise). Without `holdUntil` the window loops for ever.
+ */
+export function OpeningHoldTime(hold, duration, seconds, holdUntil) {
+  if (!hold || !(seconds > hold[1])) return seconds;
+  const span = hold[1] - hold[0];
+  const Wrap = (at) => (at > hold[1] && span > 1e-6 ? hold[0] + ((at - hold[0]) % span) : Math.min(at, hold[1]));
+  if (!Number.isFinite(holdUntil) || seconds <= holdUntil) return Wrap(seconds);
+  // Released: continue from where the loop was at the moment of release.
+  const from = holdUntil > hold[1] ? Wrap(holdUntil) : holdUntil;
+  return Math.min(duration, from + (seconds - holdUntil));
+}
+
+/** A bone by its glTF name (GLTFLoader rewrites spaces and dots in node names). */
+const Normalize = (name) => String(name || "").replace(/[\s_.:]/g, "").toLowerCase();
+function FindBone(root, name) {
+  if (!root || !name) return null;
+  const want = Normalize(name);
+  let found = null;
+  root.traverse((node) => { if (!found && node.isBone && Normalize(node.name) === want) found = node; });
+  return found;
+}
+
+/** Topmost ancestor (the scene), or null when the object is not in a tree. */
+function SceneRoot(object) {
+  let top = object?.parent || null;
+  while (top?.parent) top = top.parent;
+  return top;
+}
+
+/** Re-parent `object` to the scene root keeping its world transform. Returns true if moved. */
+function LeaveInWorld(object) {
+  const top = SceneRoot(object);
+  if (!top) return false;
+  object.updateWorldMatrix(true, false);
+  top.attach(object);
+  object.matrixAutoUpdate = true;
+  object.updateMatrixWorld(true);
+  return true;
+}
 
 /** The extra props one actor shows while playing opening clips. Built lazily, per actor. */
 export class OpeningPropSet {
@@ -166,6 +222,10 @@ export class OpeningPropSet {
     this.actor = actor;
     this.spec = propsSpec;
     this.items = new Map();
+    this.owned = new Set();           // props this actor carries between clips (the sheathed bayonet)
+    this.mounts = {};                 // record.propMounts: {name: {bone, origin, axis, up}} (rig asset)
+    this.left = [];                   // objects left in the world (dropped weapon), removed on Dispose
+    this.from = new Map();            // name -> {p, q, visible} displayed when the clip changed
   }
 
   Item(name) {
@@ -184,26 +244,107 @@ export class OpeningPropSet {
     return item;
   }
 
-  /** Show the named extra props of `clip` at `seconds`; hide the ones it does not name. */
-  Update(clip, seconds, rigRoot) {
-    const tracks = clip?.props || {};
-    for (const [name, item] of this.items) if (!tracks[name]) item.object.visible = false;
-    for (const name of Object.keys(tracks)) {
-      if (name === "weapon") continue;
-      const item = this.Item(name);
-      if (!item) continue;
-      if (!SampleOpeningPropTrack(tracks[name], clip, seconds, SAMPLE)) { item.object.visible = false; continue; }
-      PlaceOnOpeningTrack(item.object, SAMPLE, rigRoot, item.axis, MODEL_UP, true);
+  /** Carry `name` between clips: a prop with a bone mount (the bayonet in its scabbard) is shown
+   * on that bone whenever the playing clip has no track for it. Clips with a `bayonet` track own
+   * it automatically; a director can own it earlier (ijaA before the draw). */
+  Own(name) { this.owned.add(name); }
+
+  /** Remember what is displayed now; Update eases every prop from here over the pose blend. */
+  BeginBlend() {
+    this.from.clear();
+    for (const [name, item] of this.items) {
+      this.from.set(name, { p: item.object.position.clone(), q: item.object.quaternion.clone(), visible: item.object.visible });
     }
   }
 
-  /** Leave every prop where it is (the director may keep a planted blade or a kicked beam). */
+  /**
+   * Show the named extra props of `clip` at `seconds`; hide the ones it does not name (an owned
+   * prop with a bone mount goes back to that bone). `mix` < 1 (the pose blend, 0..1) eases each
+   * prop from where it was displayed when the clip changed, in step with the bones.
+   */
+  Update(clip, seconds, rigRoot, mix = 1) {
+    const tracks = clip?.props || {};
+    for (const name of Object.keys(tracks)) if (name === "bayonet") this.owned.add(name);
+    for (const [name, item] of this.items) if (!tracks[name] && !this.owned.has(name)) item.object.visible = false;
+    for (const name of new Set([...Object.keys(tracks), ...this.owned])) {
+      if (name === "weapon") continue;
+      const item = this.Item(name);
+      if (!item) continue;
+      if (tracks[name]) {
+        if (!SampleOpeningPropTrack(tracks[name], clip, seconds, SAMPLE)) { item.object.visible = false; continue; }
+        PlaceOnOpeningTrack(item.object, SAMPLE, rigRoot, item.axis, MODEL_UP, true);
+      } else if (!this.PlaceOnMount(name, item, rigRoot)) {
+        item.object.visible = false;
+        continue;
+      }
+      const from = this.from.get(name);
+      if (mix < 1 && from?.visible && item.object.visible) {
+        item.object.position.lerpVectors(from.p, BLEND_P.copy(item.object.position), mix);
+        item.object.quaternion.slerpQuaternions(from.q, BLEND_Q.copy(item.object.quaternion), mix);
+        item.object.updateMatrix();
+        item.object.updateMatrixWorld(true);
+      }
+    }
+  }
+
+  /** Put an owned prop on its bone mount (rig asset `propMounts`). */
+  PlaceOnMount(name, item, rigRoot) {
+    const mount = this.mounts?.[name];
+    const bone = mount && FindBone(this.actor.characterRig?.root || rigRoot, mount.bone);
+    if (!bone || !rigRoot) return false;
+    bone.updateWorldMatrix(true, false);
+    rigRoot.updateWorldMatrix(true, false);
+    // bone-local -> world -> rig-root local (the frame PlaceOnOpeningTrack expects)
+    BONE_MATRIX.multiplyMatrices(ROOT_INVERSE.copy(rigRoot.matrixWorld).invert(), bone.matrixWorld);
+    MOUNT_POINT.fromArray(mount.origin).applyMatrix4(BONE_MATRIX);
+    MOUNT_AXIS.fromArray(mount.axis).transformDirection(BONE_MATRIX);
+    MOUNT_UP.fromArray(mount.up).transformDirection(BONE_MATRIX);
+    MOUNT_SAMPLE[0] = MOUNT_POINT.x; MOUNT_SAMPLE[1] = MOUNT_POINT.y; MOUNT_SAMPLE[2] = MOUNT_POINT.z;
+    MOUNT_SAMPLE[3] = MOUNT_AXIS.x; MOUNT_SAMPLE[4] = MOUNT_AXIS.y; MOUNT_SAMPLE[5] = MOUNT_AXIS.z;
+    MOUNT_SAMPLE[6] = MOUNT_UP.x; MOUNT_SAMPLE[7] = MOUNT_UP.y; MOUNT_SAMPLE[8] = MOUNT_UP.z;
+    MOUNT_SAMPLE[9] = 1;
+    return PlaceOnOpeningTrack(item.object, MOUNT_SAMPLE, rigRoot, item.axis, MODEL_UP, true);
+  }
+
+  /**
+   * Hand `name` over to the caller and leave it where it is in the world (re-parented to the
+   * scene root with its world transform): the kicked beam, a planted blade. It stops following
+   * the actor and this set no longer updates, hides or disposes it -- the caller owns it.
+   */
   Detach(name) {
     const item = this.items.get(name);
     if (!item) return null;
     this.items.delete(name);
+    this.owned.delete(name);
+    this.from.delete(name);
+    LeaveInWorld(item.object);
     return item.object;
   }
+
+  /**
+   * Leave a copy of the actor's hand weapon in the world where it is displayed now (the rifle a
+   * blast throws, the dadao planted in the dirt) and hide the hand weapon until the actor gets a
+   * new one (SetWeapon builds a new weaponGroup, which is shown again). The copy shares the
+   * weapon's geometry; Dispose removes it.
+   */
+  DropWeapon() {
+    const actor = this.actor, group = actor?.weaponGroup;
+    if (!group || this.dropped === group) return this.droppedObject || null;
+    const copy = group.clone();
+    copy.name = `OpeningDropped_${actor.weaponId || "weapon"}`;
+    group.parent?.add(copy);
+    copy.position.copy(group.position); copy.quaternion.copy(group.quaternion); copy.scale.copy(group.scale);
+    copy.visible = true;
+    if (!LeaveInWorld(copy)) { copy.parent?.remove(copy); return null; }
+    group.visible = false;
+    this.dropped = group;
+    this.droppedObject = copy;
+    this.left.push(copy);
+    return copy;
+  }
+
+  /** True while the actor's current hand weapon is the one that was dropped (keep it hidden). */
+  WeaponDropped() { return !!this.dropped && this.dropped === this.actor?.weaponGroup; }
 
   HideAll() { for (const item of this.items.values()) item.object.visible = false; }
 
@@ -212,12 +353,20 @@ export class OpeningPropSet {
       item.object.parent?.remove(item.object);
       item.object.traverse((node) => { if (node.isMesh && node.name === "OpeningProp_Beam") node.geometry.dispose(); });
     }
+    for (const object of this.left) object.parent?.remove(object);
     this.items.clear();
+    this.left.length = 0;
+    this.from.clear();
+    this.dropped = this.droppedObject = null;
   }
 }
 
-/** Drive the actor's own hand weapon from the clip's `weapon` track. Returns true when applied. */
-export function ApplyOpeningWeaponTrack(actor, clip, seconds) {
+/**
+ * Drive the actor's own hand weapon from the clip's `weapon` track. Returns true when applied.
+ * `from` ({p, q} of weaponGroup, captured when the clip changed) and `mix` < 1 ease it in step
+ * with the pose blend, so the weapon does not jump ahead of the hands.
+ */
+export function ApplyOpeningWeaponTrack(actor, clip, seconds, from = null, mix = 1) {
   const track = clip?.props?.weapon;
   const group = actor?.weaponGroup, rig = actor?.characterRig;
   if (!track || !group || !rig?.root) return false;
@@ -226,6 +375,16 @@ export function ApplyOpeningWeaponTrack(actor, clip, seconds) {
   const scale = group.scale.x;
   PlaceOnOpeningTrack(group, SAMPLE, rig.root, muzzle, MODEL_UP, false);
   group.scale.setScalar(scale);
+  if (from && mix < 1) BlendWeaponFrom(group, from, mix);
   group.updateMatrix();
   return true;
+}
+
+/** Ease the weapon group from a captured local transform toward where it is now. */
+export function BlendWeaponFrom(group, from, mix) {
+  if (!group || !from || !(mix < 1)) return;
+  group.position.lerpVectors(from.p, BLEND_P.copy(group.position), mix);
+  group.quaternion.slerpQuaternions(from.q, BLEND_Q.copy(group.quaternion), mix);
+  group.updateMatrix();
+  group.updateMatrixWorld(true);
 }

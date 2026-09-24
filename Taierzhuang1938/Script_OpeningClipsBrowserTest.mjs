@@ -9,6 +9,11 @@
 //   4) 没有 NaN：骨骼世界矩阵、武器与道具的世界矩阵全是有限数。
 //   5) 成对 stage 里人与人不穿插：粗胶囊（躯干、头、四肢，手不算）两两量最深的交叠；躯干/头对躯干/头 ≤ 3 cm，
 //      带四肢的 ≤ 8 cm（胶囊把袖子裤腿都包进去了）。clip 声明了手去碰对方的那条胳膊，前臂不跟对方算。
+//   6) 跪地的膝盖：bake 声明的膝盖着地窗口（kneePlants）里，膝关节离窗口起点的最大位移 ≤ 2 cm；
+//   7) 贴墙：clip 声明的墙面接触（contacts 里 target:"wall"），那块皮肤（运行时 CPU 蒙皮的顶点）到 env 墙面的
+//      距离在整个窗口里离墙 ≤ 3 cm、进墙 ≤ 3 cm；
+//   8) 运行时行为：换 clip 时枪/刺刀跟着 0.28 s 的姿态混合走（不瞬移）、炸飞的枪留在地上不回手、
+//      刺刀收鞘后挂在骨盆上、LuoKneelCheck 的 holdUntil 放开循环后播到底。
 // 用法：node Taierzhuang1938/Script_OpeningClipsBrowserTest.mjs [--shots] [--clip=名字,名字]
 //   --shots 另存审片图到 <仓库>/tmp/OpeningClipsReview/（每条 clip 三帧 × 侧面/45° 俯视，每个 stage 的关键时刻），不进仓库。
 // 演员一律 sizeScale:1（过场站位按原尺寸算到厘米；导演摆成对动作时也必须钉死 sizeScale）。
@@ -29,7 +34,17 @@ if (shots) fs.mkdirSync(outDir, { recursive: true });
 // overlap: torso/head against torso/head ≤ 3 cm; anything with a limb ≤ 8 cm (limb capsules carry
 // the sleeve and trouser cloth and are round where a limb is not, so a hand-to-hand struggle reads
 // a few cm deep without anything passing through).
-const LIMIT = { footM: .02, contactM: .03, boneRatio: .01, coreOverlapM: .03, limbOverlapM: .08 };
+const LIMIT = { footM: .02, kneeM: .02, wallM: .03, contactM: .03, boneRatio: .01, coreOverlapM: .03, limbOverlapM: .08,
+  // while a clip change blends, a weapon or prop moves at most this far in the first 1/60 s step
+  // (the old behaviour jumped 0.3-0.7 m there) and at most propStepM in any later step of the
+  // 0.28 s blend (a 6 m/s swing: the blend itself plus the clip's own motion)
+  propFirstM: .02, propStepM: .10 };
+// Skin regions of the wall contacts (the bake's WALL_REGIONS): bones whose weight the vertex carries.
+const WALL_REGIONS = {
+  shoulderBack: ["spine2", "lclavicle", "rclavicle"], back: ["spine1", "spine2"], shoulderL: ["lclavicle", "lupperarm"],
+  shoulderR: ["rclavicle", "rupperarm"], head: ["head"], handL: ["lhand", "lfinger"], handR: ["rhand", "rfinger"],
+  hips: ["pelvis", "spine"], feet: ["lfoot", "rfoot", "ltoe0", "rtoe0"], calves: ["lcalf", "rcalf"],
+};
 
 const server = await ServeRoot(rootDir, 0);
 const browser = await LaunchBrowser();
@@ -41,7 +56,8 @@ try {
   const port = server.address().port;
   await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?shot=1&poseShot=1&phase=0&quality=high`, { waitUntil: "load", timeout: 120000 });
   await page.waitForFunction(() => window.Taierzhuang?.actorFactory, null, { timeout: 300000 });
-  const plan = await page.evaluate(async ({ W, H }) => {
+  const plan = await page.evaluate(async ({ W, H, WALL_REGIONS }) => {
+    const WALL_REGIONS_PAGE = WALL_REGIONS;
     const T = window.Taierzhuang, THREE = await import("three");
     const api = await import("./Script_OpeningStoryboardAnimation.mjs");
     const library = await api.LoadOpeningStoryboardAnimation();
@@ -90,7 +106,8 @@ try {
       const toes = { L: bones.find(b => /ltoe0$/.test(N(b.name))), R: bones.find(b => /rtoe0$/.test(N(b.name))) };
       const row = library.config.models.find(r => r.id === rig);
       const contactPoints = row?.contactPoints || {};
-      const entry = { rig, role, clip, actor, soldier, bones, byName, pairs, fingers, toes, contactPoints, clock: 0 };
+      const entry = { rig, role, clip, actor, soldier, bones, byName, pairs, fingers, toes, contactPoints, clock: 0,
+        skinned, regionVerts: new Map(), knees: { L: bones.find(b => /lcalf$/.test(N(b.name))), R: bones.find(b => /rcalf$/.test(N(b.name))) } };
       state.actors.push(entry);
       return entry;
     };
@@ -224,10 +241,41 @@ try {
       if (env?.wallLeftM) add(-(env.wallLeftM + .03), 0, .06, 2.0);
       if (env?.wallRightM) add(env.wallRightM + .03, 0, .06, 2.0);
     };
+    // Signed skin-to-wall gap of one region (runtime metres, negative = inside), from the CPU-skinned
+    // vertices whose weight on the region's bones is over one half. Walls: env of the clip, in the
+    // actor frame (+x right, -z forward): wallBehindM at +z, wallLeftM at -x, wallRightM at +x.
+    state.RegionGap = (e, region, env) => {
+      const want = WALL_REGIONS_PAGE[region] || [];
+      let best = Infinity; const v = V();
+      e.actor.root.updateMatrixWorld(true);
+      for (const mesh of e.skinned) {
+        let picked = e.regionVerts.get(mesh)?.get(region);
+        if (!picked) {
+          picked = [];
+          const idx = mesh.geometry.getAttribute("skinIndex"), wgt = mesh.geometry.getAttribute("skinWeight"), bones = mesh.skeleton.bones;
+          for (let i = 0; i < idx.count; i++) {
+            let sum = 0;
+            for (let k = 0; k < 4; k++) { const b = bones[idx.getComponent(i, k)]; if (b && want.some(w => N(b.name).endsWith(w) || (w.endsWith("finger") && N(b.name).includes(w)))) sum += wgt.getComponent(i, k); }
+            if (sum > .5) picked.push(i);
+          }
+          if (!e.regionVerts.has(mesh)) e.regionVerts.set(mesh, new Map());
+          e.regionVerts.get(mesh).set(region, picked);
+        }
+        mesh.skeleton.update();
+        const inverse = new THREE.Matrix4().copy(e.actor.root.matrixWorld).invert();
+        for (const i of picked) {
+          mesh.getVertexPosition(i, v); v.applyMatrix4(mesh.matrixWorld).applyMatrix4(inverse);
+          if (env?.wallBehindM) best = Math.min(best, env.wallBehindM - v.z);
+          if (env?.wallLeftM) best = Math.min(best, v.x + env.wallLeftM);
+          if (env?.wallRightM) best = Math.min(best, env.wallRightM - v.x);
+        }
+      }
+      return best;
+    };
     const clips = Object.entries(library.config.clips).filter(([, m]) => !m.legacy && m.rig).map(([name, m]) => ({ name, rig: m.rig, role: m.role, duration: m.duration,
       contacts: m.contacts || [], env: m.env || null, stage: m.stage || null }));
     return { clips, stages: library.config.stages, fps: library.config.fps };
-  }, { W, H });
+  }, { W, H, WALL_REGIONS });
 
   // ---- 1/3/4: every authored clip alone on its canonical rig --------------------------------
   const clipRows = [];
@@ -237,9 +285,11 @@ try {
       const s = window.openingClipsReview, { THREE } = s;
       s.Clear();
       const e = s.Make(clip.rig, clip.role, clip.name);
-      const plants = (s.library.config.models.find(r => r.id === clip.rig)?.clips || []).find(c => c.clip === clip.name)?.plants || [];
+      const report = (s.library.config.models.find(r => r.id === clip.rig)?.clips || []).find(c => c.clip === clip.name) || {};
+      const plants = report.plants || [], kneePlants = report.kneePlants || [];
+      const wallRows = (clip.contacts || []).filter(c => c.target === "wall" && c.action !== "release").map(c => ({ limb: c.limb, t0: c.t, t1: c.untilT ?? c.t, max: -Infinity, min: Infinity }));
       const frames = Math.round(clip.duration * fps) + 1;
-      const feet = [], ratios = [];
+      const feet = [], ratios = [], knees = [];
       let finite = true;
       s.Pose(0, true);
       for (let f = 0; f < frames; f++) {
@@ -248,6 +298,13 @@ try {
         const b = e.actor.characterRig.bones;
         feet.push({ t, L: [b.footL.getWorldPosition(new THREE.Vector3()), e.toes.L?.getWorldPosition(new THREE.Vector3())],
           R: [b.footR.getWorldPosition(new THREE.Vector3()), e.toes.R?.getWorldPosition(new THREE.Vector3())] });
+        knees.push({ t, L: e.knees.L?.getWorldPosition(new THREE.Vector3()), R: e.knees.R?.getWorldPosition(new THREE.Vector3()) });
+        // Every second frame inside the window, and the frames nearest its ends (a single-instant
+        // contact such as a palm slapped on the wall is the frame nearest that instant).
+        for (const w of wallRows) if (t >= w.t0 - .5 / fps && t <= w.t1 + .5 / fps && (f % 2 === 0 || Math.abs(t - w.t0) <= .5 / fps || Math.abs(t - w.t1) <= .5 / fps)) {
+          const gap = s.RegionGap(e, w.limb, clip.env);
+          w.max = Math.max(w.max, gap); w.min = Math.min(w.min, gap); w.samples = (w.samples || 0) + 1;
+        }
         const frameRatios = e.pairs.map(p => p.bone.getWorldPosition(new THREE.Vector3()).distanceTo(p.parent.getWorldPosition(new THREE.Vector3())) / p.rest);
         ratios.push(frameRatios);
         e.actor.root.traverse(o => { if (!o.matrixWorld.elements.every(Number.isFinite)) finite = false; });
@@ -260,15 +317,25 @@ try {
           for (const r of win) { const d = r[side][k].distanceTo(a); if (d > footM) { footM = d; footAt = `${side}${k ? "toe" : "ankle"}@${r.t.toFixed(2)}`; } }
         }
       }
+      let kneeM = 0, kneeAt = null;
+      for (const [side, t0, t1] of kneePlants) {
+        const win = knees.filter(r => r.t >= t0 - 1e-6 && r.t <= t1 + 1e-6 && r[side]);
+        for (const r of win) { const d = r[side].distanceTo(win[0][side]); if (d > kneeM) { kneeM = d; kneeAt = `${side}@${r.t.toFixed(2)}`; } }
+      }
       const all = ratios.flat().sort((a, b) => a - b), median = all[all.length >> 1] || 1;
       let boneDev = 0, boneAt = null;
       ratios.forEach((row, f) => row.forEach((r, i) => { const d = Math.abs(r / median - 1); if (d > boneDev) { boneDev = d; boneAt = `${e.pairs[i].bone.name}@${(f / fps).toFixed(2)}`; } }));
-      return { clip: clip.name, rig: clip.rig, frames, plants: plants.length, footM, footAt, boneDev, boneAt, finite };
+      return { clip: clip.name, rig: clip.rig, frames, plants: plants.length, footM, footAt, kneePlants: kneePlants.length, kneeM, kneeAt,
+        walls: wallRows.map(w => ({ limb: w.limb, t0: w.t0, t1: w.t1, max: w.max, min: w.min, samples: w.samples || 0 })), boneDev, boneAt, finite };
     }, { clip, fps: plan.fps });
     clipRows.push(row);
-    const bad = row.footM > LIMIT.footM || row.boneDev > LIMIT.boneRatio || !row.finite;
+    const wallBad = row.walls.some(w => !w.samples || !(w.max <= LIMIT.wallM) || !(w.min >= -LIMIT.wallM));
+    const bad = row.footM > LIMIT.footM || row.kneeM > LIMIT.kneeM || wallBad || row.boneDev > LIMIT.boneRatio || !row.finite;
     if (bad) failed++;
-    console.log(`${bad ? "FAIL" : "ok  "} ${row.clip.padEnd(24)} ${row.rig} foot ${(row.footM * 100).toFixed(2)} cm (${row.plants} plants, ${row.footAt || "-"}) bone ${(row.boneDev * 100).toFixed(2)}% (${row.boneAt || "-"}) finite ${row.finite}`);
+    console.log(`${bad ? "FAIL" : "ok  "} ${row.clip.padEnd(24)} ${row.rig} foot ${(row.footM * 100).toFixed(2)} cm (${row.plants} plants, ${row.footAt || "-"})`
+      + (row.kneePlants ? ` knee ${(row.kneeM * 100).toFixed(2)} cm (${row.kneeAt || "-"})` : "")
+      + row.walls.map(w => ` wall ${w.limb} ${w.t0}-${w.t1}s ${(w.min * 100).toFixed(1)}..${(w.max * 100).toFixed(1)} cm`).join("")
+      + ` bone ${(row.boneDev * 100).toFixed(2)}% (${row.boneAt || "-"}) finite ${row.finite}`);
     if (shots) {
       const d = clip.duration, times = [0, d * .5, d];
       for (const c of clip.contacts) if (c.t > .05 && c.t < d - .05) { times[1] = c.t; break; }
@@ -401,7 +468,84 @@ try {
       }
     }
   }
-  if (shots) fs.writeFileSync(path.join(outDir, "Data_OpeningClipsReview.json"), JSON.stringify({ clips: clipRows, contacts: contactRows, overlaps: overlapRows }, null, 2));
+  // ---- 8: runtime behaviour of the prop and weapon layer across clip changes -----------------
+  const runtimeRows = only.length ? [] : await page.evaluate(() => {
+    const s = window.openingClipsReview, { THREE } = s, out = [];
+    const W = o => o.getWorldPosition(new THREE.Vector3());
+    // Step one actor through a clip change at 60 steps/s: the soldier's pose switches from
+    // (a, ta) to (b, 0) and b runs for `span` seconds.
+    const Switch = (e, a, ta, b, span, Measure) => {
+      e.soldier.openingStoryboardPose = { clip: a, seconds: ta };
+      for (let i = 0; i < 40; i++) { e.clock += 1 / 60; e.actor.Update(1 / 60, { elapsed: e.clock, moveSpeed: 0, aim: 0 }); }
+      s.scene.updateMatrixWorld(true);
+      let last = Measure(), worst = 0, first = null;
+      for (let i = 1; i <= Math.round(Math.min(span, .28) * 60); i++) {
+        e.soldier.openingStoryboardPose = { clip: b, seconds: i / 60 };
+        e.clock += 1 / 60; e.actor.Update(1 / 60, { elapsed: e.clock, moveSpeed: 0, aim: 0 });
+        s.scene.updateMatrixWorld(true);
+        const now = Measure();
+        const step = now && last ? now.distanceTo(last) : 0;
+        if (first === null) first = step;
+        worst = Math.max(worst, step); last = now;
+      }
+      return { worst, first };
+    };
+    // a) the rifle of IjaButtStrike -> IjaHoldCollarUp (0.7 m apart between the two tracks)
+    s.Clear();
+    let e = s.Make("LugouIja02", "ijaA", "IjaButtStrike");
+    let r = Switch(e, "IjaButtStrike", 1.0, "IjaHoldCollarUp", .4, () => W(e.actor.weaponGroup));
+    out.push({ name: "weapon blend IjaButtStrike->IjaHoldCollarUp", stepM: r.worst, firstM: r.first });
+    // b) the bayonet going back into the scabbard mount: IjaWipeSheathBayonet end -> IjaReadyRifle
+    s.Clear();
+    e = s.Make("LugouIja02", "ijaA", "IjaWipeSheathBayonet");
+    const knife = () => e.actor.characterRig.openingProps?.items.get("bayonet")?.object;
+    const wipeEnd = s.library.config.clips.IjaWipeSheathBayonet.duration;
+    r = Switch(e, "IjaWipeSheathBayonet", wipeEnd, "IjaReadyRifle", .6, () => knife() ? W(knife()) : null);
+    const sheathed = knife()?.visible === true;
+    const hip = knife() ? W(knife()).distanceTo(W(e.actor.characterRig.bones.pelvis)) : Infinity;
+    out.push({ name: "bayonet stays in the scabbard after IjaWipeSheathBayonet", stepM: r.worst, firstM: r.first, visible: sheathed, hipM: hip });
+    // c) the comrade's rifle thrown by BlastSlamBuried stays where it fell
+    s.Clear();
+    e = s.Make("LugouNra02", "comrade", "BlastSlamBuried");
+    e.soldier.openingStoryboardPose = { clip: "BlastSlamBuried", seconds: 1.5 };
+    for (let i = 0; i < 40; i++) { e.clock += 1 / 60; e.actor.Update(1 / 60, { elapsed: e.clock, moveSpeed: 0, aim: 0 }); }
+    s.scene.updateMatrixWorld(true);
+    const fell = W(e.actor.weaponGroup);
+    for (let i = 1; i <= 60; i++) {
+      e.soldier.openingStoryboardPose = { clip: "CaptiveDraggedFromDirt", seconds: i / 60 };
+      if (i === 30) e.actor.root.position.x += .5;       // the director moves him: the rifle stays
+      e.clock += 1 / 60; e.actor.Update(1 / 60, { elapsed: e.clock, moveSpeed: 0, aim: 0 });
+    }
+    s.scene.updateMatrixWorld(true);
+    const dropped = e.actor.characterRig.openingProps?.droppedObject;
+    out.push({ name: "BlastSlamBuried rifle left on the ground", handVisible: e.actor.weaponGroup.visible,
+      droppedVisible: dropped?.visible === true, droppedM: dropped ? W(dropped).distanceTo(fell) : Infinity });
+    // d) LuoKneelCheck: loops without holdUntil, plays through the rise after it
+    s.Clear();
+    e = s.Make("LugouNra05", "luo", "LuoKneelCheck");
+    const At = (seconds, holdUntil) => {
+      e.soldier.openingStoryboardPose = { clip: "LuoKneelCheck", seconds, holdUntil };
+      e.clock += 1 / 60; e.actor.Update(1 / 60, { elapsed: e.clock, moveSpeed: 0, aim: 0 });
+      return e.actor.characterRig.openingStoryboardState?.seconds;
+    };
+    out.push({ name: "LuoKneelCheck hold loop and release", looped: At(6), released: At(6, 5), end: At(30, 5) });
+    return out;
+  });
+  for (const row of runtimeRows) {
+    let bad = false, text = "";
+    if ("stepM" in row) { bad ||= !(row.firstM <= LIMIT.propFirstM) || !(row.stepM <= LIMIT.propStepM); text += ` first step ${(row.firstM * 100).toFixed(1)} cm, largest step in the blend ${(row.stepM * 100).toFixed(1)} cm`; }
+    if ("visible" in row) { bad ||= !row.visible || !(row.hipM < .35); text += ` sheathed ${row.visible} ${(row.hipM * 100).toFixed(0)} cm from the pelvis`; }
+    if ("droppedM" in row) { bad ||= row.handVisible || !row.droppedVisible || !(row.droppedM <= .01); text += ` hand weapon visible ${row.handVisible}, dropped copy ${(row.droppedM * 100).toFixed(1)} cm from where it fell`; }
+    if ("looped" in row) {
+      const meta = plan.clips.find(c => c.name === "LuoKneelCheck");
+      const expected = Math.min(meta.duration, .9 + ((5 - .9) % (2.6 - .9)) + 1);   // loop position at holdUntil 5 s, then 1 s on
+      bad ||= !(row.looped >= .9 - 1e-6 && row.looped <= 2.6 + 1e-6) || !(Math.abs(row.released - expected) < 1e-3) || !(Math.abs(row.end - meta.duration) < 1e-6);
+      text += ` looped @6s ${row.looped?.toFixed(2)} s, released @6s (holdUntil 5) ${row.released?.toFixed(2)} s, @30s ${row.end?.toFixed(2)} s`;
+    }
+    if (bad) failed++;
+    console.log(`${bad ? "FAIL" : "ok  "} runtime ${row.name}:${text}`);
+  }
+  if (shots) fs.writeFileSync(path.join(outDir, "Data_OpeningClipsReview.json"), JSON.stringify({ clips: clipRows, contacts: contactRows, overlaps: overlapRows, runtime: runtimeRows }, null, 2));
   assert.ok(clipRows.length > 0, "no authored clip was reviewed");
   assert.equal(failed, 0, `${failed} opening clip checks failed`);
   console.log(`ok opening clips browser review: ${clipRows.length} clips, ${contactRows.length} paired contacts on production rigs`);
