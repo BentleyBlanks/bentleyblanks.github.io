@@ -298,8 +298,10 @@ export class OpeningFirstPerson{
     body.visible=s.ready;body.position.copy(cam.position);body.quaternion.copy(cam.quaternion);body.updateWorldMatrix(true,true);
     const Local=(x,y,z)=>V(x,y,z).applyQuaternion(cam.quaternion).add(cam.position);
     const Direction=(x,y,z)=>V(x,y,z).applyQuaternion(cam.quaternion).normalize();
-    const look=V(0,0,-1).applyQuaternion(cam.quaternion);
-    const bodyQ=Q().setFromAxisAngle(V(0,1,0),Math.atan2(-look.x,-look.z));
+    const look=V(0,0,-1).applyQuaternion(cam.quaternion),camUp=V(0,1,0).applyQuaternion(cam.quaternion);
+    // Heading that stays defined at any pitch: look*cos(pitch) - up*sin(pitch) is the level forward.
+    const level=look.clone().multiplyScalar(camUp.y).addScaledVector(camUp,-look.y);
+    const bodyQ=Q().setFromAxisAngle(V(0,1,0),Math.atan2(-level.x,-level.z));
     const eyeGround=cam.position.y-C.shunzi.lieEyeM;
     const Ground=(x,z)=>{const y=r.battlefield?.GroundHeight?.(x,z);return Number.isFinite(y)?y:eyeGround;};
     const frames={cam,bodyQ,Ground};

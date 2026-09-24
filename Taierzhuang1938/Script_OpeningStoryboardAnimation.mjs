@@ -1,7 +1,7 @@
 import { CutscenePerformer, LoadMachineGunCaptivesAnimation } from "./Script_CutscenePerformance.mjs";
 import { OPENING_STORYBOARDS as C } from "./Data_OpeningStoryboards.mjs";
 import { LoadMeleeAnimations } from "./Script_MeleeAnimationData.mjs";
-import { Quaternion } from "three";
+import { Quaternion, Matrix4, Vector3 } from "three";
 import { OpeningActorPerformance, ResolveOpeningActorPose, CorrectOpeningActorGrips, SettleOpeningCaptive } from "./Script_OpeningActorPerformance.mjs";
 import { ApplyOpeningRescueReady } from "./Script_OpeningFirstPerson.mjs";
 import { OpeningPropSet, ApplyOpeningWeaponTrack, BlendWeaponFrom, OpeningHoldTime } from "./Script_OpeningProps.mjs";
@@ -124,6 +124,19 @@ export function InstallOpeningStoryboardAnimation(soldier){
   const blendTarget=new Quaternion();
   const Snapshot=out=>{for(let i=0;i<bones.length;i++){out[i].p.copy(bones[i].position);out[i].q.copy(bones[i].quaternion);}return out;};
   let displayed;
+  // The skeleton root bone's parent as displayed: a blend that starts after the director moved or
+  // turned the root (a re-root at a clip hand-over) starts from the pelvis where it was seen.
+  const rootBone=bones.findIndex(bone=>!bone.parent?.isBone),displayedParent=new Matrix4(),reroot=new Matrix4(),rerootLocal=new Matrix4(),rerootScale=new Vector3();
+  let displayedParentValid=false;
+  const KeepDisplayedPelvis=()=>{
+    if(rootBone<0||!displayedParentValid||!displayed)return;
+    const bone=bones[rootBone];bone.parent.updateWorldMatrix(true,false);
+    reroot.copy(bone.parent.matrixWorld).invert().multiply(displayedParent);
+    const e=reroot.elements;let off=0;for(let i=0;i<16;i++)off=Math.max(off,Math.abs(e[i]-(i%5===0?1:0)));
+    if(off<1e-6)return;
+    rerootLocal.compose(blendFrom[rootBone].p,blendFrom[rootBone].q,bone.scale).premultiply(reroot).decompose(blendFrom[rootBone].p,blendFrom[rootBone].q,rerootScale);
+  };
+  const RememberDisplayedParent=()=>{if(rootBone>=0){displayedParent.copy(bones[rootBone].parent.matrixWorld);displayedParentValid=true;}};
   actor.Update=function(dt,state){
     const acting=rig.openingActorPerformance ||= new OpeningActorPerformance(soldier);
     acting.Restore();
@@ -169,7 +182,7 @@ export function InstallOpeningStoryboardAnimation(soldier){
     wasRescueReady=rescueReady;
     if(key!==lastKey){
       blendFrom=blendBuffer;
-      if(displayed)for(let i=0;i<bones.length;i++){blendFrom[i].p.copy(displayed[i].p);blendFrom[i].q.copy(displayed[i].q);}
+      if(displayed){for(let i=0;i<bones.length;i++){blendFrom[i].p.copy(displayed[i].p);blendFrom[i].q.copy(displayed[i].q);}KeepDisplayedPelvis();}
       else Snapshot(blendFrom);
       // Weapon and extra props ease from where they were displayed, in step with the bones --
       // a weapon/prop track would otherwise jump to the new clip's first frame at once.
@@ -208,7 +221,7 @@ export function InstallOpeningStoryboardAnimation(soldier){
       bones[i].quaternion.slerpQuaternions(blendFrom[i].q,blendTarget,mix);
     }
     SettleOpeningCaptive(soldier,pose);
-    if(!rescueHandoff)displayed=Snapshot(shownBuffer);rig.root.updateMatrixWorld(true);
+    if(!rescueHandoff)displayed=Snapshot(shownBuffer);rig.root.updateMatrixWorld(true);if(!rescueHandoff)RememberDisplayedParent();
     acting.Apply(dt,state,pose);
     CorrectOpeningActorGrips(soldier,pose);
     let rescueHandoffApplied=false;

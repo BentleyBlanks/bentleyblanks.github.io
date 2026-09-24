@@ -313,6 +313,13 @@ export class FirstLevelBunkerShow {
     const arrived=this.Move(actor,route[walk.index],last&&Distance(at,route[walk.index])<.3?faceEnd:null,clip,speed,options);
     return last&&arrived;
   }
+  /** Land on a stage root without a jump: an arrival gate leaves up to ~0.15 m, walked here at run speed. */
+  Settle(actor,root){
+    if(!actor)return;
+    const at=actor.openingStoryboardLast||actor.position;
+    if(Distance(at,root)<.01){this.Put(actor,root);return;}
+    this.Move(actor,root,Number.isFinite(root.yaw)?root.yaw:null,null,C.speed.run);
+  }
   /** Stationary pose on the current root (no travel). */
   Pose(actor,clip,options={}){
     if(!actor)return;
@@ -859,8 +866,20 @@ export class FirstLevelBunkerShow {
     if(!this.flags.luoChopAt)this.Follow(luo,"rescue",[...R.luoRoute,chop.luo],luoFast?C.speed.run:C.speed.brisk,"CreepDadao",chop.luo.yaw);
     if(!this.flags.heChopAt&&(go>.8||heFast))this.Follow(he,"rescue",[...R.heRoute,chop.he],heFast?C.speed.run:C.speed.creep,"CreepDadao",chop.he.yaw);
     else if(!this.flags.heChopAt)this.Hide(he);
-    if(!this.flags.liuReleased&&go>1.6){if(this.Follow(liu,"rescue",[...R.liuRoute,R.liuShot],C.speed.creep,null,R.liuShot.yaw))this.Pose(liu,null,{face:Face(R.liuShot,A.bunkerJunction)});}
+    if(!this.flags.liuReleased&&go>1.6)this.LiuWalk();
     else if(!this.flags.liuReleased)this.Hide(liu);
+  }
+  /** Liu Wencai creeps round RC to his firing step (liuShot) and holds it facing J until released. */
+  LiuWalk(){
+    const R=C.rescue,liu=this.Squad("liuwencai");
+    if(!liu||this.flags.liuReleased||this.flags.glimpseAt==null)return false;
+    if(this.flags.liuAt==null){
+      const speed=this.flags.luoChopAt!=null?C.speed.brisk:C.speed.creep;
+      if(!this.Follow(liu,"rescue",[...R.liuRoute,R.liuShot],speed,null,R.liuShot.yaw))return false;
+      this.flags.liuAt=this.r.time;
+    }
+    this.Pose(liu,null,{face:Face(R.liuShot,A.bunkerJunction)});
+    return true;
   }
   ChopMarks(m=this.CircleMarks()){
     const luo=this.StageRoot("chopRear","luo",m.ijaBWatch),he=this.StageRoot("chopParry","heyoutian",m.ijaA);
@@ -959,7 +978,7 @@ export class FirstLevelBunkerShow {
     this.Put(ijaA,m.ijaA);this.Pose(ijaA,"IjaHoldCollarUp",{seconds:r.time-this.flags.holdAt});
     this.Put(interp,m.interpreter);this.Pose(interp,"InterpreterGrabCollar",{seconds:r.time-this.at+2});
     const chop=this.ChopMarks(m);
-    this.Put(luo,chop.luo);this.Pose(luo,"LuoDadaoChopRear",{seconds:age});
+    this.Settle(luo,chop.luo);this.Pose(luo,"LuoDadaoChopRear",{seconds:age});
     this.Put(ijaB,m.ijaBWatch);
     if(ijaB.alive)this.Pose(ijaB,"IjaChoppedFallWall",{seconds:age});else this.Corpse(ijaB,"IjaChoppedFallWall");
     if(age>=.45&&ijaB.alive){this.BladeKill(ijaB,luo);this.Blood(ijaB,"neck");}
@@ -977,7 +996,7 @@ export class FirstLevelBunkerShow {
       this.Put(ijaA,m.ijaA);this.Pose(ijaA,"IjaHoldCollarUp",{seconds:r.time-this.flags.holdAt});
     }else{
       const t=r.time-this.flags.heChopAt;
-      this.Put(he,chop.he);this.Pose(he,"HeDadaoParryChop",{seconds:t});
+      this.Settle(he,chop.he);this.Pose(he,"HeDadaoParryChop",{seconds:t});
       this.Put(ijaA,m.ijaA);
       if(ijaA.alive)this.Pose(ijaA,"IjaParriedChoppedFall",{seconds:t});else this.Corpse(ijaA,"IjaParriedChoppedFall");
       if(t>=.05)this.flags.collarReleasedAt??=r.time;
@@ -987,8 +1006,9 @@ export class FirstLevelBunkerShow {
     }
     this.Corpse(this.Comrade,"CaptiveWallSlideTwitch");
     this.Put(ijaB,m.ijaBWatch);this.Corpse(ijaB,"IjaChoppedFallWall");
-    this.Put(luo,chop.luo);this.Pose(luo,"LuoDadaoChopRear",{seconds:r.time-this.flags.luoChopAt});
+    this.Settle(luo,chop.luo);this.Pose(luo,"LuoDadaoChopRear",{seconds:r.time-this.flags.luoChopAt});
     this.Put(interp,m.interpreter);this.Pose(interp,"InterpreterGrabCollar",{seconds:2.9});
+    this.LiuWalk();
     // The interpreter bolts once ijaA is turned on by He (heChopAt is forced by heArriveS).
     if(this.flags.heChopAt!=null&&r.time-this.flags.heChopAt>=.4)this.Stage("Flee");
   }
@@ -1018,12 +1038,12 @@ export class FirstLevelBunkerShow {
     }
     const s=r.time-this.flags.heSwapAt;
     if(s<1.6){this.Pose(he,"HeSwapDadaoRifle",{seconds:s});return;}
-    if(!this.flags.heArmed){this.flags.heArmed=true;DropOpeningWeapon(he,"HeSwapDadaoRifle");Equip(he,"HanYang");this.ReleaseSquad(he,C.rescue.heCover);}
+    if(!this.flags.heArmed){this.flags.heArmed=true;this.flags.heArmedAt=r.time;DropOpeningWeapon(he,"HeSwapDadaoRifle");Equip(he,"HanYang");this.ReleaseSquad(he,C.rescue.heCover);}
   }
   PhaseFlee(age){
     const r=this.r,interp=this.cast.interpreter,luo=this.Squad("luo"),m=this.CircleMarks();
     if(!this.phaseEntered){this.phaseEntered=true;this.Scene("RescueFlee",r.voice?.PlayScene("RescueFlee",{speakers:this.Speakers()}));this.PlayClip(interp,"InterpreterFlee",{restart:true});}
-    this.Aftercut();
+    this.Aftercut();this.LiuWalk();
     this.Put(interp,m.interpreter);this.Pose(interp,"InterpreterFlee",{seconds:age});
     this.Put(luo,this.ChopMarks(m).luo);this.Pose(luo,"LuoDadaoChopRear",{seconds:r.time-this.flags.luoChopAt});
     if(age>=1.6||age>C.timeouts.fleeS){this.flags.fleeAt=r.time;this.Stage("DragCover");}
@@ -1032,6 +1052,14 @@ export class FirstLevelBunkerShow {
   UpdateFleeing(){
     const r=this.r,interp=this.cast.interpreter;
     if(!interp||this.flags.fleeAt==null||this.flags.interpreterGone)return;
+    // InterpreterFlee carries him ~1.3 m in root motion: hand the native run a root under the clip's
+    // last pelvis, or the blend back to the old root drags him backwards (0.15 m/frame, 09-24 probe).
+    if(!this.flags.fleeRooted){
+      this.flags.fleeRooted=true;
+      const rig=interp.actor.characterRig,end=OpeningClipRoot(rig?.clipModelId||rig?.modelId,"InterpreterFlee")?.end;
+      const at=interp.openingStoryboardLast||interp.position;
+      if(end){const o=Rot(interp.yaw,end[0],end[1]);this.Put(interp,{x:at.x+o.x,z:at.z+o.z,yaw:interp.yaw+end[2]*DEG});}
+    }
     const end=this.Follow(interp,"flee",C.ija.interpreterFlee,C.speed.flee,null);
     if(end||r.time-this.flags.fleeAt>12){this.flags.interpreterGone=true;interp.scriptEssential=false;this.Hide(interp);r.ai.Remove(interp);delete this.cast.interpreter;}
   }
@@ -1039,7 +1067,13 @@ export class FirstLevelBunkerShow {
     const r=this.r,luo=this.Squad("luo");
     this.Aftercut();this.UpdateFleeing();this.LongShotTick();
     Equip(luo,null);
-    if(age<.4){this.Pose(luo,"LuoDragToCover",{seconds:age});return;}
+    // 「罗班长抓住顺子衣领」: step in front of him facing the way out, take the collar, then walk.
+    if(this.flags.dragGrabAt==null){
+      if(this.Hold(luo,this.DragGrabRoot(),null,{speed:C.speed.brisk})||age>C.timeouts.luoArriveS*.5)this.flags.dragGrabAt=r.time;
+      return;
+    }
+    const grab=r.time-this.flags.dragGrabAt;
+    if(grab<.4){this.Pose(luo,"LuoDragToCover",{seconds:grab});return;}
     luo.openingStoryboardContact=()=>this.CollarContact(luo);
     const arrived=this.Follow(luo,"dragCover",[...C.rescue.dragCoverRoute,C.rescue.luoCheck],C.speed.drag,"CollarDrag");
     if(arrived||age>C.timeouts.dragOutS){
@@ -1048,9 +1082,16 @@ export class FirstLevelBunkerShow {
       this.Stage("LongShot");
     }
   }
+  /** Where Luo takes the collar: the player point (behind him, lieCollar) is exactly Shunzi's kneeling spot. */
+  DragGrabRoot(){
+    const S=C.shunzi.dragged,to=C.rescue.dragCoverRoute[0],d=Distance(S,to)||1,k=.55/d;
+    const at={x:S.x+(to.x-S.x)*k,z:S.z+(to.z-S.z)*k};
+    return {...at,yaw:Face(at,to)};
+  }
   /** Liu Wencai's long shot at the junction man; fallbacks never leave the hand-back waiting. */
   LongShotTick(){
     const r=this.r,ijaD=this.Ija("ijaD"),ijaC=this.Ija("ijaC"),liu=this.Squad("liuwencai");
+    this.LiuWalk();
     if(this.flags.longShotAt==null)this.flags.longShotAt=r.time;
     const t=r.time-this.flags.longShotAt;
     if(ijaC?.alive&&!ijaC.openingCombatReleased)this.ReleaseCombat(ijaC);
@@ -1059,15 +1100,17 @@ export class FirstLevelBunkerShow {
       // 「一名日兵从岔口回身举枪」
       this.Pose(ijaD,t<1.1?"IjaReadyRifle":null,{seconds:t,face:Face(ijaD.position,C.rescue.liuShot)});
     }
-    if(!ijaD.alive){if(!r.Has("junctionShot"))r.Record("junctionShot",{by:this.flags.junctionBy||"liuwencai"});return;}
+    if(!ijaD.alive){if(!r.Has("junctionShot"))r.Record("junctionShot",{by:this.flags.junctionBy||"other"});return;}
     const Try=(shooter,id,at)=>{
       if(this.flags["shot:"+id]||t<at||!shooter)return;
       this.flags["shot:"+id]=r.time;
       const hit=this.ShootAt(shooter,ijaD,t>=C.timeouts.longShotForceS);
       if(hit)this.flags.junctionBy=id;
     };
-    Try(liu,"liu",1.2);
-    Try(this.Squad("heyoutian"),"he",C.timeouts.longShotRetryS);
+    // Liu fires from his step (a late walker is covered by the two fallbacks below).
+    if(this.flags.liuAt!=null)Try(liu,"liu",Math.max(1.2,this.flags.liuAt-this.flags.longShotAt+.6));
+    // He fires once the rifle is actually in his hands (HeSwapDadaoRifle ends ~ +4.7 s).
+    if(this.flags.heArmedAt!=null)Try(this.Squad("heyoutian"),"he",Math.max(C.timeouts.longShotRetryS,this.flags.heArmedAt-this.flags.longShotAt+.4));
     Try(this.Squad("luo"),"luo",C.timeouts.longShotForceS);
     if(t>=C.timeouts.longShotForceS+.5&&ijaD.alive){this.Kill(ijaD,"bullet");this.flags.junctionBy??="forced";}
   }
@@ -1423,7 +1466,7 @@ export class FirstLevelBunkerShow {
     const p=this.phase,S=C.shunzi,ijaA=this.Ija("ijaA"),luo=this.Squad("luo");
     if(["Drag","Snag","KickBeam"].includes(p)){const c=this.TrackPoint(ijaA,"collar");if(c)return {x:c.x-Math.sin(S.trap.yaw)*S.lieCollarBackM,z:c.z-Math.cos(S.trap.yaw)*S.lieCollarBackM};}
     if(p==="DragOut"&&ijaA){const f={x:-Math.sin(ijaA.yaw),z:-Math.cos(ijaA.yaw)};return {x:ijaA.position.x-f.x*.62,z:ijaA.position.z-f.z*.62};}
-    if(p==="DragCover"&&luo&&this.Age>=.4){const f={x:-Math.sin(luo.yaw),z:-Math.cos(luo.yaw)};return {x:luo.position.x-f.x*.55,z:luo.position.z-f.z*.55};}
+    if(p==="DragCover"&&luo&&this.flags.dragGrabAt!=null&&this.r.time-this.flags.dragGrabAt>=.4){const f={x:-Math.sin(luo.yaw),z:-Math.cos(luo.yaw)};return {x:luo.position.x-f.x*.55,z:luo.position.z-f.z*.55};}
     if(TRAPPED.has(p)&&!["Butt","Boots"].includes(p))return S.trap;
     if(["LongShot","Check","KickRifle","Released"].includes(p))return S.cover;
     if(p==="DragCover")return S.dragged;
@@ -1488,7 +1531,7 @@ export class FirstLevelBunkerShow {
       if(this.flags.collarReleasedAt)height=Math.max(.34,height-(height-.34)*Smooth((r.time-this.flags.collarReleasedAt)/.4));
     }
     else if(p==="Flee"){eye=S.dragged;height=.34;target=Head(interp)||At(A.bunkerJunction,1.2);}
-    else if(p==="DragCover"){const pt=this.PlayerPoint();eye=pt;height=.55;const back=Face(pt,C.shunzi.dragged);target=a<.4?(Head(luo)||At(S.dragged,1)):At(C.shunzi.dragged,.9);}
+    else if(p==="DragCover"){const pt=this.PlayerPoint();eye=pt;height=.55;const back=Face(pt,C.shunzi.dragged);target=this.flags.dragGrabAt==null||r.time-this.flags.dragGrabAt<.4?(Head(luo)||At(S.dragged,1)):At(C.shunzi.dragged,.9);}
     else if(p==="LongShot"){eye=S.cover;height=.62;target=At(A.bunkerJunction,1.2);}
     else if(p==="Check"){const h=this.TrackPoint(luo,"head");eye=h?{x:h.x,z:h.z}:S.cover;height=h?h.h:.73;target=Head(luo)||At(C.rescue.luoCheck,1);
       if(this.flags.checkLineAt!=null){const n=r.time-this.flags.checkLineAt;target=target.clone?target.clone():target;if(n<.8)target.y-=.18*Math.sin(Math.PI*n/.8);}}
