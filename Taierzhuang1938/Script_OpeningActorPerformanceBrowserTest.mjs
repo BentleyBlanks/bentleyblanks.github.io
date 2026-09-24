@@ -126,17 +126,17 @@ try{
   }
   console.log("ok freely controlled Luo/Zhou aim=1: audible-line head acting preserves hands, torso and weapon; idle melee is not protected");
   const cases=[
-    {role:"yaowa",phase:"Supply",kind:"nra",variant:1,clip:"SupplyReceive",freeHand:"handR",minHandM:.04},
+    {role:"yaowa",phase:"Banter",kind:"nra",variant:1,clip:"SupplyReceive",freeHand:"handR",minHandM:.04},
     {role:"luo",phase:"Orders",kind:"nra",variant:4,clip:"PointBlockade",freeHand:"handL",minHandM:.07},
     {role:"runner",phase:"Orders",kind:"nra",variant:4,clip:"IjaBayonetGuard",freeHand:"handL",minHandM:.07},
     {role:"heyoutian",phase:"Orders",kind:"nra",variant:1,clip:"IjaBayonetGuard",minHeadRad:.1},
     {role:"liuwencai",phase:"Orders",kind:"nra",variant:4,clip:"IjaBayonetGuard",minHeadRad:.1},
     // Contract §5.1 (v1.3): the interpreter is NRA06 and ijaA is IJA06 (IJA02's clip library), ijaB is IJA01.
-    {role:"interpreter",phase:"Interrogate",kind:"nra",variant:5,castId:"interpreter",clip:"InterpreterPoint",freeHand:"handR",minHandM:.10},
-    {role:"ijaA",phase:"Interrogate",kind:"ija",variant:5,castId:"ijaA",clip:"InterrogateCrouch",freeHand:"handR",minHandM:.07},
-    {role:"ijaB",phase:"Interrogate",kind:"ija",variant:0,clip:"IjaBayonetGuard",minHeadRad:.1},
-    {role:"guard",phase:"Captive",kind:"ija",variant:2,clip:"IjaBayonetGuard",minHeadRad:.1},
-    {role:"captiveHelper",phase:"Captive",kind:"nra",variant:1,clip:"CaptiveHeld",freeHand:"handL",minHandM:.1},
+    {role:"interpreter",phase:"Interrogation",kind:"nra",variant:5,castId:"interpreter",clip:"InterpreterPoint",freeHand:"handR",minHandM:.10},
+    {role:"ijaA",phase:"Interrogation",kind:"ija",variant:5,castId:"ijaA",clip:"InterrogateCrouch",freeHand:"handR",minHandM:.07},
+    {role:"ijaB",phase:"Interrogation",kind:"ija",variant:0,clip:"IjaBayonetGuard",minHeadRad:.1},
+    {role:"guard",phase:"Interrogation",kind:"ija",variant:2,clip:"IjaBayonetGuard",minHeadRad:.1},
+    {role:"comrade",phase:"Interrogation",kind:"nra",variant:1,clip:"CaptiveHeld",freeHand:"handL",minHandM:.1},
     {role:"ijaA",caseName:"ButtStrike",phase:"Butt",kind:"ija",variant:5,castId:"ijaA",clip:"ButtThreat",onceDuration:1.4,minHeadRad:.1},
   ];
   const receipts=[];

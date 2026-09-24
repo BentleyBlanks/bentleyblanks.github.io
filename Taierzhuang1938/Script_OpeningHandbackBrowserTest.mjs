@@ -1,11 +1,11 @@
 // 02 hand-back in non-ideal orders (contract docs/Data_FirstLevel0105Refactor20260923Contract.md
 // §2.1 and v1.1 ③: "the new gate needs a fallback too, never a deadlock").
 //
-//   node Taierzhuang1938/Script_OpeningHandbackBrowserTest.mjs [--variant=miss|hide|early]
+//   node Taierzhuang1938/Script_OpeningHandbackBrowserTest.mjs [--variant=miss|hide|early|absent]
 //
 // Each variant cold-starts 02 (missionStage=2, a debug start, not a jump inside a run) and bends
 // the LongShot beat: Liu Wencai misses / the junction man hides out of every line of sight / he is
-// already dead. The director must still reach Released with ijaA and ijaB cut down, without
+// already dead / he is missing from the enemy table altogether. The director must still reach Released with ijaA and ijaB cut down, without
 // teleports, and the real F pickup must still start the withdrawal. The ideal order is covered by
 // Script_FirstLevelMissionBrowserTest.mjs --campaign --stage-to=3.
 import fs from "node:fs/promises";
@@ -19,7 +19,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const output = path.join(here, "_shots", "OpeningHandback");
 await fs.mkdir(output, { recursive: true });
 const only = process.argv.find((arg) => arg.startsWith("--variant="))?.split("=")[1];
-const variants = only ? [only] : ["miss", "hide", "early"];
+const variants = only ? [only] : ["miss", "hide", "early", "absent"];
 const server = await ServeRoot(path.resolve(here, ".."), 0);
 const browser = await LaunchBrowser();
 const errors = [];

@@ -44,7 +44,8 @@ const ROUTE_RETRY_BUDGET = 2;
 /** 分段驾驶脚本允许的起点：每一段的第一个公开阶段。 */
 export const CAMPAIGN_SEGMENT_STARTS = Object.freeze([8, 11, 15, 18]);
 /** `--stage-to` 允许的终点：Front 段末（7）、Mid 段末（14）、整关（18）。 */
-export const CAMPAIGN_SEGMENT_ENDS = Object.freeze([3, 6, 7, 14, 18]);
+// 2 = 01–02 to the collection hand-over (the opening package's own acceptance, 03 not driven).
+export const CAMPAIGN_SEGMENT_ENDS = Object.freeze([2, 3, 6, 7, 14, 18]);
 
 export function ParseCampaignArgs(argv = process.argv) {
   const Has = (flag) => argv.includes(flag);
@@ -71,7 +72,7 @@ export function ParseCampaignArgs(argv = process.argv) {
     quietGuidanceInterruptProbe: Has("--probe-quiet-guidance-interrupt"),
     allowCheckpointRetry: Has("--allow-checkpoint-retry"),
     stageFrom, stageTo,
-    suite: stageFrom === 3 ? "FirstLevelFrontTopology" : stageTo === 3 ? "FirstLevelOpeningStoryboards" : stageTo === 7 ? "FirstLevelStageFront"
+    suite: stageFrom === 3 ? "FirstLevelFrontTopology" : stageTo === 2 || stageTo === 3 ? "FirstLevelOpeningStoryboards" : stageTo === 7 ? "FirstLevelStageFront"
       : stageTo === 14 ? "FirstLevelStageMiddle"
         : stageFrom === 8 ? "FirstLevelStageVillage"
           : stageFrom === 11 ? "FirstLevelStageTransfer"

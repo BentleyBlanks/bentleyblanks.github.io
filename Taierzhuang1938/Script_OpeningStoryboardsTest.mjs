@@ -276,4 +276,14 @@ assert.deepEqual([...C.phases.RearTrench],["Withdraw","Corner","Collection","Sup
   assert.ok(Object.values(C.timeouts).every(v=>Number.isFinite(v)&&v>0),"all director timeouts are finite and positive");
   assert.deepEqual([...C.vanguardIds].sort(),["BunkerExecutionerA","BunkerExecutionerB","BunkerFollowB"],"hand-back waits for ijaA, ijaB and ijaD only");
 }
+// Two methods of one name in a class: the later silently replaces the earlier (09-24 review: the corner
+// man's rifle shot had become the camera's Shot and his loop fired without sound, flash or tracer).
+{
+  const source=fs.readFileSync(new URL("./Script_OpeningStoryboards.mjs",import.meta.url),"utf8");
+  const names=[...source.matchAll(/^  (?:static )?(?:async )?([A-Za-z_]\w*)\([^)]*\)\{/gm)].map(m=>m[1]);
+  const twice=names.filter((name,i)=>names.indexOf(name)!==i);
+  assert.deepEqual(twice,[],"the director class has no duplicate method names");
+  assert.match(source,/CornerFire\([^)]*\)\{[\s\S]*?this\.FireRifle\(/,"the corner man's loop fires a real rifle shot");
+  assert.ok(Object.values(C.pursuit).every(v=>Number.isFinite(v)&&v>0),"pursuit tuning is finite");
+}
 console.log(`ok opening storyboards: five original rigs, ${clipCount} rig clips (${NEW.length} authored 2026-09-23, ${paired} paired contacts cross-checked, ${chains} same-root hand-overs, ${seams} hold-loop seams), ${frames} normalized frames, director phase table and marks`);

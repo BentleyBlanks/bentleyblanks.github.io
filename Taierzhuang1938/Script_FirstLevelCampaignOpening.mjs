@@ -20,6 +20,8 @@ import { MISSION_ANCHORS as A } from "./Data_FirstLevelMissionLayout.mjs";
 import { MISSION_STAGE_ROUTES } from "./Data_FirstLevelMissionTopology.mjs";
 import { FRONT_SPACE } from "./Data_FirstLevelFrontRoute.mjs";
 import { OPENING_STORYBOARDS as Storyboards } from "./Data_OpeningStoryboards.mjs";
+import { MISSION_ENCOUNTER_ACTIVATION } from "./Data_FirstLevelMissionGates.mjs";
+import { MISSION_ENCOUNTERS } from "./Data_FirstLevelMission.mjs";
 
 /** Listener jaw ceiling (rad): breathing only (Script_CharacterSpeechBrowserTest SILENT_JAW_RADIANS). */
 export const SILENT_JAW_RADIANS = .02;
@@ -31,6 +33,17 @@ export const SILENT_AFTER_S = .6;
 export const STEP_LIMIT_M = .15;
 /** How long the withdrawal may hold at the rear corner looking back for the pursuit (s). */
 export const LOOKBACK_S = 12;
+/** Pursuers that must show in the look-back from the rear corner (「追兵占住刚才的位置」). */
+export const LOOKBACK_SEEN = 2;
+/** The front's standing groups are placed at 02 (AGENTS.md; activation step BunkerRescue), far from the rescue. */
+export const PRESET_GROUPS = Object.entries(MISSION_ENCOUNTER_ACTIVATION)
+  .filter(([, rule]) => rule.spawn?.kind === "step" && rule.spawn.step === "BunkerRescue").map(([group]) => group);
+export const PRESET_MIN_DISTANCE_M = 25;
+/** Speakers who must visibly act (head turn or free-hand gesture) through a line, by scene/role. */
+export const REQUIRED_ACTING = ["BunkerBanter/yaowa", "BunkerBanter/comrade", "BunkerOrders/runner", "BunkerOrders/luo",
+  "CaptiveInterrogation/interpreter", "RescueInterrogation/interpreter", "SupportOrder/guard", "SupportOrder/luo"];
+/** Mouths that must be sampled mid-line (the collection guard included). */
+export const REQUIRED_JAWS = ["comrade", "yaowa", "luo", "runner", "interpreter", "ijaA", "guard"];
 const DIRECTOR_PHASES = [...Storyboards.phases.Trapped, ...Storyboards.phases.BunkerRescue];
 const RC = MISSION_STAGE_ROUTES.rearTrench[2];
 const WITHDRAW_ROUTE = [...Storyboards.withdraw.lane.slice(1), ...MISSION_STAGE_ROUTES.rearTrench.slice(3)];
@@ -64,6 +77,7 @@ async function InstallProbe(page) {
       previous: {}, maxStep: 0, maxStepAt: null, maxTurn: 0, maxCameraStep: 0, maxCameraTurn: 0, minShoulderBehind: Infinity,
       maxWristBend: 0, maxWristTwist: 0, maxReachRatio: 0, maxHandRotationStep: 0, maxHandRotationPhase: null,
       violations: [], kills: {}, deaths: {}, jaw: {}, releaseHealth: null, minHealth: Infinity, frames: 0,
+      births: {}, acting: {}, maxPartnerHandRotationStep: 0, maxPartnerHandRotationPhase: null,
     };
     const P = window.openingProbe, Vec = () => g.player.position.clone();
     const Jaw = (actor) => {
@@ -111,6 +125,22 @@ async function InstallProbe(page) {
         }
         P.previous[id] = { x: at.x, z: at.z, yaw: a.yaw, src };
       }
+      // Where and when every enemy first exists (the front's standing groups are placed at 02).
+      for (const a of r.enemies.values()) if (a?.missionId && !P.births[a.missionId])
+        P.births[a.missionId] = { entity: a.id, stage: r.flow.stage.id, phase: s.phase, time: r.time,
+          distance: Math.hypot(a.position.x - g.player.position.x, a.position.z - g.player.position.z) };
+      // Visible acting per scene/role while the line plays (head turn, free-hand travel in the root frame).
+      for (const a of [...Object.values(s.cast), ...r.squad, ...r.enemies.values()]) {
+        const acting = a?.actor?.characterRig?.openingActorPerformanceState;
+        if (!a?.alive || !acting || acting.protected || !acting.cue || a.openingStoryboardHidden) continue;
+        const key = acting.cue + "/" + acting.role, bones = a.actor.characterRig.bones, head = bones.head.quaternion;
+        const hand = a.actor.root.worldToLocal(bones.handR.getWorldPosition(Vec()));
+        const row = P.acting[key] ??= { head: head.toArray(), hand: hand.toArray(), headRadians: 0, handMetres: 0, speakingFrames: 0 };
+        if (!acting.speaking) continue;
+        row.speakingFrames++;
+        row.headRadians = Math.max(row.headRadians, head.angleTo(head.clone().fromArray(row.head)));
+        row.handMetres = Math.max(row.handMetres, hand.distanceTo(Vec().fromArray(row.hand)));
+      }
       // Camera and the first-person arms while the director owns the view. A cut under closed eyes
       // (the fade-in, the blast's black) is not a jump anyone sees.
       if ((r.opening?.eyeClosure ?? 0) >= .5) { P.camera = null; P.cameraRotation = null; }
@@ -135,6 +165,9 @@ async function InstallProbe(page) {
           const rot = hand.rotationStepDegrees || 0;
           if (rot > P.maxHandRotationStep) { P.maxHandRotationStep = rot; P.maxHandRotationPhase = s.phase; }
           if (rot >= 12 && (P.handFlips ??= []).length < 20) P.handFlips.push({ phase: s.phase, age: s.Age, side, pose: hand.pose, rot, time: r.time });
+          // The dragging partner's palm (ijaA's / Luo's hand solved onto the collar) approaches contact smoothly.
+          const partner = hand.partnerRotationStepDegrees || 0;
+          if (partner > P.maxPartnerHandRotationStep) { P.maxPartnerHandRotationStep = partner; P.maxPartnerHandRotationPhase = s.phase; }
         }
       }
       if (P.wasCameraActive && !s.CameraActive && P.cameraRotation) {
@@ -211,6 +244,10 @@ export async function DriveOpening(ctx){
       vanguard:[...r.enemies.values()].filter(a=>a.missionEncounter==="bunkerAssault").map(a=>({id:a.missionId,alive:a.alive,health:a.health,essential:a.scriptEssential})),
       rifleInteraction:r.interact.points.get("MissionRifle")?.position?.toArray?.()||null};
   });
+  // The front's standing groups at the hand-back: the same entities must still be there when 03 begins.
+  const presetIds=PRESET_GROUPS.flatMap(group=>(MISSION_ENCOUNTERS[group]||[]).map(spec=>spec.id));
+  const roster=await page.evaluate(ids=>{const r=window.Tengxian.Debug.FirstLevelMissionRuntime();
+    return Object.fromEntries(ids.filter(id=>r.enemies.get(id)).map(id=>[id,r.enemies.get(id).id]));},presetIds);
   await fs.writeFile(path.join(output,"Data_OpeningShow.json"),JSON.stringify(show,null,2));
   const probe=await page.evaluate(()=>{const {Sample,previous,...rest}=window.openingProbe;return rest;});
   await fs.writeFile(path.join(output,"Data_OpeningMotionContinuity.json"),JSON.stringify(probe,null,2));
@@ -238,13 +275,21 @@ export async function DriveOpening(ctx){
   for(const id of [ijaA,ijaB])assert.ok(["Chop","Parry","Flee"].includes(probe.kills[id]?.phase)&&probe.kills[id].kind==="blade"&&probe.kills[id].weapon==="Dadao",
     `${id} falls to the dadao contact (${JSON.stringify(probe.kills[id])})`);
   assert.ok(["DragCover","LongShot"].includes(probe.kills[ijaD]?.phase)&&probe.kills[ijaD].kind==="bullet",`${ijaD} is shot at the junction (${JSON.stringify(probe.kills[ijaD])})`);
-  assert.ok(["liu","he","luo","forced"].includes(show.flags.junctionBy),`junction shot is attributed (${show.flags.junctionBy})`);
+  // Normal input: Liu Wencai's own shot drops the junction man (contract §2.1); He's backup and the
+  // timeout are the negative variants' business (Script_OpeningHandbackBrowserTest).
+  assert.equal(show.flags.junctionBy,"liu",`Liu Wencai really shoots the junction man (${show.flags.junctionBy})`);
+  // The front's five standing groups are already out there, far off, during the rescue (AGENTS.md).
+  for(const id of presetIds){
+    const birth=probe.births[id];
+    assert.ok(birth&&birth.stage==="BunkerRescue"&&birth.distance>PRESET_MIN_DISTANCE_M,`distant enemy ${id} exists during the rescue before the player leaves (${JSON.stringify(birth)})`);
+  }
   // ---- continuity ---------------------------------------------------------------------------
   assert.deepEqual(probe.violations,[],"actors move continuously (no pelvis step > STEP_LIMIT_M per frame) and nobody is released early");
   assert.ok(probe.maxCameraStep<.14,`camera never jumps between shots (${probe.maxCameraStep})`);
   assert.ok(probe.maxCameraTurn<10,`camera turns continuously (${probe.maxCameraTurn}° in ${probe.maxCameraTurnPhase})`);
   assert.ok(probe.minShoulderBehind>.08,"both open sleeve roots stay behind the eye");
   assert.ok(probe.maxHandRotationStep<12,`palms never flip in one frame (${probe.maxHandRotationStep}° in ${probe.maxHandRotationPhase})`);
+  assert.ok(probe.maxPartnerHandRotationStep<20,`the dragging hand approaches the collar without an orientation jump (${probe.maxPartnerHandRotationStep}° in ${probe.maxPartnerHandRotationPhase})`);
   assert.ok(probe.maxWristBend<=42.1&&probe.maxWristTwist<1&&probe.maxReachRatio<=.971,"wrists and reach stay anatomical");
   assert.ok(probe.releaseCameraTurn<5,"returning control keeps the last presented view");
   // ---- hand-back ----------------------------------------------------------------------------
@@ -266,6 +311,8 @@ export async function DriveOpening(ctx){
   if(pickup!=="MissionRifle")await Route([{x:show.rifleInteraction[0],z:show.rifleInteraction[2]}],"OpeningRifle",{stance:"crouch",arrivalM:.3});
   await Interact();
   await WaitStage("RearTrench",5);
+  // 02–03 speakers (the collection report, Luo's front commands) are watched from here on.
+  await InstallRearActing(page);
   const armed=await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMission());
   assert.ok(armed.facts.includes("rifleRecovered"));assert.equal(armed.emptyHands,false);
   // Out of the mouth, over the crater step, down the SSW leg to the rear corner: a player withdrawing
@@ -283,20 +330,22 @@ export async function DriveOpening(ctx){
       const pursuit=(s.pursuit||[]).filter(q=>q.actor.alive).map(q=>{
         const at=r.Point(q.actor.position,1.3),view=at.clone().project(cam);
         return {id:q.spec.id,x:+q.actor.position.x.toFixed(2),z:+q.actor.position.z.toFixed(2),
+          distance:+Math.hypot(q.actor.position.x-eye.x,q.actor.position.z-eye.z).toFixed(1),
           seen:!r.BlocksSight(eye,at)&&Math.abs(view.x)<1&&Math.abs(view.y)<1&&view.z<1};});
       return {pursuit,time:r.time,stage:r.flow.stage.id,player:g.player.position.toArray(),eye:T.toArray()};
     });
-    if(lookBack.pursuit.some(p=>p.seen))break;
+    if(lookBack.pursuit.filter(p=>p.seen).length>=LOOKBACK_SEEN)break;
   }
   await page.screenshot({path:path.join(shots,"Key_WithdrawLookBack.png")});
   await Restore(page,back);
   console.log("LOOKBACK",JSON.stringify(lookBack));
   assert.ok(lookBack.pursuit.length>=3,"bunkerPursuit follows into the trench behind the withdrawal");
+  assert.ok(lookBack.pursuit.filter(p=>p.seen).length>=LOOKBACK_SEEN,`at least ${LOOKBACK_SEEN} pursuers are seen in the trench just left (${JSON.stringify(lookBack.pursuit)})`);
   // On to the collection: stop once it is in view; the scene gathers round the player.
   await Route(WITHDRAW_ROUTE.slice(AT_RC),"OpeningRearTrench",{fight:true,stance:"crouch",stopFact:"collectionPointSeen"});
   // The meeting (Yaowa) and the guard's report are photographed as they play, from where the player stopped.
   let meetShot=false,reportShot=false;
-  for(let i=0;i<120&&!(meetShot&&reportShot);i++){
+  for(let i=0;i<160;i++){
     const at=await StepSampled(page,30);
     if(!meetShot&&at.flags.meetAt!=null&&at.time-at.flags.meetAt>=1.5){await page.screenshot({path:path.join(shots,"Key_CollectionMeet.png")});meetShot=true;}
     if(!reportShot&&at.phase==="SupportOrder"&&at.phaseTime>=1.2){await page.screenshot({path:path.join(shots,"Key_SupportOrder.png")});reportShot=true;}
@@ -307,6 +356,7 @@ export async function DriveOpening(ctx){
   const rear=await page.evaluate(()=>{
     const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime(),s=r.frontShow.bunker;
     return {mission:g.Debug.FirstLevelMission(),
+      continued:Object.fromEntries([...r.enemies.values()].map(a=>[a.missionId,a.id])),
       pursuitEnemies:[...r.enemies.values()].filter(a=>a.missionEncounter==="bunkerPursuit"&&a.alive).map(a=>a.missionId),
       pursuitLeft:(s.pursuit||[]).filter(p=>p.actor.alive).map(p=>({id:p.spec.id,x:p.actor.position.x,z:p.actor.position.z})),
       ijaCEnemy:!!r.enemies.get("BunkerFollowA")?.alive,flags:s.flags};
@@ -319,13 +369,30 @@ export async function DriveOpening(ctx){
   assert.deepEqual(rear.pursuitEnemies,[],"pursuers leave the fight at the collection (retire)");
   assert.equal(rear.ijaCEnemy,false,"the fold man is no longer an active enemy after the collection");
   assert.ok(rear.mission.front.collection.litters>=4&&rear.mission.front.collection.people>=8,"casualty collection is present");
+  // 02 -> 03 keeps the same front: nobody placed at 02 is re-spawned when 03 begins (09-23 red caught here).
+  for(const [id,entity] of Object.entries(roster))assert.equal(rear.continued[id],entity,`${id} remains the same entity when 03 begins`);
+  // Mouths and acting over 01 -> the collection (the guard reports at the collection).
+  const late=await page.evaluate(()=>{const {Sample,previous,...rest}=window.openingProbe;return rest;});
+  await fs.writeFile(path.join(output,"Data_OpeningMotionContinuity.json"),JSON.stringify(late,null,2));
+  console.log("ACTING",JSON.stringify(Object.fromEntries(Object.entries(late.acting).map(([k,v])=>[k,{f:v.speakingFrames,head:+v.headRadians.toFixed(3),hand:+v.handMetres.toFixed(3)}]))));
+  console.log("JAW",JSON.stringify(late.jaw));
+  for(const role of REQUIRED_JAWS)assert.ok(late.jaw[role]?.speakingFrames>10,`${role}'s mouth was sampled mid-line (${JSON.stringify(late.jaw[role]||null)})`);
+  for(const [role,row] of Object.entries(late.jaw)){
+    if(row.speakingFrames>10)assert.ok(row.speakingMax>=SPEAKING_JAW_RADIANS,`${role} opens the jaw while speaking (${row.speakingMax})`);
+    if(row.silentFrames>10)assert.ok(row.silentMax<=SILENT_JAW_RADIANS,`${role} keeps the mouth closed while others speak (${row.silentMax} in ${row.silentMaxPhase})`);
+  }
+  for(const key of REQUIRED_ACTING){
+    const row=late.acting[key];
+    assert.ok(row?.speakingFrames>10,`${key}: the speaking actor gets dialogue acting (${JSON.stringify(row||null)})`);
+    assert.ok(row.headRadians>.06||row.handMetres>.055,`${key}: visible acting continues through the line (${JSON.stringify(row)})`);
+  }
+  assert.deepEqual(late.violations,[],"no teleports through the withdrawal and the collection");
   await fs.writeFile(path.join(output,"Data_OpeningRear.json"),JSON.stringify({lookBack,rear:{...rear,mission:undefined,facts:rear.mission.facts}},null,2));
   await Capture("OpeningSupport");
   console.log("ok 01–02 normal progression to Support");
-  await InstallRearActing(page);
 }
 
-/** 03 speakers (Front cues and the guard) are sampled for visible acting until CheckOpeningActing. */
+/** 02–03 speakers (the collection report, Front cues) are sampled for visible acting until CheckOpeningActing. */
 async function InstallRearActing(page){
   await page.evaluate(()=>{
     const s=window.Tengxian.Debug.FirstLevelMissionRuntime().frontShow.bunker,update=s.UpdatePerformances;
@@ -357,6 +424,9 @@ export async function CheckOpeningActing(ctx){
   // Culled actors legitimately skip detailed bone updates: check every audible 03 speaker that
   // actually rendered nearby has a live performance.
   const visible=Object.keys(heard).filter(key=>heard[key].visibleFrames>10);
+  assert.ok(visible.length>0,"02–03 speakers were sampled on screen");
+  assert.ok(visible.includes("SupportOrder/guard"),`the collection report has its real visible speaker (${JSON.stringify(heard)})`);
+  if(ctx.stageTo>=3)assert.ok(visible.some(key=>key.startsWith("Front")&&key.endsWith("/luo")),"Luo performs visible front commands");
   for(const key of visible){
     assert.ok(rearActing[key]?.frames>10,`${key}: actual visible 03 speaker has an active performance`);
     assert.ok(rearActing[key].turn>.03,`${key}: actual visible 03 speaker visibly turns/nods`);
@@ -367,6 +437,8 @@ export async function CheckOpeningActing(ctx){
 
 // ---- non-ideal hand-back orders (contract v1.1 ③: 02 must never stall) -------------------------
 /** Where the junction man ducks for the "hide" variant: the depth sap past J, walled off from the rescue. */
+/** Luo's walk to the kick mark before the kick clock starts (PhaseKickRifle waits at most kickRifleS). */
+const C_KICK_WALK_S = Storyboards.timeouts.kickRifleS;
 export const HANDBACK_HIDE_POINT = Object.freeze({ x: FRONT_SPACE.pursuitFallback[0].x + .6, z: FRONT_SPACE.pursuitFallback[0].z + 3 });
 /**
  * Start at BunkerRescue (debug start 2, `missionStage=2`) and bend the long shot (it starts with the DragCover pull):
@@ -376,6 +448,8 @@ export const HANDBACK_HIDE_POINT = Object.freeze({ x: FRONT_SPACE.pursuitFallbac
  *            sight; Luo's forced shot at +8 s (or the +8.5 s timeout) must take him.
  *   "early": the junction man is already dead when DragCover begins (the backdrop fire got him);
  *            nobody shoots a dead man and the hand-back does not wait for a shot.
+ *   "absent": the junction man is missing from the enemy table from Hold on (a spawn failure or a debug
+ *            removal): nobody can see him dead, the kick still hands back after kickRifleS.
  * Each still reaches Released with ijaA/ijaB cut down, and the real F pickup still starts RearTrench.
  */
 export async function DriveHandbackNegative(page,variant,output){
@@ -388,6 +462,7 @@ export async function DriveHandbackNegative(page,variant,output){
   await page.evaluate(({variant,C})=>{
     const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime(),s=r.frontShow.bunker;
     const F=window.handbackFixture={variant,applied:false,blocked:0};
+    if(variant==="absent"){const a=r.enemies.get(C.ijaD);if(a){r.ai.Remove(a);r.enemies.delete(C.ijaD);F.removed=true;}}
     const blocks=r.BlocksSight.bind(r);
     r.BlocksSight=(from,to)=>{
       const ijaD=r.enemies.get(C.ijaD);
@@ -446,6 +521,12 @@ export async function DriveHandbackNegative(page,variant,output){
     assert.equal(result.flags["shot:liu"],undefined,"early: nobody shoots a dead man");
     const lingered=at("Check")-at("LongShot");
     assert.ok(lingered<1.5,`early: the hand-back does not wait for a shot (${lingered.toFixed(2)} s after LongShot)`);
+  }
+  if(variant==="absent"){
+    assert.ok(result.fixture.removed,"absent: the junction man was taken out of the enemy table");
+    assert.equal(result.flags.releaseMissing,Storyboards.cast.ijaD,"absent: the hand-back records who was missing");
+    const kicked=at("Released")-at("KickRifle");
+    assert.ok(kicked<=1.2+Storyboards.timeouts.kickRifleS+C_KICK_WALK_S+.5,`absent: the kick hands back within its timeout (${kicked.toFixed(2)} s)`);
   }
   await page.screenshot({path:path.join(output,`Handback_${variant}_Released.png`)});
   // The real F pickup hands 02 on to the withdrawal.
