@@ -1594,7 +1594,11 @@ export class FirstLevelBunkerShow {
       cam.position.lerpVectors(this.cameraFrom.position,cam.position,mix);
       cam.quaternion.slerpQuaternions(this.cameraFrom.quaternion,desiredQuaternion,mix);
     }
-    if(this.presentedAt!==r.time){this.previousViewQuaternion=this.presentedCamera?.quaternion.clone();this.presentedAt=r.time;}
+    if(this.presentedAt!==r.time){this.previousViewQuaternion=this.presentedCamera?.quaternion.clone();this.previousViewPosition=this.presentedCamera?.position.clone();this.presentedAt=r.time;}
+    if(this.previousViewPosition&&this.delta>0){
+      const travel=cam.position.distanceTo(this.previousViewPosition),most=C.cameraMoveMps*this.delta;
+      if(travel>most)cam.position.lerpVectors(this.previousViewPosition,cam.position,most/travel);
+    }
     if(this.previousViewQuaternion){
       const desiredQuaternion=cam.quaternion.clone();
       cam.quaternion.copy(this.previousViewQuaternion).rotateTowards(desiredQuaternion,C.cameraTurnRps*(this.delta||0));
@@ -1720,7 +1724,7 @@ export class FirstLevelBunkerShow {
     for(const p of this.pursuit||[])if(p.actor?.alive)this.r.ai.Remove(p.actor);
     this.cast={};this.captives=[];this.playerBody=null;this.setup=false;this.phase=null;this.at=this.r.time;this.started=this.r.time;
     this.scenes={};this.flags={};this.events=[];this.beats.clear();this.pursuit=null;this.pursuitSpawned=false;this.pursuitMissing=0;this.withdraw=null;
-    this.firstPerson=null;this.firstPersonState=null;this.presentedAt=null;this.previousViewQuaternion=null;
+    this.firstPerson=null;this.firstPersonState=null;this.presentedAt=null;this.previousViewQuaternion=null;this.previousViewPosition=null;
     this.strikeAt=null;this.bloodMask=0;this.cameraFrom=null;this.presentedCamera=null;this.pointActor=null;this.phaseEntered=null;
     this.beam=null;this.leftBeam=null;this.beamState=null;
     this.perception=null;this.perceptionLevel=null;this.headFree=0;this.headLook=null;this.releaseAt=null;this.releaseLevel=null;

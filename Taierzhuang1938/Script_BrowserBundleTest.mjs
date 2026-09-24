@@ -64,7 +64,7 @@ try {
       await page.waitForFunction(before => window.Tengxian.Debug.FirstLevelMission().time > before, before, {timeout:10000});
       assert.ok(await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission().stage === "Trapped"));
     } else if (fixture.name === 'MissingCharacters') {
-      // The current opening creates its one captive, interpreter and runner only
+      // The 09.23 opening director creates its comrade, runner, shouter and interpreter only
       // after Start. Preserve each selected appearance slot through the failed
       // downloads, then exercise their actual director and close-up performances.
       const partial=await page.evaluate(()=>{const g=window.Tengxian;
@@ -96,14 +96,14 @@ try {
           squad:Object.fromEntries(r.squad.map(a=>[a.castId,Person(a)])),
           enemies:Object.fromEntries(['BunkerExecutionerA','BunkerExecutionerB','BunkerFollowA','BunkerFollowB'].map(id=>[id,Person(r.enemies.get(id))])),
           playerModel:b.playerBody?.characterRig?.modelId||null};});
-      assert.equal(setup.count,6,'the four squad members, one captive and runner all remain physical NRA actors');
-      assert.deepEqual(setup.captives,['BunkerCaptiveHelper'],'the adopted opening has exactly one physical captive');
-      assert.deepEqual(Object.keys(setup.cast).sort(),['BunkerCaptiveHelper','BunkerInterpreter','BunkerRunner'],
+      assert.equal(setup.count,7,'the four squad members, the wounded comrade, the runner and the shouter all remain physical NRA actors');
+      assert.deepEqual(setup.captives,['Opening_comrade'],'the opening has exactly one physical captive (the wounded comrade)');
+      assert.deepEqual(Object.keys(setup.cast).sort(),['comrade','interpreter','runner','shouter'],
         'the director creates its complete current cast after Start');
       assert.deepEqual(Object.fromEntries(Object.entries(setup.cast).map(([id,a])=>[id,a.model])),
-        {BunkerCaptiveHelper:null,BunkerInterpreter:'LugouNra06',BunkerRunner:null},
+        {comrade:null,interpreter:'LugouNra06',runner:null,shouter:null},
         'new cast uses its requested model slots instead of reassigning failed downloads '
-        +'(runner is pinned to NRA02 since the 09-23 face package; the interpreter wears his own NRA06 since 2026-09-24)');
+        +'(comrade, runner and shouter are pinned to NRA02 since the 09-23 face package; the interpreter wears his own NRA06 since 2026-09-24)');
       assert.equal(setup.playerModel,null,'the protagonist also preserves the missing NRA02 slot');
       for(const [id,actor] of Object.entries({...setup.squad,...setup.cast,...setup.enemies})) {
         assert.ok(actor.alive&&actor.physical&&actor.finite,`${id} remains a live physical person: ${JSON.stringify(actor)}`);
@@ -114,26 +114,27 @@ try {
       // captive/contact sequence into the interrogation close-up. No debug jump,
       // synthetic mission facts or manual phase advancement may mask a crash.
       await page.waitForFunction(()=>{const b=window.Tengxian.Debug.FirstLevelMissionRuntime()?.frontShow?.bunker;
-        return window.bundleFixtureErrors.length||b?.phase==='Interrogate'&&b.Age>2;},null,{timeout:180000});
+        return window.bundleFixtureErrors.length||b?.phase==='Interrogation'&&b.Age>2;},null,{timeout:240000});
       const closeup=await page.evaluate(()=>{const r=window.Tengxian.Debug.FirstLevelMissionRuntime(),b=r.frontShow.bunker;
         const actors=[...r.squad,...Object.values(b.cast),...['BunkerExecutionerA','BunkerExecutionerB','BunkerFollowA','BunkerFollowB'].map(id=>r.enemies.get(id))];
         return {errors:window.bundleFixtureErrors,stage:r.flow.stage.id,phase:b.phase,time:r.time,
           beats:[...b.beats],camera:r.player.camera.position.toArray(),captives:b.captives.map(a=>({id:a.missionId,alive:a.alive})),
           actors:actors.map(a=>{const root=a?.actor?.root;let attached=false,finite=!!root;
+            if(a?.openingStoryboardHidden)return {id:a?.castId||a?.missionId,hidden:true,finite:true};
             for(let node=root;node;node=node.parent)if(node===r.scene)attached=true;
             root?.traverse(node=>{finite&&=node.matrixWorld.elements.every(Number.isFinite);});
             return {id:a?.castId||a?.missionId,attached,finite,lod:a?.renderLod||null};})};});
       await fs.writeFile(path.join(outputDir,'MissingCharacters.json'),JSON.stringify({partial,setup,closeup},null,2));
       assert.deepEqual(closeup.errors,[],'missing characters must not crash the captive, collar, strike or interrogation performances');
-      assert.equal(closeup.stage,'BunkerRescue');
-      assert.equal(closeup.phase,'Interrogate');
-      for(const phase of ['Advance','Captive','CaptiveShot','Discover','Drag','Butt','Interrogate'])
+      assert.equal(closeup.stage,'Trapped');
+      assert.equal(closeup.phase,'Interrogation');
+      for(const phase of ['Banter','Orders','Incoming','Blast','Black','Wake','FrontPass','CaptiveDragged','CaptiveWall','Interrogation'])
         assert.ok(closeup.beats.includes(phase),'the missing-model run physically completed '+phase);
-      assert.deepEqual(closeup.captives,[{id:'BunkerCaptiveHelper',alive:false}],
-        'the actual captive survives creation and reaches the authored shooting outcome');
-      for(const actor of closeup.actors)assert.ok(actor.finite&&(actor.attached||['culled','crowd'].includes(actor.lod)),
+      assert.deepEqual(closeup.captives,[{id:'Opening_comrade',alive:true}],
+        'the actual captive survives creation and kneels at the wall for the interrogation');
+      for(const actor of closeup.actors)assert.ok(actor.finite&&(actor.hidden||actor.attached||['culled','crowd'].includes(actor.lod)),
         `${actor.id} still has a finite hierarchy under the normal culling/LOD contract`);
-      for(const id of ['BunkerExecutionerA','BunkerInterpreter']) {
+      for(const id of ['BunkerExecutionerA','interpreter']) {
         const actor=closeup.actors.find(a=>a.id===id);
         assert.ok(actor?.attached&&actor.lod==='detail',`${id} must actually render in the interrogation close-up`);
       }

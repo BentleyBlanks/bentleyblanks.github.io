@@ -29,6 +29,8 @@ export const SPEAKING_JAW_RADIANS = .06;
 export const SILENT_AFTER_S = .6;
 /** Pelvis travel per 1/60 s frame above which a move is a jump (9 m/s: faster than any run, pelvis sway included). */
 export const STEP_LIMIT_M = .15;
+/** How long the withdrawal may hold at the rear corner looking back for the pursuit (s). */
+export const LOOKBACK_S = 12;
 const DIRECTOR_PHASES = [...Storyboards.phases.Trapped, ...Storyboards.phases.BunkerRescue];
 const RC = MISSION_STAGE_ROUTES.rearTrench[2];
 const WITHDRAW_ROUTE = [...Storyboards.withdraw.lane.slice(1), ...MISSION_STAGE_ROUTES.rearTrench.slice(3)];
@@ -42,10 +44,10 @@ const KEY_FRAMES = [
   { label: "ThroatCut", phase: "Slash", flag: "throatCut", at: .25 },
   { label: "Drag", phase: "Drag", age: 1.2 },
   { label: "Boots", phase: "Boots", age: 1 },
-  // K2: Luo is over the crater step behind the circle when the gate for 「说话！」 opens (at the rear
-  // corner he is still below the mouth spoil from Shunzi's eye).
+  // K2: from Shunzi's eye the mouth spoil hides the whole SSW leg; Luo first shows over it on the
+  // crater step about 2 m away (09-24 filmstrip), just before 「说话！」.
   { label: "K2_GlimpseRise", phase: "Glimpse", age: 1.5 },
-  { label: "K2_Glimpse", phase: "Glimpse", luoWithinM: 5 },
+  { label: "K2_Glimpse", phase: "Glimpse", luoWithinM: 2.3 },
   { label: "LuoChop", phase: "Parry", flag: "luoChopAt", at: .5 },
   // He's parry and cut run on past Parry into Flee (Parry hands over 0.4 s after heChopAt): no phase filter.
   { label: "HeParry", flag: "heChopAt", at: .42 },
@@ -266,16 +268,26 @@ export async function DriveOpening(ctx){
   await WaitStage("RearTrench",5);
   const armed=await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMission());
   assert.ok(armed.facts.includes("rifleRecovered"));assert.equal(armed.emptyHands,false);
-  // Out of the mouth, over the crater step, down the SSW leg to the rear corner.
-  await Route(WITHDRAW_ROUTE.slice(0,AT_RC),"OpeningWithdraw",{fight:true,stance:"crouch"});
-  // 「回头看见追兵占住刚才的位置」: from the rear corner look back up the leg toward the mouth.
+  // Out of the mouth, over the crater step, down the SSW leg to the rear corner: a player withdrawing
+  // under fire keeps moving (the squad covers); he does not stop to duel the fold man from the mouth.
+  await Route(WITHDRAW_ROUTE.slice(0,AT_RC),"OpeningWithdraw",{fight:false,stance:"crouch"});
+  // 「回头看见追兵占住刚才的位置」: at the rear corner he turns and looks back up the leg (crouched at the
+  // corner for up to LOOKBACK_S) until a pursuer shows in the trench he has just left.
   const back=await LookAt(page,A.bunkerBend||Storyboards.withdraw.lane[3],1.3);
-  const lookBack=await page.evaluate(()=>{
-    const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime(),s=r.frontShow.bunker,eye=g.player.EyePosition;
-    const pursuit=(s.pursuit||[]).filter(q=>q.actor.alive).map(q=>({id:q.spec.id,x:+q.actor.position.x.toFixed(2),z:+q.actor.position.z.toFixed(2),
-      seen:!r.BlocksSight(eye,r.Point(q.actor.position,1.3))}));
-    return {pursuit,stage:r.flow.stage.id,player:g.player.position.toArray()};
-  });
+  let lookBack;
+  for(let i=0;i<LOOKBACK_S*2;i++){
+    lookBack=await page.evaluate(()=>{
+      const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime(),s=r.frontShow.bunker,eye=g.player.EyePosition;
+      g.Debug.Key("KeyW",false);g.StepFrames(29,1/60,false);g.StepFrames(1,1/60,true);
+      const cam=g.player.camera,T=cam.position.clone();
+      const pursuit=(s.pursuit||[]).filter(q=>q.actor.alive).map(q=>{
+        const at=r.Point(q.actor.position,1.3),view=at.clone().project(cam);
+        return {id:q.spec.id,x:+q.actor.position.x.toFixed(2),z:+q.actor.position.z.toFixed(2),
+          seen:!r.BlocksSight(eye,at)&&Math.abs(view.x)<1&&Math.abs(view.y)<1&&view.z<1};});
+      return {pursuit,time:r.time,stage:r.flow.stage.id,player:g.player.position.toArray(),eye:T.toArray()};
+    });
+    if(lookBack.pursuit.some(p=>p.seen))break;
+  }
   await page.screenshot({path:path.join(shots,"Key_WithdrawLookBack.png")});
   await Restore(page,back);
   console.log("LOOKBACK",JSON.stringify(lookBack));

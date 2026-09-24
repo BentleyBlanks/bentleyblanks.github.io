@@ -38,6 +38,9 @@ export const OPENING_STORYBOARDS = Object.freeze({
   }),
   fps:24, fov:65, fadeInS:1.8,
   walkMps:2.3, turnRps:4.5, poseBlendS:.28, cameraBlendS:.65, cameraTurnRps:3.5,
+  // The eye travels at most this fast (m/s): ijaA's yank at the collar peaks at 8.7 m/s on the 12 fps
+  // player track (09-24 probe, 0.145 m in one frame); capped, the drag reads as a pull, not a cut.
+  cameraMoveMps:7.5,
   // Kept for the dadao ambush adapter in Script_OpeningStoryboardAnimation (legacy DadaoHeavy).
   ambushS:1.1,
   // Move speeds of the director's walks along trench polylines (m/s).
