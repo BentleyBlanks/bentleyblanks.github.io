@@ -102,7 +102,9 @@ export const FRONT_PRESSURE_GROUPS = Object.freeze({
   boundWest: Object.freeze({ ids: Object.freeze(["FrontRifleA", "FrontRifleB", "FrontRifleC"]) }),
   boundEast: Object.freeze({ ids: Object.freeze(["FrontRifleD", "FrontRifleE", "FrontRifleF"]) }),
   flank: Object.freeze({ ids: Object.freeze([...FRONT_FLANK_GROUP.map((s) => s.id), FRONT_OFFICER.id]), officer: FRONT_OFFICER.id }),
-  nest: Object.freeze({ encounter: "approach" }),
+  // noDrop：阵位机枪手倒在座位前 1 m，他那挺十一年式就是座位上那挺（夺下的 MissionGun），尸体不再掉第二挺 ——
+  // 09-24 战车探针：「长按拾起 十一年式轻机枪」盖掉了座位上「F 上枪」的提示（CampaignKit.Interact 断言红）。
+  nest: Object.freeze({ encounter: "approach", noDrop: Object.freeze(["RightNestGunner"]) }),
   // 军官取第一个步枪手（机枪手上不了刺刀，也带不了冲锋）。
   // offstage：北侧出发壕里等战车的推进组，战车露面（tankPreviewed）以前装睡、不算前沿在场的人（04 起一律醒）。
   // 09-24 探针：03 里他们在出发壕 88 m 外，对任何授权点都不通视，四个人一百多秒端着枪不打。

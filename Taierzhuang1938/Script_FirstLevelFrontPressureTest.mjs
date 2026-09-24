@@ -274,6 +274,13 @@ function MakeWorld(stage = "BunkerRescue") {
   // The jump-off trench push group waits offstage until the tank shows (FRONT_PRESSURE_GROUPS.mgAttack.offstage).
   const mgPush = FrontGroupMembers("mgAttack", enemies);
   Check(mgPush.length === 4 && mgPush.every((a) => a.missionDormant && a.scriptedNoncombatant), "03: the push group waits offstage before the tank shows");
+  {
+    const gunnerMan = enemies.get("RightNestGunner"), guardMan = enemies.get("RightNestGuard");
+    gunnerMan.alive = false; gunnerMan.drop = { weaponId: "Type11", taken: false }; guardMan.alive = false; guardMan.drop = { weaponId: "Type38", taken: false };
+    r.time += 0.1; pressure.Update();
+    Check(gunnerMan.drop.taken && !guardMan.drop.taken, "the nest gunner leaves no second LMG on the captured gun's seat; the riflemen still drop theirs");
+    gunnerMan.alive = true; guardMan.alive = true;
+  }
   // The fire base fires from its own list (crest and left gun only); the bounders keep the phase list.
   const fbIds = (enemies.get("FrontGunner").ambientFirePoints || []).map((p) => p.id);
   const assaultPhase = FRONT_PRESSURE_PHASES.find((p) => p.id === "assault");

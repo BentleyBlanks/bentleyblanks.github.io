@@ -259,6 +259,7 @@ export class FirstLevelFrontPressure {
     if (phase !== this.phase) this.EnterPhase(phase);
     if (!phase) return;
     this.Offstage(stage);
+    this.NoDrop();
     if (phase.reserve) this.ReleaseReserves(stage);
     this.AssignFire();
     if (r.time >= this.groupTickAt) {
@@ -286,6 +287,14 @@ export class FirstLevelFrontPressure {
         a.missionDormant = asleep; a.scriptedNoncombatant = asleep;
       }
       if (!asleep) this.Note("offstageWake", { group: groupId });
+    }
+  }
+
+  /** 组名册的 noDrop：这些人死了，尸体上的枪不给拾（drop.taken）。 */
+  NoDrop() {
+    for (const g of Object.values(FRONT_PRESSURE_GROUPS)) for (const id of g.noDrop || []) {
+      const a = this.r.enemies.get(id);
+      if (a && !a.alive && a.drop && !a.drop.taken) a.drop.taken = true;
     }
   }
 
