@@ -119,8 +119,8 @@ Mouth shapes therefore come from the text, baked offline per take.
 
 User decision 2026-09-25: the 03-06 speakers only turned the head, nodded on stressed syllables and breathed;
 they get hand gestures fitting the line, AAA-FPS style: not every line, commands and pointing first, one hand
-off the rifle, nobody gestures while shooting. Status: Step 1 (inventory and design) done; the clips (Step 2) and
-the runtime layer (Step 3) are to come, so everything below marked "planned" does not exist in code yet.
+off the rifle, nobody gestures while shooting. Status: Step 1 (inventory and design) and Step 2 (the clips) done;
+the runtime layer (Step 3) is to come, so everything below marked "planned" does not exist in code yet.
 
 ### Inventory
 
@@ -191,30 +191,64 @@ What exists and why it is not reused as is:
 - The officer "point" clip that Report_ai.md:201 found missing is for the Japanese front officer (IJA01), who has
   no line in 03-06; this package does not make it.
 
-Planned (Step 2): ten new clips, each baked on LugouNra02 and LugouNra05 through the opening pipeline's importer,
-two-bone IK and original-local-frame exporter (`_import/Script_MachineGunCaptivesBake.py`, the same route as
-`_import/Script_OpeningStoryboardBake.py`) in a new bake script; the opening scripts stay untouched. Clip specs
-(hand, duration, lift / stroke / hold / release windows, whether the arm is aimed) are in
-`SPEAKER_GESTURE_CLIPS`:
+Baked (Step 2, 2026-09-25): ten clips on LugouNra02 and LugouNra05 by `_import/Script_SpeakerGestureBake.py`, which
+reuses the captives baker's production-rig importer, two-bone IK, palm turn and finger curl
+(`_import/Script_MachineGunCaptivesBake.py`, the same route as `_import/Script_OpeningStoryboardBake.py`; the
+opening scripts are untouched). Clip specs (hand, duration, lift / stroke / hold / release windows, whether the
+arm is aimed, `reach`) are in `SPEAKER_GESTURE_CLIPS`; the bake keeps the same table and the node test compares
+them:
 
 | Clip | Hand | s | Used for |
 | --- | --- | --- | --- |
-| GesturePointL | L | 1.8 | point at a place (aimed) |
-| GestureWaveOnL | L | 1.6 | go / move up that way (aimed) |
-| GestureBeckonL | L | 1.8 | come here / follow me |
-| GestureDownL | L | 1.4 | get down / keep low |
-| GestureBeatL | L | 1.6 | assigning, explaining |
+| GesturePointL | L | 1.8 | point at a place (aimed): arm out at shoulder height 25 deg left, index out, overshoot and settle |
+| GestureWaveOnL | L | 1.6 | go / move up that way (aimed): flat hand up beside the head, chopped forward twice (stroke 0.48 s) |
+| GestureBeckonL | L | 1.8 | come here / follow me: palm up out in front, forearm swung back to the chest twice |
+| GestureDownL | L | 1.4 | get down / keep low: palm down at chest height, pushed down twice |
+| GestureBeatL | L | 1.6 | assigning, explaining: open hand half raised, two small down beats |
 | GestureAskR | R | 1.6 | asking for something, palm up (aimed at the listener) |
-| GestureToMouthR | R | 1.8 | fingers to the cigarette at the lips |
+| GestureToMouthR | R | 1.8 | fingers to the cigarette at the lips (reach: `mouth`) |
 | GestureOfferR | R | 2.2 | handing something over (aimed at the listener) |
-| GestureHaltR | R | 1.4 | wait, palm up |
-| GestureFlickR | R | 1.2 | annoyed back-hand flick |
+| GestureHaltR | R | 1.4 | wait: palm raised toward the listener |
+| GestureFlickR | R | 1.2 | annoyed back-hand flick out to the side |
 
-Output (planned): `Animation/SpeakerGestures/Data_SpeakerGesturesAnimation.json` (clip windows, masks, per-rig
-file hashes) and `Animation_Lugou{Nra02,Nra05}SpeakerGestures.json`. Only the moved bones are stored (one arm's
-clavicle, upper arm, forearm, hand and fingers plus Spine/Spine1/Spine2 for a small lean; quaternions only),
-so the two files together should stay well under 1 MB; they load when the first gesture layer is created, that is
-only in the 01-06 steps, never at boot.
+How they are authored: keys are real metres from the gesture side's rest shoulder in the body frame (out, forward,
+up) on an upright stance; the wrist targets stay inside 94 % of the arm (0.455-0.458 m on both rigs), so the elbow
+never locks. Palm orientations are keyed as (fingers, palm normal) and interpolated as one quaternion (component
+interpolation of the two vectors flipped the hand when the palm turned over); half of the hand's roll goes to the
+forearm (pronation). Keys are monotone cubic (PCHIP); each hold window's two ends are the same key, so it loops
+without a seam. 30 fps, so every clip length and window is a whole frame. An L clip starts and ends on the
+rifleman's fore-end hand, an R clip on a hand resting forward-low (the knee of a seated man); the layer weight is 0
+there, so these only shape the lift and the release.
+
+Output: `Animation/SpeakerGestures/Data_SpeakerGesturesAnimation.json` (version `20260925SpeakerGesturesV1` =
+`SPEAKER_GESTURE_ASSET.version`; the clip table, per-rig file hashes, the shipped GLB's hash and the bake's
+validation numbers) and `Animation_Lugou{Nra02,Nra05}SpeakerGestures.json` (per clip: its bone list, glTF
+node-local rotations x y z w per frame, `strokeDir` = shoulder -> hand at the stroke in the three.js actor frame;
+per rig: `anchors`). Only the gesture arm (clavicle, upper arm, forearm, hand, 15 finger bones) and
+Spine/Spine1/Spine2 are stored, rotations only: 337 KB per rig raw, 55 KB gzip, 0.68 MB for both. Nothing loads at
+boot: `Script_SpeakerGestureClips.LoadSpeakerGestureClips()` fetches them on first use (the Step 3 layer, 01-06
+only). The same module has the sampler (`SampleSpeakerGesture`, slerp between the two nearest frames;
+`SpeakerGestureFirstFrame` for the spine reference), `BindSpeakerGestureBones` (bones by normalized name:
+GLTFLoader turns "Bip002 L UpperArm" into "Bip002_L_UpperArm") and the reach helpers below.
+
+Reach (`GestureToMouthR`): on the real seated body (`lifePose.sit` plays `LeanWallSitPeek`: hunched, head turned
+about 40 deg to his left) a chest-relative hand lands on the cheek, and the head layer turns the head again toward
+the listener. So each rig's file carries `anchors.mouth`: where the grip (finger-root centroid, the point the
+runtime grips with) and the hand's rotation were at the stroke, in the head bone's glTF node frame.
+`ReachSpeakerGestureAnchor(upper, fore, hand, fingerRoots, head, anchor, weight)` turns the hand to that rotation
+relative to the live head and reaches the arm (two-bone, keeping the arm's bend plane) so the grip lands there;
+two passes. It must run after the head layer has turned the head (Step 3 ordering).
+
+Bake numbers (`validation` in the manifest, gated by `Script_SpeakerGestureTest`): largest per-frame step of any
+exported bone 31 deg at 30 fps (the WaveOn chop; gate 35), hold seam <= 1.8 deg (gate 3), elbow bend 28-143 deg
+(gate 20-150), deepest forearm/hand/finger vertex inside the torso skin on the upright body 1.8 cm (NRA02 cloth;
+gate 2), cigarette-clip finger roots 5.7 cm from the lip centre (gate 7). Browser review on the production rigs
+(`Script_SpeakerGestureClipsBrowserTest`, each clip at weight 1 over the body the speaker actually has: L clips on
+a crouching rifleman holding the HanYang, R clips on the seated sit clip without a weapon): all 20 clip x rig runs
+finite; arm into torso <= 2.4 cm (gate 2.5), into the head 0 except the cigarette fingers on the lips 2.1-2.3 cm
+(gate 4.5; other clips 3); left arm to the rifle >= 23 cm during stroke and hold (the rifle stays where the
+two-hand pose put it; gate 1 cm). Screenshots (front, gesture side, 45 deg top, listener's view) were looked at.
+Editable scenes: `OneDrive/AI/Models/Blender/Taierzhuang1938/SpeakerGestures_20260925/Scene_Lugou{Nra02,Nra05}SpeakerGestures.blend`.
 
 ### Runtime (planned, Step 3)
 
@@ -226,6 +260,9 @@ only in the 01-06 steps, never at boot.
   frame: `{ active, who, lineId, cue, sourceTime, stress }` from `Script_DialoguePlayer.Speech`. A new `lineId`
   with a row in the table starts that gesture; `sourceTime` is the line clock. Whole-cue takes (no lineId) never
   gesture.
+- Order and the neck: the Biped clavicles are children of Neck, so the head layer's neck yaw (`neckShare`) also
+  swings the gesturing arm a little; the aim (below) is measured after the arm is applied and before the head
+  turn, and a reach clip (`reach`) re-aims after the head turn, on the live head.
 - Masks: the gesture arm's clavicle, upper arm, forearm, hand and fingers are set to the clip's local rotations,
   slerped from the pose the body mixer produced by the layer weight; Spine/Spine1/Spine2 get the clip's delta from
   its first frame as an additive (at most a few degrees of lean). Neck, head and `Face_*` are never written: the
@@ -262,17 +299,34 @@ only in the 01-06 steps, never at boot.
   (`Script_FirstLevelCampaignOpening.InstallSpeakerActing`, owned by the Front package) can read it next to the
   head layer's `speaking`.
 
-### Validation (planned, Step 3)
+### Validation
 
-A new `Script_SpeakerGestureTest.mjs` (pure node: table covers every 03-06 embodied line, clips and windows
-valid, targets resolve, masks never include neck/head/Face bones, weights and suppression on a stub rig) and a
-browser test on the production rigs (six or more lines including a point, a beckon, a one-hand-on-rifle gesture
+Done in Step 2: `Script_SpeakerGestureTest.mjs` (pure node, tier 0: the table covers every 03-06 embodied line,
+rows name existing clips and resolvable targets, rifle holders use the left hand, about a third to a half of the
+lines gesture, nobody gestures on two of his own lines in a row except the seated cigarette talk; the baked
+windows equal the table; clips move only the gesture arm and the spine; unit quaternions; the bake's numbers above;
+reach anchors; the sampler) and `Script_SpeakerGestureClipsBrowserTest.mjs` (tier 2; the clip-on-body review
+above; `--shots` writes the stills to `tmp/SpeakerGestureReview/`).
+
+Planned (Step 3): the node test grows weights and suppression on a stub rig, and a browser test on the production
+rigs (six or more lines including a point, a beckon, a one-hand-on-rifle gesture
 and the seated 06 Zhou's offer): weight > .5 for enough frames while the line plays, 0 while firing, back to 0
 after the line; no hand inside the torso or the rifle; the rifle's direction unchanged by a left-hand gesture;
 first-person and close-up screenshots looked at. Frame cost: 04 front, same-page alternating A/B with the layer
 on/off, p95 increase <= 0.3 ms.
 
 ## Rebuilding
+
+Speaker gestures: from the worktree root, one headless Blender per rig (no BlenderMCP instance needed; each run
+takes a few seconds):
+`GESTURE_PROJECT=<worktree>/Taierzhuang1938 GESTURE_MODEL=LugouNra02 blender --background --factory-startup
+--python-exit-code 1 --python Taierzhuang1938/_import/Script_SpeakerGestureBake.py` (and LugouNra05), then the
+same with `GESTURE_PASS=manifest`. `GESTURE_CLIPS=a,b` re-bakes only those clips into the rig's file,
+`GESTURE_RENDER=1` writes Workbench stills (front, side, top at the start, stroke, mid-hold, release, end) to
+`tmp/SpeakerGestures/BlenderReview/`, `GESTURE_BLEND_DIR` saves the editable scene (one action per clip). A new
+version string goes to both the bake's `VERSION` and `SPEAKER_GESTURE_ASSET.version` (the fetch cache key).
+
+Facial rigs:
 
 Blender sources: `OneDrive/AI/Models/Blender/Taierzhuang1938/FacialRigs_20260923/`
 (`Animation_{Nra02,Ija02,Nra05}FacialTalk.blend`; NRA05 is the reviewed 2026-09-13
