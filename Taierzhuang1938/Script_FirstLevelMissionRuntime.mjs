@@ -1091,12 +1091,14 @@ export class FirstLevelMissionRuntime {
         // the line. Re-anchoring on his own position at every new contact let a man creep contact by contact -
         // 09-25 03-06 cold starts: flank man A went from his last line north of the nest (33,-158) through the
         // abandoned nest to the rear-door ramp (30,-143) in 04 and bayoneted the player waiting there, three runs of three.
-        if(s.mode!=="contact"){const line=s.points[Math.min(s.index,s.points.length-1)]||actor.position;
-          this.Defend(actor,line,R.defendHoldRadiusM,R.assaultCoverSearchM);
-          // The captured nest is ours: the circle stops FB.capturedGunKeepOutM short of the gun's seat.
-          actor.contactRadiusBaseM??=actor.tacticalRadiusM;
-          actor.tacticalRadiusM=this.Has("rightNestCaptured")
-            ?Math.max(2,Math.min(actor.contactRadiusBaseM,Distance(line,Sortie.seat)-FB.capturedGunKeepOutM)):actor.contactRadiusBaseM;}
+        const line=s.points[Math.min(s.index,s.points.length-1)]||actor.position;
+        if(s.mode!=="contact")this.Defend(actor,line,R.defendHoldRadiusM,R.assaultCoverSearchM);
+        // The captured nest is ours: the circle stops FB.capturedGunKeepOutM short of the gun's seat. Every frame, not
+        // only on entering contact: a man already in contact when the nest falls (idle probe 09-25: bound man F, in
+        // contact since before the capture, shot the player on the gun from 3.6 m) is pulled back out of it too.
+        actor.contactRadiusBaseM??=actor.tacticalRadiusM;
+        actor.tacticalRadiusM=this.Has("rightNestCaptured")
+          ?Math.max(2,Math.min(actor.contactRadiusBaseM,Distance(line,Sortie.seat)-FB.capturedGunKeepOutM)):actor.contactRadiusBaseM;
         s.mode="contact";continue;
       }
       if (actor.suppression >= R.tacticalSuppression) {
