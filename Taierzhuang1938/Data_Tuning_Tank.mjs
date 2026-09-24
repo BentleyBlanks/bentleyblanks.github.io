@@ -145,6 +145,13 @@ export const TANK = Object.freeze({
     // 保护：任何弹着点离 missionUntargetable / protect 的人至少这么远
     // （[旧] 弹片外沿 5 × BLAST.radiusScale 1.9 = 9.5 m，再留 0.3 m）。
     protectClearM: 9.8,
+    // 上面那条量的是**真炸点**，不只是瞄点（Script_FirstLevelTankRuntime.SafeShellAim）：瞄点推到 9.8 m 外，
+    // 弹道却先撞上半路的沟沿 / 墙，照样炸在人跟前。2026-09-24 Front 探针实测：05 封缺口的区域弹瞄在缺口北面
+    // (−8, −145)，从东南的 Block 打过来先撞 z ≈ −149 的沟沿，离最后一道掩体后待撤的守军 5.8–8.6 m，
+    // 一趟 6 发把他们磨到 17–45 血，另一趟六人全灭（guardBatchLost，任务失败）。
+    // 真炸点不够远：瞄点往炮口方向收 protectPullM 再算，最多 protectPullSteps 次；还不够这一发不打。
+    protectPullM: 3,
+    protectPullSteps: 4,
     // 区域目标（缺口封锁）默认散布 3–5 m。
     zoneScatterMinM: 3,
     zoneScatterMaxM: 5,

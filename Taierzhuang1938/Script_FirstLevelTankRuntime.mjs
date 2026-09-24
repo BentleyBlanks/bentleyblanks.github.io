@@ -359,11 +359,37 @@ export class FirstLevelTankRuntime {
     if (state !== "Intact") r.Record("tankImmobilized", { state, zone: last?.zone || null });
     if (state === "Disabled") r.Record("tankFireDisabled", { zone: last?.zone || null });
   }
+  /**
+   * 契约 §2.9 的保护落到真炸点上（TANK.gunner.protectPullM 头注）：大脑只核对瞄点，弹道半路撞上的沟沿 / 墙
+   * 它看不见。按 Combat 同一条抛物线算真炸点，离受保护的人不够 protectClearM 就把瞄点往炮口收；
+   * 收 protectPullSteps 次还不够返回 null（这一发不打）。
+   */
+  SafeShellAim(from, at) {
+    const r = this.r, G = this.T.gunner;
+    const list = r.combat?.PredictShellImpact ? this.brain.ProtectedPoints({ targets: this.Targets(r.flow.stage.id) }) : [];
+    const Flight = (p) => Math.max(0.06, from.distanceTo(p) / G.shellSpeedMps);
+    if (!list.length) return { at, flight: Flight(at), pulled: 0 };
+    const aim = at.clone();
+    for (let pulled = 0; pulled <= G.protectPullSteps; pulled++) {
+      const flight = Flight(aim);
+      const impact = r.combat.PredictShellImpact(from, aim, { flight, sourceCollider: r.view.tankCollider });
+      if (!impact || list.every((p) => Math.hypot(impact.x - p.x, impact.z - p.z) >= G.protectClearM)) return { at: aim, flight, pulled, impact };
+      const dx = from.x - aim.x, dz = from.z - aim.z, d = Math.hypot(dx, dz);
+      if (d <= G.protectPullM + G.minRangeM) break;
+      const lift = aim.y - this.Ground(aim.x, aim.z);
+      aim.x += dx / d * G.protectPullM; aim.z += dz / d * G.protectPullM;
+      aim.y = this.Ground(aim.x, aim.z) + lift;
+    }
+    return null;
+  }
   Fire(f) {
     const r = this.r, t = r.tank, view = r.view, V = this.T.view, G = this.T.gunner, M = this.T.mg;
     if (f.weapon === "main") {
       const from = view.TankMuzzle(t);
-      const at = new THREE.Vector3(f.at.x, f.at.y, f.at.z), dir = at.clone().sub(from).normalize();
+      const safe = this.SafeShellAim(from, new THREE.Vector3(f.at.x, f.at.y, f.at.z));
+      if (!safe) { this.log.withheld = (this.log.withheld || 0) + 1; return; }
+      if (safe.pulled) this.log.pulled = (this.log.pulled || 0) + 1;
+      const at = safe.at, dir = at.clone().sub(from).normalize();
       r.vfx.MuzzleFlash(from, dir, { scale: V.cannonMuzzleScale, kind: "cannon" });
       const R = V.groundRing;
       r.vfx.GroundDustRing?.(new THREE.Vector3(from.x, this.Ground(from.x, from.z), from.z), dir,
@@ -374,10 +400,10 @@ export class FirstLevelTankRuntime {
         const distance = Distance(r.player.position, t);
         if (distance < V.fireKickRangeM) r.player.shake.Impulse({ pitch: V.fireKickPitchRad * (1 - distance / V.fireKickRangeM) });
       }
-      const shot = { t: r.time, kind: f.kind, target: f.target, warning: !!f.warning, layS: f.layS, damage: f.damage, at: { ...f.at },
-        from: Plain(from), impact: null };
+      const shot = { t: r.time, kind: f.kind, target: f.target, warning: !!f.warning, layS: f.layS, damage: f.damage, at: Plain(at),
+        from: Plain(from), impact: null, ...(safe.pulled ? { pulled: safe.pulled, plannedAt: { ...f.at } } : {}) };
       this.log.shots.push(shot);
-      const flight = Math.max(0.06, from.distanceTo(at) / G.shellSpeedMps);
+      const flight = safe.flight;
       // 炮口声：有 TankAudio 就走它的近 / 中 / 远三层（Combat 的 report 是借来的 explosionMid，不再叠）。
       const sound = this.Sound;
       if (sound) sound.OnCannon(Plain(from), { ...f.at }, flight);
