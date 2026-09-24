@@ -1174,7 +1174,10 @@ export const SFX_SOURCES = [
     credit: "Pole Position Production · BAR .30cal 300 m 正面 · Sonniss GDC 2016",
     license: "sonniss",
     bitrate: BITRATE_TRANSIENT,
-    // `type11` 是这挺枪的 0.1 m 机位，这条是 300 m 机位，同一次双发。
+    // 这条是 BAR 300 m 机位（原来与 BAR 0.1 m 近场同一次双发；2026-09-24 起 `type11` 近场已换成 MINIMI 1 m，
+    // 这一组只剩远场 `_01` 这一条，`_02` / `_03` 由下面的 `Type11FarMinimi50m` 追加）。
+    // 清单里 type11Far 的 seconds 记的是 `_01` 的 1.25 s —— SfxBake 的约定是 seconds 取第一条变体的时长，
+    // append 不改它；运行时不读这个字段。
     // **已知的重复**：`rifleIjaFar_01` 也切自这条素材的末发（rate 1.08）。
     // 镜像里没有第二条 300 m 的全威力自动武器实录 —— 这一条记在缺口清单里，
     // 别当没看见（三百米外一支步枪和一挺轻机本来也难分，真正的区别由引擎排的射速给）。

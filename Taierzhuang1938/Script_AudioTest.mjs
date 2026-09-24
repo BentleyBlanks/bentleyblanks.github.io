@@ -15,6 +15,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
+import fs from "node:fs";
+import { SFX_SOURCES } from "./Data_SfxSources.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(projectDir, "..");
@@ -42,6 +44,57 @@ page.on("response", (res) => {
 let failed = 0;
 const Fail = (msg) => { console.log(`FAIL ${msg}`); failed += 1; };
 const Ok = (msg) => console.log(`ok   ${msg}`);
+
+// 【2026-09-24 审查补】配方表与清单对账（纯 Node，不等浏览器）。
+// type11 = SeedAudio 1 + MINIMI 2 只靠表尾 `Type11Variants` 登记；SeedAudio 烘焙单独重跑会把清单里的 type11
+// 改回一条，忘了补跑 `Type11Variants` 时下面「听得见」那一节照样全过，两条 MINIMI 就悄悄没了。
+// 这里按 SFX_SOURCES 的顺序推一遍全量 SfxBake 会写出的文件表（登记组 = 逐字文件名；切割组 = 条数，append 累加），
+// 与清单对账。rifleIja / rifleIjaFar 例外：2026-09-11 起由 Script_SeedAudioGunfireBake 改写成 SeedAudio 单条、
+// 配方表里没有对应的登记组（用户 09-24 定了步枪不动），全量 SfxBake 会把它们改回实录 —— 已知分歧，记在
+// docs/Data_AudioWiring.md 二之三第 8 节。另查 `mixed` 许可的 cue 里没有参考视频实录（许可债不许藏进 mixed）。
+{
+  const manifest = JSON.parse(fs.readFileSync(path.join(projectDir, "Audio/Sfx/Data_SfxManifest.json"), "utf8"));
+  const Pascal = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+  const expect = {}, licenseOfPrefix = {};
+  for (const group of SFX_SOURCES) for (const cut of group.cuts || []) {
+    if (group.seedAudio || group.prebaked) {
+      expect[cut.cue] = { files: cut.files || [cut.file || `AudioSfx_${Pascal(cut.cue)}_01.mp3`], by: group.id };
+      continue;
+    }
+    (licenseOfPrefix[Pascal(cut.cue)] ??= new Set()).add(group.license);
+    const n = group.generated || cut.whole ? 1 : Math.max(1, cut.variants || 1);
+    const prev = cut.append ? expect[cut.cue] : null;
+    expect[cut.cue] = { n: (prev ? (prev.files?.length ?? prev.n) : 0) + n, by: group.id };
+  }
+  const known = new Set(["rifleIja", "rifleIjaFar"]);
+  const drift = [];
+  for (const [cue, e] of Object.entries(expect)) {
+    if (known.has(cue)) continue;
+    const got = manifest.cues[cue]?.files || manifest.pendingCues?.[cue]?.files;
+    if (!got) { drift.push(`${cue} 清单里没有（配方 ${e.by}）`); continue; }
+    if (e.files ? JSON.stringify(got) !== JSON.stringify(e.files) : got.length !== e.n) {
+      drift.push(`${cue} 清单 ${got.length} 条，配方 ${e.by} 推出来 ${e.files ? e.files.join(" ") : e.n + " 条"}`);
+    }
+  }
+  const type11 = manifest.cues.type11?.files || [], type11Far = manifest.cues.type11Far?.files || [];
+  const needFar = ["AudioSfx_Type11Far_01.mp3", "AudioSfx_Type11Far_02.mp3", "AudioSfx_Type11Far_03.mp3"];
+  if (!(type11.length === 3 && type11.includes("AudioSfx_SeedAudioType11_01.mp3"))) drift.push(`type11 ${JSON.stringify(type11)}`);
+  if (!needFar.every((f) => type11Far.includes(f))) drift.push(`type11Far ${JSON.stringify(type11Far)}`);
+  const missing = [...type11, ...type11Far].filter((f) => !fs.existsSync(path.join(projectDir, "Audio/Sfx", f)));
+  if (missing.length) drift.push(`文件缺失 ${missing.join(" ")}`);
+  const hidden = [];
+  for (const [cue, entry] of Object.entries(manifest.cues)) {
+    if (entry.license !== "mixed") continue;
+    for (const file of entry.files) {
+      const prefix = /^AudioSfx_(.+)_\d+\.mp3$/.exec(file)?.[1];
+      if (!prefix || prefix.startsWith("SeedAudio")) continue;
+      if (!licenseOfPrefix[prefix] || licenseOfPrefix[prefix].has("refvideo")) hidden.push(`${cue}:${file}`);
+    }
+  }
+  if (hidden.length) drift.push(`mixed 里混进了参考视频实录或查不到来源：${hidden.join(" ")}`);
+  if (drift.length) Fail(`配方表与清单对不上：${drift.join("；")}`);
+  else Ok(`配方表与清单对账：${Object.keys(expect).length - known.size} 个 cue 一致；type11 ${type11.length} 条、type11Far ${type11Far.length} 条；mixed 里没有参考视频实录`);
+}
 
 await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?scale=small`, { waitUntil: "load", timeout: 120000 });
 await page.waitForFunction(() => window.Taierzhuang !== undefined, null, { timeout: 180000 });

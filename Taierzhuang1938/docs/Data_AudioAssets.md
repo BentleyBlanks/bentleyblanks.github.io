@@ -1337,14 +1337,19 @@ Audio native levels are aligned.
 不带组名的全量会从零重建清单并重切全库（连没有 `alignDbfs` 的老 cue 一起）。
 
 ```bash
-# 补变体的十三组（append，重复跑会把变体追加成 _05/_06，重跑前先还原清单与成品）
+# 补变体的十二组（append，重复跑会把变体追加成 _05/_06，重跑前先还原清单与成品）
+# （原来是十三组；2026-09-24 撤掉了 Type11BarSecondShot。另一个 append 组 Type11FarMinimi50m
+#  必须紧跟 Type11Far 跑，放在下面那条命令里。注意 RifleIjaSpringfieldTakes / RifleIjaFarBuildings
+#  会把美制步枪实录追加进 rifleIja / rifleIjaFar —— 用户 09-24 定了步枪维持 SeedAudio 单条，这两组别跑。）
 node Taierzhuang1938/Script_SfxBake.mjs RifleNraK98kTakes RifleIjaSpringfieldTakes \
   Zb26L86Lsw Type92M1919Near5m Type92M1919Turret1m \
   RifleNraFarNagant50m RifleIjaFarBuildings FootstepDirtLoop \
   ExplosionFarHowitzer ExplosionFarCannon BoltCycleM38 StripperLoadK98kSecond
 
-# 新 cue 的三十二组（共 45 组，全量清单见 Data_SfxSources 末段）（pending，每次从空表重建，可以放心重跑）
-node Taierzhuang1938/Script_SfxBake.mjs Zb26Far Type11Far Type92Far \
+# 新 cue 的三十三组（共 45 组，全量清单见 Data_SfxSources 末段）（pending，每次从空表重建，可以放心重跑；其中 Type11FarMinimi50m 靠同一次跑的 Type11Far 先清表，所以也能重跑）
+# Type11FarMinimi50m 是 append：Type11Far 把 type11Far 重写成只有 _01，它接着补 _02/_03（组按表序执行，
+# 点名顺序无关）。漏点它，_02/_03 会变成清单外的孤儿文件；Script_AudioTest 开头的对账会报出来。
+node Taierzhuang1938/Script_SfxBake.mjs Zb26Far Type11Far Type11FarMinimi50m Type92Far \
   GunTailOpenRifle GunTailStreetRifle GunTailInteriorRifle GunTailOpenMg GunTailInteriorMg \
   BulletCrack BulletWhizz Ricochet FootstepWood FootstepStone FootstepGrass FootstepMud \
   ClothMove GearRattle BreathHeavy BodyLand GrenadeBounceCarMetal GrenadeBounceWeightPlate \
