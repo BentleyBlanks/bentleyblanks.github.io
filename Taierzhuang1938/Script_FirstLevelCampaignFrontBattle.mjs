@@ -99,6 +99,15 @@ export async function DriveFrontBattle(ctx){
         routeBot:window.routeBot?{index:window.routeBot.index,target:window.routeBot.points?.[window.routeBot.index],stalled:window.routeBot.stalled}:null,
         ground:g.battlefield.GroundHeight(at.x,at.z),colliders,people,damage:window.missionDamage?.slice(-20),
         impacts:(g.Debug.FirstLevelMissionRuntime().tank?.impacts||[]).filter(i=>near(i.x,i.z,5)),
+        interaction:(()=>{const q=g.interact?.Query?.(g.player);return {query:q?{kind:q.kind,label:q.label,tag:q.point?.tag??null,id:q.point?.id??null,dist:q.dist}:null,
+          prompts:(g.hud?.actionPrompts||[]).map(p=>p.label),text:document.querySelector('.actionText')?.textContent??null};})(),
+        meshes:(()=>{const out=[],B=new (g.player.position.constructor)(),box=g.scene.children.length?null:null;void box;
+          g.scene.traverse(o=>{if(!o.isMesh||!o.visible||/^Actor_|Camera|Viewmodel|FirstPerson/i.test(o.name+(o.parent?.name||'')))return;
+            if(!o.geometry.boundingBox)o.geometry.computeBoundingBox();const bb=o.geometry.boundingBox.clone().applyMatrix4(o.matrixWorld);
+            if(o.isInstancedMesh)return;
+            if(bb.min.x<at.x+0.9&&bb.max.x>at.x-0.9&&bb.min.z<at.z+0.9&&bb.max.z>at.z-0.9&&bb.max.y>at.y+0.1&&bb.min.y<at.y+1.3)
+              out.push([o.name||o.parent?.name||'?',+bb.min.x.toFixed(2),+bb.min.y.toFixed(2),+bb.min.z.toFixed(2),+bb.max.x.toFixed(2),+bb.max.y.toFixed(2),+bb.max.z.toFixed(2)]);});
+          return out.slice(0,24);})(),
         profile:(()=>{const t=window.routeBot?.points?.[window.routeBot.index];if(!t)return null;const out=[];
           for(let k=0;k<=8;k++){const x=at.x+(t.x-at.x)*k/8,z=at.z+(t.z-at.z)*k/8;out.push([+x.toFixed(2),+z.toFixed(2),+g.battlefield.GroundHeight(x,z).toFixed(2)]);}return out;})(),
         fragments:(()=>{const out=[],m=new (g.player.position.constructor)();g.scene.traverse(o=>{if(!o.isInstancedMesh||!/Fragment|Debris|Rubble/i.test(o.name+(o.parent?.name||'')))return;
@@ -136,6 +145,20 @@ export async function DriveFrontBattle(ctx){
   assert.ok(staging.separation>=1.5&&staging.seatDistance>=1.5,'Luo occupies his own firing post clear of the player');
   assert.ok(staging.gunSupportGap>=-.02&&staging.gunSupportGap<.04,'the visible gun rests on its actual parapet');
   if(ctx.options.probeFrontGun){
+    // A bounder who ran into the nest at the capture leaves the player in a bayonet fight with the Dadao out: the HUD
+    // shows no F prompt while the melee lasts (UpdateContextualActionPrompts). Put the rifle back and let the prompt for
+    // the gun come up before pressing F, as a player does (09-24: FrontRifleF died at (23.4,−153.6), 4 runs in a row).
+    const ready=await page.evaluate(()=>{
+      const g=window.Tengxian;
+      for(let f=0;f<240;f++){
+        const q=g.interact.Query(g.player);
+        if(!g.meleeCombat.Active&&q?.point?.tag==="FirstLevelMission"&&g.hud.actionPrompts.some(p=>p.label===q.label))return {frames:f,label:q.label};
+        if(!g.meleeCombat.Active&&g.state.activeSlot==="melee")g.Debug.Key("Digit1");
+        g.StepFrames(1,1/60,false);
+      }
+      return {frames:240,melee:g.meleeCombat.Active,slot:g.state.activeSlot,prompts:g.hud.actionPrompts.map(p=>p.label)};
+    });
+    console.log("GUN_PROMPT",JSON.stringify(ready));
     await Interact();
     const gun=await page.evaluate(()=>{
       const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime(),gun=r.emplacement.Emplacement(r.gunId),before=gun.roundsFired;
