@@ -47,6 +47,7 @@ const browserLockWriteGraceMs = 10 * 1000;
 // 七章通关链不再存在）。expectedFailures 基线机制保留在 AssessResult 里，现在没有测试登记基线。
 
 export const testDefs = {
+  BlastFeedbackTest: {file:"Script_BlastFeedbackTest.mjs",timeoutMs:300000,desc:"Shared grenade/shell camera response, bounded tinnitus, actual PCM, mute and reset"},
   FirstLevelWhiteboxVillageTest: {file:"Script_FirstLevelWhiteboxVillageTest.mjs",desc:"06–10 referenced village buildings, kitchen link, real alley entry and sheltered litter detour"},
   FirstLevelWhiteboxTransferTest: {file:"Script_FirstLevelWhiteboxTransferTest.mjs",desc:"11–14 loading yard, crouched cover, two fire lanes, open cart road and litter escape"},
   FirstLevelRearSpaceTest: {file:"Script_FirstLevelSpaceTest.mjs",args:["--rear-only"],desc:"06–18 geometry scope with full route, litter, cart, roof, river and bridge checks"},
@@ -398,7 +399,7 @@ export const browserTests = new Set([
   "DressingProbeTest", "EastSuburbNavTest", "EditorTest", "WorldInfoEditorTest", "PlayerStateEditorTest", "FixedCenterAimTest", "FpsArmTest", "FpsHandContactTest", "FpsGripEditorTest",
   "FrameProfileTest", "GeoTest", "GiTest", "GodRaysPerformanceTest", "GtaoTest", "GunFeelTest",
   "SamplerBudgetTest", "CharacterWoundsTest", "BloodEffectsTest", "BulletDecalPbrTest", "VehicleTracerTest",
-  "HitDisorientationTest", "IncomingFireBrowserTest", "HudPromptBrowserTest", "WeaponPickupTest", "JieheTerrainTest", "JumpTest", "StanceTest", "MeleeQteTest", "MeleeKillBloodTest", "GoreRangeTest", "MenuTest", "DeathMenuTest",
+  "BlastFeedbackTest", "HitDisorientationTest", "IncomingFireBrowserTest", "HudPromptBrowserTest", "WeaponPickupTest", "JieheTerrainTest", "JumpTest", "StanceTest", "MeleeQteTest", "MeleeKillBloodTest", "GoreRangeTest", "MenuTest", "DeathMenuTest",
   "ClusteredLightsTest", "MaterialUpgradeTest",
   "PerformanceTest", "PhysicsTest", "PostTest", "PostFrameGraphTest", "CsmTest", "SsrTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ProfilerTest", "PropInstancingTest",
   "PropPcgEditorTest",
@@ -489,7 +490,7 @@ export const domains = {
   },
   combat: {
     label: "武器/伤害/枪感/瞄准（共享底座，碰弹道或输入要跑全串）",
-    tests: ["MuzzleFlashTest", "HeadshotTest", "FirearmHandlingTest", "FirearmHandlingBrowserTest", "HitDisorientationTest", "CoverLeanTest", "CoverLeanBrowserTest", "StanceTest", "DamageTest", "GunFeelTest", "FixedCenterAimTest", "ReticleCalibrationTest", "SprintCrosshairTest",
+    tests: ["BlastFeedbackTest", "MuzzleFlashTest", "HeadshotTest", "FirearmHandlingTest", "FirearmHandlingBrowserTest", "HitDisorientationTest", "CoverLeanTest", "CoverLeanBrowserTest", "StanceTest", "DamageTest", "GunFeelTest", "FixedCenterAimTest", "ReticleCalibrationTest", "SprintCrosshairTest",
       "FirstPersonEmbodimentTest", "AdsSightTest", "SprintViewmodelTest", "FpsArmTest", "FpsHandContactTest", "FpsGripEditorTest", "FpsAnimationTest", "SprintMeleeTest", "BayonetTest", "RangeTest", "WeaponRangeTest", "WeaponPickupTest", "MeleeQteTest", "MeleeKillBloodTest", "GoreRangeTest", "MeleeCombatTest", "MeleeAnimationTest",
       "CharacterModelTest", "CharacterHitboxMathTest", "AssetStandardsTest", "ModelFacingTest",
       // 玩家自己的命中几何（AI 打玩家的部位由它判）与通用震屏（爆炸/近失/中弹/落地/扫射/扑沟）：
@@ -536,7 +537,7 @@ export const domains = {
     // 所以也挂在这个域下。
     tests: ["CarryTest", "EmplacementTest", "HudPromptTest", "HudPromptBrowserTest", "WeaponPickupTest", "TelegraphTest", "MissionHooksTest", "MissionSetpiecesTest"],
   },
-  audio: { label: "音效/音乐/环境声", tests: ["FirstLevelVoicePerspectiveTest","FirstLevelMissionMusicTest", "FirstLevelMissionMusicBrowserTest", "AudioTest", "AudioWiringTest", "MachineGunCutsceneAudioTest"] },
+  audio: { label: "音效/音乐/环境声", tests: ["BlastFeedbackTest","FirstLevelVoicePerspectiveTest","FirstLevelMissionMusicTest", "FirstLevelMissionMusicBrowserTest", "AudioTest", "AudioWiringTest", "MachineGunCutsceneAudioTest"] },
   // 「声库装没装进去」与「输出端有没有电平」是两件事，后者只有 MachineGunCutsceneAudioTest
   // 在真入口上量：VoiceTest 验的是资产与交付档，量不到 AudioEngine 的装载分叉。
   voice: { label: "语音", tests: ["VoiceTest", "MachineGunCutsceneAudioTest"] },

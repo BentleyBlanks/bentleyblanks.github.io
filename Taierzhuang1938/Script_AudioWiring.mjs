@@ -198,6 +198,7 @@ export class AudioWiring {
 
   /** 每次换关调一次：缓存里存的是上一张地图的墙。 */
   Reset() {
+    this.Audio?.ResetDeafen?.();
     this.occCache.clear();
     this.zoneCache.clear();
     // 弹啸限速的窗口也要归零：换一张地图之后「上一条离得多近」是上一局的事。
@@ -1226,7 +1227,8 @@ export class AudioWiring {
     // IsBlastCue 抬头）。不给这一条的话，11 m 外的一发 75 炮要吃 Panner 按
     // refDistance 3.5 m 算出来的 −9.4 dB —— 那正是「炮弹没有声音」的最大一块。
     const opts = { position: { x: position.x, y: position.y, z: position.z }, volume, priority: true,
-      sourceSizeM: Math.max(BLAST_AUDIO.sourceSizeFloorM, radius * BLAST_AUDIO.sourceSizeScale) };
+      sourceSizeM: Math.max(BLAST_AUDIO.sourceSizeFloorM, radius * BLAST_AUDIO.sourceSizeScale),
+      blastRadiusM: radius, blastOccluded: occluded };
     // 遮挡**只许算一层**。
     //
     // 【2026-09-09】这是用户报的「炮弹爆炸经常没声音」的直接成因：引擎侧
@@ -1252,7 +1254,7 @@ export class AudioWiring {
     }
     audio.Play(cue, opts);
     // 耳鸣：引擎侧接上「Play 里按爆炸类 cue 自动 Deafen」之后这条是兜底
-    // （两条同时生效也只是耳鸣重叠一次，不会更聋 —— Deafen 写的是同一条滤波自动化）。
+    // blastAutoDeafen 确保同一次爆炸只进入一次反应包络。
     if (d < BLAST_AUDIO.deafenWithinM && !audio.blastAutoDeafen) {
       audio.Deafen?.(BLAST_AUDIO.deafenS);
     }

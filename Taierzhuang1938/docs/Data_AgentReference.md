@@ -60,6 +60,12 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
 
 ## 路由表：改哪个系统，动哪些文件，先读哪份分册
 
+### 通用近爆反馈
+- `Script_Combat.BlastFeedback`：实弹与剧情爆破共用的感知事件。
+- `Script_CameraShake` / `Data_Tuning_Player.CAMERA_SHAKE.explosion`：定向冲击与独立余震。
+- `Script_AudioWiring.Blast` / `Script_Audio.BlastHearing` / `Data_Tuning_Audio.BLAST_HEARING`：距离、威力、遮挡与有限耳鸣包络。
+- 说明与验收：[通用近爆反馈](Data_BlastFeedback.md)。
+
 ### 引导 / 主循环
 - `Script_Main.mjs` —— 装配层：启动顺序、关卡流程、每帧调度、输入接线。
   **任何规则不许写在这里**——规则在 Script_Ai / Script_Player / Script_Story / Data_*。

@@ -45,6 +45,7 @@ export class CameraShake {
     this.T = tuning;
     this.seed = seed;
     this.trauma = 0;
+    this.blastTrauma = 0;
     this.time = 0;
     this.springs = { pitch: new Spring(), yaw: new Spring(), roll: new Spring(), rise: new Spring() };
     this.pitch = 0; this.yaw = 0; this.roll = 0; this.rise = 0;
@@ -71,15 +72,26 @@ export class CameraShake {
    * 爆炸。distance 到爆心（米），reachM 伤害外沿（Combat.Blast 的 radius × radiusScale），
    * 震感延伸到 reachM × reachScale；隔墙打折。返回实际加的创伤（0 = 太远没感觉）。
    */
-  Explosion(distanceM, reachM, occluded = false) {
+  Explosion(distanceM, reachM, occluded = false, side = 0) {
     const E = this.T.explosion;
     const reach = Math.max(0.5, reachM) * E.reachScale;
     const k = Clamp01(1 - Math.max(0, distanceM) / reach);
-    let trauma = E.traumaAtCenter * k * k;
+    let trauma = E.traumaAtCenter * Math.pow(k, E.falloffPower);
     if (occluded) trauma *= E.occludedScale;
     if (trauma < E.minTrauma) return 0;
-    this.AddTrauma(trauma);
-    this.Impulse({ pitch: E.pitchKickRad * k });
+    this.blastTrauma = Clamp01(this.blastTrauma + trauma);
+    const kick = k * (occluded ? E.occludedScale : 1);
+    const lateral = Clamp(side, -1, 1) * kick;
+    // A barrage has its own small kick cap; it must never accumulate a dive-sized tilt.
+    // Preserve an already larger authored impulse (for example diving into cover).
+    const kickSpring = (axis, amount, cap) => {
+      const spring = this.springs[axis];
+      spring.Kick(amount, Math.max(cap, Math.abs(spring.x)));
+    };
+    kickSpring("pitch", E.pitchKickRad * kick, E.maxKickRad);
+    kickSpring("yaw", E.yawKickRad * lateral, E.maxKickRad);
+    kickSpring("roll", E.rollKickRad * lateral, E.maxKickRad);
+    kickSpring("rise", E.riseKickM * kick, E.maxKickM);
     this.events.explosion += 1;
     return trauma;
   }
@@ -144,13 +156,14 @@ export class CameraShake {
     const step = Clamp(Number(dt) || 0, 0, 0.25);
     this.time += step;
     this.trauma = Math.max(0, this.trauma - T.traumaDecayPerS * step);
+    this.blastTrauma = Math.max(0, this.blastTrauma - T.explosion.decayPerS * step);
     let remaining = step;
     while (remaining > 1e-6) {
       const h = Math.min(MAX_STEP_S, remaining);
       for (const s of Object.values(this.springs)) s.Step(h, T.impulseStiffness, T.impulseDamping);
       remaining -= h;
     }
-    const amp = Math.pow(this.trauma, T.traumaPower);
+    const amp = Math.pow(Math.max(this.trauma, this.blastTrauma), T.traumaPower);
     const t = this.time * T.noiseHz;
     const n = (v) => (ValueNoise2(t, v, this.seed) - 0.5) * 2;
     this.pitch = amp * T.maxPitchRad * n(3.1) + this.springs.pitch.x;
@@ -161,11 +174,12 @@ export class CameraShake {
 
   /** 是否还在动（取证 / 测试用）。 */
   get Active() {
-    return this.trauma > 0 || Object.values(this.springs).some((s) => s.x !== 0 || s.v !== 0);
+    return this.trauma > 0 || this.blastTrauma > 0 || Object.values(this.springs).some((s) => s.x !== 0 || s.v !== 0);
   }
 
   Reset() {
     this.trauma = 0;
+    this.blastTrauma = 0;
     for (const s of Object.values(this.springs)) s.Reset();
     this.pitch = 0; this.yaw = 0; this.roll = 0; this.rise = 0;
   }
@@ -173,7 +187,7 @@ export class CameraShake {
   /** 取证快照。 */
   State() {
     return {
-      trauma: this.trauma, pitch: this.pitch, yaw: this.yaw, roll: this.roll, rise: this.rise,
+      trauma: this.trauma, blastTrauma: this.blastTrauma, pitch: this.pitch, yaw: this.yaw, roll: this.roll, rise: this.rise,
       active: this.Active, events: { ...this.events },
     };
   }

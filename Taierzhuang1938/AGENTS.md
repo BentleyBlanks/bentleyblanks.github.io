@@ -26,6 +26,8 @@
 
 ## 跨系统契约
 
+- **近爆反馈为跨关卡共用机制**：手榴弹、炮弹等实弹通过 `Combat.Blast` 接入；无伤害剧情爆破用 `Combat.BlastFeedback`。距离与遮挡控制相机冲击、余震和耳鸣，不在关卡内复制一套震屏/耳鸣。接口、数值入口与验收见 [通用近爆反馈](docs/Data_BlastFeedback.md)。
+
 1. 浏览器模块变更更新 `index.html` import map 对应的 `?v=`，新增模块登记 import map；源码 import 不自带 `?v=`，避免同一模块形成两个实例。验收：`Script_ModuleGraphTest.mjs`。
 2. `Data_*.mjs`、规则层及要求纯 Node 运行的 TexBake / FarLand / Identify / CutsceneCheck 保持无 three 依赖。
 3. 新静态几何走 `BuildSink` 分区合批，不零散 add Mesh；开机预算统一取 `SCENE_RENDER_LIMITS`。涉及场景预算时按七关检查，验收：`Script_BootTest.mjs`。

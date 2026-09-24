@@ -43,7 +43,7 @@ import { Mulberry32, HashString, Clamp, Clamp01 } from "./Script_Noise.mjs";
 import { VOICE_BASE, VOICE_LINES } from "./Data_Voice.mjs";
 import { FIRST_LEVEL_MUSIC_CUES, FIRST_LEVEL_MUSIC_MIX } from "./Data_FirstLevelMissionMusic.mjs";
 import { HIT_DISORIENTATION } from "./Data_Tuning_Player.mjs";
-import { GUN_AUDIBILITY } from "./Data_Tuning_Audio.mjs";
+import { GUN_AUDIBILITY, BLAST_HEARING } from "./Data_Tuning_Audio.mjs";
 import { CARRIAGE_SOUND } from "./Data_FirstLevelCarriageSound.mjs";
 import { AUDIO_MIX_DEFAULTS, STORY_SPEECH } from "./Data_Tuning_Audio.mjs";
 import { BuildSpeechEnvelope } from "./Script_SpeechEnvelope.mjs";
@@ -178,20 +178,26 @@ const DUCK_ON = {
 const DUCK_MIN_AMOUNT = 0.06;
 
 /**
- * 触发耳鸣的 cue 与时长。同样从配方里搬出来。
+ * 触发耳鸣的 cue。距离、半径、遮挡与恢复包络由 BLAST_HEARING 控制。
  *
  * 顺带修掉一个反过来的错：`explosionFar`（远炸）的合成配方里写着 `A.Deafen(0.3)` ——
  * **几百米外的一记闷响把玩家的耳朵震了**。耳鸣是「炸在脸上」的独有反馈，
- * 所以现在一律要过 DEAFEN_M 这道距离闸。
+ * 所以现在一律要过 BlastHearing 的距离闸。
  */
-const DEAFEN_ON = { explosionNear: 0.42, explosionMid: 0.3, shellImpact: 0.3 };
-/** 炸到这么近才耳鸣。12 m 是手榴弹的杀伤半径量级：再远只是很响，不是被震。 */
-const DEAFEN_M = 12;
+const DEAFEN_ON = { explosionNear: true, explosionMid: true, shellImpact: true };
+
+export function BlastHearing(distance, radius = BLAST_HEARING.referenceRadiusM, occluded = false) {
+  const H = BLAST_HEARING;
+  const reach = Clamp(radius * H.radiusScale, H.minReachM, H.maxReachM);
+  const strength = Math.pow(Clamp01(1 - Math.max(0, distance) / reach), H.falloffPower)
+    * (occluded ? H.occludedScale : 1);
+  return strength < H.minStrength ? 0 : strength;
+}
 /**
  * 耳鸣的起音期（秒）：这段时间里总线仍是全带宽的。
  * 一发炮弹的爆裂全在头 0.1 s 里，耳鸣该发生在它**之后**（见 Deafen）。
  */
-const DEAFEN_ATTACK_HOLD_S = 0.13;
+const DEAFEN_ATTACK_HOLD_S = BLAST_HEARING.attackHoldS;
 
 /**
  * 玩家开枪压环境（HDR-lite）。
@@ -3573,7 +3579,7 @@ export class AudioEngine {
      * 计数器（不是「失败」，是「做了多少次」）。取证与预算调参用。
      * occlusionQueries 是宿主最关心的一条：它等于每秒真正打出去的射线数。
      */
-    // 爆炸类 cue 的耳鸣由 Play 按 DEAFEN_ON / DEAFEN_M 自动触发（见 Reactions）。
+    // 爆炸类 cue 的耳鸣由 Play 按 DEAFEN_ON / BlastHearing 自动触发（见 Reactions）。
     // 这个标志告诉宿主接线层（Script_AudioWiring.Blast）别再手动 Deafen 一次 ——
     // 两条各自都对，合在一起就是同一记爆炸把耳鸣自动化写两遍。
     this.blastAutoDeafen = true;
@@ -4018,6 +4024,7 @@ export class AudioEngine {
 
   Dispose() {
     this.disposed = true;
+    this.ResetDeafen();
     for (const id of this.timers) clearTimeout(id);
     this.timers.clear();
     // 清定时器把「到点回收」也一起清了，所以还在飞的 voice 必须在这儿手动拆 ——
@@ -4855,7 +4862,8 @@ export class AudioEngine {
 
   Play(name, { position = null, volume = 1, pitch = 1, delay = 0, offset = 0, maxDuration = Infinity, pan = 0, burst = null, priority = false,
     bus = "sfx", airCut = 0, soundField = false, firstPerson = false, occlusion = null,
-    weaponClass = null, sourceSizeM = 0, storySpeech = false } = {}) {
+    weaponClass = null, sourceSizeM = 0, storySpeech = false,
+    blastRadiusM = BLAST_HEARING.referenceRadiusM, blastOccluded = false } = {}) {
     // priority：玩家自己的枪永远要响。实测 59 个兵在打时 liveNodes 峰值 118/120，
     // AI 枪声丢 40.4%，**玩家自己的枪也丢了 8.3%** —— 因为玩家和 59 个兵共用
     // "rifleNra" 这一个去重 key，22 ms 窗口内谁先谁得。
@@ -5100,7 +5108,8 @@ export class AudioEngine {
     this.ReleaseVoice(v, v.life);
     // Duck / 耳鸣 / 环境闪避统一在这儿触发（配方里不再各自触发，见 DUCK_ON 的抬头）。
     // 放在最后：这三样都会去动别的总线，而这条 voice 得先建成功才算「这一声真响了」。
-    this.Reactions(name, distance, !!position, priority || firstPerson, weaponClass);
+    this.Reactions(name, distance, !!position, priority || firstPerson, weaponClass,
+      blastRadiusM, blastOccluded, startDelay);
     return v;
   }
 
@@ -5113,7 +5122,8 @@ export class AudioEngine {
    * 而这件事没有任何机器发现得了（声音全在响、控制台干净、冒烟全绿）。
    * 触发条件属于「这一声是什么、离多远」，那是 Play 知道的事，不是配方知道的事。
    */
-  Reactions(name, distance, spatial, selfShot, weaponClass = null) {
+  Reactions(name, distance, spatial, selfShot, weaponClass = null,
+    blastRadiusM = BLAST_HEARING.referenceRadiusM, blastOccluded = false, startDelay = 0) {
     const duck = DUCK_ON[name];
     if (duck) {
       // 按听者距离缩放：两百米外的一颗手榴弹不该把配乐压下去。
@@ -5124,7 +5134,12 @@ export class AudioEngine {
     }
     const deaf = DEAFEN_ON[name];
     // 耳鸣要过距离闸：几百米外的一记闷响不该震聋玩家（旧的 explosionFar 配方里正是这么写的）。
-    if (deaf && (!spatial || distance < DEAFEN_M)) { this.Deafen(deaf); this.stats.deafens += 1; }
+    const strength = deaf ? BlastHearing(spatial ? distance : 0, blastRadiusM, blastOccluded) : 0;
+    if (strength > 0) {
+      this.Deafen(BLAST_HEARING.minHoldS + BLAST_HEARING.holdSpanS * strength,
+        DEAFEN_ATTACK_HOLD_S + startDelay, strength);
+      this.stats.deafens += 1;
+    }
     // 玩家自己开的那一枪：环境床与远声组快压慢放（HDR-lite）。
     //
     // 【2026-09-09】远声组这一半**收敛了**：只有自动武器或真的在连着打时才压，
@@ -5263,6 +5278,7 @@ export class AudioEngine {
     const t = this.ctx.currentTime;
     // 20 ms 斜坡：直接赋值会在正在响的声音上留一道「咔」。
     this.masterGain.gain.setTargetAtTime(this.masterVolume, t, 0.02);
+    this.SyncDeafenVolume();
   }
 
   /**
@@ -5283,6 +5299,7 @@ export class AudioEngine {
     const node = { sfx: this.sfxUser, music: this.musicUser, ambience: this.ambienceUser }[kind];
     if (!node || !this.ctx) return;
     node.gain.setTargetAtTime(v, this.ctx.currentTime, 0.02);
+    this.SyncDeafenVolume();
   }
 
   /** 把背景层（环境床 + 音乐）就地停掉。暂停与「退出音效编辑器时游戏还停着」都走它。 */
@@ -5397,7 +5414,7 @@ export class AudioEngine {
    * 同时脑子里留一条 4 kHz 的正弦慢慢衰减。缺任何一半都不像被震过。
    * 正弦接在耳鸣低通**之后**，不然它自己也会被压掉。
    *
-   * 【2026-09-08】现在由 Play 按 DEAFEN_ON + DEAFEN_M 自动触发（爆炸类且炸得够近）。
+   * 【2026-09-08】现在由 Play 按 DEAFEN_ON + BlastHearing 自动触发（爆炸类且炸得够近）。
    * 这个方法**保留**成手动 API：编辑器要能单独试听，过场也可能要在没有爆炸的
    * 地方来一下（比如被埋在土里那一拍）。
    */
@@ -5411,41 +5428,76 @@ export class AudioEngine {
     this.concussionFilter.frequency.setValueAtTime(Math.max(cutoff,floor),this.ctx.currentTime);
   }
 
-  Deafen(seconds = 0.4, holdS = DEAFEN_ATTACK_HOLD_S) {
-    if (!this.ctx) return;
+  Deafen(seconds = 0.4, holdS = DEAFEN_ATTACK_HOLD_S, strength = 1) {
+    if (!this.ctx || this.disposed) return;
+    const H = BLAST_HEARING;
     const ctx = this.ctx;
     const t = ctx.currentTime;
+    const active = this.deafenUntil + H.recoveryS > t;
+    const residual = active ? this.deafenStrength * Clamp01((this.deafenUntil + H.recoveryS - t) / H.recoveryS) : 0;
+    const level = Math.max(Clamp01(strength), residual || 0);
+    if (!(level > 0)) return;
+    const until = Math.max(active ? this.deafenUntil : t,
+      t + holdS + Clamp(seconds, H.attackS, H.maxHoldS));
+    this.deafenUntil = until;
+    this.deafenStrength = level;
     const f = this.deafFilter.frequency;
+    const current = Math.max(f.value, H.muffledHz);
+    const cutoff = H.clearHz * Math.pow(H.muffledHz / H.clearHz, level);
     f.cancelScheduledValues(t);
-    f.setValueAtTime(Math.max(f.value, 200), t);
+    f.setValueAtTime(current, t);
     // 【2026-09-09】起音期：原来 30 ms 就压到 520 Hz，于是**触发这次耳鸣的那一声
     // 自己**的高频先被吃掉了 —— 爆炸听着像隔壁的闷响，而耳鸣是「之后」的事。
     // 先原样放过起音的那 0.13 s（一发炮弹的爆裂全在这一段里），再关门。
-    f.setValueAtTime(Math.max(f.value, 200), t + holdS);
-    f.exponentialRampToValueAtTime(520, t + holdS + 0.05);
-    f.setValueAtTime(520, t + holdS + seconds);
-    f.exponentialRampToValueAtTime(20000, t + holdS + seconds + 0.9);
+    f.setValueAtTime(current, t + holdS);
+    f.exponentialRampToValueAtTime(cutoff, t + holdS + H.attackS);
+    f.setValueAtTime(cutoff, until);
+    f.exponentialRampToValueAtTime(H.clearHz, until + H.recoveryS);
 
-    if (this.liveNodes + 4 > this.nodeBudget) return;   // 预算紧就只做闷响
-    const osc = ctx.createOscillator();
-    osc.type = "sine";
-    osc.frequency.value = 4000;
-    const g = ctx.createGain();
-    const total = holdS + seconds + 1.4;
-    // 脑子里那声也等起音期过去再进来：它 0.055 的电平（−25 dB）本来就在
-    // 爆炸的量级上，压在爆裂那一瞬间等于给自己加了一层遮罩。
-    g.gain.setValueAtTime(FLOOR, t);
-    g.gain.setValueAtTime(FLOOR, t + holdS);
-    g.gain.linearRampToValueAtTime(0.055, t + holdS + 0.02);
-    g.gain.exponentialRampToValueAtTime(FLOOR, t + total);
+    let voice = this.deafenVoice;
+    if (!voice) {
+      if (this.liveNodes + 3 > this.nodeBudget) return;
+      const osc = ctx.createOscillator(), g = ctx.createGain(), user = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = H.ringHz;
+      g.gain.value = FLOOR;
+      osc.connect(g).connect(user).connect(this.outGain);
+      voice = this.deafenVoice = { nodes: [osc, g, user], osc, g, user };
+      this.liveNodes += 3;
+      this.pendingVoices.add(voice);
+      osc.start(t);
+    }
+    this.SyncDeafenVolume();
+    const g = voice.g;
+    const gainNow = Math.max(FLOOR, g.gain.value);
+    g.gain.cancelScheduledValues(t);
+    // 耳鸣在起音后进入；连续近爆复用同一振荡器与包络，不叠加音量。
+    g.gain.setValueAtTime(gainNow, t);
+    g.gain.setValueAtTime(gainNow, t + holdS);
+    g.gain.linearRampToValueAtTime(H.ringGain * level, t + holdS + H.attackS);
+    g.gain.exponentialRampToValueAtTime(FLOOR, until + H.recoveryS);
     // 接在耳鸣低通**之后** —— 接在前面的话它自己也被压掉，就没有「脑子里那声」了。
-    osc.connect(g).connect(this.outGain);
-    osc.start(t);
-    osc.stop(t + total + 0.05);
-    this.liveNodes += 2;
-    // 借 voice 的账本回收：这样 Dispose 里的 pendingVoices 也能把它拆掉，
-    // 否则爆炸声正响着退出关卡，这两个节点就永远挂在总线上了。
-    this.ReleaseVoice({ nodes: [osc, g] }, total);
+    if (this.deafenTimer) { clearTimeout(this.deafenTimer); this.timers.delete(this.deafenTimer); }
+    this.deafenTimer = this.Later((until + H.recoveryS - t) * 1000 + 220, () => this.ResetDeafen());
+  }
+
+  SyncDeafenVolume() {
+    this.deafenVoice?.user.gain.setTargetAtTime(this.masterVolume * this.mix.sfx, this.ctx.currentTime, 0.02);
+  }
+
+  ResetDeafen() {
+    if (this.deafenTimer) { clearTimeout(this.deafenTimer); this.timers.delete(this.deafenTimer); }
+    this.deafenTimer = null;
+    if (this.deafenVoice) {
+      this.deafenVoice.osc.stop();
+      this.FreeVoice(this.deafenVoice);
+      this.deafenVoice = null;
+    }
+    this.deafenUntil = 0; this.deafenStrength = 0;
+    if (this.ctx && this.deafFilter) {
+      this.deafFilter.frequency.cancelScheduledValues(this.ctx.currentTime);
+      this.deafFilter.frequency.setValueAtTime(BLAST_HEARING.clearHz, this.ctx.currentTime);
+    }
   }
 
   // --- 环境床 -------------------------------------------------------------

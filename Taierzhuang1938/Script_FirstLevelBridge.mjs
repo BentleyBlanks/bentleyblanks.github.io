@@ -270,7 +270,7 @@ export class FirstLevelBridge {
     state.fired = true;
     const at = r.Point(A.railBridge, 1.2);
     r.vfx.Explosion?.(at, { radius: R.bridgeBlastRadiusM });
-    r.audio.Play("shellImpact", { position: at, volume: 1 });
+    r.combat.BlastFeedback(at, R.bridgeBlastRadiusM);
     // 桥面 / 桁架 / 钢轨的 5 个完好件与 3 个残骸件都挂在 RailBridgeDestroyed 这个信号上
     //（MISSION_SCENARIO_SIGNALS：信号 → bridgeDestroyed 这条事实）。一次翻完，不可逆。
     r.Record("bridgeDestroyed", { x: A.railBridge.x, z: A.railBridge.z, waitedS: Number(state.waitedS.toFixed(1)) });

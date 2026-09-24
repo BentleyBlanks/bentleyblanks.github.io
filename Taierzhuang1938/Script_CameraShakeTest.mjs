@@ -3,6 +3,7 @@
 import assert from "node:assert/strict";
 import { CameraShake } from "./Script_CameraShake.mjs";
 import { CAMERA_SHAKE } from "./Data_Tuning_Player.mjs";
+import { BlastHearing } from "./Script_Audio.mjs";
 
 function Run(shake, seconds, dt = 1 / 60) {
   let peak = 0;
@@ -115,4 +116,32 @@ function Run(shake, seconds, dt = 1 / 60) {
   assert.ok(Number.isFinite(s.pitch) && Math.abs(s.pitch) < 1, "大步长不发散");
 }
 
-console.log("CameraShakeTest OK — 创伤漏光/弹簧回位/幅度封顶/距离与遮挡衰减/扑沟栽向下/确定性");
+// Nearby blasts retain a settling tail without lengthening landing/bullet feedback.
+{
+  const s = new CameraShake();
+  s.Explosion(5, 4 * 1.9, false, 1);
+  Run(s, .6);
+  assert.ok(s.blastTrauma > .25 && s.Active, "near grenade still has a visible settling tail");
+  Run(s, 3);
+  assert.equal(s.Active, false);
+  const left = new CameraShake(), right = new CameraShake(), covered = new CameraShake();
+  left.Explosion(4, 12, false, -1); right.Explosion(4, 12, false, 1);
+  covered.Explosion(4, 12, true, 1);
+  assert.equal(left.springs.roll.x, -right.springs.roll.x);
+  assert.ok(Math.abs(covered.springs.pitch.x) < Math.abs(right.springs.pitch.x), "cover softens the initial kick too");
+  for (let i = 0; i < 100; i++) right.Explosion(0, 12, false, 1);
+  assert.equal(right.blastTrauma, 1);
+  assert.ok(Math.abs(right.springs.pitch.x) <= CAMERA_SHAKE.explosion.maxKickRad);
+  assert.ok(Math.abs(right.springs.roll.x) <= CAMERA_SHAKE.explosion.maxKickRad);
+  right.Reset(); assert.equal(right.Active, false);
+  right.Dive();
+  const divePitch = right.springs.pitch.x;
+  right.Explosion(3, 12);
+  assert.equal(right.springs.pitch.x, divePitch, "blast cap must not snap a larger dive impulse back toward zero");
+  assert.ok(BlastHearing(2, 4) > BlastHearing(6, 4));
+  assert.ok(BlastHearing(6, 8) > BlastHearing(6, 4));
+  assert.ok(BlastHearing(2, 4, true) < BlastHearing(2, 4));
+  assert.equal(BlastHearing(30, 100), 0, "even a large explosion has a bounded hearing radius");
+}
+
+console.log("CameraShakeTest OK — decay, bounded repeated blasts, direction, cover, hearing distance and radius");

@@ -68,6 +68,8 @@ function FakeRuntime({ stage = "Regroup" } = {}) {
     audio: { Ambience(name) { r.ambience = name; }, Play() {} },
     vfx: { Explosion(at, options) { r.explosions.push({ ...at, ...options }); } },
     explosions: [],
+    blastFeedback: [],
+    combat: { BlastFeedback(at, radius) { r.blastFeedback.push({ ...at, radius }); } },
     nightLights: { specs: [], Sync(specs) { this.specs = specs; return specs.length; }, get count() { return this.specs.length; } },
     threatIds: new Set(),
     Has: id => facts.has(id),
@@ -795,6 +797,8 @@ function BridgeRuntime() {
   r.Step(40, "BridgeWithdraw");
   Check(r.Has("bridgeDestroyed"), "人真的走净了才炸");
   Check(r.explosions.length === 1, "只炸一次");
+  Check(r.blastFeedback.length === 1 && r.blastFeedback[0].radius === R.bridgeBlastRadiusM,
+    "桥梁爆破只调用一次共用感知入口，不另行播放重复爆炸音");
   Check(r.said.includes("MarchToTengxian"), "炸完军官只喊「往滕县！跟上前队！」");
   const occupant = r.bridge.BlastZoneOccupant();
   Check(occupant === null, "点火那一刻爆破区里一个己方都没有");

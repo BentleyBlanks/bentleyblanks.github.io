@@ -316,6 +316,18 @@ export const BLAST_AUDIO = Object.freeze({
   gunDuckAmount: 0.5,
 });
 
+/** Shared near-blast hearing response, authored for the 2026-09-24 request.
+ * Radius affects reach; cover softens it. These are game-feel values, not medical thresholds.
+ * Keep the initial report audible, then muffle and ring with a bounded recovery.
+ */
+export const BLAST_HEARING = Object.freeze({
+  referenceRadiusM: 6, radiusScale: 2, minReachM: 6, maxReachM: 18,
+  falloffPower: 0.65, occludedScale: 0.55, minStrength: 0.08,
+  minHoldS: 0.25, holdSpanS: 1.55, maxHoldS: 2.2,
+  attackHoldS: 0.13, attackS: 0.05, recoveryS: 1.4,
+  clearHz: 20000, muffledHz: 520, ringHz: 4000, ringGain: 0.035,
+});
+
 /**
  * 战场密度（2026-09-09）。用户原话：「打起来整个战场安安静静的」。
  *
