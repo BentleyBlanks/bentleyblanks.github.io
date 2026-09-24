@@ -108,6 +108,34 @@ const Dist = (c, L) => Math.hypot(c.position.x - L.x, c.position.z - L.z);
   };
   const sparse = Density(0, 20), dense = Density(S.riseS - 10, S.riseS + 10);
   assert.ok(dense > sparse * 1.2, `由稀到密（16 个种子平均）：头 20 s ${sparse.toFixed(1)} 声 → 到顶前后 20 s ${dense.toFixed(1)} 声`);
+  // 【2026-09-24 审查补】频次那一半单独钉住：上面的密度对比只靠「首场往后摊 + 等待按涨幅缩短」
+  // 也过得去（把 rate 上的 swell.intensity 倍率拿掉，16 种子仍是 26.4 → 37.6）。这里直接量每一场
+  // 交火排下一场时用的频次：等待 = R(gapS) / (P.intensity × swell.intensity × 扇区权重) + 排队余量。
+  {
+    // 包住 StartExchange 之后的第一次 R（就是 gapS 那一抽）与紧跟着的 QueueSpanS，
+    // 在排下的那一帧读 nextAt（下一帧的「按涨幅缩短」会再改它，所以只对照刚排下的那一刻）。
+    const ag = FakeAudio(), sg = new FirstLevelMissionBattleSound(ag, { Has: () => false }, 0x5e11);
+    const R1 = sg.R.bind(sg), Q1 = sg.QueueSpanS.bind(sg), X1 = sg.StartExchange.bind(sg);
+    let armed2 = false, gap2 = null, pending = null;
+    const got = [];
+    sg.StartExchange = (sector) => { const r = X1(sector); armed2 = true; return r; };
+    sg.R = (a, b) => { const v = R1(a, b); if (armed2) { gap2 = v; armed2 = false; } return v; };
+    sg.QueueSpanS = (sector) => { const q = Q1(sector); pending = { sector, gap: gap2, q, now: sg.frontTime, intensity: sg.swellScale.intensity }; return q; };
+    for (let t = 0; t < S.riseS + 10; t += 1 / 30) {
+      ag.Tick(1 / 30);
+      sg.Update(1 / 30, "Trapped", false);
+      if (pending) { got.push({ ...pending, wait: pending.sector.nextAt - pending.now - pending.q }); pending = null; }
+    }
+    const earlyN = got.filter((g) => g.intensity < 0.7).length;
+    assert.ok(got.length >= 10 && earlyN >= 3, `量到 ${got.length} 场交火（其中 ${earlyN} 场在渐强前段）`);
+    for (let i = 0; i < got.length; i += 1) {
+      const g = got[i], weight = (P.weights?.[g.sector.spec.id] ?? 1) * g.sector.spec.weight;
+      const expected = g.gap / Math.max(0.05, P.intensity * g.intensity * weight);
+      assert.ok(Math.abs(g.wait - expected) < 1e-6,
+        `第 ${i + 1} 场（${g.now.toFixed(2)} s，渐强强度 ×${g.intensity.toFixed(3)}）排下一场的等待 ${g.wait.toFixed(3)} s，应为 ${expected.toFixed(3)} s`);
+    }
+    Ok(`01 渐强的频次：${got.length} 场交火排下一场的等待都按 P.intensity × 渐强倍率 × 权重算（渐强前段 ${earlyN} 场）`);
+  }
   Ok(`01 渐强：强度 ${first.intensity.toFixed(2)}→${P.intensity}、音量 ${first.gain.toFixed(2)}→${P.gain}（${S.riseS} s 到顶）；`
     + `每声相对音量 ${Mean(early).toFixed(3)}→${Mean(late).toFixed(3)}，20 s 声数 ${sparse.toFixed(1)}→${dense.toFixed(1)}`);
 
@@ -127,11 +155,28 @@ const Dist = (c, L) => Math.hypot(c.position.x - L.x, c.position.z - L.z);
   }
   assert.ok(before.u < 0.5 && topAt !== null && topAt <= S.catchUpS + 0.15,
     `第 20 s 近爆（u ${before.u}）→ ${topAt?.toFixed(1)} s 补到顶（≤ ${S.catchUpS} s）`);
-  // 从近爆之后进 01（调试入口 / 检查点）：一进来就在顶上。
+  // 从近爆之后进 01（调试入口 / 读档）：进步骤第一帧就在顶上，不再从底补 catchUpS 秒
+  //（2026-09-24 审查：原断言等 catchUpS + 0.2 s 才看，测的是「2 s 内补满」，实际头两秒轻 7 dB 上下）。
   const a3 = FakeAudio(), s3 = new FirstLevelMissionBattleSound(a3, { Has: () => true }, 0x19380924);
-  Run(s3, a3, "Trapped", S.catchUpS + 0.2);
-  assert.equal(s3.State().front.swell.u, 1, "近爆已经发生过的 01 直接在顶上");
-  Ok(`01 渐强：近爆早到 ${topAt.toFixed(1)} s 补到顶；近爆后再进 01 直接在顶上`);
+  for (let t = 0; t < 5; t += 1 / 30) {
+    a3.Tick(1 / 30);
+    s3.Update(1 / 30, "Trapped", false);
+    const w = s3.State().front.swell;
+    assert.ok(w.u === 1 && w.intensity === 1 && w.gain === 1, `近爆已经发生过的 01：第 ${a3.clock.toFixed(2)} s 倍率 ${JSON.stringify(w)}，应一直是顶`);
+  }
+  // 播出来的也是顶上的音量：16 个种子，进步骤头 2 s（原来补到顶的那段）与 5–30 s 比。
+  // 实测：现在 0.683 / 0.715 = 0.95；改之前从底补起是 0.341 / 0.712 = 0.48。
+  const reentry = [], settled = [];
+  for (let seed = 1; seed <= 16; seed += 1) {
+    const ar = FakeAudio(), sr = new FirstLevelMissionBattleSound(ar, { Has: () => true }, seed);
+    Run(sr, ar, "Trapped", 30);
+    const Rel = (c) => c.volume / D.front.cueVolume[c.cue];
+    reentry.push(...ar.calls.filter((c) => c.soundField && c.t < S.catchUpS).map(Rel));
+    settled.push(...ar.calls.filter((c) => c.soundField && c.t >= 5).map(Rel));
+  }
+  assert.ok(reentry.length >= 10 && Mean(reentry) >= Mean(settled) * 0.8,
+    `近爆后再进 01：头 ${S.catchUpS} s ${reentry.length} 声相对音量均 ${Mean(reentry).toFixed(3)}，5–30 s 均 ${Mean(settled).toFixed(3)}`);
+  Ok(`01 渐强：近爆早到 ${topAt.toFixed(1)} s 补到顶；近爆后再进 01 第一帧就在顶上（头 ${S.catchUpS} s 相对音量 ${Mean(reentry).toFixed(3)} / 5–30 s ${Mean(settled).toFixed(3)}）`);
 
   // 其它步骤不受影响：进步骤第一帧起倍率就是 1；01 之后接 02 也是。
   for (const stage of Object.keys(D.front.stages).filter((id) => id !== "Trapped")) {

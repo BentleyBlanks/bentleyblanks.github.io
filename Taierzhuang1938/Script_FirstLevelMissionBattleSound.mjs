@@ -163,15 +163,19 @@ export class FirstLevelMissionBattleSound {
       .sort((a, b) => b.w - a.w);
     // 有渐强的步骤（01）其余扇区的第一场按起始频次往后摊（首场仍在 firstWithinS 内），
     // 不然五个扇区在头十几秒里各打一场，渐强的开头反而最密。没有渐强的步骤倍率为 1，一个数不变。
-    const from = P.swell ? (P.swell.intensityFrom ?? 1) : 1;
+    // 进来时 peakFact 已经为真（近爆之后从调试入口 / 读档进 01）：直接在顶上，不再从底爬
+    //（2026-09-24 审查：原来 swellU 清零后 catchUpS 从 0 补起，头两秒的声音轻 7 dB 上下）。
+    const atTop = !!(P.swell?.peakFact && this.host?.Has?.(P.swell.peakFact));
+    const from = P.swell && !atTop ? (P.swell.intensityFrom ?? 1) : 1;
     ranked.forEach(({ s }, i) => {
       s.nextAt = i === 0 ? now + this.R(0.15, F.firstWithinS) : now + F.firstWithinS + this.R(0.8, F.gapS[1]) / from;
       s.swellAt = from;
     });
     this.frontStage = stage;
     this.frontStageAt = now;
-    this.swellU = 0;
-    this.swellFactAt = null;
+    this.swellU = atTop ? 1 : 0;
+    this.swellFactAt = atTop ? now : null;
+    this.swellFactFrom = atTop ? 1 : 0;
   }
 
   /**

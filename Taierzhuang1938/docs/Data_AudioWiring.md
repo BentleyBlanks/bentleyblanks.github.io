@@ -670,8 +670,11 @@ Hell Let Loose 的战场声。改之前查到的病根（`survey/Digest_audio.md
 - `riseS` 50 s 对的是新导演的近爆时刻。浏览器实测（p012 实时跑，`Probe_TrappedSwell`）：Banter 2.5–34.4 s、
   Orders 34.4–48.6 s、Incoming 48.6 s、近爆（Blast）50.4 s、Black 50.9 s、Wake 53.5 s、FrontPass 57.8 s、
   Interrogation 80.4 s、Found 129.3 s（之后进 02）。
-- `peakFact: "bunkerCollapsed"`：近爆一出现，剩下的在 `catchUpS` 2 s 内补完（黑屏盖着）；从 Wake 起的调试入口
-  或近爆已经发生过的检查点一进来就在顶上。u 只增不减。
+- `peakFact: "bunkerCollapsed"`：近爆一出现，剩下的在 `catchUpS` 2 s 内补完（黑屏盖着）。u 只增不减。
+- 进 01 时近爆事实**已经**为真（从 Wake 起的调试入口之类；检查点重来会删掉这条事实，碰不到）：`EnterFront`
+  直接把 u 置 1，其余扇区的首场也按顶上的频次排，第一帧起就在顶上。2026-09-24 审查前这里是先清零再用
+  `catchUpS` 从底补起，实测头三声相对音量 0.21 / 0.25 / 0.33（顶上约 0.7），头 2 s 轻 7 dB 上下，而文档与
+  断言名都写着「直接在顶上」——旧断言是跑满 `catchUpS + 0.2` s 才看 u，测的其实是「2 s 内补满」。
 - **近爆之后不回落**：耳鸣与闷耳是剧情档（`Data_OpeningStoryboards.perception.hearing`）与 `Deafen` 的事，
   近落弹有 `quietAfter` 14 s 让路；前线再掉下去，等闷耳退掉又要爬一次，听起来像第二次渐强。之后接 02
   （BunkerRescue 0.72 / 0.95）、02 撤退（0.78 / 1）、03（0.85 / 1），整条 01→03 只升不降。
@@ -817,7 +820,10 @@ stress ≥ 0.42 开始喘（`breathHeavy` 原速原调，0.26–0.5 随 stress�
   （2026-09-24 恢复的「the front grows while the man lies pinned」）；03 双方对射；07 以后回到旧声源。
 - `Script_FirstLevelBattleSoundTest`（2026-09-24，01 渐强）：逐秒只升不降、到顶前每秒都涨、`riseS` 时正好等于
   `stages.Trapped` 的 intensity / gain、到顶后不回落；每声相对音量头 15 s → 到顶前后 ≥ 2 倍；16 个种子平均声数
-  头 20 s → 到顶前后 20 s ≥ 1.2 倍；近爆早到时 `catchUpS` 内补到顶；近爆后再进 01 直接在顶上；其余步骤倍率恒为 1。
+  头 20 s → 到顶前后 20 s ≥ 1.2 倍；**频次那一半单独钉住**：每一场交火排下一场的等待都等于
+  `R(gapS) / (intensity × 渐强倍率 × 扇区权重)`（光看声数分不出来——把 rate 上的渐强倍率拿掉，靠首场后摊与
+  等待缩短，16 种子声数照样 26.4 → 37.6）；近爆早到时 `catchUpS` 内补到顶；近爆后再进 01 **逐帧**都在顶上，
+  16 种子头 2 s 每声相对音量 ≥ 5–30 s 的 0.8 倍（现在 0.683 / 0.715，改前 0.341 / 0.712）；其余步骤倍率恒为 1。
 
 ---
 
