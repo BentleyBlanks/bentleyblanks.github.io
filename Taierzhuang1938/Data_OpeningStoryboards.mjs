@@ -1,7 +1,7 @@
 // Metres relative to the existing bunker/traffic-trench ground sampler.
 // Composition follows Notion 01–03, 03–07 V2 and 08–09A V3 (2026-09-21).
 export const OPENING_STORYBOARDS = Object.freeze({
-  version:"20260923OpeningStoryboardsV3", animationBase:"./Animation/OpeningStoryboards/",
+  version:"20260923OpeningStoryboardsV4", animationBase:"./Animation/OpeningStoryboards/",
   // 2026-09-23 action library (contract §5.4). Names are frozen; per-clip metadata (role,
   // contacts, stages, props, root motion, holdLoop, next) is in the manifest `clips`.
   clips:{
