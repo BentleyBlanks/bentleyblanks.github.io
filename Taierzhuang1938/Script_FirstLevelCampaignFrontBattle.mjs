@@ -7,6 +7,7 @@ import { MISSION_ROUTES as Routes, MISSION_ANCHORS as A } from "./Data_FirstLeve
 import { MISSION_STAGE_ROUTES } from "./Data_FirstLevelMissionTopology.mjs";
 import { CampaignActions } from "./Script_FirstLevelCampaignKit.mjs";
 import { DriveBundleThrow } from "./Script_FirstLevelBundleThrowDriver.mjs";
+import { FRONT_TUNING as F } from "./Data_Tuning_FirstLevelFront.mjs";
 
 export async function DriveFrontBattle(ctx){
   const {page,output}=ctx,{Route,Interact,WaitStage,CaptureFocus}=CampaignActions(ctx);
@@ -110,6 +111,16 @@ export async function DriveFrontBattle(ctx){
           return out.slice(0,24);})(),
         profile:(()=>{const t=window.routeBot?.points?.[window.routeBot.index];if(!t)return null;const out=[];
           for(let k=0;k<=8;k++){const x=at.x+(t.x-at.x)*k/8,z=at.z+(t.z-at.z)*k/8;out.push([+x.toFixed(2),+z.toFixed(2),+g.battlefield.GroundHeight(x,z).toFixed(2)]);}return out;})(),
+        // Rapier's own view (09-24 step 3): every collider whose box overlaps the body's, what the controller hits
+        // on a 5 cm step toward the target, and whether a knockdown / melee / emplacement holds the input.
+        physics:(()=>{const P=g.physics,W=P.world,b=p.body,out={colliders:[],hits:[],hold:null,velocity:[+p.velocity.x.toFixed(2),+p.velocity.y.toFixed(2),+p.velocity.z.toFixed(2)],grounded:p.grounded};
+          try{W.collidersWithAabbIntersectingAabb({x:at.x,y:at.y+.9,z:at.z},{x:.9,y:1.1,z:.9},c=>{if(c.handle===b?.collider?.handle)return true;const r=P.recordByHandle.get(c.handle),t=c.translation(),sh=c.shape;
+            out.colliders.push({tag:r?.tag??null,id:r?.id??null,tile:r?.tile??null,type:sh?.type??null,group:c.collisionGroups?.(),sensor:c.isSensor?.(),t:[+t.x.toFixed(2),+t.y.toFixed(2),+t.z.toFixed(2)],he:sh?.halfExtents?[+sh.halfExtents.x.toFixed(2),+sh.halfExtents.y.toFixed(2),+sh.halfExtents.z.toFixed(2)]:null,r:sh?.radius??null,body:c.parent()?.bodyType?.()??null});return out.colliders.length<30;});}catch(e){out.collidersError=String(e);}
+          const t=window.routeBot?.points?.[window.routeBot.index];
+          if(t&&b?.collider){try{const cc=P.controller,d=Math.hypot(t.x-at.x,t.z-at.z)||1;cc.computeColliderMovement(b.collider,{x:(t.x-at.x)/d*.05,y:-.01,z:(t.z-at.z)/d*.05});const m=cc.computedMovement();out.test=[+m.x.toFixed(4),+m.y.toFixed(4),+m.z.toFixed(4)];
+            for(let i=0;i<cc.numComputedCollisions();i++){const c=cc.computedCollision(i),r=P.recordByHandle.get(c.collider?.handle);out.hits.push({tag:r?.tag??null,id:r?.id??null,tile:r?.tile??null,n:[+c.normal1.x.toFixed(2),+c.normal1.y.toFixed(2),+c.normal1.z.toFixed(2)],w:[+c.witness1.x.toFixed(2),+c.witness1.y.toFixed(2),+c.witness1.z.toFixed(2)]});}}catch(e){out.testError=String(e);}}
+          const mc=g.meleeCombat;out.hold={melee:!!mc?.Active,blocking:!!mc?.Blocking,fighter:mc?.Fighter?.(mc.Player?.())?.state??null,mounted:!!g.emplacement?.Mounted,carry:g.carry?.KindId??null,cutscene:g.state.cutscene??null,busy:!!p.Busy};
+          return out;})(),
         fragments:(()=>{const out=[],m=new (g.player.position.constructor)();g.scene.traverse(o=>{if(!o.isInstancedMesh||!/Fragment|Debris|Rubble/i.test(o.name+(o.parent?.name||'')))return;
           const M=new (o.matrixWorld.constructor)();for(let i=0;i<o.count;i++){o.getMatrixAt(i,M);m.setFromMatrixPosition(M).applyMatrix4(o.matrixWorld);if(near(m.x,m.z,2.5))out.push([o.name,+m.x.toFixed(2),+m.y.toFixed(2),+m.z.toFixed(2)]);}});return out.slice(0,20);})()};
     }).catch(e=>({error:String(e)}));
@@ -183,6 +194,30 @@ export async function DriveFrontBattle(ctx){
   await ReturnToSeat("ReturnToNestAfterEvade");
   await HoldNest({fact:"tankPositionPressured"},120,"ReturnToNestAfterEvade");
   await Route(S.rearRoute,"RightNestShortRetreat",{stance:"crouch",fight:false});
+  // rightRearReached needs the player at the junction (F.rearArrivalM) out of the gun's sight. Wait there like a
+  // player: dodge a grenade, then walk back. 2026-09-24 step 3: a dodge during the wait carried the bot 13 m north to
+  // (36.6,-130.7), it stood there for 180 s and 04 never ended.
+  for(let round=0;round<9;round++){
+    const wait=await page.evaluate(({x,z})=>{
+      const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime();
+      for(let f=0;f<20*60&&g.player.alive&&r.flow.stage.id!=="Tank";f++){
+        const evading=window.MissionInputDriver.EvadeGrenade();
+        if(!evading){g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);}
+        if(g.player.bleeding&&g.player.health<80)g.Debug.Key("KeyB");
+        g.StepFrames(1,1/60,false);
+        if(!evading&&Math.hypot(g.player.position.x-x,g.player.position.z-z)>2.5)break;
+      }
+      const p=g.player.position;
+      return {stage:r.flow.stage.id,alive:g.player.alive,d:Math.hypot(p.x-x,p.z-z),at:[+p.x.toFixed(2),+p.z.toFixed(2)]};
+    },S.rear);
+    if(wait.stage==="Tank"||!wait.alive)break;
+    if(wait.d>2.5){
+      console.log("RIGHT_REAR_REJOIN",JSON.stringify(wait));
+      // Back the way the dodge went: along the ammo-house trench (S.route starts at the junction), from its nearest corner.
+      const near=S.route.reduce((best,q,i)=>Math.hypot(q.x-wait.at[0],q.z-wait.at[1])<Math.hypot(S.route[best].x-wait.at[0],S.route[best].z-wait.at[1])?i:best,0);
+      await Route(S.route.slice(0,near+1).reverse(),"RightRearRejoin",{stance:"crouch",fight:false,arrivalM:Math.min(1,F.rearArrivalM)});
+    }
+  }
   await WaitStage("Tank",180);
   assert.deepEqual(await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMissionRuntime().guards.map(g=>g.actor.id)),guardIds,"04 retains both existing guard batches");
   await CaptureFocus("RightRearJunction",S.attackRoute[1]);
@@ -210,7 +245,9 @@ export async function DriveFrontBattle(ctx){
   // 要再补一颗才彻底哑火。旧路径（没有大脑）一颗同帧两样全记，break 条件与原来一致。
   // 战车探针（ctx.options.tankProbe）：断履带以后在攻击位上蹲 ≥ 8 s，记下车在 MobilityKill 里有没有朝投掷者开火；
   // 第二颗扔上车顶后甲板（aim "deck"），验发动机舱那一路。
-  const aims=ctx.options.tankProbe?["farTrack","deck"]:["farTrack","farTrack"];
+  // "auto" (Script_FirstLevelBundleThrowDriver): the near track's far end when it is ≥ 7.5 m away (the tank holds Block
+  // through 05, 7.8–8.9 m from the attack position), else over the hull to the far track.
+  const aims=ctx.options.tankProbe?["auto","deck"]:["auto","auto"];
   for(let attempt=0;attempt<aims.length;attempt++){
     if(attempt>0&&ctx.options.tankProbe){
       const hold=await page.evaluate(()=>{
