@@ -320,7 +320,12 @@ export class FirstLevelTankRuntime {
       const t = r.tank, groundY = r.view?.tank?.position.y ?? this.Ground(t.x, t.z);
       position = { x: t.x, y: groundY + (this.T.audio?.turretY ?? 2.2) - 1.5, z: t.z };
     }
-    const played = r.audio?.Bark?.(spec.kind, { key, who: spec.who ?? null, side: spec.side || "nra", position, priority: false,
+    // 这几句是契约 §2 第 7 条的「窗口」提示（不加 HUD，靠罗班长喊）：按优先战术提示喊（priority，不给剧情对白让路、
+    // 不吃 0.55 s 全局闸）—— 只有点名的那个人自己正在说剧情台词时才排队等他说完（不许一个人两张嘴）。
+    // 2026-09-25：非优先时「履带断了」排了 6 s 队，一次都没喊出来（对白与班组喊话把让路闸和全局闸占满）。
+    const own = spec.who ? r.voice?.Speech?.(spec.who) : null;
+    if (own && own.active !== false) return false;
+    const played = r.audio?.Bark?.(spec.kind, { key, who: spec.who ?? null, side: spec.side || "nra", position, priority: true,
       seed: key.length }) ?? null;
     if (!played) return false;
     this.barkSaidAt.set(key, r.time);
