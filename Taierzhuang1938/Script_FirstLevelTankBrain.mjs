@@ -475,15 +475,9 @@ export class TankBrain {
         const dx = d > 1e-3 ? (point.x - p.x) / d : Math.sin(pass + 1), dz = d > 1e-3 ? (point.z - p.z) / d : Math.cos(pass + 1);
         point.x = p.x + dx * (clear + 0.05); point.z = p.z + dz * (clear + 0.05); moved = true;
       }
-      if (!moved) return this.OutsideKeepOut(point);
+      if (!moved) return point;
     }
-    return list.every((p) => Dist(point, p) >= clear - 1e-6) ? this.OutsideKeepOut(point) : null;
-  }
-  /** 落点在 gunner.keepOutRects 里：这一发不打（坡道瓦片一出弹坑就走不过去，见 Data_Tuning_Tank）。 */
-  OutsideKeepOut(point) {
-    for (const k of this.T.gunner.keepOutRects || [])
-      if (point.x > k.minX && point.x < k.maxX && point.z > k.minZ && point.z < k.maxZ) return null;
-    return point;
+    return list.every((p) => Dist(point, p) >= clear - 1e-6) ? point : null;
   }
   GroundOf(m) { return m.ground ?? (m.y ?? 1.2) - 1.2; }
   /** 规划这一发打在哪。 */

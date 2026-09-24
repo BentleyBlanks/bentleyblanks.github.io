@@ -299,10 +299,10 @@ export async function DriveFrontBattle(ctx){
   const back=MISSION_STAGE_ROUTES.collectionReturn,door=back.findIndex(p=>Math.hypot(p.x-Space.westDoor.x,p.z-Space.westDoor.z)<.5);
   assert.ok(door>0,"the collection return passes the nest's west door");
   // Walk through the compound to the west door without stopping to trade shots (the watch itself fights below).
-  // The 09-24 stalls at (29.9,-143.8) on this leg were a crater-tile seam on the rear-door ramp, not the bot: see
-  // Data_Tuning_Tank TANK.gunner.keepOutRects.
+  // The 09-24 stalls at (29.9,-143.8) on this leg were the capsule resting on the north edge of crater tile 3,-19
+  // and never counting as grounded (fall speed -44 m/s pushed it back down the ramp); fixed in Script_Physics
+  // (TERRAIN_TILE_EDGE_SNAP_M).
   await Route(back.slice(0,door+1),"WestDoorGapWatch",{stance:"crouch",fight:false,crawl:true});
-
   await CaptureFocus("BreachReopened",S.gap);
   await WaitFact("lastGuardsWithdrawn",240,true);
   const meet=back.findIndex(p=>p.x===S.approach[2].x&&p.z===S.approach[2].z);

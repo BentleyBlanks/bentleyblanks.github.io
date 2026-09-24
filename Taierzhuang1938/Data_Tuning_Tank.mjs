@@ -145,11 +145,6 @@ export const TANK = Object.freeze({
     // 保护：任何弹着点离 missionUntargetable / protect 的人至少这么远
     // （[旧] 弹片外沿 5 × BLAST.radiusScale 1.9 = 9.5 m，再留 0.3 m）。
     protectClearM: 9.8,
-    // 主炮不落弹的矩形（世界 x/z）。阵位后门坡道（后墙岔口 (29.7,−141.5) → 后门 (29.7,−145.6)）横跨两块 8 m 弹坑地形瓦片
-    //（z −152…−144 / −144…−136，x 24…32）；坡度 0.47 超过 TERRAIN_DEFORMATION.maxAxisGrade 0.38，瓦片里只要有一个弹坑，
-    // 重建的格子就把坡压平、在瓦片边上留一道台阶，人蹲着走、站起来跳都过不去（09-24：05 攻击支路的掩体弹落在 (30.8,−145.1)，
-    // 03→06 连续三趟卡死在 (29.9,−143.8)）。矩形 = 两块瓦片各外扩 1.5 m（弹坑半径），南沿留在机枪座 (25.9,−153.9) 以北。
-    keepOutRects: Object.freeze([Object.freeze({ id: "nestRearRamp", minX: 22.5, maxX: 33.5, minZ: -153.5, maxZ: -134.5 })]),
     // 区域目标（缺口封锁）默认散布 3–5 m。
     zoneScatterMinM: 3,
     zoneScatterMaxM: 5,
