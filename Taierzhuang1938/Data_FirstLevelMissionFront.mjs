@@ -234,6 +234,39 @@ export const FRONT_DEFENDERS=[[-7.5,-112.4,"HanYang"],[-12,-111.8,"HanYang"]]
 // Guard 1 sits 0.6 m west of the old -5 so the observation step's line to him passes south of GapLastCover (K3).
 export const FRONT_GUARD_POSTS=[[-11,-156.3],[-5.6,-156.3],[-14.5,-156.4],[-1.5,-156.3],[-18,-156.4],[2,-156.2],[-22,-156.5],[-26,-156.5]]
   .map(([x,z])=>({x,z}));
+/**
+ * 03 backslope LMG pair (contract Data_FirstLevelStoryboard0103Contract §2.11, SB07 left: "土坎背坡 2 名守军 + 轻机枪 +
+ * 1 名伤员"). Two of the eight withdrawing guards (MISSION_TUNING.guardCount), no extra men: guards 6 and 7 of the
+ * second batch spawn here instead of on their scrape posts (FRONT_GUARD_POSTS 6/7 stay the scrape geometry the K3 and
+ * enfilade gates measure). They lie on the berm's upper backslope at its east end, the gunner firing the LMG over the
+ * crest at `fire` only (the brain's ambient fire, docs/Data_EnemyAi.md §20: never a hit, no token, no TTK account),
+ * the assistant beside him. They are scripted non-combatants and protected like every waiting guard.
+ * When: the whole of 03 (Support). At 04 entry they crawl down the `exit` points into the scrape and gather at the
+ * last cover with the rest of the second batch, which withdraws in 05 as before.
+ * Where (tmp probe, SampleMissionTerrain + SpaceProbe.Sight from the right low trench at (4.6..5,-143.3) eye 1.62):
+ * only the upper slope, z <= -158.8, shows over the trench lip (the berm foot at z -155.6 is hidden); the crest is at
+ * z -160 (2.1 m), the berm ends past x 12. From (5,-143) the pair bears 16-21 deg east of north: with Luo 4-5 m ahead
+ * (bearing ~82 deg) a frame at yaw ~-51 deg holds both, the pair at x ~0.2, Luo at x ~0.8 (SB07).
+ * `wounded`: the bloodied casualty beside them, a battlefield body (MISSION_AFTERMATH), not a live man.
+ * `exit`: down the slope south of ScrapeEastTraverse (5.9,-156.9) into the scrape, then the east posts' leg past the
+ * last-cover sandbags (-6.3,-156.8, Data_FirstLevelMissionLayout.guardWithdrawalRoutes).
+ */
+export const FRONT_GUARD_MG_GROUP=Object.freeze({
+  members:Object.freeze([
+    Object.freeze({guard:6,role:"gunner",x:10.4,z:-159.4,weapon:"Zb26",fire:true}),
+    Object.freeze({guard:7,role:"assistant",x:11.3,z:-159.1,weapon:"HanYang",fire:false}),
+  ]),
+  exit:Object.freeze([{x:8.2,z:-155.4},{x:4.2,z:-156.3},{x:-6.3,z:-156.8}].map(Object.freeze)),
+  // Ambient-fire points for the gunner: the enemy's bound lines north of the crest in front of him (Stub / Ridge / Mound
+  // rows of the CenterEast and Center columns, FRONT_COVER), 8-24 m out, inside the brain's 1.1 rad facing cone.
+  fire:Object.freeze([
+    {id:"mgStubE",x:10,z:-167.5,h:.6,r:1.6},{id:"mgStubC",x:2,z:-168,h:.6,r:1.8},
+    {id:"mgRidgeE",x:15,z:-174,h:.7,r:2},{id:"mgMound",x:6,z:-181,h:.8,r:2.2},
+  ].map(Object.freeze)),
+  wounded:Object.freeze({x:9.3,z:-158.9,yaw:2.4}),
+  /** Battlefield bodies closer than this to a member or to the wounded man are left out (a body under a live man). */
+  bodyClearanceM:1.2,
+});
 // Breaches only ever RAISE a dug floor toward (natural - depth). Gap: the sap is shallowed to 0.5 m
 // for ~6 m (the one exposed crossing). Damaged lip: 1.1 m for ~6 m - crouched (eye 1.05) is below the
 // natural ground and hidden from the tank, standing shows the road and the turret (graft from B's K8).
@@ -357,4 +390,9 @@ export const MISSION_AFTERMATH=clusters.flatMap(([x,z,count,ijaShare,spread],gro
     yaw:Random()*Math.PI*2,side:ija?"ija":"nra",pose:i%4,
     pile,scale:.94+Random()*.12,blood:.6+Random()*.75,opening:group<13};
 });}).filter(body=>(!body.opening||(+body.id.split("_")[1]<2&&OpeningRouteClear(body)))&&
-  musterPoints.every(point=>Math.hypot(body.x-point.x,body.z-point.z)>=musterBodyClearanceM));
+  musterPoints.every(point=>Math.hypot(body.x-point.x,body.z-point.z)>=musterBodyClearanceM)&&
+  [...FRONT_GUARD_MG_GROUP.members,FRONT_GUARD_MG_GROUP.wounded].every(p=>Math.hypot(body.x-p.x,body.z-p.z)>=FRONT_GUARD_MG_GROUP.bodyClearanceM)).concat([
+  // SB07: the bloodied casualty lying beside the backslope LMG pair (a body, not a live man: contract §6 budget).
+  {id:"AftermathMgWounded",x:FRONT_GUARD_MG_GROUP.wounded.x,z:FRONT_GUARD_MG_GROUP.wounded.z,yaw:FRONT_GUARD_MG_GROUP.wounded.yaw,
+    side:"nra",pose:1,pile:0,scale:1,blood:1.35,opening:false},
+]);

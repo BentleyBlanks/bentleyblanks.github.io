@@ -7,7 +7,8 @@ import { MISSION_FRONT_COLLECTION_ROUTE, MISSION_STAGE_ROUTES } from "./Data_Fir
 import { MISSION_ENCOUNTERS, FRONT_BATTLE_OBJECTIVES as Objectives } from "./Data_FirstLevelMission.mjs";
 import { MissionRouteProjection, MissionRoutePoint, MissionRouteLength, MissionRouteLookahead } from "./Script_FirstLevelMissionColumn.mjs";
 import { InstallMissionSentry } from "./Script_FirstLevelMissionPeople.mjs";
-import { FRONT_DEFENDERS } from "./Data_FirstLevelMissionFront.mjs";
+import { FRONT_DEFENDERS, FRONT_GUARD_MG_GROUP } from "./Data_FirstLevelMissionFront.mjs";
+import { InstallOpeningStoryboardAnimation } from "./Script_OpeningStoryboardAnimation.mjs";
 import { SpeakingCastOptions } from "./Data_FirstLevelSpeakingCast.mjs";
 import { TankClearFact } from "./Script_FirstLevelTankBrain.mjs";
 import { MISSION_VOICE_CAST } from "./Data_FirstLevelMissionDialogue.mjs";
@@ -70,6 +71,45 @@ export function FrontEntryRoute(position,route){
   return remaining;
 }
 /** Where the relief gunner waits for He to leave the left gun: B.reliefGunStandbyM back along leftRoute's last leg. */
+/** Guard i's part in the 03 backslope LMG pair (FRONT_GUARD_MG_GROUP.members), or null. */
+export function FrontGuardMgMember(i){return FRONT_GUARD_MG_GROUP.members.find(m=>m.guard===i)||null;}
+/**
+ * Guard i's withdrawal route and the route index he holds at for the 04 gather (1: the point after his scrape post).
+ * The LMG pair starts on the backslope and comes down FRONT_GUARD_MG_GROUP.exit into the scrape; its last exit point is
+ * the east posts' leg past the last-cover sandbags, from the last cover on it is the guard's own Layout route.
+ */
+export function GuardWithdrawalRoute(i){
+  const base=P.guardWithdrawalRoutes[i],mg=FrontGuardMgMember(i);
+  if(!mg)return {route:base,gatherIndex:1,mg:null};
+  const from=base.findIndex(p=>Distance(p,S.lastCover)<.01);
+  return {route:[{x:mg.x,z:mg.z},...FRONT_GUARD_MG_GROUP.exit.map(p=>({...p})),...base.slice(from).map(p=>({...p}))],
+    gatherIndex:FRONT_GUARD_MG_GROUP.exit.length,mg};
+}
+/**
+ * The corner the walker has just reached on his route (B.leaderLead): the route point before his current target turns
+ * more than cornerTurnDeg and he stands within cornerNearM of it. Returns the point to face and point at (the next leg's
+ * end), or null.
+ */
+export function LeadCorner(route,index,position,L=B.leaderLead){
+  if(index<2||index>=route.length)return null;
+  const a=route[index-2],p=route[index-1],b=route[index];
+  if(Distance(position,p)>L.cornerNearM)return null;
+  const ux=p.x-a.x,uz=p.z-a.z,vx=b.x-p.x,vz=b.z-p.z,lu=Math.hypot(ux,uz),lv=Math.hypot(vx,vz);
+  if(lu<1e-6||lv<1e-6)return null;
+  const turn=Math.acos(Math.max(-1,Math.min(1,(ux*vx+uz*vz)/(lu*lv))))*180/Math.PI;
+  return turn>L.cornerTurnDeg?{x:b.x,z:b.z}:null;
+}
+/**
+ * 03 lead (B.leaderLead, SB07): pace of a leader who must stay minM-maxM ahead of the player along his route.
+ * gap = leader's route progress - player's. Runs below catchUpM until the gap is minM again (`state.run` carries the
+ * hysteresis), waits above maxM, and holds at a just-reached corner while the player is minM or more behind.
+ */
+export function LeadPace(route,index,leader,player,state,L=B.leaderLead,walkMps=R.squadSpeedMps){
+  const gap=MissionRouteProjection(route,leader).progress-MissionRouteProjection(route,player).progress;
+  if(gap<L.catchUpM)state.run=true;else if(gap>=L.minM)state.run=false;
+  const corner=gap>=L.minM?LeadCorner(route,index,leader,L):null;
+  return {gap,corner,wait:gap>L.maxM||!!corner,speed:state.run?L.runMps:walkMps};
+}
 function ReliefGunStandby(){const a=S.leftRoute.at(-2),b=S.leftSeat,d=Math.hypot(a.x-b.x,a.z-b.z),k=Math.min(1,B.reliefGunStandbyM/Math.max(d,1e-6));return {x:b.x+(a.x-b.x)*k,z:b.z+(a.z-b.z)*k};}
 
 export class FirstLevelFrontBattle {
@@ -88,7 +128,7 @@ export class FirstLevelFrontBattle {
   get Active(){return ["Support","MachineGun","Tank"].includes(this.r.flow.stage.id);}
   get Leader(){return this.r.companion.Handle("luo");}
   SetWalk(actor,route){if(!actor)return;this.walks.set(actor.id,{route:route.map(p=>({...p})),index:0});this.r.squadRoutes.set(actor.id,route.map(p=>({...p})));}
-  Walk(actor,{follow=false,speed=R.squadSpeedMps}={}){
+  Walk(actor,{follow=false,speed=R.squadSpeedMps,lead=false}={}){
     const r=this.r,w=actor&&this.walks.get(actor.id);if(!actor?.alive||!w)return false;
     // Intermediate points describe checked trench corners. Advancing a metre
     // early cuts across the inside cover at the right-hand approach; this
@@ -100,7 +140,13 @@ export class FirstLevelFrontBattle {
     if(w.index>=w.route.length){r.Defend(actor,w.route.at(-1),0,.4);r.ai.SetStance(actor,1,.5,true);r.squadRoutes.set(actor.id,[]);return true;}
     if(r.RespondToGrenade(actor)){w.bestAt=r.time;return false;}
     const ahead=MissionRouteProjection(w.route,actor.position).progress>MissionRouteProjection(w.route,r.player.position).progress+B.leaderLeadM;
-    const wait=follow&&ahead&&Distance(actor.position,r.player.position)>S.leaderWaitM;
+    // 03 lead stretch (B.leaderLead): until the last bend before the nest's west door the leader keeps 3-5 m ahead.
+    if(lead)w.leadEnd??=MissionRouteProjection(w.route,S.approach[B.leaderLead.endApproachIndex]).progress;
+    const pace=lead&&MissionRouteProjection(w.route,actor.position).progress<w.leadEnd-B.arrivalM
+      ?LeadPace(w.route,w.index,actor.position,r.player.position,w.lead||(w.lead={})):null;
+    if(lead)this.lead=pace;
+    const wait=pace?pace.wait:follow&&ahead&&Distance(actor.position,r.player.position)>S.leaderWaitM;
+    if(pace)speed=pace.speed;
     // Stall fallback: intermediate points only count within 0.25 m, so a man shoved off the line (a gun block, a
     // crowd, a crater edge) could hold one point for good - Luo 200 s beside the captured gun's seat, the relief
     // gunner 70 s on the leftRoute leg (09-24 review). No progress for B.walkStallS -> skip the point, or take a
@@ -131,7 +177,27 @@ export class FirstLevelFrontBattle {
     r.ai.SetStance(actor,1,.5,true);r.MoveActor(actor,w.rejoin||w.route[w.index],wait?0:speed);
     actor.scriptArrivalRadius=Math.min(actor.scriptArrivalRadius,(w.rejoin?B.arrivalM*.25:Arrival())*.5);
     r.squadRoutes.set(actor.id,w.route.slice(w.index));
-    if(wait)r.leaderGuide?.Watch(actor);return false;
+    if(wait&&!pace?.corner)r.leaderGuide?.Watch(actor);return false;
+  }
+  /**
+   * SB07 pointing (upper body only, the legs keep walking): the leader points along the trench ahead through the first
+   * FrontApproach line, and at a corner he holds (B.leaderLead) he faces the next leg and points along it. The pose is
+   * the opening layer's PointBlockade (Script_OpeningStoryboardAnimation; loaded at level start by the bunker show),
+   * written only while this pointing lasts and taken off only if it is still ours.
+   */
+  UpdatePoint(){
+    const r=this.r,L=B.leaderLead,luo=this.Leader,w=luo&&this.walks.get(luo.id);if(!luo?.alive)return;
+    const approach=this.approachPointAt!=null&&r.time-this.approachPointAt<L.pointS;
+    const to=this.lead?.corner||(approach&&w&&w.index<w.route.length?w.route[w.index]:null);
+    if(to){
+      if(!this.pointFrom)this.pointFrom={at:r.time,corner:!!this.lead?.corner};
+      InstallOpeningStoryboardAnimation(luo);
+      luo.openingStoryboardPose={clip:"PointBlockade",seconds:r.time-this.pointFrom.at,upperBody:true};luo.frontPointing=true;
+      luo.watchYaw=Math.atan2(luo.position.x-to.x,luo.position.z-to.z);luo.watchUntil=r.ai.time+.3;
+      return;
+    }
+    this.pointFrom=null;
+    if(luo.frontPointing){luo.frontPointing=false;if(luo.openingStoryboardPose?.clip==="PointBlockade")luo.openingStoryboardPose=null;}
   }
   SetLeg(id,route){if(this.leg===id)return;this.leg=id;this.leaderRoute=route;this.SetWalk(this.Leader,route);}
   Prepare(){
@@ -198,7 +264,8 @@ export class FirstLevelFrontBattle {
     if(!this.Active)return;const r=this.r,stage=r.flow.stage.id;
     for(const cast of ["heyoutian","liuwencai","yaowa"])this.Walk(r.companion.Handle(cast),{
       speed:cast==="yaowa"&&this.walks.has(r.opening.zhou?.id)&&!r.Has("zhouGunWounded")?R.walkSpeedMps:R.squadSpeedMps});
-    this.Walk(this.Leader,{follow:true});
+    const leading=stage==="Support"&&this.leg==="capture";if(!leading)this.lead=null;
+    this.Walk(this.Leader,{follow:true,lead:leading});
     this.blocked=this.InfantryBlockade()||this.TankBlockade();
     this.UpdateHandover();
     // Sound package's music stinger: the gap is open again (tank silenced and no one fires on the gap).
@@ -206,6 +273,7 @@ export class FirstLevelFrontBattle {
     if(stage==="Support")this.UpdateCapture();
     if(stage==="MachineGun")this.UpdatePressure();
     if(stage==="Tank")this.UpdateSortie();
+    this.UpdatePoint();
   }
   UpdateCapture(){
     const r=this.r;
@@ -213,11 +281,15 @@ export class FirstLevelFrontBattle {
     // and the burning nest (it used to fire at 0 s of the step with Zhou 50 m away: Voice report).
     if(r.Near(Space.observationSpur[0],B.observationCallM)||r.Near(Space.fold,B.observationCallM))r.Say("FrontBlockade");
     // "贴这道墙！前头有人！" belongs to the right low trench, 12-20 m short of the nest's west door.
-    if(r.Near(S.approach[B.frontApproachCallIndex],5))r.Say("FrontApproach");
+    if(r.Near(S.approach[B.frontApproachCallIndex],B.frontApproachCallRadiusM))r.Say("FrontApproach");
+    // SB07: Luo points ahead through 「贴这道墙！前头有人！」 from the moment the scene is really playing.
+    const scenes=r.frontScenes,approachOn=!!r.voice?.scenes?.has?.("FrontApproach")||(scenes?.handle?.id==="FrontApproach"&&!scenes.handle.done);
+    if(approachOn&&this.approachPointAt==null){this.approachPointAt=r.time;r.Record("frontApproachPointed",{luo:{x:+this.Leader.position.x.toFixed(2),z:+this.Leader.position.z.toFixed(2)},
+      player:{x:+r.player.position.x.toFixed(2),z:+r.player.position.z.toFixed(2)},gap:this.lead?+this.lead.gap.toFixed(2):null});}
     const defenders=MISSION_ENCOUNTERS.approach.map(s=>r.enemies.get(s.id));
     if(r.Near(S.nest,B.captureRadiusM)&&Distance(this.Leader.position,S.nest)<B.captureRadiusM
       &&defenders.every(a=>a&&!a.alive)){
-      r.Record("frontReached");r.Record("rightNestCaptured");r.Say("FrontAttack");this.SetLeg("cover",[S.leaderCover]);
+      r.Record("frontReached");r.Record("rightNestCaptured");r.Say("FrontAttack");this.SetLeg("cover",[S.leaderCover]);this.lead=null;
     }
     if([...r.enemies.values()].some(a=>a.lastFire>0)||r.Inventory().shots>0)r.Record("frontContact");
     const assault=B.assaultIds.map(id=>r.enemies.get(id));
@@ -304,6 +376,7 @@ export class FirstLevelFrontBattle {
     }
     const stage=r.flow.stage.id;
     const clear=!this.InfantryBlockade()&&!this.TankBlockade();
+    if(r.Has("rightNestCaptured")&&r.Has("frontRifleDefense"))this.UpdateColumn(first);
     for(const [i,g] of r.guards.entries()){
       const firstBatch=i<B.firstBatch;
       const released=firstBatch?r.Has("rightNestCaptured")&&r.Has("frontRifleDefense"):
@@ -320,6 +393,17 @@ export class FirstLevelFrontBattle {
       // them with a bayonet charge at 1 m) -> guardBatchLost (Space package cold start, docs §10.3).
       g.actor.missionUntargetable=g.actor.alive&&!g.safe;
       if(!g.actor.alive||g.progress>=g.route.length)continue;
+      // 03 backslope LMG pair (FRONT_GUARD_MG_GROUP): on the slope through 03, then down the exit points into the
+      // scrape (04 on), where the ordinary second-batch gather and crossing take over.
+      if(g.mg&&!g.mgLeft){
+        if(stage==="Support"){this.HoldMg(g);continue;}
+        this.LeaveMg(g);
+      }
+      if(g.mg&&g.progress<g.gatherIndex){
+        if(g.progress===0)g.progress=1;
+        while(g.progress<g.gatherIndex&&Distance(g.actor.position,g.route[g.progress])<B.arrivalM)g.progress++;
+        if(g.progress<g.gatherIndex){r.ai.SetStance(g.actor,1,.5,true);r.MoveActor(g.actor,g.route[g.progress],R.guardSpeedMps);continue;}
+      }
       // The nearest man probes the visible breach once, then returns to his original cover.
       // This is real movement of the existing defender, with no scripted casualty or teleport.
       if(i===0&&!r.Has("rightNestCaptured")){
@@ -336,19 +420,25 @@ export class FirstLevelFrontBattle {
       if(g.progress===0)g.progress=1;
       if(!released||!clear){
         if(g.crossing){/* finish the exposed bound into the next cover */}
-        else if(gather&&g.progress<=1){
+        else if(gather&&g.progress<=(g.gatherIndex??1)){
           const hold={x:S.lastCover.x+(i-B.firstBatch)*B.gatherSpacingM,z:S.lastCover.z};
           if(Distance(g.actor.position,hold)>B.arrivalM){r.ai.SetStance(g.actor,1,.5,true);r.MoveActor(g.actor,hold,R.guardSpeedMps);continue;}
           g.gathered=true;r.Defend(g.actor,hold,0,0);r.ai.SetStance(g.actor,B.guardWaitStance,.5,true);continue;
         }else {r.Defend(g.actor,g.actor.position,0,0);r.ai.SetStance(g.actor,B.guardWaitStance,.5,true);continue;}
       }
-      if(!g.crossing){
+      if(firstBatch){
+        // SB08: the first batch goes as one column, firstColumnSpacingM apart (B.firstColumnSpacingM).
+        const gap=this.ColumnGap(g);
+        if(!g.crossing&&gap<B.firstColumnSpacingM)continue;
+        if(g.crossing&&gap<B.firstColumnMinM){r.ai.SetStance(g.actor,0,.5,true);r.MoveActor(g.actor,g.route[g.progress],0);continue;}
+      }else if(!g.crossing){
         // One man in the exposed gap at a time, but the next one goes as soon as the man ahead is gapClearM past
         // the gap (the trench behind it is covered). Waiting until he was in the safe zone 40-60 m on made the
         // six-man batch cross in ~90 s (Step 2 campaign run 2: tankFireDisabled 313 s -> last man past the gap ~400 s).
         const ahead=r.guards.slice(0,i).some(other=>other.actor.alive&&other.crossing&&!other.safe&&!GuardClearOfGap(other));
         if(ahead)continue;
       }
+      if(!g.crossing)g.columnMovedAt=r.time;
       g.crossing=true;g.actor.scriptedNoncombatant=false;
       while(g.progress<g.route.length&&Distance(g.actor.position,g.route[g.progress])<B.arrivalM)g.progress++;
       if(g.progress>=g.route.length){g.safe=true;r.Record(`guardWithdrawn${g.actor.id}`);r.Defend(g.actor,g.route.at(-1),0,0);continue;}
@@ -359,6 +449,50 @@ export class FirstLevelFrontBattle {
     if(BatchRecovered(last)&&r.Has("tankFireDisabled")){
       r.Record("lastGuardsWithdrawn",{survived:AliveBatch(last).length});r.Record("guardWithdrawalResolved");
     }
+  }
+  /** 03: the LMG pair lies on its backslope spot as scripted non-combatants; the gunner fires at FRONT_GUARD_MG_GROUP.fire. */
+  HoldMg(g){
+    const r=this.r,a=g.actor,spot=g.route[0];
+    if(!g.mgHeld){
+      g.mgHeld=true;
+      a.scriptedNoncombatant=true;a.p012Guided=false;delete a.scriptMoveSpeedMps;a.manualGoalUntil=Infinity;
+      a.order="hold";a.holdZone={id:`FrontMg_${g.mg.role}`,x:spot.x,z:spot.z,radius:.5};a.goal.set(spot.x,0,spot.z);
+      a.ambientFirePoints=g.mg.fire?FRONT_GUARD_MG_GROUP.fire:null;a.ambientFirePoint=null;
+      // Facing the crest (north) until the brain turns the gunner onto his first point.
+      a.watchYaw=0;a.watchUntil=r.ai.time+2;
+    }
+    r.ai.SetStance(a,2,Infinity,true);
+  }
+  LeaveMg(g){
+    const a=g.actor;g.mgLeft=true;
+    a.ambientFirePoints=null;a.ambientFirePoint=null;a.scriptedNoncombatant=false;
+    this.r.ai.SetStance(a,1,.5,true);
+  }
+  /** Guard g's position along his withdrawal route measured from the last cover (negative before it). */
+  ColumnAlong(g){
+    g.lastCoverAt??=MissionRouteLength(g.route.slice(0,g.route.findIndex(p=>Distance(p,S.lastCover)<.01)+1));
+    return MissionRouteProjection(g.route,g.actor.position).progress-g.lastCoverAt;
+  }
+  /** First-batch column: order fixed at release (nearest the last cover first), and each man's last forward move. */
+  UpdateColumn(first){
+    const r=this.r;
+    if(!this.firstColumn)this.firstColumn=first.map(g=>({g,along:this.ColumnAlong(g)})).sort((a,b)=>b.along-a.along).map(e=>e.g);
+    for(const g of this.firstColumn){
+      if(!g.actor.alive||!g.crossing)continue;
+      const along=this.ColumnAlong(g);
+      if(g.columnAlong==null||along>g.columnAlong+.2){g.columnAlong=along;g.columnMovedAt=r.time;}
+    }
+  }
+  /** Route distance to the live first-batch man ahead of g in the column (Infinity: nobody ahead, or he is stuck). */
+  ColumnGap(g){
+    const col=this.firstColumn||[],i=col.indexOf(g);
+    for(let k=i-1;k>=0;k--){
+      const o=col[k];if(!o.actor.alive||o.safe)continue;
+      if(!o.crossing)return -Infinity;
+      if(this.r.time-(o.columnMovedAt??this.r.time)>=B.firstColumnStallS)return Infinity;
+      return this.ColumnAlong(o)-this.ColumnAlong(g);
+    }
+    return Infinity;
   }
   UpdateZhou(){
     const r=this.r,a=r.opening.zhou;if(!a||r.Has("zhouGunWounded"))return;
@@ -500,5 +634,6 @@ export class FirstLevelFrontBattle {
     const labels={supply:"bundle",return:"bundle",attack:"throw",retreat:"front",gapWatch:"front",disengage:"orders",home:"orders"};
     return {target:!r.Has("bundleTaken")&&r.Near(S.house,S.supplierRangeM)?A.bundle:MissionRouteLookahead(this.leaderRoute||Routes.bundle,r.player.position),label:labels[this.leg]||"bundle",objective:Objectives[{gapWatch:"retreat",home:"disengage"}[this.leg]||this.leg]||Objectives.supply};
   }
-  State(){return {leg:this.leg,blocked:this.blocked,gapWatched:!!this.gapWatched,returnMeetDone:!!this.returnMeetDone,handoverStarted:!!this.handoverStarted,roadProgress:this.r.tank.roadProgress||0,walks:[...this.walks].map(([id,w])=>({id,index:w.index,total:w.route.length})),stalls:this.stalls.slice()};}
+  State(){return {leg:this.leg,blocked:this.blocked,lead:this.lead?{gap:+this.lead.gap.toFixed(2),wait:this.lead.wait,corner:!!this.lead.corner,run:this.lead.speed>R.squadSpeedMps}:null,
+    pointing:!!this.r.companion?.Handle?.("luo")?.frontPointing,approachPointAt:this.approachPointAt??null,firstColumn:this.firstColumn?.map(g=>g.actor.missionId||g.actor.id)??null,gapWatched:!!this.gapWatched,returnMeetDone:!!this.returnMeetDone,handoverStarted:!!this.handoverStarted,roadProgress:this.r.tank.roadProgress||0,walks:[...this.walks].map(([id,w])=>({id,index:w.index,total:w.route.length})),stalls:this.stalls.slice()};}
 }

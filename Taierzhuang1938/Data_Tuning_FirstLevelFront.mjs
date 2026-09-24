@@ -238,7 +238,10 @@ export const FRONT_TUNING_SOURCES = Object.freeze({
 // it is not part of the wave (Space package 03->06 cold starts, docs/Data_FirstLevelSpace0106_20260923.md §10.3).
 export const FRONT_BATTLE_TUNING=Object.freeze({
   arrivalM:1.0,leaderLeadM:3,captureRadiusM:4,rearArrivalM:3.5,attackArrivalM:3,
-  firstBatch:2,assaultKills:3,assaultIds:["FrontRifleA","FrontRifleB","FrontRifleC","FrontRifleD","FrontRifleE","FrontRifleF"],
+  // First batch 2 -> 5 (contract Data_FirstLevelStoryboard0103Contract §2.12, SB08: a column crossing the gap, >= 3 men in
+  // one frame from the captured nest). The total (MISSION_TUNING.guardCount 8) and the simultaneous-alive budget are
+  // unchanged: the second batch shrinks to 3, two of them the 03 backslope LMG pair (FRONT_GUARD_MG_GROUP).
+  firstBatch:5,assaultKills:3,assaultIds:["FrontRifleA","FrontRifleB","FrontRifleC","FrontRifleD","FrontRifleE","FrontRifleF"],
   guardHeightM:1.2,blockadeRangeM:85,gatherSpacingM:1.35,zhouHealth:80,
   // Zhou's age on the crosshair card (both bodies: 03-05 at the gun, 06 seated). The random identity pool gave him
   // 17 / 29 / 32 across runs ("老周 17 岁"); the cast note says 三十多岁 (Data_FirstLevelMissionDialogue MISSION_VOICE_CAST.zhou).
@@ -256,9 +259,32 @@ export const FRONT_BATTLE_TUNING=Object.freeze({
   handoverReadyM:3,
   // FrontBlockade (Zhou/Luo shouting across) fires when the player is this close to the observation spur mouth or the fold (K3).
   observationCallM:6,
-  // FrontApproach ("贴这道墙！前头有人！") fires 5 m around this FRONT_SORTIE.approach point: (13,-144.2) in the right
-  // low trench, 13 m short of the nest's west door (the old index 3 now sits at the observation step).
-  frontApproachCallIndex:10,
+  // FrontApproach ("贴这道墙！前头有人！") fires frontApproachCallRadiusM around this FRONT_SORTIE.approach point.
+  // 09-25 storyboard round (contract §2.11, SB07): the line is the SB07 frame, player at about (5,-143) with Luo 4-5 m
+  // ahead against the wall and the backslope LMG pair on the left of the frame. Point 9 (7,-143.5) at 2.5 m fires at
+  // about (4.6,-143.3) walking in from the west. It used to be point 10 (13,-144.2) at 5 m, i.e. the player at about
+  // (8,-143.6): from there the LMG pair on the berm's east end bears straight north, 50-60 deg left of any frame that
+  // also holds Luo (tmp probe: bearing 6-12 deg from (8,-143.6) vs 16-21 deg from (5,-143)).
+  frontApproachCallIndex:9,frontApproachCallRadiusM:2.5,
+  // 03 lead (contract §2.11, SB07 "班长在前 4-5 m"): from 03 entry until Luo reaches FRONT_SORTIE.approach[endApproachIndex]
+  // (19,-146.8), the last bend before the nest's west door, he keeps minM-maxM ahead of the player along his route.
+  // Before this he only waited when > leaderLeadM ahead and > leaderWaitM (10 m) away, and the driving bot (as any
+  // player who does not dawdle) overtook him at every stop: 0.67 m BEHIND the player at each survey stop (Survey_B SB07).
+  //   gap < catchUpM   -> he runs (runMps) and keeps running until the gap is back to minM;
+  //   gap > maxM       -> he stops and waits (faces the player, LeaderGuide.Watch);
+  //   at a corner      -> (the route turns > cornerTurnDeg at the point he just passed, within cornerNearM of it) he
+  //                       stops, faces the next leg and points along it (PointBlockade, upper body) until the player
+  //                       is within minM.
+  // runMps: the player's sprint is Data_Tuning_Player STANCE.stand.speed 3.05 x (1 + sprintBoost 0.72) = 5.25 m/s;
+  // 5.4 keeps a sprinting player from overtaking him. pointS: FrontApproach line 1 is 2.82 s long
+  // (Data_FirstLevelMissionVoiceAlignment), he points through it.
+  leaderLead:Object.freeze({minM:3,maxM:5,catchUpM:1.5,runMps:5.4,endApproachIndex:11,cornerTurnDeg:35,cornerNearM:1.6,pointS:2.8}),
+  // First batch crossing (SB08): the batch goes as one column in the order nearest-to-the-last-cover first; a man leaves
+  // (and keeps walking) once the man ahead of him is firstColumnSpacingM further along the shared withdrawal route, and
+  // pauses when closer than firstColumnMinM. A man ahead who has not moved on for firstColumnStallS is passed. 2 m at
+  // guardSpeedMps 2.7 is 0.74 s per man: the five men span ~8 m of the gap sap (lastCover -> gap -> junction is 14.6 m),
+  // so from the nest 3-5 of them are in the frame together. The second batch keeps the one-at-a-time gapClearM rule.
+  firstColumnSpacingM:2,firstColumnMinM:1.4,firstColumnStallS:4,
   // 05->06: at the safe zone (FRONT_SPACE.returnMeet) Luo waits for FrontRelief at most this long before going on.
   returnMeetMaxWaitS:20,
   // Posts on the support sap floor around returnMeet (probed: 2.0 m deep, >= 1.25 m from the sap wall). The relief

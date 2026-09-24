@@ -4,6 +4,7 @@ import { MISSION_ANCHORS as A, MISSION_PLACEMENT as P } from "./Data_FirstLevelM
 import { BuildFirstLevelCheckpoint } from "./Script_FirstLevelMissionCheckpoint.mjs";
 import { FIRST_LEVEL_STAGE_ENCOUNTERS, FIRST_LEVEL_ENCOUNTER_STARTS, FIRST_LEVEL_STAGE_CLEARED_ENEMIES, FIRST_LEVEL_DEFERRED_ENCOUNTERS } from "./Data_FirstLevelMissionStages.mjs";
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
+import { FRONT_BATTLE_TUNING as FB } from "./Data_Tuning_FirstLevelFront.mjs";
 
 // Called once on a fresh runtime, after the shared level restart has cleared all
 // combat, controls, destruction and actors. Backward jumps cannot retain future facts.
@@ -67,7 +68,7 @@ export function ApplyFirstLevelStageJump(runtime, value, { midCutscenes = false 
   }
   if (n >= 4 && n <= 5) {
     r.SpawnGuards();
-    for (const guard of r.guards.slice(0,OPENING.rifleGuardCount)) {
+    for (const guard of r.guards.slice(0,FB.firstBatch)) {
       guard.safe = true; guard.progress = guard.route.length;
       r.PlaceActor(guard.actor,guard.route.at(-1));
     }
