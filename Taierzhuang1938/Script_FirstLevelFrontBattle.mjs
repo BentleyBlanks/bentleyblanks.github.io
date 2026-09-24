@@ -221,6 +221,13 @@ export class FirstLevelFrontBattle {
     const last=r.guards.slice(B.firstBatch);
     this.gapWatched ||= BatchPastGap(last);
     if(!this.gapWatched){this.SetLeg("gapWatch",toDoor);return;}
+    // frontDisengaged = both back in our own trench behind the fold (the safe zone, FRONT_SPACE.returnMeet). The old
+    // point S.approach[0] became the support junction SJ next to the collection in the 09.23 space. A player who ran
+    // on past the meeting counts by his progress along the return route.
+    const reach=Math.max(B.rearArrivalM,Space.returnMeet.radiusM),meetAt=MissionRouteProjection(back,Space.returnMeet).progress-reach;
+    this.playerLeftFront ||= MissionRouteProjection(back,r.player.position).progress>=meetAt;
+    this.leaderLeftFront ||= MissionRouteProjection(back,this.Leader.position).progress>=meetAt;
+    if(this.playerLeftFront&&this.leaderLeftFront)r.Record("frontDisengaged");
     if(!this.returnMeetDone){
       this.SetLeg("disengage",toMeet);
       if(Distance(this.Leader.position,Space.returnMeet)<Space.returnMeet.radiusM)this.meetHoldAt??=r.time;
@@ -228,9 +235,6 @@ export class FirstLevelFrontBattle {
       if(!this.returnMeetDone)return;
     }
     this.SetLeg("home",home);
-    this.playerLeftFront ||= r.Near(S.approach[0],B.rearArrivalM);
-    this.leaderLeftFront ||= Distance(this.Leader.position,S.approach[0])<B.rearArrivalM;
-    if(this.playerLeftFront&&this.leaderLeftFront)r.Record("frontDisengaged");
     if(r.Has("frontDisengaged")&&r.Has("reliefInPosition")&&r.Near(A.collection,B.rearArrivalM)
       &&Distance(this.Leader.position,A.collection)<B.rearArrivalM)r.Record("collectionReturned");
   }
@@ -261,7 +265,8 @@ export class FirstLevelFrontBattle {
       // The nearest man probes the visible breach once, then returns to his original cover.
       // This is real movement of the existing defender, with no scripted casualty or teleport.
       if(i===0&&!r.Has("rightNestCaptured")){
-        if(!g.probe&&r.Near(S.approach[0],12))g.probe="forward";
+        // The probe is for the player to see (K3): start it when he reaches the observation step, not at SJ 45 m back.
+        if(!g.probe&&(r.Near(Space.observationSpur[0],B.observationCallM)||r.Near(Space.fold,B.observationCallM)))g.probe="forward";
         if(g.probe==="forward"||g.probe==="return"){
           const target=g.probe==="forward"?S.guardRoute[1]:g.route[0];
           if(Distance(g.actor.position,target)<B.arrivalM)g.probe=g.probe==="forward"?"return":"complete";

@@ -115,6 +115,10 @@ const Ok = (label) => console.log(`ok ${label}`);
   luo.position = { ...Space.returnMeet };
   battle.UpdateSortie();
   assert.equal(battle.leg, "disengage", "Luo holds at returnMeet until FrontRelief has started");
+  assert.ok(!facts.has("frontDisengaged"), "the player still at the rear junction has not disengaged");
+  player.position = { x: Space.returnMeet.x + 1, z: Space.returnMeet.z };
+  battle.UpdateSortie();
+  assert.ok(facts.has("frontDisengaged"), "both behind the fold in the safe zone: frontDisengaged (not at SJ next to the collection)");
   r.voice.played.add("FrontRelief");
   battle.UpdateSortie();
   assert.equal(battle.leg, "home", "after the meeting the pair walks home");
@@ -125,7 +129,7 @@ const Ok = (label) => console.log(`ok ${label}`);
   const b2 = new FirstLevelFrontBattle(r2); b2.gapWatched = true;
   b2.UpdateSortie(); r2.time = B.returnMeetMaxWaitS + 0.1; b2.UpdateSortie();
   assert.equal(b2.leg, "home", "returnMeetMaxWaitS bounds the wait at returnMeet");
-  checks += 11;
+  checks += 13;
   Ok("② 05 bomb-first + parallel withdrawal: skipped attack position, west-door watch, returnMeet, home");
 }
 

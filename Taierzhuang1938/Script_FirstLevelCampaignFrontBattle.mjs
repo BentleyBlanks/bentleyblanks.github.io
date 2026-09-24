@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import path from "node:path";
-import { FRONT_SORTIE as S } from "./Data_FirstLevelFrontRoute.mjs";
+import { FRONT_SORTIE as S, FRONT_SPACE as Space } from "./Data_FirstLevelFrontRoute.mjs";
 import { MISSION_ROUTES as Routes, MISSION_ANCHORS as A } from "./Data_FirstLevelMissionLayout.mjs";
 import { MISSION_STAGE_ROUTES } from "./Data_FirstLevelMissionTopology.mjs";
 import { CampaignActions } from "./Script_FirstLevelCampaignKit.mjs";
@@ -170,10 +170,20 @@ export async function DriveFrontBattle(ctx){
   assert.ok(state.facts.includes("tankImmobilized"));assert.ok(state.facts.includes("tankFireDisabled"));
   await CaptureFocus("TankDisabled",state.tank);
   await Route([...S.attackRoute].reverse(),"AttackBranchRetreat",{stance:"crouch",fight:true,crawl:true});
+  // Contract §2.6 (Front package step 2): the last batch crosses while the pair walks back. Like Luo, cover the
+  // gap from the nest's west door (K10) until the batch is home, then go down the right low trench to the safe zone
+  // (FRONT_SPACE.returnMeet: Liu, He and the relief NCO), and on to the collection.
+  const back=MISSION_STAGE_ROUTES.collectionReturn,door=back.findIndex(p=>Math.hypot(p.x-Space.westDoor.x,p.z-Space.westDoor.z)<.5);
+  assert.ok(door>0,"the collection return passes the nest's west door");
+  await Route(back.slice(0,door+1),"WestDoorGapWatch",{stance:"crouch",fight:true,crawl:true});
+  await CaptureFocus("BreachReopened",S.gap);
   await WaitFact("lastGuardsWithdrawn",240,true);
-  await Route(MISSION_STAGE_ROUTES.collectionReturn.slice(0,5),"LeaveFrontThroughRearTrench",{stance:"crouch",fight:false});
+  const meet=back.findIndex(p=>p.x===S.approach[2].x&&p.z===S.approach[2].z);
+  assert.ok(meet>door,"the collection return passes the safe zone");
+  await Route([...back.slice(door,meet),Space.returnMeet],"SafeZoneMeeting",{stance:"crouch",fight:false});
   await WaitFact("frontDisengaged",90);
-  await Route(MISSION_STAGE_ROUTES.collectionReturn.slice(5),"OriginalCollectionPoint",{stance:"crouch",fight:false});
+  await WaitFact("returnMet",60);
+  await Route([Space.returnMeet,...back.slice(meet)],"OriginalCollectionPoint",{stance:"crouch",fight:false});
   const end=await WaitStage("Orders",180);
   for(const fact of ["attackRetreated","reliefInPosition","collectionReturned"])assert.ok(end.mission.facts.includes(fact));
   assert.ok(end.mission.guards.filter(g=>g.alive).every(g=>g.safe));
