@@ -602,6 +602,7 @@ function WalkRuntime(extra = {}) {
   assert.equal(gunner.actor.ambientFirePoints, FRONT_GUARD_MG_GROUP.fire, "the gunner fires at the authorised points only");
   assert.equal(assistant.actor.ambientFirePoints, null, "the assistant does not fire");
   assert.ok(!gunner.actor.defended && gunner.actor.missionUntargetable, "never handed to Defend (that clears the scripted flag); protected like every waiting guard");
+  assert.ok(gunner.actor.scriptDefensive === false, "not scriptDefensive: the script-defense RELOAD would never finish for a scripted man (one magazine, then silence)");
   assert.ok(stances.some((e) => e.id === gunner.actor.id && e.s === 2), "prone");
   // 04: they leave the slope, walk the exit points, then gather at the last cover with the second batch.
   r.flow.stage.id = "MachineGun"; moves.length = 0;
@@ -614,7 +615,7 @@ function WalkRuntime(extra = {}) {
   }
   assert.ok(facts.has("remainingGuardsGathered"), "the second batch, the pair included, gathers at the last cover in 04");
   assert.equal(gunner.progress, gunner.gatherIndex, "the pair holds at its gather index (the crossing starts from there)");
-  checks += 8;
+  checks += 9;
   Ok("⑧c backslope LMG pair: ambient fire on the slope in 03, exit and gather with the second batch in 04");
 }
 {

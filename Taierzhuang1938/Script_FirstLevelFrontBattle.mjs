@@ -455,7 +455,10 @@ export class FirstLevelFrontBattle {
     const r=this.r,a=g.actor,spot=g.route[0];
     if(!g.mgHeld){
       g.mgHeld=true;
-      a.scriptedNoncombatant=true;a.p012Guided=false;delete a.scriptMoveSpeedMps;a.manualGoalUntil=Infinity;
+      // Not scriptDefensive (the spawn's Defend set it): the brain's ApplyScriptDefense would put the gunner into RELOAD
+      // every frame the scripted Think set him back to ADVANCE, re-arming the 3.2 s timer - one magazine (20 rounds) and
+      // then silence for the rest of 03 (09-25 probe). The ambient path reloads a scripted man in place.
+      a.scriptedNoncombatant=true;a.scriptDefensive=false;a.scriptSuppressible=false;a.p012Guided=false;delete a.scriptMoveSpeedMps;a.manualGoalUntil=Infinity;
       a.order="hold";a.holdZone={id:`FrontMg_${g.mg.role}`,x:spot.x,z:spot.z,radius:.5};a.goal.set(spot.x,0,spot.z);
       a.ambientFirePoints=g.mg.fire?FRONT_GUARD_MG_GROUP.fire:null;a.ambientFirePoint=null;
       // Facing the crest (north) until the brain turns the gunner onto his first point.
