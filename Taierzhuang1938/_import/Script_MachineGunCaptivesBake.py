@@ -302,6 +302,9 @@ def Bake(modelId, probe=None):
         Put(pb, matrix)
 
     def Tilt(pb, x=0, y=0, z=0):
+        return TiltWorld(pb, x=x, y=y, z=z)
+
+    def TiltWorld(pb, x=0, y=0, z=0):
         if abs(x) < 1e-9 and abs(y) < 1e-9 and abs(z) < 1e-9:
             return
         matrix = BWorld(pb)
@@ -405,12 +408,44 @@ def Bake(modelId, probe=None):
 
     # ---- pose application -------------------------------------------------
     def ApplyPose(p, lift):
-        """p is a plain dict of world-space targets; `lift` shifts every one of them."""
+        """p is a plain dict of world-space targets; `lift` shifts every one of them.
+
+        Optional `frameYaw` (radians, + = turn left) and `frameShift` (x, y) author the whole
+        pose in a turned/moved frame (opening clips that pivot the body): every target and
+        every tilt axis is carried by that frame. Absent (all captives clips) the math below
+        is the original world-axis path, bit for bit."""
+        frameYaw = p.get('frameYaw', 0.0)
+        shift = p.get('frameShift', (0.0, 0.0))
+        framed = abs(frameYaw) > 1e-12 or abs(shift[0]) > 1e-12 or abs(shift[1]) > 1e-12
+        spin = Quaternion((0, 0, 1), frameYaw)
+        spinInv = spin.inverted()
+
         def L(point):
-            return (point[0], point[1], point[2] + lift)
+            if not framed:
+                return (point[0], point[1], point[2] + lift)
+            v = spin @ Vector(point)
+            return (v.x + shift[0], v.y + shift[1], v.z + lift)
+
+        def D(v):
+            return tuple(spin @ Vector(v)) if framed else v
+
+        def Tilt(pb, x=0, y=0, z=0):
+            if not framed:
+                return TiltWorld(pb, x=x, y=y, z=z)
+            if abs(x) < 1e-9 and abs(y) < 1e-9 and abs(z) < 1e-9:
+                return
+            matrix = BWorld(pb)
+            point = matrix.translation.copy()
+            rotation = spin @ Quaternion((0, 0, 1), z) @ Quaternion((0, 1, 0), y) @ Quaternion((1, 0, 0), x) @ spinInv
+            Put(pb, Matrix.Translation(point) @ rotation.to_matrix().to_4x4()
+                @ Matrix.Translation(-point) @ matrix)
 
         pelvis = Bone('Pelvis')
         Move(pelvis, L(p['pelvis']))
+        if framed and abs(frameYaw) > 1e-12:
+            # The frame turns the body itself: the hips (and everything the spine carries)
+            # yaw about the pelvis; the tilts below are then expressed in that turned frame.
+            TiltWorld(pelvis, z=frameYaw)
         tilt = p.get('pelvisTilt', (0, 0, 0))
         Tilt(pelvis, x=tilt[0], y=tilt[1], z=tilt[2])
         bend = p.get('bend', 0.0)
@@ -435,10 +470,10 @@ def Bake(modelId, probe=None):
                 matrix = BWorld(foot)
                 location = matrix.translation.copy()
                 _, _, scale = matrix.decompose()
-                Put(foot, Matrix.LocRotScale(location, footQuats[side], scale))
+                Put(foot, Matrix.LocRotScale(location, (spin @ footQuats[side]) if framed else footQuats[side], scale))
             else:
                 at = Point(foot)
-                Aim(foot, Bone(side + ' Toe0'), at + Vector(toeDir).normalized() * footLen)
+                Aim(foot, Bone(side + ' Toe0'), at + Vector(D(toeDir)).normalized() * footLen)
         for side, sign in [('L', 1), ('R', -1)]:
             Chain(Bone(side + ' UpperArm'), Bone(side + ' Forearm'), Bone(side + ' Hand'),
                   L(p['hands'][side]), L(p['armPoles'][side]), label='arm' + side)
@@ -448,7 +483,7 @@ def Bake(modelId, probe=None):
                 continue
             forward, normalHint, curl = palm[0], palm[1], palm[2]
             indexCurl = palm[3] if len(palm) > 3 else None
-            normal = TurnPalm(side, forward, normalHint)
+            normal = TurnPalm(side, D(forward), D(normalHint))
             CurlFingers(side, normal, curl, indexAmount=indexCurl)
         Update()
 

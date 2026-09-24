@@ -57,6 +57,7 @@ export const testDefs = {
   FirstLevelFrontTest: {file:"Script_FirstLevelFrontTest.mjs",desc:"第一关阶段 1–7：分镜契约、集结处、借火、南行与演出接线（纯 Node）"},
   OpeningStoryboardsTest: {file:"Script_OpeningStoryboardsTest.mjs",desc:"01–03 source rigs, baked animation hashes, normalized poses and V3 placement"},
   OpeningActorPerformanceBrowserTest: {file:"Script_OpeningActorPerformanceBrowserTest.mjs",timeoutMs:300000,desc:"Production-rig dialogue, idle, guard movement, planted feet and high-quality acting views"},
+  OpeningClipsBrowserTest: {file:"Script_OpeningClipsBrowserTest.mjs",timeoutMs:600000,desc:"2026-09-23 opening clips on production rigs: plant slide, paired contacts, body overlap, bone length, NaN"},
   OpeningFirstPersonTest: {file:"Script_OpeningFirstPersonTest.mjs",desc:"Production-arm anatomy, wrist twist and fixed bone lengths across 2000 poses"},
   FirstLevelVoicePerspectiveTest: {file:"Script_FirstLevelVoicePerspectiveTest.mjs",timeoutMs:120000,desc:"Actual WebAudio per-line dialogue: centred self line, spatial NPC lines, overlapping sources, dialogue sidechain, bark yield, concussion speech floor"},
   CarriagePropVelocityTest: {file:'Script_CarriagePropVelocityTest.mjs',timeoutMs:300000,desc:'Real cart/stretcher GPU velocities with moving camera, stop and reappearance; high-quality transfer scene'},
@@ -351,7 +352,7 @@ export const testDefs = {
 };
 
 export const browserTests = new Set([
-  "OpeningActorPerformanceBrowserTest", "FirstLevelVoicePerspectiveTest",
+  "OpeningActorPerformanceBrowserTest", "OpeningClipsBrowserTest", "FirstLevelVoicePerspectiveTest",
   "FirstLevelFrontRouteBrowserTest",
   "FirstLevelLeaderGuideBrowserTest",
   "FirstLevelMissionTopologyBrowserTest",
@@ -462,6 +463,7 @@ export const tier0 = [...tier0Browser, ...tier0Fast];
 
 export const tier2 = [
   "OpeningActorPerformanceBrowserTest",
+  "OpeningClipsBrowserTest",
   "ShotTest",
   "GiTest",
   "PerformanceTest",
@@ -472,7 +474,7 @@ export const tier2 = [
 ];
 
 export const domains = {
-  openingStoryboards: {label:"01–03 storyboard reconstruction",tests:["OpeningStoryboardsTest","OpeningActorPerformanceBrowserTest","OpeningFirstPersonTest","FirstLevelVoicePerspectiveTest"]},
+  openingStoryboards: {label:"01–03 storyboard reconstruction",tests:["OpeningStoryboardsTest","OpeningClipsBrowserTest","OpeningActorPerformanceBrowserTest","OpeningFirstPersonTest","FirstLevelVoicePerspectiveTest"]},
   missionGuide: {label:"Physical mission leader and HUD",tests:["FirstLevelLeaderGuideTest","FirstLevelLeaderGuideBrowserTest","FirstLevelMissionTest","FirstLevelMissionBrowserTest"]},
   characterSpeech: {label:"说话人面部对白",tests:["CharacterSpeechTest","CharacterSpeechBrowserTest"]},
   motionVector: {label:'统一运动矢量接入契约',tests:['MotionVectorContractTest']},
@@ -581,7 +583,7 @@ export const domains = {
 const changedDomainRules = [
   {domain:"menu",pattern:/PlayerDeath/},
   {domain:"combat",pattern:/PlayerDeath/},
-  {domain:"openingStoryboards",pattern:/OpeningStoryboards|OpeningStoryboardAnimation|OpeningStoryboardBake|OpeningActorPerformance|OpeningFirstPerson|FirstLevelCampaignOpening/},
+  {domain:"openingStoryboards",pattern:/OpeningStoryboards|OpeningStoryboardAnimation|OpeningClips|OpeningStoryboardBake|OpeningStoryboardClips|OpeningProps|OpeningActorPerformance|OpeningFirstPerson|FirstLevelCampaignOpening/},
   // 剖析器的显示层与命令行入口：文件名里没有「Profiler」，下面 render 域那条
   // 通配的 /Profiler/ 盖不到 Script_ProfileCli / Script_FrameProbeViews。
   // 归 render（ProfilerTest 在那一串里）；命令行自己的冒烟在 tier 2 的 perf 档。
