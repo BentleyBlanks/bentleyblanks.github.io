@@ -8,6 +8,7 @@ import { MISSION_STAGE_ROUTES } from "./Data_FirstLevelMissionTopology.mjs";
 import { CampaignActions } from "./Script_FirstLevelCampaignKit.mjs";
 import { DriveBundleThrow } from "./Script_FirstLevelBundleThrowDriver.mjs";
 import { FRONT_BATTLE_TUNING as B } from "./Data_Tuning_FirstLevelFront.mjs";
+import { InstallSpeakerActing, CheckFrontActing } from "./Script_FirstLevelCampaignOpening.mjs";
 
 export async function DriveFrontBattle(ctx){
   const {page,output}=ctx,{Route,Interact,WaitStage,CaptureFocus}=CampaignActions(ctx);
@@ -90,6 +91,8 @@ export async function DriveFrontBattle(ctx){
     };
   });
   assert.equal((await State()).stage,"Support");
+  // Luo's front commands (03) are sampled from here (a run from 01 installed the sampler at RearTrench already).
+  await InstallSpeakerActing(page);
   try{await DriveLegs();}
   catch(error){
     // Where the body stood when a leg failed: colliders and people within reach, keys, the route bot, the damage log
@@ -198,6 +201,8 @@ export async function DriveFrontBattle(ctx){
   assert.ok(first.mission.facts.includes("leftGunHandover")&&first.mission.facts.includes("zhouLeftGun"));
   const guardIds=await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMissionRuntime().guards.map(g=>g.actor.id));
   await CaptureFocus("FirstBatchSafe",S.gap);
+  // A cold start at 03 checks Luo's front commands here; a run from 01 checks them with the 02 speakers (CheckOpeningActing).
+  if(ctx.stageFrom>1)await CheckFrontActing(ctx);
   if(ctx.stageTo===3)return;
   await ReturnToSeat("ReturnToNestAfterEvade");
   await HoldNest({fact:"tankPositionPressured"},120,"ReturnToNestAfterEvade");

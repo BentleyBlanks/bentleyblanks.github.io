@@ -85,7 +85,7 @@ export class FirstLevelFrontShow {
 
   // --- 对白事件 -------------------------------------------------------------
   OnLine(cueId, detail) {
-    this.bunker.OnLine(cueId, detail?.index);
+    this.bunker.OnLine(cueId, detail?.index, detail?.who ?? null);
     this.collection.OnLine(cueId, detail?.index);
   }
   OnEvent(id) { this.collection.OnEvent(id); }

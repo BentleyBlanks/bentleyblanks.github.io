@@ -321,7 +321,7 @@ export async function DriveOpening(ctx){
   await Interact();
   await WaitStage("RearTrench",5);
   // 02–03 speakers (the collection report, Luo's front commands) are watched from here on.
-  await InstallRearActing(page);
+  await InstallSpeakerActing(page);
   const armed=await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMission());
   assert.ok(armed.facts.includes("rifleRecovered"));assert.equal(armed.emptyHands,false);
   // Out of the mouth, over the crater step, down the SSW leg to the rear corner: a player withdrawing
@@ -401,27 +401,64 @@ export async function DriveOpening(ctx){
   console.log("ok 01–02 normal progression to Support");
 }
 
-/** 02–03 speakers (the collection report, Front cues) are sampled for visible acting until CheckOpeningActing. */
-async function InstallRearActing(page){
-  await page.evaluate(()=>{
-    const s=window.Tengxian.Debug.FirstLevelMissionRuntime().frontShow.bunker,update=s.UpdatePerformances;
+/** Speaking roles whose lines are sampled for visible acting from 02 on (the named bodies of 02–06). */
+export const ACTING_ROLES = Object.freeze(["guard", "zhou", "luo"]);
+/**
+ * 02–06 speakers are sampled for visible acting until CheckOpeningActing / CheckFrontActing.
+ * The sample hangs on the runtime's speaker binder (its Update runs every frame in every 01–06 step), not on the
+ * 01–02 director: 03–06 lines are per-line scenes (Script_FirstLevelFrontScenes via voice.PlayScene) that the
+ * director's CurrentSpeaker never listed (09-24: only 02 cues were ever recorded). Who is talking is what is heard
+ * (voice.Speech(who): per-line scenes and the old whole-cue queue alike); the body is the one whose mouth moves
+ * (binder.ActorForWho). A frame counts as acted when the body is on screen and one of the two acting layers is
+ * speaking on it: the director's dialogue acting (rig.openingActorPerformanceState.speaking) or, when the director
+ * does not own the rig, the shared head layer (rig.speakerHead.speaking). `silentFrames` counts frames in which the
+ * line was heard from a visible body that neither layer acted.
+ * Idempotent: a run from 01 installs it at RearTrench, the front driver again at 03 (cold start).
+ */
+export async function InstallSpeakerActing(page){
+  await page.evaluate((roles)=>{
+    const r=window.Tengxian.Debug.FirstLevelMissionRuntime(),binder=r.speakers;
+    if(binder.actingSampled)return;binder.actingSampled=true;
     window.openingRearActing={};window.openingRearHeard={};
-    s.UpdatePerformances=function(){
-      const current=this.CurrentSpeaker(),who=current?.who;
-      if(current&&["guard","zhou","luo"].includes(who)){
-        const key=current.cue+"/"+who,row=window.openingRearHeard[key]??={frames:0,visibleFrames:0};
-        row.frames++;if(this.SpeakerActor(who)?.actor.poseVisible)row.visibleFrames++;
+    const update=binder.Update;
+    binder.Update=function(){
+      const result=update.apply(this,arguments);
+      for(const who of roles){
+        const speech=r.voice?.Speech?.(who);if(!speech?.active||!speech.cue)continue;
+        const key=speech.cue+"/"+who,soldier=this.ActorForWho(who,true),rig=soldier?.actor?.characterRig;
+        const heard=window.openingRearHeard[key]??={frames:0,visibleFrames:0,silentFrames:0,stage:r.flow.stage.id};
+        heard.frames++;
+        if(!soldier?.actor?.poseVisible||!rig?.bones?.head)continue;
+        heard.visibleFrames++;
+        const director=rig.openingActorPerformanceState,layer=rig.speakerHead;
+        const acting=director?(!!director.speaking&&!director.protected):!!(layer?.enabled&&layer.speaking);
+        if(!acting){heard.silentFrames++;continue;}
+        const head=rig.bones.head.quaternion;
+        const row=window.openingRearActing[key]??={frames:0,head:head.toArray(),turn:0,director:0,headLayer:0};
+        row.frames++;row[director?"director":"headLayer"]++;
+        row.turn=Math.max(row.turn,head.angleTo(head.clone().fromArray(row.head)));
       }
-      for(const role of ["guard","zhou","luo"]){
-        const actor=this.SpeakerActor(role),rig=actor?.actor?.characterRig,state=rig?.openingActorPerformanceState;
-        if(!state?.speaking)continue;
-        const key=state.cue+"/"+role,head=rig.bones.head.quaternion;
-        const row=window.openingRearActing[key]??={frames:0,head:head.toArray(),turn:0};
-        row.frames++;row.turn=Math.max(row.turn,head.angleTo(head.clone().fromArray(row.head)));
-      }
-      return update.apply(this,arguments);
+      return result;
     };
-  });
+  },ACTING_ROLES);
+}
+
+/** 03: Luo's front commands (Front* scenes) are seen on screen and acted, at the 02 speakers' thresholds. */
+export async function CheckFrontActing(ctx){
+  const {page,output}=ctx;
+  const acting=await page.evaluate(()=>window.openingRearActing);
+  const heard=await page.evaluate(()=>window.openingRearHeard);
+  await fs.writeFile(path.join(output,"Data_FrontActing.json"),JSON.stringify({heard,acting},null,2));
+  const front=Object.keys(heard).filter(key=>key.startsWith("Front")&&key.endsWith("/luo"));
+  console.log("FRONT_ACTING",JSON.stringify(Object.fromEntries(front.map(key=>[key,{...heard[key],
+    ...(acting[key]?{acted:acting[key].frames,turn:+acting[key].turn.toFixed(3),director:acting[key].director,headLayer:acting[key].headLayer}:{})}]))));
+  const visible=front.filter(key=>heard[key].visibleFrames>10);
+  assert.ok(visible.length>0,`Luo performs visible front commands (${JSON.stringify(Object.fromEntries(front.map(key=>[key,heard[key]])))})`);
+  for(const key of visible){
+    assert.ok(acting[key]?.frames>10,`${key}: Luo's front command has an active performance (${JSON.stringify(heard[key])})`);
+    assert.ok(acting[key].turn>.03,`${key}: Luo visibly turns/nods through the front command (${JSON.stringify(acting[key])})`);
+  }
+  return visible;
 }
 
 export async function CheckOpeningActing(ctx){
@@ -435,10 +472,10 @@ export async function CheckOpeningActing(ctx){
   const visible=Object.keys(heard).filter(key=>heard[key].visibleFrames>10);
   assert.ok(visible.length>0,"02–03 speakers were sampled on screen");
   assert.ok(visible.includes("SupportOrder/guard"),`the collection report has its real visible speaker (${JSON.stringify(heard)})`);
-  if(ctx.stageTo>=3)assert.ok(visible.some(key=>key.startsWith("Front")&&key.endsWith("/luo")),"Luo performs visible front commands");
+  if(ctx.stageTo>=3)await CheckFrontActing(ctx);
   for(const key of visible){
-    assert.ok(rearActing[key]?.frames>10,`${key}: actual visible 03 speaker has an active performance`);
-    assert.ok(rearActing[key].turn>.03,`${key}: actual visible 03 speaker visibly turns/nods`);
+    assert.ok(rearActing[key]?.frames>10,`${key}: actual visible 02–05 speaker has an active performance (${JSON.stringify(heard[key])})`);
+    assert.ok(rearActing[key].turn>.03,`${key}: actual visible 02–05 speaker visibly turns/nods (${JSON.stringify(rearActing[key])})`);
   }
   assert.deepEqual(ctx.errors,[]);
   console.log(`ok 01–0${ctx.stageTo>=3?3:2} normal progression, continuous hands and visible dialogue performances`,JSON.stringify(visible));

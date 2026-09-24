@@ -23,6 +23,7 @@ import { SampleMissionTerrain as Ground } from "./Data_FirstLevelMissionTerrain.
 import { TRAVERSAL } from "./Data_Traversal.mjs";
 import { END_TUNING as END } from "./Data_Tuning_FirstLevelEnd.mjs";
 import { ZhouGunExitRoute } from "./Script_FirstLevelOpening.mjs";
+import { FirstLevelFrontBattle } from "./Script_FirstLevelFrontBattle.mjs";
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
 import { FRONT_SORTIE as Sortie, FRONT_SPACE as Space } from "./Data_FirstLevelFrontRoute.mjs";
 import { SampleMissionNaturalHeight as Natural } from "./Data_FirstLevelMissionTerrain.mjs";
@@ -92,9 +93,9 @@ const report = {};
 
 // 2026-09-23 01–06 空间重排：老周的左枪挪到土坎西端（Sortie.leftSeat），前沿补给箱不再在他身边。
 // 负伤的老周沿何有田来的那条路下撤：左枪通道 → 支沟 → 支沟交汇 SJ → 集结处（Sortie.zhouExit），
-// 全程胶囊净空、坡度可爬。旧的 ZhouGunExitRoute 只在旧枪位成立（它从枪位直线拉到 zhouRest），
-// 数据折线（接线目标）在这里断言净空与坡度；运行时 helper 目前仍是直线（61° 坡、撞左枪通道射击湾），
-// 这条接线归 Front/Opening 包：未接线前打印 TODO 行而不是静默通过，接上以后同一段自动转成断言。
+// 全程胶囊净空、坡度可爬。数据折线在这里断言净空与坡度；运行时（FrontBattle.UpdateZhou，03 交枪与 04 检查点
+// 两处）走的是 ZhouGunExitRoute 的返回值——下面用桩运行时真跑一遍 UpdateZhou，拿它交给 SetWalk 的路线来量，
+// 同一只胶囊、同一条 52° 规则（2026-09-24 v1.8 接线，原来这里是 TODO 行）。
 {
   const route=Sortie.zhouExit;
   assert.deepEqual(route[0],Sortie.leftSeat,"Zhou's exit starts at the left gun seat");
@@ -110,21 +111,36 @@ const report = {};
       previous=y;
     }
   }
-  const legacy=ZhouGunExitRoute(Sortie.leftSeat,.34);
-  assert.ok(Distance(legacy.at(-1),OPENING.zhouRest)<0.01,"the runtime exit helper still ends at zhouRest");
-  // The runtime route (what Zhou actually walks today) measured with the same capsule and 52 deg rule.
-  const runtime=[Sortie.leftSeat,...legacy],runtimeHits=RouteClearance(runtime,Solids("BunkerIntact"));
+  // The runtime walk, as UpdateZhou hands it to SetWalk (a stub runtime: facts, Zhou, Yaowa, the gun).
+  const RuntimeZhouRoute=(zhouAt,facts)=>{
+    const zhou={id:54,alive:true,health:80,position:{...zhouAt}},yaowa={id:2,alive:true,position:{...zhouAt}};
+    const r={opening:{zhou},column:{zhou:{}},squadRoutes:new Map(),companion:{Handle:()=>yaowa},
+      Has:(id)=>facts.includes(id),Record:()=>{},Defend:()=>{},OnPlayerDown:()=>{},MissionFailure:()=>{},
+      emplacement:{NpcVacate:()=>{}},ai:{Remove:()=>{}},PlaceActor:(actor,at)=>Object.assign(actor.position,{x:at.x,z:at.z})};
+    const battle=new FirstLevelFrontBattle(r);battle.Walk=()=>false;battle.UpdateZhou();
+    const walk=battle.walks.get(zhou.id);
+    return walk&&{from:{x:zhou.position.x,z:zhou.position.z},route:walk.route.map((p)=>({x:p.x,z:p.z}))};
+  };
+  const handover=RuntimeZhouRoute(Sortie.leftSeat,["rifleWithdrawalResolved"]);
+  const checkpoint=RuntimeZhouRoute(Sortie.leftSeat,["rifleWithdrawalResolved","zhouLeftGun"]);
+  assert.ok(handover&&checkpoint,"UpdateZhou starts Zhou's walk at the 03 hand-over and at the 04 checkpoint");
+  const helper=ZhouGunExitRoute(Sortie.leftSeat,.34),rest=P.collection.zhouWall;
+  assert.deepEqual(handover.route,[...helper,{x:rest.x,z:rest.z}],"the 03 hand-over walks the route ZhouGunExitRoute returns");
+  assert.deepEqual(checkpoint.from,{x:route[2].x,z:route[2].z},"the 04 checkpoint puts Zhou on zhouExit[2]");
+  assert.deepEqual(checkpoint.route,[...route.slice(3).map((p)=>({x:p.x,z:p.z})),{x:rest.x,z:rest.z}],
+    "the 04 checkpoint walks on from zhouExit[3] (the corner he stands on is behind him)");
+  // What Zhou actually walks from the seat, measured with the same capsule and 52 deg rule as the data polyline.
+  const runtime=[Sortie.leftSeat,...handover.route.slice(0,-1)],runtimeHits=RouteClearance(runtime,Solids("BunkerIntact"));
   let runtimeSlopeDeg=0,prevY=Walkable(runtime[0].x,runtime[0].z);
   for(let leg=1;leg<runtime.length;leg++){
-    const a=runtime[leg-1],b=runtime[leg],steps=Math.ceil(Distance(a,b)/.2);
+    const a=runtime[leg-1],b=runtime[leg],length=Distance(a,b),steps=Math.ceil(length/.2);
     for(let i=1;i<=steps;i++){const t=i/steps,y=Walkable(a.x+(b.x-a.x)*t,a.z+(b.z-a.z)*t);
-      runtimeSlopeDeg=Math.max(runtimeSlopeDeg,Math.atan2(Math.abs(y-prevY),Distance(a,b)/steps)*180/Math.PI);prevY=y;}
+      assert.ok(Math.abs(y-prevY)<=TAN52*(length/steps)+.03,`Zhou's runtime exit climbs a passable slope (${prevY.toFixed(2)} -> ${y.toFixed(2)})`);
+      runtimeSlopeDeg=Math.max(runtimeSlopeDeg,Math.atan2(Math.abs(y-prevY),length/steps)*180/Math.PI);prevY=y;}
   }
-  const wired=runtime.length>=Sortie.zhouExit.length&&runtimeHits.length===0&&runtimeSlopeDeg<=52.5;
-  report.zhouRuntimeExit={points:runtime.length,hits:runtimeHits,maxSlopeDeg:+runtimeSlopeDeg.toFixed(0),wired};
-  if(wired)assert.ok(true);
-  else console.log(`TODO(Front/Opening) Zhou's runtime exit is still a straight line: ${runtime.length} points, `
-    +`max slope ${runtimeSlopeDeg.toFixed(0)} deg, hits ${[...new Set(runtimeHits.map((h)=>h.split(" @")[0]))].join(", ")||"none"} — wire ZhouGunExitRoute to FRONT_SORTIE.zhouExit`);
+  assert.deepEqual(runtimeHits,[],"Zhou's runtime exit is physically clear");
+  assert.ok(runtime.length>=route.length&&Distance(runtime.at(-1),OPENING.zhouRest)<0.01,"Zhou's runtime exit is the whole access-trench polyline to zhouRest");
+  report.zhouRuntimeExit={points:runtime.length,hits:runtimeHits,maxSlopeDeg:+runtimeSlopeDeg.toFixed(0),wired:true};
   report.zhouExitM=+RouteLength(route).toFixed(1);
   console.log(`ok wounded Zhou walks ${report.zhouExitM} m from the left gun down the access trench to the collection`);
 }

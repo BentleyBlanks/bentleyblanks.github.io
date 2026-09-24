@@ -464,11 +464,12 @@ export class FirstLevelBunkerShow {
     for(let n=1;n<40;n++){const entry=lines[`${sceneId}.${String(n).padStart(2,"0")}`];if(!entry)break;t+=(n>1?entry.gapBeforeS??.3:0)+entry.seconds;}
     return t||6;
   }
-  OnLine(cue,index){
-    // Legacy whole-cue lines (03 FrontBlockade pointing).
-    if(cue==="FrontBlockade"){
+  OnLine(cue,index,who=null){
+    // 03 FrontBlockade: whoever calls the blockade points at it (a per-line scene says who; the legacy whole cue
+    // is looked up by index). Only while this director runs the squad (a cold start at 03 never set it up).
+    if(cue==="FrontBlockade"&&this.setup){
       const current=this.r.voice?.current?.cue;
-      this.pointActor=this.SpeakerActor(current?.id===cue?current.lines[index]?.who:null);this.pointAt=this.r.time;
+      this.pointActor=this.SpeakerActor(who??(current?.id===cue?current.lines[index]?.who:null));this.pointAt=this.r.time;
       InstallOpeningStoryboardAnimation(this.pointActor);
     }
   }
@@ -1848,13 +1849,19 @@ export class FirstLevelBunkerShow {
     if(role==="zhou")return this.r.opening.zhou;
     return this.Squad(role);
   }
-  /** Who is talking now in the director's scenes (or the legacy queue). */
+  /** Who is talking now: the director's scenes, then any other per-line scene (the 03 front commands that
+   *  Script_FirstLevelFrontScenes plays through voice.PlayScene while this director still acts the squad in
+   *  Support), then the legacy whole-cue queue. Without the second the speaking body got the listener's acting
+   *  and its own head layer was held off (09-24: Luo's FrontBlockade…FrontWithdraw lines, mouth only). */
   CurrentSpeaker(){
-    for(const handle of Object.values(this.scenes)){
-      if(!handle||handle.done)continue;
+    const Playing=handle=>{
+      if(!handle||handle.done||handle.paused)return null;
       const playing=handle.lines?.filter(line=>line.state==="playing");
-      if(playing?.length){const line=playing.at(-1);return {who:line.line.who,cue:handle.id,line:line.line.index,seconds:line.t};}
-    }
+      if(!playing?.length)return null;
+      const line=playing.at(-1);return {who:line.line.who,cue:handle.id,line:line.line.index,seconds:line.t};
+    };
+    for(const handle of Object.values(this.scenes)){const current=Playing(handle);if(current)return current;}
+    for(const handle of this.r.voice?.scenes?.values?.()||[]){const current=Playing(handle);if(current)return current;}
     const current=this.r.voice?.current;
     if(current?.phase==="playing"&&!this.r.voice?.paused){
       const index=current.plan.lines.findIndex(([start,end])=>current.sourceTime>=start&&current.sourceTime<end);

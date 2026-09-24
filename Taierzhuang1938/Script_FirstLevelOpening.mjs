@@ -39,8 +39,10 @@ const SegmentDistance=(p,a,b)=>{
  * off the seat joins it after the leg nearest to him instead of walking back to the seat first -- but
  * only over a clear first leg (a capsule of `radius` against the solid blocks, the SpaceTest rule): a
  * gunner pushed off the line by the AI steps back to the earlier corner first instead of cutting a wall.
- * Not wired yet: the runtime walk is Script_FirstLevelFrontBattle.UpdateZhou (Front package).
+ * A corner he already stands on is behind him (the 04 checkpoint puts him on zhouExit[2]: he walks on from [3]).
+ * The runtime walk is Script_FirstLevelFrontBattle.UpdateZhou (both the 03 hand-over and the 04 checkpoint).
  */
+const ZHOU_ON_CORNER_M=.05;
 const ZHOU_SOLIDS=Layout.blocks.filter(block=>block.solid!==false&&!(Layout.walkableSurfaces||[]).some(surface=>surface.id===block.id));
 function ZhouLegClear(a,b,radius){
   const length=Distance(a,b);
@@ -58,6 +60,7 @@ export function ZhouGunExitRoute(start,radius=.34){
   const route=FRONT_SORTIE.zhouExit;
   let join=1,best=Infinity;
   for(let i=1;i<route.length;i++){const d=SegmentDistance(start,route[i-1],route[i]);if(d<best-1e-9){best=d;join=i;}}
+  while(join<route.length-1&&Distance(start,route[join])<ZHOU_ON_CORNER_M)join++;
   // Blocked straight to the join point: go back along the polyline to a corner he can reach.
   while(join>0&&!ZhouLegClear(start,route[join],radius))join--;
   return route.slice(Math.max(0,join)).map(point=>({x:point.x,z:point.z}));

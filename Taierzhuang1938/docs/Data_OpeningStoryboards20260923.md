@@ -70,12 +70,12 @@
 ## 6. 验收
 
 - 纯 node：`Script_OpeningStoryboardsTest`（含「导演类没有重名方法」）、`Script_OpeningFirstPersonTest`、`Script_MissionGatesTest`、`Script_FirstLevelVoiceTest`（含 `--audio`）。
-- 浏览器：`Script_FirstLevelMissionBrowserTest.mjs --campaign --stage-to=2`，从 01 正常输入连续跑到集结处交接。Front 包合入前 03 的驾驶器在基线上就是红的，合入后恢复 `--stage-to=3`。还有 `Script_OpeningHandbackBrowserTest.mjs`（miss / hide / early / absent 四种非理想顺序）和 `Script_OpeningActorPerformanceBrowserTest.mjs`。
+- 浏览器：`Script_FirstLevelMissionBrowserTest.mjs --campaign --stage-to=3`（TestRunner 的 `FirstLevelOpeningCampaignTest`），从 01 正常输入连续跑到集结处交接，再接着打完 03、进入 MachineGun。Front 包合入前登记的是 `--stage-to=2`，2026-09-24 合入后恢复到 3（契约 v1.8）。还有 `Script_OpeningHandbackBrowserTest.mjs`（miss / hide / early / absent 四种非理想顺序）和 `Script_OpeningActorPerformanceBrowserTest.mjs`。
 - 驾驶器（`Script_FirstLevelCampaignOpening.mjs`）检查以下各项：
   - phase 按序发生；
   - 甲乙死于刀的接触帧，丁被刘文财击中；
   - 前沿各组 02 就在场、离得远，进 03 时仍是同一批实体；
   - 零瞬移，镜头、手掌、拖拽方手掌都连续；
-  - 说话人有表演、口型对（含集结处守军）；
+  - 说话人有表演、口型对（含集结处守军）；02–05 的取样挂在运行时的说话人绑定器上（谁在说＝`voice.Speech(who)`，哪具身体＝`speakers.ActorForWho`），03 罗班长的前沿命令（`Front*` 场景）必须在画面上被采到并有头部动作（`CheckFrontActing`）；
   - 回头能看见至少 2 名追兵；
   - 集结处交接完成。

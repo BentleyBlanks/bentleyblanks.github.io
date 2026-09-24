@@ -11,6 +11,7 @@ import { FRONT_DEFENDERS } from "./Data_FirstLevelMissionFront.mjs";
 import { SpeakingCastOptions } from "./Data_FirstLevelSpeakingCast.mjs";
 import { TankClearFact } from "./Script_FirstLevelTankBrain.mjs";
 import { MISSION_VOICE_CAST } from "./Data_FirstLevelMissionDialogue.mjs";
+import { ZhouGunExitRoute } from "./Script_FirstLevelOpening.mjs";
 const Distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const AliveBatch=batch=>batch.filter(g=>g.actor.alive);
 /** Route split at the point nearest to `point`: [head ending there, tail starting there]. */
@@ -363,7 +364,7 @@ export class FirstLevelFrontBattle {
     // handover is history. Zhou (respawned on the seat by Opening.Update) starts down the access trench past the
     // 10 m line with Yaowa, instead of sharing the seat with He, whom the checkpoint also puts there (09-24 review).
     if(r.Has("zhouLeftGun")&&!this.walks.has(a.id)){
-      const at=S.zhouExit[2],yaowa=r.companion.Handle("yaowa"),route=[...S.zhouExit.slice(3),P.collection.zhouWall];
+      const at=S.zhouExit[2],yaowa=r.companion.Handle("yaowa"),route=[...ZhouGunExitRoute(at),P.collection.zhouWall];
       r.emplacement.NpcVacate(r.leftGunId,"checkpoint");r.PlaceActor(a,at);this.SetWalk(a,route);
       if(yaowa){r.PlaceActor(yaowa,{x:at.x+1,z:at.z+1.2});this.SetWalk(yaowa,route);}
       this.zhouEscortDispatched=true;
@@ -376,8 +377,8 @@ export class FirstLevelFrontBattle {
       const he=r.companion.Handle("heyoutian");
       if(he?.alive&&Distance(he.position,S.leftSeat)>B.handoverReadyM)return;
       r.emplacement.NpcVacate(r.leftGunId,"woundedWithdrawal");
-      // Same polyline Script_FirstLevelOpening.ZhouGunExitRoute is to follow (FRONT_SORTIE.zhouExit, Opening package).
-      const route=[...S.zhouExit,P.collection.zhouWall];
+      // FRONT_SORTIE.zhouExit from the corner nearest to where he stands, over a clear first leg (Opening's helper).
+      const route=[...ZhouGunExitRoute(a.position),P.collection.zhouWall];
       this.SetWalk(a,route);this.SetWalk(yaowa,route);
     }
     // Contract §2.6: 03 ends once Zhou is 10 m off the gun (He has it); reaching the collection is a 05 condition.

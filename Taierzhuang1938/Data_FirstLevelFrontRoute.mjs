@@ -68,8 +68,8 @@ export const FRONT_SORTIE=Object.freeze({
   // He / relief / Zhou use the support sap's first leg and then the left gun access trench.
   leftRoute:[Point(-29,-110),Point(-30,-118),Point(-26.5,-126),Point(-31,-136),Point(-34,-147),Point(-33.6,-156.4)],
   // Wounded Zhou leaves the left gun the way He came in: left gun access -> support sap -> SJ -> collection rest.
-  // Script_FirstLevelOpening.ZhouGunExitRoute returns this polyline from the nearest clear corner (Opening
-  // package, 2026-09-24); the runtime walk (Script_FirstLevelFrontBattle.UpdateZhou) is the Front package's to wire.
+  // Script_FirstLevelOpening.ZhouGunExitRoute returns this polyline from the nearest clear corner; the runtime walk
+  // (Script_FirstLevelFrontBattle.UpdateZhou: the 03 hand-over and the 04 checkpoint) walks what it returns.
   zhouExit:[Point(-33.6,-156.4),Point(-34,-147),Point(-31,-136),Point(-26.5,-126),Point(-30,-118),Point(-29,-110),Point(-33,-106),Point(-36,-99)],
   gap:Point(-8,-150),lastCover:Point(-8,-155.2),
   // Backslope scrape -> the one gap -> gap junction -> fold -> safe zone behind the fold.

@@ -59,9 +59,8 @@ export const testDefs = {
   OpeningActorPerformanceBrowserTest: {file:"Script_OpeningActorPerformanceBrowserTest.mjs",timeoutMs:300000,desc:"Production-rig dialogue, idle, guard movement, planted feet and high-quality acting views"},
   OpeningClipsBrowserTest: {file:"Script_OpeningClipsBrowserTest.mjs",timeoutMs:600000,desc:"2026-09-23 opening clips on production rigs: plant slide, paired contacts, body overlap, bone length, NaN"},
   OpeningHandbackBrowserTest: {file:"Script_OpeningHandbackBrowserTest.mjs",timeoutMs:900000,desc:"02 hand-back in non-ideal orders (Liu misses / the junction man hides / he is already dead): never stalls, real pickup still starts the withdrawal"},
-  // --stage-to=2 until the Front package lands (03's own driver is red on b120d852a); the integrator
-  // turns it back to --stage-to=3 with the Front merge.
-  FirstLevelOpeningCampaignTest: {file:"Script_FirstLevelMissionBrowserTest.mjs",args:["--campaign","--stage-to=2"],timeoutMs:1200000,desc:"01–02 normal input: every 09.23 director phase in order, real kills, continuity, mouths and acting, withdrawal and the collection hand-over"},
+  // Runs on into 03 (to MachineGun) since the Front merge: Luo's front commands are checked with the 02 speakers.
+  FirstLevelOpeningCampaignTest: {file:"Script_FirstLevelMissionBrowserTest.mjs",args:["--campaign","--stage-to=3"],timeoutMs:1800000,desc:"01–03 normal input: every 09.23 director phase in order, real kills, continuity, mouths and acting, withdrawal, the collection hand-over and Luo's acted front commands up to MachineGun"},
   OpeningFirstPersonTest: {file:"Script_OpeningFirstPersonTest.mjs",desc:"Production-arm anatomy, wrist twist and fixed bone lengths across 2000 poses"},
   FirstLevelVoicePerspectiveTest: {file:"Script_FirstLevelVoicePerspectiveTest.mjs",timeoutMs:120000,desc:"Actual WebAudio per-line dialogue: centred self line, spatial NPC lines, overlapping sources, dialogue sidechain, bark yield, concussion speech floor"},
   CarriagePropVelocityTest: {file:'Script_CarriagePropVelocityTest.mjs',timeoutMs:300000,desc:'Real cart/stretcher GPU velocities with moving camera, stop and reappearance; high-quality transfer scene'},
