@@ -294,10 +294,13 @@ export async function DriveOpening(ctx){
   assert.ok(lookBack.pursuit.length>=3,"bunkerPursuit follows into the trench behind the withdrawal");
   // On to the collection: stop once it is in view; the scene gathers round the player.
   await Route(WITHDRAW_ROUTE.slice(AT_RC),"OpeningRearTrench",{fight:true,stance:"crouch",stopFact:"collectionPointSeen"});
-  let meetShot=false;
-  for(let i=0;i<80&&!meetShot;i++){
+  // The meeting (Yaowa) and the guard's report are photographed as they play, from where the player stopped.
+  let meetShot=false,reportShot=false;
+  for(let i=0;i<120&&!(meetShot&&reportShot);i++){
     const at=await StepSampled(page,30);
-    if(at.flags.meetAt!=null&&at.time-at.flags.meetAt>=1.5){await page.screenshot({path:path.join(shots,"Key_CollectionMeet.png")});meetShot=true;}
+    if(!meetShot&&at.flags.meetAt!=null&&at.time-at.flags.meetAt>=1.5){await page.screenshot({path:path.join(shots,"Key_CollectionMeet.png")});meetShot=true;}
+    if(!reportShot&&at.phase==="SupportOrder"&&at.phaseTime>=1.2){await page.screenshot({path:path.join(shots,"Key_SupportOrder.png")});reportShot=true;}
+    if(at.stage!=="RearTrench")break;
   }
   assert.ok(meetShot,"CollectionMeet starts at the collection");
   await WaitStage("Support",120,{fight:true});
@@ -449,6 +452,6 @@ export async function DriveHandbackNegative(page,variant,output){
   await page.evaluate(()=>{const g=window.Tengxian;g.StepFrames(2,1/60,true);g.Debug.Key("KeyF",true);g.StepFrames(90,1/60,false);g.Debug.Key("KeyF",false);g.StepFrames(10,1/60,true);});
   const after=await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMission());
   assert.ok(after.facts.includes("rifleRecovered")&&after.stage==="RearTrench",`${variant}: the rifle pickup hands 02 on to the withdrawal`);
-  console.log(`ok hand-back (${variant}): Check ${waited.toFixed(2)} s after LongShot, junction by ${result.flags.junctionBy}`);
+  console.log(`ok hand-back (${variant}): Check ${waited.toFixed(2)} s after the long shot began, junction man down by ${result.flags.junctionBy||"(already dead)"}`);
   return result;
 }
