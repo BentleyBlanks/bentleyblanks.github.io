@@ -258,6 +258,7 @@ export class FirstLevelFrontPressure {
     const phase = FrontPressurePhase(stage, (id) => r.Has(id));
     if (phase !== this.phase) this.EnterPhase(phase);
     if (!phase) return;
+    this.Offstage(stage);
     if (phase.reserve) this.ReleaseReserves(stage);
     this.AssignFire();
     if (r.time >= this.groupTickAt) {
@@ -267,6 +268,24 @@ export class FirstLevelFrontPressure {
     if (phase.yield && r.time >= this.yieldTickAt) {
       this.yieldTickAt = r.time + FRONT_PRESSURE_TICK.yieldEveryS;
       this.YieldGap();
+    }
+  }
+
+  /**
+   * 组名册的 offstage：事实 `until` 记下以前、且还在 `steps` 里，组员装睡（missionDormant + scriptedNoncombatant，
+   * 不参战、探针不算在场）；过了就醒，只改一次（醒过的不再睡回去）。
+   */
+  Offstage(stage) {
+    const r = this.r;
+    for (const [groupId, g] of Object.entries(FRONT_PRESSURE_GROUPS)) {
+      if (!g.offstage || this.woken?.has(groupId)) continue;
+      const asleep = !r.Has(g.offstage.until) && g.offstage.steps.includes(stage);
+      if (!asleep) (this.woken ||= new Set()).add(groupId);
+      for (const a of FrontGroupMembers(groupId, r.enemies)) {
+        if (!a.alive || !!a.missionDormant === asleep) continue;
+        a.missionDormant = asleep; a.scriptedNoncombatant = asleep;
+      }
+      if (!asleep) this.Note("offstageWake", { group: groupId });
     }
   }
 

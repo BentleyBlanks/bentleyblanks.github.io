@@ -271,6 +271,9 @@ function MakeWorld(stage = "BunkerRescue") {
   // 03 opens.
   r.flow.stage.id = "Support"; world.facts.add("frontBattleStarted"); r.time = 1; pressure.Update();
   Eq(pressure.phase.id, "assault");
+  // The jump-off trench push group waits offstage until the tank shows (FRONT_PRESSURE_GROUPS.mgAttack.offstage).
+  const mgPush = FrontGroupMembers("mgAttack", enemies);
+  Check(mgPush.length === 4 && mgPush.every((a) => a.missionDormant && a.scriptedNoncombatant), "03: the push group waits offstage before the tank shows");
   // The fire base fires from its own list (crest and left gun only); the bounders keep the phase list.
   const fbIds = (enemies.get("FrontGunner").ambientFirePoints || []).map((p) => p.id);
   const assaultPhase = FRONT_PRESSURE_PHASES.find((p) => p.id === "assault");
@@ -360,6 +363,7 @@ function MakeWorld(stage = "BunkerRescue") {
   }
   // Machine-gun attack: charge once, then repelled.
   world.facts.add("tankPreviewed"); r.time = 6; pressure.Update();
+  Check(FrontGroupMembers("mgAttack", enemies).every((a) => !a.missionDormant && !a.scriptedNoncombatant), "the tank shows: the push group wakes");
   Eq(pressure.phase.id, "tankShown");
   // Men of the machine-gun attack killed while they were still waiting are not the attack's casualties.
   const mgWait = FrontGroupMembers("mgAttack", enemies);

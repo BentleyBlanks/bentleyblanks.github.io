@@ -74,6 +74,8 @@ export const FRONT_FIRE_POINTS = Object.freeze({
   // 取弹沟与道路连接支沟的交汇口（05 切入组要切进来的地方）：东头守位的两人 03/04 唯一打得到的点
   //（09-24 探针：他们对土坎、左枪、缺口全不通视，214 s 里一发没打）。环境射击不命中，只是近失弹与曳光。
   eastLink: P(44.6, -125.6, 0.8, 1.2),
+  // 受损沟沿（取弹沟东段）顶上：东头那两人的第二个点（只有一个点时，枪口那条线一挡就要等 blockedRetryS 才重挑）。
+  eastLip: P(40.6, -130.6, 1.4, 1.0),
 });
 
 const CREST = Object.freeze(["crestA", "crestB", "crestC", "crestD", "crestE", "crestF"]);
@@ -102,8 +104,11 @@ export const FRONT_PRESSURE_GROUPS = Object.freeze({
   flank: Object.freeze({ ids: Object.freeze([...FRONT_FLANK_GROUP.map((s) => s.id), FRONT_OFFICER.id]), officer: FRONT_OFFICER.id }),
   nest: Object.freeze({ encounter: "approach" }),
   // 军官取第一个步枪手（机枪手上不了刺刀，也带不了冲锋）。
+  // offstage：北侧出发壕里等战车的推进组，战车露面（tankPreviewed）以前装睡、不算前沿在场的人（04 起一律醒）。
+  // 09-24 探针：03 里他们在出发壕 88 m 外，对任何授权点都不通视，四个人一百多秒端着枪不打。
   mgAttack: Object.freeze({ ids: Object.freeze(FRONT_MACHINE_GUN_ATTACK.map((spec) => spec.id)),
-    officer: FRONT_MACHINE_GUN_ATTACK.find((spec) => spec.weapon !== "Type11")?.id ?? null }),
+    officer: FRONT_MACHINE_GUN_ATTACK.find((spec) => spec.weapon !== "Type11")?.id ?? null,
+    offstage: Object.freeze({ until: "tankPreviewed", steps: Object.freeze(["BunkerRescue", "RearTrench", "Support"]) }) }),
   reserveWest: Object.freeze({ ids: ReserveIds("NorthWestPlateau") }),
   reserveRoad: Object.freeze({ ids: ReserveIds("RoadCutting") }),
 });
@@ -157,8 +162,8 @@ export const FRONT_RESERVE_RELEASE = Object.freeze({ encounter: "frontReserve",
 
 export const FRONT_PRESSURE_STAGES = Object.freeze(["BunkerRescue", "RearTrench", "Support", "MachineGun", "Tank"]);
 
-const FIRE_03 = Object.freeze([...CREST, "leftGunParapet", "eastLink", ...GAP]);
-const FIRE_03_NEST = Object.freeze([...CREST, "leftGunParapet", ...NEST_WALLS, "eastLink", ...GAP]);
+const FIRE_03 = Object.freeze([...CREST, "leftGunParapet", "eastLink", "eastLip", ...GAP]);
+const FIRE_03_NEST = Object.freeze([...CREST, "leftGunParapet", ...NEST_WALLS, "eastLink", "eastLip", ...GAP]);
 const FIRE_05 = Object.freeze([...CREST_05, "leftGunParapet", "nestNorth", "attackRuin", ...GAP]);
 const NoGap = (list) => Object.freeze(list.filter((id) => !GAP.includes(id)));
 const HOLD = Object.freeze({ role: "hold" });
