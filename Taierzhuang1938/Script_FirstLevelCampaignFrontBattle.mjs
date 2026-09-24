@@ -99,6 +99,10 @@ export async function DriveFrontBattle(ctx){
       return {position:at.toArray().map(v=>+v.toFixed(2)),stance:p.stance,health:p.health,keys:[...(g.Debug.KeysDown?.()||[])],
         routeBot:window.routeBot?{index:window.routeBot.index,target:window.routeBot.points?.[window.routeBot.index],stalled:window.routeBot.stalled}:null,
         ground:g.battlefield.GroundHeight(at.x,at.z),colliders,people,damage:window.missionDamage?.slice(-20),
+        // A mission failure freezes the body exactly like a stall (09-24 TankProbe run N: the second guard batch died
+        // to tank shells while the player walked the ammo branch; the route reported "stalled"). Name it here.
+        failure:(()=>{const r=g.Debug.FirstLevelMissionRuntime(),facts=[...r.flow.facts].filter(f=>/Lost|Killed/.test(f));
+          return {facts,guards:(r.guards||[]).map(x=>x.actor.alive?Math.round(x.actor.health):0),menu:document.querySelector('#pauseMenu, .pauseMenu')?.innerText?.slice(0,80)??null};})(),
         impacts:(g.Debug.FirstLevelMissionRuntime().tank?.impacts||[]).filter(i=>near(i.x,i.z,5)),
         interaction:(()=>{const q=g.interact?.Query?.(g.player);return {query:q?{kind:q.kind,label:q.label,tag:q.point?.tag??null,id:q.point?.id??null,dist:q.dist}:null,
           prompts:(g.hud?.actionPrompts||[]).map(p=>p.label),text:document.querySelector('.actionText')?.textContent??null};})(),
@@ -125,6 +129,7 @@ export async function DriveFrontBattle(ctx){
           const M=new (o.matrixWorld.constructor)();for(let i=0;i<o.count;i++){o.getMatrixAt(i,M);m.setFromMatrixPosition(M).applyMatrix4(o.matrixWorld);if(near(m.x,m.z,2.5))out.push([o.name,+m.x.toFixed(2),+m.y.toFixed(2),+m.z.toFixed(2)]);}});return out.slice(0,20);})()};
     }).catch(e=>({error:String(e)}));
     await fs.writeFile(path.join(output,"Data_FrontStuck.json"),JSON.stringify(stuck,null,2)).catch(()=>{});
+    if(stuck.failure?.facts?.length)console.log("FRONT_MISSION_FAILED",JSON.stringify(stuck.failure));
     console.log("FRONT_STUCK",JSON.stringify(stuck).slice(0,3000));
     throw error;
   }
