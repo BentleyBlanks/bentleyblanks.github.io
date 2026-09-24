@@ -132,7 +132,7 @@ CLIPS = {
     'GestureDownL':    {'hand': 'L', 'duration': 1.4, 'inS': .25, 'strokeS': .40, 'hold': [.35, .90], 'outS': .95, 'aim': False},
     'GestureBeatL':    {'hand': 'L', 'duration': 1.6, 'inS': .30, 'strokeS': .50, 'hold': [.40, 1.05], 'outS': 1.10, 'aim': False},
     'GestureAskR':     {'hand': 'R', 'duration': 1.6, 'inS': .35, 'strokeS': .55, 'hold': [.50, 1.10], 'outS': 1.15, 'aim': True},
-    'GestureToMouthR': {'hand': 'R', 'duration': 1.8, 'inS': .40, 'strokeS': .60, 'hold': [.55, 1.20], 'outS': 1.30, 'aim': False},
+    'GestureToMouthR': {'hand': 'R', 'duration': 1.8, 'inS': .40, 'strokeS': .60, 'hold': [.55, 1.20], 'outS': 1.30, 'aim': False, 'reach': 'mouth'},
     'GestureOfferR':   {'hand': 'R', 'duration': 2.2, 'inS': .45, 'strokeS': .70, 'hold': [.65, 1.60], 'outS': 1.70, 'aim': True},
     'GestureHaltR':    {'hand': 'R', 'duration': 1.4, 'inS': .25, 'strokeS': .35, 'hold': [.35, .90], 'outS': .95, 'aim': False},
     'GestureFlickR':   {'hand': 'R', 'duration': 1.2, 'inS': .20, 'strokeS': .38, 'hold': [.40, .70], 'outS': .75, 'aim': False},
@@ -294,14 +294,14 @@ def KeysToMouthR(mouth):
         return tuple(Vector(roots) - fingers * .085)
     lipsRoots = (mouth[0] + .03, mouth[1] + .03, mouth[2] - .035)
     lips = {'hand': Wrist(lipsRoots), 'palmF': tuple(fingers), 'palmN': palmN, 'curl': .95, 'index': .55,
-            'pole': (.55, -.05, -.55), 'bend': .02}
+            'pole': (.75, .10, -.35), 'bend': .02}
     near = dict(lips, hand=Wrist((lipsRoots[0] + .01, lipsRoots[1] + .03, lipsRoots[2] - .03)))
     held = dict(lips, hand=Wrist((lipsRoots[0], lipsRoots[1] + .006, lipsRoots[2] - .003)))
-    away = {'hand': (-.02, .26, -.12), 'palmF': (.30, .50, .80), 'palmN': (-.2, .95, -.3), 'curl': .5, 'index': .2,
-            'pole': (.45, -.10, -.55), 'bend': .03}
+    away = {'hand': (.03, .32, -.10), 'palmF': (.30, .50, .80), 'palmN': (-.2, .95, -.3), 'curl': .5, 'index': .2,
+            'pole': (.55, -.10, -.50), 'bend': .03}
     return [
         (0.0, dict(r)),
-        (.40, dict(away, hand=(-.02, .26, -.20))),
+        (.40, dict(away, hand=(.03, .32, -.16))),
         (.55, dict(near)),
         (.60, dict(lips)),
         (.90, dict(held)),
@@ -315,14 +315,14 @@ def KeysToMouthR(mouth):
 def KeysOfferR():
     r = REST['R']
     # The arm extends toward the listener, fingers loosely closed as if holding a cigarette out.
-    out = {'hand': (-.07, .39, -.15), 'palmF': (-.20, .95, .10), 'palmN': (-.15, 0.0, 1.0), 'curl': .75, 'index': .55,
+    out = {'hand': (-.05, .39, -.12), 'palmF': (-.20, .95, .10), 'palmN': (-.15, 0.0, 1.0), 'curl': .75, 'index': .55,
            'pole': (.55, -.15, -.50), 'twist': -.08, 'bend': .10}
     return [
         (0.0, dict(r)),
-        (.45, dict(out, hand=(-.05, .36, -.22), twist=-.04, bend=.07)),
+        (.45, dict(out, hand=(-.03, .38, -.18), twist=-.04, bend=.07)),
         (.65, dict(out)),
-        (.70, dict(out, hand=(-.07, .40, -.14))),
-        (1.10, dict(out, hand=(-.07, .39, -.16))),
+        (.70, dict(out, hand=(-.05, .40, -.11))),
+        (1.10, dict(out, hand=(-.05, .39, -.13))),
         (1.60, dict(out)),
         (1.70, dict(out)),
         (1.95, dict(r, hand=(-.03, .29, -.27))),
@@ -333,13 +333,13 @@ def KeysOfferR():
 def KeysHaltR():
     r = REST['R']
     # Palm raised toward the listener at shoulder height ("wait").
-    palm = {'hand': (.02, .30, -.02), 'palmF': (0.0, .15, 1.0), 'palmN': (0.0, 1.0, -.10), 'curl': .10, 'index': .1,
+    palm = {'hand': (.08, .36, -.06), 'palmF': (0.0, .15, 1.0), 'palmN': (0.0, 1.0, -.10), 'curl': .10, 'index': .1,
             'pole': (.50, -.05, -.55), 'bend': .02}
     return [
         (0.0, dict(r)),
-        (.25, dict(palm, hand=(.02, .27, -.08))),
+        (.25, dict(palm, hand=(.07, .33, -.12))),
         (.35, dict(palm)),
-        (.60, dict(palm, hand=(.02, .31, -.01))),
+        (.60, dict(palm, hand=(.08, .37, -.05))),
         (.90, dict(palm)),
         (.95, dict(palm)),
         (1.18, dict(r, hand=(-.02, .28, -.26))),
@@ -557,6 +557,23 @@ def BakeRig(ctx):
 
     fileOut = output / ('Animation_' + modelId + 'SpeakerGestures.json')
     previous = json.loads(fileOut.read_text()) if (selectedClips and fileOut.exists()) else None
+    # Reach anchors: where a reach clip's grip (the finger roots, what the runtime reaches with) is at its stroke,
+    # in the HEAD bone's glTF node frame (source metres). The runtime layer re-aims the arm at this point on the
+    # live head, which the body clip and the head layer turn (a seated man looking at his listener).
+    headName = prefix + ' Head'
+    anchors = dict(previous.get('anchors') or {}) if previous else {}
+
+    def Node(name):
+        return convertInv @ BWorld(arm.pose.bones[name]) @ corrections[name]
+
+    def HeadLocal(point):
+        return [round(c, 6) for c in (Node(headName).inverted() @ (convertInv @ point))]
+
+    def HeadRelative(name):
+        """The bone's world rotation relative to the head's (x, y, z, w): the hand keeps it on a turned head."""
+        q = (Node(headName).inverted() @ Node(name)).to_quaternion().normalized()
+        return [round(q.x, 6), round(q.y, 6), round(q.z, 6), round(q.w, 6)]
+
     clipsOut = dict(previous['clips']) if previous else {}
     reports = dict(previous.get('validation') or {}) if previous else {}
     wanted = [c for c in CLIPS if not selectedClips or c in selectedClips]
@@ -575,6 +592,10 @@ def BakeRig(ctx):
         strokeDir = None
         tipOf = {}
         started = time.time()
+        # Review and measure frames: the nearest frame to each window time.
+        At = lambda seconds: int(round(seconds * FPS))
+        strokeFrame = At(meta['strokeS'])
+        reviewFrames = {0, count - 1, strokeFrame, At((meta['hold'][0] + meta['hold'][1]) / 2), At((meta['outS'] + meta['duration']) / 2)}
         for frame in range(count):
             t = frame * meta['duration'] / (count - 1)
             Pose(side, keys(t))
@@ -587,7 +608,12 @@ def BakeRig(ctx):
             elbowMin, elbowMax = min(elbowMin, bendDeg), max(elbowMax, bendDeg)
             tip = Point(Bone(side + ' Finger12')) if clip == 'GesturePointL' else ctx['GripPoint'](side)
             tipOf[frame] = tip
-            if abs(t - meta['strokeS']) < .5 / FPS:
+            if frame == strokeFrame and meta.get('reach'):
+                anchors[meta['reach']] = {'bone': headName, 'offset': HeadLocal(ctx['GripPoint'](side)),
+                                          'handQ': HeadRelative(prefix + ' ' + side + ' Hand'), 'clip': clip,
+                                          'note': 'grip (finger-root centroid) at the stroke in the head bone glTF node frame; '
+                                                  'handQ: the hand rotation relative to the head there'}
+            if frame == strokeFrame:
                 d = (tip - ua).normalized()
                 strokeDir = [round(-d.x, 4), round(d.z, 4), round(d.y, 4)]      # three.js actor frame
             live = meta['inS'] * .5 <= t <= meta['outS'] + (meta['duration'] - meta['outS']) * .5
@@ -595,9 +621,7 @@ def BakeRig(ctx):
                 pen = Penetration(side, withHead=(clip == 'GestureToMouthR'))
                 if pen > worstPen:
                     worstPen, worstPenAt = pen, round(t, 3)
-            if RENDER and (frame in (0, count - 1) or abs(t - meta['strokeS']) < .5 / FPS
-                           or abs(t - (meta['hold'][0] + meta['hold'][1]) / 2) < .5 / FPS
-                           or abs(t - (meta['outS'] + meta['duration']) / 2) < .5 / FPS):
+            if RENDER and frame in reviewFrames:
                 RenderReview(clip, modelId, frame, side)
             if action is not None:
                 arm.animation_data.action = action
@@ -629,8 +653,7 @@ def BakeRig(ctx):
                   'penetrationM': round(worstPen * scale, 4), 'penetrationAt': worstPenAt,
                   'finite': all(math.isfinite(v) for v in values)}
         if clip == 'GestureToMouthR':
-            s0 = int(round(meta['strokeS'] * FPS))
-            report['lipsGapM'] = round((tipOf[s0] - lipsWorld).length * scale, 4)
+            report['lipsGapM'] = round((tipOf[strokeFrame] - lipsWorld).length * scale, 4)
         if action is not None:
             action.use_fake_user = True
         clipsOut[clip] = {'duration': meta['duration'], 'frameCount': count, 'hand': side,
@@ -645,7 +668,7 @@ def BakeRig(ctx):
     asset = {'schema': 1, 'modelId': modelId, 'fps': FPS, 'stride': 4,
              'coordinates': 'glTF node-local bone rotations (q xyzw) of the listed bones; strokeDir is the '
                             'shoulder -> hand (index tip for a point) direction at the stroke, three.js actor frame',
-             'clips': {c: clipsOut[c] for c in CLIPS if c in clipsOut}, 'validation': {c: reports[c] for c in CLIPS if c in reports},
+             'clips': {c: clipsOut[c] for c in CLIPS if c in clipsOut}, 'anchors': anchors, 'validation': {c: reports[c] for c in CLIPS if c in reports},
              'originalModelSha256': Sha(source), 'authoringTool': 'Blender ' + bpy.app.version_string + ' (bpy; headless)'}
     temporary = fileOut.with_suffix('.json.tmp')
     temporary.write_text(json.dumps(asset, separators=(',', ':')), encoding='utf-8')

@@ -30,6 +30,9 @@ export const SPEAKER_GESTURE_ASSET = Object.freeze({
  *   hold    [a, b]: repeated while the line lasts longer than the clip, with a small beat on each stress
  *   outS    the layer weight falls 1 -> 0 over [outS, duration]: the arm goes back to what the body is doing
  *   aim     the upper arm is turned so that shoulder -> hand points at the line's target (cone: tuning table)
+ *   reach   the arm is re-aimed (two-bone reach) so the grip lands on this anchor of the rig's live head (the manifest's
+ *           per-rig `anchors`: where the grip was at the stroke, in the head bone's frame), because the body clip and
+ *           the head layer turn the head away from where the clip was authored
  */
 export const SPEAKER_GESTURE_CLIPS = Object.freeze({
   GesturePointL: Object.freeze({ hand: "L", duration: 1.8, inS: .35, strokeS: .40, hold: [.45, 1.15], outS: 1.25, aim: true,
@@ -44,7 +47,7 @@ export const SPEAKER_GESTURE_CLIPS = Object.freeze({
     note: "assigning / explaining: open hand half raised, small downward beats" }),
   GestureAskR: Object.freeze({ hand: "R", duration: 1.6, inS: .35, strokeS: .55, hold: [.50, 1.10], outS: 1.15, aim: true,
     note: "asking for something: open palm up, held out low toward the listener" }),
-  GestureToMouthR: Object.freeze({ hand: "R", duration: 1.8, inS: .40, strokeS: .60, hold: [.55, 1.20], outS: 1.30, aim: false,
+  GestureToMouthR: Object.freeze({ hand: "R", duration: 1.8, inS: .40, strokeS: .60, hold: [.55, 1.20], outS: 1.30, aim: false, reach: "mouth",
     note: "index and middle finger lifted to the cigarette at the lips, then away" }),
   GestureOfferR: Object.freeze({ hand: "R", duration: 2.2, inS: .45, strokeS: .70, hold: [.65, 1.60], outS: 1.70, aim: true,
     note: "handing over: the arm extends toward the listener, fingers loosely closed as if holding a cigarette" }),
