@@ -44,7 +44,10 @@ export async function DriveFrontBattle(ctx){
     // 西墙（RightNestWestLow，x 23.65…24.35，z −156.8…−151.8）外面的人从西门回来（09-24 探针：躲雷甩到 (23.3,−153.9)，
     // 直线回座位顶在那道矮墙上三个 chunk 不动）。
     const west=off.x<24.4&&off.z<-151.2;
-    await Route(off.x>32.5?[{x:off.x,z:-141.8},{x:30,z:-141.8},S.seat]:west?[{x:off.x,z:Space.westDoor.z},Space.westDoor,S.seat]:[S.seat],label,{stance:"crouch",fight:true,recoverAfterEvade:true});
+    // Only north of the yard's north wall (z −145.6): a dodge inside the yard's east half (09-24 chain R: 34.9,−153.1)
+    // walked the east-wall detour straight into that wall and stalled there.
+    const east=off.x>32.5&&off.z>-145.2;
+    await Route(east?[{x:off.x,z:-141.8},{x:30,z:-141.8},S.seat]:west?[{x:off.x,z:Space.westDoor.z},Space.westDoor,S.seat]:[S.seat],label,{stance:"crouch",fight:true,recoverAfterEvade:true});
   }
   async function HoldNest({stage=null,fact=null},seconds,label){
     let state;
@@ -265,8 +268,13 @@ export async function DriveFrontBattle(ctx){
         if(g.player.stance==="stand")g.Debug.Key("KeyC");
         for(let f=0;f<9*60&&g.player.alive&&r.tank.damageState==="MobilityKill";f++){
           if(g.player.bleeding&&g.player.health<80)g.Debug.Key("KeyB");
+          // A tank escort walking up during the hold is answered like a player would (09-24 TankProbe run R: escort C
+          // shot and bayoneted the crouched thrower from 1.8 m while the hold only watched the tank).
+          const close=window.MissionInputDriver?.Target?.(8);
+          if(close)window.MissionInputDriver.Shoot(close);else{g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);}
           g.StepFrames(1,1/60,false);
         }
+        g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);
         const bursts=(tr?.brain?.telemetry.bursts||[]).slice(bursts0),shots=(tr?.log.shots||[]).slice(shots0);
         return {heldS:r.time-start,state:r.tank.damageState,alive:g.player.alive,health:g.player.health,shots,
           bursts,atPlayer:bursts.filter(b=>b.target==="player"||b.target==="thrower").length+shots.filter(s=>s.target==="player").length};
@@ -275,6 +283,12 @@ export async function DriveFrontBattle(ctx){
       console.log("MOBILITY_KILL_HOLD",JSON.stringify({heldS:hold.heldS,state:hold.state,health:hold.health,atPlayer:hold.atPlayer,bursts:hold.bursts.length,shots:hold.shots.length}));
       assert.ok(hold.alive,"player survives the MobilityKill hold");
     }
+    // Nobody gets a free bayonet on a thrower busy aiming: deal with anyone inside 8 m first (at most 6 s).
+    const cleared=await page.evaluate(()=>{const g=window.Tengxian,D=window.MissionInputDriver;let frames=0,close=null;
+      for(;frames<360&&g.player.alive&&(close=D?.Target?.(8));frames++){D.Shoot(close);g.StepFrames(1,1/60,false);}
+      g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);if(g.state.activeSlot!=="primary")g.Debug.Key("Digit1");
+      return {frames,left:close?.missionId??null};});
+    if(cleared.frames)console.log("BUNDLE_CLEAR_CLOSE",JSON.stringify(cleared));
     const thrown=await DriveBundleThrow(page,{aim:aims[attempt]});
     await fs.writeFile(path.join(output,`Data_BundleThrow${attempt}.json`),JSON.stringify(thrown,null,2));
     const t=thrown.mission.tank;
