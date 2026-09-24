@@ -41,7 +41,9 @@ export const MISSION_STAGES = Object.freeze([
     "Support",
     "跟随班长，夺取右侧机枪阵位。",
     A.front,
-    ["frontReached", "rightNestCaptured", "frontContact", "frontRifleDefense", "rifleWithdrawalResolved", "zhouGunWounded", "tankPreviewed"],
+    // 契约 §2.6：03 到「何有田接枪 + 老周离枪 ≥10 m」即过，不再等老周走回集结处（约 100 s 空等）；
+    // zhouGunWounded（老周走到集结处）挪到 05 的背景条件：06 之前必须成立。
+    ["frontReached", "rightNestCaptured", "frontContact", "frontRifleDefense", "rifleWithdrawalResolved", "leftGunHandover", "zhouLeftGun", "tankPreviewed"],
     null,
   ),
   Stage(
@@ -55,7 +57,7 @@ export const MISSION_STAGES = Object.freeze([
     "Tank",
     "沿后侧支沟取得集束弹，解除撤口封锁。",
     A.bundle,
-    ["bundleRouteTraversed", "bundleTaken", "bundleReturned", "attackPositionReached", "tankImmobilized", "tankFireDisabled", "attackRetreated", "lastGuardsWithdrawn", "frontDisengaged", "reliefInPosition", "collectionReturned"],
+    ["bundleRouteTraversed", "bundleTaken", "bundleReturned", "attackPositionReached", "tankImmobilized", "tankFireDisabled", "attackRetreated", "lastGuardsWithdrawn", "frontDisengaged", "reliefInPosition", "collectionReturned", "zhouGunWounded"],
     "BundleGo",
   ),
   Stage(

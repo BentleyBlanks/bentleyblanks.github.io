@@ -234,5 +234,23 @@ export const FRONT_BATTLE_TUNING=Object.freeze({
   // Waiting guards kneel (1), they are not forced prone (2): prone they show 0.3 m above the scrape and the K3
   // observation step cannot read them; kneeling they show 0.75-1.0 m (Space FrontTopologyTest K3, docs §10.2).
   guardWaitStance:1,
+  // ---- 03-06 pacing (contract §2.6, 2026-09-24 Front package step 2) ----
+  // 03 ends when He has the left gun and Zhou is this far off it (was: Zhou back at the collection, ~100 s of waiting).
+  zhouLeftGunM:10,
+  // Zhou lets go of the gun only once He stands this close to the seat (the gun is never left empty).
+  handoverReadyM:3,
+  // FrontBlockade (Zhou/Luo shouting across) fires when the player is this close to the observation spur mouth or the fold (K3).
+  observationCallM:6,
+  // FrontApproach ("贴这道墙！前头有人！") fires 5 m around this FRONT_SORTIE.approach point: (13,-144.2) in the right
+  // low trench, 13 m short of the nest's west door (the old index 3 now sits at the observation step).
+  frontApproachCallIndex:10,
+  // 05->06: at the safe zone (FRONT_SPACE.returnMeet) Luo waits for FrontRelief at most this long before going on.
+  returnMeetMaxWaitS:20,
+  // Posts on the support sap floor around returnMeet (probed: 2.0 m deep, >= 1.25 m from the sap wall). The relief
+  // NCO receives the batch there; He comes down from the left gun to it; Liu holds the sap mouth there from 03 on
+  // ("文财，看住沟口！") - his old post (-18,-123) was on open ground beside the sap.
+  reliefLeadPost:Object.freeze({x:-21.2,z:-126}),
+  heMeetPost:Object.freeze({x:-24.8,z:-125.6}),
+  liuMeetPost:Object.freeze({x:-19.5,z:-129}),
   bandage:{radius:.087,height:.2,y:-.19,color:0xb6ac8b},
 });

@@ -1,5 +1,5 @@
 // 03–05 persistent battlefield director. Geometry and routes: Data_FirstLevelFrontRoute.
-import { FRONT_SORTIE as S } from "./Data_FirstLevelFrontRoute.mjs";
+import { FRONT_SORTIE as S, FRONT_SPACE as Space } from "./Data_FirstLevelFrontRoute.mjs";
 import { FRONT_BATTLE_TUNING as B } from "./Data_Tuning_FirstLevelFront.mjs";
 import { MISSION_TUNING as R } from "./Data_Tuning_FirstLevel.mjs";
 import { MISSION_ROUTES as Routes, MISSION_ANCHORS as A, MISSION_PLACEMENT as P } from "./Data_FirstLevelMissionLayout.mjs";
@@ -12,6 +12,39 @@ import { SpeakingCastOptions } from "./Data_FirstLevelSpeakingCast.mjs";
 import { TankClearFact } from "./Script_FirstLevelTankBrain.mjs";
 const Distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const AliveBatch=batch=>batch.filter(g=>g.actor.alive);
+/** Route split at the point nearest to `point`: [head ending there, tail starting there]. */
+export function SplitRoute(route,point){
+  const {progress}=MissionRouteProjection(route,point),at=MissionRoutePoint(route,progress),head=[],tail=[{x:at.x,z:at.z}];
+  let distance=0;head.push({...route[0]});
+  for(let i=1;i<route.length;i++){
+    distance+=Distance(route[i-1],route[i]);
+    if(distance<progress-.01)head.push({...route[i]});else if(distance>progress+.01)tail.push({...route[i]});
+  }
+  head.push({x:at.x,z:at.z});
+  return [head,tail];
+}
+/** Every live guard of the batch is safe or already past the gap (contract §2.6: 05 relief and return run in parallel). */
+export function BatchPastGap(batch,gap=S.gap){
+  return AliveBatch(batch).every(g=>{
+    if(g.safe)return true;
+    const i=g.route.findIndex(p=>Distance(p,gap)<.01);
+    return i>=0&&g.progress>i;
+  });
+}
+/**
+ * 06 departure (contract v1.1 deadlock ①): the litters start the step already spaced out along the route
+ * (the lead one at count x litterSpacingM), so "some litter has progress >= spacing" was true on the very frame
+ * zhouOnLitter was recorded - 07 started before Zhou's litter left the wall and it stayed "fallen" for good.
+ * The column has departed only once Zhou is on a litter that is in the queue (not "fallen") and the column has
+ * then really moved: the furthest-moving litter advanced spacingM beyond where it stood at that moment.
+ */
+export function ColumnDeparture(baseline,litters,spacingM){
+  const zhou=litters.find(l=>l.zhou);
+  if(!zhou||zhou.state==="fallen")return {baseline:null,departed:false,lead:0};
+  const base=baseline||new Map(litters.map(l=>[l.id,l.progress]));
+  const lead=Math.max(0,...litters.map(l=>l.progress-(base.get(l.id)??l.progress)));
+  return {baseline:base,departed:lead>=spacingM,lead};
+}
 export function BatchRecovered(batch){return batch.length>0&&AliveBatch(batch).length>0&&AliveBatch(batch).every(g=>g.safe&&g.progress>=g.route.length);}
 export function AssaultWindow(actors,captured,blocked,threshold=B.assaultKills){return captured&&actors.length>=threshold&&actors.filter(a=>a&&!a.alive).length>=threshold&&!blocked;}
 // The player can reach Support while companions are still behind the rear bank.
@@ -80,13 +113,28 @@ export class FirstLevelFrontBattle {
       r.tank.present=false;r.tank.active=false;
       for(const [role,route] of [
         ["heyoutian",[...MISSION_FRONT_COLLECTION_ROUTE,...S.leftRoute.slice(1,-1)]],
-        ["liuwencai",[...MISSION_FRONT_COLLECTION_ROUTE,{x:-18,z:-123}]],
+        ["liuwencai",[...MISSION_FRONT_COLLECTION_ROUTE,...S.approach.slice(1,4),B.liuMeetPost]],
         ["yaowa",[...MISSION_FRONT_COLLECTION_ROUTE,...S.leftRoute.slice(1,-2)]],
       ]){const actor=r.companion.Handle(role);if(actor)this.SetWalk(actor,FrontEntryRoute(actor.position,route));}
-      r.Say("FrontBlockade");
     }
-    if(stage==="MachineGun"){r.Say("TankRoadContact");r.tank.present=true;r.tank.active=true;this.SetLeg("cover",[S.leaderCover]);}
+    if(stage==="MachineGun"){
+      r.Say("TankRoadContact");r.tank.present=true;r.tank.active=true;this.SetLeg("cover",[S.leaderCover]);
+      // A debug start at 04 never ran the 03 handover: send He to the left gun now.
+      this.StartHandover(false);
+    }
     if(stage==="Tank"){r.emplacement.Vacate("sortie");this.SetLeg("supply",Routes.bundle);r.EnsureBundleKeeper();r.Say("BundleGo");}
+  }
+  /** 03 handover: He Youtian walks the last leg of the left gun access trench and takes the gun Zhou leaves. */
+  StartHandover(say=true){
+    if(this.handoverStarted)return;
+    const r=this.r,he=r.companion.Handle("heyoutian");if(!he)return;
+    this.handoverStarted=true;this.SetWalk(he,[...S.leftRoute.slice(-2)]);if(say)r.Say("TakeOverGun");
+  }
+  UpdateHandover(){
+    const r=this.r,he=r.companion.Handle("heyoutian");
+    if(!this.handoverStarted||this.postsRelieved||!he?.alive)return;
+    // Not gated on the fact: a debug start at 04 already carries leftGunHandover, He still has to sit down.
+    if(Distance(he.position,S.leftSeat)<B.arrivalM&&!r.emplacement.guns.get(r.leftGunId)?.npc){r.emplacement.NpcOccupy(r.leftGunId,he);r.Record("leftGunHandover");}
   }
   InfantryBlockade(){
     const r=this.r;
@@ -104,13 +152,20 @@ export class FirstLevelFrontBattle {
       speed:cast==="yaowa"&&this.walks.has(r.opening.zhou?.id)&&!r.Has("zhouGunWounded")?R.walkSpeedMps:R.squadSpeedMps});
     this.Walk(this.Leader,{follow:true});
     this.blocked=this.InfantryBlockade()||this.TankBlockade();
+    this.UpdateHandover();
+    // Sound package's music stinger: the gap is open again (tank silenced and no one fires on the gap).
+    if(stage==="Tank"&&r.Has(TankClearFact(r.tank))&&!this.blocked)r.Record("breachReopened");
     if(stage==="Support")this.UpdateCapture();
     if(stage==="MachineGun")this.UpdatePressure();
     if(stage==="Tank")this.UpdateSortie();
   }
   UpdateCapture(){
     const r=this.r;
-    if(r.Near(S.approach[3],5))r.Say("FrontApproach");
+    // K3: Zhou and Luo shout across the observation step, where the player first sees the pinned guards, the gap
+    // and the burning nest (it used to fire at 0 s of the step with Zhou 50 m away: Voice report).
+    if(r.Near(Space.observationSpur[0],B.observationCallM)||r.Near(Space.fold,B.observationCallM))r.Say("FrontBlockade");
+    // "贴这道墙！前头有人！" belongs to the right low trench, 12-20 m short of the nest's west door.
+    if(r.Near(S.approach[B.frontApproachCallIndex],5))r.Say("FrontApproach");
     const defenders=MISSION_ENCOUNTERS.approach.map(s=>r.enemies.get(s.id));
     if(r.Near(S.nest,B.captureRadiusM)&&Distance(this.Leader.position,S.nest)<B.captureRadiusM
       &&defenders.every(a=>a&&!a.alive)){
@@ -121,9 +176,7 @@ export class FirstLevelFrontBattle {
     if(AssaultWindow(assault,r.Has("rightNestCaptured"),this.blocked)){r.Record("frontRifleDefense");r.Say("FrontWithdraw");}
     if(r.Has("rifleWithdrawalResolved")){
       r.tank.present=true;r.tank.active=true;
-      const he=r.companion.Handle("heyoutian");
-      if(!this.handoverStarted){this.handoverStarted=true;this.SetWalk(he,[...S.leftRoute.slice(-2)]);r.Say("TakeOverGun");}
-      if(Distance(he.position,S.leftSeat)<B.arrivalM&&!r.emplacement.guns.get(r.leftGunId)?.npc){r.emplacement.NpcOccupy(r.leftGunId,he);r.Record("leftGunHandover");}
+      this.StartHandover();
     }
   }
   UpdatePressure(){
@@ -159,8 +212,22 @@ export class FirstLevelFrontBattle {
     if(!r.Has("attackPositionReached"))r.Record("attackPositionReached",{skipped:true,reason:"tankClearedFirst",
       playerAtThrow:r.Near(S.throw,B.attackArrivalM),leaderAtThrow:Distance(this.Leader.position,S.throw)<B.rearArrivalM});
     if(r.Near(S.rear,B.rearArrivalM))r.Record("attackRetreated");
-    if(!r.Has("lastGuardsWithdrawn")){this.SetLeg("retreat",[...S.attackRoute].reverse());return;}
-    this.SetLeg("disengage",Routes.orders.slice(S.attackRoute.length-1));
+    if(!r.Has("attackRetreated")){this.SetLeg("retreat",[...S.attackRoute].reverse());return;}
+    // Contract §2.6: the last batch's crossing, the relief and the pair's return run in parallel. The pair walks
+    // back through the nest and holds at its west door (K10: the gap is in view 34 m away) until every live man of
+    // the last batch is past the gap, then goes on down the right low trench to the safe zone (returnMeet), where
+    // the batch, Liu and the relief NCO meet them (FrontRelief), and on to the collection.
+    const back=Routes.orders.slice(S.attackRoute.length-1),[toDoor,fromDoor]=SplitRoute(back,Space.westDoor),[toMeet,home]=SplitRoute(fromDoor,Space.returnMeet);
+    const last=r.guards.slice(B.firstBatch);
+    this.gapWatched ||= BatchPastGap(last);
+    if(!this.gapWatched){this.SetLeg("gapWatch",toDoor);return;}
+    if(!this.returnMeetDone){
+      this.SetLeg("disengage",toMeet);
+      if(Distance(this.Leader.position,Space.returnMeet)<Space.returnMeet.radiusM)this.meetHoldAt??=r.time;
+      this.returnMeetDone=r.voice.played.has("FrontRelief")||(this.meetHoldAt!=null&&r.time-this.meetHoldAt>=B.returnMeetMaxWaitS);
+      if(!this.returnMeetDone)return;
+    }
+    this.SetLeg("home",home);
     this.playerLeftFront ||= r.Near(S.approach[0],B.rearArrivalM);
     this.leaderLeftFront ||= Distance(this.Leader.position,S.approach[0])<B.rearArrivalM;
     if(this.playerLeftFront&&this.leaderLeftFront)r.Record("frontDisengaged");
@@ -235,11 +302,16 @@ export class FirstLevelFrontBattle {
     const yaowa=r.companion.Handle("yaowa");
     if(!this.zhouEscortDispatched){this.zhouEscortDispatched=true;this.SetWalk(yaowa,S.leftRoute.slice(-3));}
     if(!this.walks.has(a.id)){
-      if(Distance(yaowa.position,a.position)>B.rearArrivalM)return;
+      if(yaowa?.alive&&Distance(yaowa.position,a.position)>B.rearArrivalM)return;
+      const he=r.companion.Handle("heyoutian");
+      if(he?.alive&&Distance(he.position,S.leftSeat)>B.handoverReadyM)return;
       r.emplacement.NpcVacate(r.leftGunId,"woundedWithdrawal");
-      const route=[...S.leftRoute].reverse().concat([...MISSION_FRONT_COLLECTION_ROUTE].reverse().slice(1),[P.collection.zhouWall]);
+      // Same polyline Script_FirstLevelOpening.ZhouGunExitRoute is to follow (FRONT_SORTIE.zhouExit, Opening package).
+      const route=[...S.zhouExit,P.collection.zhouWall];
       this.SetWalk(a,route);this.SetWalk(yaowa,route);
     }
+    // Contract §2.6: 03 ends once Zhou is 10 m off the gun (He has it); reaching the collection is a 05 condition.
+    if(!r.Has("zhouLeftGun")&&Distance(a.position,S.leftSeat)>=B.zhouLeftGunM)r.Record("zhouLeftGun",{distance:+Distance(a.position,S.leftSeat).toFixed(1)});
     if(this.Walk(a,{speed:R.walkSpeedMps})){
       Object.assign(r.column.zhou,{x:a.position.x,z:a.position.z,health:a.health,visible:true,state:"waiting"});
       r.Record("zhouGunWounded",{priorWound:true,x:a.position.x,z:a.position.z});r.ai.Remove(a);this.SetWalk(yaowa,[{x:-33,z:-100}]);
@@ -268,35 +340,77 @@ export class FirstLevelFrontBattle {
     }
     if(stage==="Support"&&t.roadProgress>=limit-.2)r.Record("tankPreviewed");
   }
+  /** Relief roster: the NCO who receives the batch in the safe zone (he speaks FrontRelief), the gunner for the left gun, the gap-junction holder. */
+  ReliefRoster(){
+    return [
+      {post:B.reliefLeadPost,weapon:"HanYang",speaking:true,route:[...MISSION_FRONT_COLLECTION_ROUTE,...S.approach.slice(1,4),B.reliefLeadPost]},
+      {post:P.reliefPositions[0],weapon:"Zb26",gun:true,route:[...MISSION_FRONT_COLLECTION_ROUTE,...S.leftRoute.slice(1)]},
+      // Down the support sap to the gap junction (the old straight line from SJ cut through the sap walls).
+      {post:P.reliefPositions[1],weapon:"HanYang",route:[...MISSION_FRONT_COLLECTION_ROUTE,...S.approach.slice(1,8),P.reliefPositions[1]]},
+    ];
+  }
   UpdateRelief(dt){
-    const r=this.r;if(!r.Has("lastGuardsWithdrawn")||!["Tank","Orders"].includes(r.flow.stage.id))return;
-    if(!r.relief){
-      r.relief=P.reliefPositions.map((post,i)=>{
-        const actor=r.ai.Spawn("nra",A.collection.x+i*1.5,A.collection.z,{weapon:i?"HanYang":"Zb26",squadId:"MissionRelief",...(i?{}:SpeakingCastOptions("relief"))});
+    const r=this.r,stage=r.flow.stage.id;
+    if(!["Tank","Orders"].includes(stage))return;
+    // Contract §2.6: the relief comes up as soon as the tank is silenced, in parallel with the last batch and the pair's return.
+    if(!r.relief&&(stage==="Orders"||r.Has(TankClearFact(r.tank)))){
+      r.relief=this.ReliefRoster().map((spec,i)=>{
+        const actor=r.ai.Spawn("nra",A.collection.x+i*1.5,A.collection.z,{weapon:spec.weapon,squadId:"MissionRelief",...(spec.speaking?SpeakingCastOptions("relief"):{})});
         if(!actor)return null;InstallMissionSentry(actor);actor.missionId=`Relief${i}`;
-        this.SetWalk(actor,[...MISSION_FRONT_COLLECTION_ROUTE,...(i?[post]:S.leftRoute.slice(1))]);
-        return {actor,arrived:false,index:0,distance:0,delay:0,route:this.walks.get(actor.id).route};
+        this.SetWalk(actor,spec.route);
+        return {actor,gun:!!spec.gun,speaking:!!spec.speaking,arrived:false,index:0,distance:0,delay:0,route:this.walks.get(actor.id).route};
       }).filter(Boolean);
     }
+    if(!r.relief)return;
     for(const e of r.relief){e.arrived=this.Walk(e.actor);e.index=this.walks.get(e.actor.id)?.index||0;}
-    if(r.relief.length===P.reliefPositions.length&&r.relief.every(e=>e.actor.alive&&e.arrived)){
-      r.Record("reliefInPosition");r.Say("FrontRelief");
+    if(r.relief.length===this.ReliefRoster().length&&r.relief.every(e=>e.actor.alive&&e.arrived)){
+      r.Record("reliefInPosition");
       if(!this.postsRelieved){
         this.postsRelieved=true;r.emplacement.NpcVacate(r.leftGunId,"relief");
-        this.SetWalk(r.companion.Handle("heyoutian"),[...S.leftRoute].reverse().concat([...MISSION_FRONT_COLLECTION_ROUTE].reverse().slice(1)));
-        this.SetWalk(r.companion.Handle("liuwencai"),[{x:-17,z:-124},...MISSION_FRONT_COLLECTION_ROUTE.slice(-1),...[...MISSION_FRONT_COLLECTION_ROUTE].reverse().slice(1)]);
-        r.emplacement.NpcOccupy(r.leftGunId,r.relief[0].actor);
+        // He leaves the gun down the access trench to the safe zone, Liu steps over from the trench mouth: both
+        // meet the returning pair there (FRONT_SPACE.returnMeet), then walk home with them.
+        this.SetWalk(r.companion.Handle("heyoutian"),[...S.leftRoute].reverse().slice(0,4).concat([B.heMeetPost]));
+        this.SetWalk(r.companion.Handle("liuwencai"),[B.liuMeetPost]);
+        const gunner=r.relief.find(e=>e.gun)?.actor;if(gunner)r.emplacement.NpcOccupy(r.leftGunId,gunner);
       }
     }
-    if(this.postsRelieved&&r.flow.stage.id==="Orders")for(const id of ["heyoutian","liuwencai"])this.Walk(r.companion.Handle(id));
+    this.UpdateReturnMeet();
+    if(this.postsRelieved&&stage==="Orders")for(const id of ["heyoutian","liuwencai"])this.Walk(r.companion.Handle(id));
+  }
+  /** 05->06 return beat in the safe zone (FRONT_SPACE.returnMeet): Liu reports the batch through, the relief NCO takes over, Luo sends everyone home. */
+  UpdateReturnMeet(){
+    const r=this.r;
+    if(r.voice.played.has("FrontRelief")){
+      if(this.postsRelieved&&!this.homeSent&&r.voice.finished.has("FrontRelief")){
+        this.homeSent=true;
+        const home=[S.approach[3],S.approach[2],S.approach[1],...[...MISSION_FRONT_COLLECTION_ROUTE].reverse()];
+        for(const id of ["heyoutian","liuwencai"])this.SetWalk(r.companion.Handle(id),home);
+      }
+      return;
+    }
+    if(r.flow.stage.id!=="Tank"||!r.Has("lastGuardsWithdrawn")||!r.relief)return;
+    const lead=r.relief.find(e=>e.speaking);
+    const ready=!lead?.actor?.alive||lead.arrived;
+    const back=Routes.orders.slice(S.attackRoute.length-1);
+    const passed=MissionRouteProjection(back,r.player.position).progress>MissionRouteProjection(back,Space.returnMeet).progress+Space.returnMeet.radiusM;
+    if(ready&&(r.Near(Space.returnMeet,Space.returnMeet.radiusM)||passed)){r.Record("returnMet",{passed});r.Say("FrontRelief");}
   }
   Guide(){
     const r=this.r;if(!this.Active)return null;
     const stage=r.flow.stage.id;
-    if(stage==="Support")return r.Has("rightNestCaptured")?{target:S.gap,label:"front",objective:Objectives.coverFirst}:{target:MissionRouteLookahead(Routes.support,r.player.position),label:"support",objective:Objectives.capture};
-    if(stage==="MachineGun")return r.Has("tankPositionPressured")?{target:MissionRouteLookahead(S.rearRoute,r.player.position),label:"bundle",objective:Objectives.rear}:{target:S.gap,label:"front",objective:Objectives.coverRest};
-    const labels={supply:"bundle",return:"bundle",attack:"throw",retreat:"front",disengage:"orders"};
-    return {target:!r.Has("bundleTaken")&&r.Near(S.house,S.supplierRangeM)?A.bundle:MissionRouteLookahead(this.leaderRoute||Routes.bundle,r.player.position),label:labels[this.leg]||"bundle",objective:Objectives[this.leg]||Objectives.supply};
+    // Brief item 5: while the tank shows itself (03 preview) and until it has shelled the nest (04), the guide points
+    // at the tank, not at the gap - the new threat is what the player has to read.
+    const tank=r.tank?.present?{x:r.tank.x,z:r.tank.z}:null;
+    if(stage==="Support"){
+      if(!r.Has("rightNestCaptured"))return {target:MissionRouteLookahead(Routes.support,r.player.position),label:"support",objective:Objectives.capture};
+      return tank&&r.Has("tankPreviewed")?{target:tank,label:"tank",objective:Objectives.coverFirst}:{target:S.gap,label:"front",objective:Objectives.coverFirst};
+    }
+    if(stage==="MachineGun"){
+      if(r.Has("tankPositionPressured"))return {target:MissionRouteLookahead(S.rearRoute,r.player.position),label:"bundle",objective:Objectives.rear};
+      return tank?{target:tank,label:"tank",objective:Objectives.coverRest}:{target:S.gap,label:"front",objective:Objectives.coverRest};
+    }
+    const labels={supply:"bundle",return:"bundle",attack:"throw",retreat:"front",gapWatch:"front",disengage:"orders",home:"orders"};
+    return {target:!r.Has("bundleTaken")&&r.Near(S.house,S.supplierRangeM)?A.bundle:MissionRouteLookahead(this.leaderRoute||Routes.bundle,r.player.position),label:labels[this.leg]||"bundle",objective:Objectives[{gapWatch:"retreat",home:"disengage"}[this.leg]||this.leg]||Objectives.supply};
   }
-  State(){return {leg:this.leg,blocked:this.blocked,roadProgress:this.r.tank.roadProgress||0,walks:[...this.walks].map(([id,w])=>({id,index:w.index,total:w.route.length}))};}
+  State(){return {leg:this.leg,blocked:this.blocked,gapWatched:!!this.gapWatched,returnMeetDone:!!this.returnMeetDone,handoverStarted:!!this.handoverStarted,roadProgress:this.r.tank.roadProgress||0,walks:[...this.walks].map(([id,w])=>({id,index:w.index,total:w.route.length}))};}
 }

@@ -112,7 +112,8 @@ export async function DriveFrontBattle(ctx){
   assert.ok(first.mission.guards.slice(0,2).some(g=>g.alive));
   assert.ok(first.mission.guards.slice(0,2).filter(g=>g.alive).every(g=>g.safe));
   assert.ok(first.mission.guards.slice(2).some(g=>g.alive&&!g.safe));
-  assert.ok(first.mission.facts.includes("zhouGunWounded"));
+  // 契约 §2.6：04 开始时何有田已接枪、老周已离枪 10 m（走回集结处是 05 的条件，这时可能还在路上）。
+  assert.ok(first.mission.facts.includes("leftGunHandover")&&first.mission.facts.includes("zhouLeftGun"));
   const guardIds=await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMissionRuntime().guards.map(g=>g.actor.id));
   await CaptureFocus("FirstBatchSafe",S.gap);
   if(ctx.stageTo===3)return;

@@ -1,4 +1,5 @@
-import { FirstLevelFrontBattle } from "./Script_FirstLevelFrontBattle.mjs";
+import { FirstLevelFrontBattle, ColumnDeparture } from "./Script_FirstLevelFrontBattle.mjs";
+import { FirstLevelFrontScenes } from "./Script_FirstLevelFrontScenes.mjs";
 // 03–05 战车：纯规则大脑 + 接线层（战车包 2026-09-23）。开关 Data_Tuning_Tank.brainEnabled，关掉走下面旧的定时插值。
 import { FirstLevelTankRuntime } from "./Script_FirstLevelTankRuntime.mjs";
 import { BundleResupplyOpen } from "./Script_FirstLevelTankBrain.mjs";
@@ -166,6 +167,8 @@ export class FirstLevelMissionRuntime {
     // Enter 马上就会问它要门外那一拍。
     this.frontShow = new FirstLevelFrontShow(this);
     this.frontBattle = new FirstLevelFrontBattle(this);
+    // 03–06 对白走 voice.PlayScene、说话人由 binder 绑到真人头上（Front 包，契约 §5.5）。
+    this.frontScenes = new FirstLevelFrontScenes(this);
     this.tankRuntime = TANK.brainEnabled ? new FirstLevelTankRuntime(this) : null;
     // 02–05 前沿压力表（docs/Data_EnemyAi.md §20）：相位、环境射击点、组规则与任务侧 AI 开关。
     this.frontPressure = new FirstLevelFrontPressure(this);
@@ -303,6 +306,7 @@ export class FirstLevelMissionRuntime {
    */
   Say(id, options) {
     if (!id) return;
+    if (this.frontScenes?.Owns(id)) { this.frontScenes.Say(id); return; }
     if (CUE_IDS.has(id)) { this.voice.Enqueue(id, options); return; }
     if (this.missingCues.includes(id)) return;
     this.missingCues.push(id);
@@ -316,7 +320,7 @@ export class FirstLevelMissionRuntime {
       stage:this.flow.stage.id}))return;
     // The death pipeline already removes this soldier's fire, cover and tokens.
     // A living squadmate may react locally; never stop or refill the mission.
-    if(this.voice.current || this.time<(this.nextCasualtyReactionAt||0)
+    if(this.voice.current || this.frontScenes?.Busy || this.time<(this.nextCasualtyReactionAt||0)
       || Distance(actor.position,this.player.position)>R.casualtyWitnessM)return;
     const witness=this.ai.soldiers.find(other=>other!==actor&&other.alive&&other.side==="nra"
       && actor.squadId && other.squadId===actor.squadId
@@ -2264,9 +2268,10 @@ export class FirstLevelMissionRuntime {
     const prof = this.profiler?.on ? this.profiler : null;
     prof?.B("story/mission/voice");
     this.voice.Update(dt);
+    this.frontScenes.Update();
     this.speakers.Update();
     this.UpdateMusic();
-    this.battleSound.Update(dt,this.flow.stage.id,this.voice.current?.phase==="playing");
+    this.battleSound.Update(dt,this.flow.stage.id,this.StorySpeaking);
     prof?.E("story/mission/voice");
     prof?.B("story/mission/other");
     this.opening.Update(dt);
@@ -2346,9 +2351,13 @@ export class FirstLevelMissionRuntime {
       // Notion 06 是老周「看见顺子经过」才开口，触发与担架员的走位在
       // Script_FirstLevelCollection.UpdateOrders 里（玩家走到他跟前、脸朝着他）。
       if(this.GateNear("ordersReached")){this.Record("ordersReached");this.Say("Volunteer");}
-      // 后送队真实起行：担架队离开集结处，队首走出 litterSpacingM 以上。
-      if(this.Has("zhouOnLitter")&&this.column.litters.some(litter=>litter.progress>=R.litterSpacingM))
-        this.Record("columnDeparted",{lead:Math.max(...this.column.litters.map(litter=>litter.progress))});
+      // 后送队真实起行：老周的担架已经回到队列（不再是 fallen），而且队伍从那一刻起真的往前走了
+      // litterSpacingM 以上（ColumnDeparture；担架一开始就按间距排开，旧判据在 zhouOnLitter 同帧成立）。
+      if(this.Has("zhouOnLitter")){
+        const departure=ColumnDeparture(this.columnDepartureBase,this.column.litters,R.litterSpacingM);
+        this.columnDepartureBase=departure.baseline;
+        if(departure.departed)this.Record("columnDeparted",{lead:+departure.lead.toFixed(2)});
+      }
     }
     if(stage==="South"){
       this.Say("SouthWhisper");
@@ -2587,8 +2596,14 @@ export class FirstLevelMissionRuntime {
   UpdateMusic(stage = this.flow.stage.id) {
     if (this.musicInitializing) return;
     this.music.Update(stage, { shellImpact: this.Has("bunkerCollapsed"),
-      speaking: this.voice.current?.phase === "playing", failed: this.failed, has: (id) => this.Has(id) });
+      speaking: this.StorySpeaking, failed: this.failed, has: (id) => this.Has(id) });
   }
+  /** A story line is sounding: the queued cue, or a 03–06 scene played through voice.PlayScene. */
+  get StorySpeaking() {
+    return this.voice.current?.phase === "playing" || !!(this.frontScenes?.handle && !this.frontScenes.handle.done);
+  }
+  /** Story dialogue is playing or waiting its turn (reminders and casualty reactions hold off). */
+  get StoryVoiceBusy() { return !!this.voice.current || !!this.frontScenes?.Busy; }
   ObjectiveProgress() {
     const progress = this.flow.ObjectiveProgress();
     progress.conditions = progress.conditions.map(condition => {
@@ -2611,6 +2626,7 @@ export class FirstLevelMissionRuntime {
       opening:this.opening.State(),
       front:this.frontShow?.State() || null,
       frontBattle:this.frontBattle.State(),
+      frontScenes:this.frontScenes.State(),
       pressure:this.frontPressure?.State() || null,
       backdrop:this.backdrop?.State() || null,
       ...this.flow.State(),
