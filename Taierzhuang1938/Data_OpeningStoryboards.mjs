@@ -251,6 +251,33 @@ export const OPENING_STORYBOARDS = Object.freeze({
     rifleKicked:P(.3,-124.66,1.1+Math.PI),
     kickFrom:P(1.85,-125.55),
   }),
+  // ---- storyboard shots (contract docs/Data_FirstLevelStoryboard0103Contract.md §5, read by
+  // Script_OpeningStoryboardShots.mjs) ----------------------------------------------------------
+  // Each shot: the moment in the real 01–02 flow (phase + age, or a `when` expression over the director s,
+  // the runtime r and window.Tengxian g), the storyboard picture (REL/附件/storyboard, not in the repository)
+  // and the part of its picture criteria that the staging and the camera decide: screen x / y are 0..1 of
+  // the 1280×720 frame (left -> right, top -> bottom), head points; points = world landmarks [x, h over
+  // ground, z]; absent = roles that must be out of the picture; inFrameAtLeast = how many of a group are seen.
+  storyboardShots:Object.freeze([
+    // SB01: the order comes in (BunkerOrders.01): mouth x 0.30–0.74, Yaowa left third, the runner at the
+    // north post left of centre, Luo's back in the middle, the wounded comrade right, men going away down the trench.
+    Object.freeze({ id:"SB01", storyboard:"Storyboard_01_CaveResupply.png",
+      when:"s.phase==='Orders'&&s.flags['scene:BunkerOrders']!=null&&r.time-s.flags['scene:BunkerOrders']>1.2",
+      judge:{ camera:{ eyeM:[.85,1.05], pitchDeg:[-20,-9], yawDeg:[-101,-85] }, horizonY:[.16,.34],
+        points:{ mouthPostN:{ at:[1.05,1.0,-127.5], x:[.2,.4] }, mouthPostS:{ at:[1.05,1.0,-124.3], x:[.64,.84] } },
+        actors:{ yaowa:{ x:[0,.34] }, runner:{ x:[.2,.5] }, luo:{ x:[.4,.64] }, comrade:{ x:[.64,1] } },
+        inFrameAtLeast:[{ roles:["DepthNra"], count:2, minDistM:8 }], rifleHidden:true } }),
+    // SB02: the near miss, mirrored (contract §2.2): tilted ≥ 12° head to the left, low, the north post and the
+    // dugout's north wall on the left, the mouth and the blast on the right; the eyes still open.
+    Object.freeze({ id:"SB02", storyboard:"Storyboard_02_NearMissBlast.png", phase:"Blast", age:.7,
+      judge:{ camera:{ eyeM:[.6,.95], pitchDeg:[-24,-4], rollDeg:[12,26], yawDeg:[-78,-54] }, eyeClosure:[0,.2],
+        points:{ mouthPostN:{ at:[1.05,1.2,-127.5], x:[.25,.6] } } } }),
+  ]),
+  // Wave 1 stand-ins (contract §3): where a clip, hand pose, lens effect, set piece or blast effect of another
+  // package belongs, the director uses the nearest existing one and lists it here. Wave 2 wires each entry to
+  // the named replacement and removes it; the list must then be empty (Script_OpeningStoryboardsTest).
+  pendingWiring:Object.freeze([
+  ].map(Object.freeze)),
   // ---- 02 pursuit (bunkerPursuit, contract §5.8) -----------------------------------------
   // The roster's delayS (Space) are scaled so the three followers are in the trench the player just left
   // while he looks back from the rear corner (review 09-24: at delayS as authored one man showed, 12 m off).
