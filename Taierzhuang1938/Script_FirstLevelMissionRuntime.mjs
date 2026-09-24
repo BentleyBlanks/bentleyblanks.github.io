@@ -1078,6 +1078,16 @@ export class FirstLevelMissionRuntime {
         if (s.mode !== "settled") { this.Defend(actor, actor.position); s.mode = "settled"; }
         continue;
       }
+      // The captured nest is ours (brief item 11 ④): once rightNestCaptured, the circle the combat brain may roam around
+      // a man's line (tacticalRadiusM - it bounds his movement in hold as well as in contact) is cut so it stays
+      // FB.capturedGunKeepOutM off the gun's seat. Every frame, every mode: 09-25 idle-probe drives had bound man F
+      // (holding his last line 15.6 m from the seat) and the flank group walk up to the nest's north wall and shoot
+      // the player on the gun from 1-4 m, three times in a row.
+      if(actor.tacticalRadiusM>0&&this.Has("rightNestCaptured")){
+        const line=s.points[Math.min(s.index,s.points.length-1)];
+        actor.contactRadiusBaseM??=actor.tacticalRadiusM;
+        if(line)actor.tacticalRadiusM=Math.max(2,Math.min(actor.contactRadiusBaseM,Distance(line,Sortie.seat)-FB.capturedGunKeepOutM));
+      }
       // A nearby visible opponent overrides the scheduled bound. The shared
       // combat brain owns cover, search and the physical melee handoff.
       // 压力表「让口子」刚把他往回拉（s.yieldUntil，Script_FirstLevelFrontPressure.YieldGap）：这几秒不认近距交火 ——
@@ -1093,12 +1103,6 @@ export class FirstLevelMissionRuntime {
         // abandoned nest to the rear-door ramp (30,-143) in 04 and bayoneted the player waiting there, three runs of three.
         const line=s.points[Math.min(s.index,s.points.length-1)]||actor.position;
         if(s.mode!=="contact")this.Defend(actor,line,R.defendHoldRadiusM,R.assaultCoverSearchM);
-        // The captured nest is ours: the circle stops FB.capturedGunKeepOutM short of the gun's seat. Every frame, not
-        // only on entering contact: a man already in contact when the nest falls (idle probe 09-25: bound man F, in
-        // contact since before the capture, shot the player on the gun from 3.6 m) is pulled back out of it too.
-        actor.contactRadiusBaseM??=actor.tacticalRadiusM;
-        actor.tacticalRadiusM=this.Has("rightNestCaptured")
-          ?Math.max(2,Math.min(actor.contactRadiusBaseM,Distance(line,Sortie.seat)-FB.capturedGunKeepOutM)):actor.contactRadiusBaseM;
         s.mode="contact";continue;
       }
       if (actor.suppression >= R.tacticalSuppression) {
