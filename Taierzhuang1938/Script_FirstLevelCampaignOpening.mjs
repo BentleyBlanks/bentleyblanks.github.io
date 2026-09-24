@@ -104,13 +104,17 @@ async function InstallProbe(page) {
         }
         if (!a.alive && !P.deaths[id]) P.deaths[id] = { phase: s.phase, time: r.time, health: a.health };
       }
-      if (["Check", "KickRifle", "Released"].includes(s.phase) && !s.VanguardCleared() && P.violations.length < 30)
+      // A required man still standing at the hand-back beats (one missing from the table cannot stand).
+      if (["Check", "KickRifle", "Released"].includes(s.phase) && C.vanguardIds.some((id) => r.enemies.get(id)?.alive === true) && P.violations.length < 30)
         P.violations.push({ phase: s.phase, error: "hand-back beat while a required vanguard man is alive" });
       // Teleports: the pelvis (not the root: chained clips re-root with the pelvis held still) of
       // every shown living actor, per frame.
+      // Under closed eyes (the fade-in, the blast's black) nobody sees a jump: the same rule as the camera below.
+      const eyesShut = (r.opening?.eyeClosure ?? 0) >= .5;
       for (const a of [...Object.values(s.cast), ...r.squad, ...r.enemies.values()]) {
         if (!a) continue;
         const id = a.missionId || a.castId || a.id;
+        if (eyesShut) { delete P.previous[id]; continue; }
         if (!a.alive || a.openingStoryboardHidden || !a.actor?.root?.visible) { delete P.previous[id]; continue; }
         const previous = P.previous[id], pelvis = a.actor.characterRig?.bones?.pelvis;
         const src = pelvis && a.actor.poseVisible !== false ? "pelvis" : "root";
@@ -121,9 +125,10 @@ async function InstallProbe(page) {
           if (step > P.maxStep) { P.maxStep = step; P.maxStepAt = { id, phase: s.phase, stage: r.flow.stage.id, age: s.Age }; }
           P.maxTurn = Math.max(P.maxTurn, turn);
           if (step > C.stepLimitM && P.violations.length < 30) P.violations.push({ id, phase: s.phase, age: s.Age, stage: r.flow.stage.id, step, clip: a.openingStoryboardPose?.clip || null,
-            from: [previous.x, previous.z], to: [at.x, at.z], root: [a.actor.root.position.x, a.actor.root.position.z] });
+            from: [previous.x, previous.z], to: [at.x, at.z], root: [a.actor.root.position.x, a.actor.root.position.z],
+            lod: a.renderLod || null, blend: a.actor.characterRig?.openingBlendState || null, previousLod: previous.lod ?? null });
         }
-        P.previous[id] = { x: at.x, z: at.z, yaw: a.yaw, src };
+        P.previous[id] = { x: at.x, z: at.z, yaw: a.yaw, src, lod: a.renderLod || null };
       }
       // Where and when every enemy first exists (the front's standing groups are placed at 02).
       for (const a of r.enemies.values()) if (a?.missionId && !P.births[a.missionId])
@@ -533,6 +538,6 @@ export async function DriveHandbackNegative(page,variant,output){
   await page.evaluate(()=>{const g=window.Tengxian;g.StepFrames(2,1/60,true);g.Debug.Key("KeyF",true);g.StepFrames(90,1/60,false);g.Debug.Key("KeyF",false);g.StepFrames(10,1/60,true);});
   const after=await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMission());
   assert.ok(after.facts.includes("rifleRecovered")&&after.stage==="RearTrench",`${variant}: the rifle pickup hands 02 on to the withdrawal`);
-  console.log(`ok hand-back (${variant}): Check ${waited.toFixed(2)} s after the long shot began, junction man down by ${result.flags.junctionBy||"(already dead)"}`);
+  console.log(`ok hand-back (${variant}): Check ${waited.toFixed(2)} s after the long shot began, junction man down by ${result.flags.junctionBy||(variant==="absent"?"(absent from the table)":"(already dead)")}`);
   return result;
 }
