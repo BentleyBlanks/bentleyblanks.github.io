@@ -1990,7 +1990,9 @@ export class FirstLevelMissionRuntime {
    * 2026.09.19 起整关只有掩蔽部那一处重击，曲线在 FirstLevelOpening 里采样。
    */
   Perception() {
-    return { eyeClosure: this.opening.eyeClosure || 0, concussion: this.opening.concussion || null };
+    // 06 老周从坐着的活人换回担架躺姿时玩家闭一下眼（FirstLevelCollection.SeatSwapClosure）。
+    const swap = this.frontShow?.collection?.SeatSwapClosure?.() || 0;
+    return { eyeClosure: Math.max(this.opening.eyeClosure || 0, swap), concussion: this.opening.concussion || null };
   }
   /**
    * 控制锁算视线用的眼位。被枪托砸翻躺在地上的时候（旧的屋内伏击）真正的眼位在地板上方

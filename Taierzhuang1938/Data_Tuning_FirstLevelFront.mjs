@@ -132,6 +132,15 @@ export const FRONT_TUNING = Object.freeze({
   // 担架员把老周抬上担架（ZhouLift 播完 → zhouOnLitter）之后，
   // 他从土壁挪回队列那一小段的时长，走 litterSpeedMps 的量级。
   zhouLiftMoveS: 2.6,
+  // 06 老周坐在土壁边的那副活人身体（有脸、会说话）换回担架上的烘焙躺姿：玩家闭一下眼盖住这一下替换。
+  // 合眼 / 全黑停留 / 睁眼，秒。[需] 集成负责人 2026-09-24 第 9 条（NotifyCameraCut 或淡入淡出盖住切换）；
+  // 数值按一次正常眨眼放慢到读得出「顺子眨了下眼」的量级（眨眼 0.1–0.4 s）。
+  zhouSeatSwapCloseS: 0.22,
+  zhouSeatSwapHoldS: 0.12,
+  zhouSeatSwapOpenS: 0.3,
+  // 他坐的那只弹药箱（宽 × 高 × 深，米）。Actor 的 sit 是凳面坐姿：胯落到「大腿长 + 0.045 身高」≈ 0.5 m，
+  // 箱面比它低 5 cm 让胯坐实。[几] 木制子弹箱量级。
+  zhouSeatBoxM: Object.freeze([0.56, 0.44, 0.36]),
 
   // =========================================================================
   // 07 沿沟南行
