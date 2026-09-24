@@ -264,5 +264,10 @@ export const FRONT_BATTLE_TUNING=Object.freeze({
   reliefLeadPost:Object.freeze({x:-21.2,z:-126}),
   heMeetPost:Object.freeze({x:-24.8,z:-125.6}),
   liuMeetPost:Object.freeze({x:-19.5,z:-129}),
+  // The relief gunner stops this far short of the left gun's seat (back along FRONT_SORTIE.leftRoute's last leg) and
+  // steps in only after He has left it. Walking onto the occupied seat, the two bodies pushed each other 1.4 m apart
+  // and neither came within arrivalM (1.0): reliefInPosition never fired and 05 hung before Orders (09-24 Step 3
+  // chain Q, Ideal2, relief walk 7/8 at t 370-600 s).
+  reliefGunStandbyM:2,
   bandage:{radius:.087,height:.2,y:-.19,color:0xb6ac8b},
 });

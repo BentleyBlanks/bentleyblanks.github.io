@@ -67,6 +67,9 @@ export function FrontEntryRoute(position,route){
   }
   return remaining;
 }
+/** Where the relief gunner waits for He to leave the left gun: B.reliefGunStandbyM back along leftRoute's last leg. */
+function ReliefGunStandby(){const a=S.leftRoute.at(-2),b=S.leftSeat,d=Math.hypot(a.x-b.x,a.z-b.z),k=Math.min(1,B.reliefGunStandbyM/Math.max(d,1e-6));return {x:b.x+(a.x-b.x)*k,z:b.z+(a.z-b.z)*k};}
+
 export class FirstLevelFrontBattle {
   constructor(runtime){this.r=runtime;this.walks=new Map();this.leg=null;this.blocked=true;}
   get Active(){return ["Support","MachineGun","Tank"].includes(this.r.flow.stage.id);}
@@ -359,7 +362,7 @@ export class FirstLevelFrontBattle {
   ReliefRoster(){
     return [
       {post:B.reliefLeadPost,weapon:"HanYang",speaking:true,route:[...MISSION_FRONT_COLLECTION_ROUTE,...S.approach.slice(1,4),B.reliefLeadPost]},
-      {post:P.reliefPositions[0],weapon:"Zb26",gun:true,route:[...MISSION_FRONT_COLLECTION_ROUTE,...S.leftRoute.slice(1)]},
+      {post:P.reliefPositions[0],weapon:"Zb26",gun:true,route:[...MISSION_FRONT_COLLECTION_ROUTE,...S.leftRoute.slice(1,-1),ReliefGunStandby()]},
       // Down the support sap to the gap junction (the old straight line from SJ cut through the sap walls).
       {post:P.reliefPositions[1],weapon:"HanYang",route:[...MISSION_FRONT_COLLECTION_ROUTE,...S.approach.slice(1,8),P.reliefPositions[1]]},
     ];
@@ -386,7 +389,8 @@ export class FirstLevelFrontBattle {
         // meet the returning pair there (FRONT_SPACE.returnMeet), then walk home with them.
         this.SetWalk(r.companion.Handle("heyoutian"),[...S.leftRoute].reverse().slice(0,4).concat([B.heMeetPost]));
         this.SetWalk(r.companion.Handle("liuwencai"),[B.liuMeetPost]);
-        const gunner=r.relief.find(e=>e.gun)?.actor;if(gunner)r.emplacement.NpcOccupy(r.leftGunId,gunner);
+        // He has vacated the seat: the relief gunner takes the last reliefGunStandbyM into it (B.reliefGunStandbyM).
+        const gunner=r.relief.find(e=>e.gun)?.actor;if(gunner){r.emplacement.NpcOccupy(r.leftGunId,gunner);this.SetWalk(gunner,[S.leftSeat]);}
       }
     }
     this.UpdateReturnMeet();
