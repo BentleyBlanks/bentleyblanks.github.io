@@ -405,16 +405,19 @@ export class FirstLevelTankRuntime {
     const Flight = (p) => Math.max(0.06, from.distanceTo(p) / G.shellSpeedMps);
     if (!list.length) return { at, flight: Flight(at), pulled: 0 };
     const aim = at.clone();
-    // Overshoot along the line of fire past the planned aim point (G.overshootMaxM): measured on the ground plane.
+    // Overshoot along the line of fire past the aim point being tried (G.overshootMaxM), on the ground plane: a pulled
+    // aim that sails over the lip lands on the far side just the same (09-25 cold starts: aim pulled to (−0.9, −147.7),
+    // burst at (−11.4, −142.7) by the gap junction, 11.5 m on).
     const fx = at.x - from.x, fz = at.z - from.z, fd = Math.hypot(fx, fz) || 1;
-    const Over = (impact) => ((impact.x - at.x) * fx + (impact.z - at.z) * fz) / fd;
+    const Over = (impact) => ((impact.x - aim.x) * fx + (impact.z - aim.z) * fz) / fd;
     let safeFallback = null;
     for (let pulled = 0; pulled <= G.protectPullSteps; pulled++) {
       const flight = Flight(aim);
       const impact = r.combat.PredictShellImpact(from, aim, { flight, sourceCollider: r.view.tankCollider });
       const clear = !impact || list.every((p) => Math.hypot(impact.x - p.x, impact.z - p.z) >= G.protectClearM);
       if (clear && (!impact || !(Over(impact) > (G.overshootMaxM ?? Infinity)))) return { at: aim.clone(), flight, pulled, impact };
-      if (clear && !safeFallback) safeFallback = { at: aim.clone(), flight, pulled, impact, overshoot: +Over(impact).toFixed(1) };
+      // No try short enough: fire the protected-clear one that overshoots least (never fewer shells for it).
+      if (clear && (!safeFallback || Over(impact) < safeFallback.overshoot)) safeFallback = { at: aim.clone(), flight, pulled, impact, overshoot: +Over(impact).toFixed(1) };
       const dx = from.x - aim.x, dz = from.z - aim.z, d = Math.hypot(dx, dz);
       if (d <= G.protectPullM + G.minRangeM) break;
       const lift = aim.y - this.Ground(aim.x, aim.z);

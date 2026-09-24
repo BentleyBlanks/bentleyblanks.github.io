@@ -129,12 +129,13 @@ export const FRONT_PRESSURE_GROUPS = Object.freeze({
  */
 const NEST_FALLBACK = Object.freeze({ casualties: 2, to: Object.freeze({ x: 32.2, z: -146.8 }) });
 /**
- * nest 组自己的点名表（夺点前）：土坎、左枪、东头两点，加西门外的接近沟 westApproach。2026-09-24 审查（任务书第 11 项 ②）
+ * nest 组自己的点名表（夺点前）：相位表 FIRE_03 加西门外的接近沟 westApproach（缺口那几点照样在过口窗口里去掉：
+ * 组的点名表与相位表同一个 noGap 过滤）。2026-09-24 审查（任务书第 11 项 ②）
  * 引擎射线逐人量过：阵位机枪手坐着对土坎顶站姿 11/12、蹲姿只剩 eastLink / eastLip（照样挑得到、打得出）；入口守卫
  * 蹲姿对相位表 0/12，只有 westApproach 通；院里的 RightNestGuard / RightLinkGuard 被院墙围着，对哪一点都不通视 ——
  * 他们守的是院子，玩家进院才交火，这里不硬给点（给了也只会把挑点的射线预算耗在墙上）。
  */
-const NEST_FIRE = Object.freeze([...CREST, "leftGunParapet", "eastLink", "eastLip", "westApproach"]);
+const NEST_FIRE = Object.freeze([...CREST, "leftGunParapet", "eastLink", "eastLip", ...GAP, "westApproach"]);
 const NEST = Object.freeze({ role: "nestGuard", fallback: NEST_FALLBACK, fire: NEST_FIRE });
 
 /**
@@ -191,11 +192,18 @@ const HOLD = Object.freeze({ role: "hold" });
  * 蹲在墙后「开火」，挑点射线全被墙挡死。掩体循环（COVER_ENGAGE）自己有探头姿态，不管；压制值到
  * fireStanceMaxSuppression 就随 AI 趴下，不硬拉起来。
  *
- * posts：组里个别人的射位（盖过出生点的守点圈）。FrontGunner 出生在 FireBaseRuinC（1.4 m）正后方，AI 挪进墙根的掩体后
- * (9.5, −193.3) 站、蹲、趴对土坎顶 / 左枪 / 阵位 9 个点一个都不通视；墙的西头 (6.7, −193.0) 三种姿态都通 8/9
- *（2026-09-24 Front 包审查后引擎射线逐点量过，scratchpad PostLos）。以前的办法是把 Space 的墙降到 1.1 m（越界改布局，已退回）。
+ * posts：组里个别人的射位（盖过出生点的守点圈）。三堵残墙后的人一挪进墙根的掩体，站、蹲、趴对土坎顶 / 左枪 / 阵位
+ * 9 个点一个都不通视（FireBaseRuinC 后 (9.5, −193.3)、RuinW 后 (−24, −193.3)、RuinE 后 (25.5, −193.3) 都是 0/9），
+ * 空转探针里 FrontSupportGunner / FrontRifleH 03–05 空转 91–93%。射位挪到各自那堵墙的端头：
+ *   FrontGunner         RuinC 西头 (6.7, −193.0)    站 8/9、蹲 8/9、趴 8/9
+ *   FrontSupportGunner  RuinW 东头 (−19.5, −193.6)  站 9/9、蹲 8/9、趴 7/9
+ *   FrontRifleH         RuinE 西头 (22.0, −193.6)   站 8/9、蹲 8/9、趴 7/9
+ *（2026-09-25 Front 包审查后引擎射线逐点量过，scratchpad PostLos / PostLos2）。以前的办法是把 Space 的墙降到 1.1 m
+ *（越界改布局，已退回）。
  */
-const FIRE_BASE_POSTS = Object.freeze({ FrontGunner: P(6.7, -193.0, 0, 0.4) });
+const FIRE_BASE_POSTS = Object.freeze({
+  FrontGunner: P(6.7, -193.0, 0, 0.4), FrontSupportGunner: P(-19.5, -193.6, 0, 0.4), FrontRifleH: P(22.0, -193.6, 0, 0.4),
+});
 const FIRE_BASE = (fire) => Object.freeze({ role: "hold", fire: Object.freeze(fire), fireStance: 0, fireStanceMaxSuppression: 0.5,
   posts: FIRE_BASE_POSTS });
 const FB_03 = FIRE_BASE([...CREST, "leftGunParapet"]);

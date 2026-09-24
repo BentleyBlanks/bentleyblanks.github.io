@@ -67,9 +67,14 @@ for (const phase of FRONT_PRESSURE_PHASES) {
     Check(["hold", "assault", "nestGuard"].includes(cfg.role), `phase ${phase.id} ${groupId} role ${cfg.role}`);
     // 「跃进不能在 60–90 s 后停摆：每相位都有下一步」—— 每个跃进组在每个相位都是循环的。
     if (cfg.role === "assault") Check(cfg.loop === true, `phase ${phase.id} ${groupId} always has a next step (loop)`);
-    // A group's own fire list (the fire base): known points only, never the withdrawal gap it cannot see anyway.
-    if (cfg.fire) Check(cfg.fire.length > 0 && cfg.fire.every((id) => FRONT_FIRE_POINTS[id] && !FRONT_FIRE_POINTS[id].gapPath),
-      `phase ${phase.id} ${groupId} fire list names known non-gap points`);
+    // A group's own fire list (the fire base, the nest): known points only, and its evacuation version (the one
+    // AssignFire uses while guards cross) never names a gap point. The fire base lists carry no gap point at all.
+    if (cfg.fire) {
+      Check(cfg.fire.length > 0 && cfg.fire.every((id) => FRONT_FIRE_POINTS[id]), `phase ${phase.id} ${groupId} fire list names known points`);
+      Check(!FrontFirePoints({ id: `${phase.id}/${groupId}`, fire: cfg.fire }, true).some((p) => FRONT_FIRE_POINTS[p.id].gapPath),
+        `phase ${phase.id} ${groupId} fire list drops the gap points in an evacuation window`);
+      if (groupId === "fireBase") Check(cfg.fire.every((id) => !FRONT_FIRE_POINTS[id].gapPath), `phase ${phase.id} fire base never names a gap point`);
+    }
     if (cfg.charge) charges += 1;
     if (cfg.fallback?.repelledFact) Check(facts.has(cfg.fallback.repelledFact), `${cfg.fallback.repelledFact} is a mission fact`);
   }

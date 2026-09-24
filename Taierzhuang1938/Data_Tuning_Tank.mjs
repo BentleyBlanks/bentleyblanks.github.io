@@ -152,7 +152,7 @@ export const TANK = Object.freeze({
     // 真炸点不够远：瞄点往炮口方向收 protectPullM 再算，最多 protectPullSteps 次；还不够这一发不打。
     protectPullM: 3,
     protectPullSteps: 4,
-    // 同一个收瞄循环顺带管「打过头」：真炸点沿射向越过计划瞄点超过 overshootMaxM，也往炮口收一步再算。
+    // 同一个收瞄循环顺带管「打过头」：真炸点沿射向越过这一次试的瞄点超过 overshootMaxM，也往炮口收一步再算。
     // 2026-09-24 Front 包审查：缺口区的弹常越过缺口 8–12 m，落进我方后沟 (−16, −140) 一带 —— 05 玩家回撤、守军过缺口后
     // 走的就是那里。只有保护够了而过头收不回来时，照打保护够的那一发（不因过头少打）。
     overshootMaxM: 6,
