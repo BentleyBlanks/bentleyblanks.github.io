@@ -641,6 +641,7 @@ Hell Let Loose 的战场声。改之前查到的病根（`survey/Digest_audio.md
 按反比律补上差的衰减，600 m 外再压一道高频（到 1.5 km 时 520 Hz）。
 
 - **01 立刻开始**：进 01–06 任一步，1.2 s 内第一声（旧口径是沿用军列的 24 s）。01 隔着土（airCut 450）、02 620。
+- **01 渐强**（2026-09-24 恢复，用户拍板「恢复」；`front.stages.Trapped.swell`）：见下面「3a」。
 - **强度**：阶段基线 × 场上交火的让位 —— `AudioWiring` 的战场强度到 1 时，新交火频次 ×0.5、电平 ×0.65
   （03–05 近处本来就吵，远处再满密度就糊）；对白播放时新交火频次 ×0.45（电平交给 Voice 包的侧链）。
 - **总线**：`bus: "sfx"`，全部在 45 m 以外 → 引擎自动归进**远声组 `farGain`**（玩家连射让路；
@@ -651,6 +652,46 @@ Hell Let Loose 的战场声。改之前查到的病根（`survey/Digest_audio.md
   2026-09-24 审查前炮击的上限只挡新一发、不挡一发自己的五条声音，假引擎 15 分钟实测炮击峰值 5、合计 9–10；
   现在 `Script_FirstLevelBattleSoundTest` 各步骤 15 分钟量峰值断言合计 ≤ 8。「同时在响」按每一声本体的可听时长算（`cueActiveS`），不按引擎回收时刻（那要等混响尾巴与传播延迟，远处一枪常常五六秒）。节点上它们全是远处的低优先级声：`liveNodes` 过 120 × 0.62 就先饿它们，近处的枪声与对白不受影响 —— 场上打得凶时远处这一层自然变稀。
 - 取证：`missionRuntime.State().battleSound.front`（每个扇区打了几场、下一场几秒后、最近 12 声的距离/音量）。
+
+### 3a. 01 被压着时前线渐强（`front.stages.Trapped.swell`，2026-09-24 恢复）
+
+**旧曲线**（基线 `f581ac7dd`，`profiles.Trapped`：`startAfterS 24, rampFromGain .3, rampS 30`）：进 01 头 24 s
+前线一声没有；之后 30 s 里每一声的音量从 ×0.3 线性涨到 ×1（档位 gain .62），第 54 s 到顶；交火频次不变。
+旧 `Script_FirstLevelMissionTest` 断言「后一段的远炮比前一段响」（`the front grows while the man lies pinned`）。
+09-23 换新声景时 24 s 静默是用户报的问题，连同渐强一起删了，01 变成恒定 intensity 0.62 / gain 0.8。
+
+**新曲线**（24 s 静默不恢复）：u = 进 01 后的秒数 / `riseS`（50 s），w = u^`curve`（1.6）；
+
+| 量 | 起点 | 顶（= `stages.Trapped` 原来的恒定值） | 插值 |
+| --- | --- | --- | --- |
+| 起交火的频次 intensity | 0.62 × 0.4 = 0.25 | 0.62 | 线性 |
+| 每一声的音量 gain | 0.8 × 0.3 = 0.24（−10.5 dB，沿用旧 `rampFromGain`） | 0.8 | 分贝上线性 |
+
+- `riseS` 50 s 对的是新导演的近爆时刻。浏览器实测（p012 实时跑，`Probe_TrappedSwell`）：Banter 2.5–34.4 s、
+  Orders 34.4–48.6 s、Incoming 48.6 s、近爆（Blast）50.4 s、Black 50.9 s、Wake 53.5 s、FrontPass 57.8 s、
+  Interrogation 80.4 s、Found 129.3 s（之后进 02）。
+- `peakFact: "bunkerCollapsed"`：近爆一出现，剩下的在 `catchUpS` 2 s 内补完（黑屏盖着）；从 Wake 起的调试入口
+  或近爆已经发生过的检查点一进来就在顶上。u 只增不减。
+- **近爆之后不回落**：耳鸣与闷耳是剧情档（`Data_OpeningStoryboards.perception.hearing`）与 `Deafen` 的事，
+  近落弹有 `quietAfter` 14 s 让路；前线再掉下去，等闷耳退掉又要爬一次，听起来像第二次渐强。之后接 02
+  （BunkerRescue 0.72 / 0.95）、02 撤退（0.78 / 1）、03（0.85 / 1），整条 01→03 只升不降。
+- 对白期间：前半段（Banter 对白）w 小、涨得慢；侧链（`dialogueFarDuck` −3 dB）与剧情档都没动。
+- 运行时只加了两处：`UpdateSwell` 算倍率（乘在 `rate` 与 `DrainFront` 的音量上）；有 swell 的步骤里，扇区
+  已排好的等待按强度的涨幅缩短、其余扇区的第一场按起始频次往后摊（首场仍 ≤ 1.2 s）—— 不然五个扇区在头十几秒
+  各打一场，渐强的开头反而最密。没有 swell 的步骤倍率恒为 1、随机数调用顺序不变。
+- 取证：`State().battleSound.front.stageTime / swell {u, intensity, gain, factAt}`。
+
+浏览器实测（2026-09-24，p012 `quality=low` 实时 170 s，拦 `audio.Play` 记前线每一声；「相对音量」= 这一声的
+volume ÷ 它的 `cueVolume`，含距离补偿与 ±10 % 抖动）：
+
+| 进 01 后 | 0–10 s | 10–20 | 20–30 | 30–40 | 40–50 | 50–60 | 60–80 | 80–100 | 100–130 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 前线声数（排出 / 引擎收下） | 10/10 | 8/8 | 14/14 | 10/10 | 7/7 | 31/15 | 27/23 | 31/30 | 46/43 |
+| 平均相对音量 | 0.214 | 0.257 | 0.334 | 0.445 | 0.511 | 0.621 | 0.685 | 0.699 | 0.697 |
+
+swell 倍率读数：5 s 0.41/0.31、15 s 0.49/0.36、30 s 0.66/0.51、40 s 0.82/0.69、45 s 0.90/0.82、
+49.9 s 1.00/1.00（intensity / gain 倍率）。50–60 s 那 16 声没被收下的都落在 Black 黑屏那 2.6 s 里，是引擎侧的拒绝
+（原因没查，这一轮没动它）。这些是数字，不是试听。
 
 ### 4. 场外近落弹（`Script_BattleArtillery`）
 
@@ -772,7 +813,11 @@ stress ≥ 0.42 开始喘（`breathHeavy` 原速原调，0.26–0.5 随 stress�
 - `Script_FirstLevelBattleSoundTest` 另有（2026-09-24）：真 CameraShake 在 45/75/140 m、沟里/洞里都震得到且是轻震；
   各步骤 15 分钟声部峰值（炮击 ≤ 4、前线 ≤ 5、合计 ≤ 8）；真实档每一发附属层一条不丢；避车；土柱；01 洞顶掉土；
   对白中进步骤头一发不抽稀；运行时每局换种子；配乐标点冷启动不误触发。
-- `Script_FirstLevelMissionTest`：01 立刻有声、隔着土；03 双方对射；07 以后回到旧声源。
+- `Script_FirstLevelMissionTest`：01 立刻有声、隔着土；01 头 21 s 与 39–61 s 比每声相对音量 ≥ 1.8 倍、声数更多
+  （2026-09-24 恢复的「the front grows while the man lies pinned」）；03 双方对射；07 以后回到旧声源。
+- `Script_FirstLevelBattleSoundTest`（2026-09-24，01 渐强）：逐秒只升不降、到顶前每秒都涨、`riseS` 时正好等于
+  `stages.Trapped` 的 intensity / gain、到顶后不回落；每声相对音量头 15 s → 到顶前后 ≥ 2 倍；16 个种子平均声数
+  头 20 s → 到顶前后 20 s ≥ 1.2 倍；近爆早到时 `catchUpS` 内补到顶；近爆后再进 01 直接在顶上；其余步骤倍率恒为 1。
 
 ---
 

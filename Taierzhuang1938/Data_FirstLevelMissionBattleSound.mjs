@@ -48,7 +48,7 @@ export const MISSION_BATTLE_SOUND = Object.freeze({
    * 还击，来回 rounds 轮；机枪对射、步枪零星对射、日军炮与掷弹筒打我方一线
    *（炮口闷响在日方炮兵阵地，落点在我方一线）。
    *
-   * 强度 = 阶段基线（stages[].intensity）× 场上交火的让位：屏幕上打得越凶
+   * 强度 = 阶段基线（stages[].intensity，01 另乘 swell 渐强）× 场上交火的让位：屏幕上打得越凶
    *（AudioWiring 的 BattleIntensity），远处这一层起得越稀、越轻 ——
    * 03–05 近处本来就吵，远处再满密度就糊成一片。对白播放时新交火也少起。
    *
@@ -59,7 +59,22 @@ export const MISSION_BATTLE_SOUND = Object.freeze({
     stages: Object.freeze({
       // 01：洞里听外面，闷（airCut）；醒来之前前线已经在打。三百米外的东西引擎的空气低通
       // 本来就压到 700 Hz，这里再往下压一档才是「隔着土」。
-      Trapped: { intensity: 0.62, gain: 0.8, airCut: 450, weights: { EastFlank: 1.6, NorthEastVillage: 1.4 } },
+      // intensity / gain 是渐强的**顶**：近爆那一刻到这里，之后整段 01 就停在这里。
+      Trapped: { intensity: 0.62, gain: 0.8, airCut: 450, weights: { EastFlank: 1.6, NorthEastVillage: 1.4 },
+        // 【2026-09-24 恢复渐强（用户拍板「恢复」）】旧口径（f581ac7dd 的 profiles.Trapped：
+        // startAfterS 24、rampFromGain .3、rampS 30，即头 24 s 一声没有、之后 30 s 里音量 ×0.3 → ×1，
+        // 第 54 s 到顶；MissionTest 断言「后一段的远炮比前一段响」）在 09-23 换新声景时被删了，
+        // 01 变成恒定 0.62。这里恢复「由远及近」，但不恢复那 24 s 静默（新口径：首声 ≤ firstWithinS）。
+        //   · 时间从进 01 算起，riseS 秒到顶。50 s ≈ 新导演的近爆时刻（2026-09-24 浏览器实测：
+        //     Banter 2.5–34.4 s → Orders 34.4–48.6 s → Incoming 48.6 s → 近爆 50.4 s，见
+        //     docs/Data_AudioWiring.md 二之三 3a）；旧曲线 54 s 到顶，两者只差几秒。
+        //   · 近爆事实（peakFact）一出现，剩下的在 catchUpS 秒里补完 —— 黑屏盖着，听不出台阶；
+        //     导演走得快（或从 Wake 起的调试入口）也保证近爆时已在顶上。
+        //   · 近爆之后不回落：耳鸣与闷耳是剧情档（Data_OpeningStoryboards.perception.hearing）的事，
+        //     近落弹有 quietAfter 14 s 让路；前线再掉下去，等闷耳退掉又得爬一次，像第二次渐强。
+        //   · gain 在分贝上线性（gainFrom .3 ≈ −10.5 dB，沿用旧 rampFromGain），intensity（起交火的
+        //     频次）线性；两者都按 u^curve 走，curve > 1 = 对白那半分钟里涨得慢、传令到近爆涨得快。
+        swell: { riseS: 50, curve: 1.6, intensityFrom: 0.4, gainFrom: 0.3, peakFact: "bunkerCollapsed", catchUpS: 2 } },
       BunkerRescue: { intensity: 0.72, gain: 0.95, airCut: 620, weights: { EastFlank: 1.5, NorthEastVillage: 1.3 } },
       RearTrench: { intensity: 0.78, gain: 1 },
       Support: { intensity: 0.85, gain: 1 },

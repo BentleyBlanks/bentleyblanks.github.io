@@ -60,6 +60,92 @@ const Dist = (c, L) => Math.hypot(c.position.x - L.x, c.position.z - L.z);
   Ok(`01 一分钟 ${front.length} 声，全部闷、全在 ${Math.min(...recent.map((r) => r.distance))} m 以外`);
 }
 {
+  // 【2026-09-24 恢复】01 被压着时前线渐强（front.stages.Trapped.swell）。旧断言在 09-23 换声景时删了，
+  // 用户拍板「恢复」。逐秒量 State().front.swell：从底单调爬到顶（顶 = stages.Trapped 的 intensity / gain），
+  // 到顶后不回落；近爆事实一来 catchUpS 内补完；其它步骤恒为 1。
+  const P = D.front.stages.Trapped, S = P.swell;
+  assert.ok(S && S.riseS > 0 && S.intensityFrom < 1 && S.gainFrom < 1, "01 有渐强数据");
+  const facts = new Set();
+  const audio = FakeAudio();
+  const sound = new FirstLevelMissionBattleSound(audio, { Has: (id) => facts.has(id) }, 0x19380924);
+  const curve = [];
+  for (let second = 1; second <= S.riseS + 40; second += 1) {
+    Run(sound, audio, "Trapped", 1);
+    const f = sound.State().front;
+    curve.push({ t: f.stageTime, u: f.swell.u, intensity: P.intensity * f.swell.intensity, gain: P.gain * f.swell.gain });
+  }
+  for (let i = 1; i < curve.length; i += 1) {
+    assert.ok(curve[i].intensity >= curve[i - 1].intensity - 1e-9 && curve[i].gain >= curve[i - 1].gain - 1e-9,
+      `01 前线强度只升不降：${JSON.stringify(curve[i - 1])} → ${JSON.stringify(curve[i])}`);
+  }
+  const rising = curve.filter((c) => c.t < S.riseS - 0.5);
+  for (let i = 1; i < rising.length; i += 1) {
+    assert.ok(rising[i].intensity > rising[i - 1].intensity && rising[i].gain > rising[i - 1].gain,
+      `到顶之前每一秒都在涨（${rising[i].t} s）`);
+  }
+  const first = curve[0], atPeak = curve.find((c) => c.t >= S.riseS - 1e-6), last = curve.at(-1);
+  assert.ok(first.intensity < P.intensity * 0.5 && first.gain < P.gain * 0.35,
+    `开头远而轻：强度 ${first.intensity.toFixed(3)}、音量 ${first.gain.toFixed(3)}`);
+  assert.ok(Math.abs(atPeak.intensity - P.intensity) < 1e-9 && Math.abs(atPeak.gain - P.gain) < 1e-9,
+    `${S.riseS} s 到顶：强度 ${atPeak.intensity}、音量 ${atPeak.gain}`);
+  assert.ok(curve.filter((c) => c.t >= S.riseS).every((c) => c.intensity === P.intensity && c.gain === P.gain),
+    "到顶之后整段 01 停在顶上，不回落");
+  // 实际播出来的音量也跟着涨：每一声相对自己的 cueVolume，头 15 s 与到顶前后 15 s 比。
+  const Norm = (a, b) => audio.calls.filter((c) => c.soundField && c.t >= a && c.t < b).map((c) => c.volume / D.front.cueVolume[c.cue]);
+  const Mean = (xs) => xs.reduce((x, y) => x + y, 0) / Math.max(1, xs.length);
+  const early = Norm(0, 15), late = Norm(S.riseS - 5, S.riseS + 10);
+  assert.ok(early.length > 0 && late.length > 0 && Mean(late) > Mean(early) * 2,
+    `播出来的前线由轻到响：头 15 s ${early.length} 声 均 ${Mean(early).toFixed(3)}，到顶前后 ${late.length} 声 均 ${Mean(late).toFixed(3)}`);
+  // 由稀到密：单个种子里一个窗口只有四五场交火，看不出来；十六个种子平均。
+  const Density = (a, b) => {
+    let n = 0;
+    for (let seed = 1; seed <= 16; seed += 1) {
+      const ad = FakeAudio(), sd = new FirstLevelMissionBattleSound(ad, { Has: () => false }, seed);
+      Run(sd, ad, "Trapped", b);
+      n += ad.calls.filter((c) => c.soundField && c.t >= a && c.t < b).length;
+    }
+    return n / 16;
+  };
+  const sparse = Density(0, 20), dense = Density(S.riseS - 10, S.riseS + 10);
+  assert.ok(dense > sparse * 1.2, `由稀到密（16 个种子平均）：头 20 s ${sparse.toFixed(1)} 声 → 到顶前后 20 s ${dense.toFixed(1)} 声`);
+  Ok(`01 渐强：强度 ${first.intensity.toFixed(2)}→${P.intensity}、音量 ${first.gain.toFixed(2)}→${P.gain}（${S.riseS} s 到顶）；`
+    + `每声相对音量 ${Mean(early).toFixed(3)}→${Mean(late).toFixed(3)}，20 s 声数 ${sparse.toFixed(1)}→${dense.toFixed(1)}`);
+
+  // 近爆来得比 riseS 早：catchUpS 内补到顶，补的过程也只升不降。
+  const facts2 = new Set(), a2 = FakeAudio();
+  const s2 = new FirstLevelMissionBattleSound(a2, { Has: (id) => facts2.has(id) }, 0x19380924);
+  Run(s2, a2, "Trapped", 20);
+  const before = s2.State().front.swell;
+  facts2.add(S.peakFact);
+  let prev = before.u, topAt = null;
+  for (let t = 0; t < S.catchUpS + 1; t += 0.1) {
+    Run(s2, a2, "Trapped", 0.1);
+    const w = s2.State().front.swell;
+    assert.ok(w.u >= prev - 1e-9, "补到顶的过程只升不降");
+    prev = w.u;
+    if (topAt === null && w.u >= 1) topAt = t + 0.1;
+  }
+  assert.ok(before.u < 0.5 && topAt !== null && topAt <= S.catchUpS + 0.15,
+    `第 20 s 近爆（u ${before.u}）→ ${topAt?.toFixed(1)} s 补到顶（≤ ${S.catchUpS} s）`);
+  // 从近爆之后进 01（调试入口 / 检查点）：一进来就在顶上。
+  const a3 = FakeAudio(), s3 = new FirstLevelMissionBattleSound(a3, { Has: () => true }, 0x19380924);
+  Run(s3, a3, "Trapped", S.catchUpS + 0.2);
+  assert.equal(s3.State().front.swell.u, 1, "近爆已经发生过的 01 直接在顶上");
+  Ok(`01 渐强：近爆早到 ${topAt.toFixed(1)} s 补到顶；近爆后再进 01 直接在顶上`);
+
+  // 其它步骤不受影响：进步骤第一帧起倍率就是 1；01 之后接 02 也是。
+  for (const stage of Object.keys(D.front.stages).filter((id) => id !== "Trapped")) {
+    assert.equal(D.front.stages[stage].swell, undefined, `${stage} 没有渐强数据`);
+    const a4 = FakeAudio(), s4 = new FirstLevelMissionBattleSound(a4, null);
+    Run(s4, a4, stage, 0.1);
+    const w = s4.State().front.swell;
+    assert.ok(w.intensity === 1 && w.gain === 1, `${stage} 一进来强度就是本档基线`);
+  }
+  Run(sound, audio, "BunkerRescue", 0.1);
+  assert.ok(sound.State().front.swell.intensity === 1 && sound.State().front.swell.gain === 1, "01 之后接 02：02 用自己的基线");
+  Ok("渐强只作用于 01，其余 01–06 步骤进来就是本档基线");
+}
+{
   const audio = FakeAudio();
   const sound = new FirstLevelMissionBattleSound(audio, null);
   Run(sound, audio, "Support", 120);

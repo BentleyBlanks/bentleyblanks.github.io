@@ -32,7 +32,9 @@ export class FirstLevelMissionBattleSound {
     this.rng = Mulberry32(this.seed);
     this.frontTime = 0;
     this.frontStage = null;
-    this.frontSectors = D.front.sectors.map((spec) => ({ spec, nextAt: null, exchanges: 0, plays: 0 }));
+    this.frontStageAt = 0;        // 进当前 01–06 步骤时的 frontTime（渐强从这里算）
+    this.swellU = 0; this.swellFactAt = null; this.swellFactFrom = 0; this.swellScale = null;
+    this.frontSectors = D.front.sectors.map((spec) => ({ spec, nextAt: null, swellAt: 1, exchanges: 0, plays: 0 }));
     this.frontQueue = [];
     this.frontVoices = [];
     this.frontPlays = 0;
@@ -117,16 +119,24 @@ export class FirstLevelMissionBattleSound {
     this.frontVoices = this.frontVoices.filter((e) => now < e.until && this.audio?.pendingVoices?.has?.(e.v) !== false);
     this.UpdateColumns();
     const live = Math.max(0, Math.min(1, this.audio?.battleIntensity || 0));
-    const rate = P.intensity * (1 - F.rateYield * live) * (speaking ? F.speechRate : 1);
     if (stage !== this.frontStage) this.EnterFront(stage);
+    const swell = this.UpdateSwell(P);
+    const rate = P.intensity * swell.intensity * (1 - F.rateYield * live) * (speaking ? F.speechRate : 1);
     for (const sector of this.frontSectors) {
+      // 渐强期间已经排好的等待按强度的涨幅缩短（等于「等待按当前频次走」）：
+      // 否则开头按低频次排下的三四十秒空档，要到近爆之后才轮到，前线反而在顶上最稀。
+      if (P.swell && sector.nextAt !== null && swell.intensity > sector.swellAt) {
+        sector.nextAt = now + Math.max(0, sector.nextAt - now) * sector.swellAt / swell.intensity;
+        sector.swellAt = swell.intensity;
+      }
       if (sector.nextAt === null || now < sector.nextAt) continue;
       this.StartExchange(sector);
       const weight = (P.weights?.[sector.spec.id] ?? 1) * sector.spec.weight;
       sector.nextAt = now + this.R(F.gapS[0], F.gapS[1]) / Math.max(0.05, rate * weight)
         + this.QueueSpanS(sector);
+      sector.swellAt = swell.intensity;
     }
-    this.DrainFront(P, live);
+    this.DrainFront(P, live, swell.gain);
     // 场外近落弹。
     const A = D.artillery, AP = A.stages[stage] || null;
     let quiet = false;
@@ -151,10 +161,40 @@ export class FirstLevelMissionBattleSound {
     const now = this.frontTime;
     const ranked = this.frontSectors.map((s) => ({ s, w: (P.weights?.[s.spec.id] ?? 1) * s.spec.weight }))
       .sort((a, b) => b.w - a.w);
+    // 有渐强的步骤（01）其余扇区的第一场按起始频次往后摊（首场仍在 firstWithinS 内），
+    // 不然五个扇区在头十几秒里各打一场，渐强的开头反而最密。没有渐强的步骤倍率为 1，一个数不变。
+    const from = P.swell ? (P.swell.intensityFrom ?? 1) : 1;
     ranked.forEach(({ s }, i) => {
-      s.nextAt = i === 0 ? now + this.R(0.15, F.firstWithinS) : now + F.firstWithinS + this.R(0.8, F.gapS[1]);
+      s.nextAt = i === 0 ? now + this.R(0.15, F.firstWithinS) : now + F.firstWithinS + this.R(0.8, F.gapS[1]) / from;
+      s.swellAt = from;
     });
     this.frontStage = stage;
+    this.frontStageAt = now;
+    this.swellU = 0;
+    this.swellFactAt = null;
+  }
+
+  /**
+   * 渐强（front.stages[].swell，目前只有 01）：进步骤后 riseS 秒从底爬到顶；peakFact 一出现，
+   * 剩下的在 catchUpS 秒里补完。u 只增不减。返回乘在 intensity / gain 上的两个倍率。
+   * 没有 swell 的步骤恒为 1。
+   */
+  UpdateSwell(P) {
+    const S = P.swell;
+    if (!S) { this.swellU = 1; this.swellScale = { u: 1, intensity: 1, gain: 1 }; return this.swellScale; }
+    const age = this.frontTime - (this.frontStageAt ?? this.frontTime);
+    let u = Math.min(1, age / Math.max(1e-3, S.riseS));
+    if (S.peakFact && this.host?.Has?.(S.peakFact)) {
+      if (this.swellFactAt == null) { this.swellFactAt = this.frontTime; this.swellFactFrom = this.swellU ?? u; }
+      const k = Math.min(1, (this.frontTime - this.swellFactAt) / Math.max(1e-3, S.catchUpS ?? 0));
+      u = Math.max(u, this.swellFactFrom + (1 - this.swellFactFrom) * k);
+    }
+    u = Math.max(u, this.swellU ?? 0);
+    this.swellU = u;
+    const w = Math.pow(u, S.curve ?? 1);
+    const intensityFrom = S.intensityFrom ?? 1, gainFrom = Math.max(1e-4, S.gainFrom ?? 1);
+    this.swellScale = { u, intensity: intensityFrom + (1 - intensityFrom) * w, gain: Math.pow(gainFrom, 1 - w) };
+    return this.swellScale;
   }
 
   SetSoundscape(on) {
@@ -263,13 +303,13 @@ export class FirstLevelMissionBattleSound {
     return { position: { x: L.x + dx * k, y: L.y + F.placeRiseM, z: L.z + dz * k }, gain: extra, airCut, distance: d };
   }
 
-  DrainFront(P, live) {
+  DrainFront(P, live, swellGain = 1) {
     const F = D.front;
     if (!this.frontQueue.length) return;
     const due = this.frontQueue.filter((e) => e.at <= this.frontTime);
     if (!due.length) return;
     this.frontQueue = this.frontQueue.filter((e) => e.at > this.frontTime);
-    const volumeScale = (P.gain ?? 1) * (1 - F.volumeYield * live);
+    const volumeScale = (P.gain ?? 1) * swellGain * (1 - F.volumeYield * live);
     // 声部上限：屏幕上打得凶时收紧；与场外炮击合计不过 sharedMaxVoices（炮击留的位也算）。
     const cap = live > F.hotAbove ? Math.min(F.maxVoices, F.maxVoicesHot) : F.maxVoices;
     for (const e of due) {
@@ -350,6 +390,9 @@ export class FirstLevelMissionBattleSound {
     return {elapsed:this.elapsed,sources:this.sources.map(s=>({id:s.spec.id,count:s.count})),recent:this.events.slice(-12),
       front:{stage:this.frontStage,time:+this.frontTime.toFixed(2),exchanges:this.frontExchanges,plays:this.frontPlays,
         skipped:this.frontSkipped,queued:this.frontQueue.length,voices:this.frontVoices.length,
+        stageTime:this.frontStage===null?null:+(this.frontTime-(this.frontStageAt??this.frontTime)).toFixed(2),
+        swell:this.swellScale?{u:+this.swellScale.u.toFixed(3),intensity:+this.swellScale.intensity.toFixed(3),
+          gain:+this.swellScale.gain.toFixed(3),factAt:this.swellFactAt==null?null:+(this.swellFactAt-(this.frontStageAt??0)).toFixed(2)}:null,
         sectors:this.frontSectors.map(s=>({id:s.spec.id,exchanges:s.exchanges,plays:s.plays,
           nextInS:s.nextAt===null?null:+(s.nextAt-this.frontTime).toFixed(2)})),
         recent:this.frontRecent.slice(-12),dugoutSwitches:this.dugoutSwitches,peakShared:this.frontPeakShared,

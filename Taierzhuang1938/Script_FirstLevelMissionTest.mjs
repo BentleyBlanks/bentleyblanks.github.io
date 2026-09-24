@@ -13,6 +13,7 @@ import { TRAVERSAL } from "./Data_Traversal.mjs";
 import { CollectBulletNearMisses,ApplyBulletNearMisses } from "./Script_BallisticSuppression.mjs";
 import { MISSION_VOICE_ALIGNMENT } from "./Data_FirstLevelMissionVoiceAlignment.mjs";
 import { FirstLevelMissionBattleSound } from "./Script_FirstLevelMissionBattleSound.mjs";
+import { MISSION_BATTLE_SOUND as D_BATTLE } from "./Data_FirstLevelMissionBattleSound.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import crypto from "node:crypto";
@@ -1064,7 +1065,19 @@ assert.equal(new Set(MISSION_DIALOGUE.map((cue) => cue.id)).size, MISSION_DIALOG
  // 生成器本身（扇区、交火来回、让位、炮击、防炮洞环境）的逐条断言在 Script_FirstLevelBattleSoundTest。
  for(let i=0;i<3;i++)sound.Update(.4,"Trapped");
  assert.ok(calls.length>0,"the front is already firing when 01 begins");
- for(let i=0;i<120;i++)sound.Update(.5,"Trapped");
+ // 【2026-09-24 恢复】4. 被压着的这一分钟里前线**渐强**（旧断言「the front grows while the man lies pinned」，
+ //   09-23 换声景时随 24 s 静默一起删了；用户拍板恢复）：头 21 s 与近爆前后的 39–61 s 比，
+ //   每一声相对自己的基础音量（cueVolume）平均更响、交火更密。曲线本身在 BattleSoundTest 逐秒断言。
+ const Norm=rows=>rows.filter(c=>c.soundField).map(c=>c.volume/D_BATTLE.front.cueVolume[c.cue]);
+ const Mean=xs=>xs.reduce((a,b)=>a+b,0)/Math.max(1,xs.length);
+ for(let i=0;i<40;i++)sound.Update(.5,"Trapped");
+ const swellEarly=Norm(calls);let swellMark=calls.length;
+ for(let i=0;i<36;i++)sound.Update(.5,"Trapped");swellMark=calls.length;
+ for(let i=0;i<44;i++)sound.Update(.5,"Trapped");
+ const swellLate=Norm(calls.slice(swellMark));
+ assert.ok(swellEarly.length>0&&swellLate.length>swellEarly.length&&Mean(swellLate)>Mean(swellEarly)*1.8,
+   "the front grows while the man lies pinned: "+JSON.stringify({early:{n:swellEarly.length,mean:+Mean(swellEarly).toFixed(3)},
+     late:{n:swellLate.length,mean:+Mean(swellLate).toFixed(3)}}));
  const early=calls.slice();
  // 洞顶掉土（debrisFall）是洞里的声音，不算「外面的炮弹」：01 整段按洞里算（artillery.stages.Trapped.listenerZone），
  // 每一发落地之后头顶上掉一次土。【2026-09-24 审查后】原来这条夹具没给空间档，01 一次土都不掉。
