@@ -150,6 +150,9 @@ export async function CaptureFailure(ctx) {
   }).then(state => fs.writeFile(path.join(ctx.output, "Data_FailureCast.json"), JSON.stringify(state, null, 2)))
     .catch(() => {});
   await ctx.page.screenshot({ path: path.join(ctx.output, "Scene_Failure.png") }).catch(() => {});
+  // 挨打取证（InstallDamageForensics）：03 的每一下与每次阵亡的现场，统计阵亡率时按行 grep。
+  await Report03Damage(ctx);
+  await ReportDeaths(ctx);
   console.error(await ctx.page.evaluate(() => ({
     boot: document.querySelector("#bootText")?.textContent,
     body: document.body.innerText.slice(-1800),
@@ -266,7 +269,10 @@ export async function InstallInputDriver(ctx) {
                 });
             },
             Shoot(foe) {
+              // Bookkeeping for the damage forensics only (what the player was doing when a hit landed).
+              const Did=(what)=>{this.lastAction={t:g.ai.time,what:what+":"+(foe?.missionId||foe?.id)};};
               if(g.meleeCombat.Active){
+                Did("bind");
                 g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);
                 g.Debug.Key("KeyF",true);g.Debug.Key("KeyF",false);return;
               }
@@ -298,6 +304,7 @@ export async function InstallInputDriver(ctx) {
                 this.wallSerial=wall.serial;this.obstructed.set(foe.id,g.ai.time+4);
               }
               if(distance<3 && Math.abs(gap)<.2 && !((this.obstructed.get(foe.id)||0)>g.ai.time)){
+                Did("melee");
                 g.Debug.Mouse(2,false);
                 if(g.state.activeSlot!=="melee"){g.Debug.Key("KeyV");return;}
                 if(!fighter.weapon)return;
@@ -311,6 +318,7 @@ export async function InstallInputDriver(ctx) {
                 }
                 return;
               }
+              Did(Math.abs(gap)<.06?"rifle":"turn");
               if(g.state.activeSlot!=="primary"){g.Debug.Key("Digit1");return;}
               g.Debug.Mouse(2, true);
               if (g.state.ammo === 0) g.Debug.Key("KeyR");
@@ -318,6 +326,145 @@ export async function InstallInputDriver(ctx) {
             },
           };
   });
+  await InstallDamageForensics(ctx.page);
+}
+
+/**
+ * 挨打取证（只记录，不改任何数值与判定）：玩家每挨一下，记下谁打的、用什么、多远、在不在视野里、
+ * 中间有没有东西挡着、玩家这时候在干什么；玩家阵亡那一刻把周围 30 m 的现场整个存下来。
+ * 01→03 连续打过来的阵亡率要分清「模拟玩家太笨」还是「游戏真的难」，靠的就是这一份。
+ *   window.damageForensics  每一下（全关，最多 600 条）
+ *   window.deathForensics   每次阵亡的现场
+ * 手榴弹/炮弹记爆炸源（Combat.Blast 的 kind / explosiveId / ownerId），子弹记离枪口最近的日军，
+ * 刺刀记出刀的人；都找不到时离战车 6 m 内记 "tank"。流血不走 TakeHit，只在阵亡现场里看 bleeding。
+ */
+export async function InstallDamageForensics(page) {
+  await page.evaluate(() => {
+    const g = window.Tengxian;
+    if (window.damageForensics) return;
+    const log = window.damageForensics = [], deaths = window.deathForensics = [];
+    const Runtime = () => { try { return g.Debug.FirstLevelMissionRuntime(); } catch { return null; } };
+    const Name = (a) => a ? (a.missionId || a.castId || String(a.id)) : null;
+    const Round = (v, n = 1) => +(+v).toFixed(n);
+    let blast = null;
+    const combatBlast = g.combat.Blast.bind(g.combat);
+    g.combat.Blast = (position, radius, damage, kind, hurtSide, byPlayer, onHit, explosiveId, ownerId, options) => {
+      const previous = blast;
+      blast = { kind, explosive: explosiveId ?? kind, ownerId, x: position.x, z: position.z, byPlayer: !!byPlayer };
+      try { return combatBlast(position, radius, damage, kind, hurtSide, byPlayer, onHit, explosiveId, ownerId, options); }
+      finally { blast = previous; }
+    };
+    // Where the player looks (yaw + aimYaw; forward = (-sin, -cos), the convention Shoot uses) and whether the
+    // rendered world blocks the line from the eye to the source.
+    const View = (point, rise) => {
+      const eye = g.player.EyePosition, dx = point.x - eye.x, dz = point.z - eye.z;
+      const yaw = Math.atan2(-dx, -dz), look = g.player.yaw + (g.player.aimYaw || 0);
+      const angle = Math.abs(Math.atan2(Math.sin(yaw - look), Math.cos(yaw - look)));
+      const to = eye.clone().set(point.x, (point.y ?? g.battlefield.GroundHeight(point.x, point.z)) + rise, point.z);
+      const ray = to.clone().sub(eye), d = ray.length();
+      const hit = d > .3 ? g.battlefield.Raycast(eye, ray.normalize(), d, { terrain: true }) : null;
+      return { angleDeg: Math.round(angle * 180 / Math.PI), inView: angle < .9, los: !hit || hit.t >= d - .3 };
+    };
+    const Soldier = (from, m) => {
+      let best = null, bd = m;
+      for (const s of g.ai.soldiers) {
+        if (s.side !== "ija") continue;
+        const d = Math.hypot(s.position.x - from.x, s.position.z - from.z);
+        if (d < bd) { bd = d; best = s; }
+      }
+      return best;
+    };
+    const Activity = () => {
+      const D = window.MissionInputDriver || {};
+      return { leg: D.leg ?? null, mode: D.mode ?? null,
+        action: D.lastAction && g.ai.time - D.lastAction.t < .5 ? D.lastAction.what : null,
+        stance: g.player.stance, slot: g.state.activeSlot, mounted: !!g.emplacement?.View?.(),
+        bind: !!g.meleeCombat?.Active, cutscene: g.state.cutscene || null };
+    };
+    const Source = (info) => {
+      const p = g.player.position, r = Runtime();
+      if (info?.blast && blast) {
+        const owner = blast.ownerId != null ? g.ai.soldiers.find((s) => s.id === blast.ownerId) : null;
+        return { kind: "blast", weapon: blast.explosive || blast.kind, who: owner ? Name(owner) : blast.byPlayer ? "player" : null,
+          encounter: owner?.missionEncounter || null, distance: Round(Math.hypot(blast.x - p.x, blast.z - p.z)),
+          ...View({ x: blast.x, z: blast.z }, .3) };
+      }
+      const from = info?.from;
+      const kind = info?.melee ? "melee" : info?.bullet ? "bullet" : info?.blast ? "blast" : info?.projectile ? "projectile" : info?.fire ? "fire" : "other";
+      if (!from) return { kind, weapon: null, who: null };
+      const s = Soldier(from, info?.melee ? 3.5 : 2.5);
+      const tank = !s && r?.tank && Number.isFinite(r.tank.x) && Math.hypot(r.tank.x - from.x, r.tank.z - from.z) < 6;
+      return { kind, weapon: s ? (info?.melee ? "bayonet" : s.weaponId) : tank ? "tankGun" : null, who: s ? Name(s) : tank ? "tank" : null,
+        encounter: s?.missionEncounter || null, distance: Round(Math.hypot(from.x - p.x, from.z - p.z)), ...View(from, 0) };
+    };
+    const originalHit = g.player.TakeHit.bind(g.player);
+    g.player.TakeHit = (damage, part, direction, info) => {
+      const before = g.player.health, alive = g.player.alive, r = Runtime();
+      const result = originalHit(damage, part, direction, info);
+      const lost = before - g.player.health;
+      if (alive && lost > 0) {
+        log.push({ time: Round(r?.time ?? 0), stage: r?.flow?.stage?.id ?? null, lost: Round(lost), health: Round(g.player.health),
+          part, ...Source(info), at: [Round(g.player.position.x), Round(g.player.position.z)], activity: Activity() });
+        if (log.length > 600) log.shift();
+      }
+      return result;
+    };
+    const originalKill = g.player.Kill.bind(g.player);
+    g.player.Kill = (...args) => {
+      if (g.player.alive && !g.player.debug?.invincible) {
+        const r = Runtime(), p = g.player.position;
+        deaths.push({ time: Round(r?.time ?? 0), stage: r?.flow?.stage?.id ?? null, at: [Round(p.x), Round(p.z)],
+          bleeding: Round(g.player.bleeding, 2), bandages: g.player.bandages, ammo: g.state.ammo, clips: g.state.clips,
+          grenades: g.state.grenades, activity: Activity(), lastHits: log.slice(-8),
+          enemies: g.ai.soldiers.filter((s) => s.side === "ija" && s.alive && Math.hypot(s.position.x - p.x, s.position.z - p.z) < 30)
+            .map((s) => ({ id: Name(s), encounter: s.missionEncounter || null, d: Round(Math.hypot(s.position.x - p.x, s.position.z - p.z)),
+              at: [Round(s.position.x), Round(s.position.z)], state: s.state, stance: s.stance, targetPlayer: !!s.target?.isPlayer,
+              weapon: s.weaponId, dormant: !!s.missionDormant, ...View(s.position, 1.2) }))
+            .sort((a, b) => a.d - b.d).slice(0, 16),
+          liveGrenades: g.combat.projectiles.filter((q) => q.alive).map((q) => ({ owner: q.owner, fuse: Round(q.fuse, 2),
+            d: Round(Math.hypot(q.position.x - p.x, q.position.z - p.z)) })) });
+      }
+      return originalKill(...args);
+    };
+  });
+}
+
+/** 03 的统计口之一：进 03（Support）那一刻带着什么。连续打过来与冷启动 03 用同一行，便于对表。 */
+export async function Snapshot03Entry(ctx, source) {
+  const entry = await ctx.page.evaluate(async () => {
+    const g = window.Tengxian, r = g.Debug.FirstLevelMissionRuntime(), { WEAPONS } = await import("./Data_Weapons.mjs");
+    const started = r.flow.log.filter((e) => e.kind === "stage").findLast((e) => e.id === "Support")?.time ?? null;
+    const primary = g.state.mags?.primary || {}, onRifle = g.state.activeSlot === "primary";
+    const hits = window.damageForensics || [];
+    return { stage: r.flow.stage.id, time: +r.time.toFixed(1), sinceSupport: started == null ? null : +(r.time - started).toFixed(1),
+      health: +g.player.health.toFixed(1), bleeding: +g.player.bleeding.toFixed(2), bandages: g.player.bandages,
+      rifle: g.state.slots?.primary ?? null, activeSlot: g.state.activeSlot,
+      magazine: onRifle ? g.state.ammo : primary.ammo ?? null, spareClips: onRifle ? g.state.clips : primary.clips ?? null,
+      clipRounds: WEAPONS[g.state.slots?.primary]?.magazine ?? null, grenades: g.state.grenades,
+      hitsBefore: hits.length, lostBefore: +hits.reduce((sum, e) => sum + e.lost, 0).toFixed(1) };
+  });
+  entry.source = source;
+  entry.reserveRounds = entry.spareClips != null && entry.clipRounds ? entry.spareClips * entry.clipRounds : null;
+  console.log("CAMPAIGN_03_ENTRY", JSON.stringify(entry));
+  await fs.writeFile(path.join(ctx.output, "Data_Campaign03Entry.json"), JSON.stringify(entry, null, 2));
+  return entry;
+}
+
+/** 03 的统计口之二：03 里挨的每一下（一次性，03 收尾或失败时各打一行）。 */
+export async function Report03Damage(ctx) {
+  if (ctx.reported03 || !ctx.snapshot03) return;
+  ctx.reported03 = true;
+  const hits = await ctx.page.evaluate(() => (window.damageForensics || []).filter((e) => e.stage === "Support")).catch(() => []);
+  console.log("CAMPAIGN_03_DAMAGE", JSON.stringify(hits));
+  await fs.writeFile(path.join(ctx.output, "Data_Campaign03Damage.json"), JSON.stringify(hits, null, 2));
+}
+
+/** 失败收尾：每次阵亡的现场各打一行 CAMPAIGN_DEATH，全关挨打记录落盘。 */
+export async function ReportDeaths(ctx) {
+  const out = await ctx.page.evaluate(() => ({ hits: window.damageForensics || [], deaths: window.deathForensics || [] }))
+    .catch(() => ({ hits: [], deaths: [] }));
+  for (const death of out.deaths) console.log("CAMPAIGN_DEATH", JSON.stringify(death));
+  await fs.writeFile(path.join(ctx.output, "Data_DamageForensics.json"), JSON.stringify(out, null, 2));
 }
 
 /** 七个通用动作，全部闭包在 ctx 上（模块级不留可变全局）。 */
@@ -483,13 +630,14 @@ export function CampaignActions(ctx) {
     let routeGuardHp;
     const rejoinTarget=points.at(-1);
     await page.evaluate(
-      async ({ points, stance, sprint, rejoinRoute, rejoinTarget }) => {
+      async ({ points, stance, sprint, rejoinRoute, rejoinTarget, label }) => {
         const g = window.Tengxian;
         if(rejoinRoute){
           const {MissionRouteBetween}=await import("./Script_FirstLevelMissionColumn.mjs");
           points=MissionRouteBetween(rejoinRoute,g.player.position,rejoinTarget);
         }
         window.routeBot = { points, corridor:points, index: 0, frames: 0, stalled: 0, last: { ...g.player.position } };
+        if(window.MissionInputDriver)window.MissionInputDriver.leg=label;
         if (g.player.stance !== stance)
           g.Debug.Key(
             stance === "crouch"
@@ -502,7 +650,7 @@ export function CampaignActions(ctx) {
           );
         g.Debug.Key("ShiftLeft", sprint);
       },
-      { points, stance, sprint, rejoinRoute, rejoinTarget },
+      { points, stance, sprint, rejoinRoute, rejoinTarget, label },
     );
     const carriedKind=await page.evaluate(()=>window.Tengxian.carry.KindId);
     let result, retries = 0;
@@ -528,6 +676,7 @@ export function CampaignActions(ctx) {
           // 像玩家一样等它播完 —— 松手、照常推帧、这一段不算进停滞计数
           // （44 s 不动的话，下面那条「三个 chunk 没挪窝就算走不通」会把整条路判死）。
           if (g.state.cutscene) {
+            window.MissionInputDriver.mode="cutscene";
             g.Debug.Key("KeyW", false);
             g.Debug.Mouse(0, false);
             g.Debug.Mouse(2, false);
@@ -565,6 +714,7 @@ export function CampaignActions(ctx) {
             if(g.player.stance!==desired)g.Debug.Key(desired==="prone"?"KeyZ":desired==="crouch"?"KeyC":g.player.stance==="prone"?"KeyZ":"KeyC");
             g.Debug.Key("ShiftLeft",sprint&&!low&&!foe);
           }
+          window.MissionInputDriver.mode=evading?"evade":foe?"fight":"walk";
           if(evading){g.StepFrames(1,1/60,false);b.frames++;continue;}
           if (foe) {
             g.Debug.Key("KeyW", false);
@@ -815,6 +965,7 @@ export function CampaignActions(ctx) {
       state = await page.evaluate(
         ({ expected, fight, cover }) => {
           const g = window.Tengxian;
+          window.MissionInputDriver.leg="WaitStage:"+expected;window.MissionInputDriver.mode="hold";
           for (let i = 0; i < 300 && g.player.alive && g.Debug.FirstLevelMissionRuntime().flow.stage.id !== expected; i++) {
             const evading=window.MissionInputDriver.EvadeGrenade();
             // At a waist-high defensive wall, use normal crouch/peek inputs.

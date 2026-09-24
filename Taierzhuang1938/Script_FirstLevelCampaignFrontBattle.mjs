@@ -7,7 +7,7 @@ import path from "node:path";
 import { FRONT_SORTIE as S, FRONT_SPACE as Space } from "./Data_FirstLevelFrontRoute.mjs";
 import { MISSION_ROUTES as Routes, MISSION_ANCHORS as A } from "./Data_FirstLevelMissionLayout.mjs";
 import { MISSION_STAGE_ROUTES } from "./Data_FirstLevelMissionTopology.mjs";
-import { CampaignActions } from "./Script_FirstLevelCampaignKit.mjs";
+import { CampaignActions, Snapshot03Entry, Report03Damage } from "./Script_FirstLevelCampaignKit.mjs";
 import { DriveBundleThrow } from "./Script_FirstLevelBundleThrowDriver.mjs";
 import { FRONT_BATTLE_TUNING as B } from "./Data_Tuning_FirstLevelFront.mjs";
 import { InstallSpeakerActing, CheckFrontActing } from "./Script_FirstLevelCampaignOpening.mjs";
@@ -20,6 +20,7 @@ export async function DriveFrontBattle(ctx){
     for(let i=0;i<seconds;i+=5){
       state=await page.evaluate(({fact,fight})=>{
         const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime();
+        window.MissionInputDriver.leg="WaitFact:"+fact;window.MissionInputDriver.mode="hold";
         for(let f=0;f<300&&g.player.alive&&!r.Has(fact);f++){
           const foe=fight?window.MissionInputDriver.Target(90):null;
           if(foe)window.MissionInputDriver.Shoot(foe);else {g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);}
@@ -115,6 +116,7 @@ export async function DriveFrontBattle(ctx){
     for(let i=0;i<seconds;i+=5){
       state=await page.evaluate(({stage,fact})=>{
         const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime(),Done=()=>stage?r.flow.stage.id===stage:r.Has(fact);
+        window.MissionInputDriver.leg="HoldNest:"+(stage||fact);window.MissionInputDriver.mode="hold";
         let evaded=false;
         for(let f=0;f<300&&g.player.alive&&!Done();f++){
           const evading=window.MissionInputDriver.EvadeGrenade();evaded||=evading;
@@ -154,6 +156,8 @@ export async function DriveFrontBattle(ctx){
   assert.equal((await State()).stage,checkpoint||"Support");
   // Luo's front commands (03) are sampled from here (a run from 01 installed the sampler at RearTrench already).
   if(!checkpoint)await InstallSpeakerActing(page);
+  // What the player carries into 03 (a run from 01 vs a cold start at 03): CAMPAIGN_03_ENTRY / CAMPAIGN_03_DAMAGE.
+  if(!checkpoint){ctx.snapshot03=await Snapshot03Entry(ctx,ctx.stageFrom===3?"cold":"continuous");}
   try{await DriveLegs();}
   catch(error){
     // Where the body stood when a leg failed: colliders and people within reach, keys, the route bot, the damage log
@@ -264,6 +268,7 @@ export async function DriveFrontBattle(ctx){
   }
   await CaptureFocus("RightNestCaptured",S.gap);
   const first=await HoldNest({stage:"MachineGun"},240,"ReturnToNestAfterEvade");
+  await Report03Damage(ctx);
   assert.ok(first.mission.guards.slice(0,2).some(g=>g.alive));
   assert.ok(first.mission.guards.slice(0,2).filter(g=>g.alive).every(g=>g.safe));
   assert.ok(first.mission.guards.slice(2).some(g=>g.alive&&!g.safe));
