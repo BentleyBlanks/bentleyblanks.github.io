@@ -13,8 +13,17 @@
 // the RIGHT hand. A speaker who is firing, aiming (aim > .6), in melee, carrying, prone or acted by the 01-03
 // storyboard director gets no gesture (head layer only).
 
+/** Baked arm clips: _import/Script_SpeakerGestureBake.py (Blender, both rigs) writes the manifest and one file per rig
+ * here; Script_SpeakerGestureClips loads them on first use (01-06 only, never at boot). */
+export const SPEAKER_GESTURE_ASSET = Object.freeze({
+  version: "20260925SpeakerGesturesV1",
+  animationBase: "./Animation/SpeakerGestures/",
+  manifest: "Data_SpeakerGesturesAnimation.json",
+});
+
 /**
- * Gesture clips (authored in Step 2 on LugouNra02 and LugouNra05). Seconds are clip time.
+ * Gesture clips (baked 2026-09-25 on LugouNra02 and LugouNra05, 30 fps). Seconds are clip time; the bake's CLIPS table
+ * must carry the same windows (Script_SpeakerGestureTest compares them with the manifest).
  *   hand    L | R: the arm the clip moves (clavicle, upper arm, forearm, hand and fingers of that side)
  *   inS     the layer weight rises 0 -> 1 over [0, inS] (the arm lifts off the rifle / knee)
  *   strokeS the accented frame (finger out, palm down, flick), lined up with the line's first stress
@@ -25,7 +34,7 @@
 export const SPEAKER_GESTURE_CLIPS = Object.freeze({
   GesturePointL: Object.freeze({ hand: "L", duration: 1.8, inS: .35, strokeS: .40, hold: [.45, 1.15], outS: 1.25, aim: true,
     note: "index finger out, arm up to shoulder height toward the target, wrist straight" }),
-  GestureWaveOnL: Object.freeze({ hand: "L", duration: 1.6, inS: .30, strokeS: .45, hold: [.40, 1.00], outS: 1.10, aim: true,
+  GestureWaveOnL: Object.freeze({ hand: "L", duration: 1.6, inS: .30, strokeS: .48, hold: [.40, 1.00], outS: 1.10, aim: true,
     note: "go / move up: flat hand lifted beside the head, chopped forward and down toward the target" }),
   GestureBeckonL: Object.freeze({ hand: "L", duration: 1.8, inS: .30, strokeS: .55, hold: [.35, 1.20], outS: 1.30, aim: false,
     note: "come / follow me: the forearm swings from out in front back past the shoulder, twice" }),
