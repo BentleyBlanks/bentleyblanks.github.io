@@ -409,7 +409,8 @@ export const ACTING_ROLES = Object.freeze(["guard", "zhou", "luo"]);
  * 01–02 director: 03–06 lines are per-line scenes (Script_FirstLevelFrontScenes via voice.PlayScene) that the
  * director's CurrentSpeaker never listed (09-24: only 02 cues were ever recorded). Who is talking is what is heard
  * (voice.Speech(who): per-line scenes and the old whole-cue queue alike); the body is the one whose mouth moves
- * (binder.ActorForWho). A frame counts as acted when the body is on screen and one of the two acting layers is
+ * (binder.ActorForWho). A frame counts as acted when the body is shown (poseVisible: in the scene, not hidden - not a
+ * frustum or occlusion test; inFrameFrames counts the frames whose head projects inside the picture) and one of the two acting layers is
  * speaking on it: the director's dialogue acting (rig.openingActorPerformanceState.speaking) or, when the director
  * does not own the rig, the shared head layer (rig.speakerHead.speaking). `silentFrames` counts frames in which the
  * line was heard from a visible body that neither layer acted.
@@ -426,16 +427,21 @@ export async function InstallSpeakerActing(page){
       for(const who of roles){
         const speech=r.voice?.Speech?.(who);if(!speech?.active||!speech.cue)continue;
         const key=speech.cue+"/"+who,soldier=this.ActorForWho(who,true),rig=soldier?.actor?.characterRig;
-        const heard=window.openingRearHeard[key]??={frames:0,visibleFrames:0,silentFrames:0,stage:r.flow.stage.id};
+        const heard=window.openingRearHeard[key]??={frames:0,visibleFrames:0,inFrameFrames:0,silentFrames:0,stage:r.flow.stage.id};
         heard.frames++;
         if(!soldier?.actor?.poseVisible||!rig?.bones?.head)continue;
         heard.visibleFrames++;
+        // poseVisible only says the body is in the scene and not hidden; inFrame says his head projects inside
+        // the player's picture (no occlusion test). Reported next to visibleFrames, not gated (09-24 verify).
+        const cam=r.camera,headAt=rig.bones.head.getWorldPosition(rig.bones.head.position.clone()),ndc=cam&&headAt.clone().project(cam);
+        const inFrame=!!ndc&&ndc.z<1&&Math.abs(ndc.x)<.95&&Math.abs(ndc.y)<.95;
+        if(inFrame)heard.inFrameFrames++;
         const director=rig.openingActorPerformanceState,layer=rig.speakerHead;
         const acting=director?(!!director.speaking&&!director.protected):!!(layer?.enabled&&layer.speaking);
         if(!acting){heard.silentFrames++;continue;}
         const head=rig.bones.head.quaternion;
-        const row=window.openingRearActing[key]??={frames:0,head:head.toArray(),turn:0,director:0,headLayer:0};
-        row.frames++;row[director?"director":"headLayer"]++;
+        const row=window.openingRearActing[key]??={frames:0,inFrame:0,head:head.toArray(),turn:0,director:0,headLayer:0};
+        row.frames++;if(inFrame)row.inFrame++;row[director?"director":"headLayer"]++;
         row.turn=Math.max(row.turn,head.angleTo(head.clone().fromArray(row.head)));
       }
       return result;
@@ -451,7 +457,7 @@ export async function CheckFrontActing(ctx){
   await fs.writeFile(path.join(output,"Data_FrontActing.json"),JSON.stringify({heard,acting},null,2));
   const front=Object.keys(heard).filter(key=>key.startsWith("Front")&&key.endsWith("/luo"));
   console.log("FRONT_ACTING",JSON.stringify(Object.fromEntries(front.map(key=>[key,{...heard[key],
-    ...(acting[key]?{acted:acting[key].frames,turn:+acting[key].turn.toFixed(3),director:acting[key].director,headLayer:acting[key].headLayer}:{})}]))));
+    ...(acting[key]?{acted:acting[key].frames,actedInFrame:acting[key].inFrame,turn:+acting[key].turn.toFixed(3),director:acting[key].director,headLayer:acting[key].headLayer}:{})}]))));
   const visible=front.filter(key=>heard[key].visibleFrames>10);
   assert.ok(visible.length>0,`Luo performs visible front commands (${JSON.stringify(Object.fromEntries(front.map(key=>[key,heard[key]])))})`);
   for(const key of visible){

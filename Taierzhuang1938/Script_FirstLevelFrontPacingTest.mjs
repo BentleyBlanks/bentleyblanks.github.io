@@ -65,9 +65,23 @@ const Ok = (label) => console.log(`ok ${label}`);
   battle.UpdateZhou();
   assert.ok(calls.includes("vacate"), "Zhou lets go once He stands within handoverReadyM of the seat");
   const route = battle.walks.get(zhou.id).route;
-  assert.deepEqual(route.slice(0, S.zhouExit.length).map((p) => [p.x, p.z]), S.zhouExit.map((p) => [p.x, p.z]),
-    "Zhou walks the access-trench polyline FRONT_SORTIE.zhouExit");
+  // Contract v1.8: ZhouGunExitRoute counts the corner under his feet as behind him. Zhou sits on the seat,
+  // zhouExit[0], so he walks the whole polyline from [1] (the old copy started with the seat he stands on).
+  assert.ok(Dist(S.zhouExit[0], S.leftSeat) < 1e-9, "zhouExit starts at the seat");
+  assert.deepEqual(route.slice(0, -1).map((p) => [p.x, p.z]), S.zhouExit.slice(1).map((p) => [p.x, p.z]),
+    "Zhou walks the access-trench polyline FRONT_SORTIE.zhouExit on from the seat");
   assert.deepEqual(route.at(-1), { ...P.collection.zhouWall }, "... and ends at the collection wall");
+  // 09-24 01->06 verify run: He's walk had ended while Zhou still held the gun, then he was shoved to 1.31 m and
+  // the hold order parked him there - the seat stayed free for 240 s and 03 never ended.
+  battle.walks.get(he.id).index = battle.walks.get(he.id).route.length;
+  he.position = { x: -33.34, z: -155.11 };
+  battle.UpdateHandover();
+  assert.ok(gun.npc === null && !facts.has("leftGunHandover"), "1.31 m off the seat is not a handover");
+  const reWalk = battle.walks.get(he.id);
+  assert.ok(reWalk.index === 0 && reWalk.route.length === 1 && Dist(reWalk.route[0], S.leftSeat) < 1e-9,
+    "a finished walk off the free seat is walked onto the seat again");
+  battle.UpdateHandover();
+  assert.ok(battle.walks.get(he.id) === reWalk, "... once, not every frame");
   he.position = { x: S.leftSeat.x + 0.3, z: S.leftSeat.z };
   battle.UpdateHandover();
   assert.ok(gun.npc === he && facts.has("leftGunHandover"), "He takes the gun Zhou left");
@@ -77,7 +91,7 @@ const Ok = (label) => console.log(`ok ${label}`);
   zhou.position = { x: S.leftSeat.x, z: S.leftSeat.z + (B.zhouLeftGunM + 0.2) };
   battle.UpdateZhou();
   assert.ok(facts.has("zhouLeftGun") && !facts.has("zhouGunWounded"), "10.2 m: zhouLeftGun, the walk to the collection goes on");
-  checks += 8;
+  checks += 12;
   Ok("① 03 handover: He at the gun before Zhou lets go, zhouExit walk, zhouLeftGun at 10 m");
 }
 

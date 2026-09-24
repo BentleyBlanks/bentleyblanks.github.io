@@ -177,7 +177,12 @@ export class FirstLevelFrontBattle {
     const r=this.r,he=r.companion.Handle("heyoutian");
     if(!this.handoverStarted||this.postsRelieved||!he?.alive)return;
     // Not gated on the fact: a debug start at 04 already carries leftGunHandover, He still has to sit down.
-    if(Distance(he.position,S.leftSeat)<B.arrivalM&&!r.emplacement.guns.get(r.leftGunId)?.npc){r.emplacement.NpcOccupy(r.leftGunId,he);r.Record("leftGunHandover");}
+    const gun=r.emplacement.guns.get(r.leftGunId);if(gun?.npc)return;
+    if(Distance(he.position,S.leftSeat)<B.arrivalM){r.emplacement.NpcOccupy(r.leftGunId,he);r.Record("leftGunHandover");return;}
+    // The seat is free but He stands off it. His walk can end while Zhou still holds the gun (He reached arrivalM
+    // first, UpdateZhou waits for Yaowa); the two then shove each other off the seat and the hold order leaves He
+    // wherever he was pushed - 1.31 m off, 240 s, 03 never ended (09-24 01->06 verify run). Walk him on again.
+    const w=this.walks.get(he.id);if(!w||w.index>=w.route.length)this.SetWalk(he,[S.leftSeat]);
   }
   InfantryBlockade(){
     const r=this.r;
