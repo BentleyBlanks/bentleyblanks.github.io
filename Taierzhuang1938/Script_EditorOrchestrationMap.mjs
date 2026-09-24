@@ -973,6 +973,42 @@ export class OrchestrationMap {
   }
 
   /**
+   * 导出一张与编辑器视口无关的整图。
+   *
+   * `ToPng()` 是给批注快照用的：它故意保留用户当时缩放、平移后正在看的局部。
+   * 「下载本图」则不能拿那张视口快照冒充地图文件；这里始终按底图自己的完整
+   * `model.bounds` 重新排版，再叠当前勾选的图层、过滤结果、实时状态与草图。
+   */
+  ToFullPng({ pixelsPerMeter = 2, padding = 24, maxDimension = 4096 } = {}) {
+    const doc = this.canvas?.ownerDocument || globalThis.document;
+    const region = this.model?.bounds || this.contentBounds;
+    if (!doc || !region || !Number.isFinite(region.minX)) return "";
+    const rw = Math.max(1, region.maxX - region.minX);
+    const rd = Math.max(1, region.maxZ - region.minZ);
+    const pad = Math.round(Clamp(Number(padding) || 0, 0, 128));
+    const limit = Math.round(Clamp(Number(maxDimension) || 4096, 512, 8192));
+    const requestedScale = Clamp(Number(pixelsPerMeter) || 2, 0.25, 8);
+    const fitScale = Math.max(0.05, (limit - pad * 2) / Math.max(rw, rd));
+    const mapScale = Math.min(requestedScale, fitScale);
+    const w = Math.max(16, Math.round(rw * mapScale) + pad * 2);
+    const h = Math.max(16, Math.round(rd * mapScale) + pad * 2);
+    const off = doc.createElement("canvas");
+    off.width = w;
+    off.height = h;
+    const ctx = off.getContext("2d");
+    const view = {
+      w,
+      h,
+      scale: mapScale,
+      cx: (region.minX + region.maxX) / 2,
+      cz: (region.minZ + region.maxZ) / 2,
+      pixel: Clamp(mapScale, 1, 4),
+    };
+    this.Paint(ctx, view, { picks: null, interactive: false });
+    return off.toDataURL("image/png");
+  }
+
+  /**
    * 「这一套图标都长什么样」一张图：每个图标配一行中文名，外加 16 px 的缩略
    * （图标是要在 14–22 px 上看的，只看大图看不出哪一个到那个尺寸就糊了）。
    * 工作台的帮助里放它，测试也存一张当验收底片。

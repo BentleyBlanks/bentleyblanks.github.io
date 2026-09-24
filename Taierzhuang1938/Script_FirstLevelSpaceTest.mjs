@@ -28,6 +28,10 @@ import { OPENING } from "./Data_FirstLevelOpening.mjs";
 import { FRONT_SORTIE as Sortie, FRONT_SPACE as Space } from "./Data_FirstLevelFrontRoute.mjs";
 import { SampleMissionNaturalHeight as Natural } from "./Data_FirstLevelMissionTerrain.mjs";
 
+// Scope selection for the 06–18 refactor. The default still exercises every
+// original front/opening assertion, including the retired gunner-exit fixture.
+const rearOnly = process.argv.includes("--rear-only");
+
 const TAN52 = Math.tan(52 * Math.PI / 180);   // Script_Physics: setMaxSlopeClimbAngle(52°)
 const CAPSULE_R = 0.35;                        // 路线净空半径（MakeCharacter 的 0.34 + 余量）
 const Scenario = Object.fromEntries(Layout.scenario.states.map((state) => [state.id, state.blocks]));
@@ -96,7 +100,8 @@ const report = {};
 // 全程胶囊净空、坡度可爬。数据折线在这里断言净空与坡度；运行时（FrontBattle.UpdateZhou，03 交枪与 04 检查点
 // 两处）走的是 ZhouGunExitRoute 的返回值——下面用桩运行时真跑一遍 UpdateZhou，拿它交给 SetWalk 的路线来量，
 // 同一只胶囊、同一条 52° 规则（2026-09-24 v1.8 接线，原来这里是 TODO 行）。
-{
+// 06–18 专项（--rear-only）不跑这一段（master 2026-09-24 白盒重建的分段口径）。
+if (!rearOnly) {
   const route=Sortie.zhouExit;
   assert.deepEqual(route[0],Sortie.leftSeat,"Zhou's exit starts at the left gun seat");
   assert.ok(Distance(route.at(-1),OPENING.zhouRest)<0.01,"Zhou's exit ends at his rest by the collection");
@@ -223,7 +228,7 @@ const report = {};
 // 3. 01 防炮洞：交通壕弯角外侧的单口低矮洞室，躺姿从洞里看出去是一条东向走廊
 //    （杀俘位 8 m、岔口 J 15 m、折角 F 20 m），洞口塌土挡住 02 的还权位
 // ---------------------------------------------------------------------------
-{
+if (!rearOnly) {
   const blocks = Solids("BunkerCollapsed");
   report.bunkerKillingM = +Distance(S.bunker, S.bunkerKilling).toFixed(2);
   report.bunkerMouthM = +Distance(S.bunker, S.bunkerDoor).toFixed(2);
@@ -718,16 +723,37 @@ const report = {};
 }
 
 // ---------------------------------------------------------------------------
-// 07 以后一个不动：z > −95（集结处以南）的体块、壕沟杂物与共享地面采样，逐项与重排前基线
-// （f581ac7dd）的指纹相同（Data_FirstLevelSpaceSouthFingerprint.json；只许从那份基线重新生成）。
+// 07 以后一个不动：z > −95（集结处以南）的体块、壕沟杂物与共享地面采样，逐项与基线的指纹相同
+//（Data_FirstLevelSpaceSouthFingerprint.json；只许从 baseline 字段那份提交重新生成）。基线原是重排前的 f581ac7dd；
+// 2026-09-24 并入 master 后换成 master 的 b3ba06096（其 c85614d43 重建了 06–18 白盒），合并后 07+ 与它逐项相同。
 // ---------------------------------------------------------------------------
 {
   const expected = JSON.parse(fs.readFileSync(new URL("./Data_FirstLevelSpaceSouthFingerprint.json", import.meta.url), "utf8"));
   const now = SouthFingerprint({ blocks: Layout.blocks, placements: MISSION_TRENCH_PLACEMENTS, bodies: MISSION_AFTERMATH,
     sample: (x, z) => Ground(x, z), zMin: expected.zMin });
   for (const key of ["blocks", "placements", "bodies", "ground"])
-    assert.deepEqual(now[key], { ...expected[key] }, `south of z=${expected.zMin} the ${key} are exactly the 09.22 baseline's`);
-  console.log(`ok 07+ untouched: ${now.blocks.count} blocks, ${now.placements.count} trench props, ${now.bodies.count} dead, ${now.ground.count} ground samples match f581ac7dd`);
+    assert.deepEqual(now[key], { ...expected[key] }, `south of z=${expected.zMin} the ${key} are exactly the baseline ${expected.baseline}'s`);
+  console.log(`ok 07+ untouched: ${now.blocks.count} blocks, ${now.placements.count} trench props, ${now.bodies.count} dead, ${now.ground.count} ground samples match ${expected.baseline}`);
 }
 
-console.log("ok first-level 2026.09.19 space:", JSON.stringify(report));
+// 16–17 are a roofed wing in the same ordinary receiving courtyard. Sample the
+// working floor, not one known roof ID, so a narrow cut-away strip cannot pass.
+{
+  const solids = Solids();
+  const roomSamples = [-30, -26, -22].flatMap(x => [227, 231, 235, 239, 241].map(z => ({x,z})));
+  for (const p of roomSamples) {
+    const floor = Ground(p.x, p.z);
+    const roof = solids.find(b => Math.abs(p.x-b.x)<b.w/2 && Math.abs(p.z-b.z)<b.d/2
+      && b.y-b.h/2>floor+2.4 && b.y-b.h/2<floor+4.2);
+    assert.ok(roof, `the ward floor at ${p.x},${p.z} has actual overhead cover`);
+  }
+  assert.deepEqual(RouteClearance(Routes.reception, solids, {margin:.625,ceiling:1.9}), [],
+    "two bearers can take the litter through the receiving yard and into the roofed ward");
+  for (const state of Layout.scenario.states) {
+    const ids=[...Layout.blocks,...state.blocks].map(b=>b.id);
+    assert.equal(new Set(ids).size,ids.length,`${state.id} has no duplicate whitebox block identifiers`);
+  }
+  report.wardCoveredSamples=roomSamples.length;
+  console.log("ok 16–17 roof covers the working floor and the two-bearer reception route stays clear");
+}
+console.log(rearOnly ? "ok first-level 06–18 space:" : "ok first-level 2026.09.19 space:", JSON.stringify(report));

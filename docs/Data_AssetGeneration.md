@@ -16,7 +16,8 @@ node scripts/Script_BlenderMcp.mjs stop
 ```
 
 - `start` 带窗口起 Blender（插件服务在后台模式下会拒绝启动，必须有窗口），把 BlenderMCP 插件服务拉到本 worktree 专用端口，等它应答 `ping` 才返回；本机实测冷启动约 5 秒。已有活实例且 `.blend` 不冲突时直接复用，不重复起进程；要再起一个用 `--new`。
-- `exec` 走插件的 `execute_code`，回显的是 Python 侧 `print` 出来的内容 —— 想看什么就 `print` 什么。**多行 Python 用 `--file` 或 `--stdin`**，`--code` 留给单行。`call --type <名字>` 可以发 `get_scene_info`、`get_viewport_screenshot` 等原生命令。
+- `exec` 走插件的代码执行接口，回显的是 Python 侧 `print` 出来的内容 —— 想看什么就 `print` 什么。**多行 Python 用 `--file` 或 `--stdin`**，`--code` 留给单行。旧插件的 `call --type <名字>` 可发 `get_scene_info`、`get_viewport_screenshot` 等原生命令。
+- Blender 5.2 改用 `bl_ext.user_default.mcp` 扩展；入口兼容它的新协议，仍使用本 worktree 专用端口。该扩展支持 `exec` 和 `call --type ping`；场景查询直接在 `exec` 中用 `bpy` 完成。
 - `stop` 先（可选 `--save`）存盘，再请 Blender 自己退出（正常退出会把 `quit.blend` 落到临时目录，File > Recover Last Session 还能捞回来），超时才 `taskkill /T /F`。
 - 完整参数见 `node scripts/Script_BlenderMcp.mjs --help`。
 

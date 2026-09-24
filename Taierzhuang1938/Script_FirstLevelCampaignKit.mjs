@@ -53,8 +53,8 @@ export function ParseCampaignArgs(argv = process.argv) {
   const raw = argv.find((arg) => arg.startsWith("--stage-from="))?.split("=")[1];
   const stageFrom = Number(raw || 1);
   assert.ok(
-    stageFrom === 1 || stageFrom === 3 || (stageJumps && CAMPAIGN_SEGMENT_STARTS.includes(stageFrom)),
-    "continuation suites start at 1 or at a segment boundary (" + CAMPAIGN_SEGMENT_STARTS.join(" / ") + ")",
+    [1, 3, 6].includes(stageFrom) || (stageJumps && CAMPAIGN_SEGMENT_STARTS.includes(stageFrom)),
+    "continuous suites start at 1, 3 or 6; debug continuation starts at " + CAMPAIGN_SEGMENT_STARTS.join(" / "),
   );
   // 只跑某一段到它的末尾（`--stage-to=7` = Front 包的 1–7）。默认 18 = 整关走到 Complete。
   // 分段跑出来的证据目录与整关分开，一段跑通不许冒充通关。
@@ -72,7 +72,7 @@ export function ParseCampaignArgs(argv = process.argv) {
     quietGuidanceInterruptProbe: Has("--probe-quiet-guidance-interrupt"),
     allowCheckpointRetry: Has("--allow-checkpoint-retry"),
     stageFrom, stageTo,
-    suite: stageFrom === 3 ? "FirstLevelFrontTopology" : stageTo === 2 || stageTo === 3 ? "FirstLevelOpeningStoryboards" : stageTo === 7 ? "FirstLevelStageFront"
+    suite: stageFrom === 6 ? "FirstLevelWhitebox0618" : stageFrom === 3 ? "FirstLevelFrontTopology" : stageTo === 2 || stageTo === 3 ? "FirstLevelOpeningStoryboards" : stageTo === 7 ? "FirstLevelStageFront"
       : stageTo === 14 ? "FirstLevelStageMiddle"
         : stageFrom === 8 ? "FirstLevelStageVillage"
           : stageFrom === 11 ? "FirstLevelStageTransfer"
@@ -97,7 +97,7 @@ export async function OpenCampaign(options) {
     jumpReceipts: [], campaignRetries: [], capturedActivities: new Set(),
   };
   await page.goto(
-    `http://127.0.0.1:${server.address().port}/Taierzhuang1938/?whitebox=p012&${options.audioCheck ? "menu=0" : "shot=1"}&manual=1${options.stageFrom===3?"&missionStage=3":""}&quality=${options.quality||"low"}&scale=small`,
+    `http://127.0.0.1:${server.address().port}/Taierzhuang1938/?whitebox=p012&${options.audioCheck ? "menu=0" : "shot=1"}&manual=1${[3,6].includes(options.stageFrom)?`&missionStage=${options.stageFrom}`:""}&quality=${options.quality||"low"}&scale=small`,
     { waitUntil: "domcontentloaded", timeout: 180000 },
   );
   await page.waitForFunction(() => window.Tengxian?.state?.ready, null, { timeout: 180000 });
@@ -116,6 +116,23 @@ export async function CloseCampaign(ctx) {
 export async function CaptureFailure(ctx) {
   await ctx.page.evaluate(() => window.Tengxian?.Debug.FirstLevelMission())
     .then((state) => fs.writeFile(path.join(ctx.output, "Data_Failure.json"), JSON.stringify(state, null, 2)))
+    .catch(() => {});
+  await ctx.page.evaluate(() => {
+    const runtime = window.Tengxian?.Debug.FirstLevelMissionRuntime();
+    if (!runtime) return null;
+    return {
+      stage: runtime.flow.stage.id,
+      bedGuide: runtime.bedGuide && { cast: runtime.bedGuide.actor?.castId, route: runtime.bedGuide.route },
+      squad: runtime.squad.map(actor => ({
+        id: actor.id, cast: actor.castId, alive: actor.alive,
+        position: { x: actor.position.x, y: actor.position.y, z: actor.position.z },
+        ready: !!actor.missionTrainReady, noncombatant: !!actor.scriptedNoncombatant,
+        stance: actor.stance, reach: actor.missionReach || 0,
+        receptionWalk: runtime.reception.HasWalk(actor.id),
+        route: runtime.squadRoutes.get(actor.id),
+      })),
+    };
+  }).then(state => fs.writeFile(path.join(ctx.output, "Data_FailureCast.json"), JSON.stringify(state, null, 2)))
     .catch(() => {});
   await ctx.page.screenshot({ path: path.join(ctx.output, "Scene_Failure.png") }).catch(() => {});
   console.error(await ctx.page.evaluate(() => ({

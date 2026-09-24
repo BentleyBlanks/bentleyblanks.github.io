@@ -14,17 +14,77 @@
 // ===========================================================================
 import { END_TUNING as E } from "./Data_Tuning_FirstLevelEnd.mjs";
 import { MISSION_TUNING as R } from "./Data_Tuning_FirstLevel.mjs";
-import { MISSION_ANCHORS as A, MISSION_PLACEMENT as P, MISSION_ROUTES } from "./Data_FirstLevelMissionLayout.mjs";
+import { MISSION_ANCHORS as A, MISSION_PLACEMENT as P, MISSION_ROUTES, MISSION_LAYOUT } from "./Data_FirstLevelMissionLayout.mjs";
+import { MISSION_RECEPTION_SPACE, MISSION_STAGE_ROUTES, MISSION_REAR_ROUTES } from "./Data_FirstLevelMissionTopology.mjs";
+import { P012SegmentClear } from "./Script_FirstLevelP012March.mjs";
 import { EndRouteLength, EndRoutePoint } from "./Script_FirstLevelEndCast.mjs";
 
 const Distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 const NEXT_LITTER_LENGTH = EndRouteLength(E.nextLitterRoute);
 /** 15C–17 常驻的三个人：院门守军两名、接收人员、军医。 */
 export const RECEPTION_CAST = Object.freeze(["GateGuardNorth", "GateGuardSouth", "YardReceiver", "WardSurgeon"]);
-/** 16 真走完整接收路线；17 丢弃可能残留的中间点，只收束到床边。 */
-export function ReceptionBedGuideRoute(step) {
+const RECEPTION_WALK_BLOCKS = MISSION_LAYOUT.blocks.filter(block => block.h > 0.55);
+export function ReceptionWalkSegmentClear(from, to) {
+  return P012SegmentClear(RECEPTION_WALK_BLOCKS, from, to, E.receptionWalkerRadiusM);
+}
+/** 接回有限门洞路线。只采用真实胶囊净空的边，不将演员移进院子。 */
+export function ReceptionWalkRoute(position, target) {
+  const evacuation = MISSION_REAR_ROUTES.evacuation;
+  if (position.z < evacuation[6].z) {
+    // 滞后在退沟内时先接回最近可见路点，随后保留整段已验证的退沟折线。
+    // 不能让院内的最短路图跨越河槽和沿墙路直接剪向接收院。
+    const joins = evacuation.map((point, index) => ({ point, index, distance: Distance(position, point) }))
+      .filter(entry => ReceptionWalkSegmentClear(position, entry.point)).sort((a, b) => a.distance - b.distance);
+    if (!joins.length) return null;
+    const remainder = evacuation.slice(joins[0].index).map(point => ({ ...point }));
+    if (!remainder.every((point, index) => ReceptionWalkSegmentClear(index ? remainder[index - 1] : position, point))) return null;
+    const approach = ReceptionWalkRoute(remainder.at(-1), target);
+    return approach ? [...remainder, ...approach] : null;
+  }
+  const nodes = [position, target, ...E.receptionApproach, ...MISSION_STAGE_ROUTES.wallPath,
+    ...MISSION_ROUTES.reception], costs = nodes.map(() => Infinity), previous = [], visited = new Set();
+  costs[0] = 0;
+  while (visited.size < nodes.length) {
+    let at = -1;
+    for (let i = 0; i < nodes.length; i++) if (!visited.has(i) && (at < 0 || costs[i] < costs[at])) at = i;
+    if (at < 0 || !Number.isFinite(costs[at])) return null;
+    if (at === 1) {
+      const route = [];
+      for (let i = 1; i !== 0; i = previous[i]) route.unshift({ ...nodes[i] });
+      return route;
+    }
+    visited.add(at);
+    for (let i = 1; i < nodes.length; i++) if (!visited.has(i) && ReceptionWalkSegmentClear(nodes[at], nodes[i])) {
+      const cost = costs[at] + Distance(nodes[at], nodes[i]);
+      if (cost < costs[i]) { costs[i] = cost; previous[i] = at; }
+    }
+  }
+  return null;
+}
+/** 屋外仍走院门/厢房门；屋内且直达床边时才丢弃旧中间点。 */
+export function ReceptionBedGuideRoute(step, position = null, remaining = []) {
   const bedside={...P.receptionYard.yaowaBedside};
-  return step==="Handover"?[...MISSION_ROUTES.reception.map(point=>({...point})),bedside]:[bedside];
+  if (!position) return step==="Handover"?[...MISSION_ROUTES.reception.map(point=>({...point})),bedside]:[bedside];
+  const ward = MISSION_RECEPTION_SPACE.ward;
+  if (position.x > ward.minX && position.x < ward.maxX && position.z > ward.minZ && position.z < ward.maxZ
+      && ReceptionWalkSegmentClear(position, bedside)) return [bedside];
+  const route = step === "Death" && remaining.length ? remaining : [...MISSION_ROUTES.reception, bedside];
+  const approach = ReceptionWalkRoute(position, route[0]);
+  // 无可走接驳时留在真实位置；不以未经验证的穿墙直线冒充回退。
+  return approach ? [...approach, ...route.slice(1).map(point => ({ ...point }))] : [{ ...position }];
+}
+/** 中间门洞保持原容差；最后床边点从任何方向接近都须进入护理范围。 */
+export function ReceptionBedGuideArrivalM(route) {
+  return route.length === 1 ? E.bedsideArrivalM : 0.7;
+}
+/** 接令后从每个人的实际位置出院，再接共同桥头路线。 */
+export function ReceptionDepartureRoute(position, endPost = null) {
+  const bridge = MISSION_STAGE_ROUTES.toBridge;
+  const approach = ReceptionWalkRoute(position, bridge[0]);
+  if (!approach) return [{ ...position }];
+  const route = [...approach, ...bridge.slice(1).map(point => ({ ...point }))];
+  if (endPost && Distance(endPost, bridge.at(-1)) > 0.01) route.push({ ...endPost });
+  return route;
 }
 
 export class FirstLevelReception {
@@ -55,6 +115,12 @@ export class FirstLevelReception {
       this.handover = { tilt: 0, tilted: false, placeAsked: false, examineAsked: false, assignAsked: false, assigned: false };
       // 15C 的四个人留着（16/17 都在同一个院子里）。
       r.extras.Keep(RECEPTION_CAST);
+      for (const [castId, route] of Object.entries(E.squadAssign)) {
+        const actor = r.companion.Handle(castId);
+        if (actor?.alive) this.walks.set(actor.id, {
+          actor, route: ReceptionWalkRoute(actor.position, route[0]) || [], speed: E.squadAssignMps, arrived: false,
+        });
+      }
     }
     if (step === "Death") {
       this.death = { confirmed: false, nextProgress: 0, nextSaid: false, coverS: 0, resumed: false };
@@ -69,6 +135,8 @@ export class FirstLevelReception {
   }
   /** 18 接令时还回步枪与正常 AI；显隐同时还原，下一帧无需等模型重建。 */
   EndBedsideCare() {
+    for (const { actor } of this.walks.values()) actor.scriptedNoncombatant = false;
+    this.walks.clear();
     const yaowa=this.runtime.companion.Handle("yaowa");
     if(!yaowa)return;
     yaowa.missionHideWeapon=false;
@@ -177,7 +245,7 @@ export class FirstLevelReception {
       r.ai.SetStance(r.extras.Actor("WardSurgeon"), 1, 1.5, true);
 
     // 其余幸存伤员也进了接收流程，班长才分派人手。
-    if (r.Has("medicExamining") && !state.assignAsked && this.OthersInReception()) {
+    if (r.Has("medicExamining") && !state.assignAsked && this.OthersInReception() && this.SquadInReception()) {
       state.assignAsked = true;
       r.Say("SquadAssign");
     }
@@ -186,7 +254,10 @@ export class FirstLevelReception {
       state.assigned = true;
       for (const [castId, route] of Object.entries(E.squadAssign)) {
         const actor = r.companion.Handle(castId);
-        if (actor?.alive) this.walks.set(actor.id, { actor, route: route.map(point => ({ ...point })), speed: E.squadAssignMps });
+        if (actor?.alive) {
+          const approach = ReceptionWalkRoute(actor.position, route[0]);
+          this.walks.set(actor.id, { actor, route: approach ? [...approach, ...route.slice(1).map(point => ({ ...point }))] : [], speed: E.squadAssignMps, arrived: false });
+        }
       }
       r.Record("squadDispersed", { sent: this.walks.size });
     }
@@ -195,6 +266,16 @@ export class FirstLevelReception {
     const others = this.runtime.column.litters.filter(entry =>
       entry.visible && entry.health > 0 && !entry.zhou && !entry.evacuated && !entry.loaded);
     return others.every(entry => entry.received || (entry.receiveProgress || 0) > 0);
+  }
+  SquadInReception() {
+    const bounds = MISSION_RECEPTION_SPACE.bounds;
+    return Object.keys(E.squadAssign).every(castId => {
+      const actor = this.runtime.companion.Handle(castId);
+      // 到场只由最后路点实际被消费给出。胶囊互挤不撤销到场，但人仍须留在接收院内。
+      return !actor?.alive || (this.walks.get(actor.id)?.arrived === true
+        && actor.position.x > bounds.minX && actor.position.x < bounds.maxX
+        && actor.position.z > bounds.minZ && actor.position.z < bounds.maxZ);
+    });
   }
 
   // -------------------------------------------------------------------------
@@ -252,7 +333,7 @@ export class FirstLevelReception {
     const he = r.companion.Handle("heyoutian");
     if (he?.alive && !this.walks.has(he.id) && !state.heSent) {
       state.heSent = true;
-      this.walks.set(he.id, { actor: he, route: E.heDoorLook.map(point => ({ ...point })), speed: E.squadAssignMps });
+      this.walks.set(he.id, { actor: he, route: E.heDoorLook.map(point => ({ ...point })), speed: E.squadAssignMps, arrived: false });
     }
     // 接收处确实继续在工作了，17 才算走完。
     if (!state.resumed && state.treating && state.coverS >= E.coverStraightenS && r.voice.finished.has("NextLitter")) {
@@ -274,8 +355,15 @@ export class FirstLevelReception {
     for (const [id, walk] of this.walks) {
       const actor = walk.actor;
       if (!actor?.alive) { this.walks.delete(id); continue; }
-      while (walk.route.length && Distance(actor.position, walk.route[0]) < 0.9) walk.route.shift();
-      if (walk.route.length) r.MoveActor(actor, walk.route[0], walk.speed);
+      while (walk.route.length && Distance(actor.position, walk.route[0]) < E.receptionWalkArrivalM) {
+        walk.route.shift();
+        if (!walk.route.length) walk.arrived = true;
+      }
+      if (walk.route.length) {
+        r.ai.SetStance(actor, 0, 0.5, true);
+        r.MoveActor(actor, walk.route[0], walk.speed);
+        actor.scriptArrivalRadius = E.receptionWalkArrivalM * 0.5;
+      }
       else { r.MoveActor(actor, actor.position, 0); r.ai.SetStance(actor, 0, 1, true); }
     }
   }

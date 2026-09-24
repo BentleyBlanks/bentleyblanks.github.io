@@ -119,6 +119,10 @@ async function DriveRegroup(ctx, { JumpStage, Capture, CaptureFocus, Route, Inte
   // columnMoving 紧跟着就齐，15A 几秒内换步，再回头就来不及了（实拍 2026-09-20）。
   await Route([{ x: 47, z: 114 }, { x: E.droverPost.x + 2.4, z: E.droverPost.z + 1.2 }],
     "RegroupDrover", { fight: true });
+  // A continuous 14->15 run can still be playing ZhouCheck at this point.
+  // Approaching the drover queues CartAbandon; remain here until the real voice
+  // completes instead of treating an admitted, queued exchange as a missing cue.
+  await WaitVoiceFinished(page, "CartAbandon", "15A 车边询问赶车人", 90);
   {
     const shot = await Mission(page);
     assert.ok(shot.voice.played.includes("CartAbandon"), "顺子走到车边真的问过赶车人");
@@ -338,6 +342,13 @@ async function DriveBridge(ctx, { JumpStage, Capture, CaptureFocus, Route, WaitS
     assert.ok((await page.locator("#hud").innerText()).includes("铁路桥"),
       "HUD 目标更新为「掩护回援分队通过铁路桥」");
   }
+  // 连续16/17可能仍站在床边；先经厢房南门，不能直接朝院墙后门穿过房墙。
+  const insideWard = await page.evaluate(ward => {
+    const position = window.Tengxian.player.position;
+    return position.x > ward.minX && position.x < ward.maxX
+      && position.z > ward.minZ && position.z < ward.maxZ;
+  }, Reception.ward);
+  if (insideWard) await Route(Points(MISSION_ROUTES.reception.slice(-2).reverse()), "WardToCourtyard");
   // 沿 toBridge 到南岸射位。
   await Route(Points(MISSION_STAGE_ROUTES.toBridge), "BridgeToCover", { fight: true });
   await WaitStage("BridgeCover", 120, { fight: true });

@@ -677,6 +677,47 @@ export class CombatSystem {
     }
   }
 
+  /** Shared sensory event, also usable by scripted demolition without changing damage. */
+  BlastFeedback(position, radius) {
+    const bf = this.host.battlefield;
+    const from = position.clone();
+    from.y += BLAST.originRiseM;
+    // 震屏：与伤害判定分开算 —— 震感传得比弹片远（Script_CameraShake 按 reachScale 外推），
+    // 隔着墙也感觉得到，只是打折。伤害那一支仍然是「有墙挡着 = 完全免伤」。
+    const shaken = this.host.player;
+    // 遮挡只算一次，震屏与音频共用。
+    //
+    // 【2026-09-08】音频这一支原来算在**破坏结算之前**，而且根本没有遮挡这一项：
+    // 隔着一堵墙的爆炸与炸在脸上的是同一条声音，只是距离衰减小一点。
+    // 现在挪到这儿有两个作用：拿到同一个 occluded（判据与震屏完全一致，
+    // 不会出现「震得到听不到」这种自相矛盾），以及**先改场景拓扑再算遮挡** ——
+    // 爆压把墙打穿的同一瞬间，洞口后面的人应该听到没被削过的那一声。
+    let blastOccluded = false;
+    if (shaken && shaken.Alive) {
+      const eye = this.tmp.set(shaken.position.x, shaken.position.y + BLAST.playerHitRiseM, shaken.position.z);
+      const toEye = this.tmpB.subVectors(eye, from);
+      const eyeDist = toEye.length();
+      toEye.divideScalar(eyeDist || 1);
+      const wall = eyeDist > BLAST.wallMarginM ? bf.Raycast(from, toEye, eyeDist, {terrain:true}) : null;
+      blastOccluded = !!(wall && wall.t < eyeDist - BLAST.wallMarginM);
+      const side = -(toEye.x * Math.cos(shaken.yaw || 0) - toEye.z * Math.sin(shaken.yaw || 0));
+      if (shaken.shake) shaken.shake.Explosion(eyeDist, radius * BLAST.radiusScale, blastOccluded, side);
+    }
+    // 距离分档、落屑与按威力/距离/遮挡分级的耳鸣，
+    // 全在 Script_AudioWiring.Blast 里；这里只负责把「炸在哪、多大、挡没挡住」交出去。
+    // 接线层缺席时（编辑器裸跑规则层）退回原来那条两档判断，一声不少。
+    if (this.host.audioWiring) this.host.audioWiring.Blast(position, radius, blastOccluded);
+    else if (this.host.audio) {
+      const audio = this.host.audio;
+      const L = audio.listenerPos || { x: 0, y: 0, z: 0 };
+      const d = Math.hypot(position.x - L.x, position.y - L.y, position.z - L.z);
+      audio.Play(d > BLAST.nearAudioM ? "explosionFar" : "explosionNear",
+        { position: position.clone(), blastRadiusM: radius, blastOccluded,
+          volume: Clamp(radius / BLAST.audioVolumeRadiusDiv, BLAST.audioVolumeMin, BLAST.audioVolumeMax) });
+    }
+
+  }
+
   Detonate(p) {
     const isBundle = p.kind === "GrenadeBundle";
     // hurtSide 是**挨炸的那一方**：玩家/中方的弹伤日军，日军的弹伤中方。
@@ -706,38 +747,7 @@ export class CombatSystem {
     const from = position.clone();
     from.y += BLAST.originRiseM;
 
-    // 震屏：与伤害判定分开算 —— 震感传得比弹片远（Script_CameraShake 按 reachScale 外推），
-    // 隔着墙也感觉得到，只是打折。伤害那一支仍然是「有墙挡着 = 完全免伤」。
-    const shaken = this.host.player;
-    // 遮挡只算一次，震屏与音频共用。
-    //
-    // 【2026-09-08】音频这一支原来算在**破坏结算之前**，而且根本没有遮挡这一项：
-    // 隔着一堵墙的爆炸与炸在脸上的是同一条声音，只是距离衰减小一点。
-    // 现在挪到这儿有两个作用：拿到同一个 occluded（判据与震屏完全一致，
-    // 不会出现「震得到听不到」这种自相矛盾），以及**先改场景拓扑再算遮挡** ——
-    // 爆压把墙打穿的同一瞬间，洞口后面的人应该听到没被削过的那一声。
-    let blastOccluded = false;
-    if (shaken && shaken.Alive) {
-      const eye = this.tmp.set(shaken.position.x, shaken.position.y + BLAST.playerHitRiseM, shaken.position.z);
-      const toEye = this.tmpB.subVectors(eye, from);
-      const eyeDist = toEye.length();
-      toEye.divideScalar(eyeDist || 1);
-      const wall = eyeDist > BLAST.wallMarginM ? bf.Raycast(from, toEye, eyeDist, {terrain:true}) : null;
-      blastOccluded = !!(wall && wall.t < eyeDist - BLAST.wallMarginM);
-      if (shaken.shake) shaken.shake.Explosion(eyeDist, radius * BLAST.radiusScale, blastOccluded);
-    }
-    // 三档（near < 40 / mid 40—120 / far）+ 近炸后的落屑 + 十二米内的耳鸣，
-    // 全在 Script_AudioWiring.Blast 里；这里只负责把「炸在哪、多大、挡没挡住」交出去。
-    // 接线层缺席时（编辑器裸跑规则层）退回原来那条两档判断，一声不少。
-    if (this.host.audioWiring) this.host.audioWiring.Blast(position, radius, blastOccluded);
-    else if (this.host.audio) {
-      const audio = this.host.audio;
-      const L = audio.listenerPos || { x: 0, y: 0, z: 0 };
-      const d = Math.hypot(position.x - L.x, position.y - L.y, position.z - L.z);
-      audio.Play(d > BLAST.nearAudioM ? "explosionFar" : "explosionNear",
-        { position: position.clone(),
-          volume: Clamp(radius / BLAST.audioVolumeRadiusDiv, BLAST.audioVolumeMin, BLAST.audioVolumeMax) });
-    }
+    this.BlastFeedback(position, radius);
 
     const affect = (targetPos, apply) => {
       const rel = this.tmp.subVectors(targetPos, from);

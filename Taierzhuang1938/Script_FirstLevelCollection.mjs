@@ -80,6 +80,7 @@ export class FirstLevelCollection {
     this.zhouParked = false;
     this.zhouLiftAt = null;
     this.zhouLiftFrom = null;
+    this.zhouLiftComplete = false;
     // 抬老周那两个担架员：对白期间在 bearerWait 上等，ZhouLift 催的时候才走上来。
     this.liftBearers = Place.collection.bearerWait.map((spot, i) => ({
       // 沿用 column/view 里这副担架原有的两个人物身份；Orders 只是把同两个人
@@ -377,7 +378,11 @@ export class FirstLevelCollection {
       zhou.x = this.zhouLiftFrom.x + (target.x - this.zhouLiftFrom.x) * t;
       zhou.z = this.zhouLiftFrom.z + (target.z - this.zhouLiftFrom.z) * t;
       zhou.yaw = target.yaw ?? zhou.yaw;
-      if (t >= 1 && zhou.state === "fallen") { zhou.state = "waiting"; this.ShowSmoke(false); }
+      if (t >= 1 && zhou.state === "fallen") {
+        zhou.state = "waiting";
+        this.zhouLiftComplete = true;
+        this.ShowSmoke(false);
+      }
     }
     void dt;
   }
@@ -402,6 +407,9 @@ export class FirstLevelCollection {
     p.x += fx / f * 0.04; p.z += fz / f * 0.04; p.y -= 0.005;
     this.smoke.rotation.y = Math.atan2(fx, fz);
   }
+
+  /** The lift actually placed Zhou on the column route; the voice fact alone cannot leave 06. */
+  ZhouLiftComplete() { return this.zhouLiftComplete; }
 
   /** 07 起行之后集结处那一带的收尾：小道具收掉，摆位留着。 */
   Leave() {
@@ -433,6 +441,7 @@ export class FirstLevelCollection {
       zhouSeated: this.seated?.alive ? { id: this.seated.id, x: +this.seated.position.x.toFixed(2), z: +this.seated.position.z.toFixed(2),
         model: this.seated.actor?.characterRig?.modelId ?? null, face: !!this.seated.actor?.characterRig?.facial } : null,
       seatSwapAt: this.seatSwapAt,
+      zhouLiftComplete: this.ZhouLiftComplete(),
     };
   }
   Dispose() {

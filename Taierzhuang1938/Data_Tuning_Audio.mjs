@@ -316,6 +316,18 @@ export const BLAST_AUDIO = Object.freeze({
   gunDuckAmount: 0.5,
 });
 
+/** Shared near-blast hearing response, authored for the 2026-09-24 request.
+ * Radius affects reach; cover softens it. These are game-feel values, not medical thresholds.
+ * Keep the initial report audible, then muffle and ring with a bounded recovery.
+ */
+export const BLAST_HEARING = Object.freeze({
+  referenceRadiusM: 6, radiusScale: 2, minReachM: 6, maxReachM: 18,
+  falloffPower: 0.65, occludedScale: 0.55, minStrength: 0.08,
+  minHoldS: 0.25, holdSpanS: 1.55, maxHoldS: 2.2,
+  attackHoldS: 0.13, attackS: 0.05, recoveryS: 1.4,
+  clearHz: 20000, muffledHz: 520, ringHz: 4000, ringGain: 0.035,
+});
+
 /**
  * 战场密度（2026-09-09）。用户原话：「打起来整个战场安安静静的」。
  *
@@ -538,12 +550,8 @@ export const TINNITUS = Object.freeze({
     lowHz: 380,
     recover: Object.freeze([[0.0, 380], [1.6, 700], [3.8, 1800], [6.5, 6200], [9.0, 20000]]),
   }),
-  /**
-   * 【2026-09-24 审查后加】07 以后与其它关卡（任务侧开关 audio.firstLevelSoundscape 关着）
-   * 仍走这一轮之前的旧耳鸣：一条 toneHz 正弦、ringS 衰减完、低通 lowHz 停满 seconds 后
-   * recoverS 一口气回到全频，2 个节点。数与 f581ac7dd 的 Script_Audio.Deafen 一字不差。
-   */
-  legacy: Object.freeze({ toneHz: 4000, toneLevel: 0.055, ringS: 1.4, lowHz: 520, recoverS: 0.9, budgetNodes: 4 }),
+  // 07 以后与其它关卡（任务侧开关 audio.firstLevelSoundscape 关着）走通用近爆耳鸣 BLAST_HEARING
+  //（2026-09-24 合并 master 后，原来这里的 legacy 旧耳鸣退役）。
   /** 新两档一次建几个节点（两条音 + 两个声像 + 一个音量 + 噪声、带通、噪声音量）。 */
   nodes: 8,
   /**

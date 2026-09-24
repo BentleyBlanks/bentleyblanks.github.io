@@ -4,6 +4,8 @@
 接口契约（步骤 id、事实名、锚点、遭遇组、cue id 一律以它为准）：[分包契约](Data_FirstLevelRebuild20260919Contract.md)。
 本文件只讲**这一段怎么实装的**：谁在什么时候真的做了什么，数值从哪儿来，怎么验收。
 
+2026-09-24空间迭代见[概念/拓扑对应与验收](Data_FirstLevelWhitebox20260924.md)：主街东窗与侧间院口是两处真实射位，沿用现有敌人名册和事实门。
+
 ## 1. 文件
 
 | 文件 | 管什么 |
@@ -28,8 +30,8 @@
 - **街那一头真的有人**：`VILLAGE_BYSTANDERS` 按空间包的 `MISSION_PLACEMENT.streetBlock.frontParty`
   与 `withdrawnGuards` 生出四个 NRA（`scriptEssential`、`scriptedNoncombatant`：只站位与喊话）。
   `streetBlockSeen`（距离门，锚点 `streetBlock` 22 m）落下时喊 `StreetBlocked`。
-- **东巷窗口**：`village` 组的 `VillageGunner` 占住能打主街的窗位；遮挡判定用
-  `P.streetBlock.windowShooter` 作为射线起点。
+- **东巷窗口**：`village` 组的 `RearWindow` 占住主街东窗，实际摆位与遮挡判定共同读取
+  `P.streetBlock.windowShooter`；`VillageGunner` 则占侧间朝向内院的射位。
 - **担架队真的停进遮挡**：`MidLitterHoldSlots` 按 `litterWait` 三个点派生车位（多于三副按行往北排），
   `column.UpdateHold` 把每一副担架/每一个民夫从后送线上横着走过去、走到就钉住（`litter.held`）。
   `littersInCover` 要求**全部活着的担架都停到位**，而且窗口射手与主街缺口**两条射线都被
@@ -69,9 +71,11 @@
 
 - **四类人流**：
   1. 牛车 / 2. 马车 —— `column.vehicles` / `column.traffic` 各带 `draft`，由
-     `MidDraftKind` 按 `oxBayIndices` / `oxTrafficIndices` 分。视觉是同一对实例桶
-     （`muleBody` / `muleHead`）按 `MID_TUNING.draft` 的比例缩：牛更矮更宽 + 一对
-     `draftHorn`，马更高更窄。**`draftHorn` 桶满了是静默截断**，容量按 `hornCapacity`(16) 给。
+     `MidDraftKind` 按 `oxBayIndices` / `oxTrafficIndices` 分。正常加载时共用
+     `Model_WoodenEvacCart.glb` 双轮板车，并按 `draft` 加载 `Model_WorkingOx.glb` 或
+     `Model_WorkingHorse.glb`；两种牲口都有 Blender `Walk` 动画，车轮按行进距离转动。
+     `Script_DraftCartModel.mjs` 同时供关卡和「人物动作」编辑器使用。三件模型由
+     `_blender/Script_OxCartBake.py` 重建；原白盒实例桶只在资产加载中或失败时保底。
   3. 人力担架 —— 后送队本身。
   4. 能走的伤员 —— `MidWalkingWounded()` 在接运点现场摆六个人三对（一个搀一个被搀）。
      后送队自己的 `walkingWoundedCount` 是 0（用户 2026-09-16 砍的是随队护送编制），
@@ -133,7 +137,11 @@
 `meleeCurseReachM` = `R.ambushBindReachM` + 0.4（与 `meleeEngaged` 同一把尺）、
 `loadAllowancePerThreat` = `R.transferBatchLoads`、
 `zhouCartDeparted` 用 `R.cartDepartedM`、担架步速用 `R.litterSpeedMps`。
-牛/马的缩放比例是相对现有 `muleBody` 0.62×0.72×1.5 与 `muleHead` 0.25×0.56×0.44 量的。
+新车板为 2.3 × 3.5 m、离地约 1.12 m，木辐条轮直径 1.44 m；保留原车位与装载座位偏移。
+历史造型参考为 1930 年前后中国牛车照片及山东地方交通资料；生图概念稿只作建模参考，
+可编辑 `.blend` 保存在仓库外的 `OneDrive/AI/Models/Blender/Taierzhuang1938/OxCart`。
+参考：[1930 年中国牛车照片](https://www.bridgemanimages.com/en-US/williams-maynard-owen/chinese-peasants-with-cart-pulled-by-an-ox-pass-a-city-gate-1930-photo/photograph/asset/8777732)、
+[烟台交易运输民俗中的木轮铁瓦和骡马牛牵引记载](https://dsyjy.yantai.gov.cn/art/2010/7/26/art_1335_378567.html)。
 
 ## 4. 新增的内部辅助事实
 

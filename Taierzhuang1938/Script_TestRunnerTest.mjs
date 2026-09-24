@@ -142,7 +142,7 @@ Check(missionPrepush.includes("MissionSetpiecesTest") && !missionPrepush.include
 const textureChange = InferDomains(["Taierzhuang1938/Texture/Texture_BrickWallBase.webp"]);
 // 2026.09.19 第二波：近景刚体道具的被测对象从军列车厢里的腊肉/背包换成 12/13
 // 牛马车上老周的担架与车上近景件（军列开场已下线，Script_FirstLevelMeal 不再是它的对象）。
-for(const file of ['Script_PostPrepass.mjs','Script_FirstLevelTransferCart.mjs','Script_FirstLevelMissionColumn.mjs','Script_FirstLevelMissionView.mjs']){
+for(const file of ['Script_PostPrepass.mjs','Script_FirstLevelTransferCart.mjs','Script_FirstLevelMissionColumn.mjs','Script_FirstLevelMissionView.mjs','Script_DraftCartModel.mjs','Model/OxCart/Model_WorkingOx.glb']){
   const change=InferDomains(['Taierzhuang1938/'+file]);
   const selection=ResolveSelection(ParseArgs(['--changed=origin/master','--profile=prepush']),change.domains,change);
   Check(selection.includes('CarriagePropVelocityTest'),file+' keeps the per-prop GPU velocity gate when the opening route changes');

@@ -252,9 +252,9 @@ async function PickPort(taken) {
   throw new Error(`${PORT_MIN}..${PORT_MAX} 全被占了；先 stop 掉旧实例，或用 --port 指定`);
 }
 
-// 插件那头没有长度前缀：一整条 JSON 写进去，应答也是一整条 JSON 直接 sendall。
-// 所以这里的收包逻辑只能是「攒着，每来一块就试着 JSON.parse 一次」。
-function SendCommand(port, payload, timeoutMs) {
+// 旧插件直接收发 JSON；Blender 5.2 内置扩展以 NUL 结尾。
+// 两者都在收包时攒块并解析完整 JSON。
+function SendCommand(port, payload, timeoutMs, protocol = "legacy") {
   return new Promise((resolve, reject) => {
     const socket = net.createConnection({ port, host: "127.0.0.1" });
     let buffer = "";
@@ -266,9 +266,15 @@ function SendCommand(port, payload, timeoutMs) {
       if (error) reject(error); else resolve(value);
     };
     socket.setTimeout(timeoutMs);
-    socket.on("connect", () => socket.write(JSON.stringify(payload)));
+    socket.on("connect", () => {
+      if (protocol === "extension") {
+        const code = payload.type === "ping" ? "result = {'pong': True}" : payload.params?.code;
+        if (!code) { finish(new Error(`Blender 5.2 extension does not support ${payload.type}`)); return; }
+        socket.write(JSON.stringify({ type: "execute", code, strict_json: false }) + "\0");
+      } else socket.write(JSON.stringify(payload));
+    });
     socket.on("data", (chunk) => {
-      buffer += chunk.toString("utf8");
+      buffer += chunk.toString("utf8").replace(/\0/g, "");
       try {
         finish(null, JSON.parse(buffer));
       } catch {
@@ -287,11 +293,25 @@ function SendCommand(port, payload, timeoutMs) {
 
 async function Ping(port, timeoutMs = 3000) {
   try {
-    const reply = await SendCommand(port, { type: "ping" }, timeoutMs);
-    return reply && reply.status === "success";
+    const reply = await SendCommand(port, { type: "ping" }, timeoutMs, "extension");
+    if (reply?.status === "ok" && reply?.result?.pong) return true;
   } catch {
-    return false;
+    // Older BlenderMCP uses newline-free JSON and supports a dedicated ping.
   }
+  try { return (await SendCommand(port, { type: "ping" }, timeoutMs)).status === "success"; }
+  catch { return false; }
+}
+
+async function SendCompatibleCommand(port, payload, timeoutMs) {
+  try {
+    const probe = await SendCommand(port, { type: "ping" }, Math.min(timeoutMs, 2000), "extension");
+    if (probe?.status === "ok" && probe?.result?.pong) {
+      const reply = await SendCommand(port, payload, timeoutMs, "extension");
+      if (reply.status === "ok") return { status: "success", result: { result: reply.stdout || JSON.stringify(reply.result) } };
+      return reply;
+    }
+  } catch { /* The legacy add-on uses a different socket protocol. */ }
+  return SendCommand(port, payload, timeoutMs);
 }
 
 function Sleep(ms) {
@@ -371,6 +391,26 @@ function WriteBootstrap() {
     "    except Exception:",
     "        return False",
     "",
+    "def EnsureExtensionServer():",
+    "    # Blender 5.2 ships MCP as the bl_ext.user_default.mcp extension.",
+    "    try:",
+    "        from bl_ext.user_default.mcp import mcp_to_blender_server as server, execute_interactive",
+    "    except ImportError:",
+    "        return None",
+    "    addon_name = 'bl_ext.user_default.mcp'",
+    "    if not addon_utils.check(addon_name)[1]:",
+    "        addon_utils.enable(addon_name, default_set=False, persistent=True)",
+    "    if server.is_running():",
+    "        sock = getattr(server._state, 'sock', None)",
+    "        if sock and sock.getsockname()[1] == PORT:",
+    "            return True",
+    "        # A user preference may have autostarted the default 9876 port.",
+    "        server.stop()",
+    "    server.start('127.0.0.1', PORT)",
+    "    if not bpy.app.timers.is_registered(execute_interactive.run):",
+    "        bpy.app.timers.register(execute_interactive.run, first_interval=0.25, persistent=True)",
+    "    return True",
+    "",
     "",
     "def PreclaimServer():",
     "    # 插件的 register() 会照 scene 里的端口（默认 9876）自动起一遍服务。",
@@ -391,6 +431,8 @@ function WriteBootstrap() {
     "",
     "",
     "def EnsureServer():",
+    "    if EnsureExtensionServer() is not None:",
+    "        return True",
     "    PreclaimServer()",
     "    if not AddonEnabled():",
     "        try:",
@@ -634,7 +676,7 @@ async function CommandExec(opts) {
 
   const port = await ResolveTargetPort(opts);
   const timeoutMs = NumberFlag(opts.flags, "timeout", DEFAULT_CALL_TIMEOUT_SEC) * 1000;
-  const reply = await SendCommand(port, { type: "execute_code", params: { code } }, timeoutMs);
+  const reply = await SendCompatibleCommand(port, { type: "execute_code", params: { code } }, timeoutMs);
   if (opts.flags.json) { console.log(JSON.stringify(reply, null, 2)); return reply.status === "success" ? 0 : 1; }
   if (reply.status !== "success") {
     console.error(`Blender 那头报错：${reply.message || JSON.stringify(reply)}`);
@@ -654,6 +696,13 @@ async function CommandCall(opts) {
     catch (error) { throw new Error(`--params 不是合法 JSON：${error.message}`); }
   }
   const port = await ResolveTargetPort(opts);
+  const extension = await SendCommand(port, { type: "ping" }, 2000, "extension")
+    .then((reply) => reply?.status === "ok" && reply?.result?.pong).catch(() => false);
+  if (extension) {
+    if (type !== "ping") throw new Error(`Blender 5.2 extension exposes code execution only; use exec for ${type}`);
+    console.log(JSON.stringify({ status: "success", result: { port, pong: true } }, null, 2));
+    return 0;
+  }
   const timeoutMs = NumberFlag(opts.flags, "timeout", DEFAULT_CALL_TIMEOUT_SEC) * 1000;
   const reply = await SendCommand(port, { type, params }, timeoutMs);
   console.log(JSON.stringify(reply, null, 2));
@@ -703,7 +752,7 @@ async function StopOne(record, opts) {
 
   if (opts.flags.save) {
     try {
-      await SendCommand(record.port, { type: "execute_code", params: { code: SAVE_CODE } }, 120000);
+      await SendCompatibleCommand(record.port, { type: "execute_code", params: { code: SAVE_CODE } }, 120000);
       outcome.steps.push("已保存");
     } catch (error) {
       outcome.steps.push(`保存失败：${error.message}`);
@@ -715,7 +764,7 @@ async function StopOne(record, opts) {
   // 注意必须带窗口 temp_override：wm.quit_blender 的 exec 路径要在一个真实窗口上
   // 排退出事件，插件的定时器上下文里直接调有时候不落地（实测过一次 8s 没退）。
   try {
-    await SendCommand(record.port, { type: "execute_code", params: { code: QUIT_CODE } }, 5000);
+    await SendCompatibleCommand(record.port, { type: "execute_code", params: { code: QUIT_CODE } }, 5000);
     outcome.steps.push("已请求退出");
   } catch {
     outcome.steps.push("已请求退出（无应答，符合预期）");

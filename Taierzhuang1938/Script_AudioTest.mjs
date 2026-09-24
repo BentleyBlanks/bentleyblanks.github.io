@@ -981,9 +981,11 @@ else if (!(chain.bus.ratio <= 2 && chain.bus.rel >= 0.5)) {
 } else Ok(`两级动态在位（母线 ${chain.bus.thr}/${chain.bus.ratio}:1/${chain.bus.rel}s ×${chain.makeup}，`
   + `末端 ${chain.peak.thr}/${chain.peak.ratio}:1）；六档 IR ${JSON.stringify(chain.irSeconds)}`);
 
-// 耳鸣（2026-09-24 审查后）：任务侧开关关着（07 以后、其它关卡）走旧的单正弦 2 节点；
+// 耳鸣（2026-09-24 审查后；同日合并 master 的通用近爆反馈）：任务侧开关关着（07 以后、其它关卡）
+// 走通用近爆耳鸣（BLAST_HEARING，一条复用的 3 节点振荡器，细节由 Script_BlastFeedbackTest 验）；
 // 开着（01–06）走双音拍频 8 节点；连续近爆时旧的鸣响立刻停掉归还节点、不攒；
-// 剧情台词正在说时低通不低于对白保底，台词一停曲线接着往回走。
+// 剧情台词正在说时低通不低于对白保底，台词一停曲线接着往回走；
+// 剧情档长尾没走完时战斗档近爆不顶掉它（过场由导演曲线独占）；弱的战斗近爆低通压得浅。
 const deaf = await page.evaluate(async () => {
   const a = window.Taierzhuang.audio;
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -991,10 +993,12 @@ const deaf = await page.evaluate(async () => {
   const Tinnitus = () => [...a.pendingVoices].filter((v) => v.tone && v.hiss && v.nodes.length > 0);
   const New = (before) => [...a.pendingVoices].filter((v) => !before.has(v));
   a.firstLevelSoundscape = false;
+  a.ResetDeafen();
   let before = new Set(a.pendingVoices);
   a.Deafen(0.45);
   const legacy = New(before).map((v) => v.nodes.length);
-  const legacyProfile = a.tinnitusState?.profile;
+  const legacyProfile = a.deafenVoice && a.deafenStrength === 1 && !a.tinnitusState ? "shared" : a.tinnitusState?.profile;
+  a.ResetDeafen();
   a.firstLevelSoundscape = true;
   before = new Set(a.pendingVoices);
   a.Deafen(0.45);
@@ -1014,25 +1018,37 @@ const deaf = await page.evaluate(async () => {
   a.RefreshDeafFloor();
   await sleep(350);
   const silent = a.deafFilter.frequency.value;
+  // 剧情档还在恢复：战斗档近爆（Reactions 走的那条）不顶掉它。
+  a.DeafenFirstLevel(0.42, 0.13, 1, "combat");
+  const storyKept = a.tinnitusState?.profile;
   a.storyVoice = prevStory;
   a.StopTinnitus(0.01);
   a.deafCurve = null;
   a.deafFilter.frequency.cancelScheduledValues(a.ctx.currentTime);
   a.deafFilter.frequency.setValueAtTime(20000, a.ctx.currentTime);
+  a.tinnitusState = null;
+  // 弱的战斗近爆（BlastHearing 强度 0.3）：低通落点比满强度的 520 Hz 高得多。
+  a.DeafenFirstLevel(0.42, 0.13, 0.3, "combat");
+  const weakLowHz = Math.round(a.deafCurve?.points?.[2]?.[1] ?? 0);
+  a.ResetDeafen();
   a.firstLevelSoundscape = saved;
   await sleep(100);
-  return { legacy, legacyProfile, combat, combatProfile, ringing, speaking: Math.round(speaking), silent: Math.round(silent) };
+  return { legacy, legacyProfile, combat, combatProfile, ringing, speaking: Math.round(speaking), silent: Math.round(silent), storyKept, weakLowHz };
 });
-if (deaf.legacyProfile !== "legacy" || deaf.legacy.join(",") !== "2") {
-  Fail(`开关关着的耳鸣不是旧的单正弦：${JSON.stringify(deaf)}`);
+if (deaf.legacyProfile !== "shared" || deaf.legacy.join(",") !== "3") {
+  Fail(`开关关着的耳鸣不是通用近爆耳鸣（BLAST_HEARING 3 节点）：${JSON.stringify(deaf)}`);
 } else if (deaf.combatProfile !== "combat" || deaf.combat.join(",") !== "8") {
   Fail(`01–06 的战斗档耳鸣没起来：${JSON.stringify(deaf)}`);
 } else if (deaf.ringing > 1) {
   Fail(`连续近爆攒下 ${deaf.ringing} 份耳鸣节点（旧的没立刻归还）`);
 } else if (!(deaf.speaking >= 4000 && deaf.silent < 1500)) {
   Fail(`剧情档耳鸣的对白保底不对：说话时 ${deaf.speaking} Hz（要 ≥ 4000）、停下后 ${deaf.silent} Hz（要回到恢复曲线 < 1500）`);
-} else Ok(`耳鸣：开关关着 2 节点旧版、开着 8 节点新版；连续近爆只剩 ${deaf.ringing} 份；`
-  + `台词说着 ${deaf.speaking} Hz → 停下 ${deaf.silent} Hz`);
+} else if (deaf.storyKept !== "story") {
+  Fail(`剧情档耳鸣被战斗档近爆顶掉了（过场应由导演曲线独占）：${JSON.stringify(deaf)}`);
+} else if (!(deaf.weakLowHz > 2000 && deaf.weakLowHz < 20000)) {
+  Fail(`弱近爆的低通落点不对（要在 2 kHz 与 20 kHz 之间）：${JSON.stringify(deaf)}`);
+} else Ok(`耳鸣：开关关着走通用 3 节点、开着 8 节点新版；连续近爆只剩 ${deaf.ringing} 份；`
+  + `台词说着 ${deaf.speaking} Hz → 停下 ${deaf.silent} Hz；剧情档不被战斗档顶掉；强度 0.3 落点 ${deaf.weakLowHz} Hz`);
 
 // Continuous audition regression: real AudioBufferSource nodes must stop, including
 // scheduled repeats and editor exit, without stopping an unrelated gameplay engine.

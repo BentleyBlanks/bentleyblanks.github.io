@@ -8,7 +8,7 @@
 // 那份「18 个阶段事实逐条抄录」已随采用稿下线，不在这里重建。
 import assert from "node:assert/strict";
 import { MISSION_ANCHORS as A, MISSION_ROUTES as Routes,
-  MISSION_LAYOUT as Layout } from "./Data_FirstLevelMissionLayout.mjs";
+  MISSION_LAYOUT as Layout, MISSION_WHITEBOX_VERSION } from "./Data_FirstLevelMissionLayout.mjs";
 import { MISSION_RECEPTION_SPACE as Reception, MISSION_REGROUP_CORRIDORS as Corridors,
   MISSION_STAGE_ANCHORS as S, MISSION_STAGE_ROUTES as StageRoutes,
   MISSION_FRONT_COLLECTION_ROUTE as FrontCollectionRoute,
@@ -21,7 +21,12 @@ import { SampleMissionTerrain } from "./Data_FirstLevelMissionTerrain.mjs";
 
 const Distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
 // 2026-09-23: 01–06 空间按 3A 线性关卡重排（docs/Data_FirstLevelSpace0106_20260923.md），其余区沿用 09.19 采用稿。
-assert.match(MISSION_TOPOLOGY_VERSION, /^first-level-20260923-space-0106$/, "the 2026.09.23 01-06 space rebuild is live");
+// Targeted 06–18 verification (--rear-only) leaves the 01–05 assertions intact in the
+// default run. The front topology and its earlier camera points are a separate baseline.
+const rearOnly = process.argv.includes("--rear-only");
+if (rearOnly) assert.equal(MISSION_WHITEBOX_VERSION, "first-level-20260924-whitebox-06-18-r1",
+  "the reviewed 06–18 whitebox revision is live");
+else assert.match(MISSION_TOPOLOGY_VERSION, /^first-level-20260923-space-0106$/, "the 2026.09.23 01-06 space rebuild is live");
 
 // ---------------------------------------------------------------------------
 // 1. 四个空间区：各自的 z 带，且 A → B → C → 北沙河 → D 单调南行
@@ -38,6 +43,7 @@ const ZONES = [
       "blastSafe", "marchOut"] },
 ];
 for (const zone of ZONES) for (const id of zone.anchors) {
+  if (rearOnly && zone.id === "A" && id !== "collection") continue;
   const point = S[id] || A[id];
   assert.ok(point, `${id} exists`);
   assert.ok(point.z >= zone.z[0] && point.z <= zone.z[1],
@@ -57,6 +63,7 @@ console.log("ok four zones hold their anchors and run monotonically south", ZONE
 // 06 的伤员集结处；03 从同一个集结处起步，经 SJ 转入支沟北上（2026-09-23 空间重排）。
 {
   const route = StageRoutes.rearTrench;
+  if (!rearOnly) {
   assert.ok(route.some((p) => Math.hypot(p.x - S.collection.x, p.z - S.collection.z) < 0.01),
     "02 walks through the casualty collection point on its way to 03");
   const south = Math.max(...route.map((p) => p.z));
@@ -67,6 +74,7 @@ console.log("ok four zones hold their anchors and run monotonically south", ZONE
     "02 comes down the shared collection-to-front trench centerline");
   assert.deepEqual(Routes.support.slice(0, FrontCollectionRoute.length), FrontCollectionRoute,
     "03 leaves the collection along the same centerline");
+  }
   assert.deepEqual(StageRoutes.collectionReturn.slice(-FrontCollectionRoute.length),
     [...FrontCollectionRoute].reverse(), "06 reverses the same physical trench centerline");
   assert.deepEqual(OPENING.supportRoute.slice(-FrontCollectionRoute.length), FrontCollectionRoute,
@@ -122,6 +130,7 @@ const measured = {
 // 2026-09-20 第一轮实拍在破口里只有几个像素，改到 13.5 m 还是只有约 70 像素高；
 // 第二轮把整间掩蔽部从 12 m 进深收到 7 m（Notion 写的就是「小型掩蔽部」），
 // 行刑处落在受困位 8.5 m 外 —— 720p 下人有约 150 像素高，门框仍能裁掉创口。
+if (!rearOnly) {
 assert.ok(measured.bunkerKillingM >= 7 && measured.bunkerKillingM <= 9,
   `the killing ground reads at a glance: ${measured.bunkerKillingM.toFixed(1)} m from the player`);
 // 门外那一段：够远到门框还能裁掉创口，够近到看得清（门外 3–4 m，锚点在门外 1.35 m）。
@@ -133,6 +142,7 @@ assert.ok(StageRoutes.rearTrench.indexOf(S.rearCorner) >= 0
   "the retreat turns the rear corner before the support junction");
 assert.ok(Distance(S.supportJunction, S.collection) < 15, "the support junction and the collection point are neighbours");
 assert.ok(S.rearCorner.z < S.collection.z, "the corner is north of the collection point");
+}
 // 06 的接令点与集结处同区。
 assert.ok(Distance(A.orders, S.collection) < 12, "the orders anchor moved into the collection area");
 // 村落绕行：改道不能比直穿主街短，也不能长成一条新关卡。
@@ -297,4 +307,6 @@ assert.ok(S.receptionGate.x > bounds.maxX && Math.abs(S.receptionGate.z - Recept
 assert.ok(Reception.wardThreshold.z === Reception.ward.maxZ, "the threshold is the ward's own doorway");
 console.log("ok bridge lifecycles, bunker/night scenario states, 15/18 return corridors and one reception compound");
 
-console.log("ok Notion 2026.09.19 topology: four zones, southward progression, metric adjacency, sight rules");
+console.log(rearOnly
+  ? "ok targeted 06–18 topology: front camera/version assertions excluded; rear routes, metrics and sight rules verified"
+  : "ok Notion 2026.09.19 topology: four zones, southward progression, metric adjacency, sight rules");

@@ -448,7 +448,10 @@ map.drawnMarkers                // 本帧真画出去的标记 [{kind, id, encou
   图还只在本地时再加一颗 **下载这张图**。
   缩略图的来源：本地草稿的图取自 IndexedDB 里的 dataURL，已经落盘的那张走绝对 URL
   （弹窗文档是 `about:blank`，相对路径在那儿解不出来）。
-- 底部一行弱化的导出：复制交接文本 / 下载 JSON / 复制 JSON / 下载本图。
+- 底部一行弱化的导出：复制交接文本 / 下载 JSON / 复制 JSON / 下载本图。「下载本图」
+  不截编辑器当前视口，也不复用上一条批注的旧截图；它每次按底图完整 `bounds` 重新合成，
+  再叠加当前勾选的图层、分类筛选、实时状态、已存批注和当前草图/候选位。缩放、平移和
+  编辑器面板尺寸只影响工作时的视口，不影响下载范围。
 
 ### 写批注：浮在俯视图上的那一个对话框
 
@@ -574,12 +577,13 @@ map.drawnMarkers                // 本帧真画出去的标记 [{kind, id, encou
 `SetNoteText(text)` / `SetProposalKind(kind)` / `SetNoteTime(seconds)` / `SetNoteFilter(v)` /
 `SetLabelText(text)` / `CommitLabel()` / `CancelLabel()` /
 `ClearDraft()` / `await SaveDraft()` / `HandoffText()` / `CopyHandoff()` / `CopyJson()` /
-`DownloadJson()` / `DownloadImage()` / `DownloadNoteImage(id)` / `await MarkVerified(id)` / `LocateNote(id)` /
+`DownloadJson()` / `DownloadImage()`（完整底图合成）/ `DownloadNoteImage(id)` / `await MarkVerified(id)` / `LocateNote(id)` /
 `await LoadNotes()` / `await Jump(n)`；只读字段 `model` / `live` / `notes` / `localImages` /
 `draft`（含 `draft.mentions` 与 `draft.state`）/ `map` / `selection` / `phaseNumber`。
 俯视图那一侧（`tool.map`）另有 `HandlePoint(kind,id)`、`ArmMention(on)`、
 `onMention(cb)`（Ctrl / Meta + 点任何可拾取对象时回调，**selection 不变**）、
-`FinishPath()` / `CancelPath()`，以及只读的 `viewTouched` / `handles` / `mentionArmed`。
+`FinishPath()` / `CancelPath()` / `ToFullPng({pixelsPerMeter?,padding?,maxDimension?})`，以及只读的
+`viewTouched` / `handles` / `mentionArmed`。
 select 工具下草图形状可拾取：`onSelect` 会给出 `{kind:"sketch", index}`，
 index 是上一次 `SetSketch(array)` 传进去那个数组的下标（ghost 在最后）。
 `SetLive(live)` 认 `live.squad`（画成友军图标，拾取为 `{kind:"friendly", id, live:true}`）。
@@ -764,8 +768,8 @@ node Taierzhuang1938/Script_TestRunnerTest.mjs
 node Taierzhuang1938/Script_TextTest.mjs
 
 # 浏览器
-node Taierzhuang1938/Script_OrchestrationMapTest.mjs        # 俯视图（45 条）：数像素、PickAt、组/威胁把手、ToPng、工具回调
-node Taierzhuang1938/Script_OrchestrationEditorTest.mjs     # 工作台（152 条）：三栏/分栏线/时间轴折叠、事实与 flow 一致、顶栏只剩一枚状态、时间轴接住时钟与「正在等」空心标记、live 指纹含玩家朝向与班里人、跟随实时不抢视野、标注输入框、分类抽屉与敌军布设表、右栏两页签、批注对话框（阶段/状态下拉框、@ 提及、候选位 ✕、Delete 删草图）、批注退化与图片补传、关窗还干净
+node Taierzhuang1938/Script_OrchestrationMapTest.mjs        # 俯视图（110 条）：数像素、PickAt、组/威胁把手、视口快照与完整底图合成、工具回调
+node Taierzhuang1938/Script_OrchestrationEditorTest.mjs     # 工作台（153 条）：三栏/分栏线/时间轴折叠、事实与 flow 一致、顶栏只剩一枚状态、时间轴接住时钟与「正在等」空心标记、live 指纹含玩家朝向与班里人、跟随实时不抢视野、标注输入框、分类抽屉与敌军布设表、右栏两页签、完整底图下载、批注对话框（阶段/状态下拉框、@ 提及、候选位 ✕、Delete 删草图）、批注退化与图片补传、关窗还干净
 node Taierzhuang1938/Script_EditorTest.mjs --launcher-only  # 入口面板 26 个按钮
 node Taierzhuang1938/Script_WorldInfoEditorTest.mjs
 node Taierzhuang1938/Script_PlayerStateEditorTest.mjs

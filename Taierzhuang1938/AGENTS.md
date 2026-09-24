@@ -6,9 +6,11 @@
 
 ## 当前入口与任务范围
 
+- **06–18 场景白盒采用 Notion 2026-09-24 参考迭代**：[概念/拓扑对应与验收](docs/Data_FirstLevelWhitebox20260924.md)。三个 `Data_FirstLevelWhitebox*` 模块承载村落、接运与后方体块，Layout统一接地与合并；夜门新增体块仍仅属于NightGate。06起连续验收可用 `Script_FirstLevelMissionBrowserTest.mjs --campaign --stage-from=6`，加载时初始化06后不再跳阶段。
+
 - **03–05 当前采用稿为 Notion 2026.09.22 修订**：[正文](docs/Data_FirstLevelFrontSource20260922.md)、[白盒与连续流程](docs/Data_FirstLevelFrontTopology20260922.md)。以右侧夺点、同一撤口、同一道路战车、东南旧院取弹、原路返回攻击支路为准。导演为 `Script_FirstLevelFrontBattle`。本轮用户限定实机验收 03–06：`Script_FirstLevelMissionBrowserTest.mjs --campaign --stage-from=3 --stage-to=6`，仅加载时初始化 03，之后连续推进，不测试 07 及其他阶段。
 - **01–06 空间以 [2026-09-23 空间重排](docs/Data_FirstLevelSpace0106_20260923.md) 为准**（防炮洞与前沿交通壕、02 撤退、观察射台、右侧阵位与后墙岔口、取弹沟与攻击支路、战车语义路点、01–05 敌我名册、可破坏掩体、K1–K11 关键帧）；与下面两条的旧坐标冲突时以它为准。静态验收 `node Taierzhuang1938/Script_FirstLevelFrontTopologyTest.mjs`（量尺 `Script_FirstLevelSpaceProbe.mjs`），重构分包口径见 [01–05 重构契约](docs/Data_FirstLevel0105Refactor20260923Contract.md)。
-- **01–02 采用 Notion 2026.09.23 新稿**：[正文](docs/Data_FirstLevelOpeningSource20260923.md)、[导演口径](docs/Data_OpeningStoryboards20260923.md)（09.21 稿与[旧分镜](docs/Data_OpeningStoryboards20260922.md)只作历史）。导演为 `Script_OpeningStoryboards`，phase 表、超时与节奏数值在 `Data_OpeningStoryboards`，动作库在 `Animation/OpeningStoryboards`。还权按 [01–05 重构契约](docs/Data_FirstLevel0105Refactor20260923Contract.md) §2 第 1 条：日兵甲、乙被大刀真实砍死，岔口的丁被刘文财真实击倒，才进入 Check 和踢枪还权；折角的丙和追兵活着也可以还权，玩家望见集结处时经纵深支沟收走；每个等待点都有超时兜底。前沿五组敌军在 02 预置，03–05 不因接近临时生成。验收用 `--campaign --stage-to=2` 与 `Script_OpeningHandbackBrowserTest`；Front 包合入后恢复 `--stage-to=3`。06–18 沿用既有来源与连接；前沿新版衔接 06 的原集结处。
+- **01–02 采用 Notion 2026.09.23 新稿**：[正文](docs/Data_FirstLevelOpeningSource20260923.md)、[导演口径](docs/Data_OpeningStoryboards20260923.md)（09.21 稿与[旧分镜](docs/Data_OpeningStoryboards20260922.md)只作历史）。导演为 `Script_OpeningStoryboards`，phase 表、超时与节奏数值在 `Data_OpeningStoryboards`，动作库在 `Animation/OpeningStoryboards`。还权按 [01–05 重构契约](docs/Data_FirstLevel0105Refactor20260923Contract.md) §2 第 1 条：日兵甲、乙被大刀真实砍死，岔口的丁被刘文财真实击倒，才进入 Check 和踢枪还权；折角的丙和追兵活着也可以还权，玩家望见集结处时经纵深支沟收走；每个等待点都有超时兜底。前沿五组敌军在 02 预置，03–05 不因接近临时生成。验收用 `--campaign --stage-to=2` 与 `Script_OpeningHandbackBrowserTest`；Front 包合入后恢复 `--stage-to=3`。06–18 的流程与连接沿用既有来源，场景白盒按上方 2026-09-24 入口迭代；前沿新版衔接 06 的原集结处。
 
 - 正片第一关是《往南的路》，入口 `?whitebox=p012`，序章已并入。需求来源是 Notion `2026.09.19` 采用稿（转录见 [采用稿](docs/Data_FirstLevelRebuildSource20260919.md)），跨包接口冻结在 [分包契约](docs/Data_FirstLevelRebuild20260919Contract.md)（步骤 id、事实名、锚点/路线键、遭遇组 id、cue id 都在那里改，不各自改名）。任务、对白和数值分别由 `Data_FirstLevelMission`、`Data_FirstLevelMissionDialogue`、`Data_Tuning_FirstLevel` 管理；范围决定、逐阶段通过条件与未完成项见 [重构验收](docs/Data_FirstLevelRebuildAcceptance.md)。
 - **18 个公开阶段、27 个可玩内部步骤**（调试菜单 18 项；流程表另有终止哨兵 `Complete`）：1 Trapped｜2 Rescue(`BunkerRescue`→`RearTrench`)｜3 Support｜4 MachineGun｜5 Tank｜6 Orders｜7 South｜8 Village｜9 Melee｜10 Courtyard｜11 TransferApproach｜12 Transfer(`Transfer`→`CartRide`)｜13 AirFirst｜14 Dive(`Carry`→`Dive`→`Rescue`)｜15 Regroup(`Regroup`→`WallPath`→`ReceptionGate`)｜16 Handover｜17 Death｜18 Bridge(`BridgeOrders`→`BridgeCover`→`BridgeWithdraw`→`NightMarch`)。旧的 `Train` `Unloading` `TrenchEntry` `Shelter` `Retreat*` `Reception` `FinalCarry` `FinalDefense` `Exit` 已下线。调试菜单与 agent 跳转接口见 [阶段跳转](docs/Data_FirstLevelStageJump.md)。
@@ -24,6 +26,8 @@
 - `?whitebox=p012-archive` 是旧 P0–P2 的开发回归夹具，旧资产与组件契约继续保留。旧任务表、旧 Notion 摘录和旧通关结果不能替代新版需求与验收；任务涉及哪条入口，就核对对应运行时及测试。新需求在当前任务授权范围内同步数据、消费方和文档，不按旧提案自行恢复已废弃内容。
 
 ## 跨系统契约
+
+- **近爆反馈为跨关卡共用机制**：手榴弹、炮弹等实弹通过 `Combat.Blast` 接入；无伤害剧情爆破用 `Combat.BlastFeedback`。距离与遮挡控制相机冲击、余震和耳鸣，不在关卡内复制一套震屏/耳鸣。接口、数值入口与验收见 [通用近爆反馈](docs/Data_BlastFeedback.md)。
 
 1. 浏览器模块变更更新 `index.html` import map 对应的 `?v=`，新增模块登记 import map；源码 import 不自带 `?v=`，避免同一模块形成两个实例。验收：`Script_ModuleGraphTest.mjs`。
 2. `Data_*.mjs`、规则层及要求纯 Node 运行的 TexBake / FarLand / Identify / CutsceneCheck 保持无 three 依赖。

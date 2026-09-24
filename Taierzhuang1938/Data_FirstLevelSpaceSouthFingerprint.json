@@ -1,10 +1,10 @@
 {
- "note": "01-06 rebuild guard: MISSION_LAYOUT.blocks, MISSION_TRENCH_PLACEMENTS, MISSION_AFTERMATH and SampleMissionTerrain south of z=-95 (07 onward) as of the pre-rebuild baseline. Regenerate only from that baseline (git archive f581ac7dd, then Script_FirstLevelSpaceProbe.SouthFingerprint over its modules).",
- "baseline": "f581ac7dd",
+ "note": "01-06 rebuild guard: MISSION_LAYOUT.blocks, MISSION_TRENCH_PLACEMENTS, MISSION_AFTERMATH and SampleMissionTerrain south of z=-95 (07 onward). Baseline was f581ac7dd (pre-rebuild); on 2026-09-24 the 01-06 line merged master, whose c85614d43 rebuilt the 06-18 whitebox, so the baseline moved to that master commit (b3ba06096). Regenerate only from the baseline: git archive <baseline> Taierzhuang1938, then Script_FirstLevelSpaceProbe.SouthFingerprint over its modules.",
+ "baseline": "b3ba06096",
  "zMin": -95,
  "blocks": {
-  "count": 1069,
-  "sha": "90cbd2d25c37da13"
+  "count": 1229,
+  "sha": "f8a50a7549867d03"
  },
  "placements": {
   "count": 2,
@@ -22,5 +22,6 @@
   "stepM": 2,
   "count": 56048,
   "sha": "215c2863718678c1"
- }
+ },
+ "previousBaseline": "f581ac7dd"
 }

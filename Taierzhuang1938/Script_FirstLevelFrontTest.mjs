@@ -19,12 +19,12 @@ import { MissionVoiceTimeline } from "./Data_FirstLevelMissionVoiceTiming.mjs";
 import { MISSION_STAGES, MISSION_TUNING as R } from "./Data_FirstLevelMission.mjs";
 import { MISSION_FACT_GATES } from "./Data_FirstLevelMissionGates.mjs";
 import { MISSION_ANCHORS as A, MISSION_ROUTES, MISSION_PLACEMENT as P } from "./Data_FirstLevelMissionLayout.mjs";
-import { MissionRouteProjection } from "./Script_FirstLevelMissionColumn.mjs";
+import { MissionRouteProjection, MissionCarryRoutePoint } from "./Script_FirstLevelMissionColumn.mjs";
 import {
   FRONT_TUNING as F, FRONT_TUNING_SOURCES, BUNKER_KILL_BEATS, BORROW_LIGHT_BEATS,
   SouthWalkLengthM, SouthWalkSeconds,
 } from "./Data_Tuning_FirstLevelFront.mjs";
-import { CollectionDressing, BorrowPosesDue, BORROW_POSE_ORDER, BorrowLightCued } from "./Script_FirstLevelCollection.mjs";
+import { FirstLevelCollection, CollectionDressing, BorrowPosesDue, BORROW_POSE_ORDER, BorrowLightCued } from "./Script_FirstLevelCollection.mjs";
 import { SouthPointerSpot, FRONT_WIRED_CUES } from "./Script_FirstLevelFrontShow.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -133,6 +133,45 @@ const Cue = (id) => MISSION_DIALOGUE.find((cue) => cue.id === id);
 // ---------------------------------------------------------------------------
 // 5. 集结处摆位：担架 / 伤员 / 搬运人员一个不落，全部取自空间包
 // ---------------------------------------------------------------------------
+// Regression: another litter was already ahead when ZhouLift ended. Orders used
+// to finish at t=0 of the actual lift, leaving Zhou permanently fallen in 07/08.
+{
+  const facts = new Set(), zhou = { id: "LiftRegressionZhou", ...P.collection.zhouWall,
+    state: "waiting", progress: 0, health: 65, bearers: [100, 100] };
+  const route = [A.collection, { x: -26, z: -92 }];
+  const r = { time: 0, column: { zhou, route, litters: [{ progress: R.litterSpacingM + 1 }, zhou] },
+    player: { position: { ...P.collection.borrowStand } }, Has: id => facts.has(id), Say() {},
+    // The 01-06 line seats a live speaking Zhou by the wall (SeatZhou); no AI here, so no seated actor --
+    // the lift and its completion only move column.zhou.
+    ai: { Spawn: () => null, Remove() {} } };
+  const collection = new FirstLevelCollection(r);
+  // Only unrelated rendering/dialogue dependencies are stubbed; the production
+  // UpdateOrders interpolation and completion predicate run at their real boundary.
+  collection.EnsureRunner = () => {};
+  collection.UpdateBorrowCue = () => {};
+  collection.ShowSmoke = () => {};
+  assert.equal(collection.ZhouLiftComplete(), false, "an arbitrary waiting state is not a completed lift");
+  collection.UpdateOrders(0);
+  facts.add("zhouOnLitter");
+  collection.UpdateOrders(0);
+  assert.equal(zhou.state, "fallen");
+  assert.equal(collection.ZhouLiftComplete(), false, "voice completion must not finish the lift at t=0");
+  r.time = F.zhouLiftMoveS / 2;
+  collection.UpdateOrders(F.zhouLiftMoveS / 2);
+  assert.equal(collection.ZhouLiftComplete(), false, "a partly moved litter still keeps Orders active");
+  r.time = F.zhouLiftMoveS;
+  collection.UpdateOrders(F.zhouLiftMoveS / 2);
+  const target = MissionCarryRoutePoint(route, zhou.progress);
+  assert.ok(Math.hypot(zhou.x - target.x, zhou.z - target.z) < 1e-9,
+    "completion follows actual placement on the column route");
+  assert.equal(zhou.state, "waiting", "the regular column loop can move Zhou after the lift");
+  assert.equal(collection.ZhouLiftComplete(), true);
+  const runtime = Read("Script_FirstLevelMissionRuntime.mjs");
+  // 2026-09-24 merge with the 01-06 line: the leading-litter half is now ColumnDeparture (movement since the lift),
+  // asserted by Script_FirstLevelFrontPacingTest; this keeps the lift-completion gate in front of it.
+  assert.match(runtime, /if\(this\.Has\("zhouOnLitter"\)&&this\.frontShow\.collection\.ZhouLiftComplete\(\)\)\{\s*const departure=ColumnDeparture\(/,
+    "columnDeparted waits for the production lift completion as well as the leading litter");
+}
 {
   const dressing = CollectionDressing();
   assert.equal(dressing.length, P.collection.wounded.length + P.collection.bearers.length,

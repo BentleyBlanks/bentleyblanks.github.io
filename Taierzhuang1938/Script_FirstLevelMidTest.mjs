@@ -15,7 +15,8 @@
 // ===========================================================================
 import assert from "node:assert/strict";
 import { MISSION_STAGES, MISSION_ENCOUNTERS, MISSION_TRANSFER_THREATS } from "./Data_FirstLevelMission.mjs";
-import { MISSION_ANCHORS as A, MISSION_PLACEMENT as P, MISSION_ROUTES } from "./Data_FirstLevelMissionLayout.mjs";
+import { MISSION_LAYOUT, MISSION_ANCHORS as A, MISSION_PLACEMENT as P, MISSION_ROUTES } from "./Data_FirstLevelMissionLayout.mjs";
+import { SampleMissionTerrain } from "./Data_FirstLevelMissionTerrain.mjs";
 import { MISSION_FACT_GATES, MISSION_ENCOUNTER_ACTIVATION, MissionGateInArea } from "./Data_FirstLevelMissionGates.mjs";
 import { MISSION_TUNING as R } from "./Data_Tuning_FirstLevel.mjs";
 import { MID_TUNING as M, MidLitterHoldSlots, MidDraftKind } from "./Data_Tuning_FirstLevelMid.mjs";
@@ -210,7 +211,7 @@ const Step = (host, module, seconds, options = {}) => {
         alive: true, missionDormant: true, scriptedNoncombatant: true,
         missionEncounter: "melee", position: { x: spec.x, z: spec.z },
       });
-    host.enemies.set("VillageGunner", { alive: true, missionEncounter: "village", position: { x: 43, z: 8 } });
+    host.enemies.set("VillageGunner", { alive: true, missionEncounter: "village", position: { ...P.sideRoomGunner } });
     return { host, village: new FirstLevelVillageBlock(host) };
   };
   const wake = MISSION_ENCOUNTER_ACTIVATION.melee.wake;
@@ -421,6 +422,11 @@ const Step = (host, module, seconds, options = {}) => {
   const cart = host.column.ReserveBoardingCart(P.cartBays[0]);
   Check(cart, "预留了一辆车");
   cart.x = P.cartBays[0].x; cart.z = P.cartBays[0].z; cart.state = "loading";
+  // Continuous 12->15 has another wounded passenger already aboard this cart.
+  // He must be physically unloaded too, not remain stranded and fail regroup forever.
+  const passenger = host.column.litters.find(litter => !litter.zhou);
+  passenger.loaded = true; passenger.state = "loaded";
+  cart.load.push(passenger.id);
   Check(transfer.Board(), "上车：老周被装在这辆车上，顺子坐车板");
   Check(cart.load.includes(host.column.zhou.id), "老周真的在车上（不是躺在原地看着车开）");
   host.controls = { kind: "cartRide" };
@@ -446,21 +452,70 @@ const Step = (host, module, seconds, options = {}) => {
 
   // 卸人有过程：搬运的人先到，再用 unloadSeconds 把担架放下来。
   Check(!host.Has("zhouUnloaded"), "刚停车不算卸完");
+  Check(passenger.loaded && cart.load.includes(passenger.id), "同车伤员没有在停车时瞬移下车");
   // 13 的时候民夫已经跟到接运点了（这里把他们摆到车附近，别让 240 m 的路程喧宾夺主）。
   for (const walker of host.column.walkers) { walker.x = cart.x - 6; walker.z = cart.z + 2; }
-  for (let i = 0; i < 60 * 20 && !host.Has("zhouUnloaded"); i++) {
+  let passengerLoweringSeen = false;
+  for (let i = 0; i < 60 * 40 && !host.Has("zhouUnloaded"); i++) {
     host.time += 1 / 60; transfer.UpdateUnload(1 / 60); host.column.Update(1 / 60, { moving: false });
+    if (passenger.state === "unloading" && passenger.liftFraction > 0 && passenger.liftFraction < 1) {
+      passengerLoweringSeen = true;
+      Check(!host.Has("zhouUnloaded"), "同车伤员尚在下放时老周卸车事实不能提前完成");
+    }
   }
   Check(host.Has("zhouUnloaded"), "两个搬运的人到位之后，老周被卸回担架");
   Check(transfer.unload.seconds >= M.unloadSeconds, `卸人至少花了 ${M.unloadSeconds} 秒，不是一帧完成`);
   Check(host.said.includes("WestDitchOrder"), "接运兵随即指西沟");
   Check(!cart.load.includes(host.column.zhou.id), "老周已经不在车上了");
   Check(host.column.zhou.liftFraction === 0 && host.column.zhou.state === "waiting", "他回到了地面的担架上");
+  Check(passengerLoweringSeen && !passenger.loaded && passenger.state === "waiting",
+    "同车伤员经过真实下放过程回到担架，能随队进入西沟");
+  Check(!cart.load.includes(passenger.id) && passenger.unloadedFromCart,
+    "同车伤员的车载归属清除，卸车后位置由撤离路线接管");
+  Check(Distance(passenger, host.column.zhou) >= R.litterSpacingM - .01,
+    "两副卸下的担架没有重叠");
 }
 
 // ---------------------------------------------------------------------------
 // 13 空袭打的是道路与车列
 // ---------------------------------------------------------------------------
+{
+  const host = MakeHost("AirFirst"), transfer = new FirstLevelTransferCart(host);
+  const cart = host.column.ReserveBoardingCart(P.cartBays[0]);
+  Object.assign(cart, A.cartHalt, { state: "loading" });
+  const passenger = host.column.litters.find(litter => !litter.zhou);
+  passenger.loaded = true; passenger.state = "loaded"; cart.load.push(passenger.id);
+  transfer.Board();
+  transfer.BeginUnload();
+  const slot = transfer.unload.queue.find(entry => entry.litter === passenger).target;
+  Object.assign(passenger, slot, { loaded: false, state: "waiting" });
+  host.column.StartRetreat();
+  const end = passenger.joinRoute.findIndex(point => Distance(point, A.retreatA) < .01);
+  assert.ok(end > 0, "the actual passenger join route reaches the regroup anchor");
+  const route = passenger.joinRoute.slice(0, end + 1), hits = new Set();
+  const solids = MISSION_LAYOUT.blocks.filter(block => block.solid !== false);
+  // Sample both actual bearer positions as well as the litter's 1.3 m wide
+  // corridor. A centre line alone missed the north tip of the road shoulder.
+  for (let leg = 1; leg < route.length; leg++) {
+    const a = route[leg - 1], b = route[leg], length = Distance(a, b);
+    if (!length) continue;
+    const dx = (b.x - a.x) / length, dz = (b.z - a.z) / length;
+    for (let d = 0; d <= length; d += .1) {
+      for (const [offset, margin] of [[0, .65], [-R.litterBearerOffsetM, .34], [R.litterBearerOffsetM, .34]]) {
+        const x = a.x + dx * (d + offset), z = a.z + dz * (d + offset), y = SampleMissionTerrain(x, z);
+        for (const box of solids) {
+          const c = Math.cos(box.ry || 0), s = Math.sin(box.ry || 0), bx = x - box.x, bz = z - box.z;
+          if (Math.abs(bx * c - bz * s) < box.w / 2 + margin
+            && Math.abs(bx * s + bz * c) < box.d / 2 + margin
+            && box.y + box.h / 2 > y + .3 && box.y - box.h / 2 < y + 1.8)
+            hits.add(`${box.id} leg=${leg} bearer=${offset}`);
+        }
+      }
+    }
+  }
+  assert.deepEqual([...hits], [], "the additional unloaded passenger and both bearers clear the road shoulder into the western ditch");
+  Check(slot.z < A.cartHalt.z - R.litterSpacingM, "额外乘员卸到停车点北侧的完整搬运空间");
+}
 {
   const host = MakeHost("AirFirst");
   const transfer = new FirstLevelTransferCart(host);

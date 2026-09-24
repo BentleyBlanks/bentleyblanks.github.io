@@ -329,7 +329,12 @@ export const CAMERA_SHAKE = Object.freeze({
   impulseDamping: 24,
   maxImpulseRad: 0.6,
   maxImpulseM: 0.25,
-  explosion: Object.freeze({ traumaAtCenter: 0.95, reachScale: 3.2, minTrauma: 0.05, occludedScale: 0.55, pitchKickRad: -0.05 }),
+  // 2026-09-24: nearby blast = initial kick, then a readable settling tail.
+  // Authored feel reference: the user's Battlefield 1 opening request, not measured BF1 values.
+  explosion: Object.freeze({ traumaAtCenter: 0.95, reachScale: 3.2, falloffPower: 0.85,
+    minTrauma: 0.05, occludedScale: 0.55, decayPerS: 0.72,
+    pitchKickRad: -0.085, yawKickRad: 0.025, rollKickRad: 0.035,
+    riseKickM: -0.035, maxKickRad: 0.12, maxKickM: 0.06 }),
   nearMiss: Object.freeze({ traumaPerSuppress: 0.4, maxTrauma: 0.32 }),
   landing: Object.freeze({ traumaScale: 0.3, pitchKickRad: -0.07 }),
   strafe: Object.freeze({ reachM: 14, traumaPerImpact: 0.14, maxTrauma: 0.5 }),

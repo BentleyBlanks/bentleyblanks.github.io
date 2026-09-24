@@ -47,6 +47,11 @@ const browserLockWriteGraceMs = 10 * 1000;
 // 七章通关链不再存在）。expectedFailures 基线机制保留在 AssessResult 里，现在没有测试登记基线。
 
 export const testDefs = {
+  BlastFeedbackTest: {file:"Script_BlastFeedbackTest.mjs",timeoutMs:300000,desc:"Shared grenade/shell camera response, bounded tinnitus, actual PCM, mute and reset"},
+  FirstLevelWhiteboxVillageTest: {file:"Script_FirstLevelWhiteboxVillageTest.mjs",desc:"06–10 referenced village buildings, kitchen link, real alley entry and sheltered litter detour"},
+  FirstLevelWhiteboxTransferTest: {file:"Script_FirstLevelWhiteboxTransferTest.mjs",desc:"11–14 loading yard, crouched cover, two fire lanes, open cart road and litter escape"},
+  FirstLevelRearSpaceTest: {file:"Script_FirstLevelSpaceTest.mjs",args:["--rear-only"],desc:"06–18 geometry scope with full route, litter, cart, roof, river and bridge checks"},
+  FirstLevelRearTopologyTest: {file:"Script_FirstLevelMissionTopologyTest.mjs",args:["--rear-only"],desc:"06–18 adopted topology and whitebox version, directions, distances and lifecycle"},
   FirstLevelFrontRouteBrowserTest:{file:"Script_FirstLevelFrontRouteBrowserTest.mjs",timeoutMs:1200000,desc:"Continuous 03–06 capture, optional gun, shared breach, supply sortie and collection return"},
   FirstLevelLeaderGuideTest: {file:"Script_FirstLevelLeaderGuideTest.mjs",desc:"Leader rendezvous, route progress, stage cues and story-first reminder scheduling"},
   FirstLevelLeaderGuideBrowserTest: {file:"Script_FirstLevelLeaderGuideBrowserTest.mjs",timeoutMs:600000,desc:"Real leader waiting/resuming, reachable stops, physical gesture and single COD-style marker"},
@@ -64,6 +69,7 @@ export const testDefs = {
   OpeningFirstPersonTest: {file:"Script_OpeningFirstPersonTest.mjs",desc:"Production-arm anatomy, wrist twist and fixed bone lengths across 2000 poses"},
   FirstLevelVoicePerspectiveTest: {file:"Script_FirstLevelVoicePerspectiveTest.mjs",timeoutMs:120000,desc:"Actual WebAudio per-line dialogue: centred self line, spatial NPC lines, overlapping sources, dialogue sidechain, bark yield, concussion speech floor"},
   CarriagePropVelocityTest: {file:'Script_CarriagePropVelocityTest.mjs',timeoutMs:300000,desc:'Real cart/stretcher GPU velocities with moving camera, stop and reappearance; high-quality transfer scene'},
+  DraftCartEditorTest: {file:'Script_DraftCartEditorTest.mjs',timeoutMs:300000,desc:'Blender ox/horse cart action editor, walking legs, rolling wheels and camera restoration'},
   MotionVectorContractTest: {file:'Script_MotionVectorContractTest.mjs',timeoutMs:120000,desc:'GPU admission contract for new rigid/skinned renderers, bone attachments, foreground inheritance and history lifecycle'},
   HitDisorientationTest: {file:"Script_HitDisorientationTest.mjs",timeoutMs:420000,desc:"Shared bullet disorientation: real GPU/audio, decay and lifecycle"},
   IncomingFireBrowserTest: {file:"Script_IncomingFireBrowserTest.mjs",timeoutMs:300000,desc:"Real near-fire/hit HUD, camera bearings, sector merging, expiry and compact screenshots"},
@@ -394,6 +400,7 @@ export const browserTests = new Set([
   "FirstLevelFrontBombFirstTest",
   "MachineGunCaptivesAnimationTest",
   "CarriagePropVelocityTest",
+  "DraftCartEditorTest",
   "MotionVectorContractTest",
   "BrowserBundleTest",
 
@@ -409,7 +416,7 @@ export const browserTests = new Set([
   "DressingProbeTest", "EastSuburbNavTest", "EditorTest", "WorldInfoEditorTest", "PlayerStateEditorTest", "FixedCenterAimTest", "FpsArmTest", "FpsHandContactTest", "FpsGripEditorTest",
   "FrameProfileTest", "GeoTest", "GiTest", "GodRaysPerformanceTest", "GtaoTest", "GunFeelTest",
   "SamplerBudgetTest", "CharacterWoundsTest", "BloodEffectsTest", "BulletDecalPbrTest", "VehicleTracerTest",
-  "HitDisorientationTest", "IncomingFireBrowserTest", "HudPromptBrowserTest", "WeaponPickupTest", "JieheTerrainTest", "JumpTest", "StanceTest", "MeleeQteTest", "MeleeKillBloodTest", "GoreRangeTest", "MenuTest", "DeathMenuTest",
+  "BlastFeedbackTest", "HitDisorientationTest", "IncomingFireBrowserTest", "HudPromptBrowserTest", "WeaponPickupTest", "JieheTerrainTest", "JumpTest", "StanceTest", "MeleeQteTest", "MeleeKillBloodTest", "GoreRangeTest", "MenuTest", "DeathMenuTest",
   "ClusteredLightsTest", "MaterialUpgradeTest",
   "PerformanceTest", "PhysicsTest", "PostTest", "PostFrameGraphTest", "CsmTest", "SsrTest", "AtmosphereTest", "VolumetricsTest", "ExposureTest", "TaauTest", "ProfilerTest", "PropInstancingTest",
   "PropPcgEditorTest",
@@ -488,10 +495,10 @@ export const domains = {
   missionGuide: {label:"Physical mission leader and HUD",tests:["FirstLevelLeaderGuideTest","FirstLevelLeaderGuideBrowserTest","FirstLevelMissionTest","FirstLevelMissionBrowserTest"]},
   characterSpeech: {label:"说话人面部对白",tests:["CharacterSpeechTest","CharacterSpeechBrowserTest"]},
   motionVector: {label:'统一运动矢量接入契约',tests:['MotionVectorContractTest']},
-  propVelocity: {label:'近景刚体道具速度与移动清晰度',tests:['CarriagePropVelocityTest']},
+  propVelocity: {label:'近景刚体道具速度与移动清晰度',tests:['CarriagePropVelocityTest','DraftCartEditorTest']},
   squadMarch: {label:"通用小队行进",tests:["SquadMarchCoverTest","SquadMarchCoverBrowserTest","SquadMarchTest","SquadMarchAiTest","SquadMarchEditorTest","SquadMarchNavigationTest","FirstLevelSquadMarchTest","EditorLauncherTest"]},
   firstLevelTail: {label:"第一关降压段至结尾定向续接",tests:["FirstLevelMissionStageRegroupTest","FirstLevelMissionStageTailTest"]},
-  firstLevel: {label:'新版第一关完整任务',tests:['FirstLevelFrontTopologyTest','FirstLevelEndTest','MachineGunCutsceneAudioTest','Type89DamageTest','FirstLevelTankBrainTest','FirstLevelTankProbeTest','FirstLevelFrontRouteBrowserTest','FirstLevelMissionTopologyTest','FirstLevelMissionTopologyBrowserTest','FirstLevelSpaceTest','MissionReturnTest','FirstLevelMissionReturnBrowserTest','FirstLevelCasualtyBrowserTest','FirstLevelMissionTest','MissionGatesTest','FirstLevelVoiceTest','FirstLevelVoiceAudioTest','FirstLevelFrontPresenceTest','FirstLevelMachineGunTest','FirstLevelZhouExitBrowserTest','FirstLevelMachineGunCutsceneTest','FirstLevelMissionAftermathTest','FirstLevelMissionFortificationsTest','FirstLevelMissionBrowserTest','FirstLevelMissionStageJumpTest','FirstLevelMissionStageContinueTest','FirstLevelMissionPresentationTest','FirstLevelMidTest','FirstLevelFrontTest','FirstLevelFrontPressureTest','FirstLevelFrontPacingTest','FirstLevelEnemyIdleProbe','FirstLevelFrontBattleBrowserTest','FirstLevelFrontBombFirstTest']},
+  firstLevel: {label:'新版第一关完整任务',tests:['FirstLevelWhiteboxVillageTest','FirstLevelWhiteboxTransferTest','FirstLevelRearSpaceTest','FirstLevelRearTopologyTest','FirstLevelFrontTopologyTest','FirstLevelEndTest','MachineGunCutsceneAudioTest','Type89DamageTest','FirstLevelTankBrainTest','FirstLevelTankProbeTest','FirstLevelFrontRouteBrowserTest','FirstLevelMissionTopologyTest','FirstLevelMissionTopologyBrowserTest','FirstLevelSpaceTest','MissionReturnTest','FirstLevelMissionReturnBrowserTest','FirstLevelCasualtyBrowserTest','FirstLevelMissionTest','MissionGatesTest','FirstLevelVoiceTest','FirstLevelVoiceAudioTest','FirstLevelFrontPresenceTest','FirstLevelMachineGunTest','FirstLevelZhouExitBrowserTest','FirstLevelMachineGunCutsceneTest','FirstLevelMissionAftermathTest','FirstLevelMissionFortificationsTest','FirstLevelMissionBrowserTest','FirstLevelMissionStageJumpTest','FirstLevelMissionStageContinueTest','FirstLevelMissionPresentationTest','FirstLevelMidTest','FirstLevelFrontTest','FirstLevelFrontPressureTest','FirstLevelFrontPacingTest','FirstLevelEnemyIdleProbe','FirstLevelFrontBattleBrowserTest','FirstLevelFrontBombFirstTest']},
   text: { label: "玩家文本 / 数值表（数据驱动闸门）", tests: ["TextTest", "TextGatherCheck"] },
   animation: { label: '独立动画资产验收', tests: ['ActorLocomotionTest','BackRifleRunTest','MeleeAnimationTest','DadaoSwingTest','GrenadeThrowTest','InfantryAnimationTest','DeathCollapseTest'] },
   explosives: { label: "爆炸白盒与通用地形形变/返掷", tests: ["ExplosionRulesTest", "ExplosionRangeTest", "CraterSurfaceTest"] },
@@ -505,7 +512,7 @@ export const domains = {
   },
   combat: {
     label: "武器/伤害/枪感/瞄准（共享底座，碰弹道或输入要跑全串）",
-    tests: ["MuzzleFlashTest", "HeadshotTest", "FirearmHandlingTest", "FirearmHandlingBrowserTest", "HitDisorientationTest", "CoverLeanTest", "CoverLeanBrowserTest", "StanceTest", "DamageTest", "GunFeelTest", "FixedCenterAimTest", "ReticleCalibrationTest", "SprintCrosshairTest",
+    tests: ["BlastFeedbackTest", "MuzzleFlashTest", "HeadshotTest", "FirearmHandlingTest", "FirearmHandlingBrowserTest", "HitDisorientationTest", "CoverLeanTest", "CoverLeanBrowserTest", "StanceTest", "DamageTest", "GunFeelTest", "FixedCenterAimTest", "ReticleCalibrationTest", "SprintCrosshairTest",
       "FirstPersonEmbodimentTest", "AdsSightTest", "SprintViewmodelTest", "FpsArmTest", "FpsHandContactTest", "FpsGripEditorTest", "FpsAnimationTest", "SprintMeleeTest", "BayonetTest", "RangeTest", "WeaponRangeTest", "WeaponPickupTest", "MeleeQteTest", "MeleeKillBloodTest", "GoreRangeTest", "MeleeCombatTest", "MeleeAnimationTest",
       "CharacterModelTest", "CharacterHitboxMathTest", "AssetStandardsTest", "ModelFacingTest",
       // 玩家自己的命中几何（AI 打玩家的部位由它判）与通用震屏（爆炸/近失/中弹/落地/扫射/扑沟）：
@@ -554,7 +561,7 @@ export const domains = {
     // 所以也挂在这个域下。
     tests: ["CarryTest", "EmplacementTest", "HudPromptTest", "HudPromptBrowserTest", "WeaponPickupTest", "TelegraphTest", "MissionHooksTest", "MissionSetpiecesTest"],
   },
-  audio: { label: "音效/音乐/环境声", tests: ["FirstLevelVoicePerspectiveTest","FirstLevelMissionMusicTest", "FirstLevelBattleSoundTest", "FirstLevelMissionMusicBrowserTest", "AudioTest", "AudioWiringTest", "MachineGunCutsceneAudioTest"] },
+  audio: { label: "音效/音乐/环境声", tests: ["BlastFeedbackTest","FirstLevelVoicePerspectiveTest","FirstLevelMissionMusicTest", "FirstLevelBattleSoundTest", "FirstLevelMissionMusicBrowserTest", "AudioTest", "AudioWiringTest", "MachineGunCutsceneAudioTest"] },
   // 「声库装没装进去」与「输出端有没有电平」是两件事，后者只有 MachineGunCutsceneAudioTest
   // 在真入口上量：VoiceTest 验的是资产与交付档，量不到 AudioEngine 的装载分叉。
   voice: { label: "语音", tests: ["VoiceTest", "MachineGunCutsceneAudioTest"] },
@@ -591,6 +598,7 @@ export const domains = {
 };
 
 const changedDomainRules = [
+  {domain:"firstLevel",pattern:/FirstLevelWhitebox(Village|Transfer|Rear)/},
   {domain:"menu",pattern:/PlayerDeath/},
   {domain:"combat",pattern:/PlayerDeath/},
   {domain:"openingStoryboards",pattern:/OpeningStoryboards|OpeningStoryboardAnimation|OpeningClips|OpeningStoryboardBake|OpeningStoryboardClips|OpeningProps|OpeningActorPerformance|OpeningFirstPerson|OpeningHandback|FirstLevelCampaignOpening/},
@@ -621,7 +629,7 @@ const changedDomainRules = [
   { domain: "render", pattern: /Script_SkinnedClone|Script_ShadowDepth|Script_ShadowSkip/ },
   // 2026.09.19 第二波：被测对象从军列车厢里的腊肉/背包换成 12/13 牛马车上老周的担架与车上近景件
   // （军列开场已下线）。改牛马车的那两个模块也要拉进这个域。
-  {domain:'propVelocity',pattern:/CarriagePropVelocity|PostPrepass|FirstLevelMissionView|FirstLevelTransferCart|FirstLevelMissionColumn/},
+  {domain:'propVelocity',pattern:/CarriagePropVelocity|PostPrepass|FirstLevelMissionView|FirstLevelTransferCart|FirstLevelMissionColumn|DraftCartModel|Model_(WoodenEvacCart|WorkingOx|WorkingHorse)|OxCartBake/},
   { domain: "render", pattern: /DeathPose|Data_Tuning_ActorDeath/ },
   { domain: "animation", pattern: /DeathCollapse|DeathPose|ActorDeath|MotionDeath/ },
   {domain:"hud",pattern:/IncomingFire/},
@@ -744,6 +752,7 @@ const changedDomainRules = [
 ];
 
 const ignoredChangeRules = [
+  /\/Script_OxCartIterationGate\.mjs$/i, // Local scheduled-session lock; never loaded by the game.
   /\/Animation\/FirstPerson\/Data_FirstPersonSource\.json$/i, // Blender measurements; never loaded by the game.
   /\/docs\//i,
   /\/(?:AGENTS|README)[^/]*\.md$/i,

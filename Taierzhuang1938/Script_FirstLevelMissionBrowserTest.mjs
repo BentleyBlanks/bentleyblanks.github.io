@@ -3,6 +3,7 @@
 //   node Taierzhuang1938/Script_FirstLevelMissionBrowserTest.mjs                基线：开机、初始状态、开场演出
 //   node Taierzhuang1938/Script_FirstLevelMissionBrowserTest.mjs --campaign     整关：真实玩家输入走完 18 个阶段
 //   node …  --campaign --audio                                                  再加逐条录音的真实解码与播放
+//   node …  --campaign --stage-from=6                                           初始化06后连续输入推进到关尾，不逐阶段跳转
 //   node …  --campaign --stage-jumps [--stage-from=8|11|15|18]                  从某个分段起点继续
 //   node …  --campaign --stage-jumps --stage-from=15 --probe-quiet-guidance-interrupt
 //                                                                                专项验证静默取消带路 cue；不算默认连续通关
@@ -124,7 +125,8 @@ try {
       await fs.writeFile(path.join(output, "Data_JumpContinuation.json"),
         JSON.stringify(ctx.jumpReceipts, null, 2));
       console.log(`ok debug starts ${ctx.stageFrom}–18 continued with real player input through their next stage, ending at Complete`);
-    } else console.log("ok entire first level completed with real player input and physical mission events");
+    } else console.log(ctx.stageFrom===1 ? "ok entire first level completed with real player input and physical mission events"
+      : `ok continuous stages ${ctx.stageFrom}–18 completed with real player input and physical mission events`);
     }
   }
 } catch (error) {

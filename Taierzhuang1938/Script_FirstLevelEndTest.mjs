@@ -26,10 +26,10 @@ import { MISSION_DIALOGUE } from "./Data_FirstLevelMissionDialogue.mjs";
 import { MISSION_VOICE_ALIGNMENT } from "./Data_FirstLevelMissionVoiceAlignment.mjs";
 import { FIRST_LEVEL_STAGE_MUSIC, FirstLevelMusicState } from "./Data_FirstLevelMissionMusic.mjs";
 import { END_TUNING as E } from "./Data_Tuning_FirstLevelEnd.mjs";
-import { FirstLevelMissionColumn, MissionRouteProjection } from "./Script_FirstLevelMissionColumn.mjs";
+import { FirstLevelMissionColumn, MissionRouteProjection, MissionGuideRoute } from "./Script_FirstLevelMissionColumn.mjs";
 import { EndExtras, EndDressing, EndProjectOnto, EndRouteLength, EndRoutePoint } from "./Script_FirstLevelEndCast.mjs";
-import { FirstLevelQuietMarch, QUIET_MARCH_PICKETS, QUIET_MARCH_WALL_LENGTH } from "./Script_FirstLevelQuietMarch.mjs";
-import { FirstLevelReception, RECEPTION_CAST, ReceptionBedGuideRoute } from "./Script_FirstLevelReception.mjs";
+import { FirstLevelQuietMarch, QUIET_MARCH_PICKETS, QUIET_MARCH_WALL_LENGTH, WallPathGuideRoute } from "./Script_FirstLevelQuietMarch.mjs";
+import { FirstLevelReception, RECEPTION_CAST, ReceptionBedGuideRoute, ReceptionBedGuideArrivalM, ReceptionWalkRoute, ReceptionWalkSegmentClear, ReceptionDepartureRoute } from "./Script_FirstLevelReception.mjs";
 import { FirstLevelBridge, BRIDGE_NORTH_IDS, BRIDGE_GUNNER_ID, BRIDGE_CAST, REAR_COLUMN_IDS, BRIDGE_CROSSING_LENGTH } from "./Script_FirstLevelBridge.mjs";
 import { FirstLevelNightGate, NightLightSpecs } from "./Script_FirstLevelNightGate.mjs";
 
@@ -68,6 +68,8 @@ function FakeRuntime({ stage = "Regroup" } = {}) {
     audio: { Ambience(name) { r.ambience = name; }, Play() {} },
     vfx: { Explosion(at, options) { r.explosions.push({ ...at, ...options }); } },
     explosions: [],
+    blastFeedback: [],
+    combat: { BlastFeedback(at, radius) { r.blastFeedback.push({ ...at, radius }); } },
     nightLights: { specs: [], Sync(specs) { this.specs = specs; return specs.length; }, get count() { return this.specs.length; } },
     threatIds: new Set(),
     Has: id => facts.has(id),
@@ -172,6 +174,34 @@ const VOICE_FACT = Object.freeze({
 // ---------------------------------------------------------------------------
 // 2. 15A 收拢：警戒兵真站位、老周担架两端真有人、队首真的走起来
 // ---------------------------------------------------------------------------
+{
+  const r = FakeRuntime({ stage: "Regroup" });
+  r.column.Activate();
+  // One surviving litter isolates the rally gate from casualty replacement.
+  for (const entry of [...r.column.litters, ...r.column.walkers]) entry.visible = false;
+  const zhou = r.column.zhou;
+  Object.assign(zhou, A.ditch, { visible: true, state: "waiting" });
+  r.column.StartRetreat();
+  r.quietMarch.Enter("Regroup");
+  const rally = MissionRouteProjection(r.column.route, A.retreatA).progress;
+  const Advance = seconds => {
+    for (let frame = 0; frame < seconds * 30; frame++) {
+      r.time += 1 / 30;
+      r.quietMarch.Update(1 / 30, "Regroup");
+      r.column.Update(1 / 30, { moving: true, routeSafe: true, maxProgress: r.quietMarch.ColumnLimit() });
+    }
+  };
+  Advance(180);
+  Check(zhou.progress <= rally + .01 && Distance(zhou, A.retreatA) < 1,
+    "点名未完成时真实担架停在收拢点，等待多久也不能先跑到接收院");
+  Check(r.Has("litterRemanned") && !r.Has("headcountDone"), "测试确实停在重新抬稳后、点名完成前");
+  r.Finish("Headcount");
+  Advance(20);
+  Check(zhou.progress > rally + E.columnMovingM - .1 && zhou.progress <= rally + E.columnMovingM + .01,
+    "点名完成才允许队首从收拢点真实走出重新起行的一段距离");
+  r.flow.stage.id = "WallPath";
+  Check(r.quietMarch.ColumnLimit() === Infinity, "收拢进度上限不限制后续沿墙路线");
+}
 {
   const r = FakeRuntime({ stage: "Regroup" });
   r.column.Activate();
@@ -414,7 +444,90 @@ const VOICE_FACT = Object.freeze({
   Check(handoverGuide.length>1&&Distance(handoverGuide.at(-1),P.receptionYard.yaowaBedside)<1e-6,
     "16 幺娃沿真实接收路线走到数据化床边位");
   Check(deathGuide.length===1&&Distance(deathGuide[0],P.receptionYard.yaowaBedside)<1e-6,
-    "17 丢弃 16 未走完的中间点，只保留床边终点");
+    "17 未传实际演员位置的独立夹具保留床边终点");
+  Check(ReceptionBedGuideArrivalM(handoverGuide) === 0.7
+      && Distance(P.receptionYard.yaowaBedside, A.zhouDrop) + ReceptionBedGuideArrivalM(deathGuide) < 2.4,
+    "门洞保持原容差，床边最终到点圆的任意方向都在真实护理半径内");
+  const stuckYaowa = { x: -9.340194831690031, z: 235.33990916187614 };
+  const wallGuide = WallPathGuideRoute();
+  Check(!ReceptionWalkSegmentClear(A.retreatA, MISSION_STAGE_ROUTES.wallPath[0]),
+    "15 原先从收拢点直指夹道起点会横穿沟壁，不能跳过退沟三折");
+  Check(wallGuide[0].x === A.retreatA.x && wallGuide[0].z === A.retreatA.z
+      && wallGuide.some(point => point.x === 50 && point.z === 150)
+      && wallGuide.some(point => point.x === 56 && point.z === 165)
+      && wallGuide.some(point => point.x === 56 && point.z === 184),
+    "15 小队从真实收拢点经过完整退沟折角再接夹道");
+  for (let index = 1; index < wallGuide.length; index++)
+    Check(ReceptionWalkSegmentClear(wallGuide[index - 1], wallGuide[index]), `15 收拢到夹道第${index}段胶囊净空`);
+  for (const start of [{ x: 36.35, z: 136.10 }, { x: 37.27, z: 130.89 }, { x: 38, z: 129.09 }, { x: 34.44, z: 137.60 }]) {
+    const queued = MissionGuideRoute(start, [{ ...A.retreatA }], wallGuide);
+    Check(Distance(queued[0], A.retreatA) < 1e-6
+        && queued.every((point, index) => ReceptionWalkSegmentClear(index ? queued[index - 1] : start, point)),
+      `15 稍落后队员(${start.x},${start.z})保留未完成收拢接点再沿退沟折线行进`);
+  }
+  const ditchFailure = [
+    { x: 47.799202087700536, y: -0.9607896501110748, z: 159.1219658026697 },
+    { x: 46.09033997249185, y: -0.95367929753374, z: 159.14012442054738 },
+    { x: 44.68321364160618, y: -1.0235328412254623, z: 158.01783287122163 },
+    { x: 47.03651229099968, y: -0.9566328046235449, z: 159.14026519342218 },
+  ];
+  for (const [actorIndex, start] of ditchFailure.entries()) {
+    const route = ReceptionWalkRoute(start, E.squadAssign.luo[0]);
+    Check(route?.length && route[0].x === 50 && route[0].z === 150
+        && route.some(point => point.x === 56 && point.z === 184)
+        && route.some(point => point.x === 56 && point.z === 207),
+      `16 沟口失败快照演员${actorIndex}先绕挡墙、沿完整撤离折线入院`);
+    for (const [index, point] of route.entries())
+      Check(ReceptionWalkSegmentClear(index ? route[index - 1] : start, point),
+        `16 沟口失败演员${actorIndex}接驳第${index}段有胶囊净空`);
+  }
+  const rescuedGuide = ReceptionBedGuideRoute("Death", stuckYaowa);
+  Check(!ReceptionWalkSegmentClear(stuckYaowa, P.receptionYard.yaowaBedside),
+    "完整06失败快照的幺娃在街房里，直指床边确实穿墙");
+  Check(rescuedGuide.some(point => point.x === -5 && point.z === 240)
+      && rescuedGuide.some(point => point.x === -26 && point.z === 249),
+    "17 屋外演员经街房南门和厢房南门入屋，不删掉门洞路线");
+  for (const [index, point] of rescuedGuide.entries())
+    Check(ReceptionWalkSegmentClear(index ? rescuedGuide[index - 1] : stuckYaowa, point),
+      `17 失败位置恢复路径第${index + 1}段有实际胶囊净空`);
+  Check(ReceptionBedGuideRoute("Death", P.receptionYard.yaowaBedside, handoverGuide).length === 1,
+    "已在床边的幺娃不会被旧路线重新带出门外");
+  const inherited = ReceptionBedGuideRoute("Death", { x: -13, z: 245 }, handoverGuide.slice(1));
+  Check(inherited.some(point => point.x === -26 && point.z === 249),
+    "16 尚未走完的厢房南门路线在17继续有效");
+  for (const [cast, x] of [["luo", -24.9201999772], ["heyoutian", -26.4191409968], ["liuwencai", -25.6701482691]]) {
+    const start = { x, z: 217.29 }, assigned = E.squadAssign[cast];
+    const approach = ReceptionWalkRoute(start, assigned[0]);
+    Check(approach?.some((point, index) => {
+      const before = index ? approach[index - 1] : start;
+      if (before.x < 2 || point.x > 2) return false;
+      const gateZ = before.z + (point.z - before.z) * (2 - before.x) / (point.x - before.x);
+      return gateZ > 238 && gateZ < 242;
+    }), `${cast} 从真实院北卡点绕东侧院门进入`);
+    const route = [...approach, ...assigned.slice(1)];
+    for (const [index, point] of route.entries())
+      Check(ReceptionWalkSegmentClear(index ? route[index - 1] : start, point), `${cast} 入院及分派第${index + 1}段不穿实体墙`);
+  }
+  for (const start of MISSION_STAGE_ROUTES.wallPath) {
+    const route = ReceptionWalkRoute(start, E.squadAssign.luo[0]);
+    Check(route?.length && route.every((point, index) => ReceptionWalkSegmentClear(index ? route[index - 1] : start, point)),
+      `仍滞后在沿墙路(${start.x},${start.z})的队员能接回真实门洞路线`);
+  }
+  Check(ReceptionWalkRoute({ x: -10, z: 229 }, E.squadAssign.luo[0]) === null,
+    "墙内无合法接驳时不伪造一条穿墙直线");
+  const blockedStart = { x: -10, z: 229 };
+  const formationPost = { x: MISSION_STAGE_ROUTES.toBridge.at(-1).x + 1, z: MISSION_STAGE_ROUTES.toBridge.at(-1).z };
+  const blockedDeparture = ReceptionDepartureRoute(blockedStart, formationPost);
+  Check(blockedDeparture.length === 1 && Distance(blockedDeparture[0], blockedStart) < 1e-6,
+    "18 离院接驳失败时即使存在队形终点也只停原位，不追加穿墙捷径");
+  const validDeparture = ReceptionDepartureRoute(P.receptionYard.yaowaBedside, formationPost);
+  Check(validDeparture.length > 1 && Distance(validDeparture.at(-1), formationPost) < 1e-6,
+    "18 成功接驳才保留各人的桥头队形终点");
+  for (const start of [P.receptionYard.yaowaBedside, ...Object.values(E.squadAssign).map(route => route.at(-1))]) {
+    const route = ReceptionDepartureRoute(start), exit = route.findIndex(point => Distance(point, MISSION_STAGE_ROUTES.toBridge[0]) < 1e-6);
+    Check(exit >= 0 && route.slice(0, exit + 1).every((point, index) => ReceptionWalkSegmentClear(index ? route[index - 1] : start, point)),
+      `18 队员从自身院内或床边位置(${start.x},${start.z})沿真实门洞离院`);
+  }
   // 台词侧：「脚……慢点」之后老周再没有任何一句。
   const order = MISSION_DIALOGUE.map(cue => cue.id);
   const thresholdAt = order.indexOf("Threshold");
@@ -430,7 +543,10 @@ const VOICE_FACT = Object.freeze({
   const zhou = r.column.zhou;
   Object.assign(zhou, { x: A.zhouDrop.x, z: A.zhouDrop.z, state: "carried" });
   r.carry.KindId = "stretcher";
+  for (const castId of Object.keys(E.squadAssign))
+    Object.assign(r.companion.Handle(castId).position, { x: -25, z: 217.29 });
   r.reception.Enter("Handover");
+  Check(!r.reception.SquadInReception(), "院北实际站位尚未入院，不能因玩家已到床边而假算三人到场");
   r.extras.Spawn("WardSurgeon", P.receptionYard.surgeon, { weapon: null, unarmed: true });
   // 即使先走到放置点旁边，没过门槛、老周最后一句没播完，军医也不能抢先喊。
   r.player.position.x = A.zhouDrop.x; r.player.position.z = A.zhouDrop.z;
@@ -472,7 +588,47 @@ const VOICE_FACT = Object.freeze({
   const beforeWalk = { ...wencai.position };
   r.Step(10, "Handover");
   Check(Distance(wencai.position, beforeWalk) > 3, "被派出去的人真的走开了");
+  r.Step(30, "Handover");
+  Check([...r.reception.walks.values()].every(walk => walk.route.length === 0), "分派走位完成后仍有三个空路线句柄，需要明确交还控制权");
+  r.reception.EndBedsideCare();
+  Check(Object.keys(E.squadAssign).every(castId => !r.reception.HasWalk(r.companion.Handle(castId).id)),
+    "18 离院交接释放全部三个已完成分派句柄，不只是释放幺娃");
   console.log("ok 16 门槛一歪、军医先指位置、分派之后人真的动");
+}
+
+{
+  const r = FakeRuntime({ stage: "Handover" });
+  for (const actor of r.squad) {
+    Object.assign(actor.position, { x: -25, z: 217.29 });
+    actor.stance = 1;
+  }
+  for (const litter of r.column.litters) if (!litter.zhou) litter.receiveProgress = 0.5;
+  r.facts.add("medicExamining");
+  r.reception.Enter("Handover");
+  r.Step(1, "Handover");
+  Check(Object.keys(E.squadAssign).every(castId => r.companion.Handle(castId).stance === 0),
+    "接收走位明确恢复站立行走，不把退沟时蹲姿一直带到沿墙低坎");
+  Check(!r.said.includes("SquadAssign"), "班里人尚在院外，即使军医与伤员都已就位也不能隔墙分派");
+  r.Step(100, "Handover");
+  Check(r.reception.SquadInReception() && r.said.includes("SquadAssign"),
+    "三人从院北沿真实接驳路走入院内起点之后才开始分派对白");
+  const wencai = r.companion.Handle("liuwencai"), target = E.squadAssign.liuwencai[0];
+  Object.assign(r.companion.Handle("luo").position, { x: -24.877, z: 245.996 });
+  Object.assign(r.companion.Handle("heyoutian").position, { x: -26.423, z: 246.705 });
+  Object.assign(wencai.position, { x: -26.474, z: 245.759 });
+  Check(r.reception.SquadInReception(), "真实消费最后路点后，失败快照里的院内胶囊互挤不撤销到场");
+  Object.assign(wencai.position, { x: MISSION_RECEPTION_SPACE.bounds.minX - 1, z: target.z });
+  Check(!r.reception.SquadInReception(), "已到场者仍须留在接收院内，走出院外不算在场");
+  Object.assign(wencai.position, target);
+  const walk = r.reception.walks.get(wencai.id);
+  walk.arrived = false; walk.route = [];
+  r.Step(0.1, "Handover");
+  Check(!walk.arrived && !r.reception.SquadInReception(), "初始空路线不能置arrived，即使演员恰在目标旁也没有伪造行进完成");
+  Object.assign(wencai.position, { x: -10, z: 229 });
+  r.reception.Enter("Handover");
+  r.Step(0.1, "Handover");
+  Check(r.reception.walks.get(wencai.id).route.length === 0 && !r.reception.walks.get(wencai.id).arrived,
+    "无可走接驳返回null时初始空路线保持未到场");
 }
 
 // ---------------------------------------------------------------------------
@@ -508,7 +664,18 @@ const VOICE_FACT = Object.freeze({
   Check(!r.Has("deathSceneComplete"), "对白还没放完，17 不许算走完");
   // 受控演出放完只是「确认了」。
   r.reception.OnDeathSceneEnd();
+  const bedside = P.receptionYard.yaowaBedside;
+  const awayX = (bedside.x - zhou.x) / Distance(bedside, zhou);
+  const awayZ = (bedside.z - zhou.z) / Distance(bedside, zhou);
+  Object.assign(yaowa.position, { x: bedside.x + awayX * 0.69, z: bedside.z + awayZ * 0.69 });
   r.Step(1, "Death");
+  Check(r.reception.death.coverS === 0 && !r.Has("deathSceneComplete"),
+    "旧通用到点容差远侧确实够不到覆盖物，不能假算护理或跳过死亡门禁");
+  const arrivalM = ReceptionBedGuideArrivalM(ReceptionBedGuideRoute("Death"));
+  Object.assign(yaowa.position, { x: bedside.x + awayX * arrivalM, z: bedside.z + awayZ * arrivalM });
+  r.Step(1, "Death");
+  Check(r.reception.death.coverS > 0 && yaowa.missionReach === 1,
+    "新床边到点容差最远侧也能实际整理覆盖物");
   Check(!r.Has("deathSceneComplete"), "确认完成之后接收处还要真的继续工作");
   r.Step(30, "Death");
   Check(r.said.includes("NextLitter"), "门外又抬来一副担架");
@@ -522,6 +689,8 @@ const VOICE_FACT = Object.freeze({
   r.reception.EndBedsideCare();
   Check(yaowa.missionHideWeapon === false && yaowa.missionReach === 0 && !yaowa.scriptedNoncombatant,
     "18 接令前还回幺娃的步枪与正常战斗状态");
+  Check(r.squad.every(actor => !r.reception.HasWalk(actor.id)),
+    "18 接令同时释放三人分派走位占用，空路线也不能继续截断桥头行军");
   // 老周死亡不判全关失败。
   Check(!MISSION_STAGES.some(stage => stage.requirements.includes("zhouSurvived")), "过关条件里没有「老周活着」");
   Check(MISSION_FACT_GATES.deathSceneComplete.text.includes("不判全关失败"), "编排表里写明老周死亡不判失败");
@@ -628,6 +797,8 @@ function BridgeRuntime() {
   r.Step(40, "BridgeWithdraw");
   Check(r.Has("bridgeDestroyed"), "人真的走净了才炸");
   Check(r.explosions.length === 1, "只炸一次");
+  Check(r.blastFeedback.length === 1 && r.blastFeedback[0].radius === R.bridgeBlastRadiusM,
+    "桥梁爆破只调用一次共用感知入口，不另行播放重复爆炸音");
   Check(r.said.includes("MarchToTengxian"), "炸完军官只喊「往滕县！跟上前队！」");
   const occupant = r.bridge.BlastZoneOccupant();
   Check(occupant === null, "点火那一刻爆破区里一个己方都没有");

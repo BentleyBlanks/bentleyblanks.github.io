@@ -30,6 +30,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
+import { MISSION_ENCOUNTERS } from "./Data_FirstLevelMission.mjs";
 
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(projectDir, "..");
@@ -623,7 +624,7 @@ try {
     `阶段3 ${p3?.enemy} px vs 阶段12 ${p12?.enemy} px`);
 
   // -------------------------------------------------------------------------
-  // 3) PickAt：点得中 VillageGunner (43, 8)
+  // 3) PickAt：点得中当前编排的 VillageGunner
   // -------------------------------------------------------------------------
   const pick = await page.evaluate(() => {
     const map = window.__map;
@@ -634,11 +635,12 @@ try {
         if (member.id === "VillageGunner") truth = { x: member.x, z: member.z, encounter: encounter.id };
       }
     }
+    window.__GunnerPoint = { x: truth.x, z: truth.z };
     const hits = [];
     for (const phase of model.phases) {
       map.SetPhase(phase.number);
-      map.ZoomTo({ x: 43, z: 8 }, 40);
-      const screen = map.WorldToScreen(43, 8);
+      map.ZoomTo(truth, 40);
+      const screen = map.WorldToScreen(truth.x, truth.z);
       const sel = map.PickAt(screen.x, screen.y);
       if (sel && sel.id === "VillageGunner") hits.push({ phase: phase.number, sel, screen });
       // 空地上点一下必须什么也点不到 —— 否则 PickAt 就是个「永远返回最近的东西」
@@ -647,8 +649,9 @@ try {
     }
     return { truth, hits: hits.slice(0, 4), count: hits.length, leaky: hits.some((h) => h.leaky) };
   });
-  Check("模型里 VillageGunner 就在 (43, 8)",
-    !!pick.truth && pick.truth.x === 43 && pick.truth.z === 8,
+  const authoredGunner=MISSION_ENCOUNTERS.village.find(member=>member.id==="VillageGunner");
+  Check("模型里 VillageGunner 与当前关卡编排坐标一致",
+    !!pick.truth && pick.truth.x === authoredGunner.x && pick.truth.z === authoredGunner.z,
     pick.truth ? `${pick.truth.encounter} 组 @ (${pick.truth.x}, ${pick.truth.z})` : "没找到这个人");
   Check("PickAt 点得中 VillageGunner", pick.count > 0 && pick.hits[0]?.sel?.kind === "member",
     `${pick.count} 个阶段命中；首个 = 阶段 ${pick.hits[0]?.phase}，encounterId=${pick.hits[0]?.sel?.encounterId}`);
@@ -746,22 +749,55 @@ try {
   // -------------------------------------------------------------------------
   // 4) ToPng：PNG dataURL 且 > 10 KB
   // -------------------------------------------------------------------------
-  const png = await page.evaluate(() => {
+  const png = await page.evaluate(async () => {
     const map = window.__map;
     map.SetPhase(12);
     map.FitBounds();
     const full = map.ToPng({ scale: 1 });
     const region = map.ToPng({ scale: 1, region: { minX: 20, maxX: 120, minZ: -20, maxZ: 60 } });
-    return { full, region, fullLen: full.length, regionLen: region.length };
+    const exportFull = map.ToFullPng();
+    const size = await new Promise((resolve) => {
+      const image = new Image();
+      image.onload = () => resolve({ width: image.naturalWidth, height: image.naturalHeight });
+      image.onerror = () => resolve({ width: 0, height: 0 });
+      image.src = exportFull;
+    });
+    const bounds = map.model.bounds;
+    const expected = {
+      width: Math.round((bounds.maxX - bounds.minX) * 2) + 48,
+      height: Math.round((bounds.maxZ - bounds.minZ) * 2) + 48,
+    };
+    // 整图导出不许跟编辑器镜头走；但图层和当前草图必须实时进合成图。
+    map.ZoomTo({ x: 80, z: 40 }, 20);
+    const sameAfterViewChange = exportFull === map.ToFullPng();
+    map.SetLayers({ routes: false });
+    const changedAfterLayerToggle = exportFull !== map.ToFullPng();
+    map.SetLayers({ routes: true });
+    map.SetSketch([{ type: "circle", x: 80, z: 40, r: 12 }]);
+    const changedAfterMarker = exportFull !== map.ToFullPng();
+    map.SetSketch([]);
+    return {
+      full, region, exportFull, size, expected, sameAfterViewChange, changedAfterLayerToggle, changedAfterMarker,
+      fullLen: full.length, regionLen: region.length, exportLen: exportFull.length,
+    };
   });
   SavePng("topng_full.png", png.full);
   SavePng("topng_region.png", png.region);
+  SavePng("topng_export_full_bounds.png", png.exportFull);
   Check("ToPng 返回 PNG dataURL 且 > 10 KB",
     png.full.startsWith("data:image/png") && png.fullLen > 10 * 1024,
     `${(png.fullLen / 1024).toFixed(0)} KB（dataURL 长度）`);
   Check("ToPng 带 region 也出图",
     png.region.startsWith("data:image/png") && png.regionLen > 10 * 1024 && png.regionLen !== png.fullLen,
     `${(png.regionLen / 1024).toFixed(0)} KB`);
+  Check("ToFullPng 按完整底图 bounds 出图，不受编辑器缩放和平移影响",
+    png.exportFull.startsWith("data:image/png") && png.exportLen > 10 * 1024
+    && png.size.width === png.expected.width && png.size.height === png.expected.height
+    && png.sameAfterViewChange,
+    `${png.size.width}×${png.size.height}（预期 ${png.expected.width}×${png.expected.height}）`);
+  Check("ToFullPng 逐次读取当前勾选图层与标记",
+    png.changedAfterLayerToggle && png.changedAfterMarker,
+    `图层变化=${png.changedAfterLayerToggle}，标记变化=${png.changedAfterMarker}`);
 
   // -------------------------------------------------------------------------
   // 5) 工具：circle 拖出圆 → onSketch；move 拖成员 → onMove（且不改模型）
@@ -811,12 +847,12 @@ try {
     let phase = null;
     for (const p of model.phases) {
       map.SetPhase(p.number);
-      map.ZoomTo({ x: 43, z: 8 }, 40);
-      const screen = map.WorldToScreen(43, 8);
+      map.ZoomTo(before, 40);
+      const screen = map.WorldToScreen(before.x, before.z);
       if (map.PickAt(screen.x, screen.y)?.id === "VillageGunner") { phase = p.number; break; }
     }
     map.SetTool("select");
-    const screen = map.WorldToScreen(43, 8);
+    const screen = map.WorldToScreen(before.x, before.z);
     window.__Mouse("mousedown", screen.x, screen.y);
     window.__Mouse("mouseup", screen.x, screen.y);
     const selected = map.selection;
@@ -847,14 +883,14 @@ try {
     map.SetTool("select");
     map.SetSelection(null);
     map.SetHover(null);
-    map.ZoomTo({ x: 43, z: 8 }, 40);
+    map.ZoomTo(window.__GunnerPoint, 40);
     const base = window.__Count([]).sum;
-    const screen = map.WorldToScreen(43, 8);
+    const screen = map.WorldToScreen(window.__GunnerPoint.x, window.__GunnerPoint.z);
     const before = window.__events.hover.length;
     window.__Mouse("mousemove", screen.x, screen.y);
     const hovered = window.__Count([]).sum;
     const sel = map.hover;
-    map.SetSelection({ kind: "member", id: "VillageGunner", x: 43, z: 8 });
+    map.SetSelection({ kind: "member", id: "VillageGunner", ...window.__GunnerPoint });
     const selected = window.__Count(["select"]);
     return {
       sel, added: window.__events.hover.length - before,
@@ -1089,8 +1125,8 @@ try {
       ? ["members", "routes", "zones", "friendlies", "anchors", "notes"].every((k) => map.filter[k] === null)
       : false;
     // 被过滤掉的人也不该再点得中。
-    map.ZoomTo({ x: 43, z: 8 }, 40);
-    const gunner = map.WorldToScreen(43, 8);
+    map.ZoomTo(window.__GunnerPoint, 40);
+    const gunner = map.WorldToScreen(window.__GunnerPoint.x, window.__GunnerPoint.z);
     const pickFiltered = map.PickAt(gunner.x, gunner.y);
     map.SetFilter(null);
     const pickBack = map.PickAt(gunner.x, gunner.y);
@@ -1309,13 +1345,13 @@ try {
     map.SetHover(null);
     map.SetPhase(12);
     map.SetClusterGap(0);                 // 逐个人画，免得点到的是一撮人
-    map.ZoomTo({ x: 43, z: 8 }, 60);      // VillageGunner 就在 (43, 8)
+    map.ZoomTo(window.__GunnerPoint, 60);      // 当前编排中的 VillageGunner
     const shapes = [
       { type: "circle", x: 0, z: 0, r: 12 },
       { type: "arrow", from: { x: 20, z: -30 }, to: { x: 60, z: -30 } },
       { type: "path", points: [{ x: -20, z: 40 }, { x: 0, z: 50 }, { x: 20, z: 40 }] },
       { type: "label", x: 60, z: 20, text: "这里太早" },
-      { type: "ghost", x: 43, z: 8, memberId: "TransferGunner" },       // 正压在一个人身上
+      { type: "ghost", ...window.__GunnerPoint, memberId: "TransferGunner" },       // 正压在一个人身上
       { type: "ghost", x: 95, z: -34, memberId: "TransferGunner" },     // 空地上的那一枚
     ];
     const emptySpot = map.WorldToScreen(95, -34);
@@ -1327,7 +1363,7 @@ try {
     const arrowA = S(20, -30), arrowB = S(60, -30);
     const pathMid = S(-10, 45);
     const label = S(60, 20);
-    const onMan = S(43, 8);
+    const onMan = S(window.__GunnerPoint.x, window.__GunnerPoint.z);
     const picks = {
       circleCentre: map.PickAt(centre.x, centre.y),
       circleRim: map.PickAt(rim.x, rim.y),
@@ -1391,7 +1427,7 @@ try {
     const map = window.__map;
     const events = window.__events;
     map.SetPhase(12);
-    map.ZoomTo({ x: 43, z: 8 }, 60);
+    map.ZoomTo(window.__GunnerPoint, 60);
     map.SetSketch([{ type: "ghost", x: 95, z: -34, memberId: "TransferGunner" }]);
     map.SetTool("move");
     const from = map.WorldToScreen(95, -34);
@@ -1425,8 +1461,8 @@ try {
     map.SetLive(null);
     map.SetClusterGap(0);
     map.SetPhase(12);
-    map.ZoomTo({ x: 43, z: 8 }, 40);
-    const on = map.WorldToScreen(43, 8);
+    map.ZoomTo(window.__GunnerPoint, 40);
+    const on = map.WorldToScreen(window.__GunnerPoint.x, window.__GunnerPoint.z);
     const empty = { x: on.x + 260, y: on.y + 240 };
     const out = {};
     const Counts = () => ({ mention: events.mention.length, select: events.select.length });

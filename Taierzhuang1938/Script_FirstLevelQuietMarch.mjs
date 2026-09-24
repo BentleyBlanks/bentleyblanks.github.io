@@ -12,8 +12,8 @@
 // 零 three：本模块可以在 node 里直接 import（Script_FirstLevelEndTest 就这么测）。
 // ===========================================================================
 import { END_TUNING as E } from "./Data_Tuning_FirstLevelEnd.mjs";
-import { MISSION_PLACEMENT as P, MISSION_ROUTES } from "./Data_FirstLevelMissionLayout.mjs";
-import { MISSION_STAGE_ROUTES } from "./Data_FirstLevelMissionTopology.mjs";
+import { MISSION_ANCHORS as A, MISSION_PLACEMENT as P, MISSION_ROUTES } from "./Data_FirstLevelMissionLayout.mjs";
+import { MISSION_STAGE_ROUTES, MISSION_REAR_ROUTES } from "./Data_FirstLevelMissionTopology.mjs";
 import { MISSION_ENCOUNTERS } from "./Data_FirstLevelMission.mjs";
 import { EndFacing, EndProjectOnto, EndRouteLength, EndRoutePoint } from "./Script_FirstLevelEndCast.mjs";
 
@@ -23,6 +23,11 @@ const PICKET_IDS = Object.freeze(["PicketLeft", "PicketCentre", "PicketRight"]);
 const PURSUIT_IDS = Object.freeze(MISSION_ENCOUNTERS.air.map(spec => spec.id));
 const WALL_PATH = MISSION_STAGE_ROUTES.wallPath;
 const WALL_PATH_LENGTH = EndRouteLength(WALL_PATH);
+/** 从沟内收拢点走完退沟折角后再接夹道；叙事夹道进度仍只读 WALL_PATH。 */
+export function WallPathGuideRoute() {
+  return [...MISSION_REAR_ROUTES.evacuation.slice(2, 6), ...MISSION_STAGE_ROUTES.wallPath]
+    .map(point => ({ ...point }));
+}
 /** 15B 掉队伤员：读 MISSION_PLACEMENT.wallPath.stragglers，投影回夹道中线再用。 */
 const STRAGGLERS = Object.freeze(P.wallPath.stragglers.map((point, index) => {
   const on = EndProjectOnto(WALL_PATH, point);
@@ -65,6 +70,14 @@ export class FirstLevelQuietMarch {
   // -------------------------------------------------------------------------
   // 15A 沟口收拢
   // -------------------------------------------------------------------------
+  /** Hold the actual column at the rally until it has regrouped; allow only the witnessed restart. */
+  ColumnLimit() {
+    const r = this.runtime;
+    if (r.flow.stage.id !== "Regroup") return Infinity;
+    const rally = EndProjectOnto(r.column.route, A.retreatA).progress;
+    return rally + (r.Has("headcountDone") && r.Has("litterRemanned") ? E.columnMovingM : 0);
+  }
+
   UpdateRegroup(dt) {
     const r = this.runtime, state = this.regroup;
     if (!state) return;
