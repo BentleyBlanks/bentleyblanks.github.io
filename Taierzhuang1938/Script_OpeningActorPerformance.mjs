@@ -211,6 +211,11 @@ export class OpeningActorPerformance {
         this.Turn(bones.upperArmR,this.up,.10*this.speech*Math.sin(lineAge*2.2));
         this.Turn(bones.forearmR,this.right,.12*emphasis);
         this.Turn(chest,this.right,-.065*this.speech-.02*emphasis);
+      }else if(captive&&interrogating&&talking){
+        // The kneeling comrade pleads with his free left hand while he answers (「我不晓得……」), on top of the kneel.
+        this.Turn(bones.upperArmL,this.right,-.42*this.speech+.2*emphasis);
+        this.Turn(bones.forearmL,this.right,-.25*this.speech);
+        this.Turn(chest,this.right,-.04*this.speech);
       }else if(context.role==="ijaA"&&pose?.clip==="InterrogateCrouch"){
         this.Turn(bones.upperArmR,this.right,-.32*(1-this.speech)+.24*emphasis);
         this.Turn(chest,this.right,-.055*emphasis);

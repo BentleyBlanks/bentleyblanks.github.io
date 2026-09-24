@@ -136,7 +136,10 @@ export function InstallOpeningStoryboardAnimation(soldier){
     if(off<1e-6)return;
     rerootLocal.compose(blendFrom[rootBone].p,blendFrom[rootBone].q,bone.scale).premultiply(reroot).decompose(blendFrom[rootBone].p,blendFrom[rootBone].q,rerootScale);
   };
-  const RememberDisplayedParent=()=>{if(rootBone>=0){displayedParent.copy(bones[rootBone].parent.matrixWorld);displayedParentValid=true;}};
+  // A root the AI has taken out of the scene (culled) is not refreshed by the scene's matrix update: bring the
+  // parent chain up to date here, or the remembered matrix is from the last frame he was shown and a re-root
+  // against it slides him back to where he was last seen (09-24: ijaB 1.4 m, Liu 6.8 m).
+  const RememberDisplayedParent=()=>{if(rootBone>=0){bones[rootBone].parent.updateWorldMatrix(true,false);displayedParent.copy(bones[rootBone].parent.matrixWorld);displayedParentValid=true;}};
   // The top bone (GroundRoot) carries no track in the opening clips: the director's KeepSkeleton writes
   // the displayed pelvis into it for one frame at a re-root, and it must go back to rest before the next
   // sample, or that offset stays for good (09-24 review: ijaA's head sank 10 m below ground over 02).
@@ -146,6 +149,11 @@ export function InstallOpeningStoryboardAnimation(soldier){
     const acting=rig.openingActorPerformance ||= new OpeningActorPerformance(soldier);
     acting.Restore();
     performer?.Restore();
+    // Not shown last frame (the AI culled him and skipped this layer): what was remembered as displayed is from
+    // the last frame he was on screen, somewhere else; blend from the pose, never re-root against that place
+    // (09-24: ijaB slid 1.4 m, Liu 6.8 m from where they were last seen when the camera turned to them).
+    const freshShow=!!soldier.openingNotShown;
+    if(freshShow){soldier.openingNotShown=false;displayedParentValid=false;displayed=null;}
     if(rootRest){bones[rootBone].position.copy(rootRest.p);bones[rootBone].quaternion.copy(rootRest.q);}
     clock+=dt;
     const record=library?.models.get(rig.clipModelId||rig.modelId);
@@ -201,6 +209,9 @@ export function InstallOpeningStoryboardAnimation(soldier){
       blendAt=clock;if(key!==lastKey)travelClock=0;lastKey=key;
       if(noBlend){blendFrom=null;displayed=null;}
     }
+    // First frame back on screen: nobody saw the pose he had, so show the current one outright (a blend from
+    // the pose he had when culled moved the pelvis 0.15 m in a frame, 09-24 run).
+    if(freshShow){blendFrom=null;lastKey=key;}
     const locomotion=Snapshot(baseBuffer);
     if(pose&&record&&pose.clip!=="DadaoAmbush"){
     performer ||= new CutscenePerformer(actor,record,library.config);

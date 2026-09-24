@@ -46,6 +46,8 @@ export const OPENING_STORYBOARDS = Object.freeze({
   // Move speeds of the director's walks along trench polylines (m/s).
   speed:Object.freeze({ walk:1.5, brisk:2.3, creep:1.15, run:3.2, drag:1.25, flee:3.4, stroll:1.1 }),
   arriveM:.12,
+  culledHeadM:1.4,     // head height used for an actor the AI has culled (its bones are not updated)
+  shotRiseM:1.4,       // a squad rifleman's scripted shot leaves at least this high over his feet (he rises to fire)
   // Hard timeouts (s since the phase began, or since the named wait began). A timeout never
   // skips a physical beat that the flow needs: it forces the beat (a late walker runs, a
   // missed shot is fired again by another man, a contact that did not kill is made lethal).

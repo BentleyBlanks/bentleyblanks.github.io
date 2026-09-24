@@ -390,7 +390,11 @@ export class OpeningFirstPerson{
         // Using the player's side sign here folds both elbows through the torso.
         const otherPole=otherShoulder.clone().add(Direction(otherSide==="l"?.4:-.4,-.45,.18));
         let previous=this.previousFramePartners[side];
-        if(previous?.rig!==otherRig||previous?.phase!==p)previous=this.partnerEntryFrom[side] ||= {
+        // A grasp carried over a phase change (Drag -> Snag -> KickBeam, same hand on the same collar) goes on
+        // from the palm frame shown last frame; only a new grasp starts from the partner's own clip hand
+        // (restarting from the clip at KickBeam turned ijaA's palm 132 deg in one frame, 09-24 run).
+        const carried=previous?.rig===otherRig&&previous?.mode==="grasp";
+        if(!carried&&(previous?.rig!==otherRig||previous?.phase!==p))previous=this.partnerEntryFrom[side] ||= {
           rig:otherRig,phase:p,shoulder:otherShoulder.clone(),elbow:Pos(otherRig.bones[otherSide].forearm),palm:Palm(otherRig,otherSide),
           frame:otherRig.bones[otherSide].hand.getWorldQuaternion(Q()).multiply(otherRig.anatomy[otherSide].frame.quaternion)};
         const reaching=transitionAge<.35,stepScale=Math.min(3,Math.max(.1,dt*60));
@@ -400,11 +404,12 @@ export class OpeningFirstPerson{
         }
         let partner=Solve(otherRig,otherSide,otherShoulder,otherTarget,player.forward.clone().negate(),player.dorsal.clone().negate(),otherPole,true);
         let partnerFrame=FrameQuaternion(partner.forward,partner.dorsal);
-        // A not-yet-reachable grasp has no fixed palm plane. Follow the previous
-        // presented hand frame through that interval instead of switching wrist
-        // limit branches as soon as the desired plane becomes feasible.
-        if(reaching&&previous.frame.angleTo(partnerFrame)>10/Degrees*stepScale){
-          const limited=previous.frame.clone().rotateTowards(partnerFrame,10/Degrees*stepScale);
+        // A not-yet-reachable grasp has no fixed palm plane, and a held grasp can switch wrist-limit
+        // branches when the partner's own clip swings his arm (ijaA's kick in KickBeam turned the palm
+        // 132 deg in one frame, 09-24 run): the partner's palm turns at most HAND_TURN_DEG a frame, as
+        // the player's does.
+        if(previous.frame.angleTo(partnerFrame)>HAND_TURN_DEG/Degrees*stepScale){
+          const limited=previous.frame.clone().rotateTowards(partnerFrame,HAND_TURN_DEG/Degrees*stepScale);
           partner=Solve(otherRig,otherSide,otherShoulder,otherTarget,V(0,0,1).applyQuaternion(limited),V(0,1,0).applyQuaternion(limited),otherPole,true,true);
           partnerFrame=FrameQuaternion(partner.forward,partner.dorsal);
         }

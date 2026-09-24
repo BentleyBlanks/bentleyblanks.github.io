@@ -441,7 +441,13 @@ export class FirstLevelBunkerShow {
     const out={};for(const role of ["luo","yaowa","heyoutian","liuwencai","comrade","runner","shouter","interpreter","ijaA","ijaB","ijaC","ijaD","guard"])out[role]=who(role);
     return out;
   }
-  HeadPoint(actor){return (actor?.actor?.characterRig?.bones.head||actor?.actor?.head)?.getWorldPosition(new THREE.Vector3())||null;}
+  HeadPoint(actor){
+    if(!actor)return null;
+    // Culled by the AI (renderLod not "detail"): the anim layer is skipped and the head bone is wherever he was
+    // last shown (09-24: He's backup shot at the junction was traced from a stale head and hit the spoil).
+    if(actor.renderLod&&actor.renderLod!=="detail"&&actor.position)return this.r.Point(actor.position,C.culledHeadM);
+    return (actor.actor?.characterRig?.bones.head||actor.actor?.head)?.getWorldPosition(new THREE.Vector3())||null;
+  }
   /** Estimated start of a line inside its scene (manifest durations and gaps; direction offsets). */
   LineStart(sceneId,lineId){
     const lines=this.r.voice?.manifest?.lines||{};let t=0;
@@ -503,6 +509,22 @@ export class FirstLevelBunkerShow {
     }
     this.UpdatePursuit();
     this.UpdatePerformances();
+    // Outside the director's shots the AI's own cull is the frame's last word.
+    if(!this.CameraActive)this.MarkNotShown();
+  }
+  /**
+   * After this frame's final cull. The AI animates only actors whose root is visible, and culling takes it out
+   * of the scene: an actor the director is posing keeps animating off screen (root visible but detached, so
+   * nothing is drawn -- the carriage passengers' rule in Script_Ai), so the frame he comes into shot shows his
+   * current pose, not the one he had when he left it. Anyone else the cull left out is flagged for the anim
+   * layer (openingNotShown: no blend from, no re-root against, the last place he was seen).
+   */
+  MarkNotShown(){
+    for(const actor of [...Object.values(this.cast),...this.r.squad,...this.r.enemies.values()]){
+      if(!actor?.renderLod||actor.renderLod==="detail")continue;
+      const posed=actor.alive&&!actor.openingStoryboardHidden&&(actor.openingStoryboardPose||actor.openingStoryboardTravel!=null);
+      if(posed)actor.actor.root.visible=true;else actor.openingNotShown=true;
+    }
   }
   // -- 01 -------------------------------------------------------------------------------------
   Tableau(){
@@ -1197,7 +1219,7 @@ export class FirstLevelBunkerShow {
     const Try=(shooter,id,at)=>{
       if(this.flags["shot:"+id]||t<at||!shooter)return;
       this.flags["shot:"+id]=r.time;
-      const force=t>=C.timeouts.longShotForceS,clear=!r.BlocksSight(this.HeadPoint(shooter)||r.Point(shooter.position,1.3),r.Point(ijaD.position,1.2));
+      const force=t>=C.timeouts.longShotForceS,clear=!r.BlocksSight(this.ShotOrigin(shooter),this.AimPoint(ijaD));
       const hit=this.ShootAt(shooter,ijaD,force);
       // A hit only the timeout made (no line to him: he hid) is credited to the timeout, not the shooter.
       if(hit)this.flags.junctionBy=clear||!force?id:"forced";
@@ -1210,10 +1232,21 @@ export class FirstLevelBunkerShow {
     if(t>=C.timeouts.longShotForceS+.5&&ijaD.alive){this.Kill(ijaD,"bullet");this.flags.junctionBy??="forced";}
   }
   /** A visible, audible aimed rifle shot from `shooter` at `target`; hits when the line is clear. */
+  /** Where a squad rifleman's shot leaves from: his head, risen at least C.shotRiseM over his feet (a man
+   *  crouched behind the spoil comes up to fire over it; 09-24: He's backup was traced from a crouched head). */
+  ShotOrigin(shooter){
+    const r=this.r,head=this.HeadPoint(shooter)||r.Point(shooter.position,C.culledHeadM),floor=r.Point(shooter.position,C.shotRiseM);
+    if(head.y<floor.y)head.y=floor.y;
+    return head;
+  }
+  /** Chest of the target when he is on screen (bones current), else his body at chest height. */
+  AimPoint(target){
+    const shown=!target.renderLod||target.renderLod==="detail";
+    return shown&&(target.actor?.characterRig?.bones.chest||target.actor?.chest)?.getWorldPosition(new THREE.Vector3())||this.r.Point(target.position,1.2);
+  }
   ShootAt(shooter,target,force=false){
     const r=this.r;
-    const from=this.HeadPoint(shooter)||r.Point(shooter.position,1.3);
-    const aim=(target.actor?.characterRig?.bones.chest||target.actor?.chest)?.getWorldPosition(new THREE.Vector3())||r.Point(target.position,1.2);
+    const from=this.ShotOrigin(shooter),aim=this.AimPoint(target);
     const clear=!r.BlocksSight(from,aim);
     const dir=aim.clone().sub(from).normalize();
     r.vfx?.MuzzleFlash(from.clone().addScaledVector(dir,.8),dir,{kind:"boltRifle"});r.vfx?.Tracer(from,aim,{kind:"nra"});
@@ -1726,6 +1759,12 @@ export class FirstLevelBunkerShow {
     }
     cam.updateMatrixWorld(true);
     this.presentedCamera={position:cam.position.clone(),quaternion:cam.quaternion.clone()};
+    // The AI culls actors earlier in the frame against the player's own view (Script_Main runs ai.Update
+    // before the mission's ApplyCamera); while the director owns the view that frustum points elsewhere and
+    // actors in the shot were taken out of the scene (09-24: Luo invisible at K2, renderLod "culled" while
+    // centred in frame). Cull again against the shot actually shown.
+    r.ai?.CullActors?.(cam);
+    this.MarkNotShown();
     const opening=r.opening;
     const fade=p==="Banter"?1-Smooth((r.time-(this.started??r.time))/C.fadeInS):0;
     // 「泥土落下来。顺子闭了一下眼，再睁开时……」
