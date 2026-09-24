@@ -184,8 +184,8 @@ def LoftY(name, stations, mat, col, parent=None, sides=18):
             next_step = (step + 1) % sides
             faces.append((station*sides+step, (station+1)*sides+step,
                           (station+1)*sides+next_step, station*sides+next_step))
-    faces.extend((tuple(reversed(range(sides))),
-                  tuple((len(stations)-1)*sides+step for step in range(sides))))
+    faces.extend((tuple(range(sides)),
+                  tuple((len(stations)-1)*sides+step for step in reversed(range(sides)))))
     mesh = bpy.data.meshes.new(name+'Mesh')
     mesh.from_pydata(vertices, [], faces)
     mesh.update()
@@ -236,8 +236,8 @@ def LoftZ(name, stations, mat, col, parent=None, sides=14):
             next_step = (step+1)%sides
             faces.append((station*sides+step,(station+1)*sides+step,
                           (station+1)*sides+next_step,station*sides+next_step))
-    faces.extend((tuple(reversed(range(sides))),
-                  tuple((len(stations)-1)*sides+step for step in range(sides))))
+    faces.extend((tuple(range(sides)),
+                  tuple((len(stations)-1)*sides+step for step in reversed(range(sides)))))
     mesh = bpy.data.meshes.new(name+'Mesh')
     mesh.from_pydata(vertices, [], faces)
     mesh.update()
@@ -337,21 +337,28 @@ def HoofDigit(name, center_x, foot_y, direction, mat, col, parent):
 
 
 def HorseHoof(name, center_x, foot_y, mat, col, parent):
-    """A single flat-bottomed hoof, wider at the toe than the coronet."""
-    vertices = []
-    for z, half_width, back, front in ((.012,.132,-.105,.205),
-                                        (.155,.105,-.075,.105)):
-        vertices.extend([(center_x-half_width,foot_y+back,z),
-                         (center_x+half_width,foot_y+back,z),
-                         (center_x+half_width,foot_y+front,z),
-                         (center_x-half_width,foot_y+front,z)])
+    """A grounded rounded toe and narrower coronet instead of a square block."""
+    outline = [(-.095,-.105),(.095,-.105),(.132,-.055),
+               (.142,.055),(.112,.17),(.06,.205),(-.06,.205),
+               (-.112,.17),(-.142,.055),(-.132,-.055)]
+    vertices, faces = [], []
+    for z, scale, forward in ((.012,1,0),(.095,.94,-.012),(.158,.78,-.035)):
+        vertices.extend((center_x+x*scale,foot_y+y*scale+forward,z)
+                        for x,y in outline)
+    sides = len(outline)
+    for station in range(2):
+        for step in range(sides):
+            next_step = (step+1)%sides
+            faces.append((station*sides+step,station*sides+next_step,
+                          (station+1)*sides+next_step,(station+1)*sides+step))
+    faces.extend((tuple(reversed(range(sides))),
+                  tuple(2*sides+step for step in range(sides))))
     mesh = bpy.data.meshes.new(name+'Mesh')
-    mesh.from_pydata(vertices, [], [(3,2,1,0),(4,5,6,7),
-        (0,1,5,4),(1,2,6,5),(2,3,7,6),(3,0,4,7)])
+    mesh.from_pydata(vertices, [], faces)
     mesh.update()
     obj = bpy.data.objects.new(name,mesh)
     col.objects.link(obj)
-    return Finish(obj,name,mat,col,parent,.014)
+    return Finish(obj,name,mat,col,parent,.012)
 
 def Cylinder(name, center, radius, depth, mat, col, parent=None, vertices=12, axis='Z'):
     bpy.ops.mesh.primitive_cylinder_add(vertices=vertices, radius=radius, depth=depth, location=center)
@@ -474,7 +481,7 @@ deck = Empty('CartDeck', (0,0,0), cart_col, cart_root)
 # The deck is 2.3 x 3.5 m, top 1.12 m: two 0.6 m stretchers and a seated escort.
 for index in range(10):
     x = -1.035 + index*.23
-    Cube(f'DeckPlank{index:02}', (x,0,1.045), (.218,3.5,.13), edge if index%3==0 else wood, cart_col, deck, .012)
+    Cube(f'DeckPlank{index:02}', (x,0,1.045), (.218,3.5,.13), edge if index in (0,9) else wood, cart_col, deck, .012)
 for x in (-.98,.98):
     Beam(f'LongitudinalBeam{x}', (x,-1.72,.89), (x,1.74,.89), .13,.13,dark_wood,cart_col,deck)
 for y in (-1.55,-.4,.72,1.58):
@@ -492,9 +499,11 @@ for x in (-1.1,1.1):
         Cylinder(f'PostPeg{x}_{y}',(x+(.079 if x>0 else -.079),y,1.33),
                  .016,.011,dark_wood,cart_col,deck,8,'X')
     Cube(f'SideBoard{x}',(x,0,1.235),(.064,3.32,.20),wood,cart_col,deck,.005)
+    Cube(f'SideBoardUpper{x}',(x,0,1.40),(.064,3.32,.10),wood,cart_col,deck,.005)
     Cube(f'SideRail{x}',(x,0,1.50),(.075,3.35,.075),edge,cart_col,deck)
 for y in (-1.68,1.68):
     Cube(f'EndBoard{y}',(0,y,1.22),(2.1,.075,.18),wood,cart_col,deck,.005)
+    Cube(f'EndBoardUpper{y}',(0,y,1.40),(2.1,.075,.10),wood,cart_col,deck,.005)
     Cube(f'EndRail{y}',(0,y,1.50),(2.1,.08,.08),edge,cart_col,deck)
 for side in (-1,1):
     # The shaft bows outside the ox's 0.67 m shoulder, then rises to a real
@@ -564,8 +573,8 @@ def BuildAnimal(kind):
         # The withers rise out of the whole forequarter.  The deep brisket,
         # narrower waist and rounded pelvic end belong to the same skin mesh.
         ox_profile = [
-            (2.96,.035,1.53,1.43),(3.04,.26,1.68,1.08),
-            (3.24,.46,1.80,.92),
+            (2.94,.035,1.53,1.43),(3.04,.28,1.68,1.08),
+            (3.24,.49,1.80,.92),
             (3.45,.57,1.84,.79),(3.70,.59,1.79,.77),
             (3.96,.57,1.75,.75),(4.19,.59,1.82,.70),
             (4.40,.65,1.96,.68),(4.56,.67,2.04,.67),
@@ -577,12 +586,12 @@ def BuildAnimal(kind):
         # Croup, tucked flank, sloping shoulder and withers are independent of
         # the ox's deep cylindrical barrel. Values are metres above ground.
         horse_profile = [
-            (3.04,.04,1.67,1.60),(3.15,.27,1.82,1.27),
-            (3.34,.39,1.90,1.19),(3.57,.43,1.87,1.16),
-            (3.82,.39,1.82,1.13),(4.07,.37,1.82,1.15),
-            (4.28,.41,1.90,1.17),(4.47,.44,2.05,1.16),
-            (4.62,.43,2.08,1.10),(4.78,.38,1.95,1.17),
-            (4.94,.24,1.76,1.30),(5.02,.04,1.57,1.50)]
+            (3.04,.05,1.69,1.58),(3.15,.27,1.84,1.27),
+            (3.34,.40,1.93,1.18),(3.57,.43,1.89,1.16),
+            (3.82,.40,1.83,1.12),(4.07,.37,1.83,1.13),
+            (4.28,.42,1.92,1.15),(4.47,.45,2.05,1.15),
+            (4.62,.45,2.08,1.10),(4.78,.39,1.96,1.17),
+            (4.94,.24,1.77,1.30),(5.02,.04,1.57,1.50)]
         torso_stations = [(y,width,(top+bottom)/2,(top-bottom)/2)
                           for y,width,top,bottom in SmoothStations(horse_profile)]
     LoftY(kind+'Torso',torso_stations,coat,col,body)
@@ -593,40 +602,40 @@ def BuildAnimal(kind):
             (4.72,.24,.94,.29),(4.92,.20,1.04,.27),
             (5.14,.09,1.17,.15)]),coat,col,body,14)
     else:
-        TaperCurve('HorseManeCrest',[(0,4.60,2.04,.055),
-                   (0,4.79,2.16,.105),(0,4.98,2.27,.11),
-                   (0,5.18,2.36,.075),(0,5.29,2.39,.005)],horse_dark,col,body)
-        for index in range(8):
-            y = 4.65 + index*.079
-            z = 2.07 + index*.046
+        TaperCurve('HorseManeCrest',[(0,4.60,2.04,.045),
+                   (0,4.79,2.16,.075),(0,4.98,2.27,.080),
+                   (0,5.18,2.36,.055),(0,5.33,2.40,.005)],horse_dark,col,body)
+        for index in range(16):
+            y = 4.67 + index*.043
+            z = 2.08 + index*.022
             for side in (-1,1):
                 TaperCurve(f'HorseManeTuft{index}_{side}',
-                           [(side*.035,y,z,.047),
-                            (side*.10,y-.055,z-.065,.041),
-                            (side*.15,y-.105,z-.135,.004)],
+                           [(side*.025,y,z+.01,.020),
+                            (side*.055,y-.045,z+.075,.018),
+                            (side*.075,y-.12,z+.11,.002)],
                            horse_dark,col,body,8)
     head_pivot=Empty(kind+'HeadPivot',(0,4.82,1.61 if is_ox else 1.72),col,root)
     if is_ox:
         neck_stations = [(4.70,.33,1.44,.37),(4.90,.35,1.51,.39),
                          (5.13,.30,1.58,.34),(5.29,.20,1.61,.23)]
-        skull_stations = [(5.05,.19,1.62,.19),(5.25,.31,1.67,.29),
-                          (5.42,.31,1.59,.27),(5.56,.26,1.51,.21),
+        skull_stations = [(5.05,.20,1.62,.20),(5.25,.34,1.67,.30),
+                          (5.42,.35,1.59,.28),(5.56,.28,1.51,.22),
                           (5.68,.17,1.44,.13)]
     else:
         neck_stations = SmoothStations([
-            (4.64,.31,1.62,.38),(4.82,.30,1.77,.40),
-            (5.02,.265,1.94,.37),(5.20,.20,2.11,.31),
-            (5.34,.115,2.24,.18)],2)
+            (4.62,.30,1.63,.37),(4.80,.30,1.78,.40),
+            (4.98,.27,1.94,.38),(5.16,.23,2.10,.32),
+            (5.26,.16,2.18,.20),(5.30,.09,2.18,.13)],2)
         skull_stations = SmoothStations([
-            (5.19,.14,2.17,.18),(5.32,.205,2.13,.265),
-            (5.44,.205,2.02,.285),(5.57,.16,1.87,.25),
-            (5.71,.115,1.73,.16)],2)
+            (5.19,.14,2.17,.18),(5.32,.19,2.13,.25),
+            (5.45,.215,2.02,.28),(5.58,.17,1.87,.24),
+            (5.71,.12,1.73,.16)],2)
     LoftY(kind+'Neck',neck_stations,coat,col,head_pivot)
     LoftY(kind+'Skull',skull_stations,coat,col,head_pivot)
     if is_ox:
         LoftY('OxNoseBridge',[(5.46,.19,1.47,.13),(5.60,.19,1.44,.13),
                              (5.75,.15,1.40,.11)],coat,col,head_pivot,16)
-        Ellipsoid('OxMuzzle',(0,5.79,1.34),(.29,.18,.145),
+        Ellipsoid('OxMuzzle',(0,5.79,1.34),(.33,.18,.15),
                   ox_light,col,head_pivot,18,12)
         Ellipsoid('OxLowerLip',(0,5.905,1.235),(.16,.060,.035),
                   ox_light,col,head_pivot,16,8)
@@ -644,6 +653,8 @@ def BuildAnimal(kind):
               (0,5.63,1.97),(0,5.71,1.83)],.025,horse_light,col,head_pivot)
     for side in (-1,1):
         if is_ox:
+            Ellipsoid(f'OxCheek{side}',(side*.245,5.49,1.47),
+                      (.145,.185,.145),coat,col,head_pivot,16,10)
             LoftX(f'OxEar{side}',[(side*.24,5.29,1.80,.035,.04),
                   (side*.35,5.29,1.81,.09,.07),(side*.49,5.28,1.82,.13,.075),
                   (side*.62,5.27,1.84,.10,.055),(side*.69,5.27,1.85,.008,.008)],
@@ -659,17 +670,17 @@ def BuildAnimal(kind):
             Curve(f'OxBrow{side}',[(side*.30,5.40,1.716),
                   (side*.34,5.46,1.728),(side*.31,5.54,1.703)],
                   .022,coat,col,head_pivot)
-            Ellipsoid(f'OxNostrilRim{side}',(side*.17,5.929,1.399),
+            Ellipsoid(f'OxNostrilRim{side}',(side*.205,5.929,1.399),
                       (.054,.024,.035),ox_socket,col,head_pivot,12,8)
-            Ellipsoid(f'OxNostril{side}',(side*.17,5.950,1.401),
+            Ellipsoid(f'OxNostril{side}',(side*.205,5.950,1.401),
                       (.032,.014,.021),eye,col,head_pivot,12,8)
             Ellipsoid(f'OxHornRoot{side}',(side*.255,5.24,1.89),
                       (.095,.085,.075),coat,col,head_pivot,12,8)
             TaperCurve(f'OxHorn{side}',[(side*.275,5.235,1.89,.082),
-                       (side*.375,5.245,1.955,.069),
-                       (side*.505,5.265,2.035,.047),
-                       (side*.595,5.285,2.145,.027),
-                       (side*.625,5.305,2.22,.003)],horn,col,head_pivot)
+                       (side*.405,5.245,1.955,.069),
+                       (side*.565,5.265,2.025,.047),
+                       (side*.685,5.285,2.105,.027),
+                       (side*.725,5.305,2.17,.003)],horn,col,head_pivot)
         else:
             TaperCurve(f'HorseEar{side}',[(side*.15,5.29,2.29,.069),
                        (side*.17,5.28,2.43,.055),
@@ -702,28 +713,30 @@ def BuildAnimal(kind):
                 # The upper foreleg flows out of the shoulder; the haunch
                 # narrows through a backwards hock. Keep pivots for the walk.
                 upper_stations = (
-                    [(1.65,side*.30,y-.09,.15,.18),
-                     (1.42,side*.36,y-.06,.20,.23),
-                     (1.23,x,y-.03,.25,.26),
-                     (1.03,x,y,.20,.22),(.76,x,knee_y-.015,.15,.17),
+                    [(1.73,side*.27,y-.12,.13,.17),
+                     (1.48,side*.34,y-.07,.20,.23),
+                     (1.26,x,y-.03,.25,.26),
+                     (1.03,x,y,.19,.22),(.76,x,knee_y-.015,.15,.17),
                      (joint,x,knee_y,.125,.14)] if front else
-                    [(1.59,side*.27,3.47,.14,.18),
-                     (1.43,side*.31,3.44,.18,.23),
+                    [(1.67,side*.25,3.47,.12,.16),
+                     (1.43,side*.30,3.44,.18,.23),
                      (1.25,x,3.38,.27,.30),
                      (1.03,x,3.32,.22,.23),(.80,x,3.27,.16,.18),
                      (joint,x,knee_y,.125,.15)])
                 LoftZ(name+'Upper',SmoothStations(upper_stations,2),coat,col,pivot)
             else:
                 if front:
-                    upper_stations = [(1.81,side*.29,y-.08,.105,.14),
-                        (1.58,side*.29,y-.03,.19,.21),
-                        (1.35,x,y+.025,.17,.18),
+                    upper_stations = [(1.76,side*.20,y-.12,.10,.14),
+                        (1.62,side*.25,y-.07,.15,.19),
+                        (1.48,side*.29,y,.19,.22),
+                        (1.28,x,y+.025,.17,.18),
                         (1.08,x,y+.04,.115,.13),
                         (.80,x,knee_y,.088,.102),
                         (joint,x,knee_y,.105,.115)]
                 else:
-                    upper_stations = [(1.78,side*.28,3.36,.12,.15),
-                        (1.55,side*.32,3.35,.22,.25),
+                    upper_stations = [(1.72,side*.20,3.38,.10,.14),
+                        (1.61,side*.26,3.35,.18,.22),
+                        (1.48,side*.31,3.33,.22,.25),
                         (1.28,x,3.30,.23,.25),
                         (1.00,x,3.20,.15,.17),
                         (.78,x,knee_y-.04,.108,.13),
@@ -768,21 +781,22 @@ def BuildAnimal(kind):
     else:
         TaperCurve('HorseTailDock',[(0,3.16,1.75,.085),
                    (0,2.99,1.58,.09),(0,2.85,1.42,.065)],coat,col,tail)
-        TaperCurve('HorseTailMass',[(0,2.88,1.50,.065),
-                   (0,2.76,1.30,.13),(0,2.72,1.03,.15),
-                   (0,2.71,.76,.12),(0,2.70,.59,.008)],horse_dark,col,tail,12)
-        for index in range(5):
-            spread = (index-2)*.045
+        TaperCurve('HorseTailMass',[(0,2.88,1.50,.060),
+                   (0,2.75,1.30,.12),(0,2.66,1.04,.15),
+                   (0,2.58,.78,.105),(0,2.53,.62,.006)],horse_dark,col,tail,12)
+        for index in range(15):
+            spread = (index-7)*.027
+            shift = (index%3-1)*.035
             TaperCurve(f'HorseTailStrand{index}',[
-                (spread*.5,2.75,1.22,.025),
-                (spread,2.68-(index%2)*.03,.94,.034),
-                (spread*1.4,2.67-(index%2)*.03,.61+(index%3)*.04,.002)],
+                (spread*.4,2.79,1.32,.024),
+                (spread,2.63+shift,1.04,.027),
+                (spread*1.3,2.45+shift,.67+(index%4)*.045,.002)],
                 horse_dark,col,tail,8)
     # Head halter stays with the animated head; the load-bearing harness is
     # anchored to the body and meets the cart's two iron shaft eyes.
     if is_ox:
-        nose_points=[(-.26,5.64,1.48),(-.29,5.72,1.41),(0,5.78,1.32),
-                     (.29,5.72,1.41),(.26,5.64,1.48)]
+        nose_points=[(-.27,5.64,1.48),(-.32,5.72,1.41),(0,5.78,1.32),
+                     (.32,5.72,1.41),(.27,5.64,1.48)]
     else:
         nose_points=[(-.17,5.80,1.68),(-.18,5.88,1.61),(0,5.92,1.51),
                      (.18,5.88,1.61),(.17,5.80,1.68)]
