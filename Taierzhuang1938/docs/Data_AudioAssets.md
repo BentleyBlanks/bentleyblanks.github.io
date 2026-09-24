@@ -1340,11 +1340,12 @@ Audio native levels are aligned.
 # 补变体的十二组（append，重复跑会把变体追加成 _05/_06，重跑前先还原清单与成品）
 # （原来是十三组；2026-09-24 撤掉了 Type11BarSecondShot。另一个 append 组 Type11FarMinimi50m
 #  必须紧跟 Type11Far 跑，放在下面那条命令里。注意 RifleIjaSpringfieldTakes / RifleIjaFarBuildings
-#  会把美制步枪实录追加进 rifleIja / rifleIjaFar —— 用户 09-24 定了步枪维持 SeedAudio 单条，这两组别跑。）
+#  会把美制步枪实录追加进 rifleIja / rifleIjaFar —— 用户 09-24 定了步枪维持 SeedAudio 单条，所以命令末尾
+#  带上表尾登记组 RifleIjaSeedAudio（按表序最后执行，把两条步枪的清单登记回 SeedAudio 单条；实录只落成孤儿文件）。）
 node Taierzhuang1938/Script_SfxBake.mjs RifleNraK98kTakes RifleIjaSpringfieldTakes \
   Zb26L86Lsw Type92M1919Near5m Type92M1919Turret1m \
   RifleNraFarNagant50m RifleIjaFarBuildings FootstepDirtLoop \
-  ExplosionFarHowitzer ExplosionFarCannon BoltCycleM38 StripperLoadK98kSecond
+  ExplosionFarHowitzer ExplosionFarCannon BoltCycleM38 StripperLoadK98kSecond RifleIjaSeedAudio
 
 # 新 cue 的三十三组（共 45 组，全量清单见 Data_SfxSources 末段）（pending，每次从空表重建，可以放心重跑；其中 Type11FarMinimi50m 靠同一次跑的 Type11Far 先清表，所以也能重跑）
 # Type11FarMinimi50m 是 append：Type11Far 把 type11Far 重写成只有 _01，它接着补 _02/_03（组按表序执行，

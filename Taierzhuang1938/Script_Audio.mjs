@@ -2836,7 +2836,8 @@ export const MUSIC_BASE = "Audio/Music/";
 // 2026-09-17：大刀挥空从三条换成一条（AudioSfx_DadaoSwing_01 同文件名、内容变了）。
 // 2026-09-24：十一年式换枪声（用户拍板）：type11 = SeedAudio 1 + MINIMI 1 m 2，type11Far 补 MINIMI 50 m 2；
 // AudioSfx_Type11_01/02 同文件名、内容变了（BAR 0.1 m → MINIMI），不抬戳就还是缓存里的 BAR。
-export const SFX_PACK_VERSION = "20260924type11minimi";
+// 2026-09-25：type11 去掉 SeedAudio 生成音、只留 MINIMI 1 m 两条（用户定，清单条目变了）。
+export const SFX_PACK_VERSION = "20260925type11minimionly";
 export const AMB_PACK_VERSION = "20260912trainonly";
 export const MUSIC_PACK_VERSION = "5";
 
@@ -3143,7 +3144,12 @@ const SAMPLE_CYCLE = new Set(["dadaoSwing", "dadaoHit", "bayonetHit", "telegraph
   // 断肢两条与白刃同理由：变体是一条条量过挑出来的（`Script_SeedAudioGoreBake`
   // 的头注记了每条的取舍），要的就是它们本来的样子；而近炸一次卸两三段时
   // 随机挑两条里的一条必然连出两次同一条。
-  "goreSever", "goreLimbLand"]);
+  "goreSever", "goreLimbLand",
+  // 十一年式两条（2026-09-24 夜接力收口，照「交替用＝按顺序轮」的口径）：近场 MINIMI 1 m 两条实录
+  // （09-25 用户定换掉 SeedAudio 生成音）、远场 BAR 300 m 1 + MINIMI 50 m 2。随机挑时连着两发同一条的概率
+  // 1/2—1/3、一梭 4 发可能整梭同一条；轮播让一梭里各条依次出，且不叠 ±3% 变调（点射 0.12 s 一发，
+  // 变调会把各条的起音拧开）。
+  "type11", "type11Far"]);
 
 /**
  * 把一组 AudioBuffer 包成配方。

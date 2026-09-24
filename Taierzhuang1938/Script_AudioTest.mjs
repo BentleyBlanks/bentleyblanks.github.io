@@ -46,12 +46,13 @@ const Fail = (msg) => { console.log(`FAIL ${msg}`); failed += 1; };
 const Ok = (msg) => console.log(`ok   ${msg}`);
 
 // 【2026-09-24 审查补】配方表与清单对账（纯 Node，不等浏览器）。
-// type11 = SeedAudio 1 + MINIMI 2 只靠表尾 `Type11Variants` 登记；SeedAudio 烘焙单独重跑会把清单里的 type11
-// 改回一条，忘了补跑 `Type11Variants` 时下面「听得见」那一节照样全过，两条 MINIMI 就悄悄没了。
+// type11 = MINIMI 1 m 两条实录（2026-09-25 用户定换掉 SeedAudio 生成音）只靠表尾 `Type11Variants` 登记；
+// SeedAudio 烘焙单独重跑会把清单里的 type11 改回生成音一条，忘了补跑 `Type11Variants` 时下面「听得见」那一节
+// 照样全过，两条 MINIMI 就悄悄没了、生成音悄悄回来。
 // 这里按 SFX_SOURCES 的顺序推一遍全量 SfxBake 会写出的文件表（登记组 = 逐字文件名；切割组 = 条数，append 累加），
-// 与清单对账。rifleIja / rifleIjaFar 例外：2026-09-11 起由 Script_SeedAudioGunfireBake 改写成 SeedAudio 单条、
-// 配方表里没有对应的登记组（用户 09-24 定了步枪不动），全量 SfxBake 会把它们改回实录 —— 已知分歧，记在
-// docs/Data_AudioWiring.md 二之三第 8 节。另查 `mixed` 许可的 cue 里没有参考视频实录（许可债不许藏进 mixed）。
+// 与清单对账，没有例外：rifleIja / rifleIjaFar 的 SeedAudio 单条由表尾 `RifleIjaSeedAudio` 登记组钉住
+// （2026-09-24 夜接力收口；之前这两条是已知分歧、在这里被放过）。另查 `mixed` 许可的 cue 里没有参考视频实录
+// （许可债不许藏进 mixed）。
 {
   const manifest = JSON.parse(fs.readFileSync(path.join(projectDir, "Audio/Sfx/Data_SfxManifest.json"), "utf8"));
   const Pascal = (s) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -66,10 +67,8 @@ const Ok = (msg) => console.log(`ok   ${msg}`);
     const prev = cut.append ? expect[cut.cue] : null;
     expect[cut.cue] = { n: (prev ? (prev.files?.length ?? prev.n) : 0) + n, by: group.id };
   }
-  const known = new Set(["rifleIja", "rifleIjaFar"]);
   const drift = [];
   for (const [cue, e] of Object.entries(expect)) {
-    if (known.has(cue)) continue;
     const got = manifest.cues[cue]?.files || manifest.pendingCues?.[cue]?.files;
     if (!got) { drift.push(`${cue} 清单里没有（配方 ${e.by}）`); continue; }
     if (e.files ? JSON.stringify(got) !== JSON.stringify(e.files) : got.length !== e.n) {
@@ -78,8 +77,16 @@ const Ok = (msg) => console.log(`ok   ${msg}`);
   }
   const type11 = manifest.cues.type11?.files || [], type11Far = manifest.cues.type11Far?.files || [];
   const needFar = ["AudioSfx_Type11Far_01.mp3", "AudioSfx_Type11Far_02.mp3", "AudioSfx_Type11Far_03.mp3"];
-  if (!(type11.length === 3 && type11.includes("AudioSfx_SeedAudioType11_01.mp3"))) drift.push(`type11 ${JSON.stringify(type11)}`);
+  const needNear = ["AudioSfx_Type11_01.mp3", "AudioSfx_Type11_02.mp3"];
+  if (JSON.stringify(type11) !== JSON.stringify(needNear)) drift.push(`type11 ${JSON.stringify(type11)}（应为 MINIMI 实录两条 ${needNear.join(" ")}，不含 SeedAudio 生成音）`);
+  if (manifest.cues.type11?.license !== "sonniss") drift.push(`type11 许可 ${manifest.cues.type11?.license}（全是实录，应为 sonniss）`);
   if (!needFar.every((f) => type11Far.includes(f))) drift.push(`type11Far ${JSON.stringify(type11Far)}`);
+  // 步枪两条钉死成 09-11 的 SeedAudio 单条（用户定了不动）：配方表和清单一起被改回实录时上面的对账会双双同意，这里兜住。
+  for (const [cue, file] of [["rifleIja", "AudioSfx_SeedAudioRifleIja_01.mp3"], ["rifleIjaFar", "AudioSfx_SeedAudioRifleIjaFar_01.mp3"]]) {
+    const got = manifest.cues[cue]?.files || [];
+    if (!(got.length === 1 && got[0] === file)) drift.push(`${cue} ${JSON.stringify(got)}（应为 SeedAudio 单条 ${file}）`);
+    else if (!fs.existsSync(path.join(projectDir, "Audio/Sfx", file))) drift.push(`文件缺失 ${file}`);
+  }
   const missing = [...type11, ...type11Far].filter((f) => !fs.existsSync(path.join(projectDir, "Audio/Sfx", f)));
   if (missing.length) drift.push(`文件缺失 ${missing.join(" ")}`);
   const hidden = [];
@@ -93,7 +100,7 @@ const Ok = (msg) => console.log(`ok   ${msg}`);
   }
   if (hidden.length) drift.push(`mixed 里混进了参考视频实录或查不到来源：${hidden.join(" ")}`);
   if (drift.length) Fail(`配方表与清单对不上：${drift.join("；")}`);
-  else Ok(`配方表与清单对账：${Object.keys(expect).length - known.size} 个 cue 一致；type11 ${type11.length} 条、type11Far ${type11Far.length} 条；mixed 里没有参考视频实录`);
+  else Ok(`配方表与清单对账：${Object.keys(expect).length} 个 cue 一致（无例外）；type11 ${type11.length} 条、type11Far ${type11Far.length} 条；mixed 里没有参考视频实录`);
 }
 
 await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?scale=small`, { waitUntil: "load", timeout: 120000 });
@@ -672,6 +679,56 @@ else {
   } else if (rates.some((r) => r !== 1)) Fail(`挥空被逐发变调了：${rates.join(" ")}（选定的三条要原样播）`);
   else if (cycle.variants !== 1 || unique.length !== 1) Fail(`挥空应只有用户选定的一条：清单 ${cycle.variants} 条、播出变体号 ${seq.join(" ")}`);
   else Ok(`挥空原样播、不变调（${durs[0]} ms，rate 恒为 1；同期滤掉别人的 ${cycle.others} 个一次性源）`);
+}
+
+// 【2026-09-24 夜接力】十一年式近/远两条进了 SAMPLE_CYCLE：一梭里按表序轮、不叠 ±3% 变调。
+// 近场 2 条（MINIMI 1 m）、远场 3 条（BAR 300 m + MINIMI 50 m ×2）。
+// 回归形态是「有人把它们从 SAMPLE_CYCLE 删了」：那时每发随机挑、rate 在 0.97–1.03 抖，
+// 下面两条都红（随机挑 7 发每步都恰好 +1 轮进的概率是 (1/2)^6 或 (1/3)^6，rate 恰为 1 的概率为 0）。
+// 认源同挥空：按清单文件解码后的指纹认，场上 AI 同期开的枪、喊的话不算数。
+// 游戏里可能已经开过十一年式，游标起点不定，所以只看「相邻两发是不是 +1 轮进」。
+const type11Cycle = await page.evaluate(async () => {
+  const a = window.Taierzhuang.audio;
+  const mod = await import("./Script_Audio.mjs");
+  const Fingerprint = (buf) => {
+    const d = buf.getChannelData(0);
+    const step = Math.max(1, Math.floor(d.length / 64));
+    let sum = 0;
+    for (let i = 0; i < d.length; i += step) sum += d[i];
+    return `${buf.length}:${sum.toFixed(6)}`;
+  };
+  const out = {};
+  for (const cue of ["type11", "type11Far"]) {
+    const entry = a.sfxManifest && a.sfxManifest.cues[cue];
+    if (!entry || !entry.files) { out[cue] = { error: `清单里没有 ${cue}` }; continue; }
+    const mine = new Map();
+    for (let i = 0; i < entry.files.length; i += 1) {
+      const url = `${mod.SFX_BASE}${entry.files[i]}?v=${mod.SFX_PACK_VERSION}`;
+      const buf = await a.ctx.decodeAudioData(await (await fetch(url)).arrayBuffer());
+      mine.set(Fingerprint(buf), i);
+    }
+    const made = [];
+    const orig = a.ctx.createBufferSource;
+    a.ctx.createBufferSource = function patched() { const src = orig.call(this); made.push(src); return src; };
+    a.lastPlayAt.delete(cue);
+    // 一梭 7 发：至少跨过两次回绕。priority 绕开预算闸（这里测的是挑哪条，不是闸）。
+    const voice = a.Play(cue, { priority: true, volume: 0.01, burst: 7 });
+    a.ctx.createBufferSource = orig;
+    if (voice) a.StopVoice(voice, 0.001);
+    const picked = made.filter((s) => s.buffer && mine.has(Fingerprint(s.buffer)));
+    out[cue] = { variants: mine.size, seq: picked.map((s) => mine.get(Fingerprint(s.buffer))),
+      rates: picked.map((s) => Number(s.playbackRate.value.toFixed(4))), others: made.length - picked.length };
+  }
+  return out;
+});
+for (const [cue, want] of [["type11", 2], ["type11Far", 3]]) {
+  const r = type11Cycle[cue];
+  if (r.error) { Fail(`${cue} 轮播测不到东西：${r.error}`); continue; }
+  const steps = r.seq.slice(1).map((v, i) => (v - r.seq[i] + r.variants) % r.variants);
+  if (r.variants !== want || r.seq.length !== 7) Fail(`${cue} 一梭 7 发只认到 ${r.seq.length} 发（清单 ${r.variants} 条）—— 断言没测到东西`);
+  else if (steps.some((s) => s !== 1)) Fail(`${cue} 没按顺序轮：变体号 ${r.seq.join(" ")}`);
+  else if (r.rates.some((x) => x !== 1)) Fail(`${cue} 被逐发变调了：${r.rates.join(" ")}`);
+  else Ok(`${cue} 一梭 7 发按表序轮（${r.seq.join(" ")}）、rate 恒为 1（同期滤掉别人的 ${r.others} 个源）`);
 }
 
 // ---------------------------------------------------------------------------

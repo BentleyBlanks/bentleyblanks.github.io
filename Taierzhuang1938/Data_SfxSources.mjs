@@ -1086,7 +1086,7 @@ export const SFX_SOURCES = [
   // 已不在轮播里。用户 2026-09-24 看过这个结论后决定「枪声换」，于是换成下面这组：
   // FN MINIMI（L110A2）1 m 单发两发。5.56 与十一年式的 6.5×50 同属小口径、高膛压，机构同是
   // 班用轻机；rate 0.95 往下压半档，hp 38 把次低频切掉（「40 Hz 以下偷电平」那条教训）。
-  // 最终 type11 = SeedAudio 1 + MINIMI 2，由表尾 `Type11Variants` 登记（见那里的注释）。
+  // 最终 type11 = MINIMI 2（2026-09-25 用户定：SeedAudio 那条换掉、全用实录），由表尾 `Type11Variants` 登记（见那里的注释）。
   {
     id: "Type11MinimiSingles",
     item: "sonniss-gdc-2016-game-audio-bundle-normalized",
@@ -1698,19 +1698,43 @@ export const SFX_SOURCES = [
   // 2026-09-11 那一轮（Script_SeedAudioGunfireBake）把 type11 直接改写成**只有一条**
   // SeedAudio 生成音；而全量 SfxBake 又会反过来把那一条丢掉（上面 `Type11MinimiSingles`
   // 不是 append，只写 `_01` / `_02`）。这一组放在表尾、只登记不切割（seedAudio 组的语义），
-  // 把 type11 钉死成「SeedAudio 1 + MINIMI 1 m 2」，两边谁先跑都不丢。
-  // 只管 type11：rifleIja / rifleIjaFar 维持 2026-09-11 的 SeedAudio 单条，用户没要换。
-  // 许可：火山引擎生成音 + Sonniss 免版税实录混在一条 cue 里 → "mixed"，逐文件出处写在 credit（顺序与 files 一致）。
+  // 把 type11 钉死，两边谁先跑都不丢。2026-09-24 定的是「SeedAudio 1 + MINIMI 1 m 2」；
+  // 2026-09-25 00:30 用户定「换掉生成音、全用实录」，于是只剩 MINIMI 1 m 两条（AudioSfx_SeedAudioType11_01.mp3
+  // 留在磁盘上不进清单，要恢复时加回 files 首位、license 改回 mixed、重跑本组、抬 SFX_PACK_VERSION）。
+  // 这组仍要留着：Script_SeedAudioGunfireBake 重跑会把清单里的 type11 改写成生成音那一条，跑完再跑本组登记回来。
+  // 只管 type11；rifleIja / rifleIjaFar 由下面的 `RifleIjaSeedAudio` 同法钉住。
+  // 许可：两条都是 Sonniss 免版税实录 → "sonniss"；逐文件出处写在 credit（顺序与 files 一致）。
   // 部分重烘要三组一起点名：`Type11MinimiSingles Type11FarMinimi50m Type11Variants`。
   {
     id: "Type11Variants",
     seedAudio: true,
-    license: "mixed",
-    credit: "Volcengine SeedAudio 1.0（2026-09-11）＋ Sonniss GDC 2016 实录",
+    license: "sonniss",
+    credit: "Sonniss GDC 2016 实录",
     cuts: [
       { cue: "type11", durS: 0.82,
-        files: ["AudioSfx_SeedAudioType11_01.mp3", "AudioSfx_Type11_01.mp3", "AudioSfx_Type11_02.mp3"],
-        credit: "Volcengine SeedAudio 1.0 · type11 · 2026-09-11 ／ Pole Position Production · L110A2 LMG（FN MINIMI）5.56 单发（1 m，素材 4.07 s 那一发）· Sonniss GDC 2016 ／ Pole Position Production · L110A2 LMG（FN MINIMI）5.56 单发（1 m，素材 0.09 s 那一发）· Sonniss GDC 2016" },
+        files: ["AudioSfx_Type11_01.mp3", "AudioSfx_Type11_02.mp3"],
+        credit: "Pole Position Production · L110A2 LMG（FN MINIMI）5.56 单发（1 m，素材 4.07 s 那一发）· Sonniss GDC 2016 ／ Pole Position Production · L110A2 LMG（FN MINIMI）5.56 单发（1 m，素材 0.09 s 那一发）· Sonniss GDC 2016" },
+    ],
+  },
+  // === 三八式两条的最终文件表（2026-09-24 夜接力收口）=============================
+  // 2026-09-11 起游戏里的 rifleIja / rifleIjaFar 是 Script_SeedAudioGunfireBake 写进清单的 SeedAudio 单条
+  // （用户 09-24 定了步枪不动）。但表里还挂着 GarandClose、BarFar300、RifleIjaSpringfieldTakes、
+  // RifleIjaFarBuildings、RifleIjaType38Live 五组实录（含美制 .30-06），全量 SfxBake 会按它们把两条步枪
+  // 改回实录、丢掉 SeedAudio。这一组与 `Type11Variants` 同法：放表尾、只登记不切割，全量 bake 后清单保持现状。
+  // 上面五组照旧会把 AudioSfx_RifleIja_0N / AudioSfx_RifleIjaFar_0N 切到磁盘（孤儿文件，不进清单），
+  // 留着是为了用户哪天要换回实录时只删这一组就行。
+  // 部分重烘两条步枪时要连这一组一起点名，否则最后写进清单的是实录那组。
+  {
+    id: "RifleIjaSeedAudio",
+    seedAudio: true,
+    bake: "Script_SeedAudioGunfireBake.mjs",
+    license: "volcengine",
+    credit: "Volcengine SeedAudio 1.0（2026-09-11）",
+    cuts: [
+      { cue: "rifleIja", durS: 1.4, files: ["AudioSfx_SeedAudioRifleIja_01.mp3"],
+        credit: "Volcengine SeedAudio 1.0 · rifleIja · 2026-09-11" },
+      { cue: "rifleIjaFar", durS: 1.8, files: ["AudioSfx_SeedAudioRifleIjaFar_01.mp3"],
+        credit: "Volcengine SeedAudio 1.0 · rifleIjaFar · 2026-09-11" },
     ],
   },
   // 战车那一批：成品由 Script_TankAudioBake.mjs 烘，这里只负责在全量 SfxBake 时把它们重新登记进清单。
