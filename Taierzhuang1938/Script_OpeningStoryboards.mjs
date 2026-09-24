@@ -826,9 +826,10 @@ export class FirstLevelBunkerShow {
     }
     // They come round RC only once the questioning is under way: at the glimpse Luo is on the
     // south-south-west leg, over the interpreter's shoulder (K2), not already behind the circle.
-    const go=this.flags.askAt!=null?this.r.time-this.flags.askAt-C.rescue.creepAfterAskS:age-C.timeouts.holdLineS;
+    // Luo turns the rear corner the moment Shunzi looks up (K2); He and Liu come round behind him.
+    const go=this.flags.glimpseAt!=null?this.r.time-this.flags.glimpseAt:-1;
     if(go<0&&!luoFast){for(const actor of [luo,he,liu])this.Hide(actor);return;}
-    if(!this.flags.luoChopAt)this.Follow(luo,"rescue",[...R.luoRoute,chop.luo],luoFast?C.speed.run:C.speed.creep,"CreepDadao",chop.luo.yaw);
+    if(!this.flags.luoChopAt)this.Follow(luo,"rescue",[...R.luoRoute,chop.luo],luoFast?C.speed.run:C.speed.brisk,"CreepDadao",chop.luo.yaw);
     if(!this.flags.heChopAt&&(go>.8||heFast))this.Follow(he,"rescue",[...R.heRoute,chop.he],heFast?C.speed.run:C.speed.creep,"CreepDadao",chop.he.yaw);
     else if(!this.flags.heChopAt)this.Hide(he);
     if(!this.flags.liuReleased&&go>1.6){if(this.Follow(liu,"rescue",[...R.liuRoute,R.liuShot],C.speed.creep,null,R.liuShot.yaw))this.Pose(liu,null,{face:Face(R.liuShot,A.bunkerJunction)});}
@@ -888,6 +889,7 @@ export class FirstLevelBunkerShow {
   }
   PhaseGlimpse(age){
     const r=this.r,m=this.CircleMarks(),ijaA=this.Ija("ijaA"),ijaB=this.Ija("ijaB");
+    this.flags.glimpseAt??=r.time;
     this.RescueCircle(age);
     this.Put(ijaA,m.ijaA);this.Pose(ijaA,"IjaHoldCollarUp",{seconds:r.time-this.flags.holdAt});
     this.Hold(this.cast.interpreter,m.interpreter,"InterpreterCrouchAsk");
@@ -960,7 +962,8 @@ export class FirstLevelBunkerShow {
     this.Put(ijaB,m.ijaBWatch);this.Corpse(ijaB,"IjaChoppedFallWall");
     this.Put(luo,chop.luo);this.Pose(luo,"LuoDadaoChopRear",{seconds:r.time-this.flags.luoChopAt});
     this.Put(interp,m.interpreter);this.Pose(interp,"InterpreterGrabCollar",{seconds:2.9});
-    if(age>=.4)this.Stage("Flee");
+    // The interpreter bolts once ijaA is turned on by He (heChopAt is forced by heArriveS).
+    if(this.flags.heChopAt!=null&&r.time-this.flags.heChopAt>=.4)this.Stage("Flee");
   }
   Blood(actor,part){
     const bone=actor?.actor?.characterRig?.bones?.[part==="neck"?"neck":"chest"]||actor?.actor?.characterRig?.bones?.head;
@@ -1060,6 +1063,11 @@ export class FirstLevelBunkerShow {
     const r=this.r,luo=this.Squad("luo");
     this.Aftercut();this.UpdateFleeing();this.LongShotTick();
     this.Pose(luo,null,{face:C.shunzi.cover});
+    // Last resort against a stall: the cut-down pair is made dead, the flow never waits on them.
+    if(age>C.timeouts.longShotForceS+2&&!r.Has("vanguardMeleeResolved")){
+      for(const role of ["ijaA","ijaB"])this.Kill(this.Ija(role));
+      if(!this.Ija("ijaA")?.alive&&!this.Ija("ijaB")?.alive)r.Record("vanguardMeleeResolved",{forced:true});
+    }
     const ready=!this.Ija("ijaD")?.alive&&r.Has("vanguardMeleeResolved");
     if(!r.Has("luoRescueComplete")&&r.Has("vanguardMeleeResolved"))r.Record("luoRescueComplete");
     if(ready&&age>=.6)this.Stage("Check");
@@ -1215,7 +1223,7 @@ export class FirstLevelBunkerShow {
         if(actor&&!this.pursuit.some(p=>p.actor===actor)){this.pursuit.push({spec,actor,at:r.time,index:0});this.pursuitMissing--;}
       }
     }
-    const retire=r.Has("collectionPointSeen")||!["RearTrench","BunkerRescue"].includes(r.flow.stage.id);
+    const retire=r.Has("collectionPointSeen")||!["Trapped","RearTrench","BunkerRescue"].includes(r.flow.stage.id);
     const leaving=[];
     if(this.pursuit)for(const p of this.pursuit)leaving.push(p);
     const ijaC=this.Ija("ijaC");

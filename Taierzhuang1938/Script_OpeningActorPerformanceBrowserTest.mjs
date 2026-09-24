@@ -131,19 +131,20 @@ try{
     {role:"runner",phase:"Orders",kind:"nra",variant:4,clip:"IjaBayonetGuard",freeHand:"handL",minHandM:.07},
     {role:"heyoutian",phase:"Orders",kind:"nra",variant:1,clip:"IjaBayonetGuard",minHeadRad:.1},
     {role:"liuwencai",phase:"Orders",kind:"nra",variant:4,clip:"IjaBayonetGuard",minHeadRad:.1},
-    {role:"interpreter",phase:"Interrogate",kind:"nra",variant:1,clip:"InterpreterPoint",freeHand:"handR",minHandM:.10},
-    {role:"ijaA",phase:"Interrogate",kind:"ija",variant:0,clip:"InterrogateCrouch",freeHand:"handR",minHandM:.07},
-    {role:"ijaB",phase:"Interrogate",kind:"ija",variant:1,clip:"IjaBayonetGuard",minHeadRad:.1},
+    // Contract §5.1 (v1.3): the interpreter is NRA06 and ijaA is IJA06 (IJA02's clip library), ijaB is IJA01.
+    {role:"interpreter",phase:"Interrogate",kind:"nra",variant:5,castId:"interpreter",clip:"InterpreterPoint",freeHand:"handR",minHandM:.10},
+    {role:"ijaA",phase:"Interrogate",kind:"ija",variant:5,castId:"ijaA",clip:"InterrogateCrouch",freeHand:"handR",minHandM:.07},
+    {role:"ijaB",phase:"Interrogate",kind:"ija",variant:0,clip:"IjaBayonetGuard",minHeadRad:.1},
     {role:"guard",phase:"Captive",kind:"ija",variant:2,clip:"IjaBayonetGuard",minHeadRad:.1},
     {role:"captiveHelper",phase:"Captive",kind:"nra",variant:1,clip:"CaptiveHeld",freeHand:"handL",minHandM:.1},
-    {role:"ijaA",caseName:"ButtStrike",phase:"Butt",kind:"ija",variant:0,clip:"ButtThreat",onceDuration:1.4,minHeadRad:.1},
+    {role:"ijaA",caseName:"ButtStrike",phase:"Butt",kind:"ija",variant:5,castId:"ijaA",clip:"ButtThreat",onceDuration:1.4,minHeadRad:.1},
   ];
   const receipts=[];
   for(const spec of cases){
     await page.evaluate(spec=>{
       const p=window.openingActorPerformanceProbe;
       if(p.soldier){p.g.scene.remove(p.soldier.actor.root);p.soldier.actor.Dispose();}
-      const actor=p.g.actorFactory.Create(spec.kind,{modelVariant:spec.variant,weapon:spec.role==="interpreter"||spec.role==="captiveHelper"?null:"HanYang",seed:271});
+      const actor=p.g.actorFactory.Create(spec.kind,{modelVariant:spec.variant,castId:spec.castId,weapon:spec.role==="interpreter"||spec.role==="captiveHelper"?null:"HanYang",seed:271});
       actor.root.position.copy(p.r.Point({x:-40,z:-119.5}));p.g.scene.add(actor.root);
       p.soldier={actor,id:spec.role,alive:true,openingStoryboardTravel:0,openingStoryboardPose:{clip:spec.clip,seconds:0}};
       p.api.InstallOpeningStoryboardAnimation(p.soldier);p.spec=spec;p.time=0;p.samples=[];

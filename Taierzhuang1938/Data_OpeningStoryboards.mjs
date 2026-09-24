@@ -101,11 +101,10 @@ export const OPENING_STORYBOARDS = Object.freeze({
     ijaBGuard:Object.freeze([-.55,-1.25]),  // ijaB aims at him from the left front, then kicks
     ijaBWatch:P(5.25,-125.82,-.96),       // ...then turns to the front at the north wall (wall 0.7 m on his left)
     kickM:.62,
-    creepAfterAskS:1.2,             // Luo comes round RC this long after the interpreter's first question
     // Luo and He creep from RC down the SSW leg, over the crater step, to their marks.
     luoRoute:Route([-4,-113],[-1,-118.5],[1.2,-120.4],[3.1,-121.3],[4.7,-122.6],[5.25,-123.7]),
     heRoute:Route([-4,-113],[-1,-118.5],[1.2,-120.4],[3.1,-121.3],[4.9,-121.9]),
-    luoStart:P(-5.6,-112.2), heStart:P(-6.6,-111.7), liuStart:P(-7.8,-111.4),
+    luoStart:P(-4.6,-112.8), heStart:P(-5.9,-112.3), liuStart:P(-7.2,-111.8),   // just round the rear corner
     liuRoute:Route([-4,-113],[-1.6,-117.2]),
     liuShot:P(-1,-121,2.0),               // bunker.liuwencaiShot: 15.4 m down the trench to J
     heCover:P(.05,-121.45),               // behind the mouth spoil's west face after the swap
