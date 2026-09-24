@@ -261,12 +261,33 @@ assert.deepEqual([...C.phases.BunkerRescue],["Hold","Ask","KickShunzi","Glimpse"
   "Check","KickRifle","Released"],"contract §5.3 BunkerRescue phases");
 assert.deepEqual([...C.phases.RearTrench],["Withdraw","Corner","Collection","SupportOrder"],"contract §5.3 RearTrench phases");
 {
-  const {MISSION_PLACEMENT:Place,MISSION_ANCHORS:Anchor}=await import("./Data_FirstLevelMissionLayout.mjs");
+  const {MISSION_PLACEMENT:Place,MISSION_ANCHORS:Anchor,MISSION_LAYOUT:Layout}=await import("./Data_FirstLevelMissionLayout.mjs");
   const {MISSION_TUNING:Tune}=await import("./Data_Tuning_FirstLevel.mjs");
   const D=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
-  assert.ok(D(C.shunzi.trap,Place.bunker.player)<.01,"Shunzi is pinned where the space puts him (bunker.player)");
+  // 2026-09-25 storyboard round (contract §2.1): he sits at the back of the dugout for SB01 and is pinned in the
+  // mouth itself from the blast on (SB03–SB04): west of the door posts, between them, out of reach of the rifle.
+  const blocks=Layout.scenario.states.find(state=>state.id==="BunkerCollapsed").blocks,Block=id=>blocks.find(b=>b.id===id);
+  const postN=Block("BunkerMouthPostN"),postS=Block("BunkerMouthPostS");
+  const trap=C.shunzi.trap,seat=C.shunzi.seat;
+  assert.ok(trap.x<postN.x-postN.w/2&&trap.x>postN.x-1.5&&trap.z>postN.z+.5&&trap.z<postS.z-.5,"Shunzi is pinned in the dugout mouth, inside the door posts");
+  assert.ok(D(seat,Place.bunker.player)<1&&seat.x<trap.x-1.5,"SB01 seat at the back of the dugout, near the dugout anchor");
+  for(const id of ["BunkerBeamPinWest","BunkerBeamPinEast","BunkerRoofSag"]){const b=Block(id);
+    assert.ok(Math.abs(trap.x-b.x)>b.w/2+.3||Math.abs(trap.z-b.z)>b.d/2+.3,`the in-dugout collapse ${id} no longer pins him`);}
   assert.ok(D(C.shunzi.dragged,Anchor.shunziDragged)<.01,"ijaA drags him to the K2 eye (shunziDragged)");
-  assert.ok(D(C.rescue.rifleMouth,Place.bunker.rifleMouth)<.01,"the rifle is half-buried at the space's mouth mark");
+  const rifleReach=D(C.rescue.rifleMouth,trap);
+  assert.ok(rifleReach>.9&&rifleReach<1.6,`the rifle lies in the mouth mud just out of reach (${rifleReach.toFixed(2)} m)`);
+  assert.ok(C.rescue.rifleMouth.x>trap.x&&C.rescue.rifleMouth.x<postN.x+.6,"the rifle lies between him and the posts");
+  assert.ok(C.ija.foundRoute.every(p=>p.x>trap.x)&&C.ija.dragOutRoute[0].x>trap.x&&D(C.ija.dragOutRoute[0],trap)<1.5,"ijaA comes back to the mouth and drags him out from there");
+  // SB02 (contract §2.2): the fall ends in the dugout, looking at the north post with the head rolled left.
+  const B=C.banter.blastShot;
+  assert.ok(B.fallStartS<B.fallEndS&&B.fallEndS<B.eyesCloseS&&B.eyesCloseS<B.phaseS,"blast: fall, then the eyes close, then Black");
+  assert.ok(B.rollDeg>=12&&B.yawDeg<-50&&B.yawDeg>-80,"blast: mirrored (yaw -66, head rolled left)");
+  // SB01 depth walkers: they walk away from the mouth (east) and leave down the link sap.
+  const {OPENING_DEPTH_WALKERS:Walkers}=await import("./Data_FirstLevelBackdropSquads.mjs");
+  for(const m of Walkers.members)assert.ok(m.start.x>postN.x+5&&m.route.every((p,i,all)=>p.x>=(i?all[i-1].x:m.start.x)),`${m.id} walks away east from the mouth`);
+  // Storyboard shots and wave-1 stand-ins (contract §4.6).
+  assert.ok(C.storyboardShots.length>=2&&C.storyboardShots.every(s=>/^SB0[1-9]/.test(s.id)&&(s.when||s.phase&&Number.isFinite(s.age))&&s.judge),"storyboard shots are well formed");
+  for(const e of C.pendingWiring)assert.ok(["shot","what","now","wave2"].every(k=>typeof e[k]==="string"&&e[k].length>3),"pendingWiring entry "+JSON.stringify(e));
   assert.ok(D(C.rescue.rifleKicked,C.shunzi.cover)<Tune.interactionRangeM-1,"Luo's kick leaves the rifle within easy reach of the cover");
   assert.ok(D(C.rescue.liuShot,Place.bunker.liuwencaiShot)<.01,"Liu Wencai shoots from the space's mark");
   for(const [name,route] of [["runner",C.banter.runnerRoute],["exit",C.banter.exitRoute],["walkIn",C.ija.walkIn],["found",C.ija.foundRoute],

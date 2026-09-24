@@ -59,6 +59,15 @@
 - 踢到手边的汉阳造枪口朝西落在洞里，避开南门柱与洞口塌土；刘文财第二跳在后折角拐角后面，不挡玩家回头看连接支沟的视线。
 - 玩家可在列出的 phase 里小幅转头（±0.14 rad），其余 phase 平滑收回。耳鸣、重影、失衡由一条连续曲线驱动，还权后 16 s 内衰减完。
 
+## 4a. 2026-09-25 分镜还原（契约 [Data_FirstLevelStoryboard0103Contract.md](Data_FirstLevelStoryboard0103Contract.md)）
+
+- 抓帧与画面判据：`node Taierzhuang1938/Script_OpeningStoryboardShots.mjs [--shots=SB01,SB02] [--side-by-side=<分镜目录>]`（TestRunner 的 `OpeningStoryboardShotsTest`）。从 01 开场按真实流程推进，在 `Data_OpeningStoryboards.storyboardShots` 每镜的时刻截导演实际画面、写当帧 json，并判由站位与镜头决定的那部分画面判据（人物头部屏幕 x、距离、俯仰 / 横滚 / 眼高、地标屏幕 x、谁不许在画内）；`--side-by-side` 拼「分镜 | 实机」（分镜图不进仓库）。产物在 `_shots/OpeningStoryboards/`。
+- 顺子的位置分三段（`shunzi.*`）：Banter / Orders 坐在洞底 `seat` (−1.95,−126.25)，眼高 0.95，SB01 机位 yaw −93°、pitch −15°（`banter.seatShot`，Banter 里朝说话人转头不超过 0.14 rad）；Incoming 站起来往洞口走一步（`incomingStep`）；Blast 被掀倒（`banter.blastShot`：0.22 s 炮弹落地，0.22–0.65 s 眼高降到 0.75、转到 yaw −66°、pitch −14°、头向左倒 17°，0.95 s 闭眼，1.0 s 进 Black）；从 Black 起压在洞口 `trap` (0.1,−125.45)。MISSION_PLACEMENT.bunker.player 仍是掩蔽部锚点，不再是受困位。
+- SB02 做镜像（契约 §2 第 2 条）：爆点与塌方在洞口南侧（世界不动），画面左侧是北门柱与洞里北壁，右侧是洞口。
+- SB01 站位：幺娃靠北壁、侧身；传令兵沿 `runnerRoute` 贴北壁进来，停在北门柱内侧朝洞里喊；罗班长在洞口跪着朝东，自己那句台词（BunkerOrders.02）时起身回头指路；负伤川军脸转向洞里（yaw +30°）；纵深三名往前沿去的川军（`Data_FirstLevelBackdropSquads.OPENING_DEPTH_WALKERS`）Banter 时站在东沟、Orders 后沿东沟走进连接支沟，走到末点又不在镜头里就收走，最迟 Black 收走。
+- 任务汉阳造：装填段手里拿的那支（supply）显示时它藏着；Blast 期间也藏着，从 Black 起才出现在洞口泥里（`rescue.rifleMouth`，枪口朝东南）。松动的断木从 Black 起压在背包上（不在睁眼时凭空出现）。
+- 第一波替身（`pendingWiring`）：别的包的新 clip、手势、腿、镜头后处理、布景、定向喷土还没接，导演先用最接近的现有 clip / 效果，逐条登记 `{shot, what, now, wave2}`，第二波接线后清空。
+
 ## 5. 02 撤离与接上 03
 
 - 拾枪（`rifleRecovered`）时生成 `bunkerPursuit`（据守 1 + 跟进 3）。跟进组的 `delayS` 乘 `pursuit.delayScale`（0.35），好让玩家在后折角回头时看见追兵已经进了刚离开的那段沟。追兵都不越过弯角 M。

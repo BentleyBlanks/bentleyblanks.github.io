@@ -106,6 +106,7 @@ async function Main() {
   const page = await browser.newPage({ viewport: { width: W, height: H } });
   const errors = [];
   page.on("pageerror", (e) => { errors.push(String(e)); console.log("PAGEERROR", String(e)); });
+  page.on("crash", () => { errors.push("page crashed"); console.log("PAGECRASH"); });
   const log = { quality: QUALITY, size: [W, H], started: new Date().toISOString(), shots: [], errors };
   const t0 = Date.now();
   let failed = 0;
@@ -132,6 +133,8 @@ async function Main() {
       const dump = await page.evaluate(Dump, { warm: WARM, freeze: !!shot.freeze, points: shot.judge?.points || {} });
       const file = `${shot.id}${TAG ? "_" + TAG : ""}`;
       await page.screenshot({ path: path.join(OUT, file + ".png") });
+      // A lost WebGL context (the GPU process died, e.g. under other browsers' load) leaves a blank picture.
+      if (dump.contextLost) { errors.push(`${shot.id}: WebGL context lost`); console.log("CONTEXTLOST", shot.id); }
       const checks = Has("no-judge") ? [] : JudgeShot(shot.judge, dump);
       const bad = checks.filter((c) => !c.ok);
       if (bad.length) failed++;
@@ -265,7 +268,7 @@ function Dump({ warm, freeze, points }) {
     shot: window.__sbShots.lastShot, perception: s.perception ? { amount: R3(s.perception.amount), focus: R3(s.perception.focus) } : null,
     eyeClosure: op?.eyeClosure ?? null, bloodMask: s.bloodMask ?? null,
     flags: Object.fromEntries(Object.entries(s.flags).filter(([, v]) => typeof v === "number" || typeof v === "boolean").map(([k, v]) => [k, typeof v === "number" ? R3(v) : v])),
-    actors, rifle, hands,
+    actors, rifle, hands, contextLost: !!g.renderer?.getContext?.()?.isContextLost?.(),
   };
 }
 /** Storyboard | engine at one height, drawn in a blank page (no Python needed); failed checks listed below. */

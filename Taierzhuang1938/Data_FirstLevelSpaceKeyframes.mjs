@@ -17,18 +17,22 @@ const T = TANK_HEIGHTS;
 const Stand = [1.6, 1.2], Kneel = [1.0, 0.75], Crouch = [1.0, 0.7];
 
 export const SPACE_KEYFRAMES = Object.freeze([
-  { id: "K1", label: "01 dugout, waking low view", state: "BunkerCollapsed",
-    camera: { x: -1.3, z: -126.2, eyeM: 0.42 }, look: { ...SP.bunkerJunction, h: 1.2 },
+  // 2026-09-25 storyboard round (contract docs/Data_FirstLevelStoryboard0103Contract.md §2.1, SB03): Shunzi is pinned
+  // in the dugout mouth itself (Data_OpeningStoryboards.shunzi.trap), the eye just inside the door posts and low
+  // over the mud. The interrogation is at the comrade's wall root on the north wall 3.8 m out, J and F beyond it.
+  { id: "K1", label: "01 dugout mouth, pinned low view (SB03)", state: "BunkerCollapsed",
+    camera: { x: 0.35, z: -125.15, eyeM: 0.26 }, look: { x: 4.1, z: -125.6, h: 0.9 },
     targets: [
-      { name: "kill spot (ijaA standing)", at: SP.bunkerKilling, heights: Stand, need: 2 },
-      { name: "comrade against the trench wall (kneeling)", at: { x: 6.5, z: -123.1 }, heights: [1.0, 0.7], need: 2 },
+      { name: "ijaA holding the comrade (standing)", at: { x: 4.1, z: -125.63 }, heights: Stand, need: 2 },
+      { name: "comrade kneeling at the north wall", at: { x: 4.06, z: -125.9 }, heights: [1.0, 0.7], need: 2 },
       { name: "junction J (ijaD standing)", at: SP.bunkerJunction, heights: Stand, need: 2 },
       { name: "fold F (ijaC standing)", at: SP.bunkerFold, heights: Stand, need: 2 },
-      { name: "rifle in the mouth", at: { x: 0.1, z: -125.7 }, heights: [0.08], need: 1 },
+      { name: "rifle in the mouth mud", at: { x: 1.25, z: -125.75 }, heights: [0.08], need: 1 },
     ] },
-  // C's intact-state check: before the collapse, sitting in the dugout, the roof must not hide the trench.
-  { id: "K1i", label: "01 opening, intact dugout, sitting", state: "BunkerIntact",
-    camera: { x: -1.3, z: -126.2, eyeM: 0.9 }, look: { ...SP.bunkerJunction, h: 1.2 },
+  // C's intact-state check: before the collapse, sitting at the back of the dugout (SB01 seat), the roof must not
+  // hide the trench.
+  { id: "K1i", label: "01 opening, intact dugout, sitting (SB01)", state: "BunkerIntact",
+    camera: { x: -1.95, z: -126.25, eyeM: 0.95 }, look: { ...SP.bunkerJunction, h: 1.2 },
     targets: [
       { name: "trench floor outside the mouth", at: SP.bunkerBend, heights: [0.6], need: 1 },
       { name: "a runner coming down the trench (J)", at: SP.bunkerJunction, heights: [1.5, 1.2], need: 2 },

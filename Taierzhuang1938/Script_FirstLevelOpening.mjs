@@ -5,6 +5,7 @@ import { SampleMissionTerrain as Ground } from "./Data_FirstLevelMissionTerrain.
 import { CLOSE_RANGE } from "./Data_Tuning_AiShooting.mjs";
 import { SpeakingCastOptions } from "./Data_FirstLevelSpeakingCast.mjs";
 import { FRONT_SORTIE } from "./Data_FirstLevelFrontRoute.mjs";
+import { OPENING_STORYBOARDS as Storyboard } from "./Data_OpeningStoryboards.mjs";
 const Distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const Smooth=t=>{t=Math.max(0,Math.min(1,t));return t*t*(3-2*t)};
 // 一条 [[秒, 值], ...] 曲线在 t 处的取样：段内 smoothstep，两端夹住。
@@ -90,7 +91,8 @@ export class FirstLevelOpening {
     return posts[slot]||posts.at(-1);
   }
   /** 分镜控制段的起始位置与获救位置。 */
-  get TrappedPoint(){return {x:Place.bunker.player.x,z:Place.bunker.player.z};}
+  // 2026-09-25 storyboard round: pinned in the dugout mouth (director shunzi.trap), not the dugout anchor.
+  get TrappedPoint(){return {x:Storyboard.shunzi.trap.x,z:Storyboard.shunzi.trap.z};}
   get RescueEnd(){
     const b=Place.bunker;
     return {x:(b.luoLift.x+b.yaowaLift.x)/2,z:(b.luoLift.z+b.yaowaLift.z)/2};

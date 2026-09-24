@@ -45,6 +45,24 @@ export const BACKDROP_FIRE_POINTS = Object.freeze({
   linkSap: P(23.5, -130, 1.0, 1.8),
 });
 
+// ---------------------------------------------------------------------------
+// 01 开场（近爆之前）洞口正前方东沟的纵深：分镜 SB01「纵深有人远去」（契约
+// docs/Data_FirstLevelStoryboard0103Contract.md §2 第 3 条）。撤向后沟的人出洞口右转（导演的 exitRoute），
+// 纵深里放三名**往前沿去**的川军背对镜头走远：Banter 时站在沟里朝东，传令兵进洞后（Orders 起 delayS 秒）
+// 沿东沟走向岔口 J、拐进连接支沟，走到末点且不在镜头里就收走（最迟近爆那一刻）。
+// 运行时由 01–02 导演（Script_OpeningStoryboards）生成与收走：剧本兵，不开枪，不进任务敌人表。
+//   members[] { id, start:{x,z}, route:[{x,z}…] }；speedMps 走速；delayS 从 Orders 开始算。
+// ---------------------------------------------------------------------------
+const W = (x, z) => Object.freeze({ x, z });
+export const OPENING_DEPTH_WALKERS = Object.freeze({
+  delayS: 1.4, speedMps: 1.25, staggerS: 0.5,
+  members: Object.freeze([
+    Object.freeze({ id: "DepthNraA", start: W(9.4, -124.75), route: Object.freeze([W(14, -124.6), W(18.2, -125.6), W(21.2, -128.0)]) }),
+    Object.freeze({ id: "DepthNraB", start: W(10.6, -124.45), route: Object.freeze([W(14, -124.6), W(18.2, -125.6), W(21.2, -128.0)]) }),
+    Object.freeze({ id: "DepthNraC", start: W(11.9, -124.8), route: Object.freeze([W(14, -124.6), W(18.2, -125.6), W(21.2, -128.0)]) }),
+  ]),
+});
+
 const Stop = (x, z, holdS, fire) => Object.freeze({ x, z, holdS, fire: Object.freeze(fire) });
 const Roster = MISSION_ENCOUNTERS.bunkerBackdrop;
 // Where the Japanese pause on the way down: the link sap's second fold (fire at RC over the field)

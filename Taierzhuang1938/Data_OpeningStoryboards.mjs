@@ -183,17 +183,37 @@ export const OPENING_STORYBOARDS = Object.freeze({
   cast:Object.freeze({ ijaA:"BunkerExecutionerA", ijaB:"BunkerExecutionerB", ijaC:"BunkerFollowA", ijaD:"BunkerFollowB" }),
   // ---- 01 marks ------------------------------------------------------------------------
   shunzi:Object.freeze({
-    trap:P(-1.3,-126.2,-Math.PI/2),     // bunker.player: pinned in the dugout pit, looking east out of the mouth (K1)
-    seatEyeM:.9, standEyeM:1.32, lieEyeM:.42,
+    // 2026-09-25 storyboard round (contract §2.1): he sits at the back of the dugout for the talk and the order
+    // (SB01), stands and steps toward the mouth after the others (Incoming), is knocked down by the near miss
+    // (SB02) and wakes pinned in the mouth itself, the fallen timber on his pack (SB03–SB04). The Space's
+    // MISSION_PLACEMENT.bunker.player (-1.3,-126.2) stays the dugout's anchor (A.bunker); the director's
+    // Shunzi marks are these.
+    seat:P(-1.95,-126.25,-93*Math.PI/180),   // SB01 eye: back of the dugout, the mouth x 0.30–0.74 of the frame
+    incomingStep:P(-1.15,-126.1),            // Incoming: stood up and a step toward the mouth when the shell lands
+    blastFall:P(-.9,-126.0),                 // SB02: where the eye has dropped to at the end of the fall
+    trap:P(.1,-125.45,-Math.PI/2),           // Wake → KickBeam: lying in the mouth, looking east down the trench
+    seatEyeM:.95, standEyeM:1.32, lieEyeM:.42,
     dragged:P(3.8,-123.2),              // bunker.dragged = K2 eye (kneeling); ijaA drags him here
     cover:P(.45,-124.35),               // behind the south mouth post + mouth rubble: J and F are both masked (post shadow)
     lieCollarBackM:.16,                 // collar sits this far behind the lying eye
   }),
   // Banter tableau inside the intact dugout (seated Shunzi at the pit's west end).
   banter:Object.freeze({
-    yaowa:P(-.35,-127.05), comradeSeat:P(.35,-124.35,0), luo:P(1.35,-125.95), he:P(4.6,-125.3), liu:P(6.1,-124.4),
-    shouter:P(8.6,-122.9),
-    runnerRoute:Route([-1,-118.5],[1.2,-120.6],[3.0,-121.6],[3.4,-123.4],[2.25,-124.95]),
+    // SB01 (contract §5): Yaowa low against the north wall side-on to the camera, Luo kneeling in the mouth with his
+    // back to the camera looking east, the wounded comrade against the south wall with his face turned to the room.
+    yaowa:P(-.55,-127.35,-150*Math.PI/180), comradeSeat:P(.35,-124.35,30*Math.PI/180), luo:P(1.75,-125.7,-Math.PI/2),
+    he:P(4.6,-125.3), liu:P(6.1,-124.4), shouter:P(8.6,-122.9),
+    // Luo's kneel until his order (LuoKneelCheck held inside its kneel loop, pendingWiring SB01).
+    luoKneelS:1.6,
+    // SB01 camera (eye = shunzi.seat) and the talk's head turn toward whoever speaks (clamped, eased).
+    seatShot:Object.freeze({ yawDeg:-93, pitchDeg:-15, speakerTurnRad:.14, turnRps:2 }),
+    // Incoming: standing, the step toward the mouth takes this long; the look is at the comrade outside.
+    incomingStepS:1.2,
+    // SB02 mirrored (contract §2.2): the shell lands at fallStartS (FireShell flight); the eye drops to eyeM and turns
+    // to yaw/pitch with the head rolled to the left by fallEndS; the eyes close at eyesCloseS; Black at phaseS.
+    blastShot:Object.freeze({ fallStartS:.22, fallEndS:.65, eyeM:.75, yawDeg:-66, pitchDeg:-14, rollDeg:17, eyesCloseS:.95, phaseS:1.0 }),
+    // The runner comes down the SSW leg, round the bend and in along the north wall to the inside of the north post.
+    runnerRoute:Route([-1,-118.5],[1.2,-120.6],[3.0,-121.6],[3.3,-123.6],[2.2,-126.0],[.72,-127.0]),
     // Everyone who leaves after the order goes out of the mouth, down the SSW leg to RC and on west.
     exitRoute:Route([2.1,-125.2],[3.4,-123.6],[3.1,-121.6],[1.2,-120.6],[-1,-118.5],[-4,-113],[-9,-111.3]),
     hide:Object.freeze({ luo:P(-12.5,-112.2), yaowa:P(-16,-112), he:P(-10.4,-111.6), liu:P(-14.6,-112.3), runner:P(-19,-111) }),
@@ -208,10 +228,10 @@ export const OPENING_STORYBOARDS = Object.freeze({
     walkInDelayS:Object.freeze({ ijaA:2.2, ijaB:3.0 }),   // after the eyes open (Wake)
     // After the throat cut ijaB turns to the front (east) until the Found drag begins.
     ijaBWatch:P(6.4,-125.1),
-    // Found: ijaA's path from the kill spot back in through the mouth to Shunzi.
-    foundRoute:Route([2.4,-125.55],[1.1,-125.9]),
-    // ijaA drags Shunzi out of the pit, past the comrade, to the trench edge.
-    dragOutRoute:Route([.3,-126.05],[1.6,-125.7],[2.9,-125.1],[3.9,-124.2],[4.3,-123.35]),
+    // Found: ijaA's path from the kill spot back to the mouth, where Shunzi lies (the snag root is inside the posts).
+    foundRoute:Route([2.6,-125.3],[1.6,-125.35]),
+    // ijaA drags Shunzi out of the mouth, past the comrade, to the trench edge.
+    dragOutRoute:Route([1.3,-125.4],[2.5,-125.1],[3.5,-124.3],[4.3,-123.35]),
     interpreterEnter:Route([23.5,-130],[18.2,-125.6],[14,-124.6],[8,-124.6]),
     // Flee "往前沟逃去": east down the trench, into the depth sap, removed out of sight.
     interpreterFlee:Route([6.2,-123.6],[10,-124.1],[14,-124.6],[15.2,-118.5],[17.5,-111]),
@@ -245,7 +265,9 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // Luo drags Shunzi (backwards) from the circle round the rubble into the mouth, behind the post.
     dragCoverRoute:Route([3.2,-124.25],[2.3,-124.95],[1.35,-125.05]),
     luoCheck:P(.5,-125.05),
-    rifleMouth:P(1.4,-125.6,.3),          // bunker.rifleMouth: stock half-buried in the mouth (01 prop)
+    // 01 prop: stock toward Shunzi, muzzle to the south-east in the mud of the mouth, out of reach (SB03: left of
+    // centre, low). Prop yaw: the muzzle points along (-sin yaw, -cos yaw) (survey A, checked in picture).
+    rifleMouth:P(1.25,-125.75,-125*Math.PI/180),
     // At his hand after Luo's kick (0.34 m, a seated reach); muzzle to the west into the dugout, clear of the south
     // post and the mouth rubble (turned east, its muzzle lay inside BunkerMouthRubbleS). The pickup follows the prop.
     rifleKicked:P(.3,-124.66,1.1+Math.PI),
@@ -277,6 +299,28 @@ export const OPENING_STORYBOARDS = Object.freeze({
   // package belongs, the director uses the nearest existing one and lists it here. Wave 2 wires each entry to
   // the named replacement and removes it; the list must then be empty (Script_OpeningStoryboardsTest).
   pendingWiring:Object.freeze([
+    // SB01 (Banter / Orders)
+    {shot:"SB01", what:"Yaowa sits low against the north wall loading clips, side-on to the camera",
+      now:"ClipLoad (legacy kneeling load) at banter.yaowa, Tableau/Tableau2", wave2:"YaowaSitLoad (Anim, optional in contract §4.1) if built; else keep ClipLoad"},
+    {shot:"SB01", what:"the runner leans on the north post and calls in to the room",
+      now:"MessengerReport at runnerRoute's end (PhaseOrders)", wave2:"RunnerLeanPostCall holdLoop with its post contact (Anim)"},
+    {shot:"SB01", what:"Luo kneels in the mouth looking out down the trench",
+      now:"LuoKneelCheck held at banter.luoKneelS (its kneel loop; the reach arm shows) in Tableau/PhaseOrders", wave2:"a native kneel (KneelHold/RifleIdle, contract §4.1) through the Anim layer's pose request"},
+    {shot:"SB01", what:"first person: clip on the left palm, rifle across the thighs, legs in view",
+      now:"supply hands holding the loading rifle across the view (Script_OpeningFirstPerson)", wave2:"EXTRA_HAND_POSES.palmClip, FP_PROPS.loadingRifleOnLegs and LEG_POSES.sitForward in beats.Banter/Orders (Eye)"},
+    {shot:"SB01", what:"north-wall crate stack, foreground crate, duckboards and revetment of the front trench",
+      now:"nothing (bare earth)", wave2:"OpeningSet props bunkerCrateStackN, bunkerCrateFront, duckboardsFront, revetmentFront (Set)"},
+    // SB02 (Blast)
+    {shot:"SB02", what:"mud, clods and splinters blown into the dugout from the south lip of the mouth, on the right",
+      now:"FireShell at banter.shellAt only (the crater, not seen from inside) in Blast()", wave2:"OpeningBlastFx.DirectionalBlast((1.2,-124.5) toward the north-west) at blastShot.fallStartS (Set)"},
+    {shot:"SB02", what:"the lintel's south end falls in the mouth 0.25–0.6 s and stays",
+      now:"nothing falls; the loose beam appears on his pack from Black (PhaseBlack PlaceBeam)", wave2:"OpeningSet.FallLintel(progress) / fallenLintel over Blast (Set)"},
+    {shot:"SB02", what:"strong chromatic aberration, radial edge blur, heavier vignette",
+      now:"the existing concussion blur/ghost only", wave2:"OpeningLens.Evaluate(phase, age, events) into Perception().lens (Eye)"},
+    {shot:"SB02", what:"right hand flung open toward the mouth, the loading rifle sliding out of the foreground, legs in view",
+      now:"protect/limp hand keys (beats.Blast); the loading rifle vanishes at 0.12 s; the mission rifle is hidden until Black (ApplyCamera)", wave2:"EXTRA_HAND_POSES.flingOpen, FP_PROPS.loadingRifleOnLegs.rifleSlide and LEG_POSES.sprawl in beats.Blast (Eye)"},
+    {shot:"SB02", what:"sandbag wall, poster, lit lantern and crates on the dugout's north wall (left of the frame)",
+      now:"nothing (bare earth)", wave2:"OpeningSet props bunkerSandbagWallN, bunkerPoster, bunkerLantern, bunkerCrateStackN (Set)"},
   ].map(Object.freeze)),
   // ---- 02 pursuit (bunkerPursuit, contract §5.8) -----------------------------------------
   // The roster's delayS (Space) are scaled so the three followers are in the trench the player just left
