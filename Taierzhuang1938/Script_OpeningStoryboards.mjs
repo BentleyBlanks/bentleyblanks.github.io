@@ -31,6 +31,20 @@ const DEG=Math.PI/180;
 const Rot=(yaw,x,z)=>({x:x*Math.cos(yaw)+z*Math.sin(yaw),z:-x*Math.sin(yaw)+z*Math.cos(yaw)});
 /** A point in an anchor's frame (+x right, -z forward), yaw offset in degrees (+ = turn left). */
 const Local=(anchor,x,z,dyawDeg=0)=>{const o=Rot(anchor.yaw||0,x,z);return {x:anchor.x+o.x,z:anchor.z+o.z,yaw:(anchor.yaw||0)+dyawDeg*DEG};};
+/** Freeze the displayed skeleton in world space across a root move this frame: returns the restore. */
+const _keepMatrix=new THREE.Matrix4(),_keepLocal=new THREE.Matrix4();
+function KeepSkeleton(soldier){
+  const rig=soldier?.actor?.characterRig,root=rig?.bones?.pelvis;
+  let top=root;while(top?.parent?.isBone)top=top.parent;
+  if(!top?.parent)return null;
+  top.updateWorldMatrix(true,false);
+  const world=top.matrixWorld.clone();
+  return()=>{
+    soldier.actor.root.updateMatrixWorld(true);
+    _keepLocal.copy(top.parent.matrixWorld).invert().multiply(world).decompose(top.position,top.quaternion,top.scale);
+    top.updateMatrixWorld(true);
+  };
+}
 const Equip=(soldier,id)=>{if(soldier&&soldier.actor.weaponId!==id)soldier.actor.SetWeapon(id);};
 const RouteLength=route=>route.slice(1).reduce((sum,p,i)=>sum+Distance(route[i],p),0);
 const TRAPPED=new Set(C.phases.Trapped),RESCUE=new Set(C.phases.BunkerRescue);
@@ -244,11 +258,25 @@ export class FirstLevelBunkerShow {
   Hide(actor){if(actor){actor.openingStoryboardHidden=true;actor.actor.root.visible=false;actor.openingStoryboardPose=null;}}
   Show(actor){if(actor){actor.openingStoryboardHidden=false;actor.actor.root.visible=true;}}
   /** Teleport a root (only for placements that are out of view or pelvis-continuous by design). */
-  Put(actor,point){
+  Put(actor,point,{noBlend=false}={}){
     if(!actor)return;
+    // A re-root (under 1.5 m: a clip hand-over or a paired stage) keeps the displayed body; a longer
+    // Put is a placement (a debug start, an actor brought on out of sight) and is instant.
+    const root=actor.actor?.root,shift=root?Math.hypot(root.position.x-point.x,root.position.z-point.z):0;
+    const moved=root&&root.visible&&!actor.openingStoryboardHidden&&shift<1.5
+      &&(shift>.01||Number.isFinite(point.yaw)&&Math.abs(Wrap(point.yaw-actor.yaw))>.01);
+    const keep=moved?KeepSkeleton(actor):null;
     this.r.PlaceActor(actor,point);actor.openingStoryboardLast={x:point.x,z:point.z,time:this.r.time};
     if(Number.isFinite(point.yaw)){actor.yaw=point.yaw;actor.actor.root.rotation.y=point.yaw;}
     actor.openingStoryboardTravel=0;
+    if(keep){keep();actor.openingRerooted=true;if(noBlend)actor.openingNoBlend=true;}
+  }
+  /** A re-root under the pelvis at a root-motion clip's hand-over to the native gait (no pose blend:
+   *  the clip ends in the gait it hands to, and a blend would drag the old root offset along). */
+  RerootUnderPelvis(actor,yaw){
+    const pelvis=actor?.actor?.characterRig?.bones?.pelvis;if(!pelvis)return;
+    const at=pelvis.getWorldPosition(new THREE.Vector3());
+    this.Put(actor,{x:at.x,z:at.z,yaw},{noBlend:true});
   }
   /** Current clip of an actor and its start time; restarting only when the clip changes. */
   PlayClip(actor,clip,{at=null,restart=false,holdUntil=null,additive=null,offset=0}={}){
@@ -504,7 +532,7 @@ export class FirstLevelBunkerShow {
     if(rise<0)this.Hold(comrade,b.comradeSeat,"WoundedSitRifleIdle");
     else if(rise<2.8)this.Pose(comrade,"WoundedRiseWall");
     else{
-      if(!this.flags.comradeStood){this.flags.comradeStood=true;this.Put(comrade,this.ChainRoot(b.comradeSeat,"LugouNra02","WoundedRiseWall","MessengerReport"));}
+      if(!this.flags.comradeStood){this.flags.comradeStood=true;this.RerootUnderPelvis(comrade,this.ChainRoot(b.comradeSeat,"LugouNra02","WoundedRiseWall","MessengerReport").yaw);}
       if(this.Hold(comrade,b.comradeBlast,null,{speed:C.speed.walk})||since>C.timeouts.ordersExitS)this.Stage("Incoming");
     }
   }
@@ -944,7 +972,7 @@ export class FirstLevelBunkerShow {
     this.Rescuers(r.time-this.flags.holdAt,{luoFast:age>C.timeouts.luoArriveS});
     const chop=this.ChopMarks(m),luo=this.Squad("luo");
     // 「说话！」 only once Shunzi has seen the squad leader and Luo is close behind ijaB.
-    if(age>=1.5&&(Distance(luo.position,chop.luo)<3.6||age>C.timeouts.glimpseGateS+C.timeouts.luoArriveS))this.flags.sayGate=true;
+    if(age>=1.5&&(Distance(luo.position,chop.luo)<3.6||age>C.timeouts.glimpseGateS+C.timeouts.luoArriveS)){this.flags.sayGate=true;this.flags.sayGateAt??=r.time;}
     if(this.flags.collarAt!=null||this.flags.sayGate&&age>C.timeouts.glimpseGateS+C.timeouts.luoArriveS+3)this.Stage("Collar");
   }
   PhaseCollar(age){
@@ -1057,8 +1085,7 @@ export class FirstLevelBunkerShow {
     if(!this.flags.fleeRooted){
       this.flags.fleeRooted=true;
       const rig=interp.actor.characterRig,end=OpeningClipRoot(rig?.clipModelId||rig?.modelId,"InterpreterFlee")?.end;
-      const at=interp.openingStoryboardLast||interp.position;
-      if(end){const o=Rot(interp.yaw,end[0],end[1]);this.Put(interp,{x:at.x+o.x,z:at.z+o.z,yaw:interp.yaw+end[2]*DEG});}
+      this.RerootUnderPelvis(interp,interp.yaw+(end?end[2]*DEG:0));
     }
     const end=this.Follow(interp,"flee",C.ija.interpreterFlee,C.speed.flee,null);
     if(end||r.time-this.flags.fleeAt>12){this.flags.interpreterGone=true;interp.scriptEssential=false;this.Hide(interp);r.ai.Remove(interp);delete this.cast.interpreter;}
@@ -1466,7 +1493,11 @@ export class FirstLevelBunkerShow {
     const p=this.phase,S=C.shunzi,ijaA=this.Ija("ijaA"),luo=this.Squad("luo");
     if(["Drag","Snag","KickBeam"].includes(p)){const c=this.TrackPoint(ijaA,"collar");if(c)return {x:c.x-Math.sin(S.trap.yaw)*S.lieCollarBackM,z:c.z-Math.cos(S.trap.yaw)*S.lieCollarBackM};}
     if(p==="DragOut"&&ijaA){const f={x:-Math.sin(ijaA.yaw),z:-Math.cos(ijaA.yaw)};return {x:ijaA.position.x-f.x*.62,z:ijaA.position.z-f.z*.62};}
-    if(p==="DragCover"&&luo&&this.flags.dragGrabAt!=null&&this.r.time-this.flags.dragGrabAt>=.4){const f={x:-Math.sin(luo.yaw),z:-Math.cos(luo.yaw)};return {x:luo.position.x-f.x*.55,z:luo.position.z-f.z*.55};}
+    if(p==="DragCover"&&luo&&this.flags.dragGrabAt!=null&&this.r.time-this.flags.dragGrabAt>=.4){
+      const f={x:-Math.sin(luo.yaw),z:-Math.cos(luo.yaw)},behind={x:luo.position.x-f.x*.55,z:luo.position.z-f.z*.55};
+      const w=Smooth((this.r.time-this.flags.dragGrabAt-.4)/.5);
+      return {x:S.dragged.x+(behind.x-S.dragged.x)*w,z:S.dragged.z+(behind.z-S.dragged.z)*w};
+    }
     if(TRAPPED.has(p)&&!["Butt","Boots"].includes(p))return S.trap;
     if(["LongShot","Check","KickRifle","Released"].includes(p))return S.cover;
     if(p==="DragCover")return S.dragged;
@@ -1523,12 +1554,15 @@ export class FirstLevelBunkerShow {
     else if(["Hold","Ask","KickShunzi","Glimpse","Collar","Chop","Parry"].includes(p)){
       const h=this.TrackPoint(ijaA,"head");eye=S.dragged;height=h?h.h:.66;
       // 「他缓慢抬起眼睛……视线越过他的肩膀」: the head comes up enough to clear the crater step (K2 is 0.9).
-      if(["Glimpse","Collar"].includes(p))height=Math.max(height,.66+(.92-.66)*Smooth((p==="Glimpse"?a:1)/1.2));
+      const rise=["Glimpse","Collar"].includes(p)?Smooth((p==="Glimpse"?a:1.2)/1.2):0;
+      if(rise>0)height=Math.max(height,.66+(L.glimpseEyeM-.66)*rise);
       if(h&&["Hold","Ask","KickShunzi"].includes(p))eye={x:h.x,z:h.z};
-      const past=Head(luo)&&Head(interp)?Head(luo).clone().lerp(Head(interp),.3):Head(luo);
+      const past=Head(luo)&&Head(interp)?Head(luo).clone().lerp(Head(interp),L.glimpseInterpreterPull):Head(luo);
       target=["Glimpse","Collar"].includes(p)?(past||At(A.rearCorner,1.3)):p==="Chop"?At(this.CircleMarks().ijaBWatch,1.1):p==="Parry"?(Head(ijaA)||At(S.dragged,1)):(Head(interp)||At(S.dragged,1));
       if(this.flags.kicked&&r.time-this.flags.kicked<.5)roll=.12*(1-(r.time-this.flags.kicked)/.5);
       if(this.flags.collarReleasedAt)height=Math.max(.34,height-(height-.34)*Smooth((r.time-this.flags.collarReleasedAt)/.4));
+      // Lean aside (to the left of the line to Luo) so the interpreter frames the right of K2.
+      if(rise>0&&target){const dx=target.x-eye.x,dz=target.z-eye.z,d=Math.hypot(dx,dz)||1,k=L.glimpseAsideM*rise;eye={x:eye.x+dz/d*k,z:eye.z-dx/d*k};}
     }
     else if(p==="Flee"){eye=S.dragged;height=.34;target=Head(interp)||At(A.bunkerJunction,1.2);}
     else if(p==="DragCover"){const pt=this.PlayerPoint();eye=pt;height=.55;const back=Face(pt,C.shunzi.dragged);target=this.flags.dragGrabAt==null||r.time-this.flags.dragGrabAt<.4?(Head(luo)||At(S.dragged,1)):At(C.shunzi.dragged,.9);}

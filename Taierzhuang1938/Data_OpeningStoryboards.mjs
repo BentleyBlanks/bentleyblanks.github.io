@@ -70,7 +70,11 @@ export const OPENING_STORYBOARDS = Object.freeze({
       free:Object.freeze(["Wake","FrontPass","CaptiveDragged","CaptiveWall","Interrogation","Taunt","Wipe","Reach","Boots","Hold","Ask","LongShot"]) }),
     // Shot pitch (rad, + up) while a hand beat is the subject; the push-up lift of the lying eye (m).
     look:Object.freeze({ digPitch:-.45, boltPitch:-.2, clawPitch:-.8, reachPitch:-.28, grabPitch:-.24, pushUpM:.13, dragRollRad:.025,
-      grabLeanM:.1, grabEyeM:.62, grabLookRifle:.5 }),     // 「抓住枪」: he leans over the rifle as it stops at his hand
+      grabLeanM:.1, grabEyeM:.62, grabLookRifle:.5,     // 「抓住枪」: he leans over the rifle as it stops at his hand
+      // K2 「视线越过他的肩膀」: the interpreter crouches on the crater step 0.6 m above Shunzi's knees, square
+      // between him and the SSW leg; the head comes up and leans aside so the leg (Luo) clears his shoulder
+      // (09-24 composition probe: 0.25 m aside, eye 1.0 m keeps the interpreter's face at the right third).
+      glimpseAsideM:.25, glimpseEyeM:1.0, glimpseInterpreterPull:.15 }),
     hands:Object.freeze({
       poses:Object.freeze({
         rest:H("cam",[.18,-.46,-.15],[0,-.4,-1],[.25,.65,.1],[14,24,14]),

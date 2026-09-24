@@ -42,10 +42,14 @@ const KEY_FRAMES = [
   { label: "ThroatCut", phase: "Slash", flag: "throatCut", at: .25 },
   { label: "Drag", phase: "Drag", age: 1.2 },
   { label: "Boots", phase: "Boots", age: 1 },
-  { label: "K2_Glimpse", phase: "Glimpse", age: 1.5 },
+  // K2: Luo is over the crater step behind the circle when the gate for 「说话！」 opens (at the rear
+  // corner he is still below the mouth spoil from Shunzi's eye).
+  { label: "K2_GlimpseRise", phase: "Glimpse", age: 1.5 },
+  { label: "K2_Glimpse", phase: "Glimpse", luoWithinM: 5 },
   { label: "LuoChop", phase: "Parry", flag: "luoChopAt", at: .5 },
-  { label: "HeParry", phase: "Parry", flag: "heChopAt", at: .45 },
-  { label: "HeChop", phase: "Parry", flag: "heChopAt", at: .85 },
+  // He's parry and cut run on past Parry into Flee (Parry hands over 0.4 s after heChopAt): no phase filter.
+  { label: "HeParry", flag: "heChopAt", at: .42 },
+  { label: "HeChop", flag: "heChopAt", at: .8 },
   { label: "DragCover", phase: "DragCover", age: 1.2 },
   { label: "KickRifle", phase: "KickRifle", flag: "kickRifleAt", at: .95 },
 ];
@@ -105,8 +109,10 @@ async function InstallProbe(page) {
         }
         P.previous[id] = { x: at.x, z: at.z, yaw: a.yaw, src };
       }
-      // Camera and the first-person arms while the director owns the view.
-      if (s.CameraActive && s.playerBody) {
+      // Camera and the first-person arms while the director owns the view. A cut under closed eyes
+      // (the fade-in, the blast's black) is not a jump anyone sees.
+      if ((r.opening?.eyeClosure ?? 0) >= .5) { P.camera = null; P.cameraRotation = null; }
+      else if (s.CameraActive && s.playerBody) {
         if (P.camera) {
           const step = cam.position.distanceTo(Vec().fromArray(P.camera));
           if (step > P.maxCameraStep) { P.maxCameraStep = step; P.maxCameraStepAt = { phase: s.phase, age: s.Age, time: r.time }; }
@@ -156,7 +162,7 @@ const StepSampled = (page, frames) => page.evaluate((frames) => {
   for (let i = 0; i < frames; i++) { g.StepFrames(1, 1 / 60, i === frames - 1); window.openingProbe.Sample(); }
   const r = g.Debug.FirstLevelMissionRuntime(), s = r.frontShow.bunker, m = g.Debug.FirstLevelMission();
   return { stage: m.stage, time: m.time, facts: m.facts, alive: g.player.alive, health: g.player.health,
-    phase: s.phase, phaseTime: s.Age, flags: Object.fromEntries(Object.entries(s.flags).filter(([, v]) => typeof v === "number")),
+    phase: s.phase, phaseTime: s.Age, luoM: (() => { const l = s.Squad("luo"); return l && !l.openingStoryboardHidden ? Math.hypot(l.position.x - g.player.camera.position.x, l.position.z - g.player.camera.position.z) : null; })(), flags: Object.fromEntries(Object.entries(s.flags).filter(([, v]) => typeof v === "number")),
     error: s.error };
 }, frames);
 
@@ -185,8 +191,9 @@ export async function DriveOpening(ctx){
       damage:await page.evaluate(()=>window.missionDamage),probe:await page.evaluate(()=>window.openingProbe)},null,2));
     assert.ok(state.alive,"player survives the authored opening");
     for(const k of KEY_FRAMES){
-      if(taken.has(k.label)||state.phase!==k.phase)continue;
-      if(!(k.flag?state.flags[k.flag]!=null&&state.time-state.flags[k.flag]>=k.at:state.phaseTime>=k.age))continue;
+      if(taken.has(k.label)||k.phase&&state.phase!==k.phase)continue;
+      const due=k.luoWithinM?state.luoM!=null&&state.luoM<=k.luoWithinM:k.flag?state.flags[k.flag]!=null&&state.time-state.flags[k.flag]>=k.at:state.phaseTime>=k.age;
+      if(!due)continue;
       taken.add(k.label);await page.screenshot({path:path.join(shots,`Key_${k.label}.png`)});
       console.log("KEYFRAME",k.label,state.time.toFixed(2));
     }
@@ -358,6 +365,10 @@ export const HANDBACK_HIDE_POINT = Object.freeze({ x: FRONT_SPACE.pursuitFallbac
  */
 export async function DriveHandbackNegative(page,variant,output){
   await page.waitForFunction(()=>window.Tengxian.Debug.FirstLevelMissionRuntime()?.frontShow?.bunker?.ready,null,{timeout:120000});
+  // A debug start places the rescue circle on its first frames (instant Puts from spawn points):
+  // watch continuity from Hold +0.5 s, as a player arriving from 01 would.
+  await page.evaluate(()=>{const g=window.Tengxian,s=g.Debug.FirstLevelMissionRuntime().frontShow.bunker;
+    for(let i=0;i<600&&!(s.phase==="Hold"&&s.Age>.5);i++)g.StepFrames(1,1/60,false);});
   await InstallProbe(page);
   await page.evaluate(({variant,C})=>{
     const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime(),s=r.frontShow.bunker;

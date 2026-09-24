@@ -205,6 +205,8 @@ export function ApplyOpeningRescueReady(actor,clock){
 const HANDS=C.firstPerson.hands;
 const SUPPLY_PHASES=new Set(["Banter","Orders","Incoming"]);
 const HAND_BLEND_S=.5;
+/** Most the solved palm may turn in one 1/60 s frame (the continuity gate is 12°). */
+const HAND_TURN_DEG=10;
 function Mirror(pose,side){
   if(!pose)return null;
   if(side==="r")return pose;
@@ -363,7 +365,15 @@ export class OpeningFirstPerson{
         const shared=Shared(target.clone(),shoulder,Reach(this.rig,side),otherShoulder,Reach(otherRig,otherSide));
         target.lerp(shared,Smooth(transitionAge/.25));
       }
-      const player=Solve(this.rig,side,shoulder,target,forward,normal,pole);
+      let player=Solve(this.rig,side,shoulder,target,forward,normal,pole);
+      const shown=this.previousFrameFrames[side],turnCap=HAND_TURN_DEG/Degrees*Math.min(3,Math.max(.1,dt*60));
+      if(shown&&player){
+        const solved=FrameQuaternion(player.forward,player.dorsal);
+        if(shown.angleTo(solved)>turnCap){
+          const limited=shown.clone().rotateTowards(solved,turnCap);
+          player=Solve(this.rig,side,shoulder,target,V(0,0,1).applyQuaternion(limited),V(0,1,0).applyQuaternion(limited),pole,true,true)||player;
+        }
+      }
       Fingers(this.rig,side,curl);
       const entry={contactError:player.contactError,wristBend:player.wristBend,wristTwist:player.wristTwist,reachRatio:player.reachRatio,
         upperLength:player.upperLength,lowerLength:player.lowerLength,shoulderBehind:cam.worldToLocal(shoulder.clone()).z,

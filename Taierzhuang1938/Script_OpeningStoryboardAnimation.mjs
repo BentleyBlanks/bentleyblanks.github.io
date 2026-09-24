@@ -180,7 +180,9 @@ export function InstallOpeningStoryboardAnimation(soldier){
     const rescueReady=context?.role==="luo"&&!actor.weaponId&&((context.phase==="Pull"&&pose?.clip!=="PullComrade")||context.phase==="Kick");
     if(wasRescueReady&&!rescueReady)rescueHandoff=true;
     wasRescueReady=rescueReady;
-    if(key!==lastKey){
+    const rerooted=soldier.openingRerooted,noBlend=soldier.openingNoBlend;
+    soldier.openingRerooted=false;soldier.openingNoBlend=false;
+    if(key!==lastKey||rerooted){
       blendFrom=blendBuffer;
       if(displayed){for(let i=0;i<bones.length;i++){blendFrom[i].p.copy(displayed[i].p);blendFrom[i].q.copy(displayed[i].q);}KeepDisplayedPelvis();}
       else Snapshot(blendFrom);
@@ -190,7 +192,8 @@ export function InstallOpeningStoryboardAnimation(soldier){
       weaponEase=!!(shownWeapon.p&&shownWeapon.group===actor.weaponGroup&&(before?.props?.weapon||after?.props?.weapon));
       if(weaponEase){weaponFrom.p=shownWeapon.p.clone();weaponFrom.q=shownWeapon.q.clone();weaponFrom.group=shownWeapon.group;}
       rig.openingProps?.BeginBlend();
-      blendAt=clock;lastKey=key;travelClock=0;
+      blendAt=clock;if(key!==lastKey)travelClock=0;lastKey=key;
+      if(noBlend){blendFrom=null;displayed=null;}
     }
     const locomotion=Snapshot(baseBuffer);
     if(pose&&record&&pose.clip!=="DadaoAmbush"){
@@ -214,6 +217,7 @@ export function InstallOpeningStoryboardAnimation(soldier){
     if(pose.additive)ApplyOpeningAdditive(performer,record,pose.additive);
     }else{rig.openingStoryboardState=null;}
     const blend=nativeCombat?1:Math.min(1,(clock-blendAt)/C.poseBlendS),mix=blend*blend*(3-2*blend);
+    rig.openingBlendState={key,mix:blendFrom?mix:1,rerooted:!!rerooted,noBlend:!!noBlend};
     if(blendFrom&&blend<1)for(let i=0;i<bones.length;i++){
       if(rescueHandoff&&RescueHandoffBone(bones[i]))continue;
       bones[i].position.lerpVectors(blendFrom[i].p,bones[i].position,mix);
