@@ -402,6 +402,15 @@ export class FirstLevelFrontBattle {
       if(g.mg&&g.progress<g.gatherIndex){
         if(g.progress===0)g.progress=1;
         while(g.progress<g.gatherIndex&&Distance(g.actor.position,g.route[g.progress])<B.arrivalM)g.progress++;
+        // Same stall fallback as FrontBattle.Walk: no walkStallProgressM closer for walkStallS -> skip that exit point.
+        const d=g.progress<g.gatherIndex?Distance(g.actor.position,g.route[g.progress]):0;
+        if(g.exitAt!==g.progress){g.exitAt=g.progress;g.exitBest=d;g.exitBestAt=r.time;}
+        else if(d<g.exitBest-B.walkStallProgressM){g.exitBest=d;g.exitBestAt=r.time;}
+        else if(r.time-g.exitBestAt>=B.walkStallS){
+          this.stalls.push({id:g.actor.missionId||g.actor.id,index:g.progress,total:g.route.length,final:false,
+            x:+g.actor.position.x.toFixed(1),z:+g.actor.position.z.toFixed(1),at:+r.time.toFixed(1)});
+          g.progress++;continue;
+        }
         if(g.progress<g.gatherIndex){r.ai.SetStance(g.actor,1,.5,true);r.MoveActor(g.actor,g.route[g.progress],R.guardSpeedMps);continue;}
       }
       // The nearest man probes the visible breach once, then returns to his original cover.

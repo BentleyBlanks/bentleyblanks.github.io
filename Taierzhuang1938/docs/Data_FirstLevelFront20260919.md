@@ -115,6 +115,26 @@ collectionPointSeen（collection 14 m）—— 第一次看见担架、伤员与
 `FrontBlockade`（老周指右边破墙）由 `UpdateFrontDialogue` 按「封锁是真的」判时机。
 通过条件不变：`frontReached` `frontContact` `frontRifleDefense` `rifleWithdrawalResolved`。
 
+2026-09-25 分镜还原（`docs/Data_FirstLevelStoryboard0103Contract.md` §2.11–12，SB07/SB08），数值全在
+`Data_Tuning_FirstLevelFront.FRONT_BATTLE_TUNING`：
+
+- **罗班长领路**（`leaderLead`）：03 入口到阵位西门前最后一个弯（`FRONT_SORTIE.approach[11]`）之间，罗沿自己的路线保持在玩家前
+  3–5 m：差距小于 1.5 m 就跑（5.4 m/s，快过玩家冲刺 5.25），跑回 3 m 再走；超前 5 m 以上停下等（面向玩家）；刚过一个转角
+  （转角 > 35°）且玩家还在 3 m 以外时停在拐角、面向下一段、上半身 `PointBlockade` 指路。过了那个弯恢复旧规则
+  （超前 3 m 且离玩家 10 m 以上才等）。纯规则 `LeadPace` / `LeadCorner`（`Script_FirstLevelFrontBattle`）。
+- **「贴这道墙！前头有人！」**（`FrontApproach`）改在 `approach[9]`=(7,−143.5) 周围 2.5 m 触发，玩家约在 (4.6,−143.3)；这一场
+  真正开播的那一刻记 `frontApproachPointed`（罗和玩家的位置、差距），罗在接下来 2.8 s 里边走边伸臂指前方（腿照走）。
+- **背坡轻机枪组**（`Data_FirstLevelMissionFront.FRONT_GUARD_MG_GROUP`）：第二批守军里的 6 号（射手，捷克式）和 7 号（副射手）
+  整个 03 趴在土坎东端背坡上（只有 z ≤ −158.8 能从右侧低沟的沟沿上看见），是剧本兵：只朝 `fire` 里的授权点打环境射击（不命中、
+  不进 TTK 账），不交给 `Defend`（`scriptDefensive` 关掉，否则换弹永远换不完）。04 一开始沿 `exit` 绕过 `ScrapeEastTraverse`
+  南侧下到浅壕，再走东侧守军那条腿到最后遮挡后集合（`gatherIndex`），05 与第二批一起撤。旁边那名带血伤员是战场尸体层
+  （`MISSION_AFTERMATH` 的 `AftermathMgWounded`），不是活人。同时存活预算不变（8 名守军还是 8 名）。
+- **第一批 5 人成列过缺口**：第一批改为 5 人（第二批 3 人），放行条件不变（夺点 + `frontRifleDefense`，缺口没有直接火力）。
+  放行时按离最后遮挡的路程排成一列，前一人沿撤退路线领先 2 m 后一人才走，走动中近于 1.4 m 就原地停一下，前一人 4 s 没往前挪
+  就绕过他。第二批仍是一次一个人过口（`gapClearM`）。
+- 04/05 检查点：`Script_FirstLevelMissionStageJump` 按 `firstBatch` 把第一批直接放进安全区；原来 `OPENING.rifleGuardCount`
+  这份重复的人数已删。说话的那名守军（`FACED_FRONT_GUARD_INDEX`）跟着改成 5 号——仍是第二批第一人。
+
 掩护行进分成两个有实际几何依据的门。接近段保留三个真实掩体和 cover-bound controller，
 四名队员按 `[[0,2],[1],[0,2],[1]]` 交替使用；重建后的 Support 段没有实体掩体，因而明确
 `hasBounds === false`，不再合成虚构的 cover-bound controller 或绕向退役站位。四人仍各自

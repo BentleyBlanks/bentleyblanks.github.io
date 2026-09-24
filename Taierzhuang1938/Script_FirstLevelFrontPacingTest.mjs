@@ -25,6 +25,7 @@ import { fileURLToPath } from "node:url";
 import { FirstLevelFrontBattle, ColumnDeparture, BatchPastGap, SplitRoute, GuardClearOfGap, GuardWithdrawalRoute, FrontGuardMgMember, LeadPace, LeadCorner } from "./Script_FirstLevelFrontBattle.mjs";
 import { FRONT_GUARD_MG_GROUP, FRONT_GUARD_POSTS, MISSION_AFTERMATH } from "./Data_FirstLevelMissionFront.mjs";
 import { FACED_FRONT_GUARD_INDEX } from "./Data_FirstLevelSpeakingCast.mjs";
+import { RouteClearance } from "./Script_FirstLevelSpaceProbe.mjs";
 import { FirstLevelFrontScenes, FRONT_SCENE_IDS, FrontSceneSpeakers } from "./Script_FirstLevelFrontScenes.mjs";
 import { FRONT_SORTIE as S, FRONT_SPACE as Space, FRONT_TANK_PATH } from "./Data_FirstLevelFrontRoute.mjs";
 import { FRONT_BATTLE_TUNING as B } from "./Data_Tuning_FirstLevelFront.mjs";
@@ -532,6 +533,8 @@ function WalkRuntime(extra = {}) {
     assert.equal(gatherIndex, FRONT_GUARD_MG_GROUP.exit.length);
     assert.ok(Dist(route[gatherIndex], { x: -6.3, z: -156.8 }) < 0.01, "... and gathers where the east posts do (behind the last-cover sandbags)");
     assert.ok(Dist(FRONT_GUARD_POSTS[i], route[0]) > 20, "the pair is not on its scrape post");
+    const exit = RouteClearance(route.slice(0, gatherIndex + 2));
+    assert.ok(!exit.hits.length && !exit.slopes.length, "the pair's way down into the scrape clears every block and slope: " + JSON.stringify(exit));
   }
   // The pair is on the upper backslope (only z <= -158.8 shows over the right low trench's lip) and its casualty is a body.
   for (const m of mg) assert.ok(m.z <= -158.8 && m.z > -160, m.role + " on the upper backslope, behind the crest");

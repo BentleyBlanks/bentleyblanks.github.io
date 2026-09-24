@@ -248,15 +248,17 @@ export const FRONT_GUARD_POSTS=[[-11,-156.3],[-5.6,-156.3],[-14.5,-156.4],[-1.5,
  * z -160 (2.1 m), the berm ends past x 12. From (5,-143) the pair bears 16-21 deg east of north: with Luo 4-5 m ahead
  * (bearing ~82 deg) a frame at yaw ~-51 deg holds both, the pair at x ~0.2, Luo at x ~0.8 (SB07).
  * `wounded`: the bloodied casualty beside them, a battlefield body (MISSION_AFTERMATH), not a live man.
- * `exit`: down the slope south of ScrapeEastTraverse (5.9,-156.9) into the scrape, then the east posts' leg past the
- * last-cover sandbags (-6.3,-156.8, Data_FirstLevelMissionLayout.guardWithdrawalRoutes).
+ * `exit`: down the slope and round the south side of ScrapeEastTraverse (5.9,-156.9, 1.4 x 1.4 m) into the scrape, then
+ * the east posts' leg past the last-cover sandbags (-6.3,-156.8, Data_FirstLevelMissionLayout.guardWithdrawalRoutes).
+ * The first cut (8.2,-155.4)->(4.2,-156.3) grazed the traverse's corner (SpaceProbe.RouteClearance hit at 6.1,-155.9):
+ * the gunner stuck against it at (7,-156.3) and 04 never had remainingGuardsGathered (09-25 campaign 03->06 run 1).
  */
 export const FRONT_GUARD_MG_GROUP=Object.freeze({
   members:Object.freeze([
     Object.freeze({guard:6,role:"gunner",x:10.4,z:-159.4,weapon:"Zb26",fire:true}),
     Object.freeze({guard:7,role:"assistant",x:11.3,z:-159.1,weapon:"HanYang",fire:false}),
   ]),
-  exit:Object.freeze([{x:8.2,z:-155.4},{x:4.2,z:-156.3},{x:-6.3,z:-156.8}].map(Object.freeze)),
+  exit:Object.freeze([{x:8.6,z:-155.2},{x:6,z:-154.9},{x:4,z:-155.8},{x:-6.3,z:-156.8}].map(Object.freeze)),
   // Ambient-fire points for the gunner: the enemy's bound lines north of the crest in front of him (Stub / Ridge / Mound
   // rows of the CenterEast and Center columns, FRONT_COVER), 8-24 m out, inside the brain's 1.1 rad facing cone.
   fire:Object.freeze([
