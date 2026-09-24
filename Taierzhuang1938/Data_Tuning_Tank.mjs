@@ -251,6 +251,10 @@ export const TANK = Object.freeze({
     // 余量一大 AI 会挑坑外的掩体，从那儿顺土坎南坡看得见缺口（Space 包 09-24 实测）。[几]
     slotRadiusM: 1.2,
     slotSlackM: 0.8,
+    // 护兵从守位能跑开的圈（AI 的 tacticalRadiusM，14 m）截到离攻击位（FRONT_SORTIE.throw）至少这么远：弹坑槽离攻击位 13 m，
+    // 不截的话白刃 / 近距交火把护兵一路带到投弹人身边。2026-09-25 03–06 冷启动：护兵 C 从 2 m 外两枪加一颗手榴弹，
+    // 玩家在攻击位还没投就死了（此前 TankProbe run R 也是他，1.8 m 开枪加刺刀）。他们照样从槽里打攻击位。[几]
+    throwKeepOutM: 7,
     // 车彻底哑火以后护兵沿来路（倒着走战车路点）撤回路线起点：到一个路点算 retreatArrivalM，跑步速度。[需]
     retreatArrivalM: 4,
     retreatSpeedMps: 3.2,

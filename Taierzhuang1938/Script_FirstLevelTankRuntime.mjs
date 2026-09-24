@@ -545,6 +545,12 @@ export class FirstLevelTankRuntime {
       const actor = r.enemies.get(e.id);
       if (!actor?.alive) continue;
       const previous = this.escortAnchors.get(e.id);
+      // The roaming circle (tacticalRadiusM) around his hold point stays TANK.escorts.throwKeepOutM off the attack position
+      // (see the tuning note). Every frame: an escort released from offstage gets his radius back after his last Defend.
+      if (previous && actor.tacticalRadiusM > 0) {
+        actor.escortRadiusBaseM ??= actor.tacticalRadiusM;
+        actor.tacticalRadiusM = Math.max(2, Math.min(actor.escortRadiusBaseM, Distance(previous.at || previous.anchor, S.throw) - this.T.escorts.throwKeepOutM));
+      }
       // 还没接过来的护兵：车离他远就不管（03 车在图外时他们留在原处打仗）。
       if (!previous && Distance(actor.position, e.anchor) > this.T.escorts.joinRangeM) continue;
       if (previous && previous.mode === e.mode && Distance(previous.anchor, e.anchor) < P.escortRecommandM) continue;
@@ -554,7 +560,7 @@ export class FirstLevelTankRuntime {
         const cover = this.CoverNear(e.anchor, actor);
         if (cover) { anchor = cover; radius = P.escortCoverRadiusM; }
       }
-      this.escortAnchors.set(e.id, { anchor: { ...e.anchor }, mode: e.mode, cover: anchor !== e.anchor });
+      this.escortAnchors.set(e.id, { anchor: { ...e.anchor }, mode: e.mode, cover: anchor !== e.anchor, at: { x: anchor.x, z: anchor.z } });
       r.Defend(actor, anchor, radius, e.slack);
       if (e.mode === "move" || e.mode === "rally") r.ai.SetStance(actor, e.mode === "rally" ? 0 : 1, 0.5, true);
       else if (e.mode === "slot") r.ai.SetStance(actor, 1, 0.5, true);
