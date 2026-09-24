@@ -129,8 +129,20 @@ export async function DriveFrontBattle(ctx){
   await CaptureFocus("AmmoHouse",A.bundle);
   await Route(Routes.bundleReturn,"SameBranchReturn",{stance:"crouch",fight:true,crawl:true});
   await WaitFact("bundleReturned",90,true);
-  await Route(S.attackRoute,"RoadsideAttackBranch",{stance:"crouch",fight:true,crawl:true});
-  await WaitFact("attackPositionReached",60,true);
+  // --bomb-first (contract v1.1 deadlock ②, a non-ideal order the ideal drive never hits): stop on the attack branch
+  // one bend (about 5 m) short of the attack position and finish the tank from there. attackPositionReached must then
+  // be recorded as skipped and 05 must go on to the withdrawal like the ideal order.
+  const bombFirst=process.argv.includes("--bomb-first");
+  const throwFrom=bombFirst?S.attackRoute.findIndex(p=>Math.hypot(p.x-S.throw.x,p.z-S.throw.z)<6)+1:S.attackRoute.length;
+  assert.ok(throwFrom>1&&throwFrom<S.attackRoute.length+(bombFirst?0:1),"the attack branch has a throwing point short of the attack position");
+  await Route(S.attackRoute.slice(0,throwFrom),"RoadsideAttackBranch",{stance:"crouch",fight:true,crawl:true});
+  if(!bombFirst)await WaitFact("attackPositionReached",60,true);
+  else{
+    const short=await page.evaluate(({x,z})=>{const g=window.Tengxian,p=g.player.position;
+      return {d:Math.hypot(p.x-x,p.z-z),facts:g.Debug.FirstLevelMission().facts};},S.throw);
+    console.log("BOMB_FIRST_POSITION",JSON.stringify({fromThrowM:+short.d.toFixed(2)}));
+    assert.ok(short.d>3&&!short.facts.includes("attackPositionReached"),`bomb-first throws from off the attack position (${short.d.toFixed(1)} m)`);
+  }
   // 两段毁伤（战车大脑）：第一颗越过车顶扔到远侧履带边（断履带 MobilityKill，车体挡弹片），炮塔机枪照样打，
   // 要再补一颗才彻底哑火。旧路径（没有大脑）一颗同帧两样全记，break 条件与原来一致。
   // 战车探针（ctx.options.tankProbe）：断履带以后在攻击位上蹲 ≥ 8 s，记下车在 MobilityKill 里有没有朝投掷者开火；
@@ -167,7 +179,18 @@ export async function DriveFrontBattle(ctx){
   state=await State();
   // 战车大脑取证（露面、每发主炮的预兆与落点、机枪、反应、毁伤序列、可破坏掩体）：证据目录，不断言。
   if(state.tankBrain)await fs.writeFile(path.join(output,"Data_TankBrain.json"),JSON.stringify(state.tankBrain,null,2));
+  // Thrown from 5-6 m further back, both bundles can land short of the far track (09-24: 3.8 m, MobilityKill only);
+  // with none left Luo pushes one into the hatch (TANK.luoFinishS). That is the game's own answer, not a driver shortcut.
+  if(bombFirst&&!state.facts.includes("tankFireDisabled"))state=await WaitFact("tankFireDisabled",90,true);
   assert.ok(state.facts.includes("tankImmobilized"));assert.ok(state.facts.includes("tankFireDisabled"));
+  if(bombFirst){
+    // One runtime step lets UpdateSortie see the cleared tank; the beat must be closed as skipped, not waited for.
+    const skip=await page.evaluate(()=>{const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime();g.StepFrames(2,1/60,false);
+      return r.flow.log.find(e=>e.kind==="fact"&&e.id==="attackPositionReached")?.detail??null;});
+    await fs.writeFile(path.join(output,"Data_BombFirst.json"),JSON.stringify(skip,null,2));
+    console.log("BOMB_FIRST_SKIP",JSON.stringify(skip));
+    assert.ok(skip?.skipped&&skip.reason==="tankClearedFirst"&&!skip.playerAtThrow,"bomb-first: attackPositionReached recorded as skipped");
+  }
   await CaptureFocus("TankDisabled",state.tank);
   await Route([...S.attackRoute].reverse(),"AttackBranchRetreat",{stance:"crouch",fight:true,crawl:true});
   // Contract §2.6 (Front package step 2): the last batch crosses while the pair walks back. Like Luo, cover the

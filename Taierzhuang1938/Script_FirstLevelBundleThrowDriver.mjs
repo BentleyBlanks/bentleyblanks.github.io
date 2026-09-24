@@ -13,7 +13,16 @@ export async function DriveBundleThrow(page, { aim: aimKind = "farTrack" } = {})
   const { THROW } = await import("./Data_Tuning_Combat.mjs");
   const { JUMP } = await import("./Data_Tuning_Player.mjs");
   const { WEAPONS } = await import("./Data_Weapons.mjs");
-  const g = window.Tengxian, tank = g.Debug.FirstLevelMission().tank, p = g.player.position;
+  const g = window.Tengxian;
+  // Stand up to throw, like a player does. The route arrives crouched (or prone after a dodge), and the attack
+  // branch floor dips 0.5 m within a metre of the attack position: 2026-09-24 run 3 of the 03-06 campaign threw from
+  // (42.8, -160.4) with the hand 0.5 m lower than runs 1-2 and the bundle hit the lip in front of it at 0.05 s and
+  // killed the thrower. The throw returns to cover (crouch) right after the release, below.
+  const stanceBefore = g.player.stance;
+  for (let i = 0; i < 2 && g.player.stance !== "stand"; i++) {
+    g.Debug.Key(g.player.stance === "prone" ? "KeyZ" : "KeyC"); g.StepFrames(12, 1 / 60, false);
+  }
+  const tank = g.Debug.FirstLevelMission().tank, p = g.player.position;
   const kind = WEAPONS.GrenadeBundle;
   let target = { x: tank.x, z: tank.z, rise: 0 };
   const yaw = tank.hullYaw ?? Math.PI, c = Math.cos(yaw), s = Math.sin(yaw);
@@ -107,7 +116,7 @@ export async function DriveBundleThrow(page, { aim: aimKind = "farTrack" } = {})
   const launch=Initial(launched),requested={pitch:+g.player.pitch.toFixed(3),aimPitch:+g.player.aimPitch.toFixed(3),
     yaw:+g.player.yaw.toFixed(3),aimYaw:+g.player.aimYaw.toFixed(3),
     direction:[+requestedDirection.x.toFixed(3),+requestedDirection.y.toFixed(3),+requestedDirection.z.toFixed(3)],
-    power:+power.toFixed(3),chargeFrames};
+    power:+power.toFixed(3),chargeFrames,stance:g.player.stance};
   g.StepFrames(1, 1 / 60, false);
   if (g.player.stance === "stand") g.Debug.Key("KeyC");
   // 跟着这一发看它落在哪儿：炸不停的时候，落点比任何推断都说明问题。
@@ -135,7 +144,7 @@ export async function DriveBundleThrow(page, { aim: aimKind = "farTrack" } = {})
   const selfBlast = blast ? hits.filter((h) => h.blast && h.from && Math.hypot(h.from.x - blast.x, h.from.y - blast.y, h.from.z - blast.z) < 1)
     .reduce((sum, h) => sum + Math.max(0, h.loss), 0) : 0;
   return { before, after: g.state.bundles, alive: g.player.alive, health: g.player.health, selfBlast: +selfBlast.toFixed(1),
-    mission: g.Debug.FirstLevelMission(), aimKind, target,
+    mission: g.Debug.FirstLevelMission(), aimKind, target, stanceBefore, stanceAtRelease: requested.stance,
     aim: { pitch: +shot.pitch.toFixed(3), speed: +shot.speed.toFixed(2),
       clearance: shot.clearance == null ? null : +shot.clearance.toFixed(2),
       distance:+(shot.distance??rawDistance).toFixed(2),rise:+(shot.rise??(targetY-eye.y)).toFixed(2),solved:!!best },
