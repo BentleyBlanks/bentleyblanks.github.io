@@ -1,6 +1,6 @@
 {
  "schema": 2,
- "version": "20260923OpeningStoryboardsV4",
+ "version": "20260925OpeningStoryboardsV5",
  "fps": 24,
  "actorForward": [
   0,
@@ -1422,17 +1422,23 @@
      "kind": "shake"
     },
     {
+     "t": 2.45,
+     "kind": "glanceRight"
+    },
+    {
      "t": 3.0,
      "kind": "shake"
     }
    ],
    "prev": [
+    "IjaDragByForearm",
     "IjaButtStrike"
    ],
    "next": [
+    "IjaStartleTurn",
     "IjaParriedChoppedFall"
    ],
-   "notes": "Squats at his right, fists the front of his jacket and hauls the upper body out of the mud; 0.8-3.8 s is a seamless hold loop (turns his head to the interpreter, two shakes).",
+   "notes": "SB05 (2026-09-25): squats in front of Shunzi, fists the front of his jacket and hauls him up until his eye is 0.73 m off the ground (player head); the head is up and pushed forward and the face stays on Shunzi's eye (head aimed at the player head track; the helmet brim does not cover it) except one glance to his right at the interpreter (2.2-2.9 s). 0.8-3.8 s is a seamless hold loop with two shakes.",
    "rigs": [
     "LugouIja02"
    ]
@@ -1664,56 +1670,6 @@
     "LugouNra02"
    ]
   },
-  "IjaParriedChoppedFall": {
-   "duration": 2.4,
-   "loop": false,
-   "weaponHold": "track",
-   "role": "ijaA",
-   "rig": "LugouIja02",
-   "props": [
-    "weapon"
-   ],
-   "rootMotion": true,
-   "stage": "chopParry",
-   "terminal": true,
-   "contacts": [
-    {
-     "t": 0.417,
-     "by": "heyoutian",
-     "part": "muzzle",
-     "action": "parry"
-    },
-    {
-     "t": 0.792,
-     "by": "heyoutian",
-     "part": "neckSideL",
-     "action": "cut"
-    }
-   ],
-   "events": [
-    {
-     "t": 0.05,
-     "kind": "releaseCollar"
-    },
-    {
-     "t": 0.792,
-     "kind": "bloodSpray",
-     "at": "neckSideL"
-    },
-    {
-     "t": 2.4,
-     "kind": "dead"
-    }
-   ],
-   "prev": [
-    "IjaHoldCollarUp"
-   ],
-   "next": [],
-   "notes": "Lets go of Shunzi, comes up spinning left and swinging the rifle off his shoulder at the man behind him; the muzzle is beaten aside, the cut drops him beside Shunzi. Last frame is the corpse.",
-   "rigs": [
-    "LugouIja02"
-   ]
-  },
   "LuoDragToCover": {
    "duration": 2.6,
    "loop": false,
@@ -1825,6 +1781,278 @@
    "notes": "Drops onto his right knee in front of Shunzi, left hand on his shoulder, looks him in the face (0.9-2.6 s hold loop while \"\u8fd8\u80fd\u6253\u4e0d\uff1f\" and the nod play), then stands for the kick.",
    "rigs": [
     "LugouNra05"
+   ]
+  },
+  "IjaButtStrikeCollar": {
+   "duration": 2.125,
+   "loop": false,
+   "weaponHold": "track",
+   "role": "ijaA",
+   "rig": "LugouIja02",
+   "props": [
+    "weapon"
+   ],
+   "rootMotion": false,
+   "weaponState": "clubRight",
+   "player": true,
+   "holdLoop": [
+    0.55,
+    1.05
+   ],
+   "holdExit": "pose.holdUntil: the apex loop lets go at that clip time; 1.05-1.125 s wind-up, butt on the head at 1.375 s",
+   "contacts": [
+    {
+     "t": 0.0,
+     "limb": "handL",
+     "action": "hold",
+     "partnerRole": "shunzi",
+     "part": "collar"
+    },
+    {
+     "t": 1.375,
+     "limb": "butt",
+     "action": "strike",
+     "partnerRole": "shunzi",
+     "part": "head"
+    }
+   ],
+   "events": [
+    {
+     "t": 0.55,
+     "kind": "apex"
+    },
+    {
+     "t": 1.125,
+     "kind": "windUp"
+    },
+    {
+     "t": 1.375,
+     "kind": "buttHit",
+     "fact": "playerStruck"
+    }
+   ],
+   "prev": [
+    "CollarDrag",
+    "IjaKickBeam"
+   ],
+   "next": [
+    "IjaDragByForearm"
+   ],
+   "notes": "SB04: squats astride Shunzi's legs, left fist in his collar (player collar), and raises the rifle one-handed by the handguard (0.62 m from the butt plate) over his right shoulder, butt up over his back (apex 0.55 s). 0.55-1.05 s is a seamless hold loop (the fist trembles); the director lets go with pose.holdUntil (hold at least 0.4 s). Wind-up to 1.125 s, then the butt comes over the top and down onto the head (buttHit 1.375 s, player head), pulls back over and ends in the low carry (fist at the knee, muzzle forward-down to his right). Face up and on Shunzi's eye throughout (look = player head). Last frame = IjaDragByForearm frame 0.",
+   "rigs": [
+    "LugouIja02"
+   ]
+  },
+  "IjaDragByForearm": {
+   "duration": 2.625,
+   "loop": false,
+   "weaponHold": "track",
+   "role": "ijaA",
+   "rig": "LugouIja02",
+   "props": [
+    "weapon"
+   ],
+   "rootMotion": true,
+   "weaponState": "clubRight",
+   "player": true,
+   "contacts": [
+    {
+     "t": 0.0,
+     "limb": "handL",
+     "action": "hold",
+     "partnerRole": "shunzi",
+     "part": "collar"
+    },
+    {
+     "t": 0.05,
+     "limb": "handL",
+     "action": "release"
+    },
+    {
+     "t": 0.41,
+     "limb": "handL",
+     "action": "grab",
+     "partnerRole": "shunzi",
+     "part": "forearmR"
+    }
+   ],
+   "events": [
+    {
+     "t": 0.45,
+     "kind": "haulStart"
+    },
+    {
+     "t": 2.4,
+     "kind": "haulStop"
+    }
+   ],
+   "prev": [
+    "IjaButtStrikeCollar"
+   ],
+   "next": [
+    "IjaHoldCollarUp"
+   ],
+   "notes": "SB04A: frame 0 = IjaButtStrikeCollar's last frame (astride, rifle in the low carry). Lets go of the collar, grabs Shunzi's right forearm (player forearmR, 0.41 s) and backs off bent low, hauling him 2.0 m (root motion along +z of the actor frame, i.e. backwards) with ten short steps; the right fist keeps the rifle low, muzzle forward-down. The head is up and the face on Shunzi's eye (look = player head) the whole way.",
+   "rigs": [
+    "LugouIja02"
+   ]
+  },
+  "IjaLookBackLow": {
+   "duration": 1.625,
+   "loop": false,
+   "weaponHold": "track",
+   "role": "ijaA",
+   "rig": "LugouIja02",
+   "props": [
+    "weapon"
+   ],
+   "rootMotion": false,
+   "weaponState": "twoHand->oneHandRight",
+   "holdLoop": [
+    0.8,
+    1.625
+   ],
+   "events": [
+    {
+     "t": 0.15,
+     "kind": "hears"
+    },
+    {
+     "t": 0.75,
+     "kind": "lookSettled"
+    }
+   ],
+   "prev": [
+    "IjaReadyRifle"
+   ],
+   "next": [
+    "BayonetClearWood",
+    "IjaButtStrikeCollar"
+   ],
+   "notes": "SB03A: standing at low ready he hears the beam shift, stops, and turns head and shoulders back and down over his LEFT shoulder (0.15-0.75 s; hips 13 deg, spine 29 deg, the rest in neck and head) onto a point 4.7 m away, 115 deg to his left of his forward and 0.18 m off the ground (the director turns his root so Shunzi's eye is there). The left hand leaves the handguard; the rifle hangs low in the right fist, muzzle forward-down. 0.8 s to the end is a seamless hold (breathing).",
+   "rigs": [
+    "LugouIja02"
+   ]
+  },
+  "IjaStartleTurn": {
+   "duration": 0.625,
+   "loop": false,
+   "weaponHold": "track",
+   "role": "ijaA",
+   "rig": "LugouIja02",
+   "props": [
+    "weapon"
+   ],
+   "rootMotion": false,
+   "weaponState": "slungRight",
+   "player": true,
+   "contacts": [
+    {
+     "t": 0.0,
+     "limb": "handL",
+     "action": "hold",
+     "partnerRole": "shunzi",
+     "part": "collar"
+    },
+    {
+     "t": 0.12,
+     "limb": "handL",
+     "action": "release"
+    }
+   ],
+   "events": [
+    {
+     "t": 0.04,
+     "kind": "startle"
+    },
+    {
+     "t": 0.12,
+     "kind": "releaseCollar"
+    }
+   ],
+   "prev": [
+    "IjaHoldCollarUp"
+   ],
+   "next": [
+    "IjaParriedChoppedFall"
+   ],
+   "notes": "SB05A: frame 0 = IjaHoldCollarUp at its hold-loop start (0.8 s). A flinch (0.04 s), the fist opens off the collar (0.12 s) and head and shoulders snap round to his LEFT rear (= screen right from Shunzi, where Luo and He come from) by 0.3 s, eyes on a point 95 deg to his left at head height. Shunzi sinks (player collar and head drop 0.12 m). Last frame = IjaParriedChoppedFall frame 0 (same root, no blend).",
+   "rigs": [
+    "LugouIja02"
+   ]
+  },
+  "IjaParriedChoppedFall": {
+   "duration": 2.4,
+   "loop": false,
+   "weaponHold": "track",
+   "role": "ijaA",
+   "rig": "LugouIja02",
+   "props": [
+    "weapon"
+   ],
+   "rootMotion": true,
+   "stage": "chopParry",
+   "terminal": true,
+   "contacts": [
+    {
+     "t": 0.417,
+     "by": "heyoutian",
+     "part": "muzzle",
+     "action": "parry"
+    },
+    {
+     "t": 0.792,
+     "by": "heyoutian",
+     "part": "neckSideL",
+     "action": "cut"
+    }
+   ],
+   "events": [
+    {
+     "t": 0.05,
+     "kind": "releaseCollar"
+    },
+    {
+     "t": 0.792,
+     "kind": "bloodSpray",
+     "at": "neckSideL"
+    },
+    {
+     "t": 2.4,
+     "kind": "dead"
+    }
+   ],
+   "prev": [
+    "IjaStartleTurn",
+    "IjaHoldCollarUp"
+   ],
+   "next": [],
+   "notes": "Comes up spinning left and swinging the rifle off his shoulder at the man behind him; the muzzle is beaten aside, the cut drops him beside Shunzi. Last frame is the corpse. Frame 0 is IjaStartleTurn's last frame (collar already let go, head and shoulders turned to his left rear); from IjaHoldCollarUp it is a blend.",
+   "rigs": [
+    "LugouIja02"
+   ]
+  },
+  "IjaGuardPort": {
+   "duration": 3.0,
+   "loop": true,
+   "weaponHold": "track",
+   "role": "ijaB",
+   "rig": "LugouIja01",
+   "props": [
+    "weapon"
+   ],
+   "rootMotion": false,
+   "weaponState": "twoHand",
+   "prev": [
+    "IjaKickPrisoner",
+    "IjaReadyRifle"
+   ],
+   "next": [
+    "IjaChoppedFallWall"
+   ],
+   "notes": "SB05 ijaB: stands square in the trench, rifle level at the waist (butt at the right hip, left hand on the handguard), muzzle a little down onto the captive 4 m ahead; breathing, the muzzle drifts 1-2 deg. The face is on a point 4 m ahead, 0.75 m up (look). Seamless 3 s loop.",
+   "rigs": [
+    "LugouIja01"
    ]
   }
  },
@@ -4656,7 +4884,7 @@
   {
    "id": "LugouIja01",
    "file": "Animation_LugouIja01OpeningStoryboards.json",
-   "sha256": "72c5b8aeb1da85ffe20f110952e96e036083e257c26dcec5f266e499d26bcd9e",
+   "sha256": "762d24d4fc7a1c43e468f1d3bcfa6561651ce330b4189ffd97ea875e604705ab",
    "originalModelSha256": "23fa4ef88891bd14d49dfb9a3e61b9f0dcaf45b8956a720aab24d9c4c23eb9c7",
    "clipIds": [
     "SupplyReceive",
@@ -4683,7 +4911,8 @@
     "IjaReadyRifle",
     "IjaCornerFire",
     "IjaJunctionPeek",
-    "IjaChoppedFallWall"
+    "IjaChoppedFallWall",
+    "IjaGuardPort"
    ],
    "contactPoints": {
     "hairBack": {
@@ -5705,51 +5934,57 @@
      ],
      "wallContactGapM": 0.0237,
      "wallContactDepthM": 0.0023
+    },
+    {
+     "clip": "IjaGuardPort",
+     "frames": 73,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0009,
+     "floorCorrectionMin": -0.0,
+     "floorCorrectionMax": 0.0,
+     "root": {
+      "start": [
+       0.0224,
+       -0.0617,
+       -4.14,
+       0.7206
+      ],
+      "end": [
+       0.0224,
+       -0.0617,
+       -4.14,
+       0.7206
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       3.0
+      ],
+      [
+       "R",
+       0,
+       3.0
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0,
+     "lookErrorDeg": 0.0,
+     "headTurnDeg": 14.6
     }
    ]
   },
   {
    "id": "LugouIja02",
    "file": "Animation_LugouIja02OpeningStoryboards.json",
-   "sha256": "94baa2416f52a11058485f52125a6b8ceff6c35655a385599f700cac8714b0f7",
+   "sha256": "569ead16318eed0f67f2c73da1a24e77a886544336a64d3d09d605deec9ac5be",
    "originalModelSha256": "8c4860ec2d4dd3076b06ff7e593e5dcfd4d23aefe2fedf6f9fdec3b0e12cc9aa",
-   "clipIds": [
-    "SupplyReceive",
-    "ClipLoad",
-    "MessengerReport",
-    "DuckBlast",
-    "WoundedReach",
-    "CaptiveHeld",
-    "CollarControl",
-    "BayonetClearWood",
-    "CollarDrag",
-    "ButtThreat",
-    "InterrogateCrouch",
-    "InterpreterPoint",
-    "CreepDadao",
-    "DadaoAmbush",
-    "RifleDeflect",
-    "PullComrade",
-    "KickRifle",
-    "PointBlockade",
-    "ShotCollapse",
-    "GuardTurn",
-    "IjaDragCollarFromDirt",
-    "IjaShoveToWall",
-    "IjaHairGrabPull",
-    "IjaDrawBayonet",
-    "IjaThroatSlash",
-    "IjaWipeSheathBayonet",
-    "IjaReadyRifle",
-    "IjaCornerFire",
-    "IjaJunctionPeek",
-    "IjaSlingRifle",
-    "IjaCollarDragSnag",
-    "IjaKickBeam",
-    "IjaButtStrike",
-    "IjaHoldCollarUp",
-    "IjaParriedChoppedFall"
-   ],
+   "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningStoryboards_20260925\\Scene_LugouIja02OpeningStoryboards.blend",
    "contactPoints": {
     "hairBack": {
      "bone": "Bip001 Head",
@@ -5921,7 +6156,6 @@
      ]
     }
    },
-   "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningStoryboards_20260923\\Scene_LugouIja02OpeningStoryboards.blend",
    "clips": [
     {
      "clip": "SupplyReceive",
@@ -7097,12 +7331,12 @@
     {
      "clip": "IjaHoldCollarUp",
      "frames": 93,
-     "footSlideM": 0.0015,
-     "contactErrorM": 0.0046,
-     "gripSolveErrorM": 0.00459,
-     "pelvisMaxStepM": 0.0922,
-     "floorCorrectionMin": -0.00189,
-     "floorCorrectionMax": -6e-05,
+     "footSlideM": 0.0016,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0889,
+     "floorCorrectionMin": -0.00199,
+     "floorCorrectionMax": -0.00012,
      "root": {
       "start": [
        -0.0,
@@ -7111,10 +7345,10 @@
        0.3694
       ],
       "end": [
-       0.0234,
-       0.0245,
+       0.0237,
+       0.0096,
        -0.0,
-       0.3268
+       0.3345
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
@@ -7132,6 +7366,230 @@
       ]
      ],
      "kneePlants": [],
+     "kneeSlideM": 0.0,
+     "lookErrorDeg": 0.74,
+     "headTurnDeg": 12.31
+    },
+    {
+     "clip": "IjaButtStrikeCollar",
+     "frames": 52,
+     "footSlideM": 0.0006,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0798,
+     "floorCorrectionMin": -0.00059,
+     "floorCorrectionMax": 0.00031,
+     "root": {
+      "start": [
+       0.0399,
+       -0.0273,
+       -0.0,
+       0.188
+      ],
+      "end": [
+       0.0237,
+       -0.0105,
+       -0.0,
+       0.2486
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       2.125
+      ],
+      [
+       "R",
+       0,
+       2.125
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0,
+     "lookErrorDeg": 0.5,
+     "headTurnDeg": 28.04,
+     "probes": {
+      "buttOnHead": [
+       0.0,
+       1.375
+      ]
+     }
+    },
+    {
+     "clip": "IjaDragByForearm",
+     "frames": 64,
+     "footSlideM": 0.0034,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0656,
+     "floorCorrectionMin": -0.00206,
+     "floorCorrectionMax": 0.0036,
+     "root": {
+      "start": [
+       0.0237,
+       -0.0105,
+       -0.0,
+       0.2486
+      ],
+      "end": [
+       -0.0,
+       2.0538,
+       1.17,
+       0.2927
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0.0,
+       0.645
+      ],
+      [
+       "L",
+       0.84,
+       1.035
+      ],
+      [
+       "L",
+       1.23,
+       1.425
+      ],
+      [
+       "L",
+       1.62,
+       1.815
+      ],
+      [
+       "L",
+       2.01,
+       2.205
+      ],
+      [
+       "L",
+       2.4,
+       2.625
+      ],
+      [
+       "R",
+       0.0,
+       0.45
+      ],
+      [
+       "R",
+       0.645,
+       0.84
+      ],
+      [
+       "R",
+       1.035,
+       1.23
+      ],
+      [
+       "R",
+       1.425,
+       1.62
+      ],
+      [
+       "R",
+       1.815,
+       2.01
+      ],
+      [
+       "R",
+       2.205,
+       2.625
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0,
+     "lookErrorDeg": 0.24,
+     "headTurnDeg": 16.04
+    },
+    {
+     "clip": "IjaLookBackLow",
+     "frames": 40,
+     "footSlideM": 0.0007,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0554,
+     "floorCorrectionMin": -0.00045,
+     "floorCorrectionMax": 0.00027,
+     "root": {
+      "start": [
+       0.0464,
+       -0.0603,
+       -0.0,
+       0.6716
+      ],
+      "end": [
+       0.0,
+       0.0183,
+       22.35,
+       0.7454
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       1.625
+      ],
+      [
+       "R",
+       0,
+       1.625
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0,
+     "lookErrorDeg": 0.0,
+     "headTurnDeg": 56.06
+    },
+    {
+     "clip": "IjaStartleTurn",
+     "frames": 16,
+     "footSlideM": 0.0014,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0806,
+     "floorCorrectionMin": -0.00199,
+     "floorCorrectionMax": -0.00049,
+     "root": {
+      "start": [
+       0.024,
+       0.0087,
+       -0.0,
+       0.3339
+      ],
+      "end": [
+       -0.0,
+       0.0913,
+       8.77,
+       0.3692
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       0.625
+      ],
+      [
+       "R",
+       0,
+       0.625
+      ]
+     ],
+     "kneePlants": [],
      "kneeSlideM": 0.0
     },
     {
@@ -7140,15 +7598,15 @@
      "footSlideM": 0.0049,
      "contactErrorM": 0.0,
      "gripSolveErrorM": 0.0,
-     "pelvisMaxStepM": 0.1021,
+     "pelvisMaxStepM": 0.1011,
      "floorCorrectionMin": -0.01697,
      "floorCorrectionMax": 0.14884,
      "root": {
       "start": [
        -0.0,
        0.0913,
-       -0.0,
-       0.3694
+       8.77,
+       0.3692
       ],
       "end": [
        0.1643,
@@ -7174,6 +7632,47 @@
      "kneePlants": [],
      "kneeSlideM": 0.0
     }
+   ],
+   "clipIds": [
+    "SupplyReceive",
+    "ClipLoad",
+    "MessengerReport",
+    "DuckBlast",
+    "WoundedReach",
+    "CaptiveHeld",
+    "CollarControl",
+    "BayonetClearWood",
+    "CollarDrag",
+    "ButtThreat",
+    "InterrogateCrouch",
+    "InterpreterPoint",
+    "CreepDadao",
+    "DadaoAmbush",
+    "RifleDeflect",
+    "PullComrade",
+    "KickRifle",
+    "PointBlockade",
+    "ShotCollapse",
+    "GuardTurn",
+    "IjaDragCollarFromDirt",
+    "IjaShoveToWall",
+    "IjaHairGrabPull",
+    "IjaDrawBayonet",
+    "IjaThroatSlash",
+    "IjaWipeSheathBayonet",
+    "IjaReadyRifle",
+    "IjaCornerFire",
+    "IjaJunctionPeek",
+    "IjaSlingRifle",
+    "IjaCollarDragSnag",
+    "IjaKickBeam",
+    "IjaButtStrike",
+    "IjaHoldCollarUp",
+    "IjaButtStrikeCollar",
+    "IjaDragByForearm",
+    "IjaLookBackLow",
+    "IjaStartleTurn",
+    "IjaParriedChoppedFall"
    ]
   },
   {

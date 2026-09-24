@@ -17,7 +17,9 @@ const FROZEN_AUTHORED=["WoundedSitRifleIdle","BanterLaugh","BanterLookShoulder",
   "CaptiveWallSlideTwitch","IjaWipeSheathBayonet","IjaReadyRifle","IjaCornerFire","IjaJunctionPeek","IjaSlingRifle",
   "IjaCollarDragSnag","IjaKickBeam","IjaButtStrike","IjaHoldCollarUp","InterpreterCrouchAsk","InterpreterGrabCollar",
   "InterpreterFlee","LuoDadaoChopRear","IjaChoppedFallWall","HeDadaoParryChop","IjaParriedChoppedFall","LuoDragToCover",
-  "HeSwapDadaoRifle","LuoKneelCheck"];
+  "HeSwapDadaoRifle","LuoKneelCheck",
+  // 2026-09-25 storyboard round (Data_FirstLevelStoryboard0103Contract.md §4.1)
+  "IjaButtStrikeCollar","IjaDragByForearm","IjaLookBackLow","IjaStartleTurn","IjaGuardPort"];
 const FROZEN_REUSED=["ClipLoad","MessengerReport","CollarControl","CollarDrag","BayonetClearWood","ButtThreat","CreepDadao",
   "DadaoHeavy","RifleDeflect","DadaoParry","KickRifle","GuardTurn","PointBlockade","InterrogateCrouch","InterpreterPoint",
   "DeathCollapseA","DeathCollapseB","DeathCollapseC","DeathCollapseD",
@@ -228,6 +230,62 @@ const WorldPose=(id,asset,clip,t)=>{
   };
   return asset.bones.map(name=>W(byName.get(name)));
 };
+// ---- 2026-09-25 storyboard clips (Data_FirstLevelStoryboard0103Contract.md §4.1) -----------------------
+const SB0925=["IjaButtStrikeCollar","IjaDragByForearm","IjaLookBackLow","IjaStartleTurn","IjaGuardPort"];
+{
+  const ijaB=assets.get("LugouIja01"),reportOf=(rig,id)=>manifest.models.find(m=>m.id===rig).clips.find(c=>c.clip===id);
+  for(const id of SB0925){
+    const spec=manifest.clips[id];
+    assert.equal(spec.rig,id==="IjaGuardPort"?"LugouIja01":"LugouIja02",`${id}: cast on the contract's rig`);
+    // durations are whole baked frames (a contact or event key then lands on a frame)
+    assert.ok(Math.abs(spec.duration*manifest.fps-Math.round(spec.duration*manifest.fps))<1e-6,`${id}: duration ${spec.duration} s is whole frames`);
+  }
+  // Every clip that aims ijaA's face at the camera (the player's eye) or ijaB's at the captive: the face
+  // points at it (bake lookErrorDeg: face direction vs eye->target, while the aim is fully on) and the
+  // head stays on the neck.
+  for(const [rig,id,limit] of [["LugouIja02","IjaButtStrikeCollar",3],["LugouIja02","IjaDragByForearm",3],["LugouIja02","IjaHoldCollarUp",3],
+    ["LugouIja02","IjaLookBackLow",3],["LugouIja01","IjaGuardPort",3]]){
+    const r=reportOf(rig,id);
+    assert.ok(r.lookErrorDeg<=limit,`${rig}/${id}: the face misses its look point by ${r.lookErrorDeg} deg`);
+    assert.ok(r.headTurnDeg<=70,`${rig}/${id}: head turned ${r.headTurnDeg} deg on the neck`);
+  }
+  // SB04: apex hold >= 0.4 s, the butt on the player's head at the declared strike (bake probe), event = contact.
+  const butt=manifest.clips.IjaButtStrikeCollar,strike=butt.contacts.find(c=>c.action==="strike");
+  assert.ok(butt.holdLoop[1]-butt.holdLoop[0]>=.4,"IjaButtStrikeCollar: the apex hold loop is at least 0.4 s");
+  assert.equal(butt.events.find(e=>e.kind==="buttHit").t,strike.t,"IjaButtStrikeCollar: buttHit is the strike contact");
+  const probe=reportOf("LugouIja02","IjaButtStrikeCollar").probes?.buttOnHead;
+  assert.ok(probe&&probe[0]<=.03&&Math.abs(probe[1]-strike.t)<1e-3,`IjaButtStrikeCollar: butt on the head at ${strike.t} s (${probe})`);
+  // First-person partner parts: collar/head on every clip that holds him, forearmR on the drag.
+  const parts=(id)=>Object.keys(ijaA.clips[id].player?.parts||{}).sort().join(",");
+  assert.equal(parts("IjaButtStrikeCollar"),"collar,head");assert.equal(parts("IjaDragByForearm"),"collar,forearmR,head");
+  assert.equal(parts("IjaStartleTurn"),"collar,head");assert.equal(parts("IjaHoldCollarUp"),"collar,head");
+  // SB04A: 1.5-2.5 m of root motion backwards (actor +z), the forearm grab declared on the player's forearmR.
+  const drag=reportOf("LugouIja02","IjaDragByForearm").root,travel=Math.hypot(drag.end[0]-drag.start[0],drag.end[1]-drag.start[1]);
+  assert.ok(travel>=1.5&&travel<=2.5&&drag.end[1]>drag.start[1],`IjaDragByForearm: hauls ${travel.toFixed(2)} m backwards`);
+  assert.ok(manifest.clips.IjaDragByForearm.contacts.some(c=>c.action==="grab"&&c.part==="forearmR"&&c.partnerRole==="shunzi"),"IjaDragByForearm: grabs forearmR");
+  // SB05: Shunzi's eye 0.65-0.85 m up in the IjaHoldCollarUp hold (the contract's 0.75 m).
+  const eye=ijaA.clips.IjaHoldCollarUp.player.parts.head,holdAt=Math.round(1.0*12)*3;
+  assert.ok(eye[holdAt+1]>=.65&&eye[holdAt+1]<=.85,`IjaHoldCollarUp: eye ${eye[holdAt+1]} m up in the hold`);
+  // IjaGuardPort is a seamless loop on ijaB's rig.
+  assert.ok(ijaB.clips.IjaGuardPort.loop,"IjaGuardPort loops");
+  // Same-root hand-overs frame to frame (world pose, every bone <= 2 deg and 1 cm; props <= 2 cm):
+  // strike -> drag, hold loop start -> startle, startle -> the parried fall.
+  const World=(rig,asset,id,t)=>WorldPose(rig,asset,id,t);
+  for(const [a,ta,b,tb] of [["IjaButtStrikeCollar",null,"IjaDragByForearm",0],["IjaHoldCollarUp",manifest.clips.IjaHoldCollarUp.holdLoop[0],"IjaStartleTurn",0],
+    ["IjaStartleTurn",null,"IjaParriedChoppedFall",0]]){
+    const x=World("LugouIja02",ijaA,a,ta??manifest.clips[a].duration),y=World("LugouIja02",ijaA,b,tb);
+    let angle=0,offset=0,where="";
+    x.forEach((p,i)=>{
+      if(/Fingerdd|Nub/.test(ijaA.bones[i]))return;
+      const q=y[i],deg=2*Math.acos(Math.min(1,Math.abs(p.q[0]*q.q[0]+p.q[1]*q.q[1]+p.q[2]*q.q[2]+p.q[3]*q.q[3])))*180/Math.PI;
+      if(deg>angle){angle=deg;where=ijaA.bones[i];}
+      offset=Math.max(offset,Math.hypot(p.p[0]-q.p[0],p.p[1]-q.p[1],p.p[2]-q.p[2]));
+    });
+    assert.ok(angle<=2&&offset<=.01,`${a}@${ta??"end"} -> ${b}@${tb}: ${angle.toFixed(2)} deg at ${where}, ${(offset*100).toFixed(2)} cm`);
+    if(ta==null)assert.ok(PropJump(ijaA,a,-1,b,0)<=.02,`${a} -> ${b}: the rifle continues`);
+    chains++;
+  }
+}
 let seams=0;
 for(const [id,spec] of Object.entries(manifest.clips)){
   if(!spec.holdLoop||spec.legacy)continue;
@@ -286,4 +344,4 @@ assert.deepEqual([...C.phases.RearTrench],["Withdraw","Corner","Collection","Sup
   assert.match(source,/CornerFire\([^)]*\)\{[\s\S]*?this\.FireRifle\(/,"the corner man's loop fires a real rifle shot");
   assert.ok(Object.values(C.pursuit).every(v=>Number.isFinite(v)&&v>0),"pursuit tuning is finite");
 }
-console.log(`ok opening storyboards: five original rigs, ${clipCount} rig clips (${NEW.length} authored 2026-09-23, ${paired} paired contacts cross-checked, ${chains} same-root hand-overs, ${seams} hold-loop seams), ${frames} normalized frames, director phase table and marks`);
+console.log(`ok opening storyboards: five original rigs, ${clipCount} rig clips (${NEW.length} authored 2026-09-23/25, ${paired} paired contacts cross-checked, ${chains} same-root hand-overs, ${seams} hold-loop seams), ${frames} normalized frames, director phase table and marks`);

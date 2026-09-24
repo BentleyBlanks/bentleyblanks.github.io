@@ -10,7 +10,7 @@ const H = (frame, p, f, n, c, extra = {}) => Object.freeze({ in: frame, p: Objec
 const K = (...keys) => Object.freeze({ keys: Object.freeze(keys.map((k) => Object.freeze(k))) });
 const KC = (clock, ...keys) => Object.freeze({ clock, keys: Object.freeze(keys.map((k) => Object.freeze(k))) });
 export const OPENING_STORYBOARDS = Object.freeze({
-  version:"20260923OpeningStoryboardsV4", animationBase:"./Animation/OpeningStoryboards/",
+  version:"20260925OpeningStoryboardsV5", animationBase:"./Animation/OpeningStoryboards/",
   // 2026-09-23 action library (contract §5.4). Names are frozen; per-clip metadata (role,
   // contacts, stages, props, root motion, holdLoop, next) is in the manifest `clips`.
   clips:{
@@ -24,7 +24,9 @@ export const OPENING_STORYBOARDS = Object.freeze({
       "CaptiveWallSlideTwitch","IjaWipeSheathBayonet","IjaReadyRifle","IjaCornerFire","IjaJunctionPeek","IjaSlingRifle",
       "IjaCollarDragSnag","IjaKickBeam","IjaButtStrike","IjaHoldCollarUp","InterpreterCrouchAsk","InterpreterGrabCollar",
       "InterpreterFlee","LuoDadaoChopRear","IjaChoppedFallWall","HeDadaoParryChop","IjaParriedChoppedFall","LuoDragToCover",
-      "HeSwapDadaoRifle","LuoKneelCheck"],
+      "HeSwapDadaoRifle","LuoKneelCheck",
+      // 2026-09-25 storyboard round (Data_FirstLevelStoryboard0103Contract.md §4.1).
+      "IjaButtStrikeCollar","IjaDragByForearm","IjaLookBackLow","IjaStartleTurn","IjaGuardPort"],
     // Not in §5.4, added for the draft's "日兵甲把他推到沟壁上" pair (reported to the integrator).
     added:["IjaShoveToWall"],
   },

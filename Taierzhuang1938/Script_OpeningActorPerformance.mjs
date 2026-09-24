@@ -14,7 +14,10 @@ const ContactClips=new Set(["DuckBlast","BayonetClearWood","CollarDrag","ButtThr
   "CaptiveClutchThroat","CaptiveWallSlideTwitch","IjaWipeSheathBayonet","IjaReadyRifle","IjaSlingRifle","IjaCollarDragSnag",
   "IjaKickBeam","IjaButtStrike","IjaHoldCollarUp","InterpreterGrabCollar","InterpreterFlee","LuoDadaoChopRear",
   "IjaChoppedFallWall","HeDadaoParryChop","IjaParriedChoppedFall","LuoDragToCover","HeSwapDadaoRifle","LuoKneelCheck",
-  "BanterPatRifle","IjaKickPrisoner","IjaShoveForward","CaptiveKneelFlinch","CaptiveShovedStumble"]);
+  "BanterPatRifle","IjaKickPrisoner","IjaShoveForward","CaptiveKneelFlinch","CaptiveShovedStumble",
+  // 2026-09-25 storyboard round: the face is aimed at the first-person eye inside the clip (a
+  // dialogue head turn on top would take it off the camera).
+  "IjaButtStrikeCollar","IjaDragByForearm","IjaLookBackLow","IjaStartleTurn","IjaGuardPort"]);
 const Guards=new Set(["ijaA","ijaB","guard","heyoutian","liuwencai"]);
 const Hash=value=>[...String(value)].reduce((sum,char)=>(sum*31+char.charCodeAt(0))>>>0,7);
 const HandClips=new Set(["ButtThreat","InterrogateCrouch","InterpreterPoint","MessengerReport","PointBlockade"]);
