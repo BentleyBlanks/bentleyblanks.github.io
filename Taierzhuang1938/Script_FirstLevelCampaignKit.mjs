@@ -46,15 +46,21 @@ export const CAMPAIGN_SEGMENT_STARTS = Object.freeze([8, 11, 15, 18]);
 /** `--stage-to` 允许的终点：Front 段末（7）、Mid 段末（14）、整关（18）。 */
 // 2 = 01–02 to the collection hand-over (the opening package's own acceptance, 03 not driven).
 export const CAMPAIGN_SEGMENT_ENDS = Object.freeze([2, 3, 6, 7, 14, 18]);
+/**
+ * 不带 `--stage-jumps` 也能起跑的冷启动点（`missionStage=N`，玩家阵亡重来 / 选章落在这里）：
+ * 01 开局、03 前沿、04 / 05 检查点、06 集结处。从这里起一路真输入推进，中途不再跳。
+ */
+export const CAMPAIGN_CONTINUOUS_STARTS = Object.freeze([1, 3, 4, 5, 6]);
 
 export function ParseCampaignArgs(argv = process.argv) {
   const Has = (flag) => argv.includes(flag);
   const stageJumps = Has("--stage-jumps");
   const raw = argv.find((arg) => arg.startsWith("--stage-from="))?.split("=")[1];
   const stageFrom = Number(raw || 1);
+  // 4 / 5 = the 04 / 05 checkpoints, driven on with real input like 3 and 6: a cold start, never a jump inside a run.
   assert.ok(
-    [1, 3, 6].includes(stageFrom) || (stageJumps && CAMPAIGN_SEGMENT_STARTS.includes(stageFrom)),
-    "continuous suites start at 1, 3 or 6; debug continuation starts at " + CAMPAIGN_SEGMENT_STARTS.join(" / "),
+    CAMPAIGN_CONTINUOUS_STARTS.includes(stageFrom) || (stageJumps && CAMPAIGN_SEGMENT_STARTS.includes(stageFrom)),
+    "continuous suites start at " + CAMPAIGN_CONTINUOUS_STARTS.join(", ") + "; debug continuation starts at " + CAMPAIGN_SEGMENT_STARTS.join(" / "),
   );
   // 只跑某一段到它的末尾（`--stage-to=7` = Front 包的 1–7）。默认 18 = 整关走到 Complete。
   // 分段跑出来的证据目录与整关分开，一段跑通不许冒充通关。
@@ -62,6 +68,12 @@ export function ParseCampaignArgs(argv = process.argv) {
   const stageTo = Number(toRaw || 18);
   assert.ok(CAMPAIGN_SEGMENT_ENDS.includes(stageTo), "segment suites end at " + CAMPAIGN_SEGMENT_ENDS.join(" / "));
   assert.ok(stageTo >= stageFrom, "a segment cannot end before it starts");
+  // 05 的非理想顺序：先在攻击支路上把车炸掉、再（不）到攻击位（契约 v1.1 卡死②）。03 起与 05 检查点起都能带。
+  const bombFirst = Has("--bomb-first");
+  assert.ok(!bombFirst || (stageFrom <= 5 && stageTo >= 6), "--bomb-first drives 05 and needs the run to reach 06");
+  // 同一套件并行跑多份时（统计阵亡率），各自的证据目录分开：`--evidence-tag=R2` → _shots/<suite>_R2。
+  const evidenceTag = argv.find((arg) => arg.startsWith("--evidence-tag="))?.split("=")[1] || "";
+  assert.ok(/^[A-Za-z0-9_-]*$/.test(evidenceTag), "--evidence-tag is letters, digits, _ or -");
   return {
     campaign: Has("--campaign"),
     audioCheck: Has("--audio"),
@@ -71,8 +83,11 @@ export function ParseCampaignArgs(argv = process.argv) {
     // 默认整关/分段驾驶只观察运行时自主产生的 cue，不能改写真实语音排队。
     quietGuidanceInterruptProbe: Has("--probe-quiet-guidance-interrupt"),
     allowCheckpointRetry: Has("--allow-checkpoint-retry"),
+    bombFirst, evidenceTag,
     stageFrom, stageTo,
-    suite: stageFrom === 6 ? "FirstLevelWhitebox0618" : stageFrom === 3 ? "FirstLevelFrontTopology" : stageTo === 2 || stageTo === 3 ? "FirstLevelOpeningStoryboards" : stageTo === 7 ? "FirstLevelStageFront"
+    suite: stageFrom === 6 ? "FirstLevelWhitebox0618" : stageFrom === 3 ? "FirstLevelFrontTopology"
+      : stageFrom === 4 || stageFrom === 5 ? `FirstLevelFrontCheckpoint0${stageFrom}${bombFirst ? "BombFirst" : ""}`
+      : stageTo === 2 || stageTo === 3 ? "FirstLevelOpeningStoryboards" : stageTo === 7 ? "FirstLevelStageFront"
       : stageTo === 14 ? "FirstLevelStageMiddle"
         : stageFrom === 8 ? "FirstLevelStageVillage"
           : stageFrom === 11 ? "FirstLevelStageTransfer"
@@ -84,7 +99,7 @@ export function ParseCampaignArgs(argv = process.argv) {
 
 /** 起服务、起浏览器、开页面，返回 ctx。 */
 export async function OpenCampaign(options) {
-  const output = path.join(here, "_shots", options.suite);
+  const output = path.join(here, "_shots", options.suite + (options.evidenceTag ? "_" + options.evidenceTag : ""));
   await fs.mkdir(output, { recursive: true });
   const server = await ServeRoot(root, 0);
   const browser = await LaunchBrowser();
@@ -97,7 +112,7 @@ export async function OpenCampaign(options) {
     jumpReceipts: [], campaignRetries: [], capturedActivities: new Set(),
   };
   await page.goto(
-    `http://127.0.0.1:${server.address().port}/Taierzhuang1938/?whitebox=p012&${options.audioCheck ? "menu=0" : "shot=1"}&manual=1${[3,6].includes(options.stageFrom)?`&missionStage=${options.stageFrom}`:""}&quality=${options.quality||"low"}&scale=small`,
+    `http://127.0.0.1:${server.address().port}/Taierzhuang1938/?whitebox=p012&${options.audioCheck ? "menu=0" : "shot=1"}&manual=1${[3,4,5,6].includes(options.stageFrom)?`&missionStage=${options.stageFrom}`:""}&quality=${options.quality||"low"}&scale=small`,
     { waitUntil: "domcontentloaded", timeout: 180000 },
   );
   await page.waitForFunction(() => window.Tengxian?.state?.ready, null, { timeout: 180000 });

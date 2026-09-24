@@ -47,7 +47,8 @@ export async function Drive(ctx) {
   if(ctx.stageFrom===1)await DriveOpening(ctx);
   // --stage-to=2: 01–02 through the collection hand-over only (03 is the front battle's).
   if(ctx.stageTo===2){await CheckOpeningActing(ctx);return;}
-  if(ctx.stageFrom<=3)await DriveFrontBattle(ctx);
+  // 03–05 (and the 04 / 05 checkpoints) are one continuous driver.
+  if(ctx.stageFrom<=5)await DriveFrontBattle(ctx);
   if(ctx.stageFrom===1)await CheckOpeningActing(ctx);
   if(ctx.stageTo===3)return;
 
