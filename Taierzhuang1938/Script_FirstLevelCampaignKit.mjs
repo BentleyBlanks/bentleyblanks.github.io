@@ -242,7 +242,12 @@ export async function InstallInputDriver(ctx) {
               // Mobile enemies now reach real bayonet contact. The campaign maps V
               // to the equipped melee slot (Dadao), so keep that weapon out through
               // contact instead of switching back to the rifle on every frame.
-              if(distance<3 && Math.abs(gap)<.2){
+              // A swing the scenery keeps catching (the nest gunner crouched behind his gun block: every cut ends
+              // "Obstructed") is a wall, like a shot that hits one: use the rifle on him for 4 s instead (09-24 Front idle
+              // probe U1: 16 s of blocked dadao cuts at 0.8 m, empty rifle never reloaded, killed by the link guard).
+              this.obstructed ||= new Map();
+              if(fighter?.state==="stagger"&&(fighter.clip==="Obstructed"||fighter.clip==="WeaponClash"))this.obstructed.set(foe.id,g.ai.time+4);
+              if(distance<3 && Math.abs(gap)<.2 && !((this.obstructed.get(foe.id)||0)>g.ai.time)){
                 g.Debug.Mouse(2,false);
                 if(g.state.activeSlot!=="melee"){g.Debug.Key("KeyV");return;}
                 if(!fighter.weapon)return;
