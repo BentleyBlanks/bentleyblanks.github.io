@@ -503,8 +503,10 @@ const TANK_PACE = Object.freeze({
   // 04：驶出路弯 → 压阵位，压住了（tankPositionPressured）才往前封口。
   Pressure: { stage: "MachineGun", holdUntil: "tankPositionPressured" },
   Approach: { stage: "MachineGun" },
-  Block: { stage: "MachineGun", holdUntil: "stage:Tank", escortSlots: FRONT_TANK_ESCORT_SLOTS },
-  // 05：往缺口挤一次（油门、履带尖啸、排气）。
+  // 05 也停在 Block，不再往 Squeeze 挤：Squeeze 离攻击位 11 m，后甲板（发动机舱，车顶 2.56 m）要初速 13.2 m/s 才够得着，
+  // 集束弹上限 13 —— 两段毁伤的第二颗扔不上去（09-24 战车探针：第二颗落在近侧履带边，Disabled 记成 trackL；
+  // 05 车体机枪也一串没打）。Block 离攻击位 9.7 m，后甲板要 12.6 m/s。车断了履带（tankImmobilized）也就走不了了。
+  Block: { stage: "MachineGun", holdUntil: "tankImmobilized", escortSlots: FRONT_TANK_ESCORT_SLOTS },
   Squeeze: { stage: "Tank", escortSlots: FRONT_TANK_ESCORT_SLOTS },
 });
 const Seg = (a, b, stage) => Object.freeze({ x: a.x, z: a.z, stage });

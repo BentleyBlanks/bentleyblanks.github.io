@@ -13,6 +13,9 @@ import { FRONT_TANK_PATH, FRONT_SORTIE, FRONT_SPACE, FrontTankIndex } from "./Da
 import { FRONT_TANK_ESCORT_SLOTS } from "./Data_FirstLevelMissionFront.mjs";
 import { FRONT_BREAKABLES, FRONT_UNBREAKABLE } from "./Data_FirstLevelFrontBreakables.mjs";
 import { MISSION_LAYOUT } from "./Data_FirstLevelMissionLayout.mjs";
+import { THROW } from "./Data_Tuning_Combat.mjs";
+import { JUMP } from "./Data_Tuning_Player.mjs";
+import { WEAPONS } from "./Data_Weapons.mjs";
 import { SampleMissionTerrain } from "./Data_FirstLevelMissionTerrain.mjs";
 import { TankAudio, TankLoopParams, CannonLayerWeights, ShellPassPoint } from "./Script_TankAudio.mjs";
 import { TANK_SFX, TankSfxFiles } from "./Data_SfxSources.mjs";
@@ -371,7 +374,7 @@ function Run(brain, world, seconds, each = null) {
   ok(W.length === FRONT_TANK_PATH.length && W.every((w, i) => w.id === FRONT_TANK_PATH[i].id && w.x === FRONT_TANK_PATH[i].x
     && w.z === FRONT_TANK_PATH[i].z && w.kind === FRONT_TANK_PATH[i].kind), "the brain drives Space's waypoints, same ids, coordinates and kinds");
   ok(W[I("HullDown")].preview && W[I("HullDown")].holdS === 15 && W[I("Pressure")].holdUntil === "tankPositionPressured"
-    && W[I("Block")].holdUntil === "stage:Tank" && W[I("Squeeze")].stage === "Tank", "pace: preview at HullDown, pressure before block, squeeze in 05");
+    && W[I("Block")].holdUntil === "tankImmobilized" && W[I("Squeeze")].stage === "Tank", "pace: preview at HullDown, pressure before block, holds Block through 05");
   ok(Dist(W[I("HullDown")].faceTo, FRONT_SPACE.tankTargets.nest) < 1e-9 && Dist(W[I("Block")].faceTo, FRONT_SPACE.tankTargets.gap) < 1e-9,
     "faceTo names resolve to FRONT_SPACE.tankTargets");
   ok(W[I("Block")].escortSlots === FRONT_TANK_ESCORT_SLOTS && FRONT_TANK_ESCORT_SLOTS.length === 4, "block escorts take Space's four crater slots");
@@ -413,8 +416,21 @@ function Run(brain, world, seconds, each = null) {
   ok(brain.holdIndex === I("Block") && brain.reached === I("Block"), "04: advances to Block after the nest is pressured");
   world.stage = "Tank";
   step(40);
-  ok(brain.reached === I("Squeeze"), "05: squeezes toward the gap");
-  ok(Dist(brain, FRONT_SORTIE.throw) < 12, `05: attack position within bundle reach of the hull (${Dist(brain, FRONT_SORTIE.throw).toFixed(1)} m)`);
+  ok(brain.holdIndex === I("Block") && brain.reached === I("Block"), "05: holds Block (never squeezes out of the deck throw's reach)");
+  // Two-stage damage needs the second bundle on the engine deck (hull top 2.56 m, 1.2 m aft of centre). With the
+  // throw model of Script_FirstLevelBundleThrowDriver (THROW.arcLift, muzzle advance, gravity 19.6) the slowest
+  // throw that lands there from the attack position must stay under the bundle's top speed.
+  {
+    const f = Forward(brain.hullYaw), deck = { x: brain.x - f.x * 1.2, z: brain.z - f.z * 1.2 };
+    const raw = Dist(deck, FRONT_SORTIE.throw), rise = 2.61, hg = JUMP.gravityMps2 / 2;
+    let need = Infinity;
+    for (let pitch = 0.06; pitch <= 1.3; pitch += 0.02) {
+      const cos = Math.cos(pitch), v = Math.sin(pitch) + THROW.arcLift, d = raw - THROW.muzzleAheadM * cos;
+      const drop = d * v / cos - (rise - (THROW.muzzleAheadM * Math.sin(pitch) + THROW.muzzleRiseM));
+      if (drop > 0.05) need = Math.min(need, Math.sqrt(hg * d * d / (cos * cos * drop)));
+    }
+    ok(need <= WEAPONS.GrenadeBundle.throwSpeedMax - 0.05, `05: the engine deck is within a bundle throw from the attack position (${raw.toFixed(1)} m needs ${need.toFixed(2)} m/s)`);
+  }
   // Block escorts: absolute crater slots, not road-side pushes.
   const held = CreateTankBrain(P, TANK, { seed: 22 });
   held.PlaceAt(I("Block"));
