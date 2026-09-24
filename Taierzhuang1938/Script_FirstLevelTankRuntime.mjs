@@ -440,6 +440,9 @@ export class FirstLevelTankRuntime {
     if (t.impacts.length > 8) t.impacts.shift();
     shot.impact = Plain(position);
     shot.playerDistance = r.player ? Distance(position, r.player.position) : null;
+    // Nearest protected man at the real burst (SafeShellAim's promise; TankProbe gates it).
+    const guarded = this.brain.ProtectedPoints({ targets: this.Targets(r.flow.stage.id) });
+    shot.protectedMinM = guarded.length ? Math.min(...guarded.map((p) => Math.hypot(position.x - p.x, position.z - p.z))) : null;
     for (const actor of r.squad || []) if (Distance(actor.position, position) < 12) r.ai.SetStance(actor, 2, 2, true);
     if (!r.Has("tankPositionPressured") && Distance(position, S.nest) < this.T.pressureRadiusM) {
       r.Record("tankPositionPressured", { x: position.x, z: position.z });

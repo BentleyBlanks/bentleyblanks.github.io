@@ -104,7 +104,7 @@ function Metrics(samples, debug) {
     const sample = before.at(-1);
     return { t: Round(shot.t), stage: sample?.stage, kind: shot.kind, target: shot.target, warning: shot.warning,
       layS: Round(shot.layS), crankStopToFireS: lastCrank ? Round(shot.t - lastCrank.t) : null,
-      playerDistance: Round(shot.playerDistance ?? null), impact: shot.impact ? { x: Round(shot.impact.x, 1), z: Round(shot.impact.z, 1) } : null };
+      playerDistance: Round(shot.playerDistance ?? null), protectedMinM: Round(shot.protectedMinM ?? null), pulled: shot.pulled || 0, impact: shot.impact ? { x: Round(shot.impact.x, 1), z: Round(shot.impact.z, 1) } : null };
   });
   const bursts = tel.bursts || [];
   const byKind = {};
@@ -204,6 +204,10 @@ async function RunCampaign() {
     const essentialShots = ["heyoutian", "luo", "liuwencai", "zhou"].reduce((n, id) => n + (metrics.tankStageShots.byTarget[id] || 0), 0);
     assert.ok(essentialShots <= 1, `05: main gun no longer wastes shells on script-essential companions (${JSON.stringify(metrics.tankStageShots.byTarget)})`);
     assert.ok(metrics.mg.byStage.Tank >= 1, `05: the hull MG fires (${metrics.mg.byStage.Tank} bursts)`);
+    // Contract §2.9 at the real burst, not the aim point (09-24 Front: gap-zone shells hit the trench lip 5.8–8.6 m from
+    // the waiting guards and one run lost the whole batch). 0.5 m slack for men moving during the ~0.3 s flight.
+    const nearProtected = metrics.shots.filter((s) => s.protectedMinM != null && s.protectedMinM < TANK.gunner.protectClearM - 0.5);
+    assert.deepEqual(nearProtected, [], `no main-gun burst lands within ${TANK.gunner.protectClearM} m of a protected man`);
     // 04：打掩体真把墙打掉一截（临时数据 RightNestFrontRest / RightNestNorthRuin）。
     assert.ok(metrics.breaks.some((b) => b.stage === "MachineGun"), `04: at least one cover segment is shot away (${JSON.stringify(metrics.breaks)})`);
     // 断履带以后还会打；第二颗扔上后甲板 = 炸发动机舱。
