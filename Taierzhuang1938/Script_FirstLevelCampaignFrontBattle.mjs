@@ -101,7 +101,7 @@ export async function DriveFrontBattle(ctx){
         ground:g.battlefield.GroundHeight(at.x,at.z),colliders,people,damage:window.missionDamage?.slice(-20),
         // A mission failure freezes the body exactly like a stall (09-24 TankProbe run N: the second guard batch died
         // to tank shells while the player walked the ammo branch; the route reported "stalled"). Name it here.
-        failure:(()=>{const r=g.Debug.FirstLevelMissionRuntime(),facts=[...r.flow.facts].filter(f=>/Lost|Killed/.test(f));
+        failure:(()=>{const r=g.Debug.FirstLevelMissionRuntime(),facts=[...r.flow.facts].filter(f=>/^(guardBatchLost|zhouGunKilled)$/.test(f));
           return {facts,guards:(r.guards||[]).map(x=>x.actor.alive?Math.round(x.actor.health):0),menu:document.querySelector('#pauseMenu, .pauseMenu')?.innerText?.slice(0,80)??null};})(),
         impacts:(g.Debug.FirstLevelMissionRuntime().tank?.impacts||[]).filter(i=>near(i.x,i.z,5)),
         interaction:(()=>{const q=g.interact?.Query?.(g.player);return {query:q?{kind:q.kind,label:q.label,tag:q.point?.tag??null,id:q.point?.id??null,dist:q.dist}:null,
