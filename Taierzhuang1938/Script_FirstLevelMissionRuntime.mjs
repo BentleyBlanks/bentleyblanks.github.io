@@ -2337,6 +2337,8 @@ export class FirstLevelMissionRuntime {
     // 阶段 1–7 的演出（Front 包）。放在 UpdateSquad 之后：剧情走位要压过接触反应。
     this.frontShow?.Update(dt);
     this.frontBattle.Update(dt);
+    // 03–06: a speaker stepping into the player's picture for his line (after every other mover, so it holds).
+    this.frontScenes.Steer();
     prof?.E("story/mission/director");
     prof?.B("story/mission/other");
     if (this.controls) {

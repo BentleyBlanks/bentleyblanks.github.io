@@ -220,6 +220,10 @@ export class DialoguePlayer {
       if (prev) at = Math.max(at, prev.startAt);             // 不许比上一句更早开口
       l.startAt = at;
       if (handle.time < at) return;
+      // 调用方可以按住一句先不开口（03–06：等说话人进画面，Script_FirstLevelFrontScenes.HoldLine，有超时）。
+      // 按过的句子从真正开口那一刻起算，后面 after:"prev" 的句子才不会提前叠上来。
+      if (handle.opts.hold?.(l.line, handle)) { l.held = true; return; }
+      if (l.held) l.startAt = handle.time;
       this.StartLine(handle, l);
     }
   }

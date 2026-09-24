@@ -22,6 +22,8 @@ import { FRONT_SPACE } from "./Data_FirstLevelFrontRoute.mjs";
 import { OPENING_STORYBOARDS as Storyboards } from "./Data_OpeningStoryboards.mjs";
 import { MISSION_ENCOUNTER_ACTIVATION } from "./Data_FirstLevelMissionGates.mjs";
 import { MISSION_ENCOUNTERS } from "./Data_FirstLevelMission.mjs";
+import { FRONT_BATTLE_TUNING as B } from "./Data_Tuning_FirstLevelFront.mjs";
+import { FRONT_SCENE_IDS } from "./Script_FirstLevelFrontScenes.mjs";
 
 /** Listener jaw ceiling (rad): breathing only (Script_CharacterSpeechBrowserTest SILENT_JAW_RADIANS). */
 export const SILENT_JAW_RADIANS = .02;
@@ -444,17 +446,223 @@ export async function InstallSpeakerActing(page){
         row.frames++;if(inFrame)row.inFrame++;row[director?"director":"headLayer"]++;
         row.turn=Math.max(row.turn,head.angleTo(head.clone().fromArray(row.head)));
       }
+      // Per line, every embodied role (2026-09-25 Front r2 step 1): the line gate of CheckFrontActing counts frames in
+      // which the speaker's head projects inside the picture (inFrame) and those acted in the picture (actedInFrame).
+      const lines=window.frontLineActing??={};
+      // Where the named speakers and the player are, every half second (read with the per-line rows when a line fails).
+      const trace=window.frontSpeakerTrace??=[];
+      if(!trace.length||r.time-trace.at(-1).t>=.5){
+        const at=a=>a?[+a.position.x.toFixed(1),+a.position.z.toFixed(1)]:null,p=window.Tengxian.player;
+        trace.push({t:+(r.time??0).toFixed(1),stage:r.flow.stage.id,player:at(p),yaw:+p.yaw.toFixed(2),luo:at(this.ActorForWho("luo",true)),
+          steer:r.frontScenes?.steer?.who??null,glance:window.Tengxian.speakerGlance?.saved?1:0});
+        if(trace.length>2400)trace.shift();
+      }
+      for(const handle of r.voice?.dialogue?.handles||[]){
+        if(handle.paused)continue;
+        for(const l of handle.lines){
+          if(l.state!=="playing"||l.line.who==="shunzi"||l.line.who==="crowd")continue;
+          const who=l.line.who,soldier=this.ActorForWho(who,true),rig=soldier?.actor?.characterRig;
+          const p=window.Tengxian.player.position;
+          const row=lines[l.line.id]??={cue:handle.id,who,stage:r.flow.stage.id,t:+(r.time??0).toFixed(2),frames:0,bodyFrames:0,
+            visibleFrames:0,inFrameFrames:0,acted:0,actedInFrame:0,turn:0,minOffDeg:180,held:r.frontScenes?.holds?.get(l.line.id)?.heldS??null,
+            heldWhy:r.frontScenes?.holds?.get(l.line.id)?.released??null,glanced:0,
+            start:{player:[+p.x.toFixed(2),+p.z.toFixed(2)],yaw:+window.Tengxian.player.yaw.toFixed(2),
+              speaker:soldier?[+soldier.position.x.toFixed(2),+soldier.position.z.toFixed(2)]:null,
+              distM:soldier?+Math.hypot(soldier.position.x-p.x,soldier.position.z-p.z).toFixed(1):null}};
+          row.frames++;
+          if(!soldier)continue;row.bodyFrames++;
+          if(!soldier.actor?.poseVisible||!rig?.bones?.head)continue;
+          row.visibleFrames++;
+          const cam=r.camera,headAt=rig.bones.head.getWorldPosition(rig.bones.head.position.clone());
+          const ndc=cam&&headAt.clone().project(cam);
+          const inFrame=!!ndc&&ndc.z<1&&Math.abs(ndc.x)<.95&&Math.abs(ndc.y)<.95;
+          if(cam){
+            const eye=cam.getWorldPosition(cam.position.clone()),fwd=cam.getWorldDirection(eye.clone());
+            row.minOffDeg=Math.min(row.minOffDeg,+(fwd.angleTo(headAt.clone().sub(eye))*180/Math.PI).toFixed(1));
+            row.distM=+headAt.distanceTo(eye).toFixed(1);
+          }
+          if(inFrame)row.inFrameFrames++;
+          const director=rig.openingActorPerformanceState,layer=rig.speakerHead;
+          const acting=director?(!!director.speaking&&!director.protected):!!(layer?.enabled&&layer.speaking);
+          if(!acting)continue;
+          const head=rig.bones.head.quaternion;
+          row.head0??=head.toArray();
+          row.acted++;if(inFrame)row.actedInFrame++;
+          // Evidence: one first-person picture per line, taken the 15th frame he is acted in the picture (the drive's
+          // StepFrames wrapper renders and reads it back in the same task, see InstallSpeakerGlance).
+          if(inFrame&&row.actedInFrame===15&&!window.frontLineShots?.[l.line.id])window.frontLineShotPending=l.line.id;
+          if(inFrame)row.turn=Math.max(row.turn,+head.angleTo(head.clone().fromArray(row.head0)).toFixed(3));
+        }
+      }
       return result;
     };
   },ACTING_ROLES);
+  await InstallSpeakerGlance(page);
 }
 
-/** 03: Luo's front commands (Front* scenes) are seen on screen and acted, at the 02 speakers' thresholds. */
-export async function CheckFrontActing(ctx){
+/**
+ * The drive's ears (2026-09-25 relay r2 Front step 1): a player who hears a squadmate talk close by
+ * (FRONT_BATTLE_TUNING.speakerViewNearM) while nobody is to be shot, no grenade to dodge and no gun manned, turns
+ * his head to him - the dialogue is positional, it comes from the speaker's mouth. When the line is over and the
+ * drive has not aimed anywhere else meanwhile, the view turns back to where it was (06: the drive faces Zhou at the
+ * borrow stand and never turns again; BorrowLight needs that facing). Turns at most GLANCE_RAD_PER_FRAME, like the
+ * route bot's own turning; the game never turns the camera by itself. Runs on single-frame StepFrames calls (every
+ * drive loop); multi-frame steps (captures, idles) pass through. Idempotent.
+ */
+export const GLANCE_RAD_PER_FRAME = .06;
+async function InstallSpeakerGlance(page){
+  await page.evaluate(({near,turn})=>{
+    const g=window.Tengxian;if(g.speakerGlance)return;
+    const glance=g.speakerGlance={frames:0,restores:0,saved:null,last:null,lines:{}};
+    const step=g.StepFrames,Wrap=a=>Math.atan2(Math.sin(a),Math.cos(a));
+    const Toward=(from,to)=>from+Math.max(-turn,Math.min(turn,Wrap(to-from)));
+    window.frontLineShots??={};
+    document.addEventListener("mousedown",e=>{if(e.button===2)glance.aiming=true;});
+    document.addEventListener("mouseup",e=>{if(e.button===2)glance.aiming=false;});
+    g.StepFrames=function(frames){
+      if(frames===1)try{Glance();}catch(error){glance.error=String(error);}
+      const result=step.apply(this,arguments);
+      const id=window.frontLineShotPending;
+      if(id&&frames===1){
+        window.frontLineShotPending=null;
+        // No preserveDrawingBuffer: render one frame and read the canvas back before this task ends.
+        try{step.call(this,1,1/60,true);const canvas=g.renderer?.domElement||document.querySelector("canvas");
+          window.frontLineShots[id]=canvas.toDataURL("image/jpeg",.82);}catch(error){window.frontLineShots[id]="error:"+error;}
+      }
+      return result;
+    };
+    // While a near speaker talks the glance owns the view: the route bot's own turning (it re-aims at its next corner
+    // every frame, 0.04 rad) is undone, so the player stops and looks, as a player does when someone talks to him.
+    // The route bot lets go of W when it faces 0.65 rad off its corner. Shooting, dodging, melee and a manned gun win.
+    function Glance(){
+      const r=g.Debug.FirstLevelMissionRuntime(),p=g.player;
+      if(!r?.voice?.dialogue||!p.alive||g.state.cutscene||r.controls){glance.active=false;glance.saved=null;return;}
+      const moved=!!glance.last&&(Math.abs(p.yaw-glance.last.yaw)>1e-6||Math.abs(p.pitch-glance.last.pitch)>1e-6);
+      const eye=p.EyePosition;let head=null,lineId=null;
+      for(const h of r.voice.dialogue.handles)if(!h.paused&&!h.done)for(const l of h.lines){
+        if(l.state!=="playing"||l.line.who==="shunzi"||l.line.who==="crowd")continue;
+        const bone=r.speakers?.ActorForWho?.(l.line.who,true)?.actor?.characterRig?.bones?.head;if(!bone)continue;
+        const at=bone.getWorldPosition(bone.position.clone());
+        if(at.distanceTo(eye)<=near){head=at;lineId=l.line.id;}
+      }
+      const drive=window.MissionInputDriver;
+      // Nor while an enemy is at arm's length or the player was just hit (09-25 drive: FrontFlankA's bayonet from 2 m
+      // behind the nest's east wall, four stabs; a player in that spot looks for the knife, not for who is talking).
+      glance.frame=(glance.frame||0)+1;
+      if(p.health<(glance.health??p.health)-.5)glance.hurtFrame=glance.frame;
+      glance.health=p.health;
+      const close=g.ai.soldiers.some(s=>s.side==="ija"&&s.alive&&Math.hypot(s.position.x-p.position.x,s.position.z-p.position.z)<6);
+      // The drive is aiming (it holds the right button down on every shot, MissionInputDriver.Shoot).
+      const busy=g.emplacement?.View?.()||g.meleeCombat?.Active||drive?.evading||close||glance.frame-(glance.hurtFrame??-1e9)<120
+        ||glance.aiming;
+      // Frames of each near line the player spent fighting (FRONT_LINES_IN_FIREFIGHT is checked against them).
+      if(busy)for(const h of r.voice.dialogue.handles)for(const l of h.lines)
+        if(l.state==="playing"&&window.frontLineActing?.[l.line.id])window.frontLineActing[l.line.id].busyFrames=(window.frontLineActing[l.line.id].busyFrames||0)+1;
+      if(busy){glance.active=false;glance.saved=null;glance.last=null;return;}
+      let yaw,pitch;
+      if(head){
+        if(!glance.active){glance.active=true;glance.saved??={yaw:p.yaw,pitch:p.pitch};}
+        else if(moved){p.yaw=glance.last.yaw;p.pitch=glance.last.pitch;}
+        glance.frames++;glance.lines[lineId]=(glance.lines[lineId]||0)+1;
+        const row=window.frontLineActing?.[lineId];if(row)row.glanced++;
+        // Well inside the picture already: just keep looking.
+        const ndc=r.camera&&head.clone().project(r.camera);
+        if(ndc&&ndc.z<1&&Math.abs(ndc.x)<.6&&Math.abs(ndc.y)<.6){glance.last={yaw:p.yaw,pitch:p.pitch};return;}
+        yaw=Math.atan2(-(head.x-eye.x),-(head.z-eye.z));pitch=Math.atan2(head.y-eye.y,Math.hypot(head.x-eye.x,head.z-eye.z));
+      }else{
+        glance.active=false;
+        // The drive aimed somewhere since our last turn: that is where it wants to look now, nothing to restore.
+        if(moved)glance.saved=null;
+        if(!glance.saved){glance.last=null;return;}
+        yaw=glance.saved.yaw;pitch=glance.saved.pitch;
+        if(Math.abs(Wrap(yaw-p.yaw))<turn&&Math.abs(pitch-p.pitch)<turn){p.yaw=yaw;p.pitch=pitch;glance.saved=null;glance.last=null;glance.restores++;return;}
+      }
+      p.yaw=Toward(p.yaw,yaw);p.pitch=p.pitch+Math.max(-turn,Math.min(turn,pitch-p.pitch));
+      glance.last={yaw:p.yaw,pitch:p.pitch};
+    }
+  },{near:B.speakerViewNearM,turn:GLANCE_RAD_PER_FRAME});
+}
+
+/** Frames a 03–06 line's speaker must have his head in the picture, and be acted there (CheckFrontActing). */
+export const FRONT_LINE_IN_FRAME_FRAMES = 10;
+/**
+ * 03–06 lines whose speaker is out of the picture by design, one reason each. Every one is a shout across the front
+ * or from a body that has no face: CheckFrontActing still checks that the speaker really was that far (beyond
+ * FRONT_BATTLE_TUNING.speakerViewNearM when the line started) or had no body, so a speaker who comes near stops being
+ * excused. Distances: 09-25 03->06 drive (tmp/front/base_r1.log).
+ */
+export const FRONT_LINES_OUT_OF_PICTURE = Object.freeze({
+  "TakeOverGun.02": "老周在左枪位（约 60 m）隔着缺口喊「外头还有人！」；玩家这时守着右枪位看缺口",
+  "TankRoadContact.01": "何有田在左枪位（约 60 m）喊战车出来了；该看的是右边路上的战车，不是他",
+  "BundleOrder.01": "报弹药屋的守军被压在缺口外沿（约 38 m），隔着沟喊；集结处以外没有守军到得了后沟口",
+  "BundleGo.01": "何有田顶在左枪位（约 63 m），隔着阵地喊「快点」",
+  "BundleReturnCall.01": "何有田在左枪位（约 72 m）喊战车又往前挤了；玩家在弹药屋支沟里，看不到也不该回头找他",
+  "TankStopped.01": "何有田在左枪位（约 76 m）喊「停了」；玩家这时看着刚炸停的战车",
+  "TankStopped.03": "刘文才在沟口（约 67 m）招呼后面的人跟上",
+  "ZhouLift.01": "担架员是集结处的立即模式人群（FirstLevelCollection.Draw），没有能绑脸的身体",
+  "ZhouLift.03": "同上，担架员没有能绑脸的身体",
+});
+/**
+ * Near lines shouted in the thick of a fight, one reason each: excused only when the player really was fighting through
+ * most of the line (aiming, dodging, in melee, an enemy within 6 m, or just hit - the drive's busy frames, see
+ * InstallSpeakerGlance) - FRONT_LINE_FIGHT_SHARE of its frames. A player who is free to look has to see the speaker.
+ */
+export const FRONT_LINES_IN_FIREFIGHT = Object.freeze({
+  "FrontAttack.01": "夺下右枪位那一刻：罗班长喊「土坎前头那一伙」时，玩家正对着缺口外的冲锋组开枪",
+  "BundleRetreat.01": "炸车后罗班长在身旁 1 m 内喊「回来！低头！」，玩家这时对着战车与跟车步兵",
+  "TankStopped.02": "战车刚停，罗班长朝缺口喊守军下来；玩家边撤边打剩下的跟车步兵",
+});
+export const FRONT_LINE_FIGHT_SHARE = .5;
+const FRONT_LINE_STAGES = Object.freeze(["Support", "MachineGun", "Tank", "Orders"]);
+
+/**
+ * 03–06: every line of a Front scene is seen and acted (2026-09-25 relay r2 Front step 1). Per line (the sampler's
+ * window.frontLineActing, keyed "<Scene>.<NN>"): the speaker's head projects inside the picture for at least
+ * FRONT_LINE_IN_FRAME_FRAMES frames, is acted in at least as many of them, and turns/nods there (> 0.03 rad) - unless
+ * the line is in FRONT_LINES_OUT_OF_PICTURE and its speaker really was far or bodiless. Lines of steps up to `upTo`
+ * that are no longer playing are checked; each line once (a later call picks up what was still sounding).
+ * Also keeps the 09-24 per-cue check of Luo's Front* commands (poseVisible frames).
+ */
+export async function CheckFrontActing(ctx,{upTo="Support"}={}){
   const {page,output}=ctx;
   const acting=await page.evaluate(()=>window.openingRearActing);
   const heard=await page.evaluate(()=>window.openingRearHeard);
-  await fs.writeFile(path.join(output,"Data_FrontActing.json"),JSON.stringify({heard,acting},null,2));
+  const {lines,playing}=await page.evaluate(()=>({lines:window.frontLineActing||{},
+    playing:[...(window.Tengxian.Debug.FirstLevelMissionRuntime().voice?.dialogue?.handles||[])].flatMap(h=>h.lines.filter(l=>l.state==="playing").map(l=>l.line.id))}));
+  const trace=await page.evaluate(()=>window.frontSpeakerTrace||[]);
+  // The pictures taken while each line was spoken (not committed: _shots is ignored).
+  const shots=await page.evaluate(()=>{const out=window.frontLineShots||{};window.frontLineShots=Object.fromEntries(Object.keys(out).map(k=>[k,"saved"]));return out;});
+  const shotDir=path.join(output,"L1Lines");await fs.mkdir(shotDir,{recursive:true});
+  for(const [id,url] of Object.entries(shots))if(url.startsWith("data:image/jpeg;base64,"))
+    await fs.writeFile(path.join(shotDir,`Line_${id}.jpg`),Buffer.from(url.slice(23),"base64"));
+  await fs.writeFile(path.join(output,`Data_FrontActing_${upTo}.json`),JSON.stringify({heard,acting,lines,trace},null,2));
+  ctx.frontLinesChecked??=new Set();
+  const last=FRONT_LINE_STAGES.indexOf(upTo),due=Object.keys(lines).filter(id=>!ctx.frontLinesChecked.has(id)&&!playing.includes(id)
+    &&FRONT_SCENE_IDS.includes(lines[id].cue)&&FRONT_LINE_STAGES.indexOf(lines[id].stage)>=0&&FRONT_LINE_STAGES.indexOf(lines[id].stage)<=last);
+  const Row=id=>{const r=lines[id];return `${id} ${r.who} ${r.stage} t=${r.t} inFrame=${r.inFrameFrames} actedInFrame=${r.actedInFrame} turn=${r.turn} startDist=${r.start.distM} minOff=${r.minOffDeg}`;};
+  console.log("FRONT_LINES",upTo,JSON.stringify(Object.fromEntries(due.map(id=>{const r=lines[id];
+    return [id,{who:r.who,stage:r.stage,inFrame:r.inFrameFrames,actedInFrame:r.actedInFrame,turn:r.turn,startDistM:r.start.distM,held:r.held??null,
+      heldWhy:r.heldWhy??null,glanced:r.glanced??0}];}))));
+  // Every due line is judged before anything throws: one failure message lists all the lines that missed.
+  const failures=[];
+  for(const id of due){
+    ctx.frontLinesChecked.add(id);
+    const r=lines[id],excused=FRONT_LINES_OUT_OF_PICTURE[id];
+    const fight=FRONT_LINES_IN_FIREFIGHT[id];
+    if(fight&&r.inFrameFrames<FRONT_LINE_IN_FRAME_FRAMES){
+      if(!((r.busyFrames||0)>=r.frames*FRONT_LINE_FIGHT_SHARE))failures.push(`${id} is excused as said in a fight («${fight}») but the player was free to look (busy ${r.busyFrames||0}/${r.frames}; ${Row(id)})`);
+      continue;
+    }
+    if(excused){
+      if(r.bodyFrames&&!(r.start.distM>B.speakerViewNearM))failures.push(`${id} is excused as out of the picture («${excused}») but its speaker stood near (${Row(id)})`);
+      continue;
+    }
+    if(r.inFrameFrames<FRONT_LINE_IN_FRAME_FRAMES)failures.push(`${id}: the speaker's head is in the picture while he talks (${Row(id)})`);
+    else if(r.actedInFrame<FRONT_LINE_IN_FRAME_FRAMES)failures.push(`${id}: he is acted while in the picture (${Row(id)})`);
+    else if(!(r.turn>.03))failures.push(`${id}: he visibly turns/nods in the picture (${Row(id)})`);
+  }
+  if(failures.length)console.log("FRONT_LINES_FAILED",JSON.stringify(failures));
+  assert.deepEqual(failures,[],`03–06 lines up to ${upTo}: speaker in the picture and acted`);
   const front=Object.keys(heard).filter(key=>key.startsWith("Front")&&key.endsWith("/luo"));
   console.log("FRONT_ACTING",JSON.stringify(Object.fromEntries(front.map(key=>[key,{...heard[key],
     ...(acting[key]?{acted:acting[key].frames,actedInFrame:acting[key].inFrame,turn:+acting[key].turn.toFixed(3),director:acting[key].director,headLayer:acting[key].headLayer}:{})}]))));
@@ -478,7 +686,7 @@ export async function CheckOpeningActing(ctx){
   const visible=Object.keys(heard).filter(key=>heard[key].visibleFrames>10);
   assert.ok(visible.length>0,"02–03 speakers were sampled on screen");
   assert.ok(visible.includes("SupportOrder/guard"),`the collection report has its real visible speaker (${JSON.stringify(heard)})`);
-  if(ctx.stageTo>=3)await CheckFrontActing(ctx);
+  if(ctx.stageTo>=3)await CheckFrontActing(ctx,{upTo:ctx.stageTo>=4?"Tank":"Support"});
   for(const key of visible){
     assert.ok(rearActing[key]?.frames>10,`${key}: actual visible 02–05 speaker has an active performance (${JSON.stringify(heard[key])})`);
     assert.ok(rearActing[key].turn>.03,`${key}: actual visible 02–05 speaker visibly turns/nods (${JSON.stringify(rearActing[key])})`);

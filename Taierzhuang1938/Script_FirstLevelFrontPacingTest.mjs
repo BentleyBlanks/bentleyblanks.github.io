@@ -20,7 +20,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { FirstLevelFrontBattle, ColumnDeparture, BatchPastGap, SplitRoute, GuardClearOfGap } from "./Script_FirstLevelFrontBattle.mjs";
-import { FirstLevelFrontScenes, FRONT_SCENE_IDS, FrontSceneSpeakers } from "./Script_FirstLevelFrontScenes.mjs";
+import { FirstLevelFrontScenes, FRONT_SCENE_IDS, FrontSceneSpeakers, ProjectToView, InPicture, CameraPose, StepCandidates } from "./Script_FirstLevelFrontScenes.mjs";
+import { DialoguePlayer } from "./Script_DialoguePlayer.mjs";
 import { FRONT_SORTIE as S, FRONT_SPACE as Space, FRONT_TANK_PATH } from "./Data_FirstLevelFrontRoute.mjs";
 import { FRONT_BATTLE_TUNING as B } from "./Data_Tuning_FirstLevelFront.mjs";
 import { MISSION_TUNING as R } from "./Data_FirstLevelMission.mjs";
@@ -505,6 +506,118 @@ function WalkRuntime(extra = {}) {
   const seat = S.seat, lastF = { x: 16.8, z: -166.57 }, lastFlankA = { x: 39.2, z: -162.2 };
   for (const line of [lastF, lastFlankA]) assert.ok(Dist(line, seat) - B.capturedGunKeepOutM >= 2, "a last line leaves room for a >= 2 m contact circle");
   checks += 4;
+}
+
+// ---------------------------------------------------------------------------
+// ⑧ the speaker is in the picture when he talks (relay r2 Front step 1): a near speaker out of view holds his line
+//    (at most speakerViewHoldS) and steps to a spot the player sees; far shouts and Node runs play at once
+// ---------------------------------------------------------------------------
+{
+  // A camera at (0, 1.6, 0) looking down -z (three's default facing), 55 deg vertical field of view, 16:9.
+  const fov = 55 * Math.PI / 180, aspect = 16 / 9, near = 0.05, far = 500, f = 1 / Math.tan(fov / 2);
+  const Camera = (x = 0, y = 1.6, z = 0) => ({
+    matrixWorld: { elements: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, y, z, 1] },
+    matrixWorldInverse: { elements: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -x, -y, -z, 1] },
+    projectionMatrix: { elements: [f / aspect, 0, 0, 0, 0, f, 0, 0, 0, 0, (far + near) / (near - far), -1, 0, 0, 2 * far * near / (near - far), 0] },
+  });
+  const camera = Camera();
+  const ahead = ProjectToView(camera, { x: 0, y: 1.6, z: -3 });
+  assert.ok(Math.abs(ahead.x) < 1e-9 && Math.abs(ahead.y) < 1e-9 && Math.abs(ahead.depth - 3) < 1e-9, "a head straight ahead is the centre of the picture");
+  assert.equal(ProjectToView(camera, { x: 0, y: 1.6, z: 3 }), null, "a head behind the camera is not in the picture");
+  assert.ok(!InPicture(ProjectToView(camera, { x: 3, y: 1.6, z: -1 })) && InPicture(ProjectToView(camera, { x: 1, y: 1.6, z: -3 })),
+    "72 deg off the axis is out of the frame, 18 deg is in");
+  const pose = CameraPose(camera);
+  assert.ok(Math.abs(Math.abs(pose.yaw) - Math.PI) < 1e-9, "the pose yaw is the facing (-z here)");
+  const spots = StepCandidates(pose, { x: -1, z: 1 });
+  assert.equal(spots.length, B.speakerStepBearingsDeg.length * B.speakerStepDistancesM.length * 2, "every bearing x distance, both sides");
+  assert.ok(spots[0].bearing > 0 === Math.sin(Math.atan2(-1, 1) - pose.yaw) > 0, "the speaker's own side first");
+  for (const s of spots) assert.ok(InPicture(ProjectToView(camera, { x: s.x, y: 1.55, z: s.z })), `a stepping spot frames a standing head (${s.bearing} deg, ${s.distance} m)`);
+
+  // HoldLine / Steer on a stub runtime: flat ground, nothing blocks, Luo 1.5 m behind the player.
+  const moves = [], defends = [];
+  const luo = { id: 7, alive: true, position: { x: 0.4, y: 0, z: 1.5 } };
+  const guard = { id: 8, alive: true, position: { x: -30, y: 0, z: -20 } };
+  const V = (x, y, z) => ({ x, y, z, clone() { return V(this.x, this.y, this.z); }, set(a, b, c) { this.x = a; this.y = b; this.z = c; return this; } });
+  const r = { time: 0, camera, flow: { stage: { id: "Support" } }, ai: { soldiers: [luo, guard] },
+    player: { position: { x: 0, y: 0, z: 0 }, get EyePosition() { return V(0, 1.6, 0); } },
+    speakers: { ActorForWho: (who) => ({ luo, guard })[who] || null },
+    Point: (p, rise = 0) => V(p.x, rise, p.z), BlocksSight: () => false,
+    MoveActor: (actor, point, speed) => moves.push({ id: actor.id, ...point, speed }), Defend: (actor, point) => defends.push({ id: actor.id, ...point }) };
+  const scenes = new FirstLevelFrontScenes(r);
+  const line = (id, who) => ({ id, who, direction: {} });
+  assert.equal(scenes.HoldLine(line("TakeOverGun.01", "luo"), "TakeOverGun"), true, "Luo behind the player: the line waits");
+  assert.ok(scenes.steer?.soldier === luo && Dist(scenes.steer.spot, luo.position) <= B.speakerStepMaxM, "and Luo is sent to a spot in view");
+  const spot = scenes.steer.spot;
+  assert.ok(InPicture(ProjectToView(camera, { x: spot.x, y: 1.55, z: spot.z })), "the spot is in the picture");
+  scenes.handle = { id: "TakeOverGun", done: false, lines: [{ line: { who: "luo" }, state: "pending" }] };
+  scenes.Steer();
+  assert.ok(moves.length === 1 && moves[0].id === 7 && moves[0].speed === B.speakerStepSpeedMps, "Steer walks him there (no teleport)");
+  assert.ok(scenes.Steers(luo) && !scenes.Steers(guard), "FrontBattle.Walk is told to leave him alone meanwhile");
+  r.time = B.speakerViewHoldS * 0.5;
+  assert.equal(scenes.HoldLine(line("TakeOverGun.01", "luo"), "TakeOverGun"), true, "still out of view: still waiting");
+  luo.position = { x: spot.x, y: 0, z: spot.z };
+  assert.equal(scenes.HoldLine(line("TakeOverGun.01", "luo"), "TakeOverGun"), false, "in view: the line starts");
+  assert.equal(scenes.holds.get("TakeOverGun.01").released, "inView");
+  scenes.Steer();
+  assert.ok(defends.length === 1, "at the spot he holds there while his lines last");
+  scenes.handle.lines[0].state = "done"; scenes.Steer();
+  assert.equal(scenes.steer, null, "his lines done: his own orders take over again");
+  // No spot he can walk to straight (every knee-high line blocked): he stays and the line plays at once.
+  luo.position = { x: 0.4, y: 0, z: 1.5 }; r.BlocksSight = (a, b) => b.y < 1; r.time = 10;
+  assert.equal(scenes.HoldLine(line("TakeOverGun.03", "luo"), "TakeOverGun"), false, "no clear spot: the line is not delayed");
+  assert.ok(scenes.steer === null && scenes.holds.get("TakeOverGun.03").released === "noSpot", "and he stays where he is");
+  // Timeout: a spot, but he never gets there (shoved, blocked by a body) -> the line plays after speakerViewHoldS.
+  r.BlocksSight = () => false;
+  assert.equal(scenes.HoldLine(line("FrontWithdraw.01", "luo"), "FrontWithdraw"), true, "held while he walks");
+  r.time = 10 + B.speakerViewHoldS + 0.01;
+  assert.equal(scenes.HoldLine(line("FrontWithdraw.01", "luo"), "FrontWithdraw"), false, "after speakerViewHoldS the line plays anyway");
+  assert.equal(scenes.holds.get("FrontWithdraw.01").released, "timeout");
+  scenes.steer = null;
+  assert.equal(scenes.HoldLine(line("BundleOrder.01", "guard"), "BundleOrder"), false, "a shout from 36 m plays at once");
+  assert.equal(scenes.HoldLine(line("FrontAttack.01", "shunzi"), "FrontAttack"), false, "Shunzi (the player) is never held");
+  // Walking together the leader is not stopped at a spot (he would lose the lead) and the line is not delayed.
+  r.BlocksSight = () => false; r.time = 20; r.player.velocity = { x: 2, y: 0, z: 0 };
+  assert.equal(scenes.HoldLine(line("FrontBlockade.02", "luo"), "FrontBlockade"), false, "walking: the line plays at once");
+  assert.ok(scenes.steer === null && scenes.holds.get("FrontBlockade.02").released === "walking", "walking: the leader keeps his own walk");
+  r.player.velocity = { x: 0, y: 0, z: 0 };
+  assert.equal(scenes.HoldLine(line("FrontBlockade.03", "luo"), "FrontBlockade"), true, "standing: the next line waits");
+  assert.ok(scenes.steer?.soldier === luo, "standing: now he steps up");
+  scenes.handle = { id: "FrontBlockade", done: false, lines: [{ line: { who: "luo" }, state: "pending" }] };
+  r.player.position = { x: 0, y: 0, z: -(B.speakerStepReleaseM + 0.1) };
+  scenes.Steer();
+  assert.equal(scenes.steer, null, "the player walked off: the speaker goes back to his own orders");
+  r.player.position = { x: 0, y: 0, z: 0 };
+  // In the middle of the picture but closer than speakerViewMinM (the camera in his shoulder): he steps back first.
+  luo.position = { x: 0, y: 0, z: -(B.speakerViewMinM - 0.4) }; r.time = 30;
+  assert.equal(scenes.HoldLine(line("BundleSupply.02", "luo"), "BundleSupply"), true, "too close to be seen talking: the line waits");
+  assert.ok(scenes.steer?.soldier === luo && Math.hypot(scenes.steer.spot.x, scenes.steer.spot.z) >= Math.min(...B.speakerStepDistancesM) - 1e-9,
+    "and he steps back to a framed distance");
+  scenes.steer = null;
+  r.camera = null;
+  assert.equal(scenes.HoldLine(line("TakeOverGun.02", "luo"), "TakeOverGun"), false, "no camera (Node runs): nothing is held");
+
+  // The dialogue player's hook: a held line starts late, and the next "after prev" line follows its real end.
+  const events = [];
+  const player = new DialoguePlayer({ Event: (id, scene, detail) => events.push({ id, ...detail }) });
+  let held = 30;
+  const scene = { id: "T", lines: [
+    { id: "T.01", who: "luo", index: 0, duration: 1, direction: {}, speaker: "", text: "" },
+    { id: "T.02", who: "zhou", index: 1, duration: 1, direction: { after: "prev", offsetS: 0.2 }, speaker: "", text: "" }] };
+  const handle = player.Play(scene, { hold: (l) => l.id === "T.01" && held-- > 0 });
+  for (let i = 0; i < 400 && !handle.done; i++) player.Update(1 / 60);
+  const starts = events.filter((e) => e.id === "Line");
+  assert.ok(handle.done && starts.length === 2, "both lines play");
+  assert.ok(starts[0].start >= 30 / 60 - 1e-9, `the held line starts when released (${starts[0].start})`);
+  // One frame of slack: a line's clock already advances in the frame it starts (the player's own timing, held or not).
+  assert.ok(starts[1].start >= starts[0].start + 1 + 0.2 - 1 / 60 - 1e-6, `the next line keeps its gap after the held one (${starts[1].start})`);
+  // Wiring: PlayScene passes the hook, the runtime steers after every mover, FrontBattle.Walk yields.
+  const voiceSrc = Read("Script_FirstLevelMissionVoice.mjs"), runtimeSrc = Read("Script_FirstLevelMissionRuntime.mjs");
+  assert.ok(/speakers, gate, hold, priority,/.test(voiceSrc), "voice.PlayScene hands `hold` to the dialogue player");
+  assert.ok(/this\.frontBattle\.Update\(dt\);\s*\n(\s*\/\/[^\n]*\n)*\s*this\.frontScenes\.Steer\(\);/.test(runtimeSrc), "runtime steers the speaker after frontBattle.Update");
+  assert.ok(Read("Script_FirstLevelFrontBattle.mjs").includes("if(r.frontScenes?.Steers?.(actor)){w.bestAt=r.time;return false;}"),
+    "FrontBattle.Walk neither orders nor stall-skips a speaker stepping into view");
+  checks += 40;
+  Ok("⑧ near speaker out of the picture: line held <= speakerViewHoldS, he steps into view; far shouts and Node runs unaffected");
 }
 
 console.log(`FirstLevelFrontPacingTest 通过：${checks} 条断言`);

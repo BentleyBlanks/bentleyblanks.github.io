@@ -90,6 +90,8 @@ export class FirstLevelFrontBattle {
   SetWalk(actor,route){if(!actor)return;this.walks.set(actor.id,{route:route.map(p=>({...p})),index:0});this.r.squadRoutes.set(actor.id,route.map(p=>({...p})));}
   Walk(actor,{follow=false,speed=R.squadSpeedMps}={}){
     const r=this.r,w=actor&&this.walks.get(actor.id);if(!actor?.alive||!w)return false;
+    // Stepping into the player's picture for a line (FrontScenes.Steer moves him): no walk order, no stall clock.
+    if(r.frontScenes?.Steers?.(actor)){w.bestAt=r.time;return false;}
     // Intermediate points describe checked trench corners. Advancing a metre
     // early cuts across the inside cover at the right-hand approach; this
     // corridor intentionally disables the AI's arbitrary obstacle detours.

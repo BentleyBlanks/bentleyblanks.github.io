@@ -296,5 +296,34 @@ export const FRONT_BATTLE_TUNING=Object.freeze({
   // from the captured gun's seat (FRONT_SORTIE.seat): brief item 11 ④, and 09-25 idle-probe drives where bound man F and
   // the flank group came up to the nest's north wall in contact and shot the player on the gun from 1-4 m, twice in a row.
   capturedGunKeepOutM:6,
+  // ---- 03-06 lines: the speaker is in the picture when he talks (2026-09-25 relay r2 Front step 1) ----
+  // Script_FirstLevelFrontScenes.HoldLine: a line whose speaker stands within speakerViewNearM of the player but is not
+  // in the picture waits up to speakerViewHoldS while he steps into view (StepSpot), then plays anyway. Never turns the
+  // player's camera. Measured 09-25 (03->06 drive, 48 lines): every near line that missed the picture had its speaker
+  // 0.7-2.8 m from the player (beside or behind him); every far one was a shout across the front from 32-76 m (left
+  // gun, the pinned guards, the trench mouth). 15 m splits the two with room on both sides.
+  speakerViewNearM:15,
+  // How long a line may wait for its speaker (s). A shouted order held longer than the gap between two of the
+  // recorded lines (1.4-2.0 s in the 03-05 takes) reads as a stall; this is one such gap.
+  speakerViewHoldS:1.6,
+  // "In the picture" for the hold: the head projects inside this share of the frame (NDC), not just onto its edge.
+  // The acceptance sample (CheckFrontActing) counts 0.95; the hold asks for more so the head is not cut by the border.
+  speakerViewNdc:.8,
+  // ... and at least this far from the eye (m): nearer, the first-person camera sits in his shoulder and clips him.
+  speakerViewMinM:1.2,
+  // StepSpot: where the speaker may step to be seen - on the player's floor (|dy| <= speakerStepDyM) at one of these
+  // distances (m) and bearings off the view axis (deg, both sides; 0 would put him across the player's aim), no
+  // farther than speakerStepMaxM from where he stands, reached on a straight walk nothing blocks. 2.2-3.4 m frames a
+  // standing man's head and shoulders at the game's 55 deg vertical field of view (Data_Tuning_Main baseFovDeg,
+  // about 90 deg across at 16:9); 16-30 deg keeps him clear of the sights.
+  speakerStepDistancesM:Object.freeze([2.6,3.4,2.2]),speakerStepBearingsDeg:Object.freeze([22,16,30]),
+  speakerStepMaxM:5,speakerStepDyM:.45,
+  // Stepping in is a quick shuffle, not a march: R.squadCatchupMps (4.5, the 07 catch-up) covers speakerStepMaxM in
+  // about the hold.
+  speakerStepSpeedMps:4.5,
+  // Stepping in is for a player who stands still (horizontal speed <= speakerStepPlayerStillMps: below a crouch walk,
+  // above the sway of aiming); the speaker goes back to his own orders once the player has moved speakerStepReleaseM
+  // from where he stood when the line was held.
+  speakerStepPlayerStillMps:.8,speakerStepReleaseM:2.5,
   bandage:{radius:.087,height:.2,y:-.19,color:0xb6ac8b},
 });
