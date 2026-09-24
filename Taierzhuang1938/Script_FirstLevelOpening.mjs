@@ -1,9 +1,9 @@
 import { OPENING as C } from "./Data_FirstLevelOpening.mjs";
 import { MISSION_TUNING as R, OPENING_PERCEPTION as P } from "./Data_Tuning_FirstLevel.mjs";
-import { MISSION_ANCHORS as A, MISSION_PLACEMENT as Place, MISSION_SUPPLIES,
-  MISSION_SUPPLY_COLLIDER } from "./Data_FirstLevelMissionLayout.mjs";
+import { MISSION_ANCHORS as A, MISSION_PLACEMENT as Place } from "./Data_FirstLevelMissionLayout.mjs";
 import { CLOSE_RANGE } from "./Data_Tuning_AiShooting.mjs";
 import { SpeakingCastOptions } from "./Data_FirstLevelSpeakingCast.mjs";
+import { FRONT_SORTIE } from "./Data_FirstLevelFrontRoute.mjs";
 const Distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const Smooth=t=>{t=Math.max(0,Math.min(1,t));return t*t*(3-2*t)};
 // 一条 [[秒, 值], ...] 曲线在 t 处的取样：段内 smoothstep，两端夹住。
@@ -27,38 +27,22 @@ export function SampleOpeningPerception(elapsed){
   };
 }
 
-const ZhouSupply=MISSION_SUPPLIES.find(spec=>spec.id==="Front");
-const SegmentHitsRect=(a,b,rect)=>{
-  let lo=0,hi=1;
-  for(const [origin,delta,min,max] of [[a.x,b.x-a.x,rect.minX,rect.maxX],[a.z,b.z-a.z,rect.minZ,rect.maxZ]]){
-    if(Math.abs(delta)<1e-9){if(origin>=min&&origin<=max)continue;return false;}
-    let enter=(min-origin)/delta,exit=(max-origin)/delta;
-    if(enter>exit)[enter,exit]=[exit,enter];
-    lo=Math.max(lo,enter);hi=Math.min(hi,exit);
-    if(lo>hi)return false;
-  }
-  return true;
+const SegmentDistance=(p,a,b)=>{
+  const dx=b.x-a.x,dz=b.z-a.z,t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.z-a.z)*dz)/(dx*dx+dz*dz||1)));
+  return Math.hypot(p.x-a.x-dx*t,p.z-a.z-dz*t);
 };
 /**
- * Physical exit route around the front supply crate. The candidates cover a
- * gunner displaced west, east, or already south of the crate; the shortest
- * route whose every leg clears the real crouched capsule is selected.
+ * The wounded gunner's way back (2026-09-23 space §10.2): the way He came in, as the access-trench
+ * polyline FRONT_SORTIE.zhouExit (left gun access -> support sap -> SJ -> collection rest), which
+ * Script_FirstLevelSpaceTest checks for capsule clearance and a climbable slope. A gunner displaced
+ * off the seat joins it after the leg nearest to him instead of walking back to the seat first.
+ * `radius` is kept for callers; the clearance is the polyline's.
  */
 export function ZhouGunExitRoute(start,radius=.34){
-  const rest={...C.zhouRest};
-  if(!ZhouSupply)return [rest];
-  const halfW=MISSION_SUPPLY_COLLIDER.w/2+radius,halfD=MISSION_SUPPLY_COLLIDER.d/2+radius;
-  const rect={minX:ZhouSupply.x-halfW,maxX:ZhouSupply.x+halfW,
-    minZ:ZhouSupply.z-halfD,maxZ:ZhouSupply.z+halfD};
-  const [west,east]=C.zhouExitBypass.map(point=>({...point}));
-  const candidates=[[rest],[east,rest],[west,east,rest]];
-  const clear=route=>{
-    let from=start;
-    for(const to of route){if(SegmentHitsRect(from,to,rect))return false;from=to;}
-    return true;
-  };
-  const length=route=>{let total=0,from=start;for(const to of route){total+=Distance(from,to);from=to;}return total;};
-  return candidates.filter(clear).sort((a,b)=>length(a)-length(b))[0]||[west,east,rest];
+  const route=FRONT_SORTIE.zhouExit;
+  let join=1,best=Infinity;
+  for(let i=1;i<route.length;i++){const d=SegmentDistance(start,route[i-1],route[i]);if(d<best-1e-9){best=d;join=i;}}
+  return route.slice(join).map(point=>({x:point.x,z:point.z}));
 }
 
 // 2026.09.19 重构（docs/Data_FirstLevelRebuild20260919Contract.md §2）：
@@ -147,26 +131,24 @@ export class FirstLevelOpening {
   // --- 02 获救 --------------------------------------------------------------
   RescueElapsed(){return this.rescueAt==null?0:this.r.time-this.rescueAt;}
   RescueSampleTime(){return this.RescueElapsed();}
-  RescueLift(){
-    return this.rescueAt==null?0:Smooth((this.RescueSampleTime()-C.rescuePullSeconds)/(C.rescueStandSeconds-C.rescuePullSeconds));
-  }
   UpdateRescue(){ /* Storyboard director owns this performance. */ }
-  /** 受困与被拖出来那两段的身体位置（BeforePlayer 每帧调）。 */
+  /** 受困与被拖出来那两段的身体位置（BeforePlayer 每帧调）：开场导演按 phase 摆。 */
   PlacePlayer(){
     const r=this.r;
     if(r.Has("luoRescueComplete"))return;
     if(r.frontShow?.bunker){r.frontShow.bunker.PlacePlayer();return;}
-    const from=this.TrappedPoint,to=this.RescueEnd,t=this.RescueLift();
-    const x=from.x+(to.x-from.x)*t,z=from.z+(to.z-from.z)*t;
-    const y=r.battlefield.GroundHeight(x,z);
-    r.player.position.set(x,y,z);r.player.body?.Teleport(x,y,z);r.player.velocity.set(0,0,0);
+    const at=this.TrappedPoint,y=r.battlefield.GroundHeight(at.x,at.z);
+    r.player.position.set(at.x,y,at.z);r.player.body?.Teleport(at.x,y,at.z);r.player.velocity.set(0,0,0);
   }
   /** 感知（眼皮 + 恍惚 + 耳鸣）。整关只有这一处重击，曲线与旧开场逐字相同。 */
   ApplyCamera(){
     const r=this.r;
     this.eyeClosure=0;this.concussion=null;this.blackout=0;
     if(r.frontShow?.bunker.ApplyCamera())return;
-    if(this.blastAt==null)return;
+    // After the hand-back the director's concussion residue fades out while the player is in control.
+    const residue=r.frontShow?.bunker?.ReleasedPerception?.();
+    if(residue){this.concussion=residue;return;}
+    if(this.blastAt==null||r.frontShow?.bunker)return;
     const elapsed=r.time-this.blastAt;
     const perception=SampleOpeningPerception(elapsed);
     this.eyeClosure=perception.eyeClosure;
@@ -221,13 +203,18 @@ export class FirstLevelOpening {
     if(this.blastAt!=null){
       const age=r.time-this.blastAt;
       const recoveryAge=OpeningRecoveryTime(age,C.hearing.find(([,value])=>value===1)[0]);
-      const hearing=Curve(C.hearing,recoveryAge);
+      // The near-miss curve, held up by the director's continuous concussion (「耳鸣还没有完全消失」)
+      // through 01–02 and faded after the hand-back.
+      const hearing=Math.max(Curve(C.hearing,recoveryAge),r.frontShow?.bunker?.HearingAmount?.()||0);
       if(hearing!==this.hearingAmount)r.audio.SetConcussion?.(hearing,C.hearingLowHz);
       this.hearingAmount=hearing;
-      const b=C.breath;
-      if(age>=b.start&&recoveryAge<b.end&&(this.nextBreathAt==null||age>=this.nextBreathAt)){
-        this.breathVoice=r.audio.Play("breathHeavy",{volume:b.volume*(1-.45*Smooth((recoveryAge-b.start)/(b.end-b.start))),priority:true});
-        this.nextBreathAt=age+b.interval;
+      // Heavy breathing after the near miss, and again after the butt strike (「呼吸急促」).
+      const strikeAt=r.frontShow?.bunker?.strikeAt,anchor=strikeAt!=null&&strikeAt>this.blastAt?strikeAt:this.blastAt;
+      const b=C.breath,breathAge=r.time-anchor,breathRecovery=OpeningRecoveryTime(breathAge,C.hearing.find(([,value])=>value===1)[0]);
+      if(anchor!==this.breathAnchor){this.breathAnchor=anchor;this.nextBreathAt=null;}
+      if(breathAge>=b.start&&breathRecovery<b.end&&(this.nextBreathAt==null||breathAge>=this.nextBreathAt)){
+        this.breathVoice=r.audio.Play("breathHeavy",{volume:b.volume*(1-.45*Smooth((breathRecovery-b.start)/(b.end-b.start))),priority:true});
+        this.nextBreathAt=breathAge+b.interval;
       }
     }
     if(OPENING_FAILURE_STAGES.includes(stage)&&!r.Has("gunOccupied")){
