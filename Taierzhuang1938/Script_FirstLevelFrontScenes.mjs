@@ -16,6 +16,12 @@
 // turned. Speakers farther out are shouts across the front (the left gun, the pinned guards) and play at once.
 // A squadmate whose body stands between the player's eye and a talking speaker's head steps aside, square to that
 // line of sight, until the line ends (ClearView / StepAside; relay r2 Front step 2: Yaowa hid Luo's 06 order to her).
+// A near speaker's line has a guard of the withdrawing batches or a man of the relief in that line of sight step aside the
+// same way, and a guard walks back to where he stood once the line is done (relay r2 acceptance acc36: guard 50 hid the
+// relief NCO's FrontRelief.02 for 148 of 155 frames).
+// A line whose speaker was put off his post near the player (a grenade dodge) and is beyond 15 m, out of sight, waits, at most
+// B.speakerReturnHoldS, for him to be back where the player can see him (PostAwayFrom; relay r2 acceptance idle probe 2:
+// Luo dodged 15 m out of the nest behind its walls and said FrontWithdraw.01 from there).
 // With or without a line, a named squadmate holding his spot steps out of the way of a player coming past him and goes
 // back once the player is through (GiveWay; 2026-09-26 relay r2 wrap-up: Luo in his cover in the nest's west door).
 import { MISSION_DIALOGUE } from "./Data_FirstLevelMissionDialogue.mjs";
@@ -334,6 +340,30 @@ export class FirstLevelFrontScenes {
       if (hold) { hold.released = why; hold.heldS = +(now - hold.since).toFixed(2); }
       return false;
     };
+    // His post is near the player but a grenade dodge (or a shove) has put him off it, out of sight: the line waits, at most
+    // B.speakerReturnHoldS, while his own walk takes him back (FrontBattle.Walk walks the dodge trail back), and is released
+    // the frame he is in view - or, back at his post and still out of the picture, judged as any near line from then on.
+    // Said at once it came from 15 m away behind the nest's walls (relay r2 acceptance idle probe 2, FrontWithdraw.01: Luo
+    // dodged the grenade the player dodged, north out of the nest, 227 frames 0 seen, back in his cover 7.5 s later).
+    // Not a wider gate: a speaker whose post is far (He at the left gun) still shouts at once.
+    const post = view && !view.inView ? this.PostAwayFrom(body) : null;
+    // It starts only for a speaker beyond B.speakerViewNearM (a near one steps into the picture or plays, below); once
+    // started it lasts until he is in view, back at his post, or the time is up - wherever he is on the way.
+    if (post && r.player?.position && Distance(post, r.player.position) <= B.speakerViewNearM
+      && (hold?.returnSince != null || view.distance > B.speakerViewNearM)) {
+      if (!hold) {
+        hold = { since: now, released: null, heldS: 0, stepped: false, who: line.who, sceneId };
+        this.holds.set(line.id, hold);
+        if (this.holds.size > 64) this.holds.delete(this.holds.keys().next().value);
+      }
+      hold.returnSince ??= now;
+      if (now - hold.returnSince < B.speakerReturnHoldS) return true;
+      return Release("returnTimeout");
+    }
+    if (hold?.returnSince != null && hold.returnS == null) {
+      hold.returnS = +(now - hold.returnSince).toFixed(2);
+      hold.since = now;
+    }
     // No body, no camera (Node tests), or a shout from across the front: the line plays as it always did.
     if (!view || view.distance > B.speakerViewNearM) return Release(!view ? "noView" : "far");
     if (view.inView) return Release("inView");
@@ -371,6 +401,19 @@ export class FirstLevelFrontScenes {
     }
     return true;
   }
+  /**
+   * The post a FrontBattle walker was put off: the last point of his walk while he is on its last leg (or past it) and
+   * farther from it than its arrival radius (arrivalM, else B.arrivalM) plus B.coverReopenM - the distance at which Walk
+   * takes a finished walk up again. null for a man with no walk, one still on the way, one whose stall fallback accepted
+   * where he stands (he is not going back), and outside FrontBattle's steps (06: nobody walks the old walks any more).
+   */
+  PostAwayFrom(body) {
+    const battle = this.r.frontBattle;
+    if (!body || !battle?.Active) return null;
+    const w = battle.walks?.get?.(body.id), post = w?.route?.at(-1);
+    if (!post || w.stallAccepted || w.index < w.route.length - 1) return null;
+    return Distance(body.position, post) > (post.arrivalM ?? B.arrivalM) + B.coverReopenM ? post : null;
+  }
   /** The player stands within B.speakerStepGunSeatM of the seat of a gun no squadmate mans (the captured right gun). */
   AtFreeGun() {
     const r = this.r, player = r.player?.position, guns = r.emplacement?.guns ? [...r.emplacement.guns.values()] : [];
@@ -400,11 +443,27 @@ export class FirstLevelFrontScenes {
   }
   /** This soldier is walking into the picture for a line (FirstLevelFrontBattle.Walk leaves him alone meanwhile). */
   Steers(soldier) { return !!soldier && (this.steer?.soldier === soldier || this.aside?.soldier === soldier || this.giveWay?.soldier === soldier); }
-  /** The squadmate (B.speakerAsideCast, not busy on a gun or a litter) standing between `eye` and `head`, or null. */
-  Blocker(speaker, eye, head) {
+  /**
+   * The men of the front who are nobody's named squadmate but stand about the player in 03-06: the guards of both batches
+   * (not one bounding across the gap: that walk is his cover) and the relief. -> Set of soldiers.
+   */
+  PlainFriends() {
+    const r = this.r, out = new Set();
+    for (const g of r.guards || []) if (g?.actor && (g.safe || !g.crossing)) out.add(g.actor);
+    for (const e of r.relief || []) if (e?.actor) out.add(e.actor);
+    return out;
+  }
+  /**
+   * The squadmate (B.speakerAsideCast, not busy on a gun or a litter) standing between `eye` and `head`, or null. With `near`
+   * (the speaker within B.speakerViewNearM) a guard or a relief man (PlainFriends) in the way counts as well: relay r2
+   * acceptance acc36, guard 50 stood 0.95 m in front of the player, square in the line to the relief NCO 1.4 m off, and
+   * hid FrontRelief.02 for 148 of its 155 frames (only the four named squadmates stepped aside then).
+   */
+  Blocker(speaker, eye, head, near = false) {
     const r = this.r, guns = r.emplacement?.guns ? [...r.emplacement.guns.values()] : [];
+    const plain = near ? this.PlainFriends() : null;
     for (const s of r.ai?.soldiers || []) {
-      if (s === speaker || !s?.alive || !B.speakerAsideCast.includes(s.castId) || s.carryRole) continue;
+      if (s === speaker || !s?.alive || s.carryRole || !(B.speakerAsideCast.includes(s.castId) || plain?.has(s))) continue;
       if (guns.some((g) => g?.npc === s) || this.steer?.soldier === s || this.giveWay?.soldier === s) continue;
       const crown = ResolveSpeaker(s);
       const top = crown && Number.isFinite(crown.y) && crown !== s.position ? crown.y + 0.15 : (s.position.y || 0) + 1.75;
@@ -439,20 +498,42 @@ export class FirstLevelFrontScenes {
       if (l.state !== "playing" || !l.line || l.line.who === "shunzi" || l.line.direction?.spatial === "self") continue;
       const body = this.Body(l.line.who), view = body && this.SpeakerView(body);
       if (!view?.inView) continue;
-      const blocker = this.Blocker(body, eye, view.head), spot = blocker && this.AsideSpot(blocker, eye, view.head);
+      const blocker = this.Blocker(body, eye, view.head, view.distance <= B.speakerViewNearM), spot = blocker && this.AsideSpot(blocker, eye, view.head);
       if (!spot) continue;
-      this.aside = { soldier: blocker, spot, sceneId: handle.id, lineId: l.line.id };
-      this.asides.push({ line: l.line.id, who: blocker.castId, t: +(r.time ?? 0).toFixed(2) });
+      // A guard has no walk to take him back where he stood (UpdateGuards leaves a safe man alone, holds a waiting one
+      // wherever he is): he walks back himself once the line is done (StepAside). A named squadmate or a relief man is
+      // taken up by his own orders (FrontBattle.Walk) again.
+      const guard = (r.guards || []).some((g) => g?.actor === blocker);
+      this.aside = { soldier: blocker, spot, sceneId: handle.id, lineId: l.line.id,
+        home: guard ? { x: blocker.position.x, z: blocker.position.z } : null, phase: "aside", backSince: null };
+      this.asides.push({ line: l.line.id, who: blocker.castId ?? blocker.id, t: +(r.time ?? 0).toFixed(2) });
       if (this.asides.length > 24) this.asides.shift();
       return;
     }
   }
-  /** Keeps the squadmate from ClearView walking to / holding his spot; lets him go when the line is done. */
+  /**
+   * Keeps the squadmate from ClearView walking to / holding his spot; lets him go when the line is done - a guard walks
+   * back to where he stood first (within B.speakerAsideReturnM, at most B.speakerAsideReturnS, then holds it: Defend).
+   */
   StepAside() {
-    const a = this.aside, r = this.r, handle = this.handle;
+    const a = this.aside, r = this.r, handle = this.handle, now = r.time ?? 0;
     if (!a) return;
+    if (a.phase === "back") {
+      if (!a.soldier?.alive || !FRONT_SCENE_STEPS.includes(r.flow?.stage?.id)) { this.aside = null; return; }
+      if (Distance(a.soldier.position, a.home) <= B.speakerAsideReturnM || now - a.backSince >= B.speakerAsideReturnS) {
+        r.Defend?.(a.soldier, a.home, 0, 0);
+        this.aside = null;
+        return;
+      }
+      r.MoveActor?.(a.soldier, a.home, B.speakerStepSpeedMps);
+      return;
+    }
     const talking = !!handle && !handle.done && handle.id === a.sceneId && handle.lines.some((l) => l.line?.id === a.lineId && l.state !== "done");
-    if (!talking || !a.soldier?.alive) { this.aside = null; return; }
+    if (!talking || !a.soldier?.alive) {
+      if (a.home && a.soldier?.alive) { a.phase = "back"; a.backSince = now; this.StepAside(); return; }
+      this.aside = null;
+      return;
+    }
     if (Distance(a.soldier.position, a.spot) > 0.35) r.MoveActor?.(a.soldier, a.spot, B.speakerStepSpeedMps);
     else if (r.Defend) r.Defend(a.soldier, a.spot, 0, 0.3);
   }
@@ -690,7 +771,7 @@ export class FirstLevelFrontScenes {
     return { pending: [...this.pending], playing: this.handle && !this.handle.done ? this.handle.id : null, log: this.log.slice(-24),
       holds: Object.fromEntries([...this.holds].slice(-24).map(([id, h]) => [id, { ...h, since: +h.since.toFixed(2) }])),
       steer: this.steer ? { who: this.steer.who, backOff: !!this.steer.backOff, spot: { x: +this.steer.spot.x.toFixed(2), z: +this.steer.spot.z.toFixed(2) } } : null,
-      aside: this.aside ? { who: this.aside.soldier.castId, line: this.aside.lineId, spot: { x: +this.aside.spot.x.toFixed(2), z: +this.aside.spot.z.toFixed(2) } } : null,
+      aside: this.aside ? { who: this.aside.soldier.castId ?? this.aside.soldier.id, line: this.aside.lineId, phase: this.aside.phase, spot: { x: +this.aside.spot.x.toFixed(2), z: +this.aside.spot.z.toFixed(2) } } : null,
       asides: this.asides.slice(), stood: this.stood.slice(), dropped: this.dropped.slice(),
       giveWay: this.giveWay ? { who: this.giveWay.who, phase: this.giveWay.phase, spot: { x: +this.giveWay.spot.x.toFixed(2), z: +this.giveWay.spot.z.toFixed(2) },
         home: { x: +this.giveWay.home.x.toFixed(2), z: +this.giveWay.home.z.toFixed(2) } } : null,

@@ -356,6 +356,13 @@ export const FRONT_BATTLE_TUNING=Object.freeze({
   // starts. Said at once, FrontWithdraw.01 went by while the player ran from a grenade, Luo never in the picture
   // (09-25 relay r2 Gate drive ABfix_1a; Front step 3 addendum B).
   speakerDangerHoldS:4.5,
+  // ... and at most speakerReturnHoldS (s) while a speaker beyond speakerViewNearM, out of the picture, is on his way back
+  // to a post of his within speakerViewNearM of the player (FrontScenes.PostAwayFrom: a grenade dodge put him off it). It
+  // is released the frame he is in view. Measured (relay r2 acceptance idle probe 2, 2026-09-26): Luo dodged 15.4 m out of
+  // the right nest, north behind its walls, and was back in his cover 7.5 s after the grenade (FrontBattle.Walk's walk back
+  // along the dodge trail at MISSION_TUNING.squadSpeedMps 3.05 with the nest's door corner); 8 s covers that walk. Longer
+  // and the order is late; a speaker who is not back by then is heard from where he is.
+  speakerReturnHoldS:8,
   // "In the picture" for the hold: the head projects inside this share of the frame (NDC), not just onto its edge.
   // The acceptance sample (CheckFrontActing) counts 0.95; the hold asks for more so the head is not cut by the border.
   speakerViewNdc:.8,
@@ -412,6 +419,13 @@ export const FRONT_BATTLE_TUNING=Object.freeze({
   // (Volunteer.05) was said behind Yaowa's back in 2 of 7 drives (245 of 268 frames hidden by her).
   speakerAsideCast:Object.freeze(["yaowa","heyoutian","liuwencai","luo"]),speakerAsideOffsetsM:Object.freeze([1.0,1.4,1.8]),
   speakerAsideBodyRadiusM:.28,speakerAsidePlayerM:1.0,
+  // A near speaker's (speakerViewNearM) line also sends aside a guard of either batch (not one bounding across the gap)
+  // or a man of the relief who stands in that line of sight (relay r2 acceptance acc36, 2026-09-26: safe guard 50, 0.95 m
+  // in front of the player, hid the relief NCO 1.4 m off through 148 of FrontRelief.02's 155 frames). A guard has no walk
+  // that takes him back, so once the line is done he walks back to where he stood - within speakerAsideReturnM, at most
+  // speakerAsideReturnS - at speakerStepSpeedMps, and holds it. 0.35 m: the arrival every other FrontScenes walk uses;
+  // 4 s: the longest aside (speakerAsideOffsetsM 1.8 m) at a walk with room to start and stop, as giveWayReturnS.
+  speakerAsideReturnM:.35,speakerAsideReturnS:4,
   // ---- 03-06: a squadmate holding his spot lets the player past (2026-09-26 relay r2 wrap-up; the integration lead
   // chose option c of the Front package's first open decision) ----
   // FrontScenes.GiveWay: a named squadmate (giveWayCast) standing at his spot (not walking: Script_Ai moveSpeed at or
