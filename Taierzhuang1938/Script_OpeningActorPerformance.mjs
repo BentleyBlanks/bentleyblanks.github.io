@@ -17,7 +17,10 @@ const ContactClips=new Set(["DuckBlast","BayonetClearWood","CollarDrag","ButtThr
   "BanterPatRifle","IjaKickPrisoner","IjaShoveForward","CaptiveKneelFlinch","CaptiveShovedStumble",
   // 2026-09-25 storyboard round: the face is aimed at the first-person eye inside the clip (a
   // dialogue head turn on top would take it off the camera).
-  "IjaButtStrikeCollar","IjaDragByForearm","IjaLookBackLow","IjaStartleTurn","IjaGuardPort"]);
+  "IjaButtStrikeCollar","IjaDragByForearm","IjaLookBackLow","IjaStartleTurn","IjaGuardPort",
+  // hands on the post, the rifle or held out to Shunzi, faces aimed inside the clip: no dialogue gestures or the
+  // Banter/Orders MessengerReport substitution on top (the runner and Yaowa talk in those phases)
+  "LuoKneelReach","RunnerLeanPostCall","InterpreterHurryReach","YaowaSitLoad"]);
 const Guards=new Set(["ijaA","ijaB","guard","heyoutian","liuwencai"]);
 const Hash=value=>[...String(value)].reduce((sum,char)=>(sum*31+char.charCodeAt(0))>>>0,7);
 const HandClips=new Set(["ButtThreat","InterrogateCrouch","InterpreterPoint","MessengerReport","PointBlockade"]);

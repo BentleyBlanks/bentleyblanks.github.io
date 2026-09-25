@@ -19,6 +19,9 @@
 //      不许把胳膊锁直去够人；枪托砸头（limb butt → head）在接触时刻枪的网格到 player 头点（加 contact 的
 //      playerOffsetM：眼位前上方的额头）≤ 3 cm（只查声明了落点的；2026-09-23 的 IjaButtStrike 没声明，
 //      枪托到眼位 7.9 cm）。
+//      伸手递向玩家（action reach，带 gapM：LuoKneelReach 的手停在胸口前 0.3 m）：窗口里握点到 player 轨那一点的距离
+//      与 gapM 相差 ≤ 5 cm，臂长比同样 ≤ 1.05；手扶世界里的点（contact 带 pointM，演员坐标系运行时米：传令兵扶门柱）
+//      在 [t, untilT] 里握点到那一点 ≤ 3 cm、臂长比 ≤ 1.05。
 //  10) 单帧突跳（ROUND_0925 里的 clip）：任一骨头相邻两帧的世界旋转 > 25° 且大于前后两帧各自的 2.5 倍，算一跳。
 // 用法：node Taierzhuang1938/Script_OpeningClipsBrowserTest.mjs [--shots] [--clip=名字,名字]
 //   --shots 另存审片图到 <仓库>/tmp/OpeningClipsReview/（每条 clip 三帧 × 侧面/45° 俯视，每个 stage 的关键时刻），不进仓库。
@@ -47,6 +50,8 @@ const LIMIT = { footM: .02, kneeM: .02, wallM: .03, contactM: .03, boneRatio: .0
   propFirstM: .02, propStepM: .10,
   // 9) a hand on the first-person player: needed reach / bind-pose reach (shoulder -> grip point)
   reachRatio: 1.05,
+  // 9) a hand held out toward the player (contact gapM): the distance to the player point within this of gapM
+  reachGapM: .05,
   // 10) a one-frame spike: a bone's world rotation between two frames over jumpDeg and over
   // jumpRatio times both neighbouring steps
   jumpDeg: 25, jumpRatio: 2.5 };
@@ -55,9 +60,10 @@ const LIMIT = { footM: .02, kneeM: .02, wallM: .03, contactM: .03, boneRatio: .0
 // first frame this round re-authored, keeps the 2026-09-23 right-forearm snap at 0.83 s: 60° world,
 // the same frame and size as before this round).
 const ROUND_0925 = new Set(["IjaButtStrikeCollar", "IjaDragByForearm", "IjaLookBackLow", "IjaStartleTurn", "IjaGuardPort",
-  "IjaHoldCollarUp"]);
+  "IjaHoldCollarUp", "LuoKneelReach", "RunnerLeanPostCall", "InterpreterHurryReach", "YaowaSitLoad"]);
 // player-track part a contact names (the bake keeps one collar point for the front and the back of the collar)
-const PLAYER_PART = { collar: "collar", collarFront: "collar", collarBack: "collar", head: "head", forearmR: "forearmR", shoulderR: "shoulderR" };
+const PLAYER_PART = { collar: "collar", collarFront: "collar", collarBack: "collar", head: "head", forearmR: "forearmR", shoulderR: "shoulderR",
+  chest: "chest" };
 // Skin regions of the wall contacts (the bake's WALL_REGIONS): bones whose weight the vertex carries.
 const WALL_REGIONS = {
   shoulderBack: ["spine2", "lclavicle", "rclavicle"], back: ["spine1", "spine2"], shoulderL: ["lclavicle", "lupperarm"],
@@ -237,8 +243,10 @@ try {
       for (const e of state.actors) {
         const seconds = Math.max(0, at - (e.offsetS || 0));
         // holdUntil (a single-clip review sets it to the hold loop's end): play through the
-        // loop instead of wrapping inside it, so the part after the hold is sampled too
-        e.soldier.openingStoryboardPose = { clip: e.clip, seconds, holdUntil: e.holdUntil };
+        // loop instead of wrapping inside it, so the part after the hold is sampled too.
+        // upperBody:false: the review measures the whole baked clip (an upper-body clip such as
+        // InterpreterHurryReach otherwise rides this page's standing native legs).
+        e.soldier.openingStoryboardPose = { clip: e.clip, seconds, holdUntil: e.holdUntil, upperBody: false };
         const steps = warm ? 30 : 1;
         for (let i = 0; i < steps; i++) { e.clock += 1 / 60; e.actor.Update(1 / 60, { elapsed: e.clock, moveSpeed: 0, aim: 0 }); }
       }
@@ -405,18 +413,27 @@ try {
   // ---- 9: hands and the butt on the first-person player (clip player track) ----------------
   const playerRows = [];
   for (const clip of plan.clips) {
-    if (!clip.player || (only.length && !only.includes(clip.name))) continue;
+    const world = clip.contacts.some(c => Array.isArray(c.pointM));
+    if ((!clip.player && !world) || (only.length && !only.includes(clip.name))) continue;
     const checks = [];
     for (const c of clip.contacts) {
+      if (/^hand[LR]$/.test(c.limb) && Array.isArray(c.pointM)) {
+        // a hand on a point of the world (the runner's fist on the post), actor frame, runtime metres
+        const from = Math.ceil(c.t * plan.fps - 1e-6) / plan.fps, until = c.untilT ?? clip.duration;
+        for (let t = from; t <= Math.max(from, until) + 1e-6; t += 2 / plan.fps)
+          checks.push({ limb: c.limb, action: c.action, part: c.target || "world", point: c.pointM, contactT: c.t, at: Math.round(t * 1000) / 1000 });
+        continue;
+      }
       const part = PLAYER_PART[c.part];
       if (!part || c.action === "release") continue;
-      if (/^hand[LR]$/.test(c.limb) && (c.action === "grab" || c.action === "hold")) {
+      if (/^hand[LR]$/.test(c.limb) && (c.action === "grab" || c.action === "hold" || (c.action === "reach" && c.gapM != null))) {
         // held from the first baked frame at/after the contact to the same hand's next release or the clip end
         const from = Math.ceil(c.t * plan.fps - 1e-6) / plan.fps;
         const release = clip.contacts.find(o => (o.limb === c.limb || o.limb === "handsLR") && o.t > c.t && o.action === "release");
         const until = release ? release.t : clip.duration;
         for (let t = from; t <= Math.max(from, until) + 1e-6; t += 2 / plan.fps)
-          checks.push({ limb: c.limb, action: c.action, part: c.part, track: part, contactT: c.t, at: Math.round(t * 1000) / 1000 });
+          checks.push({ limb: c.limb, action: c.action, part: c.part, track: part, contactT: c.t, at: Math.round(t * 1000) / 1000,
+            gap: c.action === "reach" ? c.gapM : 0 });
       } else if (c.limb === "butt" && c.action === "strike" && c.playerOffsetM)   // where on the head (2026-09-25 clips declare it)
         checks.push({ limb: c.limb, action: c.action, part: c.part, track: part, contactT: c.t, at: c.t, offset: c.playerOffsetM || [0, 0, 0] });
     }
@@ -429,12 +446,15 @@ try {
       s.Pose(0, true);
       for (const c of checks) {
         s.Pose(c.at, true);
-        const p = s.api.OpeningPlayerPoint(clip.rig, clip.name, c.track, c.at);
+        const p = c.point ? { x: c.point[0], y: c.point[1], z: c.point[2] } : s.api.OpeningPlayerPoint(clip.rig, clip.name, c.track, c.at);
         if (!p) { out.push({ ...c, missing: true }); continue; }
         const o = c.offset || [0, 0, 0], target = e.actor.root.localToWorld(new THREE.Vector3(p.x + o[0], p.y + o[1], p.z + o[2]));
         if (c.limb === "butt") { out.push({ ...c, error: s.MeshDistance(e.actor.weaponGroup, target) }); continue; }
         const side = c.limb.slice(-1), shoulder = e.bones.find(b => b.name.toLowerCase().replace(/[^a-z0-9]/g, "").endsWith(side.toLowerCase() + "upperarm"));
-        out.push({ ...c, error: s.Grip(e, side).distanceTo(target), ratio: shoulder && e.reach[side] ? shoulder.getWorldPosition(new THREE.Vector3()).distanceTo(target) / e.reach[side] : NaN });
+        // a reach (gap > 0) is measured as how far the hand is from stopping gap metres short of the point
+        // the arm's reach: to the grip itself when the hand stops short of the point (a reach)
+        const grip = s.Grip(e, side), aim = c.gap ? grip : target;
+        out.push({ ...c, error: Math.abs(grip.distanceTo(target) - (c.gap || 0)), ratio: shoulder && e.reach[side] ? shoulder.getWorldPosition(new THREE.Vector3()).distanceTo(aim) / e.reach[side] : NaN });
       }
       return out;
     }, { clip, checks });
@@ -450,9 +470,10 @@ try {
     for (const row of groups.values()) {
       playerRows.push({ clip: clip.name, ...row });
       const hand = row.limb !== "butt";
-      const bad = row.missing || !(row.error <= LIMIT.contactM) || (hand && !(row.ratio <= LIMIT.reachRatio));
+      const bad = row.missing || !(row.error <= (row.gap ? LIMIT.reachGapM : LIMIT.contactM)) || (hand && !(row.ratio <= LIMIT.reachRatio));
       if (bad) failed++;
-      console.log(`${bad ? "FAIL" : "ok  "} player ${clip.name}.${row.limb} ${row.action} -> player.${row.part} @${row.contactT.toFixed(2)}s`
+      console.log(`${bad ? "FAIL" : "ok  "} ${row.point ? "world" : "player"} ${clip.name}.${row.limb} ${row.action} -> ${row.point ? "" : "player."}${row.part} @${row.contactT.toFixed(2)}s`
+        + (row.gap ? ` (held ${row.gap} m short)` : "")
         + (row.missing ? " player track missing" : ` max ${(row.error * 100).toFixed(1)} cm over ${row.samples} samples (worst @${row.worstAt.toFixed(2)}s)`
         + (hand ? `, reach ${row.ratio.toFixed(3)} of the arm (@${row.ratioAt.toFixed(2)}s)` : "")));
     }

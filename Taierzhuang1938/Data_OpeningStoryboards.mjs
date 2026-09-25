@@ -26,7 +26,10 @@ export const OPENING_STORYBOARDS = Object.freeze({
       "InterpreterFlee","LuoDadaoChopRear","IjaChoppedFallWall","HeDadaoParryChop","IjaParriedChoppedFall","LuoDragToCover",
       "HeSwapDadaoRifle","LuoKneelCheck",
       // 2026-09-25 storyboard round (Data_FirstLevelStoryboard0103Contract.md §4.1).
-      "IjaButtStrikeCollar","IjaDragByForearm","IjaLookBackLow","IjaStartleTurn","IjaGuardPort"],
+      "IjaButtStrikeCollar","IjaDragByForearm","IjaLookBackLow","IjaStartleTurn","IjaGuardPort",
+      "LuoKneelReach","RunnerLeanPostCall","InterpreterHurryReach",
+      // §4.1 optional, made (Anim report 2026-09-25: the kneeling ClipLoad does not read as sitting from SB01)
+      "YaowaSitLoad"],
     // Not in §5.4, added for the draft's "日兵甲把他推到沟壁上" pair (reported to the integrator).
     added:["IjaShoveToWall"],
   },

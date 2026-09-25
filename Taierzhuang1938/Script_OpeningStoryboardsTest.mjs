@@ -19,7 +19,8 @@ const FROZEN_AUTHORED=["WoundedSitRifleIdle","BanterLaugh","BanterLookShoulder",
   "InterpreterFlee","LuoDadaoChopRear","IjaChoppedFallWall","HeDadaoParryChop","IjaParriedChoppedFall","LuoDragToCover",
   "HeSwapDadaoRifle","LuoKneelCheck",
   // 2026-09-25 storyboard round (Data_FirstLevelStoryboard0103Contract.md §4.1)
-  "IjaButtStrikeCollar","IjaDragByForearm","IjaLookBackLow","IjaStartleTurn","IjaGuardPort"];
+  "IjaButtStrikeCollar","IjaDragByForearm","IjaLookBackLow","IjaStartleTurn","IjaGuardPort",
+  "LuoKneelReach","RunnerLeanPostCall","InterpreterHurryReach","YaowaSitLoad"];
 const FROZEN_REUSED=["ClipLoad","MessengerReport","CollarControl","CollarDrag","BayonetClearWood","ButtThreat","CreepDadao",
   "DadaoHeavy","RifleDeflect","DadaoParry","KickRifle","GuardTurn","PointBlockade","InterrogateCrouch","InterpreterPoint",
   "DeathCollapseA","DeathCollapseB","DeathCollapseC","DeathCollapseD",
@@ -285,6 +286,52 @@ const SB0925=["IjaButtStrikeCollar","IjaDragByForearm","IjaLookBackLow","IjaStar
     if(ta==null)assert.ok(PropJump(ijaA,a,-1,b,0)<=.02,`${a} -> ${b}: the rifle continues`);
     chains++;
   }
+}
+// ---- 2026-09-25 storyboard clips on the NRA rigs (§4.1: SB01 runner/Yaowa, SB04A interpreter, SB06 Luo) ----------
+{
+  const SB0925_NRA={LuoKneelReach:"LugouNra05",RunnerLeanPostCall:"LugouNra02",InterpreterHurryReach:"LugouNra02",YaowaSitLoad:"LugouNra02"};
+  const reportOf=(rig,id)=>manifest.models.find(m=>m.id===rig).clips.find(c=>c.clip===id);
+  for(const [id,rig] of Object.entries(SB0925_NRA)){
+    const spec=manifest.clips[id],r=reportOf(rig,id);
+    assert.equal(spec.rig,rig,`${id}: cast on the contract's rig`);
+    assert.ok(Math.abs(spec.duration*manifest.fps-Math.round(spec.duration*manifest.fps))<1e-6,`${id}: duration ${spec.duration} s is whole frames`);
+    // bake numbers: planted feet (and Luo's knee) hold, hands on their targets, the face on its look point
+    assert.ok(r.footSlideM<=.02&&(r.kneeSlideM??0)<=.02,`${rig}/${id}: foot ${r.footSlideM} m, knee ${r.kneeSlideM} m`);
+    assert.ok(r.contactErrorM<=.03,`${rig}/${id}: hand ${r.contactErrorM} m off its target`);
+    assert.ok(r.lookErrorDeg<=3&&r.headTurnDeg<=70,`${rig}/${id}: face ${r.lookErrorDeg} deg off, head turned ${r.headTurnDeg} deg`);
+  }
+  const luo=assets.get("LugouNra05"),nra02=assets.get("LugouNra02");
+  // SB06: the offered hand 0.3 m short of Shunzi's chest (player chest/head tracks), a hold loop with an exit, and
+  // the clip starts and ends on LuoKneelCheck frame 0 (a drop-in for the Check beat, then KickRifle).
+  const reach=manifest.clips.LuoKneelReach,offer=reach.contacts.find(c=>c.action==="reach");
+  assert.ok(offer&&offer.limb==="handL"&&offer.part==="chest"&&offer.partnerRole==="shunzi"&&Math.abs(offer.gapM-.3)<1e-9,"LuoKneelReach: left hand offered 0.3 m short of the chest");
+  assert.equal(Object.keys(luo.clips.LuoKneelReach.player?.parts||{}).sort().join(","),"chest,head","LuoKneelReach: player chest/head");
+  assert.equal(reportOf("LugouNra05","LuoKneelReach").kneePlants.length,1,"LuoKneelReach: the right knee is declared on the ground");
+  for(const [a,ta,b,tb] of [["LuoKneelReach",reach.duration,"LuoKneelCheck",0],["LuoKneelReach",0,"LuoKneelCheck",0]]){
+    const x=WorldPose("LugouNra05",luo,a,ta),y=WorldPose("LugouNra05",luo,b,tb);
+    let angle=0,offset=0,where="";
+    x.forEach((p,i)=>{
+      if(/Finger\d\d|Nub/.test(luo.bones[i]))return;
+      const q=y[i],deg=2*Math.acos(Math.min(1,Math.abs(p.q[0]*q.q[0]+p.q[1]*q.q[1]+p.q[2]*q.q[2]+p.q[3]*q.q[3])))*180/Math.PI;
+      if(deg>angle){angle=deg;where=luo.bones[i];}
+      offset=Math.max(offset,Math.hypot(p.p[0]-q.p[0],p.p[1]-q.p[1],p.p[2]-q.p[2]));
+    });
+    assert.ok(angle<=2&&offset<=.01,`${a}@${ta} -> ${b}@${tb}: ${angle.toFixed(2)} deg at ${where}, ${(offset*100).toFixed(2)} cm`);
+    chains++;
+  }
+  // SB01 runner: the fist on the post (pointM) sits just outside the post (postAxisM, postRadiusM), shoulder high.
+  const post=manifest.clips.RunnerLeanPostCall.contacts.find(c=>c.target==="post");
+  const gap=Math.hypot(post.pointM[0]-post.postAxisM[0],post.pointM[2]-post.postAxisM[2]);
+  assert.ok(post.limb==="handL"&&gap>=post.postRadiusM&&gap<=post.postRadiusM+.05&&post.pointM[1]>1.0&&post.pointM[1]<1.35,
+    `RunnerLeanPostCall: fist ${gap.toFixed(3)} m from the post axis at ${post.pointM[1]} m`);
+  assert.ok(manifest.clips.RunnerLeanPostCall.holdLoop[1]===manifest.clips.RunnerLeanPostCall.duration,"RunnerLeanPostCall: holds to the end");
+  // SB04A interpreter: an upper-body clip (the runtime lays it on the native legs).
+  assert.equal(manifest.clips.InterpreterHurryReach.upperBody,true,"InterpreterHurryReach: upper body");
+  // SB01 Yaowa: a seamless loop, sitting on the ground against the wall.
+  assert.ok(nra02.clips.YaowaSitLoad.loop&&manifest.clips.YaowaSitLoad.env.wallBehindM>0,"YaowaSitLoad: loops against the wall");
+  const seam=HandOver(nra02,"YaowaSitLoad",0,"YaowaSitLoad",-1);
+  assert.ok(seam.angle<=.5&&seam.offset<=.001,`YaowaSitLoad: loop seam ${seam.angle.toFixed(3)} deg`);
+  assert.ok(reportOf("LugouNra02","YaowaSitLoad").root.start[3]<.2,"YaowaSitLoad: the pelvis is on the ground (sitting)");
 }
 let seams=0;
 for(const [id,spec] of Object.entries(manifest.clips)){
