@@ -4688,7 +4688,10 @@ def BuildChoppedFallBack(T, name):
         else:
             h = hands(t)
             f['handRel.R'], f['handRel.L'] = h['handRel.R'], h['handRel.L']
-            f['palmF.R'], f['palmN.R'] = (0, -.2, -1), (1, 0, 0)
+            # the right hand opens toward Shunzi as it is flung up (SB05A: fingers spread, palm out)
+            w = Smooth((t - .62) / .20)
+            f['palmF.R'] = Unit(Lerp3((0, -.2, -1), (-.6, 0, .8), w))
+            f['palmN.R'] = Unit(Lerp3((1, 0, 0), (0, -1, 0), w))
             f['palmF.L'], f['palmN.L'] = (0, .2, 1), (1, 0, 0)
             f['curl.R'] = f['curl.L'] = Mix(.35, .20, Smooth((t - .60) / .30))
             f['poleRel.R'], f['poleRel.L'] = (-.45, .40, -.35), (.45, .40, -.35)
