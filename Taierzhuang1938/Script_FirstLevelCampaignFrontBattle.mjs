@@ -5,6 +5,7 @@ import path from "node:path";
 import { FRONT_SORTIE as S, FRONT_SPACE as Space } from "./Data_FirstLevelFrontRoute.mjs";
 import { MISSION_ROUTES as Routes, MISSION_ANCHORS as A } from "./Data_FirstLevelMissionLayout.mjs";
 import { MISSION_STAGE_ROUTES } from "./Data_FirstLevelMissionTopology.mjs";
+import { MISSION_ENCOUNTERS } from "./Data_FirstLevelMission.mjs";
 import { CampaignActions } from "./Script_FirstLevelCampaignKit.mjs";
 import { DriveBundleThrow } from "./Script_FirstLevelBundleThrowDriver.mjs";
 import { FRONT_BATTLE_TUNING as B } from "./Data_Tuning_FirstLevelFront.mjs";
@@ -142,15 +143,50 @@ export async function DriveFrontBattle(ctx){
     console.log("FRONT_STUCK",JSON.stringify(stuck).slice(0,3000));
     throw error;
   }
+  // Clear the nest from its door bend (FRONT_SORTIE.approach[-3]) before walking in, as a player does: fight from there
+  // until the approach defenders are down (the capture needs them dead anyway) or maxS runs out; a grenade dodge that
+  // carries the body more than 3 m off the bend walks back to it. 09-25 A/B (Front step 2): a run that dodged a grenade
+  // at the door rejoined straight onto the seat past a live RightEntryGuard and died in his bayonet fight (two runs,
+  // same trajectory to the digit); runs that walked in after the guards were down all lived.
+  async function ClearNestFromDoor(maxS=45){
+    const bend=S.approach.at(-3),ids=MISSION_ENCOUNTERS.approach.map(e=>e.id);
+    let state;
+    for(let i=0;i<maxS;i+=5){
+      state=await page.evaluate(({ids})=>{
+        const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime(),Clear=()=>ids.every(id=>!r.enemies.get(id)?.alive);
+        for(let f=0;f<300&&g.player.alive&&!Clear();f++){
+          const evading=window.MissionInputDriver.EvadeGrenade(),foe=evading?null:window.MissionInputDriver.Target(90);
+          if(foe)window.MissionInputDriver.Shoot(foe);
+          else if(!evading){g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);if(g.state.activeSlot==="melee")g.Debug.Key("Digit1");if(g.state.ammo===0)g.Debug.Key("KeyR");}
+          if(g.player.bleeding&&g.player.health<80)g.Debug.Key("KeyB");
+          g.StepFrames(1,1/60,false);
+        }
+        g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);
+        return {alive:g.player.alive,clear:Clear(),time:r.time,x:g.player.position.x,z:g.player.position.z,
+          left:ids.filter(id=>r.enemies.get(id)?.alive)};
+      },{ids});
+      console.log("ClearNestFromDoor",JSON.stringify(state));
+      if(state.clear||!state.alive)break;
+      if(Math.hypot(state.x-bend.x,state.z-bend.z)>3)await Route([bend],"ClearNestReturn",{stance:"crouch",fight:true,crawl:true,recoverAfterEvade:true});
+    }
+    assert.ok(state.alive,"ClearNestFromDoor: player alive at the nest's door bend");
+    return state;
+  }
   async function DriveLegs(){
-  await Route(Routes.support,"RightNestApproach",{stance:"crouch",fight:true,crawl:true,recoverAfterEvade:true}).catch(async error=>{
+  await Route(Routes.support.slice(0,-2),"RightNestApproach",{stance:"crouch",fight:true,crawl:true,recoverAfterEvade:true}).catch(async error=>{
     // A grenade dodge at the west door can leave the body south of the nest's west parapet (23.3,-153); the evade
     // rejoin then aims at the nearest corridor point, the door->seat leg on the other side of that parapet, and the
     // bot walks into it for good (09-25 runs 6 and 8, the nest gunner alive behind it). A player walks back round
     // through the west door: the last three approach points (door bend, west door, seat), fighting as before.
     if(!/actual body reached route end/.test(error?.message||""))throw error;
     console.log("RightNestApproach: stalled after an evade, going round through the west door");
-    await Route(S.approach.slice(-3),"RightNestApproachViaDoor",{stance:"crouch",fight:true,crawl:true,recoverAfterEvade:true});
+    await Route(S.approach.slice(-3,-2),"RightNestApproachViaDoor",{stance:"crouch",fight:true,crawl:true,recoverAfterEvade:true});
+  });
+  await ClearNestFromDoor();
+  await Route(S.approach.slice(-2),"RightNestEntry",{stance:"crouch",fight:true,crawl:true,recoverAfterEvade:true}).catch(async error=>{
+    if(!/actual body reached route end/.test(error?.message||""))throw error;
+    console.log("RightNestEntry: stalled after an evade, going round through the west door");
+    await Route(S.approach.slice(-3),"RightNestEntryViaDoor",{stance:"crouch",fight:true,crawl:true,recoverAfterEvade:true});
   });
   await WaitFact("rightNestCaptured",90,true);
   const sight=await page.evaluate(async()=>{
