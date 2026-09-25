@@ -63,6 +63,23 @@ export const OPENING_DEPTH_WALKERS = Object.freeze({
   ]),
 });
 
+// ---------------------------------------------------------------------------
+// 01 翻译与日兵乙退下南南西沟之后（分镜 SB03A「纵深有背身远去的日兵」，契约 §5）：两名日军从弯角弹坑台阶
+// （南南西沟那头搜完后沟回来，在画面外）下到前沟，背对洞口沿东沟南侧走向岔口 J、拐进纵深支沟，走到末点且不在
+// 镜头里就收走；最迟 02 开始（Hold）收走。Wipe 开始时生成、原地站着，afterWipeS 起逐个出发（staggerS 间隔）。
+// 时刻按 SB03A（Reach 3 s，约 Wipe 起 9.7 s）排：那一刻前一个约在 x 9.5、后一个约在 x 6.5，都在日兵甲右边。
+// 运行时由 01–02 导演（Script_OpeningStoryboards.DepthIja）生成与收走：剧本兵，不开枪，不进任务敌人名册
+// （01–05 累计名册 49 人不含这两人；他们只活在 01 的 Wipe→Boots 里，不占 03–05 的同时存活预算）。
+// ---------------------------------------------------------------------------
+const IJA_DEPTH_ROUTE = Object.freeze([W(3.3, -123.6), W(6, -123.3), W(10, -123.35), W(13.6, -123.6), W(15.2, -118.5), W(17.5, -111)]);
+export const OPENING_DEPTH_IJA = Object.freeze({
+  afterWipeS: 3.6, speedMps: 1.4, staggerS: 1.7,
+  members: Object.freeze([
+    Object.freeze({ id: "DepthIjaA", start: W(3.1, -121.3), route: IJA_DEPTH_ROUTE }),
+    Object.freeze({ id: "DepthIjaB", start: W(2.6, -120.8), route: IJA_DEPTH_ROUTE }),
+  ]),
+});
+
 const Stop = (x, z, holdS, fire) => Object.freeze({ x, z, holdS, fire: Object.freeze(fire) });
 const Roster = MISSION_ENCOUNTERS.bunkerBackdrop;
 // Where the Japanese pause on the way down: the link sap's second fold (fire at RC over the field)

@@ -15,7 +15,7 @@ import { MissionRouteProjection, MissionRoutePoint, MissionRouteLength, MissionR
 import { SampleOpeningPerception } from "./Script_FirstLevelOpening.mjs";
 import { BuildSink } from "./Script_World.mjs";
 import { InCameraView } from "./Script_FirstLevelBackdropSquads.mjs";
-import { OPENING_DEPTH_WALKERS } from "./Data_FirstLevelBackdropSquads.mjs";
+import { OPENING_DEPTH_WALKERS, OPENING_DEPTH_IJA } from "./Data_FirstLevelBackdropSquads.mjs";
 // ===========================================================================
 // 01–02 director (2026-09-23 draft, docs/Data_FirstLevelOpeningSource20260923.md).
 // Contract docs/Data_FirstLevel0105Refactor20260923Contract.md §5.3 phases, §5.4 clips,
@@ -55,6 +55,12 @@ const EventAt=(clip,kind,fallback)=>OpeningClipMeta(clip)?.events?.find(e=>e.kin
 const ClipLength=(clip,fallback)=>OpeningClipMeta(clip)?.duration??fallback;
 const Equip=(soldier,id)=>{if(soldier&&soldier.actor.weaponId!==id)soldier.actor.SetWeapon(id);};
 const RouteLength=route=>route.slice(1).reduce((sum,p,i)=>sum+Distance(route[i],p),0);
+/** The point `s` metres along a polyline (from its start; past the end it carries on along the last leg). */
+const RoutePointAt=(route,s)=>{
+  for(let i=1;i<route.length;i++){const a=route[i-1],b=route[i],d=Distance(a,b),last=i===route.length-1;
+    if(s<=d||last){const k=d>0?Math.max(0,last?s/d:Math.min(1,s/d)):1;return {x:a.x+(b.x-a.x)*k,z:a.z+(b.z-a.z)*k};}s-=d;}
+  return {x:route[0].x,z:route[0].z};
+};
 const TRAPPED=new Set(C.phases.Trapped),RESCUE=new Set(C.phases.BunkerRescue);
 const UP=new THREE.Vector3(0,1,0);
 // 02 -> 03: the player's way out along the rear trench (return spot ... RC ... SJ ... collection).
@@ -497,8 +503,9 @@ export class FirstLevelBunkerShow {
       if(!this.savedMeleeDormancy){this.playerMeleeDormancy=r.player.meleeDormant;this.savedMeleeDormancy=true;}
       r.player.meleeDormant=true;
     }else this.ReleaseMeleeDormancy();
-    const bloodAge=this.strikeAt==null?Infinity:r.time-this.strikeAt;
-    this.bloodMask=C.strikeBlood.opacity*(1-Smooth((bloodAge-C.strikeBlood.holdS)/C.strikeBlood.fadeS));
+    // The blow's blood layer: full for holdS, settles to `settle` over settleS (SB04A: about 0.3), then fades out.
+    const bloodAge=this.strikeAt==null?Infinity:r.time-this.strikeAt,SB=C.strikeBlood;
+    this.bloodMask=(SB.opacity+(SB.settle-SB.opacity)*Smooth((bloodAge-SB.holdS)/SB.settleS))*(1-Smooth((bloodAge-SB.holdS-SB.settleS)/SB.fadeS));
     r.hud.SetStoryBlood?.(this.bloodMask);
     if(!this.ready)return;
     if(["Trapped","BunkerRescue","RearTrench"].includes(stage)||this.setup)this.Setup();
@@ -812,8 +819,60 @@ export class FirstLevelBunkerShow {
   /** Interrogation marks round the kneeling comrade (his wall root R3). */
   InterrogationMarks(){
     const wall=this.ComradeWallRoot(),I=C.interrogation;
+    // SB03: the interpreter side-on to the comrade east of the group, ijaB behind him (world marks, contract §5).
     return {wall,ijaA:this.StageRoot("captiveWall","ijaA",wall),ijaAHold:Local(wall,...I.ijaAHold),
-      interpreter:Local(wall,...I.interpreter),ijaB:Local(wall,...I.ijaB)};
+      interpreter:{...I.interpreterAt},ijaB:{...I.ijaBAt}};
+  }
+  /** Seconds since the interpreter began to back off down the SSW leg (Infinity when it was skipped). */
+  RearGo(){return this.flags.backOffAt!=null?this.r.time-this.flags.backOffAt:Infinity;}
+  /**
+   * Contract §2.7: the interpreter and ijaB after the interrogation. Until the back-off they hold their SB03 marks
+   * (ijaB turned to the front once the far call has come); then they go back down the SSW leg one after the other,
+   * leaving SB03's picture on the right (out of SB03A's), and wait there. Boots brings them running back (Hurry).
+   */
+  RearParty(go,m=this.InterrogationMarks()){
+    const I=C.interrogation,ijaB=this.Ija("ijaB"),interp=this.cast.interpreter;
+    for(const [actor,key,delay,mark] of [[interp,"interpreter",0,m.interpreter],[ijaB,"ijaB",I.backOffStaggerS,m.ijaB]]){
+      if(!actor)continue;
+      if(go<delay){
+        if(key==="ijaB")this.Hold(actor,this.flags.frontCallAt!=null?{...mark,yaw:C.ija.ijaBWatchYaw}:mark,null,{speed:C.speed.walk});
+        else this.Hold(actor,mark,this.phase==="Wipe"?null:"InterpreterCrouchAsk");
+        continue;
+      }
+      const end=I.backOff[key];
+      this.Follow(actor,"backOff",[...I.backOffRoute,end],C.speed.walk,null,Face(end,C.shunzi.dragged));
+    }
+  }
+  /** The men off stage from the wipe to the blow: the rear party down the SSW leg, SB03A's Japanese going away. */
+  Aside(){this.RearParty(this.RearGo());this.DepthIja();}
+  /**
+   * SB03A's Japanese going away down the front trench (Data_FirstLevelBackdropSquads.OPENING_DEPTH_IJA): spawned at the
+   * wipe on the crater step (out of the picture), walking from afterWipeS (+ staggerS each), retired at the route's end
+   * once out of the shot, and at the latest when 02 begins (RetireDepthIja).
+   */
+  DepthIja(){
+    const D=OPENING_DEPTH_IJA,at=this.flags.depthIjaAt;if(at==null)return;
+    D.members.forEach((m,i)=>{
+      if(this.flags["retired:"+m.id])return;
+      const start={...m.start,yaw:Face(m.start,m.route[0])};
+      let actor=this.cast[m.id];
+      if(!actor){actor=this.Spawn(m.id,"ija",m.start,{weapon:"Type38"});this.Put(actor,start);}
+      if(this.r.time<at+D.afterWipeS+i*D.staggerS){this.Hold(actor,start,null);return;}
+      if(!this.Follow(actor,"depth",m.route,D.speedMps,null))return;
+      if(!InCameraView(this.r.player.camera,this.r.Point(actor.position,1),10))this.RetireDepthIja(m.id);else this.Pose(actor,null);
+    });
+  }
+  RetireDepthIja(id=null){
+    for(const m of OPENING_DEPTH_IJA.members)if(id==null||m.id===id){this.flags["retired:"+m.id]=true;this.RetireWalker(m.id);}
+  }
+  /** SB03A: ijaA walks off to lookBack; when the timber shifts (beamShift) he stops and turns back toward the mouth. */
+  LookBack(){
+    const r=this.r,ijaA=this.Ija("ijaA"),J=C.ija,at=J.lookBack;if(!ijaA)return;
+    const heard=this.flags.beamShift!=null?r.time-this.flags.beamShift:-1;
+    if(heard<0){this.Hold(ijaA,at,null,{speed:C.speed.stroll});return;}
+    // Wave 1 (pendingWiring SB03A): GuardTurn, the root turned to lookBackOffDeg short of the eye, the head layer the rest.
+    const here=ijaA.openingStoryboardLast||ijaA.position;
+    this.Move(ijaA,{x:here.x,z:here.z},Face(here,C.shunzi.reachEye)-J.lookBackOffDeg*DEG,"GuardTurn",0,{seconds:heard});
   }
   PhaseCaptiveWall(age){
     const r=this.r,comrade=this.Comrade,ijaA=this.Ija("ijaA"),ijaB=this.Ija("ijaB"),interp=this.cast.interpreter,m=this.InterrogationMarks();
@@ -876,8 +935,7 @@ export class FirstLevelBunkerShow {
     this.VanguardFront(this.flags.vanguardAt);
     this.Pose(comrade,"CaptiveClutchThroat",{seconds:age});
     this.Pose(ijaA,"IjaThroatSlash",{seconds:1+age});
-    this.Hold(this.Ija("ijaB"),m.ijaB,null);
-    this.Hold(this.cast.interpreter,m.interpreter,"InterpreterCrouchAsk");
+    this.RearParty(-1,m);
     const done=this.scenes.CaptiveTaunt?this.scenes.CaptiveTaunt.lines?.[2]?.state==="done":age>4;
     if(done||age>this.SceneLength("CaptiveTaunt")+C.timeouts.tauntExtraS)this.Stage("Wipe");
   }
@@ -888,6 +946,7 @@ export class FirstLevelBunkerShow {
       comrade.scriptEssential=false;this.PlayClip(comrade,"CaptiveWallSlideTwitch",{restart:true});
       this.Kill(comrade);
       this.flags.comradeDead=true;
+      this.flags.backOffAt=r.time+C.interrogation.backOffAfterS;this.flags.depthIjaAt=r.time;
     }
     this.VanguardFront(this.flags.vanguardAt);
     this.Corpse(comrade,"CaptiveWallSlideTwitch");
@@ -896,20 +955,18 @@ export class FirstLevelBunkerShow {
     if(age<wipe)this.Pose(ijaA,"IjaWipeSheathBayonet",{seconds:age});
     else if(age<ready)this.Pose(ijaA,"IjaReadyRifle",{seconds:age-wipe});
     else this.Pose(ijaA,null);
-    // 「日兵乙转头看向前沟」: he turns to the front at the far call.
-    if(this.flags.frontCallAt!=null)this.Hold(ijaB,{...C.ija.ijaBWatch,yaw:-Math.PI/2},null,{speed:C.speed.walk});else this.Hold(ijaB,m.ijaB,null);
-    const interp=this.cast.interpreter;
-    this.Hold(interp,{...Local(m.wall,1.4,-1.6),yaw:Face(Local(m.wall,1.4,-1.6),m.wall)},null,{speed:C.speed.stroll});
+    // 「日兵乙转头看向前沟」 (he turns to the front at the far call), then the two go back down the SSW leg.
+    this.RearParty(this.RearGo(),m);this.DepthIja();
     if(age>=ready)this.Stage("Reach");
   }
   PhaseReach(age){
     const r=this.r;
     this.VanguardFront(this.flags.vanguardAt);
     this.Corpse(this.Comrade,"CaptiveWallSlideTwitch");
-    this.Pose(this.Ija("ijaA"),null);
-    this.Hold(this.Ija("ijaB"),{...C.ija.ijaBWatch,yaw:-Math.PI/2},null,{speed:C.speed.walk});
-    // The pack strap snaps him back; the loose beam shifts (the noise that turns ijaA round).
+    this.Aside();
+    // The pack strap snaps him back; the loose beam shifts (the noise that turns ijaA round, SB03A).
     if(age>=2&&!this.flags.beamShift){this.flags.beamShift=r.time;r.audio?.Play?.("debrisFall",{position:r.Point(C.shunzi.trap,.4),volume:.4});}
+    this.LookBack();
     this.PlaceBeam("nudged",this.flags.beamShift?Smooth((r.time-this.flags.beamShift)/.3)*.25:0);
     if(age>=C.timeouts.reachS)this.Stage("Found");
   }
@@ -918,7 +975,7 @@ export class FirstLevelBunkerShow {
     if(!this.phaseEntered){this.phaseEntered=true;r.Record("doorSearchStarted");}
     this.VanguardFront(this.flags.vanguardAt);
     this.Corpse(this.Comrade,"CaptiveWallSlideTwitch");
-    this.Hold(this.Ija("ijaB"),{...C.ija.ijaBWatch,yaw:-Math.PI/2},null,{speed:C.speed.walk});
+    this.Aside();
     if(this.flags.clearAt==null){
       if(this.Follow(ijaA,"found",[...C.ija.foundRoute,root],age>C.timeouts.foundWalkS?C.speed.run:C.speed.walk,null,root.yaw)&&this.Hold(ijaA,root,null))this.flags.clearAt=r.time;
       this.PlaceBeam("nudged",.25);
@@ -936,7 +993,7 @@ export class FirstLevelBunkerShow {
   PhaseDrag(age){
     const ijaA=this.Ija("ijaA");
     this.Put(ijaA,this.SnagRoot());
-    this.Corpse(this.Comrade,"CaptiveWallSlideTwitch");
+    this.Corpse(this.Comrade,"CaptiveWallSlideTwitch");this.Aside();
     this.PlaceBeam("nudged");
     if(age<.8){this.Pose(ijaA,"IjaSlingRifle",{seconds:age});return;}
     const t=age-.8;
@@ -945,7 +1002,7 @@ export class FirstLevelBunkerShow {
   }
   PhaseSnag(age){
     const ijaA=this.Ija("ijaA");
-    this.Put(ijaA,this.SnagRoot());this.Corpse(this.Comrade,"CaptiveWallSlideTwitch");
+    this.Put(ijaA,this.SnagRoot());this.Corpse(this.Comrade,"CaptiveWallSlideTwitch");this.Aside();
     this.PlaceBeam("nudged");
     const t=EventAt("IjaCollarDragSnag","packSnagged",.95)+age;
     this.Pose(ijaA,"IjaCollarDragSnag",{seconds:t});
@@ -953,7 +1010,7 @@ export class FirstLevelBunkerShow {
   }
   PhaseKickBeam(age){
     const r=this.r,ijaA=this.Ija("ijaA");
-    this.Put(ijaA,this.SnagRoot());this.Corpse(this.Comrade,"CaptiveWallSlideTwitch");
+    this.Put(ijaA,this.SnagRoot());this.Corpse(this.Comrade,"CaptiveWallSlideTwitch");this.Aside();
     this.Pose(ijaA,"IjaKickBeam",{seconds:age});
     if(this.beam)this.beam.visible=false;   // the clip's own beam track takes over from frame 0
     if(age>=ContactAt("IjaKickBeam","kick",.45)&&!this.flags.beamKicked){this.flags.beamKicked=r.time;r.audio?.Play?.("debrisFall",{position:r.Point(C.shunzi.trap,.3),volume:.7});}
@@ -965,33 +1022,49 @@ export class FirstLevelBunkerShow {
   }
   PhaseDragOut(age){
     const r=this.r,ijaA=this.Ija("ijaA");
-    this.Corpse(this.Comrade,"CaptiveWallSlideTwitch");
+    this.Corpse(this.Comrade,"CaptiveWallSlideTwitch");this.Aside();
     if(ijaA)ijaA.openingStoryboardContact=()=>this.CollarContact(ijaA);
     const arrived=this.Follow(ijaA,"dragOut",C.ija.dragOutRoute,C.speed.drag,"CollarDrag");
     this.dragOutProgress=Clamp(age/Math.max(.1,RouteLength(C.ija.dragOutRoute)/C.speed.drag));
     if(arrived||age>C.timeouts.dragOutS){
       if(ijaA)ijaA.openingStoryboardContact=null;
-      this.MudMarks(this.Densify([C.shunzi.trap,...C.ija.dragOutRoute].map((p,i,all)=>i===all.length-1?C.shunzi.dragged:p)));
+      this.MudMarks(this.Densify([C.shunzi.trap,...C.ija.dragOutRoute].map((p,i,all)=>i===all.length-1?C.shunzi.butt:p)));
       this.Stage("Butt");
     }
   }
-  /** ijaA's butt-strike root: Shunzi's head is the clip's `head` track point. */
+  /** ijaA's butt-strike root (SB04): over Shunzi's head on the side ija.butt.yawDeg; the clip's `head` track point on it. */
   ButtRoot(){
-    const S=C.shunzi.dragged,ijaA=this.Ija("ijaA");
-    const yaw=Face(ijaA?.position||{x:S.x+1,z:S.z-1},S);
-    const head=OpeningPlayerPoint("LugouIja02","IjaButtStrike","head",0)||{x:0,z:-.58};
-    const o=Rot(yaw,head.x,head.z);return {x:S.x-o.x,z:S.z-o.z,yaw};
+    const S=C.shunzi.butt,Y=C.ija.butt.yawDeg*DEG;
+    const head=OpeningPlayerPoint("LugouIja02","IjaButtStrike","head",0)||{x:0,z:-.58},dist=Math.hypot(head.x,head.z);
+    const yaw=Face({x:S.x-Math.sin(Y)*dist,z:S.z-Math.cos(Y)*dist},S),o=Rot(yaw,head.x,head.z);
+    return {x:S.x-o.x,z:S.z-o.z,yaw};
   }
+  /** Clip time of the butt strike `t` s after buttAt: the rise, held at the top for holdS, then the blow (SB04). */
+  ButtClipTime(t){const B=C.ija.butt;return t<B.raiseTopS?t:t<B.raiseTopS+B.holdS?B.raiseTopS:t-B.holdS;}
   PhaseButt(age){
-    const r=this.r,ijaA=this.Ija("ijaA");
+    const r=this.r,ijaA=this.Ija("ijaA"),B=C.ija.butt;
     if(!this.phaseEntered){this.phaseEntered=true;this.flags.buttRoot=this.ButtRoot();}
-    this.Corpse(this.Comrade,"CaptiveWallSlideTwitch");
+    this.Corpse(this.Comrade,"CaptiveWallSlideTwitch");this.Aside();
     const root=this.flags.buttRoot;
-    if(this.flags.buttAt==null){if(this.Hold(ijaA,root,null,{speed:C.speed.walk})||age>1.5)this.flags.buttAt=r.time;return;}
+    if(this.flags.buttAt==null){
+      // He comes round the east side of Shunzi's head to stand over it (never through him).
+      const there=this.Follow(ijaA,"butt",[...B.approach,root],C.speed.walk,null,root.yaw)&&this.Hold(ijaA,root,null);
+      if(there||age>2.5){this.Put(ijaA,root);this.flags.buttAt=r.time;}
+      return;
+    }
     const t=r.time-this.flags.buttAt;
-    this.Put(ijaA,root);this.Pose(ijaA,"IjaButtStrike",{seconds:t});
-    if(t>=ContactAt("IjaButtStrike","strike",.42)&&!this.strikeAt){this.strikeAt=r.time;r.audio.Deafen?.(1.1);r.Record("playerButtStruck");}
-    if(t>=ClipLength("IjaButtStrike",1))this.Stage("Boots");
+    this.Put(ijaA,root);this.Pose(ijaA,"IjaButtStrike",{seconds:this.ButtClipTime(t)});
+    if(t>=ContactAt("IjaButtStrike","strike",.42)+B.holdS&&!this.strikeAt){this.strikeAt=r.time;r.audio.Deafen?.(1.1);r.Record("playerButtStruck");}
+    if(t>=ClipLength("IjaButtStrike",1)+B.holdS)this.Stage("Boots");
+  }
+  /**
+   * SB04A: where the drag has got to `age` s into Boots: Shunzi on shunzi.butt -> dragAway.route -> shunzi.dragged
+   * (after catchS, at speedMps) and ijaA's place leadM further along the same line, facing him.
+   */
+  DragAway(age=this.phase==="Boots"?this.Age:0){
+    const D=C.ija.dragAway,route=[C.shunzi.butt,...D.route,C.shunzi.dragged],length=RouteLength(route);
+    const s=Math.min(length,Math.max(0,age-D.catchS)*D.speedMps),point=RoutePointAt(route,s),lead=RoutePointAt(route,s+D.leadM);
+    return {point,lead,yaw:Face(lead,point),done:s>=length,route};
   }
   /** The circle round the dragged Shunzi (02): interpreter in front, ijaA crouched at his side, ijaB aiming. */
   CircleMarks(){
@@ -1005,15 +1078,34 @@ export class FirstLevelBunkerShow {
     const guard=Local(anchor,...R.ijaBGuard);guard.yaw=Face(guard,S);
     return {anchor,interpreter,ijaA,ijaBGuard:guard,ijaBWatch:R.ijaBWatch};
   }
+  /**
+   * SB04A (contract §2.7, §5), from 0.6 s after the blow: ijaA drags Shunzi by the forearm from shunzi.butt into the
+   * SSW leg's north mouth (shunzi.dragged), backing ahead of him (DragAway); the interpreter and ijaB come running
+   * back up the SSW leg; then 「几双军靴围过来」: the circle closes on its 02 marks while the eye is down at the boots.
+   */
   PhaseBoots(age){
-    const r=this.r,m=this.CircleMarks();
-    this.Corpse(this.Comrade,"CaptiveWallSlideTwitch");
-    const a=this.Hold(this.Ija("ijaA"),m.ijaA,null,{speed:C.speed.stroll});
-    const b=this.Hold(this.Ija("ijaB"),m.ijaBGuard,null,{speed:C.speed.walk});
-    // 「几双军靴围过来」: ijaA's and ijaB's boots first, the interpreter only steps in behind them.
-    const interp=this.cast.interpreter;
-    const i=age<C.rescue.bootsInterpreterS?(this.Pose(interp,null),false):this.Hold(interp,m.interpreter,null,{speed:C.speed.walk});
-    if(age>=1.5&&(a&&b&&i||age>C.timeouts.bootsS))this.Stage("Hold");
+    const r=this.r,m=this.CircleMarks(),D=C.ija.dragAway,I=C.interrogation,drag=this.DragAway(age),ijaA=this.Ija("ijaA");
+    this.Corpse(this.Comrade,"CaptiveWallSlideTwitch");this.DepthIja();
+    let a=false;
+    if(!drag.done){
+      // Wave 1 (pendingWiring SB04A): IjaHoldCollarUp in its hold loop (0.8-3.8 s), carried backward on the lead.
+      this.Move(ijaA,drag.lead,drag.yaw,"IjaHoldCollarUp",C.speed.run,{seconds:.8+(age+.4)%3});
+    }else{
+      if(this.flags.dragDone==null){this.flags.dragDone=r.time;this.MudMarks(this.Densify(drag.route));}
+      a=this.Hold(ijaA,m.ijaA,null,{speed:C.speed.stroll});
+    }
+    // They come running back up the SSW leg from where they waited (the interpreter's arm out: pendingWiring SB04A).
+    const Hurry=(actor,mark,clip)=>{
+      if(!actor)return true;
+      if(age<I.hurryAfterS)return false;
+      if(actor.openingWalk?.key==="hurry"&&actor.openingWalk.done)return this.Hold(actor,mark,null,{speed:C.speed.walk});
+      if(this.Follow(actor,"hurry",[I.backOffRoute.at(-1),mark],I.hurryMps,clip,mark.yaw,clip?{upperBody:true}:{}))actor.openingWalk.done=true;
+      return false;
+    };
+    if(age<I.hurryAfterS)this.RearParty(this.RearGo());
+    const b=Hurry(this.Ija("ijaB"),m.ijaBGuard,null),i=Hurry(this.cast.interpreter,m.interpreter,"InterpreterPoint");
+    const closed=this.flags.dragDone!=null&&r.time-this.flags.dragDone>=D.closeS;
+    if(closed&&(a&&b&&i||age>C.timeouts.bootsS))this.Stage("Hold");
   }
   // -- 02 -------------------------------------------------------------------------------------
   /** Luo, He and Liu creep from behind RC down the SSW leg (never out of the enemy's rear). */
@@ -1064,7 +1156,7 @@ export class FirstLevelBunkerShow {
   PhaseHold(age){
     const r=this.r,m=this.CircleMarks(),ijaA=this.Ija("ijaA");
     if(!this.phaseEntered){
-      this.phaseEntered=true;r.Record("rescueCallHeard");
+      this.phaseEntered=true;r.Record("rescueCallHeard");this.RetireDepthIja();
       this.Scene("RescueInterrogation",r.voice?.PlayScene("RescueInterrogation",{speakers:this.Speakers(),
         gate:(lineId)=>lineId!=="RescueInterrogation.06"||this.flags.sayGate===true,
         onLine:(lineId)=>{
@@ -1671,6 +1763,8 @@ export class FirstLevelBunkerShow {
       const w=Smooth((this.r.time-this.flags.dragGrabAt-.4)/.5);
       return {x:S.dragged.x+(behind.x-S.dragged.x)*w,z:S.dragged.z+(behind.z-S.dragged.z)*w};
     }
+    if(p==="Butt")return S.butt;
+    if(p==="Boots")return this.DragAway().point;
     if(p==="Banter"||p==="Orders")return S.seat;
     if(p==="Incoming")return this.IncomingPoint();
     if(p==="Blast")return this.BlastPoint();
@@ -1686,7 +1780,7 @@ export class FirstLevelBunkerShow {
     const Head=actor=>this.HeadPoint(actor);
     const At=(point,h)=>r.Point(point,h);
     const ijaA=this.Ija("ijaA"),comrade=this.Comrade,luo=this.Squad("luo"),interp=this.cast.interpreter,L=C.firstPerson.look;
-    let eye=S.trap,height=S.lieEyeM,target=At({x:4,z:-125.4},.9),roll=0,pitch=0;
+    let eye=S.witnessEye,height=S.lieEyeM,target=At({x:4,z:-125.4},.9),roll=0,pitch=0;
     if(p==="Banter"){
       // SB01: from the back of the dugout out through the mouth (the talk turns the head a little to the speaker).
       eye=S.seat;height=S.seatEyeM;
@@ -1717,13 +1811,22 @@ export class FirstLevelBunkerShow {
       if(p==="Wake"){height+=L.pushUpM*Smooth((a-1.2)/.5)*(1-Smooth((a-1.85)/.12));pitch=L.clawPitch*Smooth((a-2)/.4);}
     }
     else if(p==="FrontPass"){target=At(A.bunkerJunction,1.1);roll=-.05;}
-    else if(["CaptiveDragged","CaptiveWall","Interrogation","Slash","Taunt","Wipe"].includes(p)){target=Head(comrade)||At(this.InterrogationMarks().wall,.8);roll=-.04;}
-    else if(p==="Reach"){
-      target=At(C.rescue.rifleMouth,.15);roll=-.05;
-      // The reaching hand and the rifle both in frame; 「再撑一下」 lifts the eye for a moment.
-      pitch=L.reachPitch*Smooth((a-.3)/.6);height+=.06*Smooth((a-1.9)/.12)*(1-Smooth((a-2.05)/.1));
+    else if(["CaptiveDragged","CaptiveWall","Interrogation","Slash","Taunt","Wipe"].includes(p)){
+      // SB03 (contract §5): from the mud of the mouth past the fallen lintel to the group at the north wall, left of
+      // centre, the trench's depth on the right.
+      const W=C.interrogation.witnessShot;target=this.Aim(eye,height,W.yawDeg*DEG,W.pitchDeg*DEG);roll=W.rollDeg*DEG;
     }
-    else if(p==="Found"){target=Head(ijaA)||At({x:1,z:-125.9},1.2);pitch=L.reachPitch*(1-Smooth(a/.9));}
+    else if(p==="Reach"){
+      // SB03A: the eye sinks lower into the mud for the reach (reachEye), dips to the hand and the rifle, and comes up
+      // at the timber's noise to ijaA turning round; 「再撑一下」 lifts the eye for a moment.
+      const W=C.interrogation.witnessShot,R=C.ija.reachShot,w=Smooth(a),E=S.witnessEye;
+      const shift=this.flags.beamShift!=null?r.time-this.flags.beamShift:-1,dip=Smooth((a-.3)/.6)*(shift<0?1:1-Smooth(shift/.4));
+      eye={x:E.x+(S.reachEye.x-E.x)*w,z:E.z+(S.reachEye.z-E.z)*w};height=S.lieEyeM+(S.reachEyeM-S.lieEyeM)*w;
+      target=this.Aim(eye,height,(W.yawDeg+(R.yawDeg-W.yawDeg)*w)*DEG,(R.pitchDeg+R.dipDeg*dip)*DEG);
+      roll=(W.rollDeg+(R.rollDeg-W.rollDeg)*w)*DEG;
+      height+=.06*Smooth((a-1.9)/.12)*(1-Smooth((a-2.05)/.1));
+    }
+    else if(p==="Found"){eye=S.reachEye;height=S.reachEyeM;target=Head(ijaA)||At({x:1,z:-125.9},1.2);roll=C.ija.reachShot.rollDeg*DEG*(1-Smooth(a/1.2));}
     else if(["Drag","Snag","KickBeam"].includes(p)){
       const c=this.TrackPoint(ijaA,"collar"),f={x:-Math.sin(S.trap.yaw),z:-Math.cos(S.trap.yaw)};
       if(c){eye={x:c.x+f.x*.12,z:c.z+f.z*.12};height=c.h+.08;}
@@ -1737,12 +1840,24 @@ export class FirstLevelBunkerShow {
       target=near?At(corpse,.45):ijaA?At(ijaA.position,.55):At(C.shunzi.dragged,.5);
       roll=L.dragRollRad*Math.sin(r.time*4.5);   // chest and knees over the mud
     }
-    else if(p==="Butt"){eye=S.dragged;height=.5;target=Head(ijaA)||At(S.dragged,1.2);if(this.strikeAt)roll=.22*Smooth((r.time-this.strikeAt)/.12);}
+    else if(p==="Butt"){
+      // SB04 (contract §5): up past ijaA at the north wall's door with the dead comrade right of it; the blow rolls the head.
+      const B=C.ija.buttShot;eye=S.butt;height=B.eyeM;target=this.Aim(eye,height,B.yawDeg*DEG,B.pitchDeg*DEG);
+      roll=B.rollDeg*DEG+(this.strikeAt?.22*Smooth((r.time-this.strikeAt)/.12):0);
+    }
     else if(p==="Boots"){
-      // Low along the mud between the two pairs of boots closing in (ijaA from the east, ijaB from the front).
-      eye=S.dragged;height=.3;roll=.18;
-      const a1=this.Ija("ijaA")?.position,b1=this.Ija("ijaB")?.position;
-      target=a1&&b1?At({x:(a1.x+b1.x)/2,z:(a1.z+b1.z)/2},.15):At(this.CircleMarks().ijaBGuard,.15);
+      const G=C.ija.dragShot,drag=this.DragAway(a);eye=drag.point;height=G.eyeM;roll=G.rollDeg*DEG;
+      const head=Head(ijaA);
+      if(this.flags.dragDone==null&&head){
+        // SB04A: up at ijaA's face (in the upper third, yawOffsetDeg aside); turning into the SSW leg the mouth's south
+        // post and rubble are on the left and the leg with the men running up it on the right (contract §2.7).
+        const e=r.Point(eye,height),elev=Math.atan2(head.y-e.y,Math.hypot(head.x-e.x,head.z-e.z));
+        target=this.Aim(eye,height,Face(eye,head)+G.yawOffsetDeg*DEG,Math.min(G.maxPitchDeg*DEG,Math.max(G.pitchDeg*DEG,elev-G.headAboveDeg*DEG)));
+      }else{
+        // 「几双军靴围过来」: low along the mud between ijaA's and ijaB's boots closing in.
+        const a1=this.Ija("ijaA")?.position,b1=this.Ija("ijaB")?.position;
+        target=a1&&b1?At({x:(a1.x+b1.x)/2,z:(a1.z+b1.z)/2},.15):At(this.CircleMarks().ijaBGuard,.15);
+      }
     }
     else if(["Hold","Ask","KickShunzi","Glimpse","Collar","Chop","Parry"].includes(p)){
       const h=this.TrackPoint(ijaA,"head");eye=S.dragged;height=h?h.h:.66;
@@ -1958,6 +2073,8 @@ export class FirstLevelBunkerShow {
       let lookAt=speakerPoint;
       if(role===speaker)lookAt=role==="runner"?this.HeadPoint(this.SpeakerActor("luo")):role==="interpreter"&&this.phase==="Interrogation"?this.HeadPoint(this.Comrade)
         :["ijaA","ijaB"].includes(role)&&["Interrogation","Slash","Taunt"].includes(this.phase)?this.HeadPoint(this.Comrade):this.r.player.camera.position;
+      // SB03A: ijaA turned round by the timber's noise looks for the source, the mouth where Shunzi lies.
+      if(role==="ijaA"&&this.phase==="Reach"&&this.flags.beamShift!=null)lookAt=this.r.player.camera.position;
       InstallOpeningStoryboardAnimation(actor);
       const speech=this.r.voice?.Speech?.(role);
       SetOpeningActorPerformance(actor,{role,phase:["Trapped","BunkerRescue"].includes(stage)?this.phase:stage,

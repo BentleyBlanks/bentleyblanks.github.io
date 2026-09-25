@@ -66,6 +66,16 @@
 - SB02 做镜像（契约 §2 第 2 条）：爆点与塌方在洞口南侧（世界不动），画面左侧是北门柱与洞里北壁，右侧是洞口。
 - SB01 站位：幺娃靠北壁、侧身；传令兵沿 `runnerRoute` 贴北壁进来，停在北门柱内侧朝洞里喊；罗班长在洞口跪着朝东（`LuoKneelCheck` 停在跪姿段；以前站着的原因：Banter/Orders 里 `ResolveOpeningActorPose` 会把静止的罗班长换成 `MessengerReport`/`PointBlockade` 站姿，只有 ContactClips 里的 clip 不换，而导演的 Move 给原生层的 kneel 恒为 0——原生跪姿要 Anim 包加钩子，见 pendingWiring），自己那句台词（BunkerOrders.02）时起身回头指路；负伤川军脸转向洞里（yaw +30°）；纵深三名往前沿去的川军（`Data_FirstLevelBackdropSquads.OPENING_DEPTH_WALKERS`）Banter 时站在东沟、Orders 后沿东沟走进连接支沟，走到末点又不在镜头里就收走，最迟 Black 收走。
 - 任务汉阳造：装填段手里拿的那支（supply）显示时它藏着；Blast 期间也藏着，从 Black 起才出现在洞口泥里（`rescue.rifleMouth`，枪口朝东南）。松动的断木从 Black 起压在背包上（不在睁眼时凭空出现）。
+- 洞外（SB03–SB04A）：
+  - 趴着的眼位（契约 §2 第 1 条）：Black→Found 眼在 `shunzi.witnessEye` (0.35,−125.15)、离地 `lieEyeM` 0.26，比压住的身体（`trap`）靠前一点；Reach 开始 1 s 内沉到 `reachEye` (0.25,−125.25)、0.18。
+  - SB03（CaptiveDragged→Wipe，`interrogation.witnessShot`）：yaw −80°、pitch +5°、roll +4°。审问组在左中：翻译改到组东侧 `interrogation.interpreterAt` (4.75,−124.85) 侧身对川军，日兵乙在他身后 `ijaBAt` (5.0,−124.86)，不再蹲在镜头和川军之间。
+  - Taunt 里远处那声喊（CaptiveTaunt.04）之后日兵乙原地转向前沟；Wipe 开始 `backOffAfterS`（2.5 s）后翻译、再过 0.8 s 日兵乙沿 `backOffRoute` 退进南南西沟（从 SB03 画面右边出画），停在 `backOff` 两点等着（契约 §2 第 7 条）。
+  - SB03A（Reach 3 s 前后，`ija.reachShot`）：yaw −82°、pitch +4°、roll +3°，伸手时视线往下压 12°，压梁一响（Reach 2.0 s，`beamShift`）抬回来。日兵甲擦完刺刀后走到 `ija.lookBack` (4.9,−124.45) 背对洞口；压梁一响他停步回身（现用 `GuardTurn`，身体转到离镜头方向差 45°，头部 lookAt 顺子），看完才走 `foundRoute` 回来。伸手换成左手（分镜是左手）。
+  - 纵深背身走远的日军：`Data_FirstLevelBackdropSquads.OPENING_DEPTH_IJA` 两人，Wipe 开始时生成在弯角弹坑台阶上（画外），`afterWipeS` 起逐个下到前沟、沿东沟南侧走向岔口 J 再拐进纵深支沟；走到末点又不在镜头里就收走，最迟 02 的 Hold 收走。剧本兵、不开枪，不进任务名册。
+  - SB04（Butt，`ija.buttShot`）：枪托位 `shunzi.butt` (2.3,−124.4)（洞口塌土东边的沟边）。`dragOutRoute` 改成从洞口塌土北边出去再朝东南，拖完顺子正好在枪托位。日兵甲从顺子头的东边绕到正北（`ija.butt.yawDeg` 0），镜头眼高 0.35、yaw −18°、仰 30°、roll −4°：背景是北壁木框门（Set 的 `trenchFacadeN`，x 2.7–3.9）和门右边的死川军。现有 `IjaButtStrike` 举到 0.3 s 停 0.45 s 再砸（`ButtClipTime`），接触比原来晚 0.45 s；手势 `beats.Butt` 同步推后。
+  - SB04A（Boots，`ija.dragAway`）：砸后约 0.6 s 进 Boots，日兵甲倒退着把顺子从枪托位沿 `dragAway.route` 拖回洞口（塌土北边）再往南拖进南南西沟北口 `shunzi.dragged` (0.6,−123.9)（契约 §2 第 6 条；塌土 `BunkerMouthRubbleS` 与它南边 1.4 m 高的 `BunkerMouthSpoil` 之间只有 0.5 m，走不了）。日兵甲始终在顺子前方 `leadM` 0.65 m、面朝他，拖完正好在他南边。镜头（`ija.dragShot`）眼高 0.3、roll −8°，看日兵甲的脸（脸在画面上三分之一），拐进南南西沟时洞口南门柱和塌土在左、沟纵深在右。翻译与日兵乙从 Boots 0.8 s 起从南南西沟深处跑回来（`hurryMps` 2.0，翻译现用 `InterpreterPoint` 叠在跑步上）。拖完再用 `closeS` 0.9 s 拍「几双军靴围过来」，然后进 02。
+  - 枪托血层（`strikeBlood`）：满 0.2 s，1.1 s 内淡到 0.3（SB04A「血层约 0.3」），再 8 s 淡完。
+  - 02 的救援圈跟着 `shunzi.dragged` 挪到南南西沟口；圈里各人站位、罗何路线、K2 在 Step 3 按 Survey B 重排。
 - 第一波替身（`pendingWiring`）：别的包的新 clip、手势、腿、镜头后处理、布景、定向喷土还没接，导演先用最接近的现有 clip / 效果，逐条登记 `{shot, what, now, wave2}`，第二波接线后清空。
 
 ## 5. 02 撤离与接上 03

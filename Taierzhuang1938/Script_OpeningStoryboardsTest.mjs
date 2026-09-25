@@ -273,7 +273,22 @@ assert.deepEqual([...C.phases.RearTrench],["Withdraw","Corner","Collection","Sup
   assert.ok(D(seat,Place.bunker.player)<1&&seat.x<trap.x-1.5,"SB01 seat at the back of the dugout, near the dugout anchor");
   for(const id of ["BunkerBeamPinWest","BunkerBeamPinEast","BunkerRoofSag"]){const b=Block(id);
     assert.ok(Math.abs(trap.x-b.x)>b.w/2+.3||Math.abs(trap.z-b.z)>b.d/2+.3,`the in-dugout collapse ${id} no longer pins him`);}
-  assert.ok(D(C.shunzi.dragged,Anchor.shunziDragged)<.01,"ijaA drags him to the K2 eye (shunziDragged)");
+  // Contract §2.6: 02's circle closes in the SSW leg's north mouth (the Space's shunziDragged is K2's old eye point).
+  assert.ok(D(C.shunzi.dragged,{x:.6,z:-123.9})<.61,"ijaA drags him into the SSW leg's north mouth (contract §2.6)");
+  // SB04 / SB04A (contract §2.5, §2.7): the butt spot east of the mouth rubble; the drag from it back past the mouth and
+  // into the SSW mouth -- Shunzi and ijaA backing leadM ahead of him -- keeps clear of the mouth's collapse blocks.
+  {
+    const Inside=(p,b,m)=>Math.abs(p.x-b.x)<b.w/2+m&&Math.abs(p.z-b.z)<b.d/2+m;
+    const solid=["BunkerMouthRubbleS","BunkerMouthSpoil","BunkerMouthPostS","BunkerMouthPostN"].map(Block);
+    const G=C.ija.dragAway,route=[C.shunzi.butt,...G.route,C.shunzi.dragged],last=route.length-1;
+    const dx=route[last].x-route[last-1].x,dz=route[last].z-route[last-1].z,dl=Math.hypot(dx,dz);
+    const lead=[...route,{x:route[last].x+dx/dl*G.leadM,z:route[last].z+dz/dl*G.leadM}];
+    for(let i=1;i<lead.length;i++)for(let k=0;k<=20;k++){
+      const p={x:lead[i-1].x+(lead[i].x-lead[i-1].x)*k/20,z:lead[i-1].z+(lead[i].z-lead[i-1].z)*k/20};
+      for(const b of solid)assert.ok(!Inside(p,b,.12),`the SB04A drag keeps clear of ${b.id} at (${p.x.toFixed(2)},${p.z.toFixed(2)})`);
+    }
+    assert.ok(lead.at(-1).z>C.shunzi.dragged.z+.4,"ijaA ends the drag south of him in the SSW leg (02's circle)");
+  }
   const rifleReach=D(C.rescue.rifleMouth,trap);
   assert.ok(rifleReach>.9&&rifleReach<1.6,`the rifle lies in the mouth mud just out of reach (${rifleReach.toFixed(2)} m)`);
   assert.ok(C.rescue.rifleMouth.x>trap.x&&C.rescue.rifleMouth.x<postN.x+.6,"the rifle lies between him and the posts");
@@ -285,6 +300,13 @@ assert.deepEqual([...C.phases.RearTrench],["Withdraw","Corner","Collection","Sup
   // SB01 depth walkers: they walk away from the mouth (east) and leave down the link sap.
   const {OPENING_DEPTH_WALKERS:Walkers}=await import("./Data_FirstLevelBackdropSquads.mjs");
   for(const m of Walkers.members)assert.ok(m.start.x>postN.x+5&&m.route.every((p,i,all)=>p.x>=(i?all[i-1].x:m.start.x)),`${m.id} walks away east from the mouth`);
+  // SB03A's Japanese going away: they wait out of SB03's picture and walk away east.
+  const {OPENING_DEPTH_IJA:DepthIja}=await import("./Data_FirstLevelBackdropSquads.mjs");
+  const Bearing=(a,b)=>Math.atan2(a.x-b.x,a.z-b.z)*180/Math.PI;
+  for(const m of DepthIja.members){
+    assert.ok(Math.abs(Bearing(C.shunzi.witnessEye,m.start)-C.interrogation.witnessShot.yawDeg)>55,`${m.id} waits out of SB03's picture`);
+    assert.ok(m.route.every((p,i,all)=>p.x>=(i?all[i-1].x:m.start.x)),`${m.id} walks away east`);
+  }
   // Storyboard shots and wave-1 stand-ins (contract §4.6).
   assert.ok(C.storyboardShots.length>=2&&C.storyboardShots.every(s=>/^SB0[1-9]/.test(s.id)&&(s.when||s.phase&&Number.isFinite(s.age))&&s.judge),"storyboard shots are well formed");
   for(const e of C.pendingWiring)assert.ok(["shot","what","now","wave2"].every(k=>typeof e[k]==="string"&&e[k].length>3),"pendingWiring entry "+JSON.stringify(e));

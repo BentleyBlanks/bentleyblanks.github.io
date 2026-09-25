@@ -63,7 +63,9 @@ export function JudgeShot(judge, dump) {
     const a = dump.actors.find((row) => row.role === role);
     if (!a) { out.push({ label: `${role} present`, ok: false, value: "missing", range: null }); continue; }
     const shown = a.visible && !a.hidden && OnScreen(a.headPx);
-    out.push({ label: `${role} head in frame`, ok: !!shown, value: a.headPx ? `${a.headPx.x},${a.headPx.y}` : null, range: null });
+    // headOptional: a wave-1 stand-in clip may carry the head out of the frame (the x check still applies).
+    if (want.headOptional) out.push({ label: `${role} shown`, ok: a.visible && !a.hidden && !!a.headPx?.front, value: a.headPx ? `${a.headPx.x},${a.headPx.y}` : null, range: null });
+    else out.push({ label: `${role} head in frame`, ok: !!shown, value: a.headPx ? `${a.headPx.x},${a.headPx.y}` : null, range: null });
     if (want.x) out.push(Range(`${role} head x`, a.headPx?.x, want.x));
     if (want.y) out.push(Range(`${role} head y`, a.headPx?.y, want.y));
     if (want.distM) out.push(Range(`${role} distance (m)`, a.distM, want.distM));
@@ -86,6 +88,11 @@ export function JudgeShot(judge, dump) {
     out.push(Range(`${group.roles.join("/")} in frame${group.minDistM ? ` beyond ${group.minDistM} m` : ""}`, seen, [group.count, null]));
   }
   if (judge.rifleHidden) out.push({ label: "mission rifle hidden", ok: !dump.rifle?.visible, value: dump.rifle?.visible ?? null, range: null });
+  if (judge.rifle) {
+    const px = dump.rifle?.visible && dump.rifle.px?.front ? dump.rifle.px : null;
+    if (judge.rifle.x) out.push(Range("mission rifle x", px ? px.x : NaN, judge.rifle.x));
+    if (judge.rifle.y) out.push(Range("mission rifle y", px ? px.y : NaN, judge.rifle.y));
+  }
   return out;
 }
 

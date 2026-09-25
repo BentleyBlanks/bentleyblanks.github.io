@@ -54,12 +54,14 @@ export const OPENING_STORYBOARDS = Object.freeze({
   timeouts:Object.freeze({
     banterExtraS:8, runnerArriveS:9, ordersExitS:9, blastEventS:3.5, blackS:2.6, wakeS:3.2,
     frontPassS:14, walkInS:12, interrogationExtraS:10, tauntExtraS:8, reachS:3.4, foundWalkS:10,
-    dragOutS:9, bootsS:6, holdLineS:8, glimpseGateS:2.2, luoArriveS:7, heArriveS:7, fleeS:2.4,
+    dragOutS:9, bootsS:8, holdLineS:8, glimpseGateS:2.2, luoArriveS:7, heArriveS:7, fleeS:2.4,
     longShotRetryS:4, longShotForceS:8, checkS:9, kickRifleS:3, contactKillS:.35,
     // 02 -> 03: Yaowa catches up (else the scene starts where he is), the guard's run up the sap.
     collectionMeetS:8, guardArriveS:10,
   }),
-  strikeBlood:{holdS:1.3,fadeS:8,opacity:.92},
+  // The butt strike's blood layer: opacity for holdS, settling to `settle` over settleS (SB04A 「血层约 0.3」, contract §4.4),
+  // then fading out over fadeS.
+  strikeBlood:{holdS:.2,opacity:.92,settleS:1.1,settle:.3,fadeS:8},
   // ---- first person (Opening package item 2) -------------------------------------------
   // Shoulders sit behind the eye (the hidden sleeve roots). Poses are the RIGHT hand; the left hand
   // mirrors x. Frames: "cam" camera-local (x right, y up, +z back), "body" the eye with yaw-only axes,
@@ -126,13 +128,15 @@ export const OPENING_STORYBOARDS = Object.freeze({
         FrontPass:K([0,"flat","clawOut"],[.6,"flat","flat"]),
         CaptiveDragged:K([0,"flat","flat"]), CaptiveWall:K([0,"flat","flat"]), Interrogation:K([0,"flat","flat"]),
         Slash:K([0,"flat","flat"]), Taunt:K([0,"flat","flat"]), Wipe:K([0,"flat","flat"]),
-        Reach:K([0,"flat","flat"],[.6,"flat","flat"],[1.9,"flat","reach"],[2.05,"push","reach"],[2.35,"flat","reach"],[3.2,"flat","reachCurl"]),
-        Found:K([0,"flat","reachCurl"],[1.2,"flat","flat"]),
+        // SB03A: the LEFT hand reaches for the rifle (the storyboard's arm comes in from the lower left).
+        Reach:K([0,"flat","flat"],[.6,"flat","flat"],[1.9,"reach","flat"],[2.05,"reach","push"],[2.35,"reach","flat"],[3.2,"reachCurl","flat"]),
+        Found:K([0,"reachCurl","flat"],[1.2,"flat","flat"]),
         // 「一只手本能地抓住勒紧的衣领，另一只手撑着泥地」 (on ijaA's hand while he pulls in place; at his own
         // collar once he walks off with it, where ijaA's grip is solved onto the same point); chest and knees on the mud.
         Drag:K([0,"grasp","push"]), Snag:K([0,"grasp","push"]), KickBeam:K([0,"grasp","push"]), DragOut:K([0,"collar","scrape"]),
         // 「刚想撑起身体，枪托突然砸过来」 (the strike lands 0.42 s after buttAt).
-        Butt:KC("buttAt",[-1,"flat","flat"],[0,"push","push"],[.42,"push","push"],[.75,"rest","rest"]),
+        // The blow lands at the clip's strike + ija.butt.holdS (the pause at the top): .42 + .45 s after buttAt.
+        Butt:KC("buttAt",[-1,"flat","flat"],[0,"push","push"],[.87,"push","push"],[1.05,"rest","rest"]),
         Boots:K([0,"rest","rest"]),
         // 「日兵甲抓住他的前襟，把上身从泥里拽起来」: the left hand at his own collar until it is let go.
         Hold:K([0,"rest","rest"],[1,"collar","rest"]), Ask:K([0,"collar","rest"]), KickShunzi:K([0,"collar","rest"]),
@@ -192,8 +196,15 @@ export const OPENING_STORYBOARDS = Object.freeze({
     incomingStep:P(-1.15,-126.1),            // Incoming: stood up and a step toward the mouth when the shell lands
     blastFall:P(-.9,-126.0),                 // SB02: where the eye has dropped to at the end of the fall
     trap:P(.1,-125.45,-Math.PI/2),           // Wake → KickBeam: lying in the mouth, looking east down the trench
-    seatEyeM:.95, standEyeM:1.32, lieEyeM:.42,
-    dragged:P(3.8,-123.2),              // bunker.dragged = K2 eye (kneeling); ijaA drags him here
+    // The lying eye (contract §2.1: Wake→Found eye (0.25–0.35,−125.2), 0.18–0.26 m over the mud), a little ahead of
+    // the pinned body with the chin in the mud: SB03 holds witnessEye, the reach (SB03A) sinks to reachEye.
+    witnessEye:P(.35,-125.15), reachEye:P(.25,-125.25),
+    seatEyeM:.95, standEyeM:1.32, lieEyeM:.26, reachEyeM:.18,
+    // SB04 (contract §2.5): ijaA drags him out of the mouth to the trench edge east of the mouth rubble (where the
+    // fallen lintel lies) and brings the butt down on him there. SB04A (§2.7): he drags him on by the forearm, south
+    // of the rubble, into the north mouth of the SSW leg, where 02's circle closes round him (§2.6).
+    butt:P(2.3,-124.4),
+    dragged:P(.6,-123.9),
     cover:P(.45,-124.35),               // behind the south mouth post + mouth rubble: J and F are both masked (post shadow)
     lieCollarBackM:.16,                 // collar sits this far behind the lying eye
   }),
@@ -229,12 +240,36 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // ijaA/ijaB come down the link sap to J, then west along the trench to the buried comrade.
     walkIn:Route([23.5,-130],[18.2,-125.6],[14,-124.6],[9,-124.8]),
     walkInDelayS:Object.freeze({ ijaA:2.2, ijaB:3.0 }),   // after the eyes open (Wake)
-    // After the throat cut ijaB turns to the front (east) until the Found drag begins.
-    ijaBWatch:P(6.4,-125.1),
-    // Found: ijaA's path from the kill spot back to the mouth, where Shunzi lies (the snag root is inside the posts).
+    // At the far call (CaptiveTaunt.04) ijaB turns to the front (east) where he stands, then backs off (interrogation.backOff).
+    ijaBWatchYaw:-Math.PI/2,
+    // SB03A (contract §5): after the wipe ijaA walks off east-south-east toward the front and is at lookBack (facing
+    // away, north-east) when the pinning timber shifts (Reach beamShift); he stops and turns back to the mouth --
+    // the root to lookBackOffDeg short of facing the eye (the head layer adds the rest, clamped for a guard) --
+    // and looks for at least lookBackS before he walks back (foundRoute). SB03A camera: reachShot from reachEye.
+    lookBack:P(4.9,-124.45,-60*Math.PI/180), lookBackOffDeg:45, lookBackTurnS:.35, lookBackS:.6,
+    reachShot:Object.freeze({ yawDeg:-82, pitchDeg:4, rollDeg:3, dipDeg:-12 }),
+    // Found: ijaA's path from lookBack back to the mouth, where Shunzi lies (the snag root is inside the posts).
     foundRoute:Route([2.6,-125.3],[1.6,-125.35]),
-    // ijaA drags Shunzi out of the mouth, past the comrade, to the trench edge.
-    dragOutRoute:Route([1.3,-125.4],[2.5,-125.1],[3.5,-124.3],[4.3,-123.35]),
+    // ijaA drags Shunzi out of the mouth, round the north-east corner of the mouth rubble and south-south-east to the
+    // trench edge; Shunzi, 0.62 m behind him, ends at shunzi.butt.
+    dragOutRoute:Route([1.3,-125.4],[2.15,-125.0],[2.49,-123.81]),
+    // SB04 (contract §5): ijaA stands over his head on the side yawDeg (yaw convention: 0 = north of him), coming
+    // round the east side (approach). The camera (buttShot) looks up past him at the north wall's timber door with
+    // the dead comrade right of it. Wave 1 plays the existing IjaButtStrike (it stands straight) with its clip time
+    // held at raiseTopS for holdS (the pause at the top, >= 0.4 s) before the blow (pendingWiring SB04).
+    butt:Object.freeze({ yawDeg:0, approach:Route([3.0,-124.55]), raiseTopS:.3, holdS:.45 }),
+    // pitchDeg 22 (contract ~30, ±8): at 30 the north rim sat mid-frame, half the picture sky (SB04 wants <= 40 %).
+    buttShot:Object.freeze({ eyeM:.35, yawDeg:-18, pitchDeg:22, rollDeg:-4 }),
+    // SB04A (contract §2.7, §5; Boots from 0.6 s after the blow): ijaA drags him by the forearm from shunzi.butt along
+    // route -- back past the mouth north of its rubble (BunkerMouthRubbleS, the spoil south of it walls off the way
+    // between) and south into the SSW leg's north mouth (shunzi.dragged) -- at speedMps after catchS, backing leadM
+    // ahead of him along the same line and facing him (he ends south of him, where 02's circle has him). Turning
+    // into the leg the camera looks up at his face yawOffsetDeg aside: the mouth's south post and rubble on the left,
+    // the SSW leg with the interpreter and ijaB running up it on the right (the storyboard's sides). The boots close
+    // in over the last closeS (Boots' old low shot).
+    dragAway:Object.freeze({ route:Route([1.55,-124.95],[.62,-124.95],[.6,-124.45]), leadM:.65, speedMps:1.1, catchS:.35, closeS:.9 }),
+    // headAboveDeg: his head that far above the centre of the picture (the storyboard's face in the upper third).
+    dragShot:Object.freeze({ eyeM:.3, yawOffsetDeg:-8, pitchDeg:12, maxPitchDeg:38, headAboveDeg:14, rollDeg:-8 }),
     interpreterEnter:Route([23.5,-130],[18.2,-125.6],[14,-124.6],[8,-124.6]),
     // Flee "往前沟逃去": east down the trench, into the depth sap, removed out of sight.
     interpreterFlee:Route([6.2,-123.6],[10,-124.1],[14,-124.6],[15.2,-118.5],[17.5,-111]),
@@ -242,8 +277,20 @@ export const OPENING_STORYBOARDS = Object.freeze({
   // ---- 01 comrade chain ----------------------------------------------------------------
   // Offsets are the manifest stages (anchor frame +x right, -z forward). The interrogation
   // extras stand where the chain leaves room (the comrade kneels back to the north wall).
-  interrogation:Object.freeze({ interpreter:Object.freeze([.62,-.95,160]), ijaB:Object.freeze([-.95,-1.05,-150]),
-    ijaAHold:Object.freeze([-.04,-.28,180]) }),
+  interrogation:Object.freeze({ ijaAHold:Object.freeze([-.04,-.28,180]),
+    // SB03 (contract §5): the interpreter crouches side-on to the comrade east of the group (he no longer kneels
+    // between the camera and the comrade), ijaB stands behind him; world marks (yaw radians).
+    interpreterAt:P(4.75,-124.85,50*Math.PI/180), ijaBAt:P(5.0,-124.86,30*Math.PI/180),
+    // SB03 camera from shunzi.witnessEye (lieEyeM): the group left of centre, the trench's depth right.
+    witnessShot:Object.freeze({ yawDeg:-80, pitchDeg:5, rollDeg:4 }),
+    // Contract §2.7: backOffAfterS into Wipe the interpreter, then ijaB (backOffStaggerS later), go back down the SSW
+    // leg -- over the crater step like the withdrawal lane (the gap between the mouth rubble and the spoil is too
+    // narrow to walk) -- leaving SB03's picture on the right (out of SB03A's); from the blow they come running back up
+    // it (hurryMps, from Boots hurryAfterS) -- SB04A's men in the depth.
+    backOffAfterS:2.5, backOffStaggerS:.8,
+    backOffRoute:Route([3.3,-124.2],[3.3,-122.2],[3.1,-121.3],[1.4,-120.8],[-.6,-120.4]),
+    backOff:Object.freeze({ interpreter:P(-1.6,-118.4), ijaB:P(-2.2,-117.3) }),
+    hurryMps:2.0, hurryAfterS:.8 }),
   // ---- 02 rescue circle (anchored at shunzi.dragged, facing `rescueFacing`) --------------
   rescue:Object.freeze({
     facing:P(-1,-118.5),                 // Shunzi looks up the SSW leg past the interpreter (K2)
@@ -256,7 +303,6 @@ export const OPENING_STORYBOARDS = Object.freeze({
     ijaBGuard:Object.freeze([-.55,-1.25]),  // ijaB aims at him from the left front, then kicks
     ijaBWatch:P(5.25,-125.82,-.96),       // ...then turns to the front at the north wall (wall 0.7 m on his left)
     kickM:.62,
-    bootsInterpreterS:1.8,               // Boots: the interpreter walks in only after the two soldiers' boots
     // Luo and He creep from RC down the SSW leg, over the crater step, to their marks.
     luoRoute:Route([-4,-113],[-1,-118.5],[1.2,-120.4],[3.1,-121.3],[4.7,-122.6],[5.25,-123.7]),
     heRoute:Route([-4,-113],[-1,-118.5],[1.2,-120.4],[3.1,-121.3],[4.9,-121.9]),
@@ -297,6 +343,32 @@ export const OPENING_STORYBOARDS = Object.freeze({
     Object.freeze({ id:"SB02", storyboard:"Storyboard_02_NearMissBlast.png", phase:"Blast", age:.7,
       judge:{ camera:{ eyeM:[.6,.95], pitchDeg:[-24,-4], rollDeg:[12,26], yawDeg:[-78,-54] }, eyeClosure:[0,.2],
         points:{ mouthPostN:{ at:[1.05,1.2,-127.5], x:[.25,.6] } } } }),
+    // SB03: the questioning seen from the mouth mud: the group left of centre with the north wall's door (Set's
+    // trenchFacadeN, x 2.7–3.9) behind it, the trench's depth right, the rifle low left of centre out of reach.
+    Object.freeze({ id:"SB03", storyboard:"Storyboard_03_ProneWitness.png", phase:"Interrogation", age:3,
+      judge:{ camera:{ eyeM:[.2,.32], pitchDeg:[1,10], rollDeg:[1,8], yawDeg:[-88,-72] },
+        actors:{ ijaA:{ x:[.25,.58] }, comrade:{ x:[.25,.58] }, interpreter:{ x:[.4,.75], distM:[3.5,5.5] }, ijaB:{ x:[.4,.8] } },
+        points:{ facadeDoor:{ at:[3.3,.9,-126.3], x:[.25,.6] } }, rifle:{ x:[.2,.55], y:[.62,1] } } }),
+    // SB03A: the reach; ijaA turned round by the timber's noise right of centre, the dead comrade left of centre at
+    // the wall, the interpreter and ijaB gone down the SSW leg, Japanese going away down the trench.
+    Object.freeze({ id:"SB03A", storyboard:"Storyboard_03A_ReachRifle.png", phase:"Reach", age:3.1,
+      judge:{ camera:{ eyeM:[.12,.26], pitchDeg:[-2,9], rollDeg:[0,7], yawDeg:[-90,-74] },
+        actors:{ comrade:{ x:[.2,.52] }, ijaA:{ x:[.55,.88], distM:[3.8,5.6] } }, absent:["interpreter","ijaB"],
+        inFrameAtLeast:[{ roles:["DepthIja"], count:1, minDistM:5 }], rifle:{ x:[.3,.65], y:[.55,1] } } }),
+    // SB04: at the top of the swing (held), looking up past ijaA at the north wall's door with the comrade right of
+    // it, the rim of the wall above the middle (sky <= 40 %). Wave 1: IjaButtStrike stands straight, so his head
+    // may be above the frame (pendingWiring SB04 restores the head check).
+    Object.freeze({ id:"SB04", storyboard:"Storyboard_04_Discovered.png",
+      when:"s.phase==='Butt'&&s.flags.buttAt!=null&&r.time-s.flags.buttAt>=.55",
+      judge:{ camera:{ eyeM:[.28,.42], pitchDeg:[20,36], rollDeg:[-8,-1], yawDeg:[-28,-8] },
+        actors:{ ijaA:{ x:[.22,.5], distM:[.3,1], headOptional:true }, comrade:{ x:[.6,.98] } },
+        points:{ facadeDoor:{ at:[3.3,.9,-126.3], x:[.4,.75] }, northRim:{ at:[3.3,0,-127.3], y:[0,.42] } } } }),
+    // SB04A: dragged by the forearm into the SSW leg: ijaA's face close, the mouth's south post and rubble left, the
+    // SSW leg with the interpreter and ijaB running up it right (contract §2.7).
+    Object.freeze({ id:"SB04A", storyboard:"Storyboard_04A_DraggedIntoTrench.png", phase:"Boots", age:2.1,
+      judge:{ camera:{ eyeM:[.2,.4], rollDeg:[-12,-4] },
+        actors:{ ijaA:{ x:[.3,.65], distM:[.4,1.1] }, interpreter:{ x:[.5,1], distM:[1.8,6.5] }, ijaB:{ distM:[2,8] } },
+        points:{ mouthPostS:{ at:[1.05,1.0,-124.3], x:[0,.4] } } } }),
   ]),
   // Wave 1 stand-ins (contract §3): where a clip, hand pose, lens effect, set piece or blast effect of another
   // package belongs, the director uses the nearest existing one and lists it here. Wave 2 wires each entry to
@@ -324,6 +396,50 @@ export const OPENING_STORYBOARDS = Object.freeze({
       now:"protect/limp hand keys (beats.Blast); the loading rifle vanishes at 0.12 s; the mission rifle is hidden until Black (ApplyCamera)", wave2:"EXTRA_HAND_POSES.flingOpen, FP_PROPS.loadingRifleOnLegs.rifleSlide and LEG_POSES.sprawl in beats.Blast (Eye)"},
     {shot:"SB02", what:"sandbag wall, poster, lit lantern and crates on the dugout's north wall (left of the frame)",
       now:"nothing (bare earth)", wave2:"OpeningSet props bunkerSandbagWallN, bunkerPoster, bunkerLantern, bunkerCrateStackN (Set)"},
+    // SB03 (CaptiveDragged .. Wipe, witnessShot)
+    {shot:"SB03", what:"the timber door in the north wall behind the group, the fallen lintel upper left, flag, sandbags and stakes, lower mouth rubble",
+      now:"bare north wall; the loose beam only; BunkerMouthRubbleS as built", wave2:"OpeningSet trenchFacadeN, fallenLintel, flagTrench, sandbagStakesSouth, revetmentFront and the lowered mouth rubble (Set)"},
+    {shot:"SB03", what:"three black smoke columns in the sky",
+      now:"clear sky", wave2:"Data_OpeningSet0103.SMOKE for stages 01-02 (Set)"},
+    {shot:"SB03", what:"blood-red corner vignette, shallow depth of field (near blur), mud specks on the lens",
+      now:"the existing concussion blur/ghost only", wave2:"OpeningLens.Evaluate LOOKS for CaptiveDragged..Wipe into Perception().lens (Eye)"},
+    {shot:"SB03", what:"right hand spread in the mud at the lower right (screen about 0.62, 0.75), arm reaching forward",
+      now:"flat hand keys (beats.CaptiveDragged..Wipe): the palms are just below the frame", wave2:"a forward prone palm pose from the Eye package in beats.CaptiveDragged..Wipe (Eye)"},
+    {shot:"SB03", what:"blood on the comrade's face",
+      now:"none", wave2:"CharacterFacial.SetFaceBlood(comrade rig, ~0.8) from CaptiveDragged (Face)"},
+    // SB03A (Reach -> Found)
+    {shot:"SB03A", what:"ijaA stops and looks back low over his shoulder at the mouth, rifle held low, the snarl starting",
+      now:"GuardTurn at ija.lookBack, root turned to lookBackOffDeg short of the eye + head lookAt the camera (LookBack, UpdatePerformances)", wave2:"IjaLookBackLow (Anim) in LookBack(), in ContactClips; expression.snarl rising (Face)"},
+    {shot:"SB03A", what:"a whole timber across the top edge (the fallen roof), dead trees on the rim, the flag",
+      now:"nothing", wave2:"OpeningSet roofTimberDown, deadTreeRim*, flagTrench (Set)"},
+    {shot:"SB03A", what:"the left hand stops about 0.15 m short of the rifle's stock; the pack strap at the left edge",
+      now:"the left hand's reach/reachCurl (0.29 m ahead)", wave2:"EXTRA_HAND_POSES.reachLeft and FP_PROPS.packStrap in beats.Reach (Eye)"},
+    {shot:"SB03A", what:"dark, low contrast, weaker red edge, mud specks",
+      now:"the existing concussion blur/ghost only", wave2:"OpeningLens LOOKS for Reach/Found (Eye)"},
+    // SB04 (Butt)
+    {shot:"SB04", what:"ijaA bent over Shunzi, left hand at his collar, rifle held butt-up over his head, pause at the top, one-handed blow",
+      now:"IjaButtStrike (stands straight, both hands) with its clip time held at ija.butt.raiseTopS for holdS (ButtClipTime); the SB04 judge lets his head be out of frame (headOptional)", wave2:"IjaButtStrikeCollar (Anim) with holdUntil and its buttHit event for the strike; drop headOptional from storyboardShots SB04"},
+    {shot:"SB04", what:"ijaA snarls from Found to the end of the blow",
+      now:"neutral face", wave2:"CharacterFacial.SetExpression(ijaA rig, {snarl:1}) Found..Butt (Face)"},
+    {shot:"SB04", what:"white flash when the butt lands",
+      now:"Deafen, strike roll and the blood layer only", wave2:"lens.flash on the buttHit event (Eye)"},
+    {shot:"SB04", what:"Shunzi's right hand grips ijaA's forearm at his collar",
+      now:"push hand keys (beats.Butt)", wave2:"EXTRA_HAND_POSES.gripForearm on ijaA in beats.Butt (Eye)"},
+    {shot:"SB04", what:"broken planks in the foreground by the butt spot; the timber door behind",
+      now:"nothing", wave2:"OpeningSet plankDebrisButt, trenchFacadeN (Set)"},
+    // SB04A (Boots)
+    {shot:"SB04A", what:"ijaA bent over, backing, dragging him by the right forearm, rifle low in the other hand",
+      now:"IjaHoldCollarUp held in its loop and carried backward on DragAway's lead (PhaseBoots)", wave2:"IjaDragByForearm (Anim) in PhaseBoots, with its forearmR player track"},
+    {shot:"SB04A", what:"the interpreter hurrying up the SSW leg with one arm out",
+      now:"InterpreterPoint as upperBody on the run (PhaseBoots Hurry)", wave2:"InterpreterHurryReach (Anim)"},
+    {shot:"SB04A", what:"Shunzi's hand holds ijaA's sleeve",
+      now:"rest hand keys (beats.Boots)", wave2:"EXTRA_HAND_POSES.gripSleeve on ijaA in beats.Boots (Eye)"},
+    {shot:"SB04A", what:"dizzy softening, desaturation, blood edge about 0.3",
+      now:"concussion blur/ghost; the story blood layer settles to strikeBlood.settle 0.3", wave2:"OpeningLens LOOKS for Boots (Eye)"},
+    {shot:"SB04A", what:"plank revetment and duckboards down the SSW leg",
+      now:"bare earth", wave2:"OpeningSet revetmentSSW, duckboardsSSW (Set)"},
+    {shot:"SB04A", what:"the SSW leg open from the dugout mouth's south pocket (the drag ends at shunzi.dragged (0.6,-123.9) and 02 looks down the leg from there)",
+      now:"BunkerSouthRevetment (x -2.8..0.8, z -123.95..-123.55, 2.2 m) walls the pocket off from the leg: shunzi.dragged lies inside it and ijaA backs through it; Survey B's SB05 trial saw through it from inside", wave2:"Set: in the collapsed state shorten BunkerSouthRevetment's east end to x <= 0 (or open it) so the pocket and the leg join; then add it to the drag clearance check in Script_OpeningStoryboardsTest"},
   ].map(Object.freeze)),
   // ---- 02 pursuit (bunkerPursuit, contract §5.8) -----------------------------------------
   // The roster's delayS (Space) are scaled so the three followers are in the trench the player just left

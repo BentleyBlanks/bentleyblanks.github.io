@@ -747,6 +747,7 @@ for (const [name, route] of Object.entries({ ...MISSION_ROUTES, ...Object.fromEn
 {
   const bunker=P.bunker;
   const {OPENING_STORYBOARDS:storyboards}=await import("./Data_OpeningStoryboards.mjs");
+  const {OPENING_DEPTH_IJA}=await import("./Data_FirstLevelBackdropSquads.mjs");
   const lanes={
     // 2026-09-23 dugout: out through the east mouth, round the spoil, back to the return spot and up the rear leg.
     BunkerExit:bunker.exitLane,
@@ -762,6 +763,11 @@ for (const [name, route] of Object.entries({ ...MISSION_ROUTES, ...Object.fromEn
     RescueHe:storyboards.rescue.heRoute,
     RescueLiu:[...storyboards.rescue.liuRoute,storyboards.rescue.liuShot],
     DragCover:[...storyboards.rescue.dragCoverRoute,storyboards.rescue.luoCheck],
+    // 2026-09-25 storyboard round: the interpreter / ijaB backing off down the SSW leg, SB03A's Japanese going away.
+    BackOff:[storyboards.interrogation.interpreterAt,...storyboards.interrogation.backOffRoute,storyboards.interrogation.backOff.interpreter],
+    BackOffB:[storyboards.interrogation.ijaBAt,...storyboards.interrogation.backOffRoute,storyboards.interrogation.backOff.ijaB],
+    DepthIja:[OPENING_DEPTH_IJA.members[0].start,...OPENING_DEPTH_IJA.members[0].route],
+    DepthIjaB:[OPENING_DEPTH_IJA.members[1].start,...OPENING_DEPTH_IJA.members[1].route],
     Withdraw:storyboards.withdraw.lane,
   };
   for(const state of MISSION_LAYOUT.scenario.states)for(const [name,lane] of Object.entries(lanes)){
