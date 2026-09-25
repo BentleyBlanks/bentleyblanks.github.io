@@ -281,7 +281,7 @@ export const FRONT_BATTLE_TUNING=Object.freeze({
   // 3.6 m/s), so runStandsWithPlayer: while he runs and the player stands he runs upright (the player can only sprint
   // standing, Script_Player canSprint); behind a crouched player (STANCE.crouch.speed 1.62) he stays crouched.
   // pointS: FrontApproach line 1 is 2.82 s long (Data_FirstLevelMissionVoiceAlignment), he points through it.
-  // pointHoldsFire: for those pointS he does not aim or fire (an aiming brain cancels the upper-body clip, 09-25 SB07 shot)
+  // pointHoldsFire: for those pointS (the FrontApproach line only, not the corner holds) he does not aim or fire (an aiming brain cancels the upper-body clip, 09-25 SB07 shot)
   // and turns himself toward where he points at pointTurnRps (the AI's standing turn is 3.4 rad/s, Script_Ai; 5 turns him
   // from facing the waiting-for player to the trench ahead in ~0.6 s, a quick about-face while the line is 2.8 s).
   leaderLead:Object.freeze({minM:3,maxM:5,catchUpM:1.5,runMps:6,runStandsWithPlayer:true,endApproachIndex:11,cornerTurnDeg:35,cornerNearM:1.6,pointS:2.8,pointHoldsFire:true,pointTurnRps:5}),

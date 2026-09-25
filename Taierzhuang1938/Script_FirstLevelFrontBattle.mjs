@@ -188,7 +188,8 @@ export class FirstLevelFrontBattle {
    * FrontApproach line, and at a corner he holds (B.leaderLead) he faces the next leg and points along it. The pose is
    * the opening layer's PointBlockade (Script_OpeningStoryboardAnimation; loaded at level start by the bunker show),
    * written only while this pointing lasts and taken off only if it is still ours.
-   * For the first pointS of a pointing he holds his fire (scriptedNoncombatant, the value he had is put back): the
+   * Through the FrontApproach pointing (pointS; not at the corner holds, those keep him in the fight) he holds his fire
+   * (scriptedNoncombatant, the value he had is put back): the
    * opening layer drops an upper-body clip whenever the brain aims or fires (Script_OpeningStoryboardAnimation
    * nativeCombat), and at the FrontApproach line he has the nest gunner in sight -- 09-25 SB07 shot: flagged
    * PointBlockade, drawn kneeling with the rifle up.
@@ -203,7 +204,7 @@ export class FirstLevelFrontBattle {
     const to=this.lead?.corner||(approach&&w&&w.index<w.route.length?w.route[w.index]:null);
     if(to){
       if(!this.pointFrom)this.pointFrom={at:r.time,corner:!!this.lead?.corner};
-      this.PointQuiet(luo,L.pointHoldsFire&&r.time-this.pointFrom.at<L.pointS);
+      this.PointQuiet(luo,L.pointHoldsFire&&approach&&!this.lead?.corner);
       InstallOpeningStoryboardAnimation(luo);
       luo.openingStoryboardPose={clip:"PointBlockade",seconds:r.time-this.pointFrom.at,upperBody:true};luo.frontPointing=true;
       luo.watchYaw=Math.atan2(luo.position.x-to.x,luo.position.z-to.z);luo.watchUntil=r.ai.time+.3;
