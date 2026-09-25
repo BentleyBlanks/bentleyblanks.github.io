@@ -5474,7 +5474,14 @@ export class AudioEngine {
     v.wetBase = wet.gain.value;                    // 配方给的干湿比；MoveVoice 按新距离重乘
     wet.gain.value = Clamp01(wet.gain.value * v.wetScale);
     this.activeVoices.add(v);
-    this.ReleaseVoice(v, v.life);
+    // 【2026-09-25】回收计时从**这一声开始响**的那一刻算，不从调用 Play 的这一刻算。
+    // `v.life` 是配方按 v.t（起播时刻）量的长度（Voice.Live 的调用处都是这么量的，如 `stop - this.t`），
+    // 而 v.t 已经含了 delay 与传播延迟。原来写 `ReleaseVoice(v, v.life)`，计时器在
+    // `now + life + 0.22 s` 就断开节点 —— 起播推迟多少，尾巴就被砍掉多少（减去 0.22 s 余量）。
+    // 实测：380 m 的 explosionFar 晚 1.12 s 起播，3.31 s 长的声音最后 0.90 s 被掐掉；
+    // 120 m 的 rifleIjaFar 砍掉 0.13 s；带 delay 0.3 s 的 debrisFall 砍掉 0.08 s。
+    // 远处的炮声、枪声尾巴是这么没的，账面上它们也比真实少活一截（预算算少了）。
+    this.ReleaseVoice(v, (v.t - now) + v.life);
     // Duck / 耳鸣 / 环境闪避统一在这儿触发（配方里不再各自触发，见 DUCK_ON 的抬头）。
     // 放在最后：这三样都会去动别的总线，而这条 voice 得先建成功才算「这一声真响了」。
     this.Reactions(name, distance, !!position, priority || firstPerson, weaponClass,

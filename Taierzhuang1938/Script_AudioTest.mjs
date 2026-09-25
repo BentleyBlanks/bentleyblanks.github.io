@@ -1039,6 +1039,45 @@ if (selfCap.without.played || selfCap.without.starved !== 1) {
 } else Ok(`selfCapped：账面 ${selfCap.with.live}+14 / 预算 ${selfCap.with.budget}（低优先级天花板 ${selfCap.with.lowCeiling}），`
   + `不带的饿死、带的收下`);
 
+// 【2026-09-25】回收计时从起播算起：带传播延迟 / delay 的一声，节点要等它放完才断开。
+// 原来计时从调用 Play 算，380 m 的 explosionFar 晚 1.12 s 起播、最后 0.90 s 被掐掉（远处炮声没有尾巴）。
+// 量法：包一层 FreeVoice 记下断开的 ctx 时刻，与 v.t + v.life（配方声明的放完时刻）比。
+const release = await page.evaluate(async () => {
+  const a = window.Taierzhuang.audio, L = a.listenerPos;
+  const saved = a.nodeBudget;
+  a.nodeBudget = 4000;                         // 这一条量回收时刻，不量预算闸
+  const own = Object.prototype.hasOwnProperty.call(a, "FreeVoice"), orig = a.FreeVoice;
+  const rows = [], watch = new Map();
+  a.FreeVoice = function (v) {
+    const r = watch.get(v);
+    if (r && r.freedAt == null) r.freedAt = a.ctx.currentTime;
+    return orig.call(this, v);
+  };
+  try {
+    for (const [cue, d, delay] of [["explosionFar", 380, 0], ["debrisFall", 6, 0.8]]) {
+      const now = a.ctx.currentTime;
+      const v = a.Play(cue, { position: { x: L.x + d, y: L.y, z: L.z + 0.5 }, volume: 0.02, delay });
+      if (!v) { rows.push({ cue, played: false }); continue; }
+      const r = { cue, played: true, startIn: +(v.t - now).toFixed(3), life: +v.life.toFixed(3), end: v.t + v.life, freedAt: null };
+      watch.set(v, r); rows.push(r);
+    }
+    const last = Math.max(0, ...rows.filter((r) => r.played).map((r) => r.end));
+    while (a.ctx.currentTime < last + 0.6) await new Promise((res) => setTimeout(res, 50));
+  } finally {
+    if (own) a.FreeVoice = orig; else delete a.FreeVoice;
+    a.nodeBudget = saved;
+  }
+  return rows.map(({ end, freedAt, ...r }) => ({ ...r,
+    early: freedAt == null ? null : +(end - freedAt).toFixed(3) }));
+});
+{
+  const bad = release.filter((r) => !r.played || r.early == null || r.early > 0.001);
+  const measured = release.every((r) => r.played && r.startIn >= 0.7);
+  if (!measured) Fail(`回收时刻：没测到起播推迟的声音（${JSON.stringify(release)}）—— 这条断言没测到东西`);
+  else if (bad.length) Fail(`起播推迟的声音没放完就被断开了：${JSON.stringify(bad)}（early = 离放完还差几秒）`);
+  else Ok(`回收时刻从起播算：${release.map((r) => `${r.cue} 晚 ${r.startIn} s 起播、放完后 ${(-r.early).toFixed(2)} s 才断开`).join("；")}`);
+}
+
 // 两级动态：母线慢压 + 末端快限，参数不许被谁顺手改回单级。
 // 抽泵深度的实测（10.08 → 8.91 dB）在 Script_Audio 的 BUS_COMP 抬头与
 // docs/Data_AudioEngine.md 里，那是离线渲染量的，不在这条冒烟的成本里。
