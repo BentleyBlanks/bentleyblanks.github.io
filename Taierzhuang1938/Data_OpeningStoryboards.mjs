@@ -54,7 +54,7 @@ export const OPENING_STORYBOARDS = Object.freeze({
   timeouts:Object.freeze({
     banterExtraS:8, runnerArriveS:9, ordersExitS:9, blastEventS:3.5, blackS:2.6, wakeS:3.2,
     frontPassS:14, walkInS:12, interrogationExtraS:10, tauntExtraS:8, reachS:3.4, foundWalkS:10,
-    dragOutS:9, bootsS:8, holdLineS:8, glimpseGateS:2.2, luoArriveS:7, heArriveS:7, fleeS:2.4,
+    dragOutS:9, bootsS:8, holdLineS:8, glimpseGateS:2.2, luoArriveS:7, heArriveS:7, fleeS:3.2,
     longShotRetryS:4, longShotForceS:8, checkS:9, kickRifleS:3, contactKillS:.35,
     // 02 -> 03: Yaowa catches up (else the scene starts where he is), the guard's run up the sap.
     collectionMeetS:8, guardArriveS:10,
@@ -76,19 +76,10 @@ export const OPENING_STORYBOARDS = Object.freeze({
     headLook:Object.freeze({ maxRad:.14, returnS:.6,
       free:Object.freeze(["Wake","FrontPass","CaptiveDragged","CaptiveWall","Interrogation","Taunt","Wipe","Reach","Boots","Hold","Ask","LongShot"]) }),
     // Shot pitch (rad, + up) while a hand beat is the subject; the push-up lift of the lying eye (m).
-    look:Object.freeze({ digPitch:-.45, boltPitch:-.2, clawPitch:-.8, reachPitch:-.28, grabPitch:-.24, pushUpM:.13, dragRollRad:.025,
-      grabLeanM:.1, grabEyeM:.62, grabLookRifle:.5,     // 「抓住枪」: he leans over the rifle as it stops at his hand
-      // K2 「视线越过他的肩膀」: the interpreter crouches on the crater step 0.6 m above Shunzi's knees, square
-      // between him and the SSW leg; the head comes up and leans aside so the leg (Luo) clears his shoulder
-      // (09-24 composition probe: 0.25 m aside, eye 1.0 m keeps the interpreter's face at the right third).
-      glimpseAsideM:.25, glimpseEyeM:1.0, glimpseInterpreterPull:.15,
-      // LongShot: lean [dx, dz] (m) from the cover seat past the south mouth post, eye height over the rubble.
-      longShotLean:Object.freeze([.05,-.34]), longShotEyeM:.8,
-      // Check: sit back from Luo's kneel, eye no lower than this, look at his eyes rather than the chin.
-      checkBackM:.14, checkEyeM:.8, checkLookUpM:.06,
+    look:Object.freeze({ digPitch:-.45, boltPitch:-.2, clawPitch:-.8, reachPitch:-.28, pushUpM:.13, dragRollRad:.025,
       // Parry: the eye steps this far aside from ijaA's back so He (behind ijaA) is seen, and holds the
       // duel this long after the cut before following the interpreter.
-      duelAsideM:.4, duelHoldS:.45 }),
+      duelAsideM:.25, duelHoldS:.45 }),
     hands:Object.freeze({
       poses:Object.freeze({
         rest:H("cam",[.18,-.46,-.15],[0,-.4,-1],[.25,.65,.1],[14,24,14]),
@@ -157,11 +148,13 @@ export const OPENING_STORYBOARDS = Object.freeze({
   // the post blur/ghost and the hearing muffle (× hearing); after the hand-back the residue fades
   // over releaseDecayS while the player is in control. Imbalance = a slow irregular sway × amount.
   perception:Object.freeze({
+    // 02 (contract §5 SB05): Hold/Ask/KickShunzi <= 0.45, the glimpse keeps a light ghost (~0.55, 「翻译的脸还是重影」),
+    // SB05A/SB06 clean. fallRps brings the butt strike's 0.88 down to the circle's 0.45 in under 2 s.
     base:Object.freeze({ Banter:0, Orders:0, Incoming:0, Blast:.95, Black:.95, Wake:.9, FrontPass:.74, CaptiveDragged:.68,
       CaptiveWall:.64, Interrogation:.6, Slash:.6, Taunt:.58, Wipe:.56, Reach:.6, Found:.62, Drag:.66, Snag:.7, KickBeam:.7,
-      DragOut:.72, Butt:.8, Boots:.88, Hold:.8, Ask:.76, KickShunzi:.76, Glimpse:.66, Collar:.64, Chop:.6, Parry:.6, Flee:.56,
-      DragCover:.58, LongShot:.54, Check:.5, KickRifle:.46, Released:.44 }),
-    riseRps:.8, fallRps:.1,
+      DragOut:.72, Butt:.8, Boots:.88, Hold:.45, Ask:.42, KickShunzi:.42, Glimpse:.55, Collar:.48, Chop:.4, Parry:.4, Flee:.4,
+      DragCover:.42, LongShot:.4, Check:.36, KickRifle:.34, Released:.32 }),
+    riseRps:.8, fallRps:.25,
     focusScale:.3,
     strike:.85, kick:.22, kickFadeS:.45,
     releaseDecayS:16,
@@ -205,7 +198,9 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // of the rubble, into the north mouth of the SSW leg, where 02's circle closes round him (§2.6).
     butt:P(2.3,-124.4),
     dragged:P(.6,-123.9),
-    cover:P(.45,-124.35),               // behind the south mouth post + mouth rubble: J and F are both masked (post shadow)
+    // SB06 (contract §2.9): the hand-back seat on the trench floor east of the mouth rubble, his back to it, facing east
+    // down the front trench (J in view: its man is down by then; F is to be masked by Set's reshaped rubble, pendingWiring).
+    cover:P(2.4,-125.2,-94*Math.PI/180),
     lieCollarBackM:.16,                 // collar sits this far behind the lying eye
   }),
   // Banter tableau inside the intact dugout (seated Shunzi at the pit's west end).
@@ -271,8 +266,11 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // headAboveDeg: his head that far above the centre of the picture (the storyboard's face in the upper third).
     dragShot:Object.freeze({ eyeM:.3, yawOffsetDeg:-8, pitchDeg:12, maxPitchDeg:38, headAboveDeg:14, rollDeg:-8 }),
     interpreterEnter:Route([23.5,-130],[18.2,-125.6],[14,-124.6],[8,-124.6]),
-    // Flee "往前沟逃去": east down the trench, into the depth sap, removed out of sight.
-    interpreterFlee:Route([6.2,-123.6],[10,-124.1],[14,-124.6],[15.2,-118.5],[17.5,-111]),
+    // Flee "往前沟逃去" (contract §2.8): he turns from the circle to fleeYawDeg (InterpreterFlee carries him 1.3 m back
+    // from his facing, ENE along the strip between the mouth rubble and the spoil), then east down the front trench,
+    // out of the left of SB05A's picture, into the depth sap; removed out of sight.
+    interpreterFleeYawDeg:100,
+    interpreterFlee:Route([2.6,-123.7],[6.2,-124.4],[10,-124.1],[14,-124.6],[15.2,-118.5],[17.5,-111]),
   }),
   // ---- 01 comrade chain ----------------------------------------------------------------
   // Offsets are the manifest stages (anchor frame +x right, -z forward). The interrogation
@@ -291,36 +289,74 @@ export const OPENING_STORYBOARDS = Object.freeze({
     backOffRoute:Route([3.3,-124.2],[3.3,-122.2],[3.1,-121.3],[1.4,-120.8],[-.6,-120.4]),
     backOff:Object.freeze({ interpreter:P(-1.6,-118.4), ijaB:P(-2.2,-117.3) }),
     hurryMps:2.0, hurryAfterS:.8 }),
-  // ---- 02 rescue circle (anchored at shunzi.dragged, facing `rescueFacing`) --------------
+  // ---- 02 rescue circle (contract §2.6, §5 SB05–SB06) -------------------------------------
+  // The circle closes in the SSW leg's north mouth (shunzi.dragged) and Shunzi looks south down the straight 11 m leg:
+  // ijaA crouched just ahead holding his collar (left of centre), the interpreter at the left edge by the spoil's corner,
+  // ijaB in the leg, and Luo and He creeping up it along the west wall (right of the frame) from the rear corner RC.
+  // Floor strip at the mouth: x 0.4–0.8 between the west slope and BunkerMouthSpoil (x 0.8–2.2, z -123.3..-121.9).
   rescue:Object.freeze({
-    facing:P(-1,-118.5),                 // Shunzi looks up the SSW leg past the interpreter (K2)
-    facingOffsetDeg:10,
-    interpreter:Object.freeze([.28,-.95,180]),
-    // ijaA crouches east of him holding the front collar; He comes in behind ijaA. At 70° He's chopParry
-    // mark fell 0.9 m up the south trench wall (inside its mesh: the parry was never seen, 09-24 probe);
-    // at 115° it is on the trench floor (5.6, -123.8).
-    ijaAHoldBearingDeg:115,
-    ijaBGuard:Object.freeze([-.55,-1.25]),  // ijaB aims at him from the left front, then kicks
-    ijaBWatch:P(5.25,-125.82,-.96),       // ...then turns to the front at the north wall (wall 0.7 m on his left)
-    kickM:.62,
-    // Luo and He creep from RC down the SSW leg, over the crater step, to their marks.
-    luoRoute:Route([-4,-113],[-1,-118.5],[1.2,-120.4],[3.1,-121.3],[4.7,-122.6],[5.25,-123.7]),
-    heRoute:Route([-4,-113],[-1,-118.5],[1.2,-120.4],[3.1,-121.3],[4.9,-121.9]),
-    luoStart:P(-4.6,-112.8), heStart:P(-5.9,-112.3), liuStart:P(-7.2,-111.8),   // just round the rear corner
+    // SB05 / SB05A camera from shunzi.dragged (eye over the ground; the collar pulls him up to eyeM; chopEyeM once
+    // ijaA lets go). yaw 184: the leg's vanishing point on the right third; the kick adds its 0.12 rad roll.
+    // yaw 180 (Survey B tried 184): ijaA, whose body is 0.5 m ahead, then fills the left and the leg shows on the right.
+    // SB05A: at the cut the eye sinks to chopEyeM and slips chopAsideM west, turned to chopYawDeg, past ijaA's body.
+    // Flee: after the duel the eye rises over the mouth rubble in line with the strip (fleeEye) to follow the interpreter.
+    circleShot:Object.freeze({ eyeM:.75, yawDeg:180, pitchDeg:3, chopEyeM:.62, chopDropS:.3, chopAsideM:.25, chopYawDeg:185,
+      fleeEye:P(.65,-123.6), fleeEyeM:.85, fleeLookS:.5 }),
+    // ijaA's IjaHoldCollarUp root is solved so the clip's player head track is at shunzi.dragged; the bearing (deg,
+    // yaw convention from Shunzi) places him in the floor strip. The chopParry stage puts He 1.35 m behind his left:
+    // at 5° that is the leg floor (0.5,-122.05); from 10° on it is inside BunkerMouthSpoil.
+    ijaAHoldBearingDeg:5,
+    interpreter:P(.97,-123.42,36*Math.PI/180),   // squatting side-on at the spoil's north-west corner (left edge)
+    ijaBGuard:P(.04,-119.94,-8*Math.PI/180),      // standing in the leg 4 m off, rifle levelled at him (SB05)
+    // The kick (「日兵乙不耐烦地朝顺子踢了一脚」): up the leg's west side to kickM from him on kickBearingDeg (clear of
+    // ijaA), then back to ijaBWatch -- the chopRear stage's anchor, Luo then lands at (0.04,-120.42) on the floor.
+    kickM:.62, kickBearingDeg:-35,
+    ijaBWatch:P(.31,-121.12,-.96),
+    // Where ijaB's rifle ends after the cut (IjaChoppedFallWall weaponLost): 1.4 m ahead, right of centre, stock toward
+    // the eye (prop yaw: the muzzle along (-sin yaw, -cos yaw)).
+    ijaBRifleDrop:P(.55,-122.55,Math.PI-.4), ijaBRifleDropS:.35,
+    // They wait out of the leg's picture (x <= -8 at z -112, behind the RC frame and the rear trench's wall) and set off when
+    // the questioning starts (askAt; holdLineS at the latest): Luo creeps round RC and down the west wall, He heLagS
+    // behind; Luo is at the SB05 mark (-3.1,-116.9) about when Shunzi looks up (Glimpse).
+    luoStart:P(-8.2,-112.0), heStart:P(-9.3,-111.7), liuStart:P(-10.4,-111.5),
+    goAfterAskS:1.5, heLagS:1.4, liuLagS:3.2,
+    luoRoute:Route([-4.2,-113.1],[-3.1,-116.9],[-1.6,-119.0]),
+    // He follows along the west wall to heWait (at Luo's right-rear when the first cut lands, SB05A), and only then runs
+    // round to his chopParry mark behind ijaA.
+    heRoute:Route([-4.2,-113.1],[-4.3,-114.6],[-2.6,-117.9]),
+    heWait:P(-.7,-119.9),
     heTrailM:1.5,                        // He closes up (brisk) when he is this much further from his mark than Luo from his
-    liuRoute:Route([-4,-113],[-1.6,-117.2]),
+    liuRoute:Route([-4.2,-113.1],[-1.6,-117.2]),
     liuShot:P(-1,-121,2.0),               // bunker.liuwencaiShot: 15.4 m down the trench to J
-    heCover:P(.05,-121.45),               // behind the mouth spoil's west face after the swap
-    // Luo drags Shunzi (backwards) from the circle round the rubble into the mouth, behind the post.
-    dragCoverRoute:Route([3.2,-124.25],[2.3,-124.95],[1.35,-125.05]),
-    luoCheck:P(.5,-125.05),
+    // SB06: after the long shot Liu goes over the crater step to the trench edge east of the seat and aims east (right
+    // centre); He, after the parry and the swap, kneels with the rifle at the right edge (heCover).
+    liuCoverRoute:Route([1.4,-120.8],[3.1,-121.3],[3.3,-122.2],[4.3,-123.25]),
+    liuCover:P(5.47,-123.52,-Math.PI/2),
+    heCoverRoute:Route([.3,-121.2],[1.4,-120.8],[3.1,-121.3],[3.3,-122.2],[3.3,-123.5]),
+    heCover:P(3.6,-124.3,-1.3),
+    // DragCover: Luo walks this line (Shunzi trails him by 0.55 m): north out of the leg's mouth into the dugout, east
+    // through the mouth between the posts, and on along the trench floor until Shunzi sits on shunzi.cover.
+    dragCoverRoute:Route([.45,-124.5],[.5,-124.95],[1.1,-125.15],[1.9,-125.3],[2.95,-125.25]),
+    // SB06: Luo kneels at his left front, 0.9 m off, facing him (CheckRoot).
+    luoCheck:P(3.12,-125.73),
+    // SB06 camera from shunzi.cover: forward down the trench with Luo at the left; the kick brings the eye down to the
+    // rifle to kickPitchDeg and the hand-back keeps that (Released: pitch in -15..+5, contract §2.9).
+    checkShot:Object.freeze({ eyeM:.72, yawDeg:-94, pitchDeg:-8, kickPitchDeg:-13 }),
     // 01 prop: stock toward Shunzi, muzzle to the south-east in the mud of the mouth, out of reach (SB03: left of
     // centre, low). Prop yaw: the muzzle points along (-sin yaw, -cos yaw) (survey A, checked in picture).
     rifleMouth:P(1.25,-125.75,-125*Math.PI/180),
-    // At his hand after Luo's kick (0.34 m, a seated reach); muzzle to the west into the dugout, clear of the south
-    // post and the mouth rubble (turned east, its muzzle lay inside BunkerMouthRubbleS). The pickup follows the prop.
-    rifleKicked:P(.3,-124.66,1.1+Math.PI),
-    kickFrom:P(1.85,-125.55),
+    // 「罗班长看见旁边的汉阳造，一脚把枪踢过来。枪托滑过泥地，停在顺子手边。」 The rifle still lies in the mouth mud 1.2 m
+    // behind his left shoulder: Luo steps back into the mouth (kickFrom, behind the eye) and kicks it out past Shunzi's
+    // right side (via, clear of the rubble and his legs) to stop ahead of his right hand, stock toward him, muzzle
+    // north-east (SB06: centre-low, ~0.85 m). The pickup follows the prop.
+    kickFrom:P(.88,-126.15),
+    rifleKickVia:P(2.2,-124.72),
+    rifleKicked:P(3.2,-124.85,-.6),
+    // 「还权后 3 s 内玩家不掉血」: at the hand-back every live Japanese within holdFireM holds his fire this long
+    // (the AI's hesitation), so the player has control before anyone shoots at the seat.
+    handbackHoldFireS:3.5, handbackHoldFireM:40,
+    // Flee: how long the camera stays on the fleeing interpreter's back before DragCover (the clip is 1.6 s).
+    fleeFollowS:2.3,
   }),
   // ---- storyboard shots (contract docs/Data_FirstLevelStoryboard0103Contract.md §5, read by
   // Script_OpeningStoryboardShots.mjs) ----------------------------------------------------------
@@ -369,6 +405,37 @@ export const OPENING_STORYBOARDS = Object.freeze({
       judge:{ camera:{ eyeM:[.2,.4], rollDeg:[-12,-4] },
         actors:{ ijaA:{ x:[.3,.65], distM:[.4,1.1] }, interpreter:{ x:[.5,1], distM:[1.8,6.5] }, ijaB:{ distM:[2,8] } },
         points:{ mouthPostS:{ at:[1.05,1.0,-124.3], x:[0,.4] } } } }),
+    // SB05: Shunzi looks up (Glimpse): ijaA's face close on the left, the interpreter at the left edge, ijaB in the leg,
+    // Luo creeping up the west wall about 8 m off on the right, the leg running straight away; light concussion.
+    Object.freeze({ id:"SB05", storyboard:"Storyboard_05_Interrogation.png", phase:"Glimpse", age:1,
+      judge:{ camera:{ eyeM:[.62,.9], pitchDeg:[-5,10], yawDeg:[170,192] }, perception:[0,.62],
+        actors:{ ijaA:{ x:[.28,.47], distM:[.3,1] }, interpreter:{ x:[0,.25] }, ijaB:{ x:[.5,.7], distM:[2.4,4.6] },
+          luo:{ x:[.68,.88], distM:[6,9.6] } } } }),
+    // SB05A: the cut (Chop 0.25–0.45 s): ijaA side-on at the left front, Luo cutting ijaB down right of centre 2.5–3.5 m,
+    // He behind Luo.
+    Object.freeze({ id:"SB05A", storyboard:"Storyboard_05A_Counterattack.png", phase:"Chop", age:.35,
+      judge:{ camera:{ eyeM:[.5,.8], pitchDeg:[-5,10], yawDeg:[170,192] },
+        actors:{ ijaA:{ x:[0,.48], distM:[.3,1.2] }, luo:{ x:[.52,.9], distM:[2.4,4] }, ijaB:{ x:[.5,.9], distM:[2,3.8] },
+          heyoutian:{ x:[.52,1], distM:[2.4,6] } } } }),
+    // SB05A (contract §2.8): after the duel the camera follows the interpreter's back east down the front trench.
+    Object.freeze({ id:"SB05A_Flee", storyboard:"Storyboard_05A_Counterattack.png", phase:"Flee", age:2,
+      judge:{ actors:{ interpreter:{ x:[.2,.8], distM:[2,14] } } } }),
+    // SB06: Check (「还能打不？」): forward down the front trench from the seat east of the mouth rubble, Luo kneeling at the
+    // left, Liu right of centre, He at the right edge.
+    Object.freeze({ id:"SB06", storyboard:"Storyboard_06_RifleReturned.png",
+      when:"s.phase==='Check'&&s.flags.kneelAt!=null&&r.time-s.flags.kneelAt>=1.5",
+      judge:{ camera:{ eyeM:[.6,.85], pitchDeg:[-14,-2], yawDeg:[-104,-84] },
+        // Wave 1: LuoKneelCheck kneels upright and He stands (pendingWiring SB06: LuoKneelReach leans in low, He kneels):
+        // their heads may be above the frame.
+        actors:{ luo:{ x:[0,.3], distM:[.6,1.3], headOptional:true }, liuwencai:{ x:[.55,.85], distM:[2.6,4.6] },
+          heyoutian:{ x:[.7,1], distM:[.8,2.2], headOptional:true } } } }),
+    // SB06 after the kick: the rifle has stopped at his hand, centre-low, ~0.85 m off.
+    Object.freeze({ id:"SB06_Kick", storyboard:"Storyboard_06_RifleReturned.png",
+      when:"s.phase==='KickRifle'&&s.flags.kickRifleAt!=null&&r.time-s.flags.kickRifleAt>=1",
+      judge:{ camera:{ eyeM:[.6,.85], pitchDeg:[-16,-6], yawDeg:[-104,-84] }, rifle:{ x:[.35,.8], y:[.6,.97] } } }),
+    // SB06 at the hand-back (the player's crouched view from here on): about level, not at the ground (contract §2.9).
+    Object.freeze({ id:"SB06_Released", storyboard:"Storyboard_06_RifleReturned.png", when:"s.phase==='Released'",
+      judge:{ camera:{ pitchDeg:[-15,5], yawDeg:[-104,-84] } } }),
   ]),
   // Wave 1 stand-ins (contract §3): where a clip, hand pose, lens effect, set piece or blast effect of another
   // package belongs, the director uses the nearest existing one and lists it here. Wave 2 wires each entry to
@@ -440,6 +507,35 @@ export const OPENING_STORYBOARDS = Object.freeze({
       now:"bare earth", wave2:"OpeningSet revetmentSSW, duckboardsSSW (Set)"},
     {shot:"SB04A", what:"the SSW leg open from the dugout mouth's south pocket (the drag ends at shunzi.dragged (0.6,-123.9) and 02 looks down the leg from there)",
       now:"BunkerSouthRevetment (x -2.8..0.8, z -123.95..-123.55, 2.2 m) walls the pocket off from the leg: shunzi.dragged lies inside it and ijaA backs through it; Survey B's SB05 trial saw through it from inside", wave2:"Set: in the collapsed state shorten BunkerSouthRevetment's east end to x <= 0 (or open it) so the pocket and the leg join; then add it to the drag clearance check in Script_OpeningStoryboardsTest"},
+    // SB05 (Hold .. Collar)
+    {shot:"SB05", what:"02's eye in the SSW leg's north mouth looks out of BunkerSouthRevetment (the SB05/SB05A camera and DragCover's first 0.4 m are inside it; unseen from inside, the K2 probe ignores it)",
+      now:"shunzi.dragged (0.6,-123.9) as contract §2.6; Data_FirstLevelSpaceKeyframes K2 targets ignore BunkerSouthRevetment", wave2:"Set opens the revetment's east end (entry above); then drop K2's ignore"},
+    {shot:"SB05", what:"ijaA holds the collar with his face up, leaning in, snarling at the eye",
+      now:"IjaHoldCollarUp as baked (head down under the cap) + the performance layer's head look at the camera (UpdatePerformances)", wave2:"IjaHoldCollarUp re-baked with the head up (Anim, contract §4.1) and expression.snarl 1 Hold..Collar (Face)"},
+    {shot:"SB05", what:"ijaB stands in the leg with the rifle levelled at the waist, pointed at Shunzi",
+      now:"IjaReadyRifle held on its last frame (GuardHold)", wave2:"IjaGuardPort (Anim) in GuardHold, in ContactClips if it needs to be"},
+    {shot:"SB05", what:"both hands at the bottom edge gripping ijaA's forearm at the collar",
+      now:"collar/rest hand keys (beats.Hold..Collar)", wave2:"EXTRA_HAND_POSES.gripForearm on ijaA in beats.Hold..Collar (Eye)"},
+    {shot:"SB05", what:"duckboards down the SSW leg, log revetment on its east wall (left), a flag beyond RC",
+      now:"bare earth", wave2:"OpeningSet duckboardsSSW, revetmentSSW, flagRC (Set)"},
+    // SB05A (Chop, Parry, Flee)
+    {shot:"SB05A", what:"ijaA lets go and snaps round to his right-rear, shocked",
+      now:"IjaHoldCollarUp with the head look turned to Luo (UpdatePerformances, Chop), then IjaParriedChoppedFall", wave2:"IjaStartleTurn (Anim) at the cut (its last frame = IjaParriedChoppedFall's first, same root) + expression.shock (Face), in ContactClips"},
+    {shot:"SB05A", what:"right hand on ijaA's arm as he turns",
+      now:"collar/rest hand keys (beats.Chop)", wave2:"EXTRA_HAND_POSES.gripArm on ijaA in beats.Chop (Eye)"},
+    {shot:"SB05A", what:"two black smoke columns left of centre down the leg",
+      now:"clear sky", wave2:"Data_OpeningSet0103.SMOKE for stage 02 (Set)"},
+    // SB06 (Check, KickRifle, Released)
+    {shot:"SB06", what:"Luo kneels, leans in and reaches toward Shunzi (「还能打不？」)",
+      now:"LuoKneelCheck at CheckRoot (rescue.luoCheck, 0.9 m): he kneels upright, the head above the frame (SB06 judge headOptional) and the grip lands 0.35 m short", wave2:"LuoKneelReach (Anim) in PhaseCheck (its last frame = LuoKneelCheck's first), in ContactClips; drop headOptional from storyboardShots SB06"},
+    {shot:"SB06", what:"Liu kneels aiming east at the trench edge; He kneels at the right edge with his rifle",
+      now:"standing at liuCover / heCover while the director poses them (the director's Move hands the native layer kneel:0; He's head may leave the frame, SB06 judge headOptional); kneeling (AI stance 1) from the hand-back", wave2:"the Anim-owned kneel hook for director poses (as SB01's Luo) for Liu and He from their arrival; drop He's headOptional"},
+    {shot:"SB06", what:"his own legs and boots at the lower right; the left hand toward Luo, the right hand toward the rifle",
+      now:"sit/brace/rifle hand keys (beats.Check/KickRifle), no legs", wave2:"LEG_POSES.sitCover and the swapped hands in beats.Check/KickRifle (Eye)"},
+    {shot:"SB06", what:"the hand-back seat hides the fold F (not J): K2b",
+      now:"F is in view of shunzi.cover; the Japanese near the seat hold their fire handbackHoldFireS at Released; K2b checks only that J is in view", wave2:"Set's reshaped mouth rubble masks F from shunzi.cover (contract §4.5); add F mustHide back to K2b and keep the hold-fire"},
+    {shot:"SB06", what:"distant smoke columns and a fire down the trench",
+      now:"clear", wave2:"Data_OpeningSet0103.SMOKE for stage 02 (Set)"},
   ].map(Object.freeze)),
   // ---- 02 pursuit (bunkerPursuit, contract §5.8) -----------------------------------------
   // The roster's delayS (Space) are scaled so the three followers are in the trench the player just left

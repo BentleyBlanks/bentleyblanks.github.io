@@ -2,7 +2,7 @@
 //
 //   node Taierzhuang1938/Script_OpeningStoryboardShots.mjs [--shots=SB01,SB02] [--quality=high|medium|low]
 //        [--size=1280x720] [--out=<dir>] [--hud] [--warm=6] [--tag=<suffix>] [--side-by-side=<storyboard dir>]
-//        [--plan=<plan.json>] [--no-stop] [--no-judge]
+//        [--plan=<plan.json>] [--no-stop] [--no-judge] [--stage=2]
 //
 // Plays 01 from its first frame in the real flow (no phase skips, no injected facts), and at each
 // shot of OPENING_STORYBOARDS.storyboardShots (a phase + age, or a `when` expression over the director
@@ -24,6 +24,9 @@
 // (not for acceptance): camera {eye:[x,z],h,target:[x,y,z]|yawDeg,pitchDeg,rollDeg,fov}, actors
 // {<role>:{x,z,yawDeg,clip,seconds,hide}}, rifle {x,z,yawDeg}, eyesOpen, freeze, boxes [...], eval "<js>",
 // noShot. Output goes to Taierzhuang1938/_shots/OpeningStoryboards (not committed).
+//
+// --stage=2 cold-starts 02 (missionStage=2, the director's StageRescue) for trying 02 compositions quickly; it is
+// not the real flow (the rescuers and the circle start on their marks), so acceptance runs without it.
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -56,7 +59,9 @@ export function JudgeShot(judge, dump) {
   if (J.pitchDeg) out.push(Range("pitch (deg)", cam.pitchDeg, J.pitchDeg));
   if (J.rollDeg) out.push(Range("roll (deg)", cam.rollDeg, J.rollDeg));
   if (J.absRollDeg) out.push(Range("|roll| (deg)", Math.abs(cam.rollDeg), J.absRollDeg));
-  if (J.yawDeg) out.push(Range("yaw (deg)", cam.yawDeg, J.yawDeg));
+  // Yaw is compared in the range's own turn (SB05 looks south: 184 deg is the camera's -176).
+  if (J.yawDeg) { const mid = (J.yawDeg[0] + J.yawDeg[1]) / 2; let y = cam.yawDeg; while (y < mid - 180) y += 360; while (y > mid + 180) y -= 360; out.push(Range("yaw (deg)", y, J.yawDeg)); }
+  if (judge.perception) out.push(Range("concussion amount", dump.perception?.amount, judge.perception));
   if (judge.horizonY) out.push(Range("horizon y", dump.horizonY, judge.horizonY));
   if (judge.eyeClosure) out.push(Range("eye closure", dump.eyeClosure, judge.eyeClosure));
   for (const [role, want] of Object.entries(judge.actors || {})) {
@@ -118,7 +123,8 @@ async function Main() {
   const t0 = Date.now();
   let failed = 0;
   try {
-    const url = `http://127.0.0.1:${server.address().port}/Taierzhuang1938/?whitebox=p012&shot=1&manual=1&quality=${QUALITY}&scale=small`;
+    const stage = Arg("stage") ? `&missionStage=${Number(Arg("stage"))}` : "";
+    const url = `http://127.0.0.1:${server.address().port}/Taierzhuang1938/?whitebox=p012${stage}&shot=1&manual=1&quality=${QUALITY}&scale=small`;
     await page.goto(url, { waitUntil: "domcontentloaded", timeout: 180000 });
     await page.waitForFunction(() => window.Tengxian?.state?.ready, null, { timeout: 300000 });
     await page.waitForFunction(() => window.Tengxian.Debug.FirstLevelMissionRuntime()?.frontShow?.bunker?.ready, null, { timeout: 120000 });

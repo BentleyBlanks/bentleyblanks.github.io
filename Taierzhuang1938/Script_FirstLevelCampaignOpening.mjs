@@ -57,10 +57,10 @@ const KEY_FRAMES = [
   { label: "ThroatCut", phase: "Slash", flag: "throatCut", at: .25 },
   { label: "Drag", phase: "Drag", age: 1.2 },
   { label: "Boots", phase: "Boots", age: 1 },
-  // K2: from Shunzi's eye the mouth spoil hides the whole SSW leg; Luo first shows over it on the
-  // crater step about 2 m away (09-24 filmstrip), just before 「说话！」.
-  { label: "K2_GlimpseRise", phase: "Glimpse", age: 1.5 },
-  { label: "K2_Glimpse", phase: "Glimpse", luoWithinM: 2.3 },
+  // K2 / SB05 (2026-09-25 storyboard round): from the SSW leg's north mouth down the leg, Luo creeping up its west wall
+  // about 8 m off when Shunzi looks up; SB05A: the cut.
+  { label: "K2_Glimpse", phase: "Glimpse", age: 1 },
+  { label: "SB05A_Chop", phase: "Chop", age: .35 },
   { label: "LuoChop", phase: "Parry", flag: "luoChopAt", at: .5 },
   // He's parry and cut run on past Parry into Flee (Parry hands over 0.4 s after heChopAt): no phase filter.
   { label: "HeParry", flag: "heChopAt", at: .42 },
@@ -181,6 +181,8 @@ async function InstallProbe(page) {
       }
       if (P.wasCameraActive && !s.CameraActive && P.cameraRotation) {
         P.releaseCameraTurn = cam.quaternion.angleTo(cam.quaternion.clone().fromArray(P.cameraRotation)) * 180 / Math.PI;
+        const look = new cam.position.constructor(0, 0, -1).applyQuaternion(cam.quaternion);
+        P.releasePitch = Math.asin(Math.max(-1, Math.min(1, look.y))) * 180 / Math.PI;
         P.releaseHealth = g.player.health;
       }
       P.wasCameraActive = s.CameraActive;
@@ -263,7 +265,7 @@ export async function DriveOpening(ctx){
   console.log("PROBE",JSON.stringify({maxStep:probe.maxStep,maxStepAt:probe.maxStepAt,maxCameraStep:probe.maxCameraStep,maxCameraTurn:probe.maxCameraTurn,
     maxCameraTurnPhase:probe.maxCameraTurnPhase,maxCameraStepAt:probe.maxCameraStepAt,handFlips:probe.handFlips,maxHandRotationStep:probe.maxHandRotationStep,maxHandRotationPhase:probe.maxHandRotationPhase,
     maxWristBend:probe.maxWristBend,maxWristTwist:probe.maxWristTwist,maxReachRatio:probe.maxReachRatio,minShoulderBehind:probe.minShoulderBehind,
-    releaseCameraTurn:probe.releaseCameraTurn,releaseHealth:probe.releaseHealth,minHealth:probe.minHealth,kills:probe.kills,jaw:probe.jaw,violations:probe.violations.length}));
+    releaseCameraTurn:probe.releaseCameraTurn,releasePitch:probe.releasePitch,releaseHealth:probe.releaseHealth,minHealth:probe.minHealth,kills:probe.kills,jaw:probe.jaw,violations:probe.violations.length}));
   // ---- phases: every director phase really started, in the table's order ---------------------
   assert.equal(show.phase,"Released","the director reaches the hand-back");
   for(const phase of DIRECTOR_PHASES)assert.ok(show.beats.includes(phase),`storyboard performed: ${phase}`);
@@ -301,6 +303,8 @@ export async function DriveOpening(ctx){
   assert.ok(probe.maxPartnerHandRotationStep<20,`the dragging hand approaches the collar without an orientation jump (${probe.maxPartnerHandRotationStep}° in ${probe.maxPartnerHandRotationPhase})`);
   assert.ok(probe.maxWristBend<=42.1&&probe.maxWristTwist<1&&probe.maxReachRatio<=.971,"wrists and reach stay anatomical");
   assert.ok(probe.releaseCameraTurn<5,"returning control keeps the last presented view");
+  // Contract §2.9 (SB06): the first view the player gets is down the trench, not at the ground (was -52°).
+  assert.ok(probe.releasePitch>=-15&&probe.releasePitch<=5,`the hand-back view is about level (${probe.releasePitch?.toFixed?.(1)}°)`);
   // ---- hand-back ----------------------------------------------------------------------------
   assert.equal(show.control,null,"movement returns at Released");
   assert.equal(show.playerShots,0,"the player did not clear the vanguard");

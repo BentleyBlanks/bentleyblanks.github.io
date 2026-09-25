@@ -94,6 +94,10 @@ const IjaRoute = (spec) => Object.freeze(spec.route.map((p) => {
 // Runtime ids keep the Ai package's lettering (BackdropIjaA… / BackdropNraA…); rosterId is the Space id.
 const Letter = (id) => String.fromCharCode(65 + Number(id.match(/(\d+)$/)?.[1] || 0));
 const NRA_FIRE = Object.freeze({ BunkerBackdropNra0: ["junction", "fold"], BunkerBackdropNra1: ["fold", "linkSap"], BunkerBackdropNra2: ["fold", "junction"] });
+// 02 分镜 SB05（契约 docs/Data_FirstLevelStoryboard0103Contract.md §5）：顺子从南南西沟北口往南看整条直沟，罗班长、
+// 何有田贴西壁从折角 RC 摸来；名册里站在 RC 口的还击者（-5.6,-112）正好在这条视线的尽头，读成「一群人在交火」。
+// 他挪到折角西侧后交通壕里（x ≤ -8 在 RC 门框与沟壁背后，静态视线探针实测看不见），仍朝 J / F 还击。
+const NRA_POST = Object.freeze({ BunkerBackdropNra0: Object.freeze({ x: -8.4, z: -112.0 }) });
 
 export const BACKDROP_SQUADS = Object.freeze({
   encounter: "bunkerBackdrop",
@@ -108,8 +112,8 @@ export const BACKDROP_SQUADS = Object.freeze({
   // 走完路线的日军：离开视野再收，最迟这么多秒后收。
   retireMaxS: 25,
   members: Object.freeze(Roster.map((spec) => spec.side === "nra"
-    ? Object.freeze({ id: `BackdropNra${Letter(spec.id)}`, rosterId: spec.id, side: "nra", weapon: spec.weapon, x: spec.x, z: spec.z,
-      delayS: 2, speedMps: 0, route: Object.freeze([Stop(spec.x, spec.z, 0, NRA_FIRE[spec.id] || ["junction"])]) })
+    ? ((p) => Object.freeze({ id: `BackdropNra${Letter(spec.id)}`, rosterId: spec.id, side: "nra", weapon: spec.weapon, x: p.x, z: p.z,
+      delayS: 2, speedMps: 0, route: Object.freeze([Stop(p.x, p.z, 0, NRA_FIRE[spec.id] || ["junction"])]) }))(NRA_POST[spec.id] || spec)
     : Object.freeze({ id: `BackdropIja${Letter(spec.id)}`, rosterId: spec.id, side: "ija", weapon: spec.weapon, x: spec.x, z: spec.z,
       delayS: spec.delayS || 0, speedMps: 3.0, retire: true, route: IjaRoute(spec) }))),
 });

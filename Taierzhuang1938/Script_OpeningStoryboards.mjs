@@ -1066,17 +1066,35 @@ export class FirstLevelBunkerShow {
     const s=Math.min(length,Math.max(0,age-D.catchS)*D.speedMps),point=RoutePointAt(route,s),lead=RoutePointAt(route,s+D.leadM);
     return {point,lead,yaw:Face(lead,point),done:s>=length,route};
   }
-  /** The circle round the dragged Shunzi (02): interpreter in front, ijaA crouched at his side, ijaB aiming. */
+  /**
+   * The circle round the dragged Shunzi (02, contract §2.6 / SB05): he looks south down the SSW leg; ijaA crouched
+   * just ahead holding the collar (his IjaHoldCollarUp head track solved onto Shunzi's head along ijaAHoldBearingDeg),
+   * the interpreter squatting at the left edge, ijaB in the leg 4 m off; `kick` is where ijaB kicks him from.
+   */
   CircleMarks(){
-    const R=C.rescue,S=C.shunzi.dragged;
-    const yaw=Face(S,R.facing)+R.facingOffsetDeg*DEG,anchor={...S,yaw};
-    const interpreter=Local(anchor,...R.interpreter);
+    const R=C.rescue,S=C.shunzi.dragged,anchor={...S,yaw:R.circleShot.yawDeg*DEG};
     const bearing=R.ijaAHoldBearingDeg*DEG,headTrack=OpeningPlayerPoint("LugouIja02","IjaHoldCollarUp","head",0)||{x:-.04,z:-.6};
     const along={x:Math.sin(bearing),z:Math.cos(bearing)},dist=Math.hypot(headTrack.x,headTrack.z);
     const approx={x:S.x+along.x*dist,z:S.z+along.z*dist},ayaw=Face(approx,S),o=Rot(ayaw,headTrack.x,headTrack.z);
     const ijaA={x:S.x-o.x,z:S.z-o.z,yaw:ayaw};
-    const guard=Local(anchor,...R.ijaBGuard);guard.yaw=Face(guard,S);
-    return {anchor,interpreter,ijaA,ijaBGuard:guard,ijaBWatch:R.ijaBWatch};
+    const kb=R.kickBearingDeg*DEG,kick={x:S.x+Math.sin(kb)*R.kickM,z:S.z+Math.cos(kb)*R.kickM};kick.yaw=Face(kick,S);
+    return {anchor,interpreter:R.interpreter,ijaA,ijaBGuard:R.ijaBGuard,ijaBWatch:R.ijaBWatch,kick};
+  }
+  /** ijaB on a mark in the leg: walks there, then holds his rifle levelled at Shunzi (pendingWiring SB05: IjaGuardPort). */
+  GuardHold(actor,mark,{face=null}={}){
+    if(!actor)return false;
+    const root=face?{...mark,yaw:Face(mark,face)}:mark,there=Distance(actor.openingStoryboardLast||actor.position,root)<.15;
+    return this.Hold(actor,root,there?"IjaReadyRifle":null,there?{speed:C.speed.walk,seconds:ClipLength("IjaReadyRifle",1.1)}:{speed:C.speed.walk});
+  }
+  /** Seconds since the rescuers set off (the questioning under way: askAt, or holdLineS into Hold), -1 before. */
+  RescueGo(){
+    const f=this.flags,r=this.r;
+    if(f.rescueGoAt==null){
+      const at=f.askAt!=null?f.askAt+C.rescue.goAfterAskS:f.holdAt!=null&&r.time-f.holdAt>C.timeouts.holdLineS?r.time:f.glimpseAt??null;
+      if(at==null||at>r.time)return -1;
+      f.rescueGoAt=at;
+    }
+    return r.time-f.rescueGoAt;
   }
   /**
    * SB04A (contract §2.7, §5), from 0.6 s after the blow: ijaA drags Shunzi by the forearm from shunzi.butt into the
@@ -1108,7 +1126,11 @@ export class FirstLevelBunkerShow {
     if(closed&&(a&&b&&i||age>C.timeouts.bootsS))this.Stage("Hold");
   }
   // -- 02 -------------------------------------------------------------------------------------
-  /** Luo, He and Liu creep from behind RC down the SSW leg (never out of the enemy's rear). */
+  /**
+   * Luo, He and Liu creep from behind RC down the SSW leg along its west wall (the right of SB05's picture), setting off
+   * when the questioning starts (RescueGo): Luo to the chopRear mark behind ijaB, He to heWait at Luo's right-rear (he
+   * runs round to his chopParry mark only once Luo's cut has landed, PhaseParry), Liu to his firing step.
+   */
   Rescuers(age,{luoFast=false,heFast=false}={}){
     const R=C.rescue,luo=this.Squad("luo"),he=this.Squad("heyoutian"),liu=this.Squad("liuwencai");
     Equip(luo,"Dadao");Equip(he,"Dadao");
@@ -1117,29 +1139,34 @@ export class FirstLevelBunkerShow {
       this.flags.rescuersPlaced=true;
       this.Put(luo,R.luoStart);this.Put(he,R.heStart);this.Put(liu,R.liuStart);
     }
-    // They come round RC only once the questioning is under way: at the glimpse Luo is on the
-    // south-south-west leg, over the interpreter's shoulder (K2), not already behind the circle.
-    // Luo turns the rear corner the moment Shunzi looks up (K2); He and Liu come round behind him.
-    const go=this.flags.glimpseAt!=null?this.r.time-this.flags.glimpseAt:-1;
+    const go=this.RescueGo();
     if(go<0&&!luoFast){for(const [actor,start] of [[luo,R.luoStart],[he,R.heStart],[liu,R.liuStart]])this.Pin(actor,start);return;}
-    if(!this.flags.luoChopAt)this.Follow(luo,"rescue",[...R.luoRoute,chop.luo],luoFast?C.speed.run:C.speed.brisk,"CreepDadao",chop.luo.yaw);
-    // He creeps behind Luo and closes up (brisk) when he falls more than heTrailM behind him, so he is
-    // on his mark behind ijaA when Luo's cut lands (the draft's parry follows the first cut at once).
+    if(!this.flags.luoChopAt)this.Follow(luo,"rescue",[...R.luoRoute,chop.luo],luoFast?C.speed.run:C.speed.creep,"CreepDadao",chop.luo.yaw);
+    // He creeps behind Luo and closes up (brisk) when he falls more than heTrailM behind him.
     const Left=(actor,mark)=>actor?Distance(actor.openingStoryboardLast||actor.position,mark):0;
-    const hePace=heFast?C.speed.run:luo&&!luo.openingStoryboardHidden&&Left(he,chop.he)>Left(luo,chop.luo)+R.heTrailM?C.speed.brisk:C.speed.creep;
-    if(!this.flags.heChopAt&&(go>.8||heFast))this.Follow(he,"rescue",[...R.heRoute,chop.he],hePace,"CreepDadao",chop.he.yaw);
+    const hePace=heFast?C.speed.brisk:luo&&!luo.openingStoryboardHidden&&Left(he,R.heWait)>Left(luo,chop.luo)+R.heTrailM?C.speed.brisk:C.speed.creep;
+    if(!this.flags.heChopAt&&(go>=R.heLagS||heFast))this.Follow(he,"rescue",[...R.heRoute,R.heWait],hePace,"CreepDadao",Face(R.heWait,m.ijaA));
     else if(!this.flags.heChopAt)this.Pin(he,R.heStart);
-    if(!this.flags.liuReleased&&go>1.6)this.LiuWalk();
-    else if(!this.flags.liuReleased)this.Pin(liu,R.liuStart);
+    if(!this.flags.liuReleased&&go>=R.liuLagS)this.LiuWalk();
+    else if(!this.flags.liuReleased&&this.flags.liuAt==null)this.Pin(liu,R.liuStart);
   }
-  /** Liu Wencai creeps round RC to his firing step (liuShot) and holds it facing J until released. */
+  /**
+   * Liu Wencai creeps round RC to his firing step (liuShot) and holds it facing J; after the long shot he goes over the
+   * crater step to the trench edge east of the hand-back seat (liuCover, SB06: right of centre) and aims east.
+   */
   LiuWalk(){
     const R=C.rescue,liu=this.Squad("liuwencai");
-    if(!liu||this.flags.liuReleased||this.flags.glimpseAt==null)return false;
+    if(!liu||this.flags.liuReleased||this.RescueGo()<R.liuLagS)return false;
     if(this.flags.liuAt==null){
       const speed=this.flags.luoChopAt!=null?C.speed.brisk:C.speed.creep;
       if(!this.Follow(liu,"rescue",[...R.liuRoute,R.liuShot],speed,null,R.liuShot.yaw))return false;
       this.flags.liuAt=this.r.time;
+    }
+    const shot=this.flags["shot:liu"];
+    if(shot!=null&&this.r.time-shot>=.6&&this.r.Has("junctionShot")){
+      if(this.flags.liuCoverAt==null&&this.Follow(liu,"liuCover",[...R.liuCoverRoute,R.liuCover],C.speed.run,null,R.liuCover.yaw))this.flags.liuCoverAt=this.r.time;
+      if(this.flags.liuCoverAt!=null)this.Pose(liu,null,{face:R.liuCover.yaw});
+      return true;
     }
     this.Pose(liu,null,{face:Face(R.liuShot,A.bunkerJunction)});
     return true;
@@ -1169,7 +1196,7 @@ export class FirstLevelBunkerShow {
     this.RescueCircle(age);
     this.Put(ijaA,m.ijaA);this.Pose(ijaA,"IjaHoldCollarUp",{seconds:r.time-this.flags.holdAt});
     this.Hold(this.cast.interpreter,m.interpreter,"InterpreterCrouchAsk");
-    this.Hold(this.Ija("ijaB"),m.ijaBGuard,null);
+    this.GuardHold(this.Ija("ijaB"),m.ijaBGuard);
     this.Rescuers(r.time-this.flags.holdAt);
     if(this.flags.askAt!=null||age>C.timeouts.holdLineS)this.Stage("Ask");
   }
@@ -1178,7 +1205,7 @@ export class FirstLevelBunkerShow {
     this.RescueCircle(age);
     this.Put(ijaA,m.ijaA);this.Pose(ijaA,"IjaHoldCollarUp",{seconds:r.time-this.flags.holdAt});
     this.Hold(this.cast.interpreter,m.interpreter,"InterpreterCrouchAsk");
-    this.Hold(this.Ija("ijaB"),m.ijaBGuard,null);
+    this.GuardHold(this.Ija("ijaB"),m.ijaBGuard);
     this.Rescuers(r.time-this.flags.holdAt);
     if(this.flags.kickAt!=null||age>C.timeouts.holdLineS)this.Stage("KickShunzi");
   }
@@ -1188,9 +1215,9 @@ export class FirstLevelBunkerShow {
     this.Put(ijaA,m.ijaA);this.Pose(ijaA,"IjaHoldCollarUp",{seconds:r.time-this.flags.holdAt});
     this.Hold(this.cast.interpreter,m.interpreter,"InterpreterCrouchAsk");
     this.Rescuers(r.time-this.flags.holdAt);
-    const S=C.shunzi.dragged,guard=m.ijaBGuard,kick={x:S.x+(guard.x-S.x)*C.rescue.kickM/Distance(guard,S),z:S.z+(guard.z-S.z)*C.rescue.kickM/Distance(guard,S)};
-    kick.yaw=Face(kick,S);
-    if(this.flags.kickClipAt==null){if(this.Hold(ijaB,kick,null,{speed:C.speed.walk})||age>1)this.flags.kickClipAt=r.time;return;}
+    // 「日兵乙不耐烦地朝顺子踢了一脚」: up the leg's west side (clear of ijaA) and back to the chop mark (Glimpse).
+    const S=C.shunzi.dragged,kick=m.kick;
+    if(this.flags.kickClipAt==null){if(this.Hold(ijaB,kick,null,{speed:C.speed.walk})||age>1.6)this.flags.kickClipAt=r.time;return;}
     const t=r.time-this.flags.kickClipAt;
     this.Pose(ijaB,"IjaKickPrisoner",{seconds:t});
     if(t>=.4&&!this.flags.kicked){this.flags.kicked=r.time;r.audio?.Play?.("meleeHit",{position:r.Point(S,.6),volume:.6});}
@@ -1202,8 +1229,8 @@ export class FirstLevelBunkerShow {
     this.RescueCircle(age);
     this.Put(ijaA,m.ijaA);this.Pose(ijaA,"IjaHoldCollarUp",{seconds:r.time-this.flags.holdAt});
     this.Hold(this.cast.interpreter,m.interpreter,"InterpreterCrouchAsk");
-    // ijaB steps back to the north wall and turns to the front; Luo comes in behind him.
-    this.Hold(ijaB,m.ijaBWatch,null,{speed:C.speed.walk});
+    // ijaB steps back down the leg to the chop mark, rifle on Shunzi; Luo comes up behind him along the west wall.
+    this.GuardHold(ijaB,m.ijaBWatch,{face:C.shunzi.dragged});
     this.Rescuers(r.time-this.flags.holdAt,{luoFast:age>C.timeouts.luoArriveS});
     const chop=this.ChopMarks(m),luo=this.Squad("luo");
     // 「说话！」 only once Shunzi has seen the squad leader and Luo is close behind ijaB.
@@ -1215,7 +1242,7 @@ export class FirstLevelBunkerShow {
     this.RescueCircle(age);
     this.Put(ijaA,m.ijaA);this.Pose(ijaA,"IjaHoldCollarUp",{seconds:r.time-this.flags.holdAt});
     this.Put(interp,m.interpreter);this.Pose(interp,"InterpreterGrabCollar",{seconds:age});
-    this.Hold(ijaB,m.ijaBWatch,null);
+    this.GuardHold(ijaB,m.ijaBWatch,{face:C.shunzi.dragged});
     this.Rescuers(r.time-this.flags.holdAt,{luoFast:age>1,heFast:age>1});
     const chop=this.ChopMarks(m),luo=this.Squad("luo");
     if(luo&&Distance(luo.position,chop.luo)<.15&&Math.abs(Wrap(luo.yaw-chop.luo.yaw))<.2)this.Stage("Chop");
@@ -1255,8 +1282,8 @@ export class FirstLevelBunkerShow {
     const r=this.r,m=this.CircleMarks(),ijaA=this.Ija("ijaA"),ijaB=this.Ija("ijaB"),luo=this.Squad("luo"),he=this.Squad("heyoutian"),interp=this.cast.interpreter;
     const chop=this.ChopMarks(m);
     if(this.flags.heChopAt==null){
-      // He has to be on his mark behind ijaA; he is already running in.
-      this.Follow(he,"rescue",[...C.rescue.heRoute,chop.he],C.speed.run,"CreepDadao",chop.he.yaw);
+      // He runs round from heWait (Luo's right-rear) to his mark behind ijaA's left.
+      this.Follow(he,"heIn",[C.rescue.heWait,chop.he],C.speed.run,"CreepDadao",chop.he.yaw);
       if(Distance(he.position,chop.he)<.15||age>C.timeouts.heArriveS){this.flags.heChopAt=r.time;this.PlayClip(ijaA,"IjaParriedChoppedFall",{restart:true});}
       this.Put(ijaA,m.ijaA);this.Pose(ijaA,"IjaHoldCollarUp",{seconds:r.time-this.flags.holdAt});
     }else{
@@ -1289,6 +1316,7 @@ export class FirstLevelBunkerShow {
     this.Corpse(this.Comrade,"CaptiveWallSlideTwitch");
     const t=r.time-(this.flags.heChopAt??r.time);
     if(ijaB){this.Put(ijaB,m.ijaBWatch);if(ijaB.alive)this.Kill(ijaB);this.Corpse(ijaB,"IjaChoppedFallWall");}
+    this.DropGuardRifle();
     if(ijaA){
       // The parried man falls on his own clip; the cut lands at 0.792 s even if Parry was left early.
       this.Put(ijaA,m.ijaA);
@@ -1296,23 +1324,49 @@ export class FirstLevelBunkerShow {
       else{if(ijaA.alive){this.BladeKill(ijaA,he);this.Blood(ijaA,"neck");}this.Corpse(ijaA,"IjaParriedChoppedFall");}
     }
     if(!ijaA?.alive&&!ijaB?.alive&&!r.Has("vanguardMeleeResolved"))r.Record("vanguardMeleeResolved");
-    // He: finish the cut, move to the spoil, plant the dadao and take up his rifle.
+    // He: finish the cut, go over the crater step to the trench edge right of the hand-back seat (SB06), plant the
+    // dadao and take up his rifle.
     if(!this.flags.heSwapAt){
       if(t<ClipLength("HeDadaoParryChop",1.5)){this.Pose(he,"HeDadaoParryChop",{seconds:t});return;}
-      if(this.Hold(he,{...C.rescue.heCover,yaw:Face(C.rescue.heCover,A.bunkerFold)},null,{speed:C.speed.walk})||t>6)this.flags.heSwapAt=r.time;
+      const R=C.rescue;
+      if(this.Follow(he,"heCover",[...R.heCoverRoute,R.heCover],C.speed.brisk,null,R.heCover.yaw)||t>9)this.flags.heSwapAt=r.time;
       return;
     }
     const s=r.time-this.flags.heSwapAt;
     if(s<ClipLength("HeSwapDadaoRifle",1.6)){this.Pose(he,"HeSwapDadaoRifle",{seconds:s});return;}
-    if(!this.flags.heArmed){this.flags.heArmed=true;this.flags.heArmedAt=r.time;DropOpeningWeapon(he,"HeSwapDadaoRifle");Equip(he,"HanYang");this.ReleaseSquad(he,C.rescue.heCover);}
+    // Armed, he holds the right edge of SB06 (director-posed) until the hand-back releases him there (Release).
+    if(!this.flags.heArmed){this.flags.heArmed=true;this.flags.heArmedAt=r.time;DropOpeningWeapon(he,"HeSwapDadaoRifle");Equip(he,"HanYang");}
+    else if(this.phase!=="Released"&&he?.alive)this.Pose(he,null,{face:C.rescue.heCover.yaw});
+  }
+  /**
+   * SB05A: ijaB's rifle leaves his hands at the cut (IjaChoppedFallWall weaponLost) and lies ijaBRifleDropS later in
+   * the mud 1.4 m ahead of Shunzi, right of centre (the clip's weapon track ends against the wall, out of the picture).
+   */
+  DropGuardRifle(){
+    const ijaB=this.Ija("ijaB"),R=C.rescue;
+    if(this.flags.guardRifleDropped||this.flags.luoChopAt==null||this.r.time-this.flags.luoChopAt<ContactAt("LuoDadaoChopRear","cut",.45)+R.ijaBRifleDropS)return;
+    this.flags.guardRifleDropped=true;
+    const dropped=DropOpeningWeapon(ijaB,"IjaChoppedFallWall");if(!dropped)return;
+    const at=R.ijaBRifleDrop,y=this.r.battlefield.GroundHeight(at.x,at.z)+.05;
+    dropped.updateMatrixWorld?.(true);
+    // Keep the weapon's own lie (the track's last frame), turn it about the vertical to the drop yaw and set it down.
+    const muzzle=new THREE.Vector3(0,0,-1).applyQuaternion(dropped.quaternion);muzzle.y=0;
+    if(muzzle.lengthSq()>1e-6){const now=Math.atan2(-muzzle.x,-muzzle.z);dropped.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(UP,Wrap(at.yaw-now)));}
+    dropped.position.set(at.x,y,at.z);dropped.updateMatrixWorld?.(true);
   }
   PhaseFlee(age){
     const r=this.r,interp=this.cast.interpreter,luo=this.Squad("luo"),m=this.CircleMarks();
+    // 「他转身往前沟逃去」 (contract §2.8): turned to fleeYawDeg, InterpreterFlee carries him ENE along the strip between
+    // the mouth rubble and the spoil, out of the left of the picture; the camera follows his back (fleeFollowS).
+    const root={...m.interpreter,yaw:C.ija.interpreterFleeYawDeg*DEG};
     if(!this.phaseEntered){this.phaseEntered=true;this.Scene("RescueFlee",r.voice?.PlayScene("RescueFlee",{speakers:this.Speakers()}));this.PlayClip(interp,"InterpreterFlee",{restart:true});}
     this.Aftercut();this.LiuWalk();
-    this.Put(interp,m.interpreter);this.Pose(interp,"InterpreterFlee",{seconds:age});
+    // The clip's 1.3 m first; then the native run (UpdateFleeing) while the camera follows him down the trench.
+    if(this.flags.fleeAt==null&&age>=ClipLength("InterpreterFlee",1.6))this.flags.fleeAt=r.time;
+    if(this.flags.fleeAt==null){this.Put(interp,root);this.Pose(interp,"InterpreterFlee",{seconds:age});}
+    else this.UpdateFleeing();
     this.Put(luo,this.ChopMarks(m).luo);this.Pose(luo,"LuoDadaoChopRear",{seconds:r.time-this.flags.luoChopAt});
-    if(age>=1.6||age>C.timeouts.fleeS){this.flags.fleeAt=r.time;this.Stage("DragCover");}
+    if(age>=C.rescue.fleeFollowS||age>C.timeouts.fleeS){this.flags.fleeAt??=r.time;this.Stage("DragCover");}
   }
   /** The interpreter runs down the front trench and into the depth sap; removed out of sight. */
   UpdateFleeing(){
@@ -1340,7 +1394,7 @@ export class FirstLevelBunkerShow {
     const grab=r.time-this.flags.dragGrabAt;
     if(grab<.4){this.Pose(luo,"LuoDragToCover",{seconds:grab});return;}
     luo.openingStoryboardContact=()=>this.CollarContact(luo);
-    const arrived=this.Follow(luo,"dragCover",[...C.rescue.dragCoverRoute,C.rescue.luoCheck],C.speed.drag,"CollarDrag");
+    const arrived=this.Follow(luo,"dragCover",C.rescue.dragCoverRoute,C.speed.drag,"CollarDrag");
     if(arrived||age>C.timeouts.dragOutS){
       luo.openingStoryboardContact=null;
       this.MudMarks(this.Densify([C.shunzi.dragged,...C.rescue.dragCoverRoute,C.shunzi.cover]),{offsets:[-.12,.12],width:.09});
@@ -1420,12 +1474,13 @@ export class FirstLevelBunkerShow {
     if(!r.Has("luoRescueComplete")&&r.Has("vanguardMeleeResolved"))r.Record("luoRescueComplete");
     if(ready&&age>=.6)this.Stage("Check");
   }
-  /** Luo kneels facing Shunzi: the clip's head track is Shunzi's head at the cover. */
+  /**
+   * SB06: Luo kneels at the left front of the seat facing Shunzi, 0.9 m off (his head in the upper left of the forward
+   * view). LuoKneelCheck's grip lands 0.35 m short of the shoulder there: pendingWiring SB06 (LuoKneelReach reaches).
+   */
   CheckRoot(){
-    const S=C.shunzi.cover,luo=this.Squad("luo");
-    const yaw=Face(C.rescue.luoCheck,S);
-    const head=OpeningPlayerPoint("LugouNra05","LuoKneelCheck","head",0)||{x:-.02,z:-.57};
-    const o=Rot(yaw,head.x,head.z);return {x:S.x-o.x,z:S.z-o.z,yaw};
+    const S=C.shunzi.cover,L=C.rescue.luoCheck;
+    return {x:L.x,z:L.z,yaw:Face(L,S)};
   }
   PhaseCheck(age){
     const r=this.r,luo=this.Squad("luo");
@@ -1444,13 +1499,14 @@ export class FirstLevelBunkerShow {
   PhaseKickRifle(age){
     const r=this.r,luo=this.Squad("luo"),R=C.rescue;
     this.Aftercut();this.UpdateFleeing();this.LongShotTick();
-    const from={...R.kickFrom,yaw:Face(R.kickFrom,R.rifleKicked)};
+    // Luo steps back behind Shunzi into the mouth, where the rifle lies, and kicks it out past his right side.
+    const from={...R.kickFrom,yaw:Face(R.kickFrom,R.rifleMouth)};
     if(this.flags.kickRifleAt==null){if(this.Hold(luo,from,null,{speed:C.speed.walk})||age>C.timeouts.kickRifleS)this.flags.kickRifleAt=r.time;return;}
     const t=r.time-this.flags.kickRifleAt;
     this.Put(luo,from);this.Pose(luo,"KickRifle",{seconds:t});
-    const slide=Smooth((t-.48)/.5);
-    this.MoveRifle({x:R.rifleMouth.x+(R.rifleKicked.x-R.rifleMouth.x)*slide,z:R.rifleMouth.z+(R.rifleKicked.z-R.rifleMouth.z)*slide,
-      yaw:R.rifleMouth.yaw+(R.rifleKicked.yaw-R.rifleMouth.yaw)*slide});
+    const slide=Smooth((t-.48)/.5),a=R.rifleMouth,v=R.rifleKickVia,b=R.rifleKicked,l1=Distance(a,v),l2=Distance(v,b),s=slide*(l1+l2);
+    const p=s<l1?{x:a.x+(v.x-a.x)*s/l1,z:a.z+(v.z-a.z)*s/l1}:{x:v.x+(b.x-v.x)*(s-l1)/l2,z:v.z+(b.z-v.z)*(s-l1)/l2};
+    this.MoveRifle({...p,yaw:a.yaw+Wrap(b.yaw-a.yaw)*slide});
     // Never stall on the hand-back: a required vanguard man still standing here gets the lethal hit.
     if(t>=1.2&&!this.VanguardCleared())for(const id of C.vanguardIds)this.Kill(this.r.enemies.get(id),id==="BunkerFollowB"?"bullet":"melee");
     // A man missing from the enemy table (spawn failure, a debug removal) can never be seen dead:
@@ -1470,6 +1526,9 @@ export class FirstLevelBunkerShow {
         this.Show(actor);
         this.Pose(actor,role==="ijaC"?"IjaCornerFire":"IjaJunctionPeek");if(role==="ijaC")this.CornerFire(actor);}}
     }
+    // SB05: Yaowa stays out of the SSW leg's picture (hidden since Black; a debug start into 02 never hid him) until
+    // the hand-back; the squad AI would otherwise walk him up behind the rear corner.
+    if(RESCUE.has(phase)&&phase!=="Released")this.Pin(this.Squad("yaowa"),C.banter.hide.yaowa);
   }
   CollarContact(actor){
     const bones=actor.actor.characterRig?.bones;if(!bones)return;
@@ -1506,10 +1565,16 @@ export class FirstLevelBunkerShow {
     const direction=new THREE.Vector3(0,0,-1).applyQuaternion(this.presentedCamera?.quaternion||r.player.camera.quaternion);
     r.player.yaw=Math.atan2(-direction.x,-direction.z);r.player.pitch=Math.asin(Math.max(-1,Math.min(1,direction.y)));
     if(this.presentedCamera)r.player.camera.quaternion.copy(this.presentedCamera.quaternion);
-    const luo=this.Squad("luo");
+    const luo=this.Squad("luo"),R=C.rescue;
     this.ReleaseSquad(luo,{...C.withdraw.luoCover,yaw:Face(C.withdraw.luoCover,A.bunkerFold)});
-    this.ReleaseSquad(this.Squad("liuwencai"),C.rescue.liuShot);
-    if(this.flags.heArmed)this.ReleaseSquad(this.Squad("heyoutian"),C.rescue.heCover);
+    // SB06: Liu at the trench edge and He at the right edge kneel (the AI's stance; pendingWiring SB06 for the show).
+    const liu=this.Squad("liuwencai");
+    this.ReleaseSquad(liu,this.flags.liuCoverAt!=null?R.liuCover:R.liuShot);if(liu)r.ai.SetStance?.(liu,1,6,true);
+    if(this.flags.heArmed){const he=this.Squad("heyoutian");this.ReleaseSquad(he,R.heCover);if(he)r.ai.SetStance?.(he,1,6,true);}
+    // 「还权后 3 s 内玩家不掉血」: the seat looks down the front trench, so every live Japanese near it holds his fire
+    // for handbackHoldFireS (the AI's hesitation: no fire, no move) and the player has control first.
+    for(const actor of r.enemies.values())if(actor?.alive&&Distance(actor.position,C.shunzi.cover)<R.handbackHoldFireM)
+      actor.hesitateUntil=Math.max(actor.hesitateUntil??-99,r.ai.time+R.handbackHoldFireS);
     for(const actor of r.squad){actor.actor.root.visible=true;actor.openingStoryboardHidden=false;}
     this.playerBody.root.visible=false;
   }
@@ -1521,7 +1586,7 @@ export class FirstLevelBunkerShow {
     if(actor.weaponId&&actor.actor.weaponId!==actor.weaponId&&actor.actor.weaponId!=="HanYang")Equip(actor,actor.weaponId);
     if(!actor.actor.weaponId)Equip(actor,actor.weaponId||"HanYang");
     this.r.Defend(actor,post,.6,.6);
-    if(post===C.rescue.liuShot)this.flags.liuReleased=true;
+    if(post===C.rescue.liuShot||post===C.rescue.liuCover)this.flags.liuReleased=true;
   }
   VanguardCleared(){return C.vanguardIds.every(id=>this.r.enemies.get(id)?.alive===false);}
   ReleaseMeleeDormancy(){
@@ -1629,6 +1694,16 @@ export class FirstLevelBunkerShow {
       const w=this.withdraw||(this.withdraw={step:0,at:r.time});
       const luo=this.Squad("luo"),he=this.Squad("heyoutian"),liu=this.Squad("liuwencai"),W=C.withdraw,p=r.player.position;
       const Post=(actor,point,face)=>{if(actor?.alive){actor.missionCoverWaiting=true;r.Defend(actor,point,.5,.6);if(face)actor.watchYaw=Face(point,face);}};
+      // He and Liu hold the trench edge east of the seat (SB06); their bounds back go over the crater step and down the
+      // SSW leg on the lane (the mouth rubble and the spoil wall the bend off from the leg: local steering jams there).
+      const R=C.rescue,liuPost=this.flags.liuCoverAt!=null?R.liuCover:R.liuShot;
+      const Bound=(actor,key,route,goal,face)=>{
+        if(!actor?.alive)return;
+        if(w[key]){Post(actor,goal,face);return;}
+        if(this.Follow(actor,key,[...route,goal],C.speed.run,null,Face(goal,face))){w[key]=true;
+          actor.openingStoryboardPose=null;actor.openingStoryboardTravel=null;actor.openingStoryboardLast=null;actor.scriptedNoncombatant=false;}
+      };
+      const heBack=W.lane.slice(3,7),liuBack=[{x:4.3,z:-123.25},...W.lane.slice(3,9)];
       if(this.phase==="Collection"||this.phase==="SupportOrder")this.UpdateCollection();
       else if(w.step===0){
         // Luo goes first: out of the mouth, over the crater step, to the first intact wall (the mouth is
@@ -1637,11 +1712,11 @@ export class FirstLevelBunkerShow {
           const lane=W.lane.slice(0,W.lane.findIndex(p=>p.x===W.luoCover.x&&p.z===W.luoCover.z)+1);
           if(this.Follow(luo,"withdraw",lane.length>1?lane:[...W.lane.slice(0,7),W.luoCover],C.speed.run,null,Face(W.luoCover,A.bunkerFold))){
             w.luoAtCover=true;luo.openingStoryboardPose=null;luo.openingStoryboardTravel=null;luo.openingStoryboardLast=null;luo.scriptedNoncombatant=false;}
-        }else Post(luo,W.luoCover,A.bunkerFold);Post(he,C.rescue.heCover,A.bunkerFold);Post(liu,C.rescue.liuShot,A.bunkerJunction);
+        }else Post(luo,W.luoCover,A.bunkerFold);Post(he,R.heCover,A.bunkerFold);Post(liu,liuPost,A.bunkerJunction);
         if(Distance(p,W.luoCover)<3.2||r.Has("cornerReached"))w.step=1,w.at=r.time;}
-      else if(w.step===1){Post(luo,W.luoCorner,W.luoCover);Post(he,W.heBound[1],A.bunkerFold);Post(liu,C.rescue.liuShot,A.bunkerJunction);
+      else if(w.step===1){Post(luo,W.luoCorner,W.luoCover);Bound(he,"heBack",heBack,W.heBound[1],A.bunkerFold);Post(liu,liuPost,A.bunkerJunction);
         if(r.time-w.at>4||Distance(p,W.luoCorner)<6)w.step=2,w.at=r.time;}
-      else if(w.step===2){Post(luo,W.luoCorner,W.luoCover);Post(he,W.heBound[1],A.bunkerFold);Post(liu,W.liuBound[1],A.bunkerJunction);
+      else if(w.step===2){Post(luo,W.luoCorner,W.luoCover);Bound(he,"heBack",heBack,W.heBound[1],A.bunkerFold);Bound(liu,"liuBack",liuBack,W.liuBound[1],A.bunkerJunction);
         if(r.Has("cornerReached"))w.step=3,w.at=r.time,this.Set("Corner");}
       else{
         // Past the corner: Luo runs on ahead down the rear trench (「罗班长先过后交通壕折角，在另一侧接应」),
@@ -1860,48 +1935,52 @@ export class FirstLevelBunkerShow {
       }
     }
     else if(["Hold","Ask","KickShunzi","Glimpse","Collar","Chop","Parry"].includes(p)){
-      const h=this.TrackPoint(ijaA,"head");eye=S.dragged;height=h?h.h:.66;
-      // 「他缓慢抬起眼睛……视线越过他的肩膀」: the head comes up enough to clear the crater step (K2 is 0.9).
-      const rise=["Glimpse","Collar"].includes(p)?Smooth((p==="Glimpse"?a:1.2)/1.2):0;
-      if(rise>0)height=Math.max(height,.66+(L.glimpseEyeM-.66)*rise);
-      if(h&&["Hold","Ask","KickShunzi"].includes(p))eye={x:h.x,z:h.z};
-      const past=Head(luo)&&Head(interp)?Head(luo).clone().lerp(Head(interp),L.glimpseInterpreterPull):Head(luo);
-      // Parry: from He's arrival through the cut both men are in frame (DuelShot); before he is there,
-      // ijaA who still holds the collar.
+      // SB05 / SB05A (contract §5): held up by the collar in the SSW leg's north mouth, looking south down the straight
+      // leg: ijaA close on the left, the interpreter at the left edge, ijaB in the leg, Luo and He creeping up its west
+      // wall on the right (「视线越过他的肩膀」). The eye follows ijaA's pull (his clip's head track) until the cut, then
+      // sinks to chopEyeM as he lets go; Parry steps aside for He's parry (DuelShot).
+      const O=C.rescue.circleShot,h=this.TrackPoint(ijaA,"head");
+      eye=h&&p!=="Parry"?{x:h.x,z:h.z}:S.dragged;
+      // SB05A: at the cut the head drops and slips out past ijaA's right (chopAsideM, west) so the cut down the leg
+      // shows right of him (the storyboard's left-foreground ijaA, right-centre Luo and ijaB).
+      const c=this.ChopEye(eye);eye=c.eye;height=c.height;
+      target=this.Aim(eye,height,c.yaw,O.pitchDeg*DEG);
       const duel=p==="Parry"?this.DuelShot(eye,height):null;
-      target=["Glimpse","Collar"].includes(p)?(past||At(A.rearCorner,1.3)):p==="Chop"?At(this.CircleMarks().ijaBWatch,1.1):p==="Parry"?(duel?.target||Head(ijaA)||At(S.dragged,1)):(Head(interp)||At(S.dragged,1));
-      if(duel){eye=duel.eye;height=duel.height;}
+      if(duel){eye=duel.eye;height=duel.height;if(duel.target)target=duel.target;}
       if(this.flags.kicked&&r.time-this.flags.kicked<.5)roll=.12*(1-(r.time-this.flags.kicked)/.5);
-      // Lean aside (to the left of the line to Luo) so the interpreter frames the right of K2.
-      if(rise>0&&target){const dx=target.x-eye.x,dz=target.z-eye.z,d=Math.hypot(dx,dz)||1,k=L.glimpseAsideM*rise;eye={x:eye.x+dz/d*k,z:eye.z-dx/d*k};}
     }
     else if(p==="Flee"){
-      // The cut lands 0.4 s into Flee: stay on the duel until it has, then follow the interpreter's bolt.
-      const duel=this.DuelShot(S.dragged,.66);
-      eye=duel?.eye||S.dragged;height=duel?.height??.34;
+      // The cut lands 0.4 s into Flee: stay on the duel until duelHoldS after it, then follow the interpreter's back
+      // east down the front trench (contract §2.8).
+      // After the hold the head comes up off the mud and round (fleeEye, over the mouth rubble, in line with the strip
+      // between it and the spoil) to watch him go.
+      const O=C.rescue.circleShot,c=this.ChopEye(S.dragged),duel=this.DuelShot(c.eye,c.height);
+      eye=duel?.eye||c.eye;height=duel?.height??.34;
       target=duel?.hold&&duel.target?duel.target:Head(interp)||At(A.bunkerJunction,1.2);
+      const after=this.flags.heChopAt!=null?r.time-this.flags.heChopAt-ContactAt("HeDadaoParryChop","cut",.792)-L.duelHoldS:-1;
+      if(after>0){const w=Smooth(after/O.fleeLookS),E=O.fleeEye;eye={x:eye.x+(E.x-eye.x)*w,z:eye.z+(E.z-eye.z)*w};height+=(O.fleeEyeM-height)*w;}
     }
     else if(p==="DragCover"){const pt=this.PlayerPoint();eye=pt;height=.55;const back=Face(pt,C.shunzi.dragged);target=this.flags.dragGrabAt==null||r.time-this.flags.dragGrabAt<.4?(Head(luo)||At(S.dragged,1)):At(C.shunzi.dragged,.9);}
     else if(p==="LongShot"){
-      // 「顺子从门柱边探出一点」: the post hides J from the cover seat; the eye leans out past its south
-      // edge and up over the rubble for the shot, and sinks back behind it for Check.
-      const lean=Smooth(a/.5);eye={x:S.cover.x+L.longShotLean[0]*lean,z:S.cover.z+L.longShotLean[1]*lean};height=.62+(L.longShotEyeM-.62)*lean;
-      target=At(A.bunkerJunction,1.2);
+      // Sat against the east face of the mouth rubble looking down the front trench: 「十几米外，一名日兵从岔口回身举枪」.
+      eye=S.cover;height=C.rescue.checkShot.eyeM;target=At(A.bunkerJunction,1.2);
     }
-    else if(p==="Check"){const h=this.TrackPoint(luo,"head");eye=h?{x:h.x,z:h.z}:S.cover;height=Math.max(h?h.h:.73,L.checkEyeM);target=Head(luo)||At(C.rescue.luoCheck,1);
-      // Sit back from his face (the kneeling squad leader otherwise fills the frame chin-first).
-      if(luo){const d=Distance(eye,luo.position)||1;eye={x:eye.x+(eye.x-luo.position.x)/d*L.checkBackM,z:eye.z+(eye.z-luo.position.z)/d*L.checkBackM};}
-      if(target?.clone){target=target.clone();target.y+=L.checkLookUpM;}
-      if(this.flags.checkLineAt!=null){const n=r.time-this.flags.checkLineAt;target=target.clone?target.clone():target;if(n<.8)target.y-=.18*Math.sin(Math.PI*n/.8);}}
-    else if(p==="KickRifle"){eye=S.cover;height=.72;const k=C.rescue.kickFrom,f=C.rescue.rifleKicked;target=At({x:(k.x+f.x)/2,z:(k.z+f.z)/2},.35);
-      if(this.flags.kickRifleAt!=null){
-        const lean=Smooth((r.time-this.flags.kickRifleAt-.5)/.5),d=Distance(S.cover,f);
-        // Half-way to the rifle: a steeper look swings the hidden shoulders back out of reach of it.
-        const rifle=this.r.bunkerRifle?.position;if(rifle)target.lerp(new THREE.Vector3(rifle.x,rifle.y+.05,rifle.z),L.grabLookRifle*Smooth((r.time-this.flags.kickRifleAt-.3)/.4));
-        pitch=L.grabPitch*lean;height+=(L.grabEyeM-height)*lean;
-        eye={x:S.cover.x+(f.x-S.cover.x)/d*L.grabLeanM*lean,z:S.cover.z+(f.z-S.cover.z)/d*L.grabLeanM*lean};
-      }}
+    else if(p==="Check"){
+      // SB06 (contract §5): forward down the trench, Luo kneeling at the left front; the nod dips the head.
+      const K=C.rescue.checkShot;eye=S.cover;height=K.eyeM;target=this.Aim(eye,height,K.yawDeg*DEG,K.pitchDeg*DEG);
+      if(this.flags.checkLineAt!=null){const n=r.time-this.flags.checkLineAt;if(n<.8)pitch=-.2*Math.sin(Math.PI*n/.8);}}
+    else if(p==="KickRifle"){
+      // The rifle slides in past his right side: the eyes drop to it (kickPitchDeg) and stay there for the hand-back
+      // (Released keeps this view: pitch in -15..+5, contract §2.9).
+      const K=C.rescue.checkShot,t=this.flags.kickRifleAt!=null?r.time-this.flags.kickRifleAt:0,dip=Smooth((t-.3)/.5);
+      eye=S.cover;height=K.eyeM;target=this.Aim(eye,height,K.yawDeg*DEG,(K.pitchDeg+(K.kickPitchDeg-K.pitchDeg)*dip)*DEG);
+    }
     return {eye,height,target,roll,pitch};
+  }
+  /** The circle's eye from Luo's cut on: sunk to chopEyeM, chopAsideM to the right (west), turned to chopYawDeg. */
+  ChopEye(eye){
+    const O=C.rescue.circleShot,w=this.flags.luoChopAt!=null?Smooth((this.r.time-this.flags.luoChopAt)/O.chopDropS):0;
+    return {eye:{x:eye.x-O.chopAsideM*w,z:eye.z},height:O.eyeM+(O.chopEyeM-O.eyeM)*w,yaw:(O.yawDeg+(O.chopYawDeg-O.yawDeg)*w)*DEG};
   }
   /**
    * He's parry and cut (heChopAt .. cut + duelHoldS): the point between the two heads, the eye stepped
@@ -2075,6 +2154,10 @@ export class FirstLevelBunkerShow {
         :["ijaA","ijaB"].includes(role)&&["Interrogation","Slash","Taunt"].includes(this.phase)?this.HeadPoint(this.Comrade):this.r.player.camera.position;
       // SB03A: ijaA turned round by the timber's noise looks for the source, the mouth where Shunzi lies.
       if(role==="ijaA"&&this.phase==="Reach"&&this.flags.beamShift!=null)lookAt=this.r.player.camera.position;
+      // SB05: ijaA keeps his face on the man he holds; SB05A: at the cut he snaps round to Luo (pendingWiring:
+      // IjaStartleTurn).
+      if(role==="ijaA"&&["Hold","Ask","KickShunzi","Glimpse","Collar"].includes(this.phase))lookAt=this.r.player.camera.position;
+      if(role==="ijaA"&&this.phase==="Chop")lookAt=this.HeadPoint(this.Squad("luo"))||lookAt;
       InstallOpeningStoryboardAnimation(actor);
       const speech=this.r.voice?.Speech?.(role);
       SetOpeningActorPerformance(actor,{role,phase:["Trapped","BunkerRescue"].includes(stage)?this.phase:stage,

@@ -763,6 +763,9 @@ for (const [name, route] of Object.entries({ ...MISSION_ROUTES, ...Object.fromEn
     RescueHe:storyboards.rescue.heRoute,
     RescueLiu:[...storyboards.rescue.liuRoute,storyboards.rescue.liuShot],
     DragCover:[...storyboards.rescue.dragCoverRoute,storyboards.rescue.luoCheck],
+    // 2026-09-25 storyboard round (SB06): Liu and He go over the crater step to the trench edge east of the seat.
+    RescueLiuCover:[storyboards.rescue.liuShot,...storyboards.rescue.liuCoverRoute,storyboards.rescue.liuCover],
+    RescueHeCover:[...storyboards.rescue.heCoverRoute,storyboards.rescue.heCover],
     // 2026-09-25 storyboard round: the interpreter / ijaB backing off down the SSW leg, SB03A's Japanese going away.
     BackOff:[storyboards.interrogation.interpreterAt,...storyboards.interrogation.backOffRoute,storyboards.interrogation.backOff.interpreter],
     BackOffB:[storyboards.interrogation.ijaBAt,...storyboards.interrogation.backOffRoute,storyboards.interrogation.backOff.ijaB],
