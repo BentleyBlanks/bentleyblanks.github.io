@@ -219,7 +219,10 @@ export async function InstallInputDriver(ctx) {
             //      （09-24 r2：RightEntryGuard 在 2.1 m 连捅 4 下，驾驶器照走路线）；
             //   ② 躲雷：看见落在身边的手榴弹就朝能跑远、最好有墙挡着的方向跑出去（16 个方向、4 m 内试走），
             //      炸完走回躲之前站的地方（最多 6 s）。本游戏里趴下不减手榴弹伤（命中点固定在脚上 1 m），
-            //      所以不趴，只跑。关掉时（reflexes=false）每条路径与改之前一字不差。
+            //      所以不趴，只跑；
+            //   ③ 近身却没东西能还手（大刀被场景挡住、步枪空仓或正在装填）：面朝他往后退出刺刀够得着的距离，
+            //      装填不再被拔刀打断（拔刀会取消装填、弹仓退回空的）。09-25 R_c01_2 就是这样被连捅四刀。
+            //   关掉时（reflexes=false）每条路径与改之前一字不差。
             reflexes: false, closeResponses: 0, escapes: 0, evadeReturns: 0, closeFoe: null, returning: null,
             CloseThreat() {
               if(!this.reflexes)return null;
@@ -237,6 +240,7 @@ export async function InstallInputDriver(ctx) {
               }
               if(best&&best!==this.closeFoe)this.closeResponses++;
               this.closeFoe=best;
+              if(!best&&this.backingOff){g.Debug.Key("KeyS",false);this.backingOff=false;}
               return best;
             },
             // One frame of walking back to where a grenade dodge started (false once there, or after 6 s).
@@ -301,6 +305,7 @@ export async function InstallInputDriver(ctx) {
                 if(heading==null){if(this.evading){g.Debug.Key("KeyW",false);g.Debug.Key("ShiftLeft",false);this.evading=false;}return false;}
                 if(!this.evading){this.evadeHome={x:p.position.x,z:p.position.z};this.escapes++;}
                 this.returning=null;
+                if(this.backingOff){g.Debug.Key("KeyS",false);this.backingOff=false;}
                 if(p.stance!=="stand")g.Debug.Key(p.stance==="crouch"?"KeyC":"KeyZ");
                 const yaw=heading+Math.PI,gap=Math.atan2(Math.sin(yaw-p.yaw-p.aimYaw),Math.cos(yaw-p.yaw-p.aimYaw));
                 g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);
@@ -395,7 +400,11 @@ export async function InstallInputDriver(ctx) {
               if(wall&&wall.serial!==this.wallSerial&&fighter?.state==="stagger"&&fighter.clip==="Obstructed"&&g.meleeCombat.time-wall.time<1){
                 this.wallSerial=wall.serial;this.obstructed.set(foe.id,g.ai.time+4);
               }
-              if(distance<3 && Math.abs(gap)<.2 && !((this.obstructed.get(foe.id)||0)>g.ai.time)){
+              // A player finishes the reload he started before drawing the Dadao: drawing it mid-reload cancels the
+              // reload and refunds nothing into the magazine (Script_Main CancelReload). The old driver flipped between
+              // a blocked cut (rifle for 4 s, R) and the Dadao again, so the rifle never got loaded (09-25 R_c01_2).
+              const reloading=g.viewmodel?.action?.kind==="reload";
+              if(distance<3 && Math.abs(gap)<.2 && !((this.obstructed.get(foe.id)||0)>g.ai.time) && !(this.reflexes&&reloading)){
                 Did("melee");
                 g.Debug.Mouse(2,false);
                 if(g.state.activeSlot!=="melee"){g.Debug.Key("KeyV");return;}
@@ -411,6 +420,12 @@ export async function InstallInputDriver(ctx) {
                 return;
               }
               Did(Math.abs(gap)<.06?"rifle":"turn");
+              // ③ Nothing to answer a man at arm's length with (the Dadao caught by the scenery, the rifle empty or
+              // reloading): back-pedal out of his bayonet reach, still facing him, while it reloads, instead of standing in
+              // it (09-25 R_c01_2: FrontFlankB stabbed four times at 2 m while the bot stood reloading in the nest).
+              const backOff=this.reflexes&&distance<3&&(g.state.ammo===0||reloading);
+              if(backOff!==!!this.backingOff){g.Debug.Key("KeyS",backOff);this.backingOff=backOff;}
+              if(backOff)this.backOffFrames=(this.backOffFrames||0)+1;
               if(g.state.activeSlot!=="primary"){g.Debug.Key("Digit1");return;}
               g.Debug.Mouse(2, true);
               if (g.state.ammo === 0) g.Debug.Key("KeyR");
@@ -551,7 +566,7 @@ export async function Report03Damage(ctx) {
   // How often the two reflexes fired (counted from 03 on; zero with --no-reflexes).
   const driver = await ctx.page.evaluate(() => { const D = window.MissionInputDriver || {};
     return { reflexes: !!D.reflexes, closeResponses: D.closeResponses || 0, escapes: D.escapes || 0, evadeReturns: D.evadeReturns || 0,
-      meleeResponses: D.meleeResponses || 0, evadeFrames: D.evadeFrames || 0 }; }).catch(() => null);
+      meleeResponses: D.meleeResponses || 0, evadeFrames: D.evadeFrames || 0, backOffFrames: D.backOffFrames || 0 }; }).catch(() => null);
   console.log("CAMPAIGN_03_DRIVER", JSON.stringify(driver));
   await fs.writeFile(path.join(ctx.output, "Data_Campaign03Damage.json"), JSON.stringify(hits, null, 2));
 }
@@ -836,6 +851,7 @@ export function CampaignActions(ctx) {
           b.frames++;
         }
         g.Debug.Key("KeyW", false);
+        if (window.MissionInputDriver.backingOff) { g.Debug.Key("KeyS", false); window.MissionInputDriver.backingOff = false; }
         g.Debug.Mouse(0, false);
         g.Debug.Mouse(2, false);
         const chunkCutscene = b.cutsceneFrames || 0;
