@@ -223,6 +223,11 @@ export const MISSION_TUNING = Object.freeze({
   // position and battle state.
   checkpointRetryHealthMin:65,
   checkpointRetryBandagesMin:1,
+  // 进这一步时绷带不足就补到这个数，多了不减；表里没有的步骤不补。只有 03（Support）：用户 2026-09-25 拍板
+  // （Gate 包的方案①）。取证：Gate 包 01→03 连续跑，进 03 时手里 0–2 卷（CAMPAIGN_03_ENTRY）；这一轮实测的
+  // 阵亡全出在「进 03 只剩 1 卷、03 里再挨一枪加一颗雷」的对局（会话接力 reports_r2/Result_gate.json）。
+  // 连续打过来和 03 检查点起步（跳关也走 flow.Enter）都经过 Enter 这一口；03 里死了重来不再补，照 checkpointRetryBandagesMin。
+  stepEntryBandagesMin:Object.freeze({Support:2}),
   // An autosave below this line waits while a live enemy has direct sight. The
   // previous safe point remains valid; once sight is broken, the same caller can
   // replace it normally.

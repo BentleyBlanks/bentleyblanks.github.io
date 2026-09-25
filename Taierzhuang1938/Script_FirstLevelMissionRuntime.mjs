@@ -106,6 +106,12 @@ export function FirstLevelCheckpointVitals(point={},player={},tuning=R){
   };
 }
 
+/** 进 stepId 这一步要补几卷绷带：补到 R.stepEntryBandagesMin[stepId]，多了不减，表里没有的步骤是 0。 */
+export function FirstLevelStepEntryBandages(stepId,bandages,tuning=R){
+  const floor=tuning.stepEntryBandagesMin?.[stepId];
+  return Number.isFinite(floor)?Math.max(0,floor-(Number.isFinite(bandages)?bandages:0)):0;
+}
+
 export function FirstLevelCheckpointIsSafe(player,directThreat,tuning=R){
   return !(directThreat&&player.health<tuning.checkpointUnsafeSaveHealth);
 }
@@ -1607,7 +1613,15 @@ export class FirstLevelMissionRuntime {
         break;
     }
     this.frontBattle.Enter(stage.id);
+    // 在存档之前补：这一步的存档点记下补过的数，死了重来从这儿起也不少于它。
+    this.TopUpStepBandages(stage.id);
     if (!["Trapped", "Dive", "Death", "NightMarch"].includes(stage.id)) this.SaveCheckpoint();
+  }
+  /** 进 03 时绷带补到 R.stepEntryBandagesMin（用户 2026-09-25 拍板）。走补给箱那条口，不弹提示：HUD 状态栏的「绷带 N」变了自己会亮。 */
+  TopUpStepBandages(stepId) {
+    const bandages = FirstLevelStepEntryBandages(stepId, this.player.bandages);
+    if (bandages) this.GiveSupply({ bandages });
+    return bandages;
   }
   SpawnGuards() {
     if(this.guards.length)return;

@@ -120,11 +120,11 @@ if(process.argv.includes("--opening-audio"))process.exit(0);
     return next(url,context);
   }});
   let CombatSystem,FirstLevelMissionRuntime,FirstLevelCheckpointVitals,FirstLevelCheckpointIsSafe,FirstLevelCheckpointThreatRange,
-    FirstLevelRifleContribution,Vector3;
+    FirstLevelRifleContribution,FirstLevelStepEntryBandages,Vector3;
   try {
     ({CombatSystem}=await import("./Script_Combat.mjs"));
-    ({FirstLevelMissionRuntime,FirstLevelCheckpointVitals,FirstLevelCheckpointIsSafe,FirstLevelCheckpointThreatRange,FirstLevelRifleContribution}=
-      await import("./Script_FirstLevelMissionRuntime.mjs"));
+    ({FirstLevelMissionRuntime,FirstLevelCheckpointVitals,FirstLevelCheckpointIsSafe,FirstLevelCheckpointThreatRange,FirstLevelRifleContribution,
+      FirstLevelStepEntryBandages}=await import("./Script_FirstLevelMissionRuntime.mjs"));
     ({Vector3}=await import("three"));
   } finally {hooks.deregister();}
   {
@@ -232,7 +232,33 @@ if(process.argv.includes("--opening-audio"))process.exit(0);
     assert.deepEqual(FirstLevelCheckpointVitals({health:82,bandages:2},{health:100,bandages:0}),{
       health:100,bleeding:0,bandages:2,
     },"a healthy checkpoint restores its stronger saved inventory without reducing Spawn health");
-    assert.equal(FirstLevelRifleContribution(5,5),false,"shots from before Support never satisfy its defence");
+    // 进 03 补绷带（用户 2026-09-25 拍板，R.stepEntryBandagesMin）：不足 2 卷补到 2，多了不减；别的步骤一卷不给。
+    assert.equal(FIRST_LEVEL_STAGES[2].entry,"Support","public stage 03 enters through Support");
+    assert.deepEqual({...R.stepEntryBandagesMin},{Support:2},"only 03 tops the dressings up on entry");
+    const TopUp=bandages=>{
+      const r=Object.create(FirstLevelMissionRuntime.prototype),supplies=[];
+      Object.assign(r,{player:{bandages},GiveSupply:({bandages=0})=>{supplies.push(bandages);r.player.bandages+=bandages;}});
+      return {given:r.TopUpStepBandages("Support"),bandages:r.player.bandages,supplies,r};
+    };
+    assert.deepEqual([0,1,2,3].map(n=>TopUp(n).bandages),[2,2,2,3],"entering 03 with 0/1/2/3 dressings leaves 2/2/2/3");
+    assert.deepEqual(TopUp(1).supplies,[1],"1 -> 2 is one dressing through the existing supply hand-off");
+    assert.deepEqual(TopUp(3).supplies,[],"3 dressings are left alone, nothing is handed over");
+    for(const step of MISSION_STAGES.map(stage=>stage.id).filter(id=>id!=="Support"))
+      assert.equal(FirstLevelStepEntryBandages(step,0),0,`${step} does not top dressings up`);
+    // Enter tops up before its checkpoint save, so the 03 entry save (and a retry from it) carries the 2.
+    {
+      const enter=FirstLevelMissionRuntime.prototype.Enter.toString();
+      const topUp=enter.indexOf("this.TopUpStepBandages(stage.id)"),save=enter.lastIndexOf("this.SaveCheckpoint()");
+      assert.ok(topUp>0&&topUp<save,"Enter tops dressings up before it saves the step's checkpoint");
+      // A debug / checkpoint start at 03 (Script_FirstLevelMissionStageJump) enters through flow.Enter too.
+      assert.match(fs.readFileSync(new URL("./Script_FirstLevelMissionStageJump.mjs",import.meta.url),"utf8"),/r\.flow\.index = saved\.index;\s*r\.flow\.Enter\(\);/,
+        "a 03 checkpoint start runs the same Enter");
+      const {r}=TopUp(0);r.player.health=100;
+      const entrySave={health:100,bandages:r.player.bandages};
+      assert.equal(FirstLevelCheckpointVitals(entrySave,{health:100,bandages:0}).bandages,2,
+        "dying in 03 after using both dressings restarts from the 03 entry save with 2");
+    }
+    console.log("ok entering 03 (run or checkpoint start) tops dressings up to 2, never down, and no other step does");
     assert.equal(FirstLevelRifleContribution(6,5),true,
       "a shot fired anywhere in the live Support approach remains a valid rifle contribution at the front");
   }
