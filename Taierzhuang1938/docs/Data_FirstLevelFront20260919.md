@@ -125,6 +125,10 @@ collectionPointSeen（collection 14 m）—— 第一次看见担架、伤员与
   （超前 3 m 且离玩家 10 m 以上才等）。纯规则 `LeadPace` / `LeadCorner`（`Script_FirstLevelFrontBattle`）。
 - **「贴这道墙！前头有人！」**（`FrontApproach`）改在 `approach[9]`=(7,−143.5) 周围 2.5 m 触发，玩家约在 (4.6,−143.3)；这一场
   真正开播的那一刻记 `frontApproachPointed`（罗和玩家的位置、差距），罗在接下来 2.8 s 里边走边伸臂指前方（腿照走）。
+  这 2.8 s（`pointS`）里他**不据枪、不开火**（`pointHoldsFire`，临时挂 `scriptedNoncombatant`，结束后还原原值），并以
+  `pointTurnRps` 5 rad/s 自己转向指的方向：大脑一据枪，开场层就把上半身 clip 扔掉（`Script_OpeningStoryboardAnimation` 的
+  nativeCombat）；而不开火的人会朝最后听见的动静看（`lkp` 压过 `watchYaw`），等人时又面朝玩家。09-25 抓帧前两条都实拍到过：
+  旗子写着 PointBlockade，画出来是跪着举枪 / 伸着胳膊指沟壁。
 - **背坡轻机枪组**（`Data_FirstLevelMissionFront.FRONT_GUARD_MG_GROUP`）：第二批守军里的 6 号（射手，捷克式）和 7 号（副射手）
   整个 03 趴在土坎东端背坡上（只有 z ≤ −158.8 能从右侧低沟的沟沿上看见），是剧本兵：只朝 `fire` 里的授权点打环境射击（不命中、
   不进 TTK 账），不交给 `Defend`（`scriptDefensive` 关掉，否则换弹永远换不完）。04 一开始沿 `exit` 绕过 `ScrapeEastTraverse`
@@ -135,6 +139,10 @@ collectionPointSeen（collection 14 m）—— 第一次看见担架、伤员与
   就绕过他。第二批仍是一次一个人过口（`gapClearM`）。
 - 04/05 检查点：`Script_FirstLevelMissionStageJump` 按 `firstBatch` 把第一批直接放进安全区；原来 `OPENING.rifleGuardCount`
   这份重复的人数已删。说话的那名守军（`FACED_FRONT_GUARD_INDEX`）跟着改成 5 号——仍是第二批第一人。
+- **抓帧与画面判据**：`Script_FrontStoryboardShots.mjs`（TestRunner `FrontStoryboardShotsTest`，tier 2，浏览器）按整关驾驶的真实输入从
+  missionStage=3 冷启动走到 FrontApproach 拍 SB07、夺点后站到阵位机枪北侧 (25.6,−155.2) 拍 SB08，按契约 §5 自动判；「看得见」用涂色图
+  数像素（投影在画框里不算，被沟壁、矮墙、自己的枪挡住的不算）。布景类判据（破砖墙、烟柱、飞机、倒墙、护壁、弹药箱）标 `set`，
+  默认只出图，`--strict` 才计入。`--side-by-side=<分镜目录>` 另拼「分镜 | 实机」并排图。
 
 掩护行进分成两个有实际几何依据的门。接近段保留三个真实掩体和 cover-bound controller，
 四名队员按 `[[0,2],[1],[0,2],[1]]` 交替使用；重建后的 Support 段没有实体掩体，因而明确

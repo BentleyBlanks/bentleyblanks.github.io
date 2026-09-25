@@ -111,6 +111,7 @@ export const testDefs = {
   MissionGatesTest: {file:'Script_MissionGatesTest.mjs',desc:'第一关编排表：事实门覆盖、按表生成与激活规则、运行时源码对账、编排模型'},
   FirstLevelEnemyIdleProbe: {file:'Script_FirstLevelEnemyIdleProbe.mjs',args:['--stage-from=3','--stage-to=6','--gate'],timeoutMs:1800000,desc:'03–06 冷启动真实驾驶：03/04/05 逐阶段与合并的 30 s 零发者 <20%、4 s 不动 ≤25%，机枪开火、放行前不打守军、跃进喊话不刷屏、成组冲锋有记录（docs/Data_EnemyAi.md §20）'},
   FirstLevelFrontBattleBrowserTest: {file:'Script_FirstLevelMissionBrowserTest.mjs',args:['--campaign','--stage-from=3','--stage-to=6','--probe-front-gun'],timeoutMs:1800000,desc:'03–06 冷启动真实输入一趟：夺点、接枪、战车露面/压阵位/封口、05 取弹投弹两段毁伤、并行撤离、安全区汇合、06 借火与起行（零页面错误、零检查点重试）'},
+  FrontStoryboardShotsTest: {file:'Script_FrontStoryboardShots.mjs',timeoutMs:1500000,desc:'03 分镜 SB07/SB08 真实驾驶抓帧（missionStage=3 冷启动）：罗在右中 3.5–5.5 m 伸臂指路、背坡机枪组在左、阵位北侧同一帧看得见第一批 ≥3 人、机枪在左前景；涂色图数像素判「看得见」；布景项等 Set 出图人工看（契约 Data_FirstLevelStoryboard0103Contract §5）'},
   FirstLevelFrontBombFirstTest: {file:'Script_FirstLevelMissionBrowserTest.mjs',args:['--campaign','--stage-from=3','--stage-to=6','--bomb-first'],timeoutMs:1800000,desc:'03–06 非理想顺序：05 在攻击支路离攻击位一个弯处先炸车，attackPositionReached 记 skipped、流程照常走完 06（契约 v1.1 卡死②）'},
   FirstLevelFrontPacingTest: {file:"Script_FirstLevelFrontPacingTest.mjs",desc:"03–06 节奏：何有田接枪/老周离枪 10 m、05 先炸车与并行撤离、安全区汇合、06 起行判据、PlayScene 说话人、指引指向战车、落弹区（纯 Node）"},
   FirstLevelFrontPressureTest: {file:'Script_FirstLevelFrontPressureTest.mjs',desc:'第一关敌军不当木桩：压力表数据与运行时、环境射击的账、迟疑/成组冲锋/军官、01 背景兵（纯 Node）'},
@@ -398,6 +399,7 @@ export const browserTests = new Set([
   "FirstLevelEnemyIdleProbe",
   "FirstLevelFrontBattleBrowserTest",
   "FirstLevelFrontBombFirstTest",
+  "FrontStoryboardShotsTest",
   "MachineGunCaptivesAnimationTest",
   "CarriagePropVelocityTest",
   "DraftCartEditorTest",
@@ -480,6 +482,7 @@ export const tier0 = [...tier0Browser, ...tier0Fast];
 
 export const tier2 = [
   "OpeningActorPerformanceBrowserTest",
+  "FrontStoryboardShotsTest",
   "OpeningClipsBrowserTest",
   "ShotTest",
   "GiTest",
@@ -491,7 +494,7 @@ export const tier2 = [
 ];
 
 export const domains = {
-  openingStoryboards: {label:"01–03 storyboard reconstruction",tests:["OpeningStoryboardsTest","OpeningClipsBrowserTest","OpeningActorPerformanceBrowserTest","OpeningFirstPersonTest","FirstLevelVoicePerspectiveTest","OpeningHandbackBrowserTest","FirstLevelOpeningCampaignTest"]},
+  openingStoryboards: {label:"01–03 storyboard reconstruction",tests:["OpeningStoryboardsTest","OpeningClipsBrowserTest","OpeningActorPerformanceBrowserTest","OpeningFirstPersonTest","FirstLevelVoicePerspectiveTest","OpeningHandbackBrowserTest","FirstLevelOpeningCampaignTest"],tier2Tests:["FrontStoryboardShotsTest"]},
   missionGuide: {label:"Physical mission leader and HUD",tests:["FirstLevelLeaderGuideTest","FirstLevelLeaderGuideBrowserTest","FirstLevelMissionTest","FirstLevelMissionBrowserTest"]},
   characterSpeech: {label:"说话人面部对白",tests:["CharacterSpeechTest","CharacterSpeechBrowserTest"]},
   motionVector: {label:'统一运动矢量接入契约',tests:['MotionVectorContractTest']},
@@ -607,6 +610,9 @@ const changedDomainRules = [
   // 归 render（ProfilerTest 在那一串里）；命令行自己的冒烟在 tier 2 的 perf 档。
   { domain: "render", pattern: /Script_Profile(Cli|r?Report)|Script_FrameProbeViews/i },
   { domain: "perf", pattern: /Script_ProfileCli/i },
+  // 03 分镜抓帧（2026-09-25 Front 包）：文件名里没有 FirstLevel，归第一关与 01–03 分镜两个域。
+  {domain:"firstLevel",pattern:/FrontStoryboardShots/},
+  {domain:"openingStoryboards",pattern:/FrontStoryboardShots/},
   {domain:"firstLevel",pattern:/FirstLevelFrontRoute|FirstLevelFrontBattle|FirstLevelFrontScenes|FirstLevelFrontPacing|FirstLevelFrontTopology|FirstLevelTransition/},
   // 2026-09-23 01–06 space rebuild: keyframe table and the static probe the space gate reads.
   {domain:"firstLevel",pattern:/FirstLevelSpaceKeyframes|FirstLevelSpaceProbe|FirstLevelSpaceMap|FirstLevelSpaceShots|FirstLevelSpaceSouthFingerprint|Data_FirstLevelFrontBreakables/},
