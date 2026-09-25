@@ -1130,6 +1130,19 @@ export class FirstLevelMissionRuntime {
       if (s.index > top) { s.index = top; s.mode = "rush"; s.hold = 0; }
       // 冲刺卡死借用的站位只对这一轮这条线有效：线一换（进 / 退 / 退线 / 让口子）就作废。
       if (s.stallTarget && s.stallTarget.index !== s.index) s.stallTarget = null;
+      // 过路点（压力表 lane 的 entry，Script_FirstLevelFrontPressure.ApplyAssault）：上第一条线之前按顺序跑过去，不停、不算线。
+      // 到了或冲刺卡死（RushStalled）就跳下一个 —— 路堑增援沿战车路下来，不在路堑和北残院后面的死角里一线线蹲。
+      if (s.entry?.length) {
+        if (Distance(actor.position, s.entry[0]) <= R.assaultArrivalM * 2 || RushStalled(s, actor.position, s.entry[0], dt, R)) {
+          s.entry.shift(); s.rushBest = NaN;
+        }
+        if (s.entry.length) {
+          s.mode = "rush";
+          this.ai.SetStance(actor, 0, .4, true);
+          this.MoveActor(actor, s.entry[0], R.assaultRushMps);
+          continue;
+        }
+      }
       let target = s.stallTarget || s.points[s.index];
       // Arrival is hysteretic (2026-09-09, docs/Data_EnemyAi.md §15). Entering the line still needs
       // assaultArrivalM, but a man who has **settled** on it may wander the whole anchor + cover slack

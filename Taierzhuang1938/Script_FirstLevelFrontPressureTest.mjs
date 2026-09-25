@@ -15,7 +15,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import {
   FRONT_PRESSURE_PHASES, FRONT_PRESSURE_GROUPS, FRONT_FIRE_POINTS, FRONT_PRESSURE_STAGES, FRONT_PRESSURE_TACTICS,
-  FRONT_RESERVE_ROAD_LANE, FRONT_PRESSURE_TICK,
+  FRONT_RESERVE_ROAD_LANE, FRONT_RESERVE_ROAD_ENTRY, FRONT_PRESSURE_TICK,
 } from "./Data_FirstLevelFrontPressure.mjs";
 import {
   FirstLevelFrontPressure, FrontPressurePhase, FrontFirePoints, FrontGroupMembers, AssaultRoundEnd, AssaultTop,
@@ -125,7 +125,7 @@ function RouteClear(name, route) {
       walked.add(key);
       const spec = roster.get(id), lane = LanePoints(spec, cfg.lane);
       Check(Array.isArray(lane) && lane.length >= 2, `${groupId}/${id} gets a lane of at least two bounds`);
-      RouteClear(`lane ${groupId}/${id}`, [spec, ...lane]);
+      RouteClear(`lane ${groupId}/${id}`, [spec, ...(cfg.entry || []), ...lane]);
     }
   }
   Check(walked.size >= FRONT_PRESSURE_GROUPS.flank.ids.length + FRONT_PRESSURE_GROUPS.reserveWest.ids.length + FRONT_PRESSURE_GROUPS.reserveRoad.ids.length,
@@ -478,7 +478,9 @@ function MakeWorld(stage = "BunkerRescue") {
     const roadMan = e5.get(w5.spawned.find((id) => roster.get(id).entry === "RoadCutting"));
     const westSpec = roster.get(westMan.missionId);
     Eq(westMan.missionAssault?.points, FrontAssaultLane(westSpec.x, westSpec.z), "the jump-off reserve bounds down the field lanes");
-    Eq(roadMan.missionAssault?.points, FRONT_RESERVE_ROAD_LANE.map((p) => ({ x: p.x, z: p.z })), "the road reserve comes down the tank road");
+    Eq(roadMan.missionAssault?.points, FRONT_RESERVE_ROAD_LANE.map((p) => ({ x: p.x, z: p.z })), "the road reserve bounds from the platform to the craters");
+    Eq(roadMan.missionAssault?.entry, FRONT_RESERVE_ROAD_ENTRY.map((p) => ({ x: p.x, z: p.z })), "the road reserve runs down the tank road first");
+    Check(westMan.missionAssault?.entry === undefined, "the jump-off reserve has no entry route");
     Check([westMan, roadMan].every((a) => a.reactionGroup?.startsWith("reserve") && a.ambientFirePoints?.length), "reserves carry group tags and fire points");
     r5.flow.stage.id = "Tank"; r5.time = 3; p5.Update(); Drain();
     Eq(w5.spawned.length, 5, "05 releases the last one");

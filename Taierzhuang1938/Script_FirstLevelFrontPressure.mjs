@@ -410,6 +410,8 @@ export class FirstLevelFrontPressure {
     if (!actor.missionAssault && cfg.lane) {
       const spec = SPAWNS.get(actor.missionId);
       actor.missionAssault = AssaultState(spec?.x ?? actor.position.x, spec?.z ?? actor.position.z, LanePoints(spec, cfg.lane));
+      // 过路点（cfg.entry，路堑增援）：先跑过这几个点再上第一条线（UpdateAssault 走完就清掉；只在生成这一次给）。
+      if (actor.missionAssault && cfg.entry?.length) actor.missionAssault.entry = cfg.entry.map((p) => ({ x: p.x, z: p.z }));
     }
     const s = actor.missionAssault;
     if (!s) return;
