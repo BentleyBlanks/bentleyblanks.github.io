@@ -286,7 +286,7 @@ export const MISSION_FACT_GATES = Object.freeze({
   }),
   frontRifleDefense: Gate({
     kind: "combat", step: "Support", source: "Update",
-    text: "指定进攻组达到击杀阈值，且撤口直接火力解除",
+    text: "指定进攻组达到击杀阈值（或夺点后守满 assaultWindowFallbackS 秒），且撤口直接火力解除",
   }),
   rifleWithdrawalResolved: Gate({
     kind: "scripted", step: "Support", source: "UpdateGuards",

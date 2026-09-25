@@ -56,7 +56,14 @@ export function ColumnDeparture(baseline,litters,spacingM){
   return {baseline:base,departed:lead>=spacingM,lead};
 }
 export function BatchRecovered(batch){return batch.length>0&&AliveBatch(batch).length>0&&AliveBatch(batch).every(g=>g.safe&&g.progress>=g.route.length);}
-export function AssaultWindow(actors,captured,blocked,threshold=B.assaultKills){return captured&&actors.length>=threshold&&actors.filter(a=>a&&!a.alive).length>=threshold&&!blocked;}
+/**
+ * The 03 withdrawal window: the nest is ours, nothing shoots straight into the gap, and either threshold bounders are
+ * down or the nest has been held heldS >= B.assaultWindowFallbackS (the attack breaks off; see the tuning note).
+ */
+export function AssaultWindow(actors,captured,blocked,threshold=B.assaultKills,heldS=0){
+  if(!captured||blocked)return false;
+  return (actors.length>=threshold&&actors.filter(a=>a&&!a.alive).length>=threshold)||heldS>=B.assaultWindowFallbackS;
+}
 // The player can reach Support while companions are still behind the rear bank.
 // Join each actor's actual progress to the existing exit polyline; collection is
 // not an unconditional first goal, and actors already there never walk back.
@@ -280,8 +287,14 @@ export class FirstLevelFrontBattle {
       r.Record("frontReached");r.Record("rightNestCaptured");r.Say("FrontAttack");this.SetLeg("cover",[LeaderCover()]);
     }
     if([...r.enemies.values()].some(a=>a.lastFire>0)||r.Inventory().shots>0)r.Record("frontContact");
-    const assault=B.assaultIds.map(id=>r.enemies.get(id));
-    if(AssaultWindow(assault,r.Has("rightNestCaptured"),this.blocked)){r.Record("frontRifleDefense");r.Say("FrontWithdraw");}
+    const assault=B.assaultIds.map(id=>r.enemies.get(id)),captured=r.Has("rightNestCaptured");
+    if(captured)this.capturedAt??=r.time;
+    const heldS=captured?r.time-this.capturedAt:0;
+    if(!r.Has("frontRifleDefense")&&AssaultWindow(assault,captured,this.blocked,B.assaultKills,heldS)){
+      const kills=assault.filter(a=>a&&!a.alive).length;
+      this.assaultWindow={t:+r.time.toFixed(1),heldS:+heldS.toFixed(1),kills,why:kills>=B.assaultKills?"kills":"held"};
+      r.Record("frontRifleDefense");r.Say("FrontWithdraw");
+    }
     if(r.Has("rifleWithdrawalResolved")){
       r.tank.present=true;r.tank.active=true;
       this.StartHandover();
@@ -563,5 +576,5 @@ export class FirstLevelFrontBattle {
     const labels={supply:"bundle",return:"bundle",attack:"throw",retreat:"front",gapWatch:"front",disengage:"orders",home:"orders"};
     return {target:!r.Has("bundleTaken")&&r.Near(S.house,S.supplierRangeM)?A.bundle:MissionRouteLookahead(this.leaderRoute||Routes.bundle,r.player.position),label:labels[this.leg]||"bundle",objective:Objectives[{gapWatch:"retreat",home:"disengage"}[this.leg]||this.leg]||Objectives.supply};
   }
-  State(){return {leg:this.leg,blocked:this.blocked,gapWatched:!!this.gapWatched,returnMeetDone:!!this.returnMeetDone,handoverStarted:!!this.handoverStarted,roadProgress:this.r.tank.roadProgress||0,walks:[...this.walks].map(([id,w])=>({id,index:w.index,total:w.route.length})),stalls:this.stalls.slice()};}
+  State(){return {leg:this.leg,blocked:this.blocked,assaultWindow:this.assaultWindow||null,gapWatched:!!this.gapWatched,returnMeetDone:!!this.returnMeetDone,handoverStarted:!!this.handoverStarted,roadProgress:this.r.tank.roadProgress||0,walks:[...this.walks].map(([id,w])=>({id,index:w.index,total:w.route.length})),stalls:this.stalls.slice()};}
 }

@@ -311,6 +311,11 @@ console.log(`ok tank escort slots hidden from the gap: ${FRONT_TANK_ESCORT_SLOTS
   assert.equal(AssaultWindow(assault,true,false),true,'finite threshold does not require battlefield wipe');
   assert.equal(AssaultWindow(assault,true,true),false,'direct fire still closes the window');
   assert.equal(AssaultWindow(assault,false,false),false,'capture is required');
+  const few=[{alive:false},{alive:true},{alive:true},{alive:true},{alive:true},{alive:false}];
+  assert.equal(AssaultWindow(few,true,false,3,B.assaultWindowFallbackS-1),false,'two of six down: the window waits');
+  assert.equal(AssaultWindow(few,true,false,3,B.assaultWindowFallbackS),true,'held assaultWindowFallbackS: the attack breaks off anyway');
+  assert.equal(AssaultWindow(few,true,true,3,B.assaultWindowFallbackS*2),false,'but never while the gap is under direct fire');
+  assert.equal(AssaultWindow(few,false,false,3,B.assaultWindowFallbackS*2),false,'nor before the capture');
   const requirements=id=>MISSION_STAGES.find(s=>s.id===id).requirements;
   for(const fact of ['tankImmobilized','tankFireDisabled','attackRetreated','lastGuardsWithdrawn','reliefInPosition','collectionReturned'])assert.ok(requirements('Tank').includes(fact));
   assert.ok(requirements('MachineGun').includes('rightRearReached'));assert.ok(requirements('Support').includes('rifleWithdrawalResolved'));

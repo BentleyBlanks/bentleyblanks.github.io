@@ -239,6 +239,13 @@ export const FRONT_TUNING_SOURCES = Object.freeze({
 export const FRONT_BATTLE_TUNING=Object.freeze({
   arrivalM:1.0,leaderLeadM:3,captureRadiusM:4,rearArrivalM:3.5,attackArrivalM:3,
   firstBatch:2,assaultKills:3,assaultIds:["FrontRifleA","FrontRifleB","FrontRifleC","FrontRifleD","FrontRifleE","FrontRifleF"],
+  // The window also opens once the nest has been held this long (s) with the gap clear, kills or not: the west half is
+  // Zhou's to kill from the left gun and with them in contact behind the berm it can take minutes - relay r2 Front
+  // step 3 drives: 03 stuck 244 s after the capture with two of six down (c16_h1; before it idle_postB3, c36_C1 and
+  // tank_oldGun2, the last on the old left gun). In 30 of 31 idle-probe drives the nest was held 0.8-81 s before the
+  // window opened (the idle probe's nestLost phase, median 16 s; the 31st is the stuck postB3, 255 s), so 90 s leaves
+  // every normal run alone.
+  assaultWindowFallbackS:90,
   guardHeightM:1.2,blockadeRangeM:85,gatherSpacingM:1.35,zhouHealth:80,
   // Zhou's age on the crosshair card (both bodies: 03-05 at the gun, 06 seated). The random identity pool gave him
   // 17 / 29 / 32 across runs ("老周 17 岁"); the cast note says 三十多岁 (Data_FirstLevelMissionDialogue MISSION_VOICE_CAST.zhou).
