@@ -68,6 +68,8 @@ export const testDefs = {
   FirstLevelOpeningCampaignTest: {file:"Script_FirstLevelMissionBrowserTest.mjs",args:["--campaign","--stage-to=3"],timeoutMs:1800000,desc:"01–03 normal input: every 09.23 director phase in order, real kills, continuity, mouths and acting, withdrawal, the collection hand-over and Luo's acted front commands up to MachineGun"},
   OpeningFirstPersonTest: {file:"Script_OpeningFirstPersonTest.mjs",desc:"Production-arm anatomy, wrist twist and fixed bone lengths across 2000 poses"},
   OpeningSetTest: {file:"Script_OpeningSetTest.mjs",desc:"01–03 storyboard set dressing: data, clear of director marks, mouth rubble sightlines, zero residue after 03"},
+  OpeningLensTest: {file:"Script_OpeningLensTest.mjs",desc:"01–02 storyboard lens looks: curves, crossfade, null outside 01–02, post/HUD wiring"},
+  OpeningLensBrowserTest: {file:"Script_OpeningLensBrowserTest.mjs",timeoutMs:600000,desc:"01–02 lens in the page from the director's own events (butt flash, mud, radial blur, red corners), one loading rifle on screen, nothing left at Released and in RearTrench"},
   FirstLevelVoicePerspectiveTest: {file:"Script_FirstLevelVoicePerspectiveTest.mjs",timeoutMs:120000,desc:"Actual WebAudio per-line dialogue: centred self line, spatial NPC lines, overlapping sources, dialogue sidechain, bark yield, concussion speech floor"},
   CarriagePropVelocityTest: {file:'Script_CarriagePropVelocityTest.mjs',timeoutMs:300000,desc:'Real cart/stretcher GPU velocities with moving camera, stop and reappearance; high-quality transfer scene'},
   DraftCartEditorTest: {file:'Script_DraftCartEditorTest.mjs',timeoutMs:300000,desc:'Blender ox/horse cart action editor, walking legs, rolling wheels and camera restoration'},
@@ -366,7 +368,7 @@ export const testDefs = {
 
 export const browserTests = new Set([
   "OpeningActorPerformanceBrowserTest", "OpeningClipsBrowserTest", "FirstLevelVoicePerspectiveTest",
-  "OpeningHandbackBrowserTest", "FirstLevelOpeningCampaignTest",
+  "OpeningHandbackBrowserTest", "OpeningLensBrowserTest", "FirstLevelOpeningCampaignTest",
   "FirstLevelFrontRouteBrowserTest",
   "FirstLevelLeaderGuideBrowserTest",
   "FirstLevelMissionTopologyBrowserTest",
@@ -493,7 +495,7 @@ export const tier2 = [
 ];
 
 export const domains = {
-  openingStoryboards: {label:"01–03 storyboard reconstruction",tests:["OpeningStoryboardsTest","OpeningSetTest","OpeningClipsBrowserTest","OpeningActorPerformanceBrowserTest","OpeningFirstPersonTest","FirstLevelVoicePerspectiveTest","OpeningHandbackBrowserTest","FirstLevelOpeningCampaignTest"]},
+  openingStoryboards: {label:"01–03 storyboard reconstruction",tests:["OpeningStoryboardsTest","OpeningSetTest","OpeningClipsBrowserTest","OpeningActorPerformanceBrowserTest","OpeningFirstPersonTest","FirstLevelVoicePerspectiveTest","OpeningHandbackBrowserTest","FirstLevelOpeningCampaignTest","OpeningLensTest","OpeningLensBrowserTest"]},
   missionGuide: {label:"Physical mission leader and HUD",tests:["FirstLevelLeaderGuideTest","FirstLevelLeaderGuideBrowserTest","FirstLevelMissionTest","FirstLevelMissionBrowserTest"]},
   characterSpeech: {label:"说话人面部对白",tests:["CharacterSpeechTest","CharacterSpeechBrowserTest"]},
   motionVector: {label:'统一运动矢量接入契约',tests:['MotionVectorContractTest']},
@@ -603,7 +605,7 @@ const changedDomainRules = [
   {domain:"firstLevel",pattern:/FirstLevelWhitebox(Village|Transfer|Rear)/},
   {domain:"menu",pattern:/PlayerDeath/},
   {domain:"combat",pattern:/PlayerDeath/},
-  {domain:"openingStoryboards",pattern:/OpeningStoryboards|OpeningStoryboardAnimation|OpeningClips|OpeningStoryboardBake|OpeningStoryboardClips|OpeningProps|OpeningActorPerformance|OpeningFirstPerson|OpeningHandback|FirstLevelCampaignOpening|OpeningSet|OpeningBlastFx|BunkerPoster/},
+  {domain:"openingStoryboards",pattern:/OpeningStoryboards|OpeningStoryboardAnimation|OpeningClips|OpeningStoryboardBake|OpeningStoryboardClips|OpeningProps|OpeningActorPerformance|OpeningFirstPerson|OpeningHandback|FirstLevelCampaignOpening|OpeningSet|OpeningBlastFx|BunkerPoster|OpeningLens/},
   // 剖析器的显示层与命令行入口：文件名里没有「Profiler」，下面 render 域那条
   // 通配的 /Profiler/ 盖不到 Script_ProfileCli / Script_FrameProbeViews。
   // 归 render（ProfilerTest 在那一串里）；命令行自己的冒烟在 tier 2 的 perf 档。

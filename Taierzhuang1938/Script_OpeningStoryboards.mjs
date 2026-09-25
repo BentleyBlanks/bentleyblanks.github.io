@@ -7,7 +7,7 @@ import { LoadOpeningStoryboardAnimation, InstallOpeningStoryboardAnimation, SetO
   UpdateOpeningStoryboardCorpse, OpeningStage, OpeningClipMeta, OpeningClipRoot, OpeningPlayerPoint, OpeningPropConfig,
   OwnOpeningProp, DropOpeningWeapon } from "./Script_OpeningStoryboardAnimation.mjs";
 import { OpeningPropSet } from "./Script_OpeningProps.mjs";
-import { OpeningFirstPerson } from "./Script_OpeningFirstPerson.mjs";
+import { OpeningFirstPerson, TrimOpeningPlayerBody } from "./Script_OpeningFirstPerson.mjs";
 import { WEAPONS } from "./Data_Weapons.mjs";
 import { SpeakingCastOptions } from "./Data_FirstLevelSpeakingCast.mjs";
 import { MISSION_STAGE_ROUTES } from "./Data_FirstLevelMissionTopology.mjs";
@@ -142,16 +142,9 @@ export class FirstLevelBunkerShow {
     this.AdoptAssault();
     this.playerBody=r.actorFactory.Create("nra",{weapon:null,modelVariant:1,seed:101});
     this.playerBody.characterRig?.SetHeadVisible?.(false);
-    this.ownedGeometry=[];
-    this.playerBody.root.traverse(mesh=>{
-      if(!mesh.isSkinnedMesh)return;
-      const source=mesh.geometry,indices=source.index?.array,skin=source.getAttribute("skinIndex"),weight=source.getAttribute("skinWeight");
-      if(!indices||!skin||!weight)return;
-      const arms=new Set(mesh.skeleton.bones.flatMap((bone,i)=>/UpperArm|Forearm|Hand|Finger/.test(bone.name)?[i]:[]));
-      const Keep=index=>{let total=0;for(let k=0;k<4;k++)if(arms.has(skin.array[index*4+k]))total+=weight.array[index*4+k];return total>.999;};
-      const selected=[];for(let i=0;i<indices.length;i+=3)if([indices[i],indices[i+1],indices[i+2]].every(Keep))selected.push(indices[i],indices[i+1],indices[i+2]);
-      const geometry=source.clone();geometry.setIndex(selected);geometry.clearGroups();mesh.geometry=geometry;this.ownedGeometry.push(geometry);
-    });
+    // First-person body (Eye package): the arms as before, plus the legs and boots on their own hidden
+    // SkinnedMesh (same skeleton), shown by OpeningFirstPerson while a leg pose is solved; torso and head cut.
+    this.ownedGeometry=[...TrimOpeningPlayerBody(this.playerBody).geometries];
     this.playerProxy={actor:this.playerBody};InstallOpeningStoryboardAnimation(this.playerProxy);
     r.scene.add(this.playerBody.root);
     this.MakeSupplyProps();

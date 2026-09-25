@@ -22,6 +22,7 @@ import * as THREE from "three";
 import { AiDirector } from "./Script_Ai.mjs";
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
 import { FirstLevelOpening, SamplePerceptionCurve } from "./Script_FirstLevelOpening.mjs";
+import { OpeningLensDriver } from "./Script_OpeningLens.mjs";
 // 公开阶段 1–7 的演出（Front 玩法包）。运行时只留构造 / Enter / Update / Draw 四个薄钩子。
 import { FirstLevelFrontShow } from "./Script_FirstLevelFrontShow.mjs";
 import { FRONT_GUARD_POSTS, FRONT_SHELLS, FRONT_ASSAULT, FrontAssaultLane, FrontReserveLane } from "./Data_FirstLevelMissionFront.mjs";
@@ -2024,7 +2025,21 @@ export class FirstLevelMissionRuntime {
   Perception() {
     // 06 老周从坐着的活人换回担架躺姿时玩家闭一下眼（FirstLevelCollection.SeatSwapClosure）。
     const swap = this.frontShow?.collection?.SeatSwapClosure?.() || 0;
-    return { eyeClosure: Math.max(this.opening.eyeClosure || 0, swap), concussion: this.opening.concussion || null };
+    return { eyeClosure: Math.max(this.opening.eyeClosure || 0, swap), concussion: this.opening.concussion || null,
+      lens: this.OpeningLens() };
+  }
+  /**
+   * 01–02 storyboard lens (Script_OpeningLens, contract §4.4): while the director owns the view, its phase,
+   * phase age and events (blast, butt hit, Found's clear, concussion) pick and sample a look; null otherwise,
+   * so Script_Main's post parameters are all defaults outside 01–02. The director may hand its own events
+   * through bunker.LensEvents() (second wave).
+   */
+  OpeningLens() {
+    const show = this.frontShow?.bunker, live = !!show?.CameraActive;
+    this.openingLens ??= new OpeningLensDriver();
+    const events = live ? (show.LensEvents?.() ?? { blastAt: this.opening?.blastAt, buttHit: show.strikeAt,
+      clearAt: show.flags?.clearAt, concussion: show.perception?.amount }) : {};
+    return this.openingLens.Sample(this.time, live ? show.phase : null, live ? show.Age : 0, events);
   }
   /**
    * 控制锁算视线用的眼位。被枪托砸翻躺在地上的时候（旧的屋内伏击）真正的眼位在地板上方

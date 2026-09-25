@@ -14,6 +14,7 @@ import { MISSION_GUIDE_TUNING as GUIDE } from "./Data_Tuning_MissionGuide.mjs";
 import { HUD_WEAPON_ICONS } from "./Data_HudWeaponIcons.mjs";
 import { LevelBriefId, LevelFieldId } from "./Script_TextIds.mjs";
 import { HIT_FEEDBACK } from "./Data_Tuning_Player.mjs";
+import { LENS_MUD_TEXTURE, REDUCED_MOTION as LENS_REDUCED_MOTION } from "./Data_OpeningLens.mjs";
 import {
   TITLE_CARD, TIMING, GRENADE_WARNING, HITMARK, HITDIR, VIGNETTE, SUPPRESSION,
   MELEE_KILL_BLOOD, PROMPTS, MINIMAP, FPS, IDLE_FADE, SUBTITLE_DEPTH,
@@ -373,6 +374,11 @@ export class Hud {
     this.el.meleeKillBlood.setAttribute("aria-hidden", "true");
     this.el.storyBlood = mk("hudStoryBlood");
     this.el.storyBlood.setAttribute("aria-hidden", "true");
+    // 01–02 storyboard lens layers (Script_OpeningLens via SetLens): mud on the lens, the butt strike's flash.
+    this.el.lensMud = mk("hudLensMud");
+    this.el.lensMud.setAttribute("aria-hidden", "true");
+    this.el.lensFlash = mk("hudLensFlash");
+    this.el.lensFlash.setAttribute("aria-hidden", "true");
     this.el.healthWarning = mk("hudHealthWarning");
     this.el.healthWarning.setAttribute("role", "status");
     this.el.healthWarning.setAttribute("aria-live", "polite");
@@ -1039,7 +1045,35 @@ export class Hud {
     };
   }
 
+  /**
+   * 01–02 storyboard lens overlays: lens.mud (0–1) shows the mud spatter layer, lens.flash (0–1) the white
+   * flash, lens.storyBloodCap caps the director's blood layer (SetStoryBlood). null (outside 01–02) turns the
+   * overlays off and lifts the cap. Reduced motion caps the flash.
+   */
+  SetLens(lens) {
+    const mud = Math.max(0, Math.min(1, lens?.mud || 0));
+    let flash = Math.max(0, Math.min(1, lens?.flash || 0));
+    if (flash > 0 && globalThis.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches) flash = Math.min(flash, LENS_REDUCED_MOTION.flashMax);
+    // Fetch the mud image as soon as any 01–02 look is on (it is needed from Wake), never in 03+.
+    if (lens && !this.lensMudLoaded) { SetStyle(this.el.lensMud, "backgroundImage", `url("${LENS_MUD_TEXTURE}")`); this.lensMudLoaded = true; }
+    SetStyle(this.el.lensMud, "opacity", mud.toFixed(3));
+    SetClass(this.el.lensMud, "on", mud > .001);
+    SetStyle(this.el.lensFlash, "opacity", flash.toFixed(3));
+    SetClass(this.el.lensFlash, "on", flash > .001);
+    const cap = lens?.storyBloodCap ?? 1;
+    if (cap !== (this.storyBloodCap ?? 1)) { this.storyBloodCap = cap; this.SetStoryBlood(this.storyBloodRaw || 0); }
+  }
+  /** Browser checks read the drawn state of the lens layers. */
+  LensState() {
+    const Read = el => ({ on: el.classList.contains("on"), opacity: Number.parseFloat(getComputedStyle(el).opacity) || 0,
+      visibility: getComputedStyle(el).visibility, backgroundImage: getComputedStyle(el).backgroundImage });
+    return { mud: Read(this.el.lensMud), flash: Read(this.el.lensFlash) };
+  }
+
   SetStoryBlood(amount=0) {
+    this.storyBloodRaw=amount;
+    // The 01–02 lens may cap the director's blood layer (SB04A 「血层淡到约 0.3」); 1 = uncapped.
+    amount=Math.min(amount,this.storyBloodCap??1);
     SetStyle(this.el.storyBlood,"opacity",Math.max(0,Math.min(1,amount)).toFixed(3));
     SetClass(this.el.storyBlood,"on",amount>.001);
   }
