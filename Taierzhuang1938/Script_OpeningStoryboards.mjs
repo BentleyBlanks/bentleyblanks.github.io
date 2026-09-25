@@ -5,7 +5,7 @@ import { MISSION_ENCOUNTERS } from "./Data_FirstLevelMission.mjs";
 import { FRONT_SPACE } from "./Data_FirstLevelFrontRoute.mjs";
 import { LoadOpeningStoryboardAnimation, InstallOpeningStoryboardAnimation, SetOpeningActorPerformance, ClearOpeningActorPerformance,
   UpdateOpeningStoryboardCorpse, OpeningStage, OpeningClipMeta, OpeningClipRoot, OpeningPlayerPoint, OpeningPropConfig,
-  OwnOpeningProp, DropOpeningWeapon } from "./Script_OpeningStoryboardAnimation.mjs";
+  OwnOpeningProp, DropOpeningWeapon, IsOpeningTerminalClip } from "./Script_OpeningStoryboardAnimation.mjs";
 import { OpeningPropSet } from "./Script_OpeningProps.mjs";
 import { OpeningFirstPerson } from "./Script_OpeningFirstPerson.mjs";
 import { WEAPONS } from "./Data_Weapons.mjs";
@@ -870,9 +870,11 @@ export class FirstLevelBunkerShow {
     const r=this.r,ijaA=this.Ija("ijaA"),J=C.ija,at=J.lookBack;if(!ijaA)return;
     const heard=this.flags.beamShift!=null?r.time-this.flags.beamShift:-1;
     if(heard<0){this.Hold(ijaA,at,null,{speed:C.speed.stroll});return;}
-    // Wave 1 (pendingWiring SB03A): GuardTurn, the root turned to lookBackOffDeg short of the eye, the head layer the rest.
-    const here=ijaA.openingStoryboardLast||ijaA.position;
-    this.Move(ijaA,{x:here.x,z:here.z},Face(here,C.shunzi.reachEye)-J.lookBackOffDeg*DEG,"GuardTurn",0,{seconds:heard});
+    // Wave 1 (pendingWiring SB03A): GuardTurn, the root turned over lookBackTurnS to lookBackOffDeg short of the eye, the
+    // head layer the rest.
+    const here=ijaA.openingStoryboardLast||ijaA.position,to=Face(here,C.shunzi.reachEye)-J.lookBackOffDeg*DEG;
+    const face=at.yaw+Wrap(to-at.yaw)*Smooth(heard/J.lookBackTurnS);
+    this.Move(ijaA,{x:here.x,z:here.z},face,"GuardTurn",0,{seconds:heard});
   }
   PhaseCaptiveWall(age){
     const r=this.r,comrade=this.Comrade,ijaA=this.Ija("ijaA"),ijaB=this.Ija("ijaB"),interp=this.cast.interpreter,m=this.InterrogationMarks();
@@ -976,6 +978,8 @@ export class FirstLevelBunkerShow {
     this.VanguardFront(this.flags.vanguardAt);
     this.Corpse(this.Comrade,"CaptiveWallSlideTwitch");
     this.Aside();
+    // SB03A: he looks back at the mouth at least lookBackS before he walks back to it.
+    if(this.flags.beamShift!=null&&r.time-this.flags.beamShift<C.ija.lookBackS){this.LookBack();this.PlaceBeam("nudged",.25);return;}
     if(this.flags.clearAt==null){
       if(this.Follow(ijaA,"found",[...C.ija.foundRoute,root],age>C.timeouts.foundWalkS?C.speed.run:C.speed.walk,null,root.yaw)&&this.Hold(ijaA,root,null))this.flags.clearAt=r.time;
       this.PlaceBeam("nudged",.25);
@@ -1076,9 +1080,11 @@ export class FirstLevelBunkerShow {
     const bearing=R.ijaAHoldBearingDeg*DEG,headTrack=OpeningPlayerPoint("LugouIja02","IjaHoldCollarUp","head",0)||{x:-.04,z:-.6};
     const along={x:Math.sin(bearing),z:Math.cos(bearing)},dist=Math.hypot(headTrack.x,headTrack.z);
     const approx={x:S.x+along.x*dist,z:S.z+along.z*dist},ayaw=Face(approx,S),o=Rot(ayaw,headTrack.x,headTrack.z);
-    const ijaA={x:S.x-o.x,z:S.z-o.z,yaw:ayaw};
+    // ijaAStandoffM: his root that much further out along the bearing; the eye keeps to his head track minus `pull`.
+    const pull={x:along.x*R.ijaAStandoffM,z:along.z*R.ijaAStandoffM};
+    const ijaA={x:S.x-o.x+pull.x,z:S.z-o.z+pull.z,yaw:ayaw};
     const kb=R.kickBearingDeg*DEG,kick={x:S.x+Math.sin(kb)*R.kickM,z:S.z+Math.cos(kb)*R.kickM};kick.yaw=Face(kick,S);
-    return {anchor,interpreter:R.interpreter,ijaA,ijaBGuard:R.ijaBGuard,ijaBWatch:R.ijaBWatch,kick};
+    return {anchor,interpreter:R.interpreter,ijaA,ijaBGuard:R.ijaBGuard,ijaBWatch:R.ijaBWatch,kick,pull};
   }
   /** ijaB on a mark in the leg: walks there, then holds his rifle levelled at Shunzi (pendingWiring SB05: IjaGuardPort). */
   GuardHold(actor,mark,{face=null}={}){
@@ -1253,7 +1259,17 @@ export class FirstLevelBunkerShow {
   Kill(victim,kind="melee"){
     if(!victim?.alive)return;
     victim.openingDoomed=true;victim.scriptEssential=false;victim.scriptedNoncombatant=false;
+    this.FallNatively(victim);
     victim.TakeHit(1000,"torso",null,{kind});
+  }
+  /**
+   * A man the director kills while it holds him on a standing pose (IjaBayonetGuard, a loop, ...) falls on the native
+   * death: the pose layer keeps any director pose over a dead body (authored falls finish that way), so a standing pose
+   * left on him kept the corpse upright (09-25 review: ijaD at J, pelvis 0.68 m, in the middle of SB06). Authored
+   * terminal clips stay.
+   */
+  FallNatively(victim){
+    if(victim&&!IsOpeningTerminalClip(victim.openingStoryboardPose?.clip)){victim.openingStoryboardPose=null;victim.openingStoryboardTravel=null;}
   }
   BladeKill(victim,attacker){
     if(!victim?.alive)return;
@@ -1281,6 +1297,8 @@ export class FirstLevelBunkerShow {
   PhaseParry(age){
     const r=this.r,m=this.CircleMarks(),ijaA=this.Ija("ijaA"),ijaB=this.Ija("ijaB"),luo=this.Squad("luo"),he=this.Squad("heyoutian"),interp=this.cast.interpreter;
     const chop=this.ChopMarks(m);
+    // SB05A: ijaB's rifle is in the mud ijaBRifleDropS after the cut, while the cut is still framed (Aftercut repeats it).
+    this.DropGuardRifle();
     if(this.flags.heChopAt==null){
       // He runs round from heWait (Luo's right-rear) to his mark behind ijaA's left.
       this.Follow(he,"heIn",[C.rescue.heWait,chop.he],C.speed.run,"CreepDadao",chop.he.yaw);
@@ -1345,8 +1363,14 @@ export class FirstLevelBunkerShow {
   DropGuardRifle(){
     const ijaB=this.Ija("ijaB"),R=C.rescue;
     if(this.flags.guardRifleDropped||this.flags.luoChopAt==null||this.r.time-this.flags.luoChopAt<ContactAt("LuoDadaoChopRear","cut",.45)+R.ijaBRifleDropS)return;
-    this.flags.guardRifleDropped=true;
-    const dropped=DropOpeningWeapon(ijaB,"IjaChoppedFallWall");if(!dropped)return;
+    this.flags.guardRifleDropped=this.r.time;
+    // No weapon to drop is a broken stand-in, not a choice: flagged (the shot tool's SB05A_Rifle check fails on it).
+    const dropped=DropOpeningWeapon(ijaB,"IjaChoppedFallWall");
+    if(!dropped){this.flags.guardRifleMissing=true;console.warn("OpeningStoryboards: ijaB has no rifle to drop at SB05A");return;}
+    this.guardRifle=dropped;
+    // The dropped copy is left under the top of ijaB's tree; a dead man's root may be out of the scene by then (the
+    // corpse layer), so the world placement below would land in his space (09-25 shots: 120 m off). Keep it in the scene.
+    if(dropped.parent!==this.r.scene)this.r.scene.attach(dropped);
     const at=R.ijaBRifleDrop,y=this.r.battlefield.GroundHeight(at.x,at.z)+.05;
     dropped.updateMatrixWorld?.(true);
     // Keep the weapon's own lie (the track's last frame), turn it about the vertical to the drop yaw and set it down.
@@ -1457,6 +1481,7 @@ export class FirstLevelBunkerShow {
     r.audio?.PlayGunshot?.("rifle",{position:from,volume:1});
     if(!(clear||force)){r.vfx?.Impact?.(aim,dir.clone().negate(),"dirt");return false;}
     target.openingDoomed=true;target.scriptEssential=false;target.scriptedNoncombatant=false;
+    this.FallNatively(target);
     target.TakeHit(1000,"torso",dir,{kind:"bullet",weaponId:"HanYang",point:aim});
     r.vfx?.Blood?.(aim,dir,1);
     return true;
@@ -1703,7 +1728,7 @@ export class FirstLevelBunkerShow {
         if(this.Follow(actor,key,[...route,goal],C.speed.run,null,Face(goal,face))){w[key]=true;
           actor.openingStoryboardPose=null;actor.openingStoryboardTravel=null;actor.openingStoryboardLast=null;actor.scriptedNoncombatant=false;}
       };
-      const heBack=W.lane.slice(3,7),liuBack=[{x:4.3,z:-123.25},...W.lane.slice(3,9)];
+      const heBack=W.heBackRoute,liuBack=W.liuBackRoute;
       if(this.phase==="Collection"||this.phase==="SupportOrder")this.UpdateCollection();
       else if(w.step===0){
         // Luo goes first: out of the mouth, over the crater step, to the first intact wall (the mouth is
@@ -1939,8 +1964,8 @@ export class FirstLevelBunkerShow {
       // leg: ijaA close on the left, the interpreter at the left edge, ijaB in the leg, Luo and He creeping up its west
       // wall on the right (「视线越过他的肩膀」). The eye follows ijaA's pull (his clip's head track) until the cut, then
       // sinks to chopEyeM as he lets go; Parry steps aside for He's parry (DuelShot).
-      const O=C.rescue.circleShot,h=this.TrackPoint(ijaA,"head");
-      eye=h&&p!=="Parry"?{x:h.x,z:h.z}:S.dragged;
+      const O=C.rescue.circleShot,h=this.TrackPoint(ijaA,"head"),pull=this.CircleMarks().pull;
+      eye=h&&p!=="Parry"?{x:h.x-pull.x,z:h.z-pull.z}:S.dragged;
       // SB05A: at the cut the head drops and slips out past ijaA's right (chopAsideM, west) so the cut down the leg
       // shows right of him (the storyboard's left-foreground ijaA, right-centre Luo and ijaB).
       const c=this.ChopEye(eye);eye=c.eye;height=c.height;

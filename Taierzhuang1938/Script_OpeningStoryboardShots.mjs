@@ -18,7 +18,9 @@
 // no scenery stands between the eye and a judged head -- a ray against the scene, named by the layout block
 // it hits; `behindOk:"<block>"` lets a wave-1 shot keep one listed blocker). People are skinned and the ray
 // skips them, so a head behind a nearer person is found apart (coveredBy: the people alone drawn flat into the
-// head's pixel after the screenshot); `coverOk:"<role>"` lets a wave-1 shot keep that one person in front. A
+// head's pixel after the screenshot); `coverOk:"<role>"` lets a wave-1 shot keep that one person in front.
+// hands.<l|r> judges a first-person palm on screen (pose, x, y), guardRifle ijaB's dropped rifle (x, y, distance),
+// pelvisM a body's pelvis height (corpse:true: a dead man on the floor, whose head needs no clear line). A
 // failed check, a missed shot or a page error exits 1. The rest of each criterion is looked at in the
 // side-by-side picture: --side-by-side=<dir with Storyboard_*.png> writes <id>_SideBySide.png
 // (storyboard | engine, same height, with the failed checks printed under it). The storyboard images are
@@ -84,19 +86,20 @@ export function JudgeShot(judge, dump) {
     const a = dump.actors.find((row) => row.role === role);
     if (!a) { out.push({ label: `${role} present`, ok: false, value: "missing", range: null }); continue; }
     const shown = a.visible && !a.hidden && OnScreen(a.headPx);
-    // headOptional: a wave-1 stand-in clip may carry the head out of the frame (the x check still applies).
-    if (want.headOptional) out.push({ label: `${role} shown`, ok: a.visible && !a.hidden && !!a.headPx?.front, value: a.headPx ? `${a.headPx.x},${a.headPx.y}` : null, range: null });
+    // headOptional: a wave-1 stand-in clip may carry the head out of the frame (the x check still applies). corpse: a
+    // dead man on the floor (SB06's junction man), judged by x, distance and pelvis height, not by a clear line to his head.
+    if (want.headOptional || want.corpse) out.push({ label: `${role} shown`, ok: a.visible && !a.hidden && !!a.headPx?.front, value: a.headPx ? `${a.headPx.x},${a.headPx.y}` : null, range: null });
     else out.push({ label: `${role} head in frame`, ok: !!shown, value: a.headPx ? `${a.headPx.x},${a.headPx.y}` : null, range: null });
     // A head on the screen can still sit behind a wall (the projection alone passed SB04A's interpreter while
     // BunkerSouthRevetment hid him). behindOk names the one blocker a wave-1 frame may still have (with its
     // pendingWiring entry); any other blocker fails.
     const allowed = !!a.blockedBy && !!want.behindOk && a.blockedBlock === want.behindOk;
-    if (shown && !want.headOptional) out.push({ label: `${role} head not behind scenery`, ok: !a.blockedBy || allowed,
+    if (shown && !want.headOptional && !want.corpse) out.push({ label: `${role} head not behind scenery`, ok: !a.blockedBy || allowed,
       value: a.blockedBy ? `${a.blockedBlock || a.blockedBy}${allowed ? " (allowed in wave 1)" : ""}` : "clear", range: null });
     // A head behind a nearer person (SB05: ijaB under ijaA's cap) passed the projection too. coverOk names the one
     // person a wave-1 frame may still have in front (with its pendingWiring entry).
     const coverAllowed = !!a.coveredBy && !!want.coverOk && a.coveredBy === want.coverOk;
-    if (shown && !want.headOptional) out.push({ label: `${role} head not behind a nearer person`, ok: !a.coveredBy || coverAllowed,
+    if (shown && !want.headOptional && !want.corpse) out.push({ label: `${role} head not behind a nearer person`, ok: !a.coveredBy || coverAllowed,
       value: a.coveredBy ? `${a.coveredBy}${coverAllowed ? " (allowed in wave 1)" : ""}` : "clear", range: null });
     if (want.x) out.push(Range(`${role} head x`, a.headPx?.x, want.x));
     if (want.y) out.push(Range(`${role} head y`, a.headPx?.y, want.y));
@@ -118,6 +121,23 @@ export function JudgeShot(judge, dump) {
     const seen = dump.actors.filter((a) => group.roles.some((r) => a.role?.startsWith(r)) && a.visible && !a.hidden && OnScreen(a.headPx)
       && !a.blockedBy && !a.coveredBy && (!group.minDistM || a.distM >= group.minDistM)).length;
     out.push(Range(`${group.roles.join("/")} in frame${group.minDistM ? ` beyond ${group.minDistM} m` : ""}`, seen, [group.count, null]));
+  }
+  // First-person palms (Dump hands.<side>.px): e.g. SB03's right hand in the mud at the lower right.
+  for (const [side, want] of Object.entries(judge.hands || {})) {
+    const h = dump.hands?.[side], px = h?.px?.front ? h.px : null;
+    if (want.pose) out.push({ label: `${side} hand pose`, ok: h?.pose === want.pose, value: h?.pose ?? null, range: [want.pose] });
+    if (want.x) out.push(Range(`${side} palm x`, px ? px.x : NaN, want.x));
+    if (want.y) out.push(Range(`${side} palm y`, px ? px.y : NaN, want.y));
+  }
+  // ijaB's rifle after the cut (DropGuardRifle): missing or not yet dropped fails.
+  if (judge.guardRifle) {
+    const gr = dump.guardRifle, px = gr?.px?.front ? gr.px : null;
+    if (!gr) out.push({ label: "ijaB's dropped rifle", ok: false, value: dump.flags?.guardRifleMissing ? "no weapon to drop" : "not dropped", range: null });
+    else {
+      if (judge.guardRifle.x) out.push(Range("ijaB's rifle x", px ? px.x : NaN, judge.guardRifle.x));
+      if (judge.guardRifle.y) out.push(Range("ijaB's rifle y", px ? px.y : NaN, judge.guardRifle.y));
+      if (judge.guardRifle.distM) out.push(Range("ijaB's rifle distance (m)", gr.distM, judge.guardRifle.distM));
+    }
   }
   if (judge.rifleHidden) out.push({ label: "mission rifle hidden", ok: !dump.rifle?.visible, value: dump.rifle?.visible ?? null, range: null });
   if (judge.rifle) {
@@ -369,6 +389,8 @@ function Dump({ warm, freeze, points }) {
   for (const [name, p] of Object.entries(points)) if (p.at) pointsOut[name] = Screen(new T.Vector3(p.at[0], g.battlefield.GroundHeight(p.at[0], p.at[2]) + p.at[1], p.at[2]));
   const view = r.bunkerRifle?.view;
   const rifle = view ? { x: R3(view.position.x), z: R3(view.position.z), yawDeg: D(view.rotation.y), visible: view.visible, px: Screen(view.position) } : null;
+  const dropped = s.guardRifle?.parent ? s.guardRifle.getWorldPosition(new T.Vector3()) : null;
+  const guardRifle = dropped ? { x: R3(dropped.x), z: R3(dropped.z), distM: R3(Math.hypot(dropped.x - cam.position.x, dropped.z - cam.position.z)), px: Screen(dropped) } : null;
   const hands = Object.fromEntries(Object.entries(s.firstPersonState?.hands || {}).map(([k, h]) => [k, { pose: h.pose, px: h.palm ? Screen(new T.Vector3(...h.palm)) : null }]));
   const op = r.opening;
   return {
@@ -380,7 +402,7 @@ function Dump({ warm, freeze, points }) {
     shot: window.__sbShots.lastShot, perception: s.perception ? { amount: R3(s.perception.amount), focus: R3(s.perception.focus) } : null,
     eyeClosure: op?.eyeClosure ?? null, bloodMask: s.bloodMask ?? null,
     flags: Object.fromEntries(Object.entries(s.flags).filter(([, v]) => typeof v === "number" || typeof v === "boolean").map(([k, v]) => [k, typeof v === "number" ? R3(v) : v])),
-    actors, rifle, hands, contextLost: !!g.renderer?.getContext?.()?.isContextLost?.(),
+    actors, rifle, guardRifle, hands, contextLost: !!g.renderer?.getContext?.()?.isContextLost?.(),
   };
 }
 /** Storyboard | engine at one height, drawn in a blank page (no Python needed); failed checks listed below. */

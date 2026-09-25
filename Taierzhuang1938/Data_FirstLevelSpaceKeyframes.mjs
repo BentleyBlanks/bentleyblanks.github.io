@@ -8,6 +8,10 @@
 // need = 至少几个高度通视；mustHide = 一个高度都不许通视。frameDeg = 全部目标（frame:false 除外）须落在这么宽的水平视角里。
 import { FRONT_SORTIE as S, FRONT_SPACE as SP, FRONT_TANK_PATH as TP, FrontTankIndex } from "./Data_FirstLevelFrontRoute.mjs";
 import { FRONT_GUARD_POSTS, FRONT_FLANK_GROUP } from "./Data_FirstLevelMissionFront.mjs";
+import { OPENING_STORYBOARDS as Storyboards } from "./Data_OpeningStoryboards.mjs";
+
+// Wave 1 of the 2026-09-25 storyboard round: the blocks K2 looks past (Data_OpeningStoryboards.wave1Allowances).
+const WAVE1_IGNORE = [Storyboards.wave1Allowances?.revetment].filter(Boolean);
 
 const W = (id) => TP[FrontTankIndex(id)];
 /** Type 89 (Chi-Ro) heights above ground, metres: hull roof, turret top, gun axis, hull MG, turret MG. */
@@ -38,22 +42,24 @@ export const SPACE_KEYFRAMES = Object.freeze([
     ] },
   // 2026-09-25 storyboard round (contract §2.6, SB05): 02's circle closes in the SSW leg's north mouth
   // (Data_OpeningStoryboards.shunzi.dragged); held up by the collar he looks south past ijaA's shoulder down the straight
-  // leg to Luo creeping up its west wall and He behind him. The eye sits in BunkerSouthRevetment until Set opens its east
-  // end (pendingWiring SB05): the rows ignore it.
+  // leg to Luo creeping up its west wall and He behind him. The eye sits in BunkerSouthRevetment until its east end is
+  // opened (pendingWiring SB04A/SB05): the rows ignore it through Data_OpeningStoryboards.wave1Allowances.revetment.
   { id: "K2", label: "02 past ijaA's shoulder down the SSW leg to the leader (SB05)", state: "BunkerCollapsed",
     camera: { x: 0.6, z: -123.9, eyeM: 0.75 }, look: { x: -3.1, z: -116.9, h: 1.0 },
     targets: [
-      { name: "Luo creeping up the SSW leg's west wall", at: { x: -3.1, z: -116.9 }, heights: Crouch, need: 2, ignore: ["BunkerSouthRevetment"] },
-      { name: "ijaB standing guard in the leg", at: { x: 0.04, z: -119.94 }, heights: Stand, need: 2, ignore: ["BunkerSouthRevetment"] },
+      { name: "Luo creeping up the SSW leg's west wall", at: { x: -3.1, z: -116.9 }, heights: Crouch, need: 2, ignore: WAVE1_IGNORE },
+      { name: "ijaB standing guard in the leg", at: { x: 0.04, z: -119.94 }, heights: Stand, need: 2, ignore: WAVE1_IGNORE },
     ] },
   // 02 hand-back seat (contract §2.9, SB06: Data_OpeningStoryboards.shunzi.cover) east of the mouth rubble: J is in view
-  // (its man is down by then, Liu's shot). F is to be masked by Set's reshaped rubble (pendingWiring SB06); until then
-  // the director holds the Japanese near the seat off for handbackHoldFireS at the hand-back. The old return spot behind
-  // the spoil (bunkerRear, both hidden) stays measured by Script_FirstLevelSpaceTest.
+  // (its man is down by then, Liu's shot) and so is F -- a known exposure, recorded here as a need row: from the seat F is
+  // 4.5° from J, and no seat within ±0.6 m hides F while J stays in view (09-25 grid probe), so no rubble can mask F alone.
+  // The hand-back hold-fire covers it (Data_OpeningStoryboards.rescue.handbackHoldFireS; Script_FirstLevelCampaignOpening
+  // asserts it). The old return spot behind the spoil (bunkerRear, both hidden) stays measured by Script_FirstLevelSpaceTest.
   { id: "K2b", label: "02 hand-back seat east of the mouth rubble (SB06)", state: "BunkerCollapsed",
     camera: { x: 2.4, z: -125.2, eyeM: 1.0 }, look: { ...SP.bunkerJunction, h: 1.2 },
     targets: [
       { name: "the junction J down the front trench", at: SP.bunkerJunction, heights: [1.6, 1.2], need: 2 },
+      { name: "the fold F beyond J (known exposure, covered by the hand-back hold-fire)", at: SP.bunkerFold, heights: [1.6, 1.2], need: 2 },
     ] },
   { id: "K3", label: "03 observation step: guards, gap, burning nest", state: "BunkerIntact", frameDeg: 80,
     camera: { x: SP.observation.x, z: SP.observation.z, eyeM: 1.6 }, look: { x: -7.3, z: -154.6, h: 1.0 },

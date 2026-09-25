@@ -279,7 +279,9 @@ assert.deepEqual([...C.phases.RearTrench],["Withdraw","Corner","Collection","Sup
   // into the SSW mouth -- Shunzi and ijaA backing leadM ahead of him -- keeps clear of the mouth's collapse blocks.
   {
     const Inside=(p,b,m)=>Math.abs(p.x-b.x)<b.w/2+m&&Math.abs(p.z-b.z)<b.d/2+m;
-    const solid=["BunkerMouthRubbleS","BunkerMouthSpoil","BunkerMouthPostS","BunkerMouthPostN"].map(Block);
+    // BunkerSouthRevetment counts too, unless wave 1 still lists it (Data_OpeningStoryboards.wave1Allowances.revetment).
+    const solid=["BunkerMouthRubbleS","BunkerMouthSpoil","BunkerMouthPostS","BunkerMouthPostN","BunkerSouthRevetment"]
+      .filter(id=>id!==C.wave1Allowances?.revetment).map(Block);
     const G=C.ija.dragAway,route=[C.shunzi.butt,...G.route,C.shunzi.dragged],last=route.length-1;
     const dx=route[last].x-route[last-1].x,dz=route[last].z-route[last-1].z,dl=Math.hypot(dx,dz);
     const lead=[...route,{x:route[last].x+dx/dl*G.leadM,z:route[last].z+dz/dl*G.leadM}];
@@ -309,7 +311,38 @@ assert.deepEqual([...C.phases.RearTrench],["Withdraw","Corner","Collection","Sup
   }
   // Storyboard shots and wave-1 stand-ins (contract §4.6).
   assert.ok(C.storyboardShots.length>=2&&C.storyboardShots.every(s=>/^SB0[1-9]/.test(s.id)&&(s.when||s.phase&&Number.isFinite(s.age))&&s.judge),"storyboard shots are well formed");
-  for(const e of C.pendingWiring)assert.ok(["shot","what","now","wave2"].every(k=>typeof e[k]==="string"&&e[k].length>3),"pendingWiring entry "+JSON.stringify(e));
+  for(const e of C.pendingWiring){
+    assert.ok(["shot","what","now","wave2"].every(k=>typeof e[k]==="string"&&e[k].length>3),"pendingWiring entry "+JSON.stringify(e));
+    assert.ok(C.storyboardShots.some(s=>s.id===e.shot||s.id.startsWith(e.shot+"_")),`pendingWiring names a storyboard shot (${e.shot})`);
+  }
+  // Contract §3/§7.2: after the wave-2 wiring (wave 2) the stand-in list is empty and no wave-1 allowance is left; before
+  // it, every allowance is backed by a listed stand-in.
+  {
+    const judged=C.storyboardShots.flatMap(s=>Object.entries(s.judge?.actors||{}).map(([role,w])=>({shot:s.id,role,w})));
+    const allowances=judged.filter(({w})=>w.behindOk||w.coverOk||w.headOptional);
+    assert.ok(C.wave===1||C.wave===2,`wave is 1 or 2 (${C.wave})`);
+    if(C.wave===2){
+      assert.deepEqual(C.pendingWiring,[],"wave 2: every stand-in is wired (pendingWiring empty)");
+      assert.ok(!C.wave1Allowances||Object.values(C.wave1Allowances).every(v=>v==null),"wave 2: no wave-1 allowance left");
+      assert.deepEqual(allowances.map(a=>a.shot+":"+a.role),[],"wave 2: no behindOk / coverOk / headOptional left in storyboardShots");
+    }else for(const a of allowances){
+      assert.ok(C.pendingWiring.some(e=>e.shot===a.shot.split("_")[0]),`wave 1: ${a.shot} ${a.role}'s allowance has a pendingWiring entry`);
+    }
+  }
+  // The butt strike (SB04): the data's strike time is the clip's, and the hand keys let go after it.
+  {
+    const strike=manifest.clips.IjaButtStrike.contacts.find(c=>c.action==="strike");
+    assert.ok(Math.abs(strike.t-C.ija.butt.strikeS)<1e-6,`ija.butt.strikeS is IjaButtStrike's strike contact (${strike.t})`);
+    const push=C.firstPerson.hands.beats.Butt.keys.filter(k=>k[2]==="push").at(-1)[0];
+    assert.ok(Math.abs(push-(C.ija.butt.strikeS+C.ija.butt.holdS))<1e-6,"beats.Butt pushes until the blow lands (strike + holdS)");
+  }
+  // The withdrawal routes back from the SB06 posts (Script_OpeningStoryboards Aftermath).
+  {
+    const W=C.withdraw,Same=(a,b)=>D(a,b)<1e-6;
+    assert.ok(Same(W.liuBackRoute[0],C.rescue.liuCoverRoute.at(-1)),"Liu's way back starts where his cover route ended");
+    assert.ok(W.liuBackRoute.slice(1).every((p,i)=>Same(p,W.lane[3+i])),"Liu's way back follows the lane from the crater step to RC");
+    assert.ok(W.heBackRoute.every((p,i)=>Same(p,W.lane[3+i]))&&Same(W.heBackRoute.at(-1),W.luoCover),"He's way back follows the lane to the first intact wall");
+  }
   assert.ok(D(C.rescue.rifleKicked,C.shunzi.cover)<Tune.interactionRangeM-1,"Luo's kick leaves the rifle within easy reach of the cover");
   // 02 (contract §2.6 / §2.9, SB05–SB06): the circle's marks, the rescuers' marks and the SB06 marks stand clear of the
   // mouth's collapse blocks (the floor strip at the SSW leg's mouth is x 0.4–0.8 between the west slope and the spoil).
@@ -323,7 +356,8 @@ assert.deepEqual([...C.phases.RearTrench],["Withdraw","Corner","Collection","Sup
     const head={x:track.parts.head[0],z:track.parts.head[2]},dist=Math.hypot(head.x,head.z),b=R.ijaAHoldBearingDeg*Deg;
     const approx={x:S.x+Math.sin(b)*dist,z:S.z+Math.cos(b)*dist},yaw=Math.atan2(approx.x-S.x,approx.z-S.z);
     const Rot=(y,x,z)=>({x:x*Math.cos(y)+z*Math.sin(y),z:-x*Math.sin(y)+z*Math.cos(y)}),o=Rot(yaw,head.x,head.z);
-    const ijaA={x:S.x-o.x,z:S.z-o.z,yaw};
+    const ijaA={x:S.x-o.x+Math.sin(b)*R.ijaAStandoffM,z:S.z-o.z+Math.cos(b)*R.ijaAStandoffM,yaw};
+    assert.ok(R.ijaAStandoffM>=0&&R.ijaAStandoffM<=.4,"SB05: ijaA's stand-off is a small correction of the clip's reach");
     const Stage=(stage,role,anchor)=>{const a=manifest.stages[stage].actors[role],d=Rot(anchor.yaw,a.x,a.z);return {x:anchor.x+d.x,z:anchor.z+d.z};};
     const heParry=Stage("chopParry","heyoutian",ijaA),luoChop=Stage("chopRear","luo",R.ijaBWatch);
     for(const [name,p,m] of [["ijaA's hold",ijaA,.05],["He's parry mark",heParry,.2],["Luo's chop mark",luoChop,.3],["ijaB's guard",R.ijaBGuard,.3],
@@ -348,8 +382,7 @@ assert.deepEqual([...C.phases.RearTrench],["Withdraw","Corner","Collection","Sup
     const {BACKDROP_SQUADS:Backdrop}=await import("./Data_FirstLevelBackdropSquads.mjs");
     const eye=Eye(S,R.circleShot.eyeM),rc=Backdrop.members.find(m=>m.rosterId==="BunkerBackdropNra0");
     for(const [name,p] of [["Luo",R.luoStart],["He",R.heStart],["Liu",R.liuStart],["the RC backdrop rifleman",rc]])
-      assert.ok([1.7,1.2].every(h=>Sight(eye,Eye(p,h),{state:"BunkerCollapsed",ignore:["BunkerSouthRevetment"]})),`SB05: ${name} waits out of the leg's picture (${p.x},${p.z})`);
-    assert.ok(["SB05","SB05A","SB06"].every(shot=>C.pendingWiring.some(e=>e.shot===shot)),"02's stand-ins are listed for wave 2");
+      assert.ok([1.7,1.2].every(h=>Sight(eye,Eye(p,h),{state:"BunkerCollapsed",ignore:[C.wave1Allowances?.revetment].filter(Boolean)})),`SB05: ${name} waits out of the leg's picture (${p.x},${p.z})`);
   }
   assert.ok(D(C.rescue.liuShot,Place.bunker.liuwencaiShot)<.01,"Liu Wencai shoots from the space's mark");
   for(const [name,route] of [["runner",C.banter.runnerRoute],["exit",C.banter.exitRoute],["walkIn",C.ija.walkIn],["found",C.ija.foundRoute],

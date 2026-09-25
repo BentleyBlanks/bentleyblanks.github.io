@@ -9,8 +9,24 @@ const H = (frame, p, f, n, c, extra = {}) => Object.freeze({ in: frame, p: Objec
 /** Hand keys of one phase: [t, leftPose, rightPose], eased with smoothstep; `clock` names a director flag. */
 const K = (...keys) => Object.freeze({ keys: Object.freeze(keys.map((k) => Object.freeze(k))) });
 const KC = (clock, ...keys) => Object.freeze({ clock, keys: Object.freeze(keys.map((k) => Object.freeze(k))) });
+// SB04 (contract §5): ijaA's butt strike. Wave 1 plays IjaButtStrike with its clip time held at raiseTopS for holdS (the
+// pause at the top, >= 0.4 s) before the blow; the blow lands at the clip's strike contact (strikeS: the manifest's
+// IjaButtStrike contacts[strike].t, Script_OpeningStoryboardsTest checks they agree) + holdS. The Butt hand keys and
+// the director's strike both read these, so a new holdS or a new clip moves them together.
+const BUTT = Object.freeze({ yawDeg:0, raiseTopS:.3, holdS:.45, strikeS:.42 });
+// Wave 1 (contract §3): BunkerSouthRevetment (Data_FirstLevelMissionLayout shell, x -2.8..0.8, z -123.95..-123.55,
+// 2.2 m) stands where 02's circle closes (shunzi.dragged) and across SB04A's drag. Until it is opened in the collapsed
+// state (pendingWiring SB04A/SB05, owner to be named by the integrator) the three places that must look past it name it
+// through this one constant: storyboardShots SB04A behindOk, Data_FirstLevelSpaceKeyframes K2 ignore and
+// Script_OpeningStoryboardsTest's sight/drag checks. Wave 2 sets wave1Allowances.revetment to null.
+const REVETMENT = "BunkerSouthRevetment";
 export const OPENING_STORYBOARDS = Object.freeze({
   version:"20260923OpeningStoryboardsV4", animationBase:"./Animation/OpeningStoryboards/",
+  // Contract §3/§7.2: wave 1 = each package alone (stand-ins listed in pendingWiring); wave 2 = wired. Set to 2 by the
+  // wave-2 wiring: Script_OpeningStoryboardsTest then requires pendingWiring empty and no wave-1 allowance left
+  // (wave1Allowances null, no behindOk / coverOk / headOptional in storyboardShots).
+  wave:1,
+  wave1Allowances:Object.freeze({ revetment:REVETMENT }),
   // 2026-09-23 action library (contract §5.4). Names are frozen; per-clip metadata (role,
   // contacts, stages, props, root motion, holdLoop, next) is in the manifest `clips`.
   clips:{
@@ -84,6 +100,9 @@ export const OPENING_STORYBOARDS = Object.freeze({
       poses:Object.freeze({
         rest:H("cam",[.18,-.46,-.15],[0,-.4,-1],[.25,.65,.1],[14,24,14]),
         flat:H("ground",[.17,.025,-.25],[.1,-.25,-1],[0,1,0],[12,20,12]),          // palm on the mud
+        // SB03 (contract §5 「右手摊在泥里在右下」): flat pushed forward and in, lifted off the mud so the lying eye
+        // (0.26 m, pitch +5) sees it in the lower right; on the mud itself a palm in reach is under the frame.
+        flatFwd:H("ground",[.13,.14,-.38],[.05,-.3,-1],[0,1,0],[12,20,12]),
         push:H("ground",[.2,.03,-.19],[.3,-.2,-1],[0,1,.1],[6,10,6]),              // pressing up, fingers spread
         clawIn:H("ground",[.13,.02,-.27],[0,-.3,-1],[0,1,0],[22,30,20]),           // 「手指在泥里抓出一道痕」
         clawOut:H("ground",[.14,.02,-.15],[0,-.45,-1],[0,1,0],[58,72,46]),
@@ -117,17 +136,18 @@ export const OPENING_STORYBOARDS = Object.freeze({
         // 「他试着撑起身体。背包带一下绷紧……又落回地面。手指在泥里抓出一道痕。」
         Wake:K([0,"limp","limp"],[1.05,"flat","flat"],[1.2,"push","push"],[1.8,"push","push"],[2,"flat","flat"],[2.2,"flat","clawIn"],[3,"flat","clawOut"]),
         FrontPass:K([0,"flat","clawOut"],[.6,"flat","flat"]),
-        CaptiveDragged:K([0,"flat","flat"]), CaptiveWall:K([0,"flat","flat"]), Interrogation:K([0,"flat","flat"]),
-        Slash:K([0,"flat","flat"]), Taunt:K([0,"flat","flat"]), Wipe:K([0,"flat","flat"]),
+        // SB03: the right hand slides forward into the lower right of the picture while he is dragged (flatFwd).
+        CaptiveDragged:K([0,"flat","flat"],[1.2,"flat","flatFwd"]), CaptiveWall:K([0,"flat","flatFwd"]), Interrogation:K([0,"flat","flatFwd"]),
+        Slash:K([0,"flat","flatFwd"]), Taunt:K([0,"flat","flatFwd"]), Wipe:K([0,"flat","flatFwd"]),
         // SB03A: the LEFT hand reaches for the rifle (the storyboard's arm comes in from the lower left).
-        Reach:K([0,"flat","flat"],[.6,"flat","flat"],[1.9,"reach","flat"],[2.05,"reach","push"],[2.35,"reach","flat"],[3.2,"reachCurl","flat"]),
+        Reach:K([0,"flat","flatFwd"],[.6,"flat","flat"],[1.9,"reach","flat"],[2.05,"reach","push"],[2.35,"reach","flat"],[3.2,"reachCurl","flat"]),
         Found:K([0,"reachCurl","flat"],[1.2,"flat","flat"]),
         // 「一只手本能地抓住勒紧的衣领，另一只手撑着泥地」 (on ijaA's hand while he pulls in place; at his own
         // collar once he walks off with it, where ijaA's grip is solved onto the same point); chest and knees on the mud.
         Drag:K([0,"grasp","push"]), Snag:K([0,"grasp","push"]), KickBeam:K([0,"grasp","push"]), DragOut:K([0,"collar","scrape"]),
-        // 「刚想撑起身体，枪托突然砸过来」 (the strike lands 0.42 s after buttAt).
-        // The blow lands at the clip's strike + ija.butt.holdS (the pause at the top): .42 + .45 s after buttAt.
-        Butt:KC("buttAt",[-1,"flat","flat"],[0,"push","push"],[.87,"push","push"],[1.05,"rest","rest"]),
+        // 「刚想撑起身体，枪托突然砸过来」: the blow lands BUTT.strikeS + BUTT.holdS after buttAt (after the pause at the
+        // top); the hands let go of the push 0.18 s later.
+        Butt:KC("buttAt",[-1,"flat","flat"],[0,"push","push"],[BUTT.strikeS+BUTT.holdS,"push","push"],[BUTT.strikeS+BUTT.holdS+.18,"rest","rest"]),
         Boots:K([0,"rest","rest"]),
         // 「日兵甲抓住他的前襟，把上身从泥里拽起来」: the left hand at his own collar until it is let go.
         Hold:K([0,"rest","rest"],[1,"collar","rest"]), Ask:K([0,"collar","rest"]), KickShunzi:K([0,"collar","rest"]),
@@ -199,7 +219,7 @@ export const OPENING_STORYBOARDS = Object.freeze({
     butt:P(2.3,-124.4),
     dragged:P(.6,-123.9),
     // SB06 (contract §2.9): the hand-back seat on the trench floor east of the mouth rubble, his back to it, facing east
-    // down the front trench (J in view: its man is down by then; F is to be masked by Set's reshaped rubble, pendingWiring).
+    // down the front trench (J in view: its man is down by then; F in view too -- see rescue.handbackHoldFireS).
     cover:P(2.4,-125.2,-94*Math.PI/180),
     lieCollarBackM:.16,                 // collar sits this far behind the lying eye
   }),
@@ -220,7 +240,9 @@ export const OPENING_STORYBOARDS = Object.freeze({
     incomingStepS:1.2,
     // SB02 mirrored (contract §2.2): the shell lands at fallStartS (FireShell flight); the eye drops to eyeM and turns
     // to yaw/pitch with the head rolled to the left by fallEndS; the eyes close at eyesCloseS; Black at phaseS.
-    blastShot:Object.freeze({ fallStartS:.22, fallEndS:.65, eyeM:.75, yawDeg:-66, pitchDeg:-14, rollDeg:17, eyesCloseS:.95, phaseS:1.0 }),
+    // pitchDeg -6 (contract -14, ±8): at -14 the lintel was above the frame and the north post's top half hung over the
+    // bank of the trench outside (09-25 review); at -6 post and lintel frame the mouth on the right (tmp/fix trials).
+    blastShot:Object.freeze({ fallStartS:.22, fallEndS:.65, eyeM:.75, yawDeg:-66, pitchDeg:-6, rollDeg:17, eyesCloseS:.95, phaseS:1.0 }),
     // The runner comes down the SSW leg, round the bend and in along the north wall to the inside of the north post.
     runnerRoute:Route([-1,-118.5],[1.2,-120.6],[3.0,-121.6],[3.3,-123.6],[2.2,-126.0],[.72,-127.0]),
     // Everyone who leaves after the order goes out of the mouth, down the SSW leg to RC and on west.
@@ -252,7 +274,7 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // round the east side (approach). The camera (buttShot) looks up past him at the north wall's timber door with
     // the dead comrade right of it. Wave 1 plays the existing IjaButtStrike (it stands straight) with its clip time
     // held at raiseTopS for holdS (the pause at the top, >= 0.4 s) before the blow (pendingWiring SB04).
-    butt:Object.freeze({ yawDeg:0, approach:Route([3.0,-124.55]), raiseTopS:.3, holdS:.45 }),
+    butt:Object.freeze({ ...BUTT, approach:Route([3.0,-124.55]) }),
     // pitchDeg 22 (contract ~30, ±8): at 30 the north rim sat mid-frame, half the picture sky (SB04 wants <= 40 %).
     buttShot:Object.freeze({ eyeM:.35, yawDeg:-18, pitchDeg:22, rollDeg:-4 }),
     // SB04A (contract §2.7, §5; Boots from 0.6 s after the blow): ijaA drags him by the forearm from shunzi.butt along
@@ -297,24 +319,34 @@ export const OPENING_STORYBOARDS = Object.freeze({
   rescue:Object.freeze({
     // SB05 / SB05A camera from shunzi.dragged (eye over the ground; the collar pulls him up to eyeM; chopEyeM once
     // ijaA lets go). yaw 184: the leg's vanishing point on the right third; the kick adds its 0.12 rad roll.
-    // yaw 180 (Survey B tried 184): ijaA, whose body is 0.5 m ahead, then fills the left and the leg shows on the right.
+    // yaw 184 (contract; it was 180 while ijaA stood 0.5 m ahead and filled the left): with ijaAStandoffM he is 0.8 m off
+    // and ijaB's head clears his shoulder on the right.
     // SB05A: at the cut the eye sinks to chopEyeM and slips chopAsideM west, turned to chopYawDeg, past ijaA's body.
     // Flee: after the duel the eye rises over the mouth rubble in line with the strip (fleeEye) to follow the interpreter.
-    circleShot:Object.freeze({ eyeM:.75, yawDeg:180, pitchDeg:3, chopEyeM:.62, chopDropS:.3, chopAsideM:.25, chopYawDeg:185,
+    circleShot:Object.freeze({ eyeM:.75, yawDeg:184, pitchDeg:3, chopEyeM:.62, chopDropS:.3, chopAsideM:.25, chopYawDeg:185,
       fleeEye:P(.65,-123.6), fleeEyeM:.85, fleeLookS:.5 }),
     // ijaA's IjaHoldCollarUp root is solved so the clip's player head track is at shunzi.dragged; the bearing (deg,
     // yaw convention from Shunzi) places him in the floor strip. The chopParry stage puts He 1.35 m behind his left:
     // at 5° that is the leg floor (0.5,-122.05); from 10° on it is inside BunkerMouthSpoil.
     ijaAHoldBearingDeg:5,
+    // SB05 (review 09-25): IjaHoldCollarUp's head track keeps Shunzi's head 0.5 m from ijaA's face, so his cap filled 20–85 %
+    // of the picture and covered ijaB (the storyboard has him ~0.7–0.9 m off). His root stands this much further out along
+    // the bearing, the eye keeps to the head track minus it (still pulled with him): 0.8 m, the head at x ~0.42, ijaB
+    // clear (tmp/fix trial T05_s30). He's chopParry mark moves with him (0.53,-121.75), still on the leg floor.
+    ijaAStandoffM:.3,
     interpreter:P(.97,-123.42,36*Math.PI/180),   // squatting side-on at the spoil's north-west corner (left edge)
     ijaBGuard:P(.04,-119.94,-8*Math.PI/180),      // standing in the leg 4 m off, rifle levelled at him (SB05)
     // The kick (「日兵乙不耐烦地朝顺子踢了一脚」): up the leg's west side to kickM from him on kickBearingDeg (clear of
     // ijaA), then back to ijaBWatch -- the chopRear stage's anchor, Luo then lands at (0.04,-120.42) on the floor.
     kickM:.62, kickBearingDeg:-35,
-    ijaBWatch:P(.31,-121.12,-.96),
+    // x 0.2 (contract 0.31): SB05's ijaB clears ijaA's cap and shoulder on the right (09-25 shots: at 0.31 his head sat
+    // behind ijaA's shoulder). Luo's chopRear mark moves with it.
+    ijaBWatch:P(.2,-121.12,-.96),
     // Where ijaB's rifle ends after the cut (IjaChoppedFallWall weaponLost): 1.4 m ahead, right of centre, stock toward
     // the eye (prop yaw: the muzzle along (-sin yaw, -cos yaw)).
-    ijaBRifleDrop:P(.55,-122.55,Math.PI-.4), ijaBRifleDropS:.35,
+    // x 0.2 (contract 0.55): the chop eye has slipped chopAsideM west and turned to chopYawDeg, so a rifle at x 0.55 lay
+    // left of centre; at x 0.2 it is right of centre, ~1.3 m off (contract SB05A 「画面中偏右下 ~1.4 m」).
+    ijaBRifleDrop:P(.2,-122.55,Math.PI-.4), ijaBRifleDropS:.35,
     // They wait out of the leg's picture (x <= -8 at z -112, behind the RC frame and the rear trench's wall) and set off when
     // the questioning starts (askAt; holdLineS at the latest): Luo creeps round RC and down the west wall, He heLagS
     // behind; Luo is at the SB05 mark (-3.1,-116.9) about when Shunzi looks up (Glimpse).
@@ -352,8 +384,13 @@ export const OPENING_STORYBOARDS = Object.freeze({
     kickFrom:P(.88,-126.15),
     rifleKickVia:P(2.2,-124.72),
     rifleKicked:P(3.2,-124.85,-.6),
-    // 「还权后 3 s 内玩家不掉血」: at the hand-back every live Japanese within holdFireM holds his fire this long
-    // (the AI's hesitation), so the player has control before anyone shoots at the seat.
+    // 「还权后 3 s 内玩家不掉血」 (contract §2.9). The seat looks east down the front trench and sees the fold F as well as J:
+    // from (2.4,-125.2) J is at -93.0° and F at -88.5°, and no seat within the contract's ±0.6 m hides F and keeps J
+    // (09-25 grid probe with Script_FirstLevelSpaceProbe.Sight, eye 0.72 and 1.0, 0.1 m grid over x 1.6-4.6, z -126.2..-123.6: 0 of 837 spots), so rubble cannot mask
+    // F without masking J. The exposure is kept and covered here: at the hand-back every live Japanese within
+    // handbackHoldFireM holds his fire this long (the AI's hesitation: no fire, no move); Script_FirstLevelCampaignOpening
+    // asserts every one of them was covered for at least 3 s and that nobody hit the player in those 3 s; K2b records F
+    // as seen.
     handbackHoldFireS:3.5, handbackHoldFireM:40,
     // Flee: how long the camera stays on the fleeing interpreter's back before DragCover (the clip is 1.6 s).
     fleeFollowS:2.3,
@@ -376,15 +413,18 @@ export const OPENING_STORYBOARDS = Object.freeze({
         inFrameAtLeast:[{ roles:["DepthNra"], count:2, minDistM:8 }], rifleHidden:true } }),
     // SB02: the near miss, mirrored (contract §2.2): tilted ≥ 12° head to the left, low, the north post and the
     // dugout's north wall on the left, the mouth and the blast on the right; the eyes still open.
+    // The post's base stands on the bank (0.23 m over the dugout floor): postNBase is 0.3 m over the ground at its south
+    // face, lintelN the lintel's underside near its north end (1.75 m over the floor).
     Object.freeze({ id:"SB02", storyboard:"Storyboard_02_NearMissBlast.png", phase:"Blast", age:.7,
-      judge:{ camera:{ eyeM:[.6,.95], pitchDeg:[-24,-4], rollDeg:[12,26], yawDeg:[-78,-54] }, eyeClosure:[0,.2],
-        points:{ mouthPostN:{ at:[1.05,1.2,-127.5], x:[.25,.6] } } } }),
+      judge:{ camera:{ eyeM:[.6,.95], pitchDeg:[-20,-2], rollDeg:[12,26], yawDeg:[-78,-54] }, eyeClosure:[0,.2],
+        points:{ postNBase:{ at:[1.05,.3,-127.33], x:[.3,.6], y:[.25,.75] }, lintelN:{ at:[1.05,1.75,-126.9], x:[.4,.8], y:[0,.3] } } } }),
     // SB03: the questioning seen from the mouth mud: the group left of centre with the north wall's door (Set's
     // trenchFacadeN, x 2.7–3.9) behind it, the trench's depth right, the rifle low left of centre out of reach.
     Object.freeze({ id:"SB03", storyboard:"Storyboard_03_ProneWitness.png", phase:"Interrogation", age:3,
       judge:{ camera:{ eyeM:[.2,.32], pitchDeg:[1,10], rollDeg:[1,8], yawDeg:[-88,-72] },
         actors:{ ijaA:{ x:[.25,.58] }, comrade:{ x:[.25,.58] }, interpreter:{ x:[.4,.75], distM:[3.5,5.5] }, ijaB:{ x:[.4,.8] } },
-        points:{ facadeDoor:{ at:[3.3,.9,-126.3], x:[.25,.6] } }, rifle:{ x:[.2,.55], y:[.62,1] } } }),
+        points:{ facadeDoor:{ at:[3.3,.9,-126.3], x:[.25,.6] } }, rifle:{ x:[.2,.55], y:[.62,1] },
+        hands:{ r:{ pose:"flatFwd", x:[.52,.8], y:[.65,.97] } } } }),
     // SB03A: the reach; ijaA turned round by the timber's noise right of centre, the dead comrade left of centre at
     // the wall, the interpreter and ijaB gone down the SSW leg, Japanese going away down the trench.
     Object.freeze({ id:"SB03A", storyboard:"Storyboard_03A_ReachRifle.png", phase:"Reach", age:3.1,
@@ -396,25 +436,28 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // may be above the frame (pendingWiring SB04 restores the head check).
     Object.freeze({ id:"SB04", storyboard:"Storyboard_04_Discovered.png",
       when:"s.phase==='Butt'&&s.flags.buttAt!=null&&r.time-s.flags.buttAt>=.55",
-      judge:{ camera:{ eyeM:[.28,.42], pitchDeg:[20,36], rollDeg:[-8,-1], yawDeg:[-28,-8] },
+      judge:{ camera:{ eyeM:[.28,.42], pitchDeg:[21.5,36], rollDeg:[-8,-1], yawDeg:[-28,-8] }, absent:["interpreter"],
         actors:{ ijaA:{ x:[.22,.5], distM:[.3,1], headOptional:true }, comrade:{ x:[.6,.98] } },
         points:{ facadeDoor:{ at:[3.3,.9,-126.3], x:[.4,.75] }, northRim:{ at:[3.3,0,-127.3], y:[0,.42] } } } }),
     // SB04A: dragged by the forearm into the SSW leg: ijaA's face close, the mouth's south post and rubble left, the
     // SSW leg with the interpreter and ijaB running up it right (contract §2.7).
     Object.freeze({ id:"SB04A", storyboard:"Storyboard_04A_DraggedIntoTrench.png", phase:"Boots", age:2.1,
-      judge:{ camera:{ eyeM:[.2,.4], rollDeg:[-12,-4] },
-        // behindOk: BunkerSouthRevetment still stands between the pocket and the leg (pendingWiring SB04A, Set);
+      // pitchDeg: the upright stand-in ijaA is only framed looking up 31–37° (the storyboard is near level, +5..+20 once
+      // IjaDragByForearm bends him over: pendingWiring SB04A).
+      judge:{ camera:{ eyeM:[.2,.4], rollDeg:[-12,-4], pitchDeg:[20,40] },
+        // behindOk: BunkerSouthRevetment still stands between the pocket and the leg (pendingWiring SB04A);
         // coverOk: the upright stand-in ijaA fills the low upward view over them (pendingWiring SB04A, Anim).
         actors:{ ijaA:{ x:[.3,.65], distM:[.4,1.1] },
-          interpreter:{ x:[.5,1], distM:[1.8,6.5], behindOk:"BunkerSouthRevetment", coverOk:"ijaA" },
-          ijaB:{ distM:[2,8], behindOk:"BunkerSouthRevetment", coverOk:"ijaA" } },
+          interpreter:{ x:[.5,1], distM:[1.8,6.5], behindOk:REVETMENT, coverOk:"ijaA" },
+          ijaB:{ distM:[2,8], behindOk:REVETMENT, coverOk:"ijaA" } },
         points:{ mouthPostS:{ at:[1.05,1.0,-124.3], x:[0,.4] } } } }),
     // SB05: Shunzi looks up (Glimpse): ijaA's face close on the left, the interpreter at the left edge, ijaB in the leg,
     // Luo creeping up the west wall about 8 m off on the right, the leg running straight away; light concussion.
     Object.freeze({ id:"SB05", storyboard:"Storyboard_05_Interrogation.png", phase:"Glimpse", age:1,
+      // ijaB at 2.4–3.4 m, not the contract's ~4 m: after the kick he steps back only to ijaBWatch (2.8 m), the chopRear
+      // anchor -- at his guard mark (4 m) Luo's chop mark (0.5 m north of him) would be between him and Shunzi.
       judge:{ camera:{ eyeM:[.62,.9], pitchDeg:[-5,10], yawDeg:[170,192] }, perception:[0,.62],
-        // coverOk: the baked head-down IjaHoldCollarUp brings ijaA's cap over ijaB (pendingWiring SB05, Anim).
-        actors:{ ijaA:{ x:[.28,.47], distM:[.3,1] }, interpreter:{ x:[0,.25] }, ijaB:{ x:[.5,.7], distM:[2.4,4.6], coverOk:"ijaA" },
+        actors:{ ijaA:{ x:[.3,.47], distM:[.6,1.05] }, interpreter:{ x:[0,.25] }, ijaB:{ x:[.48,.7], distM:[2.4,3.4] },
           luo:{ x:[.68,.88], distM:[6,9.6] } } } }),
     // SB05A: the cut (Chop 0.25–0.45 s): ijaA side-on at the left front, Luo cutting ijaB down right of centre 2.5–3.5 m,
     // He behind Luo.
@@ -422,6 +465,9 @@ export const OPENING_STORYBOARDS = Object.freeze({
       judge:{ camera:{ eyeM:[.5,.8], pitchDeg:[-5,10], yawDeg:[170,192] },
         actors:{ ijaA:{ x:[0,.48], distM:[.3,1.2] }, luo:{ x:[.52,.9], distM:[2.4,4] }, ijaB:{ x:[.5,.9], distM:[2,3.8] },
           heyoutian:{ x:[.52,1], distM:[2.4,6] } } } }),
+    // SB05A: ijaB's rifle has left his hands (DropGuardRifle, ijaBRifleDropS after the cut): in the mud right of centre, low.
+    Object.freeze({ id:"SB05A_Rifle", storyboard:"Storyboard_05A_Counterattack.png", when:"s.flags.guardRifleDropped!=null&&r.time-s.flags.guardRifleDropped>=.1",
+      judge:{ guardRifle:{ x:[.5,.8], y:[.6,1], distM:[1,1.6] } } }),
     // SB05A (contract §2.8): after the duel the camera follows the interpreter's back east down the front trench.
     Object.freeze({ id:"SB05A_Flee", storyboard:"Storyboard_05A_Counterattack.png", phase:"Flee", age:2,
       judge:{ actors:{ interpreter:{ x:[.2,.8], distM:[2,14] } } } }),
@@ -432,8 +478,9 @@ export const OPENING_STORYBOARDS = Object.freeze({
       judge:{ camera:{ eyeM:[.6,.85], pitchDeg:[-14,-2], yawDeg:[-104,-84] },
         // Wave 1: LuoKneelCheck kneels upright and He stands (pendingWiring SB06: LuoKneelReach leans in low, He kneels):
         // their heads may be above the frame.
+        // ijaD: 「J 处被击倒的日兵在正中远」 -- down on the trench floor, not standing (his pelvis near the ground).
         actors:{ luo:{ x:[0,.3], distM:[.6,1.3], headOptional:true }, liuwencai:{ x:[.55,.85], distM:[2.6,4.6] },
-          heyoutian:{ x:[.7,1], distM:[.8,2.2], headOptional:true } } } }),
+          heyoutian:{ x:[.7,1], distM:[.8,2.2], headOptional:true }, ijaD:{ x:[.35,.65], distM:[9,15], pelvisM:[null,.3], corpse:true } } } }),
     // SB06 after the kick: the rifle has stopped at his hand, centre-low, ~0.85 m off.
     Object.freeze({ id:"SB06_Kick", storyboard:"Storyboard_06_RifleReturned.png",
       when:"s.phase==='KickRifle'&&s.flags.kickRifleAt!=null&&r.time-s.flags.kickRifleAt>=1",
@@ -476,7 +523,7 @@ export const OPENING_STORYBOARDS = Object.freeze({
     {shot:"SB03", what:"blood-red corner vignette, shallow depth of field (near blur), mud specks on the lens",
       now:"the existing concussion blur/ghost only", wave2:"OpeningLens.Evaluate LOOKS for CaptiveDragged..Wipe into Perception().lens (Eye)"},
     {shot:"SB03", what:"right hand spread in the mud at the lower right (screen about 0.62, 0.75), arm reaching forward",
-      now:"flat hand keys (beats.CaptiveDragged..Wipe): the palms are just below the frame", wave2:"a forward prone palm pose from the Eye package in beats.CaptiveDragged..Wipe (Eye)"},
+      now:"flatFwd (the flat palm pushed forward and lifted 0.14 m off the mud so it is in the frame, storyboardShots SB03 hands.r) in beats.CaptiveDragged..Wipe", wave2:"Eye's sleeve/arm and legs with it (LEG_POSES.lieSide); if Eye adds a prone forward palm to EXTRA_HAND_POSES, use it in place of flatFwd and keep the SB03 hands.r check"},
     {shot:"SB03", what:"blood on the comrade's face",
       now:"none", wave2:"CharacterFacial.SetFaceBlood(comrade rig, ~0.8) from CaptiveDragged (Face)"},
     // SB03A (Reach -> Found)
@@ -501,7 +548,7 @@ export const OPENING_STORYBOARDS = Object.freeze({
       now:"nothing", wave2:"OpeningSet plankDebrisButt, trenchFacadeN (Set)"},
     // SB04A (Boots)
     {shot:"SB04A", what:"ijaA bent over, backing, dragging him by the right forearm, rifle low in the other hand",
-      now:"IjaHoldCollarUp held in its loop and carried backward on DragAway's lead (PhaseBoots); standing upright 0.65 m off he fills the low upward view and covers the interpreter's and ijaB's heads (the shot tool's people check, storyboardShots SB04A coverOk)", wave2:"IjaDragByForearm (Anim) in PhaseBoots, with its forearmR player track; then drop coverOk from storyboardShots SB04A (with behindOk once the revetment is open)"},
+      now:"IjaHoldCollarUp held in its loop and carried backward on DragAway's lead (PhaseBoots); standing upright 0.65 m off he fills the low upward view and covers the interpreter's and ijaB's heads (the shot tool's people check, storyboardShots SB04A coverOk)", wave2:"IjaDragByForearm (Anim) in PhaseBoots, with its forearmR player track; then drop coverOk from storyboardShots SB04A (with behindOk once the revetment is open), lower dragShot.maxPitchDeg and narrow SB04A's pitchDeg judge to about [5,20]. The fist in front of his chest in the wave-1 frame is ijaA's own collar grip (IjaHoldCollarUp), not Shunzi's hand (both first-person palms are below the frame, hands.*.px y 2.9)"},
     {shot:"SB04A", what:"the interpreter hurrying up the SSW leg with one arm out",
       now:"InterpreterPoint as upperBody on the run (PhaseBoots Hurry)", wave2:"InterpreterHurryReach (Anim)"},
     {shot:"SB04A", what:"Shunzi's hand holds ijaA's sleeve",
@@ -511,12 +558,12 @@ export const OPENING_STORYBOARDS = Object.freeze({
     {shot:"SB04A", what:"plank revetment and duckboards down the SSW leg",
       now:"bare earth", wave2:"OpeningSet revetmentSSW, duckboardsSSW (Set)"},
     {shot:"SB04A", what:"the SSW leg open from the dugout mouth's south pocket (the drag ends at shunzi.dragged (0.6,-123.9) and 02 looks down the leg from there)",
-      now:"BunkerSouthRevetment (x -2.8..0.8, z -123.95..-123.55, 2.2 m) walls the pocket off from the leg: shunzi.dragged lies inside it and ijaA backs through it; Survey B's SB05 trial saw through it from inside", wave2:"Set: in the collapsed state shorten BunkerSouthRevetment's east end to x <= 0 (or open it) so the pocket and the leg join; then add it to the drag clearance check in Script_OpeningStoryboardsTest and drop behindOk from storyboardShots SB04A (the shot tool's ray finds the interpreter's and ijaB's heads behind it at Boots 2.1 s)"},
+      now:"BunkerSouthRevetment (x -2.8..0.8, z -123.95..-123.55, 2.2 m) walls the pocket off from the leg: shunzi.dragged lies inside it and ijaA backs through it; Survey B's SB05 trial saw through it from inside", wave2:"needs an owner (not in contract §3/§4.5; integrator to decide, the Set package owns the layout's mouth blocks): in the collapsed state open BunkerSouthRevetment's east end (x <= 0) so the mouth pocket and the leg join -- moving the circle south out of it instead is blocked by BunkerMouthSpoil (the interpreter and ijaA have no floor left there). Then set wave1Allowances.revetment to null: that drops SB04A's behindOk, K2's ignore and the test's sight/drag exemptions in one place"},
     // SB05 (Hold .. Collar)
     {shot:"SB05", what:"02's eye in the SSW leg's north mouth looks out of BunkerSouthRevetment (the SB05/SB05A camera and DragCover's first 0.4 m are inside it; unseen from inside, the K2 probe ignores it)",
-      now:"shunzi.dragged (0.6,-123.9) as contract §2.6; Data_FirstLevelSpaceKeyframes K2 targets ignore BunkerSouthRevetment", wave2:"Set opens the revetment's east end (entry above); then drop K2's ignore"},
+      now:"shunzi.dragged (0.6,-123.9) as contract §2.6; wave1Allowances.revetment (K2 ignore, test sight/drag exemptions)", wave2:"the revetment's east end opened (entry above); wave1Allowances.revetment null"},
     {shot:"SB05", what:"ijaA holds the collar with his face up, leaning in, snarling at the eye",
-      now:"IjaHoldCollarUp as baked (head down under the cap) + the performance layer's head look at the camera (UpdatePerformances); 0.5 m from the eye his cap spans x 0.2-0.85 of SB05 and covers ijaB's head (storyboardShots SB05 coverOk)", wave2:"IjaHoldCollarUp re-baked with the head up (Anim, contract §4.1) and expression.snarl 1 Hold..Collar (Face); then drop coverOk from storyboardShots SB05. If ijaB is still covered, slide the Glimpse eye west: the 09-25 trial (--plan, eye (0.45,-123.85) yaw 188) cleared ijaB and kept Luo at x 0.79 but put ijaA's head at x 0.20 and hid the interpreter behind him, so about half that (0.08 m, yaw 185) is the next try"},
+      now:"IjaHoldCollarUp as baked (head down under the cap) + the performance layer's head look at the camera (UpdatePerformances), stood off rescue.ijaAStandoffM 0.3 m (0.8 m from the eye, his grip short of the collar, under the frame)", wave2:"IjaHoldCollarUp re-baked with the head up (Anim, contract §4.1) -- with its head track about 0.8 m out, so ijaAStandoffM goes back to 0 and the grip meets the collar -- and expression.snarl 1 Hold..Collar (Face)"},
     {shot:"SB05", what:"ijaB stands in the leg with the rifle levelled at the waist, pointed at Shunzi",
       now:"IjaReadyRifle held on its last frame (GuardHold)", wave2:"IjaGuardPort (Anim) in GuardHold, in ContactClips if it needs to be"},
     {shot:"SB05", what:"both hands at the bottom edge gripping ijaA's forearm at the collar",
@@ -537,8 +584,6 @@ export const OPENING_STORYBOARDS = Object.freeze({
       now:"standing at liuCover / heCover while the director poses them (the director's Move hands the native layer kneel:0; He's head may leave the frame, SB06 judge headOptional); kneeling (AI stance 1) from the hand-back", wave2:"the Anim-owned kneel hook for director poses (as SB01's Luo) for Liu and He from their arrival; drop He's headOptional"},
     {shot:"SB06", what:"his own legs and boots at the lower right; the left hand toward Luo, the right hand toward the rifle",
       now:"sit/brace/rifle hand keys (beats.Check/KickRifle), no legs", wave2:"LEG_POSES.sitCover and the swapped hands in beats.Check/KickRifle (Eye)"},
-    {shot:"SB06", what:"the hand-back seat hides the fold F (not J): K2b",
-      now:"F is in view of shunzi.cover; the Japanese near the seat hold their fire handbackHoldFireS at Released; K2b checks only that J is in view", wave2:"Set's reshaped mouth rubble masks F from shunzi.cover (contract §4.5); add F mustHide back to K2b and keep the hold-fire"},
     {shot:"SB06", what:"distant smoke columns and a fire down the trench",
       now:"clear", wave2:"Data_OpeningSet0103.SMOKE for stage 02 (Set)"},
   ].map(Object.freeze)),
@@ -553,6 +598,10 @@ export const OPENING_STORYBOARDS = Object.freeze({
     luoCover:P(-.6,-120.4),                // first intact wall past the low section, turned back to cover
     luoCorner:P(-7.2,-111.8),              // beyond RC, waiting for the player
     heBound:Route([-.2,-121.9],[-1.2,-118.2]),
+    // From their SB06 posts back over the crater step: He down to the first intact wall, Liu from the end of
+    // rescue.liuCoverRoute down the SSW leg to RC (the tail is lane[3..8]; Script_OpeningStoryboardsTest checks both).
+    heBackRoute:Route([3.3,-122.2],[3.1,-121.3],[1.4,-120.8],[-.6,-120.4]),
+    liuBackRoute:Route([4.3,-123.25],[3.3,-122.2],[3.1,-121.3],[1.4,-120.8],[-.6,-120.4],[-1,-118.5],[-4,-113]),
     liuBound:Route([-1,-121],[-5.3,-112.4]),   // the second bound is round the corner, off the look-back line up the leg
     pursuitBaseFaceTo:P(-.2,-122.2),
   }),
