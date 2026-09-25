@@ -1981,7 +1981,7 @@
    "next": [
     "IjaParriedChoppedFall"
    ],
-   "notes": "SB05A: frame 0 = IjaHoldCollarUp at its hold-loop start (0.8 s). A flinch (0.04 s), the fist opens off the collar (0.12 s) and head and shoulders snap round to his LEFT rear (= screen right from Shunzi, where Luo and He come from) by 0.3 s, eyes on a point 95 deg to his left at head height. Shunzi sinks (player collar and head drop 0.12 m). Last frame = IjaParriedChoppedFall frame 0 (same root, no blend).",
+   "notes": "SB05A: frame 0 = IjaHoldCollarUp at its hold-loop start (0.8 s). A flinch (0.04 s), the fist opens off the collar (0.12 s) and head and shoulders snap round to his LEFT rear (= screen right from Shunzi, where Luo and He come from) by 0.3 s, eyes on a point 95 deg to his left at head height. Shunzi sinks (player collar and head drop 0.12 m: the contract's 0.62 m eye); he flinches down with it (hips 0.07 m lower, so his head stays in the top of the SB05A frame). Look check: the face on the swinging look point while the aim is on (0-0.34 s); the keyed head then holds the turn to his left rear. Last frame = IjaParriedChoppedFall frame 0 (same root, no blend).",
    "rigs": [
     "LugouIja02"
    ]
@@ -2014,10 +2014,6 @@
    ],
    "events": [
     {
-     "t": 0.05,
-     "kind": "releaseCollar"
-    },
-    {
      "t": 0.792,
      "kind": "bloodSpray",
      "at": "neckSideL"
@@ -2032,7 +2028,7 @@
     "IjaHoldCollarUp"
    ],
    "next": [],
-   "notes": "Comes up spinning left and swinging the rifle off his shoulder at the man behind him; the muzzle is beaten aside, the cut drops him beside Shunzi. Last frame is the corpse. Frame 0 is IjaStartleTurn's last frame (collar already let go, head and shoulders turned to his left rear); from IjaHoldCollarUp it is a blend.",
+   "notes": "Comes up spinning left and swinging the rifle off his shoulder at the man behind him; the muzzle is beaten aside, the cut drops him beside Shunzi. Last frame is the corpse. Frame 0 is IjaStartleTurn's last frame (collar already let go -- IjaStartleTurn carries the releaseCollar event -- head and shoulders turned to his left rear, hips dropped); play it after IjaStartleTurn (from IjaHoldCollarUp directly it is a blend that turns the head ~60 deg in 0.12 s).",
    "rigs": [
     "LugouIja02"
    ]
@@ -2053,7 +2049,8 @@
     "IjaReadyRifle"
    ],
    "next": [
-    "IjaChoppedFallWall"
+    "IjaChoppedFallWall",
+    "IjaChoppedFallBack"
    ],
    "notes": "SB05 ijaB: stands square in the trench, rifle level at the waist (butt at the right hip, left hand on the handguard), muzzle a little down onto the captive 4 m ahead; breathing, the muzzle drifts 1-2 deg. The face is on a point 4 m ahead, 0.75 m up (look). Seamless 3 s loop.",
    "rigs": [
@@ -2133,17 +2130,17 @@
    "contacts": [
     {
      "t": 0.45,
-     "limb": "handL",
+     "limb": "handR",
      "action": "brace",
      "target": "post",
      "untilT": 3.0,
      "pointM": [
-      -0.484,
+      0.484,
       1.169,
       -0.311
      ],
      "postAxisM": [
-      -0.566,
+      0.566,
       0.0,
       -0.292
      ],
@@ -2170,7 +2167,7 @@
    "next": [
     "MessengerReport"
    ],
-   "notes": "SB01 (2026-09-25): at the dugout mouth, the left hand closes round the upright timber prop at shoulder height (0.45 s; contact pointM = the fist on the post, postAxisM = where the post stands, runtime metres in the actor frame: the director puts the root so postAxisM is on the north door post) and he leans in past it, shouting into the dugout (head on a point 2.4 m in, 0.73 m up). 0.75-3.0 s is a seamless hold loop with two shouts (1.25 / 2.30 s: the trunk pushes in, the free right hand swings up). Rifle slung across the back.",
+   "notes": "SB01 (2026-09-25): in the dugout mouth, the RIGHT hand closes round the north door post at shoulder height (0.45 s; contact pointM = the fist on the post, postAxisM = where the post stands, runtime metres in the actor frame: the director puts the root so postAxisM is on the north door post (1.05,-127.5) -- facing into the dugout that is root ~(1.24,-126.89), yawDeg ~80) and he leans in past it, shouting into the dugout (head on a point 2.4 m in, 0.73 m up, a little to his left). Mirrored from the storyboard's left hand (contract \u00a71.3: the storyboard side of the post is the north wall). 0.75-3.0 s is a seamless hold loop with two shouts (1.25 / 2.30 s: the trunk pushes in, the free left hand swings up). Rifle slung across the back.",
    "rigs": [
     "LugouNra02"
    ]
@@ -2330,7 +2327,7 @@
     "IjaReadyRifle"
    ],
    "next": [],
-   "notes": "SB05A (2026-09-25), alternative to IjaChoppedFallWall on the same stage and frames 0-0.50 s: aiming down at Shunzi when the blade lands; neck snaps away, the rifle drops forward into the mud in front of Shunzi, the front (left) foot shoots out and he sits down hard 0.2 m behind his root (0.92 s, event seatHit), the trunk thrown back, arms flung out, right knee up (the SB05A frame is 0.92-1.15 s); then he goes over onto his back, the right knee falling open. Last frame is the corpse on his back.",
+   "notes": "SB05A (2026-09-25), alternative to IjaChoppedFallWall on the same stage and frames 0-0.50 s: aiming down at Shunzi when the blade lands; neck snaps away, the rifle drops forward into the mud in front of Shunzi, the front (left) foot shoots out and he sits down hard 0.2 m behind his root (0.92 s, event seatHit), the trunk thrown back, arms flung out, right knee up (the SB05A frame is 0.92-1.15 s); then he goes over onto his back toward his left rear (turned 22 deg right about the pelvis: Luo stands at his right rear), the right knee falling open. Last frame is the corpse on his back.",
    "rigs": [
     "LugouIja01"
    ]
@@ -2636,7 +2633,7 @@
   {
    "id": "LugouNra02",
    "file": "Animation_LugouNra02OpeningStoryboards.json",
-   "sha256": "30f0e920fc55664bb98852bf34b311b58e91daa090bdafa52f5854d1b9e8903d",
+   "sha256": "1725a791c8d547f523300e665c3bfb108958291e703610f15daf7d91fdc25851",
    "originalModelSha256": "39c08ca82148e140ee2952caffdd0dee99750fb734038a5263d216c9a7345225",
    "clipIds": [
     "SupplyReceive",
@@ -4238,15 +4235,15 @@
      "floorCorrectionMax": -0.0,
      "root": {
       "start": [
-       -0.0183,
+       0.0183,
        0.0365,
        -0.0,
        0.8236
       ],
       "end": [
-       -0.0457,
+       0.0457,
        0.0914,
-       3.02,
+       -3.02,
        0.7962
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
@@ -4359,7 +4356,7 @@
   {
    "id": "LugouNra05",
    "file": "Animation_LugouNra05OpeningStoryboards.json",
-   "sha256": "fca24f35a920eeb8034b4fd7663e9ec2f15cae17225b37433fc92d914eb95496",
+   "sha256": "a2812b3e518f066b36fb561cc6abd818098b09dce9955b1aa06e9139f1fb2c3f",
    "originalModelSha256": "acbc9184da059bdf6c3c18d051f3eba77d1dd3acba469e8dbc876b092f174250",
    "clipIds": [
     "SupplyReceive",
@@ -5343,7 +5340,7 @@
   {
    "id": "LugouIja01",
    "file": "Animation_LugouIja01OpeningStoryboards.json",
-   "sha256": "4ebaf727d671ac1e881ebea1bf1fe85f5b75f522016745633c388fc2c0ffea02",
+   "sha256": "08ef8d4c8fdc0c3fc8272250798a94c474c43964d9dc2fcb750c4d6f99e4e55d",
    "originalModelSha256": "23fa4ef88891bd14d49dfb9a3e61b9f0dcaf45b8956a720aab24d9c4c23eb9c7",
    "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningStoryboards_20260925\\Scene_LugouIja01OpeningStoryboards.blend",
    "contactPoints": {
@@ -6411,13 +6408,13 @@
     {
      "clip": "IjaChoppedFallBack",
      "frames": 55,
-     "footSlideM": 0.0,
+     "footSlideM": 0.0065,
      "contactErrorM": 0.0,
      "gripSolveErrorM": 0.0,
-     "wallPenetrationM": 0.0,
-     "pelvisMaxStepM": 0.1028,
+     "wallPenetrationM": 0.0028,
+     "pelvisMaxStepM": 0.103,
      "floorCorrectionMin": -0.0,
-     "floorCorrectionMax": 0.11887,
+     "floorCorrectionMax": 0.11873,
      "root": {
       "start": [
        0.0438,
@@ -6426,10 +6423,10 @@
        0.7047
       ],
       "end": [
-       -0.0,
+       -0.0737,
        0.2488,
-       -9.18,
-       0.2016
+       -30.96,
+       0.2015
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
@@ -6483,7 +6480,7 @@
   {
    "id": "LugouIja02",
    "file": "Animation_LugouIja02OpeningStoryboards.json",
-   "sha256": "94cb6b6340817fd099dd3e658f74bbdba1cd50ab9e01544c3fb46e107477edb4",
+   "sha256": "632772afa313e08dedc2da27153e939c7688e2c6cc4f6763607de32f99710cc7",
    "originalModelSha256": "8c4860ec2d4dd3076b06ff7e593e5dcfd4d23aefe2fedf6f9fdec3b0e12cc9aa",
    "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningStoryboards_20260925\\Scene_LugouIja02OpeningStoryboards.blend",
    "contactPoints": {
@@ -7402,17 +7399,17 @@
      "clip": "IjaDrawBayonet",
      "frames": 21,
      "footSlideM": 0.0009,
-     "contactErrorM": 0.0219,
-     "gripSolveErrorM": 0.02188,
+     "contactErrorM": 0.0218,
+     "gripSolveErrorM": 0.02183,
      "pelvisMaxStepM": 0.0704,
      "floorCorrectionMin": -0.00026,
      "floorCorrectionMax": 0.00087,
      "root": {
       "start": [
        0.0247,
-       -0.1117,
+       -0.1118,
        -0.0,
-       0.7381
+       0.738
       ],
       "end": [
        0.0261,
@@ -7449,7 +7446,7 @@
      "floorCorrectionMax": 0.00186,
      "root": {
       "start": [
-       0.026,
+       0.0261,
        -0.1103,
        -0.0,
        0.7383
@@ -7497,7 +7494,7 @@
        0.0384,
        -0.2197,
        -0.0,
-       0.6863
+       0.6861
       ],
       "end": [
        -0.0,
@@ -7673,7 +7670,7 @@
        0.0474,
        -0.0597,
        -0.0,
-       0.6858
+       0.6855
       ],
       "end": [
        -0.0,
@@ -7882,10 +7879,10 @@
      "floorCorrectionMax": 0.00031,
      "root": {
       "start": [
-       0.019,
-       0.0051,
+       0.0197,
+       0.0035,
        -0.0,
-       0.2582
+       0.2568
       ],
       "end": [
        0.0237,
@@ -7931,9 +7928,9 @@
      "root": {
       "start": [
        0.0237,
-       -0.0106,
+       -0.0105,
        -0.0,
-       0.2485
+       0.2486
       ],
       "end": [
        -0.0,
@@ -8025,7 +8022,7 @@
        0.0464,
        -0.0603,
        -0.0,
-       0.6716
+       0.6714
       ],
       "end": [
        0.0,
@@ -8059,21 +8056,21 @@
      "footSlideM": 0.0014,
      "contactErrorM": 0.0,
      "gripSolveErrorM": 0.0,
-     "pelvisMaxStepM": 0.0806,
+     "pelvisMaxStepM": 0.0756,
      "floorCorrectionMin": -0.00199,
-     "floorCorrectionMax": -0.00049,
+     "floorCorrectionMax": -0.00039,
      "root": {
       "start": [
-       0.024,
-       0.0087,
+       0.0237,
+       0.0096,
        -0.0,
-       0.3339
+       0.3345
       ],
       "end": [
        -0.0,
        0.0913,
        8.77,
-       0.3692
+       0.3054
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
@@ -8091,7 +8088,9 @@
       ]
      ],
      "kneePlants": [],
-     "kneeSlideM": 0.0
+     "kneeSlideM": 0.0,
+     "lookErrorDeg": 7.16,
+     "headTurnDeg": 62.0
     },
     {
      "clip": "IjaParriedChoppedFall",
@@ -8099,7 +8098,7 @@
      "footSlideM": 0.0049,
      "contactErrorM": 0.0,
      "gripSolveErrorM": 0.0,
-     "pelvisMaxStepM": 0.1011,
+     "pelvisMaxStepM": 0.101,
      "floorCorrectionMin": -0.01697,
      "floorCorrectionMax": 0.14884,
      "root": {
@@ -8107,7 +8106,7 @@
        -0.0,
        0.0913,
        8.77,
-       0.3692
+       0.3054
       ],
       "end": [
        0.1643,
@@ -8179,7 +8178,7 @@
   {
    "id": "LugouIja03",
    "file": "Animation_LugouIja03OpeningStoryboards.json",
-   "sha256": "b779c2c2fb613f0fa72b6b0064ef5904b1a1d5fdf5fbd50ab595847441b0fcaf",
+   "sha256": "288f3d84c3a7fde4f48322a2e9f9dbd9136a97c73d1504c86e74d3c5fb2fcb6b",
    "originalModelSha256": "6d97c801f7ea62430e5397fde980ad0964ab5081fa5f15249434bce4cbf3f89d",
    "clipIds": [
     "SupplyReceive",
@@ -8334,6 +8333,19 @@
       -0.0
      ]
     },
+    "thighL": {
+     "bone": "Bip001 L Thigh",
+     "offset": [
+      20.30499,
+      5.70237,
+      -1.11266
+     ],
+     "normal": [
+      -0.0738,
+      0.9973,
+      -0.0
+     ]
+    },
     "neckSideR": {
      "bone": "Bip001 Spine2",
      "offset": [
@@ -8388,7 +8400,9 @@
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
      "finite": true,
-     "plants": []
+     "plants": [],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
     },
     {
      "clip": "ClipLoad",
@@ -8415,7 +8429,9 @@
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
      "finite": true,
-     "plants": []
+     "plants": [],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
     },
     {
      "clip": "MessengerReport",
@@ -8442,7 +8458,9 @@
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
      "finite": true,
-     "plants": []
+     "plants": [],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
     },
     {
      "clip": "DuckBlast",
@@ -8469,7 +8487,9 @@
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
      "finite": true,
-     "plants": []
+     "plants": [],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
     },
     {
      "clip": "WoundedReach",
@@ -8496,7 +8516,9 @@
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
      "finite": true,
-     "plants": []
+     "plants": [],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
     },
     {
      "clip": "CaptiveHeld",
@@ -8523,7 +8545,9 @@
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
      "finite": true,
-     "plants": []
+     "plants": [],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
     },
     {
      "clip": "CollarControl",
@@ -8550,7 +8574,9 @@
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
      "finite": true,
-     "plants": []
+     "plants": [],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
     },
     {
      "clip": "BayonetClearWood",
@@ -8577,7 +8603,9 @@
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
      "finite": true,
-     "plants": []
+     "plants": [],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
     },
     {
      "clip": "CollarDrag",
@@ -8604,7 +8632,9 @@
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
      "finite": true,
-     "plants": []
+     "plants": [],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
     },
     {
      "clip": "ButtThreat",
@@ -8631,7 +8661,9 @@
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
      "finite": true,
-     "plants": []
+     "plants": [],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
     },
     {
      "clip": "InterrogateCrouch",
@@ -8658,7 +8690,9 @@
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
      "finite": true,
-     "plants": []
+     "plants": [],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
     },
     {
      "clip": "InterpreterPoint",
@@ -8685,7 +8719,9 @@
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
      "finite": true,
-     "plants": []
+     "plants": [],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
     },
     {
      "clip": "CreepDadao",
@@ -8712,7 +8748,9 @@
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
      "finite": true,
-     "plants": []
+     "plants": [],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
     },
     {
      "clip": "DadaoAmbush",
@@ -8739,7 +8777,9 @@
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
      "finite": true,
-     "plants": []
+     "plants": [],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
     },
     {
      "clip": "RifleDeflect",
@@ -8766,7 +8806,9 @@
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
      "finite": true,
-     "plants": []
+     "plants": [],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
     },
     {
      "clip": "PullComrade",
@@ -8793,7 +8835,9 @@
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
      "finite": true,
-     "plants": []
+     "plants": [],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
     },
     {
      "clip": "KickRifle",
@@ -8820,7 +8864,9 @@
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
      "finite": true,
-     "plants": []
+     "plants": [],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
     },
     {
      "clip": "PointBlockade",
@@ -8847,7 +8893,9 @@
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
      "finite": true,
-     "plants": []
+     "plants": [],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
     },
     {
      "clip": "ShotCollapse",
@@ -8874,7 +8922,9 @@
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
      "finite": true,
-     "plants": []
+     "plants": [],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
     },
     {
      "clip": "GuardTurn",
@@ -8901,7 +8951,9 @@
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
      "finite": true,
-     "plants": []
+     "plants": [],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
     }
    ]
   }

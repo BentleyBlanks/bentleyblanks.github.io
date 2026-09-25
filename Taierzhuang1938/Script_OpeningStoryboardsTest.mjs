@@ -247,7 +247,9 @@ const SB0925=["IjaButtStrikeCollar","IjaDragByForearm","IjaLookBackLow","IjaStar
   // points at it (bake lookErrorDeg: face direction vs eye->target, while the aim is fully on) and the
   // head stays on the neck.
   for(const [rig,id,limit] of [["LugouIja02","IjaButtStrikeCollar",3],["LugouIja02","IjaDragByForearm",3],["LugouIja02","IjaHoldCollarUp",3],
-    ["LugouIja02","IjaLookBackLow",3],["LugouIja01","IjaGuardPort",3]]){
+    ["LugouIja02","IjaLookBackLow",3],["LugouIja01","IjaGuardPort",3],
+    // the startle snaps the head round in 0.3 s after a look point that swings as fast: the head trails it by up to ~7 deg
+    ["LugouIja02","IjaStartleTurn",10]]){
     const r=reportOf(rig,id);
     assert.ok(r.lookErrorDeg<=limit,`${rig}/${id}: the face misses its look point by ${r.lookErrorDeg} deg`);
     assert.ok(r.headTurnDeg<=70,`${rig}/${id}: head turned ${r.headTurnDeg} deg on the neck`);
@@ -269,6 +271,21 @@ const SB0925=["IjaButtStrikeCollar","IjaDragByForearm","IjaLookBackLow","IjaStar
   // SB05: Shunzi's eye 0.65-0.85 m up in the IjaHoldCollarUp hold (the contract's 0.75 m).
   const eye=ijaA.clips.IjaHoldCollarUp.player.parts.head,holdAt=Math.round(1.0*12)*3;
   assert.ok(eye[holdAt+1]>=.65&&eye[holdAt+1]<=.85,`IjaHoldCollarUp: eye ${eye[holdAt+1]} m up in the hold`);
+  // SB05A: IjaStartleTurn ends with the face turned to his left rear (where Luo and He come up: Shunzi's screen
+  // right), about level -- the head's rest face direction (glTF +z, the actor's forward; +x = his left) carried
+  // by the last frame -- and the flinch drops him (the head lower than in the hold it starts from).
+  {
+    const {json,parent,byName}=Glb("LugouIja02"),head=ijaA.bones.findIndex(n=>/ Head$/.test(n));
+    const RestQ=i=>{const q=json.nodes[i].rotation||[0,0,0,1];return parent[i]<0?q:QMul(RestQ(parent[i]),q);};
+    const r=RestQ(byName.get(ijaA.bones[head])),faceLocal=QRot([-r[0],-r[1],-r[2],r[3]],[0,0,1]);
+    const startle=manifest.clips.IjaStartleTurn,end=WorldPose("LugouIja02",ijaA,"IjaStartleTurn",startle.duration)[head];
+    const face=QRot(end.q,faceLocal),left=Math.atan2(face[0],face[2])*180/Math.PI,pitch=Math.asin(face[1]/Math.hypot(...face))*180/Math.PI;
+    assert.ok(left>=60&&left<=130&&Math.abs(pitch)<=20,`IjaStartleTurn: the face ends ${left.toFixed(0)} deg to his left, pitch ${pitch.toFixed(0)} deg`);
+    const start=WorldPose("LugouIja02",ijaA,"IjaStartleTurn",0)[head];
+    assert.ok(start.p[1]-end.p[1]>=.02,`IjaStartleTurn: the head drops ${((start.p[1]-end.p[1])*100).toFixed(1)} cm in the flinch`);
+    assert.ok(startle.events.some(e=>e.kind==="releaseCollar")&&!manifest.clips.IjaParriedChoppedFall.events.some(e=>e.kind==="releaseCollar"),
+      "releaseCollar is on IjaStartleTurn (IjaParriedChoppedFall frame 0 is already off the collar)");
+  }
   // IjaGuardPort is a seamless loop on ijaB's rig.
   assert.ok(ijaB.clips.IjaGuardPort.loop,"IjaGuardPort loops");
   // Same-root hand-overs frame to frame (world pose, every bone <= 2 deg and 1 cm; props <= 2 cm):
@@ -322,10 +339,20 @@ const SB0925=["IjaButtStrikeCollar","IjaDragByForearm","IjaLookBackLow","IjaStar
     chains++;
   }
   // SB01 runner: the fist on the post (pointM) sits just outside the post (postAxisM, postRadiusM), shoulder high.
+  // The RIGHT hand, the post at his front right (review 2026-09-25: with the storyboard's left hand the north door
+  // post puts him in the dugout's north wall; mirrored per contract §1.3).
   const post=manifest.clips.RunnerLeanPostCall.contacts.find(c=>c.target==="post");
   const gap=Math.hypot(post.pointM[0]-post.postAxisM[0],post.pointM[2]-post.postAxisM[2]);
-  assert.ok(post.limb==="handL"&&gap>=post.postRadiusM&&gap<=post.postRadiusM+.05&&post.pointM[1]>1.0&&post.pointM[1]<1.35,
+  assert.ok(post.limb==="handR"&&gap>=post.postRadiusM&&gap<=post.postRadiusM+.05&&post.pointM[1]>1.0&&post.pointM[1]<1.35,
     `RunnerLeanPostCall: fist ${gap.toFixed(3)} m from the post axis at ${post.pointM[1]} m`);
+  assert.ok(post.postAxisM[0]>.3&&post.postAxisM[2]<0,`RunnerLeanPostCall: the post at his front right (${post.postAxisM})`);
+  // Placed on the north door post (Data_FirstLevelMissionLayout BunkerMouthPostN) facing into the dugout (yaw 80 deg),
+  // the root stands in the mouth south of that post, outside the north wall line, within the contract's 0.6 m of its mark.
+  {
+    const yaw=80*Math.PI/180,[px,,pz]=post.postAxisM,wx=px*Math.cos(yaw)+pz*Math.sin(yaw),wz=-px*Math.sin(yaw)+pz*Math.cos(yaw);
+    const root={x:1.05-wx,z:-127.5-wz};
+    assert.ok(root.z>-127.5+.3&&Math.hypot(root.x-.72,root.z+127.0)<=.6,`RunnerLeanPostCall: root (${root.x.toFixed(2)},${root.z.toFixed(2)}) on the north door post`);
+  }
   assert.ok(manifest.clips.RunnerLeanPostCall.holdLoop[1]===manifest.clips.RunnerLeanPostCall.duration,"RunnerLeanPostCall: holds to the end");
   // SB04A interpreter: an upper-body clip (the runtime lays it on the native legs).
   assert.equal(manifest.clips.InterpreterHurryReach.upperBody,true,"InterpreterHurryReach: upper body");
