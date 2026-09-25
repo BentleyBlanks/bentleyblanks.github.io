@@ -119,7 +119,8 @@ collectionPointSeen（collection 14 m）—— 第一次看见担架、伤员与
 `Data_Tuning_FirstLevelFront.FRONT_BATTLE_TUNING`：
 
 - **罗班长领路**（`leaderLead`）：03 入口到阵位西门前最后一个弯（`FRONT_SORTIE.approach[11]`）之间，罗沿自己的路线保持在玩家前
-  3–5 m：差距小于 1.5 m 就跑（5.4 m/s，快过玩家冲刺 5.25），跑回 3 m 再走；超前 5 m 以上停下等（面向玩家）；刚过一个转角
+  3–5 m：差距小于 1.5 m 就跑（5.4 m/s，快过玩家冲刺 5.25；AI 蹲姿位移只有 0.6 倍，所以玩家站着时罗站起来跑，玩家蹲着时罗蹲着跑
+  3.24 m/s 仍快过蹲行 1.62，`runStandsWithPlayer`），跑回 3 m 再走；超前 5 m 以上停下等（面向玩家）；刚过一个转角
   （转角 > 35°）且玩家还在 3 m 以外时停在拐角、面向下一段、上半身 `PointBlockade` 指路。过了那个弯恢复旧规则
   （超前 3 m 且离玩家 10 m 以上才等）。纯规则 `LeadPace` / `LeadCorner`（`Script_FirstLevelFrontBattle`）。
 - **「贴这道墙！前头有人！」**（`FrontApproach`）改在 `approach[9]`=(7,−143.5) 周围 2.5 m 触发，玩家约在 (4.6,−143.3)；这一场

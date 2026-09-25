@@ -174,7 +174,11 @@ export class FirstLevelFrontBattle {
       if(projection.distance>B.arrivalM*.5)w.rejoin=MissionRoutePoint(segment,projection.progress);
     }
     actor.missionGuideWaiting=wait;r.squadMarch?.Release(actor);r.ai.ReleaseCover(actor);
-    r.ai.SetStance(actor,1,.5,true);r.MoveActor(actor,w.rejoin||w.route[w.index],wait?0:speed);
+    // Lead run (B.leaderLead.runStandsWithPlayer): the brain moves a crouched man at 0.6 x speed, so a crouched run is
+    // 3.24 m/s and a standing, sprinting player (5.25) still overtook him. He runs upright while the player is upright
+    // (and so no better hidden than he is); behind a crouched player (1.62 m/s) the crouched run is fast enough.
+    const upright=!wait&&!!pace&&pace.speed===B.leaderLead.runMps&&B.leaderLead.runStandsWithPlayer&&r.player.stance==="stand";
+    r.ai.SetStance(actor,upright?0:1,.5,true);r.MoveActor(actor,w.rejoin||w.route[w.index],wait?0:speed);
     actor.scriptArrivalRadius=Math.min(actor.scriptArrivalRadius,(w.rejoin?B.arrivalM*.25:Arrival())*.5);
     r.squadRoutes.set(actor.id,w.route.slice(w.index));
     if(wait&&!pace?.corner)r.leaderGuide?.Watch(actor);return false;

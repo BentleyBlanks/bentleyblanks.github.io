@@ -276,9 +276,11 @@ export const FRONT_BATTLE_TUNING=Object.freeze({
   //                       stops, faces the next leg and points along it (PointBlockade, upper body) until the player
   //                       is within minM.
   // runMps: the player's sprint is Data_Tuning_Player STANCE.stand.speed 3.05 x (1 + sprintBoost 0.72) = 5.25 m/s;
-  // 5.4 keeps a sprinting player from overtaking him. pointS: FrontApproach line 1 is 2.82 s long
-  // (Data_FirstLevelMissionVoiceAlignment), he points through it.
-  leaderLead:Object.freeze({minM:3,maxM:5,catchUpM:1.5,runMps:5.4,endApproachIndex:11,cornerTurnDeg:35,cornerNearM:1.6,pointS:2.8}),
+  // 5.4 keeps a sprinting player from overtaking him. The brain moves a crouched man at 0.6 x that (Script_Ai stanceMul:
+  // 3.24 m/s), so runStandsWithPlayer: while he runs and the player stands he runs upright (the player can only sprint
+  // standing, Script_Player canSprint); behind a crouched player (STANCE.crouch.speed 1.62) he stays crouched.
+  // pointS: FrontApproach line 1 is 2.82 s long (Data_FirstLevelMissionVoiceAlignment), he points through it.
+  leaderLead:Object.freeze({minM:3,maxM:5,catchUpM:1.5,runMps:5.4,runStandsWithPlayer:true,endApproachIndex:11,cornerTurnDeg:35,cornerNearM:1.6,pointS:2.8}),
   // First batch crossing (SB08): the batch goes as one column in the order nearest-to-the-last-cover first; a man leaves
   // (and keeps walking) once the man ahead of him is firstColumnSpacingM further along the shared withdrawal route, and
   // pauses when closer than firstColumnMinM. A man ahead who has not moved on for firstColumnStallS is passed. 2 m at

@@ -575,17 +575,22 @@ function WalkRuntime(extra = {}) {
   // The Walk option drives MoveActor with that pace, and only in the lead stretch (before approach[endApproachIndex]).
   const moves = [], r = { time: 0, squadRoutes: new Map(), player: { position: { x: 0, z: -141.6 } }, guards: [], flow: { stage: { id: "Support" } },
     Has: () => false, Record() {}, Near: () => false, Say() {}, RespondToGrenade: () => false, Defend() {},
-    MoveActor: (a, pt, speed) => moves.push(speed), ai: { ReleaseCover() {}, SetStance() {}, time: 0 }, leaderGuide: { Watch() {} } };
+    MoveActor: (a, pt, speed) => moves.push(speed), ai: { ReleaseCover() {}, SetStance: (a, s) => stances.push(s), time: 0 }, leaderGuide: { Watch() {} } };
+  const stances = [];
   const battle = new FirstLevelFrontBattle(r), luo = { id: 1, alive: true, position: { x: -3, z: -141.2 }, scriptArrivalRadius: 1 };
   battle.SetWalk(luo, S.approach.slice(7));
   battle.Walk(luo, { follow: true, lead: true }); assert.equal(moves.at(-1), L.runMps, "Luo behind the player at 03 runs past him");
+  assert.equal(stances.at(-1), 1, "... crouched behind a crouched player (0.6 x 5.4 = 3.24 m/s beats the crouched 1.62)");
+  r.player.stance = "stand"; battle.Walk(luo, { follow: true, lead: true });
+  assert.equal(stances.at(-1), 0, "... upright behind a standing player (a crouched run would lose to his 5.25 m/s sprint)");
+  r.player.stance = "crouch";
   luo.position = { x: 4, z: -142.1 }; battle.Walk(luo, { follow: true, lead: true }); assert.equal(moves.at(-1), R.squadSpeedMps, "4 m ahead: walks");
   luo.position = { x: 6.2, z: -142.9 }; battle.Walk(luo, { follow: true, lead: true }); assert.equal(moves.at(-1), 0, "6.4 m ahead: waits for the player");
   // 5.8 m ahead but 6 m away: the lead rule would hold him, the old one (wait only beyond leaderWaitM) lets him walk.
   luo.position = { x: 21, z: -148.5 }; r.player.position = { x: 16, z: -146 };
   battle.walks.get(luo.id).index = 5; battle.Walk(luo, { follow: true, lead: true });
   assert.ok(battle.lead === null && moves.at(-1) === R.squadSpeedMps, "past the last bend before the west door the old follow rule is back");
-  checks += 16;
+  checks += 18;
   Ok("⑧b SB07: FrontApproach at (5,-143), Luo keeps 3-5 m ahead (runs, walks, waits, holds at corners)");
 }
 {
