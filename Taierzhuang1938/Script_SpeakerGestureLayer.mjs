@@ -26,15 +26,19 @@ const DEG = Math.PI / 180;
 // World providers set by the mission runtime (one line): the live tank and the ground height. Without them a
 // tank line points the clip's own direction and ground anchors sit at the speaker's feet height.
 const world = { tank: null, ground: null };
-/** { tank: () => {x, z, y?} | null, ground: (x, z) => y } (either may be omitted). */
+/**
+ * { tank: () => {x, z, y?} | null, ground: (x, z) => y } (either may be omitted). The mission runtime sets both when
+ * it is built and calls SetSpeakerGestureWorld({}) in Dispose, so the closures do not keep a disposed level alive.
+ */
 export function SetSpeakerGestureWorld({ tank = null, ground = null } = {}) { world.tank = tank; world.ground = ground; }
 
+// Fetched once; a failed fetch is tried again by the next line that asks for a clip (a new line, not every frame).
 let loadStarted = false, loadError = null;
 function EnsureLoaded() {
-  if (loadStarted) return;
-  loadStarted = true;
+  if (loadStarted || typeof location === "undefined") return;
+  loadStarted = true; loadError = null;
   LoadSpeakerGestureClips().catch(error => {
-    loadError = String(error?.message || error);
+    loadError = String(error?.message || error); loadStarted = false;
     console.warn("[SpeakerGesture] clips not loaded, speakers keep the head layer only:", loadError);
   });
 }
@@ -50,7 +54,7 @@ export function SpeakerGestureTargetPoint(name, { root, lookAt } = {}, out = new
   if (m) {
     const point = m[2].split(".").reduce((o, k) => o?.[k], m[1] === "sortie" ? FRONT_SORTIE : FRONT_SPACE);
     if (!Number.isFinite(point?.x) || !Number.isFinite(point?.z)) return null;
-    return out.set(point.x, Ground(point.x, point.z, feet) + G.pointRiseM, point.z);
+    return out.set(point.x, Ground(point.x, point.z, feet) + (G.pointRiseByTarget?.[name] ?? G.pointRiseM), point.z);
   }
   if (spec === "south") return out.set(base.x, feet + G.pointRiseM, base.z + G.southM);
   if (spec === "listener") {
@@ -79,7 +83,7 @@ export function SpeakerGestureBusy(rig, state = {}, fireAge = Infinity) {
   if (state.meleeCombat || state.melee > 0) return "melee";
   if (state.throwing > 0 || rig.infantry?.IsThrowing?.()) return "throwing";
   if (state.carryRole) return "carrying";
-  if ((state.woundedWalk || 0) > .5) return "wounded";
+  if ((state.woundedWalk || 0) > G.maxWoundedWalk) return "wounded";
   if ((state.prone || 0) > G.maxProne) return "prone";
   if ((state.moveSpeed || 0) > G.maxMoveSpeed) return "moving";
   return null;
@@ -87,13 +91,15 @@ export function SpeakerGestureBusy(rig, state = {}, fireAge = Infinity) {
 
 const P = new Vector3(), P2 = new Vector3(), D = new Vector3(), S = new Vector3(), H = new Vector3(), AX = new Vector3();
 const Q = new Quaternion(), Q2 = new Quaternion(), WQ = new Quaternion(), PQ = new Quaternion(), ID = new Quaternion();
+const RO = new Vector3(), RA = new Vector3(), TW = new Vector3();
 
 // World position from a matrixWorld known to be fresh (getWorldPosition recomputes the whole parent chain each call;
-// AfterHead refreshes the arm once and TurnWorld keeps its subtree fresh).
+// AfterHead and AfterActorAim refresh the arm once from the clavicle and TurnWorld keeps the turned subtree fresh).
 const WP = (bone, out) => out.setFromMatrixPosition(bone.matrixWorld);
 const SCALE = new Vector3();
+/** Turn `bone` by a world rotation; reads the bone's and its parent's matrixWorld, which must be fresh (see WP). */
 function TurnWorld(bone, rotation) {
-  bone.getWorldQuaternion(WQ); bone.parent.getWorldQuaternion(PQ).invert();
+  bone.matrixWorld.decompose(TW, WQ, SCALE); bone.parent.matrixWorld.decompose(TW, PQ, SCALE); PQ.invert();
   bone.quaternion.copy(PQ.multiply(WQ.premultiply(rotation)));
   bone.updateMatrixWorld(true);
 }
@@ -113,11 +119,12 @@ export class SpeakerGestureLayer {
     this.bound = new Map();             // clip record -> rig bones
     this.held = { on: false, local: new Vector3(), socket: null };
     this.target = new Vector3();
+    this.aimDir = new Vector3();
     this.pending = null;                // { row, lineId } to start once the current gesture is released
     // Start fetching the clips when the first 01-06 speaker is bound (03 is minutes later); not in node tests.
     if (typeof location !== "undefined") EnsureLoaded();
     // Probe state (FRONT_ACTING, tests). lines[lineId] = { frames, gestureFrames, busyFrames, maxWeight, clip }.
-    this.state = { clip: null, lineId: null, weight: 0, t: 0, phase: null, aimError: null, clamped: false,
+    this.state = { clip: null, lineId: null, weight: 0, t: 0, phase: null, aimError: null, solveError: null, aimDir: null, clamped: false, alongLift: false,
       suppressed: null, hand: null, busyFor: 0 };
     this.lines = {};
     this.gestureFrames = 0;
@@ -170,7 +177,10 @@ export class SpeakerGestureLayer {
     const library = this.library;
     const modelId = this.rig.clipModelId || this.rig.modelId;
     const record = SpeakerGestureClip(modelId, row.gesture, library);
-    if (!record) return this._Refuse(library ? "noClip" : (loadError ? "loadFailed" : "loading"));
+    if (!record) {
+      if (!library) EnsureLoaded();       // a fetch that failed earlier is tried again here
+      return this._Refuse(library ? "noClip" : (loadError ? "loadFailed" : "loading"));
+    }
     const actor = this.rig.actor;
     const armed = !!(actor?.weaponGroup?.visible && actor?.weaponData?.kind !== "melee");
     // The rifle hangs on the right hand: a right-hand clip needs an empty right hand.
@@ -180,9 +190,14 @@ export class SpeakerGestureLayer {
       strokeDir: null, twoHanded: record.hand === "L" && armed && !!actor?.weaponTwoHanded };
     SpeakerGestureFirstFrame(record, g.q0);
     // A target far outside the arm's cone (behind him, or well round on the other side) is not pointed at: the arm
-    // would point somewhere else. The head layer still turns to the listener.
-    if (g.spec.aim && this._OutOfReachDeg(g) > G.maxOutOfConeDeg) return this._Refuse("targetOutOfReach");
-    if (g.spec.aim) g.strokeDir = this._StrokeDir(g);
+    // would point somewhere else. With a rifle up in the other hand the limit across the front is tighter: the arm
+    // clamped there and lifted over the barrel ends in front of the face. The head layer still turns to the listener.
+    if (g.spec.aim) {
+      const yaw = this._TargetYawDeg(g);
+      if (yaw != null && Math.max(0, yaw - G.coneOutDeg, -G.coneInDeg - yaw) > G.maxOutOfConeDeg) return this._Refuse("targetOutOfReach");
+      if (yaw != null && g.twoHanded && -G.coneInDeg - yaw > G.maxCrossOutDeg) return this._Refuse("targetAcrossRifle");
+      g.strokeDir = this._StrokeDir(g);
+    }
     this.active = g;
     this.busyFade = SpeakerGestureBusy(this.rig, state, this.fireAge) ? 0 : 1;
     this.state.suppressed = null;
@@ -191,14 +206,26 @@ export class SpeakerGestureLayer {
 
   _Refuse(reason) { this.state.suppressed = reason; return null; }
 
-  /** How far (degrees of yaw, seen from the body) the row's target lies outside the arm's cone; 0 inside or unknown. */
-  _OutOfReachDeg(g) {
+  /** The row's target seen from the body: degrees of yaw off his front, + toward the gesture hand's side (out), - across
+   * the chest (in); null when there is no target now. */
+  _TargetYawDeg(g) {
     const root = this.rig.actor?.root || this.rig.root;
     const target = SpeakerGestureTargetPoint(g.row.target, { root, lookAt: this.head?.lookAt }, this.target);
-    if (!target || !root) return 0;
+    if (!target || !root) return null;
     root.getWorldPosition(S); D.copy(target).sub(S).applyQuaternion(root.getWorldQuaternion(Q2).invert());
-    const yaw = Math.atan2(-D.x, -D.z) * (g.record.hand === "L" ? 1 : -1) / DEG;
-    return Math.max(0, yaw - G.coneOutDeg, -G.coneInDeg - yaw);
+    return Math.atan2(-D.x, -D.z) * (g.record.hand === "L" ? 1 : -1) / DEG;
+  }
+
+  /** The rifle held in the other hand as origin RO and barrel direction RA (world); false when there is none. Before
+   * the actor places it (`placed` false) an infantry clip's rifle prop helper is this frame's pose. */
+  _RifleLine(placed) {
+    const rig = this.rig, group = rig.actor?.weaponGroup;
+    if (!group?.isObject3D || !group.visible) return false;
+    const prop = !placed && (rig.infantryPropWeight || 0) > .5 ? rig.infantryProps?.rifle : null;
+    const rifle = prop?.isObject3D ? prop : group;
+    rifle.updateWorldMatrix(true, false);
+    WP(rifle, RO); RA.set(0, 0, -1).transformDirection(rifle.matrixWorld);
+    return true;
   }
 
   /** Clip weight: rises over [0, inS], 1 through the stroke and hold, falls over [outS, duration]. */
@@ -261,6 +288,8 @@ export class SpeakerGestureLayer {
       if (pending.lineId === lineId) {
         this.stressHigh = false;
         if (this._Start(pending.row, speech, state)) st.lineId = lineId;
+        // Clips still on the way (a cold start at 03): try again next frame while the line lasts, not drop it.
+        else if (st.suppressed === "loading") this.pending = pending;
       }
     }
     const counter = lineId ? (this.lines[lineId] ||= { frames: 0, gestureFrames: 0, busyFrames: 0, maxWeight: 0, clip: null }) : null;
@@ -302,7 +331,7 @@ export class SpeakerGestureLayer {
 
   _Pose(g, w, state) {
     const rig = this.rig, { list } = g.bones;
-    this.state.aimError = null; this.state.clamped = false;
+    this.state.aimError = null; this.state.solveError = null; this.state.aimDir = null; this.state.clamped = false; this.state.alongLift = false;
     // Rifle: remember the left grip in the right grip's frame before the left arm moves.
     if (g.twoHanded) {
       const left = rig.Grip?.("weaponL"), right = rig.Grip?.("weaponR");
@@ -329,7 +358,7 @@ export class SpeakerGestureLayer {
    */
   _Aim(g, w) {
     const rig = this.rig, { upper } = g.bones;
-    this.state.aimError = null; this.state.clamped = false;
+    this.state.aimError = null; this.state.solveError = null; this.state.aimDir = null; this.state.clamped = false; this.state.alongLift = false;
     if (g.strokeDir && upper?.parent && g.bones.clavicle?.parent) {
       const root = rig.actor?.root || rig.root;
       const target = SpeakerGestureTargetPoint(g.row.target, { root, lookAt: this.head?.lookAt }, this.target);
@@ -347,6 +376,15 @@ export class SpeakerGestureLayer {
           this.state.clamped = Math.abs(cy - yaw * side) > 1e-3 || Math.abs(cp - pitch) > 1e-3;
           if (g.twoHanded && yaw < 0) cp = Math.max(cp, G.crossLiftDeg * DEG * Math.min(1, -yaw / (G.coneInDeg * DEG)));
           const aimDir = P.set(-Math.sin(cy) * Math.cos(cp), Math.sin(cp), -Math.cos(cy) * Math.cos(cp)).applyQuaternion(Q2);
+          // Along the rifle held up in the other hand: raise the point off the barrel line (or lower it, when the
+          // target is below the barrel), so it does not read as a second man aiming.
+          if (g.twoHanded && this._RifleLine(false) && aimDir.angleTo(RA) < G.alongRifleDeg * DEG) {
+            const riflePitch = Math.asin(Clamp(RA.y, -1, 1));
+            cp = cp >= riflePitch ? Math.max(cp, riflePitch + G.alongLiftDeg * DEG) : Math.min(cp, riflePitch - G.alongLiftDeg * DEG);
+            cp = Clamp(cp, -G.coneDownDeg * DEG, G.coneUpDeg * DEG);
+            aimDir.set(-Math.sin(cy) * Math.cos(cp), Math.sin(cp), -Math.cos(cy) * Math.cos(cp)).applyQuaternion(Q2);
+            this.state.alongLift = true;
+          }
           g.bones.clavicle.parent.matrixWorld.decompose(P2, Q, SCALE);
           const stroke = H.copy(g.strokeDir).applyQuaternion(Q);
           Q.setFromUnitVectors(stroke, aimDir); ID.identity(); Q.slerp(ID, 1 - Clamp(w * G.aimStrength, 0, 1));
@@ -354,7 +392,7 @@ export class SpeakerGestureLayer {
           const hand = g.bones.hand;
           // From the stroke on, take out what is left: the clip's stroke direction was measured once on this body,
           // the hold pose and a crouch or kneel differ from it by up to ~15 deg (2026-09-25 browser test).
-          const settle = Clamp(w * G.aimStrength, 0, 1) * Smooth((g.t - g.spec.strokeS + .1) / .2);
+          const settle = Clamp(w * G.aimStrength, 0, 1) * Smooth((g.t - g.spec.strokeS + G.settleLeadS) / G.settleS);
           if (hand && settle > 0) {
             WP(hand, H); WP(upper, S); H.sub(S).normalize();
             Q.setFromUnitVectors(H, aimDir); ID.identity(); Q.slerp(ID, 1 - settle);
@@ -368,9 +406,13 @@ export class SpeakerGestureLayer {
             }
           }
           if (hand) {
+            // aimError: shoulder -> hand against the target; solveError: against the direction aimed at (the target
+            // moved into the cone and off the rifle line, see clamped / alongLift; aimDir, world).
             WP(hand, H); WP(upper, S);
-            D.copy(target).sub(S);
-            this.state.aimError = +(H.sub(S).angleTo(D) / DEG).toFixed(1);
+            D.copy(target).sub(S); H.sub(S);
+            this.state.aimError = +(H.angleTo(D) / DEG).toFixed(1);
+            this.state.solveError = +(H.angleTo(aimDir) / DEG).toFixed(1);
+            this.state.aimDir = this.aimDir.copy(aimDir);
           }
         }
       }
@@ -387,23 +429,19 @@ export class SpeakerGestureLayer {
    * aim IK then turns it again, and AfterActorAim clears against where it really ended (`placed`).
    */
   _ClearRifle(g, placed = false) {
-    const rig = this.rig, group = rig.actor?.weaponGroup, { upper, hand, roots } = g.bones;
-    if (!group?.isObject3D || !group.visible || !upper || !hand) return;
-    const prop = !placed && (rig.infantryPropWeight || 0) > .5 ? rig.infantryProps?.rifle : null;
-    const rifle = prop?.isObject3D ? prop : group;
-    rifle.updateWorldMatrix(true, false);
-    WP(rifle, P2); AX.set(0, 0, -1).transformDirection(rifle.matrixWorld);
+    const { upper, hand, roots } = g.bones;
+    if (!upper || !hand || !this._RifleLine(placed)) return;
     for (let pass = 0; pass < 2; pass++) {
       let near = Infinity, below = true;
       for (const bone of [hand, ...roots]) {
-        WP(bone, D).sub(P2);
-        const u = Clamp(D.dot(AX), -.35, .9);
-        S.copy(AX).multiplyScalar(u); const d = D.distanceTo(S);
-        if (d < near) { near = d; below = D.y >= S.y - .02; }
+        WP(bone, D).sub(RO);
+        const u = Clamp(D.dot(RA), -G.rifleBehindM, G.rifleAheadM);
+        S.copy(RA).multiplyScalar(u); const d = D.distanceTo(S);
+        if (d < near) { near = d; below = D.y >= S.y - G.rifleBelowM; }
       }
       if (!(near < G.rifleClearM)) return;
       WP(upper, S); WP(hand, H); H.sub(S);
-      const reach = Math.max(.2, H.length());
+      const reach = Math.max(G.rifleMinReachM, H.length());
       D.crossVectors(H.normalize(), P.set(0, 1, 0));
       if (D.lengthSq() < 1e-6) return;
       this._Mark(upper);
@@ -435,7 +473,7 @@ export class SpeakerGestureLayer {
       const s = g.spec, t = g.t, { upper, fore, hand, roots } = g.bones;
       const anchor = SpeakerGestureAnchor(this.rig.clipModelId || this.rig.modelId, s.reach);
       const head = this.rig.bones?.head;
-      const w = Math.min(Math.max(0, (t - s.inS) / Math.max(.01, s.strokeS - s.inS)), 1, Math.max(0, 1 - (t - s.outS) / .15))
+      const w = Math.min(Math.max(0, (t - s.inS) / Math.max(.01, s.strokeS - s.inS)), 1, Math.max(0, 1 - (t - s.outS) / G.reachFadeS))
         * this.busyFade * g.release;
       if (anchor && head && upper && fore && hand && w > 0) {
         for (const bone of [upper, fore, hand]) this._Mark(bone);

@@ -233,10 +233,14 @@ function RunLine(layer, rig, { lineId, who, lengthS, stressAt = [], seconds, bus
   assert.ok(after.length && after.every(r => r.weight === 0 && r.clip === null), "point: arm back after the line");
   layer.Apply(1 / 60, {});
   for (const [b, q] of rig.rest) assert.ok(b.quaternion.angleTo(q) < 1e-6, `restore: ${b.name} back on its base`);
-  // Aim: pointed at the nest (in the cone), shoulder -> hand within a few degrees of it at the hold.
+  // Aim: pointed at the nest (in the cone), shoulder -> hand within a few degrees of the aimed direction at the hold.
+  // The stub's rifle lies along his front, straight at the nest, so the point is raised off the barrel line
+  // (alongLift): off the nest itself by about alongLiftDeg, no more.
   const aimed = rows.filter(r => r.phase === "hold" && r.aimError !== null);
-  assert.ok(aimed.length && Math.min(...aimed.map(r => r.aimError)) < 4, `point: aim error ${Math.min(...aimed.map(r => r.aimError))} deg`);
+  assert.ok(aimed.length && Math.min(...aimed.map(r => r.solveError)) < 4, `point: solve error ${Math.min(...aimed.map(r => r.solveError))} deg`);
   assert.ok(aimed.every(r => !r.clamped), "point: the nest is inside the cone");
+  assert.ok(aimed.every(r => r.alongLift), "point: along the rifle, raised off the barrel line");
+  assert.ok(Math.min(...aimed.map(r => r.aimError)) < GT.alongLiftDeg + 4, `point: aim error ${Math.min(...aimed.map(r => r.aimError))} deg (lift ${GT.alongLiftDeg})`);
   assert.ok(layer.lines["FrontBlockade.02"].gestureFrames >= 40, "per-line gestureFrames");
   // Rifle: the held left grip keeps its place relative to the right grip (the spine lean moves both hands; the
   // rifle goes with the right hand, never with the gesturing left one).
@@ -303,6 +307,35 @@ function RunLine(layer, rig, { lineId, who, lengthS, stressAt = [], seconds, bus
   const layer4f = new SpeakerGestureLayer(behind, null);
   const away = RunLine(layer4f, behind, { lineId: "FrontBlockade.02", who: "luo", lengthS: 1.2, seconds: 1.3 });
   assert.ok(away.every(r => r.weight === 0) && away.some(r => r.suppressed === "targetOutOfReach"), "target behind: no point");
+  // The nest 75 deg to his right (across his front, the rifle's side): inside maxOutOfConeDeg, but with the rifle up
+  // in the right hand the clamped, lifted arm would end in front of his face (TankRoadContact.01 read as a salute):
+  // refused. Unarmed at the same angle he points (clamped to the cone's edge).
+  for (const armed of [true, false]) {
+    const across = StubRig("LugouNra05", { armed });
+    across.root.position.copy(rig.root.position); across.root.rotation.y = -Math.PI / 2 + 75 * Math.PI / 180;
+    across.root.updateMatrixWorld(true);
+    const layerAcross = new SpeakerGestureLayer(across, null);
+    const rowsAcross = RunLine(layerAcross, across, { lineId: "FrontBlockade.02", who: "luo", lengthS: 1.6, stressAt: [.4], seconds: 1.4 });
+    if (armed) assert.ok(rowsAcross.every(r => r.weight === 0) && rowsAcross.some(r => r.suppressed === "targetAcrossRifle"),
+      "rifle up, target far across the front: no point");
+    else assert.ok(rowsAcross.some(r => r.weight > .5 && r.clamped), "unarmed, same target: clamped point");
+  }
+  // Clips not loaded yet when the line starts: the gesture is not dropped, it starts once they are in (the line
+  // still being said).
+  ResetSpeakerGestureClips();
+  const cold = StubRig("LugouNra05", { armed: true });
+  cold.root.position.copy(rig.root.position); cold.root.rotation.y = -Math.PI / 2; cold.root.updateMatrixWorld(true);
+  const layerCold = new SpeakerGestureLayer(cold, null);
+  const early = RunLine(layerCold, cold, { lineId: "FrontBlockade.02", who: "luo", lengthS: 3, seconds: .2 });
+  assert.ok(early.every(r => r.weight === 0) && early.at(-1).suppressed === "loading", "clips loading: no gesture yet");
+  await LoadSpeakerGestureClips(read);
+  let late = 0;
+  for (let f = 0; f < 90; f++) {
+    cold.facial.lastSpeech = { active: true, who: "luo", lineId: "FrontBlockade.02", sourceTime: .2 + f / 60, stress: 0 };
+    layerCold.Apply(1 / 60, {}); layerCold.AfterHead();
+    if (layerCold.state.weight > .5) late++;
+  }
+  assert.ok(late > 20, `clips arrived mid-line: the gesture starts then (${late} frames up)`);
   // A line without a gesture row, and another speaker's line: nothing.
   const layer5 = new SpeakerGestureLayer(rig, null);
   assert.ok(RunLine(layer5, rig, { lineId: "FrontBlockade.03", who: "luo", lengthS: 1.2, seconds: 1.4 }).every(r => r.weight === 0));

@@ -44,7 +44,7 @@ export function LoadSpeakerGestureClips(read = FetchJson) {
     if (manifest.version !== A.version) throw Error(`Speaker gestures version ${manifest.version} != ${A.version}`);
     const models = new Map(await Promise.all(manifest.models.map(async row => [row.id, Prepare(await read(row.file), manifest.fps)])));
     return library = { manifest, models };
-  })();
+  })().catch(error => { pending = null; throw error; });   // a failed load can be tried again
 }
 
 /** The loaded library, or null before LoadSpeakerGestureClips resolved. */

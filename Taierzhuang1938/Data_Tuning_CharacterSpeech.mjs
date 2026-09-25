@@ -84,14 +84,38 @@ export const SPEAKER_GESTURE = Object.freeze({
   // 04 guard's ammunition house is behind his right shoulder: clamped, the arm pointed 90 deg away from it).
   aimStrength: 1, coneOutDeg: 100, coneInDeg: 40, crossLiftDeg: 15, coneUpDeg: 35, coneDownDeg: 30,
   maxOutOfConeDeg: 45,
+  // A man with a rifle up in the other hand whose target lies more than maxCrossOutDeg past the `in` edge (across
+  // his front, on the rifle's side) is not pointed at either (suppressed targetAcrossRifle): clamped to the edge and
+  // lifted over the barrel, He Youtian's point at the tank on his right (about 33 deg past the edge) ended as a hand
+  // in front of his cap brim and read as a salute (2026-09-25 review, TankRoadContact.01 close-up).
+  maxCrossOutDeg: 20,
+  // A point that would lie along the rifle held up in the other hand (within alongRifleDeg of the barrel) reads as
+  // a second man aiming (2026-09-25 review: the 06 runner's point south, the 05 keeper's point at the box): it is
+  // raised to at least alongLiftDeg so the arm goes up off the barrel line.
+  alongRifleDeg: 25, alongLiftDeg: 18,
+  // From the stroke on, the rest of the aim error is taken out over settleS, starting settleLeadS before the
+  // stroke, so the arm is on the target by the accent (2026-09-25 browser test: the hold pose differs from the
+  // measured stroke direction by up to ~15 deg on a crouch or kneel).
+  settleLeadS: .1, settleS: .2,
+  // A reach clip (the cigarette to the lips) lets go of the head anchor over reachFadeS after outS (the clip's own
+  // release then carries the arm down; shorter than the release so the hand leaves the lips first).
+  reachFadeS: .15,
   // The gesturing hand keeps rifleClearM (wrist or finger root to the barrel line) off the rifle held in the other
-  // hand, turning the arm up by at most rifleClearMaxDeg a pass (Script_SpeakerGestureLayer._ClearRifle).
-  rifleClearM: .07, rifleClearMaxDeg: 12,
+  // hand, turning the arm up by at most rifleClearMaxDeg a pass (Script_SpeakerGestureLayer._ClearRifle). The rifle
+  // is the segment rifleBehindM behind its grip (the stock) to rifleAheadM ahead (the muzzle of a HanYang/Type 24,
+  // ~.9 m from the grip); a hand less than rifleBelowM under the barrel line still counts as above it (turned up);
+  // the turn angle uses at least rifleMinReachM as the shoulder-to-hand distance (a folded arm must not spin).
+  rifleClearM: .07, rifleClearMaxDeg: 12, rifleBehindM: .35, rifleAheadM: .9, rifleBelowM: .02, rifleMinReachM: .2,
+  // A wounded walk above this weight is busy (the same threshold Script_Actor._ApplyRiggedAim uses).
+  maxWoundedWalk: .5,
   // Ground anchors are pointed at this high above the ground (a man-high point, not the dirt); the tank at
   // its hull; 'south' is southM due south at the speaker's ground height plus pointRiseM; 'listener' at the
   // listener's eye less listenerDropM (a hand is held out to the other man's chest, not his face: the seated 06
   // Zhou's offer to the standing player went up above his own head).
   pointRiseM: 1.0, tankRiseM: 1.6, southM: 30, listenerDropM: .45,
+  // Per-target rise over the ground instead of pointRiseM: the 05 ammunition box lies on the floor of the house,
+  // and a man-high point at it ran along the keeper's rifle (2026-09-25 review, BundleSupply.01).
+  pointRiseByTarget: Object.freeze({ ammoBox: .3 }),
 });
 
 // Who plays a speaking role when several bodies could (Script_FirstLevelSpeakerBinder).
