@@ -13,6 +13,7 @@
 //      也照样记 reliefInPosition；罗班长被枪座挡住 → 玩家在后墙岔口等够 rearLeaderGraceS 照样 rightRearReached；
 //      受保护的待撤守军身边不落手榴弹（任务侧投弹否决）
 //   ⑧ 近处说话人不在画面里：台词等他走进画面；太近就退开
+//   ⑩ 攻击支路过 AttackRuinA 东端留 ≥0.6 m；墙南侧死角里的人按最近路点走、先离开墙面（TankProbe5 卡死点）
 //   ⑨ 走路线的人（罗班长）在 FIRE 里被换位命令的 0.6 m 到位半径钉在路线拐点前 0.58 m（后门坡道）：Script_Ai.Act 用路线的半径
 //
 // 跑法：node Taierzhuang1938/Script_FirstLevelFrontPacingTest.mjs
@@ -29,7 +30,7 @@ import { DialoguePlayer } from "./Script_DialoguePlayer.mjs";
 import { FRONT_SORTIE as S, FRONT_SPACE as Space, FRONT_TANK_PATH } from "./Data_FirstLevelFrontRoute.mjs";
 import { FRONT_BATTLE_TUNING as B } from "./Data_Tuning_FirstLevelFront.mjs";
 import { MISSION_TUNING as R } from "./Data_FirstLevelMission.mjs";
-import { MISSION_ROUTES as Routes, MISSION_PLACEMENT as P } from "./Data_FirstLevelMissionLayout.mjs";
+import { MISSION_ROUTES as Routes, MISSION_PLACEMENT as P, MISSION_LAYOUT } from "./Data_FirstLevelMissionLayout.mjs";
 import { MISSION_DIALOGUE } from "./Data_FirstLevelMissionDialogue.mjs";
 import { MISSION_BATTLE_SOUND as Sound } from "./Data_FirstLevelMissionBattleSound.mjs";
 import { FIRST_LEVEL_MUSIC_COMBAT } from "./Data_FirstLevelMissionMusic.mjs";
@@ -698,6 +699,32 @@ function WalkRuntime(extra = {}) {
   assert.ok(ordinary > .5, `an ordinary soldier still stops on his own order's 0.6 m radius (left ${ordinary.toFixed(3)} m)`);
   checks += 3;
   Ok("⑨ a route walker in FIRE walks to his corner, not to the displace order's 0.6 m radius");
+}
+
+{
+  // ⑩ The attack branch past AttackRuinA's east end (2026-09-25 relay r2 Front step 2, TankProbe5: stuck for good at
+  // (41.67,-157.31) in the pocket south-west of the end, beside a warning-shell crater). The lane keeps >= 0.6 m off
+  // the wall box, and from any spot in that pocket the nearest route point (what CampaignFrontBattle's retreat and a
+  // rejoining walker aim at) is reached without the capsule crossing the wall box (0.34 m radius + 0.02 m skin).
+  const wall = MISSION_LAYOUT.blocks.find((b) => b.id === "AttackRuinA");
+  assert.ok(wall && !wall.ry, "AttackRuinA is an axis-aligned block");
+  const box = { minX: wall.x - wall.w / 2, maxX: wall.x + wall.w / 2, minZ: wall.z - wall.d / 2, maxZ: wall.z + wall.d / 2 };
+  const BoxDistance = (p) => Math.hypot(Math.max(box.minX - p.x, 0, p.x - box.maxX), Math.max(box.minZ - p.z, 0, p.z - box.maxZ));
+  const SegmentClear = (a, b) => { let min = Infinity; for (let i = 0; i <= 200; i++) { const t = i / 200; min = Math.min(min, BoxDistance({ x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t })); } return min; };
+  const lane = S.attackRoute, laneClear = Math.min(...lane.slice(1).map((p, i) => SegmentClear(lane[i], p)));
+  assert.ok(laneClear >= 0.6, `the attack branch clears AttackRuinA by >= 0.6 m (${laneClear.toFixed(2)} m)`);
+  const retreat = [...lane].reverse();
+  const Distance = (p, q) => Math.hypot(p.x - q.x, p.z - q.z);
+  for (const start of [{ x: 41.67, z: -157.31 }, { x: 41.0, z: -157.4 }, { x: 40.2, z: -157.3 }, { x: 41.5, z: -157.35 }, { x: 40.6, z: -157.6 }]) {
+    const nearest = retreat.reduce((best, p) => Distance(p, start) < Distance(best, start) ? p : best, retreat[0]);
+    // Leaving the face: the first 0.2 m of the walk must not get closer to the box than the start is.
+    const dir = { x: nearest.x - start.x, z: nearest.z - start.z }, len = Math.hypot(dir.x, dir.z);
+    const step = { x: start.x + dir.x / len * .2, z: start.z + dir.z / len * .2 };
+    assert.ok(BoxDistance(step) >= BoxDistance(start) - 1e-6 && SegmentClear(start, nearest) >= Math.min(BoxDistance(start), .36) - 1e-6,
+      `from the pocket (${start.x},${start.z}) the nearest route point (${nearest.x},${nearest.z}) leads away from AttackRuinA's south face`);
+  }
+  checks += 7;
+  Ok("⑩ the attack branch clears AttackRuinA's east end and a walker in the pocket south of it walks away from the face");
 }
 
 console.log(`FirstLevelFrontPacingTest 通过：${checks} 条断言`);

@@ -61,7 +61,13 @@ export const FRONT_SORTIE=Object.freeze({
   route:[Point(29.7,-141.5),Point(34,-136.4),Point(40.6,-130.6),Point(44.6,-125.6),Point(41.6,-120.8),Point(41.2,-118.6),
     Point(39.6,-117.4),Point(39.6,-114.2),Point(41.4,-112.6),Point(42.4,-111)],
   // 05 attack branch = the upper link sap the 01 Japanese came down: rear junction -> road-side ruin.
-  attackRoute:[Point(29.7,-141.5),Point(35,-142.5),Point(39.4,-144.2),Point(39.8,-150),Point(41.8,-154.8),Point(43.6,-159.6)],
+  // (42.9,-157.6) turns the last leg 0.35 m east where it passes AttackRuinA's east end (41.7,-156.6): the lane still
+  // clears the block by 0.62 m (was 0.60). A walker who ends up in the pocket south-west of that end (after a throw, a
+  // dodge, a shove) takes this point as his nearest one and walks away from the wall's south face. Aimed straight at
+  // (41.8,-154.8) he walked into the face, and with a crater tile under him he did not slide along it either
+  // (TankProbe5: a warning shell burst on the wall top, stuck at (41.67,-157.31) for good; a point on the line at
+  // (42.7,-157.2) still left 3 of 13 pocket starts stuck against the face; 2026-09-25 relay r2 Front step 2).
+  attackRoute:[Point(29.7,-141.5),Point(35,-142.5),Point(39.4,-144.2),Point(39.8,-150),Point(41.8,-154.8),Point(42.9,-157.6),Point(43.6,-159.6)],
   // The keeper kneels in the house where the west door (gap z -111.8..-110.2 at x 43) frames him from the whole
   // approach inside supplierRangeM, 2.6 m off the door-to-crate walk: he calls 「里头那个箱子！」 as the player comes up
   // and the player sees him say it (2026-09-25 relay r2 Front step 1). At (46.2,-106.4) the 0.6 m thick west wall
