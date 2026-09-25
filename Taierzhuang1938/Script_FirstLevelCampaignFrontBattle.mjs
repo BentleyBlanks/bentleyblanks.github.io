@@ -11,6 +11,8 @@ import { DriveBundleThrow } from "./Script_FirstLevelBundleThrowDriver.mjs";
 import { FRONT_BATTLE_TUNING as B } from "./Data_Tuning_FirstLevelFront.mjs";
 import { InstallSpeakerActing, CheckFrontActing } from "./Script_FirstLevelCampaignOpening.mjs";
 
+// --front-clear-from-door: see ClearNestFromDoor below (opt-in, not the gate default since the 09-25 review).
+const clearFromDoor=process.argv.includes("--front-clear-from-door");
 export async function DriveFrontBattle(ctx){
   const {page,output}=ctx,{Route,Interact,WaitStage,CaptureFocus}=CampaignActions(ctx);
   async function State(){return page.evaluate(()=>window.Tengxian.Debug.FirstLevelMission());}
@@ -143,11 +145,14 @@ export async function DriveFrontBattle(ctx){
     console.log("FRONT_STUCK",JSON.stringify(stuck).slice(0,3000));
     throw error;
   }
-  // Clear the nest from its door bend (FRONT_SORTIE.approach[-3]) before walking in, as a player does: fight from there
-  // until the approach defenders are down (the capture needs them dead anyway) or maxS runs out; a grenade dodge that
-  // carries the body more than 3 m off the bend walks back to it. 09-25 A/B (Front step 2): a run that dodged a grenade
-  // at the door rejoined straight onto the seat past a live RightEntryGuard and died in his bayonet fight (two runs,
-  // same trajectory to the digit); runs that walked in after the guards were down all lived.
+  // --front-clear-from-door (opt-in, not the gate's default): clear the nest from its door bend (FRONT_SORTIE.approach[-3])
+  // before walking in: fight from there until the approach defenders are down or maxS runs out; a grenade dodge that
+  // carries the body more than 3 m off the bend walks back to it.
+  // History: 09-25 Front step 2 made this the default after Luo's pointing hold (then scriptedNoncombatant) put 03 on a
+  // branch where a run that dodged a grenade at the door walked straight onto the seat past a live RightEntryGuard and
+  // died in his bayonet fight. The 09-25 review: that hid a game change behind a driver change, and the gate no longer
+  // covered a player who dodges and goes straight to the seat. The hold now only lowers his rifle (FrontBattle.PointQuiet)
+  // and the default drive is back to walking straight in (with the west-door way round when an evade stalls it).
   async function ClearNestFromDoor(maxS=45){
     const bend=S.approach.at(-3),ids=MISSION_ENCOUNTERS.approach.map(e=>e.id);
     let state;
@@ -182,7 +187,7 @@ export async function DriveFrontBattle(ctx){
     console.log("RightNestApproach: stalled after an evade, going round through the west door");
     await Route(S.approach.slice(-3,-2),"RightNestApproachViaDoor",{stance:"crouch",fight:true,crawl:true,recoverAfterEvade:true});
   });
-  await ClearNestFromDoor();
+  if(clearFromDoor)await ClearNestFromDoor();
   await Route(S.approach.slice(-2),"RightNestEntry",{stance:"crouch",fight:true,crawl:true,recoverAfterEvade:true}).catch(async error=>{
     if(!/actual body reached route end/.test(error?.message||""))throw error;
     console.log("RightNestEntry: stalled after an evade, going round through the west door");
