@@ -197,7 +197,7 @@ export async function DriveFrontBattle(ctx){
     // Where 03's game time goes (CAMPAIGN_03_DRIVER.seconds): every stepped frame is booked to the driver's mode, or to
     // "close" while a man at arm's length holds it (the route waits), plus the frames spent stepping in (⑤) and
     // swapping weapons at arm's length. Bookkeeping only: nothing reads it back.
-    D.modeFrames={};D.legFrames={};D.closingFrames=0;D.closeSwaps=0;
+    D.modeFrames={};D.legFrames={};D.closingFrames=0;D.closeSwaps=0;D.blockedLineFrames=0;
     if(!g.__campaignStepBooked){g.__campaignStepBooked=true;const step=g.StepFrames.bind(g);
       g.StepFrames=(n,...rest)=>{const M=window.MissionInputDriver;
         if(M?.modeFrames&&Number.isFinite(n)){

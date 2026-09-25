@@ -224,7 +224,9 @@ export async function InstallInputDriver(ctx) {
             //      装填不再被拔刀打断（拔刀会取消装填、弹仓退回空的）。09-25 R_c01_2 就是这样被连捅四刀。
             //   ④ 近身的人 8 s 里双方都没掉血（在跟罗班长拼刺刀、隔着墙角够不着）又没盯上玩家：先交给别人，
             //      6 s 内不再当近身威胁，路线照走（09-25 V_c01_1 被 2.3 m 外跟罗班长对刺的 RightLinkGuard 拖住整段）；
-            //   ⑤ 拿着大刀、人在 2.3–3 m（砍不到又不走）：往前迈一步贴上去再砍。
+            //   ⑤ 拿着大刀、人在 2.3–3 m（砍不到又不走）：往前迈一步贴上去再砍（只在大刀已在手、不在装填时）；
+            //   ⑥ 近身的人隔着矮墙：胸口那条线被墙挡住就瞄头，头也挡住就不开枪、按 ③ 后退（09-25 ABon_1 把 63 发全打进墙里）；
+            //   ⑦ 近身、大刀在手还能用、只是还没转正：拿着大刀继续转，不再收刀换枪（ABon_1 一场 51 次换武器）。
             //   关掉时（reflexes=false）每条路径与改之前一字不差。
             reflexes: false, closeResponses: 0, escapes: 0, evadeReturns: 0, closeFoe: null, returning: null,
             CloseThreat() {
@@ -390,6 +392,18 @@ export async function InstallInputDriver(ctx) {
               const eye = g.player.EyePosition,
                 to = foe.position.clone();
               to.y += foe.missionId===this.priorityTarget ? 1.2 : foe.stance === 2 ? 0.3 : foe.stance === 1 ? 0.85 : 1.2;
+              // ⑥ A man at arm's length is fought whether a ray sees him or not (①), so he can be behind a low wall,
+              // stabbing over it: aim at his head when the chest line hits the wall, and when neither line is clear hold
+              // fire and back off (③) instead of emptying the rifle into the wall (09-25 Gate ABon_1: every round of 63
+              // into the right nest's low west wall at FrontFlankB 2 m away, bayoneted three times with an empty rifle).
+              let lineBlocked=false;
+              if(this.reflexes&&foe.position.distanceTo(g.player.position)<3){
+                const Clear=(point)=>{const ray=point.clone().sub(eye),length=ray.length(),hit=g.battlefield.Raycast(eye,ray.normalize(),length,{terrain:true});
+                  return !hit||hit.t>=length-.25;};
+                if(!Clear(to)){const head=foe.position.clone();head.y+=foe.stance===2?.35:foe.stance===1?1.1:1.5;
+                  if(Clear(head))to.copy(head);else lineBlocked=true;}
+                if(lineBlocked)this.blockedLineFrames=(this.blockedLineFrames||0)+1;
+              }
               const dx = to.x - eye.x,
                 dz = to.z - eye.z,
                 yaw = Math.atan2(-dx, -dz),
@@ -438,18 +452,27 @@ export async function InstallInputDriver(ctx) {
                 if(closing||this.closing){g.Debug.Key("KeyW",closing);this.closing=closing;}
                 return;
               }
+              // ⑦ Still turning onto a man at arm's length with the Dadao out and usable: keep it in hand and turn. The
+              // path below puts the rifle back (Digit1) whenever he steps out of the 0.2 rad cone and the branch above
+              // draws the Dadao again once facing him (09-25 Gate ABon_1: 51 swaps in one 03 fight).
+              if(this.reflexes&&distance<3&&Math.abs(gap)>=.2&&g.state.activeSlot==="melee"&&!((this.obstructed.get(foe.id)||0)>g.ai.time)&&!reloading){
+                Did("turn");g.Debug.Mouse(2,false);
+                if(this.closing){g.Debug.Key("KeyW",false);this.closing=false;}
+                if(this.backingOff){g.Debug.Key("KeyS",false);this.backingOff=false;}
+                return;
+              }
               Did(Math.abs(gap)<.06?"rifle":"turn");
               if(this.closing){g.Debug.Key("KeyW",false);this.closing=false;}
               // ③ Nothing to answer a man at arm's length with (the Dadao caught by the scenery, the rifle empty or
               // reloading): back-pedal out of his bayonet reach, still facing him, while it reloads, instead of standing in
               // it (09-25 R_c01_2: FrontFlankB stabbed four times at 2 m while the bot stood reloading in the nest).
-              const backOff=this.reflexes&&distance<3&&(g.state.ammo===0||reloading);
+              const backOff=this.reflexes&&distance<3&&(g.state.ammo===0||reloading||lineBlocked);
               if(backOff!==!!this.backingOff){g.Debug.Key("KeyS",backOff);this.backingOff=backOff;}
               if(backOff)this.backOffFrames=(this.backOffFrames||0)+1;
               if(g.state.activeSlot!=="primary"){if(this.reflexes&&distance<3)this.closeSwaps=(this.closeSwaps||0)+1;g.Debug.Key("Digit1");return;}
               g.Debug.Mouse(2, true);
               if (g.state.ammo === 0) g.Debug.Key("KeyR");
-              else if (Math.abs(gap) < 0.06) g.Debug.Mouse(0, true);
+              else if (Math.abs(gap) < 0.06 && !lineBlocked) g.Debug.Mouse(0, true);
             },
           };
   });
@@ -587,7 +610,7 @@ export async function Report03Damage(ctx) {
   const driver = await ctx.page.evaluate(() => { const D = window.MissionInputDriver || {};
     return { reflexes: !!D.reflexes, closeResponses: D.closeResponses || 0, escapes: D.escapes || 0, evadeReturns: D.evadeReturns || 0,
       meleeResponses: D.meleeResponses || 0, evadeFrames: D.evadeFrames || 0, backOffFrames: D.backOffFrames || 0, closeStandoffs: D.closeStandoffs || 0,
-      closingFrames: D.closingFrames || 0, closeSwaps: D.closeSwaps || 0,
+      closingFrames: D.closingFrames || 0, closeSwaps: D.closeSwaps || 0, blockedLineFrames: D.blockedLineFrames || 0,
       seconds: Object.fromEntries(Object.entries(D.modeFrames || {}).map(([k, v]) => [k, +(v / 60).toFixed(1)])),
       legs: Object.fromEntries(Object.entries(D.legFrames || {}).map(([k, v]) => [k, +(v / 60).toFixed(1)])) }; }).catch(() => null);
   console.log("CAMPAIGN_03_DRIVER", JSON.stringify(driver));
