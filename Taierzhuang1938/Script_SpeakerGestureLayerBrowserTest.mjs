@@ -80,11 +80,12 @@ try{
     };
     P.Face=soldier=>{const eye=g.player.EyePosition.clone(),c=P.Chest(soldier).sub(eye);
       g.player.yaw=Math.atan2(-c.x,-c.z);g.player.pitch=Math.atan2(c.y,Math.hypot(c.x,c.z));};
-    // Close-up: the production post chain from a camera about 2 m off the chest on the gesturing hand's side, the
-    // first of a few directions with a clear line of sight.
+    // Close-up: the production post chain from a camera about 2 m off the chest on the gesturing hand's side (about
+    // 70 deg round from his front first, so a point toward his front is seen side-on), the first of a few
+    // directions with a clear line of sight.
     P.CloseCamera=(soldier,hand)=>{
       const root=soldier.actor.root,f=new T.Vector3(0,0,-1).transformDirection(root.matrixWorld).setY(0).normalize(),chest=P.Chest(soldier),side=hand==='L'?1:-1;
-      for(const [a,d,up] of [[.6,2.2,.1],[0,2.2,.1],[1.2,2,.1],[-.4,2.2,.1],[.6,2.2,.9],[0,3,.9],[1.8,2,.3],[-1,2.2,.6]]){
+      for(const [a,d,up] of [[1.2,2.2,.2],[.6,2.2,.1],[1.8,2.2,.3],[0,2.2,.1],[1.2,2.4,.9],[.6,2.2,.9],[0,3,.9],[-.6,2.2,.6]]){
         const pos=chest.clone().addScaledVector(f.clone().applyAxisAngle(new T.Vector3(0,1,0),a*side),d);pos.y+=up;
         if(!P.Blocked(pos,chest,root))return {pos,look:chest};
       }

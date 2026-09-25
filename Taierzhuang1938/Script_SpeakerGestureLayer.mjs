@@ -55,7 +55,7 @@ export function SpeakerGestureTargetPoint(name, { root, lookAt } = {}, out = new
   if (spec === "south") return out.set(base.x, feet + G.pointRiseM, base.z + G.southM);
   if (spec === "listener") {
     const target = typeof lookAt === "function" ? lookAt() : lookAt;
-    return target?.isVector3 ? out.copy(target) : null;
+    return target?.isVector3 ? out.copy(target).setY(target.y - G.listenerDropM) : null;
   }
   if (spec === "tank") {
     const tank = world.tank?.();

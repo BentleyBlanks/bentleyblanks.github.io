@@ -70,8 +70,9 @@ export const SPEAKER_GESTURE = Object.freeze({
   // the arm yields over fadeS and the head layer keeps acting. A shot during the gesture ends it (no comeback); a
   // body busy when its line starts waits unlifted and gestures once free. aimQuietS: the 03-05 front AI keeps aim 1
   // all fight long and fires about once in 3 s (2026-09-25 probe of 04), so only a shooting run (a shot in the last
-  // .8 s) counts as aiming. moveSpeed 1 = 4.2 m/s (Script_Actor); .45 is about 1.9 m/s.
-  fadeS: .15, maxAim: .35, aimQuietS: .8, maxMoveSpeed: .45, maxProne: .3,
+  // .8 s) counts as aiming. moveSpeed 1 = 4.2 m/s (Script_Actor); .6 is about 2.5 m/s: the 03-05 squad walks its
+  // lines at .51 (2.1 m/s; "move up", "keep low" are said on the move), a jog (.7) or a run does not gesture.
+  fadeS: .15, maxAim: .35, aimQuietS: .8, maxMoveSpeed: .6, maxProne: .3,
   // A further stress during the hold dips the forearm (the arm's version of the head nod).
   beatRadians: .16, beatS: .26,
   // Aimed clips: the upper arm turns from the clip's stroke direction to the target, limited to a cone around
@@ -84,8 +85,10 @@ export const SPEAKER_GESTURE = Object.freeze({
   aimStrength: 1, coneOutDeg: 100, coneInDeg: 40, crossLiftDeg: 15, coneUpDeg: 35, coneDownDeg: 30,
   maxOutOfConeDeg: 45,
   // Ground anchors are pointed at this high above the ground (a man-high point, not the dirt); the tank at
-  // its hull; 'south' is southM due south at the speaker's ground height plus pointRiseM.
-  pointRiseM: 1.0, tankRiseM: 1.6, southM: 30,
+  // its hull; 'south' is southM due south at the speaker's ground height plus pointRiseM; 'listener' at the
+  // listener's eye less listenerDropM (a hand is held out to the other man's chest, not his face: the seated 06
+  // Zhou's offer to the standing player went up above his own head).
+  pointRiseM: 1.0, tankRiseM: 1.6, southM: 30, listenerDropM: .45,
 });
 
 // Who plays a speaking role when several bodies could (Script_FirstLevelSpeakerBinder).
