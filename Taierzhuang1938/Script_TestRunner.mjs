@@ -102,6 +102,7 @@ export const testDefs = {
   FirstLevelZhouExitBrowserTest: {file:"Script_FirstLevelZhouExitBrowserTest.mjs",timeoutMs:240000,desc:"Wounded Zhou walks around the front supply collider from west, east and north with the real Rapier capsule"},
   FirstLevelMachineGunCutsceneTest: {file:"Script_FirstLevelMachineGunCutsceneTest.mjs",timeoutMs:600000,desc:"04 gun-position mid-level cutscene: walked-in trigger, plays once, frozen world, control returned and the gun still usable"},
   MachineGunCutsceneAudioTest: {file:"Script_MachineGunCutsceneAudioTest.mjs",timeoutMs:600000,desc:"04 关中过场听得见没有：九条 cue 在声库里、Play 建起播放头、AudioContext 输出端逐条量 RMS（对照组为 03 阶段既有对白）"},
+  FirstLevelRearDoorWalkTest: {file:"Script_FirstLevelRearDoorWalkTest.mjs",timeoutMs:1200000,desc:"罗班长过阵位后门坡道（04 北上、05→06 南下，远处敌人开火、坡下有弹坑）：每趟走到、兜底跳点 0 次、原地停不到 2 s"},
   FirstLevelFrontPresenceTest: {file:"Script_FirstLevelFrontPresenceTest.mjs",timeoutMs:600000,desc:"Finite approach fire, delayed front commitment and no respawning after a slow approach"},
   FirstLevelCasualtyBrowserTest:{file:"Script_FirstLevelCasualtyBrowserTest.mjs",timeoutMs:360000,desc:"Ordinary squad death uses real damage, retains the mission and reports local casualties"},
   MissionReturnTest: {file:"Script_MissionReturnTest.mjs",desc:"Soft return boundaries, escort separation, hysteresis and stage corridors"},
@@ -376,6 +377,7 @@ export const browserTests = new Set([
   "CharacterSpeechBrowserTest",
   "FirstLevelCasualtyBrowserTest",
   "FirstLevelFrontPresenceTest",
+  "FirstLevelRearDoorWalkTest",
   "FirstLevelTankProbeTest",
   "FirstLevelMachineGunTest",
   "FirstLevelZhouExitBrowserTest",
@@ -498,7 +500,7 @@ export const domains = {
   propVelocity: {label:'近景刚体道具速度与移动清晰度',tests:['CarriagePropVelocityTest','DraftCartEditorTest']},
   squadMarch: {label:"通用小队行进",tests:["SquadMarchCoverTest","SquadMarchCoverBrowserTest","SquadMarchTest","SquadMarchAiTest","SquadMarchEditorTest","SquadMarchNavigationTest","FirstLevelSquadMarchTest","EditorLauncherTest"]},
   firstLevelTail: {label:"第一关降压段至结尾定向续接",tests:["FirstLevelMissionStageRegroupTest","FirstLevelMissionStageTailTest"]},
-  firstLevel: {label:'新版第一关完整任务',tests:['FirstLevelWhiteboxVillageTest','FirstLevelWhiteboxTransferTest','FirstLevelRearSpaceTest','FirstLevelRearTopologyTest','FirstLevelFrontTopologyTest','FirstLevelEndTest','MachineGunCutsceneAudioTest','Type89DamageTest','FirstLevelTankBrainTest','FirstLevelTankProbeTest','FirstLevelFrontRouteBrowserTest','FirstLevelMissionTopologyTest','FirstLevelMissionTopologyBrowserTest','FirstLevelSpaceTest','MissionReturnTest','FirstLevelMissionReturnBrowserTest','FirstLevelCasualtyBrowserTest','FirstLevelMissionTest','MissionGatesTest','FirstLevelVoiceTest','FirstLevelVoiceAudioTest','FirstLevelFrontPresenceTest','FirstLevelMachineGunTest','FirstLevelZhouExitBrowserTest','FirstLevelMachineGunCutsceneTest','FirstLevelMissionAftermathTest','FirstLevelMissionFortificationsTest','FirstLevelMissionBrowserTest','FirstLevelMissionStageJumpTest','FirstLevelMissionStageContinueTest','FirstLevelMissionPresentationTest','FirstLevelMidTest','FirstLevelFrontTest','FirstLevelFrontPressureTest','FirstLevelFrontPacingTest','FirstLevelEnemyIdleProbe','FirstLevelFrontBattleBrowserTest','FirstLevelFrontBombFirstTest']},
+  firstLevel: {label:'新版第一关完整任务',tests:['FirstLevelWhiteboxVillageTest','FirstLevelWhiteboxTransferTest','FirstLevelRearSpaceTest','FirstLevelRearTopologyTest','FirstLevelFrontTopologyTest','FirstLevelEndTest','MachineGunCutsceneAudioTest','Type89DamageTest','FirstLevelTankBrainTest','FirstLevelTankProbeTest','FirstLevelFrontRouteBrowserTest','FirstLevelMissionTopologyTest','FirstLevelMissionTopologyBrowserTest','FirstLevelSpaceTest','MissionReturnTest','FirstLevelMissionReturnBrowserTest','FirstLevelCasualtyBrowserTest','FirstLevelMissionTest','MissionGatesTest','FirstLevelVoiceTest','FirstLevelVoiceAudioTest','FirstLevelFrontPresenceTest','FirstLevelMachineGunTest','FirstLevelZhouExitBrowserTest','FirstLevelMachineGunCutsceneTest','FirstLevelMissionAftermathTest','FirstLevelMissionFortificationsTest','FirstLevelMissionBrowserTest','FirstLevelMissionStageJumpTest','FirstLevelMissionStageContinueTest','FirstLevelMissionPresentationTest','FirstLevelMidTest','FirstLevelFrontTest','FirstLevelFrontPressureTest','FirstLevelFrontPacingTest','FirstLevelEnemyIdleProbe','FirstLevelFrontBattleBrowserTest','FirstLevelFrontBombFirstTest','FirstLevelRearDoorWalkTest']},
   text: { label: "玩家文本 / 数值表（数据驱动闸门）", tests: ["TextTest", "TextGatherCheck"] },
   animation: { label: '独立动画资产验收', tests: ['ActorLocomotionTest','BackRifleRunTest','MeleeAnimationTest','DadaoSwingTest','GrenadeThrowTest','InfantryAnimationTest','DeathCollapseTest'] },
   explosives: { label: "爆炸白盒与通用地形形变/返掷", tests: ["ExplosionRulesTest", "ExplosionRangeTest", "CraterSurfaceTest"] },
@@ -544,7 +546,7 @@ export const domains = {
     // 所以碰 AI 或撒兵的改动要连着 MissionHooksTest 一起跑。
     // 第一关敌军探针（30 min 真实驾驶）只登记在 firstLevel 域：改 Script_Ai 的包跑 ai 域时带纯 Node 的
     // FirstLevelFrontPressureTest 就够了（2026-09-24 审查）。
-    tests: ["AiBehaviorTest", "AiBrainGraphTest", "AiEditorTest", "AiCombatBrowserTest", "AiCloseRangeTest", "AiInitiativeBrowserTest", "AiPerceptionTest", "AiCoverTest", "AiCrowdTest", "AiShootingTest", "AiTacticsTest", "FirstLevelFrontPressureTest",
+    tests: ["AiBehaviorTest", "AiBrainGraphTest", "AiEditorTest", "AiCombatBrowserTest", "AiCloseRangeTest", "AiInitiativeBrowserTest", "AiPerceptionTest", "AiCoverTest", "AiCrowdTest", "AiShootingTest", "AiTacticsTest", "FirstLevelFrontPressureTest", "FirstLevelRearDoorWalkTest",
       "VisibilityTest", "ActorCrowdTest", "EmplacementTest", "FlareTest", "MissionHooksTest", "MissionSetpiecesTest",
       "FirstLevelP012OpeningTest", "FirstLevelP012FamilyTest", "FirstLevelP012RestingTest", "FirstLevelP012AnimationTest", "FirstLevelP012MarchTest", "FirstLevelP012TrainColumnTest", "FirstLevelP012ArrivalTest", "FirstLevelP012VillageLifeTest", "FirstLevelP012CastTest"],
   },
@@ -607,7 +609,7 @@ const changedDomainRules = [
   // 归 render（ProfilerTest 在那一串里）；命令行自己的冒烟在 tier 2 的 perf 档。
   { domain: "render", pattern: /Script_Profile(Cli|r?Report)|Script_FrameProbeViews/i },
   { domain: "perf", pattern: /Script_ProfileCli/i },
-  {domain:"firstLevel",pattern:/FirstLevelFrontRoute|FirstLevelFrontBattle|FirstLevelFrontScenes|FirstLevelFrontPacing|FirstLevelFrontTopology|FirstLevelTransition/},
+  {domain:"firstLevel",pattern:/FirstLevelRearDoorWalk|FirstLevelFrontRoute|FirstLevelFrontBattle|FirstLevelFrontScenes|FirstLevelFrontPacing|FirstLevelFrontTopology|FirstLevelTransition/},
   // 2026-09-23 01–06 space rebuild: keyframe table and the static probe the space gate reads.
   {domain:"firstLevel",pattern:/FirstLevelSpaceKeyframes|FirstLevelSpaceProbe|FirstLevelSpaceMap|FirstLevelSpaceShots|FirstLevelSpaceSouthFingerprint|Data_FirstLevelFrontBreakables/},
   {domain:"firstLevel",pattern:/FirstLevelZhouExit/},
