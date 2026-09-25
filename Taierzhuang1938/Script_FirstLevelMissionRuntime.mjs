@@ -204,8 +204,9 @@ export class FirstLevelMissionRuntime {
     this.speakers = new FirstLevelSpeakerBinder({ voice: this.voice, soldiers: () => this.ai.soldiers,
       listener: () => this.player.EyePosition, resolvers: FirstLevelSpeakerResolvers(this),
       active: () => FACE_STEPS.has(this.flow?.stage?.id), wholeLevelRoles: FIRST_LEVEL_WHOLE_LEVEL_SPEAKERS });
-    // 03–06 说话手势指向的活目标（Gesture 包薄钩子）：战车位置与地面高度。
-    SetSpeakerGestureWorld({ tank: () => (this.tank.present ? this.tank : null), ground: (x, z) => this.battlefield.GroundHeight(x, z) });
+    // 03–06 说话手势指向的活目标（Gesture 包薄钩子）：战车位置、地面高度、手臂不穿墙用的静态碰撞射线。
+    SetSpeakerGestureWorld({ tank: () => (this.tank.present ? this.tank : null), ground: (x, z) => this.battlefield.GroundHeight(x, z),
+      ray: (origin, dir, far) => this.battlefield.Raycast(origin, dir, far)?.t ?? null });
     this.view = new FirstLevelMissionView({
       scene: this.scene,
       battlefield: this.battlefield,

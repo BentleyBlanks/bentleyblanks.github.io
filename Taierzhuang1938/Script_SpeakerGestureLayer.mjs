@@ -23,14 +23,30 @@ const Clamp = (value, low, high) => Math.max(low, Math.min(high, value));
 const Smooth = x => { const t = Clamp(x, 0, 1); return t * t * (3 - 2 * t); };
 const DEG = Math.PI / 180;
 
-// World providers set by the mission runtime (one line): the live tank and the ground height. Without them a
-// tank line points the clip's own direction and ground anchors sit at the speaker's feet height.
-const world = { tank: null, ground: null };
+// World providers set by the mission runtime (one line): the live tank, the ground height and a ray against the
+// level's walls. Without them a tank line points the clip's own direction, ground anchors sit at the speaker's feet
+// height and nothing is checked against walls.
+const world = { tank: null, ground: null, ray: null };
 /**
- * { tank: () => {x, z, y?} | null, ground: (x, z) => y } (either may be omitted). The mission runtime sets both when
- * it is built and calls SetSpeakerGestureWorld({}) in Dispose, so the closures do not keep a disposed level alive.
+ * { tank: () => {x, z, y?} | null, ground: (x, z) => y, ray: (origin, unitDir, maxDist) => distance to the first wall
+ * along it | null } (any may be omitted). The mission runtime sets them when it is built and calls
+ * SetSpeakerGestureWorld({}) in Dispose, so the closures do not keep a disposed level alive.
  */
-export function SetSpeakerGestureWorld({ tank = null, ground = null } = {}) { world.tank = tank; world.ground = ground; }
+export function SetSpeakerGestureWorld({ tank = null, ground = null, ray = null } = {}) { world.tank = tank; world.ground = ground; world.ray = ray; }
+
+// Walls (world.ray). A pointing arm aimed through a wall would come out on the other side of it (2026-09-26 relay r2
+// acceptance: BundleAttack_01_Close read as Luo's arm in the ammo house wall; measured, the arm was 0.7 m off it and
+// the test camera in the doorway had the jamb's corner in front of the hand, but nothing checked it either way).
+const UP = new Vector3(0, 1, 0), WDIR = new Vector3(), BF = new Vector3(), WSEG = new Vector3(), SH = new Vector3(), WA = new Vector3(), TIP = new Vector3();
+/** Something of the world within `length` + wallPadM of `origin` along the unit `dir`. */
+function WallRay(origin, dir, length) {
+  const t = world.ray(origin, dir, length + G.wallPadM);
+  return Number.isFinite(t);
+}
+function WallSegment(a, b) {
+  WSEG.copy(b).sub(a); const length = WSEG.length();
+  return length > 1e-4 && WallRay(a, WSEG.multiplyScalar(1 / length), length);
+}
 
 // Fetched once; a failed fetch is tried again by the next line that asks for a clip (a new line, not every frame).
 let loadStarted = false, loadError = null;
@@ -56,7 +72,7 @@ export function SpeakerGestureTargetPoint(name, { root, lookAt } = {}, out = new
     if (!Number.isFinite(point?.x) || !Number.isFinite(point?.z)) return null;
     return out.set(point.x, Ground(point.x, point.z, feet) + (G.pointRiseByTarget?.[name] ?? G.pointRiseM), point.z);
   }
-  if (spec === "south") return out.set(base.x, feet + G.pointRiseM, base.z + G.southM);
+  if (spec === "south") return out.set(base.x, feet + (G.pointRiseByTarget?.[name] ?? G.pointRiseM), base.z + G.southM);
   if (spec === "listener") {
     const target = typeof lookAt === "function" ? lookAt() : lookAt;
     return target?.isVector3 ? out.copy(target).setY(target.y - G.listenerDropM) : null;
@@ -124,8 +140,13 @@ export class SpeakerGestureLayer {
     // Start fetching the clips when the first 01-06 speaker is bound (03 is minutes later); not in node tests.
     if (typeof location !== "undefined") EnsureLoaded();
     // Probe state (FRONT_ACTING, tests). lines[lineId] = { frames, gestureFrames, busyFrames, maxWeight, clip }.
+    // aimYaw / aimPitch: the target seen from the shoulder (degrees, body frame, yaw + toward the gesture hand's side);
+    // crossLift: the point was raised over the rifle; wallTurn: degrees the aim was turned off a wall; wallBlocked: no
+    // clear direction near the target this frame (the arm eases back); wallHit: the posed arm reached a wall this
+    // frame (the arm eases back); wallFallback: the point was swapped for the unaimed beat at the start.
     this.state = { clip: null, lineId: null, weight: 0, t: 0, phase: null, aimError: null, solveError: null, aimDir: null, clamped: false, alongLift: false,
-      suppressed: null, hand: null, busyFor: 0 };
+      suppressed: null, hand: null, busyFor: 0, aimYaw: null, aimPitch: null, crossLift: false, wallTurn: 0, wallBlocked: false, wallHit: false,
+      wallFallback: false };
     this.lines = {};
     this.gestureFrames = 0;
   }
@@ -152,7 +173,13 @@ export class SpeakerGestureLayer {
       const side = record.hand.toLowerCase(), prefix = (record.keys[0].match(/^bip[0-9]+/) || [""])[0];
       const find = key => list[record.keys.indexOf(prefix + side + key)] || null;
       bones = { list, clavicle: find("clavicle"), upper: find("upperarm"), fore: find("forearm"), hand: find("hand"),
-        roots: [1, 2, 3, 4].map(i => find("finger" + i)).filter(Boolean) };
+        roots: [1, 2, 3, 4].map(i => find("finger" + i)).filter(Boolean), armM: G.wallArmM };
+      // Shoulder to wrist (the bones' lengths do not change): the reach checked against walls.
+      if (bones.upper && bones.fore && bones.hand) {
+        const a = bones.upper.getWorldPosition(new Vector3()), b = bones.fore.getWorldPosition(new Vector3()), c = bones.hand.getWorldPosition(new Vector3());
+        const length = a.distanceTo(b) + b.distanceTo(c);
+        if (length > .2 && length < 1.2) bones.armM = length;
+      }
       this.bound.set(record, bones);
     }
     return bones;
@@ -177,6 +204,7 @@ export class SpeakerGestureLayer {
     const library = this.library;
     const modelId = this.rig.clipModelId || this.rig.modelId;
     const record = SpeakerGestureClip(modelId, row.gesture, library);
+    this.state.wallFallback = false;
     if (!record) {
       if (!library) EnsureLoaded();       // a fetch that failed earlier is tried again here
       return this._Refuse(library ? "noClip" : (loadError ? "loadFailed" : "loading"));
@@ -185,10 +213,14 @@ export class SpeakerGestureLayer {
     const armed = !!(actor?.weaponGroup?.visible && actor?.weaponData?.kind !== "melee");
     // The rifle hangs on the right hand: a right-hand clip needs an empty right hand.
     if (record.hand === "R" && armed) return this._Refuse("rightHandOnWeapon");
-    const g = { row, spec: record.spec, record, lineId: speech.lineId, bones: this._Bones(record), q: [], q0: [],
-      t: 0, holdS: 0, lineT: 0, stressed: false, lineOver: false, release: 1, releasing: false, beatAge: Infinity,
-      strokeDir: null, twoHanded: record.hand === "L" && armed && !!actor?.weaponTwoHanded };
-    SpeakerGestureFirstFrame(record, g.q0);
+    const Make = clip => {
+      const made = { row, spec: clip.spec, record: clip, lineId: speech.lineId, bones: this._Bones(clip), q: [], q0: [],
+        t: 0, holdS: 0, lineT: 0, stressed: false, lineOver: false, release: 1, releasing: false, releaseS: G.releaseS, beatAge: Infinity,
+        strokeDir: null, lastAim: null, wallTurn: 0, twoHanded: clip.hand === "L" && armed && !!actor?.weaponTwoHanded };
+      SpeakerGestureFirstFrame(clip, made.q0);
+      return made;
+    };
+    let g = Make(record);
     // A target far outside the arm's cone (behind him, or well round on the other side) is not pointed at: the arm
     // would point somewhere else. With a rifle up in the other hand the limit across the front is tighter: the arm
     // clamped there and lifted over the barrel ends in front of the face. The head layer still turns to the listener.
@@ -197,6 +229,13 @@ export class SpeakerGestureLayer {
       if (yaw != null && Math.max(0, yaw - G.coneOutDeg, -G.coneInDeg - yaw) > G.maxOutOfConeDeg) return this._Refuse("targetOutOfReach");
       if (yaw != null && g.twoHanded && -G.coneInDeg - yaw > G.maxCrossOutDeg) return this._Refuse("targetAcrossRifle");
       g.strokeDir = this._StrokeDir(g);
+      // A wall along every direction near the target (within the arm's reach): an unaimed beat instead of a point
+      // (the one-handed clips only; a right-hand aimed clip has no unaimed stand-in and is not made).
+      if (world.ray && g.strokeDir && !this._WallFreeAim(g)) {
+        const beat = record.hand === "L" ? SpeakerGestureClip(modelId, G.wallFallbackClip, library) : null;
+        if (!beat) return this._Refuse("wall");
+        g = Make(beat); this.state.wallFallback = true;
+      }
     }
     this.active = g;
     this.busyFade = SpeakerGestureBusy(this.rig, state, this.fireAge) ? 0 : 1;
@@ -245,7 +284,7 @@ export class SpeakerGestureLayer {
       // Line over before the release: play on when the release is close, else freeze and ease the arm back.
       if (g.t < s.outS && s.outS - g.t > G.maxTailS) g.releasing = true;
     }
-    if (g.releasing) { g.release = Math.max(0, g.release - step / G.releaseS); return g.release > 0; }
+    if (g.releasing) { g.release = Math.max(0, g.release - step / g.releaseS); return g.release > 0; }
     if (edge && !g.stressed) g.stressed = true;
     else if (edge && g.t >= s.strokeS) g.beatAge = 0;
     g.beatAge += step;
@@ -266,6 +305,7 @@ export class SpeakerGestureLayer {
     this._Restore();
     this.held.on = false;
     const rig = this.rig, st = this.state, step = Math.max(0, dt || 0);
+    this.step = step;                    // AfterHead's frame time (the wall turn's ease)
     this.fireAge = state.firing || state.fire > 0 ? 0 : this.fireAge + step;
     const speech = rig.facial?.lastSpeech || null;
     const lineId = speech?.active ? speech.lineId ?? null : null;
@@ -352,6 +392,111 @@ export class SpeakerGestureLayer {
   }
 
   /**
+   * The direction (world, into `out`) the arm is aimed from `shoulder` at `target`: clamped into the cone around the
+   * body's front, raised over the rifle held up in the other hand when it points across the front (crossLift) and off
+   * the barrel line when it points along it (alongLift). Leaves the body's world rotation in Q2 and sets the state's
+   * clamped / alongLift / crossLift / aimYaw / aimPitch.
+   */
+  _AimDirection(g, target, shoulder, out) {
+    const st = this.state, root = this.rig.actor?.root || this.rig.root;
+    // Clamp in the body's frame (front -Z, left -X): out = toward the gesture hand's side.
+    D.copy(target).sub(shoulder);
+    root.getWorldQuaternion(Q2); D.applyQuaternion(Q.copy(Q2).invert());
+    const side = g.record.hand === "L" ? 1 : -1;
+    const yaw = Math.atan2(-D.x, -D.z) * side, pitch = Math.atan2(D.y, Math.hypot(D.x, D.z));
+    const cy = Clamp(yaw, -G.coneInDeg * DEG, G.coneOutDeg * DEG) * side;
+    let cp = Clamp(pitch, -G.coneDownDeg * DEG, G.coneUpDeg * DEG);
+    st.aimYaw = +(yaw / DEG).toFixed(1); st.aimPitch = +(pitch / DEG).toFixed(1);
+    // With a rifle up in the other hand, an arm pointing across the front goes over the barrel, not along it.
+    st.clamped = Math.abs(cy - yaw * side) > 1e-3 || Math.abs(cp - pitch) > 1e-3;
+    const unlifted = cp;
+    if (g.twoHanded && yaw < 0) cp = Math.max(cp, G.crossLiftDeg * DEG * Math.min(1, -yaw / (G.coneInDeg * DEG)));
+    st.crossLift = cp > unlifted + 1e-3;
+    out.set(-Math.sin(cy) * Math.cos(cp), Math.sin(cp), -Math.cos(cy) * Math.cos(cp)).applyQuaternion(Q2);
+    // Along the rifle held up in the other hand: raise the point off the barrel line (or lower it, when the
+    // target is below the barrel), so it does not read as a second man aiming.
+    st.alongLift = false;
+    if (g.twoHanded && this._RifleLine(false) && out.angleTo(RA) < G.alongRifleDeg * DEG) {
+      const riflePitch = Math.asin(Clamp(RA.y, -1, 1));
+      cp = cp >= riflePitch ? Math.max(cp, riflePitch + G.alongLiftDeg * DEG) : Math.min(cp, riflePitch - G.alongLiftDeg * DEG);
+      cp = Clamp(cp, -G.coneDownDeg * DEG, G.coneUpDeg * DEG);
+      out.set(-Math.sin(cy) * Math.cos(cp), Math.sin(cp), -Math.cos(cy) * Math.cos(cp)).applyQuaternion(Q2);
+      st.alongLift = true;
+    }
+    return out;
+  }
+
+  /**
+   * Walls (world.ray): true when the arm can point along `aimDir`, turned (in place) about the vertical toward the
+   * body's front (`bodyQ`) as far as a wall beside it needs; false when no direction is clear. A direction is clear
+   * when shoulder -> fingertips along it and along it turned wallMarginDeg further toward the wall are (the posed arm
+   * bends: the forearm and the pointing hand end a little outside the straight line). The turn is searched in
+   * wallStepDeg steps, at most wallMaxTurnDeg, never past the cone's `in` edge and never more than wallMaxOffTargetDeg
+   * off the target (further off it points somewhere else). With `g` held across frames (g.wallTurn) the turn goes up
+   * at once when a wall needs more and comes back at wallEaseDegS when it needs less (no 5-10 deg pops from frame to
+   * frame as the shoulder rises with the lift); state.wallTurn is the turn used.
+   */
+  _WallAim(g, shoulder, aimDir, target, bodyQ, dt = 0) {
+    this.state.wallTurn = 0;
+    if (!world.ray) return true;
+    const reach = g.bones.armM + G.wallHandM;
+    const side = g.record.hand === "L" ? 1 : -1;
+    const front = BF.set(0, 0, -1).applyQuaternion(bodyQ);
+    const turn = Math.sign(aimDir.z * front.x - aimDir.x * front.z) || side;
+    D.copy(target).sub(shoulder);
+    Q.copy(bodyQ).invert();
+    // turn (degrees toward the front) -> WDIR; false when that turn is out of bounds
+    const Turned = deg => {
+      WDIR.copy(aimDir).applyAxisAngle(UP, turn * deg * DEG);
+      BF.copy(WDIR).applyQuaternion(Q);
+      return deg === 0 || (Math.atan2(-BF.x, -BF.z) * side >= -G.coneInDeg * DEG - 1e-6 && WDIR.angleTo(D) <= G.wallMaxOffTargetDeg * DEG);
+    };
+    const Clear = () => !WallRay(shoulder, WDIR, reach)
+      && !WallRay(shoulder, WSEG.copy(WDIR).applyAxisAngle(UP, -turn * G.wallMarginDeg * DEG), reach);
+    let need = -1;
+    for (let deg = 0; deg <= G.wallMaxTurnDeg + 1e-6; deg += G.wallStepDeg) {
+      if (!Turned(deg)) break;
+      if (Clear()) { need = deg; break; }
+    }
+    if (need < 0) { g.wallTurn = 0; return false; }
+    let use = need;
+    if (g.wallTurn > need) {
+      use = Math.max(need, g.wallTurn - G.wallEaseDegS * dt);
+      if (use > need && !(Turned(use) && Clear())) use = need;
+    }
+    g.wallTurn = use;
+    Turned(use); aimDir.copy(WDIR);
+    this.state.wallTurn = +use.toFixed(1);
+    return true;
+  }
+
+  /** _Start: whether the point can be made without a wall in the arm's way (the aim as the first posed frame makes it). */
+  _WallFreeAim(g) {
+    const root = this.rig.actor?.root || this.rig.root;
+    const target = SpeakerGestureTargetPoint(g.row.target, { root, lookAt: this.head?.lookAt }, this.target);
+    if (!target || !g.bones.upper) return true;
+    g.bones.upper.getWorldPosition(SH);
+    if (target.distanceToSquared(SH) <= 1e-6) return true;
+    return this._WallAim(g, SH, this._AimDirection(g, target, SH, WA), target, Q2);
+  }
+
+  /** Shoulder -> elbow -> wrist -> fingertips of the posed gesture arm reaches a wall (matrixWorld fresh). */
+  _ArmInWall(g) {
+    const { upper, fore, hand } = g.bones;
+    if (!world.ray || !upper || !fore || !hand) return false;
+    WP(upper, SH); WP(fore, WA); WP(hand, TIP);
+    if (WallSegment(SH, WA) || WallSegment(WA, TIP)) return true;
+    WA.subVectors(TIP, WA);
+    return WA.lengthSq() > 1e-8 && WallRay(TIP, WA.normalize(), G.wallHandM);
+  }
+
+  /** A wall in the arm's way: the arm eases back to the body over wallReleaseS (the line may go on). */
+  _WallRelease(g) {
+    if (!g.releasing) { g.lineOver = true; g.releasing = true; }
+    g.releaseS = Math.min(g.releaseS, G.wallReleaseS);
+  }
+
+  /**
    * Aimed clips: turn the upper arm so that shoulder -> hand points at the row's target (inside the cone). Runs after
    * the head turn: the Biped clavicles hang off the neck, so the head layer's neck yaw swings the arm (measured before
    * the turn, a point at the tank was 37 deg off on screen; 2026-09-25 browser test).
@@ -359,6 +504,7 @@ export class SpeakerGestureLayer {
   _Aim(g, w) {
     const rig = this.rig, { upper } = g.bones;
     this.state.aimError = null; this.state.solveError = null; this.state.aimDir = null; this.state.clamped = false; this.state.alongLift = false;
+    this.state.crossLift = false; this.state.wallTurn = 0; this.state.wallBlocked = false;
     if (g.strokeDir && upper?.parent && g.bones.clavicle?.parent) {
       const root = rig.actor?.root || rig.root;
       const target = SpeakerGestureTargetPoint(g.row.target, { root, lookAt: this.head?.lookAt }, this.target);
@@ -366,24 +512,14 @@ export class SpeakerGestureLayer {
         WP(upper, S);
         D.copy(target).sub(S);
         if (D.lengthSq() > 1e-6) {
-          // Clamp in the body's frame (front -Z, left -X): out = toward the gesture hand's side.
-          root.getWorldQuaternion(Q2); D.applyQuaternion(Q.copy(Q2).invert());
-          const side = g.record.hand === "L" ? 1 : -1;
-          const yaw = Math.atan2(-D.x, -D.z) * side, pitch = Math.atan2(D.y, Math.hypot(D.x, D.z));
-          const cy = Clamp(yaw, -G.coneInDeg * DEG, G.coneOutDeg * DEG) * side;
-          let cp = Clamp(pitch, -G.coneDownDeg * DEG, G.coneUpDeg * DEG);
-          // With a rifle up in the other hand, an arm pointing across the front goes over the barrel, not along it.
-          this.state.clamped = Math.abs(cy - yaw * side) > 1e-3 || Math.abs(cp - pitch) > 1e-3;
-          if (g.twoHanded && yaw < 0) cp = Math.max(cp, G.crossLiftDeg * DEG * Math.min(1, -yaw / (G.coneInDeg * DEG)));
-          const aimDir = P.set(-Math.sin(cy) * Math.cos(cp), Math.sin(cp), -Math.cos(cy) * Math.cos(cp)).applyQuaternion(Q2);
-          // Along the rifle held up in the other hand: raise the point off the barrel line (or lower it, when the
-          // target is below the barrel), so it does not read as a second man aiming.
-          if (g.twoHanded && this._RifleLine(false) && aimDir.angleTo(RA) < G.alongRifleDeg * DEG) {
-            const riflePitch = Math.asin(Clamp(RA.y, -1, 1));
-            cp = cp >= riflePitch ? Math.max(cp, riflePitch + G.alongLiftDeg * DEG) : Math.min(cp, riflePitch - G.alongLiftDeg * DEG);
-            cp = Clamp(cp, -G.coneDownDeg * DEG, G.coneUpDeg * DEG);
-            aimDir.set(-Math.sin(cy) * Math.cos(cp), Math.sin(cp), -Math.cos(cy) * Math.cos(cp)).applyQuaternion(Q2);
-            this.state.alongLift = true;
+          const aimDir = this._AimDirection(g, target, S, P);
+          // Walls: turned off a wall toward the front; no clear direction near the target (the body walked up to a
+          // wall mid-line): the last clear aim is held and the arm eases back.
+          if (this._WallAim(g, S, aimDir, target, Q2, this.step)) (g.lastAim ||= new Vector3()).copy(aimDir);
+          else {
+            this.state.wallBlocked = true;
+            if (g.lastAim) aimDir.copy(g.lastAim);
+            this._WallRelease(g);
           }
           g.bones.clavicle.parent.matrixWorld.decompose(P2, Q, SCALE);
           const stroke = H.copy(g.strokeDir).applyQuaternion(Q);
@@ -463,11 +599,14 @@ export class SpeakerGestureLayer {
   /** After the head turn: a reach clip (the cigarette to the lips) re-aims the arm at the live head. */
   AfterHead() {
     const g = this.active;
+    this.state.wallHit = false;
     if (g && this.state.weight > 1e-4) {
       g.bones.clavicle?.updateWorldMatrix(true, true);   // after the head turn: once, for WP below
       if (g.spec.aim) { if (g.bones.upper) this._Mark(g.bones.upper); this._Aim(g, this.state.weight); }
       this._Beat(g, this.state.weight);
       if (g.twoHanded) this._ClearRifle(g);
+      // Whatever the clip (an unaimed one too): the posed arm in a wall eases back.
+      if (this._ArmInWall(g)) { this.state.wallHit = true; this._WallRelease(g); }
     }
     if (g?.spec.reach && this.state.weight > 1e-4) {
       const s = g.spec, t = g.t, { upper, fore, hand, roots } = g.bones;

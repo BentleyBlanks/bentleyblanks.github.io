@@ -65,7 +65,11 @@ export const SPEAKER_GESTURE_CLIPS = Object.freeze({
  * Pointing targets. `sortie:<key>` / `space:<key>` are anchors in Data_FirstLevelFrontRoute (FRONT_SORTIE /
  * FRONT_SPACE); `listener` is whoever the head layer looks at (the player by default); `tank` is the live tank
  * (a runtime provider); `south` is a point 30 m due south (+Z) of the speaker. Ground anchors are pointed at
- * SPEAKER_GESTURE.pointRiseM over the ground (pointRiseByTarget per name: the box on the floor lower). A target up to
+ * SPEAKER_GESTURE.pointRiseM over the ground (pointRiseByTarget per name: the 05 box at the kneeling keeper's shoulder
+ * height and the 06 runner's south 5 m up, so the arm lifted over the rifle still ends within 12 deg of them; the
+ * reasons are in the tuning table). An aimed arm that would go into a wall (the level's static colliders) is turned
+ * toward the body's front until it is clear, or the line gets the unaimed GestureBeatL instead (SPEAKER_GESTURE
+ * wall*; Script_SpeakerGestureLayer._WallAim). A target up to
  * maxOutOfConeDeg outside the arm's cone is clamped to the cone's edge; further out it is not pointed at (suppressed
  * targetOutOfReach), nor is one more than maxCrossOutDeg across the front of a man with a rifle up in the other hand
  * (targetAcrossRifle). Checked on screen in the 2026-09-25 browser test.
