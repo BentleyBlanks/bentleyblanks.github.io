@@ -298,13 +298,14 @@ export const FRONT_BATTLE_TUNING=Object.freeze({
   capturedGunKeepOutM:6,
   // ---- 03-06 lines: the speaker is in the picture when he talks (2026-09-25 relay r2 Front step 1) ----
   // Script_FirstLevelFrontScenes.HoldLine: a line whose speaker stands within speakerViewNearM of the player but is not
-  // in the picture waits up to speakerViewHoldS while he steps into view (StepSpot), then plays anyway. Never turns the
-  // player's camera. Measured 09-25 (03->06 drive, 48 lines): every near line that missed the picture had its speaker
+  // in the picture waits up to speakerViewHoldS while he steps into view (StepSpot), then plays anyway - only when he
+  // can step (the player stands and does not aim, a clear spot exists); otherwise it plays at once from where he is.
+  // Never turns the player's camera. Measured 09-25 (03->06 drive, 48 lines): every near line that missed the picture had its speaker
   // 0.7-2.8 m from the player (beside or behind him); every far one was a shout across the front from 32-76 m (left
   // gun, the pinned guards, the trench mouth). 15 m splits the two with room on both sides.
   speakerViewNearM:15,
-  // How long a line may wait for its speaker (s). A shouted order held longer than the gap between two of the
-  // recorded lines (1.4-2.0 s in the 03-05 takes) reads as a stall; this is one such gap.
+  // How long a line may wait for its speaker (s): the longest step (speakerStepMaxM at speakerStepSpeedMps) is 1.1 s,
+  // plus about 0.5 s to start and stop. Chosen by this package, not tuned by feel yet; a longer wait makes an order late.
   speakerViewHoldS:1.6,
   // "In the picture" for the hold: the head projects inside this share of the frame (NDC), not just onto its edge.
   // The acceptance sample (CheckFrontActing) counts 0.95; the hold asks for more so the head is not cut by the border.
@@ -325,5 +326,8 @@ export const FRONT_BATTLE_TUNING=Object.freeze({
   // above the sway of aiming); the speaker goes back to his own orders once the player has moved speakerStepReleaseM
   // from where he stood when the line was held.
   speakerStepPlayerStillMps:.8,speakerStepReleaseM:2.5,
+  // Closest the stepping walk may pass the player (m): the 03-05 staging checks keep Luo 1.5 m clear of the player and
+  // of the captured gun's seat (Script_FirstLevelCampaignFrontBattle "Luo occupies his own firing post").
+  speakerStepPassM:1.5,
   bandage:{radius:.087,height:.2,y:-.19,color:0xb6ac8b},
 });

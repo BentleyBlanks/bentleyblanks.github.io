@@ -20,7 +20,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { FirstLevelFrontBattle, ColumnDeparture, BatchPastGap, SplitRoute, GuardClearOfGap } from "./Script_FirstLevelFrontBattle.mjs";
-import { FirstLevelFrontScenes, FRONT_SCENE_IDS, FrontSceneSpeakers, ProjectToView, InPicture, CameraPose, StepCandidates } from "./Script_FirstLevelFrontScenes.mjs";
+import { FirstLevelFrontScenes, FRONT_SCENE_IDS, FrontSceneSpeakers, ProjectToView, InPicture, CameraPose, StepCandidates, SegmentDistance } from "./Script_FirstLevelFrontScenes.mjs";
 import { DialoguePlayer } from "./Script_DialoguePlayer.mjs";
 import { FRONT_SORTIE as S, FRONT_SPACE as Space, FRONT_TANK_PATH } from "./Data_FirstLevelFrontRoute.mjs";
 import { FRONT_BATTLE_TUNING as B } from "./Data_Tuning_FirstLevelFront.mjs";
@@ -533,9 +533,9 @@ function WalkRuntime(extra = {}) {
   assert.ok(spots[0].bearing > 0 === Math.sin(Math.atan2(-1, 1) - pose.yaw) > 0, "the speaker's own side first");
   for (const s of spots) assert.ok(InPicture(ProjectToView(camera, { x: s.x, y: 1.55, z: s.z })), `a stepping spot frames a standing head (${s.bearing} deg, ${s.distance} m)`);
 
-  // HoldLine / Steer on a stub runtime: flat ground, nothing blocks, Luo 1.5 m behind the player.
+  // HoldLine / Steer on a stub runtime: flat ground, nothing blocks, Luo 1.6 m to the player's right, level with him.
   const moves = [], defends = [];
-  const luo = { id: 7, alive: true, position: { x: 0.4, y: 0, z: 1.5 } };
+  const luo = { id: 7, alive: true, position: { x: 1.6, y: 0, z: 0.3 } };
   const guard = { id: 8, alive: true, position: { x: -30, y: 0, z: -20 } };
   const V = (x, y, z) => ({ x, y, z, clone() { return V(this.x, this.y, this.z); }, set(a, b, c) { this.x = a; this.y = b; this.z = c; return this; } });
   const r = { time: 0, camera, flow: { stage: { id: "Support" } }, ai: { soldiers: [luo, guard] },
@@ -545,7 +545,7 @@ function WalkRuntime(extra = {}) {
     MoveActor: (actor, point, speed) => moves.push({ id: actor.id, ...point, speed }), Defend: (actor, point) => defends.push({ id: actor.id, ...point }) };
   const scenes = new FirstLevelFrontScenes(r);
   const line = (id, who) => ({ id, who, direction: {} });
-  assert.equal(scenes.HoldLine(line("TakeOverGun.01", "luo"), "TakeOverGun"), true, "Luo behind the player: the line waits");
+  assert.equal(scenes.HoldLine(line("TakeOverGun.01", "luo"), "TakeOverGun"), true, "Luo beside the player, out of the picture: the line waits");
   assert.ok(scenes.steer?.soldier === luo && Dist(scenes.steer.spot, luo.position) <= B.speakerStepMaxM, "and Luo is sent to a spot in view");
   const spot = scenes.steer.spot;
   assert.ok(InPicture(ProjectToView(camera, { x: spot.x, y: 1.55, z: spot.z })), "the spot is in the picture");
@@ -563,7 +563,7 @@ function WalkRuntime(extra = {}) {
   scenes.handle.lines[0].state = "done"; scenes.Steer();
   assert.equal(scenes.steer, null, "his lines done: his own orders take over again");
   // No spot he can walk to straight (every knee-high line blocked): he stays and the line plays at once.
-  luo.position = { x: 0.4, y: 0, z: 1.5 }; r.BlocksSight = (a, b) => b.y < 1; r.time = 10;
+  luo.position = { x: 1.6, y: 0, z: 0.3 }; r.BlocksSight = (a, b) => b.y < 1; r.time = 10;
   assert.equal(scenes.HoldLine(line("TakeOverGun.03", "luo"), "TakeOverGun"), false, "no clear spot: the line is not delayed");
   assert.ok(scenes.steer === null && scenes.holds.get("TakeOverGun.03").released === "noSpot", "and he stays where he is");
   // Timeout: a spot, but he never gets there (shoved, blocked by a body) -> the line plays after speakerViewHoldS.
@@ -593,6 +593,17 @@ function WalkRuntime(extra = {}) {
   assert.ok(scenes.steer?.soldier === luo && Math.hypot(scenes.steer.spot.x, scenes.steer.spot.z) >= Math.min(...B.speakerStepDistancesM) - 1e-9,
     "and he steps back to a framed distance");
   scenes.steer = null;
+  // Right behind the player every way into the picture brushes past his shoulder: no step, the line plays at once.
+  luo.position = { x: 0.2, y: 0, z: 1.6 }; r.time = 40;
+  assert.equal(scenes.HoldLine(line("TakeOverGun.02", "luo"), "TakeOverGun"), false, "behind him: no walk past the player");
+  assert.equal(scenes.holds.get("TakeOverGun.02").released, "noSpot");
+  // Aiming down the sights: nobody walks into his picture.
+  luo.position = { x: 1.6, y: 0, z: 0.3 }; r.player.ads = 1;
+  assert.equal(scenes.HoldLine(line("BundleAttack.01", "luo"), "BundleAttack"), false, "aiming: the line plays at once");
+  assert.equal(scenes.holds.get("BundleAttack.01").released, "aiming");
+  r.player.ads = 0;
+  assert.ok(SegmentDistance({ x: 0, z: 0 }, { x: -1, z: 1 }, { x: 1, z: 1 }) === 1 && SegmentDistance({ x: 0, z: 0 }, { x: 2, z: 0 }, { x: 3, z: 0 }) === 2,
+    "segment distance");
   r.camera = null;
   assert.equal(scenes.HoldLine(line("TakeOverGun.02", "luo"), "TakeOverGun"), false, "no camera (Node runs): nothing is held");
 
@@ -616,7 +627,7 @@ function WalkRuntime(extra = {}) {
   assert.ok(/this\.frontBattle\.Update\(dt\);\s*\n(\s*\/\/[^\n]*\n)*\s*this\.frontScenes\.Steer\(\);/.test(runtimeSrc), "runtime steers the speaker after frontBattle.Update");
   assert.ok(Read("Script_FirstLevelFrontBattle.mjs").includes("if(r.frontScenes?.Steers?.(actor)){w.bestAt=r.time;return false;}"),
     "FrontBattle.Walk neither orders nor stall-skips a speaker stepping into view");
-  checks += 40;
+  checks += 45;
   Ok("⑧ near speaker out of the picture: line held <= speakerViewHoldS, he steps into view; far shouts and Node runs unaffected");
 }
 

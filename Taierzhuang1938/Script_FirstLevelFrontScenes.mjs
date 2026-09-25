@@ -30,6 +30,12 @@ const CUES = new Map(MISSION_DIALOGUE.map((cue) => [cue.id, cue]));
 /** Steps in which the ids above are played as scenes (outside them runtime.Say keeps the old queue). */
 export const FRONT_SCENE_STEPS = Object.freeze(["Support", "MachineGun", "Tank", "Orders"]);
 const Distance = (a, b) => Math.hypot(a.x - b.x, a.z - b.z);
+/** Horizontal distance from p to the segment a-b. */
+export function SegmentDistance(p, a, b) {
+  const dx = b.x - a.x, dz = b.z - a.z, length2 = dx * dx + dz * dz;
+  const t = length2 > 1e-9 ? Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.z - a.z) * dz) / length2)) : 0;
+  return Math.hypot(p.x - (a.x + dx * t), p.z - (a.z + dz * t));
+}
 const DEG = Math.PI / 180;
 
 /**
@@ -164,9 +170,14 @@ export class FirstLevelFrontScenes {
     const r = this.r, camera = r.camera;
     if (!pose || !r.Point || !r.BlocksSight || !r.player?.position) return null;
     const floor = r.Point(r.player.position).y, eye = r.player.EyePosition?.clone?.();
-    const knee = r.Point(body.position, 0.6);
+    const knee = r.Point(body.position, 0.6), player = r.player.position;
+    // His walk never brings him nearer the player than B.speakerStepPassM (or than he already is): he does not brush
+    // past the player's shoulder or cross in front of the muzzle on the way (09-25 drive: Luo passed 1.08 m from the
+    // player at the captured gun and the staging check "Luo occupies his own firing post clear of the player" failed).
+    const pass = Math.min(B.speakerStepPassM, Distance(body.position, player)) - 0.05;
     for (const spot of StepCandidates(pose, body.position)) {
       if (Distance(spot, body.position) > B.speakerStepMaxM) continue;
+      if (SegmentDistance(player, body.position, spot) < pass) continue;
       const ground = r.Point(spot);
       if (Math.abs(ground.y - floor) > B.speakerStepDyM) continue;
       if (r.physics?.Overlaps?.(spot.x, ground.y + 0.04, spot.z, 0.3, 1.7)) continue;
@@ -209,6 +220,8 @@ export class FirstLevelFrontScenes {
     if (this.steer?.soldier !== body) {
       const v = r.player?.velocity, moving = !!v && Math.hypot(v.x || 0, v.z || 0) > B.speakerStepPlayerStillMps;
       if (moving) return Release("walking");
+      // Nor while he aims down the sights: a squadmate does not walk into the picture of a man who is shooting.
+      if ((r.player?.ads ?? 0) > 0.5) return Release("aiming");
       const spot = this.StepSpot(body, view.pose);
       if (!spot) return Release("noSpot");
       this.steer = { soldier: body, who: line.who, spot, sceneId, anchor: { x: r.player.position.x, z: r.player.position.z } };
