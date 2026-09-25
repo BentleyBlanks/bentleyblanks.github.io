@@ -71,7 +71,11 @@ export async function DriveFrontBattle(ctx){
       const he=r.companion.Handle("heyoutian"),luo=r.companion.Handle("luo"),zhou=r.opening.zhou,gun=r.emplacement.Emplacement(r.leftGunId);
       return {stage:m.stage,time:+m.time.toFixed(1),
         player:{...at(g.player),health:+g.player.health.toFixed(1),bandages:g.player.bandages,ammo:g.state.ammo,clips:g.state.clips,grenades:g.state.grenades},
-        he:{...at(he),onLeftGun:!!gun&&!!he&&gun.npc===he},zhou:zhou?{...at(zhou),onLeftGun:!!gun&&gun.npc===zhou}:null,luo:at(luo),
+        he:{...at(he),onLeftGun:!!gun&&!!he&&gun.npc===he,stance:he?.stance??null,prone:he?.stance===2},
+        // Where the left gun and its seat actually are (the review saw the gun 1.45 m over the trench floor, nobody behind it).
+        leftGun:gun?{x:+gun.position.x.toFixed(2),y:+gun.position.y.toFixed(2),z:+gun.position.z.toFixed(2),
+          ground:+g.battlefield.GroundHeight(gun.position.x,gun.position.z).toFixed(2),
+          seat:gun.seat?{x:+gun.seat.x.toFixed(2),y:+gun.seat.y.toFixed(2),z:+gun.seat.z.toFixed(2)}:null}:null,zhou:zhou?{...at(zhou),onLeftGun:!!gun&&gun.npc===zhou}:null,luo:at(luo),
         guards:r.guards.map(x=>({id:x.actor.id,alive:!!x.actor.alive,safe:!!x.safe,x:+x.actor.position.x.toFixed(2),z:+x.actor.position.z.toFixed(2),
           hold:x.actor.holdZone?{x:+x.actor.holdZone.x.toFixed(2),z:+x.actor.holdZone.z.toFixed(2)}:null,end:x.route.at(-1)})),
         tank:{state:m.tankBrain?.brain?.state??null,immobilized:!!m.tank.immobilized,x:+m.tank.x.toFixed(1),z:+m.tank.z.toFixed(1),damageLog:m.tankBrain?.brain?.damageLog??[]},
@@ -88,6 +92,10 @@ export async function DriveFrontBattle(ctx){
     console.log("STAGE_ENTRY",JSON.stringify({stage,source,time:s.time,player:s.player,he:s.he,zhou:s.zhou,luo:s.luo,distances:s.distances,
       guards:s.guards.map(x=>x.alive?(x.safe?"safe":"out"):"dead").join(","),tank:{state:s.tank.state,x:s.tank.x,z:s.tank.z},
       enemiesAlive:Object.fromEntries(Object.entries(s.enemies).map(([k,v])=>[k,`${v.alive.length}/${v.alive.length+v.dead}`]))}));
+    // Left-gun geometry (known baseline defect, handed to the Front package, printed not asserted): how high the gun
+    // stands over the ground under it and how far He is from it.
+    if(s.leftGun)console.log("STAGE_ENTRY_LEFT_GUN",JSON.stringify({stage,source,gunOverGroundM:+(s.leftGun.y-s.leftGun.ground).toFixed(2),
+      heFromGunM:D(s.he,s.leftGun),heFromSeatM:s.leftGun.seat?D(s.he,s.leftGun.seat):null,heStance:s.he.stance}));
     console.log("STAGE_ENTRY_ENEMIES",JSON.stringify({stage,source,enemies:Object.fromEntries(Object.entries(s.enemies).map(([k,v])=>[k,v.alive]))}));
     await fs.writeFile(path.join(output,`Data_Entry${stage}_${source}.json`),JSON.stringify(s,null,2));
     const why=" ("+source+"): "+JSON.stringify({he:s.he,zhou:s.zhou,distances:s.distances,guards:s.guards,tank:s.tank.state});
@@ -95,6 +103,9 @@ export async function DriveFrontBattle(ctx){
     for(const fact of ["rightNestCaptured","leftGunHandover","zhouLeftGun"])assert.ok(s.facts.includes(fact),`${stage} begins with ${fact}`+why);
     assert.ok(s.he.alive&&s.he.onLeftGun,`${stage} begins with He on the left gun`+why);
     assert.ok(!s.zhou?.onLeftGun,`${stage} begins with Zhou off the left gun`+why);
+    // Zhou is there on every path but one: a 05 checkpoint start does not rebuild him (a run reaches 05 with him about
+    // 40 m back on the exit route near (-36,-97), out of the fight), so there his distance checks have nothing to read.
+    if(!(source==="checkpoint"&&stage==="Tank"))assert.ok(s.zhou,`${stage} begins with Zhou in the level`+why);
     // Zhou walks the exit route away from the gun (03's zhouLeftGun is B.zhouLeftGunM); never stacked on He.
     if(s.zhou?.alive){
       assert.ok(s.distances.zhouFromLeftSeat>=B.zhouLeftGunM-.5,`${stage} begins with Zhou past the ${B.zhouLeftGunM} m line`+why);
@@ -109,14 +120,20 @@ export async function DriveFrontBattle(ctx){
       assert.ok(x.hold&&D(x.hold,x.end)<=3&&D(x,x.end)<=4,`${stage} begins with safe guard ${x.id} holding the safe zone`+why);
     assert.ok(s.tank.state==null||s.tank.state==="Intact",`${stage} begins with the tank intact`+why);
     assert.ok(!s.tank.immobilized,`${stage} begins with the tank still moving`+why);
-    // The enemies a checkpoint start leaves alive are the ones a run leaves (FIRST_LEVEL_STAGE_CLEARED_ENEMIES /
-    // FIRST_LEVEL_CHECKPOINT_ENEMY_POSTS): the flank group down to its usual 0–1 survivor, the tank escorts with the
-    // tank (04: within TANK.escorts.joinRangeM, so the tank has picked them up; 05: at its side, a run reads ≤ 6.8 m).
+    // The enemies a checkpoint start leaves alive (FIRST_LEVEL_STAGE_CLEARED_ENEMIES / FIRST_LEVEL_CHECKPOINT_ENEMY_POSTS):
+    // the flank group down to FrontFlankA, the tank escorts with the tank (04: within TANK.escorts.joinRangeM, so the
+    // tank has picked them up; 05: at its side). Asserted on a checkpoint start only, where data fixes them. On a run
+    // they depend on how that run's fight went (flank survivors read 0–1 in the Gate runs, but nothing in 03→04 needs
+    // them dead), so a run only prints them (STAGE_ENTRY_ESCORTS) to set beside the checkpoint numbers.
+    // The front group is not trimmed at a checkpoint (10/10 there, a run reaches 04/05 with 5–6/10): see the
+    // STAGE_ENTRY enemiesAlive line; whether to clear some is a difficulty call left to the integration lead.
     const flank=s.enemies.frontFlank?.alive.length??0,tankAt={x:s.tank.x,z:s.tank.z};
-    assert.ok(flank<=1,`${stage} begins with at most one flank man alive, got ${flank}`+why);
     const escortRange=stage==="Tank"?8:TANK.escorts.joinRangeM;
-    for(const e of s.escorts)assert.ok(D(e,tankAt)<=escortRange,`${stage} begins with ${e.id} within ${escortRange} m of the tank (${D(e,tankAt)} m)`+why);
     console.log("STAGE_ENTRY_ESCORTS",JSON.stringify({stage,source,flank,escorts:s.escorts.map(e=>({...e,fromTank:D(e,tankAt)}))}));
+    if(source==="checkpoint"){
+      assert.ok(flank<=1,`${stage} begins with at most one flank man alive, got ${flank}`+why);
+      for(const e of s.escorts)assert.ok(D(e,tankAt)<=escortRange,`${stage} begins with ${e.id} within ${escortRange} m of the tank (${D(e,tankAt)} m)`+why);
+    }
     if(stage==="MachineGun"){
       assert.ok(s.guards.slice(2).some(x=>x.alive&&!x.safe),"04 begins with the second guard batch still out"+why);
       if(source==="checkpoint")assert.ok(s.distances.playerFromSeat<=4,"04 begins with the player in the right nest"+why);
@@ -176,7 +193,18 @@ export async function DriveFrontBattle(ctx){
   // The player reflexes (Kit MissionInputDriver: answer a man at arm's length, run from a grenade and walk back)
   // drive 03-06; 07 on keeps the old driver (Script_FirstLevelCampaignFront switches them off).
   const reflexes=ctx.options.reflexes!==false;
-  await page.evaluate(on=>{const D=window.MissionInputDriver;D.reflexes=on;D.closeResponses=0;D.escapes=0;D.evadeReturns=0;D.meleeResponses=0;D.evadeFrames=0;D.backOffFrames=0;D.closeStandoffs=0;},reflexes);
+  await page.evaluate(on=>{const g=window.Tengxian,D=window.MissionInputDriver;D.reflexes=on;D.closeResponses=0;D.escapes=0;D.evadeReturns=0;D.meleeResponses=0;D.evadeFrames=0;D.backOffFrames=0;D.closeStandoffs=0;
+    // Where 03's game time goes (CAMPAIGN_03_DRIVER.seconds): every stepped frame is booked to the driver's mode, or to
+    // "close" while a man at arm's length holds it (the route waits), plus the frames spent stepping in (⑤) and
+    // swapping weapons at arm's length. Bookkeeping only: nothing reads it back.
+    D.modeFrames={};D.legFrames={};D.closingFrames=0;D.closeSwaps=0;
+    if(!g.__campaignStepBooked){g.__campaignStepBooked=true;const step=g.StepFrames.bind(g);
+      g.StepFrames=(n,...rest)=>{const M=window.MissionInputDriver;
+        if(M?.modeFrames&&Number.isFinite(n)){
+          const k=M.evading?"evade":M.returning?"return":M.closeFoe?"close":M.mode==="evade"||M.mode==="return"?"hold":M.mode||"other";
+          M.modeFrames[k]=(M.modeFrames[k]||0)+n;if(M.leg)M.legFrames[M.leg]=(M.legFrames[M.leg]||0)+n;if(M.closing)M.closingFrames+=n;}
+        return step(n,...rest);};}
+  },reflexes);
   // What the player carries into 03 (a run from 01 vs a cold start at 03): CAMPAIGN_03_ENTRY / CAMPAIGN_03_DAMAGE.
   if(!checkpoint){ctx.snapshot03=await Snapshot03Entry(ctx,ctx.stageFrom===3?"cold":"continuous");}
   try{await DriveLegs();}
@@ -426,7 +454,9 @@ export async function DriveFrontBattle(ctx){
   // ever moves forward and ends Disabled (an engine-deck hit may skip MobilityKill). Bomb-first: both stages, since
   // Luo only finishes a tank whose track is already cut.
   const damageLog=state.tankBrain?.brain?.damageLog;
-  if(damageLog){
+  // The 03–06 drive runs on the tank brain; a renamed debug path must turn this red, not skip it.
+  assert.ok(Array.isArray(damageLog)&&damageLog.length>0,"the tank brain's damage log is readable: "+JSON.stringify(state.tankBrain?.brain?Object.keys(state.tankBrain.brain):state.tankBrain??null));
+  {
     const steps=[damageLog[0]?.from,...damageLog.map(e=>e.to)].join(">");
     console.log("TANK_DAMAGE_LOG",JSON.stringify({steps,log:damageLog}));
     assert.ok(["Intact>Disabled","Intact>MobilityKill>Disabled"].includes(steps),"tank damage goes forward to Disabled: "+steps);

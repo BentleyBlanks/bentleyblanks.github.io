@@ -421,7 +421,7 @@ export async function InstallInputDriver(ctx) {
               if(distance<3 && Math.abs(gap)<.2 && !((this.obstructed.get(foe.id)||0)>g.ai.time) && !(this.reflexes&&reloading)){
                 Did("melee");
                 g.Debug.Mouse(2,false);
-                if(g.state.activeSlot!=="melee"){g.Debug.Key("KeyV");return;}
+                if(g.state.activeSlot!=="melee"){if(this.reflexes)this.closeSwaps=(this.closeSwaps||0)+1;g.Debug.Key("KeyV");return;}
                 if(!fighter.weapon)return;
                 this.meleeResponses=(this.meleeResponses||0)+1;
                 let closing=false;
@@ -446,7 +446,7 @@ export async function InstallInputDriver(ctx) {
               const backOff=this.reflexes&&distance<3&&(g.state.ammo===0||reloading);
               if(backOff!==!!this.backingOff){g.Debug.Key("KeyS",backOff);this.backingOff=backOff;}
               if(backOff)this.backOffFrames=(this.backOffFrames||0)+1;
-              if(g.state.activeSlot!=="primary"){g.Debug.Key("Digit1");return;}
+              if(g.state.activeSlot!=="primary"){if(this.reflexes&&distance<3)this.closeSwaps=(this.closeSwaps||0)+1;g.Debug.Key("Digit1");return;}
               g.Debug.Mouse(2, true);
               if (g.state.ammo === 0) g.Debug.Key("KeyR");
               else if (Math.abs(gap) < 0.06) g.Debug.Mouse(0, true);
@@ -586,8 +586,16 @@ export async function Report03Damage(ctx) {
   // How often the two reflexes fired (counted from 03 on; zero with --no-reflexes).
   const driver = await ctx.page.evaluate(() => { const D = window.MissionInputDriver || {};
     return { reflexes: !!D.reflexes, closeResponses: D.closeResponses || 0, escapes: D.escapes || 0, evadeReturns: D.evadeReturns || 0,
-      meleeResponses: D.meleeResponses || 0, evadeFrames: D.evadeFrames || 0, backOffFrames: D.backOffFrames || 0, closeStandoffs: D.closeStandoffs || 0 }; }).catch(() => null);
+      meleeResponses: D.meleeResponses || 0, evadeFrames: D.evadeFrames || 0, backOffFrames: D.backOffFrames || 0, closeStandoffs: D.closeStandoffs || 0,
+      closingFrames: D.closingFrames || 0, closeSwaps: D.closeSwaps || 0,
+      seconds: Object.fromEntries(Object.entries(D.modeFrames || {}).map(([k, v]) => [k, +(v / 60).toFixed(1)])),
+      legs: Object.fromEntries(Object.entries(D.legFrames || {}).map(([k, v]) => [k, +(v / 60).toFixed(1)])) }; }).catch(() => null);
   console.log("CAMPAIGN_03_DRIVER", JSON.stringify(driver));
+  // When each 03 fact landed (mission time, and seconds since 03 began), to see which wait a slow 03 spent its time in.
+  const facts = await ctx.page.evaluate(() => { const r = window.Tengxian.Debug.FirstLevelMissionRuntime(), log = r.flow.log;
+    const start = log.findLast((e) => e.kind === "stage" && e.id === "Support")?.time ?? null;
+    return { start, facts: start == null ? [] : log.filter((e) => e.kind === "fact" && e.time >= start).map((e) => [e.id, +(e.time - start).toFixed(1)]) }; }).catch(() => null);
+  console.log("CAMPAIGN_03_FACTS", JSON.stringify(facts));
   await fs.writeFile(path.join(ctx.output, "Data_Campaign03Damage.json"), JSON.stringify(hits, null, 2));
 }
 
