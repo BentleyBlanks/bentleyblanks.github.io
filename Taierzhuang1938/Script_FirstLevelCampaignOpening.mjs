@@ -510,6 +510,14 @@ export async function InstallSpeakerActing(page){
           const head=rig.bones.head.quaternion;
           row.head0??=head.toArray();
           row.acted++;if(inFrame)row.actedInFrame++;if(seen)row.actedSeen=(row.actedSeen||0)+1;
+          // Why a head does not move (09-25 relay r2 Front step 3: FrontWithdraw / TakeOverGun turn=0 on one drive path):
+          // what drives this rig at the 1st, 30th and 90th acted frame.
+          if(row.acted===1||row.acted===30||row.acted===90)(row.diag??=[]).push({n:row.acted,t:+(r.time??0).toFixed(2),st:soldier.state,
+            stance:soldier.stance,rootVis:!!soldier.actor?.root?.visible,d:+Math.sqrt(soldier.actor?.renderDistanceSq??0).toFixed(1),
+            tick:r.ai?.tickIndex,id:soldier.id,mixer:+(rig.mixer?.time??-1).toFixed(3),clip:rig.currentId??null,
+            layer:layer?{on:layer.enabled,speak:layer.speaking,clock:+(layer.clock??0).toFixed(2)}:null,
+            director:director?{speak:!!director.speaking,prot:!!director.protected}:null,rest:!!soldier.missionSurfaceRest,
+            evade:!!soldier.missionGrenadeEvade,carriage:!!soldier.missionCarriageAction,head:head.toArray().map(v=>+v.toFixed(4))});
           // Evidence: one first-person picture per line, taken the 15th frame he is acted and seen (the drive's
           // StepFrames wrapper renders and reads it back in the same task, see InstallSpeakerGlance).
           if(seen&&row.actedSeen===15&&!window.frontLineShots?.[l.line.id])window.frontLineShotPending=l.line.id;
@@ -651,6 +659,7 @@ export const FRONT_LINES_OUT_OF_PICTURE = Object.freeze({
 export const FRONT_LINES_IN_FIREFIGHT = Object.freeze({
   "FrontAttack.01": "夺下右枪位那一刻：罗班长喊「土坎前头那一伙」时，玩家正对着缺口外的冲锋组开枪",
   "FrontWithdraw.01": "夺点后罗班长朝缺口外喊守军「压下去了！前头的，下来！」—— 喊的是 20 m 外的守军，玩家这时多半正压着冲锋组；躲手榴弹的那几秒台词先等（FrontScenes 的手榴弹等待），躲完没在打仗就必须看得见他（09-25 Front step 3 驾驶：一趟 227 帧全在打）",
+  "TakeOverGun.01": "夺点后罗班长朝左枪位（约 60 m）喊何有田接枪、幺娃扶老周下去，不是对玩家说的；玩家这时在夺下的机枪上压着缺口和土台上的跟车步兵（09-25 Front step 3 续 空转探针 c2：201 帧全在打）",
   "TakeOverGun.03": "罗班长回的是 60 m 外左枪位老周的话「看到了！这边有人接」；玩家这时在夺下的机枪上压着缺口（09-25 Front step 2 驾驶：150 帧全在打）",
   "BundleRetreat.01": "炸车后罗班长在身旁 1 m 内喊「回来！低头！」，玩家这时对着战车与跟车步兵",
   "TankRoadContact.02": "04 开头罗班长回何有田「先看住跟车的！」，玩家在夺下的机枪上或正和摸近的侧翼组对射（09-25 Front step 3 驾驶：一趟 136 帧全在打、中了 FrontFlankC 一枪）",
@@ -708,7 +717,7 @@ export async function CheckFrontActing(ctx,{upTo="Support"}={}){
     }
     if((r.seenFrames||0)<FRONT_LINE_IN_FRAME_FRAMES)failures.push(`${id}: the speaker's face is seen while he talks - in the picture, >= ${B.speakerViewMinM} m, nothing in between (${Row(id)})`);
     else if((r.actedSeen||0)<FRONT_LINE_IN_FRAME_FRAMES)failures.push(`${id}: he is acted while seen (${Row(id)})`);
-    else if(!(r.turn>.03))failures.push(`${id}: he visibly turns/nods in the picture (${Row(id)})`);
+    else if(!(r.turn>.03))failures.push(`${id}: he visibly turns/nods in the picture (${Row(id)}) diag=${JSON.stringify(r.diag||null)}`);
   }
   if(failures.length)console.log("FRONT_LINES_FAILED",JSON.stringify(failures));
   assert.deepEqual(failures,[],`03–06 lines up to ${upTo}: speaker in the picture and acted`);
