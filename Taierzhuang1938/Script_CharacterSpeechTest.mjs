@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { LoadGlb, ReadAccessor } from './_import/Script_LugouGlbPose.mjs';
 import { BuildSpeechEnvelope, SampleSpeechEnvelope } from './Script_SpeechEnvelope.mjs';
 import { FirstLevelMissionVoice } from './Script_FirstLevelMissionVoice.mjs';
 
@@ -33,9 +34,21 @@ director.current.parallel = [];director.current.phase = 'waiting';clock = 10.5;
 assert.equal(director.Speech('luo'), null, 'event-gated segment waits stay closed');
 
 function Glb(file) { const b = fs.readFileSync(new URL('./Model/Character/' + file, import.meta.url)); return JSON.parse(b.subarray(20, 20 + b.readUInt32LE(12))); }
-const source = Glb('Model_LugouNra05.glb'), face = Glb('Model_LugouNra05Facial.glb');
+const source = Glb('Model_TengxianNra05.glb'), face = Glb('Model_TengxianNra05Facial.glb');
+const sourceBytes=LoadGlb(new URL('./Model/Character/Model_TengxianNra05.glb',import.meta.url));
+const faceBytes=LoadGlb(new URL('./Model/Character/Model_TengxianNra05Facial.glb',import.meta.url));
+function SameAccessor(a,b,label,tolerance=1e-5){
+  const x=ReadAccessor(sourceBytes,a).data,y=ReadAccessor(faceBytes,b).data;
+  assert.equal(x.length,y.length,label+' length');
+  assert.ok(x.every((v,i)=>Math.abs(v-y[i])<=tolerance),label+' values');
+}
 assert.equal(face.skins[0].joints.length, source.skins[0].joints.length + 11);
-assert.deepEqual(face.animations, source.animations, 'all existing body clips preserved');
+assert.deepEqual(face.animations.map(a=>a.name), source.animations.map(a=>a.name), 'all body clips preserved');
+for(let i=0;i<source.animations.length;i++){
+  const a=source.animations[i],b=face.animations[i];
+  assert.deepEqual(a.channels,b.channels,a.name+' body track bindings');
+  for(let j=0;j<a.samplers.length;j++)for(const key of ['input','output'])SameAccessor(a.samplers[j][key],b.samplers[j][key],a.name+'/'+j+'/'+key);
+}
 for (let i = 0; i < source.nodes.length; i++) {
   const original = {...source.nodes[i]}, updated = {...face.nodes[i]};
   delete original.children;delete updated.children;delete original.extras;delete updated.extras;
@@ -44,9 +57,14 @@ for (let i = 0; i < source.nodes.length; i++) {
 }
 for (let i = 0; i < source.meshes[0].primitives.length; i++) {
   for (const key of ['POSITION', 'NORMAL', 'TEXCOORD_0'])
-    assert.equal(face.meshes[0].primitives[i].attributes[key], source.meshes[0].primitives[i].attributes[key]);
+    SameAccessor(source.meshes[0].primitives[i].attributes[key],face.meshes[0].primitives[i].attributes[key],'body surface '+i+'/'+key);
 }
 assert.equal(face.meshes[0].primitives.length, source.meshes[0].primitives.length + 3, 'oral surfaces batched into three material primitives');
-assert.deepEqual(face.images, source.images, 'original face and uniform textures retained');
+assert.equal(face.images.length,source.images.length,'original texture count');
+for(let i=0;i<source.images.length;i++){
+  const a=source.images[i],b=face.images[i];assert.equal(a.mimeType,b.mimeType);assert.equal(a.name,b.name);
+  const av=source.bufferViews[a.bufferView],bv=face.bufferViews[b.bufferView];
+  assert.ok(sourceBytes.bin.subarray(av.byteOffset,av.byteOffset+av.byteLength).equals(faceBytes.bin.subarray(bv.byteOffset,bv.byteOffset+bv.byteLength)),'original face and uniform texture bytes');
+}
 assert.equal(face.extras.facialRig.bones.length, 11);
 console.log('ok speech energy, silence, audio clock, parallel speaker isolation, pause/cancel and original body/skin asset contracts');

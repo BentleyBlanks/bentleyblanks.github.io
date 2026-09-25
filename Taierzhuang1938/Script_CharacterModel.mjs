@@ -127,7 +127,7 @@ export function GetLugouCharacterVariantEntries(kind) {
     modelVariant,
     role: profile?.role || "soldier",
     modelNumber: modelVariant + 1,
-    modelId: `${profile?.faction === "ija" ? "LugouIja" : "LugouNra"}${String(modelVariant + 1).padStart(2, "0")}`,
+    modelId: `${profile?.faction === "ija" ? "TengxianIja" : "TengxianNra"}${String(modelVariant + 1).padStart(2, "0")}`,
   }));
 }
 
@@ -263,10 +263,11 @@ const MODEL_FORWARD_YAW = Math.PI;
 // v4 = 2026-08-29 补回骨盆位移轨道的那批 GLB；v5 = 2026-09-02 视频转骨骼三条
 // 新 clip（CarryStretcherFront/Rear、WoundedLimp）。十套模型的二进制都变了，
 // 戳不跟着走就会「新壳配旧芯」：清单是新的，浏览器缓存里的 GLB 还是旧的那批。
-// NRA eye maps and shoulder silhouettes: keep the manifest and GLBs on one revision.
-const MANIFEST_URL = "./Model/Character/Data_LugouCharacterManifest.json?v=202609061026";
-const ASSET_VERSION = "202609061026";
-const DEATH_COLLAPSE_ASSET_VERSION = "202609151352";
+// Tengxian shared bind, eye maps and shoulder silhouettes: version the manifest
+// and every dependent GLB together after the offline normalization bake.
+const MANIFEST_URL = "./Model/Character/Data_TengxianCharacterManifest.json?v=20260926HumanoidV1";
+const ASSET_VERSION = "20260926HumanoidV1";
+const DEATH_COLLAPSE_ASSET_VERSION = "20260926HumanoidV1";
 const DEATH_COLLAPSE_PLAYBACK_RATE = 1.6;
 const DEATH_COLLAPSE_BLEND_SECONDS = 0.1;
 // 完整蒙皮轮廓必须进入 NormalDepth；但远处占屏很小的头、手和零碎附件不值得
@@ -353,7 +354,7 @@ function VersionedUrl(url) {
 function LoadDeathLibrary(faction) {
   if (!deathLibraryPromises.has(faction)) {
     const name = faction === "ija" ? "Ija" : "Nra";
-    const url = `./Model/Character/Animation_Lugou${name}DeathCollapse.glb?v=${DEATH_COLLAPSE_ASSET_VERSION}`;
+    const url = `./Model/Character/Animation_Tengxian${name}DeathCollapse.glb?v=${DEATH_COLLAPSE_ASSET_VERSION}`;
     deathLibraryPromises.set(faction, LOADER.loadAsync(url).catch(error => {
       console.warn("[DeathCollapse] optional library unavailable", faction, String(error));
       return null;
@@ -363,7 +364,7 @@ function LoadDeathLibrary(faction) {
 }
 
 // 死亡动画库是在另一个场景里烘的：骨架容器的偏移和人物模型不一样（NRA 库的
-// Rig 偏 X=-4.731，Model_LugouNra02 是 Rig -2.384 再套一层 Character +2.384）。
+// 旧来源 Rig 偏 X=-4.731，原 NRA02 是 Rig -2.384 再套一层 Character +2.384）。
 // 只按骨头自己的静止位置做差，最顶上那节动画骨头会把容器差值一起带进来——
 // 2026-09-16 实测倒地时骨盆 0.1 s 横移 2–4 m，而命中体和尸体刚体留在原地（「爆头后瞬移」）。
 // 所以动画层级的顶层（父节点不在这条 clip 里）按「源场景坐标 → 目标父节点坐标」整体换算，
@@ -421,7 +422,7 @@ async function LoadAsset(record) {
     const infantrySource = CHARACTER_INFANTRY_SOURCE_BY_MODEL[record.id] || record.id;
     if (!infantrySource.endsWith("05")) {
       try {
-        infantry = await LOADER.loadAsync(`./Model/Character/Animation_${infantrySource}Infantry.glb?v=202609060201`);
+        infantry = await LOADER.loadAsync(`./Model/Character/Animation_${infantrySource}Infantry.glb?v=20260926HumanoidV1`);
         if (infantrySource !== record.id) {
           // NRA05 shares NRA02's limb axes. Transfer local rest offsets and omit
           // source-only unweighted helpers; the visible model remains NRA05.
@@ -670,6 +671,7 @@ export class LugouCharacterRig {
     this.modelId = asset.record.id;
     // 一具人七个分件共用一份 Skeleton（见 Script_SkinnedClone 的抬头）。
     this.root = CloneSkinnedRig(asset.gltf.scene);
+    this.root.userData.sharedHumanoid = asset.gltf.userData?.sharedHumanoid;
     this.facial = asset.gltf.userData?.facialRig
       ? new CharacterFacialAnimation(this.root, asset.gltf.userData.facialRig) : null;
     this.root.name = `Rigged_${this.modelId}`;
@@ -713,7 +715,7 @@ export class LugouCharacterRig {
           .find((candidate) => normalized.includes(NormalizeName(candidate)));
       if (id && !this.clipById.has(id)) this.clipById.set(id, clip);
     }
-    if (this.clipById.has("StandFireCrouch") && this.clipById.has("AdvanceFire")) {
+    if (!this.root.userData.sharedHumanoid && this.clipById.has("StandFireCrouch") && this.clipById.has("AdvanceFire")) {
       this.clipById.set("StandFireCrouch", FullSizeProneClip(asset, this.clipById.get("AdvanceFire")));
     }
     this.mixer = new THREE.AnimationMixer(this.root);
@@ -1374,7 +1376,7 @@ export function CreateLugouCharacterRig(
       ? explicit
       : randomVariants[HashString(`${faction}:${options.seed ?? 0}:model`) % randomVariants.length];
   // Loaded arrays omit failed downloads; numeric slots must never change model identity.
-  const modelId = `Lugou${faction === "nra" ? "Nra" : "Ija"}${String(index + 1).padStart(2, "0")}`;
+  const modelId = `Tengxian${faction === "nra" ? "Nra" : "Ija"}${String(index + 1).padStart(2, "0")}`;
   const asset = variants.find(candidate => candidate.record?.id === modelId);
   if (!asset?.gltf) return null;
   const selected = asset.record.facialCast?.includes(options.castId) && asset.facial

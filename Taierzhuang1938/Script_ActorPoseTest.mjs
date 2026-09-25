@@ -192,7 +192,7 @@ try {
     // 军人可见人体已全部换成卢沟桥资产的蒙皮 GLB；程序化骨架仍只作为动作编辑器
     // 的独立模式和既有挂点 API 兼容层，不得重新成为正式军人外观。
     const checkRiggedSoldier = (candidate, faction) => {
-      check(candidate.meshSource.startsWith(`glb:Lugou${faction}`),
+      check(candidate.meshSource.startsWith(`glb:Tengxian${faction}`),
         `${faction} should use a Lugou skinned GLB, got ${candidate.meshSource}`);
       // 16 条源动作 + 3 条救护动作 + 5 条新步兵动作；军官保留原 19 条。
       const expectedActions = candidate.characterRig?.asset.infantry ? 24 : 19;
@@ -240,7 +240,7 @@ try {
       check(head.y < 0.8, `${candidate.modelId} 卧姿开火被拉站起来: ${head.y}`);
     };
     const CheckIjaBackpackHelmet = (candidate) => {
-      if (candidate.modelId !== "LugouIja03") return;
+      if (candidate.modelId !== "TengxianIja03") return;
       const rig = candidate.characterRig;
       const helmet = rig.root.getObjectByName("Object005");
       let backpack, face;
@@ -277,9 +277,9 @@ try {
     // Explicit rejected numbers and deterministic/random seeds cannot restore a banned face.
     for (const kind of ["nra", "nraDare", "ija"]) for (let number = 0; number < 8; number++) {
       const candidate = factory.Create(kind, {seed:number,modelVariant:number % 5,weapon:null});
-      const allowed = kind.startsWith("nra") ? ["LugouNra02","LugouNra05"] : ["LugouIja01","LugouIja02","LugouIja03"];
+      const allowed = kind.startsWith("nra") ? ["TengxianNra02","TengxianNra05"] : ["TengxianIja01","TengxianIja02","TengxianIja03"];
       check(allowed.includes(candidate.modelId), `banned appearance ${candidate.modelId}`);
-      if (candidate.modelId === "LugouNra05") {
+      if (candidate.modelId === "TengxianNra05") {
         for (const id of ["RifleCrouchAdvance","StandToKneel","KneelHold","KneelToStand","GrenadeThrow"]) {
           const clip = candidate.characterRig.clipById.get(id);
           check(clip?.tracks.length > 100, `NRA05 missing adapted infantry clip ${id}`);
@@ -292,10 +292,10 @@ try {
       candidate.Dispose();
     }
     const protagonist = factory.Create("nra", { seed: "player", protagonist: true, weapon: null });
-    check(protagonist.modelId === "LugouNra02",
-      `protagonist should use LugouNra02, got ${protagonist.modelId}`);
+    check(protagonist.modelId === "TengxianNra02",
+      `protagonist should use TengxianNra02, got ${protagonist.modelId}`);
     protagonist.Dispose();
-    for (const [kind, prefix] of [["nra", "LugouNra"], ["ija", "LugouIja"]]) {
+    for (const [kind, prefix] of [["nra", "TengxianNra"], ["ija", "TengxianIja"]]) {
       const variants = [];
       for (const modelVariant of kind === "nra" ? [1,4] : [0,1,2]) {
         const candidate = factory.Create(kind, { seed: `${kind}:${modelVariant}`, modelVariant, weapon: null });

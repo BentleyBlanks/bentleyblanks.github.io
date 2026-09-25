@@ -4,7 +4,7 @@
   "cycleFrames": 88,
   "referenceSpeedMps": 2.6,
   "stanceFraction": 0.35,
-  "revision": "NaturalRunV2",
+  "revision": "HumanoidV1",
   "pelvisHeight": 0.884,
   "pelvisBounce": 0.027,
   "flightLift": 0.3,
@@ -16,39 +16,13 @@
   "slingWidthMeters": 0.027,
   "durationSeconds": 0.7333333333333333,
   "strideMeters": 1.9066666666666665,
-  "sourceModel": "Taierzhuang1938/Model/Character/Model_LugouNra01.glb",
-  "sourceModelSha256": "2f5ef965581971da9a9ba90e8f17cd96180a390b1f922c73828522ed25703913",
+  "sourceModel": "Taierzhuang1938/Model/Character/Model_TengxianNra02.glb",
+  "sourceModelSha256": "67550199849f78d581b356580f25595f361bece70fef0c82d7bd08a954197790",
   "sourceWeapon": "Taierzhuang1938/Model/Model_ZhongZheng.tzm.json",
   "sourceWeaponSha256": "0d18aaf93c0451cc2ebb0e8266648874798bd100d3a372aad920edcd027c199e",
-  "armature": "Rig_LugouCharacter",
+  "armature": "Rig_TengxianCharacter",
   "socket": "Socket_BackRifle",
-  "socketBone": "Bip002 Spine2",
-  "socketMatrixBlenderLocal": [
-    [
-      31.462871551513672,
-      -17.950820922851562,
-      -93.20866394042969,
-      -24.89697265625
-    ],
-    [
-      5.740961074829102,
-      98.37565612792969,
-      -17.00803565979004,
-      -1815.97412109375
-    ],
-    [
-      94.74771118164062,
-      0.00014361678040586412,
-      31.98235321044922,
-      11.50007438659668
-    ],
-    [
-      0.0,
-      0.0,
-      0.0,
-      1.0
-    ]
-  ],
+  "socketBone": "Bip001 Spine2",
   "rootMotion": "inPlace; GroundRoot fixed; pelvis vertical and lateral only",
   "sourceForward": "Blender -Y / glTF +Z",
   "gameForward": "apply existing MODEL_FORWARD_YAW once, game -Z",
@@ -60,7 +34,7 @@
   "samples": [
     {
       "frame": 1,
-      "phase": 0.0,
+      "phase": 0,
       "soleHeightMeters": {
         "L": 0.003000020980834961,
         "R": 0.24921643733978271
@@ -1204,7 +1178,7 @@
     },
     {
       "frame": 89,
-      "phase": 1.0,
+      "phase": 1,
       "soleHeightMeters": {
         "L": 0.003000020980834961,
         "R": 0.24921643733978271
@@ -1215,5 +1189,52 @@
         0.8840000033378601
       ]
     }
-  ]
+  ],
+  "legacySourceModel": "Taierzhuang1938/Model/Character/Model_LugouNra01.glb",
+  "legacySourceModelSha256": "2f5ef965581971da9a9ba90e8f17cd96180a390b1f922c73828522ed25703913",
+  "skeleton": "TengxianHumanoidV1",
+  "legacySocketMatrixBlenderLocal": [
+    [
+      31.462871551513672,
+      -17.950820922851562,
+      -93.20866394042969,
+      -24.89697265625
+    ],
+    [
+      5.740961074829102,
+      98.37565612792969,
+      -17.00803565979004,
+      -1815.97412109375
+    ],
+    [
+      94.74771118164062,
+      0.00014361678040586412,
+      31.98235321044922,
+      11.50007438659668
+    ],
+    [
+      0,
+      0,
+      0,
+      1
+    ]
+  ],
+  "socketTransformGltfMetres": {
+    "translation": [
+      -0.24896934628486633,
+      -0.23130440711975098,
+      0.11500077694654465
+    ],
+    "rotation": [
+      0.6092434525489807,
+      -0.3589193522930145,
+      0.46245282888412476,
+      0.5349175333976746
+    ],
+    "scale": [
+      0.9999999403953552,
+      0.9999999403953552,
+      0.9999999403953552
+    ]
+  }
 }

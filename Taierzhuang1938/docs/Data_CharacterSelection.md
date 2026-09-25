@@ -5,14 +5,16 @@ Luo uses NRA05. Young companions, train recruits and the cutscene protagonist us
 NRA officers use NRA05; IJA officers use IJA01. Gameplay and the actor editor share
 `Data_CharacterSelection.mjs`; explicit rejected variants also resolve within this allowlist.
 
-Source GLBs and canonical animation references remain available for provenance.
+The five rejected body GLBs were deleted on 2026-09-26; provenance remains in Git history.
+Adopted assets now use Tengxian names and one shared body skeleton; see
+[the character standard](Data_CharacterStandard.md) for the current inventory and rebuild entry.
 The NRA01 beard is present in the supplied NRA MAX source (`VITOH_d.mipmap.jpg`),
 which the source IJA01 also uses; it was not introduced by a game face swap.
 Private source-comparison renders are outside the repository in the Blender
 `Taierzhuang1938/CharacterSourceAudit_20260911` directory.
 
-NRA05 now borrows the existing NRA02 infantry animation library with target local
-rest offsets and rotations applied, retaining NRA05's visible mesh and skeleton.
+NRA05 shares NRA02's infantry animation library on the common reference skeleton,
+retaining NRA05's visible face and uniform.
 No new motion or image generation is involved. First-person arm-only assets have no
 head and keep their existing separate grip/weapon contract.
 

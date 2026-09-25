@@ -1,7 +1,7 @@
 // Metres relative to the existing bunker/traffic-trench ground sampler.
 // Composition follows Notion 01–03, 03–07 V2 and 08–09A V3 (2026-09-21).
 export const OPENING_STORYBOARDS = Object.freeze({
-  version:"20260922OpeningStoryboardsV1", animationBase:"./Animation/OpeningStoryboards/",
+  version:"20260926OpeningStoryboardsHumanoidV1", animationBase:"./Animation/OpeningStoryboards/",
   fps:24, fov:65, fadeInS:1.8, wakeS:5.0, strikeBlackS:1.4,
   discoverS:3.6, clearWoodS:1.6, dragS:2.8, buttS:1.4, buttContactS:.85,
   ambushS:1.1, bladeContactS:.56, deflectS:1.0, pullS:2.4, kickS:1.2, kickContactS:.48,

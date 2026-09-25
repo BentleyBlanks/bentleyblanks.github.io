@@ -6,7 +6,7 @@ const Read=file=>fs.readFileSync(new URL(file,import.meta.url));
 const Hash=bytes=>crypto.createHash("sha256").update(bytes).digest("hex");
 const manifest=JSON.parse(Read("Animation/OpeningStoryboards/Data_OpeningStoryboardsAnimation.json"));
 assert.equal(manifest.version,C.version);
-assert.deepEqual(manifest.models.map(row=>row.id),["LugouNra02","LugouNra05","LugouIja01","LugouIja02","LugouIja03"]);
+assert.deepEqual(manifest.models.map(row=>row.id),["TengxianNra02","TengxianNra05","TengxianIja01","TengxianIja02","TengxianIja03"]);
 let frames=0;
 for(const row of manifest.models){
   const bytes=Read("Animation/OpeningStoryboards/"+row.file),asset=JSON.parse(bytes);

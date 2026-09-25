@@ -10,7 +10,7 @@ import * as THREE from "three";
 import {OpeningFirstPerson,OpeningActorAnatomy,SolveOpeningActorArm} from "./Script_OpeningFirstPerson.mjs";
 
 const here=path.dirname(fileURLToPath(import.meta.url));
-const manifest=JSON.parse(fs.readFileSync(path.join(here,"Model/Character/Data_LugouCharacterManifest.json"),"utf8"));
+const manifest=JSON.parse(fs.readFileSync(path.join(here,"Model/Character/Data_TengxianCharacterManifest.json"),"utf8"));
 function Actor(id){
   const record=manifest.models.find(row=>row.id===id),buffer=fs.readFileSync(path.join(here,record.url));
   const gltf=JSON.parse(buffer.subarray(20,20+buffer.readUInt32LE(12)).toString());
@@ -38,12 +38,12 @@ for(const unavailable of [undefined,{root:new THREE.Group()},{root:new THREE.Gro
   new OpeningFirstPerson(show).Update();assert.equal(show.firstPersonState.available,false);assert.equal(show.supplyRoot.visible,false);
   if(unavailable)assert.equal(unavailable.root.visible,false,"do not show an untrimmed procedural body in front of the camera");
 }
-const missingFinger=Actor("LugouNra02");
+const missingFinger=Actor("TengxianNra02");
 missingFinger.characterRig.root.traverse(node=>{if(node.name.endsWith("L Finger1"))node.name="UnavailableDigit";});
 assert.equal(OpeningActorAnatomy(missingFinger),null,"incomplete hands cannot use uncalibrated palm frames");
 let samples=0,maxBend=0,maxTwist=0,maxRotation=0;
-for(const model of ["LugouNra01","LugouNra02"]){
-  const playerBody=Actor(model),other=Actor("LugouNra02");
+for(const model of ["TengxianNra05","TengxianNra02"]){
+  const playerBody=Actor(model),other=Actor("TengxianNra02");
   other.root.position.set(-40,-.5,-126.9);other.root.updateMatrixWorld(true);
   const show={playerBody,ready:true,phase:"Supply",Age:0,supplyRoot:new THREE.Group(),loadingRifle:new THREE.Group(),loadingRifleGrip:new THREE.Vector3(),clips:[new THREE.Group(),new THREE.Group()],
     r:{player:{camera},companion:{Handle:()=>({actor:other})}}};
@@ -70,7 +70,7 @@ for(const model of ["LugouNra01","LugouNra02"]){
 // the preferred elbow pole would make the wrist-flexion clamp roll that plane.
 // Exercise both production skins and hands with continuously moving contacts.
 let claspSamples=0,maxClaspError=0,minClaspAlignment=1,maxClaspBend=0,freeReachSamples=0,maxFreeFrameError=0;
-for(const model of ["LugouNra01","LugouNra02"])for(const side of ["l","r"]){
+for(const model of ["TengxianNra05","TengxianNra02"])for(const side of ["l","r"]){
   const actor=Actor(model),rig=OpeningActorAnatomy(actor),sign=side==="l"?-1:1;
   const shoulder=rig.bones[side].upperArm.getWorldPosition(new THREE.Vector3());
   const lengths=rig.armRest[side];

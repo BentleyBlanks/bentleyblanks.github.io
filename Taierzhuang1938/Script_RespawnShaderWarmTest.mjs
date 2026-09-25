@@ -216,7 +216,7 @@ try {
   const sweep = result.sweep;
   // 两个阵营获准的模型号都要真的挂进场景（被画过）；个别人被院墙挡在视锥外可以容忍，模型号不能缺。
   const attachedModels = new Set(sweep.attachedModels);
-  const modelsWanted = ["LugouNra02", "LugouNra05", "LugouIja01", "LugouIja02", "LugouIja03"];
+  const modelsWanted = ["TengxianNra02", "TengxianNra05", "TengxianIja01", "TengxianIja02", "TengxianIja03"];
   const missingModels = modelsWanted.filter((id) => !attachedModels.has(id));
   Report(sweep.spawned === sweep.planned && !missingModels.length,
     "全模型号摆到镜头前",

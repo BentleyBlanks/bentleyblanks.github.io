@@ -36,11 +36,11 @@ import { LoadDraftCartAssets, CreateDraftCartInstance } from "./Script_DraftCart
 
 /** 人物 kind → 中文名。KIND_SPEC 的键在 Script_Actor 里，这里只做展示名。 */
 const KINDS = [
-  { id: "nra", name: "国军步兵", note: "卢沟桥来源国军模型；可逐个查看 4 名士兵" },
-  { id: "nraDare", name: "国军敢死队", note: "4 名国军士兵模型 + 背刀骨骼挂点" },
-  { id: "nraOfficer", name: "国军军官", note: "国军第 5 套军官模型；身份与手枪由剧情数据表达" },
-  { id: "ija", name: "日军步兵", note: "卢沟桥来源日军模型；可逐个查看 4 名士兵" },
-  { id: "ijaOfficer", name: "日军军官", note: "日军第 5 套军官模型；身份与手枪由剧情数据表达" },
+  { id: "nra", name: "国军步兵", note: "采用 NRA02、NRA05 两款外观；共用滕县身体骨架" },
+  { id: "nraDare", name: "国军敢死队", note: "复用两款国军外观，附背刀骨骼挂点" },
+  { id: "nraOfficer", name: "国军军官", note: "复用 NRA05 外观；身份与手枪由剧情数据表达" },
+  { id: "ija", name: "日军步兵", note: "采用 IJA01、IJA02、IJA03 三款外观；共用滕县身体骨架" },
+  { id: "ijaOfficer", name: "日军军官", note: "复用 IJA01 外观；身份与手枪由剧情数据表达" },
   { id: "civilian", name: "百姓", note: "包头巾、布鞋、无武器" },
 ];
 

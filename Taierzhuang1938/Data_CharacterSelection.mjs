@@ -7,7 +7,7 @@ export const CHARACTER_MODEL_VARIANTS_BY_KIND = Object.freeze({
   ija, ijaOfficer: Object.freeze([0]),
 });
 export const CHARACTER_PROTAGONIST_VARIANT = 1;
-export const CHARACTER_INFANTRY_SOURCE_BY_MODEL = Object.freeze({ LugouNra05: "LugouNra02" });
+export const CHARACTER_INFANTRY_SOURCE_BY_MODEL = Object.freeze({ TengxianNra05: "TengxianNra02" });
 
 // Favor the lighter approved skins in anonymous crowds; retain every soldier.
 // NRA05: 8,683 triangles; IJA01: 11,106 (other approved IJA skins: 14,703/15,573).

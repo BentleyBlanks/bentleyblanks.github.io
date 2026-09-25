@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "version": "20260922OpeningStoryboardsV1",
+  "version": "20260926OpeningStoryboardsHumanoidV1",
   "fps": 24,
   "actorForward": [
     0,
@@ -112,10 +112,10 @@
   },
   "models": [
     {
-      "id": "LugouNra02",
-      "file": "Animation_LugouNra02OpeningStoryboards.json",
-      "sha256": "d1756c0b887531108f53a18cec1d6adbf990361342d0e22f65c6499d624c7645",
-      "originalModelSha256": "39c08ca82148e140ee2952caffdd0dee99750fb734038a5263d216c9a7345225",
+      "id": "TengxianNra02",
+      "file": "Animation_TengxianNra02OpeningStoryboards.json",
+      "sha256": "abc58c4a4c614a2ffa95a90bad0c525bf2870d5b8a525c74ab8bbdd0784d9842",
+      "originalModelSha256": "67550199849f78d581b356580f25595f361bece70fef0c82d7bd08a954197790",
       "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningStoryboards_20260922\\Scene_LugouNra02OpeningStoryboards.blend",
       "clips": [
         {
@@ -241,10 +241,10 @@
       ]
     },
     {
-      "id": "LugouNra05",
-      "file": "Animation_LugouNra05OpeningStoryboards.json",
-      "sha256": "869dce71de662500007e72bd9babedf9ac1f2bfb6d6c33a05164ab895c087f2e",
-      "originalModelSha256": "acbc9184da059bdf6c3c18d051f3eba77d1dd3acba469e8dbc876b092f174250",
+      "id": "TengxianNra05",
+      "file": "Animation_TengxianNra05OpeningStoryboards.json",
+      "sha256": "8d75de5c74c2e6dea3345a6b6b7543800479d7bd9a974232fa3b0b2ac1f2d804",
+      "originalModelSha256": "b85b90fac1843261d40fbf257470a933819a9302dff1727a591feda1a5327b55",
       "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningStoryboards_20260922\\Scene_LugouNra05OpeningStoryboards.blend",
       "clips": [
         {
@@ -370,10 +370,10 @@
       ]
     },
     {
-      "id": "LugouIja01",
-      "file": "Animation_LugouIja01OpeningStoryboards.json",
-      "sha256": "f6cfc9f042a0075cf9dcfdae277293c7b0044cf747ce507eb4b728901095bbbe",
-      "originalModelSha256": "23fa4ef88891bd14d49dfb9a3e61b9f0dcaf45b8956a720aab24d9c4c23eb9c7",
+      "id": "TengxianIja01",
+      "file": "Animation_TengxianIja01OpeningStoryboards.json",
+      "sha256": "4fb5fd254bfbb14a035fbeaaf9192e15e1849db03e14417590cead1da7563f82",
+      "originalModelSha256": "fc6c84ad51c9752066127b148a1f9db307da9659dea441989861265693b02c6b",
       "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningStoryboards_20260922\\Scene_LugouIja01OpeningStoryboards.blend",
       "clips": [
         {
@@ -499,10 +499,10 @@
       ]
     },
     {
-      "id": "LugouIja02",
-      "file": "Animation_LugouIja02OpeningStoryboards.json",
-      "sha256": "53ab8cd516acfecec0ad25434a0ae01670907a6e5f81ab370afcb072ad78adbc",
-      "originalModelSha256": "8c4860ec2d4dd3076b06ff7e593e5dcfd4d23aefe2fedf6f9fdec3b0e12cc9aa",
+      "id": "TengxianIja02",
+      "file": "Animation_TengxianIja02OpeningStoryboards.json",
+      "sha256": "c42d0b848fba8c9356f6fad026fd06429a1b1572511e07593fdbf6a202f00fd9",
+      "originalModelSha256": "fc429bafc6973e54e8d1fa72ac99c8740c81be25f895ddb1417bb47707578788",
       "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningStoryboards_20260922\\Scene_LugouIja02OpeningStoryboards.blend",
       "clips": [
         {
@@ -628,10 +628,10 @@
       ]
     },
     {
-      "id": "LugouIja03",
-      "file": "Animation_LugouIja03OpeningStoryboards.json",
-      "sha256": "9da4d5ba40b3b5009f91ab786cd3edf600fd1f71f3f6584ed1b3f9b2e1a91ee5",
-      "originalModelSha256": "6d97c801f7ea62430e5397fde980ad0964ab5081fa5f15249434bce4cbf3f89d",
+      "id": "TengxianIja03",
+      "file": "Animation_TengxianIja03OpeningStoryboards.json",
+      "sha256": "c1f08bf16feffbd084fb9f4ead5d32d1b8e5ca0e8ca08b7b4dcb52bcd237e4ab",
+      "originalModelSha256": "17163f830cdf91b2b8bbe9b6e197855bf739a48116464b19eb24738d921b4f74",
       "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningStoryboards_20260922\\Scene_LugouIja03OpeningStoryboards.blend",
       "clips": [
         {

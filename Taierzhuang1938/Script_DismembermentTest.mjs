@@ -553,7 +553,7 @@ for (const [part, pool] of [["arm", LIMB_POOLS.arm], ["leg", LIMB_POOLS.leg]]) {
 }
 
 // 屈膝的腿：关节球里的首交点按关节平分面归段，刀与子弹同一条规则（§11.9）。
-// 几何照 GoreRangeTest 木桩站定据枪那一帧的右腿（LugouIja01 实测，膝盖在前、胫骨往后斜）。
+// 几何照 GoreRangeTest 木桩站定据枪那一帧的右腿（TengxianIja01 实测，膝盖在前、胫骨往后斜）。
 {
   const Z = -1.2;
   const S = (id, a, b, start, end, worldRadius) => ({ id, type: "capsule", part: "limb", a, b, start, end, worldRadius,

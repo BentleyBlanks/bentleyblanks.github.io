@@ -80,21 +80,25 @@ function ReadGlbJson(filePath) {
   }
 }
 
-const manifestPath = path.join(characterDir, "Data_LugouCharacterManifest.json");
+const manifestPath = path.join(characterDir, "Data_TengxianCharacterManifest.json");
 assert.ok(fs.existsSync(manifestPath), "character bake manifest exists");
 const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
 assert.equal(manifest.schema, 2);
-assert.equal(manifest.models.length, 10, "ten character records");
+assert.equal(manifest.models.length, 5, "only the five adopted character records");
 assert.deepEqual(manifest.models.map((model) => model.id), [
-  "LugouIja01", "LugouIja02", "LugouIja03", "LugouIja04", "LugouIja05",
-  "LugouNra01", "LugouNra02", "LugouNra03", "LugouNra04", "LugouNra05",
+  "TengxianIja01", "TengxianIja02", "TengxianIja03", "TengxianNra02", "TengxianNra05",
 ]);
-assert.equal(manifest.models.filter((model) => model.faction === "nra").length, 5);
-assert.equal(manifest.models.filter((model) => model.faction === "ija").length, 5);
+assert.equal(manifest.models.filter((model) => model.faction === "nra").length, 2);
+assert.equal(manifest.models.filter((model) => model.faction === "ija").length, 3);
+const shared = JSON.parse(fs.readFileSync(path.join(characterDir, "Data_TengxianHumanoid.json")));
+assert.equal(shared.bodyBones.length, 53);
+for (const id of ["Nra01", "Nra03", "Nra04", "Ija04", "Ija05"])
+  for (const prefix of ["Lugou", "Tengxian"])
+    assert.equal(fs.existsSync(path.join(characterDir, `Model_${prefix}${id}.glb`)), false, `${id} rejected appearance removed`);
 
 const expectedDeathClips = ["DeathCollapseA", "DeathCollapseB", "DeathCollapseC", "DeathCollapseD"];
 for (const faction of ["Nra", "Ija"]) {
-  const deathPath = path.join(characterDir, `Animation_Lugou${faction}DeathCollapse.glb`);
+  const deathPath = path.join(characterDir, `Animation_Tengxian${faction}DeathCollapse.glb`);
   const bytes = fs.statSync(deathPath).size;
   assert.ok(bytes > 300_000 && bytes < 800_000,
     `${faction} death library contains animation data without duplicate character textures`);
@@ -114,10 +118,8 @@ for (const faction of ["Nra", "Ija"]) {
 
 for (const model of manifest.models) {
   const factionStem = model.faction === "ija" ? "Ija" : "Nra";
-  assert.equal(model.animationSource, `Lugou${factionStem}Canonical`,
-    `${model.id} uses its own faction's canonical animation rig`);
-  assert.equal(model.animationSourceModel, `Lugou${factionStem}01`,
-    `${model.id} records its same-faction animation source model`);
+  assert.equal(model.animationSource, "TengxianHumanoidV1", `${model.id} shares the body rig`);
+  assert.equal(model.animationSourceModel, "TengxianNra02", `${model.id} records the common proportion reference`);
   assert.deepEqual(model.animations, expectedActions, `${model.id} manifest actions`);
   assert.equal(Number.isInteger(model.limitedWeightVertices), true,
     `${model.id} records four-weight conversion count`);
@@ -129,8 +131,8 @@ for (const model of manifest.models) {
     const audit = model.animationAudit[actionId];
     assert.equal(audit.sourceFrames >= 2, true, `${model.id}/${actionId} source frames`);
     assert.equal(audit.sourceBones >= 52, true, `${model.id}/${actionId} source bones`);
-    assert.equal(audit.maxPoseDeltaError <= 0.001, true,
-      `${model.id}/${actionId} matches its Max/BIP pose`);
+    assert.equal(model.sourceAnimationAudit[actionId].maxPoseDeltaError <= 0.001, true,
+      `${model.id}/${actionId} retains the original Max/BIP provenance audit`);
     // 躺/坐这类接触姿允许身体小幅陷进接触面；站姿参考 clip 仍然守 8 cm。
     const groundLimit = actionId === STANDING_REFERENCE_CLIP ? 0.08 : 0.25;
     assert.equal(audit.maxGroundPenetrationMeters <= groundLimit, true,
@@ -152,6 +154,16 @@ for (const model of manifest.models) {
   const glbPath = path.join(here, model.url.replace(/^\.\//, ""));
   assert.ok(fs.statSync(glbPath).size > 100_000, `${model.id} GLB has payload`);
   const gltf = ReadGlbJson(glbPath);
+  const parents = new Map(gltf.nodes.flatMap(node => (node.children || []).map(index => [index, node.name])));
+  for (const bone of shared.bodyBones) {
+    const index = gltf.nodes.findIndex(node => node.name === bone.name), node = gltf.nodes[index];
+    assert.ok(node, `${model.id} shared bone ${bone.name}`);
+    for (const key of ["translation", "rotation", "scale"]) assert.deepEqual(node[key], bone[key], `${model.id}/${bone.name}/${key} common bind transform`);
+    if (shared.parents[bone.name]) assert.equal(parents.get(index), shared.parents[bone.name]);
+  }
+  for (const node of gltf.nodes.filter(node => /^(Rig_|Character_)/.test(node.name))) {
+    assert.deepEqual(node.translation, [0, 0, 0]); assert.deepEqual(node.rotation, [0, 0, 0, 1]); assert.deepEqual(node.scale, [1, 1, 1]);
+  }
   assert.equal((gltf.skins || []).length >= 1, true, `${model.id} GLB skin`);
   assert.equal((gltf.meshes || []).length >= 1, true, `${model.id} GLB mesh`);
   assert.equal((gltf.animations || []).length, expectedActions.length, `${model.id} GLB animations`);
@@ -160,7 +172,7 @@ for (const model of manifest.models) {
   assert.equal((gltf.nodes || []).some((node) => node.name === "Socket_HeadGear"), true,
     `${model.id} GLB has the head-centre collision anchor`);
 
-  if (model.id === "LugouIja03") {
+  if (model.id === "TengxianIja03") {
     const helmetIndex = gltf.nodes.findIndex(node => node.name === "Object005");
     const chest = gltf.nodes.find(node => node.name === model.boneRoles.chest);
     assert.ok(helmetIndex >= 0 && chest?.children?.includes(helmetIndex),
@@ -214,7 +226,7 @@ for (const model of manifest.models) {
 
 // A material can exist yet contain no iris (the white/black eye regression).
 // Check the shipped eye primitive and the UV at each forward-facing corneal pole.
-for (const id of ["LugouNra02", "LugouNra04"]) {
+for (const id of ["TengxianNra02"]) {
   const glb = LoadGlb(path.join(characterDir, "Model_" + id + ".glb"));
   const materialIndex = glb.json.materials.findIndex(material => material.name === "Material_NraEyes");
   assert.ok(materialIndex >= 0, id + " has a textured eye material");
@@ -242,15 +254,18 @@ for (const id of ["LugouNra02", "LugouNra04"]) {
 
 // Evaluate source landmarks through the actual opening skin palette. A simple
 // bind-space downward edit pushed the rotated relaxed sleeves out sideways.
-const shoulderReference = JSON.parse(fs.readFileSync(new URL("./_blender/Data_NraRelaxedShoulderReference.json", import.meta.url)));
-for (const [id, reference] of Object.entries(shoulderReference)) {
+const shoulderReference = JSON.parse(fs.readFileSync(new URL("./_blender/Data_TengxianShoulderReference.json", import.meta.url)));
+for (const [sourceId, reference] of Object.entries(shoulderReference)) {
+  const id = sourceId.replace("Lugou", "Tengxian");
+  if (!manifest.models.some(model => model.id === id)) continue;
   const glb = LoadGlb(path.join(characterDir, "Model_" + id + ".glb"));
   for (const landmark of reference.landmarks) {
     const primitive = glb.json.meshes[landmark.mesh].primitives[landmark.primitive];
     const positions = ReadAccessor(glb, primitive.attributes.POSITION).data;
     const joints = ReadAccessorInt(glb, primitive.attributes.JOINTS_0).data;
     const weights = ReadAccessor(glb, primitive.attributes.WEIGHTS_0).data;
-    const delta = landmark.sourcePosition.map((value, axis) => positions[landmark.vertex*3+axis]-value);
+    const canonicalDelta = landmark.sourcePosition.map((value, axis) => positions[landmark.vertex*3+axis]-value);
+    const delta = landmark.toSourceLinear.map(row => row.reduce((sum, value, axis) => sum+value*canonicalDelta[axis], 0));
     const world = [0, 0, 0];
     for (let k = 0; k < 4; k++) {
       const joint = joints[landmark.vertex*4+k], weight = weights[landmark.vertex*4+k];
@@ -280,7 +295,7 @@ assert.match(runtime, /DEATH_COLLAPSE_CLIP_IDS = Object\.freeze\(\[[\s\S]*?Death
   "runtime exposes exactly four shared death candidates");
 assert.match(runtime, /HashString\(`\$\{seed\}\|death-collapse`\) % DEATH_COLLAPSE_CLIP_IDS\.length/,
   "death candidate selection is random-looking but replay-stable per actor seed");
-assert.match(runtime, /Animation_Lugou\$\{name\}DeathCollapse\.glb/,
+assert.match(runtime, /Animation_Tengxian\$\{name\}DeathCollapse\.glb/,
   "NRA and IJA load their matching canonical death library");
 assert.match(runtime, /clampWhenFinished = true;[\s\S]*?action\.setLoop\(THREE\.LoopOnce, 1\)/,
   "collapse candidates play once and retain their settled terminal pose");
