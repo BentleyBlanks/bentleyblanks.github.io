@@ -13,7 +13,7 @@
 //     「贴这道墙！前头有人！」那句真的开播（事实 frontApproachPointed，罗此刻开始伸臂指路，指 leaderLead.pointS 秒）。
 //     玩家站起来，视线取契约 §5 的默认范围 yaw −66°…−50° 里让罗落在画面横向约 0.75 的那一个，俯仰 −2°。 → SB07
 //   · 接着把支援路线走完、夺点（同整关驾驶，被手榴弹甩到西矮墙外就从西门绕回），
-//     然后走到阵位机枪北侧 (25.6,−155.2) 站定，视线 yaw 99°、俯仰 −3°；一边照常还击，一边每 0.5 s 看一次
+//     蹲在座位上还击到第一批放行，再走到阵位机枪北侧 (25.6,−155.2) 站定，视线 yaw 99°、俯仰 −3°，每 0.1 s 看一次
 //     正在过缺口的第一批，第一次看到 ≥ 3 人（或 100 s 里最多的那一刻）截图。 → SB08
 //
 // 「看得见」怎么判（不是只算投影落在画框里 —— 投影在框里的人可能被沟壁、矮墙、自己的枪挡住）：
@@ -30,7 +30,7 @@ import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
 import { InstallInputDriver, CampaignActions } from "./Script_FirstLevelCampaignKit.mjs";
 import { MISSION_ROUTES } from "./Data_FirstLevelMissionLayout.mjs";
-import { FRONT_SORTIE as S } from "./Data_FirstLevelFrontRoute.mjs";
+import { FRONT_SORTIE as S, FRONT_SPACE as Space } from "./Data_FirstLevelFrontRoute.mjs";
 import { FRONT_BATTLE_TUNING as B } from "./Data_Tuning_FirstLevelFront.mjs";
 import { FRONT_GUARD_MG_GROUP as MG } from "./Data_FirstLevelMissionFront.mjs";
 
@@ -60,8 +60,8 @@ const FRONT_STORYBOARD_SHOTS = Object.freeze({
     firstBatch: Object.freeze({ minVisible: 3, minPx: 60 }),
     // 左前景的机枪（夺下的 MissionGun）：重心在画面左 0.4 以内、面积够大（前景）。
     gun: Object.freeze({ xMax: 0.4, minPx: 3000 }),
-    // 过口的那几秒（缺口段沟只有 0.5 m 深，约 6 m 长）每 0.2 s 看一次，平时 0.5 s。
-    waitS: 100, sampleS: 0.5, crossingSampleS: 0.2,
+    // 放行之后站到机位上，每 0.1 s 看一次（缺口段沟只有 0.5 m 深、约 6 m 长，人过这一段只要两三秒）。
+    waitS: 100, crossingSampleS: 0.1,
   }),
 });
 
@@ -283,22 +283,35 @@ async function ShootSB08(Route) {
   });
   const captured = await HoldUntil("r.Has('rightNestCaptured')", 90);
   if (!captured.hit) throw Error("rightNestCaptured 90 s 内没发生：" + JSON.stringify(captured));
-  await Route([{ x: C.player.x, z: C.player.z }], "SB08_NorthOfGun", { stance: "crouch", fight: true, arrivalM: 0.35, recoverAfterEvade: true });
+  // 从哪儿走回机位：西矮墙外的从西门绕，东墙外的从北头绕（同整关驾驶 ReturnToSeat；09-25 第十二趟直线走顶在西矮墙上）。
+  const ToViewpoint = async () => {
+    const at = await page.evaluate(() => { const p = window.Tengxian.player.position; return { x: p.x, z: p.z }; }), vp = { x: C.player.x, z: C.player.z };
+    const west = at.x < 24.4 && at.z < Space.westDoor.z + 0.7, east = at.x > 32.5 && at.z > -145.2;
+    const points = east ? [{ x: at.x, z: -141.8 }, { x: 30, z: -141.8 }, vp] : west ? [{ x: at.x, z: Space.westDoor.z }, Space.westDoor, vp] : [vp];
+    await Route(points, "SB08_NorthOfGun", { stance: "crouch", fight: true, arrivalM: 0.35, recoverAfterEvade: true });
+  };
+  // 先蹲着走到机位、蹲着还击等第一批放行（09-25 第九趟站在那儿干等了一百来秒，被打死在 (25.6,−152.4)；
+  // 第十一趟放行后才从座位走过去，到位时一列人已经过了缺口），有人开始过口再站起来看。
+  await ToViewpoint();
+  const released = await HoldUntil(`(r.guards||[]).slice(0,${B.firstBatch}).some((x)=>x.crossing)`, 150);
+  if (!released.hit) throw Error("第一批 150 s 内没放行：" + JSON.stringify(released));
+  if (await page.evaluate((vp) => Math.hypot(window.Tengxian.player.position.x - vp.x, window.Tengxian.player.position.z - vp.z) > 0.8, C.player)) await ToViewpoint();
   let best = null;
   const samples = [];
   for (let k = 0, t0 = null; k < 1000; k++) {
     const s = await page.evaluate(({ C, n }) => {
       const g = window.Tengxian, G = window.frontShots, r = g.Debug.FirstLevelMissionRuntime();
-      // 一边还击一边等（同整关驾驶在阵位里的做法），到时刻再摆回 SB08 的视线看一眼。
-      const crossing = (r.guards || []).slice(0, n).some((x) => x.crossing && !x.safe);
-      for (let f = 0; f < Math.round((crossing ? C.crossingSampleS : C.sampleS) * 60) && g.player.alive; f++) {
-        const ev = window.MissionInputDriver.EvadeGrenade(), foe = ev ? null : window.MissionInputDriver.Target(60);
-        if (foe) window.MissionInputDriver.Shoot(foe); else if (!ev) { g.Debug.Mouse(0, false); g.Debug.Mouse(2, false); if (g.state.ammo === 0) g.Debug.Key("KeyR"); }
+      // 站定看着缺口（分镜里玩家就是在看这一列人）：只躲手榴弹、扎绷带，不还击 ——
+      // 还击会开镜、转头，视场收放一次要一秒多，采样就稀成每 1.8 s 一张（09-25 第十趟），过口那几秒全漏掉。
+      // 第一次（或躲完雷）先 G.Look 站起来、等视场停稳；之后每 crossingSampleS 看一眼，帧帧都渲染（时间滤波不断档）。
+      if (!G.watching) { G.Look(C.yawDeg, C.pitchDeg, "stand"); G.watching = true; }
+      else for (let f = 0, frames = Math.round(C.crossingSampleS * 60); f < frames && g.player.alive; f++) {
+        const ev = window.MissionInputDriver.EvadeGrenade();
+        if (ev) G.watching = false;
+        else { g.player.yaw = C.yawDeg * Math.PI / 180; g.player.pitch = C.pitchDeg * Math.PI / 180; g.player.aimYaw = 0; }
         if (g.player.bleeding && g.player.health < 80) g.Debug.Key("KeyB");
-        g.StepFrames(1, 1 / 60, false);
+        g.StepFrames(1, 1 / 60, true);
       }
-      g.Debug.Mouse(0, false);
-      G.Look(C.yawDeg, C.pitchDeg, "stand");
       const p = g.player.position, first = (r.guards || []).slice(0, n), gun = g.scene.getObjectByName("Emplacement_MissionGun");
       const paint = G.Paint([{ key: "gun", roots: [gun] }, ...first.map((x, i) => ({ key: "g" + i, roots: [x.actor.actor?.root] }))], 1);
       // 只数正在过口的人（crossing 且还没进安全区）：还跪在最后遮挡处等的不是分镜里那一列（09-25 第五趟就数成了 3 个等着的）。
@@ -310,8 +323,18 @@ async function ShootSB08(Route) {
     t0 ??= s.t; if (s.t - t0 > C.waitS) break;
     samples.push({ t: s.t, visible: s.visible, pos: s.player.pos, crossing: s.first.filter((x) => x.crossing && !x.safe).length, safe: s.first.filter((x) => x.safe).length,
       px: s.first.map((x) => x.paint.px) });
-    if (!s.alive) throw Error("SB08：玩家在阵位上等的时候死了 " + JSON.stringify(s.player.pos));
+    if (!s.alive) {
+      // 抓帧不是生存测试：走游戏自带的检查点重来一次，回到机位接着看（次数记 holdRetries）。
+      if ((report.holdRetries || 0) >= 1) throw Error("SB08：玩家在阵位上等的时候死了两次 " + JSON.stringify(s.player.pos));
+      report.holdRetries = (report.holdRetries || 0) + 1;
+      await page.evaluate(() => { const g = window.Tengxian; g.Debug.MenuAct("continueCheckpoint"); g.StepFrames(1, 1 / 60, false); });
+      await ToViewpoint(); await page.evaluate(() => { window.frontShots.watching = false; }); continue;
+    }
     if (!best || s.visible > best.visible) { best = s; await page.screenshot({ path: path.join(OUT, "SB08.png") }); }
+    // 躲雷把人带离了机位：走回去再看。
+    if (Math.hypot(s.player.pos[0] - C.player.x, s.player.pos[2] - C.player.z) > 0.8) {
+      await ToViewpoint(); await page.evaluate(() => { window.frontShots.watching = false; });
+    }
     if (s.visible >= C.firstBatch.minVisible) break;
     if (s.first.every((x) => x.safe || !x.alive)) break;
   }
@@ -322,7 +345,10 @@ async function ShootSB08(Route) {
   Check("SB08", "玩家在阵位机枪北侧、站姿", "front", dp <= C.player.toleranceM && best.player.stance === "stand", { dp: +dp.toFixed(2), stance: best.player.stance });
   Check("SB08", "视线朝缺口 yaw 99°、俯仰 −3°", "front", Math.abs(best.camera.yawDeg - C.yawDeg) <= 8 && Math.abs(best.camera.pitchDeg - C.pitchDeg) <= 5, { yaw: best.camera.yawDeg, pitch: best.camera.pitchDeg });
   Check("SB08", `同一帧看得见正在过缺口的第一批 ≥ ${C.firstBatch.minVisible} 人`, "front", best.visible >= C.firstBatch.minVisible,
-    { visible: best.visible, t: best.t, people: best.first.map((x) => ({ id: x.id, px: x.paint.px, cx: x.paint.cx, distM: x.distM, progress: x.progress, crossing: x.crossing, safe: x.safe })) });
+    { visible: best.visible, t: best.t,
+      // 算进去的人在画面上横向铺开多宽（px）：34 m 外一列人几乎是一团，数得出 3 个不等于看得出 3 个，这个数只报不判。
+      spreadPx: (() => { const xs = best.first.filter((x) => x.crossing && !x.safe && x.paint.px >= C.firstBatch.minPx).map((x) => x.paint.cx); return xs.length ? Math.round((Math.max(...xs) - Math.min(...xs)) * W) : 0; })(),
+      people: best.first.map((x) => ({ id: x.id, px: x.paint.px, cx: x.paint.cx, distM: x.distM, progress: x.progress, crossing: x.crossing, safe: x.safe })) });
   Check("SB08", "机枪在左前景", "front", best.gun.px >= C.gun.minPx && best.gun.cx <= C.gun.xMax, best.gun);
   for (const what of ["机枪旁弹药箱", "缺口东沿倒塌砖墙延伸向远处", "缺口段沙袋木板护壁", "远处火点与烟柱"]) Check("SB08", what, "set", false, "pending: 第二波 Set 布景合入后看图");
 }

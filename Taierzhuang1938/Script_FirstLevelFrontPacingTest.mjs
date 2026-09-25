@@ -668,7 +668,7 @@ function WalkRuntime(extra = {}) {
   r.time += B.firstColumnStallS + 0.1; moves.length = 0; battle.UpdateGuards(1 / 60);
   assert.ok(Moving().has(second.actor.id), "a stuck man ahead is passed after firstColumnStallS");
   checks += 6;
-  Ok("⑧d SB08: the first batch crosses as one column, 2 m apart, a stuck man is passed");
+  Ok("⑧d SB08: the first batch crosses as one column, firstColumnSpacingM apart, a stuck man is passed");
 }
 
 console.log(`FirstLevelFrontPacingTest 通过：${checks} 条断言`);

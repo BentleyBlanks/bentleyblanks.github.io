@@ -287,10 +287,12 @@ export const FRONT_BATTLE_TUNING=Object.freeze({
   leaderLead:Object.freeze({minM:3,maxM:5,catchUpM:1.5,runMps:6,runStandsWithPlayer:true,endApproachIndex:11,cornerTurnDeg:35,cornerNearM:1.6,pointS:2.8,pointHoldsFire:true,pointTurnRps:5}),
   // First batch crossing (SB08): the batch goes as one column in the order nearest-to-the-last-cover first; a man leaves
   // (and keeps walking) once the man ahead of him is firstColumnSpacingM further along the shared withdrawal route, and
-  // pauses when closer than firstColumnMinM. A man ahead who has not moved on for firstColumnStallS is passed. 2 m at
-  // guardSpeedMps 2.7 is 0.74 s per man: the five men span ~8 m of the gap sap (lastCover -> gap -> junction is 14.6 m),
-  // so from the nest 3-5 of them are in the frame together. The second batch keeps the one-at-a-time gapClearM rule.
-  firstColumnSpacingM:2,firstColumnMinM:1.4,firstColumnStallS:4,
+  // pauses when closer than firstColumnMinM. A man ahead who has not moved on for firstColumnStallS is passed. 1.6 m at
+  // guardSpeedMps 2.7 is 0.6 s per man: the five men span ~6.4 m, about the length of the 0.5 m deep gap sap
+  // (FRONT_SPACE breach), the only stretch where the nest (34 m east) sees more than their helmets. 2 m (step 1) gave the
+  // SB08 shot 2 men showing head and shoulders (>= 60 px) at once in 3 runs of 5 (09-25 Script_FrontStoryboardShots).
+  // The second batch keeps the one-at-a-time gapClearM rule.
+  firstColumnSpacingM:1.6,firstColumnMinM:1.2,firstColumnStallS:4,
   // 05->06: at the safe zone (FRONT_SPACE.returnMeet) Luo waits for FrontRelief at most this long before going on.
   returnMeetMaxWaitS:20,
   // Posts on the support sap floor around returnMeet (probed: 2.0 m deep, >= 1.25 m from the sap wall). The relief
