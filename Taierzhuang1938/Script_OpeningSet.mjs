@@ -20,7 +20,8 @@
 // 运行时接线（Script_FirstLevelMissionRuntime 的薄钩子）：
 //   Enter(stageId)                          每一步 Enter 调；01–03 装载，别的步骤收走
 //   Update(dt, stageId, phase, flags)       flags = { collapsed, blastAge, player }（blastAge：离近爆的秒数，没炸过为 null；
-//                                           player：玩家位置，飞机按它触发）
+//                                           player：玩家位置，飞机按它触发；breakables：战车运行时的可破坏墙，
+//                                           阵位砖壳跟着它的当前级）
 //   Exit()                                  整关拆除
 // ===========================================================================
 import * as THREE from "three";
@@ -28,6 +29,7 @@ import { PROPS, SET_STAGES, FLOOR, BLAST, SMOKE, SmokeOptions, FLYOVER, FLYOVER_
   FRONT_SET_STAGES, FRONT_PROPS, BRICK, ProfileAt } from "./Data_OpeningSet0103.mjs";
 import { OPENING_STORYBOARDS } from "./Data_OpeningStoryboards.mjs";
 import { MISSION_LAYOUT } from "./Data_FirstLevelMissionLayout.mjs";
+import { FRONT_BREAKABLES } from "./Data_FirstLevelFrontBreakables.mjs";
 import { BuildSink } from "./Script_World.mjs";
 import { MakeBox, MakeSandbag, PlaceGeometry, TILE_METERS } from "./Script_Geo.mjs";
 import { OpeningBlastFx } from "./Script_OpeningBlastFx.mjs";
@@ -57,6 +59,14 @@ export function OvercastPreset(presets = SKY_PRESETS) {
 export function RegisterOvercastPreset(presets = SKY_PRESETS) {
   if (!presets[SKY.preset]) presets[SKY.preset] = Object.freeze(OvercastPreset(presets));
   return presets[SKY.preset];
+}
+/**
+ * 可破坏体块每一级的墙顶世界高度（第 0 级＝原体块顶）。与 Script_FirstLevelFrontBreakables 同一口径：
+ * 数据的 topM 是离体块脚下共享地面的高度，地面高过墙脚时从地面量（SpaceBreakableSpecs + SegmentBox 的 lift）。
+ */
+export function BreakableTops(block, breakable, groundAt) {
+  const base = block.y - block.h / 2, lift = Math.max(0, groundAt(block.x, block.z) - base);
+  return [block.y + block.h / 2, ...breakable.stages.map((s) => base + lift + s.topM)];
 }
 /** 可复现的伪随机（每件道具自己一串，改一件不牵动别的件）。 */
 function Rng(seedText) {
@@ -142,7 +152,7 @@ export class OpeningSet {
   Update(dt, stageId, phase, flags = {}) {
     if (stageId !== this.stage) this.Enter(stageId);
     this.blastFx?.Update(dt);
-    if (!this.root) return;
+    if (!this.root) { this.SyncBreakables(flags.breakables); return; }
     this.time = (this.time || 0) + dt;
     const collapsed = !!flags.collapsed;
     this.collapsedRoot.visible = collapsed;
@@ -156,6 +166,7 @@ export class OpeningSet {
     this.UpdateLantern(stageId, collapsed);
     this.UpdateSmoke(stageId);
     this.UpdateFlyover(dt, stageId, flags.player);
+    this.SyncBreakables(flags.breakables);
   }
 
   /** 整关拆除：01–03 布景、前沿布景、烟、飞机、天光全部复位。 */
@@ -211,7 +222,8 @@ export class OpeningSet {
   Stats() {
     let meshes = 0, lights = 0, nodes = 0, frontMeshes = 0;
     this.root?.traverse((o) => { nodes += 1; if (o.isMesh) meshes += 1; if (o.isLight) lights += 1; });
-    this.front?.root.traverse((o) => { if (o.isMesh) frontMeshes += 1; });
+    // 只数画得出来的（可破坏墙每级一份砖壳，只有当前级那份显示）。
+    this.front?.root.traverseVisible((o) => { if (o.isMesh) frontMeshes += 1; });
     return { active: this.Active, nodes, meshes, lights, ownedMaterials: this.ownedMaterials?.length || 0,
       collapsedVisible: !!this.collapsedRoot?.visible, rescueVisible: !!this.rescueRoot?.visible, lintelProgress: this.lintelProgress,
       front: !!this.front, frontMeshes, smoke: [...this.smoke.keys()], blast: this.blastFx?.Stats() ?? null, blastSprayed: this.blastSprayed,
@@ -711,23 +723,57 @@ export class OpeningSet {
     const front = { root, ownedMaterials: [] };
     const sink = new BuildSink(), materials = new Map();
     sink.SetSector("OpeningSet_Front");
-    // 砖：库里的旧砖墙（青砖熏黑）染成土黄（契约：阵位白盒改成「土黄砖色」的破砖墙；参考概念图 04）。
-    const brick = this.FrontLib(front, "BrickWallSooty", { color: 0xd6b38a });
-    materials.set("OpeningSetBrick", brick);
+    // 砖：城墙灰砖染成土黄灰（契约：阵位白盒改成「土黄砖色」的破砖墙；参考概念图 04）。配方按 BRICK.recipes 依次试。
+    let brick = null;
+    for (const recipe of BRICK.recipes) {
+      try { brick = this.library?.Get?.(recipe, { color: BRICK.color }) || null; } catch { brick = null; }
+      if (brick) break;
+    }
+    materials.set("OpeningSetBrick", brick || this.FrontLib(front, "BrickWallSooty"));
+    const resolve = (name) => materials.get(name) || this.FrontLib(front, name);
     const saved = { sinkMaterials: this.sinkMaterials, ownedMaterials: this.ownedMaterials };
     this.sinkMaterials = materials; this.ownedMaterials = front.ownedMaterials;
+    // 能被打塌的体块：每一级一份砖壳，各自一个组（只有当前级那一组显示，见 SyncBreakables）。
+    front.breakables = [];
     try {
       for (const prop of FRONT_PROPS) {
-        if (prop.kind === "brickShell") this.BuildBrickShell(prop, sink);
+        const breakable = prop.kind === "brickShell" ? FRONT_BREAKABLES.find((b) => b.block === prop.block) : null;
+        if (breakable) {
+          const block = MISSION_LAYOUT.blocks.find((b) => b.id === prop.block), groups = [];
+          for (const top of BreakableTops(block, breakable, this.groundAt)) {
+            const variant = new BuildSink(), group = new THREE.Group();
+            variant.SetSector("OpeningSet_Front");
+            group.name = `OpeningSet0103_Front_${prop.id}_${groups.length}`;
+            group.visible = groups.length === 0;
+            this.BuildBrickShell(prop, variant, groups.length ? top : null);
+            for (const mesh of variant.Flush(group, {}, { castShadow: true, receiveShadow: true, resolve })) mesh.name = `${group.name}_${mesh.name}`;
+            root.add(group); groups.push(group);
+          }
+          front.breakables.push({ id: breakable.id, block: prop.block, groups, stage: 0 });
+        } else if (prop.kind === "brickShell") this.BuildBrickShell(prop, sink);
         else if (prop.kind === "collapsedWall") this.BuildCollapsedWall(prop, sink);
         else this.BuildProp(prop, sink, materials);
       }
     } finally { this.sinkMaterials = saved.sinkMaterials; this.ownedMaterials = saved.ownedMaterials; }
-    const resolve = (name) => materials.get(name) || this.FrontLib(front, name);
     for (const mesh of sink.Flush(root, {}, { castShadow: true, receiveShadow: true, resolve })) mesh.name = `OpeningSet0103_Front_${mesh.name}`;
     this.scene.add(root);
     root.updateMatrixWorld(true);
     this.front = front;
+  }
+
+  /**
+   * 砖壳跟着可破坏体块的当前级走（Script_FirstLevelFrontBreakables 由战车运行时在 04 前后建；没建之前按第 0 级）。
+   * breakables：它的实例（有 items[].spec.block / stage）或 null。
+   */
+  SyncBreakables(breakables) {
+    if (!this.front?.breakables?.length) return;
+    for (const entry of this.front.breakables) {
+      const item = breakables?.items?.find((it) => it.spec?.block === entry.block);
+      const stage = Math.max(0, Math.min(entry.groups.length - 1, item?.stage ?? 0));
+      if (stage === entry.stage) continue;
+      entry.stage = stage;
+      entry.groups.forEach((group, k) => { group.visible = k === stage; });
+    }
   }
 
   /** 前沿组自己的库材质（缺配方时的纯色兜底归前沿组，随它 dispose）。 */
@@ -744,12 +790,14 @@ export class OpeningSet {
    * 破砖墙壳：把阵位体块整个包进去（每面外扩 BRICK.skinM，墙头只往上长），墙头按整皮、整砖退台出锯齿。
    * 体块本身的碰撞、掩体、射界一个不动；壳子只比体块高，不会有「看着是缺口其实是墙」。
    */
-  BuildBrickShell(prop, sink) {
+  BuildBrickShell(prop, sink, brokenTop = null) {
     const block = MISSION_LAYOUT.blocks.find((b) => b.id === prop.block);
     if (!block) throw new Error(`OpeningSet: ${prop.id} wraps missing block ${prop.block}`);
-    const rnd = Rng(`${prop.id}${prop.seed}`), skin = BRICK.skinM, course = BRICK.courseM;
+    const rnd = Rng(`${prop.id}${prop.seed}${brokenTop ?? ""}`), skin = BRICK.skinM, course = BRICK.courseM;
     const alongX = block.w >= block.d, L = alongX ? block.w : block.d, T = (alongX ? block.d : block.w) + skin * 2;
-    const top = block.y + block.h / 2 + 0.02, base = block.y - block.h / 2;
+    // 打塌以后（brokenTop：那一级的墙顶世界高度）墙头锯齿收到 1–2 皮碎砖。
+    const top = (brokenTop ?? block.y + block.h / 2) + 0.02, base = block.y - block.h / 2;
+    const extraM = brokenTop == null ? prop.extraM : Math.min(prop.extraM, 0.2);
     const ry = (block.ry || 0) + (alongX ? 0 : Math.PI / 2);
     const c = Math.cos(ry), s = Math.sin(ry);
     // 局部 u（沿墙，-L/2…L/2）→ 世界。ry 与 PlaceGeometry 同一约定（局部 +x 转到 (cos ry, 0, -sin ry)）。
@@ -761,7 +809,7 @@ export class OpeningSet {
       let e = 0;
       for (const p of prop.peaks) e = Math.max(e, p.h * Math.max(0, 1 - Math.abs(t - p.s) / p.w));
       if (prop.breach) { const z = At(u).z, x = At(u).x, w = alongX ? x : z; if (w >= prop.breach.from && w <= prop.breach.to) e = 0; }
-      return e * prop.extraM;
+      return e * extraM;
     };
     const cols = Math.max(2, Math.round(L / BRICK.lengthM)), colW = L / cols;
     for (let k = 0; ; k++) {

@@ -151,12 +151,15 @@ export const PROPS = Object.freeze([
 // 近爆的定向喷土（SB02，Script_OpeningBlastFx.DirectionalBlast）
 // ---------------------------------------------------------------------------
 // 炮弹落在洞口南侧外（导演 banter.shellAt，飞行 0.22 s）：泥土、土块、碎木从洞口南沿 (1.2,-124.5) 离地
-// 0.5–1.5 m 朝西北喷进洞里，正对着 SB02 镜像机位（眼 (-0.6,-125.95) 朝东北东 yaw -66°）的右侧。
-// 方向：从喷口指向机位 (-1.8,-1.45) 再抬 14°，锥半角约 22°。0.22 s 起喷、0.9 s 止（契约 §5 SB02）。
+// 0.5–1.5 m 朝西北喷进洞里。SB02 镜像机位是眼 (-0.6,-125.95) 朝东北东 yaw -66°：喷口在镜头右边 69°、画面外
+// （半水平视场约 48°）。喷口**正对镜头**时整锥土都沿同一方位角扑过来、一直待在画框外，画面里什么都没有
+// （实拍 tmp/cap/step2/SB02_b030.png）。所以主轴朝北北西、指向北壁 (-0.3,-127.3)：土从画面右沿进来、横扫过
+// 门洞砸到北壁（分镜里那一幕）；镜头在泥雾锥（×1.2）的边上，扑脸的那一片仍有。
+// 方向 (-0.47, 0.2, -0.86)（抬约 11°），锥半角约 22°。0.22 s 起喷、0.9 s 止（契约 §5 SB02）。
 export const BLAST = Object.freeze({
   id: "bunkerMouthSpray",
   at: P(1.2, -124.5), liftM: Object.freeze([0.5, 1.5]),
-  dir: Object.freeze({ x: -0.75, y: 0.24, z: -0.61 }),
+  dir: Object.freeze({ x: -0.47, y: 0.2, z: -0.86 }),
   /** 从近爆（blastAge 0 = 导演 Blast() 的那一帧）起算：炮弹 0.22 s 落地就喷。 */
   atS: 0.22, seconds: 0.68,
   clods: 15, splinters: 9, dust: 16, spray: 44,
@@ -246,13 +249,21 @@ export function FlyoverPose(row, t) {
 export const sky = Object.freeze({
   overcast: false,
   preset: "openingOvercast0103", base: "overcast", fogFrom: "testSceneDay",
-  tweaks: Object.freeze({ saturation: 0.74, contrast: 1.05, sunColor: Object.freeze([1.0, 0.95, 0.86]),
-    hemiSky: 0xb0b2b0, hemiGround: 0x5a4c3c, ground: Object.freeze([0.52, 0.45, 0.36]), smokeColor: Object.freeze([2.0, 1.9, 1.78]) }),
+  // 实拍四档比过（tmp/s3/sky1、sky2，SB07 贴墙处）：Script_Sky 原样的 overcast 曝光 0.88 + 泛光 0.34 + Mie 18，整张画面发白、
+  // 远处一片奶白（比晴天还亮，分镜是暗灰）；压曝光、天顶与地平线压成暗灰、Mie 降到 6 以后最接近分镜 07 的灰天。
+  tweaks: Object.freeze({ saturation: 0.68, contrast: 1.05, sunColor: Object.freeze([1.0, 0.95, 0.86]), sunIntensity: 4,
+    hemiSky: 0xb0b2b0, hemiGround: 0x5a4c3c, hemiIntensity: 1.0, ground: Object.freeze([0.52, 0.45, 0.36]), smokeColor: Object.freeze([2.0, 1.9, 1.78]),
+    exposure: 0.46, bloom: 0.05, envIntensity: 0.85, smoke: 0.35,
+    zenith: Object.freeze([0.5, 0.5, 0.51]), horizon: Object.freeze([0.7, 0.67, 0.62]),
+    atmosphere: Object.freeze({ mie: 6.0, mieG: 0.62, rayleigh: 2.0, groundAlbedo: 0.2, sunIrradiance: 26,
+      skyTint: Object.freeze([0.97, 0.97, 0.99]), skyFloor: Object.freeze([0.18, 0.2, 0.26]), aerialBlend: 0.35, aerialGain: 0.08, artGlow: 0.15 }) }),
 });
 
 // ---------------------------------------------------------------------------
 // 03 前沿布景（SB07/SB08）：右侧阵位的破砖墙外观、缺口东沿的倒墙、缺口段护壁、阵位弹药箱
 // ---------------------------------------------------------------------------
+// 能被战车打塌的三段（Data_FirstLevelFrontBreakables：RightNestWestLow / NorthLow / NorthHigh）每一级各建一份砖壳，
+// 跟着 Script_FirstLevelFrontBreakables 的当前级显示（打低一级，砖壳也矮一级），不会出现「墙已经塌了、砖还立着」。
 // 这一组是阵位与缺口的**世界外观**，03 之后 04（守机枪）、05（战车）、06（撤收）玩家还在这里打，
 // 所以装到 FRONT_SET_STAGES 结束才收走（不跟 01–03 的布景一起收；报告里写明）。
 // 全是外观：阵位白盒体块（Data_FirstLevelMissionLayout 的 RightNest*）的碰撞、掩体标签、射界一个不动，
@@ -260,7 +271,10 @@ export const sky = Object.freeze({
 // 其实是墙」的隐形墙；多出来的墙头锯齿只有外观（AI 视线、弹道仍按原体块）。
 export const FRONT_SET_STAGES = Object.freeze(["Support", "MachineGun", "Tank", "Orders"]);
 /** 砖层高（一皮砖 + 灰缝）与砖长：锯齿墙头按整皮、整砖退台；skinM 是砖壳比体块每面外扩多少。 */
-export const BRICK = Object.freeze({ courseM: 0.115, lengthM: 0.25, skinM: 0.03 });
+export const BRICK = Object.freeze({ courseM: 0.115, lengthM: 0.25, skinM: 0.03,
+  // 砖面：先用城墙砖（灰砖、浅灰缝，平均亮度 119），没有再退到熏黑旧砖（91，太黑：SB07 实拍整面墙是一块黑剪影）；
+  // 染成土黄灰（概念图 04 的残墙是灰里带黄的旧砖，不是红砖）。
+  recipes: Object.freeze(["CityWallBrickPbr", "BrickWallSooty"]), color: 0xeedcbc });
 const Peak = (s, h, w) => Object.freeze({ s, h, w });
 export const FRONT_PROPS = Object.freeze([
   // 西矮墙（机枪就架在它后面）：机枪那一段（z -154.9…-152.9）墙头不加高，做成破口；两头往上各长两皮碎砖。
@@ -282,6 +296,17 @@ export const FRONT_PROPS = Object.freeze([
     peaks: Object.freeze([Peak(0.1, 0.7, 0.3), Peak(0.62, 1, 0.3)]), seed: 7 },
   { id: "nestBrickWallRearEast", kind: "brickShell", block: "RightNestRearEast", extraM: 0.6,
     peaks: Object.freeze([Peak(0.3, 1, 0.35), Peak(0.9, 0.6, 0.15)]), seed: 8 },
+  // 阵位里另外三块蓝白盒（SB07 画面正中、从西边看阵位的近景里还露着蓝）：入口的弹药箱位、阵位中间的碎砖堆、
+  // 进阵位那条接近沟里的横墙（斜着，ry 0.72）。只长一点锯齿。机枪托架 RightNestFrontRest 已经换成沙袋（任务工事），不包。
+  { id: "nestBrickEntry", kind: "brickShell", block: "RightEntryCrate", extraM: 0.15,
+    peaks: Object.freeze([Peak(0.3, 1, 0.45)]), seed: 10 },
+  { id: "nestBrickRubble", kind: "brickShell", block: "RightNestRubble", extraM: 0.12,
+    peaks: Object.freeze([Peak(0.6, 1, 0.5)]), seed: 11 },
+  { id: "nestBrickTraverse", kind: "brickShell", block: "RightApproachTraverse", extraM: 0.3,
+    peaks: Object.freeze([Peak(0.2, 1, 0.3), Peak(0.78, 0.6, 0.22)]), seed: 12 },
+  // 阵位东边那道残墙（05 日军从它后面上来，永不破坏）：SB07 画面右沿露出一角蓝。
+  { id: "nestBrickAttackRuin", kind: "brickShell", block: "AttackRuinA", extraM: 0.5,
+    peaks: Object.freeze([Peak(0.15, 1, 0.3), Peak(0.7, 0.55, 0.3)]), seed: 13 },
   // 缺口东沿的倒墙（SB08 从阵位看在画面左侧、一路伸向远处）。沟东沿坡顶 x≈-5.9（z -150…-141 沟底 -1.2、沟沿 -0.2）。
   // **大半截是倒的**：从阵位看，缺口段沟深只有 1.1–1.2 m，守军在沟里只露头肩；东沿上立一道 1.2 m 的墙就把他们
   // 全挡了（SB08 要「≥ 3 人同时可见」）。所以北段只剩墙根两三皮（≤ 0.42 m）加倒在东边地上的墙片，

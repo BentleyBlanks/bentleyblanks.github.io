@@ -2310,7 +2310,8 @@ export class FirstLevelMissionRuntime {
     prof?.B("story/mission/other");
     this.opening.Update(dt);
     this.openingSet?.Update(dt, this.flow.stage.id, this.frontShow?.bunker?.phase ?? null,
-      { collapsed: this.Has("bunkerCollapsed"), blastAge: this.opening.blastAt != null ? this.time - this.opening.blastAt : null, player: this.player?.position });
+      { collapsed: this.Has("bunkerCollapsed"), blastAge: this.opening.blastAt != null ? this.time - this.opening.blastAt : null, player: this.player?.position,
+        breakables: this.tankRuntime?.breakables ?? null });
     if(this.failed){prof?.E("story/mission/other");return;}
     prof?.E("story/mission/other");
     prof?.B("story/mission/spawns");

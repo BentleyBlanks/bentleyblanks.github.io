@@ -21,7 +21,8 @@ import { fileURLToPath } from "node:url";
 import * as THREE from "three";
 import { PROPS, SET_STAGES, SMOKE, FLYOVER, sky, DESIGNED_CONTACTS, PropFootprints, FLOOR, BLAST, SmokeOptions, SMOKE_PARTICLE_BUDGET,
   FLYOVER_TRIGGER, FlyoverPose, FRONT_PROPS, FRONT_SET_STAGES, BRICK } from "./Data_OpeningSet0103.mjs";
-import { OpeningSet, OvercastPreset } from "./Script_OpeningSet.mjs";
+import { OpeningSet, OvercastPreset, BreakableTops } from "./Script_OpeningSet.mjs";
+import { FRONT_BREAKABLES } from "./Data_FirstLevelFrontBreakables.mjs";
 import { OpeningBlastFx } from "./Script_OpeningBlastFx.mjs";
 import { VfxSystem } from "./Script_Vfx.mjs";
 import { AircraftFlight } from "./Script_Aircraft.mjs";
@@ -368,7 +369,13 @@ function FakeVfx() {
   const toEye = new THREE.Vector3(eye.x - BLAST.at.x, 0, eye.z - BLAST.at.z).normalize();
   const flat = new THREE.Vector3(dir.x, 0, dir.z).normalize();
   report.blastAimDeg = +(flat.angleTo(toEye) / DEG).toFixed(1);
-  assert.ok(report.blastAimDeg < BLAST.spreadRad / DEG, `SB02: the spray points at the mirrored camera (${report.blastAimDeg} deg off axis)`);
+  assert.ok(report.blastAimDeg < BLAST.spreadRad * 1.2 / DEG, `SB02: the mirrored camera sits inside the mud-spray cone (${report.blastAimDeg} deg off axis)`);
+  // 喷口在 SB02 画面外（右边 69°）：主轴要横穿画面，不然整锥土一直贴着画框外沿扑过来、画面里看不见（step2 实拍）。
+  // 沿主轴 1.5 m 与 2.5 m 处都要在镜头水平视场（半角约 48°）以内（3 m 处正好出左边框，北壁在 3.5 m）。
+  const camFwd = new THREE.Vector3(-Math.sin(-66 * DEG), 0, -Math.cos(-66 * DEG));
+  report.blastSweepDeg = [1.5, 2.5].map((m) => +(new THREE.Vector3(BLAST.at.x + flat.x * m - eye.x, 0, BLAST.at.z + flat.z * m - eye.z)
+    .normalize().angleTo(camFwd) / DEG).toFixed(1));
+  assert.ok(report.blastSweepDeg.every((a) => a < 48), `SB02: the spray axis sweeps across the mirrored frame (${report.blastSweepDeg} deg off the view axis)`);
   assert.ok(dir.x < 0 && dir.z < 0 && dir.y > 0, "the spray goes north-west into the dugout, slightly up");
   assert.ok(Math.hypot(BLAST.at.x - 1.05, BLAST.at.z - -124.3) < 0.35, "the spray starts at the south edge of the mouth (south post)");
   assert.ok(BLAST.atS >= 0.2 && BLAST.atS <= 0.25 && BLAST.atS + BLAST.seconds <= 0.95, "0.22–0.9 s after the blast (contract §5 SB02)");
@@ -521,9 +528,13 @@ function FakeVfx() {
     const block = L.blocks.find((b) => b.id === prop.block), sink = Capture();
     set.BuildBrickShell(prop, sink);
     const [core, ...bricks] = sink.list, top = block.y + block.h / 2;
-    const half = { x: (block.ry ? 0 : block.w / 2), z: block.d / 2 };
-    assert.ok(core.box.min.x <= block.x - half.x - BRICK.skinM + 1e-3 && core.box.max.x >= block.x + half.x + BRICK.skinM - 1e-3
-      && core.box.min.z <= block.z - half.z - BRICK.skinM + 1e-3 && core.box.max.z >= block.z + half.z + BRICK.skinM - 1e-3
+    // 体块（可能斜着，ry）外扩 skin 后的四个角都在砖壳芯的外廓里（PlaceGeometry 约定：局部 +x → (cos, -sin)）。
+    const c = Math.cos(block.ry || 0), s = Math.sin(block.ry || 0);
+    const corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]) => {
+      const lx = a * (block.w / 2 + BRICK.skinM * 0.99), lz = b * (block.d / 2 + BRICK.skinM * 0.99);
+      return { x: block.x + lx * c + lz * s, z: block.z - lx * s + lz * c };
+    });
+    assert.ok(corners.every((p) => p.x >= core.box.min.x - 1e-3 && p.x <= core.box.max.x + 1e-3 && p.z >= core.box.min.z - 1e-3 && p.z <= core.box.max.z + 1e-3)
       && core.box.max.y >= top && core.box.min.y <= block.y - block.h / 2 + 1e-3, `${prop.id} wraps ${prop.block} on every side (no invisible wall)`);
     const jagTop = Math.max(top, ...bricks.map((b) => b.box.max.y));
     assert.ok(jagTop - top <= prop.extraM + 0.12, `${prop.id}: the ragged top grows at most ${prop.extraM} m (+1 course) over the collider`);
@@ -585,6 +596,35 @@ function FakeVfx() {
       .flatMap((b) => Samples(guardRoute).filter((p) => Clash(b, p)).slice(0, 1).map((p) => `${prop.id} at (${p.x.toFixed(1)},${p.z.toFixed(1)})`)));
     assert.deepEqual(clashes, [], "front dressing stays off the guards' withdrawal route");
   }
+  // 能被战车打塌的墙：每一级一份砖壳，跟着 FrontBreakables 的当前级只显示那一份（打塌以后砖不会还立着）。
+  {
+    const scene3 = new THREE.Scene(), fs3 = new OpeningSet({ scene: scene3, library: null, groundAt: (x, z) => G(x, z) });
+    fs3.Enter("Support");
+    const entries = fs3.front.breakables;
+    const wrapped = FRONT_PROPS.filter((p) => p.kind === "brickShell" && FRONT_BREAKABLES.some((b) => b.block === p.block));
+    assert.ok(wrapped.length >= 3 && entries.length === wrapped.length, `every breakable wall under a brick shell has per-stage shells (${entries.length})`);
+    report.breakableShells = {};
+    for (const entry of entries) {
+      const br = FRONT_BREAKABLES.find((b) => b.id === entry.id), block = L.blocks.find((b) => b.id === entry.block);
+      assert.equal(entry.groups.length, br.stages.length + 1, `${entry.id}: one shell per stage`);
+      assert.deepEqual(entry.groups.map((g) => g.visible), entry.groups.map((g, k) => k === 0), `${entry.id}: only the intact shell shows before the tank`);
+      const tops = BreakableTops(block, br, G);
+      report.breakableShells[entry.id] = entry.groups.map((group, k) => {
+        const box = new THREE.Box3().setFromObject(group);
+        assert.ok(box.max.y >= tops[k] - 1e-3, `${entry.id} stage ${k}: the shell covers the stage-${k} wall (top ${tops[k].toFixed(2)})`);
+        if (k > 0) assert.ok(box.max.y <= tops[k] + 0.02 + 0.2 + BRICK.courseM + 0.06, `${entry.id} stage ${k}: the broken shell is no taller than the broken wall + two courses (${box.max.y.toFixed(2)} vs ${tops[k].toFixed(2)})`);
+        return +(box.max.y - tops[k]).toFixed(2);
+      });
+    }
+    const first = entries[0];
+    fs3.SyncBreakables({ items: [{ spec: { block: first.block }, stage: 1 }] });
+    assert.deepEqual(first.groups.map((g) => g.visible), first.groups.map((g, k) => k === 1), "the shell follows the wall's current stage");
+    assert.ok(entries.slice(1).every((e) => e.groups[0].visible), "the other walls stay intact");
+    fs3.Update(1 / 60, "Tank", null, { breakables: { items: [{ spec: { block: first.block }, stage: 99 }] } });
+    assert.ok(first.groups[first.groups.length - 1].visible, "04–06 (no 01–03 set loaded) still follow the walls; stage clamps to the last shell");
+    fs3.Exit();
+    assert.equal(scene3.children.length, 0, "Exit removes the per-stage shells");
+  }
   const scene = new THREE.Scene(), fs2 = new OpeningSet({ scene, library: null, groundAt: (x, z) => G(x, z) });
   fs2.Enter("Support");
   report.frontMeshes = fs2.Stats().frontMeshes;
@@ -596,7 +636,7 @@ function FakeVfx() {
   assert.equal(scene.children.length, 2, "Suspend(false) puts both back");
   fs2.Exit();
   assert.equal(scene.children.length, 0, "Exit removes the front dressing");
-  console.log(`ok front: shells ${JSON.stringify(report.shells)}, SB08 ${JSON.stringify(report.sb08)}, ${report.frontMeshes} meshes`);
+  console.log(`ok front: shells ${JSON.stringify(report.shells)}, per-stage ${JSON.stringify(report.breakableShells)}, SB08 ${JSON.stringify(report.sb08)}, ${report.frontMeshes} meshes`);
 }
 
 console.log(`OpeningSetTest ok ${JSON.stringify({ timberBand: report.timberBand, rubbleTopM: report.rubbleTopM, backrest: report.backrest, seatF: report.seatF, meshes: report.stats.meshes })}`);
