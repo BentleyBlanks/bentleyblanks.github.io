@@ -140,6 +140,11 @@ export const MISSION_TUNING = Object.freeze({
   // 不封顶的后果实测过：反复改选掩体的人一轮也打不完、永远不退回 assaultRegroupLine，
   // 前沿就一直压在撤退口上，03–06 的 lastGuardsWithdrawn 等不到（2026-09-23 A/B）。
   assaultCoverWalkS:5,
+  // A round on a line lasts until he has fired from it (an ambient shot counts), but at most assaultSilentHoldS
+  // longer than the hold above: a man with nothing to shoot from there still moves on. 4 s is one cover cycle
+  // (hide 0.9-2.2 s + peek) and the aim-in. 09-25 relay r2 Front step 3 idle probes: in 04 the bound groups ran line
+  // to line 40-60 m in 30 s and never fired (UpdateAssault).
+  assaultSilentHoldS:4,
   // How many rounds a man plays out on the last line before falling back to assaultRegroupLine and coming
   // again. One round = assaultVolleyShots rounds fired or assaultFinalHoldS seconds held (the old name is
   // kept because it is the same beat count that used to pace the lateral bounds).

@@ -1184,7 +1184,12 @@ export class FirstLevelMissionRuntime {
         // sets how far a group may push (maxIndex), where it regroups and whether it loops for as long as
         // the phase lasts. Without it the old finite rhythm (assaultRegroupCycles) is unchanged.
         const spent = last && actor.fireSequence - s.volley >= R.assaultVolleyShots;
-        if (s.hold >= (last ? R.assaultFinalHoldS : R.assaultHoldS) * s.jitter || spent)
+        // Fire, then bound: a round on a line is not over before he has fired from it (an ambient shot counts) - at
+        // most assaultSilentHoldS past the hold, for a man with nothing to shoot at from there (relay r2 Front step 3:
+        // in 04 the bound groups went line to line 40-60 m in 30 s without a round, a third of the zero-shot windows).
+        const holdS = (last ? R.assaultFinalHoldS : R.assaultHoldS) * s.jitter;
+        const fired = actor.fireSequence > s.volley;
+        if ((s.hold >= holdS && (fired || s.hold >= holdS + R.assaultSilentHoldS)) || spent)
           AssaultRoundEnd(actor, s, R, last, this.time);
       }
     }

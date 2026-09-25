@@ -60,7 +60,8 @@ const G = Object.freeze({
 const ROW = 9;
 /** 看得见的动作：这些状态里站着不动不算「端枪不打」。白刃另由采样旗 4096 判。 */
 const BUSY_STATES = Object.freeze(["reload", "grenade"]);
-const GATE_NAMES = Object.freeze(["-", "noPoints", "legalTarget", "noPick", "notOwn", "ammo", "timer", "hidePhase", "turnAimLof"]);
+const GATE_NAMES = Object.freeze(["-", "noPoints", "legalTarget", "noPick", "notOwn", "ammo", "timer", "hidePhase", "turnAimLof",
+  "notOwn:melee", "notOwn:hesitate", "notOwn:state", "notOwn:advanceNoHold", "notOwn:moving"]);
 
 const { SQUAD_REACTION } = await import(pathToFileURL(path.join(here, "Data_Tuning_AiTactics.mjs")).href);
 const advanceBarkMaxPerMin = 60 / SQUAD_REACTION.advanceBarkCooldownS + 1;
@@ -92,7 +93,15 @@ await page.evaluate(({ rangeM, sampleS }) => {
     if (!s.ambientFirePoints || !s.ambientFirePoints.length) return 1;
     if (!ai.AmbientBlocked(s)) return 2;
     if (!s.ambientFirePoint) return 3;
-    if (!ai.AmbientOwnsAim(s)) return 4;
+    if (!ai.AmbientOwnsAim(s)) {
+      // Why the picked point does not get the muzzle (the same order as Script_Ai.AmbientOwnsAim).
+      if (s.meleeCombat) return 9;
+      if (s.missionSurfaceRest || s.missionGrenadeEvade || ai.time < s.hesitateUntil) return 10;
+      if (!["fire", "watch", "cover_engage", "suppress", "idle", "advance"].includes(s.state)) return 11;
+      if (s.state === "advance" && s.order !== "hold") return 12;
+      if (s.moveSpeed > 0.24) return 13;
+      return 4;
+    }
     if (s.ammo <= 0) return 5;
     if (s.fireTimer > 0) return 6;
     if (s.state === "cover_engage" && s.coverPhase !== "peek") return 7;
