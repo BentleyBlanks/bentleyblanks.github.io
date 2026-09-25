@@ -653,6 +653,7 @@ export const FRONT_LINES_IN_FIREFIGHT = Object.freeze({
   "TakeOverGun.03": "罗班长回的是 60 m 外左枪位老周的话「看到了！这边有人接」；玩家这时在夺下的机枪上压着缺口（09-25 Front step 2 驾驶：150 帧全在打）",
   "BundleRetreat.01": "炸车后罗班长在身旁 1 m 内喊「回来！低头！」，玩家这时对着战车与跟车步兵",
   "TankStopped.02": "战车刚停，罗班长朝缺口喊守军下来；玩家边撤边打剩下的跟车步兵",
+  "BundleAttack.01": "攻击位：罗班长在投弹点西侧 1.5 m 到位时喊「就这边！莫上大路！」，玩家正对着战车和跟车护兵（09-25 Front step 2 驾驶：115 帧全在打）",
   "BundleAttack.02": "攻击位上罗班长在投弹点西侧 1.5 m 喊「顺子，拿弹！旁边的人我看到！」，玩家正瞄着战车和跟车步兵",
 });
 export const FRONT_LINE_FIGHT_SHARE = .5;
