@@ -91,7 +91,11 @@ export const FRONT_SORTIE=Object.freeze({
   // player walked past his elbow just as BundleAttack.01 started (0.9 m, 78 of 115 frames).
   leaderAttackSide:Point(42.1,-159.9),
   throw:Point(43.6,-159.6),orders:Point(-34,-99),
-  leftGun:Point(-33.8,-157.6),leftSeat:Point(-33.6,-156.4),
+  // The left gun stands 0.6 m in front of its seat, on its own sandbag rest (Data_FirstLevelMissionLayout LeftGunRest):
+  // the gunner at the seat has the butt at his shoulder. At (-33.8,-157.6) it stood 1.22 m off the seat with nothing
+  // under it, 1.45 m over the pit floor - an empty gun in mid-air, the man at the seat 1.2 m behind it (2026-09-25
+  // relay r2, Gate package's STAGE_ENTRY_LEFT_GUN; Front step 3 addendum A).
+  leftGun:Point(-33.6,-157),leftSeat:Point(-33.6,-156.4),
   // He / relief / Zhou use the support sap's first leg and then the left gun access trench.
   leftRoute:[Point(-29,-110),Point(-30,-118),Point(-26.5,-126),Point(-31,-136),Point(-34,-147),Point(-33.6,-156.4)],
   // Wounded Zhou leaves the left gun the way He came in: left gun access -> support sap -> SJ -> collection rest.

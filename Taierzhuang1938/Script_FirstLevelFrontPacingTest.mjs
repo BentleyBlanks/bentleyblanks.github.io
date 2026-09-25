@@ -14,6 +14,8 @@
 //      受保护的待撤守军身边不落手榴弹（任务侧投弹否决）
 //   ⑧ 近处说话人不在画面里：台词等他走进画面；太近就退开
 //   ⑬ 罗班长的阵位掩体按 leaderCoverArrivalM 走到（1 m 外是西门门洞，被墙头挡住）；退开说完话再走回去
+//   ⑭ 左机枪：枪在座位前 0.6 m、架在自己的沙袋枪托（LeftGunRest）上；何有田接枪后换上捷克式、站着、走回座位、
+//      不被压趴、不当刺刀靶子，离枪时把汉阳造还给他（接力第二批 Front 第三步追加 A）
 //   ⑫ 说话时队友挡在玩家和说话人之间：挡的人横跨一步让开，这句说完再放（ClearView）
 //   ⑪ 05 攻击位：罗班长停在投弹点旁（leaderAttackSide），离投弹点与玩家进来的最后一段都 ≥1.4 m
 //   ⑩ 攻击支路过 AttackRuinA 东端留 ≥0.6 m；墙南侧死角里的人按最近路点走、先离开墙面（TankProbe5 卡死点）
@@ -822,6 +824,59 @@ function WalkRuntime(extra = {}) {
   assert.ok(!/\[S\.leaderCover\]|,S\.leaderCover\]/.test(src), "no leg ends on the bare leaderCover point");
   checks += 8;
   Ok("⑬ Luo walks right into his cover and back into it after a step back");
+}
+
+{
+  // ⑭ The left gun (relay r2 Front step 3 addendum A). It stood 1.22 m off the seat, 1.45 m over the pit floor with
+  // nothing under it; He held his HanYang 2 m behind it for all of 04-05 (Zhou's exit shoved him off the seat).
+  const seatToGun = Dist(S.leftGun, S.leftSeat);
+  assert.ok(seatToGun >= 0.5 && seatToGun <= 0.8, `the gun stands 0.5-0.8 m in front of its seat (${seatToGun.toFixed(2)} m)`);
+  const rest = MISSION_LAYOUT.blocks.find((b) => b.id === "LeftGunRest");
+  assert.ok(rest, "LeftGunRest exists");
+  // The rendered gun's lowest vertex sits 0.043 m under its pivot (the RightNestFrontRest rule: pivot 1.45 over the floor
+  // at the gun, + sightRiseM 0.08 - 0.12294 to the lowest vertex); the rest's top is there and under the gun's pivot.
+  const pivotY = SampleMissionTerrain(S.leftGun.x, S.leftGun.z) + 1.45, top = rest.y + rest.h / 2;
+  assert.ok(Math.abs(top - (pivotY + 0.08 - 0.12294)) < 0.01, `the rest's top carries the gun (${top.toFixed(3)} vs pivot ${pivotY.toFixed(3)})`);
+  assert.ok(Math.abs(S.leftGun.x - rest.x) <= rest.w / 2 && Math.abs(S.leftGun.z - rest.z) <= rest.d / 2, "the gun's pivot is over the rest");
+  const backFace = rest.z + rest.d / 2;
+  assert.ok(S.leftSeat.z - backFace >= 0.45, `the rest's back face stays ${(S.leftSeat.z - backFace).toFixed(2)} m >= 0.45 m off the seat (no shove)`);
+  assert.ok(pivotY - SampleMissionTerrain(S.leftSeat.x, S.leftSeat.z) > 1.3, "a standing gun: the pivot is over 1.3 m above the seat's floor");
+
+  const stances = [];
+  const { r } = WalkRuntime({ ai: { ReleaseCover() {}, SetStance: (a, st) => stances.push([a.id, st]) } });
+  const he = { id: 3, castId: "heyoutian", alive: true, weaponId: "HanYang", weapon: { id: "HanYang" }, ammo: 5, meleeDormant: false,
+    scriptSuppressible: true, position: { x: S.leftSeat.x + 0.3, z: S.leftSeat.z + 1.7 }, actor: { SetWeapon(id) { this.weaponId = id; } } };
+  const gunner = { id: 9, missionId: "Relief1", alive: true, weaponId: "Zb26", weapon: { id: "Zb26" }, position: { ...S.leftSeat }, actor: { SetWeapon() {} } };
+  const gun = { npc: he, kind: { weaponId: "Zb26" } };
+  Object.assign(r, { opening: { zhou: null }, leftGunId: "Left", emplacement: { guns: new Map([["Left", gun]]) } });
+  const battle = new FirstLevelFrontBattle(r);
+  battle.UpdateLeftGunner();
+  assert.equal(he.weaponId, "Zb26", "He takes the ZB26 into his own hands with the gun");
+  assert.equal(he.actor.weaponId, "Zb26", "... the rig shows it");
+  assert.ok(he.meleeDormant === true, "the gunner is no bayonet target (he cannot die: a man who reached him bayoneted him for good)");
+  const post = battle.walks.get(he.id)?.route.at(-1);
+  assert.ok(post && Dist(post, S.leftSeat) < 1e-9 && post.arrivalM === B.leftGunSeatArrivalM && post.stance === 0,
+    "shoved 1.7 m off the seat, he walks onto it (within leftGunSeatArrivalM, standing)");
+  assert.ok(!stances.length && he.scriptSuppressible === true, "off the seat he is not stood up at the gun yet");
+  he.position = { x: S.leftSeat.x + 0.1, z: S.leftSeat.z };
+  battle.UpdateLeftGunner();
+  assert.deepEqual(stances.at(-1), [3, 0], "on the seat he stands at the gun");
+  assert.equal(he.scriptSuppressible, false, "... and fire does not pin him prone behind the rest");
+  assert.ok(battle.walks.get(he.id).route.at(-1) === post, "the walk is set once, not every frame");
+  // Relief: the gun passes to the relief gunner; He gets his rifle back and is a melee target again.
+  gun.npc = gunner;
+  battle.UpdateLeftGunner();
+  assert.equal(he.weaponId, "HanYang", "He leaves the gun with his HanYang");
+  assert.equal(he.meleeDormant, false, "... and melee sees him again");
+  assert.ok(gunner.meleeDormant === true && gunner.weaponId === "Zb26", "the relief gunner mans it with his own ZB26");
+  const src = Read("Script_FirstLevelFrontBattle.mjs");
+  assert.ok(/UpdateHandover\(\);\s*this\.UpdateLeftGunner\(\);/.test(src) && (src.match(/this\.UpdateLeftGunner\(\);/g) || []).length === 2,
+    "the gunner is kept every front frame and from UpdateRelief (06 has no FrontBattle.Update)");
+  const main = Read("Script_Main.mjs"), runtime = Read("Script_FirstLevelMissionRuntime.mjs");
+  assert.ok(/id:"MissionLeftGun"[^\n]*payload:\{npcCarriesGun:true\}/.test(runtime) && /npcCarriesGun/.test(main),
+    "the world model on the rest is hidden while its man holds the ZB26 at the seat");
+  checks += 19;
+  Ok("⑭ the left gun rests on LeftGunRest 0.6 m ahead of the seat; He mans it standing with the ZB26 and gets his rifle back");
 }
 
 console.log(`FirstLevelFrontPacingTest 通过：${checks} 条断言`);

@@ -7904,6 +7904,11 @@ function SyncEmplacementViews() {
       emplacementViews.set(gun.id, view);
     }
     if (!view.root) continue;
+    // A gun whose man carries its weapon in his own hands (payload.npcCarriesGun: the first level's left gun) shows
+    // no second one on the rest while he stands at the seat with it (Front package, 2026-09-25).
+    const carried = gun.payload?.npcCarriesGun && gun.npc && gun.npc.alive !== false && gun.npc.weaponId === gun.kind.weaponId
+      && Math.hypot(gun.npc.position.x - gun.seat.x, gun.npc.position.z - gun.seat.z) < 1.2;
+    view.root.visible = !carried;
     view.root.position.set(gun.position.x, gun.position.y + gun.kind.sightRiseM, gun.position.z);
     view.root.rotation.set(gun.pitch, gun.yaw, 0, "YXZ");
     const recoil=gun.kind.recoil, age=state.elapsed-(view.lastShotAt??-100);

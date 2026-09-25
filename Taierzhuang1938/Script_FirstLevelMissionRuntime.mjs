@@ -1384,7 +1384,9 @@ export class FirstLevelMissionRuntime {
           Anchor:()=>new THREE.Vector3(spec.x,this.battlefield.GroundHeight(spec.x,spec.z)+(spec.supportHeight||0)+.3,spec.z)},
       );
     }
-    this.leftGunId=this.emplacement.CreateEmplacement({id:"MissionLeftGun",tag:"FirstLevelMission",kindId:"Zb26Nest",position:this.Point(Sortie.leftGun,1.45),seat:this.Point(Sortie.leftSeat),baseYaw:0,arcYawDeg:85,belts:6});
+    // payload.npcCarriesGun: the man on this gun holds the ZB26 itself (FrontBattle.UpdateLeftGunner), so the world
+    // model on the rest is hidden while he stands at the seat with it (Script_Main.SyncEmplacementViews).
+    this.leftGunId=this.emplacement.CreateEmplacement({id:"MissionLeftGun",tag:"FirstLevelMission",kindId:"Zb26Nest",position:this.Point(Sortie.leftGun,1.45),seat:this.Point(Sortie.leftSeat),baseYaw:0,arcYawDeg:85,belts:6,payload:{npcCarriesGun:true}});
     this.gunId = this.emplacement.CreateEmplacement({
       id: "MissionGun",
       tag: "FirstLevelMission",

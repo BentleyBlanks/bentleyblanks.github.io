@@ -287,6 +287,12 @@ export const FRONT_BATTLE_TUNING=Object.freeze({
   // behind the wall's end (wall 89/183/132 of 89/183/132 frames). 0.25 m is the route-corner radius (arrivalM x 0.25);
   // at 0.45 he still stopped 0.42 m short, 0.1 m clear of the wall's end in the gunner's line (DoorLuo probe).
   leaderCoverArrivalM:.25,coverReopenM:.35,
+  // The left gun's man (FrontBattle.UpdateLeftGunner): He / the relief gunner walk onto the seat within
+  // leftGunSeatArrivalM (the gun, FRONT_SORTIE.leftGun, is 0.6 m ahead of it: the butt at his shoulder) and are walked
+  // back when put more than coverReopenM past that. Within leftGunManM of the seat the gunner stands at the gun and is
+  // not pinned prone. 09-25 relay r2 Front step 3: after the handover He stood 1.99 m off the seat for all of 04-05
+  // (Zhou's exit shoved him there), 3.2 m from the gun.
+  leftGunSeatArrivalM:.25,leftGunManM:.6,
   // 04: the player has held the rear junction this long out of the tank's sight and Luo is still not there ->
   // rightRearReached anyway (Luo walks on behind him). Two stall skips plus the 5 m walk from his cover.
   rearLeaderGraceS:15,

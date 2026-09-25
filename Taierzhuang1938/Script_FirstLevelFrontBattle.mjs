@@ -12,6 +12,7 @@ import { SpeakingCastOptions } from "./Data_FirstLevelSpeakingCast.mjs";
 import { TankClearFact } from "./Script_FirstLevelTankBrain.mjs";
 import { MISSION_VOICE_CAST } from "./Data_FirstLevelMissionDialogue.mjs";
 import { ZhouGunExitRoute } from "./Script_FirstLevelOpening.mjs";
+import { WEAPONS } from "./Data_Weapons.mjs";
 const Distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const AliveBatch=batch=>batch.filter(g=>g.actor.alive);
 /** Route split at the point nearest to `point`: [head ending there, tail starting there]. */
@@ -71,6 +72,18 @@ export function FrontEntryRoute(position,route){
 }
 /** Luo's cover inside the nest's west door, walked to within B.leaderCoverArrivalM (not arrivalM: that is the doorway). */
 const LeaderCover=()=>({...S.leaderCover,arrivalM:B.leaderCoverArrivalM});
+/**
+ * The left gun's seat as a walk's last point: reached within B.leftGunSeatArrivalM (the gun's butt is at his shoulder
+ * there, Sortie.leftGun is 0.6 m ahead), taken up again when he is put off it (FrontBattle.Walk), and he stands there
+ * (the gun rests 1.45 m over the pit floor on LeftGunRest; crouched, his hands were a foot under it).
+ */
+const LeftSeatPost=()=>({...S.leftSeat,arrivalM:B.leftGunSeatArrivalM,stance:0});
+/** Puts `weaponId` into an AI soldier's hands (the AI's weapon record, a full magazine, the rig's model). */
+function ArmWith(actor,weaponId){
+  const weapon=WEAPONS[weaponId];if(!actor||!weapon)return;
+  actor.weaponId=weaponId;actor.weapon=weapon;actor.ammo=weapon.magazine||5;actor.reloadTimer=0;
+  actor.actor?.SetWeapon?.(weaponId);
+}
 /** Where the relief gunner waits for He to leave the left gun: B.reliefGunStandbyM back along leftRoute's last leg. */
 function ReliefGunStandby(){const a=S.leftRoute.at(-2),b=S.leftSeat,d=Math.hypot(a.x-b.x,a.z-b.z),k=Math.min(1,B.reliefGunStandbyM/Math.max(d,1e-6));return {x:b.x+(a.x-b.x)*k,z:b.z+(a.z-b.z)*k};}
 
@@ -107,7 +120,7 @@ export class FirstLevelFrontBattle {
     const previousIndex=w.index;
     while(w.index<w.route.length&&Distance(actor.position,w.route[w.index])<Arrival())w.index++;
     if(w.index!==previousIndex){w.rejoin=null;w.best=Infinity;w.bestAt=r.time;}
-    if(w.index>=w.route.length){r.Defend(actor,w.route.at(-1),0,.4);r.ai.SetStance(actor,1,.5,true);r.squadRoutes.set(actor.id,[]);return true;}
+    if(w.index>=w.route.length){r.Defend(actor,w.route.at(-1),0,.4);r.ai.SetStance(actor,last.stance??1,.5,true);r.squadRoutes.set(actor.id,[]);return true;}
     if(r.RespondToGrenade(actor)){w.bestAt=r.time;return false;}
     const ahead=MissionRouteProjection(w.route,actor.position).progress>MissionRouteProjection(w.route,r.player.position).progress+B.leaderLeadM;
     const wait=follow&&ahead&&Distance(actor.position,r.player.position)>S.leaderWaitM;
@@ -127,7 +140,7 @@ export class FirstLevelFrontBattle {
         // No rejoin point on the next segment: its foot is where he was stuck, it would pull him straight back.
         if(final)w.stallAccepted=true;
         w.index++;w.rejoin=null;w.noRejoin=w.index;w.best=Infinity;w.bestAt=r.time;
-        if(w.index>=w.route.length){r.Defend(actor,w.route.at(-1),0,.4);r.ai.SetStance(actor,1,.5,true);r.squadRoutes.set(actor.id,[]);return true;}
+        if(w.index>=w.route.length){r.Defend(actor,w.route.at(-1),0,.4);r.ai.SetStance(actor,last.stance??1,.5,true);r.squadRoutes.set(actor.id,[]);return true;}
       }else w.bestAt=r.time;
     }
     // Crowd pressure or a grenade evade can leave an actor beside the checked
@@ -195,6 +208,35 @@ export class FirstLevelFrontBattle {
     // wherever he was pushed - 1.31 m off, 240 s, 03 never ended (09-24 01->06 verify run). Walk him on again.
     const w=this.walks.get(he.id);if(!w||w.index>=w.route.length)this.SetWalk(he,[S.leftSeat]);
   }
+  /**
+   * Whoever holds the left gun (Zhou in 03, He Youtian from the handover, the relief gunner after that) mans it: he
+   * stands on the seat behind the gun on its rest and fires the ZB26 itself - He trades his rifle for it while the gun
+   * is his and gets the rifle back when he leaves it; fire does not pin him prone behind the rest; and he is no bayonet
+   * target. All three are scriptEssential and cannot die: a Japanese who reached the pit stood bayoneting him for good
+   * (09-25 relay r2 Front step 3, continuous 03->05 drive: FrontRifleA 24 s on Zhou in 03, MachineGunAttack0_1 and
+   * FrontReserveNorthWestPlateau0 12-30 s in melee on He's seat with no shot - most of 04's zero-shot windows). Before
+   * this He held his HanYang 1.2-2 m behind an empty gun in mid-air: Zhou's exit shoved him off the seat at the
+   * handover and nothing walked him back (Gate package's STAGE_ENTRY_LEFT_GUN; Front step 3 addendum A).
+   */
+  UpdateLeftGunner(){
+    const r=this.r,gun=r.emplacement?.guns?.get?.(r.leftGunId),g=gun?.npc&&gun.npc.alive!==false?gun.npc:null;
+    if(this.leftGunner&&this.leftGunner.actor!==g)this.ReleaseLeftGunner();
+    if(!g)return;
+    if(!this.leftGunner){
+      this.leftGunner={actor:g,weaponId:g.weaponId,meleeDormant:!!g.meleeDormant};
+      if(g.weaponId!==gun.kind.weaponId)ArmWith(g,gun.kind.weaponId);
+      // Zhou's seat is held by UpdateZhou; He and the relief gunner walk onto it (again whenever they are put off it).
+      if(g!==r.opening?.zhou)this.SetWalk(g,[LeftSeatPost()]);
+    }
+    g.meleeDormant=true;
+    if(Distance(g.position,S.leftSeat)<B.leftGunManM){g.scriptSuppressible=false;r.ai.SetStance?.(g,0,.5,true);}
+  }
+  ReleaseLeftGunner(){
+    const held=this.leftGunner;this.leftGunner=null;
+    const a=held?.actor;if(!a)return;
+    a.meleeDormant=held.meleeDormant;
+    if(a.alive!==false&&a.weaponId!==held.weaponId)ArmWith(a,held.weaponId);
+  }
   InfantryBlockade(){
     const r=this.r;
     return [S.gap,{x:S.gap.x,z:S.gap.z-2},{x:S.gap.x,z:S.gap.z+2}].some(p=>r.Threatens(p,null,B.guardHeightM,B.blockadeRangeM));
@@ -212,6 +254,7 @@ export class FirstLevelFrontBattle {
     this.Walk(this.Leader,{follow:true});
     this.blocked=this.InfantryBlockade()||this.TankBlockade();
     this.UpdateHandover();
+    this.UpdateLeftGunner();
     // Sound package's music stinger: the gap is open again (tank silenced and no one fires on the gap).
     if(stage==="Tank"&&r.Has(TankClearFact(r.tank))&&!this.blocked)r.Record("breachReopened");
     if(stage==="Support")this.UpdateCapture();
@@ -462,9 +505,11 @@ export class FirstLevelFrontBattle {
         this.SetWalk(r.companion.Handle("heyoutian"),[...S.leftRoute].reverse().slice(0,4).concat([B.heMeetPost]));
         this.SetWalk(r.companion.Handle("liuwencai"),[B.liuMeetPost]);
         // He has vacated the seat: the relief gunner takes the last reliefGunStandbyM into it (B.reliefGunStandbyM).
-        const gunner=r.relief.find(e=>e.gun)?.actor;if(gunner){r.emplacement.NpcOccupy(r.leftGunId,gunner);this.SetWalk(gunner,[S.leftSeat]);}
+        const gunner=r.relief.find(e=>e.gun)?.actor;if(gunner){r.emplacement.NpcOccupy(r.leftGunId,gunner);this.SetWalk(gunner,[LeftSeatPost()]);}
       }
     }
+    // 06 (Orders) has no FrontBattle.Update: hand He his rifle back and seat the relief gunner from here as well.
+    this.UpdateLeftGunner();
     this.UpdateReturnMeet();
     if(this.postsRelieved&&stage==="Orders")for(const id of ["heyoutian","liuwencai"])this.Walk(r.companion.Handle(id));
   }

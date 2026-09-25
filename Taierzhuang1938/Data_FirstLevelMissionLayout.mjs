@@ -235,6 +235,12 @@ TopBlock("ObservationParapet",-22.5,-132.3,2.4,.55,.7,"cover",{ry:-.52,cover:Fac
 // Zhou's left gun at the berm's west end, parapet facing north-east along the berm's north face.
 TopBlock("LeftGunParapet",-32.4,-158.4,3.6,.95,.8,"cover",{ry:-.6,cover:Face(.6,-.8)});
 TopBlock("LeftGunSide",-35.4,-155.8,.7,1.9,4,"cover",{cover:Face(-1,0)});
+// The left gun's rest: sandbags under the gun (Sortie.leftGun, 0.6 m in front of the seat), topped where the gun's
+// lowest vertex sits - the same height rule as RightNestFrontRest. Only 0.45 m deep and pushed 0.12 m forward so its
+// back face stays 0.49 m off the seat: the gunner's capsule is not shoved off it. Without it the gun hung 1.45 m over
+// the pit floor with nothing under it (2026-09-25 relay r2 Front step 3 addendum A).
+const leftGunRestTop=SampleMissionTerrain(Sortie.leftGun.x,Sortie.leftGun.z)+1.45+.08-.12294;
+Block("LeftGunRest",Sortie.leftGun.x,Sortie.leftGun.z-.12,.6,leftGunRestTop-SampleMissionTerrain(Sortie.leftGun.x,Sortie.leftGun.z-.12),.45,"cover");
 // The backslope scrape stops short of Zhou's gun pit and an earth traverse closes the last metre, so the
 // guards' only way down is the gap (no bypass west along the scrape into the left gun access trench).
 {
