@@ -41,7 +41,9 @@ from mathutils import Matrix, Quaternion, Vector, kdtree
 
 CONVERSION = Matrix.Rotation(-math.pi / 2, 4, 'X')  # Blender Z-up -> glTF Y-up
 # Linear baseColor per oral category (legacy material factors, reused as COLOR_0).
-ORAL_COLORS = {'Cavity': [.008, .001, .002, 1], 'Teeth': [.30, .255, .19, 1], 'Tongue': [.12, .022, .027, 1],
+# Teeth .30/.255/.19 -> .62/.57/.48 (2026-09-25): in the level's light, inside the dark
+# mouth, the old value read as a grey slab and a bared snarl as a dark slot.
+ORAL_COLORS = {'Cavity': [.008, .001, .002, 1], 'Teeth': [.62, .57, .48, 1], 'Tongue': [.12, .022, .027, 1],
                'Gum': [.10, .018, .022, 1]}
 
 

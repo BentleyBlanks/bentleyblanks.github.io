@@ -79,20 +79,27 @@ MODELS['Nra06'] = {**MODELS['Nra02'], 'base': 'Model_LugouNra06.glb', 'eyePrim':
 # shapes below were set in Blender (BlenderMCP, close-up and 1 m game-view renders of
 # every rig) so that a 1 m view tells 咧 (Wide: corners out and back), 圆 (Round:
 # corners in, both lips pushed forward) and 抿 (Close: lips pressed, corners in) apart.
+# Second pass the same day, tuned in the game (0.6 m, trench light, all rigs; tmp probe
+# scenes against the storyboard): seen from the front the 09-25 Wide and Round were the
+# same slot with the same teeth, so Wide now bares both rows full width with little jaw
+# (lips up/down off the teeth, corners out) and Round closes the lips over the teeth
+# from both sides (corners 14 mm in, lips forward and toward each other): a small round
+# opening. Snarl clenches (jaw 1 deg) with both lips peeled off the teeth, corners out
+# and down; Shock opens the upper lids further so the stare reads under a cap brim.
 POSES = {
     'Open':  {'Jaw': 14.0, 'LipUpper': (.18, .06, 0), 'LipLower': (-.12, .10, 0), 'Corner': (-.12, .02, -.22)},
-    'Wide':  {'Jaw': 4.0, 'LipUpper': (.26, -.10, 0), 'LipLower': (-.20, -.10, 0), 'Corner': (.14, -.30, .70)},
-    'Round': {'Jaw': 5.0, 'LipUpper': (.06, .45, 0), 'LipLower': (.02, .42, 0), 'Corner': (.02, .30, -.70)},
+    'Wide':  {'Jaw': 2.5, 'LipUpper': (.50, -.15, 0), 'LipLower': (-.45, -.12, 0), 'Corner': (.20, -.36, 1.00)},
+    'Round': {'Jaw': 5.0, 'LipUpper': (-.25, .65, 0), 'LipLower': (.30, .60, 0), 'Corner': (.05, .45, -1.40)},
     'Close': {'LipUpper': (-.14, -.02, 0), 'LipLower': (.22, .02, 0), 'Corner': (-.02, -.06, -.10)},
     'Blink': {'LidUpper': 'blink', 'LidLower': (.16, .04, 0)},
     'BrowUp': {'Brow': (.36, .05, .03), 'LidUpper': (.07, 0, 0)},
     # 龇牙怒目 (日兵甲, SB04/SB04A/SB05): teeth almost together and bared top and bottom
     # (lips drawn off them, corners back), brows down, in and knitted, lower lids up.
-    'Snarl': {'Jaw': 1.5, 'Brow': (-.50, .10, -.30), 'BrowTilt': -18, 'LipUpper': (.80, .12, 0),
-              'LipLower': (-.45, -.02, 0), 'Corner': (0, -.26, .45), 'LidLower': (.22, .03, 0), 'LidUpper': (.04, 0, 0)},
+    'Snarl': {'Jaw': 1.0, 'Brow': (-.55, .10, -.32), 'BrowTilt': -20, 'LipUpper': (1.10, .25, 0),
+              'LipLower': (-1.30, .35, 0), 'Corner': (-.25, -.30, .85), 'LidLower': (.26, .03, 0), 'LidUpper': (.04, 0, 0)},
     'DeadSlack': {'Jaw': 9.0, 'LidUpper': 'half', 'Corner': (-.14, -.03, .02), 'LipLower': (-.05, 0, 0)},
     # 惊愕 (日兵甲 at the chop, SB05A): brows high, upper lids wide, jaw dropped a little.
-    'Shock': {'Jaw': 8.0, 'Brow': (.60, .06, .04), 'BrowTilt': 6, 'LidUpper': (.24, .03, 0), 'LidLower': (-.08, 0, 0),
+    'Shock': {'Jaw': 8.0, 'Brow': (.70, .06, .04), 'BrowTilt': 6, 'LidUpper': (.40, .05, 0), 'LidLower': (-.14, 0, 0),
               'LipUpper': (.08, .04, 0), 'LipLower': (-.10, .06, 0), 'Corner': (-.08, .06, -.25)},
     # 痛苦 (the wounded comrade dragged out, SB03): inner brows up and knitted, squint,
     # upper lip raised, corners pulled down and out.
@@ -722,6 +729,11 @@ if 'FACIAL_AUTHOR' in globals():
 
 
 # ---------------------------------------------------------------- NRA05 upgrade
+
+# NRA05 (罗班长) lips overlap like NRA02 and its reviewed teeth sit deep: at 0.75 m in the
+# level the shared Grit parted the lips by a dark slit only (2026-09-25 review). Lips twice
+# as far off the teeth and the corners a little further back make the clench read.
+MODELS['Nra05'] = {'poseScale': {'Grit': {'LipUpper': 2.0, 'LipLower': 2.0, 'Corner': 1.3}}}
 
 NRA05_POSE_FRAMES = {'Rest': 1, 'Open': 140, 'Wide': 44, 'Round': 55, 'Blink': 74,
                      'Close': 300, 'BrowUp': 310, 'Snarl': 320, 'DeadSlack': 330,
