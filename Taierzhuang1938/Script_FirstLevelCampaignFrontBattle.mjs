@@ -10,6 +10,7 @@ import { MISSION_STAGE_ROUTES } from "./Data_FirstLevelMissionTopology.mjs";
 import { CampaignActions, Snapshot03Entry, Report03Damage } from "./Script_FirstLevelCampaignKit.mjs";
 import { DriveBundleThrow } from "./Script_FirstLevelBundleThrowDriver.mjs";
 import { FRONT_BATTLE_TUNING as B } from "./Data_Tuning_FirstLevelFront.mjs";
+import { TANK } from "./Data_Tuning_Tank.mjs";
 import { InstallSpeakerActing, CheckFrontActing } from "./Script_FirstLevelCampaignOpening.mjs";
 
 export async function DriveFrontBattle(ctx){
@@ -77,6 +78,7 @@ export async function DriveFrontBattle(ctx){
         // Awake enemies by encounter (alive / total), to compare what a checkpoint start leaves alive with a run.
         enemies:m.enemies.filter(e=>!e.dormant).reduce((out,e)=>{const k=e.encounter||"other",row=out[k]||={alive:[],dead:0};
           if(e.alive)row.alive.push(`${e.id}@${e.x.toFixed(0)},${e.z.toFixed(0)}`);else row.dead++;return out;},{}),
+        escorts:m.enemies.filter(e=>e.encounter==="tank"&&e.alive&&!e.dormant).map(e=>({id:e.id,x:+e.x.toFixed(1),z:+e.z.toFixed(1)})),
         facts:m.facts};
     });
     const D=(a,b)=>a&&b?+Math.hypot(a.x-b.x,a.z-b.z).toFixed(2):null;
@@ -107,6 +109,14 @@ export async function DriveFrontBattle(ctx){
       assert.ok(x.hold&&D(x.hold,x.end)<=3&&D(x,x.end)<=4,`${stage} begins with safe guard ${x.id} holding the safe zone`+why);
     assert.ok(s.tank.state==null||s.tank.state==="Intact",`${stage} begins with the tank intact`+why);
     assert.ok(!s.tank.immobilized,`${stage} begins with the tank still moving`+why);
+    // The enemies a checkpoint start leaves alive are the ones a run leaves (FIRST_LEVEL_STAGE_CLEARED_ENEMIES /
+    // FIRST_LEVEL_CHECKPOINT_ENEMY_POSTS): the flank group down to its usual 0–1 survivor, the tank escorts with the
+    // tank (04: within TANK.escorts.joinRangeM, so the tank has picked them up; 05: at its side, a run reads ≤ 6.8 m).
+    const flank=s.enemies.frontFlank?.alive.length??0,tankAt={x:s.tank.x,z:s.tank.z};
+    assert.ok(flank<=1,`${stage} begins with at most one flank man alive, got ${flank}`+why);
+    const escortRange=stage==="Tank"?8:TANK.escorts.joinRangeM;
+    for(const e of s.escorts)assert.ok(D(e,tankAt)<=escortRange,`${stage} begins with ${e.id} within ${escortRange} m of the tank (${D(e,tankAt)} m)`+why);
+    console.log("STAGE_ENTRY_ESCORTS",JSON.stringify({stage,source,flank,escorts:s.escorts.map(e=>({...e,fromTank:D(e,tankAt)}))}));
     if(stage==="MachineGun"){
       assert.ok(s.guards.slice(2).some(x=>x.alive&&!x.safe),"04 begins with the second guard batch still out"+why);
       if(source==="checkpoint")assert.ok(s.distances.playerFromSeat<=4,"04 begins with the player in the right nest"+why);

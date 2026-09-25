@@ -2,7 +2,7 @@ import { FRONT_SORTIE as Sortie } from "./Data_FirstLevelFrontRoute.mjs";
 import { MISSION_STAGES, MISSION_ENCOUNTERS, MISSION_TUNING as R } from "./Data_FirstLevelMission.mjs";
 import { MISSION_ANCHORS as A, MISSION_PLACEMENT as P } from "./Data_FirstLevelMissionLayout.mjs";
 import { BuildFirstLevelCheckpoint } from "./Script_FirstLevelMissionCheckpoint.mjs";
-import { FIRST_LEVEL_STAGE_ENCOUNTERS, FIRST_LEVEL_ENCOUNTER_STARTS, FIRST_LEVEL_STAGE_CLEARED_ENEMIES, FIRST_LEVEL_DEFERRED_ENCOUNTERS } from "./Data_FirstLevelMissionStages.mjs";
+import { FIRST_LEVEL_STAGE_ENCOUNTERS, FIRST_LEVEL_ENCOUNTER_STARTS, FIRST_LEVEL_STAGE_CLEARED_ENEMIES, FIRST_LEVEL_DEFERRED_ENCOUNTERS, FIRST_LEVEL_CHECKPOINT_ENEMY_POSTS } from "./Data_FirstLevelMissionStages.mjs";
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
 
 // Called once on a fresh runtime, after the shared level restart has cleared all
@@ -64,6 +64,12 @@ export function ApplyFirstLevelStageJump(runtime, value, { midCutscenes = false 
   for (const id of FIRST_LEVEL_STAGE_CLEARED_ENEMIES[n] || []) {
     const actor = r.enemies.get(id);
     if (actor) { r.ai.Remove(actor); r.enemies.delete(id); }
+  }
+  // Live enemies a continuous run has moved by now (04 / 05: the tank escorts beside the tank, not 50 m back at their
+  // spawn where the tank never picks them up). The tank runtime takes them over from there as in a run.
+  for (const [id, point] of Object.entries(FIRST_LEVEL_CHECKPOINT_ENEMY_POSTS[n] || {})) {
+    const actor = r.enemies.get(id);
+    if (actor?.alive) { r.PlaceActor(actor, point); r.Defend(actor, point); }
   }
   if (n >= 4 && n <= 5) {
     r.SpawnGuards();

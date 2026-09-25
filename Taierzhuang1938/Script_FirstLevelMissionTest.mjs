@@ -517,8 +517,9 @@ console.log("ok 18 Notion stages, complete prior facts, live destination gates a
 assert.ok(FIRST_LEVEL_STAGE_ENCOUNTERS[3].includes("approach"),
   "04 reconstructs the persistent capture roster");
 assert.deepEqual(FIRST_LEVEL_STAGE_CLEARED_ENEMIES[4],
-  MISSION_ENCOUNTERS.approach.map(spec=>spec.id),
-  "04 preserves the four casualties required to capture the right position");
+  [...MISSION_ENCOUNTERS.approach.map(spec=>spec.id),...MISSION_ENCOUNTERS.frontFlank.slice(1).map(spec=>spec.id)],
+  "04 preserves the four casualties required to capture the right position and the flank group cleared to its usual survivor");
+assert.deepEqual(FIRST_LEVEL_STAGE_CLEARED_ENEMIES[5],FIRST_LEVEL_STAGE_CLEARED_ENEMIES[4],"05 starts from the same casualties as 04");
 assert.ok(FIRST_LEVEL_STAGE_CLEARED_ENEMIES[4].every(id=>!MISSION_ENCOUNTERS.front.some(spec=>spec.id===id)),
   "04 debug start retains the full front line observed at the continuous transition");
 console.log("ok stage 04 reconstructs the post-03 battlefield instead of a full fresh roster");
