@@ -511,11 +511,11 @@ export class OpeningSet {
   BuildMound(prop, sink) {
     const rnd = Rng(`${prop.id}${prop.seed}`), g = new THREE.SphereGeometry(1, 18, 7, 0, Math.PI * 2, 0, Math.PI / 2), pos = g.attributes.position;
     for (let i = 0; i < pos.count; i++) {
-      const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i), bump = 1 + (rnd() - 0.5) * 0.22 * (0.4 + y);
+      const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i), bump = 1 + (rnd() - 0.5) * (prop.bump ?? 0.22) * (0.4 + y);
       pos.setXYZ(i, x * prop.rx * bump, y * prop.peak * bump, z * prop.rz * bump);
     }
     g.computeVertexNormals();
-    sink.Add("GroundRubble", PlaceGeometry(Normalize(g), { x: prop.x, y: this.groundAt(prop.x, prop.z) - 0.04, z: prop.z }));
+    sink.Add("GroundRubble", PlaceGeometry(Normalize(g), { x: prop.x, y: this.groundAt(prop.x, prop.z) - (prop.sink ?? 0.04), z: prop.z }));
     for (let k = 0; k < 6; k++) {                      // 散落的土块
       const a = rnd() * Math.PI * 2, r = 0.9 + rnd() * 0.4;
       const x = prop.x + Math.cos(a) * prop.rx * r, z = prop.z + Math.sin(a) * prop.rz * r;

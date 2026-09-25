@@ -170,7 +170,11 @@ const Samples = (route) => {
   assert.ok(rubble.solid !== false, "the south mouth rubble keeps its collider");
   assert.ok(!collapsed.some((b) => b.id === "BunkerMouthLintel"), "collapsed: the lintel box is replaced by the Set's fallen lintel");
   const mound = PROPS.find((p) => p.id === "rubbleMoundS");
-  assert.ok(mound.peak <= 0.4 && mound.peak >= report.rubbleTopM, `the mound over it is a low heap (<= 0.4 m) that covers the block: ${mound.peak}`);
+  assert.ok(mound.peak <= 0.36 && mound.peak >= report.rubbleTopM, `the mound over it is a low heap (<= 0.36 m) that covers the block: ${mound.peak}`);
+  // 体块四角处的土厚（最坏的起伏往下压）盖得住体块顶：不然实拍里方块的角从土包里露出来。
+  const cornerX = Math.abs(rubble.x - mound.x) + rubble.w / 2, cornerZ = Math.abs(rubble.z - mound.z) + rubble.d / 2;
+  const cornerLift = mound.peak * Math.sqrt(1 - (cornerX / mound.rx) ** 2 - (cornerZ / mound.rz) ** 2) * (1 - (mound.bump ?? 0.22) / 2 * 1.4) - (mound.sink ?? 0.04);
+  assert.ok(cornerLift + G(mound.x, mound.z) >= rubble.y + rubble.h / 2 - 0.005, `the mound covers the block corners: ${cornerLift.toFixed(3)} vs top ${report.rubbleTopM}`);
   // SB03 眼位 (0.35,-125.15) 离地 0.26：审问组（按契约 §5 的站位）与右侧沟底都看得见。
   const eye = Eye({ x: 0.35, z: -125.15 }, 0.26);
   const targets = [["ijaA head", { x: 4.10, z: -125.63 }, 1.55], ["captive head (kneeling)", { x: 4.06, z: -125.90 }, 0.85],
