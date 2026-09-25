@@ -2682,21 +2682,23 @@ export class Actor {
       arm.pole.copy(arm.elbow).sub(RIG_AIM_PIVOT).applyQuaternion(RIG_AIM_DELTA_Q).add(RIG_AIM_PIVOT);
       arm.handWorld.premultiply(RIG_AIM_DELTA_Q);
     }
+    // 03–06 说话手势占着的胳膊（Script_SpeakerGestureLayer.ArmWeight > 0）：下面的平移不由它触发、也不挪它，
+    // 解算后按手势权重还回手势姿势。01–06 以外没有 speakerGesture，keep 恒为 0，行为不变。
+    for (const arm of this.rigAimArms) arm.gestureKeep = rig.speakerGesture?.ArmWeight(arm.upper) || 0;
     // Translate the complete grip pair into both arms' reach; never shorten a
     // bone or move the torso/legs to force a wrist onto an unreachable target.
     for (let pass = 0; pass < 8; pass++) for (const arm of this.rigAimArms) {
+      if (arm.gestureKeep > .5) continue;
       RIG_IK_SHIFT.subVectors(arm.shoulder, arm.target);
       const distance = RIG_IK_SHIFT.length();
       const reach = arm.upperLength + arm.lowerLength - .0001;
       if (distance <= reach) continue;
       RIG_IK_SHIFT.multiplyScalar(1 - reach / distance);
-      for (const other of this.rigAimArms) { other.target.add(RIG_IK_SHIFT); other.pole.add(RIG_IK_SHIFT); }
+      for (const other of this.rigAimArms) if (!(other.gestureKeep > .5)) { other.target.add(RIG_IK_SHIFT); other.pole.add(RIG_IK_SHIFT); }
     }
     for (const arm of this.rigAimArms) {
       SolveRigAimArm(arm);
-      // 03–06 说话手势占着这只胳膊时，按手势权重把瞄准 IK 还回手势姿势（Script_SpeakerGestureLayer.ArmWeight）；
-      // 01–06 以外没有 speakerGesture，这里恒为 0。
-      const keep = rig.speakerGesture?.ArmWeight(arm.upper) || 0;
+      const keep = arm.gestureKeep;
       if (keep > 0) {
         arm.upper.quaternion.slerp(arm.upperBase, keep); arm.lower.quaternion.slerp(arm.lowerBase, keep);
         arm.hand.quaternion.slerp(arm.handBase, keep);

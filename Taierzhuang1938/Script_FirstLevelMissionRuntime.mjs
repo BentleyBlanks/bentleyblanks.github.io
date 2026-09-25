@@ -2738,6 +2738,7 @@ export class FirstLevelMissionRuntime {
     this.leaderGuide?.Dispose();
     this.ClearReturnWarning();
     this.speakers?.Dispose();
+    SetSpeakerGestureWorld({});   // Gesture 包薄钩子：放开对本关战车/地面的引用
     if(this.ai.ctx.onSoldierDeath===this.soldierDeath)this.ai.ctx.onSoldierDeath=this.oldSoldierDeath;
     this.transition.Dispose();
     this.extras.Clear();
