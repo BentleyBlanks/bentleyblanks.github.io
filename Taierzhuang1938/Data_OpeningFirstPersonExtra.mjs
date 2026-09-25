@@ -14,7 +14,8 @@
 //   - "partner": the palm is solved onto a bone of another actor (like `grasp`, but the partner's own arm
 //     stays on his clip). { partner:"<ijaA|luo|interpreter|castId>", bone:"forearmL|forearmR|upperArmL|
 //     upperArmR|chest", at: 0–1 from the bone to its child joint (atLeft for the left hand),
-//     offset:[side, out, along] m in the bone's frame (out = towards the eye), wrap: +1 fingers over the
+//     offset:[side, out, along] m in the bone's frame (out = towards the eye), boneLeft: another bone for the
+//     left hand (default `bone`), wrap: +1 fingers over the
 //     top / −1 under, twistDeg: fingers turned about the back of the hand, slipM: contact error past which
 //     the hand lets go (eases to `fallback`), fallback: pose used while the partner is missing or slipped,
 //     sh: optional shoulder override as below }.
@@ -73,15 +74,19 @@ export const EXTRA_HAND_POSES = Freeze({
   // SB04A: Shunzi's hand on the sleeve of the arm that drags him (ijaA's left), near the cuff; lets go at 5 cm
   // (at 9 cm the review saw the hand hover 8 cm off the sleeve and still count as holding).
   gripSleeve: G("ijaA", "forearmL", .78, { offset: V(0, .05, 0), twistDeg: -15, slipM: .05, minEyeM: .35 }),
-  // SB05: both hands at the bottom of frame on the forearm holding the collar (left nearer the elbow).
-  // Bench 2026-09-25 (eye 0.75, pitch −5…+3): his forearm runs from the eye's chin down out of frame, so the
-  // hands sit near the elbow (right 0.42, left 0.1 from the elbow) to show at the bottom edge.
-  gripArm: G("ijaA", "forearmL", .42, { atLeft: .1 }),
+  // SB05: both hands at the bottom of frame on the arm holding the collar. Browser bench 09-25 at the contract
+  // camera (eye 0.75, pitch +3): his collar forearm runs from under the chin down out of frame (elbow at the
+  // bottom edge), so the hands hold the arm at the elbow — the right just below it on the forearm, the left
+  // just above it on the upper arm — and both show at the bottom (palms ≈ (0.59,0.76) and (0.63,0.95); on
+  // the forearm alone only one hand was in frame).
+  gripArm: G("ijaA", "forearmL", .05, { boneLeft: "upperArmL", atLeft: .65 }),
   // SB05A: the RIGHT palm flat on ijaA's chest, left of centre (storyboard hand ≈ (0.3,0.5)); the shoulder comes
   // forward to reach across (his right upper arm, 0.7 m from the shoulder, is out of reach); it slides off as
   // he turns (slipM).
-  // Shoulder root 0.1 m behind the eye (was 0.08: exactly on the sleeve-root guard).
-  pressBody: G("ijaA", "chest", .35, { offset: V(-.03, .07, 0), twistDeg: 60, slipM: .06, fallback: "flat", shape: "press", c: V(12, 16, 10), sh: V(.12, -.24, .1) }),
+  // Shoulder root 0.1 m behind the eye (was 0.08: exactly on the sleeve-root guard) and low (0.3 m under it), so
+  // the upper arm passes under the frame (browser bench 09-25: at 0.24 m under the eye the rolled sleeve showed as
+  // a pale flat patch in the lower right corner); palm on the chest within 0.053 m.
+  pressBody: G("ijaA", "chest", .35, { offset: V(-.03, .07, 0), twistDeg: 60, slipM: .06, fallback: "flat", shape: "press", c: V(12, 16, 10), sh: V(.08, -.3, .1) }),
   // SB03: the RIGHT palm flat in the mud at the lower right (base `flat` is 0.25 m). The shoulder stays 0.1 m
   // behind the eye (review 09-25: the old 0.12 m forward shoulder showed the cut sleeve root), which leaves the
   // palm 0.44 m out, 0.52 m from the eye — at the eye 0.26 m up / pitch +5° that is the bottom edge (palm

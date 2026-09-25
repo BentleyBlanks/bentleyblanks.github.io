@@ -473,10 +473,12 @@ export class OpeningFirstPerson{
    */
   PartnerTarget(pose,side,frames){
     const who=this.override?.partner||pose.partner,soldier=PartnerSoldier(this.show,who);
-    const bones=soldier?.actor?.characterRig?.bones,[fromRole,toRole]=PARTNER_BONES[pose.bone]||[];
+    // The left hand may hold another bone (boneLeft) than the right.
+    const bone=side==="l"&&pose.boneLeft?pose.boneLeft:pose.bone;
+    const bones=soldier?.actor?.characterRig?.bones,[fromRole,toRole]=PARTNER_BONES[bone]||[];
     const from=bones?.[fromRole],to=bones?.[toRole];
     if(!soldier||soldier.alive===false&&pose.requireAlive||!from||!to||soldier.actor?.root?.visible===false)
-      return {missing:true,who,bone:pose.bone,reason:!soldier?"noPartner":!from||!to?"noBone":"hidden"};
+      return {missing:true,who,bone,reason:!soldier?"noPartner":!from||!to?"noBone":"hidden"};
     const cam=frames.cam,a=Pos(from),b=Pos(to),axis=b.clone().sub(a),length=axis.length();axis.normalize();
     const at=side==="l"&&pose.atLeft!=null?pose.atLeft:pose.at??.5;
     const point=a.clone().addScaledVector(axis,length*at);
@@ -491,7 +493,7 @@ export class OpeningFirstPerson{
     if(Math.abs(forward.y)>.2){if(forward.y*(pose.wrap??1)<0)forward.negate();}
     else if(forward.dot(camRight)*(side==="l"?-1:1)>0)forward.negate();
     if(pose.twistDeg)forward.applyAxisAngle(out,(side==="l"?-1:1)*pose.twistDeg/Degrees);
-    return {target,frame:FrameQuaternion(forward,out),who,bone:pose.bone,point:point.toArray()};
+    return {target,frame:FrameQuaternion(forward,out),who,bone,point:point.toArray()};
   }
   /** World target / finger direction / back-of-hand normal / curl of one named pose. */
   Resolve(pose,side,frames,clock){

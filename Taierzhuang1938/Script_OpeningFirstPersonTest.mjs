@@ -167,7 +167,7 @@ for(const [name,pose] of Object.entries(EXTRA_HAND_POSES)){
   if(pose.sh)assert.ok(pose.sh[2]>=SHOULDER_BEHIND_MIN_M,`${name}: shoulder root ${pose.sh[2]} m behind the eye (≥ ${SHOULDER_BEHIND_MIN_M})`);
   assert.ok(["cam","body","ground","partner"].includes(pose.in),`${name} frame`);
   if(pose.shape)assert.ok(HAND_SHAPES[pose.shape],`${name} shape ${pose.shape}`);
-  if(pose.in==="partner")assert.ok(["forearmL","forearmR","upperArmL","upperArmR","chest"].includes(pose.bone)&&OPENING_HAND_POSES[pose.fallback],`${name} partner bone and fallback`);
+  if(pose.in==="partner")assert.ok([pose.bone,pose.boneLeft??pose.bone].every(bone=>["forearmL","forearmR","upperArmL","upperArmR","chest"].includes(bone))&&OPENING_HAND_POSES[pose.fallback],`${name} partner bone and fallback`);
 }
 assert.equal(FP_PROPS[FP_PROPS.rifleSlide.prop]?.kind,"rifle","rifleSlide moves the loading rifle");
 {
@@ -228,11 +228,13 @@ assert.equal(FP_PROPS[FP_PROPS.rifleSlide.prop]?.kind,"rifle","rifleSlide moves 
     assert.ok(pose.slipM>0);
   }
   assert.ok(partnerActor.characterRig.bones.forearmL.quaternion.equals(partnerBefore),"a partner grip leaves the partner's own arm to his clip");
-  // Both hands on one forearm (gripArm: left nearer the elbow).
+  // Both hands on his arm at the elbow (gripArm: right on the forearm just below, left on the upper arm above).
+  {const elbow=partnerActor.characterRig.bones.forearmL.getWorldPosition(new THREE.Vector3());partnerActor.root.position.add(Local(0,-.22,-.4).sub(elbow));partnerActor.root.updateMatrixWorld(true);}
   firstPerson.Pose({left:"gripArm",right:"gripArm"});
-  {const state=Run(60);for(const side of ["l","r"])assert.ok(state.hands[side].partner.gap<.03,`gripArm ${side} on the forearm (${state.hands[side].partner.gap})`);
-    const a=partnerActor.characterRig.bones.forearmL.getWorldPosition(new THREE.Vector3());
-    assert.ok(new THREE.Vector3(...state.hands.l.palm).distanceTo(a)<new THREE.Vector3(...state.hands.r.palm).distanceTo(a),"the left hand holds nearer the elbow");}
+  {const state=Run(60);for(const side of ["l","r"])assert.ok(state.hands[side].partner.gap<.03,`gripArm ${side} on the arm (${state.hands[side].partner.gap})`);
+    assert.equal(state.hands.l.partner.bone,"upperArmL");assert.equal(state.hands.r.partner.bone,"forearmL");
+    const elbow=partnerActor.characterRig.bones.forearmL.getWorldPosition(new THREE.Vector3());
+    for(const side of ["l","r"])assert.ok(new THREE.Vector3(...state.hands[side].palm).distanceTo(elbow)<.16,`gripArm ${side} holds at the elbow`);}
   // He turns away: the grip slips off (one way) and the hand eases to its fallback.
   firstPerson.Pose({right:"gripForearm"});Run(40);
   {const from=partnerActor.root.position.clone(),state=Run(60,i=>{partnerActor.root.position.copy(from).add(new THREE.Vector3(.5*i/59,0,-.6*i/59));partnerActor.root.updateMatrixWorld(true);});
