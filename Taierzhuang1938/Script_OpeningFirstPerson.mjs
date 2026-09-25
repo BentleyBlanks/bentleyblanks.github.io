@@ -500,7 +500,7 @@ export class OpeningFirstPerson{
         this.Warn(`${side}:${got.who}:${got.bone}:${got.reason}`,`partner grip ${got.who}.${got.bone} unavailable (${got.reason}); ${side} hand holds ${pose.fallback||"rest"}`);
         return {...this.Resolve(Mirror(POSES[pose.fallback||"rest"],side),side,frames,clock),partner:got};
       }
-      return {target:got.target,frame:got.frame,curl:pose.c,shape:ShapeOf(pose),hasShape:true,partner:got,pose};
+      return {target:got.target,frame:got.frame,curl:pose.c,shape:ShapeOf(pose),hasShape:true,partner:got,pose,sh:pose.sh||null};
     }
     const p=[...pose.p];
     if(pose.osc)p[2]+=pose.osc[0]*Math.sin(clock*Math.PI*2*pose.osc[1]+(side==="l"?Math.PI:0));

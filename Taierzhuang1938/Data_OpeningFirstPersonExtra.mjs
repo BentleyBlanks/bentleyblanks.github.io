@@ -16,7 +16,8 @@
 //     upperArmR|chest", at: 0–1 from the bone to its child joint (atLeft for the left hand),
 //     offset:[side, out, along] m in the bone's frame (out = towards the eye), wrap: +1 fingers over the
 //     top / −1 under, twistDeg: fingers turned about the back of the hand, slipM: contact error past which
-//     the hand lets go (eases to `fallback`), fallback: pose used while the partner is missing or slipped }.
+//     the hand lets go (eases to `fallback`), fallback: pose used while the partner is missing or slipped,
+//     sh: optional shoulder override as below }.
 //     A missing partner is reported (firstPersonState.hands.<side>.partner.missing + one console warning),
 //     never silently re-aimed at something else.
 //   - `sh`: a shoulder override [x,y,z] camera-local (right-hand coordinates) for reaches that need the
@@ -58,17 +59,22 @@ export const EXTRA_HAND_POSES = Freeze({
   // SB04A: Shunzi's hand on the sleeve of the arm that drags him (ijaA's left), near the cuff.
   gripSleeve: G("ijaA", "forearmL", .78, { offset: V(0, .05, 0), twistDeg: -15 }),
   // SB05: both hands at the bottom of frame on the forearm holding the collar (left nearer the elbow).
-  gripArm: G("ijaA", "forearmL", .72, { atLeft: .32 }),
-  // SB05A: the RIGHT palm flat on ijaA's right upper arm; it slides off as he turns (slipM).
-  pressBody: G("ijaA", "upperArmR", .5, { offset: V(0, .06, 0), twistDeg: 60, slipM: .06, fallback: "flat", shape: "press", c: V(12, 16, 10) }),
+  // Bench 2026-09-25 (eye 0.75, pitch −5…+3): his forearm runs from the eye's chin down out of frame, so the
+  // hands sit near the elbow (right 0.42, left 0.1 from the elbow) to show at the bottom edge.
+  gripArm: G("ijaA", "forearmL", .42, { atLeft: .1 }),
+  // SB05A: the RIGHT palm flat on ijaA's chest, left of centre (storyboard hand ≈ (0.3,0.5)); the shoulder comes
+  // forward to reach across (his right upper arm, 0.7 m from the shoulder, is out of reach); it slides off as
+  // he turns (slipM).
+  pressBody: G("ijaA", "chest", .35, { offset: V(-.03, .07, 0), twistDeg: 60, slipM: .06, fallback: "flat", shape: "press", c: V(12, 16, 10), sh: V(.12, -.24, .08) }),
   // SB03: the RIGHT palm flat in the mud at the lower right, ~0.45 m ahead of the eye (base `flat` is 0.25 m).
-  // The eye is 0.26 m up with the shot pitched +5°, so the mud in frame starts ~0.5 m out: the hand reaches
-  // there, tilted so its back faces the eye (a hand flat on the mud is a sliver at this height).
-  palmMud: H("ground", [.2, .03, -.52], [.12, -.45, -.9], [.05, .8, .6], [12, 20, 12], { shape: "claw", sh: V(.2, -.2, -.05) }),
+  // The eye is 0.26 m up with the shot pitched +5°, so the mud in frame starts ~0.5 m out: the arm reaches
+  // 0.6 m with the shoulder brought forward; the back of the hand is asked to tilt to the eye (the wrist
+  // limit, 42°, leaves it nearly flat: from this height it reads as a thin hand, bench palm (0.64,0.88)).
+  palmMud: H("ground", [.2, .05, -.6], [.12, -.12, -.98], [-.05, .65, .75], [8, 12, 8], { shape: "claw", sh: V(.2, -.18, -.12) }),
   // SB03A: the LEFT arm out from the lower left, palm pressing the mud, ~0.55 m in front of the eye
   // (further than `reach`, 0.29 m): the shoulder comes forward with it.
-  // The eye is 0.18 m up: the hand is tilted so its back faces the eye, fingertips pressed into the mud.
-  reachLeft: H("ground", [.17, .035, -.5], [.1, -.45, -.9], [.05, .8, .6], [10, 16, 12], { shape: "claw", sh: V(.19, -.19, -.02) }),
+  // The eye is 0.18 m up: 0.6 m out the palm shows at about (0.37,0.72) (storyboard (0.33,0.6)).
+  reachLeft: H("ground", [.17, .05, -.6], [.1, -.4, -.9], [.05, .8, .6], [10, 16, 12], { shape: "claw", sh: V(.19, -.17, -.12) }),
 });
 
 // Legs (the kept leg and boot triangles of the NRA02 body). Frame: the eye with yaw-only axes (x right,

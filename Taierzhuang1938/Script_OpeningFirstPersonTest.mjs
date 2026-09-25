@@ -217,6 +217,11 @@ assert.equal(FP_PROPS[FP_PROPS.rifleSlide.prop]?.kind,"rifle","rifleSlide moves 
     assert.equal(state.hands.r.partner.slip,1,"out of reach the grip lets go");
     assert.ok(state.hands.r.wristBend<=42.1&&state.hands.r.rotationStepDegrees<12,"letting go stays anatomical and continuous");}
   PlacePartner(Local(.08,-.22,-.36));
+  // pressBody goes onto his chest with the shoulder brought forward (a partner pose honours `sh`).
+  firstPerson.Pose({right:"pressBody"});
+  {const state=Run(60),hand=state.hands.r;assert.equal(hand.partner.bone,"chest");assert.equal(hand.partner.missing,false);
+    assert.ok(Math.abs(hand.shoulderBehind-EXTRA_HAND_POSES.pressBody.sh[2])<1e-6,`pressBody brings the shoulder forward (${hand.shoulderBehind})`);}
+  PlacePartner(Local(.08,-.22,-.36));
   // Missing partner: an explicit report and one warning, the hand on the fallback pose.
   firstPerson.Pose({right:"gripForearm",partner:"nobody"});
   {const state=Run(40);assert.equal(state.hands.r.partner.missing,true);assert.equal(state.hands.r.partner.reason,"noPartner");
