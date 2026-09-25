@@ -162,7 +162,7 @@ export const BLAST = Object.freeze({
   dir: Object.freeze({ x: -0.47, y: 0.2, z: -0.86 }),
   /** 从近爆（blastAge 0 = 导演 Blast() 的那一帧）起算：炮弹 0.22 s 落地就喷。 */
   atS: 0.22, seconds: 0.68,
-  clods: 15, splinters: 9, dust: 16, spray: 44,
+  clods: 15, splinters: 9, dust: 26, spray: 70,
   spreadRad: 0.38,
   // 速度（米/秒）：土块 5–10、碎木 6–12（更轻、飞得远）、泥雾 7–13（一片扑到镜头上）、扬尘 1.2–3.2（填满洞口）。
   speed: Object.freeze({ clods: Object.freeze([5, 10]), splinters: Object.freeze([6, 12]), spray: Object.freeze([7, 13]), dust: Object.freeze([1.2, 3.2]) }),
@@ -180,14 +180,19 @@ const OPENING_STEPS = Object.freeze(["Trapped", "BunkerRescue", "RearTrench"]);
 export const SMOKE = Object.freeze([
   // 01–02：SB01 洞口外、SB03 审问组背后的天上、SB06 正前方远处（都在东边）。
   { id: "smokeEastNear", stages: OPENING_STEPS, x: 60, z: -112, kind: "black", scale: 1.0, fire: 0, why: "SB03 天空右侧的烟柱、SB06 远处" },
-  { id: "smokeEastMid", stages: OPENING_STEPS, x: 85, z: -140, kind: "black", scale: 1.25, fire: 0, why: "SB03 中间偏左的大烟柱" },
+  // 调研起点 (85,-140) 在 SB03 眼位正前方 0°，正好被洞口北柱挡住（实拍 tmp/s3/cap01/SB03_s3.png 只看得见 (60,-112) 一股）；
+  // 挪到柱子右边 5°、同样约 86 m 远：分镜 03 里那股贴着掩蔽部右沿、审问组头顶的烟。
+  { id: "smokeEastMid", stages: OPENING_STEPS, x: 86, z: -132.6, kind: "black", scale: 1.25, fire: 0, why: "SB03 掩蔽部右沿、审问组头顶的大烟柱" },
   { id: "smokeEastFar", stages: OPENING_STEPS, x: 110, z: -120, kind: "black", scale: 1.1, fire: 0, why: "SB01/SB03 远处第三股" },
   { id: "smokeSB06North", stages: OPENING_STEPS, x: 60, z: -150, kind: "black", scale: 0.9, fire: 0, why: "SB06 正前方偏左" },
   { id: "smokeSB06Near", stages: OPENING_STEPS, x: 45, z: -135, kind: "black", scale: 0.8, fire: 0, why: "SB06 正前方中远（(70,-118) 那一股并进 smokeEastNear）" },
   { id: "fireSB06", stages: OPENING_STEPS, x: 32, z: -126, kind: "black", scale: 0.35, fire: 0.7, why: "SB06 中远一处火光" },
   // 02 SB05A：镜头朝南南西直沟看（yaw 184°），画面中偏左两股远烟。
-  { id: "smokeSouthA", stages: Object.freeze(["BunkerRescue", "RearTrench"]), x: 18, z: -45, kind: "black", scale: 1.0, fire: 0, why: "SB05A 画面中偏左" },
-  { id: "smokeSouthB", stages: Object.freeze(["BunkerRescue", "RearTrench"]), x: -8, z: -40, kind: "black", scale: 0.85, fire: 0, why: "SB05A 画面中偏左第二股" },
+  // 调研起点 (18,-45)/(−8,−40) 在 SB05/05A 眼位 (0.6,-123.9)（yaw 184°）的左 8° 与右 10°：左边那股被画面左半的洞口木壁挡住，
+  // 只剩一股细烟（实拍 tmp/s3/cap01/SB05A_s3.png）。现在的镜头左半是洞壁，天只露在右半，两股都挪进这块天里：
+  // 右 1°（75 m）与右 12°（90 m），近的那股放大。
+  { id: "smokeSouthA", stages: Object.freeze(["BunkerRescue", "RearTrench"]), x: 4.5, z: -49, kind: "black", scale: 1.2, fire: 0, why: "SB05A 画面正中的大烟柱" },
+  { id: "smokeSouthB", stages: Object.freeze(["BunkerRescue", "RearTrench"]), x: -11.9, z: -34.8, kind: "black", scale: 0.85, fire: 0, why: "SB05A 第二股" },
   // 03：SB07 正中那一大股（战车来路 Approach 附近）、SB08 远处的火点与烟柱。
   { id: "smokeFrontBig", stages: Object.freeze(["Support"]), x: 59.8, z: -167.4, kind: "black", scale: 1.6, fire: 0, why: "SB07 正中的大黑烟柱" },
   { id: "smokeFrontWest", stages: Object.freeze(["Support"]), x: -35, z: -190, kind: "black", scale: 1.0, fire: 0, why: "SB08 远处左" },

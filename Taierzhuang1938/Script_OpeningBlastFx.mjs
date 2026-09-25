@@ -89,7 +89,8 @@ export class OpeningBlastFx {
       if (kind === "clods") {
         const size = R(0.04, 0.12);
         vfx._SpawnDebris(x, y, z, v.x, v.y + R(0.4, 1.4), v.z, size, size * R(0.6, 1.0), size * R(0.8, 1.3),
-          vfx.random() < 0.7 ? VFX_PALETTE.soil : VFX_PALETTE.woodBurnt, R(1.4, 2.2), o.groundY, 0.22, R(4, 9));
+          // 湿土块是深褐的（分镜 02）：裸土色 soil 在画面里读成一块块米黄方糖（实拍 tmp/s3/cap01/SB02dbg_t030.png）。
+          vfx.random() < 0.55 ? VFX_PALETTE.wood : VFX_PALETTE.woodBurnt, R(1.4, 2.2), o.groundY, 0.22, R(4, 9));
       } else {
         const size = R(0.014, 0.032);
         vfx._SpawnDebris(x, y, z, v.x, v.y + R(0.8, 2.0), v.z, size, size * R(0.5, 0.9), size * R(4, 9),
@@ -104,10 +105,11 @@ export class OpeningBlastFx {
       const v = vfx._ConeVelocity(emitter.axis, o.spreadRad * 1.2, R(lo, hi));
       s.vx = v.x; s.vy = v.y + R(0, 0.8); s.vz = v.z;
       s.ay = -6.5; s.drag = 1.4;
-      s.life = R(0.35, 0.75);
-      s.sizeStart = R(0.03, 0.06); s.sizeEnd = R(0.12, 0.24);
-      s.opacity = 0.9; s.fadeIn = 0.02;
-      s.colorA = VFX_PALETTE.soil; s.colorB = VFX_PALETTE.woodBurnt;
+      // 尺寸按实拍放大：0.03–0.24 m 的泥点在 1–3 m 外只有几个像素，三帧里几乎看不见。
+      s.life = R(0.4, 0.85);
+      s.sizeStart = R(0.12, 0.22); s.sizeEnd = R(0.35, 0.7);
+      s.opacity = 0.92; s.fadeIn = 0.02;
+      s.colorA = VFX_PALETTE.wood; s.colorB = VFX_PALETTE.dustDense;
     } else {
       // 扬尘：慢、大、往洞里推，把洞口填满（0.9 s 以后还浑着）。
       const v = vfx._ConeVelocity(emitter.axis, o.spreadRad * 1.8, R(lo, hi));
@@ -115,8 +117,8 @@ export class OpeningBlastFx {
       s.ax = vfx.wind?.x * 0.2 || 0; s.ay = 0.12; s.az = vfx.wind?.z * 0.2 || 0;
       s.drag = 2.2;
       s.life = R(1.8, 3.2);
-      s.sizeStart = R(0.25, 0.45); s.sizeEnd = R(1.2, 2.1);
-      s.opacity = 0.5; s.fadeIn = 0.1;
+      s.sizeStart = R(0.5, 0.8); s.sizeEnd = R(1.8, 2.8);
+      s.opacity = 0.62; s.fadeIn = 0.08;
       s.colorA = VFX_PALETTE.soilAir; s.colorB = VFX_PALETTE.dustDense;
     }
     s.angle = R(0, 6.283); s.spin = S(1.6);
