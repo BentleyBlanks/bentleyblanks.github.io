@@ -15,8 +15,12 @@
 //   4. 契约 §6 的构成：战车常驻 loop ≤ 3 条、剧情语音同时 ≤ 3 路、前线 + 场外炮击 ≤ 8 条
 //      （后一条按生成器自己的声部账数 —— 它按每一声的可听时长数，不按引擎回收时刻，
 //        引擎那边一条远处的枪要连混响尾巴与传播延迟一起挂五六秒，拿它数会数出十几条）；
-//   5. 离开阶段收得走：跳到 06 之后 6 s，战车的三条 loop 必须已经没了；每段开头 8 s 之后，
-//      正在淡出的循环层必须已经拆掉（换环境床的交叉不许留尾巴）；
+//   5. 离开阶段收得走：跳到 06 之后 6 s，战车的三条 loop 必须已经没了；循环层（环境床/配乐）Stop 之后，
+//      过了它自己的淡出秒数 + TAIL_GRACE_S 还挂着节点的，就是交叉留了尾巴 —— 整段每次取样都查，不只查开头 8 s 之后。
+//     （2026-09-26 改：原来查「每段开头 8 s 之后不许有任何淡出中的层」，默认换床只发生在跳段那一刻；
+//       01–03 分镜合入后，02 跳进来玩家站在防炮洞口，+20 s 左右听者高度降了 0.2 m 进了 dugout 档，UpdateDugout 在段中
+//       正常切一次床（fadeS 1.6 s），淡出中的 3 层按时拆掉了也被算成尾巴。现在按每层自己的 Stop 时刻算，
+//       段中正常的交叉不算、真没拆的尾巴在头 8 s 里也拦得住。）
 //   6. 同步推帧也不虚高：一个 evaluate 同步推 600 帧（战役驱动器与 TankProbe 帧耗时 A/B 的推法），
 //      推完账面仍 ≤ PEAK_CEILING、且没有过期未收（同上，含没有 releaseAt 的） —— 「整关验收 553–583」
 //      就是这种推法下计时器不回调、放完的 voice 全挂在账上量出来的。**真正卡住回归的是这一条的
@@ -38,6 +42,9 @@ const { ServeRoot } = await import(pathToFileURL(path.resolve(HERE, "Script_DevS
 
 const PEAK_CEILING = 150;
 const OVERDUE_S = 0.35;
+// LoopLayer.Stop(fade) 在 fade + 0.12 s 拆播放头、fade + 0.2 s 拆组增益（都走 setTimeout）；
+// 再给 0.8 s 让机器忙时的计时器迟到，超过就算尾巴没拆。
+const TAIL_GRACE_S = 1.0;
 const TANK_LOOPS = ["tankEngine", "tankTracks", "tankTurret"];
 // 实时推的段：01 从开机起 70 s（含近爆 → 黑屏 → 醒来），02 跳进来 25 s（后沟集合；02 开头的枪托那一下
 // 要从开机实时跑约 151 s 才到，FirstLevelJump(2) 会跳过它 —— 枪托那一下的耳鸣见 Step 3 的实时取样，
@@ -75,7 +82,7 @@ try {
   // ---- 探针：循环层登记、Play 打标（剧情语音）、按 cue 记饿死 ----
   await page.evaluate(() => {
     const a = window.Tengxian.audio;
-    const P = window.__budgetProbe = { layers: new Set(), starvedByCue: {}, listenerAt: null };
+    const P = window.__budgetProbe = { layers: new Set(), starvedByCue: {}, listenerAt: null, installedAt: a.ctx.currentTime };
     // 记下每一帧 SetListener（按帧清账所在处）进门时的音频时钟，过期未收以它为准（见文件头第 2 条）。
     const setListener = a.SetListener;
     a.SetListener = function (...x) { P.listenerAt = a.ctx.currentTime; return setListener.apply(this, x); };
@@ -84,6 +91,12 @@ try {
       proto.__budgetProbed = true;
       const start = proto.Start;
       proto.Start = function (...x) { P.layers.add(this); return start.apply(this, x); };
+      // 记下每层 Stop 的时刻与淡出秒数：尾巴按它自己的淡出算（见文件头第 5 条）。
+      const stop = proto.Stop;
+      proto.Stop = function (fade = 0, ...x) {
+        if (!this.stopped) { this.__stopAt = a.ctx.currentTime; this.__stopFade = fade > 0 ? fade : 0; }
+        return stop.call(this, fade, ...x);
+      };
     };
     for (const l of [...(a.ambLayers || []), a.musicLayer]) if (l) { P.layers.add(l); PatchLayer(Object.getPrototypeOf(l)); }
     const ambience = a.Ambience;
@@ -108,7 +121,7 @@ try {
       : (Number.isFinite(v.t) && Number.isFinite(v.life) ? v.t + v.life + 0.22 : null));
   });
 
-  const Sample = () => page.evaluate(({ OVERDUE_S, TANK_LOOPS }) => {
+  const Sample = () => page.evaluate(({ OVERDUE_S, TANK_LOOPS, TAIL_GRACE_S }) => {
     const g = window.Tengxian, a = g.audio, P = window.__budgetProbe, now = a.ctx.currentTime, ref = P.listenerAt ?? now;
     const FrontShared = () => { const b = g.Debug.FirstLevelMissionRuntime?.()?.battleSound;
       return b ? (b.frontVoices?.length || 0) + (b.artillery?.voices?.length || 0) : 0; };
@@ -125,18 +138,23 @@ try {
       if (TANK_LOOPS.includes(v.name)) tank += 1;
       if (v.__story) story += 1;
     }
-    let fromLayers = 0, fading = 0;
+    let fromLayers = 0, fading = 0, tails = 0;
+    const tailNames = [];
     for (const l of P.layers) {
       const n = (l.heads?.size || 0) * 2 + (l.group ? 1 : 0) + (l.filter ? 1 : 0);
       if (!n) { if (l.stopped) P.layers.delete(l); continue; }
       fromLayers += n;
-      if (l.stopped) fading += 1;
+      if (!l.stopped) continue;
+      fading += 1;
+      // 尾巴：Stop 之后过了自己的淡出 + TAIL_GRACE_S 还挂着节点（见文件头第 5 条）。
+      const since = now - (l.__stopAt ?? P.installedAt);
+      if (since > (l.__stopFade || 0) + TAIL_GRACE_S) { tails += 1; tailNames.push(`${l.bed || "?"}@${since.toFixed(1)}s`); }
     }
     const fallback = a.ambienceNodes?.length || 0;
     return { t: now, stage: g.Debug.FirstLevelMissionRuntime?.()?.flow?.stage?.id ?? null, live: a.liveNodes,
       drift: a.liveNodes - (fromVoices + fromLayers + fallback), overdue, overdueNames: overdueNames.slice(0, 4), gap: now - ref,
-      tank, story, shared: FrontShared(), fading, loops: fromLayers };
-  }, { OVERDUE_S, TANK_LOOPS });
+      tank, story, shared: FrontShared(), fading, tails, tailNames: tailNames.slice(0, 4), loops: fromLayers };
+  }, { OVERDUE_S, TANK_LOOPS, TAIL_GRACE_S });
 
   const report = [];
   const worst = { drift: [], overdue: [] };
@@ -164,11 +182,10 @@ try {
       await new Promise((res) => setTimeout(res, 4));
     }
     const peak = samples.reduce((m, s) => (s.live > m.live ? s : m), samples[0] || { live: 0 });
-    const settled = samples.filter((s) => s.rel >= 8);
     const row = { seg: seg.label, n: samples.length, gapMax: Math.max(0, ...samples.map((s) => s.gap)), game: +gameT.toFixed(1), peak: peak.live, peakStage: peak.stage,
       p95: [...samples.map((s) => s.live)].sort((x, y) => x - y)[Math.floor(samples.length * 0.95)] ?? 0,
       tankMax: Math.max(0, ...samples.map((s) => s.tank)), storyMax: Math.max(0, ...samples.map((s) => s.story)),
-      sharedMax: Math.max(0, ...samples.map((s) => s.shared)), fadingAfter8s: Math.max(0, ...settled.map((s) => s.fading)) };
+      sharedMax: Math.max(0, ...samples.map((s) => s.shared)), fadingMax: Math.max(0, ...samples.map((s) => s.fading)), tailMax: Math.max(0, ...samples.map((s) => s.tails)) };
     report.push(row);
     if (row.game < COVERAGE_MIN * seg.seconds) Fail(`${seg.label} 覆盖不足：只推到 ${row.game} 游戏秒（计划 ${seg.seconds}，音频时钟已走 ${WALL_FACTOR} 倍）`);
     for (const s of samples) {
@@ -179,7 +196,8 @@ try {
     if (row.tankMax > 3) Fail(`${seg.label} 战车常驻 loop 同时 ${row.tankMax} 条 > 3`);
     if (row.storyMax > 3) Fail(`${seg.label} 剧情语音同时 ${row.storyMax} 路 > 3`);
     if (row.sharedMax > 8) Fail(`${seg.label} 前线 + 场外炮击同时 ${row.sharedMax} 条 > 8`);
-    if (row.fadingAfter8s > 0) Fail(`${seg.label} 开头 8 s 之后还有 ${row.fadingAfter8s} 个淡出中的循环层没拆`);
+    const tailed = samples.filter((s) => s.tails > 0);
+    if (tailed.length) Fail(`${seg.label} 循环层淡出完了还没拆：${tailed.length} 次取样，最多同时 ${row.tailMax} 层（${tailed[0].rel.toFixed(1)} s：${tailed[0].tailNames.join(",")}）`);
     // 同步推帧放在 05（打车，最满的一段）实时推完之后：一个 evaluate 推 600 帧（10 s 游戏时间），推完就量。
     if (seg.label === "05") {
       sync = await page.evaluate(({ OVERDUE_S }) => {
@@ -204,8 +222,8 @@ try {
   else if (sync.peak > PEAK_CEILING || sync.overdue) Fail(`同步推 600 帧：liveNodes 峰值 ${sync.peak}、过期未收 ${sync.overdue} 条（${JSON.stringify(sync)}）`);
 
   const starved = await page.evaluate(() => Object.entries(window.__budgetProbe.starvedByCue).sort((x, y) => y[1] - x[1]).slice(0, 8));
-  console.log("段      取样  游戏秒  峰值  p95  战车loop  剧情语音  前线+炮击  淡出层  取样距上一帧最久(s)");
-  for (const r of report) console.log(`${r.seg.padEnd(6)} ${String(r.n).padStart(5)} ${String(r.game).padStart(7)} ${String(r.peak).padStart(5)} ${String(r.p95).padStart(4)} ${String(r.tankMax).padStart(9)} ${String(r.storyMax).padStart(9)} ${String(r.sharedMax).padStart(5)} ${String(r.fadingAfter8s).padStart(7)} ${r.gapMax.toFixed(2).padStart(9)}`);
+  console.log("段      取样  游戏秒  峰值  p95  战车loop  剧情语音  前线+炮击  淡出中  没拆尾巴  取样距上一帧最久(s)");
+  for (const r of report) console.log(`${r.seg.padEnd(6)} ${String(r.n).padStart(5)} ${String(r.game).padStart(7)} ${String(r.peak).padStart(5)} ${String(r.p95).padStart(4)} ${String(r.tankMax).padStart(9)} ${String(r.storyMax).padStart(9)} ${String(r.sharedMax).padStart(5)} ${String(r.fadingMax).padStart(6)} ${String(r.tailMax).padStart(8)} ${r.gapMax.toFixed(2).padStart(9)}`);
   if (sync) console.log(`同步推 600 帧（${sync.wallS} s 墙钟）：峰值 ${sync.peak}、推完 ${sync.end}、过期未收 ${sync.overdue} 条、按帧清账累计 ${sync.swept} 条`);
   console.log(`被预算闸饿死最多的 cue：${starved.map(([c, n]) => `${c} ${n}`).join("，") || "无"}`);
   if (errors.length) Fail(`页面报错：${errors.slice(0, 3).join(" | ")}`);
