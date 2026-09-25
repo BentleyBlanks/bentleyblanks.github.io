@@ -4310,7 +4310,7 @@ Meta('LuoKneelReach', REACH_T, False, 'free', role='luo', rig='LugouNra05', root
      events=[{'t': .60, 'kind': 'kneel'}, {'t': 1.05, 'kind': 'line', 'line': 'RescueCheck.01'}, {'t': 2.8, 'kind': 'rise'}],
      prev=['LuoDragToCover'], next=['KickRifle', 'LuoKneelCheck'],
      notes='SB06 (2026-09-25): from the standing pose (= LuoKneelCheck frame 0) he drops onto his right knee in front of '
-           'the sitting Shunzi (0.9 m, player head/chest), leans in and holds out his open left hand, palm down, fingers '
+           'the sitting Shunzi (1.1 m, player head/chest), leans in and holds out his open left hand, palm down, fingers '
            'toward him, 0.3 m short of his breastbone (1.0 s; the elbow stays bent). 1.0-2.5 s is a seamless hold loop '
            '(the hand offers twice, the face on Shunzi\'s eye, look = player head). holdUntil lets go: the hand comes back '
            'to the knee (2.5-2.8 s) and he stands (3.5 s). Last frame = frame 0 = LuoKneelCheck frame 0: a drop-in for the '
