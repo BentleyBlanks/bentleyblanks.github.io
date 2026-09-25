@@ -144,7 +144,7 @@ world：{ tankPose, targets[], Los(a,b), Cover(at), lastKnown, facts, rng }   //
 | 场景三角形 / draw call | `SCENE_RENDER_LIMITS`（8.1 M / 5000），任一截图 ≤ 7.5 M；前沿 draw call 不超过现状 +10% |
 | 帧时间 | MachineGun、FirstBatchSafe 两处 p95 ≤ 基线 ×1.2（同页交替 A/B 量） |
 | ai 桶 | 均值 ≤ 基线 +1.0 ms，P95 ≤ +2.0 ms |
-| 音频节点 | NODE_BUDGET 120 内：剧情语音同时 ≤ 3 路、战车常驻 loop ≤ 3、场外炮击/前线床 ≤ 8 |
+| 音频节点 | 进门预算 `NODE_BUDGET` 仍 120（低优先级上限 ×0.62、priority 上限 ×1.15 = 138）；01–06 实时 liveNodes 峰值护栏 150——护栏不是预算，只拦循环层、耳鸣这类绕过预算闸的自管节点顶破总账；剧情语音同时 ≤ 3 路、战车常驻 loop ≤ 3、前线 + 场外炮击 ≤ 8。回归看账面差 0、没有过期未收、同步推 600 帧后账面与过期未收（门 `Script_FirstLevelAudioNodeBudgetTest`，口径 [音频引擎 §7.5](Data_AudioEngine.md)；v1.10 起） |
 | 开机下载 | 新面部 GLB 不重复内嵌贴图（按名重绑基础 GLB 的材质）；每套 ≤ 1.5 MB |
 | 采样器 | 每材质变体 ≤ 16（SamplerBudgetTest） |
 | TTK | DamageTest 25 m 三人 TTK 维持 8–24 s 门内；环境射击与压制弹不进 TTK 账 |
@@ -199,3 +199,64 @@ world：{ tankPose, targets[], Los(a,b), Cover(at), lastKnown, facts, rng }   //
   ⑦**Space**：`Data_Tuning_FirstLevel.openingEnemyBudget` 32→26（连带 MissionTest 的 `actorCapacity`）——**认可**，26 是通用生成器名单按新名册的实数（bunkerAssault 4 + front 10 + machineGun 4 + approach 4 + 战车护兵 4），其余 01–05 组按 §6（累计 ≤ 55、同时存活 ≤ 30）另算，不是加减敌人（Report_space.md:91）。K5 炮塔 11 px（目标 20 px）——**列为已知未达标，不改口径**：炮塔高 0.86 m，要 20 px 得在 30 m 内，和 53.9 m 外的远段预告矛盾；开镜约 16 px、衬着天空（Report_space.md:72、:90）。
   ⑧idle4 新口径 v1.6 ① 已记，这里不重复。`NODE_BUDGET`（§6 写 120；实测旧路径基线就 220–259，Report_tank.md:239；整关验收 553–583）等接力第二批 Sound 包实测后另记。
   ⑨文档同步（与 v1.9 同一批提交）：项目 AGENTS.md「当前入口」加 01–06 新系统的「入口 → 口径文档 → 回归口」索引；新写 [开场动作库](Data_OpeningClipLibrary20260923.md)；[敌军 AI](Data_EnemyAi.md) §20.5 背景兵、[战车](Data_FirstLevelTank20260923.md)「可破坏掩体」、[配音同步](Data_FirstLevelVoiceSync20260919.md) §0.6 / §0.7 的班组喊话条数与待试听名单、[系统参考](Data_AgentReference.md) 的第一关路由按代码现状补齐。
+- 2026-09-25 v1.10（集成负责人，接力第二批合入时）：接力第二批 Sound、Gate、Gesture 三包与集成小修已合入接力分支（合并提交 02a5e2d6、365c30aa、d0eecf98；小修 5ea8a52a、3ac29926），Front 包结果另记 v1.11。接力分支 `claude/l1r-relay-20260924`；出处是会话接力目录 `附件/reports_r2/Result_{sound,gate,gesture}.json` 各包最后一项（修复阶段的整包报告）。合入后 quick 41/0（多出的一项是 Gesture 包的 `SpeakerGestureTest`）。
+  用户 09-25 拍板（不再问）：①04–06 说话人补手势（新开 Gesture 包，做成 03–06）；②type11 近处换成 FN MINIMI 两条实录，按顺序轮、不变调；③进 03 时绷带补到 2 卷（Gate 包方案①，见下面集成小修）；④这一批自验通过直接上线，不先交本地验收。
+
+  **Sound**（`claude/l1r-relay-sound-20260924`，合并 `02a5e2d6`）
+  - 做了什么：
+    - type11 近处只用两条 MINIMI 1 m 实录（SeedAudio 生成音撤出清单），远处 `type11Far` 为 BAR 300 m ×1 + MINIMI 50 m ×2；两条 cue 进 `Script_Audio` 的 `SAMPLE_CYCLE`（按顺序轮、不加 ±3% 变调），`SFX_PACK_VERSION` = `20260925type11minimionly`。`Data_SfxSources` 表尾新增登记组 `RifleIjaSeedAudio`，全量 SfxBake 不再把 rifleIja / rifleIjaFar 改回美制步枪实录；`Script_AudioTest` 的清单核对不留例外。
+    - 01 黑屏期间前线声全被拒收：节点预算把 500–900 m 的前线声当低优先级（上限 120 × 0.62 ≈ 74），黑屏时近爆、落土、心跳、剧情耳鸣和环境床把账面顶在 71–81。`Script_Audio.Play` 加可选项 `selfCapped`（默认 false），前线生成器的 `DrainFront` 每一声都带上、按整份预算进门；前线自己的声部上限（5 / 打得凶时 3 / 与场外炮击合计 8）不变。`State().battleSound.front` 新增 `refused`（引擎拒收数，与 `skipped` 分开记）。
+    - 耳鸣：`audio.firstLevelSoundscape` 开关翻转时，新起的一套先收掉另一套（`StopSharedRing` / `StopTinnitus`），同一时刻只有一条耳鸣；`Script_AudioTest`「两套耳鸣不叠」看守，按音频时钟量、不依赖墙钟。
+    - 节点账：v1.9 ⑧ 记的「整关 553–583、基线 220–259」不是节点泄漏，是同步推帧（一个 `page.evaluate` 里推几百帧）时回收计时器不回调、放完的 voice 一直挂在账上。下面三处修复后，同步推帧 04 从 204 降到 120，`TankProbe` 的推法从 252 / 233 降到 110 / 84。新门 `Script_FirstLevelAudioNodeBudgetTest`（浏览器，audio 域，约 6–8 分钟），口径 [音频引擎 §7.5](Data_AudioEngine.md)；拿基线 `0b13201` 的树跑同一道门会红（同步推 600 帧后过期未收 24 条、账面停在 148）。
+  - 签字：
+    - 引擎层三处记账修复**对全局生效、不挂任务开关——接受**：每帧 `SetListener` 按音频时钟清一次账（`SweepExpiredVoices`）；回收计时从起播算（原来从调 `Play` 那一刻算，延迟起播的声音尾巴被掐）；带淡出的 `StopVoice` 淡完就离账。理由：修的是账，不是新的声音行为，挂在开关后面等于让 07 以后留着同一个错账；07 以后复核了 `Script_AudioWiringTest` 81/81，`Script_BootTest` 的红与基线相同。
+    - §6「音频节点」一行按新口径改（本版已改）：`NODE_BUDGET` 仍 120、priority 上限 138、01–06 实时峰值护栏 150。理由：基线与改后的实时峰值都在 83–138 之间，拿 150 看不出预算用多了，它只拦自管节点顶破总账；真正盯回归的是账面差 0、过期未收和同步推帧后的账面。
+    - 01 黑屏期间前线声「闷着继续响」按 bug 修——**接受**。理由：黑屏时声音被饿死不是导演安排；要黑屏全静，应改导演时刻表或剧情听力曲线，不靠预算闸丢声。代价是 01 实时峰值从基线 84–88 升到 107–122，仍在护栏内。
+    - 孤儿文件 `Audio/Sfx/AudioSfx_SeedAudioType11_01.mp3` **暂留磁盘**：已不在清单里，用户听过 MINIMI 后可能改主意。重跑 `Script_SeedAudioGunfireBake.mjs` 会把 type11 改回生成音，`Script_AudioTest` 会抓到。
+  - 已知遗留：
+    - 预算闸饿死次数高：门里 `gunTailOpenRifle` 479、`type11` 395、`footstepDirt` 239 次（基线同量级），近处 type11 的顺序轮播会因此断断续续。要不要提高 `NODE_BUDGET` 或给近处 type11 更高优先级，等真人试听再定。
+    - 等用户听、定：01 黑屏时前线声闷得对不对、MINIMI 像不像十一年式；04 战车露面整合响度约 −12 LUFS（限幅顶在 −0.6 dBTP，基线一样），要不要压到约 −15（牵涉 Tank 包的战车声）；05 弹药沟布局改后判成 street 混响，是否应该听起来像壕沟。
+    - `Script_AudioWiringTest`「弹啸峰值 ≤ 枪声本体」在 150 m 处余量只有约 1.2 dB，和浏览器负载同时跑时红过一次、单跑通过；集成验收时单独跑。
+    - 基线上就红、不是本包造成：`Script_BootTest` 1–6 关「日军远景辨识材质未接全」，`Script_MachineGunCutsceneAudioTest` 38 红。6 条旧 SeedAudio 条目（`planeDrone` 等）元数据与配方表有出入，全量 bake 只改写元数据，本包没碰。
+
+  **Gate**（`claude/l1r-relay-gate-20260924`，合并 `365c30aa`）
+  - 做了什么：
+    - 04、05 检查点有了浏览器驱动：`Script_FirstLevelMissionBrowserTest.mjs --campaign --stage-from=4|5 --stage-to=6 [--bomb-first]`，从检查点冷启动、用真实输入打到 06 起行；TestRunner 登记 `FirstLevelFrontCheckpoint04Test`、`FirstLevelFrontCheckpoint05Test`、`FirstLevelFrontCheckpoint05BombFirstTest`（firstLevel 域，各 30 min 超时）。最终代码上各跑 3 趟共 9/9 通过：页面错误 0、检查点重试 0、毁伤都按 Intact → MobilityKill → Disabled 走完；先炸车两段都记上。
+    - 04 / 05 开始那一刻取样现场（EntryState）。检查点起步与连续流程共用的断言：何有田在左机枪上；老周离枪座不少于 `zhouLeftGunM` − 0.5 m、不和何有田叠在一起；第一批守军活着的都已 safe、守在安全区；战车完好；老周必须在场，只有 05 检查点例外（那里不重建老周）。只在检查点起步时断言：`frontFlank` ≤ 1 人、04 护兵在战车 `TANK.escorts.joinRangeM` 内、05 护兵离车 ≤ 8 m；连续流程只打印 `STAGE_ENTRY_ESCORTS` 对表。战车毁伤记录读不到就判红，不再静默跳过。
+    - 检查点重建（`Script_FirstLevelMissionStageJump`，只在检查点起步时生效）：第一批守军守在安全区（原来会走回前沿被 05 战车打死，`guardBatchLost` 任务失败）；05 起步时何有田接上左机枪（`FrontBattle.StartHandover`，原来只有 04 起步会走）；侧翼组清到只剩 `FrontFlankA`（`FIRST_LEVEL_STAGE_CLEARED_ENEMIES[4/5]`）；战车护兵按 `FIRST_LEVEL_CHECKPOINT_ENEMY_POSTS` 摆到连续流程读到的位置。
+    - 03 阵亡取证：日志 `CAMPAIGN_03_ENTRY`、`CAMPAIGN_03_DAMAGE`、`CAMPAIGN_DEATH`，`CAMPAIGN_03_DRIVER`（03 游戏时间按驾驶模式和路段记账、近身计数），`CAMPAIGN_03_FACTS`（03 各事实发生的时刻）。03 用时 = 走到右枪位 78–104 s + 夺点后等 `frontRifleDefense`（敌方冲锋组死够人数）0–35 s + 约 40 s 固定流程。阵亡率：01→03 连续跑改前 1/7、改后 1/6，冷启动 0/6（冷启动实际只有 2 条不同轨迹）；剩下的阵亡都出在「进 03 只剩 1 卷绷带、03 里再挨一枪加一颗雷」的对局，由用户选的补绷带处理（集成小修①）。
+    - Pages 打包开机卡死：根因是合并 `8eb4b86a` 留下第二条 `Script_Main` 入口 `<script>`，打包脚本只替换第一条，Pages 页面同时起了两局游戏。删掉重复入口（`73e6ff40`），加两道防线：`Script_BuildBrowserBundle` 在入口不是一条时拒绝打包；`Script_ModuleGraphTest`（quick 档）断言入口正好一条。`Script_BrowserBundleTest` 的缺模型那组（MissingCharacters）第一次真正跑通，v1.9 ② 留下的 runner 预期 null 与 NRA06（翻译）、IJA06（日兵甲 `BunkerExecutionerA`）断言都执行到了。
+  - 签字：
+    - 检查点起步的运行时修复（守军守在安全区、05 起步何有田接枪、侧翼清到剩 FrontFlankA、护兵就位）——**接受**。理由：都只在检查点起步时生效，是让起步现场对齐连续流程，连续流程一行不动。
+    - 删除重复 `Script_Main` 入口并加两道防线——**接受**。理由：这是 Pages 开机卡死的根因；接力线合回 master 时必须带上 `73e6ff40`。
+    - 敌军空转探针 `Script_FirstLevelEnemyIdleProbe` 默认用旧驾驶器、`--reflexes` 可选——**接受**。理由：探针量的是敌人，不该因为玩家驾驶器变了而变口径；两种都过闸（旧驾驶器 03–05 zero30 12% / idle4 14%，反射版 9% / 13%），写在 [敌军 AI §20.6](Data_EnemyAi.md)。
+    - 驾驶器（`Script_FirstLevelCampaignKit`）的「玩家反射」在 03–06 默认开、`--no-reflexes` 关，07 以后关掉并松开按住的键。共七条：①近身威胁优先还手；②躲雷时挑能跑远、最好有墙挡的方向，炸完走回原位；③没东西能还手就面朝对方后退，装填不被拔刀打断；④8 s 双方都没掉血的近身对峙先交给别人；⑤大刀已在手、对方在 2.3–3 m 时上前一步；⑥隔着矮墙时胸口那条线被挡就瞄头，头也挡住就不开枪、往后退；⑦近身、大刀在手还能用、只是还没转正时拿着大刀转身，不收刀换枪。理由同 v1.9 ①：驾驶器是测试夹具，照真实玩家会做的去走，不改游戏行为。同机成对跑 03 用时：旧驾驶器 139.7 / 152.5 s，修后 135.6–150 s。
+  - 已知遗留：
+    - **左机枪浮空、何有田不在枪后**（基线问题，已交 Front 包 Step 3）：捷克式离地 1.45 m（枪座 y = 0.737，地面 −0.71）；连续流程到 04、05 时何有田离座位 2 m、离枪 3.2 m，检查点起步时在座位上但离枪 1.22 m。现在只打印 `STAGE_ENTRY_LEFT_GUN`；修好后升成断言（例如枪离地 ≤ 0.6 m、何有田离座位 ≤ 1 m 且不是趴姿）。
+    - `FrontWithdraw` / luo 的表演取样在玩家躲雷时拿到过一次画面内 0 帧（60 多趟里 1 次，当趟 03 已走完）；门槛要不要考虑「玩家在躲雷」归 Front 包。
+    - ⑥⑦ 修后的 4 趟连续跑都没遇上近身战（`closeResponses` 0），这两条的直接效果还没在现场复现过。
+    - 01–02 罗班长下巴幅度断言（Opening 包的文件）三路并行时偶发红、单跑能过；统计类批次最多两路并行。
+    - 基线上就有：`Script_FirstLevelMissionStageJumpTest` 红在 17→18；打包测试开机 60–160 s，机器满载时离 180 s 超时余量不大。本轮 C 盘满过两次，跑浏览器批次前先看剩余空间。
+
+  **Gesture**（`claude/l1r-relay-gesture-20260924`，合并 `d0eecf98`）
+  - 做了什么：
+    - 逐句表 `Data_FirstLevelSpeakerGestures.mjs`（键为逐句 id `<Scene>.<NN>`）：前沿 19 场里有身体说的 45 句，21 句做手势，指向和命令优先；持枪的人只用左手，06 坐着的老周不拿枪、用右手；前沿场景里同一人不连续两句都做手势，06 借火一段例外。
+    - 动作：`_import/Script_SpeakerGestureBake.py` 用无头 Blender 在 LugouNra02、LugouNra05 两套骨架上烘 10 条单臂 clip，放在 `Animation/SpeakerGestures/`，两套共 0.68 MB（gzip 约 110 KB）；`Script_SpeakerGestureClips` 在 01–06 首次用到时加载，加载中开口的台词加载完补做，加载失败下一句重试。
+    - 运行时：`Script_SpeakerGestureLayer` 由 `SpeakerHeadLayer` 创建（`rig.speakerGesture`），按 `rig.facial.lastSpeech` 认出当前那句，只动手势那条胳膊加少量脊柱，颈、头、`Face_*` 不碰；开枪、白刃、担架、伤员行走、卧倒、导演接管时不做；07 以后没有这一层。数值全在 `Data_Tuning_CharacterSpeech.SPEAKER_GESTURE`，口径见 [说话人面部「Speaker gestures (03-06)」](Data_CharacterSpeech.md)。
+    - 审查后改：表里运行时每次都拒绝的 3 句改掉（`FrontBlockade.01` 老周受伤不做；`TakeOverGun.01`、`BundleOrder.01` 目标在说话人身后，改成不带方向的 Beat）；持枪的人，目标在持枪一侧、超出可指范围 20° 以上就不指（`targetAcrossRifle`，`maxCrossOutDeg` 20）；指向和枪管夹角小于 25° 时手臂抬离枪线 18°（`alongRifleDeg` / `alongLiftDeg`）。实机测试 `Script_SpeakerGestureLayerBrowserTest` 用 `KNOWN_REFUSALS` 列出固定被拒的句子，不在清单里的固定拒绝直接判红。实机：播到的 20 句有手势行的台词里 19 句做了，唯一没做的在清单里；违规 0，手离枪 7–49 cm，08 没有手势层。
+  - 签字：
+    - 共享文件三处钩子——**接受**：`Script_Actor._UpdateRiggedWeaponMount` 读 `HeldLeftGrip`（左手在做手势时，枪按手势前的左握点摆）；`Script_Actor._ApplyRiggedAim` 解算前读 `ArmWeight` 存进 `arm.gestureKeep`，手势权重 > 0.5 的胳膊不触发、也不接收两手握点平移，解算后按权重还回手势姿势，再调 `AfterActorAim`；`Script_FirstLevelMissionRuntime` 构造时调 `SetSpeakerGestureWorld`（战车位置与地面高度），Dispose 时调 `SetSpeakerGestureWorld({})` 清掉。理由：01–06 以外 `speakerGesture` 为 null、`gestureKeep` 恒为 0，平移循环和原来一样；实机断言 08 手势层 0 个。
+    - `aimQuietS` 0.8（0.8 s 内开过枪才算在瞄准）——**接受**。理由：表现层口径，不改平衡；不放宽的话 04 前沿端着枪的人几乎做不了手势，和用户「04–06 补手势」冲突。代价是端着枪没开枪的人会用左手做手势、枪留在右手。
+    - 帧耗时按本层自身在有手势帧上的 p95 / 均值 ≤ 0.3 ms 判（实测 534 帧 p95 0.2 ms、均值 0.08 ms）——**接受**。理由：本层耗时就是它加给每帧的全部工作；整帧 A/B 在共享机器上每次跑相差几到二十几 ms，分辨不出 0.3 ms。整帧 A/B 现在只打印不判，**留到最终验收在空闲机器上补测**。
+    - quick 40 → 41（新增纯 node 的 `SpeakerGestureTest`）、新增 0.68 MB 按需加载资产——**接受**。
+    - `TankRoadContact.01`（何有田「右边路上！战车出来了！」）在现布局下不做手势——**列为已知**：战车在他持枪的右侧、超出可指范围约 33°，硬指读起来像敬礼；表行保留、进 `KNOWN_REFUSALS`。要做出来得由 Front 包把何有田转向右侧路口（超出范围不多于 20°）。
+  - 已知遗留：
+    - 整帧 A/B 空机补测（见上）。
+    - `BundleSupply.01` 手臂抬到枪线上方后往上指、箱子在地上，读作指向但方向偏约 23°；`BundleAttack.01` 横过胸口指右，正面看有透视压缩；`TankTerror.01`（趴低）侧面看手在嘴边，本轮没改。用户验收重点看 `TankTerror.01`、`Volunteer.01`、`BundleAttack.01`。
+    - `FrontRelief.02` 跳关测不到（接防班长那时还不在场上）；审查者用真实输入跑的探针里这句做了 49 帧手势。
+    - 真实游玩看到的手势比测试少：视野外的人骨架不更新，正在开枪的人按规则不做（`BundleOrder.03` 这类常被开枪打断）。
+    - Front 包调站位或朝向后要跑 `Script_SpeakerGestureLayerBrowserTest`，新出现的固定拒绝会直接判红。
+
+  **集成小修**（接力分支上直接提交 `5ea8a52a`、`3ac29926`）
+  - 2026-09-25 集成小修：①用户拍板（Gate 方案①）：进 03（Support）时绷带不足 2 卷补到 2 卷，多了不减（`MISSION_TUNING.stepEntryBandagesMin`，`Enter` 在存档前经 `GiveSupply` 发放；连续流程与 03 检查点起步都生效，其余步骤不补）。②集成负责人决定：04/05 检查点起步清掉正面组 FrontRifleA/B/E/F（`FIRST_LEVEL_CHECKPOINT_FRONT_LOST`），留 6/10；依据是 Gate 包 12 趟连续流程里这四人都死、其余 6 人多数存活。FrontOfficer 保留，依据是他与 FrontFlankA 的存活 21 条记录全部一致。检查点驱动断言：正面日军 5–6 人，不含那四人，离玩家 ≥20 m。
+  - 已知：集成验收时 05 攻击支路墙端 (41.6, −157.4) 又出现一次拼刺刀堵路、卡住驾驶器（改动前就有），Front 包 Step 2 在改这一带，结果随 v1.11 记。
