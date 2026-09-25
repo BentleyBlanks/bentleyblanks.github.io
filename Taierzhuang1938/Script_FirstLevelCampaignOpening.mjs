@@ -31,6 +31,8 @@ export const SPEAKING_JAW_RADIANS = .06;
 export const SILENT_AFTER_S = .6;
 /** Pelvis travel per 1/60 s frame above which a move is a jump (9 m/s: faster than any run, pelvis sway included). */
 export const STEP_LIMIT_M = .15;
+/** Contract §2.9: the player takes no damage for this long after the 02 hand-back (s). */
+const HANDBACK_SAFE_S = 3;
 /** How long the withdrawal may hold at the rear corner looking back for the pursuit (s). */
 export const LOOKBACK_S = 12;
 /** Pursuers that must show in the look-back from the rear corner (「追兵占住刚才的位置」). */
@@ -57,10 +59,10 @@ const KEY_FRAMES = [
   { label: "ThroatCut", phase: "Slash", flag: "throatCut", at: .25 },
   { label: "Drag", phase: "Drag", age: 1.2 },
   { label: "Boots", phase: "Boots", age: 1 },
-  // K2: from Shunzi's eye the mouth spoil hides the whole SSW leg; Luo first shows over it on the
-  // crater step about 2 m away (09-24 filmstrip), just before 「说话！」.
-  { label: "K2_GlimpseRise", phase: "Glimpse", age: 1.5 },
-  { label: "K2_Glimpse", phase: "Glimpse", luoWithinM: 2.3 },
+  // K2 / SB05 (2026-09-25 storyboard round): from the SSW leg's north mouth down the leg, Luo creeping up its west wall
+  // about 8 m off when Shunzi looks up; SB05A: the cut.
+  { label: "K2_Glimpse", phase: "Glimpse", age: 1 },
+  { label: "SB05A_Chop", phase: "Chop", age: .35 },
   { label: "LuoChop", phase: "Parry", flag: "luoChopAt", at: .5 },
   // He's parry and cut run on past Parry into Flee (Parry hands over 0.4 s after heChopAt): no phase filter.
   { label: "HeParry", flag: "heChopAt", at: .42 },
@@ -80,6 +82,14 @@ async function InstallProbe(page) {
       births: {}, acting: {}, maxPartnerHandRotationStep: 0, maxPartnerHandRotationPhase: null,
     };
     const P = window.openingProbe, Vec = () => g.player.position.clone();
+    // Contract §2.9 (hand-back safety): every hit the player takes, on the runtime clock, whatever else wraps TakeHit.
+    P.hits = [];
+    const TakeHit = g.player.TakeHit.bind(g.player);
+    g.player.TakeHit = (...args) => {
+      const before = g.player.health, result = TakeHit(...args);
+      if (g.player.health < before) P.hits.push({ time: g.Debug.FirstLevelMissionRuntime().time, lost: before - g.player.health });
+      return result;
+    };
     const Jaw = (actor) => {
       const face = actor?.actor?.characterRig?.facial, c = face?.controls.find((c) => c.name === "Face_Jaw");
       return c ? c.bone.quaternion.angleTo(c.quaternion) : null;
@@ -181,7 +191,15 @@ async function InstallProbe(page) {
       }
       if (P.wasCameraActive && !s.CameraActive && P.cameraRotation) {
         P.releaseCameraTurn = cam.quaternion.angleTo(cam.quaternion.clone().fromArray(P.cameraRotation)) * 180 / Math.PI;
+        const look = new cam.position.constructor(0, 0, -1).applyQuaternion(cam.quaternion);
+        P.releasePitch = Math.asin(Math.max(-1, Math.min(1, look.y))) * 180 / Math.PI;
         P.releaseHealth = g.player.health;
+        P.releaseTime = r.time;
+        P.pursuitAtRelease = [...r.enemies.values()].filter((a) => a.missionEncounter === "bunkerPursuit").length;
+        // The hand-back hold-fire (Data_OpeningStoryboards.rescue.handbackHoldFireS): every live Japanese, his distance from
+        // the seat and how long he still hesitates (AI time).
+        P.holdFireAtRelease = [...r.enemies.values()].filter((a) => a?.alive).map((a) => ({ id: a.missionId || a.id,
+          d: Math.hypot(a.position.x - g.player.position.x, a.position.z - g.player.position.z), left: (a.hesitateUntil ?? -99) - r.ai.time }));
       }
       P.wasCameraActive = s.CameraActive;
       // Mouths: who is speaking (voice.Speech active) against the jaw of every speaking-cast face in view.
@@ -200,15 +218,29 @@ async function InstallProbe(page) {
   }, { vanguardIds: Storyboards.vanguardIds, silentAfterS: SILENT_AFTER_S, stepLimitM: STEP_LIMIT_M });
 }
 
+/**
+ * Watchdog (09-25 review: two silent hangs, one of 40 min with no line of output): a page call that does not answer in
+ * WATCHDOG_S prints the last stepped state (director phase, age, time, flags) and fails instead of waiting forever.
+ */
+const WATCHDOG_S = 360;
+let lastState = null;
+function Watch(label, promise) {
+  let timer;
+  const alarm = new Promise((_, fail) => { timer = setTimeout(() => {
+    console.log("WATCHDOG", label, JSON.stringify(lastState));
+    fail(Error(`${label}: no answer from the page in ${WATCHDOG_S} s (last state printed above)`));
+  }, WATCHDOG_S * 1000); });
+  return Promise.race([promise, alarm]).finally(() => clearTimeout(timer));
+}
 /** Step `frames` frames, sampling each; render the last one. */
-const StepSampled = (page, frames) => page.evaluate((frames) => {
+const StepSampled = (page, frames) => Watch("StepSampled", page.evaluate((frames) => {
   const g = window.Tengxian;
   for (let i = 0; i < frames; i++) { g.StepFrames(1, 1 / 60, i === frames - 1); window.openingProbe.Sample(); }
   const r = g.Debug.FirstLevelMissionRuntime(), s = r.frontShow.bunker, m = g.Debug.FirstLevelMission();
   return { stage: m.stage, time: m.time, facts: m.facts, alive: g.player.alive, health: g.player.health,
     phase: s.phase, phaseTime: s.Age, luoM: (() => { const l = s.Squad("luo"); return l && !l.openingStoryboardHidden ? Math.hypot(l.position.x - g.player.camera.position.x, l.position.z - g.player.camera.position.z) : null; })(), flags: Object.fromEntries(Object.entries(s.flags).filter(([, v]) => typeof v === "number")),
     error: s.error };
-}, frames);
+}, frames)).then((state) => (lastState = state));
 
 /** Point the view at `point` for one rendered frame; returns the previous view to restore. */
 const LookAt = (page, point, height = 1.2) => page.evaluate(({ point, height }) => {
@@ -263,7 +295,7 @@ export async function DriveOpening(ctx){
   console.log("PROBE",JSON.stringify({maxStep:probe.maxStep,maxStepAt:probe.maxStepAt,maxCameraStep:probe.maxCameraStep,maxCameraTurn:probe.maxCameraTurn,
     maxCameraTurnPhase:probe.maxCameraTurnPhase,maxCameraStepAt:probe.maxCameraStepAt,handFlips:probe.handFlips,maxHandRotationStep:probe.maxHandRotationStep,maxHandRotationPhase:probe.maxHandRotationPhase,
     maxWristBend:probe.maxWristBend,maxWristTwist:probe.maxWristTwist,maxReachRatio:probe.maxReachRatio,minShoulderBehind:probe.minShoulderBehind,
-    releaseCameraTurn:probe.releaseCameraTurn,releaseHealth:probe.releaseHealth,minHealth:probe.minHealth,kills:probe.kills,jaw:probe.jaw,violations:probe.violations.length}));
+    releaseCameraTurn:probe.releaseCameraTurn,releasePitch:probe.releasePitch,releaseHealth:probe.releaseHealth,minHealth:probe.minHealth,kills:probe.kills,jaw:probe.jaw,violations:probe.violations.length}));
   // ---- phases: every director phase really started, in the table's order ---------------------
   assert.equal(show.phase,"Released","the director reaches the hand-back");
   for(const phase of DIRECTOR_PHASES)assert.ok(show.beats.includes(phase),`storyboard performed: ${phase}`);
@@ -301,6 +333,8 @@ export async function DriveOpening(ctx){
   assert.ok(probe.maxPartnerHandRotationStep<20,`the dragging hand approaches the collar without an orientation jump (${probe.maxPartnerHandRotationStep}° in ${probe.maxPartnerHandRotationPhase})`);
   assert.ok(probe.maxWristBend<=42.1&&probe.maxWristTwist<1&&probe.maxReachRatio<=.971,"wrists and reach stay anatomical");
   assert.ok(probe.releaseCameraTurn<5,"returning control keeps the last presented view");
+  // Contract §2.9 (SB06): the first view the player gets is down the trench, not at the ground (was -52°).
+  assert.ok(probe.releasePitch>=-15&&probe.releasePitch<=5,`the hand-back view is about level (${probe.releasePitch?.toFixed?.(1)}°)`);
   // ---- hand-back ----------------------------------------------------------------------------
   assert.equal(show.control,null,"movement returns at Released");
   assert.equal(show.playerShots,0,"the player did not clear the vanguard");
@@ -327,6 +361,21 @@ export async function DriveOpening(ctx){
   // Out of the mouth, over the crater step, down the SSW leg to the rear corner: a player withdrawing
   // under fire keeps moving (the squad covers); he does not stop to duel the fold man from the mouth.
   await Route(WITHDRAW_ROUTE.slice(0,AT_RC),"OpeningWithdraw",{fight:false,stance:"crouch"});
+  // Contract §2.9 (the SB06 seat looks down the front trench): no damage in the first HANDBACK_SAFE_S after the
+  // hand-back, and the pursuit (bunkerPursuit) is not in the fight before the player has control.
+  const safe=await page.evaluate(()=>{const P=window.openingProbe,now=window.Tengxian.Debug.FirstLevelMissionRuntime().time;
+    return {releaseTime:P.releaseTime,now,pursuitAtRelease:P.pursuitAtRelease,hits:P.hits.filter(h=>h.time>=P.releaseTime-1/60)};});
+  console.log("HANDBACK_SAFE",JSON.stringify(safe));
+  assert.ok(safe.now-safe.releaseTime>=HANDBACK_SAFE_S,`the hand-back window was watched (${(safe.now-safe.releaseTime).toFixed(2)} s)`);
+  assert.deepEqual(safe.hits.filter(h=>h.time<=safe.releaseTime+HANDBACK_SAFE_S),[],`no damage in the first ${HANDBACK_SAFE_S} s after the hand-back`);
+  assert.equal(safe.pursuitAtRelease,0,"bunkerPursuit spawns only after the player has control");
+  // The seat sees F (Data_FirstLevelSpaceKeyframes K2b): every live Japanese within handbackHoldFireM hesitated for at
+  // least HANDBACK_SAFE_S from the hand-back (the fold man ijaC among them when he lives).
+  const hold=await page.evaluate(()=>window.openingProbe.holdFireAtRelease);
+  console.log("HANDBACK_HOLDFIRE",JSON.stringify(hold));
+  const R=Storyboards.rescue,near=(hold||[]).filter(a=>a.d<R.handbackHoldFireM);
+  assert.ok(Array.isArray(hold),"the hold-fire at the hand-back was recorded");
+  for(const a of near)assert.ok(a.left>=HANDBACK_SAFE_S-.05,`${a.id} ${a.d.toFixed(1)} m from the seat holds his fire ${HANDBACK_SAFE_S} s after the hand-back (${a.left.toFixed(2)} s left)`);
   // 「回头看见追兵占住刚才的位置」: at the rear corner he turns and looks back up the leg (crouched at the
   // corner for up to LOOKBACK_S) until a pursuer shows in the trench he has just left.
   const back=await LookAt(page,A.bunkerBend||Storyboards.withdraw.lane[3],1.3);
