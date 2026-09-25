@@ -602,6 +602,24 @@ function WalkRuntime(extra = {}) {
   assert.equal(scenes.HoldLine(line("BundleAttack.01", "luo"), "BundleAttack"), false, "aiming: the line plays at once");
   assert.equal(scenes.holds.get("BundleAttack.01").released, "aiming");
   r.player.ads = 0;
+  // Luo at the heels of a walking player: the line plays at once and he steps back from the player at a walk.
+  luo.position = { x: 0.3, y: 0, z: 0.6 }; r.player.velocity = { x: 0, y: 0, z: -2 }; r.time = 50; moves.length = 0;
+  assert.equal(scenes.HoldLine(line("FrontApproach.01", "luo"), "FrontApproach"), false, "walking with Luo at his heels: the line is not delayed");
+  const back = scenes.steer, heel = Dist(luo.position, r.player.position);
+  assert.ok(back?.soldier === luo && back.backOff && scenes.holds.get("FrontApproach.01").backedOff, "but Luo steps back from him");
+  assert.ok(Dist(back.spot, r.player.position) >= Math.min(...B.speakerBackOffDistancesM) - 1e-9 && Dist(back.spot, r.player.position) > heel,
+    "to a spot outside speakerViewMinM, away from the player");
+  assert.ok(SegmentDistance(r.player.position, luo.position, back.spot) >= heel - 0.05, "never passing nearer the player on the way");
+  scenes.handle = { id: "FrontApproach", done: false, lines: [{ line: { who: "luo" }, state: "playing" }] };
+  r.player.position = { x: 0, y: 0, z: -(B.speakerStepReleaseM + 1) }; scenes.Steer();
+  assert.ok(scenes.steer === back && moves.at(-1)?.speed === B.speakerBackOffSpeedMps, "at a walk, and the player walking on does not cancel it");
+  scenes.handle.lines[0].state = "done"; scenes.Steer();
+  assert.equal(scenes.steer, null, "his line done: back to his own walk");
+  // Nowhere to step back to (every knee-high line blocked): he stays and the line still plays.
+  r.player.position = { x: 0, y: 0, z: 0 }; luo.position = { x: 0.3, y: 0, z: 0.6 }; r.BlocksSight = (a, b) => b.y < 1;
+  assert.equal(scenes.HoldLine(line("FrontApproach.02", "luo"), "FrontApproach"), false, "blocked: the line is not delayed");
+  assert.ok(scenes.steer === null && !scenes.holds.get("FrontApproach.02").backedOff, "and he stays");
+  r.BlocksSight = () => false; r.player.velocity = { x: 0, y: 0, z: 0 };
   assert.ok(SegmentDistance({ x: 0, z: 0 }, { x: -1, z: 1 }, { x: 1, z: 1 }) === 1 && SegmentDistance({ x: 0, z: 0 }, { x: 2, z: 0 }, { x: 3, z: 0 }) === 2,
     "segment distance");
   r.camera = null;
@@ -627,8 +645,8 @@ function WalkRuntime(extra = {}) {
   assert.ok(/this\.frontBattle\.Update\(dt\);\s*\n(\s*\/\/[^\n]*\n)*\s*this\.frontScenes\.Steer\(\);/.test(runtimeSrc), "runtime steers the speaker after frontBattle.Update");
   assert.ok(Read("Script_FirstLevelFrontBattle.mjs").includes("if(r.frontScenes?.Steers?.(actor)){w.bestAt=r.time;return false;}"),
     "FrontBattle.Walk neither orders nor stall-skips a speaker stepping into view");
-  checks += 45;
-  Ok("⑧ near speaker out of the picture: line held <= speakerViewHoldS, he steps into view; far shouts and Node runs unaffected");
+  checks += 53;
+  Ok("⑧ near speaker out of the picture: line held <= speakerViewHoldS, he steps into view; one too near steps back; far shouts and Node runs unaffected");
 }
 
 console.log(`FirstLevelFrontPacingTest 通过：${checks} 条断言`);

@@ -329,5 +329,12 @@ export const FRONT_BATTLE_TUNING=Object.freeze({
   // Closest the stepping walk may pass the player (m): the 03-05 staging checks keep Luo 1.5 m clear of the player and
   // of the captured gun's seat (Script_FirstLevelCampaignFrontBattle "Luo occupies his own firing post").
   speakerStepPassM:1.5,
+  // BackOff: a line that plays at once (the player walks or aims, or no framed spot) while its speaker stands nearer
+  // than speakerViewMinM: he steps back from the player to one of these distances (m), straight away from him or up to
+  // these bearings off that line (deg, both sides), at a walk (m/s), and the line is not delayed. 1.7-2.4 m is outside
+  // speakerViewMinM with room for the player's own step; the walk is about the NPC walk pace (Data_Tuning_FirstLevel MISSION_TUNING.walkSpeedMps 1.7).
+  // 09-25 03->06 drive: Luo tailing the player at 0.7 m (FrontBlockade.02, FrontApproach.01, BundleSupply.02,
+  // Volunteer.02) and the relief NCO at 1.0 m (FrontRelief.02) talked from inside the camera.
+  speakerBackOffDistancesM:Object.freeze([2,1.7,2.4]),speakerBackOffBearingsDeg:Object.freeze([0,30,60]),speakerBackOffSpeedMps:1.8,
   bandage:{radius:.087,height:.2,y:-.19,color:0xb6ac8b},
 });

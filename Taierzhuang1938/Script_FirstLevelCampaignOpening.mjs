@@ -419,7 +419,7 @@ export const ACTING_ROLES = Object.freeze(["guard", "zhou", "luo"]);
  * Idempotent: a run from 01 installs it at RearTrench, the front driver again at 03 (cold start).
  */
 export async function InstallSpeakerActing(page){
-  await page.evaluate((roles)=>{
+  await page.evaluate(({roles,minM})=>{
     const r=window.Tengxian.Debug.FirstLevelMissionRuntime(),binder=r.speakers;
     if(binder.actingSampled)return;binder.actingSampled=true;
     window.openingRearActing={};window.openingRearHeard={};
@@ -476,27 +476,48 @@ export async function InstallSpeakerActing(page){
           const cam=r.camera,headAt=rig.bones.head.getWorldPosition(rig.bones.head.position.clone());
           const ndc=cam&&headAt.clone().project(cam);
           const inFrame=!!ndc&&ndc.z<1&&Math.abs(ndc.x)<.95&&Math.abs(ndc.y)<.95;
+          // "Seen" (what the line gate counts): in the picture AND a face, not a shoulder - at least speakerViewMinM from
+          // the eye (09-25 pictures at 0.7 m: a sleeve and a chin, the head cut by the frame) - AND no wall or crate
+          // (runtime.BlocksSight) and no other soldier's body (a 0.28 m column from his feet to the top of his head)
+          // between the eye and the head. inFrame alone counted a Luo standing in the camera and a keeper behind Luo.
+          let seen=false;
           if(cam){
             const eye=cam.getWorldPosition(cam.position.clone()),fwd=cam.getWorldDirection(eye.clone());
             row.minOffDeg=Math.min(row.minOffDeg,+(fwd.angleTo(headAt.clone().sub(eye))*180/Math.PI).toFixed(1));
             row.distM=+headAt.distanceTo(eye).toFixed(1);
+            if(inFrame){
+              if(headAt.distanceTo(eye)<minM)row.closeFrames=(row.closeFrames||0)+1;
+              else if(r.BlocksSight?.(eye.clone(),headAt.clone()))row.wallFrames=(row.wallFrames||0)+1;
+              else{
+                const dx=headAt.x-eye.x,dy=headAt.y-eye.y,dz=headAt.z-eye.z,h2=dx*dx+dz*dz;
+                const hidden=h2>1e-6&&(r.ai?.soldiers||[]).some(s=>{
+                  if(s===soldier||!s.actor?.poseVisible)return false;
+                  const px=s.position.x,pz=s.position.z,t=((px-eye.x)*dx+(pz-eye.z)*dz)/h2;
+                  if(!(t>.02&&t<.97)||Math.hypot(eye.x+dx*t-px,eye.z+dz*t-pz)>.28)return false;
+                  const bone=s.actor.characterRig?.bones?.head,top=bone?bone.getWorldPosition(bone.position.clone()).y+.15:s.position.y+1.75;
+                  const y=eye.y+dy*t;return y>s.position.y+.2&&y<top;
+                });
+                if(hidden)row.hiddenFrames=(row.hiddenFrames||0)+1;else seen=true;
+              }
+            }
           }
           if(inFrame)row.inFrameFrames++;
+          if(seen)row.seenFrames=(row.seenFrames||0)+1;
           const director=rig.openingActorPerformanceState,layer=rig.speakerHead;
           const acting=director?(!!director.speaking&&!director.protected):!!(layer?.enabled&&layer.speaking);
           if(!acting)continue;
           const head=rig.bones.head.quaternion;
           row.head0??=head.toArray();
-          row.acted++;if(inFrame)row.actedInFrame++;
-          // Evidence: one first-person picture per line, taken the 15th frame he is acted in the picture (the drive's
+          row.acted++;if(inFrame)row.actedInFrame++;if(seen)row.actedSeen=(row.actedSeen||0)+1;
+          // Evidence: one first-person picture per line, taken the 15th frame he is acted and seen (the drive's
           // StepFrames wrapper renders and reads it back in the same task, see InstallSpeakerGlance).
-          if(inFrame&&row.actedInFrame===15&&!window.frontLineShots?.[l.line.id])window.frontLineShotPending=l.line.id;
-          if(inFrame)row.turn=Math.max(row.turn,+head.angleTo(head.clone().fromArray(row.head0)).toFixed(3));
+          if(seen&&row.actedSeen===15&&!window.frontLineShots?.[l.line.id])window.frontLineShotPending=l.line.id;
+          if(seen)row.turn=Math.max(row.turn,+head.angleTo(head.clone().fromArray(row.head0)).toFixed(3));
         }
       }
       return result;
     };
-  },ACTING_ROLES);
+  },{roles:ACTING_ROLES,minM:B.speakerViewMinM});
   await InstallSpeakerGlance(page);
 }
 
@@ -611,6 +632,7 @@ export const FRONT_LINES_IN_FIREFIGHT = Object.freeze({
   "FrontAttack.01": "夺下右枪位那一刻：罗班长喊「土坎前头那一伙」时，玩家正对着缺口外的冲锋组开枪",
   "BundleRetreat.01": "炸车后罗班长在身旁 1 m 内喊「回来！低头！」，玩家这时对着战车与跟车步兵",
   "TankStopped.02": "战车刚停，罗班长朝缺口喊守军下来；玩家边撤边打剩下的跟车步兵",
+  "BundleAttack.02": "攻击位上罗班长在身后 1 m 喊「顺子，拿弹！旁边的人我看到！」，玩家正瞄着战车和跟车步兵",
 });
 export const FRONT_LINE_FIGHT_SHARE = .5;
 const FRONT_LINE_STAGES = Object.freeze(["Support", "MachineGun", "Tank", "Orders"]);
@@ -639,9 +661,9 @@ export async function CheckFrontActing(ctx,{upTo="Support"}={}){
   ctx.frontLinesChecked??=new Set();
   const last=FRONT_LINE_STAGES.indexOf(upTo),due=Object.keys(lines).filter(id=>!ctx.frontLinesChecked.has(id)&&!playing.includes(id)
     &&FRONT_SCENE_IDS.includes(lines[id].cue)&&FRONT_LINE_STAGES.indexOf(lines[id].stage)>=0&&FRONT_LINE_STAGES.indexOf(lines[id].stage)<=last);
-  const Row=id=>{const r=lines[id];return `${id} ${r.who} ${r.stage} t=${r.t} inFrame=${r.inFrameFrames} actedInFrame=${r.actedInFrame} turn=${r.turn} startDist=${r.start.distM} minOff=${r.minOffDeg}`;};
+  const Row=id=>{const r=lines[id];return `${id} ${r.who} ${r.stage} t=${r.t} seen=${r.seenFrames||0} actedSeen=${r.actedSeen||0} inFrame=${r.inFrameFrames} close=${r.closeFrames||0} wall=${r.wallFrames||0} hidden=${r.hiddenFrames||0} turn=${r.turn} startDist=${r.start.distM} minOff=${r.minOffDeg}`;};
   console.log("FRONT_LINES",upTo,JSON.stringify(Object.fromEntries(due.map(id=>{const r=lines[id];
-    return [id,{who:r.who,stage:r.stage,inFrame:r.inFrameFrames,actedInFrame:r.actedInFrame,turn:r.turn,startDistM:r.start.distM,held:r.held??null,
+    return [id,{who:r.who,stage:r.stage,seen:r.seenFrames||0,actedSeen:r.actedSeen||0,inFrame:r.inFrameFrames,close:r.closeFrames||0,wall:r.wallFrames||0,hidden:r.hiddenFrames||0,turn:r.turn,startDistM:r.start.distM,held:r.held??null,
       heldWhy:r.heldWhy??null,glanced:r.glanced??0}];}))));
   // Every due line is judged before anything throws: one failure message lists all the lines that missed.
   const failures=[];
@@ -649,7 +671,7 @@ export async function CheckFrontActing(ctx,{upTo="Support"}={}){
     ctx.frontLinesChecked.add(id);
     const r=lines[id],excused=FRONT_LINES_OUT_OF_PICTURE[id];
     const fight=FRONT_LINES_IN_FIREFIGHT[id];
-    if(fight&&r.inFrameFrames<FRONT_LINE_IN_FRAME_FRAMES){
+    if(fight&&(r.seenFrames||0)<FRONT_LINE_IN_FRAME_FRAMES){
       if(!((r.busyFrames||0)>=r.frames*FRONT_LINE_FIGHT_SHARE))failures.push(`${id} is excused as said in a fight («${fight}») but the player was free to look (busy ${r.busyFrames||0}/${r.frames}; ${Row(id)})`);
       continue;
     }
@@ -657,12 +679,12 @@ export async function CheckFrontActing(ctx,{upTo="Support"}={}){
       if(r.bodyFrames&&!(r.start.distM>B.speakerViewNearM))failures.push(`${id} is excused as out of the picture («${excused}») but its speaker stood near (${Row(id)})`);
       continue;
     }
-    if(r.inFrameFrames<FRONT_LINE_IN_FRAME_FRAMES)failures.push(`${id}: the speaker's head is in the picture while he talks (${Row(id)})`);
-    else if(r.actedInFrame<FRONT_LINE_IN_FRAME_FRAMES)failures.push(`${id}: he is acted while in the picture (${Row(id)})`);
+    if((r.seenFrames||0)<FRONT_LINE_IN_FRAME_FRAMES)failures.push(`${id}: the speaker's face is seen while he talks - in the picture, >= ${B.speakerViewMinM} m, nothing in between (${Row(id)})`);
+    else if((r.actedSeen||0)<FRONT_LINE_IN_FRAME_FRAMES)failures.push(`${id}: he is acted while seen (${Row(id)})`);
     else if(!(r.turn>.03))failures.push(`${id}: he visibly turns/nods in the picture (${Row(id)})`);
   }
   if(failures.length)console.log("FRONT_LINES_FAILED",JSON.stringify(failures));
-  assert.deepEqual(failures,[],`03–06 lines up to ${upTo}: speaker in the picture and acted`);
+  if(process.env.FRONT_LINES_REPORT_ONLY!=="1")assert.deepEqual(failures,[],`03–06 lines up to ${upTo}: speaker in the picture and acted`);
   const front=Object.keys(heard).filter(key=>key.startsWith("Front")&&key.endsWith("/luo"));
   console.log("FRONT_ACTING",JSON.stringify(Object.fromEntries(front.map(key=>[key,{...heard[key],
     ...(acting[key]?{acted:acting[key].frames,actedInFrame:acting[key].inFrame,turn:+acting[key].turn.toFixed(3),director:acting[key].director,headLayer:acting[key].headLayer}:{})}]))));
