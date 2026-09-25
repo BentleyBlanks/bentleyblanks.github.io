@@ -268,7 +268,7 @@ const MODEL_FORWARD_YAW = Math.PI;
 // (NRA06 is not a boot download).
 // 2026-09-26: Tengxian shared bind, eye maps and shoulder silhouettes: version the manifest
 // and every dependent GLB together after the offline normalization bake (_import/Script_StandardizeCharacters.py).
-const MANIFEST_URL = "./Model/Character/Data_TengxianCharacterManifest.json?v=20260926HumanoidV1Storyboard";
+const MANIFEST_URL = "./Model/Character/Data_TengxianCharacterManifest.json?v=20260928HumanoidV1Storyboard";
 const ASSET_VERSION = "20260926HumanoidV1";
 const DEATH_COLLAPSE_ASSET_VERSION = "20260926HumanoidV1";
 const DEATH_COLLAPSE_PLAYBACK_RATE = 1.6;

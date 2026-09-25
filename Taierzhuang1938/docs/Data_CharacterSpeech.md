@@ -11,12 +11,16 @@ supports source-audio seeking, slow playback, expression keyframes and local rev
 
 | Model | Facial skin | Size | Cast (`facialCast` in the manifest) |
 | --- | --- | --- | --- |
-| NRA02 | `Model_LugouNra02Facial.glb` | 0.71 MB | yaowa, heyoutian, liuwencai, comrade, runner, guard, shouter, zhou, relief, keeper, bearer, captiveHelper, captiveWounded |
-| NRA06 | `Model_LugouNra06Facial.glb` | 0.71 MB | interpreter |
-| NRA05 | `Model_LugouNra05Facial.glb` | 0.54 MB | luo |
-| IJA01 | `Model_LugouIja01Facial.glb` | 0.95 MB | ijaB, ijaC, frontOfficer |
-| IJA02 | `Model_LugouIja02Facial.glb` | 1.04 MB | ijaD |
-| IJA06 | `Model_LugouIja06Facial.glb` | 1.09 MB | ijaA |
+| NRA02 | `Model_TengxianNra02Facial.glb` | 0.71 MB | yaowa, heyoutian, liuwencai, comrade, runner, guard, shouter, zhou, relief, keeper, bearer, captiveHelper, captiveWounded |
+| NRA06 | `Model_TengxianNra06Facial.glb` | 0.71 MB | interpreter |
+| NRA05 | `Model_TengxianNra05Facial.glb` | 0.55 MB | luo |
+| IJA01 | `Model_TengxianIja01Facial.glb` | 0.95 MB | ijaB, ijaC, frontOfficer |
+| IJA02 | `Model_TengxianIja02Facial.glb` | 1.05 MB | ijaD |
+| IJA06 | `Model_TengxianIja06Facial.glb` | 1.09 MB | ijaA |
+
+Since 2026-09-26 every skin is on the shared `TengxianHumanoidV1` skeleton
+([character standard](Data_CharacterStandard.md)); pose translations are head-local
+metres (they were centimetres on the Lugou rigs).
 
 Each facial skin is the shipped body GLB plus 13 `Face_*` joints under the head
 (jaw, lower/upper lip, two corners, two brows, four lids, two eyes), new skin weights
@@ -222,6 +226,12 @@ bevels; `UpgradeNra05` can be re-run on an upgraded scene). The 2026-09-23 sourc
    The baker's legacy job reproduces the 2026-09-13 NRA05 file byte for byte.
 4. Put the new sha256 prefix in `facialVersion` (manifest) and run the tests below.
 5. `node scripts/Script_BlenderMcp.mjs stop`
+
+Steps 2-3 still author on the Lugou rigs (`Model_Lugou*.glb`, no longer in the tree: check
+them out of `b39cd831`). The shipped skins are those Lugou bakes moved to the shared skeleton
+by `_import/Script_StandardizeCharacters.py` (`FACIAL`, `STORYBOARD_REVISION`), which also
+writes `facialVersion`. A new face edit: bake the Lugou skin, commit it, point
+`STORYBOARD_REVISION` at that commit and rerun the standardizer (step 4 is then done by it).
 
 ## Validation
 

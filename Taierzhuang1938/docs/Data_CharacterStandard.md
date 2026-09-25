@@ -12,8 +12,11 @@
 | 日军 | `Model_TengxianIja02.glb` | 普通兵外观变体 |
 | 日军 | `Model_TengxianIja03.glb` | 普通兵外观变体 |
 
-`Model_TengxianNra05Facial.glb` 是 NRA05 的面部派生件，身体沿用同一骨架，另有 11 根
-`Face_` 控制骨。它不计作第六款人物外观。本轮没有给其他角色新增面部骨骼。
+面部派生件（2026-09-26 分镜轮起，见下文「分镜轮追加」）：`Model_Tengxian{Nra02,Nra05,Nra06,Ija01,Ija02,Ija06}Facial.glb`，
+身体沿用同一骨架，另有 13 根 `Face_` 控制骨（口型 9 个姿势 + 4 个表情）。它们不计作人物外观。
+Codex 第一次规范化时的 11 骨 `Model_TengxianNra05Facial.glb` 已由 13 骨版替换。
+派生外观 `Model_TengxianIja06.glb`（日兵甲）与 `Model_TengxianNra06.glb`（翻译官）同一骨架，只给钉死的说话人用，
+也不计入五款采用外观。
 弃用的 NRA01、NRA03、NRA04、IJA04、IJA05 实体模型已删除；旧模型仅能从 Git 历史取回。
 现存第一人称双臂、第一人称身体及百姓使用各自的既有资产契约，不计入这五款士兵外观。
 
@@ -38,6 +41,9 @@
 
 当前权威重建脚本是 `_import/Script_StandardizeCharacters.py`。它从固定 Git 提交
 `b3ba06096ae9929a44220b07cdedf86dbba8b197` 读取原始 GLB 与动作数据，避免对产物重复应用归一化。
+第二源 `STORYBOARD_REVISION = b39cd831066e1e2527389edd504048b4b5120ac6`（分镜轮合并 Codex 前的集成头）
+只提供 `DERIVED`（IJA06、NRA06）与 `FACIAL`（六个 13 骨面部件）以及清单里的派生行与 `facialCast`；
+五款采用身体在两个提交里逐字节相同。
 旧 MAX/FBX 导入脚本仅保留来源流程，不能直接用旧导出物替换当前游戏资产。
 
 在本任务的独占 worktree 中执行：
@@ -50,18 +56,50 @@ node scripts/Script_BlenderMcp.mjs stop
 node scripts/Script_BlenderMcp.mjs status --scan
 ```
 
-脚本生成身体、面部派生件、已采用步兵库、死亡库、背枪跑和两套现用剧情采样；同时重算姿态审计与
-步态速度。动作内容与播放时长沿用既有版本。本轮只做骨架适配、定长求解、接触校正和既有卧姿校正离线化。
+脚本生成身体、派生外观、面部派生件、已采用步兵库、死亡库、背枪跑和机枪俘虏剧情采样；同时重算姿态审计与
+步态速度。开场动作库不在这里重定向，见下文「开场动作库的作者流程」。动作内容与播放时长沿用既有版本。本轮只做骨架适配、定长求解、接触校正和既有卧姿校正离线化。
 压缩后删除未使用的二进制区块，不复制原始贴图到动画库。
 
 可编辑源工程：
-`C:\Users\Bentl\OneDrive\AI\Models\Blender\Tengxian\SharedCharacters\Model_TengxianSharedCharacters.blend`。
+`C:\Users\Bentl\OneDrive\AI\Models\Blender\Tengxian\SharedCharacters\Model_TengxianSharedCharacters.blend`
+（第一次规范化，五款 + 11 骨 NRA05 面部）；分镜轮重跑另存为同目录
+`Model_TengxianSharedCharactersStoryboard.blend`（13 个骨架：五款、两款派生、六个面部件），不覆盖前者。
 每款模型在独立 Collection 中、同一原点；默认只显示 NRA02。源工程与备份不进仓库。
 
 静态门禁由 `Script_CharacterModelTest.mjs` 检查五款清单、弃用文件不存在、共同绑定、动作、朝向和贴地；
 `Script_CharacterSpeechTest.mjs` 比较面部派生件的身体曲线、表面与贴图实际数据。
 实机接触与切换仍由 ActorPose、InfantryAnimation、DeathCollapse、OpeningStoryboards、近战及 GPU 门禁验收。
 截图和验收页只保存在本地忽略目录，不能把重建成功等同于通过这些验收。
+
+## 分镜轮追加（2026-09-26，01–06 重构与 01–03 分镜的人物迁到本骨架）
+
+- 重跑结果：五款身体、步兵库、死亡库、背枪跑 GLB、机枪俘虏库、`Data_TengxianHumanoid.json`、
+  `_blender/Data_TengxianShoulderReference.json` 与第一次规范化的产物逐字节相同；`Data_BackRifleRun.json`
+  只差 JSON 数字写法（`0` / `0.0`），数值相同，保留已提交版本。新增或改变的只有：两款派生外观、六个面部件、
+  清单（派生行、`facialCast`、`facialVersion` = 面部件 sha256 前 16 位）和 `Data_ActorLocomotion.mjs` 里
+  两款派生外观的步态条目（`Script_LocomotionProfileBake.mjs` 按清单全量生成）。
+- 面部件：13 根 `Face_` 骨挂在 Head（下唇挂 Jaw），相对父骨的变换原样继承；`facialRig.poses` 的平移从
+  头部局部厘米换成米（× 0.01），旋转、眼球轴向不变。面部件不带贴图与动作（`materialsFrom` / `animationsFrom`
+  = `base`），`Script_CharacterSpeechTest` 以米读姿势后换回原先复核过的厘米门槛比较。
+- 派生外观的清单行去掉了 `scaleHeight` 与 `version`：所有身体共用 NRA02 参考高度（`bounds`）。
+
+### 开场动作库的作者流程
+
+`Animation/OpeningStoryboards/` 不再由本脚本重定向。V5 开场库靠 IK 解手、搭档、墙面接触，重定向只保留旋转，
+接触会漂（IJA 的肩比原 IJA02 靠后约 5 cm、高 3.6 cm，上臂短 3.8 cm、前臂长 1.4 cm）。所以改为：
+`_import/Script_OpeningStoryboardBake.py` 直接在本骨架的五具身体上重新作者化（partner → bake → manifest 三步，
+私有目录 `OneDrive/AI/Models/Blender/Taierzhuang1938/OpeningStoryboards_20260926HumanoidV1`）。
+
+- 片段库里的数都写在「旧 Lugou 骨架的源米」里。导入器（`Script_MachineGunCaptivesBake.AuthoringRig`）把新身体按
+  `f = 现在的运行时缩放 / 旧运行时缩放` 整体缩放成一份作者用副本（`tmp/AuthoringRigs`，不提交），`AUTHORING_SCALE`
+  记旧缩放（0925 验证报告的 scale）。于是所有作者数在运行时的意义不变；写出的骨骼值、道具轨、接触点偏移、
+  挂载点与 `endLift` 除以 f 回到发货 GLB 的节点单位（读已提交文件时乘回）。
+- 新比例下有 11 条 clip 超出门槛，逐条修在作者端：`Script_OpeningStoryboardClips.py` 的 `REACH_BY_CLIP`
+  （抓头发链、拖领、踢梁的够取辅助：起点 0.86 臂长、骨盆 0.13 m、前倾 +0.40；踢梁骨盆 0.17 m）、
+  `THROAT_R/L`（捂喉的手向他左移 2 / 1.5 cm）、`CHOP_END`（靠墙倒地离墙多 2 cm）、`STARTLE_DUCK` 0.07 → 0.09、
+  `AimHead` 先减去接地抬升再瞄（罗班长跪姿看顺子）；第一人称 `EXTRA_HAND_POSES.gripArm.atLeft` 0.65 → 0.75。
+  其余 clip 的烘焙参数与 V5 相同。
+- 机枪俘虏库仍是第一次规范化的重定向产物；它的烘焙脚本已改到新模型名与作者副本，重烘会得到作者化版本。
 
 ## 2026-09-26 验证与边界
 
