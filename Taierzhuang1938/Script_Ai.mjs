@@ -3480,7 +3480,8 @@ export class AiDirector {
     // P012 route followers use an explicit metres/second pace, not a cap on the
     // ordinary 2.6m/s advance state. Scouts still perceive and fire normally.
     const scriptedPathFollower = s.p012Guided === true && Number.isFinite(s.scriptMoveSpeedMps);
-    // Walking s.goal instead of this state's moveOrder: that order's arrival radius is not his.
+    // Walking s.goal instead of this state's moveOrder, for FirstLevelFrontBattle.Walk (routeArrivalOwnsRadius, 03-06
+    // route walkers only; MissionRuntime.MoveActor clears it for every other mover): that order's radius is not his.
     let followsGoal = false;
     // Exact escort corridors own their queue waits. Locally mobile infantry
     // retain obstacle recovery even during authored bounds.
@@ -3490,9 +3491,9 @@ export class AiDirector {
       // Combat still owns aiming, firing, reloading and damage above. The
       // checked corridor owns movement: FIRE's cached cover must not pull the
       // leader away from the escort, and RELOAD must not cancel his next step.
-      if (!s.scriptDefensive) { desired = this.tmpD.copy(s.goal); followsGoal = true; }
+      if (!s.scriptDefensive) { desired = this.tmpD.copy(s.goal); followsGoal = s.routeArrivalOwnsRadius === true; }
     }
-    if (s.p012ScoutDirected || s.p012RouteRejoining) { desired = this.tmpD.copy(s.goal); speed = 2.6; followsGoal = true; }
+    if (s.p012ScoutDirected || s.p012RouteRejoining) { desired = this.tmpD.copy(s.goal); speed = 2.6; followsGoal = s.routeArrivalOwnsRadius === true; }
     if(s.missionGrenadeEvade){wantsFire=false;this.SetStance(s,s.scriptMoveSpeedMps>0?0:2,COVER_CYCLE.grenadeStanceHoldS,true);}
     else if(Number.isFinite(s.scriptEscapeStance))this.SetStance(s,s.scriptEscapeStance,COVER_CYCLE.grenadeStanceHoldS,true);
     else if(this.time<(s.scriptProneUntil||0))this.SetStance(s,2,s.scriptProneUntil-this.time,true);

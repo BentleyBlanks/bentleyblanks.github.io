@@ -453,6 +453,8 @@ export class FirstLevelMissionRuntime {
   MoveActor(actor, point, speed = R.squadSpeedMps) {
     if (!actor?.alive) return;
     actor.p012Guided = true;
+    // Set again by FrontBattle.Walk right after its own call (Script_Ai.Act: a route walker's arrival radius).
+    actor.routeArrivalOwnsRadius = false;
     actor.scriptDefensive = false;
     actor.scriptMoveSpeedMps = speed;
     actor.manualGoalUntil = this.ai.time + 3;

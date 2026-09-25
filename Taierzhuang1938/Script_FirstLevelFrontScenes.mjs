@@ -152,6 +152,8 @@ export class FirstLevelFrontScenes {
     this.stood = [];
     /** Every step into the picture given up because the player moved into its way (Steer): { who, t, spot }. */
     this.dropped = [];
+    /** soldier -> time BackOffSpot last found nothing for him (not searched again within B.speakerBackOffRetryS). */
+    this.backOffMiss = new Map();
   }
   /** runtime.Say hands the id over when this returns true. */
   Owns(id) {
@@ -248,13 +250,24 @@ export class FirstLevelFrontScenes {
    * FrontApproach.01, BundleSupply.02, Volunteer.02) and the relief NCO passing at 1.0 m (FrontRelief.02) were heard from
    * inside the camera - a chin and a sleeve. False when there is no clear spot (he stays).
    */
-  BackOff(body, who, sceneId) {
+  BackOff(body, who, sceneId, lineId) {
     const r = this.r;
     if (!r.player?.position || !r.Point || !r.BlocksSight) return false;
-    const spot = this.BackOffSpot(body);
+    const spot = this.RetryBackOffSpot(body);
     if (!spot) return false;
-    this.steer = { soldier: body, who, spot, sceneId, anchor: null, backOff: true };
+    // The step back belongs to this one line (lineId): when it is done his own orders have him again, and his next line
+    // is judged afresh by HoldLine / KeepSpace (09-26 review: held for the whole scene, his next line waited 1.6 s).
+    this.steer = { soldier: body, who, spot, sceneId, anchor: null, backOff: true, lineId };
     return true;
+  }
+  /** BackOffSpot, but not again within B.speakerBackOffRetryS of finding nothing for this speaker. */
+  RetryBackOffSpot(body) {
+    const now = this.r.time ?? 0, miss = this.backOffMiss.get(body);
+    if (miss != null && now - miss < B.speakerBackOffRetryS) return null;
+    const spot = this.BackOffSpot(body);
+    if (spot) this.backOffMiss.delete(body);
+    else this.backOffMiss.set(body, now);
+    return spot;
   }
   /**
    * Where a speaker too near the player steps back to: B.speakerBackOffDistancesM from the player, straight away from
@@ -322,6 +335,9 @@ export class FirstLevelFrontScenes {
       this.holds.set(line.id, hold);
       if (this.holds.size > 64) this.holds.delete(this.holds.keys().next().value);
     }
+    // He is stepping back from the player for his previous line (BackOff): nobody walks into the picture meanwhile, so
+    // holding this one would only delay it (09-26 review: FrontBlockade.03 / FrontApproach.02 waited the full 1.6 s).
+    if (this.steer?.soldier === body && this.steer.backOff) return Release("backOff");
     if (now - hold.since >= B.speakerViewHoldS) return Release("timeout");
     // A line waits only while its speaker walks into the picture. Nobody is stepped up to a walking player: walking
     // together the leader keeps his own walk - stopping him at a spot left behind costs him the lead for the rest of
@@ -332,7 +348,7 @@ export class FirstLevelFrontScenes {
       // The line plays at once from where he is - but a speaker inside the player's personal space (nearer than
       // B.speakerViewMinM: the camera sits in his shoulder) steps back from the player while he talks (BackOff).
       const Plays = (why) => {
-        if (view.distance < B.speakerViewMinM && this.BackOff(body, line.who, sceneId)) hold.backedOff = true;
+        if (view.distance < B.speakerViewMinM && this.BackOff(body, line.who, sceneId, line.id)) hold.backedOff = true;
         return Release(why);
       };
       const v = r.player?.velocity, moving = !!v && Math.hypot(v.x || 0, v.z || 0) > B.speakerStepPlayerStillMps;
@@ -368,7 +384,7 @@ export class FirstLevelFrontScenes {
     for (const l of handle.lines) {
       if (l.state !== "playing" || !l.line || l.line.who === "shunzi" || l.line.direction?.spatial === "self") continue;
       const body = this.Body(l.line.who), view = body && this.SpeakerView(body);
-      if (view && view.distance < B.speakerViewMinM && this.BackOff(body, l.line.who, handle.id)) {
+      if (view && view.distance < B.speakerViewMinM && this.BackOff(body, l.line.who, handle.id, l.line.id)) {
         const hold = this.holds.get(l.line.id);
         if (hold) hold.backedOff = true;
         return;
@@ -434,10 +450,6 @@ export class FirstLevelFrontScenes {
     else if (r.Defend) r.Defend(a.soldier, a.spot, 0, 0.3);
   }
   /**
-   * Called by the runtime after every other mover (frontShow, frontBattle): keeps the stepping speaker walking to
-   * his spot, and lets him go once his lines in the scene are done (his own orders take over again).
-   */
-  /**
    * A near speaker whose line plays with his head in the picture but something low between it and the player's eye (a
    * parapet, the gun on its sandbags) stands up to say it, when his standing head would be seen - an NCO rising to give
    * an order, not a walk. Held standing (B.speakerStandHoldS, refreshed) until that line ends; the combat brain has him
@@ -468,6 +480,11 @@ export class FirstLevelFrontScenes {
       return;
     }
   }
+  /**
+   * Called by the runtime after every other mover (frontShow, frontBattle): keeps the stepping speaker walking to
+   * his spot, and lets him go once his lines in the scene are done (his own orders take over again) - a step back
+   * once the one line it was for is done.
+   */
   Steer() {
     this.KeepSpace();
     this.StandToBeSeen();
@@ -477,7 +494,7 @@ export class FirstLevelFrontScenes {
     if (!s) return;
     const handle = this.handle;
     const talking = !!handle && !handle.done && handle.id === s.sceneId
-      && handle.lines.some((l) => l.line.who === s.who && l.state !== "done");
+      && handle.lines.some((l) => (s.backOff && s.lineId ? l.line.id === s.lineId : l.line.who === s.who) && l.state !== "done");
     // The player walked off: the spot framed a view he no longer has (a step back keeps its spot until the line ends).
     const left = !!s.anchor && !!r.player?.position && Distance(r.player.position, s.anchor) > B.speakerStepReleaseM;
     if (!talking || !s.soldier?.alive || left) { this.steer = null; return; }
@@ -488,8 +505,12 @@ export class FirstLevelFrontScenes {
     const near = (this.SpeakerView(s.soldier)?.distance ?? Infinity) < B.speakerViewMinM;
     const playing = !!handle && handle.lines.some((l) => l.line.who === s.who && l.state === "playing");
     if (near && (s.backOff ? Distance(s.soldier.position, s.spot) <= 0.35 : playing)) {
-      const back = this.BackOffSpot(s.soldier);
-      if (back) { s.spot = back; s.backOff = true; s.anchor = null; }
+      const back = this.RetryBackOffSpot(s.soldier);
+      if (back) {
+        s.spot = back; s.anchor = null;
+        if (!s.backOff) s.lineId = handle.lines.find((l) => l.line.who === s.who && l.state === "playing")?.line.id;
+        s.backOff = true;
+      }
     }
     // The player moved after the spot was picked (c16_a1 above: picked while he dodged a grenade, then he went back to
     // the gun): the rest of the walk would now take the speaker nearer the player than B.speakerStepPassM (or than he

@@ -20,6 +20,8 @@
 //   ⑪ 05 攻击位：罗班长停在投弹点旁（leaderAttackSide），离投弹点与玩家进来的最后一段都 ≥1.4 m
 //   ⑩ 攻击支路过 AttackRuinA 东端留 ≥0.6 m；墙南侧死角里的人按最近路点走、先离开墙面（TankProbe5 卡死点）
 //   ⑨ 走路线的人（罗班长）在 FIRE 里被换位命令的 0.6 m 到位半径钉在路线拐点前 0.58 m（后门坡道）：Script_Ai.Act 用路线的半径
+//      （只对 FrontBattle.Walk 打了 routeArrivalOwnsRadius 的人；别的剧本走路者照旧）
+//   ⑮ 躲手榴弹之后：直线回不去（隔着枪托沙袋/院墙）就沿躲的路原路退回，已到位的人被挤开也会走回岗位
 //
 // 跑法：node Taierzhuang1938/Script_FirstLevelFrontPacingTest.mjs
 // ===========================================================================
@@ -129,6 +131,11 @@ const Ok = (label) => console.log(`ok ${label}`);
   assert.equal(battle.leg, "retreat", "the pair first falls back along the attack branch");
   player.position = { ...S.rear };
   battle.UpdateSortie();
+  // The player ran on ahead: Luo, still out on the branch, finishes the branch first (09-26 review tank probe rvtank: given
+  // the next leg 13 m out on the branch, he walked into the ruins between and slid along a wall for 30 s).
+  assert.ok(facts.has("attackRetreated") && battle.leg === "retreat", "the player at the rear junction, Luo still on the branch: he keeps coming back along it");
+  luo.position = { ...S.rear };
+  battle.UpdateSortie();
   assert.ok(facts.has("attackRetreated") && battle.leg === "gapWatch",
     "back at the rear junction with the last batch still behind the gap: hold at the nest's west door, not on the branch");
   const watch = battle.walks.get(luo.id).route;
@@ -158,8 +165,16 @@ const Ok = (label) => console.log(`ok ${label}`);
   const b2 = new FirstLevelFrontBattle(r2); b2.gapWatched = true;
   b2.UpdateSortie(); r2.time = B.returnMeetMaxWaitS + 0.1; b2.UpdateSortie();
   assert.equal(b2.leg, "home", "returnMeetMaxWaitS bounds the wait at returnMeet");
-  checks += 13;
-  Ok("② 05 bomb-first + parallel withdrawal: skipped attack position, west-door watch, returnMeet, home");
+  // Back at the rear junction with the batch already past the gap: the disengage leg goes in through the rear door, it
+  // does not cut straight from the junction to the west door through the nest's rear wall.
+  const r3 = { ...r, time: 0, voice: { played: new Set(), finished: new Set() }, squadRoutes: new Map() };
+  luo.position = { ...S.rear };
+  const b3 = new FirstLevelFrontBattle(r3); b3.gapWatched = true; b3.UpdateSortie();
+  const inDoor = b3.walks.get(luo.id).route;
+  assert.ok(b3.leg === "disengage" && inDoor.some((p) => Dist(p, Space.rearDoor) < 0.3) && Dist(inDoor[0], S.rear) < 0.5,
+    "from the rear junction the disengage leg starts there and goes through the rear door");
+  checks += 15;
+  Ok("② 05 bomb-first + parallel withdrawal: skipped attack position, Luo finishes the branch, west-door watch, returnMeet, home");
 }
 
 // ②b the relief comes up when the tank is silenced; FrontRelief is said at returnMeet by the NCO posted there
@@ -727,11 +742,27 @@ function WalkRuntime(extra = {}) {
   assert.ok(Dist(back.spot, r.player.position) >= Math.min(...B.speakerBackOffDistancesM) - 1e-9 && Dist(back.spot, r.player.position) > heel,
     "to a spot outside speakerViewMinM, away from the player");
   assert.ok(SegmentDistance(r.player.position, luo.position, back.spot) >= heel - 0.05, "never passing nearer the player on the way");
-  scenes.handle = { id: "FrontApproach", done: false, lines: [{ line: { who: "luo" }, state: "playing" }] };
+  assert.equal(back.lineId, "FrontApproach.01", "the step back belongs to the line it was for");
+  scenes.handle = { id: "FrontApproach", done: false, lines: [{ line: { id: "FrontApproach.01", who: "luo" }, state: "playing" },
+    { line: { id: "FrontApproach.03", who: "luo" }, state: "waiting" }] };
   r.player.position = { x: 0, y: 0, z: -(B.speakerStepReleaseM + 1) }; scenes.Steer();
   assert.ok(scenes.steer === back && moves.at(-1)?.speed === B.speakerBackOffSpeedMps, "at a walk, and the player walking on does not cancel it");
+  // His next line while he is still stepping back (09-26 review: held the full speakerViewHoldS with nobody walking in).
+  r.player.velocity = { x: 0, y: 0, z: 0 }; r.time = 51; const farBehind = { ...r.player.position };
+  r.player.position = { x: luo.position.x, y: 0, z: luo.position.z - 3 };
+  assert.equal(scenes.HoldLine(line("FrontApproach.03", "luo"), "FrontApproach"), false, "his next line is not held while he steps back");
+  assert.equal(scenes.holds.get("FrontApproach.03").released, "backOff");
+  r.player.position = farBehind; r.player.velocity = { x: 0, y: 0, z: -2 };
   scenes.handle.lines[0].state = "done"; scenes.Steer();
-  assert.equal(scenes.steer, null, "his line done: back to his own walk");
+  assert.equal(scenes.steer, null, "the line it was for done: back to his own walk (his other lines do not pin him)");
+  // No spot found: not searched again within speakerBackOffRetryS (BackOffSpot is 21 candidates with collider tests).
+  {
+    let searches = 0; const Spot = scenes.BackOffSpot; scenes.BackOffSpot = () => { searches++; return null; };
+    r.time = 52; scenes.RetryBackOffSpot(luo); r.time = 52 + B.speakerBackOffRetryS / 2; scenes.RetryBackOffSpot(luo);
+    const within = searches; r.time = 52 + B.speakerBackOffRetryS + 0.01; scenes.RetryBackOffSpot(luo);
+    assert.ok(within === 1 && searches === 2, `a failed back-off search waits speakerBackOffRetryS (${within}, ${searches})`);
+    scenes.BackOffSpot = Spot; scenes.backOffMiss.clear();
+  }
   // Nowhere to step back to (every knee-high line blocked): he stays and the line still plays.
   r.player.position = { x: 0, y: 0, z: 0 }; luo.position = { x: 0.3, y: 0, z: 0.6 }; r.BlocksSight = (a, b) => b.y < 1;
   assert.equal(scenes.HoldLine(line("FrontApproach.02", "luo"), "FrontApproach"), false, "blocked: the line is not delayed");
@@ -800,7 +831,7 @@ function WalkRuntime(extra = {}) {
     if (Dist(p, S.house) > S.supplierRangeM) continue;
     assert.ok(SegmentDistance(S.leaderDoorSide, p, S.keeper) > 1, `Luo's door-side stop is off the sight line to the keeper from (${p.x.toFixed(1)}, ${p.z.toFixed(1)})`);
   }
-  checks += 64;
+  checks += 69;
   Ok("⑧ near speaker out of the picture: line held <= speakerViewHoldS, he steps into view; one too near steps back; far shouts and Node runs unaffected; a grenade at the player's feet holds a line <= speakerDangerHoldS");
 }
 
@@ -815,8 +846,8 @@ function WalkRuntime(extra = {}) {
   const Act = vm.runInNewContext(`(function(s,dt){let desired=s.goal,speed=2.6,stepped=false,wantedYaw=0;${block}return {stepped};})`,
     { Clamp01: (v) => Math.max(0, Math.min(1, v)), COVER_CYCLE });
   const Vec = () => ({ x: 0, y: 0, z: 0, copy(p) { this.x = p.x; this.y = p.y || 0; this.z = p.z; return this; }, set(x, y, z) { this.x = x; this.y = y; this.z = z; return this; } });
-  const Run = (guided) => {
-    const s = { p012Guided: guided, scriptMoveSpeedMps: guided ? R.squadSpeedMps : undefined, position: { x: 29.66, y: 0, z: -145.02 },
+  const Run = (guided, frontWalk = guided) => {
+    const s = { p012Guided: guided, routeArrivalOwnsRadius: frontWalk, scriptMoveSpeedMps: guided ? R.squadSpeedMps : undefined, position: { x: 29.66, y: 0, z: -145.02 },
       goal: { x: 29.7, y: 0, z: -145.6 }, scriptArrivalRadius: B.arrivalM * .25 * .5, moveArriveM: 0.6, stance: 1,
       detourTime: 0, stuckTime: 0, rnd: () => .5 };
     const host = { ctx: { nav: null }, tmpD: Vec(), navOut: { x: 0, z: 0 }, time: 0, SetStance() {}, TryVault: () => false,
@@ -824,10 +855,17 @@ function WalkRuntime(extra = {}) {
     for (let i = 0; i < 120; i++) Act.call(host, s, 1 / 60);
     return Math.hypot(s.position.x - s.goal.x, s.position.z - s.goal.z);
   };
-  const walker = Run(true), ordinary = Run(false);
+  const walker = Run(true), ordinary = Run(false), otherScripted = Run(true, false);
   assert.ok(walker < B.arrivalM * .25, `a route walker reaches the 0.25 m corner through a 0.6 m displace radius (left ${walker.toFixed(3)} m)`);
   assert.ok(ordinary > .5, `an ordinary soldier still stops on his own order's 0.6 m radius (left ${ordinary.toFixed(3)} m)`);
-  checks += 3;
+  // Only FrontBattle.Walk's walkers (03-06, routeArrivalOwnsRadius): every other P012 mover keeps the old rule (09-26 review).
+  assert.ok(otherScripted > .5, `another scripted mover (MissionRuntime.MoveActor 01-18, setpieces) keeps the order's radius (left ${otherScripted.toFixed(3)} m)`);
+  const battleSrc = Read("Script_FirstLevelFrontBattle.mjs"), runtimeSrc = Read("Script_FirstLevelMissionRuntime.mjs");
+  assert.ok(/r\.MoveActor\(actor,w\.rejoin\|\|w\.route\[w\.index\],wait\?0:speed\);[\s\S]{0,300}actor\.routeArrivalOwnsRadius=true;/.test(battleSrc),
+    "FrontBattle.Walk marks its walker after moving him");
+  assert.ok(/MoveActor\(actor, point, speed = R\.squadSpeedMps\) \{[\s\S]{0,200}actor\.routeArrivalOwnsRadius = false;/.test(runtimeSrc),
+    "MissionRuntime.MoveActor clears the mark for every other mover");
+  checks += 6;
   Ok("⑨ a route walker in FIRE walks to his corner, not to the displace order's 0.6 m radius");
 }
 
@@ -1001,6 +1039,46 @@ function WalkRuntime(extra = {}) {
     "the world model on the rest is hidden while its man holds the ZB26 at the seat");
   checks += 19;
   Ok("⑭ the left gun rests on LeftGunRest 0.6 m ahead of the seat; He mans it standing with the ZB26 and gets his rifle back");
+}
+
+{
+  // ⑮ The way back from a grenade dodge (09-26 relay r2 Front review). He dodged round LeftGunRest to its enemy side;
+  // straight back to the seat ran into the rest, the stall fallback accepted the spot 1.31 m off and he stood there
+  // for good with the gun showing on the rest (two ZB26s). Luo dodged out of the nest's west door and walked straight
+  // back into its outer wall. Here: a 0.5 x 0.3 m block between the seat (0,0) and where the dodge ended.
+  const box = { x0: -0.25, x1: 0.25, z0: -1.1, z1: -0.8 };
+  const Crosses = (a, b) => { for (let i = 0; i <= 40; i++) { const t = i / 40, x = a.x + (b.x - a.x) * t, z = a.z + (b.z - a.z) * t;
+    if (x > box.x0 && x < box.x1 && z > box.z0 && z < box.z1) return true; } return false; };
+  let dodging = false;
+  const { r, moves } = WalkRuntime({ RespondToGrenade: (a) => { a.missionGrenadeEvade = dodging; return dodging; },
+    Point: (p, rise = 0) => ({ x: p.x, y: rise, z: p.z }), BlocksSight: (a, b) => Crosses(a, b) });
+  const battle = new FirstLevelFrontBattle(r);
+  const seat = { x: 0, z: 0, arrivalM: B.leftGunSeatArrivalM, stance: 0 };
+  const he = { id: 3, castId: "heyoutian", alive: true, position: { x: 0, z: 0 }, scriptArrivalRadius: 1 };
+  battle.SetWalk(he, [seat]);
+  assert.equal(battle.Walk(he), true, "on his seat");
+  battle.walks.get(he.id).stallAccepted = true;
+  dodging = true;
+  for (const p of [{ x: 0, z: 0 }, { x: -1.3, z: -0.3 }, { x: -1.3, z: -1.3 }, { x: -0.1, z: -1.3 }]) { he.position = p; r.time += 0.3; battle.Walk(he); }
+  const w = battle.walks.get(he.id);
+  assert.equal(w.trail?.length, 4, "the dodge leaves a trail point every evadeTrailStepM");
+  assert.equal(w.stallAccepted, false, "a new dodge undoes the stall fallback's acceptance");
+  dodging = false; r.time += 0.1; moves.length = 0;
+  assert.equal(battle.Walk(he), false, "the dodge over, 1.3 m in front of the rest: the walk to the seat is taken up again");
+  assert.deepEqual([moves.at(-1).x, moves.at(-1).z], [-1.3, -1.3], "straight back is blocked: he walks the trail back round the block first");
+  assert.equal(battle.State().evadeReturns.length, 1, "the walk back is reported");
+  he.position = { x: -1.2, z: -1.25 }; r.time += 1;
+  battle.Walk(he);
+  assert.deepEqual([moves.at(-1).x, moves.at(-1).z], [0, 0], "from the trail point with a clear walk, on to the seat");
+  he.position = { x: 0.05, z: -0.05 };
+  assert.equal(battle.Walk(he), true, "and he is on the seat again");
+  // A dodge that ends with a clear walk back: no trail walk, straight to his point.
+  dodging = true; he.position = { x: 0, z: 0 }; battle.Walk(he); he.position = { x: 0.9, z: 0.4 }; battle.Walk(he);
+  dodging = false; moves.length = 0; battle.Walk(he);
+  assert.deepEqual([moves.at(-1).x, moves.at(-1).z], [0, 0], "a clear way back: straight to the seat");
+  assert.equal(battle.State().evadeReturns.length, 1, "... without a trail walk");
+  checks += 10;
+  Ok("⑮ after a grenade dodge a walker goes back the way he dodged when straight back is blocked, and a post is taken up again");
 }
 
 console.log(`FirstLevelFrontPacingTest 通过：${checks} 条断言`);

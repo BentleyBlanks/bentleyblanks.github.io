@@ -300,6 +300,22 @@ export const FRONT_BATTLE_TUNING=Object.freeze({
   // not pinned prone. 09-25 relay r2 Front step 3: after the handover He stood 1.99 m off the seat for all of 04-05
   // (Zhou's exit shoved him there), 3.2 m from the gun.
   leftGunSeatArrivalM:.25,leftGunManM:.6,
+  // FrontBattle.Walk after a grenade dodge: the dodge path is kept as a trail (a point every evadeTrailStepM) and,
+  // when a straight walk from where the dodge ended to his next point is blocked at knee height, he walks the trail
+  // back (each trail point within evadeTrailArrivalM) until one of its points has a clear walk to that point. The dodge
+  // picks each leg clear of walls, so its way back is clear too. A dodge also takes a finished walk up again when it
+  // put him off his last point, and undoes a stall-fallback acceptance there. 09-26 relay r2 Front review: He dodged
+  // round LeftGunRest to its enemy side and stood 1.31-1.44 m in front of his seat for good (straight back ran into
+  // the rest and the stall fallback accepted the spot: two ZB26s in the picture); Luo dodged 10 m west out of the
+  // nest's west door as 04's tank pressure began, walked straight back towards the rear route's first corner into the
+  // nest's west outer wall, stalled twice, and BundleOrder.02/.03/.05 were said behind that wall (review drive rv36a).
+  // The clear-walk test is three knee-high rays, evadeTrailClearM either side of the middle one (the AI capsule is
+  // 0.3 m; a single ray passed the west door's jamb that he then stuck on).
+  evadeTrailStepM:.8,evadeTrailArrivalM:.4,evadeTrailClearM:.35,
+  // 05 after the tank (FrontBattle.LeaderBehindOnBranch): Luo counts as still out on the attack branch while he is within
+  // branchCorridorM of FRONT_SORTIE.attackRoute (the RoadAttack trench is 2.2-3.2 m wide, a dodge or a step aside puts
+  // him a metre or two off its line) and not yet back at the rear junction.
+  branchCorridorM:4,
   // 04: the player has held the rear junction this long out of the tank's sight and Luo is still not there ->
   // rightRearReached anyway (Luo walks on behind him). Two stall skips plus the 5 m walk from his cover.
   rearLeaderGraceS:15,
@@ -379,6 +395,9 @@ export const FRONT_BATTLE_TUNING=Object.freeze({
   // backed into the ammo house ahead of the player going in and stayed 0.7 m from him, 09-25 drive).
   speakerBackOffDistancesM:Object.freeze([2,1.7,2.4]),speakerBackOffBearingsDeg:Object.freeze([0,30,60,90]),speakerBackOffSpeedMps:1.8,
   speakerBackOffAheadDeg:50,
+  // A speaker for whom no back-off spot was found is not searched again for this long (FrontScenes.BackOffSpot runs 21
+  // candidates with collider and sight tests; in a narrow trench it found none and ran every frame; 09-26 review).
+  speakerBackOffRetryS:.25,
   // ClearView: a squadmate (speakerAsideCast) whose body stands between the player's eye and a talking speaker's head
   // (a speakerAsideBodyRadiusM column from 0.2 m over his feet to his head top: the line gate's test) steps aside,
   // square to that line of sight, to one of these offsets (m) on his own side first, never nearer the player than

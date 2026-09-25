@@ -77,6 +77,13 @@ export function FrontEntryRoute(position,route){
   }
   return remaining;
 }
+/** The rest of `route` from where `position` projects onto it (the projected point first); never back along it. */
+function BackFrom(position,route){
+  const {progress}=MissionRouteProjection(route,position),remaining=[MissionRoutePoint(route,progress)];
+  let distance=0;
+  for(let i=1;i<route.length;i++){distance+=Distance(route[i-1],route[i]);if(distance>progress+.01)remaining.push({...route[i]});}
+  return remaining;
+}
 /** Luo's cover inside the nest's west door, walked to within B.leaderCoverArrivalM (not arrivalM: that is the doorway). */
 const LeaderCover=()=>({...S.leaderCover,arrivalM:B.leaderCoverArrivalM});
 /**
@@ -99,6 +106,8 @@ export class FirstLevelFrontBattle {
     this.r=runtime;this.walks=new Map();this.leg=null;this.blocked=true;
     /** Walk stall skips (probes read State().stalls): {id,index,total,final,x,z,at}. */
     this.stalls=[];
+    /** Every walk back along a grenade-dodge trail (EvadeReturn): {id,points,x,z,at}. */
+    this.evadeReturns=[];
     /** Task-side grenade veto (Script_AiTactics TacticsDirector.grenadeVeto), installed by the runtime while Active. */
     this.grenadeVeto=(soldier,x,z)=>this.GuardInBlast(x,z);
   }
@@ -112,19 +121,30 @@ export class FirstLevelFrontBattle {
   SetWalk(actor,route){if(!actor)return;this.walks.set(actor.id,{route:route.map(p=>({...p})),index:0});this.r.squadRoutes.set(actor.id,route.map(p=>({...p})));}
   Walk(actor,{follow=false,speed=R.squadSpeedMps}={}){
     const r=this.r,w=actor&&this.walks.get(actor.id);if(!actor?.alive||!w)return false;
+    const last=w.route.at(-1);
     // A grenade evade is finished by RespondToGrenade itself (no live grenade near him: the flag drops). It used to be
     // called only on the way, below the arrival return, so a man who reached his last point mid-evade kept the flag for
     // good and the AI kept him prone (Script_Ai: missionGrenadeEvade -> stance 2, no fire): 09-25 relay r2 Front step 3,
     // Luo flat in his cover inside the nest's west door through FrontWithdraw / TakeOverGun, his head never moving.
-    if(actor.missionGrenadeEvade&&r.RespondToGrenade(actor)){w.bestAt=r.time;return false;}
+    // Every dodge frame drops a trail point (B.evadeTrailStepM apart) for the way back (EvadeReturn below).
+    const Dodge=()=>{
+      if(!r.RespondToGrenade(actor))return false;
+      const trail=w.trail??=[{x:actor.position.x,z:actor.position.z}];
+      if(Distance(actor.position,trail.at(-1))>=B.evadeTrailStepM){trail.push({x:actor.position.x,z:actor.position.z});if(trail.length>32)trail.splice(1,1);}
+      // A new dodge: a spot the stall fallback accepted is no longer where he stands; the walk back is looked at again.
+      w.stallAccepted=false;w.back=null;w.bestAt=r.time;return true;
+    };
+    if(actor.missionGrenadeEvade&&Dodge())return false;
     // Stepping into the player's picture for a line (FrontScenes.Steer moves him): no walk order, no stall clock.
     if(r.frontScenes?.Steers?.(actor)){w.bestAt=r.time;return false;}
+    // The dodge is over: a finished walk whose last point he was put off is taken up again, and the dodge trail is
+    // walked back until a straight walk to his point is clear (B.evadeTrailStepM).
+    if(w.trail)this.EvadeReturn(actor,w);
     // Intermediate points describe checked trench corners. Advancing a metre
     // early cuts across the inside cover at the right-hand approach; this
     // corridor intentionally disables the AI's arbitrary obstacle detours.
     // A final point may carry its own arrival radius (Luo's cover: B.leaderCoverArrivalM). Such a walk is taken up
     // again when he was put off it (a step back for a line), unless the stall fallback already accepted where he stands.
-    const last=w.route.at(-1);
     if(w.index>=w.route.length&&last?.arrivalM!=null&&!w.stallAccepted&&Distance(actor.position,last)>last.arrivalM+B.coverReopenM){
       w.index=w.route.length-1;w.rejoin=null;w.best=Infinity;w.bestAt=r.time;
     }
@@ -132,8 +152,26 @@ export class FirstLevelFrontBattle {
     const previousIndex=w.index;
     while(w.index<w.route.length&&Distance(actor.position,w.route[w.index])<Arrival())w.index++;
     if(w.index!==previousIndex){w.rejoin=null;w.best=Infinity;w.bestAt=r.time;}
-    // Arrived: a grenade landing at his post still moves him (the reopen check above walks him back afterwards).
-    if(r.RespondToGrenade(actor)){w.bestAt=r.time;return false;}
+    // Arrived: a grenade landing at his post still moves him (EvadeReturn walks him back afterwards).
+    if(Dodge())return false;
+    // Walking the dodge trail back: its own progress clock (B.walkStallS without progress drops the rest of it).
+    if(w.back?.length){
+      while(w.back.length&&Distance(actor.position,w.back[0])<B.evadeTrailArrivalM){w.back.shift();w.backBest=Infinity;w.backAt=r.time;}
+      const c=w.back[0];
+      if(c){
+        const d=Distance(actor.position,c);
+        if(d<(w.backBest??Infinity)-B.walkStallProgressM||w.backAt==null){w.backBest=d;w.backAt=r.time;}
+        else if(r.time-w.backAt>=B.walkStallS)w.back=null;
+      }
+      if(w.back?.length){
+        actor.missionGuideWaiting=false;r.squadMarch?.Release(actor);r.ai.ReleaseCover(actor);
+        r.ai.SetStance(actor,1,.5,true);r.MoveActor(actor,c,speed);actor.routeArrivalOwnsRadius=true;
+        actor.scriptArrivalRadius=Math.min(actor.scriptArrivalRadius,B.evadeTrailArrivalM*.5);
+        r.squadRoutes.set(actor.id,[c,...w.route.slice(w.index)]);
+        w.bestAt=r.time;return false;
+      }
+      w.back=null;w.best=Infinity;w.bestAt=r.time;
+    }
     if(w.index>=w.route.length){r.Defend(actor,w.route.at(-1),0,.4);r.ai.SetStance(actor,last.stance??1,.5,true);r.squadRoutes.set(actor.id,[]);return true;}
     const ahead=MissionRouteProjection(w.route,actor.position).progress>MissionRouteProjection(w.route,r.player.position).progress+B.leaderLeadM;
     const wait=follow&&ahead&&Distance(actor.position,r.player.position)>S.leaderWaitM;
@@ -166,9 +204,52 @@ export class FirstLevelFrontBattle {
     }
     actor.missionGuideWaiting=wait;r.squadMarch?.Release(actor);r.ai.ReleaseCover(actor);
     r.ai.SetStance(actor,1,.5,true);r.MoveActor(actor,w.rejoin||w.route[w.index],wait?0:speed);
+    // Script_Ai.Act: this walker's goal is a route point, reached within the route's radius (scriptArrivalRadius below),
+    // not within a combat order's moveArriveM. MissionRuntime.MoveActor clears the flag for every other mover.
+    actor.routeArrivalOwnsRadius=true;
     actor.scriptArrivalRadius=Math.min(actor.scriptArrivalRadius,(w.rejoin?B.arrivalM*.25:Arrival())*.5);
     r.squadRoutes.set(actor.id,w.route.slice(w.index));
     if(wait)r.leaderGuide?.Watch(actor);return false;
+  }
+  /**
+   * Walk's way back from a grenade dodge (w.trail, dropped B.evadeTrailStepM apart while he dodged): a finished walk
+   * whose last point he was put off is taken up again, and when a straight walk from here to his next point is blocked
+   * at knee height, w.back is the trail backwards up to its first point with a clear walk to that point (or all of it:
+   * where the dodge began he was on the walk). Walk follows w.back before the route.
+   */
+  EvadeReturn(actor,w){
+    const r=this.r,trail=w.trail,last=w.route.at(-1);w.trail=null;w.back=null;
+    if(w.index>=w.route.length&&last&&Distance(actor.position,last)>(last.arrivalM??B.arrivalM)+B.coverReopenM){
+      w.index=w.route.length-1;w.rejoin=null;w.best=Infinity;w.bestAt=r.time;
+    }
+    const target=w.route[w.index];
+    if(!target||!trail?.length||!r.BlocksSight||!r.Point)return;
+    // A body-wide walk, not a sight line: three knee-high rays, the middle one and one each side B.evadeTrailClearM off
+    // it (the capsule). A single ray passed a door jamb the capsule stuck on (RearDoorWalkTest rearDodge: Luo back at the
+    // west door from a dodge, stalled twice on the jamb at (23.3,-148.4) - the review's rv36a spot).
+    const Clear=(a,b)=>{
+      const dx=b.x-a.x,dz=b.z-a.z,l=Math.hypot(dx,dz)||1,nx=-dz/l*B.evadeTrailClearM,nz=dx/l*B.evadeTrailClearM;
+      for(const k of [0,1,-1])if(r.BlocksSight(r.Point({x:a.x+nx*k,z:a.z+nz*k},.5),r.Point({x:b.x+nx*k,z:b.z+nz*k},.5)))return false;
+      return true;
+    };
+    if(Clear(actor.position,target))return;
+    const back=[];
+    for(let i=trail.length-1;i>=0;i--){back.push(trail[i]);if(Clear(trail[i],target))break;}
+    w.back=back;w.backBest=Infinity;w.backAt=r.time;w.rejoin=null;
+    this.evadeReturns.push({id:actor.missionId||actor.castId||actor.id,points:back.length,x:+actor.position.x.toFixed(1),z:+actor.position.z.toFixed(1),at:+r.time.toFixed(1)});
+    if(this.evadeReturns.length>24)this.evadeReturns.shift();
+  }
+  /**
+   * 05 after the tank: the player has reached the rear junction (attackRetreated) but Luo is still out on the attack
+   * branch - on it (within B.branchCorridorM of FRONT_SORTIE.attackRoute) and not yet within B.rearArrivalM of the
+   * junction. Once he has been there the answer stays no.
+   */
+  LeaderBehindOnBranch(){
+    const lead=this.Leader;if(!lead?.alive||this.leaderBackFromBranch)return false;
+    if(Distance(lead.position,S.rear)<B.rearArrivalM||MissionRouteProjection(S.attackRoute,lead.position).distance>B.branchCorridorM){
+      this.leaderBackFromBranch=true;return false;
+    }
+    return true;
   }
   SetLeg(id,route){if(this.leg===id)return;this.leg=id;this.leaderRoute=route;this.SetWalk(this.Leader,route);}
   Prepare(){
@@ -344,6 +425,12 @@ export class FirstLevelFrontBattle {
       playerAtThrow:r.Near(S.throw,B.attackArrivalM),leaderAtThrow:Distance(this.Leader.position,S.throw)<B.rearArrivalM});
     if(r.Near(S.rear,B.rearArrivalM))r.Record("attackRetreated");
     if(!r.Has("attackRetreated")){this.SetLeg("retreat",[...S.attackRoute].reverse());return;}
+    // attackRetreated is the player's arrival at the rear junction. Luo finishes his own way back along the attack branch
+    // first (LeaderBehindOnBranch): the next legs start at the rear junction or the west door, and a straight walk
+    // there from the branch runs into the ruins between (09-26 review tank probe rvtank: the player ran on, Luo was
+    // given the disengage leg 13 m out on the branch, slid along a wall at x 37.8 for 30 s, five stall skips, and
+    // FrontRelief.03 was said 46 m from the player).
+    const leaderBehind=this.LeaderBehindOnBranch();
     // Contract §2.6: the last batch's crossing, the relief and the pair's return run in parallel. The pair walks
     // back through the nest and holds at its west door (K10: the gap is in view 34 m away) until every live man of
     // the last batch is past the gap, then goes on down the right low trench to the safe zone (returnMeet), where
@@ -351,7 +438,11 @@ export class FirstLevelFrontBattle {
     const back=Routes.orders.slice(S.attackRoute.length-1),[toDoor,fromDoor]=SplitRoute(back,Space.westDoor),[toMeet,home]=SplitRoute(fromDoor,Space.returnMeet);
     const last=r.guards.slice(B.firstBatch);
     this.gapWatched ||= BatchPastGap(last);
-    if(!this.gapWatched){this.SetLeg("gapWatch",toDoor);return;}
+    // Each leg joins his actual progress on the way back (FrontEntryRoute on the whole of it from the rear junction):
+    // from the rear junction he goes in through the rear door, from the west door he goes on, never back.
+    const [backToMeet]=SplitRoute(back,Space.returnMeet);
+    const Leg=(id,route)=>leaderBehind?this.SetLeg("retreat",[...S.attackRoute].reverse()):this.SetLeg(id,route);
+    if(!this.gapWatched){Leg("gapWatch",toDoor);return;}
     // frontDisengaged = both back in our own trench behind the fold (the safe zone, FRONT_SPACE.returnMeet). The old
     // point S.approach[0] became the support junction SJ next to the collection in the 09.23 space. A player who ran
     // on past the meeting counts by his progress along the return route.
@@ -360,12 +451,12 @@ export class FirstLevelFrontBattle {
     this.leaderLeftFront ||= MissionRouteProjection(back,this.Leader.position).progress>=meetAt;
     if(this.playerLeftFront&&this.leaderLeftFront)r.Record("frontDisengaged");
     if(!this.returnMeetDone){
-      this.SetLeg("disengage",toMeet);
+      Leg("disengage",this.leg==="gapWatch"||leaderBehind?toMeet:BackFrom(this.Leader.position,backToMeet));
       if(Distance(this.Leader.position,Space.returnMeet)<Space.returnMeet.radiusM)this.meetHoldAt??=r.time;
       this.returnMeetDone=r.voice.played.has("FrontRelief")||(this.meetHoldAt!=null&&r.time-this.meetHoldAt>=B.returnMeetMaxWaitS);
       if(!this.returnMeetDone)return;
     }
-    this.SetLeg("home",home);
+    Leg("home",home);
     if(r.Has("frontDisengaged")&&r.Has("reliefInPosition")&&r.Near(A.collection,B.rearArrivalM)
       &&Distance(this.Leader.position,A.collection)<B.rearArrivalM)r.Record("collectionReturned");
   }
@@ -576,5 +667,5 @@ export class FirstLevelFrontBattle {
     const labels={supply:"bundle",return:"bundle",attack:"throw",retreat:"front",gapWatch:"front",disengage:"orders",home:"orders"};
     return {target:!r.Has("bundleTaken")&&r.Near(S.house,S.supplierRangeM)?A.bundle:MissionRouteLookahead(this.leaderRoute||Routes.bundle,r.player.position),label:labels[this.leg]||"bundle",objective:Objectives[{gapWatch:"retreat",home:"disengage"}[this.leg]||this.leg]||Objectives.supply};
   }
-  State(){return {leg:this.leg,blocked:this.blocked,assaultWindow:this.assaultWindow||null,gapWatched:!!this.gapWatched,returnMeetDone:!!this.returnMeetDone,handoverStarted:!!this.handoverStarted,roadProgress:this.r.tank.roadProgress||0,walks:[...this.walks].map(([id,w])=>({id,index:w.index,total:w.route.length})),stalls:this.stalls.slice()};}
+  State(){return {leg:this.leg,blocked:this.blocked,assaultWindow:this.assaultWindow||null,gapWatched:!!this.gapWatched,returnMeetDone:!!this.returnMeetDone,handoverStarted:!!this.handoverStarted,roadProgress:this.r.tank.roadProgress||0,walks:[...this.walks].map(([id,w])=>({id,index:w.index,total:w.route.length})),stalls:this.stalls.slice(),evadeReturns:this.evadeReturns.slice()};}
 }
