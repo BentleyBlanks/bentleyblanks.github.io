@@ -895,6 +895,10 @@ POST /__tuning/save  { file: "Taierzhuang1938/Data_Tuning_AiCover.mjs", changes:
 `nav.Walkable`、地面高差 ≤ 1.2 m、`Blocked()`（AABB 空间散列）。
 守区余量小于 `displaceMinReachM`（2.2 m）的人**一步都不挪** —— 机枪战位（0.4 + 0.9 = 1.3 m）是战位，挪了就不是那挺机枪了。
 找不到落点也记一次 `displaceAt`，不然「四面都走不通」的人每拍都要把候选点重扫一遍。
+走剧本路线的人（`p012Guided + scriptMoveSpeedMps`）在 `fire` 里照样会生成换位命令，但 `Act` 让他走 `s.goal`（路线点）而不是换位落点；
+这时到位半径也跟着用路线的 `scriptArrivalRadius`，**不用换位命令的 `displaceArriveM`（0.6 m）**。以前沿用了 0.6 m，
+罗班长在阵位后门坡道停在 0.25 m 路线拐点前 0.58 m，等到换位超时（5 s）或 `FrontBattle.Walk` 的跳点兜底
+（2026-09-25 接力第二批 Front 包；`Script_FirstLevelFrontPacingTest` ⑨、`Script_FirstLevelRearDoorWalkTest`）。
 
 **③ 听觉惊动** —— 剧本旗短路里的 `ForgetAll` 换成 `WatchScripted`：走一次**空候选**的 `Sense`
 （不打射线、不建新条目），只让听来的记忆按真实时间衰减，`alert` / `lkp` 照常出账；
