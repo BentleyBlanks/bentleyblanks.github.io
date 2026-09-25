@@ -5982,7 +5982,7 @@
   {
    "id": "LugouIja02",
    "file": "Animation_LugouIja02OpeningStoryboards.json",
-   "sha256": "569ead16318eed0f67f2c73da1a24e77a886544336a64d3d09d605deec9ac5be",
+   "sha256": "73a21c446938b73895a4dce225f49abe732422a2bcdccad60401cde384cca0af",
    "originalModelSha256": "8c4860ec2d4dd3076b06ff7e593e5dcfd4d23aefe2fedf6f9fdec3b0e12cc9aa",
    "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningStoryboards_20260925\\Scene_LugouIja02OpeningStoryboards.blend",
    "contactPoints": {
@@ -7367,24 +7367,24 @@
      ],
      "kneePlants": [],
      "kneeSlideM": 0.0,
-     "lookErrorDeg": 0.74,
-     "headTurnDeg": 12.31
+     "lookErrorDeg": 0.28,
+     "headTurnDeg": 15.03
     },
     {
      "clip": "IjaButtStrikeCollar",
      "frames": 52,
-     "footSlideM": 0.0006,
+     "footSlideM": 0.0004,
      "contactErrorM": 0.0,
      "gripSolveErrorM": 0.0,
-     "pelvisMaxStepM": 0.0798,
+     "pelvisMaxStepM": 0.0335,
      "floorCorrectionMin": -0.00059,
      "floorCorrectionMax": 0.00031,
      "root": {
       "start": [
-       0.0399,
-       -0.0273,
+       0.019,
+       0.0051,
        -0.0,
-       0.188
+       0.2582
       ],
       "end": [
        0.0237,
@@ -7421,18 +7421,18 @@
     {
      "clip": "IjaDragByForearm",
      "frames": 64,
-     "footSlideM": 0.0034,
+     "footSlideM": 0.0033,
      "contactErrorM": 0.0,
      "gripSolveErrorM": 0.0,
      "pelvisMaxStepM": 0.0656,
-     "floorCorrectionMin": -0.00206,
-     "floorCorrectionMax": 0.0036,
+     "floorCorrectionMin": -0.00205,
+     "floorCorrectionMax": 0.0035,
      "root": {
       "start": [
        0.0237,
-       -0.0105,
+       -0.0106,
        -0.0,
-       0.2486
+       0.2485
       ],
       "end": [
        -0.0,
@@ -7507,8 +7507,8 @@
      ],
      "kneePlants": [],
      "kneeSlideM": 0.0,
-     "lookErrorDeg": 0.24,
-     "headTurnDeg": 16.04
+     "lookErrorDeg": 0.34,
+     "headTurnDeg": 24.93
     },
     {
      "clip": "IjaLookBackLow",

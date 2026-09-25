@@ -3124,7 +3124,7 @@ def Squat(T, depth=1.0):
     return f
 
 
-HOLD_EYE = (0, -.06, .20)          # Shunzi's eye from his front collar while he is held up (source m)
+HOLD_EYE = (0, -.14, .20)          # Shunzi's eye from his front collar while he is held up: the head pulls back (source m)
 
 
 def HoldCollarPath():
@@ -3832,10 +3832,13 @@ def DirChannel(keys):
 # (player `head`, ~0.40 m high) looking up ~30-38 deg: the face is up and toward it the whole clip.
 BUTT_STANCE = {'pelvis': (0, .06, .32), 'pelvisTilt': (.32, 0, 0), 'bend': .75}   # deep squat: the collar is in reach without the reach assist
 BUTT_LOW_HAND, BUTT_LOW_DIR = (-.45, -.30, .45), (-.10, .90, .40)     # low carry: fist at the knee, butt behind the hip
-BUTT_APEX_HAND, BUTT_APEX_DIR = (-.34, -.22, 1.16), (.25, .62, .74)   # fist over the right shoulder, butt up over his back
+# Apex (SB04): the fist out to his right at head height, the butt up over his head and the long fore-end down
+# past his right knee toward the camera -- from Shunzi's eye the fist is upper left, the rifle runs down-left out
+# of the frame and the butt stands over the helmet.
+BUTT_APEX_HAND, BUTT_APEX_DIR = (-.40, -.28, 1.08), (.30, .40, .87)
 BUTT_HIT_T = 33 / 24          # the butt on the head (a baked frame)
 BUTT_T = 51 / 24               # durations are whole frames: every key time above is then a baked frame
-BUTT_THETA = 185.0            # apex -> impact: the rifle turns over the top about his left axis
+BUTT_THETA = 170.0            # apex -> impact: the rifle turns over the top about his left axis
 
 
 def ButtCollarPaths():
@@ -3966,7 +3969,7 @@ def BuildButtStrikeCollar(T, name):
             'reviewFrames': lambda n: [0, 13, 24, 27, 30, 33, 42, n - 1]}
     spec = AReview(spec)
     # the storyboard camera: Shunzi's eye, pitched up 32 deg toward ijaA (SB04 30-38 deg), rolled -4 deg
-    spec['reviewViews'].append(FirstPersonView(head, lambda t: Add3(head(t), (-.05, .85, .53)), roll=-4.0))
+    spec['reviewViews'].append(FirstPersonView(head, lambda t: Add3(head(t), (-.10, .91, .41)), roll=-4.0))
     return spec
 
 
@@ -3986,7 +3989,7 @@ def DragPaths():
     pull = lambda t: Smooth((t - .40) / .45)
     forearm = lambda t: tuple(f0 + Vector((0, DRAG_DIST(t), .12 * pull(t))))
     collar = lambda t: tuple(c0 + Vector((0, DRAG_DIST(t) - .08 * pull(t), -.03 * pull(t))))
-    eye = lambda t: tuple(Vector(collar(t)) + e0.lerp(Vector((0, -.32, .03)), pull(t)))
+    eye = lambda t: tuple(Vector(collar(t)) + e0.lerp(Vector((0, -.24, .05)), pull(t)))
     return forearm, collar, eye
 
 
@@ -4024,8 +4027,8 @@ def BuildDragByForearm(T, name):
     base = dict(start)
     base['handRel.L'] = (.10, -.42, -.18)            # the free fist between the collar and the forearm
     body = Tracks(base, dict(feet, pelvis=pelvis,
-                             bend=[(0.0, start['bend']), (.40, .78), (2.40, .78), (DRAG_T, .74)],
-                             pelvisTilt=[(0.0, start['pelvisTilt']), (.40, (.34, 0, 0)), (DRAG_T, (.34, 0, 0))],
+                             bend=[(0.0, start['bend']), (.40, .90), (2.40, .90), (DRAG_T, .86)],
+                             pelvisTilt=[(0.0, start['pelvisTilt']), (.40, (.36, 0, 0)), (DRAG_T, (.36, 0, 0))],
                              twist=[(0.0, 0.0), (.40, .10), (2.40, .10), (DRAG_T, .06)],
                              shrug=[(0.0, 0.0), (.40, .12), (DRAG_T, .10)]))
     grips = {'L': [(0.0, .05, collar, COLLAR_NORMAL, (0, 0, -1), 1.1),
@@ -4162,7 +4165,7 @@ def BuildStartleTurn(T, name):
     end = StartleEnd(T)
     held = HoldCollarPath()(.80)
     collar = Channel([(0.0, held), (.10, held), (.45, Add3(held, (0, -.02, -.12))), (STARTLE_T, Add3(held, (0, -.02, -.12)))])
-    eyeFrom = Channel([(0.0, HOLD_EYE), (.10, HOLD_EYE), (.45, (0, -.07, .17)), (STARTLE_T, (0, -.07, .17))])
+    eyeFrom = Channel([(0.0, HOLD_EYE), (.10, HOLD_EYE), (.45, (0, -.15, .14)), (STARTLE_T, (0, -.15, .14))])
     head = lambda t: tuple(Vector(collar(t)) + Vector(eyeFrom(t)))
     keys = lambda k: [(0.0, hold[k]), (.30, end[k]), (STARTLE_T, end[k])]
     body = Tracks(hold, {
