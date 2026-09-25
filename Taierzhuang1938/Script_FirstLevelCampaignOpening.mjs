@@ -457,6 +457,11 @@ export async function InstallSpeakerActing(page){
           steer:r.frontScenes?.steer?.who??null,glance:window.Tengxian.speakerGlance?.saved?1:0});
         if(trace.length>2400)trace.shift();
       }
+      // Is the player fighting this game frame (the drive's busy test, InstallSpeakerGlance)? Counted here, every frame,
+      // not in the glance: the glance runs on single-frame steps only, and the frames of multi-frame steps (F held 90
+      // frames to mount the captured gun, a 35-frame burst on it) sat in a line's frames but never in its busy frames
+      // (09-26 relay r2 Front step 3: FrontAttack.01 busy 93/234 on a drive that spent the line mounting the gun).
+      const busyNow=!!window.Tengxian.speakerGlance?.Tick?.();
       for(const handle of r.voice?.dialogue?.handles||[]){
         if(handle.paused)continue;
         for(const l of handle.lines){
@@ -469,7 +474,7 @@ export async function InstallSpeakerActing(page){
             start:{player:[+p.x.toFixed(2),+p.z.toFixed(2)],yaw:+window.Tengxian.player.yaw.toFixed(2),
               speaker:soldier?[+soldier.position.x.toFixed(2),+soldier.position.z.toFixed(2)]:null,
               distM:soldier?+Math.hypot(soldier.position.x-p.x,soldier.position.z-p.z).toFixed(1):null}};
-          row.frames++;
+          row.frames++;if(busyNow)row.busyFrames=(row.busyFrames||0)+1;
           if(!soldier)continue;row.bodyFrames++;
           if(!soldier.actor?.poseVisible||!rig?.bones?.head)continue;
           row.visibleFrames++;
@@ -560,6 +565,22 @@ async function InstallSpeakerGlance(page){
     window.frontLineShots??={};
     document.addEventListener("mousedown",e=>{if(e.button===2)glance.aiming=true;});
     document.addEventListener("mouseup",e=>{if(e.button===2)glance.aiming=false;});
+    // The player is fighting: on a gun, in melee, dodging, an enemy at arm's length (09-25 drive: FrontFlankA's bayonet
+    // from 2 m behind the nest's east wall, four stabs; a player in that spot looks for the knife, not for who is
+    // talking), hit in the last 120 game frames, or aiming (the drive holds the right button down on every shot,
+    // MissionInputDriver.Shoot). Nobody is glanced at then; the frames count as fighting frames of the lines playing.
+    glance.Busy=function(){
+      const p=g.player,drive=window.MissionInputDriver;
+      const close=g.ai.soldiers.some(s=>s.side==="ija"&&s.alive&&Math.hypot(s.position.x-p.position.x,s.position.z-p.position.z)<6);
+      return !!(g.emplacement?.View?.()||g.meleeCombat?.Active||drive?.evading||close||glance.frame-(glance.hurtFrame??-1e9)<120||glance.aiming);
+    };
+    // Once per game frame (the speaker sampler calls it from the binder's Update): keeps the hit clock, answers Busy.
+    glance.Tick=function(){
+      const p=g.player;glance.frame=(glance.frame||0)+1;
+      if(p.health<(glance.health??p.health)-.5)glance.hurtFrame=glance.frame;
+      glance.health=p.health;
+      return glance.Busy();
+    };
     g.StepFrames=function(frames){
       if(frames===1)try{Glance();}catch(error){glance.error=String(error);}
       const result=step.apply(this,arguments);
@@ -587,20 +608,8 @@ async function InstallSpeakerGlance(page){
         const seen=window.frontLineActing?.[l.line.id];if(seen&&(seen.actedSeen||0)>=enough&&seen.turn>.05)continue;
         if(at.distanceTo(eye)<=near){head=at;lineId=l.line.id;}
       }
-      const drive=window.MissionInputDriver;
-      // Nor while an enemy is at arm's length or the player was just hit (09-25 drive: FrontFlankA's bayonet from 2 m
-      // behind the nest's east wall, four stabs; a player in that spot looks for the knife, not for who is talking).
-      glance.frame=(glance.frame||0)+1;
-      if(p.health<(glance.health??p.health)-.5)glance.hurtFrame=glance.frame;
-      glance.health=p.health;
-      const close=g.ai.soldiers.some(s=>s.side==="ija"&&s.alive&&Math.hypot(s.position.x-p.position.x,s.position.z-p.position.z)<6);
-      // The drive is aiming (it holds the right button down on every shot, MissionInputDriver.Shoot).
-      const busy=g.emplacement?.View?.()||g.meleeCombat?.Active||drive?.evading||close||glance.frame-(glance.hurtFrame??-1e9)<120
-        ||glance.aiming;
-      // Frames of each near line the player spent fighting (FRONT_LINES_IN_FIREFIGHT is checked against them).
-      if(busy)for(const h of r.voice.dialogue.handles)for(const l of h.lines)
-        if(l.state==="playing"&&window.frontLineActing?.[l.line.id])window.frontLineActing[l.line.id].busyFrames=(window.frontLineActing[l.line.id].busyFrames||0)+1;
-      if(busy){glance.active=false;glance.saved=null;glance.last=null;return;}
+      // Not while the player fights (glance.Busy; the fighting frames of each line are counted by the sampler).
+      if(glance.Busy()){glance.active=false;glance.saved=null;glance.last=null;return;}
       let yaw,pitch;
       if(head){
         if(!glance.active){glance.active=true;glance.saved??={yaw:p.yaw,pitch:p.pitch};}
