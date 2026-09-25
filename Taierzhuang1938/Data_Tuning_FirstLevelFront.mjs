@@ -321,6 +321,11 @@ export const FRONT_BATTLE_TUNING=Object.freeze({
   // How long a line may wait for its speaker (s): the longest step (speakerStepMaxM at speakerStepSpeedMps) is 1.1 s,
   // plus about 0.5 s to start and stop. Chosen by this package, not tuned by feel yet; a longer wait makes an order late.
   speakerViewHoldS:1.6,
+  // ... and a line waits at most speakerDangerHoldS (s) while a live Japanese grenade has the player inside its blast
+  // (the HUD's warning): a whole fuse (Type 91: 4.2 s) and the dodge from it, after which the wait for the speaker's face
+  // starts. Said at once, FrontWithdraw.01 went by while the player ran from a grenade, Luo never in the picture
+  // (09-25 relay r2 Gate drive ABfix_1a; Front step 3 addendum B).
+  speakerDangerHoldS:4.5,
   // "In the picture" for the hold: the head projects inside this share of the frame (NDC), not just onto its edge.
   // The acceptance sample (CheckFrontActing) counts 0.95; the hold asks for more so the head is not cut by the border.
   speakerViewNdc:.8,

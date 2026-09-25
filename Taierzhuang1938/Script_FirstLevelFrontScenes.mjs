@@ -274,6 +274,22 @@ export class FirstLevelFrontScenes {
     if (!line || line.who === "shunzi" || line.direction?.spatial === "self") return false;
     let hold = this.holds.get(line.id);
     if (hold?.released) return false;
+    // A live Japanese grenade at the player's feet comes first: the line waits (at most B.speakerDangerHoldS) while he
+    // gets clear of it, and the wait for the speaker's face below starts only then. Said during the dodge it was lost:
+    // FrontWithdraw.01 started 0.9 s after the capture while the player ran from a grenade, 0 frames of Luo in the
+    // picture (09-25 relay r2 Gate drive ABfix_1a; Front step 3 addendum B).
+    if (this.PlayerInDanger()) {
+      if (!hold) {
+        hold = { since: now, released: null, heldS: 0, stepped: false, who: line.who, sceneId };
+        this.holds.set(line.id, hold);
+        if (this.holds.size > 64) this.holds.delete(this.holds.keys().next().value);
+      }
+      hold.dangerSince ??= now;
+      if (now - hold.dangerSince < B.speakerDangerHoldS) return true;
+    } else if (hold?.dangerSince != null && hold.dangerS == null) {
+      hold.dangerS = +(now - hold.dangerSince).toFixed(2);
+      hold.since = now;
+    }
     const body = this.Body(line.who), view = body && this.SpeakerView(body);
     const Release = (why) => {
       if (hold) { hold.released = why; hold.heldS = +(now - hold.since).toFixed(2); }
@@ -310,6 +326,11 @@ export class FirstLevelFrontScenes {
       hold.stepped = true;
     }
     return true;
+  }
+  /** A live enemy grenade has the player inside its blast (Script_Combat.GrenadeThreats, the HUD's own warning). */
+  PlayerInDanger() {
+    const r = this.r, threats = r.player?.position && r.combat?.GrenadeThreats?.(r.player.position);
+    return !!threats && threats.some((t) => t.owner !== "player");
   }
   /**
    * Every frame a front line plays: a speaker who has come nearer than B.speakerViewMinM since his line began (the

@@ -645,6 +645,24 @@ function WalkRuntime(extra = {}) {
   scenes.handle.lines[0].state = "done"; scenes.Steer(); scenes.handle = null;
   assert.ok(SegmentDistance({ x: 0, z: 0 }, { x: -1, z: 1 }, { x: 1, z: 1 }) === 1 && SegmentDistance({ x: 0, z: 0 }, { x: 2, z: 0 }, { x: 3, z: 0 }) === 2,
     "segment distance");
+  // A live Japanese grenade has the player in its blast (the HUD's warning): the line waits while he gets clear, at
+  // most speakerDangerHoldS, and the wait for the speaker's face starts only then (relay r2 Front step 3 addendum B:
+  // FrontWithdraw.01 went by while the player ran from a grenade, 0 frames of Luo in the picture).
+  let threats = [{ owner: "ija", fuse: 3 }];
+  r.combat = { GrenadeThreats: () => threats };
+  r.time = 70; luo.position = { x: 0, y: 0, z: -3 }; r.player.velocity = { x: 3, y: 0, z: 0 };
+  assert.equal(scenes.HoldLine(line("FrontWithdraw.02", "luo"), "FrontWithdraw"), true, "a grenade at his feet: the line waits, even with Luo in view");
+  r.time = 72;
+  assert.equal(scenes.HoldLine(line("FrontWithdraw.02", "luo"), "FrontWithdraw"), true, "2 s on, still inside the blast: still waiting");
+  threats = [{ owner: "player", fuse: 2 }];
+  r.player.velocity = { x: 0, y: 0, z: 0 };
+  assert.equal(scenes.HoldLine(line("FrontWithdraw.02", "luo"), "FrontWithdraw"), false, "clear of it (his own grenade does not count): Luo in view, the line starts");
+  assert.ok(scenes.holds.get("FrontWithdraw.02").dangerS === 2 && scenes.holds.get("FrontWithdraw.02").released === "inView", "the hold records the 2 s dodge");
+  threats = [{ owner: "ija", fuse: 4 }]; r.time = 80;
+  assert.equal(scenes.HoldLine(line("FrontWithdraw.03", "luo"), "FrontWithdraw"), true, "another grenade: the next line waits");
+  r.time = 80 + B.speakerDangerHoldS + 0.01;
+  assert.equal(scenes.HoldLine(line("FrontWithdraw.03", "luo"), "FrontWithdraw"), false, "never clear of it: after speakerDangerHoldS the line plays anyway");
+  threats = []; delete r.combat;
   r.camera = null;
   assert.equal(scenes.HoldLine(line("TakeOverGun.02", "luo"), "TakeOverGun"), false, "no camera (Node runs): nothing is held");
 
@@ -676,8 +694,8 @@ function WalkRuntime(extra = {}) {
     if (Dist(p, S.house) > S.supplierRangeM) continue;
     assert.ok(SegmentDistance(S.leaderDoorSide, p, S.keeper) > 1, `Luo's door-side stop is off the sight line to the keeper from (${p.x.toFixed(1)}, ${p.z.toFixed(1)})`);
   }
-  checks += 58;
-  Ok("⑧ near speaker out of the picture: line held <= speakerViewHoldS, he steps into view; one too near steps back; far shouts and Node runs unaffected");
+  checks += 64;
+  Ok("⑧ near speaker out of the picture: line held <= speakerViewHoldS, he steps into view; one too near steps back; far shouts and Node runs unaffected; a grenade at the player's feet holds a line <= speakerDangerHoldS");
 }
 
 {
