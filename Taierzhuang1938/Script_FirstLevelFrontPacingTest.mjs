@@ -12,6 +12,10 @@
 //   ⑦ 卡住兜底（2026-09-24 审查的两次冷启动卡死）：走路卡在一个中间点不动 → 跳点；接防班长期卡住、有人阵亡
 //      也照样记 reliefInPosition；罗班长被枪座挡住 → 玩家在后墙岔口等够 rearLeaderGraceS 照样 rightRearReached；
 //      受保护的待撤守军身边不落手榴弹（任务侧投弹否决）
+//   ⑧ 09-25 分镜还原（docs/Data_FirstLevelStoryboard0103Contract.md §2.11–12，SB07/SB08）：罗班长 03 领路保持在玩家前
+//      3–5 m（落后就跑、超前就等、拐角停下指路）；「贴这道墙！前头有人！」在玩家约 (5,−143) 触发；背坡机枪组是第二批里的
+//      两名守军（03 趴在坡上只打授权点、04 下到浅壕集合）；第一批 5 人成一列过缺口（间距 firstColumnSpacingM 1.6 m）；
+//      指路那 2.8 s 罗站着慢走、只放下枪（不清目标）；SB08 视线锥里不摆尸体
 //
 // 跑法：node Taierzhuang1938/Script_FirstLevelFrontPacingTest.mjs
 // ===========================================================================
@@ -19,7 +23,10 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { FirstLevelFrontBattle, ColumnDeparture, BatchPastGap, SplitRoute, GuardClearOfGap } from "./Script_FirstLevelFrontBattle.mjs";
+import { FirstLevelFrontBattle, ColumnDeparture, BatchPastGap, SplitRoute, GuardClearOfGap, GuardWithdrawalRoute, FrontGuardMgMember, LeadPace, LeadCorner, LastCoverIndex } from "./Script_FirstLevelFrontBattle.mjs";
+import { FRONT_GUARD_MG_GROUP, FRONT_GUARD_POSTS, MISSION_AFTERMATH, FRONT_SB08_SIGHTLINE, InFrontSb08Sightline } from "./Data_FirstLevelMissionFront.mjs";
+import { FACED_FRONT_GUARD_INDEX } from "./Data_FirstLevelSpeakingCast.mjs";
+import { RouteClearance } from "./Script_FirstLevelSpaceProbe.mjs";
 import { FirstLevelFrontScenes, FRONT_SCENE_IDS, FrontSceneSpeakers } from "./Script_FirstLevelFrontScenes.mjs";
 import { FRONT_SORTIE as S, FRONT_SPACE as Space, FRONT_TANK_PATH } from "./Data_FirstLevelFrontRoute.mjs";
 import { FRONT_BATTLE_TUNING as B } from "./Data_Tuning_FirstLevelFront.mjs";
@@ -103,7 +110,7 @@ const Ok = (label) => console.log(`ok ${label}`);
   const player = { position: { ...S.attackRoute[3] } };
   const luo = { id: 1, alive: true, position: { ...S.attackRoute[2] } };
   const guardRoute = (i) => P.guardWithdrawalRoutes[i];
-  const guards = Array.from({ length: 8 }, (_, i) => ({ actor: { id: 100 + i, alive: true }, route: guardRoute(i), progress: i < 2 ? guardRoute(i).length : 1, safe: i < 2 }));
+  const guards = Array.from({ length: 8 }, (_, i) => ({ actor: { id: 100 + i, alive: true }, route: guardRoute(i), progress: i < B.firstBatch ? guardRoute(i).length : 1, safe: i < B.firstBatch }));
   const r = { time: 0, tank: { brain: {}, fireDisabled: true, immobilized: true }, player, guards, squadRoutes: new Map(),
     flow: { stage: { id: "Tank" } }, voice: { played: new Set(), finished: new Set() },
     companion: { Handle: (who) => (who === "luo" ? luo : null) },
@@ -123,8 +130,8 @@ const Ok = (label) => console.log(`ok ${label}`);
   assert.ok(Dist(watch.at(-1), Space.westDoor) < 0.3, "the gap-watch leg ends at the west door (K10)");
   assert.ok(!facts.has("lastGuardsWithdrawn"), "the last batch is not home yet (the stage cannot pass on the pair's return alone)");
   // The last batch crosses: every live man past the gap point on his route.
-  for (const g of guards.slice(2)) g.progress = g.route.findIndex((p) => Dist(p, S.gap) < 0.01) + 1;
-  assert.ok(BatchPastGap(guards.slice(2)), "BatchPastGap reads the guards' route progress");
+  for (const g of guards.slice(B.firstBatch)) g.progress = g.route.findIndex((p) => Dist(p, S.gap) < 0.01) + 1;
+  assert.ok(BatchPastGap(guards.slice(B.firstBatch)), "BatchPastGap reads the guards' route progress");
   battle.UpdateSortie();
   assert.equal(battle.leg, "disengage", "once the batch is past the gap the pair goes on toward the safe zone");
   const toMeet = battle.walks.get(luo.id).route;
@@ -505,6 +512,208 @@ function WalkRuntime(extra = {}) {
   const seat = S.seat, lastF = { x: 16.8, z: -166.57 }, lastFlankA = { x: 39.2, z: -162.2 };
   for (const line of [lastF, lastFlankA]) assert.ok(Dist(line, seat) - B.capturedGunKeepOutM >= 2, "a last line leaves room for a >= 2 m contact circle");
   checks += 4;
+}
+
+// ---------------------------------------------------------------------------
+// ⑧ 09-25 storyboard round: SB07 lead / trigger / backslope LMG pair, SB08 first-batch column
+// ---------------------------------------------------------------------------
+{
+  // Budget (contract §6): the batches split the same eight men; the pair is two of the second batch, not extra men.
+  assert.equal(R.guardCount, 8, "eight withdrawing guards, as before");
+  assert.equal(B.firstBatch, 5, "SB08: the first batch is five men");
+  const mg = FRONT_GUARD_MG_GROUP.members;
+  assert.deepEqual(mg.map((m) => m.role), ["gunner", "assistant"]);
+  for (const m of mg) assert.ok(m.guard >= B.firstBatch && m.guard < R.guardCount, "the LMG pair are second-batch guards");
+  assert.ok(FACED_FRONT_GUARD_INDEX >= B.firstBatch && !FrontGuardMgMember(FACED_FRONT_GUARD_INDEX), "the faced guard is the second batch's first man, not one of the pair");
+  // Every withdrawal route passes the last cover (the pair's route is spliced there, the column is measured from it);
+  // a route without it throws instead of falling back (09-25 review).
+  assert.throws(() => LastCoverIndex([{ x: 0, z: 0 }, { x: 1, z: 0 }], "probe route"), /lastCover/, "a route without the last cover is a data error");
+  for (let i = 0; i < R.guardCount; i++) assert.ok(LastCoverIndex(P.guardWithdrawalRoutes[i]) >= 1, "guard " + i + "'s Layout route passes the last cover");
+  checks += 2;
+  for (let i = 0; i < R.guardCount; i++) {
+    const { route, gatherIndex, mg: member } = GuardWithdrawalRoute(i), base = P.guardWithdrawalRoutes[i];
+    const tail = (r) => r.slice(r.findIndex((p) => Dist(p, S.lastCover) < 0.01)).map((p) => [p.x, p.z]);
+    assert.deepEqual(tail(route), tail(base), "guard " + i + " withdraws along his Layout route from the last cover on");
+    if (!member) { assert.equal(route, base); assert.equal(gatherIndex, 1); continue; }
+    assert.deepEqual(route[0], { x: member.x, z: member.z }, "the pair starts on its backslope spot");
+    assert.equal(gatherIndex, FRONT_GUARD_MG_GROUP.exit.length);
+    assert.ok(Dist(route[gatherIndex], { x: -6.3, z: -156.8 }) < 0.01, "... and gathers where the east posts do (behind the last-cover sandbags)");
+    assert.ok(Dist(FRONT_GUARD_POSTS[i], route[0]) > 20, "the pair is not on its scrape post");
+    const exit = RouteClearance(route.slice(0, gatherIndex + 2));
+    assert.ok(!exit.hits.length && !exit.slopes.length, "the pair's way down into the scrape clears every block and slope: " + JSON.stringify(exit));
+  }
+  // The pair is on the upper backslope (only z <= -158.8 shows over the right low trench's lip) and its casualty is a body.
+  for (const m of mg) assert.ok(m.z <= -158.8 && m.z > -160, m.role + " on the upper backslope, behind the crest");
+  const wounded = MISSION_AFTERMATH.find((b) => b.id === "AftermathMgWounded");
+  assert.ok(wounded && wounded.side === "nra" && wounded.blood >= 1.3, "the bloodied casualty lies beside them (battlefield body)");
+  for (const b of MISSION_AFTERMATH) if (b !== wounded) for (const p of [...mg, FRONT_GUARD_MG_GROUP.wounded])
+    assert.ok(Dist(b, p) >= FRONT_GUARD_MG_GROUP.bodyClearanceM, "no battlefield body under the pair: " + b.id);
+  for (const p of FRONT_GUARD_MG_GROUP.fire) {
+    const d = Dist(p, mg[0]), bearing = Math.atan2(p.x - mg[0].x, -(p.z - mg[0].z));
+    assert.ok(d >= 8 && d <= 150 && Math.abs(bearing) <= 1.1, "fire point " + p.id + " in range and in front of the gunner");
+    assert.ok(p.z < -160.3, "fire points are north of the crest (the enemy side)");
+  }
+  checks += 8 + R.guardCount * 2;
+  Ok("⑧a batches 5+3, the LMG pair is two second-batch guards on the upper backslope, its casualty a body");
+}
+{
+  // SB07 trigger: FrontApproach fires with the player at about (5,-143) walking in from the west (contract §2.11, ±0.6 m).
+  const at = S.approach[B.frontApproachCallIndex], from = S.approach[B.frontApproachCallIndex - 1];
+  let hit = null;
+  for (let t = 0; t <= 1; t += 0.001) { const p = { x: from.x + (at.x - from.x) * t, z: from.z + (at.z - from.z) * t }; if (Dist(p, at) < B.frontApproachCallRadiusM) { hit = p; break; } }
+  assert.ok(hit && Dist(hit, { x: 5, z: -143 }) <= 0.6, "FrontApproach fires near (5,-143): " + JSON.stringify(hit));
+  // Lead pace: runs below catchUpM (faster than the player's sprint), keeps running to minM, walks, waits past maxM.
+  const L = B.leaderLead, route = [{ x: 0, z: 0 }, { x: 20, z: 0 }, { x: 40, z: 0 }], st = {};
+  assert.ok(L.runMps > 3.05 * 1.72, "Luo's run outpaces a sprinting player (5.25 m/s)");
+  const Pace = (lx, px) => LeadPace(route, 1, { x: lx, z: 0 }, { x: px, z: 0 }, st);
+  let p = Pace(11, 10); assert.ok(p.speed === L.runMps && !p.wait, "player within catchUpM: he runs");
+  p = Pace(12.5, 10); assert.equal(p.speed, L.runMps, "... and keeps running until minM");
+  p = Pace(13.2, 10); assert.ok(p.speed === R.squadSpeedMps && !p.wait, "3-5 m ahead: he walks");
+  p = Pace(15.6, 10); assert.ok(p.wait, "more than maxM ahead: he waits");
+  p = Pace(5, 10); assert.equal(p.speed, L.runMps, "behind the player: he runs to get in front");
+  // Corner: a turn > cornerTurnDeg just passed -> hold and point along the next leg until the player is within minM.
+  const bend = [{ x: 0, z: 0 }, { x: 10, z: 0 }, { x: 10, z: -10 }];
+  assert.deepEqual(LeadCorner(bend, 2, { x: 10.2, z: -0.3 }), { x: 10, z: -10 }, "at a right-angle corner he points down the next leg");
+  assert.equal(LeadCorner(route, 2, { x: 20, z: 0 }), null, "a straight run is no corner");
+  const cs = {};
+  let c = LeadPace(bend, 2, { x: 10, z: -0.2 }, { x: 6, z: 0 }, cs); assert.ok(c.wait && c.corner, "player 4 m back: he holds at the corner");
+  c = LeadPace(bend, 2, { x: 10, z: -0.2 }, { x: 8, z: 0 }, cs); assert.ok(!c.wait, "player within minM: he goes on");
+  // Pointing holds his aim and trigger for pointS (an aiming brain drops the upper-body clip: 09-25 SB07 shot) and
+  // nothing else: target, tactical state and the scene flag stay as they were (09-25 review: scriptedNoncombatant
+  // cleared his target and cover every frame and changed 03's outcome).
+  assert.equal(L.pointHoldsFire, true, "Luo holds fire while he points");
+  { const q = new FirstLevelFrontBattle({}), foe = { id: 9 }, man = { scriptedNoncombatant: false, target: foe, state: "fire", aimBlend: 1, coolUntil: -99 };
+    q.PointQuiet(man, true, 10);
+    assert.ok(man.aimBlend === 0 && man.coolUntil >= 10.1, "pointing: the rifle goes down and the trigger is held");
+    assert.ok(man.scriptedNoncombatant === false && man.target === foe && man.state === "fire", "... and he keeps his target and his place in the fight");
+    man.coolUntil = 30; q.PointQuiet(man, true, 11); assert.equal(man.coolUntil, 30, "a longer cool-down he already had is kept");
+    q.PointQuiet(man, false); assert.equal(q.pointQuiet, null, "... the hold ends with the pointing");
+    const held = { scriptedNoncombatant: true, aimBlend: 0 }; q.PointQuiet(held, true, 0); q.PointQuiet(held, false);
+    assert.equal(held.scriptedNoncombatant, true, "a man already held by the scene stays held"); }
+  // The Walk option drives MoveActor with that pace, and only in the lead stretch (before approach[endApproachIndex]).
+  const moves = [], r = { time: 0, squadRoutes: new Map(), player: { position: { x: 0, z: -141.6 } }, guards: [], flow: { stage: { id: "Support" } },
+    Has: () => false, Record() {}, Near: () => false, Say() {}, RespondToGrenade: () => false, Defend() {},
+    MoveActor: (a, pt, speed) => moves.push(speed), ai: { ReleaseCover() {}, SetStance: (a, s) => stances.push(s), time: 0 }, leaderGuide: { Watch() {} } };
+  const stances = [];
+  const battle = new FirstLevelFrontBattle(r), luo = { id: 1, alive: true, position: { x: -3, z: -141.2 }, scriptArrivalRadius: 1 };
+  battle.SetWalk(luo, S.approach.slice(7));
+  battle.Walk(luo, { follow: true, lead: true }); assert.equal(moves.at(-1), L.runMps, "Luo behind the player at 03 runs past him");
+  assert.equal(stances.at(-1), 1, "... crouched behind a crouched player (0.6 x runMps = 3.6 m/s beats the crouched 1.62)");
+  r.player.stance = "stand"; battle.Walk(luo, { follow: true, lead: true });
+  assert.equal(stances.at(-1), 0, "... upright behind a standing player (a crouched run would lose to his 5.25 m/s sprint)");
+  r.player.stance = "crouch";
+  luo.position = { x: 4, z: -142.1 }; battle.Walk(luo, { follow: true, lead: true }); assert.equal(moves.at(-1), R.squadSpeedMps, "4 m ahead: walks");
+  luo.position = { x: 6.2, z: -142.9 }; battle.Walk(luo, { follow: true, lead: true }); assert.equal(moves.at(-1), 0, "6.4 m ahead: waits for the player");
+  // SB07: through the FrontApproach pointing he walks on upright and slowly (legs keep walking, contract §5), and only
+  // stops pointExtraM beyond maxM (09-25 review: the shot caught him squatting still at 5.01 m).
+  battle.approachPointAt = 0; r.time = 0.5;
+  luo.position = { x: 5.4, z: -142.6 }; battle.Walk(luo, { follow: true, lead: true });
+  assert.ok(battle.lead.gap > L.maxM && battle.lead.gap < L.maxM + L.pointExtraM, "probe: just past maxM ahead " + battle.lead.gap);
+  assert.ok(moves.at(-1) === L.pointWalkMps && stances.at(-1) === 0, "pointing just past maxM: he walks on, upright, at pointWalkMps");
+  luo.position = { x: 4, z: -142.1 }; battle.Walk(luo, { follow: true, lead: true });
+  assert.ok(moves.at(-1) === L.pointWalkMps && stances.at(-1) === 0, "pointing 4 m ahead: the same slow upright walk");
+  luo.position = { x: 7.4, z: -143.4 }; battle.Walk(luo, { follow: true, lead: true });
+  assert.equal(moves.at(-1), 0, "pointing, more than maxM + pointExtraM ahead: he stops");
+  r.time = L.pointS + 0.1; luo.position = { x: 5.4, z: -142.6 }; battle.Walk(luo, { follow: true, lead: true });
+  assert.ok(moves.at(-1) === 0 && stances.at(-1) === 1, "after pointS the lead rule is back (waits past maxM, crouched)");
+  // A grenade dive: no stale lead or pointing (09-25 review: the corner he had reached kept pointing him through the dodge).
+  r.time = 0.5; r.RespondToGrenade = () => true; battle.Walk(luo, { follow: true, lead: true });
+  assert.ok(battle.lead === null && battle.leaderDodging === true, "diving from a grenade: not leading");
+  r.RespondToGrenade = () => false; battle.approachPointAt = null; r.time = 0;
+  // 5.8 m ahead but 6 m away: the lead rule would hold him, the old one (wait only beyond leaderWaitM) lets him walk.
+  luo.position = { x: 21, z: -148.5 }; r.player.position = { x: 16, z: -146 };
+  battle.walks.get(luo.id).index = 5; battle.Walk(luo, { follow: true, lead: true });
+  assert.ok(battle.lead === null && moves.at(-1) === R.squadSpeedMps, "past the last bend before the west door the old follow rule is back");
+  checks += 25;
+  Ok("⑧b SB07: FrontApproach at (5,-143), Luo keeps 3-5 m ahead (runs, walks, waits, holds at corners, walks upright while he points)");
+}
+{
+  // Backslope LMG pair: on the slope in 03 (ambient fire only), down the exit points into the scrape and the gather at 04.
+  const facts = new Map(), moves = [], stances = [];
+  const Actor = (i, p) => ({ id: 100 + i, missionId: "Guard" + i, alive: true, position: { ...p }, stance: 2, goal: { set() {} } });
+  const guards = Array.from({ length: R.guardCount }, (_, i) => { const w = GuardWithdrawalRoute(i); return { actor: Actor(i, w.route[0]), progress: 0, safe: false, route: w.route, gatherIndex: w.gatherIndex, mg: w.mg }; });
+  const r = { time: 0, guards, flow: { stage: { id: "Support" } }, player: { position: { x: 0, z: -141.6 } },
+    Has: (id) => facts.has(id), Record: (id, d) => { if (!facts.has(id)) facts.set(id, d ?? true); }, Near: () => false,
+    Defend: (a) => { a.scriptedNoncombatant = false; a.defended = true; }, MoveActor: (a, pt, speed) => moves.push({ id: a.id, x: pt.x, z: pt.z, speed }),
+    ai: { time: 0, SetStance: (a, s) => stances.push({ id: a.id, s }) }, OnPlayerDown() {}, MissionFailure() {} };
+  const battle = new FirstLevelFrontBattle(r);
+  battle.InfantryBlockade = () => false; battle.TankBlockade = () => false;
+  battle.UpdateGuards(1 / 60);
+  const [gunner, assistant] = FRONT_GUARD_MG_GROUP.members.map((m) => guards[m.guard]);
+  assert.ok(gunner.actor.scriptedNoncombatant && assistant.actor.scriptedNoncombatant, "03: the pair are scripted non-combatants (no real target, no hit)");
+  assert.equal(gunner.actor.ambientFirePoints, FRONT_GUARD_MG_GROUP.fire, "the gunner fires at the authorised points only");
+  assert.equal(assistant.actor.ambientFirePoints, null, "the assistant does not fire");
+  assert.ok(!gunner.actor.defended && gunner.actor.missionUntargetable, "never handed to Defend (that clears the scripted flag); protected like every waiting guard");
+  assert.ok(gunner.actor.scriptDefensive === false, "not scriptDefensive: the script-defense RELOAD would never finish for a scripted man (one magazine, then silence)");
+  assert.ok(stances.some((e) => e.id === gunner.actor.id && e.s === 2), "prone");
+  // 04: they leave the slope, walk the exit points, then gather at the last cover with the second batch.
+  r.flow.stage.id = "MachineGun"; moves.length = 0;
+  battle.UpdateGuards(1 / 60);
+  assert.equal(gunner.actor.ambientFirePoints, null, "04: no more ambient fire");
+  assert.ok(moves.some((m) => m.id === gunner.actor.id && Dist(m, FRONT_GUARD_MG_GROUP.exit[0]) < 0.01), "04: down the first exit point");
+  for (let step = 0; step < 12 && !facts.has("remainingGuardsGathered"); step++) {
+    moves.length = 0; battle.UpdateGuards(1 / 60);
+    for (const m of moves) { const g = guards.find((e) => e.actor.id === m.id); if (m.speed > 0) g.actor.position = { x: m.x, z: m.z }; }
+  }
+  assert.ok(facts.has("remainingGuardsGathered"), "the second batch, the pair included, gathers at the last cover in 04");
+  assert.equal(gunner.progress, gunner.gatherIndex, "the pair holds at its gather index (the crossing starts from there)");
+  checks += 9;
+  Ok("⑧c backslope LMG pair: ambient fire on the slope in 03, exit and gather with the second batch in 04");
+}
+{
+  // SB08: the first batch crosses as one column, firstColumnSpacingM apart; a stuck man ahead is passed.
+  const facts = new Map([["rightNestCaptured", true], ["frontRifleDefense", true]]), moves = [];
+  const guards = Array.from({ length: R.guardCount }, (_, i) => { const w = GuardWithdrawalRoute(i);
+    return { actor: { id: 100 + i, alive: true, position: { ...w.route[0] }, stance: 1, goal: { set() {} } }, progress: 0, safe: false, route: w.route, gatherIndex: w.gatherIndex, mg: w.mg }; });
+  const r = { time: 0, guards, flow: { stage: { id: "Support" } }, player: { position: { x: 25.6, z: -155.2 } },
+    Has: (id) => facts.has(id), Record: (id, d) => { if (!facts.has(id)) facts.set(id, d ?? true); }, Near: () => false,
+    Defend() {}, MoveActor: (a, pt, speed) => moves.push({ id: a.id, speed }), ai: { time: 0, SetStance() {} }, OnPlayerDown() {}, MissionFailure() {} };
+  const battle = new FirstLevelFrontBattle(r);
+  battle.InfantryBlockade = () => false; battle.TankBlockade = () => false;
+  const Moving = () => new Set(moves.filter((m) => m.speed > 0).map((m) => m.id));
+  battle.UpdateGuards(1 / 60);
+  const order = battle.firstColumn, head = order[0], second = order[1];
+  assert.equal(order.length, B.firstBatch, "the column is the whole first batch");
+  assert.ok(battle.ColumnAlong(head) >= battle.ColumnAlong(order.at(-1)), "nearest the last cover goes first");
+  assert.deepEqual([...Moving()], [head.actor.id], "at release only the head of the column moves");
+  // Put a man s metres along his own route from the last cover (negative: back along it, before the last cover).
+  const Place = (g, s) => { const w = g.route, at = LastCoverIndex(w), dir = s < 0 ? -1 : 1; let left = Math.abs(s), i = at, p = { ...w[at] };
+    while (left > 0 && i + dir >= 0 && i + dir < w.length) { const n = w[i + dir], d = Dist(p, n); if (d >= left) { p = { x: p.x + (n.x - p.x) * left / d, z: p.z + (n.z - p.z) * left / d }; left = 0; } else { left -= d; p = { ...n }; i += dir; } }
+    g.actor.position = p; };
+  const secondAlong = battle.ColumnAlong(second);
+  // The head only firstColumnSpacingM - 0.8 ahead of the second man (both before the last cover): the second man waits.
+  // (09-25 review: the old placement clamped the head to the last cover, 3.2 m ahead, and this assertion never ran.)
+  r.time = 0.5; Place(head, secondAlong + B.firstColumnSpacingM - 0.8);
+  assert.ok(Math.abs(battle.ColumnAlong(head) - secondAlong - (B.firstColumnSpacingM - 0.8)) < 0.05, "probe: head placed under firstColumnSpacingM ahead");
+  moves.length = 0; battle.UpdateGuards(1 / 60);
+  assert.ok(!Moving().has(second.actor.id), "the man behind waits while the head is under firstColumnSpacingM ahead");
+  r.time = 1; Place(head, Math.max(0, secondAlong) + B.firstColumnSpacingM + 0.5);
+  moves.length = 0; battle.UpdateGuards(1 / 60);
+  assert.ok(Moving().has(second.actor.id), "firstColumnSpacingM ahead: the next man goes");
+  // A crossing man closer than firstColumnMinM to the one ahead pauses (speed 0) instead of bunching up.
+  Place(second, battle.ColumnAlong(head) - 0.5);
+  moves.length = 0; battle.UpdateGuards(1 / 60);
+  assert.ok(moves.some((m) => m.id === second.actor.id && m.speed === 0), "closer than firstColumnMinM: he pauses");
+  // The head stops moving for firstColumnStallS: the man behind passes him.
+  r.time += B.firstColumnStallS + 0.1; moves.length = 0; battle.UpdateGuards(1 / 60);
+  assert.ok(Moving().has(second.actor.id), "a stuck man ahead is passed after firstColumnStallS");
+  checks += 7;
+  Ok("⑧d SB08: the first batch crosses as one column, firstColumnSpacingM apart, a stuck man is passed");
+}
+{
+  // SB08 middle ground: no battlefield body in the sightline from the nest to the gap, short of the gap (09-25 review:
+  // 13 bodies of the held line's east end lay across the strip the column crosses). The dead at the gap stay.
+  const L = FRONT_SB08_SIGHTLINE;
+  assert.ok(Dist(L.to, S.gap) < 0.01, "the sightline ends at the gap");
+  assert.ok(Dist(L.from, { x: 25.6, z: -155.2 }) < 0.01, "... and starts north of the captured gun (contract §5 SB08)");
+  const inCone = MISSION_AFTERMATH.filter((b) => InFrontSb08Sightline(b));
+  assert.deepEqual(inCone.map((b) => b.id), [], "no body in the SB08 sightline");
+  assert.ok(InFrontSb08Sightline({ x: 6, z: -154.5 }) && !InFrontSb08Sightline({ x: -10.4, z: -152.8 }) && !InFrontSb08Sightline({ x: 9.3, z: -158.9 }),
+    "the cone covers the scrape's east end, not the dead at the gap or the LMG pair's casualty");
+  assert.ok(MISSION_AFTERMATH.filter((b) => b.id.startsWith("Aftermath14_")).length === 4, "the 4 dead north-west of the gap are still there");
+  assert.ok(MISSION_AFTERMATH.filter((b) => b.id.startsWith("Aftermath15_")).length >= 5, "the held line's east end keeps its dead outside the cone");
+  checks += 6;
+  Ok("⑧e SB08: the sightline from the nest to the gap is clear of battlefield bodies");
 }
 
 console.log(`FirstLevelFrontPacingTest 通过：${checks} 条断言`);

@@ -1,4 +1,4 @@
-import { FirstLevelFrontBattle, ColumnDeparture } from "./Script_FirstLevelFrontBattle.mjs";
+import { FirstLevelFrontBattle, ColumnDeparture, GuardWithdrawalRoute } from "./Script_FirstLevelFrontBattle.mjs";
 import { FirstLevelFrontScenes } from "./Script_FirstLevelFrontScenes.mjs";
 // 03–05 战车：纯规则大脑 + 接线层（战车包 2026-09-23）。开关 Data_Tuning_Tank.brainEnabled，关掉走下面旧的定时插值。
 import { FirstLevelTankRuntime } from "./Script_FirstLevelTankRuntime.mjs";
@@ -25,7 +25,7 @@ import { FirstLevelOpening, SamplePerceptionCurve } from "./Script_FirstLevelOpe
 import { OpeningLensDriver } from "./Script_OpeningLens.mjs";
 // 公开阶段 1–7 的演出（Front 玩法包）。运行时只留构造 / Enter / Update / Draw 四个薄钩子。
 import { FirstLevelFrontShow } from "./Script_FirstLevelFrontShow.mjs";
-import { FRONT_GUARD_POSTS, FRONT_SHELLS, FRONT_ASSAULT, FrontAssaultLane, FrontReserveLane } from "./Data_FirstLevelMissionFront.mjs";
+import { FRONT_SHELLS, FRONT_ASSAULT, FrontAssaultLane, FrontReserveLane } from "./Data_FirstLevelMissionFront.mjs";
 import {
   MISSION_STAGES,
   MISSION_TUNING as R,
@@ -1619,9 +1619,10 @@ export class FirstLevelMissionRuntime {
   SpawnGuards() {
     if(this.guards.length)return;
     for (let i = 0; i < R.guardCount; i++) {
-      const post=FRONT_GUARD_POSTS[i];
+      // The 03 backslope LMG pair (FRONT_GUARD_MG_GROUP) starts on its slope spot, everyone else on his scrape post.
+      const {route,gatherIndex,mg}=GuardWithdrawalRoute(i),post=route[0];
       const actor = this.ai.Spawn("nra", post.x, post.z, {
-        weapon: "HanYang",
+        weapon: mg?.weapon || "HanYang",
         squadId: "MissionWithdrawingGuard",
         // One guard carries the talking face; the rest stay pooled bodies of random appearance.
         ...(i === FACED_FRONT_GUARD_INDEX ? SpeakingCastOptions("guard") : {}),
@@ -1630,12 +1631,18 @@ export class FirstLevelMissionRuntime {
         if (i === FACED_FRONT_GUARD_INDEX) actor.speakerRole = "guard";
         InstallMissionSentry(actor);this.Defend(actor,actor.position,0,0);
         actor.scriptedNoncombatant=true;
+        // Protected from the first frame (FrontBattle.UpdateGuards rewrites it every frame once 03 runs): the 03
+        // backslope LMG pair spawns 8 m below the crest the assault line holds, and one enemy locked it for the AI
+        // tick before the first UpdateGuards (EnemyIdleProbe hunters [26], 09-25).
+        actor.missionUntargetable=true;
         this.ai.SetStance(actor,2,Infinity,true);
         this.guards.push({
           actor,
           progress: 0,
           safe: false,
-          route: P.guardWithdrawalRoutes[i],
+          route,
+          gatherIndex,
+          mg,
         });
       }
     }
@@ -2669,11 +2676,11 @@ export class FirstLevelMissionRuntime {
       const row = { ...condition, text: T(`menu.condition.${condition.id}`) };
       if (condition.id === "minimumSeconds") row.detail = T("menu.progress.seconds", condition);
       if (condition.id === "rifleWithdrawalResolved" || condition.id === "guardWithdrawalResolved") {
-        const guards = condition.id === "rifleWithdrawalResolved" ? this.guards.slice(0, OPENING.rifleGuardCount) : this.guards;
+        const guards = condition.id === "rifleWithdrawalResolved" ? this.guards.slice(0, FB.firstBatch) : this.guards;
         row.detail = T("menu.progress.guards", {
           safe: guards.filter(guard => guard.safe && guard.actor.alive).length,
           lost: guards.filter(guard => !guard.actor.alive).length,
-          target: condition.id === "rifleWithdrawalResolved" ? OPENING.rifleGuardCount : guards.length,
+          target: condition.id === "rifleWithdrawalResolved" ? FB.firstBatch : guards.length,
         });
       }
       return row;
@@ -2750,6 +2757,7 @@ export class FirstLevelMissionRuntime {
         alive: guard.actor.alive,
         x: guard.actor.position.x, z: guard.actor.position.z,
         progress: guard.progress, threatened: this.Threatens(guard.actor.position),
+        mg: guard.mg?.role || null, crossing: !!guard.crossing, stance: guard.actor.stance,
       })),
       air: this.air && { ...this.air },
     };

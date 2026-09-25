@@ -238,7 +238,10 @@ export const FRONT_TUNING_SOURCES = Object.freeze({
 // it is not part of the wave (Space package 03->06 cold starts, docs/Data_FirstLevelSpace0106_20260923.md §10.3).
 export const FRONT_BATTLE_TUNING=Object.freeze({
   arrivalM:1.0,leaderLeadM:3,captureRadiusM:4,rearArrivalM:3.5,attackArrivalM:3,
-  firstBatch:2,assaultKills:3,assaultIds:["FrontRifleA","FrontRifleB","FrontRifleC","FrontRifleD","FrontRifleE","FrontRifleF"],
+  // First batch 2 -> 5 (contract Data_FirstLevelStoryboard0103Contract §2.12, SB08: a column crossing the gap, >= 3 men in
+  // one frame from the captured nest). The total (MISSION_TUNING.guardCount 8) and the simultaneous-alive budget are
+  // unchanged: the second batch shrinks to 3, two of them the 03 backslope LMG pair (FRONT_GUARD_MG_GROUP).
+  firstBatch:5,assaultKills:3,assaultIds:["FrontRifleA","FrontRifleB","FrontRifleC","FrontRifleD","FrontRifleE","FrontRifleF"],
   guardHeightM:1.2,blockadeRangeM:85,gatherSpacingM:1.35,zhouHealth:80,
   // Zhou's age on the crosshair card (both bodies: 03-05 at the gun, 06 seated). The random identity pool gave him
   // 17 / 29 / 32 across runs ("老周 17 岁"); the cast note says 三十多岁 (Data_FirstLevelMissionDialogue MISSION_VOICE_CAST.zhou).
@@ -256,9 +259,51 @@ export const FRONT_BATTLE_TUNING=Object.freeze({
   handoverReadyM:3,
   // FrontBlockade (Zhou/Luo shouting across) fires when the player is this close to the observation spur mouth or the fold (K3).
   observationCallM:6,
-  // FrontApproach ("贴这道墙！前头有人！") fires 5 m around this FRONT_SORTIE.approach point: (13,-144.2) in the right
-  // low trench, 13 m short of the nest's west door (the old index 3 now sits at the observation step).
-  frontApproachCallIndex:10,
+  // FrontApproach ("贴这道墙！前头有人！") fires frontApproachCallRadiusM around this FRONT_SORTIE.approach point.
+  // 09-25 storyboard round (contract §2.11, SB07): the line is the SB07 frame, player at about (5,-143) with Luo 4-5 m
+  // ahead against the wall and the backslope LMG pair on the left of the frame. Point 9 (7,-143.5) at 2.5 m fires at
+  // about (4.6,-143.3) walking in from the west. It used to be point 10 (13,-144.2) at 5 m, i.e. the player at about
+  // (8,-143.6): from there the LMG pair on the berm's east end bears straight north, 50-60 deg left of any frame that
+  // also holds Luo (tmp probe: bearing 6-12 deg from (8,-143.6) vs 16-21 deg from (5,-143)).
+  frontApproachCallIndex:9,frontApproachCallRadiusM:2.5,
+  // 03 lead (contract §2.11, SB07 "班长在前 4-5 m"): from 03 entry until Luo reaches FRONT_SORTIE.approach[endApproachIndex]
+  // (19,-146.8), the last bend before the nest's west door, he keeps minM-maxM ahead of the player along his route.
+  // Before this he only waited when > leaderLeadM ahead and > leaderWaitM (10 m) away, and the driving bot (as any
+  // player who does not dawdle) overtook him at every stop: 0.67 m BEHIND the player at each survey stop (Survey_B SB07).
+  //   gap < catchUpM   -> he runs (runMps) and keeps running until the gap is back to minM;
+  //   gap > maxM       -> he stops and waits (faces the player, LeaderGuide.Watch);
+  //   at a corner      -> (the route turns > cornerTurnDeg at the point he just passed, within cornerNearM of it) he
+  //                       stops, faces the next leg and points along it (PointBlockade, upper body) until the player
+  //                       is within minM.
+  // runMps: the player's sprint is Data_Tuning_Player STANCE.stand.speed 3.05 x (1 + sprintBoost 0.72) = 5.25 m/s;
+  // 6.0 (was 5.4: a probe with a standing sprint held him 0.7 m BEHIND the player for 8 s, 0.15 m/s is no margin) gets
+  // him back in front of a sprinting player within a few seconds. The brain moves a crouched man at 0.6 x that (Script_Ai stanceMul:
+  // 3.6 m/s), so runStandsWithPlayer: while he runs and the player stands he runs upright (the player can only sprint
+  // standing, Script_Player canSprint); behind a crouched player (STANCE.crouch.speed 1.62) he stays crouched.
+  // pointS: he points through the first 1.2 s of FrontApproach line 1 (2.82 s long, Data_FirstLevelMissionVoiceAlignment:
+  // the "贴这道墙！" half), then takes his rifle up again. 09-25 review A/B, 03->06 campaign driver walking straight into
+  // the nest (Front/Fix logs): pointing and holding the rifle down 2.8 s -> 6 of 9 runs through (3 deaths in 04/05:
+  // two on one branch, grenades at the nest's north end), 1.2 s -> 3/3, no hold -> 3/3, round baseline b33e30951 -> 3/3.
+  // The SB07 shot is taken ~0.4 s into the pointing.
+  // pointHoldsFire: for those pointS (the FrontApproach line only, not the corner holds) he does not raise the rifle or
+  // pull the trigger (an aiming brain cancels the upper-body clip, 09-25 SB07 shot); he keeps his target and his place in
+  // the fight (FrontBattle.PointQuiet: aimBlend and coolUntil only -- the first cut's scriptedNoncombatant changed 03's
+  // outcome, 09-25 review), and turns himself toward where he points at pointTurnRps (the AI's standing turn is 3.4 rad/s,
+  // Script_Ai; 5 turns him from facing the waiting-for player to the trench ahead in ~0.6 s, the line is 2.8 s).
+  // pointWalkMps / pointExtraM: through that pointing he walks on upright ("腿照走", contract §5 SB07) at a slow walk,
+  // and only stops pointExtraM beyond maxM. The player who stops to look (the SB07 shot stops at the trigger, 5.0 m) has
+  // him 5.3 m ahead 0.45 s later and 5.5 m (the shot's distance limit) at 0.7 s; a player who keeps walking (crouched
+  // 1.62 m/s) closes on him and he walks at 0.7 m/s the whole line.
+  leaderLead:Object.freeze({minM:3,maxM:5,catchUpM:1.5,runMps:6,runStandsWithPlayer:true,endApproachIndex:11,cornerTurnDeg:35,cornerNearM:1.6,pointS:1.2,pointHoldsFire:true,pointTurnRps:5,
+    pointWalkMps:.7,pointExtraM:1}),
+  // First batch crossing (SB08): the batch goes as one column in the order nearest-to-the-last-cover first; a man leaves
+  // (and keeps walking) once the man ahead of him is firstColumnSpacingM further along the shared withdrawal route, and
+  // pauses when closer than firstColumnMinM. A man ahead who has not moved on for firstColumnStallS is passed. 1.6 m at
+  // guardSpeedMps 2.7 is 0.6 s per man: the five men span ~6.4 m, about the length of the 0.5 m deep gap sap
+  // (FRONT_SPACE breach), the only stretch where the nest (34 m east) sees more than their helmets. 2 m (step 1) gave the
+  // SB08 shot 2 men showing head and shoulders (>= 60 px) at once in 3 runs of 5 (09-25 Script_FrontStoryboardShots).
+  // The second batch keeps the one-at-a-time gapClearM rule.
+  firstColumnSpacingM:1.6,firstColumnMinM:1.2,firstColumnStallS:4,
   // 05->06: at the safe zone (FRONT_SPACE.returnMeet) Luo waits for FrontRelief at most this long before going on.
   returnMeetMaxWaitS:20,
   // Posts on the support sap floor around returnMeet (probed: 2.0 m deep, >= 1.25 m from the sap wall). The relief

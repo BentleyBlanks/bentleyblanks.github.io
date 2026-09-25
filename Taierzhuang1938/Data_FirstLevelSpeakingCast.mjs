@@ -45,7 +45,8 @@ export const FIRST_LEVEL_FACE_STEPS = Object.freeze(["Trapped", "BunkerRescue", 
 // no voice position). Before this package Luo's face already followed his lines all level.
 export const FIRST_LEVEL_WHOLE_LEVEL_SPEAKERS = Object.freeze(["luo", "yaowa", "heyoutian", "liuwencai"]);
 // The withdrawing front guards (FRONT_GUARD_POSTS): one of them carries the guard face;
-// the others stay anonymous pooled bodies with random appearance. Index 2 is the first
-// man of the second batch, who holds the last covered line at 04 next to the player's
-// position and so is the one who points to the ammo house (BundleOrder).
-export const FACED_FRONT_GUARD_INDEX = 2;
+// the others stay anonymous pooled bodies with random appearance. Index 5 is the first
+// man of the second batch (FRONT_BATTLE_TUNING.firstBatch 5 since the 09-25 storyboard round,
+// it was index 2 with a first batch of 2), who holds the last covered line at 04 next to the
+// player's position and so is the one who points to the ammo house (BundleOrder).
+export const FACED_FRONT_GUARD_INDEX = 5;
