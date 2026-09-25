@@ -134,7 +134,9 @@ try {
         'the actual captive survives creation and kneels at the wall for the interrogation');
       for(const actor of closeup.actors)assert.ok(actor.finite&&(actor.hidden||actor.attached||['culled','crowd'].includes(actor.lod)),
         `${actor.id} still has a finite hierarchy under the normal culling/LOD contract`);
-      for(const id of ['BunkerExecutionerA','interpreter']) {
+      // Close-up rows are keyed by castId||missionId: squad by castId, the director's own cast by
+      // its missionId (Opening_<slot>), so the interpreter row is Opening_interpreter.
+      for(const id of ['BunkerExecutionerA','Opening_interpreter']) {
         const actor=closeup.actors.find(a=>a.id===id);
         assert.ok(actor?.attached&&actor.lod==='detail',`${id} must actually render in the interrogation close-up`);
       }
