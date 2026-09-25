@@ -175,7 +175,7 @@ export class FirstLevelFrontBattle {
     }
     actor.missionGuideWaiting=wait;r.squadMarch?.Release(actor);r.ai.ReleaseCover(actor);
     // Lead run (B.leaderLead.runStandsWithPlayer): the brain moves a crouched man at 0.6 x speed, so a crouched run is
-    // 3.24 m/s and a standing, sprinting player (5.25) still overtook him. He runs upright while the player is upright
+    // 3.6 m/s and a standing, sprinting player (5.25) still overtook him. He runs upright while the player is upright
     // (and so no better hidden than he is); behind a crouched player (1.62 m/s) the crouched run is fast enough.
     const upright=!wait&&!!pace&&pace.speed===B.leaderLead.runMps&&B.leaderLead.runStandsWithPlayer&&r.player.stance==="stand";
     r.ai.SetStance(actor,upright?0:1,.5,true);r.MoveActor(actor,w.rejoin||w.route[w.index],wait?0:speed);

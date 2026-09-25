@@ -580,7 +580,7 @@ function WalkRuntime(extra = {}) {
   const battle = new FirstLevelFrontBattle(r), luo = { id: 1, alive: true, position: { x: -3, z: -141.2 }, scriptArrivalRadius: 1 };
   battle.SetWalk(luo, S.approach.slice(7));
   battle.Walk(luo, { follow: true, lead: true }); assert.equal(moves.at(-1), L.runMps, "Luo behind the player at 03 runs past him");
-  assert.equal(stances.at(-1), 1, "... crouched behind a crouched player (0.6 x 5.4 = 3.24 m/s beats the crouched 1.62)");
+  assert.equal(stances.at(-1), 1, "... crouched behind a crouched player (0.6 x runMps = 3.6 m/s beats the crouched 1.62)");
   r.player.stance = "stand"; battle.Walk(luo, { follow: true, lead: true });
   assert.equal(stances.at(-1), 0, "... upright behind a standing player (a crouched run would lose to his 5.25 m/s sprint)");
   r.player.stance = "crouch";
