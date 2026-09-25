@@ -272,10 +272,15 @@ export const OPENING_STORYBOARDS = Object.freeze({
     lookBack:P(4.9,-124.45,-60*Math.PI/180), lookBackOffDeg:45, lookBackTurnS:.35, lookBackS:.6,
     reachShot:Object.freeze({ yawDeg:-82, pitchDeg:4, rollDeg:3, dipDeg:-12 }),
     // Found: ijaA's path from lookBack back to the mouth, where Shunzi lies (the snag root is inside the posts).
-    foundRoute:Route([2.6,-125.3],[1.6,-125.35]),
-    // ijaA drags Shunzi out of the mouth, round the north-east corner of the mouth rubble and south-south-east to the
-    // trench edge; Shunzi, 0.62 m behind him, ends at shunzi.butt.
-    dragOutRoute:Route([1.3,-125.4],[2.15,-125.0],[2.49,-123.81]),
+    // 2026-09-26 integration (Set x Dir, Script_OpeningSetTest §2): he walks back along the south side of the trench
+    // floor and turns in at the mouth south of the broken board (Data_OpeningSet0103 brokenBoardNW hangs to 0.55 m at
+    // z -125.62) and west of the hand-back backrest's spot (rubbleMoundBack, shown from 02): the old line at z -125.3
+    // ran across both.
+    foundRoute:Route([2.9,-124.75],[1.75,-124.8],[1.42,-125.28]),
+    // ijaA drags Shunzi out of the mouth -- south of the broken board, clear of the fallen lintel (lateral >= 0.5 m) --
+    // then east-south-east past the mouth rubble to the trench edge. The last leg is aimed through shunzi.butt, so
+    // Shunzi, 0.62 m behind him, ends on it (2026-09-26: the old middle point (2.15,-125.0) stood on the backrest's spot).
+    dragOutRoute:Route([1.4,-125.3],[1.55,-124.8],[2.85,-124.11]),
     // SB04 (contract §5): ijaA stands over his head on the side yawDeg (yaw convention: 0 = north of him), coming
     // round the east side (approach). The camera (buttShot) looks up past him at the north wall's timber door with
     // the dead comrade right of it. Wave 1 plays the existing IjaButtStrike (it stands straight) with its clip time
@@ -372,9 +377,13 @@ export const OPENING_STORYBOARDS = Object.freeze({
     liuCover:P(5.47,-123.52,-Math.PI/2),
     heCoverRoute:Route([.3,-121.2],[1.4,-120.8],[3.1,-121.3],[3.3,-122.2],[3.3,-123.5]),
     heCover:P(3.6,-124.3,-1.3),
-    // DragCover: Luo walks this line (Shunzi trails him by 0.55 m): north out of the leg's mouth into the dugout, east
-    // through the mouth between the posts, and on along the trench floor until Shunzi sits on shunzi.cover.
-    dragCoverRoute:Route([.45,-124.5],[.5,-124.95],[1.1,-125.15],[1.9,-125.3],[2.95,-125.25]),
+    // DragCover: Luo walks this line (Shunzi trails him by 0.55 m). 2026-09-26 integration: after the near miss the
+    // mouth is choked (Data_OpeningSet0103: the fallen lintel, the roof timber on its rubble supports, the broken board),
+    // so the drag no longer goes back in through it. From the leg's north mouth Luo goes east along the 0.75 m strip
+    // between the mouth rubble and the spoil (the Set's SB06_DRAG_COVER_SET line), turns north only once Shunzi is past
+    // the spoil's east end (a trailing body swings inward on a turn), and comes up the trench floor east of the backrest
+    // (rubbleMoundBack); the last short leg ends 0.55 m north of the seat, so Shunzi stops on shunzi.cover.
+    dragCoverRoute:Route([1.2,-123.7],[2.8,-123.72],[2.85,-124.1],[2.58,-124.9],[2.43,-125.4],[2.4,-125.75]),
     // SB06: Luo kneels at his left front, 0.9 m off, facing him (CheckRoot).
     luoCheck:P(3.12,-125.73),
     // SB06 camera from shunzi.cover: forward down the trench with Luo at the left; the kick brings the eye down to the
@@ -382,13 +391,18 @@ export const OPENING_STORYBOARDS = Object.freeze({
     checkShot:Object.freeze({ eyeM:.72, yawDeg:-94, pitchDeg:-8, kickPitchDeg:-13 }),
     // 01 prop: stock toward Shunzi, muzzle to the south-east in the mud of the mouth, out of reach (SB03: left of
     // centre, low). Prop yaw: the muzzle points along (-sin yaw, -cos yaw) (survey A, checked in picture).
-    rifleMouth:P(1.25,-125.75,-125*Math.PI/180),
-    // 「罗班长看见旁边的汉阳造，一脚把枪踢过来。枪托滑过泥地，停在顺子手边。」 The rifle still lies in the mouth mud 1.2 m
-    // behind his left shoulder: Luo steps back into the mouth (kickFrom, behind the eye) and kicks it out past Shunzi's
-    // right side (via, clear of the rubble and his legs) to stop ahead of his right hand, stock toward him, muzzle
-    // north-east (SB06: centre-low, ~0.85 m). The pickup follows the prop.
-    kickFrom:P(.88,-126.15),
-    rifleKickVia:P(2.2,-124.72),
+    // x 1.43 (was 1.25): just outside the posts, clear of the roof timber's north rubble support and the broken board
+    // hanging in the mouth (Data_OpeningSet0103), so Luo can reach it in 02 without standing in the collapse.
+    rifleMouth:P(1.43,-125.75,-125*Math.PI/180),
+    // 「罗班长看见旁边的汉阳造，一脚把枪踢过来。枪托滑过泥地，停在顺子手边。」 The rifle still lies in the mouth mud behind
+    // his left shoulder. 2026-09-26 integration: Luo no longer steps back into the choked mouth (the old kickFrom
+    // (0.88,-126.15) stood on the fallen lintel's end and the roof timber's support); he goes round behind the seat
+    // to the trench floor north of the rifle (kickFrom, 0.5 m off, facing south) and kicks it south along the posts;
+    // it glances off the low mouth rubble at `via` and slides east past Shunzi's right side (south of the backrest,
+    // clear of his legs) to stop ahead of his right hand, stock toward him, muzzle north-east (SB06: centre-low,
+    // ~0.85 m). The pickup follows the prop.
+    kickFrom:P(1.45,-126.25),
+    rifleKickVia:P(1.45,-124.85),
     rifleKicked:P(3.2,-124.85,-.6),
     // 「还权后 3 s 内玩家不掉血」 (contract §2.9). The seat looks east down the front trench and sees the fold F as well as J:
     // from (2.4,-125.2) J is at -93.0° and F at -88.5°, and no seat within the contract's ±0.6 m hides F and keeps J
@@ -599,8 +613,12 @@ export const OPENING_STORYBOARDS = Object.freeze({
   pursuit:Object.freeze({ delayScale:.35, speedMps:3.2, retireMps:3, retireMaxS:40 }),
   // ---- 02 withdrawal (RearTrench) --------------------------------------------------------
   withdraw:Object.freeze({
-    // The player's way out: mouth -> bend -> crater step (exposed to F) -> SSW leg -> RC.
-    lane:Route([.3,-125.1],[1.7,-125.3],[3.3,-124.2],[3.3,-122.2],[3.1,-121.3],[1.4,-120.8],[-.6,-120.4],[-1,-118.5],[-4,-113]),
+    // The way out: seat -> crater step (exposed to F) -> SSW leg -> RC. lane[0] is Luo's (he comes from kickFrom round
+    // the north of the seat, past Shunzi's feet); the player (Script_FirstLevelCampaignOpening) walks from lane[1].
+    // 2026-09-26 integration: the old start in the mouth, (0.3,-125.1) -> (1.7,-125.3), ran through the fallen lintel,
+    // the roof timber and the backrest (Script_OpeningSetTest §2). lane[3] (the crater step) and lane[6] (luoCover) keep
+    // their indices: heBackRoute / liuBackRoute and the campaign's look-back read them.
+    lane:Route([3.3,-125.65],[3.35,-124.9],[3.3,-124.2],[3.3,-122.2],[3.1,-121.3],[1.4,-120.8],[-.6,-120.4],[-1,-118.5],[-4,-113]),
     luoCover:P(-.6,-120.4),                // first intact wall past the low section, turned back to cover
     luoCorner:P(-7.2,-111.8),              // beyond RC, waiting for the player
     heBound:Route([-.2,-121.9],[-1.2,-118.2]),

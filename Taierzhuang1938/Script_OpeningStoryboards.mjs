@@ -1517,7 +1517,8 @@ export class FirstLevelBunkerShow {
   PhaseKickRifle(age){
     const r=this.r,luo=this.Squad("luo"),R=C.rescue;
     this.Aftercut();this.UpdateFleeing();this.LongShotTick();
-    // Luo steps back behind Shunzi into the mouth, where the rifle lies, and kicks it out past his right side.
+    // Luo goes round behind Shunzi to the trench floor north of the rifle (it lies in the mud just outside the choked
+    // mouth) and kicks it south; it glances off the mouth rubble and slides out past his right side (rescue.kickFrom/via).
     const from={...R.kickFrom,yaw:Face(R.kickFrom,R.rifleMouth)};
     if(this.flags.kickRifleAt==null){if(this.Hold(luo,from,null,{speed:C.speed.walk})||age>C.timeouts.kickRifleS)this.flags.kickRifleAt=r.time;return;}
     const t=r.time-this.flags.kickRifleAt;
@@ -1724,8 +1725,9 @@ export class FirstLevelBunkerShow {
       const heBack=W.heBackRoute,liuBack=W.liuBackRoute;
       if(this.phase==="Collection"||this.phase==="SupportOrder")this.UpdateCollection();
       else if(w.step===0){
-        // Luo goes first: out of the mouth, over the crater step, to the first intact wall (the mouth is
-        // walled off from the rear leg, so this leg is walked on the lane, not left to local steering).
+        // Luo goes first: from the kick spot round the north of the seat, past Shunzi's feet, over the crater step
+        // to the first intact wall (the choked mouth and the spoil wall the bend off from the rear leg, so this leg is
+        // walked on the lane, not left to local steering).
         if(luo?.alive&&!w.luoAtCover){
           const lane=W.lane.slice(0,W.lane.findIndex(p=>p.x===W.luoCover.x&&p.z===W.luoCover.z)+1);
           if(this.Follow(luo,"withdraw",lane.length>1?lane:[...W.lane.slice(0,7),W.luoCover],C.speed.run,null,Face(W.luoCover,A.bunkerFold))){

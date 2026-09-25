@@ -11,7 +11,7 @@
 //    SB03/03A 眼位看审问组也不被本包的布景挡（布景只是外观，Space 的视线探针看不见它们，这里单独量）；
 //    SB03 看旗面（离地 2.4–2.8 m）与画面右四分之一的沟纵深不被本包布景挡；SB03 画面里没有塌顶木（它到 Reach 才塌下来），
 //    左上角有那根斜断木；SB03A 上沿那条塌顶木真在画面上沿；
-//    还权位对折角 F：契约 §2 第 9 条要遮住。Dir 包合进来以后硬断言；合进来之前只报（报告里写了几何冲突，等集成负责人拍板）；
+//    还权位对折角 F：契约 v1.1 §8 第 1 条定为「F 可见，由还权迟疑保护」：断言 K2b 把 F 记为 need、迟疑 >= 3 s / 40 m、战役驾驶器在断言它；
 // 4. Script_OpeningSet 的生命周期：进 01–03 装载，近爆后塌方组出现、门楣落下，马灯只在 01 亮；
 //    离开 01–03 后场景零残留、几何与自有材质全部 dispose（03 前沿那一份活到 06，离开前沿各步再收）；
 // 5. Step 2：近爆定向喷土（方向对着 SB02 机位、时序 0.22–0.9 s、只喷一次）、烟柱火点（按步骤挂与收、粒子预算）、
@@ -35,6 +35,7 @@ import { SampleMissionTerrain as G } from "./Data_FirstLevelMissionTerrain.mjs";
 import { MISSION_LAYOUT as L } from "./Data_FirstLevelMissionLayout.mjs";
 import { FRONT_SPACE as SP } from "./Data_FirstLevelFrontRoute.mjs";
 import { Sight, Eye, RouteClearance } from "./Script_FirstLevelSpaceProbe.mjs";
+import { SPACE_KEYFRAMES } from "./Data_FirstLevelSpaceKeyframes.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const DEG = Math.PI / 180;
@@ -240,12 +241,14 @@ const Samples = (route) => {
   report.dragCoverSetClearance = RouteClearance(SB06_DRAG_COVER_SET.slice(1), { state: "BunkerCollapsed" });
   report.dragCoverSetStartHits = RouteClearance(SB06_DRAG_COVER_SET.slice(0, 2), { state: "BunkerCollapsed" }).hits;
   assert.deepEqual([report.dragCoverSetClearance.hits, report.dragCoverSetClearance.slopes], [[], []], "the suggested SB06 drag-cover line clears the collapsed-state blocks (capsule r 0.35)");
-  // 折角 F：契约 §2 第 9 条「还权位只遮 F、不遮 J」（K2b）。现状通视（[null,null]）。几何冲突（报告里交集成负责人拍板）：
+  // 折角 F：契约 §2 第 9 条原写「还权位只遮 F、不遮 J」（K2b）。几何冲突（Set 报告）：
   //  · F 与 J 在同一条东西向沟里，从坐位看只差 4.4°，挡 F 的东西落在追兵 F→J、BunkerPursuitC F→(9.6,-125.1) 的路上；
   //  · 契约 §2 第 1 条把 01 受困眼位挪到洞口 (0.25–0.35,-125.2)，K1 要这个眼位看得见 F（need 2）：它和坐位看 F 的两条线
   //    在平面上几乎重合（x 10 处只差约 2 cm），受困眼更低（0.22 vs 0.72）。地上任何土堆挡住坐位眼的线，必然也挡住受困眼的线。
   //    下面把两条线在 x 10 处的离地高度算出来放进报告。
-  // Dir 包合进来以前只报；合进来以后按契约硬断言（集成负责人改契约 / 选方案之后改这里，不许一直只报不判）。
+  // 契约 v1.1（docs/Data_FirstLevelStoryboard0103Contract.md §8 第 1 条，集成负责人拍板）：坐位对 F **可见**，由「还权迟疑」保护
+  // （40 m 内每名日军在还权后至少 3 s 不开火，战役驾驶器断言）。下面的断言按 v1.1 改成：F 在 K2b 里记为 need（看得见），
+  // 迟疑的数值够 3 s / 40 m，战役驾驶器真的在断言它——不再要求坐位遮住 F。
   report.seatF = [1.6, 1.2].map((h) => Sight(seatEye, Eye(SP.bunkerFold, h), { state: "BunkerCollapsed" }));
   {
     const trapEye = Eye({ x: 0.3, z: -125.2 }, 0.22), at = 10;
@@ -255,7 +258,19 @@ const Samples = (route) => {
     // 冲突本身是真的：坐位眼的线在 x 10 处比受困眼的线高、平面位置几乎重合。
     for (const row of Object.values(report.seatFConflict)) assert.ok(row.seat.liftM > row.trappedK1.liftM && Math.abs(row.seat.z - row.trappedK1.z) < 0.1, "seat->F runs just above trapped->F (geometry note)");
   }
-  if (DIR_MERGED) assert.deepEqual(report.seatF.map((b) => b != null), [true, true], "contract §2 item 9 / K2b: the hand-back seat is hidden from the fold F (decision pending: see the Set report)");
+  // 契约 v1.1 §8 第 1 条：F 可见、由还权迟疑保护。
+  {
+    const k2b = SPACE_KEYFRAMES.find((k) => k.id === "K2b"), rowF = k2b?.targets.find((t) => Math.hypot(t.at.x - SP.bunkerFold.x, t.at.z - SP.bunkerFold.z) < 0.01);
+    assert.ok(rowF && rowF.need === rowF.heights.length, "contract v1.1 §8 item 1: K2b records the fold F as seen from the hand-back seat (need = every height)");
+    const R = C.rescue;
+    assert.ok(R.handbackHoldFireS >= 3 && R.handbackHoldFireM >= 40,
+      `contract v1.1 §8 item 1: every Japanese within 40 m holds his fire >= 3 s after the hand-back (${R.handbackHoldFireS} s, ${R.handbackHoldFireM} m)`);
+    const driver = fs.readFileSync(path.join(HERE, "Script_FirstLevelCampaignOpening.mjs"), "utf8");
+    const safeS = +(driver.match(/const HANDBACK_SAFE_S\s*=\s*([\d.]+)/)?.[1] ?? NaN);
+    assert.ok(safeS >= 3 && /handbackHoldFireM/.test(driver) && /holds his fire/.test(driver),
+      "contract v1.1 §8 item 1: the campaign driver (Script_FirstLevelCampaignOpening) asserts the hold-fire of every Japanese near the seat for >= 3 s");
+    report.seatFHoldFire = { k2bNeed: rowF.need, holdFireS: R.handbackHoldFireS, holdFireM: R.handbackHoldFireM, driverSafeS: safeS };
+  }
   // SB03（Interrogation）与 SB03A（Found）眼位：01 里看得见的布景（常驻组 + 塌方组）不挡审问组。
   // 射线逐 2 cm 步进，落进任一件道具的占地盒（高度按盒子自己的参考地面算，斜木按投影插值）就算挡住。
   // SB03（Interrogation）时塌顶木还卡在洞顶下（hang），到 Reach 才塌下来：两套盒子。

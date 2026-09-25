@@ -51,7 +51,9 @@ export const PROPS = Object.freeze([
     light: Object.freeze({ color: 0xffa65a, intensity: 2.2, distanceM: 3.2, decay: 2, flickerHz: Object.freeze([7.3, 11.1, 2.3]), flicker: 0.16 }),
     litStages: Object.freeze(["Trapped"]) },
   // 北壁弹药箱两层（幺娃身后，SB01 左中），箱背嵌进北壁坡脚。
-  { id: "bunkerCrateStackN", kind: "crateStack", ground: FLOOR, x: -0.15, z: -127.88, yawDeg: 4,
+  // z -127.92（原 -127.88）：幺娃坐位 (-0.55,-127.35) 离箱前沿差 3 cm 就进了箱子（Script_OpeningSetTest §2 的 banter.yaowa），
+  // 往墙里再推 4 cm，他背靠箱子、不坐进箱子；SB01 画面上看不出这 4 cm。
+  { id: "bunkerCrateStackN", kind: "crateStack", ground: FLOOR, x: -0.15, z: -127.92, yawDeg: 4,
     layers: Object.freeze([Object.freeze({ w: 0.8, h: 0.45, d: 0.5 }), Object.freeze({ w: 0.72, h: 0.4, d: 0.48, dx: 0.04, dyawDeg: -6 })]) },
   // SB01 左下前景：一只开着盖的木箱（眼位 (-1.95,-126.25) 左前 0.85 m）。
   { id: "bunkerCrateFront", kind: "crateStack", ground: FLOOR, x: -1.35, z: -126.85, yawDeg: -18,
@@ -172,7 +174,11 @@ export const PROPS = Object.freeze([
   // 坐位 (2.40,-125.20)、审问组 (4.1,-125.6) 几乎一条线），01 里摆着会把审问组腰以下全挡掉（实拍）。
   // 02 开场镜头朝南，这里在镜头背后，出现的那一下没人看得见。01/02 的界线按导演 phase 算（任务步骤在 Found
   // 前后就切到 BunkerRescue 了，见 Script_OpeningSet.RescueShown）。
-  { id: "rubbleMoundBack", kind: "mound", show: "rescue", x: 1.85, z: -125.17, rx: 0.36, rz: 0.43, peak: 0.48, seed: 23 },
+  // 2026-09-26 集成：契约 v1.1 §8 第 1 条定了「坐位对 F 可见、由还权迟疑保护」，靠背不再承担遮 F，缩成一小堆
+  // （原 rx 0.36 / rz 0.43 / 峰 0.48、中心 (1.85,-125.17)，正好横在洞口出口上）：洞口塌死以后，01 日兵甲回洞口
+  // （foundRoute）、拖人出洞（dragOutRoute）、02 罗班长拖顺子上坐位（dragCoverRoute 从东边上来）、踢枪（枪从它南边
+  // 滑过）都要从它旁边过，高过 0.3 m 的核只剩约 0.25 m 见方，放在坐位西北 0.2 m（靠背离坐位点 0.22 m）。
+  { id: "rubbleMoundBack", kind: "mound", show: "rescue", x: 1.95, z: -125.3, rx: 0.23, rz: 0.23, peak: 0.36, seed: 23 },
 ]);
 
 // ---------------------------------------------------------------------------
