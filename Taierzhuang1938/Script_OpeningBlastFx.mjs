@@ -33,7 +33,9 @@ export class OpeningBlastFx {
    * 定向喷发。position 是喷口（世界坐标，y 取喷口中心高），direction 是喷射主方向（会归一化）。
    * opts：clods / splinters / spray / dust（个数）、seconds（整段时长）、spreadRad（锥半角）、
    * speed:{clods,splinters,spray,dust:[min,max]}、burst:{headS, headShare}、heightM（喷口上下展开）、
-   * groundY（碎块落到哪一层；默认 position.y - 1）。
+   * groundY（碎块落到哪一层；默认 position.y - 1）、
+   * sprayDir（泥雾单独的主方向，默认同 direction）、dustAt / dustDir（扬尘的出生点与方向：默认同喷口、同主方向；
+   * SB02 让扬尘在门洞里起、往洞里推）、clodSize:[min,max]（土块边长，米）、upBoost:{clods,splinters}（额外上抛，米/秒）。
    * @returns {object|null} 发射器（Stats 用）；没有 vfx 时 null
    */
   DirectionalBlast(position, direction, opts = {}) {
@@ -41,10 +43,13 @@ export class OpeningBlastFx {
     const o = {
       clods: BLAST.clods, splinters: BLAST.splinters, spray: BLAST.spray, dust: BLAST.dust,
       seconds: BLAST.seconds, spreadRad: BLAST.spreadRad, speed: BLAST.speed, burst: BLAST.burst,
-      heightM: 0.5, groundY: position.y - 1, ...opts,
+      heightM: 0.5, groundY: position.y - 1, clodSize: BLAST.clodSize, upBoost: BLAST.upBoost, ...opts,
     };
     const axis = new THREE.Vector3(direction.x, direction.y, direction.z).normalize();
-    const emitter = { at: new THREE.Vector3(position.x, position.y, position.z), axis, o, age: 0,
+    const V = (v) => (v ? new THREE.Vector3(v.x, v.y, v.z) : null);
+    const sprayAxis = (V(o.sprayDir) || axis.clone()).normalize(), dustAxis = (V(o.dustDir) || axis.clone()).normalize();
+    const dustAt = o.dustAt ? new THREE.Vector3(o.dustAt.x, o.dustAt.y ?? position.y, o.dustAt.z) : null;
+    const emitter = { at: new THREE.Vector3(position.x, position.y, position.z), axis, sprayAxis, dustAxis, dustAt, o, age: 0,
       emitted: { clods: 0, splinters: 0, spray: 0, dust: 0 } };
     this.emitters.push(emitter);
     this.fired += 1;
@@ -73,7 +78,7 @@ export class OpeningBlastFx {
   Emit(emitter) {
     const o = emitter.o, share = OpeningBlastFx.Share(emitter.age, o);
     // 扬尘均匀摊满整段（洞口越来越浑），其余按喷发曲线。
-    const dustShare = Math.min(1, 0.15 + 0.85 * emitter.age / Math.max(1e-3, o.seconds));
+    const lead = o.dustLead ?? 0.15, dustShare = Math.min(1, lead + (1 - lead) * emitter.age / Math.max(1e-3, o.seconds));
     for (const kind of ["clods", "splinters", "spray", "dust"]) {
       const want = Math.round(o[kind] * (kind === "dust" ? dustShare : share) * (this.vfx.spawnScale ?? 1));
       while (emitter.emitted[kind] < want) { this.SpawnOne(kind, emitter); emitter.emitted[kind] += 1; this.spawned[kind] += 1; }
@@ -82,18 +87,21 @@ export class OpeningBlastFx {
 
   SpawnOne(kind, emitter) {
     const vfx = this.vfx, o = emitter.o, R = (a, b) => a + (b - a) * vfx.random(), S = (k) => (vfx.random() * 2 - 1) * k;
-    const at = emitter.at, y = at.y + S(o.heightM), x = at.x + S(0.15), z = at.z + S(0.15);
+    const dustHere = kind === "dust" && emitter.dustAt;
+    const at = dustHere ? emitter.dustAt : emitter.at, y = at.y + S(dustHere ? o.dustHeightM ?? o.heightM : o.heightM), x = at.x + S(0.15), z = at.z + S(0.15);
     const [lo, hi] = o.speed[kind];
+    const up = o.upBoost || { clods: [0.4, 1.4], splinters: [0.8, 2.0] };
     if (kind === "clods" || kind === "splinters") {
       const v = vfx._ConeVelocity(emitter.axis, o.spreadRad, R(lo, hi));
       if (kind === "clods") {
-        const size = R(0.04, 0.12);
-        vfx._SpawnDebris(x, y, z, v.x, v.y + R(0.4, 1.4), v.z, size, size * R(0.6, 1.0), size * R(0.8, 1.3),
-          // 湿土块是深褐的（分镜 02）：裸土色 soil 在画面里读成一块块米黄方糖（实拍 tmp/s3/cap01/SB02dbg_t030.png）。
-          vfx.random() < 0.55 ? VFX_PALETTE.wood : VFX_PALETTE.woodBurnt, R(1.4, 2.2), o.groundY, 0.22, R(4, 9));
+        const [s0, s1] = o.clodSize || [0.04, 0.12], size = R(s0, s1);
+        vfx._SpawnDebris(x, y, z, v.x, v.y + R(...up.clods), v.z, size, size * R(0.6, 1.0), size * R(0.8, 1.3),
+          // 湿土块是深褐的（分镜 02）：裸土色 soil 在画面里读成一块块米黄方糖（实拍 tmp/s3/cap01/SB02dbg_t030.png）；
+          // 审查 09-25 再压暗：多数用焦褐，逆着天空读成黑剪影。
+          vfx.random() < 0.3 ? VFX_PALETTE.wood : VFX_PALETTE.woodBurnt, R(1.4, 2.2), o.groundY, 0.22, R(4, 9));
       } else {
-        const size = R(0.014, 0.032);
-        vfx._SpawnDebris(x, y, z, v.x, v.y + R(0.8, 2.0), v.z, size, size * R(0.5, 0.9), size * R(4, 9),
+        const size = R(0.018, 0.04);
+        vfx._SpawnDebris(x, y, z, v.x, v.y + R(...up.splinters), v.z, size, size * R(0.5, 0.9), size * R(4, 9),
           vfx.random() < 0.6 ? VFX_PALETTE.wood : VFX_PALETTE.woodBurnt, R(1.6, 2.4), o.groundY, 0.3, R(8, 16));
       }
       return;
@@ -102,17 +110,17 @@ export class OpeningBlastFx {
     s.x = x; s.y = y; s.z = z;
     if (kind === "spray") {
       // 泥雾：一片小而密的湿土，贴着锥面扑过来，带重力往下掉。
-      const v = vfx._ConeVelocity(emitter.axis, o.spreadRad * 1.2, R(lo, hi));
-      s.vx = v.x; s.vy = v.y + R(0, 0.8); s.vz = v.z;
+      const v = vfx._ConeVelocity(emitter.sprayAxis, o.spreadRad * 1.2, R(lo, hi));
+      s.vx = v.x; s.vy = v.y + R(0, 0.5); s.vz = v.z;
       s.ay = -6.5; s.drag = 1.4;
       // 尺寸按实拍放大：0.03–0.24 m 的泥点在 1–3 m 外只有几个像素，三帧里几乎看不见。
-      s.life = R(0.4, 0.85);
-      s.sizeStart = R(0.12, 0.22); s.sizeEnd = R(0.35, 0.7);
-      s.opacity = 0.92; s.fadeIn = 0.02;
-      s.colorA = VFX_PALETTE.wood; s.colorB = VFX_PALETTE.dustDense;
+      s.life = R(0.5, 0.95);
+      s.sizeStart = R(0.16, 0.3); s.sizeEnd = R(0.45, 0.85);
+      s.opacity = 1; s.fadeIn = 0.01;
+      s.colorA = VFX_PALETTE.woodBurnt; s.colorB = VFX_PALETTE.wood;
     } else {
       // 扬尘：慢、大、往洞里推，把洞口填满（0.9 s 以后还浑着）。
-      const v = vfx._ConeVelocity(emitter.axis, o.spreadRad * 1.8, R(lo, hi));
+      const v = vfx._ConeVelocity(emitter.dustAxis, o.spreadRad * 1.8, R(lo, hi));
       s.vx = v.x; s.vy = v.y * 0.5 + R(0.1, 0.5); s.vz = v.z;
       s.ax = vfx.wind?.x * 0.2 || 0; s.ay = 0.12; s.az = vfx.wind?.z * 0.2 || 0;
       s.drag = 2.2;

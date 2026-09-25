@@ -25,7 +25,7 @@
 //   Exit()                                  整关拆除
 // ===========================================================================
 import * as THREE from "three";
-import { PROPS, SET_STAGES, FLOOR, BLAST, SMOKE, SmokeOptions, FLYOVER, FLYOVER_TRIGGER, FlyoverPose, sky as SKY,
+import { PROPS, SET_STAGES, FLOOR, BLAST, SMOKE, SmokeOptions, SmokeShare, FLYOVER, FLYOVER_TRIGGER, FlyoverPose, sky as SKY,
   FRONT_SET_STAGES, FRONT_PROPS, BRICK, ProfileAt } from "./Data_OpeningSet0103.mjs";
 import { OPENING_STORYBOARDS } from "./Data_OpeningStoryboards.mjs";
 import { MISSION_LAYOUT } from "./Data_FirstLevelMissionLayout.mjs";
@@ -141,8 +141,13 @@ export class OpeningSet {
   // ---------------------------------------------------------------- lifecycle
   Enter(stageId) {
     this.stage = stageId;
-    if (FRONT_SET_STAGES.includes(stageId)) { if (!this.front && !this.suspended) this.BuildFront(); }
-    else this.ExitFront();
+    // 前沿布景在 01 进场时就建好（先藏着）：02→03 是正常游玩里的步骤切换，不是加载画面，
+    // 几千块砖的合批放在那一帧现建会卡一下（审查 09-25）。03–06 显示，出了 01–06 收走。
+    const frontShown = FRONT_SET_STAGES.includes(stageId);
+    if (frontShown || SET_STAGES.includes(stageId)) {
+      if (!this.front && !this.suspended) this.BuildFront();
+      if (this.front) this.front.root.visible = frontShown;
+    } else this.ExitFront();
     if (!SET_STAGES.includes(stageId)) { this.ExitOpening(); return false; }
     if (!this.root && !this.suspended) this.Build();
     this.SyncSky();
@@ -159,12 +164,14 @@ export class OpeningSet {
     this.rescueRoot.visible = collapsed && RescueShown(stageId, phase);
     if (collapsed) {
       const f = this.lintel?.spec.fall;
-      // 没看到近爆（选章 / 回跳 / 重试直接进 02）＝已经落定。
-      this.FallLintel(flags.blastAge == null || !f ? 1 : this.LintelProgressAt(flags.blastAge));
+      // 没看到近爆（选章 / 回跳 / 重试直接进 02）＝已经落定。落定后不再每帧设姿态。
+      const want = flags.blastAge == null || !f ? 1 : this.LintelProgressAt(flags.blastAge);
+      if (want !== this.lintelProgress) this.FallLintel(want);
+      this.UpdateRoofTimber(dt, stageId, phase);
     }
     this.UpdateBlast(flags.blastAge, stageId);
     this.UpdateLantern(stageId, collapsed);
-    this.UpdateSmoke(stageId);
+    if (this.smokeStage !== stageId) { this.smokeStage = stageId; this.UpdateSmoke(stageId); }
     this.UpdateFlyover(dt, stageId, flags.player);
     this.SyncBreakables(flags.breakables);
   }
@@ -185,7 +192,8 @@ export class OpeningSet {
     if (this.skyApplied) { this.skyApplied = false; this.restoreSky?.(); }
     if (!this.root) return;
     this.DisposeRoot(this.root, this.ownedMaterials, this.ownedTextures, this.lights);
-    this.root = null; this.collapsedRoot = null; this.rescueRoot = null; this.lintel = null; this.lantern = null;
+    this.root = null; this.collapsedRoot = null; this.rescueRoot = null; this.lintel = null; this.lantern = null; this.roofTimber = null;
+    this.smokeStage = null;
     this.ownedMaterials = []; this.ownedTextures = []; this.lights = [];
     for (const handle of this.fireHandles || []) this.vfx?.lights?.RemoveFire?.(handle);
     this.fireHandles = [];
@@ -244,37 +252,47 @@ export class OpeningSet {
   }
 
   /** 从 BLAST 数据喷一次（调试入口 DebugBlast 也走这里）。 */
-  SprayBlast() {
+  SprayBlast(tuning = null) {
     if (!this.blastFx) return null;
-    const floor = this.groundAt(BLAST.at.x, BLAST.at.z), [lo, hi] = BLAST.liftM;
-    return this.blastFx.DirectionalBlast({ x: BLAST.at.x, y: floor + (lo + hi) / 2, z: BLAST.at.z }, BLAST.dir,
-      { heightM: (hi - lo) / 2, groundY: this.groundAt(FLOOR.x, FLOOR.z) });
+    const b = tuning ? { ...BLAST, ...tuning } : BLAST;       // tuning：抓帧 / 调参时临时覆盖（正片不传）
+    const floor = this.groundAt(b.at.x, b.at.z), [lo, hi] = b.liftM;
+    const dustAt = b.dustAt ? { x: b.dustAt.x, y: this.groundAt(b.dustAt.x, b.dustAt.z) + (b.dustAt.lift ?? 0.7), z: b.dustAt.z } : null;
+    return this.blastFx.DirectionalBlast({ x: b.at.x, y: floor + (lo + hi) / 2, z: b.at.z }, b.dir,
+      { heightM: (hi - lo) / 2, groundY: this.groundAt(FLOOR.x, FLOOR.z), clods: b.clods, splinters: b.splinters, spray: b.spray, dust: b.dust,
+        seconds: b.seconds, spreadRad: b.spreadRad, speed: b.speed, burst: b.burst, clodSize: b.clodSize, upBoost: b.upBoost,
+        sprayDir: b.sprayDir, dustDir: b.dustDir, dustAt, dustHeightM: b.dustHeightM, dustLead: b.dustLead });
   }
 
   /**
    * 调试 / 抓帧入口：现在就近爆一次（喷土 + 门楣从门楣位重新落下），不碰导演与任务状态。
    * 之后的 Update 若 flags.blastAge 仍是 null，门楣按「已落定」处理——抓帧请在真实流程的 Blast 拍里拍。
    */
-  DebugBlast() {
+  DebugBlast(tuning = null) {
     this.blastSprayed = true;
-    return this.SprayBlast();
+    return this.SprayBlast(tuning);
   }
 
   // ---------------------------------------------------------------- 烟柱与火点
   UpdateSmoke(stageId) {
     if (!this.vfx) return;
-    const want = new Set(SMOKE.filter((row) => row.stages.includes(stageId)).map((row) => row.id));
+    const rows = SMOKE.filter((row) => row.stages.includes(stageId)), want = new Set(rows.map((row) => row.id));
     for (const [id, handle] of this.smoke) if (!want.has(id)) { this.vfx.RemoveSmokeSource(handle); this.smoke.delete(id); }
-    for (const row of SMOKE) {
-      if (!want.has(row.id) || this.smoke.has(row.id)) continue;
+    // 按当前画质与池容量压 rate（SmokeShare）：这一步所有烟源一起压，已经在冒的也改（改 source.rate，不重建、烟柱不断）。
+    const spawn = this.vfx.spawnScale ?? 1, share = SmokeShare(rows, spawn, this.vfx.pools?.sourceSmoke?.capacity);
+    this.smokeShare = share;
+    for (const row of rows) {
+      const opts = SmokeOptions(row);
+      opts.rate = +(opts.rate * share).toFixed(3);
+      if (this.smoke.has(row.id)) { const src = this.vfx.smokeSources?.get?.(this.smoke.get(row.id)); if (src) src.rate = opts.rate * spawn; continue; }
       const y = this.groundAt(row.x, row.z) + (row.fire > 0 ? 0.15 : 1.0);
-      this.smoke.set(row.id, this.vfx.SmokeSource({ x: row.x, y, z: row.z }, SmokeOptions(row)));
+      this.smoke.set(row.id, this.vfx.SmokeSource({ x: row.x, y, z: row.z }, opts));
     }
   }
 
   ClearSmoke() {
     for (const handle of this.smoke.values()) this.vfx?.RemoveSmokeSource(handle);
     this.smoke.clear();
+    this.smokeStage = null;
   }
 
   // ---------------------------------------------------------------- 03 开头的飞机
@@ -346,16 +364,73 @@ export class OpeningSet {
     piece.updateMatrixWorld(true);
   }
 
+  // ---------------------------------------------------------------- 塌顶木：近爆后卡在洞顶下，到 settle.phase 那一拍塌下来
+  /** 0 = 卡在洞顶下（hang），1 = 落定（SB03A 画面上沿那一条）。导演 phase 到了 settle.phase（或 01 之后的任何一拍）开始落。 */
+  RoofTimberSettled(stageId, phase) {
+    const spec = this.roofTimber?.spec;
+    if (!spec?.settle) return true;
+    if (stageId !== "Trapped" && stageId !== "BunkerRescue") return true;
+    const order = OPENING_STORYBOARDS.phases.Trapped, at = order.indexOf(spec.settle.phase), k = order.indexOf(phase);
+    if (k < 0) return RescueShown(stageId, phase) || stageId !== "Trapped";      // 02 的拍，或没有导演 phase：已落定
+    return k >= at;
+  }
+
+  UpdateRoofTimber(dt, stageId, phase) {
+    const t = this.roofTimber;
+    if (!t) return;
+    const settled = this.RoofTimberSettled(stageId, phase);
+    if (!settled) { t.age = null; t.sawHang = true; if (t.progress !== 0) this.PoseRoofTimber(0); return; }
+    if (t.age == null) t.age = t.sawHang ? 0 : Infinity;      // 看着它卡在洞顶下的才演塌下来；选章 / 直接进 02 就是落定的
+    t.age += dt;
+    const s = t.spec.settle, u = Clamp01(t.age / s.seconds);
+    let p = u * u;
+    const after = t.age - s.seconds;
+    if (after > 0 && after < s.bounceS) p = 1 - s.bounceRad * Math.sin(Math.PI * after / s.bounceS);
+    if (p !== t.progress) {
+      // 看着它塌下来的那一下：砸地的一小团土（和垫块同时出现，盖住它们「冒出来」）。
+      if (t.sawHang && p >= 0.9 && (t.progress ?? 0) < 0.9 && this.blastFx) {
+        const s = t.spec.settle, mid = t.restA.clone().lerp(t.restB, 0.7);
+        this.blastFx.DirectionalBlast({ x: mid.x, y: mid.y - 0.3, z: mid.z }, { x: 0.35, y: 0.3, z: 0.2 },
+          { clods: s.impact.clods, splinters: 0, spray: 0, dust: s.impact.dust, seconds: 0.3, spreadRad: 1.0, heightM: 0.15, groundY: this.groundAt(FLOOR.x, FLOOR.z),
+            speed: { clods: [1, 3], splinters: [1, 2], spray: [1, 2], dust: [0.6, 1.6] } });
+      }
+      this.PoseRoofTimber(p);
+    }
+  }
+
+  /** 塌顶木姿态：0 = hang，1 = 落定（a/b）。两头各自插值，网格局部 +z 从 a 指向 b。 */
+  PoseRoofTimber(progress) {
+    const t = this.roofTimber;
+    if (!t) return;
+    t.progress = progress;
+    const a = t.hangA.clone().lerp(t.restA, progress), b = t.hangB.clone().lerp(t.restB, progress);
+    t.mesh.position.copy(a).add(b).multiplyScalar(0.5);
+    t.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), b.clone().sub(a).normalize());
+    t.mesh.updateMatrixWorld(true);
+    if (t.supports) t.supports.visible = progress >= 0.9;
+  }
+
   // ---------------------------------------------------------------- lantern
   UpdateLantern(stageId, collapsed) {
     const lamp = this.lantern;
     if (!lamp) return;
     const s = lamp.spec, lit = s.litStages.includes(stageId);
+    // 马灯只在 01 亮：出了 01 就把火光池的槽还回去（不等离开 03），灭了的灯不再占 LightRig 的名额；回跳到 01 再要回来。
+    if (lamp.light.isClusterFire) {
+      if (!lit && lamp.light.handle != null) {
+        lamp.rig.RemoveFire(lamp.light.handle);
+        this.fireHandles = this.fireHandles.filter((h) => h !== lamp.light.handle);
+        lamp.light.handle = null;
+      } else if (lit && lamp.light.handle == null) {
+        lamp.light.handle = lamp.rig.AddFire(lamp.fireAt, lamp.fireOptions);
+        this.fireHandles.push(lamp.light.handle);
+      }
+    }
     const [a, b, c] = s.light.flickerHz, t = this.time;
     const flicker = 1 - s.light.flicker * (0.5 + 0.25 * Math.sin(t * a * 2 * Math.PI) + 0.15 * Math.sin(t * b * 2 * Math.PI + 1.3) + 0.1 * Math.sin(t * c * 2 * Math.PI + 0.4));
     lamp.light.visible = lit;
     lamp.light.intensity = lit ? s.light.intensity * flicker : 0;
-    if (lamp.light.isClusterFire) lamp.rig.UpdateFire(lamp.light.handle, { intensity: lamp.light.intensity });
+    if (lamp.light.isClusterFire && lamp.light.handle != null) lamp.rig.UpdateFire(lamp.light.handle, { intensity: lamp.light.intensity });
     lamp.glass.emissiveIntensity = lit ? 2.4 * flicker : 0.05;
     // 近爆那一下马灯晃（挂钩上摆），之后慢慢停住。
     const swing = collapsed ? 0.12 * Math.exp(-0.9 * (this.time - (lamp.swingFrom ??= this.time))) : 0;
@@ -389,9 +464,8 @@ export class OpeningSet {
   }
 
   Lib(name, options) {
-    if (this.library?.Get) {
-      try { return this.library.Get(name, options); } catch { /* 缺配方退回自有纯色材质 */ }
-    }
+    // 真材质库在：缺配方就是写错名字，原样抛出（契约「不许静默退回」）。只有没有库（纯 node、编辑器预览）才用纯色。
+    if (this.library?.Get) return this.library.Get(name, options);
     const key = `__fallback_${name}`;
     if (!this.sinkMaterials.has(key)) this.sinkMaterials.set(key, this.Own(new THREE.MeshStandardMaterial({ color: 0x6b5a45, roughness: 0.95 })));
     return this.sinkMaterials.get(key);
@@ -414,6 +488,7 @@ export class OpeningSet {
     if (kind === "flag") return this.BuildFlag(prop, sink);
     if (kind === "planks") return this.BuildPlanks(prop, sink);
     if (kind === "mound") return this.BuildMound(prop, sink);
+    if (kind === "earthSkin") return this.BuildEarthSkin(prop, sink);
     if (kind === "external") return null;       // 异步：LoadExternals
     throw new Error(`OpeningSet: unknown prop kind ${kind} (${prop.id})`);
   }
@@ -494,8 +569,10 @@ export class OpeningSet {
     let light;
     if (rig) {
       const at = { x: group.position.x, y: group.position.y - 0.18, z: group.position.z };
-      light = { isClusterFire: true, handle: rig.AddFire(at, { intensity: 0, radius: s.distanceM, color: s.color, flicker: false, priority: 2 }), visible: false, intensity: 0 };
+      const fireOptions = { intensity: 0, radius: s.distanceM, color: s.color, flicker: false, priority: 2 };
+      light = { isClusterFire: true, handle: rig.AddFire(at, fireOptions), visible: false, intensity: 0 };
       this.fireHandles.push(light.handle);
+      this.lanternFire = { at, fireOptions };
     } else {
       light = new THREE.PointLight(s.color, 0, s.distanceM, s.decay);
       light.name = `${group.name}_Light`; light.castShadow = false; light.position.set(0, -0.18, 0);
@@ -503,7 +580,7 @@ export class OpeningSet {
       this.lights.push(light);
     }
     this.root.add(group);
-    this.lantern = { spec: prop, group, light, glass, rig };
+    this.lantern = { spec: prop, group, light, glass, rig, fireAt: this.lanternFire?.at, fireOptions: this.lanternFire?.fireOptions };
   }
 
   BuildCrates(prop, sink) {
@@ -527,9 +604,8 @@ export class OpeningSet {
 
   BuildFallingTimber(prop, sink) {
     const floor = this.Floor(prop, prop.intact.x, prop.intact.z), i = prop.intact, rnd = Rng(prop.id);
-    // 北段：还搁在北柱顶上（静态，塌方组）。断口处几根劈开的木刺。
-    const northEnd = i.z - i.d / 2, stubLen = prop.breakZ - northEnd;
-    sink.Add("WoodBeam", PlaceGeometry(MakeBox(i.w, i.h, stubLen, TILE_METERS.wood, `${prop.id}N`), { x: i.x, y: floor + i.lift, z: northEnd + stubLen / 2 }));
+    // 北段还搁在北柱顶上：它是 MISSION_SCENARIO 塌方态的 Space 体块 BunkerMouthLintelN（整关都在，04 以后洞口不会
+    // 少一根门楣）。这里只加断口处几根劈开的木刺。
     for (let k = 0; k < 4; k++) sink.Add("WoodBeam", PlaceGeometry(MakeBox(0.04 + rnd() * 0.03, 0.03 + rnd() * 0.03, 0.18 + rnd() * 0.14, TILE_METERS.wood, `${prop.id}sN${k}`),
       { x: i.x + (rnd() - 0.5) * i.w * 0.8, y: floor + i.lift + (rnd() - 0.5) * i.h * 0.7, z: prop.breakZ + 0.06, rx: (rnd() - 0.5) * 0.5, ry: (rnd() - 0.5) * 0.4 }));
     // 南段：以南门柱顶为轴落下，单独一只网格（每帧设姿态）。局部 -z 指向断头。
@@ -553,12 +629,37 @@ export class OpeningSet {
   BuildTimber(prop, sink) {
     const floor = this.Floor(prop, prop.a.x, prop.a.z);
     const a = new THREE.Vector3(prop.a.x, floor + prop.a.lift, prop.a.z), b = new THREE.Vector3(prop.b.x, floor + prop.b.lift, prop.b.z);
-    sink.Add("WoodBeam", Beam(a, b, { w: prop.w, h: prop.h, seed: prop.id }));
     const rnd = Rng(prop.id);
+    if (prop.hang) {
+      // 会塌的那根：单独一只网格（原点在中点、局部 +z 沿木料），每帧由 PoseRoofTimber 摆。
+      const len = a.distanceTo(b), pieceSink = new BuildSink();
+      pieceSink.Add("WoodBeam", MakeBox(prop.w, prop.h, len, TILE_METERS.wood, prop.id));
+      const [mesh] = pieceSink.Flush(this.collapsedRoot, {}, { castShadow: true, receiveShadow: true, resolve: () => this.Lib("WoodBeam") });
+      mesh.name = `OpeningSet0103_${prop.id}_Settling`;
+      const V = (p) => new THREE.Vector3(p.x, floor + p.lift, p.z);
+      this.roofTimber = { spec: prop, mesh, restA: a, restB: b, hangA: V(prop.hang.a), hangB: V(prop.hang.b), progress: null, age: null };
+      this.PoseRoofTimber(0);
+    } else sink.Add("WoodBeam", Beam(a, b, { w: prop.w, h: prop.h, seed: prop.id }));
+    // 断口的木刺（断板用）：挂在下端。
+    const dir = b.clone().sub(a).normalize();
+    for (let k = 0; k < (prop.splinters || 0); k++) {
+      const tip = b.clone().addScaledVector(dir, 0.04 + rnd() * 0.12);
+      tip.x += (rnd() - 0.5) * prop.w * 0.8;
+      sink.Add("WoodBeam", Beam(b.clone().addScaledVector(dir, -0.05), tip, { w: 0.02 + rnd() * 0.03, h: 0.015 + rnd() * 0.02, seed: `${prop.id}s${k}` }));
+    }
+    // 两头垫的土块：会塌的那根，土块跟它一起下来（塌下之前不在：南头那堆在 SB03 画面右下，审查 09-25）。
+    const supportSink = prop.hang ? new BuildSink() : sink;
     for (const s of prop.supports || []) for (let k = 0; k < 5; k++)
-      sink.Add("GroundRubble", PlaceGeometry(Normalize(new THREE.DodecahedronGeometry(0.5, 0)), {
+      supportSink.Add("GroundRubble", PlaceGeometry(Normalize(new THREE.DodecahedronGeometry(0.5, 0)), {
         x: s.x + (rnd() - 0.5) * s.w * 0.6, y: floor + s.h * (0.25 + rnd() * 0.3), z: s.z + (rnd() - 0.5) * s.d * 0.6,
         ry: rnd() * 6, rx: rnd() * 2, scale: 0.16 + rnd() * 0.1 }));
+    if (prop.hang && prop.supports?.length) {
+      const group = new THREE.Group(); group.name = `OpeningSet0103_${prop.id}_Supports`; group.visible = false;
+      this.collapsedRoot.add(group);
+      supportSink.Flush(group, {}, { castShadow: true, receiveShadow: true, resolve: () => this.Lib("GroundRubble") });
+      this.roofTimber.supports = group;
+      this.PoseRoofTimber(this.roofTimber.progress ?? 0);
+    }
   }
 
   BuildFacade(prop, sink, materials) {
@@ -716,6 +817,68 @@ export class OpeningSet {
         { x: p.x, y: this.groundAt(p.x, p.z) + p.lift, z: p.z, ry: (p.yawDeg || 0) * DEG, rx: (p.pitchDeg || 0) * DEG, rz: (p.rollDeg || 0) * DEG }));
   }
 
+  /**
+   * Space 体块的土皮（SB05 左半那块平的深褐方块）：选定的几面贴一层起伏的土（外鼓 0.015–bulgeM）、顶上压一层土，
+   * 再钉几根护壁木桩、两道横板。体块本身（碰撞、掩体标签）不动；土皮只往外长，不会出现隐形墙。
+   */
+  BuildEarthSkin(prop, sink) {
+    const block = MISSION_LAYOUT.scenario.states.find((s) => s.id === "BunkerCollapsed")?.blocks.find((b) => b.id === prop.block);
+    if (!block) throw new Error(`OpeningSet: earthSkin block ${prop.block} is not in the collapsed scenario`);
+    const rnd = Rng(`${prop.id}${prop.seed}`), bottom = block.y - block.h / 2 - 0.06, top = block.y + block.h / 2;
+    const Noise = (a, b) => 0.5 + 0.28 * Math.sin(a * 5.1 + b * 2.3 + prop.seed) + 0.22 * Math.sin(a * 11.7 - b * 7.9 + 1.7 * prop.seed);
+    const faces = {
+      north: { o: new THREE.Vector3(block.x - block.w / 2, 0, block.z - block.d / 2), t: new THREE.Vector3(1, 0, 0), n: new THREE.Vector3(0, 0, -1), len: block.w },
+      south: { o: new THREE.Vector3(block.x + block.w / 2, 0, block.z + block.d / 2), t: new THREE.Vector3(-1, 0, 0), n: new THREE.Vector3(0, 0, 1), len: block.w },
+      west: { o: new THREE.Vector3(block.x - block.w / 2, 0, block.z + block.d / 2), t: new THREE.Vector3(0, 0, -1), n: new THREE.Vector3(-1, 0, 0), len: block.d },
+      east: { o: new THREE.Vector3(block.x + block.w / 2, 0, block.z - block.d / 2), t: new THREE.Vector3(0, 0, 1), n: new THREE.Vector3(1, 0, 0), len: block.d },
+    };
+    const Grid = (nu, nv, at) => {
+      const pos = [], uv = [], index = [];
+      for (let j = 0; j <= nv; j++) for (let i = 0; i <= nu; i++) { const [p, u, v] = at(i / nu, j / nv); pos.push(p.x, p.y, p.z); uv.push(u, v); }
+      for (let j = 0; j < nv; j++) for (let i = 0; i < nu; i++) {
+        const a = j * (nu + 1) + i, b = a + 1, c = a + nu + 1, d = c + 1;
+        index.push(a, c, b, b, c, d);
+      }
+      const g = new THREE.BufferGeometry();
+      g.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+      g.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2));
+      g.setIndex(index); g.computeVertexNormals();
+      return g;
+    };
+    for (const [key, dress] of Object.entries(prop.faces)) {
+      const f = faces[key], h = top - bottom;
+      // 面：沿面 0→len、竖直 bottom→top；最上一排往里收 0.12、往上 0.05，接住顶上的土。两端各多出 0.08 包住棱角。
+      sink.Add("GroundRubble", Grid(Math.ceil(f.len / 0.12) + 2, Math.ceil(h / 0.12), (u, v) => {
+        const s = -0.08 + u * (f.len + 0.16), y = bottom + v * h, lip = v > 0.97 ? 1 : 0;
+        const out = 0.015 + (prop.bulgeM - 0.015) * Noise(s, y) * (0.6 + 0.4 * Math.sin(v * Math.PI));
+        const p = f.o.clone().addScaledVector(f.t, s).addScaledVector(f.n, out - lip * 0.12);
+        p.y = y + lip * 0.05;
+        return [p, s / 1.2, y / 1.2];
+      }));
+      // 护壁木桩：贴着土皮外面，顶比体块高一点、微微往墙里斜。
+      const st = dress.stakes;
+      for (let s = 0.2; st && s < f.len - 0.1; s += st.everyM) {
+        const base = f.o.clone().addScaledVector(f.t, s + (rnd() - 0.5) * 0.08).addScaledVector(f.n, prop.bulgeM + st.w / 2);
+        base.y = bottom;
+        const axis = new THREE.Vector3(-f.n.x * 0.06, 1, -f.n.z * 0.06).normalize();
+        sink.Add("WoodBeam", Post(base, axis, h + st.aboveM + rnd() * 0.1, st.w, { round: true, seed: `${prop.id}${key}${s}` }));
+      }
+      // 横板：压在木桩外侧。
+      for (const lift of st ? dress.planks || [] : []) {
+        const y = bottom + 0.06 + lift, off = prop.bulgeM + st.w + 0.018;
+        const a = f.o.clone().addScaledVector(f.t, 0.05).addScaledVector(f.n, off), b = f.o.clone().addScaledVector(f.t, f.len - 0.05).addScaledVector(f.n, off);
+        a.y = y + (rnd() - 0.5) * 0.04; b.y = y + (rnd() - 0.5) * 0.04;
+        sink.Add("WoodBeam", Beam(a, b, { w: 0.18, h: 0.035, seed: `${prop.id}${key}p${lift}` }));
+      }
+    }
+    // 顶上的土：起伏的一层，四边垂到体块顶以下一点。
+    sink.Add("GroundRubble", Grid(12, 12, (u, v) => {
+      const x = block.x - block.w / 2 - 0.1 + u * (block.w + 0.2), z = block.z - block.d / 2 - 0.1 + v * (block.d + 0.2);
+      const edge = Math.min(u, 1 - u, v, 1 - v), y = top + (edge < 0.05 ? -0.04 : 0.02 + 0.08 * Noise(x, z) * Math.min(1, edge * 6));
+      return [new THREE.Vector3(x, y, z), x / 1.2, z / 1.2];
+    }));
+  }
+
   BuildMound(prop, sink) {
     const rnd = Rng(`${prop.id}${prop.seed}`), g = new THREE.SphereGeometry(1, 18, 7, 0, Math.PI * 2, 0, Math.PI / 2), pos = g.attributes.position;
     for (let i = 0; i < pos.count; i++) {
@@ -737,13 +900,8 @@ export class OpeningSet {
     const front = { root, ownedMaterials: [] };
     const sink = new BuildSink(), materials = new Map();
     sink.SetSector("OpeningSet_Front");
-    // 砖：城墙灰砖染成土黄灰（契约：阵位白盒改成「土黄砖色」的破砖墙；参考概念图 04）。配方按 BRICK.recipes 依次试。
-    let brick = null;
-    for (const recipe of BRICK.recipes) {
-      try { brick = this.library?.Get?.(recipe, { color: BRICK.color }) || null; } catch { brick = null; }
-      if (brick) break;
-    }
-    materials.set("OpeningSetBrick", brick || this.FrontLib(front, "BrickWallSooty"));
+    // 砖：城墙灰砖染成土黄灰（契约：阵位白盒改成「土黄砖色」的破砖墙；参考概念图 04）。缺配方就抛（不静默退回）。
+    materials.set("OpeningSetBrick", this.FrontLib(front, BRICK.recipe, { color: BRICK.color }));
     const resolve = (name) => materials.get(name) || this.FrontLib(front, name);
     const saved = { sinkMaterials: this.sinkMaterials, ownedMaterials: this.ownedMaterials };
     this.sinkMaterials = materials; this.ownedMaterials = front.ownedMaterials;
@@ -792,9 +950,7 @@ export class OpeningSet {
 
   /** 前沿组自己的库材质（缺配方时的纯色兜底归前沿组，随它 dispose）。 */
   FrontLib(front, name, options) {
-    if (this.library?.Get) {
-      try { return this.library.Get(name, options); } catch { /* 退回纯色 */ }
-    }
+    if (this.library?.Get) return this.library.Get(name, options);      // 真库在：缺配方原样抛出
     const material = new THREE.MeshStandardMaterial({ color: name.startsWith("Brick") ? 0x9a7a58 : 0x6b5a45, roughness: 0.95 });
     front.ownedMaterials.push(material);
     return material;

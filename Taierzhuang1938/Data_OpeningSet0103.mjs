@@ -33,18 +33,21 @@ export const PROPS = Object.freeze([
   // 弹药箱东边、贴着北门柱（x 0.3…0.9）：SB02 从洞里朝东北东看，北门柱在画面中间，沙袋、标语、
   // 马灯都要挨着门柱才进画。
   { id: "bunkerSandbagWallN", kind: "sandbagWall", ground: FLOOR,
-    a: P(0.3, -127.62), b: P(0.9, -127.62), layers: 4, layerM: 0.18, depthM: 0.36, bagM: 0.5 },
+    // 3 层 0.54 m（调研写高 1.1、上一版 4 层 0.72）：海报的字排在下半，沙袋墙得让出来（见 bunkerPoster）。
+    a: P(0.3, -127.62), b: P(0.9, -127.62), layers: 3, layerM: 0.18, depthM: 0.36, bagM: 0.5 },
   // 竖排两行标语配宣传画，贴在北壁的木板上，面朝南。底图 Lovart、字程序叠加（Texture/Script_MakeBunkerPoster.mjs）。
-  // 离洞底 1.02 m 的中心（调研写 1.2）：SB02 镜像机位眼高 0.75、俯 14°，画面上沿只到离地约 1.45 m，
-  // 1.2 时实拍只看得见下半截的画、看不见字（tmp/cap/step1b/SB02_set_after.png）。1.02 时字（上 45%，
-  // 离地 0.98–1.47）露在沙袋与弹药箱上方；下半截的画被弹药箱（0.85）与沙袋墙（0.72）压住一角，像贴在后面。
-  // x 从 0.2 东移到 0.35，少被弹药箱挡。
-  { id: "bunkerPoster", kind: "poster", ground: FLOOR, x: 0.35, z: -127.8, lift: 1.02, w: 0.6, h: 0.9, faceYawDeg: 180,
+  // 审查 09-25：真实流程 Blast 机位（眼 0.75、俯 13°、横滚 +15°：头向左倒，画面左半往上翻）北壁上离地 0.95 m 以上
+  // 全在画框外，上一版（中心 1.02、字在上 45%、离地 0.98–1.47）只露出下半截的画。现在贴图改成**画在上、字在下**
+  // （版式 textBottom），中心 0.95、x 0.5：字在离地 0.54–0.86，落在沙袋墙（0.54）上方、画框上沿以下；
+  // 投到 Blast 镜像机位是画面 x 0.19–0.25、y 0.12–0.30（Script_OpeningSetTest 量）。x 0.5 也避开了北壁弹药箱（x ≤ 0.25）。
+  { id: "bunkerPoster", kind: "poster", ground: FLOOR, x: 0.5, z: -127.8, lift: 0.95, w: 0.6, h: 0.9, faceYawDeg: 180,
+    textBand: Object.freeze([0.605, 0.955]),        // 字在贴图里的纵向范围（从上往下，0–1），与 Script_MakeBunkerPoster 的 textBottom 一致
     texture: "./Texture/Texture_BunkerPosterDefendShandong.webp",
     board: Object.freeze({ x0: -0.75, x1: 0.92, z: -127.87, lift0: 0.0, lift1: 1.84, plankM: 0.2 }) },
   // 铁皮马灯：挂在北门柱内侧（柱 x 0.925…1.175、z -127.65…-127.35）的钉子上，暖色点光只在 01 亮、轻微闪烁。
-  // 离洞底 1.28 m（调研写 1.55）：同上，SB02 俯 14° 时 1.55、1.4 都在画面上沿外（实拍）。
-  { id: "bunkerLantern", kind: "lantern", ground: FLOOR, x: 0.84, z: -127.42, lift: 1.28,
+  // 离洞底 1.0 m（调研写 1.55，上一版 1.28）：Blast 机位俯 13° 时 1.28 只在画面上沿露一小块亮斑（审查 09-25）；
+  // 1.0 时灯身在画面 (0.37, 0.13)，挨着北门柱。
+  { id: "bunkerLantern", kind: "lantern", ground: FLOOR, x: 0.84, z: -127.42, lift: 1.0,
     light: Object.freeze({ color: 0xffa65a, intensity: 2.2, distanceM: 3.2, decay: 2, flickerHz: Object.freeze([7.3, 11.1, 2.3]), flicker: 0.16 }),
     litStages: Object.freeze(["Trapped"]) },
   // 北壁弹药箱两层（幺娃身后，SB01 左中），箱背嵌进北壁坡脚。
@@ -65,7 +68,7 @@ export const PROPS = Object.freeze([
     intact: Object.freeze({ x: 1.05, z: -125.9, lift: 1.84, w: 0.3, h: 0.22, d: 3.4 }),
     pivot: P(1.05, -124.3, 1.84),          // 南段绕南门柱顶转
     rest: P(0.72, -126.15, 0.87),          // 断头落在塌顶木 roofTimberDown 上（顶面离地 0.76 + 半厚 0.11）
-    breakZ: -126.5,                         // 断口：北段 z -127.6…-126.5 留在北柱顶
+    breakZ: -126.5,                         // 断口：北段 z -127.6…-126.5 留在北柱顶（MISSION_SCENARIO 塌方态的 BunkerMouthLintelN 体块）
     // 近爆后的落下时刻（秒，从 Blast 起算），契约 §5 SB02「fallenLintel 0.25–0.6 s 塌下」。
     fall: Object.freeze({ startS: 0.25, endS: 0.6, bounceRad: 0.05, bounceS: 0.18 }) },
   // SB03A 画面上沿那一整条黑木料：塌下的洞顶木，沿 z 横在洞口内侧，两头各垫一堆土块。
@@ -74,10 +77,23 @@ export const PROPS = Object.freeze([
   // 离地抬到 0.62/0.66（下沿 0.48–0.52）：0.47/0.55 时木料下沿 0.33–0.41，SB03 眼高 0.26 离它只有 0.45 m，
   // 实拍盖掉画面上 42%、审问组只剩头（tmp/cap/step1b/SB03_set.png）。现在 SB03 约占上 25%、SB03A 约 20%，
   // 日兵甲的头从木料下沿露出来（Script_OpeningSetTest 的视线检查，余量约 4 cm）。
+  // **近爆后先卡在洞顶下面，到 Reach（顺子伸手够枪）那一拍才塌下来**（审查 09-25：SB03 与 SB03A 两个眼位只差 8 cm、
+  // 2°，同一根木料落定在这里就会在 SB03 也横在画面上 25%、把旗面挡掉；分镜 SB03 画面顶上是天，没有这条木料）。
+  // hang 是卡在洞顶下的姿态（北头 1.62、南头 1.05：两个眼位看都在画面上沿以外），settle 是塌下的时刻与时长。
+  // 离眼 0.45 m 的木料要在 SB03 画框外，下沿得高过眼 0.35 m 以上（竖直半视场 32.5° + 俯仰 5°）。
   { id: "roofTimberDown", kind: "timber", ground: FLOOR, show: "collapsed",
     a: P(0.8, -126.25, 0.62), b: P(0.8, -124.5, 0.66), w: 0.3, h: 0.28,
+    hang: Object.freeze({ a: P(0.8, -126.25, 1.62), b: P(0.8, -124.5, 1.05) }),
+    settle: Object.freeze({ phase: "Reach", seconds: 0.32, bounceRad: 0.03, bounceS: 0.16, impact: Object.freeze({ clods: 4, dust: 10 }) }),
     supports: Object.freeze([Object.freeze({ x: 0.8, z: -126.15, w: 0.5, h: 0.48, d: 0.45 }),
       Object.freeze({ x: 0.82, z: -124.62, w: 0.45, h: 0.52, d: 0.4 })]) },
+
+  // SB03 左上角那根斜断木（分镜 03：画面左上一截劈开的木料斜着插下来；SB03A 左侧也有）：门楣断口（北段 z -126.5）南边
+  // 挂下来的一块断板，上头卡在洞顶边、下头垂到离地 0.55 m，在门洞北半、x 0.98（塌顶木 x 0.65–0.95 的东边一点）。
+  // 下头在塌顶木 roofTimberDown 的通道限制以内（人从洞口进出本来就得走 z < -126.4 或 x > 1.25），不另外占路。
+  // 画面位置（SB03 眼位、1280×720）：下端约 (0.28, 0.29)，上端出左上角（Script_OpeningSetTest 量）。
+  { id: "brokenBoardNW", kind: "timber", ground: FLOOR, show: "collapsed",
+    a: P(1.02, -126.32, 1.8), b: P(0.98, -125.62, 0.55), w: 0.22, h: 0.05, splinters: 5 },
 
   // ---------------------------------------------------------------- 洞口外前沟（SB03/03A/04/04A 的背景）
   // 北壁木框洞口立面：挖在北壁里的另一处掩蔽部口（纯装饰，门内黑），门洞 x 2.7–3.9，另一口 x 4.9–5.5。
@@ -105,7 +121,8 @@ export const PROPS = Object.freeze([
     runs: Object.freeze([Path([6.0, -121.84], [12.3, -122.0]), Path([16.8, -122.72], [19.6, -123.3])]) },
   // 日军插在南沟沿上的旗（SB03 右沿、SB03A 右上、SB04 左远）：调研写 (10.5,-122.3)，那里是南壁半坡（地面 -1.13），
   // 挪到沟沿 z -121.8、插在沙袋中间。杆 2.8 m，旗面 0.7×0.46，程序化白底红日加脏污。
-  { id: "flagTrench", kind: "flag", x: 10.5, z: -121.8, poleM: 2.8, cloth: Object.freeze([0.7, 0.46]), flyYawDeg: 70 },
+  // 旗往南飘（flyYawDeg 170）：SB03/03A 从洞口朝东看，旗面正对镜头、往画面右边展开；原来朝西（70°）从洞口看是一条边（实拍只见杆）。
+  { id: "flagTrench", kind: "flag", x: 10.5, z: -121.8, poleM: 2.8, cloth: Object.freeze([0.7, 0.46]), flyYawDeg: 170 },
   // 北沟沿枯树（现成 Model_DeadTreeTrunkSet.glb）。
   { id: "deadTreeRim0", kind: "external", asset: "deadTreeTrunk01", x: 8.6, z: -127.7, yawDeg: 40, scale: 0.9 },
   { id: "deadTreeRim1", kind: "external", asset: "deadTreeTrunk02", x: 11.6, z: -128.25, yawDeg: -65, scale: 1.0 },
@@ -135,9 +152,20 @@ export const PROPS = Object.freeze([
   // 塌土体块是方盒；这里各盖一个压扁的土包把方盒包进去（SB03 右侧：峰高不超过 0.4 m）。
   // 南侧塌土：体块 BunkerMouthRubbleS 收成 0.6×0.5×0.25 m（中心 (1.35,-124.3)），给 02 救援圈 S' (0.60,-123.90)
   // 跪着的顺子留出身位，北边与洞口塌土之间留一条 0.7 m 的过道（拖人去还权位走这里，见测试的 SB06.dragCoverSet）。
-  // 峰高 0.35（原 0.38，任务书上限约 0.35）、摊宽、起伏减半：SB03 眼高 0.26，0.38 的土包在画面右下拱过地平线；
-  // 0.31 时 0.25 m 体块的四角从土里露出来（实拍 tmp/cap/step1d/SB06_back.png）。体块四角处土厚 ≥ 0.27。
-  { id: "rubbleMoundS", kind: "mound", show: "collapsed", x: 1.35, z: -124.33, rx: 0.85, rz: 0.66, peak: 0.35, bump: 0.12, sink: 0.01, seed: 11 },
+  // 峰高 0.19（审查 09-25：0.35 的土包高过 SB03 眼高 0.26，在画面右下拱过地平线、占掉右下约 30%，沟的纵深与旗都被压住；
+  // 分镜 03 右下是泥地和伸出的右手）。体块 BunkerMouthRubbleS 同步压到 0.12 m，土包要比眼睛低 7 cm 以上。
+  // 体块四角处土厚仍盖得住体块顶（测试量）。
+  { id: "rubbleMoundS", kind: "mound", show: "collapsed", x: 1.35, z: -124.33, rx: 0.8, rz: 0.6, peak: 0.19, bump: 0.1, sink: 0.01, seed: 11 },
+  // 02 掩体 BunkerMouthSpoil（Space 体块，1.4 m 见方、碰撞与掩体标签不动）的外皮：SB05/05A 朝南看时它是画面左半一整块
+  // 平的深褐方块（审查 09-25）。北面与西面（对着 SB05 镜头的两面）贴一层起伏的土皮（外鼓 ≤ 0.05 m），西面（SB05 画面左缘
+  // 那条沟壁）再钉护壁木桩与两道横板（外伸 0.17 m），顶上压一层土：读成带护壁的沟壁。只是外观，贴着体块。
+  // 北面不钉桩：日兵甲、翻译 SB05 站位本来就贴着它的北面，拖进遮挡的替代折线离北面 0.38 m。
+  { id: "spoilEarthSkin", kind: "earthSkin", show: "collapsed", block: "BunkerMouthSpoil",
+    box: Object.freeze({ x: 1.5, z: -122.6, w: 1.4, d: 1.4, h: 1.4 }), bulgeM: 0.05, seed: 31,
+    faces: Object.freeze({
+      north: Object.freeze({}),
+      west: Object.freeze({ stakes: Object.freeze({ everyM: 0.45, aboveM: 0.12, w: 0.08 }), planks: Object.freeze([0.55, 1.05]) }),
+    }) },
   // 还权坐位 (2.40,-125.20) 西侧的靠背（只是外观，不进碰撞：进了会挡住拖进遮挡与撤出的路线）。
   // 南北只伸到 z -125.6…-124.75，南边 SB04 枪托位 (2.3,-124.4) 躺人的地方空着。
   // **02 起才出现**（show:"rescue"）：它正好在 SB03/03A 眼位看审问组的视线上（眼 (0.35,-125.15) 高 0.26、
@@ -150,22 +178,34 @@ export const PROPS = Object.freeze([
 // ---------------------------------------------------------------------------
 // 近爆的定向喷土（SB02，Script_OpeningBlastFx.DirectionalBlast）
 // ---------------------------------------------------------------------------
-// 炮弹落在洞口南侧外（导演 banter.shellAt，飞行 0.22 s）：泥土、土块、碎木从洞口南沿 (1.2,-124.5) 离地
-// 0.5–1.5 m 朝西北喷进洞里。SB02 镜像机位是眼 (-0.6,-125.95) 朝东北东 yaw -66°：喷口在镜头右边 69°、画面外
-// （半水平视场约 48°）。喷口**正对镜头**时整锥土都沿同一方位角扑过来、一直待在画框外，画面里什么都没有
-// （实拍 tmp/cap/step2/SB02_b030.png）。所以主轴朝北北西、指向北壁 (-0.3,-127.3)：土从画面右沿进来、横扫过
-// 门洞砸到北壁（分镜里那一幕）；镜头在泥雾锥（×1.2）的边上，扑脸的那一片仍有。
-// 方向 (-0.47, 0.2, -0.86)（抬约 11°），锥半角约 22°。0.22 s 起喷、0.9 s 止（契约 §5 SB02）。
+// 炮弹落在洞口南侧外（导演 banter.shellAt，飞行 0.22 s）：泥土、土块、碎木从洞口南沿 (1.2,-124.5) 朝西北喷进洞里。
+// SB02 镜像机位是眼 (-0.6,-125.95) 离地 0.75、朝东北东 yaw -66°、俯 13–14°、横滚 +15–17°：喷口在镜头右边约 65°、画面外
+// （半水平视场约 48°）。两次教训（都是实拍）：
+//  · 主轴**正对镜头**：整锥土沿同一方位角扑过来、一直贴在画框外（tmp/cap/step2/SB02_b030.png）；
+//  · 主轴朝北壁、**往上抬 11°**（上一版 (-0.47,0.2,-0.86) 离地 0.5–1.5）：镜头往下俯 13°，画面上沿在镜头前 1.1 m 处只到
+//    离地约 1.1 m，土块再加上抛全从画面上面飞过去了；背景又是洞口外暗色的北沟壁，深褐的土落在深褐的墙上，
+//    真实流程 Blast 0.22/0.30/0.40 三帧里一点都看不见（审查 09-25，Review_Set/Rv_SB02.png）。
+// 现在：喷口挪到南门柱内侧 (1.1,-124.7)、压低到离地 0.35–1.1 m、主轴放平并偏北（朝北壁，西 15°），土块与碎木从画面右沿
+// 横穿进来（主轴越朝西＝越对着镜头，就越贴着画框外沿走，Script_OpeningSetTest 按弹道投影数过）；泥雾（sprayDir）偏西 22°、
+// 扫过镜头前 1 m，镜头在泥雾锥的外沿；扬尘在门洞里先起一成多（dustLead）、往洞里推（dustAt/dustDir），
+// 浅土色的扬尘垫在暗色沟壁前面，深色的土块从它前面飞过读得出来。判据在浏览器里量：Blast 0.30/0.40 s、强制睁眼时，画面右三分之一里被喷发粒子
+// 盖住的像素比例（tmp 下的 Script 探针，报告附数）。0.22 s 起喷、0.9 s 止（契约 §5 SB02）。
 export const BLAST = Object.freeze({
   id: "bunkerMouthSpray",
-  at: P(1.2, -124.5), liftM: Object.freeze([0.5, 1.5]),
-  dir: Object.freeze({ x: -0.47, y: 0.2, z: -0.86 }),
+  at: P(1.1, -124.7), liftM: Object.freeze([0.35, 1.1]),
+  dir: Object.freeze({ x: -0.25, y: 0.02, z: -0.97 }),
+  sprayDir: Object.freeze({ x: -0.38, y: 0.0, z: -0.925 }),
+  dustAt: P(1.15, -125.3, 0.7), dustHeightM: 0.45, dustLead: 0.35,
+  dustDir: Object.freeze({ x: -0.95, y: 0.15, z: -0.2 }),
   /** 从近爆（blastAge 0 = 导演 Blast() 的那一帧）起算：炮弹 0.22 s 落地就喷。 */
   atS: 0.22, seconds: 0.68,
-  clods: 15, splinters: 9, dust: 26, spray: 70,
+  clods: 18, splinters: 14, dust: 30, spray: 80,
   spreadRad: 0.38,
-  // 速度（米/秒）：土块 5–10、碎木 6–12（更轻、飞得远）、泥雾 7–13（一片扑到镜头上）、扬尘 1.2–3.2（填满洞口）。
-  speed: Object.freeze({ clods: Object.freeze([5, 10]), splinters: Object.freeze([6, 12]), spray: Object.freeze([7, 13]), dust: Object.freeze([1.2, 3.2]) }),
+  // 土块边长（米）与额外上抛（米/秒）：少抛，贴着画面右三分之一飞。边长上限 0.13：试过 0.22，离镜头 1 m 的土块读成一只只黑方箱。
+  clodSize: Object.freeze([0.05, 0.13]),
+  upBoost: Object.freeze({ clods: Object.freeze([0.1, 0.7]), splinters: Object.freeze([0.2, 1.0]) }),
+  // 速度（米/秒）：土块 5–10、碎木 6–12（更轻、飞得远）、泥雾 8–13（一片扫过镜头前）、扬尘 1.2–3.2（填满洞口）。
+  speed: Object.freeze({ clods: Object.freeze([5, 10]), splinters: Object.freeze([6, 12]), spray: Object.freeze([8, 13]), dust: Object.freeze([1.2, 3.2]) }),
   // 前 0.18 s 喷出 70%，后面是拖尾（落土）。
   burst: Object.freeze({ headS: 0.18, headShare: 0.7 }),
 });
@@ -212,10 +252,22 @@ export function SmokeOptions(row) {
   };
 }
 /**
- * 同时在冒的烟团上限（rate × life 之和，spawnScale 1）。vfx 的持续烟池 sourceSmoke 在 high 档是
- * 4000 × 0.08 = 320 片（环形缓冲，满了就挤掉最老的，烟柱会从顶上断掉）；给战车尘土、机枪热烟留 100 片。
+ * 每一步同时在冒的烟团设计上限（rate × life 之和，按 spawnScale 1 算）。
+ * 真正的池子随画质档与战场规模变：vfx 的持续烟池 sourceSmoke = maxParticles(规模 small 2200 / medium 3400 / large 4200)
+ * × 画质 budget(low 0.35 / medium 0.65 / high、ultra 1.0) × 0.08，环形缓冲，满了就挤掉最老的（烟柱从顶上断、
+ * 别的烟源的烟团也被挤掉）；而烟源的 rate 还要乘画质的 spawnScale（low 0.45 … ultra 1.25）。
+ * 所以运行时按 SmokeShare 把本表的 rate 统一压到「只占池子 SMOKE_POOL_SHARE」以内（审查 09-25：原来只按 high/4000 算，
+ * ultra 档余量不到一半、small 规模直接超池）。
  */
 export const SMOKE_PARTICLE_BUDGET = 220;
+/** 本表的烟最多占持续烟池的这么多，余下留给战车尘土、机枪热烟、燃烧物。 */
+export const SMOKE_POOL_SHARE = 0.65;
+/** 一步的烟源在当前画质下要乘的 rate 系数（≤ 1）：rows 是这一步挂着的烟表行，capacity 是 sourceSmoke 池容量（没有就不压）。 */
+export function SmokeShare(rows, spawnScale = 1, capacity = null) {
+  const live = rows.reduce((sum, row) => { const o = SmokeOptions(row); return sum + o.rate * o.life; }, 0) * spawnScale;
+  if (!(capacity > 0) || live <= 0) return 1;
+  return Math.min(1, SMOKE_POOL_SHARE * capacity / live);
+}
 
 // ---------------------------------------------------------------------------
 // 03 开头两架日机横飞（SB07 天上两架飞机），aircraft.SetManualPose
@@ -270,16 +322,17 @@ export const sky = Object.freeze({
 // 能被战车打塌的三段（Data_FirstLevelFrontBreakables：RightNestWestLow / NorthLow / NorthHigh）每一级各建一份砖壳，
 // 跟着 Script_FirstLevelFrontBreakables 的当前级显示（打低一级，砖壳也矮一级），不会出现「墙已经塌了、砖还立着」。
 // 这一组是阵位与缺口的**世界外观**，03 之后 04（守机枪）、05（战车）、06（撤收）玩家还在这里打，
-// 所以装到 FRONT_SET_STAGES 结束才收走（不跟 01–03 的布景一起收；报告里写明）。
+// 所以装到 FRONT_SET_STAGES 结束才收走（不跟 01–03 的布景一起收）。这是契约 §4.5/§6「01–03 之外全部收走」的**例外**，
+// 报告里提请集成负责人改契约。01 进场时就建好、藏着（02→03 那一帧不现建），03 起显示。
 // 全是外观：阵位白盒体块（Data_FirstLevelMissionLayout 的 RightNest*）的碰撞、掩体标签、射界一个不动，
 // 砖壳把体块整个包进去（每面外扩 3 cm、墙头只往上长）——所以砖壳露出来的只会比碰撞高，不会有「看着是缺口、
 // 其实是墙」的隐形墙；多出来的墙头锯齿只有外观（AI 视线、弹道仍按原体块）。
 export const FRONT_SET_STAGES = Object.freeze(["Support", "MachineGun", "Tank", "Orders"]);
 /** 砖层高（一皮砖 + 灰缝）与砖长：锯齿墙头按整皮、整砖退台；skinM 是砖壳比体块每面外扩多少。 */
 export const BRICK = Object.freeze({ courseM: 0.115, lengthM: 0.25, skinM: 0.03,
-  // 砖面：先用城墙砖（灰砖、浅灰缝，平均亮度 119），没有再退到熏黑旧砖（91，太黑：SB07 实拍整面墙是一块黑剪影）；
-  // 染成土黄灰（概念图 04 的残墙是灰里带黄的旧砖，不是红砖）。
-  recipes: Object.freeze(["CityWallBrickPbr", "BrickWallSooty"]), color: 0xeedcbc });
+  // 砖面：城墙砖（灰砖、浅灰缝，平均亮度 119；熏黑旧砖 BrickWallSooty 91 太黑：SB07 实拍整面墙是一块黑剪影），
+  // 染成土黄灰（概念图 04 的残墙是灰里带黄的旧砖，不是红砖）。材质库缺这个配方就抛错，不退回纯色。
+  recipe: "CityWallBrickPbr", color: 0xeedcbc });
 const Peak = (s, h, w) => Object.freeze({ s, h, w });
 export const FRONT_PROPS = Object.freeze([
   // 西矮墙（机枪就架在它后面）：机枪那一段（z -154.9…-152.9）墙头不加高，做成破口；两头往上各长两皮碎砖。
@@ -347,7 +400,8 @@ export const FRONT_PROPS = Object.freeze([
 export const DESIGNED_CONTACTS = Object.freeze({
   fallenLintel: Object.freeze({ marks: Object.freeze(["shunzi.trap", "SB02.trap", "SB03.eye", "SB03A.eye"]), why: "塌下的门楣就落在受困的顺子身边（SB02/SB03A）" }),
   roofTimberDown: Object.freeze({ marks: Object.freeze(["shunzi.trap", "SB02.trap", "SB03.eye", "SB03A.eye"]), why: "SB03A：顺子压在塌顶木下伸手够枪" }),
-  rubbleMoundBack: Object.freeze({ marks: Object.freeze(["shunzi.cover", "SB06.seat", "SB06.dragCoverSet"]), why: "SB06：顺子坐着背靠塌土（拖进遮挡的终点就是坐位）" }),
+  rubbleMoundBack: Object.freeze({ marks: Object.freeze(["shunzi.cover", "SB06.seat", "SB06.dragCoverSet", "withdraw.playerSet"]),
+    why: "SB06：顺子坐着背靠塌土（拖进遮挡的终点、撤出的起点都是坐位）" }),
   bunkerCrateStackN: Object.freeze({ marks: Object.freeze(["SB01.yaowa"]), why: "SB01：幺娃靠着北壁坐，身后就是弹药箱" }),
   trenchFacadeN: Object.freeze({ marks: Object.freeze(["SB03.captive", "SB03A.captive", "banter.comradeBlast"]),
     why: "SB03/03A：死川军背靠门框边的板墙；近爆时他就是被摔在这面北壁上（BlastSlamBuried）" }),
@@ -414,6 +468,12 @@ export function PropFootprints(prop) {
           P(prop.a.x + (prop.b.x - prop.a.x) * t1, prop.a.z + (prop.b.z - prop.a.z) * t1), prop.thickM, 0, h));
       }
       return out;
+    }
+    case "earthSkin": {
+      // 每面外长：土皮外鼓；钉了桩与横板的那面再加桩径与板厚。没贴的面不长。
+      const b = prop.box, G = (side) => { const f = prop.faces[side]; return !f ? 0 : prop.bulgeM + (f.stakes ? f.stakes.w + 0.04 : 0); };
+      const x0 = b.x - b.w / 2 - G("west"), x1 = b.x + b.w / 2 + G("east"), z0 = b.z - b.d / 2 - G("north"), z1 = b.z + b.d / 2 + G("south");
+      return [{ x: (x0 + x1) / 2, z: (z0 + z1) / 2, w: x1 - x0, d: z1 - z0, ry: 0, y0: 0, y1: b.h + 0.2, block: b }];
     }
     case "mound": {
       // 土包是个压扁的半椭球：只算高过 0.3 m（膝下）的那一圈核，边上一圈薄土人能踩过去。
