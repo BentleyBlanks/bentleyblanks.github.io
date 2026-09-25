@@ -242,8 +242,11 @@ assert.equal(FP_PROPS[FP_PROPS.rifleSlide.prop]?.kind,"rifle","rifleSlide moves 
       else assert.ok(knee.z<-.1&&ankle.z<-.3,`${name} ${side}: the legs are out in front`);
     }
     if(name==="sitForward"){
-      const rifle=new THREE.Vector3(...state.props.loadingRifleOnLegs.position),knee=new THREE.Vector3(...state.legs.sides.r.knee);
-      assert.ok(state.props.loadingRifleOnLegs.visible&&rifle.distanceTo(knee)<.2&&rifle.y>knee.y,"the loading rifle lies on the right knee");
+      const rifle=new THREE.Vector3(...state.props.loadingRifleOnLegs.position),knee=new THREE.Vector3(...state.legs.sides.r.knee),spec=FP_PROPS.loadingRifleOnLegs;
+      const hip=new THREE.Vector3(...state.legs.sides[spec.thigh].hip),rests=hip.clone().lerp(knee,spec.along).add(new THREE.Vector3(0,spec.lift,0));
+      const expected=rests.clone().addScaledVector(new THREE.Vector3(...spec.muzzle).normalize(),spec.gripAheadM||0);
+      assert.ok(spec.along>=.5&&spec.along<=1.05&&spec.lift>0&&spec.lift<.12,"the loading rifle rests on the thigh, not in the air beyond the knee");
+      assert.ok(state.props.loadingRifleOnLegs.visible&&rifle.distanceTo(expected)<1e-3&&rests.y>knee.y-.05,"the loading rifle lies along the right thigh, over the knee");
       assert.ok(state.props.palmClipProp.visible,"the clip is in the palm");
       firstPerson.Pose({left:"rest",right:"flingOpen",legs:"sprawl",props:["loadingRifleOnLegs","rifleSlide"]});
       const before=Run(5).props.loadingRifleOnLegs.position,after=Run(60);

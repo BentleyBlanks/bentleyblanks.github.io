@@ -62,10 +62,13 @@ export const EXTRA_HAND_POSES = Freeze({
   // SB05A: the RIGHT palm flat on ijaA's right upper arm; it slides off as he turns (slipM).
   pressBody: G("ijaA", "upperArmR", .5, { offset: V(0, .06, 0), twistDeg: 60, slipM: .06, fallback: "flat", shape: "press", c: V(12, 16, 10) }),
   // SB03: the RIGHT palm flat in the mud at the lower right, ~0.45 m ahead of the eye (base `flat` is 0.25 m).
-  palmMud: H("ground", [.22, .02, -.42], [.15, -.2, -1], [0, 1, 0], [12, 20, 12], { shape: "claw", sh: V(.19, -.2, .04) }),
+  // The eye is 0.26 m up with the shot pitched +5°, so the mud in frame starts ~0.5 m out: the hand reaches
+  // there, tilted so its back faces the eye (a hand flat on the mud is a sliver at this height).
+  palmMud: H("ground", [.2, .03, -.52], [.12, -.45, -.9], [.05, .8, .6], [12, 20, 12], { shape: "claw", sh: V(.2, -.2, -.05) }),
   // SB03A: the LEFT arm out from the lower left, palm pressing the mud, ~0.55 m in front of the eye
   // (further than `reach`, 0.29 m): the shoulder comes forward with it.
-  reachLeft: H("ground", [.17, .025, -.5], [.12, -.18, -1], [0, 1, 0], [10, 16, 12], { shape: "claw", sh: V(.19, -.19, -.02) }),
+  // The eye is 0.18 m up: the hand is tilted so its back faces the eye, fingertips pressed into the mud.
+  reachLeft: H("ground", [.17, .035, -.5], [.1, -.45, -.9], [.05, .8, .6], [10, 16, 12], { shape: "claw", sh: V(.19, -.19, -.02) }),
 });
 
 // Legs (the kept leg and boot triangles of the NRA02 body). Frame: the eye with yaw-only axes (x right,
@@ -78,9 +81,10 @@ export const LEG_POSES = Freeze({
   // SB01 (eye 0.95, pitch −15°): sitting against the back wall, legs out towards the mouth, right knee
   // up under the loading rifle (bolt low right), left leg longer.
   // The eye is 0.95 m up, so he sits on something low (hip 0.25 m up, 0.28 m ahead of the eye); the right
-  // knee joint lands at about (0.75, 0.93) of the frame with the thigh top and the rifle above it.
+  // knee is drawn up (ankle 0.48 m ahead) so its top shows at the lower right edge with the rifle's bolt on it
+  // (bench 2026-09-25: knee (0.82,1.0), bolt ≈ (0.83,0.88), muzzle (0.52,0.63); storyboard bolt (0.92,0.9)).
   sitForward: Freeze({ hip: V(.02, .25, -.28), up: V(0, .95, .3),
-    l: Leg([-.25, .1, -1.02], [-.2, 1, -.1], 5), r: Leg([.36, .1, -.66], [.3, 1, 0], 0) }),
+    l: Leg([-.25, .1, -1.02], [-.2, 1, -.1], 5), r: Leg([.33, .1, -.48], [.3, 1, 0], 0) }),
   // SB02 (eye falling to 0.75, roll +17°): thrown down, legs sprawled in the foreground, one knee up.
   sprawl: Freeze({ hip: V(0, .16, -.22), up: V(-.2, .7, .7),
     l: Leg([-.36, .09, -.95], [-.5, 1, 0], -5), r: Leg([.2, .12, -.6], [.1, 1, .1], 10) }),
@@ -98,18 +102,20 @@ export const LEG_POSES = Freeze({
 // (Script_OpeningStoryboards.MakeSupplyProps), cloned; the strap is a small ribbon.
 //   palmClipProp: on the named hand's palm frame; offset [x,y,z] m in that frame (y = back of the hand, so
 //     negative sits it on the palm side), yawDeg turns it in the palm.
-//   loadingRifleOnLegs: across the thighs: centre = the mix of hip and knee (`along` 0 = hip, 1 = knee) of
-//     one thigh (`thigh`) or of both, lifted `lift` m, at the rifle's front grip; muzzle direction and the up of the rifle in the body frame (x right, z back).
+//   loadingRifleOnLegs: resting on the thighs at the mix of hip and knee (`along` 0 = hip, 1 = knee) of one
+//     thigh (`thigh`) or of both, lifted `lift` m (the receiver sits there); its front grip is `gripAheadM`
+//     further along the muzzle direction; muzzle direction and the up of the rifle in the body frame (x right, z back).
 //     SB01 「枪栓朝镜头」: bolt (right side of the action) towards the eye, muzzle to the upper left.
 //   rifleSlide: SB02 Blast 0.25–0.7 s (beat clock) the rifle slides `moveM` along `direction` (body frame at
 //     the start of the slide), turning `spinDeg`, and settles `restM` above the ground.
 //   packStrap: SB03A 「左边缘能看到背包带」: a canvas strap from the left shoulder root, camera-local points.
 export const FP_PROPS = Freeze({
   palmClipProp: Freeze({ kind: "clip", hand: "l", offset: V(0, -.02, 0), yawDeg: 0 }),
-  loadingRifleOnLegs: Freeze({ kind: "rifle", thigh: "r", along: .9, lift: .09, muzzle: V(-.8, .12, -.55), up: V(0, .5, 1) }),
+  loadingRifleOnLegs: Freeze({ kind: "rifle", thigh: "r", along: 1, lift: .07, gripAheadM: .28, muzzle: V(-.37, -.2, -.9), up: V(-.3, 1, .2) }),
   rifleSlide: Freeze({ kind: "track", prop: "loadingRifleOnLegs", t0: .25, t1: .7, direction: V(-.45, 0, -.55), moveM: .4, spinDeg: 28, restM: .03 }),
   packStrap: Freeze({ kind: "strap", widthM: .05, thickM: .006, color: 0x4a4031,
-    points: Freeze([V(-.16, -.1, .1), V(-.2, -.17, .02), V(-.23, -.26, -.07), V(-.24, -.36, -.13)]) }),
+    // screen ≈ (0.02,0.25) → (0.18,1.0) down the left edge, 0.16–0.28 m in front of the eye
+    points: Freeze([V(-.174, .051, -.16), V(-.19, 0, -.2), V(-.196, -.076, -.24), V(-.203, -.178, -.28)]) }),
 });
 
 // Leg pose changes ease over legBlendS (the hands use 0.5 s too); a slipped grip eases to its fallback over

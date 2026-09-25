@@ -583,8 +583,9 @@ export class OpeningFirstPerson{
         else{
           // Across one thigh (`thigh`: l/r, from its hip joint to its knee) or across both (hips to the knees' midpoint).
           const hips=spec.thigh?V(...L[spec.thigh].hip):V(...legReport.hip),knees=spec.thigh?V(...L[spec.thigh].knee):V(...L.l.knee).add(V(...L.r.knee)).multiplyScalar(.5);
-          const centre=hips.lerp(knees,spec.along).add(V(0,spec.lift,0));
           const muzzle=Dir(spec.muzzle).normalize(),up=Dir(spec.up).normalize();
+          // It rests at that point (bolt and receiver on the thigh); the front grip is gripAheadM on towards the muzzle.
+          const centre=hips.lerp(knees,spec.along).add(V(0,spec.lift,0)).addScaledVector(muzzle,spec.gripAheadM||0);
           const q=FrameQuaternion(muzzle.clone().negate(),up),grip=(s.loadingRifleGrip||V()).clone().applyQuaternion(q);
           let position=centre.sub(grip),quaternion=q;
           const Spec=n=>this.override?.propSpecs?.[n]||FP_PROPS[n],slideName=[...wanted].find(n=>Spec(n)?.kind==="track"&&Spec(n).prop===name);
