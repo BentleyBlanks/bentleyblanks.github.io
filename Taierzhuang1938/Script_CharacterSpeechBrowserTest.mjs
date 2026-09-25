@@ -15,6 +15,8 @@ const local=process.argv.find(arg=>arg.startsWith('--port='))?.split('=')[1];
 const server=local?null:await ServeRoot(path.dirname(here),0), browser=await LaunchBrowser();
 const page=await browser.newPage({viewport:{width:1280,height:720}}), errors=[];
 page.on('pageerror',error=>errors.push(String(error)));
+// A material patched twice (face blood over a cloth wound, 2026-09-25 review) fails to link: three logs it.
+const shaderErrors=[];page.on('console',message=>{if(/Shader Error|WebGLProgram|VALIDATE_STATUS/i.test(message.text()))shaderErrors.push(message.text().slice(0,300));});
 // Silent faces breathe: the jaw may drift by the breathing weight only (Data_Tuning_CharacterSpeech.breathJaw).
 const SILENT_JAW_RADIANS=.02;
 try {
@@ -334,7 +336,7 @@ try {
   const acting={};
   for(const [key,castId,setup] of [
     ['ijaA_Rest','ijaA',{expression:{}}],['ijaA_Still','ijaA',{expression:{},ref:'ijaA_Rest'}],['ijaA_Snarl','ijaA',{expression:{snarl:1},ref:'ijaA_Rest'}],['ijaA_Shock','ijaA',{expression:{shock:1},ref:'ijaA_Rest'}],
-    ['ijaA_Shout','ijaA',{expression:{shout:1},ref:'ijaA_Rest'}],['luo_Rest','luo',{expression:{}}],['luo_Grit','luo',{expression:{grit:1},ref:'luo_Rest'}],
+    ['ijaA_Shout','ijaA',{expression:{shout:1},ref:'ijaA_Rest'}],['luo_Rest','luo',{expression:{}}],['luo_Grit','luo',{expression:{grit:1},ref:'luo_Rest'}],['luo_Concern','luo',{expression:{pain:.6,shock:.25},ref:'luo_Rest'}],
     ['comrade_Rest','comrade',{expression:{},blood:0}],['comrade_Pain','comrade',{expression:{pain:1},blood:0,ref:'comrade_Rest'}],
     ['comrade_PainStill','comrade',{expression:{pain:1},blood:0,ref:'comrade_Pain'}],
     ['comrade_Blood','comrade',{expression:{pain:1},blood:1,ref:'comrade_Pain'}]]){
@@ -362,9 +364,10 @@ try {
         if(Math.abs(r-ref[i])+Math.abs(gg-ref[i+1])+Math.abs(b-ref[i+2])>20&&r>=1.6*gg&&r>=1.3*b)bloodied++;
       }
       const jaw=face.controls.find(c=>c.name==='Face_Jaw');
-      let patched=0;rig.root.traverse(o=>{if(o.isMesh&&(o.material?.userData?.materialPatchKeys||[]).includes('face-blood-1'))patched++;});
+      let patched=0;const patchedMaterials=[];
+      rig.root.traverse(o=>{if(o.isMesh&&(o.material?.userData?.materialPatchKeys||[]).includes('face-blood-1')){patched++;patchedMaterials.push(o.material.name);}});
       return {model:rig.modelId,weights:{...face.expressionWeights},jaw:jaw.bone.quaternion.angleTo(jaw.quaternion),
-        took,blood:face.State().faceBlood,patched,bloodied:bloodied/n,diff,mouth,box:{...box},mouthBox:{...mouthBox}};
+        took,blood:face.State().faceBlood,patched,patchedMaterials,bloodied:bloodied/n,diff,mouth,box:{...box},mouthBox:{...mouthBox}};
     },{key,castId,setup});
     await page.screenshot({path:path.join(output,`Acting_${acting[key].model}_${key}.png`)});
   }
@@ -393,12 +396,97 @@ try {
   Shows(acting.ijaA_Snarl,'日兵甲 Snarl');Shows(acting.ijaA_Shock,'日兵甲 Shock');Shows(acting.ijaA_Shout,'日兵甲 Shout');
   assert.ok(acting.ijaA_Shock.jaw>5*DEG,`日兵甲 Shock gapes (${(acting.ijaA_Shock.jaw/DEG).toFixed(1)} deg)`);
   assert.ok(acting.ijaA_Shout.jaw>12*DEG,`Shout drops the jaw (${(acting.ijaA_Shout.jaw/DEG).toFixed(1)} deg)`);
-  Shows(acting.comrade_Pain,'comrade Pain',.04);Shows(acting.luo_Grit,'罗班长 Grit',.04);
+  Shows(acting.comrade_Pain,'comrade Pain',.04);Shows(acting.luo_Grit,'罗班长 Grit',.04);Shows(acting.luo_Concern,'罗班长 concern (pain .6 + shock .25)',.04);
   assert.equal(acting.comrade_Blood.took,true,'SetFaceBlood found the comrade head surface');
   assert.ok(acting.comrade_Blood.patched>0&&acting.comrade_Blood.blood===1);
   assert.ok(acting.comrade_Blood.bloodied>bloodFloor+.015,`blood is drawn: ${Pct(acting.comrade_Blood.bloodied)} of the face box turned blood red (control ${Pct(bloodFloor)})`);
   assert.ok(acting.comrade_Blood.diff>.08&&acting.comrade_Blood.diff>3*stillFace,`blood changes the face (${Pct(acting.comrade_Blood.diff)} of face blocks)`);
   assert.ok(shoutTalk.high-shoutTalk.low>6*DEG,`under Shout the mouth still opens and shuts (${(shoutTalk.low/DEG).toFixed(1)}-${(shoutTalk.high/DEG).toFixed(1)} deg)`);
+
+  // Talking lip shapes at 0.6 m (2026-09-25 review: the Open/Round/Near close-ups only proved the jaw).
+  // Held track samples as the speaker binder delivers them (the runtime track gains apply): the mouth
+  // corners and both lips move off rest in world space, the mouth box changes on screen, and a wide
+  // syllable and a rounded one are different mouths from the front (corner distance and pixels).
+  const talkShapes={};
+  for(const castId of ['ijaA','comrade','interpreter']){
+    const shapes={};
+    for(const [label,speech] of [['Rest',null],['RestAgain',null],['Wide',{active:true,jaw:.5,wide:.5,round:0,close:0,stress:0}],
+      ['Round',{active:true,jaw:.45,wide:0,round:.5,close:0,stress:0}],['Close',{active:true,jaw:0,wide:0,round:0,close:1,stress:0}]]){
+      shapes[label]=await page.evaluate(({castId,label,speech})=>{
+        const p=window.SpeechProbe,g=p.g,T=p.T,actor=p.closeup[castId],rig=actor.characterRig,face=rig.facial;
+        for(const other of Object.values(p.closeup))other.root.visible=other===actor;
+        p.focus=rig;p.distance=.6;p.faceOn=true;p.eyeLevel=true;face.gaze=null;face.nextBlinkS=99;face.blinkAge=-1;
+        p.facialApi.SetExpression(rig,{snarl:0,shock:0,pain:0,shout:0,grit:0},0);p.facialApi.SetFaceBlood(rig,0);
+        face.source=speech?()=>speech:null;for(let i=0;i<20;i++)face.Update(1/60,{});
+        g.post.NotifyCameraCut();g.StepFrames(3,1/60,true);
+        const grab=p.Grab(castId);(p.talkGrab ||= {})[castId+label]=grab.mouth;
+        const W=name=>face.controls.find(c=>c.name===name).bone.getWorldPosition(new T.Vector3());
+        const head=rig.bones.head.getWorldPosition(new T.Vector3());
+        const bones=Object.fromEntries(['Face_CornerL','Face_CornerR','Face_LipUpper','Face_LipLower'].map(n=>[n,W(n).sub(head).toArray()]));
+        const Blocks=(a,b)=>p.ChangedBlocks(a,b,p.mouthBox[castId].w,p.mouthBox[castId].h);
+        const ref=p.talkGrab[castId+'Rest'];
+        return {bones,width:W('Face_CornerL').distanceTo(W('Face_CornerR')),weights:{wide:face.wide,round:face.round,close:face.close},
+          mouth:ref&&label!=='Rest'?Blocks(grab.mouth,ref):0,vsWide:label==='Round'?Blocks(grab.mouth,p.talkGrab[castId+'Wide']):null};
+      },{castId,label,speech});
+      if(label!=='RestAgain')await page.screenshot({path:path.join(output,`Talk_${castId}_${label}.png`)});
+    }
+    await page.evaluate(()=>{window.SpeechProbe.closeup.ijaA.characterRig.facial.source=null;});
+    const Move=(label,bone)=>1000*Math.hypot(...shapes[label].bones[bone].map((x,k)=>x-shapes.Rest.bones[bone][k]));
+    talkShapes[castId]={still:shapes.RestAgain.mouth,
+      move:Object.fromEntries(['Wide','Round','Close'].map(l=>[l,Object.fromEntries(['Face_CornerL','Face_CornerR','Face_LipUpper','Face_LipLower'].map(b=>[b,+Move(l,b).toFixed(1)]))])),
+      widthMm:Object.fromEntries(['Rest','Wide','Round'].map(l=>[l,+(shapes[l].width*1000).toFixed(1)])),
+      mouth:{wide:shapes.Wide.mouth,round:shapes.Round.mouth,close:shapes.Close.mouth,wideVsRound:shapes.Round.vsWide},
+      weights:{wide:shapes.Wide.weights.wide,round:shapes.Round.weights.round}};
+  }
+  await page.evaluate(()=>{window.SpeechProbe.eyeLevel=false;});
+  console.log('talkShapes',JSON.stringify(talkShapes));
+  for(const [castId,t] of Object.entries(talkShapes)){
+    // Track .5 (a typical baked value) reaches the rig as .8 with the 1.6 gain.
+    assert.ok(t.weights.wide>.75&&t.weights.round>.75,`${castId}: track lip shapes are boosted (${JSON.stringify(t.weights)})`);
+    for(const label of ['Wide','Round'])for(const bone of ['Face_CornerL','Face_CornerR'])
+      assert.ok(t.move[label][bone]>=3,`${castId} ${label}: ${bone} moves >= 3 mm while talking (${t.move[label][bone]} mm)`);
+    for(const label of ['Wide','Round'])assert.ok(t.move[label].Face_LipUpper>=2&&t.move[label].Face_LipLower>=2,
+      `${castId} ${label}: both lips move >= 2 mm (${t.move[label].Face_LipUpper}/${t.move[label].Face_LipLower} mm)`);
+    assert.ok(t.widthMm.Wide-t.widthMm.Round>=12,`${castId}: a wide syllable is >= 12 mm wider than a round one (${JSON.stringify(t.widthMm)})`);
+    assert.ok(t.still<.05,`${castId}: talk-shape control is steady (${Pct(t.still)})`);
+    // Close presses lips that are already shut at rest: it moves the lips, not many pixels.
+    assert.ok(t.move.Close.Face_LipLower>=2,castId+': Close presses the lower lip up >= 2 mm ('+t.move.Close.Face_LipLower+' mm)');
+    for(const [k,v] of Object.entries({wide:t.mouth.wide,round:t.mouth.round,'wide vs round':t.mouth.wideVsRound}))
+      assert.ok(v>.06&&v>3*t.still,`${castId}: ${k} changes the mouth on screen (${Pct(v)} of mouth blocks, control ${Pct(t.still)})`);
+  }
+  // Blood goes on the face skin only (not the NRA cap brim: 2026-09-25 review), and survives the
+  // cloth-wound stacking cycle with one copy of each patch and no program that fails to link.
+  assert.equal(acting.comrade_Blood.patched,1,`one face surface takes the blood (${acting.comrade_Blood.patchedMaterials})`);
+  const bloodCycle=await page.evaluate(async()=>{
+    const p=window.SpeechProbe,g=p.g,T=p.T,actor=p.closeup.comrade,rig=actor.characterRig,face=rig.facial;
+    const {PatchKeysOf}=await import('./Script_MaterialPatches.mjs');
+    const {FaceBloodFrame,FaceBloodLipDistance}=await import('./Script_CharacterFaceBlood.mjs');
+    const {FACE_BLOOD}=await import('./Data_Tuning_CharacterSpeech.mjs');
+    for(const other of Object.values(p.closeup))other.root.visible=other===actor;
+    face.Reset(); // back to the shared materials (the acting shots left the blood clone on)
+    const before=new Map();rig.root.traverse(o=>{if(o.isMesh)before.set(o,o.material);});
+    p.facialApi.SetFaceBlood(rig,1);
+    const changed=[];rig.root.traverse(o=>{if(o.isMesh&&before.get(o)!==o.material)changed.push(o);});
+    const lip=changed.map(o=>FaceBloodLipDistance(o,FaceBloodFrame(o)));
+    const Keys=()=>{const out=[];rig.root.traverse(o=>{if(o.isMesh)for(const k of PatchKeysOf(o.material))if(/face-blood|cloth-wound/.test(k))out.push(k);});return out;};
+    const steps={};
+    actor.AddBulletWound('head',new T.Vector3(0,0,1));steps.wound=Keys();
+    face.Reset();p.facialApi.SetFaceBlood(rig,1);steps.bloodAgain=Keys();
+    g.post.NotifyCameraCut();g.StepFrames(3,1/60,true);
+    actor.woundBlood?.Clear();actor.AddBulletWound('head',new T.Vector3(0,0,1));steps.woundAgain=Keys();
+    g.StepFrames(3,1/60,true);
+    actor.woundBlood?.Clear();p.facialApi.SetFaceBlood(rig,0);g.StepFrames(1,1/60,true);
+    return {changed:changed.map(o=>o.material.name),lip,reach:FACE_BLOOD.skinLipReach,steps};
+  });
+  console.log('bloodCycle',JSON.stringify(bloodCycle));
+  assert.equal(bloodCycle.changed.length,1,`blood clones one material, the face skin (${bloodCycle.changed})`);
+  assert.ok(bloodCycle.lip[0]<=bloodCycle.reach,`the bloodied surface holds the lips (${bloodCycle.lip[0]?.toFixed(3)} eye distances)`);
+  for(const [step,keys] of Object.entries(bloodCycle.steps)){
+    assert.equal(new Set(keys).size,keys.length,`${step}: no patch twice on one material (${keys})`);
+    assert.ok(keys.includes('face-blood-1'),`${step}: face blood still on`);
+  }
+  assert.ok(bloodCycle.steps.wound.some(k=>/cloth-wound/.test(k))&&bloodCycle.steps.woundAgain.some(k=>/cloth-wound/.test(k)),'the head wound stacks on the blood');
+  assert.deepEqual(shaderErrors,[],'no shader fails to compile or link');
 
   // Motion vectors: the mouth writes velocity while the jaw moves, none when still.
   const velocity=await page.evaluate(async()=>{
@@ -526,7 +614,7 @@ try {
     await page.evaluate(()=>{const s=window.Seat06Shot;s.rig.facial.source=s.source;});
   }
   seat06.rows=seat06.rows.filter((_,i)=>i%4===0);
-  await fs.writeFile(path.join(output,'Data_CharacterSpeech.json'),JSON.stringify({initial,samples,pauseReceipt,pause,resumed,closeups,acting,shoutTalk,velocity,seat06,
+  await fs.writeFile(path.join(output,'Data_CharacterSpeech.json'),JSON.stringify({initial,samples,pauseReceipt,pause,resumed,closeups,acting,shoutTalk,talkShapes,bloodCycle,velocity,seat06,
     faceTrack:{key:trackRun.key,shots,track:trackStats,envelope:envelopeStats,trackRows:trackPass.rows,envelopeRows:envelopePass.rows},errors},null,2));
   assert.deepEqual(errors,[]);
   console.log(`ok live faces: Luo speaks with his own line, Yaowa listens closed-mouthed; ${closeups.length} close-ups of 6 facial skins; acting ${Object.keys(acting).length} shots (snarl/shock/shout/grit/pain/blood); `
