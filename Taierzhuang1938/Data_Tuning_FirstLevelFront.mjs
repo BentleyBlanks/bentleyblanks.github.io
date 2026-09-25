@@ -343,6 +343,9 @@ export const FRONT_BATTLE_TUNING=Object.freeze({
   // probe e2, Luo stepped for FrontWithdraw.01 to the nest's west doorway, the combat brain crouched him there, and the
   // door's wall hid his head for the whole line (166 frames in the picture, 0 seen).
   speakerStepHeadsM:Object.freeze([1.55,1.05]),
+  // StandToBeSeen: a near speaker in the picture whose crouched head something low hides stands up for his line when his
+  // standing head (speakerStepHeadsM[0]) would be seen; the stance is re-held for this long (s) every frame the line plays.
+  speakerStandHoldS:.5,
   // Stepping in is a quick shuffle, not a march: R.squadCatchupMps (4.5, the 07 catch-up) covers speakerStepMaxM in
   // about the hold.
   speakerStepSpeedMps:4.5,

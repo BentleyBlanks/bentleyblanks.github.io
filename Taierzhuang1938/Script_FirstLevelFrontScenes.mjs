@@ -147,6 +147,9 @@ export class FirstLevelFrontScenes {
     this.aside = null;
     /** Every ClearView step aside: { line, who, t } (probes read State().asides). */
     this.asides = [];
+    /** The speaker standing up to be seen over something low (StandToBeSeen): { body, lineId }; every such stand: { id, who, t }. */
+    this.standing = null;
+    this.stood = [];
   }
   /** runtime.Say hands the id over when this returns true. */
   Owns(id) {
@@ -419,8 +422,40 @@ export class FirstLevelFrontScenes {
    * Called by the runtime after every other mover (frontShow, frontBattle): keeps the stepping speaker walking to
    * his spot, and lets him go once his lines in the scene are done (his own orders take over again).
    */
+  /**
+   * A near speaker whose line plays with his head in the picture but something low between it and the player's eye (a
+   * parapet, the gun on its sandbags) stands up to say it, when his standing head would be seen - an NCO rising to give
+   * an order, not a walk. Held standing (B.speakerStandHoldS, refreshed) until that line ends; the combat brain has him
+   * back afterwards. 09-25 relay r2 Front step 3 drive c36_g3: the player back from a grenade dodge stood 1.8 m north of
+   * the captured gun's seat, Luo knelt in his cover inside the west door 4.9 m off, the gun and the nest's low west wall
+   * hid his crouched head through TakeOverGun (188 and 137 frames in the picture, 0 seen) and no stepping spot was clear.
+   */
+  StandToBeSeen() {
+    const r = this.r, handle = this.handle;
+    if (this.standing && (!handle || handle.done || !handle.lines.some((l) => l.line?.id === this.standing.lineId && l.state === "playing")
+      || !this.standing.body.alive)) this.standing = null;
+    if (this.standing) { r.ai?.SetStance?.(this.standing.body, 0, B.speakerStandHoldS, true); return; }
+    if (!handle || handle.done || !r.camera || !r.ai?.SetStance || !r.Point || !r.BlocksSight) return;
+    const eye = r.player?.EyePosition?.clone?.();
+    if (!eye) return;
+    for (const l of handle.lines) {
+      if (l.state !== "playing" || !l.line || l.line.who === "shunzi" || l.line.direction?.spatial === "self") continue;
+      const body = this.Body(l.line.who);
+      if (!body?.alive || (body.stance | 0) === 0 || this.Steers(body) || body.missionGrenadeEvade || body.meleeCombat) continue;
+      const view = this.SpeakerView(body);
+      if (!view || view.inView || view.distance > B.speakerViewNearM || view.distance < B.speakerViewMinM || !InPicture(view.ndc)) continue;
+      const head = r.Point(body.position, B.speakerStepHeadsM[0]);
+      if (!InPicture(ProjectToView(r.camera, head)) || r.BlocksSight(eye, head)) continue;
+      this.standing = { body, lineId: l.line.id };
+      this.stood.push({ id: l.line.id, who: l.line.who, t: +(r.time ?? 0).toFixed(2) });
+      if (this.stood.length > 24) this.stood.shift();
+      r.ai.SetStance(body, 0, B.speakerStandHoldS, true);
+      return;
+    }
+  }
   Steer() {
     this.KeepSpace();
+    this.StandToBeSeen();
     this.ClearView();
     this.StepAside();
     const s = this.steer, r = this.r;
@@ -467,6 +502,6 @@ export class FirstLevelFrontScenes {
       holds: Object.fromEntries([...this.holds].slice(-24).map(([id, h]) => [id, { ...h, since: +h.since.toFixed(2) }])),
       steer: this.steer ? { who: this.steer.who, backOff: !!this.steer.backOff, spot: { x: +this.steer.spot.x.toFixed(2), z: +this.steer.spot.z.toFixed(2) } } : null,
       aside: this.aside ? { who: this.aside.soldier.castId, line: this.aside.lineId, spot: { x: +this.aside.spot.x.toFixed(2), z: +this.aside.spot.z.toFixed(2) } } : null,
-      asides: this.asides.slice() };
+      asides: this.asides.slice(), stood: this.stood.slice() };
   }
 }

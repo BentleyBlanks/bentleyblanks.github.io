@@ -624,6 +624,28 @@ function WalkRuntime(extra = {}) {
     assert.ok(!scenes.steer?.backOff && Dist(scenes.steer.spot, unreachable) < 1e-9, "still held for his line: he keeps walking to the framed spot");
     Object.assign(scenes, { handle: saved.handle, steer: saved.steer }); luo.position = saved.position;
   }
+  // StandToBeSeen (c36_g3): a kneeling speaker in the picture, 3 m off, his crouched head behind something low, stands
+  // up for his line when a standing head would be seen; held until that line ends; not when the wall is taller.
+  {
+    const kneel = { id: 12, alive: true, stance: 1, position: { x: 0.5, y: 0, z: -3 },
+      actor: { head: { matrixWorld: { elements: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0.5, 1.0, -3, 1] } } } };
+    const stances = [];
+    const rs = { time: 0, camera, flow: { stage: { id: "Support" } }, ai: { soldiers: [kneel], SetStance: (a, st) => stances.push([a.id, st]) },
+      player: { position: { x: 0, y: 0, z: 0 }, get EyePosition() { return V(0, 1.6, 0); } },
+      speakers: { ActorForWho: (who) => (who === "luo" ? kneel : null) },
+      Point: (p, rise = 0) => V(p.x, rise, p.z), BlocksSight: (a, b) => b.y < 1.3, MoveActor() {}, Defend() {} };
+    const sc = new FirstLevelFrontScenes(rs);
+    sc.handle = { id: "TakeOverGun", done: false, lines: [{ line: { id: "TakeOverGun.01", who: "luo" }, state: "playing" }] };
+    sc.Steer();
+    assert.ok(sc.standing?.lineId === "TakeOverGun.01" && stances.at(-1)?.[1] === 0, "crouched head behind a low wall: he stands up for his line");
+    kneel.stance = 0; sc.Steer();
+    assert.equal(stances.length, 2, "and is held standing while the line plays");
+    sc.handle.lines[0].state = "done"; sc.Steer();
+    assert.equal(sc.standing, null, "the line over: the combat brain has him back");
+    kneel.stance = 1; sc.handle.lines[0].state = "playing"; rs.BlocksSight = () => true; sc.Steer();
+    assert.ok(sc.standing === null && stances.length === 2, "a wall that hides him standing too: he stays down");
+    assert.deepEqual(sc.State().stood.map((s) => s.id), ["TakeOverGun.01"], "each stand is logged for probes");
+  }
   // Timeout: a spot, but he never gets there (shoved, blocked by a body) -> the line plays after speakerViewHoldS.
   r.BlocksSight = () => false;
   assert.equal(scenes.HoldLine(line("FrontWithdraw.01", "luo"), "FrontWithdraw"), true, "held while he walks");
