@@ -1,5 +1,8 @@
 # Luo facial speech
 
+For close-up dialogue inspection, use Tools → 人物面部. The [facial editor](Data_FacialEditor.md)
+supports source-audio seeking, slow playback, expression keyframes and local review notes.
+
 Luo (`castId=luo`) uses the reviewed NRA05 facial skin from
 `Model/Character/Model_LugouNra05Facial.glb`. The original NRA05 remains the
 appearance for anonymous soldiers and other officers. Both share the existing

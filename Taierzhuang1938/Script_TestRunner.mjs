@@ -184,6 +184,8 @@ export const testDefs = {
   RiggedModelTest: { file: "Script_RiggedModelTest.mjs", desc: "第一人称手臂 GLB 的二进制契约（纯 Node，秒级）" },
   ActorLocomotionTest: { file: "Script_ActorLocomotionTest.mjs", timeoutMs: 240000, desc: "实测步幅、世界支撑脚、转弯与位移时钟" },
   InfantryAnimationTest: { file: "Script_InfantryAnimationTest.mjs", timeoutMs: 360000, desc: "八套步兵动作、道具与状态衔接" },
+  FacialReviewTest: { file: "Script_FacialReviewTest.mjs", desc: "面部编辑器说话人隔离、关键帧与草稿校验" },
+  FacialEditorBrowserTest: { file: "Script_FacialEditorBrowserTest.mjs", timeoutMs: 240000, desc: "真实面部与录音时钟、逐帧、草稿及缺失绑定状态" },
   CharacterSpeechTest: { file: "Script_CharacterSpeechTest.mjs", desc: "班长语音节奏、说话人隔离与面部资产契约" },
   CharacterSpeechBrowserTest: { file: "Script_CharacterSpeechBrowserTest.mjs", timeoutMs: 240000, desc: "班长实际语音、面部蒙皮与真实场景画面" },
   CharacterModelTest: { file: "Script_CharacterModelTest.mjs", desc: "十名蒙皮士兵：19 动作、骨骼挂点、命中体与阵营分配契约（纯 Node）" },
@@ -352,6 +354,7 @@ export const testDefs = {
 };
 
 export const browserTests = new Set([
+  "FacialEditorBrowserTest",
   "OpeningActorPerformanceBrowserTest", "FirstLevelVoicePerspectiveTest",
   "FirstLevelFrontRouteBrowserTest",
   "FirstLevelLeaderGuideBrowserTest",
@@ -414,6 +417,7 @@ export const browserTests = new Set([
 ]);
 
 export const tier0Fast = [
+  "FacialReviewTest",
   "CharacterSpeechTest",
   "FpsAnimationTest",
   "TextTest",
@@ -469,6 +473,7 @@ export const tier2 = [
 ];
 
 export const domains = {
+  facialEditor: {label:"人物面部可视化编辑器",tests:["FacialReviewTest","FacialEditorBrowserTest","ModuleGraphTest"]},
   openingStoryboards: {label:"01–03 storyboard reconstruction",tests:["OpeningStoryboardsTest","OpeningActorPerformanceBrowserTest","OpeningFirstPersonTest","FirstLevelVoicePerspectiveTest"]},
   missionGuide: {label:"Physical mission leader and HUD",tests:["FirstLevelLeaderGuideTest","FirstLevelLeaderGuideBrowserTest","FirstLevelMissionTest","FirstLevelMissionBrowserTest"]},
   characterSpeech: {label:"班长面部对白",tests:["CharacterSpeechTest","CharacterSpeechBrowserTest"]},
@@ -574,6 +579,7 @@ export const domains = {
 };
 
 const changedDomainRules = [
+  {domain:"facialEditor",pattern:/FacialReview|EditorFacial|FacialEditor/},
   {domain:"firstLevel",pattern:/FirstLevelWhitebox(Village|Transfer|Rear)/},
   {domain:"menu",pattern:/PlayerDeath/},
   {domain:"combat",pattern:/PlayerDeath/},
