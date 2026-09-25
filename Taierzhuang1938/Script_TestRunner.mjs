@@ -201,6 +201,9 @@ export const testDefs = {
   InfantryAnimationTest: { file: "Script_InfantryAnimationTest.mjs", timeoutMs: 360000, desc: "八套步兵动作、道具与状态衔接" },
   CharacterSpeechTest: { file: "Script_CharacterSpeechTest.mjs", desc: "说话人口型驱动、说话人隔离与面部资产契约" },
   CharacterSpeechBrowserTest: { file: "Script_CharacterSpeechBrowserTest.mjs", timeoutMs: 480000, desc: "说话人实际语音、面部蒙皮与真实场景画面" },
+  SpeakerGestureTest: { file: "Script_SpeakerGestureTest.mjs", desc: "03–06 说话手势：台词表覆盖、手势 clip 窗口/骨骼范围/烘焙验收数字、采样器" },
+  SpeakerGestureClipsBrowserTest: { file: "Script_SpeakerGestureClipsBrowserTest.mjs", timeoutMs: 600000, desc: "03–06 说话手势 clip 叠在正式骨架的蹲/坐姿上：NaN、手臂进躯干/头、左手不穿枪" },
+  SpeakerGestureLayerBrowserTest: { file: "Script_SpeakerGestureLayerBrowserTest.mjs", timeoutMs: 1800000, desc: "03–06 实机播全部前沿台词：该做手势的句子做了、射击时为 0 且不回来、句后收回、指向准、枪不跟手、07 以后没有手势层" },
   CharacterModelTest: { file: "Script_CharacterModelTest.mjs", desc: "十名蒙皮士兵：19 动作、骨骼挂点、命中体与阵营分配契约（纯 Node）" },
   DeathCollapseTest: { file: "Script_DeathCollapseTest.mjs", timeoutMs: 300000,
     desc: "Kimodo受击倒下：两军四候选、稳定随机、全身贴地与终帧保持" },
@@ -380,6 +383,8 @@ export const browserTests = new Set([
   "SquadMarchCoverBrowserTest",
   "FirearmHandlingBrowserTest",
   "CharacterSpeechBrowserTest",
+  "SpeakerGestureClipsBrowserTest",
+  "SpeakerGestureLayerBrowserTest",
   "FirstLevelCasualtyBrowserTest",
   "FirstLevelFrontPresenceTest",
   "FirstLevelTankProbeTest",
@@ -440,6 +445,7 @@ export const browserTests = new Set([
 
 export const tier0Fast = [
   "CharacterSpeechTest",
+  "SpeakerGestureTest",
   "FpsAnimationTest",
   "TextTest",
   "AiPerceptionTest",
@@ -489,6 +495,8 @@ export const tier0 = [...tier0Browser, ...tier0Fast];
 export const tier2 = [
   "OpeningActorPerformanceBrowserTest",
   "OpeningClipsBrowserTest",
+  "SpeakerGestureClipsBrowserTest",
+  "SpeakerGestureLayerBrowserTest",
   "ShotTest",
   "GiTest",
   "PerformanceTest",
@@ -501,7 +509,7 @@ export const tier2 = [
 export const domains = {
   openingStoryboards: {label:"01–03 storyboard reconstruction",tests:["OpeningStoryboardsTest","OpeningClipsBrowserTest","OpeningActorPerformanceBrowserTest","OpeningFirstPersonTest","FirstLevelVoicePerspectiveTest","OpeningHandbackBrowserTest","FirstLevelOpeningCampaignTest"]},
   missionGuide: {label:"Physical mission leader and HUD",tests:["FirstLevelLeaderGuideTest","FirstLevelLeaderGuideBrowserTest","FirstLevelMissionTest","FirstLevelMissionBrowserTest"]},
-  characterSpeech: {label:"说话人面部对白",tests:["CharacterSpeechTest","CharacterSpeechBrowserTest"]},
+  characterSpeech: {label:"说话人面部对白",tests:["CharacterSpeechTest","CharacterSpeechBrowserTest","SpeakerGestureTest","SpeakerGestureClipsBrowserTest","SpeakerGestureLayerBrowserTest"]},
   motionVector: {label:'统一运动矢量接入契约',tests:['MotionVectorContractTest']},
   propVelocity: {label:'近景刚体道具速度与移动清晰度',tests:['CarriagePropVelocityTest','DraftCartEditorTest']},
   squadMarch: {label:"通用小队行进",tests:["SquadMarchCoverTest","SquadMarchCoverBrowserTest","SquadMarchTest","SquadMarchAiTest","SquadMarchEditorTest","SquadMarchNavigationTest","FirstLevelSquadMarchTest","EditorLauncherTest"]},
@@ -625,7 +633,7 @@ const changedDomainRules = [
   {domain:"missionGuide",pattern:/FirstLevelLeaderGuide|FirstLevelGuideDialogue|FirstLevelGuideVoiceAlignment|FirstLevelMissionRuntime|Script_FirstLevelMissionVoice|NpcMissionGuide|NpcGuideGesture|Tuning_MissionGuide/},
   { domain: "combat", pattern: /FirearmHandling|MuzzleFlash|Headshot/i },
   {domain:"firstLevel",pattern:/Type89Damage/},
-  {domain:"characterSpeech",pattern:/CharacterSpeech|CharacterFacial|SpeechEnvelope|NraFacial|Nra05Facial|Lugou\w*Facial|SpeakerBinder|SpeakerHeadLayer|SpeakingCast|FaceTrack|Script_FirstLevelMissionVoice|Script_Audio\.mjs|Script_CharacterModel/},
+  {domain:"characterSpeech",pattern:/CharacterSpeech|CharacterFacial|SpeechEnvelope|NraFacial|Nra05Facial|Lugou\w*Facial|SpeakerBinder|SpeakerHeadLayer|SpeakerGesture|SpeakingCast|FaceTrack|Script_FirstLevelMissionVoice|Script_Audio\.mjs|Script_CharacterModel/},
   { domain: "animation", pattern: /ActorLocomotion|LocomotionProfileBake/ },
   {domain:'animation',pattern:/DadaoSwing|DadaoPowerSwing|GrenadeThrow/},
   {domain:"combat",pattern:/HitDisorientation/},

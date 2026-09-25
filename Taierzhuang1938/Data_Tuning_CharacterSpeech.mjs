@@ -51,6 +51,73 @@ export const SPEAKER_HEAD = Object.freeze({
   breathRadians: .025, breathRate: 2.1,
 });
 
+// 03-06 speaker gestures (Script_SpeakerGestureLayer; rows in Data_FirstLevelSpeakerGestures, design in
+// docs/Data_CharacterSpeech.md "Speaker gestures (03-06)"). User decision 2026-09-25; numbers set on the
+// 2026-09-25 browser review of the 03-06 lines.
+export const SPEAKER_GESTURE = Object.freeze({
+  enabled: true,
+  // Stroke on the first stress: after the lift the arm waits `strokeLeadS` before the stroke until the line's
+  // first stressed syllable (the face-track stress pulse, whose rising edge is FACE_TRACK_BAKE.stressPulseS / 2
+  // = .08 s early), for at most `stressWaitS` of line time; then the clip runs on without waiting.
+  strokeLeadS: .12, stressWaitS: .9,
+  // A line longer than the clip repeats the hold window, at most this long in total, then releases anyway
+  // (a pointing arm frozen through a 4 s line reads as a statue).
+  maxHoldS: 2.4,
+  // Line over (or cut): the clip plays on to its release when that is at most `maxTailS` away; otherwise the
+  // pose freezes and the arm eases back to the body over `releaseS`.
+  maxTailS: .45, releaseS: .35,
+  // Busy (firing, aim > maxAim within aimQuietS of a shot, melee, carrying, prone > maxProne, faster than a walk):
+  // the arm yields over fadeS and the head layer keeps acting. A shot during the gesture ends it (no comeback); a
+  // body busy when its line starts waits unlifted and gestures once free. aimQuietS: the 03-05 front AI keeps aim 1
+  // all fight long and fires about once in 3 s (2026-09-25 probe of 04), so only a shooting run (a shot in the last
+  // .8 s) counts as aiming. moveSpeed 1 = 4.2 m/s (Script_Actor); .6 is about 2.5 m/s: the 03-05 squad walks its
+  // lines at .51 (2.1 m/s; "move up", "keep low" are said on the move), a jog (.7) or a run does not gesture.
+  fadeS: .15, maxAim: .35, aimQuietS: .8, maxMoveSpeed: .6, maxProne: .3,
+  // A further stress during the hold dips the forearm (the arm's version of the head nod).
+  beatRadians: .16, beatS: .26,
+  // Aimed clips: the upper arm turns from the clip's stroke direction to the target, limited to a cone around
+  // the body's front (degrees; `out` = toward the gesture hand's side, `in` = across the chest). crossLiftDeg: the
+  // left hand of a man holding a rifle up in the right, pointing across his front, lies on the barrel (He Youtian
+  // pointing at the tank on his right, 2026-09-25 browser test: 3.7 cm from the rifle), so the point is raised to
+  // at least this pitch at the full `in` angle (in proportion below it) and passes over the barrel (25 put the
+  // forearm across the face). maxOutOfConeDeg: a target further outside the cone than this is not pointed at (the
+  // 04 guard's ammunition house is behind his right shoulder: clamped, the arm pointed 90 deg away from it).
+  aimStrength: 1, coneOutDeg: 100, coneInDeg: 40, crossLiftDeg: 15, coneUpDeg: 35, coneDownDeg: 30,
+  maxOutOfConeDeg: 45,
+  // A man with a rifle up in the other hand whose target lies more than maxCrossOutDeg past the `in` edge (across
+  // his front, on the rifle's side) is not pointed at either (suppressed targetAcrossRifle): clamped to the edge and
+  // lifted over the barrel, He Youtian's point at the tank on his right (about 33 deg past the edge) ended as a hand
+  // in front of his cap brim and read as a salute (2026-09-25 review, TankRoadContact.01 close-up).
+  maxCrossOutDeg: 20,
+  // A point that would lie along the rifle held up in the other hand (within alongRifleDeg of the barrel) reads as
+  // a second man aiming (2026-09-25 review: the 06 runner's point south, the 05 keeper's point at the box): it is
+  // raised to at least alongLiftDeg so the arm goes up off the barrel line.
+  alongRifleDeg: 25, alongLiftDeg: 18,
+  // From the stroke on, the rest of the aim error is taken out over settleS, starting settleLeadS before the
+  // stroke, so the arm is on the target by the accent (2026-09-25 browser test: the hold pose differs from the
+  // measured stroke direction by up to ~15 deg on a crouch or kneel).
+  settleLeadS: .1, settleS: .2,
+  // A reach clip (the cigarette to the lips) lets go of the head anchor over reachFadeS after outS (the clip's own
+  // release then carries the arm down; shorter than the release so the hand leaves the lips first).
+  reachFadeS: .15,
+  // The gesturing hand keeps rifleClearM (wrist or finger root to the barrel line) off the rifle held in the other
+  // hand, turning the arm up by at most rifleClearMaxDeg a pass (Script_SpeakerGestureLayer._ClearRifle). The rifle
+  // is the segment rifleBehindM behind its grip (the stock) to rifleAheadM ahead (the muzzle of a HanYang/Type 24,
+  // ~.9 m from the grip); a hand less than rifleBelowM under the barrel line still counts as above it (turned up);
+  // the turn angle uses at least rifleMinReachM as the shoulder-to-hand distance (a folded arm must not spin).
+  rifleClearM: .07, rifleClearMaxDeg: 12, rifleBehindM: .35, rifleAheadM: .9, rifleBelowM: .02, rifleMinReachM: .2,
+  // A wounded walk above this weight is busy (the same threshold Script_Actor._ApplyRiggedAim uses).
+  maxWoundedWalk: .5,
+  // Ground anchors are pointed at this high above the ground (a man-high point, not the dirt); the tank at
+  // its hull; 'south' is southM due south at the speaker's ground height plus pointRiseM; 'listener' at the
+  // listener's eye less listenerDropM (a hand is held out to the other man's chest, not his face: the seated 06
+  // Zhou's offer to the standing player went up above his own head).
+  pointRiseM: 1.0, tankRiseM: 1.6, southM: 30, listenerDropM: .45,
+  // Per-target rise over the ground instead of pointRiseM: the 05 ammunition box lies on the floor of the house,
+  // and a man-high point at it ran along the keeper's rifle (2026-09-25 review, BundleSupply.01).
+  pointRiseByTarget: Object.freeze({ ammoBox: .3 }),
+});
+
 // Who plays a speaking role when several bodies could (Script_FirstLevelSpeakerBinder).
 export const SPEAKER_BINDING = Object.freeze({
   // 04 BundleOrder: the withdrawing guard with the talking face (FACED_FRONT_GUARD_INDEX)
