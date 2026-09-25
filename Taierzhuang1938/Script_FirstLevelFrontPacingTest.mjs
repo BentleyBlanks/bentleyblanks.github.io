@@ -414,6 +414,22 @@ function WalkRuntime(extra = {}) {
   checks += 7;
 }
 {
+  // 09-25 relay r2 Front step 3: a man who reached his last point mid-evade kept missionGrenadeEvade for good (the
+  // grenade check sat below the arrival return) and lay prone in his cover through three lines. The walk now lets
+  // RespondToGrenade (the runtime's, which drops the flag once no live grenade is near) see him every frame.
+  let live = false, asked = 0;
+  const { r } = WalkRuntime({ RespondToGrenade: (a) => { asked++; if (!live) { a.missionGrenadeEvade = false; return false; } a.missionGrenadeEvade = true; return true; } });
+  const battle = new FirstLevelFrontBattle(r);
+  const luo = { id: 11, alive: true, position: { x: 0, z: 0 }, scriptArrivalRadius: 1, missionGrenadeEvade: true };
+  battle.SetWalk(luo, [{ x: 0, z: 0 }]);
+  assert.equal(battle.Walk(luo), true, "no grenade left: he is at his post");
+  assert.equal(luo.missionGrenadeEvade, false, "and the stale evade flag is gone");
+  live = true;
+  assert.equal(battle.Walk(luo), false, "a live grenade at his post: he evades, not 'arrived'");
+  assert.ok(asked >= 2, "the grenade check runs at the post too");
+  checks += 4;
+}
+{
   // Relief: the gunner stuck on the leftRoute leg for 70 s (probe V) and one man killed on the way -> still in position.
   const { r, facts } = WalkRuntime({ flow: { stage: { id: "Tank" } }, tank: { brain: {}, fireDisabled: true },
     companion: { Handle: () => null }, emplacement: { NpcVacate() {}, NpcOccupy() {} } });

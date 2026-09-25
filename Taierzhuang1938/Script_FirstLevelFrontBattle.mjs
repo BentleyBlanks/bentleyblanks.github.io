@@ -105,6 +105,11 @@ export class FirstLevelFrontBattle {
   SetWalk(actor,route){if(!actor)return;this.walks.set(actor.id,{route:route.map(p=>({...p})),index:0});this.r.squadRoutes.set(actor.id,route.map(p=>({...p})));}
   Walk(actor,{follow=false,speed=R.squadSpeedMps}={}){
     const r=this.r,w=actor&&this.walks.get(actor.id);if(!actor?.alive||!w)return false;
+    // A grenade evade is finished by RespondToGrenade itself (no live grenade near him: the flag drops). It used to be
+    // called only on the way, below the arrival return, so a man who reached his last point mid-evade kept the flag for
+    // good and the AI kept him prone (Script_Ai: missionGrenadeEvade -> stance 2, no fire): 09-25 relay r2 Front step 3,
+    // Luo flat in his cover inside the nest's west door through FrontWithdraw / TakeOverGun, his head never moving.
+    if(actor.missionGrenadeEvade&&r.RespondToGrenade(actor)){w.bestAt=r.time;return false;}
     // Stepping into the player's picture for a line (FrontScenes.Steer moves him): no walk order, no stall clock.
     if(r.frontScenes?.Steers?.(actor)){w.bestAt=r.time;return false;}
     // Intermediate points describe checked trench corners. Advancing a metre
@@ -120,8 +125,9 @@ export class FirstLevelFrontBattle {
     const previousIndex=w.index;
     while(w.index<w.route.length&&Distance(actor.position,w.route[w.index])<Arrival())w.index++;
     if(w.index!==previousIndex){w.rejoin=null;w.best=Infinity;w.bestAt=r.time;}
-    if(w.index>=w.route.length){r.Defend(actor,w.route.at(-1),0,.4);r.ai.SetStance(actor,last.stance??1,.5,true);r.squadRoutes.set(actor.id,[]);return true;}
+    // Arrived: a grenade landing at his post still moves him (the reopen check above walks him back afterwards).
     if(r.RespondToGrenade(actor)){w.bestAt=r.time;return false;}
+    if(w.index>=w.route.length){r.Defend(actor,w.route.at(-1),0,.4);r.ai.SetStance(actor,last.stance??1,.5,true);r.squadRoutes.set(actor.id,[]);return true;}
     const ahead=MissionRouteProjection(w.route,actor.position).progress>MissionRouteProjection(w.route,r.player.position).progress+B.leaderLeadM;
     const wait=follow&&ahead&&Distance(actor.position,r.player.position)>S.leaderWaitM;
     // Stall fallback: intermediate points only count within 0.25 m, so a man shoved off the line (a gun block, a
