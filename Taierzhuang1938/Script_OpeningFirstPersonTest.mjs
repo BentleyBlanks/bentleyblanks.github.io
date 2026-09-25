@@ -105,6 +105,23 @@ assert.ok(groundContacts>=20,"ground beats were sampled at rest ("+groundContact
   show.flags.buttAt=9.8;assert.equal(OpeningHandBeat(show).names.r,"push","he pushes up before the stock lands");
   show.flags.buttAt=9;assert.equal(OpeningHandBeat(show).names.r,"rest","after the strike the arms go slack");
 }
+// A cut between phases (the camera jumps, e.g. Blast -> Wake) must not carry last frame's world shoulder
+// into the new view: the shoulder blend is camera-local (campaign probe minShoulderBehind was -0.003).
+{
+  const playerBody=Actor("LugouNra02"),other=Actor("LugouNra02");other.root.position.set(-40,-.5,-126.9);other.root.updateMatrixWorld(true);
+  const eye=camera.clone();const r={player:{camera:eye},companion:{Handle:()=>({actor:other})},time:0};
+  const show={playerBody,ready:true,phase:PHASES[0],Age:0,flags:{},supplyRoot:new THREE.Group(),loadingRifle:new THREE.Group(),loadingRifleGrip:new THREE.Vector3(),
+    clips:[new THREE.Group(),new THREE.Group()],r,Ija:()=>({actor:other})};
+  const firstPerson=new OpeningFirstPerson(show);let cuts=0,minBehind=Infinity;
+  for(const [i,phase] of PHASES.entries()){
+    if(i){eye.position.x+=3;eye.rotateY(Math.PI/2);eye.updateMatrixWorld(true);cuts++;}
+    show.phase=phase;const start=r.time;show.flags={buttAt:start,collarReleasedAt:start,checkLineAt:start,kickRifleAt:start};
+    for(let frame=0;frame<20;frame++){show.Age=frame/60;r.time=start+frame/60;firstPerson.Update(1/60);
+      for(const hand of Object.values(firstPerson.report.hands))minBehind=Math.min(minBehind,hand.shoulderBehind);}
+    r.time+=.1;
+  }
+  assert.ok(cuts>5&&minBehind>.08,`the sleeve roots stay behind the eye across ${cuts} camera cuts (${minBehind})`);
+}
 // A helper approaching from the side must meet a clasp's palm plane even when
 // the preferred elbow pole would make the wrist-flexion clamp roll that plane.
 // Exercise both production skins and hands with continuously moving contacts.
