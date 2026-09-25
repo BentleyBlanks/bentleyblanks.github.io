@@ -1095,8 +1095,20 @@ const sweep = await page.evaluate(() => {
     while (!(a.ctx.currentTime > v.releaseAt + 0.02) && performance.now() - wall < 6000) { /* 忙等：不让出主线程 */ }
     const before = a.liveNodes, stillOwned = v.nodes.length;
     a.SetListener(g.camera);
+    // 第二条：淡出掐掉的（StopVoice(v, fade)，战车 loop 离场就是这么收的）淡完就要能被清账收走，
+    // 不等它原来那个回收点（这一条的回收点还在 1 s 多以后）。
+    const w = a.Play("rifleNra", { position: { x: L.x - 10, y: L.y, z: L.z + 0.5 }, volume: 0.02 });
+    let faded = null;
+    if (w) {
+      a.StopVoice(w, 0.1);
+      const wall2 = performance.now();
+      while (!(a.ctx.currentTime > w.t + 0.15) && performance.now() - wall2 < 3000) { /* 忙等 */ }
+      const releaseIn = +(w.releaseAt - a.ctx.currentTime).toFixed(3);
+      a.SetListener(g.camera);
+      faded = { freed: w.nodes.length === 0, pending: a.pendingVoices.has(w), releaseIn, lifeLeft: +(w.t + w.life - a.ctx.currentTime).toFixed(3) };
+    }
     return { played: true, cost, releaseIn, stillOwned, freed: v.nodes.length === 0, returned: before - a.liveNodes,
-      pending: a.pendingVoices.has(v), waitedS: +((performance.now() - wall) / 1000).toFixed(2) };
+      pending: a.pendingVoices.has(v), waitedS: +((performance.now() - wall) / 1000).toFixed(2), faded };
   } finally { a.nodeBudget = saved; }
 });
 if (!sweep.played || !(sweep.releaseIn > 0) || sweep.stillOwned !== sweep.cost) {
@@ -1104,7 +1116,10 @@ if (!sweep.played || !(sweep.releaseIn > 0) || sweep.stillOwned !== sweep.cost) 
 } else if (!sweep.freed || sweep.pending || sweep.returned < sweep.cost) {
   Fail(`按帧清账：到点的 voice 在 SetListener 之后还挂在账上（${JSON.stringify(sweep)}）`
     + ` —— 同步推帧的测试会把 liveNodes 量成几百`);
-} else Ok(`按帧清账：同步块里忙等 ${sweep.waitedS} s，到点的那一声（${sweep.cost} 个节点）在 SetListener 里断开并还回账面`);
+} else if (!sweep.faded || !(sweep.faded.lifeLeft > 0.5) || !sweep.faded.freed || sweep.faded.pending) {
+  Fail(`按帧清账：淡出掐掉的那一声淡完了还挂在账上（${JSON.stringify(sweep.faded)}）—— 同步推帧时离场的战车 loop 会整段留在账上`);
+} else Ok(`按帧清账：同步块里忙等 ${sweep.waitedS} s，到点的那一声（${sweep.cost} 个节点）在 SetListener 里断开并还回账面；`
+  + `淡出掐掉的那一声离原回收点还有 ${sweep.faded.lifeLeft} s 就已收走`);
 
 // 两级动态：母线慢压 + 末端快限，参数不许被谁顺手改回单级。
 // 抽泵深度的实测（10.08 → 8.91 dB）在 Script_Audio 的 BUS_COMP 抬头与

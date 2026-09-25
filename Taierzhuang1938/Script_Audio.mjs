@@ -5609,6 +5609,11 @@ export class AudioEngine {
       voice.out.gain.cancelScheduledValues(t);
       voice.out.gain.setTargetAtTime(0, t, fadeS / 4);
       this.Later(fadeS * 1000, () => this.StopVoice(voice, 0));
+      // 按帧清账也认这个时刻（见 SweepExpiredVoices）：淡完就停，不等原来那个回收点。
+      // 要紧的是常驻 loop（战车三条、会飞的引擎）：它们的回收点在几分钟以后，
+      // 主线程一口气推几百帧时只靠上面那个计时器的话，淡完的 loop 整段挂在账上。
+      // 到点走 StopVoice 而不是 FreeVoice：循环的播放头只断开不 stop 会在音频线程里一直转。
+      if (this.pendingVoices.has(voice)) { voice.releaseAt = t + fadeS; voice.stopAtRelease = true; }
       return true;
     }
     for (const node of voice.nodes) {
@@ -5652,7 +5657,7 @@ export class AudioEngine {
     for (const v of this.pendingVoices) {
       if (!(v.releaseAt <= now)) continue;
       if (v.releaseTimer != null) { clearTimeout(v.releaseTimer); this.timers.delete(v.releaseTimer); v.releaseTimer = null; }
-      this.FreeVoice(v);
+      if (v.stopAtRelease) this.StopVoice(v, 0); else this.FreeVoice(v);
       freed += 1;
     }
     if (freed) this.stats.sweptVoices = (this.stats.sweptVoices || 0) + freed;
