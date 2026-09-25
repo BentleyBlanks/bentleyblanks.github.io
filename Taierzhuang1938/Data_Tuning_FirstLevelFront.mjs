@@ -281,10 +281,17 @@ export const FRONT_BATTLE_TUNING=Object.freeze({
   // 3.6 m/s), so runStandsWithPlayer: while he runs and the player stands he runs upright (the player can only sprint
   // standing, Script_Player canSprint); behind a crouched player (STANCE.crouch.speed 1.62) he stays crouched.
   // pointS: FrontApproach line 1 is 2.82 s long (Data_FirstLevelMissionVoiceAlignment), he points through it.
-  // pointHoldsFire: for those pointS (the FrontApproach line only, not the corner holds) he does not aim or fire (an aiming brain cancels the upper-body clip, 09-25 SB07 shot)
-  // and turns himself toward where he points at pointTurnRps (the AI's standing turn is 3.4 rad/s, Script_Ai; 5 turns him
-  // from facing the waiting-for player to the trench ahead in ~0.6 s, a quick about-face while the line is 2.8 s).
-  leaderLead:Object.freeze({minM:3,maxM:5,catchUpM:1.5,runMps:6,runStandsWithPlayer:true,endApproachIndex:11,cornerTurnDeg:35,cornerNearM:1.6,pointS:2.8,pointHoldsFire:true,pointTurnRps:5}),
+  // pointHoldsFire: for those pointS (the FrontApproach line only, not the corner holds) he does not raise the rifle or
+  // pull the trigger (an aiming brain cancels the upper-body clip, 09-25 SB07 shot); he keeps his target and his place in
+  // the fight (FrontBattle.PointQuiet: aimBlend and coolUntil only -- the first cut's scriptedNoncombatant changed 03's
+  // outcome, 09-25 review), and turns himself toward where he points at pointTurnRps (the AI's standing turn is 3.4 rad/s,
+  // Script_Ai; 5 turns him from facing the waiting-for player to the trench ahead in ~0.6 s, the line is 2.8 s).
+  // pointWalkMps / pointExtraM: through that pointing he walks on upright ("腿照走", contract §5 SB07) at a slow walk,
+  // and only stops pointExtraM beyond maxM. The player who stops to look (the SB07 shot stops at the trigger, 5.0 m) has
+  // him 5.3 m ahead 0.45 s later and 5.5 m (the shot's distance limit) at 0.7 s; a player who keeps walking (crouched
+  // 1.62 m/s) closes on him and he walks at 0.7 m/s the whole line.
+  leaderLead:Object.freeze({minM:3,maxM:5,catchUpM:1.5,runMps:6,runStandsWithPlayer:true,endApproachIndex:11,cornerTurnDeg:35,cornerNearM:1.6,pointS:2.8,pointHoldsFire:true,pointTurnRps:5,
+    pointWalkMps:.7,pointExtraM:1}),
   // First batch crossing (SB08): the batch goes as one column in the order nearest-to-the-last-cover first; a man leaves
   // (and keeps walking) once the man ahead of him is firstColumnSpacingM further along the shared withdrawal route, and
   // pauses when closer than firstColumnMinM. A man ahead who has not moved on for firstColumnStallS is passed. 1.6 m at

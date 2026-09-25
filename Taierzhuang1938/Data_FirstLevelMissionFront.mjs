@@ -269,6 +269,25 @@ export const FRONT_GUARD_MG_GROUP=Object.freeze({
   /** Battlefield bodies closer than this to a member or to the wounded man are left out (a body under a live man). */
   bodyClearanceM:1.2,
 });
+/**
+ * SB08 sightline (contract Data_FirstLevelStoryboard0103Contract §5 SB08): from the captured nest, north of the gun
+ * (the viewpoint Script_FrontStoryboardShots stands on), to the gap 34 m west. The middle ground of that frame is where
+ * the first batch is read as a column crossing the gap; battlefield bodies inside halfDeg of the line, from nearM out to
+ * beforeGapM short of the gap, are left out of MISSION_AFTERMATH (the bodies at and beyond the gap stay: the 4 dead
+ * north-west of it, the held line's west end).
+ * 09-25 review (SB08 run 1/2): 13 bodies of the held line's east-end cluster (7,-155.8), 18-22 m out and 1.5-15 deg off
+ * the line, lay across the exact screen strip (x 0.46-0.60) where the column crosses: blue-grey and khaki shapes the
+ * size of the 60-170 px men, a viewer could not tell the column from the dead. Filtering after generation keeps every
+ * other body where it was (same draws).
+ */
+export const FRONT_SB08_SIGHTLINE=Object.freeze({from:Object.freeze({x:25.6,z:-155.2}),to:Object.freeze({x:Sortie.gap.x,z:Sortie.gap.z}),
+  halfDeg:15,nearM:3,beforeGapM:6});
+/** True when a ground point lies in the SB08 sightline cone (FRONT_SB08_SIGHTLINE), short of the gap. */
+export function InFrontSb08Sightline(p,L=FRONT_SB08_SIGHTLINE){
+  const ax=L.to.x-L.from.x,az=L.to.z-L.from.z,bx=p.x-L.from.x,bz=p.z-L.from.z,la=Math.hypot(ax,az),lb=Math.hypot(bx,bz);
+  if(lb<L.nearM||lb>la-L.beforeGapM)return false;
+  return Math.acos(Math.max(-1,Math.min(1,(ax*bx+az*bz)/(la*lb))))*180/Math.PI<=L.halfDeg;
+}
 // Breaches only ever RAISE a dug floor toward (natural - depth). Gap: the sap is shallowed to 0.5 m
 // for ~6 m (the one exposed crossing). Damaged lip: 1.1 m for ~6 m - crouched (eye 1.05) is below the
 // natural ground and hidden from the tank, standing shows the road and the turret (graft from B's K8).
@@ -393,7 +412,8 @@ export const MISSION_AFTERMATH=clusters.flatMap(([x,z,count,ijaShare,spread],gro
     pile,scale:.94+Random()*.12,blood:.6+Random()*.75,opening:group<13};
 });}).filter(body=>(!body.opening||(+body.id.split("_")[1]<2&&OpeningRouteClear(body)))&&
   musterPoints.every(point=>Math.hypot(body.x-point.x,body.z-point.z)>=musterBodyClearanceM)&&
-  [...FRONT_GUARD_MG_GROUP.members,FRONT_GUARD_MG_GROUP.wounded].every(p=>Math.hypot(body.x-p.x,body.z-p.z)>=FRONT_GUARD_MG_GROUP.bodyClearanceM)).concat([
+  [...FRONT_GUARD_MG_GROUP.members,FRONT_GUARD_MG_GROUP.wounded].every(p=>Math.hypot(body.x-p.x,body.z-p.z)>=FRONT_GUARD_MG_GROUP.bodyClearanceM)&&
+  !InFrontSb08Sightline(body)).concat([
   // SB07: the bloodied casualty lying beside the backslope LMG pair (a body, not a live man: contract §6 budget).
   {id:"AftermathMgWounded",x:FRONT_GUARD_MG_GROUP.wounded.x,z:FRONT_GUARD_MG_GROUP.wounded.z,yaw:FRONT_GUARD_MG_GROUP.wounded.yaw,
     side:"nra",pose:1,pile:0,scale:1,blood:1.35,opening:false},

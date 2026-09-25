@@ -74,6 +74,16 @@ export function FrontEntryRoute(position,route){
 /** Guard i's part in the 03 backslope LMG pair (FRONT_GUARD_MG_GROUP.members), or null. */
 export function FrontGuardMgMember(i){return FRONT_GUARD_MG_GROUP.members.find(m=>m.guard===i)||null;}
 /**
+ * Index of FRONT_SORTIE.lastCover on a withdrawal route. Every guard route passes it (the LMG pair's route is spliced
+ * there, the SB08 column is measured from it); a route without it is a data error, not something to fall back from
+ * (09-25 review: slice(-1) would send the pair straight from the backslope to the safe zone).
+ */
+export function LastCoverIndex(route,what="withdrawal route"){
+  const at=route.findIndex(p=>Distance(p,S.lastCover)<.01);
+  if(at<0)throw new Error(`${what} does not pass FRONT_SORTIE.lastCover (${S.lastCover.x},${S.lastCover.z})`);
+  return at;
+}
+/**
  * Guard i's withdrawal route and the route index he holds at for the 04 gather (1: the point after his scrape post).
  * The LMG pair starts on the backslope and comes down FRONT_GUARD_MG_GROUP.exit into the scrape; its last exit point is
  * the east posts' leg past the last-cover sandbags, from the last cover on it is the guard's own Layout route.
@@ -81,7 +91,7 @@ export function FrontGuardMgMember(i){return FRONT_GUARD_MG_GROUP.members.find(m
 export function GuardWithdrawalRoute(i){
   const base=P.guardWithdrawalRoutes[i],mg=FrontGuardMgMember(i);
   if(!mg)return {route:base,gatherIndex:1,mg:null};
-  const from=base.findIndex(p=>Distance(p,S.lastCover)<.01);
+  const from=LastCoverIndex(base,`guard ${i}'s Layout withdrawal route`);
   return {route:[{x:mg.x,z:mg.z},...FRONT_GUARD_MG_GROUP.exit.map(p=>({...p})),...base.slice(from).map(p=>({...p}))],
     gatherIndex:FRONT_GUARD_MG_GROUP.exit.length,mg};
 }
@@ -138,15 +148,24 @@ export class FirstLevelFrontBattle {
     while(w.index<w.route.length&&Distance(actor.position,w.route[w.index])<Arrival())w.index++;
     if(w.index!==previousIndex){w.rejoin=null;w.best=Infinity;w.bestAt=r.time;}
     if(w.index>=w.route.length){r.Defend(actor,w.route.at(-1),0,.4);r.ai.SetStance(actor,1,.5,true);r.squadRoutes.set(actor.id,[]);return true;}
-    if(r.RespondToGrenade(actor)){w.bestAt=r.time;return false;}
+    // A leader diving from a grenade is not leading or pointing this frame (09-25 review: the corner he had reached
+    // the frame before kept writing PointBlockade and turning him toward the corner through the dodge).
+    if(r.RespondToGrenade(actor)){w.bestAt=r.time;if(follow){this.leaderDodging=true;if(lead)this.lead=null;}return false;}
+    if(follow)this.leaderDodging=false;
     const ahead=MissionRouteProjection(w.route,actor.position).progress>MissionRouteProjection(w.route,r.player.position).progress+B.leaderLeadM;
     // 03 lead stretch (B.leaderLead): until the last bend before the nest's west door the leader keeps 3-5 m ahead.
     if(lead)w.leadEnd??=MissionRouteProjection(w.route,S.approach[B.leaderLead.endApproachIndex]).progress;
     const pace=lead&&MissionRouteProjection(w.route,actor.position).progress<w.leadEnd-B.arrivalM
       ?LeadPace(w.route,w.index,actor.position,r.player.position,w.lead||(w.lead={})):null;
     if(lead)this.lead=pace;
-    const wait=pace?pace.wait:follow&&ahead&&Distance(actor.position,r.player.position)>S.leaderWaitM;
+    let wait=pace?pace.wait:follow&&ahead&&Distance(actor.position,r.player.position)>S.leaderWaitM;
     if(pace)speed=pace.speed;
+    // SB07 (contract §5 "PointBlockade 上半身伸臂指路（腿照走）"): through the FrontApproach pointing he walks on upright
+    // while he points, slowly (pointWalkMps) so the player who stops to look still has him 4-5 m ahead; he only stops
+    // when he gets pointExtraM beyond maxM. A run to get back in front stays a run. 09-25 review: the shot caught him
+    // squatting still, the gap had just gone over maxM (5.01 m) and the lead rule had stopped him.
+    const L=B.leaderLead,pointing=!!pace&&!pace.corner&&this.approachPointAt!=null&&r.time-this.approachPointAt<L.pointS;
+    if(pointing){wait=pace.gap>=L.maxM+L.pointExtraM;if(pace.speed!==L.runMps)speed=Math.min(speed,L.pointWalkMps);}
     // Stall fallback: intermediate points only count within 0.25 m, so a man shoved off the line (a gun block, a
     // crowd, a crater edge) could hold one point for good - Luo 200 s beside the captured gun's seat, the relief
     // gunner 70 s on the leftRoute leg (09-24 review). No progress for B.walkStallS -> skip the point, or take a
@@ -177,7 +196,7 @@ export class FirstLevelFrontBattle {
     // Lead run (B.leaderLead.runStandsWithPlayer): the brain moves a crouched man at 0.6 x speed, so a crouched run is
     // 3.6 m/s and a standing, sprinting player (5.25) still overtook him. He runs upright while the player is upright
     // (and so no better hidden than he is); behind a crouched player (1.62 m/s) the crouched run is fast enough.
-    const upright=!wait&&!!pace&&pace.speed===B.leaderLead.runMps&&B.leaderLead.runStandsWithPlayer&&r.player.stance==="stand";
+    const upright=pointing||!wait&&!!pace&&pace.speed===B.leaderLead.runMps&&B.leaderLead.runStandsWithPlayer&&r.player.stance==="stand";
     r.ai.SetStance(actor,upright?0:1,.5,true);r.MoveActor(actor,w.rejoin||w.route[w.index],wait?0:speed);
     actor.scriptArrivalRadius=Math.min(actor.scriptArrivalRadius,(w.rejoin?B.arrivalM*.25:Arrival())*.5);
     r.squadRoutes.set(actor.id,w.route.slice(w.index));
@@ -188,23 +207,22 @@ export class FirstLevelFrontBattle {
    * FrontApproach line, and at a corner he holds (B.leaderLead) he faces the next leg and points along it. The pose is
    * the opening layer's PointBlockade (Script_OpeningStoryboardAnimation; loaded at level start by the bunker show),
    * written only while this pointing lasts and taken off only if it is still ours.
-   * Through the FrontApproach pointing (pointS; not at the corner holds, those keep him in the fight) he holds his fire
-   * (scriptedNoncombatant, the value he had is put back): the
-   * opening layer drops an upper-body clip whenever the brain aims or fires (Script_OpeningStoryboardAnimation
-   * nativeCombat), and at the FrontApproach line he has the nest gunner in sight -- 09-25 SB07 shot: flagged
-   * PointBlockade, drawn kneeling with the rifle up.
-   * While he holds fire he also turns himself toward where he points (pointTurnRps, from the facing shown last frame,
-   * the way the opening director turns its actors): a held man's brain faces what it last heard (lkp outranks
-   * watchYaw in Script_Ai), and waiting he faced the player (LeaderGuide.Watch) -- 09-25 third SB07 shot: arm out,
-   * body 85 deg off, pointing at the trench wall.
+   * Through the FrontApproach pointing (pointS; not at the corner holds, those keep him in the fight) he holds his aim
+   * and trigger (PointQuiet): the opening layer drops an upper-body clip whenever the brain aims (aimBlend > 0.6) or
+   * fires (Script_OpeningStoryboardAnimation nativeCombat), and at the FrontApproach line he has the nest gunner in
+   * sight -- 09-25 SB07 shot: flagged PointBlockade, drawn kneeling with the rifle up.
+   * While he holds he also turns himself toward where he points (pointTurnRps, from the facing shown last frame,
+   * the way the opening director turns its actors): his brain keeps facing its target, and waiting he faced the
+   * player (LeaderGuide.Watch) -- 09-25 third SB07 shot: arm out, body 85 deg off, pointing at the trench wall.
+   * Not while he dives from a grenade (leaderDodging).
    */
   UpdatePoint(dt=0){
     const r=this.r,L=B.leaderLead,luo=this.Leader,w=luo&&this.walks.get(luo.id);if(!luo?.alive)return;
     const approach=this.approachPointAt!=null&&r.time-this.approachPointAt<L.pointS;
-    const to=this.lead?.corner||(approach&&w&&w.index<w.route.length?w.route[w.index]:null);
+    const to=this.leaderDodging?null:this.lead?.corner||(approach&&w&&w.index<w.route.length?w.route[w.index]:null);
     if(to){
       if(!this.pointFrom)this.pointFrom={at:r.time,corner:!!this.lead?.corner};
-      this.PointQuiet(luo,L.pointHoldsFire&&approach&&!this.lead?.corner);
+      this.PointQuiet(luo,L.pointHoldsFire&&approach&&!this.lead?.corner,r.ai?.time??r.time);
       InstallOpeningStoryboardAnimation(luo);
       luo.openingStoryboardPose={clip:"PointBlockade",seconds:r.time-this.pointFrom.at,upperBody:true};luo.frontPointing=true;
       luo.watchYaw=Math.atan2(luo.position.x-to.x,luo.position.z-to.z);luo.watchUntil=r.ai.time+.3;
@@ -219,9 +237,20 @@ export class FirstLevelFrontBattle {
     this.pointFrom=null;this.PointQuiet(luo,false);
     if(luo.frontPointing){luo.frontPointing=false;if(luo.openingStoryboardPose?.clip==="PointBlockade")luo.openingStoryboardPose=null;}
   }
-  PointQuiet(luo,on){
-    if(on&&!this.pointQuiet){this.pointQuiet={was:!!luo.scriptedNoncombatant};luo.scriptedNoncombatant=true;}
-    else if(!on&&this.pointQuiet){luo.scriptedNoncombatant=this.pointQuiet.was;this.pointQuiet=null;}
+  /**
+   * Hold his aim and trigger for this frame, and nothing else: he keeps his target, his tactical state and his cover
+   * claim, so the fight goes on from where it was when the pointing ends. The rifle stays down (aimBlend 0: the brain
+   * climbs it back at 5.5/s, under the opening layer's 0.6 in one frame, and a shot needs BRAIN.fireAimBlendMin 0.95),
+   * and coolUntil holds the trigger also while he is culled (no skinned muzzle to check). Called every frame while on.
+   * 09-25 review: the first cut set scriptedNoncombatant for the 2.8 s, which cleared his target and released his cover
+   * every frame; 03 went down a branch where RightEntryGuard was still alive at the nest door (campaign A/B: 5/8 runs vs
+   * 4/4 with the hold off). Reads the brain's clock (`now`, AiDirector.time) for coolUntil.
+   */
+  PointQuiet(luo,on,now=0){
+    if(on){
+      this.pointQuiet??={yaw:undefined};
+      luo.aimBlend=0;luo.coolUntil=Math.max(luo.coolUntil??-99,now+.1);
+    }else if(this.pointQuiet)this.pointQuiet=null;
   }
   SetLeg(id,route){if(this.leg===id)return;this.leg=id;this.leaderRoute=route;this.SetWalk(this.Leader,route);}
   Prepare(){
@@ -506,13 +535,15 @@ export class FirstLevelFrontBattle {
   }
   /** Guard g's position along his withdrawal route measured from the last cover (negative before it). */
   ColumnAlong(g){
-    g.lastCoverAt??=MissionRouteLength(g.route.slice(0,g.route.findIndex(p=>Distance(p,S.lastCover)<.01)+1));
+    g.lastCoverAt??=MissionRouteLength(g.route.slice(0,LastCoverIndex(g.route,`guard ${g.actor?.missionId||g.actor?.id}'s withdrawal route`)+1));
     return MissionRouteProjection(g.route,g.actor.position).progress-g.lastCoverAt;
   }
   /** First-batch column: order fixed at release (nearest the last cover first), and each man's last forward move. */
   UpdateColumn(first){
     const r=this.r;
-    if(!this.firstColumn)this.firstColumn=first.map(g=>({g,along:this.ColumnAlong(g)})).sort((a,b)=>b.along-a.along).map(e=>e.g);
+    // Only the men still to cross make the column (a 04/05 checkpoint has the batch already in the safe zone; the dead
+    // and the safe are skipped by ColumnGap anyway).
+    if(!this.firstColumn)this.firstColumn=first.filter(g=>g.actor.alive&&!g.safe).map(g=>({g,along:this.ColumnAlong(g)})).sort((a,b)=>b.along-a.along).map(e=>e.g);
     for(const g of this.firstColumn){
       if(!g.actor.alive||!g.crossing)continue;
       const along=this.ColumnAlong(g);
