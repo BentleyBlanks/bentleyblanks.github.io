@@ -15,6 +15,11 @@
 //     （审查 HeWhy：绕到枪托沙袋敌方一侧，离座 1.31–1.44 m 永远回不去，两挺捷克式同框）。再把他直接挪到沙袋
 //     敌方一侧（没有躲弹轨迹），走不过去时兜底要绕路（PostDetour）回座，不许原地认定「到了」。
 //
+// 2026-09-26 接力第二批收尾（集成负责人定方案 c）：守位队友给玩家让路（FrontScenes.GiveWay）。
+//   · westDoorPass：罗班长在西门内掩体上，玩家按方向键从门洞走到缴获机枪座位（沿 03 接近路最后两段，或斜穿门洞直冲他）。
+//     断言：玩家到座位、途中原地不超过 1 s；斜穿那条每趟罗班长都让开、玩家没贴进他身体；玩家到位后罗班长回掩体、不跳点。
+//     （Front fx16：玩家在西门，罗班长在门里掩体上离他 0.78 m 不让 —— Script_Ai 的友军让路只在 0.75 m 内推。）
+//
 // 跑法：node Taierzhuang1938/Script_FirstLevelRearDoorWalkTest.mjs [--trials=4]
 // ===========================================================================
 import assert from "node:assert/strict";
@@ -36,7 +41,7 @@ const legs = [
 ];
 assert.ok(legs.every((l) => l.route.some((p) => Math.hypot(p.x - Space.rearDoor.x, p.z - Space.rearDoor.z) < .2)), "both legs cross the rear door");
 const ctx = await OpenCampaign({ suite: "RearDoorWalk", stageFrom: 3, stageTo: 6, quality: "low" });
-const runs = [], seatRuns = [];
+const runs = [], seatRuns = [], doorRuns = [];
 // A Japanese grenade that never goes off: in combat.projectiles (the AI's threat scan and RespondToGrenade see it),
 // taken back out before its fuse runs down (Defuse).
 const GRENADE_KIT = `
@@ -104,6 +109,75 @@ try {
     }
     return out;
   }, { leg: legs[0], trials: Math.max(3, Math.ceil(trials / 2)), kit: GRENADE_KIT }));
+  // westDoorPass: Luo in his cover inside the nest's west door, the player walks (movement keys, as a person plays)
+  // through the doorway to the captured gun's seat - along the approach route's last legs, or cutting straight at him.
+  // He must step out of the way (FrontScenes.GiveWay), the player must not be held up, and Luo must be back on his cover.
+  doorRuns.push(...await ctx.page.evaluate(({ paths, trials, cover, coverM }) => {
+    const g = window.Tengxian, r = g.Debug.FirstLevelMissionRuntime(), fb = r.frontBattle, scenes = r.frontScenes, p = g.player, Bf = g.battlefield;
+    const luo = fb.Leader, out = [];
+    // Japanese grenades from the men farther out are taken out of the air here: a dodge in the middle of a pass measures the
+    // dodge, not the pass (run reardoor2: a dodge put Luo 4.4 m off his cover after route#1 and 6.3 m off it at cut#0's start).
+    const Quiet = () => { const list = r.combat?.projectiles || [];
+      for (let i = list.length - 1; i >= 0; i--) { const q = list[i]; if (q.alive && q.owner === "ija" && Math.hypot(q.position.x - 26, q.position.z - 151) < 25) { q.alive = false; list.splice(i, 1); } } };
+    // The nest's own men (encounter "approach": RightNestGunner at (25.5,-152.5), between the door and the seat) are spawned
+    // only as the player comes up, so they are spawned now and cleared every frame: an enemy body in the player's way is
+    // the drive's fight (it fights him, a body walked into starts a bayonet fight), not what this trial measures.
+    const Clear = () => {
+      for (const [id, a] of [...r.enemies]) if (Math.hypot(a.position.x - 28, a.position.z - 147) < 18) { g.ai.Remove(a); r.enemies.delete(id); }
+      for (const s of [...g.ai.soldiers]) if (s.side === "ija" && Math.hypot(s.position.x - 28, s.position.z - 147) < 18) g.ai.Remove(s);
+    };
+    r.SpawnEncounter?.("approach");
+    for (let i = 0; i < 240 && r.spawnQueue?.length; i++) g.StepFrames(1, 1 / 60, false);
+    p.debug.invincible = true;
+    for (const path of paths) for (let t = 0; t < trials; t++) {
+      for (const s of [...g.ai.soldiers]) if (s.side === "ija" && s.alive && Math.hypot(s.position.x - 28, s.position.z - 147) < 18) g.ai.Remove(s);
+      const cy = Bf.GroundHeight(cover.x, cover.z);
+      luo.position.set(cover.x, cy, cover.z); luo.body?.Teleport(cover.x, cy, cover.z); luo.velocityY = 0;
+      fb.leg = null; fb.stalls.length = 0; fb.SetLeg(`westDoorPass#${path.id}#${t}`, [{ ...cover }]);
+      const [sx, sz] = path.from;
+      p.position.set(sx, Bf.GroundHeight(sx, sz), sz); p.body?.Teleport(p.position.x, p.position.y, p.position.z);
+      for (let i = 0, calm = 0; i < 60 * 12 && (i < 90 || calm < 30); i++) {
+        Clear(); Quiet(); g.StepFrames(1, 1 / 60, false);
+        calm = !luo.missionGrenadeEvade && Math.hypot(luo.position.x - cover.x, luo.position.z - cover.z) <= coverM ? calm + 1 : 0;
+      }
+      const settled = Math.hypot(luo.position.x - cover.x, luo.position.z - cover.z);
+      const gaveBefore = scenes.gaveWay.length;
+      let f = 0, k = 0, still = 0, longestStill = 0, minM = Infinity, blocked = 0, blockedAtLuo = 0, reachedAt = null, backAt = null, lastX = p.position.x, lastZ = p.position.z;
+      for (; f < 60 * 25; f++) {
+        const goal = path.points[k];
+        if (goal) {
+          const dx = goal.x - p.position.x, dz = goal.z - p.position.z;
+          if (Math.hypot(dx, dz) < (k === path.points.length - 1 ? .6 : .45)) { k++; if (k >= path.points.length) { g.Debug.Key("KeyW", false); reachedAt = f; } }
+          else { p.yaw = Math.atan2(-dx, -dz); p.pitch = 0; g.Debug.Key("KeyW", true); }
+        }
+        Clear(); Quiet();
+        g.StepFrames(1, 1 / 60, false);
+        if (reachedAt == null) {
+          const moved = Math.hypot(p.position.x - lastX, p.position.z - lastZ);
+          still = moved < .004 ? still + 1 / 60 : 0; longestStill = Math.max(longestStill, still);
+          const luoM = Math.hypot(p.position.x - luo.position.x, p.position.z - luo.position.z);
+          if (p._actorBlock?.blocked) { blocked++; if (luoM < 0.8) blockedAtLuo++; }
+          minM = Math.min(minM, luoM);
+        }
+        lastX = p.position.x; lastZ = p.position.z;
+        if (reachedAt != null && backAt == null && !scenes.giveWay && Math.hypot(luo.position.x - cover.x, luo.position.z - cover.z) <= coverM) backAt = f;
+        if (backAt != null && f - backAt > 60) break;
+      }
+      g.Debug.Key("KeyW", false);
+      const gave = scenes.gaveWay.slice(gaveBefore).filter((e) => e.who === "luo");
+      out.push({ path: path.id, trial: t, settledM: +settled.toFixed(2), reachedS: reachedAt == null ? null : +(reachedAt / 60).toFixed(1),
+        backS: backAt == null || reachedAt == null ? null : +((backAt - reachedAt) / 60).toFixed(1), longestStillS: +longestStill.toFixed(2), blockedFrames: blocked, blockedAtLuo,
+        minLuoM: +minM.toFixed(2), gave, stalls: fb.stalls.slice(), luo: [+luo.position.x.toFixed(2), +luo.position.z.toFixed(2)],
+        coverM: +Math.hypot(luo.position.x - cover.x, luo.position.z - cover.z).toFixed(2), player: [+p.position.x.toFixed(2), +p.position.z.toFixed(2)] });
+    }
+    return out;
+  }, { trials: Math.max(2, Math.ceil(trials / 2)), cover: { ...S.leaderCover, arrivalM: B.leaderCoverArrivalM }, coverM: B.leaderCoverArrivalM + B.coverReopenM,
+    paths: [
+      // The approach route's last two legs (FRONT_SORTIE.approach): (22.2,-149.6) -> west door point -> seat.
+      { id: "route", from: [21.2, -149.2], points: [S.approach.at(-3), S.approach.at(-2), S.approach.at(-1)] },
+      // Cutting across the doorway straight at his cover to the seat.
+      { id: "cut", from: [22.4, -150.0], points: [{ x: 23.7, z: -150.4 }, S.seat] },
+    ] }));
   // leftSeat: 04, He mans the left gun; a grenade lands behind him in the pit.
   await ctx.page.evaluate(async () => { await window.Tengxian.Debug.FirstLevelJump(4); });
   seatRuns.push(...await ctx.page.evaluate(async ({ trials, kit, manM, limitS }) => {
@@ -155,6 +229,7 @@ try {
 } finally {
   for (const run of runs) console.log(JSON.stringify(run));
   for (const run of seatRuns) console.log("LEFT_SEAT", JSON.stringify(run));
+  for (const run of doorRuns) console.log("WEST_DOOR", JSON.stringify(run));
   await CloseCampaign(ctx);
 }
 assert.deepEqual(ctx.errors, [], "no page errors");
@@ -173,6 +248,21 @@ for (const run of runs) {
   assert.deepEqual(run.stalls, [], `${tag}: no walk-stall skip on the rear-door ramp`);
   assert.ok(run.longestStillS < HOLD_LIMIT_S, `${tag}: never held in place ${HOLD_LIMIT_S} s (${run.longestStillS} s)`);
 }
+assert.ok(doorRuns.length >= 4, "west-door pass trials ran");
+for (const d of doorRuns) {
+  const tag = `west door ${d.path}#${d.trial}`;
+  assert.ok(d.settledM <= B.leaderCoverArrivalM + B.coverReopenM, `${tag}: Luo stood in his cover before the player came (${d.settledM} m off it)`);
+  assert.ok(d.reachedS != null, `${tag}: the player got through the door to the gun seat (ended at ${d.player})`);
+  assert.ok(d.longestStillS < 1, `${tag}: the player was never held up 1 s (${d.longestStillS} s, ${d.blockedFrames} frames against a body)`);
+  assert.deepEqual(d.stalls, [], `${tag}: no walk-stall skip for Luo`);
+  assert.ok(d.backS != null && d.backS <= RETURN_LIMIT_S && d.coverM <= B.leaderCoverArrivalM + B.coverReopenM,
+    `${tag}: Luo back in his cover within ${RETURN_LIMIT_S} s of the player reaching the seat (${d.backS} s, ${d.coverM} m off it at ${d.luo})`);
+}
+assert.ok(doorRuns.filter((d) => d.path === "cut").every((d) => d.gave.length >= 1),
+  `cutting straight at him, Luo gives way every time (${doorRuns.map((d) => d.path + ":" + d.gave.length).join(" ")})`);
+assert.ok(doorRuns.every((d) => d.blockedAtLuo <= 6),
+  `the player is not held against Luo's body (frames stopped against him: ${doorRuns.map((d) => d.path + ":" + d.blockedAtLuo + "@" + d.minLuoM + "m").join(" ")})`);
 const combat = runs.filter((r) => r.combatFrames > 0).length;
 console.log(`FirstLevelRearDoorWalkTest 通过：${runs.length} 趟过后门坡道（含 ${dodges.length} 趟先躲手榴弹），0 次跳点，${combat} 趟途中开过火；最长原地 ${Math.max(...runs.map((r) => r.longestStillS))} s；`
-  + `何有田躲弹后回座 ${seatRuns.map((s) => s.returnS).join("/")} s`);
+  + `何有田躲弹后回座 ${seatRuns.map((s) => s.returnS).join("/")} s；`
+  + `西门穿过 ${doorRuns.length} 趟：罗班长让路 ${doorRuns.filter((d) => d.gave.length).length} 趟、玩家最长原地 ${Math.max(...doorRuns.map((d) => d.longestStillS))} s、回掩体 ${doorRuns.map((d) => d.backS).join("/")} s`);

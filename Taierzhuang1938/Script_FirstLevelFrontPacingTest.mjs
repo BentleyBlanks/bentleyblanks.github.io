@@ -22,6 +22,8 @@
 //   ⑨ 走路线的人（罗班长）在 FIRE 里被换位命令的 0.6 m 到位半径钉在路线拐点前 0.58 m（后门坡道）：Script_Ai.Act 用路线的半径
 //      （只对 FrontBattle.Walk 打了 routeArrivalOwnsRadius 的人；别的剧本走路者照旧）
 //   ⑮ 躲手榴弹之后：直线回不去（隔着枪托沙袋/院墙）就沿躲的路原路退回，已到位的人被挤开也会走回岗位
+//   ⑯ 守位队友让路：玩家在 1.2 m 内朝他走（看方向键，不看被挡住的速度）→ 他横移让出玩家的路，玩家过去后走回原位
+//      （西门：罗班长在门里掩体上挡路，Front fx16；集成负责人定方案 c）；07 以后不做
 //
 // 跑法：node Taierzhuang1938/Script_FirstLevelFrontPacingTest.mjs
 // ===========================================================================
@@ -1088,6 +1090,89 @@ function WalkRuntime(extra = {}) {
   assert.deepEqual([moves.at(-1).x, moves.at(-1).z], [0, 0], "and from there on to the seat");
   checks += 13;
   Ok("⑮ after a grenade dodge a walker goes back the way he dodged when straight back is blocked, a post is taken up again, and a stall short of a post tries a way round");
+}
+
+{
+  // ⑯ A squadmate holding his spot lets the player past (2026-09-26 relay r2 wrap-up, option c): 09-26 Front drive fx16,
+  // the player at the right nest's west door, Luo in his cover (24.53,-151.05) 0.78 m from him in the doorway; the Script_Ai
+  // friendly push starts only at CROWD.spacingM 0.75 m and he never moved. The door's two wall ends (the fx16 stuck dump's
+  // colliders: x 23.65-24.35, z -156.8..-151.8 and -148.8..-145.6) stand in as physics.
+  const walls = [{ x0: 23.65, x1: 24.35, z0: -156.8, z1: -151.8 }, { x0: 23.65, x1: 24.35, z0: -148.8, z1: -145.6 }];
+  const Inside = (x, z, radius) => walls.some((w) => Math.hypot(Math.max(w.x0 - x, 0, x - w.x1), Math.max(w.z0 - z, 0, z - w.z1)) < radius);
+  const Crosses = (a, b) => { for (let i = 0; i <= 20; i++) { const t = i / 20; if (Inside(a.x + (b.x - a.x) * t, a.z + (b.z - a.z) * t, 0.3)) return true; } return false; };
+  const V = (x, y, z) => ({ x, y, z, clone() { return V(this.x, this.y, this.z); }, set(a, b, c) { this.x = a; this.y = b; this.z = c; return this; } });
+  const home = { x: 24.53, z: -151.05 };
+  const luo = { id: 1, castId: "luo", side: "nra", alive: true, moveSpeed: 0, position: { ...home, y: 0 } };
+  const moves = [], defends = [];
+  const player = { position: { x: 23.2, y: 0, z: -149.9 }, moveWishX: 0, moveWishZ: 0, velocity: { x: 0, y: 0, z: 0 } };
+  const Heading = (to) => { const dx = to.x - player.position.x, dz = to.z - player.position.z, d = Math.hypot(dx, dz); player.moveWishX = dx / d; player.moveWishZ = dz / d; };
+  const r = { time: 0, flow: { stage: { id: "Support" } }, ai: { soldiers: [luo], CrowdPinned: () => false }, player,
+    Point: (p, rise = 0) => V(p.x, rise, p.z), BlocksSight: (a, b) => Crosses(a, b),
+    physics: { Overlaps: (x, y, z, radius) => Inside(x, z, radius) },
+    emplacement: { guns: new Map([["Right", { seat: S.seat, npc: null }]]) },
+    MoveActor: (actor, point) => { moves.push({ id: actor.id, x: point.x, z: point.z }); },
+    Defend: (actor, point) => defends.push({ id: actor.id, x: point.x, z: point.z }) };
+  const scenes = new FirstLevelFrontScenes(r);
+  // The player cuts across the doorway to the captured gun's seat, straight at Luo.
+  const target = S.seat;
+  // Coming up to the door, still 1.4 m off: nothing yet.
+  Heading(target); scenes.Steer();
+  assert.equal(scenes.giveWay, null, "1.8 m off he stays in his cover");
+  // In the doorway, keys held towards the door point, blocked (velocity 0): he steps out of the way.
+  player.position = { x: 23.7, y: 0, z: -150.4 }; Heading(target); scenes.Steer();
+  const gw = scenes.giveWay;
+  assert.ok(gw?.soldier === luo && scenes.gaveWay.at(-1)?.who === "luo", "1.05 m off, the player heading at him with his keys (not moving): Luo gives way");
+  const hx = player.moveWishX, hz = player.moveWishZ, lateral = (p) => Math.abs((p.x - player.position.x) * hz - (p.z - player.position.z) * hx);
+  assert.ok(lateral(gw.spot) >= B.giveWayLaneOffsetsM[0] - 1e-6 && lateral(home) < B.giveWayLaneM, `sideways off the player's line (${lateral(home).toFixed(2)} -> ${lateral(gw.spot).toFixed(2)} m)`);
+  assert.ok(!Inside(gw.spot.x, gw.spot.z, 0.3) && !Crosses(home, gw.spot), `to a spot clear of the door's walls, a straight walk (${JSON.stringify(gw.spot)})`);
+  assert.ok(Dist(gw.spot, home) <= B.giveWayMaxStepM && SegmentDistance(player.position, home, gw.spot) >= Math.min(B.giveWayPassM, Dist(home, player.position)) - 0.05,
+    "a sidestep, never passing nearer the player");
+  assert.ok(moves.at(-1)?.id === luo.id && Dist(moves.at(-1), gw.spot) < 1e-9 && luo.routeArrivalOwnsRadius === true, "he walks there, reached within the spot's own radius");
+  assert.ok(scenes.Steers(luo), "FrontBattle.Walk leaves him alone meanwhile (no walk order, no stall clock)");
+  // At the spot he holds it (still fights: Defend) while the player goes through the door to the gun.
+  Object.assign(luo.position, gw.spot); r.time += 0.1; scenes.Steer();
+  assert.equal(defends.at(-1)?.id, luo.id, "at the spot he holds it");
+  player.position = { x: 24.4, y: 0, z: -151.5 }; Heading(S.seat); r.time += 1; scenes.Steer();
+  assert.equal(scenes.giveWay?.phase, "aside", "the player still near his spot: he keeps out of the way");
+  player.position = { x: 25.6, y: 0, z: -153.2 }; player.moveWishX = player.moveWishZ = 0; r.time += 0.1; scenes.Steer();
+  r.time += B.giveWayClearS + 0.05; moves.length = 0; scenes.Steer();
+  assert.equal(scenes.giveWay?.phase, "back", `the player ${Dist(player.position, home).toFixed(2)} m clear for ${B.giveWayClearS} s: he goes back`);
+  assert.ok(moves.at(-1)?.id === luo.id && Dist(moves.at(-1), home) < 1e-9, "to the spot he left");
+  Object.assign(luo.position, { x: home.x + 0.1, z: home.z }); r.time += 0.5; scenes.Steer();
+  assert.ok(scenes.giveWay == null && scenes.gaveWay.at(-1).end === "back" && scenes.gaveWay.at(-1).homeM <= B.giveWayReturnM, "back on his spot, his own orders have him again");
+  assert.ok(!scenes.Steers(luo), "... and FrontBattle.Walk walks him again");
+  // Not: a player walking away from him, standing still, a man who is walking, a gunner, outside 03-06.
+  const Try = (setup, stage = "Support") => {
+    const s = new FirstLevelFrontScenes({ ...r, flow: { stage: { id: stage } } });
+    Object.assign(luo.position, home); luo.moveSpeed = 0; player.position = { x: 23.7, y: 0, z: -150.4 }; player.velocity = { x: 0, y: 0, z: 0 }; Heading(target);
+    setup?.(s); s.Steer(); return s.giveWay;
+  };
+  assert.ok(Try(null), "the doorway case gives way (control)");
+  assert.equal(Try(() => { player.moveWishX = -player.moveWishX; player.moveWishZ = -player.moveWishZ; }), null, "a player walking away from him: no");
+  assert.equal(Try(() => { player.moveWishX = player.moveWishZ = 0; }), null, "a player standing still: no");
+  assert.ok(Try(() => { player.moveWishX = player.moveWishZ = 0; player.velocity = { x: 0.8, y: 0, z: -1.3 }; }), "no keys but walking at him (velocity): yes");
+  assert.equal(Try(() => { luo.moveSpeed = 0.5; }), null, "a squadmate who is walking himself: no");
+  assert.equal(Try((s) => { s.r.emplacement = { guns: new Map([["Right", { seat: S.seat, npc: luo }]]) }; }), null, "a man on a gun: no");
+  assert.equal(Try(null, "Courtyard"), null, "07 and on: no");
+  // His orders change (a new walk, a new step): let go at once.
+  const s3 = new FirstLevelFrontScenes({ ...r }); Object.assign(luo.position, home); luo.moveSpeed = 0; player.position = { x: 23.7, y: 0, z: -150.4 }; Heading(target); s3.Steer();
+  assert.ok(s3.giveWay, "giving way again");
+  s3.r = { ...s3.r, flow: { stage: { id: "MachineGun" } } }; s3.Steer();
+  assert.ok(s3.giveWay == null && s3.gaveWay.at(-1).end === "orders", "a new step: he is let go to his orders at once");
+  // A leader who stood waiting for the player (his walk not finished): once the player is through he walks on from where
+  // he is, not back to where he waited.
+  const walk = { index: 0, route: [{ x: 30, z: -140 }] };
+  const s4 = new FirstLevelFrontScenes({ ...r, flow: { stage: { id: "Support" } }, frontBattle: { walks: new Map([[luo.id, walk]]) } });
+  Object.assign(luo.position, home); luo.moveSpeed = 0; player.position = { x: 23.7, y: 0, z: -150.4 }; Heading(target); s4.Steer();
+  assert.ok(s4.giveWay, "a waiting leader gives way too");
+  player.position = { x: 25.6, y: 0, z: -153.2 }; player.moveWishX = player.moveWishZ = 0; s4.r.time = 50; s4.Steer(); s4.r.time += B.giveWayClearS + 0.05; s4.Steer();
+  assert.ok(s4.giveWay == null && s4.gaveWay.at(-1).end === "walkOn", "... and walks on from where he stepped to, not back");
+  // Wiring: Steer runs it, the player reports where his keys point.
+  assert.ok(/this\.StepAside\(\);\s*\n\s*this\.GiveWay\(\);/.test(Read("Script_FirstLevelFrontScenes.mjs")), "FrontScenes.Steer runs GiveWay every frame");
+  assert.ok(/this\.moveWishX = wish\.x; this\.moveWishZ = wish\.z;/.test(Read("Script_Player.mjs")), "Script_Player reports the movement keys' direction (moveWishX/Z)");
+  console.log("  ⑯ Luo's sidestep:", JSON.stringify(scenes.gaveWay[0]));
+  checks += 24;
+  Ok("⑯ a squadmate holding his spot steps out of the way of a player coming past him and goes back once the player is through");
 }
 
 console.log(`FirstLevelFrontPacingTest 通过：${checks} 条断言`);

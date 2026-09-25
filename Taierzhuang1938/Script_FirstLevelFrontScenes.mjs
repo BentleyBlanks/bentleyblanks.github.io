@@ -16,9 +16,12 @@
 // turned. Speakers farther out are shouts across the front (the left gun, the pinned guards) and play at once.
 // A squadmate whose body stands between the player's eye and a talking speaker's head steps aside, square to that
 // line of sight, until the line ends (ClearView / StepAside; relay r2 Front step 2: Yaowa hid Luo's 06 order to her).
+// With or without a line, a named squadmate holding his spot steps out of the way of a player coming past him and goes
+// back once the player is through (GiveWay; 2026-09-26 relay r2 wrap-up: Luo in his cover in the nest's west door).
 import { MISSION_DIALOGUE } from "./Data_FirstLevelMissionDialogue.mjs";
 import { ResolveSpeaker } from "./Script_DialoguePlayer.mjs";
 import { FRONT_BATTLE_TUNING as B } from "./Data_Tuning_FirstLevelFront.mjs";
+import { BRAIN } from "./Data_Tuning_Ai.mjs";
 
 /** The 03–06 scenes (steps Support, MachineGun, Tank, Orders). */
 export const FRONT_SCENE_IDS = Object.freeze([
@@ -154,6 +157,10 @@ export class FirstLevelFrontScenes {
     this.dropped = [];
     /** soldier -> time BackOffSpot last found nothing for him (not searched again within B.speakerBackOffRetryS). */
     this.backOffMiss = new Map();
+    /** A squadmate stepping out of the player's way (GiveWay): { soldier, who, spot, home, phase: "aside"|"back", ... }. */
+    this.giveWay = null;
+    /** Every GiveWay sidestep: { who, t, home, spot, playerM, end, endT, homeM } (probes read State().gaveWay). */
+    this.gaveWay = [];
   }
   /** runtime.Say hands the id over when this returns true. */
   Owns(id) {
@@ -392,13 +399,13 @@ export class FirstLevelFrontScenes {
     }
   }
   /** This soldier is walking into the picture for a line (FirstLevelFrontBattle.Walk leaves him alone meanwhile). */
-  Steers(soldier) { return !!soldier && (this.steer?.soldier === soldier || this.aside?.soldier === soldier); }
+  Steers(soldier) { return !!soldier && (this.steer?.soldier === soldier || this.aside?.soldier === soldier || this.giveWay?.soldier === soldier); }
   /** The squadmate (B.speakerAsideCast, not busy on a gun or a litter) standing between `eye` and `head`, or null. */
   Blocker(speaker, eye, head) {
     const r = this.r, guns = r.emplacement?.guns ? [...r.emplacement.guns.values()] : [];
     for (const s of r.ai?.soldiers || []) {
       if (s === speaker || !s?.alive || !B.speakerAsideCast.includes(s.castId) || s.carryRole) continue;
-      if (guns.some((g) => g?.npc === s) || this.steer?.soldier === s) continue;
+      if (guns.some((g) => g?.npc === s) || this.steer?.soldier === s || this.giveWay?.soldier === s) continue;
       const crown = ResolveSpeaker(s);
       const top = crown && Number.isFinite(crown.y) && crown !== s.position ? crown.y + 0.15 : (s.position.y || 0) + 1.75;
       if (BodyBetween(eye, head, s.position, top)) return s;
@@ -450,6 +457,135 @@ export class FirstLevelFrontScenes {
     else if (r.Defend) r.Defend(a.soldier, a.spot, 0, 0.3);
   }
   /**
+   * Where the player wants to go this frame, as a horizontal unit vector: his movement keys (Script_Player.moveWishX/Z,
+   * which a body in the way does not cut), else his velocity when he moves faster than B.speakerStepPlayerStillMps.
+   * null when he stands.
+   */
+  PlayerHeading() {
+    const p = this.r.player;
+    if (!p?.position) return null;
+    const wx = p.moveWishX || 0, wz = p.moveWishZ || 0, wish = Math.hypot(wx, wz);
+    if (wish > B.giveWayWishMin) return { x: wx / wish, z: wz / wish };
+    const v = p.velocity, speed = v ? Math.hypot(v.x || 0, v.z || 0) : 0;
+    return speed > B.speakerStepPlayerStillMps ? { x: v.x / speed, z: v.z / speed } : null;
+  }
+  /**
+   * The player is coming past `s`: within B.giveWayNearM (and B.giveWayNearM up or down), `s` within B.giveWayAheadDeg of
+   * `heading` and within B.giveWayLaneM of the line the player walks.
+   */
+  InPlayersWay(s, heading) {
+    const player = this.r.player.position, dx = s.position.x - player.x, dz = s.position.z - player.z, d = Math.hypot(dx, dz);
+    if (!heading || d >= B.giveWayNearM || Math.abs((s.position.y ?? 0) - (player.y ?? 0)) > B.giveWayNearM) return false;
+    if (d > 1e-4 && (dx * heading.x + dz * heading.z) / d < Math.cos(B.giveWayAheadDeg * DEG)) return false;
+    return Math.abs(dx * heading.z - dz * heading.x) < B.giveWayLaneM;
+  }
+  /**
+   * A spot `s` can sidestep to out of the player's way: B.giveWayLaneOffsetsM from the player's line (his own side of it
+   * first), shifted B.giveWayAlongM along it, within B.giveWayMaxStepM of him, on his floor, clear of colliders, a straight
+   * walk nothing blocks at knee height that passes no nearer the player than B.giveWayPassM (or than he already is), and
+   * not beside the seat of a gun he does not man. null when there is none (he stays; the crowd push still works).
+   */
+  GiveWaySpot(s, heading) {
+    const r = this.r, player = r.player.position, from = s.position;
+    const floor = r.Point(from).y, knee = r.Point(from, 0.6), hx = heading.x, hz = heading.z, nx = -hz, nz = hx;
+    const along = (from.x - player.x) * hx + (from.z - player.z) * hz;
+    const side = Math.sign((from.x - player.x) * nx + (from.z - player.z) * nz) || 1;
+    const pass = Math.min(B.giveWayPassM, Distance(from, player)) - 0.05;
+    const seats = r.emplacement?.guns ? [...r.emplacement.guns.values()].filter((g) => g?.seat && g.npc !== s).map((g) => g.seat) : [];
+    for (const sign of [side, -side]) for (const offset of B.giveWayLaneOffsetsM) for (const shift of B.giveWayAlongM) {
+      const t = Math.max(0, along + shift);
+      const spot = { x: player.x + hx * t + nx * sign * offset, z: player.z + hz * t + nz * sign * offset };
+      if (Distance(spot, from) > B.giveWayMaxStepM || SegmentDistance(player, from, spot) < pass) continue;
+      if (seats.some((seat) => Distance(spot, seat) < B.speakerStepPassM)) continue;
+      const ground = r.Point(spot);
+      if (Math.abs(ground.y - floor) > B.speakerStepDyM) continue;
+      if (r.physics?.Overlaps?.(spot.x, ground.y + 0.04, spot.z, 0.3, 1.7)) continue;
+      if (r.BlocksSight(knee, r.Point(spot, 0.6))) continue;
+      return { x: spot.x, z: spot.z, offset: sign * offset };
+    }
+    return null;
+  }
+  /**
+   * 03-06: a named squadmate holding his spot (Luo in his cover inside the nest's west door, a guard at his post) steps
+   * out of the way of a player coming past him (InPlayersWay / GiveWaySpot), holds there until the player is clear of the
+   * spot he left, walks back to it, and his own orders have him again (FrontBattle.Walk leaves him alone meanwhile:
+   * Steers). The Script_Ai friendly push works only with the bodies touching (CROWD.spacingM 0.75 m); 09-26 Front drive
+   * fx16 stood at the west door with Luo 0.78 m in front. The line movers come first: a squadmate a line steps, backs off
+   * or sends aside (steer / aside) is let go at once.
+   */
+  GiveWay() {
+    const r = this.r, stage = r.flow?.stage?.id, now = r.time ?? 0, g = this.giveWay;
+    const inSteps = FRONT_SCENE_STEPS.includes(stage);
+    if (!inSteps || !r.player?.position || !r.Point || !r.BlocksSight) { if (g) this.EndGiveWay("stage"); return; }
+    const heading = this.PlayerHeading();
+    if (g) {
+      const s = g.soldier, walk = r.frontBattle?.walks?.get?.(s.id) ?? null;
+      if (!s.alive || s.missionGrenadeEvade || s.meleeCombat || s.carryRole || g.stage !== stage || walk !== g.walk
+        || this.steer?.soldier === s || this.aside?.soldier === s) { this.EndGiveWay("orders"); return; }
+      // Coming past him again (on the way back, or at the spot): a fresh sidestep from where he stands, same place to go back to.
+      if (this.InPlayersWay(s, heading) && (g.phase === "back" || Distance(s.position, g.spot) <= B.giveWaySpotArrivalM)) {
+        const spot = this.GiveWaySpot(s, heading);
+        if (spot && Distance(spot, g.spot) > 0.2) { g.spot = spot; g.phase = "aside"; g.clearSince = null; }
+        else if (g.phase === "back") { g.phase = "aside"; g.clearSince = null; }
+      }
+      if (g.phase === "aside") {
+        if (Distance(r.player.position, g.home) >= B.giveWayReleaseM) g.clearSince ??= now;
+        else g.clearSince = null;
+        if (g.clearSince != null && now - g.clearSince >= B.giveWayClearS) {
+          // A man with a route still to walk (a leader who stood waiting for the player) takes it up from where he is:
+          // walking back to where he waited would only put him behind the player he leads.
+          if (walk && walk.index < walk.route.length) { this.EndGiveWay("walkOn"); return; }
+          g.phase = "back"; g.backSince = now;
+        }
+      }
+      if (g.phase === "back") {
+        if (Distance(s.position, g.home) <= B.giveWayReturnM || now - g.backSince >= B.giveWayReturnS) { this.EndGiveWay("back"); return; }
+        this.GiveWayMove(s, g.home, B.giveWayReturnM);
+        return;
+      }
+      if (Distance(s.position, g.spot) > B.giveWaySpotArrivalM) this.GiveWayMove(s, g.spot, B.giveWaySpotArrivalM);
+      else if (r.Defend) r.Defend(s, g.spot, 0, 0.3);
+      return;
+    }
+    if (!heading) return;
+    const guns = r.emplacement?.guns ? [...r.emplacement.guns.values()] : [];
+    for (const s of r.ai?.soldiers || []) {
+      if (!s?.alive || s.side === "ija" || !B.giveWayCast.includes(s.castId) || s.carryRole || s.meleeCombat || s.missionGrenadeEvade) continue;
+      if ((s.moveSpeed ?? 0) > BRAIN.movingSignal || this.steer?.soldier === s || this.aside?.soldier === s || r.ai?.CrowdPinned?.(s)) continue;
+      if (guns.some((gun) => gun?.npc === s) || !this.InPlayersWay(s, heading)) continue;
+      const spot = this.GiveWaySpot(s, heading);
+      if (!spot) continue;
+      this.giveWay = { soldier: s, who: s.castId, spot, home: { x: s.position.x, z: s.position.z }, phase: "aside", since: now,
+        clearSince: null, backSince: null, stage, walk: r.frontBattle?.walks?.get?.(s.id) ?? null };
+      this.gaveWay.push({ who: s.castId, t: +now.toFixed(2), home: { x: +s.position.x.toFixed(2), z: +s.position.z.toFixed(2) },
+        spot: { x: +spot.x.toFixed(2), z: +spot.z.toFixed(2) }, playerM: +Distance(s.position, r.player.position).toFixed(2), end: null });
+      if (this.gaveWay.length > 24) this.gaveWay.shift();
+      this.GiveWayMove(s, spot, B.giveWaySpotArrivalM);
+      return;
+    }
+  }
+  /**
+   * One frame of GiveWay's walk to `point`, reached within `within` m: the runtime's MoveActor with the goal's own arrival
+   * radius, as FrontBattle.Walk sets it (routeArrivalOwnsRadius; the next MoveActor from anyone else clears it). With a
+   * FIRE reposition's 0.6 m radius he would stop short of the spot he left, inside the gap FrontBattle.Walk does not reopen.
+   */
+  GiveWayMove(s, point, within) {
+    const r = this.r;
+    if (!r.MoveActor) return;
+    r.MoveActor(s, point, B.giveWaySpeedMps);
+    s.routeArrivalOwnsRadius = true;
+    s.scriptArrivalRadius = Math.min(s.scriptArrivalRadius ?? Infinity, within * 0.5);
+  }
+  /** Lets the squadmate GiveWay moved go (his own orders have him again) and notes why in State().gaveWay. */
+  EndGiveWay(why) {
+    const g = this.giveWay, entry = this.gaveWay.at(-1);
+    if (g && entry?.who === g.who && entry.end == null) {
+      entry.end = why; entry.endT = +(this.r.time ?? 0).toFixed(2);
+      entry.homeM = +Distance(g.soldier.position, g.home).toFixed(2);
+    }
+    this.giveWay = null;
+  }
+  /**
    * A near speaker whose line plays with his head in the picture but something low between it and the player's eye (a
    * parapet, the gun on its sandbags) stands up to say it, when his standing head would be seen - an NCO rising to give
    * an order, not a walk. Held standing (B.speakerStandHoldS, refreshed) until that line ends; the combat brain has him
@@ -490,6 +626,7 @@ export class FirstLevelFrontScenes {
     this.StandToBeSeen();
     this.ClearView();
     this.StepAside();
+    this.GiveWay();
     const s = this.steer, r = this.r;
     if (!s) return;
     const handle = this.handle;
@@ -550,6 +687,9 @@ export class FirstLevelFrontScenes {
       holds: Object.fromEntries([...this.holds].slice(-24).map(([id, h]) => [id, { ...h, since: +h.since.toFixed(2) }])),
       steer: this.steer ? { who: this.steer.who, backOff: !!this.steer.backOff, spot: { x: +this.steer.spot.x.toFixed(2), z: +this.steer.spot.z.toFixed(2) } } : null,
       aside: this.aside ? { who: this.aside.soldier.castId, line: this.aside.lineId, spot: { x: +this.aside.spot.x.toFixed(2), z: +this.aside.spot.z.toFixed(2) } } : null,
-      asides: this.asides.slice(), stood: this.stood.slice(), dropped: this.dropped.slice() };
+      asides: this.asides.slice(), stood: this.stood.slice(), dropped: this.dropped.slice(),
+      giveWay: this.giveWay ? { who: this.giveWay.who, phase: this.giveWay.phase, spot: { x: +this.giveWay.spot.x.toFixed(2), z: +this.giveWay.spot.z.toFixed(2) },
+        home: { x: +this.giveWay.home.x.toFixed(2), z: +this.giveWay.home.z.toFixed(2) } } : null,
+      gaveWay: this.gaveWay.slice() };
   }
 }

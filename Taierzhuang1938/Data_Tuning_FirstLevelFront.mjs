@@ -412,5 +412,35 @@ export const FRONT_BATTLE_TUNING=Object.freeze({
   // (Volunteer.05) was said behind Yaowa's back in 2 of 7 drives (245 of 268 frames hidden by her).
   speakerAsideCast:Object.freeze(["yaowa","heyoutian","liuwencai","luo"]),speakerAsideOffsetsM:Object.freeze([1.0,1.4,1.8]),
   speakerAsideBodyRadiusM:.28,speakerAsidePlayerM:1.0,
+  // ---- 03-06: a squadmate holding his spot lets the player past (2026-09-26 relay r2 wrap-up; the integration lead
+  // chose option c of the Front package's first open decision) ----
+  // FrontScenes.GiveWay: a named squadmate (giveWayCast) standing at his spot (not walking: Script_Ai moveSpeed at or
+  // under Data_Tuning_Ai BRAIN.movingSignal), not on a gun, not carrying, within giveWayNearM of the player, whom the
+  // player moves toward - he is within giveWayAheadDeg of the way the player wants to go (the movement keys, not the
+  // velocity: walking into a body leaves only the slide along it, head-on nearly nothing) and within giveWayLaneM of
+  // that line - steps sideways out of the way: to giveWayLaneOffsetsM from the player's line (his own side first, then
+  // the other), shifted giveWayAlongM along it, at most giveWayMaxStepM from where he stands, on his floor, clear of
+  // colliders, a straight walk that passes no nearer the player than giveWayPassM, not beside a gun seat he does not man
+  // (speakerStepPassM). He holds there (Defend: he still fights) until the player has been giveWayReleaseM from the spot
+  // he left for giveWayClearS, then walks back to it (at most giveWayReturnS, back within giveWayReturnM) and his own
+  // orders have him again; a man with a FrontBattle walk still to finish (a leader waiting for the player) walks on
+  // from there instead. Only in the 03-06 steps (FRONT_SCENE_STEPS); 07 on is untouched.
+  // Why: 09-26 Front drive fx16 (01->06 with audio), the player at the right nest's west door, Luo in his cover
+  // (24.53,-151.05) 0.78 m from him in the doorway. The friendly give-way in Script_Ai.SeparateSoldiers pushes a
+  // squadmate only inside Data_Tuning_Ai CROWD.spacingM (0.75 m, bodies touching), so he never moved.
+  // giveWayNearM 1.2: that push's 0.75 plus about a stride (0.45); the same distance as speakerViewMinM. giveWayAheadDeg
+  // 80: a man beside the player's way counts (fx16: Luo 80 deg off the player's heading, 0.77 m from his line), one
+  // behind him does not. giveWayLaneOffsetsM from 1.0: two bodies (0.34 + 0.35 capsules) with a hand's width to spare.
+  // giveWaySpeedMps 2.4: the AI's run to cover (Data_Tuning_Ai BRAIN comment) - a quick sidestep, not a march.
+  giveWayCast:Object.freeze(["luo","heyoutian","liuwencai","yaowa"]),
+  giveWayNearM:1.2,giveWayAheadDeg:80,giveWayLaneM:1.0,giveWayWishMin:.3,
+  giveWayLaneOffsetsM:Object.freeze([1.0,1.3,1.6]),giveWayAlongM:Object.freeze([0,.5,-.5]),giveWayMaxStepM:1.8,
+  // giveWaySpotArrivalM: he is at his sidestep spot within this (m); the walk there is reached within half of it. The
+  // steps are short: from Luo's cover the clear spot is 0.3-0.4 m north-east, and his cover leaves 0.47 m between his
+  // body and the south wall end of the door, less than the player's 0.7 m. With the 0.35 m every other FrontScenes walk
+  // uses he counted as there after 3 cm, went on holding (Defend), and a suppressed, prone Luo pinned the player against
+  // that wall end for 1.8 s (relay r2 wrap-up probe gwprobe probe6, cut#1).
+  giveWaySpotArrivalM:.12,
+  giveWayPassM:.7,giveWaySpeedMps:2.4,giveWayReleaseM:1.8,giveWayClearS:.6,giveWayReturnS:4,giveWayReturnM:.15,
   bandage:{radius:.087,height:.2,y:-.19,color:0xb6ac8b},
 });
