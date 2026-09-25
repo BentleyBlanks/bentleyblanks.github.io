@@ -12,7 +12,8 @@
 //   · rearDodge：罗班长在西门内掩体上，身边落一颗（测试造的、落地前收走、不炸）日军手榴弹，他躲开后仍要走完 04 的
 //     「rear」腿、跳点 0 次（审查 rv36a：躲到西门外 10 m，直线往回撞阵位西外墙，跳点两次，BundleOrder 隔墙说）。
 //   · leftSeat：04 何有田在左枪座上，身后落一颗；躲开后 RETURN_LIMIT_S 内回到座位 leftGunManM 以内并留在那里
-//     （审查 HeWhy：绕到枪托沙袋敌方一侧，离座 1.31–1.44 m 永远回不去，两挺捷克式同框）。
+//     （审查 HeWhy：绕到枪托沙袋敌方一侧，离座 1.31–1.44 m 永远回不去，两挺捷克式同框）。再把他直接挪到沙袋
+//     敌方一侧（没有躲弹轨迹），走不过去时兜底要绕路（PostDetour）回座，不许原地认定「到了」。
 //
 // 跑法：node Taierzhuang1938/Script_FirstLevelRearDoorWalkTest.mjs [--trials=4]
 // ===========================================================================
@@ -134,6 +135,21 @@ try {
         at: [+he.position.x.toFixed(2), +he.position.z.toFixed(2)], stallAccepted: !!w?.stallAccepted, gunner: gun.npc === he, zb26: he.weaponId === gun.kind.weaponId,
         evadeReturns: r.frontBattle.evadeReturns.filter((e) => e.id === "heyoutian").length });
     }
+    // Shoved to LeftGunRest's enemy face (no dodge trail): straight back runs into the rest; the stall fallback must
+    // find the way round (PostDetour) instead of accepting the spot (09-26 fix drive fx36a: 16 s there).
+    for (let k = 0; k < 60 * 10 && D() > manM; k++) g.StepFrames(1, 1 / 60, false);
+    const sx = gun.seat.x, sz = gun.seat.z - 1.35, sy = Bf.GroundHeight(sx, sz);
+    he.position.set(sx, sy, sz); he.body?.Teleport?.(sx, sy, sz); he.velocityY = 0;
+    let f = 0, back = null;
+    for (; f < 60 * (limitS + 6); f++) {
+      g.StepFrames(1, 1 / 60, false);
+      if (back == null && D() <= manM) back = f;
+      if (back != null && f - back > 120) break;
+    }
+    const w = r.frontBattle.walks.get(he.id);
+    out.push({ trial: "shoved", before: 1.35, dodgeM: 1.35, returnS: back == null ? null : +(back / 60).toFixed(1), endM: +D().toFixed(2),
+      at: [+he.position.x.toFixed(2), +he.position.z.toFixed(2)], stallAccepted: !!w?.stallAccepted, gunner: gun.npc === he, zb26: he.weaponId === gun.kind.weaponId,
+      detours: r.frontBattle.detours.filter((e) => e.id === "heyoutian") });
     return out;
   }, { trials: 4, kit: GRENADE_KIT, manM: B.leftGunManM, limitS: RETURN_LIMIT_S }));
 } finally {

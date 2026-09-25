@@ -108,6 +108,8 @@ export class FirstLevelFrontBattle {
     this.stalls=[];
     /** Every walk back along a grenade-dodge trail (EvadeReturn): {id,points,x,z,at}. */
     this.evadeReturns=[];
+    /** Every way round to a post taken instead of the stall fallback (PostDetour): {id,x,z,via,at}. */
+    this.detours=[];
     /** Task-side grenade veto (Script_AiTactics TacticsDirector.grenadeVeto), installed by the runtime while Active. */
     this.grenadeVeto=(soldier,x,z)=>this.GuardInBlast(x,z);
   }
@@ -132,7 +134,7 @@ export class FirstLevelFrontBattle {
       const trail=w.trail??=[{x:actor.position.x,z:actor.position.z}];
       if(Distance(actor.position,trail.at(-1))>=B.evadeTrailStepM){trail.push({x:actor.position.x,z:actor.position.z});if(trail.length>32)trail.splice(1,1);}
       // A new dodge: a spot the stall fallback accepted is no longer where he stands; the walk back is looked at again.
-      w.stallAccepted=false;w.back=null;w.bestAt=r.time;return true;
+      w.stallAccepted=false;w.back=null;w.detours=0;w.bestAt=r.time;return true;
     };
     if(actor.missionGrenadeEvade&&Dodge())return false;
     // Stepping into the player's picture for a line (FrontScenes.Steer moves him): no walk order, no stall clock.
@@ -183,8 +185,19 @@ export class FirstLevelFrontBattle {
     if(!(w.best<Infinity)||w.bestAt==null){w.best=d;w.bestAt=r.time;}
     if(wait||d<w.best-B.walkStallProgressM){w.best=Math.min(w.best,d);w.bestAt=r.time;}
     else if(r.time-w.bestAt>=B.walkStallS){
-      const final=w.index===w.route.length-1;
-      if(!final||d<B.arrivalM*B.walkStallArrivalScale){
+      const final=w.index===w.route.length-1,post=w.route[w.index];
+      // A post (a last point with its own arrivalM: Luo's cover, the left gun's seat) is not given up while a way round
+      // what stops him is clear (PostDetour): 09-26 fix drive fx36a, He back from a grenade dodge stood against
+      // LeftGunRest's enemy face 1.3 m from the seat and the fallback accepted it for 16 s.
+      const via=final&&post.arrivalM!=null&&d>post.arrivalM+B.coverReopenM&&(w.detours||0)<B.postDetourTries?this.PostDetour(actor,post):null;
+      if(via){
+        // Walked like a dodge trail back (w.back: its own progress clock), then the post.
+        w.detours=(w.detours||0)+1;w.back=via;w.backBest=Infinity;w.backAt=r.time;w.rejoin=null;w.best=Infinity;w.bestAt=r.time;
+        this.detours.push({id:actor.missionId||actor.castId||actor.id,x:+actor.position.x.toFixed(1),z:+actor.position.z.toFixed(1),
+          via:via.map(p=>({x:+p.x.toFixed(2),z:+p.z.toFixed(2)})),at:+r.time.toFixed(1)});
+        if(this.detours.length>24)this.detours.shift();
+        return false;
+      }else if(!final||d<B.arrivalM*B.walkStallArrivalScale){
         this.stalls.push({id:actor.missionId||actor.castId||actor.id,index:w.index,total:w.route.length,final,
           x:+actor.position.x.toFixed(1),z:+actor.position.z.toFixed(1),at:+r.time.toFixed(1)});
         if(this.stalls.length>24)this.stalls.shift();
@@ -224,14 +237,7 @@ export class FirstLevelFrontBattle {
     }
     const target=w.route[w.index];
     if(!target||!trail?.length||!r.BlocksSight||!r.Point)return;
-    // A body-wide walk, not a sight line: three knee-high rays, the middle one and one each side B.evadeTrailClearM off
-    // it (the capsule). A single ray passed a door jamb the capsule stuck on (RearDoorWalkTest rearDodge: Luo back at the
-    // west door from a dodge, stalled twice on the jamb at (23.3,-148.4) - the review's rv36a spot).
-    const Clear=(a,b)=>{
-      const dx=b.x-a.x,dz=b.z-a.z,l=Math.hypot(dx,dz)||1,nx=-dz/l*B.evadeTrailClearM,nz=dx/l*B.evadeTrailClearM;
-      for(const k of [0,1,-1])if(r.BlocksSight(r.Point({x:a.x+nx*k,z:a.z+nz*k},.5),r.Point({x:b.x+nx*k,z:b.z+nz*k},.5)))return false;
-      return true;
-    };
+    const Clear=(a,b)=>this.ClearWalk(a,b);
     if(Clear(actor.position,target))return;
     const back=[];
     for(let i=trail.length-1;i>=0;i--){back.push(trail[i]);if(Clear(trail[i],target))break;}
@@ -250,6 +256,48 @@ export class FirstLevelFrontBattle {
       this.leaderBackFromBranch=true;return false;
     }
     return true;
+  }
+  /**
+   * A body-wide straight walk from a to b, not a sight line: rays at B.evadeTrailClearHeightsM over the ground, the
+   * middle one and one each side B.evadeTrailClearM off it (the capsule). A single knee-high ray passed a door jamb
+   * the capsule stuck on (RearDoorWalkTest rearDodge: Luo back at the west door from a dodge, stalled twice on the
+   * jamb at (23.3,-148.4) - the review's rv36a spot). True without a world to ask (Node).
+   */
+  ClearWalk(a,b){
+    const r=this.r;if(!r.BlocksSight||!r.Point)return true;
+    const dx=b.x-a.x,dz=b.z-a.z,l=Math.hypot(dx,dz)||1,nx=-dz/l*B.evadeTrailClearM,nz=dx/l*B.evadeTrailClearM;
+    for(const h of B.evadeTrailClearHeightsM)for(const k of [0,1,-1])
+      if(r.BlocksSight(r.Point({x:a.x+nx*k,z:a.z+nz*k},h),r.Point({x:b.x+nx*k,z:b.z+nz*k},h)))return false;
+    return true;
+  }
+  /**
+   * A way round to `post` for a walker stalled short of it: one or two points of a ring B.postDetourRadiiM round the
+   * post (B.postDetourBearings directions; on his floor within B.postDetourDyM, not inside a collider) joined by clear
+   * walks (ClearWalk) from him, between them and on to the post; the shortest total walk. Two, because a man standing
+   * square behind a block (He against LeftGunRest's enemy face) has no single point both he and the post see round it.
+   * null when there is none (the stall fallback then accepts where he stands).
+   */
+  PostDetour(actor,post){
+    const r=this.r;if(!r.BlocksSight||!r.Point)return null;
+    const from=actor.position,floor=r.Point(from).y,ring=[];
+    for(const radius of B.postDetourRadiiM)for(let i=0;i<B.postDetourBearings;i++){
+      const a=i*Math.PI*2/B.postDetourBearings,p={x:post.x+Math.sin(a)*radius,z:post.z+Math.cos(a)*radius},ground=r.Point(p);
+      if(Math.abs(ground.y-floor)>B.postDetourDyM||r.physics?.Overlaps?.(p.x,ground.y+.04,p.z,.3,1.7))continue;
+      ring.push(p);
+    }
+    const first=ring.filter(p=>Distance(from,p)>=B.evadeTrailArrivalM&&this.ClearWalk(from,p));
+    const home=new Map(ring.map(p=>[p,null])),Home=p=>{if(home.get(p)==null)home.set(p,this.ClearWalk(p,post));return home.get(p);};
+    let best=null,bestLength=Infinity;
+    for(const a of first){
+      const toA=Distance(from,a);
+      if(toA+Distance(a,post)<bestLength&&Home(a)){best=[a];bestLength=toA+Distance(a,post);continue;}
+      for(const b of ring){
+        const length=toA+Distance(a,b)+Distance(b,post);
+        if(b===a||length>=bestLength||!Home(b)||!this.ClearWalk(a,b))continue;
+        best=[a,b];bestLength=length;
+      }
+    }
+    return best;
   }
   SetLeg(id,route){if(this.leg===id)return;this.leg=id;this.leaderRoute=route;this.SetWalk(this.Leader,route);}
   Prepare(){
@@ -667,5 +715,5 @@ export class FirstLevelFrontBattle {
     const labels={supply:"bundle",return:"bundle",attack:"throw",retreat:"front",gapWatch:"front",disengage:"orders",home:"orders"};
     return {target:!r.Has("bundleTaken")&&r.Near(S.house,S.supplierRangeM)?A.bundle:MissionRouteLookahead(this.leaderRoute||Routes.bundle,r.player.position),label:labels[this.leg]||"bundle",objective:Objectives[{gapWatch:"retreat",home:"disengage"}[this.leg]||this.leg]||Objectives.supply};
   }
-  State(){return {leg:this.leg,blocked:this.blocked,assaultWindow:this.assaultWindow||null,gapWatched:!!this.gapWatched,returnMeetDone:!!this.returnMeetDone,handoverStarted:!!this.handoverStarted,roadProgress:this.r.tank.roadProgress||0,walks:[...this.walks].map(([id,w])=>({id,index:w.index,total:w.route.length})),stalls:this.stalls.slice(),evadeReturns:this.evadeReturns.slice()};}
+  State(){return {leg:this.leg,blocked:this.blocked,assaultWindow:this.assaultWindow||null,gapWatched:!!this.gapWatched,returnMeetDone:!!this.returnMeetDone,handoverStarted:!!this.handoverStarted,roadProgress:this.r.tank.roadProgress||0,walks:[...this.walks].map(([id,w])=>({id,index:w.index,total:w.route.length})),stalls:this.stalls.slice(),evadeReturns:this.evadeReturns.slice(),detours:this.detours.slice()};}
 }

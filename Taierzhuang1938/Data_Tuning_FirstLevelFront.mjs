@@ -309,9 +309,16 @@ export const FRONT_BATTLE_TUNING=Object.freeze({
   // the rest and the stall fallback accepted the spot: two ZB26s in the picture); Luo dodged 10 m west out of the
   // nest's west door as 04's tank pressure began, walked straight back towards the rear route's first corner into the
   // nest's west outer wall, stalled twice, and BundleOrder.02/.03/.05 were said behind that wall (review drive rv36a).
-  // The clear-walk test is three knee-high rays, evadeTrailClearM either side of the middle one (the AI capsule is
-  // 0.3 m; a single ray passed the west door's jamb that he then stuck on).
-  evadeTrailStepM:.8,evadeTrailArrivalM:.4,evadeTrailClearM:.35,
+  // The clear-walk test (FrontBattle.ClearWalk) is three rays at each of evadeTrailClearHeightsM over the ground,
+  // evadeTrailClearM either side of the middle one (a little under the AI capsule's 0.3 m, so a man standing against
+  // a wall, 0.3-0.35 m from it, still has clear walks along it; a single knee-high ray passed the west door's jamb
+  // that he then stuck on).
+  evadeTrailStepM:.8,evadeTrailArrivalM:.4,evadeTrailClearM:.25,evadeTrailClearHeightsM:Object.freeze([.4,.9]),
+  // A walker stalled short of a post (a last point with its own arrivalM) tries a way round before the stall fallback
+  // accepts where he stands (FrontBattle.PostDetour): a point postDetourRadiiM from the post in postDetourBearings
+  // directions, on his floor within postDetourDyM, clear walks both ways; at most postDetourTries per walk (a dodge
+  // resets it). 09-26 fix drive fx36a: He stood 16 s against LeftGunRest's enemy face 1.3 m from his seat.
+  postDetourRadiiM:Object.freeze([1.1,1.6]),postDetourBearings:12,postDetourDyM:.6,postDetourTries:2,
   // 05 after the tank (FrontBattle.LeaderBehindOnBranch): Luo counts as still out on the attack branch while he is within
   // branchCorridorM of FRONT_SORTIE.attackRoute (the RoadAttack trench is 2.2-3.2 m wide, a dodge or a step aside puts
   // him a metre or two off its line) and not yet back at the rear junction.

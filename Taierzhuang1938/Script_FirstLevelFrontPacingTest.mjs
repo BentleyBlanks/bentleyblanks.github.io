@@ -1077,8 +1077,17 @@ function WalkRuntime(extra = {}) {
   dodging = false; moves.length = 0; battle.Walk(he);
   assert.deepEqual([moves.at(-1).x, moves.at(-1).z], [0, 0], "a clear way back: straight to the seat");
   assert.equal(battle.State().evadeReturns.length, 1, "... without a trail walk");
-  checks += 10;
-  Ok("⑮ after a grenade dodge a walker goes back the way he dodged when straight back is blocked, and a post is taken up again");
+  // Stalled against the block with no dodge trail (shoved there): not accepted while a way round is clear (PostDetour).
+  he.position = { x: 0, z: -1.5 }; battle.SetWalk(he, [seat]); r.time += 1; battle.Walk(he);
+  he.position = { x: 0, z: -1.45 }; r.time += B.walkStallS + 0.1; moves.length = 0;
+  assert.equal(battle.Walk(he), false, "stalled against the block 1.45 m short of the seat (his capsule 0.35 m off its face): not accepted");
+  const via = battle.State().detours.at(-1)?.via;
+  assert.ok(via?.length && [he.position, ...via, seat].every((p, i, all) => i === 0 || !Crosses(all[i - 1], p)), `a way round it (${JSON.stringify(via)})`);
+  for (const p of via) { r.time += 0.5; battle.Walk(he); assert.ok(Dist(moves.at(-1), p) < 0.01, `he walks round it (${JSON.stringify(p)})`); he.position = { ...p }; }
+  r.time += 0.5; battle.Walk(he);
+  assert.deepEqual([moves.at(-1).x, moves.at(-1).z], [0, 0], "and from there on to the seat");
+  checks += 13;
+  Ok("⑮ after a grenade dodge a walker goes back the way he dodged when straight back is blocked, a post is taken up again, and a stall short of a post tries a way round");
 }
 
 console.log(`FirstLevelFrontPacingTest 通过：${checks} 条断言`);
