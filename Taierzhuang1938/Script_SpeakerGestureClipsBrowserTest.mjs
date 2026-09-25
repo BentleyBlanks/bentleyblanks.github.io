@@ -1,4 +1,4 @@
-// 03–06 说话手势 clip 的浏览器审片：正式 GLB（LugouNra02 / LugouNra05）+ 运行时装载链（Script_Actor + CharacterModel），
+// 03–06 说话手势 clip 的浏览器审片：正式 GLB（TengxianNra02 / TengxianNra05，共用骨架 TengxianHumanoidV1 上同一套 clip）+ 运行时装载链（Script_Actor + CharacterModel），
 // 把每条手势 clip 以权重 1 叠在说话人实际会有的身体姿态上（左手 clip：蹲姿持汉阳造 crouchIdle；右手 clip：坐姿不持枪
 // lifePose.sit），逐帧量：
 //   1) 没有 NaN：手势臂、脊柱的世界矩阵都是有限数；
@@ -26,7 +26,7 @@ if (shots) fs.mkdirSync(outDir, { recursive: true });
 // head: a hand brought to the mouth rests its fingers on the lips (a few cm of the low-poly face give way);
 // no other clip comes near the head.
 const LIMIT = { torsoM: .025, headM: .03, headContactM: .045, rifleM: .01 };
-const RIGS = ["LugouNra02", "LugouNra05"];
+const RIGS = ["TengxianNra02", "TengxianNra05"];
 
 const server = await ServeRoot(rootDir, 0);
 const browser = await LaunchBrowser();

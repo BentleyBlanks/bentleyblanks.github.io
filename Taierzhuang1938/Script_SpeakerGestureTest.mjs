@@ -28,9 +28,16 @@ const animationDir = path.join(projectDir, SPEAKER_GESTURE_ASSET.animationBase);
 // The bake's numbers: a gesture is fast (a pointing stroke turns the forearm ~20 deg a frame at 30 fps), but a
 // flip is not; the elbow never locks back or folds shut; the arm stays out of the torso beyond cloth depth.
 const LIMIT = { stepDeg: 35, seamDeg: 3, elbowMaxDeg: 150, elbowMinDeg: 20, penetrationM: .02, lipsGapM: .07, sampleDeg: .5 };
-// Bodies that speak 03-06 lines (Data_FirstLevelSpeakingCast): the model and so the rig their clips come from.
-const RIG_OF = { luo: "LugouNra05", zhou: "LugouNra02", heyoutian: "LugouNra02", liuwencai: "LugouNra02", guard: "LugouNra02",
-  keeper: "LugouNra02", relief: "LugouNra02", runner: "LugouNra02" };
+// Bodies that speak 03-06 lines (Data_FirstLevelSpeakingCast): the model each is drawn with. All of them are on the
+// shared TengxianHumanoidV1 skeleton (2026-09-26), whose one clip set serves them all.
+const RIG_OF = { luo: "TengxianNra05", zhou: "TengxianNra02", heyoutian: "TengxianNra02", liuwencai: "TengxianNra02", guard: "TengxianNra02",
+  keeper: "TengxianNra02", relief: "TengxianNra02", runner: "TengxianNra02" };
+const SKELETON = "TengxianHumanoidV1";
+// A second body's own bake against the reference's (the bake's AGREE_DEG): every bone of every frame within this angle.
+const AGREE_DEG = 1;
+// The mouth anchor is an offset in the head bone's frame in metres (head bone scale 1 on the shared skeleton). The Lugou
+// rigs had it in centimetres (head bone scale 0.01): a centimetre anchor read as metres would put the hand metres away.
+const ANCHOR_M = [.05, .4];
 
 // ---- the line table ------------------------------------------------------------------------------------------
 const cues = new Map(MISSION_DIALOGUE.map(cue => [cue.id, cue]));
@@ -100,16 +107,27 @@ for (const [name, c] of Object.entries(SPEAKER_GESTURE_CLIPS)) {
 }
 const rigs = [...new Set(Object.values(RIG_OF))];
 let totalBytes = 0;
-for (const modelId of rigs) {
-  const row = manifest.models.find(m => m.id === modelId);
-  assert.ok(row, `manifest has ${modelId}`);
+assert.equal(manifest.models.length, 1, "one clip set, for the shared skeleton");
+for (const row of manifest.models) {
+  const modelId = row.id;
+  assert.equal(modelId, SKELETON, "the clip set is the shared skeleton's");
+  const characters = JSON.parse(fs.readFileSync(path.join(projectDir, "Model/Character/Data_TengxianCharacterManifest.json"), "utf8"));
+  for (const body of rigs) assert.ok(row.bodies.includes(body), `${SKELETON} serves ${body}`);
+  for (const body of row.bodies) assert.ok(characters.models.some(m => m.id === body && m.animationSource === SKELETON), `${body} is a ${SKELETON} body`);
   const file = path.join(animationDir, row.file);
   const bytes = fs.readFileSync(file);
   totalBytes += bytes.length;
   assert.equal(crypto.createHash("sha256").update(bytes).digest("hex"), row.sha256, `${row.file} hash`);
-  const glb = fs.readFileSync(path.join(projectDir, "Model/Character", `Model_${modelId}.glb`));
-  assert.equal(crypto.createHash("sha256").update(glb).digest("hex"), row.originalModelSha256, `${modelId}: baked on the shipped GLB`);
   const asset = JSON.parse(bytes);
+  // Baked on the shipped bodies: the reference and every speaking body (its own clothes, its own face).
+  assert.ok(asset.reference && asset.bakedOnModelSha256[asset.reference], "reference body baked");
+  for (const [body, sha] of Object.entries(asset.bakedOnModelSha256)) {
+    const glb = fs.readFileSync(path.join(projectDir, "Model/Character", `Model_${body}.glb`));
+    assert.equal(crypto.createHash("sha256").update(glb).digest("hex"), sha, `${body}: baked on the shipped GLB`);
+  }
+  for (const body of rigs) assert.ok(asset.bakedOnModelSha256[body], `${body}: its own bake checked`);
+  for (const [body, byClip] of Object.entries(asset.agreeDegByModel)) for (const [name, deg] of Object.entries(byClip))
+    if (!SPEAKER_GESTURE_CLIPS[name].reach) assert.ok(deg <= AGREE_DEG, `${body} ${name}: its own bake is ${deg} deg off the shared clip`);
   assert.equal(asset.stride, 4);
   assert.deepEqual(Object.keys(asset.clips).sort(), Object.keys(SPEAKER_GESTURE_CLIPS).sort(), `${modelId}: every clip`);
   for (const [name, clip] of Object.entries(asset.clips)) {
@@ -128,21 +146,26 @@ for (const modelId of rigs) {
       assert.ok([x, y, z, w].every(Number.isFinite), `${label}: finite`);
       assert.ok(Math.abs(Math.hypot(x, y, z, w) - 1) < 1e-3, `${label}: unit quaternion`);
     }
-    if (spec.reach) {
-      const anchor = asset.anchors?.[spec.reach];
-      assert.ok(anchor && /Head$/.test(anchor.bone) && anchor.offset.every(Number.isFinite), `${label}: reach anchor ${spec.reach} on the head`);
+    if (spec.reach) for (const body of [asset.reference, ...rigs]) {
+      const anchor = asset.anchorsByModel?.[body]?.[spec.reach] || asset.anchors?.[spec.reach];
+      assert.ok(anchor && /Head$/.test(anchor.bone) && anchor.offset.every(Number.isFinite), `${label} ${body}: reach anchor ${spec.reach} on the head`);
+      const m = Math.hypot(...anchor.offset);
+      assert.ok(m >= ANCHOR_M[0] && m <= ANCHOR_M[1], `${label} ${body}: anchor ${m.toFixed(3)} m from the head bone (metres, not centimetres)`);
     }
     if (spec.aim) assert.ok(clip.strokeDir?.length === 3 && Math.abs(Math.hypot(...clip.strokeDir) - 1) < 1e-3, `${label}: strokeDir`);
-    const v = asset.validation[name];
-    assert.ok(v?.finite, `${label}: bake finite`);
-    assert.ok(v.maxStepDeg <= LIMIT.stepDeg, `${label}: per-frame step ${v.maxStepDeg} deg (${v.maxStepAt})`);
-    assert.ok(v.holdSeamDeg <= LIMIT.seamDeg, `${label}: hold seam ${v.holdSeamDeg} deg`);
-    assert.ok(v.elbowBendDeg[0] >= LIMIT.elbowMinDeg && v.elbowBendDeg[1] <= LIMIT.elbowMaxDeg, `${label}: elbow ${v.elbowBendDeg}`);
-    assert.ok(v.penetrationM <= LIMIT.penetrationM, `${label}: arm into torso ${v.penetrationM} m at ${v.penetrationAt}`);
-    if (name === "GestureToMouthR") assert.ok(v.lipsGapM <= LIMIT.lipsGapM, `${label}: finger roots ${v.lipsGapM} m from the lips`);
+    // The bake's numbers on every baked body (the other clothes, the other face).
+    for (const [body, validation] of Object.entries(asset.validationByModel)) {
+      const v = validation[name], where = `${label} on ${body}`;
+      assert.ok(v?.finite, `${where}: bake finite`);
+      assert.ok(v.maxStepDeg <= LIMIT.stepDeg, `${where}: per-frame step ${v.maxStepDeg} deg (${v.maxStepAt})`);
+      assert.ok(v.holdSeamDeg <= LIMIT.seamDeg, `${where}: hold seam ${v.holdSeamDeg} deg`);
+      assert.ok(v.elbowBendDeg[0] >= LIMIT.elbowMinDeg && v.elbowBendDeg[1] <= LIMIT.elbowMaxDeg, `${where}: elbow ${v.elbowBendDeg}`);
+      assert.ok(v.penetrationM <= LIMIT.penetrationM, `${where}: arm into torso ${v.penetrationM} m at ${v.penetrationAt}`);
+      if (name === "GestureToMouthR") assert.ok(v.lipsGapM <= LIMIT.lipsGapM, `${where}: finger roots ${v.lipsGapM} m from the lips`);
+    }
   }
 }
-// Download: only the two rigs, loaded in 01-06 only (well under a megabyte raw).
+// Download: one file for every body, loaded in 01-06 only (well under a megabyte raw).
 assert.ok(totalBytes < 1_000_000, `gesture clips ${totalBytes} bytes`);
 
 // ---- sampler ---------------------------------------------------------------------------------------------------
@@ -151,6 +174,7 @@ const library = await LoadSpeakerGestureClips(read);
 for (const modelId of rigs) for (const name of Object.keys(SPEAKER_GESTURE_CLIPS)) {
   const record = SpeakerGestureClip(modelId, name, library);
   assert.ok(record && record.fps === 30 && record.spec === SPEAKER_GESTURE_CLIPS[name], `${modelId} ${name} record`);
+  assert.equal(record, SpeakerGestureClip(SKELETON, name, library), `${modelId} ${name}: the shared skeleton's record`);
   const first = SpeakerGestureFirstFrame(record, []), at0 = SampleSpeakerGesture(record, 0, []);
   first.forEach((q, k) => assert.ok(q.angleTo(at0[k]) < 2e-3, "t=0 is the first frame"));
   // on a frame: that frame exactly; between frames: between them; past the end: the last frame
@@ -174,16 +198,16 @@ function StubRig(modelId, { armed = false } = {}) {
   const root = new THREE.Group(), bone = (name, parent, x, y, z) => {
     const b = new THREE.Bone(); b.name = name.replace(/ /g, "_"); b.position.set(x, y, z); parent.add(b); return b;
   };
-  const pelvis = bone("Bip002 Pelvis", root, 0, .95, 0), spine = bone("Bip002 Spine", pelvis, 0, .1, 0);
-  const spine1 = bone("Bip002 Spine1", spine, 0, .12, 0), spine2 = bone("Bip002 Spine2", spine1, 0, .12, 0);
-  const neck = bone("Bip002 Neck", spine2, 0, .16, 0), head = bone("Bip002 Head", neck, 0, .1, 0);
+  const pelvis = bone("Bip001 Pelvis", root, 0, .95, 0), spine = bone("Bip001 Spine", pelvis, 0, .1, 0);
+  const spine1 = bone("Bip001 Spine1", spine, 0, .12, 0), spine2 = bone("Bip001 Spine2", spine1, 0, .12, 0);
+  const neck = bone("Bip001 Neck", spine2, 0, .16, 0), head = bone("Bip001 Head", neck, 0, .1, 0);
   const sides = {};
   for (const [s, x] of [["L", -1], ["R", 1]]) {
-    const clav = bone(`Bip002 ${s} Clavicle`, neck, .03 * x, -.03, 0), upper = bone(`Bip002 ${s} UpperArm`, clav, .15 * x, 0, 0);
-    const fore = bone(`Bip002 ${s} Forearm`, upper, .28 * x, 0, 0), hand = bone(`Bip002 ${s} Hand`, fore, .25 * x, 0, 0);
+    const clav = bone(`Bip001 ${s} Clavicle`, neck, .03 * x, -.03, 0), upper = bone(`Bip001 ${s} UpperArm`, clav, .15 * x, 0, 0);
+    const fore = bone(`Bip001 ${s} Forearm`, upper, .28 * x, 0, 0), hand = bone(`Bip001 ${s} Hand`, fore, .25 * x, 0, 0);
     for (let f = 0; f <= 4; f++) {
       let parent = hand;
-      for (const suffix of ["", "1", "2"]) parent = bone(`Bip002 ${s} Finger${f}${suffix}`, parent, .03 * x, 0, (f - 2) * .01);
+      for (const suffix of ["", "1", "2"]) parent = bone(`Bip001 ${s} Finger${f}${suffix}`, parent, .03 * x, 0, (f - 2) * .01);
     }
     const grip = new THREE.Object3D(); grip.position.set(.06 * x, 0, 0); hand.add(grip);
     sides[s] = { clav, upper, fore, hand, grip };
@@ -213,7 +237,7 @@ function RunLine(layer, rig, { lineId, who, lengthS, stressAt = [], seconds, bus
 }
 {
   // Luo points at the right position (FrontBlockade.02, GesturePointL) with a rifle in both hands.
-  const rig = StubRig("LugouNra05", { armed: true }), layer = new SpeakerGestureLayer(rig, { lookAt: new THREE.Vector3(0, 1.6, 5) });
+  const rig = StubRig("TengxianNra05", { armed: true }), layer = new SpeakerGestureLayer(rig, { lookAt: new THREE.Vector3(0, 1.6, 5) });
   rig.root.position.set(FRONT_SORTIE.nest.x - 30, 0, FRONT_SORTIE.nest.z);   // 30 m west of the nest
   rig.root.rotation.y = -Math.PI / 2;            // front (-Z) turned to +X: facing the nest
   rig.root.updateMatrixWorld(true);
@@ -302,7 +326,7 @@ function RunLine(layer, rig, { lineId, who, lengthS, stressAt = [], seconds, bus
   assert.ok(layer4e.state.rifleLift > 0 && clearM > GT.rifleClearM * .7, `rifle in the way: arm turned off it (${clearM.toFixed(3)} m)`);
   gun.position.set(0, 0, 0); gun.updateMatrixWorld(true);
   // The nest behind him: far outside the cone, the point is not made (it would point elsewhere).
-  const behind = StubRig("LugouNra05", { armed: true });
+  const behind = StubRig("TengxianNra05", { armed: true });
   behind.root.position.copy(rig.root.position); behind.root.rotation.y = Math.PI / 2; behind.root.updateMatrixWorld(true);
   const layer4f = new SpeakerGestureLayer(behind, null);
   const away = RunLine(layer4f, behind, { lineId: "FrontBlockade.02", who: "luo", lengthS: 1.2, seconds: 1.3 });
@@ -311,7 +335,7 @@ function RunLine(layer, rig, { lineId, who, lengthS, stressAt = [], seconds, bus
   // in the right hand the clamped, lifted arm would end in front of his face (TankRoadContact.01 read as a salute):
   // refused. Unarmed at the same angle he points (clamped to the cone's edge).
   for (const armed of [true, false]) {
-    const across = StubRig("LugouNra05", { armed });
+    const across = StubRig("TengxianNra05", { armed });
     across.root.position.copy(rig.root.position); across.root.rotation.y = -Math.PI / 2 + 75 * Math.PI / 180;
     across.root.updateMatrixWorld(true);
     const layerAcross = new SpeakerGestureLayer(across, null);
@@ -323,7 +347,7 @@ function RunLine(layer, rig, { lineId, who, lengthS, stressAt = [], seconds, bus
   // Clips not loaded yet when the line starts: the gesture is not dropped, it starts once they are in (the line
   // still being said).
   ResetSpeakerGestureClips();
-  const cold = StubRig("LugouNra05", { armed: true });
+  const cold = StubRig("TengxianNra05", { armed: true });
   cold.root.position.copy(rig.root.position); cold.root.rotation.y = -Math.PI / 2; cold.root.updateMatrixWorld(true);
   const layerCold = new SpeakerGestureLayer(cold, null);
   const early = RunLine(layerCold, cold, { lineId: "FrontBlockade.02", who: "luo", lengthS: 3, seconds: .2 });
@@ -357,7 +381,7 @@ function RunLine(layer, rig, { lineId, who, lengthS, stressAt = [], seconds, bus
     return { ray, side };
   };
   const WallRig = () => {
-    const rig = StubRig("LugouNra05");
+    const rig = StubRig("TengxianNra05");
     rig.root.position.set(FRONT_SORTIE.nest.x - 30, 0, FRONT_SORTIE.nest.z);
     rig.root.rotation.y = -5 * Math.PI / 6;       // front 60 deg right of the nest (+X): the nest on his left
     // arms hanging down (the stub is built in a T-pose, with the hands out through any wall beside him)
@@ -411,7 +435,7 @@ function RunLine(layer, rig, { lineId, who, lengthS, stressAt = [], seconds, bus
 {
   // Seated Zhou offers the cigarette (BorrowLight.07, GestureOfferR, aimed at the listener); a long line holds the
   // arm at most maxHoldS, then releases while he still talks. Armed: the right hand is on the rifle, refused.
-  const rig = StubRig("LugouNra02"), listener = new THREE.Vector3(1.2, 1.5, -2);
+  const rig = StubRig("TengxianNra02"), listener = new THREE.Vector3(1.2, 1.5, -2);
   const layer = new SpeakerGestureLayer(rig, { lookAt: () => listener });
   const rows = RunLine(layer, rig, { lineId: "BorrowLight.07", who: "zhou", lengthS: 6, stressAt: [.5, 1.4, 2.3], seconds: 7 });
   const spec = SPEAKER_GESTURE_CLIPS.GestureOfferR;
@@ -420,7 +444,7 @@ function RunLine(layer, rig, { lineId, who, lengthS, stressAt = [], seconds, bus
   assert.ok(lastUp.t < 6, `offer: released before the 6 s line ended (last weight at ${lastUp.t.toFixed(2)} s)`);
   assert.ok(lastUp.t > spec.strokeS + GT.maxHoldS - .2, "offer: held about maxHoldS");
   assert.ok(rows.filter(r => r.phase === "hold" && r.aimError !== null).some(r => r.aimError < 6), "offer: aimed at the listener");
-  const armed = StubRig("LugouNra02", { armed: true }), layer2 = new SpeakerGestureLayer(armed, null);
+  const armed = StubRig("TengxianNra02", { armed: true }), layer2 = new SpeakerGestureLayer(armed, null);
   const refused = RunLine(layer2, armed, { lineId: "BorrowLight.07", who: "zhou", lengthS: 2, seconds: 2.2 });
   assert.ok(refused.every(r => r.weight === 0) && layer2.state.suppressed === "rightHandOnWeapon", "right-hand clip refused with a rifle");
   // The reach clip lands on the head anchor (the stub has no face; only that it runs and reports a distance).
@@ -446,10 +470,10 @@ function RunLine(layer, rig, { lineId, who, lengthS, stressAt = [], seconds, bus
   assert.deepEqual(SpeakerGestureTargetPoint("tank", { root }).toArray(), [40, 3 + GT.tankRiseM, -120]);
   SetSpeakerGestureWorld({});
   assert.equal(SpeakerGestureTargetPoint("tank", { root }), null, "no tank provider: no tank point");
-  const stub = StubRig("LugouNra02"), head = new SpeakerHeadLayer(stub, 3);
+  const stub = StubRig("TengxianNra02"), head = new SpeakerHeadLayer(stub, 3);
   assert.ok(stub.speakerGesture instanceof SpeakerGestureLayer && head.gesture === stub.speakerGesture, "head layer owns rig.speakerGesture");
   head.Dispose();
   assert.equal(stub.speakerGesture, null, "disposed with the head layer");
 }
 
-console.log(`ok speaker gestures: ${lines} lines, ${gestures} gesture (${Math.round(ratio * 100)} %), ${Object.keys(SPEAKER_GESTURE_CLIPS).length} clips x ${rigs.length} rigs, ${totalBytes} bytes; runtime layer on a stub rig`);
+console.log(`ok speaker gestures: ${lines} lines, ${gestures} gesture (${Math.round(ratio * 100)} %), ${Object.keys(SPEAKER_GESTURE_CLIPS).length} clips on ${SKELETON} for ${rigs.length} bodies, ${totalBytes} bytes; runtime layer on a stub rig`);

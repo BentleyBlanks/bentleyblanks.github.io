@@ -259,11 +259,16 @@ gestures; the leader guide reminders (Guide*) and squad barks are repeated calls
 
 | Speaker | Model | Clips from |
 | --- | --- | --- |
-| luo | LugouNra05 (Bip002) | LugouNra05 |
-| zhou, heyoutian, liuwencai, guard, keeper, relief, runner | LugouNra02 (Bip002) | LugouNra02 |
+| luo | TengxianNra05 (Bip001) | TengxianHumanoidV1 |
+| zhou, heyoutian, liuwencai, guard, keeper, relief, runner | TengxianNra02 (Bip001) | TengxianHumanoidV1 |
 
-The source is `rig.clipModelId || rig.modelId` (`CHARACTER_CLIP_SOURCE_BY_MODEL`: NRA06 -> NRA02, IJA06 -> IJA02;
-neither speaks in 03-06). Two rigs therefore need the gesture clips.
+2026-09-26: every body is on the shared skeleton TengxianHumanoidV1 ([character standard](Data_CharacterStandard.md):
+the same 53 bone names, parents, bind positions and rotations, one runtime scale), so ONE clip set serves every body.
+The manifest's skeleton row lists the bodies it serves (`bodies`, from `Data_TengxianCharacterManifest.json`); the
+loader maps each of them, and `rig.clipModelId || rig.modelId` (NRA06 -> NRA02 through
+`CHARACTER_CLIP_SOURCE_BY_MODEL`) finds the same record. Only the mouth reach anchor is per body (each face's own lips:
+`anchorsByModel`, falling back to the reference body's `anchors`). The clips were first baked (2026-09-25) on the
+Lugou rigs LugouNra02 / LugouNra05 (Bip002, bone scale 0.01); those files are deleted.
 
 What exists and why it is not reused as is:
 - The 01-02 opening library (`Animation/OpeningStoryboards`) has `PointBlockade`, `MessengerReport` and
@@ -279,7 +284,8 @@ What exists and why it is not reused as is:
 - The officer "point" clip that Report_ai.md:201 found missing is for the Japanese front officer (IJA01), who has
   no line in 03-06; this package does not make it.
 
-Baked (Step 2, 2026-09-25): ten clips on LugouNra02 and LugouNra05 by `_import/Script_SpeakerGestureBake.py`, which
+Baked (Step 2, 2026-09-25 on the Lugou rigs; re-baked 2026-09-26 on TengxianHumanoidV1): ten clips by
+`_import/Script_SpeakerGestureBake.py`, which
 reuses the captives baker's production-rig importer, two-bone IK, palm turn and finger curl
 (`_import/Script_MachineGunCaptivesBake.py`, the same route as `_import/Script_OpeningStoryboardBake.py`; the
 opening scripts are untouched). Clip specs (hand, duration, lift / stroke / hold / release windows, whether the
@@ -308,16 +314,29 @@ without a seam. 30 fps, so every clip length and window is a whole frame. An L c
 rifleman's fore-end hand, an R clip on a hand resting forward-low (the knee of a seated man); the layer weight is 0
 there, so these only shape the lift and the release.
 
-Output: `Animation/SpeakerGestures/Data_SpeakerGesturesAnimation.json` (version `20260925SpeakerGesturesV1` =
-`SPEAKER_GESTURE_ASSET.version`; the clip table, per-rig file hashes, the shipped GLB's hash and the bake's
-validation numbers) and `Animation_Lugou{Nra02,Nra05}SpeakerGestures.json` (per clip: its bone list, glTF
-node-local rotations x y z w per frame, `strokeDir` = shoulder -> hand at the stroke in the three.js actor frame;
-per rig: `anchors`). Only the gesture arm (clavicle, upper arm, forearm, hand, 15 finger bones) and
-Spine/Spine1/Spine2 are stored, rotations only: 337 KB per rig raw, 55 KB gzip, 0.68 MB for both. Nothing loads at
+Output: `Animation/SpeakerGestures/Data_SpeakerGesturesAnimation.json` (version `20260926SpeakerGesturesHumanoidV1` =
+`SPEAKER_GESTURE_ASSET.version`; the clip table, the skeleton row with its file hash, `bodies`, the baked bodies'
+GLB hashes, their bake numbers and how far each body's own bake is from the shipped clips) and
+`Animation_TengxianHumanoidV1SpeakerGestures.json` (per clip: its bone list, glTF node-local rotations x y z w per
+frame, `strokeDir` = shoulder -> hand at the stroke in the three.js actor frame; `anchors` / `anchorsByModel`;
+`validationByModel`; `agreeDegByModel`). Only the gesture arm (clavicle, upper arm, forearm, hand, 15 finger bones)
+and Spine/Spine1/Spine2 are stored, rotations only: 342 KB raw for every body (the Lugou pair was 0.68 MB).
+
+How the shared set is made: the bake poses both speaking bodies (TengxianNra02, the skeleton's reference body, and
+TengxianNra05, Luo) with the same keys; the shipped clips are NRA02's, and the manifest pass refuses to write when a
+bone of NRA05's own bake is more than 1 deg off them (2026-09-26: 0.55-0.56 deg, on a finger joint's curl; the lips
+clip differs by design and is carried by the per-body anchor). NRA05's arm-into-torso and lips numbers come from its
+own bake (its clothes, its face). Units: the bake poses the captives baker's authoring copy of the body (shipped GLB
+x f, so that Blender metres are the old Lugou source metres, see the character standard); rotations do not depend on
+f, and the one exported offset - the mouth anchor, in the head bone's frame - is divided by f into the shipped GLB's
+units, which are metres now: the Lugou head bone had scale 0.01 and the anchor was in centimetres. The node test
+checks the anchor is 0.05-0.4 m from the head bone (a centimetre anchor read as metres would be 20 m away). Nothing
+else in the gesture layer is written in a bone's local space: grips, the rifle line, the arm length and the wall
+checks are measured in world space on the live body each frame. Nothing loads at
 boot: `Script_SpeakerGestureClips.LoadSpeakerGestureClips()` fetches them on first use (the Step 3 layer, 01-06
 only). The same module has the sampler (`SampleSpeakerGesture`, slerp between the two nearest frames;
 `SpeakerGestureFirstFrame` for the spine reference), `BindSpeakerGestureBones` (bones by normalized name:
-GLTFLoader turns "Bip002 L UpperArm" into "Bip002_L_UpperArm") and the reach helpers below.
+GLTFLoader turns "Bip001 L UpperArm" into "Bip001_L_UpperArm") and the reach helpers below.
 
 Reach (`GestureToMouthR`): on the real seated body (`lifePose.sit` plays `LeanWallSitPeek`: hunched, head turned
 about 40 deg to his left) a chest-relative hand lands on the cheek, and the head layer turns the head again toward
@@ -327,16 +346,21 @@ runtime grips with) and the hand's rotation were at the stroke, in the head bone
 relative to the live head and reaches the arm (two-bone, keeping the arm's bend plane) so the grip lands there;
 two passes. It must run after the head layer has turned the head (Step 3 ordering).
 
-Bake numbers (`validation` in the manifest, gated by `Script_SpeakerGestureTest`): largest per-frame step of any
-exported bone 31 deg at 30 fps (the WaveOn chop; gate 35), hold seam <= 1.8 deg (gate 3), elbow bend 28-143 deg
-(gate 20-150), deepest forearm/hand/finger vertex inside the torso skin on the upright body 1.8 cm (NRA02 cloth;
-gate 2), cigarette-clip finger roots 5.7 cm from the lip centre (gate 7). Browser review on the production rigs
+Bake numbers (`validationByModel` in the manifest, gated by `Script_SpeakerGestureTest` on every baked body): largest
+per-frame step of any exported bone 31 deg at 30 fps (the WaveOn chop; gate 35), hold seam <= 1.8 deg (gate 3), elbow
+bend 28-141 deg (gate 20-150), deepest forearm/hand/finger vertex inside the torso skin on the upright body 1.8 cm
+(NRA02 cloth; NRA05 1.0 cm; gate 2), cigarette-clip finger roots 5.8 cm from the lip centre (gate 7). Browser review on the production rigs
 (`Script_SpeakerGestureClipsBrowserTest`, each clip at weight 1 over the body the speaker actually has: L clips on
 a crouching rifleman holding the HanYang, R clips on the seated sit clip without a weapon): all 20 clip x rig runs
 finite; arm into torso <= 2.4 cm (gate 2.5), into the head 0 except the cigarette fingers on the lips 2.1-2.3 cm
 (gate 4.5; other clips 3); left arm to the rifle >= 23 cm during stroke and hold (the rifle stays where the
 two-hand pose put it; gate 1 cm). Screenshots (front, gesture side, 45 deg top, listener's view) were looked at.
-Editable scenes: `OneDrive/AI/Models/Blender/Taierzhuang1938/SpeakerGestures_20260925/Scene_Lugou{Nra02,Nra05}SpeakerGestures.blend`.
+2026-09-26 re-bake on TengxianHumanoidV1, same review: 20 clip x body runs finite; arm into torso <= 2.0 cm (was 3.1 cm
+for GestureToMouthR on the seated NRA02 at 1.27 s until the arm stays at the lips to outS before it leaves, out and
+forward; GestureFlickR on the seated Zhou, 2.7 cm on the Lugou rig, is 0 now), head 0-1.0 cm except the cigarette
+fingers 2.2-2.5 cm, left arm to the rifle >= 22 cm. Screenshots looked at.
+Editable scenes (Lugou, 2026-09-25): `OneDrive/AI/Models/Blender/Taierzhuang1938/SpeakerGestures_20260925/Scene_Lugou{Nra02,Nra05}SpeakerGestures.blend`
+(`GESTURE_BLEND_DIR` saves the shared-skeleton scenes on a new bake).
 
 ### Runtime (Step 3, 2026-09-25)
 
@@ -476,11 +500,12 @@ not repeated; frames over 1 ms are now listed with the gesture starts in them). 
 
 ## Rebuilding
 
-Speaker gestures: from the worktree root, one headless Blender per rig (no BlenderMCP instance needed; each run
+Speaker gestures: from the worktree root, one headless Blender per body (no BlenderMCP instance needed; each run
 takes a few seconds):
-`GESTURE_PROJECT=<worktree>/Taierzhuang1938 GESTURE_MODEL=LugouNra02 blender --background --factory-startup
---python-exit-code 1 --python Taierzhuang1938/_import/Script_SpeakerGestureBake.py` (and LugouNra05), then the
-same with `GESTURE_PASS=manifest`. `GESTURE_CLIPS=a,b` re-bakes only those clips into the rig's file,
+`GESTURE_PROJECT=<worktree>/Taierzhuang1938 GESTURE_MODEL=TengxianNra02 blender --background --factory-startup
+--python-exit-code 1 --python Taierzhuang1938/_import/Script_SpeakerGestureBake.py` (and TengxianNra05; the per-body
+bakes go to `tmp/SpeakerGestures/Bake`, not committed), then the same with `GESTURE_PASS=manifest`, which writes the
+shared `Animation_TengxianHumanoidV1SpeakerGestures.json` and the manifest. `GESTURE_CLIPS=a,b` re-bakes only those clips into the body's work file,
 `GESTURE_RENDER=1` writes Workbench stills (front, side, top at the start, stroke, mid-hold, release, end) to
 `tmp/SpeakerGestures/BlenderReview/`, `GESTURE_BLEND_DIR` saves the editable scene (one action per clip). A new
 version string goes to both the bake's `VERSION` and `SPEAKER_GESTURE_ASSET.version` (the fetch cache key).

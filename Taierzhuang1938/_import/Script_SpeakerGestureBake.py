@@ -1,20 +1,34 @@
-"""Speaker gestures for first-level 03-06 on LugouNra02 and LugouNra05 (Data_FirstLevelSpeakerGestures).
+"""Speaker gestures for first-level 03-06 on the shared TengxianHumanoidV1 skeleton (Data_FirstLevelSpeakerGestures).
 
-Run headless, one process per rig (they are independent and bake in parallel):
+2026-09-26: every body is a Model_Tengxian*.glb on one skeleton (docs/Data_CharacterStandard.md): the same bone
+names, parents, bind positions and rotations, and the same runtime scale (targetHeight / the reference height). So one
+set of arm clips serves every body. It is authored on the reference body TengxianNra02; TengxianNra05 (Luo) is baked
+too, only to check the clips agree on it (per-frame angle) and to measure its own arm-into-torso depth (other
+clothes) and lips (its own face, for the mouth reach anchor). The shipped file is
+Animation_TengxianHumanoidV1SpeakerGestures.json; the per-body bakes go to GESTURE_WORK and are not shipped.
+
+Run headless, one process per body (they are independent and bake in parallel), then the manifest pass:
 
     blender --background --factory-startup --python-exit-code 1 --python Taierzhuang1938/_import/Script_SpeakerGestureBake.py
 
 or send the same file through `node scripts/Script_BlenderMcp.mjs exec --file` (same bpy path). Environment:
 
   GESTURE_PROJECT    absolute Taierzhuang1938 directory (required)
-  GESTURE_MODEL      comma list of rigs (default LugouNra02,LugouNra05)
-  GESTURE_CLIPS      comma list: bake only these clips and merge them into the rig's file
+  GESTURE_MODEL      comma list of bodies (default TengxianNra02,TengxianNra05)
+  GESTURE_CLIPS      comma list: bake only these clips and merge them into the body's work file
   GESTURE_PASS       'bake' (default) | 'probe' (print the rig measures, write nothing) |
-                     'manifest' (rewrite the manifest from the rig files on disk, no Blender work)
+                     'manifest' (build the shipped skeleton file and the manifest from the work files, no Blender work)
   GESTURE_OUTPUT     default <project>/Animation/SpeakerGestures
+  GESTURE_WORK       per-body bakes (default <repo>/tmp/SpeakerGestures/Bake; never committed)
   GESTURE_REVIEW     review stills folder (default <repo>/tmp/SpeakerGestures/BlenderReview; never committed)
   GESTURE_RENDER     '1' renders the review stills
   GESTURE_BLEND_DIR  when set, the editable scene (one action per clip) is saved there -- never in the repository
+
+Units (2026-09-26): the bake poses the captives baker's AUTHORING copy of the body (Script_MachineGunCaptivesBake
+AuthoringRig: the shipped GLB scaled by f so that its Blender metres are the old Lugou source metres, and
+nominalScale = AUTHORING_SCALE turns them into runtime metres). Exported rotations do not care about f; the one
+exported offset, the reach anchor in the head bone's frame, is divided by f into the shipped GLB's node units
+(metres since the shared skeleton: the head bone's scale is 1, no longer the Lugou rigs' 0.01).
 
 It reuses the production-rig importer, two-bone IK, palm turn and finger curl of
 `_import/Script_MachineGunCaptivesBake.py` (the same route as the opening library's baker); meshes,
@@ -31,7 +45,7 @@ on a standing, crouching, kneeling or seated man.
 Authoring space: Blender metres on the rig's source scale, +Z up, character forward -Y, the
 character's own left +X, ground z = 0. The keys below are REAL (runtime) metres from the gesture
 side's own rest shoulder in the body frame (out, forward, up): out is away from the body (the
-character's left for an L clip, his right for an R clip). Runtime = source x scale.
+character's left for an L clip, his right for an R clip). Runtime = source x scale (scale = nominalScale).
 """
 import bpy, os, runpy, json, math, hashlib, time
 from pathlib import Path
@@ -39,14 +53,20 @@ from mathutils import Vector, Matrix, Quaternion, bvhtree
 
 project = Path(os.environ['GESTURE_PROJECT'])
 output = Path(os.environ.get('GESTURE_OUTPUT') or (project / 'Animation/SpeakerGestures'))
+work = Path(os.environ.get('GESTURE_WORK') or (project.parent / 'tmp/SpeakerGestures/Bake'))
 reviews = Path(os.environ.get('GESTURE_REVIEW') or (project.parent / 'tmp/SpeakerGestures/BlenderReview'))
 blendDir = os.environ.get('GESTURE_BLEND_DIR')
 PASS = os.environ.get('GESTURE_PASS', 'bake')
 RENDER = os.environ.get('GESTURE_RENDER') == '1'
-VERSION = '20260925SpeakerGesturesV1'
+VERSION = '20260926SpeakerGesturesHumanoidV1'
 FPS = 30                              # every clip length and window is a whole number of 1/30 s frames
-MODELS = ['LugouNra02', 'LugouNra05']
-TARGET_HEIGHT = 1.66                  # Script_Actor KIND_SPEC nra: what CharacterModel scales the rig to
+SKELETON = 'TengxianHumanoidV1'       # Model/Character/Data_TengxianHumanoid.json id
+REFERENCE = 'TengxianNra02'           # the body the shipped clips come from (the skeleton's reference body)
+MODELS = ['TengxianNra02', 'TengxianNra05']
+# Two bodies agree when every exported bone of every frame is within this angle (deg) of the reference's; the lips
+# clip differs by design (each face's own lips), its per-body anchor carries the difference. 2026-09-26 bake: NRA05 is
+# 0.55-0.56 deg off on a finger joint (the curl), the arm bones less; 1 deg at the 0.46 m arm is 8 mm at the wrist.
+AGREE_DEG = 1.0
 selectedModels = [m for m in os.environ.get('GESTURE_MODEL', '').split(',') if m] or MODELS
 selectedClips = [c for c in os.environ.get('GESTURE_CLIPS', '').split(',') if c]
 os.environ['CAPTIVES_PROJECT'] = str(project)
@@ -306,8 +326,13 @@ def KeysToMouthR(mouth):
         (.60, dict(lips)),
         (.90, dict(held)),
         (1.20, dict(near)),
-        (1.38, dict(away)),
-        (1.60, dict(r, hand=(-.02, .28, -.26))),
+        # 2026-09-26 (TengxianHumanoidV1, shoulders ~5 cm further back): the arm stays at the lips until outS, while the
+        # runtime reach still pins the grip there, then leaves out and forward. Swinging toward `away` under the pinned
+        # grip turned the elbow in and pressed the forearm 3.1 cm into the seated man's chest at 1.27 s
+        # (Script_SpeakerGestureClipsBrowserTest, limit 2.5 cm).
+        (1.30, dict(near)),
+        (1.46, dict(away, hand=(.07, .36, -.12))),
+        (1.64, dict(r, hand=(-.02, .28, -.26))),
         (1.80, dict(r)),
     ]
 
@@ -408,7 +433,10 @@ def BakeRig(ctx):
     Bone, Point, Update, BWorld, Put = ctx['Bone'], ctx['Point'], ctx['Update'], ctx['BWorld'], ctx['Put']
     corrections, meshes = ctx['corrections'], ctx['meshes']
     nodes, nodeIndex, parents, sourceWorld = ctx['nodes'], ctx['nodeIndex'], ctx['parents'], ctx['sourceWorld']
-    scale = TARGET_HEIGHT / ctx['restTop']
+    # Authoring copy metres -> runtime metres (the captives baker's nominalScale = AUTHORING_SCALE, see the module doc);
+    # authoringFactor: shipped GLB node units -> authoring copy metres.
+    scale = ctx['nominalScale']
+    authoringFactor = ctx['authoringFactor']
     prefix = next(n for n in names if n.endswith(' Pelvis')).split(' ')[0]
     R = lambda metres: metres / scale
 
@@ -555,11 +583,12 @@ def BakeRig(ctx):
     sR = shoulder['R']
     lipsRel = (-(lipsWorld.x - sR.x) * scale, -(lipsWorld.y - sR.y) * scale, (lipsWorld.z - sR.z) * scale)
 
-    fileOut = output / ('Animation_' + modelId + 'SpeakerGestures.json')
+    fileOut = work / ('Animation_' + modelId + 'SpeakerGestures.json')
     previous = json.loads(fileOut.read_text()) if (selectedClips and fileOut.exists()) else None
     # Reach anchors: where a reach clip's grip (the finger roots, what the runtime reaches with) is at its stroke,
-    # in the HEAD bone's glTF node frame (source metres). The runtime layer re-aims the arm at this point on the
-    # live head, which the body clip and the head layer turn (a seated man looking at his listener).
+    # in the HEAD bone's glTF node frame of the SHIPPED GLB (metres on TengxianHumanoidV1, where the head bone's scale
+    # is 1: the authoring copy's offset divided by authoringFactor). The runtime layer re-aims the arm at this point on
+    # the live head, which the body clip and the head layer turn (a seated man looking at his listener).
     headName = prefix + ' Head'
     anchors = dict(previous.get('anchors') or {}) if previous else {}
 
@@ -567,7 +596,7 @@ def BakeRig(ctx):
         return convertInv @ BWorld(arm.pose.bones[name]) @ corrections[name]
 
     def HeadLocal(point):
-        return [round(c, 6) for c in (Node(headName).inverted() @ (convertInv @ point))]
+        return [round(c / authoringFactor, 6) for c in (Node(headName).inverted() @ (convertInv @ point))]
 
     def HeadRelative(name):
         """The bone's world rotation relative to the head's (x, y, z, w): the hand keeps it on a turned head."""
@@ -663,7 +692,7 @@ def BakeRig(ctx):
             clip, modelId, count, stepWorst, stepAt, seam, report['elbowBendDeg'], report['penetrationM'], worstPenAt,
             ('lips %.4f' % report['lipsGapM']) if 'lipsGapM' in report else '', time.time() - started), flush=True)
 
-    output.mkdir(parents=True, exist_ok=True)
+    work.mkdir(parents=True, exist_ok=True)
     source = project / 'Model/Character' / ('Model_' + modelId + '.glb')
     asset = {'schema': 1, 'modelId': modelId, 'fps': FPS, 'stride': 4,
              'coordinates': 'glTF node-local bone rotations (q xyzw) of the listed bones; strokeDir is the '
@@ -711,24 +740,55 @@ def RenderReview(clip, modelId, frame, side):
         bpy.ops.render.render(write_still=True)
 
 
+def AgreeDeg(a, b):
+    """Worst per-frame angle (deg) between two bakes of one clip (same bones, same frame count)."""
+    assert a['bones'] == b['bones'] and len(a['values']) == len(b['values']), 'bakes differ in shape'
+    va, vb, worst = a['values'], b['values'], 0.0
+    for i in range(0, len(va), 4):
+        dot = abs(sum(va[i + k] * vb[i + k] for k in range(4)))
+        worst = max(worst, math.degrees(2 * math.acos(min(1.0, dot))))
+    return round(worst, 3)
+
+
 def WriteManifest():
-    rows = []
+    """One shipped file for the skeleton: the reference body's clips, every baked body's anchors and bake numbers,
+    and how far each other body's own bake is from the reference's (AGREE_DEG; the lips clip is exempt)."""
+    bakes = {}
     for modelId in MODELS:
-        file = output / ('Animation_' + modelId + 'SpeakerGestures.json')
-        if not file.exists():
+        file = work / ('Animation_' + modelId + 'SpeakerGestures.json')
+        assert file.exists(), 'bake %s first (%s)' % (modelId, file)
+        bakes[modelId] = json.loads(file.read_text())
+    reference = bakes[REFERENCE]
+    agree = {}
+    for modelId, asset in bakes.items():
+        if modelId == REFERENCE:
             continue
-        asset = json.loads(file.read_text())
-        rows.append({'id': modelId, 'file': file.name, 'sha256': Sha(file), 'bytes': file.stat().st_size,
-                     'originalModelSha256': asset['originalModelSha256'], 'clipIds': list(asset['clips']),
-                     'validation': asset.get('validation') or {}})
-    manifest = {'schema': 1, 'version': VERSION, 'fps': FPS,
+        agree[modelId] = {clip: AgreeDeg(reference['clips'][clip], asset['clips'][clip]) for clip in CLIPS}
+        for clip, deg in agree[modelId].items():
+            if not CLIPS[clip].get('reach'):
+                assert deg <= AGREE_DEG, '%s %s is %.3f deg off the reference bake' % (modelId, clip, deg)
+    characters = json.loads((project / 'Model/Character/Data_TengxianCharacterManifest.json').read_text(encoding='utf-8'))
+    bodies = [row['id'] for row in characters['models']]
+    asset = {'schema': 2, 'skeleton': SKELETON, 'modelId': SKELETON, 'reference': REFERENCE, 'fps': FPS, 'stride': 4,
+             'coordinates': reference['coordinates'], 'clips': reference['clips'],
+             'anchors': reference['anchors'], 'anchorsByModel': {m: bakes[m]['anchors'] for m in MODELS},
+             'validation': reference['validation'], 'validationByModel': {m: bakes[m]['validation'] for m in MODELS},
+             'agreeDegByModel': agree, 'bakedOnModelSha256': {m: bakes[m]['originalModelSha256'] for m in MODELS},
+             'authoringTool': reference['authoringTool']}
+    output.mkdir(parents=True, exist_ok=True)
+    file = output / ('Animation_' + SKELETON + 'SpeakerGestures.json')
+    file.write_text(json.dumps(asset, separators=(',', ':')), encoding='utf-8')
+    row = {'id': SKELETON, 'file': file.name, 'sha256': Sha(file), 'bytes': file.stat().st_size, 'bodies': bodies,
+           'reference': REFERENCE, 'bakedOnModelSha256': asset['bakedOnModelSha256'], 'clipIds': list(asset['clips']),
+           'agreeDegByModel': agree, 'validationByModel': asset['validationByModel']}
+    manifest = {'schema': 2, 'version': VERSION, 'fps': FPS,
                 'scope': 'First-level 03-06 speaker gestures (Data_FirstLevelSpeakerGestures); arm layer, not body clips',
                 'coordinates': {'values': 'glTF node-local bone rotations (q xyzw), stride 4, per clip bone list',
                                 'strokeDir': 'three.js actor frame (+x right, +y up, -z forward)'},
-                'clips': CLIPS, 'models': rows}
+                'clips': CLIPS, 'models': [row]}
     target = output / 'Data_SpeakerGesturesAnimation.json'
     target.write_text(json.dumps(manifest, indent=1), encoding='utf-8')
-    print('GESTURE_MANIFEST', len(rows), 'models', len(CLIPS), 'clips', flush=True)
+    print('GESTURE_MANIFEST', SKELETON, len(bodies), 'bodies', len(CLIPS), 'clips', 'agree', json.dumps(agree), flush=True)
 
 
 if PASS == 'manifest':

@@ -4,9 +4,14 @@
 // LoadSpeakerGestureClips(), which only happens in the 01-06 steps.
 //
 // A clip is one arm (clavicle, upper arm, forearm, hand, fingers) plus Spine/Spine1/Spine2, stored as
-// glTF node-local rotations (x, y, z, w) per frame. Bone names are the rig's source names ("Bip002 L
+// glTF node-local rotations (x, y, z, w) per frame. Bone names are the rig's source names ("Bip001 L
 // UpperArm"); GLTFLoader turns spaces into underscores and drops dots, so bones are matched on a
 // normalized name (lower case, letters and digits only), the same way the opening library does.
+//
+// 2026-09-26: one clip set per SKELETON, not per model. Every body is on TengxianHumanoidV1 (same bone names,
+// parents, bind and runtime scale; docs/Data_CharacterStandard.md), so the manifest row of the skeleton lists the
+// bodies it serves (`bodies`) and each of them looks up the same record. The mouth reach anchor is per body (each
+// face's own lips: `anchorsByModel`), falling back to the reference body's (`anchors`).
 import { Quaternion, Vector3 } from "three";
 import { SPEAKER_GESTURE_ASSET as A, SPEAKER_GESTURE_CLIPS } from "./Data_FirstLevelSpeakerGestures.mjs";
 
@@ -31,7 +36,7 @@ function Prepare(record, fps) {
       values: Float32Array.from(row.values), spec,
     });
   }
-  return { modelId: record.modelId, clips, anchors: record.anchors || {} };
+  return { modelId: record.modelId, clips, anchors: record.anchors || {}, anchorsByModel: record.anchorsByModel || {} };
 }
 
 /**
@@ -42,7 +47,11 @@ export function LoadSpeakerGestureClips(read = FetchJson) {
   return pending ||= (async () => {
     const manifest = await read(A.manifest);
     if (manifest.version !== A.version) throw Error(`Speaker gestures version ${manifest.version} != ${A.version}`);
-    const models = new Map(await Promise.all(manifest.models.map(async row => [row.id, Prepare(await read(row.file), manifest.fps)])));
+    const models = new Map();
+    for (const row of manifest.models) {
+      const prepared = Prepare(await read(row.file), manifest.fps);
+      for (const id of [row.id, ...(row.bodies || [])]) models.set(id, prepared);
+    }
     return library = { manifest, models };
   })().catch(error => { pending = null; throw error; });   // a failed load can be tried again
 }
@@ -50,7 +59,7 @@ export function LoadSpeakerGestureClips(read = FetchJson) {
 /** The loaded library, or null before LoadSpeakerGestureClips resolved. */
 export function SpeakerGestureLibrary() { return library; }
 
-/** One rig's clip record (null when the rig or the clip was not baked, or before the load). */
+/** A body's clip record (its skeleton's; null when no baked skeleton serves the body, no such clip, or before the load). */
 export function SpeakerGestureClip(modelId, clip, from = library) {
   return from?.models.get(modelId)?.clips[clip] || null;
 }
@@ -90,9 +99,11 @@ export function SpeakerGestureFirstFrame(record, out) {
 /** Test hook: forget the loaded library (node tests load with different readers). */
 export function ResetSpeakerGestureClips() { library = null; pending = null; }
 
-/** A rig's reach anchor (manifest `anchors[name]`: bone name and glTF node-local offset), or null. */
+/** A body's reach anchor (`anchorsByModel[modelId][name]`, else the reference body's `anchors[name]`: bone name, glTF
+ *  node-local offset in the head bone's frame - metres on TengxianHumanoidV1 - and hand rotation), or null. */
 export function SpeakerGestureAnchor(modelId, name, from = library) {
-  return from?.models.get(modelId)?.anchors?.[name] || null;
+  const record = from?.models.get(modelId);
+  return record?.anchorsByModel?.[modelId]?.[name] || record?.anchors?.[name] || null;
 }
 
 const U = new Vector3(), F = new Vector3(), E = new Vector3(), T = new Vector3(), A1 = new Vector3(), A2 = new Vector3();

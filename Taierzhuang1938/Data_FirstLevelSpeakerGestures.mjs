@@ -2,10 +2,11 @@
 // Pure data (no three). Design, layering and the inventory rationale: docs/Data_CharacterSpeech.md, section
 // "Speaker gestures (03-06)". Timing and weight numbers belong in Data_Tuning_CharacterSpeech.SPEAKER_GESTURE.
 //
-// Who can gesture: every 03-06 body the speaker binder resolves: luo (NRA05); zhou, heyoutian, liuwencai, guard,
-// keeper, relief, runner (NRA02) -- Data_FirstLevelSpeakingCast. The clips are baked on the two rigs LugouNra02 and
-// LugouNra05 (a model that borrows clips through CHARACTER_CLIP_SOURCE_BY_MODEL would use its source's). 06
-// ZhouLift's bearer is a MissionPeople layout figure without a skeleton: no gesture.
+// Who can gesture: every 03-06 body the speaker binder resolves: luo (TengxianNra05); zhou, heyoutian, liuwencai,
+// guard, keeper, relief, runner (TengxianNra02) -- Data_FirstLevelSpeakingCast. Since 2026-09-26 every body is on the
+// shared TengxianHumanoidV1 skeleton, so one clip set serves them all (baked on TengxianNra02, checked on
+// TengxianNra05; the manifest's skeleton row lists the bodies it serves). 06 ZhouLift's bearer is a MissionPeople
+// layout figure without a skeleton: no gesture.
 //
 // A rifle hangs on the right hand (Script_Actor._UpdateRiggedWeaponMount: the weapon sits on the right grip and
 // aims at the left grip), so anybody holding a weapon gestures with the LEFT hand only, and the weapon keeps the
@@ -14,16 +15,17 @@
 // carrying, prone, faster than a walk or acted by the 01-03 storyboard director gets no gesture (head layer only);
 // numbers in Data_Tuning_CharacterSpeech.SPEAKER_GESTURE.
 
-/** Baked arm clips: _import/Script_SpeakerGestureBake.py (Blender, both rigs) writes the manifest and one file per rig
- * here; Script_SpeakerGestureClips loads them on first use (01-06 only, never at boot). */
+/** Baked arm clips: _import/Script_SpeakerGestureBake.py (Blender) writes the manifest and one file for the shared
+ * skeleton (Animation_TengxianHumanoidV1SpeakerGestures.json) here; Script_SpeakerGestureClips loads them on first use
+ * (01-06 only, never at boot). */
 export const SPEAKER_GESTURE_ASSET = Object.freeze({
-  version: "20260925SpeakerGesturesV1",
+  version: "20260926SpeakerGesturesHumanoidV1",
   animationBase: "./Animation/SpeakerGestures/",
   manifest: "Data_SpeakerGesturesAnimation.json",
 });
 
 /**
- * Gesture clips (baked 2026-09-25 on LugouNra02 and LugouNra05, 30 fps). Seconds are clip time; the bake's CLIPS table
+ * Gesture clips (baked 2026-09-25 on the Lugou rigs, re-baked 2026-09-26 on TengxianHumanoidV1, 30 fps). Seconds are clip time; the bake's CLIPS table
  * must carry the same windows (Script_SpeakerGestureTest compares them with the manifest).
  *   hand    L | R: the arm the clip moves (clavicle, upper arm, forearm, hand and fingers of that side)
  *   inS     the layer weight rises 0 -> 1 over [0, inS] (the arm lifts off the rifle / knee)

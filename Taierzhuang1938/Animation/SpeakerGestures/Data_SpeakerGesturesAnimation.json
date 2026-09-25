@@ -1,6 +1,6 @@
 {
- "schema": 1,
- "version": "20260925SpeakerGesturesV1",
+ "schema": 2,
+ "version": "20260926SpeakerGesturesHumanoidV1",
  "fps": 30,
  "scope": "First-level 03-06 speaker gestures (Data_FirstLevelSpeakerGestures); arm layer, not body clips",
  "coordinates": {
@@ -132,11 +132,24 @@
  },
  "models": [
   {
-   "id": "LugouNra02",
-   "file": "Animation_LugouNra02SpeakerGestures.json",
-   "sha256": "1680cd4ea09bfbd42145ecfec4b62be941585ff4ca53b237f806d4d57b6c95fd",
-   "bytes": 337666,
-   "originalModelSha256": "39c08ca82148e140ee2952caffdd0dee99750fb734038a5263d216c9a7345225",
+   "id": "TengxianHumanoidV1",
+   "file": "Animation_TengxianHumanoidV1SpeakerGestures.json",
+   "sha256": "3c7644fa79886dcea3573a380ff5021b7b33cc24c690f1f1cb734e4cfffb3dab",
+   "bytes": 342278,
+   "bodies": [
+    "TengxianIja01",
+    "TengxianIja02",
+    "TengxianIja03",
+    "TengxianIja06",
+    "TengxianNra02",
+    "TengxianNra05",
+    "TengxianNra06"
+   ],
+   "reference": "TengxianNra02",
+   "bakedOnModelSha256": {
+    "TengxianNra02": "67550199849f78d581b356580f25595f361bece70fef0c82d7bd08a954197790",
+    "TengxianNra05": "b85b90fac1843261d40fbf257470a933819a9302dff1727a591feda1a5327b55"
+   },
    "clipIds": [
     "GesturePointL",
     "GestureWaveOnL",
@@ -149,289 +162,286 @@
     "GestureHaltR",
     "GestureFlickR"
    ],
-   "validation": {
-    "GesturePointL": {
-     "frames": 55,
-     "maxStepDeg": 20.7,
-     "maxStepAt": "L Forearm@0.37",
-     "holdSeamDeg": 1.327,
-     "elbowBendDeg": [
-      28.1,
-      94.3
-     ],
-     "penetrationM": 0.0,
-     "penetrationAt": null,
-     "finite": true
-    },
-    "GestureWaveOnL": {
-     "frames": 49,
-     "maxStepDeg": 31.06,
-     "maxStepAt": "L Forearm@0.97",
-     "holdSeamDeg": 0.0,
-     "elbowBendDeg": [
-      47.8,
-      141.4
-     ],
-     "penetrationM": 0.009,
-     "penetrationAt": 1.267,
-     "finite": true
-    },
-    "GestureBeckonL": {
-     "frames": 55,
-     "maxStepDeg": 26.64,
-     "maxStepAt": "L Hand@1.43",
-     "holdSeamDeg": 0.778,
-     "elbowBendDeg": [
-      47.8,
-      94.6
-     ],
-     "penetrationM": 0.0022,
-     "penetrationAt": 1.533,
-     "finite": true
-    },
-    "GestureDownL": {
-     "frames": 43,
-     "maxStepDeg": 15.48,
-     "maxStepAt": "L Hand@0.40",
-     "holdSeamDeg": 1.782,
-     "elbowBendDeg": [
-      47.8,
-      74.7
-     ],
-     "penetrationM": 0.0007,
-     "penetrationAt": 1.133,
-     "finite": true
-    },
-    "GestureBeatL": {
-     "frames": 49,
-     "maxStepDeg": 19.66,
-     "maxStepAt": "L Hand@1.23",
-     "holdSeamDeg": 0.069,
-     "elbowBendDeg": [
-      47.8,
-      76.0
-     ],
-     "penetrationM": 0.0183,
-     "penetrationAt": 1.333,
-     "finite": true
-    },
-    "GestureAskR": {
-     "frames": 49,
-     "maxStepDeg": 23.82,
-     "maxStepAt": "R Forearm@1.30",
-     "holdSeamDeg": 0.0,
-     "elbowBendDeg": [
-      57.2,
-      63.6
-     ],
-     "penetrationM": 0.0015,
-     "penetrationAt": 1.333,
-     "finite": true
-    },
-    "GestureToMouthR": {
-     "frames": 55,
-     "maxStepDeg": 23.01,
-     "maxStepAt": "R Hand@0.50",
-     "holdSeamDeg": 1.448,
-     "elbowBendDeg": [
-      60.8,
-      111.5
-     ],
-     "penetrationM": 0.017,
-     "penetrationAt": 0.6,
-     "finite": true,
-     "lipsGapM": 0.0577
-    },
-    "GestureOfferR": {
-     "frames": 67,
-     "maxStepDeg": 26.99,
-     "maxStepAt": "R Hand@1.83",
-     "holdSeamDeg": 0.486,
-     "elbowBendDeg": [
-      54.9,
-      70.6
-     ],
-     "penetrationM": 0.0147,
-     "penetrationAt": 0.333,
-     "finite": true
-    },
-    "GestureHaltR": {
-     "frames": 43,
-     "maxStepDeg": 21.32,
-     "maxStepAt": "R Hand@1.07",
-     "holdSeamDeg": 0.345,
-     "elbowBendDeg": [
-      60.8,
-      79.4
-     ],
-     "penetrationM": 0.0,
-     "penetrationAt": null,
-     "finite": true
-    },
-    "GestureFlickR": {
-     "frames": 37,
-     "maxStepDeg": 15.62,
-     "maxStepAt": "R Hand@0.30",
-     "holdSeamDeg": 0.0,
-     "elbowBendDeg": [
-      51.0,
-      69.6
-     ],
-     "penetrationM": 0.0002,
-     "penetrationAt": 0.133,
-     "finite": true
+   "agreeDegByModel": {
+    "TengxianNra05": {
+     "GesturePointL": 0.564,
+     "GestureWaveOnL": 0.564,
+     "GestureBeckonL": 0.564,
+     "GestureDownL": 0.564,
+     "GestureBeatL": 0.564,
+     "GestureAskR": 0.547,
+     "GestureToMouthR": 0.997,
+     "GestureOfferR": 0.553,
+     "GestureHaltR": 0.547,
+     "GestureFlickR": 0.547
     }
-   }
-  },
-  {
-   "id": "LugouNra05",
-   "file": "Animation_LugouNra05SpeakerGestures.json",
-   "sha256": "85b7f1771d004883ccc0c097bde42442e46c4deed656e11492aebc68f3d4ca77",
-   "bytes": 337696,
-   "originalModelSha256": "acbc9184da059bdf6c3c18d051f3eba77d1dd3acba469e8dbc876b092f174250",
-   "clipIds": [
-    "GesturePointL",
-    "GestureWaveOnL",
-    "GestureBeckonL",
-    "GestureDownL",
-    "GestureBeatL",
-    "GestureAskR",
-    "GestureToMouthR",
-    "GestureOfferR",
-    "GestureHaltR",
-    "GestureFlickR"
-   ],
-   "validation": {
-    "GesturePointL": {
-     "frames": 55,
-     "maxStepDeg": 19.28,
-     "maxStepAt": "L Forearm@0.37",
-     "holdSeamDeg": 1.17,
-     "elbowBendDeg": [
-      35.0,
-      96.6
-     ],
-     "penetrationM": 0.0,
-     "penetrationAt": null,
-     "finite": true
+   },
+   "validationByModel": {
+    "TengxianNra02": {
+     "GesturePointL": {
+      "frames": 55,
+      "maxStepDeg": 20.7,
+      "maxStepAt": "L Forearm@0.37",
+      "holdSeamDeg": 1.328,
+      "elbowBendDeg": [
+       28.1,
+       94.3
+      ],
+      "penetrationM": 0.0035,
+      "penetrationAt": 1.467,
+      "finite": true
+     },
+     "GestureWaveOnL": {
+      "frames": 49,
+      "maxStepDeg": 31.06,
+      "maxStepAt": "L Forearm@0.97",
+      "holdSeamDeg": 0.0,
+      "elbowBendDeg": [
+       47.8,
+       141.4
+      ],
+      "penetrationM": 0.009,
+      "penetrationAt": 1.267,
+      "finite": true
+     },
+     "GestureBeckonL": {
+      "frames": 55,
+      "maxStepDeg": 26.64,
+      "maxStepAt": "L Hand@1.43",
+      "holdSeamDeg": 0.778,
+      "elbowBendDeg": [
+       47.8,
+       94.6
+      ],
+      "penetrationM": 0.0022,
+      "penetrationAt": 1.533,
+      "finite": true
+     },
+     "GestureDownL": {
+      "frames": 43,
+      "maxStepDeg": 15.48,
+      "maxStepAt": "L Hand@0.40",
+      "holdSeamDeg": 1.782,
+      "elbowBendDeg": [
+       47.8,
+       74.7
+      ],
+      "penetrationM": 0.0007,
+      "penetrationAt": 1.133,
+      "finite": true
+     },
+     "GestureBeatL": {
+      "frames": 49,
+      "maxStepDeg": 19.66,
+      "maxStepAt": "L Hand@1.23",
+      "holdSeamDeg": 0.069,
+      "elbowBendDeg": [
+       47.8,
+       76.0
+      ],
+      "penetrationM": 0.0183,
+      "penetrationAt": 1.333,
+      "finite": true
+     },
+     "GestureAskR": {
+      "frames": 49,
+      "maxStepDeg": 23.82,
+      "maxStepAt": "R Forearm@1.30",
+      "holdSeamDeg": 0.0,
+      "elbowBendDeg": [
+       57.2,
+       63.6
+      ],
+      "penetrationM": 0.0015,
+      "penetrationAt": 1.333,
+      "finite": true
+     },
+     "GestureToMouthR": {
+      "frames": 55,
+      "maxStepDeg": 23.01,
+      "maxStepAt": "R Hand@0.50",
+      "holdSeamDeg": 1.449,
+      "elbowBendDeg": [
+       60.8,
+       111.5
+      ],
+      "penetrationM": 0.017,
+      "penetrationAt": 0.6,
+      "finite": true,
+      "lipsGapM": 0.0577
+     },
+     "GestureOfferR": {
+      "frames": 67,
+      "maxStepDeg": 26.99,
+      "maxStepAt": "R Hand@1.83",
+      "holdSeamDeg": 0.485,
+      "elbowBendDeg": [
+       54.9,
+       70.6
+      ],
+      "penetrationM": 0.0147,
+      "penetrationAt": 0.333,
+      "finite": true
+     },
+     "GestureHaltR": {
+      "frames": 43,
+      "maxStepDeg": 21.32,
+      "maxStepAt": "R Hand@1.07",
+      "holdSeamDeg": 0.345,
+      "elbowBendDeg": [
+       60.8,
+       79.4
+      ],
+      "penetrationM": 0.0,
+      "penetrationAt": null,
+      "finite": true
+     },
+     "GestureFlickR": {
+      "frames": 37,
+      "maxStepDeg": 15.62,
+      "maxStepAt": "R Hand@0.30",
+      "holdSeamDeg": 0.0,
+      "elbowBendDeg": [
+       51.0,
+       69.6
+      ],
+      "penetrationM": 0.0002,
+      "penetrationAt": 0.133,
+      "finite": true
+     }
     },
-    "GestureWaveOnL": {
-     "frames": 49,
-     "maxStepDeg": 30.98,
-     "maxStepAt": "L Forearm@0.97",
-     "holdSeamDeg": 0.0,
-     "elbowBendDeg": [
-      51.8,
-      142.9
-     ],
-     "penetrationM": 0.0,
-     "penetrationAt": null,
-     "finite": true
-    },
-    "GestureBeckonL": {
-     "frames": 55,
-     "maxStepDeg": 26.65,
-     "maxStepAt": "L Hand@1.43",
-     "holdSeamDeg": 0.721,
-     "elbowBendDeg": [
-      51.8,
-      96.5
-     ],
-     "penetrationM": 0.0,
-     "penetrationAt": null,
-     "finite": true
-    },
-    "GestureDownL": {
-     "frames": 43,
-     "maxStepDeg": 15.83,
-     "maxStepAt": "L Hand@0.40",
-     "holdSeamDeg": 1.749,
-     "elbowBendDeg": [
-      51.8,
-      77.5
-     ],
-     "penetrationM": 0.0,
-     "penetrationAt": null,
-     "finite": true
-    },
-    "GestureBeatL": {
-     "frames": 49,
-     "maxStepDeg": 19.69,
-     "maxStepAt": "L Hand@1.23",
-     "holdSeamDeg": 0.069,
-     "elbowBendDeg": [
-      51.8,
-      79.0
-     ],
-     "penetrationM": 0.0,
-     "penetrationAt": null,
-     "finite": true
-    },
-    "GestureAskR": {
-     "frames": 49,
-     "maxStepDeg": 24.13,
-     "maxStepAt": "R Hand@1.30",
-     "holdSeamDeg": 0.0,
-     "elbowBendDeg": [
-      60.9,
-      66.6
-     ],
-     "penetrationM": 0.0,
-     "penetrationAt": null,
-     "finite": true
-    },
-    "GestureToMouthR": {
-     "frames": 55,
-     "maxStepDeg": 23.02,
-     "maxStepAt": "R Hand@0.50",
-     "holdSeamDeg": 1.46,
-     "elbowBendDeg": [
-      63.9,
-      112.3
-     ],
-     "penetrationM": 0.0117,
-     "penetrationAt": 0.6,
-     "finite": true,
-     "lipsGapM": 0.0574
-    },
-    "GestureOfferR": {
-     "frames": 67,
-     "maxStepDeg": 27.24,
-     "maxStepAt": "R Hand@1.83",
-     "holdSeamDeg": 0.463,
-     "elbowBendDeg": [
-      58.8,
-      73.6
-     ],
-     "penetrationM": 0.0,
-     "penetrationAt": null,
-     "finite": true
-    },
-    "GestureHaltR": {
-     "frames": 43,
-     "maxStepDeg": 21.13,
-     "maxStepAt": "R Hand@1.07",
-     "holdSeamDeg": 0.338,
-     "elbowBendDeg": [
-      63.9,
-      82.1
-     ],
-     "penetrationM": 0.0,
-     "penetrationAt": null,
-     "finite": true
-    },
-    "GestureFlickR": {
-     "frames": 37,
-     "maxStepDeg": 15.64,
-     "maxStepAt": "R Hand@0.30",
-     "holdSeamDeg": 0.0,
-     "elbowBendDeg": [
-      55.0,
-      72.5
-     ],
-     "penetrationM": 0.0,
-     "penetrationAt": null,
-     "finite": true
+    "TengxianNra05": {
+     "GesturePointL": {
+      "frames": 55,
+      "maxStepDeg": 20.72,
+      "maxStepAt": "L Forearm@0.37",
+      "holdSeamDeg": 1.329,
+      "elbowBendDeg": [
+       28.0,
+       94.2
+      ],
+      "penetrationM": 0.0,
+      "penetrationAt": null,
+      "finite": true
+     },
+     "GestureWaveOnL": {
+      "frames": 49,
+      "maxStepDeg": 31.06,
+      "maxStepAt": "L Forearm@0.97",
+      "holdSeamDeg": 0.0,
+      "elbowBendDeg": [
+       47.8,
+       141.3
+      ],
+      "penetrationM": 0.0,
+      "penetrationAt": null,
+      "finite": true
+     },
+     "GestureBeckonL": {
+      "frames": 55,
+      "maxStepDeg": 26.64,
+      "maxStepAt": "L Hand@1.43",
+      "holdSeamDeg": 0.777,
+      "elbowBendDeg": [
+       47.8,
+       94.6
+      ],
+      "penetrationM": 0.0,
+      "penetrationAt": null,
+      "finite": true
+     },
+     "GestureDownL": {
+      "frames": 43,
+      "maxStepDeg": 15.48,
+      "maxStepAt": "L Hand@0.40",
+      "holdSeamDeg": 1.784,
+      "elbowBendDeg": [
+       47.8,
+       74.7
+      ],
+      "penetrationM": 0.0,
+      "penetrationAt": null,
+      "finite": true
+     },
+     "GestureBeatL": {
+      "frames": 49,
+      "maxStepDeg": 19.66,
+      "maxStepAt": "L Hand@1.23",
+      "holdSeamDeg": 0.069,
+      "elbowBendDeg": [
+       47.8,
+       76.0
+      ],
+      "penetrationM": 0.0,
+      "penetrationAt": null,
+      "finite": true
+     },
+     "GestureAskR": {
+      "frames": 49,
+      "maxStepDeg": 23.82,
+      "maxStepAt": "R Forearm@1.30",
+      "holdSeamDeg": 0.0,
+      "elbowBendDeg": [
+       57.2,
+       63.6
+      ],
+      "penetrationM": 0.0,
+      "penetrationAt": null,
+      "finite": true
+     },
+     "GestureToMouthR": {
+      "frames": 55,
+      "maxStepDeg": 23.16,
+      "maxStepAt": "R Hand@0.50",
+      "holdSeamDeg": 1.463,
+      "elbowBendDeg": [
+       60.8,
+       110.7
+      ],
+      "penetrationM": 0.0096,
+      "penetrationAt": 0.6,
+      "finite": true,
+      "lipsGapM": 0.0577
+     },
+     "GestureOfferR": {
+      "frames": 67,
+      "maxStepDeg": 26.99,
+      "maxStepAt": "R Hand@1.83",
+      "holdSeamDeg": 0.486,
+      "elbowBendDeg": [
+       54.9,
+       70.6
+      ],
+      "penetrationM": 0.0,
+      "penetrationAt": null,
+      "finite": true
+     },
+     "GestureHaltR": {
+      "frames": 43,
+      "maxStepDeg": 21.32,
+      "maxStepAt": "R Hand@1.07",
+      "holdSeamDeg": 0.347,
+      "elbowBendDeg": [
+       60.8,
+       79.4
+      ],
+      "penetrationM": 0.0,
+      "penetrationAt": null,
+      "finite": true
+     },
+     "GestureFlickR": {
+      "frames": 37,
+      "maxStepDeg": 15.62,
+      "maxStepAt": "R Hand@0.30",
+      "holdSeamDeg": 0.0,
+      "elbowBendDeg": [
+       51.0,
+       69.6
+      ],
+      "penetrationM": 0.0,
+      "penetrationAt": null,
+      "finite": true
+     }
     }
    }
   }
