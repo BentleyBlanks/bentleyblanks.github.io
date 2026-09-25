@@ -593,6 +593,14 @@ function WalkRuntime(extra = {}) {
   luo.position = { x: 1.6, y: 0, z: 0.3 }; r.BlocksSight = (a, b) => b.y < 1; r.time = 10;
   assert.equal(scenes.HoldLine(line("TakeOverGun.03", "luo"), "TakeOverGun"), false, "no clear spot: the line is not delayed");
   assert.ok(scenes.steer === null && scenes.holds.get("TakeOverGun.03").released === "noSpot", "and he stays where he is");
+  // A spot whose low wall hides a crouched head but not a standing one is no spot (09-25 idle probe e2: the combat brain
+  // crouched Luo in the nest's west doorway and the door's wall hid him through FrontWithdraw.01).
+  r.BlocksSight = (a, b) => a.y > 1.5 && b.y > 0.8 && b.y < 1.3;
+  assert.equal(scenes.StepSpot(luo, CameraPose(camera)), null, "a crouched head behind a wall: not a stepping spot");
+  r.BlocksSight = (a, b) => a.y > 1.5 && b.y > 1.3;
+  assert.equal(scenes.StepSpot(luo, CameraPose(camera)), null, "nor a standing head behind one");
+  r.BlocksSight = () => false;
+  assert.ok(scenes.StepSpot(luo, CameraPose(camera)), "open ground: a spot");
   // Timeout: a spot, but he never gets there (shoved, blocked by a body) -> the line plays after speakerViewHoldS.
   r.BlocksSight = () => false;
   assert.equal(scenes.HoldLine(line("FrontWithdraw.01", "luo"), "FrontWithdraw"), true, "held while he walks");

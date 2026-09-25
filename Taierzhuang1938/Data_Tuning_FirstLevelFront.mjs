@@ -338,6 +338,11 @@ export const FRONT_BATTLE_TUNING=Object.freeze({
   // about 90 deg across at 16:9); 16-30 deg keeps him clear of the sights.
   speakerStepDistancesM:Object.freeze([2.6,3.4,2.2]),speakerStepBearingsDeg:Object.freeze([22,16,30]),
   speakerStepMaxM:5,speakerStepDyM:.45,
+  // Head heights (m above the spot's ground) that must be in the picture with nothing in between: standing, and crouched
+  // (StanceEye 1.0 + the head bone above the eye). Only the standing head was checked: 09-25 relay r2 Front step 3 idle
+  // probe e2, Luo stepped for FrontWithdraw.01 to the nest's west doorway, the combat brain crouched him there, and the
+  // door's wall hid his head for the whole line (166 frames in the picture, 0 seen).
+  speakerStepHeadsM:Object.freeze([1.55,1.05]),
   // Stepping in is a quick shuffle, not a march: R.squadCatchupMps (4.5, the 07 catch-up) covers speakerStepMaxM in
   // about the hold.
   speakerStepSpeedMps:4.5,

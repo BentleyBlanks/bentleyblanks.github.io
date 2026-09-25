@@ -215,9 +215,13 @@ export class FirstLevelFrontScenes {
       if (Math.abs(ground.y - floor) > B.speakerStepDyM) continue;
       if (r.physics?.Overlaps?.(spot.x, ground.y + 0.04, spot.z, 0.3, 1.7)) continue;
       if (r.BlocksSight(knee, r.Point(spot, 0.6))) continue;
-      const head = r.Point(spot, 1.55);
-      if (!InPicture(ProjectToView(camera, head))) continue;
-      if (eye && r.BlocksSight(eye, head)) continue;
+      // Standing and crouched: at the spot the combat brain crouches him (cover, suppress) as often as not.
+      let seen = true;
+      for (const h of B.speakerStepHeadsM) {
+        const head = r.Point(spot, h);
+        if (!InPicture(ProjectToView(camera, head)) || (eye && r.BlocksSight(eye, head))) { seen = false; break; }
+      }
+      if (!seen) continue;
       return { x: spot.x, z: spot.z, bearing: spot.bearing, distance: spot.distance };
     }
     return null;
