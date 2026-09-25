@@ -73,6 +73,20 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
     radial-gradient(ellipse at 45% 48%, rgba(125,5,8,.18), rgba(89,0,4,.72));
 }
 .hudStoryBlood.on { visibility: visible; }
+/* 01–02 storyboard lens layers (Script_Hud.SetLens, curves in Data_OpeningLens): mud on the lens
+   (SB03/SB03A; Lovart mask baked to RGBA, alpha from luminance) and the butt strike's white flash (SB04).
+   The mud image is set from JS the first time it is needed, so 03+ never loads it. */
+.hudLensMud {
+  position: absolute; inset: 0; z-index: 8; pointer-events: none;
+  opacity: 0; visibility: hidden;
+  background: center / 100% 100% no-repeat;
+}
+.hudLensMud.on { visibility: visible; }
+.hudLensFlash {
+  position: absolute; inset: 0; z-index: 9; pointer-events: none;
+  opacity: 0; visibility: hidden; background: #fffdf6;
+}
+.hudLensFlash.on { visibility: visible; }
 .hudHealthWarning {
   position: absolute; right: 22px; bottom: 122px; z-index: 7;
   max-width: calc(100vw - 32px); opacity: 0;
@@ -708,7 +722,7 @@ canvas#view { display: block; width: 100vw; height: 100vh; }
 /* 剧本拍（第一关屋内伏击）：HUD 全部让位，只留字幕、提示环与满屏的受伤／血。
    与下面的 .cinematic 分两档：过场那一档连字幕都归过场自己画，这一档要留字幕。
    阵亡卡不在让位名单里 —— 这一拍里死掉时它必须盖上来。 */
-#hud.cinematicBeat > *:not(.hudSubtitle):not(.hudCinematicPrompt):not(.hudDamage):not(.hudMeleeKillBlood):not(.hudStoryBlood):not(.hudDeathCard):not(.csRoot):not(.previewTerminal) {
+#hud.cinematicBeat > *:not(.hudSubtitle):not(.hudCinematicPrompt):not(.hudDamage):not(.hudMeleeKillBlood):not(.hudStoryBlood):not(.hudLensMud):not(.hudLensFlash):not(.hudDeathCard):not(.csRoot):not(.previewTerminal) {
   opacity: 0 !important; transition: none !important;
 }
 

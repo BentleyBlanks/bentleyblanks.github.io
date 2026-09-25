@@ -62,6 +62,7 @@ import {
 } from "./Data_FirstLevelP012Whitebox.mjs";
 import { FIRST_LEVEL_MISSION_PHASE as FIRST_LEVEL_P012_WHITEBOX_PHASE } from "./Data_FirstLevelMission.mjs";
 import { FirstLevelMissionRuntime } from "./Script_FirstLevelMissionRuntime.mjs";
+import { ApplyLensToPost } from "./Script_OpeningLens.mjs";
 import { FIRST_LEVEL_STAGES, ResolveFirstLevelStage } from "./Data_FirstLevelMissionStages.mjs";
 import { FirstLevelWhiteboxField } from "./Script_FirstLevelWhiteboxField.mjs";
 import { FirstLevelP012Debug } from "./Script_FirstLevelP012Debug.mjs";
@@ -8984,8 +8985,12 @@ function RenderScene(dt) {
   const adsNearDof = state.running && !state.menu && !state.cutscene && player?.Alive
     && viewmodel?.root?.visible && viewmodel?.rig?.sight
     ? Clamp01(adsFovT * (viewmodel.adsSuppress ?? 1)) : 0;
+  // 01–02 storyboard lens (Script_OpeningLens, contract §4.4): null outside 01–02, and then the post
+  // parameters below go through untouched and the HUD flash / mud layers are off.
+  const openingLens = missionRuntime?.Perception().lens || null;
+  hud.SetLens?.(openingLens);
   profiler.B("post");
-  post.Render(scene, camera, {
+  post.Render(scene, camera, ApplyLensToPost({
     sunDirection: sky.sunDirection,
     sunColor: preset.sunColor,
     fog: preset.fog,
@@ -9037,7 +9042,7 @@ function RenderScene(dt) {
     nearDofRange: ADS_NEAR_DOF_RANGE_M,
     nearDofMaxPx: ADS_NEAR_DOF_MAX_PX,
     nearDofSightUv: adsNearDof > 0 && !WEAPON_RANGE ? AdsSightUv() : null,
-  });
+  }, openingLens));
   profiler.E("post");
   profiler.GpuFrameEnd();
   skeletonPassGuard = false;
