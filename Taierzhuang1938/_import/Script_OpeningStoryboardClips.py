@@ -4267,6 +4267,329 @@ def BuildGuardPort(T, name):
     return spec
 
 
+# -- 2026-09-25 storyboard round, NRA clips (SB01, SB04A, SB06) ---------------------------
+NRA02_SCALE = .9135          # LugouNra02 source -> runtime metres (manifest numbers below are runtime)
+
+
+def Bump(t, t0, t1):
+    """0 -> 1 -> 0 over [t0, t1] with zero value and zero slope at both ends (a pulse that keeps a hold loop's
+    seam C1); 0 outside."""
+    if t <= t0 or t >= t1:
+        return 0.0
+    return .5 - .5 * math.cos(Tau * (t - t0) / (t1 - t0))
+
+
+def EaseGrip(f, side, point, weight, palmF, palmN, curl):
+    """A hand on a world point with its own ease weight (0 = the free body-frame hand, 1 = on the point)."""
+    if weight <= 1e-4:
+        return
+    f['grip.' + side], f['gripW.' + side] = tuple(point), min(1.0, weight)
+    f['palmF.' + side], f['palmN.' + side], f['curl.' + side] = palmF, palmN, curl
+    f['handRel.' + side] = f.get('handRel.' + side) or (.06 if side == 'L' else -.06, -.14, -.45)
+
+
+# -- SB06 LuoKneelReach (Nra05) ----------------------------------------------------------
+# Shunzi sits against the collapsed earth 0.9 m in front of Luo; Luo drops onto his right knee, leans in and
+# holds out his open left hand to him ("还能打不？"), 0.3 m short of his breastbone, then takes it back and
+# stands. Frame 0 and the last frame are LuoKneelCheck frame 0 (the standing pose Luo arrives in after
+# LuoDragToCover), so the director can play either clip at the Check beat and hand on to KickRifle.
+REACH_T = 84 / 24                    # 3.5 s
+REACH_HOLD = (1.0, 2.5)
+REACH_EYE = (.02, -.88, .78)          # Shunzi's eye from Luo's root (source m): sitting, 0.72 m up, 0.8 m off
+REACH_CHEST = (.04, -.80, .50)        # his breastbone
+REACH_GAP_M = .30                    # runtime m: the offered hand stops this far short of the chest (SB06)
+REACH_DIR = (.16, .54, .82)           # chest -> the offered hand: up toward Luo's left shoulder (out in front of his face, clear of the knee)
+LUO_KNEEL_HAND = (.20, -.46, .72)     # where his free left hand is in the kneel, over the raised knee, elbow bent (baked, source m)
+Meta('LuoKneelReach', REACH_T, False, 'free', role='luo', rig='LugouNra05', rootMotion=False, player=True,
+     holdLoop=list(REACH_HOLD),
+     holdExit='pose.holdUntil: the loop lets go at that clip time and plays on through the 2.5-2.8 s hand back and the rise',
+     contacts=[{'t': REACH_HOLD[0], 'limb': 'handL', 'action': 'reach', 'partnerRole': 'shunzi', 'part': 'chest',
+                'gapM': REACH_GAP_M},
+               {'t': REACH_HOLD[1], 'limb': 'handL', 'action': 'release'}],
+     events=[{'t': .60, 'kind': 'kneel'}, {'t': 1.05, 'kind': 'line', 'line': 'RescueCheck.01'}, {'t': 2.8, 'kind': 'rise'}],
+     prev=['LuoDragToCover'], next=['KickRifle', 'LuoKneelCheck'],
+     notes='SB06 (2026-09-25): from the standing pose (= LuoKneelCheck frame 0) he drops onto his right knee in front of '
+           'the sitting Shunzi (0.9 m, player head/chest), leans in and holds out his open left hand, palm down, fingers '
+           'toward him, 0.3 m short of his breastbone (1.0 s; the elbow stays bent). 1.0-2.5 s is a seamless hold loop '
+           '(the hand offers twice, the face on Shunzi\'s eye, look = player head). holdUntil lets go: the hand comes back '
+           'to the knee (2.5-2.8 s) and he stands (3.5 s). Last frame = frame 0 = LuoKneelCheck frame 0: a drop-in for the '
+           'Check beat, hands on to KickRifle like LuoKneelCheck does.')
+
+
+def LuoKneelPose(T):
+    K = T.K
+    H, A = T.H, T.A
+    kz, ky = K['kneelPelvisZ'], K['kneelPelvisY']
+    kp = K['toeKneelPitch'] - K['toeStandPitch']
+    return {'pelvis': (0, ky - .16, kz + .14), 'ankle.L': (H + .08, ky - .58, A), 'legPole.L': (H + .30, -1.2, .9), 'foot.L': (0, 12, 0),
+            'ankle.R': K['kneelAnkle'](-1), 'legPole.R': K['kneelPole'](-1), 'foot.R': (kp, 0, 0),
+            'bend': .50, 'pelvisTilt': (.08, 0, 0)}
+
+
+@Builder('LuoKneelReach')
+def BuildKneelReach(T, name):
+    stand = Standing(T)
+    kneel = LuoKneelPose(T)
+    base = dict(stand, **{'handRel.L': (.06, -.14, -.45), 'palmF.L': (0, -.2, -1), 'palmN.L': (-1, 0, 0),
+                          'handRel.R': (-.08, -.16, -.44), 'palmF.R': (0, -.2, -1), 'palmN.R': (1, 0, 0), 'curl.R': .7, 'lookW': 0.0})
+    upright = {k: stand[k] for k in ('pelvis', 'ankle.L', 'ankle.R', 'legPole.L', 'legPole.R', 'foot.L', 'foot.R', 'bend', 'pelvisTilt')}
+    rows = [(0.0, {}), (.20, {'pelvis': Add3(stand['pelvis'], (0, 0, -.12)), 'bend': .25}),
+            (.60, dict(kneel, lookW=.8, **{'handRel.L': (.05, -.24, -.33)})),
+            (REACH_HOLD[0], {'bend': .86, 'lookW': 1.0, 'handRel.R': (-.10, -.22, -.40)}),
+            (REACH_HOLD[1], {'bend': .86, 'lookW': 1.0}),
+            (2.80, {'bend': .50, 'lookW': .8, 'handRel.R': base['handRel.R']}),
+            (3.10, {'handRel.L': base['handRel.L']}),
+            (3.20, {'lookW': 0.0}),
+            (REACH_T, dict(upright, lookW=0.0))]
+    body = Keys(base, rows, lag={'head': .05})
+    gap = T.R(REACH_GAP_M)
+    offered = tuple(Vector(REACH_CHEST) + Vector(Unit(REACH_DIR)) * gap)
+    palmF, palmN = Unit((-.18, -.93, -.30)), Unit((-.30, -.22, -.93))      # fingers to him, palm down (an offered hand)
+
+    # The hand travels on a world path from where it hangs in the kneel (by his left knee) out to the offer and
+    # back, and the free hand is bent over the knee meanwhile: a hanging (straight) arm blended into the offer
+    # by weight let the bake's reach assist pull the hips (and the planted knee) 3-10 cm while it moved.
+    rest = LUO_KNEEL_HAND
+    out = Channel([(.60, rest), (REACH_HOLD[0], offered), (REACH_HOLD[1], offered), (2.75, rest)])
+
+    def Hand(t):
+        # the offer: the hand eases forward twice per loop (1.5 cm), zero slope at the loop seam
+        b = Bump(t, REACH_HOLD[0], REACH_HOLD[0] + .75) + Bump(t, REACH_HOLD[0] + .75, REACH_HOLD[1])
+        return Add3(out(t), (-.004 * b, -.016 * b, .010 * b))
+
+    def Weight(t):
+        if t < REACH_HOLD[1]:
+            return Smooth((t - .52) / .12)
+        return 1 - Smooth((t - 2.70) / .10)
+
+    def Pose(t):
+        f = body(t)
+        f['look'] = REACH_EYE
+        b = Bump(t, REACH_HOLD[0], REACH_HOLD[0] + .75) + Bump(t, REACH_HOLD[0] + .75, REACH_HOLD[1])
+        f['bend'] += .02 * b
+        EaseGrip(f, 'L', Hand(t), Weight(t), palmF, palmN, .22)
+        return T.Nest(f)
+
+    def Check(t):
+        return {'L': Hand(t)} if REACH_HOLD[0] <= t <= REACH_HOLD[1] else {}
+    spec = {'pose': Pose, 'check': Check, 'plants': [('L', .60, 2.80), ('R', .60, 2.80)], 'kneePlants': [('R', .62, 2.78)],
+            'player': lambda t: {'head': REACH_EYE, 'chest': REACH_CHEST},
+            'look': lambda t: REACH_EYE if body(t)['lookW'] >= .99 else None,
+            'reviewProps': lambda t: [('point', REACH_CHEST, None, .04), ('point', offered, None, .025),
+                                      ('cyl', (.04, -1.10, .05), (.04, -1.10, .45), .10)],
+            'reviewFrames': lambda n: [0, int(n * .17), int(n * .29), int(n * .5), int(n * .8), n - 1]}
+    spec = AReview(spec)
+    # SB06 camera: Shunzi's eye looking at Luo (the storyboard frames him left of centre: aim to his left, +X)
+    spec['reviewViews'].append(FirstPersonView(REACH_EYE, (.42, -.30, .92), roll=0.0))
+    return spec
+
+
+# -- SB01 RunnerLeanPostCall (Nra02) -----------------------------------------------------
+# The runner at the dugout mouth: left hand round the upright timber prop at shoulder height, leaning in past
+# it and shouting into the dugout. The post is on his left, a little ahead (the storyboard: the post on the
+# right of him as he faces the camera).
+RUNNER_T = 72 / 24                     # 3.0 s
+RUNNER_HOLD = (.75, RUNNER_T)
+RUNNER_POST = (.62, -.32)              # the post's axis on the ground (source m, his frame)
+RUNNER_POST_R = .065                   # post radius (source m, ~0.12 m timber)
+RUNNER_GRIP = (.62 - RUNNER_POST_R - .025, -.34, 1.28)   # finger-root centroid of the fist round the post (source m)
+RUNNER_LOOK = (-.30, -2.6, .80)        # into the dugout: the men 2.6 m in, low (source m)
+
+
+def _RuntimePoint(p, scale=NRA02_SCALE):
+    return [round(-p[0] * scale, 3), round(p[2] * scale, 3), round(p[1] * scale, 3)]
+
+
+Meta('RunnerLeanPostCall', RUNNER_T, False, 'track', role='runner', rig='LugouNra02', props=['weapon'], rootMotion=False,
+     weaponState='slungBack', holdLoop=list(RUNNER_HOLD),
+     contacts=[{'t': .45, 'limb': 'handL', 'action': 'brace', 'target': 'post', 'untilT': RUNNER_T,
+                # the fist's finger roots on the post, and the post's axis on the ground (runtime metres, actor frame)
+                'pointM': _RuntimePoint(RUNNER_GRIP), 'postAxisM': _RuntimePoint((RUNNER_POST[0], RUNNER_POST[1], 0.0)),
+                'postRadiusM': round(RUNNER_POST_R * NRA02_SCALE, 3)}],
+     events=[{'t': .45, 'kind': 'handOnPost'}, {'t': 1.25, 'kind': 'shout'}, {'t': 2.30, 'kind': 'shout'}],
+     prev=['MessengerReport'], next=['MessengerReport'],
+     notes='SB01 (2026-09-25): at the dugout mouth, the left hand closes round the upright timber prop at shoulder height '
+           '(0.45 s; contact pointM = the fist on the post, postAxisM = where the post stands, runtime metres in the actor '
+           'frame: the director puts the root so postAxisM is on the north door post) and he leans in past it, shouting '
+           'into the dugout (head on a point 2.4 m in, 0.73 m up). 0.75-3.0 s is a seamless hold loop with two shouts '
+           '(1.25 / 2.30 s: the trunk pushes in, the free right hand swings up). Rifle slung across the back.')
+
+
+@Builder('RunnerLeanPostCall')
+def BuildRunnerLeanPost(T, name):
+    H, P, A, SX = T.H, T.P, T.A, T.SX
+    base = Standing(T)
+    base.update({'ankle.L': (H + .06, -.14, A), 'ankle.R': (-(H + .02), .20, A), 'foot.L': (0, 14, 0), 'foot.R': (0, -12, 0),
+                 'pelvis': (.02, .04, P - .05), 'lookW': 0.0, 'handRel.R': (-.06, -.14, -.44), 'curl.R': .55})
+    lean = {'bend': .48, 'pelvisTilt': (.14, 0, .04), 'twist': .04, 'pelvis': (.05, .07, P - .07), 'lookW': 1.0}
+    body = Keys(base, [(0.0, {'bend': .12}), (.45, lean), (RUNNER_HOLD[0], lean), (RUNNER_HOLD[1], lean)], lag={'head': .05})
+    # the fist on the post: fingers round it (toward his front), palm onto the wood, thumb up
+    palmF, palmN = Unit((-.25, -.95, 0)), Unit((1, -.15, 0))
+
+    def Shout(t):
+        return Bump(t, .95, 1.75) + Bump(t, 2.0, 2.85)
+
+    def Pose(t):
+        f = body(t)
+        s = Shout(t)
+        f['bend'] += .08 * s
+        f['look'] = Add3(RUNNER_LOOK, (0, 0, -.10 * s))
+        # the right hand swings up a little on each shout
+        r = f['handRel.R']
+        f['handRel.R'] = (r[0] - .01 * s, r[1] - .07 * s, r[2] + .07 * s)
+        f['curl.R'] = .55 + .25 * s
+        EaseGrip(f, 'L', RUNNER_GRIP, Smooth((t - .15) / .30), palmF, palmN, .95)
+        return T.Nest(f)
+    props, review = SlungProps(T, 'back')
+    post = [('cyl', (RUNNER_POST[0], RUNNER_POST[1], 0.0), (RUNNER_POST[0], RUNNER_POST[1], 1.95), RUNNER_POST_R)]
+    spec = {'pose': Pose, 'props': props, 'plants': [('L', 0, RUNNER_T), ('R', 0, RUNNER_T)],
+            'check': lambda t: {'L': RUNNER_GRIP} if t >= .45 else {},
+            'look': lambda t: Add3(RUNNER_LOOK, (0, 0, -.10 * Shout(t))) if body(t)['lookW'] >= .99 else None,
+            'reviewProps': lambda t: review(t) + post,
+            'reviewFrames': lambda n: [0, int(n * .15), int(n * .42), int(n * .77), n - 1]}
+    spec = AReview(spec)
+    # SB01 camera: sitting in the dugout 2.7 m in front of him, eye 0.95 m up, looking out past him
+    spec['reviewViews'].append(('sb', (-.9, -2.9, 1.04), (.35, 0, 1.05), 65.0, 0.0))
+    return spec
+
+
+# -- SB04A InterpreterHurryReach (Nra02 -> NRA06) --------------------------------------
+# The interpreter hurries back up the trench toward the downed Shunzi with one arm out (SB04A). An upper-body
+# clip: the director plays it with upperBody:true over the native fast walk (Move(..., {upperBody:true})),
+# so only the arms, clavicles, neck and head come from here; the legs here only stand in a stride for the
+# stills and a stationary fallback.
+HURRY_T = 30 / 24                      # 1.25 s
+HURRY_HOLD = (.50, HURRY_T)
+HURRY_LOOK = (0, -3.2, .40)            # the man on the ground ~3 m ahead (source m)
+Meta('InterpreterHurryReach', HURRY_T, False, 'free', role='interpreter', rig='LugouNra02', rootMotion=False,
+     upperBody=True, holdLoop=list(HURRY_HOLD),
+     events=[{'t': .40, 'kind': 'reachOut'}],
+     prev=['InterpreterCrouchAsk'], next=['InterpreterCrouchAsk', 'InterpreterGrabCollar'],
+     notes='SB04A (2026-09-25): play with upperBody:true over the native walk/run (the director\'s Move(actor, point, '
+           'face, "InterpreterHurryReach", speed, {upperBody:true})): the right arm comes up and reaches forward, open '
+           'hand palm down, fingers spread (0.40 s), the left arm pulled back, the face on the ground 3 m ahead. '
+           '0.5-1.25 s is a seamless hold loop (the hand grabs at the air once). Full-body it is a standing stride '
+           '(stills and a stationary fallback only).')
+
+
+@Builder('InterpreterHurryReach')
+def BuildHurryReach(T, name):
+    H, P, A = T.H, T.P, T.A
+    base = Standing(T)
+    base.update({'ankle.L': (H + .02, -.24, A), 'ankle.R': (-(H + .02), .22, A), 'foot.L': (0, 6, 0), 'foot.R': (0, -6, 0),
+                 'pelvis': (0, .0, P - .06), 'bend': .20, 'pelvisTilt': (.08, 0, 0), 'lookW': 1.0,
+                 'handRel.L': (.10, .06, -.40), 'poleRel.L': (.40, .45, -.20), 'palmF.L': (0, .2, -1), 'palmN.L': (-1, 0, 0), 'curl.L': .75,
+                 'handRel.R': (-.07, -.10, -.47), 'poleRel.R': (-.45, .40, -.35), 'palmF.R': (0, -.2, -1), 'palmN.R': (1, 0, 0), 'curl.R': .45})
+    reach = {'handRel.R': (-.04, -.43, -.15), 'poleRel.R': (-.45, .15, -.45), 'palmF.R': Unit((.05, -1, -.12)),
+             'palmN.R': Unit((.25, -.15, -.95)), 'curl.R': .18, 'bend': .24}
+    body = Keys(base, [(0.0, {}), (.40, reach), (HURRY_HOLD[0], reach), (HURRY_HOLD[1], reach)], lag={'head': .04})
+
+    def Pose(t):
+        f = body(t)
+        g = Bump(t, HURRY_HOLD[0] + .10, HURRY_HOLD[1] - .05)
+        r = f['handRel.R']
+        f['handRel.R'] = (r[0], r[1] - .05 * g, r[2] + .02 * g)
+        f['curl.R'] += .40 * g
+        f['look'] = HURRY_LOOK
+        return T.Nest(f)
+    spec = {'pose': Pose, 'plants': [('L', 0, HURRY_T), ('R', 0, HURRY_T)], 'look': lambda t: HURRY_LOOK,
+            'reviewFrames': lambda n: [0, int(n * .32), int(n * .7), n - 1]}
+    spec = AReview(spec)
+    # SB04A camera: on the ground 3 m ahead of him, looking up the trench at him
+    spec['reviewViews'].append(('sb', (.25, -3.3, .33), (0, 0, 1.15), 65.0, -8.0))
+    return spec
+
+
+# -- SB01 YaowaSitLoad (Nra02) -----------------------------------------------------------
+# Yaowa sits on the dugout floor against the north wall, knees up, the rifle between his knees (butt in the
+# dirt, muzzle leaning away to his left), bent over it pushing a charger of rounds down into the magazine.
+# The 2026-09-22 ClipLoad he had is a kneeling pose that reads as a man kneeling with his arms out from the
+# SB01 camera (survey T_SB01_staged2). Seamless 3 s loop: two thumb pushes, the empty charger flicked away, a
+# new one from the belt pouch, seated in the guide.
+LOAD_T = 72 / 24                       # 3.0 s
+Meta('YaowaSitLoad', LOAD_T, True, 'track', role='yaowa', rig='LugouNra02', props=['weapon'], rootMotion=False,
+     env={'wallBehindM': .35},
+     contacts=[{'t': 0, 'limb': 'handL', 'action': 'hold', 'target': 'weapon', 'part': 'handguard'},
+               {'t': 0, 'limb': 'butt', 'action': 'rest', 'target': 'ground'},
+               {'t': .20, 'limb': 'handR', 'action': 'press', 'target': 'weapon', 'part': 'receiver'},
+               {'t': 1.20, 'limb': 'handR', 'action': 'release'},
+               {'t': 2.40, 'limb': 'handR', 'action': 'seat', 'target': 'weapon', 'part': 'receiver'}],
+     events=[{'t': .45, 'kind': 'roundsDown'}, {'t': .95, 'kind': 'roundsDown'}, {'t': 1.30, 'kind': 'chargerOut'},
+             {'t': 1.75, 'kind': 'pouch'}, {'t': 2.45, 'kind': 'chargerIn'}],
+     next=['BanterLaugh'],
+     notes='SB01 (2026-09-25): sits on the floor against the north wall (wall 0.35 m behind the root), knees up and apart, '
+           'the rifle between the knees, butt in the dirt, muzzle leaning away to his left; the left hand holds the '
+           'handguard, the head is bowed over the open bolt (look = the receiver). Loop: two thumb pushes on the charger '
+           '(0.2-1.1 s), the empty charger flicked out to his right (1.3 s), a new one from the belt pouch (1.75 s), '
+           'seated in the guide (2.45 s). Replaces the kneeling ClipLoad for Yaowa in Banter/Orders.')
+
+
+def YaowaRifle(T):
+    rifle = T.RifleFromButt((-.03, -.27, .012), Unit((.12, -.17, .98)))
+    # sights toward him (he looks down into the open receiver)
+    a = Vector(rifle['axis'])
+    up = Vector((0, 1, .15))
+    up = (up - a * up.dot(a)).normalized()
+    return rifle, tuple(up)
+
+
+@Builder('YaowaSitLoad')
+def BuildYaowaSitLoad(T, name):
+    H, A = T.H, T.A
+    rifle, up = YaowaRifle(T)
+    a, u = Vector(rifle['axis']), Vector(up)
+    butt = Vector(rifle['butt'])
+    receiver = butt + a * T.R(.355) + u * T.R(.035)          # the charger guide on top of the receiver
+    handguard = butt + a * T.R(.56)
+    base = SitBase(T)
+    base.update({'pelvisTilt': (-.28, 0, .02), 'bend': .56, 'lean': 0.0, 'twist': .04, 'shrug': .04, 'lookW': 1.0,
+                 # knees up and apart, the rifle between them
+                 'ankle.L': (H + .16, -.42, A), 'ankle.R': (-(H + .12), -.46, A),
+                 'legPole.L': (H + .75, -.30, 1.0), 'legPole.R': (-(H + .70), -.35, 1.0), 'foot.L': (0, 22, 0), 'foot.R': (0, -18, 0),
+                 'hand.L': base['hand.L'], 'armPole.L': (.60, -.10, .30), 'armPole.R': (-.60, -.05, .35)})
+    across = (a.cross(u)).normalized()                        # across the receiver, toward his left
+    pressAt = receiver + u * T.R(.030)                        # the fist's finger roots over the charger, thumb on it
+    pouch = Vector((-.13, -.17, .25))                         # right front belt pouch
+    flick = pressAt + Vector((-.16, .02, .10))
+    down = -a * T.R(.028)
+    path = Channel([(0.0, tuple(pressAt)), (.20, tuple(pressAt)), (.45, tuple(pressAt + down)), (.60, tuple(pressAt)),
+                    (.70, tuple(pressAt)), (.95, tuple(pressAt + down * 1.3)), (1.15, tuple(pressAt + down * 1.3)),
+                    (1.30, tuple(flick)), (1.50, tuple(Vector(flick).lerp(pouch, .45) + Vector((0, 0, .04)))),
+                    (1.75, tuple(pouch)), (1.95, tuple(pouch)), (2.20, tuple(pressAt + u * T.R(.06))),
+                    (2.45, tuple(pressAt)), (LOAD_T, tuple(pressAt))], periodic=True)
+    # palm: onto the top of the charger (thumb push); at the pouch the palm faces the belt
+    pressF, pressN = tuple(across), tuple(-u)
+    pouchF, pouchN = Unit((.30, -.95, 0)), Unit((0, -.30, -.95))
+    palm = Channel([(0.0, 0.0), (1.15, 0.0), (1.50, 1.0), (1.95, 1.0), (2.30, 0.0), (LOAD_T, 0.0)], periodic=True)
+    curl = Channel([(0.0, .55), (1.15, .55), (1.30, .20), (1.60, .35), (1.75, .75), (1.95, .80), (2.45, .55), (LOAD_T, .55)], periodic=True)
+    palmsL = T.Palms(rifle['axis'])
+
+    def Palm(t):
+        w = palm(t)
+        return Unit(Lerp3(pressF, pouchF, w)), Unit(Lerp3(pressN, pouchN, w))
+
+    def Pose(t):
+        f = SitBreath(t, dict(base), period=LOAD_T, amount=.6)
+        push = Bump(t, .20, .60) + Bump(t, .70, 1.10)
+        f['bend'] += .03 * push
+        f['look'] = tuple(receiver)
+        f['grip.L'] = tuple(handguard)
+        f['palmF.L'], f['palmN.L'], f['curl.L'] = palmsL['L'][0], palmsL['L'][1], .85
+        pf, pn = Palm(t)
+        f['grip.R'] = path(t)
+        f['palmF.R'], f['palmN.R'], f['curl.R'] = pf, pn, curl(t)
+        f['handRel.L'] = f['handRel.R'] = None
+        return T.Nest(f)
+    spec = {'pose': Pose, 'props': lambda t: {'weapon': T.Track(rifle, up=up)}, 'plants': [('L', 0, LOAD_T), ('R', 0, LOAD_T)],
+            'check': lambda t: {'L': tuple(handguard), 'R': path(t)}, 'look': lambda t: tuple(receiver),
+            'reviewProps': lambda t: T.RifleProps(rifle) + [('box', (0, .385 + .03, .7), (1.6, .06, 1.4), 0),
+                                                            ('point', tuple(receiver), None, .02)],
+            'walls': SIT_WALL, 'reviewFrames': lambda n: [0, int(n * .15), int(n * .43), int(n * .58), int(n * .82)]}
+    spec['reviewViews'] = list(SIT_VIEWS) + [('sb', (-1.75, -.30, 1.02), (0, -.25, .45), 65.0, 0.0)]
+    spec['reviewScale'] = 2.2
+    return spec
+
+
 # =================================================================================
 # which rigs bake which clip (manifest `rigs`). Every 2026-09-23 clip is baked only on the
 # rigs its role can wear (contract §5.1: comrade/interpreter/He/Liu/yaowa = NRA02, Luo =

@@ -2059,6 +2059,228 @@
    "rigs": [
     "LugouIja01"
    ]
+  },
+  "LuoKneelReach": {
+   "duration": 3.5,
+   "loop": false,
+   "weaponHold": "free",
+   "role": "luo",
+   "rig": "LugouNra05",
+   "rootMotion": false,
+   "player": true,
+   "holdLoop": [
+    1.0,
+    2.5
+   ],
+   "holdExit": "pose.holdUntil: the loop lets go at that clip time and plays on through the 2.5-2.8 s hand back and the rise",
+   "contacts": [
+    {
+     "t": 1.0,
+     "limb": "handL",
+     "action": "reach",
+     "partnerRole": "shunzi",
+     "part": "chest",
+     "gapM": 0.3
+    },
+    {
+     "t": 2.5,
+     "limb": "handL",
+     "action": "release"
+    }
+   ],
+   "events": [
+    {
+     "t": 0.6,
+     "kind": "kneel"
+    },
+    {
+     "t": 1.05,
+     "kind": "line",
+     "line": "RescueCheck.01"
+    },
+    {
+     "t": 2.8,
+     "kind": "rise"
+    }
+   ],
+   "prev": [
+    "LuoDragToCover"
+   ],
+   "next": [
+    "KickRifle",
+    "LuoKneelCheck"
+   ],
+   "notes": "SB06 (2026-09-25): from the standing pose (= LuoKneelCheck frame 0) he drops onto his right knee in front of the sitting Shunzi (0.9 m, player head/chest), leans in and holds out his open left hand, palm down, fingers toward him, 0.3 m short of his breastbone (1.0 s; the elbow stays bent). 1.0-2.5 s is a seamless hold loop (the hand offers twice, the face on Shunzi's eye, look = player head). holdUntil lets go: the hand comes back to the knee (2.5-2.8 s) and he stands (3.5 s). Last frame = frame 0 = LuoKneelCheck frame 0: a drop-in for the Check beat, hands on to KickRifle like LuoKneelCheck does.",
+   "rigs": [
+    "LugouNra05"
+   ]
+  },
+  "RunnerLeanPostCall": {
+   "duration": 3.0,
+   "loop": false,
+   "weaponHold": "track",
+   "role": "runner",
+   "rig": "LugouNra02",
+   "props": [
+    "weapon"
+   ],
+   "rootMotion": false,
+   "weaponState": "slungBack",
+   "holdLoop": [
+    0.75,
+    3.0
+   ],
+   "contacts": [
+    {
+     "t": 0.45,
+     "limb": "handL",
+     "action": "brace",
+     "target": "post",
+     "untilT": 3.0,
+     "pointM": [
+      -0.484,
+      1.169,
+      -0.311
+     ],
+     "postAxisM": [
+      -0.566,
+      0.0,
+      -0.292
+     ],
+     "postRadiusM": 0.059
+    }
+   ],
+   "events": [
+    {
+     "t": 0.45,
+     "kind": "handOnPost"
+    },
+    {
+     "t": 1.25,
+     "kind": "shout"
+    },
+    {
+     "t": 2.3,
+     "kind": "shout"
+    }
+   ],
+   "prev": [
+    "MessengerReport"
+   ],
+   "next": [
+    "MessengerReport"
+   ],
+   "notes": "SB01 (2026-09-25): at the dugout mouth, the left hand closes round the upright timber prop at shoulder height (0.45 s; contact pointM = the fist on the post, postAxisM = where the post stands, runtime metres in the actor frame: the director puts the root so postAxisM is on the north door post) and he leans in past it, shouting into the dugout (head on a point 2.4 m in, 0.73 m up). 0.75-3.0 s is a seamless hold loop with two shouts (1.25 / 2.30 s: the trunk pushes in, the free right hand swings up). Rifle slung across the back.",
+   "rigs": [
+    "LugouNra02"
+   ]
+  },
+  "InterpreterHurryReach": {
+   "duration": 1.25,
+   "loop": false,
+   "weaponHold": "free",
+   "role": "interpreter",
+   "rig": "LugouNra02",
+   "rootMotion": false,
+   "upperBody": true,
+   "holdLoop": [
+    0.5,
+    1.25
+   ],
+   "events": [
+    {
+     "t": 0.4,
+     "kind": "reachOut"
+    }
+   ],
+   "prev": [
+    "InterpreterCrouchAsk"
+   ],
+   "next": [
+    "InterpreterCrouchAsk",
+    "InterpreterGrabCollar"
+   ],
+   "notes": "SB04A (2026-09-25): play with upperBody:true over the native walk/run (the director's Move(actor, point, face, \"InterpreterHurryReach\", speed, {upperBody:true})): the right arm comes up and reaches forward, open hand palm down, fingers spread (0.40 s), the left arm pulled back, the face on the ground 3 m ahead. 0.5-1.25 s is a seamless hold loop (the hand grabs at the air once). Full-body it is a standing stride (stills and a stationary fallback only).",
+   "rigs": [
+    "LugouNra02"
+   ]
+  },
+  "YaowaSitLoad": {
+   "duration": 3.0,
+   "loop": true,
+   "weaponHold": "track",
+   "role": "yaowa",
+   "rig": "LugouNra02",
+   "props": [
+    "weapon"
+   ],
+   "rootMotion": false,
+   "env": {
+    "wallBehindM": 0.35
+   },
+   "contacts": [
+    {
+     "t": 0,
+     "limb": "handL",
+     "action": "hold",
+     "target": "weapon",
+     "part": "handguard"
+    },
+    {
+     "t": 0,
+     "limb": "butt",
+     "action": "rest",
+     "target": "ground"
+    },
+    {
+     "t": 0.2,
+     "limb": "handR",
+     "action": "press",
+     "target": "weapon",
+     "part": "receiver"
+    },
+    {
+     "t": 1.2,
+     "limb": "handR",
+     "action": "release"
+    },
+    {
+     "t": 2.4,
+     "limb": "handR",
+     "action": "seat",
+     "target": "weapon",
+     "part": "receiver"
+    }
+   ],
+   "events": [
+    {
+     "t": 0.45,
+     "kind": "roundsDown"
+    },
+    {
+     "t": 0.95,
+     "kind": "roundsDown"
+    },
+    {
+     "t": 1.3,
+     "kind": "chargerOut"
+    },
+    {
+     "t": 1.75,
+     "kind": "pouch"
+    },
+    {
+     "t": 2.45,
+     "kind": "chargerIn"
+    }
+   ],
+   "next": [
+    "BanterLaugh"
+   ],
+   "notes": "SB01 (2026-09-25): sits on the floor against the north wall (wall 0.35 m behind the root), knees up and apart, the rifle between the knees, butt in the dirt, muzzle leaning away to his left; the left hand holds the handguard, the head is bowed over the open bolt (look = the receiver). Loop: two thumb pushes on the charger (0.2-1.1 s), the empty charger flicked out to his right (1.3 s), a new one from the belt pouch (1.75 s), seated in the guide (2.45 s). Replaces the kneeling ClipLoad for Yaowa in Banter/Orders.",
+   "rigs": [
+    "LugouNra02"
+   ]
   }
  },
  "stages": {
@@ -2361,7 +2583,7 @@
   {
    "id": "LugouNra02",
    "file": "Animation_LugouNra02OpeningStoryboards.json",
-   "sha256": "72d42eb5e3422e1a0b1ad3c21a7e799cf57d06c9993626287e95764927e731c8",
+   "sha256": "f9fd3113c3576546447a5f3f71758aea915aa18ab3d44e1a31891c6782a5bf6b",
    "originalModelSha256": "39c08ca82148e140ee2952caffdd0dee99750fb734038a5263d216c9a7345225",
    "clipIds": [
     "SupplyReceive",
@@ -2401,7 +2623,10 @@
     "InterpreterGrabCollar",
     "InterpreterFlee",
     "HeDadaoParryChop",
-    "HeSwapDadaoRifle"
+    "HeSwapDadaoRifle",
+    "RunnerLeanPostCall",
+    "InterpreterHurryReach",
+    "YaowaSitLoad"
    ],
    "contactPoints": {
     "hairBack": {
@@ -3948,13 +4173,140 @@
      ],
      "kneePlants": [],
      "kneeSlideM": 0.0
+    },
+    {
+     "clip": "RunnerLeanPostCall",
+     "frames": 73,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0341,
+     "floorCorrectionMin": -0.0,
+     "floorCorrectionMax": -0.0,
+     "root": {
+      "start": [
+       -0.0183,
+       0.0365,
+       -0.0,
+       0.8236
+      ],
+      "end": [
+       -0.0457,
+       0.0639,
+       3.04,
+       0.8053
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       3.0
+      ],
+      [
+       "R",
+       0,
+       3.0
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0,
+     "lookErrorDeg": 0.04,
+     "headTurnDeg": 24.89
+    },
+    {
+     "clip": "InterpreterHurryReach",
+     "frames": 31,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0,
+     "floorCorrectionMin": -0.0,
+     "floorCorrectionMax": -0.0,
+     "root": {
+      "start": [
+       -0.0,
+       -0.0,
+       -0.0,
+       0.8144
+      ],
+      "end": [
+       -0.0,
+       -0.0,
+       -0.0,
+       0.8144
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       1.25
+      ],
+      [
+       "R",
+       0,
+       1.25
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0,
+     "lookErrorDeg": 0.0,
+     "headTurnDeg": 4.87
+    },
+    {
+     "clip": "YaowaSitLoad",
+     "frames": 73,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "wallPenetrationM": 0.0,
+     "pelvisMaxStepM": 0.0257,
+     "floorCorrectionMin": -0.0,
+     "floorCorrectionMax": -0.0,
+     "root": {
+      "start": [
+       0.0018,
+       -0.005,
+       1.9,
+       0.1051
+      ],
+      "end": [
+       0.0018,
+       -0.005,
+       1.9,
+       0.1051
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       3.0
+      ],
+      [
+       "R",
+       0,
+       3.0
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0,
+     "lookErrorDeg": 0.67,
+     "headTurnDeg": 41.46
     }
    ]
   },
   {
    "id": "LugouNra05",
    "file": "Animation_LugouNra05OpeningStoryboards.json",
-   "sha256": "bc6139a8ec7294f176eab1515a9f7742b5ba540b6f969b375d7df608fbb84ef3",
+   "sha256": "11cde824afded98ce521f6f7981d6d8ce85dca5ae11f302aa668e2a0f1341631",
    "originalModelSha256": "acbc9184da059bdf6c3c18d051f3eba77d1dd3acba469e8dbc876b092f174250",
    "clipIds": [
     "SupplyReceive",
@@ -3979,7 +4331,8 @@
     "GuardTurn",
     "LuoDadaoChopRear",
     "LuoDragToCover",
-    "LuoKneelCheck"
+    "LuoKneelCheck",
+    "LuoKneelReach"
    ],
    "contactPoints": {
     "hairBack": {
@@ -4883,6 +5236,54 @@
      ],
      "kneePlants": [],
      "kneeSlideM": 0.0
+    },
+    {
+     "clip": "LuoKneelReach",
+     "frames": 85,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.0838,
+     "floorCorrectionMin": -0.0,
+     "floorCorrectionMax": 0.12392,
+     "root": {
+      "start": [
+       -0.0,
+       0.0184,
+       -0.0,
+       0.8334
+      ],
+      "end": [
+       -0.0,
+       0.0184,
+       -0.0,
+       0.8334
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0.6,
+       2.8
+      ],
+      [
+       "R",
+       0.6,
+       2.8
+      ]
+     ],
+     "kneePlants": [
+      [
+       "R",
+       0.62,
+       2.78
+      ]
+     ],
+     "kneeSlideM": 0.0148,
+     "lookErrorDeg": 2.01,
+     "headTurnDeg": 9.31
     }
    ]
   },
