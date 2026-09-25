@@ -30,10 +30,54 @@ export const CHARACTER_SPEECH = Object.freeze({
   breathPeriodS: 4.4, breathJaw: .025, breathClose: .12,
   // Death: jaw drops and lids sag to DeadSlack while the body collapses.
   deadSlackWeight: 1,
+  // Acting expressions (2026-09-25, 01-03 storyboard contract section 4.2):
+  // rig.facial.expression = {snarl, shock, pain, shout, grit} are targets; each
+  // weight moves linearly and takes expressionBlendS for a full 0 -> 1 swing
+  // (SetExpression may pass its own time, e.g. ~.12 s for the Chop shock).
+  expressionBlendS: .25,
+  // Speech sits on top of the expression. Shout (19 deg) and Shock (8 deg) drop
+  // the jaw themselves; on top of the 10-14 deg Open that would hang the mouth
+  // at 30+ deg with syllables reading as a wobble. While the face talks the
+  // expression keeps only (1 - yield) of its jaw drop, so a shouted line still
+  // opens and shuts on every syllable around a half-open base (Blender ShoutTalk).
+  // talkBlendS: how fast the face counts as talking / not talking.
+  expressionTalkJawYield: .6, talkBlendS: .12,
+  // Secondary: a stressed syllable pulls the mouth corners back (a Wide pulse on
+  // top of the track's own lip shape), decaying with the brows (browDecayS).
+  stressCornerPull: .35,
   // Eyes (Face_EyeL/R): look at the attention target, clamped, with small
   // seeded saccades while holding a gaze.
   gazeMaxYawDeg: 24, gazeMaxPitchDeg: 14, gazeFollowS: .09,
   saccadeMinS: .7, saccadeMaxS: 2.4, saccadeDeg: 2.2,
+});
+
+// Face blood (Script_CharacterFaceBlood, CharacterFacial.SetFaceBlood): the captive
+// comrade's bloodied face in SB03-SB04A (01-03 storyboard contract section 4.2).
+// A procedural mask in face space (units of the eye distance, origin between the
+// eyes, +x toward Face_EyeR, +y up, +z out of the face) on private clones of the
+// head materials; no texture, so no sampler (Script_SamplerBudgetTest).
+// SB03 reads at ~4 m: a dark red forehead cut with runs down the brow, cheek and
+// nose, a smear on the other cheek, blood from the nose over the lip and chin,
+// under a thin grime film. Colours from Data_Tuning_Blood.BLOOD_WOUND (fresh
+// 0x70100e, dry 0x300b09) so face and cloth wounds match.
+export const FACE_BLOOD = Object.freeze({
+  fresh: 0x70100e, dry: 0x300b09,
+  // Cover at amount 1 and how much of the thick part is still wet (glossy, brighter).
+  opacity: .92, wetShare: .55,
+  wetRoughness: .42, dryRoughness: .88,
+  // Forehead cut: centre and half size in eye distances.
+  cut: [.28, .78], cutSize: [.34, .12],
+  // Runs from the cut down the face: x offsets from the cut, widths, lengths at amount 1.
+  runX: [-.34, -.12, .08, .3], runWidth: [.07, .1, .06, .08], runLength: [1.55, 2.25, 1.35, 1.9],
+  // Cheek smear (the other side) and the nose bleed over the lip and chin.
+  smear: [-.62, -.62], smearSize: [.38, .5],
+  nose: [.02, -.62], noseWidth: .16, noseLength: 1.25,
+  // Face region: front of the head only (z), inside the face oval.
+  frontFrom: -.95, frontTo: -.35, ovalCentreY: -.45, ovalRadius: [1.25, 1.95],
+  // A thin grime film under the blood keeps the face from reading clean at a distance.
+  grime: .22,
+  // Only materials with at least this many vertices inside the face oval get a clone.
+  minFaceVertices: 12,
 });
 
 // Shared head layer for faces that talk or listen (Script_SpeakerHeadLayer).

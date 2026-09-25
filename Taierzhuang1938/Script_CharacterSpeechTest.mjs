@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import * as THREE from 'three';
 import { BuildSpeechEnvelope, SampleSpeechEnvelope } from './Script_SpeechEnvelope.mjs';
 import { FirstLevelMissionVoice } from './Script_FirstLevelMissionVoice.mjs';
-import { CharacterFacialAnimation } from './Script_CharacterFacialAnimation.mjs';
+import { CharacterFacialAnimation, CharacterFacial } from './Script_CharacterFacialAnimation.mjs';
 import { FirstLevelSpeakerBinder, ParseLineId, WhoForLine, FIRST_LEVEL_SPEAKER_ROLES } from './Script_FirstLevelSpeakerBinder.mjs';
 import { SpeakerLookAngles, SpeakerHeadLayer } from './Script_SpeakerHeadLayer.mjs';
 import { FIRST_LEVEL_SPEAKING_CAST, SpeakingCastOptions, FIRST_LEVEL_FACE_STEPS, FIRST_LEVEL_WHOLE_LEVEL_SPEAKERS,
@@ -219,6 +219,51 @@ const jawAngle = (bone, rig) => 2 * Math.acos(Math.min(1, Math.abs(bone.quaterni
   for (let i = 0; i < 60; i++) face.Update(1 / 60, {});
   const eyeTurn = 2 * Math.acos(Math.min(1, Math.abs(eye.quaternion.dot(restEye)))) * 180 / Math.PI;
   assert.ok(eyeTurn > 5 && eyeTurn <= Math.hypot(C.gazeMaxYawDeg + C.saccadeDeg, C.gazeMaxPitchDeg + C.saccadeDeg) + 1, `eyes turn toward the gaze (${eyeTurn.toFixed(1)} deg)`);
+}
+// ---- acting expressions (01-03 storyboard contract section 4.2) on every faced model ----
+for (const label of Object.keys(definitions)) {
+  const rig = definitions[label], {root, byName} = FaceRoot(rig);
+  const face = new CharacterFacialAnimation(root, rig, {seed: 3});
+  for (let i = 0; i < 30; i++) face.Update(1 / 60, {});
+  const rest = Object.fromEntries(rig.bones.map(name => [name, {p: byName[name].position.clone(), q: byName[name].quaternion.clone()}]));
+  const Moved = name => byName[name].position.distanceTo(rest[name].p) + byName[name].quaternion.angleTo(rest[name].q);
+  const Settle = (seconds, state = {}) => { for (let t = 0; t < seconds - 1e-9; t += 1 / 60) face.Update(1 / 60, state); };
+  // Partial update, eased over expressionBlendS (a linear full swing).
+  CharacterFacial.SetExpression({facial: face}, {snarl: 1});
+  Settle(C.expressionBlendS / 2);
+  assert.ok(Math.abs(face.expressionWeights.snarl - .5) < .08, `${label}: snarl half way after half the blend (${face.expressionWeights.snarl.toFixed(2)})`);
+  Settle(C.expressionBlendS);
+  assert.equal(face.expressionWeights.snarl, 1, `${label}: snarl reaches its target`);
+  assert.equal(face.weights.Snarl, 1); assert.equal(face.expression.shock, 0, 'other expressions keep theirs');
+  assert.ok(Moved('Face_CornerL') > .002 && Moved('Face_BrowL') > .002, `${label}: Snarl moves the mouth corners and brows`);
+  // An explicit blend time (0 = snap) and whole-object writes both work.
+  face.SetExpression({snarl: 0, shock: 1}, 0); face.Update(1 / 60, {});
+  assert.equal(face.expressionWeights.shock, 1); assert.equal(face.expressionWeights.snarl, 0, 'blendS 0 snaps');
+  face.expression = Object.freeze({grit: 1}); Settle(C.expressionBlendS + .05);
+  assert.deepEqual(face.expressionWeights, {snarl: 0, shock: 0, pain: 0, shout: 0, grit: 1}, `${label}: rig.facial.expression = {grit: 1}`);
+  face.SetExpression({pain: .5});
+  assert.deepEqual({...face.expression}, {snarl: 0, shock: 0, pain: .5, shout: 0, grit: 1}, 'SetExpression after a frozen whole-object write');
+  assert.throws(() => face.SetExpression({smile: 1}), /Unknown facial expression/);
+  // Shout drops the jaw by itself; talking on top still opens and shuts it every syllable.
+  face.SetExpression({pain: 0, grit: 0, shout: 1}, 0); Settle(.5);
+  const shoutSilent = jawAngle(byName.Face_Jaw, rig);
+  assert.ok(shoutSilent > 8, `${label}: Shout opens the jaw (${shoutSilent.toFixed(1)} deg)`);
+  let low = 1e9, high = 0;
+  for (let i = 0; i < 120; i++) {
+    const open = Math.floor(i / 9) % 2 === 0;
+    face.Update(1 / 60, {speech: {active: true, jaw: open ? .9 : 0, wide: open ? .3 : 0, round: 0, close: open ? 0 : .6, stress: 0}});
+    if (i >= 30) { const a = jawAngle(byName.Face_Jaw, rig); low = Math.min(low, a); high = Math.max(high, a); }
+  }
+  assert.ok(high - low > 6, `${label}: under Shout the mouth still opens and shuts (${low.toFixed(1)}-${high.toFixed(1)} deg)`);
+  assert.ok(high < 34, `${label}: shouting speech does not hang the jaw wide open (${high.toFixed(1)} deg)`);
+  // Every expression pose moves the face on this model.
+  for (const name of CharacterFacial.EXPRESSIONS) {
+    face.Reset(); face.SetExpression({[name]: 1}, 0); face.Update(1 / 60, {});
+    assert.ok(rig.bones.reduce((sum, bone) => sum + Moved(bone), 0) > .02, `${label}: ${name} moves the face`);
+  }
+  face.Reset();
+  assert.deepEqual(face.State().expression, {snarl: 0, shock: 0, pain: 0, shout: 0, grit: 0}, 'Reset clears expressions');
+  assert.throws(() => CharacterFacial.SetExpression({characterRig: {modelId: 'LugouNra01'}}, {snarl: 1}), /has no facial rig/);
 }
 // Blinks: seeded per actor, 2.5-6 s apart.
 {
@@ -467,5 +512,5 @@ let faceTrackCount = 0;
   ClearFaceTracks();
 }
 console.log(`ok speech envelope/clock/isolation; ${faced.length} facial skins (13 bones, ${POSES.length} poses, lip travel >= 6 mm, shared textures/clips, <=1.5 MB); `
-  + `${Object.keys(FIRST_LEVEL_SPEAKING_CAST).length} pinned speakers; additive face controller, seeded blinks, gaze, binder; `
+  + `${Object.keys(FIRST_LEVEL_SPEAKING_CAST).length} pinned speakers; additive face controller, 5 acting expressions under speech, seeded blinks, gaze, binder; `
   + `${faceTrackCount} baked face tracks (phoneme tables cover the script)`);
