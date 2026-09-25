@@ -496,7 +496,11 @@ export class FirstLevelFrontScenes {
       const t = Math.max(0, along + shift);
       const spot = { x: player.x + hx * t + nx * sign * offset, z: player.z + hz * t + nz * sign * offset };
       if (Distance(spot, from) > B.giveWayMaxStepM || SegmentDistance(player, from, spot) < pass) continue;
-      if (seats.some((seat) => Distance(spot, seat) < B.speakerStepPassM)) continue;
+      // Not beside the seat of a gun he does not man, nor nearer to it than he stands while he is inside its gun position
+      // (speakerStepGunSeatM): the player coming past is often going to that gun, and the staging check wants Luo 1.5 m
+      // clear of the player on the captured gun's seat.
+      if (seats.some((seat) => Distance(spot, seat) < B.speakerStepPassM
+        || Distance(spot, seat) < Math.min(B.speakerStepGunSeatM, Distance(from, seat)) - 0.05)) continue;
       const ground = r.Point(spot);
       if (Math.abs(ground.y - floor) > B.speakerStepDyM) continue;
       if (r.physics?.Overlaps?.(spot.x, ground.y + 0.04, spot.z, 0.3, 1.7)) continue;

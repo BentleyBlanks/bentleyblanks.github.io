@@ -293,10 +293,12 @@ export async function DriveFrontBattle(ctx){
     });
     return {separation:Math.hypot(luo.position.x-g.player.position.x,luo.position.z-g.player.position.z),
       seatDistance:Math.hypot(luo.position.x-S.seat.x,luo.position.z-S.seat.z),
-      gunSupportGap:supportedY-(rest.y+rest.h/2),luo:luo.position.toArray(),player:g.player.position.toArray()};
+      gunSupportGap:supportedY-(rest.y+rest.h/2),luo:luo.position.toArray(),player:g.player.position.toArray(),
+      // Who is moving Luo right now (FrontScenes: a line's step, a ClearView step aside, a give-way sidestep).
+      scenes:(({steer,aside,giveWay,gaveWay})=>({steer,aside,giveWay,gaveWay:gaveWay?.slice(-4)}))(r.frontScenes?.State?.()||{})};
   });
   await fs.writeFile(path.join(output,'Data_FrontStaging.json'),JSON.stringify(staging,null,2));
-  assert.ok(staging.separation>=1.5&&staging.seatDistance>=1.5,'Luo occupies his own firing post clear of the player');
+  assert.ok(staging.separation>=1.5&&staging.seatDistance>=1.5,'Luo occupies his own firing post clear of the player '+JSON.stringify(staging));
   assert.ok(staging.gunSupportGap>=-.02&&staging.gunSupportGap<.04,'the visible gun rests on its actual parapet');
   if(ctx.options.probeFrontGun){
     // A bounder who ran into the nest at the capture leaves the player in a bayonet fight with the Dadao out: the HUD

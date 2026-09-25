@@ -1127,6 +1127,18 @@ function WalkRuntime(extra = {}) {
   assert.ok(!Inside(gw.spot.x, gw.spot.z, 0.3) && !Crosses(home, gw.spot), `to a spot clear of the door's walls, a straight walk (${JSON.stringify(gw.spot)})`);
   assert.ok(Dist(gw.spot, home) <= B.giveWayMaxStepM && SegmentDistance(player.position, home, gw.spot) >= Math.min(B.giveWayPassM, Dist(home, player.position)) - 0.05,
     "a sidestep, never passing nearer the player");
+  assert.ok(Dist(gw.spot, S.seat) >= Math.min(B.speakerStepGunSeatM, Dist(home, S.seat)) - 0.05, "not towards the captured gun's seat the player is going to");
+  // Standing inside that gun's position, a spot nearer the seat is refused (09-26 wrap-up drive giveway1: Luo 1.24 m from the
+  // player on the seat at the capture's staging check).
+  // Luo on his cover, the player coming east through the doorway 0.2 m north of him: straight across his line the nearest
+  // clear spot is 0.8 m south, towards the seat (2.3 m from it); he goes the other way instead.
+  { const s5 = new FirstLevelFrontScenes({ ...r, ai: { soldiers: [] } }), from = { ...S.leaderCover };
+    const near = { castId: "luo", position: { ...from, y: 0 } }, keep = { ...player.position };
+    player.position = { x: 23.4, y: 0, z: -150.9 };
+    const spot = s5.GiveWaySpot(near, { x: 1, z: 0 });
+    assert.ok(spot && Dist(spot, S.seat) >= Math.min(B.speakerStepGunSeatM, Dist(from, S.seat)) - 0.05,
+      `inside the gun position no step nearer its seat (${JSON.stringify(spot)})`);
+    player.position = keep; }
   assert.ok(moves.at(-1)?.id === luo.id && Dist(moves.at(-1), gw.spot) < 1e-9 && luo.routeArrivalOwnsRadius === true, "he walks there, reached within the spot's own radius");
   assert.ok(scenes.Steers(luo), "FrontBattle.Walk leaves him alone meanwhile (no walk order, no stall clock)");
   // At the spot he holds it (still fights: Defend) while the player goes through the door to the gun.
@@ -1171,7 +1183,7 @@ function WalkRuntime(extra = {}) {
   assert.ok(/this\.StepAside\(\);\s*\n\s*this\.GiveWay\(\);/.test(Read("Script_FirstLevelFrontScenes.mjs")), "FrontScenes.Steer runs GiveWay every frame");
   assert.ok(/this\.moveWishX = wish\.x; this\.moveWishZ = wish\.z;/.test(Read("Script_Player.mjs")), "Script_Player reports the movement keys' direction (moveWishX/Z)");
   console.log("  ⑯ Luo's sidestep:", JSON.stringify(scenes.gaveWay[0]));
-  checks += 24;
+  checks += 26;
   Ok("⑯ a squadmate holding his spot steps out of the way of a player coming past him and goes back once the player is through");
 }
 

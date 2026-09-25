@@ -421,7 +421,7 @@ export const FRONT_BATTLE_TUNING=Object.freeze({
   // that line - steps sideways out of the way: to giveWayLaneOffsetsM from the player's line (his own side first, then
   // the other), shifted giveWayAlongM along it, at most giveWayMaxStepM from where he stands, on his floor, clear of
   // colliders, a straight walk that passes no nearer the player than giveWayPassM, not beside a gun seat he does not man
-  // (speakerStepPassM). He holds there (Defend: he still fights) until the player has been giveWayReleaseM from the spot
+  // (speakerStepPassM) and, inside that gun's position (speakerStepGunSeatM), no nearer its seat than he stands. He holds there (Defend: he still fights) until the player has been giveWayReleaseM from the spot
   // he left for giveWayClearS, then walks back to it (at most giveWayReturnS, back within giveWayReturnM) and his own
   // orders have him again; a man with a FrontBattle walk still to finish (a leader waiting for the player) walks on
   // from there instead. Only in the 03-06 steps (FRONT_SCENE_STEPS); 07 on is untouched.
