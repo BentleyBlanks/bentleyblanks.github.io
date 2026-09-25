@@ -4905,6 +4905,8 @@ export class AudioEngine {
    */
   SetListener(camera) {
     if (!this.ctx || !camera || !camera.matrixWorld) return;
+    // 每帧顺手按音频时钟清账（见 ReleaseVoice）：SetListener 是四条出画路径与手动推帧都会过的那一处。
+    this.SweepExpiredVoices();
     const e = camera.matrixWorld.elements;
     const px = e[12], py = e[13], pz = e[14];
     // three 的相机看向自身 -Z，所以 forward 是第三列取反。
@@ -5616,15 +5618,45 @@ export class AudioEngine {
     return true;
   }
 
-  /** 到点断开所有节点并归还预算。**唯一的防泄漏出口**。 */
+  /**
+   * 到点断开所有节点并归还预算。**唯一的防泄漏出口**。
+   *
+   * 【2026-09-25】两条路谁先到谁收：主线程计时器，以及每帧 SetListener 里的
+   * SweepExpiredVoices（按 AudioContext 时钟查 `releaseAt`）。FreeVoice 可重入，后到的那条是空操作。
+   * 只靠计时器的话，账面跟着主线程走而不是跟着声音走：主线程一口气跑几百帧
+   *（战役驱动器、TankProbe 的帧耗时 A/B 都是一个 evaluate 同步推几百帧）时计时器一个都不回调，
+   * 早就放完的 voice 全挂在账上 —— 「整关验收 liveNodes 553–583」就是这么量出来的，
+   * 而同一段实时推帧量到的是 92–138。账面虚高还会反过来把后面的声音当成超预算饿死。
+   */
   ReleaseVoice(v, seconds) {
     this.pendingVoices.add(v);
     const ms = Math.max(0, seconds * 1000) + 220;
+    if (this.ctx) v.releaseAt = this.ctx.currentTime + ms / 1000;
     const id = setTimeout(() => {
       this.timers.delete(id);
       this.FreeVoice(v);
     }, ms);
+    v.releaseTimer = id;
     this.timers.add(id);
+  }
+
+  /**
+   * 按 AudioContext 时钟收掉已经到点的 voice（见 ReleaseVoice）。每帧由 SetListener 调一次。
+   * 没登记 releaseAt 的（通用耳鸣 deafenVoice 那种自己管生命期的）不碰。
+   * @returns {number} 这次收了几条
+   */
+  SweepExpiredVoices() {
+    if (!this.ctx || !this.pendingVoices.size) return 0;
+    const now = this.ctx.currentTime;
+    let freed = 0;
+    for (const v of this.pendingVoices) {
+      if (!(v.releaseAt <= now)) continue;
+      if (v.releaseTimer != null) { clearTimeout(v.releaseTimer); this.timers.delete(v.releaseTimer); v.releaseTimer = null; }
+      this.FreeVoice(v);
+      freed += 1;
+    }
+    if (freed) this.stats.sweptVoices = (this.stats.sweptVoices || 0) + freed;
+    return freed;
   }
 
   FreeVoice(v) {

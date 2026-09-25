@@ -1078,6 +1078,34 @@ const release = await page.evaluate(async () => {
   else Ok(`回收时刻从起播算：${release.map((r) => `${r.cue} 晚 ${r.startIn} s 起播、放完后 ${(-r.early).toFixed(2)} s 才断开`).join("；")}`);
 }
 
+// 【2026-09-25】账面跟着音频时钟走，不跟着主线程计时器走（ReleaseVoice / SweepExpiredVoices）。
+// 回归背景：战役驱动器与 TankProbe 一个 evaluate 同步推几百帧，计时器一个都不回调，
+// 放完的 voice 全挂在账上，量出「liveNodes 553–583」，同一段实时推帧只有 92–138。
+// 量法：整段放在一个同步块里（计时器不可能插进来），发一声、忙等到它的 releaseAt 过去，
+// 调一次 SetListener（每帧都会调），那一声必须已断开、节点已还回账面。
+const sweep = await page.evaluate(() => {
+  const g = window.Taierzhuang, a = g.audio, L = a.listenerPos;
+  const saved = a.nodeBudget;
+  a.nodeBudget = 4000;
+  try {
+    const v = a.Play("rifleIja", { position: { x: L.x + 10, y: L.y, z: L.z + 0.5 }, volume: 0.02 });
+    if (!v) return { played: false };
+    const cost = v.nodes.length, releaseIn = +(v.releaseAt - a.ctx.currentTime).toFixed(3);
+    const wall = performance.now();
+    while (!(a.ctx.currentTime > v.releaseAt + 0.02) && performance.now() - wall < 6000) { /* 忙等：不让出主线程 */ }
+    const before = a.liveNodes, stillOwned = v.nodes.length;
+    a.SetListener(g.camera);
+    return { played: true, cost, releaseIn, stillOwned, freed: v.nodes.length === 0, returned: before - a.liveNodes,
+      pending: a.pendingVoices.has(v), waitedS: +((performance.now() - wall) / 1000).toFixed(2) };
+  } finally { a.nodeBudget = saved; }
+});
+if (!sweep.played || !(sweep.releaseIn > 0) || sweep.stillOwned !== sweep.cost) {
+  Fail(`按帧清账：没测到东西（${JSON.stringify(sweep)}）—— 要一条在同步块里到点、计时器还没回调的 voice`);
+} else if (!sweep.freed || sweep.pending || sweep.returned < sweep.cost) {
+  Fail(`按帧清账：到点的 voice 在 SetListener 之后还挂在账上（${JSON.stringify(sweep)}）`
+    + ` —— 同步推帧的测试会把 liveNodes 量成几百`);
+} else Ok(`按帧清账：同步块里忙等 ${sweep.waitedS} s，到点的那一声（${sweep.cost} 个节点）在 SetListener 里断开并还回账面`);
+
 // 两级动态：母线慢压 + 末端快限，参数不许被谁顺手改回单级。
 // 抽泵深度的实测（10.08 → 8.91 dB）在 Script_Audio 的 BUS_COMP 抬头与
 // docs/Data_AudioEngine.md 里，那是离线渲染量的，不在这条冒烟的成本里。
