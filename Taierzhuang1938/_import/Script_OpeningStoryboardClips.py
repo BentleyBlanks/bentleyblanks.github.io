@@ -4295,10 +4295,11 @@ def EaseGrip(f, side, point, weight, palmF, palmN, curl):
 # LuoDragToCover), so the director can play either clip at the Check beat and hand on to KickRifle.
 REACH_T = 84 / 24                    # 3.5 s
 REACH_HOLD = (1.0, 2.5)
-REACH_EYE = (.02, -.88, .78)          # Shunzi's eye from Luo's root (source m): sitting, 0.72 m up, 0.8 m off
-REACH_CHEST = (.04, -.80, .50)        # his breastbone
+REACH_EYE = (.02, -1.24, .78)         # Shunzi's eye from Luo's root (source m): sitting, 0.72 m up, 1.14 m off (SB06: Luo bent
+#                                      far over his knee, his face ~0.6 m from the camera, the offered hand ~0.45 m)
+REACH_CHEST = (.04, -1.14, .50)        # his breastbone
 REACH_GAP_M = .30                    # runtime m: the offered hand stops this far short of the chest (SB06)
-REACH_DIR = (.16, .54, .82)           # chest -> the offered hand: up toward Luo's left shoulder (out in front of his face, clear of the knee)
+REACH_DIR = (.12, .78, .62)           # chest -> the offered hand: toward Luo's left shoulder and up (clear of his raised knee)
 LUO_KNEEL_HAND = (.20, -.46, .72)     # where his free left hand is in the kneel, over the raised knee, elbow bent (baked, source m)
 Meta('LuoKneelReach', REACH_T, False, 'free', role='luo', rig='LugouNra05', rootMotion=False, player=True,
      holdLoop=list(REACH_HOLD),
@@ -4321,7 +4322,7 @@ def LuoKneelPose(T):
     H, A = T.H, T.A
     kz, ky = K['kneelPelvisZ'], K['kneelPelvisY']
     kp = K['toeKneelPitch'] - K['toeStandPitch']
-    return {'pelvis': (0, ky - .16, kz + .14), 'ankle.L': (H + .08, ky - .58, A), 'legPole.L': (H + .30, -1.2, .9), 'foot.L': (0, 12, 0),
+    return {'pelvis': (0, ky - .16, kz + .0), 'ankle.L': (H + .08, ky - .58, A), 'legPole.L': (H + .30, -1.2, .9), 'foot.L': (0, 12, 0),
             'ankle.R': K['kneelAnkle'](-1), 'legPole.R': K['kneelPole'](-1), 'foot.R': (kp, 0, 0),
             'bend': .50, 'pelvisTilt': (.08, 0, 0)}
 
@@ -4335,8 +4336,8 @@ def BuildKneelReach(T, name):
     upright = {k: stand[k] for k in ('pelvis', 'ankle.L', 'ankle.R', 'legPole.L', 'legPole.R', 'foot.L', 'foot.R', 'bend', 'pelvisTilt')}
     rows = [(0.0, {}), (.20, {'pelvis': Add3(stand['pelvis'], (0, 0, -.12)), 'bend': .25}),
             (.60, dict(kneel, lookW=.8, **{'handRel.L': (.05, -.24, -.33)})),
-            (REACH_HOLD[0], {'bend': .86, 'lookW': 1.0, 'handRel.R': (-.10, -.22, -.40)}),
-            (REACH_HOLD[1], {'bend': .86, 'lookW': 1.0}),
+            (REACH_HOLD[0], {'bend': 1.25, 'lookW': 1.0, 'handRel.R': (-.10, -.22, -.40)}),
+            (REACH_HOLD[1], {'bend': 1.25, 'lookW': 1.0}),
             (2.80, {'bend': .50, 'lookW': .8, 'handRel.R': base['handRel.R']}),
             (3.10, {'handRel.L': base['handRel.L']}),
             (3.20, {'lookW': 0.0}),
@@ -4380,7 +4381,7 @@ def BuildKneelReach(T, name):
             'reviewFrames': lambda n: [0, int(n * .17), int(n * .29), int(n * .5), int(n * .8), n - 1]}
     spec = AReview(spec)
     # SB06 camera: Shunzi's eye looking at Luo (the storyboard frames him left of centre: aim to his left, +X)
-    spec['reviewViews'].append(FirstPersonView(REACH_EYE, (.42, -.30, .92), roll=0.0))
+    spec['reviewViews'].append(FirstPersonView(REACH_EYE, (.52, -.30, .70), roll=0.0))
     return spec
 
 
@@ -4421,7 +4422,7 @@ def BuildRunnerLeanPost(T, name):
     base = Standing(T)
     base.update({'ankle.L': (H + .06, -.14, A), 'ankle.R': (-(H + .02), .20, A), 'foot.L': (0, 14, 0), 'foot.R': (0, -12, 0),
                  'pelvis': (.02, .04, P - .05), 'lookW': 0.0, 'handRel.R': (-.06, -.14, -.44), 'curl.R': .55})
-    lean = {'bend': .48, 'pelvisTilt': (.14, 0, .04), 'twist': .04, 'pelvis': (.05, .07, P - .07), 'lookW': 1.0}
+    lean = {'bend': .60, 'pelvisTilt': (.16, 0, .04), 'twist': .04, 'pelvis': (.05, .10, P - .08), 'lookW': 1.0}
     body = Keys(base, [(0.0, {'bend': .12}), (.45, lean), (RUNNER_HOLD[0], lean), (RUNNER_HOLD[1], lean)], lag={'head': .05})
     # the fist on the post: fingers round it (toward his front), palm onto the wood, thumb up
     palmF, palmN = Unit((-.25, -.95, 0)), Unit((1, -.15, 0))
@@ -4480,7 +4481,7 @@ def BuildHurryReach(T, name):
                  'pelvis': (0, .0, P - .06), 'bend': .20, 'pelvisTilt': (.08, 0, 0), 'lookW': 1.0,
                  'handRel.L': (.10, .06, -.40), 'poleRel.L': (.40, .45, -.20), 'palmF.L': (0, .2, -1), 'palmN.L': (-1, 0, 0), 'curl.L': .75,
                  'handRel.R': (-.07, -.10, -.47), 'poleRel.R': (-.45, .40, -.35), 'palmF.R': (0, -.2, -1), 'palmN.R': (1, 0, 0), 'curl.R': .45})
-    reach = {'handRel.R': (-.04, -.43, -.15), 'poleRel.R': (-.45, .15, -.45), 'palmF.R': Unit((.05, -1, -.12)),
+    reach = {'handRel.R': (-.03, -.43, -.05), 'poleRel.R': (-.45, .15, -.45), 'palmF.R': Unit((.05, -1, -.12)),
              'palmN.R': Unit((.25, -.15, -.95)), 'curl.R': .18, 'bend': .24}
     body = Keys(base, [(0.0, {}), (.40, reach), (HURRY_HOLD[0], reach), (HURRY_HOLD[1], reach)], lag={'head': .04})
 

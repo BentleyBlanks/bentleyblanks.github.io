@@ -2583,7 +2583,7 @@
   {
    "id": "LugouNra02",
    "file": "Animation_LugouNra02OpeningStoryboards.json",
-   "sha256": "f9fd3113c3576546447a5f3f71758aea915aa18ab3d44e1a31891c6782a5bf6b",
+   "sha256": "30f0e920fc55664bb98852bf34b311b58e91daa090bdafa52f5854d1b9e8903d",
    "originalModelSha256": "39c08ca82148e140ee2952caffdd0dee99750fb734038a5263d216c9a7345225",
    "clipIds": [
     "SupplyReceive",
@@ -4180,7 +4180,7 @@
      "footSlideM": 0.0,
      "contactErrorM": 0.0,
      "gripSolveErrorM": 0.0,
-     "pelvisMaxStepM": 0.0341,
+     "pelvisMaxStepM": 0.035,
      "floorCorrectionMin": -0.0,
      "floorCorrectionMax": -0.0,
      "root": {
@@ -4192,9 +4192,9 @@
       ],
       "end": [
        -0.0457,
-       0.0639,
-       3.04,
-       0.8053
+       0.0914,
+       3.02,
+       0.7962
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
@@ -4213,8 +4213,8 @@
      ],
      "kneePlants": [],
      "kneeSlideM": 0.0,
-     "lookErrorDeg": 0.04,
-     "headTurnDeg": 24.89
+     "lookErrorDeg": 0.06,
+     "headTurnDeg": 32.81
     },
     {
      "clip": "InterpreterHurryReach",
@@ -4306,7 +4306,7 @@
   {
    "id": "LugouNra05",
    "file": "Animation_LugouNra05OpeningStoryboards.json",
-   "sha256": "11cde824afded98ce521f6f7981d6d8ce85dca5ae11f302aa668e2a0f1341631",
+   "sha256": "fca24f35a920eeb8034b4fd7663e9ec2f15cae17225b37433fc92d914eb95496",
    "originalModelSha256": "acbc9184da059bdf6c3c18d051f3eba77d1dd3acba469e8dbc876b092f174250",
    "clipIds": [
     "SupplyReceive",
@@ -5240,10 +5240,10 @@
     {
      "clip": "LuoKneelReach",
      "frames": 85,
-     "footSlideM": 0.0,
+     "footSlideM": 0.0059,
      "contactErrorM": 0.0,
      "gripSolveErrorM": 0.0,
-     "pelvisMaxStepM": 0.0838,
+     "pelvisMaxStepM": 0.1058,
      "floorCorrectionMin": -0.0,
      "floorCorrectionMax": 0.12392,
      "root": {
@@ -5281,9 +5281,9 @@
        2.78
       ]
      ],
-     "kneeSlideM": 0.0148,
-     "lookErrorDeg": 2.01,
-     "headTurnDeg": 9.31
+     "kneeSlideM": 0.0012,
+     "lookErrorDeg": 2.6,
+     "headTurnDeg": 62.0
     }
    ]
   },
