@@ -100,11 +100,8 @@ convertInv = convert.inverted()
 # sit ~5 cm further back and 3.6 cm higher and the arm is 2.4 cm shorter than IJA02's own (NRA02
 # proportions), and a grasping hand's finger-root centroid stops ~0.85 arm lengths out, so at .92 the
 # assist never woke for the hair hold; the clips that grip at the end of their reach override it
-# (Script_OpeningStoryboardClips REACH_HUMANOID_V1). OPENING_REACH_* are for experiments only.
-REACH_FRACTION = float(os.environ.get('OPENING_REACH_FRACTION') or .92)
-REACH_TRAVEL = float(os.environ.get('OPENING_REACH_TRAVEL') or .10)
-REACH_BEND = float(os.environ.get('OPENING_REACH_BEND') or .25)
-ARM_PASSES = int(os.environ.get('OPENING_ARM_PASSES') or 4)   # ArmSolve grip-pinning passes
+# (Script_OpeningStoryboardClips REACH_BY_CLIP). The defaults are the Lugou bake's.
+REACH_FRACTION, REACH_TRAVEL, REACH_BEND = .92, .10, .25
 
 
 def Smooth01(x):
@@ -394,7 +391,7 @@ def BakeRig(ctx):
         target = Vector(grip)
         wrist = target.copy()
         reported = []
-        for _ in range(ARM_PASSES):
+        for _ in range(4):
             mark = len(ctx['overreach'])
             ctx['Chain'](Bone(side + ' UpperArm'), Bone(side + ' Forearm'), hand, wrist, Vector(pole), label='grip' + side)
             reported = ctx['overreach'][mark:]
