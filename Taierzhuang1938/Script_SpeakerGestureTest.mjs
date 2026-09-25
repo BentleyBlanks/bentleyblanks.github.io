@@ -191,7 +191,10 @@ function StubRig(modelId, { armed = false } = {}) {
   root.updateMatrixWorld(true);
   const rig = { root, modelId, clipModelId: modelId, bones: { head, neck, pelvis }, facial: { lastSpeech: null, stress: 0 },
     Grip: role => (role === "weaponL" ? sides.L.grip : role === "weaponR" ? sides.R.grip : null), sides };
-  rig.actor = { root, weaponGroup: armed ? { visible: true } : null, weaponTwoHanded: armed, weaponData: armed ? { kind: "boltRifle" } : null };
+  // The stub rifle hangs on the right grip, barrel along the grip's -Z (_ClearRifle reads it).
+  const weaponGroup = armed ? new THREE.Group() : null;
+  if (weaponGroup) sides.R.grip.add(weaponGroup);
+  rig.actor = { root, weaponGroup, weaponTwoHanded: armed, weaponData: armed ? { kind: "boltRifle" } : null };
   rig.rest = new Map(); root.traverse(o => { if (o.isBone) rig.rest.set(o, o.quaternion.clone()); });
   return rig;
 }
@@ -283,6 +286,17 @@ function RunLine(layer, rig, { lineId, who, lengthS, stressAt = [], seconds, bus
   const layer4e = new SpeakerGestureLayer(rig, null);
   RunLine(layer4e, rig, { lineId: "FrontBlockade.02", who: "luo", lengthS: 1.6, stressAt: [.4], seconds: .9 });
   assert.ok(layer4e.ArmWeight(rig.sides.L.upper) > .9 && layer4e.ArmWeight(rig.sides.R.upper) === 0 && layer4e.ArmWeight(null) === 0, "ArmWeight");
+  // Rifle in the way: put the stub's barrel through the pointing hand; the next frame turns the arm off it.
+  const gun = rig.actor.weaponGroup, handAt = rig.sides.L.hand.getWorldPosition(new THREE.Vector3());
+  gun.position.copy(gun.parent.worldToLocal(handAt.clone())); gun.updateMatrixWorld(true);
+  layer4e.state.rifleLift = 0;
+  rig.facial.lastSpeech = { active: true, who: "luo", lineId: "FrontBlockade.02", sourceTime: 1, stress: 0 };
+  layer4e.Apply(1 / 60, {}); layer4e.AfterHead();
+  const gunAt = gun.getWorldPosition(new THREE.Vector3()), barrel = new THREE.Vector3(0, 0, -1).transformDirection(gun.matrixWorld);
+  const off = rig.sides.L.hand.getWorldPosition(new THREE.Vector3()).sub(gunAt);
+  const clearM = off.sub(barrel.multiplyScalar(Math.max(-.35, Math.min(.9, off.dot(barrel))))).length();
+  assert.ok(layer4e.state.rifleLift > 0 && clearM > GT.rifleClearM * .7, `rifle in the way: arm turned off it (${clearM.toFixed(3)} m)`);
+  gun.position.set(0, 0, 0); gun.updateMatrixWorld(true);
   // The nest behind him: far outside the cone, the point is not made (it would point elsewhere).
   const behind = StubRig("LugouNra05", { armed: true });
   behind.root.position.copy(rig.root.position); behind.root.rotation.y = Math.PI / 2; behind.root.updateMatrixWorld(true);

@@ -2702,6 +2702,7 @@ export class Actor {
         arm.hand.quaternion.slerp(arm.handBase, keep);
       }
     }
+    rig.speakerGesture?.AfterActorAim();
     this.rigAimApplied = true;
   }
 

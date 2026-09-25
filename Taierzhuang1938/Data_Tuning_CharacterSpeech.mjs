@@ -84,6 +84,9 @@ export const SPEAKER_GESTURE = Object.freeze({
   // 04 guard's ammunition house is behind his right shoulder: clamped, the arm pointed 90 deg away from it).
   aimStrength: 1, coneOutDeg: 100, coneInDeg: 40, crossLiftDeg: 15, coneUpDeg: 35, coneDownDeg: 30,
   maxOutOfConeDeg: 45,
+  // The gesturing hand keeps rifleClearM (wrist or finger root to the barrel line) off the rifle held in the other
+  // hand, turning the arm up by at most rifleClearMaxDeg a pass (Script_SpeakerGestureLayer._ClearRifle).
+  rifleClearM: .07, rifleClearMaxDeg: 12,
   // Ground anchors are pointed at this high above the ground (a man-high point, not the dirt); the tank at
   // its hull; 'south' is southM due south at the speaker's ground height plus pointRiseM; 'listener' at the
   // listener's eye less listenerDropM (a hand is held out to the other man's chest, not his face: the seated 06

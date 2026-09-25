@@ -11,7 +11,9 @@
 // Usage: node Taierzhuang1938/Script_SpeakerGestureLayerBrowserTest.mjs [--stages=3,4,5,6] [--shots] [--ab] [--port=N]
 //   --shots  first-person and close-up stills of the picked lines to _shots/SpeakerGestureLayer/
 //   --scenes=TankRoadContact,...  only these scenes (debugging)
-//   --ab     04 frame cost, same page, gesture layer on/off alternating (p95 increase <= .3 ms), and the layer's own time
+//   --ab     04 frame cost, same page, gesture layer on/off alternating, and the layer's own time per frame (Apply +
+//            AfterHead, all bodies); gate: whole-frame p95 increase <= .3 ms or, when the whole frame is too noisy to
+//            resolve that (headless on a shared machine: tens of ms), the layer's own p95 on gesture frames <= .3 ms
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -157,10 +159,12 @@ try{
                     .applyQuaternion(root.getWorldQuaternion(new T.Quaternion()));
                   row.muzzleDev=Math.max(row.muzzleDev,actor.MuzzleDirection(V()).angleTo(look)*180/Math.PI);
                 }
-                // Gesturing hand (wrist and finger roots) to the rifle's segment: stock .35 m behind the grip, .9 m ahead.
-                if(a&&st.weight>.9&&a.record.hand==='L'){
+                // Gesturing hand (wrist and finger roots) to the rifle's segment (stock .35 m behind the grip, .9 m ahead)
+                // in the hold: the lift starts on the fore-end and the release ends there.
+                if(a&&st.weight>.9&&st.phase==='hold'&&a.record.hand==='L'){
                   const o=actor.weaponGroup.getWorldPosition(V()),dir=actor.MuzzleDirection(V()),pts=[a.bones.hand,...a.bones.roots].filter(Boolean);
-                  for(const b of pts){const p=b.getWorldPosition(V()).sub(o),u=Math.max(-.35,Math.min(.9,p.dot(dir)));row.clear=Math.min(row.clear,p.sub(dir.clone().multiplyScalar(u)).length());}
+                  for(const b of pts){const p=b.getWorldPosition(V()).sub(o),u=Math.max(-.35,Math.min(.9,p.dot(dir))),c=p.sub(dir.clone().multiplyScalar(u)).length();
+                    if(c<row.clear){row.clear=c;row.clearAt={t:st.t,along:+u.toFixed(2),bone:b.name,prop:+(rig.infantryPropWeight||0).toFixed(2),clip:rig.currentId,lifts:st.rifleLift||0,two:!!a.twoHanded};}}
                 }
               }
               // After the whole frame (aim IK included): shoulder -> hand against the target.
@@ -219,21 +223,21 @@ try{
       const Face=()=>P.Face(luo);P.View(luo);
       const Layers=()=>r.ai.soldiers.map(s=>s.actor?.characterRig?.speakerGesture).filter(Boolean);
       const SetOn=on=>{for(const l of Layers())l.enabled=on;};
-      const Replay=()=>{for(const id of ['TakeOverGun','BundleOrder'])if(![...r.voice.scenes.keys()].includes(id)){const cue=P.MISSION_DIALOGUE.find(c=>c.id===id);
+      const Replay=()=>{for(const id of ['TankTerror','TankRoadContact','BundleOrder'])if(![...r.voice.scenes.keys()].includes(id)){const cue=P.MISSION_DIALOGUE.find(c=>c.id===id);
         r.voice.PlayScene(id,{speakers:P.FrontSceneSpeakers(cue,who=>r.frontScenes.Body(who))});break;}};
-      const A=[],B=[],LA=[],up={on:0,off:0};
+      const A=[],B=[],LA=[],LU=[],up={on:0,off:0};
       for(let round=0;round<20;round++){
         for(const on of (round%2?[true,false]:[false,true])){
           SetOn(on);Replay();for(let i=0;i<5;i++){Face();g.StepFrames(1,1/60,true);}
           for(let i=0;i<30;i++){Face();P.layerMs=0;const t=performance.now();g.StepFrames(1,1/60,true);const dt=performance.now()-t;
-            (on?A:B).push(dt);if(on)LA.push(P.layerMs);if(Layers().some(l=>l.state.weight>.5))up[on?'on':'off']++;}
+            (on?A:B).push(dt);const gestureUp=Layers().some(l=>l.state.weight>.5);if(on){LA.push(P.layerMs);if(gestureUp)LU.push(P.layerMs);}if(gestureUp)up[on?'on':'off']++;}
         }
       }
       SetOn(true);
       const q=(a,p)=>{const s=[...a].sort((x,y)=>x-y);return +s[Math.min(s.length-1,Math.floor(p*s.length))].toFixed(3);};
       const mean=a=>+(a.reduce((x,y)=>x+y,0)/a.length).toFixed(3);
       return {n:A.length,on:{mean:mean(A),p50:q(A,.5),p95:q(A,.95)},off:{mean:mean(B),p50:q(B,.5),p95:q(B,.95)},
-        layerMs:{mean:mean(LA),p95:q(LA,.95),max:q(LA,1)},gestureUpFrames:up};
+        layerMs:{mean:mean(LA),p95:q(LA,.95),max:q(LA,1)},layerMsGestureUp:LU.length?{n:LU.length,mean:mean(LU),p95:q(LU,.95)}:null,gestureUpFrames:up};
     });
   }
   // 07 and later: the binder binds no head layer, so no gesture layer, and Script_Actor's two hooks read nothing.
@@ -253,7 +257,7 @@ assert.deepEqual(result.errors,[],'page errors');
 const all={};for(const stage of Object.values(result.stages))Object.assign(all,stage.lines||{});
 const rows=Object.entries(all).filter(([id])=>FIRST_LEVEL_SPEAKER_GESTURES[id]?.gesture);
 for(const [id,row] of Object.entries(all))console.log(id.padEnd(20),row.who.padEnd(9),`frames ${row.frames} up ${row.up} max ${row.maxW.toFixed(2)}`,
-  row.clip||'-',JSON.stringify(row.supp),row.postAim?`aim ${row.postAim.median}/${row.postAim.max} deg (layer ${row.layerAim}, clamped ${row.clamped})`:'',row.clear!=null?`clear ${row.clear} m`:'',
+  row.clip||'-',JSON.stringify(row.supp),row.postAim?`aim ${row.postAim.median}/${row.postAim.max} deg (layer ${row.layerAim}, clamped ${row.clamped})`:'',row.clear!=null?`clear ${row.clear} m ${JSON.stringify(row.clearAt)}`:'',
   row.muzzleDev?`muzzle ${row.muzzleDev} deg`:'',JSON.stringify(row.pose||{}));
 const gestured=rows.filter(([,row])=>row.up>=LIMIT.upFrames);
 console.log(`gesture rows seen ${rows.length}, gestured ${gestured.length}; violations ${Object.values(result.stages).reduce((n,s)=>n+(s.violations?.length||0),0)}`);
@@ -273,7 +277,7 @@ assert.equal(result.after06.gestureLayers,0,`07+: no gesture layer (${JSON.strin
 if(result.ab){
   console.log('A/B 04',JSON.stringify(result.ab));
   assert.ok(result.ab.gestureUpFrames.on>0,'A/B: gestures were up in the on half');
-  assert.ok(result.ab.on.p95-result.ab.off.p95<=LIMIT.abP95Ms||result.ab.layerMs.p95<=LIMIT.abP95Ms,
+  assert.ok(result.ab.on.p95-result.ab.off.p95<=LIMIT.abP95Ms||(result.ab.layerMsGestureUp?.p95??result.ab.layerMs.p95)<=LIMIT.abP95Ms,
     `A/B: p95 increase ${(result.ab.on.p95-result.ab.off.p95).toFixed(3)} ms, layer p95 ${result.ab.layerMs.p95} ms`);
 }
 console.log(`ok speaker gesture layer: stages ${stages.join(',')}, ${gestured.length}/${rows.length} gesture lines up, ${result.shots.length} stills`);

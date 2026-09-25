@@ -250,54 +250,59 @@ finite; arm into torso <= 2.4 cm (gate 2.5), into the head 0 except the cigarett
 two-hand pose put it; gate 1 cm). Screenshots (front, gesture side, 45 deg top, listener's view) were looked at.
 Editable scenes: `OneDrive/AI/Models/Blender/Taierzhuang1938/SpeakerGestures_20260925/Scene_Lugou{Nra02,Nra05}SpeakerGestures.blend`.
 
-### Runtime (planned, Step 3)
+### Runtime (Step 3, 2026-09-25)
 
-- `Script_SpeakerGestureLayer.mjs`, owned by `SpeakerHeadLayer` (one per rig the speaker binder binds with a
-  head, so it exists exactly where the head layer does: the 01-06 steps, `FIRST_LEVEL_FACE_STEPS`). Runs inside
-  `SpeakerHeadLayer.Apply`, before the head turn; the face (`facial.Update`) still runs after both. The binder,
+- `Script_SpeakerGestureLayer.mjs`, owned by `SpeakerHeadLayer` (`rig.speakerGesture`, created and disposed with
+  the head layer). The speaker binder only makes head layers in the 01-06 steps (`FIRST_LEVEL_FACE_STEPS`), so
+  07 and later have no gesture layer at all (checked by the live test: 0 layers after a jump to 08). The binder,
   the front scene player and the dialogue player are not changed.
-- Which line: the rig's face already knows it. `rig.facial.lastSpeech` is the voice sample the mouth played last
-  frame: `{ active, who, lineId, cue, sourceTime, stress }` from `Script_DialoguePlayer.Speech`. A new `lineId`
-  with a row in the table starts that gesture; `sourceTime` is the line clock. Whole-cue takes (no lineId) never
-  gesture.
-- Order and the neck: the Biped clavicles are children of Neck, so the head layer's neck yaw (`neckShare`) also
-  swings the gesturing arm a little; the aim (below) is measured after the arm is applied and before the head
-  turn, and a reach clip (`reach`) re-aims after the head turn, on the live head.
-- Masks: the gesture arm's clavicle, upper arm, forearm, hand and fingers are set to the clip's local rotations,
-  slerped from the pose the body mixer produced by the layer weight; Spine/Spine1/Spine2 get the clip's delta from
-  its first frame as an additive (at most a few degrees of lean). Neck, head and `Face_*` are never written: the
-  head layer turns the head after the arm and the face layer runs last. Local arm rotations are relative to the
-  chest, so one clip reads the same on a standing, crouching, kneeling or seated body. Every written bone is put
-  back before the next mixer sample (the head layer's restore pattern).
-- Weight: rises over the clip's `inS` window, 1 through the stroke and hold, falls over the release window back to
-  whatever the base pose does with that arm (hand back on the fore-end, hand on the knee). If the line is longer
-  than the clip, the hold window repeats until the line ends; when the line ends early (or is cut), the release
-  starts at once. The stroke is lined up with the line's first stressed syllable (the face track's stress event)
-  when it comes within the first second, otherwise the clip starts with the line. During the hold every further
-  stress adds a small beat (forearm dip), the arm's version of the head nod.
-- Aim: for `aim` clips the upper arm is turned (after the clip is applied) so that shoulder -> hand points at the
-  target, limited to a cone in front of the chest (left hand: about 100 degrees to the left, 40 to the right,
-  pitch -30..+35; numbers in `Data_Tuning_CharacterSpeech.SPEAKER_GESTURE`); outside the cone the direction is
-  clamped to the cone edge. Targets: `FRONT_SORTIE` / `FRONT_SPACE` anchors from `Data_FirstLevelFrontRoute`,
-  `listener` (the head layer's look target: the player or the nearest talker), `south`, and `tank`, which needs a
-  one-line provider from the mission runtime (the live tank position); without it the tank point falls back to
-  the gesture's unaimed direction.
-- Rifle: the weapon hangs on the right grip and aims at the left grip socket
-  (`Script_Actor._UpdateRiggedWeaponMount`). Before a left-hand gesture moves the arm, the layer stores the left
-  grip's world position for this frame; the actor's mount reads it instead of the moved socket (a thin hook in
-  `Script_Actor`), so the rifle stays where the two-hand pose put it and the right hand keeps holding it. NRA02
-  bodies on an infantry clip place the rifle from its prop track (`_UpdateInfantryProps`), which the arm does not
-  touch. Right-hand gestures only run on a body with no visible weapon (the seated 06 Zhou).
-- No gesture (weight falls to 0 over 0.15 s, the head layer keeps acting): firing or `fire > 0`, `aim > .6`,
-  melee, carrying (`carryRole`), wounded walk, prone, dead or ragdoll, running faster than a walk, a machine-gun
-  holder or emplacement gunner while he shoots, and any rig the 01-03 storyboard director acts
-  (`openingActorPerformanceState` or an `openingStoryboardPose`), exactly like the head layer.
-- Switch: `SPEAKER_GESTURE.enabled` in the tuning table; the layer exists only while the binder is active (01-06),
-  so 07 and later are unaffected.
-- Probe state (for FRONT_ACTING and tests): `rig.speakerGesture.state = { clip, lineId, weight, t, aimError,
-  suppressed }` and counters `gestureFrames` (frames with weight > .5) per line id. The front acting sample
-  (`Script_FirstLevelCampaignOpening.InstallSpeakerActing`, owned by the Front package) can read it next to the
-  head layer's `speaking`.
+- Which line: `rig.facial.lastSpeech` (the voice sample the mouth played last frame: `{ active, who, lineId,
+  cue, sourceTime, stress }` from `Script_DialoguePlayer.Speech`). A new `lineId` with a row in the table starts
+  that gesture; whole-cue takes (no lineId) never gesture. A body that is off screen is not animated
+  (`Script_Ai.CullActors`), so its gesture starts when it comes into view, and only if its line is still being
+  said.
+- Order inside `SpeakerHeadLayer.Apply`: `gesture.Apply` (restore last frame's bones, advance the clip, set the
+  arm's local rotations slerped from the body mixer's pose by the weight, spine additive, remember the rifle's
+  left grip) -> the head turn -> `gesture.AfterHead` (aim at the target, the beat, the reach to the mouth). The
+  aim runs after the head turn because the Biped clavicles hang off the neck: measured before it, the point was
+  15-37 deg off on screen. The face (`facial.Update`) runs last.
+- Masks: the gesture arm's clavicle, upper arm, forearm, hand and fingers, and Spine/Spine1/Spine2 as a small
+  additive. Neck, head and `Face_*` are never written. Every written bone is put back at the next Apply.
+- Weight and timing: rises over `inS`, 1 through the stroke and hold, falls over the release. The lifted arm
+  waits up to `stressWaitS` of line time for the first stressed syllable, then strikes; a line longer than the
+  clip repeats the hold (at most `maxHoldS`); each further stress in the hold dips the forearm (`beatRadians`).
+  Line over: the clip plays to its release when that is close (`maxTailS`), otherwise the arm eases back over
+  `releaseS`. A new line of the same body while the last gesture is up: the old one eases back first.
+- Aim (`aim` clips): the upper arm is turned from the clip's stroke direction to the target, then (from the
+  stroke on) the rest of the error is taken out, and `GesturePointL` (`extend: .9`) is also straightened along
+  the aim: the baked point is a bent arm out to the side, which turned to a target in front read as a forearm
+  across the chest. Cone around the body's front: out 100 deg, in 40 deg, pitch -30..+35. A man with a rifle up in
+  the other hand who points across his front raises the point to at least `crossLiftDeg` (15 deg) so the arm goes
+  over the barrel (at 0 lift the hand lay 3.7 cm from it). A target more than `maxOutOfConeDeg` (45 deg) outside
+  the cone is not pointed at (suppressed `targetOutOfReach`): the 04 guard's ammunition house is behind his
+  shoulder, and a clamped arm pointed 90 deg away from it. Targets: `FRONT_SORTIE` / `FRONT_SPACE` anchors,
+  `listener` (the head layer's look target), `south`, and `tank` from the mission runtime's provider
+  (`SetSpeakerGestureWorld`, one line in `Script_FirstLevelMissionRuntime`).
+- Rifle: a left-hand gesture on a two-handed weapon remembers where the left grip was before the arm moved, in the
+  right grip's frame; `Script_Actor._UpdateRiggedWeaponMount` asks `HeldLeftGrip()` for it instead of the moved
+  socket (hook 1), so the rifle keeps its direction in the right hand. The actor's aim IK
+  (`_ApplyRiggedAim`) solves both arms onto the rifle afterwards; `ArmWeight(upperArm)` tells it how much of the
+  gesturing arm to give back to the gesture (hook 2), so the aim correction turns the right arm and the rifle
+  only. Both hooks read `rig.speakerGesture`, which is null outside 01-06: 07+ behaviour is unchanged. Right-hand
+  clips only run on a body with no visible weapon (the seated 06 Zhou); otherwise suppressed `rightHandOnWeapon`.
+- Busy (weight to 0 over `fadeS`, the head layer keeps acting): firing, melee, throwing, carrying, wounded walk,
+  prone, dead/ragdoll, a forced clip, faster than `maxMoveSpeed`, the 01-03 storyboard director. "Aiming" means a
+  shooting run (aim > `maxAim` and a shot within `aimQuietS`): the 03-05 front AI holds aim 1 through the whole
+  fight and fires about once in 3 s, so a shouldered rifle alone does not stop a gesture (it stopped nearly every
+  04 gesture before). A shot while the arm is up ends that gesture (no comeback after the shot); a body busy when
+  its line starts waits unlifted and gestures once free, while the line lasts (`waitFree`, else `missed`).
+- Switch: `SPEAKER_GESTURE.enabled`, or `rig.speakerGesture.enabled = false` per body.
+- Probe state (FRONT_ACTING, tests): `rig.speakerGesture.state = { clip, lineId, weight, t, phase, hand,
+  aimError, clamped, suppressed, busyFor, reachError }` (`phase`: lift, wait, hold, out, release, waitFree,
+  cancelled, missed, done); `rig.speakerGesture.lines[lineId] = { frames, gestureFrames, busyFrames, maxWeight,
+  clip }` (`gestureFrames`: frames with weight > .5 while that line's gesture ran); `rig.speakerGesture
+  .gestureFrames` in all. A front acting sample can count a frame as acted by the gesture when
+  `rig.speakerGesture?.state.weight > .5`, next to the head layer's `speaking`.
 
 ### Validation
 

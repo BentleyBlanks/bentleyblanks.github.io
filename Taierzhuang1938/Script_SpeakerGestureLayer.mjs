@@ -373,6 +373,41 @@ export class SpeakerGestureLayer {
     }
   }
 
+  /**
+   * Keep the gesturing hand off the rifle the other hand still holds: the rifle stays where the two-hand pose put
+   * it (a crouched advance carries it across the chest), so a point or a chop toward the front can end on it (2.5 cm
+   * from the receiver in the 2026-09-25 browser test). When the wrist or a finger root comes within rifleClearM of
+   * the barrel line, the whole arm is turned up (down, if the rifle is above the hand) about the shoulder until it
+   * clears. The actor places the rifle after this layer runs: on an infantry clip it copies this frame's rifle prop
+   * helper (already sampled), otherwise the rifle's pose from the last frame is used; with the rifle up the actor's
+   * aim IK then turns it again, and AfterActorAim clears against where it really ended (`placed`).
+   */
+  _ClearRifle(g, placed = false) {
+    const rig = this.rig, group = rig.actor?.weaponGroup, { upper, hand, roots } = g.bones;
+    if (!group?.isObject3D || !group.visible || !upper || !hand) return;
+    const prop = !placed && (rig.infantryPropWeight || 0) > .5 ? rig.infantryProps?.rifle : null;
+    const rifle = prop?.isObject3D ? prop : group;
+    rifle.updateWorldMatrix(true, false);
+    rifle.getWorldPosition(P2); AX.set(0, 0, -1).transformDirection(rifle.matrixWorld);
+    for (let pass = 0; pass < 2; pass++) {
+      let near = Infinity, below = true;
+      for (const bone of [hand, ...roots]) {
+        bone.getWorldPosition(D).sub(P2);
+        const u = Clamp(D.dot(AX), -.35, .9);
+        S.copy(AX).multiplyScalar(u); const d = D.distanceTo(S);
+        if (d < near) { near = d; below = D.y >= S.y - .02; }
+      }
+      if (!(near < G.rifleClearM)) return;
+      upper.getWorldPosition(S); hand.getWorldPosition(H); H.sub(S);
+      const reach = Math.max(.2, H.length());
+      D.crossVectors(H.normalize(), P.set(0, 1, 0));
+      if (D.lengthSq() < 1e-6) return;
+      this._Mark(upper);
+      TurnWorld(upper, Q.setFromAxisAngle(D.normalize(), (below ? 1 : -1) * Math.min(G.rifleClearMaxDeg * DEG, (G.rifleClearM - near + .01) / reach)));
+      this.state.rifleLift = (this.state.rifleLift || 0) + 1;
+    }
+  }
+
   /** A further stress in the hold: dip the forearm about the body's right axis (after the aim, so it shows). */
   _Beat(g, w) {
     const rig = this.rig, fore = g.bones.fore;
@@ -389,6 +424,7 @@ export class SpeakerGestureLayer {
     if (g && this.state.weight > 1e-4) {
       if (g.spec.aim) { if (g.bones.upper) this._Mark(g.bones.upper); this._Aim(g, this.state.weight); }
       this._Beat(g, this.state.weight);
+      if (g.twoHanded) this._ClearRifle(g);
     }
     if (g?.spec.reach && this.state.weight > 1e-4) {
       const s = g.spec, t = g.t, { upper, fore, hand, roots } = g.bones;
@@ -402,6 +438,12 @@ export class SpeakerGestureLayer {
       }
     }
     this._Seal();
+  }
+
+  /** Script_Actor._ApplyRiggedAim, after its arms are solved: keep the gesturing hand off the rifle where it ended. */
+  AfterActorAim() {
+    const g = this.active;
+    if (g?.twoHanded && this.state.weight > 1e-4) this._ClearRifle(g, true);
   }
 
   /**
