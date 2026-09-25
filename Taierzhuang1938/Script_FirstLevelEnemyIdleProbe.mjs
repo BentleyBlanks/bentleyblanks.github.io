@@ -354,14 +354,19 @@ function AnalyzeEnemyIdle({ meta, states, ticks }) {
       steps: [...new Set(ser.map((r, k) => r ? ticks[k].step : null).filter(Boolean))] });
   }
   // 30 s 窗口：全局按时间切，窗口归中点所在的阶段 / 相位；在场 ≥ 90% 的人才进分母。
+  // 03–05 每个零发窗口是谁、那 30 s 里多半在干什么（找「为什么零发」用，不参与判）。
+  const zeroWho = [];
   for (let k0 = 0; k0 + W30 <= ticks.length; k0 += W30) {
     const s = Seg(segOf[k0 + (W30 >> 1)]);
-    for (const [, ser] of series) {
+    for (const [i, ser] of series) {
       let present = 0, a = null, b = null;
       for (let k = k0; k < k0 + W30; k += 1) if (ser[k]) { present += 1; a ??= ser[k]; b = ser[k]; }
       if (present < W30 * G.zeroPresence) continue;
       s.win += 1;
-      if (b.fs === a.fs) s.zeroWin += 1;
+      if (b.fs === a.fs) {
+        s.zeroWin += 1;
+        if (G.gatedSteps.includes(s.step)) zeroWho.push(ZeroWhy(meta[i], ser, k0, k0 + W30, ticks[k0].t, s.key));
+      }
     }
   }
   // 相位 / 阶段切换后 15 s 内的成组移动。
@@ -420,7 +425,31 @@ function AnalyzeEnemyIdle({ meta, states, ticks }) {
   const gated = Sum(phases.filter((p) => G.gatedSteps.includes(p.key.split("/")[0])));
   perSoldier.sort((a, b) => b.idle4 - a.idle4);
   return { gates: G, samples: ticks.length, seconds: +(ticks.length * G.sampleS).toFixed(1), phases, byStage, gated,
-    transitions, soldiers: perSoldier };
+    transitions, soldiers: perSoldier, zeroWho };
+}
+
+/** 一个零发 30 s 窗口里这个人的概况：最常见的状态、环境射击闸、各旗占比、走了多远。 */
+function ZeroWhy(m, ser, k0, k1, t0, seg) {
+  const st = new Map(), gt = new Map();
+  const FL = [[1, "cover"], [2, "noncombat"], [4, "fireHold"], [8, "standby"], [16, "guided"], [32, "hold"], [64, "tgt"],
+    [128, "tgtPlayer"], [256, "seen"], [8192, "ambPts"], [2048, "culled"], [512, "hesitate"], [1024, "charge"]];
+  const fl = new Map();
+  let n = 0, path = 0, prev = null, first = null, last = null;
+  for (let k = k0; k < k1; k += 1) {
+    const r = ser[k];
+    if (!r) continue;
+    n += 1; first ??= r; last = r;
+    st.set(r.st, (st.get(r.st) || 0) + 1);
+    const g = GATE_NAMES[r.gate] || String(r.gate);
+    gt.set(g, (gt.get(g) || 0) + 1);
+    for (const [bit, name] of FL) if (r.f & bit) fl.set(name, (fl.get(name) || 0) + 1);
+    if (prev) path += Math.hypot(r.x - prev.x, r.z - prev.z);
+    prev = r;
+  }
+  const Top = (map) => [...map].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k, v]) => `${k}:${Math.round(100 * v / n)}%`).join(",");
+  return { t: t0, seg, who: m.mid || String(m.id), grp: m.grp, wk: m.wk, states: Top(st), gates: Top(gt),
+    flags: [...fl].filter(([, v]) => v >= n * 0.2).map(([k, v]) => `${k}:${Math.round(100 * v / n)}%`).join(","),
+    pathM: +path.toFixed(1), at: first ? `${first.x},${first.z}` : null, to: last ? `${last.x},${last.z}` : null };
 }
 
 /**
@@ -503,6 +532,9 @@ function PrintReport(r) {
   console.log("\n== 03–05 idle seconds per soldier (top 15; reason = ambient gate / state) ==");
   for (const s of [...r.soldiers].sort((a, b) => b.gatedIdleS - a.gatedIdleS).slice(0, 15))
     if (s.gatedIdleS > 0) console.log(`${(s.mid || String(s.id)).padEnd(22)} ${String(s.grp).padEnd(12)} ${String(s.wk).padEnd(9)} idle ${String(s.gatedIdleS).padStart(6)}s / ${s.gatedS}s  ${s.gatedWhy.join("  ")}`);
+  console.log("\n== 03–05 zero-shot 30 s windows (who; top states; ambient gate; flags ≥ 20%; path walked) ==");
+  for (const z of r.zeroWho || [])
+    console.log(`${String(z.t).padStart(7)} ${z.seg.padEnd(26)} ${String(z.who).padEnd(22)} ${String(z.grp).padEnd(12)} ${String(z.wk).padEnd(7)} ${z.states}  | ${z.gates}  | ${z.flags}  | ${z.pathM} m ${z.at} -> ${z.to}`);
   console.log("\n== player damage by step (hp lost; bullet / blast / melee; top shooters) ==");
   for (const [step, b] of Object.entries(r.playerHits.bySteps))
     console.log(`${step.padEnd(14)} lost=${b.lost} (${b.hits} hits)  bullet=${b.bullet} blast=${b.blast} melee=${b.melee} other=${b.other}  ${JSON.stringify(b.who)}`);
