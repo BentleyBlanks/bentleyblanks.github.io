@@ -916,7 +916,10 @@ export class FirstLevelBunkerShow {
       this.flags.throatCut=r.time;
       const neck=comrade.actor.characterRig?.bones.neck||comrade.actor.characterRig?.bones.head;
       const out=Rot(m.wall.yaw,0,-1);
-      if(neck)this.flags.spurt=r.vfx?.BloodSpurt?.(neck,new THREE.Vector3(0,.02,.06),new THREE.Vector3(out.x,.25,out.z),{seconds:2.8,arterial:true,pool:true,worldDirection:true})||null;
+      // The jet leaves from the neck bone itself. The offset is in the bone's own space: the V5 value (0,.02,.06)
+      // sat on the Lugou rig whose bones carried a 0.01 scale (0.6 mm, i.e. the neck), but on TengxianHumanoidV1
+      // (unit-scale bones) it put the jet 6 cm to the side of the throat, so it is gone rather than rescaled.
+      if(neck)this.flags.spurt=r.vfx?.BloodSpurt?.(neck,null,new THREE.Vector3(out.x,.25,out.z),{seconds:2.8,arterial:true,pool:true,worldDirection:true})||null;
       const handle=this.Scene("CaptiveTaunt",r.voice?.PlayScene("CaptiveTaunt",{speakers:this.Speakers(),onLine:(lineId)=>{
         if(lineId==="CaptiveTaunt.04")this.flags.frontCallAt=r.time;
       }}));
