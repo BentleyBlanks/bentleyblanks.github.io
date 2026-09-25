@@ -14,7 +14,7 @@ export function IsMissionSandbagBlock(id) {
   // 沟沿上的射击位是 PCG 摆的（Script_TrenchPlan 的 bays 通道），id 是
   // `<段名>TrenchBay<n>` —— 段名在前，所以这条不能锚在开头。
   if(/TrenchBay\d+$/.test(id))return true;
-  return /^(FrontParapet|FrontTraverseCover|MachineGunSideCover|MachineGunRest$|RightNestFrontRest$|BundleParapet$|FlankParapet$|WithdrawCover|GuardWaitingCover|GuardWaitingWing|VillageRoadBlock$|VillageApproachCover$|TransferEastCover$|TransferCorner$|TransferWestCover$|DrainCorner$|RearExitCover$|FinalAlleyCover$)/.test(id)
+  return /^(FrontParapet|FrontTraverseCover|MachineGunSideCover|MachineGunRest$|RightNestFrontRest$|LeftGunRest$|BundleParapet$|FlankParapet$|WithdrawCover|GuardWaitingCover|GuardWaitingWing|VillageRoadBlock$|VillageApproachCover$|TransferEastCover$|TransferCorner$|TransferWestCover$|DrainCorner$|RearExitCover$|FinalAlleyCover$)/.test(id)
     || MISSION_DEFENSE_POSTS.some(post=>post.id===id);
 }
 

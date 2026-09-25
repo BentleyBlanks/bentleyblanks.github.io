@@ -197,7 +197,7 @@ export class FirstLevelMissionVoice {
    * 契约 §5.5：导演直接开一场对白（不排队，可与别的场景并行）。
    * speakers[who] = 演员 | () => Vector3 | Vector3；缺的人退回运行时的 VoicePosition。
    */
-  PlayScene(sceneId, { speakers = {}, gate = null, onLine = null, onEnd = null, priority } = {}) {
+  PlayScene(sceneId, { speakers = {}, gate = null, hold = null, onLine = null, onEnd = null, priority } = {}) {
     const cue = MISSION_DIALOGUE.find((entry) => entry.id === sceneId);
     if (!cue?.perLine) {
       if (!this.unknown.has(sceneId)) { this.unknown.add(sceneId); console.warn(`FirstLevelMissionVoice: ${sceneId} is not a per-line scene`); }
@@ -205,7 +205,7 @@ export class FirstLevelMissionVoice {
     }
     this.scenes.get(sceneId)?.Stop();
     const handle = this.dialogue.Play(this.BuildScene(cue), {
-      speakers, gate, priority,
+      speakers, gate, hold, priority,
       Position: (line) => this.Position?.(cue, cue.lines[line.index]),
       onLine, onEnd: (h) => { this.scenes.delete(sceneId); this.finished.add(sceneId); this.Done?.(sceneId); onEnd?.(h); },
     });

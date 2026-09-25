@@ -4,7 +4,7 @@
 // 口径：全程只用正常输入（WASD / F / 鼠标 / H），不改任务事实、不瞬移、不发子弹外挂。
 // 调试跳转只在 --stage-jumps 下生效，且每次跳转前上一段必须真的走到了下一个公开阶段。
 import { DriveFrontBattle } from "./Script_FirstLevelCampaignFrontBattle.mjs";
-import { DriveOpening, CheckOpeningActing } from "./Script_FirstLevelCampaignOpening.mjs";
+import { DriveOpening, CheckOpeningActing, CheckFrontActing } from "./Script_FirstLevelCampaignOpening.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -116,6 +116,8 @@ export async function Drive(ctx) {
   // =========================================================================
   // 07 沿沟南行：真走 135 m，目标时长 45–75 秒。
   // =========================================================================
+  // 04–06 lines: speaker in the picture and acted (Front r2 step 1; the sampler is installed from 03 on).
+  if(ctx.stageFrom<=3)await CheckFrontActing(ctx,{upTo:"Orders"});
   if(ctx.stageTo===6)return;
   // 07 on is driven as before (the reflexes were tuned and measured on 03–06 only).
   // Let go of any key a reflex was holding when 06 ended (③ back-off holds S, ⑤ step-in holds W; with the reflexes

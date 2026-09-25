@@ -12,6 +12,16 @@
 //   ⑦ 卡住兜底（2026-09-24 审查的两次冷启动卡死）：走路卡在一个中间点不动 → 跳点；接防班长期卡住、有人阵亡
 //      也照样记 reliefInPosition；罗班长被枪座挡住 → 玩家在后墙岔口等够 rearLeaderGraceS 照样 rightRearReached；
 //      受保护的待撤守军身边不落手榴弹（任务侧投弹否决）
+//   ⑧ 近处说话人不在画面里：台词等他走进画面；太近就退开
+//   ⑬ 罗班长的阵位掩体按 leaderCoverArrivalM 走到（1 m 外是西门门洞，被墙头挡住）；退开说完话再走回去
+//   ⑭ 左机枪：枪在座位前 0.6 m、架在自己的沙袋枪托（LeftGunRest）上；何有田接枪后换上捷克式、站着、走回座位、
+//      不被压趴、不当刺刀靶子，离枪时把汉阳造还给他（接力第二批 Front 第三步追加 A）
+//   ⑫ 说话时队友挡在玩家和说话人之间：挡的人横跨一步让开，这句说完再放（ClearView）
+//   ⑪ 05 攻击位：罗班长停在投弹点旁（leaderAttackSide），离投弹点与玩家进来的最后一段都 ≥1.4 m
+//   ⑩ 攻击支路过 AttackRuinA 东端留 ≥0.6 m；墙南侧死角里的人按最近路点走、先离开墙面（TankProbe5 卡死点）
+//   ⑨ 走路线的人（罗班长）在 FIRE 里被换位命令的 0.6 m 到位半径钉在路线拐点前 0.58 m（后门坡道）：Script_Ai.Act 用路线的半径
+//      （只对 FrontBattle.Walk 打了 routeArrivalOwnsRadius 的人；别的剧本走路者照旧）
+//   ⑮ 躲手榴弹之后：直线回不去（隔着枪托沙袋/院墙）就沿躲的路原路退回，已到位的人被挤开也会走回岗位
 //
 // 跑法：node Taierzhuang1938/Script_FirstLevelFrontPacingTest.mjs
 // ===========================================================================
@@ -19,12 +29,16 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import vm from "node:vm";
+import { COVER_CYCLE } from "./Data_Tuning_AiCover.mjs";
 import { FirstLevelFrontBattle, ColumnDeparture, BatchPastGap, SplitRoute, GuardClearOfGap } from "./Script_FirstLevelFrontBattle.mjs";
-import { FirstLevelFrontScenes, FRONT_SCENE_IDS, FrontSceneSpeakers } from "./Script_FirstLevelFrontScenes.mjs";
+import { FirstLevelFrontScenes, FRONT_SCENE_IDS, FrontSceneSpeakers, ProjectToView, InPicture, CameraPose, StepCandidates, SegmentDistance, BodyBetween, AsideCandidates } from "./Script_FirstLevelFrontScenes.mjs";
+import { DialoguePlayer } from "./Script_DialoguePlayer.mjs";
 import { FRONT_SORTIE as S, FRONT_SPACE as Space, FRONT_TANK_PATH } from "./Data_FirstLevelFrontRoute.mjs";
 import { FRONT_BATTLE_TUNING as B } from "./Data_Tuning_FirstLevelFront.mjs";
 import { MISSION_TUNING as R } from "./Data_FirstLevelMission.mjs";
-import { MISSION_ROUTES as Routes, MISSION_PLACEMENT as P } from "./Data_FirstLevelMissionLayout.mjs";
+import { MISSION_ROUTES as Routes, MISSION_PLACEMENT as P, MISSION_LAYOUT } from "./Data_FirstLevelMissionLayout.mjs";
+import { SampleMissionTerrain } from "./Data_FirstLevelMissionTerrain.mjs";
 import { MISSION_DIALOGUE } from "./Data_FirstLevelMissionDialogue.mjs";
 import { MISSION_BATTLE_SOUND as Sound } from "./Data_FirstLevelMissionBattleSound.mjs";
 import { FIRST_LEVEL_MUSIC_COMBAT } from "./Data_FirstLevelMissionMusic.mjs";
@@ -117,6 +131,11 @@ const Ok = (label) => console.log(`ok ${label}`);
   assert.equal(battle.leg, "retreat", "the pair first falls back along the attack branch");
   player.position = { ...S.rear };
   battle.UpdateSortie();
+  // The player ran on ahead: Luo, still out on the branch, finishes the branch first (09-26 review tank probe rvtank: given
+  // the next leg 13 m out on the branch, he walked into the ruins between and slid along a wall for 30 s).
+  assert.ok(facts.has("attackRetreated") && battle.leg === "retreat", "the player at the rear junction, Luo still on the branch: he keeps coming back along it");
+  luo.position = { ...S.rear };
+  battle.UpdateSortie();
   assert.ok(facts.has("attackRetreated") && battle.leg === "gapWatch",
     "back at the rear junction with the last batch still behind the gap: hold at the nest's west door, not on the branch");
   const watch = battle.walks.get(luo.id).route;
@@ -146,8 +165,16 @@ const Ok = (label) => console.log(`ok ${label}`);
   const b2 = new FirstLevelFrontBattle(r2); b2.gapWatched = true;
   b2.UpdateSortie(); r2.time = B.returnMeetMaxWaitS + 0.1; b2.UpdateSortie();
   assert.equal(b2.leg, "home", "returnMeetMaxWaitS bounds the wait at returnMeet");
-  checks += 13;
-  Ok("② 05 bomb-first + parallel withdrawal: skipped attack position, west-door watch, returnMeet, home");
+  // Back at the rear junction with the batch already past the gap: the disengage leg goes in through the rear door, it
+  // does not cut straight from the junction to the west door through the nest's rear wall.
+  const r3 = { ...r, time: 0, voice: { played: new Set(), finished: new Set() }, squadRoutes: new Map() };
+  luo.position = { ...S.rear };
+  const b3 = new FirstLevelFrontBattle(r3); b3.gapWatched = true; b3.UpdateSortie();
+  const inDoor = b3.walks.get(luo.id).route;
+  assert.ok(b3.leg === "disengage" && inDoor.some((p) => Dist(p, Space.rearDoor) < 0.3) && Dist(inDoor[0], S.rear) < 0.5,
+    "from the rear junction the disengage leg starts there and goes through the rear door");
+  checks += 15;
+  Ok("② 05 bomb-first + parallel withdrawal: skipped attack position, Luo finishes the branch, west-door watch, returnMeet, home");
 }
 
 // ②b the relief comes up when the tank is silenced; FrontRelief is said at returnMeet by the NCO posted there
@@ -402,6 +429,22 @@ function WalkRuntime(extra = {}) {
   checks += 7;
 }
 {
+  // 09-25 relay r2 Front step 3: a man who reached his last point mid-evade kept missionGrenadeEvade for good (the
+  // grenade check sat below the arrival return) and lay prone in his cover through three lines. The walk now lets
+  // RespondToGrenade (the runtime's, which drops the flag once no live grenade is near) see him every frame.
+  let live = false, asked = 0;
+  const { r } = WalkRuntime({ RespondToGrenade: (a) => { asked++; if (!live) { a.missionGrenadeEvade = false; return false; } a.missionGrenadeEvade = true; return true; } });
+  const battle = new FirstLevelFrontBattle(r);
+  const luo = { id: 11, alive: true, position: { x: 0, z: 0 }, scriptArrivalRadius: 1, missionGrenadeEvade: true };
+  battle.SetWalk(luo, [{ x: 0, z: 0 }]);
+  assert.equal(battle.Walk(luo), true, "no grenade left: he is at his post");
+  assert.equal(luo.missionGrenadeEvade, false, "and the stale evade flag is gone");
+  live = true;
+  assert.equal(battle.Walk(luo), false, "a live grenade at his post: he evades, not 'arrived'");
+  assert.ok(asked >= 2, "the grenade check runs at the post too");
+  checks += 4;
+}
+{
   // Relief: the gunner stuck on the leftRoute leg for 70 s (probe V) and one man killed on the way -> still in position.
   const { r, facts } = WalkRuntime({ flow: { stage: { id: "Tank" } }, tank: { brain: {}, fireDisabled: true },
     companion: { Handle: () => null }, emplacement: { NpcVacate() {}, NpcOccupy() {} } });
@@ -505,6 +548,546 @@ function WalkRuntime(extra = {}) {
   const seat = S.seat, lastF = { x: 16.8, z: -166.57 }, lastFlankA = { x: 39.2, z: -162.2 };
   for (const line of [lastF, lastFlankA]) assert.ok(Dist(line, seat) - B.capturedGunKeepOutM >= 2, "a last line leaves room for a >= 2 m contact circle");
   checks += 4;
+}
+
+// ---------------------------------------------------------------------------
+// ⑧ the speaker is in the picture when he talks (relay r2 Front step 1): a near speaker out of view holds his line
+//    (at most speakerViewHoldS) and steps to a spot the player sees; far shouts and Node runs play at once
+// ---------------------------------------------------------------------------
+{
+  // A camera at (0, 1.6, 0) looking down -z (three's default facing), 55 deg vertical field of view, 16:9.
+  const fov = 55 * Math.PI / 180, aspect = 16 / 9, near = 0.05, far = 500, f = 1 / Math.tan(fov / 2);
+  const Camera = (x = 0, y = 1.6, z = 0) => ({
+    matrixWorld: { elements: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, x, y, z, 1] },
+    matrixWorldInverse: { elements: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -x, -y, -z, 1] },
+    projectionMatrix: { elements: [f / aspect, 0, 0, 0, 0, f, 0, 0, 0, 0, (far + near) / (near - far), -1, 0, 0, 2 * far * near / (near - far), 0] },
+  });
+  const camera = Camera();
+  const ahead = ProjectToView(camera, { x: 0, y: 1.6, z: -3 });
+  assert.ok(Math.abs(ahead.x) < 1e-9 && Math.abs(ahead.y) < 1e-9 && Math.abs(ahead.depth - 3) < 1e-9, "a head straight ahead is the centre of the picture");
+  assert.equal(ProjectToView(camera, { x: 0, y: 1.6, z: 3 }), null, "a head behind the camera is not in the picture");
+  assert.ok(!InPicture(ProjectToView(camera, { x: 3, y: 1.6, z: -1 })) && InPicture(ProjectToView(camera, { x: 1, y: 1.6, z: -3 })),
+    "72 deg off the axis is out of the frame, 18 deg is in");
+  const pose = CameraPose(camera);
+  assert.ok(Math.abs(Math.abs(pose.yaw) - Math.PI) < 1e-9, "the pose yaw is the facing (-z here)");
+  const spots = StepCandidates(pose, { x: -1, z: 1 });
+  assert.equal(spots.length, B.speakerStepBearingsDeg.length * B.speakerStepDistancesM.length * 2, "every bearing x distance, both sides");
+  assert.ok(spots[0].bearing > 0 === Math.sin(Math.atan2(-1, 1) - pose.yaw) > 0, "the speaker's own side first");
+  for (const s of spots) assert.ok(InPicture(ProjectToView(camera, { x: s.x, y: 1.55, z: s.z })), `a stepping spot frames a standing head (${s.bearing} deg, ${s.distance} m)`);
+
+  // HoldLine / Steer on a stub runtime: flat ground, nothing blocks, Luo 1.6 m to the player's right, level with him.
+  const moves = [], defends = [];
+  const luo = { id: 7, alive: true, position: { x: 1.6, y: 0, z: 0.3 } };
+  const guard = { id: 8, alive: true, position: { x: -30, y: 0, z: -20 } };
+  const V = (x, y, z) => ({ x, y, z, clone() { return V(this.x, this.y, this.z); }, set(a, b, c) { this.x = a; this.y = b; this.z = c; return this; } });
+  const r = { time: 0, camera, flow: { stage: { id: "Support" } }, ai: { soldiers: [luo, guard] },
+    player: { position: { x: 0, y: 0, z: 0 }, get EyePosition() { return V(0, 1.6, 0); } },
+    speakers: { ActorForWho: (who) => ({ luo, guard })[who] || null },
+    Point: (p, rise = 0) => V(p.x, rise, p.z), BlocksSight: () => false,
+    MoveActor: (actor, point, speed) => moves.push({ id: actor.id, ...point, speed }), Defend: (actor, point) => defends.push({ id: actor.id, ...point }) };
+  const scenes = new FirstLevelFrontScenes(r);
+  const line = (id, who) => ({ id, who, direction: {} });
+  assert.equal(scenes.HoldLine(line("TakeOverGun.01", "luo"), "TakeOverGun"), true, "Luo beside the player, out of the picture: the line waits");
+  assert.ok(scenes.steer?.soldier === luo && Dist(scenes.steer.spot, luo.position) <= B.speakerStepMaxM, "and Luo is sent to a spot in view");
+  const spot = scenes.steer.spot;
+  assert.ok(InPicture(ProjectToView(camera, { x: spot.x, y: 1.55, z: spot.z })), "the spot is in the picture");
+  scenes.handle = { id: "TakeOverGun", done: false, lines: [{ line: { who: "luo" }, state: "pending" }] };
+  scenes.Steer();
+  assert.ok(moves.length === 1 && moves[0].id === 7 && moves[0].speed === B.speakerStepSpeedMps, "Steer walks him there (no teleport)");
+  assert.ok(scenes.Steers(luo) && !scenes.Steers(guard), "FrontBattle.Walk is told to leave him alone meanwhile");
+  r.time = B.speakerViewHoldS * 0.5;
+  assert.equal(scenes.HoldLine(line("TakeOverGun.01", "luo"), "TakeOverGun"), true, "still out of view: still waiting");
+  luo.position = { x: spot.x, y: 0, z: spot.z };
+  assert.equal(scenes.HoldLine(line("TakeOverGun.01", "luo"), "TakeOverGun"), false, "in view: the line starts");
+  assert.equal(scenes.holds.get("TakeOverGun.01").released, "inView");
+  scenes.Steer();
+  assert.ok(defends.length === 1, "at the spot he holds there while his lines last");
+  scenes.handle.lines[0].state = "done"; scenes.Steer();
+  assert.equal(scenes.steer, null, "his lines done: his own orders take over again");
+  // No spot he can walk to straight (every knee-high line blocked): he stays and the line plays at once.
+  luo.position = { x: 1.6, y: 0, z: 0.3 }; r.BlocksSight = (a, b) => b.y < 1; r.time = 10;
+  assert.equal(scenes.HoldLine(line("TakeOverGun.03", "luo"), "TakeOverGun"), false, "no clear spot: the line is not delayed");
+  assert.ok(scenes.steer === null && scenes.holds.get("TakeOverGun.03").released === "noSpot", "and he stays where he is");
+  // A spot whose low wall hides a crouched head but not a standing one is no spot (09-25 idle probe e2: the combat brain
+  // crouched Luo in the nest's west doorway and the door's wall hid him through FrontWithdraw.01).
+  r.BlocksSight = (a, b) => a.y > 1.5 && b.y > 0.8 && b.y < 1.3;
+  assert.equal(scenes.StepSpot(luo, CameraPose(camera)), null, "a crouched head behind a wall: not a stepping spot");
+  r.BlocksSight = (a, b) => a.y > 1.5 && b.y > 1.3;
+  assert.equal(scenes.StepSpot(luo, CameraPose(camera)), null, "nor a standing head behind one");
+  r.BlocksSight = () => false;
+  assert.ok(scenes.StepSpot(luo, CameraPose(camera)), "open ground: a spot");
+  // Level with the player but a metre above the speaker's own floor (c36_d2: up the bank beside the 05 attack position):
+  // he cannot walk there, so it is no spot.
+  const flatPoint = r.Point;
+  r.Point = (p, rise = 0) => V(p.x, (Math.hypot(p.x - luo.position.x, p.z - luo.position.z) < 0.5 ? -1 : 0) + rise, p.z);
+  assert.equal(scenes.StepSpot(luo, CameraPose(camera)), null, "a spot a metre above the speaker's floor: not a stepping spot");
+  r.Point = flatPoint;
+  // Stepping into the picture while his line already plays, and the player stands within speakerViewMinM of him (he never
+  // reached the spot): he backs off instead of being held there at the player's elbow.
+  {
+    const saved = { position: luo.position, handle: scenes.handle, steer: scenes.steer };
+    const unreachable = { x: -2.5, z: -3 };
+    luo.position = { x: 0.6, y: 0, z: -0.6 };
+    scenes.handle = { id: "TakeOverGun", done: false, lines: [{ line: { who: "luo" }, state: "playing" }] };
+    scenes.steer = { soldier: luo, who: "luo", spot: unreachable, sceneId: "TakeOverGun", anchor: { x: 0, z: 0 } };
+    scenes.Steer();
+    assert.ok(scenes.steer?.backOff && Dist(scenes.steer.spot, unreachable) > 0.5, "too near while talking: he backs off instead");
+    assert.ok(Dist(scenes.steer.spot, r.player.position) >= Math.min(...B.speakerBackOffDistancesM) - 1e-6, "to a back-off distance from the player");
+    scenes.steer = { soldier: luo, who: "luo", spot: unreachable, sceneId: "TakeOverGun", anchor: { x: 0, z: 0 } };
+    scenes.handle.lines[0].state = "pending";
+    scenes.Steer();
+    assert.ok(!scenes.steer?.backOff && Dist(scenes.steer.spot, unreachable) < 1e-9, "still held for his line: he keeps walking to the framed spot");
+    Object.assign(scenes, { handle: saved.handle, steer: saved.steer }); luo.position = saved.position;
+  }
+  // 09-26 c16_a1: the player moved into the rest of the walk after the spot was picked (dodged a grenade, went back to the
+  // captured gun) - the step is given up and his own orders take over; a walk that stays clear of the player goes on.
+  {
+    const saved = { position: luo.position, handle: scenes.handle, steer: scenes.steer };
+    luo.position = { x: 3, y: 0, z: 0 };
+    scenes.handle = { id: "FrontAttack", done: false, lines: [{ line: { who: "luo" }, state: "playing" }] };
+    scenes.steer = { soldier: luo, who: "luo", spot: { x: -2, z: 0 }, sceneId: "FrontAttack", anchor: { x: 0, z: 0 } };
+    scenes.Steer();
+    assert.equal(scenes.steer, null, "the rest of the walk runs through the player: the step is given up");
+    assert.equal(scenes.State().dropped.at(-1)?.who, "luo", "and logged for probes");
+    scenes.steer = { soldier: luo, who: "luo", spot: { x: 3, z: -3 }, sceneId: "FrontAttack", anchor: { x: 0, z: 0 } };
+    scenes.Steer();
+    assert.ok(scenes.steer?.soldier === luo && !scenes.steer.backOff, "a walk that keeps clear of the player goes on");
+    Object.assign(scenes, { handle: saved.handle, steer: saved.steer }); luo.position = saved.position;
+  }
+  // Nor a spot at, or a walk past, the seat of a gun he does not man (c16_a1: 1.5 m east of the captured gun's seat,
+  // where the player sat down again). His own gun's seat does not count.
+  {
+    const first = scenes.StepSpot(luo, CameraPose(camera));
+    r.emplacement = { guns: new Map([["Captured", { seat: { x: first.x, y: 0, z: first.z }, npc: null }]]) };
+    // Every framed spot on his side lies within 1.5 m of this one: none is left (the line then plays from where he is).
+    const other = scenes.StepSpot(luo, CameraPose(camera));
+    assert.ok(!other || Dist(other, first) >= B.speakerStepPassM - 1e-9, `a gun seat keeps the stepping spot ${B.speakerStepPassM} m off (${JSON.stringify(other)})`);
+    r.emplacement.guns.get("Captured").seat = { x: first.x, y: 0, z: first.z + 10 };
+    assert.ok(Dist(scenes.StepSpot(luo, CameraPose(camera)), first) < 1e-9, "a seat 10 m off changes nothing");
+    r.emplacement.guns.get("Captured").seat = { x: first.x, y: 0, z: first.z };
+    r.emplacement.guns.get("Captured").npc = luo;
+    assert.ok(Dist(scenes.StepSpot(luo, CameraPose(camera)), first) < 1e-9, "the seat of his own gun does not count");
+    delete r.emplacement;
+  }
+  // StandToBeSeen (c36_g3): a kneeling speaker in the picture, 3 m off, his crouched head behind something low, stands
+  // up for his line when a standing head would be seen; held until that line ends; not when the wall is taller.
+  {
+    const kneel = { id: 12, alive: true, stance: 1, position: { x: 0.5, y: 0, z: -3 },
+      actor: { head: { matrixWorld: { elements: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0.5, 1.0, -3, 1] } } } };
+    const stances = [];
+    const rs = { time: 0, camera, flow: { stage: { id: "Support" } }, ai: { soldiers: [kneel], SetStance: (a, st) => stances.push([a.id, st]) },
+      player: { position: { x: 0, y: 0, z: 0 }, get EyePosition() { return V(0, 1.6, 0); } },
+      speakers: { ActorForWho: (who) => (who === "luo" ? kneel : null) },
+      Point: (p, rise = 0) => V(p.x, rise, p.z), BlocksSight: (a, b) => b.y < 1.3, MoveActor() {}, Defend() {} };
+    const sc = new FirstLevelFrontScenes(rs);
+    sc.handle = { id: "TakeOverGun", done: false, lines: [{ line: { id: "TakeOverGun.01", who: "luo" }, state: "playing" }] };
+    sc.Steer();
+    assert.ok(sc.standing?.lineId === "TakeOverGun.01" && stances.at(-1)?.[1] === 0, "crouched head behind a low wall: he stands up for his line");
+    kneel.stance = 0; sc.Steer();
+    assert.equal(stances.length, 2, "and is held standing while the line plays");
+    sc.handle.lines[0].state = "done"; sc.Steer();
+    assert.equal(sc.standing, null, "the line over: the combat brain has him back");
+    kneel.stance = 1; sc.handle.lines[0].state = "playing"; rs.BlocksSight = () => true; sc.Steer();
+    assert.ok(sc.standing === null && stances.length === 2, "a wall that hides him standing too: he stays down");
+    assert.deepEqual(sc.State().stood.map((s) => s.id), ["TakeOverGun.01"], "each stand is logged for probes");
+  }
+  // Timeout: a spot, but he never gets there (shoved, blocked by a body) -> the line plays after speakerViewHoldS.
+  r.BlocksSight = () => false;
+  assert.equal(scenes.HoldLine(line("FrontWithdraw.01", "luo"), "FrontWithdraw"), true, "held while he walks");
+  r.time = 10 + B.speakerViewHoldS + 0.01;
+  assert.equal(scenes.HoldLine(line("FrontWithdraw.01", "luo"), "FrontWithdraw"), false, "after speakerViewHoldS the line plays anyway");
+  assert.equal(scenes.holds.get("FrontWithdraw.01").released, "timeout");
+  scenes.steer = null;
+  assert.equal(scenes.HoldLine(line("BundleOrder.01", "guard"), "BundleOrder"), false, "a shout from 36 m plays at once");
+  assert.equal(scenes.HoldLine(line("FrontAttack.01", "shunzi"), "FrontAttack"), false, "Shunzi (the player) is never held");
+  // Walking together the leader is not stopped at a spot (he would lose the lead) and the line is not delayed.
+  r.BlocksSight = () => false; r.time = 20; r.player.velocity = { x: 2, y: 0, z: 0 };
+  assert.equal(scenes.HoldLine(line("FrontBlockade.02", "luo"), "FrontBlockade"), false, "walking: the line plays at once");
+  assert.ok(scenes.steer === null && scenes.holds.get("FrontBlockade.02").released === "walking", "walking: the leader keeps his own walk");
+  r.player.velocity = { x: 0, y: 0, z: 0 };
+  assert.equal(scenes.HoldLine(line("FrontBlockade.03", "luo"), "FrontBlockade"), true, "standing: the next line waits");
+  assert.ok(scenes.steer?.soldier === luo, "standing: now he steps up");
+  scenes.handle = { id: "FrontBlockade", done: false, lines: [{ line: { who: "luo" }, state: "pending" }] };
+  r.player.position = { x: 0, y: 0, z: -(B.speakerStepReleaseM + 0.1) };
+  scenes.Steer();
+  assert.equal(scenes.steer, null, "the player walked off: the speaker goes back to his own orders");
+  r.player.position = { x: 0, y: 0, z: 0 };
+  // In the middle of the picture but closer than speakerViewMinM (the camera in his shoulder): he steps back first.
+  luo.position = { x: 0, y: 0, z: -(B.speakerViewMinM - 0.4) }; r.time = 30;
+  assert.equal(scenes.HoldLine(line("BundleSupply.02", "luo"), "BundleSupply"), true, "too close to be seen talking: the line waits");
+  assert.ok(scenes.steer?.soldier === luo && Math.hypot(scenes.steer.spot.x, scenes.steer.spot.z) >= Math.min(...B.speakerStepDistancesM) - 1e-9,
+    "and he steps back to a framed distance");
+  scenes.steer = null;
+  // Right behind the player every way into the picture brushes past his shoulder: no step, the line plays at once.
+  luo.position = { x: 0.2, y: 0, z: 1.6 }; r.time = 40;
+  assert.equal(scenes.HoldLine(line("TakeOverGun.02", "luo"), "TakeOverGun"), false, "behind him: no walk past the player");
+  assert.equal(scenes.holds.get("TakeOverGun.02").released, "noSpot");
+  // Aiming down the sights: nobody walks into his picture.
+  luo.position = { x: 1.6, y: 0, z: 0.3 }; r.player.ads = 1;
+  assert.equal(scenes.HoldLine(line("BundleAttack.01", "luo"), "BundleAttack"), false, "aiming: the line plays at once");
+  assert.equal(scenes.holds.get("BundleAttack.01").released, "aiming");
+  r.player.ads = 0;
+  // Going to a gun no squadmate mans (c16_a1 / c16_d1: the captured nest's seat): nobody steps into that gun position.
+  r.emplacement = { guns: new Map([["Captured", { seat: { x: -0.5, y: 0, z: 0.8 }, npc: null }]]) }; r.time = 45;
+  assert.equal(scenes.HoldLine(line("GunSeat.01", "luo"), "GunSeat"), false, "at a free gun: the line plays at once");
+  assert.ok(scenes.steer === null && scenes.holds.get("GunSeat.01").released === "gun", "and nobody steps into the gun position");
+  r.emplacement.guns.get("Captured").npc = guard;
+  assert.equal(scenes.HoldLine(line("GunSeat.02", "luo"), "GunSeat"), true, "a gun a squadmate mans is not the player's: he steps up");
+  scenes.steer = null; delete r.emplacement;
+  // Luo at the heels of a walking player: the line plays at once and he steps back from the player at a walk.
+  luo.position = { x: 0.3, y: 0, z: 0.6 }; r.player.velocity = { x: 0, y: 0, z: -2 }; r.time = 50; moves.length = 0;
+  assert.equal(scenes.HoldLine(line("FrontApproach.01", "luo"), "FrontApproach"), false, "walking with Luo at his heels: the line is not delayed");
+  const back = scenes.steer, heel = Dist(luo.position, r.player.position);
+  assert.ok(back?.soldier === luo && back.backOff && scenes.holds.get("FrontApproach.01").backedOff, "but Luo steps back from him");
+  assert.ok(Dist(back.spot, r.player.position) >= Math.min(...B.speakerBackOffDistancesM) - 1e-9 && Dist(back.spot, r.player.position) > heel,
+    "to a spot outside speakerViewMinM, away from the player");
+  assert.ok(SegmentDistance(r.player.position, luo.position, back.spot) >= heel - 0.05, "never passing nearer the player on the way");
+  assert.equal(back.lineId, "FrontApproach.01", "the step back belongs to the line it was for");
+  scenes.handle = { id: "FrontApproach", done: false, lines: [{ line: { id: "FrontApproach.01", who: "luo" }, state: "playing" },
+    { line: { id: "FrontApproach.03", who: "luo" }, state: "waiting" }] };
+  r.player.position = { x: 0, y: 0, z: -(B.speakerStepReleaseM + 1) }; scenes.Steer();
+  assert.ok(scenes.steer === back && moves.at(-1)?.speed === B.speakerBackOffSpeedMps, "at a walk, and the player walking on does not cancel it");
+  // His next line while he is still stepping back (09-26 review: held the full speakerViewHoldS with nobody walking in).
+  r.player.velocity = { x: 0, y: 0, z: 0 }; r.time = 51; const farBehind = { ...r.player.position };
+  r.player.position = { x: luo.position.x, y: 0, z: luo.position.z - 3 };
+  assert.equal(scenes.HoldLine(line("FrontApproach.03", "luo"), "FrontApproach"), false, "his next line is not held while he steps back");
+  assert.equal(scenes.holds.get("FrontApproach.03").released, "backOff");
+  r.player.position = farBehind; r.player.velocity = { x: 0, y: 0, z: -2 };
+  scenes.handle.lines[0].state = "done"; scenes.Steer();
+  assert.equal(scenes.steer, null, "the line it was for done: back to his own walk (his other lines do not pin him)");
+  // No spot found: not searched again within speakerBackOffRetryS (BackOffSpot is 21 candidates with collider tests).
+  {
+    let searches = 0; const Spot = scenes.BackOffSpot; scenes.BackOffSpot = () => { searches++; return null; };
+    r.time = 52; scenes.RetryBackOffSpot(luo); r.time = 52 + B.speakerBackOffRetryS / 2; scenes.RetryBackOffSpot(luo);
+    const within = searches; r.time = 52 + B.speakerBackOffRetryS + 0.01; scenes.RetryBackOffSpot(luo);
+    assert.ok(within === 1 && searches === 2, `a failed back-off search waits speakerBackOffRetryS (${within}, ${searches})`);
+    scenes.BackOffSpot = Spot; scenes.backOffMiss.clear();
+  }
+  // Nowhere to step back to (every knee-high line blocked): he stays and the line still plays.
+  r.player.position = { x: 0, y: 0, z: 0 }; luo.position = { x: 0.3, y: 0, z: 0.6 }; r.BlocksSight = (a, b) => b.y < 1;
+  assert.equal(scenes.HoldLine(line("FrontApproach.02", "luo"), "FrontApproach"), false, "blocked: the line is not delayed");
+  assert.ok(scenes.steer === null && !scenes.holds.get("FrontApproach.02").backedOff, "and he stays");
+  r.BlocksSight = () => false;
+  // Luo right in front of a walking player: not further along his way (he would walk into him again) but aside.
+  luo.position = { x: 0.2, y: 0, z: -0.7 }; r.time = 60;
+  assert.equal(scenes.HoldLine(line("BundleGo.02", "luo"), "BundleGo"), false, "walking into Luo: the line is not delayed");
+  const aside = scenes.steer?.spot;
+  assert.ok(aside && Math.acos(-(aside.z) / Math.hypot(aside.x, aside.z)) > B.speakerBackOffAheadDeg * Math.PI / 180 - 1e-9,
+    "and Luo steps aside, not ahead of the player's walk");
+  // KeepSpace: a line already playing, and the speaker comes too near meanwhile -> he steps back.
+  scenes.steer = null; r.player.velocity = { x: 0, y: 0, z: 0 }; luo.position = { x: 0.4, y: 0, z: 0.5 };
+  scenes.handle = { id: "BundleProne", done: false, lines: [{ line: { id: "BundleProne.01", who: "luo", direction: {} }, state: "playing" }] };
+  scenes.Steer();
+  assert.ok(scenes.steer?.soldier === luo && scenes.steer.backOff, "a speaker who came within speakerViewMinM mid-line steps back");
+  scenes.handle.lines[0].state = "done"; scenes.Steer(); scenes.handle = null;
+  assert.ok(SegmentDistance({ x: 0, z: 0 }, { x: -1, z: 1 }, { x: 1, z: 1 }) === 1 && SegmentDistance({ x: 0, z: 0 }, { x: 2, z: 0 }, { x: 3, z: 0 }) === 2,
+    "segment distance");
+  // A live Japanese grenade has the player in its blast (the HUD's warning): the line waits while he gets clear, at
+  // most speakerDangerHoldS, and the wait for the speaker's face starts only then (relay r2 Front step 3 addendum B:
+  // FrontWithdraw.01 went by while the player ran from a grenade, 0 frames of Luo in the picture).
+  let threats = [{ owner: "ija", fuse: 3 }];
+  r.combat = { GrenadeThreats: () => threats };
+  r.time = 70; luo.position = { x: 0, y: 0, z: -3 }; r.player.velocity = { x: 3, y: 0, z: 0 };
+  assert.equal(scenes.HoldLine(line("FrontWithdraw.02", "luo"), "FrontWithdraw"), true, "a grenade at his feet: the line waits, even with Luo in view");
+  r.time = 72;
+  assert.equal(scenes.HoldLine(line("FrontWithdraw.02", "luo"), "FrontWithdraw"), true, "2 s on, still inside the blast: still waiting");
+  threats = [{ owner: "player", fuse: 2 }];
+  r.player.velocity = { x: 0, y: 0, z: 0 };
+  assert.equal(scenes.HoldLine(line("FrontWithdraw.02", "luo"), "FrontWithdraw"), false, "clear of it (his own grenade does not count): Luo in view, the line starts");
+  assert.ok(scenes.holds.get("FrontWithdraw.02").dangerS === 2 && scenes.holds.get("FrontWithdraw.02").released === "inView", "the hold records the 2 s dodge");
+  threats = [{ owner: "ija", fuse: 4 }]; r.time = 80;
+  assert.equal(scenes.HoldLine(line("FrontWithdraw.03", "luo"), "FrontWithdraw"), true, "another grenade: the next line waits");
+  r.time = 80 + B.speakerDangerHoldS + 0.01;
+  assert.equal(scenes.HoldLine(line("FrontWithdraw.03", "luo"), "FrontWithdraw"), false, "never clear of it: after speakerDangerHoldS the line plays anyway");
+  threats = []; delete r.combat;
+  r.camera = null;
+  assert.equal(scenes.HoldLine(line("TakeOverGun.02", "luo"), "TakeOverGun"), false, "no camera (Node runs): nothing is held");
+
+  // The dialogue player's hook: a held line starts late, and the next "after prev" line follows its real end.
+  const events = [];
+  const player = new DialoguePlayer({ Event: (id, scene, detail) => events.push({ id, ...detail }) });
+  let held = 30;
+  const scene = { id: "T", lines: [
+    { id: "T.01", who: "luo", index: 0, duration: 1, direction: {}, speaker: "", text: "" },
+    { id: "T.02", who: "zhou", index: 1, duration: 1, direction: { after: "prev", offsetS: 0.2 }, speaker: "", text: "" }] };
+  const handle = player.Play(scene, { hold: (l) => l.id === "T.01" && held-- > 0 });
+  for (let i = 0; i < 400 && !handle.done; i++) player.Update(1 / 60);
+  const starts = events.filter((e) => e.id === "Line");
+  assert.ok(handle.done && starts.length === 2, "both lines play");
+  assert.ok(starts[0].start >= 30 / 60 - 1e-9, `the held line starts when released (${starts[0].start})`);
+  // One frame of slack: a line's clock already advances in the frame it starts (the player's own timing, held or not).
+  assert.ok(starts[1].start >= starts[0].start + 1 + 0.2 - 1 / 60 - 1e-6, `the next line keeps its gap after the held one (${starts[1].start})`);
+  // Wiring: PlayScene passes the hook, the runtime steers after every mover, FrontBattle.Walk yields.
+  const voiceSrc = Read("Script_FirstLevelMissionVoice.mjs"), runtimeSrc = Read("Script_FirstLevelMissionRuntime.mjs");
+  assert.ok(/speakers, gate, hold, priority,/.test(voiceSrc), "voice.PlayScene hands `hold` to the dialogue player");
+  assert.ok(/this\.frontBattle\.Update\(dt\);\s*\n(\s*\/\/[^\n]*\n)*\s*this\.frontScenes\.Steer\(\);/.test(runtimeSrc), "runtime steers the speaker after frontBattle.Update");
+  assert.ok(Read("Script_FirstLevelFrontBattle.mjs").includes("if(r.frontScenes?.Steers?.(actor)){w.bestAt=r.time;return false;}"),
+    "FrontBattle.Walk neither orders nor stall-skips a speaker stepping into view");
+  // 05 ammo house: Luo's supply leg stops beside the door, clear of every sight line from the approach inside
+  // supplierRangeM to the keeper (he stood in the doorway and hid the keeper's whole line, 09-25 drive).
+  assert.ok(Dist(S.leaderDoorSide, S.route.at(-1)) > 1, "Luo does not stop at the doorway point");
+  for (let i = 1; i < S.route.length; i++) for (let k = 0; k <= 10; k++) {
+    const a = S.route[i - 1], b = S.route[i], p = { x: a.x + (b.x - a.x) * k / 10, z: a.z + (b.z - a.z) * k / 10 };
+    if (Dist(p, S.house) > S.supplierRangeM) continue;
+    assert.ok(SegmentDistance(S.leaderDoorSide, p, S.keeper) > 1, `Luo's door-side stop is off the sight line to the keeper from (${p.x.toFixed(1)}, ${p.z.toFixed(1)})`);
+  }
+  checks += 69;
+  Ok("⑧ near speaker out of the picture: line held <= speakerViewHoldS, he steps into view; one too near steps back; far shouts and Node runs unaffected; a grenade at the player's feet holds a line <= speakerDangerHoldS");
+}
+
+{
+  // ⑨ Route walker vs a combat state's arrival radius (2026-09-25 relay r2 Front step 2). FIRE's displace order sets
+  // moveArriveM 0.6 m; Script_Ai.Act replaced the order with the route goal but kept that radius, so Luo stood 0.58 m
+  // short of the 0.25 m rear-door corner (29.7,-145.6) until the displace timed out or Walk skipped the corner
+  // (LuoRamp probe: 4 of 16 live 05->06 trials held 4-6 s at (29.7,-145.0) / (27.7,-149.1)). Runs the real Act block.
+  const source = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "Script_Ai.mjs"), "utf8").replace(/\r/g, "");
+  const block = source.slice(source.indexOf("    // P012 route followers"), source.indexOf("    let targetYaw = null;"));
+  assert.ok(block.includes("this.StepBody"), "the Act movement block is where the test expects it");
+  const Act = vm.runInNewContext(`(function(s,dt){let desired=s.goal,speed=2.6,stepped=false,wantedYaw=0;${block}return {stepped};})`,
+    { Clamp01: (v) => Math.max(0, Math.min(1, v)), COVER_CYCLE });
+  const Vec = () => ({ x: 0, y: 0, z: 0, copy(p) { this.x = p.x; this.y = p.y || 0; this.z = p.z; return this; }, set(x, y, z) { this.x = x; this.y = y; this.z = z; return this; } });
+  const Run = (guided, frontWalk = guided) => {
+    const s = { p012Guided: guided, routeArrivalOwnsRadius: frontWalk, scriptMoveSpeedMps: guided ? R.squadSpeedMps : undefined, position: { x: 29.66, y: 0, z: -145.02 },
+      goal: { x: 29.7, y: 0, z: -145.6 }, scriptArrivalRadius: B.arrivalM * .25 * .5, moveArriveM: 0.6, stance: 1,
+      detourTime: 0, stuckTime: 0, rnd: () => .5 };
+    const host = { ctx: { nav: null }, tmpD: Vec(), navOut: { x: 0, z: 0 }, time: 0, SetStance() {}, TryVault: () => false,
+      StepBody(a, dx, dz) { a.position.x += dx; a.position.z += dz; } };
+    for (let i = 0; i < 120; i++) Act.call(host, s, 1 / 60);
+    return Math.hypot(s.position.x - s.goal.x, s.position.z - s.goal.z);
+  };
+  const walker = Run(true), ordinary = Run(false), otherScripted = Run(true, false);
+  assert.ok(walker < B.arrivalM * .25, `a route walker reaches the 0.25 m corner through a 0.6 m displace radius (left ${walker.toFixed(3)} m)`);
+  assert.ok(ordinary > .5, `an ordinary soldier still stops on his own order's 0.6 m radius (left ${ordinary.toFixed(3)} m)`);
+  // Only FrontBattle.Walk's walkers (03-06, routeArrivalOwnsRadius): every other P012 mover keeps the old rule (09-26 review).
+  assert.ok(otherScripted > .5, `another scripted mover (MissionRuntime.MoveActor 01-18, setpieces) keeps the order's radius (left ${otherScripted.toFixed(3)} m)`);
+  const battleSrc = Read("Script_FirstLevelFrontBattle.mjs"), runtimeSrc = Read("Script_FirstLevelMissionRuntime.mjs");
+  assert.ok(/r\.MoveActor\(actor,w\.rejoin\|\|w\.route\[w\.index\],wait\?0:speed\);[\s\S]{0,300}actor\.routeArrivalOwnsRadius=true;/.test(battleSrc),
+    "FrontBattle.Walk marks its walker after moving him");
+  assert.ok(/MoveActor\(actor, point, speed = R\.squadSpeedMps\) \{[\s\S]{0,200}actor\.routeArrivalOwnsRadius = false;/.test(runtimeSrc),
+    "MissionRuntime.MoveActor clears the mark for every other mover");
+  checks += 6;
+  Ok("⑨ a route walker in FIRE walks to his corner, not to the displace order's 0.6 m radius");
+}
+
+{
+  // ⑩ The attack branch past AttackRuinA's east end (2026-09-25 relay r2 Front step 2, TankProbe5: stuck for good at
+  // (41.67,-157.31) in the pocket south-west of the end, beside a warning-shell crater). The lane keeps >= 0.6 m off
+  // the wall box, and from any spot in that pocket the nearest route point (what CampaignFrontBattle's retreat and a
+  // rejoining walker aim at) is reached without the capsule crossing the wall box (0.34 m radius + 0.02 m skin).
+  const wall = MISSION_LAYOUT.blocks.find((b) => b.id === "AttackRuinA");
+  assert.ok(wall && !wall.ry, "AttackRuinA is an axis-aligned block");
+  const box = { minX: wall.x - wall.w / 2, maxX: wall.x + wall.w / 2, minZ: wall.z - wall.d / 2, maxZ: wall.z + wall.d / 2 };
+  const BoxDistance = (p) => Math.hypot(Math.max(box.minX - p.x, 0, p.x - box.maxX), Math.max(box.minZ - p.z, 0, p.z - box.maxZ));
+  const SegmentClear = (a, b) => { let min = Infinity; for (let i = 0; i <= 200; i++) { const t = i / 200; min = Math.min(min, BoxDistance({ x: a.x + (b.x - a.x) * t, z: a.z + (b.z - a.z) * t })); } return min; };
+  const lane = S.attackRoute, laneClear = Math.min(...lane.slice(1).map((p, i) => SegmentClear(lane[i], p)));
+  assert.ok(laneClear >= 0.6, `the attack branch clears AttackRuinA by >= 0.6 m (${laneClear.toFixed(2)} m)`);
+  const retreat = [...lane].reverse();
+  const Distance = (p, q) => Math.hypot(p.x - q.x, p.z - q.z);
+  for (const start of [{ x: 41.67, z: -157.31 }, { x: 41.0, z: -157.4 }, { x: 40.2, z: -157.3 }, { x: 41.5, z: -157.35 }, { x: 40.6, z: -157.6 }]) {
+    const nearest = retreat.reduce((best, p) => Distance(p, start) < Distance(best, start) ? p : best, retreat[0]);
+    // Leaving the face: the first 0.2 m of the walk must not get closer to the box than the start is.
+    const dir = { x: nearest.x - start.x, z: nearest.z - start.z }, len = Math.hypot(dir.x, dir.z);
+    const step = { x: start.x + dir.x / len * .2, z: start.z + dir.z / len * .2 };
+    assert.ok(BoxDistance(step) >= BoxDistance(start) - 1e-6 && SegmentClear(start, nearest) >= Math.min(BoxDistance(start), .36) - 1e-6,
+      `from the pocket (${start.x},${start.z}) the nearest route point (${nearest.x},${nearest.z}) leads away from AttackRuinA's south face`);
+  }
+  checks += 7;
+  Ok("⑩ the attack branch clears AttackRuinA's east end and a walker in the pocket south of it walks away from the face");
+}
+
+{
+  // ⑪ Luo stops beside the throw spot (S.leaderAttackSide), never on it and never on the player's way in: >= 1.4 m from
+  // the throw spot and from the branch's last leg, so his BundleAttack lines show a face; inside rearArrivalM so
+  // attackPositionReached still needs him there; on the trench floor (within 0.4 m of the throw spot's floor height, clear
+  // of every block by his capsule).
+  const side = S.leaderAttackSide, lane = S.attackRoute, d = Math.hypot(side.x - S.throw.x, side.z - S.throw.z);
+  assert.ok(d >= 1.4 && d < B.rearArrivalM, `Luo's attack stop is ${d.toFixed(2)} m from the throw spot`);
+  const a = lane.at(-2), b = lane.at(-1), t = Math.max(0, Math.min(1, ((side.x - a.x) * (b.x - a.x) + (side.z - a.z) * (b.z - a.z)) / ((b.x - a.x) ** 2 + (b.z - a.z) ** 2)));
+  const off = Math.hypot(side.x - (a.x + (b.x - a.x) * t), side.z - (a.z + (b.z - a.z) * t));
+  assert.ok(off >= 1.4, `Luo's attack stop is off the player's last leg in (${off.toFixed(2)} m)`);
+  assert.ok(Math.abs(SampleMissionTerrain(side.x, side.z) - SampleMissionTerrain(S.throw.x, S.throw.z)) <= 0.4, "Luo's attack stop is on the trench floor");
+  for (const block of MISSION_LAYOUT.blocks) {
+    const ry = block.ry || 0, c = Math.cos(ry), q = Math.sin(ry), dx = side.x - block.x, dz = side.z - block.z;
+    const lx = dx * c - dz * q, lz = dx * q + dz * c;
+    const gap = Math.hypot(Math.max(Math.abs(lx) - block.w / 2, 0), Math.max(Math.abs(lz) - block.d / 2, 0));
+    assert.ok(gap >= 0.45, `Luo's attack stop clears ${block.id} (${gap.toFixed(2)} m)`);
+  }
+  const { r } = WalkRuntime({ flow: { stage: { id: "Tank" } }, companion: { Handle: () => ({ id: 1, alive: true, position: { x: 0, z: 0 } }) } });
+  const battle = new FirstLevelFrontBattle(r);
+  r.Has = (id) => id === "bundleTaken" || id === "bundleReturned"; r.Inventory = () => ({ bundles: 1 }); r.tank = { brain: true };
+  battle.UpdateSortie();
+  assert.deepEqual(battle.leaderRoute.at(-1), side, "the 05 attack leg ends at leaderAttackSide");
+  checks += 5;
+  Ok("⑪ Luo's 05 attack leg ends beside the throw spot, 1.4 m+ from it and off the player's way in");
+}
+
+{
+  // ⑫ ClearView (relay r2 Front step 2 drives): a squadmate between the player's eye and a talking speaker's head steps
+  // aside square to the line of sight and holds there until the line ends; the speaker and the camera stay put.
+  const eye = { x: 0, y: 1.6, z: 0 }, head = { x: 0, y: 1.6, z: -3.6 };
+  assert.ok(BodyBetween(eye, head, { x: 0.1, y: 0, z: -1.8 }, 1.75), "a standing body on the line of sight hides the head");
+  assert.ok(!BodyBetween(eye, head, { x: 0.5, y: 0, z: -1.8 }, 1.75), "0.5 m off the line he does not");
+  assert.ok(!BodyBetween(eye, head, { x: 0, y: 0, z: -1.8 }, 1.2), "nor does a crouched man below the line");
+  const cands = AsideCandidates(eye, head, { x: -0.1, z: -1.8 });
+  assert.ok(cands[0].x < 0 && Math.abs(cands[0].offset) === B.speakerAsideOffsetsM[0], "his own side first, the nearest offset first");
+  for (const c of cands) assert.ok(SegmentDistance(c, eye, head) >= B.speakerAsideOffsetsM[0] - 1e-9, "every candidate is off the line of sight");
+  const fov = 55 * Math.PI / 180, aspect = 16 / 9, near = 0.05, far = 500, f = 1 / Math.tan(fov / 2);
+  const camera = { matrixWorld: { elements: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1.6, 0, 1] },
+    matrixWorldInverse: { elements: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, -1.6, 0, 1] },
+    projectionMatrix: { elements: [f / aspect, 0, 0, 0, 0, f, 0, 0, 0, 0, (far + near) / (near - far), -1, 0, 0, 2 * far * near / (near - far), 0] } };
+  const V = (x, y, z) => ({ x, y, z, clone() { return V(this.x, this.y, this.z); }, set(a, b, c) { this.x = a; this.y = b; this.z = c; return this; } });
+  const luo = { id: 1, castId: "luo", alive: true, position: { x: 0, y: 0, z: -3.6 } };
+  const yaowa = { id: 2, castId: "yaowa", alive: true, position: { x: -0.1, y: 0, z: -1.8 } };
+  const moves = [], defends = [];
+  const r = { time: 0, camera, flow: { stage: { id: "Orders" } }, ai: { soldiers: [luo, yaowa] },
+    player: { position: { x: 0, y: 0, z: 0 }, get EyePosition() { return V(0, 1.6, 0); } },
+    speakers: { ActorForWho: (who) => ({ luo, yaowa })[who] || null },
+    Point: (p, rise = 0) => V(p.x, rise, p.z), BlocksSight: () => false,
+    MoveActor: (actor, point) => { moves.push({ id: actor.id, ...point }); }, Defend: (actor, point) => defends.push({ id: actor.id, ...point }) };
+  const scenes = new FirstLevelFrontScenes(r);
+  scenes.handle = { id: "Volunteer", done: false, lines: [{ line: { id: "Volunteer.05", who: "luo", direction: {} }, state: "playing" }] };
+  scenes.Steer();
+  assert.ok(scenes.aside?.soldier === yaowa && scenes.asides.at(-1).line === "Volunteer.05", "Yaowa, between the player and Luo, is sent aside");
+  assert.ok(moves.at(-1).id === yaowa.id && SegmentDistance(scenes.aside.spot, eye, { x: 0, z: -3.6 }) >= B.speakerAsideOffsetsM[0] - 1e-9 && scenes.aside.spot.x < 0,
+    "to her own side, off the line of sight");
+  assert.ok(scenes.Steers(yaowa) && !moves.some((m) => m.id === luo.id), "FrontBattle.Walk leaves her alone; Luo is not moved");
+  Object.assign(yaowa.position, scenes.aside.spot); scenes.Steer();
+  assert.equal(defends.at(-1).id, yaowa.id, "at her spot she holds it");
+  scenes.handle.lines[0].state = "done"; scenes.Steer();
+  assert.equal(scenes.aside, null, "the line done, she is let go");
+  // A squadmate on a gun is never moved.
+  const s2 = new FirstLevelFrontScenes({ ...r, emplacement: { guns: new Map([["Left", { npc: yaowa }]]) } });
+  yaowa.position = { x: -0.1, y: 0, z: -1.8 };
+  s2.handle = { id: "Volunteer", done: false, lines: [{ line: { id: "Volunteer.05", who: "luo", direction: {} }, state: "playing" }] };
+  s2.Steer();
+  assert.equal(s2.aside, null, "a gunner stays on his gun");
+  checks += 12;
+  Ok("⑫ a squadmate between the player and a talking speaker steps aside until the line ends");
+}
+
+{
+  // ⑬ Luo's cover is walked to within B.leaderCoverArrivalM (relay r2 Front step 2: 1.0 m short of it is the west
+  // doorway, behind the wall's end from the captured gun), and the walk is taken up again after a step back.
+  const { r, moves } = WalkRuntime();
+  const battle = new FirstLevelFrontBattle(r), cover = { ...S.leaderCover, arrivalM: B.leaderCoverArrivalM };
+  const luo = { id: 1, alive: true, position: { x: S.leaderCover.x - 0.97, z: S.leaderCover.z }, scriptArrivalRadius: 1 };
+  battle.SetWalk(luo, [cover]);
+  assert.equal(battle.Walk(luo), false, "0.97 m short (the doorway) is not his cover");
+  assert.deepEqual([moves.at(-1).x, moves.at(-1).z], [S.leaderCover.x, S.leaderCover.z], "he walks on into it");
+  luo.position = { x: S.leaderCover.x - 0.2, z: S.leaderCover.z };
+  assert.equal(battle.Walk(luo), true, "within leaderCoverArrivalM he is there");
+  luo.position = { x: S.leaderCover.x - 1.3, z: S.leaderCover.z }; moves.length = 0;
+  assert.equal(battle.Walk(luo), false, "put 1.3 m off it (a step back for a line), the walk is taken up again");
+  assert.equal(moves.at(-1)?.id, 1, "... and he walks back");
+  const w = battle.walks.get(luo.id); w.stallAccepted = true; w.index = 1;
+  assert.equal(battle.Walk(luo), true, "a spot the stall fallback accepted stays accepted (no stall loop)");
+  const src = Read("Script_FirstLevelFrontBattle.mjs");
+  assert.equal((src.match(/LeaderCover\(\)\]/g) || []).length, 3, "capture, 04 and after-capture cover legs all end on LeaderCover()");
+  assert.ok(!/\[S\.leaderCover\]|,S\.leaderCover\]/.test(src), "no leg ends on the bare leaderCover point");
+  checks += 8;
+  Ok("⑬ Luo walks right into his cover and back into it after a step back");
+}
+
+{
+  // ⑭ The left gun (relay r2 Front step 3 addendum A). It stood 1.22 m off the seat, 1.45 m over the pit floor with
+  // nothing under it; He held his HanYang 2 m behind it for all of 04-05 (Zhou's exit shoved him off the seat).
+  const seatToGun = Dist(S.leftGun, S.leftSeat);
+  assert.ok(seatToGun >= 0.5 && seatToGun <= 0.8, `the gun stands 0.5-0.8 m in front of its seat (${seatToGun.toFixed(2)} m)`);
+  const rest = MISSION_LAYOUT.blocks.find((b) => b.id === "LeftGunRest");
+  assert.ok(rest, "LeftGunRest exists");
+  // The rendered gun's lowest vertex sits 0.043 m under its pivot (the RightNestFrontRest rule: pivot 1.45 over the floor
+  // at the gun, + sightRiseM 0.08 - 0.12294 to the lowest vertex); the rest's top is there and under the gun's pivot.
+  const pivotY = SampleMissionTerrain(S.leftGun.x, S.leftGun.z) + 1.45, top = rest.y + rest.h / 2;
+  assert.ok(Math.abs(top - (pivotY + 0.08 - 0.12294)) < 0.01, `the rest's top carries the gun (${top.toFixed(3)} vs pivot ${pivotY.toFixed(3)})`);
+  assert.ok(Math.abs(S.leftGun.x - rest.x) <= rest.w / 2 && Math.abs(S.leftGun.z - rest.z) <= rest.d / 2, "the gun's pivot is over the rest");
+  const backFace = rest.z + rest.d / 2;
+  assert.ok(S.leftSeat.z - backFace >= 0.45, `the rest's back face stays ${(S.leftSeat.z - backFace).toFixed(2)} m >= 0.45 m off the seat (no shove)`);
+  assert.ok(pivotY - SampleMissionTerrain(S.leftSeat.x, S.leftSeat.z) > 1.3, "a standing gun: the pivot is over 1.3 m above the seat's floor");
+
+  const stances = [];
+  const { r } = WalkRuntime({ ai: { ReleaseCover() {}, SetStance: (a, st) => stances.push([a.id, st]) } });
+  const he = { id: 3, castId: "heyoutian", alive: true, weaponId: "HanYang", weapon: { id: "HanYang" }, ammo: 5, meleeDormant: false,
+    scriptSuppressible: true, position: { x: S.leftSeat.x + 0.3, z: S.leftSeat.z + 1.7 }, actor: { SetWeapon(id) { this.weaponId = id; } } };
+  const gunner = { id: 9, missionId: "Relief1", alive: true, weaponId: "Zb26", weapon: { id: "Zb26" }, position: { ...S.leftSeat }, actor: { SetWeapon() {} } };
+  const gun = { npc: he, kind: { weaponId: "Zb26" } };
+  Object.assign(r, { opening: { zhou: null }, leftGunId: "Left", emplacement: { guns: new Map([["Left", gun]]) } });
+  const battle = new FirstLevelFrontBattle(r);
+  battle.UpdateLeftGunner();
+  assert.equal(he.weaponId, "Zb26", "He takes the ZB26 into his own hands with the gun");
+  assert.equal(he.actor.weaponId, "Zb26", "... the rig shows it");
+  assert.ok(he.meleeDormant === true, "the gunner is no bayonet target (he cannot die: a man who reached him bayoneted him for good)");
+  const post = battle.walks.get(he.id)?.route.at(-1);
+  assert.ok(post && Dist(post, S.leftSeat) < 1e-9 && post.arrivalM === B.leftGunSeatArrivalM && post.stance === 0,
+    "shoved 1.7 m off the seat, he walks onto it (within leftGunSeatArrivalM, standing)");
+  assert.ok(!stances.length && he.scriptSuppressible === true, "off the seat he is not stood up at the gun yet");
+  he.position = { x: S.leftSeat.x + 0.1, z: S.leftSeat.z };
+  battle.UpdateLeftGunner();
+  assert.deepEqual(stances.at(-1), [3, 0], "on the seat he stands at the gun");
+  assert.equal(he.scriptSuppressible, false, "... and fire does not pin him prone behind the rest");
+  assert.ok(battle.walks.get(he.id).route.at(-1) === post, "the walk is set once, not every frame");
+  // Relief: the gun passes to the relief gunner; He gets his rifle back and is a melee target again.
+  gun.npc = gunner;
+  battle.UpdateLeftGunner();
+  assert.equal(he.weaponId, "HanYang", "He leaves the gun with his HanYang");
+  assert.equal(he.meleeDormant, false, "... and melee sees him again");
+  assert.ok(gunner.meleeDormant === true && gunner.weaponId === "Zb26", "the relief gunner mans it with his own ZB26");
+  const src = Read("Script_FirstLevelFrontBattle.mjs");
+  assert.ok(/UpdateHandover\(\);\s*this\.UpdateLeftGunner\(\);/.test(src) && (src.match(/this\.UpdateLeftGunner\(\);/g) || []).length === 2,
+    "the gunner is kept every front frame and from UpdateRelief (06 has no FrontBattle.Update)");
+  const main = Read("Script_Main.mjs"), runtime = Read("Script_FirstLevelMissionRuntime.mjs");
+  assert.ok(/id:"MissionLeftGun"[^\n]*payload:\{npcCarriesGun:true\}/.test(runtime) && /npcCarriesGun/.test(main),
+    "the world model on the rest is hidden while its man holds the ZB26 at the seat");
+  checks += 19;
+  Ok("⑭ the left gun rests on LeftGunRest 0.6 m ahead of the seat; He mans it standing with the ZB26 and gets his rifle back");
+}
+
+{
+  // ⑮ The way back from a grenade dodge (09-26 relay r2 Front review). He dodged round LeftGunRest to its enemy side;
+  // straight back to the seat ran into the rest, the stall fallback accepted the spot 1.31 m off and he stood there
+  // for good with the gun showing on the rest (two ZB26s). Luo dodged out of the nest's west door and walked straight
+  // back into its outer wall. Here: a 0.5 x 0.3 m block between the seat (0,0) and where the dodge ended.
+  const box = { x0: -0.25, x1: 0.25, z0: -1.1, z1: -0.8 };
+  const Crosses = (a, b) => { for (let i = 0; i <= 40; i++) { const t = i / 40, x = a.x + (b.x - a.x) * t, z = a.z + (b.z - a.z) * t;
+    if (x > box.x0 && x < box.x1 && z > box.z0 && z < box.z1) return true; } return false; };
+  let dodging = false;
+  const { r, moves } = WalkRuntime({ RespondToGrenade: (a) => { a.missionGrenadeEvade = dodging; return dodging; },
+    Point: (p, rise = 0) => ({ x: p.x, y: rise, z: p.z }), BlocksSight: (a, b) => Crosses(a, b) });
+  const battle = new FirstLevelFrontBattle(r);
+  const seat = { x: 0, z: 0, arrivalM: B.leftGunSeatArrivalM, stance: 0 };
+  const he = { id: 3, castId: "heyoutian", alive: true, position: { x: 0, z: 0 }, scriptArrivalRadius: 1 };
+  battle.SetWalk(he, [seat]);
+  assert.equal(battle.Walk(he), true, "on his seat");
+  battle.walks.get(he.id).stallAccepted = true;
+  dodging = true;
+  for (const p of [{ x: 0, z: 0 }, { x: -1.3, z: -0.3 }, { x: -1.3, z: -1.3 }, { x: -0.1, z: -1.3 }]) { he.position = p; r.time += 0.3; battle.Walk(he); }
+  const w = battle.walks.get(he.id);
+  assert.equal(w.trail?.length, 4, "the dodge leaves a trail point every evadeTrailStepM");
+  assert.equal(w.stallAccepted, false, "a new dodge undoes the stall fallback's acceptance");
+  dodging = false; r.time += 0.1; moves.length = 0;
+  assert.equal(battle.Walk(he), false, "the dodge over, 1.3 m in front of the rest: the walk to the seat is taken up again");
+  assert.deepEqual([moves.at(-1).x, moves.at(-1).z], [-1.3, -1.3], "straight back is blocked: he walks the trail back round the block first");
+  assert.equal(battle.State().evadeReturns.length, 1, "the walk back is reported");
+  he.position = { x: -1.2, z: -1.25 }; r.time += 1;
+  battle.Walk(he);
+  assert.deepEqual([moves.at(-1).x, moves.at(-1).z], [0, 0], "from the trail point with a clear walk, on to the seat");
+  he.position = { x: 0.05, z: -0.05 };
+  assert.equal(battle.Walk(he), true, "and he is on the seat again");
+  // A dodge that ends with a clear walk back: no trail walk, straight to his point.
+  dodging = true; he.position = { x: 0, z: 0 }; battle.Walk(he); he.position = { x: 0.9, z: 0.4 }; battle.Walk(he);
+  dodging = false; moves.length = 0; battle.Walk(he);
+  assert.deepEqual([moves.at(-1).x, moves.at(-1).z], [0, 0], "a clear way back: straight to the seat");
+  assert.equal(battle.State().evadeReturns.length, 1, "... without a trail walk");
+  // Stalled against the block with no dodge trail (shoved there): not accepted while a way round is clear (PostDetour).
+  he.position = { x: 0, z: -1.5 }; battle.SetWalk(he, [seat]); r.time += 1; battle.Walk(he);
+  he.position = { x: 0, z: -1.45 }; r.time += B.walkStallS + 0.1; moves.length = 0;
+  assert.equal(battle.Walk(he), false, "stalled against the block 1.45 m short of the seat (his capsule 0.35 m off its face): not accepted");
+  const via = battle.State().detours.at(-1)?.via;
+  assert.ok(via?.length && [he.position, ...via, seat].every((p, i, all) => i === 0 || !Crosses(all[i - 1], p)), `a way round it (${JSON.stringify(via)})`);
+  for (const p of via) { r.time += 0.5; battle.Walk(he); assert.ok(Dist(moves.at(-1), p) < 0.01, `he walks round it (${JSON.stringify(p)})`); he.position = { ...p }; }
+  r.time += 0.5; battle.Walk(he);
+  assert.deepEqual([moves.at(-1).x, moves.at(-1).z], [0, 0], "and from there on to the seat");
+  checks += 13;
+  Ok("⑮ after a grenade dodge a walker goes back the way he dodged when straight back is blocked, a post is taken up again, and a stall short of a post tries a way round");
 }
 
 console.log(`FirstLevelFrontPacingTest 通过：${checks} 条断言`);

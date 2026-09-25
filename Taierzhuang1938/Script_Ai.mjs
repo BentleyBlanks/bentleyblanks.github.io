@@ -3480,6 +3480,9 @@ export class AiDirector {
     // P012 route followers use an explicit metres/second pace, not a cap on the
     // ordinary 2.6m/s advance state. Scouts still perceive and fire normally.
     const scriptedPathFollower = s.p012Guided === true && Number.isFinite(s.scriptMoveSpeedMps);
+    // Walking s.goal instead of this state's moveOrder, for FirstLevelFrontBattle.Walk (routeArrivalOwnsRadius, 03-06
+    // route walkers only; MissionRuntime.MoveActor clears it for every other mover): that order's radius is not his.
+    let followsGoal = false;
     // Exact escort corridors own their queue waits. Locally mobile infantry
     // retain obstacle recovery even during authored bounds.
     const lockedCorridor = scriptedPathFollower && !(s.tacticalRadiusM > 0);
@@ -3488,9 +3491,9 @@ export class AiDirector {
       // Combat still owns aiming, firing, reloading and damage above. The
       // checked corridor owns movement: FIRE's cached cover must not pull the
       // leader away from the escort, and RELOAD must not cancel his next step.
-      if (!s.scriptDefensive) desired = this.tmpD.copy(s.goal);
+      if (!s.scriptDefensive) { desired = this.tmpD.copy(s.goal); followsGoal = s.routeArrivalOwnsRadius === true; }
     }
-    if (s.p012ScoutDirected || s.p012RouteRejoining) { desired = this.tmpD.copy(s.goal); speed = 2.6; }
+    if (s.p012ScoutDirected || s.p012RouteRejoining) { desired = this.tmpD.copy(s.goal); speed = 2.6; followsGoal = s.routeArrivalOwnsRadius === true; }
     if(s.missionGrenadeEvade){wantsFire=false;this.SetStance(s,s.scriptMoveSpeedMps>0?0:2,COVER_CYCLE.grenadeStanceHoldS,true);}
     else if(Number.isFinite(s.scriptEscapeStance))this.SetStance(s,s.scriptEscapeStance,COVER_CYCLE.grenadeStanceHoldS,true);
     else if(this.time<(s.scriptProneUntil||0))this.SetStance(s,2,s.scriptProneUntil-this.time,true);
@@ -3501,7 +3504,10 @@ export class AiDirector {
       const d = Math.hypot(dx, dz);
       // 掩体微走位要自己的到位半径：hide↔peek 的侧步只有 sideStepM（0.55 m），
       // 拿默认的 1.2 m 判的话人永远「已经到了」，探头一次都不会发生。
-      const arrivalRadius = Number.isFinite(s.moveArriveM) ? Math.max(0.05, s.moveArriveM)
+      // A route walker who replaced the moveOrder with s.goal keeps the route's radius: FIRE's displace order left
+      // moveArriveM at 0.6 m, so Luo stood 0.58 m short of a 0.25 m route corner at the nest's rear door until the
+      // displace timed out or FrontBattle.Walk skipped the corner (2026-09-25 relay r2 Front step 2).
+      const arrivalRadius = !followsGoal && Number.isFinite(s.moveArriveM) ? Math.max(0.05, s.moveArriveM)
         : (Number.isFinite(s.scriptArrivalRadius) ? Math.max(0.05, s.scriptArrivalRadius) : 1.2);
       if (d > arrivalRadius) {
         let nx = dx / d, nz = dz / d;
@@ -3534,7 +3540,7 @@ export class AiDirector {
         // 掩体微走位（半米的侧步）不参与「卡住就翻墙 / 卡住就绕路」那一套：
         // 一帧只挪两三厘米，胶囊求解的余量本来就吃得下，判成"卡住"的话
         // 探头探到一半会去翻墙。
-        const microStep = Number.isFinite(s.moveArriveM) && d < COVER_CYCLE.microMoveM;
+        const microStep = !followsGoal && Number.isFinite(s.moveArriveM) && d < COVER_CYCLE.microMoveM;
         if (moved < step * 0.4 && !microStep) {
           s.stuckTime += dt;
           // 挡在前面的要是一堵翻得过去的墙，就翻过去 —— 别沿着院墙兜半圈找门洞。

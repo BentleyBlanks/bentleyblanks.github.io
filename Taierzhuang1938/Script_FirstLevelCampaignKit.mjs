@@ -101,7 +101,10 @@ export function ParseCampaignArgs(argv = process.argv) {
 
 /** 起服务、起浏览器、开页面，返回 ctx。 */
 export async function OpenCampaign(options) {
-  const output = path.join(here, "_shots", options.suite + (options.evidenceTag ? "_" + options.evidenceTag : ""));
+  // --evidence-tag (Gate) or CAMPAIGN_SHOTS_TAG (Front relay r2): runs of the same suite in parallel keep their evidence apart
+  // (_shots/<suite>_<tag>); unset, the directory is the suite's as before.
+  const shotsTag = options.evidenceTag || process.env.CAMPAIGN_SHOTS_TAG;
+  const output = path.join(here, "_shots", options.suite + (shotsTag ? "_" + shotsTag : ""));
   await fs.mkdir(output, { recursive: true });
   const server = await ServeRoot(root, 0);
   const browser = await LaunchBrowser();

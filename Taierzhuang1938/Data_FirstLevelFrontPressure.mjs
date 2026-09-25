@@ -30,6 +30,8 @@
 //                  regroupLine 最后一线打完 assaultLateralShifts 轮退回哪一条再上（负数同上）
 //                  loop       是否无限循环（true = 相位不切就一直「退回再上」，不会坐死）
 //                  points     给了就换成这条显式路线；viaLine 给了的话，先沿**自己的**跃进线跑到那条线再横移
+//                  entry      和 lane 一起给（relay r2 Front 09-25 加）：生成后先按顺序跑过这几个过路点再上第一条线 ——
+//                             过路点不停、不开枪、不算跃进线（下标、退线、让口子都只数 lane 的线）；卡住就跳下一个
 //                  fallback   { casualtyFraction|casualties, backLines, holdS, repelledFact? }：本组伤亡过这个比例
 //                             就全组退 backLines 条线、喊「一旦下がれ」，holdS 秒后照常再上；
 //                             **每组整关只退一次**；repelledFact 给了的话，退完（或全灭）记这个事实
@@ -155,16 +157,27 @@ const MG_ATTACK = (extra = {}) => Object.freeze({ role: "assault", maxLine: -1, 
   fallback: Object.freeze({ casualtyFraction: 0.5, backLines: 2, holdS: 15, repelledFact: "frontAttackRepelled" }),
   stalemate: STALEMATE, ...extra });
 /**
- * 路堑增援沿战车路下来（同一条路：路堑 → 北残院后 → 折返顶 → 路弯出口），到侧翼组第三跳那两个弹坑；
- * 北侧增援从出发壕按跃进线现算（"field"）。
+ * 路堑增援：先沿战车路跑下路堑（entry：CrestEast → Shadow → 残院北面那道缓坡的坡脚，**过路点，不停、不算跃进线**），
+ * 上残院西北的土台，再一线线压到侧翼组第三跳那两个弹坑；北侧增援从出发壕按跃进线现算（"field"）。
+ *
+ * relay r2 Front 第三步续（2026-09-25）：以前的跃进线是战车路上的六个路点（CrestEast / Shadow / HullDown / Descent /
+ * Bend / BendExit），前五个都在路堑和北残院后面的死角里 —— x 46–66、z −206…−182 对 04 的授权射击点一个都打不着
+ *（引擎射线逐格量过：站姿 step3c/RoadGrid3、蹲姿 RoadGrid4）。两个人在每条线上蹲 3.5 s 左右、一枪不开，走完要
+ * 一分多钟，04 空转探针里他们几乎每趟都占一到两个「30 s 一发没打」的窗口。现在的线：
+ *   土台东沿 (45, −195)     蹲姿 11/11 个非缺口点、缺口 0/3
+ *   残院西墙外 (43.5, −189.5) 蹲姿 11/11、缺口 0/3（站姿同）；secondWithdrawal 的 maxLine 就是它（看不见撤退口）
+ *   侧翼组第三跳两个弹坑（不变）
+ * 坡脚 (56, −197.5) 到土台东沿是那道缓坡（地面 0.4 → 2.0 m，约 12°）；土台南北两侧是 1.6–2.2 m 的陡坎，不从那儿上。
  */
 const ROAD = (id) => FRONT_TANK_PATH[FrontTankIndex(id)];
-export const FRONT_RESERVE_ROAD_LANE = Object.freeze([ROAD("CrestEast"), ROAD("Shadow"), ROAD("HullDown"), ROAD("Descent"),
-  ROAD("Bend"), ROAD("BendExit"), { x: 46.5, z: -176.2 }, { x: 42.6, z: -174.2 }].map((p) => Object.freeze({ x: p.x, z: p.z })));
+export const FRONT_RESERVE_ROAD_ENTRY = Object.freeze([ROAD("CrestEast"), ROAD("Shadow"), { x: 56, z: -197.5 }]
+  .map((p) => Object.freeze({ x: p.x, z: p.z })));
+export const FRONT_RESERVE_ROAD_LANE = Object.freeze([{ x: 45, z: -195 }, { x: 43.5, z: -189.5 }, { x: 46.5, z: -176.2 }, { x: 42.6, z: -174.2 }]
+  .map((p) => Object.freeze({ x: p.x, z: p.z })));
 const RESERVE_WEST = (extra = {}) => Object.freeze({ role: "assault", lane: "field", maxLine: -1, regroupLine: 1, loop: true,
   stalemate: STALEMATE, ...extra });
-const RESERVE_ROAD = (extra = {}) => Object.freeze({ role: "assault", lane: FRONT_RESERVE_ROAD_LANE, maxLine: -1, regroupLine: -2,
-  loop: true, stalemate: STALEMATE, ...extra });
+const RESERVE_ROAD = (extra = {}) => Object.freeze({ role: "assault", lane: FRONT_RESERVE_ROAD_LANE, entry: FRONT_RESERVE_ROAD_ENTRY,
+  maxLine: -1, regroupLine: -2, loop: true, stalemate: STALEMATE, ...extra });
 
 /**
  * 增援放出（契约 §2 第 8 条、§6；Space 名册 FRONT_RESERVE_ENTRIES.slotStages）：带 reserve 的相位里，
@@ -253,7 +266,7 @@ export const FRONT_PRESSURE_PHASES = Object.freeze([
     yield: true, bark: "fallback", fire: NoGap(FIRE_05), reserve: true,
     groups: Object.freeze({ fireBase: FB_05, boundWest: BOUND({ maxLine: 1 }), boundEast: BOUND_EAST({ maxLine: 1 }),
       flank: FLANK({ maxLine: 1 }), mgAttack: MG_ATTACK({ maxLine: 1, regroupLine: 0 }),
-      reserveWest: RESERVE_WEST({ maxLine: 1, regroupLine: 0 }), reserveRoad: RESERVE_ROAD({ maxLine: 4, regroupLine: 3 }) }) }),
+      reserveWest: RESERVE_WEST({ maxLine: 1, regroupLine: 0 }), reserveRoad: RESERVE_ROAD({ maxLine: 1, regroupLine: 0 }) }) }),
   // 守军撤完、玩家离开前沿：零星的土坎火力，跃进停在原地。
   Object.freeze({ id: "disengage", when: "lastGuardsWithdrawn", stages: Object.freeze(["Tank"]),
     fire: CREST_05,

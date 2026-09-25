@@ -37,7 +37,12 @@ export const FRONT_TANK_PATH=Object.freeze([
   Way("Pressure",51,-172.5,"firePoint",{faceTo:"nest",turretTo:"nest",holdS:14,note:"04 pressure: HE + hull MG on the nest front seat, 31 m"}),
   Way("Approach",44.5,-169,"cruise"),
   Way("Block",38,-167.5,"block",{faceTo:"gap",turretTo:"gap",holdS:0,note:"04-05 blockade, 7.5 m north of the berm line"}),
-  Way("Squeeze",35.5,-167,"squeeze",{faceTo:"gap",turretTo:"attackTail",holdS:0,note:"05 push, +2.6 m; hull still on the gap, turret on the attack branch's last 4.7 m"}),
+  // RESERVED, the brain never drives here: 05 holds Block until the track is cut (Data_Tuning_Tank TANK_PACE.Block
+  // holdUntil tankImmobilized; a tank with a cut track cannot move on). From Squeeze, 11 m off the attack position, the
+  // second bundle cannot reach the engine deck (13.2 m/s needed, 13 max). Kept, and still measured by FrontTopologyTest
+  // (hull clearance, gap and attack-tail sight), for the old key tankEndIndex and for a later 05 push if the throw ever
+  // reaches it (integration lead 2026-09-25: 05 stays at Block).
+  Way("Squeeze",35.5,-167,"squeeze",{faceTo:"gap",turretTo:"attackTail",holdS:0,note:"reserved: 2.6 m past Block; the brain holds Block through 05 and never comes here"}),
 ]);
 const T=FRONT_TANK_PATH;
 /** Index of a named tank waypoint; FRONT_SORTIE's old tank*Index keys are resolved through it. */
@@ -61,10 +66,36 @@ export const FRONT_SORTIE=Object.freeze({
   route:[Point(29.7,-141.5),Point(34,-136.4),Point(40.6,-130.6),Point(44.6,-125.6),Point(41.6,-120.8),Point(41.2,-118.6),
     Point(39.6,-117.4),Point(39.6,-114.2),Point(41.4,-112.6),Point(42.4,-111)],
   // 05 attack branch = the upper link sap the 01 Japanese came down: rear junction -> road-side ruin.
-  attackRoute:[Point(29.7,-141.5),Point(35,-142.5),Point(39.4,-144.2),Point(39.8,-150),Point(41.8,-154.8),Point(43.6,-159.6)],
-  house:Point(47.5,-109),bundle:Point(49,-110.2),keeper:Point(46.2,-106.4),
+  // (42.9,-157.6) turns the last leg 0.35 m east where it passes AttackRuinA's east end (41.7,-156.6): the lane still
+  // clears the block by 0.62 m (was 0.60). A walker who ends up in the pocket south-west of that end (after a throw, a
+  // dodge, a shove) takes this point as his nearest one and walks away from the wall's south face. Aimed straight at
+  // (41.8,-154.8) he walked into the face, and with a crater tile under him he did not slide along it either
+  // (TankProbe5: a warning shell burst on the wall top, stuck at (41.67,-157.31) for good; a point on the line at
+  // (42.7,-157.2) still left 3 of 13 pocket starts stuck against the face; 2026-09-25 relay r2 Front step 2).
+  attackRoute:[Point(29.7,-141.5),Point(35,-142.5),Point(39.4,-144.2),Point(39.8,-150),Point(41.8,-154.8),Point(42.9,-157.6),Point(43.6,-159.6)],
+  // The keeper kneels in the house where the west door (gap z -111.8..-110.2 at x 43) frames him from the whole
+  // approach inside supplierRangeM, 2.6 m off the door-to-crate walk: he calls 「里头那个箱子！」 as the player comes up
+  // and the player sees him say it (2026-09-25 relay r2 Front step 1). At (46.2,-106.4) the 0.6 m thick west wall
+  // stood between the two for the whole line (09-25 03->06 drive: 130 of 130 frames); in the alley outside the door
+  // (41.6,-108.8) he ended up in the doorway, in the player's way.
+  house:Point(47.5,-109),bundle:Point(49,-110.2),keeper:Point(46.8,-107.8),
+  // Luo's 05 supply leg ends beside the back door (0.8 m off the west wall, south of the gap), not in it: stopped at
+  // the route's last point (42.4,-111) he stood in the doorway between the player and the keeper for the keeper's
+  // whole line (09-25 drive: hidden by Luo 130 of 130 frames) and in the player's way in.
+  leaderDoorSide:Point(41.9,-109.4),
+  // Luo's 05 attack leg ends beside the throw spot, not on it: 1.5 m west of it on the trench floor behind RoadsideRuin,
+  // 1.5 m off the player's last leg in, inside rearArrivalM for attackPositionReached. The player at the throw spot,
+  // facing the tank, has him at the left of the picture. Walking to the throw spot itself he stood 0.8-1.3 m from the
+  // player for BundleAttack (09-25 relay r2 Front step 2 drives: BundleAttack.02 181 of 189 frames closer than 1.2 m,
+  // BundleAttack.01 56 of 56), a chin and a sleeve instead of a face; stopped 2 m back up the branch (44.2,-157.7) the
+  // player walked past his elbow just as BundleAttack.01 started (0.9 m, 78 of 115 frames).
+  leaderAttackSide:Point(42.1,-159.9),
   throw:Point(43.6,-159.6),orders:Point(-34,-99),
-  leftGun:Point(-33.8,-157.6),leftSeat:Point(-33.6,-156.4),
+  // The left gun stands 0.6 m in front of its seat, on its own sandbag rest (Data_FirstLevelMissionLayout LeftGunRest):
+  // the gunner at the seat has the butt at his shoulder. At (-33.8,-157.6) it stood 1.22 m off the seat with nothing
+  // under it, 1.45 m over the pit floor - an empty gun in mid-air, the man at the seat 1.2 m behind it (2026-09-25
+  // relay r2, Gate package's STAGE_ENTRY_LEFT_GUN; Front step 3 addendum A).
+  leftGun:Point(-33.6,-157),leftSeat:Point(-33.6,-156.4),
   // He / relief / Zhou use the support sap's first leg and then the left gun access trench.
   leftRoute:[Point(-29,-110),Point(-30,-118),Point(-26.5,-126),Point(-31,-136),Point(-34,-147),Point(-33.6,-156.4)],
   // Wounded Zhou leaves the left gun the way He came in: left gun access -> support sap -> SJ -> collection rest.
@@ -90,6 +121,7 @@ export const FRONT_SORTIE=Object.freeze({
   // Old keys, resolved by waypoint id (integration decision 2026-09-23: resolve, never renumber).
   tankPath:T,
   tankPreviewIndex:FrontTankIndex("HullDown"),tankPressureIndex:FrontTankIndex("Pressure"),
+  // tankEndIndex = the reserved Squeeze point (the end of the drivable road), not where the tank stops in 05: that is Block.
   tankBlockIndex:FrontTankIndex("Block"),tankEndIndex:FrontTankIndex("Squeeze"),
   tankRoadX:38,tankNorthZ:-228,tankSouthZ:-166,tankLeadM:6,
   retreatCasualtyFraction:.5,retreatSuppression:.72,retreatSuppressionS:3,

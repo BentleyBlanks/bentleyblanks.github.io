@@ -551,8 +551,19 @@ export class FirstLevelTankRuntime {
         actor.escortRadiusBaseM ??= actor.tacticalRadiusM;
         actor.tacticalRadiusM = Math.max(2, Math.min(actor.escortRadiusBaseM, Distance(previous.at || previous.anchor, S.throw) - this.T.escorts.throwKeepOutM));
       }
-      // 还没接过来的护兵：车离他远就不管（03 车在图外时他们留在原处打仗）。
-      if (!previous && Distance(actor.position, e.anchor) > this.T.escorts.joinRangeM) continue;
+      // 还没接过来的护兵：车离他远就不管（03 车在图外时他们留在原处打仗）。看守位（overwatch）例外：车一进图就派，
+      // 护兵从路堑里的出生点直接走过去（离看守位 60 m 上下，比 joinRangeM 远）。
+      if (!previous && e.mode !== "overwatch" && Distance(actor.position, e.anchor) > this.T.escorts.joinRangeM) continue;
+      // Overwatch posts: run there (MoveActor every frame, its goal lasts 3 s), then hold the post. Walked (Defend's own
+      // pace) the 45-50 m from the cutting took the whole first 04 window and they fired nothing in it (idle probes h1, i1).
+      if (e.mode === "overwatch") {
+        const E = this.T.escorts, far = Distance(actor.position, e.anchor) > E.overwatchRunFromM, step = far ? "run" : "post";
+        if (far) { r.MoveActor(actor, e.anchor, E.overwatchRunMps); r.ai.SetStance(actor, 0, 0.5, true); }
+        if (previous && previous.mode === e.mode && previous.step === step && Distance(previous.anchor, e.anchor) < P.escortRecommandM) continue;
+        this.escortAnchors.set(e.id, { anchor: { ...e.anchor }, mode: e.mode, step, cover: false, at: { x: e.anchor.x, z: e.anchor.z } });
+        if (!far) { r.Defend(actor, e.anchor, e.radius, e.slack); r.ai.SetStance(actor, 1, 0.5, true); }
+        continue;
+      }
       if (previous && previous.mode === e.mode && Distance(previous.anchor, e.anchor) < P.escortRecommandM) continue;
       let anchor = e.anchor, radius = e.radius;
       // 停车（firePoint / hullDown / block / squeeze）：推到路边真有的掩体点上（AiCover）。

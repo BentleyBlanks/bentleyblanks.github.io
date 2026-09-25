@@ -843,6 +843,13 @@ export class TankBrain {
     // 路点自带护兵槽（FRONT_TANK_PATH 的 Block/Squeeze → FRONT_TANK_ESCORT_SLOTS，Space 包量过：都在车北侧/西侧弹坑里、
     // 看不见缺口）：停在这儿时护兵去这几个绝对位置，不按车体相对槽往路边推（那样会有人顺土坎南坡看见缺口）。
     const fixed = holding ? this.points[this.holdIndex].escortSlots : null;
+    // 看守位（路点的 escortOverwatch，Data_Tuning_Tank TANK_ESCORT_OVERWATCH）：到了 E.overwatchFromStage（04）车还没开过
+    // BendExit（还在路堑、折返顶或北残院后面的路弯里），护兵不再贴着车走，去残院西北土台上的看守位 —— 车身旁那条路从头到尾
+    // 对前沿一个点都打不着。03 照旧跟车藏在路堑里（土台对夺下的机枪敞着，03 就上去会被一个个打掉）。车开往 Pressure
+    //（下一个路点没有 escortOverwatch）就归队。
+    const leg = this.cum.findIndex((c) => c >= this.progress - 0.05);
+    const overStage = this.StageRank(world.stage) >= this.StageRank(E.overwatchFromStage);
+    const over = !fixed && overStage && leg >= 0 ? this.points[leg].escortOverwatch || null : null;
     const out = [];
     for (const [i, slot] of E.slots.entries()) {
       const id = ids[i];
@@ -858,6 +865,10 @@ export class TankBrain {
         const toward = { x: mode.point.x - this.x, z: mode.point.z - this.z }, d = Math.hypot(toward.x, toward.z) || 1;
         anchor = { x: this.x + toward.x / d * 3 + r.x * slot.side * 1.5, z: this.z + toward.z / d * 3 + r.z * slot.side * 1.5 };
         radius = E.rallyRadiusM; slack = E.moveSlackM;
+      }
+      if (over?.[i] && mode?.kind !== "rally") {
+        out.push({ id, slot: over[i].id ?? slot.id, anchor: { x: over[i].x, z: over[i].z }, radius: E.slotRadiusM, slack: E.slotSlackM, mode: "overwatch" });
+        continue;
       }
       if (fixed?.[i] && mode?.kind !== "rally") {
         out.push({ id, slot: fixed[i].id ?? slot.id, anchor: { x: fixed[i].x, z: fixed[i].z }, radius: E.slotRadiusM, slack: E.slotSlackM, mode: "slot" });

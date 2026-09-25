@@ -462,6 +462,8 @@ export class FirstLevelMissionRuntime {
   MoveActor(actor, point, speed = R.squadSpeedMps) {
     if (!actor?.alive) return;
     actor.p012Guided = true;
+    // Set again by FrontBattle.Walk right after its own call (Script_Ai.Act: a route walker's arrival radius).
+    actor.routeArrivalOwnsRadius = false;
     actor.scriptDefensive = false;
     actor.scriptMoveSpeedMps = speed;
     actor.manualGoalUntil = this.ai.time + 3;
@@ -1139,6 +1141,19 @@ export class FirstLevelMissionRuntime {
       if (s.index > top) { s.index = top; s.mode = "rush"; s.hold = 0; }
       // 冲刺卡死借用的站位只对这一轮这条线有效：线一换（进 / 退 / 退线 / 让口子）就作废。
       if (s.stallTarget && s.stallTarget.index !== s.index) s.stallTarget = null;
+      // 过路点（压力表 lane 的 entry，Script_FirstLevelFrontPressure.ApplyAssault）：上第一条线之前按顺序跑过去，不停、不算线。
+      // 到了或冲刺卡死（RushStalled）就跳下一个 —— 路堑增援沿战车路下来，不在路堑和北残院后面的死角里一线线蹲。
+      if (s.entry?.length) {
+        if (Distance(actor.position, s.entry[0]) <= R.assaultArrivalM * 2 || RushStalled(s, actor.position, s.entry[0], dt, R)) {
+          s.entry.shift(); s.rushBest = NaN;
+        }
+        if (s.entry.length) {
+          s.mode = "rush";
+          this.ai.SetStance(actor, 0, .4, true);
+          this.MoveActor(actor, s.entry[0], R.assaultRushMps);
+          continue;
+        }
+      }
       let target = s.stallTarget || s.points[s.index];
       // Arrival is hysteretic (2026-09-09, docs/Data_EnemyAi.md §15). Entering the line still needs
       // assaultArrivalM, but a man who has **settled** on it may wander the whole anchor + cover slack
@@ -1393,7 +1408,9 @@ export class FirstLevelMissionRuntime {
           Anchor:()=>new THREE.Vector3(spec.x,this.battlefield.GroundHeight(spec.x,spec.z)+(spec.supportHeight||0)+.3,spec.z)},
       );
     }
-    this.leftGunId=this.emplacement.CreateEmplacement({id:"MissionLeftGun",tag:"FirstLevelMission",kindId:"Zb26Nest",position:this.Point(Sortie.leftGun,1.45),seat:this.Point(Sortie.leftSeat),baseYaw:0,arcYawDeg:85,belts:6});
+    // payload.npcCarriesGun: the man on this gun holds the ZB26 itself (FrontBattle.UpdateLeftGunner), so the world
+    // model on the rest is hidden while he stands at the seat with it (Script_Main.SyncEmplacementViews).
+    this.leftGunId=this.emplacement.CreateEmplacement({id:"MissionLeftGun",tag:"FirstLevelMission",kindId:"Zb26Nest",position:this.Point(Sortie.leftGun,1.45),seat:this.Point(Sortie.leftSeat),baseYaw:0,arcYawDeg:85,belts:6,payload:{npcCarriesGun:true}});
     this.gunId = this.emplacement.CreateEmplacement({
       id: "MissionGun",
       tag: "FirstLevelMission",
@@ -2354,6 +2371,8 @@ export class FirstLevelMissionRuntime {
     // 阶段 1–7 的演出（Front 包）。放在 UpdateSquad 之后：剧情走位要压过接触反应。
     this.frontShow?.Update(dt);
     this.frontBattle.Update(dt);
+    // 03–06: a speaker stepping into the player's picture for his line (after every other mover, so it holds).
+    this.frontScenes.Steer();
     prof?.E("story/mission/director");
     prof?.B("story/mission/other");
     if (this.controls) {

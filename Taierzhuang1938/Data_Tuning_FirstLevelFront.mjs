@@ -239,6 +239,13 @@ export const FRONT_TUNING_SOURCES = Object.freeze({
 export const FRONT_BATTLE_TUNING=Object.freeze({
   arrivalM:1.0,leaderLeadM:3,captureRadiusM:4,rearArrivalM:3.5,attackArrivalM:3,
   firstBatch:2,assaultKills:3,assaultIds:["FrontRifleA","FrontRifleB","FrontRifleC","FrontRifleD","FrontRifleE","FrontRifleF"],
+  // The window also opens once the nest has been held this long (s) with the gap clear, kills or not: the west half is
+  // Zhou's to kill from the left gun and with them in contact behind the berm it can take minutes - relay r2 Front
+  // step 3 drives: 03 stuck 244 s after the capture with two of six down (c16_h1; before it idle_postB3, c36_C1 and
+  // tank_oldGun2, the last on the old left gun). In 30 of 31 idle-probe drives the nest was held 0.8-81 s before the
+  // window opened (the idle probe's nestLost phase, median 16 s; the 31st is the stuck postB3, 255 s), so 90 s leaves
+  // every normal run alone.
+  assaultWindowFallbackS:90,
   guardHeightM:1.2,blockadeRangeM:85,gatherSpacingM:1.35,zhouHealth:80,
   // Zhou's age on the crosshair card (both bodies: 03-05 at the gun, 06 seated). The random identity pool gave him
   // 17 / 29 / 32 across runs ("老周 17 岁"); the cast note says 三十多岁 (Data_FirstLevelMissionDialogue MISSION_VOICE_CAST.zhou).
@@ -279,6 +286,43 @@ export const FRONT_BATTLE_TUNING=Object.freeze({
   // him and rearRoute[0], rightRearReached never came), the relief gunner held 70 s on the leftRoute leg.
   // 6 s is about three times the longest grenade evade and crowd shove seen in the 03-06 drives.
   walkStallS:6,walkStallProgressM:.3,walkStallArrivalScale:2,
+  // Luo's cover inside the nest's west door (FRONT_SORTIE.leaderCover) is reached within leaderCoverArrivalM, not the
+  // general arrivalM (1.0): 1.0 m short of it is the doorway itself, where the west wall's end stands between the
+  // captured gun and his head. A walk that ends on it is taken up again when something else (a step back for a line,
+  // a shove) has put him more than coverReopenM past that radius. 09-25 relay r2 Front step 2 tank probes: stepped back
+  // out of the door for FrontAttack, he came back only 0.97 m and FrontWithdraw / TakeOverGun (20 s) were said from
+  // behind the wall's end (wall 89/183/132 of 89/183/132 frames). 0.25 m is the route-corner radius (arrivalM x 0.25);
+  // at 0.45 he still stopped 0.42 m short, 0.1 m clear of the wall's end in the gunner's line (DoorLuo probe).
+  leaderCoverArrivalM:.25,coverReopenM:.35,
+  // The left gun's man (FrontBattle.UpdateLeftGunner): He / the relief gunner walk onto the seat within
+  // leftGunSeatArrivalM (the gun, FRONT_SORTIE.leftGun, is 0.6 m ahead of it: the butt at his shoulder) and are walked
+  // back when put more than coverReopenM past that. Within leftGunManM of the seat the gunner stands at the gun and is
+  // not pinned prone. 09-25 relay r2 Front step 3: after the handover He stood 1.99 m off the seat for all of 04-05
+  // (Zhou's exit shoved him there), 3.2 m from the gun.
+  leftGunSeatArrivalM:.25,leftGunManM:.6,
+  // FrontBattle.Walk after a grenade dodge: the dodge path is kept as a trail (a point every evadeTrailStepM) and,
+  // when a straight walk from where the dodge ended to his next point is blocked at knee height, he walks the trail
+  // back (each trail point within evadeTrailArrivalM) until one of its points has a clear walk to that point. The dodge
+  // picks each leg clear of walls, so its way back is clear too. A dodge also takes a finished walk up again when it
+  // put him off his last point, and undoes a stall-fallback acceptance there. 09-26 relay r2 Front review: He dodged
+  // round LeftGunRest to its enemy side and stood 1.31-1.44 m in front of his seat for good (straight back ran into
+  // the rest and the stall fallback accepted the spot: two ZB26s in the picture); Luo dodged 10 m west out of the
+  // nest's west door as 04's tank pressure began, walked straight back towards the rear route's first corner into the
+  // nest's west outer wall, stalled twice, and BundleOrder.02/.03/.05 were said behind that wall (review drive rv36a).
+  // The clear-walk test (FrontBattle.ClearWalk) is three rays at each of evadeTrailClearHeightsM over the ground,
+  // evadeTrailClearM either side of the middle one (a little under the AI capsule's 0.3 m, so a man standing against
+  // a wall, 0.3-0.35 m from it, still has clear walks along it; a single knee-high ray passed the west door's jamb
+  // that he then stuck on).
+  evadeTrailStepM:.8,evadeTrailArrivalM:.4,evadeTrailClearM:.25,evadeTrailClearHeightsM:Object.freeze([.4,.9]),
+  // A walker stalled short of a post (a last point with its own arrivalM) tries a way round before the stall fallback
+  // accepts where he stands (FrontBattle.PostDetour): a point postDetourRadiiM from the post in postDetourBearings
+  // directions, on his floor within postDetourDyM, clear walks both ways; at most postDetourTries per walk (a dodge
+  // resets it). 09-26 fix drive fx36a: He stood 16 s against LeftGunRest's enemy face 1.3 m from his seat.
+  postDetourRadiiM:Object.freeze([1.1,1.6]),postDetourBearings:12,postDetourDyM:.6,postDetourTries:2,
+  // 05 after the tank (FrontBattle.LeaderBehindOnBranch): Luo counts as still out on the attack branch while he is within
+  // branchCorridorM of FRONT_SORTIE.attackRoute (the RoadAttack trench is 2.2-3.2 m wide, a dodge or a step aside puts
+  // him a metre or two off its line) and not yet back at the rear junction.
+  branchCorridorM:4,
   // 04: the player has held the rear junction this long out of the tank's sight and Luo is still not there ->
   // rightRearReached anyway (Luo walks on behind him). Two stall skips plus the 5 m walk from his cover.
   rearLeaderGraceS:15,
@@ -296,5 +340,77 @@ export const FRONT_BATTLE_TUNING=Object.freeze({
   // from the captured gun's seat (FRONT_SORTIE.seat): brief item 11 ④, and 09-25 idle-probe drives where bound man F and
   // the flank group came up to the nest's north wall in contact and shot the player on the gun from 1-4 m, twice in a row.
   capturedGunKeepOutM:6,
+  // ---- 03-06 lines: the speaker is in the picture when he talks (2026-09-25 relay r2 Front step 1) ----
+  // Script_FirstLevelFrontScenes.HoldLine: a line whose speaker stands within speakerViewNearM of the player but is not
+  // in the picture waits up to speakerViewHoldS while he steps into view (StepSpot), then plays anyway - only when he
+  // can step (the player stands and does not aim, a clear spot exists); otherwise it plays at once from where he is.
+  // Never turns the player's camera. Measured 09-25 (03->06 drive, 48 lines): every near line that missed the picture had its speaker
+  // 0.7-2.8 m from the player (beside or behind him); every far one was a shout across the front from 32-76 m (left
+  // gun, the pinned guards, the trench mouth). 15 m splits the two with room on both sides.
+  speakerViewNearM:15,
+  // How long a line may wait for its speaker (s): the longest step (speakerStepMaxM at speakerStepSpeedMps) is 1.1 s,
+  // plus about 0.5 s to start and stop. Chosen by this package, not tuned by feel yet; a longer wait makes an order late.
+  speakerViewHoldS:1.6,
+  // ... and a line waits at most speakerDangerHoldS (s) while a live Japanese grenade has the player inside its blast
+  // (the HUD's warning): a whole fuse (Type 91: 4.2 s) and the dodge from it, after which the wait for the speaker's face
+  // starts. Said at once, FrontWithdraw.01 went by while the player ran from a grenade, Luo never in the picture
+  // (09-25 relay r2 Gate drive ABfix_1a; Front step 3 addendum B).
+  speakerDangerHoldS:4.5,
+  // "In the picture" for the hold: the head projects inside this share of the frame (NDC), not just onto its edge.
+  // The acceptance sample (CheckFrontActing) counts 0.95; the hold asks for more so the head is not cut by the border.
+  speakerViewNdc:.8,
+  // ... and at least this far from the eye (m): nearer, the first-person camera sits in his shoulder and clips him.
+  speakerViewMinM:1.2,
+  // StepSpot: where the speaker may step to be seen - on the player's floor (|dy| <= speakerStepDyM) at one of these
+  // distances (m) and bearings off the view axis (deg, both sides; 0 would put him across the player's aim), no
+  // farther than speakerStepMaxM from where he stands, reached on a straight walk nothing blocks. 2.2-3.4 m frames a
+  // standing man's head and shoulders at the game's 55 deg vertical field of view (Data_Tuning_Main baseFovDeg,
+  // about 90 deg across at 16:9); 16-30 deg keeps him clear of the sights.
+  speakerStepDistancesM:Object.freeze([2.6,3.4,2.2]),speakerStepBearingsDeg:Object.freeze([22,16,30]),
+  speakerStepMaxM:5,speakerStepDyM:.45,
+  // Head heights (m above the spot's ground) that must be in the picture with nothing in between: standing, and crouched
+  // (StanceEye 1.0 + the head bone above the eye). Only the standing head was checked: 09-25 relay r2 Front step 3 idle
+  // probe e2, Luo stepped for FrontWithdraw.01 to the nest's west doorway, the combat brain crouched him there, and the
+  // door's wall hid his head for the whole line (166 frames in the picture, 0 seen).
+  speakerStepHeadsM:Object.freeze([1.55,1.05]),
+  // StandToBeSeen: a near speaker in the picture whose crouched head something low hides stands up for his line when his
+  // standing head (speakerStepHeadsM[0]) would be seen; the stance is re-held for this long (s) every frame the line plays.
+  speakerStandHoldS:.5,
+  // Stepping in is a quick shuffle, not a march: R.squadCatchupMps (4.5, the 07 catch-up) covers speakerStepMaxM in
+  // about the hold.
+  speakerStepSpeedMps:4.5,
+  // Stepping in is for a player who stands still (horizontal speed <= speakerStepPlayerStillMps: below a crouch walk,
+  // above the sway of aiming); the speaker goes back to his own orders once the player has moved speakerStepReleaseM
+  // from where he stood when the line was held.
+  speakerStepPlayerStillMps:.8,speakerStepReleaseM:2.5,
+  // Closest the stepping walk may pass the player (m): the 03-05 staging checks keep Luo 1.5 m clear of the player and
+  // of the captured gun's seat (Script_FirstLevelCampaignFrontBattle "Luo occupies his own firing post").
+  speakerStepPassM:1.5,
+  // Nobody steps into the picture of a player this near (m, horizontal) to the seat of a gun no squadmate mans: he is
+  // taking that gun, and the spot would be in the gun position he is walking into (09-26 relay r2 Front step 3 drives
+  // c16_a1 / c16_d1: FrontAttack.01 stepped Luo into the captured nest as the player went to the seat, and the staging
+  // check found Luo 1.28 m / 1.46 m from him). The line plays at once from where the speaker is. 3 m: the nest's west door
+  // to the seat is 3.2 m, the player sits 0.8 m off the seat point.
+  speakerStepGunSeatM:3,
+  // BackOff: a line that plays at once (the player walks or aims, or no framed spot) while its speaker stands nearer
+  // than speakerViewMinM: he steps back from the player to one of these distances (m), straight away from him or up to
+  // these bearings off that line (deg, both sides), at a walk (m/s), and the line is not delayed. 1.7-2.4 m is outside
+  // speakerViewMinM with room for the player's own step; the walk is about the NPC walk pace (Data_Tuning_FirstLevel MISSION_TUNING.walkSpeedMps 1.7).
+  // 09-25 03->06 drive: Luo tailing the player at 0.7 m (FrontBlockade.02, FrontApproach.01, BundleSupply.02,
+  // Volunteer.02) and the relief NCO at 1.0 m (FrontRelief.02) talked from inside the camera.
+  // Not to a spot within speakerBackOffAheadDeg of where a walking player is heading (he would walk into it again: Luo
+  // backed into the ammo house ahead of the player going in and stayed 0.7 m from him, 09-25 drive).
+  speakerBackOffDistancesM:Object.freeze([2,1.7,2.4]),speakerBackOffBearingsDeg:Object.freeze([0,30,60,90]),speakerBackOffSpeedMps:1.8,
+  speakerBackOffAheadDeg:50,
+  // A speaker for whom no back-off spot was found is not searched again for this long (FrontScenes.BackOffSpot runs 21
+  // candidates with collider and sight tests; in a narrow trench it found none and ran every frame; 09-26 review).
+  speakerBackOffRetryS:.25,
+  // ClearView: a squadmate (speakerAsideCast) whose body stands between the player's eye and a talking speaker's head
+  // (a speakerAsideBodyRadiusM column from 0.2 m over his feet to his head top: the line gate's test) steps aside,
+  // square to that line of sight, to one of these offsets (m) on his own side first, never nearer the player than
+  // speakerAsidePlayerM, then holds there until the line ends. 09-25 03->06 drives: Luo's 06 order to Yaowa
+  // (Volunteer.05) was said behind Yaowa's back in 2 of 7 drives (245 of 268 frames hidden by her).
+  speakerAsideCast:Object.freeze(["yaowa","heyoutian","liuwencai","luo"]),speakerAsideOffsetsM:Object.freeze([1.0,1.4,1.8]),
+  speakerAsideBodyRadiusM:.28,speakerAsidePlayerM:1.0,
   bandage:{radius:.087,height:.2,y:-.19,color:0xb6ac8b},
 });

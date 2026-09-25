@@ -63,7 +63,7 @@ async function InstallSampler(page, lane) {
       const aimed = present ? lane.map((q) => Math.abs(Math.atan2(Math.sin((t.turretYaw ?? 0) - YawTo(t, q)), Math.cos((t.turretYaw ?? 0) - YawTo(t, q))))) : null;
       const hullAimed = present ? lane.map((q) => Math.abs(Math.atan2(Math.sin((t.hullYaw ?? 0) - YawTo(t, q)), Math.cos((t.hullYaw ?? 0) - YawTo(t, q))))) : null;
       probe.samples.push({
-        t: Number(time.toFixed(2)), stage: R.flow.stage.id, present,
+        t: Number(time.toFixed(2)), bt: tr.brain ? Number(tr.brain.time.toFixed(2)) : null, stage: R.flow.stage.id, present,
         tank: present ? { x: +t.x.toFixed(2), z: +t.z.toFixed(2), state: t.damageState, speed: +(t.speed || 0).toFixed(2),
           rpm: Math.round(t.rpm || 0), load: +(t.load || 0).toFixed(2), turretYaw: +(t.turretYaw || 0).toFixed(3), hullYaw: +(t.hullYaw || 0).toFixed(3),
           cranking: !!t.cranking, phase: t.gunPhase || null, target: t.target || null } : null,
@@ -154,8 +154,14 @@ function Metrics(samples, debug) {
       withCrankStopBefore: shots.filter((s) => s.crankStopToFireS != null).length,
       minCrankStopToFireS: Math.min(...shots.filter((s) => s.crankStopToFireS != null).map((s) => s.crankStopToFireS)) },
     mg: { bursts: bursts.length, byKind, walkInShots: log.walkInShots, mgShots: log.mgShots,
+      // A burst's t is the brain's own clock (it starts when the tank enters, in 03), not the mission clock the samples
+      // keep: match on the brain time each sample records (relay r2 Front step 3 - matched on mission time, bursts landed
+      // up to a stage early, 05's showed up in 03/04 and the "05: the hull MG fires" check read 0).
       byStage: Object.fromEntries(["Support", "MachineGun", "Tank"].map((st) => [st, bursts.filter((b) => {
-        const s = samples.find((x) => x.t >= b.t); return s?.stage === st; }).length])) },
+        const s = samples.find((x) => x.bt != null && x.bt >= b.t); return s?.stage === st; }).length])),
+      // Who each stage's bursts went at (target ids; a burst at the attack lane is a lane point id).
+      targetsByStage: Object.fromEntries(["Support", "MachineGun", "Tank"].map((st) => [st, bursts.reduce((out, b) => {
+        const s = samples.find((x) => x.bt != null && x.bt >= b.t); if (s?.stage === st) out[b.target ?? "-"] = (out[b.target ?? "-"] || 0) + 1; return out; }, {})])) },
     laneThreat,
     onLaneThreat,
     tankStageShots: { total: shots.filter((s) => s.stage === "Tank").length,
