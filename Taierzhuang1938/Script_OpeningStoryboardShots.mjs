@@ -14,7 +14,9 @@
 //
 // Judging: each shot's `judge` (Data_OpeningStoryboards.storyboardShots) is checked against the dump --
 // the part of the contract's picture criteria that the staging and the camera decide (who is where on
-// screen, how far, pitch / roll / eye height, landmarks on screen, who must be out of the picture). A
+// screen, how far, pitch / roll / eye height, landmarks on screen, who must be out of the picture, and that
+// no scenery stands between the eye and a judged head -- a ray against the scene, named by the layout block
+// it hits; `behindOk:"<block>"` lets a wave-1 shot keep one listed blocker). A
 // failed check, a missed shot or a page error exits 1. The rest of each criterion is looked at in the
 // side-by-side picture: --side-by-side=<dir with Storyboard_*.png> writes <id>_SideBySide.png
 // (storyboard | engine, same height, with the failed checks printed under it). The storyboard images are
@@ -33,6 +35,7 @@ import { fileURLToPath } from "node:url";
 import { LaunchBrowser } from "../PrairieFire1937/Script_BrowserTestKit.mjs";
 import { ServeRoot } from "./Script_DevServer.mjs";
 import { OPENING_STORYBOARDS as C } from "./Data_OpeningStoryboards.mjs";
+import { MISSION_LAYOUT as Layout } from "./Data_FirstLevelMissionLayout.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const argv = process.argv.slice(2);
@@ -46,6 +49,17 @@ function Range(label, value, range) {
   return { label, ok, value: Number.isFinite(value) ? Math.round(value * 1000) / 1000 : value, range };
 }
 const OnScreen = (p) => !!p?.front && p.x >= 0 && p.x <= 1 && p.y >= 0 && p.y <= 1;
+// The layout block a ray hit lies on (the whitebox merges its blocks into a few meshes, so the mesh name alone
+// says "FirstLevelWhitebox_Hub_BunkerCollapsed"); 5 cm of slack for the hit sitting on a face.
+const LayoutBlocks = [...Layout.blocks, ...Layout.scenario.states.flatMap((s) => s.blocks)];
+export function BlockAt([x, y, z], slack = .05) {
+  for (const b of LayoutBlocks) {
+    const cos = Math.cos(b.ry || 0), sin = Math.sin(b.ry || 0), dx = x - b.x, dz = z - b.z;
+    if (Math.abs(dx * cos - dz * sin) <= b.w / 2 + slack && Math.abs(dx * sin + dz * cos) <= b.d / 2 + slack
+      && Math.abs(y - b.y) <= b.h / 2 + slack) return b.id;
+  }
+  return null;
+}
 /**
  * The automatic part of a shot's picture criteria. `dump` is what the page reported for the frame
  * (normalised screen coordinates: x left -> right, y top -> bottom). Returns [{label, ok, value, range}].
@@ -71,6 +85,12 @@ export function JudgeShot(judge, dump) {
     // headOptional: a wave-1 stand-in clip may carry the head out of the frame (the x check still applies).
     if (want.headOptional) out.push({ label: `${role} shown`, ok: a.visible && !a.hidden && !!a.headPx?.front, value: a.headPx ? `${a.headPx.x},${a.headPx.y}` : null, range: null });
     else out.push({ label: `${role} head in frame`, ok: !!shown, value: a.headPx ? `${a.headPx.x},${a.headPx.y}` : null, range: null });
+    // A head on the screen can still sit behind a wall (the projection alone passed SB04A's interpreter while
+    // BunkerSouthRevetment hid him). behindOk names the one blocker a wave-1 frame may still have (with its
+    // pendingWiring entry); any other blocker fails.
+    const allowed = !!a.blockedBy && !!want.behindOk && a.blockedBlock === want.behindOk;
+    if (shown && !want.headOptional) out.push({ label: `${role} head not behind scenery`, ok: !a.blockedBy || allowed,
+      value: a.blockedBy ? `${a.blockedBlock || a.blockedBy}${allowed ? " (allowed in wave 1)" : ""}` : "clear", range: null });
     if (want.x) out.push(Range(`${role} head x`, a.headPx?.x, want.x));
     if (want.y) out.push(Range(`${role} head y`, a.headPx?.y, want.y));
     if (want.distM) out.push(Range(`${role} distance (m)`, a.distM, want.distM));
@@ -89,7 +109,7 @@ export function JudgeShot(judge, dump) {
   }
   for (const group of judge.inFrameAtLeast || []) {
     const seen = dump.actors.filter((a) => group.roles.some((r) => a.role?.startsWith(r)) && a.visible && !a.hidden && OnScreen(a.headPx)
-      && (!group.minDistM || a.distM >= group.minDistM)).length;
+      && !a.blockedBy && (!group.minDistM || a.distM >= group.minDistM)).length;
     out.push(Range(`${group.roles.join("/")} in frame${group.minDistM ? ` beyond ${group.minDistM} m` : ""}`, seen, [group.count, null]));
   }
   if (judge.rifleHidden) out.push({ label: "mission rifle hidden", ok: !dump.rifle?.visible, value: dump.rifle?.visible ?? null, range: null });
@@ -148,6 +168,7 @@ async function Main() {
       await page.screenshot({ path: path.join(OUT, file + ".png") });
       // A lost WebGL context (the GPU process died, e.g. under other browsers' load) leaves a blank picture.
       if (dump.contextLost) { errors.push(`${shot.id}: WebGL context lost`); console.log("CONTEXTLOST", shot.id); }
+      for (const a of dump.actors) if (a.blockedAt) a.blockedBlock = BlockAt(a.blockedAt);
       const checks = Has("no-judge") ? [] : JudgeShot(shot.judge, dump);
       const bad = checks.filter((c) => !c.ok);
       if (bad.length) failed++;
@@ -249,7 +270,7 @@ function Dump({ warm, freeze, points }) {
   for (const role of ["ijaA", "ijaB", "ijaC", "ijaD", "luo", "yaowa", "heyoutian", "liuwencai", "comrade", "runner", "shouter", "interpreter"]) { const a = Actor(role); if (a && !roles.has(a)) roles.set(a, role); }
   for (const [id, a] of Object.entries(s.cast)) if (!roles.has(a)) roles.set(a, id);
   for (const a of r.squad) if (!roles.has(a)) roles.set(a, a.castId || a.id);
-  const actors = [];
+  const actors = [], heads = new Map(), people = new Set();
   for (const a of new Set([...roles.keys(), ...r.enemies.values()])) {
     if (!a?.actor?.root) continue;
     const d = Math.hypot(a.position.x - cam.position.x, a.position.z - cam.position.z);
@@ -263,6 +284,29 @@ function Dump({ warm, freeze, points }) {
       clipS: a.openingStoryboardPose?.seconds != null ? R3(a.openingStoryboardPose.seconds) : null, distM: R3(d),
       pelvisY: pelvis ? R3(pelvis.y - feet.y) : null, headPx: head ? Screen(head) : null, feetPx: Screen(feet),
       jaw: jaw ? R3(jaw.bone.quaternion.angleTo(jaw.quaternion)) : null });
+    if (head) heads.set(actors[actors.length - 1], head);
+    people.add(a.actor.root);
+  }
+  // blockedBy: the first piece of scenery between the eye and an on-screen head within 40 m. People, whatever
+  // hangs under the camera (first-person hands and props), the mission rifle, hidden or see-through things,
+  // skinned meshes and lines/sprites do not block. three's raycast keeps the material's side, so a box the eye
+  // sits inside (its back faces culled) does not count -- as in the picture.
+  const ray = new T.Raycaster(), rifleView = r.bunkerRifle?.view;
+  const Ignored = (o) => {
+    if (!o.isMesh || o.isSkinnedMesh) return true;
+    const m = Array.isArray(o.material) ? o.material[0] : o.material;
+    if (!m || m.visible === false || m.colorWrite === false || (m.transparent && m.opacity < .5)) return true;
+    for (let p = o; p; p = p.parent) if (!p.visible || people.has(p) || p === cam || p === rifleView) return true;
+    return false;
+  };
+  for (const [row, head] of heads) {
+    const hp = row.headPx;
+    if (!row.visible || row.hidden || row.distM > 40 || !hp.front || hp.x < 0 || hp.x > 1 || hp.y < 0 || hp.y > 1) continue;
+    const dir = head.clone().sub(cam.position), far = dir.length() - .15;
+    ray.set(cam.position, dir.normalize()); ray.near = .05; ray.far = far;
+    const hit = ray.intersectObject(g.scene, true).find((h) => !Ignored(h.object));
+    row.blockedBy = hit ? (hit.object.name || hit.object.parent?.name || hit.object.type) : null;
+    if (hit) row.blockedAt = [R3(hit.point.x), R3(hit.point.y), R3(hit.point.z)];
   }
   actors.sort((a, b) => a.distM - b.distM);
   const flat = new T.Vector3(-Math.sin(e.y), 0, -Math.cos(e.y)).multiplyScalar(300).add(cam.position);

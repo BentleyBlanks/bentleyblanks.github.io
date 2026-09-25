@@ -403,7 +403,9 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // SSW leg with the interpreter and ijaB running up it right (contract §2.7).
     Object.freeze({ id:"SB04A", storyboard:"Storyboard_04A_DraggedIntoTrench.png", phase:"Boots", age:2.1,
       judge:{ camera:{ eyeM:[.2,.4], rollDeg:[-12,-4] },
-        actors:{ ijaA:{ x:[.3,.65], distM:[.4,1.1] }, interpreter:{ x:[.5,1], distM:[1.8,6.5] }, ijaB:{ distM:[2,8] } },
+        // behindOk: BunkerSouthRevetment still stands between the pocket and the leg (pendingWiring SB04A, Set).
+        actors:{ ijaA:{ x:[.3,.65], distM:[.4,1.1] }, interpreter:{ x:[.5,1], distM:[1.8,6.5], behindOk:"BunkerSouthRevetment" },
+          ijaB:{ distM:[2,8], behindOk:"BunkerSouthRevetment" } },
         points:{ mouthPostS:{ at:[1.05,1.0,-124.3], x:[0,.4] } } } }),
     // SB05: Shunzi looks up (Glimpse): ijaA's face close on the left, the interpreter at the left edge, ijaB in the leg,
     // Luo creeping up the west wall about 8 m off on the right, the leg running straight away; light concussion.
@@ -506,7 +508,7 @@ export const OPENING_STORYBOARDS = Object.freeze({
     {shot:"SB04A", what:"plank revetment and duckboards down the SSW leg",
       now:"bare earth", wave2:"OpeningSet revetmentSSW, duckboardsSSW (Set)"},
     {shot:"SB04A", what:"the SSW leg open from the dugout mouth's south pocket (the drag ends at shunzi.dragged (0.6,-123.9) and 02 looks down the leg from there)",
-      now:"BunkerSouthRevetment (x -2.8..0.8, z -123.95..-123.55, 2.2 m) walls the pocket off from the leg: shunzi.dragged lies inside it and ijaA backs through it; Survey B's SB05 trial saw through it from inside", wave2:"Set: in the collapsed state shorten BunkerSouthRevetment's east end to x <= 0 (or open it) so the pocket and the leg join; then add it to the drag clearance check in Script_OpeningStoryboardsTest"},
+      now:"BunkerSouthRevetment (x -2.8..0.8, z -123.95..-123.55, 2.2 m) walls the pocket off from the leg: shunzi.dragged lies inside it and ijaA backs through it; Survey B's SB05 trial saw through it from inside", wave2:"Set: in the collapsed state shorten BunkerSouthRevetment's east end to x <= 0 (or open it) so the pocket and the leg join; then add it to the drag clearance check in Script_OpeningStoryboardsTest and drop behindOk from storyboardShots SB04A (the shot tool's ray finds the interpreter's and ijaB's heads behind it at Boots 2.1 s)"},
     // SB05 (Hold .. Collar)
     {shot:"SB05", what:"02's eye in the SSW leg's north mouth looks out of BunkerSouthRevetment (the SB05/SB05A camera and DragCover's first 0.4 m are inside it; unseen from inside, the K2 probe ignores it)",
       now:"shunzi.dragged (0.6,-123.9) as contract §2.6; Data_FirstLevelSpaceKeyframes K2 targets ignore BunkerSouthRevetment", wave2:"Set opens the revetment's east end (entry above); then drop K2's ignore"},
