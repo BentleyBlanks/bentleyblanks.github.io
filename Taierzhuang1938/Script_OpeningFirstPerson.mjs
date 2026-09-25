@@ -734,8 +734,9 @@ export class OpeningFirstPerson{
       // A new beat eases in over HAND_BLEND_S from where the hand was (position and palm frame).
       if(this.transitionFrom?.[side]&&transitionAge<HAND_BLEND_S)target.lerpVectors(this.transitionFrom[side],target,Smooth(transitionAge/HAND_BLEND_S));
       if(this.transitionShoulders?.[side]&&transitionAge<HAND_BLEND_S){
-        // The shoulder root is camera-local: blend it in the camera frame so a moving camera is not dragged.
-        const from=cam.worldToLocal(this.transitionShoulders[side].clone()),to=cam.worldToLocal(shoulder.clone());
+        // The shoulder root is camera-local (lastShoulders is stored camera-local): blend it in the camera frame so a
+        // cut between phases (Blast -> Wake) does not carry the old world position into the new view.
+        const from=this.transitionShoulders[side].clone(),to=cam.worldToLocal(shoulder.clone());
         shoulder=cam.localToWorld(from.lerp(to,Smooth(transitionAge/HAND_BLEND_S)));
       }
       // The solver must receive the same orthogonal palm basis both during and
@@ -815,7 +816,7 @@ export class OpeningFirstPerson{
         entry.partnerMode="grasp";
         this.lastPartners[side]={rig:otherRig,rigSide:otherSide,phase:p,mode:"grasp",frame:partnerFrame,shoulder:otherShoulder.clone(),elbow:partner.elbow.clone(),palm:partner.palm.clone(),fingers:otherRig.fingerBones[otherSide].map(bone=>bone.quaternion.clone())};
       }else this.ReleasePartner(side,entry,frameClock,dt);
-      this.report.hands[side]=entry;this.lastTargets[side]=player.palm.clone();this.lastFrames[side]=currentFrame;this.lastShoulders[side]=shoulder.clone();
+      this.report.hands[side]=entry;this.lastTargets[side]=player.palm.clone();this.lastFrames[side]=currentFrame;this.lastShoulders[side]=cam.worldToLocal(shoulder.clone());
     }
     this.report.props=this.UpdateProps(bodyBeat,frames,bodyClock,legReport.sides?legReport:null);
     if(s.supplyRoot)s.supplyRoot.visible=supply;
