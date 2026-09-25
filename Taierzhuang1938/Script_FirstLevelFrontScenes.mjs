@@ -150,6 +150,8 @@ export class FirstLevelFrontScenes {
     /** The speaker standing up to be seen over something low (StandToBeSeen): { body, lineId }; every such stand: { id, who, t }. */
     this.standing = null;
     this.stood = [];
+    /** Every step into the picture given up because the player moved into its way (Steer): { who, t, spot }. */
+    this.dropped = [];
   }
   /** runtime.Say hands the id over when this returns true. */
   Owns(id) {
@@ -211,9 +213,15 @@ export class FirstLevelFrontScenes {
     // past the player's shoulder or cross in front of the muzzle on the way (09-25 drive: Luo passed 1.08 m from the
     // player at the captured gun and the staging check "Luo occupies his own firing post clear of the player" failed).
     const pass = Math.min(B.speakerStepPassM, Distance(body.position, player)) - 0.05;
+    // Nor into, or past, the seat of a gun he does not man himself: the player takes that seat (the captured right gun)
+    // or a squadmate works it (09-26 relay r2 Front step 3 drive c16_a1: a spot 1.5 m east of the captured gun's seat,
+    // picked while the player dodged a grenade; he went back to the seat and Luo stood 1.28 m from it and from him).
+    const seats = r.emplacement?.guns ? [...r.emplacement.guns.values()].filter((g) => g?.seat && g.npc !== body).map((g) => g.seat) : [];
     for (const spot of StepCandidates(pose, body.position)) {
       if (Distance(spot, body.position) > B.speakerStepMaxM) continue;
       if (SegmentDistance(player, body.position, spot) < pass) continue;
+      if (seats.some((seat) => Distance(spot, seat) < B.speakerStepPassM
+        || SegmentDistance(seat, body.position, spot) < Math.min(B.speakerStepPassM, Distance(body.position, seat)) - 0.05)) continue;
       // On the player's floor and on the speaker's own: 09-25 relay r2 Front step 3 drive c36_d2, the player stood on the
       // hump in the middle of the 05 attack position and the spot picked was up the bank west of it - level with the
       // player, a metre above Luo on the trench floor. He never got there and stood 1.0-1.1 m from the player through
@@ -476,6 +484,18 @@ export class FirstLevelFrontScenes {
       const back = this.BackOffSpot(s.soldier);
       if (back) { s.spot = back; s.backOff = true; s.anchor = null; }
     }
+    // The player moved after the spot was picked (c16_a1 above: picked while he dodged a grenade, then he went back to
+    // the gun): the rest of the walk would now take the speaker nearer the player than B.speakerStepPassM (or than he
+    // already is). The step is given up - his own orders take over and the line plays on (a held line is looked at
+    // again by HoldLine, from where both of them stand now).
+    const player = r.player?.position;
+    if (!s.backOff && player && Distance(s.soldier.position, s.spot) > 0.35
+      && SegmentDistance(player, s.soldier.position, s.spot) < Math.min(B.speakerStepPassM, Distance(s.soldier.position, player)) - 0.05) {
+      this.dropped.push({ who: s.who, t: +(r.time ?? 0).toFixed(2), spot: { x: +s.spot.x.toFixed(2), z: +s.spot.z.toFixed(2) } });
+      if (this.dropped.length > 24) this.dropped.shift();
+      this.steer = null;
+      return;
+    }
     if (Distance(s.soldier.position, s.spot) > 0.35) r.MoveActor?.(s.soldier, s.spot, s.backOff ? B.speakerBackOffSpeedMps : B.speakerStepSpeedMps);
     else if (r.Defend) r.Defend(s.soldier, s.spot, 0, 0.3);
   }
@@ -502,6 +522,6 @@ export class FirstLevelFrontScenes {
       holds: Object.fromEntries([...this.holds].slice(-24).map(([id, h]) => [id, { ...h, since: +h.since.toFixed(2) }])),
       steer: this.steer ? { who: this.steer.who, backOff: !!this.steer.backOff, spot: { x: +this.steer.spot.x.toFixed(2), z: +this.steer.spot.z.toFixed(2) } } : null,
       aside: this.aside ? { who: this.aside.soldier.castId, line: this.aside.lineId, spot: { x: +this.aside.spot.x.toFixed(2), z: +this.aside.spot.z.toFixed(2) } } : null,
-      asides: this.asides.slice(), stood: this.stood.slice() };
+      asides: this.asides.slice(), stood: this.stood.slice(), dropped: this.dropped.slice() };
   }
 }

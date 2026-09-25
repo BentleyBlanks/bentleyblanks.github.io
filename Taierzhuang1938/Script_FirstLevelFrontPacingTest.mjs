@@ -624,6 +624,36 @@ function WalkRuntime(extra = {}) {
     assert.ok(!scenes.steer?.backOff && Dist(scenes.steer.spot, unreachable) < 1e-9, "still held for his line: he keeps walking to the framed spot");
     Object.assign(scenes, { handle: saved.handle, steer: saved.steer }); luo.position = saved.position;
   }
+  // 09-26 c16_a1: the player moved into the rest of the walk after the spot was picked (dodged a grenade, went back to the
+  // captured gun) - the step is given up and his own orders take over; a walk that stays clear of the player goes on.
+  {
+    const saved = { position: luo.position, handle: scenes.handle, steer: scenes.steer };
+    luo.position = { x: 3, y: 0, z: 0 };
+    scenes.handle = { id: "FrontAttack", done: false, lines: [{ line: { who: "luo" }, state: "playing" }] };
+    scenes.steer = { soldier: luo, who: "luo", spot: { x: -2, z: 0 }, sceneId: "FrontAttack", anchor: { x: 0, z: 0 } };
+    scenes.Steer();
+    assert.equal(scenes.steer, null, "the rest of the walk runs through the player: the step is given up");
+    assert.equal(scenes.State().dropped.at(-1)?.who, "luo", "and logged for probes");
+    scenes.steer = { soldier: luo, who: "luo", spot: { x: 3, z: -3 }, sceneId: "FrontAttack", anchor: { x: 0, z: 0 } };
+    scenes.Steer();
+    assert.ok(scenes.steer?.soldier === luo && !scenes.steer.backOff, "a walk that keeps clear of the player goes on");
+    Object.assign(scenes, { handle: saved.handle, steer: saved.steer }); luo.position = saved.position;
+  }
+  // Nor a spot at, or a walk past, the seat of a gun he does not man (c16_a1: 1.5 m east of the captured gun's seat,
+  // where the player sat down again). His own gun's seat does not count.
+  {
+    const first = scenes.StepSpot(luo, CameraPose(camera));
+    r.emplacement = { guns: new Map([["Captured", { seat: { x: first.x, y: 0, z: first.z }, npc: null }]]) };
+    // Every framed spot on his side lies within 1.5 m of this one: none is left (the line then plays from where he is).
+    const other = scenes.StepSpot(luo, CameraPose(camera));
+    assert.ok(!other || Dist(other, first) >= B.speakerStepPassM - 1e-9, `a gun seat keeps the stepping spot ${B.speakerStepPassM} m off (${JSON.stringify(other)})`);
+    r.emplacement.guns.get("Captured").seat = { x: first.x, y: 0, z: first.z + 10 };
+    assert.ok(Dist(scenes.StepSpot(luo, CameraPose(camera)), first) < 1e-9, "a seat 10 m off changes nothing");
+    r.emplacement.guns.get("Captured").seat = { x: first.x, y: 0, z: first.z };
+    r.emplacement.guns.get("Captured").npc = luo;
+    assert.ok(Dist(scenes.StepSpot(luo, CameraPose(camera)), first) < 1e-9, "the seat of his own gun does not count");
+    delete r.emplacement;
+  }
   // StandToBeSeen (c36_g3): a kneeling speaker in the picture, 3 m off, his crouched head behind something low, stands
   // up for his line when a standing head would be seen; held until that line ends; not when the wall is taller.
   {
