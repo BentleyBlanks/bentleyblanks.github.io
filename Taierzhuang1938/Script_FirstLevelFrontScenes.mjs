@@ -339,12 +339,19 @@ export class FirstLevelFrontScenes {
       if (moving) return Plays("walking");
       // Nor while he aims down the sights: a squadmate does not walk into the picture of a man who is shooting.
       if ((r.player?.ads ?? 0) > 0.5) return Plays("aiming");
+      // Nor while he goes to, or sits at, a gun no squadmate mans (B.speakerStepGunSeatM): that gun position is his.
+      if (this.AtFreeGun()) return Plays("gun");
       const spot = this.StepSpot(body, view.pose);
       if (!spot) return Plays("noSpot");
       this.steer = { soldier: body, who: line.who, spot, sceneId, anchor: { x: r.player.position.x, z: r.player.position.z } };
       hold.stepped = true;
     }
     return true;
+  }
+  /** The player stands within B.speakerStepGunSeatM of the seat of a gun no squadmate mans (the captured right gun). */
+  AtFreeGun() {
+    const r = this.r, player = r.player?.position, guns = r.emplacement?.guns ? [...r.emplacement.guns.values()] : [];
+    return !!player && guns.some((g) => g?.seat && !g.npc && Distance(g.seat, player) < B.speakerStepGunSeatM);
   }
   /** A live enemy grenade has the player inside its blast (Script_Combat.GrenadeThreats, the HUD's own warning). */
   PlayerInDanger() {

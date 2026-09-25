@@ -363,6 +363,12 @@ export const FRONT_BATTLE_TUNING=Object.freeze({
   // Closest the stepping walk may pass the player (m): the 03-05 staging checks keep Luo 1.5 m clear of the player and
   // of the captured gun's seat (Script_FirstLevelCampaignFrontBattle "Luo occupies his own firing post").
   speakerStepPassM:1.5,
+  // Nobody steps into the picture of a player this near (m, horizontal) to the seat of a gun no squadmate mans: he is
+  // taking that gun, and the spot would be in the gun position he is walking into (09-26 relay r2 Front step 3 drives
+  // c16_a1 / c16_d1: FrontAttack.01 stepped Luo into the captured nest as the player went to the seat, and the staging
+  // check found Luo 1.28 m / 1.46 m from him). The line plays at once from where the speaker is. 3 m: the nest's west door
+  // to the seat is 3.2 m, the player sits 0.8 m off the seat point.
+  speakerStepGunSeatM:3,
   // BackOff: a line that plays at once (the player walks or aims, or no framed spot) while its speaker stands nearer
   // than speakerViewMinM: he steps back from the player to one of these distances (m), straight away from him or up to
   // these bearings off that line (deg, both sides), at a walk (m/s), and the line is not delayed. 1.7-2.4 m is outside

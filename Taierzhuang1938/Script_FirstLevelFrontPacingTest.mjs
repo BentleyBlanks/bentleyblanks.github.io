@@ -712,6 +712,13 @@ function WalkRuntime(extra = {}) {
   assert.equal(scenes.HoldLine(line("BundleAttack.01", "luo"), "BundleAttack"), false, "aiming: the line plays at once");
   assert.equal(scenes.holds.get("BundleAttack.01").released, "aiming");
   r.player.ads = 0;
+  // Going to a gun no squadmate mans (c16_a1 / c16_d1: the captured nest's seat): nobody steps into that gun position.
+  r.emplacement = { guns: new Map([["Captured", { seat: { x: -0.5, y: 0, z: 0.8 }, npc: null }]]) }; r.time = 45;
+  assert.equal(scenes.HoldLine(line("GunSeat.01", "luo"), "GunSeat"), false, "at a free gun: the line plays at once");
+  assert.ok(scenes.steer === null && scenes.holds.get("GunSeat.01").released === "gun", "and nobody steps into the gun position");
+  r.emplacement.guns.get("Captured").npc = guard;
+  assert.equal(scenes.HoldLine(line("GunSeat.02", "luo"), "GunSeat"), true, "a gun a squadmate mans is not the player's: he steps up");
+  scenes.steer = null; delete r.emplacement;
   // Luo at the heels of a walking player: the line plays at once and he steps back from the player at a walk.
   luo.position = { x: 0.3, y: 0, z: 0.6 }; r.player.velocity = { x: 0, y: 0, z: -2 }; r.time = 50; moves.length = 0;
   assert.equal(scenes.HoldLine(line("FrontApproach.01", "luo"), "FrontApproach"), false, "walking with Luo at his heels: the line is not delayed");
