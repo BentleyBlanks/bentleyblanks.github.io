@@ -222,6 +222,9 @@ export async function InstallInputDriver(ctx) {
             //      所以不趴，只跑；
             //   ③ 近身却没东西能还手（大刀被场景挡住、步枪空仓或正在装填）：面朝他往后退出刺刀够得着的距离，
             //      装填不再被拔刀打断（拔刀会取消装填、弹仓退回空的）。09-25 R_c01_2 就是这样被连捅四刀。
+            //   ④ 近身的人 8 s 里双方都没掉血（在跟罗班长拼刺刀、隔着墙角够不着）又没盯上玩家：先交给别人，
+            //      6 s 内不再当近身威胁，路线照走（09-25 V_c01_1 被 2.3 m 外跟罗班长对刺的 RightLinkGuard 拖住整段）；
+            //   ⑤ 拿着大刀、人在 2.3–3 m（砍不到又不走）：往前迈一步贴上去再砍。
             //   关掉时（reflexes=false）每条路径与改之前一字不差。
             reflexes: false, closeResponses: 0, escapes: 0, evadeReturns: 0, closeFoe: null, returning: null,
             CloseThreat() {
@@ -236,9 +239,20 @@ export async function InstallInputDriver(ctx) {
                 // His forward is (-sin yaw, -cos yaw); the way to the player is (-dx, -dz).
                 const facing=Number.isFinite(a.yaw)&&(Math.sin(a.yaw)*dx+Math.cos(a.yaw)*dz)/(d||1)>.5;
                 if(!(striking||facing||a.target?.isPlayer||d<=2.5))continue;
+                // ④ A man the player has stood off for 8 s without a scratch on either side (busy with Luo, out of
+                // reach behind a wall end) is left to the others for 6 s and the route goes on, unless he turns on
+                // the player (09-25 V_c01_1: RightLinkGuard duelling Luo at 2.3 m held the bot for the whole leg).
+                if((this.ignoreClose?.get(a)||0)>g.ai.time&&!a.target?.isPlayer)continue;
                 bd=d;best=a;
               }
-              if(best&&best!==this.closeFoe)this.closeResponses++;
+              if(best&&best!==this.closeFoe){this.closeResponses++;this.closeSince={t:g.ai.time,hp:best.health,player:g.player.health};}
+              else if(best&&this.closeSince&&g.ai.time-this.closeSince.t>8){
+                if(best.health>=this.closeSince.hp&&g.player.health>=this.closeSince.player&&!best.target?.isPlayer){
+                  (this.ignoreClose||=new Map()).set(best,g.ai.time+6);this.closeStandoffs=(this.closeStandoffs||0)+1;best=null;
+                }
+                this.closeSince=best?{t:g.ai.time,hp:best.health,player:g.player.health}:null;
+              }
+              if(!best&&this.closing){g.Debug.Key("KeyW",false);this.closing=false;}
               this.closeFoe=best;
               if(!best&&this.backingOff){g.Debug.Key("KeyS",false);this.backingOff=false;}
               return best;
@@ -410,16 +424,22 @@ export async function InstallInputDriver(ctx) {
                 if(g.state.activeSlot!=="melee"){g.Debug.Key("KeyV");return;}
                 if(!fighter.weapon)return;
                 this.meleeResponses=(this.meleeResponses||0)+1;
+                let closing=false;
                 if(g.meleeCombat.Active){g.Debug.Key("KeyF",true);g.Debug.Key("KeyF",false);}
                 else if(fighter.state==="idle"){
                   const attacker=g.meleeCombat.Fighter(foe);
                   if(attacker.attack && attacker.t>attacker.attack.windup-.13 && attacker.t<attacker.attack.windup
                     && distance<attacker.attack.reach){g.Debug.Mouse(2,true);g.Debug.Mouse(2,false);}
                   else if(distance<2.3){g.Debug.Mouse(0,true);g.Debug.Mouse(0,false);}
+                  // ⑤ Between cutting range (2.3 m) and 3 m the old driver neither cut nor walked: step in to him.
+                  else closing=this.reflexes;
                 }
+                // Pressed every frame while closing in: a route leg lets go of W before it calls Shoot.
+                if(closing||this.closing){g.Debug.Key("KeyW",closing);this.closing=closing;}
                 return;
               }
               Did(Math.abs(gap)<.06?"rifle":"turn");
+              if(this.closing){g.Debug.Key("KeyW",false);this.closing=false;}
               // ③ Nothing to answer a man at arm's length with (the Dadao caught by the scenery, the rifle empty or
               // reloading): back-pedal out of his bayonet reach, still facing him, while it reloads, instead of standing in
               // it (09-25 R_c01_2: FrontFlankB stabbed four times at 2 m while the bot stood reloading in the nest).
@@ -566,7 +586,7 @@ export async function Report03Damage(ctx) {
   // How often the two reflexes fired (counted from 03 on; zero with --no-reflexes).
   const driver = await ctx.page.evaluate(() => { const D = window.MissionInputDriver || {};
     return { reflexes: !!D.reflexes, closeResponses: D.closeResponses || 0, escapes: D.escapes || 0, evadeReturns: D.evadeReturns || 0,
-      meleeResponses: D.meleeResponses || 0, evadeFrames: D.evadeFrames || 0, backOffFrames: D.backOffFrames || 0 }; }).catch(() => null);
+      meleeResponses: D.meleeResponses || 0, evadeFrames: D.evadeFrames || 0, backOffFrames: D.backOffFrames || 0, closeStandoffs: D.closeStandoffs || 0 }; }).catch(() => null);
   console.log("CAMPAIGN_03_DRIVER", JSON.stringify(driver));
   await fs.writeFile(path.join(ctx.output, "Data_Campaign03Damage.json"), JSON.stringify(hits, null, 2));
 }

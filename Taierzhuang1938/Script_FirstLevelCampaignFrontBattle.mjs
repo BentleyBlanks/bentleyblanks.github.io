@@ -176,7 +176,7 @@ export async function DriveFrontBattle(ctx){
   // The player reflexes (Kit MissionInputDriver: answer a man at arm's length, run from a grenade and walk back)
   // drive 03-06; 07 on keeps the old driver (Script_FirstLevelCampaignFront switches them off).
   const reflexes=ctx.options.reflexes!==false;
-  await page.evaluate(on=>{const D=window.MissionInputDriver;D.reflexes=on;D.closeResponses=0;D.escapes=0;D.evadeReturns=0;D.meleeResponses=0;D.evadeFrames=0;D.backOffFrames=0;},reflexes);
+  await page.evaluate(on=>{const D=window.MissionInputDriver;D.reflexes=on;D.closeResponses=0;D.escapes=0;D.evadeReturns=0;D.meleeResponses=0;D.evadeFrames=0;D.backOffFrames=0;D.closeStandoffs=0;},reflexes);
   // What the player carries into 03 (a run from 01 vs a cold start at 03): CAMPAIGN_03_ENTRY / CAMPAIGN_03_DAMAGE.
   if(!checkpoint){ctx.snapshot03=await Snapshot03Entry(ctx,ctx.stageFrom===3?"cold":"continuous");}
   try{await DriveLegs();}
