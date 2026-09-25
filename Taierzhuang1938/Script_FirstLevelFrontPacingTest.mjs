@@ -24,6 +24,9 @@
 //   ⑮ 躲手榴弹之后：直线回不去（隔着枪托沙袋/院墙）就沿躲的路原路退回，已到位的人被挤开也会走回岗位
 //   ⑯ 守位队友让路：玩家在 1.2 m 内朝他走（看方向键，不看被挡住的速度）→ 他横移让出玩家的路，玩家过去后走回原位
 //      （西门：罗班长在门里掩体上挡路，Front fx16；集成负责人定方案 c）；07 以后不做
+//   ⑫b 挡在玩家和近处说话人之间的普通守军（r.guards，不含正在过缺口的）/接防的人也让开；守军说完走回原处（验收 acc36：守军 50 挡住 FrontRelief.02）
+//   ⑰ 说话人被躲手榴弹带离玩家身边的岗位、在 15 m 外看不见：这句等他走回看得见的地方（至多 speakerReturnHoldS），
+//      岗位远的（左枪位）照旧隔空喊（验收空转探针第 2 趟：罗班长躲到巢外 15 m 墙后说 FrontWithdraw.01）
 //
 // 跑法：node Taierzhuang1938/Script_FirstLevelFrontPacingTest.mjs
 // ===========================================================================
@@ -963,7 +966,46 @@ function WalkRuntime(extra = {}) {
   s2.handle = { id: "Volunteer", done: false, lines: [{ line: { id: "Volunteer.05", who: "luo", direction: {} }, state: "playing" }] };
   s2.Steer();
   assert.equal(s2.aside, null, "a gunner stays on his gun");
-  checks += 12;
+  // ⑫b A guard of the batch (no castId: relay r2 acceptance acc36, safe guard 50 in front of the player hid the relief
+  // NCO's FrontRelief.02 for 148 of 155 frames) steps aside the same way, and once the line is done walks back to where
+  // he stood and holds it. A guard bounding across the gap is left to his bound; a far shout moves nobody but the named.
+  {
+    const guard = { id: 50, alive: true, position: { x: -0.1, y: 0, z: -1.8 } };
+    const gm = [], gd = [];
+    const rg = { ...r, time: 0, ai: { soldiers: [luo, guard] }, guards: [{ actor: guard, safe: true, crossing: true }],
+      MoveActor: (actor, point) => gm.push({ id: actor.id, ...point }), Defend: (actor, point) => gd.push({ id: actor.id, ...point }) };
+    luo.position = { x: 0, y: 0, z: -3.6 };
+    const Playing = () => ({ id: "FrontRelief", done: false, lines: [{ line: { id: "FrontRelief.02", who: "luo", direction: {} }, state: "playing" }] });
+    const s3 = new FirstLevelFrontScenes(rg);
+    s3.handle = Playing(); s3.Steer();
+    assert.ok(s3.aside?.soldier === guard && s3.aside.home && s3.asides.at(-1).who === 50, "a safe guard between the player and the speaker is sent aside");
+    assert.ok(gm.at(-1).id === 50 && SegmentDistance(s3.aside.spot, eye, head) >= B.speakerAsideOffsetsM[0] - 1e-9, "off the line of sight");
+    Object.assign(guard.position, s3.aside.spot); s3.Steer();
+    assert.equal(gd.at(-1).id, 50, "at his spot he holds it while the line plays");
+    s3.handle.lines[0].state = "done"; rg.time = 1; s3.Steer();
+    assert.ok(s3.aside?.phase === "back" && gm.at(-1).id === 50 && Dist(gm.at(-1), { x: -0.1, z: -1.8 }) < 1e-9, "the line done, he walks back to where he stood");
+    assert.ok(s3.Steers(guard), "FrontBattle leaves him alone on the way back");
+    Object.assign(guard.position, { x: -0.1, z: -1.8 }); s3.Steer();
+    assert.ok(s3.aside === null && gd.at(-1).id === 50 && Dist(gd.at(-1), { x: -0.1, z: -1.8 }) < 1e-9, "back there he holds it again and is let go");
+    // Never back (blocked on the way): after speakerAsideReturnS he is given his old spot to hold anyway.
+    s3.handle = Playing(); rg.time = 10; s3.Steer();
+    assert.ok(s3.aside?.soldier === guard, "sent aside again for the next line");
+    s3.handle.lines[0].state = "done"; s3.Steer();
+    rg.time = 10 + B.speakerAsideReturnS + 0.01; s3.Steer();
+    assert.ok(s3.aside === null && Dist(gd.at(-1), { x: -0.1, z: -1.8 }) < 1e-9, "not back within speakerAsideReturnS: he holds his old spot (Defend walks him there)");
+    // A guard in his bound across the gap keeps going.
+    rg.guards[0].safe = false;
+    const s4 = new FirstLevelFrontScenes(rg);
+    s4.handle = Playing(); s4.Steer();
+    assert.equal(s4.aside, null, "a guard bounding across the gap is not sent aside");
+    // A far speaker (a shout across the front, beyond speakerViewNearM): only a named squadmate steps aside for him.
+    rg.guards[0].safe = true; luo.position = { x: 0, y: 0, z: -20 }; guard.position = { x: -0.1, y: 0, z: -10 };
+    const s5 = new FirstLevelFrontScenes(rg);
+    s5.handle = Playing(); s5.Steer();
+    assert.equal(s5.aside, null, "a far shout does not move a guard");
+    luo.position = { x: 0, y: 0, z: -3.6 };
+  }
+  checks += 12 + 10;
   Ok("⑫ a squadmate between the player and a talking speaker steps aside until the line ends");
 }
 
@@ -1185,6 +1227,65 @@ function WalkRuntime(extra = {}) {
   console.log("  ⑯ Luo's sidestep:", JSON.stringify(scenes.gaveWay[0]));
   checks += 26;
   Ok("⑯ a squadmate holding his spot steps out of the way of a player coming past him and goes back once the player is through");
+}
+
+{
+  // ⑰ Relay r2 acceptance idle probe 2 (2026-09-26): the grenade the player dodged in the captured nest sent Luo 15.4 m
+  // north out of it, behind its walls; FrontWithdraw.01 was released the moment the player was clear ("far") and said from
+  // there (227 frames, 0 seen), while Luo walked back and was in his cover 7.5 s later. A far speaker, out of sight, whose
+  // post is near the player waits for him to be back in view (at most speakerReturnHoldS); a far post still shouts at once.
+  const fov = 55 * Math.PI / 180, aspect = 16 / 9, near = 0.05, far = 500, f = 1 / Math.tan(fov / 2);
+  const camera = { matrixWorld: { elements: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1.6, 0, 1] },
+    matrixWorldInverse: { elements: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, -1.6, 0, 1] },
+    projectionMatrix: { elements: [f / aspect, 0, 0, 0, 0, f, 0, 0, 0, 0, (far + near) / (near - far), -1, 0, 0, 2 * far * near / (near - far), 0] } };
+  const V = (x, y, z) => ({ x, y, z, clone() { return V(this.x, this.y, this.z); }, set(a, b, c) { this.x = a; this.y = b; this.z = c; return this; } });
+  const cover = { x: 0.5, z: -4, arrivalM: B.leaderCoverArrivalM };
+  const luo = { id: 1, castId: "luo", alive: true, position: { x: 0, y: 0, z: -16 } };
+  const walk = { index: 1, route: [cover] };
+  // The nest's walls: everything farther out than 10 m in front of the player is behind them.
+  const r = { time: 100, camera, flow: { stage: { id: "Support" } }, ai: { soldiers: [luo] },
+    player: { position: { x: 0, y: 0, z: 0 }, velocity: { x: 0, y: 0, z: 0 }, get EyePosition() { return V(0, 1.6, 0); } },
+    speakers: { ActorForWho: (who) => (who === "luo" ? luo : null) },
+    frontBattle: { Active: true, walks: new Map([[luo.id, walk]]) },
+    Point: (p, rise = 0) => V(p.x, rise, p.z), BlocksSight: (a, b) => b.z < -10,
+    MoveActor: () => {}, Defend: () => {} };
+  const scenes = new FirstLevelFrontScenes(r);
+  const line = (id) => ({ id, who: "luo", direction: {} });
+  assert.equal(scenes.PostAwayFrom(luo), cover, "Luo 12 m off his cover is away from his post");
+  assert.equal(scenes.HoldLine(line("FrontWithdraw.01"), "FrontWithdraw"), true, "15-odd m out, behind the walls, his cover near the player: the line waits");
+  r.time = 103; luo.position = { x: 0.2, y: 0, z: -12 };
+  assert.equal(scenes.HoldLine(line("FrontWithdraw.01"), "FrontWithdraw"), true, "inside 15 m on his way back, still behind the walls: still waiting");
+  assert.equal(scenes.steer, null, "nobody is stepped anywhere meanwhile (his own walk brings him back)");
+  r.time = 105.5; luo.position = { x: 0.6, y: 0, z: -5 };
+  assert.equal(scenes.HoldLine(line("FrontWithdraw.01"), "FrontWithdraw"), false, "in view on his way back: the line starts");
+  const hold = scenes.holds.get("FrontWithdraw.01");
+  assert.ok(hold.released === "inView" && hold.returnS === 5.5, "the hold records the 5.5 s wait for him");
+  // Never back in view: after speakerReturnHoldS the line is said from where he is.
+  r.time = 200; luo.position = { x: 0, y: 0, z: -16 };
+  assert.equal(scenes.HoldLine(line("FrontWithdraw.02"), "FrontWithdraw"), true, "another line, him out again: waits");
+  r.time = 200 + B.speakerReturnHoldS + 0.01;
+  assert.equal(scenes.HoldLine(line("FrontWithdraw.02"), "FrontWithdraw"), false, "not back within speakerReturnHoldS: played anyway");
+  assert.equal(scenes.holds.get("FrontWithdraw.02").released, "returnTimeout");
+  // What still plays at once: a post far from the player (He's left gun), a man whose stall fallback took where he is, a
+  // man still on the way (not his last leg), outside FrontBattle's steps, a speaker already in view.
+  const Plays = (label, setup, undo) => {
+    setup(); r.time += 20;
+    const id = "Probe." + label;
+    assert.equal(scenes.HoldLine(line(id), "Probe"), false, label + ": played at once");
+    assert.equal(scenes.holds.get(id)?.returnSince, undefined, label + ": no wait for his return");
+    undo();
+  };
+  Plays("far post", () => { walk.route = [{ x: 0, z: -40 }]; }, () => { walk.route = [cover]; });
+  Plays("stall accepted", () => { walk.stallAccepted = true; }, () => { walk.stallAccepted = false; });
+  Plays("on the way", () => { walk.route = [{ x: 0, z: -30 }, cover]; walk.index = 0; }, () => { walk.route = [cover]; walk.index = 1; });
+  Plays("06", () => { r.frontBattle.Active = false; }, () => { r.frontBattle.Active = true; });
+  Plays("in view", () => { r.BlocksSight = () => false; }, () => { r.BlocksSight = (a, b) => b.z < -10; });
+  // A near speaker off his post (inside 15 m) is judged as before: this wait only starts for one beyond speakerViewNearM.
+  luo.position = { x: 0.2, y: 0, z: -12 }; r.player.velocity = { x: 3, y: 0, z: 0 }; r.time += 20;
+  assert.equal(scenes.HoldLine(line("Probe.near"), "Probe"), false, "a near speaker behind a wall while the player walks: plays at once, as before");
+  assert.equal(scenes.holds.get("Probe.near").released, "walking");
+  checks += 21;
+  Ok("⑰ a far speaker a grenade dodge put off his post near the player, out of sight: his line waits <= speakerReturnHoldS for him to be back in view");
 }
 
 console.log(`FirstLevelFrontPacingTest 通过：${checks} 条断言`);
