@@ -403,15 +403,18 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // SSW leg with the interpreter and ijaB running up it right (contract §2.7).
     Object.freeze({ id:"SB04A", storyboard:"Storyboard_04A_DraggedIntoTrench.png", phase:"Boots", age:2.1,
       judge:{ camera:{ eyeM:[.2,.4], rollDeg:[-12,-4] },
-        // behindOk: BunkerSouthRevetment still stands between the pocket and the leg (pendingWiring SB04A, Set).
-        actors:{ ijaA:{ x:[.3,.65], distM:[.4,1.1] }, interpreter:{ x:[.5,1], distM:[1.8,6.5], behindOk:"BunkerSouthRevetment" },
-          ijaB:{ distM:[2,8], behindOk:"BunkerSouthRevetment" } },
+        // behindOk: BunkerSouthRevetment still stands between the pocket and the leg (pendingWiring SB04A, Set);
+        // coverOk: the upright stand-in ijaA fills the low upward view over them (pendingWiring SB04A, Anim).
+        actors:{ ijaA:{ x:[.3,.65], distM:[.4,1.1] },
+          interpreter:{ x:[.5,1], distM:[1.8,6.5], behindOk:"BunkerSouthRevetment", coverOk:"ijaA" },
+          ijaB:{ distM:[2,8], behindOk:"BunkerSouthRevetment", coverOk:"ijaA" } },
         points:{ mouthPostS:{ at:[1.05,1.0,-124.3], x:[0,.4] } } } }),
     // SB05: Shunzi looks up (Glimpse): ijaA's face close on the left, the interpreter at the left edge, ijaB in the leg,
     // Luo creeping up the west wall about 8 m off on the right, the leg running straight away; light concussion.
     Object.freeze({ id:"SB05", storyboard:"Storyboard_05_Interrogation.png", phase:"Glimpse", age:1,
       judge:{ camera:{ eyeM:[.62,.9], pitchDeg:[-5,10], yawDeg:[170,192] }, perception:[0,.62],
-        actors:{ ijaA:{ x:[.28,.47], distM:[.3,1] }, interpreter:{ x:[0,.25] }, ijaB:{ x:[.5,.7], distM:[2.4,4.6] },
+        // coverOk: the baked head-down IjaHoldCollarUp brings ijaA's cap over ijaB (pendingWiring SB05, Anim).
+        actors:{ ijaA:{ x:[.28,.47], distM:[.3,1] }, interpreter:{ x:[0,.25] }, ijaB:{ x:[.5,.7], distM:[2.4,4.6], coverOk:"ijaA" },
           luo:{ x:[.68,.88], distM:[6,9.6] } } } }),
     // SB05A: the cut (Chop 0.25–0.45 s): ijaA side-on at the left front, Luo cutting ijaB down right of centre 2.5–3.5 m,
     // He behind Luo.
@@ -498,7 +501,7 @@ export const OPENING_STORYBOARDS = Object.freeze({
       now:"nothing", wave2:"OpeningSet plankDebrisButt, trenchFacadeN (Set)"},
     // SB04A (Boots)
     {shot:"SB04A", what:"ijaA bent over, backing, dragging him by the right forearm, rifle low in the other hand",
-      now:"IjaHoldCollarUp held in its loop and carried backward on DragAway's lead (PhaseBoots)", wave2:"IjaDragByForearm (Anim) in PhaseBoots, with its forearmR player track"},
+      now:"IjaHoldCollarUp held in its loop and carried backward on DragAway's lead (PhaseBoots); standing upright 0.65 m off he fills the low upward view and covers the interpreter's and ijaB's heads (the shot tool's people check, storyboardShots SB04A coverOk)", wave2:"IjaDragByForearm (Anim) in PhaseBoots, with its forearmR player track; then drop coverOk from storyboardShots SB04A (with behindOk once the revetment is open)"},
     {shot:"SB04A", what:"the interpreter hurrying up the SSW leg with one arm out",
       now:"InterpreterPoint as upperBody on the run (PhaseBoots Hurry)", wave2:"InterpreterHurryReach (Anim)"},
     {shot:"SB04A", what:"Shunzi's hand holds ijaA's sleeve",
@@ -513,7 +516,7 @@ export const OPENING_STORYBOARDS = Object.freeze({
     {shot:"SB05", what:"02's eye in the SSW leg's north mouth looks out of BunkerSouthRevetment (the SB05/SB05A camera and DragCover's first 0.4 m are inside it; unseen from inside, the K2 probe ignores it)",
       now:"shunzi.dragged (0.6,-123.9) as contract §2.6; Data_FirstLevelSpaceKeyframes K2 targets ignore BunkerSouthRevetment", wave2:"Set opens the revetment's east end (entry above); then drop K2's ignore"},
     {shot:"SB05", what:"ijaA holds the collar with his face up, leaning in, snarling at the eye",
-      now:"IjaHoldCollarUp as baked (head down under the cap) + the performance layer's head look at the camera (UpdatePerformances)", wave2:"IjaHoldCollarUp re-baked with the head up (Anim, contract §4.1) and expression.snarl 1 Hold..Collar (Face)"},
+      now:"IjaHoldCollarUp as baked (head down under the cap) + the performance layer's head look at the camera (UpdatePerformances); 0.5 m from the eye his cap spans x 0.2-0.85 of SB05 and covers ijaB's head (storyboardShots SB05 coverOk)", wave2:"IjaHoldCollarUp re-baked with the head up (Anim, contract §4.1) and expression.snarl 1 Hold..Collar (Face); then drop coverOk from storyboardShots SB05. If ijaB is still covered, slide the Glimpse eye west: the 09-25 trial (--plan, eye (0.45,-123.85) yaw 188) cleared ijaB and kept Luo at x 0.79 but put ijaA's head at x 0.20 and hid the interpreter behind him, so about half that (0.08 m, yaw 185) is the next try"},
     {shot:"SB05", what:"ijaB stands in the leg with the rifle levelled at the waist, pointed at Shunzi",
       now:"IjaReadyRifle held on its last frame (GuardHold)", wave2:"IjaGuardPort (Anim) in GuardHold, in ContactClips if it needs to be"},
     {shot:"SB05", what:"both hands at the bottom edge gripping ijaA's forearm at the collar",

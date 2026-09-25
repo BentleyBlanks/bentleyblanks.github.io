@@ -27,7 +27,7 @@
 - 岔口的日兵丁必须被真实击倒：刘文财到位后开枪，有视线才打中；打偏则何有田拿到步枪后补枪，再打偏由罗班长在 `longShotForceS` 补枪；超过 `longShotForceS + 0.5 s` 仍活着就强制击倒，记 `junctionShot{by:"forced"}`。
 - 折角的日兵丙和追兵活着也可以还权。
 - 先头兵不在敌人表里（生成失败、调试删除）时：岔口记 `junctionShot{by:"absent"}`；踢枪超过 `kickRifleS` 仍放行，缺席者写进 `playerDraggedFromWreck.missing`。
-- 还权位是洞口南门柱与塌土后面的 `shunzi.cover` (0.45, −124.35)。门柱挡住 J 与 F，离踢过来的枪 0.34 m。空间文档 §3 的 `returnSpot` (−0.2, −122.2) 在塌土西侧，枪踢不过去，所以两处不一致，**待集成负责人拍板**改哪一边。`rearTrenchEntered` 的锚点离它不到 5 m，照样能触发。
+- 还权位（2026-09-25 分镜还原，契约 §2 第 9 条）是洞口塌土东面沟底的 `shunzi.cover` (2.40, −125.20)，背靠塌土、朝东看前沟（yaw −94°）。J 看得见（那里的日兵此时已被刘文财击倒），F 要等 Set 包改形的塌土挡住（pendingWiring SB06）；在那之前，还权那一刻 `handbackHoldFireM` 40 m 内活着的日军一律迟疑 `handbackHoldFireS` 3.5 s（不开枪、不移动）。追兵 `bunkerPursuit` 在拾枪（`rifleRecovered`）时才生成，开火前玩家早已能行动。战役驾驶器断言：还权后 3 s 内玩家不掉血、还权时追兵不在敌人表里（`HANDBACK_SAFE` 一行）。旧还权位（门柱后 (0.45,−124.35)）与空间文档的 `bunkerRear` 都不再用于还权。
 
 ## 3. 超时（`Data_OpeningStoryboards.timeouts`，单位秒）
 
@@ -75,7 +75,12 @@
   - SB04（Butt，`ija.buttShot`）：枪托位 `shunzi.butt` (2.3,−124.4)（洞口塌土东边的沟边）。`dragOutRoute` 改成从洞口塌土北边出去再朝东南，拖完顺子正好在枪托位。日兵甲从顺子头的东边绕到正北（`ija.butt.yawDeg` 0），镜头眼高 0.35、yaw −18°、仰 30°、roll −4°：背景是北壁木框门（Set 的 `trenchFacadeN`，x 2.7–3.9）和门右边的死川军。现有 `IjaButtStrike` 举到 0.3 s 停 0.45 s 再砸（`ButtClipTime`），接触比原来晚 0.45 s；手势 `beats.Butt` 同步推后。
   - SB04A（Boots，`ija.dragAway`）：砸后约 0.6 s 进 Boots，日兵甲倒退着把顺子从枪托位沿 `dragAway.route` 拖回洞口（塌土北边）再往南拖进南南西沟北口 `shunzi.dragged` (0.6,−123.9)（契约 §2 第 6 条；塌土 `BunkerMouthRubbleS` 与它南边 1.4 m 高的 `BunkerMouthSpoil` 之间只有 0.5 m，走不了）。日兵甲始终在顺子前方 `leadM` 0.65 m、面朝他，拖完正好在他南边。镜头（`ija.dragShot`）眼高 0.3、roll −8°，看日兵甲的脸（脸在画面上三分之一），拐进南南西沟时洞口南门柱和塌土在左、沟纵深在右。翻译与日兵乙从 Boots 0.8 s 起从南南西沟深处跑回来（`hurryMps` 2.0，翻译现用 `InterpreterPoint` 叠在跑步上）。拖完再用 `closeS` 0.9 s 拍「几双军靴围过来」，然后进 02。
   - 枪托血层（`strikeBlood`）：满 0.2 s，1.1 s 内淡到 0.3（SB04A「血层约 0.3」），再 8 s 淡完。
-  - 02 的救援圈跟着 `shunzi.dragged` 挪到南南西沟口；圈里各人站位、罗何路线、K2 在 Step 3 按 Survey B 重排。
+- 02（SB05、SB05A、SB06，契约 §2 第 6、8、9 条）：
+  - 救援圈在南南西沟北口 `shunzi.dragged` (0.6,−123.9)，顺子朝南看那条直沟（`rescue.circleShot`：眼高 0.75、yaw 180、pitch +3）。日兵甲按 `ijaAHoldBearingDeg` 5° 蹲在正前方揪领（`IjaHoldCollarUp` 的顺子头部轨迹解到眼位上，眼跟着他拉）；翻译蹲在沟口弃土西北角 `rescue.interpreter` (0.97,−123.42)，画面左边缘；日兵乙站在沟里 `ijaBGuard` (0.04,−119.94) 端枪对着顺子（`GuardHold`：`IjaReadyRifle` 末帧），踢一脚时沿西侧走到离顺子 `kickM` 0.62 m 处（`kickBearingDeg` −35°），踢完退回劈砍位 `ijaBWatch` (0.31,−121.12)。
+  - 罗班长、何有田、刘文财先在 RC 西侧后交通壕里等（x ≤ −8，画外），审问开始（`askAt` + `goAfterAskS` 1.5 s；最迟 `holdLineS`）才出发（`RescueGo`），贴西壁（画面右）摸进来：罗走 `luoRoute`、何晚 `heLagS` 1.4 s 走 `heRoute` 停在罗右后 `heWait` (−0.7,−119.9)，刘晚 `liuLagS` 3.2 s 去射击台阶 `liuShot`。RC 口的背景川军挪到 (−8.4,−112)（`Data_FirstLevelBackdropSquads` 的 `NRA_POST`），幺娃 Hold→Released 钉在 `banter.hide.yaowa`，都不进这条视线。
+  - SB05A：罗落刀后 `chopDropS` 0.3 s 内眼高降到 `chopEyeM` 0.62、向西让开 `chopAsideM` 0.25、转到 yaw 185，罗劈乙出现在日兵甲右边；日兵甲头转向罗（替身，pending `IjaStartleTurn`）；何从 `heWait` 跑到甲背后格挡再劈；乙的枪在落刀后 `ijaBRifleDropS` 落到 `ijaBRifleDrop` (0.55,−122.55)。劈砍画面定住 `duelHoldS` 0.45 s 后，眼抬到 `fleeEye` 跟拍翻译背影：他转到 `interpreterFleeYawDeg` 100° 做 `InterpreterFlee`，再沿 `interpreterFlee` 往东沟逃（Flee 总长 `fleeFollowS` 2.3 s）。
+  - SB06：罗倒拖顺子走 `dragCoverRoute` 出沟口、穿过洞口两门柱、到塌土东面的还权位 `shunzi.cover`；镜头 `rescue.checkShot`（眼高 0.72、yaw −94、pitch −8，踢枪时压到 −13 并保持到还权）。罗跪在左前 `luoCheck` (3.12,−125.73)（替身 `LuoKneelCheck`，pending `LuoKneelReach`）；踢枪时退到顺子身后洞口泥里 `kickFrom` (0.88,−126.15)，把 01 就躺在那里的汉阳造（`rifleMouth`）经 `rifleKickVia` 踢过顺子右侧，停在 `rifleKicked` (3.2,−124.85)。与契约表的差别：契约写的踢枪起点 (3.9,−125.6) 在枪的东边，而枪从 01 起就在洞口西边的泥里，照那个点踢不到，所以改从枪后面踢。刘远射后翻过弹坑台阶到 `liuCover` (5.47,−123.52) 朝东；何换枪后到 `heCover` (3.6,−124.3)（契约表写 (3.23,−124.07)，这里往东约 0.4 m；实测 SB06 何在画面右边缘 x 0.86、1.5 m，判据成立）；两人导演期间站着（pending 跪姿钩子），还权后 AI 跪姿。Released 那一帧俯仰约 −13°（战役驾驶器断言 −15°～+5°）。
+  - 抓帧工具另判「头不在更近的人后面」（`coveredBy`，人物是蒙皮网格、射线穿过，所以只画人物到头部那一个像素判谁挡着）；第一波允许的遮挡写 `coverOk`：SB05 日兵乙被低头替身日兵甲的帽子挡住、SB04A 翻译和日兵乙被直立替身日兵甲挡住，各有 pendingWiring 条目。
 - 第一波替身（`pendingWiring`）：别的包的新 clip、手势、腿、镜头后处理、布景、定向喷土还没接，导演先用最接近的现有 clip / 效果，逐条登记 `{shot, what, now, wave2}`，第二波接线后清空。
 
 ## 5. 02 撤离与接上 03

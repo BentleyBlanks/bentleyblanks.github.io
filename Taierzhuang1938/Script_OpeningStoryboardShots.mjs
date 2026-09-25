@@ -16,7 +16,9 @@
 // the part of the contract's picture criteria that the staging and the camera decide (who is where on
 // screen, how far, pitch / roll / eye height, landmarks on screen, who must be out of the picture, and that
 // no scenery stands between the eye and a judged head -- a ray against the scene, named by the layout block
-// it hits; `behindOk:"<block>"` lets a wave-1 shot keep one listed blocker). A
+// it hits; `behindOk:"<block>"` lets a wave-1 shot keep one listed blocker). People are skinned and the ray
+// skips them, so a head behind a nearer person is found apart (coveredBy: the people alone drawn flat into the
+// head's pixel after the screenshot); `coverOk:"<role>"` lets a wave-1 shot keep that one person in front. A
 // failed check, a missed shot or a page error exits 1. The rest of each criterion is looked at in the
 // side-by-side picture: --side-by-side=<dir with Storyboard_*.png> writes <id>_SideBySide.png
 // (storyboard | engine, same height, with the failed checks printed under it). The storyboard images are
@@ -91,6 +93,11 @@ export function JudgeShot(judge, dump) {
     const allowed = !!a.blockedBy && !!want.behindOk && a.blockedBlock === want.behindOk;
     if (shown && !want.headOptional) out.push({ label: `${role} head not behind scenery`, ok: !a.blockedBy || allowed,
       value: a.blockedBy ? `${a.blockedBlock || a.blockedBy}${allowed ? " (allowed in wave 1)" : ""}` : "clear", range: null });
+    // A head behind a nearer person (SB05: ijaB under ijaA's cap) passed the projection too. coverOk names the one
+    // person a wave-1 frame may still have in front (with its pendingWiring entry).
+    const coverAllowed = !!a.coveredBy && !!want.coverOk && a.coveredBy === want.coverOk;
+    if (shown && !want.headOptional) out.push({ label: `${role} head not behind a nearer person`, ok: !a.coveredBy || coverAllowed,
+      value: a.coveredBy ? `${a.coveredBy}${coverAllowed ? " (allowed in wave 1)" : ""}` : "clear", range: null });
     if (want.x) out.push(Range(`${role} head x`, a.headPx?.x, want.x));
     if (want.y) out.push(Range(`${role} head y`, a.headPx?.y, want.y));
     if (want.distM) out.push(Range(`${role} distance (m)`, a.distM, want.distM));
@@ -109,7 +116,7 @@ export function JudgeShot(judge, dump) {
   }
   for (const group of judge.inFrameAtLeast || []) {
     const seen = dump.actors.filter((a) => group.roles.some((r) => a.role?.startsWith(r)) && a.visible && !a.hidden && OnScreen(a.headPx)
-      && !a.blockedBy && (!group.minDistM || a.distM >= group.minDistM)).length;
+      && !a.blockedBy && !a.coveredBy && (!group.minDistM || a.distM >= group.minDistM)).length;
     out.push(Range(`${group.roles.join("/")} in frame${group.minDistM ? ` beyond ${group.minDistM} m` : ""}`, seen, [group.count, null]));
   }
   if (judge.rifleHidden) out.push({ label: "mission rifle hidden", ok: !dump.rifle?.visible, value: dump.rifle?.visible ?? null, range: null });
@@ -166,6 +173,7 @@ async function Main() {
       const dump = await page.evaluate(Dump, { warm: WARM, freeze: !!shot.freeze, points: shot.judge?.points || {} });
       const file = `${shot.id}${TAG ? "_" + TAG : ""}`;
       await page.screenshot({ path: path.join(OUT, file + ".png") });
+      for (const { index, by } of await page.evaluate(PeopleCover)) if (dump.actors[index]) dump.actors[index].coveredBy = by;
       // A lost WebGL context (the GPU process died, e.g. under other browsers' load) leaves a blank picture.
       if (dump.contextLost) { errors.push(`${shot.id}: WebGL context lost`); console.log("CONTEXTLOST", shot.id); }
       for (const a of dump.actors) if (a.blockedAt) a.blockedBlock = BlockAt(a.blockedAt);
@@ -259,6 +267,52 @@ function Advance({ cond, noStop }) {
   }
   return { hit: false, phase: s.phase, age: s.Age, stage: r.flow.stage.id, time: r.time };
 }
+/**
+ * Page side, after the screenshot: which judged heads sit behind a nearer person. Only people are drawn (a spare
+ * layer), into one pixel at the head (the camera's view offset), this man flat blue and every other person flat
+ * red with his index in the red channel; a red pixel names the person in front of the head. All is put back after.
+ */
+function PeopleCover() {
+  const g = window.Tengxian, r = g.Debug.FirstLevelMissionRuntime(), { T, last } = window.__sbShots;
+  if (!last || !g.renderer) return [];
+  const cam = r.player.camera, renderer = g.renderer, scene = g.scene, LAYER = 30, size = renderer.getSize(new T.Vector2());
+  const Flat = (red, blue) => new T.MeshBasicMaterial({ color: new T.Color().setRGB(red / 255, 0, blue, T.LinearSRGBColorSpace), fog: false });
+  const own = Flat(0, 1), meshes = new Map(), flats = [own];
+  for (const [row, root] of last.roots) {
+    const index = last.actors.indexOf(row), flat = Flat(Math.min(254, index + 1), 0), list = [];
+    flats.push(flat);
+    root.traverse((o) => { if (o.isMesh) list.push({ o, material: o.material, layer: o.layers.isEnabled(LAYER), flat }); });
+    meshes.set(row, list);
+    for (const m of list) { m.o.layers.enable(LAYER); m.o.material = flat; }
+  }
+  const saved = { mask: cam.layers.mask, target: renderer.getRenderTarget(), background: scene.background, fog: scene.fog,
+    clear: renderer.getClearColor(new T.Color()), alpha: renderer.getClearAlpha(), shadows: renderer.shadowMap.autoUpdate };
+  const rt = new T.WebGLRenderTarget(1, 1), pixel = new Uint8Array(4), out = [];
+  try {
+    cam.layers.set(LAYER); scene.background = null; scene.fog = null; renderer.shadowMap.autoUpdate = false;
+    renderer.setRenderTarget(rt); renderer.setClearColor(0x000000, 1);
+    for (const [row] of last.heads) {
+      const hp = row.headPx;
+      if (!row.visible || row.hidden || !hp?.front || hp.x < 0 || hp.x > 1 || hp.y < 0 || hp.y > 1) continue;
+      const mine = meshes.get(row) || [];
+      for (const m of mine) m.o.material = own;
+      cam.setViewOffset(size.x, size.y, Math.min(size.x - 1, hp.x * size.x), Math.min(size.y - 1, hp.y * size.y), 1, 1);
+      renderer.clear(); renderer.render(scene, cam); renderer.readRenderTargetPixels(rt, 0, 0, 1, 1, pixel);
+      for (const m of mine) m.o.material = m.flat;
+      if (pixel[2] < 128 && pixel[0] > 0) {
+        const by = last.actors[pixel[0] - 1];
+        out.push({ index: last.actors.indexOf(row), by: by?.role || by?.missionId || `#${pixel[0] - 1}` });
+      }
+    }
+  } finally {
+    cam.clearViewOffset(); cam.layers.mask = saved.mask;
+    renderer.setRenderTarget(saved.target); renderer.setClearColor(saved.clear, saved.alpha); renderer.shadowMap.autoUpdate = saved.shadows;
+    scene.background = saved.background; scene.fog = saved.fog;
+    for (const list of meshes.values()) for (const m of list) { m.o.material = m.material; if (!m.layer) m.o.layers.disable(LAYER); }
+    rt.dispose(); for (const f of flats) f.dispose();
+  }
+  return out;
+}
 /** Page side: render the warm frames and report the frame (normalised screen coordinates). */
 function Dump({ warm, freeze, points }) {
   const g = window.Tengxian, r = g.Debug.FirstLevelMissionRuntime(), s = r.frontShow.bunker, { T, Actor } = window.__sbShots;
@@ -270,7 +324,7 @@ function Dump({ warm, freeze, points }) {
   for (const role of ["ijaA", "ijaB", "ijaC", "ijaD", "luo", "yaowa", "heyoutian", "liuwencai", "comrade", "runner", "shouter", "interpreter"]) { const a = Actor(role); if (a && !roles.has(a)) roles.set(a, role); }
   for (const [id, a] of Object.entries(s.cast)) if (!roles.has(a)) roles.set(a, id);
   for (const a of r.squad) if (!roles.has(a)) roles.set(a, a.castId || a.id);
-  const actors = [], heads = new Map(), people = new Set();
+  const actors = [], heads = new Map(), people = new Set(), roots = new Map();
   for (const a of new Set([...roles.keys(), ...r.enemies.values()])) {
     if (!a?.actor?.root) continue;
     const d = Math.hypot(a.position.x - cam.position.x, a.position.z - cam.position.z);
@@ -285,7 +339,7 @@ function Dump({ warm, freeze, points }) {
       pelvisY: pelvis ? R3(pelvis.y - feet.y) : null, headPx: head ? Screen(head) : null, feetPx: Screen(feet),
       jaw: jaw ? R3(jaw.bone.quaternion.angleTo(jaw.quaternion)) : null });
     if (head) heads.set(actors[actors.length - 1], head);
-    people.add(a.actor.root);
+    people.add(a.actor.root); roots.set(actors[actors.length - 1], a.actor.root);
   }
   // blockedBy: the first piece of scenery between the eye and an on-screen head within 40 m. People, whatever
   // hangs under the camera (first-person hands and props), the mission rifle, hidden or see-through things,
@@ -309,6 +363,7 @@ function Dump({ warm, freeze, points }) {
     if (hit) row.blockedAt = [R3(hit.point.x), R3(hit.point.y), R3(hit.point.z)];
   }
   actors.sort((a, b) => a.distM - b.distM);
+  window.__sbShots.last = { actors, heads, roots };
   const flat = new T.Vector3(-Math.sin(e.y), 0, -Math.cos(e.y)).multiplyScalar(300).add(cam.position);
   const pointsOut = {};
   for (const [name, p] of Object.entries(points)) if (p.at) pointsOut[name] = Screen(new T.Vector3(p.at[0], g.battlefield.GroundHeight(p.at[0], p.at[2]) + p.at[1], p.at[2]));
