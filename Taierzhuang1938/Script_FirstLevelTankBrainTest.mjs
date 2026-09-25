@@ -378,24 +378,6 @@ function Run(brain, world, seconds, each = null) {
   ok(Dist(W[I("HullDown")].faceTo, FRONT_SPACE.tankTargets.nest) < 1e-9 && Dist(W[I("Block")].faceTo, FRONT_SPACE.tankTargets.gap) < 1e-9,
     "faceTo names resolve to FRONT_SPACE.tankTargets");
   ok(W[I("Block")].escortSlots === FRONT_TANK_ESCORT_SLOTS && FRONT_TANK_ESCORT_SLOTS.length === 4, "block escorts take Space's four crater slots");
-  // Relay r2 Front step 3: from HullDown through the switchback behind NorthRuin to BendExit the escorts hold the
-  // overwatch posts north of the ruin (the pocket beside the hull sees no fire point) and rejoin the tank after BendExit.
-  {
-    const over = W[I("Bend")].escortOverwatch;
-    ok(over?.length === 4 && ["HullDown", "Descent", "Bend", "BendExit"].every((id) => W[I(id)].escortOverwatch === over)
-      && ["Shadow", "Pressure", "Approach", "Block"].every((id) => !W[I(id)].escortOverwatch), "overwatch legs: HullDown to BendExit only");
-    const ruin = MISSION_LAYOUT.blocks.find((b) => b.id === "NorthRuinNorth");
-    ok(over.every((p) => p.z < ruin.z - ruin.d / 2 - 2.5), "the posts stand north of NorthRuin's north wall, off the pocket");
-    const escortIds = ["TankEscortA", "TankEscortB", "TankEscortC", "TankEscortD"];
-    const at = CreateTankBrain(P, TANK, { seed: 3 });
-    at.PlaceAt(I("Bend"));
-    const plan = at.Escorts({ escortIds });
-    ok(plan.length === 4 && plan.every((e, i) => e.mode === "slot" && e.anchor.x === over[i].x && e.anchor.z === over[i].z),
-      "the tank waiting at Bend: its escorts on the overwatch posts, not beside the hull");
-    const on = CreateTankBrain(P, TANK, { seed: 3 });
-    on.PlaceAt(I("Pressure"));
-    ok(on.Escorts({ escortIds }).every((e) => !over.some((p) => p.x === e.anchor.x && p.z === e.anchor.z)), "past BendExit they are back with the tank");
-  }
   const brain = CreateTankBrain(P, TANK, { seed: 21 });
   ok(brain.reversals.includes(I("HullDown")) && brain.reversals.length === 1, "HullDown is the one switchback (tangent never smoothed across it)");
   const facts = new Set();

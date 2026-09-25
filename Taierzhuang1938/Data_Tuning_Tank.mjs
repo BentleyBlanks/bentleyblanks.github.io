@@ -494,25 +494,13 @@ export const NEVER_BREAKABLE_RULES = Object.freeze({
 // （drive.reversalRad，大脑不跨折返点磨圆切线）。开进图的时机见 entry.fact。
 // ---------------------------------------------------------------------------
 const TankTarget = (name) => name ? Object.freeze({ x: FRONT_SPACE.tankTargets[name].x, z: FRONT_SPACE.tankTargets[name].z }) : undefined;
-/**
- * 护兵的看守位（relay r2 Front 第三步，2026-09-25）：战车从折返顶 HullDown 下坡、在北残院后面的路弯 Bend 等 04、再开到
- * BendExit 这一整段，护兵不跟着车走进路弯 —— 那是北残院（墙高 2.9 m）和南边土坡夹出来的死角：x 48–60、z −194…−182
- * 一个授权射击点都打不着（引擎射线量过，站姿，FIRE_03_NEST 14 点里 0 点），04 空转探针里 TankEscortA / C 几乎每趟都在
- * 那里 30 s 一发不打（量过的 8 趟全有，多数一趟两个零发窗口）。他们停在残院北墙外那道高 1.6–2.1 m 的土台上：同一套射线
- * 对土坎顶、左枪胸墙、阵位北墙 / 西墙、东头交汇口能打到 9–11 点，**对撤退口三点（gapWest / gapEast / gapJunction）
- * 全都打不到**（09-24 教训：护兵看得见缺口，InfantryBlockade 就一直亮着）。车开过 BendExit 往 Pressure 去时归队。
- */
-const TANK_ESCORT_OVERWATCH = Object.freeze([
-  Object.freeze({ id: "OverwatchA", x: 44, z: -194.5 }), Object.freeze({ id: "OverwatchB", x: 46, z: -194.2 }),
-  Object.freeze({ id: "OverwatchC", x: 48, z: -194.3 }), Object.freeze({ id: "OverwatchD", x: 45, z: -196.8 }),
-]);
 const TANK_PACE = Object.freeze({
   Start: { stage: "Support" }, Cutting: { stage: "Support" }, CrestEast: { stage: "Support" }, Shadow: { stage: "Support" },
-  HullDown: { stage: "Support", preview: true, escortOverwatch: TANK_ESCORT_OVERWATCH },
-  Descent: { stage: "Support", escortOverwatch: TANK_ESCORT_OVERWATCH },
+  HullDown: { stage: "Support", preview: true },
+  Descent: { stage: "Support" },
   // 03 露面以后退回北残院后面，在路弯里等 04（从机枪座看不见）。
-  Bend: { stage: "Support", escortOverwatch: TANK_ESCORT_OVERWATCH },
-  BendExit: { stage: "MachineGun", escortOverwatch: TANK_ESCORT_OVERWATCH },
+  Bend: { stage: "Support" },
+  BendExit: { stage: "MachineGun" },
   // 04：驶出路弯 → 压阵位，压住了（tankPositionPressured）才往前封口。
   Pressure: { stage: "MachineGun", holdUntil: "tankPositionPressured" },
   Approach: { stage: "MachineGun" },

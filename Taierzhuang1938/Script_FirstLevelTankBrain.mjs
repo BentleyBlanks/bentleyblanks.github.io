@@ -842,12 +842,7 @@ export class TankBrain {
     const holding = !this.moving && this.holdIndex >= 0 && ["firePoint", "hullDown", "block", "squeeze"].includes(this.points[this.holdIndex].kind);
     // 路点自带护兵槽（FRONT_TANK_PATH 的 Block/Squeeze → FRONT_TANK_ESCORT_SLOTS，Space 包量过：都在车北侧/西侧弹坑里、
     // 看不见缺口）：停在这儿时护兵去这几个绝对位置，不按车体相对槽往路边推（那样会有人顺土坎南坡看见缺口）。
-    // Overwatch legs (a waypoint's escortOverwatch, Data_Tuning_Tank TANK_ESCORT_OVERWATCH): from the leg into that
-    // waypoint until the tank drives on past it, the escorts hold absolute posts instead of walking beside the hull -
-    // the switchback behind NorthRuin is a pocket from which nothing at the front can be seen or shot at.
-    const at = this.cum.findIndex((c) => c >= this.progress - 0.05);
-    const over = at >= 0 ? this.points[at].escortOverwatch : null;
-    const fixed = (holding ? this.points[this.holdIndex].escortSlots : null) || over || null;
+    const fixed = holding ? this.points[this.holdIndex].escortSlots : null;
     const out = [];
     for (const [i, slot] of E.slots.entries()) {
       const id = ids[i];
