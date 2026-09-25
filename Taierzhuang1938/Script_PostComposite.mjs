@@ -501,7 +501,7 @@ vec3 LensEffects(vec3 color, vec2 uv, float r2, float gradedLuma) {
     float corner = mix(mix(uBloodCorners.z, uBloodCorners.w, uv.x), mix(uBloodCorners.x, uBloodCorners.y, uv.x), uv.y);
     float ring = smoothstep(0.06, 0.40, r2);
     float blotch = .62 + .38 * sin(uv.x * 11.0 + sin(uv.y * 7.0) * 2.3) * sin(uv.y * 9.0 + sin(uv.x * 5.0) * 1.7 + 1.3);
-    float blood = clamp(ring * corner * blotch * uBloodEdge.a * 2.8, 0.0, 0.92);
+    float blood = clamp(ring * corner * blotch * uBloodEdge.a * 3.4, 0.0, 0.92);
     color = mix(color, uBloodEdge.rgb * (.28 + .72 * Luma(color)), blood);
   }
 
