@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import crypto from "node:crypto";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { OPENING_STORYBOARDS as C } from "./Data_OpeningStoryboards.mjs";
 import { OpeningHoldTime } from "./Script_OpeningProps.mjs";
 const Read=file=>fs.readFileSync(new URL(file,import.meta.url));
@@ -17,7 +19,10 @@ const FROZEN_AUTHORED=["WoundedSitRifleIdle","BanterLaugh","BanterLookShoulder",
   "CaptiveWallSlideTwitch","IjaWipeSheathBayonet","IjaReadyRifle","IjaCornerFire","IjaJunctionPeek","IjaSlingRifle",
   "IjaCollarDragSnag","IjaKickBeam","IjaButtStrike","IjaHoldCollarUp","InterpreterCrouchAsk","InterpreterGrabCollar",
   "InterpreterFlee","LuoDadaoChopRear","IjaChoppedFallWall","HeDadaoParryChop","IjaParriedChoppedFall","LuoDragToCover",
-  "HeSwapDadaoRifle","LuoKneelCheck"];
+  "HeSwapDadaoRifle","LuoKneelCheck",
+  // 2026-09-25 storyboard round (Data_FirstLevelStoryboard0103Contract.md §4.1)
+  "IjaButtStrikeCollar","IjaDragByForearm","IjaLookBackLow","IjaStartleTurn","IjaGuardPort",
+  "LuoKneelReach","RunnerLeanPostCall","InterpreterHurryReach","YaowaSitLoad","IjaChoppedFallBack"];
 const FROZEN_REUSED=["ClipLoad","MessengerReport","CollarControl","CollarDrag","BayonetClearWood","ButtThreat","CreepDadao",
   "DadaoHeavy","RifleDeflect","DadaoParry","KickRifle","GuardTurn","PointBlockade","InterrogateCrouch","InterpreterPoint",
   "DeathCollapseA","DeathCollapseB","DeathCollapseC","DeathCollapseD",
@@ -228,6 +233,161 @@ const WorldPose=(id,asset,clip,t)=>{
   };
   return asset.bones.map(name=>W(byName.get(name)));
 };
+// ---- 2026-09-25 storyboard clips (Data_FirstLevelStoryboard0103Contract.md §4.1) -----------------------
+const SB0925=["IjaButtStrikeCollar","IjaDragByForearm","IjaLookBackLow","IjaStartleTurn","IjaGuardPort"];
+{
+  const ijaB=assets.get("LugouIja01"),reportOf=(rig,id)=>manifest.models.find(m=>m.id===rig).clips.find(c=>c.clip===id);
+  for(const id of SB0925){
+    const spec=manifest.clips[id];
+    assert.equal(spec.rig,id==="IjaGuardPort"?"LugouIja01":"LugouIja02",`${id}: cast on the contract's rig`);
+    // durations are whole baked frames (a contact or event key then lands on a frame)
+    assert.ok(Math.abs(spec.duration*manifest.fps-Math.round(spec.duration*manifest.fps))<1e-6,`${id}: duration ${spec.duration} s is whole frames`);
+  }
+  // Every clip that aims ijaA's face at the camera (the player's eye) or ijaB's at the captive: the face
+  // points at it (bake lookErrorDeg: face direction vs eye->target, while the aim is fully on) and the
+  // head stays on the neck.
+  for(const [rig,id,limit] of [["LugouIja02","IjaButtStrikeCollar",3],["LugouIja02","IjaDragByForearm",3],["LugouIja02","IjaHoldCollarUp",3],
+    ["LugouIja02","IjaLookBackLow",3],["LugouIja01","IjaGuardPort",3],
+    // the startle snaps the head round in 0.3 s after a look point that swings as fast: the head trails it by up to ~7 deg
+    ["LugouIja02","IjaStartleTurn",10]]){
+    const r=reportOf(rig,id);
+    assert.ok(r.lookErrorDeg<=limit,`${rig}/${id}: the face misses its look point by ${r.lookErrorDeg} deg`);
+    assert.ok(r.headTurnDeg<=70,`${rig}/${id}: head turned ${r.headTurnDeg} deg on the neck`);
+  }
+  // SB04: apex hold >= 0.4 s, the butt on the player's head at the declared strike (bake probe), event = contact.
+  const butt=manifest.clips.IjaButtStrikeCollar,strike=butt.contacts.find(c=>c.action==="strike");
+  assert.ok(butt.holdLoop[1]-butt.holdLoop[0]>=.4,"IjaButtStrikeCollar: the apex hold loop is at least 0.4 s");
+  assert.equal(butt.events.find(e=>e.kind==="buttHit").t,strike.t,"IjaButtStrikeCollar: buttHit is the strike contact");
+  const probe=reportOf("LugouIja02","IjaButtStrikeCollar").probes?.buttOnHead;
+  assert.ok(probe&&probe[0]<=.03&&Math.abs(probe[1]-strike.t)<1e-3,`IjaButtStrikeCollar: butt on the head at ${strike.t} s (${probe})`);
+  // First-person partner parts: collar/head on every clip that holds him, forearmR on the drag.
+  const parts=(id)=>Object.keys(ijaA.clips[id].player?.parts||{}).sort().join(",");
+  assert.equal(parts("IjaButtStrikeCollar"),"collar,head");assert.equal(parts("IjaDragByForearm"),"collar,forearmR,head");
+  assert.equal(parts("IjaStartleTurn"),"collar,head");assert.equal(parts("IjaHoldCollarUp"),"collar,head");
+  // SB04A: 1.5-2.5 m of root motion backwards (actor +z), the forearm grab declared on the player's forearmR.
+  const drag=reportOf("LugouIja02","IjaDragByForearm").root,travel=Math.hypot(drag.end[0]-drag.start[0],drag.end[1]-drag.start[1]);
+  assert.ok(travel>=1.5&&travel<=2.5&&drag.end[1]>drag.start[1],`IjaDragByForearm: hauls ${travel.toFixed(2)} m backwards`);
+  assert.ok(manifest.clips.IjaDragByForearm.contacts.some(c=>c.action==="grab"&&c.part==="forearmR"&&c.partnerRole==="shunzi"),"IjaDragByForearm: grabs forearmR");
+  // SB05: Shunzi's eye 0.65-0.85 m up in the IjaHoldCollarUp hold (the contract's 0.75 m).
+  const eye=ijaA.clips.IjaHoldCollarUp.player.parts.head,holdAt=Math.round(1.0*12)*3;
+  assert.ok(eye[holdAt+1]>=.65&&eye[holdAt+1]<=.85,`IjaHoldCollarUp: eye ${eye[holdAt+1]} m up in the hold`);
+  // SB05A: IjaStartleTurn ends with the face turned to his left rear (where Luo and He come up: Shunzi's screen
+  // right), about level -- the head's rest face direction (glTF +z, the actor's forward; +x = his left) carried
+  // by the last frame -- and the flinch drops him (the head lower than in the hold it starts from).
+  {
+    const {json,parent,byName}=Glb("LugouIja02"),head=ijaA.bones.findIndex(n=>/ Head$/.test(n));
+    const RestQ=i=>{const q=json.nodes[i].rotation||[0,0,0,1];return parent[i]<0?q:QMul(RestQ(parent[i]),q);};
+    const r=RestQ(byName.get(ijaA.bones[head])),faceLocal=QRot([-r[0],-r[1],-r[2],r[3]],[0,0,1]);
+    const startle=manifest.clips.IjaStartleTurn,end=WorldPose("LugouIja02",ijaA,"IjaStartleTurn",startle.duration)[head];
+    const face=QRot(end.q,faceLocal),left=Math.atan2(face[0],face[2])*180/Math.PI,pitch=Math.asin(face[1]/Math.hypot(...face))*180/Math.PI;
+    assert.ok(left>=60&&left<=130&&Math.abs(pitch)<=20,`IjaStartleTurn: the face ends ${left.toFixed(0)} deg to his left, pitch ${pitch.toFixed(0)} deg`);
+    const start=WorldPose("LugouIja02",ijaA,"IjaStartleTurn",0)[head];
+    assert.ok(start.p[1]-end.p[1]>=.02,`IjaStartleTurn: the head drops ${((start.p[1]-end.p[1])*100).toFixed(1)} cm in the flinch`);
+    assert.ok(startle.events.some(e=>e.kind==="releaseCollar")&&!manifest.clips.IjaParriedChoppedFall.events.some(e=>e.kind==="releaseCollar"),
+      "releaseCollar is on IjaStartleTurn (IjaParriedChoppedFall frame 0 is already off the collar)");
+  }
+  // IjaGuardPort is a seamless loop on ijaB's rig.
+  assert.ok(ijaB.clips.IjaGuardPort.loop,"IjaGuardPort loops");
+  // Same-root hand-overs frame to frame (world pose, every bone <= 2 deg and 1 cm; props <= 2 cm):
+  // strike -> drag, hold loop start -> startle, startle -> the parried fall.
+  const World=(rig,asset,id,t)=>WorldPose(rig,asset,id,t);
+  for(const [a,ta,b,tb] of [["IjaButtStrikeCollar",null,"IjaDragByForearm",0],["IjaHoldCollarUp",manifest.clips.IjaHoldCollarUp.holdLoop[0],"IjaStartleTurn",0],
+    ["IjaStartleTurn",null,"IjaParriedChoppedFall",0]]){
+    const x=World("LugouIja02",ijaA,a,ta??manifest.clips[a].duration),y=World("LugouIja02",ijaA,b,tb);
+    let angle=0,offset=0,where="";
+    x.forEach((p,i)=>{
+      if(/Finger\d\d|Nub/.test(ijaA.bones[i]))return;
+      const q=y[i],deg=2*Math.acos(Math.min(1,Math.abs(p.q[0]*q.q[0]+p.q[1]*q.q[1]+p.q[2]*q.q[2]+p.q[3]*q.q[3])))*180/Math.PI;
+      if(deg>angle){angle=deg;where=ijaA.bones[i];}
+      offset=Math.max(offset,Math.hypot(p.p[0]-q.p[0],p.p[1]-q.p[1],p.p[2]-q.p[2]));
+    });
+    assert.ok(angle<=2&&offset<=.01,`${a}@${ta??"end"} -> ${b}@${tb}: ${angle.toFixed(2)} deg at ${where}, ${(offset*100).toFixed(2)} cm`);
+    if(ta==null)assert.ok(PropJump(ijaA,a,-1,b,0)<=.02,`${a} -> ${b}: the rifle continues`);
+    chains++;
+  }
+}
+// ---- 2026-09-25 storyboard clips on the NRA rigs (§4.1: SB01 runner/Yaowa, SB04A interpreter, SB06 Luo) ----------
+{
+  const SB0925_NRA={LuoKneelReach:"LugouNra05",RunnerLeanPostCall:"LugouNra02",InterpreterHurryReach:"LugouNra02",YaowaSitLoad:"LugouNra02"};
+  const reportOf=(rig,id)=>manifest.models.find(m=>m.id===rig).clips.find(c=>c.clip===id);
+  for(const [id,rig] of Object.entries(SB0925_NRA)){
+    const spec=manifest.clips[id],r=reportOf(rig,id);
+    assert.equal(spec.rig,rig,`${id}: cast on the contract's rig`);
+    assert.ok(Math.abs(spec.duration*manifest.fps-Math.round(spec.duration*manifest.fps))<1e-6,`${id}: duration ${spec.duration} s is whole frames`);
+    // bake numbers: planted feet (and Luo's knee) hold, hands on their targets, the face on its look point
+    assert.ok(r.footSlideM<=.02&&(r.kneeSlideM??0)<=.02,`${rig}/${id}: foot ${r.footSlideM} m, knee ${r.kneeSlideM} m`);
+    assert.ok(r.contactErrorM<=.03,`${rig}/${id}: hand ${r.contactErrorM} m off its target`);
+    assert.ok(r.lookErrorDeg<=3&&r.headTurnDeg<=70,`${rig}/${id}: face ${r.lookErrorDeg} deg off, head turned ${r.headTurnDeg} deg`);
+  }
+  const luo=assets.get("LugouNra05"),nra02=assets.get("LugouNra02");
+  // SB06: the offered hand 0.3 m short of Shunzi's chest (player chest/head tracks), a hold loop with an exit, and
+  // the clip starts and ends on LuoKneelCheck frame 0 (a drop-in for the Check beat, then KickRifle).
+  const reach=manifest.clips.LuoKneelReach,offer=reach.contacts.find(c=>c.action==="reach");
+  assert.ok(offer&&offer.limb==="handL"&&offer.part==="chest"&&offer.partnerRole==="shunzi"&&Math.abs(offer.gapM-.3)<1e-9,"LuoKneelReach: left hand offered 0.3 m short of the chest");
+  assert.equal(Object.keys(luo.clips.LuoKneelReach.player?.parts||{}).sort().join(","),"chest,head","LuoKneelReach: player chest/head");
+  assert.equal(reportOf("LugouNra05","LuoKneelReach").kneePlants.length,1,"LuoKneelReach: the right knee is declared on the ground");
+  for(const [a,ta,b,tb] of [["LuoKneelReach",reach.duration,"LuoKneelCheck",0],["LuoKneelReach",0,"LuoKneelCheck",0]]){
+    const x=WorldPose("LugouNra05",luo,a,ta),y=WorldPose("LugouNra05",luo,b,tb);
+    let angle=0,offset=0,where="";
+    x.forEach((p,i)=>{
+      if(/Finger\d\d|Nub/.test(luo.bones[i]))return;
+      const q=y[i],deg=2*Math.acos(Math.min(1,Math.abs(p.q[0]*q.q[0]+p.q[1]*q.q[1]+p.q[2]*q.q[2]+p.q[3]*q.q[3])))*180/Math.PI;
+      if(deg>angle){angle=deg;where=luo.bones[i];}
+      offset=Math.max(offset,Math.hypot(p.p[0]-q.p[0],p.p[1]-q.p[1],p.p[2]-q.p[2]));
+    });
+    assert.ok(angle<=2&&offset<=.01,`${a}@${ta} -> ${b}@${tb}: ${angle.toFixed(2)} deg at ${where}, ${(offset*100).toFixed(2)} cm`);
+    chains++;
+  }
+  // SB01 runner: the fist on the post (pointM) sits just outside the post (postAxisM, postRadiusM), shoulder high.
+  // The RIGHT hand, the post at his front right (review 2026-09-25: with the storyboard's left hand the north door
+  // post puts him in the dugout's north wall; mirrored per contract §1.3).
+  const post=manifest.clips.RunnerLeanPostCall.contacts.find(c=>c.target==="post");
+  const gap=Math.hypot(post.pointM[0]-post.postAxisM[0],post.pointM[2]-post.postAxisM[2]);
+  assert.ok(post.limb==="handR"&&gap>=post.postRadiusM&&gap<=post.postRadiusM+.05&&post.pointM[1]>1.0&&post.pointM[1]<1.35,
+    `RunnerLeanPostCall: fist ${gap.toFixed(3)} m from the post axis at ${post.pointM[1]} m`);
+  assert.ok(post.postAxisM[0]>.3&&post.postAxisM[2]<0,`RunnerLeanPostCall: the post at his front right (${post.postAxisM})`);
+  // Placed on the north door post (Data_FirstLevelMissionLayout BunkerMouthPostN) facing into the dugout (yaw 80 deg),
+  // the root stands in the mouth south of that post, outside the north wall line, within the contract's 0.6 m of its mark.
+  {
+    const yaw=80*Math.PI/180,[px,,pz]=post.postAxisM,wx=px*Math.cos(yaw)+pz*Math.sin(yaw),wz=-px*Math.sin(yaw)+pz*Math.cos(yaw);
+    const root={x:1.05-wx,z:-127.5-wz};
+    assert.ok(root.z>-127.5+.3&&Math.hypot(root.x-.72,root.z+127.0)<=.6,`RunnerLeanPostCall: root (${root.x.toFixed(2)},${root.z.toFixed(2)}) on the north door post`);
+  }
+  assert.ok(manifest.clips.RunnerLeanPostCall.holdLoop[1]===manifest.clips.RunnerLeanPostCall.duration,"RunnerLeanPostCall: holds to the end");
+  // SB04A interpreter: an upper-body clip (the runtime lays it on the native legs).
+  assert.equal(manifest.clips.InterpreterHurryReach.upperBody,true,"InterpreterHurryReach: upper body");
+  // SB01 Yaowa: a seamless loop, sitting on the ground against the wall.
+  assert.ok(nra02.clips.YaowaSitLoad.loop&&manifest.clips.YaowaSitLoad.env.wallBehindM>0,"YaowaSitLoad: loops against the wall");
+  const seam=HandOver(nra02,"YaowaSitLoad",0,"YaowaSitLoad",-1);
+  assert.ok(seam.angle<=.5&&seam.offset<=.001,`YaowaSitLoad: loop seam ${seam.angle.toFixed(3)} deg`);
+  assert.ok(reportOf("LugouNra02","YaowaSitLoad").root.start[3]<.2,"YaowaSitLoad: the pelvis is on the ground (sitting)");
+}
+// ---- SB05A IjaChoppedFallBack (ijaB, optional §4.1): the alternative to IjaChoppedFallWall on the same stage --------
+{
+  const ijaB=assets.get("LugouIja01"),spec=manifest.clips.IjaChoppedFallBack,wall=manifest.clips.IjaChoppedFallWall;
+  const r=manifest.models.find(m=>m.id==="LugouIja01").clips.find(c=>c.clip==="IjaChoppedFallBack");
+  assert.ok(spec.rig==="LugouIja01"&&spec.role==="ijaB"&&spec.stage===wall.stage&&spec.terminal===true,"IjaChoppedFallBack: ijaB, the chopRear stage, terminal");
+  assert.ok(Math.abs(spec.duration*manifest.fps-Math.round(spec.duration*manifest.fps))<1e-6,`IjaChoppedFallBack: duration ${spec.duration} s is whole frames`);
+  // the same cut as the wall fall (LuoDadaoChopRear aims at the wall fall's neck track)
+  const cut=c=>c.by==="luo"&&c.part==="neckSideR"&&c.action==="cut";
+  assert.equal(spec.contacts.find(cut)?.t,wall.contacts.find(cut)?.t,"IjaChoppedFallBack: the cut lands when it does on IjaChoppedFallWall");
+  assert.ok(spec.events.some(e=>e.kind==="seatHit")&&spec.events.some(e=>e.kind==="dead"&&e.t===spec.duration),"IjaChoppedFallBack: seatHit and dead events");
+  // up to the cut it IS the wall fall, so the director swaps the clip without moving Luo: world pose <= 1 deg, 5 mm
+  for(const t of [0,.25,.45]){
+    const x=WorldPose("LugouIja01",ijaB,"IjaChoppedFallWall",t),y=WorldPose("LugouIja01",ijaB,"IjaChoppedFallBack",t);
+    let angle=0,offset=0,where="";
+    x.forEach((p,i)=>{
+      if(/Finger\d\d|Nub/.test(ijaB.bones[i]))return;
+      const q=y[i],deg=2*Math.acos(Math.min(1,Math.abs(p.q[0]*q.q[0]+p.q[1]*q.q[1]+p.q[2]*q.q[2]+p.q[3]*q.q[3])))*180/Math.PI;
+      if(deg>angle){angle=deg;where=ijaB.bones[i];}
+      offset=Math.max(offset,Math.hypot(p.p[0]-q.p[0],p.p[1]-q.p[1],p.p[2]-q.p[2]));
+    });
+    assert.ok(angle<=1&&offset<=.005,`IjaChoppedFallBack@${t} vs IjaChoppedFallWall: ${angle.toFixed(2)} deg at ${where}, ${(offset*100).toFixed(2)} cm`);
+  }
+  // bake numbers: planted feet hold until the fall, nothing in the trench wall, and he ends on the ground behind his root
+  assert.ok(r.footSlideM<=.02&&(r.wallPenetrationM??0)<=.01,`IjaChoppedFallBack: foot ${r.footSlideM} m, wall ${r.wallPenetrationM} m`);
+  assert.ok(r.root.end[3]<.25&&r.root.end[1]>r.root.start[1]+.15,`IjaChoppedFallBack: ends on the ground behind his root (${r.root.end})`);
+}
 let seams=0;
 for(const [id,spec] of Object.entries(manifest.clips)){
   if(!spec.holdLoop||spec.legacy)continue;
@@ -286,4 +446,37 @@ assert.deepEqual([...C.phases.RearTrench],["Withdraw","Corner","Collection","Sup
   assert.match(source,/CornerFire\([^)]*\)\{[\s\S]*?this\.FireRifle\(/,"the corner man's loop fires a real rifle shot");
   assert.ok(Object.values(C.pursuit).every(v=>Number.isFinite(v)&&v>0),"pursuit tuning is finite");
 }
-console.log(`ok opening storyboards: five original rigs, ${clipCount} rig clips (${NEW.length} authored 2026-09-23, ${paired} paired contacts cross-checked, ${chains} same-root hand-overs, ${seams} hold-loop seams), ${frames} normalized frames, director phase table and marks`);
+// ---- reproducibility (optional): --rebake=<dir> holds rig files from `OPENING_PASS=verify` (the repository bake
+// script, any subset of clips); every clip in them must be the committed clip -- every bone within 0.5 deg and
+// 1 mm (source metres) in the rig's world on every frame (fingers excluded, as at the hand-overs).
+const rebake=process.argv.find(arg=>arg.startsWith("--rebake="))?.slice(9);
+if(rebake){
+  // relative to the worktree root (where the bake's verify pass writes tmp/OpeningStoryboards/Verify), or absolute
+  const dir=path.resolve(fileURLToPath(new URL("../",import.meta.url)),rebake),off=[];let compared=0;
+  for(const rig of RIGS){
+    const file=path.join(dir,`Animation_${rig}OpeningStoryboards.json`);
+    if(!fs.existsSync(file))continue;
+    const fresh=JSON.parse(fs.readFileSync(file)),asset=assets.get(rig);
+    assert.deepEqual(fresh.bones,asset.bones,`${rig}: rebake bone order`);
+    for(const id of Object.keys(fresh.clips)){
+      const a=asset.clips[id],b=fresh.clips[id];
+      assert.ok(a,`${rig}/${id}: rebaked clip is committed`);assert.equal(b.frameCount,a.frameCount,`${rig}/${id}: frame count`);
+      let angle=0,offset=0,where="";
+      for(let f=0;f<a.frameCount;f++){
+        const t=f*a.duration/(a.frameCount-1),x=WorldPose(rig,asset,id,t),y=WorldPose(rig,fresh,id,t);
+        x.forEach((p,i)=>{
+          if(/Finger\d\d|Nub/.test(asset.bones[i]))return;
+          const q=y[i],deg=2*Math.acos(Math.min(1,Math.abs(p.q[0]*q.q[0]+p.q[1]*q.q[1]+p.q[2]*q.q[2]+p.q[3]*q.q[3])))*180/Math.PI;
+          if(deg>angle){angle=deg;where=`${asset.bones[i]} frame ${f}`;}
+          offset=Math.max(offset,Math.hypot(p.p[0]-q.p[0],p.p[1]-q.p[1],p.p[2]-q.p[2]));
+        });
+      }
+      if(angle>.5||offset>.001)off.push(`${rig}/${id}: ${angle.toFixed(2)} deg at ${where}, ${(offset*1000).toFixed(1)} mm`);
+      compared++;
+    }
+  }
+  assert.ok(compared>0,`--rebake=${rebake}: no rig files`);
+  assert.deepEqual(off,[],"the repository bake script reproduces the committed clips");
+  console.log(`ok rebake: ${compared} rig clips from ${rebake} equal the committed ones (<=0.5 deg, 1 mm)`);
+}
+console.log(`ok opening storyboards: five original rigs, ${clipCount} rig clips (${NEW.length} authored 2026-09-23/25, ${paired} paired contacts cross-checked, ${chains} same-root hand-overs, ${seams} hold-loop seams), ${frames} normalized frames, director phase table and marks`);

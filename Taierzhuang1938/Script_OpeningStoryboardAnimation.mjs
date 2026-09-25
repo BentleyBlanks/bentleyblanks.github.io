@@ -12,6 +12,19 @@ let library, pending;
 const CAPTIVES_REUSED = ["IjaBayonetGuard","CaptiveStandToKneel","CaptiveHandsUpWalk","CaptiveKneelPlead",
   "IjaKickPrisoner","IjaShoveForward","IjaTauntGesture","CaptiveKneelFlinch","CaptiveShovedStumble"];
 const Quat = new Quaternion(), QuatRef = new Quaternion(), QuatAdd = new Quaternion();
+// A clip name the director asks for that this rig was not baked with plays the native animation instead --
+// said once per rig and name (console + window.__openingMissingClips), so a dead reference cannot hide
+// behind that fallback (contract Data_FirstLevelStoryboard0103Contract.md §3).
+const missingClips = new Set();
+function ReportMissingOpeningClip(modelId, clip){
+  const key = `${modelId}/${clip}`;
+  if(missingClips.has(key))return;
+  missingClips.add(key);
+  console.warn(`opening clip ${clip} is not baked on ${modelId}: the native animation plays instead`);
+  if(typeof window!=="undefined")(window.__openingMissingClips ||= []).push(key);
+}
+/** Every "<modelId>/<clip>" a director asked for that the rig does not have (see ReportMissingOpeningClip). */
+export function OpeningMissingClips(){return [...missingClips];}
 
 /** Static metadata of one opening clip (manifest `clips[name]`): role, contacts, holdLoop, ... */
 export function OpeningClipMeta(clip){return library?.config.clips?.[clip]||null;}
@@ -161,8 +174,11 @@ export function InstallOpeningStoryboardAnimation(soldier){
     clock+=dt;
     const record=library?.models.get(rig.clipModelId||rig.modelId);
     let pose=ResolveOpeningActorPose(soldier,soldier.openingStoryboardPose,clock,record);
-    if(pose&&record&&!record.clips[pose.clip]&&pose.clip!=="DadaoAmbush")pose=null;
+    if(pose&&record&&!record.clips[pose.clip]&&pose.clip!=="DadaoAmbush"){if(typeof pose.clip==="string")ReportMissingOpeningClip(rig.clipModelId||rig.modelId,pose.clip);pose=null;}
     if(pose&&OpeningClipMeta(pose.clip)?.holdLoop)pose={...pose,seconds:OpeningHoldSeconds(pose.clip,pose.seconds,pose.holdUntil)};
+    // An upper-body clip (manifest upperBody: InterpreterHurryReach) rides the native legs unless the
+    // director says otherwise (pose.upperBody:false plays it full-body).
+    if(pose&&pose.upperBody==null&&OpeningClipMeta(pose.clip)?.upperBody)pose={...pose,upperBody:true};
     const nativeCombat=soldier.openingStoryboardTravel==null&&(state.firing||state.fire>0||state.aim>.6
       ||state.meleeCombat?.state==="attack"||state.meleeCombat?.state==="bind");
     // Front commands can occur while moving and firing. An explicit pointing
