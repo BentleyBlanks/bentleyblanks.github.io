@@ -114,7 +114,7 @@ export class AircraftFlight {
 
   SetPhase(phase) {
     this.phase = phase;
-    this.manualPoses.clear();
+    this.manualPoses.clear(); this.manualAlias?.clear();
     if (phase.whitebox?.p012 || phase.ambientAircraft === false) for (const { root } of this.forms) this._Show(root, false);
     this.anchor.set(
       (phase.bounds.minX + phase.bounds.maxX) * 0.5,
@@ -170,17 +170,23 @@ export class AircraftFlight {
   /**
    * A scripted call-in owns one aircraft until it leaves. Idle orbiters remain disabled.
    * Several ids can be posed at once (each id owns its own airframe); `pose = null` releases that id only.
+   * Release goes through the id the caller posed with (manualAlias): an id that was never posed releases nothing
+   * (it must not fall back to forms[0] and knock another caller's pose off). MitsubishiKi30 is shared by the mission
+   * strafe (MISSION_AIRCRAFT_ID) and the 03 flyover wingman (Data_OpeningSet0103.FLYOVER): never schedule both in one step.
    */
   SetManualPose(id, pose) {
-    const form = this.FormFor(id);
+    this.manualAlias ??= new Map();
     if (!pose) {
-      const key = form && this.manualPoses.has(form.spec.id) ? form.spec.id : (this.manualPoses.has(id) ? id : null);
-      if (key == null) return;
+      const key = this.manualAlias.get(id) ?? (this.manualPoses.has(id) ? id : null);
+      this.manualAlias.delete(id);
+      if (key == null || !this.manualPoses.has(key)) return;
       const old = this.forms.find((f) => f.spec.id === key);
       if (old) this._Show(old.root, false);
       this.manualPoses.delete(key); return;
     }
+    const form = this.FormFor(id);
     if (!form) return;
+    this.manualAlias.set(id, form.spec.id);
     this.manualPoses.set(form.spec.id, pose);
     ApplyStrafePose(form.root, pose); this._Show(form.root, true);
   }
