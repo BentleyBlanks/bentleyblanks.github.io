@@ -346,6 +346,28 @@ const Samples = (route) => {
   assert.equal(scene.children.length, 1, "Exit() removes it again");
   console.log(`ok lifecycle: ${report.stats.meshes} meshes / 1 light in 01–03, lintel falls 0.25–0.6 s, lantern only in 01, zero residue after 03`);
 }
+{
+  // 正片里马灯走 LightRig 的火光池（簇光）：场景里一盏 three PointLight 都不放，01 进场、01→02 灭灯都不改 NUM_POINT_LIGHTS
+  // （不然整座城的材质各重编译一次，Script_ClusteredLights 文件头）。
+  const fires = new Map(); let next = 1;
+  const rig = { AddFire: (p, o) => { const h = next++; fires.set(h, { p: { ...p }, ...o }); return h; },
+    UpdateFire: (h, o) => { if (!fires.has(h)) return false; Object.assign(fires.get(h), o); return true; }, RemoveFire: (h) => { fires.delete(h); } };
+  const scene = new THREE.Scene(), set = new OpeningSet({ scene, library: null, groundAt: (x, z) => G(x, z), vfx: { ...FakeVfx(), lights: rig } });
+  set.Enter("Trapped");
+  set.Update(0.016, "Trapped", "Banter", {});
+  let pointLights = 0; scene.traverse((o) => { if (o.isLight) pointLights += 1; });
+  assert.equal(pointLights, 0, "with a LightRig the lantern adds no three PointLight (no NUM_POINT_LIGHTS change)");
+  assert.equal(fires.size, 1, "the lantern takes one fire-pool slot");
+  const fire = [...fires.values()][0], lamp = PROPS.find((p) => p.id === "bunkerLantern");
+  assert.ok(fire.intensity > 1 && fire.radius === lamp.light.distanceM && fire.flicker === false, "lit in 01 through the fire pool (our own flicker)");
+  assert.ok(Math.abs(fire.p.x - lamp.x) < 1e-6 && Math.abs(fire.p.z - lamp.z) < 1e-6, "the fire sits in the lantern");
+  set.Update(0.016, "BunkerRescue", "Hold", { collapsed: true });
+  assert.equal(fire.intensity, 0, "out after 01 (intensity 0: the rig skips it, nothing recompiles)");
+  set.Update(0.016, "Tank", null, {});
+  assert.equal(fires.size, 0, "leaving 01–03 hands the fire slot back");
+  set.Exit();
+  console.log("ok lantern: fire-pool light in the game (no three PointLight), lit only in 01, slot returned after 03");
+}
 
 // ---------------------------------------------------------------- 5. Step 2：喷土、烟火、飞机、阴天、03 前沿布景
 // vfx 在 node 里建不起来（要 document），用一个假的：只录下生了什么，锥形速度借真的 _ConeVelocity。

@@ -187,6 +187,8 @@ export class OpeningSet {
     this.DisposeRoot(this.root, this.ownedMaterials, this.ownedTextures, this.lights);
     this.root = null; this.collapsedRoot = null; this.rescueRoot = null; this.lintel = null; this.lantern = null;
     this.ownedMaterials = []; this.ownedTextures = []; this.lights = [];
+    for (const handle of this.fireHandles || []) this.vfx?.lights?.RemoveFire?.(handle);
+    this.fireHandles = [];
     this.lintelProgress = null;
   }
 
@@ -224,7 +226,7 @@ export class OpeningSet {
     this.root?.traverse((o) => { nodes += 1; if (o.isMesh) meshes += 1; if (o.isLight) lights += 1; });
     // 只数画得出来的（可破坏墙每级一份砖壳，只有当前级那份显示）。
     this.front?.root.traverseVisible((o) => { if (o.isMesh) frontMeshes += 1; });
-    return { active: this.Active, nodes, meshes, lights, ownedMaterials: this.ownedMaterials?.length || 0,
+    return { active: this.Active, nodes, meshes, lights, clusterLights: this.fireHandles?.length || 0, ownedMaterials: this.ownedMaterials?.length || 0,
       collapsedVisible: !!this.collapsedRoot?.visible, rescueVisible: !!this.rescueRoot?.visible, lintelProgress: this.lintelProgress,
       front: !!this.front, frontMeshes, smoke: [...this.smoke.keys()], blast: this.blastFx?.Stats() ?? null, blastSprayed: this.blastSprayed,
       flyover: this.flyover ? { t: +this.flyover.t.toFixed(2), triggered: this.flyover.triggered, flying: [...this.flyover.poses] } : null,
@@ -353,6 +355,7 @@ export class OpeningSet {
     const flicker = 1 - s.light.flicker * (0.5 + 0.25 * Math.sin(t * a * 2 * Math.PI) + 0.15 * Math.sin(t * b * 2 * Math.PI + 1.3) + 0.1 * Math.sin(t * c * 2 * Math.PI + 0.4));
     lamp.light.visible = lit;
     lamp.light.intensity = lit ? s.light.intensity * flicker : 0;
+    if (lamp.light.isClusterFire) lamp.rig.UpdateFire(lamp.light.handle, { intensity: lamp.light.intensity });
     lamp.glass.emissiveIntensity = lit ? 2.4 * flicker : 0.05;
     // 近爆那一下马灯晃（挂钩上摆），之后慢慢停住。
     const swing = collapsed ? 0.12 * Math.exp(-0.9 * (this.time - (lamp.swingFrom ??= this.time))) : 0;
@@ -365,7 +368,7 @@ export class OpeningSet {
     this.collapsedRoot = new THREE.Group(); this.collapsedRoot.name = "OpeningSet0103_Collapsed"; this.collapsedRoot.visible = false;
     this.rescueRoot = new THREE.Group(); this.rescueRoot.name = "OpeningSet0103_Rescue"; this.rescueRoot.visible = false;
     this.root.add(this.collapsedRoot, this.rescueRoot);
-    this.ownedMaterials = []; this.ownedTextures = []; this.lights = [];
+    this.ownedMaterials = []; this.ownedTextures = []; this.lights = []; this.fireHandles = [];
     const sinks = { always: new BuildSink(), collapsed: new BuildSink(), rescue: new BuildSink() };
     const materials = new Map();
     this.sinkMaterials = materials;
@@ -484,12 +487,23 @@ export class OpeningSet {
     for (const mesh of glassSink.Flush(group, {}, { castShadow: false, resolve: () => glass })) mesh.name = `${group.name}_Glass`;
     const nail = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.02, 0.07), steel); nail.position.set(0, 0.0, 0); nail.name = `${group.name}_Nail`;
     group.add(nail);
-    const s = prop.light, light = new THREE.PointLight(s.color, 0, s.distanceM, s.decay);
-    light.name = `${group.name}_Light`; light.castShadow = false; light.position.set(0, -0.18, 0);
-    group.add(light);
-    this.lights.push(light);
+    // 灯光走 LightRig 的火光池（簇光），**不往场景里放 three 的 PointLight**：每多/少一盏 visible 的 PointLight，
+    // NUM_POINT_LIGHTS 就变一次，整座城的材质全部重编译（Script_ClusteredLights 文件头；01 进场与 01→02 灭灯各卡一次）。
+    // 没有 LightRig（纯 node 测试、编辑器预览）才退回一盏 PointLight。
+    const s = prop.light, rig = this.vfx?.lights?.AddFire ? this.vfx.lights : null;
+    let light;
+    if (rig) {
+      const at = { x: group.position.x, y: group.position.y - 0.18, z: group.position.z };
+      light = { isClusterFire: true, handle: rig.AddFire(at, { intensity: 0, radius: s.distanceM, color: s.color, flicker: false, priority: 2 }), visible: false, intensity: 0 };
+      this.fireHandles.push(light.handle);
+    } else {
+      light = new THREE.PointLight(s.color, 0, s.distanceM, s.decay);
+      light.name = `${group.name}_Light`; light.castShadow = false; light.position.set(0, -0.18, 0);
+      group.add(light);
+      this.lights.push(light);
+    }
     this.root.add(group);
-    this.lantern = { spec: prop, group, light, glass };
+    this.lantern = { spec: prop, group, light, glass, rig };
   }
 
   BuildCrates(prop, sink) {
