@@ -320,12 +320,27 @@ windows equal the table; clips move only the gesture arm and the spine; unit qua
 reach anchors; the sampler) and `Script_SpeakerGestureClipsBrowserTest.mjs` (tier 2; the clip-on-body review
 above; `--shots` writes the stills to `tmp/SpeakerGestureReview/`).
 
-Planned (Step 3): the node test grows weights and suppression on a stub rig, and a browser test on the production
-rigs (six or more lines including a point, a beckon, a one-hand-on-rifle gesture
-and the seated 06 Zhou's offer): weight > .5 for enough frames while the line plays, 0 while firing, back to 0
-after the line; no hand inside the torso or the rifle; the rifle's direction unchanged by a left-hand gesture;
-first-person and close-up screenshots looked at. Frame cost: 04 front, same-page alternating A/B with the layer
-on/off, p95 increase <= 0.3 ms.
+Step 3 (2026-09-25): the node test also drives the layer on a stub Biped (stroke on the first stress, hold and
+release, busy and shot suppression, the delayed start, `missed`, `ArmWeight`, the held rifle grip, aim, the rifle
+clearance, the out-of-reach refusal, the head layer owning the layer). `Script_SpeakerGestureLayerBrowserTest.mjs`
+(tier 2, about 25 min for 03-06) jumps to each step, plays every front scene through the per-line player on sim time
+with the player looking at whoever talks, and reads the layer off the speaking body each frame. Gates: the picked
+lines (FrontBlockade.02, FrontApproach.02, TankRoadContact.01, BundleOrder.03, Volunteer.01, BorrowLight.03/.07,
+ZhouLift.02) gesture (weight > .5 for at least 20 frames); no frame with weight > 0 once a body has been busy
+longer than `fadeS`, after a shot has cut the gesture, or long after the line; a pointing arm within 15 deg of its
+target after the whole frame (unclamped lines); the rifle on the look direction the aim IK gives it; the gesturing
+hand at least 5 cm off the rifle in the hold; no gesture layer after a jump to 08. `--shots` writes a player view
+and a close-up of each picked line in its hold, and a close-up before the lift, to `_shots/SpeakerGestureLayer/`;
+`--ab` is the frame cost below. Result 2026-09-25: 18 of the 21 lines with a row that were played gestured on
+screen. The other three do not: Zhou says FrontBlockade.01 wounded, and the 04 guard's ammunition house
+(BundleOrder.01) and the left gun in Luo's TakeOverGun.01 are outside the arm's reach. FrontRelief.02 was not
+measured: the relief NCO is not on the field when the test jumps to 05 and plays the scene early. Pointing error
+after the frame 0-9 deg where the target is inside the cone; rifle clearance 7-53 cm.
+
+Frame cost (`--ab`, 04, same page, the gesture layers swapped out and back in alternating blocks of 30 frames, 600
+frames each): the whole frame on this shared machine is 40-200 ms headless, so its p95 cannot resolve 0.3 ms; the
+layer's own time (Apply + AfterHead + AfterActorAim, all bodies) is reported instead: mean about 0.2 ms, p95
+0.3-0.5 ms on frames with a gesture up.
 
 ## Rebuilding
 

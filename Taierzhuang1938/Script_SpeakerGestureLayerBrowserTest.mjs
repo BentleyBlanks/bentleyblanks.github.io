@@ -49,7 +49,7 @@ try{
     const L=await import('./Script_SpeakerGestureLayer.mjs'),D=await import('./Data_FirstLevelSpeakerGestures.mjs');
     const {MISSION_DIALOGUE}=await import('./Data_FirstLevelMissionDialogue.mjs'),{FrontSceneSpeakers}=await import('./Script_FirstLevelFrontScenes.mjs');
     const {SPEAKER_GESTURE}=await import('./Data_Tuning_CharacterSpeech.mjs');
-    // The body state the layer saw (posture report) and the layer's own time per frame.
+    // The body state the layer saw (posture report) and the layer's own time per frame (Apply, AfterHead, AfterActorAim).
     const proto=L.SpeakerGestureLayer.prototype,apply=proto.Apply,after=proto.AfterHead;
     const P=window.GestureProbe={g,T,L,D,SPEAKER_GESTURE,MISSION_DIALOGUE,FrontSceneSpeakers,picked,limit,layerMs:0,close:null};
     proto.Apply=function(dt,s={}){const t=performance.now();this.probePose={firing:!!s.firing,aim:+(s.aim||0).toFixed(2),move:+(s.moveSpeed||0).toFixed(2),
@@ -57,6 +57,8 @@ try{
       lookYaw:s.lookYaw||0,lookPitch:s.lookPitch||0};
       const out=apply.call(this,dt,s);P.layerMs+=performance.now()-t;return out;};
     proto.AfterHead=function(){const t=performance.now();const out=after.call(this);P.layerMs+=performance.now()-t;return out;};
+    const afterAim=proto.AfterActorAim;
+    proto.AfterActorAim=function(){const t=performance.now();const out=afterAim.call(this);P.layerMs+=performance.now()-t;return out;};
     // Line of sight (walls, trench sides, props; not the speaker himself): true when something is in between.
     const ray=new T.Raycaster();
     P.Blocked=(from,to,ignore)=>{
