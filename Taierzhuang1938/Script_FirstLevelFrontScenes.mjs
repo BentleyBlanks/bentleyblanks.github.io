@@ -14,6 +14,8 @@
 // hook): the speaker steps to a spot the player can see (StepSpot / Steer, a short walk, never a teleport) and the
 // line starts when his head is in the picture - or after B.speakerViewHoldS anyway. The player's camera is never
 // turned. Speakers farther out are shouts across the front (the left gun, the pinned guards) and play at once.
+// A squadmate whose body stands between the player's eye and a talking speaker's head steps aside, square to that
+// line of sight, until the line ends (ClearView / StepAside; relay r2 Front step 2: Yaowa hid Luo's 06 order to her).
 import { MISSION_DIALOGUE } from "./Data_FirstLevelMissionDialogue.mjs";
 import { ResolveSpeaker } from "./Script_DialoguePlayer.mjs";
 import { FRONT_BATTLE_TUNING as B } from "./Data_Tuning_FirstLevelFront.mjs";
@@ -53,6 +55,33 @@ export function ProjectToView(camera, p) {
   const w = m[3] * x + m[7] * y + m[11] * z + m[15];
   if (!(Math.abs(w) > 1e-6)) return null;
   return { x: (m[0] * x + m[4] * y + m[8] * z + m[12]) / w, y: (m[1] * x + m[5] * y + m[9] * z + m[13]) / w, depth: -z };
+}
+/**
+ * A body standing between the eye and a head: its column (radius `radius`, from 0.2 m over its feet `position.y` up to
+ * `top`) crosses the eye->head line of sight between 2% and 97% of the way (the line gate's "hidden" test).
+ */
+export function BodyBetween(eye, head, position, top, radius = B.speakerAsideBodyRadiusM) {
+  const dx = head.x - eye.x, dy = head.y - eye.y, dz = head.z - eye.z, h2 = dx * dx + dz * dz;
+  if (!(h2 > 1e-6)) return false;
+  const t = ((position.x - eye.x) * dx + (position.z - eye.z) * dz) / h2;
+  if (!(t > 0.02 && t < 0.97) || Math.hypot(eye.x + dx * t - position.x, eye.z + dz * t - position.z) > radius) return false;
+  const y = eye.y + dy * t;
+  return y > (position.y || 0) + 0.2 && y < top;
+}
+/**
+ * Spots a body in the eye->head line of sight can step to: square to that line from where he stands on it, at
+ * B.speakerAsideOffsetsM, his own side first. Pure: the caller filters them against the world (AsideSpot).
+ */
+export function AsideCandidates(eye, head, from) {
+  const dx = head.x - eye.x, dz = head.z - eye.z, length = Math.hypot(dx, dz);
+  if (!(length > 1e-6)) return [];
+  const ux = dx / length, uz = dz / length, nx = -uz, nz = ux;
+  const t = Math.max(0, Math.min(length, (from.x - eye.x) * ux + (from.z - eye.z) * uz));
+  const base = { x: eye.x + ux * t, z: eye.z + uz * t };
+  const side = Math.sign((from.x - base.x) * nx + (from.z - base.z) * nz) || 1, out = [];
+  for (const offset of B.speakerAsideOffsetsM) for (const sign of [side, -side])
+    out.push({ x: base.x + nx * sign * offset, z: base.z + nz * sign * offset, offset: sign * offset });
+  return out;
 }
 /** The projected point lies inside `margin` of the frame (1 = the frame's edge). */
 export function InPicture(ndc, margin = B.speakerViewNdc) {
@@ -114,6 +143,10 @@ export class FirstLevelFrontScenes {
     this.holds = new Map();
     /** The speaker walking into the picture: { soldier, who, spot, sceneId } (Steer moves him each frame). */
     this.steer = null;
+    /** A squadmate stepping out of the line of sight to a talking speaker: { soldier, spot, sceneId, lineId }. */
+    this.aside = null;
+    /** Every ClearView step aside: { line, who, t } (probes read State().asides). */
+    this.asides = [];
   }
   /** runtime.Say hands the id over when this returns true. */
   Owns(id) {
@@ -296,13 +329,71 @@ export class FirstLevelFrontScenes {
     }
   }
   /** This soldier is walking into the picture for a line (FirstLevelFrontBattle.Walk leaves him alone meanwhile). */
-  Steers(soldier) { return !!soldier && this.steer?.soldier === soldier; }
+  Steers(soldier) { return !!soldier && (this.steer?.soldier === soldier || this.aside?.soldier === soldier); }
+  /** The squadmate (B.speakerAsideCast, not busy on a gun or a litter) standing between `eye` and `head`, or null. */
+  Blocker(speaker, eye, head) {
+    const r = this.r, guns = r.emplacement?.guns ? [...r.emplacement.guns.values()] : [];
+    for (const s of r.ai?.soldiers || []) {
+      if (s === speaker || !s?.alive || !B.speakerAsideCast.includes(s.castId) || s.carryRole) continue;
+      if (guns.some((g) => g?.npc === s) || this.steer?.soldier === s) continue;
+      const crown = ResolveSpeaker(s);
+      const top = crown && Number.isFinite(crown.y) && crown !== s.position ? crown.y + 0.15 : (s.position.y || 0) + 1.75;
+      if (BodyBetween(eye, head, s.position, top)) return s;
+    }
+    return null;
+  }
+  /** The first AsideCandidates spot `blocker` can walk to: his floor, clear of colliders, a straight walk, not at the player. */
+  AsideSpot(blocker, eye, head) {
+    const r = this.r, from = blocker.position, player = r.player.position;
+    const floor = r.Point(from).y, knee = r.Point(from, 0.6);
+    for (const spot of AsideCandidates(eye, head, from)) {
+      if (Distance(spot, from) > B.speakerStepMaxM || Distance(spot, player) < B.speakerAsidePlayerM) continue;
+      const ground = r.Point(spot);
+      if (Math.abs(ground.y - floor) > B.speakerStepDyM) continue;
+      if (r.physics?.Overlaps?.(spot.x, ground.y + 0.04, spot.z, 0.3, 1.7)) continue;
+      if (r.BlocksSight(knee, r.Point(spot, 0.6))) continue;
+      return { x: spot.x, z: spot.z, offset: spot.offset };
+    }
+    return null;
+  }
+  /**
+   * Every frame a front line plays: its speaker is in the picture with nothing solid in between, but a squadmate's body
+   * is (Blocker) - that squadmate steps aside (AsideSpot) until the line ends. The speaker and the camera stay put.
+   */
+  ClearView() {
+    const r = this.r, handle = this.handle;
+    if (this.aside || !handle || handle.done || !r.camera || !r.Point || !r.BlocksSight || !r.player?.position) return;
+    const eye = r.player.EyePosition?.clone?.();
+    if (!eye) return;
+    for (const l of handle.lines) {
+      if (l.state !== "playing" || !l.line || l.line.who === "shunzi" || l.line.direction?.spatial === "self") continue;
+      const body = this.Body(l.line.who), view = body && this.SpeakerView(body);
+      if (!view?.inView) continue;
+      const blocker = this.Blocker(body, eye, view.head), spot = blocker && this.AsideSpot(blocker, eye, view.head);
+      if (!spot) continue;
+      this.aside = { soldier: blocker, spot, sceneId: handle.id, lineId: l.line.id };
+      this.asides.push({ line: l.line.id, who: blocker.castId, t: +(r.time ?? 0).toFixed(2) });
+      if (this.asides.length > 24) this.asides.shift();
+      return;
+    }
+  }
+  /** Keeps the squadmate from ClearView walking to / holding his spot; lets him go when the line is done. */
+  StepAside() {
+    const a = this.aside, r = this.r, handle = this.handle;
+    if (!a) return;
+    const talking = !!handle && !handle.done && handle.id === a.sceneId && handle.lines.some((l) => l.line?.id === a.lineId && l.state !== "done");
+    if (!talking || !a.soldier?.alive) { this.aside = null; return; }
+    if (Distance(a.soldier.position, a.spot) > 0.35) r.MoveActor?.(a.soldier, a.spot, B.speakerStepSpeedMps);
+    else if (r.Defend) r.Defend(a.soldier, a.spot, 0, 0.3);
+  }
   /**
    * Called by the runtime after every other mover (frontShow, frontBattle): keeps the stepping speaker walking to
    * his spot, and lets him go once his lines in the scene are done (his own orders take over again).
    */
   Steer() {
     this.KeepSpace();
+    this.ClearView();
+    this.StepAside();
     const s = this.steer, r = this.r;
     if (!s) return;
     const handle = this.handle;
@@ -338,6 +429,8 @@ export class FirstLevelFrontScenes {
   State() {
     return { pending: [...this.pending], playing: this.handle && !this.handle.done ? this.handle.id : null, log: this.log.slice(-24),
       holds: Object.fromEntries([...this.holds].slice(-24).map(([id, h]) => [id, { ...h, since: +h.since.toFixed(2) }])),
-      steer: this.steer ? { who: this.steer.who, backOff: !!this.steer.backOff, spot: { x: +this.steer.spot.x.toFixed(2), z: +this.steer.spot.z.toFixed(2) } } : null };
+      steer: this.steer ? { who: this.steer.who, backOff: !!this.steer.backOff, spot: { x: +this.steer.spot.x.toFixed(2), z: +this.steer.spot.z.toFixed(2) } } : null,
+      aside: this.aside ? { who: this.aside.soldier.castId, line: this.aside.lineId, spot: { x: +this.aside.spot.x.toFixed(2), z: +this.aside.spot.z.toFixed(2) } } : null,
+      asides: this.asides.slice() };
   }
 }

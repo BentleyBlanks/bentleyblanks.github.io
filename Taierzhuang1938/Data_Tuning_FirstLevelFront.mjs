@@ -339,5 +339,12 @@ export const FRONT_BATTLE_TUNING=Object.freeze({
   // backed into the ammo house ahead of the player going in and stayed 0.7 m from him, 09-25 drive).
   speakerBackOffDistancesM:Object.freeze([2,1.7,2.4]),speakerBackOffBearingsDeg:Object.freeze([0,30,60,90]),speakerBackOffSpeedMps:1.8,
   speakerBackOffAheadDeg:50,
+  // ClearView: a squadmate (speakerAsideCast) whose body stands between the player's eye and a talking speaker's head
+  // (a speakerAsideBodyRadiusM column from 0.2 m over his feet to his head top: the line gate's test) steps aside,
+  // square to that line of sight, to one of these offsets (m) on his own side first, never nearer the player than
+  // speakerAsidePlayerM, then holds there until the line ends. 09-25 03->06 drives: Luo's 06 order to Yaowa
+  // (Volunteer.05) was said behind Yaowa's back in 2 of 7 drives (245 of 268 frames hidden by her).
+  speakerAsideCast:Object.freeze(["yaowa","heyoutian","liuwencai","luo"]),speakerAsideOffsetsM:Object.freeze([1.0,1.4,1.8]),
+  speakerAsideBodyRadiusM:.28,speakerAsidePlayerM:1.0,
   bandage:{radius:.087,height:.2,y:-.19,color:0xb6ac8b},
 });

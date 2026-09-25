@@ -13,6 +13,7 @@
 //      也照样记 reliefInPosition；罗班长被枪座挡住 → 玩家在后墙岔口等够 rearLeaderGraceS 照样 rightRearReached；
 //      受保护的待撤守军身边不落手榴弹（任务侧投弹否决）
 //   ⑧ 近处说话人不在画面里：台词等他走进画面；太近就退开
+//   ⑫ 说话时队友挡在玩家和说话人之间：挡的人横跨一步让开，这句说完再放（ClearView）
 //   ⑪ 05 攻击位：罗班长停在投弹点旁（leaderAttackSide），离投弹点与玩家进来的最后一段都 ≥1.4 m
 //   ⑩ 攻击支路过 AttackRuinA 东端留 ≥0.6 m；墙南侧死角里的人按最近路点走、先离开墙面（TankProbe5 卡死点）
 //   ⑨ 走路线的人（罗班长）在 FIRE 里被换位命令的 0.6 m 到位半径钉在路线拐点前 0.58 m（后门坡道）：Script_Ai.Act 用路线的半径
@@ -26,7 +27,7 @@ import { fileURLToPath } from "node:url";
 import vm from "node:vm";
 import { COVER_CYCLE } from "./Data_Tuning_AiCover.mjs";
 import { FirstLevelFrontBattle, ColumnDeparture, BatchPastGap, SplitRoute, GuardClearOfGap } from "./Script_FirstLevelFrontBattle.mjs";
-import { FirstLevelFrontScenes, FRONT_SCENE_IDS, FrontSceneSpeakers, ProjectToView, InPicture, CameraPose, StepCandidates, SegmentDistance } from "./Script_FirstLevelFrontScenes.mjs";
+import { FirstLevelFrontScenes, FRONT_SCENE_IDS, FrontSceneSpeakers, ProjectToView, InPicture, CameraPose, StepCandidates, SegmentDistance, BodyBetween, AsideCandidates } from "./Script_FirstLevelFrontScenes.mjs";
 import { DialoguePlayer } from "./Script_DialoguePlayer.mjs";
 import { FRONT_SORTIE as S, FRONT_SPACE as Space, FRONT_TANK_PATH } from "./Data_FirstLevelFrontRoute.mjs";
 import { FRONT_BATTLE_TUNING as B } from "./Data_Tuning_FirstLevelFront.mjs";
@@ -753,6 +754,50 @@ function WalkRuntime(extra = {}) {
   assert.deepEqual(battle.leaderRoute.at(-1), side, "the 05 attack leg ends at leaderAttackSide");
   checks += 5;
   Ok("⑪ Luo's 05 attack leg ends beside the throw spot, 1.4 m+ from it and off the player's way in");
+}
+
+{
+  // ⑫ ClearView (relay r2 Front step 2 drives): a squadmate between the player's eye and a talking speaker's head steps
+  // aside square to the line of sight and holds there until the line ends; the speaker and the camera stay put.
+  const eye = { x: 0, y: 1.6, z: 0 }, head = { x: 0, y: 1.6, z: -3.6 };
+  assert.ok(BodyBetween(eye, head, { x: 0.1, y: 0, z: -1.8 }, 1.75), "a standing body on the line of sight hides the head");
+  assert.ok(!BodyBetween(eye, head, { x: 0.5, y: 0, z: -1.8 }, 1.75), "0.5 m off the line he does not");
+  assert.ok(!BodyBetween(eye, head, { x: 0, y: 0, z: -1.8 }, 1.2), "nor does a crouched man below the line");
+  const cands = AsideCandidates(eye, head, { x: -0.1, z: -1.8 });
+  assert.ok(cands[0].x < 0 && Math.abs(cands[0].offset) === B.speakerAsideOffsetsM[0], "his own side first, the nearest offset first");
+  for (const c of cands) assert.ok(SegmentDistance(c, eye, head) >= B.speakerAsideOffsetsM[0] - 1e-9, "every candidate is off the line of sight");
+  const fov = 55 * Math.PI / 180, aspect = 16 / 9, near = 0.05, far = 500, f = 1 / Math.tan(fov / 2);
+  const camera = { matrixWorld: { elements: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 1.6, 0, 1] },
+    matrixWorldInverse: { elements: [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, -1.6, 0, 1] },
+    projectionMatrix: { elements: [f / aspect, 0, 0, 0, 0, f, 0, 0, 0, 0, (far + near) / (near - far), -1, 0, 0, 2 * far * near / (near - far), 0] } };
+  const V = (x, y, z) => ({ x, y, z, clone() { return V(this.x, this.y, this.z); }, set(a, b, c) { this.x = a; this.y = b; this.z = c; return this; } });
+  const luo = { id: 1, castId: "luo", alive: true, position: { x: 0, y: 0, z: -3.6 } };
+  const yaowa = { id: 2, castId: "yaowa", alive: true, position: { x: -0.1, y: 0, z: -1.8 } };
+  const moves = [], defends = [];
+  const r = { time: 0, camera, flow: { stage: { id: "Orders" } }, ai: { soldiers: [luo, yaowa] },
+    player: { position: { x: 0, y: 0, z: 0 }, get EyePosition() { return V(0, 1.6, 0); } },
+    speakers: { ActorForWho: (who) => ({ luo, yaowa })[who] || null },
+    Point: (p, rise = 0) => V(p.x, rise, p.z), BlocksSight: () => false,
+    MoveActor: (actor, point) => { moves.push({ id: actor.id, ...point }); }, Defend: (actor, point) => defends.push({ id: actor.id, ...point }) };
+  const scenes = new FirstLevelFrontScenes(r);
+  scenes.handle = { id: "Volunteer", done: false, lines: [{ line: { id: "Volunteer.05", who: "luo", direction: {} }, state: "playing" }] };
+  scenes.Steer();
+  assert.ok(scenes.aside?.soldier === yaowa && scenes.asides.at(-1).line === "Volunteer.05", "Yaowa, between the player and Luo, is sent aside");
+  assert.ok(moves.at(-1).id === yaowa.id && SegmentDistance(scenes.aside.spot, eye, { x: 0, z: -3.6 }) >= B.speakerAsideOffsetsM[0] - 1e-9 && scenes.aside.spot.x < 0,
+    "to her own side, off the line of sight");
+  assert.ok(scenes.Steers(yaowa) && !moves.some((m) => m.id === luo.id), "FrontBattle.Walk leaves her alone; Luo is not moved");
+  Object.assign(yaowa.position, scenes.aside.spot); scenes.Steer();
+  assert.equal(defends.at(-1).id, yaowa.id, "at her spot she holds it");
+  scenes.handle.lines[0].state = "done"; scenes.Steer();
+  assert.equal(scenes.aside, null, "the line done, she is let go");
+  // A squadmate on a gun is never moved.
+  const s2 = new FirstLevelFrontScenes({ ...r, emplacement: { guns: new Map([["Left", { npc: yaowa }]]) } });
+  yaowa.position = { x: -0.1, y: 0, z: -1.8 };
+  s2.handle = { id: "Volunteer", done: false, lines: [{ line: { id: "Volunteer.05", who: "luo", direction: {} }, state: "playing" }] };
+  s2.Steer();
+  assert.equal(s2.aside, null, "a gunner stays on his gun");
+  checks += 12;
+  Ok("⑫ a squadmate between the player and a talking speaker steps aside until the line ends");
 }
 
 console.log(`FirstLevelFrontPacingTest 通过：${checks} 条断言`);
