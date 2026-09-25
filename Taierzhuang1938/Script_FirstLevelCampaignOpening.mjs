@@ -614,7 +614,7 @@ async function InstallSpeakerGlance(page){
   },{near:B.speakerViewNearM,turn:GLANCE_RAD_PER_FRAME,enough:GLANCE_SEEN_FRAMES});
 }
 
-/** Frames a 03–06 line's speaker must have his head in the picture, and be acted there (CheckFrontActing). */
+/** Frames a 03–06 line's speaker must be seen (CheckFrontActing: head in the picture, a face not a shoulder, nothing in between), and be acted then. */
 export const FRONT_LINE_IN_FRAME_FRAMES = 10;
 /**
  * 03–06 lines whose speaker is out of the picture by design, one reason each. Every one is a shout across the front
@@ -649,8 +649,10 @@ const FRONT_LINE_STAGES = Object.freeze(["Support", "MachineGun", "Tank", "Order
 
 /**
  * 03–06: every line of a Front scene is seen and acted (2026-09-25 relay r2 Front step 1). Per line (the sampler's
- * window.frontLineActing, keyed "<Scene>.<NN>"): the speaker's head projects inside the picture for at least
- * FRONT_LINE_IN_FRAME_FRAMES frames, is acted in at least as many of them, and turns/nods there (> 0.03 rad) - unless
+ * window.frontLineActing, keyed "<Scene>.<NN>"): the speaker is seen for at least FRONT_LINE_IN_FRAME_FRAMES frames -
+ * his head projects inside the picture (0.95 of the frame), at least FRONT_BATTLE_TUNING.speakerViewMinM from the eye,
+ * with no wall (runtime.BlocksSight) and no other soldier's body between - is acted in at least as many of them, and
+ * turns/nods then (> 0.03 rad) - unless
  * the line is in FRONT_LINES_OUT_OF_PICTURE and its speaker really was far or bodiless. Lines of steps up to `upTo`
  * that are no longer playing are checked; each line once (a later call picks up what was still sounding).
  * Also keeps the 09-24 per-cue check of Luo's Front* commands (poseVisible frames).
@@ -694,7 +696,7 @@ export async function CheckFrontActing(ctx,{upTo="Support"}={}){
     else if(!(r.turn>.03))failures.push(`${id}: he visibly turns/nods in the picture (${Row(id)})`);
   }
   if(failures.length)console.log("FRONT_LINES_FAILED",JSON.stringify(failures));
-  if(process.env.FRONT_LINES_REPORT_ONLY!=="1")assert.deepEqual(failures,[],`03–06 lines up to ${upTo}: speaker in the picture and acted`);
+  assert.deepEqual(failures,[],`03–06 lines up to ${upTo}: speaker in the picture and acted`);
   const front=Object.keys(heard).filter(key=>key.startsWith("Front")&&key.endsWith("/luo"));
   console.log("FRONT_ACTING",JSON.stringify(Object.fromEntries(front.map(key=>[key,{...heard[key],
     ...(acting[key]?{acted:acting[key].frames,actedInFrame:acting[key].inFrame,turn:+acting[key].turn.toFixed(3),director:acting[key].director,headLayer:acting[key].headLayer}:{})}]))));
