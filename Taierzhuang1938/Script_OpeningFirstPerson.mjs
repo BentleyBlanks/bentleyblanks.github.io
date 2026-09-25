@@ -63,6 +63,8 @@ function RestoreArm(rig,side){
 
 function Palm(rig,side){return rig?.bones?.[side]?rig.bones[side].hand.localToWorld(rig.anatomy[side].frame.position.clone()):null;}
 function Reach(rig,side){const r=rig.armRest[side];return (r.upper+r.lower)*.97;}
+/** Farthest the palm centre gets from the shoulder root (the wrist reach plus the palm offset). */
+function PalmReach(rig,side){return Reach(rig,side)+rig.anatomy[side].frame.position.length()*rig.bones[side].hand.getWorldScale(V()).x;}
 function Shared(target,a,ra,b,rb){
   for(let i=0;i<24;i++)for(const [origin,reach] of [[a,ra],[b,rb]]){
     const delta=target.clone().sub(origin);if(delta.length()>reach)target.copy(origin).add(delta.setLength(reach));
@@ -414,7 +416,7 @@ function PartnerSoldier(show,who){
 }
 export class OpeningFirstPerson{
   constructor(show){this.show=show;this.rig=Anatomy(show.playerBody);this.phase=null;this.lastTargets={};this.lastFrames={};this.lastPartners={};this.partnerReleases={};this.report={};this.previousFrameFrames={};this.previousFramePartners={};
-    this.lastShoulders={};this.slip={};this.slipPose={};this.warned=new Set();this.props={};this.owned=[];this.override=null;this.legName=null;this.legShown=null;
+    this.lastShoulders={};this.slip={};this.slipPose={};this.gripHeld={};this.warned=new Set();this.props={};this.owned=[];this.override=null;this.legName=null;this.legShown=null;
     // Test bench (storyboard round): Debug.OpeningFirstPerson.Pose({left,right,legs,props,partner}).
     const debug=globalThis.Tengxian?.Debug;
     if(debug)debug.OpeningFirstPerson={Pose:spec=>this.Pose(spec),Clear:()=>this.Pose(null),State:()=>this.report,
@@ -439,7 +441,7 @@ export class OpeningFirstPerson{
   }
   /** Leave the scene clean (the director's Dispose removes the body root these hang from). */
   Dispose(){
-    for(const prop of Object.values(this.props))prop.object?.removeFromParent();
+    for(const prop of Object.values(this.props))prop?.object?.removeFromParent();
     for(const item of this.owned)item.dispose?.();this.owned=[];this.props={};
   }
   Warn(key,message){if(this.warned.has(key))return;this.warned.add(key);console.warn(`[OpeningFirstPerson] ${message}`);}
@@ -500,7 +502,8 @@ export class OpeningFirstPerson{
         this.Warn(`${side}:${got.who}:${got.bone}:${got.reason}`,`partner grip ${got.who}.${got.bone} unavailable (${got.reason}); ${side} hand holds ${pose.fallback||"rest"}`);
         return {...this.Resolve(Mirror(POSES[pose.fallback||"rest"],side),side,frames,clock),partner:got};
       }
-      return {target:got.target,frame:got.frame,curl:pose.c,shape:ShapeOf(pose),hasShape:true,partner:got,pose,sh:pose.sh||null};
+      // A copy: BeatPose mixes key targets in place, the partner's own point stays as solved.
+      return {target:got.target.clone(),frame:got.frame,curl:pose.c,shape:ShapeOf(pose),hasShape:true,partner:got,pose,sh:pose.sh||null};
     }
     const p=[...pose.p];
     if(pose.osc)p[2]+=pose.osc[0]*Math.sin(clock*Math.PI*2*pose.osc[1]+(side==="l"?Math.PI:0));
@@ -560,7 +563,7 @@ export class OpeningFirstPerson{
     return {...report,visible:legMeshes.length>0,...solved};
   }
   /** First-person props (FP_PROPS) named by the beat; everything else is hidden. */
-  UpdateProps(body,frames,clock,legReport){
+  UpdateProps(body,frames,clock,legReport,supply=false){
     const s=this.show,root=s.playerBody?.root,wanted=new Set(body?.props||[]),report={};
     if(!root)return report;
     const {cam,bodyQ,Ground}=frames,Dir=v=>V(...v).applyQuaternion(bodyQ);
@@ -568,7 +571,7 @@ export class OpeningFirstPerson{
       const spec=this.override?.propSpecs?.[name]||FP_PROPS[name];if(!spec){this.Warn(`prop:${name}`,`unknown prop ${name}`);continue;}
       if(spec.kind==="track")continue;
       const prop=this.props[name] ||= this.MakeProp(name,spec,root);
-      if(!prop?.object)continue;
+      if(!prop?.object){report[name]={visible:false,missing:true};continue;}
       let shown=true;
       if(spec.kind==="clip"){
         const palm=Palm(this.rig,spec.hand);
@@ -579,7 +582,10 @@ export class OpeningFirstPerson{
         SetWorld(prop.object,palm.add(V(...spec.offset).applyQuaternion(frame)),q);
       }else if(spec.kind==="rifle"){
         const L=legReport?.sides;
-        if(!L){shown=false;this.Warn(`prop:${name}:legs`,`${name} needs a leg pose; hidden`);}
+        // One loading rifle at a time: while the hands still hold it (a loading phase without hand keys) the
+        // lap rifle is not drawn.
+        if(supply){shown=false;this.Warn(`prop:${name}:supply`,`${name} is hidden while the loading rifle is in the hands (give the phase hand keys to put it on the legs)`);}
+        else if(!L){shown=false;this.Warn(`prop:${name}:legs`,`${name} needs a leg pose; hidden`);}
         else{
           // Across one thigh (`thigh`: l/r, from its hip joint to its knee) or across both (hips to the knees' midpoint).
           const hips=spec.thigh?V(...L[spec.thigh].hip):V(...legReport.hip),knees=spec.thigh?V(...L[spec.thigh].knee):V(...L.l.knee).add(V(...L.r.knee)).multiplyScalar(.5);
@@ -609,34 +615,57 @@ export class OpeningFirstPerson{
       prop.object.visible=shown;
       report[name]={visible:shown,position:prop.object.getWorldPosition(V()).toArray()};
     }
-    for(const [name,prop] of Object.entries(this.props))if(!wanted.has(name)&&prop.object){prop.object.visible=false;prop.slide=null;}
+    for(const [name,prop] of Object.entries(this.props))if(!wanted.has(name)&&prop?.object){prop.object.visible=false;prop.slide=null;}
     return report;
   }
   MakeProp(name,spec,root){
     const s=this.show;let object=null;
-    if(spec.kind==="clip")object=s.clips?.[0]?.clone?.()||new THREE.Group();
-    else if(spec.kind==="rifle")object=s.loadingRifle?.clone?.()||new THREE.Group();
+    // Owned geometry/material go to the director's dispose lists when it has them (it disposes those on
+    // Reset/Dispose); otherwise to this.owned (Dispose()).
+    const Own=(geometry,material)=>{for(const [list,item] of [[s.ownedGeometry,geometry],[s.owned,material]])(Array.isArray(list)?list:this.owned).push(item);};
+    // The clip and the rifle are clones of the director's supply props; a renamed / missing source is reported
+    // (one warning, report missing:true), never replaced by an empty stand-in.
+    const Source=(source,what)=>{if(source?.clone)return source.clone();this.Warn(`prop:${name}:source`,`${name}: the director has no ${what}; prop missing`);return null;};
+    if(spec.kind==="clip")object=Source(s.clips?.[0],"procedural clip (show.clips[0])");
+    else if(spec.kind==="rifle")object=Source(s.loadingRifle,"loading rifle (show.loadingRifle)");
     else if(spec.kind==="strap"){
-      // A ribbon along the points, facing the eye (camera-local, so it hangs from the camera frame).
-      const positions=[],index=[],half=spec.widthM/2;
-      for(let i=0;i<spec.points.length;i++){
-        const p=V(...spec.points[i]),a=V(...spec.points[Math.max(0,i-1)]),b=V(...spec.points[Math.min(spec.points.length-1,i+1)]);
-        const along=b.sub(a).normalize(),across=V().crossVectors(along,V(0,0,1)).normalize();
-        positions.push(...p.clone().addScaledVector(across,-half).toArray(),...p.clone().addScaledVector(across,half).toArray());
-        if(i)index.push((i-1)*2,i*2,(i-1)*2+1,(i-1)*2+1,i*2,i*2+1);
+      // A canvas ribbon along the points, facing the eye (camera-local, so it hangs from the camera frame):
+      // three columns (hems darker than the middle), rows every ~1 cm with a darker stitched band every
+      // stitchEveryM, and a small steel buckle.
+      const path=[],positions=[],colors=[],index=[],half=spec.widthM/2,columns=[-1,0,1];
+      for(let i=1;i<spec.points.length;i++){
+        const a=V(...spec.points[i-1]),b=V(...spec.points[i]),steps=Math.max(1,Math.ceil(a.distanceTo(b)/.01));
+        for(let k=i===1?0:1;k<=steps;k++)path.push(a.clone().lerp(b,k/steps));
+      }
+      let run=0;const lengths=path.map((p,i)=>(run+=i?p.distanceTo(path[i-1]):0));
+      const across=path.map((p,i)=>V().crossVectors(path[Math.min(path.length-1,i+1)].clone().sub(path[Math.max(0,i-1)]).normalize(),V(0,0,1)).normalize());
+      for(let i=0;i<path.length;i++){
+        const stitch=spec.stitchEveryM&&Math.abs((lengths[i]/spec.stitchEveryM)%1-.5)>.42?spec.stitchShade:1;
+        for(const c of columns){
+          positions.push(...path[i].clone().addScaledVector(across[i],c*half).toArray());
+          const shade=(c?spec.hemShade??1:1)*stitch;colors.push(shade,shade,shade);
+        }
+        if(i)for(let c=0;c<2;c++){const p=(i-1)*3+c,q=i*3+c;index.push(p,q,p+1,p+1,q,q+1);}
       }
       const geometry=new THREE.BufferGeometry();geometry.setAttribute("position",new THREE.Float32BufferAttribute(positions,3));
+      geometry.setAttribute("color",new THREE.Float32BufferAttribute(colors,3));
       geometry.setAttribute("uv",new THREE.Float32BufferAttribute(new Float32Array(positions.length/3*2),2));
       geometry.setIndex(index);geometry.computeVertexNormals();
-      const material=new THREE.MeshStandardMaterial({color:spec.color,roughness:.95,metalness:0,side:THREE.DoubleSide});
-      object=new THREE.Mesh(geometry,material);object.frustumCulled=false;
-      // Owned geometry/material go to the director's dispose lists when it has them (it disposes those
-      // on Reset/Dispose); otherwise to this.owned (Dispose()).
-      for(const [list,item] of [[s.ownedGeometry,geometry],[s.owned,material]])(Array.isArray(list)?list:this.owned).push(item);
+      const material=new THREE.MeshStandardMaterial({color:spec.color,vertexColors:true,roughness:.95,metalness:0,side:THREE.DoubleSide});
+      object=new THREE.Mesh(geometry,material);object.frustumCulled=false;Own(geometry,material);
+      if(spec.buckleM){
+        const at=Math.max(0,Math.min(path.length-1,Math.round((path.length-1)*(spec.buckleAt??.5))));
+        const along=path[Math.min(path.length-1,at+1)].clone().sub(path[Math.max(0,at-1)]).normalize(),side=across[at],normal=V().crossVectors(side,along).normalize();
+        const buckleGeometry=new THREE.BoxGeometry(...spec.buckleM),buckleMaterial=new THREE.MeshStandardMaterial({color:spec.buckleColor??0x888880,roughness:.45,metalness:.6});
+        const buckle=new THREE.Mesh(buckleGeometry,buckleMaterial);buckle.name="OpeningFirstPerson_packStrapBuckle";buckle.frustumCulled=false;
+        buckle.position.copy(path[at]).addScaledVector(normal,(spec.thickM||.006));
+        buckle.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(side,along,normal));
+        object.add(buckle);Own(buckleGeometry,buckleMaterial);
+      }
     }
     if(!object)return null;
     object.name=`OpeningFirstPerson_${name}`;object.visible=false;root.add(object);
-    return {object};
+    return {object,kind:spec.kind};
   }
   Update(dt=1/60){
     const s=this.show,r=s.r,p=s.phase,a=s.Age,cam=r.player.camera,fp=C.firstPerson;
@@ -651,7 +680,6 @@ export class OpeningFirstPerson{
     // The debug bench (Pose) overrides the director's beat; its clock starts at its first frame.
     const override=this.override;
     if(override&&override.at==null)override.at=now;
-    const phaseBeat=HANDS.beats[p];
     // The loading rifle is in his hands until the near miss throws it out of them (Blast +0.12 s), unless the
     // director gives those phases hand keys (then the beat, e.g. palmClip with the rifle on his legs, rules).
     const legacySupply=phase=>SUPPLY_PHASES.has(phase)&&!HandKeys(HANDS.beats[phase]);
@@ -721,13 +749,29 @@ export class OpeningFirstPerson{
         partner=pose.partner;partnerPose=pose.partnerPose;poseName=beat.names?.[side]||null;
         shoulder=this.Shoulder(pose,side,Local);
         // A partner grip that has slipped (the partner turned out of reach) eases to its fallback pose.
-        if(this.slipPose[side]!==poseName){this.slipPose[side]=poseName;this.slip[side]=0;}
+        const entered=this.slipPose[side]!==poseName;
+        if(entered){this.slipPose[side]=poseName;this.slip[side]=0;this.gripHeld[side]=false;}
+        if(partnerPose&&partner&&!partner.missing){
+          // Out: farther from the shoulder than the palm reaches (plus slipM), or nearer the eye than minEyeM.
+          const far=shoulder.distanceTo(partner.target)>PalmReach(this.rig,side)+(partnerPose.slipM??.09);
+          const near=partner.target.distanceTo(cam.position)<(partnerPose.minEyeM||0);
+          partner.out=far?"far":near?"nearEye":null;
+          // Not yet held: an out point keeps the hand on its fallback (from the first frame of the pose — it
+          // never reaches into the lens first) and a reachable one eases the hand onto it.
+          if(!this.gripHeld[side]){
+            const step=dt/X.slipBlendS,was=this.slip[side]||0;
+            this.slip[side]=partner.out?(entered?1:Math.min(1,was+step)):Math.max(0,was-step);
+          }
+        }
         if(partnerPose&&this.slip[side]>0){
           const fallback=this.Resolve(Mirror(POSES[partnerPose.fallback||"rest"],side),side,frames,now),w=Smooth(this.slip[side]);
           target.lerp(fallback.target,w);const frame=FrameQuaternion(forward,normal).slerp(fallback.frame,w);
           forward=V(0,0,1).applyQuaternion(frame);normal=V(0,1,0).applyQuaternion(frame);
           if(shape)shape=MixShape(shape,fallback.shape,w);
         }
+        // Never inside minEyeM of the eye, whatever the partner does (no half screen of bare arm).
+        const minEye=partnerPose?.minEyeM||0;
+        if(minEye>0&&target.distanceTo(cam.position)<minEye)target.sub(cam.position).setLength(minEye).add(cam.position);
       }
       let otherRig,otherSide,otherShoulder;
       if(grasp&&side==="l"){otherRig=Anatomy(DragPartner(s));otherSide="l";if(!otherRig)grasp=false;}
@@ -770,10 +814,14 @@ export class OpeningFirstPerson{
         pose:supply?"supply":beat?.names?.[side]||"rest",eyeDistance:player.palm.distanceTo(cam.position)};
       if(partner){
         entry.partner={who:partner.who,bone:partner.bone,missing:!!partner.missing,reason:partner.reason||null,
-          gap:partner.missing?null:player.palm.distanceTo(partner.target),slip:this.slip[side]||0};
-        // Slip only once the grip has eased in: an out-of-reach contact then lets go (one way until the pose changes).
-        if(!partner.missing&&partnerPose&&transitionAge>=HAND_BLEND_S&&(this.slip[side]>0||player.contactError>(partnerPose.slipM??.09)))
-          this.slip[side]=Math.min(1,(this.slip[side]||0)+dt/X.slipBlendS);
+          gap:partner.missing?null:player.palm.distanceTo(partner.target),slip:this.slip[side]||0,held:!!this.gripHeld[side],out:partner.out||null};
+        // Once the grip has eased in it is held; a held contact that drifts out of reach (or into the eye's
+        // minEyeM) lets go, one way until the pose changes.
+        if(!partner.missing&&partnerPose&&transitionAge>=HAND_BLEND_S){
+          const miss=player.contactError>(partnerPose.slipM??.09);
+          if(!this.gripHeld[side]&&!partner.out&&!(this.slip[side]>0))this.gripHeld[side]=true;
+          if(this.gripHeld[side]&&(this.slip[side]>0||miss||partner.out))this.slip[side]=Math.min(1,(this.slip[side]||0)+dt/X.slipBlendS);
+        }
       }
       const currentFrame=FrameQuaternion(player.forward,player.dorsal);
       entry.rotationStepDegrees=this.previousFrameFrames[side]?this.previousFrameFrames[side].angleTo(currentFrame)*Degrees:0;
@@ -818,9 +866,16 @@ export class OpeningFirstPerson{
       }else this.ReleasePartner(side,entry,frameClock,dt);
       this.report.hands[side]=entry;this.lastTargets[side]=player.palm.clone();this.lastFrames[side]=currentFrame;this.lastShoulders[side]=cam.worldToLocal(shoulder.clone());
     }
-    this.report.props=this.UpdateProps(bodyBeat,frames,bodyClock,legReport.sides?legReport:null);
+    this.report.props=this.UpdateProps(bodyBeat,frames,bodyClock,legReport.sides?legReport:null,supply);
     if(s.supplyRoot)s.supplyRoot.visible=supply;
-    if(r.bunkerRifle?.view)r.bunkerRifle.view.visible=!supply;
+    // One loading rifle on screen at a time: in the hands (supply), on the legs (a lap prop), or the world rifle.
+    // The world rifle (moved to rescue.rifleMouth when 01 starts) stays hidden through the loading phases and
+    // the first 0.12 s of Blast whoever owns the hands (the debug bench, hand keys), and while a lap rifle
+    // shows; a rifleSlide hands over to it when Blast ends (the Black phase is black).
+    const lapRifle=Object.values(this.props).some(prop=>prop?.kind==="rifle"&&prop.object?.visible);
+    const worldRifleHidden=supply||SUPPLY_PHASES.has(p)||p==="Blast"&&a<.12||lapRifle;
+    if(r.bunkerRifle?.view)r.bunkerRifle.view.visible=!worldRifleHidden;
+    this.report.worldRifleVisible=r.bunkerRifle?.view?!worldRifleHidden:null;
     if(supply){
       s.loadingRifle.quaternion.copy(cam.quaternion).multiply(Q().setFromAxisAngle(V(0,1,0),Math.PI/2));
       s.loadingRifle.position.copy(Palm(this.rig,"l")).sub(s.loadingRifleGrip.clone().applyQuaternion(s.loadingRifle.quaternion));

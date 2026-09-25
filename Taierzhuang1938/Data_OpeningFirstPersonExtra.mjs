@@ -27,8 +27,19 @@
 const Freeze = (value) => Object.freeze(value);
 const V = (...v) => Freeze(v);
 const H = (frame, p, f, n, c, extra = {}) => Freeze({ in: frame, p: V(...p), f: V(...f), n: V(...n), c: V(...c), ...extra });
+//   - `minEyeM`: a partner point nearer the eye than this is not grasped (the hand stays on / eases to its
+//     fallback until the point moves out; the same rule as flingOpen's 「不许半屏肉色」). 0 = no limit (SB05
+//     holds the forearm that is right under the chin).
+//   A partner grip is only "held" once the palm has reached it (transition eased in, contact within slipM).
+//   Before that, a point out of reach (farther from the shoulder than the palm can get, plus slipM) or nearer
+//   the eye than minEyeM keeps the hand on its fallback from the very first frame instead of reaching into
+//   the lens; once held, an out-of-reach contact lets go one way (slipM) until the pose changes.
+// Sleeve roots: every `sh` keeps the shoulder root at least SHOULDER_BEHIND_MIN_M behind the eye (the cut arm
+// root must never come into view: Script_FirstLevelCampaignOpening minShoulderBehind > 0.08 and
+// Script_OpeningFirstPersonTest). The mud reaches therefore end ~0.45–0.5 m from the eye (not 0.55–0.6).
+export const SHOULDER_BEHIND_MIN_M = .1;
 const G = (partner, bone, at, extra = {}) => Freeze({ in: "partner", partner, bone, at, c: V(55, 70, 48), wrap: 1, twistDeg: 0,
-  offset: V(0, .045, 0), slipM: .09, fallback: "rest", shape: "grip", ...extra });
+  offset: V(0, .045, 0), slipM: .09, minEyeM: 0, fallback: "rest", shape: "grip", ...extra });
 
 // Finger shapes (ApplyAnatomicalFingers contact fields): fingers[0] is the thumb (segments 1–2; segment 0
 // follows thumbDirection in the hand's anatomical frame: x across the palm, y back of the hand, z fingers),
@@ -51,13 +62,17 @@ export const EXTRA_HAND_POSES = Freeze({
   // SB01: the LEFT palm up with a five-round clip, low centre-left (survey target screen (0.33,0.80)).
   palmClip: H("cam", [.14, -.14, -.36], [-.38, .12, -1], [.28, -1, .05], [18, 26, 16], { shape: "cradle" }),
   // SB02: the RIGHT hand flung open towards the mouth, ≥0.35 m from the eye (not a half-screen of skin);
-  // survey target screen (0.72,0.45) in the mirrored shot.
-  flingOpen: H("cam", [.22, -.03, -.33], [.35, .5, -.8], [-.1, .35, .93], [5, 8, 5], { shape: "fling" }),
+  // survey target screen (0.72,0.45) in the mirrored shot. Storyboard: the back of the hand to the eye, the
+  // spread fingers up and out in the picture plane (review 09-25: fingers pointing into the frame foreshortened
+  // to a fist) — fingers (0.4,0.85,−0.3), back of the hand ~0.8 towards the eye (node bench).
+  flingOpen: H("cam", [.22, -.03, -.33], [.4, .85, -.3], [-.1, .35, .93], [5, 8, 5], { shape: "fling" }),
   // SB04: the RIGHT hand round ijaA's LEFT forearm (the arm holding the collar: the manifest contacts of
-  // IjaHoldCollarUp / IjaCollarDragSnag are handL), fingers over the top.
-  gripForearm: G("ijaA", "forearmL", .55),
-  // SB04A: Shunzi's hand on the sleeve of the arm that drags him (ijaA's left), near the cuff.
-  gripSleeve: G("ijaA", "forearmL", .78, { offset: V(0, .05, 0), twistDeg: -15 }),
+  // IjaHoldCollarUp / IjaCollarDragSnag are handL), fingers over the top. Not while that forearm is inside
+  // 0.35 m of the eye (the strike swings it into the lens: review 09-25 had half a screen of bare arm).
+  gripForearm: G("ijaA", "forearmL", .55, { minEyeM: .35 }),
+  // SB04A: Shunzi's hand on the sleeve of the arm that drags him (ijaA's left), near the cuff; lets go at 5 cm
+  // (at 9 cm the review saw the hand hover 8 cm off the sleeve and still count as holding).
+  gripSleeve: G("ijaA", "forearmL", .78, { offset: V(0, .05, 0), twistDeg: -15, slipM: .05, minEyeM: .35 }),
   // SB05: both hands at the bottom of frame on the forearm holding the collar (left nearer the elbow).
   // Bench 2026-09-25 (eye 0.75, pitch −5…+3): his forearm runs from the eye's chin down out of frame, so the
   // hands sit near the elbow (right 0.42, left 0.1 from the elbow) to show at the bottom edge.
@@ -65,16 +80,19 @@ export const EXTRA_HAND_POSES = Freeze({
   // SB05A: the RIGHT palm flat on ijaA's chest, left of centre (storyboard hand ≈ (0.3,0.5)); the shoulder comes
   // forward to reach across (his right upper arm, 0.7 m from the shoulder, is out of reach); it slides off as
   // he turns (slipM).
-  pressBody: G("ijaA", "chest", .35, { offset: V(-.03, .07, 0), twistDeg: 60, slipM: .06, fallback: "flat", shape: "press", c: V(12, 16, 10), sh: V(.12, -.24, .08) }),
-  // SB03: the RIGHT palm flat in the mud at the lower right, ~0.45 m ahead of the eye (base `flat` is 0.25 m).
-  // The eye is 0.26 m up with the shot pitched +5°, so the mud in frame starts ~0.5 m out: the arm reaches
-  // 0.6 m with the shoulder brought forward; the back of the hand is asked to tilt to the eye (the wrist
-  // limit, 42°, leaves it nearly flat: from this height it reads as a thin hand, bench palm (0.64,0.88)).
-  palmMud: H("ground", [.2, .05, -.6], [.12, -.12, -.98], [-.05, .65, .75], [8, 12, 8], { shape: "claw", sh: V(.2, -.18, -.12) }),
-  // SB03A: the LEFT arm out from the lower left, palm pressing the mud, ~0.55 m in front of the eye
-  // (further than `reach`, 0.29 m): the shoulder comes forward with it.
-  // The eye is 0.18 m up: 0.6 m out the palm shows at about (0.37,0.72) (storyboard (0.33,0.6)).
-  reachLeft: H("ground", [.17, .05, -.6], [.1, -.4, -.9], [.05, .8, .6], [10, 16, 12], { shape: "claw", sh: V(.19, -.17, -.12) }),
+  // Shoulder root 0.1 m behind the eye (was 0.08: exactly on the sleeve-root guard).
+  pressBody: G("ijaA", "chest", .35, { offset: V(-.03, .07, 0), twistDeg: 60, slipM: .06, fallback: "flat", shape: "press", c: V(12, 16, 10), sh: V(.12, -.24, .1) }),
+  // SB03: the RIGHT palm flat in the mud at the lower right (base `flat` is 0.25 m). The shoulder stays 0.1 m
+  // behind the eye (review 09-25: the old 0.12 m forward shoulder showed the cut sleeve root), which leaves the
+  // palm 0.44 m out, 0.52 m from the eye — at the eye 0.26 m up / pitch +5° that is the bottom edge (palm
+  // ≈ (0.76,1.0), fingers into the frame). Fingers turned to the upper left as in the storyboard, back of
+  // the hand to the eye (dorsal·eye 0.85, node bench; it read as one finger edge-on before).
+  palmMud: H("ground", [.26, .04, -.44], [-.6, -.08, -.8], [-.05, .65, .75], [8, 12, 8], { shape: "claw", sh: V(.2, -.2, .1) }),
+  // SB03A: the LEFT arm out from the lower left, palm pressing the mud ahead of the eye (further than `reach`,
+  // 0.29 m). Shoulder 0.1 m behind the eye (see palmMud): the palm ends 0.44 m out, 0.48 m from the eye, at
+  // about (0.35,0.78) at eye 0.18 / pitch +4° (storyboard (0.33,0.6); the task's ~0.55 m needs the shoulder
+  // in front of the eye). Fingers turned out to the left so the back of the hand shows (dorsal·eye 0.33).
+  reachLeft: H("ground", [.14, .05, -.44], [.6, -.1, -.8], [-.3, .7, .6], [10, 16, 12], { shape: "claw", sh: V(.19, -.16, .1) }),
 });
 
 // Legs (the kept leg and boot triangles of the NRA02 body). Frame: the eye with yaw-only axes (x right,
@@ -86,11 +104,13 @@ const Leg = (ankle, knee, flexDeg = 0) => Freeze({ ankle: V(...ankle), knee: V(.
 export const LEG_POSES = Freeze({
   // SB01 (eye 0.95, pitch −15°): sitting against the back wall, legs out towards the mouth, right knee
   // up under the loading rifle (bolt low right), left leg longer.
-  // The eye is 0.95 m up, so he sits on something low (hip 0.25 m up, 0.28 m ahead of the eye); the right
-  // knee is drawn up (ankle 0.48 m ahead) so its top shows at the lower right edge with the rifle's bolt on it
-  // (bench 2026-09-25: knee (0.82,1.0), bolt ≈ (0.83,0.88), muzzle (0.52,0.63); storyboard bolt (0.92,0.9)).
-  sitForward: Freeze({ hip: V(.02, .25, -.28), up: V(0, .95, .3),
-    l: Leg([-.25, .1, -1.02], [-.2, 1, -.1], 5), r: Leg([.33, .1, -.48], [.3, 1, 0], 0) }),
+  // The eye is 0.95 m up, so he sits on something low (hip 0.32 m up, 0.35 m ahead of the eye: leaning back on
+  // the wall); the right knee is drawn up high (ankle 0.48 m ahead) so the knee and the top of the thigh are in
+  // the lower right with the rifle across them (review 09-25: knee (0.82,1.0) was out of frame and the rifle
+  // read as lying on the ground). Node bench: knee (0.77,0.88), thigh from the bottom edge to the knee,
+  // bolt ≈ (0.8,0.93) on the knee, muzzle ≈ (0.52,0.62); storyboard knee ≈ (0.7,0.9), bolt (0.92,0.9).
+  sitForward: Freeze({ hip: V(.02, .32, -.35), up: V(0, .95, .3),
+    l: Leg([-.25, .1, -1.02], [-.2, 1, -.1], 5), r: Leg([.3, .1, -.48], [.15, 1, 0], 0) }),
   // SB02 (eye falling to 0.75, roll +17°): thrown down, legs sprawled in the foreground, one knee up.
   sprawl: Freeze({ hip: V(0, .16, -.22), up: V(-.2, .7, .7),
     l: Leg([-.36, .09, -.95], [-.5, 1, 0], -5), r: Leg([.2, .12, -.6], [.1, 1, .1], 10) }),
@@ -117,9 +137,13 @@ export const LEG_POSES = Freeze({
 //   packStrap: SB03A 「左边缘能看到背包带」: a canvas strap from the left shoulder root, camera-local points.
 export const FP_PROPS = Freeze({
   palmClipProp: Freeze({ kind: "clip", hand: "l", offset: V(0, -.02, 0), yawDeg: 0 }),
-  loadingRifleOnLegs: Freeze({ kind: "rifle", thigh: "r", along: 1, lift: .07, gripAheadM: .28, muzzle: V(-.37, -.2, -.9), up: V(-.3, 1, .2) }),
+  // The receiver on the thigh just behind the knee, muzzle forward-left (bench: bolt over the knee).
+  loadingRifleOnLegs: Freeze({ kind: "rifle", thigh: "r", along: .85, lift: .07, gripAheadM: .2, muzzle: V(-.45, -.1, -.88), up: V(-.3, 1, .2) }),
   rifleSlide: Freeze({ kind: "track", prop: "loadingRifleOnLegs", t0: .25, t1: .7, direction: V(-.45, 0, -.55), moveM: .4, spinDeg: 28, restM: .03 }),
-  packStrap: Freeze({ kind: "strap", widthM: .05, thickM: .006, color: 0x4a4031,
+  // Canvas olive-drab with darker hems and a stitched band every few centimetres (vertex shades), a steel
+  // buckle at buckleAt (0–1 along); review 09-25: the flat 0x4a4031 read as a black bar.
+  packStrap: Freeze({ kind: "strap", widthM: .05, thickM: .006, color: 0x7a6a4a, hemShade: .62, stitchShade: .8, stitchEveryM: .035,
+    buckleAt: .45, buckleColor: 0x8a8a82, buckleM: V(.034, .026, .006),
     // screen ≈ (0.02,0.25) → (0.18,1.0) down the left edge, 0.16–0.28 m in front of the eye
     points: Freeze([V(-.174, .051, -.16), V(-.19, 0, -.2), V(-.196, -.076, -.24), V(-.203, -.178, -.28)]) }),
 });

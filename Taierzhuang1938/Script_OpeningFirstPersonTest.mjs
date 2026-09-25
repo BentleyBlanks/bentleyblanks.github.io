@@ -9,7 +9,7 @@ import {fileURLToPath} from "node:url";
 import * as THREE from "three";
 import {OpeningFirstPerson,OpeningActorAnatomy,SolveOpeningActorArm,OpeningHandBeat,OPENING_HAND_POSES,TrimOpeningPlayerBody} from "./Script_OpeningFirstPerson.mjs";
 import {OPENING_STORYBOARDS as C} from "./Data_OpeningStoryboards.mjs";
-import {EXTRA_HAND_POSES,HAND_SHAPES,LEG_POSES,FP_PROPS} from "./Data_OpeningFirstPersonExtra.mjs";
+import {EXTRA_HAND_POSES,HAND_SHAPES,LEG_POSES,FP_PROPS,SHOULDER_BEHIND_MIN_M} from "./Data_OpeningFirstPersonExtra.mjs";
 
 const here=path.dirname(fileURLToPath(import.meta.url));
 const manifest=JSON.parse(fs.readFileSync(path.join(here,"Model/Character/Data_LugouCharacterManifest.json"),"utf8"));
@@ -160,7 +160,11 @@ for(const model of ["LugouNra01","LugouNra02"])for(const side of ["l","r"]){
 for(const name of ["palmClip","flingOpen","gripForearm","gripSleeve","gripArm","pressBody","reachLeft"])assert.ok(EXTRA_HAND_POSES[name]&&OPENING_HAND_POSES[name],`extra hand pose ${name}`);
 for(const name of ["sitForward","sprawl","lieSide","sitCover"])assert.ok(LEG_POSES[name],`leg pose ${name}`);
 for(const name of ["palmClipProp","loadingRifleOnLegs","rifleSlide","packStrap"])assert.ok(FP_PROPS[name],`first-person prop ${name}`);
+// The cut sleeve root never comes into view: every shoulder override stays behind the eye by more than the
+// campaign's minShoulderBehind guard (Script_FirstLevelCampaignOpening, > 0.08 m).
+assert.ok(SHOULDER_BEHIND_MIN_M>.08,"the sleeve-root margin is above the campaign guard");
 for(const [name,pose] of Object.entries(EXTRA_HAND_POSES)){
+  if(pose.sh)assert.ok(pose.sh[2]>=SHOULDER_BEHIND_MIN_M,`${name}: shoulder root ${pose.sh[2]} m behind the eye (≥ ${SHOULDER_BEHIND_MIN_M})`);
   assert.ok(["cam","body","ground","partner"].includes(pose.in),`${name} frame`);
   if(pose.shape)assert.ok(HAND_SHAPES[pose.shape],`${name} shape ${pose.shape}`);
   if(pose.in==="partner")assert.ok(["forearmL","forearmR","upperArmL","upperArmR","chest"].includes(pose.bone)&&OPENING_HAND_POSES[pose.fallback],`${name} partner bone and fallback`);
@@ -200,7 +204,8 @@ assert.equal(FP_PROPS[FP_PROPS.rifleSlide.prop]?.kind,"rifle","rifleSlide moves 
     partnerActor.root.position.copy(at.clone().sub(mid));partnerActor.root.updateMatrixWorld(true);
   };
   PlacePartner(Local(.08,-.22,-.36));
-  const r={player:{camera:eye},time:0},show={playerBody,ready:true,phase:"Drag",Age:0,flags:{},supplyRoot:new THREE.Group(),r,
+  const bunkerRifle={view:new THREE.Group()};
+  const r={player:{camera:eye},time:0,bunkerRifle},show={playerBody,ready:true,phase:"Drag",Age:0,flags:{},supplyRoot:new THREE.Group(),r,
     loadingRifle:new THREE.Group(),loadingRifleGrip:new THREE.Vector3(),clips:[new THREE.Group(),new THREE.Group()],
     SpeakerActor:who=>who==="ijaA"?partner:null};
   const firstPerson=new OpeningFirstPerson(show);
@@ -286,9 +291,74 @@ assert.equal(FP_PROPS[FP_PROPS.rifleSlide.prop]?.kind,"rifle","rifleSlide moves 
   {eye.rotation.set(.07,0,0,"YXZ");eye.updateMatrixWorld(true);r.battlefield={GroundHeight:()=>eye.position.y-.18};
     const state=Run(40),strap=state.props.packStrap,hand=state.hands.l;
     assert.ok(strap.visible&&new THREE.Vector3(...strap.position).distanceTo(eye.position)<1e-6,"the strap hangs from the camera frame");
-    assert.ok(hand.contactError<.02&&hand.eyeDistance>.5,`reachLeft reaches the mud ~0.55 m ahead (${hand.eyeDistance})`);
+    // 0.45 m, not the task's ~0.55 m: with the sleeve root kept 0.1 m behind the eye the arm ends there
+    // (review 09-25: the old forward shoulder showed the cut root).
+    assert.ok(hand.contactError<.02&&hand.eyeDistance>.45,`reachLeft reaches the mud ahead of the eye (${hand.eyeDistance})`);
+    assert.ok(hand.shoulderBehind>.08,`reachLeft keeps the sleeve root behind the eye (${hand.shoulderBehind})`);
     assert.ok(hand.wristBend<=42.1&&hand.reachRatio<=.971,"reachLeft stays anatomical");
-    const shoulder=eye.worldToLocal(new THREE.Vector3(...hand.elbow));assert.ok(shoulder.x<0,"the left arm comes from the left");}
+    const shoulder=eye.worldToLocal(new THREE.Vector3(...hand.elbow));assert.ok(shoulder.x<0,"the left arm comes from the left");
+    const strapMesh=playerBody.root.getObjectByName("OpeningFirstPerson_packStrap");
+    const shades=new Set([...strapMesh.geometry.getAttribute("color").array].map(v=>v.toFixed(2)));
+    assert.ok(shades.size>=3&&strapMesh.getObjectByName("OpeningFirstPerson_packStrapBuckle"),"the strap has hems, stitching and a buckle (not a flat black bar)");}
+  // palmMud (SB03) touches the mud with the sleeve root behind the eye.
+  firstPerson.Pose({left:"rest",right:"palmMud",legs:"lieSide"});
+  {eye.rotation.set(5/180*Math.PI,0,0,"YXZ");eye.updateMatrixWorld(true);r.battlefield={GroundHeight:()=>eye.position.y-.26};
+    const hand=Run(40).hands.r;
+    assert.ok(hand.contactError<.02&&hand.shoulderBehind>.08&&hand.wristBend<=42.1,`palmMud lies in the mud, sleeve root behind the eye (${hand.contactError}, ${hand.shoulderBehind})`);
+    assert.ok(new THREE.Vector3(...hand.dorsal).dot(eye.position.clone().sub(new THREE.Vector3(...hand.palm)).normalize())>.5,"palmMud shows the back of the hand to the eye");}
+  eye.rotation.set(-.1,0,0,"YXZ");eye.updateMatrixWorld(true);r.battlefield=null;
+  // A partner point out of reach, or inside minEyeM of the eye, is not reached for: the hand is on its fallback
+  // from the first frame and never comes nearer the eye than minEyeM; once the point is reachable the grip
+  // eases on and is held.
+  {
+    const minEye=EXTRA_HAND_POSES.gripForearm.minEyeM;assert.ok(minEye>=.35,"gripForearm keeps 0.35 m from the eye");
+    Run(30);
+    for(const [where,reason] of [[Local(.05,-.1,-.22),"nearEye"],[Local(.2,-.3,-1.6),"far"]]){
+      PlacePartner(where);firstPerson.Pose({left:"rest",right:"gripForearm"});
+      let first=null,closest=Infinity;
+      Run(30,i=>{if(i===1)first={...show.firstPersonState.hands.r.partner};});
+      for(let i=0;i<30;i++){Run(1);closest=Math.min(closest,show.firstPersonState.hands.r.eyeDistance);}
+      const hand=show.firstPersonState.hands.r;
+      assert.equal(first.out,reason,`${reason}: reported`);assert.equal(first.slip,1,`${reason}: on the fallback from the first frame`);
+      assert.equal(hand.partner.held,false,`${reason}: not held`);
+      assert.ok(closest>=minEye-1e-3,`${reason}: the hand keeps ${minEye} m from the eye (${closest})`);
+      firstPerson.Pose({left:"rest",right:"rest"});Run(20);
+    }
+    PlacePartner(Local(.08,-.22,-.36));firstPerson.Pose({left:"rest",right:"gripForearm"});
+    const state=Run(60);
+    assert.ok(state.hands.r.partner.held&&state.hands.r.partner.slip===0&&state.hands.r.partner.gap<.02,`a reachable point is gripped and held (${state.hands.r.partner.gap})`);
+  }
+  // One loading rifle at a time: the world rifle is hidden in the loading phases whoever owns the hands (the
+  // bench, director hand keys) and while the lap rifle shows; after Blast it is back.
+  {
+    eye.rotation.set(-15/180*Math.PI,0,0,"YXZ");eye.updateMatrixWorld(true);r.battlefield={GroundHeight:()=>eye.position.y-.95};
+    for(const phase of ["Banter","Orders","Incoming"]){
+      show.phase=phase;show.Age=0;firstPerson.Pose({left:"palmClip",right:"rest",legs:"sitForward",props:["palmClipProp","loadingRifleOnLegs"]});
+      const state=Run(10);
+      assert.ok(state.props.loadingRifleOnLegs.visible&&bunkerRifle.view.visible===false&&state.worldRifleVisible===false,`${phase}: the lap rifle shows, the world rifle does not`);
+    }
+    show.phase="Blast";show.Age=0;firstPerson.Pose({left:"rest",right:"flingOpen",legs:"sprawl",props:["loadingRifleOnLegs","rifleSlide"]});
+    assert.equal(Run(50).props.loadingRifleOnLegs.visible,true);assert.equal(bunkerRifle.view.visible,false,"Blast: the sliding lap rifle, no world rifle");
+    firstPerson.Pose(null);show.phase="Wake";show.Age=0;Run(5);
+    assert.equal(bunkerRifle.view.visible,true,"after Blast the world rifle is the only one");
+    // A loading phase whose hands still hold the rifle (supply) does not also draw it on the legs.
+    firstPerson.Pose({left:"palmClip",right:"rest",legs:"sitForward"});const legs=Run(10).legs;
+    const bodyQ=new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0,1,0),0);
+    const report=firstPerson.UpdateProps({props:["loadingRifleOnLegs"]},{cam:eye,bodyQ,Ground:()=>eye.position.y-.95},0,legs,true);
+    assert.equal(report.loadingRifleOnLegs.visible,false,"no lap rifle while the rifle is in the hands");
+    assert.ok(warnings.some(w=>/loadingRifleOnLegs is hidden while the loading rifle is in the hands/.test(w)),"and it says why");
+    firstPerson.Pose(null);show.phase="Drag";Run(5);
+  }
+  // A missing prop source is reported, not drawn as an empty stand-in.
+  {
+    const loading=show.loadingRifle;show.loadingRifle=null;delete firstPerson.props.loadingRifleOnLegs;
+    firstPerson.Pose({left:"rest",right:"rest",legs:"sitForward",props:["loadingRifleOnLegs"]});
+    const state=Run(5);
+    assert.deepEqual(state.props.loadingRifleOnLegs,{visible:false,missing:true},"a missing loading rifle is reported missing");
+    assert.ok(warnings.some(w=>/loadingRifleOnLegs: the director has no loading rifle/.test(w)),"one warning names the missing source");
+    show.loadingRifle=loading;firstPerson.Pose(null);Run(2);
+  }
+  eye.rotation.set(-.1,0,0,"YXZ");eye.updateMatrixWorld(true);
   firstPerson.Dispose();console.warn=warn;delete globalThis.Tengxian;
 }
 console.log(JSON.stringify({samples,maxBend,maxTwist,maxRotation,groundContacts,maxGroundError,claspSamples,maxClaspError,minClaspAlignment,maxClaspBend,freeReachSamples,maxFreeFrameError}));
