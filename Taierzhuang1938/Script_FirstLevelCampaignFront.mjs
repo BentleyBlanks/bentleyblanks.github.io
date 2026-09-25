@@ -118,7 +118,12 @@ export async function Drive(ctx) {
   // =========================================================================
   if(ctx.stageTo===6)return;
   // 07 on is driven as before (the reflexes were tuned and measured on 03–06 only).
-  await page.evaluate(() => { const D = window.MissionInputDriver; if (D) { D.reflexes = false; D.returning = null; } });
+  // Let go of any key a reflex was holding when 06 ended (③ back-off holds S, ⑤ step-in holds W; with the reflexes
+  // off CloseThreat returns before the lines that would release them), so 07 starts exactly like the old driver.
+  await page.evaluate(() => { const g = window.Tengxian, D = window.MissionInputDriver; if (D) {
+    if (D.backingOff) { g.Debug.Key("KeyS", false); D.backingOff = false; }
+    if (D.closing) { g.Debug.Key("KeyW", false); D.closing = false; }
+    D.reflexes = false; D.returning = null; D.closeFoe = null; } });
   await JumpStage(7);
   // 拆两段只为在路上拍一张（Capture 只渲几帧，进不了阶段计时）。
   await Route(Routes.southWalk.slice(0, 5), "SouthWalkFirst", { fight: false, stance: "stand", sprint: false });

@@ -105,6 +105,8 @@ try {
         'new cast uses its requested model slots instead of reassigning failed downloads '
         +'(comrade, runner and shouter are pinned to NRA02 since the 09-23 face package; the interpreter wears his own NRA06 since 2026-09-24)');
       assert.equal(setup.playerModel,null,'the protagonist also preserves the missing NRA02 slot');
+      assert.equal(setup.enemies.BunkerExecutionerA.model,'LugouIja06',
+        'ijaA (BunkerExecutionerA) wears the approved IJA06 through the failed NRA downloads (Model package, 2026-09-24)');
       for(const [id,actor] of Object.entries({...setup.squad,...setup.cast,...setup.enemies})) {
         assert.ok(actor.alive&&actor.physical&&actor.finite,`${id} remains a live physical person: ${JSON.stringify(actor)}`);
         assert.ok(actor.attached||['culled','crowd'].includes(actor.lod),
