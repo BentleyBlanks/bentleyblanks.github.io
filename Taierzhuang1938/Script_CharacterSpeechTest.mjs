@@ -78,6 +78,9 @@ const POSES = ['Rest', 'Open', 'Wide', 'Round', 'Close', 'Blink', 'BrowUp', 'Sna
   // 2026-09-25 expressions (01-03 storyboard contract section 4.2).
   'Shock', 'Pain', 'Shout', 'Grit'];
 const faced = MANIFEST.models.filter(record => record.facialUrl);
+// Face pose translations are head-local METRES on TengxianHumanoidV1 (2026-09-26; the Lugou rigs stored
+// centimetres). The gates below keep their reviewed centimetre numbers: CM converts before comparing.
+const CM = 100;
 assert.deepEqual(faced.map(r => r.id).sort(), ['TengxianIja01', 'TengxianIja02', 'TengxianIja06', 'TengxianNra02', 'TengxianNra05', 'TengxianNra06']);
 const definitions = {};
 for (const record of faced) {
@@ -124,7 +127,7 @@ for (const record of faced) {
   // Pose masks: blinking never opens the jaw, opening the mouth never lifts the brows.
   const moved = (pose, bone) => {
     const a = rig.poses[pose][bone], r = rig.poses.Rest[bone];
-    return Math.hypot(...a.translation.map((x, k) => x - r.translation[k])) > 1e-4
+    return Math.hypot(...a.translation.map((x, k) => x - r.translation[k])) * CM > 1e-4
       || Math.abs(Math.abs(a.rotation.reduce((s, x, k) => s + x * r.rotation[k], 0)) - 1) > 1e-6;
   };
   assert.ok(moved('Open', 'Face_Jaw') && !moved('Open', 'Face_BrowL'), `${label} Open: jaw only-mouth`);
@@ -132,7 +135,7 @@ for (const record of faced) {
   assert.ok(moved('DeadSlack', 'Face_Jaw') && moved('BrowUp', 'Face_BrowR') && moved('Close', 'Face_LipLower'));
   // Lip shapes readable at 1 m (2026-09-25): the corners travel >= 6 mm for Wide/Round
   // (09-23: 1.8-4.2 mm, under 2 px in the game view), the snarl lifts the upper lip.
-  const travel = (pose, bone) => Math.hypot(...rig.poses[pose][bone].translation.map((x, k) => x - rig.poses.Rest[bone].translation[k]));
+  const travel = (pose, bone) => Math.hypot(...rig.poses[pose][bone].translation.map((x, k) => x - rig.poses.Rest[bone].translation[k])) * CM;
   const turn = (pose, bone) => 2 * Math.acos(Math.min(1, Math.abs(rig.poses[pose][bone].rotation.reduce((s, x, k) => s + x * rig.poses.Rest[bone].rotation[k], 0)))) / Math.PI * 180;
   for (const bone of ['Face_CornerL', 'Face_CornerR']) {
     assert.ok(travel('Wide', bone) >= .6 && travel('Round', bone) >= .6, `${label} ${bone}: Wide/Round corner travel >= 6 mm`);
@@ -143,7 +146,7 @@ for (const record of faced) {
   // Shock opens the upper lids far enough to read under a cap brim. Head-local cm: [up, forward, out].
   // Face_LipLower hangs under Face_Jaw: bring its delta into the head frame (NRA05's reviewed jaw is rotated).
   const jawRest = new THREE.Quaternion().fromArray(rig.poses.Rest.Face_Jaw.rotation);
-  const delta = (pose, bone) => { const d = new THREE.Vector3().fromArray(rig.poses[pose][bone].translation).sub(new THREE.Vector3().fromArray(rig.poses.Rest[bone].translation));
+  const delta = (pose, bone) => { const d = new THREE.Vector3().fromArray(rig.poses[pose][bone].translation).sub(new THREE.Vector3().fromArray(rig.poses.Rest[bone].translation)).multiplyScalar(CM);
     return (bone === 'Face_LipLower' ? d.applyQuaternion(jawRest) : d).toArray(); };
   const out = (pose) => delta(pose, 'Face_CornerL')[2] - delta(pose, 'Face_CornerR')[2]; // both corners, + = wider
   assert.ok(out('Wide') >= 1.8 && out('Round') <= -2.4 && out('Wide') - out('Round') >= 4.5,
@@ -207,14 +210,14 @@ const jawAngle = (bone, rig) => 2 * Math.acos(Math.min(1, Math.abs(bone.quaterni
   assert.ok(open > 8, `face track opens the jaw (${open.toFixed(1)} deg)`);
   const cornerRound = byName.Face_CornerL.position.clone();
   for (let i = 0; i < 20; i++) face.Update(1 / 60, {speech: {active: true, jaw: .9, wide: 1, round: 0, close: 0, stress: 0}});
-  assert.ok(byName.Face_CornerL.position.distanceTo(cornerRound) > .2, 'wide and round are different mouth shapes');
+  assert.ok(byName.Face_CornerL.position.distanceTo(cornerRound) * CM > .2, 'wide and round are different mouth shapes');
   // A closure (m/b/p) presses the lips with the jaw shut.
   for (let i = 0; i < 20; i++) face.Update(1 / 60, {speech: {active: true, jaw: 0, wide: 0, round: 0, close: 1, stress: 0}});
   assert.ok(jawAngle(byName.Face_Jaw, rig) < 1 && face.close > .9, 'closure keeps the jaw shut');
   // Stress lifts the brows (only stress does), then settles.
   const browRest = byName.Face_BrowL.position.clone();
   for (let i = 0; i < 20; i++) face.Update(1 / 60, {speech: {active: true, jaw: .5, wide: .3, round: 0, close: 0, stress: 0}});
-  assert.ok(byName.Face_BrowL.position.distanceTo(browRest) < .02, 'an open jaw alone does not lift the brows');
+  assert.ok(byName.Face_BrowL.position.distanceTo(browRest) * CM < .02, 'an open jaw alone does not lift the brows');
   face.Update(1 / 60, {speech: {active: true, jaw: .6, wide: .3, round: 0, close: 0, stress: 1}});
   assert.ok(face.brow > .5 && face.stress > .5, 'stress event lifts the brows and feeds the nod');
   // A pause right after a stressed syllable: the corner pull (Wide carries some jaw) lets go with the jaw.
@@ -245,7 +248,7 @@ for (const label of Object.keys(definitions)) {
   const face = new CharacterFacialAnimation(root, rig, {seed: 3});
   for (let i = 0; i < 30; i++) face.Update(1 / 60, {});
   const rest = Object.fromEntries(rig.bones.map(name => [name, {p: byName[name].position.clone(), q: byName[name].quaternion.clone()}]));
-  const Moved = name => byName[name].position.distanceTo(rest[name].p) + byName[name].quaternion.angleTo(rest[name].q);
+  const Moved = name => byName[name].position.distanceTo(rest[name].p) * CM + byName[name].quaternion.angleTo(rest[name].q);
   const Settle = (seconds, state = {}) => { for (let t = 0; t < seconds - 1e-9; t += 1 / 60) face.Update(1 / 60, state); };
   // Partial update, eased over expressionBlendS (a linear full swing).
   CharacterFacial.SetExpression({facial: face}, {snarl: 1});

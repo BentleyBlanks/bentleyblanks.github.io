@@ -5,7 +5,7 @@
     {
       "id": "TengxianIja01",
       "facialUrl": "./Model/Character/Model_TengxianIja01Facial.glb",
-      "facialVersion": "20260926HumanoidV1Pending",
+      "facialVersion": "6aa5cdb504f8276a",
       "facialCast": [
         "ijaB",
         "ijaC",
@@ -521,7 +521,7 @@
     {
       "id": "TengxianIja02",
       "facialUrl": "./Model/Character/Model_TengxianIja02Facial.glb",
-      "facialVersion": "20260926HumanoidV1Pending",
+      "facialVersion": "743a48293ee66e2e",
       "facialCast": [
         "ijaD"
       ],
@@ -1544,7 +1544,7 @@
     {
       "id": "TengxianIja06",
       "facialUrl": "./Model/Character/Model_TengxianIja06Facial.glb",
-      "facialVersion": "20260926HumanoidV1Pending",
+      "facialVersion": "9eee205ee7b3f407",
       "facialCast": [
         "ijaA"
       ],
@@ -1559,7 +1559,7 @@
       "vertices": 8909,
       "triangles": 14643,
       "limitedWeightVertices": 131,
-      "bytes": 5485896,
+      "bytes": 3589152,
       "boneRoles": {
         "head": "Bip001 Head",
         "neck": "Bip001 Neck",
@@ -1622,6 +1622,56 @@
         "CarryStretcherRear",
         "WoundedLimp"
       ],
+      "missingTextures": [],
+      "validation": {
+        "armatures": 1,
+        "skinnedMeshes": 1,
+        "animations": [
+          "AdvanceFire",
+          "AdvanceKneelFire",
+          "AttackCommand",
+          "CarryStretcherFront",
+          "CarryStretcherRear",
+          "CrouchFire",
+          "CrouchFireAlt",
+          "CrouchIdle",
+          "EmplacementIdle",
+          "LeanWallSitPeek",
+          "MachineGunFire",
+          "PistolFire",
+          "ProneFire",
+          "RifleIdle",
+          "RifleIdleAlt",
+          "RifleRun",
+          "StandFireCrouch",
+          "StandFireCrouchAlt",
+          "WoundedLimp"
+        ],
+        "maxGroundPenetrationMeters": {
+          "AdvanceFire": 0.057811,
+          "AdvanceKneelFire": 0.084658,
+          "AttackCommand": 0.049305,
+          "CrouchFire": 0.038517,
+          "CrouchFireAlt": 0.038924,
+          "CrouchIdle": 0.060916,
+          "EmplacementIdle": 0.038657,
+          "LeanWallSitPeek": 0.077558,
+          "MachineGunFire": 0.009692,
+          "PistolFire": 0.016323,
+          "ProneFire": 0.026205,
+          "RifleIdle": 0.0375,
+          "RifleIdleAlt": 0.0375,
+          "RifleRun": 0.091975,
+          "StandFireCrouch": 0.204532,
+          "StandFireCrouchAlt": 0.05766,
+          "CarryStretcherFront": 0.019966,
+          "CarryStretcherRear": 0.019894,
+          "WoundedLimp": 0.01087
+        }
+      },
+      "pelvisHeightSpreadMeters": 0.854822,
+      "pelvisTrackSource": "3d1f879b",
+      "sourceRevision": "b39cd831066e1e2527389edd504048b4b5120ac6",
       "sourceAnimationAudit": {
         "LeanWallSitPeek": {
           "sourceFrames": 78,
@@ -1833,64 +1883,185 @@
           ]
         }
       },
-      "animationAudit": {},
-      "missingTextures": [],
-      "validation": {
-        "armatures": 1,
-        "skinnedMeshes": 1,
-        "animations": [
-          "AdvanceFire",
-          "AdvanceKneelFire",
-          "AttackCommand",
-          "CarryStretcherFront",
-          "CarryStretcherRear",
-          "CrouchFire",
-          "CrouchFireAlt",
-          "CrouchIdle",
-          "EmplacementIdle",
-          "LeanWallSitPeek",
-          "MachineGunFire",
-          "PistolFire",
-          "ProneFire",
-          "RifleIdle",
-          "RifleIdleAlt",
-          "RifleRun",
-          "StandFireCrouch",
-          "StandFireCrouchAlt",
-          "WoundedLimp"
-        ],
-        "maxGroundPenetrationMeters": {
-          "AdvanceFire": 0.057811,
-          "AdvanceKneelFire": 0.084658,
-          "AttackCommand": 0.049305,
-          "CrouchFire": 0.038517,
-          "CrouchFireAlt": 0.038924,
-          "CrouchIdle": 0.060916,
-          "EmplacementIdle": 0.038657,
-          "LeanWallSitPeek": 0.077558,
-          "MachineGunFire": 0.009692,
-          "PistolFire": 0.016323,
-          "ProneFire": 0.026205,
-          "RifleIdle": 0.0375,
-          "RifleIdleAlt": 0.0375,
-          "RifleRun": 0.091975,
-          "StandFireCrouch": 0.204532,
-          "StandFireCrouchAlt": 0.05766,
-          "CarryStretcherFront": 0.019966,
-          "CarryStretcherRear": 0.019894,
-          "WoundedLimp": 0.01087
+      "animationAudit": {
+        "LeanWallSitPeek": {
+          "sourceFrames": 78,
+          "sourceBones": 53,
+          "pelvisHeightMeters": [
+            0.2183669584506095,
+            0.23105234716937034
+          ],
+          "maxGroundPenetrationMeters": 0
+        },
+        "RifleIdle": {
+          "sourceFrames": 52,
+          "sourceBones": 53,
+          "pelvisHeightMeters": [
+            0.3827004065121069,
+            0.3833204189827003
+          ],
+          "maxGroundPenetrationMeters": 0
+        },
+        "RifleIdleAlt": {
+          "sourceFrames": 52,
+          "sourceBones": 53,
+          "pelvisHeightMeters": [
+            0.3827004065121069,
+            0.3833204189827003
+          ],
+          "maxGroundPenetrationMeters": 0
+        },
+        "RifleRun": {
+          "sourceFrames": 44,
+          "sourceBones": 53,
+          "pelvisHeightMeters": [
+            0.7487395999544919,
+            0.8579188759128252
+          ],
+          "maxGroundPenetrationMeters": 0.002920844198744338
+        },
+        "CrouchFire": {
+          "sourceFrames": 24,
+          "sourceBones": 53,
+          "pelvisHeightMeters": [
+            0.6100509837293764,
+            0.6110358387114856
+          ],
+          "maxGroundPenetrationMeters": 0
+        },
+        "CrouchFireAlt": {
+          "sourceFrames": 9,
+          "sourceBones": 53,
+          "pelvisHeightMeters": [
+            0.6101005598902702,
+            0.6110317515125762
+          ],
+          "maxGroundPenetrationMeters": 0
+        },
+        "CrouchIdle": {
+          "sourceFrames": 2,
+          "sourceBones": 53,
+          "pelvisHeightMeters": [
+            0.6632360890507698,
+            0.6632360890507698
+          ],
+          "maxGroundPenetrationMeters": 0
+        },
+        "MachineGunFire": {
+          "sourceFrames": 31,
+          "sourceBones": 53,
+          "pelvisHeightMeters": [
+            0.5362836830317974,
+            0.5400167740881443
+          ],
+          "maxGroundPenetrationMeters": 0
+        },
+        "EmplacementIdle": {
+          "sourceFrames": 2,
+          "sourceBones": 53,
+          "pelvisHeightMeters": [
+            0.6093616187572479,
+            0.6093616187572479
+          ],
+          "maxGroundPenetrationMeters": 0
+        },
+        "AttackCommand": {
+          "sourceFrames": 121,
+          "sourceBones": 53,
+          "pelvisHeightMeters": [
+            0.8213830171712402,
+            0.9321533908978916
+          ],
+          "maxGroundPenetrationMeters": 0
+        },
+        "ProneFire": {
+          "sourceFrames": 14,
+          "sourceBones": 53,
+          "pelvisHeightMeters": [
+            0.9392116731584863,
+            0.9434013683348894
+          ],
+          "maxGroundPenetrationMeters": 0
+        },
+        "StandFireCrouch": {
+          "sourceFrames": 2,
+          "sourceBones": 53,
+          "pelvisHeightMeters": [
+            0.33502343297004694,
+            0.33502343297004705
+          ],
+          "maxGroundPenetrationMeters": 0
+        },
+        "StandFireCrouchAlt": {
+          "sourceFrames": 96,
+          "sourceBones": 53,
+          "pelvisHeightMeters": [
+            0.3833077728978806,
+            0.8281411007265476
+          ],
+          "maxGroundPenetrationMeters": 0
+        },
+        "AdvanceKneelFire": {
+          "sourceFrames": 101,
+          "sourceBones": 53,
+          "pelvisHeightMeters": [
+            0.40788965903297336,
+            0.810538066085428
+          ],
+          "maxGroundPenetrationMeters": 0
+        },
+        "AdvanceFire": {
+          "sourceFrames": 88,
+          "sourceBones": 53,
+          "pelvisHeightMeters": [
+            0.8292498365094507,
+            0.9937522525929829
+          ],
+          "maxGroundPenetrationMeters": 0.0013350859942174074
+        },
+        "PistolFire": {
+          "sourceFrames": 81,
+          "sourceBones": 53,
+          "pelvisHeightMeters": [
+            0.4653448180530457,
+            0.46956030413768235
+          ],
+          "maxGroundPenetrationMeters": 0
+        },
+        "CarryStretcherFront": {
+          "sourceFrames": 25,
+          "sourceBones": 53,
+          "pelvisHeightMeters": [
+            0.8786387686294787,
+            0.9434590384780699
+          ],
+          "maxGroundPenetrationMeters": 0
+        },
+        "CarryStretcherRear": {
+          "sourceFrames": 25,
+          "sourceBones": 53,
+          "pelvisHeightMeters": [
+            0.9595571466600393,
+            1.0288697000159084
+          ],
+          "maxGroundPenetrationMeters": 0.0005449574712648341
+        },
+        "WoundedLimp": {
+          "sourceFrames": 45,
+          "sourceBones": 53,
+          "pelvisHeightMeters": [
+            0.9403373005732354,
+            1.0244998121829407
+          ],
+          "maxGroundPenetrationMeters": 0
         }
       },
-      "pelvisHeightSpreadMeters": 0.854822,
-      "pelvisTrackSource": "3d1f879b",
-      "sourceRevision": "b39cd831",
-      "skeleton": "TengxianHumanoidV1",
-      "pendingStandardization": "Step 2 of Brief_MigrateHumanoidV1: bake Model_TengxianIja06.glb and its facial GLB on TengxianHumanoidV1"
+      "skeleton": "TengxianHumanoidV1"
     },
     {
       "id": "TengxianNra02",
       "facialUrl": "./Model/Character/Model_TengxianNra02Facial.glb",
-      "facialVersion": "20260926HumanoidV1Pending",
+      "facialVersion": "4772d3b954acb369",
       "facialCast": [
         "yaowa",
         "heyoutian",
@@ -2422,7 +2593,7 @@
     {
       "id": "TengxianNra05",
       "facialUrl": "./Model/Character/Model_TengxianNra05Facial.glb",
-      "facialVersion": "20260926HumanoidV1Pending",
+      "facialVersion": "718fad28d54a90a0",
       "facialCast": [
         "luo"
       ],
@@ -2943,7 +3114,7 @@
     {
       "id": "TengxianNra06",
       "facialUrl": "./Model/Character/Model_TengxianNra06Facial.glb",
-      "facialVersion": "20260926HumanoidV1Pending",
+      "facialVersion": "4d7977aabe146dd2",
       "facialCast": [
         "interpreter"
       ],
@@ -2956,7 +3127,7 @@
       "vertices": 6730,
       "triangles": 10321,
       "limitedWeightVertices": 298,
-      "bytes": 5622932,
+      "bytes": 3722604,
       "boneRoles": {
         "head": "Bip001 Head",
         "neck": "Bip001 Neck",
@@ -3019,6 +3190,67 @@
         "CarryStretcherRear",
         "WoundedLimp"
       ],
+      "missingTextures": [],
+      "validation": {
+        "armatures": 1,
+        "skinnedMeshes": 1,
+        "animations": [
+          "AdvanceFire",
+          "AdvanceKneelFire",
+          "AttackCommand",
+          "CarryStretcherFront",
+          "CarryStretcherRear",
+          "CrouchFire",
+          "CrouchFireAlt",
+          "CrouchIdle",
+          "EmplacementIdle",
+          "LeanWallSitPeek",
+          "MachineGunFire",
+          "PistolFire",
+          "ProneFire",
+          "RifleIdle",
+          "RifleIdleAlt",
+          "RifleRun",
+          "StandFireCrouch",
+          "StandFireCrouchAlt",
+          "WoundedLimp"
+        ],
+        "maxGroundPenetrationMeters": {
+          "AdvanceFire": 0.059555,
+          "AdvanceKneelFire": 0.096623,
+          "AttackCommand": 0.02974,
+          "CrouchFire": 0.03618,
+          "CrouchFireAlt": 0.03618,
+          "CrouchIdle": 0.049961,
+          "EmplacementIdle": 0.036198,
+          "LeanWallSitPeek": 0.061373,
+          "MachineGunFire": 0.017354,
+          "PistolFire": 0.011885,
+          "ProneFire": 0.033852,
+          "RifleIdle": 0,
+          "RifleIdleAlt": 0,
+          "RifleRun": 0.041356,
+          "StandFireCrouch": 0.136824,
+          "StandFireCrouchAlt": 0.031575,
+          "CarryStretcherFront": 0.022013,
+          "CarryStretcherRear": 0.021772,
+          "WoundedLimp": 0.008485
+        }
+      },
+      "pelvisHeightSpreadMeters": 0.830437,
+      "pelvisTrackSource": "3d1f879b",
+      "appearanceRepair": {
+        "revision": "20260906NraEyesShoulders",
+        "sourceSha256": "eefd83935caf62e4195fced7b02edd025570efd1a28c937f1feb625d004b404c",
+        "shoulderVertices": 351,
+        "eyeVertices": 74,
+        "maxShoulderDropMeters": 0.04
+      },
+      "derivedFrom": "TengxianNra02",
+      "builder": "_import/Script_BuildLugouNra06.py",
+      "approved": "2026-09-24",
+      "role": "interpreter",
+      "sourceRevision": "b39cd831066e1e2527389edd504048b4b5120ac6",
       "sourceAnimationAudit": {
         "LeanWallSitPeek": {
           "sourceFrames": 78,
@@ -3230,70 +3462,180 @@
           ]
         }
       },
-      "animationAudit": {},
-      "missingTextures": [],
-      "validation": {
-        "armatures": 1,
-        "skinnedMeshes": 1,
-        "animations": [
-          "AdvanceFire",
-          "AdvanceKneelFire",
-          "AttackCommand",
-          "CarryStretcherFront",
-          "CarryStretcherRear",
-          "CrouchFire",
-          "CrouchFireAlt",
-          "CrouchIdle",
-          "EmplacementIdle",
-          "LeanWallSitPeek",
-          "MachineGunFire",
-          "PistolFire",
-          "ProneFire",
-          "RifleIdle",
-          "RifleIdleAlt",
-          "RifleRun",
-          "StandFireCrouch",
-          "StandFireCrouchAlt",
-          "WoundedLimp"
-        ],
-        "maxGroundPenetrationMeters": {
-          "AdvanceFire": 0.059555,
-          "AdvanceKneelFire": 0.096623,
-          "AttackCommand": 0.02974,
-          "CrouchFire": 0.03618,
-          "CrouchFireAlt": 0.03618,
-          "CrouchIdle": 0.049961,
-          "EmplacementIdle": 0.036198,
-          "LeanWallSitPeek": 0.061373,
-          "MachineGunFire": 0.017354,
-          "PistolFire": 0.011885,
-          "ProneFire": 0.033852,
-          "RifleIdle": 0,
-          "RifleIdleAlt": 0,
-          "RifleRun": 0.041356,
-          "StandFireCrouch": 0.136824,
-          "StandFireCrouchAlt": 0.031575,
-          "CarryStretcherFront": 0.022013,
-          "CarryStretcherRear": 0.021772,
-          "WoundedLimp": 0.008485
+      "animationAudit": {
+        "LeanWallSitPeek": {
+          "sourceFrames": 78,
+          "sourceBones": 53,
+          "pelvisHeightMeters": [
+            0.21686307328342275,
+            0.22980719316964193
+          ],
+          "maxGroundPenetrationMeters": 0
+        },
+        "RifleIdle": {
+          "sourceFrames": 52,
+          "sourceBones": 53,
+          "pelvisHeightMeters": [
+            0.38249515307704784,
+            0.3836180605267579
+          ],
+          "maxGroundPenetrationMeters": 0
+        },
+        "RifleIdleAlt": {
+          "sourceFrames": 52,
+          "sourceBones": 53,
+          "pelvisHeightMeters": [
+            0.38249515307704784,
+            0.3836180605267579
+          ],
+          "maxGroundPenetrationMeters": 0
+        },
+        "RifleRun": {
+          "sourceFrames": 44,
+          "sourceBones": 53,
+          "pelvisHeightMeters": [
+            0.7664333631311003,
+            0.8716421961784364
+          ],
+          "maxGroundPenetrationMeters": 0.0028477638150302964
+        },
+        "CrouchFire": {
+          "sourceFrames": 24,
+          "sourceBones": 53,
+          "pelvisHeightMeters": [
+            0.6201469078684136,
+            0.6211314648272865
+          ],
+          "maxGroundPenetrationMeters": 0
+        },
+        "CrouchFireAlt": {
+          "sourceFrames": 9,
+          "sourceBones": 53,
+          "pelvisHeightMeters": [
+            0.6201968044042587,
+            0.6211274970239294
+          ],
+          "maxGroundPenetrationMeters": 0
+        },
+        "CrouchIdle": {
+          "sourceFrames": 2,
+          "sourceBones": 53,
+          "pelvisHeightMeters": [
+            0.6638924852013587,
+            0.6638924852013588
+          ],
+          "maxGroundPenetrationMeters": 0
+        },
+        "MachineGunFire": {
+          "sourceFrames": 31,
+          "sourceBones": 53,
+          "pelvisHeightMeters": [
+            0.5559723470360041,
+            0.5594103019684553
+          ],
+          "maxGroundPenetrationMeters": 0
+        },
+        "EmplacementIdle": {
+          "sourceFrames": 2,
+          "sourceBones": 53,
+          "pelvisHeightMeters": [
+            0.6194436103105544,
+            0.6194436103105546
+          ],
+          "maxGroundPenetrationMeters": 0
+        },
+        "AttackCommand": {
+          "sourceFrames": 121,
+          "sourceBones": 53,
+          "pelvisHeightMeters": [
+            0.8393186176878574,
+            0.9502504357522233
+          ],
+          "maxGroundPenetrationMeters": 0
+        },
+        "ProneFire": {
+          "sourceFrames": 14,
+          "sourceBones": 53,
+          "pelvisHeightMeters": [
+            0.9618848303911005,
+            0.9658620990812778
+          ],
+          "maxGroundPenetrationMeters": 0
+        },
+        "StandFireCrouch": {
+          "sourceFrames": 2,
+          "sourceBones": 53,
+          "pelvisHeightMeters": [
+            0.31832888114450947,
+            0.3183288811445096
+          ],
+          "maxGroundPenetrationMeters": 0
+        },
+        "StandFireCrouchAlt": {
+          "sourceFrames": 96,
+          "sourceBones": 53,
+          "pelvisHeightMeters": [
+            0.3977996587977819,
+            0.8479242621817119
+          ],
+          "maxGroundPenetrationMeters": 0
+        },
+        "AdvanceKneelFire": {
+          "sourceFrames": 101,
+          "sourceBones": 53,
+          "pelvisHeightMeters": [
+            0.40672071102058227,
+            0.8322859253261787
+          ],
+          "maxGroundPenetrationMeters": 0
+        },
+        "AdvanceFire": {
+          "sourceFrames": 88,
+          "sourceBones": 53,
+          "pelvisHeightMeters": [
+            0.8485704610446977,
+            0.9925316056946034
+          ],
+          "maxGroundPenetrationMeters": 0.0020707269180204046
+        },
+        "PistolFire": {
+          "sourceFrames": 81,
+          "sourceBones": 53,
+          "pelvisHeightMeters": [
+            0.4871411258354783,
+            0.48854615837646387
+          ],
+          "maxGroundPenetrationMeters": 0
+        },
+        "CarryStretcherFront": {
+          "sourceFrames": 25,
+          "sourceBones": 53,
+          "pelvisHeightMeters": [
+            0.8992050676873773,
+            0.9647970958859879
+          ],
+          "maxGroundPenetrationMeters": 0
+        },
+        "CarryStretcherRear": {
+          "sourceFrames": 25,
+          "sourceBones": 53,
+          "pelvisHeightMeters": [
+            0.9211485248840304,
+            0.9925732593126364
+          ],
+          "maxGroundPenetrationMeters": 0.0027957093799889365
+        },
+        "WoundedLimp": {
+          "sourceFrames": 45,
+          "sourceBones": 53,
+          "pelvisHeightMeters": [
+            0.9011687339341162,
+            0.9981294150080668
+          ],
+          "maxGroundPenetrationMeters": 0
         }
       },
-      "pelvisHeightSpreadMeters": 0.830437,
-      "pelvisTrackSource": "3d1f879b",
-      "appearanceRepair": {
-        "revision": "20260906NraEyesShoulders",
-        "sourceSha256": "eefd83935caf62e4195fced7b02edd025570efd1a28c937f1feb625d004b404c",
-        "shoulderVertices": 351,
-        "eyeVertices": 74,
-        "maxShoulderDropMeters": 0.04
-      },
-      "derivedFrom": "TengxianNra02",
-      "builder": "_import/Script_BuildLugouNra06.py",
-      "approved": "2026-09-24",
-      "role": "interpreter",
-      "sourceRevision": "b39cd831",
-      "skeleton": "TengxianHumanoidV1",
-      "pendingStandardization": "Step 2 of Brief_MigrateHumanoidV1: bake Model_TengxianNra06.glb and its facial GLB on TengxianHumanoidV1"
+      "skeleton": "TengxianHumanoidV1"
     }
   ],
   "elapsedSeconds": 726.127,

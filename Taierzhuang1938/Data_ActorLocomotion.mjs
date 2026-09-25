@@ -99,6 +99,39 @@ export const ACTOR_LOCOMOTION_PROFILES = {
       "referenceMps": 0.23864468053263868
     }
   },
+  "TengxianIja06": {
+    "RifleRun": {
+      "duration": 1.466667,
+      "referenceMps": 2.04209,
+      "contacts": {
+        "L": [
+          [
+            0.254237,
+            0.480226
+          ],
+          [
+            0.819209,
+            0.971751
+          ]
+        ],
+        "R": [
+          [
+            0.022599,
+            0.20339
+          ],
+          [
+            0.548023,
+            0.711864
+          ]
+        ]
+      },
+      "source": "Model/Character/Model_TengxianIja06.glb",
+      "sha256": "137ae283403ef39430c15e356dfe70ed07b2ca8a8bb65f217c6b72051dd3fb83"
+    },
+    "RifleCrouchAdvance": {
+      "referenceMps": 0.23864468053263868
+    }
+  },
   "TengxianNra02": {
     "RifleRun": {
       "duration": 1.466667,
@@ -180,6 +213,59 @@ export const ACTOR_LOCOMOTION_PROFILES = {
       },
       "source": "Model/Character/Model_TengxianNra05.glb",
       "sha256": "b85b90fac1843261d40fbf257470a933819a9302dff1727a591feda1a5327b55"
+    },
+    "RifleCrouchAdvance": {
+      "referenceMps": 0.2554529916490837
+    },
+    "BackRifleRun": {
+      "duration": 0.733333,
+      "referenceMps": 2.59972,
+      "contacts": {
+        "L": [
+          [
+            0,
+            0.393258
+          ]
+        ],
+        "R": [
+          [
+            0.449438,
+            0.898876
+          ]
+        ]
+      },
+      "source": "Animation/BackRifleRun/Animation_TengxianNraBackRifleRun.glb",
+      "sha256": "9a81b95623f6228d3162fc1fe72bbac162c5a0ed05ed72bc4eb5c7c5a782efd8"
+    }
+  },
+  "TengxianNra06": {
+    "RifleRun": {
+      "duration": 1.466667,
+      "referenceMps": 2.038773,
+      "contacts": {
+        "L": [
+          [
+            0.248588,
+            0.491525
+          ],
+          [
+            0.80226,
+            0.977401
+          ]
+        ],
+        "R": [
+          [
+            0.022599,
+            0.214689
+          ],
+          [
+            0.542373,
+            0.717514
+          ]
+        ]
+      },
+      "source": "Model/Character/Model_TengxianNra06.glb",
+      "sha256": "440cee221ce31fd124be2e154bda3a3568b1be448d04c159d60ae583122d1b83"
     },
     "RifleCrouchAdvance": {
       "referenceMps": 0.2554529916490837

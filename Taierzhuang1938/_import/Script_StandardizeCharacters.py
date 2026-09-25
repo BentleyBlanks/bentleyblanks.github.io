@@ -19,12 +19,18 @@ REPO = Path(__file__).resolve().parents[2]
 PROJECT = REPO / 'Taierzhuang1938'
 REVISION = 'b3ba06096ae9929a44220b07cdedf86dbba8b197'
 ADOPTED = ('Nra02', 'Nra05', 'Ija01', 'Ija02', 'Ija03')
+# Second source (2026-09-26): the 01-06 refactor / 01-03 storyboard round authored these on the
+# Lugou rigs before this standardization landed. They are read from the storyboard integration
+# head that preceded the merge; the adopted bodies above are byte-identical in both revisions.
+STORYBOARD_REVISION = 'b39cd831066e1e2527389edd504048b4b5120ac6'
+DERIVED = ('Ija06', 'Nra06')        # cast-only looks derived from Ija02 / Nra02 (not adopted appearances)
+FACIAL = ('Ija01Facial', 'Ija02Facial', 'Ija06Facial', 'Nra02Facial', 'Nra05Facial', 'Nra06Facial')   # 13 Face_ bones
 SOURCE_DIR = Path('C:/Users/Bentl/OneDrive/AI/Models/Blender/Tengxian/SharedCharacters')
 WIDTH = {'SCALAR': 1, 'VEC2': 2, 'VEC3': 3, 'VEC4': 4, 'MAT4': 16}
 DTYPE = {5121: '<u1', 5123: '<u2', 5125: '<u4', 5126: '<f4'}
 
-def Source(relative):
-    return subprocess.check_output(['git', '-C', str(REPO), 'show', REVISION + ':Taierzhuang1938/' + relative])
+def Source(relative, revision=REVISION):
+    return subprocess.check_output(['git', '-C', str(REPO), 'show', revision + ':Taierzhuang1938/' + relative])
 
 def Name(name):
     return re.sub(r'^Bip\d+', 'Bip001', name).replace('Lugou', 'Tengxian')
@@ -214,9 +220,9 @@ class Retarget:
                 if name not in ('GroundRoot', 'Bip001 Pelvis'): output[name].translation = canonicalLocal[name].translation
         return output
 
-def BakeModel(identifier, relative=None, destination=None):
+def BakeModel(identifier, relative=None, destination=None, revision=REVISION):
     relative = relative or 'Model/Character/Model_Lugou' + identifier + '.glb'
-    glb = Glb(Source(relative)); source = copy.deepcopy(glb)
+    glb = Glb(Source(relative, revision)); source = copy.deepcopy(glb)
     retarget = Retarget(source, relative.endswith('Infantry.glb'))
     # Biped's exported thigh-under-spine / clavicle-under-neck hierarchy relied
     # on animated joint translations. Use anatomical parents so fixed segment
@@ -310,13 +316,22 @@ def BakeModel(identifier, relative=None, destination=None):
         matrices = [np.array(newWorld[j].inverted()).T.reshape(16) for j in skin['joints']]
         skin['inverseBindMatrices'] = glb.Add(matrices, 'MAT4'); skin['name'] = 'Rig_TengxianHumanoid'
     glb.g['asset']['extras'] = {'skeleton': 'TengxianHumanoidV1', 'unit': 'metre', 'up': '+Y', 'forward': '+Z',
-        'sourceRevision': REVISION, 'sourceAsset': relative, 'bodyReference': 'TengxianNra02'}
+        'sourceRevision': revision, 'sourceAsset': relative, 'bodyReference': 'TengxianNra02'}
+    # A derived look names itself and its base body in the root extras (CharacterModelTest reads the id).
+    variant = glb.g.get('extras', {}).get('lugouVariant')
+    if variant:
+        for key in ('id', 'derivedFrom'):
+            if key in variant: variant[key] = variant[key].replace('Lugou', 'Tengxian')
     glb.g.setdefault('extras', {})['sharedHumanoid'] = {
         'id': 'TengxianHumanoidV1',
         'sourceBindRotations': {name.removeprefix('Bip001 '): QArray(source.world[source.byName[name]].to_quaternion()) for name in bodyNames if name in source.byName},
     }
     BakeClips(glb, source, retarget)
-    if relative.startswith('Model/Character/Model_'):
+    if not glb.g['animations']:
+        # The 13-bone facial derivatives carry no clips: the runtime plays the base body's
+        # animations on them (facialRig.animationsFrom = 'base').
+        del glb.g['animations']
+    elif relative.startswith('Model/Character/Model_'):
         BakeProne(glb)
         GroundClips(glb, glb)
     if relative.endswith('Infantry.glb'):
@@ -476,8 +491,10 @@ def BakeProne(glb):
     glb.g['animations'] = [animation if a['name'] == animation['name'] else a for a in glb.g['animations']]
 
 def BakeStoryLibraries(outputs):
-    for folder, manifestName in [('OpeningStoryboards', 'Data_OpeningStoryboardsAnimation.json'),
-                                 ('MachineGunCaptives', 'Data_MachineGunCaptivesAnimation.json')]:
+    # OpeningStoryboards is no longer retargeted here (2026-09-26): its V5 library solves hand,
+    # partner and wall contacts by IK, so `_import/Script_OpeningStoryboardBake.py` re-authors it
+    # directly on the TengxianHumanoidV1 bodies this script writes (docs/Data_CharacterStandard.md).
+    for folder, manifestName in [('MachineGunCaptives', 'Data_MachineGunCaptivesAnimation.json')]:
         manifest = json.loads(Source('Animation/' + folder + '/' + manifestName))
         manifest['version'] = '20260926' + folder + 'HumanoidV1'
         for row in manifest['models']:
@@ -528,15 +545,25 @@ def BakeStoryLibraries(outputs):
         (PROJECT / 'Animation' / folder / manifestName).write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf8')
 
 def WriteManifest(outputs):
-    manifest = json.loads(Source('Model/Character/Data_LugouCharacterManifest.json'))
-    manifest['models'] = [row for row in manifest['models'] if row['id'].replace('Lugou', '') in ADOPTED]
+    # The storyboard head's manifest is the adopted rows plus the derived looks and the facial
+    # cast (facialUrl / facialCast); every other adopted-row field is the same as in REVISION.
+    manifest = json.loads(Source('Model/Character/Data_LugouCharacterManifest.json', STORYBOARD_REVISION))
+    manifest['models'] = [row for row in manifest['models'] if row['id'].replace('Lugou', '') in (*ADOPTED, *DERIVED)]
     manifest['generatedBy'] = 'Script_StandardizeCharacters.py'; manifest['skeleton'] = 'TengxianHumanoidV1'
     for row in manifest['models']:
         identifier = row['id'].replace('Lugou', ''); glb, source, bounds = outputs[identifier]
         row['id'] = Name(row['id']); row['url'] = Name(row['url'])
-        row['sourceRevision'] = REVISION; row['animationSource'] = 'TengxianHumanoidV1'; row['animationSourceModel'] = 'TengxianNra02'
+        row['sourceRevision'] = STORYBOARD_REVISION if identifier in DERIVED else REVISION
+        row['animationSource'] = 'TengxianHumanoidV1'; row['animationSourceModel'] = 'TengxianNra02'
         row['boneRoles'] = {key: Name(value) for key, value in row['boneRoles'].items()}
-        if 'facialUrl' in row: row['facialUrl'] = Name(row['facialUrl']); row['facialVersion'] = '20260926HumanoidV1'
+        if 'derivedFrom' in row: row['derivedFrom'] = Name(row['derivedFrom'])
+        # Derived looks used to scale to their base body's height; every body now shares the
+        # reference skeleton (bounds below), so the per-look height and bake stamp go.
+        row.pop('scaleHeight', None); row.pop('version', None)
+        if 'facialUrl' in row:
+            row['facialUrl'] = Name(row['facialUrl'])
+            # CharacterSpeechTest: the cache stamp is the facial file's own hash.
+            row['facialVersion'] = hashlib.sha256((PROJECT / row['facialUrl'].removeprefix('./')).read_bytes()).hexdigest()[:16]
         # Runtime target heights use a shared skeleton reference, not hats or hair.
         row['bounds'] = copy.deepcopy(next(r for r in json.loads(Source('Model/Character/Data_LugouCharacterManifest.json'))['models'] if r['id'] == 'LugouNra02')['bounds'])
         row['bytes'] = (PROJECT / row['url'].removeprefix('./')).stat().st_size
@@ -563,7 +590,7 @@ def SaveBlenderSource():
     for action in list(bpy.data.actions): bpy.data.actions.remove(action)
     bpy.data.orphans_purge(do_recursive=True)
     scene = bpy.context.scene; scene.unit_settings.system = 'METRIC'; scene.unit_settings.scale_length = 1
-    for identifier in (*ADOPTED, 'Nra05Facial'):
+    for identifier in (*ADOPTED, *DERIVED, *FACIAL):
         before = set(bpy.data.objects)
         bpy.ops.import_scene.gltf(filepath=str(PROJECT / 'Model/Character' / ('Model_Tengxian' + identifier + '.glb')))
         collection = bpy.data.collections.new('Character_Tengxian' + identifier); scene.collection.children.link(collection)
@@ -577,8 +604,9 @@ def SaveBlenderSource():
         collection.hide_viewport = identifier != 'Nra02'; collection.hide_render = identifier != 'Nra02'
     scene['SharedSkeletonContract'] = 'Model/Character/Data_TengxianHumanoid.json'
     scene['SourceRevision'] = REVISION
+    scene['StoryboardSourceRevision'] = STORYBOARD_REVISION
     rigs = [obj for obj in bpy.data.objects if obj.type == 'ARMATURE']
-    assert len(rigs) == 6, 'One armature per adopted body or facial derivative'
+    assert len(rigs) == len(ADOPTED) + len(DERIVED) + len(FACIAL), 'One armature per body, derived look or facial derivative'
     referenceRig = bpy.data.objects['Rig_TengxianNra02']
     audit = []
     for rig in rigs:
@@ -587,8 +615,9 @@ def SaveBlenderSource():
         difference = max(abs(referenceRig.data.bones[bone.name].matrix_local[i][j] - bone.matrix_local[i][j]) for bone in rig.data.bones if bone.name in referenceRig.data.bones for i in range(4) for j in range(4))
         assert difference < 3e-6
         audit.append({'rig': rig.name, 'bones': len(rig.data.bones), 'maxBodyRestDifference': difference})
-    (SOURCE_DIR / 'Data_TengxianSharedCharacters.json').write_text(json.dumps(audit, indent=2) + '\n', encoding='utf8')
-    bpy.ops.wm.save_as_mainfile(filepath=str(SOURCE_DIR / 'Model_TengxianSharedCharacters.blend'))
+    # 2026-09-26: saved beside (not over) the first standardization's Model_TengxianSharedCharacters.blend.
+    (SOURCE_DIR / 'Data_TengxianSharedCharactersStoryboard.json').write_text(json.dumps(audit, indent=2) + '\n', encoding='utf8')
+    bpy.ops.wm.save_as_mainfile(filepath=str(SOURCE_DIR / 'Model_TengxianSharedCharactersStoryboard.blend'))
 
 def WriteShoulderAudit(outputs):
     references = json.loads(Source('_blender/Data_NraRelaxedShoulderReference.json'))
@@ -704,8 +733,9 @@ def Main(skipBodies=False):
     assert bpy.context.scene.get('BlenderMcpTask') == 'CharacterStandardization', 'Use the isolated task BlenderMCP instance'
     SOURCE_DIR.mkdir(parents=True, exist_ok=True)
     outputs = {}
-    for identifier in (*ADOPTED, 'Nra05Facial'):
-        outputs[identifier] = (Glb((PROJECT / 'Model/Character' / ('Model_Tengxian' + identifier + '.glb')).read_bytes()), Glb(Source('Model/Character/Model_Lugou' + identifier + '.glb')), None) if skipBodies else BakeModel(identifier)
+    for identifier in (*ADOPTED, *DERIVED, *FACIAL):
+        revision = REVISION if identifier in ADOPTED else STORYBOARD_REVISION
+        outputs[identifier] = (Glb((PROJECT / 'Model/Character' / ('Model_Tengxian' + identifier + '.glb')).read_bytes()), Glb(Source('Model/Character/Model_Lugou' + identifier + '.glb', revision)), None) if skipBodies else BakeModel(identifier, revision=revision)
         print('Baked', identifier, flush=True)
     for identifier in ('Nra02', 'Ija01', 'Ija02', 'Ija03'):
         source = 'Model/Character/Animation_Lugou' + identifier + 'Infantry.glb'
