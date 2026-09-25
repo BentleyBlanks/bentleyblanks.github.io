@@ -203,7 +203,10 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // back to the camera looking east, the wounded comrade against the south wall with his face turned to the room.
     yaowa:P(-.55,-127.35,-150*Math.PI/180), comradeSeat:P(.35,-124.35,30*Math.PI/180), luo:P(1.75,-125.7,-Math.PI/2),
     he:P(4.6,-125.3), liu:P(6.1,-124.4), shouter:P(8.6,-122.9),
-    // Luo's kneel until his order (LuoKneelCheck held inside its kneel loop, pendingWiring SB01).
+    // Luo's kneel until his order (LuoKneelCheck held inside its kneel loop, pendingWiring SB01). Why he stood before:
+    // in Banter/Orders ResolveOpeningActorPose (Script_OpeningActorPerformance) turns a stationary Luo's pose into
+    // MessengerReport / PointBlockade (standing) unless the clip is in ContactClips, and the director's Move hands the
+    // native layer kneel:0 (Script_OpeningStoryboardAnimation). LuoKneelCheck is a contact clip, so it is kept.
     luoKneelS:1.6,
     // SB01 camera (eye = shunzi.seat) and the talk's head turn toward whoever speaks (clamped, eased).
     seatShot:Object.freeze({ yawDeg:-93, pitchDeg:-15, speakerTurnRad:.14, turnRps:2 }),
@@ -305,7 +308,7 @@ export const OPENING_STORYBOARDS = Object.freeze({
     {shot:"SB01", what:"the runner leans on the north post and calls in to the room",
       now:"MessengerReport at runnerRoute's end (PhaseOrders)", wave2:"RunnerLeanPostCall holdLoop with its post contact (Anim)"},
     {shot:"SB01", what:"Luo kneels in the mouth looking out down the trench",
-      now:"LuoKneelCheck held at banter.luoKneelS (its kneel loop; the reach arm shows) in Tableau/PhaseOrders", wave2:"a native kneel (KneelHold/RifleIdle, contract §4.1) through the Anim layer's pose request"},
+      now:"LuoKneelCheck held at banter.luoKneelS (its kneel loop; the reach arm shows) in Tableau/PhaseOrders", wave2:"a native kneel (KneelHold/RifleIdle, contract §4.1): needs an Anim-owned hook -- a director request that passes kneel:1 through Script_OpeningStoryboardAnimation's Move state (now forced to 0) and is exempt from ResolveOpeningActorPose's Banter/Orders Luo substitution"},
     {shot:"SB01", what:"first person: clip on the left palm, rifle across the thighs, legs in view",
       now:"supply hands holding the loading rifle across the view (Script_OpeningFirstPerson)", wave2:"EXTRA_HAND_POSES.palmClip, FP_PROPS.loadingRifleOnLegs and LEG_POSES.sitForward in beats.Banter/Orders (Eye)"},
     {shot:"SB01", what:"north-wall crate stack, foreground crate, duckboards and revetment of the front trench",
