@@ -1624,6 +1624,10 @@ export class FirstLevelMissionRuntime {
         if (i === FACED_FRONT_GUARD_INDEX) actor.speakerRole = "guard";
         InstallMissionSentry(actor);this.Defend(actor,actor.position,0,0);
         actor.scriptedNoncombatant=true;
+        // Protected from the first frame (FrontBattle.UpdateGuards rewrites it every frame once 03 runs): the 03
+        // backslope LMG pair spawns 8 m below the crest the assault line holds, and one enemy locked it for the AI
+        // tick before the first UpdateGuards (EnemyIdleProbe hunters [26], 09-25).
+        actor.missionUntargetable=true;
         this.ai.SetStance(actor,2,Infinity,true);
         this.guards.push({
           actor,
