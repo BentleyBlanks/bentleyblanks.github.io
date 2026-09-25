@@ -12,6 +12,8 @@
 //   ⑦ 卡住兜底（2026-09-24 审查的两次冷启动卡死）：走路卡在一个中间点不动 → 跳点；接防班长期卡住、有人阵亡
 //      也照样记 reliefInPosition；罗班长被枪座挡住 → 玩家在后墙岔口等够 rearLeaderGraceS 照样 rightRearReached；
 //      受保护的待撤守军身边不落手榴弹（任务侧投弹否决）
+//   ⑧ 近处说话人不在画面里：台词等他走进画面；太近就退开
+//   ⑨ 走路线的人（罗班长）在 FIRE 里被换位命令的 0.6 m 到位半径钉在路线拐点前 0.58 m（后门坡道）：Script_Ai.Act 用路线的半径
 //
 // 跑法：node Taierzhuang1938/Script_FirstLevelFrontPacingTest.mjs
 // ===========================================================================
@@ -19,6 +21,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import vm from "node:vm";
+import { COVER_CYCLE } from "./Data_Tuning_AiCover.mjs";
 import { FirstLevelFrontBattle, ColumnDeparture, BatchPastGap, SplitRoute, GuardClearOfGap } from "./Script_FirstLevelFrontBattle.mjs";
 import { FirstLevelFrontScenes, FRONT_SCENE_IDS, FrontSceneSpeakers, ProjectToView, InPicture, CameraPose, StepCandidates, SegmentDistance } from "./Script_FirstLevelFrontScenes.mjs";
 import { DialoguePlayer } from "./Script_DialoguePlayer.mjs";
@@ -667,6 +671,33 @@ function WalkRuntime(extra = {}) {
   }
   checks += 58;
   Ok("⑧ near speaker out of the picture: line held <= speakerViewHoldS, he steps into view; one too near steps back; far shouts and Node runs unaffected");
+}
+
+{
+  // ⑨ Route walker vs a combat state's arrival radius (2026-09-25 relay r2 Front step 2). FIRE's displace order sets
+  // moveArriveM 0.6 m; Script_Ai.Act replaced the order with the route goal but kept that radius, so Luo stood 0.58 m
+  // short of the 0.25 m rear-door corner (29.7,-145.6) until the displace timed out or Walk skipped the corner
+  // (LuoRamp probe: 4 of 16 live 05->06 trials held 4-6 s at (29.7,-145.0) / (27.7,-149.1)). Runs the real Act block.
+  const source = fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), "Script_Ai.mjs"), "utf8").replace(/\r/g, "");
+  const block = source.slice(source.indexOf("    // P012 route followers"), source.indexOf("    let targetYaw = null;"));
+  assert.ok(block.includes("this.StepBody"), "the Act movement block is where the test expects it");
+  const Act = vm.runInNewContext(`(function(s,dt){let desired=s.goal,speed=2.6,stepped=false,wantedYaw=0;${block}return {stepped};})`,
+    { Clamp01: (v) => Math.max(0, Math.min(1, v)), COVER_CYCLE });
+  const Vec = () => ({ x: 0, y: 0, z: 0, copy(p) { this.x = p.x; this.y = p.y || 0; this.z = p.z; return this; }, set(x, y, z) { this.x = x; this.y = y; this.z = z; return this; } });
+  const Run = (guided) => {
+    const s = { p012Guided: guided, scriptMoveSpeedMps: guided ? R.squadSpeedMps : undefined, position: { x: 29.66, y: 0, z: -145.02 },
+      goal: { x: 29.7, y: 0, z: -145.6 }, scriptArrivalRadius: B.arrivalM * .25 * .5, moveArriveM: 0.6, stance: 1,
+      detourTime: 0, stuckTime: 0, rnd: () => .5 };
+    const host = { ctx: { nav: null }, tmpD: Vec(), navOut: { x: 0, z: 0 }, time: 0, SetStance() {}, TryVault: () => false,
+      StepBody(a, dx, dz) { a.position.x += dx; a.position.z += dz; } };
+    for (let i = 0; i < 120; i++) Act.call(host, s, 1 / 60);
+    return Math.hypot(s.position.x - s.goal.x, s.position.z - s.goal.z);
+  };
+  const walker = Run(true), ordinary = Run(false);
+  assert.ok(walker < B.arrivalM * .25, `a route walker reaches the 0.25 m corner through a 0.6 m displace radius (left ${walker.toFixed(3)} m)`);
+  assert.ok(ordinary > .5, `an ordinary soldier still stops on his own order's 0.6 m radius (left ${ordinary.toFixed(3)} m)`);
+  checks += 3;
+  Ok("⑨ a route walker in FIRE walks to his corner, not to the displace order's 0.6 m radius");
 }
 
 console.log(`FirstLevelFrontPacingTest 通过：${checks} 条断言`);
