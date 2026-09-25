@@ -1,14 +1,23 @@
 import * as THREE from 'three';
 import { CHARACTER_SPEECH as C } from './Data_Tuning_CharacterSpeech.mjs';
+import { CharacterFaceBlood } from './Script_CharacterFaceBlood.mjs';
 
 // Face-only layer on the Face_* bones baked by _import/Script_BakeCharacterFacial.py.
 // Runs after the body mixer and never replaces body clips. Every pose is stored as
 // a delta from Rest in the bone's parent (Head-local) frame and blended additively:
 //   jaw*Open + wide*Wide + round*Round + close*Close + blink*Blink + brow*BrowUp
-//   + snarl*Snarl + dead*DeadSlack
+//   + snarl*Snarl + shock*Shock + pain*Pain + shout*Shout + grit*Grit + dead*DeadSlack
 // A speech sample is either a baked face track {jaw, wide, round, close, stress}
 // or, as fallback, the runtime envelope {level, brightness}.
-const POSES = ['Open', 'Wide', 'Round', 'Close', 'Blink', 'BrowUp', 'Snarl', 'DeadSlack'];
+// Acting expressions (01-03 storyboard contract section 4.2) are targets in
+// this.expression {snarl, shock, pain, shout, grit} (0-1), eased by
+// Data_Tuning_CharacterSpeech.expressionBlendS; speech is layered on top of them
+// and keeps opening and shutting the jaw (expressionTalkJawYield).
+const POSES = ['Open', 'Wide', 'Round', 'Close', 'Blink', 'BrowUp', 'Snarl', 'Shock', 'Pain', 'Shout', 'Grit', 'DeadSlack'];
+export const FACIAL_EXPRESSIONS = Object.freeze(['snarl', 'shock', 'pain', 'shout', 'grit']);
+const EXPRESSION_POSE = Object.freeze({ snarl: 'Snarl', shock: 'Shock', pain: 'Pain', shout: 'Shout', grit: 'Grit' });
+const EXPRESSION_POSES = new Set(Object.values(EXPRESSION_POSE));
+const ZeroExpression = () => Object.fromEntries(FACIAL_EXPRESSIONS.map(name => [name, 0]));
 const Clamp01 = value => Math.min(1, Math.max(0, value));
 const Smooth = (e0, e1, x) => { const t = Clamp01((x - e0) / (e1 - e0)); return t * t * (3 - 2 * t); };
 const Approach = (value, target, dt, riseS, fallS) =>
@@ -29,7 +38,14 @@ export class CharacterFacialAnimation {
   constructor(root, definition, { seed = 0 } = {}) {
     this.source = null;       // () => speech sample | null (set by the speaker binder)
     this.gaze = null;         // THREE.Vector3 | () => THREE.Vector3 | null (world point)
-    this.expression = null;   // { snarl } optional acting override
+    this.root = root;
+    // Acting expression targets (0-1), writable as a whole (the setter) or through SetExpression.
+    this._expression = ZeroExpression();
+    this.expressionWeights = ZeroExpression(); // eased weights actually applied
+    this.expressionBlend = {};                  // per-expression blend seconds from the last SetExpression
+    this._warnedPoses = new Set();
+    this.talk = 0;                              // 0-1: eased "this face is speaking"
+    this.faceBlood = null;                      // CharacterFaceBlood, made on first use
     this.random = Random(seed);
     this.time = 0; this.lastSpeech = null; this.speaking = false;
     this.jaw = 0; this.wide = 0; this.round = 0; this.close = 0; this.brow = 0; this.stress = 0;
@@ -52,9 +68,9 @@ export class CharacterFacialAnimation {
         const dp = new THREE.Vector3().fromArray(data.translation).sub(position);
         const dq = inverse.clone().multiply(new THREE.Quaternion().fromArray(data.rotation));
         const moves = dp.lengthSq() > 1e-12, turns = 1 - Math.abs(dq.w) > 1e-9;
-        if (moves || turns) deltas.push({ pose, dp: moves ? dp : null, dq: turns ? dq : null });
+        if (moves || turns) deltas.push({ pose, dp: moves ? dp : null, dq: turns ? dq : null, expression: EXPRESSION_POSES.has(pose) });
       }
-      return { name, bone, position, quaternion, deltas };
+      return { name, bone, position, quaternion, deltas, jaw: name === 'Face_Jaw' };
     });
     this.poses = new Set(POSES.filter(pose => definition.poses[pose]));
     const eyes = definition.eyes;
@@ -70,10 +86,70 @@ export class CharacterFacialAnimation {
     this._p = new THREE.Vector3(); this._target = new THREE.Vector3(); this._id = new THREE.Quaternion();
   }
 
+  /** Model id for error messages (CharacterRig names its root Rigged_<modelId>). */
+  _Name() { return String(this.root?.name || 'unnamed face').replace(/^Rigged_/, ''); }
+
   _BlinkGap() { return C.blinkMinS + (C.blinkMaxS - C.blinkMinS) * this.random(); }
 
   /** Start a blink now unless one is running. */
   Blink() { if (this.blinkAge < 0) this.blinkAge = 0; }
+
+  /** Expression targets {snarl, shock, pain, shout, grit} (0-1). */
+  get expression() { return this._expression; }
+  /**
+   * Whole-object write (may be partial or frozen: the missing fields go to 0). It
+   * eases every expression over Data_Tuning_CharacterSpeech.expressionBlendS: blend
+   * times left by an earlier SetExpression(..., blendS) are dropped.
+   */
+  set expression(value) {
+    const next = ZeroExpression();
+    for (const [name, target] of Object.entries(value && typeof value === 'object' ? value : {})) next[name] = this._Target(name, target);
+    this._expression = next; this.expressionBlend = {};
+  }
+
+  /** Validated target: a known expression whose pose this face has (no silent no-op on a stale GLB). */
+  _Target(name, value) {
+    if (!EXPRESSION_POSE[name]) throw new Error(`Unknown facial expression "${name}" (${FACIAL_EXPRESSIONS.join(', ')})`);
+    const target = Clamp01(Number(value) || 0);
+    if (target > 0 && !this.poses.has(EXPRESSION_POSE[name])) {
+      throw new Error(`Facial rig ${this._Name()} has no ${EXPRESSION_POSE[name]} pose for expression "${name}" (stale facial GLB?)`);
+    }
+    return target;
+  }
+
+  /**
+   * Set some expression targets (0-1); the others keep theirs. blendS, when given,
+   * is the time for a full 0 -> 1 swing of the named expressions (0 = snap) and stays
+   * with them until the next SetExpression without blendS or a whole-object write;
+   * otherwise they ease over Data_Tuning_CharacterSpeech.expressionBlendS.
+   */
+  SetExpression(partial = {}, blendS) {
+    const next = { ...ZeroExpression(), ...this._expression };
+    const entries = Object.entries(partial || {}).map(([name, value]) => [name, this._Target(name, value)]);
+    for (const [name, target] of entries) {
+      next[name] = target;
+      if (Number.isFinite(blendS)) this.expressionBlend[name] = Math.max(0, blendS);
+      else delete this.expressionBlend[name];
+    }
+    this._expression = next;
+    return this;
+  }
+
+  /** Blood on this face, 0-1 (Script_CharacterFaceBlood). Throws when amount > 0 finds no skin to paint. */
+  SetFaceBlood(amount) {
+    this.faceBlood ||= new CharacterFaceBlood(this.root);
+    const took = this.faceBlood.Set(amount);
+    if (!took && this.faceBlood.amount > 0) {
+      throw new Error(`Facial rig ${this._Name()}: SetFaceBlood found no face skin surface`);
+    }
+    return took;
+  }
+
+  /** Make the blood materials now (amount 0) so the first SetFaceBlood does not link a program mid-scene. */
+  PrepareFaceBlood() {
+    this.faceBlood ||= new CharacterFaceBlood(this.root);
+    return this.faceBlood.Prepare();
+  }
 
   Update(dt, state = {}) {
     const step = Math.max(0, dt || 0); this.time += step;
@@ -85,7 +161,9 @@ export class CharacterFacialAnimation {
     let jaw = 0, wide = 0, round = 0, close = 0, stress = 0;
     if (active) {
       if (Number.isFinite(speech.jaw)) {
-        jaw = speech.jaw; wide = speech.wide || 0; round = speech.round || 0; close = speech.close || 0;
+        // Track lip shapes are mostly .1-.5; the gains make the 1 m corner/lip shapes of the rigs read.
+        jaw = speech.jaw; wide = Clamp01((speech.wide || 0) * C.trackWideGain);
+        round = Clamp01((speech.round || 0) * C.trackRoundGain); close = Clamp01((speech.close || 0) * C.trackCloseGain);
         stress = speech.stress || 0;
       } else {
         const level = speech.level || 0, bright = Smooth(C.fallbackWideFrom, C.fallbackWideTo, speech.brightness || 0);
@@ -123,6 +201,20 @@ export class CharacterFacialAnimation {
     this.stressHigh = stress > .5;
     this.brow *= Math.exp(-step / C.browDecayS);
     this.stress *= Math.exp(-step / C.browDecayS);
+    this.talk = Approach(this.talk, active ? 1 : 0, step, C.talkBlendS, C.talkBlendS);
+    // Expressions: linear ease toward the targets, a full swing in blendS.
+    const targets = this._expression || {};
+    for (const name of FACIAL_EXPRESSIONS) {
+      const target = Clamp01(Number(targets[name]) || 0), current = this.expressionWeights[name];
+      // A field written directly (rig.facial.expression.snarl = 1) skips the setter's check: report once.
+      if (target > 0 && !this.poses.has(EXPRESSION_POSE[name]) && !this._warnedPoses.has(name)) {
+        this._warnedPoses.add(name);
+        console.error(`[CharacterFacial] ${this._Name()} has no ${EXPRESSION_POSE[name]} pose; expression "${name}" shows nothing`);
+      }
+      const blend = this.expressionBlend[name] ?? C.expressionBlendS;
+      this.expressionWeights[name] = blend <= 0 ? target
+        : current + Math.sign(target - current) * Math.min(Math.abs(target - current), step / blend);
+    }
     if (this.pendingBlinkS >= 0) { this.pendingBlinkS -= step; if (this.pendingBlinkS < 0) this.Blink(); }
     // Seeded blink rhythm.
     this.nextBlinkS -= step;
@@ -142,14 +234,20 @@ export class CharacterFacialAnimation {
     } else this.dead = 0;
     const w = this.weights;
     const alive = 1 - this.dead;
-    w.Open = this.jaw * alive; w.Wide = this.wide * alive; w.Round = this.round * alive; w.Close = this.close * alive;
+    w.Open = this.jaw * alive; w.Round = this.round * alive; w.Close = this.close * alive;
+    // A stressed syllable also pulls the corners back (decays with the brows, lets go with the jaw).
+    const cornerPull = C.stressCornerPull * this.stress * Clamp01(this.jaw / C.stressCornerPullFullJaw);
+    w.Wide = Math.min(1, this.wide + cornerPull) * alive;
     w.Blink = blink * alive; w.BrowUp = this.brow * alive;
-    w.Snarl = Clamp01(this.expression?.snarl || 0) * alive; w.DeadSlack = this.dead * C.deadSlackWeight;
+    for (const name of FACIAL_EXPRESSIONS) w[EXPRESSION_POSE[name]] = this.expressionWeights[name] * alive;
+    w.DeadSlack = this.dead * C.deadSlackWeight;
+    // While talking the expressions give most of their jaw drop to the speech.
+    const expressionJaw = 1 - C.expressionTalkJawYield * this.talk;
     for (const control of this.controls) {
       const { bone, position, quaternion, deltas } = control;
       bone.position.copy(position); bone.quaternion.copy(quaternion);
       for (const delta of deltas) {
-        const weight = w[delta.pose];
+        const weight = control.jaw && delta.expression ? w[delta.pose] * expressionJaw : w[delta.pose];
         if (!(weight > 1e-4)) continue;
         if (delta.dp) bone.position.addScaledVector(delta.dp, weight);
         if (delta.dq) bone.quaternion.multiply(this._q.copy(this._id).slerp(delta.dq, Math.min(weight, 1.5)));
@@ -195,15 +293,43 @@ export class CharacterFacialAnimation {
   State() {
     return { speaking: this.speaking, jaw: this.jaw, wide: this.wide, round: this.round, close: this.close,
       brow: this.brow, blink: this.weights.Blink, dead: this.dead, yaw: this.yaw, pitch: this.pitch,
-      poses: [...this.poses], eyes: this.eyes.length };
+      poses: [...this.poses], eyes: this.eyes.length, talk: this.talk,
+      expression: { ...this.expressionWeights }, faceBlood: this.faceBlood?.amount ?? 0 };
   }
 
   Reset() {
-    this.source = null; this.gaze = null; this.expression = null;
-    this.jaw = this.wide = this.round = this.close = this.brow = this.stress = this.dead = 0;
+    this.source = null; this.gaze = null;
+    this._expression = ZeroExpression(); this.expressionWeights = ZeroExpression(); this.expressionBlend = {};
+    this.faceBlood?.Dispose(); this.faceBlood = null;
+    this.jaw = this.wide = this.round = this.close = this.brow = this.stress = this.dead = this.talk = 0;
     this.blinkAge = -1; this.speaking = false; this.lastSpeech = null; this.level = 0; this.yaw = this.pitch = 0;
     for (const w of Object.keys(this.weights)) this.weights[w] = 0;
     for (const { bone, position, quaternion } of this.controls) { bone.position.copy(position); bone.quaternion.copy(quaternion); }
     for (const eye of this.eyes) eye.bone.quaternion.copy(eye.rest);
   }
 }
+
+/** The face layer of a character rig, an actor (actor.characterRig) or the layer itself. */
+function FacialOf(target) {
+  if (target instanceof CharacterFacialAnimation) return target;
+  return target?.facial ?? target?.characterRig?.facial ?? target?.actor?.characterRig?.facial ?? null;
+}
+function RequireFacial(target, what) {
+  const facial = FacialOf(target);
+  if (!facial) throw new Error(`CharacterFacial.${what}: ${target?.modelId ?? target?.characterRig?.modelId ?? 'this rig'} has no facial rig`);
+  return facial;
+}
+
+// Director-facing face controls (01-03 storyboard contract section 4.2). `rig` is a
+// CharacterRig (rig.facial), an actor, or the CharacterFacialAnimation itself; a rig
+// without a face throws (the speaking cast always has one: Data_FirstLevelSpeakingCast).
+export const CharacterFacial = Object.freeze({
+  EXPRESSIONS: FACIAL_EXPRESSIONS,
+  Of: FacialOf,
+  /** Partial update of {snarl, shock, pain, shout, grit} targets (0-1); blendS = full-swing time. */
+  SetExpression(rig, partial, blendS) { return RequireFacial(rig, 'SetExpression').SetExpression(partial, blendS); },
+  /** Face blood 0-1 (the captive comrade). Throws when amount > 0 finds no face skin. */
+  SetFaceBlood(rig, amount) { return RequireFacial(rig, 'SetFaceBlood').SetFaceBlood(amount); },
+  /** Build the blood materials ahead of time (amount 0). */
+  PrepareFaceBlood(rig) { return RequireFacial(rig, 'PrepareFaceBlood').PrepareFaceBlood(); },
+});

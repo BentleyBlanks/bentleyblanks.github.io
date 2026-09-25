@@ -267,7 +267,8 @@ const MODEL_FORWARD_YAW = Math.PI;
 // 2026-09-23: facialUrl/facialVersion/facialCast for NRA02/IJA01/IJA02 (GLBs unchanged: ASSET_VERSION stays).
 // 2026-09-24: IJA06 (standard rifleman) and NRA06 (interpreter) records; review fixes add
 // per-record version, scaleHeight and loadOnDemand (NRA06 is not a boot download).
-const MANIFEST_URL = "./Model/Character/Data_LugouCharacterManifest.json?v=202609241600";
+// 2026-09-25: six facial GLBs re-baked (facialVersion only; Face package, 01-03 storyboard round).
+const MANIFEST_URL = "./Model/Character/Data_LugouCharacterManifest.json?v=202609251800";
 const ASSET_VERSION = "202609061026";
 const DEATH_COLLAPSE_ASSET_VERSION = "202609151352";
 const DEATH_COLLAPSE_PLAYBACK_RATE = 1.6;
