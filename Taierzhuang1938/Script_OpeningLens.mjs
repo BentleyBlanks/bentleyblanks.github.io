@@ -7,15 +7,21 @@
 //     (lens null: the object is returned untouched — nothing of 01–02 survives outside it).
 // Looks and curves live in Data_OpeningLens. The flash and the mud are HUD layers (Script_Hud.SetLens).
 //
-// events = { now, blastAt, buttHit, clearAt, concussion } — times on the mission clock (r.time); any may
-// be missing (the channel then shows its `before` value). Debug: Tengxian.Debug.OpeningLens.Force(look, age).
-import { LENS_DEFAULT, LOOKS, PHASE_LOOKS, LOOK_BLEND_S } from "./Data_OpeningLens.mjs";
+// events = { now, blastAt, impactAt?, buttHit, clearAt, concussion } — times on the mission clock (r.time); any
+// may be missing (the channel then shows its `before` value; a phase that runs on without the event it waits
+// for says so once on the console, see EVENT_WAITS). Debug: Tengxian.Debug.OpeningLens.Force(look, age).
+import { LENS_DEFAULT, LOOKS, PHASE_LOOKS, LOOK_BLEND_S, SHELL_FLIGHT_S } from "./Data_OpeningLens.mjs";
 
 const Clamp01 = v => Math.max(0, Math.min(1, v));
 const Smooth = t => { const x = Clamp01(t); return x * x * (3 - 2 * x); };
 const Lerp = (a, b, t) => a + (b - a) * t;
 // A lens sampled longer ago than this is not a crossfade source.
 const STALE_S = 0.25;
+// The phase whose look waits on an event, and how long into the phase that event is overdue (s): Blast's
+// near miss starts with the phase; Butt's hold before the strike is ≥ 0.4 s (contract §4.2) and the strike
+// comes well inside 8 s; Found waits for ijaA to walk up (well under 15 s). Past that the look is stuck on its
+// `before` value — a renamed or retimed director event — and the driver warns once.
+export const EVENT_WAITS = Object.freeze({ Blast: Object.freeze(["blastAt", 1]), Butt: Object.freeze(["buttHit", 8]), Found: Object.freeze(["clearAt", 15]) });
 
 /** Linear through [[t, v], ...], held past both ends. */
 export function SampleKeys(keys, t) {
@@ -31,7 +37,8 @@ export function SampleKeys(keys, t) {
 /** Seconds on each clock (null = that event has not happened). */
 function Clocks(age, events = {}) {
   const now = events.now, Since = at => (now != null && at != null && now >= at ? now - at : null);
-  return { phase: age ?? 0, blast: Since(events.blastAt), buttHit: Since(events.buttHit), clearAt: Since(events.clearAt) };
+  const impactAt = events.impactAt ?? (events.blastAt != null ? events.blastAt + SHELL_FLIGHT_S : null);
+  return { phase: age ?? 0, blast: Since(events.blastAt), impact: Since(impactAt), buttHit: Since(events.buttHit), clearAt: Since(events.clearAt) };
 }
 
 function Channel(spec, fallback, clocks, events) {
@@ -96,6 +103,7 @@ export function BlendLens(a, b, t) {
 export class OpeningLensDriver {
   constructor() {
     this.look = null; this.since = 0; this.from = null; this.last = null; this.lastNow = null; this.forced = null; this.enabled = true;
+    this.warnings = []; this.warned = new Set();
     this.Attach();
   }
   /** (Re)hang the bench on Tengxian.Debug — the page may build its Debug table after the runtime. */
@@ -132,6 +140,12 @@ export class OpeningLensDriver {
     this.lastNow = now; this.lastPhase = phase;
     const name = LookForPhase(phase);
     if (!name) { this.look = null; this.from = null; return (this.last = null); }
+    const wait = EVENT_WAITS[phase];
+    if (wait && (age ?? 0) > wait[1] && events[wait[0]] == null && !this.warned.has(phase)) {
+      this.warned.add(phase);
+      const message = `[OpeningLens] ${phase} has run ${(age ?? 0).toFixed(1)} s without ${wait[0]}: the ${name} look holds its before value`;
+      this.warnings.push(message); console.warn(message);
+    }
     // Crossfade only from what was really on screen a moment ago (a stale snapshot — frames stepped without
     // rendering, a paused tab — would drag an old look into the new one).
     const fresh = this.last && !this.last.forced && this.lastSampleAt != null && now - this.lastSampleAt <= STALE_S;

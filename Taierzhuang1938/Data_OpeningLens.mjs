@@ -11,6 +11,8 @@
 // A channel is either a number, or { clock, keys:[[t, v], ...], before?, byConcussion? }:
 //   clock "phase"   — seconds since the director's phase began (the `age` argument);
 //         "blast"   — seconds since the near miss (events.blastAt: FirstLevelOpening.BunkerBlast, the start of Blast);
+//         "impact"  — seconds since the shell lands (events.impactAt when the director hands it; otherwise
+//                     blastAt + SHELL_FLIGHT_S);
 //         "buttHit" — seconds since the rifle butt lands (events.buttHit: the director's strikeAt, clip contact "strike");
 //         "clearAt" — seconds since ijaA stops over the trap (events.clearAt: the director's flags.clearAt, Found).
 //   keys are linear between points and held past both ends. `before` is used while that event has not
@@ -40,9 +42,10 @@ export const LENS_DEFAULT = Freeze({
 // Crossfade between looks when the phase changes (s).
 export const LOOK_BLEND_S = 0.6;
 
-// The shell's flight after Blast begins (Script_OpeningStoryboards.Blast: FireShell flight .22 s) — the
-// optical hit starts when it lands, not when the phase starts.
-const IMPACT_S = 0.22;
+// The shell's flight after Blast begins (Script_OpeningStoryboards.Blast: FireShell {flight:.22}) — the optical
+// hit starts when it lands, not when the phase starts. Used only while the director does not hand
+// events.impactAt; Script_OpeningLensTest reads the director's FireShell flight and fails if they drift apart.
+export const SHELL_FLIGHT_S = 0.22;
 
 // Blood edge corners [top-left, top-right, bottom-left, bottom-right] (SB03: 「右上与左侧偏重」).
 const WITNESS_CORNERS = Freeze([0.85, 1.0, 0.8, 0.3]);
@@ -55,9 +58,9 @@ export const LOOKS = Freeze({
   // 1.5 s; edges dragged outward (radial blur); heavier vignette.
   nearMiss: Freeze({
     blendInS: 0.05,
-    aberration: K("blast", [[IMPACT_S, 0.0022], [IMPACT_S + 0.06, 0.02], [IMPACT_S + 1.5, 0.0022]]),
-    radialBlur: K("blast", [[IMPACT_S, 0], [IMPACT_S + 0.06, 0.055], [IMPACT_S + 0.75, 0.032], [IMPACT_S + 1.6, 0]]),
-    vignette: K("blast", [[IMPACT_S, 0.42], [IMPACT_S + 0.1, 0.8], [IMPACT_S + 2.4, 0.55]]),
+    aberration: K("impact", [[0, 0.0022], [0.06, 0.02], [1.5, 0.0022]]),
+    radialBlur: K("impact", [[0, 0], [0.06, 0.055], [0.75, 0.032], [1.6, 0]]),
+    vignette: K("impact", [[0, 0.42], [0.1, 0.8], [2.4, 0.55]]),
   }),
   // SB03 lying in the mud watching the group (Wake → Wipe): blood-red corners ~0.3 fading in with the
   // concussion, near depth of field 0.5 focused ~3.8 m (foreground 0.3–1 m soft), mud on the lens.
@@ -96,14 +99,15 @@ export const LOOKS = Freeze({
   }),
   // Dragged out to the butt position (Drag → DragOut): SB04 has no red edge before the strike.
   dragged: Freeze({ blendInS: 0.8, aberration: 0.003, vignette: 0.5, desaturate: 0.05 }),
-  // SB04 butt strike (Butt): white flash 0.08 s when the butt lands, then the red edge and a short
-  // aberration kick.
+  // SB04 butt strike (Butt): white flash 0.08 s when the butt lands and a short aberration kick. The
+  // storyboard frame is otherwise clean: no red edge of the lens's own, and the director's HUD blood layer
+  // (0.92 after the strike) is capped to 0.5 once the flash has gone (review 09-25: the frame read all red).
   butt: Freeze({
     blendInS: 0.4,
     vignette: 0.48,
     flash: K("buttHit", [[0, 0.92], [0.08, 0.92], [0.2, 0]], { before: 0 }),
     aberration: K("buttHit", [[0, 0.014], [0.9, 0.0022]], { before: 0.0022 }),
-    bloodEdge: Freeze({ strength: K("buttHit", [[0.05, 0], [0.35, 0.3]], { before: 0 }), tint: BLOOD_TINT, corners: WITNESS_CORNERS }),
+    storyBloodCap: K("buttHit", [[0.1, 1], [0.4, 0.5]], { before: 1 }),
   }),
   // SB04A dragged into the SSW sap (Boots): blood layer down to ~0.3, desaturated.
   boots: Freeze({

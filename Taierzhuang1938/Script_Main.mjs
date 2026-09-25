@@ -8988,7 +8988,7 @@ function RenderScene(dt) {
   // 01–02 storyboard lens (Script_OpeningLens, contract §4.4): null outside 01–02, and then the post
   // parameters below go through untouched and the HUD flash / mud layers are off.
   const openingLens = missionRuntime?.Perception().lens || null;
-  hud.SetLens?.(openingLens);
+  hud.SetLens(openingLens);
   profiler.B("post");
   post.Render(scene, camera, ApplyLensToPost({
     sunDirection: sky.sunDirection,

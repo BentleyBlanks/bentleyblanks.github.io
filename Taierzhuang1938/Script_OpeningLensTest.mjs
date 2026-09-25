@@ -7,8 +7,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { Evaluate, EvaluateLook, OpeningLensDriver, ApplyLensToPost, BlendLens, SampleKeys, LookForPhase } from "./Script_OpeningLens.mjs";
-import { LENS_DEFAULT, LOOKS, PHASE_LOOKS, LENS_MUD_TEXTURE } from "./Data_OpeningLens.mjs";
+import { Evaluate, EvaluateLook, OpeningLensDriver, ApplyLensToPost, BlendLens, SampleKeys, LookForPhase, EVENT_WAITS } from "./Script_OpeningLens.mjs";
+import { LENS_DEFAULT, LOOKS, PHASE_LOOKS, LENS_MUD_TEXTURE, SHELL_FLIGHT_S } from "./Data_OpeningLens.mjs";
 import { OPENING_STORYBOARDS as C } from "./Data_OpeningStoryboards.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -46,6 +46,33 @@ Check("SB02 near miss: aberration ~0.02 decaying over 1.5 s, radial blur, heavie
   assert.ok(At(0.35).vignette >= 0.75, "vignette heavier");
   const black = Evaluate("Black", 0.4, { now: 101.2, blastAt: 100 });
   assert.equal(black.look, "nearMiss", "Black carries the near-miss curve on the blast clock");
+  // The director may hand the landing itself (impactAt); the curve then follows it, not blastAt + flight.
+  Near(Evaluate("Blast", 0.5, { now: 100.5, blastAt: 100, impactAt: 100.44 }).aberration, 0.02, 0.0005, "peak 0.06 s after impactAt");
+  assert.equal(Evaluate("Blast", 0.3, { now: 100.3, blastAt: 100, impactAt: 100.4 }).aberration, LENS_DEFAULT.aberration, "nothing before impactAt");
+});
+
+Check("the fallback shell flight is the director's FireShell flight", () => {
+  const source = Read("Script_OpeningStoryboards.mjs");
+  const blast = source.slice(source.indexOf("  Blast(){"), source.indexOf("\n  }", source.indexOf("  Blast(){")));
+  const flight = Number(/FireShell\(.*?\{[^}]*flight:\s*([\d.]+)/.exec(blast)?.[1]);
+  assert.ok(Number.isFinite(flight), "Blast() fires the near miss with a flight time");
+  assert.equal(SHELL_FLIGHT_S, flight, "Data_OpeningLens.SHELL_FLIGHT_S matches the director's flight (or hand events.impactAt)");
+});
+
+Check("a look stuck waiting for its event warns once (renamed / retimed director fields)", () => {
+  const warn = console.warn, seen = []; console.warn = m => seen.push(String(m));
+  try {
+    const d = new OpeningLensDriver();
+    for (const [phase, [event, after]] of Object.entries(EVENT_WAITS)) {
+      d.Sample(1000 + after - 0.5, phase, after - 0.5, {});
+      assert.ok(!seen.some(m => m.includes(`${phase} has run`)), `${phase}: no warning before ${after} s`);
+      d.Sample(1000 + after + 0.5, phase, after + 0.5, {}); d.Sample(1000 + after + 1, phase, after + 1, {});
+      assert.equal(seen.filter(m => m.includes(`${phase} has run`) && m.includes(event)).length, 1, `${phase}: one warning naming ${event}`);
+    }
+    const ok = new OpeningLensDriver();
+    ok.Sample(50, "Butt", 20, { buttHit: 40 }); ok.Sample(51, "Found", 30, { clearAt: 30 });
+    assert.equal(ok.warnings.length, 0, "no warning once the event has come");
+  } finally { console.warn = warn; }
 });
 
 Check("SB03 witness: blood corners 0.3 with the concussion, near DOF 0.5 at 3.8 m, mud", () => {
@@ -74,7 +101,7 @@ Check("SB03A reach: darker, red weaker than SB03, mud; Found's blink clears the 
   assert.equal(found(1.3).bloodEdge.strength, 0, "SB04 starts without a red edge");
 });
 
-Check("SB04 butt: no red before the strike, 0.08 s white flash on the hit, red after", () => {
+Check("SB04 butt: 0.08 s white flash on the hit, no red edge (storyboard clean), director blood capped after", () => {
   const before = Evaluate("Butt", 1, { now: 20 });
   assert.equal(before.flash, 0); assert.equal(before.bloodEdge.strength, 0);
   assert.equal(Evaluate("Drag", 1).bloodEdge.strength, 0, "dragged out: no red edge");
@@ -82,7 +109,9 @@ Check("SB04 butt: no red before the strike, 0.08 s white flash on the hit, red a
   assert.ok(hit(0).flash >= 0.9 && hit(0.08).flash >= 0.9, "white for 0.08 s");
   assert.ok(hit(0.14).flash < hit(0.08).flash && hit(0.14).flash > 0, "fast fall");
   assert.equal(hit(0.25).flash, 0);
-  Near(hit(0.5).bloodEdge.strength, 0.3, 1e-9, "red after the hit");
+  assert.equal(hit(0.5).bloodEdge.strength, 0, "no red edge of the lens's own after the hit");
+  assert.equal(hit(0.05).storyBloodCap, 1, "the director's blood layer is not capped under the flash");
+  Near(hit(0.5).storyBloodCap, 0.5, 1e-9, "then capped to 0.5");
   assert.ok(hit(0.02).aberration > 0.01, "aberration kick on the hit");
 });
 
@@ -169,7 +198,7 @@ Check("wiring: Main, Runtime, Composite and HUD use the lens; no new pass or sam
   const main = Read("Script_Main.mjs"), runtime = Read("Script_FirstLevelMissionRuntime.mjs");
   const composite = Read("Script_PostComposite.mjs"), hud = Read("Script_Hud.mjs"), css = Read("Style_Game.css");
   assert.match(main, /const openingLens = missionRuntime\?\.Perception\(\)\.lens \|\| null;/);
-  assert.match(main, /hud\.SetLens\?\.\(openingLens\)/);
+  assert.match(main, /hud\.SetLens\(openingLens\)/, "a direct call: a renamed HUD method fails loudly");
   assert.match(main, /post\.Render\(scene, camera, ApplyLensToPost\(\{[\s\S]*?\}, openingLens\)\);/);
   assert.match(runtime, /lens: this\.OpeningLens\(\)/);
   assert.match(runtime, /live \? show\.phase : null/);

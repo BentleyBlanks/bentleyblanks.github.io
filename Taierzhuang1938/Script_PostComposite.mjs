@@ -223,8 +223,9 @@ vec3 MotionBlur(vec2 uv, vec2 centered, float r2, vec4 nd) {
   if(uConcussion.y>0.001||uRadialBlur>0.0001){
     float peripheral=smoothstep(.015,.32,r2);
     vec2 radius=vec2(uConcussion.z*uConcussion.y*(.35+.65*peripheral))/uResolution;
-    // Per-pixel jitter of the streak length turns the nine discrete copies into one smear (grain hides the noise).
-    vec2 streak=centered*uRadialBlur*peripheral*2.0*(.6+.8*Hash12(gl_FragCoord.xy+uFrame*7.13));
+    // A small per-pixel, per-frame jitter of the streak length joins the nine copies into one smear; kept narrow
+    // (±15 %) so it reads as a directional drag, not grain, and TAA averages what is left.
+    vec2 streak=centered*uRadialBlur*peripheral*2.0*(.85+.3*Hash12(gl_FragCoord.xy+uFrame*7.13));
     vec3 center=texture2D(uHdr,uv).rgb;
     vec3 soft=center*.25;
     soft+=(texture2D(uHdr,clamp(uv+vec2(radius.x,0.0)-streak*.25,0.0,1.0)).rgb
@@ -238,12 +239,11 @@ vec3 MotionBlur(vec2 uv, vec2 centered, float r2, vec4 nd) {
     vec2 offset=vec2(uConcussion.w,-uConcussion.w*.22)*uConcussion.y/uResolution;
     vec3 secondary=texture2D(uHdr,clamp(uv+offset,0.0,1.0)).rgb;
     vec3 blurred=mix(soft,secondary,uConcussionGrade.x*uConcussion.y*(.25+.75*peripheral));
-    if(uRadialBlur>0.0001){
-      // Keep the channel split of the plain tap on top of the smear (SB02 wants both at once).
-      blurred+=clear-center;
-      return blurred;
-    }
-    return mix(clear,blurred,smoothstep(0.0,.08,uConcussion.y));
+    // Keep the channel split of the plain tap on top of the smear (SB02 wants both at once); both effects fade
+    // in smoothly from zero (no step where the radial blur crosses a threshold).
+    float radialWeight=smoothstep(0.0,.01,uRadialBlur);
+    blurred+=(clear-center)*radialWeight;
+    return mix(clear,blurred,max(smoothstep(0.0,.08,uConcussion.y),radialWeight));
   }
   return clear;
 }
