@@ -31,7 +31,7 @@ export async function DriveFrontBattle(ctx){
           const close=D.reflexes?D.CloseThreat():null;
           if(!close&&D.StepHome()){g.StepFrames(1,1/60,false);continue;}
           const foe=fight?D.Target(90):close;
-          if(foe)window.MissionInputDriver.Shoot(foe);else {g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);}
+          if(foe)window.MissionInputDriver.Shoot(foe);else {g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);D.Rearm();}
           if(g.player.bleeding&&g.player.health<80)g.Debug.Key("KeyB");
           g.StepFrames(1,1/60,false);
         }
@@ -49,17 +49,57 @@ export async function DriveFrontBattle(ctx){
   // 在阵位里等（03 等进 04、04 等压住阵位）：躲手榴弹（EvadeGrenade）照常躲，躲完离座位 3 m 以上就走回来。
   // 2026-09-24 实测：躲雷把人甩到阵位东墙外 (34,−139)/(35,−147)/(42,−141)，一直站在那儿等，
   // 03 末尾战车开到、04 战车机枪都打得到那儿（探针 3 次里 1 次死在 03 的 (35.4,−147.5)）。玩家躲完会回掩体。
+  // The way back to the seat, planned from where the player stands now (after a dodge: from where it left him).
+  //   东墙（x 33.5，z −140…−132）外面的人从墙南头绕回来（他也是从那儿被甩出去的）。Only north of the yard's north
+  //   wall (z −145.6): a dodge inside the yard's east half (09-24 chain R: 34.9,−153.1) walked the east-wall detour
+  //   straight into that wall and stalled there.
+  //   西墙（RightNestWestLow x 23.65…24.35 z −156.8…−151.8，RightNestWestHigh z −148.8…−145.6，两段之间是西门）外面
+  //   或者站在墙头上的人：先往西下墙，沿墙外走到门口那条线，从西门进来。09-26 验收空转探针第 1 趟：人在
+  //   (23.29,−151.96)，旧判据只认 z<−151.2，走了直线，贴着墙角滑到 (23.29,−153.62) 顶住不动；acc36r 躲雷后
+  //   站上被炮打矮的西墙 (24.09, y 0.22)，直线穿枪体。现在墙的整段（含墙头）都算。
+  //   院子里枪体（RightNestFrontRest x 24.45…25.35 z −154.25…−153.55）挡在直线上：从枪的北边（或南边）绕过去。
+  const SEAT_WALL_X=24.25,SEAT_OUT_X=23.1,SEAT_DOOR_Z=-150;
+  const GUN_BOX={x0:24.45-.4,x1:25.35+.4,z0:-154.25-.4,z1:-153.55+.4};   // the gun block grown by a body radius
+  function CrossesGun(a,b){
+    // Liang-Barsky: does the segment a→b pass through GUN_BOX?
+    let t0=0,t1=1;const dx=b.x-a.x,dz=b.z-a.z;
+    for(const [p,q] of [[-dx,a.x-GUN_BOX.x0],[dx,GUN_BOX.x1-a.x],[-dz,a.z-GUN_BOX.z0],[dz,GUN_BOX.z1-a.z]]){
+      if(p===0){if(q<0)return false;continue;}
+      const r=q/p;
+      if(p<0){if(r>t1)return false;if(r>t0)t0=r;}else{if(r<t0)return false;if(r<t1)t1=r;}
+    }
+    return t0<t1;
+  }
+  function SeatPath(at){
+    if(at.x>32.5&&at.z>-145.2)return {kind:"east",points:[{x:at.x,z:-141.8},{x:30,z:-141.8},S.seat]};
+    if(at.x<SEAT_WALL_X&&at.z>-157.6&&at.z<-144.8){
+      const x=Math.min(at.x,SEAT_OUT_X);
+      return {kind:"west",points:[{x,z:at.z},{x,z:SEAT_DOOR_Z},{x:Space.westDoor.x,z:Space.westDoor.z},S.seat]};
+    }
+    if(CrossesGun(at,S.seat)){
+      const side=at.z>(GUN_BOX.z0+GUN_BOX.z1)/2?GUN_BOX.z1+.25:GUN_BOX.z0-.25;
+      return {kind:"gun",points:[{x:at.x,z:side},{x:S.seat.x,z:side},S.seat]};
+    }
+    return {kind:"direct",points:[S.seat]};
+  }
   async function ReturnToSeat(label){
     const off=await page.evaluate(({x,z})=>{const p=window.Tengxian.player.position;return {d:Math.hypot(p.x-x,p.z-z),x:p.x,z:p.z,alive:window.Tengxian.player.alive};},S.seat);
-    if(!off.alive||off.d<=3)return;
-    // 东墙（x 33.5，z −140…−132）外面的人从墙南头绕回来（他也是从那儿被甩出去的）。
-    // 西墙（RightNestWestLow，x 23.65…24.35，z −156.8…−151.8）外面的人从西门回来（09-24 探针：躲雷甩到 (23.3,−153.9)，
-    // 直线回座位顶在那道矮墙上三个 chunk 不动）。
-    const west=off.x<24.4&&off.z<-151.2;
-    // Only north of the yard's north wall (z −145.6): a dodge inside the yard's east half (09-24 chain R: 34.9,−153.1)
-    // walked the east-wall detour straight into that wall and stalled there.
-    const east=off.x>32.5&&off.z>-145.2;
-    await Route(east?[{x:off.x,z:-141.8},{x:30,z:-141.8},S.seat]:west?[{x:off.x,z:Space.westDoor.z},Space.westDoor,S.seat]:[S.seat],label,{stance:"crouch",fight:true,recoverAfterEvade:true});
+    if(!off.alive)return;
+    const plan=SeatPath(off);
+    // Within 3 m inside the yard he holds where he is (as before); outside or on the west wall he is not in the nest,
+    // however close the seat looks.
+    if(off.d<=3&&plan.kind!=="west")return;
+    console.log("RETURN_TO_SEAT",JSON.stringify({label,at:[+off.x.toFixed(2),+off.z.toFixed(2)],d:+off.d.toFixed(2),kind:plan.kind}));
+    await Route(plan.points,label,{stance:"crouch",fight:true,recoverAfterEvade:true,replanAfterEvade:at=>SeatPath(at).points});
+  }
+  // 04 short withdrawal from where the player stands: into the nest the way ReturnToSeat goes, then the authored rear
+  // route (from its nearest point when he is already in the yard with a clear line). Planned again after a dodge.
+  function RearPath(at){
+    const rear=S.rearRoute,plan=SeatPath(at);
+    if(plan.kind==="east")return [{x:at.x,z:-141.8},rear.at(-1)];
+    if(plan.kind!=="direct")return [...plan.points,...rear.slice(1)];
+    const near=rear.reduce((best,q,i)=>Math.hypot(q.x-at.x,q.z-at.z)<Math.hypot(rear[best].x-at.x,rear[best].z-at.z)?i:best,0);
+    return rear.slice(near);
   }
   // Who stands where when 04 / 05 begin. The same probe runs on a continuous drive (at the 03→04 and 04→05
   // transitions) and on a checkpoint start, with the same asserts, so the checkpoint cannot drift from the game a
@@ -154,14 +194,18 @@ export async function DriveFrontBattle(ctx){
     return s;
   }
   async function HoldNest({stage=null,fact=null},seconds,label){
-    let state;
-    for(let i=0;i<seconds;i+=5){
-      state=await page.evaluate(({stage,fact})=>{
+    // Counted in stepped frames: a chunk ends early the frame a dodge ends, so ReturnToSeat plans the way back from
+    // where the dodge left the player (not up to 5 s later, after walking straight at a wall in between).
+    let state,frames=0;
+    while(frames<seconds*60){
+      state=await page.evaluate(({stage,fact,budget})=>{
         const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime(),Done=()=>stage?r.flow.stage.id===stage:r.Has(fact);
         window.MissionInputDriver.leg="HoldNest:"+(stage||fact);window.MissionInputDriver.mode="hold";
-        let evaded=false;
-        for(let f=0;f<300&&g.player.alive&&!Done();f++){
-          const evading=window.MissionInputDriver.EvadeGrenade();evaded||=evading;
+        let evaded=false,f=0;
+        for(;f<budget&&g.player.alive&&!Done();f++){
+          const evading=window.MissionInputDriver.EvadeGrenade();
+          if(evaded&&!evading)break;
+          evaded||=evading;
           if(!evading&&!window.MissionInputDriver.CloseThreat()&&window.MissionInputDriver.StepHome()){g.StepFrames(1,1/60,false);continue;}
           const foe=evading?null:window.MissionInputDriver.Target(90);
           if(foe)window.MissionInputDriver.Shoot(foe);
@@ -171,8 +215,9 @@ export async function DriveFrontBattle(ctx){
           g.StepFrames(1,1/60,false);
         }
         g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);
-        return {alive:g.player.alive,health:g.player.health,done:Done(),evaded,mission:g.Debug.FirstLevelMission()};
-      },{stage,fact});
+        return {alive:g.player.alive,health:g.player.health,done:Done(),evaded,frames:f,mission:g.Debug.FirstLevelMission()};
+      },{stage,fact,budget:Math.min(300,seconds*60-frames)});
+      frames+=Math.max(1,state.frames);
       if(state.done||!state.alive)break;
       await ReturnToSeat(label);
     }
@@ -344,7 +389,12 @@ export async function DriveFrontBattle(ctx){
   if(ctx.stageFrom<=4){
   await ReturnToSeat("ReturnToNestAfterEvade");
   await HoldNest({fact:"tankPositionPressured"},120,"ReturnToNestAfterEvade");
-  await Route(S.rearRoute,"RightNestShortRetreat",{stance:"crouch",fight:false});
+  // From where the 04 hold left him (09-26 acc36r: a 03 dodge left him outside the west wall, 2.7 m from the seat, and
+  // the straight line onto the rear route's first point climbed the shelled wall into the gun block).
+  const retreatFrom=await page.evaluate(()=>{const p=window.Tengxian.player.position;return {x:p.x,z:p.z};});
+  const retreat=RearPath(retreatFrom);
+  if(retreat.length!==S.rearRoute.length)console.log("REAR_PATH",JSON.stringify({at:[+retreatFrom.x.toFixed(2),+retreatFrom.z.toFixed(2)],points:retreat}));
+  await Route(retreat,"RightNestShortRetreat",{stance:"crouch",fight:false,replanAfterEvade:RearPath});
   // rightRearReached needs the player at the junction (B.rearArrivalM) out of the gun's sight. Wait there like a
   // player: dodge a grenade, then walk back. 2026-09-24 step 3: a dodge during the wait carried the bot 13 m north to
   // (36.6,-130.7), it stood there for 180 s and 04 never ended.

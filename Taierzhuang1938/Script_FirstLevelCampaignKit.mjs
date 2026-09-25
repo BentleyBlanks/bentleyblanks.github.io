@@ -230,6 +230,13 @@ export async function InstallInputDriver(ctx) {
             //   ⑤ 拿着大刀、人在 2.3–3 m（砍不到又不走）：往前迈一步贴上去再砍（只在大刀已在手、不在装填时）；
             //   ⑥ 近身的人隔着矮墙：胸口那条线被墙挡住就瞄头，头也挡住就不开枪、按 ③ 后退（09-25 ABon_1 把 63 发全打进墙里）；
             //   ⑦ 近身、大刀在手还能用、只是还没转正：拿着大刀继续转，不再收刀换枪（ABon_1 一场 51 次换武器）。
+            //   ⑧ ⑤ 迈步贴上去 1 s 没近一点（中间隔着队友、枪体）：这个人 4 s 内不算近身威胁、也不当目标（除非他
+            //      正在出刀或盯着玩家打），换回步枪，路线照走（Front fx16：03 西门口，罗班长挡在中间，驾驶器大刀
+            //      在手、步枪空仓，对着 3 m 外的右机枪手原地站到超时）；
+            //   ⑨ 手里没有要应付的人时不拿大刀走路：切回步枪，弹仓空了有备弹就装填；步枪连备弹都打光了，远处的人
+            //      不再当目标（只剩近身的），路线照走，不对着远处的人干站着；
+            //   ⑩ 躲雷挑方向时，同样能躲开的方向里优先离胸墙/沙袋留出一掌宽的、躲完直线能走回起点的（不绕到
+            //      矮墙另一边去）。09-26 验收 acc36r：躲雷从西门绕到阵位西矮墙外，走回原处的直线被墙挡住。
             //   关掉时（reflexes=false）每条路径与改之前一字不差。
             reflexes: false, closeResponses: 0, escapes: 0, evadeReturns: 0, closeFoe: null, returning: null,
             CloseThreat() {
@@ -248,6 +255,8 @@ export async function InstallInputDriver(ctx) {
                 // reach behind a wall end) is left to the others for 6 s and the route goes on, unless he turns on
                 // the player (09-25 V_c01_1: RightLinkGuard duelling Luo at 2.3 m held the bot for the whole leg).
                 if((this.ignoreClose?.get(a)||0)>g.ai.time&&!a.target?.isPlayer)continue;
+                // ⑧ A man the step-in could not reach (a squadmate or the gun between) is left for 4 s unless he acts.
+                if((this.unreachable?.get(a)||0)>g.ai.time&&!striking&&!a.target?.isPlayer)continue;
                 bd=d;best=a;
               }
               if(best&&best!==this.closeFoe){this.closeResponses++;this.closeSince={t:g.ai.time,hp:best.health,player:g.player.health};}
@@ -261,6 +270,21 @@ export async function InstallInputDriver(ctx) {
               this.closeFoe=best;
               if(!best&&this.backingOff){g.Debug.Key("KeyS",false);this.backingOff=false;}
               return best;
+            },
+            // ⑨ Rifle rounds whichever slot is out (the live counters belong to the weapon in hand; mags keeps the rest).
+            RifleRounds() {
+              const s=g.state;
+              return s.activeSlot==="primary"?{ammo:s.ammo,clips:s.clips}:{ammo:s.mags?.primary?.ammo??0,clips:s.mags?.primary?.clips??0};
+            },
+            // ⑨ Nothing to answer: put the Dadao away and load the rifle if it is empty and there is a clip to load.
+            // Only keys; the caller keeps walking. False when nothing was needed.
+            Rearm() {
+              if(!this.reflexes||g.meleeCombat.Active)return false;
+              if(g.state.activeSlot==="melee"){g.Debug.Key("Digit1");this.rearms=(this.rearms||0)+1;return true;}
+              if(g.state.activeSlot!=="primary")return false;
+              const r=this.RifleRounds();
+              if(r.ammo>0||r.clips<=0||g.viewmodel?.action?.kind==="reload")return false;
+              g.Debug.Key("KeyR");this.rearms=(this.rearms||0)+1;return true;
             },
             // One frame of walking back to where a grenade dodge started (false once there, or after 6 s).
             StepHome() {
@@ -298,7 +322,20 @@ export async function InstallInputDriver(ctx) {
                 if(reach<1)continue;
                 const to=from.clone().set(cx,y+BLAST.playerHitRiseM,cz),ray=to.clone().sub(from),len=ray.length();
                 const hit=len>.1?g.battlefield.Raycast(from,ray.normalize(),len,{terrain:true}):null;
-                const score=Math.hypot(cx-gx,cz-gz)+(hit&&hit.t<len-BLAST.wallMarginM?6:0);
+                let score=Math.hypot(cx-gx,cz-gz)+(hit&&hit.t<len-BLAST.wallMarginM?6:0);
+                // ⑩ Tie-breaks below the wall-cover bonus (6): a way that brushes a parapet or sandbag (within 0.2 m
+                // more than the body radius, every half metre), and an end spot with a wall between it and where the
+                // dodge began (the walk back would run into it), each lose 1.5 m.
+                for(let s=.5;s<=reach;s+=.5){
+                  const x=p.x+Math.sin(angle)*s,z=p.z+Math.cos(angle)*s;
+                  if(g.physics.Overlaps(x,g.battlefield.GroundHeight(x,z)+.04,z,g.player.radius+.2,1.78)){score-=1.5;break;}
+                }
+                const home=this.evading&&this.evadeHome?this.evadeHome:null,back=home?Math.hypot(home.x-cx,home.z-cz):0;
+                if(back>.8){
+                  const o=from.clone().set(cx,y+.5,cz),dir=from.clone().set((home.x-cx)/back,0,(home.z-cz)/back);
+                  const wall=g.battlefield.Raycast(o,dir,back,{terrain:true});
+                  if(wall&&wall.t<back-.3)score-=1.5;
+                }
                 if(score>bestScore){bestScore=score;best=angle;}
               }
               return best;
@@ -358,6 +395,8 @@ export async function InstallInputDriver(ctx) {
               // ① A man at arm's length comes before the route's far targets, seen through a ray or not.
               const close=this.CloseThreat();
               if(close)return close;
+              // ⑨ No rifle round left at all (magazine and spare clips): nobody far off is a target, the route walks on.
+              if(this.reflexes){const r=this.RifleRounds();if(r.ammo<=0&&r.clips<=0)return null;}
               if(this.observedShot!==g.state.playerShots) {
                 this.observedShot=g.state.playerShots;
                 if(this.lastTarget && g.state.lastShot?.hitKind==="wall")this.blocked.set(this.lastTarget,g.ai.time+4);
@@ -370,6 +409,7 @@ export async function InstallInputDriver(ctx) {
                     a.alive &&
                     !a.scriptedNoncombatant &&
                     (this.blocked.get(a.id)||0) < g.ai.time &&
+                    (this.unreachable?.get(a)||0) < g.ai.time &&
                     a.position.distanceTo(eye) < maxRange,
                 )
                 .sort((a, b) => (a.missionId===this.priorityTarget?-1:0)-(b.missionId===this.priorityTarget?-1:0) || a.position.distanceToSquared(eye) - b.position.distanceToSquared(eye))
@@ -450,6 +490,21 @@ export async function InstallInputDriver(ctx) {
                   else if(distance<2.3){g.Debug.Mouse(0,true);g.Debug.Mouse(0,false);}
                   // ⑤ Between cutting range (2.3 m) and 3 m the old driver neither cut nor walked: step in to him.
                   else closing=this.reflexes;
+                }
+                // ⑧ The step-in has to get somewhere: 1 s without coming 0.15 m closer (a squadmate or the gun between
+                // us) sets him aside for 4 s (CloseThreat and Target skip him unless he strikes or aims at the player)
+                // and keeps the Dadao off him meanwhile, so the route and the rifle take over.
+                if(closing){
+                  const w=this.stepIn;
+                  if(!w||w.id!==foe.id||g.ai.time-w.seen>.25)this.stepIn={id:foe.id,d:distance,t:g.ai.time,seen:g.ai.time};
+                  else{
+                    w.seen=g.ai.time;
+                    if(distance<w.d-.15){w.d=distance;w.t=g.ai.time;}
+                    else if(g.ai.time-w.t>1){
+                      (this.unreachable||=new Map()).set(foe,g.ai.time+4);this.obstructed.set(foe.id,g.ai.time+4);
+                      this.stepInBlocked=(this.stepInBlocked||0)+1;this.stepIn=null;closing=false;
+                    }
+                  }
                 }
                 // Pressed every frame while closing in: a route leg lets go of W before it calls Shoot.
                 if(closing||this.closing){g.Debug.Key("KeyW",closing);this.closing=closing;}
@@ -792,7 +847,13 @@ export function CampaignActions(ctx) {
    * 人确实到了 nightSpawn(−160,292)，转场结束后又被驾驶器走了 110 m 回到 marchOut，
    * 于是「黑屏里那一下瞬移没生效」看着像引擎的锅，其实是驾驶器自己走回去的。
    */
-  async function Route(points, label, { fight = false, stance = "stand", sprint = false, crawl = false, rejoinRoute = null, stopFact = null, arrivalM = 0.8, recoverAfterEvade = false } = {}) {
+  /**
+   * `replanAfterEvade(position) → points`：躲雷一结束就停下这一段，按玩家现在站的地方重新算剩下的路（替代
+   * recoverAfterEvade 的「回到原路线上」）。给「原路线在墙这边、躲雷把人甩到墙那边」的段用（阵位回座位、
+   * 04 短撤退）。不传时与原来一字不差。
+   */
+  async function Route(points, label, { fight = false, stance = "stand", sprint = false, crawl = false, rejoinRoute = null, stopFact = null, arrivalM = 0.8, recoverAfterEvade = false, replanAfterEvade = null } = {}) {
+    const breakOnEvadeEnd = typeof replanAfterEvade === "function";
     let routeGuardHp;
     const rejoinTarget=points.at(-1);
     await page.evaluate(
@@ -821,7 +882,7 @@ export function CampaignActions(ctx) {
     const carriedKind=await page.evaluate(()=>window.Tengxian.carry.KindId);
     let result, retries = 0;
     for (let chunk = 0; chunk < 90; chunk++) {
-      result = await page.evaluate(async ({fight,stance,crawl,sprint,stopFact,arrivalM,recoverAfterEvade}) => {
+      result = await page.evaluate(async ({fight,stance,crawl,sprint,stopFact,arrivalM,recoverAfterEvade,breakOnEvadeEnd}) => {
         const {FRONT_SORTIE}=await import("./Data_FirstLevelFrontRoute.mjs");
         const {MissionRouteProjection, MissionRoutePoint, MissionRouteNextIndex}=await import("./Script_FirstLevelMissionColumn.mjs");
         const g = window.Tengxian,
@@ -855,6 +916,11 @@ export function CampaignActions(ctx) {
           }
           const D=window.MissionInputDriver;
           const evading=(crawl&&fight||D.reflexes)&&D.EvadeGrenade();
+          // replanAfterEvade: hand the leg back to Node the frame a dodge ends; it plans on from here.
+          if(breakOnEvadeEnd){
+            if(evading)b.dodging=true;
+            else if(b.dodging){b.dodging=false;b.evadeEnded=true;D.returning=null;break;}
+          }
           if(recoverAfterEvade){
             if(evading)b.wasEvading=true;
             else if(b.wasEvading){
@@ -894,6 +960,7 @@ export function CampaignActions(ctx) {
           } else {
             g.Debug.Mouse(0, false);
             g.Debug.Mouse(2, false);
+            if(D.reflexes)D.Rearm();
             const yaw = Math.atan2(p.x - target.x, p.z - target.z);
             const gap = Wrap(yaw - g.player.yaw);
             g.Debug.Key("KeyW", Math.abs(gap) < 0.65);
@@ -925,7 +992,8 @@ export function CampaignActions(ctx) {
           health: g.player.health,
           medical:{bleeding:g.player.bleeding,bandages:g.player.bandages,regenTo:g.player.bandageRegenTo},
           stage: g.Debug.FirstLevelMissionRuntime().flow.stage.id,
-          stalled: b.stalled,evadeRejoins:b.evadeRejoins||0,
+          stalled: b.stalled,evadeRejoins:b.evadeRejoins||0,replans:b.replans||0,
+          evadeEnded:(()=>{const ended=!!b.evadeEnded;b.evadeEnded=false;return ended;})(),
           cutscene: g.state.cutscene,
           cutsceneFrames: chunkCutscene,
           cutscenesSeen: b.cutscenes || null,
@@ -956,7 +1024,17 @@ export function CampaignActions(ctx) {
               probe: x.probe || null, crossing: !!x.crossing, nc: !!x.actor.scriptedNoncombatant })), hunters };
           })(),
         };
-      }, {fight,stance,crawl,sprint,stopFact,arrivalM,recoverAfterEvade});
+      }, {fight,stance,crawl,sprint,stopFact,arrivalM,recoverAfterEvade,breakOnEvadeEnd});
+      if (breakOnEvadeEnd && result.evadeEnded && result.alive && !result.done) {
+        const replanned = replanAfterEvade(result.position);
+        console.log(label, "REPLAN_AFTER_EVADE", JSON.stringify({ at: [+result.position.x.toFixed(2), +result.position.z.toFixed(2)], points: replanned }));
+        await page.evaluate((points) => {
+          const g = window.Tengxian, b = window.routeBot;
+          b.points = points; b.corridor = points; b.index = 0; b.stalled = 0; b.wasEvading = false; b.dodging = false;
+          b.replans = (b.replans || 0) + 1; b.last = { ...g.player.position };
+        }, replanned);
+        continue;
+      }
       const guardHp = (result.guards?.list || []).map((x) => x.alive ? x.hp : -1).join(",");
       const guardHit = routeGuardHp !== undefined && guardHp !== routeGuardHp;
       routeGuardHp = guardHp;
