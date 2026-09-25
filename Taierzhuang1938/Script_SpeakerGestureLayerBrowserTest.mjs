@@ -7,6 +7,8 @@
 //     is back to 0 a clip length after its line;
 //   * after the whole frame (the actor's aim IK included) a pointing arm points at its target, the rifle keeps the
 //     look direction the aim IK gives it, and the gesturing hand stays clear of the rifle;
+//   * the gesturing arm (shoulder -> elbow -> wrist -> fingertips, after the whole frame) never reaches the level's
+//     walls (static colliders, the same ray the game uses) on a frame the gesture is up;
 //   * 07 and later: no body has a gesture layer (the Actor hooks are inert there);
 //   * every row the runtime refuses for a reason that does not change from run to run (target out of reach or across
 //     the rifle, wounded, no clip ...) is in KNOWN_REFUSALS, so the table and the game agree.
@@ -102,6 +104,11 @@ try{
       }
       return false;
     };
+    // Walls: the posed arm's segments against the level's static colliders (battlefield ray, not the render meshes).
+    P.ArmInWall=pts=>{const r=g.Debug.FirstLevelMissionRuntime?.();if(!r)return false;
+      for(let i=0;i+1<pts.length;i++){const d=pts[i+1].clone().sub(pts[i]),len=d.length();if(len<1e-4)continue;
+        if(r.battlefield.Raycast(pts[i],d.multiplyScalar(1/len),len))return true;}
+      return false;};
     P.Chest=soldier=>soldier.actor.characterRig.bones.head.getWorldPosition(new T.Vector3()).add(new T.Vector3(0,-.3,0));
     // Player view of a speaker: stand 3.5-7 m off him where the chest is in sight (first try his front).
     P.View=soldier=>{
@@ -118,12 +125,20 @@ try{
       g.player.yaw=Math.atan2(-c.x,-c.z);g.player.pitch=Math.atan2(c.y,Math.hypot(c.x,c.z));};
     // Close-up: the production post chain from a camera about 2 m off the chest on the gesturing hand's side (about
     // 70 deg round from his front first, so a point toward his front is seen side-on), the first of a few
-    // directions with a clear line of sight.
+    // directions with a clear line of sight to the chest and to the gesturing hand (from the 05 ammo-house doorway
+    // the jamb's corner hid Luo's pointing hand in BundleAttack_01_Close, which read as the arm going into the wall
+    // while it was 0.7 m off it; 2026-09-26 relay r2 fix 3).
     P.CloseCamera=(soldier,hand)=>{
       const root=soldier.actor.root,f=new T.Vector3(0,0,-1).transformDirection(root.matrixWorld).setY(0).normalize(),chest=P.Chest(soldier),side=hand==='L'?1:-1;
+      const bone=soldier.actor.characterRig.bones[hand==='L'?'handL':'handR'],handAt=bone?bone.getWorldPosition(new T.Vector3()):null;
+      const Clear=pos=>!P.Blocked(pos,chest,root)&&!(handAt&&P.Blocked(pos,handAt,root));
       for(const [a,d,up] of [[1.2,2.2,.2],[.6,2.2,.1],[1.8,2.2,.3],[0,2.2,.1],[1.2,2.4,.9],[.6,2.2,.9],[0,3,.9],[-.6,2.2,.6]]){
         const pos=chest.clone().addScaledVector(f.clone().applyAxisAngle(new T.Vector3(0,1,0),a*side),d);pos.y+=up;
-        if(!P.Blocked(pos,chest,root))return {pos,look:chest};
+        if(Clear(pos))return {pos,look:chest};
+      }
+      for(const [a,d,up] of [[1.2,2.2,.2],[.6,2.2,.1],[1.8,2.2,.3],[0,2.2,.1],[1.2,2.4,.9],[.6,2.2,.9],[0,3,.9],[-.6,2.2,.6]]){
+        const pos=chest.clone().addScaledVector(f.clone().applyAxisAngle(new T.Vector3(0,1,0),a*side),d);pos.y+=up;
+        if(!P.Blocked(pos,chest,root))return {pos,look:chest,handHidden:true};
       }
       return {pos:chest.clone().addScaledVector(f,2.2).setY(chest.y+.1),look:chest};
     };
@@ -177,13 +192,29 @@ try{
               if(st.lineId&&track.cancelled.has(st.lineId)&&st.weight>0&&st.phase!=='cancelled')V2('back after the shot',st.weight);
               if(!lineId&&track.lineEndAt!=null&&track.t-track.lineEndAt>2.2+P.limit.lineTailS&&st.weight>0)V2('up long after the line',track.t-track.lineEndAt);
               if(!lineId)continue;
-              const row=P.lines[lineId]??={who,frames:0,up:0,maxW:0,clip:null,supp:{},lod:null,pose:null,postAim:[],postSolve:[],layerAim:[],clamped:0,along:0,muzzle:null,muzzleDev:0,clear:Infinity,reach:null,phases:{}};
+              const row=P.lines[lineId]??={who,frames:0,up:0,maxW:0,clip:null,supp:{},lod:null,pose:null,postAim:[],postSolve:[],layerAim:[],clamped:0,along:0,muzzle:null,muzzleDev:0,clear:Infinity,reach:null,phases:{},
+                wallFrames:0,wallAt:null,wallTurn:0,wallHits:0,fallback:false,crossLift:0,aimGeo:null};
               if(row.who!==who)continue;
               row.frames++;row.lod=soldier.renderLod;row.maxW=Math.max(row.maxW,st.weight);if(st.weight>.5)row.up++;
               if(st.clip)row.clip=st.clip;if(st.suppressed)row.supp[st.suppressed]=(row.supp[st.suppressed]||0)+1;
               if(st.phase)row.phases[st.phase]=(row.phases[st.phase]||0)+1;
               if(row.frames===8)row.pose=gl.probePose;if(st.reachError!=null&&st.weight>.9)row.reach=st.reachError;
               const a=gl.active,actor=soldier.actor,root=actor.root;
+              // Walls, after the whole frame: the gesturing arm on every frame its gesture is up.
+              if(a&&st.weight>.5&&st.lineId===lineId){
+                const W=b=>b.getWorldPosition(V()),sh=W(a.bones.upper),el=W(a.bones.fore),wr=W(a.bones.hand);
+                const tip=wr.clone().addScaledVector(wr.clone().sub(el).normalize(),G.wallHandM);
+                if(P.ArmInWall([sh,el,wr,tip])){row.wallFrames++;row.wallAt??={t:st.t,phase:st.phase,clip:st.clip,weight:+st.weight.toFixed(2)};}
+                row.wallTurn=Math.max(row.wallTurn,st.wallTurn||0);if(st.wallHit)row.wallHits++;
+              }
+              if(st.wallFallback&&st.lineId===lineId)row.fallback=true;
+              if(a&&a.spec.aim&&st.phase==='hold'&&st.lineId===lineId){
+                if(st.crossLift)row.crossLift++;
+                if(!row.aimGeo){const f=V().set(0,0,-1).applyQuaternion(root.getWorldQuaternion(new T.Quaternion())),tp=P.L.SpeakerGestureTargetPoint(a.row.target,{root,lookAt:rig.speakerHead?.lookAt},V());
+                  row.aimGeo={yaw:st.aimYaw,pitch:st.aimPitch,clamped:st.clamped,along:st.alongLift,cross:st.crossLift,wallTurn:st.wallTurn,
+                    at:root.getWorldPosition(V()).toArray().map(v=>+v.toFixed(2)),front:[+f.x.toFixed(2),+f.z.toFixed(2)],target:tp?tp.toArray().map(v=>+v.toFixed(2)):null,
+                    shoulder:a.bones.upper.getWorldPosition(V()).toArray().map(v=>+v.toFixed(2))};}
+              }
               // Rifle direction: with the rifle up (aim 1) the actor's aim IK lays the barrel on the look direction
               // (Script_Actor._ApplyRiggedAim); a left-hand gesture must not change that.
               if(actor.weaponGroup?.visible&&actor.weaponTwoHanded){
@@ -232,7 +263,7 @@ try{
           const st=rig.speakerGesture?.state||{},ga=rig.speakerGesture?.active,W=b=>b.getWorldPosition(new T.Vector3());
           const arm=ga?{reach:+W(ga.bones.upper).distanceTo(W(ga.bones.hand)).toFixed(3),length:+(W(ga.bones.upper).distanceTo(W(ga.bones.fore))+W(ga.bones.fore).distanceTo(W(ga.bones.hand))).toFixed(3),extend:ga.spec.extend??null}:null;
           return {handL:at(rig.bones.handL),handR:at(rig.bones.handR),grip:at(soldier.actor.weaponGroup),muzzle,weight:+(st.weight||0).toFixed(2),
-            phase:st.phase,aimError:st.aimError,clamped:st.clamped,arm,camera:P.close.pos.toArray().map(v=>+v.toFixed(1))};},{id:step.shot.id,hand:step.shot.hand});
+            phase:st.phase,aimError:st.aimError,clamped:st.clamped,arm,camera:P.close.pos.toArray().map(v=>+v.toFixed(1)),handHidden:!!P.close.handHidden};},{id:step.shot.id,hand:step.shot.hand});
         const closeName=`${name}_${step.shot.before?'CloseBefore':'Close'}.png`;
         await page.screenshot({path:path.join(output,closeName)});files.push(closeName);
         await page.evaluate(()=>{const P=window.GestureProbe;P.close=null;P.g.post.NotifyCameraCut?.();});
@@ -307,7 +338,8 @@ const all={};for(const stage of Object.values(result.stages))Object.assign(all,s
 const rows=Object.entries(all).filter(([id])=>FIRST_LEVEL_SPEAKER_GESTURES[id]?.gesture);
 for(const [id,row] of Object.entries(all))console.log(id.padEnd(20),row.who.padEnd(9),`frames ${row.frames} up ${row.up} max ${row.maxW.toFixed(2)}`,
   row.clip||'-',JSON.stringify(row.supp),row.postAim?`aim ${row.postAim.median}/${row.postAim.max} deg (layer ${row.layerAim}, clamped ${row.clamped})`:'',row.clear!=null?`clear ${row.clear} m ${JSON.stringify(row.clearAt)}`:'',
-  row.muzzleDev?`muzzle ${row.muzzleDev} deg`:'',JSON.stringify(row.pose||{}));
+  row.muzzleDev?`muzzle ${row.muzzleDev} deg`:'',JSON.stringify(row.pose||{}),
+  row.clip?`walls: in ${row.wallFrames} frames, turn ${row.wallTurn} deg, layer hits ${row.wallHits}${row.fallback?', beat instead of the point':''}${row.crossLift?`, crossLift ${row.crossLift}`:''}`:'',row.aimGeo?JSON.stringify(row.aimGeo):'');
 const gestured=rows.filter(([,row])=>row.up>=LIMIT.upFrames);
 console.log(`gesture rows seen ${rows.length}, gestured ${gestured.length}; violations ${Object.values(result.stages).reduce((n,s)=>n+(s.violations?.length||0),0)}`);
 for(const shot of result.shots)console.log('still',shot.line,shot.before?'before':'hold',JSON.stringify(shot.geo));
@@ -330,6 +362,7 @@ for(const [id,row] of rows){
   if(row.postSolve)assert.ok(row.postSolve.median<=LIMIT.postAimDeg,`${id}: points where the layer aimed after the aim IK (${JSON.stringify(row.postSolve)})`);
   if(row.muzzleDev)assert.ok(row.muzzleDev<=LIMIT.muzzleDeg,`${id}: rifle keeps its direction (${row.muzzleDev} deg)`);
   if(row.clear!=null)assert.ok(row.clear>=LIMIT.rifleClearM,`${id}: gesturing hand clear of the rifle (${row.clear} m)`);
+  assert.equal(row.wallFrames||0,0,`${id}: gesturing arm in a wall on ${row.wallFrames} frames (${JSON.stringify(row.wallAt)})`);
 }
 assert.equal(result.after06.gestureLayers,0,`07+: no gesture layer (${JSON.stringify(result.after06)})`);
 if(result.ab){

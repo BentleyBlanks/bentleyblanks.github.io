@@ -294,7 +294,20 @@ Editable scenes: `OneDrive/AI/Models/Blender/Taierzhuang1938/SpeakerGestures_202
   tank on his rifle side, clamped and lifted, ended as a hand in front of his cap brim. A point that would lie
   within `alongRifleDeg` (25 deg) of the rifle held up in the other hand is moved `alongLiftDeg` (18 deg) off the
   barrel line, up (down when the target is below the barrel), so it does not read as a second man aiming
-  (`state.alongLift`); the 05 box is pointed at `pointRiseByTarget.ammoBox` (.3 m) over the floor, not man-high.
+  (`state.alongLift`). Both lifts put the arm above a low target, so the two points made with a rifle up in the
+  other hand have their own rise (`pointRiseByTarget`, 2026-09-26 relay r2 fix 3, after the Front package moved
+  the 05 keeper into the west door's view): the 05 box at the kneeling keeper's shoulder height (1.4 m; on the floor
+  the point ended 16.4-16.9 deg under the lifted arm) and the 06 runner's `south` 5 m up at 30 m (level, it lay
+  along his rifle and ended 15.2 deg off); measured after the fix 0 / 4.3 and 7.6 / 7.7 deg (median / max).
+  Walls (`world.ray`, the level's static colliders, set by the same runtime hook): an aimed arm is checked from the
+  shoulder along the aim for its length + `wallHandM` + `wallPadM`, and again `wallMarginDeg` further toward
+  the wall (the posed arm is not quite straight); in the way, the aim turns about the vertical toward the body's
+  front in `wallStepDeg` steps to the first clear direction (at most `wallMaxTurnDeg`, never past the cone's `in`
+  edge, at most `wallMaxOffTargetDeg` off the target; `state.wallTurn`), and eases back at `wallEaseDegS` once the
+  wall allows less. No clear direction when the line starts: the unaimed `wallFallbackClip` (`GestureBeatL`,
+  `state.wallFallback`) instead of the point; later (`state.wallBlocked`), or the posed arm of any clip reaching a
+  wall after the whole solve (`state.wallHit`): the arm eases back over `wallReleaseS`. The browser test gates
+  every gesture line on no frame with shoulder -> elbow -> wrist -> fingertips through a wall.
   Targets: `FRONT_SORTIE` / `FRONT_SPACE` anchors,
   `listener` (the head layer's look target, `listenerDropM` below the eye: a hand held out goes to the other man's
   chest, not above the seated Zhou's head), `south`, and `tank` from the mission runtime's provider
@@ -307,8 +320,8 @@ Editable scenes: `OneDrive/AI/Models/Blender/Taierzhuang1938/SpeakerGestures_202
   aim correction turns the right arm and the rifle only. An arm with `ArmWeight` over .5 also takes no part in the
   IK's reach shift (it neither triggers nor receives the shift of the grip pair), so a stretched pointing arm
   cannot drag the rifle hand. Both hooks read `rig.speakerGesture`, which is null outside 01-06: 07+ behaviour is
-  unchanged. Hook 3 is the one line `SetSpeakerGestureWorld` in the mission runtime's constructor (tank position
-  and ground height), cleared with `SetSpeakerGestureWorld({})` in its Dispose. The rifle stays where the two-hand pose put it (a crouched advance
+  unchanged. Hook 3 is the one line `SetSpeakerGestureWorld` in the mission runtime's constructor (tank position,
+  ground height and the static-collider ray for walls), cleared with `SetSpeakerGestureWorld({})` in its Dispose. The rifle stays where the two-hand pose put it (a crouched advance
   carries it across the chest), so the gesturing wrist and finger roots are kept `rifleClearM` (7 cm) off the
   barrel line by turning the arm about the shoulder (`_ClearRifle`): after the head turn against this frame's
   rifle prop helper, and again in `AfterActorAim` against where the aim IK really left the rifle (a point and a
@@ -326,7 +339,8 @@ Editable scenes: `OneDrive/AI/Models/Blender/Taierzhuang1938/SpeakerGestures_202
   again by the next line.
 - Switch: `SPEAKER_GESTURE.enabled`, or `rig.speakerGesture.enabled = false` per body.
 - Probe state (FRONT_ACTING, tests): `rig.speakerGesture.state = { clip, lineId, weight, t, phase, hand,
-  aimError, solveError, aimDir, clamped, alongLift, suppressed, busyFor, reachError, rifleLift }` (`aimError`:
+  aimError, solveError, aimDir, clamped, alongLift, crossLift, aimYaw, aimPitch, wallTurn, wallBlocked, wallHit,
+  wallFallback, suppressed, busyFor, reachError, rifleLift }` (`aimError`:
   shoulder -> hand against the target; `solveError` against the direction aimed at after the cone and rifle
   rules; `phase`: lift, wait, hold, out, release, waitFree,
   cancelled, missed, done); `rig.speakerGesture.lines[lineId] = { frames, gestureFrames, busyFrames, maxWeight,

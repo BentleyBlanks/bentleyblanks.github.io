@@ -109,13 +109,33 @@ export const SPEAKER_GESTURE = Object.freeze({
   // A wounded walk above this weight is busy (the same threshold Script_Actor._ApplyRiggedAim uses).
   maxWoundedWalk: .5,
   // Ground anchors are pointed at this high above the ground (a man-high point, not the dirt); the tank at
-  // its hull; 'south' is southM due south at the speaker's ground height plus pointRiseM; 'listener' at the
+  // its hull; 'south' is southM due south at the speaker's ground height plus its rise; 'listener' at the
   // listener's eye less listenerDropM (a hand is held out to the other man's chest, not his face: the seated 06
   // Zhou's offer to the standing player went up above his own head).
   pointRiseM: 1.0, tankRiseM: 1.6, southM: 30, listenerDropM: .45,
-  // Per-target rise over the ground instead of pointRiseM: the 05 ammunition box lies on the floor of the house,
-  // and a man-high point at it ran along the keeper's rifle (2026-09-25 review, BundleSupply.01).
-  pointRiseByTarget: Object.freeze({ ammoBox: .3 }),
+  // Per-target rise over the ground instead of pointRiseM, for the two points made with a rifle up in the other hand
+  // (the arm is lifted over the barrel across the front, crossLiftDeg, and off it along the front, alongLiftDeg), so
+  // that the lifted arm still ends within 12 deg of the target (the browser gate is 15):
+  //   ammoBox (BundleSupply.01): the keeper kneels at FRONT_SORTIE.keeper facing the front (north-north-east) with the
+  //   box 3.4 m off, 23 deg across his front to the right (2026-09-26 relay r2 fix 3, after the Front package moved him
+  //   into the west door's view). The box on the floor (.3) put the point 16 deg under the lifted arm (acceptance:
+  //   16.4-16.9 deg); at his kneeling shoulder height (1.29 m) the lift alone is left (8.6 deg): the point goes at the
+  //   height of his shoulder over the box, "in there".
+  //   south (Volunteer.01): the 06 runner kneels facing due south with the rifle 14 deg to his left and 3 deg down, so
+  //   a level point south lies along it and is raised 18 deg over the barrel (acceptance: 15.2 deg); a point at a far
+  //   destination goes up anyway, 5 m over the ground 30 m off (7 deg) leaves 8.
+  pointRiseByTarget: Object.freeze({ ammoBox: 1.4, south: 5 }),
+  // Walls (Script_SpeakerGestureLayer, world.ray = the level's static colliders; 2026-09-26 relay r2 acceptance
+  // close-up BundleAttack_01_Close read as Luo's arm in a wall, nothing checked it). An aimed arm is checked from the shoulder along the aim for the arm's length (wallArmM when
+  // the rig's bones cannot be measured) plus wallHandM (wrist to the tip of the pointing finger) plus wallPadM (sleeve
+  // and hand thickness), and again wallMarginDeg further toward the wall (the posed arm is not quite straight: on the
+  // node stub the fingertip ended 4 cm inside a wall the straight line cleared); in the way, the aim turns toward the
+  // body's front in wallStepDeg steps, at most wallMaxTurnDeg and at most wallMaxOffTargetDeg off the target (further
+  // off it points somewhere else), and eases back at wallEaseDegS once the wall allows less. No clear direction at
+  // the start: the unaimed wallFallbackClip instead; later, or the posed arm (any clip) in a wall: it eases back over
+  // wallReleaseS.
+  wallArmM: .5, wallHandM: .16, wallPadM: .04, wallMarginDeg: 12, wallStepDeg: 5, wallMaxTurnDeg: 60, wallMaxOffTargetDeg: 50,
+  wallEaseDegS: 90, wallReleaseS: .12, wallFallbackClip: "GestureBeatL",
 });
 
 // Who plays a speaking role when several bodies could (Script_FirstLevelSpeakerBinder).

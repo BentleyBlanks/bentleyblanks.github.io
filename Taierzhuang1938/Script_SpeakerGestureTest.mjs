@@ -343,6 +343,72 @@ function RunLine(layer, rig, { lineId, who, lengthS, stressAt = [], seconds, bus
     "a row for zhou does not play on luo");
 }
 {
+  // Walls (world.ray): an unarmed Luo points at the nest 60 deg to his left with a wall running along his left side.
+  // The wall is a plane parallel to his front, lateral metres off his root; the ray reports it like the level's
+  // colliders do (0 from inside it). Near enough that the point at the nest would end in it: the aim turns toward his
+  // front to the first clear direction and the posed arm never reaches the wall. Nearer still (no clear direction
+  // within wallMaxOffTargetDeg of the nest): the unaimed beat instead of the point.
+  const WallWorld = (rig, lateral) => {
+    const left = new THREE.Vector3(-1, 0, 0).transformDirection(rig.root.matrixWorld), n = left.clone().negate();
+    const p0 = rig.root.getWorldPosition(new THREE.Vector3()).addScaledVector(left, lateral);
+    const side = p => p.clone().sub(p0).dot(n);          // > 0: on his side of the wall
+    const ray = (o, d, far) => { const s = side(o); if (s <= 0) return 0; const into = -d.dot(n); if (into <= 1e-9) return null;
+      const t = s / into; return t <= far ? t : null; };
+    return { ray, side };
+  };
+  const WallRig = () => {
+    const rig = StubRig("LugouNra05");
+    rig.root.position.set(FRONT_SORTIE.nest.x - 30, 0, FRONT_SORTIE.nest.z);
+    rig.root.rotation.y = -5 * Math.PI / 6;       // front 60 deg right of the nest (+X): the nest on his left
+    // arms hanging down (the stub is built in a T-pose, with the hands out through any wall beside him)
+    rig.sides.L.upper.quaternion.setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2);
+    rig.sides.R.upper.quaternion.setFromAxisAngle(new THREE.Vector3(0, 0, 1), -Math.PI / 2);
+    rig.root.updateMatrixWorld(true);
+    return rig;
+  };
+  const InWall = (rig, wall) => {
+    const W = b => b.getWorldPosition(new THREE.Vector3()), s = rig.sides.L, hand = W(s.hand), fore = W(s.fore);
+    const tip = hand.clone().addScaledVector(hand.clone().sub(fore).normalize(), GT.wallHandM);
+    return Math.min(...[W(s.upper), fore, hand, tip].map(wall.side));
+  };
+  const Drive = (rig, layer, wall, line) => {
+    const rows = [], dt = 1 / 60;
+    for (let f = 0; f < 150; f++) {
+      const t = f * dt;
+      rig.facial.lastSpeech = t < 1.6 ? { active: true, who: "luo", lineId: line, sourceTime: t, stress: t > .6 && t < .7 ? 1 : 0 } : null;
+      layer.Apply(dt, {}); layer.AfterHead(); rig.root.updateMatrixWorld(true);
+      rows.push({ ...layer.state, gap: InWall(rig, wall) });
+    }
+    return rows;
+  };
+  const turned = WallRig(), wallA = WallWorld(turned, .6);
+  SetSpeakerGestureWorld({ ray: wallA.ray });
+  const rowsA = Drive(turned, new SpeakerGestureLayer(turned, null), wallA, "FrontBlockade.02");
+  const holdA = rowsA.filter(r => r.phase === "hold" && r.weight > .9);
+  assert.ok(holdA.length > 20 && holdA.every(r => r.clip === "GesturePointL"), "wall beside: still a point");
+  assert.ok(holdA.every(r => r.aimYaw > 50 && r.aimYaw < 70), `wall beside: the nest is ~60 deg out (${holdA[0]?.aimYaw})`);
+  assert.ok(holdA.every(r => r.wallTurn >= 20 && r.wallTurn <= GT.wallMaxOffTargetDeg), `wall beside: aim turned off the wall (${holdA.map(r => r.wallTurn)})`);
+  assert.ok(rowsA.filter(r => r.weight > .05).every(r => r.gap > 0), `wall beside: arm never in the wall (min gap ${Math.min(...rowsA.map(r => r.gap)).toFixed(3)} m)`);
+  // Without walls the same point goes straight at the nest (the turn above came from the wall).
+  SetSpeakerGestureWorld({});
+  const free = WallRig(), rowsFree = Drive(free, new SpeakerGestureLayer(free, null), wallA, "FrontBlockade.02");
+  assert.ok(rowsFree.filter(r => r.phase === "hold" && r.weight > .9).every(r => r.wallTurn === 0 && r.aimError < 8), "no world ray: no wall turn");
+  const tight = WallRig(), wallB = WallWorld(tight, .3);
+  SetSpeakerGestureWorld({ ray: wallB.ray });
+  const layerB = new SpeakerGestureLayer(tight, null), rowsB = Drive(tight, layerB, wallB, "FrontBlockade.02");
+  assert.ok(rowsB.some(r => r.clip === "GestureBeatL") && rowsB.every(r => r.clip !== "GesturePointL") && layerB.state.wallFallback,
+    `wall close beside: the beat instead of the point (${[...new Set(rowsB.map(r => r.clip))]})`);
+  assert.ok(rowsB.filter(r => r.weight > .5).every(r => r.gap > 0), "wall close beside: the beat's arm is not in the wall either");
+  // A wall right through where the beat's hand goes: the posed arm is caught and eases back within wallReleaseS.
+  const blocked = WallRig(), wallC = WallWorld(blocked, .05);
+  SetSpeakerGestureWorld({ ray: wallC.ray });
+  const rowsC = Drive(blocked, new SpeakerGestureLayer(blocked, null), wallC, "FrontBlockade.02");
+  const firstHit = rowsC.findIndex(r => r.wallHit);
+  assert.ok(firstHit >= 0 && rowsC.slice(firstHit + Math.ceil(GT.wallReleaseS * 60) + 1).every(r => r.weight === 0),
+    `arm in a wall: eased back within wallReleaseS (first hit frame ${firstHit})`);
+  SetSpeakerGestureWorld({});
+}
+{
   // Seated Zhou offers the cigarette (BorrowLight.07, GestureOfferR, aimed at the listener); a long line holds the
   // arm at most maxHoldS, then releases while he still talks. Armed: the right hand is on the rifle, refused.
   const rig = StubRig("LugouNra02"), listener = new THREE.Vector3(1.2, 1.5, -2);
@@ -376,7 +442,7 @@ function RunLine(layer, rig, { lineId, who, lengthS, stressAt = [], seconds, bus
   const root = new THREE.Object3D(); root.position.set(5, 2, 7); root.updateMatrixWorld(true);
   SetSpeakerGestureWorld({ ground: () => 3, tank: () => ({ x: 40, z: -120 }) });
   assert.deepEqual(SpeakerGestureTargetPoint("rightNest", { root }).toArray(), [FRONT_SORTIE.nest.x, 3 + GT.pointRiseM, FRONT_SORTIE.nest.z]);
-  assert.deepEqual(SpeakerGestureTargetPoint("south", { root }).toArray(), [5, 2 + GT.pointRiseM, 7 + GT.southM]);
+  assert.deepEqual(SpeakerGestureTargetPoint("south", { root }).toArray(), [5, 2 + (GT.pointRiseByTarget.south ?? GT.pointRiseM), 7 + GT.southM]);
   assert.deepEqual(SpeakerGestureTargetPoint("tank", { root }).toArray(), [40, 3 + GT.tankRiseM, -120]);
   SetSpeakerGestureWorld({});
   assert.equal(SpeakerGestureTargetPoint("tank", { root }), null, "no tank provider: no tank point");
