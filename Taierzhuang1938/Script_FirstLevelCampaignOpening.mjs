@@ -540,8 +540,11 @@ export const GLANCE_RAD_PER_FRAME = .1;
  * and died there in 6 of 16 cold 03 starts, against 0 in the Gate package's and the baseline's runs.
  */
 export const GLANCE_SEEN_FRAMES = 30;
+/** A view change between two glance frames bigger than this (rad) is the drive facing something on purpose, not the
+ *  route bot's own re-aiming (0.04 rad a frame, CampaignKit.Route): it becomes the view to go back to. */
+export const GLANCE_DRIVE_TURN_RAD = .06;
 async function InstallSpeakerGlance(page){
-  await page.evaluate(({near,turn,enough})=>{
+  await page.evaluate(({near,turn,enough,driveTurn:GLANCE_DRIVE_TURN_RAD})=>{
     const g=window.Tengxian;if(g.speakerGlance)return;
     const glance=g.speakerGlance={frames:0,restores:0,saved:null,last:null,lines:{}};
     const step=g.StepFrames,Wrap=a=>Math.atan2(Math.sin(a),Math.cos(a));
@@ -593,7 +596,14 @@ async function InstallSpeakerGlance(page){
       let yaw,pitch;
       if(head){
         if(!glance.active){glance.active=true;glance.saved??={yaw:p.yaw,pitch:p.pitch};}
-        else if(moved){p.yaw=glance.last.yaw;p.pitch=glance.last.pitch;}
+        else if(moved){
+          // A jump bigger than the route bot's own 0.04 rad a frame is the drive facing something on purpose (06: it faces
+          // Zhou at the borrow stand while Luo's last order still plays): that is where the view goes back to afterwards.
+          // Reverting it and restoring the older view left the player facing away from Zhou and BorrowLight never cued
+          // (09-25 relay r2 Front step 2 tank probe: 140 s at the borrow stand, lightShared missing).
+          if(Math.abs(Wrap(p.yaw-glance.last.yaw))>GLANCE_DRIVE_TURN_RAD||Math.abs(p.pitch-glance.last.pitch)>GLANCE_DRIVE_TURN_RAD)glance.saved={yaw:p.yaw,pitch:p.pitch};
+          p.yaw=glance.last.yaw;p.pitch=glance.last.pitch;
+        }
         glance.frames++;glance.lines[lineId]=(glance.lines[lineId]||0)+1;
         const row=window.frontLineActing?.[lineId];if(row)row.glanced++;
         // Well inside the picture already: just keep looking.
@@ -611,7 +621,7 @@ async function InstallSpeakerGlance(page){
       p.yaw=Toward(p.yaw,yaw);p.pitch=p.pitch+Math.max(-turn,Math.min(turn,pitch-p.pitch));
       glance.last={yaw:p.yaw,pitch:p.pitch};
     }
-  },{near:B.speakerViewNearM,turn:GLANCE_RAD_PER_FRAME,enough:GLANCE_SEEN_FRAMES});
+  },{near:B.speakerViewNearM,turn:GLANCE_RAD_PER_FRAME,enough:GLANCE_SEEN_FRAMES,driveTurn:GLANCE_DRIVE_TURN_RAD});
 }
 
 /** Frames a 03–06 line's speaker must be seen (CheckFrontActing: head in the picture, a face not a shoulder, nothing in between), and be acted then. */
