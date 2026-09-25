@@ -158,6 +158,7 @@ world：{ tankPose, targets[], Los(a,b), Cover(at), lastKnown, facts, rng }   //
 2. `node Taierzhuang1938/Script_FirstLevelMissionBrowserTest.mjs --campaign --stage-to=6 --audio`：01→06 一趟正常输入连续通过，零跳关、零检查点重试、页面错误 0。
 3. `--campaign --stage-from=3 --stage-to=6 --probe-front-gun` 冷启动一趟。
 4. 关键帧 K1–K11 实机截图逐张看过；口型采样（说话人嘴动、非说话人闭嘴）；敌军空转探针（每阶段 30 s 零发者 < 20%、4 s 不动者 ≤ 25%）；战车（露面可见、先压阵位再封口、05 对玩家有真实威胁窗口、毁伤两段）。
+   - 03–06 逐句「看得见」门（`Script_FirstLevelCampaignOpening.CheckFrontActing`）：有身体、在近处说的台词，说话人的脸要在画面里至少 10 帧（≥ `speakerViewMinM`、中间没墙没人），且那几帧在演、有转头/点头。两张豁免单：`FRONT_LINES_OUT_OF_PICTURE`（隔着阵地远喊或没有身体，要核实开口时确实远于 `speakerViewNearM`）；`FRONT_LINES_IN_FIREFIGHT`（交战中喊的 10 句）。**2026-09-26 集成负责人定：交战单按「玩家或说话人任一方在交战」豁免**——一句台词的帧里，至少一半是交战帧（玩家在交战：瞄准、躲闪、白刃、6 m 内有敌、刚挨打；或说话人在交战：1.5 s 内开过枪、处于压制状态、身边有手榴弹或 1 s 内躲过雷、白刃中或上刺刀冲锋，全部读 AI 已有状态）即豁免；原来只看玩家。依据：3A 射击里队友隔着掩体喊的报警和命令不要求入画（验收里 FrontWithdraw.01、TankRoadContact.02、TankTerror.01 都是罗班长交战中隔墙喊）。其它台词与其它门槛（10 帧、一半、转角 0.03 rad）不变。
 5. 07 以后未改动的阶段不测；改了共享系统（Script_Ai、Script_Audio 等）的地方用任务侧开关限定在 01–06，或补跑受影响段落。
 
 ## 8. 变更记录

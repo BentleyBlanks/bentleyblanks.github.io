@@ -419,9 +419,15 @@ export const ACTING_ROLES = Object.freeze(["guard", "zhou", "luo"]);
  * Idempotent: a run from 01 installs it at RearTrench, the front driver again at 03 (cold start).
  */
 export async function InstallSpeakerActing(page){
-  await page.evaluate(({roles,minM,stages})=>{
+  await page.evaluate(({roles,minM,stages,fireRecentS})=>{
     const r=window.Tengxian.Debug.FirstLevelMissionRuntime(),binder=r.speakers;
     if(binder.actingSampled)return;binder.actingSampled=true;
+    // The speaker's own fight (the firefight excuse, CheckFrontActing): read from the AI soldier, nothing new computed.
+    const SpeakerFighting=s=>{
+      const now=window.Tengxian.ai?.time??0,melee=s.meleeCombat;
+      return now-(s.lastFire??-99)<fireRecentS||s.state==="suppressed"||!!s.grenadeThreat||now-(s.grenadeThreatAt??-99)<1
+        ||!!(melee&&melee.state&&melee.state!=="idle")||s.state==="charge";
+    };
     window.openingRearActing={};window.openingRearHeard={};
     const update=binder.Update;
     binder.Update=function(){
@@ -479,6 +485,13 @@ export async function InstallSpeakerActing(page){
               speaker:soldier?[+soldier.position.x.toFixed(2),+soldier.position.z.toFixed(2)]:null,
               distM:soldier?+Math.hypot(soldier.position.x-p.x,soldier.position.z-p.z).toFixed(1):null}};
           row.frames++;if(busyNow)row.busyFrames=(row.busyFrames||0)+1;
+          // Is the speaker fighting this frame (2026-09-26 integration decision)? Firing (a shot within
+          // FRONT_SPEAKER_FIRE_RECENT_S), suppressed (AI state), dodging a grenade (a live grenade threat on him, or one
+          // within the last second) or in melee (a non-idle melee pose, or a bayonet charge) - the AI's own state, 03–06
+          // only. A fight frame is a frame either side fights; the firefight excuse of CheckFrontActing counts these.
+          const speakerFight=!!soldier&&stages.includes(r.flow.stage.id)&&SpeakerFighting(soldier);
+          if(speakerFight)row.speakerFightFrames=(row.speakerFightFrames||0)+1;
+          if(busyNow||speakerFight)row.fightFrames=(row.fightFrames||0)+1;
           if(!soldier)continue;row.bodyFrames++;
           if(!soldier.actor?.poseVisible||!rig?.bones?.head)continue;
           row.visibleFrames++;
@@ -536,7 +549,7 @@ export async function InstallSpeakerActing(page){
       }
       return result;
     };
-  },{roles:ACTING_ROLES,minM:B.speakerViewMinM,stages:FRONT_LINE_STAGES});
+  },{roles:ACTING_ROLES,minM:B.speakerViewMinM,stages:FRONT_LINE_STAGES,fireRecentS:FRONT_SPEAKER_FIRE_RECENT_S});
   await InstallSpeakerGlance(page);
 }
 
@@ -670,9 +683,14 @@ export const FRONT_LINES_OUT_OF_PICTURE = Object.freeze({
   "ZhouLift.03": "同上，担架员没有能绑脸的身体",
 });
 /**
- * Near lines shouted in the thick of a fight, one reason each: excused only when the player really was fighting through
- * most of the line (aiming, dodging, in melee, an enemy within 6 m, or just hit - the drive's busy frames, see
- * InstallSpeakerGlance) - FRONT_LINE_FIGHT_SHARE of its frames. A player who is free to look has to see the speaker.
+ * Near lines shouted in the thick of a fight, one reason each: excused only when either side really was fighting through
+ * most of the line - FRONT_LINE_FIGHT_SHARE of its frames are fight frames, a frame in which the player fights (aiming,
+ * dodging, in melee, an enemy within 6 m, or just hit - the drive's busy frames, see InstallSpeakerGlance) OR the
+ * speaker fights (firing, suppressed, dodging a grenade, in melee or a bayonet charge - his AI state, see
+ * InstallSpeakerActing). 2026-09-26 integration decision: in a 3A shooter a squad leader's warning or order shouted
+ * from behind cover while he is in the fight is not required to be in the picture (FrontWithdraw.01, TankRoadContact.02,
+ * TankTerror.01 in the acceptance run: Luo shouting through a wall mid-fight). Lines outside this list (and these lines
+ * when neither side fights) still have to be seen.
  */
 export const FRONT_LINES_IN_FIREFIGHT = Object.freeze({
   "FrontAttack.01": "夺下右枪位那一刻：罗班长喊「土坎前头那一伙」时，玩家正对着缺口外的冲锋组开枪",
@@ -687,6 +705,8 @@ export const FRONT_LINES_IN_FIREFIGHT = Object.freeze({
   "BundleAttack.02": "攻击位上罗班长在投弹点西侧 1.5 m 喊「顺子，拿弹！旁边的人我看到！」，玩家正瞄着战车和跟车步兵",
 });
 export const FRONT_LINE_FIGHT_SHARE = .5;
+/** A speaker counts as firing for this long after his last shot (s): a rifleman's bolt cycle and an MG burst pause. */
+export const FRONT_SPEAKER_FIRE_RECENT_S = 1.5;
 const FRONT_LINE_STAGES = Object.freeze(["Support", "MachineGun", "Tank", "Orders"]);
 
 /**
@@ -717,7 +737,7 @@ export async function CheckFrontActing(ctx,{upTo="Support"}={}){
     &&FRONT_SCENE_IDS.includes(lines[id].cue)&&FRONT_LINE_STAGES.indexOf(lines[id].stage)>=0&&FRONT_LINE_STAGES.indexOf(lines[id].stage)<=last);
   const Row=id=>{const r=lines[id];return `${id} ${r.who} ${r.stage} t=${r.t} seen=${r.seenFrames||0} actedSeen=${r.actedSeen||0} inFrame=${r.inFrameFrames} close=${r.closeFrames||0} wall=${r.wallFrames||0} hidden=${r.hiddenFrames||0} turn=${r.turn} startDist=${r.start.distM} minOff=${r.minOffDeg}`;};
   console.log("FRONT_LINES",upTo,JSON.stringify(Object.fromEntries(due.map(id=>{const r=lines[id];
-    return [id,{who:r.who,stage:r.stage,frames:r.frames,visible:r.visibleFrames,busy:r.busyFrames||0,hiddenBy:r.hiddenBy||null,seen:r.seenFrames||0,ownView:r.seenOwnView||0,actedSeen:r.actedSeen||0,inFrame:r.inFrameFrames,close:r.closeFrames||0,wall:r.wallFrames||0,hidden:r.hiddenFrames||0,turn:r.turn,startDistM:r.start.distM,held:r.held??null,
+    return [id,{who:r.who,stage:r.stage,frames:r.frames,visible:r.visibleFrames,busy:r.busyFrames||0,speakerFight:r.speakerFightFrames||0,fight:r.fightFrames||0,hiddenBy:r.hiddenBy||null,seen:r.seenFrames||0,ownView:r.seenOwnView||0,actedSeen:r.actedSeen||0,inFrame:r.inFrameFrames,close:r.closeFrames||0,wall:r.wallFrames||0,hidden:r.hiddenFrames||0,turn:r.turn,startDistM:r.start.distM,held:r.held??null,
       heldWhy:r.heldWhy??null,glanced:r.glanced??0}];}))));
   // Every due line is judged before anything throws: one failure message lists all the lines that missed.
   const failures=[];
@@ -726,7 +746,7 @@ export async function CheckFrontActing(ctx,{upTo="Support"}={}){
     const r=lines[id],excused=FRONT_LINES_OUT_OF_PICTURE[id];
     const fight=FRONT_LINES_IN_FIREFIGHT[id];
     if(fight&&(r.seenFrames||0)<FRONT_LINE_IN_FRAME_FRAMES){
-      if(!((r.busyFrames||0)>=r.frames*FRONT_LINE_FIGHT_SHARE))failures.push(`${id} is excused as said in a fight («${fight}») but the player was free to look (busy ${r.busyFrames||0}/${r.frames}; ${Row(id)})`);
+      if(!((r.fightFrames||0)>=r.frames*FRONT_LINE_FIGHT_SHARE))failures.push(`${id} is excused as said in a fight («${fight}») but neither the player nor the speaker was fighting (fight ${r.fightFrames||0}/${r.frames}: player ${r.busyFrames||0}, speaker ${r.speakerFightFrames||0}; ${Row(id)})`);
       continue;
     }
     if(excused){
