@@ -1843,7 +1843,7 @@
    "next": [
     "IjaDragByForearm"
    ],
-   "notes": "SB04: squats astride Shunzi's legs, left fist in his collar (player collar), and raises the rifle one-handed by the handguard (0.62 m from the butt plate) over his right shoulder, butt up over his back (apex 0.55 s). 0.55-1.05 s is a seamless hold loop (the fist trembles); the director lets go with pose.holdUntil (hold at least 0.4 s). Wind-up to 1.125 s, then the butt comes over the top and down onto the head (buttHit 1.375 s, player head), pulls back over and ends in the low carry (fist at the knee, muzzle forward-down to his right). Face up and on Shunzi's eye throughout (look = player head). Last frame = IjaDragByForearm frame 0.",
+   "notes": "SB04: squats astride Shunzi's legs, left fist in his collar (player collar), and swings the rifle up one-handed, butt first over the top, sliding his fist from the handguard up to the wrist of the stock (0.42 m from the butt plate): fist high over his right shoulder, butt aimed down at Shunzi's face, barrel up behind him (apex 0.55 s; from Shunzi's eye the butt is upper left). 0.55-1.05 s is a seamless hold loop (the fist trembles); the director lets go with pose.holdUntil (hold at least 0.4 s). Cocks to 1.125 s and drives the butt down onto the forehead (buttHit 1.375 s, player head + playerOffsetM), swings it back over the top and ends in the low carry (fist on the handguard at the knee, muzzle forward-down to his right). Face up and on Shunzi's eye throughout (look = player head). Last frame = IjaDragByForearm frame 0.",
    "rigs": [
     "LugouIja02"
    ]
@@ -5987,7 +5987,7 @@
   {
    "id": "LugouIja02",
    "file": "Animation_LugouIja02OpeningStoryboards.json",
-   "sha256": "8e80f17fa7fab9c28f6b1a92407a8daae6abd6baa34299ec7d4d44b2f3e74573",
+   "sha256": "94cb6b6340817fd099dd3e658f74bbdba1cd50ab9e01544c3fb46e107477edb4",
    "originalModelSha256": "8c4860ec2d4dd3076b06ff7e593e5dcfd4d23aefe2fedf6f9fdec3b0e12cc9aa",
    "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningStoryboards_20260925\\Scene_LugouIja02OpeningStoryboards.blend",
    "contactPoints": {

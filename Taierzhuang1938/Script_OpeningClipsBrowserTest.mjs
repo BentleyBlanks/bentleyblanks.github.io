@@ -17,7 +17,8 @@
 //   9) 抓第一人称玩家（2026-09-25 起）：clip 带 player 轨（collar / head / forearmR…）的，手在 grab/hold 窗口里
 //      握点到 player 轨那一点 ≤ 3 cm；抓握臂长比（肩到目标点 ÷ 上臂+前臂+手到握点的绑定长度）≤ 1.05——
 //      不许把胳膊锁直去够人；枪托砸头（limb butt → head）在接触时刻枪的网格到 player 头点（加 contact 的
-//      playerOffsetM：眼位前上方的额头）≤ 3 cm。
+//      playerOffsetM：眼位前上方的额头）≤ 3 cm（只查声明了落点的；2026-09-23 的 IjaButtStrike 没声明，
+//      枪托到眼位 7.9 cm）。
 //  10) 单帧突跳（ROUND_0925 里的 clip）：任一骨头相邻两帧的世界旋转 > 25° 且大于前后两帧各自的 2.5 倍，算一跳。
 // 用法：node Taierzhuang1938/Script_OpeningClipsBrowserTest.mjs [--shots] [--clip=名字,名字]
 //   --shots 另存审片图到 <仓库>/tmp/OpeningClipsReview/（每条 clip 三帧 × 侧面/45° 俯视，每个 stage 的关键时刻），不进仓库。
@@ -416,7 +417,7 @@ try {
         const until = release ? release.t : clip.duration;
         for (let t = from; t <= Math.max(from, until) + 1e-6; t += 2 / plan.fps)
           checks.push({ limb: c.limb, action: c.action, part: c.part, track: part, contactT: c.t, at: Math.round(t * 1000) / 1000 });
-      } else if (c.limb === "butt" && c.action === "strike")
+      } else if (c.limb === "butt" && c.action === "strike" && c.playerOffsetM)   // where on the head (2026-09-25 clips declare it)
         checks.push({ limb: c.limb, action: c.action, part: c.part, track: part, contactT: c.t, at: c.t, offset: c.playerOffsetM || [0, 0, 0] });
     }
     if (!checks.length) continue;

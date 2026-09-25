@@ -3827,18 +3827,24 @@ def DirChannel(keys):
 
 # -- SB04 IjaButtStrikeCollar ------------------------------------------------------------
 # Shunzi half-lies on his back, propped, feet toward ijaA; ijaA squats astride his legs, left fist in his
-# collar, and swings the rifle one-handed by the handguard like a club: butt up over his own back at the
-# apex (hold loop), over the top and down onto the head. The storyboard camera is Shunzi's eye
-# (player `head`, ~0.40 m high) looking up ~30-38 deg: the face is up and toward it the whole clip.
+# collar. He swings the rifle up butt-first over the top and holds it high one-handed, choked up to the
+# wrist of the stock, the butt aimed down at Shunzi's face and the barrel standing up behind his right
+# shoulder (apex, hold loop) -- from Shunzi's eye the butt is in the upper left (SB04). He cocks it and
+# drives the butt down onto the forehead. The storyboard camera is Shunzi's eye (player `head`, ~0.40 m
+# high) looking up ~30-38 deg: the face is up and toward it the whole clip.
 BUTT_STANCE = {'pelvis': (0, .06, .32), 'pelvisTilt': (.32, 0, 0), 'bend': .75}   # deep squat: the collar is in reach without the reach assist
 BUTT_LOW_HAND, BUTT_LOW_DIR = (-.45, -.30, .45), (-.10, .90, .40)     # low carry: fist at the knee, butt behind the hip
-# Apex (SB04): the fist out to his right at head height, the butt up over his head and the long fore-end down
-# past his right knee toward the camera -- from Shunzi's eye the fist is upper left, the rifle runs down-left out
-# of the frame and the butt stands over the helmet.
-BUTT_APEX_HAND, BUTT_APEX_DIR = (-.40, -.28, 1.08), (.30, .40, .87)
+# Apex (SB04): the fist high over his right shoulder, the butt aimed forward-down at Shunzi's face.
+BUTT_APEX_HAND, BUTT_APEX_DIR = (-.30, -.32, 1.20), (.06, -.63, -.77)   # the fist clear of the helmet on screen
+BUTT_WIND_DIR = (-.10, -.75, -.45)        # cocked: the butt pulled up a little before the blow
+BUTT_HIT_DIR = (.05, -.45, -.89)          # the blow: the butt driven down onto the forehead
+# Where the fist holds the rifle (real metres from the butt plate): the handguard in the low carry, choked
+# up to the wrist of the stock for the blow (the rifle slides through the fist on the way up and down).
+BUTT_GRIP = Channel([(0.0, .62), (.20, .62), (.46, .42), (1.55, .42), (1.95, .62), (51 / 24, .62)])
+# The butt goes over the top (fist -> butt, keys <= 52 deg apart for DirChannel), both ways.
+BUTT_OVER = [(-.18, .40, .90), (-.18, -.25, .95), (-.15, -.85, .40), (-.12, -.95, -.20)]
 BUTT_HIT_T = 33 / 24          # the butt on the head (a baked frame)
 BUTT_T = 51 / 24               # durations are whole frames: every key time above is then a baked frame
-BUTT_THETA = 170.0            # apex -> impact: the rifle turns over the top about his left axis
 
 
 def ButtCollarPaths():
@@ -3860,8 +3866,8 @@ def ButtStrikeParts(T):
     H, A = T.H, T.A
     collar, head = ButtCollarPaths()
     hitButt = Vector(head(BUTT_HIT_T)) + Vector((0, .05, .07))           # the forehead, in front of the eye
-    hitDir = RotX(Unit(BUTT_APEX_DIR), BUTT_THETA)
-    hitHand = tuple(hitButt - Vector(hitDir) * T.R(.62))
+    hitDir = Unit(BUTT_HIT_DIR)
+    hitHand = tuple(hitButt - Vector(hitDir) * T.R(BUTT_GRIP(BUTT_HIT_T)))
     base = Standing(T)
     base.update({'pelvis': BUTT_STANCE['pelvis'], 'pelvisTilt': BUTT_STANCE['pelvisTilt'], 'bend': BUTT_STANCE['bend'],
                  'neck': (-.15, 0, 0), 'head': (-.20, 0, 0), 'lookW': 1.0,
@@ -3881,23 +3887,21 @@ def ButtStrikeParts(T):
                       # elbow pole was: the elbow is held back/up meanwhile (it flipped over in one frame at 1.96 s)
                       (1.75, (-.72, -.10, .95)), (1.88, (-.55, .35, .90)), (2.02, (-.62, .15, .55)), (BUTT_T, (-.70, -.20, .55))],
     })
-    hand = Channel([(0.0, BUTT_LOW_HAND), (.20, Add3(BUTT_LOW_HAND, (0, 0, .03))), (.40, (-.36, -.28, .85)), (.55, BUTT_APEX_HAND),
-                    (1.05, BUTT_APEX_HAND), (1.125, Add3(BUTT_APEX_HAND, (-.02, .06, .02))), (1.25, (-.22, -.32, 1.10)),
-                    (BUTT_HIT_T, hitHand), (1.50, Add3(hitHand, (-.02, .04, -.01))), (1.70, (-.28, -.30, 1.02)),
-                    (1.88, (-.34, -.28, .85)), (2.05, BUTT_LOW_HAND), (BUTT_T, BUTT_LOW_HAND)])
-    theta = Channel([(.55, 0.0), (1.05, 0.0), (1.125, -12.0), (1.25, 95.0), (BUTT_HIT_T, BUTT_THETA), (1.50, BUTT_THETA - 14)])
-    pre = DirChannel([(0.0, BUTT_LOW_DIR), (.20, BUTT_LOW_DIR), (.55, BUTT_APEX_DIR)])
-    apex = Unit(BUTT_APEX_DIR)
-    # after the hit he pulls the rifle back up and over (the reverse arc) and lets it down to the low carry
-    post = DirChannel([(1.50, RotX(apex, BUTT_THETA - 14)), (1.62, RotX(apex, 120)), (1.74, RotX(apex, 60)),
-                       (1.88, apex), (2.05, BUTT_LOW_DIR), (BUTT_T, BUTT_LOW_DIR)])
+    windHand = Add3(BUTT_APEX_HAND, (-.02, .08, -.03))      # cocked back (the apex fist is already near full reach)
+    # the rifle is up by 0.48 s: the hand's rate limit settles on the apex before the hold loop starts (seam)
+    hand = Channel([(0.0, BUTT_LOW_HAND), (.20, Add3(BUTT_LOW_HAND, (0, 0, .03))), (.35, (-.34, -.24, .98)), (.48, BUTT_APEX_HAND),
+                    (.55, BUTT_APEX_HAND),
+                    (1.05, BUTT_APEX_HAND), (1.125, windHand), (1.25, Lerp3(windHand, hitHand, .55)),
+                    (BUTT_HIT_T, hitHand), (1.50, Add3(hitHand, (-.03, .05, .04))), (1.70, (-.26, -.26, 1.12)),
+                    (1.88, (-.36, -.26, .85)), (2.05, BUTT_LOW_HAND), (BUTT_T, BUTT_LOW_HAND)])
+    o1, o2, o3, o4 = BUTT_OVER
+    # up: the butt swings from behind his hip over the top and forward; back down: the same arc reversed
+    rifleDir = DirChannel([(0.0, BUTT_LOW_DIR), (.20, BUTT_LOW_DIR), (.28, o1), (.35, o2), (.40, o3), (.44, o4), (.48, BUTT_APEX_DIR), (.55, BUTT_APEX_DIR),
+                           (1.05, BUTT_APEX_DIR), (1.125, BUTT_WIND_DIR), (BUTT_HIT_T, BUTT_HIT_DIR), (1.50, (0, -.55, -.83)),
+                           (1.62, o4), (1.72, o3), (1.82, o2), (1.94, o1), (2.05, BUTT_LOW_DIR), (BUTT_T, BUTT_LOW_DIR)])
 
     def DirAt(t):
-        if t <= .55:
-            return pre(t)
-        if t <= 1.50:
-            return RotX(apex, theta(t))
-        return post(t)
+        return rifleDir(t)
 
     def Tremor(t):
         # the apex hold: the fist trembles with the effort (two cycles per loop, zero at both seams)
@@ -3907,18 +3911,18 @@ def ButtStrikeParts(T):
         return (0, 0, 0)
 
     def RifleAt(t):
-        return RifleByHand(T, Add3(hand(t), Tremor(t)), DirAt(t))
+        return RifleByHand(T, Add3(hand(t), Tremor(t)), DirAt(t), BUTT_GRIP(t))
     parts = {'base': base, 'body': body, 'collar': collar, 'head': head, 'rifle': RifleAt, 'hitButt': tuple(hitButt),
-             'hand': lambda t: Add3(hand(t), Tremor(t))}
+             'hand': lambda t: Add3(hand(t), Tremor(t)), 'grip': BUTT_GRIP}
     T.cache['buttStrike'] = parts
     return parts
 
 
-def ClubGrip(f, T, rifle):
-    """Right fist on the handguard of a club-held rifle."""
+def ClubGrip(f, T, rifle, along=.62):
+    """Right fist round a club-held rifle, `along` real metres from the butt plate (the handguard by default)."""
     up = ClubUp(rifle['axis'])
     palmF, palmN = ClubPalm(rifle['axis'], up)
-    f['grip.R'] = T.Along(rifle, .62)
+    f['grip.R'] = T.Along(rifle, along)
     f['palmF.R'], f['palmN.R'], f['curl.R'] = palmF, palmN, 1.0
     f['handRel.R'] = None
     return up
@@ -3935,11 +3939,13 @@ Meta('IjaButtStrikeCollar', BUTT_T, False, 'track', role='ijaA', rig='LugouIja02
      events=[{'t': .55, 'kind': 'apex'}, {'t': 1.125, 'kind': 'windUp'},
              {'t': BUTT_HIT_T, 'kind': 'buttHit', 'fact': 'playerStruck'}],
      prev=['CollarDrag', 'IjaKickBeam'], next=['IjaDragByForearm'],
-     notes='SB04: squats astride Shunzi\'s legs, left fist in his collar (player collar), and raises the rifle one-handed by '
-           'the handguard (0.62 m from the butt plate) over his right shoulder, butt up over his back (apex 0.55 s). '
-           '0.55-1.05 s is a seamless hold loop (the fist trembles); the director lets go with pose.holdUntil (hold at '
-           'least 0.4 s). Wind-up to 1.125 s, then the butt comes over the top and down onto the head (buttHit 1.375 s, '
-           'player head), pulls back over and ends in the low carry (fist at the knee, muzzle forward-down to his right). '
+     notes='SB04: squats astride Shunzi\'s legs, left fist in his collar (player collar), and swings the rifle up one-handed, '
+           'butt first over the top, sliding his fist from the handguard up to the wrist of the stock (0.42 m from the butt '
+           'plate): fist high over his right shoulder, butt aimed down at Shunzi\'s face, barrel up behind him (apex 0.55 s; '
+           'from Shunzi\'s eye the butt is upper left). 0.55-1.05 s is a seamless hold loop (the fist trembles); the '
+           'director lets go with pose.holdUntil (hold at least 0.4 s). Cocks to 1.125 s and drives the butt down onto the '
+           'forehead (buttHit 1.375 s, player head + playerOffsetM), swings it back over the top and ends in the low carry '
+           '(fist on the handguard at the knee, muzzle forward-down to his right). '
            'Face up and on Shunzi\'s eye throughout (look = player head). Last frame = IjaDragByForearm frame 0.')
 
 
@@ -3953,12 +3959,12 @@ def BuildButtStrikeCollar(T, name):
         f = body(t)
         f['look'] = head(t)
         PlayerHands(f, t, grips)
-        ClubGrip(f, T, RifleAt(t))
+        ClubGrip(f, T, RifleAt(t), BUTT_GRIP(t))
         return T.Nest(f)
 
     def Check(t):
         out = PlayerHands({}, t, grips)
-        out['R'] = T.Along(RifleAt(t), .62)
+        out['R'] = T.Along(RifleAt(t), BUTT_GRIP(t))
         return out
 
     def Probes(t):
