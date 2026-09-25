@@ -1224,38 +1224,59 @@ if (deaf.legacyProfile !== "shared" || deaf.legacy.join(",") !== "3") {
 
 // 两套耳鸣不叠（2026-09-25）：任务侧开关翻过来的那一刻（06→07、跳关回到 01–06），
 // 另一套的鸣响若还在响，新的一套起来时要把它收掉 —— 同一时刻只许一条耳鸣在响，收掉的那条节点归还。
+// 不靠墙钟（2026-09-25 审查）：原来按 0.45 s 的耳鸣 + 睡 300 ms 再读增益，机器忙时这一觉睡过一秒多，
+// 通用那条已经自己淡完，前置就读成「没建起来」（假红，复跑又绿）。现在：
+//   - 每一档都给 2 s 的保持（通用那条封顶 maxHoldS 2.2 s，再加 1.4 s 恢复），留足余量；
+//   - 「在响」同时认增益与状态：通用那条 = deafenVoice 在、且增益 > 1e-3 或还没到 deafenUntil；
+//     两档那条 = tinnitus 在、且增益 > 1e-3 或它的回收点还没到。「另一条已收掉」照旧要求句柄为空、节点已归还；
+//   - 按音频时钟量每一觉实际睡了多久，超过 1.5 s 就整轮重来（最多 3 轮），三轮都超就报「环境太慢不判」而不是红。
 const flip = await page.evaluate(async () => {
   const a = window.Taierzhuang.audio;
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const saved = a.firstLevelSoundscape;
-  a.ResetDeafen();
-  await sleep(150);
-  const Ringing = () => ({
-    firstLevel: !!a.tinnitus && a.tinnitus.tone.gain.value > 1e-3,
-    shared: !!a.deafenVoice && a.deafenVoice.g.gain.value > 1e-3,
-    firstLevelPending: [...a.pendingVoices].filter((v) => v.tone && v.hiss).length,
-    sharedPending: [...a.pendingVoices].filter((v) => v.osc && v.user && v.g).length,
-  });
-  // 通用那条在响 → 开关翻到 01–06 → 战斗档近爆。
-  a.firstLevelSoundscape = false;
-  a.Deafen(0.45);
-  await sleep(300);
-  const sharedBefore = Ringing();
-  a.firstLevelSoundscape = true;
-  a.DeafenFirstLevel(0.42, 0.13, 1, "combat");
-  await sleep(300);
-  const toFirstLevel = Ringing();
-  // 01–06 的战斗档在响 → 开关翻到 07 以后 → 通用近爆。
-  a.firstLevelSoundscape = false;
-  a.Deafen(0.45);
-  await sleep(300);
-  const toShared = { ...Ringing(), deafCurve: !!a.deafCurve, profile: a.tinnitusState?.profile ?? null };
+  const HOLD_S = 2.0, NAP_LIMIT_S = 1.5;
+  const Nap = async (ms) => { const t0 = a.ctx.currentTime; await sleep(ms); return a.ctx.currentTime - t0; };
+  const Ringing = () => {
+    const now = a.ctx.currentTime;
+    return {
+      firstLevel: !!a.tinnitus && (a.tinnitus.tone.gain.value > 1e-3
+        || (a.pendingVoices.has(a.tinnitus) && a.tinnitus.releaseAt > now)),
+      shared: !!a.deafenVoice && (a.deafenVoice.g.gain.value > 1e-3 || a.deafenUntil > now),
+      firstLevelPending: [...a.pendingVoices].filter((v) => v.tone && v.hiss).length,
+      sharedPending: [...a.pendingVoices].filter((v) => v.osc && v.user && v.g).length,
+    };
+  };
+  let result = null;
+  for (let round = 1; round <= 3; round += 1) {
+    a.ResetDeafen();
+    await sleep(150);
+    const naps = [];
+    // 通用那条在响 → 开关翻到 01–06 → 战斗档近爆。
+    a.firstLevelSoundscape = false;
+    a.Deafen(HOLD_S);
+    naps.push(await Nap(300));
+    const sharedBefore = Ringing();
+    a.firstLevelSoundscape = true;
+    a.DeafenFirstLevel(HOLD_S, 0.13, 1, "combat");
+    naps.push(await Nap(300));
+    const toFirstLevel = Ringing();
+    // 01–06 的战斗档在响 → 开关翻到 07 以后 → 通用近爆。
+    a.firstLevelSoundscape = false;
+    a.Deafen(HOLD_S);
+    naps.push(await Nap(300));
+    const toShared = { ...Ringing(), deafCurve: !!a.deafCurve, profile: a.tinnitusState?.profile ?? null };
+    const napMax = +Math.max(...naps).toFixed(2);
+    result = { round, napMax, tooSlow: napMax > NAP_LIMIT_S, sharedBefore, toFirstLevel, toShared };
+    if (!result.tooSlow) break;
+  }
   a.ResetDeafen();
   a.firstLevelSoundscape = saved;
   await sleep(200);
-  return { sharedBefore, toFirstLevel, toShared };
+  return result;
 });
-if (!flip.sharedBefore.shared) {
+if (flip.tooSlow) {
+  console.log(`skip 两套耳鸣不叠：环境太慢不判 —— 三轮里每一轮都有一觉按音频时钟睡了 > 1.5 s（最后一轮 ${flip.napMax} s）`);
+} else if (!flip.sharedBefore.shared) {
   Fail(`前置没建起来：开关关着时通用耳鸣没响 ${JSON.stringify(flip)}`);
 } else if (!(flip.toFirstLevel.firstLevel && !flip.toFirstLevel.shared && flip.toFirstLevel.sharedPending === 0)) {
   Fail(`开关翻到 01–06 后通用耳鸣没收掉，两套叠在一起响：${JSON.stringify(flip)}`);
