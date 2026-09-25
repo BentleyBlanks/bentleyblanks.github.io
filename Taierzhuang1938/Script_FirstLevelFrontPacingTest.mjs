@@ -572,6 +572,13 @@ function WalkRuntime(extra = {}) {
   const cs = {};
   let c = LeadPace(bend, 2, { x: 10, z: -0.2 }, { x: 6, z: 0 }, cs); assert.ok(c.wait && c.corner, "player 4 m back: he holds at the corner");
   c = LeadPace(bend, 2, { x: 10, z: -0.2 }, { x: 8, z: 0 }, cs); assert.ok(!c.wait, "player within minM: he goes on");
+  // Pointing holds his fire for pointS (an aiming brain drops the upper-body clip: 09-25 SB07 shot), and gives back the value he had.
+  assert.equal(L.pointHoldsFire, true, "Luo holds fire while he points");
+  { const q = new FirstLevelFrontBattle({}), man = { scriptedNoncombatant: false };
+    q.PointQuiet(man, true); assert.equal(man.scriptedNoncombatant, true, "pointing: he does not aim or fire");
+    q.PointQuiet(man, true); q.PointQuiet(man, false); assert.equal(man.scriptedNoncombatant, false, "... and fights again once the pointing ends");
+    const held = { scriptedNoncombatant: true }; q.PointQuiet(held, true); q.PointQuiet(held, false);
+    assert.equal(held.scriptedNoncombatant, true, "a man already held by the scene stays held"); }
   // The Walk option drives MoveActor with that pace, and only in the lead stretch (before approach[endApproachIndex]).
   const moves = [], r = { time: 0, squadRoutes: new Map(), player: { position: { x: 0, z: -141.6 } }, guards: [], flow: { stage: { id: "Support" } },
     Has: () => false, Record() {}, Near: () => false, Say() {}, RespondToGrenade: () => false, Defend() {},

@@ -188,20 +188,39 @@ export class FirstLevelFrontBattle {
    * FrontApproach line, and at a corner he holds (B.leaderLead) he faces the next leg and points along it. The pose is
    * the opening layer's PointBlockade (Script_OpeningStoryboardAnimation; loaded at level start by the bunker show),
    * written only while this pointing lasts and taken off only if it is still ours.
+   * For the first pointS of a pointing he holds his fire (scriptedNoncombatant, the value he had is put back): the
+   * opening layer drops an upper-body clip whenever the brain aims or fires (Script_OpeningStoryboardAnimation
+   * nativeCombat), and at the FrontApproach line he has the nest gunner in sight -- 09-25 SB07 shot: flagged
+   * PointBlockade, drawn kneeling with the rifle up.
+   * While he holds fire he also turns himself toward where he points (pointTurnRps, from the facing shown last frame,
+   * the way the opening director turns its actors): a held man's brain faces what it last heard (lkp outranks
+   * watchYaw in Script_Ai), and waiting he faced the player (LeaderGuide.Watch) -- 09-25 third SB07 shot: arm out,
+   * body 85 deg off, pointing at the trench wall.
    */
-  UpdatePoint(){
+  UpdatePoint(dt=0){
     const r=this.r,L=B.leaderLead,luo=this.Leader,w=luo&&this.walks.get(luo.id);if(!luo?.alive)return;
     const approach=this.approachPointAt!=null&&r.time-this.approachPointAt<L.pointS;
     const to=this.lead?.corner||(approach&&w&&w.index<w.route.length?w.route[w.index]:null);
     if(to){
       if(!this.pointFrom)this.pointFrom={at:r.time,corner:!!this.lead?.corner};
+      this.PointQuiet(luo,L.pointHoldsFire&&r.time-this.pointFrom.at<L.pointS);
       InstallOpeningStoryboardAnimation(luo);
       luo.openingStoryboardPose={clip:"PointBlockade",seconds:r.time-this.pointFrom.at,upperBody:true};luo.frontPointing=true;
       luo.watchYaw=Math.atan2(luo.position.x-to.x,luo.position.z-to.z);luo.watchUntil=r.ai.time+.3;
+      if(this.pointQuiet){
+        if(Number.isFinite(this.pointQuiet.yaw))luo.yaw=this.pointQuiet.yaw;
+        const turn=Math.atan2(Math.sin(luo.watchYaw-luo.yaw),Math.cos(luo.watchYaw-luo.yaw)),step=L.pointTurnRps*dt;
+        luo.yaw+=Math.max(-step,Math.min(step,turn));this.pointQuiet.yaw=luo.yaw;
+        if(luo.actor?.root)luo.actor.root.rotation.y=luo.yaw;
+      }
       return;
     }
-    this.pointFrom=null;
+    this.pointFrom=null;this.PointQuiet(luo,false);
     if(luo.frontPointing){luo.frontPointing=false;if(luo.openingStoryboardPose?.clip==="PointBlockade")luo.openingStoryboardPose=null;}
+  }
+  PointQuiet(luo,on){
+    if(on&&!this.pointQuiet){this.pointQuiet={was:!!luo.scriptedNoncombatant};luo.scriptedNoncombatant=true;}
+    else if(!on&&this.pointQuiet){luo.scriptedNoncombatant=this.pointQuiet.was;this.pointQuiet=null;}
   }
   SetLeg(id,route){if(this.leg===id)return;this.leg=id;this.leaderRoute=route;this.SetWalk(this.Leader,route);}
   Prepare(){
@@ -277,7 +296,7 @@ export class FirstLevelFrontBattle {
     if(stage==="Support")this.UpdateCapture();
     if(stage==="MachineGun")this.UpdatePressure();
     if(stage==="Tank")this.UpdateSortie();
-    this.UpdatePoint();
+    this.UpdatePoint(dt);
   }
   UpdateCapture(){
     const r=this.r;
