@@ -24,7 +24,7 @@
 6. **02 救援圈挪到南南西直沟北口**：`shunzi.dragged` → (0.60,−123.90)，镜头朝南（yaw ≈ 184°）看那条 11 m 直沟，罗班长、何有田贴西壁（画面右）从后交通壕折角 RC 摸来。日兵乙站在这条沟里、背对罗班长看守顺子。
 7. **SB04A 与 02 衔接**：枪托后日兵甲抓顺子前臂把他拖进南南西沟口（即 02 的救援圈）；翻译与日兵乙此前（Taunt/Wipe 期间）已沿南南西沟往后摸了几步，听到甲喊「还藏着一个」后从沟里赶回来——所以 SB04A 的「翻译与警戒兵在通道后方赶来」是在南南西沟纵深。洞口木框与断木在画面一侧、沟纵深在另一侧，允许镜像等价。
 8. **SB05A 翻译逃向**按正文往东（前沟、去 J），从画面**左侧**出画；劈砍构图至少定住 `duelHoldS`（0.45 s）后镜头跟过去拍他背对镜头沿东沟逃跑（补回分镜「沿前沟退开」的背影）。
-9. **还权位改到洞口塌土东面**：顺子坐 (2.40,−125.20) 朝东（yaw ≈ −94°、俯 ≈ −8°），罗班长跪在左、刘文财右中跪射、何有田右边缘跪姿持**步枪**（正文：他已换回步枪）。Space K2b 改为「还权位只遮 F、不遮 J」（J 处日兵此时已被刘文财击倒）。**还权安全是硬约束**：还权后 3 s 内玩家不掉血、追兵开火前玩家已能行动（`Script_OpeningHandbackBrowserTest` 四个负例 + 战役驾驶器都要过）。Released 时镜头保持约平视前方，不再 −52° 看地（`releaseCameraTurn` 断言相应改为「不看地 + 转向小」）。
+9. **还权位改到洞口塌土东面**：顺子坐 (2.40,−125.20) 朝东（yaw ≈ −94°、俯 ≈ −8°），罗班长跪在左、刘文财右中跪射、何有田右边缘跪姿持**步枪**（正文：他已换回步枪）。~~Space K2b 改为「还权位只遮 F、不遮 J」~~ **v1.1 改为：还权位对 F 可见，由「还权迟疑」保护**——40 m 内每名日军在还权后至少还有 3 s 不开火（战役驾驶器断言），K2b 把 F 记为 need 行。依据：Dir 在坐位附近 837 个点网格探针找不到「遮 F 又看得见 J」的点；Set 证明坐位看 F 与 01 受困眼位看 F（K1 要求看得见 F）两条线几乎重合，挡住前者必先挡住后者。**还权安全是硬约束**：还权后 3 s 内玩家不掉血、追兵开火前玩家已能行动（`Script_OpeningHandbackBrowserTest` 四个负例 + 战役驾驶器都要过）。Released 时镜头保持约平视前方，不再 −52° 看地（`releaseCameraTurn` 断言相应改为「不看地 + 转向小」）。
 10. **何有田的兵器**按正文：SB05A 用大刀格开再劈；SB06 持步枪。**03 机枪型号**维持现状（捷克式 Zb26Nest），不加防盾（装备细节不作标准）。
 11. **SB07 挪到右侧低沟「贴这道墙！前头有人！」那一刻**（玩家约 (5.0,−143.0)，罗班长在前 4–5 m 墙根、伸臂指路）；K3「辨认三处」功能不变。分镜左侧的机枪组用**土坎背坡上 2 名守军 + 轻机枪 + 1 名伤员**代替（老周枪位在世界里方向相反）。右侧阵位机枪不抬到墙头（射界验证不动），把阵位的蓝色白盒改成**破砖墙**造型、机枪从墙的破口开火。
 12. **SB08 接受从夺下阵位看的侧面远景**（世界里阵位在缺口正东 34 m，做不出背影纵队）；**第一批守军 2 → 5 人，第二批相应减少，总数不变**，同时存活预算不变（§6）。
@@ -134,3 +134,13 @@
 ## 8. 变更记录
 
 - v1.0（2026-09-25）：初版。基线 `0b1320121`。
+- v1.1（2026-09-25，第一波合入集成分支 `fe7fbd8d` 后，集成负责人拍板）：
+  1. §2 第 9 条：F 可见、由还权迟疑保护（见正文）。Set 的 `OpeningSetTest` 里「坐位对 F 不通视」的硬断言随之改为断言还权迟疑（第二波）。
+  2. **塌方态打开洞口南护壁 `BunkerSouthRevetment` 的东端**（Dir 的救援圈 S' 站在它里面）：第二波由 Set 改 Space 体块（近爆塌开，x > 0 的一段塌低或移除），同步 `Script_FirstLevelSpaceTest` 的单口断言；之后 `Data_OpeningStoryboards.wave1Allowances.revetment = null`。
+  3. **03 前沿破砖墙外观活到 06**（01 起预建藏起、03–06 显示）：04–05 仍在用这个阵位，认可为 §4.5/§6「01–03 之外收走」的例外；其余 01–02 布景、烟、飞机、阴天仍在离开 03 后收走。
+  4. 数据口径：`SMOKE` 用 `stages` 数组；`flagSkyline*` 不单做，由 `flagTrench` 承担；标语用繁体「保衛山東」「抗擊日寇」（1938 年用字；改简体只需 `Texture/Script_MakeBunkerPoster.mjs --simplified`，不重新生图）。
+  5. 取样时刻与机位（实测后修正 §5 起点）：SB05A 取 Chop 后 0.70–0.80 s（刀在 0.45 s 才落，0.25–0.45 s 时乙不可能已后仰）；SB05 俯仰 +8°～+10°（+3° 帽顶出画）；SB06 Check 段俯仰 −3°～0°（−8° 切掉罗的眼睛）；SB04 仰约 22°（Face：仰 30° 龇牙读成暗缝，≤ 15° 最清楚）。Dir 实际落地的数：`kickFrom` (0.88,−126.15)、`heCover` (3.6,−124.3)、`blastShot` 俯 −6°、`ijaBWatch` (0.2,−121.12)、`ijaBRifleDrop` (0.2,−122.55)、`ijaAStandoffM` 0.3（Anim 重烘抬头后归零）、SB05 日兵乙 2.7 m。
+  6. 追认的越界/新增归属：Dir 共享 `Script_OpeningStoryboardsTest.mjs`、`Script_FirstLevelMissionTest.mjs`；Eye 加 `Style_Game.css`，§4.4 `lens` 增字段 `desaturate`、`darken`、`storyBloodCap`、`maxPx`、可选 `impactAt`；Face 抬 `Script_CharacterModel.mjs` 的 MANIFEST_URL 戳、`Script_CharacterWounds.mjs` 补丁按 key 去重；Set 改 `Script_Aircraft.mjs`（`manualAlias`，只释放用同一 id 摆过的那架）；Front 改 `Data_FirstLevelOpening`、`Data_FirstLevelSpeakingCast`、`Script_FirstLevelMissionStageJump`、`Data_FirstLevelSpaceKeyframes`（只 K3）、`Script_FirstLevelFrontTopologyTest`、`Script_MissionOrchestration`。
+  7. Front：罗指路时停火 1.2 s（`leaderLead.pointS`）认可；第一批守军 0–4、第二批 5–7（背坡机枪组 6、7 号 04 起归第二批）。
+  8. Space 旧锚点（`MISSION_PLACEMENT.bunker.player/rifle/rifleMouth`、`FRONT_SPACE.shunziDragged`）第二波**同步到新值**，不标废弃。
+  9. 第二波起点：`pendingWiring` 42 条 + 本条 2、8 + Set/Dir 道具与站位的 16 处重叠（`OpeningSetTest` 合并后红在这里，预期内）。
