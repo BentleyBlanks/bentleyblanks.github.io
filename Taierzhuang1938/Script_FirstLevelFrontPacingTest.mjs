@@ -657,7 +657,15 @@ function WalkRuntime(extra = {}) {
   assert.ok(/this\.frontBattle\.Update\(dt\);\s*\n(\s*\/\/[^\n]*\n)*\s*this\.frontScenes\.Steer\(\);/.test(runtimeSrc), "runtime steers the speaker after frontBattle.Update");
   assert.ok(Read("Script_FirstLevelFrontBattle.mjs").includes("if(r.frontScenes?.Steers?.(actor)){w.bestAt=r.time;return false;}"),
     "FrontBattle.Walk neither orders nor stall-skips a speaker stepping into view");
-  checks += 56;
+  // 05 ammo house: Luo's supply leg stops beside the door, clear of every sight line from the approach inside
+  // supplierRangeM to the keeper (he stood in the doorway and hid the keeper's whole line, 09-25 drive).
+  assert.ok(Dist(S.leaderDoorSide, S.route.at(-1)) > 1, "Luo does not stop at the doorway point");
+  for (let i = 1; i < S.route.length; i++) for (let k = 0; k <= 10; k++) {
+    const a = S.route[i - 1], b = S.route[i], p = { x: a.x + (b.x - a.x) * k / 10, z: a.z + (b.z - a.z) * k / 10 };
+    if (Dist(p, S.house) > S.supplierRangeM) continue;
+    assert.ok(SegmentDistance(S.leaderDoorSide, p, S.keeper) > 1, `Luo's door-side stop is off the sight line to the keeper from (${p.x.toFixed(1)}, ${p.z.toFixed(1)})`);
+  }
+  checks += 58;
   Ok("⑧ near speaker out of the picture: line held <= speakerViewHoldS, he steps into view; one too near steps back; far shouts and Node runs unaffected");
 }
 

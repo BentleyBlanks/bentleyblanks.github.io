@@ -165,7 +165,7 @@ export class FirstLevelFrontBattle {
       // A debug start at 04 never ran the 03 handover: send He to the left gun now.
       this.StartHandover(false);
     }
-    if(stage==="Tank"){r.emplacement.Vacate("sortie");this.SetLeg("supply",Routes.bundle);r.EnsureBundleKeeper();r.Say("BundleGo");}
+    if(stage==="Tank"){r.emplacement.Vacate("sortie");this.SetLeg("supply",[...Routes.bundle.slice(0,-1),S.leaderDoorSide]);r.EnsureBundleKeeper();r.Say("BundleGo");}
   }
   /** 03 handover: He Youtian walks the last leg of the left gun access trench and takes the gun Zhou leaves. */
   StartHandover(say=true){

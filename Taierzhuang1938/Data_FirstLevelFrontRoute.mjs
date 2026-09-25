@@ -68,6 +68,10 @@ export const FRONT_SORTIE=Object.freeze({
   // stood between the two for the whole line (09-25 03->06 drive: 130 of 130 frames); in the alley outside the door
   // (41.6,-108.8) he ended up in the doorway, in the player's way.
   house:Point(47.5,-109),bundle:Point(49,-110.2),keeper:Point(46.8,-107.8),
+  // Luo's 05 supply leg ends beside the back door (0.8 m off the west wall, south of the gap), not in it: stopped at
+  // the route's last point (42.4,-111) he stood in the doorway between the player and the keeper for the keeper's
+  // whole line (09-25 drive: hidden by Luo 130 of 130 frames) and in the player's way in.
+  leaderDoorSide:Point(41.9,-109.4),
   throw:Point(43.6,-159.6),orders:Point(-34,-99),
   leftGun:Point(-33.8,-157.6),leftSeat:Point(-33.6,-156.4),
   // He / relief / Zhou use the support sap's first leg and then the left gun access trench.

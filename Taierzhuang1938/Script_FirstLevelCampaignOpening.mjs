@@ -490,14 +490,15 @@ export async function InstallSpeakerActing(page){
               else if(r.BlocksSight?.(eye.clone(),headAt.clone()))row.wallFrames=(row.wallFrames||0)+1;
               else{
                 const dx=headAt.x-eye.x,dy=headAt.y-eye.y,dz=headAt.z-eye.z,h2=dx*dx+dz*dz;
-                const hidden=h2>1e-6&&(r.ai?.soldiers||[]).some(s=>{
+                const hidden=h2>1e-6&&(r.ai?.soldiers||[]).find(s=>{
                   if(s===soldier||!s.actor?.poseVisible)return false;
                   const px=s.position.x,pz=s.position.z,t=((px-eye.x)*dx+(pz-eye.z)*dz)/h2;
                   if(!(t>.02&&t<.97)||Math.hypot(eye.x+dx*t-px,eye.z+dz*t-pz)>.28)return false;
                   const bone=s.actor.characterRig?.bones?.head,top=bone?bone.getWorldPosition(bone.position.clone()).y+.15:s.position.y+1.75;
                   const y=eye.y+dy*t;return y>s.position.y+.2&&y<top;
                 });
-                if(hidden)row.hiddenFrames=(row.hiddenFrames||0)+1;else seen=true;
+                if(hidden){row.hiddenFrames=(row.hiddenFrames||0)+1;const by=hidden.missionId||hidden.castId||hidden.id;(row.hiddenBy??={})[by]=(row.hiddenBy[by]||0)+1;}
+                else seen=true;
               }
             }
           }
@@ -526,11 +527,12 @@ export async function InstallSpeakerActing(page){
  * (FRONT_BATTLE_TUNING.speakerViewNearM) while nobody is to be shot, no grenade to dodge and no gun manned, turns
  * his head to him - the dialogue is positional, it comes from the speaker's mouth. When the line is over and the
  * drive has not aimed anywhere else meanwhile, the view turns back to where it was (06: the drive faces Zhou at the
- * borrow stand and never turns again; BorrowLight needs that facing). Turns at most GLANCE_RAD_PER_FRAME, like the
- * route bot's own turning; the game never turns the camera by itself. Runs on single-frame StepFrames calls (every
+ * borrow stand and never turns again; BorrowLight needs that facing). Turns at most GLANCE_RAD_PER_FRAME: a mouse
+ * flick, 180 deg in about half a second (0.06, the aiming rate, took 52 frames - longer than Volunteer.02, 50 frames
+ * said from behind the player, 09-25 drive); the game never turns the camera by itself. Runs on single-frame StepFrames calls (every
  * drive loop); multi-frame steps (captures, idles) pass through. Idempotent.
  */
-export const GLANCE_RAD_PER_FRAME = .06;
+export const GLANCE_RAD_PER_FRAME = .1;
 /**
  * A glance, not a stare: once the speaker of a line has been seen and acted this many frames (and turned his head),
  * the drive looks back to its own business while the line goes on. Holding the view for the whole line stopped the
@@ -671,7 +673,7 @@ export async function CheckFrontActing(ctx,{upTo="Support"}={}){
     &&FRONT_SCENE_IDS.includes(lines[id].cue)&&FRONT_LINE_STAGES.indexOf(lines[id].stage)>=0&&FRONT_LINE_STAGES.indexOf(lines[id].stage)<=last);
   const Row=id=>{const r=lines[id];return `${id} ${r.who} ${r.stage} t=${r.t} seen=${r.seenFrames||0} actedSeen=${r.actedSeen||0} inFrame=${r.inFrameFrames} close=${r.closeFrames||0} wall=${r.wallFrames||0} hidden=${r.hiddenFrames||0} turn=${r.turn} startDist=${r.start.distM} minOff=${r.minOffDeg}`;};
   console.log("FRONT_LINES",upTo,JSON.stringify(Object.fromEntries(due.map(id=>{const r=lines[id];
-    return [id,{who:r.who,stage:r.stage,seen:r.seenFrames||0,actedSeen:r.actedSeen||0,inFrame:r.inFrameFrames,close:r.closeFrames||0,wall:r.wallFrames||0,hidden:r.hiddenFrames||0,turn:r.turn,startDistM:r.start.distM,held:r.held??null,
+    return [id,{who:r.who,stage:r.stage,frames:r.frames,visible:r.visibleFrames,busy:r.busyFrames||0,hiddenBy:r.hiddenBy||null,seen:r.seenFrames||0,actedSeen:r.actedSeen||0,inFrame:r.inFrameFrames,close:r.closeFrames||0,wall:r.wallFrames||0,hidden:r.hiddenFrames||0,turn:r.turn,startDistM:r.start.distM,held:r.held??null,
       heldWhy:r.heldWhy??null,glanced:r.glanced??0}];}))));
   // Every due line is judged before anything throws: one failure message lists all the lines that missed.
   const failures=[];
