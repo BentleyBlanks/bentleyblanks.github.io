@@ -296,6 +296,9 @@ const Samples = (route) => {
   const floor = G(spec.ground.x, spec.ground.z);
   assert.ok(tip.distanceTo(new THREE.Vector3(spec.rest.x, floor + spec.rest.lift, spec.rest.z)) < 0.02, `the fallen lintel's broken end rests on its mark: ${tip.toArray().map((v) => v.toFixed(2))}`);
   // 选章 / 回跳直接进 02：没见过近爆＝已经落定；马灯灭。
+  // 任务步骤在 Found 前后就切到 BunkerRescue，导演还在演 01 的拍：靠背仍藏着（SB03A/SB04 的画面）。
+  set.Update(0.016, "BunkerRescue", "Found", { collapsed: true, blastAge: null });
+  assert.equal(set.Stats().rescueVisible, false, "the backrest stays hidden while the director still plays 01 beats under the BunkerRescue step");
   set.Update(0.016, "BunkerRescue", "Hold", { collapsed: true, blastAge: null });
   assert.equal(set.Stats().lintelProgress, 1, "entering 02 without a blast shows the lintel already down");
   assert.ok(!set.lantern.light.visible && set.lantern.light.intensity === 0, "the lantern is out after 01");

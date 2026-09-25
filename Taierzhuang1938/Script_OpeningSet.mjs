@@ -16,12 +16,21 @@
 // ===========================================================================
 import * as THREE from "three";
 import { PROPS, SET_STAGES, FLOOR } from "./Data_OpeningSet0103.mjs";
+import { OPENING_STORYBOARDS } from "./Data_OpeningStoryboards.mjs";
 import { BuildSink } from "./Script_World.mjs";
 import { MakeBox, MakeSandbag, PlaceGeometry, TILE_METERS } from "./Script_Geo.mjs";
 
 const DEG = Math.PI / 180;
 const Clamp01 = (v) => Math.max(0, Math.min(1, v));
 const UP = new THREE.Vector3(0, 1, 0);
+/** 01 的导演拍：任务步骤在「Found」前后就从 Trapped 切到 BunkerRescue 了，01/02 的界线要看导演 phase。 */
+const TRAPPED_PHASES = new Set(OPENING_STORYBOARDS.phases.Trapped);
+/** 02（救援）起才出现的组：步骤进了 01–02 之后，或者 01–02 里导演已经演到 02 的拍。 */
+export function RescueShown(stageId, phase) {
+  if (stageId === "Trapped") return false;
+  if (stageId === "BunkerRescue") return !TRAPPED_PHASES.has(phase);
+  return true;
+}
 /** 可复现的伪随机（每件道具自己一串，改一件不牵动别的件）。 */
 function Rng(seedText) {
   let h = 2166136261;
@@ -91,7 +100,7 @@ export class OpeningSet {
     this.time = (this.time || 0) + dt;
     const collapsed = !!flags.collapsed;
     this.collapsedRoot.visible = collapsed;
-    this.rescueRoot.visible = collapsed && stageId !== "Trapped";
+    this.rescueRoot.visible = collapsed && RescueShown(stageId, phase);
     if (collapsed) {
       const f = this.lintel?.spec.fall;
       // 没看到近爆（选章 / 回跳 / 重试直接进 02）＝已经落定。
