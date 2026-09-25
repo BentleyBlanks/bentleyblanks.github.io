@@ -30,12 +30,15 @@ export const SPEAKER_GESTURE_ASSET = Object.freeze({
  *   hold    [a, b]: repeated while the line lasts longer than the clip, with a small beat on each stress
  *   outS    the layer weight falls 1 -> 0 over [outS, duration]: the arm goes back to what the body is doing
  *   aim     the upper arm is turned so that shoulder -> hand points at the line's target (cone: tuning table)
+ *   extend  (aim clips) from the stroke on the arm is also straightened so the hand reaches this fraction of the arm's
+ *           length along the aim: the baked point is a bent arm out to the side, which turned toward a target in
+ *           front reads as a forearm across the chest (2026-09-25 browser test)
  *   reach   the arm is re-aimed (two-bone reach) so the grip lands on this anchor of the rig's live head (the manifest's
  *           per-rig `anchors`: where the grip was at the stroke, in the head bone's frame), because the body clip and
  *           the head layer turn the head away from where the clip was authored
  */
 export const SPEAKER_GESTURE_CLIPS = Object.freeze({
-  GesturePointL: Object.freeze({ hand: "L", duration: 1.8, inS: .35, strokeS: .40, hold: [.45, 1.15], outS: 1.25, aim: true,
+  GesturePointL: Object.freeze({ hand: "L", duration: 1.8, inS: .35, strokeS: .40, hold: [.45, 1.15], outS: 1.25, aim: true, extend: .9,
     note: "index finger out, arm up to shoulder height toward the target, wrist straight" }),
   GestureWaveOnL: Object.freeze({ hand: "L", duration: 1.6, inS: .30, strokeS: .48, hold: [.40, 1.00], outS: 1.10, aim: true,
     note: "go / move up: flat hand lifted beside the head, chopped forward and down toward the target" }),

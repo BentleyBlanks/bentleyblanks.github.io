@@ -283,6 +283,12 @@ function RunLine(layer, rig, { lineId, who, lengthS, stressAt = [], seconds, bus
   const layer4e = new SpeakerGestureLayer(rig, null);
   RunLine(layer4e, rig, { lineId: "FrontBlockade.02", who: "luo", lengthS: 1.6, stressAt: [.4], seconds: .9 });
   assert.ok(layer4e.ArmWeight(rig.sides.L.upper) > .9 && layer4e.ArmWeight(rig.sides.R.upper) === 0 && layer4e.ArmWeight(null) === 0, "ArmWeight");
+  // The nest behind him: far outside the cone, the point is not made (it would point elsewhere).
+  const behind = StubRig("LugouNra05", { armed: true });
+  behind.root.position.copy(rig.root.position); behind.root.rotation.y = Math.PI / 2; behind.root.updateMatrixWorld(true);
+  const layer4f = new SpeakerGestureLayer(behind, null);
+  const away = RunLine(layer4f, behind, { lineId: "FrontBlockade.02", who: "luo", lengthS: 1.2, seconds: 1.3 });
+  assert.ok(away.every(r => r.weight === 0) && away.some(r => r.suppressed === "targetOutOfReach"), "target behind: no point");
   // A line without a gesture row, and another speaker's line: nothing.
   const layer5 = new SpeakerGestureLayer(rig, null);
   assert.ok(RunLine(layer5, rig, { lineId: "FrontBlockade.03", who: "luo", lengthS: 1.2, seconds: 1.4 }).every(r => r.weight === 0));

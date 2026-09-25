@@ -5,7 +5,7 @@
 // layer keeps its gestures and calls the same look math). Runs after the body
 // mixer, before the face (eyes read the turned head).
 // It owns the 03-06 arm gestures (Script_SpeakerGestureLayer, rig.speakerGesture):
-// the arm is posed before the head turn, a reach to the mouth after it.
+// the arm is posed before the head turn; the aim at a target, the beat and a reach to the mouth after it.
 import { Quaternion, Vector3 } from "three";
 import { SPEAKER_HEAD as H } from "./Data_Tuning_CharacterSpeech.mjs";
 import { SpeakerGestureLayer } from "./Script_SpeakerGestureLayer.mjs";

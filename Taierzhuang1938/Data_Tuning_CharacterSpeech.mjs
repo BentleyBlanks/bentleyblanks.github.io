@@ -75,8 +75,14 @@ export const SPEAKER_GESTURE = Object.freeze({
   // A further stress during the hold dips the forearm (the arm's version of the head nod).
   beatRadians: .16, beatS: .26,
   // Aimed clips: the upper arm turns from the clip's stroke direction to the target, limited to a cone around
-  // the body's front (degrees; `out` = toward the gesture hand's side, `in` = across the chest).
-  aimStrength: 1, coneOutDeg: 100, coneInDeg: 40, coneUpDeg: 35, coneDownDeg: 30,
+  // the body's front (degrees; `out` = toward the gesture hand's side, `in` = across the chest). crossLiftDeg: the
+  // left hand of a man holding a rifle up in the right, pointing across his front, lies on the barrel (He Youtian
+  // pointing at the tank on his right, 2026-09-25 browser test: 3.7 cm from the rifle), so the point is raised to
+  // at least this pitch at the full `in` angle (in proportion below it) and passes over the barrel (25 put the
+  // forearm across the face). maxOutOfConeDeg: a target further outside the cone than this is not pointed at (the
+  // 04 guard's ammunition house is behind his right shoulder: clamped, the arm pointed 90 deg away from it).
+  aimStrength: 1, coneOutDeg: 100, coneInDeg: 40, crossLiftDeg: 15, coneUpDeg: 35, coneDownDeg: 30,
+  maxOutOfConeDeg: 45,
   // Ground anchors are pointed at this high above the ground (a man-high point, not the dirt); the tank at
   // its hull; 'south' is southM due south at the speaker's ground height plus pointRiseM.
   pointRiseM: 1.0, tankRiseM: 1.6, southM: 30,
