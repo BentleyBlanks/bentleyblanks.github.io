@@ -419,7 +419,7 @@ export const ACTING_ROLES = Object.freeze(["guard", "zhou", "luo"]);
  * Idempotent: a run from 01 installs it at RearTrench, the front driver again at 03 (cold start).
  */
 export async function InstallSpeakerActing(page){
-  await page.evaluate(({roles,minM})=>{
+  await page.evaluate(({roles,minM,stages})=>{
     const r=window.Tengxian.Debug.FirstLevelMissionRuntime(),binder=r.speakers;
     if(binder.actingSampled)return;binder.actingSampled=true;
     window.openingRearActing={};window.openingRearHeard={};
@@ -461,7 +461,11 @@ export async function InstallSpeakerActing(page){
       // not in the glance: the glance runs on single-frame steps only, and the frames of multi-frame steps (F held 90
       // frames to mount the captured gun, a 35-frame burst on it) sat in a line's frames but never in its busy frames
       // (09-26 relay r2 Front step 3: FrontAttack.01 busy 93/234 on a drive that spent the line mounting the gun).
-      const busyNow=!!window.Tengxian.speakerGlance?.Tick?.();
+      // 03–06 only (FRONT_LINE_STAGES): the 02 opening and the 07+ drive are not the front's lines (09-26 review).
+      const tickBusy=!!window.Tengxian.speakerGlance?.Tick?.(),busyNow=tickBusy&&stages.includes(r.flow.stage.id);
+      // Seen with the drive's own view: frames the glance is not holding a turned view (speakerGlance.saved is the view
+      // it will turn back to) - what a player who does not turn to the voice would see. Reported, not gated.
+      const ownView=!window.Tengxian.speakerGlance?.saved;
       for(const handle of r.voice?.dialogue?.handles||[]){
         if(handle.paused)continue;
         for(const l of handle.lines){
@@ -509,6 +513,7 @@ export async function InstallSpeakerActing(page){
           }
           if(inFrame)row.inFrameFrames++;
           if(seen)row.seenFrames=(row.seenFrames||0)+1;
+          if(seen&&ownView)row.seenOwnView=(row.seenOwnView||0)+1;
           const director=rig.openingActorPerformanceState,layer=rig.speakerHead;
           const acting=director?(!!director.speaking&&!director.protected):!!(layer?.enabled&&layer.speaking);
           if(!acting)continue;
@@ -531,7 +536,7 @@ export async function InstallSpeakerActing(page){
       }
       return result;
     };
-  },{roles:ACTING_ROLES,minM:B.speakerViewMinM});
+  },{roles:ACTING_ROLES,minM:B.speakerViewMinM,stages:FRONT_LINE_STAGES});
   await InstallSpeakerGlance(page);
 }
 
@@ -557,7 +562,7 @@ export const GLANCE_SEEN_FRAMES = 30;
  *  route bot's own re-aiming (0.04 rad a frame, CampaignKit.Route): it becomes the view to go back to. */
 export const GLANCE_DRIVE_TURN_RAD = .06;
 async function InstallSpeakerGlance(page){
-  await page.evaluate(({near,turn,enough,driveTurn:GLANCE_DRIVE_TURN_RAD})=>{
+  await page.evaluate(({near,turn,enough,driveTurn:GLANCE_DRIVE_TURN_RAD,stages,scenes})=>{
     const g=window.Tengxian;if(g.speakerGlance)return;
     const glance=g.speakerGlance={frames:0,restores:0,saved:null,last:null,lines:{}};
     const step=g.StepFrames,Wrap=a=>Math.atan2(Math.sin(a),Math.cos(a));
@@ -599,9 +604,12 @@ async function InstallSpeakerGlance(page){
     function Glance(){
       const r=g.Debug.FirstLevelMissionRuntime(),p=g.player;
       if(!r?.voice?.dialogue||!p.alive||g.state.cutscene||r.controls){glance.active=false;glance.saved=null;return;}
+      // Only the 03–06 front scenes (FRONT_SCENE_IDS in FRONT_LINE_STAGES): the 02 opening's speakers are checked on
+      // the drive's own view, and 07+ belongs to the route bot (09-26 review: it turned the drive in 02 and 07-18).
+      if(!stages.includes(r.flow.stage.id)){glance.active=false;glance.saved=null;glance.last=null;return;}
       const moved=!!glance.last&&(Math.abs(p.yaw-glance.last.yaw)>1e-6||Math.abs(p.pitch-glance.last.pitch)>1e-6);
       const eye=p.EyePosition;let head=null,lineId=null;
-      for(const h of r.voice.dialogue.handles)if(!h.paused&&!h.done)for(const l of h.lines){
+      for(const h of r.voice.dialogue.handles)if(!h.paused&&!h.done&&scenes.includes(h.id))for(const l of h.lines){
         if(l.state!=="playing"||l.line.who==="shunzi"||l.line.who==="crowd")continue;
         const bone=r.speakers?.ActorForWho?.(l.line.who,true)?.actor?.characterRig?.bones?.head;if(!bone)continue;
         const at=bone.getWorldPosition(bone.position.clone());
@@ -638,7 +646,8 @@ async function InstallSpeakerGlance(page){
       p.yaw=Toward(p.yaw,yaw);p.pitch=p.pitch+Math.max(-turn,Math.min(turn,pitch-p.pitch));
       glance.last={yaw:p.yaw,pitch:p.pitch};
     }
-  },{near:B.speakerViewNearM,turn:GLANCE_RAD_PER_FRAME,enough:GLANCE_SEEN_FRAMES,driveTurn:GLANCE_DRIVE_TURN_RAD});
+  },{near:B.speakerViewNearM,turn:GLANCE_RAD_PER_FRAME,enough:GLANCE_SEEN_FRAMES,driveTurn:GLANCE_DRIVE_TURN_RAD,
+    stages:FRONT_LINE_STAGES,scenes:FRONT_SCENE_IDS});
 }
 
 /** Frames a 03–06 line's speaker must be seen (CheckFrontActing: head in the picture, a face not a shoulder, nothing in between), and be acted then. */
@@ -708,7 +717,7 @@ export async function CheckFrontActing(ctx,{upTo="Support"}={}){
     &&FRONT_SCENE_IDS.includes(lines[id].cue)&&FRONT_LINE_STAGES.indexOf(lines[id].stage)>=0&&FRONT_LINE_STAGES.indexOf(lines[id].stage)<=last);
   const Row=id=>{const r=lines[id];return `${id} ${r.who} ${r.stage} t=${r.t} seen=${r.seenFrames||0} actedSeen=${r.actedSeen||0} inFrame=${r.inFrameFrames} close=${r.closeFrames||0} wall=${r.wallFrames||0} hidden=${r.hiddenFrames||0} turn=${r.turn} startDist=${r.start.distM} minOff=${r.minOffDeg}`;};
   console.log("FRONT_LINES",upTo,JSON.stringify(Object.fromEntries(due.map(id=>{const r=lines[id];
-    return [id,{who:r.who,stage:r.stage,frames:r.frames,visible:r.visibleFrames,busy:r.busyFrames||0,hiddenBy:r.hiddenBy||null,seen:r.seenFrames||0,actedSeen:r.actedSeen||0,inFrame:r.inFrameFrames,close:r.closeFrames||0,wall:r.wallFrames||0,hidden:r.hiddenFrames||0,turn:r.turn,startDistM:r.start.distM,held:r.held??null,
+    return [id,{who:r.who,stage:r.stage,frames:r.frames,visible:r.visibleFrames,busy:r.busyFrames||0,hiddenBy:r.hiddenBy||null,seen:r.seenFrames||0,ownView:r.seenOwnView||0,actedSeen:r.actedSeen||0,inFrame:r.inFrameFrames,close:r.closeFrames||0,wall:r.wallFrames||0,hidden:r.hiddenFrames||0,turn:r.turn,startDistM:r.start.distM,held:r.held??null,
       heldWhy:r.heldWhy??null,glanced:r.glanced??0}];}))));
   // Every due line is judged before anything throws: one failure message lists all the lines that missed.
   const failures=[];
@@ -728,6 +737,11 @@ export async function CheckFrontActing(ctx,{upTo="Support"}={}){
     else if((r.actedSeen||0)<FRONT_LINE_IN_FRAME_FRAMES)failures.push(`${id}: he is acted while seen (${Row(id)})`);
     else if(!(r.turn>.03))failures.push(`${id}: he visibly turns/nods in the picture (${Row(id)}) diag=${JSON.stringify(r.diag||null)}`);
   }
+  // Without the drive turning to the voice (report only, 09-26 review): how many of the due lines that the gate asks to
+  // be seen had FRONT_LINE_IN_FRAME_FRAMES seen frames on the drive's own view.
+  const gated=due.filter(id=>!FRONT_LINES_OUT_OF_PICTURE[id]&&!FRONT_LINES_IN_FIREFIGHT[id]);
+  console.log("FRONT_LINES_OWN_VIEW",upTo,JSON.stringify({gated:gated.length,seenOnOwnView:gated.filter(id=>(lines[id].seenOwnView||0)>=FRONT_LINE_IN_FRAME_FRAMES).length,
+    lines:Object.fromEntries(gated.map(id=>[id,[lines[id].seenOwnView||0,lines[id].seenFrames||0]]))}));
   if(failures.length)console.log("FRONT_LINES_FAILED",JSON.stringify(failures));
   assert.deepEqual(failures,[],`03–06 lines up to ${upTo}: speaker in the picture and acted`);
   const front=Object.keys(heard).filter(key=>key.startsWith("Front")&&key.endsWith("/luo"));
