@@ -88,6 +88,10 @@ export function SpeakerGestureBusy(rig, state = {}, fireAge = Infinity) {
 const P = new Vector3(), P2 = new Vector3(), D = new Vector3(), S = new Vector3(), H = new Vector3(), AX = new Vector3();
 const Q = new Quaternion(), Q2 = new Quaternion(), WQ = new Quaternion(), PQ = new Quaternion(), ID = new Quaternion();
 
+// World position from a matrixWorld known to be fresh (getWorldPosition recomputes the whole parent chain each call;
+// AfterHead refreshes the arm once and TurnWorld keeps its subtree fresh).
+const WP = (bone, out) => out.setFromMatrixPosition(bone.matrixWorld);
+const SCALE = new Vector3();
 function TurnWorld(bone, rotation) {
   bone.getWorldQuaternion(WQ); bone.parent.getWorldQuaternion(PQ).invert();
   bone.quaternion.copy(PQ.multiply(WQ.premultiply(rotation)));
@@ -314,7 +318,6 @@ export class SpeakerGestureLayer {
       if (g.record.spine[k]) bone.quaternion.multiply(Q.copy(g.q0[k]).invert().multiply(g.q[k]).slerp(ID, 1 - w));
       else bone.quaternion.slerp(g.q[k], w);
     });
-    (g.bones.clavicle || rig.root).updateWorldMatrix(true, true);
     ID.identity();
     this._Seal();
   }
@@ -331,7 +334,7 @@ export class SpeakerGestureLayer {
       const root = rig.actor?.root || rig.root;
       const target = SpeakerGestureTargetPoint(g.row.target, { root, lookAt: this.head?.lookAt }, this.target);
       if (target) {
-        upper.getWorldPosition(S);
+        WP(upper, S);
         D.copy(target).sub(S);
         if (D.lengthSq() > 1e-6) {
           // Clamp in the body's frame (front -Z, left -X): out = toward the gesture hand's side.
@@ -344,7 +347,8 @@ export class SpeakerGestureLayer {
           this.state.clamped = Math.abs(cy - yaw * side) > 1e-3 || Math.abs(cp - pitch) > 1e-3;
           if (g.twoHanded && yaw < 0) cp = Math.max(cp, G.crossLiftDeg * DEG * Math.min(1, -yaw / (G.coneInDeg * DEG)));
           const aimDir = P.set(-Math.sin(cy) * Math.cos(cp), Math.sin(cp), -Math.cos(cy) * Math.cos(cp)).applyQuaternion(Q2);
-          const stroke = H.copy(g.strokeDir).applyQuaternion(g.bones.clavicle.parent.getWorldQuaternion(Q));
+          g.bones.clavicle.parent.matrixWorld.decompose(P2, Q, SCALE);
+          const stroke = H.copy(g.strokeDir).applyQuaternion(Q);
           Q.setFromUnitVectors(stroke, aimDir); ID.identity(); Q.slerp(ID, 1 - Clamp(w * G.aimStrength, 0, 1));
           TurnWorld(upper, Q);
           const hand = g.bones.hand;
@@ -352,19 +356,19 @@ export class SpeakerGestureLayer {
           // the hold pose and a crouch or kneel differ from it by up to ~15 deg (2026-09-25 browser test).
           const settle = Clamp(w * G.aimStrength, 0, 1) * Smooth((g.t - g.spec.strokeS + .1) / .2);
           if (hand && settle > 0) {
-            hand.getWorldPosition(H); upper.getWorldPosition(S); H.sub(S).normalize();
+            WP(hand, H); WP(upper, S); H.sub(S).normalize();
             Q.setFromUnitVectors(H, aimDir); ID.identity(); Q.slerp(ID, 1 - settle);
             TurnWorld(upper, Q);
             // A pointing arm is (nearly) straight: reach the hand out along the aim.
             const fore = g.bones.fore;
             if (g.spec.extend && fore) {
-              upper.getWorldPosition(S); fore.getWorldPosition(P2); hand.getWorldPosition(H);
+              WP(upper, S); WP(fore, P2); WP(hand, H);
               const length = S.distanceTo(P2) + P2.distanceTo(H);
               ReachSpeakerGestureArm(upper, fore, hand, H, P2.copy(S).addScaledVector(aimDir, length * g.spec.extend), settle);
             }
           }
           if (hand) {
-            hand.getWorldPosition(H); upper.getWorldPosition(S);
+            WP(hand, H); WP(upper, S);
             D.copy(target).sub(S);
             this.state.aimError = +(H.sub(S).angleTo(D) / DEG).toFixed(1);
           }
@@ -388,17 +392,17 @@ export class SpeakerGestureLayer {
     const prop = !placed && (rig.infantryPropWeight || 0) > .5 ? rig.infantryProps?.rifle : null;
     const rifle = prop?.isObject3D ? prop : group;
     rifle.updateWorldMatrix(true, false);
-    rifle.getWorldPosition(P2); AX.set(0, 0, -1).transformDirection(rifle.matrixWorld);
+    WP(rifle, P2); AX.set(0, 0, -1).transformDirection(rifle.matrixWorld);
     for (let pass = 0; pass < 2; pass++) {
       let near = Infinity, below = true;
       for (const bone of [hand, ...roots]) {
-        bone.getWorldPosition(D).sub(P2);
+        WP(bone, D).sub(P2);
         const u = Clamp(D.dot(AX), -.35, .9);
         S.copy(AX).multiplyScalar(u); const d = D.distanceTo(S);
         if (d < near) { near = d; below = D.y >= S.y - .02; }
       }
       if (!(near < G.rifleClearM)) return;
-      upper.getWorldPosition(S); hand.getWorldPosition(H); H.sub(S);
+      WP(upper, S); WP(hand, H); H.sub(S);
       const reach = Math.max(.2, H.length());
       D.crossVectors(H.normalize(), P.set(0, 1, 0));
       if (D.lengthSq() < 1e-6) return;
@@ -422,6 +426,7 @@ export class SpeakerGestureLayer {
   AfterHead() {
     const g = this.active;
     if (g && this.state.weight > 1e-4) {
+      g.bones.clavicle?.updateWorldMatrix(true, true);   // after the head turn: once, for WP below
       if (g.spec.aim) { if (g.bones.upper) this._Mark(g.bones.upper); this._Aim(g, this.state.weight); }
       this._Beat(g, this.state.weight);
       if (g.twoHanded) this._ClearRifle(g);
@@ -443,7 +448,9 @@ export class SpeakerGestureLayer {
   /** Script_Actor._ApplyRiggedAim, after its arms are solved: keep the gesturing hand off the rifle where it ended. */
   AfterActorAim() {
     const g = this.active;
-    if (g?.twoHanded && this.state.weight > 1e-4) this._ClearRifle(g, true);
+    if (!(g?.twoHanded && this.state.weight > 1e-4)) return;
+    g.bones.clavicle?.updateWorldMatrix(true, true);     // the actor set the arm's local rotations
+    this._ClearRifle(g, true);
   }
 
   /**

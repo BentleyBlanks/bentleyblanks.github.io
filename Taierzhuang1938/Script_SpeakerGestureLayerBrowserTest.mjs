@@ -220,11 +220,19 @@ try{
       const P=window.GestureProbe,g=P.g;await g.Debug.FirstLevelJump(4);const r=g.Debug.FirstLevelMissionRuntime();g.player.health=1e9;
       g.StepFrames(240,1/60,true);r.voice.dialogue.Clock=()=>NaN;
       const luo=r.frontScenes.Body('luo');
-      const Face=()=>P.Face(luo);P.View(luo);
-      const Layers=()=>r.ai.soldiers.map(s=>s.actor?.characterRig?.speakerGesture).filter(Boolean);
-      const SetOn=on=>{for(const l of Layers())l.enabled=on;};
-      const Replay=()=>{for(const id of ['TankTerror','TankRoadContact','BundleOrder'])if(![...r.voice.scenes.keys()].includes(id)){const cue=P.MISSION_DIALOGUE.find(c=>c.id===id);
-        r.voice.PlayScene(id,{speakers:P.FrontSceneSpeakers(cue,who=>r.frontScenes.Body(who))});break;}};
+      P.View(luo);
+      // Look at whoever is talking (an off-screen body is not animated, so it would not gesture).
+      const Face=()=>{let who=null;for(const h of r.voice.scenes.values())for(const l of h.lines)if(l.state==='playing'&&l.line.who!=='shunzi')who=l.line.who;
+        P.Face((who&&r.frontScenes.Body(who))||luo);};
+      // Off = the head layers run without their gesture layer (and the actor hooks see none); a disabled layer would
+      // drop the line it is on, so the on halves would hardly ever see a gesture.
+      const Rigs=()=>r.ai.soldiers.map(s=>s.actor?.characterRig).filter(rig=>rig?.speakerHead);
+      const Layers=()=>Rigs().map(rig=>rig.speakerGesture).filter(Boolean);
+      const SetOn=on=>{for(const rig of Rigs()){const head=rig.speakerHead;head.__gesture??=head.gesture;
+        head.gesture=on?head.__gesture:null;rig.speakerGesture=on?head.__gesture:null;}};
+      let next=0;const cycle=['TankTerror','BundleOrder','TankRoadContact'];
+      const Replay=()=>{if([...r.voice.scenes.values()].some(h=>!h.done))return;const id=cycle[next++%cycle.length],cue=P.MISSION_DIALOGUE.find(c=>c.id===id);
+        r.voice.PlayScene(id,{speakers:P.FrontSceneSpeakers(cue,who=>r.frontScenes.Body(who))});};
       const A=[],B=[],LA=[],LU=[],up={on:0,off:0};
       for(let round=0;round<20;round++){
         for(const on of (round%2?[true,false]:[false,true])){
@@ -265,7 +273,7 @@ for(const shot of result.shots)console.log('still',shot.line,shot.before?'before
 for(const stage of Object.values(result.stages))assert.deepEqual(stage.violations||[],[],'busy / cancelled / after-the-line weights');
 for(const line of PICKED){
   const stageOf=Object.entries(SCENES).find(([,ids])=>ids.includes(line.split('.')[0]))?.[0];
-  if(!stages.includes(+stageOf))continue;
+  if(!stages.includes(+stageOf)||(only&&!only.includes(line.split('.')[0])))continue;
   assert.ok(all[line]?.up>=LIMIT.upFrames,`${line} gestures on screen (${JSON.stringify(all[line])})`);
 }
 for(const [id,row] of rows){

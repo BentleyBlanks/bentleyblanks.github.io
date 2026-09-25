@@ -119,8 +119,8 @@ Mouth shapes therefore come from the text, baked offline per take.
 
 User decision 2026-09-25: the 03-06 speakers only turned the head, nodded on stressed syllables and breathed;
 they get hand gestures fitting the line, AAA-FPS style: not every line, commands and pointing first, one hand
-off the rifle, nobody gestures while shooting. Status: Step 1 (inventory and design) and Step 2 (the clips) done;
-the runtime layer (Step 3) is to come, so everything below marked "planned" does not exist in code yet.
+off the rifle, nobody gestures while shooting. Status: Step 1 (inventory and design), Step 2 (the clips) and
+Step 3 (the runtime layer on the 03-06 lines, the live test) done.
 
 ### Inventory
 
@@ -281,24 +281,31 @@ Editable scenes: `OneDrive/AI/Models/Blender/Taierzhuang1938/SpeakerGestures_202
   over the barrel (at 0 lift the hand lay 3.7 cm from it). A target more than `maxOutOfConeDeg` (45 deg) outside
   the cone is not pointed at (suppressed `targetOutOfReach`): the 04 guard's ammunition house is behind his
   shoulder, and a clamped arm pointed 90 deg away from it. Targets: `FRONT_SORTIE` / `FRONT_SPACE` anchors,
-  `listener` (the head layer's look target), `south`, and `tank` from the mission runtime's provider
+  `listener` (the head layer's look target, `listenerDropM` below the eye: a hand held out goes to the other man's
+  chest, not above the seated Zhou's head), `south`, and `tank` from the mission runtime's provider
   (`SetSpeakerGestureWorld`, one line in `Script_FirstLevelMissionRuntime`).
 - Rifle: a left-hand gesture on a two-handed weapon remembers where the left grip was before the arm moved, in the
   right grip's frame; `Script_Actor._UpdateRiggedWeaponMount` asks `HeldLeftGrip()` for it instead of the moved
   socket (hook 1), so the rifle keeps its direction in the right hand. The actor's aim IK
   (`_ApplyRiggedAim`) solves both arms onto the rifle afterwards; `ArmWeight(upperArm)` tells it how much of the
-  gesturing arm to give back to the gesture (hook 2), so the aim correction turns the right arm and the rifle
-  only. Both hooks read `rig.speakerGesture`, which is null outside 01-06: 07+ behaviour is unchanged. Right-hand
-  clips only run on a body with no visible weapon (the seated 06 Zhou); otherwise suppressed `rightHandOnWeapon`.
+  gesturing arm to give back to the gesture, and `AfterActorAim()` runs once its arms are solved (hook 2), so the
+  aim correction turns the right arm and the rifle only. Both hooks read `rig.speakerGesture`, which is null
+  outside 01-06: 07+ behaviour is unchanged. The rifle stays where the two-hand pose put it (a crouched advance
+  carries it across the chest), so the gesturing wrist and finger roots are kept `rifleClearM` (7 cm) off the
+  barrel line by turning the arm about the shoulder (`_ClearRifle`): after the head turn against this frame's
+  rifle prop helper, and again in `AfterActorAim` against where the aim IK really left the rifle (a point and a
+  WaveOn chop ended 2.5-3.7 cm from it before). Right-hand clips only run on a body with no visible weapon (the
+  seated 06 Zhou); otherwise suppressed `rightHandOnWeapon`.
 - Busy (weight to 0 over `fadeS`, the head layer keeps acting): firing, melee, throwing, carrying, wounded walk,
-  prone, dead/ragdoll, a forced clip, faster than `maxMoveSpeed`, the 01-03 storyboard director. "Aiming" means a
+  prone, dead/ragdoll, a forced clip, faster than `maxMoveSpeed` (.6 = 2.5 m/s: the squad says its 03-05 lines at
+  a crouched walk, .51; a jog or a run does not gesture), the 01-03 storyboard director. "Aiming" means a
   shooting run (aim > `maxAim` and a shot within `aimQuietS`): the 03-05 front AI holds aim 1 through the whole
   fight and fires about once in 3 s, so a shouldered rifle alone does not stop a gesture (it stopped nearly every
   04 gesture before). A shot while the arm is up ends that gesture (no comeback after the shot); a body busy when
   its line starts waits unlifted and gestures once free, while the line lasts (`waitFree`, else `missed`).
 - Switch: `SPEAKER_GESTURE.enabled`, or `rig.speakerGesture.enabled = false` per body.
 - Probe state (FRONT_ACTING, tests): `rig.speakerGesture.state = { clip, lineId, weight, t, phase, hand,
-  aimError, clamped, suppressed, busyFor, reachError }` (`phase`: lift, wait, hold, out, release, waitFree,
+  aimError, clamped, suppressed, busyFor, reachError, rifleLift }` (`phase`: lift, wait, hold, out, release, waitFree,
   cancelled, missed, done); `rig.speakerGesture.lines[lineId] = { frames, gestureFrames, busyFrames, maxWeight,
   clip }` (`gestureFrames`: frames with weight > .5 while that line's gesture ran); `rig.speakerGesture
   .gestureFrames` in all. A front acting sample can count a frame as acted by the gesture when

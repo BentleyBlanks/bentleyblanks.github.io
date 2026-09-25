@@ -10,8 +10,9 @@
 // A rifle hangs on the right hand (Script_Actor._UpdateRiggedWeaponMount: the weapon sits on the right grip and
 // aims at the left grip), so anybody holding a weapon gestures with the LEFT hand only, and the weapon keeps the
 // direction it had before the gesture moved the left hand. The seated 06 Zhou holds no weapon and gestures with
-// the RIGHT hand. A speaker who is firing, aiming (aim > .6), in melee, carrying, prone or acted by the 01-03
-// storyboard director gets no gesture (head layer only).
+// the RIGHT hand. A speaker who is firing, in a shooting run (a shot in the last .8 s with the rifle up), in melee,
+// carrying, prone, faster than a walk or acted by the 01-03 storyboard director gets no gesture (head layer only);
+// numbers in Data_Tuning_CharacterSpeech.SPEAKER_GESTURE.
 
 /** Baked arm clips: _import/Script_SpeakerGestureBake.py (Blender, both rigs) writes the manifest and one file per rig
  * here; Script_SpeakerGestureClips loads them on first use (01-06 only, never at boot). */
@@ -85,8 +86,10 @@ export const SPEAKER_GESTURE_TARGETS = Object.freeze({
  * front scenes nobody gestures on two of his own lines in a row, and questions and replies stay still. The 06
  * cigarette talk (BorrowLight, ZhouLift) is the exception: a seated conversation carried by its hands. Lines said
  * at the gun or while shooting keep their entry, but the runtime drops the gesture while the body is busy.
- * `pose` is the posture expected from the 2026-09-24 code (to be measured in Step 3):
- *   gun (at the machine-gun emplacement) | crouch | kneel | stand | move | seat.
+ * `pose` is the posture expected from the 2026-09-24 code: gun (at the machine-gun emplacement) | crouch | kneel |
+ * stand | move | seat. Measured on the live 03-06 lines (Script_SpeakerGestureLayerBrowserTest, 2026-09-25): Luo
+ * says most 03-05 lines at a crouched walk (moveSpeed .51) with the rifle up (aim 1), He Youtian and the guard
+ * kneel with the rifle up, the 06 Zhou sits unarmed; Zhou's FrontBlockade.01 is said wounded (no gesture).
  */
 const Row = (who, pose, gesture = null, target = null) => Object.freeze({ who, pose, gesture, target });
 export const FIRST_LEVEL_SPEAKER_GESTURES = Object.freeze({
