@@ -140,7 +140,15 @@ export async function DriveFrontBattle(ctx){
     throw error;
   }
   async function DriveLegs(){
-  await Route(Routes.support,"RightNestApproach",{stance:"crouch",fight:true,crawl:true,recoverAfterEvade:true});
+  await Route(Routes.support,"RightNestApproach",{stance:"crouch",fight:true,crawl:true,recoverAfterEvade:true}).catch(async error=>{
+    // A grenade dodge at the west door can leave the body south of the nest's west parapet (23.3,-153); the evade
+    // rejoin then aims at the nearest corridor point, the door->seat leg on the other side of that parapet, and the
+    // bot walks into it for good (09-25 runs 6 and 8, the nest gunner alive behind it). A player walks back round
+    // through the west door: the last three approach points (door bend, west door, seat), fighting as before.
+    if(!/actual body reached route end/.test(error?.message||""))throw error;
+    console.log("RightNestApproach: stalled after an evade, going round through the west door");
+    await Route(S.approach.slice(-3),"RightNestApproachViaDoor",{stance:"crouch",fight:true,crawl:true,recoverAfterEvade:true});
+  });
   await WaitFact("rightNestCaptured",90,true);
   const sight=await page.evaluate(async()=>{
     const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime(),{FRONT_SORTIE:S}=await import('./Data_FirstLevelFrontRoute.mjs');
@@ -330,9 +338,11 @@ export async function DriveFrontBattle(ctx){
   }
   await CaptureFocus("TankDisabled",state.tank);
   // Back along the branch from wherever the body is now (the bomb-first wait already stands a bend back).
-  const retreat=[...S.attackRoute].reverse(),here=await page.evaluate(()=>({x:window.Tengxian.player.position.x,z:window.Tengxian.player.position.z}));
-  const from=retreat.reduce((best,p,i)=>Math.hypot(p.x-here.x,p.z-here.z)<Math.hypot(retreat[best].x-here.x,retreat[best].z-here.z)?i:best,0);
-  await Route(retreat.slice(from),"AttackBranchRetreat",{stance:"crouch",fight:true,crawl:true});
+  // Joined at the body's projection on the branch (rejoinRoute), not at its nearest corner: a shell blast threw the
+  // body 0.9 m west of the (43.6,-159.6)->(41.8,-154.8) leg and the straight line to that nearest corner clipped the
+  // east end of the attack-lane parapet (39.9,-156.6) for good (09-25 run 9).
+  const retreat=[...S.attackRoute].reverse();
+  await Route(retreat,"AttackBranchRetreat",{stance:"crouch",fight:true,crawl:true,rejoinRoute:retreat});
   // Contract §2.6 (Front package step 2): the last batch crosses while the pair walks back. Like Luo, cover the
   // gap from the nest's west door (K10) until the batch is home, then go down the right low trench to the safe zone
   // (FRONT_SPACE.returnMeet: Liu, He and the relief NCO), and on to the collection.
