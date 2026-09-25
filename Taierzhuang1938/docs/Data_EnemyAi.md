@@ -1469,7 +1469,9 @@ f581ac7dd 布局配的临时数据**。
 - 角色：`hold`（原地守，只给环境射击点）；`assault`（`maxLine` / `regroupLine`，负数从末尾数；`loop`；
   `points` + `viaLine` 先沿自己的跃进线到那条线再横移；`fallback { casualtyFraction | casualties, backLines,
   holdS, repelledFact }`；`charge { afterS, minAlive, playerWithinM, lastLineShare }`）；`nestGuard`
-  （`fallback { casualties, to }`）。
+  （`fallback { casualties, to }`）。`assault` 带 `lane` 时可再给 `entry`（relay r2 Front 09-25）：生成后先按顺序跑过这几个
+  过路点再上第一条线——不停、不开枪、不算线（下标、退线、让口子只数 `lane` 的线），到点或冲刺卡死就跳下一个
+  （`UpdateAssault` 开头那一段）。路堑增援用它跑下战车路：路堑与北残院后的路弯对授权点全是死角，以前把路点当线一线线蹲。
 - `FRONT_PRESSURE_TACTICS`：覆盖 `MISSION_TACTICS` 的同名条目，支持事实门 `plan.fact`。
 
 运行时规矩：
