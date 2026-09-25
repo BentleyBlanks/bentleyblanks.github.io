@@ -4,6 +4,9 @@ Every character who speaks on screen in 01-06 has a bone face rig and moves its
 mouth with its own lines only. Contract: [01-05 refactor](Data_FirstLevel0105Refactor20260923Contract.md)
 section 2 item 4 and section 5.6. Morph targets are not used (MotionVector contract item 12).
 
+For close-up dialogue inspection, use Tools → 人物面部. The [facial editor](Data_FacialEditor.md)
+supports source-audio seeking, slow playback, expression keyframes and local review notes.
+
 ## Assets
 
 | Model | Facial skin | Size | Cast (`facialCast` in the manifest) |

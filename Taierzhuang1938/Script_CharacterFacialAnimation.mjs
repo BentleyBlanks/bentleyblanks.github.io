@@ -70,7 +70,17 @@ export class CharacterFacialAnimation {
         const moves = dp.lengthSq() > 1e-12, turns = 1 - Math.abs(dq.w) > 1e-9;
         if (moves || turns) deltas.push({ pose, dp: moves ? dp : null, dq: turns ? dq : null, expression: EXPRESSION_POSES.has(pose) });
       }
-      return { name, bone, position, quaternion, deltas, jaw: name === 'Face_Jaw' };
+      // Absolute per-pose targets, the shape the facial review editor (Tools → 人物面部) lerps toward;
+      // a pose that leaves this bone alone targets its rest.
+      const poses = {};
+      for (const pose of POSES) {
+        if (!definition.poses[pose]) continue;
+        const data = definition.poses[pose][name];
+        poses[pose] = data
+          ? { position: new THREE.Vector3().fromArray(data.translation), quaternion: new THREE.Quaternion().fromArray(data.rotation) }
+          : { position: position.clone(), quaternion: quaternion.clone() };
+      }
+      return { name, bone, position, quaternion, deltas, poses, jaw: name === 'Face_Jaw' };
     });
     this.poses = new Set(POSES.filter(pose => definition.poses[pose]));
     const eyes = definition.eyes;

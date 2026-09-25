@@ -125,6 +125,7 @@ const afterGear = await page.evaluate(() => {
     panelOpen: T.Debug.Editor().panelOpen,
     entries: document.querySelectorAll(".edPanel.launcher [data-editor]").length,
     squadMarch: !!document.querySelector('.edPanel.launcher [data-editor="squadMarch"]'),
+    facial: !!document.querySelector('.edPanel.launcher [data-editor="facial"]'),
   };
 });
 Check("打游戏当中按 ` 弹出入口面板", afterGear.panelOpen && afterGear.capturing,
@@ -132,7 +133,7 @@ Check("打游戏当中按 ` 弹出入口面板", afterGear.panelOpen && afterGea
 // 三个设置 + 五个「调试」叠加层（渲染调试/性能剖析/WorldInfo/玩家状态/敌军 AI）
 // + 十七个「编辑器」（十六个含小队行进，加上关卡编排 —— 它语义上仍是叠加层，
 //   但按钮画在编辑器组里）+ 一个「全部关掉」（data-editor 是空串，也被选择器数进来）
-Check("面板列出设置、调试与全部编辑器入口", afterGear.entries === 26 && afterGear.squadMarch, `按钮数=${afterGear.entries}，小队行进=${afterGear.squadMarch}`);
+Check("面板列出设置、调试与全部编辑器入口", afterGear.entries === 27 && afterGear.squadMarch && afterGear.facial, `按钮数=${afterGear.entries}，小队行进=${afterGear.squadMarch}，人物面部=${afterGear.facial}`);
 const fpsDefault = await page.evaluate(() => {
   const fps = document.querySelector(".hudFps");
   const toggle = document.querySelector('[data-action="fps"]');

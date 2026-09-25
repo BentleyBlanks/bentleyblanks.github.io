@@ -202,6 +202,8 @@ export const testDefs = {
   InfantryAnimationTest: { file: "Script_InfantryAnimationTest.mjs", timeoutMs: 360000, desc: "八套步兵动作、道具与状态衔接" },
   CharacterSpeechTest: { file: "Script_CharacterSpeechTest.mjs", desc: "说话人口型驱动、说话人隔离与面部资产契约" },
   CharacterSpeechBrowserTest: { file: "Script_CharacterSpeechBrowserTest.mjs", timeoutMs: 480000, desc: "说话人实际语音、面部蒙皮与真实场景画面" },
+  FacialReviewTest: { file: "Script_FacialReviewTest.mjs", desc: "面部编辑器说话人隔离、关键帧与草稿校验" },
+  FacialEditorBrowserTest: { file: "Script_FacialEditorBrowserTest.mjs", timeoutMs: 240000, desc: "真实面部与录音时钟、逐帧、草稿及缺失绑定状态" },
   CharacterModelTest: { file: "Script_CharacterModelTest.mjs", desc: "十名蒙皮士兵：19 动作、骨骼挂点、命中体与阵营分配契约（纯 Node）" },
   DeathCollapseTest: { file: "Script_DeathCollapseTest.mjs", timeoutMs: 300000,
     desc: "Kimodo受击倒下：两军四候选、稳定随机、全身贴地与终帧保持" },
@@ -372,6 +374,7 @@ export const browserTests = new Set([
   "OpeningActorPerformanceBrowserTest", "OpeningClipsBrowserTest", "FirstLevelVoicePerspectiveTest",
   "OpeningHandbackBrowserTest", "OpeningLensBrowserTest", "FirstLevelOpeningCampaignTest",
   "OpeningHandbackBrowserTest", "FirstLevelOpeningCampaignTest", "OpeningStoryboardShotsTest",
+  "FacialEditorBrowserTest",
   "FirstLevelFrontRouteBrowserTest",
   "FirstLevelLeaderGuideBrowserTest",
   "FirstLevelMissionTopologyBrowserTest",
@@ -438,6 +441,7 @@ export const browserTests = new Set([
 ]);
 
 export const tier0Fast = [
+  "FacialReviewTest",
   "CharacterSpeechTest",
   "FpsAnimationTest",
   "TextTest",
@@ -501,6 +505,7 @@ export const tier2 = [
 
 export const domains = {
   openingStoryboards: {label:"01–03 storyboard reconstruction",tests:["OpeningStoryboardsTest","OpeningSetTest","OpeningClipsBrowserTest","OpeningActorPerformanceBrowserTest","OpeningFirstPersonTest","FirstLevelVoicePerspectiveTest","OpeningHandbackBrowserTest","FirstLevelOpeningCampaignTest","OpeningLensTest","OpeningLensBrowserTest","OpeningStoryboardShotsTest"]},
+  facialEditor: {label:"人物面部可视化编辑器",tests:["FacialReviewTest","FacialEditorBrowserTest","ModuleGraphTest"]},
   missionGuide: {label:"Physical mission leader and HUD",tests:["FirstLevelLeaderGuideTest","FirstLevelLeaderGuideBrowserTest","FirstLevelMissionTest","FirstLevelMissionBrowserTest"]},
   characterSpeech: {label:"说话人面部对白",tests:["CharacterSpeechTest","CharacterSpeechBrowserTest"]},
   motionVector: {label:'统一运动矢量接入契约',tests:['MotionVectorContractTest']},
@@ -607,6 +612,7 @@ export const domains = {
 };
 
 const changedDomainRules = [
+  {domain:"facialEditor",pattern:/FacialReview|EditorFacial|FacialEditor/},
   {domain:"firstLevel",pattern:/FirstLevelWhitebox(Village|Transfer|Rear)/},
   {domain:"menu",pattern:/PlayerDeath/},
   {domain:"combat",pattern:/PlayerDeath/},
