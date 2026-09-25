@@ -8,9 +8,14 @@
 // need = 至少几个高度通视；mustHide = 一个高度都不许通视。frameDeg = 全部目标（frame:false 除外）须落在这么宽的水平视角里。
 import { FRONT_SORTIE as S, FRONT_SPACE as SP, FRONT_TANK_PATH as TP, FrontTankIndex } from "./Data_FirstLevelFrontRoute.mjs";
 import { MISSION_STAGE_ANCHORS as A } from "./Data_FirstLevelMissionTopology.mjs";
-import { FRONT_GUARD_POSTS, FRONT_FLANK_GROUP } from "./Data_FirstLevelMissionFront.mjs";
+import { FRONT_GUARD_POSTS, FRONT_FLANK_GROUP, FRONT_GUARD_MG_GROUP } from "./Data_FirstLevelMissionFront.mjs";
 
 const W = (id) => TP[FrontTankIndex(id)];
+/** The guards that hold the scrape through 03: every FRONT_GUARD_POSTS index except the backslope LMG pair's. */
+function FrontGuardPosts03() {
+  const pair = new Set(FRONT_GUARD_MG_GROUP.members.map((m) => m.guard));
+  return FRONT_GUARD_POSTS.map((p, i) => ({ i, p })).filter(({ i }) => !pair.has(i));
+}
 /** Type 89 (Chi-Ro) heights above ground, metres: hull roof, turret top, gun axis, hull MG, turret MG. */
 export const TANK_HEIGHTS = Object.freeze({ hullTop: 1.7, turretTop: 2.56, turret: 2.35, gun: 2.05, hullMg: 0.96, turretMg: 2.0 });
 const T = TANK_HEIGHTS;
@@ -52,8 +57,14 @@ export const SPACE_KEYFRAMES = Object.freeze([
     targets: [
       // Every guard reads kneeling (both heights) AND lying (0.5 m, the AI's prone chest): 09.23 review found 7 of 8
       // prone in the engine and hidden by the scrape lip.
-      ...FRONT_GUARD_POSTS.map((p, i) => ({ name: `guard ${i} kneeling in the scrape`, at: p, heights: Kneel, need: 2 })),
-      ...FRONT_GUARD_POSTS.map((p, i) => ({ name: `guard ${i} lying in the scrape`, at: p, heights: [0.5], need: 1 })),
+      // 09-25 storyboard round (contract Data_FirstLevelStoryboard0103Contract §2.11): guards 6 and 7 spend 03 as the
+      // backslope LMG pair (FRONT_GUARD_MG_GROUP), not on their scrape posts, so six guards are measured in the scrape
+      // and the pair where it lies (prone chest 0.5 m, and kneeling for the moment it comes down); the K3 job -- guards,
+      // gap, burning nest in one look -- is unchanged, the frame gets narrower (the pair sits between the guards and the nest).
+      ...FrontGuardPosts03().flatMap(({ i, p }) => [{ name: `guard ${i} kneeling in the scrape`, at: p, heights: Kneel, need: 2 },
+        { name: `guard ${i} lying in the scrape`, at: p, heights: [0.5], need: 1 }]),
+      ...FRONT_GUARD_MG_GROUP.members.flatMap((m) => [{ name: `LMG ${m.role} (guard ${m.guard}) lying on the backslope`, at: { x: m.x, z: m.z }, heights: [0.5], need: 1 },
+        { name: `LMG ${m.role} (guard ${m.guard}) kneeling on the backslope`, at: { x: m.x, z: m.z }, heights: Kneel, need: 2 }]),
       { name: "the gap (a man crossing, crouched)", at: S.gap, heights: Crouch, need: 2 },
       { name: "nest MG muzzle over the west wall", at: { x: 24.0, z: -153.9 }, heights: [1.55, 1.4], need: 1 },
       { name: "nest gable peak (landmark)", at: { x: 37, z: -151.2 }, heights: [5.2, 4.4], need: 1,

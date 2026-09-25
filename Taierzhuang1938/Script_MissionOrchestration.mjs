@@ -41,7 +41,7 @@ import {
 import { MISSION_TERRAIN } from "./Data_FirstLevelMissionTerrain.mjs";
 import { MISSION_TRENCH_NETWORK } from "./Data_FirstLevelMissionTrenches.mjs";
 import { MISSION_DEFENSE_POSTS } from "./Data_FirstLevelMissionFortifications.mjs";
-import { FRONT_DEFENDERS, FRONT_GUARD_POSTS, FrontAssaultLane, FrontReserveLane } from "./Data_FirstLevelMissionFront.mjs";
+import { FRONT_DEFENDERS, FRONT_GUARD_POSTS, FRONT_GUARD_MG_GROUP, FrontAssaultLane, FrontReserveLane } from "./Data_FirstLevelMissionFront.mjs";
 import { MISSION_SOUTH_BRIDGE, MISSION_STAGE_ROUTES } from "./Data_FirstLevelMissionTopology.mjs";
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
 import { FRONT_SORTIE as Sortie } from "./Data_FirstLevelFrontRoute.mjs";
@@ -252,8 +252,13 @@ function BuildFriendlies() {
   const friendlies = [];
   for (const [i, post] of MISSION_PLACEMENT.squadFrontPositions.entries())
     friendlies.push({ id: `SquadFrontPost${i}`, kind: "squadPost", x: post.x, z: post.z, step: "MachineGun", phaseNumber: PhaseNumberForStep("MachineGun") });
-  for (const [i, post] of FRONT_GUARD_POSTS.entries())
-    friendlies.push({ id: `FrontGuardPost${i}`, kind: "guardPost", x: post.x, z: post.z, step: "Support", phaseNumber: PhaseNumberForStep("Support") });
+  // 03 stations: guards 6 and 7 spend 03 as the backslope LMG pair (FRONT_GUARD_MG_GROUP, storyboard round 09-25),
+  // not on their scrape posts; the workbench draws them where they lie.
+  for (const [i, post] of FRONT_GUARD_POSTS.entries()) {
+    const mg = FRONT_GUARD_MG_GROUP.members.find((m) => m.guard === i), at = mg || post;
+    friendlies.push({ id: `FrontGuardPost${i}`, kind: "guardPost", x: at.x, z: at.z, step: "Support", phaseNumber: PhaseNumberForStep("Support"),
+      ...(mg ? { station: `backslopeLmg:${mg.role}`, weapon: mg.weapon } : {}) });
+  }
   for (const spec of FRONT_DEFENDERS)
     friendlies.push({ id: spec.id, kind: "defender", x: spec.x, z: spec.z, step: "Support", phaseNumber: PhaseNumberForStep("Support"), weapon: spec.weapon });
   friendlies.push({ id: "ForwardNest", kind: "forwardNest", x: MISSION_ANCHORS.forwardNest.x, z: MISSION_ANCHORS.forwardNest.z, step: "Support", phaseNumber: PhaseNumberForStep("Support") });
