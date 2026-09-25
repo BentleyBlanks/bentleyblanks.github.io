@@ -28,8 +28,9 @@ export const OPENING_STORYBOARDS = Object.freeze({
       // 2026-09-25 storyboard round (Data_FirstLevelStoryboard0103Contract.md §4.1).
       "IjaButtStrikeCollar","IjaDragByForearm","IjaLookBackLow","IjaStartleTurn","IjaGuardPort",
       "LuoKneelReach","RunnerLeanPostCall","InterpreterHurryReach",
-      // §4.1 optional, made (Anim report 2026-09-25: the kneeling ClipLoad does not read as sitting from SB01)
-      "YaowaSitLoad"],
+      // §4.1 optional, made (Anim report 2026-09-25: the kneeling ClipLoad does not read as sitting from SB01;
+      // IjaChoppedFallWall reads as crumpling into the wall from Shunzi's eye, not as going over backwards in SB05A)
+      "YaowaSitLoad","IjaChoppedFallBack"],
     // Not in §5.4, added for the draft's "日兵甲把他推到沟壁上" pair (reported to the integrator).
     added:["IjaShoveToWall"],
   },

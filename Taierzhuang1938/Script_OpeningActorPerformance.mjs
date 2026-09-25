@@ -20,7 +20,9 @@ const ContactClips=new Set(["DuckBlast","BayonetClearWood","CollarDrag","ButtThr
   "IjaButtStrikeCollar","IjaDragByForearm","IjaLookBackLow","IjaStartleTurn","IjaGuardPort",
   // hands on the post, the rifle or held out to Shunzi, faces aimed inside the clip: no dialogue gestures or the
   // Banter/Orders MessengerReport substitution on top (the runner and Yaowa talk in those phases)
-  "LuoKneelReach","RunnerLeanPostCall","InterpreterHurryReach","YaowaSitLoad"]);
+  "LuoKneelReach","RunnerLeanPostCall","InterpreterHurryReach","YaowaSitLoad",
+  // SB05A alternative to IjaChoppedFallWall (the dadao cut and the fall backwards keep their authored timing)
+  "IjaChoppedFallBack"]);
 const Guards=new Set(["ijaA","ijaB","guard","heyoutian","liuwencai"]);
 const Hash=value=>[...String(value)].reduce((sum,char)=>(sum*31+char.charCodeAt(0))>>>0,7);
 const HandClips=new Set(["ButtThreat","InterrogateCrouch","InterpreterPoint","MessengerReport","PointBlockade"]);

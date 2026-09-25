@@ -4591,6 +4591,126 @@ def BuildYaowaSitLoad(T, name):
     return spec
 
 
+# -- SB05A IjaChoppedFallBack (ijaB, Ija01) -----------------------------------------------
+# SB05A frames ijaB going over backwards: sat down hard in the mud, one leg shot out toward Shunzi,
+# the other knee up, trunk thrown back, arms flung out, mouth open. IjaChoppedFallWall (staggers left
+# into the wall and slides down it) reads from Shunzi's eye as a man crumpling over, not as a man
+# thrown off balance backwards, so this is its alternative for the SB05A camera. Frames 0-0.50 s are
+# IjaChoppedFallWall's (the same aim, the same neck under Luo's LuoDadaoChopRear blade at 0.45 s):
+# the director swaps the clip on ijaB in STAGES['chopRear'] without moving anyone.
+FALLBACK_T = 54 / 24                      # 2.25 s
+FALLBACK_SEAT = (-.02, .20, .15)          # pelvis when the seat hits the mud (source m, IJA01): 0.2 m behind his root
+FALLBACK_SIT = 22 / 24                    # 0.917 s: the seat hits the mud
+Meta('IjaChoppedFallBack', FALLBACK_T, False, 'track', role='ijaB', rig='LugouIja01', props=['weapon'], rootMotion=True,
+     stage='chopRear', env={'wallLeftM': round(CHOP_WALL_X * .9213, 2)}, terminal=True,
+     contacts=[{'t': .45, 'by': 'luo', 'part': 'neckSideR', 'action': 'cut'}],
+     events=[{'t': .45, 'kind': 'bloodSpray', 'at': 'neckSideR'}, {'t': .50, 'kind': 'weaponLost'},
+             {'t': FALLBACK_SIT, 'kind': 'seatHit'}, {'t': FALLBACK_T, 'kind': 'dead'}],
+     prev=['IjaGuardPort', 'IjaBayonetGuard', 'IjaReadyRifle'], next=[],
+     notes='SB05A (2026-09-25), alternative to IjaChoppedFallWall on the same stage and frames 0-0.50 s: aiming down '
+           'at Shunzi when the blade lands; neck snaps away, the rifle drops forward into the mud in front of Shunzi, '
+           'the front (left) foot shoots out and he sits down hard 0.2 m behind his root (0.92 s, event seatHit), the '
+           'trunk thrown back, arms flung out, right knee up (the SB05A frame is 0.92-1.15 s); then he goes over onto '
+           'his back, the right knee falling open. Last frame is the corpse on his back.')
+
+
+@Builder('IjaChoppedFallBack')
+def BuildChoppedFallBack(T, name):
+    H, P, A, SX = T.H, T.P, T.A, T.SX
+    base = AimStance(T)
+    base.update({'bend': .18, 'head': (.30, -.14, .42)})           # = IjaChoppedFallWall's base
+    rifle0 = AimDownRifle(T)
+    ground = T.Rifle((-.12, -.92, .035), Unit((.85, -.52, .02)))  # in the mud in front of Shunzi
+    wallX = CHOP_WALL_X
+    sx, sy, sz = FALLBACK_SEAT
+    S = FALLBACK_SIT
+    rows = [
+        (0.00, {}),
+        (0.45, {}),
+        # The blade lands on the right of the neck: shoulders hunch, head and neck thrown left (as the wall fall,
+        # but the head goes over 0.12 s: the wall fall's one-frame 43 deg head snap reads as a pop).
+        (0.50, {'shrug': .30, 'bend': .08, 'head': (.22, .08, .50), 'neck': (0.03, .08, .20)}),
+        # The front foot slips out and the weight goes back over the rear foot (the drop to the seat takes
+        # about as long as a free fall of that height, 0.3 s).
+        (0.62, {'pelvis': (.02, .07, P - .18), 'pelvisTilt': (-.12, .05, -.35), 'bend': .02,
+                'head': (.10, .35, .60), 'neck': (0.0, .20, .20),
+                'ankle.L': (H + .04, -.30, A + .06), 'foot.L': (-20, 10, 0)}),
+        (0.78, {'pelvis': (.0, .15, P - .44), 'pelvisTilt': (-.30, .08, -.28), 'bend': -.04,
+                'ankle.L': (H + .06, -.48, A + .10), 'legPole.L': (H + .15, -1.0, 1.0), 'foot.L': (-40, 10, 0),
+                'legPole.R': (-(H + .30), -.9, .6), 'head': (-.05, .30, .50), 'shrug': .15}),
+        # Seat in the mud: trunk thrown back, left leg out toward Shunzi, right knee up, arms flung wide.
+        (S, {'pelvis': (sx, sy, sz), 'pelvisTilt': (-.50, .08, -.22), 'bend': -.08, 'lean': -.04,
+             'ankle.L': (H + .06, -.52, A + .01), 'legPole.L': (H + .10, -1.0, 1.1), 'foot.L': (-50, 10, 0),
+             'ankle.R': (-(H + .02), -.24, A), 'legPole.R': (-(H + .45), -.55, .80), 'foot.R': (0, -20, 0),
+             'head': (-.25, .25, .40), 'neck': (-.10, .12, .12), 'shrug': .05}),
+        (1.12, {'pelvisTilt': (-.58, .08, -.22), 'bend': -.10, 'head': (-.30, .22, .35)}),
+        # Over onto his back; the right knee falls open.
+        (1.50, {'pelvis': (sx + .01, sy + .04, sz - .03), 'pelvisTilt': (-1.00, .06, -.18), 'bend': -.04,
+                'head': (-.10, .25, .40), 'neck': (-.05, .10, .10), 'ankle.R': (-(H + .08), -.30, A)}),
+        (1.85, {'pelvis': (sx + .02, sy + .06, sz - .05), 'pelvisTilt': (-1.32, .06, -.14), 'bend': 0.0,
+                'ankle.R': (-(H + .18), -.36, A - .05), 'legPole.R': (-(H + .95), -.50, .45), 'foot.R': (0, -35, -20),
+                'ankle.L': (H + .10, -.50, A - .06), 'foot.L': (-60, 20, 15)}),
+        (FALLBACK_T, {'pelvis': (sx + .02, sy + .07, sz - .05), 'pelvisTilt': (-1.40, .06, -.12), 'bend': .02,
+                      'head': (.0, .40, .45), 'neck': (0.0, .12, .12), 'shrug': 0.0,
+                      'ankle.R': (-(H + .22), -.38, A - .06), 'ankle.L': (H + .10, -.50, A - .07), 'foot.R': (0, -45, -30)}),
+    ]
+    anim = Keys(base, rows, lag={'head': .04, 'neck': .03})
+    # Free hands in the torso frame (left, back, up from the shoulder): flung out as he sits, slack on the
+    # ground beside him once he lies back (the torso's `back` is then the ground). The left one stays clear
+    # of the trench wall on his left.
+    hands = Keys({'handRel.R': (-.10, -.20, -.42), 'handRel.L': (.10, -.10, -.45)}, [
+        (0.0, {}), (.62, {}),
+        (0.78, {'handRel.R': (-.28, -.34, -.18), 'handRel.L': (.26, -.26, -.20)}),
+        (S, {'handRel.R': (-.26, -.44, -.02), 'handRel.L': (.30, -.22, -.10)}),
+        (1.12, {'handRel.R': (-.30, -.40, -.10), 'handRel.L': (.30, -.14, -.16)}),
+        (1.50, {'handRel.R': (-.40, -.12, -.20), 'handRel.L': (.30, -.04, -.24)}),
+        (FALLBACK_T, {'handRel.R': (-.42, .04, -.24), 'handRel.L': (.30, .04, -.28)})])
+
+    def RifleAt(t):
+        if t <= .50:
+            return rifle0
+        # Let go and falls: a small toss forward, then the drop gathers speed like a free fall.
+        u = Clamp((t - .50) / .34)
+        o = Lerp3(rifle0['origin'], ground['origin'], Smooth(u))
+        o = (o[0], o[1], rifle0['origin'][2] + (ground['origin'][2] - rifle0['origin'][2]) * u * u)
+        return T.Rifle(o, Unit(Lerp3(rifle0['axis'], ground['axis'], Smooth(u))))
+
+    def Pose(t):
+        f = anim(t)
+        if t <= .50:
+            r = rifle0
+            palms = T.Palms(r['axis'])
+            f['grip.R'], f['grip.L'] = r['gripR'], r['gripL']
+            f['palmF.R'], f['palmN.R'], f['curl.R'] = palms['R'][0], palms['R'][1], .95
+            f['palmF.L'], f['palmN.L'], f['curl.L'] = palms['L'][0], palms['L'][1], .85
+            f['armPole.R'] = (-(SX + .45), .10, T.SZ - .35)
+            f['armPole.L'] = (SX + .30, -.40, T.SZ - .60)
+        else:
+            h = hands(t)
+            f['handRel.R'], f['handRel.L'] = h['handRel.R'], h['handRel.L']
+            f['palmF.R'], f['palmN.R'] = (0, -.2, -1), (1, 0, 0)
+            f['palmF.L'], f['palmN.L'] = (0, .2, 1), (1, 0, 0)
+            f['curl.R'] = f['curl.L'] = Mix(.35, .20, Smooth((t - .60) / .30))
+            f['poleRel.R'], f['poleRel.L'] = (-.45, .40, -.35), (.45, .40, -.35)
+            if t < .64:
+                # The hands open off the rifle over 0.14 s (they do not snap to the new pose).
+                r = rifle0
+                f['grip.R'], f['grip.L'] = r['gripR'], r['gripL']
+                f['gripW.R'] = f['gripW.L'] = 1 - Smooth((t - .50) / .14)
+                f['armPole.R'] = (-(SX + .45), .10, T.SZ - .35)
+                f['armPole.L'] = (SX + .30, -.40, T.SZ - .60)
+        return T.Nest(f)
+
+    spec = {'pose': Pose, 'props': lambda t: {'weapon': T.Track(RifleAt(t))}, 'plants': [('L', 0, .50), ('R', 0, .72)],
+            'walls': [((wallX, 0, 0), (-1, 0, 0))],
+            'reviewProps': lambda t: T.RifleProps(RifleAt(t)) + [('box', (wallX + .03, 0, .7), (.06, 2.0, 1.4), 0)],
+            'reviewFrames': lambda n: [0, int(n * .22), int(n * .35), int(n * .41), int(n * .5), int(n * .7), n - 1]}
+    spec = AReview(spec)
+    # SB05A camera: Shunzi half-lying 3 m in front of ijaB, eye 0.67 m up, looking a little up the trench
+    spec['reviewViews'].append(('sb', (-.315, -3.02, .673), (-.52, -.03, .99), 65.0, 0.0))
+    return spec
+
+
 # =================================================================================
 # which rigs bake which clip (manifest `rigs`). Every 2026-09-23 clip is baked only on the
 # rigs its role can wear (contract §5.1: comrade/interpreter/He/Liu/yaowa = NRA02, Luo =

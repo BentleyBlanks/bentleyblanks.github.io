@@ -2281,6 +2281,59 @@
    "rigs": [
     "LugouNra02"
    ]
+  },
+  "IjaChoppedFallBack": {
+   "duration": 2.25,
+   "loop": false,
+   "weaponHold": "track",
+   "role": "ijaB",
+   "rig": "LugouIja01",
+   "props": [
+    "weapon"
+   ],
+   "rootMotion": true,
+   "stage": "chopRear",
+   "env": {
+    "wallLeftM": 0.69
+   },
+   "terminal": true,
+   "contacts": [
+    {
+     "t": 0.45,
+     "by": "luo",
+     "part": "neckSideR",
+     "action": "cut"
+    }
+   ],
+   "events": [
+    {
+     "t": 0.45,
+     "kind": "bloodSpray",
+     "at": "neckSideR"
+    },
+    {
+     "t": 0.5,
+     "kind": "weaponLost"
+    },
+    {
+     "t": 0.9166666666666666,
+     "kind": "seatHit"
+    },
+    {
+     "t": 2.25,
+     "kind": "dead"
+    }
+   ],
+   "prev": [
+    "IjaGuardPort",
+    "IjaBayonetGuard",
+    "IjaReadyRifle"
+   ],
+   "next": [],
+   "notes": "SB05A (2026-09-25), alternative to IjaChoppedFallWall on the same stage and frames 0-0.50 s: aiming down at Shunzi when the blade lands; neck snaps away, the rifle drops forward into the mud in front of Shunzi, the front (left) foot shoots out and he sits down hard 0.2 m behind his root (0.92 s, event seatHit), the trunk thrown back, arms flung out, right knee up (the SB05A frame is 0.92-1.15 s); then he goes over onto his back, the right knee falling open. Last frame is the corpse on his back.",
+   "rigs": [
+    "LugouIja01"
+   ]
   }
  },
  "stages": {
@@ -5290,36 +5343,9 @@
   {
    "id": "LugouIja01",
    "file": "Animation_LugouIja01OpeningStoryboards.json",
-   "sha256": "762d24d4fc7a1c43e468f1d3bcfa6561651ce330b4189ffd97ea875e604705ab",
+   "sha256": "93f52e32eafeea31f98c15a91e2da07289d8f1c54cca33368a60d6b7870a91d0",
    "originalModelSha256": "23fa4ef88891bd14d49dfb9a3e61b9f0dcaf45b8956a720aab24d9c4c23eb9c7",
-   "clipIds": [
-    "SupplyReceive",
-    "ClipLoad",
-    "MessengerReport",
-    "DuckBlast",
-    "WoundedReach",
-    "CaptiveHeld",
-    "CollarControl",
-    "BayonetClearWood",
-    "CollarDrag",
-    "ButtThreat",
-    "InterrogateCrouch",
-    "InterpreterPoint",
-    "CreepDadao",
-    "DadaoAmbush",
-    "RifleDeflect",
-    "PullComrade",
-    "KickRifle",
-    "PointBlockade",
-    "ShotCollapse",
-    "GuardTurn",
-    "IjaPullArm",
-    "IjaReadyRifle",
-    "IjaCornerFire",
-    "IjaJunctionPeek",
-    "IjaChoppedFallWall",
-    "IjaGuardPort"
-   ],
+   "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningStoryboards_20260925\\Scene_LugouIja01OpeningStoryboards.blend",
    "contactPoints": {
     "hairBack": {
      "bone": "Bip001 Head",
@@ -5491,7 +5517,6 @@
      ]
     }
    },
-   "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningStoryboards_20260923\\Scene_LugouIja01OpeningStoryboards.blend",
    "clips": [
     {
      "clip": "SupplyReceive",
@@ -6382,7 +6407,77 @@
      "kneeSlideM": 0.0,
      "lookErrorDeg": 0.0,
      "headTurnDeg": 14.6
+    },
+    {
+     "clip": "IjaChoppedFallBack",
+     "frames": 55,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "wallPenetrationM": 0.0,
+     "pelvisMaxStepM": 0.1028,
+     "floorCorrectionMin": -0.0,
+     "floorCorrectionMax": 0.11887,
+     "root": {
+      "start": [
+       0.0438,
+       -0.0811,
+       -27.88,
+       0.7047
+      ],
+      "end": [
+       -0.0,
+       0.2488,
+       -9.18,
+       0.2016
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0,
+       0.5
+      ],
+      [
+       "R",
+       0,
+       0.72
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
     }
+   ],
+   "clipIds": [
+    "SupplyReceive",
+    "ClipLoad",
+    "MessengerReport",
+    "DuckBlast",
+    "WoundedReach",
+    "CaptiveHeld",
+    "CollarControl",
+    "BayonetClearWood",
+    "CollarDrag",
+    "ButtThreat",
+    "InterrogateCrouch",
+    "InterpreterPoint",
+    "CreepDadao",
+    "DadaoAmbush",
+    "RifleDeflect",
+    "PullComrade",
+    "KickRifle",
+    "PointBlockade",
+    "ShotCollapse",
+    "GuardTurn",
+    "IjaPullArm",
+    "IjaReadyRifle",
+    "IjaCornerFire",
+    "IjaJunctionPeek",
+    "IjaChoppedFallWall",
+    "IjaGuardPort",
+    "IjaChoppedFallBack"
    ]
   },
   {

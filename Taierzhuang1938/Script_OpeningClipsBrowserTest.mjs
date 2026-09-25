@@ -60,7 +60,7 @@ const LIMIT = { footM: .02, kneeM: .02, wallM: .03, contactM: .03, boneRatio: .0
 // first frame this round re-authored, keeps the 2026-09-23 right-forearm snap at 0.83 s: 60° world,
 // the same frame and size as before this round).
 const ROUND_0925 = new Set(["IjaButtStrikeCollar", "IjaDragByForearm", "IjaLookBackLow", "IjaStartleTurn", "IjaGuardPort",
-  "IjaHoldCollarUp", "LuoKneelReach", "RunnerLeanPostCall", "InterpreterHurryReach", "YaowaSitLoad"]);
+  "IjaHoldCollarUp", "LuoKneelReach", "RunnerLeanPostCall", "InterpreterHurryReach", "YaowaSitLoad", "IjaChoppedFallBack"]);
 // player-track part a contact names (the bake keeps one collar point for the front and the back of the collar)
 const PLAYER_PART = { collar: "collar", collarFront: "collar", collarBack: "collar", head: "head", forearmR: "forearmR", shoulderR: "shoulderR",
   chest: "chest" };

@@ -20,7 +20,7 @@ const FROZEN_AUTHORED=["WoundedSitRifleIdle","BanterLaugh","BanterLookShoulder",
   "HeSwapDadaoRifle","LuoKneelCheck",
   // 2026-09-25 storyboard round (Data_FirstLevelStoryboard0103Contract.md §4.1)
   "IjaButtStrikeCollar","IjaDragByForearm","IjaLookBackLow","IjaStartleTurn","IjaGuardPort",
-  "LuoKneelReach","RunnerLeanPostCall","InterpreterHurryReach","YaowaSitLoad"];
+  "LuoKneelReach","RunnerLeanPostCall","InterpreterHurryReach","YaowaSitLoad","IjaChoppedFallBack"];
 const FROZEN_REUSED=["ClipLoad","MessengerReport","CollarControl","CollarDrag","BayonetClearWood","ButtThreat","CreepDadao",
   "DadaoHeavy","RifleDeflect","DadaoParry","KickRifle","GuardTurn","PointBlockade","InterrogateCrouch","InterpreterPoint",
   "DeathCollapseA","DeathCollapseB","DeathCollapseC","DeathCollapseD",
@@ -332,6 +332,32 @@ const SB0925=["IjaButtStrikeCollar","IjaDragByForearm","IjaLookBackLow","IjaStar
   const seam=HandOver(nra02,"YaowaSitLoad",0,"YaowaSitLoad",-1);
   assert.ok(seam.angle<=.5&&seam.offset<=.001,`YaowaSitLoad: loop seam ${seam.angle.toFixed(3)} deg`);
   assert.ok(reportOf("LugouNra02","YaowaSitLoad").root.start[3]<.2,"YaowaSitLoad: the pelvis is on the ground (sitting)");
+}
+// ---- SB05A IjaChoppedFallBack (ijaB, optional §4.1): the alternative to IjaChoppedFallWall on the same stage --------
+{
+  const ijaB=assets.get("LugouIja01"),spec=manifest.clips.IjaChoppedFallBack,wall=manifest.clips.IjaChoppedFallWall;
+  const r=manifest.models.find(m=>m.id==="LugouIja01").clips.find(c=>c.clip==="IjaChoppedFallBack");
+  assert.ok(spec.rig==="LugouIja01"&&spec.role==="ijaB"&&spec.stage===wall.stage&&spec.terminal===true,"IjaChoppedFallBack: ijaB, the chopRear stage, terminal");
+  assert.ok(Math.abs(spec.duration*manifest.fps-Math.round(spec.duration*manifest.fps))<1e-6,`IjaChoppedFallBack: duration ${spec.duration} s is whole frames`);
+  // the same cut as the wall fall (LuoDadaoChopRear aims at the wall fall's neck track)
+  const cut=c=>c.by==="luo"&&c.part==="neckSideR"&&c.action==="cut";
+  assert.equal(spec.contacts.find(cut)?.t,wall.contacts.find(cut)?.t,"IjaChoppedFallBack: the cut lands when it does on IjaChoppedFallWall");
+  assert.ok(spec.events.some(e=>e.kind==="seatHit")&&spec.events.some(e=>e.kind==="dead"&&e.t===spec.duration),"IjaChoppedFallBack: seatHit and dead events");
+  // up to the cut it IS the wall fall, so the director swaps the clip without moving Luo: world pose <= 1 deg, 5 mm
+  for(const t of [0,.25,.45]){
+    const x=WorldPose("LugouIja01",ijaB,"IjaChoppedFallWall",t),y=WorldPose("LugouIja01",ijaB,"IjaChoppedFallBack",t);
+    let angle=0,offset=0,where="";
+    x.forEach((p,i)=>{
+      if(/Finger\d\d|Nub/.test(ijaB.bones[i]))return;
+      const q=y[i],deg=2*Math.acos(Math.min(1,Math.abs(p.q[0]*q.q[0]+p.q[1]*q.q[1]+p.q[2]*q.q[2]+p.q[3]*q.q[3])))*180/Math.PI;
+      if(deg>angle){angle=deg;where=ijaB.bones[i];}
+      offset=Math.max(offset,Math.hypot(p.p[0]-q.p[0],p.p[1]-q.p[1],p.p[2]-q.p[2]));
+    });
+    assert.ok(angle<=1&&offset<=.005,`IjaChoppedFallBack@${t} vs IjaChoppedFallWall: ${angle.toFixed(2)} deg at ${where}, ${(offset*100).toFixed(2)} cm`);
+  }
+  // bake numbers: planted feet hold until the fall, nothing in the trench wall, and he ends on the ground behind his root
+  assert.ok(r.footSlideM<=.02&&(r.wallPenetrationM??0)<=.01,`IjaChoppedFallBack: foot ${r.footSlideM} m, wall ${r.wallPenetrationM} m`);
+  assert.ok(r.root.end[3]<.25&&r.root.end[1]>r.root.start[1]+.15,`IjaChoppedFallBack: ends on the ground behind his root (${r.root.end})`);
 }
 let seams=0;
 for(const [id,spec] of Object.entries(manifest.clips)){
