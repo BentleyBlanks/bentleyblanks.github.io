@@ -1705,7 +1705,11 @@ export class FirstLevelBunkerShow {
         const target=p.spec.route[p.index];
         if(Distance(actor.position,target)<.9)p.index++;
         else r.MoveActor(actor,target,C.pursuit.speedMps);
-      }else if(!p.holding){p.holding=true;r.Defend(actor,p.spec.route.at(-1),.8,1);}
+      }else if(!p.holding){
+        // 「玩家回头时，能够看见敌人占据刚才自己停留的位置」: at the end of his route a pursuer holds that spot
+        // (cover within Defend's slack) instead of roaming the infantry tactical radius out of the look-back.
+        p.holding=true;actor.tacticalRadiusM=0;r.Defend(actor,p.spec.route.at(-1),.8,1);
+      }
     }
     if(retire&&this.pursuit)this.pursuit=this.pursuit.filter(p=>!p.actor.openingRemoved);
   }
