@@ -13,6 +13,7 @@
 //      也照样记 reliefInPosition；罗班长被枪座挡住 → 玩家在后墙岔口等够 rearLeaderGraceS 照样 rightRearReached；
 //      受保护的待撤守军身边不落手榴弹（任务侧投弹否决）
 //   ⑧ 近处说话人不在画面里：台词等他走进画面；太近就退开
+//   ⑪ 05 攻击位：罗班长停在投弹点旁（leaderAttackSide），离玩家 ≥1.5 m
 //   ⑩ 攻击支路过 AttackRuinA 东端留 ≥0.6 m；墙南侧死角里的人按最近路点走、先离开墙面（TankProbe5 卡死点）
 //   ⑨ 走路线的人（罗班长）在 FIRE 里被换位命令的 0.6 m 到位半径钉在路线拐点前 0.58 m（后门坡道）：Script_Ai.Act 用路线的半径
 //
@@ -725,6 +726,24 @@ function WalkRuntime(extra = {}) {
   }
   checks += 7;
   Ok("⑩ the attack branch clears AttackRuinA's east end and a walker in the pocket south of it walks away from the face");
+}
+
+{
+  // ⑪ Luo stops beside the throw spot (S.leaderAttackSide), never on it: >= 1.5 m from the player's throw spot so his
+  // BundleAttack lines show a face, inside rearArrivalM so attackPositionReached still needs him there, and on the
+  // attack branch's 3.4 m floor (<= 1.3 m off its centre line).
+  const side = S.leaderAttackSide, lane = S.attackRoute, d = Math.hypot(side.x - S.throw.x, side.z - S.throw.z);
+  assert.ok(d >= 1.5 && d < B.rearArrivalM, `Luo's attack stop is ${d.toFixed(2)} m from the throw spot`);
+  const a = lane.at(-2), b = lane.at(-1), t = Math.max(0, Math.min(1, ((side.x - a.x) * (b.x - a.x) + (side.z - a.z) * (b.z - a.z)) / ((b.x - a.x) ** 2 + (b.z - a.z) ** 2)));
+  const off = Math.hypot(side.x - (a.x + (b.x - a.x) * t), side.z - (a.z + (b.z - a.z) * t));
+  assert.ok(off <= 1.3, `Luo's attack stop is on the branch floor (${off.toFixed(2)} m off its centre line)`);
+  const { r } = WalkRuntime({ flow: { stage: { id: "Tank" } }, companion: { Handle: () => ({ id: 1, alive: true, position: { x: 0, z: 0 } }) } });
+  const battle = new FirstLevelFrontBattle(r);
+  r.Has = (id) => id === "bundleTaken" || id === "bundleReturned"; r.Inventory = () => ({ bundles: 1 }); r.tank = { brain: true };
+  battle.UpdateSortie();
+  assert.deepEqual(battle.leaderRoute.at(-1), side, "the 05 attack leg ends at leaderAttackSide");
+  checks += 3;
+  Ok("⑪ Luo's 05 attack leg ends beside the throw spot, 1.5 m+ from the player");
 }
 
 console.log(`FirstLevelFrontPacingTest 通过：${checks} 条断言`);

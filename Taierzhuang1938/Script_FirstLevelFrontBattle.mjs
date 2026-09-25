@@ -262,7 +262,7 @@ export class FirstLevelFrontBattle {
     }
     // 大脑接管时断履带不算解决（炮塔机枪还活着、还封口）：带路人留在攻击位，Disabled 以后才撤。
     if(!r.Has(TankClearFact(r.tank))){
-      this.SetLeg("attack",S.attackRoute);
+      this.SetLeg("attack",[...S.attackRoute.slice(0,-1),S.leaderAttackSide]);
       if(r.Near(S.throw,B.attackArrivalM)&&Distance(this.Leader.position,S.throw)<B.rearArrivalM){r.Record("attackPositionReached");r.Say("BundleAttack");}
       return;
     }
