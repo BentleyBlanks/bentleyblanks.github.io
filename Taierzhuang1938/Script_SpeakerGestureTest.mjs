@@ -196,13 +196,13 @@ function StubRig(modelId, { armed = false } = {}) {
   return rig;
 }
 // One frame of a driven line: speech from `line` (null = silent), state from `busy`.
-function RunLine(layer, rig, { lineId, who, lengthS, stressAt = [], seconds, busyFrom = Infinity, state = {} }) {
+function RunLine(layer, rig, { lineId, who, lengthS, stressAt = [], seconds, busyFrom = Infinity, state = {}, stateAt = null }) {
   const out = [], dt = 1 / 60;
   for (let f = 0; f < Math.round(seconds / dt); f++) {
     const t = f * dt, live = t < lengthS;
     const stress = Math.max(0, ...stressAt.map(s => 1 - Math.abs(t - s) / .08));
     rig.facial.lastSpeech = live ? { active: true, who, lineId, cue: lineId.split(".")[0], sourceTime: t, stress } : null;
-    layer.Apply(dt, t >= busyFrom ? { ...state, firing: true } : state);
+    layer.Apply(dt, stateAt ? stateAt(t) : t >= busyFrom ? { ...state, firing: true } : state);
     layer.AfterHead();
     out.push({ ...layer.state, clipT: layer.state.t, t });   // t: line time; clipT: the clip's clock
   }
@@ -257,6 +257,32 @@ function RunLine(layer, rig, { lineId, who, lengthS, stressAt = [], seconds, bus
   const cut = RunLine(layer4, rig, { lineId: "FrontBlockade.02", who: "luo", lengthS: 1.6, stressAt: [.4], seconds: 2, busyFrom: .8 });
   assert.ok(cut.some(r => r.t < .8 && r.weight > .9), "busy later: gesture up before");
   assert.ok(cut.filter(r => r.t >= .8 + GT.fadeS + 1 / 60).every(r => r.weight === 0), "busy later: weight 0 after fadeS");
+  // One shot (firing for .12 s, as the AI reports it) mid-gesture ends the gesture: no comeback after the shot.
+  const layer4b = new SpeakerGestureLayer(rig, null);
+  const shot = RunLine(layer4b, rig, { lineId: "FrontBlockade.02", who: "luo", lengthS: 1.6, stressAt: [.4], seconds: 2,
+    stateAt: t => ({ aim: 1, firing: t >= .8 && t < .92 }) });
+  assert.ok(shot.some(r => r.t < .8 && r.weight > .9), "aim 1 without a shot: the gesture plays");
+  assert.ok(shot.filter(r => r.t >= .8 + GT.fadeS + 1 / 60).every(r => r.weight === 0), "shot: weight 0 after fadeS and no comeback");
+  assert.ok(shot.some(r => r.phase === "cancelled"), "shot: reported as cancelled");
+  // Aim 1 in a shooting run (a shot just before the line): "aiming" until aimQuietS after the shot, then the clip
+  // starts with its lift (no jump to the hold).
+  const layer4c = new SpeakerGestureLayer(rig, null);
+  layer4c.Apply(1 / 60, { aim: 1, firing: true });
+  const run = RunLine(layer4c, rig, { lineId: "FrontBlockade.02", who: "luo", lengthS: 2.4, stressAt: [1.2], seconds: 2.6,
+    stateAt: () => ({ aim: 1 }) });
+  const firstUp = run.findIndex(r => r.weight > 0);
+  assert.ok(run.slice(0, Math.round(GT.aimQuietS * 60) - 2).every(r => r.weight === 0 && r.suppressed === "aiming"), "shooting run: aiming");
+  assert.ok(firstUp > 0 && run[firstUp].t <= GT.aimQuietS + .05, `shooting run: gesture starts after aimQuietS (${run[firstUp]?.t})`);
+  assert.ok(run.slice(firstUp).every((r, i, a) => i === 0 || r.weight - a[i - 1].weight < .2), "delayed start lifts, no jump");
+  assert.ok(run.filter(r => r.weight > .5).length >= 40, "delayed start: gesture up afterwards");
+  // Busy for the whole line: never lifted, the line's gesture is dropped.
+  const layer4d = new SpeakerGestureLayer(rig, null);
+  const moving = RunLine(layer4d, rig, { lineId: "FrontBlockade.02", who: "luo", lengthS: 1, seconds: 1.4, stateAt: () => ({ moveSpeed: 1 }) });
+  assert.ok(moving.every(r => r.weight === 0) && moving.some(r => r.phase === "missed"), "busy all line: missed");
+  // The aim IK hand-back (Script_Actor._ApplyRiggedAim): the gesture arm's weight, 0 for the other arm.
+  const layer4e = new SpeakerGestureLayer(rig, null);
+  RunLine(layer4e, rig, { lineId: "FrontBlockade.02", who: "luo", lengthS: 1.6, stressAt: [.4], seconds: .9 });
+  assert.ok(layer4e.ArmWeight(rig.sides.L.upper) > .9 && layer4e.ArmWeight(rig.sides.R.upper) === 0 && layer4e.ArmWeight(null) === 0, "ArmWeight");
   // A line without a gesture row, and another speaker's line: nothing.
   const layer5 = new SpeakerGestureLayer(rig, null);
   assert.ok(RunLine(layer5, rig, { lineId: "FrontBlockade.03", who: "luo", lengthS: 1.2, seconds: 1.4 }).every(r => r.weight === 0));
@@ -287,7 +313,9 @@ function RunLine(layer, rig, { lineId, who, lengthS, stressAt = [], seconds, bus
   // Busy reasons, targets and the head layer owning the gesture layer.
   const rig = { actor: {}, infantry: null };
   assert.equal(SpeakerGestureBusy(rig, {}), null);
-  for (const [state, why] of [[{ firing: true }, "firing"], [{ aim: .5 }, "aiming"], [{ meleeCombat: {} }, "melee"],
+  assert.equal(SpeakerGestureBusy(rig, { aim: 1 }), null, "a shouldered rifle with no shot is not aiming");
+  assert.equal(SpeakerGestureBusy(rig, { aim: .5 }, GT.aimQuietS / 2), "aiming");
+  for (const [state, why] of [[{ firing: true }, "firing"], [{ meleeCombat: {} }, "melee"],
     [{ carryRole: "front" }, "carrying"], [{ prone: 1 }, "prone"], [{ moveSpeed: .8 }, "moving"], [{ dead: true }, "dead"]]) {
     assert.equal(SpeakerGestureBusy(rig, state), why);
   }

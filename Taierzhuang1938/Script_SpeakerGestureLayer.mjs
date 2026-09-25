@@ -65,13 +65,17 @@ export function SpeakerGestureTargetPoint(name, { root, lookAt } = {}, out = new
   return null;
 }
 
-/** Why a body cannot gesture now (null: it can). */
-export function SpeakerGestureBusy(rig, state = {}) {
+/**
+ * Why a body cannot gesture now (null: it can). `fireAge`: seconds since this body last fired. A shouldered rifle
+ * alone is not "aiming": the 03-05 front AI holds aim 1 through the whole fight (ambient fire, one shot every few
+ * seconds; 2026-09-25 probe), so a man counts as aiming only while he is in a shooting run (fired within aimQuietS).
+ */
+export function SpeakerGestureBusy(rig, state = {}, fireAge = Infinity) {
   if (state.dead || rig.actor?.ragdollState) return "dead";
   if (rig.openingActorPerformanceState) return "director";
   if (rig.forcedClip) return "forcedClip";
   if (state.firing || state.fire > 0) return "firing";
-  if ((state.aim || 0) > G.maxAim) return "aiming";
+  if ((state.aim || 0) > G.maxAim && fireAge < G.aimQuietS) return "aiming";
   if (state.meleeCombat || state.melee > 0) return "melee";
   if (state.throwing > 0 || rig.infantry?.IsThrowing?.()) return "throwing";
   if (state.carryRole) return "carrying";
@@ -99,6 +103,7 @@ export class SpeakerGestureLayer {
     this.lastLineId = null;             // the line a gesture was last started (or refused) for
     this.stressHigh = false;
     this.busyFade = 1;
+    this.fireAge = Infinity;            // seconds since this body last fired (state.firing)
     this.written = new Map();           // bone -> [base, written]
     this.touched = new Set();
     this.bound = new Map();             // clip record -> rig bones
@@ -172,7 +177,7 @@ export class SpeakerGestureLayer {
     SpeakerGestureFirstFrame(record, g.q0);
     if (g.spec.aim) g.strokeDir = this._StrokeDir(g);
     this.active = g;
-    this.busyFade = SpeakerGestureBusy(this.rig, state) ? 0 : 1;
+    this.busyFade = SpeakerGestureBusy(this.rig, state, this.fireAge) ? 0 : 1;
     this.state.suppressed = null;
     return g;
   }
@@ -217,6 +222,7 @@ export class SpeakerGestureLayer {
     this._Restore();
     this.held.on = false;
     const rig = this.rig, st = this.state, step = Math.max(0, dt || 0);
+    this.fireAge = state.firing || state.fire > 0 ? 0 : this.fireAge + step;
     const speech = rig.facial?.lastSpeech || null;
     const lineId = speech?.active ? speech.lineId ?? null : null;
     if (!this.enabled || (this.head && this.head.enabled === false)) {
@@ -244,10 +250,23 @@ export class SpeakerGestureLayer {
     if (counter) counter.frames++;
     const g = this.active;
     if (!g) { st.weight = 0; st.clip = null; st.phase = null; return; }
-    const busy = SpeakerGestureBusy(rig, state);
-    this.busyFade = busy ? Math.max(0, this.busyFade - step / G.fadeS) : Math.min(1, this.busyFade + step / G.fadeS);
+    const busy = SpeakerGestureBusy(rig, state, this.fireAge);
+    // A shot while the arm is up ends this gesture: it fades out and does not come back after the shot (an arm
+    // bobbing off and on the rifle at every shot reads worse than no gesture).
+    if (busy === "firing" && g.t > 0 && this.busyFade > 0) g.cancelled = true;
+    this.busyFade = busy || g.cancelled ? Math.max(0, this.busyFade - step / G.fadeS) : Math.min(1, this.busyFade + step / G.fadeS);
     st.busyFor = busy ? st.busyFor + step : 0;   // seconds busy in a row (tests: weight 0 after fadeS)
     const live = lineId === g.lineId;
+    const End = phase => { this.active = null; st.weight = 0; st.clip = null; st.phase = phase; st.suppressed = busy; st.aimError = null; };
+    if (g.cancelled && this.busyFade <= 0) return End("cancelled");
+    // Busy when the line started: the clip waits unlifted and starts with its lift once the body is free, while the
+    // line is still being said.
+    if (g.t === 0 && this.busyFade <= 0 && busy) {
+      if (!live) return End("missed");
+      st.weight = 0; st.clip = g.record.name; st.phase = "waitFree"; st.suppressed = busy; st.aimError = null;
+      if (counter) counter.busyFrames++;
+      return;
+    }
     if (!this._Advance(g, step, speech || {}, live)) { this.active = null; st.weight = 0; st.clip = null; st.phase = "done"; return; }
     const w = Clamp(this._Envelope(g) * this.busyFade * g.release, 0, 1);
     st.clip = g.record.name; st.hand = g.record.hand; st.t = +g.t.toFixed(3); st.weight = w;
@@ -335,6 +354,16 @@ export class SpeakerGestureLayer {
       }
     }
     this._Seal();
+  }
+
+  /**
+   * Script_Actor._ApplyRiggedAim: how much of the aim IK on this arm to give back to the gesture (its upper arm
+   * bone; 0 when this layer is not gesturing with it). The rifle aim correction then turns the right arm and the
+   * rifle only; the pointing arm keeps the direction it was aimed at.
+   */
+  ArmWeight(upperArm) {
+    const g = this.active;
+    return g && upperArm && g.bones.upper === upperArm ? this.state.weight : 0;
   }
 
   /**

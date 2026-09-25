@@ -2692,7 +2692,16 @@ export class Actor {
       RIG_IK_SHIFT.multiplyScalar(1 - reach / distance);
       for (const other of this.rigAimArms) { other.target.add(RIG_IK_SHIFT); other.pole.add(RIG_IK_SHIFT); }
     }
-    for (const arm of this.rigAimArms) SolveRigAimArm(arm);
+    for (const arm of this.rigAimArms) {
+      SolveRigAimArm(arm);
+      // 03–06 说话手势占着这只胳膊时，按手势权重把瞄准 IK 还回手势姿势（Script_SpeakerGestureLayer.ArmWeight）；
+      // 01–06 以外没有 speakerGesture，这里恒为 0。
+      const keep = rig.speakerGesture?.ArmWeight(arm.upper) || 0;
+      if (keep > 0) {
+        arm.upper.quaternion.slerp(arm.upperBase, keep); arm.lower.quaternion.slerp(arm.lowerBase, keep);
+        arm.hand.quaternion.slerp(arm.handBase, keep);
+      }
+    }
     this.rigAimApplied = true;
   }
 

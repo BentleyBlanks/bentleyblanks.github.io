@@ -66,9 +66,12 @@ export const SPEAKER_GESTURE = Object.freeze({
   // Line over (or cut): the clip plays on to its release when that is at most `maxTailS` away; otherwise the
   // pose freezes and the arm eases back to the body over `releaseS`.
   maxTailS: .45, releaseS: .35,
-  // Busy (firing, aim > maxAim, melee, carrying, prone > maxProne, faster than a walk): the arm yields over
-  // fadeS and the head layer keeps acting. moveSpeed 1 = 4.2 m/s (Script_Actor); .45 is about 1.9 m/s.
-  fadeS: .15, maxAim: .35, maxMoveSpeed: .45, maxProne: .3,
+  // Busy (firing, aim > maxAim within aimQuietS of a shot, melee, carrying, prone > maxProne, faster than a walk):
+  // the arm yields over fadeS and the head layer keeps acting. A shot during the gesture ends it (no comeback); a
+  // body busy when its line starts waits unlifted and gestures once free. aimQuietS: the 03-05 front AI keeps aim 1
+  // all fight long and fires about once in 3 s (2026-09-25 probe of 04), so only a shooting run (a shot in the last
+  // .8 s) counts as aiming. moveSpeed 1 = 4.2 m/s (Script_Actor); .45 is about 1.9 m/s.
+  fadeS: .15, maxAim: .35, aimQuietS: .8, maxMoveSpeed: .45, maxProne: .3,
   // A further stress during the hold dips the forearm (the arm's version of the head nod).
   beatRadians: .16, beatS: .26,
   // Aimed clips: the upper arm turns from the clip's stroke direction to the target, limited to a cone around
