@@ -64,8 +64,11 @@ export const SPEAKER_GESTURE_CLIPS = Object.freeze({
 /**
  * Pointing targets. `sortie:<key>` / `space:<key>` are anchors in Data_FirstLevelFrontRoute (FRONT_SORTIE /
  * FRONT_SPACE); `listener` is whoever the head layer looks at (the player by default); `tank` is the live tank
- * (a runtime provider); `south` is a point 30 m due south (+Z) of the speaker. The anchors are checked on screen
- * in Step 3; a target outside the arm's cone is clamped to the cone's edge.
+ * (a runtime provider); `south` is a point 30 m due south (+Z) of the speaker. Ground anchors are pointed at
+ * SPEAKER_GESTURE.pointRiseM over the ground (pointRiseByTarget per name: the box on the floor lower). A target up to
+ * maxOutOfConeDeg outside the arm's cone is clamped to the cone's edge; further out it is not pointed at (suppressed
+ * targetOutOfReach), nor is one more than maxCrossOutDeg across the front of a man with a rifle up in the other hand
+ * (targetAcrossRifle). Checked on screen in the 2026-09-25 browser test.
  */
 export const SPEAKER_GESTURE_TARGETS = Object.freeze({
   rightNest: "sortie:nest",       // FrontBlockade: the right position with the burning broken wall that seals the way
@@ -82,20 +85,25 @@ export const SPEAKER_GESTURE_TARGETS = Object.freeze({
 
 /**
  * Every 03-06 line spoken by a body (shunzi is the player; the bearer has no skeleton). gesture null = no gesture
- * on purpose (head turn, nods and breath only). 22 of the 45 lines gesture: commands and pointing first; in the
+ * on purpose (head turn, nods and breath only). 21 of the 45 lines gesture: commands and pointing first; in the
  * front scenes nobody gestures on two of his own lines in a row, and questions and replies stay still. The 06
  * cigarette talk (BorrowLight, ZhouLift) is the exception: a seated conversation carried by its hands. Lines said
  * at the gun or while shooting keep their entry, but the runtime drops the gesture while the body is busy.
  * `pose` is the posture expected from the 2026-09-24 code: gun (at the machine-gun emplacement) | crouch | kneel |
  * stand | move | seat. Measured on the live 03-06 lines (Script_SpeakerGestureLayerBrowserTest, 2026-09-25): Luo
  * says most 03-05 lines at a crouched walk (moveSpeed .51) with the rifle up (aim 1), He Youtian and the guard
- * kneel with the rifle up, the 06 Zhou sits unarmed; Zhou's FrontBlockade.01 is said wounded (no gesture).
+ * kneel with the rifle up, the 06 Zhou sits unarmed; Zhou's FrontBlockade.01 is said wounded (no row gesture: the
+ * runtime never lifts a wounded arm). Points whose target lies outside the reach in the current Front layout were
+ * changed to an unaimed assigning beat (TakeOverGun.01: the left gun is behind Luo; BundleOrder.01: the ammunition
+ * house is behind the guard's shoulder). TankRoadContact.01 keeps its point at the live tank: made when the tank is
+ * in reach, refused (targetAcrossRifle) when it is on He Youtian's rifle side as in the 2026-09-25 layout; the
+ * browser test lists it as a known refusal (Script_SpeakerGestureLayerBrowserTest KNOWN_REFUSALS).
  */
 const Row = (who, pose, gesture = null, target = null) => Object.freeze({ who, pose, gesture, target });
 export const FIRST_LEVEL_SPEAKER_GESTURES = Object.freeze({
   // 03 Support. Cold start: head layer and gestures. Run from 01: the storyboard director still acts the squad in
   // this step (its own PointBlockade on FrontBlockade.02) and both shared layers yield to it.
-  "FrontBlockade.01": Row("zhou", "gun", "GesturePointL", "rightNest"),
+  "FrontBlockade.01": Row("zhou", "wounded"),
   "FrontBlockade.02": Row("luo", "crouch", "GesturePointL", "rightNest"),
   "FrontBlockade.03": Row("luo", "crouch"),
   "FrontApproach.01": Row("luo", "move"),
@@ -103,13 +111,13 @@ export const FIRST_LEVEL_SPEAKER_GESTURES = Object.freeze({
   "FrontAttack.01": Row("luo", "crouch"),
   "FrontWithdraw.01": Row("luo", "crouch", "GestureBeckonL", "listener"),
   // 04 MachineGun (TankTerror and BundleOrder are said while the tank blocks the gap, still in this step)
-  "TakeOverGun.01": Row("luo", "crouch", "GesturePointL", "leftGun"),
+  "TakeOverGun.01": Row("luo", "crouch", "GestureBeatL"),
   "TakeOverGun.02": Row("zhou", "gun"),
   "TakeOverGun.03": Row("luo", "crouch"),
   "TankRoadContact.01": Row("heyoutian", "gun", "GesturePointL", "tank"),
   "TankRoadContact.02": Row("luo", "crouch"),
   "TankTerror.01": Row("luo", "crouch", "GestureDownL"),
-  "BundleOrder.01": Row("guard", "kneel", "GesturePointL", "ammoHouse"),
+  "BundleOrder.01": Row("guard", "kneel", "GestureBeatL"),
   "BundleOrder.02": Row("luo", "crouch"),
   "BundleOrder.03": Row("luo", "crouch", "GestureBeckonL", "listener"),
   "BundleOrder.05": Row("luo", "crouch"),
