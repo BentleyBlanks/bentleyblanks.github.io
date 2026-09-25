@@ -6,6 +6,8 @@
 // 2. 道具不压导演的站位与路线（读 Data_OpeningStoryboards；近爆之后才出现的道具只对近爆之后的标记算；
 //    DESIGNED_CONTACTS 里写明的有意接触除外）；
 // 3. 洞口塌土改形：SB03 眼位看审问组与右侧沟底不被塌土挡；还权坐位西侧有靠背、看得见岔口 J；
+//    SB03/03A 眼位看审问组也不被本包的布景挡（布景只是外观，Space 的视线探针看不见它们，这里单独量）；
+//    SB03A 上沿那条塌顶木真在画面上沿；
 //    还权位对折角 F 的通视只量不判（见文末说明与报告）；
 // 4. Script_OpeningSet 的生命周期：进 01–03 装载，近爆后塌方组出现、门楣落下，马灯只在 01 亮；
 //    离开 01–03 后场景零残留、几何与自有材质全部 dispose。
@@ -46,7 +48,7 @@ const report = {};
     const boxes = PropFootprints(prop);
     assert.ok(boxes.length > 0, `${prop.id} has a footprint`);
     for (const b of boxes) assert.ok(b.w > 0 && b.d > 0 && b.y1 > b.y0, `${prop.id} footprint is a real box`);
-    if (prop.show) assert.ok(["collapsed"].includes(prop.show), `${prop.id}.show is known`);
+    if (prop.show) assert.ok(["collapsed", "rescue"].includes(prop.show), `${prop.id}.show is known`);
     if (prop.texture) assert.ok(fs.existsSync(path.join(HERE, prop.texture)), `${prop.id} texture ${prop.texture} exists`);
   }
   const externalSource = fs.readFileSync(path.join(HERE, "Script_ExternalProps.mjs"), "utf8");
@@ -137,7 +139,7 @@ const Samples = (route) => {
     const boxes = PropFootprints(prop).filter((b) => !b.walkable);
     const allowed = new Set(DESIGNED_CONTACTS[prop.id]?.marks || []);
     for (const mark of MARKS) {
-      if (prop.show === "collapsed" && !mark.after) continue;
+      if (prop.show && !mark.after) continue;          // 近爆之后 / 02 起才出现的道具
       if (allowed.has(mark.name)) continue;
       const hit = Samples(mark.route).find((p) => boxes.some((b) => Clash(b, p)));
       if (!hit) continue;
@@ -198,6 +200,63 @@ const Samples = (route) => {
   // 折角 F：只量不判。F 与 J 在同一条东西向沟里，从坐位看两者只差 4.4°；任何挡 F 的东西都落在
   // 追兵从 F 走到 J 的路线上（BunkerPursuitA/C、ijaD、背景兵），或同样挡住 01 受困眼位看 F（K1）。
   report.seatF = [1.6, 1.2].map((h) => Sight(seatEye, Eye(SP.bunkerFold, h), { state: "BunkerCollapsed" }));
+  // SB03（Interrogation）与 SB03A（Found）眼位：01 里看得见的布景（常驻组 + 塌方组）不挡审问组。
+  // 射线逐 2 cm 步进，落进任一件道具的占地盒（高度按盒子自己的参考地面算，斜木按投影插值）就算挡住。
+  const visible01 = PROPS.filter((p) => !p.show || p.show === "collapsed");
+  const boxes01 = visible01.flatMap((prop) => PropFootprints(prop).map((box) => ({ prop: prop.id, box,
+    ground: prop.ground ? G(prop.ground.x, prop.ground.z) : null })));
+  const Inside = ({ box, ground }, x, y, z) => {
+    const c = Math.cos(box.ry), sn = Math.sin(box.ry), dx = x - box.x, dz = z - box.z;
+    const lx = dx * c - dz * sn, lz = dx * sn + dz * c;
+    if (Math.abs(lx) > box.w / 2 || Math.abs(lz) > box.d / 2) return false;
+    if (box.ellipse && (lx / (box.w / 2)) ** 2 + (lz / (box.d / 2)) ** 2 > 1) return false;
+    const g = ground ?? G(x, z);
+    let y0 = box.y0, y1 = box.y1;
+    if (box.sloped) {
+      const { a, b, half } = box.sloped, len2 = (b.x - a.x) ** 2 + (b.z - a.z) ** 2;
+      const t = Math.max(0, Math.min(1, ((x - a.x) * (b.x - a.x) + (z - a.z) * (b.z - a.z)) / len2));
+      const h = a.lift + (b.lift - a.lift) * t; y0 = h - half; y1 = h + half;
+    }
+    return y > g + y0 && y < g + y1;
+  };
+  const SetBlocker = (from, fromH, to, toH) => {
+    const a = { x: from.x, y: G(from.x, from.z) + fromH, z: from.z }, b = { x: to.x, y: G(to.x, to.z) + toH, z: to.z };
+    const n = Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / 0.02);
+    for (let k = 1; k < n; k++) {
+      const t = k / n, x = a.x + (b.x - a.x) * t, y = a.y + (b.y - a.y) * t, z = a.z + (b.z - a.z) * t;
+      const hit = boxes01.find((entry) => Inside(entry, x, y, z));
+      if (hit) return hit.prop;
+    }
+    return null;
+  };
+  const groups = {
+    SB03: { eye: { x: 0.35, z: -125.15 }, h: 0.26, pitchDeg: 5, yawDeg: -80, targets: [["ijaA", { x: 4.10, z: -125.63 }, [1.55, 0.9, 0.35]],
+      ["captive (sitting)", { x: 4.06, z: -125.90 }, [0.85, 0.5]], ["ijaB", { x: 5.0, z: -124.86 }, [1.55, 0.9, 0.35]],
+      ["interpreter (crouched)", { x: 4.75, z: -124.85 }, [1.0, 0.6]]] },
+    SB03A: { eye: { x: 0.25, z: -125.25 }, h: 0.18, pitchDeg: 4, yawDeg: -82, targets: [["captive (sitting)", { x: 4.06, z: -125.88 }, [0.85, 0.5]],
+      ["ijaA looking back", { x: 4.9, z: -124.45 }, [1.55, 0.9, 0.35]]] },
+  };
+  report.setSight = {};
+  for (const [shot, spec] of Object.entries(groups)) {
+    report.setSight[shot] = spec.targets.flatMap(([name, at, heights]) => heights.map((h) => ({ name, h, blocker: SetBlocker(spec.eye, spec.h, at, h) })));
+    const blocked = report.setSight[shot].filter((row) => row.blocker);
+    assert.deepEqual(blocked, [], `${shot}: the set dressing does not hide the interrogation group`);
+  }
+  // 塌顶木的下沿在 SB03/03A 画面里的位置（1280×720、竖直视场 65°，沿镜头正前方量）：SB03A 要「上沿一整条黑木料」，
+  // SB03 不能再被它框住（门柱过梁不再框住画面）。
+  const timber = PROPS.find((p) => p.id === "roofTimberDown"), tanHalf = Math.tan(32.5 * Math.PI / 180);
+  report.timberBand = {};
+  for (const [shot, spec] of Object.entries(groups)) {
+    const yaw = spec.yawDeg * Math.PI / 180, dir = { x: -Math.sin(yaw), z: -Math.cos(yaw) };
+    // 木料在眼睛上方：挡住的下边界是它的远端下棱（东面那条棱）。
+    const dist = (timber.a.x + timber.w / 2 - spec.eye.x) / dir.x, z = spec.eye.z + dir.z * dist;
+    const t = (z - timber.a.z) / (timber.b.z - timber.a.z), bottom = timber.a.lift + (timber.b.lift - timber.a.lift) * t - timber.h / 2;
+    const eyeY = G(spec.eye.x, spec.eye.z) + spec.h, floor = G(FLOOR.x, FLOOR.z);
+    const elev = Math.atan2(floor + bottom - eyeY, dist) - spec.pitchDeg * Math.PI / 180;
+    report.timberBand[shot] = +(0.5 - Math.tan(elev) / (2 * tanHalf)).toFixed(3);   // 木料下沿在画面的纵向位置（0 = 上沿）
+  }
+  assert.ok(report.timberBand.SB03A > 0.06 && report.timberBand.SB03A < 0.25, `SB03A: the fallen roof timber is a band along the top: ${report.timberBand.SB03A}`);
+  assert.ok(report.timberBand.SB03 < 0.3, `SB03: the fallen roof timber takes less than the top 30%: ${report.timberBand.SB03}`);
   console.log(`ok rubble: heap ${report.rubbleTopM} m, SB03 group and right-hand trench in view, backrest ${JSON.stringify(report.backrest)}, seat sees J; seat->F ${JSON.stringify(report.seatF)} (reported, not asserted)`);
 }
 
@@ -218,6 +277,7 @@ const Samples = (route) => {
   set.Update(0.016, "Trapped", "Banter", { collapsed: false, blastAge: null });
   stats = set.Stats();
   assert.equal(stats.collapsedVisible, false, "before the blast the collapse group is hidden");
+  assert.equal(stats.rescueVisible, false, "the 02 group is hidden in 01");
   assert.ok(set.lantern.light.visible && set.lantern.light.intensity > 1, "the lantern is lit in 01");
   // 近爆：0.1 s 门楣还在原位，0.45 s 正在落，1.0 s 落定（搁在塌顶木上）。
   set.Update(0.016, "Trapped", "Blast", { collapsed: true, blastAge: 0.1 });
@@ -228,6 +288,7 @@ const Samples = (route) => {
   set.Update(0.016, "Trapped", "Blast", { collapsed: true, blastAge: 1.2 });
   assert.equal(set.Stats().lintelProgress, 1, "the lintel is down by 1.2 s");
   assert.equal(set.Stats().collapsedVisible, true, "after the blast the collapse group shows");
+  assert.equal(set.Stats().rescueVisible, false, "the hand-back backrest stays hidden through 01 (it would hide the SB03 group)");
   // 断头落在 rest 点上（世界坐标核对 FallLintel 的朝向）。
   const spec = PROPS.find((p) => p.id === "fallenLintel"), piece = set.lintel.mesh;
   piece.updateMatrixWorld(true);
@@ -238,6 +299,7 @@ const Samples = (route) => {
   set.Update(0.016, "BunkerRescue", "Hold", { collapsed: true, blastAge: null });
   assert.equal(set.Stats().lintelProgress, 1, "entering 02 without a blast shows the lintel already down");
   assert.ok(!set.lantern.light.visible && set.lantern.light.intensity === 0, "the lantern is out after 01");
+  assert.equal(set.Stats().rescueVisible, true, "the hand-back backrest shows from 02 on");
   // 离开 01–03：场景零残留，几何与自有材质全部 dispose，共享库材质不碰。
   const geometries = new Set(), owned = [...set.ownedMaterials];
   set.root.traverse((o) => { if (o.geometry) geometries.add(o.geometry); });
@@ -261,4 +323,4 @@ const Samples = (route) => {
   console.log(`ok lifecycle: ${report.stats.meshes} meshes / 1 light in 01–03, lintel falls 0.25–0.6 s, lantern only in 01, zero residue after 03`);
 }
 
-console.log(`OpeningSetTest ok ${JSON.stringify({ rubbleTopM: report.rubbleTopM, backrest: report.backrest, seatF: report.seatF, meshes: report.stats.meshes })}`);
+console.log(`OpeningSetTest ok ${JSON.stringify({ timberBand: report.timberBand, rubbleTopM: report.rubbleTopM, backrest: report.backrest, seatF: report.seatF, meshes: report.stats.meshes })}`);

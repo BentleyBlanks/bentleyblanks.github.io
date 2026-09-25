@@ -3,7 +3,8 @@
 // docs/Data_FirstLevelStoryboard0103Contract.md §4.5）。
 //
 // 数据在 Data_OpeningSet0103.PROPS（纯数据）；这里只把它变成 three 网格：
-//   · 静态件按材质走 BuildSink 合批（AGENTS §3），分两组：01–03 常驻组、近爆之后才出现的塌方组；
+//   · 静态件按材质走 BuildSink 合批（AGENTS §3），分三组：01–03 常驻组、近爆之后才出现的塌方组、
+//     02 起才出现的组（show:"rescue"，还权坐位的靠背：01 里它挡 SB03 看审问组的视线）；
 //   · 会动的只有两样：门楣南段的落下（FallLintel）、马灯的点光与灯罩闪烁；
 //   · 全部挂在本模块自己的根节点下，Exit() 拆干净（几何、自有材质、贴图、灯），场景里不留一个节点。
 // 库材质（library.Get）与外部模型模板是共享的，只摘不 dispose。
@@ -90,6 +91,7 @@ export class OpeningSet {
     this.time = (this.time || 0) + dt;
     const collapsed = !!flags.collapsed;
     this.collapsedRoot.visible = collapsed;
+    this.rescueRoot.visible = collapsed && stageId !== "Trapped";
     if (collapsed) {
       const f = this.lintel?.spec.fall;
       // 没看到近爆（选章 / 回跳 / 重试直接进 02）＝已经落定。
@@ -108,7 +110,7 @@ export class OpeningSet {
     for (const m of materials) { m.map?.dispose?.(); m.dispose(); }
     for (const t of this.ownedTextures) t.dispose();
     for (const light of this.lights) light.dispose?.();
-    this.root = null; this.collapsedRoot = null; this.lintel = null; this.lantern = null;
+    this.root = null; this.collapsedRoot = null; this.rescueRoot = null; this.lintel = null; this.lantern = null;
     this.ownedMaterials = []; this.ownedTextures = []; this.lights = [];
     this.lintelProgress = null;
   }
@@ -118,7 +120,7 @@ export class OpeningSet {
     let meshes = 0, lights = 0, nodes = 0;
     this.root?.traverse((o) => { nodes += 1; if (o.isMesh) meshes += 1; if (o.isLight) lights += 1; });
     return { active: this.Active, nodes, meshes, lights, ownedMaterials: this.ownedMaterials?.length || 0,
-      collapsedVisible: !!this.collapsedRoot?.visible, lintelProgress: this.lintelProgress };
+      collapsedVisible: !!this.collapsedRoot?.visible, rescueVisible: !!this.rescueRoot?.visible, lintelProgress: this.lintelProgress };
   }
 
   // ---------------------------------------------------------------- fallen lintel
@@ -160,19 +162,21 @@ export class OpeningSet {
   Build() {
     this.root = new THREE.Group(); this.root.name = "OpeningSet0103";
     this.collapsedRoot = new THREE.Group(); this.collapsedRoot.name = "OpeningSet0103_Collapsed"; this.collapsedRoot.visible = false;
-    this.root.add(this.collapsedRoot);
+    this.rescueRoot = new THREE.Group(); this.rescueRoot.name = "OpeningSet0103_Rescue"; this.rescueRoot.visible = false;
+    this.root.add(this.collapsedRoot, this.rescueRoot);
     this.ownedMaterials = []; this.ownedTextures = []; this.lights = [];
-    const sinks = { always: new BuildSink(), collapsed: new BuildSink() };
+    const sinks = { always: new BuildSink(), collapsed: new BuildSink(), rescue: new BuildSink() };
     const materials = new Map();
     this.sinkMaterials = materials;
     for (const prop of PROPS) {
-      const sink = prop.show === "collapsed" ? sinks.collapsed : sinks.always;
-      sink.SetSector(`OpeningSet_${prop.show === "collapsed" ? "C" : "A"}`);
+      const sink = sinks[prop.show || "always"];
+      if (!sink) throw new Error(`OpeningSet: unknown show ${prop.show} (${prop.id})`);
+      sink.SetSector(`OpeningSet_${prop.show || "always"}`);
       this.BuildProp(prop, sink, materials);
     }
     const resolve = (name) => materials.get(name) || this.Lib(name);
     for (const [key, sink] of Object.entries(sinks)) {
-      const parent = key === "collapsed" ? this.collapsedRoot : this.root;
+      const parent = { collapsed: this.collapsedRoot, rescue: this.rescueRoot }[key] || this.root;
       for (const mesh of sink.Flush(parent, {}, { castShadow: true, receiveShadow: true, resolve })) mesh.name = `OpeningSet0103_${key}_${mesh.name}`;
     }
     this.scene.add(this.root);

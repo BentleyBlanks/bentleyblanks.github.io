@@ -35,12 +35,16 @@ export const PROPS = Object.freeze([
   { id: "bunkerSandbagWallN", kind: "sandbagWall", ground: FLOOR,
     a: P(0.3, -127.62), b: P(0.9, -127.62), layers: 4, layerM: 0.18, depthM: 0.36, bagM: 0.5 },
   // 竖排两行标语配宣传画，贴在北壁的木板上，面朝南。底图 Lovart、字程序叠加（Texture/Script_MakeBunkerPoster.mjs）。
-  // 离洞底 1.2 m 的中心：下沿 0.75，刚好在沙袋墙（0.72）与弹药箱（0.85）上方露出来。
-  { id: "bunkerPoster", kind: "poster", ground: FLOOR, x: 0.2, z: -127.8, lift: 1.2, w: 0.6, h: 0.9, faceYawDeg: 180,
+  // 离洞底 1.02 m 的中心（调研写 1.2）：SB02 镜像机位眼高 0.75、俯 14°，画面上沿只到离地约 1.45 m，
+  // 1.2 时实拍只看得见下半截的画、看不见字（tmp/cap/step1b/SB02_set_after.png）。1.02 时字（上 45%，
+  // 离地 0.98–1.47）露在沙袋与弹药箱上方；下半截的画被弹药箱（0.85）与沙袋墙（0.72）压住一角，像贴在后面。
+  // x 从 0.2 东移到 0.35，少被弹药箱挡。
+  { id: "bunkerPoster", kind: "poster", ground: FLOOR, x: 0.35, z: -127.8, lift: 1.02, w: 0.6, h: 0.9, faceYawDeg: 180,
     texture: "./Texture/Texture_BunkerPosterDefendShandong.webp",
     board: Object.freeze({ x0: -0.75, x1: 0.92, z: -127.87, lift0: 0.0, lift1: 1.84, plankM: 0.2 }) },
   // 铁皮马灯：挂在北门柱内侧（柱 x 0.925…1.175、z -127.65…-127.35）的钉子上，暖色点光只在 01 亮、轻微闪烁。
-  { id: "bunkerLantern", kind: "lantern", ground: FLOOR, x: 0.84, z: -127.42, lift: 1.55,
+  // 离洞底 1.28 m（调研写 1.55）：同上，SB02 俯 14° 时 1.55、1.4 都在画面上沿外（实拍）。
+  { id: "bunkerLantern", kind: "lantern", ground: FLOOR, x: 0.84, z: -127.42, lift: 1.28,
     light: Object.freeze({ color: 0xffa65a, intensity: 2.2, distanceM: 3.2, decay: 2, flickerHz: Object.freeze([7.3, 11.1, 2.3]), flicker: 0.16 }),
     litStages: Object.freeze(["Trapped"]) },
   // 北壁弹药箱两层（幺娃身后，SB01 左中），箱背嵌进北壁坡脚。
@@ -60,16 +64,20 @@ export const PROPS = Object.freeze([
     // 完好时的门楣（= MISSION_SCENARIO 完好态的 BunkerMouthLintel：中心 (1.05,-125.9)，0.3×0.22×3.4，顶在洞底上 1.95 m）。
     intact: Object.freeze({ x: 1.05, z: -125.9, lift: 1.84, w: 0.3, h: 0.22, d: 3.4 }),
     pivot: P(1.05, -124.3, 1.84),          // 南段绕南门柱顶转
-    rest: P(0.72, -126.15, 0.66),          // 断头落在塌顶木 roofTimberDown 上
+    rest: P(0.72, -126.15, 0.87),          // 断头落在塌顶木 roofTimberDown 上（顶面离地 0.76 + 半厚 0.11）
     breakZ: -126.5,                         // 断口：北段 z -127.6…-126.5 留在北柱顶
     // 近爆后的落下时刻（秒，从 Blast 起算），契约 §5 SB02「fallenLintel 0.25–0.6 s 塌下」。
     fall: Object.freeze({ startS: 0.25, endS: 0.6, bounceRad: 0.05, bounceS: 0.18 }) },
-  // SB03A 画面上沿那一整条黑木料：塌下的洞顶木，沿 z 横在洞口内侧，南端搁在南侧塌土上，北端垫着一堆土块。
+  // SB03A 画面上沿那一整条黑木料：塌下的洞顶木，沿 z 横在洞口内侧，两头各垫一堆土块。
   // 调研起点：中心 (0.8,-125.4)、离地 0.52、0.3×0.3×3.4。长度收到 1.75 m（z -126.25…-124.5）：SB03A 画面
   // 左右缘只用到 z -126.1…-124.8，北边留出拖人出洞的通道。
+  // 离地抬到 0.62/0.66（下沿 0.48–0.52）：0.47/0.55 时木料下沿 0.33–0.41，SB03 眼高 0.26 离它只有 0.45 m，
+  // 实拍盖掉画面上 42%、审问组只剩头（tmp/cap/step1b/SB03_set.png）。现在 SB03 约占上 25%、SB03A 约 20%，
+  // 日兵甲的头从木料下沿露出来（Script_OpeningSetTest 的视线检查，余量约 4 cm）。
   { id: "roofTimberDown", kind: "timber", ground: FLOOR, show: "collapsed",
-    a: P(0.8, -126.25, 0.47), b: P(0.8, -124.5, 0.55), w: 0.3, h: 0.28,
-    supports: Object.freeze([Object.freeze({ x: 0.8, z: -126.15, w: 0.5, h: 0.34, d: 0.45 })]) },
+    a: P(0.8, -126.25, 0.62), b: P(0.8, -124.5, 0.66), w: 0.3, h: 0.28,
+    supports: Object.freeze([Object.freeze({ x: 0.8, z: -126.15, w: 0.5, h: 0.48, d: 0.45 }),
+      Object.freeze({ x: 0.82, z: -124.62, w: 0.45, h: 0.52, d: 0.4 })]) },
 
   // ---------------------------------------------------------------- 洞口外前沟（SB03/03A/04/04A 的背景）
   // 北壁木框洞口立面：挖在北壁里的另一处掩蔽部口（纯装饰，门内黑），门洞 x 2.7–3.9，另一口 x 4.9–5.5。
@@ -127,10 +135,14 @@ export const PROPS = Object.freeze([
   // 塌土体块是方盒；这里各盖一个压扁的土包把方盒包进去（SB03 右侧：峰高不超过 0.4 m）。
   // 南侧塌土：体块 BunkerMouthRubbleS 收成 0.6×0.5×0.25 m（中心 (1.35,-124.3)），给 02 救援圈 S' (0.60,-123.90)
   // 跪着的顺子留出身位，北边与洞口塌土之间留一条 0.7 m 的过道（拖人去还权位走这里，见测试的 SB06.dragCoverSet）。
-  { id: "rubbleMoundS", kind: "mound", show: "collapsed", x: 1.35, z: -124.3, rx: 0.62, rz: 0.45, peak: 0.38, seed: 11 },
+  // 峰高 0.31（原 0.38）、摊宽：SB03 眼高 0.26，0.38 的土包在画面右下拱过地平线（实拍）。仍盖得住 0.25 m 的体块。
+  { id: "rubbleMoundS", kind: "mound", show: "collapsed", x: 1.35, z: -124.3, rx: 0.82, rz: 0.62, peak: 0.31, seed: 11 },
   // 还权坐位 (2.40,-125.20) 西侧的靠背（只是外观，不进碰撞：进了会挡住拖进遮挡与撤出的路线）。
   // 南北只伸到 z -125.6…-124.75，南边 SB04 枪托位 (2.3,-124.4) 躺人的地方空着。
-  { id: "rubbleMoundBack", kind: "mound", show: "collapsed", x: 1.85, z: -125.17, rx: 0.36, rz: 0.43, peak: 0.48, seed: 23 },
+  // **02 起才出现**（show:"rescue"）：它正好在 SB03/03A 眼位看审问组的视线上（眼 (0.35,-125.15) 高 0.26、
+  // 坐位 (2.40,-125.20)、审问组 (4.1,-125.6) 几乎一条线），01 里摆着会把审问组腰以下全挡掉（实拍）。
+  // 02 开场镜头朝南，这里在镜头背后，出现的那一下没人看得见。
+  { id: "rubbleMoundBack", kind: "mound", show: "rescue", x: 1.85, z: -125.17, rx: 0.36, rz: 0.43, peak: 0.48, seed: 23 },
 ]);
 
 /** 烟柱与火点（Step 2 填：{id, stages, x, z, kind, scale, fire}）。 */
@@ -184,7 +196,8 @@ export function PropFootprints(prop) {
         { sloped: { a: prop.pivot, b: prop.rest, half: i.h / 2 } }),
       Seg(P(i.x, i.z - i.d / 2), P(i.x, prop.breakZ), i.w, i.lift - i.h / 2, i.lift + i.h / 2)];
     }
-    case "timber": return [Seg(prop.a, prop.b, prop.w, Math.min(prop.a.lift, prop.b.lift) - prop.h / 2, Math.max(prop.a.lift, prop.b.lift) + prop.h / 2),
+    case "timber": return [Seg(prop.a, prop.b, prop.w, Math.min(prop.a.lift, prop.b.lift) - prop.h / 2, Math.max(prop.a.lift, prop.b.lift) + prop.h / 2,
+        { sloped: { a: prop.a, b: prop.b, half: prop.h / 2 } }),
       ...(prop.supports || []).map((s) => ({ x: s.x, z: s.z, w: s.w, d: s.d, ry: 0, y0: 0, y1: s.h }))];
     case "facade": return [Seg(P(prop.x0, prop.z), P(prop.x1, prop.z), 0.2, 0, prop.heightM)];
     case "duckboards": {
