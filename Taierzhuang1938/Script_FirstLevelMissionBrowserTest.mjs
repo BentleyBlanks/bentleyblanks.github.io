@@ -7,6 +7,8 @@
 //   node …  --campaign --stage-from=4|5 --stage-to=6 [--bomb-first]             从 04 / 05 检查点（missionStage=4|5）冷启动，
 //                                                                                真实输入推进到 06 收尾；--bomb-first = 05 先炸车再（不）到攻击位
 //   node …  … --evidence-tag=R2                                                 同一套件并行跑多份时证据目录分开（_shots/<suite>_R2）
+//   node …  … --no-reflexes                                                     03–06 关掉驾驶器的两条玩家反射（近身还手、躲雷后回位），
+//                                                                                回到 2026-09-25 以前的驾驶器，做阵亡率前后对照用
 //   node …  --campaign --stage-jumps [--stage-from=8|11|15|18]                  从某个分段起点继续
 //   node …  --campaign --stage-jumps --stage-from=15 --probe-quiet-guidance-interrupt
 //                                                                                专项验证静默取消带路 cue；不算默认连续通关

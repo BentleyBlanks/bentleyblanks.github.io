@@ -117,6 +117,8 @@ export async function Drive(ctx) {
   // 07 沿沟南行：真走 135 m，目标时长 45–75 秒。
   // =========================================================================
   if(ctx.stageTo===6)return;
+  // 07 on is driven as before (the reflexes were tuned and measured on 03–06 only).
+  await page.evaluate(() => { const D = window.MissionInputDriver; if (D) { D.reflexes = false; D.returning = null; } });
   await JumpStage(7);
   // 拆两段只为在路上拍一张（Capture 只渲几帧，进不了阶段计时）。
   await Route(Routes.southWalk.slice(0, 5), "SouthWalkFirst", { fight: false, stance: "stand", sprint: false });

@@ -22,7 +22,13 @@ export async function DriveFrontBattle(ctx){
         const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime();
         window.MissionInputDriver.leg="WaitFact:"+fact;window.MissionInputDriver.mode="hold";
         for(let f=0;f<300&&g.player.alive&&!r.Has(fact);f++){
-          const foe=fight?window.MissionInputDriver.Target(90):null;
+          // With the reflexes on, a wait dodges grenades, walks back and answers a man at arm's length even when it
+          // is not a fighting wait; off, this is the old loop.
+          const D=window.MissionInputDriver,evading=D.reflexes&&D.EvadeGrenade();
+          if(evading){g.StepFrames(1,1/60,false);continue;}
+          const close=D.reflexes?D.CloseThreat():null;
+          if(!close&&D.StepHome()){g.StepFrames(1,1/60,false);continue;}
+          const foe=fight?D.Target(90):close;
           if(foe)window.MissionInputDriver.Shoot(foe);else {g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);}
           if(g.player.bleeding&&g.player.health<80)g.Debug.Key("KeyB");
           g.StepFrames(1,1/60,false);
@@ -120,6 +126,7 @@ export async function DriveFrontBattle(ctx){
         let evaded=false;
         for(let f=0;f<300&&g.player.alive&&!Done();f++){
           const evading=window.MissionInputDriver.EvadeGrenade();evaded||=evading;
+          if(!evading&&!window.MissionInputDriver.CloseThreat()&&window.MissionInputDriver.StepHome()){g.StepFrames(1,1/60,false);continue;}
           const foe=evading?null:window.MissionInputDriver.Target(90);
           if(foe)window.MissionInputDriver.Shoot(foe);
           else if(!evading){g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);
@@ -156,6 +163,10 @@ export async function DriveFrontBattle(ctx){
   assert.equal((await State()).stage,checkpoint||"Support");
   // Luo's front commands (03) are sampled from here (a run from 01 installed the sampler at RearTrench already).
   if(!checkpoint)await InstallSpeakerActing(page);
+  // The player reflexes (Kit MissionInputDriver: answer a man at arm's length, run from a grenade and walk back)
+  // drive 03-06; 07 on keeps the old driver (Script_FirstLevelCampaignFront switches them off).
+  const reflexes=ctx.options.reflexes!==false;
+  await page.evaluate(on=>{const D=window.MissionInputDriver;D.reflexes=on;D.closeResponses=0;D.escapes=0;D.evadeReturns=0;D.meleeResponses=0;D.evadeFrames=0;},reflexes);
   // What the player carries into 03 (a run from 01 vs a cold start at 03): CAMPAIGN_03_ENTRY / CAMPAIGN_03_DAMAGE.
   if(!checkpoint){ctx.snapshot03=await Snapshot03Entry(ctx,ctx.stageFrom===3?"cold":"continuous");}
   try{await DriveLegs();}

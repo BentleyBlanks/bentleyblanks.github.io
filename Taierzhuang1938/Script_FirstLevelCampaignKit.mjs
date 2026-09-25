@@ -73,6 +73,8 @@ export function ParseCampaignArgs(argv = process.argv) {
   assert.ok(!bombFirst || (stageFrom <= 5 && stageTo >= 6), "--bomb-first drives 05 and needs the run to reach 06");
   // 同一套件并行跑多份时（统计阵亡率），各自的证据目录分开：`--evidence-tag=R2` → _shots/<suite>_R2。
   const evidenceTag = argv.find((arg) => arg.startsWith("--evidence-tag="))?.split("=")[1] || "";
+  // 03–06 的两条玩家反射（近身还手、躲雷后回位）默认开；--no-reflexes 回到改之前的驾驶器，做前后对照用。
+  const reflexes = !Has("--no-reflexes");
   assert.ok(/^[A-Za-z0-9_-]*$/.test(evidenceTag), "--evidence-tag is letters, digits, _ or -");
   return {
     campaign: Has("--campaign"),
@@ -83,7 +85,7 @@ export function ParseCampaignArgs(argv = process.argv) {
     // 默认整关/分段驾驶只观察运行时自主产生的 cue，不能改写真实语音排队。
     quietGuidanceInterruptProbe: Has("--probe-quiet-guidance-interrupt"),
     allowCheckpointRetry: Has("--allow-checkpoint-retry"),
-    bombFirst, evidenceTag,
+    bombFirst, evidenceTag, reflexes,
     stageFrom, stageTo,
     suite: stageFrom === 6 ? "FirstLevelWhitebox0618" : stageFrom === 3 ? "FirstLevelFrontTopology"
       : stageFrom === 4 || stageFrom === 5 ? `FirstLevelFrontCheckpoint0${stageFrom}${bombFirst ? "BombFirst" : ""}`
@@ -211,6 +213,73 @@ export async function InstallInputDriver(ctx) {
           const { BLAST } = await import("./Data_Tuning_Combat.mjs");
           window.MissionInputDriver = {
             blocked: new Map(),
+            // 「像一个正常玩家」的两条反射（DriveFrontBattle 在 03–06 打开，--no-reflexes 关掉做前后对照）：
+            //   ① 近身威胁先还手：3 m 内朝着玩家 / 正在出刀 / 盯着玩家打的日军（2.5 m 内的不论朝向）
+            //      优先于路线与远处目标，转身用刺刀大刀或步枪解决，不需要视线射线先看见他
+            //      （09-24 r2：RightEntryGuard 在 2.1 m 连捅 4 下，驾驶器照走路线）；
+            //   ② 躲雷：看见落在身边的手榴弹就朝能跑远、最好有墙挡着的方向跑出去（16 个方向、4 m 内试走），
+            //      炸完走回躲之前站的地方（最多 6 s）。本游戏里趴下不减手榴弹伤（命中点固定在脚上 1 m），
+            //      所以不趴，只跑。关掉时（reflexes=false）每条路径与改之前一字不差。
+            reflexes: false, closeResponses: 0, escapes: 0, evadeReturns: 0, closeFoe: null, returning: null,
+            CloseThreat() {
+              if(!this.reflexes)return null;
+              const p=g.player.position;let best=null,bd=3;
+              for(const a of g.ai.soldiers){
+                if(a.side!=="ija"||!a.alive||a.scriptedNoncombatant)continue;
+                const dx=a.position.x-p.x,dz=a.position.z-p.z,d=Math.hypot(dx,dz);
+                if(d>=bd||Math.abs(a.position.y-p.y)>1.6)continue;
+                const f=g.meleeCombat.fighters?.get(a);
+                const striking=!!f&&["attack","charge","contact"].includes(f.state);
+                // His forward is (-sin yaw, -cos yaw); the way to the player is (-dx, -dz).
+                const facing=Number.isFinite(a.yaw)&&(Math.sin(a.yaw)*dx+Math.cos(a.yaw)*dz)/(d||1)>.5;
+                if(!(striking||facing||a.target?.isPlayer||d<=2.5))continue;
+                bd=d;best=a;
+              }
+              if(best&&best!==this.closeFoe)this.closeResponses++;
+              this.closeFoe=best;
+              return best;
+            },
+            // One frame of walking back to where a grenade dodge started (false once there, or after 6 s).
+            StepHome() {
+              const h=this.returning;if(!h)return false;
+              const p=g.player.position,d=Math.hypot(h.x-p.x,h.z-p.z);
+              if(d<.8||g.ai.time>h.until||!g.player.alive){this.returning=null;g.Debug.Key("KeyW",false);g.Debug.Key("ShiftLeft",false);return false;}
+              const yaw=Math.atan2(p.x-h.x,p.z-h.z),gap=Math.atan2(Math.sin(yaw-g.player.yaw),Math.cos(yaw-g.player.yaw));
+              g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);
+              g.player.yaw+=Math.max(-.08,Math.min(.08,gap));g.player.pitch=0;
+              g.Debug.Key("KeyW",Math.abs(gap)<.65);
+              this.mode="return";
+              return true;
+            },
+            // Best way out of a grenade's reach: walk-test 16 headings up to 4 m (ground step, body overlap, and a
+            // waist/chest ray for walls thinner than a step), score by the distance from the grenade at the end,
+            // plus a wall between the grenade and that spot.
+            EscapeHeading(threat) {
+              const p=g.player.position,gx=threat.position.x,gz=threat.position.z;
+              const from=threat.position.clone();from.y+=BLAST.originRiseM;
+              let best=null,bestScore=-Infinity;
+              for(let k=0;k<16;k++){
+                const angle=k*Math.PI/8,dir=from.clone().set(Math.sin(angle),0,Math.cos(angle));
+                let free=4;
+                for(const rise of [.5,1.2]){
+                  const o=p.clone();o.y+=rise;const hit=g.battlefield.Raycast(o,dir,4,{terrain:true});
+                  if(hit)free=Math.min(free,hit.t-g.player.radius-.1);
+                }
+                let reach=0,y=p.y,cx=p.x,cz=p.z;
+                for(const step of [1,2,3,4]){
+                  if(step>free)break;
+                  const x=p.x+Math.sin(angle)*step,z=p.z+Math.cos(angle)*step,gy=g.battlefield.GroundHeight(x,z);
+                  if(Math.abs(gy-y)>.4||g.physics.Overlaps(x,gy+.04,z,g.player.radius,1.78))break;
+                  reach=step;y=gy;cx=x;cz=z;
+                }
+                if(reach<1)continue;
+                const to=from.clone().set(cx,y+BLAST.playerHitRiseM,cz),ray=to.clone().sub(from),len=ray.length();
+                const hit=len>.1?g.battlefield.Raycast(from,ray.normalize(),len,{terrain:true}):null;
+                const score=Math.hypot(cx-gx,cz-gz)+(hit&&hit.t<len-BLAST.wallMarginM?6:0);
+                if(score>bestScore){bestScore=score;best=angle;}
+              }
+              return best;
+            },
             EvadeGrenade() {
               const p=g.player,threat=g.combat.GrenadeThreats(p.position).find(t=>{
                 const from=t.position.clone();from.y+=BLAST.originRiseM;
@@ -219,8 +288,26 @@ export async function InstallInputDriver(ctx) {
                 return !hit||hit.t>=d-BLAST.wallMarginM;
               });
               if(!threat){
-                if(this.evading){g.Debug.Key("KeyW",false);g.Debug.Key("ShiftLeft",false);this.evading=false;}
+                if(this.evading){g.Debug.Key("KeyW",false);g.Debug.Key("ShiftLeft",false);this.evading=false;
+                  if(this.reflexes&&this.evadeHome){this.returning={...this.evadeHome,until:g.ai.time+6};this.evadeReturns++;}}
+                this.evadeHome=null;
                 return false;
+              }
+              if(this.reflexes){
+                if(!this.escape||this.escape.threat!==threat.position||g.ai.time>=this.escape.until)
+                  this.escape={threat:threat.position,until:g.ai.time+.25,heading:this.EscapeHeading(threat)};
+                const heading=this.escape.heading;
+                // Walled in on every side: stop running (keys up) and keep fighting, like the old driver.
+                if(heading==null){if(this.evading){g.Debug.Key("KeyW",false);g.Debug.Key("ShiftLeft",false);this.evading=false;}return false;}
+                if(!this.evading){this.evadeHome={x:p.position.x,z:p.position.z};this.escapes++;}
+                this.returning=null;
+                if(p.stance!=="stand")g.Debug.Key(p.stance==="crouch"?"KeyC":"KeyZ");
+                const yaw=heading+Math.PI,gap=Math.atan2(Math.sin(yaw-p.yaw-p.aimYaw),Math.cos(yaw-p.yaw-p.aimYaw));
+                g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);
+                g.Debug.Look(Math.max(-60,Math.min(60,-gap/.0022)),0);
+                g.Debug.Key("KeyW",Math.abs(gap)<.5);g.Debug.Key("ShiftLeft",true);
+                this.evading=true;this.evadeFrames=(this.evadeFrames||0)+1;this.mode="evade";
+                return true;
               }
               // Read the same live warning used by the HUD, then turn and sprint
               // through an open physical direction. Do not clear the projectile.
@@ -244,6 +331,9 @@ export async function InstallInputDriver(ctx) {
               // A real bind has priority over an unobstructed distant rifle target.
               const opponent=g.meleeCombat.qte.active?.attacker;
               if(g.meleeCombat.Active && opponent?.alive)return opponent;
+              // ① A man at arm's length comes before the route's far targets, seen through a ray or not.
+              const close=this.CloseThreat();
+              if(close)return close;
               if(this.observedShot!==g.state.playerShots) {
                 this.observedShot=g.state.playerShots;
                 if(this.lastTarget && g.state.lastShot?.hitKind==="wall")this.blocked.set(this.lastTarget,g.ai.time+4);
@@ -285,7 +375,9 @@ export async function InstallInputDriver(ctx) {
                 dz = to.z - eye.z,
                 yaw = Math.atan2(-dx, -dz),
                 gap = Math.atan2(Math.sin(yaw - g.player.yaw), Math.cos(yaw - g.player.yaw));
-              g.player.yaw += Math.max(-0.06, Math.min(0.06, gap));
+              // A close threat is turned to twice as fast (a player spins round on a man at his shoulder).
+              const turn=this.reflexes&&Math.hypot(foe.position.x-g.player.position.x,foe.position.z-g.player.position.z)<3?.12:.06;
+              g.player.yaw += Math.max(-turn, Math.min(turn, gap));
               g.player.pitch = Math.atan2(to.y - eye.y, Math.hypot(dx, dz)) - g.player.aimPitch;
               g.player.yaw -= g.player.aimYaw;
               const distance=foe.position.distanceTo(g.player.position),fighter=g.meleeCombat.Fighter(g.player);
@@ -456,6 +548,11 @@ export async function Report03Damage(ctx) {
   ctx.reported03 = true;
   const hits = await ctx.page.evaluate(() => (window.damageForensics || []).filter((e) => e.stage === "Support")).catch(() => []);
   console.log("CAMPAIGN_03_DAMAGE", JSON.stringify(hits));
+  // How often the two reflexes fired (counted from 03 on; zero with --no-reflexes).
+  const driver = await ctx.page.evaluate(() => { const D = window.MissionInputDriver || {};
+    return { reflexes: !!D.reflexes, closeResponses: D.closeResponses || 0, escapes: D.escapes || 0, evadeReturns: D.evadeReturns || 0,
+      meleeResponses: D.meleeResponses || 0, evadeFrames: D.evadeFrames || 0 }; }).catch(() => null);
+  console.log("CAMPAIGN_03_DRIVER", JSON.stringify(driver));
   await fs.writeFile(path.join(ctx.output, "Data_Campaign03Damage.json"), JSON.stringify(hits, null, 2));
 }
 
@@ -687,7 +784,8 @@ export function CampaignActions(ctx) {
             b.frames++;
             continue;
           }
-          const evading=crawl&&fight&&window.MissionInputDriver.EvadeGrenade();
+          const D=window.MissionInputDriver;
+          const evading=(crawl&&fight||D.reflexes)&&D.EvadeGrenade();
           if(recoverAfterEvade){
             if(evading)b.wasEvading=true;
             else if(b.wasEvading){
@@ -707,10 +805,15 @@ export function CampaignActions(ctx) {
               }
             }
           }
-          const foe = fight&&!evading ? window.MissionInputDriver.Target(crawl?28:90) : null;
+          // The corridor rejoin above is this leg's own way back after a dodge; otherwise walk back to the dodge's start.
+          if(recoverAfterEvade)D.returning=null;
+          const close=!evading&&D.reflexes?D.CloseThreat():null;
+          if(!evading&&!close&&D.StepHome()){g.StepFrames(1,1/60,false);b.frames++;continue;}
+          const foe = evading ? null : fight ? D.Target(crawl?28:90) : close;
           if(crawl&&!evading){
             const low=FRONT_SORTIE.crawl.some(c=>Math.abs(p.x-c.x)<c.w/2+1 && Math.abs(p.z-c.z)<c.d/2+3);
-            const desired=low?"prone":stance;
+            // Nobody fights a man at arm's length lying down: crouch up for him.
+            const desired=low&&!close?"prone":stance;
             if(g.player.stance!==desired)g.Debug.Key(desired==="prone"?"KeyZ":desired==="crouch"?"KeyC":g.player.stance==="prone"?"KeyZ":"KeyC");
             g.Debug.Key("ShiftLeft",sprint&&!low&&!foe);
           }
@@ -968,6 +1071,7 @@ export function CampaignActions(ctx) {
           window.MissionInputDriver.leg="WaitStage:"+expected;window.MissionInputDriver.mode="hold";
           for (let i = 0; i < 300 && g.player.alive && g.Debug.FirstLevelMissionRuntime().flow.stage.id !== expected; i++) {
             const evading=window.MissionInputDriver.EvadeGrenade();
+            if(!evading&&!window.MissionInputDriver.CloseThreat()&&window.MissionInputDriver.StepHome()){g.StepFrames(1,1/60,false);continue;}
             // At a waist-high defensive wall, use normal crouch/peek inputs.
             // Grenade evasion can leave the player standing outside its protection.
             if(cover&&!evading){
