@@ -79,7 +79,9 @@ export const EXTRA_HAND_POSES = Freeze({
   // bottom edge), so the hands hold the arm at the elbow — the right just below it on the forearm, the left
   // just above it on the upper arm — and both show at the bottom (palms ≈ (0.59,0.76) and (0.63,0.95); on
   // the forearm alone only one hand was in frame).
-  gripArm: G("ijaA", "forearmL", .05, { boneLeft: "upperArmL", atLeft: .65 }),
+  // TengxianHumanoidV1 (2026-09-26): ijaA's upper arm is 15 % shorter on the common skeleton and rests level; at .65 the left hand
+  // stopped 3.6 cm short of its point (node bench); at .75 it holds ~5 cm above the elbow (8 cm before).
+  gripArm: G("ijaA", "forearmL", .05, { boneLeft: "upperArmL", atLeft: .75 }),
   // SB05A: the RIGHT palm flat on ijaA's chest, left of centre (storyboard hand ≈ (0.3,0.5)); the shoulder comes
   // forward to reach across (his right upper arm, 0.7 m from the shoulder, is out of reach); it slides off as
   // he turns (slipM).

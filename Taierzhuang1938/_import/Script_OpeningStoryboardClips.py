@@ -278,22 +278,22 @@ REUSED = {
 ADDITIVE_UPPER = ['Spine', 'Spine1', 'Spine2', 'Neck', 'Head', 'L Clavicle', 'R Clavicle']
 ADDITIVE_ARM_R = ADDITIVE_UPPER + ['R UpperArm', 'R Forearm', 'R Hand', 'R Finger']
 
-# -- 01 bunker banter / blast (comrade = LugouNra02) ------------------------------------
-Meta('WoundedSitRifleIdle', 4.0, True, 'track', role='comrade', rig='LugouNra02', props=['weapon'],
+# -- 01 bunker banter / blast (comrade = TengxianNra02) ------------------------------------
+Meta('WoundedSitRifleIdle', 4.0, True, 'track', role='comrade', rig='TengxianNra02', props=['weapon'],
      rootMotion=False, env={'wallBehindM': .35},
      contacts=[{'t': 0, 'limb': 'handR', 'action': 'hold', 'target': 'weapon', 'part': 'handguard'},
                {'t': 0, 'limb': 'butt', 'action': 'rest', 'target': 'ground'}],
      next=['BanterLaugh', 'BanterLookShoulder', 'BanterPatRifle', 'WoundedRiseWall'],
      notes='Seated on the dugout floor, back on the wall, knees up; rifle upright between the knees, '
            'butt in the dirt, right hand round the handguard; bandaged left arm limp on the left knee.')
-Meta('BanterLaugh', 1.6, False, 'track', role='any', rig='LugouNra02', props=['weapon'], rootMotion=False,
+Meta('BanterLaugh', 1.6, False, 'track', role='any', rig='TengxianNra02', props=['weapon'], rootMotion=False,
      additive={'reference': 'frame0', 'bones': ADDITIVE_UPPER},
      notes='Short shared laugh: breath in, three decaying chest pulses, head back then down. '
            'Additive on spine/neck/head/clavicles; full-body it is the seated comrade.')
-Meta('BanterLookShoulder', 2.2, False, 'track', role='comrade', rig='LugouNra02', props=['weapon'], rootMotion=False,
+Meta('BanterLookShoulder', 2.2, False, 'track', role='comrade', rig='TengxianNra02', props=['weapon'], rootMotion=False,
      additive={'reference': 'frame0', 'bones': ADDITIVE_UPPER},
      notes='Glances down at the bandaged left shoulder and back up ("低头看了一眼肩膀").')
-Meta('BanterPatRifle', 2.0, False, 'track', role='comrade', rig='LugouNra02', props=['weapon'], rootMotion=False,
+Meta('BanterPatRifle', 2.0, False, 'track', role='comrade', rig='TengxianNra02', props=['weapon'], rootMotion=False,
      additive={'reference': 'WoundedSitRifleIdle@0', 'bones': ADDITIVE_ARM_R},
      contacts=[{'t': .62, 'limb': 'handR', 'action': 'pat', 'target': 'weapon'},
                {'t': 1.02, 'limb': 'handR', 'action': 'pat', 'target': 'weapon'},
@@ -301,7 +301,7 @@ Meta('BanterPatRifle', 2.0, False, 'track', role='comrade', rig='LugouNra02', pr
      prev=['WoundedSitRifleIdle'], next=['WoundedSitRifleIdle', 'WoundedRiseWall'],
      notes='"拿这个噻": lets go of the handguard, pats the rifle twice, closes the hand again. '
            'Starts and ends on WoundedSitRifleIdle frame 0.')
-Meta('WoundedRiseWall', 2.8, False, 'track', role='comrade', rig='LugouNra02', props=['weapon'], rootMotion=True,
+Meta('WoundedRiseWall', 2.8, False, 'track', role='comrade', rig='TengxianNra02', props=['weapon'], rootMotion=True,
      env={'wallBehindM': .35, 'wallLeftM': .43},
      contacts=[{'t': .55, 'limb': 'handL', 'action': 'brace', 'target': 'wall'},
                {'t': 1.9, 'limb': 'handL', 'action': 'release', 'target': 'wall'},
@@ -310,7 +310,7 @@ Meta('WoundedRiseWall', 2.8, False, 'track', role='comrade', rig='LugouNra02', p
      prev=['WoundedSitRifleIdle'], next=['BlastSlamBuried'],
      notes='Pulls the feet in, braces the bandaged side on the wall, stalls with a sharp inhale when '
            'the shoulder pulls, rises into a hunched low-ceiling stance, clamps the rifle at port.')
-Meta('BlastSlamBuried', 1.5, False, 'track', role='comrade', rig='LugouNra02', props=['weapon'], rootMotion=True,
+Meta('BlastSlamBuried', 1.5, False, 'track', role='comrade', rig='TengxianNra02', props=['weapon'], rootMotion=True,
      weaponState='held->dropped',
      env={'wallLeftM': .55},
      events=[{'t': 0.0, 'kind': 'blastHit'}, {'t': .08, 'kind': 'weaponLost'}, {'t': .30, 'kind': 'wallImpact'},
@@ -327,26 +327,26 @@ STAGES['captiveDrag'] = {
     'notes': 'All three clips start together; roots stay put, every body moves inside its clip. '
              'Comrade root = BlastSlamBuried root (wall 0.55 m on his left).',
     'actors': {
-        'comrade': {'rig': 'LugouNra02', 'clip': 'CaptiveDraggedFromDirt', 'x': 0.0, 'z': 0.0, 'yawDeg': 0},
-        'ijaA': {'rig': 'LugouIja02', 'clip': 'IjaDragCollarFromDirt', 'x': .05, 'z': -.58, 'yawDeg': 156},
+        'comrade': {'rig': 'TengxianNra02', 'clip': 'CaptiveDraggedFromDirt', 'x': 0.0, 'z': 0.0, 'yawDeg': 0},
+        'ijaA': {'rig': 'TengxianIja02', 'clip': 'IjaDragCollarFromDirt', 'x': .05, 'z': -.58, 'yawDeg': 156},
         # ijaB works from his right side (yaw 95, was 122): at 122 both soldiers stooped into the
         # same space in front of him and ijaB's head went through ijaA's chest at the grab.
-        'ijaB': {'rig': 'LugouIja01', 'clip': 'IjaPullArm', 'x': .48, 'z': -.24, 'yawDeg': 95},
+        'ijaB': {'rig': 'TengxianIja01', 'clip': 'IjaPullArm', 'x': .48, 'z': -.24, 'yawDeg': 95},
     }}
 STAGES['captiveWall'] = {
     'anchor': 'comrade', 'syncS': 0.0,
     'notes': 'Comrade root R3 = his kneel spot at the end of the drag (pelvis hand-over: models[].clips[].root, CaptiveDraggedFromDirt end = CaptiveWallBrace start); '
              'the trench wall is 0.49 m behind him (he was hauled round to face his right). ijaA stands square in front.',
     'actors': {
-        'comrade': {'rig': 'LugouNra02', 'clip': 'CaptiveWallBrace', 'x': 0.0, 'z': 0.0, 'yawDeg': 0},
-        'ijaA': {'rig': 'LugouIja02', 'clip': 'IjaShoveToWall', 'x': .02, 'z': -.60, 'yawDeg': 180},
+        'comrade': {'rig': 'TengxianNra02', 'clip': 'CaptiveWallBrace', 'x': 0.0, 'z': 0.0, 'yawDeg': 0},
+        'ijaA': {'rig': 'TengxianIja02', 'clip': 'IjaShoveToWall', 'x': .02, 'z': -.60, 'yawDeg': 180},
     }}
-PARTNER_SOURCES.setdefault('LugouNra02', {}).update({
+PARTNER_SOURCES.setdefault('TengxianNra02', {}).update({
     'CaptiveDraggedFromDirt': ['collarBack', 'upperArmR', 'wristR'],
     'CaptiveWallBrace': ['chestFront'],
 })
 
-Meta('CaptiveDraggedFromDirt', 4.4, False, 'free', role='comrade', rig='LugouNra02', rootMotion=True, weaponState='dropped', weaponDropFrom='BlastSlamBuried',
+Meta('CaptiveDraggedFromDirt', 4.4, False, 'free', role='comrade', rig='TengxianNra02', rootMotion=True, weaponState='dropped', weaponDropFrom='BlastSlamBuried',
      stage='captiveDrag', env={'wallLeftM': .55},
      contacts=[{'t': .30, 'by': 'ijaA', 'part': 'collarBack', 'action': 'grab'},
                {'t': .70, 'by': 'ijaB', 'part': 'upperArmR', 'action': 'grab'},
@@ -359,14 +359,14 @@ Meta('CaptiveDraggedFromDirt', 4.4, False, 'free', role='comrade', rig='LugouNra
      notes='Hauled out of the loose earth by the back collar (ijaA) and the right arm (ijaB); knees and '
            'insteps drag, one foot gets under him and slips; jerked up on "立て！", drops onto his knees; '
            'the arm is wrenched up across the wound (gasp). Frame 0 = BlastSlamBuried last frame.')
-Meta('IjaDragCollarFromDirt', 4.4, False, 'track', role='ijaA', rig='LugouIja02', props=['weapon'], rootMotion=True,
+Meta('IjaDragCollarFromDirt', 4.4, False, 'track', role='ijaA', rig='TengxianIja02', props=['weapon'], rootMotion=True,
      stage='captiveDrag', weaponState='slungBack',
      contacts=[{'t': .30, 'limb': 'handR', 'action': 'grab', 'partnerRole': 'comrade', 'part': 'collarBack', 'standoffM': .035}],
      events=[{'t': 2.20, 'kind': 'jerkUp', 'line': 'CaptiveDragged.02'}],
      next=['IjaShoveToWall'],
      notes='Stoops, hooks the back collar with the right hand, backs up three steps hauling; the '
            'jerk on "立て！" straightens him. Rifle slung across the back.')
-Meta('IjaPullArm', 4.4, False, 'track', role='ijaB', rig='LugouIja01', props=['weapon'], rootMotion=True,
+Meta('IjaPullArm', 4.4, False, 'track', role='ijaB', rig='TengxianIja01', props=['weapon'], rootMotion=True,
      stage='captiveDrag', weaponState='slungBack',
      contacts=[{'t': .70, 'limb': 'handL', 'action': 'grab', 'partnerRole': 'comrade', 'part': 'upperArmR', 'standoffM': .045},
                {'t': .62, 'limb': 'handR', 'action': 'grab', 'partnerRole': 'comrade', 'part': 'wristR', 'standoffM': .04},
@@ -375,7 +375,7 @@ Meta('IjaPullArm', 4.4, False, 'track', role='ijaB', rig='LugouIja01', props=['w
      next=['IjaBayonetGuard', 'GuardTurn', 'IjaReadyRifle'],
      notes='Two-handed hold on the right upper arm and wrist, sidesteps back with the drag, '
            'wrenches the arm up at 3.2 s and lets go at 4.05 s.')
-Meta('CaptiveWallBrace', 2.0, False, 'free', role='comrade', rig='LugouNra02', rootMotion=True, weaponState='dropped', weaponDropFrom='BlastSlamBuried',
+Meta('CaptiveWallBrace', 2.0, False, 'free', role='comrade', rig='TengxianNra02', rootMotion=True, weaponState='dropped', weaponDropFrom='BlastSlamBuried',
      stage='captiveWall', env={'wallBehindM': .49},
      contacts=[{'t': .34, 'by': 'ijaA', 'part': 'chestFront', 'action': 'shove'},
                {'t': .62, 'limb': 'handL', 'action': 'brace', 'target': 'wall', 'untilT': 1.0},
@@ -383,14 +383,14 @@ Meta('CaptiveWallBrace', 2.0, False, 'free', role='comrade', rig='LugouNra02', r
      prev=['CaptiveDraggedFromDirt'], next=['CaptiveKneelMud', 'CaptiveHeadPulledBack'],
      notes='Shoved in the chest: topples back-left, the left palm finds the wall and slides down the loose '
            'earth, he ends kneel-sitting with shoulder and back on the wall, right hand on the torn bandage.')
-Meta('IjaShoveToWall', 1.0, False, 'track', role='ijaA', rig='LugouIja02', props=['weapon'], rootMotion=True,
+Meta('IjaShoveToWall', 1.0, False, 'track', role='ijaA', rig='TengxianIja02', props=['weapon'], rootMotion=True,
      stage='captiveWall', weaponState='slungBack', extra=True,
      contacts=[{'t': .34, 'limb': 'handR', 'action': 'shove', 'partnerRole': 'comrade', 'part': 'chestFront', 'standoffM': .04},
                {'t': .56, 'limb': 'handR', 'action': 'release'}],
      prev=['IjaDragCollarFromDirt'], next=['InterrogateCrouch', 'IjaHairGrabPull'],
      notes='Not in contract §5.4 (added): the shove the draft describes ("推到沟壁上") needs its own pair '
            'with CaptiveWallBrace. Short wind-up, lunge on the left foot, flat right palm to the chest.')
-Meta('CaptiveKneelMud', 3.0, True, 'free', role='comrade', rig='LugouNra02', rootMotion=False, weaponState='dropped', weaponDropFrom='BlastSlamBuried',
+Meta('CaptiveKneelMud', 3.0, True, 'free', role='comrade', rig='TengxianNra02', rootMotion=False, weaponState='dropped', weaponDropFrom='BlastSlamBuried',
      env={'wallBehindM': .49},
      contacts=[{'t': 0.0, 'limb': 'shoulderBack', 'action': 'lean', 'target': 'wall', 'untilT': 3.0}],
      prev=['CaptiveWallBrace'], next=['CaptiveHeadPulledBack'],
@@ -402,6 +402,16 @@ Meta('CaptiveKneelMud', 3.0, True, 'free', role='comrade', rig='LugouNra02', roo
 # per-rig builders
 # =================================================================================
 BUILDERS = {}
+# TengxianHumanoidV1 (2026-09-26): the bake's reach assist (Script_OpeningStoryboardBake Solve, spec 'reach')
+# for the clips whose hands grip at the end of the IJA reach. On the common skeleton the IJA shoulders sit ~5 cm
+# further back and 3.6 cm higher and the arm is 2.4 cm shorter than IJA02's own; at the Lugou defaults
+# (.92 / .10 / .25) these left the hand 3.2-9 cm off its target. Everything else keeps the defaults.
+REACH_HUMANOID_V1 = {'fraction': .86, 'travel': .13, 'bend': .40}
+REACH_BY_CLIP = {name: REACH_HUMANOID_V1 for name in (
+    'IjaDragCollarFromDirt', 'IjaHairGrabPull', 'IjaDrawBayonet', 'IjaThroatSlash', 'IjaCollarDragSnag')}
+# The wipe starts in the hair hold (IjaThroatSlash's last frame) and ends reaching for the slung barrel
+# (IjaReadyRifle's first frame, default assist): the start eases back to the default by 1.5 s.
+REACH_BY_CLIP['IjaWipeSheathBayonet'] = dict(REACH_HUMANOID_V1, fraction=lambda t: .86 + .06 * Smooth(Clamp((t - .5) / 1.0)))
 
 
 def Builder(*names):
@@ -424,6 +434,8 @@ def MakeClips(K):
             print('OPENING_MISSING_BUILDER', name, flush=True)
             continue
         spec = fn(T, name)
+        if name in REACH_BY_CLIP:
+            spec.setdefault('reach', REACH_BY_CLIP[name])
         specs[name] = spec
     for spec in specs.values():
         spec.setdefault('scale', K['scale'])
@@ -454,7 +466,7 @@ class Toolkit:
         self.SZ, self.SX = K['shoulder']['L'].z, K['shoulder']['L'].x
         self.ARM = K['armLen']
         self.rig = K['modelId']
-        self.nra = K['modelId'].startswith('LugouNra')
+        self.nra = K['modelId'].startswith('TengxianNra')
         self.gun = 'HanYang' if self.nra else 'Type38'
         self.cache = {}
 
@@ -545,6 +557,11 @@ class Toolkit:
         eye; an authored head tilt cannot follow a moving eye point."""
         K = self.K
         head, neck = K['Bone']('Head'), K['Bone']('Neck')
+        # The bake grounds every frame AFTER the pose (a kneeling body is lifted by up to 0.15 m): aim
+        # from where the eye will be, as the grips do (the previous frame's lift; 2026-09-26 -- with the
+        # TengxianHumanoidV1 proportions a 12 cm kneel lift left Luo's face 4 deg under Shunzi's eye).
+        if K.get('GroundLift'):
+            target = Vector(target) - Vector((0, 0, K['GroundLift']()))
         loc, q0, sc = K['BWorld'](head).decompose()
         q = q0.copy()
         for _ in range(3):
@@ -1766,30 +1783,30 @@ def BuildShoveToWall(T, name):
 # =================================================================================
 IJA_A_AT = {'x': -.04, 'z': -.28, 'yawDeg': 180}
 STAGES['slashGrab'] = {'anchor': 'comrade', 'notes': 'IjaHairGrabPull and CaptiveHeadPulledBack start together.',
-                       'actors': {'comrade': {'rig': 'LugouNra02', 'clip': 'CaptiveHeadPulledBack', 'x': 0.0, 'z': 0.0, 'yawDeg': 0},
-                                  'ijaA': dict(IJA_A_AT, rig='LugouIja02', clip='IjaHairGrabPull')}}
+                       'actors': {'comrade': {'rig': 'TengxianNra02', 'clip': 'CaptiveHeadPulledBack', 'x': 0.0, 'z': 0.0, 'yawDeg': 0},
+                                  'ijaA': dict(IJA_A_AT, rig='TengxianIja02', clip='IjaHairGrabPull')}}
 STAGES['slashDraw'] = {'anchor': 'comrade', 'notes': 'IjaDrawBayonet starts 1.0 s into CaptiveHeadPulledBack (the hair is still held).',
-                       'actors': {'comrade': {'rig': 'LugouNra02', 'clip': 'CaptiveHeadPulledBack', 'x': 0.0, 'z': 0.0, 'yawDeg': 0},
-                                  'ijaA': dict(IJA_A_AT, rig='LugouIja02', clip='IjaDrawBayonet', offsetS=1.0)}}
+                       'actors': {'comrade': {'rig': 'TengxianNra02', 'clip': 'CaptiveHeadPulledBack', 'x': 0.0, 'z': 0.0, 'yawDeg': 0},
+                                  'ijaA': dict(IJA_A_AT, rig='TengxianIja02', clip='IjaDrawBayonet', offsetS=1.0)}}
 STAGES['slashCut'] = {'anchor': 'comrade', 'notes': 'IjaThroatSlash and CaptiveThroatCut start together; the blade crosses at 0.24 s.',
-                      'actors': {'comrade': {'rig': 'LugouNra02', 'clip': 'CaptiveThroatCut', 'x': 0.0, 'z': 0.0, 'yawDeg': 0},
-                                 'ijaA': dict(IJA_A_AT, rig='LugouIja02', clip='IjaThroatSlash')}}
+                      'actors': {'comrade': {'rig': 'TengxianNra02', 'clip': 'CaptiveThroatCut', 'x': 0.0, 'z': 0.0, 'yawDeg': 0},
+                                 'ijaA': dict(IJA_A_AT, rig='TengxianIja02', clip='IjaThroatSlash')}}
 STAGES['slashTaunt'] = {'anchor': 'comrade', 'notes': 'CaptiveClutchThroat loops from IjaThroatSlash 1.0 s; both loop the same 3.0 s.',
-                        'actors': {'comrade': {'rig': 'LugouNra02', 'clip': 'CaptiveClutchThroat', 'x': 0.0, 'z': 0.0, 'yawDeg': 0, 'offsetS': 1.0},
-                                   'ijaA': dict(IJA_A_AT, rig='LugouIja02', clip='IjaThroatSlash')}}
+                        'actors': {'comrade': {'rig': 'TengxianNra02', 'clip': 'CaptiveClutchThroat', 'x': 0.0, 'z': 0.0, 'yawDeg': 0, 'offsetS': 1.0},
+                                   'ijaA': dict(IJA_A_AT, rig='TengxianIja02', clip='IjaThroatSlash')}}
 STAGES['slashWipe'] = {'anchor': 'comrade', 'notes': 'IjaWipeSheathBayonet and CaptiveWallSlideTwitch start together: '
                                                      'ijaA lets go of the hair (0-0.3 s), watches him slide down and '
                                                      'wipes the blade on the corpse from 3.2 s.',
-                       'actors': {'comrade': {'rig': 'LugouNra02', 'clip': 'CaptiveWallSlideTwitch', 'x': 0.0, 'z': 0.0, 'yawDeg': 0},
-                                  'ijaA': dict(IJA_A_AT, rig='LugouIja02', clip='IjaWipeSheathBayonet')}}
-PARTNER_SOURCES['LugouNra02'].update({
+                       'actors': {'comrade': {'rig': 'TengxianNra02', 'clip': 'CaptiveWallSlideTwitch', 'x': 0.0, 'z': 0.0, 'yawDeg': 0},
+                                  'ijaA': dict(IJA_A_AT, rig='TengxianIja02', clip='IjaWipeSheathBayonet')}}
+PARTNER_SOURCES['TengxianNra02'].update({
     'CaptiveHeadPulledBack': ['crown', 'hairBack', 'throat'],
     'CaptiveThroatCut': ['crown', 'hairBack', 'throat'],
     'CaptiveClutchThroat': ['crown', 'hairBack', 'throat'],
     'CaptiveWallSlideTwitch': ['shoulderR', 'shoulderL', 'hairBack', 'crown', 'thighL'],
 })
 
-Meta('CaptiveHeadPulledBack', 1.8, False, 'free', role='comrade', rig='LugouNra02', rootMotion=False, stage='slashGrab', weaponState='dropped', weaponDropFrom='BlastSlamBuried',
+Meta('CaptiveHeadPulledBack', 1.8, False, 'free', role='comrade', rig='TengxianNra02', rootMotion=False, stage='slashGrab', weaponState='dropped', weaponDropFrom='BlastSlamBuried',
      env={'wallBehindM': .49},
      contacts=[{'t': .28, 'by': 'ijaA', 'part': 'crown', 'action': 'grab'},
                {'t': 0.0, 'limb': 'shoulderBack', 'action': 'lean', 'target': 'wall', 'untilT': .28},
@@ -1798,13 +1815,13 @@ Meta('CaptiveHeadPulledBack', 1.8, False, 'free', role='comrade', rig='LugouNra0
      notes='Fist in the hair: he is hauled up off his heels and off the wall, the head torn back and the '
            'throat opened; both hands come up by reflex and stay half-raised while the bayonet is drawn '
            '(covers IjaHairGrabPull + IjaDrawBayonet).')
-Meta('IjaHairGrabPull', 1.0, False, 'track', role='ijaA', rig='LugouIja02', props=['weapon'], rootMotion=False,
+Meta('IjaHairGrabPull', 1.0, False, 'track', role='ijaA', rig='TengxianIja02', props=['weapon'], rootMotion=False,
      stage='slashGrab', weaponState='slungBack',
      contacts=[{'t': .28, 'limb': 'handL', 'action': 'grab', 'partnerRole': 'comrade', 'part': 'crown', 'standoffM': .03},
                {'t': .42, 'limb': 'handL', 'action': 'yank', 'partnerRole': 'comrade'}],
      next=['IjaDrawBayonet'],
      notes='Half step in, left fist into the hair, yanks the head back hard. No pause before the draw.')
-Meta('IjaDrawBayonet', .8, False, 'track', role='ijaA', rig='LugouIja02', props=['weapon', 'bayonet'], rootMotion=False,
+Meta('IjaDrawBayonet', .8, False, 'track', role='ijaA', rig='TengxianIja02', props=['weapon', 'bayonet'], rootMotion=False,
      stage='slashDraw', weaponState='slungBack',
      contacts=[{'t': 0, 'limb': 'handL', 'action': 'hold', 'partnerRole': 'comrade', 'part': 'crown', 'standoffM': .03},
                {'t': .22, 'limb': 'handR', 'action': 'grip', 'target': 'bayonet', 'part': 'handle'},
@@ -1813,7 +1830,7 @@ Meta('IjaDrawBayonet', .8, False, 'track', role='ijaA', rig='LugouIja02', props=
      prev=['IjaHairGrabPull'], next=['IjaThroatSlash'],
      notes='Left fist keeps the hair; right hand to the scabbard on the left hip, draws the short bayonet '
            'and brings it low to the right, point toward the victim.')
-Meta('IjaThroatSlash', 4.0, False, 'track', role='ijaA', rig='LugouIja02', props=['weapon', 'bayonet'], rootMotion=False,
+Meta('IjaThroatSlash', 4.0, False, 'track', role='ijaA', rig='TengxianIja02', props=['weapon', 'bayonet'], rootMotion=False,
      stage='slashCut', weaponState='slungBack', holdLoop=[1.0, 4.0],
      contacts=[{'t': .24, 'limb': 'bayonet', 'action': 'cut', 'partnerRole': 'comrade', 'part': 'throat'},
                {'t': 0, 'limb': 'handL', 'action': 'hold', 'partnerRole': 'comrade', 'part': 'crown', 'standoffM': .03},
@@ -1825,7 +1842,7 @@ Meta('IjaThroatSlash', 4.0, False, 'track', role='ijaA', rig='LugouIja02', props
      notes='No pause: a 0.1 s cock to the right and one hard right-to-left draw across the throat (blade at '
            'the throat 0.24 s). Keeps the hair and leans in to taunt; 1.0-4.0 s is a seamless hold loop '
            '(the director samples it in window until "日兵甲松手") with two hair shakes on the taunt lines.')
-Meta('CaptiveThroatCut', 1.0, False, 'free', role='comrade', rig='LugouNra02', rootMotion=True, stage='slashCut', weaponState='dropped', weaponDropFrom='BlastSlamBuried',
+Meta('CaptiveThroatCut', 1.0, False, 'free', role='comrade', rig='TengxianNra02', rootMotion=True, stage='slashCut', weaponState='dropped', weaponDropFrom='BlastSlamBuried',
      env={'wallBehindM': .49},
      contacts=[{'t': .24, 'by': 'ijaA', 'part': 'throat', 'action': 'cut'},
                {'t': .44, 'limb': 'handsLR', 'action': 'clutch', 'target': 'self.throat'},
@@ -1834,7 +1851,7 @@ Meta('CaptiveThroatCut', 1.0, False, 'free', role='comrade', rig='LugouNra02', r
      prev=['CaptiveHeadPulledBack'], next=['CaptiveClutchThroat'],
      notes='The cut lands: a full-body jolt, both hands fly to the throat, the legs go and the trunk slams '
            'back into the wall (0.52 s); the head stays up where the fist holds it.')
-Meta('CaptiveClutchThroat', 3.0, True, 'free', role='comrade', rig='LugouNra02', rootMotion=False, stage='slashTaunt', weaponState='dropped', weaponDropFrom='BlastSlamBuried',
+Meta('CaptiveClutchThroat', 3.0, True, 'free', role='comrade', rig='TengxianNra02', rootMotion=False, stage='slashTaunt', weaponState='dropped', weaponDropFrom='BlastSlamBuried',
      env={'wallBehindM': .49},
      contacts=[{'t': 0.0, 'limb': 'shoulderBack', 'action': 'lean', 'target': 'wall', 'untilT': 3.0}],
      events=[{'t': .30, 'kind': 'spasm'}, {'t': 1.2, 'kind': 'spasm'}, {'t': 2.2, 'kind': 'spasm'},
@@ -1842,7 +1859,7 @@ Meta('CaptiveClutchThroat', 3.0, True, 'free', role='comrade', rig='LugouNra02',
      prev=['CaptiveThroatCut'], next=['CaptiveWallSlideTwitch'],
      notes='Hands clamped on the throat, choking spasms, head held back by the fist and shaken twice per loop '
            '(in step with IjaThroatSlash hold window).')
-Meta('CaptiveWallSlideTwitch', 3.2, False, 'free', role='comrade', rig='LugouNra02', rootMotion=True, stage='slashWipe', weaponState='dropped', weaponDropFrom='BlastSlamBuried',
+Meta('CaptiveWallSlideTwitch', 3.2, False, 'free', role='comrade', rig='TengxianNra02', rootMotion=True, stage='slashWipe', weaponState='dropped', weaponDropFrom='BlastSlamBuried',
      env={'wallBehindM': .49}, terminal=True,
      contacts=[{'t': 0.0, 'limb': 'shoulderBack', 'action': 'slide', 'target': 'wall', 'untilT': 1.2},
                {'t': 1.6, 'limb': 'shoulderBack', 'action': 'rest', 'target': 'wall', 'untilT': 3.2}],
@@ -1852,7 +1869,7 @@ Meta('CaptiveWallSlideTwitch', 3.2, False, 'free', role='comrade', rig='LugouNra
      notes='Let go: the head drops, he slides down the wall onto his side-sit, one hand slips off the throat, '
            'the legs jerk three times and stop. Last frame is the corpse (hold it; replaces ShotCollapse).')
 WIPE_LEAD = 3.2     # IjaWipeSheathBayonet: the release and the watch while CaptiveWallSlideTwitch plays
-Meta('IjaWipeSheathBayonet', WIPE_LEAD + 2.4, False, 'track', role='ijaA', rig='LugouIja02', props=['weapon', 'bayonet'],
+Meta('IjaWipeSheathBayonet', WIPE_LEAD + 2.4, False, 'track', role='ijaA', rig='TengxianIja02', props=['weapon', 'bayonet'],
      rootMotion=False, stage='slashWipe', weaponState='slungBack',
      contacts=[{'t': 0.0, 'limb': 'handL', 'action': 'hold', 'partnerRole': 'comrade', 'part': 'crown', 'standoffM': .03},
                {'t': .05, 'limb': 'handL', 'action': 'release', 'partnerRole': 'comrade'},
@@ -1867,7 +1884,7 @@ Meta('IjaWipeSheathBayonet', WIPE_LEAD + 2.4, False, 'track', role='ijaA', rig='
            'Then he squats, drags the flat of the blade once across the dead man\'s trouser leg, straightens, '
            'sheathes on the left hip and reaches over the right shoulder for the slung rifle '
            '(last frame = IjaReadyRifle frame 0).')
-Meta('IjaReadyRifle', 1.1, False, 'track', role='ijaA', rig='LugouIja02', props=['weapon'], rootMotion=False,
+Meta('IjaReadyRifle', 1.1, False, 'track', role='ijaA', rig='TengxianIja02', props=['weapon'], rootMotion=False,
      weaponState='slungBack->twoHand', endHold='twoHand',
      contacts=[{'t': 0, 'limb': 'handR', 'action': 'grip', 'target': 'weapon', 'part': 'barrel'},
                {'t': .55, 'limb': 'handL', 'action': 'grip', 'target': 'weapon', 'part': 'handguard'},
@@ -1981,7 +1998,10 @@ def BuildHeadPulledBack(T, name):
 # Both hands on the cut (torso frame from each hand's own shoulder: left, back, up). The wrist
 # targets sit below the jaw in front of the collar so the knuckles land on the throat and the
 # fingers lie across it (right fingers toward his left, left hand over them), elbows down.
-THROAT_R, THROAT_L = (.13, -.17, -.02), (-.11, -.20, .00)
+# TengxianHumanoidV1 (2026-09-26): +2.0 / +1.5 cm toward his left. With the clavicles on Spine2 (no
+# longer under the neck) the shrugged shoulders the hands hang from sit further out, and both
+# knuckle groups landed ~2.5 / 1.5 cm to his right of the throat check (CaptiveClutchThroat 4.0 cm).
+THROAT_R, THROAT_L = (.15, -.17, -.02), (-.095, -.20, .00)
 THROAT_PALM_F_R, THROAT_PALM_N_R = Unit((1, .10, .10)), (0, 1, 0)
 THROAT_PALM_F_L, THROAT_PALM_N_L = Unit((-1, .10, .15)), (0, 1, 0)
 THROAT_POLE_R, THROAT_POLE_L = (-.25, -.10, -.65), (.25, -.10, -.65)
@@ -2583,28 +2603,28 @@ def SlungSideNominal(T):
     return T.Rifle((-.24, .06, T.P + .02), Unit((0, .12, .97)))
 
 
-Meta('IjaCornerFire', 2.6, True, 'track', role='ijaC', rig='LugouIja01', props=['weapon'], rootMotion=False,
+Meta('IjaCornerFire', 2.6, True, 'track', role='ijaC', rig='TengxianIja01', props=['weapon'], rootMotion=False,
      events=[{'t': .10, 'kind': 'fire', 'weapon': 'Type38'}, {'t': .70, 'kind': 'boltUp'}, {'t': .82, 'kind': 'boltBack'},
              {'t': .98, 'kind': 'boltForward'}],
      notes='At the trench corner: bladed stance, cheek on the stock, one shot, recoil, bolt cycled with the right '
            'hand while the butt stays in the shoulder, back on aim and breathing. Muzzle along actor -Z, 4 deg up.')
-Meta('IjaJunctionPeek', 3.2, True, 'track', role='ijaD', rig='LugouIja02', props=['weapon'], rootMotion=False,
+Meta('IjaJunctionPeek', 3.2, True, 'track', role='ijaD', rig='TengxianIja02', props=['weapon'], rootMotion=False,
      env={'wallRightM': .32},
      notes='Right shoulder on the junction wall, rifle at high port; leans out to the right past the corner, '
            'scans, leans back and waits. The wall edge is 0.30 m to his right, its corner 0.25 m ahead.')
-Meta('IjaSlingRifle', .8, False, 'track', role='ijaA', rig='LugouIja02', props=['weapon'], rootMotion=False,
+Meta('IjaSlingRifle', .8, False, 'track', role='ijaA', rig='TengxianIja02', props=['weapon'], rootMotion=False,
      weaponState='twoHand->slungRight', endHold='slungRight',
      prev=['IjaReadyRifle', 'IjaBayonetGuard'], next=['IjaCollarDragSnag', 'CollarDrag'],
      notes='"把步枪甩到身侧": swings the rifle up and back onto the right shoulder by the sling, lets go, '
            'hands free and stooping for the collar.')
-Meta('IjaCollarDragSnag', 2.2, False, 'track', role='ijaA', rig='LugouIja02', props=['weapon'], rootMotion=False,
+Meta('IjaCollarDragSnag', 2.2, False, 'track', role='ijaA', rig='TengxianIja02', props=['weapon'], rootMotion=False,
      weaponState='slungRight', player=True,
      contacts=[{'t': .25, 'limb': 'handL', 'action': 'grab', 'partnerRole': 'shunzi', 'part': 'collarBack'}],
      events=[{'t': .95, 'kind': 'packSnagged', 'target': 'beam'}, {'t': 1.12, 'kind': 'yank'}, {'t': 1.42, 'kind': 'yank'}],
      prev=['IjaSlingRifle'], next=['IjaKickBeam'],
      notes='Hooks the back of the collar, backs off two steps hauling; the pack snags on the beam at 0.95 s: '
            'a dead stop that jerks him forward, two yanks, a look back at what holds.')
-Meta('IjaKickBeam', 1.2, False, 'track', role='ijaA', rig='LugouIja02', props=['weapon', 'beam'], rootMotion=False,
+Meta('IjaKickBeam', 1.2, False, 'track', role='ijaA', rig='TengxianIja02', props=['weapon', 'beam'], rootMotion=False,
      weaponState='slungRight', player=True,
      contacts=[{'t': 0, 'limb': 'handL', 'action': 'hold', 'partnerRole': 'shunzi', 'part': 'collarBack'},
                {'t': .45, 'limb': 'footR', 'action': 'kick', 'target': 'beam'}],
@@ -2612,7 +2632,7 @@ Meta('IjaKickBeam', 1.2, False, 'track', role='ijaA', rig='LugouIja02', props=['
      prev=['IjaCollarDragSnag'], next=['CollarDrag'],
      notes='Keeps the collar in his left fist, stamps the loose beam off the pack with the right sole; the '
            '`beam` track carries it clear (rests at 0.9 s).')
-Meta('IjaButtStrike', 1.0, False, 'track', role='ijaA', rig='LugouIja02', props=['weapon'], rootMotion=False,
+Meta('IjaButtStrike', 1.0, False, 'track', role='ijaA', rig='TengxianIja02', props=['weapon'], rootMotion=False,
      weaponState='slungRight->twoHand', endHold='twoHand', player=True,
      contacts=[{'t': .42, 'limb': 'butt', 'action': 'strike', 'partnerRole': 'shunzi', 'part': 'head'}],
      events=[{'t': .42, 'kind': 'buttHit', 'fact': 'playerStruck'}],
@@ -2917,6 +2937,9 @@ def BuildKickBeam(T, name):
         'head': [(0.0, (.10, .05, -.50)), (.35, (.40, 0, -.25)), (.60, (.35, 0, -.15)), (1.2, (.30, 0, 0))],
     }, lag={'head': .05})
     spec = PlayerGripSpec(T, body, {'L': [(0.0, 1.2, lambda t: hold, (0, 0, -1), 1.1)]})
+    # TengxianHumanoidV1: the stooped collar hold is 9 cm short at the default assist; the planted left
+    # foot holds (<= 0.4 cm) with 0.17 m of pelvis travel.
+    spec['reach'] = dict(REACH_HUMANOID_V1, travel=.17)
     props, review = SlungProps(T, 'side')
 
     def Beam(t):
@@ -3012,22 +3035,22 @@ STAGES['rescueCircle'] = {
     'front collar, the interpreter squatting in front, ijaB standing off his left aiming; each clip\'s `player` '
     'track says where Shunzi\'s collar/head must be relative to that actor.',
     'actors': {'shunzi': {'rig': None, 'clip': None, 'x': 0.0, 'z': 0.0, 'yawDeg': 0},
-               'ijaA': {'rig': 'LugouIja02', 'clip': 'IjaHoldCollarUp', 'x': .52, 'z': -.52, 'yawDeg': -105},
-               'interpreter': {'rig': 'LugouNra02', 'clip': 'InterpreterCrouchAsk', 'x': 0.0, 'z': -1.02, 'yawDeg': 180},
-               'ijaB': {'rig': 'LugouIja01', 'clip': 'IjaChoppedFallWall', 'x': -.80, 'z': -.72, 'yawDeg': 133}}}
+               'ijaA': {'rig': 'TengxianIja02', 'clip': 'IjaHoldCollarUp', 'x': .52, 'z': -.52, 'yawDeg': -105},
+               'interpreter': {'rig': 'TengxianNra02', 'clip': 'InterpreterCrouchAsk', 'x': 0.0, 'z': -1.02, 'yawDeg': 180},
+               'ijaB': {'rig': 'TengxianIja01', 'clip': 'IjaChoppedFallWall', 'x': -.80, 'z': -.72, 'yawDeg': 133}}}
 STAGES['chopRear'] = {'anchor': 'ijaB', 'notes': 'Luo steps in from ijaB\'s right-rear; the blade reaches the right side '
                       'of his neck at 0.45 s in both clips.',
-                      'actors': {'ijaB': {'rig': 'LugouIja01', 'clip': 'IjaChoppedFallWall', 'x': 0.0, 'z': 0.0, 'yawDeg': 0},
-                                 'luo': {'rig': 'LugouNra05', 'clip': 'LuoDadaoChopRear', 'x': .42, 'z': .62, 'yawDeg': 34}}}
+                      'actors': {'ijaB': {'rig': 'TengxianIja01', 'clip': 'IjaChoppedFallWall', 'x': 0.0, 'z': 0.0, 'yawDeg': 0},
+                                 'luo': {'rig': 'TengxianNra05', 'clip': 'LuoDadaoChopRear', 'x': .42, 'z': .62, 'yawDeg': 34}}}
 STAGES['chopParry'] = {'anchor': 'ijaA', 'notes': 'ijaA root = his IjaHoldCollarUp root (crouched, facing Shunzi). He comes '
                        'in behind his left; ijaA spins left onto him. Muzzle beaten aside at 0.40 s, the cut lands at 0.78 s.',
-                       'actors': {'ijaA': {'rig': 'LugouIja02', 'clip': 'IjaParriedChoppedFall', 'x': 0.0, 'z': 0.0, 'yawDeg': 0},
-                                  'heyoutian': {'rig': 'LugouNra02', 'clip': 'HeDadaoParryChop', 'x': -.30, 'z': 1.32,
+                       'actors': {'ijaA': {'rig': 'TengxianIja02', 'clip': 'IjaParriedChoppedFall', 'x': 0.0, 'z': 0.0, 'yawDeg': 0},
+                                  'heyoutian': {'rig': 'TengxianNra02', 'clip': 'HeDadaoParryChop', 'x': -.30, 'z': 1.32,
                                                 'yawDeg': 12}}}
-PARTNER_SOURCES.setdefault('LugouIja01', {}).update({'IjaChoppedFallWall': ['neckSideR']})
-PARTNER_SOURCES.setdefault('LugouIja02', {}).update({'IjaParriedChoppedFall': ['neckSideL', 'muzzle']})
+PARTNER_SOURCES.setdefault('TengxianIja01', {}).update({'IjaChoppedFallWall': ['neckSideR']})
+PARTNER_SOURCES.setdefault('TengxianIja02', {}).update({'IjaParriedChoppedFall': ['neckSideL', 'muzzle']})
 
-Meta('IjaHoldCollarUp', 3.8, False, 'track', role='ijaA', rig='LugouIja02', props=['weapon'], rootMotion=False,
+Meta('IjaHoldCollarUp', 3.8, False, 'track', role='ijaA', rig='TengxianIja02', props=['weapon'], rootMotion=False,
      weaponState='slungRight', holdLoop=[.8, 3.8], player=True,
      contacts=[{'t': .35, 'limb': 'handL', 'action': 'grab', 'partnerRole': 'shunzi', 'part': 'collarFront'},
                {'t': .8, 'limb': 'handL', 'action': 'hold', 'partnerRole': 'shunzi', 'part': 'collarFront'}],
@@ -3037,22 +3060,22 @@ Meta('IjaHoldCollarUp', 3.8, False, 'track', role='ijaA', rig='LugouIja02', prop
            'is 0.73 m off the ground (player head); the head is up and pushed forward and the face stays on Shunzi\'s '
            'eye (head aimed at the player head track; the helmet brim does not cover it) except one glance to his '
            'right at the interpreter (2.2-2.9 s). 0.8-3.8 s is a seamless hold loop with two shakes.')
-Meta('InterpreterCrouchAsk', 3.2, True, 'free', role='interpreter', rig='LugouNra02', rootMotion=False, player=True,
+Meta('InterpreterCrouchAsk', 3.2, True, 'free', role='interpreter', rig='TengxianNra02', rootMotion=False, player=True,
      notes='Squatting on his heels in front of Shunzi, leaning in, right hand turned up asking and jabbing, left '
            'forearm on the left knee; the head searches his face.')
-Meta('InterpreterGrabCollar', 3.0, False, 'free', role='interpreter', rig='LugouNra02', rootMotion=False, player=True,
+Meta('InterpreterGrabCollar', 3.0, False, 'free', role='interpreter', rig='TengxianNra02', rootMotion=False, player=True,
      holdLoop=[.6, 3.0],
      contacts=[{'t': .32, 'limb': 'handR', 'action': 'grab', 'partnerRole': 'shunzi', 'part': 'collarFront'}],
      events=[{'t': .45, 'kind': 'shake', 'line': 'RescueInterrogation.06'}],
      prev=['InterpreterCrouchAsk'], next=['InterpreterFlee'],
      notes='"说话！": lunges from the squat, grabs the collar with the right hand and shakes once; 0.6-3.0 s holds.')
-Meta('InterpreterFlee', 1.6, False, 'free', role='interpreter', rig='LugouNra02', rootMotion=True,
+Meta('InterpreterFlee', 1.6, False, 'free', role='interpreter', rig='TengxianNra02', rootMotion=True,
      events=[{'t': .05, 'kind': 'startle', 'line': 'RescueFlee.01'}, {'t': .40, 'kind': 'handsDown'},
              {'t': 1.6, 'kind': 'handoff', 'to': 'locomotion.run'}],
      prev=['InterpreterGrabCollar', 'InterpreterCrouchAsk'], next=[],
      notes='Lets go, recoils onto his hands, scrambles up turning away and breaks into a run toward the front trench '
            '(about 1.3 m inside the clip); the director hands him to the native run at the end.')
-Meta('LuoDadaoChopRear', 1.3, False, 'track', role='luo', rig='LugouNra05', props=['weapon'], rootMotion=True,
+Meta('LuoDadaoChopRear', 1.3, False, 'track', role='luo', rig='TengxianNra05', props=['weapon'], rootMotion=True,
      stage='chopRear', weapon='Dadao',
      contacts=[{'t': .45, 'limb': 'blade', 'action': 'cut', 'partnerRole': 'ijaB', 'part': 'neckSideR'}],
      events=[{'t': .45, 'kind': 'dadaoHit'}],
@@ -3060,8 +3083,10 @@ Meta('LuoDadaoChopRear', 1.3, False, 'track', role='luo', rig='LugouNra05', prop
      notes='From the right-rear: dadao cocked over the right shoulder, a step in on the left foot and one diagonal '
            'two-handed cut down through the right side of the neck, follow-through low left, back to guard.')
 CHOP_WALL_X = float(__import__('os').environ.get('CHOPWALL') or .745)   # trench wall on ijaB's left (source metres)
-CHOP_END = [float(v) for v in (__import__('os').environ.get('CHOPEND') or '.40,.51,.455,.22,-.1,-.1,.34,.51').split(',')]
-Meta('IjaChoppedFallWall', 2.2, False, 'track', role='ijaB', rig='LugouIja01', props=['weapon'], rootMotion=True,
+# TengxianHumanoidV1 (2026-09-26): the pelvis distances from the wall +2 cm (.40,.51,.455 / .51 before) -- the
+# common skeleton's shoulders are 1.7 cm wider, and the left shoulder rode 1.9 cm into the wall (body 3.2 cm).
+CHOP_END = [float(v) for v in (__import__('os').environ.get('CHOPEND') or '.42,.53,.475,.22,-.1,-.1,.34,.53').split(',')]
+Meta('IjaChoppedFallWall', 2.2, False, 'track', role='ijaB', rig='TengxianIja01', props=['weapon'], rootMotion=True,
      stage='chopRear', env={'wallLeftM': round(CHOP_WALL_X * .9213, 2)}, terminal=True,
      contacts=[{'t': .45, 'by': 'luo', 'part': 'neckSideR', 'action': 'cut'},
                {'t': .92, 'limb': 'shoulderL', 'action': 'hit', 'target': 'wall', 'untilT': 2.2}],
@@ -3071,7 +3096,7 @@ Meta('IjaChoppedFallWall', 2.2, False, 'track', role='ijaB', rig='LugouIja01', p
            'staggers left into the trench wall, left shoulder first, and slides down it into a sit on the ground, '
            'the left shoulder and head against the wall, legs out, arms slack. Frame 0 is his aim; last frame is '
            'the corpse.')
-Meta('HeDadaoParryChop', 1.5, False, 'track', role='heyoutian', rig='LugouNra02', props=['weapon'], rootMotion=True,
+Meta('HeDadaoParryChop', 1.5, False, 'track', role='heyoutian', rig='TengxianNra02', props=['weapon'], rootMotion=True,
      stage='chopParry', weapon='Dadao',
      contacts=[{'t': .417, 'limb': 'blade', 'action': 'parry', 'partnerRole': 'ijaA', 'part': 'muzzle'},
                {'t': .792, 'limb': 'blade', 'action': 'cut', 'partnerRole': 'ijaA', 'part': 'neckSideL'}],
@@ -3079,7 +3104,7 @@ Meta('HeDadaoParryChop', 1.5, False, 'track', role='heyoutian', rig='LugouNra02'
      prev=['CreepDadao'], next=['HeSwapDadaoRifle'],
      notes='Runs the last step in, beats the turning muzzle aside with the flat of the dadao (0.40 s), and cuts down '
            'into the left side of the neck (0.78 s). No pause between the two.')
-Meta('IjaParriedChoppedFall', 2.4, False, 'track', role='ijaA', rig='LugouIja02', props=['weapon'], rootMotion=True,
+Meta('IjaParriedChoppedFall', 2.4, False, 'track', role='ijaA', rig='TengxianIja02', props=['weapon'], rootMotion=True,
      stage='chopParry', terminal=True,
      contacts=[{'t': .417, 'by': 'heyoutian', 'part': 'muzzle', 'action': 'parry'},
                {'t': .792, 'by': 'heyoutian', 'part': 'neckSideL', 'action': 'cut'}],
@@ -3090,14 +3115,14 @@ Meta('IjaParriedChoppedFall', 2.4, False, 'track', role='ijaA', rig='LugouIja02'
            '(collar already let go -- IjaStartleTurn carries the releaseCollar event -- head and shoulders turned to his '
            'left rear, hips dropped); play it after IjaStartleTurn (from IjaHoldCollarUp directly it is a blend that '
            'turns the head ~60 deg in 0.12 s).')
-Meta('LuoDragToCover', 2.6, False, 'free', role='luo', rig='LugouNra05', rootMotion=True, player=True, weapon='Dadao',
+Meta('LuoDragToCover', 2.6, False, 'free', role='luo', rig='TengxianNra05', rootMotion=True, player=True, weapon='Dadao',
      weaponState='dadaoInBelt',
      contacts=[{'t': .30, 'limb': 'handsLR', 'action': 'grab', 'partnerRole': 'shunzi', 'part': 'collarBackAndStrap'},
                {'t': 2.30, 'limb': 'handsLR', 'action': 'release'}],
      prev=['LuoDadaoChopRear'], next=['LuoKneelCheck'],
      notes='Crouches, fists the back of the collar and the pack strap, and hauls Shunzi backwards 1.4 m behind the '
            'collapsed earth (first-person: Shunzi is the dragged one; `player` gives his collar).')
-Meta('HeSwapDadaoRifle', 1.6, False, 'track', role='heyoutian', rig='LugouNra02', props=['weapon', 'rifle'], rootMotion=False,
+Meta('HeSwapDadaoRifle', 1.6, False, 'track', role='heyoutian', rig='TengxianNra02', props=['weapon', 'rifle'], rootMotion=False,
      events=[{'t': .45, 'kind': 'dadaoPlanted'}, {'t': .90, 'kind': 'switchWeapon', 'to': 'HanYang'}],
      endHold='twoHand', weaponState='dadao->planted',
      prev=['HeDadaoParryChop'], next=[],
@@ -3105,7 +3130,7 @@ Meta('HeSwapDadaoRifle', 1.6, False, 'track', role='heyoutian', rig='LugouNra02'
            'right shoulder and comes up at low ready. `weapon` = the dadao (planted), `rifle` = the rifle. At the '
            'last frame the director calls DropOpeningWeapon(soldier, "HeSwapDadaoRifle") (the dadao stays planted in '
            'the world) and then SetWeapon("HanYang") (his rifle; the `rifle` prop hides with the next clip).')
-Meta('LuoKneelCheck', 3.4, False, 'free', role='luo', rig='LugouNra05', rootMotion=False, player=True, holdLoop=[.9, 2.6],
+Meta('LuoKneelCheck', 3.4, False, 'free', role='luo', rig='TengxianNra05', rootMotion=False, player=True, holdLoop=[.9, 2.6],
      holdExit='pose.holdUntil: the loop lets go at that clip time and plays on through the 2.6-3.4 s release and rise',
      contacts=[{'t': .85, 'limb': 'handL', 'action': 'grip', 'partnerRole': 'shunzi', 'part': 'shoulderR'},
                {'t': 2.6, 'limb': 'handL', 'action': 'release'}],
@@ -3930,7 +3955,7 @@ def ClubGrip(f, T, rifle, along=.62):
     return up
 
 
-Meta('IjaButtStrikeCollar', BUTT_T, False, 'track', role='ijaA', rig='LugouIja02', props=['weapon'], rootMotion=False,
+Meta('IjaButtStrikeCollar', BUTT_T, False, 'track', role='ijaA', rig='TengxianIja02', props=['weapon'], rootMotion=False,
      weaponState='clubRight', player=True, holdLoop=[.55, 1.05],
      holdExit='pose.holdUntil: the apex loop lets go at that clip time; 1.05-1.125 s wind-up, butt on the head at 1.375 s',
      contacts=[{'t': 0.0, 'limb': 'handL', 'action': 'hold', 'partnerRole': 'shunzi', 'part': 'collar'},
@@ -4006,7 +4031,7 @@ def DragPaths():
     return forearm, collar, eye
 
 
-Meta('IjaDragByForearm', DRAG_T, False, 'track', role='ijaA', rig='LugouIja02', props=['weapon'], rootMotion=True,
+Meta('IjaDragByForearm', DRAG_T, False, 'track', role='ijaA', rig='TengxianIja02', props=['weapon'], rootMotion=True,
      weaponState='clubRight', player=True,
      contacts=[{'t': 0.0, 'limb': 'handL', 'action': 'hold', 'partnerRole': 'shunzi', 'part': 'collar'},
                {'t': .05, 'limb': 'handL', 'action': 'release'},
@@ -4081,7 +4106,7 @@ def BuildDragByForearm(T, name):
 LOOKBACK_BEARING = 115.0      # deg to his left from his forward: where the low eye is
 LOOKBACK_EYE = (4.67, 2.18, .20)     # 4.7 m out on that bearing, 0.18 m off the ground (source m)
 LOOK_T = 39 / 24
-Meta('IjaLookBackLow', LOOK_T, False, 'track', role='ijaA', rig='LugouIja02', props=['weapon'], rootMotion=False,
+Meta('IjaLookBackLow', LOOK_T, False, 'track', role='ijaA', rig='TengxianIja02', props=['weapon'], rootMotion=False,
      weaponState='twoHand->oneHandRight', holdLoop=[.8, LOOK_T],
      events=[{'t': .15, 'kind': 'hears'}, {'t': .75, 'kind': 'lookSettled'}],
      prev=['IjaReadyRifle'], next=['BayonetClearWood', 'IjaButtStrikeCollar'],
@@ -4151,7 +4176,9 @@ STARTLE_T = 15 / 24
 STARTLE_LOOK = (3.0, .26, 1.30)     # 95 deg to his left (a man coming up behind his left shoulder), head height
 
 
-STARTLE_DUCK = .07                  # the flinch drops his hips (source m): the head comes down out of the top of SB05A
+STARTLE_DUCK = .09                  # the flinch drops his hips (source m): the head comes down out of the top of SB05A
+# (.07 on the Lugou rig; TengxianHumanoidV1 2026-09-26: the collar hold already sinks the hips on the shorter reach, and
+# at .07 the head dropped only 0.8 cm between the hold and the end of the flinch -- the test wants >= 2 cm)
 # The keyed head of the last frame (x = nod, + down; z = turn, + to his left): chin up so the face stays level on
 # the man coming up behind him after the look aim lets go (0.34-0.54 s). With the squat's forward lean the old
 # (.05, 0, .80) dropped the face 39 deg to the ground by the end (2026-09-25 review).
@@ -4167,7 +4194,7 @@ def StartleEnd(T):
     return f
 
 
-Meta('IjaStartleTurn', STARTLE_T, False, 'track', role='ijaA', rig='LugouIja02', props=['weapon'], rootMotion=False,
+Meta('IjaStartleTurn', STARTLE_T, False, 'track', role='ijaA', rig='TengxianIja02', props=['weapon'], rootMotion=False,
      weaponState='slungRight', player=True,
      contacts=[{'t': 0.0, 'limb': 'handL', 'action': 'hold', 'partnerRole': 'shunzi', 'part': 'collar'},
                {'t': .12, 'limb': 'handL', 'action': 'release'}],
@@ -4242,7 +4269,7 @@ CLIPS['IjaParriedChoppedFall'] = CLIPS.pop('IjaParriedChoppedFall')
 
 # -- SB05 IjaGuardPort (ijaB) ------------------------------------------------------------
 GUARD_TARGET = (0, -4.4, .82)       # the captive's eye 4 m ahead, 0.75 m up (source m, IJA01)
-Meta('IjaGuardPort', 3.0, True, 'track', role='ijaB', rig='LugouIja01', props=['weapon'], rootMotion=False,
+Meta('IjaGuardPort', 3.0, True, 'track', role='ijaB', rig='TengxianIja01', props=['weapon'], rootMotion=False,
      weaponState='twoHand',
      prev=['IjaKickPrisoner', 'IjaReadyRifle'], next=['IjaChoppedFallWall', 'IjaChoppedFallBack'],
      notes='SB05 ijaB: stands square in the trench, rifle level at the waist (butt at the right hip, left hand on the '
@@ -4289,7 +4316,7 @@ def BuildGuardPort(T, name):
 
 
 # -- 2026-09-25 storyboard round, NRA clips (SB01, SB04A, SB06) ---------------------------
-NRA02_SCALE = .9135          # LugouNra02 source -> runtime metres (manifest numbers below are runtime)
+NRA02_SCALE = .9135          # TengxianNra02 source -> runtime metres (manifest numbers below are runtime)
 
 
 def Bump(t, t0, t1):
@@ -4322,7 +4349,7 @@ REACH_CHEST = (.04, -1.14, .50)        # his breastbone
 REACH_GAP_M = .30                    # runtime m: the offered hand stops this far short of the chest (SB06)
 REACH_DIR = (.12, .78, .62)           # chest -> the offered hand: toward Luo's left shoulder and up (clear of his raised knee)
 LUO_KNEEL_HAND = (.20, -.46, .72)     # where his free left hand is in the kneel, over the raised knee, elbow bent (baked, source m)
-Meta('LuoKneelReach', REACH_T, False, 'free', role='luo', rig='LugouNra05', rootMotion=False, player=True,
+Meta('LuoKneelReach', REACH_T, False, 'free', role='luo', rig='TengxianNra05', rootMotion=False, player=True,
      holdLoop=list(REACH_HOLD),
      holdExit='pose.holdUntil: the loop lets go at that clip time and plays on through the 2.5-2.8 s hand back and the rise',
      contacts=[{'t': REACH_HOLD[0], 'limb': 'handL', 'action': 'reach', 'partnerRole': 'shunzi', 'part': 'chest',
@@ -4426,7 +4453,7 @@ def _RuntimePoint(p, scale=NRA02_SCALE):
     return [round(-p[0] * scale, 3), round(p[2] * scale, 3), round(p[1] * scale, 3)]
 
 
-Meta('RunnerLeanPostCall', RUNNER_T, False, 'track', role='runner', rig='LugouNra02', props=['weapon'], rootMotion=False,
+Meta('RunnerLeanPostCall', RUNNER_T, False, 'track', role='runner', rig='TengxianNra02', props=['weapon'], rootMotion=False,
      weaponState='slungBack', holdLoop=list(RUNNER_HOLD),
      contacts=[{'t': .45, 'limb': 'handR', 'action': 'brace', 'target': 'post', 'untilT': RUNNER_T,
                 # the fist's finger roots on the post, and the post's axis on the ground (runtime metres, actor frame)
@@ -4490,7 +4517,7 @@ def BuildRunnerLeanPost(T, name):
 HURRY_T = 30 / 24                      # 1.25 s
 HURRY_HOLD = (.50, HURRY_T)
 HURRY_LOOK = (0, -3.2, .40)            # the man on the ground ~3 m ahead (source m)
-Meta('InterpreterHurryReach', HURRY_T, False, 'free', role='interpreter', rig='LugouNra02', rootMotion=False,
+Meta('InterpreterHurryReach', HURRY_T, False, 'free', role='interpreter', rig='TengxianNra02', rootMotion=False,
      upperBody=True, holdLoop=list(HURRY_HOLD),
      events=[{'t': .40, 'kind': 'reachOut'}],
      prev=['InterpreterCrouchAsk'], next=['InterpreterCrouchAsk', 'InterpreterGrabCollar'],
@@ -4536,7 +4563,7 @@ def BuildHurryReach(T, name):
 # SB01 camera (survey T_SB01_staged2). Seamless 3 s loop: two thumb pushes, the empty charger flicked away, a
 # new one from the belt pouch, seated in the guide.
 LOAD_T = 72 / 24                       # 3.0 s
-Meta('YaowaSitLoad', LOAD_T, True, 'track', role='yaowa', rig='LugouNra02', props=['weapon'], rootMotion=False,
+Meta('YaowaSitLoad', LOAD_T, True, 'track', role='yaowa', rig='TengxianNra02', props=['weapon'], rootMotion=False,
      env={'wallBehindM': .35},
      contacts=[{'t': 0, 'limb': 'handL', 'action': 'hold', 'target': 'weapon', 'part': 'handguard'},
                {'t': 0, 'limb': 'butt', 'action': 'rest', 'target': 'ground'},
@@ -4633,7 +4660,7 @@ FALLBACK_SEAT = (.06, .20, .15)           # pelvis when the seat hits the mud (s
 # Luo's left thigh (browser review 2026-09-25, 11 cm capsule overlap at 1.08 s). The wall on his left is 0.745 m off.
 FALLBACK_TURN = -.38
 FALLBACK_SIT = 22 / 24                    # 0.917 s: the seat hits the mud
-Meta('IjaChoppedFallBack', FALLBACK_T, False, 'track', role='ijaB', rig='LugouIja01', props=['weapon'], rootMotion=True,
+Meta('IjaChoppedFallBack', FALLBACK_T, False, 'track', role='ijaB', rig='TengxianIja01', props=['weapon'], rootMotion=True,
      stage='chopRear', env={'wallLeftM': round(CHOP_WALL_X * .9213, 2)}, terminal=True,
      contacts=[{'t': .45, 'by': 'luo', 'part': 'neckSideR', 'action': 'cut'}],
      events=[{'t': .45, 'kind': 'bloodSpray', 'at': 'neckSideR'}, {'t': .50, 'kind': 'weaponLost'},
@@ -4755,11 +4782,11 @@ def BuildChoppedFallBack(T, name):
 # on all five so the old director keeps working. A clip missing on a rig is not playable on
 # it (the runtime falls back to native animation), so the director must cast accordingly.
 # =================================================================================
-IJA_BOTH = ['LugouIja01', 'LugouIja02']
-RIGS_BY_ROLE = {'ijaA': ['LugouIja02'], 'ijaB': ['LugouIja01'], 'ijaC': IJA_BOTH, 'ijaD': IJA_BOTH,
-                'luo': ['LugouNra05']}
+IJA_BOTH = ['TengxianIja01', 'TengxianIja02']
+RIGS_BY_ROLE = {'ijaA': ['TengxianIja02'], 'ijaB': ['TengxianIja01'], 'ijaC': IJA_BOTH, 'ijaD': IJA_BOTH,
+                'luo': ['TengxianNra05']}
 SHARED_IJA = {'IjaReadyRifle'}          # ijaA and ijaB both ready their rifles
 for _name, _row in CLIPS.items():
     if _row.get('legacy'):
         continue
-    _row.setdefault('rigs', IJA_BOTH if _name in SHARED_IJA else RIGS_BY_ROLE.get(_row.get('role'), ['LugouNra02']))
+    _row.setdefault('rigs', IJA_BOTH if _name in SHARED_IJA else RIGS_BY_ROLE.get(_row.get('role'), ['TengxianNra02']))

@@ -97,11 +97,11 @@ CONTACT_BAND_CLIPS = ('CaptiveHandsUpWalk', 'CaptiveKneelHandsHead', 'CaptiveKne
 # rifle butt plate and a bayonet blade are all well inside 18 cm across).
 CONTACT_CORRIDOR = 0.09
 MODEL_CLIPS = {
-    'LugouNra02': CAPTIVE_CLIPS,
-    'LugouNra05': CAPTIVE_CLIPS,
-    'LugouIja01': GUARD_CLIPS,
-    'LugouIja02': GUARD_CLIPS,
-    'LugouIja03': GUARD_CLIPS,
+    'TengxianNra02': CAPTIVE_CLIPS,
+    'TengxianNra05': CAPTIVE_CLIPS,
+    'TengxianIja01': GUARD_CLIPS,
+    'TengxianIja02': GUARD_CLIPS,
+    'TengxianIja03': GUARD_CLIPS,
 }
 # Type38 with a fixed bayonet, measured from the right-hand grip mount
 # (_blender/BuildWeapons.py BUTT_Z 0.255, Data_Weapons bayonetTotalM 1.663).
@@ -110,6 +110,18 @@ BAYONET_TIP_M = 1.663 - 0.255
 # runtime-metre number this script prints is source metres times targetHeight/restTop,
 # so getting the guards wrong (they are NOT 1.66) biases every reach it reports.
 TARGET_HEIGHT = {'nra': 1.66, 'ija': 1.62}
+# 2026-09-26 (TengxianHumanoidV1, docs/Data_CharacterStandard.md): the rigs are the shared-skeleton
+# bodies, and the runtime scales every one of them by targetHeight / the reference skeleton height
+# (manifest bounds). The clips were authored in "source metres" of the old Lugou rigs, whose
+# runtime scale was targetHeight / their own rest top. To keep every authored number meaning what
+# it meant at runtime, the bake poses an AUTHORING copy of the new body scaled by
+# f = runtime scale now / runtime scale then (tmp/AuthoringRigs): its Blender metres are the old
+# source metres, AUTHORING_SCALE is the old source -> runtime factor, and SourcePose divides the
+# written translations by f, so the JSON is in the shipped GLB's own node units.
+# Values: the 2026-09-25 validation reports' scale (1.62 or 1.66 / the Lugou rest top).
+AUTHORING_SCALE = {'TengxianNra02': 0.9135347842293876, 'TengxianNra05': 0.9184049601068548,
+                   'TengxianIja01': 0.9213172117987332, 'TengxianIja02': 0.9127865977215439,
+                   'TengxianIja03': 0.9197482282578858}
 
 convert = Matrix(((1, 0, 0, 0), (0, 0, -1, 0), (0, 1, 0, 0), (0, 0, 0, 1)))
 convertInv = convert.inverted()
@@ -185,6 +197,55 @@ def Add(operator, **kwargs):
         return bpy.context.object
 
 
+def AuthoringRig(modelId):
+    """(authoring GLB path, f): the shipped body uniformly scaled by f about its origin (joint
+    translations, vertex positions and inverse-bind translations; clips dropped)."""
+    import numpy as np
+    shipped = project / 'Model/Character' / ('Model_' + modelId + '.glb')
+    manifest = json.loads((project / 'Model/Character/Data_TengxianCharacterManifest.json').read_text(encoding='utf-8'))
+    record = next(r for r in manifest['models'] if r['id'] == modelId)
+    height = float(record.get('scaleHeight') or record['bounds']['size'][2])   # Script_CharacterModel CharacterScaleHeight
+    kind = 'ija' if 'Ija' in modelId else 'nra'
+    f = (TARGET_HEIGHT[kind] / height) / AUTHORING_SCALE[modelId]
+    data = shipped.read_bytes()
+    length = struct.unpack_from('<I', data, 12)[0]
+    doc = json.loads(data[20:20 + length])
+    binary = bytearray(data[28 + length:])
+    for node in doc['nodes']:
+        if 'translation' in node:
+            node['translation'] = [v * f for v in node['translation']]
+        if 'matrix' in node:
+            node['matrix'] = [v * f if i in (12, 13, 14) else v for i, v in enumerate(node['matrix'])]
+
+    def View(index, width):
+        a = doc['accessors'][index]
+        assert a['componentType'] == 5126 and not a.get('sparse')
+        v = doc['bufferViews'][a['bufferView']]
+        stride = v.get('byteStride', width * 4) // 4
+        start = v.get('byteOffset', 0) + a.get('byteOffset', 0)
+        return np.ndarray((a['count'], width), dtype='<f4', buffer=binary, offset=start, strides=(stride * 4, 4))
+    positions = {p['attributes']['POSITION'] for mesh in doc.get('meshes', []) for p in mesh['primitives']}
+    for index in positions:
+        values = View(index, 3)
+        values *= f
+        a = doc['accessors'][index]
+        if 'min' in a:
+            a['min'], a['max'] = values.min(axis=0).tolist(), values.max(axis=0).tolist()
+    for skin in doc.get('skins', []):
+        values = View(skin['inverseBindMatrices'], 16)
+        values[:, 12:15] *= f
+    doc.pop('animations', None)
+    raw = json.dumps(doc, separators=(',', ':')).encode()
+    raw += b' ' * (-len(raw) % 4)
+    binary += b'\0' * (-len(binary) % 4)
+    out = project.parent / 'tmp/AuthoringRigs' / ('Model_' + modelId + '.glb')
+    out.parent.mkdir(parents=True, exist_ok=True)
+    out.write_bytes(struct.pack('<III', 0x46546c67, 2, 28 + len(raw) + len(binary))
+                    + struct.pack('<II', len(raw), 0x4e4f534a) + raw
+                    + struct.pack('<II', len(binary), 0x004e4942) + bytes(binary))
+    return out, f
+
+
 def ReadGlb(path):
     data = path.read_bytes()
     length = struct.unpack_from('<I', data, 12)[0]
@@ -235,7 +296,8 @@ def Bake(modelId, probe=None):
     scene = bpy.context.scene
     scene.render.fps = fps
     source = project / 'Model/Character' / ('Model_' + modelId + '.glb')
-    document = ReadGlb(source)
+    rigFile, authoringFactor = AuthoringRig(modelId)
+    document = ReadGlb(rigFile)
     nodes = document['nodes']
     parents = {c: i for i, n in enumerate(nodes) for c in n.get('children', [])}
     nodeIndex = {n.get('name'): i for i, n in enumerate(nodes)}
@@ -248,7 +310,7 @@ def Bake(modelId, probe=None):
 
     for i in range(len(nodes)):
         WorldOf(i)
-    Op(bpy.ops.import_scene.gltf, filepath=str(source))
+    Op(bpy.ops.import_scene.gltf, filepath=str(rigFile))
     arm = next(o for o in scene.objects if o.type == 'ARMATURE')
     arm.animation_data_clear()
     for pb in arm.pose.bones:
@@ -390,7 +452,8 @@ def Bake(modelId, probe=None):
     # (Script_Actor KIND_SPEC: nra 1.66, ija 1.62). Reporting the guards at 1.66 made
     # every IJA reach in this file 2.4 % long -- about 2 cm on the butt and the bayonet,
     # which is four times the tolerance the stage distances are tuned to.
-    nominalScale = TARGET_HEIGHT['ija' if modelId.startswith('LugouIja') else 'nra'] / restTop
+    # (was targetHeight / restTop on the Lugou rigs; the authoring copy keeps that meaning -- see AUTHORING_SCALE)
+    nominalScale = AUTHORING_SCALE[modelId]
     print('REST %s pelvis %.3f chest %.3f head %.3f ankle %.3f femur %.3f shin %.3f arm %.3f'
           % (modelId, restPelvis, restChest, restHead, ankleZ, femur, shin, armLen), flush=True)
 
@@ -1252,7 +1315,7 @@ def Bake(modelId, probe=None):
             parentName = nodes[parent].get('name') if parent is not None else None
             pm = current.get(parentName, sourceWorld[parent]) if parent is not None else Matrix.Identity(4)
             p, q, s = (pm.inverted() @ current[name]).decompose()
-            result.extend([*p, q.x, q.y, q.z, q.w])
+            result.extend([*(p / authoringFactor), q.x, q.y, q.z, q.w])   # shipped node units
         return [round(v, 6) for v in result]
 
     depsgraph = lambda: bpy.context.evaluated_depsgraph_get()
@@ -1603,7 +1666,7 @@ def Bake(modelId, probe=None):
     asset = {'schema': 1, 'modelId': modelId, 'authoringTool': TOOL,
              'originalModelSha256': hashlib.sha256(source.read_bytes()).hexdigest(),
              'fps': fps, 'stride': 7, 'bones': names, 'clips': framesByClip}
-    file = output / ('Animation_Lugou' + modelId[len('Lugou'):] + 'MachineGunCaptives.json')
+    file = output / ('Animation_' + modelId + 'MachineGunCaptives.json')
     temporary = file.with_suffix('.json.tmp')
     temporary.write_text(json.dumps(asset, separators=(',', ':')), encoding='utf-8')
     temporary.replace(file)
@@ -1683,7 +1746,7 @@ if __name__ == '__main__':
                           for name, (duration, loop, hold) in DEFINITIONS.items()},
                 'models': []}
     for modelId, clips in MODEL_CLIPS.items():
-        file = output / ('Animation_Lugou' + modelId[len('Lugou'):] + 'MachineGunCaptives.json')
+        file = output / ('Animation_' + modelId + 'MachineGunCaptives.json')
         if file.exists():
             manifest['models'].append({
                 'id': modelId, 'file': file.name,
