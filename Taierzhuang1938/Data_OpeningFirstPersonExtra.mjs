@@ -104,13 +104,14 @@ const Leg = (ankle, knee, flexDeg = 0) => Freeze({ ankle: V(...ankle), knee: V(.
 export const LEG_POSES = Freeze({
   // SB01 (eye 0.95, pitch −15°): sitting against the back wall, legs out towards the mouth, right knee
   // up under the loading rifle (bolt low right), left leg longer.
-  // The eye is 0.95 m up, so he sits on something low (hip 0.32 m up, 0.35 m ahead of the eye: leaning back on
-  // the wall); the right knee is drawn up high (ankle 0.48 m ahead) so the knee and the top of the thigh are in
-  // the lower right with the rifle across them (review 09-25: knee (0.82,1.0) was out of frame and the rifle
-  // read as lying on the ground). Node bench: knee (0.77,0.88), thigh from the bottom edge to the knee,
-  // bolt ≈ (0.8,0.93) on the knee, muzzle ≈ (0.52,0.62); storyboard knee ≈ (0.7,0.9), bolt (0.92,0.9).
-  sitForward: Freeze({ hip: V(.02, .32, -.35), up: V(0, .95, .3),
-    l: Leg([-.25, .1, -1.02], [-.2, 1, -.1], 5), r: Leg([.3, .1, -.48], [.15, 1, 0], 0) }),
+  // The eye is 0.95 m up, so he sits on something low (a crate: hip 0.4 m up, 0.4 m ahead of the eye, leaning
+  // back on the wall); the right knee is drawn up (ankle 0.75 m ahead) so the knee and the top of the thigh are
+  // in the lower right with the rifle across them (review 09-25: knee (0.82,1.0) was out of frame and the rifle
+  // read as lying on the ground). Browser bench 09-25 (01 Orders, contract camera): right knee (0.68,0.79), left
+  // knee (0.40,0.87), the rifle's receiver on the right thigh just short of the knee, muzzle to the upper left;
+  // storyboard knee ≈ (0.7,0.9), bolt (0.92,0.9).
+  sitForward: Freeze({ hip: V(.02, .4, -.4), up: V(0, .95, .3),
+    l: Leg([-.25, .1, -1.02], [-.2, 1, -.1], 5), r: Leg([.3, .1, -.75], [.15, 1, 0], 0) }),
   // SB02 (eye falling to 0.75, roll +17°): thrown down, legs sprawled in the foreground, one knee up.
   sprawl: Freeze({ hip: V(0, .16, -.22), up: V(-.2, .7, .7),
     l: Leg([-.36, .09, -.95], [-.5, 1, 0], -5), r: Leg([.2, .12, -.6], [.1, 1, .1], 10) }),
@@ -137,8 +138,8 @@ export const LEG_POSES = Freeze({
 //   packStrap: SB03A 「左边缘能看到背包带」: a canvas strap from the left shoulder root, camera-local points.
 export const FP_PROPS = Freeze({
   palmClipProp: Freeze({ kind: "clip", hand: "l", offset: V(0, -.02, 0), yawDeg: 0 }),
-  // The receiver on the thigh just behind the knee, muzzle forward-left (bench: bolt over the knee).
-  loadingRifleOnLegs: Freeze({ kind: "rifle", thigh: "r", along: .85, lift: .07, gripAheadM: .2, muzzle: V(-.45, -.1, -.88), up: V(-.3, 1, .2) }),
+  // The receiver on the right thigh short of the knee, muzzle forward-left (browser bench 09-25, variant B).
+  loadingRifleOnLegs: Freeze({ kind: "rifle", thigh: "r", along: .6, lift: .07, gripAheadM: .2, muzzle: V(-.45, -.1, -.88), up: V(-.3, 1, .2) }),
   rifleSlide: Freeze({ kind: "track", prop: "loadingRifleOnLegs", t0: .25, t1: .7, direction: V(-.45, 0, -.55), moveM: .4, spinDeg: 28, restM: .03 }),
   // Canvas olive-drab with darker hems and a stitched band every few centimetres (vertex shades), a steel
   // buckle at buckleAt (0–1 along); review 09-25: the flat 0x4a4031 read as a black bar.
