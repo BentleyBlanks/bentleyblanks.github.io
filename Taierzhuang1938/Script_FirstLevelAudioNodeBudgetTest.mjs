@@ -4,7 +4,10 @@
 //   1. 账面对得上：engine.liveNodes = 在账 voice 的节点 + 循环层（环境床/配乐）的节点 + 旧环境回退节点，
 //      差值必须恒为 0 —— 差了就是有人多还或少还（「预算怎么用不完」/「越跑越少」那一类）；
 //   2. 没有过期未收：pendingVoices 里没有一条已经过了 releaseAt 0.35 s 还挂着（ReleaseVoice 的
-//      计时器与 SetListener 里的按帧清账两条路都失手才会有）；
+//      计时器与 SetListener 里的按帧清账两条路都失手才会有）。「过了多久」按**最近一次 SetListener**
+//      时的音频时钟算，不按取样那一刻：按帧清账就在 SetListener 里，它之后到期的本来就要等下一帧；
+//      机器忙时两次 evaluate 之间主线程能卡住半秒，拿取样时刻量出来的是这段卡顿，不是漏收
+//     （2026-09-25 复跑时 05 就这样红过一次：2 条在上一帧之后才到期）；
 //   3. 峰值不破顶：每段实时推帧的 liveNodes 峰值 ≤ PEAK_CEILING（见下）；
 //   4. 契约 §6 的构成：战车常驻 loop ≤ 3 条、剧情语音同时 ≤ 3 路、前线 + 场外炮击 ≤ 8 条
 //      （后一条按生成器自己的声部账数 —— 它按每一声的可听时长数，不按引擎回收时刻，
@@ -57,7 +60,10 @@ try {
   // ---- 探针：循环层登记、Play 打标（剧情语音）、按 cue 记饿死 ----
   await page.evaluate(() => {
     const a = window.Tengxian.audio;
-    const P = window.__budgetProbe = { layers: new Set(), starvedByCue: {} };
+    const P = window.__budgetProbe = { layers: new Set(), starvedByCue: {}, listenerAt: null };
+    // 记下每一帧 SetListener（按帧清账所在处）进门时的音频时钟，过期未收以它为准（见文件头第 2 条）。
+    const setListener = a.SetListener;
+    a.SetListener = function (...x) { P.listenerAt = a.ctx.currentTime; return setListener.apply(this, x); };
     const PatchLayer = (proto) => {
       if (!proto || proto.__budgetProbed) return;
       proto.__budgetProbed = true;
@@ -82,7 +88,7 @@ try {
   });
 
   const Sample = () => page.evaluate(({ OVERDUE_S, TANK_LOOPS }) => {
-    const g = window.Tengxian, a = g.audio, P = window.__budgetProbe, now = a.ctx.currentTime;
+    const g = window.Tengxian, a = g.audio, P = window.__budgetProbe, now = a.ctx.currentTime, ref = P.listenerAt ?? now;
     const FrontShared = () => { const b = g.Debug.FirstLevelMissionRuntime?.()?.battleSound;
       return b ? (b.frontVoices?.length || 0) + (b.artillery?.voices?.length || 0) : 0; };
     const seen = new Set();
@@ -91,7 +97,7 @@ try {
     for (const set of [a.activeVoices, a.pendingVoices]) for (const v of set || []) {
       if (seen.has(v)) continue;
       seen.add(v);
-      if (a.pendingVoices.has(v) && v.releaseAt != null && now - v.releaseAt > OVERDUE_S) { overdue += 1; overdueNames.push(v.name || "?"); }
+      if (a.pendingVoices.has(v) && v.releaseAt != null && ref - v.releaseAt > OVERDUE_S) { overdue += 1; overdueNames.push(v.name || "?"); }
       if (v.reclaimed || !v.nodes || !v.nodes.length) continue;
       fromVoices += v.nodes.length;
       if (TANK_LOOPS.includes(v.name)) tank += 1;
@@ -106,7 +112,7 @@ try {
     }
     const fallback = a.ambienceNodes?.length || 0;
     return { t: now, stage: g.Debug.FirstLevelMissionRuntime?.()?.flow?.stage?.id ?? null, live: a.liveNodes,
-      drift: a.liveNodes - (fromVoices + fromLayers + fallback), overdue, overdueNames: overdueNames.slice(0, 4),
+      drift: a.liveNodes - (fromVoices + fromLayers + fallback), overdue, overdueNames: overdueNames.slice(0, 4), gap: now - ref,
       tank, story, shared: FrontShared(), fading, loops: fromLayers };
   }, { OVERDUE_S, TANK_LOOPS });
 
@@ -137,14 +143,14 @@ try {
     }
     const peak = samples.reduce((m, s) => (s.live > m.live ? s : m), samples[0] || { live: 0 });
     const settled = samples.filter((s) => s.rel >= 8);
-    const row = { seg: seg.label, n: samples.length, game: +gameT.toFixed(1), peak: peak.live, peakStage: peak.stage,
+    const row = { seg: seg.label, n: samples.length, gapMax: Math.max(0, ...samples.map((s) => s.gap)), game: +gameT.toFixed(1), peak: peak.live, peakStage: peak.stage,
       p95: [...samples.map((s) => s.live)].sort((x, y) => x - y)[Math.floor(samples.length * 0.95)] ?? 0,
       tankMax: Math.max(0, ...samples.map((s) => s.tank)), storyMax: Math.max(0, ...samples.map((s) => s.story)),
       sharedMax: Math.max(0, ...samples.map((s) => s.shared)), fadingAfter8s: Math.max(0, ...settled.map((s) => s.fading)) };
     report.push(row);
     for (const s of samples) {
       if (s.drift !== 0) worst.drift.push(`${seg.label}@${s.rel.toFixed(1)}s drift ${s.drift}`);
-      if (s.overdue) worst.overdue.push(`${seg.label}@${s.rel.toFixed(1)}s ${s.overdue} 条（${s.overdueNames.join(",")}）`);
+      if (s.overdue) worst.overdue.push(`${seg.label}@${s.rel.toFixed(1)}s ${s.overdue} 条（${s.overdueNames.join(",")}，距上一帧 ${s.gap.toFixed(2)} s）`);
     }
     if (peak.live > PEAK_CEILING) Fail(`${seg.label} 实时 liveNodes 峰值 ${peak.live} > ${PEAK_CEILING}（阶段 ${peak.stage}）`);
     if (row.tankMax > 3) Fail(`${seg.label} 战车常驻 loop 同时 ${row.tankMax} 条 > 3`);
@@ -158,9 +164,9 @@ try {
         const wall = performance.now();
         let peak = 0;
         for (let i = 0; i < 600; i += 1) { g.player.health = 1e9; g.StepFrames(1, 1 / 60, false); peak = Math.max(peak, a.liveNodes); }
-        const now = a.ctx.currentTime;
+        const ref = window.__budgetProbe.listenerAt ?? a.ctx.currentTime;
         let overdue = 0;
-        for (const v of a.pendingVoices) if (v.releaseAt != null && now - v.releaseAt > OVERDUE_S) overdue += 1;
+        for (const v of a.pendingVoices) if (v.releaseAt != null && ref - v.releaseAt > OVERDUE_S) overdue += 1;
         return { wallS: +((performance.now() - wall) / 1000).toFixed(1), peak, end: a.liveNodes, overdue, swept: a.stats.sweptVoices || 0 };
       }, { OVERDUE_S });
     }
@@ -175,8 +181,8 @@ try {
   else if (sync.peak > PEAK_CEILING || sync.overdue) Fail(`同步推 600 帧：liveNodes 峰值 ${sync.peak}、过期未收 ${sync.overdue} 条（${JSON.stringify(sync)}）`);
 
   const starved = await page.evaluate(() => Object.entries(window.__budgetProbe.starvedByCue).sort((x, y) => y[1] - x[1]).slice(0, 8));
-  console.log("段      取样  游戏秒  峰值  p95  战车loop  剧情语音  前线+炮击  淡出层");
-  for (const r of report) console.log(`${r.seg.padEnd(6)} ${String(r.n).padStart(5)} ${String(r.game).padStart(7)} ${String(r.peak).padStart(5)} ${String(r.p95).padStart(4)} ${String(r.tankMax).padStart(9)} ${String(r.storyMax).padStart(9)} ${String(r.sharedMax).padStart(5)} ${String(r.fadingAfter8s).padStart(7)}`);
+  console.log("段      取样  游戏秒  峰值  p95  战车loop  剧情语音  前线+炮击  淡出层  取样距上一帧最久(s)");
+  for (const r of report) console.log(`${r.seg.padEnd(6)} ${String(r.n).padStart(5)} ${String(r.game).padStart(7)} ${String(r.peak).padStart(5)} ${String(r.p95).padStart(4)} ${String(r.tankMax).padStart(9)} ${String(r.storyMax).padStart(9)} ${String(r.sharedMax).padStart(5)} ${String(r.fadingAfter8s).padStart(7)} ${r.gapMax.toFixed(2).padStart(9)}`);
   console.log(`同步推 600 帧（${sync.wallS} s 墙钟）：峰值 ${sync.peak}、推完 ${sync.end}、按帧清账累计 ${sync.swept} 条`);
   console.log(`被预算闸饿死最多的 cue：${starved.map(([c, n]) => `${c} ${n}`).join("，") || "无"}`);
   if (errors.length) Fail(`页面报错：${errors.slice(0, 3).join(" | ")}`);

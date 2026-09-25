@@ -650,14 +650,14 @@ drops = { dedupe, distance, stolen, starved, get budget() { return this.starved;
 
 - **进门预算 `NODE_BUDGET` 仍是 120**（低优先级的天花板 0.62 倍、priority 的 1.15 倍 = 138 都不变）。
 - **01–06 实时峰值上限 150**：priority 天花板 138，再留一条 priority 声（约 12 个节点）的余量。
-  实测最高 138（04），`Script_FirstLevelAudioNodeBudgetTest` 四段复跑 87–137。
+  实测最高 138（04），`Script_FirstLevelAudioNodeBudgetTest` 四段复跑 83–137。
   每个节点是一个 AudioNode（gain/filter/panner/buffer source）；卷积混响是共用的四个，不按 voice 建，
   所以 150 个节点在低端机上的风险主要是 25 m 内那些 HRTF panner 的数量，不在卷积上。
 - 门：`node Taierzhuang1938/Script_FirstLevelAudioNodeBudgetTest.mjs`（浏览器，约 5 分钟，登记在 audio 域）。
-  实时推 01（70 s）、04、05（各 45 s）、06（20 s），断言：峰值 ≤ 150、账面差 0、没有过了回收点 0.35 s 还挂着的 voice、
+  实时推 01（70 s）、04、05（各 45 s）、06（20 s），断言：峰值 ≤ 150、账面差 0、没有过了回收点 0.35 s 还挂着的 voice（「过了多久」按最近一次 `SetListener` 时的音频时钟算：机器忙时两次取样之间主线程能卡住半秒，按取样时刻量会把卡顿算成漏收）、
   战车 loop ≤ 3、剧情语音 ≤ 3 路、前线 + 场外炮击 ≤ 8 条（按生成器自己的声部账数）、换床的淡出层 8 s 内拆掉、
   离开 05 后 6 s 战车 loop 收走；最后在 05 之后同步推 600 帧，推完账面仍 ≤ 150 且没有过期未收。
-  反向验证：把 `SweepExpiredVoices` 换成空函数，门红两项（05 实时过期未收 3 次；同步推 600 帧峰值 142、过期未收 26 条）。
+  反向验证：把 `SweepExpiredVoices` 换成空函数，门红在同步推 600 帧那一项（峰值 139、推完仍 139、过期未收 20 条）；实时那几段计时器照常回调，本来就不该红。
 - `Script_AudioTest.mjs` 另有三条单元断言：延迟起播的两条 cue 放完才收；一个同步块里到期的 voice 由 `SetListener` 收掉；
   淡出的 voice 比原回收点早一秒以上离账。
 
