@@ -15,19 +15,27 @@ path; start/stop the instance around it). Environment:
                      tracks and validation reports)
   OPENING_VERSION    manifest version (default 20260925OpeningStoryboardsV5)
   OPENING_MODEL      comma list of rigs (default all five)
-  OPENING_CLIPS      comma list: bake only these clips and merge into the rig's JSON. Clips bake in
-                     library order and carry the hand/forearm-roll and finger rate limits from one
-                     clip to the next: rebake a same-root chain together (IJA02 2026-09-25:
-                     IjaHoldCollarUp,IjaButtStrikeCollar,IjaDragByForearm,IjaLookBackLow,
-                     IjaStartleTurn,IjaParriedChoppedFall). Baking IjaDragByForearm alone rolls
-                     its right forearm 180 deg off IjaButtStrikeCollar's last frame, and a
-                     from-scratch bake of every IJA02 clip moves six 2026-09-23 clips by up to
-                     2 cm at their hand-overs -- the committed files are the chained bakes.
+  OPENING_CLIPS      comma list: bake only these clips and merge into the rig's JSON. A clip's only
+                     inputs from other clips are the arm-roll seeds of its `prev` clip (below): a
+                     partial bake gives the same frames as a from-scratch bake of every clip.
   OPENING_PASS       'bake' (default) | 'partner' (dump the partner tracks the paired
                      clips aim their hands at -- run it before 'bake') | 'manifest'
-                     (rewrite the manifest from the rig files on disk, no Blender work)
+                     (rewrite the manifest from the rig files on disk, no Blender work) |
+                     'verify' (bake as 'bake' but write ONLY the baked clips to
+                     tmp/OpeningStoryboards/Verify -- no report, scene or manifest -- then
+                     `node Taierzhuang1938/Script_OpeningStoryboardsTest.mjs
+                     --rebake=tmp/OpeningStoryboards/Verify` compares them with the committed
+                     files: every bone within 0.5 deg and 1 mm on every frame)
   OPENING_RENDER     '1' renders review stills to tmp/OpeningStoryboards/BlenderReview
   OPENING_SKIP_BLEND '1' skips saving the editable scene while iterating
+
+Reproducibility (2026-09-25 review): each clip starts from a clean solver state (grounding lift,
+hand/forearm/finger rate limits). A clip that continues another on the same root (`prev`) takes
+its forearm-twist branch, arm rolls and grounding lift (rig JSON `endLift`) from the LAST WRITTEN
+FRAME of the first `prev` clip that
+bakes before it on this rig -- the one baked in this run, or else the committed repository file
+(the same numbers, which 'verify' checks) -- so baking one clip alone gives the frames a full
+bake gives.
 
 It reuses the production-rig importer, two-bone IK, palm solver and original-local-frame
 exporter of `_import/Script_MachineGunCaptivesBake.py`; meshes, skins and inverse binds are
@@ -48,7 +56,9 @@ project = Path(os.environ['OPENING_PROJECT'])
 private = Path(os.environ.get('OPENING_BLEND_DIR')
                or 'C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/OpeningStoryboards_20260925')
 VERSION = os.environ.get('OPENING_VERSION') or '20260925OpeningStoryboardsV5'
-output = Path(os.environ.get('OPENING_OUTPUT') or (project / 'Animation/OpeningStoryboards'))
+committedDir = project / 'Animation/OpeningStoryboards'
+output = Path(os.environ.get('OPENING_OUTPUT') or (project.parent / 'tmp/OpeningStoryboards/Verify'
+                                                   if os.environ.get('OPENING_PASS') == 'verify' else committedDir))
 reviews = Path(os.environ.get('OPENING_REVIEW') or (project.parent / 'tmp/OpeningStoryboards/BlenderReview'))
 PASS = os.environ.get('OPENING_PASS', 'bake')
 RENDER = os.environ.get('OPENING_RENDER') == '1'
@@ -484,6 +494,53 @@ def BakeRig(ctx):
 
     clipsOut, reports, partnerDump = {}, [], {}
     twistEnd = {}
+    committedFile = committedDir / ('Animation_' + modelId + 'OpeningStoryboards.json')
+    committed = json.loads(committedFile.read_text()) if committedFile.exists() else {'clips': {}}
+    depth = {name: len(arm.pose.bones[name].parent_recursive) for name in names}
+
+    def PoseFromValues(bones, values):
+        """Put the rig in one written frame (glTF node-local p xyz, q xyzw per bone): SourcePose inverted."""
+        nodes, parents, nodeIndex = ctx['nodes'], ctx['parents'], ctx['nodeIndex']
+        local = {name: values[i * 7:i * 7 + 7] for i, name in enumerate(bones)}
+        world = {}
+
+        def Node(name):
+            if name not in world:
+                i = nodeIndex[name]
+                parent = parents.get(i)
+                if parent is None:
+                    pm = Matrix.Identity(4)
+                else:
+                    pname = nodes[parent].get('name')
+                    pm = Node(pname) if pname in local else ctx['sourceWorld'][parent]
+                v = local[name]
+                world[name] = pm @ Matrix.LocRotScale(Vector(v[:3]), Quaternion((v[6], v[3], v[4], v[5])),
+                                                      Vector(nodes[i].get('scale', [1, 1, 1])))
+            return world[name]
+        Reset()
+        for name in sorted(local, key=lambda n: depth[n]):
+            ctx['Put'](arm.pose.bones[name], convert @ Node(name) @ corrections[name].inverted())
+
+    def SeedsFromValues(bones, values):
+        """ArmRoll's carried state for the frame `values`: the forearm-twist branch (twice the forearm's roll about
+        its own axis against the same forearm re-aimed from rest -- the forearm takes half the twist) and the
+        upper-arm / forearm world rotations with their axes."""
+        twist, ua, fa = {}, {}, {}
+        for side in 'LR':
+            PoseFromValues(bones, values)
+            u_, f_, h_ = Bone(side + ' UpperArm'), Bone(side + ' Forearm'), Bone(side + ' Hand')
+            S, E, Wr = Point(u_), Point(f_), Point(h_)
+            a = (Wr - E).normalized()
+            ua[side] = (BWorld(u_).to_quaternion(), (E - S).normalized())
+            fa[side] = (BWorld(f_).to_quaternion(), a.copy())
+            f_.matrix_basis = ctx['rest'][f_.name]
+            Update()
+            ctx['Aim'](f_, h_, Wr)
+            rel = fa[side][0] @ BWorld(f_).to_quaternion().inverted()
+            roll = 2 * math.atan2(Vector((rel.x, rel.y, rel.z)).dot(a), rel.w)
+            twist[side] = 2 * ((roll + math.pi) % (2 * math.pi) - math.pi)
+        Reset()
+        return twist, ua, fa
     # Bone mounts of props an actor carries between clips (spec 'mountFrames': {prop: (bone role,
     # frame)}): the prop track at that frame in that bone's glTF node frame -- the sheathed
     # bayonet on the pelvis, taken from IjaDrawBayonet frame 0.
@@ -519,7 +576,8 @@ def BakeRig(ctx):
                 wallFrames.setdefault(f, []).append(k)
         # The reach assist reads the previous frame's grounding lift; a clip's first frame must not read
         # the last frame of whichever clip was baked before it (a partial and a full bake then differ --
-        # 10 cm on IjaStartleTurn frame 0 after the parried fall's corpse).
+        # 10 cm on IjaStartleTurn frame 0 after the parried fall's corpse). A continuation (below) starts
+        # from its `prev` clip's last lift -- that IS the frame before -- and anything else from 0.
         solveState['lift'] = 0.0
         handPrev.clear()
         twistPrev.clear()
@@ -535,11 +593,22 @@ def BakeRig(ctx):
         twistSeed.clear()
         uaSeed.clear()
         faSeed.clear()
+        # The first `prev` that bakes before this clip on this rig (what a full bake has in twistEnd); when
+        # this run did not bake it, its last frame comes from the committed file.
+        earlier = onRig[:onRig.index(clip)]
         for before in meta.get('prev') or []:
+            if before not in earlier:
+                continue
+            if before not in twistEnd and before in committed['clips']:
+                row = committed['clips'][before]
+                last = len(committed['bones']) * 7 * (row['frameCount'] - 1)
+                twistEnd[before] = SeedsFromValues(committed['bones'], row['values'][last:]) + (row.get('endLift', 0.0),)
+                print('   SEED', clip, 'from committed', before, flush=True)
             if before in twistEnd:
                 twistSeed.update(twistEnd[before][0])
                 uaSeed.update(twistEnd[before][1])
                 faSeed.update(twistEnd[before][2])
+                solveState['lift'] = twistEnd[before][3]
                 break
         for frame in range(count):
             arm.animation_data.action = None
@@ -640,7 +709,6 @@ def BakeRig(ctx):
                 pb = arm.pose.bones[name]
                 pb.keyframe_insert('location', frame=frame)
                 pb.keyframe_insert('rotation_quaternion', frame=frame)
-        twistEnd[clip] = (dict(twistPrev), dict(uaPrev), dict(faPrev))
         stride = len(names) * 7
         seam = max(abs(values[i] - values[len(values) - stride + i]) for i in range(stride)) if loop else 0.0
         if loop:
@@ -649,11 +717,17 @@ def BakeRig(ctx):
                 props[name][-10:] = props[name][:10]
         action.use_fake_user = True
         arm.animation_data.action = None
+        # What a clip that continues this one starts from: the written last frame (not the solver's running
+        # state, which a loop's seam copy or an authored clip leaves out of step with it).
+        # (+ the grounding lift of that frame: a loop's last frame is its first)
+        endLift = round(lifts[0] if loop else lifts[-1], 6)
+        twistEnd[clip] = SeedsFromValues(names, values[-stride:]) + (endLift,)
         nla = arm.animation_data.nla_tracks.new()
         nla.name = clip
         nla.mute = True
         nla.strips.new(clip, 0, action)
-        row = {'duration': duration, 'loop': loop, 'weaponHold': meta['weaponHold'], 'frameCount': count, 'values': values}
+        row = {'duration': duration, 'loop': loop, 'weaponHold': meta['weaponHold'], 'frameCount': count, 'values': values,
+               'endLift': endLift}   # bake bookkeeping (source m): what a partial bake of a continuation starts from
         if meta.get('referenceSpeedMps'):
             row['referenceSpeedMps'] = meta['referenceSpeedMps']
         if props:
@@ -706,7 +780,7 @@ def BakeRig(ctx):
 
     source = project / 'Model/Character' / ('Model_' + modelId + '.glb')
     file = output / ('Animation_' + modelId + 'OpeningStoryboards.json')
-    if selectedClips and file.exists():
+    if selectedClips and file.exists() and PASS != 'verify':
         previous = json.loads(file.read_text())
         merged = previous['clips']
         merged.update(clipsOut)
@@ -719,6 +793,9 @@ def BakeRig(ctx):
     temporary = file.with_suffix('.json.tmp')
     temporary.write_text(json.dumps(asset, separators=(',', ':')), encoding='utf-8')
     temporary.replace(file)
+    if PASS == 'verify':
+        print('OPENING_VERIFY_BAKED', modelId, len(clipsOut), str(file), flush=True)
+        return {'id': modelId, 'verify': list(clipsOut)}
     reportFile = private / ('Data_' + modelId + 'OpeningValidation.json')
     if selectedClips and reportFile.exists():
         old = {row['clip']: row for row in json.loads(reportFile.read_text())['clips']}

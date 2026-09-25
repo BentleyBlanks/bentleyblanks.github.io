@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import crypto from "node:crypto";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { OPENING_STORYBOARDS as C } from "./Data_OpeningStoryboards.mjs";
 import { OpeningHoldTime } from "./Script_OpeningProps.mjs";
 const Read=file=>fs.readFileSync(new URL(file,import.meta.url));
@@ -277,7 +279,7 @@ const SB0925=["IjaButtStrikeCollar","IjaDragByForearm","IjaLookBackLow","IjaStar
     const x=World("LugouIja02",ijaA,a,ta??manifest.clips[a].duration),y=World("LugouIja02",ijaA,b,tb);
     let angle=0,offset=0,where="";
     x.forEach((p,i)=>{
-      if(/Fingerdd|Nub/.test(ijaA.bones[i]))return;
+      if(/Finger\d\d|Nub/.test(ijaA.bones[i]))return;
       const q=y[i],deg=2*Math.acos(Math.min(1,Math.abs(p.q[0]*q.q[0]+p.q[1]*q.q[1]+p.q[2]*q.q[2]+p.q[3]*q.q[3])))*180/Math.PI;
       if(deg>angle){angle=deg;where=ijaA.bones[i];}
       offset=Math.max(offset,Math.hypot(p.p[0]-q.p[0],p.p[1]-q.p[1],p.p[2]-q.p[2]));
@@ -416,5 +418,38 @@ assert.deepEqual([...C.phases.RearTrench],["Withdraw","Corner","Collection","Sup
   assert.deepEqual(twice,[],"the director class has no duplicate method names");
   assert.match(source,/CornerFire\([^)]*\)\{[\s\S]*?this\.FireRifle\(/,"the corner man's loop fires a real rifle shot");
   assert.ok(Object.values(C.pursuit).every(v=>Number.isFinite(v)&&v>0),"pursuit tuning is finite");
+}
+// ---- reproducibility (optional): --rebake=<dir> holds rig files from `OPENING_PASS=verify` (the repository bake
+// script, any subset of clips); every clip in them must be the committed clip -- every bone within 0.5 deg and
+// 1 mm (source metres) in the rig's world on every frame (fingers excluded, as at the hand-overs).
+const rebake=process.argv.find(arg=>arg.startsWith("--rebake="))?.slice(9);
+if(rebake){
+  // relative to the worktree root (where the bake's verify pass writes tmp/OpeningStoryboards/Verify), or absolute
+  const dir=path.resolve(fileURLToPath(new URL("../",import.meta.url)),rebake),off=[];let compared=0;
+  for(const rig of RIGS){
+    const file=path.join(dir,`Animation_${rig}OpeningStoryboards.json`);
+    if(!fs.existsSync(file))continue;
+    const fresh=JSON.parse(fs.readFileSync(file)),asset=assets.get(rig);
+    assert.deepEqual(fresh.bones,asset.bones,`${rig}: rebake bone order`);
+    for(const id of Object.keys(fresh.clips)){
+      const a=asset.clips[id],b=fresh.clips[id];
+      assert.ok(a,`${rig}/${id}: rebaked clip is committed`);assert.equal(b.frameCount,a.frameCount,`${rig}/${id}: frame count`);
+      let angle=0,offset=0,where="";
+      for(let f=0;f<a.frameCount;f++){
+        const t=f*a.duration/(a.frameCount-1),x=WorldPose(rig,asset,id,t),y=WorldPose(rig,fresh,id,t);
+        x.forEach((p,i)=>{
+          if(/Finger\d\d|Nub/.test(asset.bones[i]))return;
+          const q=y[i],deg=2*Math.acos(Math.min(1,Math.abs(p.q[0]*q.q[0]+p.q[1]*q.q[1]+p.q[2]*q.q[2]+p.q[3]*q.q[3])))*180/Math.PI;
+          if(deg>angle){angle=deg;where=`${asset.bones[i]} frame ${f}`;}
+          offset=Math.max(offset,Math.hypot(p.p[0]-q.p[0],p.p[1]-q.p[1],p.p[2]-q.p[2]));
+        });
+      }
+      if(angle>.5||offset>.001)off.push(`${rig}/${id}: ${angle.toFixed(2)} deg at ${where}, ${(offset*1000).toFixed(1)} mm`);
+      compared++;
+    }
+  }
+  assert.ok(compared>0,`--rebake=${rebake}: no rig files`);
+  assert.deepEqual(off,[],"the repository bake script reproduces the committed clips");
+  console.log(`ok rebake: ${compared} rig clips from ${rebake} equal the committed ones (<=0.5 deg, 1 mm)`);
 }
 console.log(`ok opening storyboards: five original rigs, ${clipCount} rig clips (${NEW.length} authored 2026-09-23/25, ${paired} paired contacts cross-checked, ${chains} same-root hand-overs, ${seams} hold-loop seams), ${frames} normalized frames, director phase table and marks`);
