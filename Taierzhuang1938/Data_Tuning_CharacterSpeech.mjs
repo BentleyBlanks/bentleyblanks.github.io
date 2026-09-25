@@ -43,8 +43,10 @@ export const CHARACTER_SPEECH = Object.freeze({
   // talkBlendS: how fast the face counts as talking / not talking.
   expressionTalkJawYield: .6, talkBlendS: .12,
   // Secondary: a stressed syllable pulls the mouth corners back (a Wide pulse on
-  // top of the track's own lip shape), decaying with the brows (browDecayS).
-  stressCornerPull: .35,
+  // top of the track's own lip shape), decaying with the brows (browDecayS). It rides
+  // on the open jaw (full from stressCornerPullFullJaw), so it lets go with the jaw
+  // (releaseS) when the line ends or pauses: Wide carries a little jaw drop of its own.
+  stressCornerPull: .35, stressCornerPullFullJaw: .4,
   // Eyes (Face_EyeL/R): look at the attention target, clamped, with small
   // seeded saccades while holding a gaze.
   gazeMaxYawDeg: 24, gazeMaxPitchDeg: 14, gazeFollowS: .09,

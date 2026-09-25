@@ -72,16 +72,19 @@ function FaceBloodPatch(uniforms) {
   });
 }
 
-const _m = new THREE.Matrix4(), _v = new THREE.Vector3();
+const _m = new THREE.Matrix4(), _bind = new THREE.Matrix4(), _v = new THREE.Vector3();
 
 /** Face frame in one skinned mesh's geometry space, from the Face_* bones at bind time. */
 export function FaceBloodFrame(mesh, eyeL = 'Face_EyeL', eyeR = 'Face_EyeR', lip = 'Face_LipUpper') {
   const bones = mesh.skeleton?.bones || [];
+  // Bind space is bindMatrix * position. Not mesh.bindMatrixInverse: in the attached bind mode
+  // three rewrites that every frame from the mesh's current matrixWorld (actor placement and scale).
+  _bind.copy(mesh.bindMatrix).invert();
   const Bind = name => {
     const index = bones.findIndex(bone => bone.name === name);
     if (index < 0) return null;
     _m.copy(mesh.skeleton.boneInverses[index]).invert();
-    return new THREE.Vector3().setFromMatrixPosition(_m).applyMatrix4(mesh.bindMatrixInverse);
+    return new THREE.Vector3().setFromMatrixPosition(_m).applyMatrix4(_bind);
   };
   const left = Bind(eyeL), right = Bind(eyeR), mouth = Bind(lip);
   const headName = bones.find(bone => bone.name === eyeL)?.parent?.name, head = headName ? Bind(headName) : null;

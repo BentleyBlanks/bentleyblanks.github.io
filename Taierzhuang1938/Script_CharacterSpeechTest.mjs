@@ -201,6 +201,9 @@ const jawAngle = (bone, rig) => 2 * Math.acos(Math.min(1, Math.abs(bone.quaterni
   assert.ok(byName.Face_BrowL.position.distanceTo(browRest) < .02, 'an open jaw alone does not lift the brows');
   face.Update(1 / 60, {speech: {active: true, jaw: .6, wide: .3, round: 0, close: 0, stress: 1}});
   assert.ok(face.brow > .5 && face.stress > .5, 'stress event lifts the brows and feeds the nod');
+  // A pause right after a stressed syllable: the corner pull (Wide carries some jaw) lets go with the jaw.
+  for (let i = 0; i < 8; i++) face.Update(1 / 60, {speech: null});
+  assert.ok(face.stress > .5 && jawAngle(byName.Face_Jaw, rig) < 1.15, `pause after stress shuts the mouth (${jawAngle(byName.Face_Jaw, rig).toFixed(2)} deg)`);
   // Envelope fallback still works (no face track yet).
   for (let i = 0; i < 20; i++) face.Update(1 / 60, {speech: {active: true, level: .9, brightness: .1}});
   assert.ok(jawAngle(byName.Face_Jaw, rig) > 8 && face.round > face.wide, 'envelope fallback: dark voice rounds the lips');

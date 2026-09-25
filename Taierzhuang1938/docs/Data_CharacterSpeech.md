@@ -58,12 +58,37 @@ Open/Wide/Round jaw and gets the same lip/corner shapes added on top (`LayerNra0
 
 - `Script_CharacterFacialAnimation`: additive blend of pose deltas from Rest:
   jaw*Open + wide*Wide + round*Round + close*Close + blink*Blink + brow*BrowUp
-  (+ Snarl, DeadSlack). Input is a baked face track sample `{jaw, wide, round, close,
+  (+ snarl*Snarl + shock*Shock + pain*Pain + shout*Shout + grit*Grit + DeadSlack). Input is a baked face track sample `{jaw, wide, round, close,
   stress}`; without one it falls back to the runtime envelope `{level, brightness}`.
   Brows lift only on stress events; blinks follow a per-actor seeded rhythm (2.5-6 s)
   plus line starts and after stress; eyes look at the attention target with small
   saccades; silent mouths stay closed with a slow breathing drift; death drops into
   DeadSlack (`LugouCharacterRig.PoseDeath`). Numbers: `Data_Tuning_CharacterSpeech.mjs`.
+- Acting expressions (2026-09-25, contract section 4.2): `rig.facial.expression =
+  {snarl, shock, pain, shout, grit}` (0-1 targets; a whole-object write may be partial) or
+  `CharacterFacial.SetExpression(rig, partial, blendS?)` from `Script_CharacterFacialAnimation`
+  (`rig` = CharacterRig, actor or the face layer; a rig without a face throws). Each weight
+  moves linearly, a full 0 -> 1 swing in `expressionBlendS` (0.25 s) or the call's `blendS`
+  (0 snaps). Speech is layered on top: while the face talks (`talkBlendS`) an expression
+  keeps only 40 % of its jaw drop (`expressionTalkJawYield`), so a shouted line opens and
+  shuts on every syllable around a half-open base (unit and browser tests: 8-21 deg under
+  Shout). A stressed syllable adds a short corner pull (`stressCornerPull`, riding on the
+  open jaw so it lets go with it). `State().expression` reports the applied weights.
+- Face blood: `CharacterFacial.SetFaceBlood(rig, amount 0-1)` (`Script_CharacterFaceBlood`):
+  a procedural mask (forehead cut, runs down brow/cheek/nose, cheek smear, nose bleed over
+  lip and chin, thin grime) on private clones of the head materials, patched through
+  `Script_MaterialPatches` like `Script_CharacterWounds` (both stack). It reads the
+  pre-skinning position in a face frame taken from the Face_* bind poses, changes colour and
+  roughness only (motion vectors untouched) and uses no texture (no sampler). Colours come
+  from `Data_Tuning_Blood.BLOOD_WOUND`; layout in `Data_Tuning_CharacterSpeech.FACE_BLOOD`.
+  `PrepareFaceBlood(rig)` builds the materials at amount 0 ahead of time (first use would
+  otherwise link a program mid-scene); `Reset()` gives the shared materials back.
+- Recommended use for the director (01-03 second wave): 日兵甲 Snarl 1 through
+  Found -> Butt -> Drag -> Hold -> Collar (his lines talk through it), Shock 1 with
+  `blendS` ~0.12 s on Chop (then hold; he dies); 罗班长 Grit 0.8-1 on the chop swing,
+  Check (关切) = Pain 0.35 + Shock 0.2 (raised inner brows, parted lips), back to 0 over
+  0.4 s; 传令兵 / 「敵だ」 Shout 1 for the line, released after it; 川军 CaptiveDragged
+  Pain 0.7-1 plus `SetFaceBlood(rig, 1)` (prepare it when he is cast).
 - `Script_SpeakerHeadLayer`: head/neck turn toward the attention target and nod on
   stressed syllables, for every rig the binder owns. The 01-03 storyboard director
   (`Script_OpeningActorPerformance`) uses the same look math and, for faces, the same
@@ -170,8 +195,10 @@ bevels; `UpgradeNra05` can be re-run on an upgraded scene). The 2026-09-23 sourc
 - `Script_CharacterSpeechTest.mjs`: envelope, voice clock, speaker isolation; facial
   GLB contracts (13 bones, 9 poses, masks, shared materials by name, <= 1.5 MB,
   version = file hash); pinned cast vs `facialCast` and the approved list; controller
-  (additive shapes, closure, stress-only brows, fallback, release, DeadSlack, gaze,
-  seeded blinks); binder (isolation, listener gaze, release on death/dispose); face
+  (additive shapes, closure, stress-only brows, pause after stress shuts, fallback, release,
+  DeadSlack, gaze, seeded blinks; on all six rigs the five expressions: eased partial
+  updates, whole-object writes, every expression moves the face, a shouted line still
+  opens and shuts); binder (isolation, listener gaze, release on death/dispose); face
   tracks (lip-shape tables cover every spoken character and kana; sampler semantics;
   per-line hook; every recorded take has a track keyed by its sha256 with the aligned
   line intervals; 01-06 takes articulate on >= 80 % of speech frames, every take >= 70 %,
@@ -184,7 +211,10 @@ bevels; `UpgradeNra05` can be re-run on an upgraded scene). The 2026-09-23 sourc
   TakeOverGun (03-05 take, Luo and Zhou alternate) on its face track: each face follows
   the track on >= 80 % of articulating frames, opens >= 2 times a second, is shut
   between lines and while the other one talks; the same take on the envelope is
-  recorded next to it for comparison, with close-ups of both faces mid-word.
+  recorded next to it for comparison, with close-ups of both faces mid-word; acting
+  close-ups at 0.6 m (日兵甲 Snarl/Shock/Shout, 罗班长 Grit, the captive comrade Pain and
+  face blood) measured on the rendered pixels (changed face, blood-red share) and a
+  shouted line that still opens and shuts.
   Evidence: `_shots/CharacterSpeech`.
 - Shared gates: `Script_MotionVectorContractTest`, `Script_SamplerBudgetTest`,
   `Script_AssetStandardsTest`, `Script_CharacterModelTest`.

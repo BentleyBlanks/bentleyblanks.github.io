@@ -196,8 +196,9 @@ export class CharacterFacialAnimation {
     const w = this.weights;
     const alive = 1 - this.dead;
     w.Open = this.jaw * alive; w.Round = this.round * alive; w.Close = this.close * alive;
-    // A stressed syllable also pulls the corners back (decays with the brows).
-    w.Wide = Math.min(1, this.wide + C.stressCornerPull * this.stress) * alive;
+    // A stressed syllable also pulls the corners back (decays with the brows, lets go with the jaw).
+    const cornerPull = C.stressCornerPull * this.stress * Clamp01(this.jaw / C.stressCornerPullFullJaw);
+    w.Wide = Math.min(1, this.wide + cornerPull) * alive;
     w.Blink = blink * alive; w.BrowUp = this.brow * alive;
     for (const name of FACIAL_EXPRESSIONS) w[EXPRESSION_POSE[name]] = this.expressionWeights[name] * alive;
     w.DeadSlack = this.dead * C.deadSlackWeight;
