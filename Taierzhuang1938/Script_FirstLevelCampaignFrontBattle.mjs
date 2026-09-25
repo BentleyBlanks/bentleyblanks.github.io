@@ -41,7 +41,7 @@ export async function DriveFrontBattle(ctx){
   // 在阵位里等（03 等进 04、04 等压住阵位）：躲手榴弹（EvadeGrenade）照常躲，躲完离座位 3 m 以上就走回来。
   // 2026-09-24 实测：躲雷把人甩到阵位东墙外 (34,−139)/(35,−147)/(42,−141)，一直站在那儿等，
   // 03 末尾战车开到、04 战车机枪都打得到那儿（探针 3 次里 1 次死在 03 的 (35.4,−147.5)）。玩家躲完会回掩体。
-  async function ReturnToSeat(label){
+  async function ReturnToSeat(label,again=true){
     const off=await page.evaluate(({x,z})=>{const p=window.Tengxian.player.position;return {d:Math.hypot(p.x-x,p.z-z),x:p.x,z:p.z,alive:window.Tengxian.player.alive};},S.seat);
     if(!off.alive||off.d<=3)return;
     // 东墙（x 33.5，z −140…−132）外面的人从墙南头绕回来（他也是从那儿被甩出去的）。
@@ -54,7 +54,15 @@ export async function DriveFrontBattle(ctx){
     // Only north of the yard's north wall (z −145.6): a dodge inside the yard's east half (09-24 chain R: 34.9,−153.1)
     // walked the east-wall detour straight into that wall and stalled there.
     const east=off.x>32.5&&off.z>-145.2;
-    await Route(east?[{x:off.x,z:-141.8},{x:30,z:-141.8},S.seat]:west?[{x:off.x,z:Space.westDoor.z},Space.westDoor,S.seat]:[S.seat],label,{stance:"crouch",fight:true,recoverAfterEvade:true});
+    // A second grenade dive on the way back rejoins at the nearest corridor point, which can be the seat itself across
+    // the west parapet (09-25 fix run 4: stalled at 23.86,-151.44 with the route already going round by the door). A
+    // player walks round again from where he landed: one more ReturnToSeat from the new position.
+    await Route(east?[{x:off.x,z:-141.8},{x:30,z:-141.8},S.seat]:west?[{x:off.x,z:Space.westDoor.z},Space.westDoor,S.seat]:[S.seat],label,{stance:"crouch",fight:true,recoverAfterEvade:true})
+      .catch(async error=>{
+        if(!again||!/actual body reached route end/.test(error?.message||""))throw error;
+        console.log(`${label}: stalled after an evade on the way back, going round again from where the body is`);
+        await ReturnToSeat(label+"Again",false);
+      });
   }
   async function HoldNest({stage=null,fact=null},seconds,label){
     let state;
