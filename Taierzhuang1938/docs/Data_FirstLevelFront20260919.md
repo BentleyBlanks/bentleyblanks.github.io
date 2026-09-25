@@ -125,13 +125,15 @@ collectionPointSeen（collection 14 m）—— 第一次看见担架、伤员与
   （超前 3 m 且离玩家 10 m 以上才等）。纯规则 `LeadPace` / `LeadCorner`（`Script_FirstLevelFrontBattle`）。
 - **「贴这道墙！前头有人！」**（`FrontApproach`）改在 `approach[9]`=(7,−143.5) 周围 2.5 m 触发，玩家约在 (4.6,−143.3)；这一场
   真正开播的那一刻记 `frontApproachPointed`（罗和玩家的位置、差距），罗在接下来 2.8 s 里边走边伸臂指前方（腿照走）。
-  这 2.8 s（`pointS`）里他**站着慢走**（`pointWalkMps` 0.7 m/s；超前 `maxM + pointExtraM` 6 m 才停；本来在跑的照跑），
+  指路只占台词前 1.2 s（`pointS`，「贴这道墙！」那半句）。这 1.2 s 里他**站着慢走**（`pointWalkMps` 0.7 m/s；超前 `maxM + pointExtraM` 6 m 才停；本来在跑的照跑），
   **放下枪、不扣扳机**（`pointHoldsFire`，`FrontBattle.PointQuiet` 每帧把 `aimBlend` 压回 0、`coolUntil` 往后推 0.1 s），
   目标、战术状态、掩体都不动，并以 `pointTurnRps` 5 rad/s 自己转向指的方向：大脑一据枪（aimBlend > 0.6）或开火，开场层就把
   上半身 clip 扔掉（`Script_OpeningStoryboardAnimation` 的 nativeCombat）；他的大脑照旧朝目标转身，等人时又面朝玩家。
   09-25 抓帧实拍到过：旗子写着 PointBlockade，画出来是跪着举枪 / 伸着胳膊指沟壁 / 蹲着不动（差距刚过 5 m 被领路规则停下）。
   第一版用临时挂 `scriptedNoncombatant` 按住他，那会每帧清掉他的目标、放掉掩体，03 的战斗因此走进另一支（整关驾驶 A/B：
   开 5/8、关 4/4、改前 3/3）；09-25 审查后改成现在只动枪和扳机。躲手榴弹那一帧不领路、不指路（`leaderDodging`）。
+  只动枪和扳机但仍按 2.8 s 时，03→06 整关驾驶（直接进阵位）9 趟过 6 趟（两趟同一支死在 04 阵位北头两颗手榴弹下、一趟死在
+  05 弹药屋支路）；缩到 1.2 s 后 3/3，与不按住（3/3）、本轮基线 b33e30951（3/3，逐位相同）一致，所以定 1.2 s。
 - **背坡轻机枪组**（`Data_FirstLevelMissionFront.FRONT_GUARD_MG_GROUP`）：第二批守军里的 6 号（射手，捷克式）和 7 号（副射手）
   整个 03 趴在土坎东端背坡上（只有 z ≤ −158.8 能从右侧低沟的沟沿上看见），是剧本兵：只朝 `fire` 里的授权点打环境射击（不命中、
   不进 TTK 账），不交给 `Defend`（`scriptDefensive` 关掉，否则换弹永远换不完）。04 一开始沿 `exit` 绕过 `ScrapeEastTraverse`
