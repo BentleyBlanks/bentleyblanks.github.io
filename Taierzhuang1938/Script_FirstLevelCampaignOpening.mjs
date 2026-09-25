@@ -196,6 +196,10 @@ async function InstallProbe(page) {
         P.releaseHealth = g.player.health;
         P.releaseTime = r.time;
         P.pursuitAtRelease = [...r.enemies.values()].filter((a) => a.missionEncounter === "bunkerPursuit").length;
+        // The hand-back hold-fire (Data_OpeningStoryboards.rescue.handbackHoldFireS): every live Japanese, his distance from
+        // the seat and how long he still hesitates (AI time).
+        P.holdFireAtRelease = [...r.enemies.values()].filter((a) => a?.alive).map((a) => ({ id: a.missionId || a.id,
+          d: Math.hypot(a.position.x - g.player.position.x, a.position.z - g.player.position.z), left: (a.hesitateUntil ?? -99) - r.ai.time }));
       }
       P.wasCameraActive = s.CameraActive;
       // Mouths: who is speaking (voice.Speech active) against the jaw of every speaking-cast face in view.
@@ -214,15 +218,29 @@ async function InstallProbe(page) {
   }, { vanguardIds: Storyboards.vanguardIds, silentAfterS: SILENT_AFTER_S, stepLimitM: STEP_LIMIT_M });
 }
 
+/**
+ * Watchdog (09-25 review: two silent hangs, one of 40 min with no line of output): a page call that does not answer in
+ * WATCHDOG_S prints the last stepped state (director phase, age, time, flags) and fails instead of waiting forever.
+ */
+const WATCHDOG_S = 360;
+let lastState = null;
+function Watch(label, promise) {
+  let timer;
+  const alarm = new Promise((_, fail) => { timer = setTimeout(() => {
+    console.log("WATCHDOG", label, JSON.stringify(lastState));
+    fail(Error(`${label}: no answer from the page in ${WATCHDOG_S} s (last state printed above)`));
+  }, WATCHDOG_S * 1000); });
+  return Promise.race([promise, alarm]).finally(() => clearTimeout(timer));
+}
 /** Step `frames` frames, sampling each; render the last one. */
-const StepSampled = (page, frames) => page.evaluate((frames) => {
+const StepSampled = (page, frames) => Watch("StepSampled", page.evaluate((frames) => {
   const g = window.Tengxian;
   for (let i = 0; i < frames; i++) { g.StepFrames(1, 1 / 60, i === frames - 1); window.openingProbe.Sample(); }
   const r = g.Debug.FirstLevelMissionRuntime(), s = r.frontShow.bunker, m = g.Debug.FirstLevelMission();
   return { stage: m.stage, time: m.time, facts: m.facts, alive: g.player.alive, health: g.player.health,
     phase: s.phase, phaseTime: s.Age, luoM: (() => { const l = s.Squad("luo"); return l && !l.openingStoryboardHidden ? Math.hypot(l.position.x - g.player.camera.position.x, l.position.z - g.player.camera.position.z) : null; })(), flags: Object.fromEntries(Object.entries(s.flags).filter(([, v]) => typeof v === "number")),
     error: s.error };
-}, frames);
+}, frames)).then((state) => (lastState = state));
 
 /** Point the view at `point` for one rendered frame; returns the previous view to restore. */
 const LookAt = (page, point, height = 1.2) => page.evaluate(({ point, height }) => {
@@ -351,6 +369,13 @@ export async function DriveOpening(ctx){
   assert.ok(safe.now-safe.releaseTime>=HANDBACK_SAFE_S,`the hand-back window was watched (${(safe.now-safe.releaseTime).toFixed(2)} s)`);
   assert.deepEqual(safe.hits.filter(h=>h.time<=safe.releaseTime+HANDBACK_SAFE_S),[],`no damage in the first ${HANDBACK_SAFE_S} s after the hand-back`);
   assert.equal(safe.pursuitAtRelease,0,"bunkerPursuit spawns only after the player has control");
+  // The seat sees F (Data_FirstLevelSpaceKeyframes K2b): every live Japanese within handbackHoldFireM hesitated for at
+  // least HANDBACK_SAFE_S from the hand-back (the fold man ijaC among them when he lives).
+  const hold=await page.evaluate(()=>window.openingProbe.holdFireAtRelease);
+  console.log("HANDBACK_HOLDFIRE",JSON.stringify(hold));
+  const R=Storyboards.rescue,near=(hold||[]).filter(a=>a.d<R.handbackHoldFireM);
+  assert.ok(Array.isArray(hold),"the hold-fire at the hand-back was recorded");
+  for(const a of near)assert.ok(a.left>=HANDBACK_SAFE_S-.05,`${a.id} ${a.d.toFixed(1)} m from the seat holds his fire ${HANDBACK_SAFE_S} s after the hand-back (${a.left.toFixed(2)} s left)`);
   // 「回头看见追兵占住刚才的位置」: at the rear corner he turns and looks back up the leg (crouched at the
   // corner for up to LOOKBACK_S) until a pursuer shows in the trench he has just left.
   const back=await LookAt(page,A.bunkerBend||Storyboards.withdraw.lane[3],1.3);
