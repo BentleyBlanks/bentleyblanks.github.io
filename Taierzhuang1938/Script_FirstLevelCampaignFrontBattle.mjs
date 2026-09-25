@@ -44,7 +44,10 @@ export async function DriveFrontBattle(ctx){
     // 东墙（x 33.5，z −140…−132）外面的人从墙南头绕回来（他也是从那儿被甩出去的）。
     // 西墙（RightNestWestLow，x 23.65…24.35，z −156.8…−151.8）外面的人从西门回来（09-24 探针：躲雷甩到 (23.3,−153.9)，
     // 直线回座位顶在那道矮墙上三个 chunk 不动）。
-    const west=off.x<24.4&&off.z<-151.2;
+    // 09-25 run 11: a body west of the wall line but north of -151.2 took the straight line to the seat and clipped the
+    // wall's north end at -151.8 (stalled at 23.95,-151.43). Everyone west of the wall line and south of the door line
+    // + 0.7 m goes round through the west door.
+    const west=off.x<24.4&&off.z<Space.westDoor.z+.7;
     // Only north of the yard's north wall (z −145.6): a dodge inside the yard's east half (09-24 chain R: 34.9,−153.1)
     // walked the east-wall detour straight into that wall and stalled there.
     const east=off.x>32.5&&off.z>-145.2;
@@ -202,9 +205,10 @@ export async function DriveFrontBattle(ctx){
   }
   await CaptureFocus("RightNestCaptured",S.gap);
   const first=await HoldNest({stage:"MachineGun"},240,"ReturnToNestAfterEvade");
-  assert.ok(first.mission.guards.slice(0,2).some(g=>g.alive));
-  assert.ok(first.mission.guards.slice(0,2).filter(g=>g.alive).every(g=>g.safe));
-  assert.ok(first.mission.guards.slice(2).some(g=>g.alive&&!g.safe));
+  // First batch B.firstBatch (5 since the 09-25 storyboard round, it was 2).
+  assert.ok(first.mission.guards.slice(0,B.firstBatch).some(g=>g.alive));
+  assert.ok(first.mission.guards.slice(0,B.firstBatch).filter(g=>g.alive).every(g=>g.safe));
+  assert.ok(first.mission.guards.slice(B.firstBatch).some(g=>g.alive&&!g.safe));
   // 契约 §2.6：04 开始时何有田已接枪、老周已离枪 10 m（走回集结处是 05 的条件，这时可能还在路上）。
   assert.ok(first.mission.facts.includes("leftGunHandover")&&first.mission.facts.includes("zhouLeftGun"));
   const guardIds=await page.evaluate(()=>window.Tengxian.Debug.FirstLevelMissionRuntime().guards.map(g=>g.actor.id));
