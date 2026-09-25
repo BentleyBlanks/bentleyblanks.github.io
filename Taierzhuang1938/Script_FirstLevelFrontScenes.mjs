@@ -202,7 +202,7 @@ export class FirstLevelFrontScenes {
   StepSpot(body, pose) {
     const r = this.r, camera = r.camera;
     if (!pose || !r.Point || !r.BlocksSight || !r.player?.position) return null;
-    const floor = r.Point(r.player.position).y, eye = r.player.EyePosition?.clone?.();
+    const floor = r.Point(r.player.position).y, own = r.Point(body.position).y, eye = r.player.EyePosition?.clone?.();
     const knee = r.Point(body.position, 0.6), player = r.player.position;
     // His walk never brings him nearer the player than B.speakerStepPassM (or than he already is): he does not brush
     // past the player's shoulder or cross in front of the muzzle on the way (09-25 drive: Luo passed 1.08 m from the
@@ -211,8 +211,12 @@ export class FirstLevelFrontScenes {
     for (const spot of StepCandidates(pose, body.position)) {
       if (Distance(spot, body.position) > B.speakerStepMaxM) continue;
       if (SegmentDistance(player, body.position, spot) < pass) continue;
+      // On the player's floor and on the speaker's own: 09-25 relay r2 Front step 3 drive c36_d2, the player stood on the
+      // hump in the middle of the 05 attack position and the spot picked was up the bank west of it - level with the
+      // player, a metre above Luo on the trench floor. He never got there and stood 1.0-1.1 m from the player through
+      // BundleAttack.02.
       const ground = r.Point(spot);
-      if (Math.abs(ground.y - floor) > B.speakerStepDyM) continue;
+      if (Math.abs(ground.y - floor) > B.speakerStepDyM || Math.abs(ground.y - own) > B.speakerStepDyM) continue;
       if (r.physics?.Overlaps?.(spot.x, ground.y + 0.04, spot.z, 0.3, 1.7)) continue;
       if (r.BlocksSight(knee, r.Point(spot, 0.6))) continue;
       // Standing and crouched: at the spot the combat brain crouches him (cover, suppress) as often as not.
@@ -427,9 +431,16 @@ export class FirstLevelFrontScenes {
     // The player walked off: the spot framed a view he no longer has (a step back keeps its spot until the line ends).
     const left = !!s.anchor && !!r.player?.position && Distance(r.player.position, s.anchor) > B.speakerStepReleaseM;
     if (!talking || !s.soldier?.alive || left) { this.steer = null; return; }
-    // Stepped back, and the player came up to him again: one more step back.
-    if (s.backOff && Distance(s.soldier.position, s.spot) <= 0.35 && (this.SpeakerView(s.soldier)?.distance ?? Infinity) < B.speakerViewMinM)
-      s.spot = this.BackOffSpot(s.soldier) || s.spot;
+    // Stepped back, and the player came up to him again: one more step back. And a speaker stepping into the picture
+    // whose line is already playing (the hold ran out before he got there) while the player stands nearer than
+    // speakerViewMinM: he backs off instead (KeepSpace does not look at a steered man) - c36_d2 above, Luo held 1.0 m
+    // from the player on his way to a spot he could not reach, through the whole line.
+    const near = (this.SpeakerView(s.soldier)?.distance ?? Infinity) < B.speakerViewMinM;
+    const playing = !!handle && handle.lines.some((l) => l.line.who === s.who && l.state === "playing");
+    if (near && (s.backOff ? Distance(s.soldier.position, s.spot) <= 0.35 : playing)) {
+      const back = this.BackOffSpot(s.soldier);
+      if (back) { s.spot = back; s.backOff = true; s.anchor = null; }
+    }
     if (Distance(s.soldier.position, s.spot) > 0.35) r.MoveActor?.(s.soldier, s.spot, s.backOff ? B.speakerBackOffSpeedMps : B.speakerStepSpeedMps);
     else if (r.Defend) r.Defend(s.soldier, s.spot, 0, 0.3);
   }

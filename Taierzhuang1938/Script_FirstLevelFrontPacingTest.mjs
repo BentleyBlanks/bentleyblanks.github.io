@@ -601,6 +601,29 @@ function WalkRuntime(extra = {}) {
   assert.equal(scenes.StepSpot(luo, CameraPose(camera)), null, "nor a standing head behind one");
   r.BlocksSight = () => false;
   assert.ok(scenes.StepSpot(luo, CameraPose(camera)), "open ground: a spot");
+  // Level with the player but a metre above the speaker's own floor (c36_d2: up the bank beside the 05 attack position):
+  // he cannot walk there, so it is no spot.
+  const flatPoint = r.Point;
+  r.Point = (p, rise = 0) => V(p.x, (Math.hypot(p.x - luo.position.x, p.z - luo.position.z) < 0.5 ? -1 : 0) + rise, p.z);
+  assert.equal(scenes.StepSpot(luo, CameraPose(camera)), null, "a spot a metre above the speaker's floor: not a stepping spot");
+  r.Point = flatPoint;
+  // Stepping into the picture while his line already plays, and the player stands within speakerViewMinM of him (he never
+  // reached the spot): he backs off instead of being held there at the player's elbow.
+  {
+    const saved = { position: luo.position, handle: scenes.handle, steer: scenes.steer };
+    const unreachable = { x: -2.5, z: -3 };
+    luo.position = { x: 0.6, y: 0, z: -0.6 };
+    scenes.handle = { id: "TakeOverGun", done: false, lines: [{ line: { who: "luo" }, state: "playing" }] };
+    scenes.steer = { soldier: luo, who: "luo", spot: unreachable, sceneId: "TakeOverGun", anchor: { x: 0, z: 0 } };
+    scenes.Steer();
+    assert.ok(scenes.steer?.backOff && Dist(scenes.steer.spot, unreachable) > 0.5, "too near while talking: he backs off instead");
+    assert.ok(Dist(scenes.steer.spot, r.player.position) >= Math.min(...B.speakerBackOffDistancesM) - 1e-6, "to a back-off distance from the player");
+    scenes.steer = { soldier: luo, who: "luo", spot: unreachable, sceneId: "TakeOverGun", anchor: { x: 0, z: 0 } };
+    scenes.handle.lines[0].state = "pending";
+    scenes.Steer();
+    assert.ok(!scenes.steer?.backOff && Dist(scenes.steer.spot, unreachable) < 1e-9, "still held for his line: he keeps walking to the framed spot");
+    Object.assign(scenes, { handle: saved.handle, steer: saved.steer }); luo.position = saved.position;
+  }
   // Timeout: a spot, but he never gets there (shoved, blocked by a body) -> the line plays after speakerViewHoldS.
   r.BlocksSight = () => false;
   assert.equal(scenes.HoldLine(line("FrontWithdraw.01", "luo"), "FrontWithdraw"), true, "held while he walks");
