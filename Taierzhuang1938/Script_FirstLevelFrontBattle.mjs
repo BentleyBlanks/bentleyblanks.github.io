@@ -398,7 +398,8 @@ export class FirstLevelFrontBattle {
   RoadDistance(index){return MissionRouteLength(S.road.slice(0,index+1));}
   MoveTank(dt){
     const r=this.r,t=r.tank,stage=r.flow.stage.id;
-    let limit=this.RoadDistance(stage==="Support"?S.tankPreviewIndex:stage==="MachineGun"?S.tankBlockIndex:S.tankEndIndex);
+    // 04 and 05 both stop at Block (Squeeze is reserved; the brain path, which replaced this mover, never goes there either).
+    let limit=this.RoadDistance(stage==="Support"?S.tankPreviewIndex:S.tankBlockIndex);
     t.roadProgress??=MissionRouteProjection(S.road,t).progress;
     const canMove=t.active&&!t.immobilized&&t.roadProgress<limit;
     // Stop to fire on the captured front before proceeding to the actual breach.

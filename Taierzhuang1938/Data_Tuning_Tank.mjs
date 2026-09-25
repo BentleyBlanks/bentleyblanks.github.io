@@ -508,8 +508,8 @@ const TANK_PACE = Object.freeze({
   // 集束弹上限 13 —— 两段毁伤的第二颗扔不上去（09-24 战车探针：第二颗落在近侧履带边，Disabled 记成 trackL；
   // 05 车体机枪也一串没打）。Block 离攻击位 9.7 m，后甲板要 12.6 m/s。车断了履带（tankImmobilized）也就走不了了。
   Block: { stage: "MachineGun", holdUntil: "tankImmobilized", escortSlots: FRONT_TANK_ESCORT_SLOTS },
-  // Squeeze 现在到不了（Block 一直等到 tankImmobilized，断了履带也就走不了）：Space 的语义路点照留、大脑不再走到这里；
-  // Space 文档 §6「05 前挤到 Squeeze」与此不符，删不删这个路点由 Space 包 / 集成负责人定（2026-09-25 Front 包审查）。
+  // Squeeze 是「预留，大脑不去」的路点（集成负责人 2026-09-25 定：05 停在 Block）：Block 一直等到 tankImmobilized，断了
+  // 履带也就走不了。路点和它的测量（FrontTopologyTest 的车体净空、缺口与攻击支路尾段视线）照留，Space 文档 §6 已改成同一口径。
   Squeeze: { stage: "Tank", escortSlots: FRONT_TANK_ESCORT_SLOTS },
 });
 const Seg = (a, b, stage) => Object.freeze({ x: a.x, z: a.z, stage });

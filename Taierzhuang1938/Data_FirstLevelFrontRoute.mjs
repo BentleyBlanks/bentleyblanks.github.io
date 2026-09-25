@@ -37,7 +37,12 @@ export const FRONT_TANK_PATH=Object.freeze([
   Way("Pressure",51,-172.5,"firePoint",{faceTo:"nest",turretTo:"nest",holdS:14,note:"04 pressure: HE + hull MG on the nest front seat, 31 m"}),
   Way("Approach",44.5,-169,"cruise"),
   Way("Block",38,-167.5,"block",{faceTo:"gap",turretTo:"gap",holdS:0,note:"04-05 blockade, 7.5 m north of the berm line"}),
-  Way("Squeeze",35.5,-167,"squeeze",{faceTo:"gap",turretTo:"attackTail",holdS:0,note:"05 push, +2.6 m; hull still on the gap, turret on the attack branch's last 4.7 m"}),
+  // RESERVED, the brain never drives here: 05 holds Block until the track is cut (Data_Tuning_Tank TANK_PACE.Block
+  // holdUntil tankImmobilized; a tank with a cut track cannot move on). From Squeeze, 11 m off the attack position, the
+  // second bundle cannot reach the engine deck (13.2 m/s needed, 13 max). Kept, and still measured by FrontTopologyTest
+  // (hull clearance, gap and attack-tail sight), for the old key tankEndIndex and for a later 05 push if the throw ever
+  // reaches it (integration lead 2026-09-25: 05 stays at Block).
+  Way("Squeeze",35.5,-167,"squeeze",{faceTo:"gap",turretTo:"attackTail",holdS:0,note:"reserved: 2.6 m past Block; the brain holds Block through 05 and never comes here"}),
 ]);
 const T=FRONT_TANK_PATH;
 /** Index of a named tank waypoint; FRONT_SORTIE's old tank*Index keys are resolved through it. */
@@ -105,6 +110,7 @@ export const FRONT_SORTIE=Object.freeze({
   // Old keys, resolved by waypoint id (integration decision 2026-09-23: resolve, never renumber).
   tankPath:T,
   tankPreviewIndex:FrontTankIndex("HullDown"),tankPressureIndex:FrontTankIndex("Pressure"),
+  // tankEndIndex = the reserved Squeeze point (the end of the drivable road), not where the tank stops in 05: that is Block.
   tankBlockIndex:FrontTankIndex("Block"),tankEndIndex:FrontTankIndex("Squeeze"),
   tankRoadX:38,tankNorthZ:-228,tankSouthZ:-166,tankLeadM:6,
   retreatCasualtyFraction:.5,retreatSuppression:.72,retreatSuppressionS:3,

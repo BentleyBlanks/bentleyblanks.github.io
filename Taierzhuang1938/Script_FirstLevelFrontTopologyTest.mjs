@@ -14,6 +14,7 @@ import {FRONT_BREAKABLES,FRONT_UNBREAKABLE} from "./Data_FirstLevelFrontBreakabl
 import {MISSION_LAYOUT as L} from "./Data_FirstLevelMissionLayout.mjs";
 import {FRONT_GUARD_POSTS,FRONT_FLANK_GROUP,FrontAssaultLane,FRONT_TANK_ESCORT_SLOTS} from "./Data_FirstLevelMissionFront.mjs";
 import {TANK_HEIGHTS as TH} from "./Data_FirstLevelSpaceKeyframes.mjs";
+import {FRONT_TANK_BRAIN_PATH} from "./Data_Tuning_Tank.mjs";
 import {MISSION_ENCOUNTERS as E} from "./Data_FirstLevelMission.mjs";
 import {SampleMissionTerrain as G,SampleMissionNaturalHeight as N} from "./Data_FirstLevelMissionTerrain.mjs";
 import {ProbeKeyframes,ProbeTank,ProbeRoutes,ProbeExposure,ProbeEnemyCover,ProbeCounts,ProbeEntries,ProbeSeparation,
@@ -40,6 +41,16 @@ console.log("ok keyframes "+keyframes.map(k=>`${k.id}${k.frameDeg?`(${k.spanDeg}
   assert.equal(S.tankBlockIndex,FrontTankIndex("Block"));assert.equal(S.tankEndIndex,FrontTankIndex("Squeeze"));
   assert.equal(TP[S.tankPreviewIndex].kind,"hullDown");assert.equal(TP[S.tankPressureIndex].kind,"firePoint");
   assert.equal(TP[S.tankBlockIndex].kind,"block");assert.equal(TP[S.tankEndIndex].kind,"squeeze");
+  // Squeeze is RESERVED, the brain never goes there (integration lead 2026-09-25: 05 stays at Block). The brain holds
+  // Block until the track is cut, and a tank with a cut track cannot move on; nothing but Block may stop it in 05.
+  // The Squeeze measurements below (hull clearance, gap sight, attack-tail sight) are kept so the point stays valid.
+  {
+    const way=Object.fromEntries(FRONT_TANK_BRAIN_PATH.waypoints.map((w,i)=>[w.id,{...w,i}]));
+    assert.equal(way.Block.holdUntil,"tankImmobilized","05: the brain holds Block until the track is cut");
+    assert.ok(way.Squeeze.i>way.Block.i,"Squeeze lies past Block, so the brain can only reach it by leaving Block");
+    assert.ok(!("holdUntil" in way.Squeeze)&&!way.Squeeze.preview,"Squeeze carries no pace of its own (reserved)");
+    assert.ok(/reserved/.test(TP[S.tankEndIndex].note),"the Squeeze waypoint says it is reserved");
+  }
   assert.ok(S.tankPressureIndex<S.tankBlockIndex,"the tank presses the nest before it seals the gap");
   assert.deepEqual(S.road.slice(0,TP.length),TP.map(w=>({x:w.x,z:w.z})),"the terrain road is the tank path");
   const t=ProbeTank();
@@ -65,6 +76,7 @@ console.log("ok keyframes "+keyframes.map(k=>`${k.id}${k.frameDeg?`(${k.spanDeg}
   assert.ok(v.skyFromM!==null&&TH.turretTop-v.skyFromM>=0.6,`the turret stands against the sky: sky behind from ${v.skyFromM} m`);
   assert.ok(v.px720>=10.5&&v.px720Ads>=15,`K5 turret on screen: ${v.px720} px (ADS ${v.px720Ads} px) at 720p`);
   assert.equal(t.gapLast21m.seen,t.gapLast21m.n,"the gun holds the gap over the last 21 m of the path (a stable lane, not one edge)");
+  // Squeeze (reserved) keeps the same sight and position measurements as Block.
   assert.ok(t.gapGridBlock.ok>=6&&t.gapGridSqueeze.ok>=6,`Block/Squeeze see the gap over ±1 m x 4 heights: ${t.gapGridBlock.ok}/${t.gapGridSqueeze.ok} of 12`);
   assert.ok(t.blockNorthOfCrestM>=5&&t.squeezeNorthOfCrestM>=5,"the tank stops north of the berm line, never in our depth");
   assert.ok(t.pressureSeesSeat,"from the pressure point the gun reaches the nest seat");

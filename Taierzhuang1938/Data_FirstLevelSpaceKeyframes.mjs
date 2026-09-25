@@ -111,7 +111,9 @@ export const SPACE_KEYFRAMES = Object.freeze([
     targets: [
       { name: "tank side (hull centre)", at: W("Block"), heights: [1.2, 1.5], need: 2 },
       { name: "tank rear deck", at: { x: W("Block").x + 2.2, z: W("Block").z - 0.9 }, heights: [1.6, 1.4], need: 1 },
-      { name: "tank after the 05 squeeze", at: W("Squeeze"), heights: [1.2, 1.5], need: 2 },
+      // 05 the tank holds Block until its track is cut (Squeeze is reserved, the brain never goes there): the turret that
+      // swings onto the attack branch's last metres shows from the throw spot too.
+      { name: "tank turret at Block through 05", at: W("Block"), heights: [T.turret, T.turretTop], need: 1 },
     ] },
   { id: "K10", label: "05 the gap reopens, the rest of the line crosses", state: "BunkerIntact",
     // 1 m north of the door's middle: the backslope wire's stakes fall clear below-left of the crossing man.
