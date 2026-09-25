@@ -69,7 +69,13 @@ const { Drive: DriveFront } = await Load("Script_FirstLevelCampaignFront.mjs");
 const { FIRST_LEVEL_STAGES } = await Load("Data_FirstLevelMissionStages.mjs");
 const stepNumber = new Map(FIRST_LEVEL_STAGES.flatMap((s) => (s.steps || [s.id]).map((id) => [id, s.number])));
 
-const options = Kit.ParseCampaignArgs(["node", "probe", "--campaign", `--stage-from=${stageFrom}`, `--stage-to=${stageTo}`]);
+// The gate numbers (zero30 / idle4) were set with the old 03–06 driver, the one that stands where the route puts it.
+// The CampaignKit's player reflexes (answer a man at arm's length, dodge a grenade and walk back, back off, step in)
+// move the player off the gun and change who has a target, so the probe pins the old driver; --reflexes opts in to
+// measure the enemies against the reflex driver instead (contract §8 v1.10, Gate package).
+const reflexes = argv.includes("--reflexes");
+const options = Kit.ParseCampaignArgs(["node", "probe", "--campaign", `--stage-from=${stageFrom}`, `--stage-to=${stageTo}`,
+  ...(reflexes ? [] : ["--no-reflexes"]), ...argv.filter((a) => a.startsWith("--evidence-tag="))]);
 options.suite = "FirstLevelEnemyIdleProbe";
 const ctx = await Kit.OpenCampaign(options);
 const { page } = ctx;
@@ -220,7 +226,7 @@ report.aiStats = head.stats;
 report.barks = SummarizeBarks(head.barks, ticks, head.meta);
 report.charges = SummarizeCharges(head.pressure);
 report.pressureEvents = head.pressure;
-Object.assign(report, { label, root: treeRoot, stageFrom, stageTo, wallS: +wallS.toFixed(0), samplerError: head.error, facts,
+Object.assign(report, { label, reflexes, root: treeRoot, stageFrom, stageTo, wallS: +wallS.toFixed(0), samplerError: head.error, facts,
   driveError: driveError ? String(driveError.message || driveError).slice(0, 600) : null });
 PrintReport(report);
 const out = path.join(here, "_shots", "FirstLevelEnemyIdleProbe");
@@ -477,7 +483,7 @@ function SummarizeHits(hits) {
 }
 
 function PrintReport(r) {
-  console.log(`\n== enemy idle probe (${r.label}) stages ${r.stageFrom}-${r.stageTo}: ${r.samples} samples = ${r.seconds} s game time, wall ${r.wallS} s ==`);
+  console.log(`\n== enemy idle probe (${r.label}, ${r.reflexes ? "reflex driver" : "old driver"}) stages ${r.stageFrom}-${r.stageTo}: ${r.samples} samples = ${r.seconds} s game time, wall ${r.wallS} s ==`);
   console.log("phase".padEnd(34), "sec".padStart(6), "men".padStart(4), "zero30".padStart(7), "idle4".padStart(6), "strict".padStart(7), "still4".padStart(7),
     "shots".padStart(6), "amb".padStart(5), "mg".padStart(5), "nest".padStart(5), "hunt".padStart(5), "guards".padStart(6));
   for (const p of r.phases)

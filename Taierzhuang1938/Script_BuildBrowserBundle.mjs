@@ -27,6 +27,10 @@ export async function BuildBrowserBundle() {
   const preloadPattern = /<script>\s*\{\s*const map = JSON.parse\([\s\S]*?<\/script>/;
   const entryPattern = /<script type="module" src="\.\/Script_Main\.mjs\?v=\d+"><\/script>/;
   if (!preloadPattern.test(sourceHtml) || !entryPattern.test(sourceHtml)) throw new Error('Source boot markup changed; update the bundle builder');
+  // A second source entry tag survives the single replace below and boots a second game
+  // from the source graph next to the bundle (a merge left one behind on 2026-09-24).
+  const entryCount = (sourceHtml.match(new RegExp(entryPattern.source, 'g')) || []).length;
+  if (entryCount !== 1) throw new Error('index.html must have exactly one Script_Main entry tag, found ' + entryCount);
   let html = sourceHtml.replace(preloadPattern, preloadUrls.map(url => '<link rel="modulepreload" href="' + url + '">').join('\n  '))
     .replace(entryPattern, '<script type="module" src="' + bundleUrl + '"></script>');
   // Source modules remain available for workers and diagnostics, but are never bulk-preloaded.

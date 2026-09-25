@@ -4,6 +4,11 @@
 //   node Taierzhuang1938/Script_FirstLevelMissionBrowserTest.mjs --campaign     整关：真实玩家输入走完 18 个阶段
 //   node …  --campaign --audio                                                  再加逐条录音的真实解码与播放
 //   node …  --campaign --stage-from=6                                           初始化06后连续输入推进到关尾，不逐阶段跳转
+//   node …  --campaign --stage-from=4|5 --stage-to=6 [--bomb-first]             从 04 / 05 检查点（missionStage=4|5）冷启动，
+//                                                                                真实输入推进到 06 收尾；--bomb-first = 05 先炸车再（不）到攻击位
+//   node …  … --evidence-tag=R2                                                 同一套件并行跑多份时证据目录分开（_shots/<suite>_R2）
+//   node …  … --no-reflexes                                                     03–06 关掉驾驶器的两条玩家反射（近身还手、躲雷后回位），
+//                                                                                回到 2026-09-25 以前的驾驶器，做阵亡率前后对照用
 //   node …  --campaign --stage-jumps [--stage-from=8|11|15|18]                  从某个分段起点继续
 //   node …  --campaign --stage-jumps --stage-from=15 --probe-quiet-guidance-interrupt
 //                                                                                专项验证静默取消带路 cue；不算默认连续通关
@@ -30,6 +35,7 @@ import { Drive as DriveMid } from "./Script_FirstLevelCampaignMid.mjs";
 import { Drive as DriveEnd } from "./Script_FirstLevelCampaignEnd.mjs";
 
 const options = ParseCampaignArgs();
+const startedAt = Date.now();
 const ctx = await OpenCampaign(options);
 const { page, output } = ctx;
 
@@ -98,11 +104,21 @@ try {
     else assert.equal(ctx.campaignRetries.length, 0,
       "默认整关样本必须 zero-checkpoint-retry；需要真实复活的诊断跑法显式传 --allow-checkpoint-retry");
     if (ctx.stageTo < 18) {
+      // 分段回执：每个阶段在游戏时间里用了多少秒（最后一段算到现在）、墙钟、页面错误、检查点重试。
+      // 04 / 05 检查点与 03 起的连续驾驶用同一行 SEGMENT_SUMMARY，便于多跑几次对表。
+      const segment = await page.evaluate(() => {
+        const m = window.Tengxian.Debug.FirstLevelMission(), stages = m.log.filter((e) => e.kind === "stage");
+        return { stage: m.stage, time: m.time, debugStart: m.debugStart,
+          seconds: Object.fromEntries(stages.map((e, i) => [e.id, +((stages[i + 1]?.time ?? m.time) - e.time).toFixed(1)])),
+          health: +window.Tengxian.player.health.toFixed(1) };
+      });
+      const summary = { stageFrom: ctx.stageFrom, stageTo: ctx.stageTo, bombFirst: !!options.bombFirst, ...segment,
+        wallSeconds: Math.round((Date.now() - startedAt) / 1000), pageErrors: ctx.errors.length,
+        checkpointRetries: ctx.campaignRetries.length };
+      console.log("SEGMENT_SUMMARY", JSON.stringify(summary));
+      await fs.writeFile(path.join(output, "Data_Segment.json"), JSON.stringify(summary, null, 2));
       assert.deepEqual(ctx.errors, []);
       console.log(`ok stages ${ctx.stageFrom}-${ctx.stageTo} driven with real player input`);
-      await fs.writeFile(path.join(output, "Data_Segment.json"),
-        JSON.stringify({ stageFrom: ctx.stageFrom, stageTo: ctx.stageTo,
-          stage: await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission().stage) }, null, 2));
     } else {
 
     assert.equal(await page.evaluate(() => window.Tengxian.Debug.FirstLevelMission().stage), "Complete");

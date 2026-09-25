@@ -2,7 +2,7 @@ import { FRONT_SORTIE as Sortie } from "./Data_FirstLevelFrontRoute.mjs";
 import { MISSION_STAGES, MISSION_ENCOUNTERS, MISSION_TUNING as R } from "./Data_FirstLevelMission.mjs";
 import { MISSION_ANCHORS as A, MISSION_PLACEMENT as P } from "./Data_FirstLevelMissionLayout.mjs";
 import { BuildFirstLevelCheckpoint } from "./Script_FirstLevelMissionCheckpoint.mjs";
-import { FIRST_LEVEL_STAGE_ENCOUNTERS, FIRST_LEVEL_ENCOUNTER_STARTS, FIRST_LEVEL_STAGE_CLEARED_ENEMIES, FIRST_LEVEL_DEFERRED_ENCOUNTERS } from "./Data_FirstLevelMissionStages.mjs";
+import { FIRST_LEVEL_STAGE_ENCOUNTERS, FIRST_LEVEL_ENCOUNTER_STARTS, FIRST_LEVEL_STAGE_CLEARED_ENEMIES, FIRST_LEVEL_DEFERRED_ENCOUNTERS, FIRST_LEVEL_CHECKPOINT_ENEMY_POSTS } from "./Data_FirstLevelMissionStages.mjs";
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
 
 // Called once on a fresh runtime, after the shared level restart has cleared all
@@ -65,11 +65,21 @@ export function ApplyFirstLevelStageJump(runtime, value, { midCutscenes = false 
     const actor = r.enemies.get(id);
     if (actor) { r.ai.Remove(actor); r.enemies.delete(id); }
   }
+  // Live enemies a continuous run has moved by now (04 / 05: the tank escorts beside the tank, not 50 m back at their
+  // spawn where the tank never picks them up). The tank runtime takes them over from there as in a run.
+  for (const [id, point] of Object.entries(FIRST_LEVEL_CHECKPOINT_ENEMY_POSTS[n] || {})) {
+    const actor = r.enemies.get(id);
+    if (actor?.alive) { r.PlaceActor(actor, point); r.Defend(actor, point); }
+  }
   if (n >= 4 && n <= 5) {
     r.SpawnGuards();
     for (const guard of r.guards.slice(0,OPENING.rifleGuardCount)) {
       guard.safe = true; guard.progress = guard.route.length;
       r.PlaceActor(guard.actor,guard.route.at(-1));
+      // Hold where he stands, as FrontBattle.UpdateGuards does for a man who walks in. SpawnGuards anchored him on
+      // his front-trench post; without this he walked back there and died to the 05 tank (2026-09-25 Gate
+      // checkpoint drive: both rifle guards dead at (-12,-155)/(-7,-155), guardBatchLost, mission failed).
+      r.Defend(guard.actor,guard.route.at(-1),0,0);
     }
   }
   if (n >= 8 && n <= 10) {
@@ -92,6 +102,9 @@ export function ApplyFirstLevelStageJump(runtime, value, { midCutscenes = false 
   r.flow.index = saved.index;
   r.flow.Enter();
   while (r.spawnQueue.length) r.DrainSpawns();
+  // 05 opens with He Youtian on the left gun (03's leftGunHandover). FrontBattle.Enter only sends him there for a 04
+  // start; at 05 he stood on the seat beside an empty gun (2026-09-25 Gate checkpoint drive).
+  if (n === 5) r.frontBattle?.StartHandover?.(false);
   if (n === 14) {r.BeginCarry();r.UpdateCarry();}
   if (n === 17) {
     // 幺娃守在担架边；军医是 15C 起就在院子里的那个真人（EnsureYardCast 已经建好），

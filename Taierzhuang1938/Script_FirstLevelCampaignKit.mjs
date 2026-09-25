@@ -46,15 +46,21 @@ export const CAMPAIGN_SEGMENT_STARTS = Object.freeze([8, 11, 15, 18]);
 /** `--stage-to` 允许的终点：Front 段末（7）、Mid 段末（14）、整关（18）。 */
 // 2 = 01–02 to the collection hand-over (the opening package's own acceptance, 03 not driven).
 export const CAMPAIGN_SEGMENT_ENDS = Object.freeze([2, 3, 6, 7, 14, 18]);
+/**
+ * 不带 `--stage-jumps` 也能起跑的冷启动点（`missionStage=N`，玩家阵亡重来 / 选章落在这里）：
+ * 01 开局、03 前沿、04 / 05 检查点、06 集结处。从这里起一路真输入推进，中途不再跳。
+ */
+export const CAMPAIGN_CONTINUOUS_STARTS = Object.freeze([1, 3, 4, 5, 6]);
 
 export function ParseCampaignArgs(argv = process.argv) {
   const Has = (flag) => argv.includes(flag);
   const stageJumps = Has("--stage-jumps");
   const raw = argv.find((arg) => arg.startsWith("--stage-from="))?.split("=")[1];
   const stageFrom = Number(raw || 1);
+  // 4 / 5 = the 04 / 05 checkpoints, driven on with real input like 3 and 6: a cold start, never a jump inside a run.
   assert.ok(
-    [1, 3, 6].includes(stageFrom) || (stageJumps && CAMPAIGN_SEGMENT_STARTS.includes(stageFrom)),
-    "continuous suites start at 1, 3 or 6; debug continuation starts at " + CAMPAIGN_SEGMENT_STARTS.join(" / "),
+    CAMPAIGN_CONTINUOUS_STARTS.includes(stageFrom) || (stageJumps && CAMPAIGN_SEGMENT_STARTS.includes(stageFrom)),
+    "continuous suites start at " + CAMPAIGN_CONTINUOUS_STARTS.join(", ") + "; debug continuation starts at " + CAMPAIGN_SEGMENT_STARTS.join(" / "),
   );
   // 只跑某一段到它的末尾（`--stage-to=7` = Front 包的 1–7）。默认 18 = 整关走到 Complete。
   // 分段跑出来的证据目录与整关分开，一段跑通不许冒充通关。
@@ -62,6 +68,14 @@ export function ParseCampaignArgs(argv = process.argv) {
   const stageTo = Number(toRaw || 18);
   assert.ok(CAMPAIGN_SEGMENT_ENDS.includes(stageTo), "segment suites end at " + CAMPAIGN_SEGMENT_ENDS.join(" / "));
   assert.ok(stageTo >= stageFrom, "a segment cannot end before it starts");
+  // 05 的非理想顺序：先在攻击支路上把车炸掉、再（不）到攻击位（契约 v1.1 卡死②）。03 起与 05 检查点起都能带。
+  const bombFirst = Has("--bomb-first");
+  assert.ok(!bombFirst || (stageFrom <= 5 && stageTo >= 6), "--bomb-first drives 05 and needs the run to reach 06");
+  // 同一套件并行跑多份时（统计阵亡率），各自的证据目录分开：`--evidence-tag=R2` → _shots/<suite>_R2。
+  const evidenceTag = argv.find((arg) => arg.startsWith("--evidence-tag="))?.split("=")[1] || "";
+  // 03–06 的两条玩家反射（近身还手、躲雷后回位）默认开；--no-reflexes 回到改之前的驾驶器，做前后对照用。
+  const reflexes = !Has("--no-reflexes");
+  assert.ok(/^[A-Za-z0-9_-]*$/.test(evidenceTag), "--evidence-tag is letters, digits, _ or -");
   return {
     campaign: Has("--campaign"),
     audioCheck: Has("--audio"),
@@ -71,8 +85,11 @@ export function ParseCampaignArgs(argv = process.argv) {
     // 默认整关/分段驾驶只观察运行时自主产生的 cue，不能改写真实语音排队。
     quietGuidanceInterruptProbe: Has("--probe-quiet-guidance-interrupt"),
     allowCheckpointRetry: Has("--allow-checkpoint-retry"),
+    bombFirst, evidenceTag, reflexes,
     stageFrom, stageTo,
-    suite: stageFrom === 6 ? "FirstLevelWhitebox0618" : stageFrom === 3 ? "FirstLevelFrontTopology" : stageTo === 2 || stageTo === 3 ? "FirstLevelOpeningStoryboards" : stageTo === 7 ? "FirstLevelStageFront"
+    suite: stageFrom === 6 ? "FirstLevelWhitebox0618" : stageFrom === 3 ? "FirstLevelFrontTopology"
+      : stageFrom === 4 || stageFrom === 5 ? `FirstLevelFrontCheckpoint0${stageFrom}${bombFirst ? "BombFirst" : ""}`
+      : stageTo === 2 || stageTo === 3 ? "FirstLevelOpeningStoryboards" : stageTo === 7 ? "FirstLevelStageFront"
       : stageTo === 14 ? "FirstLevelStageMiddle"
         : stageFrom === 8 ? "FirstLevelStageVillage"
           : stageFrom === 11 ? "FirstLevelStageTransfer"
@@ -84,7 +101,7 @@ export function ParseCampaignArgs(argv = process.argv) {
 
 /** 起服务、起浏览器、开页面，返回 ctx。 */
 export async function OpenCampaign(options) {
-  const output = path.join(here, "_shots", options.suite);
+  const output = path.join(here, "_shots", options.suite + (options.evidenceTag ? "_" + options.evidenceTag : ""));
   await fs.mkdir(output, { recursive: true });
   const server = await ServeRoot(root, 0);
   const browser = await LaunchBrowser();
@@ -97,7 +114,7 @@ export async function OpenCampaign(options) {
     jumpReceipts: [], campaignRetries: [], capturedActivities: new Set(),
   };
   await page.goto(
-    `http://127.0.0.1:${server.address().port}/Taierzhuang1938/?whitebox=p012&${options.audioCheck ? "menu=0" : "shot=1"}&manual=1${[3,6].includes(options.stageFrom)?`&missionStage=${options.stageFrom}`:""}&quality=${options.quality||"low"}&scale=small`,
+    `http://127.0.0.1:${server.address().port}/Taierzhuang1938/?whitebox=p012&${options.audioCheck ? "menu=0" : "shot=1"}&manual=1${[3,4,5,6].includes(options.stageFrom)?`&missionStage=${options.stageFrom}`:""}&quality=${options.quality||"low"}&scale=small`,
     { waitUntil: "domcontentloaded", timeout: 180000 },
   );
   await page.waitForFunction(() => window.Tengxian?.state?.ready, null, { timeout: 180000 });
@@ -135,6 +152,9 @@ export async function CaptureFailure(ctx) {
   }).then(state => fs.writeFile(path.join(ctx.output, "Data_FailureCast.json"), JSON.stringify(state, null, 2)))
     .catch(() => {});
   await ctx.page.screenshot({ path: path.join(ctx.output, "Scene_Failure.png") }).catch(() => {});
+  // 挨打取证（InstallDamageForensics）：03 的每一下与每次阵亡的现场，统计阵亡率时按行 grep。
+  await Report03Damage(ctx);
+  await ReportDeaths(ctx);
   console.error(await ctx.page.evaluate(() => ({
     boot: document.querySelector("#bootText")?.textContent,
     body: document.body.innerText.slice(-1800),
@@ -193,6 +213,93 @@ export async function InstallInputDriver(ctx) {
           const { BLAST } = await import("./Data_Tuning_Combat.mjs");
           window.MissionInputDriver = {
             blocked: new Map(),
+            // 「像一个正常玩家」的两条反射（DriveFrontBattle 在 03–06 打开，--no-reflexes 关掉做前后对照）：
+            //   ① 近身威胁先还手：3 m 内朝着玩家 / 正在出刀 / 盯着玩家打的日军（2.5 m 内的不论朝向）
+            //      优先于路线与远处目标，转身用刺刀大刀或步枪解决，不需要视线射线先看见他
+            //      （09-24 r2：RightEntryGuard 在 2.1 m 连捅 4 下，驾驶器照走路线）；
+            //   ② 躲雷：看见落在身边的手榴弹就朝能跑远、最好有墙挡着的方向跑出去（16 个方向、4 m 内试走），
+            //      炸完走回躲之前站的地方（最多 6 s）。本游戏里趴下不减手榴弹伤（命中点固定在脚上 1 m），
+            //      所以不趴，只跑；
+            //   ③ 近身却没东西能还手（大刀被场景挡住、步枪空仓或正在装填）：面朝他往后退出刺刀够得着的距离，
+            //      装填不再被拔刀打断（拔刀会取消装填、弹仓退回空的）。09-25 R_c01_2 就是这样被连捅四刀。
+            //   ④ 近身的人 8 s 里双方都没掉血（在跟罗班长拼刺刀、隔着墙角够不着）又没盯上玩家：先交给别人，
+            //      6 s 内不再当近身威胁，路线照走（09-25 V_c01_1 被 2.3 m 外跟罗班长对刺的 RightLinkGuard 拖住整段）；
+            //   ⑤ 拿着大刀、人在 2.3–3 m（砍不到又不走）：往前迈一步贴上去再砍（只在大刀已在手、不在装填时）；
+            //   ⑥ 近身的人隔着矮墙：胸口那条线被墙挡住就瞄头，头也挡住就不开枪、按 ③ 后退（09-25 ABon_1 把 63 发全打进墙里）；
+            //   ⑦ 近身、大刀在手还能用、只是还没转正：拿着大刀继续转，不再收刀换枪（ABon_1 一场 51 次换武器）。
+            //   关掉时（reflexes=false）每条路径与改之前一字不差。
+            reflexes: false, closeResponses: 0, escapes: 0, evadeReturns: 0, closeFoe: null, returning: null,
+            CloseThreat() {
+              if(!this.reflexes)return null;
+              const p=g.player.position;let best=null,bd=3;
+              for(const a of g.ai.soldiers){
+                if(a.side!=="ija"||!a.alive||a.scriptedNoncombatant)continue;
+                const dx=a.position.x-p.x,dz=a.position.z-p.z,d=Math.hypot(dx,dz);
+                if(d>=bd||Math.abs(a.position.y-p.y)>1.6)continue;
+                const f=g.meleeCombat.fighters?.get(a);
+                const striking=!!f&&["attack","charge","contact"].includes(f.state);
+                // His forward is (-sin yaw, -cos yaw); the way to the player is (-dx, -dz).
+                const facing=Number.isFinite(a.yaw)&&(Math.sin(a.yaw)*dx+Math.cos(a.yaw)*dz)/(d||1)>.5;
+                if(!(striking||facing||a.target?.isPlayer||d<=2.5))continue;
+                // ④ A man the player has stood off for 8 s without a scratch on either side (busy with Luo, out of
+                // reach behind a wall end) is left to the others for 6 s and the route goes on, unless he turns on
+                // the player (09-25 V_c01_1: RightLinkGuard duelling Luo at 2.3 m held the bot for the whole leg).
+                if((this.ignoreClose?.get(a)||0)>g.ai.time&&!a.target?.isPlayer)continue;
+                bd=d;best=a;
+              }
+              if(best&&best!==this.closeFoe){this.closeResponses++;this.closeSince={t:g.ai.time,hp:best.health,player:g.player.health};}
+              else if(best&&this.closeSince&&g.ai.time-this.closeSince.t>8){
+                if(best.health>=this.closeSince.hp&&g.player.health>=this.closeSince.player&&!best.target?.isPlayer){
+                  (this.ignoreClose||=new Map()).set(best,g.ai.time+6);this.closeStandoffs=(this.closeStandoffs||0)+1;best=null;
+                }
+                this.closeSince=best?{t:g.ai.time,hp:best.health,player:g.player.health}:null;
+              }
+              if(!best&&this.closing){g.Debug.Key("KeyW",false);this.closing=false;}
+              this.closeFoe=best;
+              if(!best&&this.backingOff){g.Debug.Key("KeyS",false);this.backingOff=false;}
+              return best;
+            },
+            // One frame of walking back to where a grenade dodge started (false once there, or after 6 s).
+            StepHome() {
+              const h=this.returning;if(!h)return false;
+              const p=g.player.position,d=Math.hypot(h.x-p.x,h.z-p.z);
+              if(d<.8||g.ai.time>h.until||!g.player.alive){this.returning=null;g.Debug.Key("KeyW",false);g.Debug.Key("ShiftLeft",false);return false;}
+              const yaw=Math.atan2(p.x-h.x,p.z-h.z),gap=Math.atan2(Math.sin(yaw-g.player.yaw),Math.cos(yaw-g.player.yaw));
+              g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);
+              g.player.yaw+=Math.max(-.08,Math.min(.08,gap));g.player.pitch=0;
+              g.Debug.Key("KeyW",Math.abs(gap)<.65);
+              this.mode="return";
+              return true;
+            },
+            // Best way out of a grenade's reach: walk-test 16 headings up to 4 m (ground step, body overlap, and a
+            // waist/chest ray for walls thinner than a step), score by the distance from the grenade at the end,
+            // plus a wall between the grenade and that spot.
+            EscapeHeading(threat) {
+              const p=g.player.position,gx=threat.position.x,gz=threat.position.z;
+              const from=threat.position.clone();from.y+=BLAST.originRiseM;
+              let best=null,bestScore=-Infinity;
+              for(let k=0;k<16;k++){
+                const angle=k*Math.PI/8,dir=from.clone().set(Math.sin(angle),0,Math.cos(angle));
+                let free=4;
+                for(const rise of [.5,1.2]){
+                  const o=p.clone();o.y+=rise;const hit=g.battlefield.Raycast(o,dir,4,{terrain:true});
+                  if(hit)free=Math.min(free,hit.t-g.player.radius-.1);
+                }
+                let reach=0,y=p.y,cx=p.x,cz=p.z;
+                for(const step of [1,2,3,4]){
+                  if(step>free)break;
+                  const x=p.x+Math.sin(angle)*step,z=p.z+Math.cos(angle)*step,gy=g.battlefield.GroundHeight(x,z);
+                  if(Math.abs(gy-y)>.4||g.physics.Overlaps(x,gy+.04,z,g.player.radius,1.78))break;
+                  reach=step;y=gy;cx=x;cz=z;
+                }
+                if(reach<1)continue;
+                const to=from.clone().set(cx,y+BLAST.playerHitRiseM,cz),ray=to.clone().sub(from),len=ray.length();
+                const hit=len>.1?g.battlefield.Raycast(from,ray.normalize(),len,{terrain:true}):null;
+                const score=Math.hypot(cx-gx,cz-gz)+(hit&&hit.t<len-BLAST.wallMarginM?6:0);
+                if(score>bestScore){bestScore=score;best=angle;}
+              }
+              return best;
+            },
             EvadeGrenade() {
               const p=g.player,threat=g.combat.GrenadeThreats(p.position).find(t=>{
                 const from=t.position.clone();from.y+=BLAST.originRiseM;
@@ -201,8 +308,27 @@ export async function InstallInputDriver(ctx) {
                 return !hit||hit.t>=d-BLAST.wallMarginM;
               });
               if(!threat){
-                if(this.evading){g.Debug.Key("KeyW",false);g.Debug.Key("ShiftLeft",false);this.evading=false;}
+                if(this.evading){g.Debug.Key("KeyW",false);g.Debug.Key("ShiftLeft",false);this.evading=false;
+                  if(this.reflexes&&this.evadeHome){this.returning={...this.evadeHome,until:g.ai.time+6};this.evadeReturns++;}}
+                this.evadeHome=null;
                 return false;
+              }
+              if(this.reflexes){
+                if(!this.escape||this.escape.threat!==threat.position||g.ai.time>=this.escape.until)
+                  this.escape={threat:threat.position,until:g.ai.time+.25,heading:this.EscapeHeading(threat)};
+                const heading=this.escape.heading;
+                // Walled in on every side: stop running (keys up) and keep fighting, like the old driver.
+                if(heading==null){if(this.evading){g.Debug.Key("KeyW",false);g.Debug.Key("ShiftLeft",false);this.evading=false;}return false;}
+                if(!this.evading){this.evadeHome={x:p.position.x,z:p.position.z};this.escapes++;}
+                this.returning=null;
+                if(this.backingOff){g.Debug.Key("KeyS",false);this.backingOff=false;}
+                if(p.stance!=="stand")g.Debug.Key(p.stance==="crouch"?"KeyC":"KeyZ");
+                const yaw=heading+Math.PI,gap=Math.atan2(Math.sin(yaw-p.yaw-p.aimYaw),Math.cos(yaw-p.yaw-p.aimYaw));
+                g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);
+                g.Debug.Look(Math.max(-60,Math.min(60,-gap/.0022)),0);
+                g.Debug.Key("KeyW",Math.abs(gap)<.5);g.Debug.Key("ShiftLeft",true);
+                this.evading=true;this.evadeFrames=(this.evadeFrames||0)+1;this.mode="evade";
+                return true;
               }
               // Read the same live warning used by the HUD, then turn and sprint
               // through an open physical direction. Do not clear the projectile.
@@ -226,6 +352,9 @@ export async function InstallInputDriver(ctx) {
               // A real bind has priority over an unobstructed distant rifle target.
               const opponent=g.meleeCombat.qte.active?.attacker;
               if(g.meleeCombat.Active && opponent?.alive)return opponent;
+              // ① A man at arm's length comes before the route's far targets, seen through a ray or not.
+              const close=this.CloseThreat();
+              if(close)return close;
               if(this.observedShot!==g.state.playerShots) {
                 this.observedShot=g.state.playerShots;
                 if(this.lastTarget && g.state.lastShot?.hitKind==="wall")this.blocked.set(this.lastTarget,g.ai.time+4);
@@ -251,7 +380,10 @@ export async function InstallInputDriver(ctx) {
                 });
             },
             Shoot(foe) {
+              // Bookkeeping for the damage forensics only (what the player was doing when a hit landed).
+              const Did=(what)=>{this.lastAction={t:g.ai.time,what:what+":"+(foe?.missionId||foe?.id)};};
               if(g.meleeCombat.Active){
+                Did("bind");
                 g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);
                 g.Debug.Key("KeyF",true);g.Debug.Key("KeyF",false);return;
               }
@@ -260,11 +392,25 @@ export async function InstallInputDriver(ctx) {
               const eye = g.player.EyePosition,
                 to = foe.position.clone();
               to.y += foe.missionId===this.priorityTarget ? 1.2 : foe.stance === 2 ? 0.3 : foe.stance === 1 ? 0.85 : 1.2;
+              // ⑥ A man at arm's length is fought whether a ray sees him or not (①), so he can be behind a low wall,
+              // stabbing over it: aim at his head when the chest line hits the wall, and when neither line is clear hold
+              // fire and back off (③) instead of emptying the rifle into the wall (09-25 Gate ABon_1: every round of 63
+              // into the right nest's low west wall at FrontFlankB 2 m away, bayoneted three times with an empty rifle).
+              let lineBlocked=false;
+              if(this.reflexes&&foe.position.distanceTo(g.player.position)<3){
+                const Clear=(point)=>{const ray=point.clone().sub(eye),length=ray.length(),hit=g.battlefield.Raycast(eye,ray.normalize(),length,{terrain:true});
+                  return !hit||hit.t>=length-.25;};
+                if(!Clear(to)){const head=foe.position.clone();head.y+=foe.stance===2?.35:foe.stance===1?1.1:1.5;
+                  if(Clear(head))to.copy(head);else lineBlocked=true;}
+                if(lineBlocked)this.blockedLineFrames=(this.blockedLineFrames||0)+1;
+              }
               const dx = to.x - eye.x,
                 dz = to.z - eye.z,
                 yaw = Math.atan2(-dx, -dz),
                 gap = Math.atan2(Math.sin(yaw - g.player.yaw), Math.cos(yaw - g.player.yaw));
-              g.player.yaw += Math.max(-0.06, Math.min(0.06, gap));
+              // A close threat is turned to twice as fast (a player spins round on a man at his shoulder).
+              const turn=this.reflexes&&Math.hypot(foe.position.x-g.player.position.x,foe.position.z-g.player.position.z)<3?.12:.06;
+              g.player.yaw += Math.max(-turn, Math.min(turn, gap));
               g.player.pitch = Math.atan2(to.y - eye.y, Math.hypot(dx, dz)) - g.player.aimPitch;
               g.player.yaw -= g.player.aimYaw;
               const distance=foe.position.distanceTo(g.player.position),fighter=g.meleeCombat.Fighter(g.player);
@@ -282,27 +428,206 @@ export async function InstallInputDriver(ctx) {
               if(wall&&wall.serial!==this.wallSerial&&fighter?.state==="stagger"&&fighter.clip==="Obstructed"&&g.meleeCombat.time-wall.time<1){
                 this.wallSerial=wall.serial;this.obstructed.set(foe.id,g.ai.time+4);
               }
-              if(distance<3 && Math.abs(gap)<.2 && !((this.obstructed.get(foe.id)||0)>g.ai.time)){
+              // A player finishes the reload he started before drawing the Dadao: drawing it mid-reload cancels the
+              // reload and refunds nothing into the magazine (Script_Main CancelReload). The old driver flipped between
+              // a blocked cut (rifle for 4 s, R) and the Dadao again, so the rifle never got loaded (09-25 R_c01_2).
+              const reloading=g.viewmodel?.action?.kind==="reload";
+              if(distance<3 && Math.abs(gap)<.2 && !((this.obstructed.get(foe.id)||0)>g.ai.time) && !(this.reflexes&&reloading)){
+                Did("melee");
                 g.Debug.Mouse(2,false);
-                if(g.state.activeSlot!=="melee"){g.Debug.Key("KeyV");return;}
+                if(g.state.activeSlot!=="melee"){if(this.reflexes)this.closeSwaps=(this.closeSwaps||0)+1;g.Debug.Key("KeyV");return;}
                 if(!fighter.weapon)return;
                 this.meleeResponses=(this.meleeResponses||0)+1;
+                let closing=false;
                 if(g.meleeCombat.Active){g.Debug.Key("KeyF",true);g.Debug.Key("KeyF",false);}
                 else if(fighter.state==="idle"){
                   const attacker=g.meleeCombat.Fighter(foe);
                   if(attacker.attack && attacker.t>attacker.attack.windup-.13 && attacker.t<attacker.attack.windup
                     && distance<attacker.attack.reach){g.Debug.Mouse(2,true);g.Debug.Mouse(2,false);}
                   else if(distance<2.3){g.Debug.Mouse(0,true);g.Debug.Mouse(0,false);}
+                  // ⑤ Between cutting range (2.3 m) and 3 m the old driver neither cut nor walked: step in to him.
+                  else closing=this.reflexes;
                 }
+                // Pressed every frame while closing in: a route leg lets go of W before it calls Shoot.
+                if(closing||this.closing){g.Debug.Key("KeyW",closing);this.closing=closing;}
                 return;
               }
-              if(g.state.activeSlot!=="primary"){g.Debug.Key("Digit1");return;}
+              // ⑦ Still turning onto a man at arm's length with the Dadao out and usable: keep it in hand and turn. The
+              // path below puts the rifle back (Digit1) whenever he steps out of the 0.2 rad cone and the branch above
+              // draws the Dadao again once facing him (09-25 Gate ABon_1: 51 swaps in one 03 fight).
+              if(this.reflexes&&distance<3&&Math.abs(gap)>=.2&&g.state.activeSlot==="melee"&&!((this.obstructed.get(foe.id)||0)>g.ai.time)&&!reloading){
+                Did("turn");g.Debug.Mouse(2,false);
+                if(this.closing){g.Debug.Key("KeyW",false);this.closing=false;}
+                if(this.backingOff){g.Debug.Key("KeyS",false);this.backingOff=false;}
+                return;
+              }
+              Did(Math.abs(gap)<.06?"rifle":"turn");
+              if(this.closing){g.Debug.Key("KeyW",false);this.closing=false;}
+              // ③ Nothing to answer a man at arm's length with (the Dadao caught by the scenery, the rifle empty or
+              // reloading): back-pedal out of his bayonet reach, still facing him, while it reloads, instead of standing in
+              // it (09-25 R_c01_2: FrontFlankB stabbed four times at 2 m while the bot stood reloading in the nest).
+              const backOff=this.reflexes&&distance<3&&(g.state.ammo===0||reloading||lineBlocked);
+              if(backOff!==!!this.backingOff){g.Debug.Key("KeyS",backOff);this.backingOff=backOff;}
+              if(backOff)this.backOffFrames=(this.backOffFrames||0)+1;
+              if(g.state.activeSlot!=="primary"){if(this.reflexes&&distance<3)this.closeSwaps=(this.closeSwaps||0)+1;g.Debug.Key("Digit1");return;}
               g.Debug.Mouse(2, true);
               if (g.state.ammo === 0) g.Debug.Key("KeyR");
-              else if (Math.abs(gap) < 0.06) g.Debug.Mouse(0, true);
+              else if (Math.abs(gap) < 0.06 && !lineBlocked) g.Debug.Mouse(0, true);
             },
           };
   });
+  await InstallDamageForensics(ctx.page);
+}
+
+/**
+ * 挨打取证（只记录，不改任何数值与判定）：玩家每挨一下，记下谁打的、用什么、多远、在不在视野里、
+ * 中间有没有东西挡着、玩家这时候在干什么；玩家阵亡那一刻把周围 30 m 的现场整个存下来。
+ * 01→03 连续打过来的阵亡率要分清「模拟玩家太笨」还是「游戏真的难」，靠的就是这一份。
+ *   window.damageForensics  每一下（全关，最多 600 条）
+ *   window.deathForensics   每次阵亡的现场
+ * 手榴弹/炮弹记爆炸源（Combat.Blast 的 kind / explosiveId / ownerId），子弹记离枪口最近的日军，
+ * 刺刀记出刀的人；都找不到时离战车 6 m 内记 "tank"。流血不走 TakeHit，只在阵亡现场里看 bleeding。
+ */
+export async function InstallDamageForensics(page) {
+  await page.evaluate(() => {
+    const g = window.Tengxian;
+    if (window.damageForensics) return;
+    const log = window.damageForensics = [], deaths = window.deathForensics = [];
+    const Runtime = () => { try { return g.Debug.FirstLevelMissionRuntime(); } catch { return null; } };
+    const Name = (a) => a ? (a.missionId || a.castId || String(a.id)) : null;
+    const Round = (v, n = 1) => +(+v).toFixed(n);
+    let blast = null;
+    const combatBlast = g.combat.Blast.bind(g.combat);
+    g.combat.Blast = (position, radius, damage, kind, hurtSide, byPlayer, onHit, explosiveId, ownerId, options) => {
+      const previous = blast;
+      blast = { kind, explosive: explosiveId ?? kind, ownerId, x: position.x, z: position.z, byPlayer: !!byPlayer };
+      try { return combatBlast(position, radius, damage, kind, hurtSide, byPlayer, onHit, explosiveId, ownerId, options); }
+      finally { blast = previous; }
+    };
+    // Where the player looks (yaw + aimYaw; forward = (-sin, -cos), the convention Shoot uses) and whether the
+    // rendered world blocks the line from the eye to the source.
+    const View = (point, rise) => {
+      const eye = g.player.EyePosition, dx = point.x - eye.x, dz = point.z - eye.z;
+      const yaw = Math.atan2(-dx, -dz), look = g.player.yaw + (g.player.aimYaw || 0);
+      const angle = Math.abs(Math.atan2(Math.sin(yaw - look), Math.cos(yaw - look)));
+      const to = eye.clone().set(point.x, (point.y ?? g.battlefield.GroundHeight(point.x, point.z)) + rise, point.z);
+      const ray = to.clone().sub(eye), d = ray.length();
+      const hit = d > .3 ? g.battlefield.Raycast(eye, ray.normalize(), d, { terrain: true }) : null;
+      return { angleDeg: Math.round(angle * 180 / Math.PI), inView: angle < .9, los: !hit || hit.t >= d - .3 };
+    };
+    const Soldier = (from, m) => {
+      let best = null, bd = m;
+      for (const s of g.ai.soldiers) {
+        if (s.side !== "ija") continue;
+        const d = Math.hypot(s.position.x - from.x, s.position.z - from.z);
+        if (d < bd) { bd = d; best = s; }
+      }
+      return best;
+    };
+    const Activity = () => {
+      const D = window.MissionInputDriver || {};
+      return { leg: D.leg ?? null, mode: D.mode ?? null,
+        action: D.lastAction && g.ai.time - D.lastAction.t < .5 ? D.lastAction.what : null,
+        stance: g.player.stance, slot: g.state.activeSlot, mounted: !!g.emplacement?.View?.(),
+        bind: !!g.meleeCombat?.Active, cutscene: g.state.cutscene || null };
+    };
+    const Source = (info) => {
+      const p = g.player.position, r = Runtime();
+      if (info?.blast && blast) {
+        const owner = blast.ownerId != null ? g.ai.soldiers.find((s) => s.id === blast.ownerId) : null;
+        return { kind: "blast", weapon: blast.explosive || blast.kind, who: owner ? Name(owner) : blast.byPlayer ? "player" : null,
+          encounter: owner?.missionEncounter || null, distance: Round(Math.hypot(blast.x - p.x, blast.z - p.z)),
+          ...View({ x: blast.x, z: blast.z }, .3) };
+      }
+      const from = info?.from;
+      const kind = info?.melee ? "melee" : info?.bullet ? "bullet" : info?.blast ? "blast" : info?.projectile ? "projectile" : info?.fire ? "fire" : "other";
+      if (!from) return { kind, weapon: null, who: null };
+      const s = Soldier(from, info?.melee ? 3.5 : 2.5);
+      const tank = !s && r?.tank && Number.isFinite(r.tank.x) && Math.hypot(r.tank.x - from.x, r.tank.z - from.z) < 6;
+      return { kind, weapon: s ? (info?.melee ? "bayonet" : s.weaponId) : tank ? "tankGun" : null, who: s ? Name(s) : tank ? "tank" : null,
+        encounter: s?.missionEncounter || null, distance: Round(Math.hypot(from.x - p.x, from.z - p.z)), ...View(from, 0) };
+    };
+    const originalHit = g.player.TakeHit.bind(g.player);
+    g.player.TakeHit = (damage, part, direction, info) => {
+      const before = g.player.health, alive = g.player.alive, r = Runtime();
+      const result = originalHit(damage, part, direction, info);
+      const lost = before - g.player.health;
+      if (alive && lost > 0) {
+        log.push({ time: Round(r?.time ?? 0), stage: r?.flow?.stage?.id ?? null, lost: Round(lost), health: Round(g.player.health),
+          part, ...Source(info), at: [Round(g.player.position.x), Round(g.player.position.z)], activity: Activity() });
+        if (log.length > 600) log.shift();
+      }
+      return result;
+    };
+    const originalKill = g.player.Kill.bind(g.player);
+    g.player.Kill = (...args) => {
+      if (g.player.alive && !g.player.debug?.invincible) {
+        const r = Runtime(), p = g.player.position;
+        deaths.push({ time: Round(r?.time ?? 0), stage: r?.flow?.stage?.id ?? null, at: [Round(p.x), Round(p.z)],
+          bleeding: Round(g.player.bleeding, 2), bandages: g.player.bandages, ammo: g.state.ammo, clips: g.state.clips,
+          grenades: g.state.grenades, activity: Activity(), lastHits: log.slice(-8),
+          enemies: g.ai.soldiers.filter((s) => s.side === "ija" && s.alive && Math.hypot(s.position.x - p.x, s.position.z - p.z) < 30)
+            .map((s) => ({ id: Name(s), encounter: s.missionEncounter || null, d: Round(Math.hypot(s.position.x - p.x, s.position.z - p.z)),
+              at: [Round(s.position.x), Round(s.position.z)], state: s.state, stance: s.stance, targetPlayer: !!s.target?.isPlayer,
+              weapon: s.weaponId, dormant: !!s.missionDormant, ...View(s.position, 1.2) }))
+            .sort((a, b) => a.d - b.d).slice(0, 16),
+          liveGrenades: g.combat.projectiles.filter((q) => q.alive).map((q) => ({ owner: q.owner, fuse: Round(q.fuse, 2),
+            d: Round(Math.hypot(q.position.x - p.x, q.position.z - p.z)) })) });
+      }
+      return originalKill(...args);
+    };
+  });
+}
+
+/** 03 的统计口之一：进 03（Support）那一刻带着什么。连续打过来与冷启动 03 用同一行，便于对表。 */
+export async function Snapshot03Entry(ctx, source) {
+  const entry = await ctx.page.evaluate(async () => {
+    const g = window.Tengxian, r = g.Debug.FirstLevelMissionRuntime(), { WEAPONS } = await import("./Data_Weapons.mjs");
+    const started = r.flow.log.filter((e) => e.kind === "stage").findLast((e) => e.id === "Support")?.time ?? null;
+    const primary = g.state.mags?.primary || {}, onRifle = g.state.activeSlot === "primary";
+    const hits = window.damageForensics || [];
+    return { stage: r.flow.stage.id, time: +r.time.toFixed(1), sinceSupport: started == null ? null : +(r.time - started).toFixed(1),
+      health: +g.player.health.toFixed(1), bleeding: +g.player.bleeding.toFixed(2), bandages: g.player.bandages,
+      rifle: g.state.slots?.primary ?? null, activeSlot: g.state.activeSlot,
+      magazine: onRifle ? g.state.ammo : primary.ammo ?? null, spareClips: onRifle ? g.state.clips : primary.clips ?? null,
+      clipRounds: WEAPONS[g.state.slots?.primary]?.magazine ?? null, grenades: g.state.grenades,
+      hitsBefore: hits.length, lostBefore: +hits.reduce((sum, e) => sum + e.lost, 0).toFixed(1) };
+  });
+  entry.source = source;
+  entry.reserveRounds = entry.spareClips != null && entry.clipRounds ? entry.spareClips * entry.clipRounds : null;
+  console.log("CAMPAIGN_03_ENTRY", JSON.stringify(entry));
+  await fs.writeFile(path.join(ctx.output, "Data_Campaign03Entry.json"), JSON.stringify(entry, null, 2));
+  return entry;
+}
+
+/** 03 的统计口之二：03 里挨的每一下（一次性，03 收尾或失败时各打一行）。 */
+export async function Report03Damage(ctx) {
+  if (ctx.reported03 || !ctx.snapshot03) return;
+  ctx.reported03 = true;
+  const hits = await ctx.page.evaluate(() => (window.damageForensics || []).filter((e) => e.stage === "Support")).catch(() => []);
+  console.log("CAMPAIGN_03_DAMAGE", JSON.stringify(hits));
+  // How often the two reflexes fired (counted from 03 on; zero with --no-reflexes).
+  const driver = await ctx.page.evaluate(() => { const D = window.MissionInputDriver || {};
+    return { reflexes: !!D.reflexes, closeResponses: D.closeResponses || 0, escapes: D.escapes || 0, evadeReturns: D.evadeReturns || 0,
+      meleeResponses: D.meleeResponses || 0, evadeFrames: D.evadeFrames || 0, backOffFrames: D.backOffFrames || 0, closeStandoffs: D.closeStandoffs || 0,
+      closingFrames: D.closingFrames || 0, closeSwaps: D.closeSwaps || 0, blockedLineFrames: D.blockedLineFrames || 0,
+      seconds: Object.fromEntries(Object.entries(D.modeFrames || {}).map(([k, v]) => [k, +(v / 60).toFixed(1)])),
+      legs: Object.fromEntries(Object.entries(D.legFrames || {}).map(([k, v]) => [k, +(v / 60).toFixed(1)])) }; }).catch(() => null);
+  console.log("CAMPAIGN_03_DRIVER", JSON.stringify(driver));
+  // When each 03 fact landed (mission time, and seconds since 03 began), to see which wait a slow 03 spent its time in.
+  const facts = await ctx.page.evaluate(() => { const r = window.Tengxian.Debug.FirstLevelMissionRuntime(), log = r.flow.log;
+    const start = log.findLast((e) => e.kind === "stage" && e.id === "Support")?.time ?? null;
+    return { start, facts: start == null ? [] : log.filter((e) => e.kind === "fact" && e.time >= start).map((e) => [e.id, +(e.time - start).toFixed(1)]) }; }).catch(() => null);
+  console.log("CAMPAIGN_03_FACTS", JSON.stringify(facts));
+  await fs.writeFile(path.join(ctx.output, "Data_Campaign03Damage.json"), JSON.stringify(hits, null, 2));
+}
+
+/** 失败收尾：每次阵亡的现场各打一行 CAMPAIGN_DEATH，全关挨打记录落盘。 */
+export async function ReportDeaths(ctx) {
+  const out = await ctx.page.evaluate(() => ({ hits: window.damageForensics || [], deaths: window.deathForensics || [] }))
+    .catch(() => ({ hits: [], deaths: [] }));
+  for (const death of out.deaths) console.log("CAMPAIGN_DEATH", JSON.stringify(death));
+  await fs.writeFile(path.join(ctx.output, "Data_DamageForensics.json"), JSON.stringify(out, null, 2));
 }
 
 /** 七个通用动作，全部闭包在 ctx 上（模块级不留可变全局）。 */
@@ -468,13 +793,14 @@ export function CampaignActions(ctx) {
     let routeGuardHp;
     const rejoinTarget=points.at(-1);
     await page.evaluate(
-      async ({ points, stance, sprint, rejoinRoute, rejoinTarget }) => {
+      async ({ points, stance, sprint, rejoinRoute, rejoinTarget, label }) => {
         const g = window.Tengxian;
         if(rejoinRoute){
           const {MissionRouteBetween}=await import("./Script_FirstLevelMissionColumn.mjs");
           points=MissionRouteBetween(rejoinRoute,g.player.position,rejoinTarget);
         }
         window.routeBot = { points, corridor:points, index: 0, frames: 0, stalled: 0, last: { ...g.player.position } };
+        if(window.MissionInputDriver)window.MissionInputDriver.leg=label;
         if (g.player.stance !== stance)
           g.Debug.Key(
             stance === "crouch"
@@ -487,7 +813,7 @@ export function CampaignActions(ctx) {
           );
         g.Debug.Key("ShiftLeft", sprint);
       },
-      { points, stance, sprint, rejoinRoute, rejoinTarget },
+      { points, stance, sprint, rejoinRoute, rejoinTarget, label },
     );
     const carriedKind=await page.evaluate(()=>window.Tengxian.carry.KindId);
     let result, retries = 0;
@@ -513,6 +839,7 @@ export function CampaignActions(ctx) {
           // 像玩家一样等它播完 —— 松手、照常推帧、这一段不算进停滞计数
           // （44 s 不动的话，下面那条「三个 chunk 没挪窝就算走不通」会把整条路判死）。
           if (g.state.cutscene) {
+            window.MissionInputDriver.mode="cutscene";
             g.Debug.Key("KeyW", false);
             g.Debug.Mouse(0, false);
             g.Debug.Mouse(2, false);
@@ -523,7 +850,8 @@ export function CampaignActions(ctx) {
             b.frames++;
             continue;
           }
-          const evading=crawl&&fight&&window.MissionInputDriver.EvadeGrenade();
+          const D=window.MissionInputDriver;
+          const evading=(crawl&&fight||D.reflexes)&&D.EvadeGrenade();
           if(recoverAfterEvade){
             if(evading)b.wasEvading=true;
             else if(b.wasEvading){
@@ -543,13 +871,19 @@ export function CampaignActions(ctx) {
               }
             }
           }
-          const foe = fight&&!evading ? window.MissionInputDriver.Target(crawl?28:90) : null;
+          // The corridor rejoin above is this leg's own way back after a dodge; otherwise walk back to the dodge's start.
+          if(recoverAfterEvade)D.returning=null;
+          const close=!evading&&D.reflexes?D.CloseThreat():null;
+          if(!evading&&!close&&D.StepHome()){g.StepFrames(1,1/60,false);b.frames++;continue;}
+          const foe = evading ? null : fight ? D.Target(crawl?28:90) : close;
           if(crawl&&!evading){
             const low=FRONT_SORTIE.crawl.some(c=>Math.abs(p.x-c.x)<c.w/2+1 && Math.abs(p.z-c.z)<c.d/2+3);
-            const desired=low?"prone":stance;
+            // Nobody fights a man at arm's length lying down: crouch up for him.
+            const desired=low&&!close?"prone":stance;
             if(g.player.stance!==desired)g.Debug.Key(desired==="prone"?"KeyZ":desired==="crouch"?"KeyC":g.player.stance==="prone"?"KeyZ":"KeyC");
             g.Debug.Key("ShiftLeft",sprint&&!low&&!foe);
           }
+          window.MissionInputDriver.mode=evading?"evade":foe?"fight":"walk";
           if(evading){g.StepFrames(1,1/60,false);b.frames++;continue;}
           if (foe) {
             g.Debug.Key("KeyW", false);
@@ -568,6 +902,7 @@ export function CampaignActions(ctx) {
           b.frames++;
         }
         g.Debug.Key("KeyW", false);
+        if (window.MissionInputDriver.backingOff) { g.Debug.Key("KeyS", false); window.MissionInputDriver.backingOff = false; }
         g.Debug.Mouse(0, false);
         g.Debug.Mouse(2, false);
         const chunkCutscene = b.cutsceneFrames || 0;
@@ -800,8 +1135,10 @@ export function CampaignActions(ctx) {
       state = await page.evaluate(
         ({ expected, fight, cover }) => {
           const g = window.Tengxian;
+          window.MissionInputDriver.leg="WaitStage:"+expected;window.MissionInputDriver.mode="hold";
           for (let i = 0; i < 300 && g.player.alive && g.Debug.FirstLevelMissionRuntime().flow.stage.id !== expected; i++) {
             const evading=window.MissionInputDriver.EvadeGrenade();
+            if(!evading&&!window.MissionInputDriver.CloseThreat()&&window.MissionInputDriver.StepHome()){g.StepFrames(1,1/60,false);continue;}
             // At a waist-high defensive wall, use normal crouch/peek inputs.
             // Grenade evasion can leave the player standing outside its protection.
             if(cover&&!evading){

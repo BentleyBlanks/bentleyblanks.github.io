@@ -105,6 +105,8 @@ try {
         'new cast uses its requested model slots instead of reassigning failed downloads '
         +'(comrade, runner and shouter are pinned to NRA02 since the 09-23 face package; the interpreter wears his own NRA06 since 2026-09-24)');
       assert.equal(setup.playerModel,null,'the protagonist also preserves the missing NRA02 slot');
+      assert.equal(setup.enemies.BunkerExecutionerA.model,'LugouIja06',
+        'ijaA (BunkerExecutionerA) wears the approved IJA06 through the failed NRA downloads (Model package, 2026-09-24)');
       for(const [id,actor] of Object.entries({...setup.squad,...setup.cast,...setup.enemies})) {
         assert.ok(actor.alive&&actor.physical&&actor.finite,`${id} remains a live physical person: ${JSON.stringify(actor)}`);
         assert.ok(actor.attached||['culled','crowd'].includes(actor.lod),
@@ -134,7 +136,9 @@ try {
         'the actual captive survives creation and kneels at the wall for the interrogation');
       for(const actor of closeup.actors)assert.ok(actor.finite&&(actor.hidden||actor.attached||['culled','crowd'].includes(actor.lod)),
         `${actor.id} still has a finite hierarchy under the normal culling/LOD contract`);
-      for(const id of ['BunkerExecutionerA','interpreter']) {
+      // Close-up rows are keyed by castId||missionId: squad by castId, the director's own cast by
+      // its missionId (Opening_<slot>), so the interpreter row is Opening_interpreter.
+      for(const id of ['BunkerExecutionerA','Opening_interpreter']) {
         const actor=closeup.actors.find(a=>a.id===id);
         assert.ok(actor?.attached&&actor.lod==='detail',`${id} must actually render in the interrogation close-up`);
       }

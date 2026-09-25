@@ -2,7 +2,7 @@ import { MISSION_RECEPTION_SPACE, MISSION_STAGE_ROUTES as Stage } from "./Data_F
 // Notion 2026-09-19（docs/Data_FirstLevelRebuild20260919Contract.md §1）：18 个公开阶段，
 // 27 个可玩内部步骤；流程表另有终止哨兵 Complete。公开阶段只做分组与调试跳转的起点，事实门仍各自独立。
 import { MISSION_ANCHORS as A, MISSION_ROUTES as Routes } from "./Data_FirstLevelMissionLayout.mjs";
-import { FRONT_APPROACH_ENEMIES } from "./Data_FirstLevelMissionFront.mjs";
+import { FRONT_APPROACH_ENEMIES, FRONT_FLANK_GROUP } from "./Data_FirstLevelMissionFront.mjs";
 const Phase = (number, id, title, steps, spawn) => Object.freeze({
   number, id, title, steps: Object.freeze(steps), entry: steps[0], spawn: Object.freeze(spawn),
 });
@@ -42,10 +42,22 @@ export const FIRST_LEVEL_STAGE_CLEARED_ENEMIES = Object.freeze({
   // A 04 debug start represents the observed continuous 03→04 battlefield.
   // Capturing the right nest requires all four existing position guards to be neutralized.
   // Rebuild the persistent roster while pre-clearing those four original ids.
-  4: Object.freeze(FRONT_APPROACH_ENEMIES.map(spec=>spec.id)),
-  5: Object.freeze(FRONT_APPROACH_ENEMIES.map(spec=>spec.id)),
+  // The flank group is cleared to its usual survivor too: a continuous run reaches 04 / 05 with 0–1 of the four flank
+  // men alive, and that one is always FrontFlankA (2026-09-25 Gate: three 03→06 drives read 0, 1, 1 at both the
+  // 03→04 and the 04→05 transition; a checkpoint start used to bring back all four on their start line at x 50–59).
+  4: Object.freeze([...FRONT_APPROACH_ENEMIES.map(spec=>spec.id),...FRONT_FLANK_GROUP.slice(1).map(spec=>spec.id)]),
+  5: Object.freeze([...FRONT_APPROACH_ENEMIES.map(spec=>spec.id),...FRONT_FLANK_GROUP.slice(1).map(spec=>spec.id)]),
   9: Object.freeze(["VillageCorner","KitchenGuard"]),
   10: Object.freeze(["VillageCorner","KitchenGuard"]),
+});
+// Where a checkpoint start puts live enemies who, in a continuous run, have moved by then. The tank escorts ride
+// with the tank from its road cutting; from their spawn (x 99–107) they are beyond TANK.escorts.joinRangeM (30 m) of
+// the tank at a 04 / 05 start, so they never joined it and 05 had no escorts. The points are what three continuous
+// 03→06 drives read at the 03→04 and 04→05 transitions (2026-09-25 Gate, STAGE_ENTRY_ENEMIES; each read within 4 m of it).
+// Only a checkpoint start reads this (Script_FirstLevelMissionStageJump); a continuous run is untouched.
+export const FIRST_LEVEL_CHECKPOINT_ENEMY_POSTS = Object.freeze({
+  4: Object.freeze({TankEscortA:{x:69,z:-204},TankEscortB:{x:67,z:-212},TankEscortC:{x:60,z:-207},TankEscortD:{x:61,z:-212}}),
+  5: Object.freeze({TankEscortA:{x:40,z:-164},TankEscortB:{x:40,z:-173.5},TankEscortC:{x:38,z:-163.5},TankEscortD:{x:39.5,z:-172}}),
 });
 // 下标对齐 FIRST_LEVEL_STAGES（第 n 阶段读 [n-1]）。这里写的是**跳到该阶段时仍活着**的组，
 // 没列进来又已经开始过的组会被登记成 spawned（不再重建）。
