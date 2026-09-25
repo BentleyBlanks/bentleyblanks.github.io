@@ -1813,7 +1813,12 @@
      "limb": "butt",
      "action": "strike",
      "partnerRole": "shunzi",
-     "part": "head"
+     "part": "head",
+     "playerOffsetM": [
+      0.0,
+      0.064,
+      0.046
+     ]
     }
    ],
    "events": [
@@ -5982,7 +5987,7 @@
   {
    "id": "LugouIja02",
    "file": "Animation_LugouIja02OpeningStoryboards.json",
-   "sha256": "73a21c446938b73895a4dce225f49abe732422a2bcdccad60401cde384cca0af",
+   "sha256": "8e80f17fa7fab9c28f6b1a92407a8daae6abd6baa34299ec7d4d44b2f3e74573",
    "originalModelSha256": "8c4860ec2d4dd3076b06ff7e593e5dcfd4d23aefe2fedf6f9fdec3b0e12cc9aa",
    "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningStoryboards_20260925\\Scene_LugouIja02OpeningStoryboards.blend",
    "contactPoints": {
@@ -6901,17 +6906,17 @@
      "clip": "IjaDrawBayonet",
      "frames": 21,
      "footSlideM": 0.0009,
-     "contactErrorM": 0.0218,
-     "gripSolveErrorM": 0.02183,
+     "contactErrorM": 0.0219,
+     "gripSolveErrorM": 0.02188,
      "pelvisMaxStepM": 0.0704,
      "floorCorrectionMin": -0.00026,
      "floorCorrectionMax": 0.00087,
      "root": {
       "start": [
        0.0247,
-       -0.1118,
+       -0.1117,
        -0.0,
-       0.738
+       0.7381
       ],
       "end": [
        0.0261,
@@ -6948,7 +6953,7 @@
      "floorCorrectionMax": 0.00186,
      "root": {
       "start": [
-       0.0261,
+       0.026,
        -0.1103,
        -0.0,
        0.7383
@@ -6996,7 +7001,7 @@
        0.0384,
        -0.2197,
        -0.0,
-       0.6861
+       0.6863
       ],
       "end": [
        -0.0,
@@ -7172,7 +7177,7 @@
        0.0474,
        -0.0597,
        -0.0,
-       0.6857
+       0.6858
       ],
       "end": [
        -0.0,
@@ -7516,7 +7521,7 @@
      "footSlideM": 0.0007,
      "contactErrorM": 0.0,
      "gripSolveErrorM": 0.0,
-     "pelvisMaxStepM": 0.0554,
+     "pelvisMaxStepM": 0.066,
      "floorCorrectionMin": -0.00045,
      "floorCorrectionMax": 0.00027,
      "root": {

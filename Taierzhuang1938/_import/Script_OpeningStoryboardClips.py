@@ -3877,7 +3877,9 @@ def ButtStrikeParts(T):
         'twist': [(0.0, 0.0), (.55, -.18), (1.05, -.18), (1.125, -.24), (BUTT_HIT_T, .10), (1.60, .02), (BUTT_T, 0.0)],
         'shrug': [(0.0, 0.0), (.55, .10), (1.05, .10), (BUTT_HIT_T, .18), (BUTT_T, 0.0)],
         'armPole.R': [(0.0, (-.70, -.20, .55)), (.55, (-.75, .05, 1.10)), (1.05, (-.75, .05, 1.10)), (BUTT_HIT_T, (-.70, -.30, .90)),
-                      (1.75, (-.72, -.10, .95)), (BUTT_T, (-.70, -.20, .55))],
+                      # letting the rifle down past shoulder height the fist goes out to his right, where the
+                      # elbow pole was: the elbow is held back/up meanwhile (it flipped over in one frame at 1.96 s)
+                      (1.75, (-.72, -.10, .95)), (1.88, (-.55, .35, .90)), (2.02, (-.62, .15, .55)), (BUTT_T, (-.70, -.20, .55))],
     })
     hand = Channel([(0.0, BUTT_LOW_HAND), (.20, Add3(BUTT_LOW_HAND, (0, 0, .03))), (.40, (-.36, -.28, .85)), (.55, BUTT_APEX_HAND),
                     (1.05, BUTT_APEX_HAND), (1.125, Add3(BUTT_APEX_HAND, (-.02, .06, .02))), (1.25, (-.22, -.32, 1.10)),
@@ -3926,7 +3928,10 @@ Meta('IjaButtStrikeCollar', BUTT_T, False, 'track', role='ijaA', rig='LugouIja02
      weaponState='clubRight', player=True, holdLoop=[.55, 1.05],
      holdExit='pose.holdUntil: the apex loop lets go at that clip time; 1.05-1.125 s wind-up, butt on the head at 1.375 s',
      contacts=[{'t': 0.0, 'limb': 'handL', 'action': 'hold', 'partnerRole': 'shunzi', 'part': 'collar'},
-               {'t': BUTT_HIT_T, 'limb': 'butt', 'action': 'strike', 'partnerRole': 'shunzi', 'part': 'head'}],
+               # the butt lands on his forehead: playerOffsetM from the player 'head' point (his eye) in the
+               # actor frame, runtime metres (ButtStrikeParts hitButt: source (0, .05, .07) x IJA02 scale 0.913)
+               {'t': BUTT_HIT_T, 'limb': 'butt', 'action': 'strike', 'partnerRole': 'shunzi', 'part': 'head',
+                'playerOffsetM': [0.0, .064, .046]}],
      events=[{'t': .55, 'kind': 'apex'}, {'t': 1.125, 'kind': 'windUp'},
              {'t': BUTT_HIT_T, 'kind': 'buttHit', 'fact': 'playerStruck'}],
      prev=['CollarDrag', 'IjaKickBeam'], next=['IjaDragByForearm'],
@@ -4025,7 +4030,7 @@ def BuildDragByForearm(T, name):
     bob = lambda t: -.012 * abs(math.sin(math.pi * Clamp((t - .45) / .195))) if .45 <= t <= 2.40 else 0.0
     pelvis = [(t, (PelvisXY(t)[0], PelvisXY(t)[1], p0[2] + bob(t))) for t in times]
     base = dict(start)
-    base['handRel.L'] = (.10, -.42, -.18)            # the free fist between the collar and the forearm
+    base['handRel.L'] = (.10, -.34, -.20)            # the free fist between the collar and the forearm (elbow bent: no straight-arm reach)
     body = Tracks(base, dict(feet, pelvis=pelvis,
                              bend=[(0.0, start['bend']), (.40, .90), (2.40, .90), (DRAG_T, .86)],
                              pelvisTilt=[(0.0, start['pelvisTilt']), (.40, (.36, 0, 0)), (DRAG_T, (.36, 0, 0))],
@@ -4121,7 +4126,7 @@ def BuildLookBackLow(T, name):
         if wl > .05:
             f['grip.L'], f['gripW.L'] = rifle['gripL'], wl
             f['palmF.L'], f['palmN.L'], f['curl.L'] = palms['L'][0], palms['L'][1], .85
-        f['handRel.L'] = (.07, -.06, -.46)
+        f['handRel.L'] = (.08, -.10, -.40)          # hangs with the elbow a little bent (a straight arm locked on the way off)
         return T.Nest(f)
     spec = {'pose': Pose, 'props': lambda t: {'weapon': T.Track(RifleAt(t))}, 'plants': [('L', 0, LOOK_T), ('R', 0, LOOK_T)],
             'check': lambda t: {'R': RifleAt(t)['gripR']},

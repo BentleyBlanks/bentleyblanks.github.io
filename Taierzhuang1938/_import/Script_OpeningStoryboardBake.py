@@ -15,7 +15,14 @@ path; start/stop the instance around it). Environment:
                      tracks and validation reports)
   OPENING_VERSION    manifest version (default 20260925OpeningStoryboardsV5)
   OPENING_MODEL      comma list of rigs (default all five)
-  OPENING_CLIPS      comma list: bake only these clips and merge into the rig's JSON
+  OPENING_CLIPS      comma list: bake only these clips and merge into the rig's JSON. Clips bake in
+                     library order and carry the hand/forearm-roll and finger rate limits from one
+                     clip to the next: rebake a same-root chain together (IJA02 2026-09-25:
+                     IjaHoldCollarUp,IjaButtStrikeCollar,IjaDragByForearm,IjaLookBackLow,
+                     IjaStartleTurn,IjaParriedChoppedFall). Baking IjaDragByForearm alone rolls
+                     its right forearm 180 deg off IjaButtStrikeCollar's last frame, and a
+                     from-scratch bake of every IJA02 clip moves six 2026-09-23 clips by up to
+                     2 cm at their hand-overs -- the committed files are the chained bakes.
   OPENING_PASS       'bake' (default) | 'partner' (dump the partner tracks the paired
                      clips aim their hands at -- run it before 'bake') | 'manifest'
                      (rewrite the manifest from the rig files on disk, no Blender work)
@@ -344,12 +351,20 @@ def BakeRig(ctx):
         """Pin the grip centroid (finger roots -- what the runtime mounts to) on `grip`.
 
         The IK drives the wrist; the grip sits 8-10 cm past it along the palm, so a
-        couple of arm-only passes close the gap without re-solving the body."""
+        couple of arm-only passes close the gap without re-solving the body.
+
+        Only the last pass reports an overreach: the first pass aims the WRIST at the grip
+        point (a hand length too far), so it read every relaxed arm easing onto a grip as
+        1.1-1.3 of its length although the converged arm was bent (2026-09-25)."""
         hand = Bone(side + ' Hand')
         target = Vector(grip)
         wrist = target.copy()
+        reported = []
         for _ in range(4):
+            mark = len(ctx['overreach'])
             ctx['Chain'](Bone(side + ' UpperArm'), Bone(side + ' Forearm'), hand, wrist, Vector(pole), label='grip' + side)
+            reported = ctx['overreach'][mark:]
+            del ctx['overreach'][mark:]
             if palm:
                 normal = ctx['TurnPalm'](side, palm[0], palm[1])
                 LimitHand(side)
@@ -362,6 +377,7 @@ def BakeRig(ctx):
             if error.length < .0006:
                 break
             wrist += error
+        ctx['overreach'].extend(reported)
         return (target - ctx['GripPoint'](side)).length
 
     solveState = {'lift': 0.0}
