@@ -61,7 +61,7 @@ const FRONT_STORYBOARD_SHOTS = Object.freeze({
     // 左前景的机枪（夺下的 MissionGun）：重心在画面左 0.4 以内、面积够大（前景）。
     gun: Object.freeze({ xMax: 0.4, minPx: 3000 }),
     // 放行之后站到机位上，每 0.1 s 看一次（缺口段沟只有 0.5 m 深、约 6 m 长，人过这一段只要两三秒）。
-    waitS: 100, crossingSampleS: 0.1,
+    waitS: 100, crossingSampleS: 0.1, spreadS: 6,
   }),
 });
 
@@ -275,11 +275,14 @@ async function HoldUntil(cond, seconds) {
 
 async function ShootSB08(Route) {
   const C = FRONT_STORYBOARD_SHOTS.SB08;
-  // 走完支援路线、夺点（与整关驾驶 DriveLegs 同一条：躲雷甩到西矮墙外就从西门绕回）。
-  await Route(MISSION_ROUTES.support, "SB08_RightNestApproach", { stance: "crouch", fight: true, crawl: true, recoverAfterEvade: true, rejoinRoute: MISSION_ROUTES.support }).catch(async (error) => {
+  // 走完支援路线、夺点（与整关驾驶 DriveLegs 同一条：躲雷甩到西矮墙外就从西门绕回），但最后一步不上座位、直接到机位：
+  // 机位离阵位点 1.5 m，在夺点半径（captureRadiusM 4）里；第一批常在夺点后几秒就放行，09-25 最后一趟从座位走过去再站起来，
+  // 第一眼看见时一列人已经过了缺口。
+  const vp = { x: C.player.x, z: C.player.z }, approach = [...MISSION_ROUTES.support.slice(0, -1), vp];
+  await Route(approach, "SB08_RightNestApproach", { stance: "crouch", fight: true, crawl: true, recoverAfterEvade: true, rejoinRoute: approach }).catch(async (error) => {
     if (!/actual body reached route end/.test(error?.message || "")) throw error;
     console.log("SB08_RightNestApproach: stalled after an evade, going round through the west door");
-    await Route(S.approach.slice(-3), "SB08_RightNestApproachViaDoor", { stance: "crouch", fight: true, crawl: true, recoverAfterEvade: true });
+    await Route([...S.approach.slice(-3, -1), vp], "SB08_RightNestApproachViaDoor", { stance: "crouch", fight: true, crawl: true, recoverAfterEvade: true });
   });
   const captured = await HoldUntil("r.Has('rightNestCaptured')", 90);
   if (!captured.hit) throw Error("rightNestCaptured 90 s 内没发生：" + JSON.stringify(captured));
@@ -296,7 +299,7 @@ async function ShootSB08(Route) {
   const released = await HoldUntil(`(r.guards||[]).slice(0,${B.firstBatch}).some((x)=>x.crossing)`, 150);
   if (!released.hit) throw Error("第一批 150 s 内没放行：" + JSON.stringify(released));
   if (await page.evaluate((vp) => Math.hypot(window.Tengxian.player.position.x - vp.x, window.Tengxian.player.position.z - vp.z) > 0.8, C.player)) await ToViewpoint();
-  let best = null;
+  let best = null, enough = null;
   const samples = [];
   for (let k = 0, t0 = null; k < 1000; k++) {
     const s = await page.evaluate(({ C, n }) => {
@@ -315,8 +318,9 @@ async function ShootSB08(Route) {
       const p = g.player.position, first = (r.guards || []).slice(0, n), gun = g.scene.getObjectByName("Emplacement_MissionGun");
       const paint = G.Paint([{ key: "gun", roots: [gun] }, ...first.map((x, i) => ({ key: "g" + i, roots: [x.actor.actor?.root] }))], 1);
       // 只数正在过口的人（crossing 且还没进安全区）：还跪在最后遮挡处等的不是分镜里那一列（09-25 第五趟就数成了 3 个等着的）。
-      const visible = first.filter((x, i) => x.actor.alive && x.crossing && !x.safe && paint["g" + i].px >= C.firstBatch.minPx).length;
-      return { t: +r.time.toFixed(2), stage: r.flow.stage.id, alive: g.player.alive, visible,
+      const counted = first.map((x, i) => x.actor.alive && x.crossing && !x.safe && paint["g" + i].px >= C.firstBatch.minPx ? paint["g" + i].cx : null).filter((v) => v != null);
+      const visible = counted.length, spreadPx = visible ? Math.round((Math.max(...counted) - Math.min(...counted)) * innerWidth) : 0;
+      return { t: +r.time.toFixed(2), stage: r.flow.stage.id, alive: g.player.alive, visible, spreadPx,
         first: first.map((x, i) => ({ ...G.Actor(x.actor, "g" + i), progress: x.progress, crossing: !!x.crossing, safe: !!x.safe, paint: paint["g" + i] })),
         gun: paint.gun, camera: G.Cam(), player: { pos: p.toArray().map((v) => +v.toFixed(2)), stance: g.player.stance }, state: r.frontBattle.State() };
     }, { C, n: B.firstBatch });
@@ -330,12 +334,16 @@ async function ShootSB08(Route) {
       await page.evaluate(() => { const g = window.Tengxian; g.Debug.MenuAct("continueCheckpoint"); g.StepFrames(1, 1 / 60, false); });
       await ToViewpoint(); await page.evaluate(() => { window.frontShots.watching = false; }); continue;
     }
-    if (!best || s.visible > best.visible) { best = s; await page.screenshot({ path: path.join(OUT, "SB08.png") }); }
+    // 挑「看得见的人够数（到 minVisible 为止）、其次横向铺得最开」的那一帧：刚离开遮挡时一列人挤成一团（09-25 三趟横向只铺开 15–22 px），
+    // 数得出 3 个也看不出 3 个；够数之后再看 spreadS 秒，等他们在缺口那段拉开。
+    const Enough = (v) => Math.min(v.visible, C.firstBatch.minVisible);
+    if (!best || Enough(s) > Enough(best) || (Enough(s) === Enough(best) && s.spreadPx > best.spreadPx)) { best = s; await page.screenshot({ path: path.join(OUT, "SB08.png") }); }
     // 躲雷把人带离了机位：走回去再看。
     if (Math.hypot(s.player.pos[0] - C.player.x, s.player.pos[2] - C.player.z) > 0.8) {
       await ToViewpoint(); await page.evaluate(() => { window.frontShots.watching = false; });
     }
-    if (s.visible >= C.firstBatch.minVisible) break;
+    if (s.visible >= C.firstBatch.minVisible) enough ??= s.t;
+    if (enough != null && s.t - enough > C.spreadS) break;
     if (s.first.every((x) => x.safe || !x.alive)) break;
   }
   best.samples = samples;
@@ -347,7 +355,7 @@ async function ShootSB08(Route) {
   Check("SB08", `同一帧看得见正在过缺口的第一批 ≥ ${C.firstBatch.minVisible} 人`, "front", best.visible >= C.firstBatch.minVisible,
     { visible: best.visible, t: best.t,
       // 算进去的人在画面上横向铺开多宽（px）：34 m 外一列人几乎是一团，数得出 3 个不等于看得出 3 个，这个数只报不判。
-      spreadPx: (() => { const xs = best.first.filter((x) => x.crossing && !x.safe && x.paint.px >= C.firstBatch.minPx).map((x) => x.paint.cx); return xs.length ? Math.round((Math.max(...xs) - Math.min(...xs)) * W) : 0; })(),
+      spreadPx: best.spreadPx,
       people: best.first.map((x) => ({ id: x.id, px: x.paint.px, cx: x.paint.cx, distM: x.distM, progress: x.progress, crossing: x.crossing, safe: x.safe })) });
   Check("SB08", "机枪在左前景", "front", best.gun.px >= C.gun.minPx && best.gun.cx <= C.gun.xMax, best.gun);
   for (const what of ["机枪旁弹药箱", "缺口东沿倒塌砖墙延伸向远处", "缺口段沙袋木板护壁", "远处火点与烟柱"]) Check("SB08", what, "set", false, "pending: 第二波 Set 布景合入后看图");
