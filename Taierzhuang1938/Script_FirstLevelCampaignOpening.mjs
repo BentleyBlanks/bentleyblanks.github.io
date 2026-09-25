@@ -531,8 +531,15 @@ export async function InstallSpeakerActing(page){
  * drive loop); multi-frame steps (captures, idles) pass through. Idempotent.
  */
 export const GLANCE_RAD_PER_FRAME = .06;
+/**
+ * A glance, not a stare: once the speaker of a line has been seen and acted this many frames (and turned his head),
+ * the drive looks back to its own business while the line goes on. Holding the view for the whole line stopped the
+ * route bot 3-4 s on each near line of the 03 approach (09-25 drives): it reached the right nest after the flank group
+ * and died there in 6 of 16 cold 03 starts, against 0 in the Gate package's and the baseline's runs.
+ */
+export const GLANCE_SEEN_FRAMES = 30;
 async function InstallSpeakerGlance(page){
-  await page.evaluate(({near,turn})=>{
+  await page.evaluate(({near,turn,enough})=>{
     const g=window.Tengxian;if(g.speakerGlance)return;
     const glance=g.speakerGlance={frames:0,restores:0,saved:null,last:null,lines:{}};
     const step=g.StepFrames,Wrap=a=>Math.atan2(Math.sin(a),Math.cos(a));
@@ -564,6 +571,7 @@ async function InstallSpeakerGlance(page){
         if(l.state!=="playing"||l.line.who==="shunzi"||l.line.who==="crowd")continue;
         const bone=r.speakers?.ActorForWho?.(l.line.who,true)?.actor?.characterRig?.bones?.head;if(!bone)continue;
         const at=bone.getWorldPosition(bone.position.clone());
+        const seen=window.frontLineActing?.[l.line.id];if(seen&&(seen.actedSeen||0)>=enough&&seen.turn>.05)continue;
         if(at.distanceTo(eye)<=near){head=at;lineId=l.line.id;}
       }
       const drive=window.MissionInputDriver;
@@ -601,7 +609,7 @@ async function InstallSpeakerGlance(page){
       p.yaw=Toward(p.yaw,yaw);p.pitch=p.pitch+Math.max(-turn,Math.min(turn,pitch-p.pitch));
       glance.last={yaw:p.yaw,pitch:p.pitch};
     }
-  },{near:B.speakerViewNearM,turn:GLANCE_RAD_PER_FRAME});
+  },{near:B.speakerViewNearM,turn:GLANCE_RAD_PER_FRAME,enough:GLANCE_SEEN_FRAMES});
 }
 
 /** Frames a 03–06 line's speaker must have his head in the picture, and be acted there (CheckFrontActing). */

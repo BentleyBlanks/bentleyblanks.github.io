@@ -335,6 +335,9 @@ export const FRONT_BATTLE_TUNING=Object.freeze({
   // speakerViewMinM with room for the player's own step; the walk is about the NPC walk pace (Data_Tuning_FirstLevel MISSION_TUNING.walkSpeedMps 1.7).
   // 09-25 03->06 drive: Luo tailing the player at 0.7 m (FrontBlockade.02, FrontApproach.01, BundleSupply.02,
   // Volunteer.02) and the relief NCO at 1.0 m (FrontRelief.02) talked from inside the camera.
-  speakerBackOffDistancesM:Object.freeze([2,1.7,2.4]),speakerBackOffBearingsDeg:Object.freeze([0,30,60]),speakerBackOffSpeedMps:1.8,
+  // Not to a spot within speakerBackOffAheadDeg of where a walking player is heading (he would walk into it again: Luo
+  // backed into the ammo house ahead of the player going in and stayed 0.7 m from him, 09-25 drive).
+  speakerBackOffDistancesM:Object.freeze([2,1.7,2.4]),speakerBackOffBearingsDeg:Object.freeze([0,30,60,90]),speakerBackOffSpeedMps:1.8,
+  speakerBackOffAheadDeg:50,
   bandage:{radius:.087,height:.2,y:-.19,color:0xb6ac8b},
 });

@@ -62,11 +62,12 @@ export const FRONT_SORTIE=Object.freeze({
     Point(39.6,-117.4),Point(39.6,-114.2),Point(41.4,-112.6),Point(42.4,-111)],
   // 05 attack branch = the upper link sap the 01 Japanese came down: rear junction -> road-side ruin.
   attackRoute:[Point(29.7,-141.5),Point(35,-142.5),Point(39.4,-144.2),Point(39.8,-150),Point(41.8,-154.8),Point(43.6,-159.6)],
-  // The keeper waits outside the house's west door (door gap z -111.8..-110.2 at x 43), in the alley the route comes
-  // up: he calls 「里头那个箱子！」 when the player is within supplierRangeM of the house, and the player sees him say
-  // it (2026-09-25 relay r2 Front step 1). Inside at (46.2,-106.4) the house's west wall stood between the two for
-  // the whole line (09-25 03->06 drive: 130 of 130 frames).
-  house:Point(47.5,-109),bundle:Point(49,-110.2),keeper:Point(41.6,-108.8),
+  // The keeper kneels in the house where the west door (gap z -111.8..-110.2 at x 43) frames him from the whole
+  // approach inside supplierRangeM, 2.6 m off the door-to-crate walk: he calls 「里头那个箱子！」 as the player comes up
+  // and the player sees him say it (2026-09-25 relay r2 Front step 1). At (46.2,-106.4) the 0.6 m thick west wall
+  // stood between the two for the whole line (09-25 03->06 drive: 130 of 130 frames); in the alley outside the door
+  // (41.6,-108.8) he ended up in the doorway, in the player's way.
+  house:Point(47.5,-109),bundle:Point(49,-110.2),keeper:Point(46.8,-107.8),
   throw:Point(43.6,-159.6),orders:Point(-34,-99),
   leftGun:Point(-33.8,-157.6),leftSeat:Point(-33.6,-156.4),
   // He / relief / Zhou use the support sap's first leg and then the left gun access trench.

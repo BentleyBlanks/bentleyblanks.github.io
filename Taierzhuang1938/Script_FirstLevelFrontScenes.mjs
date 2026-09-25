@@ -207,16 +207,21 @@ export class FirstLevelFrontScenes {
   /**
    * Where a speaker too near the player steps back to: B.speakerBackOffDistancesM from the player, straight away from
    * him or up to B.speakerBackOffBearingsDeg off that line, on his own floor, not inside a collider, a straight walk
-   * nothing blocks, and never passing nearer the player than he already stands. null when there is none.
+   * nothing blocks, and never passing nearer the player than he already stands. Not ahead of a walking player
+   * (within B.speakerBackOffAheadDeg of where he walks): he would walk straight back into it (09-25 drive: Luo backed
+   * into the ammo house in front of the player going in, and stayed 0.7 m from him). null when there is none.
    */
   BackOffSpot(body) {
     const r = this.r, player = r.player.position, from = body.position;
     const away = Math.atan2(from.x - player.x, from.z - player.z), near = Distance(from, player);
     const floor = r.Point(from).y, knee = r.Point(from, 0.6);
+    const v = r.player.velocity, speed = v ? Math.hypot(v.x || 0, v.z || 0) : 0;
+    const walking = speed > B.speakerStepPlayerStillMps, ahead = Math.cos(B.speakerBackOffAheadDeg * DEG);
     for (const distance of B.speakerBackOffDistancesM) for (const bearing of B.speakerBackOffBearingsDeg)
       for (const sign of bearing ? [1, -1] : [1]) {
         const yaw = away + sign * bearing * DEG;
         const spot = { x: player.x + Math.sin(yaw) * distance, z: player.z + Math.cos(yaw) * distance };
+        if (walking && (Math.sin(yaw) * v.x + Math.cos(yaw) * v.z) / speed > ahead) continue;
         if (Distance(spot, from) > B.speakerStepMaxM) continue;
         if (SegmentDistance(player, from, spot) < near - 0.05) continue;
         const ground = r.Point(spot);
@@ -273,6 +278,23 @@ export class FirstLevelFrontScenes {
     }
     return true;
   }
+  /**
+   * Every frame a front line plays: a speaker who has come nearer than B.speakerViewMinM since his line began (the
+   * player crawled up beside him, walked into him) steps back (BackOff) - HoldLine only looks when a line starts.
+   */
+  KeepSpace() {
+    const handle = this.handle;
+    if (this.steer || !handle || handle.done || !this.r.camera) return;
+    for (const l of handle.lines) {
+      if (l.state !== "playing" || !l.line || l.line.who === "shunzi" || l.line.direction?.spatial === "self") continue;
+      const body = this.Body(l.line.who), view = body && this.SpeakerView(body);
+      if (view && view.distance < B.speakerViewMinM && this.BackOff(body, l.line.who, handle.id)) {
+        const hold = this.holds.get(l.line.id);
+        if (hold) hold.backedOff = true;
+        return;
+      }
+    }
+  }
   /** This soldier is walking into the picture for a line (FirstLevelFrontBattle.Walk leaves him alone meanwhile). */
   Steers(soldier) { return !!soldier && this.steer?.soldier === soldier; }
   /**
@@ -280,6 +302,7 @@ export class FirstLevelFrontScenes {
    * his spot, and lets him go once his lines in the scene are done (his own orders take over again).
    */
   Steer() {
+    this.KeepSpace();
     const s = this.steer, r = this.r;
     if (!s) return;
     const handle = this.handle;
@@ -288,6 +311,9 @@ export class FirstLevelFrontScenes {
     // The player walked off: the spot framed a view he no longer has (a step back keeps its spot until the line ends).
     const left = !!s.anchor && !!r.player?.position && Distance(r.player.position, s.anchor) > B.speakerStepReleaseM;
     if (!talking || !s.soldier?.alive || left) { this.steer = null; return; }
+    // Stepped back, and the player came up to him again: one more step back.
+    if (s.backOff && Distance(s.soldier.position, s.spot) <= 0.35 && (this.SpeakerView(s.soldier)?.distance ?? Infinity) < B.speakerViewMinM)
+      s.spot = this.BackOffSpot(s.soldier) || s.spot;
     if (Distance(s.soldier.position, s.spot) > 0.35) r.MoveActor?.(s.soldier, s.spot, s.backOff ? B.speakerBackOffSpeedMps : B.speakerStepSpeedMps);
     else if (r.Defend) r.Defend(s.soldier, s.spot, 0, 0.3);
   }
