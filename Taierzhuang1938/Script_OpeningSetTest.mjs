@@ -10,14 +10,22 @@
 //    SB03A 上沿那条塌顶木真在画面上沿；
 //    还权位对折角 F 的通视只量不判（见文末说明与报告）；
 // 4. Script_OpeningSet 的生命周期：进 01–03 装载，近爆后塌方组出现、门楣落下，马灯只在 01 亮；
-//    离开 01–03 后场景零残留、几何与自有材质全部 dispose。
+//    离开 01–03 后场景零残留、几何与自有材质全部 dispose（03 前沿那一份活到 06，离开前沿各步再收）；
+// 5. Step 2：近爆定向喷土（方向对着 SB02 机位、时序 0.22–0.9 s、只喷一次）、烟柱火点（按步骤挂与收、粒子预算）、
+//    03 开头两架飞机（航线在 SB07 画面上部、触发与交还、AircraftFlight 能同时摆两架）、阴天开关（默认关、不改雾、
+//    01–03 套用、离开还原）、03 前沿布景（砖壳包住阵位体块、机枪破口不加高、倒墙不挡阵位看缺口里的守军、弹药箱不挡人）。
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import * as THREE from "three";
-import { PROPS, SET_STAGES, SMOKE, FLYOVER, sky, DESIGNED_CONTACTS, PropFootprints, FLOOR } from "./Data_OpeningSet0103.mjs";
-import { OpeningSet } from "./Script_OpeningSet.mjs";
+import { PROPS, SET_STAGES, SMOKE, FLYOVER, sky, DESIGNED_CONTACTS, PropFootprints, FLOOR, BLAST, SmokeOptions, SMOKE_PARTICLE_BUDGET,
+  FLYOVER_TRIGGER, FlyoverPose, FRONT_PROPS, FRONT_SET_STAGES, BRICK } from "./Data_OpeningSet0103.mjs";
+import { OpeningSet, OvercastPreset } from "./Script_OpeningSet.mjs";
+import { OpeningBlastFx } from "./Script_OpeningBlastFx.mjs";
+import { VfxSystem } from "./Script_Vfx.mjs";
+import { AircraftFlight } from "./Script_Aircraft.mjs";
+import { SKY_PRESETS } from "./Script_Sky.mjs";
 import { OPENING_STORYBOARDS as C } from "./Data_OpeningStoryboards.mjs";
 import { SampleMissionTerrain as G } from "./Data_FirstLevelMissionTerrain.mjs";
 import { MISSION_LAYOUT as L } from "./Data_FirstLevelMissionLayout.mjs";
@@ -25,6 +33,7 @@ import { FRONT_SPACE as SP } from "./Data_FirstLevelFrontRoute.mjs";
 import { Sight, Eye, RouteClearance } from "./Script_FirstLevelSpaceProbe.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
+const DEG = Math.PI / 180;
 const report = {};
 
 // ---------------------------------------------------------------- 1. 数据合法
@@ -314,9 +323,16 @@ const Samples = (route) => {
   for (const g of geometries) g.addEventListener("dispose", () => disposedGeometry++);
   for (const m of owned) m.addEventListener("dispose", () => disposedOwned++);
   for (const m of shared.values()) m.addEventListener("dispose", () => disposedShared++);
+  // 03 起还装着前沿那一份（阵位破砖墙、缺口倒墙；04–06 还在那儿打），它单独一个根节点，下面第 5 节另算。
+  set.Update(0.016, "Support", null, { collapsed: true, blastAge: 30 });
+  const frontRoot = set.front?.root;
+  assert.ok(set.Active && frontRoot?.parent === scene, "03 shows both the 01–03 set and the front dressing");
   set.Update(0.016, "MachineGun", null, { collapsed: true, blastAge: 30 });
+  assert.ok(frontRoot && set.front?.root === frontRoot, "the front dressing built in 03 stays through 04 (same root)");
+  assert.deepEqual(scene.children.map((o) => o.name), ["Existing", "OpeningSet0103_Front"], "leaving 01–03 removes the whole 01–03 set; only the front dressing stays");
+  set.Update(0.016, "South", null, { collapsed: true, blastAge: 30 });
   let nodes = 0; scene.traverse(() => nodes++);
-  assert.equal(scene.children.length, 1, "leaving 01–03 removes the whole set from the scene");
+  assert.equal(scene.children.length, 1, "leaving the front stages removes the front dressing too");
   assert.equal(nodes, 2, "no stray node is left behind");
   assert.equal(disposedGeometry, geometries.size, `every set geometry is disposed (${disposedGeometry}/${geometries.size})`);
   assert.equal(disposedOwned, owned.length, "every material the set created is disposed");
@@ -324,10 +340,263 @@ const Samples = (route) => {
   assert.equal(set.Active, false);
   // 回跳到 02：重新装载；整关拆除 Exit() 也拆干净。
   set.Enter("BunkerRescue");
-  assert.ok(set.Active && scene.children.length === 2, "jumping back to 02 rebuilds the set");
+  assert.ok(set.Active && scene.children.length === 2 && !set.front, "jumping back to 02 rebuilds the set (the front dressing waits for 03)");
   set.Exit();
   assert.equal(scene.children.length, 1, "Exit() removes it again");
   console.log(`ok lifecycle: ${report.stats.meshes} meshes / 1 light in 01–03, lintel falls 0.25–0.6 s, lantern only in 01, zero residue after 03`);
+}
+
+// ---------------------------------------------------------------- 5. Step 2：喷土、烟火、飞机、阴天、03 前沿布景
+// vfx 在 node 里建不起来（要 document），用一个假的：只录下生了什么，锥形速度借真的 _ConeVelocity。
+function FakeVfx() {
+  let seed = 7;
+  const log = { smoke: [], debris: [], sources: new Map(), removed: [], next: 1 };
+  return {
+    log, time: 0, spawnScale: 1, wind: { x: 0.35, z: -0.15 },
+    random: () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; },
+    _ConeVelocity: VfxSystem.prototype._ConeVelocity,
+    _SpawnDebris(x, y, z, vx, vy, vz, sx, sy, sz, color, life, groundY) { log.debris.push({ x, y, z, vx, vy, vz, sx, sy, sz, life, groundY }); },
+    pools: { smoke: { Spawn: (s) => log.smoke.push({ ...s }) } },
+    SmokeSource(position, opts) { const id = log.next++; log.sources.set(id, { position: { ...position }, opts }); return id; },
+    RemoveSmokeSource(id) { log.removed.push(id); log.sources.delete(id); },
+  };
+}
+{
+  // ---- 5a. 近爆喷土：数据、时序、方向
+  const eye = { x: -0.6, z: -125.95 };                       // SB02 镜像机位
+  const dir = new THREE.Vector3(BLAST.dir.x, BLAST.dir.y, BLAST.dir.z).normalize();
+  const toEye = new THREE.Vector3(eye.x - BLAST.at.x, 0, eye.z - BLAST.at.z).normalize();
+  const flat = new THREE.Vector3(dir.x, 0, dir.z).normalize();
+  report.blastAimDeg = +(flat.angleTo(toEye) / DEG).toFixed(1);
+  assert.ok(report.blastAimDeg < BLAST.spreadRad / DEG, `SB02: the spray points at the mirrored camera (${report.blastAimDeg} deg off axis)`);
+  assert.ok(dir.x < 0 && dir.z < 0 && dir.y > 0, "the spray goes north-west into the dugout, slightly up");
+  assert.ok(Math.hypot(BLAST.at.x - 1.05, BLAST.at.z - -124.3) < 0.35, "the spray starts at the south edge of the mouth (south post)");
+  assert.ok(BLAST.atS >= 0.2 && BLAST.atS <= 0.25 && BLAST.atS + BLAST.seconds <= 0.95, "0.22–0.9 s after the blast (contract §5 SB02)");
+  assert.ok(BLAST.clods >= 12 && BLAST.clods <= 18 && BLAST.splinters > 0 && BLAST.dust > 0, "about fifteen clods, splinters and dust");
+  const vfx = FakeVfx(), fx = new OpeningBlastFx({ vfx });
+  fx.DirectionalBlast({ x: BLAST.at.x, y: 0, z: BLAST.at.z }, BLAST.dir, { groundY: -2 });
+  const counts = () => ({ debris: vfx.log.debris.length, smoke: vfx.log.smoke.length });
+  let t = 0, head = null;
+  while (t < BLAST.seconds + 0.2) { fx.Update(1 / 60); t += 1 / 60; if (head == null && t >= BLAST.burst.headS) head = counts(); }
+  const total = counts(), stats = fx.Stats();
+  report.blast = { head, total, active: stats.active };
+  assert.equal(total.debris, BLAST.clods + BLAST.splinters, "every clod and splinter is spawned");
+  assert.equal(total.smoke, BLAST.spray + BLAST.dust, "every spray and dust puff is spawned");
+  assert.ok(head.debris >= 0.65 * total.debris, `most of the burst is out by ${BLAST.burst.headS} s: ${JSON.stringify(head)}`);
+  assert.equal(stats.active, 0, "the emitter retires after its seconds");
+  const cone = Math.cos(BLAST.spreadRad * 1.8 + 0.25);
+  const aligned = vfx.log.debris.filter((d) => new THREE.Vector3(d.vx, d.vy, d.vz).normalize().dot(dir) > cone).length;
+  assert.ok(aligned >= 0.9 * vfx.log.debris.length, `debris flies along the cone (${aligned}/${vfx.log.debris.length})`);
+  assert.ok(vfx.log.debris.every((d) => d.groundY === -2), "debris lands on the given floor");
+  // Set 自动触发：炮弹落地（0.22 s）那一帧喷一次，之后不再喷；选章进来（早过了）不补喷；重试（blastAge 回 null）重新计。
+  const scene = new THREE.Scene(), v2 = FakeVfx();
+  const set = new OpeningSet({ scene, library: null, groundAt: (x, z) => G(x, z), vfx: v2 });
+  set.Enter("Trapped");
+  set.Update(0.016, "Trapped", "Blast", { collapsed: true, blastAge: 0.1 });
+  assert.equal(set.Stats().blast.fired, 0, "no spray before the shell lands");
+  set.Update(0.016, "Trapped", "Blast", { collapsed: true, blastAge: 0.23 });
+  set.Update(0.016, "Trapped", "Blast", { collapsed: true, blastAge: 0.5 });
+  assert.equal(set.Stats().blast.fired, 1, "one spray when the shell lands");
+  set.Update(0.016, "Trapped", "Banter", { collapsed: false, blastAge: null });
+  set.Update(0.016, "Trapped", "Blast", { collapsed: true, blastAge: 3 });
+  assert.equal(set.Stats().blast.fired, 1, "a retry that comes back after the blast does not replay the spray");
+  set.Exit();
+  console.log(`ok blast: aim ${report.blastAimDeg} deg off the SB02 camera, ${JSON.stringify(report.blast)}`);
+}
+{
+  // ---- 5b. 烟柱与火点：按步骤挂、按步骤收，预算
+  const ids = SMOKE.map((r) => r.id);
+  assert.equal(new Set(ids).size, ids.length, "smoke ids are unique");
+  const stageBudget = {};
+  for (const stage of ["Trapped", "BunkerRescue", "RearTrench", "Support"]) {
+    stageBudget[stage] = +SMOKE.filter((r) => r.stages.includes(stage)).reduce((sum, r) => { const o = SmokeOptions(r); return sum + o.rate * o.life; }, 0).toFixed(0);
+    assert.ok(stageBudget[stage] <= SMOKE_PARTICLE_BUDGET, `${stage}: live smoke puffs ${stageBudget[stage]} <= ${SMOKE_PARTICLE_BUDGET}`);
+  }
+  for (const r of SMOKE) {
+    assert.ok(r.stages.every((s) => SET_STAGES.includes(s)), `${r.id} only in 01–03`);
+    const o = SmokeOptions(r);
+    assert.ok(o.light === false && o.kind === "black" && o.rate > 0 && o.life > 0, `${r.id} is a lightless black source`);
+  }
+  // 契约 §5 / 任务书点名的位置都在（调研坐标，逐镜截图核对）。
+  for (const [x, z] of [[60, -112], [85, -140], [110, -120], [45, -135], [70, -118], [60, -150], [32, -126], [18, -45], [-8, -40], [59.8, -167.4],
+    [-20, -175], [5, -182], [30, -178], [-35, -190], [40, -195]]) {
+    const near = SMOKE.find((r) => Math.hypot(r.x - x, r.z - z) < 12);
+    assert.ok(near, `a smoke/fire source near (${x},${z})`);
+  }
+  const vfx = FakeVfx(), scene = new THREE.Scene(), set = new OpeningSet({ scene, library: null, groundAt: (x, z) => G(x, z), vfx });
+  const live = () => [...vfx.log.sources.keys()].length;
+  set.Update(0.016, "Trapped", "Banter", {});
+  assert.equal(live(), SMOKE.filter((r) => r.stages.includes("Trapped")).length, "01 lights its columns");
+  set.Update(0.016, "BunkerRescue", "Hold", {});
+  assert.equal(live(), SMOKE.filter((r) => r.stages.includes("BunkerRescue")).length, "02 adds the SB05A columns");
+  set.Update(0.016, "Support", null, {});
+  assert.deepEqual(set.Stats().smoke.sort(), SMOKE.filter((r) => r.stages.includes("Support")).map((r) => r.id).sort(), "03 swaps to the front columns");
+  set.Update(0.016, "MachineGun", null, {});
+  assert.equal(live(), 0, "leaving 01–03 removes every smoke source");
+  set.Update(0.016, "Support", null, {});
+  set.Exit();
+  assert.equal(live(), 0, "Exit removes every smoke source");
+  report.smokeBudget = stageBudget;
+  console.log(`ok smoke: ${SMOKE.length} sources, live puffs per step ${JSON.stringify(stageBudget)} (<= ${SMOKE_PARTICLE_BUDGET}), all removed after 03`);
+}
+{
+  // ---- 5c. 03 开头两架飞机
+  assert.equal(FLYOVER.length, 2, "two aircraft");
+  assert.equal(new Set(FLYOVER.map((r) => r.aircraft)).size, 2, "two different airframes");
+  const eye = { x: FLYOVER_TRIGGER.at.x, y: G(FLYOVER_TRIGGER.at.x, FLYOVER_TRIGGER.at.z) + 1.62, z: FLYOVER_TRIGGER.at.z };
+  const View = (p) => ({ bearing: Math.atan2(-(p.x - eye.x), -(p.z - eye.z)) / DEG, elev: Math.atan2(p.y - eye.y, Math.hypot(p.x - eye.x, p.z - eye.z)) / DEG,
+    dist: Math.hypot(p.x - eye.x, p.y - eye.y, p.z - eye.z) });
+  const lead = FLYOVER[0], mid = View(FlyoverPose(lead, lead.delayS + lead.passS));
+  report.flyover = { midBearing: +mid.bearing.toFixed(1), midElev: +mid.elev.toFixed(1), midDist: Math.round(mid.dist) };
+  assert.ok(mid.bearing > -66 && mid.bearing < -46, `SB07: at mid-pass the lead is just right of the default view yaw -50: ${mid.bearing.toFixed(1)}`);
+  assert.ok(mid.elev > 12 && mid.elev < 22, `upper part of the frame (55 deg vertical fov): ${mid.elev.toFixed(1)} deg up`);
+  for (const row of FLYOVER) for (let t = row.delayS; t <= row.delayS + row.seconds; t += 0.5)
+    assert.ok(View(FlyoverPose(row, t)).dist < 640, `${row.id} stays inside the 650 m camera far plane`);
+  const first = View(FlyoverPose(lead, lead.delayS)), last = View(FlyoverPose(lead, lead.delayS + lead.seconds));
+  assert.ok(first.bearing > -35 && last.bearing < -80, `the pass crosses the view left to right: ${first.bearing.toFixed(0)} -> ${last.bearing.toFixed(0)}`);
+  // 触发、放飞、交还（假的 aircraft）；再用真的 AircraftFlight 核对两架能同时摆。
+  const calls = [];
+  const aircraft = { SetManualPose: (id, pose) => calls.push([id, pose ? 1 : 0]) };
+  const set = new OpeningSet({ scene: new THREE.Scene(), library: null, groundAt: (x, z) => G(x, z), aircraft });
+  const far = { x: -8, z: -150 };
+  set.Update(0.5, "Support", null, { player: far });
+  assert.equal(calls.length, 0, "no flight before the trigger");
+  set.Update(0.1, "Support", null, { player: { x: 6, z: -144 } });
+  set.Update(0.7, "Support", null, { player: { x: 6, z: -144 } });
+  assert.deepEqual([...new Set(calls.filter((c) => c[1]).map((c) => c[0]))].sort(), FLYOVER.map((r) => r.aircraft).sort(), "both aircraft fly once the player reaches the wall");
+  for (let i = 0; i < 40; i++) set.Update(0.5, "Support", null, { player: far });
+  const released = calls.filter((c) => !c[1]).map((c) => c[0]).sort();
+  assert.deepEqual(released, FLYOVER.map((r) => r.aircraft).sort(), "both aircraft are released after the pass");
+  calls.length = 0;
+  const late = new OpeningSet({ scene: new THREE.Scene(), library: null, groundAt: (x, z) => G(x, z), aircraft });
+  for (let i = 0; i < Math.ceil(FLYOVER_TRIGGER.fallbackS / 0.5) + 3; i++) late.Update(0.5, "Support", null, { player: far });
+  assert.ok(calls.some((c) => c[1]), "the flight also happens by the fallback time if the player never reaches the wall");
+  late.Update(0.016, "MachineGun", null, {});
+  assert.ok(calls.at(-1)[1] === 0 && calls.filter((c) => !c[1]).length === 2, "leaving 03 mid-flight releases both aircraft");
+  const flight = new AircraftFlight(new THREE.Scene());
+  for (const row of FLYOVER) { const root = new THREE.Object3D(); flight.forms.push({ spec: { id: row.aircraft }, root }); }
+  flight.SetPhase({ bounds: { minX: 0, maxX: 1, minZ: 0, maxZ: 1 }, whitebox: { p012: true } });
+  flight.SetManualPose(FLYOVER[0].aircraft, FlyoverPose(FLYOVER[0], 5));
+  flight.SetManualPose(FLYOVER[1].aircraft, FlyoverPose(FLYOVER[1], 5));
+  flight.Update(1);
+  assert.ok(flight.forms.every((f) => f.root.visible && f.root.position.y > 100), "AircraftFlight holds two manual poses at once");
+  flight.SetManualPose(FLYOVER[0].aircraft, null); flight.Update(1.1);
+  assert.ok(!flight.forms[0].root.visible && flight.forms[1].root.visible, "releasing one aircraft leaves the other flying");
+  assert.equal(flight.manualPose?.id, FLYOVER[1].aircraft, "the legacy single manualPose getter still answers");
+  console.log(`ok flyover: ${JSON.stringify(report.flyover)}, trigger at the wall or ${FLYOVER_TRIGGER.fallbackS} s, released after the pass / on leaving 03`);
+}
+{
+  // ---- 5d. 阴天开关
+  assert.equal(sky.overcast, false, "overcast defaults off (contract §2 item 15)");
+  const preset = OvercastPreset();
+  assert.deepEqual(preset.fog, SKY_PRESETS[sky.fogFrom].fog, "the overcast preset keeps the level's own fog");
+  assert.ok(preset.saturation < 0.85 && preset.sunIntensity <= SKY_PRESETS.overcast.sunIntensity, "overcast: low saturation, diffuse sun");
+  const calls = [];
+  const set = new OpeningSet({ scene: new THREE.Scene(), library: null, groundAt: (x, z) => G(x, z),
+    applySky: (name) => { calls.push(["apply", name]); return true; }, restoreSky: () => calls.push(["restore"]) });
+  set.Update(0.016, "Trapped", "Banter", {});
+  assert.equal(calls.length, 0, "switch off: the sky is not touched");
+  set.SetOvercast(true);
+  assert.deepEqual(calls, [["apply", sky.preset]], "switching on in 01 applies the overcast preset once");
+  assert.ok(SKY_PRESETS[sky.preset], "the preset is registered by name for the host's ApplySkyPreset");
+  set.Update(0.016, "BunkerRescue", "Hold", {});
+  set.Update(0.016, "Support", null, {});
+  assert.equal(calls.length, 1, "stays applied through 01–03");
+  set.Update(0.016, "MachineGun", null, {});
+  assert.deepEqual(calls.at(-1), ["restore"], "leaving 01–03 restores the level sky");
+  set.Exit();
+  assert.equal(calls.length, 2, "nothing else touched the sky");
+  console.log("ok overcast: off by default, overcast preset with the level's fog, applied in 01–03 and restored after");
+}
+{
+  // ---- 5e. 03 前沿布景：砖壳包住阵位体块、破口处不加高、倒墙不挡阵位看缺口里的人、弹药箱不挡人
+  const ids = FRONT_PROPS.map((p) => p.id);
+  for (const id of ["nestBrickWallWestHigh", "nestBrickWallRearWest", "nestBrickWallEastGable", "gapWallCollapsed", "gapRevetment", "nestAmmoBoxes"])
+    assert.ok(ids.includes(id), `front prop ${id} (contract §4.5)`);
+  assert.deepEqual(FRONT_SET_STAGES, ["Support", "MachineGun", "Tank", "Orders"], "front dressing lives through the stages fought at the nest");
+  const set = new OpeningSet({ scene: new THREE.Scene(), library: null, groundAt: (x, z) => G(x, z) });
+  const Capture = () => { const list = []; return { list, SetSector() {}, Add: (key, g) => { g.computeBoundingBox(); list.push({ key, box: g.boundingBox.clone() }); } }; };
+  report.shells = {};
+  for (const prop of FRONT_PROPS.filter((p) => p.kind === "brickShell")) {
+    const block = L.blocks.find((b) => b.id === prop.block), sink = Capture();
+    set.BuildBrickShell(prop, sink);
+    const [core, ...bricks] = sink.list, top = block.y + block.h / 2;
+    const half = { x: (block.ry ? 0 : block.w / 2), z: block.d / 2 };
+    assert.ok(core.box.min.x <= block.x - half.x - BRICK.skinM + 1e-3 && core.box.max.x >= block.x + half.x + BRICK.skinM - 1e-3
+      && core.box.min.z <= block.z - half.z - BRICK.skinM + 1e-3 && core.box.max.z >= block.z + half.z + BRICK.skinM - 1e-3
+      && core.box.max.y >= top && core.box.min.y <= block.y - block.h / 2 + 1e-3, `${prop.id} wraps ${prop.block} on every side (no invisible wall)`);
+    const jagTop = Math.max(top, ...bricks.map((b) => b.box.max.y));
+    assert.ok(jagTop - top <= prop.extraM + 0.12, `${prop.id}: the ragged top grows at most ${prop.extraM} m (+1 course) over the collider`);
+    if (prop.breach) {
+      const inBreach = bricks.filter((b) => { const c = (b.box.min.z + b.box.max.z) / 2; return c > prop.breach.from && c < prop.breach.to && b.box.min.y > top - 0.05; });
+      assert.deepEqual(inBreach, [], `${prop.id}: nothing sits on the wall in the gun breach`);
+    }
+    report.shells[prop.id] = { bricks: bricks.length, jagM: +(jagTop - top).toFixed(2) };
+  }
+  // 西矮墙在守机枪（04）时不挡坐位看 30 m 外：坐位眼高约 1.77 m、离墙 1.9 m 的视线在墙处高于墙头锯齿。
+  {
+    const low = FRONT_PROPS.find((p) => p.id === "nestBrickWallWestLow"), block = L.blocks.find((b) => b.id === low.block);
+    const seatEye = G(25.9, -153.9) + 0.12 + 1.65, wallTop = block.y + block.h / 2 + low.extraM + BRICK.courseM / 2;
+    const lineAtWall = seatEye - (seatEye - (G(-8, -150) + 1.0)) * (25.9 - 24) / (25.9 - -8);
+    assert.ok(lineAtWall > wallTop, `seat -> gap sightline passes over the ragged low wall (${lineAtWall.toFixed(2)} > ${wallTop.toFixed(2)})`);
+  }
+  // SB08：阵位（玩家 (25.6,-155.2) 站在射击台上）看缺口段沟里的守军。倒墙与护壁只是外观，但玩家的眼睛看得见它们：
+  // 基线里看得见头的点（Space 探针只算体块与地形），加了本包的布景以后还得看得见。倒墙南头 z > -143.8 那一截除外。
+  {
+    const eyeP = { x: 25.6, z: -155.2 }, eyeY = G(eyeP.x, eyeP.z) + 0.12 + 1.62;
+    const guardRoute = (await import("./Data_FirstLevelFrontRoute.mjs")).FRONT_SORTIE.guardRoute;
+    const pts = Samples(guardRoute.slice(0, 4)).filter((p, i) => i % 5 === 0 && p.z <= -143.8);
+    const boxes = FRONT_PROPS.filter((p) => ["collapsedWall", "revetment", "sandbagStakes"].includes(p.kind))
+      .flatMap((p) => PropFootprints(p).map((box) => ({ id: p.id, box })));
+    const Inside = ({ box }, x, y, z) => {
+      const c = Math.cos(box.ry), sn = Math.sin(box.ry), dx = x - box.x, dz = z - box.z, lx = dx * c - dz * sn, lz = dx * sn + dz * c;
+      if (Math.abs(lx) > box.w / 2 || Math.abs(lz) > box.d / 2) return false;
+      const g = G(box.x, box.z);
+      return y > g + box.y0 && y < g + box.y1;
+    };
+    let baseline = 0; const blocked = [];
+    for (const p of pts) {
+      const head = G(p.x, p.z) + 1.55, eye = { x: eyeP.x, y: eyeY, z: eyeP.z }, to = { x: p.x, y: head, z: p.z };
+      if (Sight(eye, to, { state: "BunkerCollapsed" }) != null) continue;
+      baseline += 1;
+      const n = Math.ceil(Math.hypot(to.x - eye.x, to.z - eye.z) / 0.05);
+      for (let k = 1; k < n; k++) {
+        const t = k / n, x = eye.x + (to.x - eye.x) * t, y = eye.y + (to.y - eye.y) * t, z = eye.z + (to.z - eye.z) * t;
+        const hit = boxes.find((b) => Inside(b, x, y, z));
+        if (hit) { blocked.push(`${hit.id} hides (${p.x.toFixed(1)},${p.z.toFixed(1)})`); break; }
+      }
+    }
+    report.sb08 = { points: pts.length, baselineVisible: baseline, blockedBySet: blocked.length };
+    assert.ok(baseline >= 3, `SB08 baseline: guards' heads visible from the nest at >= 3 route points: ${baseline}`);
+    assert.deepEqual(blocked, [], "SB08: the collapsed wall and the gap revetment hide none of the guards the nest could see");
+  }
+  // 弹药箱：不压坐位、SB08 站位与机枪托架。
+  {
+    const box = PropFootprints(FRONT_PROPS.find((p) => p.id === "nestAmmoBoxes"))[0];
+    for (const [name, p] of [["seat", { x: 25.9, z: -153.9 }], ["SB08 stand", { x: 25.6, z: -155.2 }]])
+      assert.ok(!Clash(box, p), `nestAmmoBoxes clear of the ${name}`);
+    const rest = L.blocks.find((b) => b.id === "RightNestFrontRest");
+    assert.ok(Math.abs(box.z - rest.z) > box.d / 2 + rest.d / 2, "nestAmmoBoxes beside the gun rest, not inside it");
+  }
+  // 守军撤回路线（guardRoute）不被前沿布景的实体（≥ 0.3 m 高）压住。
+  {
+    const guardRoute = (await import("./Data_FirstLevelFrontRoute.mjs")).FRONT_SORTIE.guardRoute;
+    const clashes = FRONT_PROPS.flatMap((prop) => PropFootprints(prop).filter((b) => !b.walkable)
+      .flatMap((b) => Samples(guardRoute).filter((p) => Clash(b, p)).slice(0, 1).map((p) => `${prop.id} at (${p.x.toFixed(1)},${p.z.toFixed(1)})`)));
+    assert.deepEqual(clashes, [], "front dressing stays off the guards' withdrawal route");
+  }
+  const scene = new THREE.Scene(), fs2 = new OpeningSet({ scene, library: null, groundAt: (x, z) => G(x, z) });
+  fs2.Enter("Support");
+  report.frontMeshes = fs2.Stats().frontMeshes;
+  assert.ok(report.frontMeshes <= 8, `front dressing is a handful of batched meshes: ${report.frontMeshes}`);
+  assert.ok(fs2.Stats().meshes + report.frontMeshes <= 60, "01–03 + front new draw calls <= 60 (contract §6)");
+  fs2.Suspend(true);
+  assert.equal(scene.children.length, 0, "Suspend (A/B off) takes everything out");
+  fs2.Suspend(false);
+  assert.equal(scene.children.length, 2, "Suspend(false) puts both back");
+  fs2.Exit();
+  assert.equal(scene.children.length, 0, "Exit removes the front dressing");
+  console.log(`ok front: shells ${JSON.stringify(report.shells)}, SB08 ${JSON.stringify(report.sb08)}, ${report.frontMeshes} meshes`);
 }
 
 console.log(`OpeningSetTest ok ${JSON.stringify({ timberBand: report.timberBand, rubbleTopM: report.rubbleTopM, backrest: report.backrest, seatF: report.seatF, meshes: report.stats.meshes })}`);

@@ -2827,3 +2827,7 @@ export class VfxSystem {
     }
   }
 }
+
+// 01–03 过场分镜（Set 包 Script_OpeningBlastFx 的定向喷土）借同一份粒子生成描述符。
+// 只加导出、不改旧函数（契约 docs/Data_FirstLevelStoryboard0103Contract.md §3）。
+export { ResetSpawn as ResetVfxSpawn };

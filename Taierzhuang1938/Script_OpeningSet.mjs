@@ -9,16 +9,29 @@
 //   · 全部挂在本模块自己的根节点下，Exit() 拆干净（几何、自有材质、贴图、灯），场景里不留一个节点。
 // 库材质（library.Get）与外部模型模板是共享的，只摘不 dispose。
 //
+// Step 2 加了四样，生命周期各自独立：
+//   · 世界特效：近爆的定向喷土（Script_OpeningBlastFx，blastAge 走到 BLAST.atS 自动喷一次）、
+//     远处烟柱与火点（Data SMOKE，按任务步骤挂 vfx.SmokeSource，离开 01–03 全部 RemoveSmokeSource）、
+//     03 开头两架日机横飞（Data FLYOVER，aircraft.SetManualPose，飞完/离开 03 交还）；
+//   · 03 前沿布景（Data FRONT_PROPS：阵位破砖墙壳、缺口倒墙、缺口护壁、弹药箱）：它是阵位与缺口的世界外观，
+//     04–06 玩家还在那儿打，所以装在 FRONT_SET_STAGES 里、单独一个根节点，出了这几步才收；
+//   · 阴天开关（Data sky.overcast，默认关；?openingOvercast=1 临时打开）：进 01–03 套阴天预设，离开还原。
+//
 // 运行时接线（Script_FirstLevelMissionRuntime 的薄钩子）：
 //   Enter(stageId)                          每一步 Enter 调；01–03 装载，别的步骤收走
-//   Update(dt, stageId, phase, flags)       flags = { collapsed, blastAge }（blastAge：离近爆的秒数，没炸过为 null）
+//   Update(dt, stageId, phase, flags)       flags = { collapsed, blastAge, player }（blastAge：离近爆的秒数，没炸过为 null；
+//                                           player：玩家位置，飞机按它触发）
 //   Exit()                                  整关拆除
 // ===========================================================================
 import * as THREE from "three";
-import { PROPS, SET_STAGES, FLOOR } from "./Data_OpeningSet0103.mjs";
+import { PROPS, SET_STAGES, FLOOR, BLAST, SMOKE, SmokeOptions, FLYOVER, FLYOVER_TRIGGER, FlyoverPose, sky as SKY,
+  FRONT_SET_STAGES, FRONT_PROPS, BRICK, ProfileAt } from "./Data_OpeningSet0103.mjs";
 import { OPENING_STORYBOARDS } from "./Data_OpeningStoryboards.mjs";
+import { MISSION_LAYOUT } from "./Data_FirstLevelMissionLayout.mjs";
 import { BuildSink } from "./Script_World.mjs";
 import { MakeBox, MakeSandbag, PlaceGeometry, TILE_METERS } from "./Script_Geo.mjs";
+import { OpeningBlastFx } from "./Script_OpeningBlastFx.mjs";
+import { SKY_PRESETS } from "./Script_Sky.mjs";
 
 const DEG = Math.PI / 180;
 const Clamp01 = (v) => Math.max(0, Math.min(1, v));
@@ -30,6 +43,20 @@ export function RescueShown(stageId, phase) {
   if (stageId === "Trapped") return false;
   if (stageId === "BunkerRescue") return !TRAPPED_PHASES.has(phase);
   return true;
+}
+/**
+ * 阴天预设（Data sky）：Script_Sky 的 overcast 为底，雾照抄本关自己的天（不改雾），再按 tweaks 压饱和、往灰褐里拉。
+ * 纯函数，测试直接比对。
+ */
+export function OvercastPreset(presets = SKY_PRESETS) {
+  const base = presets[SKY.base], fogFrom = presets[SKY.fogFrom];
+  if (!base || !fogFrom) throw new Error(`OpeningSet: sky presets ${SKY.base}/${SKY.fogFrom} missing`);
+  return { ...base, ...SKY.tweaks, fog: fogFrom.fog };
+}
+/** 挂进 SKY_PRESETS（宿主的 ApplySkyPreset 只认名字）；只挂一次。 */
+export function RegisterOvercastPreset(presets = SKY_PRESETS) {
+  if (!presets[SKY.preset]) presets[SKY.preset] = Object.freeze(OvercastPreset(presets));
+  return presets[SKY.preset];
 }
 /** 可复现的伪随机（每件道具自己一串，改一件不牵动别的件）。 */
 function Rng(seedText) {
@@ -71,17 +98,32 @@ export class OpeningSet {
    *   可选：loadTexture(url)→Promise<Texture>，loadExternal(assetId)→Promise<Object3D>，
    *   makeCanvas(w,h)→canvas（旗面贴图；没有就用纯色）。
    */
-  constructor({ scene, library, groundAt, loadTexture = null, loadExternal = null, makeCanvas = null }) {
+  constructor({ scene, library, groundAt, loadTexture = null, loadExternal = null, makeCanvas = null,
+    vfx = null, aircraft = null, applySky = null, restoreSky = null, overcast = null }) {
     this.scene = scene; this.library = library; this.groundAt = groundAt;
     this.loadTexture = loadTexture ?? (typeof document !== "undefined" ? (url) => new THREE.TextureLoader().loadAsync(url) : null);
     this.loadExternal = loadExternal ?? (typeof document !== "undefined"
       ? async (id) => (await import("./Script_ExternalProps.mjs")).InstantiateExternalProp(id, library) : null);
     this.makeCanvas = makeCanvas ?? (typeof document !== "undefined"
       ? (w, h) => Object.assign(document.createElement("canvas"), { width: w, height: h }) : null);
+    this.vfx = vfx; this.aircraft = aircraft; this.applySky = applySky; this.restoreSky = restoreSky;
+    this.blastFx = vfx ? new OpeningBlastFx({ vfx }) : null;
     this.root = null;
+    this.front = null;
     this.stage = null;
     this.generation = 0;
     this.lintelProgress = null;
+    /** 本次近爆喷过没有（blastAge 回到 null ＝ 重试，清掉）。 */
+    this.blastSprayed = false;
+    /** row.id -> vfx 烟源句柄。 */
+    this.smoke = new Map();
+    this.flyover = null;           // { t, triggered, stageTime, poses:Set<aircraftId> }
+    this.suspended = false;
+    // 阴天：数据开关、构造参数、或页面地址 ?openingOvercast=1（给用户 A/B 看）。
+    let urlOvercast = false;
+    try { urlOvercast = typeof location !== "undefined" && new URLSearchParams(location.search).get("openingOvercast") === "1"; } catch { /* 非浏览器 */ }
+    this.overcast = overcast ?? (SKY.overcast || urlOvercast);
+    this.skyApplied = false;
   }
 
   get Active() { return !!this.root; }
@@ -89,13 +131,17 @@ export class OpeningSet {
   // ---------------------------------------------------------------- lifecycle
   Enter(stageId) {
     this.stage = stageId;
-    if (!SET_STAGES.includes(stageId)) { this.Exit(); return false; }
-    if (!this.root) this.Build();
+    if (FRONT_SET_STAGES.includes(stageId)) { if (!this.front && !this.suspended) this.BuildFront(); }
+    else this.ExitFront();
+    if (!SET_STAGES.includes(stageId)) { this.ExitOpening(); return false; }
+    if (!this.root && !this.suspended) this.Build();
+    this.SyncSky();
     return true;
   }
 
   Update(dt, stageId, phase, flags = {}) {
     if (stageId !== this.stage) this.Enter(stageId);
+    this.blastFx?.Update(dt);
     if (!this.root) return;
     this.time = (this.time || 0) + dt;
     const collapsed = !!flags.collapsed;
@@ -106,30 +152,164 @@ export class OpeningSet {
       // 没看到近爆（选章 / 回跳 / 重试直接进 02）＝已经落定。
       this.FallLintel(flags.blastAge == null || !f ? 1 : this.LintelProgressAt(flags.blastAge));
     }
+    this.UpdateBlast(flags.blastAge, stageId);
     this.UpdateLantern(stageId, collapsed);
+    this.UpdateSmoke(stageId);
+    this.UpdateFlyover(dt, stageId, flags.player);
   }
 
+  /** 整关拆除：01–03 布景、前沿布景、烟、飞机、天光全部复位。 */
   Exit() {
+    this.ExitOpening();
+    this.ExitFront();
+  }
+
+  /** 收走 01–03 那一份（布景、烟、飞机、阴天）。前沿布景另算（ExitFront）。 */
+  ExitOpening() {
     this.generation += 1;
+    this.ClearSmoke();
+    this.EndFlyover();
+    this.blastFx?.Clear();
+    this.blastSprayed = false;
+    if (this.skyApplied) { this.skyApplied = false; this.restoreSky?.(); }
     if (!this.root) return;
-    this.root.removeFromParent();
-    const geometries = new Set(), materials = new Set(this.ownedMaterials);
-    this.root.traverse((o) => { if (o.geometry && !o.userData.sharedGeometry) geometries.add(o.geometry); });
-    for (const g of geometries) g.dispose();
-    for (const m of materials) { m.map?.dispose?.(); m.dispose(); }
-    for (const t of this.ownedTextures) t.dispose();
-    for (const light of this.lights) light.dispose?.();
+    this.DisposeRoot(this.root, this.ownedMaterials, this.ownedTextures, this.lights);
     this.root = null; this.collapsedRoot = null; this.rescueRoot = null; this.lintel = null; this.lantern = null;
     this.ownedMaterials = []; this.ownedTextures = []; this.lights = [];
     this.lintelProgress = null;
   }
 
-  /** 诊断 / 测试：当前挂着多少网格、灯、自有材质。 */
+  ExitFront() {
+    if (!this.front) return;
+    this.DisposeRoot(this.front.root, this.front.ownedMaterials, [], []);
+    this.front = null;
+  }
+
+  DisposeRoot(root, ownedMaterials, ownedTextures, lights) {
+    root.removeFromParent();
+    const geometries = new Set(), materials = new Set(ownedMaterials);
+    root.traverse((o) => { if (o.geometry && !o.userData.sharedGeometry) geometries.add(o.geometry); });
+    for (const g of geometries) g.dispose();
+    for (const m of materials) { m.map?.dispose?.(); m.dispose(); }
+    for (const t of ownedTextures) t.dispose();
+    for (const light of lights) light.dispose?.();
+  }
+
+  /**
+   * 同页 A/B（布景开/关）用：true 把两份布景、烟、飞机、阴天全收掉并且不再装载，false 恢复（下一帧按当前步骤重装）。
+   * 只给量帧耗时与调试用；正片不调。
+   */
+  Suspend(on) {
+    this.suspended = !!on;
+    const stage = this.stage;
+    if (on) this.Exit();
+    this.stage = null;
+    if (stage) this.Enter(stage);
+  }
+
+  /** 诊断 / 测试：当前挂着多少网格、灯、自有材质，烟、飞机、阴天。 */
   Stats() {
-    let meshes = 0, lights = 0, nodes = 0;
+    let meshes = 0, lights = 0, nodes = 0, frontMeshes = 0;
     this.root?.traverse((o) => { nodes += 1; if (o.isMesh) meshes += 1; if (o.isLight) lights += 1; });
+    this.front?.root.traverse((o) => { if (o.isMesh) frontMeshes += 1; });
     return { active: this.Active, nodes, meshes, lights, ownedMaterials: this.ownedMaterials?.length || 0,
-      collapsedVisible: !!this.collapsedRoot?.visible, rescueVisible: !!this.rescueRoot?.visible, lintelProgress: this.lintelProgress };
+      collapsedVisible: !!this.collapsedRoot?.visible, rescueVisible: !!this.rescueRoot?.visible, lintelProgress: this.lintelProgress,
+      front: !!this.front, frontMeshes, smoke: [...this.smoke.keys()], blast: this.blastFx?.Stats() ?? null, blastSprayed: this.blastSprayed,
+      flyover: this.flyover ? { t: +this.flyover.t.toFixed(2), triggered: this.flyover.triggered, flying: [...this.flyover.poses] } : null,
+      overcast: this.overcast, skyApplied: this.skyApplied, suspended: this.suspended };
+  }
+
+  // ---------------------------------------------------------------- 近爆的定向喷土
+  /** blastAge 走过 BLAST.atS（炮弹落地）那一帧喷一次；选章 / 重试直接进来（blastAge 早过了 1 s）不补喷。 */
+  UpdateBlast(blastAge, stageId) {
+    if (blastAge == null) { this.blastSprayed = false; return; }
+    if (this.blastSprayed || stageId !== "Trapped" || blastAge < BLAST.atS) return;
+    this.blastSprayed = true;
+    if (blastAge > BLAST.atS + 0.5) return;
+    this.SprayBlast();
+  }
+
+  /** 从 BLAST 数据喷一次（调试入口 DebugBlast 也走这里）。 */
+  SprayBlast() {
+    if (!this.blastFx) return null;
+    const floor = this.groundAt(BLAST.at.x, BLAST.at.z), [lo, hi] = BLAST.liftM;
+    return this.blastFx.DirectionalBlast({ x: BLAST.at.x, y: floor + (lo + hi) / 2, z: BLAST.at.z }, BLAST.dir,
+      { heightM: (hi - lo) / 2, groundY: this.groundAt(FLOOR.x, FLOOR.z) });
+  }
+
+  /**
+   * 调试 / 抓帧入口：现在就近爆一次（喷土 + 门楣从门楣位重新落下），不碰导演与任务状态。
+   * 之后的 Update 若 flags.blastAge 仍是 null，门楣按「已落定」处理——抓帧请在真实流程的 Blast 拍里拍。
+   */
+  DebugBlast() {
+    this.blastSprayed = true;
+    return this.SprayBlast();
+  }
+
+  // ---------------------------------------------------------------- 烟柱与火点
+  UpdateSmoke(stageId) {
+    if (!this.vfx) return;
+    const want = new Set(SMOKE.filter((row) => row.stages.includes(stageId)).map((row) => row.id));
+    for (const [id, handle] of this.smoke) if (!want.has(id)) { this.vfx.RemoveSmokeSource(handle); this.smoke.delete(id); }
+    for (const row of SMOKE) {
+      if (!want.has(row.id) || this.smoke.has(row.id)) continue;
+      const y = this.groundAt(row.x, row.z) + (row.fire > 0 ? 0.15 : 1.0);
+      this.smoke.set(row.id, this.vfx.SmokeSource({ x: row.x, y, z: row.z }, SmokeOptions(row)));
+    }
+  }
+
+  ClearSmoke() {
+    for (const handle of this.smoke.values()) this.vfx?.RemoveSmokeSource(handle);
+    this.smoke.clear();
+  }
+
+  // ---------------------------------------------------------------- 03 开头的飞机
+  UpdateFlyover(dt, stageId, player) {
+    if (!this.aircraft || stageId !== FLYOVER_TRIGGER.stage) { this.EndFlyover(); return; }
+    const fly = (this.flyover ??= { t: 0, stageTime: 0, triggered: false, done: false, poses: new Set() });
+    fly.stageTime += dt;
+    if (!fly.triggered) {
+      const near = player && Math.hypot(player.x - FLYOVER_TRIGGER.at.x, player.z - FLYOVER_TRIGGER.at.z) <= FLYOVER_TRIGGER.radiusM;
+      if (!near && fly.stageTime < FLYOVER_TRIGGER.fallbackS) return;
+      fly.triggered = true;
+    }
+    if (fly.done) return;
+    fly.t += dt;
+    let flying = 0;
+    for (const row of FLYOVER) {
+      const pose = FlyoverPose(row, fly.t);
+      if (pose) { this.aircraft.SetManualPose(row.aircraft, pose); fly.poses.add(row.aircraft); flying += 1; }
+      else if (fly.poses.has(row.aircraft) && fly.t > row.delayS) { this.aircraft.SetManualPose(row.aircraft, null); fly.poses.delete(row.aircraft); }
+    }
+    if (!flying && fly.t > 1) fly.done = true;
+  }
+
+  /** 调试 / 抓帧：现在就起飞（t 秒处）。 */
+  DebugFlyover(t = 0) {
+    this.flyover = { t, stageTime: FLYOVER_TRIGGER.fallbackS, triggered: true, done: false, poses: this.flyover?.poses ?? new Set() };
+  }
+
+  EndFlyover() {
+    if (!this.flyover) return;
+    for (const id of this.flyover.poses) this.aircraft?.SetManualPose(id, null);
+    this.flyover = null;
+  }
+
+  // ---------------------------------------------------------------- 阴天开关
+  SetOvercast(on) {
+    this.overcast = !!on;
+    this.SyncSky();
+  }
+
+  SyncSky() {
+    const want = this.overcast && !this.suspended && SET_STAGES.includes(this.stage);
+    if (want && !this.skyApplied && this.applySky) {
+      RegisterOvercastPreset();
+      this.skyApplied = this.applySky(SKY.preset) !== false;
+    } else if (!want && this.skyApplied) {
+      this.skyApplied = false;
+      this.restoreSky?.();
+    }
   }
 
   // ---------------------------------------------------------------- fallen lintel
@@ -446,7 +626,9 @@ export class OpeningSet {
     const rnd = Rng(prop.id);
     for (const run of prop.runs) for (let i = 1; i < run.length; i++) {
       const a = run[i - 1], b = run[i], d = new THREE.Vector3(b.x - a.x, 0, b.z - a.z), len = d.length(); d.normalize();
-      let n = new THREE.Vector3(d.z, 0, -d.x); if (n.z > 0) n.negate();          // 指向沟里（北）
+      // 指向沟里：默认北（南沟沿的沙袋），inward 可写 east/west/south（缺口西沿的沙袋朝东）。
+      const inward = { north: [0, -1], south: [0, 1], east: [1, 0], west: [-1, 0] }[prop.inward || "north"];
+      const n = new THREE.Vector3(d.z, 0, -d.x); if (n.x * inward[0] + n.z * inward[1] < 0) n.negate();
       const ry = Math.atan2(d.x, d.z) - Math.PI / 2;
       for (let layer = 0; layer < prop.layers; layer++) {
         const stagger = layer % 2 ? prop.bagM / 2 : 0;
@@ -520,6 +702,132 @@ export class OpeningSet {
       const a = rnd() * Math.PI * 2, r = 0.9 + rnd() * 0.4;
       const x = prop.x + Math.cos(a) * prop.rx * r, z = prop.z + Math.sin(a) * prop.rz * r;
       sink.Add("GroundRubble", PlaceGeometry(Normalize(new THREE.DodecahedronGeometry(0.5, 0)), { x, y: this.groundAt(x, z) + 0.02, z, ry: rnd() * 6, rx: rnd() * 2, scale: 0.08 + rnd() * 0.1 }));
+    }
+  }
+
+  // ---------------------------------------------------------------- 03 前沿布景（阵位破砖墙、缺口倒墙、护壁、弹药箱）
+  BuildFront() {
+    const root = new THREE.Group(); root.name = "OpeningSet0103_Front";
+    const front = { root, ownedMaterials: [] };
+    const sink = new BuildSink(), materials = new Map();
+    sink.SetSector("OpeningSet_Front");
+    // 砖：库里的旧砖墙（青砖熏黑）染成土黄（契约：阵位白盒改成「土黄砖色」的破砖墙；参考概念图 04）。
+    const brick = this.FrontLib(front, "BrickWallSooty", { color: 0xd6b38a });
+    materials.set("OpeningSetBrick", brick);
+    const saved = { sinkMaterials: this.sinkMaterials, ownedMaterials: this.ownedMaterials };
+    this.sinkMaterials = materials; this.ownedMaterials = front.ownedMaterials;
+    try {
+      for (const prop of FRONT_PROPS) {
+        if (prop.kind === "brickShell") this.BuildBrickShell(prop, sink);
+        else if (prop.kind === "collapsedWall") this.BuildCollapsedWall(prop, sink);
+        else this.BuildProp(prop, sink, materials);
+      }
+    } finally { this.sinkMaterials = saved.sinkMaterials; this.ownedMaterials = saved.ownedMaterials; }
+    const resolve = (name) => materials.get(name) || this.FrontLib(front, name);
+    for (const mesh of sink.Flush(root, {}, { castShadow: true, receiveShadow: true, resolve })) mesh.name = `OpeningSet0103_Front_${mesh.name}`;
+    this.scene.add(root);
+    root.updateMatrixWorld(true);
+    this.front = front;
+  }
+
+  /** 前沿组自己的库材质（缺配方时的纯色兜底归前沿组，随它 dispose）。 */
+  FrontLib(front, name, options) {
+    if (this.library?.Get) {
+      try { return this.library.Get(name, options); } catch { /* 退回纯色 */ }
+    }
+    const material = new THREE.MeshStandardMaterial({ color: name.startsWith("Brick") ? 0x9a7a58 : 0x6b5a45, roughness: 0.95 });
+    front.ownedMaterials.push(material);
+    return material;
+  }
+
+  /**
+   * 破砖墙壳：把阵位体块整个包进去（每面外扩 BRICK.skinM，墙头只往上长），墙头按整皮、整砖退台出锯齿。
+   * 体块本身的碰撞、掩体、射界一个不动；壳子只比体块高，不会有「看着是缺口其实是墙」。
+   */
+  BuildBrickShell(prop, sink) {
+    const block = MISSION_LAYOUT.blocks.find((b) => b.id === prop.block);
+    if (!block) throw new Error(`OpeningSet: ${prop.id} wraps missing block ${prop.block}`);
+    const rnd = Rng(`${prop.id}${prop.seed}`), skin = BRICK.skinM, course = BRICK.courseM;
+    const alongX = block.w >= block.d, L = alongX ? block.w : block.d, T = (alongX ? block.d : block.w) + skin * 2;
+    const top = block.y + block.h / 2 + 0.02, base = block.y - block.h / 2;
+    const ry = (block.ry || 0) + (alongX ? 0 : Math.PI / 2);
+    const c = Math.cos(ry), s = Math.sin(ry);
+    // 局部 u（沿墙，-L/2…L/2）→ 世界。ry 与 PlaceGeometry 同一约定（局部 +x 转到 (cos ry, 0, -sin ry)）。
+    const At = (u, v = 0) => ({ x: block.x + u * c + v * s, z: block.z - u * s + v * c });
+    sink.Add("OpeningSetBrick", PlaceGeometry(MakeBox(L + skin * 2, top - base, T, TILE_METERS.brick, `${prop.id}core`),
+      { x: block.x, y: (top + base) / 2, z: block.z, ry }));
+    const Extra = (u) => {
+      const t = (u + L / 2) / L;
+      let e = 0;
+      for (const p of prop.peaks) e = Math.max(e, p.h * Math.max(0, 1 - Math.abs(t - p.s) / p.w));
+      if (prop.breach) { const z = At(u).z, x = At(u).x, w = alongX ? x : z; if (w >= prop.breach.from && w <= prop.breach.to) e = 0; }
+      return e * prop.extraM;
+    };
+    const cols = Math.max(2, Math.round(L / BRICK.lengthM)), colW = L / cols;
+    for (let k = 0; ; k++) {
+      let any = false;
+      const stagger = k % 2 ? colW / 2 : 0;
+      for (let i = -1; i < cols; i++) {
+        const u0 = Math.max(-L / 2, -L / 2 + i * colW + stagger), u1 = Math.min(L / 2, -L / 2 + (i + 1) * colW + stagger);
+        if (u1 - u0 < 0.05) continue;
+        const u = (u0 + u1) / 2, e = Extra(u) + (rnd() - 0.5) * course * 0.9;
+        if (e < (k + 0.5) * course) continue;
+        any = true;
+        // 最上面一皮缺砖、错位，读得出是塌的不是砌的。
+        const topmost = e < (k + 1.5) * course;
+        if (topmost && rnd() < 0.22) continue;
+        const inset = rnd() * 0.03, w = (u1 - u0) - 0.012 - (topmost ? rnd() * 0.06 : 0);
+        const p = At(u, (rnd() - 0.5) * 0.02);
+        sink.Add("OpeningSetBrick", PlaceGeometry(MakeBox(w, course - 0.012, T - inset, TILE_METERS.brick, `${prop.id}b${k}_${i}`),
+          { x: p.x, y: top + k * course + course / 2, z: p.z, ry: ry + (topmost ? (rnd() - 0.5) * 0.12 : 0), rz: topmost ? (rnd() - 0.5) * 0.08 : 0 }));
+      }
+      if (!any || k > 40) break;
+    }
+    // 墙根的碎砖：两侧 0.2–0.7 m 内，贴地、矮（< 0.15 m），不挡人也不挡掩体。
+    const count = Math.round(L * 1.6);
+    for (let i = 0; i < count; i++) {
+      const u = (rnd() - 0.5) * L, v = (rnd() < 0.5 ? -1 : 1) * (T / 2 + 0.2 + rnd() * 0.5), p = At(u, v), size = 0.08 + rnd() * 0.12;
+      sink.Add("OpeningSetBrick", PlaceGeometry(MakeBox(size * 1.8, size * 0.6, size, TILE_METERS.brick, `${prop.id}r${i}`),
+        { x: p.x, y: this.groundAt(p.x, p.z) + size * 0.2, z: p.z, ry: rnd() * 6.28, rx: (rnd() - 0.5) * 0.5, rz: (rnd() - 0.5) * 0.5 }));
+    }
+  }
+
+  /**
+   * 倒塌的砖墙（纯外观）：沿 a→b 按 profile 立着的残墙（整皮整砖退台）、倒在一侧地上的几片墙体、墙根碎砖。
+   * 倒向 +法线侧（数据里是东边，远离缺口沟）。
+   */
+  BuildCollapsedWall(prop, sink) {
+    const rnd = Rng(`${prop.id}${prop.seed}`), course = BRICK.courseM;
+    const len = Math.hypot(prop.b.x - prop.a.x, prop.b.z - prop.a.z);
+    const d = { x: (prop.b.x - prop.a.x) / len, z: (prop.b.z - prop.a.z) / len };
+    let n = { x: d.z, z: -d.x }; if (n.x < 0) n = { x: -n.x, z: -n.z };          // 倒向东
+    const ry = Math.atan2(d.x, d.z) - Math.PI / 2;                                   // 局部 +x 沿墙
+    const At = (sAlong, off = 0) => ({ x: prop.a.x + d.x * sAlong + n.x * off, z: prop.a.z + d.z * sAlong + n.z * off });
+    const cols = Math.max(2, Math.round(len / BRICK.lengthM)), colW = len / cols;
+    // 墙脚埋进土里 0.12 m，按每一列自己的地面起砌。
+    for (let i = -1; i < cols; i++) for (let k = 0; k < 24; k++) {
+      const stagger = k % 2 ? colW / 2 : 0;
+      const s0 = Math.max(0, i * colW + stagger), s1 = Math.min(len, (i + 1) * colW + stagger);
+      if (s1 - s0 < 0.05) continue;
+      const sm = (s0 + s1) / 2, h = ProfileAt(prop.profile, sm) + (rnd() - 0.5) * course;
+      if (h < (k + 0.5) * course) continue;
+      const topmost = h < (k + 1.5) * course;
+      if (topmost && rnd() < 0.3) continue;
+      const p = At(sm, (rnd() - 0.5) * 0.03), g = this.groundAt(p.x, p.z) - 0.12;
+      sink.Add("OpeningSetBrick", PlaceGeometry(MakeBox(s1 - s0 - 0.012, course - 0.012, prop.thickM - rnd() * 0.04, TILE_METERS.brick, `${prop.id}b${k}_${i}`),
+        { x: p.x, y: g + k * course + course / 2, z: p.z, ry: ry + (topmost ? (rnd() - 0.5) * 0.14 : 0), rz: topmost ? (rnd() - 0.5) * 0.1 : 0 }));
+    }
+    // 倒在地上的墙片：一整片砌体平躺、一头搭在碎砖上。
+    for (const [i, f] of prop.fallen.entries()) {
+      const p = At(f.s, f.off), g = this.groundAt(p.x, p.z), tilt = f.tiltDeg * DEG;
+      sink.Add("OpeningSetBrick", PlaceGeometry(MakeBox(f.len, 0.24, f.w, TILE_METERS.brick, `${prop.id}f${i}`),
+        { x: p.x, y: g + 0.1 + Math.sin(tilt) * f.w / 2, z: p.z, ry: ry + f.yawDeg * DEG, rx: tilt }));
+    }
+    // 墙根碎砖堆：东侧（倒下的那一侧）多、西侧沟沿少。
+    for (let i = 0; i < Math.round(len * 5); i++) {
+      const sAlong = rnd() * len, off = rnd() < 0.8 ? 0.2 + rnd() * 1.8 : -(0.1 + rnd() * 0.3), p = At(sAlong, off), size = 0.08 + rnd() * 0.16;
+      sink.Add("OpeningSetBrick", PlaceGeometry(MakeBox(size * 1.8, size * 0.6, size, TILE_METERS.brick, `${prop.id}r${i}`),
+        { x: p.x, y: this.groundAt(p.x, p.z) + size * 0.15, z: p.z, ry: rnd() * 6.28, rx: (rnd() - 0.5) * 0.6, rz: (rnd() - 0.5) * 0.6 }));
     }
   }
 

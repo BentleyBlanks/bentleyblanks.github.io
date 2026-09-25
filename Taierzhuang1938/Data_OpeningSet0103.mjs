@@ -147,12 +147,168 @@ export const PROPS = Object.freeze([
   { id: "rubbleMoundBack", kind: "mound", show: "rescue", x: 1.85, z: -125.17, rx: 0.36, rz: 0.43, peak: 0.48, seed: 23 },
 ]);
 
-/** 烟柱与火点（Step 2 填：{id, stages, x, z, kind, scale, fire}）。 */
-export const SMOKE = Object.freeze([]);
-/** 03 开头两架日机的航线与时刻（Step 2 填）。 */
-export const FLYOVER = Object.freeze([]);
-/** 01–03 阴天开关（Step 2 接线；默认关，契约 §2 第 15 条）。 */
-export const sky = Object.freeze({ overcast: false });
+// ---------------------------------------------------------------------------
+// 近爆的定向喷土（SB02，Script_OpeningBlastFx.DirectionalBlast）
+// ---------------------------------------------------------------------------
+// 炮弹落在洞口南侧外（导演 banter.shellAt，飞行 0.22 s）：泥土、土块、碎木从洞口南沿 (1.2,-124.5) 离地
+// 0.5–1.5 m 朝西北喷进洞里，正对着 SB02 镜像机位（眼 (-0.6,-125.95) 朝东北东 yaw -66°）的右侧。
+// 方向：从喷口指向机位 (-1.8,-1.45) 再抬 14°，锥半角约 22°。0.22 s 起喷、0.9 s 止（契约 §5 SB02）。
+export const BLAST = Object.freeze({
+  id: "bunkerMouthSpray",
+  at: P(1.2, -124.5), liftM: Object.freeze([0.5, 1.5]),
+  dir: Object.freeze({ x: -0.75, y: 0.24, z: -0.61 }),
+  /** 从近爆（blastAge 0 = 导演 Blast() 的那一帧）起算：炮弹 0.22 s 落地就喷。 */
+  atS: 0.22, seconds: 0.68,
+  clods: 15, splinters: 9, dust: 16, spray: 44,
+  spreadRad: 0.38,
+  // 速度（米/秒）：土块 5–10、碎木 6–12（更轻、飞得远）、泥雾 7–13（一片扑到镜头上）、扬尘 1.2–3.2（填满洞口）。
+  speed: Object.freeze({ clods: Object.freeze([5, 10]), splinters: Object.freeze([6, 12]), spray: Object.freeze([7, 13]), dust: Object.freeze([1.2, 3.2]) }),
+  // 前 0.18 s 喷出 70%，后面是拖尾（落土）。
+  burst: Object.freeze({ headS: 0.18, headShare: 0.7 }),
+});
+
+// ---------------------------------------------------------------------------
+// 远处的烟柱与火点：{id, stages, x, z, kind, scale, fire, why}
+// ---------------------------------------------------------------------------
+// `stages` 是任务步骤。scale 1 = 高约 27 m 的标准烟柱（SmokeOptions 换算成 vfx.SmokeSource 的参数），
+// fire > 0 是地面火（不挂灯：都在 25 m 开外，点光照不到画面里的东西，白占灯预算）。
+// 坐标是调研按分镜推的起点（Survey_A/B），逐镜在实拍里核对位置（报告里的并排图），调过的写了原因。
+const OPENING_STEPS = Object.freeze(["Trapped", "BunkerRescue", "RearTrench"]);
+export const SMOKE = Object.freeze([
+  // 01–02：SB01 洞口外、SB03 审问组背后的天上、SB06 正前方远处（都在东边）。
+  { id: "smokeEastNear", stages: OPENING_STEPS, x: 60, z: -112, kind: "black", scale: 1.0, fire: 0, why: "SB03 天空右侧的烟柱、SB06 远处" },
+  { id: "smokeEastMid", stages: OPENING_STEPS, x: 85, z: -140, kind: "black", scale: 1.25, fire: 0, why: "SB03 中间偏左的大烟柱" },
+  { id: "smokeEastFar", stages: OPENING_STEPS, x: 110, z: -120, kind: "black", scale: 1.1, fire: 0, why: "SB01/SB03 远处第三股" },
+  { id: "smokeSB06North", stages: OPENING_STEPS, x: 60, z: -150, kind: "black", scale: 0.9, fire: 0, why: "SB06 正前方偏左" },
+  { id: "smokeSB06Near", stages: OPENING_STEPS, x: 45, z: -135, kind: "black", scale: 0.8, fire: 0, why: "SB06 正前方中远（(70,-118) 那一股并进 smokeEastNear）" },
+  { id: "fireSB06", stages: OPENING_STEPS, x: 32, z: -126, kind: "black", scale: 0.35, fire: 0.7, why: "SB06 中远一处火光" },
+  // 02 SB05A：镜头朝南南西直沟看（yaw 184°），画面中偏左两股远烟。
+  { id: "smokeSouthA", stages: Object.freeze(["BunkerRescue", "RearTrench"]), x: 18, z: -45, kind: "black", scale: 1.0, fire: 0, why: "SB05A 画面中偏左" },
+  { id: "smokeSouthB", stages: Object.freeze(["BunkerRescue", "RearTrench"]), x: -8, z: -40, kind: "black", scale: 0.85, fire: 0, why: "SB05A 画面中偏左第二股" },
+  // 03：SB07 正中那一大股（战车来路 Approach 附近）、SB08 远处的火点与烟柱。
+  { id: "smokeFrontBig", stages: Object.freeze(["Support"]), x: 59.8, z: -167.4, kind: "black", scale: 1.6, fire: 0, why: "SB07 正中的大黑烟柱" },
+  { id: "smokeFrontWest", stages: Object.freeze(["Support"]), x: -35, z: -190, kind: "black", scale: 1.0, fire: 0, why: "SB08 远处左" },
+  { id: "smokeFrontNorth", stages: Object.freeze(["Support"]), x: 40, z: -195, kind: "black", scale: 1.1, fire: 0, why: "SB08 远处右（SB07 左远）" },
+  { id: "fireFrontA", stages: Object.freeze(["Support"]), x: -20, z: -175, kind: "black", scale: 0.3, fire: 0.8, why: "SB08 弹坑区火点" },
+  { id: "fireFrontB", stages: Object.freeze(["Support"]), x: 5, z: -182, kind: "black", scale: 0.3, fire: 0.7, why: "SB08 弹坑区火点" },
+  { id: "fireFrontC", stages: Object.freeze(["Support"]), x: 30, z: -178, kind: "black", scale: 0.3, fire: 0.75, why: "SB08 弹坑区火点" },
+].map(Object.freeze));
+/** 一行烟表换成 vfx.SmokeSource 的参数（纯数学，Script_OpeningSet 与测试共用）。 */
+export function SmokeOptions(row) {
+  const s = row.scale;
+  return {
+    kind: row.kind, rate: +(3.2 * Math.sqrt(s)).toFixed(2), radius: +(0.8 * s).toFixed(2), rise: +(3.0 * s).toFixed(2),
+    sizeStart: +(0.9 * s).toFixed(2), sizeEnd: +(7.0 * s).toFixed(2), life: +(9 * Math.pow(s, 0.3)).toFixed(2),
+    opacity: 0.3, growthPower: 0.9, turbulence: 0.3,
+    fire: row.fire || 0, fireShape: "ground", light: false,
+  };
+}
+/**
+ * 同时在冒的烟团上限（rate × life 之和，spawnScale 1）。vfx 的持续烟池 sourceSmoke 在 high 档是
+ * 4000 × 0.08 = 320 片（环形缓冲，满了就挤掉最老的，烟柱会从顶上断掉）；给战车尘土、机枪热烟留 100 片。
+ */
+export const SMOKE_PARTICLE_BUDGET = 220;
+
+// ---------------------------------------------------------------------------
+// 03 开头两架日机横飞（SB07 天上两架飞机），aircraft.SetManualPose
+// ---------------------------------------------------------------------------
+// 触发：03（Support）里玩家走到「贴这道墙！」那一处 (5,-143) 8 m 内，或进 03 满 fallbackS 秒（选章/绕路也看得到）。
+// 航线是一条直线：中点 C 在触发点朝 yaw -56°（SB07 默认视线 -50° 略偏右）方向 360 m、离地 110 m
+// （仰角约 17°，玩家视场 55° 下在画面上部 y≈0.2；调研写「250 m 外、高 120 m」会贴着画面上沿）。
+// 飞行方向垂直于视线、往画面右边飞（朝南南东：往滕县城去）。时刻 0 在中点前 passS 秒。
+const FLY_BEARING = -56 * Math.PI / 180, FLY_GROUND_M = 360;
+const FLY_C = Object.freeze({ x: +(5 - Math.sin(FLY_BEARING) * FLY_GROUND_M).toFixed(1), z: +(-143 - Math.cos(FLY_BEARING) * FLY_GROUND_M).toFixed(1) });
+const FLY_DIR = Object.freeze({ x: +Math.cos(FLY_BEARING).toFixed(4), z: +(-Math.sin(FLY_BEARING)).toFixed(4) });
+export const FLYOVER = Object.freeze([
+  { id: "flyoverLead", aircraft: "MitsubishiKi21Ia", stage: "Support", centre: FLY_C, altitudeM: 110, dir: FLY_DIR,
+    speedMps: 62, passS: 5, seconds: 13, delayS: 0, bank: 0.04 },
+  // 僚机：左后 45 m、高 12 m、晚 0.6 s。
+  { id: "flyoverWing", aircraft: "MitsubishiKi30", stage: "Support",
+    centre: Object.freeze({ x: +(FLY_C.x - FLY_DIR.z * 45 - FLY_DIR.x * 30).toFixed(1), z: +(FLY_C.z + FLY_DIR.x * 45 - FLY_DIR.z * 30).toFixed(1) }),
+    altitudeM: 122, dir: FLY_DIR, speedMps: 62, passS: 5, seconds: 13, delayS: 0.6, bank: -0.03 },
+].map(Object.freeze));
+export const FLYOVER_TRIGGER = Object.freeze({ stage: "Support", at: P(5, -143), radiusM: 8, fallbackS: 22 });
+/** 航线在第 t 秒（从触发起算）的姿态（`AircraftFlight.SetManualPose` 的 pose）；航线外返回 null。 */
+export function FlyoverPose(row, t) {
+  const u = t - row.delayS;
+  if (u < 0 || u > row.seconds) return null;
+  const along = (u - row.passS) * row.speedMps;
+  return { x: row.centre.x + row.dir.x * along, y: row.altitudeM, z: row.centre.z + row.dir.z * along,
+    dirX: row.dir.x, dirZ: row.dir.z, climb: 0, bank: row.bank };
+}
+
+// ---------------------------------------------------------------------------
+// 01–03 阴天开关（契约 §2 第 15 条；默认关，本轮验收按关着算）
+// ---------------------------------------------------------------------------
+// 开时 01–03 套一档「阴天、灰褐、低饱和」的天光：以 Script_Sky 的 overcast 预设为底，**雾照抄本关自己的天**
+// （本关 testSceneDay 没有雾；用户 09 月定了「先别动雾」），再压饱和、把地面反光与太阳色往褐里拉。
+// 离开 01–03 还原本关天光。页面地址加 `?openingOvercast=1` 临时打开（给用户 A/B 看）。
+export const sky = Object.freeze({
+  overcast: false,
+  preset: "openingOvercast0103", base: "overcast", fogFrom: "testSceneDay",
+  tweaks: Object.freeze({ saturation: 0.74, contrast: 1.05, sunColor: Object.freeze([1.0, 0.95, 0.86]),
+    hemiSky: 0xb0b2b0, hemiGround: 0x5a4c3c, ground: Object.freeze([0.52, 0.45, 0.36]), smokeColor: Object.freeze([2.0, 1.9, 1.78]) }),
+});
+
+// ---------------------------------------------------------------------------
+// 03 前沿布景（SB07/SB08）：右侧阵位的破砖墙外观、缺口东沿的倒墙、缺口段护壁、阵位弹药箱
+// ---------------------------------------------------------------------------
+// 这一组是阵位与缺口的**世界外观**，03 之后 04（守机枪）、05（战车）、06（撤收）玩家还在这里打，
+// 所以装到 FRONT_SET_STAGES 结束才收走（不跟 01–03 的布景一起收；报告里写明）。
+// 全是外观：阵位白盒体块（Data_FirstLevelMissionLayout 的 RightNest*）的碰撞、掩体标签、射界一个不动，
+// 砖壳把体块整个包进去（每面外扩 3 cm、墙头只往上长）——所以砖壳露出来的只会比碰撞高，不会有「看着是缺口、
+// 其实是墙」的隐形墙；多出来的墙头锯齿只有外观（AI 视线、弹道仍按原体块）。
+export const FRONT_SET_STAGES = Object.freeze(["Support", "MachineGun", "Tank", "Orders"]);
+/** 砖层高（一皮砖 + 灰缝）与砖长：锯齿墙头按整皮、整砖退台；skinM 是砖壳比体块每面外扩多少。 */
+export const BRICK = Object.freeze({ courseM: 0.115, lengthM: 0.25, skinM: 0.03 });
+const Peak = (s, h, w) => Object.freeze({ s, h, w });
+export const FRONT_PROPS = Object.freeze([
+  // 西矮墙（机枪就架在它后面）：机枪那一段（z -154.9…-152.9）墙头不加高，做成破口；两头往上各长两皮碎砖。
+  // 只长 0.23 m：守机枪时（04）坐位眼高约 1.77 m、离墙 1.9 m，墙头要低于约 1.7 m 才不挡 30 m 外的人。
+  { id: "nestBrickWallWestLow", kind: "brickShell", block: "RightNestWestLow", extraM: 0.23,
+    peaks: Object.freeze([Peak(0.05, 1, 0.22), Peak(0.93, 0.8, 0.2)]), breach: Object.freeze({ from: -154.9, to: -152.9 }), seed: 1 },
+  // 西高墙（SB07 右侧那一堵高大的残墙）：北头高耸、往南退台跌下来。
+  { id: "nestBrickWallWestHigh", kind: "brickShell", block: "RightNestWestHigh", extraM: 0.9,
+    peaks: Object.freeze([Peak(0.22, 1, 0.35), Peak(0.8, 0.45, 0.25)]), seed: 2 },
+  { id: "nestBrickWallNorthLow", kind: "brickShell", block: "RightNestNorthLow", extraM: 0.12,
+    peaks: Object.freeze([Peak(0.1, 1, 0.12), Peak(0.55, 0.9, 0.08), Peak(0.97, 1, 0.1)]), seed: 3 },
+  { id: "nestBrickWallNorthHigh", kind: "brickShell", block: "RightNestNorthHigh", extraM: 0.55,
+    peaks: Object.freeze([Peak(0.75, 1, 0.4)]), seed: 4 },
+  { id: "nestBrickWallEastGable", kind: "brickShell", block: "RightNestEastGable", extraM: 0.35,
+    peaks: Object.freeze([Peak(0.12, 1, 0.2), Peak(0.88, 0.8, 0.2)]), seed: 5 },
+  { id: "nestBrickWallGablePeak", kind: "brickShell", block: "RightNestGablePeak", extraM: 0.45,
+    peaks: Object.freeze([Peak(0.5, 1, 0.3)]), seed: 6 },
+  { id: "nestBrickWallRearWest", kind: "brickShell", block: "RightNestRearWest", extraM: 0.8,
+    peaks: Object.freeze([Peak(0.1, 0.7, 0.3), Peak(0.62, 1, 0.3)]), seed: 7 },
+  { id: "nestBrickWallRearEast", kind: "brickShell", block: "RightNestRearEast", extraM: 0.6,
+    peaks: Object.freeze([Peak(0.3, 1, 0.35), Peak(0.9, 0.6, 0.15)]), seed: 8 },
+  // 缺口东沿的倒墙（SB08 从阵位看在画面左侧、一路伸向远处）。沟东沿坡顶 x≈-5.9（z -150…-141 沟底 -1.2、沟沿 -0.2）。
+  // **大半截是倒的**：从阵位看，缺口段沟深只有 1.1–1.2 m，守军在沟里只露头肩；东沿上立一道 1.2 m 的墙就把他们
+  // 全挡了（SB08 要「≥ 3 人同时可见」）。所以北段只剩墙根两三皮（≤ 0.42 m）加倒在东边地上的墙片，
+  // 南头 s ≥ 6.4 m（z > -143.8）才立着 1.2–2.0 m 的残墙（守军在那儿已经转向西走进岔口）。profile 是 [沿线米数, 离地高]。
+  { id: "gapWallCollapsed", kind: "collapsedWall", a: P(-5.95, -150.2), b: P(-5.95, -141.0), thickM: 0.37,
+    profile: Object.freeze([[0, 0.34], [0.8, 0.42], [1.6, 0.22], [3.2, 0.3], [4.6, 0.26], [6.0, 0.4], [6.8, 1.2], [7.6, 1.65], [8.4, 2.0], [9.2, 1.55]]),
+    fallen: Object.freeze([
+      Object.freeze({ s: 1.2, off: 1.05, len: 1.6, w: 0.9, tiltDeg: 12, yawDeg: 8 }),
+      Object.freeze({ s: 3.6, off: 1.25, len: 2.2, w: 1.1, tiltDeg: 7, yawDeg: -5 }),
+      Object.freeze({ s: 5.4, off: 0.95, len: 1.4, w: 0.8, tiltDeg: 18, yawDeg: 14 }),
+    ]), seed: 9 },
+  // 缺口段的护壁（SB08 中间那段沙袋压顶的木板护壁）：沟两壁补木板护壁（跳过现有 GuardWithdrawalRevetment*），
+  // 沙袋只压在**西沿**（远离阵位那一侧，压在东沿会挡阵位看沟里的人）。
+  { id: "gapRevetment", kind: "revetment", heightM: 1.0, postEveryM: 1.0, logs: 5, leanDeg: 8,
+    runs: Object.freeze([
+      Object.freeze({ side: "west", path: Path([-9.95, -148.35], [-9.95, -147.25]) }),
+      Object.freeze({ side: "west", path: Path([-9.95, -143.6], [-10.05, -141.6]) }),
+      Object.freeze({ side: "east", path: Path([-6.1, -149.9], [-6.05, -147.35]) }),
+      Object.freeze({ side: "east", path: Path([-6.05, -143.6], [-6.1, -142.2]) }),
+    ]) },
+  { id: "gapSandbagsWest", kind: "sandbagStakes", layers: 2, layerM: 0.17, depthM: 0.44, bagM: 0.52, inward: "east",
+    stakeEveryM: 1.4, stakeAboveM: 0.4, stakeBelowM: 0.5,
+    runs: Object.freeze([Path([-10.75, -151.2], [-10.75, -147.0]), Path([-10.8, -146.2], [-10.9, -142.2])]) },
+  // 夺下的机枪旁两个弹药箱（SB08 左前景）：机枪托架 RightNestFrontRest 南边、坐位踏板 MachineGunFiringStep 西边。
+  { id: "nestAmmoBoxes", kind: "crateStack", x: 25.1, z: -154.8, yawDeg: 12,
+    layers: Object.freeze([Object.freeze({ w: 0.45, h: 0.3, d: 0.3 }), Object.freeze({ w: 0.45, h: 0.28, d: 0.3, dx: 0.02, dyawDeg: -9 })]) },
+]);
 
 /**
  * 这些道具与导演的站位**有意接触**：是分镜要的，不算压人。键是道具 id，值是
@@ -167,7 +323,8 @@ export const DESIGNED_CONTACTS = Object.freeze({
     why: "SB03/03A：死川军背靠门框边的板墙；近爆时他就是被摔在这面北壁上（BlastSlamBuried）" }),
 });
 
-export const OPENING_SET = Object.freeze({ version: "20260925OpeningSetV1", stages: SET_STAGES, PROPS, SMOKE, FLYOVER, sky, DESIGNED_CONTACTS });
+export const OPENING_SET = Object.freeze({ version: "20260925OpeningSetV2", stages: SET_STAGES, PROPS, BLAST, SMOKE, FLYOVER, FLYOVER_TRIGGER, sky,
+  frontStages: FRONT_SET_STAGES, FRONT_PROPS, DESIGNED_CONTACTS });
 
 // ---------------------------------------------------------------------------
 // 占地（纯数学，Script_OpeningSet 与测试共用）：每件道具拆成若干只朝向盒
@@ -216,6 +373,18 @@ export function PropFootprints(prop) {
       return { x: p.x, z: p.z, w: p.w, d: p.len * Math.cos((p.pitchDeg || 0) * DEG), ry: (p.yawDeg || 0) * DEG,
         y0: p.lift - rise - p.t, y1: p.lift + rise + p.t, walkable: p.lift + rise < 0.16 };
     });
+    case "brickShell": return [];     // 外观：碰撞就是它包着的那块阵位体块（Data_FirstLevelMissionLayout）
+    case "collapsedWall": {
+      // 立着的那几段（按 profile 折线逐 0.5 m 取最高）：倒墙片与碎砖贴地（< 0.3 m）不算占地。
+      const len = Math.hypot(prop.b.x - prop.a.x, prop.b.z - prop.a.z), out = [];
+      for (let s = 0; s < len - 1e-6; s += 0.5) {
+        const e = Math.min(len, s + 0.5), h = Math.max(ProfileAt(prop.profile, s), ProfileAt(prop.profile, e));
+        const t0 = s / len, t1 = e / len;
+        out.push(Seg(P(prop.a.x + (prop.b.x - prop.a.x) * t0, prop.a.z + (prop.b.z - prop.a.z) * t0),
+          P(prop.a.x + (prop.b.x - prop.a.x) * t1, prop.a.z + (prop.b.z - prop.a.z) * t1), prop.thickM, 0, h));
+      }
+      return out;
+    }
     case "mound": {
       // 土包是个压扁的半椭球：只算高过 0.3 m（膝下）的那一圈核，边上一圈薄土人能踩过去。
       const core = Math.sqrt(Math.max(0, 1 - (0.3 / prop.peak) ** 2));
@@ -223,4 +392,14 @@ export function PropFootprints(prop) {
     }
     default: throw new Error(`OpeningSet: unknown prop kind ${prop.kind} (${prop.id})`);
   }
+}
+
+/** collapsedWall 的墙高折线在沿线 s 米处的高度（线性插值）。 */
+export function ProfileAt(profile, s) {
+  if (s <= profile[0][0]) return profile[0][1];
+  for (let i = 1; i < profile.length; i++) {
+    const [s1, h1] = profile[i];
+    if (s <= s1) { const [s0, h0] = profile[i - 1]; return h0 + (h1 - h0) * (s - s0) / Math.max(1e-6, s1 - s0); }
+  }
+  return profile[profile.length - 1][1];
 }
