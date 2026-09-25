@@ -366,7 +366,10 @@ async function ShootSB08(Route) {
       for (const cx of shown) if (!counted.length || (cx - counted.at(-1)) * 1280 >= F.minSepPx) counted.push(cx);
       const pixelsOnly = first.filter((x, i) => x.actor.alive && x.crossing && !x.safe && paint["g" + i].px >= F.minPx).length;
       const visible = counted.length, spreadPx = visible ? Math.round((Math.max(...counted) - Math.min(...counted)) * 1280) : 0;
-      return { t: +r.time.toFixed(2), stage: r.flow.stage.id, alive: g.player.alive, visible, pixelsOnly, spreadPx,
+      // 只有「站定、视线就在 yaw/pitch 上」的那一帧能当 SB08：躲雷那几帧（或刚躲完、镜头还没转回来）不算
+      // （09-25 修复后第二趟挑中了 yaw 114° 的一帧）。
+      const cam = G.Cam(), steady = !!G.watching && Math.abs(cam.yawDeg - C.yawDeg) <= 1 && Math.abs(cam.pitchDeg - C.pitchDeg) <= 1;
+      return { t: +r.time.toFixed(2), stage: r.flow.stage.id, alive: g.player.alive, steady, visible, pixelsOnly, spreadPx,
         first: first.map((x, i) => ({ ...G.Actor(x.actor, "g" + i), progress: x.progress, crossing: !!x.crossing, safe: !!x.safe, paint: paint["g" + i] })),
         gun: paint.gun, camera: G.Cam(), player: { pos: p.toArray().map((v) => +v.toFixed(2)), stance: g.player.stance }, state: r.frontBattle.State() };
     }, { C, n: B.firstBatch });
@@ -383,15 +386,16 @@ async function ShootSB08(Route) {
     // 挑「看得见的人够数（到 minVisible 为止）、其次横向铺得最开」的那一帧：刚离开遮挡时一列人挤成一团（09-25 三趟横向只铺开 15–22 px），
     // 数得出 3 个也看不出 3 个；够数之后再看 spreadS 秒，等他们在缺口那段拉开。
     const Enough = (v) => Math.min(v.visible, C.firstBatch.minVisible);
-    if (!best || Enough(s) > Enough(best) || (Enough(s) === Enough(best) && s.spreadPx > best.spreadPx)) { best = s; await page.screenshot({ path: path.join(OUT, "SB08.png") }); }
+    if (s.steady && (!best || Enough(s) > Enough(best) || (Enough(s) === Enough(best) && s.spreadPx > best.spreadPx))) { best = s; await page.screenshot({ path: path.join(OUT, "SB08.png") }); }
     // 躲雷把人带离了机位：走回去再看。
     if (Math.hypot(s.player.pos[0] - C.player.x, s.player.pos[2] - C.player.z) > C.player.rewalkM) {
       await ToViewpoint(); await page.evaluate(() => { window.frontShots.watching = false; });
     }
-    if (s.visible >= C.firstBatch.minVisible) enough ??= s.t;
+    if (s.steady && s.visible >= C.firstBatch.minVisible) enough ??= s.t;
     if (enough != null && s.t - enough > C.spreadS) break;
     if (s.first.every((x) => x.safe || !x.alive)) break;
   }
+  if (!best) throw Error("SB08：放行后没有一帧是站定看着缺口的（一直在躲雷或走回机位）");
   best.samples = samples;
   fs.writeFileSync(path.join(OUT, "SB08.json"), JSON.stringify(best, null, 1));
   report.shots.SB08 = best;
