@@ -47,6 +47,10 @@ export const CHARACTER_SPEECH = Object.freeze({
   // on the open jaw (full from stressCornerPullFullJaw), so it lets go with the jaw
   // (releaseS) when the line ends or pauses: Wide carries a little jaw drop of its own.
   stressCornerPull: .35, stressCornerPullFullJaw: .4,
+  // Baked face tracks (Data_FirstLevelFaceTracks.json) mostly carry wide/round at .1-.5, where
+  // the lip shapes barely show at 1 m (in-game review 2026-09-25). The runtime scales the track's
+  // lip-shape channels (clamped to 1); the jaw channel is left as baked.
+  trackWideGain: 1.6, trackRoundGain: 1.6, trackCloseGain: 1,
   // Eyes (Face_EyeL/R): look at the attention target, clamped, with small
   // seeded saccades while holding a gaze.
   gazeMaxYawDeg: 24, gazeMaxPitchDeg: 14, gazeFollowS: .09,
@@ -68,14 +72,27 @@ export const FACE_BLOOD = Object.freeze({
   opacity: .92, wetShare: .55,
   wetRoughness: .42, dryRoughness: .88,
   // Forehead cut: centre and half size in eye distances.
-  cut: [.28, .78], cutSize: [.34, .12],
+  // 2026-09-25 review: at .78 the cut sat under the NRA cap brim; now on the brow band
+  // just under the brim, so the wound shows and the runs come out from under the cap.
+  cut: [.28, .5], cutSize: [.34, .11],
   // Runs from the cut down the face: x offsets from the cut, widths, lengths at amount 1.
   runX: [-.34, -.12, .08, .3], runWidth: [.07, .1, .06, .08], runLength: [1.55, 2.25, 1.35, 1.9],
   // Cheek smear (the other side) and the nose bleed over the lip and chin.
-  smear: [-.62, -.62], smearSize: [.38, .5],
+  smear: [-.62, -.62], smearSize: [.32, .46],
+  // Smear edge roughness (grain, speck weights): lower reads as a wiped streak, higher as blotches.
+  smearRough: [.3, .12],
   nose: [.02, -.62], noseWidth: .16, noseLength: 1.25,
-  // Face region: front of the head only (z), inside the face oval.
-  frontFrom: -.95, frontTo: -.35, ovalCentreY: -.45, ovalRadius: [1.25, 1.95],
+  // Face region: front of the head only (z), inside the face oval (full inside ovalEdge of
+  // the radius, fading to 0 at its rim), and below the forehead band under the cap brim:
+  // full up to topFrom, gone at topTo (the skin above it is under the cap anyway).
+  frontFrom: -.95, frontTo: -.35, ovalCentreY: -.45, ovalRadius: [1.25, 1.95], ovalEdge: .85,
+  topFrom: .62, topTo: .8,
+  // Only the head surface that holds the lips takes blood: its closest vertex to
+  // Face_LipUpper at bind time within this many eye distances (caps and collars are farther).
+  skinLipReach: .25,
+  // Shading: runs wobble sideways (two sines: amplitude, frequency per eye distance);
+  // grain/speck noise frequencies; blood colour = tint * (tintBase + skin albedo * tintSkin).
+  runWobble: [.05, 6, .025, 17], grainScale: 7, speckScale: 23, tintBase: .65, tintSkin: 1.2,
   // A thin grime film under the blood keeps the face from reading clean at a distance.
   grime: .22,
   // Only materials with at least this many vertices inside the face oval get a clone.

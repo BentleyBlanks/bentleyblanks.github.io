@@ -76,9 +76,12 @@ function WoundUniforms() {
     uClothWoundAge:{value:Array.from({length:C.slots},()=>new THREE.Vector2())},
     uClothFresh:{value:new THREE.Color(C.fresh)},uClothDry:{value:new THREE.Color(C.dry)}};
 }
+// A source that already carries a wound patch (a face-blood clone made from an earlier wound
+// material, Script_CharacterFaceBlood) hands it to the clone: swap it, never declare it twice.
+function WithPatch(material,patch){return [...(PatchesOf(material)||[]).filter(p=>p.key!==patch.key),patch];}
 function WoundMaterial(source,uniforms) {
   const material=CloneShadedMaterial(source),patch=WoundPatch(uniforms);
-  for(const m of Array.isArray(material)?material:[material])ApplyPatches(m,[...(PatchesOf(m)||[]),patch]);
+  for(const m of Array.isArray(material)?material:[material])ApplyPatches(m,WithPatch(m,patch));
   return material;
 }
 // Static stains on already-baked geometry (instanced litter patients): the baked position is the
@@ -227,6 +230,8 @@ export class CharacterWounds {
   }
   Clear() {
     for(const r of this.records.values()) {
+      // A material cloned from ours later (face blood) keeps our patch and uniforms: empty the slots.
+      for(const v of r.uniforms.uClothWounds.value)v.w=0;
       if(r.mesh.material===r.material)r.mesh.material=r.original;
       for(const m of Array.isArray(r.material)?r.material:[r.material])m.dispose();
     }

@@ -138,6 +138,22 @@ for (const record of faced) {
     assert.ok(travel('Wide', bone) >= .6 && travel('Round', bone) >= .6, `${label} ${bone}: Wide/Round corner travel >= 6 mm`);
   }
   assert.ok(travel('Snarl', 'Face_LipUpper') >= .6, `${label} Snarl lifts the upper lip >= 6 mm`);
+  // Second pass (2026-09-25, in-game review): read from the front, Wide and Round are different
+  // widths and Round closes the lips over the teeth; Snarl peels both lips off clenched teeth;
+  // Shock opens the upper lids far enough to read under a cap brim. Head-local cm: [up, forward, out].
+  // Face_LipLower hangs under Face_Jaw: bring its delta into the head frame (NRA05's reviewed jaw is rotated).
+  const jawRest = new THREE.Quaternion().fromArray(rig.poses.Rest.Face_Jaw.rotation);
+  const delta = (pose, bone) => { const d = new THREE.Vector3().fromArray(rig.poses[pose][bone].translation).sub(new THREE.Vector3().fromArray(rig.poses.Rest[bone].translation));
+    return (bone === 'Face_LipLower' ? d.applyQuaternion(jawRest) : d).toArray(); };
+  const out = (pose) => delta(pose, 'Face_CornerL')[2] - delta(pose, 'Face_CornerR')[2]; // both corners, + = wider
+  assert.ok(out('Wide') >= 1.8 && out('Round') <= -2.4 && out('Wide') - out('Round') >= 4.5,
+    `${label}: Wide widens and Round narrows the mouth (corners ${out('Wide').toFixed(2)} / ${out('Round').toFixed(2)} cm)`);
+  assert.ok(delta('Round', 'Face_LipUpper')[0] < 0 && delta('Round', 'Face_LipLower')[0] > 0
+    && delta('Wide', 'Face_LipUpper')[0] > .3 && delta('Wide', 'Face_LipLower')[0] < -.3,
+    `${label}: Round brings the lips together over the teeth, Wide draws them off`);
+  assert.ok(delta('Snarl', 'Face_LipUpper')[0] >= 1 && delta('Snarl', 'Face_LipLower')[0] <= -1,
+    `${label}: Snarl bares both rows (lips >= 10 mm off the teeth)`);
+  assert.ok(delta('Shock', 'Face_LidUpperL')[0] >= .35, `${label}: Shock opens the upper lids >= 3.5 mm`);
   assert.ok(turn('Snarl', 'Face_Jaw') < 3 && turn('Grit', 'Face_Jaw') < .5, `${label} Snarl/Grit keep the teeth together`);
   assert.ok(turn('Shout', 'Face_Jaw') > 15 && turn('Shock', 'Face_Jaw') > 5, `${label} Shout/Shock drop the jaw`);
   assert.ok(travel('Shock', 'Face_BrowL') > .4 && turn('Pain', 'Face_BrowL') > 10 && turn('Snarl', 'Face_BrowR') > 10,
@@ -267,6 +283,35 @@ for (const label of Object.keys(definitions)) {
   face.Reset();
   assert.deepEqual(face.State().expression, {snarl: 0, shock: 0, pain: 0, shout: 0, grit: 0}, 'Reset clears expressions');
   assert.throws(() => CharacterFacial.SetExpression({characterRig: {modelId: 'LugouNra01'}}, {snarl: 1}), /has no facial rig/);
+}
+// ---- a face never takes an expression it cannot show (review 2026-09-25) ----
+{
+  const rig = definitions.LugouIja06, stale = {...rig, poses: {...rig.poses}};
+  delete stale.poses.Snarl;  // a cached pre-2026-09-25 GLB has no expression poses
+  const {root} = FaceRoot(stale); root.name = 'Rigged_LugouIja06';
+  const face = new CharacterFacialAnimation(root, stale, {seed: 5});
+  assert.throws(() => CharacterFacial.SetExpression({facial: face}, {snarl: 1}), /LugouIja06 has no Snarl pose/);
+  assert.throws(() => { face.expression = {snarl: .5}; }, /no Snarl pose/, 'whole-object writes are checked too');
+  face.SetExpression({snarl: 0, shock: 1});
+  assert.equal(face.expression.shock, 1, 'a pose the face has still works');
+  // No face skin under the root: SetFaceBlood(amount > 0) throws instead of painting nothing.
+  assert.throws(() => CharacterFacial.SetFaceBlood({facial: face}, 1), /SetFaceBlood found no face skin/);
+  assert.equal(CharacterFacial.SetFaceBlood({facial: face}, 0), false, 'clearing blood on a bare rig is fine');
+}
+// A whole-object write eases over expressionBlendS even after SetExpression(..., blendS) (the blend time does not stick).
+{
+  const rig = definitions.LugouNra02, {root} = FaceRoot(rig), face = new CharacterFacialAnimation(root, rig, {seed: 9});
+  face.SetExpression({shock: 1}, 0); face.Update(1 / 60, {});
+  assert.equal(face.expressionWeights.shock, 1);
+  face.expression = {shock: 0}; face.Update(C.expressionBlendS / 2, {});
+  assert.ok(Math.abs(face.expressionWeights.shock - .5) < .05, `whole-object write drops the earlier snap (${face.expressionWeights.shock.toFixed(2)})`);
+  // Baked track lip shapes are scaled by the track gains (clamped to 1).
+  face.expression = {};
+  for (let i = 0; i < 40; i++) face.Update(1 / 60, {speech: {active: true, jaw: .5, wide: .4, round: 0, close: 0, stress: 0}});
+  assert.ok(Math.abs(face.wide - Math.min(1, .4 * C.trackWideGain)) < .02, `track wide .4 -> ${face.wide.toFixed(2)} (gain ${C.trackWideGain})`);
+  for (let i = 0; i < 40; i++) face.Update(1 / 60, {speech: {active: true, jaw: .5, wide: 0, round: .8, close: 0, stress: 0}});
+  assert.ok(Math.abs(face.round - Math.min(1, .8 * C.trackRoundGain)) < .02, `track round .8 -> ${face.round.toFixed(2)} (gain ${C.trackRoundGain})`);
+  assert.ok(C.trackWideGain > 1 && C.trackRoundGain > 1, 'track lip shapes are boosted (they are mostly .1-.5)');
 }
 // Blinks: seeded per actor, 2.5-6 s apart.
 {
