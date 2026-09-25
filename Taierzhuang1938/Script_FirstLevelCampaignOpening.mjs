@@ -31,6 +31,8 @@ export const SPEAKING_JAW_RADIANS = .06;
 export const SILENT_AFTER_S = .6;
 /** Pelvis travel per 1/60 s frame above which a move is a jump (9 m/s: faster than any run, pelvis sway included). */
 export const STEP_LIMIT_M = .15;
+/** Contract §2.9: the player takes no damage for this long after the 02 hand-back (s). */
+const HANDBACK_SAFE_S = 3;
 /** How long the withdrawal may hold at the rear corner looking back for the pursuit (s). */
 export const LOOKBACK_S = 12;
 /** Pursuers that must show in the look-back from the rear corner (「追兵占住刚才的位置」). */
@@ -80,6 +82,14 @@ async function InstallProbe(page) {
       births: {}, acting: {}, maxPartnerHandRotationStep: 0, maxPartnerHandRotationPhase: null,
     };
     const P = window.openingProbe, Vec = () => g.player.position.clone();
+    // Contract §2.9 (hand-back safety): every hit the player takes, on the runtime clock, whatever else wraps TakeHit.
+    P.hits = [];
+    const TakeHit = g.player.TakeHit.bind(g.player);
+    g.player.TakeHit = (...args) => {
+      const before = g.player.health, result = TakeHit(...args);
+      if (g.player.health < before) P.hits.push({ time: g.Debug.FirstLevelMissionRuntime().time, lost: before - g.player.health });
+      return result;
+    };
     const Jaw = (actor) => {
       const face = actor?.actor?.characterRig?.facial, c = face?.controls.find((c) => c.name === "Face_Jaw");
       return c ? c.bone.quaternion.angleTo(c.quaternion) : null;
@@ -184,6 +194,8 @@ async function InstallProbe(page) {
         const look = new cam.position.constructor(0, 0, -1).applyQuaternion(cam.quaternion);
         P.releasePitch = Math.asin(Math.max(-1, Math.min(1, look.y))) * 180 / Math.PI;
         P.releaseHealth = g.player.health;
+        P.releaseTime = r.time;
+        P.pursuitAtRelease = [...r.enemies.values()].filter((a) => a.missionEncounter === "bunkerPursuit").length;
       }
       P.wasCameraActive = s.CameraActive;
       // Mouths: who is speaking (voice.Speech active) against the jaw of every speaking-cast face in view.
@@ -331,6 +343,14 @@ export async function DriveOpening(ctx){
   // Out of the mouth, over the crater step, down the SSW leg to the rear corner: a player withdrawing
   // under fire keeps moving (the squad covers); he does not stop to duel the fold man from the mouth.
   await Route(WITHDRAW_ROUTE.slice(0,AT_RC),"OpeningWithdraw",{fight:false,stance:"crouch"});
+  // Contract §2.9 (the SB06 seat looks down the front trench): no damage in the first HANDBACK_SAFE_S after the
+  // hand-back, and the pursuit (bunkerPursuit) is not in the fight before the player has control.
+  const safe=await page.evaluate(()=>{const P=window.openingProbe,now=window.Tengxian.Debug.FirstLevelMissionRuntime().time;
+    return {releaseTime:P.releaseTime,now,pursuitAtRelease:P.pursuitAtRelease,hits:P.hits.filter(h=>h.time>=P.releaseTime-1/60)};});
+  console.log("HANDBACK_SAFE",JSON.stringify(safe));
+  assert.ok(safe.now-safe.releaseTime>=HANDBACK_SAFE_S,`the hand-back window was watched (${(safe.now-safe.releaseTime).toFixed(2)} s)`);
+  assert.deepEqual(safe.hits.filter(h=>h.time<=safe.releaseTime+HANDBACK_SAFE_S),[],`no damage in the first ${HANDBACK_SAFE_S} s after the hand-back`);
+  assert.equal(safe.pursuitAtRelease,0,"bunkerPursuit spawns only after the player has control");
   // 「回头看见追兵占住刚才的位置」: at the rear corner he turns and looks back up the leg (crouched at the
   // corner for up to LOOKBACK_S) until a pursuer shows in the trench he has just left.
   const back=await LookAt(page,A.bunkerBend||Storyboards.withdraw.lane[3],1.3);
