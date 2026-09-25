@@ -83,11 +83,13 @@ export const FRONT_SORTIE=Object.freeze({
   // the route's last point (42.4,-111) he stood in the doorway between the player and the keeper for the keeper's
   // whole line (09-25 drive: hidden by Luo 130 of 130 frames) and in the player's way in.
   leaderDoorSide:Point(41.9,-109.4),
-  // Luo's 05 attack leg ends beside the throw spot, not on it: 2.0 m back up the branch and 1.2 m east of its centre line
-  // (the floor is 3.4 m wide), inside rearArrivalM for attackPositionReached. Walking to the throw spot itself he stood
-  // 0.8-1.3 m from the player for BundleAttack (09-25 relay r2 Front step 2 drives: BundleAttack.02 181 of 189 frames
-  // closer than 1.2 m, BundleAttack.01 56 of 56), a chin and a sleeve instead of a face, and in the player's elbow.
-  leaderAttackSide:Point(44.2,-157.7),
+  // Luo's 05 attack leg ends beside the throw spot, not on it: 1.5 m west of it on the trench floor behind RoadsideRuin,
+  // 1.5 m off the player's last leg in, inside rearArrivalM for attackPositionReached. The player at the throw spot,
+  // facing the tank, has him at the left of the picture. Walking to the throw spot itself he stood 0.8-1.3 m from the
+  // player for BundleAttack (09-25 relay r2 Front step 2 drives: BundleAttack.02 181 of 189 frames closer than 1.2 m,
+  // BundleAttack.01 56 of 56), a chin and a sleeve instead of a face; stopped 2 m back up the branch (44.2,-157.7) the
+  // player walked past his elbow just as BundleAttack.01 started (0.9 m, 78 of 115 frames).
+  leaderAttackSide:Point(42.1,-159.9),
   throw:Point(43.6,-159.6),orders:Point(-34,-99),
   leftGun:Point(-33.8,-157.6),leftSeat:Point(-33.6,-156.4),
   // He / relief / Zhou use the support sap's first leg and then the left gun access trench.

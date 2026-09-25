@@ -13,7 +13,7 @@
 //      也照样记 reliefInPosition；罗班长被枪座挡住 → 玩家在后墙岔口等够 rearLeaderGraceS 照样 rightRearReached；
 //      受保护的待撤守军身边不落手榴弹（任务侧投弹否决）
 //   ⑧ 近处说话人不在画面里：台词等他走进画面；太近就退开
-//   ⑪ 05 攻击位：罗班长停在投弹点旁（leaderAttackSide），离玩家 ≥1.5 m
+//   ⑪ 05 攻击位：罗班长停在投弹点旁（leaderAttackSide），离投弹点与玩家进来的最后一段都 ≥1.4 m
 //   ⑩ 攻击支路过 AttackRuinA 东端留 ≥0.6 m；墙南侧死角里的人按最近路点走、先离开墙面（TankProbe5 卡死点）
 //   ⑨ 走路线的人（罗班长）在 FIRE 里被换位命令的 0.6 m 到位半径钉在路线拐点前 0.58 m（后门坡道）：Script_Ai.Act 用路线的半径
 //
@@ -32,6 +32,7 @@ import { FRONT_SORTIE as S, FRONT_SPACE as Space, FRONT_TANK_PATH } from "./Data
 import { FRONT_BATTLE_TUNING as B } from "./Data_Tuning_FirstLevelFront.mjs";
 import { MISSION_TUNING as R } from "./Data_FirstLevelMission.mjs";
 import { MISSION_ROUTES as Routes, MISSION_PLACEMENT as P, MISSION_LAYOUT } from "./Data_FirstLevelMissionLayout.mjs";
+import { SampleMissionTerrain } from "./Data_FirstLevelMissionTerrain.mjs";
 import { MISSION_DIALOGUE } from "./Data_FirstLevelMissionDialogue.mjs";
 import { MISSION_BATTLE_SOUND as Sound } from "./Data_FirstLevelMissionBattleSound.mjs";
 import { FIRST_LEVEL_MUSIC_COMBAT } from "./Data_FirstLevelMissionMusic.mjs";
@@ -729,21 +730,29 @@ function WalkRuntime(extra = {}) {
 }
 
 {
-  // ⑪ Luo stops beside the throw spot (S.leaderAttackSide), never on it: >= 1.5 m from the player's throw spot so his
-  // BundleAttack lines show a face, inside rearArrivalM so attackPositionReached still needs him there, and on the
-  // attack branch's 3.4 m floor (<= 1.3 m off its centre line).
+  // ⑪ Luo stops beside the throw spot (S.leaderAttackSide), never on it and never on the player's way in: >= 1.4 m from
+  // the throw spot and from the branch's last leg, so his BundleAttack lines show a face; inside rearArrivalM so
+  // attackPositionReached still needs him there; on the trench floor (within 0.4 m of the throw spot's floor height, clear
+  // of every block by his capsule).
   const side = S.leaderAttackSide, lane = S.attackRoute, d = Math.hypot(side.x - S.throw.x, side.z - S.throw.z);
-  assert.ok(d >= 1.5 && d < B.rearArrivalM, `Luo's attack stop is ${d.toFixed(2)} m from the throw spot`);
+  assert.ok(d >= 1.4 && d < B.rearArrivalM, `Luo's attack stop is ${d.toFixed(2)} m from the throw spot`);
   const a = lane.at(-2), b = lane.at(-1), t = Math.max(0, Math.min(1, ((side.x - a.x) * (b.x - a.x) + (side.z - a.z) * (b.z - a.z)) / ((b.x - a.x) ** 2 + (b.z - a.z) ** 2)));
   const off = Math.hypot(side.x - (a.x + (b.x - a.x) * t), side.z - (a.z + (b.z - a.z) * t));
-  assert.ok(off <= 1.3, `Luo's attack stop is on the branch floor (${off.toFixed(2)} m off its centre line)`);
+  assert.ok(off >= 1.4, `Luo's attack stop is off the player's last leg in (${off.toFixed(2)} m)`);
+  assert.ok(Math.abs(SampleMissionTerrain(side.x, side.z) - SampleMissionTerrain(S.throw.x, S.throw.z)) <= 0.4, "Luo's attack stop is on the trench floor");
+  for (const block of MISSION_LAYOUT.blocks) {
+    const ry = block.ry || 0, c = Math.cos(ry), q = Math.sin(ry), dx = side.x - block.x, dz = side.z - block.z;
+    const lx = dx * c - dz * q, lz = dx * q + dz * c;
+    const gap = Math.hypot(Math.max(Math.abs(lx) - block.w / 2, 0), Math.max(Math.abs(lz) - block.d / 2, 0));
+    assert.ok(gap >= 0.45, `Luo's attack stop clears ${block.id} (${gap.toFixed(2)} m)`);
+  }
   const { r } = WalkRuntime({ flow: { stage: { id: "Tank" } }, companion: { Handle: () => ({ id: 1, alive: true, position: { x: 0, z: 0 } }) } });
   const battle = new FirstLevelFrontBattle(r);
   r.Has = (id) => id === "bundleTaken" || id === "bundleReturned"; r.Inventory = () => ({ bundles: 1 }); r.tank = { brain: true };
   battle.UpdateSortie();
   assert.deepEqual(battle.leaderRoute.at(-1), side, "the 05 attack leg ends at leaderAttackSide");
-  checks += 3;
-  Ok("⑪ Luo's 05 attack leg ends beside the throw spot, 1.5 m+ from the player");
+  checks += 5;
+  Ok("⑪ Luo's 05 attack leg ends beside the throw spot, 1.4 m+ from it and off the player's way in");
 }
 
 console.log(`FirstLevelFrontPacingTest 通过：${checks} 条断言`);
