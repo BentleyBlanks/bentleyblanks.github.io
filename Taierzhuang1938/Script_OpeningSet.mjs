@@ -667,6 +667,11 @@ export class OpeningSet {
     const floorAt = (x) => this.groundAt(x, z + 0.25);         // 沟底（立面南侧一点），北壁坡脚取样会偏高
     const opens = prop.openings;
     const Inside = (x, y) => opens.some((o) => x > o.x0 && x < o.x1 && y < o.h);
+    // 后仰（prop.lean）：离沟底 fromM 以下竖直，以上按 deg 往北仰、贴着北壁坡面（坡面约 70°），立面上半截不再悬在坡面前面。
+    // Back(h)：离沟底 h 处立面往北退多少（负 z）；Tilt(h)：那一截的绕 x 轴转角（负值＝顶往北）。
+    const lean = prop.lean ? { from: prop.lean.fromM, t: Math.tan(prop.lean.deg * DEG), rad: prop.lean.deg * DEG } : null;
+    const Back = (h) => lean ? -Math.max(0, h - lean.from) * lean.t : 0;
+    const Tilt = (h) => lean && h > lean.from ? -lean.rad : 0;
     // 横板：一行一行铺，开口处断开。
     for (let y = 0; y < prop.heightM - 0.01; y += prop.plankM) {
       const h = Math.min(prop.plankM, prop.heightM - y) - 0.015, yc = y + h / 2;
@@ -677,22 +682,41 @@ export class OpeningSet {
         if ((open || x >= prop.x1) && start != null) {
           const end = Math.min(x, prop.x1), w = end - start;
           if (w > 0.05) sink.Add("WoodBeam", PlaceGeometry(MakeBox(w, h, 0.05, TILE_METERS.wood, `${prop.id}${y}${start}`),
-            { x: (start + end) / 2, y: floorAt((start + end) / 2) + yc, z: z + (rnd() - 0.5) * 0.015, rz: (rnd() - 0.5) * 0.015 }));
+            { x: (start + end) / 2, y: floorAt((start + end) / 2) + yc, z: z + Back(yc) + (rnd() - 0.5) * 0.015, rx: Tilt(yc), rz: (rnd() - 0.5) * 0.015 }));
           start = null;
         }
       }
     }
-    // 立柱：两头 + 每个开口两侧；开口上方过梁；门内黑。
+    // 立柱：两头 + 每个开口两侧；开口上方过梁；门内黑。后仰时立柱在 fromM 处折成两段（下段竖直、上段后仰），两段首尾相接。
     const posts = new Set([prop.x0 + prop.postM / 2, prop.x1 - prop.postM / 2]);
     for (const o of opens) { posts.add(o.x0 - prop.postM / 2 + 0.02); posts.add(o.x1 + prop.postM / 2 - 0.02); }
-    for (const x of posts) sink.Add("WoodBeam", PlaceGeometry(MakeBox(prop.postM, prop.heightM + 0.1, prop.postM, TILE_METERS.wood, `${prop.id}p${x}`),
-      { x, y: floorAt(x) + (prop.heightM + 0.1) / 2 - 0.05, z: z + 0.05, rz: (rnd() - 0.5) * 0.03 }));
+    for (const x of posts) {
+      const rz = (rnd() - 0.5) * 0.03, top = prop.heightM + 0.05;
+      if (!lean) {
+        sink.Add("WoodBeam", PlaceGeometry(MakeBox(prop.postM, prop.heightM + 0.1, prop.postM, TILE_METERS.wood, `${prop.id}p${x}`),
+          { x, y: floorAt(x) + (prop.heightM + 0.1) / 2 - 0.05, z: z + 0.05, rz }));
+        continue;
+      }
+      const lowH = lean.from + 0.05, upH = top - lean.from, mid = lean.from + upH / 2;
+      sink.Add("WoodBeam", PlaceGeometry(MakeBox(prop.postM, lowH, prop.postM, TILE_METERS.wood, `${prop.id}p${x}`),
+        { x, y: floorAt(x) + lowH / 2 - 0.05, z: z + 0.05, rz }));
+      sink.Add("WoodBeam", PlaceGeometry(MakeBox(prop.postM, upH / Math.cos(lean.rad), prop.postM, TILE_METERS.wood, `${prop.id}pu${x}`),
+        { x, y: floorAt(x) + mid, z: z + 0.05 + Back(mid), rx: -lean.rad, rz }));
+    }
     const voidKey = "OpeningSetVoid";
     if (!materials.has(voidKey)) materials.set(voidKey, this.Own(new THREE.MeshStandardMaterial({ color: 0x050403, roughness: 1, metalness: 0 })));
     for (const o of opens) {
-      const w = o.x1 - o.x0, x = (o.x0 + o.x1) / 2;
-      sink.Add("WoodBeam", PlaceGeometry(MakeBox(w + prop.postM * 2, 0.2, 0.24, TILE_METERS.wood, `${prop.id}l${x}`), { x, y: floorAt(x) + o.h + 0.1, z: z + 0.04 }));
-      sink.Add(voidKey, PlaceGeometry(MakeBox(w, o.h, 0.04, 1, `${prop.id}v${x}`), { x, y: floorAt(x) + o.h / 2, z: z - 0.1 }));
+      const w = o.x1 - o.x0, x = (o.x0 + o.x1) / 2, lintelH = o.h + 0.1;
+      sink.Add("WoodBeam", PlaceGeometry(MakeBox(w + prop.postM * 2, 0.2, 0.24, TILE_METERS.wood, `${prop.id}l${x}`),
+        { x, y: floorAt(x) + lintelH, z: z + 0.04 + Back(lintelH), rx: Tilt(lintelH) }));
+      if (!lean) sink.Add(voidKey, PlaceGeometry(MakeBox(w, o.h, 0.04, 1, `${prop.id}v${x}`), { x, y: floorAt(x) + o.h / 2, z: z - 0.1 }));
+      else {
+        // 后仰的门：门内黑贴着门框（退 3 cm），也折成两段——退 10 cm 的话，后仰那段整个埋进北壁坡面里，门洞里露出的是土。
+        const upH = o.h - lean.from, mid = lean.from + upH / 2;
+        sink.Add(voidKey, PlaceGeometry(MakeBox(w, lean.from, 0.04, 1, `${prop.id}v${x}`), { x, y: floorAt(x) + lean.from / 2, z: z - 0.03 }));
+        sink.Add(voidKey, PlaceGeometry(MakeBox(w, upH / Math.cos(lean.rad), 0.04, 1, `${prop.id}vu${x}`),
+          { x, y: floorAt(x) + mid, z: z - 0.03 + Back(mid), rx: -lean.rad }));
+      }
       sink.Add("WoodBeam", PlaceGeometry(MakeBox(w, 0.06, 0.3, TILE_METERS.wood, `${prop.id}t${x}`), { x, y: floorAt(x) + 0.03, z: z - 0.02 }));   // 门槛
     }
   }

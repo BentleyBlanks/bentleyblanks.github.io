@@ -32,6 +32,7 @@ import { AircraftFlight } from "./Script_Aircraft.mjs";
 import { SKY_PRESETS } from "./Script_Sky.mjs";
 import { OPENING_STORYBOARDS as C } from "./Data_OpeningStoryboards.mjs";
 import { SampleMissionTerrain as G } from "./Data_FirstLevelMissionTerrain.mjs";
+import { CreateP012Terrain } from "./Data_FirstLevelP012Terrain.mjs";
 import { MISSION_LAYOUT as L } from "./Data_FirstLevelMissionLayout.mjs";
 import { FRONT_SPACE as SP } from "./Data_FirstLevelFrontRoute.mjs";
 import { Sight, Eye, RouteClearance } from "./Script_FirstLevelSpaceProbe.mjs";
@@ -481,6 +482,61 @@ const Samples = (route) => {
   set.Exit();
   assert.equal(scene.children.length, 1, "Exit() removes it again");
   console.log(`ok lifecycle: ${report.stats.meshes} meshes / 1 light in 01–03, lintel falls 0.25–0.6 s, lantern only in 01, zero residue after 03`);
+}
+{
+  // ---- 4b. 真几何视线：SB03 / SB03A / SB04 看人物的头，不被本包**真正建出来的网格**挡（第 3 节只按占地盒、按契约站位
+  // 的「头在脚正上方」量，漏掉了 SB03 实拍的红：跪着的川军往后靠，头在脚后 0.39 m、比竖直板墙还靠北 7 cm，
+  // 正好顶在第一口东门柱上——Script_OpeningStoryboardShots 报「comrade head not behind scenery: …|WoodBeam」）。
+  // 头的位置是真实流程里量的（2026-09-26，Script_OpeningStoryboardShots 抓帧时读骨骼：CaptiveKneelMud / CaptiveWallSlideTwitch /
+  // 日兵甲），写成离人脚下地面的高度；镜头是那三镜实拍的眼位。**地面用游戏里的高度场**（Data_FirstLevelP012Terrain，0.75 m 格，
+  // 宿主的 groundAt 就是它）：北壁坡脚在高度场里被抹缓，立面底比解析地形 SampleMissionTerrain 高 0.3 m 左右，
+  // 拿解析地形建立面量出来是通的、游戏里照样挡（09-26 第一版修法就栽在这）。射线打本包建出的网格（三角面、按材质正面），跟抓帧工具同一口径。
+  const P012 = CreateP012Terrain(L), GG = (x, z) => P012.SampleHeight(x, z);
+  const shared = new Map(), KNOWN = new Set(["Sandbag", "WoodBeam", "WoodCrate", "GroundRubble", "CityWallBrickPbr"]);
+  const library = { Get: (name) => { if (!KNOWN.has(name)) throw new Error(`unknown material recipe ${name}`);
+    if (!shared.has(name)) shared.set(name, new THREE.MeshStandardMaterial({ name })); return shared.get(name); } };
+  const set = new OpeningSet({ scene: new THREE.Scene(), library, groundAt: GG });
+  set.Enter("Trapped");
+  const At = (x, z, h) => new THREE.Vector3(x, GG(x, z) + h, z), AtRoot = (x, z, root, h) => new THREE.Vector3(x, GG(root.x, root.z) + h, z);
+  const comradeRoot = { x: 4.057, z: -125.905 }, deadRoot = { x: 4.061, z: -125.88 };
+  const shots = [
+    { shot: "SB03", phase: "Interrogation", eye: At(0.35, -125.15, 0.26), targets: [
+      ["comrade head (kneeling, leaning back on the north wall)", AtRoot(4.068, -126.29, comradeRoot, 0.870)],
+      ["ijaA head", AtRoot(4.097, -125.712, { x: 4.097, z: -125.625 }, 1.359)]] },
+    { shot: "SB03A", phase: "Reach", settle: true, eye: At(0.25, -125.25, 0.18), targets: [
+      ["dead comrade head (slid down the wall)", AtRoot(3.793, -126.21, deadRoot, 0.735)],
+      ["ijaA head (looking back)", AtRoot(4.879, -124.46, { x: 4.9, z: -124.45 }, 1.356)]] },
+    { shot: "SB04", phase: "Butt", eye: At(2.3, -124.4, 0.35), targets: [
+      ["dead comrade head right of the door", AtRoot(3.793, -126.21, deadRoot, 0.735)]] },
+  ];
+  const ray = new THREE.Raycaster();
+  const Shown = (o) => { for (let p = o; p; p = p.parent) if (!p.visible) return false; return true; };
+  const FirstHit = (root, eye, target) => {
+    root.updateMatrixWorld(true);
+    const dir = target.clone().sub(eye), far = dir.length() - 0.12;
+    ray.set(eye, dir.normalize()); ray.near = 0.05; ray.far = far;
+    const hit = ray.intersectObject(root, true).find((h) => h.object.isMesh && Shown(h.object));
+    return hit ? `${hit.object.name || hit.object.parent?.name} at ${hit.point.toArray().map((v) => v.toFixed(2))}` : null;
+  };
+  report.setHeads = {};
+  for (const s of shots) {
+    set.Update(0.016, "Trapped", s.phase, { collapsed: true, blastAge: 20 });
+    if (s.settle) for (let i = 0; i < 40; i++) set.Update(1 / 60, "Trapped", s.phase, { collapsed: true, blastAge: 20 + i / 60 });
+    report.setHeads[s.shot] = s.targets.map(([name, target]) => ({ name, blocker: FirstHit(set.root, s.eye, target) }));
+    assert.deepEqual(report.setHeads[s.shot].filter((r) => r.blocker), [], `${s.shot}: the built set hides no judged head`);
+  }
+  // 对照：改之前的立面（竖直、第一口 x 2.7–3.9）真挡 SB03 川军的头——这条检查抓得住那次红。
+  {
+    const facade = PROPS.find((p) => p.id === "trenchFacadeN"), old = { ...facade, x0: 2.6, lean: null,
+      openings: [{ x0: 2.7, x1: 3.9, h: 1.7 }, { x0: 4.9, x1: 5.5, h: 1.45 }] };
+    const group = new THREE.Group(), material = new THREE.MeshStandardMaterial();
+    set.BuildFacade(old, { Add: (key, geometry) => group.add(new THREE.Mesh(geometry, material)) }, new Map([["OpeningSetVoid", material]]));
+    report.setHeadsControl = FirstHit(group, shots[0].eye, shots[0].targets[0][1]);
+    assert.ok(report.setHeadsControl, "control: the pre-fix upright facade hides the SB03 comrade head (the check can see that red)");
+    group.traverse((o) => o.geometry?.dispose());
+  }
+  set.Exit();
+  console.log(`ok set vs heads (real geometry): ${JSON.stringify(report.setHeads)}; control (old upright facade) ${report.setHeadsControl}`);
 }
 {
   // 正片里马灯走 LightRig 的火光池（簇光）：场景里一盏 three PointLight 都不放，01 进场、01→02 灭灯都不改 NUM_POINT_LIGHTS
