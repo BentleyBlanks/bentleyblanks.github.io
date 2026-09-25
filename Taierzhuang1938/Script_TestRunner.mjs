@@ -295,6 +295,8 @@ export const testDefs = {
   FirstLevelBattleSoundTest: { file: "Script_FirstLevelBattleSoundTest.mjs", desc: "第一关 01–05 声景：远处扇区交火、场外近落弹、防炮洞环境、壕沟/洞室判据、压制喘息心跳、耳鸣两档、配乐让位（纯 Node）" },
   FirstLevelMissionMusicBrowserTest: { file: "Script_FirstLevelMissionMusicBrowserTest.mjs", timeoutMs: 600000, desc: "First-level score playback, stage jumps, dialogue mix and lazy-load races" },
   AudioTest: { file: "Script_AudioTest.mjs", desc: "音频资产与烘焙管线" },
+  FirstLevelAudioNodeBudgetTest: { file: "Script_FirstLevelAudioNodeBudgetTest.mjs", timeoutMs: 900000,
+    desc: "第一关 01–06 音频同时活跃节点：实时推帧峰值 ≤ 150、账面差 0、无过期未收、战车 loop / 剧情语音 / 前线+炮击的契约上限、离开 05 收走战车 loop、同步推 600 帧不虚高" },
   AudioWiringTest: { file: "Script_AudioWiringTest.mjs",
     desc: "音频接线：弹啸/遮挡/空间档/AI foley/脚下材质/掷弹筒/爆炸三档" },
   VoiceTest: { file: "Script_VoiceTest.mjs", desc: "语音资产与降级链" },
@@ -381,6 +383,7 @@ export const browserTests = new Set([
   "FirstLevelZhouExitBrowserTest",
   "FirstLevelMachineGunCutsceneTest",
   "MachineGunCutsceneAudioTest",
+  "FirstLevelAudioNodeBudgetTest",
   "FirstLevelMissionAftermathTest",
   "SquadMarchEditorTest",
   "FirstLevelSquadMarchTest",
@@ -561,7 +564,7 @@ export const domains = {
     // 所以也挂在这个域下。
     tests: ["CarryTest", "EmplacementTest", "HudPromptTest", "HudPromptBrowserTest", "WeaponPickupTest", "TelegraphTest", "MissionHooksTest", "MissionSetpiecesTest"],
   },
-  audio: { label: "音效/音乐/环境声", tests: ["BlastFeedbackTest","FirstLevelVoicePerspectiveTest","FirstLevelMissionMusicTest", "FirstLevelBattleSoundTest", "FirstLevelMissionMusicBrowserTest", "AudioTest", "AudioWiringTest", "MachineGunCutsceneAudioTest"] },
+  audio: { label: "音效/音乐/环境声", tests: ["BlastFeedbackTest","FirstLevelVoicePerspectiveTest","FirstLevelMissionMusicTest", "FirstLevelBattleSoundTest", "FirstLevelMissionMusicBrowserTest", "AudioTest", "AudioWiringTest", "MachineGunCutsceneAudioTest", "FirstLevelAudioNodeBudgetTest"] },
   // 「声库装没装进去」与「输出端有没有电平」是两件事，后者只有 MachineGunCutsceneAudioTest
   // 在真入口上量：VoiceTest 验的是资产与交付档，量不到 AudioEngine 的装载分叉。
   voice: { label: "语音", tests: ["VoiceTest", "MachineGunCutsceneAudioTest"] },

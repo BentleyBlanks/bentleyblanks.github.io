@@ -2836,7 +2836,8 @@ export const MUSIC_BASE = "Audio/Music/";
 // 2026-09-17：大刀挥空从三条换成一条（AudioSfx_DadaoSwing_01 同文件名、内容变了）。
 // 2026-09-24：十一年式换枪声（用户拍板）：type11 = SeedAudio 1 + MINIMI 1 m 2，type11Far 补 MINIMI 50 m 2；
 // AudioSfx_Type11_01/02 同文件名、内容变了（BAR 0.1 m → MINIMI），不抬戳就还是缓存里的 BAR。
-export const SFX_PACK_VERSION = "20260924type11minimi";
+// 2026-09-25：type11 去掉 SeedAudio 生成音、只留 MINIMI 1 m 两条（用户定，清单条目变了）。
+export const SFX_PACK_VERSION = "20260925type11minimionly";
 export const AMB_PACK_VERSION = "20260912trainonly";
 export const MUSIC_PACK_VERSION = "5";
 
@@ -3143,7 +3144,12 @@ const SAMPLE_CYCLE = new Set(["dadaoSwing", "dadaoHit", "bayonetHit", "telegraph
   // 断肢两条与白刃同理由：变体是一条条量过挑出来的（`Script_SeedAudioGoreBake`
   // 的头注记了每条的取舍），要的就是它们本来的样子；而近炸一次卸两三段时
   // 随机挑两条里的一条必然连出两次同一条。
-  "goreSever", "goreLimbLand"]);
+  "goreSever", "goreLimbLand",
+  // 十一年式两条（2026-09-24 夜接力收口，照「交替用＝按顺序轮」的口径）：近场 MINIMI 1 m 两条实录
+  // （09-25 用户定换掉 SeedAudio 生成音）、远场 BAR 300 m 1 + MINIMI 50 m 2。随机挑时连着两发同一条的概率
+  // 1/2—1/3、一梭 4 发可能整梭同一条；轮播让一梭里各条依次出，且不叠 ±3% 变调（点射 0.12 s 一发，
+  // 变调会把各条的起音拧开）。
+  "type11", "type11Far"]);
 
 /**
  * 把一组 AudioBuffer 包成配方。
@@ -4899,6 +4905,8 @@ export class AudioEngine {
    */
   SetListener(camera) {
     if (!this.ctx || !camera || !camera.matrixWorld) return;
+    // 每帧顺手按音频时钟清账（见 ReleaseVoice）：SetListener 是四条出画路径与手动推帧都会过的那一处。
+    this.SweepExpiredVoices();
     const e = camera.matrixWorld.elements;
     const px = e[12], py = e[13], pz = e[14];
     // three 的相机看向自身 -Z，所以 forward 是第三列取反。
@@ -5213,7 +5221,7 @@ export class AudioEngine {
 
   Play(name, { position = null, volume = 1, pitch = 1, delay = 0, offset = 0, maxDuration = Infinity, pan = 0, burst = null, priority = false,
     bus = "sfx", airCut = 0, soundField = false, firstPerson = false, occlusion = null,
-    weaponClass = null, sourceSizeM = 0, storySpeech = false,
+    weaponClass = null, sourceSizeM = 0, storySpeech = false, selfCapped = false,
     blastRadiusM = BLAST_HEARING.referenceRadiusM, blastOccluded = false } = {}) {
     // priority：玩家自己的枪永远要响。实测 59 个兵在打时 liveNodes 峰值 118/120，
     // AI 枪声丢 40.4%，**玩家自己的枪也丢了 8.3%** —— 因为玩家和 59 个兵共用
@@ -5293,8 +5301,19 @@ export class AudioEngine {
     // 【2026-09-08】超了不再直接丢新的：先试着从活着的声部里**偷**一条更轻更远的
     // （见 StealVoices）。「丢新的」这条策略在听感上是反的 —— 玩家注意的永远是
     // 刚发生的那件事，而被丢掉的恰恰就是它。
+    //
+    // 【2026-09-25】`selfCapped`：调用方**自己管着声部数**的远处声场（01–06 前线生成器
+    // `DrainFront`：maxVoices 5、打得凶时 3，与场外炮击合计 ≤ 8）不再按「远 = 低优先级」
+    // 套 0.62 那道天花板，按普通声音的整份预算进门。前线一律在 45 m 外（几百米），
+    // 所以原来永远只能用 74 个节点里剩下的那点位置 —— 实测 01 近爆后黑屏那 2.6 s 里，
+    // 近爆本体（priority，6）+ 四五条近处落土 debrisFall（约 28）+ 心跳/喘息（priority）
+    // + 剧情耳鸣 8 + 环境床 14–16 把账面顶在 71–81，前线每一声（6–16 个节点、500–900 m）
+    // 都卡在 74.4 上被饿死（drops.starved）；能偷的只有比它更远更轻的，一条都没有。
+    // 结果是黑屏里前线整段消失，而设计要的是「被耳鸣与闷音压着、还在」
+    // （所有总线都过 deafFilter，剧情曲线自然会把它们闷住）。
+    // 它们仍是最先让位的那一类：近处新来的声音比它们近、比它们响，StealVoices 照偷。
     const cost = NODE_COST[name] ?? DEFAULT_COST;
-    const far = position && distance > FAR_LOW_PRIORITY_M;
+    const far = position && distance > FAR_LOW_PRIORITY_M && !selfCapped;
     const budget = this.nodeBudget;
     const ceiling = priority ? budget * 1.15
       : (far || LOW_PRIORITY.has(name)) ? budget * LOW_PRIORITY_HEADROOM : budget;
@@ -5457,7 +5476,14 @@ export class AudioEngine {
     v.wetBase = wet.gain.value;                    // 配方给的干湿比；MoveVoice 按新距离重乘
     wet.gain.value = Clamp01(wet.gain.value * v.wetScale);
     this.activeVoices.add(v);
-    this.ReleaseVoice(v, v.life);
+    // 【2026-09-25】回收计时从**这一声开始响**的那一刻算，不从调用 Play 的这一刻算。
+    // `v.life` 是配方按 v.t（起播时刻）量的长度（Voice.Live 的调用处都是这么量的，如 `stop - this.t`），
+    // 而 v.t 已经含了 delay 与传播延迟。原来写 `ReleaseVoice(v, v.life)`，计时器在
+    // `now + life + 0.22 s` 就断开节点 —— 起播推迟多少，尾巴就被砍掉多少（减去 0.22 s 余量）。
+    // 实测：380 m 的 explosionFar 晚 1.12 s 起播，3.31 s 长的声音最后 0.90 s 被掐掉；
+    // 120 m 的 rifleIjaFar 砍掉 0.13 s；带 delay 0.3 s 的 debrisFall 砍掉 0.08 s。
+    // 远处的炮声、枪声尾巴是这么没的，账面上它们也比真实少活一截（预算算少了）。
+    this.ReleaseVoice(v, (v.t - now) + v.life);
     // Duck / 耳鸣 / 环境闪避统一在这儿触发（配方里不再各自触发，见 DUCK_ON 的抬头）。
     // 放在最后：这三样都会去动别的总线，而这条 voice 得先建成功才算「这一声真响了」。
     this.Reactions(name, distance, !!position, priority || firstPerson, weaponClass,
@@ -5583,6 +5609,11 @@ export class AudioEngine {
       voice.out.gain.cancelScheduledValues(t);
       voice.out.gain.setTargetAtTime(0, t, fadeS / 4);
       this.Later(fadeS * 1000, () => this.StopVoice(voice, 0));
+      // 按帧清账也认这个时刻（见 SweepExpiredVoices）：淡完就停，不等原来那个回收点。
+      // 要紧的是常驻 loop（战车三条、会飞的引擎）：它们的回收点在几分钟以后，
+      // 主线程一口气推几百帧时只靠上面那个计时器的话，淡完的 loop 整段挂在账上。
+      // 到点走 StopVoice 而不是 FreeVoice：循环的播放头只断开不 stop 会在音频线程里一直转。
+      if (this.pendingVoices.has(voice)) { voice.releaseAt = t + fadeS; voice.stopAtRelease = true; }
       return true;
     }
     for (const node of voice.nodes) {
@@ -5592,15 +5623,45 @@ export class AudioEngine {
     return true;
   }
 
-  /** 到点断开所有节点并归还预算。**唯一的防泄漏出口**。 */
+  /**
+   * 到点断开所有节点并归还预算。**唯一的防泄漏出口**。
+   *
+   * 【2026-09-25】两条路谁先到谁收：主线程计时器，以及每帧 SetListener 里的
+   * SweepExpiredVoices（按 AudioContext 时钟查 `releaseAt`）。FreeVoice 可重入，后到的那条是空操作。
+   * 只靠计时器的话，账面跟着主线程走而不是跟着声音走：主线程一口气跑几百帧
+   *（战役驱动器、TankProbe 的帧耗时 A/B 都是一个 evaluate 同步推几百帧）时计时器一个都不回调，
+   * 早就放完的 voice 全挂在账上 —— 「整关验收 liveNodes 553–583」就是这么量出来的，
+   * 而同一段实时推帧量到的是 92–138。账面虚高还会反过来把后面的声音当成超预算饿死。
+   */
   ReleaseVoice(v, seconds) {
     this.pendingVoices.add(v);
     const ms = Math.max(0, seconds * 1000) + 220;
+    if (this.ctx) v.releaseAt = this.ctx.currentTime + ms / 1000;
     const id = setTimeout(() => {
       this.timers.delete(id);
       this.FreeVoice(v);
     }, ms);
+    v.releaseTimer = id;
     this.timers.add(id);
+  }
+
+  /**
+   * 按 AudioContext 时钟收掉已经到点的 voice（见 ReleaseVoice）。每帧由 SetListener 调一次。
+   * 没登记 releaseAt 的（通用耳鸣 deafenVoice 那种自己管生命期的）不碰。
+   * @returns {number} 这次收了几条
+   */
+  SweepExpiredVoices() {
+    if (!this.ctx || !this.pendingVoices.size) return 0;
+    const now = this.ctx.currentTime;
+    let freed = 0;
+    for (const v of this.pendingVoices) {
+      if (!(v.releaseAt <= now)) continue;
+      if (v.releaseTimer != null) { clearTimeout(v.releaseTimer); this.timers.delete(v.releaseTimer); v.releaseTimer = null; }
+      if (v.stopAtRelease) this.StopVoice(v, 0); else this.FreeVoice(v);
+      freed += 1;
+    }
+    if (freed) this.stats.sweptVoices = (this.stats.sweptVoices || 0) + freed;
+    return freed;
   }
 
   FreeVoice(v) {
@@ -5829,6 +5890,8 @@ export class AudioEngine {
     if (P !== TINNITUS.story && running?.profile === "story" && t < running.clearAt) return;   // 过场由导演曲线独占
     const level = Clamp01(strength);
     if (!(level > 0)) return;
+    // 两套耳鸣不叠（2026-09-25）：任务侧开关刚翻过来时（跳关、检查点回到 01–06）通用那条可能还在响，先收掉它。
+    if (this.deafenVoice) this.StopSharedRing(TINNITUS.replaceFadeS);
     // 越远越浅：低通落点在 20 kHz 与 P.lowHz 之间按 level 取几何插值（与 DeafenShared 同一条式子）。
     const lowHz = 20000 * Math.pow(P.lowHz / 20000, level);
     const f = this.deafFilter.frequency;
@@ -5907,6 +5970,9 @@ export class AudioEngine {
     const residual = active ? this.deafenStrength * Clamp01((this.deafenUntil + H.recoveryS - t) / H.recoveryS) : 0;
     const level = Math.max(Clamp01(strength), residual || 0);
     if (!(level > 0)) return;
+    // 两套耳鸣不叠（2026-09-25）：06→07 那一刻 01–06 的两档可能还在响 —— 收掉它的鸣响，也丢掉它的低通曲线，
+    // 免得台词一起一停 RefreshDeafFloor 又把那条曲线排回来、盖住这里的包络。
+    if (this.tinnitus || this.deafCurve) { this.StopTinnitus(TINNITUS.replaceFadeS); this.deafCurve = null; this.tinnitusState = null; }
     const until = Math.max(active ? this.deafenUntil : t,
       t + holdS + Clamp(seconds, H.attackS, H.maxHoldS));
     this.deafenUntil = until;
@@ -5949,6 +6015,27 @@ export class AudioEngine {
     // 接在耳鸣低通**之后** —— 接在前面的话它自己也被压掉，就没有「脑子里那声」了。
     if (this.deafenTimer) { clearTimeout(this.deafenTimer); this.timers.delete(this.deafenTimer); }
     this.deafenTimer = this.Later((until + H.recoveryS - t) * 1000 + 220, () => this.ResetDeafen(true));
+  }
+
+  /**
+   * 收掉通用那条耳鸣的鸣响，不碰总线低通（调用方 DeafenFirstLevel 接着排自己的曲线）。
+   * 与 StopTinnitus 同一个淡出时长；节点在淡出之后立刻归还。
+   */
+  StopSharedRing(fade = TINNITUS.replaceFadeS) {
+    if (this.deafenTimer) { clearTimeout(this.deafenTimer); this.timers.delete(this.deafenTimer); }
+    this.deafenTimer = null;
+    this.deafenUntil = 0; this.deafenStrength = 0;
+    const v = this.deafenVoice;
+    this.deafenVoice = null;
+    if (!v || !this.ctx) return;
+    const t = this.ctx.currentTime, end = t + Math.max(0.01, fade);
+    try {
+      v.g.gain.cancelScheduledValues(t);
+      v.g.gain.setValueAtTime(Math.max(FLOOR, v.g.gain.value), t);
+      v.g.gain.linearRampToValueAtTime(FLOOR, end);
+      v.osc.stop(end + 0.02);
+    } catch (err) { /* 已经拆了 */ }
+    this.Later(Math.max(0.01, fade) * 1000 + 40, () => this.FreeVoice(v));
   }
 
   SyncDeafenVolume() {

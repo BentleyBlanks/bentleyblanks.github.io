@@ -22,18 +22,20 @@
 
 | cue | 文件 |
 | --- | --- |
-| `type11` | 本页那条 SeedAudio 1 + FN MINIMI（L110A2）1 m 单发 2（`AudioSfx_Type11_01/02`，同文件名换了内容） |
+| `type11` | FN MINIMI（L110A2）1 m 单发 2（`AudioSfx_Type11_01/02`，同文件名换了内容）。09-24 白天还带着本页那条 SeedAudio，09-25 用户定换掉、全用实录 |
 | `type11Far` | BAR 300 m 1（原有）+ MINIMI 50 m 后方单发 2（新增 `AudioSfx_Type11Far_02/03`） |
-| `rifleIja` / `rifleIjaFar` | **不动**，仍是本页的 SeedAudio 单条 |
+| `rifleIja` / `rifleIjaFar` | **不动**，仍是本页的 SeedAudio 单条（09-24 夜起由表尾 `RifleIjaSeedAudio` 登记，全量 SfxBake 不再把它们改回实录） |
 
-`type11` 的 `license` 写 `mixed`（`SFX_LICENSES.mixed`：逐文件出处在 `credit`，顺序与 `files` 一致）；`type11Far` 全是 Sonniss 实录，仍写 `sonniss`。最终文件表登记在 `Data_SfxSources` 表尾的 `Type11Variants` 组（只登记、不切割），逐条客观数字见 `Data_AudioWiring.md`「二之三」第 8 节。
+`type11` / `type11Far` 在 `Script_Audio.SAMPLE_CYCLE` 里：按表序轮播、不做逐发 ±3 % 变调（09-24 夜接力改定，理由见 `Data_AudioWiring.md`「二之三」第 8 节）。
 
-**重烘注意**：本页的 `Script_SeedAudioGunfireBake.mjs` 写清单时只登记它自己那条生成音，会把 `type11` 覆盖回一条；全量 `Script_SfxBake.mjs` 则靠表尾 `Type11Variants` 保住三条。重跑生成音之后必须再执行
+`type11` 的 `license` 09-25 起写 `sonniss`（两条都是实录；09-24 带生成音时写的是 `mixed`，逐文件出处在 `credit`，顺序与 `files` 一致）；`type11Far` 全是 Sonniss 实录，仍写 `sonniss`。最终文件表登记在 `Data_SfxSources` 表尾的 `Type11Variants` 组（只登记、不切割），逐条客观数字见 `Data_AudioWiring.md`「二之三」第 8 节。
+
+**重烘注意**：本页的 `Script_SeedAudioGunfireBake.mjs` 写清单时只登记它自己那条生成音，会把 `type11` 覆盖回生成音一条；全量 `Script_SfxBake.mjs` 则靠表尾 `Type11Variants` 保住 MINIMI 两条。重跑生成音之后必须再执行
 
 ```
 node Taierzhuang1938/Script_SfxBake.mjs Type11Variants
 ```
 
-把三条的文件表登记回来（只登记、不下载、不重切）。要重切 MINIMI 那几条时三组一起点名：`Type11MinimiSingles Type11FarMinimi50m Type11Variants`（`Type11FarMinimi50m` 是 append，重跑前先把清单里的 `type11Far` 还原成只有 `_01`）。
+把 MINIMI 两条的文件表登记回来（只登记、不下载、不重切）。要重切 MINIMI 那几条时三组一起点名：`Type11MinimiSingles Type11FarMinimi50m Type11Variants`（`Type11FarMinimi50m` 是 append，重跑前先把清单里的 `type11Far` 还原成只有 `_01`）。
 
-仍需用户用扬声器试听：MINIMI 的 5.56 mm 当十一年式 6.5 mm 像不像；生成音与实录在同一梭子里是否听得出是两种声音；MINIMI 几条起音后约 0.33 s 的低频回声鼓包在单发时是否像第二下。
+仍需用户用扬声器试听：MINIMI 的 5.56 mm 当十一年式 6.5 mm 像不像；MINIMI 几条起音后约 0.33 s 的低频回声鼓包在单发时是否像第二下。

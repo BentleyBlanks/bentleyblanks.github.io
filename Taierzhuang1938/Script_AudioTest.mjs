@@ -46,12 +46,13 @@ const Fail = (msg) => { console.log(`FAIL ${msg}`); failed += 1; };
 const Ok = (msg) => console.log(`ok   ${msg}`);
 
 // 【2026-09-24 审查补】配方表与清单对账（纯 Node，不等浏览器）。
-// type11 = SeedAudio 1 + MINIMI 2 只靠表尾 `Type11Variants` 登记；SeedAudio 烘焙单独重跑会把清单里的 type11
-// 改回一条，忘了补跑 `Type11Variants` 时下面「听得见」那一节照样全过，两条 MINIMI 就悄悄没了。
+// type11 = MINIMI 1 m 两条实录（2026-09-25 用户定换掉 SeedAudio 生成音）只靠表尾 `Type11Variants` 登记；
+// SeedAudio 烘焙单独重跑会把清单里的 type11 改回生成音一条，忘了补跑 `Type11Variants` 时下面「听得见」那一节
+// 照样全过，两条 MINIMI 就悄悄没了、生成音悄悄回来。
 // 这里按 SFX_SOURCES 的顺序推一遍全量 SfxBake 会写出的文件表（登记组 = 逐字文件名；切割组 = 条数，append 累加），
-// 与清单对账。rifleIja / rifleIjaFar 例外：2026-09-11 起由 Script_SeedAudioGunfireBake 改写成 SeedAudio 单条、
-// 配方表里没有对应的登记组（用户 09-24 定了步枪不动），全量 SfxBake 会把它们改回实录 —— 已知分歧，记在
-// docs/Data_AudioWiring.md 二之三第 8 节。另查 `mixed` 许可的 cue 里没有参考视频实录（许可债不许藏进 mixed）。
+// 与清单对账，没有例外：rifleIja / rifleIjaFar 的 SeedAudio 单条由表尾 `RifleIjaSeedAudio` 登记组钉住
+// （2026-09-24 夜接力收口；之前这两条是已知分歧、在这里被放过）。另查 `mixed` 许可的 cue 里没有参考视频实录
+// （许可债不许藏进 mixed）。
 {
   const manifest = JSON.parse(fs.readFileSync(path.join(projectDir, "Audio/Sfx/Data_SfxManifest.json"), "utf8"));
   const Pascal = (s) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -66,10 +67,8 @@ const Ok = (msg) => console.log(`ok   ${msg}`);
     const prev = cut.append ? expect[cut.cue] : null;
     expect[cut.cue] = { n: (prev ? (prev.files?.length ?? prev.n) : 0) + n, by: group.id };
   }
-  const known = new Set(["rifleIja", "rifleIjaFar"]);
   const drift = [];
   for (const [cue, e] of Object.entries(expect)) {
-    if (known.has(cue)) continue;
     const got = manifest.cues[cue]?.files || manifest.pendingCues?.[cue]?.files;
     if (!got) { drift.push(`${cue} 清单里没有（配方 ${e.by}）`); continue; }
     if (e.files ? JSON.stringify(got) !== JSON.stringify(e.files) : got.length !== e.n) {
@@ -78,8 +77,16 @@ const Ok = (msg) => console.log(`ok   ${msg}`);
   }
   const type11 = manifest.cues.type11?.files || [], type11Far = manifest.cues.type11Far?.files || [];
   const needFar = ["AudioSfx_Type11Far_01.mp3", "AudioSfx_Type11Far_02.mp3", "AudioSfx_Type11Far_03.mp3"];
-  if (!(type11.length === 3 && type11.includes("AudioSfx_SeedAudioType11_01.mp3"))) drift.push(`type11 ${JSON.stringify(type11)}`);
+  const needNear = ["AudioSfx_Type11_01.mp3", "AudioSfx_Type11_02.mp3"];
+  if (JSON.stringify(type11) !== JSON.stringify(needNear)) drift.push(`type11 ${JSON.stringify(type11)}（应为 MINIMI 实录两条 ${needNear.join(" ")}，不含 SeedAudio 生成音）`);
+  if (manifest.cues.type11?.license !== "sonniss") drift.push(`type11 许可 ${manifest.cues.type11?.license}（全是实录，应为 sonniss）`);
   if (!needFar.every((f) => type11Far.includes(f))) drift.push(`type11Far ${JSON.stringify(type11Far)}`);
+  // 步枪两条钉死成 09-11 的 SeedAudio 单条（用户定了不动）：配方表和清单一起被改回实录时上面的对账会双双同意，这里兜住。
+  for (const [cue, file] of [["rifleIja", "AudioSfx_SeedAudioRifleIja_01.mp3"], ["rifleIjaFar", "AudioSfx_SeedAudioRifleIjaFar_01.mp3"]]) {
+    const got = manifest.cues[cue]?.files || [];
+    if (!(got.length === 1 && got[0] === file)) drift.push(`${cue} ${JSON.stringify(got)}（应为 SeedAudio 单条 ${file}）`);
+    else if (!fs.existsSync(path.join(projectDir, "Audio/Sfx", file))) drift.push(`文件缺失 ${file}`);
+  }
   const missing = [...type11, ...type11Far].filter((f) => !fs.existsSync(path.join(projectDir, "Audio/Sfx", f)));
   if (missing.length) drift.push(`文件缺失 ${missing.join(" ")}`);
   const hidden = [];
@@ -93,7 +100,7 @@ const Ok = (msg) => console.log(`ok   ${msg}`);
   }
   if (hidden.length) drift.push(`mixed 里混进了参考视频实录或查不到来源：${hidden.join(" ")}`);
   if (drift.length) Fail(`配方表与清单对不上：${drift.join("；")}`);
-  else Ok(`配方表与清单对账：${Object.keys(expect).length - known.size} 个 cue 一致；type11 ${type11.length} 条、type11Far ${type11Far.length} 条；mixed 里没有参考视频实录`);
+  else Ok(`配方表与清单对账：${Object.keys(expect).length} 个 cue 一致（无例外）；type11 ${type11.length} 条、type11Far ${type11Far.length} 条；mixed 里没有参考视频实录`);
 }
 
 await page.goto(`http://127.0.0.1:${port}/Taierzhuang1938/?scale=small`, { waitUntil: "load", timeout: 120000 });
@@ -674,6 +681,56 @@ else {
   else Ok(`挥空原样播、不变调（${durs[0]} ms，rate 恒为 1；同期滤掉别人的 ${cycle.others} 个一次性源）`);
 }
 
+// 【2026-09-24 夜接力】十一年式近/远两条进了 SAMPLE_CYCLE：一梭里按表序轮、不叠 ±3% 变调。
+// 近场 2 条（MINIMI 1 m）、远场 3 条（BAR 300 m + MINIMI 50 m ×2）。
+// 回归形态是「有人把它们从 SAMPLE_CYCLE 删了」：那时每发随机挑、rate 在 0.97–1.03 抖，
+// 下面两条都红（随机挑 7 发每步都恰好 +1 轮进的概率是 (1/2)^6 或 (1/3)^6，rate 恰为 1 的概率为 0）。
+// 认源同挥空：按清单文件解码后的指纹认，场上 AI 同期开的枪、喊的话不算数。
+// 游戏里可能已经开过十一年式，游标起点不定，所以只看「相邻两发是不是 +1 轮进」。
+const type11Cycle = await page.evaluate(async () => {
+  const a = window.Taierzhuang.audio;
+  const mod = await import("./Script_Audio.mjs");
+  const Fingerprint = (buf) => {
+    const d = buf.getChannelData(0);
+    const step = Math.max(1, Math.floor(d.length / 64));
+    let sum = 0;
+    for (let i = 0; i < d.length; i += step) sum += d[i];
+    return `${buf.length}:${sum.toFixed(6)}`;
+  };
+  const out = {};
+  for (const cue of ["type11", "type11Far"]) {
+    const entry = a.sfxManifest && a.sfxManifest.cues[cue];
+    if (!entry || !entry.files) { out[cue] = { error: `清单里没有 ${cue}` }; continue; }
+    const mine = new Map();
+    for (let i = 0; i < entry.files.length; i += 1) {
+      const url = `${mod.SFX_BASE}${entry.files[i]}?v=${mod.SFX_PACK_VERSION}`;
+      const buf = await a.ctx.decodeAudioData(await (await fetch(url)).arrayBuffer());
+      mine.set(Fingerprint(buf), i);
+    }
+    const made = [];
+    const orig = a.ctx.createBufferSource;
+    a.ctx.createBufferSource = function patched() { const src = orig.call(this); made.push(src); return src; };
+    a.lastPlayAt.delete(cue);
+    // 一梭 7 发：至少跨过两次回绕。priority 绕开预算闸（这里测的是挑哪条，不是闸）。
+    const voice = a.Play(cue, { priority: true, volume: 0.01, burst: 7 });
+    a.ctx.createBufferSource = orig;
+    if (voice) a.StopVoice(voice, 0.001);
+    const picked = made.filter((s) => s.buffer && mine.has(Fingerprint(s.buffer)));
+    out[cue] = { variants: mine.size, seq: picked.map((s) => mine.get(Fingerprint(s.buffer))),
+      rates: picked.map((s) => Number(s.playbackRate.value.toFixed(4))), others: made.length - picked.length };
+  }
+  return out;
+});
+for (const [cue, want] of [["type11", 2], ["type11Far", 3]]) {
+  const r = type11Cycle[cue];
+  if (r.error) { Fail(`${cue} 轮播测不到东西：${r.error}`); continue; }
+  const steps = r.seq.slice(1).map((v, i) => (v - r.seq[i] + r.variants) % r.variants);
+  if (r.variants !== want || r.seq.length !== 7) Fail(`${cue} 一梭 7 发只认到 ${r.seq.length} 发（清单 ${r.variants} 条）—— 断言没测到东西`);
+  else if (steps.some((s) => s !== 1)) Fail(`${cue} 没按顺序轮：变体号 ${r.seq.join(" ")}`);
+  else if (r.rates.some((x) => x !== 1)) Fail(`${cue} 被逐发变调了：${r.rates.join(" ")}`);
+  else Ok(`${cue} 一梭 7 发按表序轮（${r.seq.join(" ")}）、rate 恒为 1（同期滤掉别人的 ${r.others} 个源）`);
+}
+
 // ---------------------------------------------------------------------------
 // 空间三件套 + 动态：遮挡、分区混响、传播延迟、duck/耳鸣、voice stealing、开枪压环境
 //
@@ -949,6 +1006,121 @@ if (steal.fired !== steal.total) {
 } else Ok(`预算打满：玩家 ${steal.fired}/${steal.total} 枪全响，偷了 ${steal.stolen} 条`
   + `（超支放行 ${steal.over} 次，饿死 ${steal.starved} 条）`);
 
+// 【2026-09-25】selfCapped：自己管声部数的远处声场（01–06 前线 DrainFront）按整份预算进门，
+// 不再被「远 = 低优先级」那道 0.62 天花板饿死。回归背景：01 近爆后黑屏 2.6 s 里账面 71–81，
+// 前线每一声都卡在 74.4 上（浏览器实测一次 10 声收 5 声，全是 drops.starved），黑屏里前线整段消失。
+//
+// 同一个同步块里算账、压预算、发声：liveNodes 只在计时器回调里变，块内它是定值，场上的 AI 插不进来。
+// 新声摆在 990 m（soundField 的 1000 m 闸以内）—— StealVoices 只偷比新声更远的，990 m 外没有东西可偷，
+// 于是不带 selfCapped 的那一声**必然**饿死，这一条量的是天花板，不是 voice stealing 的运气。
+// 两声用两个不同的 cue：同名同位置同一刻会被 22 ms 去重窗吃掉。
+const selfCap = await page.evaluate(() => {
+  const a = window.Taierzhuang.audio;
+  const saved = a.nodeBudget;
+  const L = a.listenerPos;
+  const pos = { x: L.x + 990, y: L.y, z: L.z };
+  const Arm = (cue, selfCapped) => {
+    const live = a.liveNodes, cost = 14;       // NODE_COST.rifleNraFar / rifleIjaFar
+    a.nodeBudget = live + cost + 2;            // 整份预算装得下；0.62 那一档装不下
+    const starved = a.drops.starved;
+    const v = a.Play(cue, { position: pos, volume: 0.02, soundField: true, bus: "sfx", selfCapped });
+    const out = { played: !!v, starved: a.drops.starved - starved, live, budget: a.nodeBudget,
+      lowCeiling: +(a.nodeBudget * 0.62).toFixed(1) };
+    a.nodeBudget = saved;
+    return out;
+  };
+  return { without: Arm("rifleIjaFar", false), with: Arm("rifleNraFar", true) };
+});
+if (selfCap.without.played || selfCap.without.starved !== 1) {
+  Fail(`远处声场不带 selfCapped 时应当卡在 0.62 天花板上饿死（${JSON.stringify(selfCap.without)}）—— 这条断言没测到东西`);
+} else if (!selfCap.with.played || selfCap.with.starved !== 0) {
+  Fail(`带 selfCapped 的前线声在整份预算装得下时被引擎拒了（${JSON.stringify(selfCap.with)}）`
+    + ` —— 01 黑屏里前线会整段消失`);
+} else Ok(`selfCapped：账面 ${selfCap.with.live}+14 / 预算 ${selfCap.with.budget}（低优先级天花板 ${selfCap.with.lowCeiling}），`
+  + `不带的饿死、带的收下`);
+
+// 【2026-09-25】回收计时从起播算起：带传播延迟 / delay 的一声，节点要等它放完才断开。
+// 原来计时从调用 Play 算，380 m 的 explosionFar 晚 1.12 s 起播、最后 0.90 s 被掐掉（远处炮声没有尾巴）。
+// 量法：包一层 FreeVoice 记下断开的 ctx 时刻，与 v.t + v.life（配方声明的放完时刻）比。
+const release = await page.evaluate(async () => {
+  const a = window.Taierzhuang.audio, L = a.listenerPos;
+  const saved = a.nodeBudget;
+  a.nodeBudget = 4000;                         // 这一条量回收时刻，不量预算闸
+  const own = Object.prototype.hasOwnProperty.call(a, "FreeVoice"), orig = a.FreeVoice;
+  const rows = [], watch = new Map();
+  a.FreeVoice = function (v) {
+    const r = watch.get(v);
+    if (r && r.freedAt == null) r.freedAt = a.ctx.currentTime;
+    return orig.call(this, v);
+  };
+  try {
+    for (const [cue, d, delay] of [["explosionFar", 380, 0], ["debrisFall", 6, 0.8]]) {
+      const now = a.ctx.currentTime;
+      const v = a.Play(cue, { position: { x: L.x + d, y: L.y, z: L.z + 0.5 }, volume: 0.02, delay });
+      if (!v) { rows.push({ cue, played: false }); continue; }
+      const r = { cue, played: true, startIn: +(v.t - now).toFixed(3), life: +v.life.toFixed(3), end: v.t + v.life, freedAt: null };
+      watch.set(v, r); rows.push(r);
+    }
+    const last = Math.max(0, ...rows.filter((r) => r.played).map((r) => r.end));
+    while (a.ctx.currentTime < last + 0.6) await new Promise((res) => setTimeout(res, 50));
+  } finally {
+    if (own) a.FreeVoice = orig; else delete a.FreeVoice;
+    a.nodeBudget = saved;
+  }
+  return rows.map(({ end, freedAt, ...r }) => ({ ...r,
+    early: freedAt == null ? null : +(end - freedAt).toFixed(3) }));
+});
+{
+  const bad = release.filter((r) => !r.played || r.early == null || r.early > 0.001);
+  const measured = release.every((r) => r.played && r.startIn >= 0.7);
+  if (!measured) Fail(`回收时刻：没测到起播推迟的声音（${JSON.stringify(release)}）—— 这条断言没测到东西`);
+  else if (bad.length) Fail(`起播推迟的声音没放完就被断开了：${JSON.stringify(bad)}（early = 离放完还差几秒）`);
+  else Ok(`回收时刻从起播算：${release.map((r) => `${r.cue} 晚 ${r.startIn} s 起播、放完后 ${(-r.early).toFixed(2)} s 才断开`).join("；")}`);
+}
+
+// 【2026-09-25】账面跟着音频时钟走，不跟着主线程计时器走（ReleaseVoice / SweepExpiredVoices）。
+// 回归背景：战役驱动器与 TankProbe 一个 evaluate 同步推几百帧，计时器一个都不回调，
+// 放完的 voice 全挂在账上，量出「liveNodes 553–583」，同一段实时推帧只有 92–138。
+// 量法：整段放在一个同步块里（计时器不可能插进来），发一声、忙等到它的 releaseAt 过去，
+// 调一次 SetListener（每帧都会调），那一声必须已断开、节点已还回账面。
+const sweep = await page.evaluate(() => {
+  const g = window.Taierzhuang, a = g.audio, L = a.listenerPos;
+  const saved = a.nodeBudget;
+  a.nodeBudget = 4000;
+  try {
+    const v = a.Play("rifleIja", { position: { x: L.x + 10, y: L.y, z: L.z + 0.5 }, volume: 0.02 });
+    if (!v) return { played: false };
+    const cost = v.nodes.length, releaseIn = +(v.releaseAt - a.ctx.currentTime).toFixed(3);
+    const wall = performance.now();
+    while (!(a.ctx.currentTime > v.releaseAt + 0.02) && performance.now() - wall < 6000) { /* 忙等：不让出主线程 */ }
+    const before = a.liveNodes, stillOwned = v.nodes.length;
+    a.SetListener(g.camera);
+    // 第二条：淡出掐掉的（StopVoice(v, fade)，战车 loop 离场就是这么收的）淡完就要能被清账收走，
+    // 不等它原来那个回收点（这一条的回收点还在 1 s 多以后）。
+    const w = a.Play("rifleNra", { position: { x: L.x - 10, y: L.y, z: L.z + 0.5 }, volume: 0.02 });
+    let faded = null;
+    if (w) {
+      a.StopVoice(w, 0.1);
+      const wall2 = performance.now();
+      while (!(a.ctx.currentTime > w.t + 0.15) && performance.now() - wall2 < 3000) { /* 忙等 */ }
+      const releaseIn = +(w.releaseAt - a.ctx.currentTime).toFixed(3);
+      a.SetListener(g.camera);
+      faded = { freed: w.nodes.length === 0, pending: a.pendingVoices.has(w), releaseIn, lifeLeft: +(w.t + w.life - a.ctx.currentTime).toFixed(3) };
+    }
+    return { played: true, cost, releaseIn, stillOwned, freed: v.nodes.length === 0, returned: before - a.liveNodes,
+      pending: a.pendingVoices.has(v), waitedS: +((performance.now() - wall) / 1000).toFixed(2), faded };
+  } finally { a.nodeBudget = saved; }
+});
+if (!sweep.played || !(sweep.releaseIn > 0) || sweep.stillOwned !== sweep.cost) {
+  Fail(`按帧清账：没测到东西（${JSON.stringify(sweep)}）—— 要一条在同步块里到点、计时器还没回调的 voice`);
+} else if (!sweep.freed || sweep.pending || sweep.returned < sweep.cost) {
+  Fail(`按帧清账：到点的 voice 在 SetListener 之后还挂在账上（${JSON.stringify(sweep)}）`
+    + ` —— 同步推帧的测试会把 liveNodes 量成几百`);
+} else if (!sweep.faded || !(sweep.faded.lifeLeft > 0.5) || !sweep.faded.freed || sweep.faded.pending) {
+  Fail(`按帧清账：淡出掐掉的那一声淡完了还挂在账上（${JSON.stringify(sweep.faded)}）—— 同步推帧时离场的战车 loop 会整段留在账上`);
+} else Ok(`按帧清账：同步块里忙等 ${sweep.waitedS} s，到点的那一声（${sweep.cost} 个节点）在 SetListener 里断开并还回账面；`
+  + `淡出掐掉的那一声离原回收点还有 ${sweep.faded.lifeLeft} s 就已收走`);
+
 // 两级动态：母线慢压 + 末端快限，参数不许被谁顺手改回单级。
 // 抽泵深度的实测（10.08 → 8.91 dB）在 Script_Audio 的 BUS_COMP 抬头与
 // docs/Data_AudioEngine.md 里，那是离线渲染量的，不在这条冒烟的成本里。
@@ -1049,6 +1221,69 @@ if (deaf.legacyProfile !== "shared" || deaf.legacy.join(",") !== "3") {
   Fail(`弱近爆的低通落点不对（要在 2 kHz 与 20 kHz 之间）：${JSON.stringify(deaf)}`);
 } else Ok(`耳鸣：开关关着走通用 3 节点、开着 8 节点新版；连续近爆只剩 ${deaf.ringing} 份；`
   + `台词说着 ${deaf.speaking} Hz → 停下 ${deaf.silent} Hz；剧情档不被战斗档顶掉；强度 0.3 落点 ${deaf.weakLowHz} Hz`);
+
+// 两套耳鸣不叠（2026-09-25）：任务侧开关翻过来的那一刻（06→07、跳关回到 01–06），
+// 另一套的鸣响若还在响，新的一套起来时要把它收掉 —— 同一时刻只许一条耳鸣在响，收掉的那条节点归还。
+// 不靠墙钟（2026-09-25 审查）：原来按 0.45 s 的耳鸣 + 睡 300 ms 再读增益，机器忙时这一觉睡过一秒多，
+// 通用那条已经自己淡完，前置就读成「没建起来」（假红，复跑又绿）。现在：
+//   - 每一档都给 2 s 的保持（通用那条封顶 maxHoldS 2.2 s，再加 1.4 s 恢复），留足余量；
+//   - 「在响」同时认增益与状态：通用那条 = deafenVoice 在、且增益 > 1e-3 或还没到 deafenUntil；
+//     两档那条 = tinnitus 在、且增益 > 1e-3 或它的回收点还没到。「另一条已收掉」照旧要求句柄为空、节点已归还；
+//   - 按音频时钟量每一觉实际睡了多久，超过 1.5 s 就整轮重来（最多 3 轮），三轮都超就报「环境太慢不判」而不是红。
+const flip = await page.evaluate(async () => {
+  const a = window.Taierzhuang.audio;
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  const saved = a.firstLevelSoundscape;
+  const HOLD_S = 2.0, NAP_LIMIT_S = 1.5;
+  const Nap = async (ms) => { const t0 = a.ctx.currentTime; await sleep(ms); return a.ctx.currentTime - t0; };
+  const Ringing = () => {
+    const now = a.ctx.currentTime;
+    return {
+      firstLevel: !!a.tinnitus && (a.tinnitus.tone.gain.value > 1e-3
+        || (a.pendingVoices.has(a.tinnitus) && a.tinnitus.releaseAt > now)),
+      shared: !!a.deafenVoice && (a.deafenVoice.g.gain.value > 1e-3 || a.deafenUntil > now),
+      firstLevelPending: [...a.pendingVoices].filter((v) => v.tone && v.hiss).length,
+      sharedPending: [...a.pendingVoices].filter((v) => v.osc && v.user && v.g).length,
+    };
+  };
+  let result = null;
+  for (let round = 1; round <= 3; round += 1) {
+    a.ResetDeafen();
+    await sleep(150);
+    const naps = [];
+    // 通用那条在响 → 开关翻到 01–06 → 战斗档近爆。
+    a.firstLevelSoundscape = false;
+    a.Deafen(HOLD_S);
+    naps.push(await Nap(300));
+    const sharedBefore = Ringing();
+    a.firstLevelSoundscape = true;
+    a.DeafenFirstLevel(HOLD_S, 0.13, 1, "combat");
+    naps.push(await Nap(300));
+    const toFirstLevel = Ringing();
+    // 01–06 的战斗档在响 → 开关翻到 07 以后 → 通用近爆。
+    a.firstLevelSoundscape = false;
+    a.Deafen(HOLD_S);
+    naps.push(await Nap(300));
+    const toShared = { ...Ringing(), deafCurve: !!a.deafCurve, profile: a.tinnitusState?.profile ?? null };
+    const napMax = +Math.max(...naps).toFixed(2);
+    result = { round, napMax, tooSlow: napMax > NAP_LIMIT_S, sharedBefore, toFirstLevel, toShared };
+    if (!result.tooSlow) break;
+  }
+  a.ResetDeafen();
+  a.firstLevelSoundscape = saved;
+  await sleep(200);
+  return result;
+});
+if (flip.tooSlow) {
+  console.log(`skip 两套耳鸣不叠：环境太慢不判 —— 三轮里每一轮都有一觉按音频时钟睡了 > 1.5 s（最后一轮 ${flip.napMax} s）`);
+} else if (!flip.sharedBefore.shared) {
+  Fail(`前置没建起来：开关关着时通用耳鸣没响 ${JSON.stringify(flip)}`);
+} else if (!(flip.toFirstLevel.firstLevel && !flip.toFirstLevel.shared && flip.toFirstLevel.sharedPending === 0)) {
+  Fail(`开关翻到 01–06 后通用耳鸣没收掉，两套叠在一起响：${JSON.stringify(flip)}`);
+} else if (!(flip.toShared.shared && !flip.toShared.firstLevel && flip.toShared.firstLevelPending === 0
+  && !flip.toShared.deafCurve && flip.toShared.profile === null)) {
+  Fail(`开关翻到 07 以后，01–06 那一档没收掉（鸣响或低通曲线还在）：${JSON.stringify(flip)}`);
+} else Ok(`两套耳鸣不叠：开关翻到 01–06 时通用那条收掉、翻回去时两档那条和它的低通曲线收掉，被收掉的那条节点都已归还`);
 
 // Continuous audition regression: real AudioBufferSource nodes must stop, including
 // scheduled repeats and editor exit, without stopping an unrelated gameplay engine.

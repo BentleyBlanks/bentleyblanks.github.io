@@ -650,7 +650,7 @@ Hell Let Loose 的战场声。改之前查到的病根（`survey/Digest_audio.md
 - **预算**：前线同时 ≤ 5 条（场上战场强度过 0.6 时收到 3 条），场外炮击 ≤ 4 条，两者合计 ≤ 契约 §6 的 8
   （`front.sharedMaxVoices`；炮击优先，前线只拿剩下的，炮击替还没落地的那一发留的两条也算进去），满了跳过不硬挤。
   2026-09-24 审查前炮击的上限只挡新一发、不挡一发自己的五条声音，假引擎 15 分钟实测炮击峰值 5、合计 9–10；
-  现在 `Script_FirstLevelBattleSoundTest` 各步骤 15 分钟量峰值断言合计 ≤ 8。「同时在响」按每一声本体的可听时长算（`cueActiveS`），不按引擎回收时刻（那要等混响尾巴与传播延迟，远处一枪常常五六秒）。节点上它们全是远处的低优先级声：`liveNodes` 过 120 × 0.62 就先饿它们，近处的枪声与对白不受影响 —— 场上打得凶时远处这一层自然变稀。
+  现在 `Script_FirstLevelBattleSoundTest` 各步骤 15 分钟量峰值断言合计 ≤ 8。「同时在响」按每一声本体的可听时长算（`cueActiveS`），不按引擎回收时刻（那要等混响尾巴与传播延迟，远处一枪常常五六秒）。节点上：前线每一声带 `selfCapped`（2026-09-25，见 3b），按整份预算进门，不再套「远 = 低优先级」的 120 × 0.62；它们仍是最先让位的那一类 —— 近处新来的声音比它们近、比它们响，`StealVoices` 照偷，所以近处的枪声与对白不受影响。场外炮击（`Script_BattleArtillery`）没改，仍按距离归档。
 - 取证：`missionRuntime.State().battleSound.front`（每个扇区打了几场、下一场几秒后、最近 12 声的距离/音量）。
 
 ### 3a. 01 被压着时前线渐强（`front.stages.Trapped.swell`，2026-09-24 恢复）
@@ -694,7 +694,56 @@ volume ÷ 它的 `cueVolume`，含距离补偿与 ±10 % 抖动）：
 
 swell 倍率读数：5 s 0.41/0.31、15 s 0.49/0.36、30 s 0.66/0.51、40 s 0.82/0.69、45 s 0.90/0.82、
 49.9 s 1.00/1.00（intensity / gain 倍率）。50–60 s 那 16 声没被收下的都落在 Black 黑屏那 2.6 s 里，是引擎侧的拒绝
-（原因没查，这一轮没动它）。这些是数字，不是试听。
+—— 根因与修法见下面 3b（2026-09-25 修掉，表里是修前的数）。这些是数字，不是试听。
+
+### 3b. 01 黑屏里前线被饿死（2026-09-25 修）
+
+**现象**：上表 50–60 s 排出 31 声只收下 15 声，没收下的都在近爆后 Black 黑屏那 2.6 s 里。
+
+**根因**（浏览器实测，p012 `quality=low` 实时跑 01，拦 `DrainFront` 里发出的每一声，记 `drops` 哪一项动了、当时
+`liveNodes`，再每 0.1 s 按发声体拆账）：不是黑屏把音频上下文挂起（`ctx.state` 一直 running）、不是去重窗、
+不是前线自己的声部上限（`frontVoices` 2–3 条 < 5）、也不是 BlastHearing / 剧情耳鸣吞的 —— 被拒的每一声都是
+`drops.starved`。前线的声源在 500–900 m，一律过 `FAR_LOW_PRIORITY_M` 45 m，被按低优先级套 `nodeBudget × 0.62`
+= 74.4 的天花板。近爆那一刻起账面被这些顶在 71–81：
+
+| 占用 | 节点 |
+| --- | --- |
+| 近爆本体 `explosionNear`（priority） | 6 |
+| 近处落土 `debrisFall` 四五条 + 洞里 `amb.debris` | 约 28–38 |
+| 心跳 / 喘息（priority，非位置音） | 3–9 |
+| 剧情耳鸣（`DeafenFirstLevel` story 档） | 8 |
+| 环境床三层（shellingFar / battleFar / windPlain） | 14–16 |
+
+前线一声 `NODE_COST` 14（rifle*Far）起，一加就过 74.4；`StealVoices` 只偷**比新声更远、更轻**的，而场上的都在
+身边（落土 1–13 m、心跳 0 m），一条都偷不到，于是饿死。黑屏一过，落土播完，账面掉回 50 以下，前线又进得来。
+
+**判断**：是 bug，不是「黑屏 = 被震聋」的设计。设计要的是前线还在、被闷住：所有总线都过 `concussionFilter` →
+`deafFilter`，实测黑屏里收下的前线声起播时 `deafFilter` 380–745 Hz、`concussionFilter` 650 Hz，剧情曲线自己会压它们；
+丢掉它们等于在耳鸣底下挖一个洞，醒来（Wake）时前线又凭空冒出来。
+
+**修法**：`Script_Audio.Play` 加一个参数 `selfCapped`：调用方自己管声部数的远处声场，按整份预算进门，不再按
+距离归进低优先级。`DrainFront` 每一声都带它（前线同时 ≤ 5 条、激战 3 条、与炮击合计 ≤ 8，已经是封顶的）。
+它们仍是最先让位的：近处新来的声音比它们近、比它们响，照偷。只动前线，场外炮击与 07 以后的旧声源（`UpdateLegacy`）不变。
+
+**统计口径**：`State().battleSound.front` 多一项 `refused`（排出了、`audio.Play` 返回空的声数：预算 / 去重 / 距离闸），
+与 `skipped`（自己的声部上限）分开；`plays` 只数收下的。
+
+**实测**（同一份代码，探针里把 `selfCapped` 抹掉作对照，cap / nocap / cap / nocap 交替各跑一次 66 s）：
+
+| 臂 | 近爆 → Wake 之间 排出 / 收下 | 50–60 s | 全程 | 拒收原因 | liveNodes 峰值 |
+| --- | --- | --- | --- | --- | --- |
+| 修后 ① | 5 / 5 | 16 / 16 | 79 / 79 | — | 95 |
+| 对照 ① | 1 / 1 | 15 / 13 | 93 / 91 | starved ×2 | 88 |
+| 修后 ② | 0 / 0 | 10 / 10 | 81 / 80 | dedupe ×1 | 101 |
+| 对照 ② | 10 / 5 | 29 / 18 | 106 / 93 | starved ×13 | 83 |
+
+每局的声数随实时时钟与随机种子浮动（黑屏里排出 0–10 声不等），所以按「拒收原因」看：修后两局拒收只剩 1 声，是
+22 ms 去重窗（同名同一刻，设计如此）；对照两局 15 声全是 starved。账面峰值多了十来个节点（95–101，仍在 120 以内；
+整体节点预算见 `Data_AudioEngine.md` §7.5）。探针 `REL/附件/r2_work/sound/s2/Probe_BlackSnap.mjs`（带 `nocap` 参数跑对照）。
+
+闸：`Script_AudioTest`「selfCapped」一条（同一同步块里把预算压到「整份装得下、0.62 装不下」，新声摆在 990 m
+使偷无可偷：不带的必须饿死、带的必须收下；把引擎里的 `!selfCapped` 拿掉就红）；`Script_FirstLevelBattleSoundTest`
+「前线每一声都带 selfCapped；拒收单独记账」（DrainFront 不传就红）。
 
 ### 4. 场外近落弹（`Script_BattleArtillery`）
 
@@ -744,8 +793,16 @@ stress ≥ 0.42 开始喘（`breathHeavy` 原速原调，0.26–0.5 随 stress�
 判不过就保留旧的鸣响只做闷响。起音期（0.13 s）照旧。
 
 【2026-09-24 审查后】
-- **只在 01–06**：任务侧开关关着（07 以后、其它关卡）时 `Deafen` 走 `DeafenLegacy`，
-  与 f581ac7dd 一字不差的旧版（4 kHz 单正弦 1.4 s、520 Hz、0.9 s 回满、2 个节点；数在 `TINNITUS.legacy`）。
+- **只在 01–06**：任务侧开关关着（07 以后、其它关卡）时 `Deafen` 走 `DeafenShared` —— 2026-09-24 合并 master 的通用近爆耳鸣
+  （`BLAST_HEARING`，一条复用的 3 节点振荡器，见 [通用近爆反馈](Data_BlastFeedback.md)）。原来的 `DeafenLegacy` / `TINNITUS.legacy` 已退役。
+- **过场独占**：剧情档（01 近爆、02 枪托，导演直接 `Deafen(1.1)`）没恢复完之前，`Play` → `Reactions` 请求的战斗档不顶掉它。
+- **两套不叠**（2026-09-25）：开关翻过来的那一刻（06→07、跳关或检查点回到 01–06）另一套的鸣响可能还在响。
+  `DeafenFirstLevel` 起来时先 `StopSharedRing` 收掉通用那条；`DeafenShared` 起来时先收掉两档那条的鸣响并丢掉它的低通曲线
+  （不然台词一起一停 `RefreshDeafFloor` 会把旧曲线排回来）。淡出都是 `TINNITUS.replaceFadeS`（60 ms），节点随后归还。
+  验收：`Script_AudioTest.mjs` 的「两套耳鸣不叠」。
+  实机取证（2026-09-25，p012 实时推进，读两套鸣响各自的音量）：01 近失弹、紧接着的 02 枪托（从开机一路跑到第 151 s）、
+  04（1–9 m 的近爆共 11 次战斗档耳鸣，其中 2 次预算紧只做闷响不另起鸣响）、05（战车在 26 m，落点 16–27 m 且隔着掩体，距离闸不给耳鸣）都只有一套在响，
+  通用那条一次都没响过；01 那发真炮弹落地时请求的战斗档（强度 0.13）被剧情档挡下。
 - **对白保底**：总线低通在耳鸣恢复段里遇到剧情台词正在说（`storyVoice.storySpeakerSpeaking`）时不低于 4.2 kHz
   （`TINNITUS.speechFloorHz`，与 `SetConcussion` 的对白保底同一条线），台词一停从曲线当时该在的位置接着往回走
   （`RefreshDeafFloor`，挂在说话状态变化的三处）。原来剧情档会让 02 枪托之后约 5 s 的审问台词压在 2 kHz 以下。
@@ -767,14 +824,16 @@ stress ≥ 0.42 开始喘（`breathHeavy` 原速原调，0.26–0.5 随 stress�
 2. **2026-09-24 用户拍板「枪声换」，只恢复十一年式两条**：用户看过「旧 BAR 近场两条 <40 Hz 能量占 98 % 上下、
    100 Hz—8 kHz 的可听部分比全带宽低十几 dB、没有低音炮的机器上等于不出声」这个结论后决定换掉。
    **步枪 `rifleIja` / `rifleIjaFar` 不动**，仍是 09-11 的 SeedAudio 单条（美制步枪实录不恢复，用户没要）。
+3. **2026-09-25 00:30 用户定「换掉生成音、全用实录」**：近场去掉 `AudioSfx_SeedAudioType11_01`，只留 MINIMI 两条；
+   同时近/远两条改成按顺序轮、不变调（见下文「轮播」）。远场不变。
 
 | cue | 现在 | 来源 |
 | --- | --- | --- |
-| `type11` | 3 条：`AudioSfx_SeedAudioType11_01` + `AudioSfx_Type11_01/02` | SeedAudio（09-11）＋ Pole Position L110A2（FN MINIMI）5.56 1 m 单发 ×2，rate 0.95、hp 38 Hz；license `mixed` |
+| `type11` | 2 条：`AudioSfx_Type11_01/02` | Pole Position L110A2（FN MINIMI）5.56 1 m 单发 ×2，rate 0.95、hp 38 Hz；license `sonniss`（09-24 白天是「SeedAudio 1 + MINIMI 2」、license `mixed`，09-25 去掉了生成音） |
 | `type11Far` | 3 条：`AudioSfx_Type11Far_01` + `_02/_03` | BAR .30cal 300 m（原有）＋ 同一挺 MINIMI 50 m 后方单发 ×2；全是 Sonniss，license `sonniss` |
 
 `AudioSfx_Type11_01/02` 同文件名、内容从 BAR 换成 MINIMI（与 Sound 包那一版逐字节相同——同一配方、同一素材重烘出来的）；
-`SFX_PACK_VERSION` 抬到 `20260924type11minimi`。配方撤掉了 `BarClose` / `Type11BarSecondShot` 两组，原因写在
+`SFX_PACK_VERSION` 抬到 `20260924type11minimi`（09-25 去掉生成音后再抬到 `20260925type11minimionly`）。配方撤掉了 `BarClose` / `Type11BarSecondShot` 两组，原因写在
 `Data_SfxSources.mjs`「轻机：十一年式」注释里。
 
 **客观数字**（实测，整段 FFT；有声段 RMS 用 20 ms 帧、最响帧 10 % 门限，与 `Script_AudioNormalize` 同口径）：
@@ -795,23 +854,24 @@ stress ≥ 0.42 开始喘（`breathHeavy` 原速原调，0.26–0.5 随 stress�
 远处的回声，不是枪机动作（枪机声 <500 Hz 只占个位数）。**单发时会不会听成「砰—嘭」两下，要人耳判断**；点射 500 rpm
 （0.12 s 一发）时它会被后面几发盖住。
 
-**轮播：有意保持随机挑 + ±3 % 变调，不进 `SAMPLE_CYCLE`**（2026-09-24 审查后定）。`type11` / `type11Far`
-走默认那套：每发在所有变体里随机挑一条、叠 ±3 % 变调，与 `zb26` / `type92` 同一待遇。理由：`Script_Audio`
-里 `SAMPLE_CYCLE` 头注写明默认这套就是给「脚步、弹着、连发枪声」的，靠随机与失谐盖复读感；进 `SAMPLE_CYCLE`
-的都是人工一条条试听选定、不许变调的音（白刃、电键、弹啸、汉阳造）。这三条不是用户逐条听过挑的，「交替用＝
-按顺序轮」那条口径管不到它们。代价（实测推算）：连着两发抽到同一条的概率 1/3；一梭 4 发（`BURST_DEFAULT`
-type11:4，0.12 s 一发）里 SeedAudio 与 MINIMI 随机交错，也可能整梭同一条。试听后若要轮：把 `"type11"`、
-`"type11Far"` 加进 `SAMPLE_CYCLE`（同时去掉变调），抬 `Script_Audio` 的 `?v=`。
+**轮播：按顺序轮、不变调，已进 `SAMPLE_CYCLE`**（2026-09-24 夜接力改定，取代当天白天「保持随机挑 + ±3 % 变调」
+的决定）。`type11` / `type11Far` 与白刃、电键、弹啸、汉阳造同一待遇：每发按表序取下一条（近场 MINIMI _01 → _02
+→ 回到 _01，远场 BAR 300 m → MINIMI 50 m ×2），不叠逐发 ±3 % 变调；游标跨梭子延续（远场一梭 4 发 = 三条各一次
+再加下一条）。改的理由是「交替用＝按顺序轮」这条口径：随机挑时连着两发同一条的概率 1/2—1/3、一梭 4 发可能整梭
+同一条，正是备多条想避开的事。`zb26` / `type92` 仍走默认的随机挑 + 变调。
+改回随机的做法：从 `SAMPLE_CYCLE` 里删掉这两个名字，抬 `Script_Audio` 的 `?v=`。
+`Script_AudioTest` 有一条浏览器断言：各播一梭 7 发，按指纹认源，相邻两发必须 +1 轮进、`playbackRate` 恒为 1。
 
-**为什么 SeedAudio 那条还留着**：用户「枪声换」回答的是凌晨撤回之后留下的那个问题——Sound 包的十一年式
-（SeedAudio 1 + MINIMI 2）要不要换回来——这次恢复的就是那一版。但要知道一个事实（实测，`93f81faa0` 的清单）：
-**这次改之前游戏里的 `type11` 只播 SeedAudio 那一条**，BAR 两条自 09-11（`4f126e32c` SeedAudio 烘焙改写清单）起
-就不在清单里，是孤儿文件；「旧 BAR <40 Hz 占 98 %」说的是没在播的文件。所以现在玩家听到的十一年式是「原来那条
-SeedAudio 约占 1/3 + MINIMI 约占 2/3」。如果用户的「换」是要换掉实际听到的那条：把 `Type11Variants` 的 `files`
-去掉 `AudioSfx_SeedAudioType11_01.mp3`、`license` 改回 `sonniss`、重跑 `Type11Variants`、抬 `SFX_PACK_VERSION`。
+**SeedAudio 那条为什么去掉**（2026-09-25）：事实（实测，`93f81faa0` 的清单）是 09-24 之前游戏里的 `type11`
+**只播 SeedAudio 那一条**，BAR 两条自 09-11（`4f126e32c` SeedAudio 烘焙改写清单）起就不在清单里，是孤儿文件；
+09-24 白天「枪声换」之后生成音仍约占 1/3。用户 09-25 00:30 定：生成音换掉、全用实录。做法：`Type11Variants`
+的 `files` 去掉 `AudioSfx_SeedAudioType11_01.mp3`、`license` 改回 `sonniss`、重跑 `Type11Variants`（只登记，清单里
+只有 `type11` 一条变了）、`SFX_PACK_VERSION` 抬到 `20260925type11minimionly`。生成音文件留在磁盘上、不进清单；
+要恢复就把它加回 `files` 首位、`license` 改回 `mixed`，重跑本组、抬戳。`Script_AudioTest` 的对账闸现在要求
+`type11` 正好是 MINIMI 两条、许可 `sonniss`。
 
 **仍需人耳试听**（下面都是数字推断，没有人听过）：
-1. MINIMI（5.56 mm）当十一年式（6.5×50 mm）用在音色上像不像；生成音与实录混在一梭子里会不会听出两种声音。
+1. MINIMI（5.56 mm）当十一年式（6.5×50 mm）用在音色上像不像（09-25 起近场只有 MINIMI，不再有生成音与实录混播）。
 2. 起音后约 0.33 s 那个以 <500 Hz 为主的鼓包（上文），单发时会不会听成「砰—嘭」两下。
 3. **起音后约 80 ms 的高频冲击**（审查补，实测）：MINIMI 近场两条在 1.5 kHz 高通后的 4 ms 包络上，主峰在 0.032 s，
    0.114–0.118 s 还有一下，只比主峰低 4.7 dB；SeedAudio 那条同位置低 24 dB，没有这一下。两发素材同一相对位置都有，
@@ -819,7 +879,7 @@ SeedAudio 约占 1/3 + MINIMI 约占 2/3」。如果用户的「换」是要换�
    `Zb26_01` 同位置也有一下（−3.5 dB），不是新素材独有。要处理只能对 80–130 ms 做衰减，缩短 `tail` 管不到这一段。
 4. **`type11Far` 三条的距离感差别大**（审查补，实测）：`_01`（BAR 300 m）90 % 能量在头 22 ms 内、<500 Hz 占 90 %、
    >4 kHz 占 0.7 %；`_02/_03`（MINIMI 50 m）50 % / 90 % 能量要到 0.21 / 0.41 s、<500 Hz 占 22–23 %、>4 kHz 占 6–7 %。
-   随机混播时同一挺远处机枪会时而短促闷响、时而一片带混响的声音。`_02/_03` 的能量分布与已接受的 `Zb26Far_01`
+   轮播时每一梭里三条依次出现，同一挺远处机枪会一发短促闷响、下两发一片带混响的声音。`_02/_03` 的能量分布与已接受的 `Zb26Far_01`
    （0.213 / 0.415 s）几乎一样，不统一的反倒是 `_01`；听着不统一就撤掉 `_01`（它本来与 `rifleIjaFar_01` 同一发）。
 
 **账面**：清单里 `type11Far` 的 `seconds` 是 1.25（`_01` 的时长），新两条实际 1.474 s。这是 SfxBake 的约定——
@@ -827,10 +887,15 @@ SeedAudio 约占 1/3 + MINIMI 约占 2/3」。如果用户的「换」是要换�
 
 **对账闸**（2026-09-24 审查补）：`Script_AudioTest` 开头一段纯 Node 检查，按 `SFX_SOURCES` 表序推一遍全量 SfxBake
 会写出的文件表与清单逐 cue 对账（`type11` 必须正好是 `Type11Variants` 那三条、`type11Far` 必须有 `_01`–`_03`），
-并查 `license: "mixed"` 的 cue 里没有参考视频实录。唯一放过的是 `rifleIja` / `rifleIjaFar`：清单是 09-11 SeedAudio
-单条，而配方表里还挂着 `RifleIjaSpringfieldTakes` / `RifleIjaFarBuildings` / `RifleIjaType38Live` 等组，**全量
-SfxBake 会把两条步枪改回实录**、把 SeedAudio 那条丢掉——这是本轮之前就有的分歧（用户 09-24 定了步枪不动），
-没有在这次处理；要收口得照 `Type11Variants` 的办法给步枪也加一组表尾登记。
+并查 `license: "mixed"` 的 cue 里没有参考视频实录。**没有例外**（2026-09-24 夜接力收口）：`rifleIja` / `rifleIjaFar`
+的清单是 09-11 SeedAudio 单条，而配方表里还挂着 `GarandClose` / `BarFar300` / `RifleIjaSpringfieldTakes` /
+`RifleIjaFarBuildings` / `RifleIjaType38Live` 五组实录，原来全量 SfxBake 会把两条步枪改回实录（含美制 .30-06）、
+丢掉 SeedAudio，对账闸只好把它们列为已知例外放过。现在照 `Type11Variants` 的办法在表尾加了只登记不切割的
+`RifleIjaSeedAudio`，全量 bake 后清单保持现状（按表序模拟全量 bake 的清单写入：4 个枪声 cue 与清单逐字一致；
+拿掉这一组再模拟，`rifleIja` 变成实录 5 条、`rifleIjaFar` 变成实录 3 条，对账闸报红）。对账闸另外钉死两条步枪
+必须正好是 SeedAudio 单条——配方表和清单一起被改回实录时逐 cue 对账会双双同意，这一条兜住。部分重烘两条步枪
+要连 `RifleIjaSeedAudio` 一起点名。上面五组实录照旧会把 `AudioSfx_RifleIja_0N` / `AudioSfx_RifleIjaFar_0N`
+切到磁盘（孤儿文件，不进清单），要换回实录时只删这一组即可。
 
 **参考视频来源的许可债**（`SFX_LICENSES.refvideo`，发布前要换或取得授权）：`rifleNra_05–07`、`bolt_03`、
 `rifleHanYang`、`boltHanYang` 仍在轮播。
@@ -854,6 +919,9 @@ SfxBake 会把两条步枪改回实录**、把 SeedAudio 那条丢掉——这�
   `R(gapS) / (intensity × 渐强倍率 × 扇区权重)`（光看声数分不出来——把 rate 上的渐强倍率拿掉，靠首场后摊与
   等待缩短，16 种子声数照样 26.4 → 37.6）；近爆早到时 `catchUpS` 内补到顶；近爆后再进 01 **逐帧**都在顶上，
   16 种子头 2 s 每声相对音量 ≥ 5–30 s 的 0.8 倍（现在 0.683 / 0.715，改前 0.341 / 0.712）；其余步骤倍率恒为 1。
+- 2026-09-25（3b，黑屏里前线被饿死）：`Script_AudioTest`「selfCapped」—— 不带的卡在 0.62 天花板上饿死、带的按整份预算收下；
+  `Script_FirstLevelBattleSoundTest`「前线每一声都带 selfCapped；拒收单独记账」—— `front.refused` 与 `skipped` 分开、
+  `plays + refused` = 排出的声数。
 
 ---
 

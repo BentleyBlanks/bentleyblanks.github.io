@@ -84,13 +84,12 @@
     },
     "type11": {
       "files": [
-        "AudioSfx_SeedAudioType11_01.mp3",
         "AudioSfx_Type11_01.mp3",
         "AudioSfx_Type11_02.mp3"
       ],
       "seconds": 0.82,
-      "credit": "Volcengine SeedAudio 1.0 · type11 · 2026-09-11 ／ Pole Position Production · L110A2 LMG（FN MINIMI）5.56 单发（1 m，素材 4.07 s 那一发）· Sonniss GDC 2016 ／ Pole Position Production · L110A2 LMG（FN MINIMI）5.56 单发（1 m，素材 0.09 s 那一发）· Sonniss GDC 2016",
-      "license": "mixed"
+      "credit": "Pole Position Production · L110A2 LMG（FN MINIMI）5.56 单发（1 m，素材 4.07 s 那一发）· Sonniss GDC 2016 ／ Pole Position Production · L110A2 LMG（FN MINIMI）5.56 单发（1 m，素材 0.09 s 那一发）· Sonniss GDC 2016",
+      "license": "sonniss"
     },
     "type92": {
       "files": [

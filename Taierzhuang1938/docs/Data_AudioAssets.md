@@ -853,6 +853,8 @@ send 分在 Panner **之前**，那是对的（湿信号不该跟着头转，见
 丢掉 172 次（47%），而丢的是随机的那 47%：眼前那一枪和一百米外那一枪一样看运气。
 可这两者根本不是一回事 —— 远处那一枪本来就只剩一层糊音，眼前那一枪缺了就是穿帮。
 现在超过 45 m（近场素材的作用边界）的位置音一律按低优先级算，**先丢远的**。
+例外（2026-09-25）：`Play` 带 `selfCapped` 的远处声场（01–06 前线 `DrainFront`，自己封了声部数）按整份预算进门 ——
+不这样的话 01 近爆后黑屏里前线整段被饿死，见 `docs/Data_AudioWiring.md` 二之三 3b。
 
 三道闸各自吃掉多少现在都记在 `audio.drops`（`{ dedupe, budget, distance }`；2026-09-08 起
 预算这一档拆成 `stolen`（偷了别人的声部补上）与 `starved`（实在偷不到、丢了），`budget` 是
@@ -1340,11 +1342,12 @@ Audio native levels are aligned.
 # 补变体的十二组（append，重复跑会把变体追加成 _05/_06，重跑前先还原清单与成品）
 # （原来是十三组；2026-09-24 撤掉了 Type11BarSecondShot。另一个 append 组 Type11FarMinimi50m
 #  必须紧跟 Type11Far 跑，放在下面那条命令里。注意 RifleIjaSpringfieldTakes / RifleIjaFarBuildings
-#  会把美制步枪实录追加进 rifleIja / rifleIjaFar —— 用户 09-24 定了步枪维持 SeedAudio 单条，这两组别跑。）
+#  会把美制步枪实录追加进 rifleIja / rifleIjaFar —— 用户 09-24 定了步枪维持 SeedAudio 单条，所以命令末尾
+#  带上表尾登记组 RifleIjaSeedAudio（按表序最后执行，把两条步枪的清单登记回 SeedAudio 单条；实录只落成孤儿文件）。）
 node Taierzhuang1938/Script_SfxBake.mjs RifleNraK98kTakes RifleIjaSpringfieldTakes \
   Zb26L86Lsw Type92M1919Near5m Type92M1919Turret1m \
   RifleNraFarNagant50m RifleIjaFarBuildings FootstepDirtLoop \
-  ExplosionFarHowitzer ExplosionFarCannon BoltCycleM38 StripperLoadK98kSecond
+  ExplosionFarHowitzer ExplosionFarCannon BoltCycleM38 StripperLoadK98kSecond RifleIjaSeedAudio
 
 # 新 cue 的三十三组（共 45 组，全量清单见 Data_SfxSources 末段）（pending，每次从空表重建，可以放心重跑；其中 Type11FarMinimi50m 靠同一次跑的 Type11Far 先清表，所以也能重跑）
 # Type11FarMinimi50m 是 append：Type11Far 把 type11Far 重写成只有 _01，它接着补 _02/_03（组按表序执行，

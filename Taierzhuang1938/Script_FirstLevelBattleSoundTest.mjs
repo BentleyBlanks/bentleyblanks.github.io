@@ -60,6 +60,26 @@ const Dist = (c, L) => Math.hypot(c.position.x - L.x, c.position.z - L.z);
   Ok(`01 一分钟 ${front.length} 声，全部闷、全在 ${Math.min(...recent.map((r) => r.distance))} m 以外`);
 }
 {
+  // 【2026-09-25】前线每一声都带 selfCapped（声部数由 maxVoices / sharedMaxVoices 自己管，引擎不再按「远 = 低优先级」
+  // 套 0.62 天花板 —— 01 近爆后黑屏 2.6 s 里前线整段被那道天花板饿死）。引擎侧的天花板断言在 Script_AudioTest。
+  // 统计口径：引擎拒收记进 front.refused，与自己的声部上限 front.skipped 分开，plays 只数真收下的。
+  const audio = FakeAudio();
+  let n = 0;
+  const base = audio.Play;
+  audio.Play = (cue, o = {}) => { const v = base(cue, o); n += 1; return o.soundField && n % 3 === 0 ? null : v; };
+  const sound = new FirstLevelMissionBattleSound(audio, null, 0x19380925);
+  Run(sound, audio, "Trapped", 90);
+  const front = audio.calls.filter((c) => c.soundField && c.bus === "sfx");
+  assert.ok(front.length > 20 && front.every((c) => c.selfCapped === true),
+    `前线每一声都带 selfCapped：${front.filter((c) => c.selfCapped === true).length}/${front.length}`);
+  const f = sound.State().front;
+  const refusedLog = sound.frontRecent.filter((r) => !r.played).length;
+  assert.ok(f.refused > 0 && f.plays + f.refused === front.length,
+    `引擎拒收单独记账：排出 ${front.length} = 收下 ${f.plays} + 拒收 ${f.refused}（自己的上限另记 skipped ${f.skipped}）`);
+  assert.ok(refusedLog > 0, "frontRecent 里拒收的那几声 played=false");
+  Ok(`前线 ${front.length} 声全带 selfCapped；拒收 ${f.refused} 单独记账，plays ${f.plays} 只数收下的`);
+}
+{
   // 【2026-09-24 恢复】01 被压着时前线渐强（front.stages.Trapped.swell）。旧断言在 09-23 换声景时删了，
   // 用户拍板「恢复」。逐秒量 State().front.swell：从底单调爬到顶（顶 = stages.Trapped 的 intensity / gain），
   // 到顶后不回落；近爆事实一来 catchUpS 内补完；其它步骤恒为 1。
