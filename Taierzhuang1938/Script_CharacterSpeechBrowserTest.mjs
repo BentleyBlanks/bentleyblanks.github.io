@@ -1,5 +1,6 @@
 // Live speaker faces in the real first level: every face-rigged speaker moves its
 // mouth with its own lines and nobody else's; listeners keep their mouths closed;
+// acting expressions and face blood show at 1 m and a shouted line still articulates;
 // facial skins of all six models render at 1-2 m through the production post
 // chain; the mouth writes real motion vectors while talking and none when still.
 import assert from 'node:assert/strict';
@@ -35,13 +36,16 @@ try {
     const probe=window.SpeechProbe;
     // Diagnostic close-up only. Render through the unchanged production post chain.
     g.post.Render=function(scene,camera,options){
-      const focus=probe.focus,root=focus.actor?.root||focus.root;
-      const center=focus.bones.head.getWorldPosition(new T.Vector3()).add(new T.Vector3(0,.10,0));
+      const focus=probe.focus,root=focus.actor?.root||focus.root,eyes=probe.eyeLevel?focus.facial?.eyes:null;
+      // eyeLevel: aim between the eyes along the head's own forward, tilt included (acting close-ups).
+      const center=eyes?.length?eyes.reduce((sum,eye)=>sum.add(eye.bone.getWorldPosition(new T.Vector3())),new T.Vector3()).multiplyScalar(1/eyes.length)
+        :focus.bones.head.getWorldPosition(new T.Vector3()).add(new T.Vector3(0,.10,0));
       // Close-ups face the face itself (Biped head frame: local +Y is forward).
-      const forward=probe.faceOn?new T.Vector3(0,1,0).transformDirection(focus.bones.head.matrixWorld).setY(0).normalize()
+      const forward=eyes?.length?new T.Vector3(0,1,0).transformDirection(focus.bones.head.matrixWorld).normalize()
+        :probe.faceOn?new T.Vector3(0,1,0).transformDirection(focus.bones.head.matrixWorld).setY(0).normalize()
         :new T.Vector3(0,0,-1).transformDirection(root.matrixWorld);
-      camera.position.copy(center).addScaledVector(forward,probe.distance);camera.position.y+=.025;
-      camera.lookAt(center);camera.updateMatrixWorld(true);g.viewmodel.root.visible=false;
+      camera.position.copy(center).addScaledVector(forward,probe.distance);if(!eyes?.length)camera.position.y+=.025;
+      camera.lookAt(center);camera.updateMatrixWorld(true);g.viewmodel.root.visible=false;probe.lastCamera=camera;
       return probe.render.call(this,scene,camera,options);
     };
     g.post.NotifyCameraCut();g.StepFrames(3,1/60,true);
@@ -277,6 +281,125 @@ try {
   for(const shot of closeups.filter(s=>['Open','Near'].includes(s.label)))assert.ok(shot.jaw>.12,`${shot.model} opens (${shot.jaw})`);
   for(const shot of closeups.filter(s=>s.label==='Rest'))assert.ok(shot.jaw<SILENT_JAW_RADIANS,`${shot.model} rests closed`);
 
+  // Acting expressions and face blood (01-03 storyboard contract section 4.2), 1 m through the production
+  // chain: 日兵甲 (IJA06) snarls and gapes, the captive comrade (NRA02) bleeds, and a shouted line still
+  // opens and shuts. Pixels are read from the frame itself (a flag that is set but never drawn is not seen).
+  await page.evaluate(async()=>{
+    const p=window.SpeechProbe,g=p.g,T=p.T;
+    p.facialApi=(await import('./Script_CharacterFacialAnimation.mjs')).CharacterFacial;
+    const {SpeakingCastOptions}=await import('./Data_FirstLevelSpeakingCast.mjs');
+    const actor=p.closeup.comrade=g.actorFactory.Create('nra',{...SpeakingCastOptions('comrade'),seed:83,weapon:null});
+    const luo=p.luo.actor.root,forward=new T.Vector3(0,0,-1).transformDirection(luo.matrixWorld);
+    actor.root.position.copy(luo.getWorldPosition(new T.Vector3())).addScaledVector(forward,3);
+    actor.root.position.x+=4+3*Object.keys(p.closeup).length;actor.root.rotation.y=luo.rotation?.y||0;g.scene.add(actor.root);
+    // Grab the frame just rendered (same task, before the drawing buffer is cleared): the face itself,
+    // a box around the projected eyes (1.6 eye distances each side, brows to chin), fixed per actor so
+    // every shot of one face compares the same pixels. The whole middle of the screen is mostly sky and
+    // bystanders, whose film grain (about 3 mean |dRGB| per pixel) drowns a changed mouth.
+    // The mouth box sits on the projected mouth corners (Face_CornerL/R at rest), from above the upper lip
+    // to below a dropped jaw. Both boxes are fixed per actor on its first (rest) shot.
+    p.faceBox={};p.mouthBox={};
+    const Clip=(x0,y0,x1,y1,w,h)=>{const x=Math.max(0,Math.round(x0)),y=Math.max(0,Math.round(y0));
+      return {x,y,w:Math.max(4,Math.min(w,Math.round(x1))-x),h:Math.max(4,Math.min(h,Math.round(y1))-y)};};
+    p.Grab=castId=>{
+      const canvas=g.renderer.domElement,w=canvas.width,h=canvas.height;
+      if(!p.faceBox[castId]){
+        const Screen=bone=>{const v=bone.getWorldPosition(new T.Vector3()).project(p.lastCamera);return new T.Vector2((v.x+1)/2*w,(1-v.y)/2*h);};
+        const eyes=p.focus.facial.eyes.map(eye=>Screen(eye.bone)),bone=name=>p.focus.facial.controls.find(c=>c.name===name).bone;
+        const cx=(eyes[0].x+eyes[1].x)/2,cy=(eyes[0].y+eyes[1].y)/2,d=eyes[0].distanceTo(eyes[1]);
+        p.faceBox[castId]={...Clip(cx-1.6*d,cy-1.3*d,cx+1.6*d,cy+2.7*d,w,h),eyePx:d};
+        const cl=Screen(bone('Face_CornerL')),cr=Screen(bone('Face_CornerR')),mx=(cl.x+cr.x)/2,my=(cl.y+cr.y)/2,half=Math.abs(cl.x-cr.x)/2+.3*d;
+        p.mouthBox[castId]=Clip(mx-half,my-.45*d,mx+half,my+.8*d,w,h);
+      }
+      const Read=box=>{const c=document.createElement('canvas');c.width=box.w;c.height=box.h;
+        const x2=c.getContext('2d',{willReadFrequently:true});
+        x2.drawImage(canvas,box.x,box.y,box.w,box.h,0,0,box.w,box.h);return x2.getImageData(0,0,box.w,box.h).data;};
+      return {face:Read(p.faceBox[castId]),mouth:Read(p.mouthBox[castId])};
+    };
+    // Share of 4x4 blocks whose average colour moved by more than 6 (mean |dRGB|): film grain and the
+    // anti-aliasing jitter at silhouettes average out inside a block (about 1 % of the blocks of an
+    // unchanged face), bared teeth, a dropped jaw or a pulled corner do not.
+    p.ChangedBlocks=(a,b,width,height,k=4,limit=6)=>{
+      let changed=0,blocks=0;
+      for(let by=0;by+k<=height;by+=k)for(let bx=0;bx+k<=width;bx+=k){
+        let sum=0;
+        for(let c=0;c<3;c++){let da=0,db=0;
+          for(let y=by;y<by+k;y++)for(let x=bx;x<bx+k;x++){const i=(y*width+x)*4+c;da+=a[i];db+=b[i];}
+          sum+=Math.abs(da-db)/(k*k);}
+        blocks++;if(sum/3>limit)changed++;
+      }
+      return blocks?changed/blocks:0;
+    };
+  });
+  const acting={};
+  for(const [key,castId,setup] of [
+    ['ijaA_Rest','ijaA',{expression:{}}],['ijaA_Still','ijaA',{expression:{},ref:'ijaA_Rest'}],['ijaA_Snarl','ijaA',{expression:{snarl:1},ref:'ijaA_Rest'}],['ijaA_Shock','ijaA',{expression:{shock:1},ref:'ijaA_Rest'}],
+    ['ijaA_Shout','ijaA',{expression:{shout:1},ref:'ijaA_Rest'}],['luo_Rest','luo',{expression:{}}],['luo_Grit','luo',{expression:{grit:1},ref:'luo_Rest'}],
+    ['comrade_Rest','comrade',{expression:{},blood:0}],['comrade_Pain','comrade',{expression:{pain:1},blood:0,ref:'comrade_Rest'}],
+    ['comrade_PainStill','comrade',{expression:{pain:1},blood:0,ref:'comrade_Pain'}],
+    ['comrade_Blood','comrade',{expression:{pain:1},blood:1,ref:'comrade_Pain'}]]){
+    acting[key]=await page.evaluate(({key,castId,setup})=>{
+      const p=window.SpeechProbe,g=p.g,actor=p.closeup[castId],rig=actor.characterRig,face=rig.facial,api=p.facialApi;
+      for(const other of Object.values(p.closeup))other.root.visible=other===actor;
+      p.focus=rig;p.distance=.6;p.faceOn=true;p.eyeLevel=true;face.source=null;face.gaze=null;
+      api.SetExpression(rig,{snarl:0,shock:0,pain:0,shout:0,grit:0,...setup.expression},0);
+      const took=setup.blood==null?null:api.SetFaceBlood(rig,setup.blood);
+      face.nextBlinkS=99;face.blinkAge=-1;
+      // The body settles once per actor, then holds: later shots of the same actor differ by the face alone.
+      p.actingPosed ||= new Set();
+      if(!p.actingPosed.has(castId)){p.actingPosed.add(castId);for(let i=0;i<12;i++)actor.Update(1/60,{elapsed:i/60});}
+      for(let i=0;i<12;i++)face.Update(1/60,{});
+      g.post.NotifyCameraCut();g.StepFrames(3,1/60,true);
+      const grab=p.Grab(castId),pixels=grab.face;p.acting ||= {};p.acting[key]=grab;const refGrab=setup.ref?p.acting[setup.ref]:null,ref=refGrab?.face;
+      const box=p.faceBox[castId],mouthBox=p.mouthBox[castId];
+      // mouth / diff: share of changed 4x4 blocks in the mouth box / the face box against the reference
+      // shot; bloodied: share of face-box pixels that changed (sum |dRGB| > 20) into a red-dominant colour
+      // (blood is dark: it lowers red too, so "redder than before" misses it).
+      let bloodied=0;const n=pixels.length/4,diff=ref?p.ChangedBlocks(pixels,ref,box.w,box.h):null;
+      const mouth=ref?p.ChangedBlocks(grab.mouth,refGrab.mouth,mouthBox.w,mouthBox.h):null;
+      if(ref)for(let i=0;i<pixels.length;i+=4){
+        const r=pixels[i],gg=pixels[i+1],b=pixels[i+2];
+        if(Math.abs(r-ref[i])+Math.abs(gg-ref[i+1])+Math.abs(b-ref[i+2])>20&&r>=1.6*gg&&r>=1.3*b)bloodied++;
+      }
+      const jaw=face.controls.find(c=>c.name==='Face_Jaw');
+      let patched=0;rig.root.traverse(o=>{if(o.isMesh&&(o.material?.userData?.materialPatchKeys||[]).includes('face-blood-1'))patched++;});
+      return {model:rig.modelId,weights:{...face.expressionWeights},jaw:jaw.bone.quaternion.angleTo(jaw.quaternion),
+        took,blood:face.State().faceBlood,patched,bloodied:bloodied/n,diff,mouth,box:{...box},mouthBox:{...mouthBox}};
+    },{key,castId,setup});
+    await page.screenshot({path:path.join(output,`Acting_${acting[key].model}_${key}.png`)});
+  }
+  // Shouting speech: the jaw keeps opening and shutting on syllables around the shout's half-open base.
+  const shoutTalk=await page.evaluate(()=>{
+    const p=window.SpeechProbe,actor=p.closeup.ijaA,face=actor.characterRig.facial;let open=false;
+    p.facialApi.SetExpression(actor.characterRig,{shout:1,snarl:0,shock:0,pain:0,grit:0},0);
+    face.source=()=>({active:true,jaw:open?.9:0,wide:open?.3:0,round:0,close:open?0:.6,stress:0});
+    const jaw=face.controls.find(c=>c.name==='Face_Jaw'),angles=[];
+    for(let i=0;i<150;i++){open=Math.floor(i/9)%2===0;actor.Update(1/60,{});if(i>=30)angles.push(jaw.bone.quaternion.angleTo(jaw.quaternion));}
+    face.source=null;p.facialApi.SetExpression(actor.characterRig,{shout:0},0);actor.Update(1/60,{});
+    return {low:Math.min(...angles),high:Math.max(...angles),talk:face.talk};
+  });
+  await page.evaluate(()=>{const p=window.SpeechProbe;p.eyeLevel=false;p.acting=null;p.facialApi.SetFaceBlood(p.closeup.comrade.characterRig,0);});
+  const Pct=v=>`${(v*100).toFixed(1)}%`;
+  console.log('acting',JSON.stringify(Object.fromEntries(Object.entries(acting).map(([k,v])=>[k,{mouth:v.mouth,diff:v.diff,bloodied:v.bloodied,
+    jawDeg:v.jaw*180/Math.PI,eyePx:v.box.eyePx,mouthBox:v.mouthBox}]))),'shoutTalk',JSON.stringify(shoutTalk));
+  const DEG=Math.PI/180;
+  assert.equal(acting.ijaA_Snarl.weights.snarl,1,'日兵甲 Snarl reaches 1');assert.equal(acting.ijaA_Shock.weights.shock,1);
+  // Controls (same face and body, nothing changed) give the noise floor: breathing, film grain, AA jitter.
+  const still=Math.max(acting.ijaA_Still.mouth,acting.comrade_PainStill.mouth),stillFace=Math.max(acting.ijaA_Still.diff,acting.comrade_PainStill.diff);
+  const bloodFloor=acting.comrade_PainStill.bloodied;
+  assert.ok(still<.05&&stillFace<.05,`control shots are steady (mouth ${Pct(still)}, face ${Pct(stillFace)} of blocks changed)`);
+  const Shows=(shot,what,share=.06)=>assert.ok(shot.mouth>share&&shot.mouth>3*still,
+    `${what} changes the mouth on screen (${Pct(shot.mouth)} of mouth blocks, control ${Pct(still)})`);
+  Shows(acting.ijaA_Snarl,'日兵甲 Snarl');Shows(acting.ijaA_Shock,'日兵甲 Shock');Shows(acting.ijaA_Shout,'日兵甲 Shout');
+  assert.ok(acting.ijaA_Shock.jaw>5*DEG,`日兵甲 Shock gapes (${(acting.ijaA_Shock.jaw/DEG).toFixed(1)} deg)`);
+  assert.ok(acting.ijaA_Shout.jaw>12*DEG,`Shout drops the jaw (${(acting.ijaA_Shout.jaw/DEG).toFixed(1)} deg)`);
+  Shows(acting.comrade_Pain,'comrade Pain',.04);Shows(acting.luo_Grit,'罗班长 Grit',.04);
+  assert.equal(acting.comrade_Blood.took,true,'SetFaceBlood found the comrade head surface');
+  assert.ok(acting.comrade_Blood.patched>0&&acting.comrade_Blood.blood===1);
+  assert.ok(acting.comrade_Blood.bloodied>bloodFloor+.015,`blood is drawn: ${Pct(acting.comrade_Blood.bloodied)} of the face box turned blood red (control ${Pct(bloodFloor)})`);
+  assert.ok(acting.comrade_Blood.diff>.08&&acting.comrade_Blood.diff>3*stillFace,`blood changes the face (${Pct(acting.comrade_Blood.diff)} of face blocks)`);
+  assert.ok(shoutTalk.high-shoutTalk.low>6*DEG,`under Shout the mouth still opens and shuts (${(shoutTalk.low/DEG).toFixed(1)}-${(shoutTalk.high/DEG).toFixed(1)} deg)`);
+
   // Motion vectors: the mouth writes velocity while the jaw moves, none when still.
   const velocity=await page.evaluate(async()=>{
     const p=window.SpeechProbe,g=p.g,T=p.T,renderer=g.renderer;
@@ -403,10 +526,10 @@ try {
     await page.evaluate(()=>{const s=window.Seat06Shot;s.rig.facial.source=s.source;});
   }
   seat06.rows=seat06.rows.filter((_,i)=>i%4===0);
-  await fs.writeFile(path.join(output,'Data_CharacterSpeech.json'),JSON.stringify({initial,samples,pauseReceipt,pause,resumed,closeups,velocity,seat06,
+  await fs.writeFile(path.join(output,'Data_CharacterSpeech.json'),JSON.stringify({initial,samples,pauseReceipt,pause,resumed,closeups,acting,shoutTalk,velocity,seat06,
     faceTrack:{key:trackRun.key,shots,track:trackStats,envelope:envelopeStats,trackRows:trackPass.rows,envelopeRows:envelopePass.rows},errors},null,2));
   assert.deepEqual(errors,[]);
-  console.log(`ok live faces: Luo speaks with his own line, Yaowa listens closed-mouthed; ${closeups.length} close-ups of 6 facial skins; `
+  console.log(`ok live faces: Luo speaks with his own line, Yaowa listens closed-mouthed; ${closeups.length} close-ups of 6 facial skins; acting ${Object.keys(acting).length} shots (snarl/shock/shout/grit/pain/blood); `
     +`mouth velocity ${velocity.speaking.mouth.max.toFixed(2)} px talking / ${velocity.silent.mouth.max.toFixed(3)} px still; `
     +`TakeOverGun track ${JSON.stringify(trackStats)} vs envelope ${JSON.stringify(envelopeStats)}; 06 seated Zhou ${JSON.stringify(seat06.stats)}`);
 } catch(error){
