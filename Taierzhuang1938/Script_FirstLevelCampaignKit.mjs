@@ -84,7 +84,9 @@ export function ParseCampaignArgs(argv = process.argv) {
 
 /** 起服务、起浏览器、开页面，返回 ctx。 */
 export async function OpenCampaign(options) {
-  const output = path.join(here, "_shots", options.suite);
+  // CAMPAIGN_SHOTS_TAG (optional, Front relay r2 thin hook): runs of the same suite in parallel keep their evidence apart
+  // (_shots/<suite>_<tag>); unset, the directory is the suite's as before.
+  const output = path.join(here, "_shots", options.suite + (process.env.CAMPAIGN_SHOTS_TAG ? "_" + process.env.CAMPAIGN_SHOTS_TAG : ""));
   await fs.mkdir(output, { recursive: true });
   const server = await ServeRoot(root, 0);
   const browser = await LaunchBrowser();
