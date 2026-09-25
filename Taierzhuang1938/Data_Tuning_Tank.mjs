@@ -250,6 +250,10 @@ export const TANK = Object.freeze({
     // 从这一步起，车还没开过 BendExit 时护兵去看守位（路点的 escortOverwatch，见 TANK_ESCORT_OVERWATCH）。03 不去：
     // 那块土台对夺下的机枪敞着，09-25 空转探针 c3（进图就去）四个护兵 03 里就被打掉两个、一枪没开。[需]
     overwatchFromStage: "MachineGun",
+    // Farther than this from his post he runs there (m/s: FRONT assaultRushMps 3.4, the bounders' rush) and holds it
+    // once inside; the 45-50 m from the cutting walked took the whole first 04 window (idle probes h1, i1). [需]
+    overwatchRunFromM: 3,
+    overwatchRunMps: 3.4,
     // 路点自带的绝对护兵槽（Block/Squeeze → FRONT_TANK_ESCORT_SLOTS，弹坑）：守区半径与掩体余量都小 ——
     // 余量一大 AI 会挑坑外的掩体，从那儿顺土坎南坡看得见缺口（Space 包 09-24 实测）。[几]
     slotRadiusM: 1.2,
