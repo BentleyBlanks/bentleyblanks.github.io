@@ -82,6 +82,7 @@ import { FirstLevelReception, ReceptionBedGuideRoute, ReceptionBedGuideArrivalM,
 import { FirstLevelBridge } from "./Script_FirstLevelBridge.mjs";
 import { FirstLevelNightGate } from "./Script_FirstLevelNightGate.mjs";
 import { FirstLevelNightLights } from "./Script_FirstLevelNightLights.mjs";
+import { OpeningSet } from "./Script_OpeningSet.mjs";
 import { EmplacementInteraction } from "./Script_Emplacement.mjs";
 import { Localize, T } from "./Script_Text.mjs";
 import { ActionKeyGlyph } from "./Script_Input.mjs";
@@ -225,6 +226,8 @@ export class FirstLevelMissionRuntime {
     this.dressing = new EndDressing();
     this.view.extras = this.dressing;
     this.nightLights = new FirstLevelNightLights({ scene: this.scene });
+    // 01–03 过场分镜布景（Set 包，Data_OpeningSet0103）：进 01–03 装载，离开收走。
+    this.openingSet = new OpeningSet({ scene: this.scene, library: this.library, groundAt: (x, z) => this.battlefield.GroundHeight(x, z) });
     this.quietMarch = new FirstLevelQuietMarch(this);
     this.reception = new FirstLevelReception(this);
     this.bridge = new FirstLevelBridge(this);
@@ -1425,6 +1428,7 @@ export class FirstLevelMissionRuntime {
     // Narrative companions survive incidental combat from the very first stage.
     for(const actor of this.squad||[])actor.scriptEssential=OPENING.requiredSquadCast.includes(actor.castId);
     this.opening.Enter(stage.id);
+    this.openingSet?.Enter(stage.id);
     this.frontShow?.Enter(stage.id);
     this.UpdateMusic(stage.id);
     this.Objective(Localize(FirstLevelStageTextId(stage.id), stage.objective));
@@ -2303,6 +2307,8 @@ export class FirstLevelMissionRuntime {
     prof?.E("story/mission/voice");
     prof?.B("story/mission/other");
     this.opening.Update(dt);
+    this.openingSet?.Update(dt, this.flow.stage.id, this.frontShow?.bunker?.phase ?? null,
+      { collapsed: this.Has("bunkerCollapsed"), blastAge: this.opening.blastAt != null ? this.time - this.opening.blastAt : null });
     if(this.failed){prof?.E("story/mission/other");return;}
     prof?.E("story/mission/other");
     prof?.B("story/mission/spawns");
@@ -2739,6 +2745,7 @@ export class FirstLevelMissionRuntime {
     this.transition.Dispose();
     this.extras.Clear();
     this.nightLights?.Dispose();
+    this.openingSet?.Exit();
     this.opening.Dispose();
     this.frontShow?.Dispose();
     this.frontPressure?.Dispose();
