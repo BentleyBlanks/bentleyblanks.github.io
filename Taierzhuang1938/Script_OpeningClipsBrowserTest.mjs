@@ -136,6 +136,10 @@ try {
       for (const b of bones) {
         const parent = b.parent;
         if (!parent?.isBone || !bind.has(b) || !bind.has(parent)) continue;
+        // TengxianHumanoidV1 (docs/Data_CharacterStandard.md): the pelvis hangs straight off GroundRoot and its
+        // offset from it IS the root motion (the Lugou rigs bound it on GroundRoot's origin, which the 1 cm filter skipped), so it is not
+        // a segment length; every other body segment still has to hold its bind length.
+        if (/pelvis$/.test(N(b.name))) continue;
         const rest = V().setFromMatrixPosition(bind.get(b)).distanceTo(V().setFromMatrixPosition(bind.get(parent)));
         if (rest > .01) pairs.push({ bone: b, parent, rest });
       }

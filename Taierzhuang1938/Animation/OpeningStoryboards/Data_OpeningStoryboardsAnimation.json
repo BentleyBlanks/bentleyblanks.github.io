@@ -2633,7 +2633,7 @@
   {
    "id": "TengxianNra02",
    "file": "Animation_TengxianNra02OpeningStoryboards.json",
-   "sha256": "5d99cb8bf0f5858f26232c35eefd7ac856db93c1a2ab56d8b387b942af363563",
+   "sha256": "bc9fee8ebd70d7982ecd7c9874eacc56adb48ab5c8e9248f24781280bc1873c7",
    "originalModelSha256": "67550199849f78d581b356580f25595f361bece70fef0c82d7bd08a954197790",
    "clipIds": [
     "SupplyReceive",
@@ -4356,7 +4356,7 @@
   {
    "id": "TengxianNra05",
    "file": "Animation_TengxianNra05OpeningStoryboards.json",
-   "sha256": "8f5bb840211a22840df3ace9e23d4452c3180c69a9e2a91677bfe64abadfa0f3",
+   "sha256": "401fc0adb2ddccf6f43b92376636ff99c37022cb8214fdd6bfdabdf86ea0c79f",
    "originalModelSha256": "b85b90fac1843261d40fbf257470a933819a9302dff1727a591feda1a5327b55",
    "clipIds": [
     "SupplyReceive",
@@ -5340,7 +5340,7 @@
   {
    "id": "TengxianIja01",
    "file": "Animation_TengxianIja01OpeningStoryboards.json",
-   "sha256": "1df0188d166d933a88b25605be58cc6b3b00824e3a1d1f375f310db590c9c34a",
+   "sha256": "d795f7e60a55289be566de38c8f70b14411fb44cef19375047e7ab28e97ae479",
    "originalModelSha256": "fc6c84ad51c9752066127b148a1f9db307da9659dea441989861265693b02c6b",
    "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningStoryboards_20260926HumanoidV1\\Scene_TengxianIja01OpeningStoryboards.blend",
    "contactPoints": {
@@ -6107,7 +6107,7 @@
      "root": {
       "start": [
        -0.226,
-       0.0134,
+       0.0871,
        0.0,
        0.7654
       ],
@@ -6480,7 +6480,7 @@
   {
    "id": "TengxianIja02",
    "file": "Animation_TengxianIja02OpeningStoryboards.json",
-   "sha256": "fd91338e982a0fed012c48e074e2b7831dd24ce9e245d85a8c54ee8579733bb8",
+   "sha256": "8b63a2a9d65572a34f90f776377b653704b94412d2a84af61798c60b59a344e8",
    "originalModelSha256": "fc429bafc6973e54e8d1fa72ac99c8740c81be25f895ddb1417bb47707578788",
    "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningStoryboards_20260926HumanoidV1\\Scene_TengxianIja02OpeningStoryboards.blend",
    "contactPoints": {
@@ -7239,10 +7239,10 @@
      "clip": "IjaDragCollarFromDirt",
      "frames": 107,
      "footSlideM": 0.0001,
-     "contactErrorM": 0.0045,
-     "gripSolveErrorM": 0.00453,
-     "pelvisMaxStepM": 0.0963,
-     "floorCorrectionMin": -3e-05,
+     "contactErrorM": 0.0027,
+     "gripSolveErrorM": 0.00273,
+     "pelvisMaxStepM": 0.0973,
+     "floorCorrectionMin": -5e-05,
      "floorCorrectionMax": 7e-05,
      "root": {
       "start": [
@@ -7252,10 +7252,10 @@
        0.757
       ],
       "end": [
-       -0.031,
-       0.2679,
+       -0.0222,
+       0.2939,
        0.0,
-       0.7082
+       0.7233
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
@@ -7359,9 +7359,9 @@
      "clip": "IjaHairGrabPull",
      "frames": 25,
      "footSlideM": 0.0,
-     "contactErrorM": 0.008,
-     "gripSolveErrorM": 0.00795,
-     "pelvisMaxStepM": 0.063,
+     "contactErrorM": 0.0071,
+     "gripSolveErrorM": 0.00712,
+     "pelvisMaxStepM": 0.0511,
      "floorCorrectionMin": -0.0,
      "floorCorrectionMax": 3e-05,
      "root": {
@@ -7372,10 +7372,10 @@
        0.8164
       ],
       "end": [
-       0.0361,
-       -0.1404,
+       0.0273,
+       -0.1145,
        0.0,
-       0.7753
+       0.7807
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
@@ -7399,23 +7399,23 @@
      "clip": "IjaDrawBayonet",
      "frames": 21,
      "footSlideM": 0.0,
-     "contactErrorM": 0.0053,
-     "gripSolveErrorM": 0.00525,
-     "pelvisMaxStepM": 0.0722,
-     "floorCorrectionMin": 3e-05,
-     "floorCorrectionMax": 6e-05,
+     "contactErrorM": 0.0071,
+     "gripSolveErrorM": 0.01907,
+     "pelvisMaxStepM": 0.0653,
+     "floorCorrectionMin": 2e-05,
+     "floorCorrectionMax": 5e-05,
      "root": {
       "start": [
-       0.0361,
-       -0.1404,
+       0.0273,
+       -0.1145,
        0.0,
-       0.7753
+       0.7807
       ],
       "end": [
-       0.0391,
-       -0.1394,
+       0.0291,
+       -0.1139,
        0.0,
-       0.7673
+       0.781
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
@@ -7439,23 +7439,23 @@
      "clip": "IjaThroatSlash",
      "frames": 97,
      "footSlideM": 0.0,
-     "contactErrorM": 0.0117,
-     "gripSolveErrorM": 0.02953,
-     "pelvisMaxStepM": 0.1174,
-     "floorCorrectionMin": 2e-05,
-     "floorCorrectionMax": 7e-05,
+     "contactErrorM": 0.0053,
+     "gripSolveErrorM": 0.02697,
+     "pelvisMaxStepM": 0.1327,
+     "floorCorrectionMin": 1e-05,
+     "floorCorrectionMax": 6e-05,
      "root": {
       "start": [
-       0.0391,
-       -0.1394,
+       0.0291,
+       -0.1139,
        0.0,
-       0.7673
+       0.781
       ],
       "end": [
-       0.0539,
-       -0.2426,
+       0.0391,
+       -0.2194,
        0.0,
-       0.6285
+       0.6757
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
@@ -7484,17 +7484,17 @@
      "clip": "IjaWipeSheathBayonet",
      "frames": 136,
      "footSlideM": 0.0034,
-     "contactErrorM": 0.0267,
-     "gripSolveErrorM": 0.03443,
-     "pelvisMaxStepM": 0.0918,
+     "contactErrorM": 0.0093,
+     "gripSolveErrorM": 0.03058,
+     "pelvisMaxStepM": 0.073,
      "floorCorrectionMin": 2e-05,
      "floorCorrectionMax": 6e-05,
      "root": {
       "start": [
-       0.0539,
-       -0.2426,
+       0.0391,
+       -0.2194,
        0.0,
-       0.6285
+       0.6757
       ],
       "end": [
        -0.0026,
@@ -8098,7 +8098,7 @@
      "footSlideM": 0.0056,
      "contactErrorM": 0.0,
      "gripSolveErrorM": 0.0,
-     "pelvisMaxStepM": 0.1089,
+     "pelvisMaxStepM": 0.1385,
      "floorCorrectionMin": -0.01208,
      "floorCorrectionMax": 0.21946,
      "root": {
@@ -8178,7 +8178,7 @@
   {
    "id": "TengxianIja03",
    "file": "Animation_TengxianIja03OpeningStoryboards.json",
-   "sha256": "6d9bc67cc3b5f81df069deae56acffb994b58a095d28cb14844c0ec1f3bcd796",
+   "sha256": "39569a8e066f926f8578ea472efc277ae1ea5faec23f83a429bc1e832bde0fc7",
    "originalModelSha256": "17163f830cdf91b2b8bbe9b6e197855bf739a48116464b19eb24738d921b4f74",
    "clipIds": [
     "SupplyReceive",

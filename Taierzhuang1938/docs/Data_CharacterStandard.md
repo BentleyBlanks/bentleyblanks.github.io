@@ -94,11 +94,21 @@ node scripts/Script_BlenderMcp.mjs status --scan
   `f = 现在的运行时缩放 / 旧运行时缩放` 整体缩放成一份作者用副本（`tmp/AuthoringRigs`，不提交），`AUTHORING_SCALE`
   记旧缩放（0925 验证报告的 scale）。于是所有作者数在运行时的意义不变；写出的骨骼值、道具轨、接触点偏移、
   挂载点与 `endLift` 除以 f 回到发货 GLB 的节点单位（读已提交文件时乘回）。
-- 新比例下有 11 条 clip 超出门槛，逐条修在作者端：`Script_OpeningStoryboardClips.py` 的 `REACH_BY_CLIP`
-  （抓头发链、拖领、踢梁的够取辅助：起点 0.86 臂长、骨盆 0.13 m、前倾 +0.40；踢梁骨盆 0.17 m）、
-  `THROAT_R/L`（捂喉的手向他左移 2 / 1.5 cm）、`CHOP_END`（靠墙倒地离墙多 2 cm）、`STARTLE_DUCK` 0.07 → 0.09、
-  `AimHead` 先减去接地抬升再瞄（罗班长跪姿看顺子）；第一人称 `EXTRA_HAND_POSES.gripArm.atLeft` 0.65 → 0.75。
-  其余 clip 的烘焙参数与 V5 相同。
+- 新比例下 11 条 clip 超出烘焙门槛，另有 6 个成对舞台互相穿插、1 处单帧突跳（`Script_OpeningClipsBrowserTest`，
+  基线 `b39cd831` 为 0 FAIL）。逐条修在作者端（`Script_OpeningStoryboardClips.py`，其余 clip 的烘焙参数与 V5 相同，
+  烘焙默认值仍是 Lugou 的 0.92 / 0.10 / 0.25）：
+  - `REACH_BY_CLIP`（烘焙 `Solve` 的够取辅助，`sides` 只放宽抓握那只手）：抓头发链 HairGrab / Draw / ThroatSlash
+    左手 0.86；拖领 DragCollarFromDirt 右手 0.86；CollarDragSnag 左手 0.86 + 骨盆 0.13 m + 前倾 +0.40；
+    KickBeam 左手 0.86 + 0.17 m + 0.40；WipeSheathBayonet 按时间：起止同上下游、只在 3.75 s 擦刀时放宽；
+    ParriedChoppedFall 左手 0.80（直臂时前臂单帧转 77°）。
+  - 锁骨前伸 `protract.<side>`（新增的姿势参数，绕竖轴，约 6 cm）：抓头发的左肩、拖领的右肩 0.65 rad。只加大前倾会让
+    日兵甲的脸撞进战友的脸（slashDraw 头对头 10 cm）。
+  - `IjaPullArm` 起始离手臂 0.72 → 0.80 m（新骨架大腿更长，两名日兵大腿互插 8.7 cm）；`THROAT_R/L` 捂喉的手向他左移
+    2 / 1.5 cm；`CHOP_END` 靠墙倒地离墙多 2 cm；`STARTLE_DUCK` 0.07 → 0.09；`AimHead` 先减去接地抬升再瞄（罗班长跪姿
+    看顺子）；第一人称 `EXTRA_HAND_POSES.gripArm.atLeft` 0.65 → 0.75。
+  - 写出的骨骼顺序对齐机枪俘虏库（运行时把俘虏库 clip 拷进开场库，要求顺序一致）。
+  - `Script_OpeningClipsBrowserTest` 的骨长检查跳过骨盆：新骨架里骨盆直接挂 GroundRoot，二者的距离就是根运动
+    （Lugou 骨架上骨盆绑在 GroundRoot 原点，被 1 cm 过滤掉了），不是骨段长度。
 - 机枪俘虏库仍是第一次规范化的重定向产物；它的烘焙脚本已改到新模型名与作者副本，重烘会得到作者化版本。
 
 ## 2026-09-26 验证与边界

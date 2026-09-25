@@ -403,15 +403,28 @@ Meta('CaptiveKneelMud', 3.0, True, 'free', role='comrade', rig='TengxianNra02', 
 # =================================================================================
 BUILDERS = {}
 # TengxianHumanoidV1 (2026-09-26): the bake's reach assist (Script_OpeningStoryboardBake Solve, spec 'reach')
-# for the clips whose hands grip at the end of the IJA reach. On the common skeleton the IJA shoulders sit ~5 cm
-# further back and 3.6 cm higher and the arm is 2.4 cm shorter than IJA02's own; at the Lugou defaults
-# (.92 / .10 / .25) these left the hand 3.2-9 cm off its target. Everything else keeps the defaults.
-REACH_HUMANOID_V1 = {'fraction': .86, 'travel': .13, 'bend': .40}
-REACH_BY_CLIP = {name: REACH_HUMANOID_V1 for name in (
-    'IjaDragCollarFromDirt', 'IjaHairGrabPull', 'IjaDrawBayonet', 'IjaThroatSlash', 'IjaCollarDragSnag')}
+# for the IJA hands that grip at the end of their reach. On the common skeleton the IJA shoulders sit ~5 cm
+# further back and 3.6 cm higher and the arm is 2.4 cm shorter than IJA02's own, and a grasping hand's
+# finger-root centroid stops ~0.85 arm lengths out: at the Lugou default start (.92 of the arm) these hands
+# stayed 3.2-9 cm off their targets. Only the gripping hand starts the assist earlier ('sides'); travel and
+# lean stay at the defaults (a bigger lean put ijaA's face into the comrade's: OpeningClipsBrowserTest).
+# The hair hand also brings its shoulder forward (HAIR_PROTRACT). Every other clip keeps the defaults.
+REACH_BY_CLIP = {name: {'fraction': .86, 'sides': 'L'} for name in ('IjaHairGrabPull', 'IjaDrawBayonet', 'IjaThroatSlash')}
+# The stooped collar drag (the player on the ground) also needs the longer travel and lean.
+REACH_BY_CLIP['IjaCollarDragSnag'] = {'fraction': .86, 'sides': 'L', 'travel': .13, 'bend': .40}
+REACH_BY_CLIP['IjaDragCollarFromDirt'] = {'fraction': .86, 'sides': 'R'}
+# The parried fall's left hand on the swinging handguard (0.10-0.52 s): at the default start the arm ran straight
+# and its forearm snapped 77 deg in one frame at 0.33 s (OpeningClipsBrowserTest spike); from 0.80 it stays bent.
+REACH_BY_CLIP['IjaParriedChoppedFall'] = {'fraction': .80, 'sides': 'L'}
+# ... and the gripping hand's shoulder comes forward (rad about the vertical, ~6 cm): the hair hand, the collar grab.
+GRIP_PROTRACT = .65
 # The wipe starts in the hair hold (IjaThroatSlash's last frame) and ends reaching for the slung barrel
-# (IjaReadyRifle's first frame, default assist): the start eases back to the default by 1.5 s.
-REACH_BY_CLIP['IjaWipeSheathBayonet'] = dict(REACH_HUMANOID_V1, fraction=lambda t: .86 + .06 * Smooth(Clamp((t - .5) / 1.0)))
+# (IjaReadyRifle's first frame, default assist); only the wipe on his thigh (3.75 s) needs more.
+_WIPE_ON = lambda t: Smooth(Clamp((t - 2.6) / .8)) - Smooth(Clamp((t - 4.3) / .7))   # 0 at the hand-overs, 1 for the thigh wipe
+REACH_BY_CLIP['IjaWipeSheathBayonet'] = {
+    'travel': lambda t: .10 + .03 * _WIPE_ON(t), 'bend': lambda t: .25 + .15 * _WIPE_ON(t), 'fractionBySide': {
+        'L': lambda t: .86 + .06 * Smooth(Clamp((t - 4.3) / .7)),   # the hair hand as in the throat slash, then free
+        'R': lambda t: .92 - .06 * _WIPE_ON(t)}}                     # the knife hand: default, lower only for the wipe
 
 
 def Builder(*names):
@@ -481,6 +494,7 @@ class Toolkit:
         if f.get('frameYaw') is not None:
             p['frameYaw'], p['frameShift'] = f['frameYaw'], f.get('frameShift') or (0.0, 0.0)
         p['ankles'] = {s: f['ankle.' + s] for s in LR}
+        p['protract'] = {s: f.get('protract.' + s) or 0.0 for s in LR}
         p['legPoles'] = {s: f['legPole.' + s] for s in LR}
         p['toeDirs'] = {s: f.get('toeDir.' + s) for s in LR}
         p['hands'], p['armPoles'], p['palms'], p['grips'] = {}, {}, {}, {}
@@ -1569,7 +1583,7 @@ def BuildDragCollar(T, name):
     anim = Tracks(base, dict(feet, pelvis=pelvis, bend=bend, pelvisTilt=tilt,
                              head=[(0.0, (.10, 0, 0)), (.30, (.25, 0, .05)), (2.20, (-.15, 0, 0)), (2.75, (.05, 0, .10)),
                                    (3.20, (.0, 0, -.35)), (3.85, (.05, 0, .05))],
-                             **{'hand.R': [(0.0, (-(SX + .05), -.05, P - .05))],
+                             **{'hand.R': [(0.0, (-(SX + .05), -.05, P - .05))], 'protract.R': [(0.0, 0.0), (.30, GRIP_PROTRACT)],
                                 'armPole.R': [(0.0, (-(SX + .45), .30, P - .10)), (2.20, (-(SX + .50), .45, P + .10))]}),
                   lag={'head': .06})
     spec = AttackerSpec(T, stage, role, 'comrade', {'R': [(.30, 4.40, 'collarBack', .035, (0, 0, -1), 1.0)]},
@@ -1592,7 +1606,8 @@ def BuildPullArm(T, name):
     # 0.72 m off the arm (closing to 0.52 m for the wrench on his knees) and down in a squat, not stooped over it; and he closes in only once
     # ijaA has hauled the man up and backed off (wrist 0.62 s, upper arm 0.70 s): grabbing at
     # 0.28 s with ijaA put his head through ijaA's chest (both reached for the same shoulder).
-    stand = [(0.0, .72), (.6, .80), (1.8, .80), (2.1, .66), (2.4, .62), (2.8, .58), (4.4, .58)]
+    # (TengxianHumanoidV1 2026-09-26: starts at .80, not .72 -- the common skeleton's longer thighs met ijaA's, 8.7 cm)
+    stand = [(0.0, .80), (.6, .80), (1.8, .80), (2.1, .66), (2.4, .62), (2.8, .58), (4.4, .58)]
 
     def PelvisXY(t):
         c = Channel(arm)(t)
@@ -2192,6 +2207,7 @@ def BuildHairGrab(T, name):
         'twist': [(0.0, 0.0), (.28, .12), (.44, -.05), (1.0, 0.0)],
         'head': [(0.0, (.10, 0, 0)), (.28, (.18, 0, 0)), (.44, (.16, 0, -.05)), (1.0, (.22, 0, 0))],
         'handRel.R': [(0.0, base['handRel.R']), (1.0, HAIR_GRAB_HAND_R)],
+        'protract.L': [(0.0, 0.0), (.28, HAIR_PROTRACT)],
     }, lag={'head': .05})
     spec = AttackerSpec(T, 'slashGrab', 'ijaA', 'comrade', {'L': [(.28, 1.0, 'crown', .03, (0, 1, -.3), 1.1)]}, anim, 1.0)
     props, review = SlungProps(T)
@@ -2219,10 +2235,21 @@ def HairHoldPose(T):
     return base
 
 
+def HairHandPose(T):
+    """HairHoldPose with the hair hand's shoulder forward (the clips that hold the hair)."""
+    return dict(HairHoldPose(T), **{'protract.L': HAIR_PROTRACT})
+
+
+# TengxianHumanoidV1 (2026-09-26): the hair hand's shoulder comes forward (rad about the vertical: ~6 cm) -- the common skeleton's shoulder
+# sits ~5 cm further back and its arm is 2.4 cm shorter than IJA02's own, and leaning the trunk in instead put
+# his face into the comrade's (OpeningClipsBrowserTest stage overlap).
+HAIR_PROTRACT = GRIP_PROTRACT
+
+
 @Builder('IjaDrawBayonet')
 def BuildDrawBayonet(T, name):
     H, P = T.H, T.P
-    base = HairHoldPose(T)
+    base = HairHandPose(T)
     pel = base['pelvis']
     scabbard = (pel[0] + T.R(.13), pel[1] - T.R(.12), pel[2] + T.R(.04))
     # The drawn knife ends exactly where IjaThroatSlash starts it: SlashKnifePath's first key,
@@ -2325,7 +2352,7 @@ def SlashKnifePath(T):
 
 @Builder('IjaThroatSlash')
 def BuildThroatSlash(T, name):
-    base = HairHoldPose(T)
+    base = HairHandPose(T)
     pel = base['pelvis']
     path = SlashKnifePath(T)
     offs = Channel([(t, o) for t, o, _ in path])
@@ -2393,7 +2420,7 @@ def BuildThroatSlash(T, name):
 
 @Builder('IjaWipeSheathBayonet')
 def BuildWipeSheath(T, name):
-    base = HairHoldPose(T)
+    base = HairHandPose(T)
     pel = base['pelvis']
     P = T.P
 
@@ -2446,7 +2473,7 @@ def BuildWipeSheath(T, name):
                        (.25, {'ankle.L': base['ankle.L'], 'ankle.R': held['ankle.R'], 'pelvis': held['pelvis']}),
                        (.40, {'ankle.L': Add3(Lerp3(base['ankle.L'], WIPE_BACK_L(base), .5), (0, 0, .07))}),
                        (.50, {'bend': .18, 'twist': -.04, 'head': (.30, 0, .02)}),
-                       (.55, {'ankle.L': WIPE_BACK_L(base)}),
+                       (.55, {'ankle.L': WIPE_BACK_L(base), 'protract.L': 0.0}),   # the hair hand's shoulder settles back
                        (.62, {'ankle.R': Add3(Lerp3(held['ankle.R'], base['ankle.R'], .5), (0, 0, .07))}),
                        (.78, {'ankle.R': base['ankle.R'], 'pelvis': pel}),
                        (1.60, {'bend': .20, 'twist': -.06, 'head': (.42, 0, -.04)}),
@@ -2937,9 +2964,9 @@ def BuildKickBeam(T, name):
         'head': [(0.0, (.10, .05, -.50)), (.35, (.40, 0, -.25)), (.60, (.35, 0, -.15)), (1.2, (.30, 0, 0))],
     }, lag={'head': .05})
     spec = PlayerGripSpec(T, body, {'L': [(0.0, 1.2, lambda t: hold, (0, 0, -1), 1.1)]})
-    # TengxianHumanoidV1: the stooped collar hold is 9 cm short at the default assist; the planted left
-    # foot holds (<= 0.4 cm) with 0.17 m of pelvis travel.
-    spec['reach'] = dict(REACH_HUMANOID_V1, travel=.17)
+    # TengxianHumanoidV1: the stooped collar hold was 9 cm short at the default assist (a shoulder brought forward
+    # about the vertical does not help a trunk bent over this far); the planted left foot holds with 0.17 m of travel.
+    spec['reach'] = {'fraction': .86, 'sides': 'L', 'travel': .17, 'bend': .40}
     props, review = SlungProps(T, 'side')
 
     def Beam(t):

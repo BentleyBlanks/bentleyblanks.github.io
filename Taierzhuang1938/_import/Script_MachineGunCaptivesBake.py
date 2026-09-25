@@ -331,6 +331,14 @@ def Bake(modelId, probe=None):
                         node.inputs['Metallic'].default_value = 0
                         node.inputs['Roughness'].default_value = .75
     names = [p.name for p in arm.pose.bones if p.name in nodeIndex]
+    # Written bone order = the committed captives library's (Script_OpeningStoryboardAnimation copies
+    # captives clips into the opening records and checks the orders match). On TengxianHumanoidV1 the
+    # Blender pose-bone order follows the new thigh/clavicle parents, not the retargeted library's.
+    committedOrder = output / ('Animation_' + modelId + 'MachineGunCaptives.json')
+    if committedOrder.exists():
+        order = json.loads(committedOrder.read_text(encoding='utf-8'))['bones']
+        if sorted(order) == sorted(names):
+            names = order
     prefix = next(n for n in names if n.endswith(' Pelvis')).split(' ')[0]
     Bone = lambda role: arm.pose.bones[prefix + ' ' + role]
     armInv = arm.matrix_world.inverted()
@@ -524,6 +532,12 @@ def Bake(modelId, probe=None):
         shrug = p.get('shrug', 0.0)
         for side, sign in [('L', 1), ('R', -1)]:
             Tilt(Bone(side + ' Clavicle'), y=-sign * shrug)
+        # Shoulder brought forward (protraction, rad about the vertical) for a hand that reaches
+        # (2026-09-26, TengxianHumanoidV1: the common skeleton's shoulders sit ~5 cm further back).
+        for side, sign in [('L', 1), ('R', -1)]:
+            amount = (p.get('protract') or {}).get(side) or 0.0
+            if amount:
+                Tilt(Bone(side + ' Clavicle'), z=-sign * amount)
         for side, sign in [('L', 1), ('R', -1)]:
             foot = Bone(side + ' Foot')
             Chain(Bone(side + ' Thigh'), Bone(side + ' Calf'), foot,

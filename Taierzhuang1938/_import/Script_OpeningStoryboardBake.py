@@ -94,8 +94,9 @@ WALL_REGIONS = {
 convertInv = convert.inverted()
 # Reach assist (Solve): where it starts (fraction of the bare arm length, shoulder to grip), how far
 # the pelvis may travel over the planted feet (source m) and how much extra trunk lean it may add
-# (rad). A clip may override any of them with spec 'reach': {'fraction', 'travel', 'bend'} (a number,
-# or for 'fraction' a function of the clip time). TengxianHumanoidV1 (2026-09-26): the IJA shoulders
+# (rad). A clip may override any of them with spec 'reach': {'fraction', 'travel', 'bend'} (a number
+# or a function of the clip time; 'sides' limits the fraction to those hands, 'fractionBySide'
+# gives each hand its own number or function of time). TengxianHumanoidV1 (2026-09-26): the IJA shoulders
 # sit ~5 cm further back and 3.6 cm higher and the arm is 2.4 cm shorter than IJA02's own (NRA02
 # proportions), and a grasping hand's finger-root centroid stops ~0.85 arm lengths out, so at .92 the
 # assist never woke for the hair hold; the clips that grip at the end of their reach override it
@@ -438,6 +439,7 @@ def BakeRig(ctx):
         fraction = assist.get('fraction', REACH_FRACTION)
         fraction = fraction(t) if callable(fraction) else fraction
         travel, lean = assist.get('travel', REACH_TRAVEL), assist.get('bend', REACH_BEND)
+        travel, lean = (travel(t) if callable(travel) else travel), (lean(t) if callable(lean) else lean)
         p0 = p['pelvis']
         bend0 = p.get('bend', 0.0)
         # Where each reaching hand is in the unassisted pose: a partial reach (weight < 1) blends
@@ -459,8 +461,11 @@ def BakeRig(ctx):
                 want = goal - shoulder
                 # Continuous in the target distance (no on/off threshold), so neighbouring
                 # frames get neighbouring corrections and the pelvis never jumps.
-                if want.length > reach * fraction:
-                    excess += want.normalized() * (want.length - reach * fraction) * w
+                own = assist.get('sides', 'LR')
+                start = (assist.get('fractionBySide') or {}).get(side, fraction if side in own else REACH_FRACTION)
+                start = reach * (start(t) if callable(start) else start)
+                if want.length > start:
+                    excess += want.normalized() * (want.length - start) * w
             if excess.length < .0015:
                 break
             px, py, pz = p['pelvis']
