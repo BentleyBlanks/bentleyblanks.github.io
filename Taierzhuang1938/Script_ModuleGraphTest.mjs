@@ -28,6 +28,10 @@ function TestModuleGraphIsCacheBusted() {
   // 入口自己走 <script src>，必须带版本戳；其余全靠 import map。
   const entry = html.match(/<script type="module" src="\.\/Script_Main\.mjs\?v=(\d+)">/);
   assert.ok(entry, "index.html 的入口 Script_Main.mjs 必须带 ?v= 版本戳");
+  // 入口只能有一条：打包脚本只替换第一条，多出来的那条在 Pages 上会从源码图再起一局游戏，
+  // 两局抢 window.Tengxian，开机卡在「烘贴图」（2026-09-24 合并留下过一条重复入口）。
+  const entries = html.match(/<script type="module" src="\.\/Script_Main\.mjs\?v=\d+"><\/script>/g) || [];
+  assert.equal(entries.length, 1, "index.html 只能有一条 Script_Main.mjs 入口 <script>，现在有 " + entries.length + " 条");
 
   // 从入口递归走静态 from 与动态 import()。
   // 字符类比 §2.8 的正则多一个「/」：Script_JieheHeight 真的从子目录
