@@ -109,7 +109,7 @@ export class SpeakerGestureLayer {
     if (typeof location !== "undefined") EnsureLoaded();
     // Probe state (FRONT_ACTING, tests). lines[lineId] = { frames, gestureFrames, busyFrames, maxWeight, clip }.
     this.state = { clip: null, lineId: null, weight: 0, t: 0, phase: null, aimError: null, clamped: false,
-      suppressed: null, hand: null };
+      suppressed: null, hand: null, busyFor: 0 };
     this.lines = {};
     this.gestureFrames = 0;
   }
@@ -246,6 +246,7 @@ export class SpeakerGestureLayer {
     if (!g) { st.weight = 0; st.clip = null; st.phase = null; return; }
     const busy = SpeakerGestureBusy(rig, state);
     this.busyFade = busy ? Math.max(0, this.busyFade - step / G.fadeS) : Math.min(1, this.busyFade + step / G.fadeS);
+    st.busyFor = busy ? st.busyFor + step : 0;   // seconds busy in a row (tests: weight 0 after fadeS)
     const live = lineId === g.lineId;
     if (!this._Advance(g, step, speech || {}, live)) { this.active = null; st.weight = 0; st.clip = null; st.phase = "done"; return; }
     const w = Clamp(this._Envelope(g) * this.busyFade * g.release, 0, 1);
