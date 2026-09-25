@@ -90,18 +90,21 @@ try {
             attached,lod:a?.renderLod||null,
             finite:!!root&&[...root.position.toArray(),...root.quaternion.toArray(),...root.scale.toArray(),a.position.x,a.position.y,a.position.z].every(Number.isFinite),
             model:a?.actor?.characterRig?.modelId||null};};
-        return {count:g.ai.soldiers.filter(a=>a.alive&&a.side==='nra').length,
+        // Backdrop NRA (MISSION_ENCOUNTERS role backdropNra and the Data_FirstLevelBackdropSquads walkers) are extras: count the named seven.
+        const backdrop=new Set((r.backdrop?.members||[]).map(m=>m.actor));
+        for(const a of g.ai.soldiers)if(a.side==='nra'&&/^(BunkerBackdropNra|Opening_DepthNra)/.test(a.missionId||''))backdrop.add(a); // MISSION_ENCOUNTERS backdropNra and the SB01 depth walkers (2026-09-25 storyboard round)
+        return {count:g.ai.soldiers.filter(a=>a.alive&&a.side==='nra'&&!backdrop.has(a)).length,backdrop:backdrop.size,nra:g.ai.soldiers.filter(a=>a.alive&&a.side==='nra'&&!backdrop.has(a)).map(a=>a.missionId||a.castId||a.id),
           captives:b.captives.map(a=>a.missionId).sort(),
           cast:Object.fromEntries(Object.entries(b.cast).map(([id,a])=>[id,Person(a)])),
           squad:Object.fromEntries(r.squad.map(a=>[a.castId,Person(a)])),
           enemies:Object.fromEntries(['BunkerExecutionerA','BunkerExecutionerB','BunkerFollowA','BunkerFollowB'].map(id=>[id,Person(r.enemies.get(id))])),
           playerModel:b.playerBody?.characterRig?.modelId||null};});
-      assert.equal(setup.count,7,'the four squad members, the wounded comrade, the runner and the shouter all remain physical NRA actors');
+      assert.equal(setup.count,7,`the four squad members, the wounded comrade, the runner and the shouter all remain physical NRA actors (${JSON.stringify(setup.nra)})`);
       assert.deepEqual(setup.captives,['Opening_comrade'],'the opening has exactly one physical captive (the wounded comrade)');
-      assert.deepEqual(Object.keys(setup.cast).sort(),['comrade','interpreter','runner','shouter'],
+      assert.deepEqual(Object.keys(setup.cast).sort(),['DepthNraA','DepthNraB','DepthNraC','comrade','interpreter','runner','shouter'], // DepthNra*: SB01 depth walkers (01-03 storyboard contract §2 item 3)
         'the director creates its complete current cast after Start');
       assert.deepEqual(Object.fromEntries(Object.entries(setup.cast).map(([id,a])=>[id,a.model])),
-        {comrade:null,interpreter:'TengxianNra06',runner:null,shouter:null},
+        {DepthNraA:'TengxianNra05',DepthNraB:'TengxianNra05',DepthNraC:'TengxianNra05',comrade:null,interpreter:'TengxianNra06',runner:null,shouter:null},
         'new cast uses its requested model slots instead of reassigning failed downloads '
         +'(comrade, runner and shouter are pinned to NRA02 since the 09-23 face package; the interpreter wears his own NRA06 since 2026-09-24)');
       assert.equal(setup.playerModel,null,'the protagonist also preserves the missing NRA02 slot');
