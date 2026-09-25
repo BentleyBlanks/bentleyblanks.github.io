@@ -13,6 +13,7 @@
 //      也照样记 reliefInPosition；罗班长被枪座挡住 → 玩家在后墙岔口等够 rearLeaderGraceS 照样 rightRearReached；
 //      受保护的待撤守军身边不落手榴弹（任务侧投弹否决）
 //   ⑧ 近处说话人不在画面里：台词等他走进画面；太近就退开
+//   ⑬ 罗班长的阵位掩体按 leaderCoverArrivalM 走到（1 m 外是西门门洞，被墙头挡住）；退开说完话再走回去
 //   ⑫ 说话时队友挡在玩家和说话人之间：挡的人横跨一步让开，这句说完再放（ClearView）
 //   ⑪ 05 攻击位：罗班长停在投弹点旁（leaderAttackSide），离投弹点与玩家进来的最后一段都 ≥1.4 m
 //   ⑩ 攻击支路过 AttackRuinA 东端留 ≥0.6 m；墙南侧死角里的人按最近路点走、先离开墙面（TankProbe5 卡死点）
@@ -798,6 +799,29 @@ function WalkRuntime(extra = {}) {
   assert.equal(s2.aside, null, "a gunner stays on his gun");
   checks += 12;
   Ok("⑫ a squadmate between the player and a talking speaker steps aside until the line ends");
+}
+
+{
+  // ⑬ Luo's cover is walked to within B.leaderCoverArrivalM (relay r2 Front step 2: 1.0 m short of it is the west
+  // doorway, behind the wall's end from the captured gun), and the walk is taken up again after a step back.
+  const { r, moves } = WalkRuntime();
+  const battle = new FirstLevelFrontBattle(r), cover = { ...S.leaderCover, arrivalM: B.leaderCoverArrivalM };
+  const luo = { id: 1, alive: true, position: { x: S.leaderCover.x - 0.97, z: S.leaderCover.z }, scriptArrivalRadius: 1 };
+  battle.SetWalk(luo, [cover]);
+  assert.equal(battle.Walk(luo), false, "0.97 m short (the doorway) is not his cover");
+  assert.deepEqual([moves.at(-1).x, moves.at(-1).z], [S.leaderCover.x, S.leaderCover.z], "he walks on into it");
+  luo.position = { x: S.leaderCover.x - 0.2, z: S.leaderCover.z };
+  assert.equal(battle.Walk(luo), true, "within leaderCoverArrivalM he is there");
+  luo.position = { x: S.leaderCover.x - 1.3, z: S.leaderCover.z }; moves.length = 0;
+  assert.equal(battle.Walk(luo), false, "put 1.3 m off it (a step back for a line), the walk is taken up again");
+  assert.equal(moves.at(-1)?.id, 1, "... and he walks back");
+  const w = battle.walks.get(luo.id); w.stallAccepted = true; w.index = 1;
+  assert.equal(battle.Walk(luo), true, "a spot the stall fallback accepted stays accepted (no stall loop)");
+  const src = Read("Script_FirstLevelFrontBattle.mjs");
+  assert.equal((src.match(/LeaderCover\(\)\]/g) || []).length, 3, "capture, 04 and after-capture cover legs all end on LeaderCover()");
+  assert.ok(!/\[S\.leaderCover\]|,S\.leaderCover\]/.test(src), "no leg ends on the bare leaderCover point");
+  checks += 8;
+  Ok("⑬ Luo walks right into his cover and back into it after a step back");
 }
 
 console.log(`FirstLevelFrontPacingTest 通过：${checks} 条断言`);

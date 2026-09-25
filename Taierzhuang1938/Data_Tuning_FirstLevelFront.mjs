@@ -279,6 +279,14 @@ export const FRONT_BATTLE_TUNING=Object.freeze({
   // him and rearRoute[0], rightRearReached never came), the relief gunner held 70 s on the leftRoute leg.
   // 6 s is about three times the longest grenade evade and crowd shove seen in the 03-06 drives.
   walkStallS:6,walkStallProgressM:.3,walkStallArrivalScale:2,
+  // Luo's cover inside the nest's west door (FRONT_SORTIE.leaderCover) is reached within leaderCoverArrivalM, not the
+  // general arrivalM (1.0): 1.0 m short of it is the doorway itself, where the west wall's end stands between the
+  // captured gun and his head. A walk that ends on it is taken up again when something else (a step back for a line,
+  // a shove) has put him more than coverReopenM past that radius. 09-25 relay r2 Front step 2 tank probes: stepped back
+  // out of the door for FrontAttack, he came back only 0.97 m and FrontWithdraw / TakeOverGun (20 s) were said from
+  // behind the wall's end (wall 89/183/132 of 89/183/132 frames). 0.25 m is the route-corner radius (arrivalM x 0.25);
+  // at 0.45 he still stopped 0.42 m short, 0.1 m clear of the wall's end in the gunner's line (DoorLuo probe).
+  leaderCoverArrivalM:.25,coverReopenM:.35,
   // 04: the player has held the rear junction this long out of the tank's sight and Luo is still not there ->
   // rightRearReached anyway (Luo walks on behind him). Two stall skips plus the 5 m walk from his cover.
   rearLeaderGraceS:15,

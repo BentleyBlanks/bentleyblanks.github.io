@@ -69,6 +69,8 @@ export function FrontEntryRoute(position,route){
   }
   return remaining;
 }
+/** Luo's cover inside the nest's west door, walked to within B.leaderCoverArrivalM (not arrivalM: that is the doorway). */
+const LeaderCover=()=>({...S.leaderCover,arrivalM:B.leaderCoverArrivalM});
 /** Where the relief gunner waits for He to leave the left gun: B.reliefGunStandbyM back along leftRoute's last leg. */
 function ReliefGunStandby(){const a=S.leftRoute.at(-2),b=S.leftSeat,d=Math.hypot(a.x-b.x,a.z-b.z),k=Math.min(1,B.reliefGunStandbyM/Math.max(d,1e-6));return {x:b.x+(a.x-b.x)*k,z:b.z+(a.z-b.z)*k};}
 
@@ -95,7 +97,13 @@ export class FirstLevelFrontBattle {
     // Intermediate points describe checked trench corners. Advancing a metre
     // early cuts across the inside cover at the right-hand approach; this
     // corridor intentionally disables the AI's arbitrary obstacle detours.
-    const Arrival=()=>w.index<w.route.length-1?B.arrivalM*.25:B.arrivalM;
+    // A final point may carry its own arrival radius (Luo's cover: B.leaderCoverArrivalM). Such a walk is taken up
+    // again when he was put off it (a step back for a line), unless the stall fallback already accepted where he stands.
+    const last=w.route.at(-1);
+    if(w.index>=w.route.length&&last?.arrivalM!=null&&!w.stallAccepted&&Distance(actor.position,last)>last.arrivalM+B.coverReopenM){
+      w.index=w.route.length-1;w.rejoin=null;w.best=Infinity;w.bestAt=r.time;
+    }
+    const Arrival=()=>w.index<w.route.length-1?B.arrivalM*.25:(last.arrivalM??B.arrivalM);
     const previousIndex=w.index;
     while(w.index<w.route.length&&Distance(actor.position,w.route[w.index])<Arrival())w.index++;
     if(w.index!==previousIndex){w.rejoin=null;w.best=Infinity;w.bestAt=r.time;}
@@ -117,6 +125,7 @@ export class FirstLevelFrontBattle {
           x:+actor.position.x.toFixed(1),z:+actor.position.z.toFixed(1),at:+r.time.toFixed(1)});
         if(this.stalls.length>24)this.stalls.shift();
         // No rejoin point on the next segment: its foot is where he was stuck, it would pull him straight back.
+        if(final)w.stallAccepted=true;
         w.index++;w.rejoin=null;w.noRejoin=w.index;w.best=Infinity;w.bestAt=r.time;
         if(w.index>=w.route.length){r.Defend(actor,w.route.at(-1),0,.4);r.ai.SetStance(actor,1,.5,true);r.squadRoutes.set(actor.id,[]);return true;}
       }else w.bestAt=r.time;
@@ -152,7 +161,7 @@ export class FirstLevelFrontBattle {
     if(!this.Active)return;const r=this.r;
     for(const actor of r.squad){actor.missionTrainReady=true;actor.scriptedNoncombatant=false;actor.missionNaturalMarch=false;}
     if(stage==="Support"){
-      this.SetLeg("capture",FrontEntryRoute(this.Leader.position,[...Routes.support.slice(0,-1),S.leaderCover]));r.Record("frontBattleStarted");r.frontBattleAt=r.time;
+      this.SetLeg("capture",FrontEntryRoute(this.Leader.position,[...Routes.support.slice(0,-1),LeaderCover()]));r.Record("frontBattleStarted");r.frontBattleAt=r.time;
       r.tank.present=false;r.tank.active=false;
       for(const [role,route] of [
         ["heyoutian",[...MISSION_FRONT_COLLECTION_ROUTE,...S.leftRoute.slice(1,-1)]],
@@ -161,7 +170,7 @@ export class FirstLevelFrontBattle {
       ]){const actor=r.companion.Handle(role);if(actor)this.SetWalk(actor,FrontEntryRoute(actor.position,route));}
     }
     if(stage==="MachineGun"){
-      r.Say("TankRoadContact");r.tank.present=true;r.tank.active=true;this.SetLeg("cover",[S.leaderCover]);
+      r.Say("TankRoadContact");r.tank.present=true;r.tank.active=true;this.SetLeg("cover",[LeaderCover()]);
       // A debug start at 04 never ran the 03 handover: send He to the left gun now.
       this.StartHandover(false);
     }
@@ -219,7 +228,7 @@ export class FirstLevelFrontBattle {
     const defenders=MISSION_ENCOUNTERS.approach.map(s=>r.enemies.get(s.id));
     if(r.Near(S.nest,B.captureRadiusM)&&Distance(this.Leader.position,S.nest)<B.captureRadiusM
       &&defenders.every(a=>a&&!a.alive)){
-      r.Record("frontReached");r.Record("rightNestCaptured");r.Say("FrontAttack");this.SetLeg("cover",[S.leaderCover]);
+      r.Record("frontReached");r.Record("rightNestCaptured");r.Say("FrontAttack");this.SetLeg("cover",[LeaderCover()]);
     }
     if([...r.enemies.values()].some(a=>a.lastFire>0)||r.Inventory().shots>0)r.Record("frontContact");
     const assault=B.assaultIds.map(id=>r.enemies.get(id));
