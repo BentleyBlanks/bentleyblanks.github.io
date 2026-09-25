@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import * as THREE from 'three';
 import { BuildSpeechEnvelope, SampleSpeechEnvelope } from './Script_SpeechEnvelope.mjs';
 import { FirstLevelMissionVoice } from './Script_FirstLevelMissionVoice.mjs';
-import { CharacterFacialAnimation } from './Script_CharacterFacialAnimation.mjs';
+import { CharacterFacialAnimation, CharacterFacial } from './Script_CharacterFacialAnimation.mjs';
 import { FirstLevelSpeakerBinder, ParseLineId, WhoForLine, FIRST_LEVEL_SPEAKER_ROLES } from './Script_FirstLevelSpeakerBinder.mjs';
 import { SpeakerLookAngles, SpeakerHeadLayer } from './Script_SpeakerHeadLayer.mjs';
 import { FIRST_LEVEL_SPEAKING_CAST, SpeakingCastOptions, FIRST_LEVEL_FACE_STEPS, FIRST_LEVEL_WHOLE_LEVEL_SPEAKERS,
@@ -52,7 +52,7 @@ director.current.parallel = [];director.current.phase = 'waiting';clock = 10.5;
 assert.equal(director.Speech('luo'), null, 'event-gated segment waits stay closed');
 
 // ---- facial GLB contracts (Script_BakeCharacterFacial.py output) ----
-const MANIFEST = JSON.parse(fs.readFileSync(new URL('./Model/Character/Data_LugouCharacterManifest.json', import.meta.url), 'utf8'));
+const MANIFEST = JSON.parse(fs.readFileSync(new URL('./Model/Character/Data_TengxianCharacterManifest.json', import.meta.url), 'utf8'));
 function Glb(file) {
   const b = fs.readFileSync(new URL(file.replace(/^\.\//, './'), import.meta.url));
   const length = b.readUInt32LE(12);
@@ -74,9 +74,14 @@ function Read(glb, index) {
 }
 const LEGACY_BONES = ['Face_Jaw', 'Face_LipLower', 'Face_LipUpper', 'Face_CornerL', 'Face_CornerR', 'Face_BrowL',
   'Face_LidUpperL', 'Face_LidLowerL', 'Face_BrowR', 'Face_LidUpperR', 'Face_LidLowerR'];
-const POSES = ['Rest', 'Open', 'Wide', 'Round', 'Close', 'Blink', 'BrowUp', 'Snarl', 'DeadSlack'];
+const POSES = ['Rest', 'Open', 'Wide', 'Round', 'Close', 'Blink', 'BrowUp', 'Snarl', 'DeadSlack',
+  // 2026-09-25 expressions (01-03 storyboard contract section 4.2).
+  'Shock', 'Pain', 'Shout', 'Grit'];
 const faced = MANIFEST.models.filter(record => record.facialUrl);
-assert.deepEqual(faced.map(r => r.id).sort(), ['LugouIja01', 'LugouIja02', 'LugouIja06', 'LugouNra02', 'LugouNra05', 'LugouNra06']);
+// Face pose translations are head-local METRES on TengxianHumanoidV1 (2026-09-26; the Lugou rigs stored
+// centimetres). The gates below keep their reviewed centimetre numbers: CM converts before comparing.
+const CM = 100;
+assert.deepEqual(faced.map(r => r.id).sort(), ['TengxianIja01', 'TengxianIja02', 'TengxianIja06', 'TengxianNra02', 'TengxianNra05', 'TengxianNra06']);
 const definitions = {};
 for (const record of faced) {
   const face = Glb(record.facialUrl), source = Glb(record.url);
@@ -122,18 +127,50 @@ for (const record of faced) {
   // Pose masks: blinking never opens the jaw, opening the mouth never lifts the brows.
   const moved = (pose, bone) => {
     const a = rig.poses[pose][bone], r = rig.poses.Rest[bone];
-    return Math.hypot(...a.translation.map((x, k) => x - r.translation[k])) > 1e-4
+    return Math.hypot(...a.translation.map((x, k) => x - r.translation[k])) * CM > 1e-4
       || Math.abs(Math.abs(a.rotation.reduce((s, x, k) => s + x * r.rotation[k], 0)) - 1) > 1e-6;
   };
   assert.ok(moved('Open', 'Face_Jaw') && !moved('Open', 'Face_BrowL'), `${label} Open: jaw only-mouth`);
   assert.ok(moved('Blink', 'Face_LidUpperL') && !moved('Blink', 'Face_Jaw'), `${label} Blink: lids only`);
   assert.ok(moved('DeadSlack', 'Face_Jaw') && moved('BrowUp', 'Face_BrowR') && moved('Close', 'Face_LipLower'));
+  // Lip shapes readable at 1 m (2026-09-25): the corners travel >= 6 mm for Wide/Round
+  // (09-23: 1.8-4.2 mm, under 2 px in the game view), the snarl lifts the upper lip.
+  const travel = (pose, bone) => Math.hypot(...rig.poses[pose][bone].translation.map((x, k) => x - rig.poses.Rest[bone].translation[k])) * CM;
+  const turn = (pose, bone) => 2 * Math.acos(Math.min(1, Math.abs(rig.poses[pose][bone].rotation.reduce((s, x, k) => s + x * rig.poses.Rest[bone].rotation[k], 0)))) / Math.PI * 180;
+  for (const bone of ['Face_CornerL', 'Face_CornerR']) {
+    assert.ok(travel('Wide', bone) >= .6 && travel('Round', bone) >= .6, `${label} ${bone}: Wide/Round corner travel >= 6 mm`);
+  }
+  assert.ok(travel('Snarl', 'Face_LipUpper') >= .6, `${label} Snarl lifts the upper lip >= 6 mm`);
+  // Second pass (2026-09-25, in-game review): read from the front, Wide and Round are different
+  // widths and Round closes the lips over the teeth; Snarl peels both lips off clenched teeth;
+  // Shock opens the upper lids far enough to read under a cap brim. Head-local cm: [up, forward, out].
+  // Face_LipLower hangs under Face_Jaw: bring its delta into the head frame (NRA05's reviewed jaw is rotated).
+  const jawRest = new THREE.Quaternion().fromArray(rig.poses.Rest.Face_Jaw.rotation);
+  const delta = (pose, bone) => { const d = new THREE.Vector3().fromArray(rig.poses[pose][bone].translation).sub(new THREE.Vector3().fromArray(rig.poses.Rest[bone].translation)).multiplyScalar(CM);
+    return (bone === 'Face_LipLower' ? d.applyQuaternion(jawRest) : d).toArray(); };
+  const out = (pose) => delta(pose, 'Face_CornerL')[2] - delta(pose, 'Face_CornerR')[2]; // both corners, + = wider
+  assert.ok(out('Wide') >= 1.8 && out('Round') <= -2.4 && out('Wide') - out('Round') >= 4.5,
+    `${label}: Wide widens and Round narrows the mouth (corners ${out('Wide').toFixed(2)} / ${out('Round').toFixed(2)} cm)`);
+  assert.ok(delta('Round', 'Face_LipUpper')[0] < 0 && delta('Round', 'Face_LipLower')[0] > 0
+    && delta('Wide', 'Face_LipUpper')[0] > .3 && delta('Wide', 'Face_LipLower')[0] < -.3,
+    `${label}: Round brings the lips together over the teeth, Wide draws them off`);
+  assert.ok(delta('Snarl', 'Face_LipUpper')[0] >= 1 && delta('Snarl', 'Face_LipLower')[0] <= -1,
+    `${label}: Snarl bares both rows (lips >= 10 mm off the teeth)`);
+  assert.ok(delta('Shock', 'Face_LidUpperL')[0] >= .35, `${label}: Shock opens the upper lids >= 3.5 mm`);
+  assert.ok(turn('Snarl', 'Face_Jaw') < 3 && turn('Grit', 'Face_Jaw') < .5, `${label} Snarl/Grit keep the teeth together`);
+  assert.ok(turn('Shout', 'Face_Jaw') > 15 && turn('Shock', 'Face_Jaw') > 5, `${label} Shout/Shock drop the jaw`);
+  assert.ok(travel('Shock', 'Face_BrowL') > .4 && turn('Pain', 'Face_BrowL') > 10 && turn('Snarl', 'Face_BrowR') > 10,
+    `${label} expression brows: Shock raises, Pain/Snarl tilt`);
+  for (const pose of ['Snarl', 'Shock', 'Pain', 'Shout', 'Grit']) {
+    assert.ok(!moved(pose, 'Face_EyeL') && !moved(pose, 'Face_EyeR'), `${label} ${pose} leaves the eyeballs to the gaze layer`);
+  }
+  assert.ok(!moved('Shout', 'Face_LidUpperL') && !moved('Grit', 'Face_LidUpperL'), `${label} Shout/Grit keep the upper lids (blinks stay readable)`);
 }
 
 // ---- speaking cast: pinned approved appearance with a face for every 01-06 speaker ----
 for (const [castId, spec] of Object.entries(FIRST_LEVEL_SPEAKING_CAST)) {
   assert.ok(IsApprovedCharacterVariant(spec.actorKind, spec.modelVariant, castId), `${castId}: approved appearance`);
-  const id = `Lugou${spec.actorKind === 'nra' ? 'Nra' : 'Ija'}${String(spec.modelVariant + 1).padStart(2, '0')}`;
+  const id = `Tengxian${spec.actorKind === 'nra' ? 'Nra' : 'Ija'}${String(spec.modelVariant + 1).padStart(2, '0')}`;
   const record = MANIFEST.models.find(r => r.id === id);
   assert.ok(record?.facialCast?.includes(castId), `${castId} is in ${id}.facialCast`);
   assert.deepEqual(SpeakingCastOptions(castId), {castId, modelVariant: spec.modelVariant});
@@ -161,7 +198,7 @@ function FaceRoot(rig) {
 }
 const jawAngle = (bone, rig) => 2 * Math.acos(Math.min(1, Math.abs(bone.quaternion.dot(new THREE.Quaternion().fromArray(rig.poses.Rest.Face_Jaw.rotation))))) * 180 / Math.PI;
 {
-  const rig = definitions.LugouNra02, {root, byName} = FaceRoot(rig);
+  const rig = definitions.TengxianNra02, {root, byName} = FaceRoot(rig);
   const face = new CharacterFacialAnimation(root, rig, {seed: 7});
   // Silence: lips closed, only a tiny breathing drift.
   let maxSilentJaw = 0;
@@ -173,16 +210,19 @@ const jawAngle = (bone, rig) => 2 * Math.acos(Math.min(1, Math.abs(bone.quaterni
   assert.ok(open > 8, `face track opens the jaw (${open.toFixed(1)} deg)`);
   const cornerRound = byName.Face_CornerL.position.clone();
   for (let i = 0; i < 20; i++) face.Update(1 / 60, {speech: {active: true, jaw: .9, wide: 1, round: 0, close: 0, stress: 0}});
-  assert.ok(byName.Face_CornerL.position.distanceTo(cornerRound) > .2, 'wide and round are different mouth shapes');
+  assert.ok(byName.Face_CornerL.position.distanceTo(cornerRound) * CM > .2, 'wide and round are different mouth shapes');
   // A closure (m/b/p) presses the lips with the jaw shut.
   for (let i = 0; i < 20; i++) face.Update(1 / 60, {speech: {active: true, jaw: 0, wide: 0, round: 0, close: 1, stress: 0}});
   assert.ok(jawAngle(byName.Face_Jaw, rig) < 1 && face.close > .9, 'closure keeps the jaw shut');
   // Stress lifts the brows (only stress does), then settles.
   const browRest = byName.Face_BrowL.position.clone();
   for (let i = 0; i < 20; i++) face.Update(1 / 60, {speech: {active: true, jaw: .5, wide: .3, round: 0, close: 0, stress: 0}});
-  assert.ok(byName.Face_BrowL.position.distanceTo(browRest) < .02, 'an open jaw alone does not lift the brows');
+  assert.ok(byName.Face_BrowL.position.distanceTo(browRest) * CM < .02, 'an open jaw alone does not lift the brows');
   face.Update(1 / 60, {speech: {active: true, jaw: .6, wide: .3, round: 0, close: 0, stress: 1}});
   assert.ok(face.brow > .5 && face.stress > .5, 'stress event lifts the brows and feeds the nod');
+  // A pause right after a stressed syllable: the corner pull (Wide carries some jaw) lets go with the jaw.
+  for (let i = 0; i < 8; i++) face.Update(1 / 60, {speech: null});
+  assert.ok(face.stress > .5 && jawAngle(byName.Face_Jaw, rig) < 1.15, `pause after stress shuts the mouth (${jawAngle(byName.Face_Jaw, rig).toFixed(2)} deg)`);
   // Envelope fallback still works (no face track yet).
   for (let i = 0; i < 20; i++) face.Update(1 / 60, {speech: {active: true, level: .9, brightness: .1}});
   assert.ok(jawAngle(byName.Face_Jaw, rig) > 8 && face.round > face.wide, 'envelope fallback: dark voice rounds the lips');
@@ -202,9 +242,83 @@ const jawAngle = (bone, rig) => 2 * Math.acos(Math.min(1, Math.abs(bone.quaterni
   const eyeTurn = 2 * Math.acos(Math.min(1, Math.abs(eye.quaternion.dot(restEye)))) * 180 / Math.PI;
   assert.ok(eyeTurn > 5 && eyeTurn <= Math.hypot(C.gazeMaxYawDeg + C.saccadeDeg, C.gazeMaxPitchDeg + C.saccadeDeg) + 1, `eyes turn toward the gaze (${eyeTurn.toFixed(1)} deg)`);
 }
+// ---- acting expressions (01-03 storyboard contract section 4.2) on every faced model ----
+for (const label of Object.keys(definitions)) {
+  const rig = definitions[label], {root, byName} = FaceRoot(rig);
+  const face = new CharacterFacialAnimation(root, rig, {seed: 3});
+  for (let i = 0; i < 30; i++) face.Update(1 / 60, {});
+  const rest = Object.fromEntries(rig.bones.map(name => [name, {p: byName[name].position.clone(), q: byName[name].quaternion.clone()}]));
+  const Moved = name => byName[name].position.distanceTo(rest[name].p) * CM + byName[name].quaternion.angleTo(rest[name].q);
+  const Settle = (seconds, state = {}) => { for (let t = 0; t < seconds - 1e-9; t += 1 / 60) face.Update(1 / 60, state); };
+  // Partial update, eased over expressionBlendS (a linear full swing).
+  CharacterFacial.SetExpression({facial: face}, {snarl: 1});
+  Settle(C.expressionBlendS / 2);
+  assert.ok(Math.abs(face.expressionWeights.snarl - .5) < .08, `${label}: snarl half way after half the blend (${face.expressionWeights.snarl.toFixed(2)})`);
+  Settle(C.expressionBlendS);
+  assert.equal(face.expressionWeights.snarl, 1, `${label}: snarl reaches its target`);
+  assert.equal(face.weights.Snarl, 1); assert.equal(face.expression.shock, 0, 'other expressions keep theirs');
+  assert.ok(Moved('Face_CornerL') > .002 && Moved('Face_BrowL') > .002, `${label}: Snarl moves the mouth corners and brows`);
+  // An explicit blend time (0 = snap) and whole-object writes both work.
+  face.SetExpression({snarl: 0, shock: 1}, 0); face.Update(1 / 60, {});
+  assert.equal(face.expressionWeights.shock, 1); assert.equal(face.expressionWeights.snarl, 0, 'blendS 0 snaps');
+  face.expression = Object.freeze({grit: 1}); Settle(C.expressionBlendS + .05);
+  assert.deepEqual(face.expressionWeights, {snarl: 0, shock: 0, pain: 0, shout: 0, grit: 1}, `${label}: rig.facial.expression = {grit: 1}`);
+  face.SetExpression({pain: .5});
+  assert.deepEqual({...face.expression}, {snarl: 0, shock: 0, pain: .5, shout: 0, grit: 1}, 'SetExpression after a frozen whole-object write');
+  assert.throws(() => face.SetExpression({smile: 1}), /Unknown facial expression/);
+  // Shout drops the jaw by itself; talking on top still opens and shuts it every syllable.
+  face.SetExpression({pain: 0, grit: 0, shout: 1}, 0); Settle(.5);
+  const shoutSilent = jawAngle(byName.Face_Jaw, rig);
+  assert.ok(shoutSilent > 8, `${label}: Shout opens the jaw (${shoutSilent.toFixed(1)} deg)`);
+  let low = 1e9, high = 0;
+  for (let i = 0; i < 120; i++) {
+    const open = Math.floor(i / 9) % 2 === 0;
+    face.Update(1 / 60, {speech: {active: true, jaw: open ? .9 : 0, wide: open ? .3 : 0, round: 0, close: open ? 0 : .6, stress: 0}});
+    if (i >= 30) { const a = jawAngle(byName.Face_Jaw, rig); low = Math.min(low, a); high = Math.max(high, a); }
+  }
+  assert.ok(high - low > 6, `${label}: under Shout the mouth still opens and shuts (${low.toFixed(1)}-${high.toFixed(1)} deg)`);
+  assert.ok(high < 34, `${label}: shouting speech does not hang the jaw wide open (${high.toFixed(1)} deg)`);
+  // Every expression pose moves the face on this model.
+  for (const name of CharacterFacial.EXPRESSIONS) {
+    face.Reset(); face.SetExpression({[name]: 1}, 0); face.Update(1 / 60, {});
+    assert.ok(rig.bones.reduce((sum, bone) => sum + Moved(bone), 0) > .02, `${label}: ${name} moves the face`);
+  }
+  face.Reset();
+  assert.deepEqual(face.State().expression, {snarl: 0, shock: 0, pain: 0, shout: 0, grit: 0}, 'Reset clears expressions');
+  assert.throws(() => CharacterFacial.SetExpression({characterRig: {modelId: 'TengxianIja03'}}, {snarl: 1}), /has no facial rig/);
+}
+// ---- a face never takes an expression it cannot show (review 2026-09-25) ----
+{
+  const rig = definitions.TengxianIja06, stale = {...rig, poses: {...rig.poses}};
+  delete stale.poses.Snarl;  // a cached pre-2026-09-25 GLB has no expression poses
+  const {root} = FaceRoot(stale); root.name = 'Rigged_TengxianIja06';
+  const face = new CharacterFacialAnimation(root, stale, {seed: 5});
+  assert.throws(() => CharacterFacial.SetExpression({facial: face}, {snarl: 1}), /TengxianIja06 has no Snarl pose/);
+  assert.throws(() => { face.expression = {snarl: .5}; }, /no Snarl pose/, 'whole-object writes are checked too');
+  face.SetExpression({snarl: 0, shock: 1});
+  assert.equal(face.expression.shock, 1, 'a pose the face has still works');
+  // No face skin under the root: SetFaceBlood(amount > 0) throws instead of painting nothing.
+  assert.throws(() => CharacterFacial.SetFaceBlood({facial: face}, 1), /SetFaceBlood found no face skin/);
+  assert.equal(CharacterFacial.SetFaceBlood({facial: face}, 0), false, 'clearing blood on a bare rig is fine');
+}
+// A whole-object write eases over expressionBlendS even after SetExpression(..., blendS) (the blend time does not stick).
+{
+  const rig = definitions.TengxianNra02, {root} = FaceRoot(rig), face = new CharacterFacialAnimation(root, rig, {seed: 9});
+  face.SetExpression({shock: 1}, 0); face.Update(1 / 60, {});
+  assert.equal(face.expressionWeights.shock, 1);
+  face.expression = {shock: 0}; face.Update(C.expressionBlendS / 2, {});
+  assert.ok(Math.abs(face.expressionWeights.shock - .5) < .05, `whole-object write drops the earlier snap (${face.expressionWeights.shock.toFixed(2)})`);
+  // Baked track lip shapes are scaled by the track gains (clamped to 1).
+  face.expression = {};
+  for (let i = 0; i < 40; i++) face.Update(1 / 60, {speech: {active: true, jaw: .5, wide: .4, round: 0, close: 0, stress: 0}});
+  assert.ok(Math.abs(face.wide - Math.min(1, .4 * C.trackWideGain)) < .02, `track wide .4 -> ${face.wide.toFixed(2)} (gain ${C.trackWideGain})`);
+  for (let i = 0; i < 40; i++) face.Update(1 / 60, {speech: {active: true, jaw: .5, wide: 0, round: .8, close: 0, stress: 0}});
+  assert.ok(Math.abs(face.round - Math.min(1, .8 * C.trackRoundGain)) < .02, `track round .8 -> ${face.round.toFixed(2)} (gain ${C.trackRoundGain})`);
+  assert.ok(C.trackWideGain > 1 && C.trackRoundGain > 1, 'track lip shapes are boosted (they are mostly .1-.5)');
+}
 // Blinks: seeded per actor, 2.5-6 s apart.
 {
-  const rig = definitions.LugouIja02;
+  const rig = definitions.TengxianIja02;
   const Blinks = seed => { const {root} = FaceRoot(rig), face = new CharacterFacialAnimation(root, rig, {seed}); const at = [];
     let was = false; for (let i = 0; i < 60 * 30; i++) { face.Update(1 / 60, {}); const now = face.weights.Blink > .5; if (now && !was) at.push(i / 60); was = now; } return at; };
   const a = Blinks(1), b = Blinks(2);
@@ -221,7 +335,7 @@ const jawAngle = (bone, rig) => 2 * Math.acos(Math.min(1, Math.abs(bone.quaterni
     && FIRST_LEVEL_SPEAKER_ROLES.includes(c.lines[0].who) && FIRST_LEVEL_SPEAKER_ROLES.includes(c.lines[1].who));
   const [whoA, whoB] = [cue.lines[0].who, cue.lines[1].who];
   assert.equal(WhoForLine(cue.id, `${cue.id}.01`), whoA);
-  const rig = definitions.LugouNra02;
+  const rig = definitions.TengxianNra02;
   const Soldier = (id, who) => { const {root} = FaceRoot(rig); const head = new THREE.Object3D(); root.add(head);
     const facial = new CharacterFacialAnimation(root, rig, {seed: id});
     return {id, alive: true, speakerRole: who, position: new THREE.Vector3(id, 0, 0),
@@ -251,7 +365,7 @@ const jawAngle = (bone, rig) => 2 * Math.acos(Math.min(1, Math.abs(bone.quaterni
   assert.ok(!FIRST_LEVEL_SPEAKER_ROLES.includes('bearer'), '06 bearer is a layout figure without a face');
   // One faced front guard, in the second batch (it gathers next to the player at 04).
   assert.ok(FACED_FRONT_GUARD_INDEX >= FRONT_BATTLE_TUNING.firstBatch && FACED_FRONT_GUARD_INDEX < FRONT_GUARD_POSTS.length);
-  const rig = definitions.LugouNra02;
+  const rig = definitions.TengxianNra02;
   const Soldier = (id, who) => { const {root} = FaceRoot(rig); const head = new THREE.Object3D(); root.add(head);
     const facial = new CharacterFacialAnimation(root, rig, {seed: id});
     return {id, alive: true, speakerRole: who, position: new THREE.Vector3(id, 0, 0),
@@ -346,7 +460,7 @@ const jawAngle = (bone, rig) => 2 * Math.acos(Math.min(1, Math.abs(bone.quaterni
   const voice = {manifest: {cues: {Fake: {sha256: 'fake'}}}, Speech: who => (who === 'luo' ? {...envelopeOnly} : null)};
   const binder = new FirstLevelSpeakerBinder({voice, loadFaceTracks: false});
   assert.equal(binder.Speech('luo').jaw, 1); assert.equal(binder.Speech('yaowa'), null);
-  const facial = new CharacterFacialAnimation(FaceRoot(definitions.LugouNra02).root, definitions.LugouNra02, {seed: 3});
+  const facial = new CharacterFacialAnimation(FaceRoot(definitions.TengxianNra02).root, definitions.TengxianNra02, {seed: 3});
   facial.source = () => binder.Speech('luo');
   for (let i = 0; i < 20; i++) facial.Update(1 / 60);
   assert.ok(facial.jaw > .6, `face follows the track's jaw: ${facial.jaw.toFixed(2)}`);
@@ -448,6 +562,6 @@ let faceTrackCount = 0;
   assert.ok(open / gap <= .02, `all takes: open in ${(open / gap).toFixed(3)} of line gaps`);
   ClearFaceTracks();
 }
-console.log(`ok speech envelope/clock/isolation; ${faced.length} facial skins (13 bones, 9 poses, shared textures/clips, <=1.5 MB); `
-  + `${Object.keys(FIRST_LEVEL_SPEAKING_CAST).length} pinned speakers; additive face controller, seeded blinks, gaze, binder; `
+console.log(`ok speech envelope/clock/isolation; ${faced.length} facial skins (13 bones, ${POSES.length} poses, lip travel >= 6 mm, shared textures/clips, <=1.5 MB); `
+  + `${Object.keys(FIRST_LEVEL_SPEAKING_CAST).length} pinned speakers; additive face controller, 5 acting expressions under speech, seeded blinks, gaze, binder; `
   + `${faceTrackCount} baked face tracks (phoneme tables cover the script)`);

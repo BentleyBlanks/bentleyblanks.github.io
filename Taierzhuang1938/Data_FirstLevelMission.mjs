@@ -197,12 +197,14 @@ export const MISSION_ENCOUNTERS = Object.freeze({
   ],
   // 02 pursuers: one base-of-fire man holds the fold F; three follow down the link sap to J and the
   // mouth (the player looks back and sees them on the spot he just left). None ever passes the bend M.
+  // 2026-09-26: B and C end just east of M (3,-124.4) -- since the 01-03 storyboard round moved the rescue and the
+  // hand-back seat to the mouth, that is the spot the rear-corner look-back sees; (6.8,-124.2)/(9.6,-125.1) are walled off.
   bunkerPursuit: [
     // 1.35 m past the fold F along the sap (the fire step's far side): ijaC may still be standing on F itself.
     { id: "BunkerPursuitFold", role: "pursuitBase", x: 19.2, z: -126.5, weapon: "Type38", hold: true, faceTo: A.bunkerRear },
     { id: "BunkerPursuitA", role: "pursuit", x: 27, z: -135.5, weapon: "Type38", route: [{x:23.5,z:-130},A.bunkerFold,A.bunkerJunction], delayS: 3 },
-    { id: "BunkerPursuitB", role: "pursuit", x: 29.7, z: -141.5, weapon: "Type38", route: [{x:23.5,z:-130},A.bunkerJunction,{x:6.8,z:-124.2}], delayS: 7 },
-    { id: "BunkerPursuitC", role: "pursuit", x: 33, z: -143.2, weapon: "Type38", route: [{x:27,z:-135.5},A.bunkerFold,{x:9.6,z:-125.1}], delayS: 11 },
+    { id: "BunkerPursuitB", role: "pursuit", x: 29.7, z: -141.5, weapon: "Type38", route: [{x:23.5,z:-130},A.bunkerJunction,{x:3.9,z:-124.4}], delayS: 7 },
+    { id: "BunkerPursuitC", role: "pursuit", x: 33, z: -143.2, weapon: "Type38", route: [{x:27,z:-135.5},A.bunkerFold,{x:5.6,z:-124.6}], delayS: 11 },
   ],
   approach: FRONT_APPROACH_ENEMIES,
   // The roster itself lives in Data_FirstLevelMissionFront: the assault lanes and the cover rows

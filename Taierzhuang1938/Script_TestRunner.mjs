@@ -64,9 +64,13 @@ export const testDefs = {
   OpeningActorPerformanceBrowserTest: {file:"Script_OpeningActorPerformanceBrowserTest.mjs",timeoutMs:300000,desc:"Production-rig dialogue, idle, guard movement, planted feet and high-quality acting views"},
   OpeningClipsBrowserTest: {file:"Script_OpeningClipsBrowserTest.mjs",timeoutMs:600000,desc:"2026-09-23 opening clips on production rigs: plant slide, paired contacts, body overlap, bone length, NaN"},
   OpeningHandbackBrowserTest: {file:"Script_OpeningHandbackBrowserTest.mjs",timeoutMs:900000,desc:"02 hand-back in non-ideal orders (Liu misses / the junction man hides / he is already dead): never stalls, real pickup still starts the withdrawal"},
+  OpeningStoryboardShotsTest: {file:"Script_OpeningStoryboardShots.mjs",timeoutMs:1200000,desc:"01–02 storyboard shots in the real flow: director camera and staging judged against the contract §5 picture criteria (screen x, distance, pitch/roll, eye height, landmarks); --side-by-side=<storyboard dir> for the paired pictures"},
   // Runs on into 03 (to MachineGun) since the Front merge: Luo's front commands are checked with the 02 speakers.
   FirstLevelOpeningCampaignTest: {file:"Script_FirstLevelMissionBrowserTest.mjs",args:["--campaign","--stage-to=3"],timeoutMs:1800000,desc:"01–03 normal input: every 09.23 director phase in order, real kills, continuity, mouths and acting, withdrawal, the collection hand-over and Luo's acted front commands up to MachineGun"},
   OpeningFirstPersonTest: {file:"Script_OpeningFirstPersonTest.mjs",desc:"Production-arm anatomy, wrist twist and fixed bone lengths across 2000 poses"},
+  OpeningSetTest: {file:"Script_OpeningSetTest.mjs",desc:"01–03 storyboard set dressing: data, clear of director marks, mouth rubble sightlines, zero residue after 03"},
+  OpeningLensTest: {file:"Script_OpeningLensTest.mjs",desc:"01–02 storyboard lens looks: curves, crossfade, null outside 01–02, post/HUD wiring"},
+  OpeningLensBrowserTest: {file:"Script_OpeningLensBrowserTest.mjs",timeoutMs:600000,desc:"01–02 lens in the page from the director's own events (butt flash, mud, radial blur, red corners), one loading rifle on screen, nothing left at Released and in RearTrench"},
   FirstLevelVoicePerspectiveTest: {file:"Script_FirstLevelVoicePerspectiveTest.mjs",timeoutMs:120000,desc:"Actual WebAudio per-line dialogue: centred self line, spatial NPC lines, overlapping sources, dialogue sidechain, bark yield, concussion speech floor"},
   CarriagePropVelocityTest: {file:'Script_CarriagePropVelocityTest.mjs',timeoutMs:300000,desc:'Real cart/stretcher GPU velocities with moving camera, stop and reappearance; high-quality transfer scene'},
   DraftCartEditorTest: {file:'Script_DraftCartEditorTest.mjs',timeoutMs:300000,desc:'Blender ox/horse cart action editor, walking legs, rolling wheels and camera restoration'},
@@ -112,6 +116,7 @@ export const testDefs = {
   MissionGatesTest: {file:'Script_MissionGatesTest.mjs',desc:'第一关编排表：事实门覆盖、按表生成与激活规则、运行时源码对账、编排模型'},
   FirstLevelEnemyIdleProbe: {file:'Script_FirstLevelEnemyIdleProbe.mjs',args:['--stage-from=3','--stage-to=6','--gate'],timeoutMs:1800000,desc:'03–06 冷启动真实驾驶：03/04/05 逐阶段与合并的 30 s 零发者 <20%、4 s 不动 ≤25%，机枪开火、放行前不打守军、跃进喊话不刷屏、成组冲锋有记录（docs/Data_EnemyAi.md §20）'},
   FirstLevelFrontBattleBrowserTest: {file:'Script_FirstLevelMissionBrowserTest.mjs',args:['--campaign','--stage-from=3','--stage-to=6','--probe-front-gun'],timeoutMs:1800000,desc:'03–06 冷启动真实输入一趟：夺点、接枪、战车露面/压阵位/封口、05 取弹投弹两段毁伤、并行撤离、安全区汇合、06 借火与起行（零页面错误、零检查点重试）'},
+  FrontStoryboardShotsTest: {file:'Script_FrontStoryboardShots.mjs',timeoutMs:1500000,desc:'03 分镜 SB07/SB08 真实驾驶抓帧（missionStage=3 冷启动）：罗在右中 3.5–5.5 m 伸臂指路、背坡机枪组在左、阵位北侧同一帧看得见第一批 ≥3 人、机枪在左前景；涂色图数像素判「看得见」；布景项等 Set 出图人工看（契约 Data_FirstLevelStoryboard0103Contract §5）'},
   FirstLevelFrontBombFirstTest: {file:'Script_FirstLevelMissionBrowserTest.mjs',args:['--campaign','--stage-from=3','--stage-to=6','--bomb-first'],timeoutMs:1800000,desc:'03–06 非理想顺序：05 在攻击支路离攻击位一个弯处先炸车，attackPositionReached 记 skipped、流程照常走完 06（契约 v1.1 卡死②）'},
   // 04 / 05 检查点（阵亡重来、选章落在这里）：missionStage=4|5 冷启动，起步现场与连续打过来的同一组断言（EntryState），再真实输入推进到 06 收尾。
   FirstLevelFrontCheckpoint04Test: {file:'Script_FirstLevelMissionBrowserTest.mjs',args:['--campaign','--stage-from=4','--stage-to=6'],timeoutMs:1800000,desc:'04 检查点冷启动：何有田在枪上、老周已离枪、首批守军已回；压阵位、退到后侧岔口、05 取弹投弹、战车毁伤按序到 Disabled、并行撤离、06 起行（零页面错误、零检查点重试）'},
@@ -205,6 +210,8 @@ export const testDefs = {
   SpeakerGestureTest: { file: "Script_SpeakerGestureTest.mjs", desc: "03–06 说话手势：台词表覆盖、手势 clip 窗口/骨骼范围/烘焙验收数字、采样器" },
   SpeakerGestureClipsBrowserTest: { file: "Script_SpeakerGestureClipsBrowserTest.mjs", timeoutMs: 600000, desc: "03–06 说话手势 clip 叠在正式骨架的蹲/坐姿上：NaN、手臂进躯干/头、左手不穿枪" },
   SpeakerGestureLayerBrowserTest: { file: "Script_SpeakerGestureLayerBrowserTest.mjs", timeoutMs: 1800000, desc: "03–06 实机播全部前沿台词：该做手势的句子做了、射击时为 0 且不回来、句后收回、指向准、枪不跟手、07 以后没有手势层" },
+  FacialReviewTest: { file: "Script_FacialReviewTest.mjs", desc: "面部编辑器说话人隔离、关键帧与草稿校验" },
+  FacialEditorBrowserTest: { file: "Script_FacialEditorBrowserTest.mjs", timeoutMs: 240000, desc: "真实面部与录音时钟、逐帧、草稿及缺失绑定状态" },
   CharacterModelTest: { file: "Script_CharacterModelTest.mjs", desc: "十名蒙皮士兵：19 动作、骨骼挂点、命中体与阵营分配契约（纯 Node）" },
   DeathCollapseTest: { file: "Script_DeathCollapseTest.mjs", timeoutMs: 300000,
     desc: "Kimodo受击倒下：两军四候选、稳定随机、全身贴地与终帧保持" },
@@ -375,7 +382,9 @@ export const testDefs = {
 
 export const browserTests = new Set([
   "OpeningActorPerformanceBrowserTest", "OpeningClipsBrowserTest", "FirstLevelVoicePerspectiveTest",
-  "OpeningHandbackBrowserTest", "FirstLevelOpeningCampaignTest",
+  "OpeningHandbackBrowserTest", "OpeningLensBrowserTest", "FirstLevelOpeningCampaignTest",
+  "OpeningHandbackBrowserTest", "FirstLevelOpeningCampaignTest", "OpeningStoryboardShotsTest",
+  "FacialEditorBrowserTest",
   "FirstLevelFrontRouteBrowserTest",
   "FirstLevelLeaderGuideBrowserTest",
   "FirstLevelMissionTopologyBrowserTest",
@@ -413,6 +422,7 @@ export const browserTests = new Set([
   "FirstLevelFrontBattleBrowserTest",
   "FirstLevelFrontBombFirstTest",
   "FirstLevelFrontCheckpoint04Test", "FirstLevelFrontCheckpoint05Test", "FirstLevelFrontCheckpoint05BombFirstTest",
+  "FrontStoryboardShotsTest",
   "MachineGunCaptivesAnimationTest",
   "CarriagePropVelocityTest",
   "DraftCartEditorTest",
@@ -446,6 +456,7 @@ export const browserTests = new Set([
 ]);
 
 export const tier0Fast = [
+  "FacialReviewTest",
   "CharacterSpeechTest",
   "SpeakerGestureTest",
   "FpsAnimationTest",
@@ -487,6 +498,7 @@ export const tier0Fast = [
   "FirstLevelFrontPressureTest",
   "FirstLevelFrontPacingTest",
   "OpeningStoryboardsTest",
+  "OpeningSetTest",
 ];
 
 export const tier0Browser = ["BootTest", "BootStallTest", "GeoTest"];
@@ -496,6 +508,7 @@ export const tier0 = [...tier0Browser, ...tier0Fast];
 
 export const tier2 = [
   "OpeningActorPerformanceBrowserTest",
+  "FrontStoryboardShotsTest",
   "OpeningClipsBrowserTest",
   "SpeakerGestureClipsBrowserTest",
   "SpeakerGestureLayerBrowserTest",
@@ -509,7 +522,8 @@ export const tier2 = [
 ];
 
 export const domains = {
-  openingStoryboards: {label:"01–03 storyboard reconstruction",tests:["OpeningStoryboardsTest","OpeningClipsBrowserTest","OpeningActorPerformanceBrowserTest","OpeningFirstPersonTest","FirstLevelVoicePerspectiveTest","OpeningHandbackBrowserTest","FirstLevelOpeningCampaignTest"]},
+  openingStoryboards: {label:"01–03 storyboard reconstruction",tests:["OpeningStoryboardsTest","OpeningSetTest","OpeningClipsBrowserTest","OpeningActorPerformanceBrowserTest","OpeningFirstPersonTest","FirstLevelVoicePerspectiveTest","OpeningHandbackBrowserTest","FirstLevelOpeningCampaignTest","OpeningLensTest","OpeningLensBrowserTest","OpeningStoryboardShotsTest"]},
+  facialEditor: {label:"人物面部可视化编辑器",tests:["FacialReviewTest","FacialEditorBrowserTest","ModuleGraphTest"]},
   missionGuide: {label:"Physical mission leader and HUD",tests:["FirstLevelLeaderGuideTest","FirstLevelLeaderGuideBrowserTest","FirstLevelMissionTest","FirstLevelMissionBrowserTest"]},
   characterSpeech: {label:"说话人面部对白",tests:["CharacterSpeechTest","CharacterSpeechBrowserTest","SpeakerGestureTest","SpeakerGestureClipsBrowserTest","SpeakerGestureLayerBrowserTest"]},
   motionVector: {label:'统一运动矢量接入契约',tests:['MotionVectorContractTest']},
@@ -616,15 +630,19 @@ export const domains = {
 };
 
 const changedDomainRules = [
+  {domain:"facialEditor",pattern:/FacialReview|EditorFacial|FacialEditor/},
   {domain:"firstLevel",pattern:/FirstLevelWhitebox(Village|Transfer|Rear)/},
   {domain:"menu",pattern:/PlayerDeath/},
   {domain:"combat",pattern:/PlayerDeath/},
-  {domain:"openingStoryboards",pattern:/OpeningStoryboards|OpeningStoryboardAnimation|OpeningClips|OpeningStoryboardBake|OpeningStoryboardClips|OpeningProps|OpeningActorPerformance|OpeningFirstPerson|OpeningHandback|FirstLevelCampaignOpening/},
+  {domain:"openingStoryboards",pattern:/OpeningStoryboards|OpeningStoryboardAnimation|OpeningClips|OpeningStoryboardBake|OpeningStoryboardClips|OpeningProps|OpeningActorPerformance|OpeningFirstPerson|OpeningHandback|FirstLevelCampaignOpening|OpeningSet|OpeningBlastFx|BunkerPoster|OpeningLens|OpeningStoryboardShots/},
   // 剖析器的显示层与命令行入口：文件名里没有「Profiler」，下面 render 域那条
   // 通配的 /Profiler/ 盖不到 Script_ProfileCli / Script_FrameProbeViews。
   // 归 render（ProfilerTest 在那一串里）；命令行自己的冒烟在 tier 2 的 perf 档。
   { domain: "render", pattern: /Script_Profile(Cli|r?Report)|Script_FrameProbeViews/i },
   { domain: "perf", pattern: /Script_ProfileCli/i },
+  // 03 分镜抓帧（2026-09-25 Front 包）：文件名里没有 FirstLevel，归第一关与 01–03 分镜两个域。
+  {domain:"firstLevel",pattern:/FrontStoryboardShots/},
+  {domain:"openingStoryboards",pattern:/FrontStoryboardShots/},
   {domain:"firstLevel",pattern:/FirstLevelRearDoorWalk|FirstLevelFrontRoute|FirstLevelFrontBattle|FirstLevelFrontScenes|FirstLevelFrontPacing|FirstLevelFrontTopology|FirstLevelTransition/},
   // 2026-09-23 01–06 space rebuild: keyframe table and the static probe the space gate reads.
   {domain:"firstLevel",pattern:/FirstLevelSpaceKeyframes|FirstLevelSpaceProbe|FirstLevelSpaceMap|FirstLevelSpaceShots|FirstLevelSpaceSouthFingerprint|Data_FirstLevelFrontBreakables/},
@@ -635,7 +653,7 @@ const changedDomainRules = [
   {domain:"missionGuide",pattern:/FirstLevelLeaderGuide|FirstLevelGuideDialogue|FirstLevelGuideVoiceAlignment|FirstLevelMissionRuntime|Script_FirstLevelMissionVoice|NpcMissionGuide|NpcGuideGesture|Tuning_MissionGuide/},
   { domain: "combat", pattern: /FirearmHandling|MuzzleFlash|Headshot/i },
   {domain:"firstLevel",pattern:/Type89Damage/},
-  {domain:"characterSpeech",pattern:/CharacterSpeech|CharacterFacial|SpeechEnvelope|NraFacial|Nra05Facial|Lugou\w*Facial|SpeakerBinder|SpeakerHeadLayer|SpeakerGesture|SpeakingCast|FaceTrack|Script_FirstLevelMissionVoice|Script_Audio\.mjs|Script_CharacterModel/},
+  {domain:"characterSpeech",pattern:/CharacterSpeech|CharacterFacial|CharacterFaceBlood|SpeechEnvelope|NraFacial|Nra05Facial|Lugou\w*Facial|SpeakerBinder|SpeakerHeadLayer|SpeakerGesture|SpeakingCast|FaceTrack|Script_FirstLevelMissionVoice|Script_Audio\.mjs|Script_CharacterModel/},
   { domain: "animation", pattern: /ActorLocomotion|LocomotionProfileBake/ },
   {domain:'animation',pattern:/DadaoSwing|DadaoPowerSwing|GrenadeThrow/},
   {domain:"combat",pattern:/HitDisorientation/},

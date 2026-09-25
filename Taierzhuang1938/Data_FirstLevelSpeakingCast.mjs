@@ -1,7 +1,7 @@
 // Pinned appearance for every role that speaks on screen in first-level 01-06.
 // A speaker keeps one face for the whole level (03-05 Zhou used to roll NRA02 or
 // NRA05 at random and turn into NRA02 at 06) and gets the facial skin of that
-// model (Model_Lugou*Facial.glb, manifest facialCast). Only approved appearances
+// model (Model_Tengxian*Facial.glb, manifest facialCast). Only approved appearances
 // (Data_CharacterSelection.mjs): NRA02 = source index 1, NRA05 = 4, IJA01 = 0,
 // IJA02 = 1, IJA06 = 5; NRA06 = 5 is the interpreter's cast-only look.
 // Contract 2026-09-23 section 5.1: 日兵乙 moves from IJA03 (closed-mouth geometry) to IJA01; 日兵丙/丁 are one IJA01 and one IJA02. User 2026-09-24: 日兵甲 (the
@@ -45,7 +45,8 @@ export const FIRST_LEVEL_FACE_STEPS = Object.freeze(["Trapped", "BunkerRescue", 
 // no voice position). Before this package Luo's face already followed his lines all level.
 export const FIRST_LEVEL_WHOLE_LEVEL_SPEAKERS = Object.freeze(["luo", "yaowa", "heyoutian", "liuwencai"]);
 // The withdrawing front guards (FRONT_GUARD_POSTS): one of them carries the guard face;
-// the others stay anonymous pooled bodies with random appearance. Index 2 is the first
-// man of the second batch, who holds the last covered line at 04 next to the player's
-// position and so is the one who points to the ammo house (BundleOrder).
-export const FACED_FRONT_GUARD_INDEX = 2;
+// the others stay anonymous pooled bodies with random appearance. Index 5 is the first
+// man of the second batch (FRONT_BATTLE_TUNING.firstBatch 5 since the 09-25 storyboard round,
+// it was index 2 with a first batch of 2), who holds the last covered line at 04 next to the
+// player's position and so is the one who points to the ammo house (BundleOrder).
+export const FACED_FRONT_GUARD_INDEX = 5;

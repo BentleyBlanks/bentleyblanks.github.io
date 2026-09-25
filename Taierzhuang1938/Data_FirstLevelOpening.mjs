@@ -83,6 +83,5 @@ export const OPENING = Object.freeze({
   // 其余被禁火的人只许看、进掩体、探头、举枪，一发不打。
   playerSuppressLimit: 3,
   fireSlotSeconds: 3.5,
-  rifleGuardCount: 2,
   frontReachRadiusM: 9,
 });

@@ -1182,11 +1182,20 @@ const MISSION_SCENARIO = (() => {
   // Collapsed: the near miss outside the mouth buried its south side and threw soil into the bend
   // (the 02 return-of-control cover), a roof beam sagged over Shunzi. From the lying eye
   // (-2.0,-126.3, floor+0.42) the kill spot, the junction J and the fold F stay in view (K1).
-  const collapsed = [...shell,
+  // 2026-09-25 storyboard round (contract docs/Data_FirstLevelStoryboard0103Contract.md §4.5): the lintel breaks at
+  // z -126.5 once the mouth collapses. Its south half falls into the mouth (a visual-only prop of the Set package,
+  // Data_OpeningSet0103 `fallenLintel`, animated at the blast); the north half stays on the north post as this
+  // stub for the rest of the level (the Set's props are gone after 03, the mouth must not lose its lintel).
+  const collapsed = [...shell.filter((block) => block.id !== "BunkerMouthLintel"),
+    B("BunkerMouthLintelN", 1.05, -127.05, 0.3, 0.22, 1.1, "timber", floor + 1.95),
     // The 02 return-of-control cover (contract §4: collider + cover tag): it faces the link sap (J/F), where the
     // pursuers shoot from. SetScenarioState must register scenario covers for the AI (see the Space doc §10).
     B("BunkerMouthSpoil", 1.5, -122.6, 1.4, 1.4, 1.4, "earthDark", floor + 1.4, { cover: { faceX: 0.984, faceZ: -0.177 } }),
-    B("BunkerMouthRubbleS", 1.3, -124.2, 0.9, 0.7, 0.8, "earthDark", floor + 0.7),
+    // Lowered 0.7 -> 0.12 m (storyboard SB03: from the lying eye at the mouth (0.35,-125.15), 0.26 m up, looking
+    // yaw -80 deg, the old box filled the right quarter of the frame; at 0.25 m the mound over it still rose above
+    // the eye, review 09-25) and shrunk to 0.6 x 0.5 m so the 02 rescue circle S' (0.60,-123.90) has room to kneel
+    // and a 0.7 m lane runs between it and the mouth spoil. The Set package covers it with a low mound.
+    B("BunkerMouthRubbleS", 1.35, -124.3, 0.6, 0.12, 0.5, "earthDark", floor + 0.12),
     // The sag hangs over Shunzi's legs (west), the pins sit either side of him: once they are lifted a
     // standing capsule at the pinned spot is clear (SpaceTest anchor check).
     B("BunkerRoofSag", -2.45, -126.2, 1.0, 0.3, 1.6, "timber", floor + 1.55),

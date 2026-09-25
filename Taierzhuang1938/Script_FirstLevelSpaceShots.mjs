@@ -5,7 +5,8 @@
 //   · K4/K4b/K4c are taken from the REAL mounted gun (stage 4: spawn on the seat, occupy MissionGun, turn).
 //   · K3 keeps the AI's own stance (mostly prone). K3zoom is the same camera at 20 deg: an identification crop to
 //     show where the guards lie, NOT a player view (the kneeling stance is the Front/Ai packages' part).
-//   · K1/K2 have no 01 cast (the 01 director still uses the retired dugout coordinates - Opening package).
+//   · K1/K2 have no 01 cast: the cameras are the 2026-09-25 storyboard marks (Data_OpeningStoryboards shunzi.witnessEye /
+//     dragged); the people there are shot by Script_OpeningStoryboardShots in the real flow.
 // Usage: node Taierzhuang1938/Script_FirstLevelSpaceShots.mjs [--only=K1,K3] ; writes Taierzhuang1938/_shots/Space0106/<K>.png + shots_log.json
 import fs from "node:fs"; import path from "node:path"; import { pathToFileURL, fileURLToPath } from "node:url";
 const WT = fileURLToPath(new URL("../", import.meta.url)).replace(/\\/g, "/");

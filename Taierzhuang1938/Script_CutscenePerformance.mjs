@@ -24,7 +24,7 @@ import { Vector3, Quaternion } from "three";
 
 const MANIFEST = "Data_MachineGunCaptivesAnimation.json";
 const DEFAULT_BASE = "./Animation/MachineGunCaptives/";
-const LIBRARY_VERSION = "20260916MachineGunCaptivesV3";
+const LIBRARY_VERSION = "20260926MachineGunCaptivesHumanoidV1";
 /** `state.moveSpeed` → m/s，与 Script_CutsceneCheck 的滑步判据同一个常数。 */
 const MOVE_SPEED_TO_MPS = 4.2;
 

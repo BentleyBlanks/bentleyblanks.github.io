@@ -15,13 +15,13 @@ function MarkMountVelocity(root) {
 }
 export function LoadP012BackRifle() {
   return libraryPromise ||= Promise.all([
-    new GLTFLoader().loadAsync("./Animation/BackRifleRun/Animation_LugouNraBackRifleRun.glb?v=20260905NaturalRunV2"),
-    fetch("./Animation/BackRifleRun/Data_BackRifleRun.json?v=20260905NaturalRunV2").then(response=>response.json()),
+    new GLTFLoader().loadAsync("./Animation/BackRifleRun/Animation_TengxianNraBackRifleRun.glb?v=20260926HumanoidV1"),
+    fetch("./Animation/BackRifleRun/Data_BackRifleRun.json?v=20260926HumanoidV1").then(response=>response.json()),
   ]);
 }
 export async function InstallP012BackRifle(soldier) {
   const actor=soldier.actor,rig=actor?.characterRig;
-  if(!rig?.modelId?.startsWith("LugouNra")||rig.p012BackRifleInstalled)return;
+  if(!rig?.modelId?.startsWith("TengxianNra")||rig.p012BackRifleInstalled)return;
   rig.p012BackRifleInstalled=true;
   const [source,config]=await LoadP012BackRifle();if(rig.disposed)return;
   const clip=source.animations.find(clip=>clip.name==="BackRifleRun").clone();

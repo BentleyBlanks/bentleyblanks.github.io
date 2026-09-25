@@ -82,7 +82,13 @@ export class AircraftFlight {
     /** 归队前的静默计时；> 0 时那一架不画。 */
     this.rejoinT = 0;
     this.lastElapsed = 0;
-    this.manualPose = null;
+    /** 脚本摆位：资产 id -> pose。可以同时摆几架（第一关 03 开头两架横飞，Set 包 Data_OpeningSet0103.FLYOVER）。 */
+    this.manualPoses = new Map();
+  }
+  /** 旧接口：只摆一架时的那一架（没有就是 null）。 */
+  get manualPose() {
+    const first = this.manualPoses.entries().next().value;
+    return first ? { id: first[0], pose: first[1] } : null;
   }
 
   async Load() {
@@ -108,7 +114,7 @@ export class AircraftFlight {
 
   SetPhase(phase) {
     this.phase = phase;
-    this.manualPose = null;
+    this.manualPoses.clear(); this.manualAlias?.clear();
     if (phase.whitebox?.p012 || phase.ambientAircraft === false) for (const { root } of this.forms) this._Show(root, false);
     this.anchor.set(
       (phase.bounds.minX + phase.bounds.maxX) * 0.5,
@@ -134,7 +140,8 @@ export class AircraftFlight {
 
     for (const form of this.forms) {
       const { spec, root } = form;
-      if (this.manualPose?.id === spec.id) { ApplyStrafePose(root, this.manualPose.pose); this._Show(root, true); continue; }
+      const manual = this.manualPoses.get(spec.id);
+      if (manual) { ApplyStrafePose(root, manual); this._Show(root, true); continue; }
       if (form === taken) { ApplyStrafePose(root, strafe.aircraft); this._Show(root, true); continue; }
       // P012 has a deliberate first railway pass: background orbiters never pre-empt it.
       if (this.phase.whitebox?.p012 || this.phase.ambientAircraft === false) { this._Show(root, false); continue; }
@@ -160,16 +167,27 @@ export class AircraftFlight {
     return this.forms.find((f) => f.spec.id === id) || this.forms[0];
   }
 
-  /** A scripted call-in owns one aircraft until it leaves. Idle orbiters remain disabled. */
+  /**
+   * A scripted call-in owns one aircraft until it leaves. Idle orbiters remain disabled.
+   * Several ids can be posed at once (each id owns its own airframe); `pose = null` releases that id only.
+   * Release goes through the id the caller posed with (manualAlias): an id that was never posed releases nothing
+   * (it must not fall back to forms[0] and knock another caller's pose off). MitsubishiKi30 is shared by the mission
+   * strafe (MISSION_AIRCRAFT_ID) and the 03 flyover wingman (Data_OpeningSet0103.FLYOVER): never schedule both in one step.
+   */
   SetManualPose(id, pose) {
+    this.manualAlias ??= new Map();
     if (!pose) {
-      const old = this.forms.find((form) => form.spec.id === this.manualPose?.id);
+      const key = this.manualAlias.get(id) ?? (this.manualPoses.has(id) ? id : null);
+      this.manualAlias.delete(id);
+      if (key == null || !this.manualPoses.has(key)) return;
+      const old = this.forms.find((f) => f.spec.id === key);
       if (old) this._Show(old.root, false);
-      this.manualPose = null; return;
+      this.manualPoses.delete(key); return;
     }
     const form = this.FormFor(id);
     if (!form) return;
-    this.manualPose = { id: form.spec.id, pose };
+    this.manualAlias.set(id, form.spec.id);
+    this.manualPoses.set(form.spec.id, pose);
     ApplyStrafePose(form.root, pose); this._Show(form.root, true);
   }
 
@@ -179,7 +197,7 @@ export class AircraftFlight {
     this.forms.length = 0;
     this.strafeForm = null;
     this.rejoinT = 0;
-    this.manualPose = null;
+    this.manualPoses.clear();
   }
 }
 

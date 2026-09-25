@@ -1,6 +1,6 @@
 {
   "schema": 1,
-  "version": "20260916MachineGunCaptivesV3",
+  "version": "20260926MachineGunCaptivesHumanoidV1",
   "authoringTool": "Blender 5.1 driven over BlenderMCP (execute_code), same bpy path as --background",
   "actorForward": [
     0,
@@ -90,9 +90,9 @@
   },
   "models": [
     {
-      "id": "LugouNra02",
-      "file": "Animation_LugouNra02MachineGunCaptives.json",
-      "sha256": "33100d7f8672122ad285250959b364ea65853c8d8c7354714972c26927df526c",
+      "id": "TengxianNra02",
+      "file": "Animation_TengxianNra02MachineGunCaptives.json",
+      "sha256": "5ff2bf7baa55f717afd30c40e26fecc583c22eb78a822d06b0356bc053314eaa",
       "clipIds": [
         "CaptiveHandsUpWalk",
         "CaptiveShovedStumble",
@@ -104,12 +104,12 @@
         "CaptiveStruckDown",
         "CaptiveStabbedCollapse"
       ],
-      "originalModelSha256": "39c08ca82148e140ee2952caffdd0dee99750fb734038a5263d216c9a7345225"
+      "originalModelSha256": "67550199849f78d581b356580f25595f361bece70fef0c82d7bd08a954197790"
     },
     {
-      "id": "LugouNra05",
-      "file": "Animation_LugouNra05MachineGunCaptives.json",
-      "sha256": "e5407c7f8d80fc68f81a9e9e65225b2915e2da654f4dec21c28cb58bcde338e9",
+      "id": "TengxianNra05",
+      "file": "Animation_TengxianNra05MachineGunCaptives.json",
+      "sha256": "95e7005f0c64ae79d5f9b09db137996e45cc957e6bfc8e1949c38e3a8fa02e24",
       "clipIds": [
         "CaptiveHandsUpWalk",
         "CaptiveShovedStumble",
@@ -121,12 +121,12 @@
         "CaptiveStruckDown",
         "CaptiveStabbedCollapse"
       ],
-      "originalModelSha256": "acbc9184da059bdf6c3c18d051f3eba77d1dd3acba469e8dbc876b092f174250"
+      "originalModelSha256": "b85b90fac1843261d40fbf257470a933819a9302dff1727a591feda1a5327b55"
     },
     {
-      "id": "LugouIja01",
-      "file": "Animation_LugouIja01MachineGunCaptives.json",
-      "sha256": "966fb4d6766cca4cfb6bdb7669a3a8efb94999e769b15ae36649ddffe48ba6a6",
+      "id": "TengxianIja01",
+      "file": "Animation_TengxianIja01MachineGunCaptives.json",
+      "sha256": "4cd4fd9cd2f24f8b713d5da51d1b1117728eadf31e2a3960dde9e7a5f054ec05",
       "clipIds": [
         "IjaBayonetGuard",
         "IjaTauntGesture",
@@ -135,12 +135,12 @@
         "IjaRifleButtStrike",
         "IjaBayonetDownThrust"
       ],
-      "originalModelSha256": "23fa4ef88891bd14d49dfb9a3e61b9f0dcaf45b8956a720aab24d9c4c23eb9c7"
+      "originalModelSha256": "fc6c84ad51c9752066127b148a1f9db307da9659dea441989861265693b02c6b"
     },
     {
-      "id": "LugouIja02",
-      "file": "Animation_LugouIja02MachineGunCaptives.json",
-      "sha256": "8b92c88a70a7312e1bd80a3df33d02582d886188600b53408b063a69b7b1c45f",
+      "id": "TengxianIja02",
+      "file": "Animation_TengxianIja02MachineGunCaptives.json",
+      "sha256": "592cdbde8c2ae33414899267c20ff8db19d896fcb92309ae7c319e397ef7a60f",
       "clipIds": [
         "IjaBayonetGuard",
         "IjaTauntGesture",
@@ -149,12 +149,12 @@
         "IjaRifleButtStrike",
         "IjaBayonetDownThrust"
       ],
-      "originalModelSha256": "8c4860ec2d4dd3076b06ff7e593e5dcfd4d23aefe2fedf6f9fdec3b0e12cc9aa"
+      "originalModelSha256": "fc429bafc6973e54e8d1fa72ac99c8740c81be25f895ddb1417bb47707578788"
     },
     {
-      "id": "LugouIja03",
-      "file": "Animation_LugouIja03MachineGunCaptives.json",
-      "sha256": "057627a8f57e27c2228d9983489c3fc5302d7bfba2b9b5371b65de8518b3670c",
+      "id": "TengxianIja03",
+      "file": "Animation_TengxianIja03MachineGunCaptives.json",
+      "sha256": "b0906f041c369d9207f4daa09fe065032a4a679d17e0eabcb2083e51deba04b9",
       "clipIds": [
         "IjaBayonetGuard",
         "IjaTauntGesture",
@@ -163,7 +163,7 @@
         "IjaRifleButtStrike",
         "IjaBayonetDownThrust"
       ],
-      "originalModelSha256": "6d97c801f7ea62430e5397fde980ad0964ab5081fa5f15249434bce4cbf3f89d"
+      "originalModelSha256": "17163f830cdf91b2b8bbe9b6e197855bf739a48116464b19eb24738d921b4f74"
     }
   ]
 }

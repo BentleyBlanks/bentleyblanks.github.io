@@ -29,7 +29,7 @@ try {
       await page.route(/Texture_Carriage(?:BenchWood|FloorSteel|CeilingSteel)Base\.webp/, route => route.fulfill({status:404,body:'missing test texture'}));
     }
     if (fixture.name === 'MissingCharacters') {
-      await page.route(/Model_LugouNra0[124][.]glb/,
+      await page.route(/Model_TengxianNra0[124][.]glb/,
         route => route.fulfill({status:503,body:'interrupted character download'}));
       await page.addInitScript(() => {
         window.bundleFixtureErrors=[];
@@ -75,7 +75,7 @@ try {
       assert.equal(partial.stage,'Trapped','the interrupted boot still opens on the collapsed bunker');
       assert.equal(partial.count,4,'all four squad members exist before the director starts');
       assert.deepEqual(partial.cast,['heyoutian','liuwencai','luo','yaowa'],'the whole squad is physically present');
-      assert.deepEqual(partial.models,{luo:'LugouNra05',yaowa:null,heyoutian:null,liuwencai:null},
+      assert.deepEqual(partial.models,{luo:'TengxianNra05',yaowa:null,heyoutian:null,liuwencai:null},
         'failed selected slots stay whitebox; the surviving approved leader keeps his own appearance');
       await page.locator('#bootStart').click();
       await page.waitForFunction(()=>window.Tengxian.state.running&&document.getElementById('boot').classList.contains('gone'),null,{timeout:10000});
@@ -101,7 +101,7 @@ try {
       assert.deepEqual(Object.keys(setup.cast).sort(),['comrade','interpreter','runner','shouter'],
         'the director creates its complete current cast after Start');
       assert.deepEqual(Object.fromEntries(Object.entries(setup.cast).map(([id,a])=>[id,a.model])),
-        {comrade:null,interpreter:'LugouNra06',runner:null,shouter:null},
+        {comrade:null,interpreter:'TengxianNra06',runner:null,shouter:null},
         'new cast uses its requested model slots instead of reassigning failed downloads '
         +'(comrade, runner and shouter are pinned to NRA02 since the 09-23 face package; the interpreter wears his own NRA06 since 2026-09-24)');
       assert.equal(setup.playerModel,null,'the protagonist also preserves the missing NRA02 slot');

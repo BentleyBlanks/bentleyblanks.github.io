@@ -4,7 +4,7 @@
 // 坎线以北、侧后攻击位、路障）、路线胶囊净空、暴露节奏、每个敌人初始有掩体、预算、视线外入口、
 // 取弹沟不连通背坡、01 进场通道 30 m 规则，以及 03–06 既有的撤退/夺点/分批判定。
 import assert from "node:assert/strict";
-import {BatchRecovered,AssaultWindow,FrontEntryRoute} from "./Script_FirstLevelFrontBattle.mjs";
+import {BatchRecovered,AssaultWindow,FrontEntryRoute,GuardWithdrawalRoute} from "./Script_FirstLevelFrontBattle.mjs";
 import {MISSION_STAGES} from "./Data_FirstLevelMission.mjs";
 import {MISSION_ROUTES as R} from "./Data_FirstLevelMissionLayout.mjs";
 import {MISSION_STAGE_ROUTES as SR} from "./Data_FirstLevelMissionTopology.mjs";
@@ -176,15 +176,22 @@ console.log(`ok tank escort slots hidden from the gap: ${FRONT_TANK_ESCORT_SLOTS
   console.log(`ok backslope scrape not enfiladed from ${who.length} enemy points`);
 }
 // FrontBattle gathers the second guard batch at lastCover + k*gatherSpacingM along lastCover.z and walks each man
-// there in a straight line from his post: every hold and every walk must be capsule-clear (GapLastCover once
-// stood across the line and pinned the second man; remainingGuardsGathered never fired in the 03-06 cold start).
+// there in a straight line from where he stands when the gather starts: every hold and every walk must be
+// capsule-clear (GapLastCover once stood across the line and pinned the second man; remainingGuardsGathered never
+// fired in the 03-06 cold start). That start is his withdrawal route's point before the gather index: his scrape post,
+// or for the backslope LMG pair (guards 6 and 7, FRONT_GUARD_MG_GROUP) the last exit point it walks down to
+// (FrontBattle.UpdateGuards walks the exit points below gatherIndex, then the gather takes over). 09-25 review: this
+// used to measure 6 and 7 from their scrape posts, where nobody stands in 03 any more.
 {
-  const holds=FRONT_GUARD_POSTS.slice(B.firstBatch).map((p,k)=>({post:p,hold:{x:S.lastCover.x+k*B.gatherSpacingM,z:S.lastCover.z}}));
-  for(const {post,hold} of holds){
-    const walk=RouteClearance([post,hold]);
-    assert.deepEqual(walk.hits,[],`guard ${post.x},${post.z} walks clear to its gather hold ${hold.x.toFixed(2)},${hold.z}`);
+  const holds=FRONT_GUARD_POSTS.slice(B.firstBatch).map((_,k)=>{const i=B.firstBatch+k,{route,gatherIndex,mg}=GuardWithdrawalRoute(i);
+    return {i,mg,from:route[gatherIndex-1],hold:{x:S.lastCover.x+k*B.gatherSpacingM,z:S.lastCover.z}};});
+  for(const {i,mg,from,hold} of holds){
+    if(!mg)assert.deepEqual(from,FRONT_GUARD_POSTS[i],`guard ${i} starts his gather from his scrape post`);
+    const walk=RouteClearance([from,hold]);
+    assert.deepEqual(walk.hits,[],`guard ${i}${mg?` (LMG ${mg.role})`:""} walks clear from ${from.x},${from.z} to its gather hold ${hold.x.toFixed(2)},${hold.z}`);
   }
-  console.log(`ok second-batch gather line clear: ${holds.length} holds`);
+  assert.equal(holds.filter(h=>h.mg).length,2,"the LMG pair is measured from where it comes down, not from the scrape posts");
+  console.log(`ok second-batch gather line clear: ${holds.length} holds (${holds.filter(h=>h.mg).length} from the backslope exit)`);
 }
 
 // ---------------------------------------------------------------- enemies: cover, roles, budget, hidden entries

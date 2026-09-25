@@ -22,12 +22,12 @@ export const CHARACTER_CAST_VARIANTS_BY_KIND = Object.freeze({
 });
 export const CHARACTER_PROTAGONIST_VARIANT = 1;
 export const CHARACTER_INFANTRY_SOURCE_BY_MODEL = Object.freeze({
-  LugouNra05: "LugouNra02", LugouNra06: "LugouNra02", LugouIja06: "LugouIja02",
+  TengxianNra05: "TengxianNra02", TengxianNra06: "TengxianNra02", TengxianIja06: "TengxianIja02",
 });
 // Models that share another model's skeleton node for node (same bones, rest pose and
 // bind): every per-model clip library (opening storyboards, captives, locomotion
 // profiles) is looked up under the source id (CharacterRig.clipModelId).
-export const CHARACTER_CLIP_SOURCE_BY_MODEL = Object.freeze({ LugouNra06: "LugouNra02", LugouIja06: "LugouIja02" });
+export const CHARACTER_CLIP_SOURCE_BY_MODEL = Object.freeze({ TengxianNra06: "TengxianNra02", TengxianIja06: "TengxianIja02" });
 
 // Anonymous spawns. NRA favours its lighter skin (NRA05: 8,683 triangles). IJA: the user
 // made IJA06 the standard rifleman (2026-09-24), so it is the most frequent anonymous IJA

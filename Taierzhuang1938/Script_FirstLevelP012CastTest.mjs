@@ -11,7 +11,7 @@ assert.match(main, /SelectP012CompanionCast\(castId, identity\)/,
 assert.match(main, /SelectP012RecruitCast\(spec\.slot/,
   "the P012 archive train fixture still uses the approved recruit cast");
 const ids = ["luo", "yaowa", "heyoutian", "liuwencai", "zhaodegui", "xiaoqin"];
-const manifest = JSON.parse(readFileSync(new URL("./Model/Character/Data_LugouCharacterManifest.json", import.meta.url), "utf8"));
+const manifest = JSON.parse(readFileSync(new URL("./Model/Character/Data_TengxianCharacterManifest.json", import.meta.url), "utf8"));
 assert.deepEqual(Object.keys(P012_COMPANION_CAST), ids);
 assert.ok(Object.isFrozen(P012_COMPANION_CAST));
 for (const castId of ids) {
@@ -26,7 +26,7 @@ for (const castId of ids) {
   }
   assert.ok([1, 4].includes(spec.modelVariant),
     "all companions use approved NRA02/05");
-  const modelId = `LugouNra${String(spec.modelVariant + 1).padStart(2, "0")}`;
+  const modelId = `TengxianNra${String(spec.modelVariant + 1).padStart(2, "0")}`;
   assert.ok(manifest.models.some(model => model.id === modelId && model.faction === "nra"));
   const base = { name: "随机姓名", fullName: "错误姓名", age: 99, origin: "四川", weapon: "HanYang" };
   const selected = SelectP012CompanionCast(castId, base);

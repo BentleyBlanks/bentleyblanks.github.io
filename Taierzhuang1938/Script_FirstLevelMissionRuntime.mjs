@@ -1,4 +1,4 @@
-import { FirstLevelFrontBattle, ColumnDeparture } from "./Script_FirstLevelFrontBattle.mjs";
+import { FirstLevelFrontBattle, ColumnDeparture, GuardWithdrawalRoute } from "./Script_FirstLevelFrontBattle.mjs";
 import { FirstLevelFrontScenes } from "./Script_FirstLevelFrontScenes.mjs";
 // 03–05 战车：纯规则大脑 + 接线层（战车包 2026-09-23）。开关 Data_Tuning_Tank.brainEnabled，关掉走下面旧的定时插值。
 import { FirstLevelTankRuntime } from "./Script_FirstLevelTankRuntime.mjs";
@@ -22,9 +22,10 @@ import * as THREE from "three";
 import { AiDirector } from "./Script_Ai.mjs";
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
 import { FirstLevelOpening, SamplePerceptionCurve } from "./Script_FirstLevelOpening.mjs";
+import { OpeningLensDriver } from "./Script_OpeningLens.mjs";
 // 公开阶段 1–7 的演出（Front 玩法包）。运行时只留构造 / Enter / Update / Draw 四个薄钩子。
 import { FirstLevelFrontShow } from "./Script_FirstLevelFrontShow.mjs";
-import { FRONT_GUARD_POSTS, FRONT_SHELLS, FRONT_ASSAULT, FrontAssaultLane, FrontReserveLane } from "./Data_FirstLevelMissionFront.mjs";
+import { FRONT_SHELLS, FRONT_ASSAULT, FrontAssaultLane, FrontReserveLane } from "./Data_FirstLevelMissionFront.mjs";
 import {
   MISSION_STAGES,
   MISSION_TUNING as R,
@@ -82,6 +83,7 @@ import { FirstLevelReception, ReceptionBedGuideRoute, ReceptionBedGuideArrivalM,
 import { FirstLevelBridge } from "./Script_FirstLevelBridge.mjs";
 import { FirstLevelNightGate } from "./Script_FirstLevelNightGate.mjs";
 import { FirstLevelNightLights } from "./Script_FirstLevelNightLights.mjs";
+import { OpeningSet } from "./Script_OpeningSet.mjs";
 import { EmplacementInteraction } from "./Script_Emplacement.mjs";
 import { Localize, T } from "./Script_Text.mjs";
 import { ActionKeyGlyph } from "./Script_Input.mjs";
@@ -235,6 +237,10 @@ export class FirstLevelMissionRuntime {
     this.dressing = new EndDressing();
     this.view.extras = this.dressing;
     this.nightLights = new FirstLevelNightLights({ scene: this.scene });
+    // 01–03 过场分镜布景（Set 包，Data_OpeningSet0103）：进 01–03 装载，离开收走；近爆喷土、远处烟火、
+    // 03 开头的飞机、阴天开关也在里面。03 阵位的破砖墙外观装到 06 才收（它是 04–06 的战场）。
+    this.openingSet = new OpeningSet({ scene: this.scene, library: this.library, groundAt: (x, z) => this.battlefield.GroundHeight(x, z),
+      vfx: this.vfx, aircraft: this.aircraft, applySky: (name) => this.ApplySky?.(name), restoreSky: () => this.RestoreSky?.() });
     this.quietMarch = new FirstLevelQuietMarch(this);
     this.reception = new FirstLevelReception(this);
     this.bridge = new FirstLevelBridge(this);
@@ -1452,6 +1458,7 @@ export class FirstLevelMissionRuntime {
     // Narrative companions survive incidental combat from the very first stage.
     for(const actor of this.squad||[])actor.scriptEssential=OPENING.requiredSquadCast.includes(actor.castId);
     this.opening.Enter(stage.id);
+    this.openingSet?.Enter(stage.id);
     this.frontShow?.Enter(stage.id);
     this.UpdateMusic(stage.id);
     this.Objective(Localize(FirstLevelStageTextId(stage.id), stage.objective));
@@ -1647,9 +1654,10 @@ export class FirstLevelMissionRuntime {
   SpawnGuards() {
     if(this.guards.length)return;
     for (let i = 0; i < R.guardCount; i++) {
-      const post=FRONT_GUARD_POSTS[i];
+      // The 03 backslope LMG pair (FRONT_GUARD_MG_GROUP) starts on its slope spot, everyone else on his scrape post.
+      const {route,gatherIndex,mg}=GuardWithdrawalRoute(i),post=route[0];
       const actor = this.ai.Spawn("nra", post.x, post.z, {
-        weapon: "HanYang",
+        weapon: mg?.weapon || "HanYang",
         squadId: "MissionWithdrawingGuard",
         // One guard carries the talking face; the rest stay pooled bodies of random appearance.
         ...(i === FACED_FRONT_GUARD_INDEX ? SpeakingCastOptions("guard") : {}),
@@ -1658,12 +1666,18 @@ export class FirstLevelMissionRuntime {
         if (i === FACED_FRONT_GUARD_INDEX) actor.speakerRole = "guard";
         InstallMissionSentry(actor);this.Defend(actor,actor.position,0,0);
         actor.scriptedNoncombatant=true;
+        // Protected from the first frame (FrontBattle.UpdateGuards rewrites it every frame once 03 runs): the 03
+        // backslope LMG pair spawns 8 m below the crest the assault line holds, and one enemy locked it for the AI
+        // tick before the first UpdateGuards (EnemyIdleProbe hunters [26], 09-25).
+        actor.missionUntargetable=true;
         this.ai.SetStance(actor,2,Infinity,true);
         this.guards.push({
           actor,
           progress: 0,
           safe: false,
-          route: P.guardWithdrawalRoutes[i],
+          route,
+          gatherIndex,
+          mg,
         });
       }
     }
@@ -2053,7 +2067,21 @@ export class FirstLevelMissionRuntime {
   Perception() {
     // 06 老周从坐着的活人换回担架躺姿时玩家闭一下眼（FirstLevelCollection.SeatSwapClosure）。
     const swap = this.frontShow?.collection?.SeatSwapClosure?.() || 0;
-    return { eyeClosure: Math.max(this.opening.eyeClosure || 0, swap), concussion: this.opening.concussion || null };
+    return { eyeClosure: Math.max(this.opening.eyeClosure || 0, swap), concussion: this.opening.concussion || null,
+      lens: this.OpeningLens() };
+  }
+  /**
+   * 01–02 storyboard lens (Script_OpeningLens, contract §4.4): while the director owns the view, its phase,
+   * phase age and events (blast, butt hit, Found's clear, concussion) pick and sample a look; null otherwise,
+   * so Script_Main's post parameters are all defaults outside 01–02. The director may hand its own events
+   * through bunker.LensEvents() (second wave).
+   */
+  OpeningLens() {
+    const show = this.frontShow?.bunker, live = !!show?.CameraActive;
+    this.openingLens ??= new OpeningLensDriver();
+    const events = live ? (show.LensEvents?.() ?? { blastAt: this.opening?.blastAt, buttHit: show.strikeAt,
+      clearAt: show.flags?.clearAt, concussion: show.perception?.amount }) : {};
+    return this.openingLens.Sample(this.time, live ? show.phase : null, live ? show.Age : 0, events);
   }
   /**
    * 控制锁算视线用的眼位。被枪托砸翻躺在地上的时候（旧的屋内伏击）真正的眼位在地板上方
@@ -2338,6 +2366,9 @@ export class FirstLevelMissionRuntime {
     prof?.E("story/mission/voice");
     prof?.B("story/mission/other");
     this.opening.Update(dt);
+    this.openingSet?.Update(dt, this.flow.stage.id, this.frontShow?.bunker?.phase ?? null,
+      { collapsed: this.Has("bunkerCollapsed"), blastAge: this.opening.blastAt != null ? this.time - this.opening.blastAt : null, player: this.player?.position,
+        breakables: this.tankRuntime?.breakables ?? null });
     if(this.failed){prof?.E("story/mission/other");return;}
     prof?.E("story/mission/other");
     prof?.B("story/mission/spawns");
@@ -2682,11 +2713,11 @@ export class FirstLevelMissionRuntime {
       const row = { ...condition, text: T(`menu.condition.${condition.id}`) };
       if (condition.id === "minimumSeconds") row.detail = T("menu.progress.seconds", condition);
       if (condition.id === "rifleWithdrawalResolved" || condition.id === "guardWithdrawalResolved") {
-        const guards = condition.id === "rifleWithdrawalResolved" ? this.guards.slice(0, OPENING.rifleGuardCount) : this.guards;
+        const guards = condition.id === "rifleWithdrawalResolved" ? this.guards.slice(0, FB.firstBatch) : this.guards;
         row.detail = T("menu.progress.guards", {
           safe: guards.filter(guard => guard.safe && guard.actor.alive).length,
           lost: guards.filter(guard => !guard.actor.alive).length,
-          target: condition.id === "rifleWithdrawalResolved" ? OPENING.rifleGuardCount : guards.length,
+          target: condition.id === "rifleWithdrawalResolved" ? FB.firstBatch : guards.length,
         });
       }
       return row;
@@ -2763,6 +2794,7 @@ export class FirstLevelMissionRuntime {
         alive: guard.actor.alive,
         x: guard.actor.position.x, z: guard.actor.position.z,
         progress: guard.progress, threatened: this.Threatens(guard.actor.position),
+        mg: guard.mg?.role || null, crossing: !!guard.crossing, stance: guard.actor.stance,
       })),
       air: this.air && { ...this.air },
     };
@@ -2777,6 +2809,7 @@ export class FirstLevelMissionRuntime {
     this.transition.Dispose();
     this.extras.Clear();
     this.nightLights?.Dispose();
+    this.openingSet?.Exit();
     this.opening.Dispose();
     this.frontShow?.Dispose();
     this.frontPressure?.Dispose();

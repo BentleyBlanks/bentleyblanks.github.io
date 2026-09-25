@@ -19,7 +19,7 @@ const project = path.dirname(fileURLToPath(import.meta.url));
 const out = path.join(project, "_shots", "MachineGunCaptives");
 const folder = path.join(project, "Animation", "MachineGunCaptives");
 const config = JSON.parse(await fs.readFile(path.join(folder, "Data_MachineGunCaptivesAnimation.json"), "utf8"));
-const manifest = JSON.parse(await fs.readFile(path.join(project, "Model", "Character", "Data_LugouCharacterManifest.json"), "utf8"));
+const manifest = JSON.parse(await fs.readFile(path.join(project, "Model", "Character", "Data_TengxianCharacterManifest.json"), "utf8"));
 
 // ---------------------------------------------------------------------------
 // 1. 清单与资产（纯 Node）
@@ -30,8 +30,8 @@ const CAPTIVE_CLIPS = ["CaptiveHandsUpWalk", "CaptiveShovedStumble", "CaptiveHan
 const GUARD_CLIPS = ["IjaBayonetGuard", "IjaTauntGesture", "IjaShoveForward", "IjaKickPrisoner",
   "IjaRifleButtStrike", "IjaBayonetDownThrust"];
 const COVERAGE = {
-  LugouNra02: CAPTIVE_CLIPS, LugouNra05: CAPTIVE_CLIPS,
-  LugouIja01: GUARD_CLIPS, LugouIja02: GUARD_CLIPS, LugouIja03: GUARD_CLIPS,
+  TengxianNra02: CAPTIVE_CLIPS, TengxianNra05: CAPTIVE_CLIPS,
+  TengxianIja01: GUARD_CLIPS, TengxianIja02: GUARD_CLIPS, TengxianIja03: GUARD_CLIPS,
 };
 const DURATIONS = {
   CaptiveHandsUpWalk: [1.8, true], CaptiveShovedStumble: [0.7, false],
@@ -51,7 +51,7 @@ for (const [kind, height] of Object.entries(TARGET_HEIGHT)) {
   assert.match(actorSource, new RegExp(String.raw`\b${kind}:\s*\{\s*height:\s*${height}\b`),
     `Script_Actor 的 KIND_SPEC.${kind}.height 不再是 ${height}，本门禁量的身高要跟着改`);
 }
-const KindOf = (modelId) => (modelId.startsWith("LugouIja") ? "ija" : "nra");
+const KindOf = (modelId) => (modelId.startsWith("TengxianIja") ? "ija" : "nra");
 // 本场七个人的身高缩放**钉死**（cast[].sizeScale）。触及随施动者缩放、体表随受击者
 // 缩放，两边各抽一次 ±4% 就是刺入深度 ±4 cm 的随机浮动，而下面这些站位是算到毫米的。
 const CAST_SCALES = new Set(CS_MachineGunCaptives.cast.map((entry) => entry.sizeScale));
@@ -104,7 +104,7 @@ for (const model of config.models) {
   // 过渡 clip 的交接帧：末帧（或首末两帧）必须就是它交给的那条循环的第 0 帧，
   // 0.12 s 淡入才会是一次空操作。这两条是「跪下没有过程 / 挨打没反应」那两项
   // 改动的接缝，写错了就是原地一跳。
-  if (model.id.startsWith("LugouNra")) {
+  if (model.id.startsWith("TengxianNra")) {
     const Frame = (id, index) => {
       const clip = data.clips[id];
       const stride = data.bones.length * 7;
@@ -184,7 +184,7 @@ const CONTACTS = [
 // NRA02 与 NRA05 在**同一条高度带、同一个方位**上的体表距离差 2.7 cm（装具不同），
 // 按「所有 NRA 里最大的那个」算站位，受击者是另一具的时候就差出那么多。
 const VariantModel = (kind, variant) =>
-  `Lugou${(kind || "nra") === "ija" ? "Ija" : "Nra"}${String(variant + 1).padStart(2, "0")}`;
+  `Tengxian${(kind || "nra") === "ija" ? "Ija" : "Nra"}${String(variant + 1).padStart(2, "0")}`;
 const CastOf = (id) => {
   const entry = CS_MachineGunCaptives.cast.find((row) => row.id === id);
   assert.ok(entry, `过场里没有 ${id}`);
@@ -660,7 +660,7 @@ try {
     const result = await RunModel(record, BaseLook(record));
 
     results.push(result);
-    const faction = record.id.startsWith("LugouIja") ? "ija" : "nra";
+    const faction = record.id.startsWith("TengxianIja") ? "ija" : "nra";
     console.log(`MODEL ${result.modelId} rootDrift=${result.maxRootDrift} restore=${result.maxRestoreError.toExponential(2)}`);
     assert.equal(result.maxRootDrift, 0, `${record.id} 表演层不许动 Actor 世界根`);
     assert.ok(result.maxRestoreError < 1e-12, `${record.id} 还原漂移 ${result.maxRestoreError}`);

@@ -25,6 +25,7 @@
 import { El } from "./Script_EditorUi.mjs";
 import { Studio, FlyCam, ViewportInput } from "./Script_EditorStage.mjs";
 import { ActorEditor } from "./Script_EditorActor.mjs";
+import { FacialEditor } from "./Script_EditorFacial.mjs";
 import { WeaponEditor } from "./Script_EditorWeapon.mjs";
 import { FirstPersonEditor } from "./Script_EditorFirstPerson.mjs";
 import { VfxEditor } from "./Script_EditorVfx.mjs";
@@ -59,7 +60,7 @@ import {
  */
 const SETTINGS = [ControlsSettings, GraphicsSettings, AudioSettings];
 const EDITORS = [
-  ActorEditor, SquadMarchEditor, WeaponEditor, FirstPersonEditor, VfxEditor, AudioEditor, TimelineEditor,
+  ActorEditor, FacialEditor, SquadMarchEditor, WeaponEditor, FirstPersonEditor, VfxEditor, AudioEditor, TimelineEditor,
   SceneEditor, PropLibraryEditor, AssetStandardsEditor, PropPcgEditor, TerrainEditor, SplineEditor, DestructionEditor,
   FullSceneEditor, SamplePointEditor,
 ];

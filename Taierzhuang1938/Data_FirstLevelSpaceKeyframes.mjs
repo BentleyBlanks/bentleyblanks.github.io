@@ -8,52 +8,78 @@
 // need = 至少几个高度通视；mustHide = 一个高度都不许通视。frameDeg = 全部目标（frame:false 除外）须落在这么宽的水平视角里。
 import { FRONT_SORTIE as S, FRONT_SPACE as SP, FRONT_TANK_PATH as TP, FrontTankIndex } from "./Data_FirstLevelFrontRoute.mjs";
 import { MISSION_STAGE_ANCHORS as A } from "./Data_FirstLevelMissionTopology.mjs";
-import { FRONT_GUARD_POSTS, FRONT_FLANK_GROUP } from "./Data_FirstLevelMissionFront.mjs";
+import { FRONT_GUARD_POSTS, FRONT_FLANK_GROUP, FRONT_GUARD_MG_GROUP } from "./Data_FirstLevelMissionFront.mjs";
+import { OPENING_STORYBOARDS as Storyboards } from "./Data_OpeningStoryboards.mjs";
+
+// Wave 1 of the 2026-09-25 storyboard round: the blocks K2 looks past (Data_OpeningStoryboards.wave1Allowances).
+const WAVE1_IGNORE = [Storyboards.wave1Allowances?.revetment].filter(Boolean);
 
 const W = (id) => TP[FrontTankIndex(id)];
+/** The guards that hold the scrape through 03: every FRONT_GUARD_POSTS index except the backslope LMG pair's. */
+function FrontGuardPosts03() {
+  const pair = new Set(FRONT_GUARD_MG_GROUP.members.map((m) => m.guard));
+  return FRONT_GUARD_POSTS.map((p, i) => ({ i, p })).filter(({ i }) => !pair.has(i));
+}
 /** Type 89 (Chi-Ro) heights above ground, metres: hull roof, turret top, gun axis, hull MG, turret MG. */
 export const TANK_HEIGHTS = Object.freeze({ hullTop: 1.7, turretTop: 2.56, turret: 2.35, gun: 2.05, hullMg: 0.96, turretMg: 2.0 });
 const T = TANK_HEIGHTS;
 const Stand = [1.6, 1.2], Kneel = [1.0, 0.75], Crouch = [1.0, 0.7];
 
 export const SPACE_KEYFRAMES = Object.freeze([
-  { id: "K1", label: "01 dugout, waking low view", state: "BunkerCollapsed",
-    camera: { x: -1.3, z: -126.2, eyeM: 0.42 }, look: { ...SP.bunkerJunction, h: 1.2 },
+  // 2026-09-25 storyboard round (contract docs/Data_FirstLevelStoryboard0103Contract.md §2.1, SB03): Shunzi is pinned
+  // in the dugout mouth itself (Data_OpeningStoryboards.shunzi.trap), the eye just inside the door posts and low
+  // over the mud. The interrogation is at the comrade's wall root on the north wall 3.8 m out, J and F beyond it.
+  { id: "K1", label: "01 dugout mouth, pinned low view (SB03)", state: "BunkerCollapsed",
+    camera: { x: 0.35, z: -125.15, eyeM: 0.26 }, look: { x: 4.1, z: -125.6, h: 0.9 },
     targets: [
-      { name: "kill spot (ijaA standing)", at: SP.bunkerKilling, heights: Stand, need: 2 },
-      { name: "comrade against the trench wall (kneeling)", at: { x: 6.5, z: -123.1 }, heights: [1.0, 0.7], need: 2 },
+      { name: "ijaA holding the comrade (standing)", at: { x: 4.1, z: -125.63 }, heights: Stand, need: 2 },
+      { name: "comrade kneeling at the north wall", at: { x: 4.06, z: -125.9 }, heights: [1.0, 0.7], need: 2 },
       { name: "junction J (ijaD standing)", at: SP.bunkerJunction, heights: Stand, need: 2 },
       { name: "fold F (ijaC standing)", at: SP.bunkerFold, heights: Stand, need: 2 },
-      { name: "rifle in the mouth", at: { x: 0.1, z: -125.7 }, heights: [0.08], need: 1 },
+      { name: "rifle in the mouth mud", at: { x: 1.25, z: -125.75 }, heights: [0.08], need: 1 },
     ] },
-  // C's intact-state check: before the collapse, sitting in the dugout, the roof must not hide the trench.
-  { id: "K1i", label: "01 opening, intact dugout, sitting", state: "BunkerIntact",
-    camera: { x: -1.3, z: -126.2, eyeM: 0.9 }, look: { ...SP.bunkerJunction, h: 1.2 },
+  // C's intact-state check: before the collapse, sitting at the back of the dugout (SB01 seat), the roof must not
+  // hide the trench.
+  { id: "K1i", label: "01 opening, intact dugout, sitting (SB01)", state: "BunkerIntact",
+    camera: { x: -1.95, z: -126.25, eyeM: 0.95 }, look: { ...SP.bunkerJunction, h: 1.2 },
     targets: [
       { name: "trench floor outside the mouth", at: SP.bunkerBend, heights: [0.6], need: 1 },
       { name: "a runner coming down the trench (J)", at: SP.bunkerJunction, heights: [1.5, 1.2], need: 2 },
     ] },
-  { id: "K2", label: "02 over the translator's shoulder to the leader", state: "BunkerCollapsed",
-    camera: { x: SP.shunziDragged.x, z: SP.shunziDragged.z, eyeM: 0.9 }, look: { ...SP.rearCorner, h: 1.4 },
+  // 2026-09-25 storyboard round (contract §2.6, SB05): 02's circle closes in the SSW leg's north mouth
+  // (Data_OpeningStoryboards.shunzi.dragged); held up by the collar he looks south past ijaA's shoulder down the straight
+  // leg to Luo creeping up its west wall and He behind him. The eye sits in BunkerSouthRevetment until its east end is
+  // opened (pendingWiring SB04A/SB05): the rows ignore it through Data_OpeningStoryboards.wave1Allowances.revetment.
+  { id: "K2", label: "02 past ijaA's shoulder down the SSW leg to the leader (SB05)", state: "BunkerCollapsed",
+    camera: { x: 0.6, z: -123.9, eyeM: 0.75 }, look: { x: -3.1, z: -116.9, h: 1.0 },
     targets: [
-      { name: "Luo at the rear corner RC", at: SP.rearCorner, heights: Stand, need: 2 },
-      { name: "Luo halfway up the SSW leg", at: { x: -2, z: -116.5 }, heights: Stand, need: 2 },
-      { name: "RC frame lintel (landmark)", at: SP.rearCorner, heights: [2.3], need: 1, ignore: ["RearCornerLintel"] },
+      { name: "Luo creeping up the SSW leg's west wall", at: { x: -3.1, z: -116.9 }, heights: Crouch, need: 2, ignore: WAVE1_IGNORE },
+      { name: "ijaB standing guard in the leg", at: { x: 0.04, z: -119.94 }, heights: Stand, need: 2, ignore: WAVE1_IGNORE },
     ] },
-  // 02 return-of-control spot: the mouth spoil hides it from the fold F and the junction J.
-  { id: "K2b", label: "02 return spot behind the mouth spoil", state: "BunkerCollapsed",
-    camera: { x: A.bunkerRear.x, z: A.bunkerRear.z, eyeM: 1.0 }, look: { ...SP.bunkerFold, h: 1.5 },
+  // 02 hand-back seat (contract §2.9, SB06: Data_OpeningStoryboards.shunzi.cover) east of the mouth rubble: J is in view
+  // (its man is down by then, Liu's shot) and so is F -- a known exposure, recorded here as a need row: from the seat F is
+  // 4.5° from J, and no seat within ±0.6 m hides F while J stays in view (09-25 grid probe), so no rubble can mask F alone.
+  // The hand-back hold-fire covers it (Data_OpeningStoryboards.rescue.handbackHoldFireS; Script_FirstLevelCampaignOpening
+  // asserts it). The old return spot behind the spoil (bunkerRear, both hidden) stays measured by Script_FirstLevelSpaceTest.
+  { id: "K2b", label: "02 hand-back seat east of the mouth rubble (SB06)", state: "BunkerCollapsed",
+    camera: { x: 2.4, z: -125.2, eyeM: 1.0 }, look: { ...SP.bunkerJunction, h: 1.2 },
     targets: [
-      { name: "ijaC at the fold F (standing)", at: SP.bunkerFold, heights: [1.6, 1.2], mustHide: true },
-      { name: "a man at the junction J (standing)", at: SP.bunkerJunction, heights: [1.6, 1.2], mustHide: true },
+      { name: "the junction J down the front trench", at: SP.bunkerJunction, heights: [1.6, 1.2], need: 2 },
+      { name: "the fold F beyond J (known exposure, covered by the hand-back hold-fire)", at: SP.bunkerFold, heights: [1.6, 1.2], need: 2 },
     ] },
   { id: "K3", label: "03 observation step: guards, gap, burning nest", state: "BunkerIntact", frameDeg: 80,
     camera: { x: SP.observation.x, z: SP.observation.z, eyeM: 1.6 }, look: { x: -7.3, z: -154.6, h: 1.0 },
     targets: [
       // Every guard reads kneeling (both heights) AND lying (0.5 m, the AI's prone chest): 09.23 review found 7 of 8
       // prone in the engine and hidden by the scrape lip.
-      ...FRONT_GUARD_POSTS.map((p, i) => ({ name: `guard ${i} kneeling in the scrape`, at: p, heights: Kneel, need: 2 })),
-      ...FRONT_GUARD_POSTS.map((p, i) => ({ name: `guard ${i} lying in the scrape`, at: p, heights: [0.5], need: 1 })),
+      // 09-25 storyboard round (contract Data_FirstLevelStoryboard0103Contract §2.11): guards 6 and 7 spend 03 as the
+      // backslope LMG pair (FRONT_GUARD_MG_GROUP), not on their scrape posts, so six guards are measured in the scrape
+      // and the pair where it lies (prone chest 0.5 m, and kneeling for the moment it comes down); the K3 job -- guards,
+      // gap, burning nest in one look -- is unchanged, the frame gets narrower (the pair sits between the guards and the nest).
+      ...FrontGuardPosts03().flatMap(({ i, p }) => [{ name: `guard ${i} kneeling in the scrape`, at: p, heights: Kneel, need: 2 },
+        { name: `guard ${i} lying in the scrape`, at: p, heights: [0.5], need: 1 }]),
+      ...FRONT_GUARD_MG_GROUP.members.flatMap((m) => [{ name: `LMG ${m.role} (guard ${m.guard}) lying on the backslope`, at: { x: m.x, z: m.z }, heights: [0.5], need: 1 },
+        { name: `LMG ${m.role} (guard ${m.guard}) kneeling on the backslope`, at: { x: m.x, z: m.z }, heights: Kneel, need: 2 }]),
       { name: "the gap (a man crossing, crouched)", at: S.gap, heights: Crouch, need: 2 },
       { name: "nest MG muzzle over the west wall", at: { x: 24.0, z: -153.9 }, heights: [1.55, 1.4], need: 1 },
       { name: "nest gable peak (landmark)", at: { x: 37, z: -151.2 }, heights: [5.2, 4.4], need: 1,

@@ -674,6 +674,7 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
   口径与施工单见 `docs/Data_MissionRemake.md` §10.7。
 
 ### 编辑器与调试工具
+- 人物面部：`Script_EditorFacial.mjs`，配套录音、口型/表情近景与关键帧草稿；见 [人物面部编辑器](Data_FacialEditor.md)。
 - `Script_Editor.mjs` —— 外壳与调度；**一次只开一个**（要接管相机的同开必抖）。
 - `Script_Editor{Scene,FullScene,Actor,Weapon,FirstPerson,Audio,Timeline,Vfx,Destruction,PropLibrary,PropPcg,SamplePoints,Terrain,Splines,Settings,Stage,Ui,DebugRendering,Profiler,WorldInfo,PlayerState}.mjs`
   （另含 AssetStandards = 资产规范只读总表；Splines = 场景样条PCG：道路 + 围墙的中心线编辑 + 拼接资产台与 WALL_PRESETS 滑杆）。

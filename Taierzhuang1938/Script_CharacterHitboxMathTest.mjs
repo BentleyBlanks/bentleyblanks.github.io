@@ -54,7 +54,7 @@ assert.equal(RaycastCapsule({ x: 0, y: 0, z: 5 }, forward, top, bottom, 0.4), 0,
     return best && { first: best.shape.id, owner: JointOwner(shapes, best.shape, point).id };
   };
 
-  // 实测帧：GoreRangeTest 木桩 L10_1（LugouIja01）站定据枪，右膝弯着、胫骨往后斜；
+  // 实测帧：GoreRangeTest 木桩 L10_1（TengxianIja01）站定据枪，右膝弯着、胫骨往后斜；
   // 玩家 4 m 外开镜瞄右小腿中点，子弹从枪口往下 17° 进来（2026-09-13 master 取证）。
   const knee = V(3331.838, 0.431, 3348.000);
   const thighR = Limb("thighR", "thighR", "calfR", V(3331.906, 0.778, 3348.005), knee, 0.089);

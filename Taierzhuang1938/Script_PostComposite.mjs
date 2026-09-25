@@ -159,6 +159,10 @@ uniform float uFade;        // 黑场
 uniform float uEyeClosure;  // Scripted eyelids, zero leaves ordinary rendering unchanged.
 uniform vec4 uConcussion;   // intensity, focus loss, blur pixels, secondary image pixels
 uniform vec3 uConcussionGrade; // secondary image mix, desaturation, peripheral dimming
+// 01–02 storyboard lens (Script_OpeningLens; zero / off everywhere else):
+uniform float uRadialBlur;   // SB02: edges dragged outward (uv at the corner per unit), inside the concussion taps
+uniform vec4 uBloodEdge;     // rgb multiplicative tint, a strength (SB03 blood-red corners)
+uniform vec4 uBloodCorners;  // weights top-left, top-right, bottom-left, bottom-right
 uniform vec4 uLidShape;      // feather, curvature, tilt, upper lid share
 
 // --- SEGMENT encode ---------------------------------------------------------
@@ -213,22 +217,33 @@ vec3 MotionBlur(vec2 uv, vec2 centered, float r2, vec4 nd) {
   // Concussion is an optical response, independent of velocity/TAA history.
   // A compact Gaussian footprint keeps silhouettes continuous; the centre
   // resolves earlier than the periphery. No extra pass, target or sampler.
-  if(uConcussion.y>0.001){
+  // The storyboard's radial blur (SB02) rides the same nine taps: each tap is also pulled towards the
+  // centre by a growing share of streak, so the periphery smears outward and the centre stays put
+  // (streak is 0 there). No extra pass, target, sampler or tap.
+  if(uConcussion.y>0.001||uRadialBlur>0.0001){
     float peripheral=smoothstep(.015,.32,r2);
     vec2 radius=vec2(uConcussion.z*uConcussion.y*(.35+.65*peripheral))/uResolution;
-    vec3 soft=texture2D(uHdr,uv).rgb*.25;
-    soft+=(texture2D(uHdr,clamp(uv+vec2(radius.x,0.0),0.0,1.0)).rgb
-          +texture2D(uHdr,clamp(uv-vec2(radius.x,0.0),0.0,1.0)).rgb
-          +texture2D(uHdr,clamp(uv+vec2(0.0,radius.y),0.0,1.0)).rgb
-          +texture2D(uHdr,clamp(uv-vec2(0.0,radius.y),0.0,1.0)).rgb)*.125;
-    soft+=(texture2D(uHdr,clamp(uv+radius,0.0,1.0)).rgb
-          +texture2D(uHdr,clamp(uv-radius,0.0,1.0)).rgb
-          +texture2D(uHdr,clamp(uv+vec2(radius.x,-radius.y),0.0,1.0)).rgb
-          +texture2D(uHdr,clamp(uv+vec2(-radius.x,radius.y),0.0,1.0)).rgb)*.0625;
+    // A small per-pixel, per-frame jitter of the streak length joins the nine copies into one smear; kept narrow
+    // (±15 %) so it reads as a directional drag, not grain, and TAA averages what is left.
+    vec2 streak=centered*uRadialBlur*peripheral*2.0*(.85+.3*Hash12(gl_FragCoord.xy+uFrame*7.13));
+    vec3 center=texture2D(uHdr,uv).rgb;
+    vec3 soft=center*.25;
+    soft+=(texture2D(uHdr,clamp(uv+vec2(radius.x,0.0)-streak*.25,0.0,1.0)).rgb
+          +texture2D(uHdr,clamp(uv-vec2(radius.x,0.0)-streak*.5,0.0,1.0)).rgb
+          +texture2D(uHdr,clamp(uv+vec2(0.0,radius.y)-streak*.75,0.0,1.0)).rgb
+          +texture2D(uHdr,clamp(uv-vec2(0.0,radius.y)-streak,0.0,1.0)).rgb)*.125;
+    soft+=(texture2D(uHdr,clamp(uv+radius-streak*.125,0.0,1.0)).rgb
+          +texture2D(uHdr,clamp(uv-radius-streak*.375,0.0,1.0)).rgb
+          +texture2D(uHdr,clamp(uv+vec2(radius.x,-radius.y)-streak*.625,0.0,1.0)).rgb
+          +texture2D(uHdr,clamp(uv+vec2(-radius.x,radius.y)-streak*.875,0.0,1.0)).rgb)*.0625;
     vec2 offset=vec2(uConcussion.w,-uConcussion.w*.22)*uConcussion.y/uResolution;
     vec3 secondary=texture2D(uHdr,clamp(uv+offset,0.0,1.0)).rgb;
     vec3 blurred=mix(soft,secondary,uConcussionGrade.x*uConcussion.y*(.25+.75*peripheral));
-    return mix(clear,blurred,smoothstep(0.0,.08,uConcussion.y));
+    // Keep the channel split of the plain tap on top of the smear (SB02 wants both at once); both effects fade
+    // in smoothly from zero (no step where the radial blur crosses a threshold).
+    float radialWeight=smoothstep(0.0,.01,uRadialBlur);
+    blurred+=(clear-center)*radialWeight;
+    return mix(clear,blurred,max(smoothstep(0.0,.08,uConcussion.y),radialWeight));
   }
   return clear;
 }
@@ -479,6 +494,17 @@ vec3 LensEffects(vec3 color, vec2 uv, float r2, float gradedLuma) {
     color *= mix(vec3(1.0), vec3(1.0, 0.40, 0.32), edge * uDamage * 0.60);
   }
 
+  // 01–02 storyboard blood edge (SB03 「四角血红」): the outer ring, weighted per corner (bilinear over the
+  // frame) and broken into blotches, is pulled towards a dark blood red that keeps a little of the scene's
+  // light — red reads on dark mud too, which a multiplicative tint cannot do. Zero outside 01–02.
+  if (uBloodEdge.a > 0.001) {
+    float corner = mix(mix(uBloodCorners.z, uBloodCorners.w, uv.x), mix(uBloodCorners.x, uBloodCorners.y, uv.x), uv.y);
+    float ring = smoothstep(0.06, 0.40, r2);
+    float blotch = .62 + .38 * sin(uv.x * 11.0 + sin(uv.y * 7.0) * 2.3) * sin(uv.y * 9.0 + sin(uv.x * 5.0) * 1.7 + 1.3);
+    float blood = clamp(ring * corner * blotch * uBloodEdge.a * 3.4, 0.0, 0.92);
+    color = mix(color, uBloodEdge.rgb * (.28 + .72 * Luma(color)), blood);
+  }
+
   // 暗角：别做成一圈发灰的环，压的是亮度不是加黑纱
   float vig = 1.0 - uVignette * smoothstep(0.02, 0.50, r2);
   color *= vig;
@@ -587,6 +613,7 @@ export class CompositePass {
       uHitGhostMix: { value: HIT_DISORIENTATION.ghostMix },
       uDamage: { value: 0 }, uFade: { value: 0 }, uEyeClosure:{value:0},
       uConcussion:{value:new THREE.Vector4()},
+      uRadialBlur:{value:0}, uBloodEdge:{value:new THREE.Vector4()}, uBloodCorners:{value:new THREE.Vector4(1,1,1,1)},
       uConcussionGrade:{value:new THREE.Vector3(OPENING_PERCEPTION.ghostMix,OPENING_PERCEPTION.desaturation,OPENING_PERCEPTION.vignette)},
       uLidShape:{value:new THREE.Vector4(OPENING_PERCEPTION.lidFeather,OPENING_PERCEPTION.lidCurve,OPENING_PERCEPTION.lidTilt,OPENING_PERCEPTION.lidUpperShare)},
       uDofStrength: { value: 0 }, uDofFocus: { value: 1.5 },
@@ -739,6 +766,13 @@ export class CompositePass {
     U.uConcussion.value.set(Math.max(0,Math.min(1,concussion?.amount||0)),
       Math.max(0,Math.min(1,concussion?.focus||0)),perception.blurPx*pixelScale,
       this.reducedMotion?.matches?0:perception.ghostPx*pixelScale);
+    // 01–02 storyboard lens (Script_OpeningLens.ApplyLensToPost); absent = off.
+    U.uRadialBlur.value = this.reducedMotion?.matches ? 0 : Math.max(0, options.radialBlur || 0);
+    const blood = options.bloodEdge;
+    if (blood?.strength > 0) {
+      U.uBloodEdge.value.set(blood.tint[0], blood.tint[1], blood.tint[2], Math.min(1, blood.strength));
+      U.uBloodCorners.value.fromArray(blood.corners);
+    } else U.uBloodEdge.value.w = 0;
     U.uDofStrength.value = options.dofStrength ?? 0;
     U.uDofFocus.value = options.dofFocus ?? 1.5;
     U.uDofRange.value = options.dofRange ?? 2.8;

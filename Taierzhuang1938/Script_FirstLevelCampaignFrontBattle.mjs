@@ -7,6 +7,7 @@ import path from "node:path";
 import { FRONT_SORTIE as S, FRONT_SPACE as Space } from "./Data_FirstLevelFrontRoute.mjs";
 import { MISSION_ROUTES as Routes, MISSION_ANCHORS as A } from "./Data_FirstLevelMissionLayout.mjs";
 import { MISSION_STAGE_ROUTES } from "./Data_FirstLevelMissionTopology.mjs";
+import { MISSION_ENCOUNTERS } from "./Data_FirstLevelMission.mjs";
 import { CampaignActions, Snapshot03Entry, Report03Damage } from "./Script_FirstLevelCampaignKit.mjs";
 import { DriveBundleThrow } from "./Script_FirstLevelBundleThrowDriver.mjs";
 import { FRONT_BATTLE_TUNING as B } from "./Data_Tuning_FirstLevelFront.mjs";
@@ -14,6 +15,8 @@ import { TANK } from "./Data_Tuning_Tank.mjs";
 import { FIRST_LEVEL_CHECKPOINT_FRONT_LOST } from "./Data_FirstLevelMissionStages.mjs";
 import { InstallSpeakerActing, CheckFrontActing } from "./Script_FirstLevelCampaignOpening.mjs";
 
+// --front-clear-from-door: see ClearNestFromDoor below (opt-in, not the gate default since the 09-25 review).
+const clearFromDoor=process.argv.includes("--front-clear-from-door");
 export async function DriveFrontBattle(ctx){
   const {page,output}=ctx,{Route,Interact,WaitStage,CaptureFocus}=CampaignActions(ctx);
   async function State(){return page.evaluate(()=>window.Tengxian.Debug.FirstLevelMission());}
@@ -82,7 +85,7 @@ export async function DriveFrontBattle(ctx){
     }
     return {kind:"direct",points:[S.seat]};
   }
-  async function ReturnToSeat(label){
+  async function ReturnToSeat(label,again=true){
     const off=await page.evaluate(({x,z})=>{const p=window.Tengxian.player.position;return {d:Math.hypot(p.x-x,p.z-z),x:p.x,z:p.z,alive:window.Tengxian.player.alive};},S.seat);
     if(!off.alive)return;
     const plan=SeatPath(off);
@@ -90,7 +93,14 @@ export async function DriveFrontBattle(ctx){
     // however close the seat looks.
     if(off.d<=3&&plan.kind!=="west")return;
     console.log("RETURN_TO_SEAT",JSON.stringify({label,at:[+off.x.toFixed(2),+off.z.toFixed(2)],d:+off.d.toFixed(2),kind:plan.kind}));
-    await Route(plan.points,label,{stance:"crouch",fight:true,recoverAfterEvade:true,replanAfterEvade:at=>SeatPath(at).points});
+    // A second grenade dive on the way back can still stall the walk (09-25 fix run 4: stalled at 23.86,-151.44 with the
+    // route already going round by the door). A player walks round again from where he landed: one more ReturnToSeat.
+    await Route(plan.points,label,{stance:"crouch",fight:true,recoverAfterEvade:true,replanAfterEvade:at=>SeatPath(at).points})
+      .catch(async error=>{
+        if(!again||!/actual body reached route end/.test(error?.message||""))throw error;
+        console.log(`${label}: stalled after an evade on the way back, going round again from where the body is`);
+        await ReturnToSeat(label+"Again",false);
+      });
   }
   // 04 short withdrawal from where the player stands: into the nest the way ReturnToSeat goes, then the authored rear
   // route (from its nearest point when he is already in the yard with a clear line). Planned again after a dodge.
@@ -153,7 +163,7 @@ export async function DriveFrontBattle(ctx){
       assert.ok(s.distances.zhouFromHe>=1,`${stage} begins with Zhou and He apart`+why);
     }
     // The rifle batch is home (the alive ones), at least one of them made it; the tank is still whole.
-    const first=s.guards.slice(0,2);
+    const first=s.guards.slice(0,B.firstBatch);
     assert.ok(first.some(x=>x.alive)&&first.filter(x=>x.alive).every(x=>x.safe),`${stage} begins with the first guard batch safe`+why);
     // ... and holding in the safe zone, not anchored back on the front-trench post he left (a checkpoint start
     // once marked them safe but left the hold on the post: they walked back and died to the 05 tank).
@@ -184,7 +194,7 @@ export async function DriveFrontBattle(ctx){
       for(const e of front)assert.ok(e.fromPlayer>=20,`${stage} begins with ${e.id} on his post, ${e.fromPlayer} m from the player, not in his face`+why);
     }
     if(stage==="MachineGun"){
-      assert.ok(s.guards.slice(2).some(x=>x.alive&&!x.safe),"04 begins with the second guard batch still out"+why);
+      assert.ok(s.guards.slice(B.firstBatch).some(x=>x.alive&&!x.safe),"04 begins with the second guard batch still out"+why);
       if(source==="checkpoint")assert.ok(s.distances.playerFromSeat<=4,"04 begins with the player in the right nest"+why);
     }
     if(stage==="Tank"){
@@ -307,6 +317,38 @@ export async function DriveFrontBattle(ctx){
     console.log("FRONT_STUCK",JSON.stringify(stuck).slice(0,3000));
     throw error;
   }
+  // --front-clear-from-door (opt-in, not the gate's default): clear the nest from its door bend (FRONT_SORTIE.approach[-3])
+  // before walking in: fight from there until the approach defenders are down or maxS runs out; a grenade dodge that
+  // carries the body more than 3 m off the bend walks back to it.
+  // History: 09-25 Front step 2 made this the default after Luo's pointing hold (then scriptedNoncombatant) put 03 on a
+  // branch where a run that dodged a grenade at the door walked straight onto the seat past a live RightEntryGuard and
+  // died in his bayonet fight. The 09-25 review: that hid a game change behind a driver change, and the gate no longer
+  // covered a player who dodges and goes straight to the seat. The hold now only lowers his rifle (FrontBattle.PointQuiet)
+  // and the default drive is back to walking straight in (with the west-door way round when an evade stalls it).
+  async function ClearNestFromDoor(maxS=45){
+    const bend=S.approach.at(-3),ids=MISSION_ENCOUNTERS.approach.map(e=>e.id);
+    let state;
+    for(let i=0;i<maxS;i+=5){
+      state=await page.evaluate(({ids})=>{
+        const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime(),Clear=()=>ids.every(id=>!r.enemies.get(id)?.alive);
+        for(let f=0;f<300&&g.player.alive&&!Clear();f++){
+          const evading=window.MissionInputDriver.EvadeGrenade(),foe=evading?null:window.MissionInputDriver.Target(90);
+          if(foe)window.MissionInputDriver.Shoot(foe);
+          else if(!evading){g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);if(g.state.activeSlot==="melee")g.Debug.Key("Digit1");if(g.state.ammo===0)g.Debug.Key("KeyR");}
+          if(g.player.bleeding&&g.player.health<80)g.Debug.Key("KeyB");
+          g.StepFrames(1,1/60,false);
+        }
+        g.Debug.Mouse(0,false);g.Debug.Mouse(2,false);
+        return {alive:g.player.alive,clear:Clear(),time:r.time,x:g.player.position.x,z:g.player.position.z,
+          left:ids.filter(id=>r.enemies.get(id)?.alive)};
+      },{ids});
+      console.log("ClearNestFromDoor",JSON.stringify(state));
+      if(state.clear||!state.alive)break;
+      if(Math.hypot(state.x-bend.x,state.z-bend.z)>3)await Route([bend],"ClearNestReturn",{stance:"crouch",fight:true,crawl:true,recoverAfterEvade:true});
+    }
+    assert.ok(state.alive,"ClearNestFromDoor: player alive at the nest's door bend");
+    return state;
+  }
   async function DriveLegs(){
   let guardIds=null;
   if(checkpoint){
@@ -317,7 +359,21 @@ export async function DriveFrontBattle(ctx){
     guardIds=entry.guards.map(x=>x.id);
   }
   if(ctx.stageFrom<=3){
-  await Route(Routes.support,"RightNestApproach",{stance:"crouch",fight:true,crawl:true,recoverAfterEvade:true});
+  await Route(Routes.support.slice(0,-2),"RightNestApproach",{stance:"crouch",fight:true,crawl:true,recoverAfterEvade:true}).catch(async error=>{
+    // A grenade dodge at the west door can leave the body south of the nest's west parapet (23.3,-153); the evade
+    // rejoin then aims at the nearest corridor point, the door->seat leg on the other side of that parapet, and the
+    // bot walks into it for good (09-25 runs 6 and 8, the nest gunner alive behind it). A player walks back round
+    // through the west door: the last three approach points (door bend, west door, seat), fighting as before.
+    if(!/actual body reached route end/.test(error?.message||""))throw error;
+    console.log("RightNestApproach: stalled after an evade, going round through the west door");
+    await Route(S.approach.slice(-3,-2),"RightNestApproachViaDoor",{stance:"crouch",fight:true,crawl:true,recoverAfterEvade:true});
+  });
+  if(clearFromDoor)await ClearNestFromDoor();
+  await Route(S.approach.slice(-2),"RightNestEntry",{stance:"crouch",fight:true,crawl:true,recoverAfterEvade:true}).catch(async error=>{
+    if(!/actual body reached route end/.test(error?.message||""))throw error;
+    console.log("RightNestEntry: stalled after an evade, going round through the west door");
+    await Route(S.approach.slice(-3),"RightNestEntryViaDoor",{stance:"crouch",fight:true,crawl:true,recoverAfterEvade:true});
+  });
   await WaitFact("rightNestCaptured",90,true);
   const sight=await page.evaluate(async()=>{
     const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime(),{FRONT_SORTIE:S}=await import('./Data_FirstLevelFrontRoute.mjs');
@@ -374,9 +430,10 @@ export async function DriveFrontBattle(ctx){
   await CaptureFocus("RightNestCaptured",S.gap);
   const first=await HoldNest({stage:"MachineGun"},240,"ReturnToNestAfterEvade");
   await Report03Damage(ctx);
-  assert.ok(first.mission.guards.slice(0,2).some(g=>g.alive));
-  assert.ok(first.mission.guards.slice(0,2).filter(g=>g.alive).every(g=>g.safe));
-  assert.ok(first.mission.guards.slice(2).some(g=>g.alive&&!g.safe));
+  // First batch B.firstBatch (5 since the 09-25 storyboard round, it was 2).
+  assert.ok(first.mission.guards.slice(0,B.firstBatch).some(g=>g.alive));
+  assert.ok(first.mission.guards.slice(0,B.firstBatch).filter(g=>g.alive).every(g=>g.safe));
+  assert.ok(first.mission.guards.slice(B.firstBatch).some(g=>g.alive&&!g.safe));
   // 契约 §2.6：04 开始时何有田已接枪、老周已离枪 10 m（走回集结处是 05 的条件，这时可能还在路上）。
   assert.ok(first.mission.facts.includes("leftGunHandover")&&first.mission.facts.includes("zhouLeftGun"));
   if(ctx.stageTo>3)await EntryState("MachineGun","continuous");
@@ -533,9 +590,11 @@ export async function DriveFrontBattle(ctx){
   }
   await CaptureFocus("TankDisabled",state.tank);
   // Back along the branch from wherever the body is now (the bomb-first wait already stands a bend back).
-  const retreat=[...S.attackRoute].reverse(),here=await page.evaluate(()=>({x:window.Tengxian.player.position.x,z:window.Tengxian.player.position.z}));
-  const from=retreat.reduce((best,p,i)=>Math.hypot(p.x-here.x,p.z-here.z)<Math.hypot(retreat[best].x-here.x,retreat[best].z-here.z)?i:best,0);
-  await Route(retreat.slice(from),"AttackBranchRetreat",{stance:"crouch",fight:true,crawl:true});
+  // Joined at the body's projection on the branch (rejoinRoute), not at its nearest corner: a shell blast threw the
+  // body 0.9 m west of the (43.6,-159.6)->(41.8,-154.8) leg and the straight line to that nearest corner clipped the
+  // east end of the attack-lane parapet (39.9,-156.6) for good (09-25 run 9).
+  const retreat=[...S.attackRoute].reverse();
+  await Route(retreat,"AttackBranchRetreat",{stance:"crouch",fight:true,crawl:true,rejoinRoute:retreat});
   // Contract §2.6 (Front package step 2): the last batch crosses while the pair walks back. Like Luo, cover the
   // gap from the nest's west door (K10) until the batch is home, then go down the right low trench to the safe zone
   // (FRONT_SPACE.returnMeet: Liu, He and the relief NCO), and on to the collection.

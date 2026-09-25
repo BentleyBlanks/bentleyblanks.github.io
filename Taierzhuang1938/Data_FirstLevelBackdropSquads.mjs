@@ -45,6 +45,41 @@ export const BACKDROP_FIRE_POINTS = Object.freeze({
   linkSap: P(23.5, -130, 1.0, 1.8),
 });
 
+// ---------------------------------------------------------------------------
+// 01 开场（近爆之前）洞口正前方东沟的纵深：分镜 SB01「纵深有人远去」（契约
+// docs/Data_FirstLevelStoryboard0103Contract.md §2 第 3 条）。撤向后沟的人出洞口右转（导演的 exitRoute），
+// 纵深里放三名**往前沿去**的川军背对镜头走远：Banter 时站在沟里朝东，传令兵进洞后（Orders 起 delayS 秒）
+// 沿东沟走向岔口 J、拐进连接支沟，走到末点且不在镜头里就收走（最迟近爆那一刻）。
+// 运行时由 01–02 导演（Script_OpeningStoryboards）生成与收走：剧本兵，不开枪，不进任务敌人表。
+//   members[] { id, start:{x,z}, route:[{x,z}…] }；speedMps 走速；delayS 从 Orders 开始算。
+// ---------------------------------------------------------------------------
+const W = (x, z) => Object.freeze({ x, z });
+export const OPENING_DEPTH_WALKERS = Object.freeze({
+  delayS: 1.4, speedMps: 1.25, staggerS: 0.5,
+  members: Object.freeze([
+    Object.freeze({ id: "DepthNraA", start: W(9.4, -124.75), route: Object.freeze([W(14, -124.6), W(18.2, -125.6), W(21.2, -128.0)]) }),
+    Object.freeze({ id: "DepthNraB", start: W(10.6, -124.45), route: Object.freeze([W(14, -124.6), W(18.2, -125.6), W(21.2, -128.0)]) }),
+    Object.freeze({ id: "DepthNraC", start: W(11.9, -124.8), route: Object.freeze([W(14, -124.6), W(18.2, -125.6), W(21.2, -128.0)]) }),
+  ]),
+});
+
+// ---------------------------------------------------------------------------
+// 01 翻译与日兵乙退下南南西沟之后（分镜 SB03A「纵深有背身远去的日兵」，契约 §5）：两名日军从弯角弹坑台阶
+// （南南西沟那头搜完后沟回来，在画面外）下到前沟，背对洞口沿东沟南侧走向岔口 J、拐进纵深支沟，走到末点且不在
+// 镜头里就收走；最迟 02 开始（Hold）收走。Wipe 开始时生成、原地站着，afterWipeS 起逐个出发（staggerS 间隔）。
+// 时刻按 SB03A（Reach 3 s，约 Wipe 起 9.7 s）排：那一刻前一个约在 x 9.5、后一个约在 x 6.5，都在日兵甲右边。
+// 运行时由 01–02 导演（Script_OpeningStoryboards.DepthIja）生成与收走：剧本兵，不开枪，不进任务敌人名册
+// （01–05 累计名册 49 人不含这两人；他们只活在 01 的 Wipe→Boots 里，不占 03–05 的同时存活预算）。
+// ---------------------------------------------------------------------------
+const IJA_DEPTH_ROUTE = Object.freeze([W(3.3, -123.6), W(6, -123.3), W(10, -123.35), W(13.6, -123.6), W(15.2, -118.5), W(17.5, -111)]);
+export const OPENING_DEPTH_IJA = Object.freeze({
+  afterWipeS: 3.6, speedMps: 1.4, staggerS: 1.7,
+  members: Object.freeze([
+    Object.freeze({ id: "DepthIjaA", start: W(3.1, -121.3), route: IJA_DEPTH_ROUTE }),
+    Object.freeze({ id: "DepthIjaB", start: W(2.6, -120.8), route: IJA_DEPTH_ROUTE }),
+  ]),
+});
+
 const Stop = (x, z, holdS, fire) => Object.freeze({ x, z, holdS, fire: Object.freeze(fire) });
 const Roster = MISSION_ENCOUNTERS.bunkerBackdrop;
 // Where the Japanese pause on the way down: the link sap's second fold (fire at RC over the field)
@@ -59,6 +94,10 @@ const IjaRoute = (spec) => Object.freeze(spec.route.map((p) => {
 // Runtime ids keep the Ai package's lettering (BackdropIjaA… / BackdropNraA…); rosterId is the Space id.
 const Letter = (id) => String.fromCharCode(65 + Number(id.match(/(\d+)$/)?.[1] || 0));
 const NRA_FIRE = Object.freeze({ BunkerBackdropNra0: ["junction", "fold"], BunkerBackdropNra1: ["fold", "linkSap"], BunkerBackdropNra2: ["fold", "junction"] });
+// 02 分镜 SB05（契约 docs/Data_FirstLevelStoryboard0103Contract.md §5）：顺子从南南西沟北口往南看整条直沟，罗班长、
+// 何有田贴西壁从折角 RC 摸来；名册里站在 RC 口的还击者（-5.6,-112）正好在这条视线的尽头，读成「一群人在交火」。
+// 他挪到折角西侧后交通壕里（x ≤ -8 在 RC 门框与沟壁背后，静态视线探针实测看不见），仍朝 J / F 还击。
+const NRA_POST = Object.freeze({ BunkerBackdropNra0: Object.freeze({ x: -8.4, z: -112.0 }) });
 
 export const BACKDROP_SQUADS = Object.freeze({
   encounter: "bunkerBackdrop",
@@ -73,8 +112,8 @@ export const BACKDROP_SQUADS = Object.freeze({
   // 走完路线的日军：离开视野再收，最迟这么多秒后收。
   retireMaxS: 25,
   members: Object.freeze(Roster.map((spec) => spec.side === "nra"
-    ? Object.freeze({ id: `BackdropNra${Letter(spec.id)}`, rosterId: spec.id, side: "nra", weapon: spec.weapon, x: spec.x, z: spec.z,
-      delayS: 2, speedMps: 0, route: Object.freeze([Stop(spec.x, spec.z, 0, NRA_FIRE[spec.id] || ["junction"])]) })
+    ? ((p) => Object.freeze({ id: `BackdropNra${Letter(spec.id)}`, rosterId: spec.id, side: "nra", weapon: spec.weapon, x: p.x, z: p.z,
+      delayS: 2, speedMps: 0, route: Object.freeze([Stop(p.x, p.z, 0, NRA_FIRE[spec.id] || ["junction"])]) }))(NRA_POST[spec.id] || spec)
     : Object.freeze({ id: `BackdropIja${Letter(spec.id)}`, rosterId: spec.id, side: "ija", weapon: spec.weapon, x: spec.x, z: spec.z,
       delayS: spec.delayS || 0, speedMps: 3.0, retire: true, route: IjaRoute(spec) }))),
 });

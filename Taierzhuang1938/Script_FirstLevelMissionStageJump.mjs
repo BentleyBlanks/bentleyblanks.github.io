@@ -1,9 +1,11 @@
 import { FRONT_SORTIE as Sortie } from "./Data_FirstLevelFrontRoute.mjs";
 import { MISSION_STAGES, MISSION_ENCOUNTERS, MISSION_TUNING as R } from "./Data_FirstLevelMission.mjs";
-import { MISSION_ANCHORS as A, MISSION_PLACEMENT as P } from "./Data_FirstLevelMissionLayout.mjs";
+import { MISSION_ANCHORS as A, MISSION_PLACEMENT as P, MISSION_ROUTES } from "./Data_FirstLevelMissionLayout.mjs";
+import { MissionRoutePoint, MissionRouteProjection } from "./Script_FirstLevelMissionColumn.mjs";
 import { BuildFirstLevelCheckpoint } from "./Script_FirstLevelMissionCheckpoint.mjs";
 import { FIRST_LEVEL_STAGE_ENCOUNTERS, FIRST_LEVEL_ENCOUNTER_STARTS, FIRST_LEVEL_STAGE_CLEARED_ENEMIES, FIRST_LEVEL_DEFERRED_ENCOUNTERS, FIRST_LEVEL_CHECKPOINT_ENEMY_POSTS } from "./Data_FirstLevelMissionStages.mjs";
 import { OPENING } from "./Data_FirstLevelOpening.mjs";
+import { FRONT_BATTLE_TUNING as FB } from "./Data_Tuning_FirstLevelFront.mjs";
 
 // Called once on a fresh runtime, after the shared level restart has cleared all
 // combat, controls, destruction and actors. Backward jumps cannot retain future facts.
@@ -37,10 +39,15 @@ export function ApplyFirstLevelStageJump(runtime, value, { midCutscenes = false 
   const bunkerPosts = [P.bunker.luoLift, P.bunker.yaowaLift, P.bunker.heyoutianFire,
     {x:P.bunker.heyoutianFire.x+2.2, z:P.bunker.heyoutianFire.z+1.6}];
   // 班里人按阶段散开：02 在掩蔽部门口，04 在前沿哨位，03/05–06 在机枪位两侧，其余跟在玩家后面。
+  // 03: Luo (squad[0]) starts leaderLead.minM + 1 m ahead of the player along the support route. The 03 lead rule
+  // (FRONT_BATTLE_TUNING.leaderLead, SB07) keeps him 3-5 m in front, but from 2 m behind he cannot pass the player in
+  // the one-man trench (probe: 0.7 m behind for 5-8 s whatever his run speed).
+  const leadStart = n === 3 ? MissionRoutePoint(MISSION_ROUTES.support,
+    MissionRouteProjection(MISSION_ROUTES.support, spawn).progress + FB.leaderLead.minM + 1) : null;
   for (const [i,actor] of (r.squad||[]).entries()) {
     actor.missionTrainReady = true;
     const point = n === 2 ? bunkerPosts[i] || bunkerPosts.at(-1)
-      : n === 3 ? {x:spawn.x+(i%2?1:-1),z:spawn.z+2+Math.floor(i/2)*2}
+      : n === 3 ? (i === 0 ? {x:leadStart.x,z:leadStart.z} : {x:spawn.x+(i%2?1:-1),z:spawn.z+2+Math.floor(i/2)*2})
       : n === 4 ? OPENING.frontPosts[i] : n === 5 ? (i===0?Sortie.rear:OPENING.frontPosts[i]) : n <= 6 ? P.squadFrontPositions[i]
         : {x:spawn.x+(i%2?2.4:-2.4),z:spawn.z+3+Math.floor(i/2)*2.4};
     r.PlaceActor(actor,point); r.Defend(actor,point);
@@ -73,7 +80,7 @@ export function ApplyFirstLevelStageJump(runtime, value, { midCutscenes = false 
   }
   if (n >= 4 && n <= 5) {
     r.SpawnGuards();
-    for (const guard of r.guards.slice(0,OPENING.rifleGuardCount)) {
+    for (const guard of r.guards.slice(0,FB.firstBatch)) {
       guard.safe = true; guard.progress = guard.route.length;
       r.PlaceActor(guard.actor,guard.route.at(-1));
       // Hold where he stands, as FrontBattle.UpdateGuards does for a man who walks in. SpawnGuards anchored him on

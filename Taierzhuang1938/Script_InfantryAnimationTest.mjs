@@ -80,7 +80,7 @@ try {
     const check = (v, message) => { if (!v) throw new Error(message); };
     const factory = window.Taierzhuang.actorFactory;
     const actors = [], stats = [];
-    for (const kind of ['nra', 'ija']) for (let modelVariant = 0; modelVariant < 4; modelVariant++) {
+    for (const [kind, variants] of [['nra', [1, 4]], ['ija', [0, 1, 2]]]) for (const modelVariant of variants) {
       const actor = factory.Create(kind, { seed: 41938, modelVariant }); const rig = actor.characterRig;
       check(rig?.asset.infantry, `${kind}/${modelVariant}: missing library`);
       for (const id of INFANTRY_ANIMATION_IDS) {
@@ -257,5 +257,5 @@ try {
   }
   assert.deepEqual(errors, []);
   fs.writeFileSync(path.join(output, 'Data_IntegrationValidation.json'), JSON.stringify(result, null, 2));
-  console.log('PASS InfantryAnimationTest: 8 game models, 40 clips, transitions, props, velocity and one-shot release; max sole drift', maximumPlantedDrift, output);
+  console.log('PASS InfantryAnimationTest: 5 adopted game models, 25 clip bindings, transitions, props, velocity and one-shot release; max sole drift', maximumPlantedDrift, output);
 } finally { await browser.close(); await new Promise(resolve => server.close(resolve)); }

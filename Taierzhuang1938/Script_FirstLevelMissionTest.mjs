@@ -1,4 +1,5 @@
 import { FirstLevelFrontBattle } from "./Script_FirstLevelFrontBattle.mjs";
+import { FRONT_BATTLE_TUNING } from "./Data_Tuning_FirstLevelFront.mjs";
 import { FRONT_SORTIE as S } from "./Data_FirstLevelFrontRoute.mjs";
 import { MISSION_FRONT_COLLECTION_ROUTE } from "./Data_FirstLevelMissionTopology.mjs";
 import { MissionVoiceTimeline } from "./Data_FirstLevelMissionVoiceTiming.mjs";
@@ -148,7 +149,7 @@ if(process.argv.includes("--opening-audio"))process.exit(0);
     // 2026-09-23 hand-back rule (contract §2.1): only ijaA, ijaB (dadao) and ijaD (the junction, Liu's shot) gate it.
     assert.deepEqual([...C.vanguardIds].sort(),["BunkerExecutionerA","BunkerExecutionerB","BunkerFollowB"]);
     // A root chained across a clip change keeps the pelvis where it was (drag -> wall).
-    const chained=show.ChainRoot.call({},{x:0,z:0,yaw:0},"LugouNra02","CaptiveDraggedFromDirt","CaptiveWallBrace");
+    const chained=show.ChainRoot.call({},{x:0,z:0,yaw:0},"TengxianNra02","CaptiveDraggedFromDirt","CaptiveWallBrace");
     assert.ok(Number.isFinite(chained.x)&&Number.isFinite(chained.z)&&Number.isFinite(chained.yaw),"root chaining without a loaded library falls back to the same root");
   }
   {
@@ -303,9 +304,11 @@ if(process.argv.includes("--opening-audio"))process.exit(0);
     opening.Update(1/60);assert.equal(r.failed,true,"the existing required-companion contract is preserved");
   }
   // 2026-09-22: both batches must physically recover; losing an entire batch fails.
-  for(const survivors of [0,1,6]){
+  // 09-25 storyboard round: the first batch is FRONT_BATTLE_TUNING.firstBatch (5), the second the other 3.
+  const firstBatch=FRONT_BATTLE_TUNING.firstBatch;
+  for(const survivors of [0,1,8-firstBatch]){
     const facts=new Map(),failures=[];
-    const guards=Array.from({length:8},(_,i)=>({actor:{id:i,alive:i<2||i<2+survivors},safe:true,progress:1,route:[{}]}));
+    const guards=Array.from({length:8},(_,i)=>({actor:{id:i,alive:i<firstBatch+survivors},safe:true,progress:1,route:[{}]}));
     const r={flow:{stage:{id:"Tank"}},guards,Has:()=>true,Record:(id,d)=>facts.set(id,d),
       OnPlayerDown:()=>failures.push("down"),MissionFailure:id=>failures.push(id)};
     r.frontBattle=new FirstLevelFrontBattle(r);
@@ -788,6 +791,7 @@ for (const [name, route] of Object.entries({ ...MISSION_ROUTES, ...Object.fromEn
 {
   const bunker=P.bunker;
   const {OPENING_STORYBOARDS:storyboards}=await import("./Data_OpeningStoryboards.mjs");
+  const {OPENING_DEPTH_IJA}=await import("./Data_FirstLevelBackdropSquads.mjs");
   const lanes={
     // 2026-09-23 dugout: out through the east mouth, round the spoil, back to the return spot and up the rear leg.
     BunkerExit:bunker.exitLane,
@@ -803,6 +807,14 @@ for (const [name, route] of Object.entries({ ...MISSION_ROUTES, ...Object.fromEn
     RescueHe:storyboards.rescue.heRoute,
     RescueLiu:[...storyboards.rescue.liuRoute,storyboards.rescue.liuShot],
     DragCover:[...storyboards.rescue.dragCoverRoute,storyboards.rescue.luoCheck],
+    // 2026-09-25 storyboard round (SB06): Liu and He go over the crater step to the trench edge east of the seat.
+    RescueLiuCover:[storyboards.rescue.liuShot,...storyboards.rescue.liuCoverRoute,storyboards.rescue.liuCover],
+    RescueHeCover:[...storyboards.rescue.heCoverRoute,storyboards.rescue.heCover],
+    // 2026-09-25 storyboard round: the interpreter / ijaB backing off down the SSW leg, SB03A's Japanese going away.
+    BackOff:[storyboards.interrogation.interpreterAt,...storyboards.interrogation.backOffRoute,storyboards.interrogation.backOff.interpreter],
+    BackOffB:[storyboards.interrogation.ijaBAt,...storyboards.interrogation.backOffRoute,storyboards.interrogation.backOff.ijaB],
+    DepthIja:[OPENING_DEPTH_IJA.members[0].start,...OPENING_DEPTH_IJA.members[0].route],
+    DepthIjaB:[OPENING_DEPTH_IJA.members[1].start,...OPENING_DEPTH_IJA.members[1].route],
     Withdraw:storyboards.withdraw.lane,
   };
   for(const state of MISSION_LAYOUT.scenario.states)for(const [name,lane] of Object.entries(lanes)){

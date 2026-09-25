@@ -115,6 +115,51 @@ collectionPointSeen（collection 14 m）—— 第一次看见担架、伤员与
 `FrontBlockade`（老周指右边破墙）由 `UpdateFrontDialogue` 按「封锁是真的」判时机。
 通过条件不变：`frontReached` `frontContact` `frontRifleDefense` `rifleWithdrawalResolved`。
 
+2026-09-25 分镜还原（`docs/Data_FirstLevelStoryboard0103Contract.md` §2.11–12，SB07/SB08），数值全在
+`Data_Tuning_FirstLevelFront.FRONT_BATTLE_TUNING`：
+
+- **罗班长领路**（`leaderLead`）：03 入口到阵位西门前最后一个弯（`FRONT_SORTIE.approach[11]`）之间，罗沿自己的路线保持在玩家前
+  3–5 m：差距小于 1.5 m 就跑（6 m/s，快过玩家冲刺 5.25；AI 蹲姿位移只有 0.6 倍，所以玩家站着时罗站起来跑，玩家蹲着时罗蹲着跑
+  3.6 m/s 仍快过蹲行 1.62，`runStandsWithPlayer`），跑回 3 m 再走；超前 5 m 以上停下等（面向玩家）；刚过一个转角
+  （转角 > 35°）且玩家还在 3 m 以外时停在拐角、面向下一段、上半身 `PointBlockade` 指路。过了那个弯恢复旧规则
+  （超前 3 m 且离玩家 10 m 以上才等）。纯规则 `LeadPace` / `LeadCorner`（`Script_FirstLevelFrontBattle`）。
+- **「贴这道墙！前头有人！」**（`FrontApproach`）改在 `approach[9]`=(7,−143.5) 周围 2.5 m 触发，玩家约在 (4.6,−143.3)；这一场
+  真正开播的那一刻记 `frontApproachPointed`（罗和玩家的位置、差距），罗在接下来 2.8 s 里边走边伸臂指前方（腿照走）。
+  指路只占台词前 1.2 s（`pointS`，「贴这道墙！」那半句）。这 1.2 s 里他**站着慢走**（`pointWalkMps` 0.7 m/s；超前 `maxM + pointExtraM` 6 m 才停；本来在跑的照跑），
+  **放下枪、不扣扳机**（`pointHoldsFire`，`FrontBattle.PointQuiet` 每帧把 `aimBlend` 压回 0、`coolUntil` 往后推 0.1 s），
+  目标、战术状态、掩体都不动，并以 `pointTurnRps` 5 rad/s 自己转向指的方向：大脑一据枪（aimBlend > 0.6）或开火，开场层就把
+  上半身 clip 扔掉（`Script_OpeningStoryboardAnimation` 的 nativeCombat）；他的大脑照旧朝目标转身，等人时又面朝玩家。
+  09-25 抓帧实拍到过：旗子写着 PointBlockade，画出来是跪着举枪 / 伸着胳膊指沟壁 / 蹲着不动（差距刚过 5 m 被领路规则停下）。
+  第一版用临时挂 `scriptedNoncombatant` 按住他，那会每帧清掉他的目标、放掉掩体，03 的战斗因此走进另一支（整关驾驶 A/B：
+  开 5/8、关 4/4、改前 3/3）；09-25 审查后改成现在只动枪和扳机。躲手榴弹那一帧不领路、不指路（`leaderDodging`）。
+  只动枪和扳机但仍按 2.8 s 时，03→06 整关驾驶（直接进阵位）9 趟过 6 趟（两趟同一支死在 04 阵位北头两颗手榴弹下、一趟死在
+  05 弹药屋支路）；缩到 1.2 s 后 3/3，与不按住（3/3）、本轮基线 b33e30951（3/3，逐位相同）一致，所以定 1.2 s。
+- **背坡轻机枪组**（`Data_FirstLevelMissionFront.FRONT_GUARD_MG_GROUP`）：第二批守军里的 6 号（射手，捷克式）和 7 号（副射手）
+  整个 03 趴在土坎东端背坡上（只有 z ≤ −158.8 能从右侧低沟的沟沿上看见），是剧本兵：只朝 `fire` 里的授权点打环境射击（不命中、
+  不进 TTK 账），不交给 `Defend`（`scriptDefensive` 关掉，否则换弹永远换不完）。04 一开始沿 `exit` 绕过 `ScrapeEastTraverse`
+  南侧下到浅壕，再走东侧守军那条腿到最后遮挡后集合（`gatherIndex`），05 与第二批一起撤。旁边那名带血伤员是战场尸体层
+  （`MISSION_AFTERMATH` 的 `AftermathMgWounded`），不是活人。同时存活预算不变（8 名守军还是 8 名）。
+- **第一批 5 人成列过缺口**：第一批改为 5 人（第二批 3 人），放行条件不变（夺点 + `frontRifleDefense`，缺口没有直接火力）。
+  放行时按离最后遮挡的路程排成一列，前一人沿撤退路线领先 1.6 m 后一人才走，走动中近于 1.2 m 就原地停一下（1.6 m 让五个人差不多都在缺口那段只有 0.5 m 深的浅沟里——从阵位只有这一段看得见人的头肩；2 m 时 SB08 抓帧 5 趟只有 3 趟同时看得见 3 人），前一人 4 s 没往前挪
+  就绕过他。第二批仍是一次一个人过口（`gapClearM`）。
+- **SB08 视线锥里不摆尸体**（`FRONT_SB08_SIGHTLINE` / `InFrontSb08Sightline`）：从阵位机枪北侧 (25.6,−155.2) 看缺口 (−8,−150)，
+  ±15°、3 m 起到缺口前 6 m 为止，战场尸体层不放尸体。原来背坡刮沟东头那一堆（聚类 (7,−155.8)）有 13 具正好铺在第一批过口的那条
+  画面带上（x 0.46–0.60），34 m 外 60–170 px 的人和尸体分不开（09-25 审查）。按生成后过滤，其余尸体的位置、随机序列一个不变；
+  缺口西北那 4 具和缺口以外的都留着。
+- 04/05 检查点：`Script_FirstLevelMissionStageJump` 按 `firstBatch` 把第一批直接放进安全区；原来 `OPENING.rifleGuardCount`
+  这份重复的人数已删。说话的那名守军（`FACED_FRONT_GUARD_INDEX`）跟着改成 5 号——仍是第二批第一人。
+- **抓帧与画面判据**：`Script_FrontStoryboardShots.mjs`（TestRunner `FrontStoryboardShotsTest`，tier 2，浏览器）按整关驾驶的真实输入从
+  missionStage=3 冷启动走到 FrontApproach 拍 SB07、夺点后站到阵位机枪北侧 (25.6,−155.2) 拍 SB08，按契约 §5 自动判；「看得见」用涂色图
+  数像素（投影在画框里不算，被沟壁、矮墙、自己的枪挡住的不算）。布景类判据（破砖墙、烟柱、飞机、倒墙、护壁、弹药箱）标 `set`，
+  默认只出图，`--strict` 才计入。`--side-by-side=<分镜目录>` 另拼「分镜 | 实机」并排图。
+  SB08 蹲在机位上还击等第一批放行，放行后站起来不再还击、每 0.1 s 看一次。抓帧不是生存测试：驾驶里阵亡走游戏自带的检查点重来（次数记 json）。
+  09-25 审查后加严：SB07 罗要站着、在走；背坡两人各 ≥ 300 px、合计 ≥ 1200 px，轻机枪本身（射手的 `weaponGroup`）单独涂色要看得见；
+  伤员（实例化尸体）按包围盒画代理数像素；阵位机枪手按像素判在右半。SB08 一个人算「看得出」要露 ≥ 60 px **且**框高 ≥ 16 px，
+  几个人之间横向隔开 ≥ 10 px 才分别算。`--side-by-side` 找不到分镜图算没过。
+- **整关驾驶进阵位**：默认直接走进西门上座位（躲雷后被甩到西矮墙外就从西门绕回）——这正是「躲完雷直接回座位」的玩家路线，
+  整关门禁要覆盖它。`--front-clear-from-door` 可选：先在西门外的弯（`approach[-3]`）把阵位守敌打光（最多 45 s）再进。
+  Step 2 曾把后者设成默认，用来绕过罗第一版指路禁火带来的难度变化（见上）；09-25 审查认为这是拿驾驶器改动盖住游戏改动，已退回。
+
 掩护行进分成两个有实际几何依据的门。接近段保留三个真实掩体和 cover-bound controller，
 四名队员按 `[[0,2],[1],[0,2],[1]]` 交替使用；重建后的 Support 段没有实体掩体，因而明确
 `hasBounds === false`，不再合成虚构的 cover-bound controller 或绕向退役站位。四人仍各自

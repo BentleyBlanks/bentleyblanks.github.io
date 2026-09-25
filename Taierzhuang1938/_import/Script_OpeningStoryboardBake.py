@@ -10,15 +10,32 @@ path; start/stop the instance around it). Environment:
   OPENING_PROJECT    absolute Taierzhuang1938 directory (required)
   OPENING_BLEND_DIR  editable scenes, validation and partner tracks; never inside the
                      repository (default OneDrive/AI/Models/Blender/Taierzhuang1938/
-                     OpeningStoryboards_20260923 -- the 20260922 sources stay untouched)
-  OPENING_VERSION    manifest version (default 20260923OpeningStoryboardsV4)
+                     OpeningStoryboards_20260926HumanoidV1 -- the 20260922/20260923/20260925
+                     Lugou-rig sources stay untouched; the 0926 folder started as a copy of
+                     the 0925 partner tracks, renamed to the Tengxian rig ids)
+  OPENING_VERSION    manifest version (default 20260926OpeningStoryboardsV5HumanoidV1)
   OPENING_MODEL      comma list of rigs (default all five)
-  OPENING_CLIPS      comma list: bake only these clips and merge into the rig's JSON
+  OPENING_CLIPS      comma list: bake only these clips and merge into the rig's JSON. A clip's only
+                     inputs from other clips are the arm-roll seeds of its `prev` clip (below): a
+                     partial bake gives the same frames as a from-scratch bake of every clip.
   OPENING_PASS       'bake' (default) | 'partner' (dump the partner tracks the paired
                      clips aim their hands at -- run it before 'bake') | 'manifest'
-                     (rewrite the manifest from the rig files on disk, no Blender work)
+                     (rewrite the manifest from the rig files on disk, no Blender work) |
+                     'verify' (bake as 'bake' but write ONLY the baked clips to
+                     tmp/OpeningStoryboards/Verify -- no report, scene or manifest -- then
+                     `node Taierzhuang1938/Script_OpeningStoryboardsTest.mjs
+                     --rebake=tmp/OpeningStoryboards/Verify` compares them with the committed
+                     files: every bone within 0.5 deg and 1 mm on every frame)
   OPENING_RENDER     '1' renders review stills to tmp/OpeningStoryboards/BlenderReview
   OPENING_SKIP_BLEND '1' skips saving the editable scene while iterating
+
+Reproducibility (2026-09-25 review): each clip starts from a clean solver state (grounding lift,
+hand/forearm/finger rate limits). A clip that continues another on the same root (`prev`) takes
+its forearm-twist branch, arm rolls and grounding lift (rig JSON `endLift`) from the LAST WRITTEN
+FRAME of the first `prev` clip that
+bakes before it on this rig -- the one baked in this run, or else the committed repository file
+(the same numbers, which 'verify' checks) -- so baking one clip alone gives the frames a full
+bake gives.
 
 It reuses the production-rig importer, two-bone IK, palm solver and original-local-frame
 exporter of `_import/Script_MachineGunCaptivesBake.py`; meshes, skins and inverse binds are
@@ -26,7 +43,13 @@ never replaced. The clips are authored in `_import/Script_OpeningStoryboardClips
 file is the frame loop, grounding, grip pinning, prop tracks, validation and export.
 
 Authoring space is Blender metres on the rig's *source* scale: +Z up, character forward
--Y, character's own left +X, ground z = 0, actor root at the origin. Every frame is lifted
+-Y, character's own left +X, ground z = 0, actor root at the origin.
+
+TengxianHumanoidV1 (2026-09-26): the rigs are the shared-skeleton bodies. The clips keep the
+source metres they were authored in on the Lugou rigs: the importer poses an authoring copy
+of each body scaled by f (Script_MachineGunCaptivesBake AUTHORING_SCALE / AuthoringRig), and
+everything written in the rig's own node units -- bone values, prop tracks, contact point
+offsets, prop mounts, endLift -- is divided by f on the way out (multiplied on the way in). Every frame is lifted
 so the lowest skinned vertex rests at CLEARANCE. Anything a director or partner reads is
 in RUNTIME metres (source x scale) in the three.js actor frame (+x right, +y up, -z
 forward): runtime = (-X, Z, Y) * scale.
@@ -37,9 +60,11 @@ from mathutils import Vector, Matrix, Quaternion
 
 project = Path(os.environ['OPENING_PROJECT'])
 private = Path(os.environ.get('OPENING_BLEND_DIR')
-               or 'C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/OpeningStoryboards_20260923')
-VERSION = os.environ.get('OPENING_VERSION') or '20260923OpeningStoryboardsV4'
-output = Path(os.environ.get('OPENING_OUTPUT') or (project / 'Animation/OpeningStoryboards'))
+               or 'C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/OpeningStoryboards_20260926HumanoidV1')
+VERSION = os.environ.get('OPENING_VERSION') or '20260926OpeningStoryboardsV5HumanoidV1'
+committedDir = project / 'Animation/OpeningStoryboards'
+output = Path(os.environ.get('OPENING_OUTPUT') or (project.parent / 'tmp/OpeningStoryboards/Verify'
+                                                   if os.environ.get('OPENING_PASS') == 'verify' else committedDir))
 reviews = Path(os.environ.get('OPENING_REVIEW') or (project.parent / 'tmp/OpeningStoryboards/BlenderReview'))
 PASS = os.environ.get('OPENING_PASS', 'bake')
 RENDER = os.environ.get('OPENING_RENDER') == '1'
@@ -50,7 +75,7 @@ os.environ['CAPTIVES_PROJECT'] = str(project)
 os.environ['CAPTIVES_SKIP_BLEND'] = '1'
 FPS = 24
 CLEARANCE = .003
-MODELS = ['LugouNra02', 'LugouNra05', 'LugouIja01', 'LugouIja02', 'LugouIja03']
+MODELS = ['TengxianNra02', 'TengxianNra05', 'TengxianIja01', 'TengxianIja02', 'TengxianIja03']
 PARTNER_GLOB = 'Data_OpeningPartnerTracks_*.json'   # one file per partner rig (parallel-safe)
 library = runpy.run_path(str(project / '_import/Script_OpeningStoryboardClips.py'), run_name='OpeningClipLibrary')
 CLIPS = library['CLIPS']            # name -> static metadata written to the manifest
@@ -67,6 +92,16 @@ WALL_REGIONS = {
     'feet': ['L Foot', 'R Foot', 'L Toe0', 'R Toe0'], 'calves': ['L Calf', 'R Calf'],
 }
 convertInv = convert.inverted()
+# Reach assist (Solve): where it starts (fraction of the bare arm length, shoulder to grip), how far
+# the pelvis may travel over the planted feet (source m) and how much extra trunk lean it may add
+# (rad). A clip may override any of them with spec 'reach': {'fraction', 'travel', 'bend'} (a number
+# or a function of the clip time; 'sides' limits the fraction to those hands, 'fractionBySide'
+# gives each hand its own number or function of time). TengxianHumanoidV1 (2026-09-26): the IJA shoulders
+# sit ~5 cm further back and 3.6 cm higher and the arm is 2.4 cm shorter than IJA02's own (NRA02
+# proportions), and a grasping hand's finger-root centroid stops ~0.85 arm lengths out, so at .92 the
+# assist never woke for the hair hold; the clips that grip at the end of their reach override it
+# (Script_OpeningStoryboardClips REACH_BY_CLIP). The defaults are the Lugou bake's.
+REACH_FRACTION, REACH_TRAVEL, REACH_BEND = .92, .10, .25
 
 
 def Smooth01(x):
@@ -87,7 +122,9 @@ def BakeRig(ctx):
     modelId = ctx['modelId']
     Bone, Point, Update, BWorld = ctx['Bone'], ctx['Point'], ctx['Update'], ctx['BWorld']
     corrections, meshes = ctx['corrections'], ctx['meshes']
-    scale = TARGET_HEIGHT['ija' if modelId.startswith('LugouIja') else 'nra'] / ctx['restTop']
+    # Authoring source metres -> runtime metres (the Lugou rig's targetHeight / rest top; see the module doc).
+    scale = ctx['nominalScale']
+    unitF = ctx['authoringFactor']   # authoring copy / shipped body; written node-unit numbers are divided by it
 
     def Reset():
         for bone in arm.pose.bones:
@@ -171,9 +208,33 @@ def BakeRig(ctx):
         normal = (convert.to_3x3() @ (m.to_3x3() @ Vector(row['normal']))).normalized()
         return point, normal
 
+    # The face of the head at rest looks along the character's forward (-Y); kept in the head
+    # bone's own frame so the look check (spec 'look': the point a clip aims the face at, e.g.
+    # the first-person player's eye) measures where the face really points on every frame.
+    Reset()
+    headRest = BWorld(Bone('Head')).to_quaternion()
+    faceLocal = headRest.inverted() @ Vector((0, -1, 0))
+    eyeLocal = headRest.inverted() @ Vector((0, -.09, .10))
+    neckRest = BWorld(Bone('Neck')).to_quaternion().inverted() @ headRest
+
+    def FaceError(target):
+        """Angle (deg) between the face direction and the eye -> target line, and the head's
+        turn against the neck (deg, from its rest relation)."""
+        loc, q, _ = BWorld(Bone('Head')).decompose()
+        face = q @ faceLocal
+        eye = loc + q @ eyeLocal
+        want = Vector(target) - eye
+        err = math.degrees(face.angle(want)) if want.length > 1e-6 else 0.0
+        rel = BWorld(Bone('Neck')).to_quaternion().inverted() @ q
+        turn = math.degrees(neckRest.rotation_difference(rel).angle)
+        return err, min(turn, 360 - turn)
+
     K = dict(ctx)
     K.update({'scale': scale, 'ContactWorld': ContactWorld, 'Reset': Reset,
               'partnerTracks': {f.stem.split('_')[-1]: json.loads(f.read_text()) for f in private.glob(PARTNER_GLOB)}})
+    # The grounding lift of the previous frame (Solve's solveState, defined below): AimHead aims from
+    # where the eye ends up after grounding, as the reach assist does for the grips.
+    K['GroundLift'] = lambda: solveState['lift']
     specs = library['MakeClips'](K)
 
     fingerBones = {s: [pb for pb in arm.pose.bones if pb.name.startswith(prefix + ' ' + s + ' Finger')] for s in 'LR'}
@@ -321,12 +382,20 @@ def BakeRig(ctx):
         """Pin the grip centroid (finger roots -- what the runtime mounts to) on `grip`.
 
         The IK drives the wrist; the grip sits 8-10 cm past it along the palm, so a
-        couple of arm-only passes close the gap without re-solving the body."""
+        couple of arm-only passes close the gap without re-solving the body.
+
+        Only the last pass reports an overreach: the first pass aims the WRIST at the grip
+        point (a hand length too far), so it read every relaxed arm easing onto a grip as
+        1.1-1.3 of its length although the converged arm was bent (2026-09-25)."""
         hand = Bone(side + ' Hand')
         target = Vector(grip)
         wrist = target.copy()
+        reported = []
         for _ in range(4):
+            mark = len(ctx['overreach'])
             ctx['Chain'](Bone(side + ' UpperArm'), Bone(side + ' Forearm'), hand, wrist, Vector(pole), label='grip' + side)
+            reported = ctx['overreach'][mark:]
+            del ctx['overreach'][mark:]
             if palm:
                 normal = ctx['TurnPalm'](side, palm[0], palm[1])
                 LimitHand(side)
@@ -339,6 +408,7 @@ def BakeRig(ctx):
             if error.length < .0006:
                 break
             wrist += error
+        ctx['overreach'].extend(reported)
         return (target - ctx['GripPoint'](side)).length
 
     solveState = {'lift': 0.0}
@@ -362,6 +432,11 @@ def BakeRig(ctx):
         # Shoulder-to-grip reach with a grasping (not pointing) hand: the finger-root centroid
         # sits off the forearm line, so the usable reach is about the bare arm length.
         reach = ctx['armLen']
+        assist = spec.get('reach') or {}
+        fraction = assist.get('fraction', REACH_FRACTION)
+        fraction = fraction(t) if callable(fraction) else fraction
+        travel, lean = assist.get('travel', REACH_TRAVEL), assist.get('bend', REACH_BEND)
+        travel, lean = (travel(t) if callable(travel) else travel), (lean(t) if callable(lean) else lean)
         p0 = p['pelvis']
         bend0 = p.get('bend', 0.0)
         # Where each reaching hand is in the unassisted pose: a partial reach (weight < 1) blends
@@ -383,20 +458,23 @@ def BakeRig(ctx):
                 want = goal - shoulder
                 # Continuous in the target distance (no on/off threshold), so neighbouring
                 # frames get neighbouring corrections and the pelvis never jumps.
-                if want.length > reach * .92:
-                    excess += want.normalized() * (want.length - reach * .92) * w
+                own = assist.get('sides', 'LR')
+                start = (assist.get('fractionBySide') or {}).get(side, fraction if side in own else REACH_FRACTION)
+                start = reach * (start(t) if callable(start) else start)
+                if want.length > start:
+                    excess += want.normalized() * (want.length - start) * w
             if excess.length < .0015:
                 break
             px, py, pz = p['pelvis']
             # Only ever sink toward a low grip; lifting the pelvis would pull the planted feet
             # up, and more than ~10 cm of sideways travel straightens the planted legs.
             moved = Vector((px, py, 0)) - Vector((p0[0], p0[1], 0)) + Vector((excess.x, excess.y, 0))
-            if moved.length > .10:
+            if moved.length > travel:
                 # The hips have gone as far as the planted feet allow: lean the trunk into
-                # the rest (up to +0.25 rad of bend), which is what a man reaching does.
-                over = moved.length - .10
-                moved = moved.normalized() * .10
-                p['bend'] = min(bend0 + .25, p.get('bend', 0.0) + over / .45)
+                # the rest (up to +0.25 rad of bend by default), which is what a man reaching does.
+                over = moved.length - travel
+                moved = moved.normalized() * travel
+                p['bend'] = min(bend0 + lean, p.get('bend', 0.0) + over / .45)
             p['pelvis'] = (p0[0] + moved.x, p0[1] + moved.y, max(p0[2] - .15, pz + min(0.0, excess.z) * .6))
             Reset()
             ctx['ApplyPose'](p, 0.0)
@@ -445,6 +523,53 @@ def BakeRig(ctx):
 
     clipsOut, reports, partnerDump = {}, [], {}
     twistEnd = {}
+    committedFile = committedDir / ('Animation_' + modelId + 'OpeningStoryboards.json')
+    committed = json.loads(committedFile.read_text()) if committedFile.exists() else {'clips': {}}
+    depth = {name: len(arm.pose.bones[name].parent_recursive) for name in names}
+
+    def PoseFromValues(bones, values):
+        """Put the rig in one written frame (glTF node-local p xyz, q xyzw per bone): SourcePose inverted."""
+        nodes, parents, nodeIndex = ctx['nodes'], ctx['parents'], ctx['nodeIndex']
+        local = {name: values[i * 7:i * 7 + 7] for i, name in enumerate(bones)}
+        world = {}
+
+        def Node(name):
+            if name not in world:
+                i = nodeIndex[name]
+                parent = parents.get(i)
+                if parent is None:
+                    pm = Matrix.Identity(4)
+                else:
+                    pname = nodes[parent].get('name')
+                    pm = Node(pname) if pname in local else ctx['sourceWorld'][parent]
+                v = local[name]
+                world[name] = pm @ Matrix.LocRotScale(Vector(v[:3]) * unitF, Quaternion((v[6], v[3], v[4], v[5])),
+                                                      Vector(nodes[i].get('scale', [1, 1, 1])))
+            return world[name]
+        Reset()
+        for name in sorted(local, key=lambda n: depth[n]):
+            ctx['Put'](arm.pose.bones[name], convert @ Node(name) @ corrections[name].inverted())
+
+    def SeedsFromValues(bones, values):
+        """ArmRoll's carried state for the frame `values`: the forearm-twist branch (twice the forearm's roll about
+        its own axis against the same forearm re-aimed from rest -- the forearm takes half the twist) and the
+        upper-arm / forearm world rotations with their axes."""
+        twist, ua, fa = {}, {}, {}
+        for side in 'LR':
+            PoseFromValues(bones, values)
+            u_, f_, h_ = Bone(side + ' UpperArm'), Bone(side + ' Forearm'), Bone(side + ' Hand')
+            S, E, Wr = Point(u_), Point(f_), Point(h_)
+            a = (Wr - E).normalized()
+            ua[side] = (BWorld(u_).to_quaternion(), (E - S).normalized())
+            fa[side] = (BWorld(f_).to_quaternion(), a.copy())
+            f_.matrix_basis = ctx['rest'][f_.name]
+            Update()
+            ctx['Aim'](f_, h_, Wr)
+            rel = fa[side][0] @ BWorld(f_).to_quaternion().inverted()
+            roll = 2 * math.atan2(Vector((rel.x, rel.y, rel.z)).dot(a), rel.w)
+            twist[side] = 2 * ((roll + math.pi) % (2 * math.pi) - math.pi)
+        Reset()
+        return twist, ua, fa
     # Bone mounts of props an actor carries between clips (spec 'mountFrames': {prop: (bone role,
     # frame)}): the prop track at that frame in that bone's glTF node frame -- the sheathed
     # bayonet on the pelvis, taken from IjaDrawBayonet frame 0.
@@ -462,6 +587,7 @@ def BakeRig(ctx):
         count = math.ceil(duration * FPS) + 1
         action = bpy.data.actions.new(clip)
         values, samples, lifts, gripErrors = [], [], [], []
+        looks, probes = [], {}
         props = {name: [] for name in (meta.get('props') or [])}
         dumpPoints = library['PARTNER_SOURCES'].get(modelId, {}).get(clip, []) if PASS == 'partner' else []
         dump = {name: [] for name in dumpPoints}
@@ -477,6 +603,11 @@ def BakeRig(ctx):
             f0, f1 = int(round(t0 * (count - 1) / duration)), int(round(t1 * (count - 1) / duration))
             for f in sorted(set(list(range(f0, f1 + 1, 2)) + [f1])):
                 wallFrames.setdefault(f, []).append(k)
+        # The reach assist reads the previous frame's grounding lift; a clip's first frame must not read
+        # the last frame of whichever clip was baked before it (a partial and a full bake then differ --
+        # 10 cm on IjaStartleTurn frame 0 after the parried fall's corpse). A continuation (below) starts
+        # from its `prev` clip's last lift -- that IS the frame before -- and anything else from 0.
+        solveState['lift'] = 0.0
         handPrev.clear()
         twistPrev.clear()
         fingerPrev.clear()
@@ -491,11 +622,22 @@ def BakeRig(ctx):
         twistSeed.clear()
         uaSeed.clear()
         faSeed.clear()
+        # The first `prev` that bakes before this clip on this rig (what a full bake has in twistEnd); when
+        # this run did not bake it, its last frame comes from the committed file.
+        earlier = onRig[:onRig.index(clip)]
         for before in meta.get('prev') or []:
+            if before not in earlier:
+                continue
+            if before not in twistEnd and before in committed['clips']:
+                row = committed['clips'][before]
+                last = len(committed['bones']) * 7 * (row['frameCount'] - 1)
+                twistEnd[before] = SeedsFromValues(committed['bones'], row['values'][last:]) + (row.get('endLift', 0.0) * unitF,)
+                print('   SEED', clip, 'from committed', before, flush=True)
             if before in twistEnd:
                 twistSeed.update(twistEnd[before][0])
                 uaSeed.update(twistEnd[before][1])
                 faSeed.update(twistEnd[before][2])
+                solveState['lift'] = twistEnd[before][3]
                 break
         for frame in range(count):
             arm.animation_data.action = None
@@ -512,6 +654,18 @@ def BakeRig(ctx):
                     fingerPrev[pb.name] = pb.matrix_basis.to_quaternion()
             lifts.append(lift)
             gripErrors.append(max(errors.values()) if errors else 0.0)
+            if spec.get('look'):
+                target = spec['look'](t)
+                if target is not None:
+                    err, turn = FaceError(target)
+                    looks.append((t, err, turn))
+            # Prop-to-player contacts (a rifle butt on the head): name -> (point, point) in source
+            # metres at the frames the clip declares them; the report keeps the largest gap.
+            for name, pair in ((spec['probes'](t) or {}).items() if spec.get('probes') else ()):
+                if pair is not None:
+                    gap = (Vector(pair[0]) - Vector(pair[1])).length * scale
+                    if gap > probes.get(name, (-1, 0))[0]:
+                        probes[name] = (gap, t)
             values.extend(ctx['SourcePose']())
             if props:
                 track = spec['props'](t)
@@ -520,7 +674,7 @@ def BakeRig(ctx):
                     if row is None:
                         props[name].extend([0, 0, 0, 0, 0, -1, 0, 1, 0, 0])
                         continue
-                    origin = convertInv @ Vector(row[0])
+                    origin = (convertInv @ Vector(row[0])) / unitF   # shipped rig-root units
                     axis = (convertInv.to_3x3() @ Vector(row[1])).normalized()
                     up = convertInv.to_3x3() @ Vector(row[2])
                     up = (up - axis * up.dot(axis)).normalized()
@@ -530,7 +684,7 @@ def BakeRig(ctx):
                         row = props[name][-10:]
                         bone = Bone(role).name
                         inverse = NodeWorld(bone).inverted()
-                        o = inverse @ Vector(row[0:3])
+                        o = (inverse @ (Vector(row[0:3]) * unitF)) / unitF
                         a = (inverse.to_3x3() @ Vector(row[3:6])).normalized()
                         u = (inverse.to_3x3() @ Vector(row[6:9])).normalized()
                         propMounts[name] = {'bone': bone, 'origin': Round(o[:], 6), 'axis': Round(a[:], 6), 'up': Round(u[:], 6),
@@ -559,8 +713,8 @@ def BakeRig(ctx):
                 c = spec['check'](t) if spec.get('check') else {}
                 print('DBG %s t=%.2f lift %.3f footL %s footR %s pelvis %s shL %s shR %s gripL %s gripR %s targets %s' % (clip, t, lift,
                       Round(Point(Bone('L Foot'))[:], 3), Round(Point(Bone('R Foot'))[:], 3), Round(Point(Bone('Pelvis'))[:], 2), Round(Point(Bone('L UpperArm'))[:], 2), Round(Point(Bone('R UpperArm'))[:], 2),
-                      Round(ctx['GripPoint']('L')[:], 2), Round(ctx['GripPoint']('R')[:], 2),
-                      {k: Round(v, 2) for k, v in c.items() if v}), flush=True)
+                      Round(ctx['GripPoint']('L')[:], 3), Round(ctx['GripPoint']('R')[:], 3),
+                      {k: Round(v, 3) for k, v in c.items() if v}), flush=True)
             if frame in wallFrames:
                 walls = spec['walls'](t) if callable(spec.get('walls')) else spec.get('walls') or []
                 for k in wallFrames[frame]:
@@ -584,7 +738,6 @@ def BakeRig(ctx):
                 pb = arm.pose.bones[name]
                 pb.keyframe_insert('location', frame=frame)
                 pb.keyframe_insert('rotation_quaternion', frame=frame)
-        twistEnd[clip] = (dict(twistPrev), dict(uaPrev), dict(faPrev))
         stride = len(names) * 7
         seam = max(abs(values[i] - values[len(values) - stride + i]) for i in range(stride)) if loop else 0.0
         if loop:
@@ -593,11 +746,17 @@ def BakeRig(ctx):
                 props[name][-10:] = props[name][:10]
         action.use_fake_user = True
         arm.animation_data.action = None
+        # What a clip that continues this one starts from: the written last frame (not the solver's running
+        # state, which a loop's seam copy or an authored clip leaves out of step with it).
+        # (+ the grounding lift of that frame: a loop's last frame is its first)
+        endLift = round(lifts[0] if loop else lifts[-1], 6)
+        twistEnd[clip] = SeedsFromValues(names, values[-stride:]) + (endLift,)
         nla = arm.animation_data.nla_tracks.new()
         nla.name = clip
         nla.mute = True
         nla.strips.new(clip, 0, action)
-        row = {'duration': duration, 'loop': loop, 'weaponHold': meta['weaponHold'], 'frameCount': count, 'values': values}
+        row = {'duration': duration, 'loop': loop, 'weaponHold': meta['weaponHold'], 'frameCount': count, 'values': values,
+               'endLift': round(endLift / unitF, 6)}   # bake bookkeeping (shipped node units): what a partial bake of a continuation starts from
         if meta.get('referenceSpeedMps'):
             row['referenceSpeedMps'] = meta['referenceSpeedMps']
         if props:
@@ -614,6 +773,13 @@ def BakeRig(ctx):
         if dump:
             partnerDump[clip] = {'fps': FPS, 'duration': duration, 'scale': scale, 'points': dump, 'skeleton': skeleton}
         report = Validate(clip, spec, samples, lifts, gripErrors, seam, scale)
+        if looks:
+            # Where the face points (spec 'look'): the largest miss while the aim is on, and the
+            # largest turn of the head on the neck (a face turned past ~70 deg reads broken).
+            report['lookErrorDeg'] = round(max(err for _, err, _ in looks), 2)
+            report['headTurnDeg'] = round(max(turn for _, _, turn in looks), 2)
+        if probes:
+            report['probes'] = {name: [round(gap, 4), round(at, 4)] for name, (gap, at) in probes.items()}
         if wallGaps:
             # Each declared wall contact [limb, t0, t1, largest gap, smallest gap] (runtime metres; a
             # negative gap is skin inside the wall): the region must stay ON the wall -- off it by at
@@ -625,6 +791,8 @@ def BakeRig(ctx):
         report['seconds'] = round(time.time() - started, 1)
         reports.append(report)
         print('   REGIONS', json.dumps(report['regions']), 'WALL', report.get('wallPenetrationM'), flush=True)
+        if report.get('lookErrorDeg') is not None or report.get('probes'):
+            print('   LOOK', report.get('lookErrorDeg'), 'HEADTURN', report.get('headTurnDeg'), 'PROBES', report.get('probes'), flush=True)
         print('CLIP %-26s %s frames %3d lift %.3f..%.3f grip %.4f slide %.4f knee %.4f wallgap %s contact %.4f(%s, >3cm %d) seam %.1e %.0fs %s' % (
             clip, modelId, count, min(lifts), max(lifts), max(gripErrors), report['footSlideM'], report['kneeSlideM'],
             report.get('wallContacts'),
@@ -641,19 +809,24 @@ def BakeRig(ctx):
 
     source = project / 'Model/Character' / ('Model_' + modelId + '.glb')
     file = output / ('Animation_' + modelId + 'OpeningStoryboards.json')
-    if selectedClips and file.exists():
+    if selectedClips and file.exists() and PASS != 'verify':
         previous = json.loads(file.read_text())
         merged = previous['clips']
         merged.update(clipsOut)
         clipsOut = {name: merged[name] for name in CLIPS if name in merged and name in onRig}
         propMounts = dict(previous.get('propMounts') or {}, **propMounts)
-    asset = {'schema': 2, 'modelId': modelId, 'fps': FPS, 'stride': 7, 'bones': names, 'clips': clipsOut,
-             'contactPoints': contactPoints, 'originalModelSha256': Sha(source),
+    # Contact patches in the shipped bone frames (the solver above used the authoring copy's).
+    shippedPoints = {name: dict(row, offset=Round([v / unitF for v in row['offset']], 5)) for name, row in contactPoints.items()}
+    asset = {'schema': 2, 'modelId': modelId, 'skeleton': 'TengxianHumanoidV1', 'fps': FPS, 'stride': 7, 'bones': names, 'clips': clipsOut,
+             'contactPoints': shippedPoints, 'originalModelSha256': Sha(source),
              **({'propMounts': propMounts} if propMounts else {}),
              'authoringTool': 'Blender ' + bpy.app.version_string + ' (bpy; headless or BlenderMCP exec)'}
     temporary = file.with_suffix('.json.tmp')
     temporary.write_text(json.dumps(asset, separators=(',', ':')), encoding='utf-8')
     temporary.replace(file)
+    if PASS == 'verify':
+        print('OPENING_VERIFY_BAKED', modelId, len(clipsOut), str(file), flush=True)
+        return {'id': modelId, 'verify': list(clipsOut)}
     reportFile = private / ('Data_' + modelId + 'OpeningValidation.json')
     if selectedClips and reportFile.exists():
         old = {row['clip']: row for row in json.loads(reportFile.read_text())['clips']}
@@ -674,7 +847,7 @@ def BakeRig(ctx):
         Op(bpy.ops.wm.save_as_mainfile, filepath=str(blend), compress=True)
     print('OPENING_BAKED', modelId, len(clipsOut), str(file), flush=True)
     return {'id': modelId, 'file': file.name, 'sha256': Sha(file), 'originalModelSha256': asset['originalModelSha256'],
-            'blend': str(blend), 'contactPoints': contactPoints,
+            'blend': str(blend), 'contactPoints': shippedPoints,
             'clips': [{k: row.get(k) for k in ('clip', 'frames', 'floorCorrectionMin', 'floorCorrectionMax',
                                                'footSlideM', 'contactErrorM', 'gripSolveErrorM', 'wallPenetrationM',
                                                'pelvisMaxStepM', 'root', 'overreach')} for row in reports]}
@@ -810,12 +983,29 @@ def RenderReview(clip, frame, t, spec, modelId):
             o.rotation_euler = (Vector(b) - Vector(a)).to_track_quat('Z', 'Y').to_euler()
         scene.collection.objects.link(o)
         extras.append(o)
-    for view, location, target in spec.get('reviewViews') or [('side', (-3.4, -.35, 1.05), (0, -.25, .75)),
-                                                              ('q', (-2.3, -2.9, 1.9), (0, -.25, .65))]:
+    for row in spec.get('reviewViews') or [('side', (-3.4, -.35, 1.05), (0, -.25, .75)),
+                                           ('q', (-2.3, -2.9, 1.9), (0, -.25, .65))]:
+        # (name, location, target) = orthographic review; (name, location, target, vfovDeg[, rollDeg])
+        # = a perspective camera, e.g. the storyboard's first-person eye. location/target may be
+        # functions of the clip time (a camera riding the player track).
+        view, location, target = row[:3]
+        location = location(t) if callable(location) else location
+        target = target(t) if callable(target) else target
+        q = (Vector(target) - Vector(location)).to_track_quat('-Z', 'Y')
+        if len(row) > 4 and row[4]:
+            q = q @ Quaternion((0, 0, 1), math.radians(row[4]))
         reviewCamera.location = location
-        reviewCamera.rotation_euler = (Vector(target) - Vector(location)).to_track_quat('-Z', 'Y').to_euler()
-        reviewCamera.data.type = 'ORTHO'
-        reviewCamera.data.ortho_scale = spec.get('reviewScale', 2.8)
+        reviewCamera.rotation_euler = q.to_euler()
+        if len(row) > 3:
+            reviewCamera.data.type = 'PERSP'
+            reviewCamera.data.sensor_fit = 'VERTICAL'
+            reviewCamera.data.angle = math.radians(row[3])
+            reviewCamera.data.clip_start = .02
+            scene.render.resolution_x, scene.render.resolution_y = 640, 360
+        else:
+            reviewCamera.data.type = 'ORTHO'
+            reviewCamera.data.ortho_scale = spec.get('reviewScale', 2.8)
+            scene.render.resolution_x, scene.render.resolution_y = 520, 600
         scene.render.filepath = str(reviews / ('%s_%s_%s_%02d.png' % (clip, modelId, view, frame)))
         bpy.ops.render.render(write_still=True)
     for o in extras:
@@ -837,14 +1027,17 @@ def WriteManifest(results):
             row['originalModelSha256'] = Sha(project / 'Model/Character' / ('Model_' + modelId + '.glb'))
             row['clipIds'] = list(asset['clips'])
             row['contactPoints'] = asset.get('contactPoints', {})
-            row.setdefault('blend', str(private / ('Scene_' + modelId + 'OpeningStoryboards.blend')))
+            blend = private / ('Scene_' + modelId + 'OpeningStoryboards.blend')
+            if blend.exists() or 'blend' not in row:
+                row['blend'] = str(blend)
             # Validation numbers of the bake (runtime metres) from the private report, so the
             # repository test can gate foot slide, contact error and pelvis continuity.
             report = private / ('Data_' + modelId + 'OpeningValidation.json')
             if report.exists():
                 keep = ('frames', 'footSlideM', 'contactErrorM', 'gripSolveErrorM', 'wallPenetrationM',
                         'pelvisMaxStepM', 'floorCorrectionMin', 'floorCorrectionMax', 'root', 'finite', 'plants',
-                        'kneePlants', 'kneeSlideM', 'wallContacts', 'wallContactGapM', 'wallContactDepthM')
+                        'kneePlants', 'kneeSlideM', 'wallContacts', 'wallContactGapM', 'wallContactDepthM',
+                        'lookErrorDeg', 'headTurnDeg', 'probes')
                 row['clips'] = [dict({'clip': c['clip']}, **{k: c[k] for k in keep if k in c})
                                 for c in json.loads(report.read_text())['clips'] if c['clip'] in asset['clips']]
     manifest = {'schema': 2, 'version': VERSION, 'fps': FPS, 'actorForward': [0, 0, -1], 'blendSeconds': .12,
