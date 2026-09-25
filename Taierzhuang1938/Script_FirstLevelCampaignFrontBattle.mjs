@@ -11,6 +11,7 @@ import { CampaignActions, Snapshot03Entry, Report03Damage } from "./Script_First
 import { DriveBundleThrow } from "./Script_FirstLevelBundleThrowDriver.mjs";
 import { FRONT_BATTLE_TUNING as B } from "./Data_Tuning_FirstLevelFront.mjs";
 import { TANK } from "./Data_Tuning_Tank.mjs";
+import { FIRST_LEVEL_CHECKPOINT_FRONT_LOST } from "./Data_FirstLevelMissionStages.mjs";
 import { InstallSpeakerActing, CheckFrontActing } from "./Script_FirstLevelCampaignOpening.mjs";
 
 export async function DriveFrontBattle(ctx){
@@ -125,14 +126,22 @@ export async function DriveFrontBattle(ctx){
     // tank has picked them up; 05: at its side). Asserted on a checkpoint start only, where data fixes them. On a run
     // they depend on how that run's fight went (flank survivors read 0–1 in the Gate runs, but nothing in 03→04 needs
     // them dead), so a run only prints them (STAGE_ENTRY_ESCORTS) to set beside the checkpoint numbers.
-    // The front group is not trimmed at a checkpoint (10/10 there, a run reaches 04/05 with 5–6/10): see the
-    // STAGE_ENTRY enemiesAlive line; whether to clear some is a difficulty call left to the integration lead.
+    // The front group (2026-09-25 integration lead): a checkpoint start clears it to what a run leaves (a run reaches
+    // 04 / 05 with 5–6 of 10, and never with FIRST_LEVEL_CHECKPOINT_FRONT_LOST alive), the survivors on their own posts
+    // 40+ m north, none in the player's face. Asserted on a checkpoint start only; a run prints STAGE_ENTRY_FRONT beside it.
     const flank=s.enemies.frontFlank?.alive.length??0,tankAt={x:s.tank.x,z:s.tank.z};
+    const front=(s.enemies.front?.alive??[]).map(e=>{const [id,at]=e.split("@"),[x,z]=at.split(",").map(Number);return {id,x,z,fromPlayer:D({x,z},s.player)};});
+    const officer=s.enemies.frontOfficer?.alive.length??0;
     const escortRange=stage==="Tank"?8:TANK.escorts.joinRangeM;
     console.log("STAGE_ENTRY_ESCORTS",JSON.stringify({stage,source,flank,escorts:s.escorts.map(e=>({...e,fromTank:D(e,tankAt)}))}));
+    console.log("STAGE_ENTRY_FRONT",JSON.stringify({stage,source,front:front.length,officer,ids:front.map(e=>e.id),
+      nearestFromPlayerM:front.length?Math.min(...front.map(e=>e.fromPlayer)):null}));
     if(source==="checkpoint"){
       assert.ok(flank<=1,`${stage} begins with at most one flank man alive, got ${flank}`+why);
       for(const e of s.escorts)assert.ok(D(e,tankAt)<=escortRange,`${stage} begins with ${e.id} within ${escortRange} m of the tank (${D(e,tankAt)} m)`+why);
+      assert.ok(front.length>=5&&front.length<=6,`${stage} begins with 5-6 front men alive as a run does, got ${front.length}`+why);
+      for(const id of FIRST_LEVEL_CHECKPOINT_FRONT_LOST)assert.ok(!front.some(e=>e.id===id),`${stage} begins without ${id}, whom a run has lost in 03`+why);
+      for(const e of front)assert.ok(e.fromPlayer>=20,`${stage} begins with ${e.id} on his post, ${e.fromPlayer} m from the player, not in his face`+why);
     }
     if(stage==="MachineGun"){
       assert.ok(s.guards.slice(2).some(x=>x.alive&&!x.safe),"04 begins with the second guard batch still out"+why);

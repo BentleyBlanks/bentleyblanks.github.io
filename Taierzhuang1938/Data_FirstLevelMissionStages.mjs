@@ -36,6 +36,17 @@ export const FIRST_LEVEL_DEFERRED_ENCOUNTERS=Object.freeze({
   12:Object.freeze(["transferAlley"]),
   18:Object.freeze(["bridgeNorth"]),
 });
+// The front line a continuous run has lost by 04 / 05 (integration lead 2026-09-25: a checkpoint start matches the run's
+// usual result). Gate's STAGE_ENTRY_ENEMIES over 12 continuous 03→06 drives (Gate worktree _shots/FirstLevelFrontTopology_*,
+// FirstLevelEnemyIdleProbe_*): FrontRifleA, B, E and F are dead at every 03→04 transition (12/12) and at every 04→05
+// one (9/9). They are the bounders who get down to the last line and are shot there: 03's attack wave
+// (FRONT_BATTLE_TUNING.assaultIds, frontRifleDefense needs three of the six down). Who lives: the fire base (FrontGunner,
+// FrontSupportGunner, FrontRifleG, FrontRifleH) behind its ruins 40+ m north of the nest, and the bounders FrontRifleC
+// and D. FrontSupportGunner is the one that varies (dead at 04 in 3 of 12, at 05 in 4 of 9), so the checkpoint keeps
+// him: 6 of 10, the majority count (9 of 12 at 04, 5 of 9 at 05). A checkpoint start used to bring back all ten.
+// FrontOfficer stays (frontOfficer, not listed here): a run reaches 04 with him alive in 6 of 12 and 05 in 4 of 9, and
+// he is alive in exactly the runs where FrontFlankA is (21 of 21 entries), the flank survivor this table already keeps.
+export const FIRST_LEVEL_CHECKPOINT_FRONT_LOST = Object.freeze(["FrontRifleA", "FrontRifleB", "FrontRifleE", "FrontRifleF"]);
 // Reaching the inner court assumes its entrance has been cleared; the window
 // gun and side courtyard defenders still belong to the upcoming capture task.
 export const FIRST_LEVEL_STAGE_CLEARED_ENEMIES = Object.freeze({
@@ -45,8 +56,8 @@ export const FIRST_LEVEL_STAGE_CLEARED_ENEMIES = Object.freeze({
   // The flank group is cleared to its usual survivor too: a continuous run reaches 04 / 05 with 0–1 of the four flank
   // men alive, and that one is always FrontFlankA (2026-09-25 Gate: three 03→06 drives read 0, 1, 1 at both the
   // 03→04 and the 04→05 transition; a checkpoint start used to bring back all four on their start line at x 50–59).
-  4: Object.freeze([...FRONT_APPROACH_ENEMIES.map(spec=>spec.id),...FRONT_FLANK_GROUP.slice(1).map(spec=>spec.id)]),
-  5: Object.freeze([...FRONT_APPROACH_ENEMIES.map(spec=>spec.id),...FRONT_FLANK_GROUP.slice(1).map(spec=>spec.id)]),
+  4: Object.freeze([...FRONT_APPROACH_ENEMIES.map(spec=>spec.id),...FRONT_FLANK_GROUP.slice(1).map(spec=>spec.id),...FIRST_LEVEL_CHECKPOINT_FRONT_LOST]),
+  5: Object.freeze([...FRONT_APPROACH_ENEMIES.map(spec=>spec.id),...FRONT_FLANK_GROUP.slice(1).map(spec=>spec.id),...FIRST_LEVEL_CHECKPOINT_FRONT_LOST]),
   9: Object.freeze(["VillageCorner","KitchenGuard"]),
   10: Object.freeze(["VillageCorner","KitchenGuard"]),
 });

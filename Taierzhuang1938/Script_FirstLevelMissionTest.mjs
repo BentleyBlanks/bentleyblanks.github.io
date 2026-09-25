@@ -19,7 +19,7 @@ import fs from "node:fs";
 import crypto from "node:crypto";
 import { FirstLevelMissionFlow } from "./Script_FirstLevelMissionFlow.mjs";
 import { GuardCrossingPair, FrontReplacementSlots } from "./Script_FirstLevelMissionPacing.mjs";
-import { FIRST_LEVEL_STAGES, FIRST_LEVEL_STAGE_ENCOUNTERS, FIRST_LEVEL_STAGE_CLEARED_ENEMIES, ResolveFirstLevelStage, FirstLevelStageForStep } from "./Data_FirstLevelMissionStages.mjs";
+import { FIRST_LEVEL_STAGES, FIRST_LEVEL_STAGE_ENCOUNTERS, FIRST_LEVEL_STAGE_CLEARED_ENEMIES, FIRST_LEVEL_CHECKPOINT_FRONT_LOST, ResolveFirstLevelStage, FirstLevelStageForStep } from "./Data_FirstLevelMissionStages.mjs";
 import { BuildFirstLevelCheckpoint } from "./Script_FirstLevelMissionCheckpoint.mjs";
 import { FirstLevelMissionColumn, MissionRouteNextIndex, MissionCarryRoutePoint, MissionGuideSpeed, MissionGuideRoute, MissionSquadRoute, MissionSquadPace } from "./Script_FirstLevelMissionColumn.mjs";
 import { MISSION_STAGES, MISSION_TUNING as R, FIRST_LEVEL_MISSION_PHASE, MISSION_TACTICS, MISSION_ENCOUNTERS, MISSION_PURSUIT_ROUTE, MISSION_TRANSFER_THREATS } from "./Data_FirstLevelMission.mjs";
@@ -543,11 +543,25 @@ console.log("ok 18 Notion stages, complete prior facts, live destination gates a
 assert.ok(FIRST_LEVEL_STAGE_ENCOUNTERS[3].includes("approach"),
   "04 reconstructs the persistent capture roster");
 assert.deepEqual(FIRST_LEVEL_STAGE_CLEARED_ENEMIES[4],
-  [...MISSION_ENCOUNTERS.approach.map(spec=>spec.id),...MISSION_ENCOUNTERS.frontFlank.slice(1).map(spec=>spec.id)],
-  "04 preserves the four casualties required to capture the right position and the flank group cleared to its usual survivor");
+  [...MISSION_ENCOUNTERS.approach.map(spec=>spec.id),...MISSION_ENCOUNTERS.frontFlank.slice(1).map(spec=>spec.id),...FIRST_LEVEL_CHECKPOINT_FRONT_LOST],
+  "04 preserves the four casualties required to capture the right position, the flank group cleared to its usual survivor and the front line cleared to what a run leaves");
 assert.deepEqual(FIRST_LEVEL_STAGE_CLEARED_ENEMIES[5],FIRST_LEVEL_STAGE_CLEARED_ENEMIES[4],"05 starts from the same casualties as 04");
-assert.ok(FIRST_LEVEL_STAGE_CLEARED_ENEMIES[4].every(id=>!MISSION_ENCOUNTERS.front.some(spec=>spec.id===id)),
-  "04 debug start retains the full front line by design (a continuous run reaches 04 with 5-6 of 10; trimming it is a difficulty call left open)");
+// 2026-09-25 integration lead: a 04 / 05 checkpoint start no longer brings back the whole front line (10/10 there, a
+// continuous run reaches 04 / 05 with 5-6/10: Gate STAGE_ENTRY_ENEMIES). It clears the four bounders every run has lost.
+{
+  const {FRONT_BATTLE_TUNING:FB}=await import("./Data_Tuning_FirstLevelFront.mjs");
+  const front=MISSION_ENCOUNTERS.front,cleared=new Set(FIRST_LEVEL_STAGE_CLEARED_ENEMIES[4]),left=front.filter(spec=>!cleared.has(spec.id));
+  assert.ok(FIRST_LEVEL_CHECKPOINT_FRONT_LOST.every(id=>front.some(spec=>spec.id===id)&&FB.assaultIds.includes(id)),
+    "only 03's attack wave (bounders) is cleared from the front line; the fire base never rushes and is never cleared");
+  assert.ok(FIRST_LEVEL_CHECKPOINT_FRONT_LOST.length>=FB.assaultKills,"a 04 / 05 checkpoint is past 03's frontRifleDefense kill threshold");
+  assert.ok(left.length>=5&&left.length<=6,`a 04 / 05 checkpoint keeps 5-6 of the ${front.length} front men, as a run does (got ${left.length})`);
+  assert.deepEqual(left.filter(spec=>spec.hold).map(spec=>spec.id),front.filter(spec=>spec.hold).map(spec=>spec.id),"the whole fire base stays on its posts");
+  for(const n of [4,5]){
+    const spawn=ResolveFirstLevelStage(n).spawn;
+    for(const spec of left)assert.ok(Math.hypot(spec.x-spawn.x,spec.z-spawn.z)>=30,
+      `${spec.id} is left alive on his own post 30+ m from the 0${n} start, not in the player's face`);
+  }
+}
 console.log("ok stage 04 reconstructs the post-03 battlefield instead of a full fresh roster");
 flow.Start();
 for (const stage of MISSION_STAGES.slice(0, -1)) {
