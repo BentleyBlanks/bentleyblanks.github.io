@@ -3,8 +3,11 @@
 // 实时推帧（游戏时间跟着 AudioContext 时钟走，每轮让出主线程，与真玩家一致），每 0.1 s 记一次账：
 //   1. 账面对得上：engine.liveNodes = 在账 voice 的节点 + 循环层（环境床/配乐）的节点 + 旧环境回退节点，
 //      差值必须恒为 0 —— 差了就是有人多还或少还（「预算怎么用不完」/「越跑越少」那一类）；
-//   2. 没有过期未收：pendingVoices 里没有一条已经过了 releaseAt 0.35 s 还挂着（ReleaseVoice 的
-//      计时器与 SetListener 里的按帧清账两条路都失手才会有）。「过了多久」按**最近一次 SetListener**
+//   2. 没有过期未收：pendingVoices 里没有一条已经过了回收点 0.35 s 还挂着（ReleaseVoice 的
+//      计时器与 SetListener 里的按帧清账两条路都失手才会有）。回收点认 releaseAt；没有 releaseAt 的
+//      voice 退回它自己的「起播时刻 + 可听时长 + 0.22 s」（v.t + v.life + 0.22，每条 Voice 都有）——
+//      releaseAt 是 2026-09-25 的修复才加的字段，只认它的话，把 ReleaseVoice 改回旧写法或整个回退
+//      按帧清账，这条都不会红（审查拿基线 0b13201 跑过：原来的门在基线上全绿）。「过了多久」按**最近一次 SetListener**
 //      时的音频时钟算，不按取样那一刻：按帧清账就在 SetListener 里，它之后到期的本来就要等下一帧；
 //      机器忙时两次 evaluate 之间主线程能卡住半秒，拿取样时刻量出来的是这段卡顿，不是漏收
 //     （2026-09-25 复跑时 05 就这样红过一次：2 条在上一帧之后才到期）；
@@ -15,11 +18,15 @@
 //   5. 离开阶段收得走：跳到 06 之后 6 s，战车的三条 loop 必须已经没了；每段开头 8 s 之后，
 //      正在淡出的循环层必须已经拆掉（换环境床的交叉不许留尾巴）；
 //   6. 同步推帧也不虚高：一个 evaluate 同步推 600 帧（战役驱动器与 TankProbe 帧耗时 A/B 的推法），
-//      推完账面仍 ≤ PEAK_CEILING、且没有过期未收 —— 「整关验收 553–583」就是这种推法下
-//      计时器不回调、放完的 voice 全挂在账上量出来的。
+//      推完账面仍 ≤ PEAK_CEILING、且没有过期未收（同上，含没有 releaseAt 的） —— 「整关验收 553–583」
+//      就是这种推法下计时器不回调、放完的 voice 全挂在账上量出来的。**真正卡住回归的是这一条的
+//      「过期未收」**：基线代码同步推 600 帧峰值只到 138–142，碰不到 150。
+//   7. 覆盖够：每段实际推到的游戏秒 ≥ COVERAGE_MIN × 计划（见 PLAN 上面的说明）。
 //
 // PEAK_CEILING = 150：引擎的进门预算 NODE_BUDGET 120 不变；priority 的天花板是 120 × 1.15 = 138，
-// 再留一条 priority 声（12 个节点）的余量。实测峰值见 docs/Data_AudioEngine.md §7.5。
+// 再留一条 priority 声（12 个节点）的余量。**这是护栏不是预算**：它只拦得住绕过预算闸的节点
+//（循环层、耳鸣这类自管节点）把总账顶破，拦不住「预算本身用得多」—— 基线与 HEAD 的实时峰值都在
+// 107–138 之间。能看出回归的是账面差 0、过期未收与同步推帧推完的读数。实测峰值见 docs/Data_AudioEngine.md §7.5。
 //
 // 用法：node Taierzhuang1938/Script_FirstLevelAudioNodeBudgetTest.mjs
 import path from "node:path";
@@ -32,13 +39,21 @@ const { ServeRoot } = await import(pathToFileURL(path.resolve(HERE, "Script_DevS
 const PEAK_CEILING = 150;
 const OVERDUE_S = 0.35;
 const TANK_LOOPS = ["tankEngine", "tankTracks", "tankTurret"];
-// 实时推的段：01 从开机起 70 s（含近爆 → 黑屏 → 醒来），04、05 各 45 s（战车露面、打车），06 20 s（战车收场）。
+// 实时推的段：01 从开机起 70 s（含近爆 → 黑屏 → 醒来），02 跳进来 25 s（后沟集合；02 开头的枪托那一下
+// 要从开机实时跑约 151 s 才到，FirstLevelJump(2) 会跳过它 —— 枪托那一下的耳鸣见 Step 3 的实时取样，
+// 这道门不覆盖），03 30 s，04、05 各 45 s（战车露面、打车），06 20 s（战车收场）。
+// seconds 是**游戏秒**：机器忙时游戏时间追不上音频时钟，就按游戏秒推满为止（音频时钟另设 WALL_FACTOR 倍的上限），
+// 推完不足 COVERAGE_MIN 就报「覆盖不足」而不是绿（2026-09-25 审查：原来按音频时钟截断，04 只推到 25 游戏秒也照绿）。
 const PLAN = [
   { jump: null, seconds: 70, label: "01" },
+  { jump: 2, seconds: 25, label: "02" },
+  { jump: 3, seconds: 30, label: "03" },
   { jump: 4, seconds: 45, label: "04" },
   { jump: 5, seconds: 45, label: "05" },
   { jump: 6, seconds: 20, label: "06" },
 ];
+const WALL_FACTOR = 3;
+const COVERAGE_MIN = 0.9;
 
 let failed = 0;
 const Fail = (msg) => { console.log(`FAIL ${msg}`); failed += 1; };
@@ -87,6 +102,12 @@ try {
     };
   });
 
+  // 回收点：releaseAt；没有就退回 v.t + v.life + 0.22（见文件头第 2 条）。页面里两处共用，挂在探针上。
+  await page.evaluate(() => {
+    window.__budgetProbe.DueAt = (v) => (v.releaseAt != null ? v.releaseAt
+      : (Number.isFinite(v.t) && Number.isFinite(v.life) ? v.t + v.life + 0.22 : null));
+  });
+
   const Sample = () => page.evaluate(({ OVERDUE_S, TANK_LOOPS }) => {
     const g = window.Tengxian, a = g.audio, P = window.__budgetProbe, now = a.ctx.currentTime, ref = P.listenerAt ?? now;
     const FrontShared = () => { const b = g.Debug.FirstLevelMissionRuntime?.()?.battleSound;
@@ -97,7 +118,8 @@ try {
     for (const set of [a.activeVoices, a.pendingVoices]) for (const v of set || []) {
       if (seen.has(v)) continue;
       seen.add(v);
-      if (a.pendingVoices.has(v) && v.releaseAt != null && ref - v.releaseAt > OVERDUE_S) { overdue += 1; overdueNames.push(v.name || "?"); }
+      const due = a.pendingVoices.has(v) ? P.DueAt(v) : null;
+      if (due != null && ref - due > OVERDUE_S) { overdue += 1; overdueNames.push(v.name || "?"); }
       if (v.reclaimed || !v.nodes || !v.nodes.length) continue;
       fromVoices += v.nodes.length;
       if (TANK_LOOPS.includes(v.name)) tank += 1;
@@ -127,9 +149,9 @@ try {
     const start = await page.evaluate(() => window.Tengxian.audio.ctx.currentTime);
     const samples = [];
     let gameT = 0, lastSample = -1;
-    while (true) {
+    while (gameT < seg.seconds) {
       const t = await page.evaluate(() => window.Tengxian.audio.ctx.currentTime) - start;
-      if (t >= seg.seconds) break;
+      if (t >= seg.seconds * WALL_FACTOR) break;
       // 落后多少就用可变 dt 追（每帧 dt ≤ 50 ms，每轮最多 3 帧）：游戏时间 ≈ 音频时钟，计时器照常回调。
       gameT += await page.evaluate((lag) => {
         const g = window.Tengxian;
@@ -148,6 +170,7 @@ try {
       tankMax: Math.max(0, ...samples.map((s) => s.tank)), storyMax: Math.max(0, ...samples.map((s) => s.story)),
       sharedMax: Math.max(0, ...samples.map((s) => s.shared)), fadingAfter8s: Math.max(0, ...settled.map((s) => s.fading)) };
     report.push(row);
+    if (row.game < COVERAGE_MIN * seg.seconds) Fail(`${seg.label} 覆盖不足：只推到 ${row.game} 游戏秒（计划 ${seg.seconds}，音频时钟已走 ${WALL_FACTOR} 倍）`);
     for (const s of samples) {
       if (s.drift !== 0) worst.drift.push(`${seg.label}@${s.rel.toFixed(1)}s drift ${s.drift}`);
       if (s.overdue) worst.overdue.push(`${seg.label}@${s.rel.toFixed(1)}s ${s.overdue} 条（${s.overdueNames.join(",")}，距上一帧 ${s.gap.toFixed(2)} s）`);
@@ -164,9 +187,9 @@ try {
         const wall = performance.now();
         let peak = 0;
         for (let i = 0; i < 600; i += 1) { g.player.health = 1e9; g.StepFrames(1, 1 / 60, false); peak = Math.max(peak, a.liveNodes); }
-        const ref = window.__budgetProbe.listenerAt ?? a.ctx.currentTime;
+        const P = window.__budgetProbe, ref = P.listenerAt ?? a.ctx.currentTime;
         let overdue = 0;
-        for (const v of a.pendingVoices) if (v.releaseAt != null && ref - v.releaseAt > OVERDUE_S) overdue += 1;
+        for (const v of a.pendingVoices) { const due = P.DueAt(v); if (due != null && ref - due > OVERDUE_S) overdue += 1; }
         return { wallS: +((performance.now() - wall) / 1000).toFixed(1), peak, end: a.liveNodes, overdue, swept: a.stats.sweptVoices || 0 };
       }, { OVERDUE_S });
     }
@@ -183,11 +206,11 @@ try {
   const starved = await page.evaluate(() => Object.entries(window.__budgetProbe.starvedByCue).sort((x, y) => y[1] - x[1]).slice(0, 8));
   console.log("段      取样  游戏秒  峰值  p95  战车loop  剧情语音  前线+炮击  淡出层  取样距上一帧最久(s)");
   for (const r of report) console.log(`${r.seg.padEnd(6)} ${String(r.n).padStart(5)} ${String(r.game).padStart(7)} ${String(r.peak).padStart(5)} ${String(r.p95).padStart(4)} ${String(r.tankMax).padStart(9)} ${String(r.storyMax).padStart(9)} ${String(r.sharedMax).padStart(5)} ${String(r.fadingAfter8s).padStart(7)} ${r.gapMax.toFixed(2).padStart(9)}`);
-  console.log(`同步推 600 帧（${sync.wallS} s 墙钟）：峰值 ${sync.peak}、推完 ${sync.end}、按帧清账累计 ${sync.swept} 条`);
+  if (sync) console.log(`同步推 600 帧（${sync.wallS} s 墙钟）：峰值 ${sync.peak}、推完 ${sync.end}、过期未收 ${sync.overdue} 条、按帧清账累计 ${sync.swept} 条`);
   console.log(`被预算闸饿死最多的 cue：${starved.map(([c, n]) => `${c} ${n}`).join("，") || "无"}`);
   if (errors.length) Fail(`页面报错：${errors.slice(0, 3).join(" | ")}`);
   if (!failed) Ok(`01–06 音频节点：实时峰值 ${Math.max(...report.map((r) => r.peak))} ≤ ${PEAK_CEILING}、账面差 0、无过期未收、`
-    + `离开 05 后战车 loop 收走、同步推帧峰值 ${sync.peak}`);
+    + `离开 05 后战车 loop 收走、同步推帧峰值 ${sync?.peak}、推完 ${sync?.end}`);
 } catch (err) {
   Fail(String(err?.stack || err).slice(0, 800));
 } finally {
