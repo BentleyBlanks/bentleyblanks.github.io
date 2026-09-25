@@ -386,18 +386,26 @@ export const FRONT_PROPS = Object.freeze([
   // 南头 s ≥ 6.4 m（z > -143.8）才立着 1.2–2.0 m 的残墙（守军在那儿已经转向西走进岔口）。profile 是 [沿线米数, 离地高]。
   { id: "gapWallCollapsed", kind: "collapsedWall", a: P(-5.95, -150.2), b: P(-5.95, -141.0), thickM: 0.37,
     profile: Object.freeze([[0, 0.34], [0.8, 0.42], [1.6, 0.22], [3.2, 0.3], [4.6, 0.26], [6.0, 0.4], [6.8, 1.2], [7.6, 1.65], [8.4, 2.0], [9.2, 1.55]]),
+    // 倒在东边地上的墙片（顶面离地 0.3–0.4 m）只放在南段 s ≥ 5（z > -145.3）与立着的残墙脚下：2026-09-26 集成，SB08 实拍红
+    // （第一批过缺口只数得出 1 人）——原来三片在 s 1.2 / 3.6 / 5.4，头一片正好横在机位看缺口浅段（z -152…-148，沟底抬到
+    // 约 -0.7）那几条视线的下沿、第二片横在后面深段的视线下沿，缺口里的人只剩头顶（Script_OpeningSetTest 5e 的真几何射线）。
+    // 机位看缺口的视线在这一带只比地面高 0.1–0.3 m，墙片放不下；s ≥ 5 以南的视线本来就被 s 6.8 起立着的残墙挡住。
     fallen: Object.freeze([
-      Object.freeze({ s: 1.2, off: 1.05, len: 1.6, w: 0.9, tiltDeg: 12, yawDeg: 8 }),
-      Object.freeze({ s: 3.6, off: 1.25, len: 2.2, w: 1.1, tiltDeg: 7, yawDeg: -5 }),
-      Object.freeze({ s: 5.4, off: 0.95, len: 1.4, w: 0.8, tiltDeg: 18, yawDeg: 14 }),
-    ]), seed: 9 },
+      Object.freeze({ s: 5.1, off: 1.0, len: 1.3, w: 0.8, tiltDeg: 12, yawDeg: 10 }),
+      Object.freeze({ s: 6.2, off: 1.15, len: 1.4, w: 1.0, tiltDeg: 8, yawDeg: -6 }),
+      Object.freeze({ s: 7.6, off: 1.0, len: 1.2, w: 0.8, tiltDeg: 16, yawDeg: 12 }),
+    ]),
+    // 同一个原因：缺口浅段那几米（s 0…4.8）东侧的墙根碎砖收在墙根 0.6 m 以内——再往外是平地，视线只高出地面 5–10 cm。
+    rubbleClear: Object.freeze({ fromS: 0, toS: 4.8, maxOffM: 0.6 }), seed: 9 },
   // 缺口段的护壁（SB08 中间那段沙袋压顶的木板护壁）：沟两壁补木板护壁（跳过现有 GuardWithdrawalRevetment*），
   // 沙袋只压在**西沿**（远离阵位那一侧，压在东沿会挡阵位看沟里的人）。
   { id: "gapRevetment", kind: "revetment", heightM: 1.0, postEveryM: 1.0, logs: 5, leanDeg: 8,
     runs: Object.freeze([
       Object.freeze({ side: "west", path: Path([-9.95, -148.35], [-9.95, -147.25]) }),
       Object.freeze({ side: "west", path: Path([-9.95, -143.6], [-10.05, -141.6]) }),
-      Object.freeze({ side: "east", path: Path([-6.1, -149.9], [-6.05, -147.35]) }),
+      // 东壁缺口浅段那一段压到 0.6 m（2026-09-26 集成）：桩脚在沟壁半坡（地面 -0.75…-0.9），1.0 m 高的桩顶冒出东沿 0.3–0.4 m，
+      // 正好横在机位看缺口里的人的视线下沿（SB08，Script_OpeningSetTest 5e 真几何）；0.6 m 桩顶齐东沿。
+      Object.freeze({ side: "east", heightM: 0.6, path: Path([-6.1, -149.9], [-6.05, -147.35]) }),
       Object.freeze({ side: "east", path: Path([-6.05, -143.6], [-6.1, -142.2]) }),
     ]) },
   { id: "gapSandbagsWest", kind: "sandbagStakes", layers: 2, layerM: 0.17, depthM: 0.44, bagM: 0.52, inward: "east",
@@ -462,7 +470,7 @@ export function PropFootprints(prop) {
       const width = prop.columns > 1 ? prop.columns * prop.width + (prop.columns - 1) * (prop.columnGapM || 0) : prop.width;
       return [...Polyline(prop.path), ...(prop.path2 ? Polyline(prop.path2) : [])].map(([a, b]) => Seg(a, b, width, 0, 0.08, { walkable: true }));
     }
-    case "revetment": return prop.runs.flatMap((run) => Polyline(run.path).map(([a, b]) => Seg(a, b, 0.24, 0, prop.heightM)));
+    case "revetment": return prop.runs.flatMap((run) => Polyline(run.path).map(([a, b]) => Seg(a, b, 0.24, 0, run.heightM ?? prop.heightM)));
     case "sandbagStakes": return prop.runs.flatMap((run) => Polyline(run).map(([a, b]) =>
       Seg(a, b, prop.depthM, -prop.stakeBelowM, Math.max(prop.layers * prop.layerM, prop.stakeAboveM))));
     case "flag": return [{ x: prop.x, z: prop.z, w: 0.12, d: 0.12, ry: 0, y0: 0, y1: prop.poleM }];

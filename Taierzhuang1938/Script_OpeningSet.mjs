@@ -752,6 +752,7 @@ export class OpeningSet {
   BuildRevetment(prop, sink) {
     const rnd = Rng(prop.id), lean = prop.leanDeg * DEG;
     for (const run of prop.runs) for (let i = 1; i < run.path.length; i++) {
+      const heightM = run.heightM ?? prop.heightM;               // 一段自己的高（沟壁矮的那一段压到沟沿，不冒出地面）
       const a = run.path[i - 1], b = run.path[i], n = WallNormal(a, b, run.side);
       const d = new THREE.Vector3(b.x - a.x, 0, b.z - a.z), len = d.length(); d.normalize();
       const axis = new THREE.Vector3(0, 1, 0).applyAxisAngle(new THREE.Vector3().crossVectors(UP, n).normalize(), -lean);   // 顶朝墙里斜
@@ -761,11 +762,11 @@ export class OpeningSet {
       for (let k = 0; k < count; k++) {
         const t = k / (count - 1), x = a.x + (b.x - a.x) * t, z = a.z + (b.z - a.z) * t, y = this.groundAt(x, z);
         ground.push(y);
-        sink.Add("WoodBeam", Post(new THREE.Vector3(x, y - 0.15, z), axis, prop.heightM + 0.15 + rnd() * 0.12, 0.09, { round: true, seed: `${prop.id}${i}${k}` }));
+        sink.Add("WoodBeam", Post(new THREE.Vector3(x, y - 0.15, z), axis, heightM + 0.15 + rnd() * 0.12, 0.09, { round: true, seed: `${prop.id}${i}${k}` }));
       }
       const g0 = Math.min(...ground);
       for (let l = 0; l < prop.logs; l++) {
-        const hy = (l + 0.5) / prop.logs * prop.heightM * 0.92, back = Math.tan(lean) * hy - 0.07;
+        const hy = (l + 0.5) / prop.logs * heightM * 0.92, back = Math.tan(lean) * hy - 0.07;
         const p0 = new THREE.Vector3(a.x + n.x * back - d.x * 0.1, g0 + hy, a.z + n.z * back - d.z * 0.1);
         const p1 = new THREE.Vector3(b.x + n.x * back + d.x * 0.1, g0 + hy + (rnd() - 0.5) * 0.04, b.z + n.z * back + d.z * 0.1);
         sink.Add("WoodBeam", Beam(p0, p1, { w: prop.round ? 0.14 : 0.12, h: 0.1, round: !!prop.round || l % 2 === 0, seed: `${prop.id}${i}l${l}` }));
@@ -1065,9 +1066,14 @@ export class OpeningSet {
       sink.Add("OpeningSetBrick", PlaceGeometry(MakeBox(f.len, 0.24, f.w, TILE_METERS.brick, `${prop.id}f${i}`),
         { x: p.x, y: g + 0.1 + Math.sin(tilt) * f.w / 2, z: p.z, ry: ry + f.yawDeg * DEG, rx: tilt }));
     }
-    // 墙根碎砖堆：东侧（倒下的那一侧）多、西侧沟沿少。
+    // 墙根碎砖堆：东侧（倒下的那一侧）多、西侧沟沿少。prop.rubbleClear 那一段东侧的碎砖收在墙根 maxOffM 以内
+    // （机位看缺口的视线在墙根外 0.9–1.5 m 只比地面高几厘米，SB08）；随机序列不变，只压偏移。
+    const clear = prop.rubbleClear;
     for (let i = 0; i < Math.round(len * 5); i++) {
-      const sAlong = rnd() * len, off = rnd() < 0.8 ? 0.2 + rnd() * 1.8 : -(0.1 + rnd() * 0.3), p = At(sAlong, off), size = 0.08 + rnd() * 0.16;
+      const sAlong = rnd() * len;
+      let off = rnd() < 0.8 ? 0.2 + rnd() * 1.8 : -(0.1 + rnd() * 0.3);
+      if (clear && off > 0 && sAlong >= clear.fromS && sAlong <= clear.toS) off = 0.2 + (off - 0.2) * (clear.maxOffM - 0.2) / 1.8;
+      const p = At(sAlong, off), size = 0.08 + rnd() * 0.16;
       sink.Add("OpeningSetBrick", PlaceGeometry(MakeBox(size * 1.8, size * 0.6, size, TILE_METERS.brick, `${prop.id}r${i}`),
         { x: p.x, y: this.groundAt(p.x, p.z) + size * 0.15, z: p.z, ry: rnd() * 6.28, rx: (rnd() - 0.5) * 0.6, rz: (rnd() - 0.5) * 0.6 }));
     }

@@ -874,6 +874,34 @@ function FakeVfx() {
     assert.ok(baseline >= 3, `SB08 baseline: guards' heads visible from the nest at >= 3 route points: ${baseline}`);
     assert.deepEqual(blocked, [], "SB08: the collapsed wall and the gap revetment hide none of the guards the nest could see");
   }
+  // SB08 真几何（2026-09-26 集成：Script_FrontStoryboardShots 合入 Set 后红——第一批过缺口只数得出 1 人，框高 8–17 px）。
+  // 上面那段只量占地盒（倒墙只算立着的几段、倒在地上的墙片不算）、只量头（1.55 m）、眼睛按站在射击台上（+0.12）算，三处都偏松：
+  //  · 机位 (25.6,-155.2) 在射击台 MachineGunFiringStep（z -155.0…-152.8）北边，不在台上：站姿眼高就是地面 + 1.62（Front 包实拍 1.62）；
+  //  · 判据要人露出 ≥ 16 px 高（34 m 外约 0.8 m 身子），缺口段沟只有约 0.5 m 深，看得见的是头、肩、胸，要量到离沟底 0.9 m；
+  //  · 倒墙东边地上那几片墙片（BuildCollapsedWall 的 fallen，一头搭在碎砖上，顶面离地 0.3–0.4 m）正好横在机位看缺口的视线下沿。
+  // 这里建出前沿那一份真网格，从站姿眼位打射线到第一批要走的缺口段（沟底抬浅的那几米，z -153…-147.5）与两头，每个点
+  // 离沟底 0.9 / 1.2 / 1.55 m；Space 本身（地形 + 体块）看得见的点，本包的网格一条都不许挡。
+  // 地面同 4b：用游戏里的高度场（宿主的 groundAt）建网格、定眼位和人的高度。
+  {
+    const P012 = CreateP012Terrain(L), GG = (x, z) => P012.SampleHeight(x, z);
+    const scene5 = new THREE.Scene(), set5 = new OpeningSet({ scene: scene5, library: null, groundAt: GG });
+    set5.Enter("Support"); set5.Update(0.016, "Support", null, {});
+    const root = set5.front.root; root.visible = true; root.updateMatrixWorld(true);
+    const eyeP = { x: 25.6, z: -155.2 }, eye = new THREE.Vector3(eyeP.x, GG(eyeP.x, eyeP.z) + 1.62, eyeP.z), ray = new THREE.Raycaster();
+    const rows = [];
+    for (let z = -155; z <= -145.01; z += 0.5) for (const h of [0.9, 1.2, 1.55]) {
+      const floor = GG(-8, z), to = new THREE.Vector3(-8, floor + h, z);
+      if (Sight({ x: eye.x, y: eye.y, z: eye.z }, { x: to.x, y: to.y, z: to.z }, { state: "BunkerCollapsed" }) != null) continue;
+      const dir = to.clone().sub(eye), far = dir.length() - 0.3;
+      ray.set(eye, dir.normalize()); ray.near = 0.05; ray.far = far;
+      const hit = ray.intersectObject(root, true).find((x) => x.object.isMesh && (() => { for (let p = x.object; p; p = p.parent) if (!p.visible) return false; return true; })());
+      rows.push({ z: +z.toFixed(1), h, hit: hit ? `${hit.object.name} at ${hit.point.toArray().map((v) => v.toFixed(2))}` : null });
+    }
+    report.sb08Mesh = { spaceVisible: rows.length, blocked: rows.filter((r) => r.hit) };
+    assert.ok(rows.filter((r) => r.z >= -153 && r.z <= -147.5).length >= 12, `SB08: the Space sees the shallow gap section from the standing eye (${rows.length} rays)`);
+    assert.deepEqual(report.sb08Mesh.blocked, [], "SB08 (built meshes, standing eye 1.62): the front dressing hides none of the gap-crossing points the Space itself leaves in view");
+    set5.Exit();
+  }
   // 弹药箱：不压坐位、SB08 站位与机枪托架。
   {
     const box = PropFootprints(FRONT_PROPS.find((p) => p.id === "nestAmmoBoxes"))[0];
@@ -929,7 +957,7 @@ function FakeVfx() {
   assert.equal(scene.children.length, 2, "Suspend(false) puts both back");
   fs2.Exit();
   assert.equal(scene.children.length, 0, "Exit removes the front dressing");
-  console.log(`ok front: shells ${JSON.stringify(report.shells)}, per-stage ${JSON.stringify(report.breakableShells)}, SB08 ${JSON.stringify(report.sb08)}, ${report.frontMeshes} meshes`);
+  console.log(`ok front: shells ${JSON.stringify(report.shells)}, per-stage ${JSON.stringify(report.breakableShells)}, SB08 ${JSON.stringify(report.sb08)}, SB08 built meshes: ${report.sb08Mesh.spaceVisible} Space-visible gap rays, ${report.sb08Mesh.blocked.length} hidden by the set, ${report.frontMeshes} meshes`);
 }
 
 console.log(`OpeningSetTest ok ${JSON.stringify({ timberBand: report.timberBand, rubbleTopM: report.rubbleTopM, backrest: report.backrest, seatF: report.seatF, meshes: report.stats.meshes })}`);
