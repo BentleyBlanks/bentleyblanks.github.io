@@ -126,6 +126,7 @@ function ReadRecovered(sample,part,position,rotation) {
 export class MeleeAnimationPlayer {
   constructor(root,kind) {
     this.root=root;this.data=String(kind).startsWith('ija')?MELEE_IJA_ANIMATIONS:MELEE_NRA_ANIMATIONS;
+    this.sharedHumanoid=root.userData.sharedHumanoid;
     root.updateWorldMatrix(true,true);inv.copy(root.matrixWorld).invert();root.getWorldQuaternion(qr).invert();
     this.bones=[];
     for(let index=0;index<this.data.parts.length;index++) {
@@ -155,6 +156,10 @@ export class MeleeAnimationPlayer {
       if(r.links.length&&!posed.has(r.links[0].parent))r.links.length=0;   // 上面没有采样骨，初始那次整树刷新已经算准了
     }
     this.heightScale=(this.bones.find(b=>b.part==='Pelvis')?.position.y||1)/(this.data.faction==='Nra'?.942464:.876513);
+    for(const r of this.allBones) {
+      const source=this.sharedHumanoid?.sourceBindRotations?.[r.part];
+      r.sourceRotation=source?new THREE.Quaternion().fromArray(source):r.rotation;
+    }
     this.applied=false;this.lastClip=null;
     this.prop=new THREE.Group();this.prop.name='MeleeRecoveredProp';root.add(this.prop);this.propWeight=0;
   }
@@ -175,14 +180,14 @@ export class MeleeAnimationPlayer {
       const {bone,index}=r,parent=bone.parent;
       bone.position.copy(r.localPosition);bone.scale.copy(r.localScale);
       for(const link of r.links)link.updateWorldMatrix(false,false);
-      {
+      if(!this.sharedHumanoid||r.part==='Pelvis') {
         v.set(THREE.MathUtils.lerp(a[index*7],b[index*7],mix),THREE.MathUtils.lerp(a[index*7+1],b[index*7+1],mix),THREE.MathUtils.lerp(a[index*7+2],b[index*7+2],mix));
         // Source skeletons share each faction's proportions; preserve each variant's native bind height.
         v.multiplyScalar(this.heightScale).add(r.position);
         this.root.localToWorld(v);parent.worldToLocal(v);bone.position.copy(v);
       }
       q0.fromArray(a,index*7+3).normalize();q1.fromArray(b,index*7+3).normalize();q0.slerp(q1,mix);
-      qd.copy(qr).multiply(q0).multiply(r.rotation);
+      qd.copy(qr).multiply(q0).multiply(r.sourceRotation);
       parent.matrixWorld.decompose(vp,qp,vs);qp.invert();bone.quaternion.copy(qp.multiply(qd));
       bone.updateMatrix();bone.updateWorldMatrix(false,false);
     }
@@ -199,7 +204,7 @@ export class MeleeAnimationPlayer {
       if(r.index<0||!legacy){position.copy(r.position);rotation.copy(r.rotation);return;}
       const offset=r.index*7,{a,b,mix}=legacy;
       position.set(THREE.MathUtils.lerp(a[offset],b[offset],mix),THREE.MathUtils.lerp(a[offset+1],b[offset+1],mix),THREE.MathUtils.lerp(a[offset+2],b[offset+2],mix)).multiplyScalar(this.heightScale).add(r.position);
-      rotation.fromArray(a,offset+3);q1.fromArray(b,offset+3);rotation.slerp(q1,mix).normalize().multiply(r.rotation);
+      rotation.fromArray(a,offset+3);q1.fromArray(b,offset+3);rotation.slerp(q1,mix).normalize().multiply(r.sourceRotation);
     };
     this.root.updateWorldMatrix(true,true);this.root.getWorldQuaternion(qr);
     for(const r of this.allBones){
@@ -207,7 +212,9 @@ export class MeleeAnimationPlayer {
       for(const link of r.links)link.updateWorldMatrix(false,false);
       Read(r,recovered,currentLegacy,vp,qd);
       if(previous&&mix<1){Read(r,from,previousLegacy,vs,qp);vp.lerpVectors(vs,vp,mix);q0.copy(qd);qd.copy(qp).slerp(q0,mix);}
-      this.root.localToWorld(vp);parent.worldToLocal(vp);bone.position.copy(vp);
+      if(!this.sharedHumanoid||r.part==='Pelvis') {
+        this.root.localToWorld(vp);parent.worldToLocal(vp);bone.position.copy(vp);
+      } else bone.position.copy(r.localPosition);
       qd.premultiply(qr);parent.getWorldQuaternion(qp).invert();bone.quaternion.copy(qp.multiply(qd));
       bone.updateMatrix();bone.updateWorldMatrix(false,false);
     }

@@ -149,7 +149,7 @@ if(process.argv.includes("--opening-audio"))process.exit(0);
     // 2026-09-23 hand-back rule (contract §2.1): only ijaA, ijaB (dadao) and ijaD (the junction, Liu's shot) gate it.
     assert.deepEqual([...C.vanguardIds].sort(),["BunkerExecutionerA","BunkerExecutionerB","BunkerFollowB"]);
     // A root chained across a clip change keeps the pelvis where it was (drag -> wall).
-    const chained=show.ChainRoot.call({},{x:0,z:0,yaw:0},"LugouNra02","CaptiveDraggedFromDirt","CaptiveWallBrace");
+    const chained=show.ChainRoot.call({},{x:0,z:0,yaw:0},"TengxianNra02","CaptiveDraggedFromDirt","CaptiveWallBrace");
     assert.ok(Number.isFinite(chained.x)&&Number.isFinite(chained.z)&&Number.isFinite(chained.yaw),"root chaining without a loaded library falls back to the same root");
   }
   {

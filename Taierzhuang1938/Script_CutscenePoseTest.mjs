@@ -63,17 +63,22 @@ import { ServeRoot } from "./Script_DevServer.mjs";
 const projectDir = path.dirname(fileURLToPath(import.meta.url));
 const rootDir = path.resolve(projectDir, "..");
 
-/** 每个姿态 clip 的骨骼高度带（离脚下平面，米）。上下界按实测留了余量。*/
+/** 每个姿态 clip 的骨骼高度带（离脚下平面，米）。上下界按实测留了余量。
+ * 2026-09-26：共用身体比例并修复原 GLB 的入地后，站/坐骨盆带重新标定。
+ * 实读 NRA05 原始顶点：AdvanceFire 最低 -0.068 m，LeanWallSitPeek -0.070 m；
+ * 规范后分别 -0.0006 m / +0.003 m。不能为守旧高度把鞋/坐部重新压进地面。
+ * 新骨盆带提高下界并收窄；另逐帧检查真实蒙皮贴地、身体骨段定长和单位缩放。
+ */
 const CLIP_BANDS = {
   // 上下限见头注最后一节：v3 离线贴地不再把人往下压 + StandFireCrouch 保留了
   // 源 BIP 那根 Neck1，头骨枢轴整体上移；带子随实测挪位并收窄，不是放宽。
   proneFire: { head: [0.25, 0.60], pelvis: [-0.05, 0.30], why: "匍匐据枪：整个人贴地" },
   crouchIdle: { head: [0.45, 1.00], pelvis: [0.20, 0.60], why: "跪蹲俯身" },
   crouchFire: { head: [0.45, 1.00], pelvis: [0.20, 0.60], why: "蹲姿据枪" },
-  standIdle: { head: [1.00, 1.45], pelvis: [0.45, 0.85], why: "站姿据枪：真站着" },
-  standFire: { head: [1.00, 1.45], pelvis: [0.45, 0.85], why: "站姿射击" },
+  standIdle: { head: [1.00, 1.45], pelvis: [0.70, 0.90], why: "站姿据枪：真站着" },
+  standFire: { head: [1.00, 1.45], pelvis: [0.70, 0.90], why: "站姿射击" },
   standReach: { head: [1.00, 1.45], pelvis: [0.45, 0.85], why: "站姿伸手/挥臂" },
-  sit: { head: [0.35, 0.75], pelvis: [-0.10, 0.20], why: "坐在地上" },
+  sit: { head: [0.35, 0.75], pelvis: [0.15, 0.23], why: "坐在地上" },
   run: { head: [0.95, 1.35], pelvis: [0.42, 0.80], why: "持枪跑步" },
   // 视频转骨骼三条（2026-09-02，_import/Script_MocapRetargetClips.mjs 烘的）：
   // 站立行走类，骨盆带按十套模型的清单 pelvisHeightMeters（0.84–0.99）
@@ -219,6 +224,16 @@ try {
     const v = new THREE.Vector3();
     const problems = [];
     const table = [];
+    const contract = await fetch('/Taierzhuang1938/Model/Character/Data_TengxianHumanoid.json').then(r=>r.json());
+    const lengths = new Map(contract.bodyBones.filter(b=>!['GroundRoot','Bip001 Pelvis'].includes(b.name))
+      .map(b=>[b.name,Math.hypot(...b.translation)]));
+    const body = [], skins = [];
+    rig.root.traverse(node=>{
+      const length=lengths.get(node.name.replaceAll('_',' '));
+      if(node.isBone && length!==undefined) body.push({node,length});
+      if(node.isSkinnedMesh) skins.push(node);
+    });
+    if(body.length!==51)problems.push(`共同定长身体骨段应有 51 根，实测 ${body.length}`);
     // 一个 clip 在自己整段时长上都得留在带里：只查一帧的话，
     // 「前一秒趴着、后两秒站起来」这种素材照样能蒙混过去。
     for (const [pose, band] of Object.entries(bands)) {
@@ -227,6 +242,7 @@ try {
       const clip = rig.clipById.get(ResolveLugouPlaybackClipId(clipId));
       if (!clip) { problems.push(`${pose} → ${clipId}：没有这个 clip`); continue; }
       const seen = { head: [Infinity, -Infinity], pelvis: [Infinity, -Infinity] };
+      let segmentError=0,scaleError=0,floorLow=Infinity,floorHigh=-Infinity;
       for (let i = 0; i <= 8; i += 1) {
         const at = (clip.duration * i) / 8;
         rig.mixer.stopAllAction();
@@ -235,6 +251,17 @@ try {
         rig.Play(clipId, 0);
         rig.mixer.setTime(at);
         actor.root.updateWorldMatrix(true, true);
+        for(const {node,length} of body){
+          segmentError=Math.max(segmentError,Math.abs(node.position.length()-length));
+          scaleError=Math.max(scaleError,Math.abs(node.scale.x-1),Math.abs(node.scale.y-1),Math.abs(node.scale.z-1));
+        }
+        if(['standIdle','standFire','sit'].includes(pose)){
+          let floor=Infinity;
+          for(const mesh of skins){mesh.skeleton.update();for(let n=0;n<mesh.geometry.attributes.position.count;n++){
+            mesh.getVertexPosition(n,v).applyMatrix4(mesh.matrixWorld);floor=Math.min(floor,v.y-actor.root.position.y);
+          }}
+          floorLow=Math.min(floorLow,floor);floorHigh=Math.max(floorHigh,floor);
+        }
         for (const role of ["head", "pelvis"]) {
           const y = rig.bones[role].getWorldPosition(v).y - actor.root.position.y;
           seen[role][0] = Math.min(seen[role][0], y);
@@ -242,6 +269,11 @@ try {
         }
       }
       table.push(`${pose.padEnd(11)} → ${clipId.padEnd(19)} 头 ${seen.head[0].toFixed(2)}–${seen.head[1].toFixed(2)}  胯 ${seen.pelvis[0].toFixed(2)}–${seen.pelvis[1].toFixed(2)}   ${band.why}`);
+      if(segmentError>1e-5 || scaleError>1e-5)problems.push(`${pose} 身体骨段变化 ${segmentError} / 缩放变化 ${scaleError}`);
+      if(Number.isFinite(floorLow)){
+        table.push(`  实皮贴地 ${floorLow.toFixed(4)}–${floorHigh.toFixed(4)} m / 最大骨段误差 ${segmentError.toExponential(1)} m`);
+        if(floorLow < -.005 || floorHigh > .03)problems.push(`${pose} 实皮悬浮/入地：${floorLow}–${floorHigh} m`);
+      }
       for (const role of ["head", "pelvis"]) {
         const [lo, hi] = band[role];
         if (seen[role][0] < lo || seen[role][1] > hi) {

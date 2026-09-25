@@ -12,7 +12,7 @@ import {OPENING_STORYBOARDS as C} from "./Data_OpeningStoryboards.mjs";
 import {EXTRA_HAND_POSES,HAND_SHAPES,LEG_POSES,FP_PROPS,SHOULDER_BEHIND_MIN_M} from "./Data_OpeningFirstPersonExtra.mjs";
 
 const here=path.dirname(fileURLToPath(import.meta.url));
-const manifest=JSON.parse(fs.readFileSync(path.join(here,"Model/Character/Data_LugouCharacterManifest.json"),"utf8"));
+const manifest=JSON.parse(fs.readFileSync(path.join(here,"Model/Character/Data_TengxianCharacterManifest.json"),"utf8"));
 function Actor(id){
   const record=manifest.models.find(row=>row.id===id),buffer=fs.readFileSync(path.join(here,record.url));
   const gltf=JSON.parse(buffer.subarray(20,20+buffer.readUInt32LE(12)).toString());
@@ -40,7 +40,7 @@ for(const unavailable of [undefined,{root:new THREE.Group()},{root:new THREE.Gro
   new OpeningFirstPerson(show).Update();assert.equal(show.firstPersonState.available,false);assert.equal(show.supplyRoot.visible,false);
   if(unavailable)assert.equal(unavailable.root.visible,false,"do not show an untrimmed procedural body in front of the camera");
 }
-const missingFinger=Actor("LugouNra02");
+const missingFinger=Actor("TengxianNra02");
 missingFinger.characterRig.root.traverse(node=>{if(node.name.endsWith("L Finger1"))node.name="UnavailableDigit";});
 assert.equal(OpeningActorAnatomy(missingFinger),null,"incomplete hands cannot use uncalibrated palm frames");
 // Every hand beat of the 2026-09-23 director (contract §5.3 phases): all poses and keys exist.
@@ -62,8 +62,8 @@ for(const phase of PHASES)assert.ok(C.firstPerson.hands.beats[phase]?.keys?.leng
 let samples=0,maxBend=0,maxTwist=0,maxRotation=0,groundContacts=0,maxGroundError=0;
 // Hands resting on the mud must really touch it: the ground under the eye is 0.42 m down here.
 const GROUND_POSES=new Set(["flat","push","clawIn","clawOut","sit","brace","limp","scrape"]);
-for(const model of ["LugouNra01","LugouNra02"]){
-  const playerBody=Actor(model),other=Actor("LugouNra02");
+for(const model of ["TengxianNra05","TengxianNra02"]){
+  const playerBody=Actor(model),other=Actor("TengxianNra02");
   other.root.position.set(-40,-.5,-126.9);other.root.updateMatrixWorld(true);
   const r={player:{camera},companion:{Handle:()=>({actor:other})},time:0};
   const show={playerBody,ready:true,phase:"Banter",Age:0,flags:{},supplyRoot:new THREE.Group(),loadingRifle:new THREE.Group(),loadingRifleGrip:new THREE.Vector3(),clips:[new THREE.Group(),new THREE.Group()],
@@ -108,7 +108,7 @@ assert.ok(groundContacts>=20,"ground beats were sampled at rest ("+groundContact
 // A cut between phases (the camera jumps, e.g. Blast -> Wake) must not carry last frame's world shoulder
 // into the new view: the shoulder blend is camera-local (campaign probe minShoulderBehind was -0.003).
 {
-  const playerBody=Actor("LugouNra02"),other=Actor("LugouNra02");other.root.position.set(-40,-.5,-126.9);other.root.updateMatrixWorld(true);
+  const playerBody=Actor("TengxianNra02"),other=Actor("TengxianNra02");other.root.position.set(-40,-.5,-126.9);other.root.updateMatrixWorld(true);
   const eye=camera.clone();const r={player:{camera:eye},companion:{Handle:()=>({actor:other})},time:0};
   const show={playerBody,ready:true,phase:PHASES[0],Age:0,flags:{},supplyRoot:new THREE.Group(),loadingRifle:new THREE.Group(),loadingRifleGrip:new THREE.Vector3(),
     clips:[new THREE.Group(),new THREE.Group()],r,Ija:()=>({actor:other})};
@@ -126,7 +126,7 @@ assert.ok(groundContacts>=20,"ground beats were sampled at rest ("+groundContact
 // the preferred elbow pole would make the wrist-flexion clamp roll that plane.
 // Exercise both production skins and hands with continuously moving contacts.
 let claspSamples=0,maxClaspError=0,minClaspAlignment=1,maxClaspBend=0,freeReachSamples=0,maxFreeFrameError=0;
-for(const model of ["LugouNra01","LugouNra02"])for(const side of ["l","r"]){
+for(const model of ["TengxianNra05","TengxianNra02"])for(const side of ["l","r"]){
   const actor=Actor(model),rig=OpeningActorAnatomy(actor),sign=side==="l"?-1:1;
   const shoulder=rig.bones[side].upperArm.getWorldPosition(new THREE.Vector3());
   const lengths=rig.armRest[side];
@@ -195,7 +195,7 @@ assert.equal(FP_PROPS[FP_PROPS.rifleSlide.prop]?.kind,"rifle","rifleSlide moves 
   // fallback once out of reach, and a missing partner is reported, never re-aimed.
   const warnings=[],warn=console.warn;console.warn=message=>warnings.push(String(message));
   globalThis.Tengxian={Debug:{}};
-  const playerBody=Actor("LugouNra02"),partnerActor=Actor("LugouIja02"),partner={actor:partnerActor,alive:true};
+  const playerBody=Actor("TengxianNra02"),partnerActor=Actor("TengxianIja02"),partner={actor:partnerActor,alive:true};
   const eye=new THREE.PerspectiveCamera(65,16/9,.05,100);eye.position.set(10,1,-120);eye.rotation.set(-.1,0,0,"YXZ");eye.updateMatrixWorld(true);
   const Local=(x,y,z)=>new THREE.Vector3(x,y,z).applyQuaternion(eye.quaternion).add(eye.position);
   const PlacePartner=at=>{

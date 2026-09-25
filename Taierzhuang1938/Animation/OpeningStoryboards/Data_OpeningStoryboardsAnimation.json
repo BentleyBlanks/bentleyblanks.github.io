@@ -1,6 +1,6 @@
 {
  "schema": 2,
- "version": "20260925OpeningStoryboardsV5",
+ "version": "20260926OpeningStoryboardsV5HumanoidV1",
  "fps": 24,
  "actorForward": [
   0,
@@ -141,7 +141,7 @@
    "loop": true,
    "weaponHold": "track",
    "role": "comrade",
-   "rig": "LugouNra02",
+   "rig": "TengxianNra02",
    "props": [
     "weapon"
    ],
@@ -172,7 +172,7 @@
    ],
    "notes": "Seated on the dugout floor, back on the wall, knees up; rifle upright between the knees, butt in the dirt, right hand round the handguard; bandaged left arm limp on the left knee.",
    "rigs": [
-    "LugouNra02"
+    "TengxianNra02"
    ]
   },
   "BanterLaugh": {
@@ -180,7 +180,7 @@
    "loop": false,
    "weaponHold": "track",
    "role": "any",
-   "rig": "LugouNra02",
+   "rig": "TengxianNra02",
    "props": [
     "weapon"
    ],
@@ -199,7 +199,7 @@
    },
    "notes": "Short shared laugh: breath in, three decaying chest pulses, head back then down. Additive on spine/neck/head/clavicles; full-body it is the seated comrade.",
    "rigs": [
-    "LugouNra02"
+    "TengxianNra02"
    ]
   },
   "BanterLookShoulder": {
@@ -207,7 +207,7 @@
    "loop": false,
    "weaponHold": "track",
    "role": "comrade",
-   "rig": "LugouNra02",
+   "rig": "TengxianNra02",
    "props": [
     "weapon"
    ],
@@ -226,7 +226,7 @@
    },
    "notes": "Glances down at the bandaged left shoulder and back up (\"\u4f4e\u5934\u770b\u4e86\u4e00\u773c\u80a9\u8180\").",
    "rigs": [
-    "LugouNra02"
+    "TengxianNra02"
    ]
   },
   "BanterPatRifle": {
@@ -234,7 +234,7 @@
    "loop": false,
    "weaponHold": "track",
    "role": "comrade",
-   "rig": "LugouNra02",
+   "rig": "TengxianNra02",
    "props": [
     "weapon"
    ],
@@ -284,7 +284,7 @@
    ],
    "notes": "\"\u62ff\u8fd9\u4e2a\u567b\": lets go of the handguard, pats the rifle twice, closes the hand again. Starts and ends on WoundedSitRifleIdle frame 0.",
    "rigs": [
-    "LugouNra02"
+    "TengxianNra02"
    ]
   },
   "WoundedRiseWall": {
@@ -292,7 +292,7 @@
    "loop": false,
    "weaponHold": "track",
    "role": "comrade",
-   "rig": "LugouNra02",
+   "rig": "TengxianNra02",
    "props": [
     "weapon"
    ],
@@ -337,7 +337,7 @@
    ],
    "notes": "Pulls the feet in, braces the bandaged side on the wall, stalls with a sharp inhale when the shoulder pulls, rises into a hunched low-ceiling stance, clamps the rifle at port.",
    "rigs": [
-    "LugouNra02"
+    "TengxianNra02"
    ]
   },
   "BlastSlamBuried": {
@@ -345,7 +345,7 @@
    "loop": false,
    "weaponHold": "track",
    "role": "comrade",
-   "rig": "LugouNra02",
+   "rig": "TengxianNra02",
    "props": [
     "weapon"
    ],
@@ -381,7 +381,7 @@
    "terminalPose": "buried",
    "notes": "Near miss from front-right: thrown back-left into the trench wall, the rifle torn out forward-right, slides down the wall into a slumped heap on his left side (dust hides him). The last frame is exactly CaptiveDraggedFromDirt frame 0 in the same root.",
    "rigs": [
-    "LugouNra02"
+    "TengxianNra02"
    ]
   },
   "CaptiveDraggedFromDirt": {
@@ -389,7 +389,7 @@
    "loop": false,
    "weaponHold": "free",
    "role": "comrade",
-   "rig": "LugouNra02",
+   "rig": "TengxianNra02",
    "rootMotion": true,
    "weaponState": "dropped",
    "weaponDropFrom": "BlastSlamBuried",
@@ -458,7 +458,7 @@
    ],
    "notes": "Hauled out of the loose earth by the back collar (ijaA) and the right arm (ijaB); knees and insteps drag, one foot gets under him and slips; jerked up on \"\u7acb\u3066\uff01\", drops onto his knees; the arm is wrenched up across the wound (gasp). Frame 0 = BlastSlamBuried last frame.",
    "rigs": [
-    "LugouNra02"
+    "TengxianNra02"
    ]
   },
   "IjaDragCollarFromDirt": {
@@ -466,7 +466,7 @@
    "loop": false,
    "weaponHold": "track",
    "role": "ijaA",
-   "rig": "LugouIja02",
+   "rig": "TengxianIja02",
    "props": [
     "weapon"
    ],
@@ -495,7 +495,7 @@
    ],
    "notes": "Stoops, hooks the back collar with the right hand, backs up three steps hauling; the jerk on \"\u7acb\u3066\uff01\" straightens him. Rifle slung across the back.",
    "rigs": [
-    "LugouIja02"
+    "TengxianIja02"
    ]
   },
   "IjaPullArm": {
@@ -503,7 +503,7 @@
    "loop": false,
    "weaponHold": "track",
    "role": "ijaB",
-   "rig": "LugouIja01",
+   "rig": "TengxianIja01",
    "props": [
     "weapon"
    ],
@@ -546,7 +546,7 @@
    ],
    "notes": "Two-handed hold on the right upper arm and wrist, sidesteps back with the drag, wrenches the arm up at 3.2 s and lets go at 4.05 s.",
    "rigs": [
-    "LugouIja01"
+    "TengxianIja01"
    ]
   },
   "CaptiveWallBrace": {
@@ -554,7 +554,7 @@
    "loop": false,
    "weaponHold": "free",
    "role": "comrade",
-   "rig": "LugouNra02",
+   "rig": "TengxianNra02",
    "rootMotion": true,
    "weaponState": "dropped",
    "weaponDropFrom": "BlastSlamBuried",
@@ -593,7 +593,7 @@
    ],
    "notes": "Shoved in the chest: topples back-left, the left palm finds the wall and slides down the loose earth, he ends kneel-sitting with shoulder and back on the wall, right hand on the torn bandage.",
    "rigs": [
-    "LugouNra02"
+    "TengxianNra02"
    ]
   },
   "IjaShoveToWall": {
@@ -601,7 +601,7 @@
    "loop": false,
    "weaponHold": "track",
    "role": "ijaA",
-   "rig": "LugouIja02",
+   "rig": "TengxianIja02",
    "props": [
     "weapon"
    ],
@@ -633,7 +633,7 @@
    ],
    "notes": "Not in contract \u00a75.4 (added): the shove the draft describes (\"\u63a8\u5230\u6c9f\u58c1\u4e0a\") needs its own pair with CaptiveWallBrace. Short wind-up, lunge on the left foot, flat right palm to the chest.",
    "rigs": [
-    "LugouIja02"
+    "TengxianIja02"
    ]
   },
   "CaptiveKneelMud": {
@@ -641,7 +641,7 @@
    "loop": true,
    "weaponHold": "free",
    "role": "comrade",
-   "rig": "LugouNra02",
+   "rig": "TengxianNra02",
    "rootMotion": false,
    "weaponState": "dropped",
    "weaponDropFrom": "BlastSlamBuried",
@@ -665,7 +665,7 @@
    ],
    "notes": "Interrogation idle: kneel-sitting in the mud against the wall, three hard breaths per loop, head lolling, right hand pressed on the bandage. Same root as CaptiveWallBrace.",
    "rigs": [
-    "LugouNra02"
+    "TengxianNra02"
    ]
   },
   "CaptiveHeadPulledBack": {
@@ -673,7 +673,7 @@
    "loop": false,
    "weaponHold": "free",
    "role": "comrade",
-   "rig": "LugouNra02",
+   "rig": "TengxianNra02",
    "rootMotion": false,
    "stage": "slashGrab",
    "weaponState": "dropped",
@@ -711,7 +711,7 @@
    ],
    "notes": "Fist in the hair: he is hauled up off his heels and off the wall, the head torn back and the throat opened; both hands come up by reflex and stay half-raised while the bayonet is drawn (covers IjaHairGrabPull + IjaDrawBayonet).",
    "rigs": [
-    "LugouNra02"
+    "TengxianNra02"
    ]
   },
   "IjaHairGrabPull": {
@@ -719,7 +719,7 @@
    "loop": false,
    "weaponHold": "track",
    "role": "ijaA",
-   "rig": "LugouIja02",
+   "rig": "TengxianIja02",
    "props": [
     "weapon"
    ],
@@ -747,7 +747,7 @@
    ],
    "notes": "Half step in, left fist into the hair, yanks the head back hard. No pause before the draw.",
    "rigs": [
-    "LugouIja02"
+    "TengxianIja02"
    ]
   },
   "IjaDrawBayonet": {
@@ -755,7 +755,7 @@
    "loop": false,
    "weaponHold": "track",
    "role": "ijaA",
-   "rig": "LugouIja02",
+   "rig": "TengxianIja02",
    "props": [
     "weapon",
     "bayonet"
@@ -801,7 +801,7 @@
    ],
    "notes": "Left fist keeps the hair; right hand to the scabbard on the left hip, draws the short bayonet and brings it low to the right, point toward the victim.",
    "rigs": [
-    "LugouIja02"
+    "TengxianIja02"
    ]
   },
   "IjaThroatSlash": {
@@ -809,7 +809,7 @@
    "loop": false,
    "weaponHold": "track",
    "role": "ijaA",
-   "rig": "LugouIja02",
+   "rig": "TengxianIja02",
    "props": [
     "weapon",
     "bayonet"
@@ -870,7 +870,7 @@
    ],
    "notes": "No pause: a 0.1 s cock to the right and one hard right-to-left draw across the throat (blade at the throat 0.24 s). Keeps the hair and leans in to taunt; 1.0-4.0 s is a seamless hold loop (the director samples it in window until \"\u65e5\u5175\u7532\u677e\u624b\") with two hair shakes on the taunt lines.",
    "rigs": [
-    "LugouIja02"
+    "TengxianIja02"
    ]
   },
   "CaptiveThroatCut": {
@@ -878,7 +878,7 @@
    "loop": false,
    "weaponHold": "free",
    "role": "comrade",
-   "rig": "LugouNra02",
+   "rig": "TengxianNra02",
    "rootMotion": true,
    "stage": "slashCut",
    "weaponState": "dropped",
@@ -927,7 +927,7 @@
    ],
    "notes": "The cut lands: a full-body jolt, both hands fly to the throat, the legs go and the trunk slams back into the wall (0.52 s); the head stays up where the fist holds it.",
    "rigs": [
-    "LugouNra02"
+    "TengxianNra02"
    ]
   },
   "CaptiveClutchThroat": {
@@ -935,7 +935,7 @@
    "loop": true,
    "weaponHold": "free",
    "role": "comrade",
-   "rig": "LugouNra02",
+   "rig": "TengxianNra02",
    "rootMotion": false,
    "stage": "slashTaunt",
    "weaponState": "dropped",
@@ -982,7 +982,7 @@
    ],
    "notes": "Hands clamped on the throat, choking spasms, head held back by the fist and shaken twice per loop (in step with IjaThroatSlash hold window).",
    "rigs": [
-    "LugouNra02"
+    "TengxianNra02"
    ]
   },
   "CaptiveWallSlideTwitch": {
@@ -990,7 +990,7 @@
    "loop": false,
    "weaponHold": "free",
    "role": "comrade",
-   "rig": "LugouNra02",
+   "rig": "TengxianNra02",
    "rootMotion": true,
    "stage": "slashWipe",
    "weaponState": "dropped",
@@ -1044,7 +1044,7 @@
    "next": [],
    "notes": "Let go: the head drops, he slides down the wall onto his side-sit, one hand slips off the throat, the legs jerk three times and stop. Last frame is the corpse (hold it; replaces ShotCollapse).",
    "rigs": [
-    "LugouNra02"
+    "TengxianNra02"
    ]
   },
   "IjaWipeSheathBayonet": {
@@ -1052,7 +1052,7 @@
    "loop": false,
    "weaponHold": "track",
    "role": "ijaA",
-   "rig": "LugouIja02",
+   "rig": "TengxianIja02",
    "props": [
     "weapon",
     "bayonet"
@@ -1120,7 +1120,7 @@
    ],
    "notes": "Frame 0 is the IjaThroatSlash hold pose: the fist opens (0.05 s) and drops, the knife stays low at the hip while he watches the man slide down the wall (to 3.2 s, in step with CaptiveWallSlideTwitch). Then he squats, drags the flat of the blade once across the dead man's trouser leg, straightens, sheathes on the left hip and reaches over the right shoulder for the slung rifle (last frame = IjaReadyRifle frame 0).",
    "rigs": [
-    "LugouIja02"
+    "TengxianIja02"
    ]
   },
   "IjaReadyRifle": {
@@ -1128,7 +1128,7 @@
    "loop": false,
    "weaponHold": "track",
    "role": "ijaA",
-   "rig": "LugouIja02",
+   "rig": "TengxianIja02",
    "props": [
     "weapon"
    ],
@@ -1168,8 +1168,8 @@
    ],
    "notes": "Pulls the rifle off the back over the right shoulder, left hand catches the handguard, right hand slides to the wrist of the stock; ends at low ready (native two-hand mount matches).",
    "rigs": [
-    "LugouIja01",
-    "LugouIja02"
+    "TengxianIja01",
+    "TengxianIja02"
    ]
   },
   "IjaCornerFire": {
@@ -1177,7 +1177,7 @@
    "loop": true,
    "weaponHold": "track",
    "role": "ijaC",
-   "rig": "LugouIja01",
+   "rig": "TengxianIja01",
    "props": [
     "weapon"
    ],
@@ -1203,8 +1203,8 @@
    ],
    "notes": "At the trench corner: bladed stance, cheek on the stock, one shot, recoil, bolt cycled with the right hand while the butt stays in the shoulder, back on aim and breathing. Muzzle along actor -Z, 4 deg up.",
    "rigs": [
-    "LugouIja01",
-    "LugouIja02"
+    "TengxianIja01",
+    "TengxianIja02"
    ]
   },
   "IjaJunctionPeek": {
@@ -1212,7 +1212,7 @@
    "loop": true,
    "weaponHold": "track",
    "role": "ijaD",
-   "rig": "LugouIja02",
+   "rig": "TengxianIja02",
    "props": [
     "weapon"
    ],
@@ -1222,8 +1222,8 @@
    },
    "notes": "Right shoulder on the junction wall, rifle at high port; leans out to the right past the corner, scans, leans back and waits. The wall edge is 0.30 m to his right, its corner 0.25 m ahead.",
    "rigs": [
-    "LugouIja01",
-    "LugouIja02"
+    "TengxianIja01",
+    "TengxianIja02"
    ]
   },
   "IjaSlingRifle": {
@@ -1231,7 +1231,7 @@
    "loop": false,
    "weaponHold": "track",
    "role": "ijaA",
-   "rig": "LugouIja02",
+   "rig": "TengxianIja02",
    "props": [
     "weapon"
    ],
@@ -1248,7 +1248,7 @@
    ],
    "notes": "\"\u628a\u6b65\u67aa\u7529\u5230\u8eab\u4fa7\": swings the rifle up and back onto the right shoulder by the sling, lets go, hands free and stooping for the collar.",
    "rigs": [
-    "LugouIja02"
+    "TengxianIja02"
    ]
   },
   "IjaCollarDragSnag": {
@@ -1256,7 +1256,7 @@
    "loop": false,
    "weaponHold": "track",
    "role": "ijaA",
-   "rig": "LugouIja02",
+   "rig": "TengxianIja02",
    "props": [
     "weapon"
    ],
@@ -1295,7 +1295,7 @@
    ],
    "notes": "Hooks the back of the collar, backs off two steps hauling; the pack snags on the beam at 0.95 s: a dead stop that jerks him forward, two yanks, a look back at what holds.",
    "rigs": [
-    "LugouIja02"
+    "TengxianIja02"
    ]
   },
   "IjaKickBeam": {
@@ -1303,7 +1303,7 @@
    "loop": false,
    "weaponHold": "track",
    "role": "ijaA",
-   "rig": "LugouIja02",
+   "rig": "TengxianIja02",
    "props": [
     "weapon",
     "beam"
@@ -1340,7 +1340,7 @@
    ],
    "notes": "Keeps the collar in his left fist, stamps the loose beam off the pack with the right sole; the `beam` track carries it clear (rests at 0.9 s).",
    "rigs": [
-    "LugouIja02"
+    "TengxianIja02"
    ]
   },
   "IjaButtStrike": {
@@ -1348,7 +1348,7 @@
    "loop": false,
    "weaponHold": "track",
    "role": "ijaA",
-   "rig": "LugouIja02",
+   "rig": "TengxianIja02",
    "props": [
     "weapon"
    ],
@@ -1381,7 +1381,7 @@
    ],
    "notes": "No warning: the rifle comes off the shoulder into both hands and the butt is driven straight down onto the head of the man propping himself up (0.42 s), then back to low ready.",
    "rigs": [
-    "LugouIja02"
+    "TengxianIja02"
    ]
   },
   "IjaHoldCollarUp": {
@@ -1389,7 +1389,7 @@
    "loop": false,
    "weaponHold": "track",
    "role": "ijaA",
-   "rig": "LugouIja02",
+   "rig": "TengxianIja02",
    "props": [
     "weapon"
    ],
@@ -1440,7 +1440,7 @@
    ],
    "notes": "SB05 (2026-09-25): squats in front of Shunzi, fists the front of his jacket and hauls him up until his eye is 0.73 m off the ground (player head); the head is up and pushed forward and the face stays on Shunzi's eye (head aimed at the player head track; the helmet brim does not cover it) except one glance to his right at the interpreter (2.2-2.9 s). 0.8-3.8 s is a seamless hold loop with two shakes.",
    "rigs": [
-    "LugouIja02"
+    "TengxianIja02"
    ]
   },
   "InterpreterCrouchAsk": {
@@ -1448,12 +1448,12 @@
    "loop": true,
    "weaponHold": "free",
    "role": "interpreter",
-   "rig": "LugouNra02",
+   "rig": "TengxianNra02",
    "rootMotion": false,
    "player": true,
    "notes": "Squatting on his heels in front of Shunzi, leaning in, right hand turned up asking and jabbing, left forearm on the left knee; the head searches his face.",
    "rigs": [
-    "LugouNra02"
+    "TengxianNra02"
    ]
   },
   "InterpreterGrabCollar": {
@@ -1461,7 +1461,7 @@
    "loop": false,
    "weaponHold": "free",
    "role": "interpreter",
-   "rig": "LugouNra02",
+   "rig": "TengxianNra02",
    "rootMotion": false,
    "player": true,
    "holdLoop": [
@@ -1492,7 +1492,7 @@
    ],
    "notes": "\"\u8bf4\u8bdd\uff01\": lunges from the squat, grabs the collar with the right hand and shakes once; 0.6-3.0 s holds.",
    "rigs": [
-    "LugouNra02"
+    "TengxianNra02"
    ]
   },
   "InterpreterFlee": {
@@ -1500,7 +1500,7 @@
    "loop": false,
    "weaponHold": "free",
    "role": "interpreter",
-   "rig": "LugouNra02",
+   "rig": "TengxianNra02",
    "rootMotion": true,
    "events": [
     {
@@ -1525,7 +1525,7 @@
    "next": [],
    "notes": "Lets go, recoils onto his hands, scrambles up turning away and breaks into a run toward the front trench (about 1.3 m inside the clip); the director hands him to the native run at the end.",
    "rigs": [
-    "LugouNra02"
+    "TengxianNra02"
    ]
   },
   "LuoDadaoChopRear": {
@@ -1533,7 +1533,7 @@
    "loop": false,
    "weaponHold": "track",
    "role": "luo",
-   "rig": "LugouNra05",
+   "rig": "TengxianNra05",
    "props": [
     "weapon"
    ],
@@ -1563,7 +1563,7 @@
    ],
    "notes": "From the right-rear: dadao cocked over the right shoulder, a step in on the left foot and one diagonal two-handed cut down through the right side of the neck, follow-through low left, back to guard.",
    "rigs": [
-    "LugouNra05"
+    "TengxianNra05"
    ]
   },
   "IjaChoppedFallWall": {
@@ -1571,7 +1571,7 @@
    "loop": false,
    "weaponHold": "track",
    "role": "ijaB",
-   "rig": "LugouIja01",
+   "rig": "TengxianIja01",
    "props": [
     "weapon"
    ],
@@ -1618,7 +1618,7 @@
    "next": [],
    "notes": "Aiming down at Shunzi when the blade lands: neck snaps away, the rifle drops out of his hands, he staggers left into the trench wall, left shoulder first, and slides down it into a sit on the ground, the left shoulder and head against the wall, legs out, arms slack. Frame 0 is his aim; last frame is the corpse.",
    "rigs": [
-    "LugouIja01"
+    "TengxianIja01"
    ]
   },
   "HeDadaoParryChop": {
@@ -1626,7 +1626,7 @@
    "loop": false,
    "weaponHold": "track",
    "role": "heyoutian",
-   "rig": "LugouNra02",
+   "rig": "TengxianNra02",
    "props": [
     "weapon"
    ],
@@ -1667,7 +1667,7 @@
    ],
    "notes": "Runs the last step in, beats the turning muzzle aside with the flat of the dadao (0.40 s), and cuts down into the left side of the neck (0.78 s). No pause between the two.",
    "rigs": [
-    "LugouNra02"
+    "TengxianNra02"
    ]
   },
   "LuoDragToCover": {
@@ -1675,7 +1675,7 @@
    "loop": false,
    "weaponHold": "free",
    "role": "luo",
-   "rig": "LugouNra05",
+   "rig": "TengxianNra05",
    "rootMotion": true,
    "player": true,
    "weapon": "Dadao",
@@ -1702,7 +1702,7 @@
    ],
    "notes": "Crouches, fists the back of the collar and the pack strap, and hauls Shunzi backwards 1.4 m behind the collapsed earth (first-person: Shunzi is the dragged one; `player` gives his collar).",
    "rigs": [
-    "LugouNra05"
+    "TengxianNra05"
    ]
   },
   "HeSwapDadaoRifle": {
@@ -1710,7 +1710,7 @@
    "loop": false,
    "weaponHold": "track",
    "role": "heyoutian",
-   "rig": "LugouNra02",
+   "rig": "TengxianNra02",
    "props": [
     "weapon",
     "rifle"
@@ -1735,7 +1735,7 @@
    "next": [],
    "notes": "Backs into the cover, drives the dadao point-down into the earth, pulls the rifle off his back over the right shoulder and comes up at low ready. `weapon` = the dadao (planted), `rifle` = the rifle. At the last frame the director calls DropOpeningWeapon(soldier, \"HeSwapDadaoRifle\") (the dadao stays planted in the world) and then SetWeapon(\"HanYang\") (his rifle; the `rifle` prop hides with the next clip).",
    "rigs": [
-    "LugouNra02"
+    "TengxianNra02"
    ]
   },
   "LuoKneelCheck": {
@@ -1743,7 +1743,7 @@
    "loop": false,
    "weaponHold": "free",
    "role": "luo",
-   "rig": "LugouNra05",
+   "rig": "TengxianNra05",
    "rootMotion": false,
    "player": true,
    "holdLoop": [
@@ -1780,7 +1780,7 @@
    ],
    "notes": "Drops onto his right knee in front of Shunzi, left hand on his shoulder, looks him in the face (0.9-2.6 s hold loop while \"\u8fd8\u80fd\u6253\u4e0d\uff1f\" and the nod play), then stands for the kick.",
    "rigs": [
-    "LugouNra05"
+    "TengxianNra05"
    ]
   },
   "IjaButtStrikeCollar": {
@@ -1788,7 +1788,7 @@
    "loop": false,
    "weaponHold": "track",
    "role": "ijaA",
-   "rig": "LugouIja02",
+   "rig": "TengxianIja02",
    "props": [
     "weapon"
    ],
@@ -1845,7 +1845,7 @@
    ],
    "notes": "SB04: squats astride Shunzi's legs, left fist in his collar (player collar), and swings the rifle up one-handed, butt first over the top, sliding his fist from the handguard up to the wrist of the stock (0.42 m from the butt plate): fist high over his right shoulder, butt aimed down at Shunzi's face, barrel up behind him (apex 0.55 s; from Shunzi's eye the butt is upper left). 0.55-1.05 s is a seamless hold loop (the fist trembles); the director lets go with pose.holdUntil (hold at least 0.4 s). Cocks to 1.125 s and drives the butt down onto the forehead (buttHit 1.375 s, player head + playerOffsetM), swings it back over the top and ends in the low carry (fist on the handguard at the knee, muzzle forward-down to his right). Face up and on Shunzi's eye throughout (look = player head). Last frame = IjaDragByForearm frame 0.",
    "rigs": [
-    "LugouIja02"
+    "TengxianIja02"
    ]
   },
   "IjaDragByForearm": {
@@ -1853,7 +1853,7 @@
    "loop": false,
    "weaponHold": "track",
    "role": "ijaA",
-   "rig": "LugouIja02",
+   "rig": "TengxianIja02",
    "props": [
     "weapon"
    ],
@@ -1899,7 +1899,7 @@
    ],
    "notes": "SB04A: frame 0 = IjaButtStrikeCollar's last frame (astride, rifle in the low carry). Lets go of the collar, grabs Shunzi's right forearm (player forearmR, 0.41 s) and backs off bent low, hauling him 2.0 m (root motion along +z of the actor frame, i.e. backwards) with ten short steps; the right fist keeps the rifle low, muzzle forward-down. The head is up and the face on Shunzi's eye (look = player head) the whole way.",
    "rigs": [
-    "LugouIja02"
+    "TengxianIja02"
    ]
   },
   "IjaLookBackLow": {
@@ -1907,7 +1907,7 @@
    "loop": false,
    "weaponHold": "track",
    "role": "ijaA",
-   "rig": "LugouIja02",
+   "rig": "TengxianIja02",
    "props": [
     "weapon"
    ],
@@ -1936,7 +1936,7 @@
    ],
    "notes": "SB03A: standing at low ready he hears the beam shift, stops, and turns head and shoulders back and down over his LEFT shoulder (0.15-0.75 s; hips 13 deg, spine 29 deg, the rest in neck and head) onto a point 4.7 m away, 115 deg to his left of his forward and 0.18 m off the ground (the director turns his root so Shunzi's eye is there). The left hand leaves the handguard; the rifle hangs low in the right fist, muzzle forward-down. 0.8 s to the end is a seamless hold (breathing).",
    "rigs": [
-    "LugouIja02"
+    "TengxianIja02"
    ]
   },
   "IjaStartleTurn": {
@@ -1944,7 +1944,7 @@
    "loop": false,
    "weaponHold": "track",
    "role": "ijaA",
-   "rig": "LugouIja02",
+   "rig": "TengxianIja02",
    "props": [
     "weapon"
    ],
@@ -1983,7 +1983,7 @@
    ],
    "notes": "SB05A: frame 0 = IjaHoldCollarUp at its hold-loop start (0.8 s). A flinch (0.04 s), the fist opens off the collar (0.12 s) and head and shoulders snap round to his LEFT rear (= screen right from Shunzi, where Luo and He come from) by 0.3 s, eyes on a point 95 deg to his left at head height. Shunzi sinks (player collar and head drop 0.12 m: the contract's 0.62 m eye); he flinches down with it (hips 0.07 m lower, so his head stays in the top of the SB05A frame). Look check: the face on the swinging look point while the aim is on (0-0.34 s); the keyed head then holds the turn to his left rear. Last frame = IjaParriedChoppedFall frame 0 (same root, no blend).",
    "rigs": [
-    "LugouIja02"
+    "TengxianIja02"
    ]
   },
   "IjaParriedChoppedFall": {
@@ -1991,7 +1991,7 @@
    "loop": false,
    "weaponHold": "track",
    "role": "ijaA",
-   "rig": "LugouIja02",
+   "rig": "TengxianIja02",
    "props": [
     "weapon"
    ],
@@ -2030,7 +2030,7 @@
    "next": [],
    "notes": "Comes up spinning left and swinging the rifle off his shoulder at the man behind him; the muzzle is beaten aside, the cut drops him beside Shunzi. Last frame is the corpse. Frame 0 is IjaStartleTurn's last frame (collar already let go -- IjaStartleTurn carries the releaseCollar event -- head and shoulders turned to his left rear, hips dropped); play it after IjaStartleTurn (from IjaHoldCollarUp directly it is a blend that turns the head ~60 deg in 0.12 s).",
    "rigs": [
-    "LugouIja02"
+    "TengxianIja02"
    ]
   },
   "IjaGuardPort": {
@@ -2038,7 +2038,7 @@
    "loop": true,
    "weaponHold": "track",
    "role": "ijaB",
-   "rig": "LugouIja01",
+   "rig": "TengxianIja01",
    "props": [
     "weapon"
    ],
@@ -2054,7 +2054,7 @@
    ],
    "notes": "SB05 ijaB: stands square in the trench, rifle level at the waist (butt at the right hip, left hand on the handguard), muzzle a little down onto the captive 4 m ahead; breathing, the muzzle drifts 1-2 deg. The face is on a point 4 m ahead, 0.75 m up (look). Seamless 3 s loop.",
    "rigs": [
-    "LugouIja01"
+    "TengxianIja01"
    ]
   },
   "LuoKneelReach": {
@@ -2062,7 +2062,7 @@
    "loop": false,
    "weaponHold": "free",
    "role": "luo",
-   "rig": "LugouNra05",
+   "rig": "TengxianNra05",
    "rootMotion": false,
    "player": true,
    "holdLoop": [
@@ -2109,7 +2109,7 @@
    ],
    "notes": "SB06 (2026-09-25): from the standing pose (= LuoKneelCheck frame 0) he drops onto his right knee in front of the sitting Shunzi (1.1 m, player head/chest), leans in and holds out his open left hand, palm down, fingers toward him, 0.3 m short of his breastbone (1.0 s; the elbow stays bent). 1.0-2.5 s is a seamless hold loop (the hand offers twice, the face on Shunzi's eye, look = player head). holdUntil lets go: the hand comes back to the knee (2.5-2.8 s) and he stands (3.5 s). Last frame = frame 0 = LuoKneelCheck frame 0: a drop-in for the Check beat, hands on to KickRifle like LuoKneelCheck does.",
    "rigs": [
-    "LugouNra05"
+    "TengxianNra05"
    ]
   },
   "RunnerLeanPostCall": {
@@ -2117,7 +2117,7 @@
    "loop": false,
    "weaponHold": "track",
    "role": "runner",
-   "rig": "LugouNra02",
+   "rig": "TengxianNra02",
    "props": [
     "weapon"
    ],
@@ -2169,7 +2169,7 @@
    ],
    "notes": "SB01 (2026-09-25): in the dugout mouth, the RIGHT hand closes round the north door post at shoulder height (0.45 s; contact pointM = the fist on the post, postAxisM = where the post stands, runtime metres in the actor frame: the director puts the root so postAxisM is on the north door post (1.05,-127.5) -- facing into the dugout that is root ~(1.24,-126.89), yawDeg ~80) and he leans in past it, shouting into the dugout (head on a point 2.4 m in, 0.73 m up, a little to his left). Mirrored from the storyboard's left hand (contract \u00a71.3: the storyboard side of the post is the north wall). 0.75-3.0 s is a seamless hold loop with two shouts (1.25 / 2.30 s: the trunk pushes in, the free left hand swings up). Rifle slung across the back.",
    "rigs": [
-    "LugouNra02"
+    "TengxianNra02"
    ]
   },
   "InterpreterHurryReach": {
@@ -2177,7 +2177,7 @@
    "loop": false,
    "weaponHold": "free",
    "role": "interpreter",
-   "rig": "LugouNra02",
+   "rig": "TengxianNra02",
    "rootMotion": false,
    "upperBody": true,
    "holdLoop": [
@@ -2199,7 +2199,7 @@
    ],
    "notes": "SB04A (2026-09-25): play with upperBody:true over the native walk/run (the director's Move(actor, point, face, \"InterpreterHurryReach\", speed, {upperBody:true})): the right arm comes up and reaches forward, open hand palm down, fingers spread (0.40 s), the left arm pulled back, the face on the ground 3 m ahead. 0.5-1.25 s is a seamless hold loop (the hand grabs at the air once). Full-body it is a standing stride (stills and a stationary fallback only).",
    "rigs": [
-    "LugouNra02"
+    "TengxianNra02"
    ]
   },
   "YaowaSitLoad": {
@@ -2207,7 +2207,7 @@
    "loop": true,
    "weaponHold": "track",
    "role": "yaowa",
-   "rig": "LugouNra02",
+   "rig": "TengxianNra02",
    "props": [
     "weapon"
    ],
@@ -2276,7 +2276,7 @@
    ],
    "notes": "SB01 (2026-09-25): sits on the floor against the north wall (wall 0.35 m behind the root), knees up and apart, the rifle between the knees, butt in the dirt, muzzle leaning away to his left; the left hand holds the handguard, the head is bowed over the open bolt (look = the receiver). Loop: two thumb pushes on the charger (0.2-1.1 s), the empty charger flicked out to his right (1.3 s), a new one from the belt pouch (1.75 s), seated in the guide (2.45 s). Replaces the kneeling ClipLoad for Yaowa in Banter/Orders.",
    "rigs": [
-    "LugouNra02"
+    "TengxianNra02"
    ]
   },
   "IjaChoppedFallBack": {
@@ -2284,7 +2284,7 @@
    "loop": false,
    "weaponHold": "track",
    "role": "ijaB",
-   "rig": "LugouIja01",
+   "rig": "TengxianIja01",
    "props": [
     "weapon"
    ],
@@ -2329,7 +2329,7 @@
    "next": [],
    "notes": "SB05A (2026-09-25), alternative to IjaChoppedFallWall on the same stage and frames 0-0.50 s: aiming down at Shunzi when the blade lands; neck snaps away, the rifle drops forward into the mud in front of Shunzi, the front (left) foot shoots out and he sits down hard 0.2 m behind his root (0.92 s, event seatHit), the trunk thrown back, arms flung out, right knee up (the SB05A frame is 0.92-1.15 s); then he goes over onto his back toward his left rear (turned 22 deg right about the pelvis: Luo stands at his right rear), the right knee falling open. Last frame is the corpse on his back.",
    "rigs": [
-    "LugouIja01"
+    "TengxianIja01"
    ]
   }
  },
@@ -2340,21 +2340,21 @@
    "notes": "All three clips start together; roots stay put, every body moves inside its clip. Comrade root = BlastSlamBuried root (wall 0.55 m on his left).",
    "actors": {
     "comrade": {
-     "rig": "LugouNra02",
+     "rig": "TengxianNra02",
      "clip": "CaptiveDraggedFromDirt",
      "x": 0.0,
      "z": 0.0,
      "yawDeg": 0
     },
     "ijaA": {
-     "rig": "LugouIja02",
+     "rig": "TengxianIja02",
      "clip": "IjaDragCollarFromDirt",
      "x": 0.05,
      "z": -0.58,
      "yawDeg": 156
     },
     "ijaB": {
-     "rig": "LugouIja01",
+     "rig": "TengxianIja01",
      "clip": "IjaPullArm",
      "x": 0.48,
      "z": -0.24,
@@ -2368,14 +2368,14 @@
    "notes": "Comrade root R3 = his kneel spot at the end of the drag (pelvis hand-over: models[].clips[].root, CaptiveDraggedFromDirt end = CaptiveWallBrace start); the trench wall is 0.49 m behind him (he was hauled round to face his right). ijaA stands square in front.",
    "actors": {
     "comrade": {
-     "rig": "LugouNra02",
+     "rig": "TengxianNra02",
      "clip": "CaptiveWallBrace",
      "x": 0.0,
      "z": 0.0,
      "yawDeg": 0
     },
     "ijaA": {
-     "rig": "LugouIja02",
+     "rig": "TengxianIja02",
      "clip": "IjaShoveToWall",
      "x": 0.02,
      "z": -0.6,
@@ -2388,7 +2388,7 @@
    "notes": "IjaHairGrabPull and CaptiveHeadPulledBack start together.",
    "actors": {
     "comrade": {
-     "rig": "LugouNra02",
+     "rig": "TengxianNra02",
      "clip": "CaptiveHeadPulledBack",
      "x": 0.0,
      "z": 0.0,
@@ -2398,7 +2398,7 @@
      "x": -0.04,
      "z": -0.28,
      "yawDeg": 180,
-     "rig": "LugouIja02",
+     "rig": "TengxianIja02",
      "clip": "IjaHairGrabPull"
     }
    }
@@ -2408,7 +2408,7 @@
    "notes": "IjaDrawBayonet starts 1.0 s into CaptiveHeadPulledBack (the hair is still held).",
    "actors": {
     "comrade": {
-     "rig": "LugouNra02",
+     "rig": "TengxianNra02",
      "clip": "CaptiveHeadPulledBack",
      "x": 0.0,
      "z": 0.0,
@@ -2418,7 +2418,7 @@
      "x": -0.04,
      "z": -0.28,
      "yawDeg": 180,
-     "rig": "LugouIja02",
+     "rig": "TengxianIja02",
      "clip": "IjaDrawBayonet",
      "offsetS": 1.0
     }
@@ -2429,7 +2429,7 @@
    "notes": "IjaThroatSlash and CaptiveThroatCut start together; the blade crosses at 0.24 s.",
    "actors": {
     "comrade": {
-     "rig": "LugouNra02",
+     "rig": "TengxianNra02",
      "clip": "CaptiveThroatCut",
      "x": 0.0,
      "z": 0.0,
@@ -2439,7 +2439,7 @@
      "x": -0.04,
      "z": -0.28,
      "yawDeg": 180,
-     "rig": "LugouIja02",
+     "rig": "TengxianIja02",
      "clip": "IjaThroatSlash"
     }
    }
@@ -2449,7 +2449,7 @@
    "notes": "CaptiveClutchThroat loops from IjaThroatSlash 1.0 s; both loop the same 3.0 s.",
    "actors": {
     "comrade": {
-     "rig": "LugouNra02",
+     "rig": "TengxianNra02",
      "clip": "CaptiveClutchThroat",
      "x": 0.0,
      "z": 0.0,
@@ -2460,7 +2460,7 @@
      "x": -0.04,
      "z": -0.28,
      "yawDeg": 180,
-     "rig": "LugouIja02",
+     "rig": "TengxianIja02",
      "clip": "IjaThroatSlash"
     }
    }
@@ -2470,7 +2470,7 @@
    "notes": "IjaWipeSheathBayonet and CaptiveWallSlideTwitch start together: ijaA lets go of the hair (0-0.3 s), watches him slide down and wipes the blade on the corpse from 3.2 s.",
    "actors": {
     "comrade": {
-     "rig": "LugouNra02",
+     "rig": "TengxianNra02",
      "clip": "CaptiveWallSlideTwitch",
      "x": 0.0,
      "z": 0.0,
@@ -2480,7 +2480,7 @@
      "x": -0.04,
      "z": -0.28,
      "yawDeg": 180,
-     "rig": "LugouIja02",
+     "rig": "TengxianIja02",
      "clip": "IjaWipeSheathBayonet"
     }
    }
@@ -2497,21 +2497,21 @@
      "yawDeg": 0
     },
     "ijaA": {
-     "rig": "LugouIja02",
+     "rig": "TengxianIja02",
      "clip": "IjaHoldCollarUp",
      "x": 0.52,
      "z": -0.52,
      "yawDeg": -105
     },
     "interpreter": {
-     "rig": "LugouNra02",
+     "rig": "TengxianNra02",
      "clip": "InterpreterCrouchAsk",
      "x": 0.0,
      "z": -1.02,
      "yawDeg": 180
     },
     "ijaB": {
-     "rig": "LugouIja01",
+     "rig": "TengxianIja01",
      "clip": "IjaChoppedFallWall",
      "x": -0.8,
      "z": -0.72,
@@ -2524,14 +2524,14 @@
    "notes": "Luo steps in from ijaB's right-rear; the blade reaches the right side of his neck at 0.45 s in both clips.",
    "actors": {
     "ijaB": {
-     "rig": "LugouIja01",
+     "rig": "TengxianIja01",
      "clip": "IjaChoppedFallWall",
      "x": 0.0,
      "z": 0.0,
      "yawDeg": 0
     },
     "luo": {
-     "rig": "LugouNra05",
+     "rig": "TengxianNra05",
      "clip": "LuoDadaoChopRear",
      "x": 0.42,
      "z": 0.62,
@@ -2544,14 +2544,14 @@
    "notes": "ijaA root = his IjaHoldCollarUp root (crouched, facing Shunzi). He comes in behind his left; ijaA spins left onto him. Muzzle beaten aside at 0.40 s, the cut lands at 0.78 s.",
    "actors": {
     "ijaA": {
-     "rig": "LugouIja02",
+     "rig": "TengxianIja02",
      "clip": "IjaParriedChoppedFall",
      "x": 0.0,
      "z": 0.0,
      "yawDeg": 0
     },
     "heyoutian": {
-     "rig": "LugouNra02",
+     "rig": "TengxianNra02",
      "clip": "HeDadaoParryChop",
      "x": -0.3,
      "z": 1.32,
@@ -2631,8 +2631,8 @@
  },
  "models": [
   {
-   "id": "LugouNra02",
-   "file": "Animation_LugouNra02OpeningStoryboards.json",
+   "id": "TengxianNra02",
+   "file": "Animation_TengxianNra02OpeningStoryboards.json",
    "sha256": "1725a791c8d547f523300e665c3bfb108958291e703610f15daf7d91fdc25851",
    "originalModelSha256": "39c08ca82148e140ee2952caffdd0dee99750fb734038a5263d216c9a7345225",
    "clipIds": [
@@ -2680,7 +2680,7 @@
    ],
    "contactPoints": {
     "hairBack": {
-     "bone": "Bip002 Head",
+     "bone": "Bip001 Head",
      "offset": [
       22.19366,
       -8.9982,
@@ -2693,7 +2693,7 @@
      ]
     },
     "crown": {
-     "bone": "Bip002 Head",
+     "bone": "Bip001 Head",
      "offset": [
       25.20314,
       -3.31766,
@@ -2706,7 +2706,7 @@
      ]
     },
     "throat": {
-     "bone": "Bip002 Head",
+     "bone": "Bip001 Head",
      "offset": [
       3.71688,
       11.37599,
@@ -2719,7 +2719,7 @@
      ]
     },
     "collarBack": {
-     "bone": "Bip002 Spine2",
+     "bone": "Bip001 Spine2",
      "offset": [
       19.00796,
       -4.21486,
@@ -2732,7 +2732,7 @@
      ]
     },
     "collarFront": {
-     "bone": "Bip002 Spine2",
+     "bone": "Bip001 Spine2",
      "offset": [
       9.73495,
       11.03244,
@@ -2745,7 +2745,7 @@
      ]
     },
     "chestFront": {
-     "bone": "Bip002 Spine2",
+     "bone": "Bip001 Spine2",
      "offset": [
       -0.62977,
       15.57993,
@@ -2758,7 +2758,7 @@
      ]
     },
     "upperArmR": {
-     "bone": "Bip002 R UpperArm",
+     "bone": "Bip001 R UpperArm",
      "offset": [
       13.01516,
       -2.48533,
@@ -2771,7 +2771,7 @@
      ]
     },
     "wristR": {
-     "bone": "Bip002 R Forearm",
+     "bone": "Bip001 R Forearm",
      "offset": [
       21.77225,
       0.07328,
@@ -2784,7 +2784,7 @@
      ]
     },
     "shoulderR": {
-     "bone": "Bip002 Spine2",
+     "bone": "Bip001 Spine2",
      "offset": [
       15.65903,
       5.72377,
@@ -2797,7 +2797,7 @@
      ]
     },
     "shoulderL": {
-     "bone": "Bip002 Spine2",
+     "bone": "Bip001 Spine2",
      "offset": [
       13.31892,
       8.00635,
@@ -2810,7 +2810,7 @@
      ]
     },
     "thighL": {
-     "bone": "Bip002 L Thigh",
+     "bone": "Bip001 L Thigh",
      "offset": [
       17.96053,
       16.26084,
@@ -2823,7 +2823,7 @@
      ]
     },
     "neckSideR": {
-     "bone": "Bip002 Spine2",
+     "bone": "Bip001 Spine2",
      "offset": [
       17.17551,
       1.52394,
@@ -2836,7 +2836,7 @@
      ]
     },
     "neckSideL": {
-     "bone": "Bip002 Spine2",
+     "bone": "Bip001 Spine2",
      "offset": [
       17.82059,
       -1.50667,
@@ -4354,8 +4354,8 @@
    ]
   },
   {
-   "id": "LugouNra05",
-   "file": "Animation_LugouNra05OpeningStoryboards.json",
+   "id": "TengxianNra05",
+   "file": "Animation_TengxianNra05OpeningStoryboards.json",
    "sha256": "a2812b3e518f066b36fb561cc6abd818098b09dce9955b1aa06e9139f1fb2c3f",
    "originalModelSha256": "acbc9184da059bdf6c3c18d051f3eba77d1dd3acba469e8dbc876b092f174250",
    "clipIds": [
@@ -4386,7 +4386,7 @@
    ],
    "contactPoints": {
     "hairBack": {
-     "bone": "Bip002 Head",
+     "bone": "Bip001 Head",
      "offset": [
       22.64242,
       -7.49951,
@@ -4399,7 +4399,7 @@
      ]
     },
     "crown": {
-     "bone": "Bip002 Head",
+     "bone": "Bip001 Head",
      "offset": [
       25.87124,
       -0.99014,
@@ -4412,7 +4412,7 @@
      ]
     },
     "throat": {
-     "bone": "Bip002 Head",
+     "bone": "Bip001 Head",
      "offset": [
       3.95251,
       12.22985,
@@ -4425,7 +4425,7 @@
      ]
     },
     "collarBack": {
-     "bone": "Bip002 Spine2",
+     "bone": "Bip001 Spine2",
      "offset": [
       17.28875,
       -1.22198,
@@ -4438,7 +4438,7 @@
      ]
     },
     "collarFront": {
-     "bone": "Bip002 Spine2",
+     "bone": "Bip001 Spine2",
      "offset": [
       9.55346,
       11.87677,
@@ -4451,7 +4451,7 @@
      ]
     },
     "chestFront": {
-     "bone": "Bip002 Spine2",
+     "bone": "Bip001 Spine2",
      "offset": [
       1.31764,
       15.28835,
@@ -4464,7 +4464,7 @@
      ]
     },
     "upperArmR": {
-     "bone": "Bip002 R UpperArm",
+     "bone": "Bip001 R UpperArm",
      "offset": [
       15.44379,
       -0.85017,
@@ -4477,7 +4477,7 @@
      ]
     },
     "wristR": {
-     "bone": "Bip002 R Forearm",
+     "bone": "Bip001 R Forearm",
      "offset": [
       21.90957,
       -0.16693,
@@ -4490,7 +4490,7 @@
      ]
     },
     "shoulderR": {
-     "bone": "Bip002 Spine2",
+     "bone": "Bip001 Spine2",
      "offset": [
       15.65304,
       6.14607,
@@ -4503,7 +4503,7 @@
      ]
     },
     "shoulderL": {
-     "bone": "Bip002 Spine2",
+     "bone": "Bip001 Spine2",
      "offset": [
       17.64706,
       6.46485,
@@ -4516,7 +4516,7 @@
      ]
     },
     "thighL": {
-     "bone": "Bip002 L Thigh",
+     "bone": "Bip001 L Thigh",
      "offset": [
       17.06414,
       15.99308,
@@ -4529,7 +4529,7 @@
      ]
     },
     "neckSideR": {
-     "bone": "Bip002 Spine2",
+     "bone": "Bip001 Spine2",
      "offset": [
       16.01952,
       2.68986,
@@ -4542,7 +4542,7 @@
      ]
     },
     "neckSideL": {
-     "bone": "Bip002 Spine2",
+     "bone": "Bip001 Spine2",
      "offset": [
       15.62389,
       7.9043,
@@ -5338,8 +5338,8 @@
    ]
   },
   {
-   "id": "LugouIja01",
-   "file": "Animation_LugouIja01OpeningStoryboards.json",
+   "id": "TengxianIja01",
+   "file": "Animation_TengxianIja01OpeningStoryboards.json",
    "sha256": "08ef8d4c8fdc0c3fc8272250798a94c474c43964d9dc2fcb750c4d6f99e4e55d",
    "originalModelSha256": "23fa4ef88891bd14d49dfb9a3e61b9f0dcaf45b8956a720aab24d9c4c23eb9c7",
    "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningStoryboards_20260925\\Scene_LugouIja01OpeningStoryboards.blend",
@@ -6478,8 +6478,8 @@
    ]
   },
   {
-   "id": "LugouIja02",
-   "file": "Animation_LugouIja02OpeningStoryboards.json",
+   "id": "TengxianIja02",
+   "file": "Animation_TengxianIja02OpeningStoryboards.json",
    "sha256": "632772afa313e08dedc2da27153e939c7688e2c6cc4f6763607de32f99710cc7",
    "originalModelSha256": "8c4860ec2d4dd3076b06ff7e593e5dcfd4d23aefe2fedf6f9fdec3b0e12cc9aa",
    "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningStoryboards_20260925\\Scene_LugouIja02OpeningStoryboards.blend",
@@ -8176,8 +8176,8 @@
    ]
   },
   {
-   "id": "LugouIja03",
-   "file": "Animation_LugouIja03OpeningStoryboards.json",
+   "id": "TengxianIja03",
+   "file": "Animation_TengxianIja03OpeningStoryboards.json",
    "sha256": "288f3d84c3a7fde4f48322a2e9f9dbd9136a97c73d1504c86e74d3c5fb2fcb6b",
    "originalModelSha256": "6d97c801f7ea62430e5397fde980ad0964ab5081fa5f15249434bce4cbf3f89d",
    "clipIds": [

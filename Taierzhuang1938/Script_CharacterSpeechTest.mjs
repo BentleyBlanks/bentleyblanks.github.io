@@ -52,7 +52,7 @@ director.current.parallel = [];director.current.phase = 'waiting';clock = 10.5;
 assert.equal(director.Speech('luo'), null, 'event-gated segment waits stay closed');
 
 // ---- facial GLB contracts (Script_BakeCharacterFacial.py output) ----
-const MANIFEST = JSON.parse(fs.readFileSync(new URL('./Model/Character/Data_LugouCharacterManifest.json', import.meta.url), 'utf8'));
+const MANIFEST = JSON.parse(fs.readFileSync(new URL('./Model/Character/Data_TengxianCharacterManifest.json', import.meta.url), 'utf8'));
 function Glb(file) {
   const b = fs.readFileSync(new URL(file.replace(/^\.\//, './'), import.meta.url));
   const length = b.readUInt32LE(12);
@@ -78,7 +78,7 @@ const POSES = ['Rest', 'Open', 'Wide', 'Round', 'Close', 'Blink', 'BrowUp', 'Sna
   // 2026-09-25 expressions (01-03 storyboard contract section 4.2).
   'Shock', 'Pain', 'Shout', 'Grit'];
 const faced = MANIFEST.models.filter(record => record.facialUrl);
-assert.deepEqual(faced.map(r => r.id).sort(), ['LugouIja01', 'LugouIja02', 'LugouIja06', 'LugouNra02', 'LugouNra05', 'LugouNra06']);
+assert.deepEqual(faced.map(r => r.id).sort(), ['TengxianIja01', 'TengxianIja02', 'TengxianIja06', 'TengxianNra02', 'TengxianNra05', 'TengxianNra06']);
 const definitions = {};
 for (const record of faced) {
   const face = Glb(record.facialUrl), source = Glb(record.url);
@@ -167,7 +167,7 @@ for (const record of faced) {
 // ---- speaking cast: pinned approved appearance with a face for every 01-06 speaker ----
 for (const [castId, spec] of Object.entries(FIRST_LEVEL_SPEAKING_CAST)) {
   assert.ok(IsApprovedCharacterVariant(spec.actorKind, spec.modelVariant, castId), `${castId}: approved appearance`);
-  const id = `Lugou${spec.actorKind === 'nra' ? 'Nra' : 'Ija'}${String(spec.modelVariant + 1).padStart(2, '0')}`;
+  const id = `Tengxian${spec.actorKind === 'nra' ? 'Nra' : 'Ija'}${String(spec.modelVariant + 1).padStart(2, '0')}`;
   const record = MANIFEST.models.find(r => r.id === id);
   assert.ok(record?.facialCast?.includes(castId), `${castId} is in ${id}.facialCast`);
   assert.deepEqual(SpeakingCastOptions(castId), {castId, modelVariant: spec.modelVariant});
@@ -195,7 +195,7 @@ function FaceRoot(rig) {
 }
 const jawAngle = (bone, rig) => 2 * Math.acos(Math.min(1, Math.abs(bone.quaternion.dot(new THREE.Quaternion().fromArray(rig.poses.Rest.Face_Jaw.rotation))))) * 180 / Math.PI;
 {
-  const rig = definitions.LugouNra02, {root, byName} = FaceRoot(rig);
+  const rig = definitions.TengxianNra02, {root, byName} = FaceRoot(rig);
   const face = new CharacterFacialAnimation(root, rig, {seed: 7});
   // Silence: lips closed, only a tiny breathing drift.
   let maxSilentJaw = 0;
@@ -282,15 +282,15 @@ for (const label of Object.keys(definitions)) {
   }
   face.Reset();
   assert.deepEqual(face.State().expression, {snarl: 0, shock: 0, pain: 0, shout: 0, grit: 0}, 'Reset clears expressions');
-  assert.throws(() => CharacterFacial.SetExpression({characterRig: {modelId: 'LugouNra01'}}, {snarl: 1}), /has no facial rig/);
+  assert.throws(() => CharacterFacial.SetExpression({characterRig: {modelId: 'TengxianIja03'}}, {snarl: 1}), /has no facial rig/);
 }
 // ---- a face never takes an expression it cannot show (review 2026-09-25) ----
 {
-  const rig = definitions.LugouIja06, stale = {...rig, poses: {...rig.poses}};
+  const rig = definitions.TengxianIja06, stale = {...rig, poses: {...rig.poses}};
   delete stale.poses.Snarl;  // a cached pre-2026-09-25 GLB has no expression poses
-  const {root} = FaceRoot(stale); root.name = 'Rigged_LugouIja06';
+  const {root} = FaceRoot(stale); root.name = 'Rigged_TengxianIja06';
   const face = new CharacterFacialAnimation(root, stale, {seed: 5});
-  assert.throws(() => CharacterFacial.SetExpression({facial: face}, {snarl: 1}), /LugouIja06 has no Snarl pose/);
+  assert.throws(() => CharacterFacial.SetExpression({facial: face}, {snarl: 1}), /TengxianIja06 has no Snarl pose/);
   assert.throws(() => { face.expression = {snarl: .5}; }, /no Snarl pose/, 'whole-object writes are checked too');
   face.SetExpression({snarl: 0, shock: 1});
   assert.equal(face.expression.shock, 1, 'a pose the face has still works');
@@ -300,7 +300,7 @@ for (const label of Object.keys(definitions)) {
 }
 // A whole-object write eases over expressionBlendS even after SetExpression(..., blendS) (the blend time does not stick).
 {
-  const rig = definitions.LugouNra02, {root} = FaceRoot(rig), face = new CharacterFacialAnimation(root, rig, {seed: 9});
+  const rig = definitions.TengxianNra02, {root} = FaceRoot(rig), face = new CharacterFacialAnimation(root, rig, {seed: 9});
   face.SetExpression({shock: 1}, 0); face.Update(1 / 60, {});
   assert.equal(face.expressionWeights.shock, 1);
   face.expression = {shock: 0}; face.Update(C.expressionBlendS / 2, {});
@@ -315,7 +315,7 @@ for (const label of Object.keys(definitions)) {
 }
 // Blinks: seeded per actor, 2.5-6 s apart.
 {
-  const rig = definitions.LugouIja02;
+  const rig = definitions.TengxianIja02;
   const Blinks = seed => { const {root} = FaceRoot(rig), face = new CharacterFacialAnimation(root, rig, {seed}); const at = [];
     let was = false; for (let i = 0; i < 60 * 30; i++) { face.Update(1 / 60, {}); const now = face.weights.Blink > .5; if (now && !was) at.push(i / 60); was = now; } return at; };
   const a = Blinks(1), b = Blinks(2);
@@ -332,7 +332,7 @@ for (const label of Object.keys(definitions)) {
     && FIRST_LEVEL_SPEAKER_ROLES.includes(c.lines[0].who) && FIRST_LEVEL_SPEAKER_ROLES.includes(c.lines[1].who));
   const [whoA, whoB] = [cue.lines[0].who, cue.lines[1].who];
   assert.equal(WhoForLine(cue.id, `${cue.id}.01`), whoA);
-  const rig = definitions.LugouNra02;
+  const rig = definitions.TengxianNra02;
   const Soldier = (id, who) => { const {root} = FaceRoot(rig); const head = new THREE.Object3D(); root.add(head);
     const facial = new CharacterFacialAnimation(root, rig, {seed: id});
     return {id, alive: true, speakerRole: who, position: new THREE.Vector3(id, 0, 0),
@@ -362,7 +362,7 @@ for (const label of Object.keys(definitions)) {
   assert.ok(!FIRST_LEVEL_SPEAKER_ROLES.includes('bearer'), '06 bearer is a layout figure without a face');
   // One faced front guard, in the second batch (it gathers next to the player at 04).
   assert.ok(FACED_FRONT_GUARD_INDEX >= FRONT_BATTLE_TUNING.firstBatch && FACED_FRONT_GUARD_INDEX < FRONT_GUARD_POSTS.length);
-  const rig = definitions.LugouNra02;
+  const rig = definitions.TengxianNra02;
   const Soldier = (id, who) => { const {root} = FaceRoot(rig); const head = new THREE.Object3D(); root.add(head);
     const facial = new CharacterFacialAnimation(root, rig, {seed: id});
     return {id, alive: true, speakerRole: who, position: new THREE.Vector3(id, 0, 0),
@@ -457,7 +457,7 @@ for (const label of Object.keys(definitions)) {
   const voice = {manifest: {cues: {Fake: {sha256: 'fake'}}}, Speech: who => (who === 'luo' ? {...envelopeOnly} : null)};
   const binder = new FirstLevelSpeakerBinder({voice, loadFaceTracks: false});
   assert.equal(binder.Speech('luo').jaw, 1); assert.equal(binder.Speech('yaowa'), null);
-  const facial = new CharacterFacialAnimation(FaceRoot(definitions.LugouNra02).root, definitions.LugouNra02, {seed: 3});
+  const facial = new CharacterFacialAnimation(FaceRoot(definitions.TengxianNra02).root, definitions.TengxianNra02, {seed: 3});
   facial.source = () => binder.Speech('luo');
   for (let i = 0; i < 20; i++) facial.Update(1 / 60);
   assert.ok(facial.jaw > .6, `face follows the track's jaw: ${facial.jaw.toFixed(2)}`);

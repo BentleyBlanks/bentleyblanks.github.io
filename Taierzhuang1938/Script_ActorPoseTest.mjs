@@ -201,7 +201,7 @@ try {
     // 军人可见人体已全部换成卢沟桥资产的蒙皮 GLB；程序化骨架仍只作为动作编辑器
     // 的独立模式和既有挂点 API 兼容层，不得重新成为正式军人外观。
     const checkRiggedSoldier = (candidate, faction) => {
-      check(candidate.meshSource.startsWith(`glb:Lugou${faction}`),
+      check(candidate.meshSource.startsWith(`glb:Tengxian${faction}`),
         `${faction} should use a Lugou skinned GLB, got ${candidate.meshSource}`);
       // 16 条源动作 + 3 条救护动作 + 5 条新步兵动作；军官保留原 19 条。
       const expectedActions = candidate.characterRig?.asset.infantry ? 24 : 19;
@@ -249,7 +249,7 @@ try {
       check(head.y < 0.8, `${candidate.modelId} 卧姿开火被拉站起来: ${head.y}`);
     };
     const CheckIjaBackpackHelmet = (candidate) => {
-      if (candidate.modelId !== "LugouIja03") return;
+      if (candidate.modelId !== "TengxianIja03") return;
       const rig = candidate.characterRig;
       const helmet = rig.root.getObjectByName("Object005");
       let backpack, face;
@@ -286,9 +286,9 @@ try {
     // Explicit rejected numbers and deterministic/random seeds cannot restore a banned face.
     for (const kind of ["nra", "nraDare", "ija"]) for (let number = 0; number < 8; number++) {
       const candidate = factory.Create(kind, {seed:number,modelVariant:number % 5,weapon:null});
-      const allowed = kind.startsWith("nra") ? ["LugouNra02","LugouNra05"] : ["LugouIja01","LugouIja02","LugouIja03","LugouIja06"];
+      const allowed = kind.startsWith("nra") ? ["TengxianNra02","TengxianNra05"] : ["TengxianIja01","TengxianIja02","TengxianIja03","TengxianIja06"];
       check(allowed.includes(candidate.modelId), `banned appearance ${candidate.modelId}`);
-      if (candidate.modelId === "LugouNra05") {
+      if (candidate.modelId === "TengxianNra05") {
         for (const id of ["RifleCrouchAdvance","StandToKneel","KneelHold","KneelToStand","GrenadeThrow"]) {
           const clip = candidate.characterRig.clipById.get(id);
           check(clip?.tracks.length > 100, `NRA05 missing adapted infantry clip ${id}`);
@@ -304,23 +304,23 @@ try {
     // castId does, and its cloth is not the NRA uniform material (no uniform tint on it).
     // It is not a boot download (manifest loadOnDemand; the first level fetches it).
     const { LoadLugouCastModels } = await import("/Taierzhuang1938/Script_CharacterModel.mjs");
-    check(!factory.characterAssets.byFaction.nra.some(asset => asset.record.id === "LugouNra06"), "NRA06 is not a boot download");
+    check(!factory.characterAssets.byFaction.nra.some(asset => asset.record.id === "TengxianNra06"), "NRA06 is not a boot download");
     const castLoaded = await LoadLugouCastModels(factory.characterAssets, [{actorKind: "nra", modelVariant: 5}]);
-    check(castLoaded.join() === "LugouNra06", `cast-only look fetched on demand: ${castLoaded.join()}`);
+    check(castLoaded.join() === "TengxianNra06", `cast-only look fetched on demand: ${castLoaded.join()}`);
     for (const seed of [0, 1, 2]) {
       const bare = factory.Create("nra", {seed, modelVariant: 5, weapon: null});
-      check(bare.modelId !== "LugouNra06", `NRA06 without its castId: ${bare.modelId}`);
+      check(bare.modelId !== "TengxianNra06", `NRA06 without its castId: ${bare.modelId}`);
       bare.Dispose();
     }
     const interpreter = factory.Create("nra", {seed: 3, modelVariant: 5, castId: "interpreter", weapon: null});
-    check(interpreter.modelId === "LugouNra06" && !!interpreter.characterRig.facial && !interpreter.pooled,
+    check(interpreter.modelId === "TengxianNra06" && !!interpreter.characterRig.facial && !interpreter.pooled,
       `interpreter wears the NRA06 facial skin: ${interpreter.modelId}`);
     const garb = [];
     interpreter.root.traverse(mesh => { if (mesh.isMesh) for (const m of [mesh.material].flat()) garb.push(m.name); });
     check(garb.includes("Material_InterpreterGarb") && !garb.includes("Material #1721585337"), `interpreter cloth: ${[...new Set(garb)].join(",")}`);
     check(!Cloth(interpreter), "no NRA uniform tint on the interpreter");
     const borrowed = factory.Create("nra", {seed: 4, modelVariant: 5, castId: "yaowa", weapon: null});
-    check(borrowed.modelId !== "LugouNra06", `another named role cannot wear NRA06: ${borrowed.modelId}`);
+    check(borrowed.modelId !== "TengxianNra06", `another named role cannot wear NRA06: ${borrowed.modelId}`);
     borrowed.Dispose();
     // Derived models are normalised by their source's height (manifest scaleHeight): the
     // shared clip libraries meet the same contact points on both bodies.
@@ -335,10 +335,10 @@ try {
     checkHeadHitbox(interpreter);
     interpreter.Dispose();
     const protagonist = factory.Create("nra", { seed: "player", protagonist: true, weapon: null });
-    check(protagonist.modelId === "LugouNra02",
-      `protagonist should use LugouNra02, got ${protagonist.modelId}`);
+    check(protagonist.modelId === "TengxianNra02",
+      `protagonist should use TengxianNra02, got ${protagonist.modelId}`);
     protagonist.Dispose();
-    for (const [kind, prefix] of [["nra", "LugouNra"], ["ija", "LugouIja"]]) {
+    for (const [kind, prefix] of [["nra", "TengxianNra"], ["ija", "TengxianIja"]]) {
       const variants = [];
       for (const modelVariant of kind === "nra" ? [1,4] : [0,1,2,5]) {
         const candidate = factory.Create(kind, { seed: `${kind}:${modelVariant}`, modelVariant, weapon: null });

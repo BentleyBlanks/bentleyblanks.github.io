@@ -15,7 +15,7 @@ const shotDir=path.join(projectDir,'_shots/BackRifleRun');
 const config=JSON.parse(fs.readFileSync(path.join(assetDir,'Data_BackRifleRun.json'),'utf8').replace(/^\uFEFF/,''));
 const sha=(file)=>createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const sourceModelHash=sha(path.join(root,config.sourceModel));
-const manifest=JSON.parse(fs.readFileSync(path.join(projectDir,'Model/Character/Data_LugouCharacterManifest.json'),'utf8'));
+const manifest=JSON.parse(fs.readFileSync(path.join(projectDir,'Model/Character/Data_TengxianCharacterManifest.json'),'utf8'));
 const repair=manifest.models.find(model=>model.url.endsWith(path.basename(config.sourceModel)))?.appearanceRepair;
 // e6b34415 changes the NRA appearance while preserving joints, weights and clips.
 // Keep the bake's original hash as provenance and accept only this exact audited revision.
@@ -25,7 +25,7 @@ const approvedAppearanceHash=repair?.revision==='20260906NraEyesShoulders'
 assert.equal(sourceModelHash,approvedAppearanceHash,'Production character matches the approved source or appearance revision');
 assert.equal(sha(path.join(root,config.sourceWeapon)),config.sourceWeaponSha256,'Production rifle remains original');
 function ReadGlb(file){const data=fs.readFileSync(file);assert.equal(data.readUInt32LE(0),0x46546c67);const length=data.readUInt32LE(12);const json=JSON.parse(data.toString('utf8',20,20+length));return {json,bin:data.subarray(28+length)};}
-const {json,bin}=ReadGlb(path.join(assetDir,'Animation_LugouNraBackRifleRun.glb'));
+const {json,bin}=ReadGlb(path.join(assetDir,'Animation_TengxianNraBackRifleRun.glb'));
 const original=ReadGlb(path.join(root,config.sourceModel)).json;
 const sourcePose=new PoseScene(LoadGlb(path.join(root,config.sourceModel)));
 sourcePose.animations.push({channels:[]});sourcePose.Apply(sourcePose.animations.length-1,0);
@@ -51,7 +51,7 @@ try{
   const r=window.BackRifleReview;r.Pause();const samples=[];let referenceMount=null,maxMountError=0;
   for(let frame=0;frame<=r.config.cycleFrames*2;frame++){
    const time=frame/(r.config.fps*2);r.SetTime(time);const s=r.Sample();
-   const body=r.views[0].character;let chest;body.traverse(o=>{if(o.name.replaceAll('_',' ')==='Bip002 Spine2')chest=o;});const socket=body.getObjectByName(r.config.socket);
+   const body=r.views[0].character;let chest;body.traverse(o=>{if(o.name.replaceAll('_',' ')==='Bip001 Spine2')chest=o;});const socket=body.getObjectByName(r.config.socket);
    const relative=chest.matrixWorld.clone().invert().multiply(socket.matrixWorld).elements;
    if(!referenceMount)referenceMount=[...relative];maxMountError=Math.max(maxMountError,...relative.map((v,i)=>Math.abs(v-referenceMount[i])));
    samples.push({time,phase:time/r.config.durationSeconds,...s});
@@ -60,10 +60,10 @@ try{
  });
  assert.equal(errors.length,0,errors.join('\n'));assert(Math.abs(report.clipDuration-config.durationSeconds)<0.00001);assert(report.maxMountError<0.0001,'Rifle mount stays constrained to chest');
  let minSole=Infinity,maxSupportClearance=0,maxSlide=0;const supportAnchors={};
- for(const sample of report.samples){assert.equal(sample.glError,0);for(const [side,offset] of [['L',0],['R',0.5]]){const phase=(sample.phase+offset)%1;const sole=sample.soles[side];assert(Number.isFinite(sole),`Missing evaluated shoe ${side}`);minSole=Math.min(minSole,sole);if(phase<config.stanceFraction-0.005)maxSupportClearance=Math.max(maxSupportClearance,Math.abs(sole));if(phase<config.stanceFraction-0.135){const segment=Math.floor(sample.phase+offset);const key=side+segment;const z=sample.bones[`Bip002 ${side} Foot`][2]+sample.time*config.referenceSpeedMps;supportAnchors[key]??=z;maxSlide=Math.max(maxSlide,Math.abs(z-supportAnchors[key]));}}}
+ for(const sample of report.samples){assert.equal(sample.glError,0);for(const [side,offset] of [['L',0],['R',0.5]]){const phase=(sample.phase+offset)%1;const sole=sample.soles[side];assert(Number.isFinite(sole),`Missing evaluated shoe ${side}`);minSole=Math.min(minSole,sole);if(phase<config.stanceFraction-0.005)maxSupportClearance=Math.max(maxSupportClearance,Math.abs(sole));if(phase<config.stanceFraction-0.135){const segment=Math.floor(sample.phase+offset);const key=side+segment;const z=sample.bones[`Bip001 ${side} Foot`][2]+sample.time*config.referenceSpeedMps;supportAnchors[key]??=z;maxSlide=Math.max(maxSlide,Math.abs(z-supportAnchors[key]));}}}
  assert(minSole>-0.015,`Sole penetration ${minSole}`);assert(maxSupportClearance<0.018,`Support foot floating ${maxSupportClearance}`);assert(maxSlide<0.003,`Support foot sliding ${maxSlide}`);
  const first=report.samples[0],last=report.samples.at(-1);let worldSeam=0;for(const [name,pos] of Object.entries(first.bones)){worldSeam=Math.max(worldSeam,...pos.map((v,i)=>Math.abs(v-last.bones[name][i])));}assert(worldSeam<0.0001,'World-space bone seam');
- const pelvisHeights=report.samples.map(s=>s.bones['Bip002 Pelvis'][1]);assert(Math.max(...pelvisHeights)-Math.min(...pelvisHeights)>0.035,'Pelvis bounce survived export');
+ const pelvisHeights=report.samples.map(s=>s.bones['Bip001 Pelvis'][1]);assert(Math.max(...pelvisHeights)-Math.min(...pelvisHeights)>0.035,'Pelvis bounce survived export');
  // A grounded foot can still hide a stretched shin. Measure the delivered bones
  // against the original bind lengths, including subframes used by the player.
  let maxLimbLengthError=0,minKneeFlex=180,maxKneeFlex=0,maxToeSlide=0,maxRootDrift=0,maxSeamVelocityJump=0,worstSeamJoint='';
@@ -71,18 +71,18 @@ try{
  for(const sample of report.samples){
   maxRootDrift=Math.max(maxRootDrift,Distance(sample.bones.GroundRoot,first.bones.GroundRoot));
   for(const [side,offset] of [['L',0],['R',0.5]]){
-   const names=['Thigh','Calf','Foot','UpperArm','Forearm','Hand'].map(n=>`Bip002 ${side} ${n}`);
+   const names=['Thigh','Calf','Foot','UpperArm','Forearm','Hand'].map(n=>`Bip001 ${side} ${n}`);
    for(const [a,b] of [[0,1],[1,2],[3,4],[4,5]])maxLimbLengthError=Math.max(maxLimbLengthError,Math.abs(Distance(sample.bones[names[a]],sample.bones[names[b]])-Distance(BindPoint(names[a]),BindPoint(names[b]))));
    const [hip,knee,ankle]=names.slice(0,3).map(n=>sample.bones[n]);
    const upper=Distance(hip,knee),lower=Distance(knee,ankle),reach=Distance(hip,ankle);
    const flex=180-Math.acos(Math.max(-1,Math.min(1,(upper*upper+lower*lower-reach*reach)/(2*upper*lower))))*180/Math.PI;
    minKneeFlex=Math.min(minKneeFlex,flex);maxKneeFlex=Math.max(maxKneeFlex,flex);
    const phase=(sample.phase+offset)%1;
-   if(phase<config.stanceFraction-0.005){const key=side+Math.floor(sample.phase+offset),z=sample.bones[`Bip002 ${side} Toe0`][2]+sample.time*config.referenceSpeedMps;toeAnchors[key]??=z;maxToeSlide=Math.max(maxToeSlide,Math.abs(z-toeAnchors[key]));}
+   if(phase<config.stanceFraction-0.005){const key=side+Math.floor(sample.phase+offset),z=sample.bones[`Bip001 ${side} Toe0`][2]+sample.time*config.referenceSpeedMps;toeAnchors[key]??=z;maxToeSlide=Math.max(maxToeSlide,Math.abs(z-toeAnchors[key]));}
   }
  }
  const dt=report.samples[1].time;
- for(const name of ['Bip002 Pelvis','Bip002 L Foot','Bip002 R Foot','Bip002 L Hand','Bip002 R Hand']){
+ for(const name of ['Bip001 Pelvis','Bip001 L Foot','Bip001 R Foot','Bip001 L Hand','Bip001 R Hand']){
   const incoming=last.bones[name].map((v,i)=>(v-report.samples.at(-2).bones[name][i])/dt);
   const outgoing=report.samples[1].bones[name].map((v,i)=>(v-first.bones[name][i])/dt);
   if(Distance(incoming,outgoing)>maxSeamVelocityJump){maxSeamVelocityJump=Distance(incoming,outgoing);worstSeamJoint=name;}

@@ -117,7 +117,7 @@ try {
     const V = () => new THREE.Vector3();
     const state = window.openingClipsReview = { T, THREE, api, library, scene, camera, walls, wallMat, actors: [] };
     state.Make = (rig, role, clip) => {
-      const kind = rig.startsWith("LugouIja") ? "ija" : "nra", modelVariant = Number(rig.slice(-2)) - 1;
+      const kind = rig.startsWith("TengxianIja") ? "ija" : "nra", modelVariant = Number(rig.slice(-2)) - 1;
       const meta = api.OpeningClipMeta(clip) || {};
       const armed = (meta.props || []).includes("weapon");
       const weapon = !armed ? null : kind === "ija" ? "Type38" : (role === "luo" || role === "heyoutian") ? "Dadao" : "HanYang";
@@ -687,12 +687,12 @@ try {
     };
     // a) the rifle of IjaButtStrike -> IjaHoldCollarUp (0.7 m apart between the two tracks)
     s.Clear();
-    let e = s.Make("LugouIja02", "ijaA", "IjaButtStrike");
+    let e = s.Make("TengxianIja02", "ijaA", "IjaButtStrike");
     let r = Switch(e, "IjaButtStrike", 1.0, "IjaHoldCollarUp", .4, () => W(e.actor.weaponGroup));
     out.push({ name: "weapon blend IjaButtStrike->IjaHoldCollarUp", stepM: r.worst, firstM: r.first });
     // b) the bayonet going back into the scabbard mount: IjaWipeSheathBayonet end -> IjaReadyRifle
     s.Clear();
-    e = s.Make("LugouIja02", "ijaA", "IjaWipeSheathBayonet");
+    e = s.Make("TengxianIja02", "ijaA", "IjaWipeSheathBayonet");
     const knife = () => e.actor.characterRig.openingProps?.items.get("bayonet")?.object;
     const wipeEnd = s.library.config.clips.IjaWipeSheathBayonet.duration;
     r = Switch(e, "IjaWipeSheathBayonet", wipeEnd, "IjaReadyRifle", .6, () => knife() ? W(knife()) : null);
@@ -701,7 +701,7 @@ try {
     out.push({ name: "bayonet stays in the scabbard after IjaWipeSheathBayonet", stepM: r.worst, firstM: r.first, visible: sheathed, hipM: hip });
     // c) the comrade's rifle thrown by BlastSlamBuried stays where it fell
     s.Clear();
-    e = s.Make("LugouNra02", "comrade", "BlastSlamBuried");
+    e = s.Make("TengxianNra02", "comrade", "BlastSlamBuried");
     e.soldier.openingStoryboardPose = { clip: "BlastSlamBuried", seconds: 1.5 };
     for (let i = 0; i < 40; i++) { e.clock += 1 / 60; e.actor.Update(1 / 60, { elapsed: e.clock, moveSpeed: 0, aim: 0 }); }
     s.scene.updateMatrixWorld(true);
@@ -717,7 +717,7 @@ try {
       droppedVisible: dropped?.visible === true, droppedM: dropped ? W(dropped).distanceTo(fell) : Infinity });
     // d) LuoKneelCheck: loops without holdUntil, plays through the rise after it
     s.Clear();
-    e = s.Make("LugouNra05", "luo", "LuoKneelCheck");
+    e = s.Make("TengxianNra05", "luo", "LuoKneelCheck");
     const At = (seconds, holdUntil) => {
       e.soldier.openingStoryboardPose = { clip: "LuoKneelCheck", seconds, holdUntil };
       e.clock += 1 / 60; e.actor.Update(1 / 60, { elapsed: e.clock, moveSpeed: 0, aim: 0 });
@@ -731,7 +731,7 @@ try {
     s.Clear();
     const travel = 1.6, poses = [{ clip: "InterpreterHurryReach", seconds: .9 }, { clip: "InterpreterHurryReach", seconds: .9, upperBody: true },
       { clip: "InterpreterHurryReach", seconds: .9, upperBody: false }, null];
-    const four = poses.map(() => s.Make("LugouNra02", "interpreter", "InterpreterHurryReach"));
+    const four = poses.map(() => s.Make("TengxianNra02", "interpreter", "InterpreterHurryReach"));
     for (let i = 0; i < 48; i++) four.forEach((e, k) => {
       e.soldier.openingStoryboardTravel = travel; e.soldier.openingStoryboardPose = poses[k] && { ...poses[k] };
       e.clock += 1 / 60; e.actor.Update(1 / 60, { elapsed: e.clock, moveSpeed: 0, aim: 0 });
@@ -748,7 +748,7 @@ try {
       falseLegsVsNative: Diff(four[2], four[3], LEGS) });
     // f) a clip this rig was not baked with: the native animation, and the name is on record once
     s.Clear();
-    e = s.Make("LugouNra02", "comrade", "BanterLaugh");
+    e = s.Make("TengxianNra02", "comrade", "BanterLaugh");
     for (let i = 0; i < 3; i++) {
       e.soldier.openingStoryboardPose = { clip: "NoSuchOpeningClip", seconds: i / 60 };
       e.clock += 1 / 60; e.actor.Update(1 / 60, { elapsed: e.clock, moveSpeed: 0, aim: 0 });
@@ -775,7 +775,7 @@ try {
         + ` arms vs upperBody:false ${row.armsVsClip.toFixed(2)}°, upperBody:false legs vs native ${row.falseLegsVsNative.toFixed(1)}°`;
     }
     if ("missing" in row) {
-      bad ||= row.missing.length !== 1 || row.missing[0] !== "LugouNra02/NoSuchOpeningClip" || row.windowMissing !== 1 || row.state !== null;
+      bad ||= row.missing.length !== 1 || row.missing[0] !== "TengxianNra02/NoSuchOpeningClip" || row.windowMissing !== 1 || row.state !== null;
       text += ` recorded ${JSON.stringify(row.missing)} (window ${row.windowMissing}), clip state ${JSON.stringify(row.state)}`;
     }
     if (bad) failed++;

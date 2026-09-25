@@ -1,7 +1,7 @@
 // Pinned appearance for every role that speaks on screen in first-level 01-06.
 // A speaker keeps one face for the whole level (03-05 Zhou used to roll NRA02 or
 // NRA05 at random and turn into NRA02 at 06) and gets the facial skin of that
-// model (Model_Lugou*Facial.glb, manifest facialCast). Only approved appearances
+// model (Model_Tengxian*Facial.glb, manifest facialCast). Only approved appearances
 // (Data_CharacterSelection.mjs): NRA02 = source index 1, NRA05 = 4, IJA01 = 0,
 // IJA02 = 1, IJA06 = 5; NRA06 = 5 is the interpreter's cast-only look.
 // Contract 2026-09-23 section 5.1: 日兵乙 moves from IJA03 (closed-mouth geometry) to IJA01; 日兵丙/丁 are one IJA01 and one IJA02. User 2026-09-24: 日兵甲 (the

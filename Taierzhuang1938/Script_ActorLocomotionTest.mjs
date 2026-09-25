@@ -147,7 +147,7 @@ try {
     assert.ok(row.contacts>20,'contact windows exercised');
     assert.ok(row.maxContactError<.015,`planted foot: ${JSON.stringify(row)}`);
     assert.ok(row.phaseError<.0001,'distance integration');
-    assert.equal(row.modelId,`Lugou${row.kind==='nra'?'Nra':'Ija'}${String(row.modelVariant+1).padStart(2,'0')}`,'test must exercise the requested approved appearance');
+    assert.equal(row.modelId,`Tengxian${row.kind==='nra'?'Nra':'Ija'}${String(row.modelVariant+1).padStart(2,'0')}`,'test must exercise the requested approved appearance');
     assert.ok(Math.abs(row.crouchSpeed-.4)<.00001,'borrowed infantry library speed');
     assert.equal(row.movingFire,'RifleRun','moving fire must preserve the lower-body gait');
     assert.equal(row.blocked.speed,0);assert.notEqual(row.blocked.clip,'RifleRun');

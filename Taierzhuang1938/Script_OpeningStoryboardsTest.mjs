@@ -8,7 +8,7 @@ import { OpeningHoldTime } from "./Script_OpeningProps.mjs";
 const Read=file=>fs.readFileSync(new URL(file,import.meta.url));
 const Hash=bytes=>crypto.createHash("sha256").update(bytes).digest("hex");
 const manifest=JSON.parse(Read("Animation/OpeningStoryboards/Data_OpeningStoryboardsAnimation.json"));
-const RIGS=["LugouNra02","LugouNra05","LugouIja01","LugouIja02","LugouIja03"];
+const RIGS=["TengxianNra02","TengxianNra05","TengxianIja01","TengxianIja02","TengxianIja03"];
 assert.equal(manifest.version,C.version);
 assert.deepEqual(manifest.models.map(row=>row.id),RIGS);
 
@@ -155,7 +155,7 @@ for(const row of manifest.models){
 const captives=JSON.parse(Read("Animation/MachineGunCaptives/Data_MachineGunCaptivesAnimation.json"));
 const captiveClips=new Map(captives.models.map(row=>[row.id,JSON.parse(Read("Animation/MachineGunCaptives/"+row.file)).clips]));
 for(const id of ["IjaKickPrisoner","IjaShoveForward","IjaTauntGesture","CaptiveKneelFlinch","CaptiveShovedStumble"])
-  for(const rig of id.startsWith("Ija")?["LugouIja01","LugouIja02"]:["LugouNra02"])assert.ok(captiveClips.get(rig)?.[id],`${rig}: reused ${id}`);
+  for(const rig of id.startsWith("Ija")?["TengxianIja01","TengxianIja02"]:["TengxianNra02"])assert.ok(captiveClips.get(rig)?.[id],`${rig}: reused ${id}`);
 const melee=String(Read("Animation/Melee/Data_MeleeNraAnimations.json"));
 for(const id of ["DadaoHeavy","DadaoParry"])assert.ok(melee.includes(`"${id}"`),`melee library: ${id}`);
 assert.ok(String(Read("Script_CharacterModel.mjs")).includes("DeathCollapseA"),"Kimodo death collapses");
@@ -187,7 +187,7 @@ const PropJump=(asset,a,ia,b,ib)=>{
   }
   return worst;
 };
-const comrade=assets.get("LugouNra02"),ijaA=assets.get("LugouIja02");
+const comrade=assets.get("TengxianNra02"),ijaA=assets.get("TengxianIja02");
 let chains=0;
 for(const [asset,a,ia,b,ib] of [[comrade,"WoundedSitRifleIdle",0,"BanterPatRifle",0],[comrade,"BanterPatRifle",-1,"WoundedSitRifleIdle",0],
   [comrade,"WoundedSitRifleIdle",0,"WoundedRiseWall",0],[comrade,"WoundedRiseWall",-1,"BlastSlamBuried",0],[comrade,"BlastSlamBuried",-1,"CaptiveDraggedFromDirt",0],
@@ -236,20 +236,20 @@ const WorldPose=(id,asset,clip,t)=>{
 // ---- 2026-09-25 storyboard clips (Data_FirstLevelStoryboard0103Contract.md §4.1) -----------------------
 const SB0925=["IjaButtStrikeCollar","IjaDragByForearm","IjaLookBackLow","IjaStartleTurn","IjaGuardPort"];
 {
-  const ijaB=assets.get("LugouIja01"),reportOf=(rig,id)=>manifest.models.find(m=>m.id===rig).clips.find(c=>c.clip===id);
+  const ijaB=assets.get("TengxianIja01"),reportOf=(rig,id)=>manifest.models.find(m=>m.id===rig).clips.find(c=>c.clip===id);
   for(const id of SB0925){
     const spec=manifest.clips[id];
-    assert.equal(spec.rig,id==="IjaGuardPort"?"LugouIja01":"LugouIja02",`${id}: cast on the contract's rig`);
+    assert.equal(spec.rig,id==="IjaGuardPort"?"TengxianIja01":"TengxianIja02",`${id}: cast on the contract's rig`);
     // durations are whole baked frames (a contact or event key then lands on a frame)
     assert.ok(Math.abs(spec.duration*manifest.fps-Math.round(spec.duration*manifest.fps))<1e-6,`${id}: duration ${spec.duration} s is whole frames`);
   }
   // Every clip that aims ijaA's face at the camera (the player's eye) or ijaB's at the captive: the face
   // points at it (bake lookErrorDeg: face direction vs eye->target, while the aim is fully on) and the
   // head stays on the neck.
-  for(const [rig,id,limit] of [["LugouIja02","IjaButtStrikeCollar",3],["LugouIja02","IjaDragByForearm",3],["LugouIja02","IjaHoldCollarUp",3],
-    ["LugouIja02","IjaLookBackLow",3],["LugouIja01","IjaGuardPort",3],
+  for(const [rig,id,limit] of [["TengxianIja02","IjaButtStrikeCollar",3],["TengxianIja02","IjaDragByForearm",3],["TengxianIja02","IjaHoldCollarUp",3],
+    ["TengxianIja02","IjaLookBackLow",3],["TengxianIja01","IjaGuardPort",3],
     // the startle snaps the head round in 0.3 s after a look point that swings as fast: the head trails it by up to ~7 deg
-    ["LugouIja02","IjaStartleTurn",10]]){
+    ["TengxianIja02","IjaStartleTurn",10]]){
     const r=reportOf(rig,id);
     assert.ok(r.lookErrorDeg<=limit,`${rig}/${id}: the face misses its look point by ${r.lookErrorDeg} deg`);
     assert.ok(r.headTurnDeg<=70,`${rig}/${id}: head turned ${r.headTurnDeg} deg on the neck`);
@@ -258,14 +258,14 @@ const SB0925=["IjaButtStrikeCollar","IjaDragByForearm","IjaLookBackLow","IjaStar
   const butt=manifest.clips.IjaButtStrikeCollar,strike=butt.contacts.find(c=>c.action==="strike");
   assert.ok(butt.holdLoop[1]-butt.holdLoop[0]>=.4,"IjaButtStrikeCollar: the apex hold loop is at least 0.4 s");
   assert.equal(butt.events.find(e=>e.kind==="buttHit").t,strike.t,"IjaButtStrikeCollar: buttHit is the strike contact");
-  const probe=reportOf("LugouIja02","IjaButtStrikeCollar").probes?.buttOnHead;
+  const probe=reportOf("TengxianIja02","IjaButtStrikeCollar").probes?.buttOnHead;
   assert.ok(probe&&probe[0]<=.03&&Math.abs(probe[1]-strike.t)<1e-3,`IjaButtStrikeCollar: butt on the head at ${strike.t} s (${probe})`);
   // First-person partner parts: collar/head on every clip that holds him, forearmR on the drag.
   const parts=(id)=>Object.keys(ijaA.clips[id].player?.parts||{}).sort().join(",");
   assert.equal(parts("IjaButtStrikeCollar"),"collar,head");assert.equal(parts("IjaDragByForearm"),"collar,forearmR,head");
   assert.equal(parts("IjaStartleTurn"),"collar,head");assert.equal(parts("IjaHoldCollarUp"),"collar,head");
   // SB04A: 1.5-2.5 m of root motion backwards (actor +z), the forearm grab declared on the player's forearmR.
-  const drag=reportOf("LugouIja02","IjaDragByForearm").root,travel=Math.hypot(drag.end[0]-drag.start[0],drag.end[1]-drag.start[1]);
+  const drag=reportOf("TengxianIja02","IjaDragByForearm").root,travel=Math.hypot(drag.end[0]-drag.start[0],drag.end[1]-drag.start[1]);
   assert.ok(travel>=1.5&&travel<=2.5&&drag.end[1]>drag.start[1],`IjaDragByForearm: hauls ${travel.toFixed(2)} m backwards`);
   assert.ok(manifest.clips.IjaDragByForearm.contacts.some(c=>c.action==="grab"&&c.part==="forearmR"&&c.partnerRole==="shunzi"),"IjaDragByForearm: grabs forearmR");
   // SB05: Shunzi's eye 0.65-0.85 m up in the IjaHoldCollarUp hold (the contract's 0.75 m).
@@ -275,13 +275,13 @@ const SB0925=["IjaButtStrikeCollar","IjaDragByForearm","IjaLookBackLow","IjaStar
   // right), about level -- the head's rest face direction (glTF +z, the actor's forward; +x = his left) carried
   // by the last frame -- and the flinch drops him (the head lower than in the hold it starts from).
   {
-    const {json,parent,byName}=Glb("LugouIja02"),head=ijaA.bones.findIndex(n=>/ Head$/.test(n));
+    const {json,parent,byName}=Glb("TengxianIja02"),head=ijaA.bones.findIndex(n=>/ Head$/.test(n));
     const RestQ=i=>{const q=json.nodes[i].rotation||[0,0,0,1];return parent[i]<0?q:QMul(RestQ(parent[i]),q);};
     const r=RestQ(byName.get(ijaA.bones[head])),faceLocal=QRot([-r[0],-r[1],-r[2],r[3]],[0,0,1]);
-    const startle=manifest.clips.IjaStartleTurn,end=WorldPose("LugouIja02",ijaA,"IjaStartleTurn",startle.duration)[head];
+    const startle=manifest.clips.IjaStartleTurn,end=WorldPose("TengxianIja02",ijaA,"IjaStartleTurn",startle.duration)[head];
     const face=QRot(end.q,faceLocal),left=Math.atan2(face[0],face[2])*180/Math.PI,pitch=Math.asin(face[1]/Math.hypot(...face))*180/Math.PI;
     assert.ok(left>=60&&left<=130&&Math.abs(pitch)<=20,`IjaStartleTurn: the face ends ${left.toFixed(0)} deg to his left, pitch ${pitch.toFixed(0)} deg`);
-    const start=WorldPose("LugouIja02",ijaA,"IjaStartleTurn",0)[head];
+    const start=WorldPose("TengxianIja02",ijaA,"IjaStartleTurn",0)[head];
     assert.ok(start.p[1]-end.p[1]>=.02,`IjaStartleTurn: the head drops ${((start.p[1]-end.p[1])*100).toFixed(1)} cm in the flinch`);
     assert.ok(startle.events.some(e=>e.kind==="releaseCollar")&&!manifest.clips.IjaParriedChoppedFall.events.some(e=>e.kind==="releaseCollar"),
       "releaseCollar is on IjaStartleTurn (IjaParriedChoppedFall frame 0 is already off the collar)");
@@ -293,7 +293,7 @@ const SB0925=["IjaButtStrikeCollar","IjaDragByForearm","IjaLookBackLow","IjaStar
   const World=(rig,asset,id,t)=>WorldPose(rig,asset,id,t);
   for(const [a,ta,b,tb] of [["IjaButtStrikeCollar",null,"IjaDragByForearm",0],["IjaHoldCollarUp",manifest.clips.IjaHoldCollarUp.holdLoop[0],"IjaStartleTurn",0],
     ["IjaStartleTurn",null,"IjaParriedChoppedFall",0]]){
-    const x=World("LugouIja02",ijaA,a,ta??manifest.clips[a].duration),y=World("LugouIja02",ijaA,b,tb);
+    const x=World("TengxianIja02",ijaA,a,ta??manifest.clips[a].duration),y=World("TengxianIja02",ijaA,b,tb);
     let angle=0,offset=0,where="";
     x.forEach((p,i)=>{
       if(/Finger\d\d|Nub/.test(ijaA.bones[i]))return;
@@ -308,7 +308,7 @@ const SB0925=["IjaButtStrikeCollar","IjaDragByForearm","IjaLookBackLow","IjaStar
 }
 // ---- 2026-09-25 storyboard clips on the NRA rigs (§4.1: SB01 runner/Yaowa, SB04A interpreter, SB06 Luo) ----------
 {
-  const SB0925_NRA={LuoKneelReach:"LugouNra05",RunnerLeanPostCall:"LugouNra02",InterpreterHurryReach:"LugouNra02",YaowaSitLoad:"LugouNra02"};
+  const SB0925_NRA={LuoKneelReach:"TengxianNra05",RunnerLeanPostCall:"TengxianNra02",InterpreterHurryReach:"TengxianNra02",YaowaSitLoad:"TengxianNra02"};
   const reportOf=(rig,id)=>manifest.models.find(m=>m.id===rig).clips.find(c=>c.clip===id);
   for(const [id,rig] of Object.entries(SB0925_NRA)){
     const spec=manifest.clips[id],r=reportOf(rig,id);
@@ -319,15 +319,15 @@ const SB0925=["IjaButtStrikeCollar","IjaDragByForearm","IjaLookBackLow","IjaStar
     assert.ok(r.contactErrorM<=.03,`${rig}/${id}: hand ${r.contactErrorM} m off its target`);
     assert.ok(r.lookErrorDeg<=3&&r.headTurnDeg<=70,`${rig}/${id}: face ${r.lookErrorDeg} deg off, head turned ${r.headTurnDeg} deg`);
   }
-  const luo=assets.get("LugouNra05"),nra02=assets.get("LugouNra02");
+  const luo=assets.get("TengxianNra05"),nra02=assets.get("TengxianNra02");
   // SB06: the offered hand 0.3 m short of Shunzi's chest (player chest/head tracks), a hold loop with an exit, and
   // the clip starts and ends on LuoKneelCheck frame 0 (a drop-in for the Check beat, then KickRifle).
   const reach=manifest.clips.LuoKneelReach,offer=reach.contacts.find(c=>c.action==="reach");
   assert.ok(offer&&offer.limb==="handL"&&offer.part==="chest"&&offer.partnerRole==="shunzi"&&Math.abs(offer.gapM-.3)<1e-9,"LuoKneelReach: left hand offered 0.3 m short of the chest");
   assert.equal(Object.keys(luo.clips.LuoKneelReach.player?.parts||{}).sort().join(","),"chest,head","LuoKneelReach: player chest/head");
-  assert.equal(reportOf("LugouNra05","LuoKneelReach").kneePlants.length,1,"LuoKneelReach: the right knee is declared on the ground");
+  assert.equal(reportOf("TengxianNra05","LuoKneelReach").kneePlants.length,1,"LuoKneelReach: the right knee is declared on the ground");
   for(const [a,ta,b,tb] of [["LuoKneelReach",reach.duration,"LuoKneelCheck",0],["LuoKneelReach",0,"LuoKneelCheck",0]]){
-    const x=WorldPose("LugouNra05",luo,a,ta),y=WorldPose("LugouNra05",luo,b,tb);
+    const x=WorldPose("TengxianNra05",luo,a,ta),y=WorldPose("TengxianNra05",luo,b,tb);
     let angle=0,offset=0,where="";
     x.forEach((p,i)=>{
       if(/Finger\d\d|Nub/.test(luo.bones[i]))return;
@@ -360,13 +360,13 @@ const SB0925=["IjaButtStrikeCollar","IjaDragByForearm","IjaLookBackLow","IjaStar
   assert.ok(nra02.clips.YaowaSitLoad.loop&&manifest.clips.YaowaSitLoad.env.wallBehindM>0,"YaowaSitLoad: loops against the wall");
   const seam=HandOver(nra02,"YaowaSitLoad",0,"YaowaSitLoad",-1);
   assert.ok(seam.angle<=.5&&seam.offset<=.001,`YaowaSitLoad: loop seam ${seam.angle.toFixed(3)} deg`);
-  assert.ok(reportOf("LugouNra02","YaowaSitLoad").root.start[3]<.2,"YaowaSitLoad: the pelvis is on the ground (sitting)");
+  assert.ok(reportOf("TengxianNra02","YaowaSitLoad").root.start[3]<.2,"YaowaSitLoad: the pelvis is on the ground (sitting)");
 }
 // ---- SB05A IjaChoppedFallBack (ijaB, optional §4.1): the alternative to IjaChoppedFallWall on the same stage --------
 {
-  const ijaB=assets.get("LugouIja01"),spec=manifest.clips.IjaChoppedFallBack,wall=manifest.clips.IjaChoppedFallWall;
-  const r=manifest.models.find(m=>m.id==="LugouIja01").clips.find(c=>c.clip==="IjaChoppedFallBack");
-  assert.ok(spec.rig==="LugouIja01"&&spec.role==="ijaB"&&spec.stage===wall.stage&&spec.terminal===true,"IjaChoppedFallBack: ijaB, the chopRear stage, terminal");
+  const ijaB=assets.get("TengxianIja01"),spec=manifest.clips.IjaChoppedFallBack,wall=manifest.clips.IjaChoppedFallWall;
+  const r=manifest.models.find(m=>m.id==="TengxianIja01").clips.find(c=>c.clip==="IjaChoppedFallBack");
+  assert.ok(spec.rig==="TengxianIja01"&&spec.role==="ijaB"&&spec.stage===wall.stage&&spec.terminal===true,"IjaChoppedFallBack: ijaB, the chopRear stage, terminal");
   assert.ok(Math.abs(spec.duration*manifest.fps-Math.round(spec.duration*manifest.fps))<1e-6,`IjaChoppedFallBack: duration ${spec.duration} s is whole frames`);
   // the same cut as the wall fall (LuoDadaoChopRear aims at the wall fall's neck track)
   const cut=c=>c.by==="luo"&&c.part==="neckSideR"&&c.action==="cut";
@@ -374,7 +374,7 @@ const SB0925=["IjaButtStrikeCollar","IjaDragByForearm","IjaLookBackLow","IjaStar
   assert.ok(spec.events.some(e=>e.kind==="seatHit")&&spec.events.some(e=>e.kind==="dead"&&e.t===spec.duration),"IjaChoppedFallBack: seatHit and dead events");
   // up to the cut it IS the wall fall, so the director swaps the clip without moving Luo: world pose <= 1 deg, 5 mm
   for(const t of [0,.25,.45]){
-    const x=WorldPose("LugouIja01",ijaB,"IjaChoppedFallWall",t),y=WorldPose("LugouIja01",ijaB,"IjaChoppedFallBack",t);
+    const x=WorldPose("TengxianIja01",ijaB,"IjaChoppedFallWall",t),y=WorldPose("TengxianIja01",ijaB,"IjaChoppedFallBack",t);
     let angle=0,offset=0,where="";
     x.forEach((p,i)=>{
       if(/Finger\d\d|Nub/.test(ijaB.bones[i]))return;
@@ -412,7 +412,7 @@ for(const id of ["CaptiveDraggedFromDirt","CaptiveWallBrace","CaptiveKneelMud","
   assert.ok(manifest.clips[manifest.clips[id].weaponDropFrom]?.props?.includes("weapon"),`${id}: weaponDropFrom has a weapon track`);
 }
 // The sheathed bayonet rides ijaA's pelvis between clips (rig asset propMounts).
-assert.ok(["origin","axis","up"].every(k=>ijaA.propMounts?.bayonet?.[k]?.length===3&&ijaA.propMounts.bayonet[k].every(Number.isFinite)),"LugouIja02: bayonet scabbard mount");
+assert.ok(["origin","axis","up"].every(k=>ijaA.propMounts?.bayonet?.[k]?.length===3&&ijaA.propMounts.bayonet[k].every(Number.isFinite)),"TengxianIja02: bayonet scabbard mount");
 
 // ---- 2026-09-23 director data (contract §5.3, space §2.1/§3) --------------------------------
 assert.deepEqual([...C.phases.Trapped],["Banter","Orders","Incoming","Blast","Black","Wake","FrontPass","CaptiveDragged","CaptiveWall",
@@ -512,7 +512,7 @@ assert.deepEqual([...C.phases.RearTrench],["Withdraw","Corner","Collection","Sup
     const Clear=(p,m)=>solid.every(b=>!(Math.abs(p.x-b.x)<b.w/2+m&&Math.abs(p.z-b.z)<b.d/2+m));
     // ijaA's root as the director solves it (IjaHoldCollarUp's player head track at 0 s onto shunzi.dragged), and the
     // paired stages' marks off the anchors (manifest stages chopParry / chopRear: +x right, +z back of the anchor).
-    const track=JSON.parse(Read("./Animation/OpeningStoryboards/Animation_LugouIja02OpeningStoryboards.json")).clips.IjaHoldCollarUp.player;
+    const track=JSON.parse(Read("./Animation/OpeningStoryboards/Animation_TengxianIja02OpeningStoryboards.json")).clips.IjaHoldCollarUp.player;
     const head={x:track.parts.head[0],z:track.parts.head[2]},dist=Math.hypot(head.x,head.z),b=R.ijaAHoldBearingDeg*Deg;
     const approx={x:S.x+Math.sin(b)*dist,z:S.z+Math.cos(b)*dist},yaw=Math.atan2(approx.x-S.x,approx.z-S.z);
     const Rot=(y,x,z)=>({x:x*Math.cos(y)+z*Math.sin(y),z:-x*Math.sin(y)+z*Math.cos(y)}),o=Rot(yaw,head.x,head.z);

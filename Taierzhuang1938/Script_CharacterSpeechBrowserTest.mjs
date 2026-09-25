@@ -80,7 +80,7 @@ try {
   assert.equal(initial.controls,13);assert.equal(initial.ordinaryHasFace,false,'anonymous soldiers keep the plain skin');
   assert.ok(initial.listener,'Yaowa (NRA02 speaker) has a face rig');
   assert.ok(initial.bound?.luo&&initial.bound?.yaowa,'speaker binder bound Luo and Yaowa');
-  for(const [castId,model] of [['ijaA','LugouIja06'],['ijaB','LugouIja01'],['ijaD','LugouIja02'],['guard','LugouNra02'],['luo','LugouNra05'],['interpreter','LugouNra06']]){
+  for(const [castId,model] of [['ijaA','TengxianIja06'],['ijaB','TengxianIja01'],['ijaD','TengxianIja02'],['guard','TengxianNra02'],['luo','TengxianNra05'],['interpreter','TengxianNra06']]){
     const entry=initial.cast[castId];
     assert.equal(entry.model,model,`${castId} wears ${model}`);assert.equal(entry.face,13);assert.equal(entry.eyes,2);
     assert.equal(entry.pooled,false,`${castId} is never a pooled body`);assert.equal(entry.oral,1);
@@ -193,7 +193,7 @@ try {
     return {key,lineKeys:lineKeys.length,hasTrack:HasTrack(),zhouModel:zhou.characterRig.modelId,zhouFace:!!zface};
   });
   assert.ok(trackRun.hasTrack,`TakeOverGun has a baked face track (${trackRun.key})`);
-  assert.equal(trackRun.zhouModel,'LugouNra02');assert.ok(trackRun.zhouFace);
+  assert.equal(trackRun.zhouModel,'TengxianNra02');assert.ok(trackRun.zhouFace);
   // Pass 1: close-ups of Luo and Zhou mid-word (1.2 m), then the full measured pass.
   const shots={};
   for(let i=0;i<2;i++){
@@ -586,7 +586,7 @@ try {
   });
   assert.ok(!seat06.error,`06: ${seat06.error} ${JSON.stringify(seat06.state)} ${seat06.stage}`);
   assert.ok(seat06.pose.bound,'06: the speaker binder plays zhou on the seated live body');
-  assert.equal(seat06.pose.model,'LugouNra02','06: seated Zhou keeps his NRA02 face');
+  assert.equal(seat06.pose.model,'TengxianNra02','06: seated Zhou keeps his NRA02 face');
   assert.equal(seat06.pose.sit,1,'06: Zhou sits (lifePose.sit)');
   // Actor.sit is a bench pose (Zhou sits on an ammo box against the wall): standing heads are ~1.6 m.
   assert.ok(seat06.pose.headY<1.42,`06: his head is at sitting height (${seat06.pose.headY} m above the ground)`);

@@ -229,7 +229,7 @@ export class FirstLevelBunkerShow {
   SnagRoot(){
     const s=C.shunzi.trap,yaw=Math.PI/2;   // ijaA faces west into the pit
     const collar={x:s.x+Math.sin(s.yaw)*C.shunzi.lieCollarBackM,z:s.z+Math.cos(s.yaw)*C.shunzi.lieCollarBackM};
-    const track=OpeningPlayerPoint("LugouIja02","IjaCollarDragSnag","collar",0)||{x:.02,z:-.57};
+    const track=OpeningPlayerPoint("TengxianIja02","IjaCollarDragSnag","collar",0)||{x:.02,z:-.57};
     const o=Rot(yaw,track.x,track.z);
     return {x:collar.x-o.x,z:collar.z-o.z,yaw};
   }
@@ -422,7 +422,7 @@ export class FirstLevelBunkerShow {
     const yaw=(root.yaw||0)+(a[2]-b[2])*DEG,pa=Rot(root.yaw||0,a[0],a[1]),pb=Rot(yaw,b[0],b[1]);
     return {x:root.x+pa.x-pb.x,z:root.z+pa.z-pb.z,yaw};
   }
-  ComradeWallRoot(){return this.ChainRoot(C.banter.comradeBlast,"LugouNra02","CaptiveDraggedFromDirt","CaptiveWallBrace");}
+  ComradeWallRoot(){return this.ChainRoot(C.banter.comradeBlast,"TengxianNra02","CaptiveDraggedFromDirt","CaptiveWallBrace");}
   // ---- phases -------------------------------------------------------------------------------
   Set(phase){
     if(this.phase===phase)return;
@@ -615,7 +615,7 @@ export class FirstLevelBunkerShow {
     if(rise<0)this.Hold(comrade,b.comradeSeat,"WoundedSitRifleIdle");
     else if(rise<2.8)this.Pose(comrade,"WoundedRiseWall");
     else{
-      if(!this.flags.comradeStood){this.flags.comradeStood=true;this.RerootUnderPelvis(comrade,this.ChainRoot(b.comradeSeat,"LugouNra02","WoundedRiseWall","MessengerReport").yaw);}
+      if(!this.flags.comradeStood){this.flags.comradeStood=true;this.RerootUnderPelvis(comrade,this.ChainRoot(b.comradeSeat,"TengxianNra02","WoundedRiseWall","MessengerReport").yaw);}
       if(this.Hold(comrade,b.comradeBlast,null,{speed:C.speed.walk})||since>C.timeouts.ordersExitS)this.Stage("Incoming");
     }
   }
@@ -1032,7 +1032,7 @@ export class FirstLevelBunkerShow {
   /** ijaA's butt-strike root (SB04): over Shunzi's head on the side ija.butt.yawDeg; the clip's `head` track point on it. */
   ButtRoot(){
     const S=C.shunzi.butt,Y=C.ija.butt.yawDeg*DEG;
-    const head=OpeningPlayerPoint("LugouIja02","IjaButtStrike","head",0)||{x:0,z:-.58},dist=Math.hypot(head.x,head.z);
+    const head=OpeningPlayerPoint("TengxianIja02","IjaButtStrike","head",0)||{x:0,z:-.58},dist=Math.hypot(head.x,head.z);
     const yaw=Face({x:S.x-Math.sin(Y)*dist,z:S.z-Math.cos(Y)*dist},S),o=Rot(yaw,head.x,head.z);
     return {x:S.x-o.x,z:S.z-o.z,yaw};
   }
@@ -1070,7 +1070,7 @@ export class FirstLevelBunkerShow {
    */
   CircleMarks(){
     const R=C.rescue,S=C.shunzi.dragged,anchor={...S,yaw:R.circleShot.yawDeg*DEG};
-    const bearing=R.ijaAHoldBearingDeg*DEG,headTrack=OpeningPlayerPoint("LugouIja02","IjaHoldCollarUp","head",0)||{x:-.04,z:-.6};
+    const bearing=R.ijaAHoldBearingDeg*DEG,headTrack=OpeningPlayerPoint("TengxianIja02","IjaHoldCollarUp","head",0)||{x:-.04,z:-.6};
     const along={x:Math.sin(bearing),z:Math.cos(bearing)},dist=Math.hypot(headTrack.x,headTrack.z);
     const approx={x:S.x+along.x*dist,z:S.z+along.z*dist},ayaw=Face(approx,S),o=Rot(ayaw,headTrack.x,headTrack.z);
     // ijaAStandoffM: his root that much further out along the bearing; the eye keeps to his head track minus `pull`.

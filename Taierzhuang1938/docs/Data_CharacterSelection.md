@@ -85,14 +85,23 @@ loaded cast-only look (facial and base skin) so the interpreter's first appearan
 compiles nothing (`Script_RespawnShaderWarmTest` cast sweep). Skeleton and clips are NRA02's
 (`CHARACTER_CLIP_SOURCE_BY_MODEL`, `CHARACTER_INFANTRY_SOURCE_BY_MODEL`).
 
-Source GLBs and canonical animation references remain available for provenance.
+Migration to the shared skeleton (2026-09-26): IJA06 and NRA06 are derived appearances on
+`TengxianHumanoidV1` (`Model_TengxianIja06.glb`, `Model_TengxianNra06.glb`, rebuilt by
+`_import/Script_StandardizeCharacters.py` from the Lugou builds above); they are not counted among the
+five adopted soldier looks of [the character standard](Data_CharacterStandard.md). With one reference
+height for every body the manifest `scaleHeight` override is no longer needed; the file and builder
+names quoted above are the Lugou-skeleton sources in Git history.
+
+The five rejected body GLBs were deleted on 2026-09-26; provenance remains in Git history.
+Adopted assets now use Tengxian names and one shared body skeleton; see
+[the character standard](Data_CharacterStandard.md) for the current inventory and rebuild entry.
 The NRA01 beard is present in the supplied NRA MAX source (`VITOH_d.mipmap.jpg`),
 which the source IJA01 also uses; it was not introduced by a game face swap.
 Private source-comparison renders are outside the repository in the Blender
 `Taierzhuang1938/CharacterSourceAudit_20260911` directory.
 
-NRA05 now borrows the existing NRA02 infantry animation library with target local
-rest offsets and rotations applied, retaining NRA05's visible mesh and skeleton.
+NRA05 shares NRA02's infantry animation library on the common reference skeleton,
+retaining NRA05's visible face and uniform.
 No new motion or image generation is involved. First-person arm-only assets have no
 head and keep their existing separate grip/weapon contract.
 

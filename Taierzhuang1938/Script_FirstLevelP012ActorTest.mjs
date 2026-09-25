@@ -9,23 +9,23 @@ const THREE = await import(`data:text/javascript;base64,${Buffer.from(threeSourc
 
 // Every imported NRA variant retains the shared cloth atlas and its insignia.
 const { NRA_UNIFORM_COLORS } = await import("./Data_Tuning_Materials.mjs");
-for (let variant = 1; variant <= 5; variant++) {
-  const buffer = fs.readFileSync(new URL(`./Model/Character/Model_LugouNra0${variant}.glb`, import.meta.url));
+for (const variant of [2, 5]) {
+  const buffer = fs.readFileSync(new URL(`./Model/Character/Model_TengxianNra0${variant}.glb`, import.meta.url));
   const gltf = JSON.parse(buffer.subarray(20, 20 + buffer.readUInt32LE(12)).toString());
   const uniform = gltf.materials.find(item => item.name === NRA_UNIFORM_COLORS.materialName);
   assert.ok(uniform?.pbrMetallicRoughness.baseColorTexture, "uniform atlas retained for every model");
 }
 // Reconstruct the real GLB hierarchy and sample its actual animation accessors.
 // No invented joint axes or T-pose is substituted for the rifle animations.
-for(let variant=1;variant<=5;variant++){
- const bytes=fs.readFileSync(new URL(`./Model/Character/Model_LugouNra0${variant}.glb`,import.meta.url));
+for(const variant of [2,5]){
+ const bytes=fs.readFileSync(new URL(`./Model/Character/Model_TengxianNra0${variant}.glb`,import.meta.url));
  const jsonLength=bytes.readUInt32LE(12),g=JSON.parse(bytes.subarray(20,20+jsonLength).toString()),binary=20+jsonLength+8;
  const nodes=g.nodes.map(spec=>{const node=new THREE.Bone();node.name=spec.name||"";
   if(spec.translation)node.position.fromArray(spec.translation);if(spec.rotation)node.quaternion.fromArray(spec.rotation);
   if(spec.scale)node.scale.fromArray(spec.scale);if(spec.matrix){node.matrix.fromArray(spec.matrix);node.matrix.decompose(node.position,node.quaternion,node.scale);}return node;});
  g.nodes.forEach((spec,i)=>(spec.children||[]).forEach(child=>nodes[i].add(nodes[child])));
  const root=new THREE.Group();g.scenes[g.scene||0].nodes.forEach(i=>root.add(nodes[i]));
- const bones={};for(const side of ["L","R"])for(const [role,label] of [["upperArm","UpperArm"],["forearm","Forearm"],["hand","Hand"]])bones[role+side]=nodes.find(n=>n.name===`Bip002 ${side} ${label}`);
+ const bones={};for(const side of ["L","R"])for(const [role,label] of [["upperArm","UpperArm"],["forearm","Forearm"],["hand","Hand"]])bones[role+side]=nodes.find(n=>n.name===`Bip001 ${side} ${label}`);
  const Read=index=>{const a=g.accessors[index],v=g.bufferViews[a.bufferView],size={SCALAR:1,VEC3:3,VEC4:4}[a.type];assert.equal(a.componentType,5126);
   return Array.from({length:a.count*size},(_,i)=>bytes.readFloatLE(binary+(v.byteOffset||0)+(a.byteOffset||0)+Math.floor(i/size)*(v.byteStride||size*4)+(i%size)*4));};
  let tracks=[],sampleTime=0;

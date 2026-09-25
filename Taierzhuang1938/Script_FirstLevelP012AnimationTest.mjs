@@ -46,7 +46,7 @@ try{
  const backRifle=await page.evaluate(async()=>{
    const t=window.Tengxian,THREE=await import('three'),{InstallP012ActorMotion}=await import('./Script_FirstLevelP012CastAppearance.mjs');
    const results=[];t.actorFactory.SetBatcher(null);
-   for(const variant of [0,1,3]){
+   for(const variant of [1,4]){ // the approved NRA looks (NRA02, NRA05); NRA01/04 were deleted 2026-09-26
      const actor=t.actorFactory.Create('nra',{seed:400+variant,weapon:'HanYang',modelVariant:variant});
      const soldier={id:400+variant,actor,p012BackRifle:true};InstallP012ActorMotion(soldier);await actor.characterRig.p012BackRifleReady;
      const rig=actor.characterRig;let elapsed=0,min=Infinity,max=-Infinity;
@@ -65,7 +65,7 @@ try{
    return results;
  });
  for(const result of backRifle){assert.equal(result.running.clip,'BackRifleRun');assert.equal(result.running.parent,'P012BackRifleMount');assert.ok(result.running.rate>1);assert.ok(result.min>=-.015&&result.min<.015);assert.ok(result.max<.12);for(const state of [result.prone,result.fire]){assert.notEqual(state.clip,'BackRifleRun');assert.equal(state.parent,'SocketAttachment_WeaponR');}}
- console.log('PASS supplied back-rifle clip, NRA01/02/04 skin contact and combat handoff',backRifle);
+ console.log('PASS supplied back-rifle clip, NRA02/05 skin contact and combat handoff',backRifle);
  const result=await page.evaluate(async()=>{
   const t=window.Tengxian,THREE=await import('/Taierzhuang1938/vendor/three/build/three.module.js');
   const {InstallP012ActorMotion}=await import('/Taierzhuang1938/Script_FirstLevelP012CastAppearance.mjs');
