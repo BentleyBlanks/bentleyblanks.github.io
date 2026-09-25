@@ -247,6 +247,9 @@ export const TANK = Object.freeze({
     rallyRadiusM: 3,
     // 车还在远处（03 从图外开进来）时，护兵照旧打自己的仗；车开到离他这么近才接过来跟车。
     joinRangeM: 30,
+    // 从这一步起，车还没开过 BendExit 时护兵去看守位（路点的 escortOverwatch，见 TANK_ESCORT_OVERWATCH）。03 不去：
+    // 那块土台对夺下的机枪敞着，09-25 空转探针 c3（进图就去）四个护兵 03 里就被打掉两个、一枪没开。[需]
+    overwatchFromStage: "MachineGun",
     // 路点自带的绝对护兵槽（Block/Squeeze → FRONT_TANK_ESCORT_SLOTS，弹坑）：守区半径与掩体余量都小 ——
     // 余量一大 AI 会挑坑外的掩体，从那儿顺土坎南坡看得见缺口（Space 包 09-24 实测）。[几]
     slotRadiusM: 1.2,
@@ -494,13 +497,30 @@ export const NEVER_BREAKABLE_RULES = Object.freeze({
 // （drive.reversalRad，大脑不跨折返点磨圆切线）。开进图的时机见 entry.fact。
 // ---------------------------------------------------------------------------
 const TankTarget = (name) => name ? Object.freeze({ x: FRONT_SPACE.tankTargets[name].x, z: FRONT_SPACE.tankTargets[name].z }) : undefined;
+/**
+ * 护兵的看守位（relay r2 Front 第三步续，2026-09-25）：04 里车还没开过 BendExit 时（还在路堑、折返顶 HullDown 或
+ * 北残院后面的路弯 Bend），护兵不贴着车走，停在残院西北那块土台上（x 39–43.5、z −196.5…−200.5，地面高约 2.1–2.8 m）；
+ * 03 照旧跟车（TANK.escorts.overwatchFromStage）。路点上的 escortOverwatch 标的是「车在这段路上」，步骤由大脑另判。
+ * 病根：车身旁那条路 x 46–60、z −206…−182 对 04 的授权射击点一个都打不着（引擎射线逐格量过，蹲姿眼高 0.85 m），
+ * 04 空转探针里 TankEscortA / B / C 几乎每趟都在那里 30 s 一发不打（09-25 八趟有效数据里七趟都有，一趟一到四个窗口）。
+ * 这四点蹲姿对 04 的 11 个非缺口授权点（土坎顶六点、左枪胸墙、阵位北墙 / 西墙、东头交汇口两点）11 点全通，
+ * **对撤退口三点（gapWest / gapEast / gapJunction）全都打不到**（09-24 教训：护兵看得见缺口，InfantryBlockade 就一直亮着）。
+ * 量法：REL/附件/r2_work/front/step3c/RoadGrid4.mjs（蹲姿）与 RoadGrid3.mjs（站姿，大范围）。
+ * 开枪还是普通 AI 的事（对人的扳机照旧受 FireWindows 的名额管，环境射击不命中），这里只给站位。
+ */
+const TANK_ESCORT_OVERWATCH = Object.freeze([
+  Object.freeze({ id: "OverwatchA", x: 41, z: -196.5 }), Object.freeze({ id: "OverwatchB", x: 43.5, z: -197.5 }),
+  Object.freeze({ id: "OverwatchC", x: 39, z: -199 }), Object.freeze({ id: "OverwatchD", x: 42, z: -200.5 }),
+]);
+const OVERWATCH = Object.freeze({ escortOverwatch: TANK_ESCORT_OVERWATCH });
 const TANK_PACE = Object.freeze({
-  Start: { stage: "Support" }, Cutting: { stage: "Support" }, CrestEast: { stage: "Support" }, Shadow: { stage: "Support" },
-  HullDown: { stage: "Support", preview: true },
-  Descent: { stage: "Support" },
+  Start: { stage: "Support", ...OVERWATCH }, Cutting: { stage: "Support", ...OVERWATCH },
+  CrestEast: { stage: "Support", ...OVERWATCH }, Shadow: { stage: "Support", ...OVERWATCH },
+  HullDown: { stage: "Support", preview: true, ...OVERWATCH },
+  Descent: { stage: "Support", ...OVERWATCH },
   // 03 露面以后退回北残院后面，在路弯里等 04（从机枪座看不见）。
-  Bend: { stage: "Support" },
-  BendExit: { stage: "MachineGun" },
+  Bend: { stage: "Support", ...OVERWATCH },
+  BendExit: { stage: "MachineGun", ...OVERWATCH },
   // 04：驶出路弯 → 压阵位，压住了（tankPositionPressured）才往前封口。
   Pressure: { stage: "MachineGun", holdUntil: "tankPositionPressured" },
   Approach: { stage: "MachineGun" },

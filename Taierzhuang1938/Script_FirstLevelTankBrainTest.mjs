@@ -378,6 +378,31 @@ function Run(brain, world, seconds, each = null) {
   ok(Dist(W[I("HullDown")].faceTo, FRONT_SPACE.tankTargets.nest) < 1e-9 && Dist(W[I("Block")].faceTo, FRONT_SPACE.tankTargets.gap) < 1e-9,
     "faceTo names resolve to FRONT_SPACE.tankTargets");
   ok(W[I("Block")].escortSlots === FRONT_TANK_ESCORT_SLOTS && FRONT_TANK_ESCORT_SLOTS.length === 4, "block escorts take Space's four crater slots");
+  // Relay r2 Front step 3 (cont.): in 04, until the tank drives on past BendExit, the escorts hold the overwatch
+  // posts on the platform north-west of NorthRuin (the road beside the hull, cutting to bend, sees no fire point at all;
+  // the posts see all eleven non-gap points of 04 and none of the three gap points, engine rays, step3c/RoadGrid4), and
+  // rejoin the tank on the leg to Pressure.
+  {
+    const over = W[I("Bend")].escortOverwatch;
+    const legs = ["Start", "Cutting", "CrestEast", "Shadow", "HullDown", "Descent", "Bend", "BendExit"];
+    ok(over?.length === 4 && legs.every((id) => W[I(id)].escortOverwatch === over)
+      && ["Pressure", "Approach", "Block", "Squeeze"].every((id) => !W[I(id)].escortOverwatch), "overwatch legs: entry to BendExit only");
+    const west = MISSION_LAYOUT.blocks.find((b) => b.id === "NorthRuinWest"), north = MISSION_LAYOUT.blocks.find((b) => b.id === "NorthRuinNorth");
+    ok(over.every((p) => p.x < west.x - west.w / 2 - 3 && p.z < north.z - north.d / 2 - 5), "the posts stand west of NorthRuin's west wall and north of its north wall, off the pocket behind it");
+    ok(over.every((p, i) => over.every((q, j) => i === j || Dist(p, q) >= 1.8)), "the four posts are a man's width apart");
+    const escortIds = ["TankEscortA", "TankEscortB", "TankEscortC", "TankEscortD"];
+    for (const id of ["Start", "HullDown", "Bend"]) {
+      const at = CreateTankBrain(P, TANK, { seed: 3 });
+      at.PlaceAt(I(id));
+      ok(at.Escorts({ escortIds, stage: "Support" }).every((e) => e.mode !== "overwatch"), `03, the tank at ${id}: the escorts stay with it (the platform is open to the captured gun)`);
+      const plan = at.Escorts({ escortIds, stage: "MachineGun" });
+      ok(plan.length === 4 && plan.every((e, i) => e.mode === "overwatch" && e.anchor.x === over[i].x && e.anchor.z === over[i].z),
+        `the tank at ${id}: its escorts on the overwatch posts, not beside the hull`);
+    }
+    const on = CreateTankBrain(P, TANK, { seed: 3 });
+    on.PlaceAt(I("Pressure"));
+    ok(on.Escorts({ escortIds, stage: "MachineGun" }).every((e) => e.mode !== "overwatch" && !over.some((p) => p.x === e.anchor.x && p.z === e.anchor.z)), "past BendExit they are back with the tank");
+  }
   const brain = CreateTankBrain(P, TANK, { seed: 21 });
   ok(brain.reversals.includes(I("HullDown")) && brain.reversals.length === 1, "HullDown is the one switchback (tangent never smoothed across it)");
   const facts = new Set();
