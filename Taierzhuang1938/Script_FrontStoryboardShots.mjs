@@ -4,7 +4,7 @@
 // 由调研工具 REL/附件/survey/tools/B_StoryboardGrab.mjs --mode=front 整理而来（2026-09-25）。
 //
 //   node Taierzhuang1938/Script_FrontStoryboardShots.mjs                       抓 SB07/SB08、判、写 json，判据没过退出码 1
-//   node …  --side-by-side=<分镜目录>                                           另拼「分镜 | 实机」并排图（找 Storyboard_07*/08* 的 png；分镜不进仓库）
+//   node …  --side-by-side=<分镜目录>                                           另拼「分镜 | 实机」并排图（找 Storyboard_07*/08* 的 png；分镜不进仓库；找不到算没过）
 //   node …  --quality=low|high（默认 high）  --out=<目录>（默认 _shots/FrontStoryboardShots）  --hud（保留 HUD）
 //   node …  --strict                                                            连「等 Set 布景」的判据也算（第二波合并后用）
 //
@@ -21,7 +21,9 @@
 //   雾、天空、粒子、半透明件不画，读回像素数、包围框、重心（换算到 1280×720）。
 //   已知近似：远景层（46 m 外的人）是实例化的，涂色图里只按黑色挡人；被判的人都在 46 m 内（走完整模型）。
 //
-// 判据分两类：owner "front"（本包：人站位、动作、人数、机位）默认就判；owner "set"（布景/烟/飞机/破墙）
+// 判据分三类：owner "front"（本包：人站位、动作、人数、机位）默认就判；owner "set"（布景/烟/飞机/破墙，以及被现有
+// 白盒挡住、要等 Set 的破砖墙破口才露出来的阵位机枪手）；owner "wave2"（本包已知现在不成立、审查同意第二波布景合入后
+// 再调站位的：背坡轻机枪本身看不清）。后两类默认只出图、json 里记实测数，--strict 才算进退出码。
 // 默认只出图人工看、json 里标 pending，--strict 才算进退出码。
 import fs from "node:fs";
 import path from "node:path";
@@ -49,15 +51,31 @@ const FRONT_STORYBOARD_SHOTS = Object.freeze({
     // 玩家约 (5.0,−143.0)：FrontApproach 在 approach[9]=(7,−143.5) 周围 2.5 m 触发，站位允许 2 m。
     player: Object.freeze({ x: 5.0, z: -143.0, toleranceM: 2.0 }),
     yawRangeDeg: Object.freeze([-66, -50]), pitchDeg: -2, luoTargetX: 0.75,
-    luo: Object.freeze({ xMin: 0.55, xMax: 0.95, yMin: 0.25, yMax: 0.85, distMin: 3.5, distMax: 5.5, clip: "PointBlockade", minPx: 1500, armStraight: 0.9, facingDeg: 35, awayMaxDeg: 100 }),
-    // 背坡机枪组：两人都要在画面左侧（重心 x < 0.4）、各自至少露出 minPx 像素（1280×720 计）。
-    mgGroup: Object.freeze({ xMax: 0.4, minPx: 25 }),
+    // 罗边指边走（契约 §5「腿照走」）：站姿、在走（AI moveSpeed > minMoveMps）。09-25 审查：两趟都拍到他蹲着不动。
+    luo: Object.freeze({ xMin: 0.55, xMax: 0.95, yMin: 0.25, yMax: 0.85, distMin: 3.5, distMax: 5.5, clip: "PointBlockade", minPx: 1500, armStraight: 0.9, facingDeg: 35, awayMaxDeg: 100,
+      stance: 0, minMoveMps: 0.1 }),
+    // 背坡机枪组：两人都要在画面左侧（重心 x < 0.4）、各自至少露出 minPx、合计 minPxPair 像素（1280×720 计）；轻机枪本身
+    // （射手手里的 Zb26，Actor.weaponGroup）露出 gunMinPx。09-25 审查：原来 25 px 只证明「有几个像素」；实测两人 496–876 px、
+    // 合计 1364–1452 px。审查建议合计 1500 —— 现在的站位下达不到（人在刺网后、画面左上角），要等第二波 Set 布景合入后
+    // 再决定是否沿土坎往西挪 1–2 m / 贴近沟沿，挪了再把 minPxPair 抬到 1500。
+    mgGroup: Object.freeze({ xMax: 0.4, minPx: 300, minPxPair: 1200, gunMinPx: 20 }),
+    // 背坡伤员（尸体层的实例化尸体，涂色图里按包围盒画一个代理：长 1.7、宽 0.5、高 0.3 m）：露出 minPx、在画面左侧。
+    wounded: Object.freeze({ xMax: 0.4, minPx: 60, box: Object.freeze([1.7, 0.3, 0.5]) }),
+    // 阵位机枪手（RightNestGunner）：涂色图里露出 minPx，重心在右半（x ≥ xMin）。契约写「右侧」；他的位置由敌军布设定、
+    // 机位 yaw 由罗定（罗在 0.75），实测 x ≈ 0.57，所以只判右半；「右侧残破砖墙、从破口开火」是 Set 的判据。
+    nestGunner: Object.freeze({ xMin: 0.5, minPx: 20 }),
   }),
   SB08: Object.freeze({
-    player: Object.freeze({ x: 25.6, z: -155.2, toleranceM: 0.6 }),
+    // toleranceM 0.4、走回阈值 rewalkM 0.3：左前景那挺枪在机位正南 1.3 m，人往北站偏 0.5 m 枪就出画（09-25 修复后第一趟：
+    // 躲雷后停在 (25.6,−155.66)，枪只剩左边缘 877 px；审查那两趟站在 −154.95，枪 3.7 万 px）。
+    player: Object.freeze({ x: 25.6, z: -155.2, toleranceM: 0.4, rewalkM: 0.3, arrivalM: 0.2 }),
     yawDeg: 99, pitchDeg: -3,
     // minPx 60（1280×720 计）：34 m 外一个人全身约 35×10 px，60 px 大约是头肩露出沟沿；只露一个头顶（≈20 px）不算。
-    firstBatch: Object.freeze({ minVisible: 3, minPx: 60 }),
+    // minBoxHPx 16：包围框高 ≥ 16 px（竖直视场 55°、34 m 处约 20 px/m，≈ 头、肩、胸 0.8 m 露出沟沿）；minSepPx 10：
+    // 算进去的人彼此横向隔开 ≥ 10 px（不是一团）。09-25 审查：60 px 只证明「有像素」，两趟里 3 人中有 1 人框高只有 13.7 px、
+    // 两人横向只隔 14 px。审查建议框高 ≥ 28 px —— 34 m 外那是整个人（1.7 m ≈ 35 px），缺口段沟 0.5 m 深，站着的人最多露
+    // 1.2 m ≈ 24 px，定 28 就等于要求人走出沟；要更大的人得靠第二波 Set 的碎砖站台抬高眼位。
+    firstBatch: Object.freeze({ minVisible: 3, minPx: 60, minBoxHPx: 16, minSepPx: 10 }),
     // 左前景的机枪（夺下的 MissionGun）：重心在画面左 0.4 以内、面积够大（前景）。
     gun: Object.freeze({ xMax: 0.4, minPx: 3000 }),
     // 放行之后站到机位上，每 0.1 s 看一次（缺口段沟只有 0.5 m 深、约 6 m 长，人过这一段只要两三秒）。
@@ -98,7 +116,7 @@ async function InstallGrab() {
     G.Actor = (a, role) => {
       const cam = g.player.camera.position;
       return { role, id: a.id, missionId: a.missionId || null, alive: a.alive, lod: a.renderLod || null, stance: a.stance ?? null,
-        pos: [+a.position.x.toFixed(2), +a.position.z.toFixed(2)], distM: +Math.hypot(a.position.x - cam.x, a.position.z - cam.z).toFixed(2),
+        pos: [+a.position.x.toFixed(2), +a.position.z.toFixed(2)], distM: +Math.hypot(a.position.x - cam.x, a.position.z - cam.z).toFixed(2), moveSpeed: +(a.moveSpeed ?? 0).toFixed(2),
         head: G.Screen(G.Head(a)), clip: a.openingStoryboardPose?.clip || null, upperBody: !!a.openingStoryboardPose?.upperBody,
         pointing: !!a.frontPointing, fired: a.fireSequence || 0, aim: +(a.aimBlend ?? 0).toFixed(2),
         // 真画出来的那一层（旗子立着不算：大脑一据枪，开场层就把上半身 clip 扔掉 —— 09-25 第一趟就是这么红的）。
@@ -121,9 +139,17 @@ async function InstallGrab() {
       }
       return best;
     };
-    // 涂色图：targets = [{key, roots:[Object3D]}]，返回每个 key 的像素数（按 W×H 计）、包围框、重心（归一化）。
-    G.Paint = (targets, scale = 0.5) => {
+    // 实例化的东西（尸体层）没法单独涂色：按包围盒摆一个临时代理网格（涂色完就拿走）。size = [长 x, 高 y, 宽 z]（米）。
+    G.Proxy = (x, z, yaw, size) => {
+      const [sx, sy, sz] = size, m = new T.Mesh(new T.BoxGeometry(sx, sy, sz), new T.MeshBasicMaterial());
+      m.position.set(x, g.battlefield.GroundHeight(x, z) + sy / 2, z); m.rotation.y = yaw; m.updateMatrixWorld(true);
+      return m;
+    };
+    // 涂色图：targets = [{key, roots:[Object3D]}]（后面的覆盖前面的：人和他手里的枪可以分两色），返回每个 key 的像素数（按 W×H 计）、
+    // 包围框、重心（归一化）。proxies 里的临时网格只在这一张涂色图里加进场景。
+    G.Paint = (targets, scale = 0.5, proxies = []) => {
       const renderer = g.renderer, scene = g.scene, cam = g.player.camera;
+      for (const p of proxies) scene.add(p);
       const w = Math.round(W * scale), h = Math.round(H * scale);
       if (!cache.rt || cache.rt.width !== w) cache.rt = new T.WebGLRenderTarget(w, h, { depthBuffer: true });
       g.ai.CullActors(cam); scene.updateMatrixWorld(true);
@@ -156,6 +182,7 @@ async function InstallGrab() {
         scene.fog = keep.fog; scene.background = keep.bg; renderer.shadowMap.autoUpdate = keep.auto;
         renderer.setClearColor(keep.clear, keep.alpha); renderer.setRenderTarget(keep.target);
         for (const m of mats) m.dispose();
+        for (const p of proxies) { scene.remove(p); p.geometry.dispose(); p.material.dispose(); }
       }
       const out = targets.map((t) => ({ key: t.key, px: 0, sx: 0, sy: 0, x0: 1, y0: 1, x1: 0, y1: 0 }));
       for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
@@ -189,7 +216,7 @@ async function InstallGrab() {
 const checks = report.checks;
 function Check(shot, name, owner, ok, detail) {
   checks.push({ shot, name, owner, ok: !!ok, detail });
-  console.log(ok ? "  ✓" : owner === "set" && !STRICT ? "  ·" : "  ✗", shot, name, `[${owner}]`, JSON.stringify(detail));
+  console.log(ok ? "  ✓" : owner !== "front" && !STRICT ? "  ·" : "  ✗", shot, name, `[${owner}]`, JSON.stringify(detail));
 }
 
 async function ShootSB07(Route) {
@@ -214,11 +241,17 @@ async function ShootSB07(Route) {
       G.Look(yaw, C.pitchDeg, "stand", 1);
     }
     G.Look(yaw, C.pitchDeg, "stand", 3);
-    const mg = (r.guards || []).filter((x) => x.mg);
-    const paint = G.Paint([{ key: "luo", roots: [luo.actor?.root] }, ...mg.map((x) => ({ key: x.mg.role, roots: [x.actor.actor?.root] }))]);
+    const mg = (r.guards || []).filter((x) => x.mg), gunner = mg.find((x) => x.mg.role === "gunner");
     const nestGunner = g.ai.soldiers.find((s) => s.missionId === "RightNestGunner");
+    // 人和轻机枪分两色（枪在射手之后，覆盖他那几个像素）；伤员按包围盒画代理；阵位机枪手也按像素判（09-25 审查：原来只判投影）。
+    const woundedProxy = G.Proxy(MG.wounded.x, MG.wounded.z, MG.wounded.yaw, C.wounded.box);
+    const paint = G.Paint([{ key: "luo", roots: [luo.actor?.root] }, ...mg.map((x) => ({ key: x.mg.role, roots: [x.actor.actor?.root] })),
+      { key: "lmg", roots: [gunner?.actor.actor?.weaponGroup] }, { key: "wounded", roots: [woundedProxy] }, { key: "nestGunner", roots: [nestGunner?.actor?.root] }],
+      0.5, [woundedProxy]);
     const wounded = G.Screen(new G.T.Vector3(MG.wounded.x, g.battlefield.GroundHeight(MG.wounded.x, MG.wounded.z) + 0.3, MG.wounded.z));
-    return { time: +r.time.toFixed(2), sincePointS: +(r.time - (fb.approachPointAt ?? r.time)).toFixed(2), fact: r.flow.facts.get?.("frontApproachPointed") ?? null,
+    // flow.facts 是 Set；事实带的细节（罗、玩家的位置与间距）在 flow.log 里（09-25 审查：原来读 facts.get，永远是 null）。
+    const fact = (r.flow.log || []).find((e) => e.kind === "fact" && e.id === "frontApproachPointed")?.detail ?? null;
+    return { time: +r.time.toFixed(2), sincePointS: +(r.time - (fb.approachPointAt ?? r.time)).toFixed(2), fact,
       bearingLuoDeg: +bearing.toFixed(1), camera: G.Cam(), player: { pos: g.player.position.toArray().map((v) => +v.toFixed(2)), stance: g.player.stance, alive: g.player.alive },
       luo: { ...G.Actor(luo, "luo"), yawDeg: +(luo.yaw * 180 / Math.PI).toFixed(1), pointYawDeg: Number.isFinite(luo.watchYaw) ? +(luo.watchYaw * 180 / Math.PI).toFixed(1) : null,
         // 他背对/侧对镜头吗：身体朝向与「镜头→罗」方向之差（0 = 正背对镜头，180 = 正对镜头）。
@@ -238,12 +271,19 @@ async function ShootSB07(Route) {
   Check("SB07", "罗面朝指的方向、背/侧对镜头（不是回头招呼玩家）", "front", L.pointYawDeg != null && Math.abs(((L.yawDeg - L.pointYawDeg + 540) % 360) - 180) <= C.luo.facingDeg && L.awayFromCameraDeg <= C.luo.awayMaxDeg,
     { yawDeg: L.yawDeg, pointYawDeg: L.pointYawDeg, awayFromCameraDeg: L.awayFromCameraDeg });
   Check("SB07", "罗看得见（没被沟壁挡住）", "front", Lp.px >= C.luo.minPx, { px: Lp.px });
+  Check("SB07", "罗站着、边指边走（腿照走）", "front", L.stance === C.luo.stance && L.moveSpeed >= C.luo.minMoveMps, { stance: L.stance, moveSpeed: L.moveSpeed, lead: info.state.lead });
   for (const m of info.mg) {
     const q = info.paint[m.role];
     Check("SB07", `背坡机枪组 ${m.role} 在画面左侧且看得见`, "front", q.px >= C.mgGroup.minPx && q.cx <= C.mgGroup.xMax, { px: q.px, cx: q.cx, cy: q.cy, distM: m.distM, stance: m.stance });
   }
-  Check("SB07", "背坡伤员（尸体层）在画面左侧", "front", info.wounded.inFrame && info.wounded.x <= C.mgGroup.xMax, info.wounded);
-  Check("SB07", "阵位机枪手在画面右侧（残破砖墙、口焰待 Set）", "front", !!info.nestGunner?.head.inFrame && info.nestGunner.head.x >= 0.5, info.nestGunner?.head ?? null);
+  const pairPx = info.mg.reduce((n, m) => n + (info.paint[m.role]?.px || 0), 0) + (info.paint.lmg?.px || 0);
+  Check("SB07", `背坡机枪组两人合计露出 ≥ ${C.mgGroup.minPxPair} px`, "front", pairPx >= C.mgGroup.minPxPair, { pairPx });
+  // 实测 8 px（人在刺网后、趴在坡顶、枪口朝北被自己的身子挡住）：审查同意等 Set 布景合入后再沿土坎挪人（第二波）。
+  Check("SB07", "背坡轻机枪本身看得见", "wave2", (info.paint.lmg?.px || 0) >= C.mgGroup.gunMinPx && info.paint.lmg.cx <= C.mgGroup.xMax, info.paint.lmg);
+  Check("SB07", "背坡伤员（尸体层）在画面左侧、看得见", "front", info.paint.wounded.px >= C.wounded.minPx && info.paint.wounded.cx <= C.wounded.xMax, { paint: info.paint.wounded, projected: info.wounded });
+  // 投影在 x ≈ 0.57，但现有蓝色白盒西墙把他整个挡住（涂色 0 px）：要等 Set 的破砖墙破口。
+  Check("SB07", "阵位机枪手在画面右半、从破口露出来", "set", info.paint.nestGunner.px >= C.nestGunner.minPx && info.paint.nestGunner.cx >= C.nestGunner.xMin,
+    { paint: info.paint.nestGunner, head: info.nestGunner?.head ?? null });
   for (const what of ["右侧残破砖墙、机枪从破口开火", "中远拒马与大黑烟柱", "天上两架日机横飞"]) Check("SB07", what, "set", false, "pending: 第二波 Set 布景合入后看图");
 }
 
@@ -291,14 +331,14 @@ async function ShootSB08(Route) {
     const at = await page.evaluate(() => { const p = window.Tengxian.player.position; return { x: p.x, z: p.z }; }), vp = { x: C.player.x, z: C.player.z };
     const west = at.x < 24.4 && at.z < Space.westDoor.z + 0.7, east = at.x > 32.5 && at.z > -145.2;
     const points = east ? [{ x: at.x, z: -141.8 }, { x: 30, z: -141.8 }, vp] : west ? [{ x: at.x, z: Space.westDoor.z }, Space.westDoor, vp] : [vp];
-    await Route(points, "SB08_NorthOfGun", { stance: "crouch", fight: true, arrivalM: 0.35, recoverAfterEvade: true });
+    await Route(points, "SB08_NorthOfGun", { stance: "crouch", fight: true, arrivalM: C.player.arrivalM, recoverAfterEvade: true });
   };
   // 先蹲着走到机位、蹲着还击等第一批放行（09-25 第九趟站在那儿干等了一百来秒，被打死在 (25.6,−152.4)；
   // 第十一趟放行后才从座位走过去，到位时一列人已经过了缺口），有人开始过口再站起来看。
   await ToViewpoint();
   const released = await HoldUntil(`(r.guards||[]).slice(0,${B.firstBatch}).some((x)=>x.crossing)`, 150);
   if (!released.hit) throw Error("第一批 150 s 内没放行：" + JSON.stringify(released));
-  if (await page.evaluate((vp) => Math.hypot(window.Tengxian.player.position.x - vp.x, window.Tengxian.player.position.z - vp.z) > 0.8, C.player)) await ToViewpoint();
+  if (await page.evaluate((vp) => Math.hypot(window.Tengxian.player.position.x - vp.x, window.Tengxian.player.position.z - vp.z) > vp.rewalkM, C.player)) await ToViewpoint();
   let best = null, enough = null;
   const samples = [];
   for (let k = 0, t0 = null; k < 1000; k++) {
@@ -318,14 +358,20 @@ async function ShootSB08(Route) {
       const p = g.player.position, first = (r.guards || []).slice(0, n), gun = g.scene.getObjectByName("Emplacement_MissionGun");
       const paint = G.Paint([{ key: "gun", roots: [gun] }, ...first.map((x, i) => ({ key: "g" + i, roots: [x.actor.actor?.root] }))], 1);
       // 只数正在过口的人（crossing 且还没进安全区）：还跪在最后遮挡处等的不是分镜里那一列（09-25 第五趟就数成了 3 个等着的）。
-      const counted = first.map((x, i) => x.actor.alive && x.crossing && !x.safe && paint["g" + i].px >= C.firstBatch.minPx ? paint["g" + i].cx : null).filter((v) => v != null);
-      const visible = counted.length, spreadPx = visible ? Math.round((Math.max(...counted) - Math.min(...counted)) * innerWidth) : 0;
-      return { t: +r.time.toFixed(2), stage: r.flow.stage.id, alive: g.player.alive, visible, spreadPx,
+      // 看得出是一个人：露出 minPx、框高 ≥ minBoxHPx；看得出是几个人：从左到右，和上一个算进去的人横向隔开 ≥ minSepPx。
+      const F = C.firstBatch, shown = first.map((x, i) => ({ x, p: paint["g" + i] }))
+        .filter(({ x, p }) => x.actor.alive && x.crossing && !x.safe && p.px >= F.minPx && (p.box[3] - p.box[1]) * 720 >= F.minBoxHPx)
+        .map(({ p }) => p.cx).sort((a, b) => a - b);
+      const counted = [];
+      for (const cx of shown) if (!counted.length || (cx - counted.at(-1)) * 1280 >= F.minSepPx) counted.push(cx);
+      const pixelsOnly = first.filter((x, i) => x.actor.alive && x.crossing && !x.safe && paint["g" + i].px >= F.minPx).length;
+      const visible = counted.length, spreadPx = visible ? Math.round((Math.max(...counted) - Math.min(...counted)) * 1280) : 0;
+      return { t: +r.time.toFixed(2), stage: r.flow.stage.id, alive: g.player.alive, visible, pixelsOnly, spreadPx,
         first: first.map((x, i) => ({ ...G.Actor(x.actor, "g" + i), progress: x.progress, crossing: !!x.crossing, safe: !!x.safe, paint: paint["g" + i] })),
         gun: paint.gun, camera: G.Cam(), player: { pos: p.toArray().map((v) => +v.toFixed(2)), stance: g.player.stance }, state: r.frontBattle.State() };
     }, { C, n: B.firstBatch });
     t0 ??= s.t; if (s.t - t0 > C.waitS) break;
-    samples.push({ t: s.t, visible: s.visible, pos: s.player.pos, crossing: s.first.filter((x) => x.crossing && !x.safe).length, safe: s.first.filter((x) => x.safe).length,
+    samples.push({ t: s.t, visible: s.visible, pixelsOnly: s.pixelsOnly, pos: s.player.pos, crossing: s.first.filter((x) => x.crossing && !x.safe).length, safe: s.first.filter((x) => x.safe).length,
       px: s.first.map((x) => x.paint.px) });
     if (!s.alive) {
       // 抓帧不是生存测试：走游戏自带的检查点重来一次，回到机位接着看（次数记 holdRetries）。
@@ -339,7 +385,7 @@ async function ShootSB08(Route) {
     const Enough = (v) => Math.min(v.visible, C.firstBatch.minVisible);
     if (!best || Enough(s) > Enough(best) || (Enough(s) === Enough(best) && s.spreadPx > best.spreadPx)) { best = s; await page.screenshot({ path: path.join(OUT, "SB08.png") }); }
     // 躲雷把人带离了机位：走回去再看。
-    if (Math.hypot(s.player.pos[0] - C.player.x, s.player.pos[2] - C.player.z) > 0.8) {
+    if (Math.hypot(s.player.pos[0] - C.player.x, s.player.pos[2] - C.player.z) > C.player.rewalkM) {
       await ToViewpoint(); await page.evaluate(() => { window.frontShots.watching = false; });
     }
     if (s.visible >= C.firstBatch.minVisible) enough ??= s.t;
@@ -352,11 +398,11 @@ async function ShootSB08(Route) {
   const dp = Math.hypot(best.player.pos[0] - C.player.x, best.player.pos[2] - C.player.z);
   Check("SB08", "玩家在阵位机枪北侧、站姿", "front", dp <= C.player.toleranceM && best.player.stance === "stand", { dp: +dp.toFixed(2), stance: best.player.stance });
   Check("SB08", "视线朝缺口 yaw 99°、俯仰 −3°", "front", Math.abs(best.camera.yawDeg - C.yawDeg) <= 8 && Math.abs(best.camera.pitchDeg - C.pitchDeg) <= 5, { yaw: best.camera.yawDeg, pitch: best.camera.pitchDeg });
-  Check("SB08", `同一帧看得见正在过缺口的第一批 ≥ ${C.firstBatch.minVisible} 人`, "front", best.visible >= C.firstBatch.minVisible,
-    { visible: best.visible, t: best.t,
-      // 算进去的人在画面上横向铺开多宽（px）：34 m 外一列人几乎是一团，数得出 3 个不等于看得出 3 个，这个数只报不判。
+  Check("SB08", `同一帧看得出正在过缺口的第一批 ≥ ${C.firstBatch.minVisible} 人（各露 ≥ ${C.firstBatch.minPx} px、框高 ≥ ${C.firstBatch.minBoxHPx} px、横向隔开 ≥ ${C.firstBatch.minSepPx} px）`, "front", best.visible >= C.firstBatch.minVisible,
+    { visible: best.visible, pixelsOnly: best.pixelsOnly, t: best.t,
+      // 算进去的人在画面上横向铺开多宽（px），只报不判。
       spreadPx: best.spreadPx,
-      people: best.first.map((x) => ({ id: x.id, px: x.paint.px, cx: x.paint.cx, distM: x.distM, progress: x.progress, crossing: x.crossing, safe: x.safe })) });
+      people: best.first.map((x) => ({ id: x.id, px: x.paint.px, cx: x.paint.cx, boxHPx: x.paint.box ? +((x.paint.box[3] - x.paint.box[1]) * 720).toFixed(1) : 0, distM: x.distM, progress: x.progress, crossing: x.crossing, safe: x.safe })) });
   Check("SB08", "机枪在左前景", "front", best.gun.px >= C.gun.minPx && best.gun.cx <= C.gun.xMax, best.gun);
   for (const what of ["机枪旁弹药箱", "缺口东沿倒塌砖墙延伸向远处", "缺口段沙袋木板护壁", "远处火点与烟柱"]) Check("SB08", what, "set", false, "pending: 第二波 Set 布景合入后看图");
 }
@@ -419,10 +465,14 @@ try {
     const Box = (p, text, color) => ({ box: p?.box || null, text, color });
     const s7 = report.shots.SB07, s8 = report.shots.SB08, sbs = {};
     if (Find(7) && s7) sbs.SB07 = await SideBySide("SB07", path.join(SBS, Find(7)), [Box(s7.paint.luo, `罗 ${s7.luo.distM} m ${s7.luo.clip || ""}`, "#ffd23c"),
-      ...s7.mg.map((m) => Box(s7.paint[m.role], `${m.role} ${m.distM} m`, "#5cf0ff"))]);
+      ...s7.mg.map((m) => Box(s7.paint[m.role], `${m.role} ${m.distM} m`, "#5cf0ff")), Box(s7.paint.lmg, "轻机枪", "#ff8a3c"),
+      Box(s7.paint.wounded, "伤员", "#ff5c8a"), Box(s7.paint.nestGunner, "阵位机枪手", "#c6ff5c")]);
     if (Find(8) && s8) sbs.SB08 = await SideBySide("SB08", path.join(SBS, Find(8)), [Box(s8.gun, "机枪", "#ff8a3c"),
       ...s8.first.map((x) => Box(x.paint, `守军 ${x.id}  ${x.distM} m  ${x.paint.px} px${x.crossing ? "  过口中" : ""}`, "#ffd23c"))]);
     report.sideBySide = sbs;
+    // 明确要了并排图却没出（目录里没有 Storyboard_07*/08*，或那一镜没拍成）：算没过，不静默跳过（09-25 审查）。
+    for (const [n, label] of [[7, "SB07"], [8, "SB08"]]) if (!sbs[label]) report.sideBySideMissing = [...(report.sideBySideMissing || []),
+      `${label}: ${Find(n) ? "那一镜没拍成" : `${SBS} 里没有 Storyboard_0${n}_*.png`}`];
   }
 } catch (error) {
   failure = error; report.failure = String(error?.stack || error);
@@ -436,9 +486,12 @@ try {
 const gating = checks.filter((c) => c.owner === "front" || STRICT);
 const bad = gating.filter((c) => !c.ok);
 if (errors.length) bad.push({ shot: "page", name: "页面错误", detail: errors.slice(0, 3) });
+if (report.sideBySideMissing) bad.push({ shot: "sideBySide", name: "并排图没出", detail: report.sideBySideMissing });
 if (failure) bad.push({ shot: "run", name: "驾驶/抓帧没走完", detail: String(failure?.message || failure) });
-const total = gating.length + (errors.length ? 1 : 0) + (failure ? 1 : 0);
-console.log(`03 分镜抓帧：${total - bad.length}/${total} 过（等 Set 布景的 ${checks.filter((c) => c.owner === "set").length} 项${STRICT ? "已计入" : "只出图人工看"}）`);
+const total = gating.length + (errors.length ? 1 : 0) + (failure ? 1 : 0) + (report.sideBySideMissing ? 1 : 0);
+console.log(`03 分镜抓帧：${total - bad.length}/${total} 过（等 Set 布景的 ${checks.filter((c) => c.owner === "set").length} 项、第二波再调的 ${checks.filter((c) => c.owner === "wave2").length} 项${STRICT ? "已计入" : "只出图人工看"}）`);
+const pending = checks.filter((c) => c.owner !== "front" && !c.ok && !STRICT && c.detail !== "pending: 第二波 Set 布景合入后看图");
+if (pending.length) { console.log("没计入退出码、但实测没成立的："); for (const c of pending) console.log(`  · [${c.owner}] ${c.shot} ${c.name}  — ${JSON.stringify(c.detail)}`); }
 console.log(`检查点重来：驾驶 ${report.retries?.length ?? 0} 次、守阵位 ${report.holdRetries ?? 0} 次`);
 if (bad.length) {
   console.log("没过的：");
