@@ -739,7 +739,7 @@ swell 倍率读数：5 s 0.41/0.31、15 s 0.49/0.36、30 s 0.66/0.51、40 s 0.82
 
 每局的声数随实时时钟与随机种子浮动（黑屏里排出 0–10 声不等），所以按「拒收原因」看：修后两局拒收只剩 1 声，是
 22 ms 去重窗（同名同一刻，设计如此）；对照两局 15 声全是 starved。账面峰值多了十来个节点（95–101，仍在 120 以内；
-整体节点预算见 Sound 包 Step 4）。探针 `REL/附件/r2_work/sound/s2/Probe_BlackSnap.mjs`（带 `nocap` 参数跑对照）。
+整体节点预算见 `Data_AudioEngine.md` §7.5）。探针 `REL/附件/r2_work/sound/s2/Probe_BlackSnap.mjs`（带 `nocap` 参数跑对照）。
 
 闸：`Script_AudioTest`「selfCapped」一条（同一同步块里把预算压到「整份装得下、0.62 装不下」，新声摆在 990 m
 使偷无可偷：不带的必须饿死、带的必须收下；把引擎里的 `!selfCapped` 拿掉就红）；`Script_FirstLevelBattleSoundTest`

@@ -608,6 +608,67 @@ drops = { dedupe, distance, stolen, starved, get budget() { return this.starved;
 `liveNodes` 在你压预算的那一刻是多少全看运气，填料会被当场饿死，
 于是一条可偷的都没有，断言变成抛硬币。第一版就是这么翻的红。
 
+## 7.5 第一关 01–06 的节点账与预算门（2026-09-25）
+
+契约 §6 写的是 `NODE_BUDGET 120`，而上一轮的读数是「基线 220–259、合并后整关验收 553–583」。
+查下来**不是节点漏了**，是账面跟着主线程计时器走：
+
+1. **账面虚高的来源：同步推帧时回收计时器不回调。** `ReleaseVoice` 原来只挂一个 `setTimeout`。
+   战役驱动器、`TankProbe` 的帧耗时 A/B 都是在一个 `page.evaluate` 里同步推几百上千帧，
+   这期间计时器一个都不回调，早就放完的 voice 全挂在账上。同一段实时推帧量到的只有 92–138。
+   现在 `SetListener`（四条出画路径与手动推帧都过这一处）每帧调 `SweepExpiredVoices()`，
+   按 AudioContext 时钟收掉 `releaseAt` 已过的 voice；计时器留着当第二条路，`FreeVoice` 可重入，后到的是空操作。
+   账面虚高不只是数字难看：它会反过来把后面的声音当成超预算饿死。
+2. **回收计时从起播算。** 原来 `ReleaseVoice(v, v.life)` 从调用 `Play` 那一刻算，而 `v.life` 是按
+   起播时刻 `v.t` 量的（含 delay 与传播延迟）。起播推迟多少，尾巴就被砍掉多少：
+   380 m 的 `explosionFar` 晚 1.12 s 起播，最后 0.90 s 被掐掉。这一条让账面**更准**（远处的声音多活一截），
+   峰值略升是对的。
+3. **带淡出的 `StopVoice` 也进按帧清账。** 淡出原来只挂一个计时器，同步推帧时淡完的常驻 loop（战车三条）
+   要一直挂到几分钟后的原回收点。现在淡出把 `releaseAt` 改成淡完的时刻，并标 `stopAtRelease`
+   （循环播放头只断开不 stop 会在音频线程里一直转）。
+
+逐项排查过、**没有**问题的：循环层（环境床/配乐）换床时的淡出层 8 s 内拆掉；离开 05 后 6 s 战车 loop 收走；
+账面 = 在账 voice 节点 + 循环层节点 + 旧环境回退节点，实时取样差值恒为 0（没有多还或少还）。
+
+### 实测（p012、quality=low、无头 Edge，开声音）
+
+实时推帧（游戏时间跟着音频时钟走，每 0.1 s 记账；两次，第一次在改动前、第二次在前两处改动之后 —— 实时推帧计时器照常回调，两次本来就该接近）：
+
+| 段 | liveNodes 峰值 | 峰值时的大头（节点数）|
+| --- | --- | --- |
+| 01–02 开场 | 122 / 124 | 远处枪声 16–50、落土 18–23、身体/受击 15–18、剧情耳鸣 8、环境床 14 |
+| 03 | 96 / 97 | 近处枪声 24、远处枪声 18–19、战车 12 |
+| 04 战车露面 | 138 / 132 | 战车 36、近处枪声 22–37、子弹掠过 20、爆炸 15、环境床 12–16 |
+| 05 打车 | 128 / 121 | 战车 38、近处枪声 42–60 |
+| 06 | 92 / 94 | 远处枪声 31–32、落土 11–21、爆炸 12 |
+| 07 | 62 / 64 | 环境事件 18、落土 10–15 |
+
+同步推帧（一个 evaluate 推 3600–9000 帧），修前 → 修后：01 125→92、03 92→80、**04 204→120**、05 148→122、06 105→63。
+`TankProbe` 的 FRAME_AB 推法：账面 252 / 233 → 110 / 84（两个档位）。
+
+### 新预算与门
+
+- **进门预算 `NODE_BUDGET` 仍是 120**（低优先级的天花板 0.62 倍、priority 的 1.15 倍 = 138 都不变）。
+- **01–06 实时峰值上限 150**：priority 天花板 138，再留一条 priority 声（约 12 个节点）的余量。
+  实测最高 138（04），`Script_FirstLevelAudioNodeBudgetTest` 四段复跑 87–137。
+  每个节点是一个 AudioNode（gain/filter/panner/buffer source）；卷积混响是共用的四个，不按 voice 建，
+  所以 150 个节点在低端机上的风险主要是 25 m 内那些 HRTF panner 的数量，不在卷积上。
+- 门：`node Taierzhuang1938/Script_FirstLevelAudioNodeBudgetTest.mjs`（浏览器，约 5 分钟，登记在 audio 域）。
+  实时推 01（70 s）、04、05（各 45 s）、06（20 s），断言：峰值 ≤ 150、账面差 0、没有过了回收点 0.35 s 还挂着的 voice、
+  战车 loop ≤ 3、剧情语音 ≤ 3 路、前线 + 场外炮击 ≤ 8 条（按生成器自己的声部账数）、换床的淡出层 8 s 内拆掉、
+  离开 05 后 6 s 战车 loop 收走；最后在 05 之后同步推 600 帧，推完账面仍 ≤ 150 且没有过期未收。
+  反向验证：把 `SweepExpiredVoices` 换成空函数，门红两项（05 实时过期未收 3 次；同步推 600 帧峰值 142、过期未收 26 条）。
+- `Script_AudioTest.mjs` 另有三条单元断言：延迟起播的两条 cue 放完才收；一个同步块里到期的 voice 由 `SetListener` 收掉；
+  淡出的 voice 比原回收点早一秒以上离账。
+
+### 帧耗时
+
+04 战车露面处同页交替 A/B（A = 现在的代码；B = 同一实例上把 `SweepExpiredVoices` 换成空函数、回收改回从调用时算；
+每块 30 帧 + `gl.finish()`，交替 16 轮，三次）：p50 53.5/53.5、57.3/58.5、55.2/57.7 ms（A/B），
+均值比 0.75、1.18、0.87 —— 在无头机的噪声里，没有变差。按帧清账本身 p95 0.1 ms、均值 0.03–0.05 ms。
+无头 Edge 没有 `AudioContext.playoutStats`，音频线程欠载量不到；`baseLatency` 0.01 s、`outputLatency` 0.024–0.04 s。
+探针在 `REL/附件/r2_work/sound/s4/`（`Probe_NodeBudget.mjs`、`Probe_FrameAb04.mjs`）。
+
 ---
 
 ## 8. 限幅抽泵：拆成两级
@@ -720,6 +781,7 @@ gunTail{Open|Street|Interior}{Rifle|Mg}      courtyard 用 Street 那条
 | `FAR_GROUP_M` | 45 m（`voice.*` 不进这一组，见 §2.5）| 6 |
 | `STEAL_FADE_S` / `STEAL_MAX_PER_PLAY` | 0.02 s / 3（`voice.*` 与 priority 一样永不被偷，见 §2.5）| 7 |
 | `NODE_BUDGET`（→ `this.nodeBudget`）| 120 | 7 |
+| 01–06 实时 liveNodes 峰值上限（`Script_FirstLevelAudioNodeBudgetTest` 的 `PEAK_CEILING`）| 150 | 7.5 |
 | `BUS_COMP` / `BUS_MAKEUP` / `PEAK_LIMITER` | 见 §8 | 8 |
 | `GUN_TAIL_GAIN` | 0.55 | 9 |
 | `PANNER_MIN_M` | 1.0 m（panner 的最小距离，不改电平只改 HRTF 方位）| 1.5 |
@@ -731,6 +793,7 @@ gunTail{Open|Street|Interior}{Rifle|Mg}      courtyard 用 Street 那条
 ```bash
 node Taierzhuang1938/Script_AudioTest.mjs     # 空间三件套 + 动态 + 原有 30 条
 node Taierzhuang1938/Script_BootTest.mjs      # 七关开机没被弄坏
+node Taierzhuang1938/Script_FirstLevelAudioNodeBudgetTest.mjs   # 01–06 节点账与峰值（§7.5）
 ```
 
 这一轮加的断言（都在 `Script_AudioTest.mjs` 末段）：
