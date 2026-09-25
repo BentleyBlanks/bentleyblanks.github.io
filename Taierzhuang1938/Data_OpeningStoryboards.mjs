@@ -614,11 +614,14 @@ export const OPENING_STORYBOARDS = Object.freeze({
   // ---- 02 withdrawal (RearTrench) --------------------------------------------------------
   withdraw:Object.freeze({
     // The way out: seat -> crater step (exposed to F) -> SSW leg -> RC. lane[0] is Luo's (he comes from kickFrom round
-    // the north of the seat, past Shunzi's feet); the player (Script_FirstLevelCampaignOpening) walks from lane[1].
+    // the north of the seat, past Shunzi's feet); the player (Script_FirstLevelCampaignOpening) walks from lane[1], which
+    // sits on the straight line from the seat to the crater step: a first point further east (3.35,-124.9) walked him
+    // into the open front trench, the pursuers took his last seen spot there (behind the spoil from RC) and the campaign's
+    // look-back from RC saw none of them (09-26 run).
     // 2026-09-26 integration: the old start in the mouth, (0.3,-125.1) -> (1.7,-125.3), ran through the fallen lintel,
     // the roof timber and the backrest (Script_OpeningSetTest §2). lane[3] (the crater step) and lane[6] (luoCover) keep
     // their indices: heBackRoute / liuBackRoute and the campaign's look-back read them.
-    lane:Route([3.3,-125.65],[3.35,-124.9],[3.3,-124.2],[3.3,-122.2],[3.1,-121.3],[1.4,-120.8],[-.6,-120.4],[-1,-118.5],[-4,-113]),
+    lane:Route([3.3,-125.65],[3.05,-124.5],[3.3,-124.2],[3.3,-122.2],[3.1,-121.3],[1.4,-120.8],[-.6,-120.4],[-1,-118.5],[-4,-113]),
     luoCover:P(-.6,-120.4),                // first intact wall past the low section, turned back to cover
     luoCorner:P(-7.2,-111.8),              // beyond RC, waiting for the player
     heBound:Route([-.2,-121.9],[-1.2,-118.2]),
