@@ -363,7 +363,11 @@ export class FirstLevelBunkerShow {
     const from=fresh?last:root?.position,shift=from?Math.hypot(from.x-point.x,from.z-point.z):0;
     const shownYaw=fresh&&Number.isFinite(actor.openingStoryboardYaw)?actor.openingStoryboardYaw:actor.yaw;
     // `keep`: a re-root however far the root is from the body (a long root-motion clip's hand-over).
-    const moved=root&&root.visible&&!actor.openingStoryboardHidden&&(force||shift<1.5
+    // Shown is last frame's final word (MarkNotShown), not root.visible alone: the AI culls against the player's
+    // own view before the director runs, so a man in the shot behind the player's back reads hidden here (09-27:
+    // the interpreter's Flee hand-over lost its keep and his body swung the clip's 183 deg turn back to the squat).
+    const shown=root&&!actor.openingStoryboardHidden&&(root.visible||actor.openingShown);
+    const moved=shown&&(force||shift<1.5
       &&(shift>.01||Number.isFinite(point.yaw)&&Math.abs(Wrap(point.yaw-shownYaw))>.01));
     const keep=moved?KeepSkeleton(actor):null;
     this.r.PlaceActor(actor,point);actor.openingStoryboardLast={x:point.x,z:point.z,time:this.r.time};
@@ -608,9 +612,12 @@ export class FirstLevelBunkerShow {
     for(const actor of [...Object.values(this.cast),...this.r.squad,...this.r.enemies.values()]){
       // The director is done moving roots for this frame: remember the parent as it will be shown.
       if(actor&&!actor.openingStoryboardHidden)actor.actor?.characterRig?.openingRememberShown?.();
-      if(!actor?.renderLod||actor.renderLod==="detail")continue;
-      const posed=actor.alive&&!actor.openingStoryboardHidden&&(actor.openingStoryboardPose||actor.openingStoryboardTravel!=null);
-      if(posed)actor.actor.root.visible=true;else actor.openingNotShown=true;
+      if(actor?.renderLod&&actor.renderLod!=="detail"){
+        const posed=actor.alive&&!actor.openingStoryboardHidden&&(actor.openingStoryboardPose||actor.openingStoryboardTravel!=null);
+        if(posed)actor.actor.root.visible=true;else actor.openingNotShown=true;
+      }
+      // What Put takes as "on screen" next frame, before the AI's cull against the player's own view.
+      if(actor?.actor?.root)actor.openingShown=actor.actor.root.visible;
     }
   }
   // -- 01 -------------------------------------------------------------------------------------
@@ -1317,26 +1324,26 @@ export class FirstLevelBunkerShow {
    * from shunzi.butt along dragAway.route to shunzi.dragged at the clip's own haul (the fraction of its player head
    * track's travel); ijaA faces him from dragAway.face at the same fraction, his root solved so the clip's head point
    * is on the eye. Before the haul (swingS, eyes shut: ija.knockOut) the root turns about the eye from the SB04 side.
+   * The clip plays at dragAway.rate (`seconds` is its own time); the route is longer than its steps (feet under the frame).
    */
   DragAway(age=this.phase==="Boots"?this.Age:0){
     const D=C.ija.dragAway,route=[C.shunzi.butt,...D.route,C.shunzi.dragged],length=RouteLength(route);
-    const clip="IjaDragByForearm",duration=ClipLength(clip,2.625);
+    const clip="IjaDragByForearm",duration=ClipLength(clip,2.625),seconds=age*(D.rate||1);
     const Head=t=>OpeningPlayerPoint("TengxianIja02",clip,"head",Math.min(duration,Math.max(0,t)))
       ||{x:-.036,y:.33,z:-.867+2*Smooth((t-.45)/1.95)};
-    const h0=Head(0),h=Head(age),travel=Math.max(.1,Head(duration).z-h0.z),u=Clamp((h.z-h0.z)/travel);
+    const h0=Head(0),h=Head(seconds),travel=Math.max(.1,Head(duration).z-h0.z),u=Clamp((h.z-h0.z)/travel);
     const point=RoutePointAt(route,u*length),toward=RoutePointAt(D.face,u*RouteLength(D.face));
     let yaw=Face(toward,point);
     const from=this.flags.buttRoot?.yaw;
     if(from!=null&&age<D.swingS)yaw=from+Wrap(yaw-from)*Smooth(age/D.swingS);
     // gripInM: nearer the eye along his facing, so Shunzi's hand reaches the arm that drags him (eased in, eyes still shut).
     const o=Rot(yaw,h.x,h.z),pull=(D.gripInM||0)*Smooth(age/D.swingS);
-    return {point,root:{x:point.x-o.x-Math.sin(yaw)*pull,z:point.z-o.z-Math.cos(yaw)*pull,yaw},yaw,eyeM:h.y,done:age>=duration,route};
+    return {point,root:{x:point.x-o.x-Math.sin(yaw)*pull,z:point.z-o.z-Math.cos(yaw)*pull,yaw},yaw,eyeM:h.y,done:seconds>=duration,seconds,route};
   }
   /**
    * The circle round the dragged Shunzi (02, contract §2.6 / SB05): he looks south down the SSW leg; ijaA crouched
    * just ahead holding the collar (his IjaHoldCollarUp head track solved onto Shunzi's head along ijaAHoldBearingDeg),
-   * the interpreter squatting at the left edge (interpreterGrab: his root from the collar grab on), ijaB in the leg 4 m
-   * off; `kick` is where ijaB kicks him from.
+   * the interpreter squatting behind ijaA's right shoulder, ijaB in the leg 3 m off; `kick` is where ijaB kicks him from.
    */
   CircleMarks(){
     const R=C.rescue,S=C.shunzi.dragged,anchor={...S,yaw:R.circleShot.yawDeg*DEG};
@@ -1347,7 +1354,7 @@ export class FirstLevelBunkerShow {
     const pull={x:along.x*R.ijaAStandoffM,z:along.z*R.ijaAStandoffM};
     const ijaA={x:S.x-o.x+pull.x,z:S.z-o.z+pull.z,yaw:ayaw};
     const kb=R.kickBearingDeg*DEG,kick={x:S.x+Math.sin(kb)*R.kickM,z:S.z+Math.cos(kb)*R.kickM};kick.yaw=Face(kick,S);
-    return {anchor,interpreter:R.interpreter,interpreterGrab:R.interpreterGrab,ijaA,ijaBGuard:R.ijaBGuard,ijaBWatch:R.ijaBWatch,kick,pull};
+    return {anchor,interpreter:R.interpreter,ijaA,ijaBGuard:R.ijaBGuard,ijaBWatch:R.ijaBWatch,kick,pull};
   }
   /** ijaB on a mark in the leg: walks there, then holds his rifle levelled at Shunzi (pendingWiring SB05: IjaGuardPort). */
   GuardHold(actor,mark,{face=null}={}){
@@ -1366,9 +1373,10 @@ export class FirstLevelBunkerShow {
     return r.time-f.rescueGoAt;
   }
   /**
-   * SB04A (contract §2.7, §5), from 0.6 s after the blow: ijaA drags Shunzi by the forearm from shunzi.butt into the
-   * SSW leg's north mouth (shunzi.dragged), backing ahead of him (DragAway); the interpreter and ijaB come running
-   * back up the SSW leg; then 「几双军靴围过来」: the circle closes on its 02 marks while the eye is down at the boots.
+   * SB04A (contract §2.7, §5), from 0.6 s after the blow: ijaA drags Shunzi by the forearm from shunzi.butt through the
+   * SSW leg's north mouth and down it to the circle (shunzi.dragged), backing ahead of him (DragAway); the interpreter
+   * and ijaB come back up the leg from the south; then 「几双军靴围过来」: the circle closes on its 02 marks while the eye
+   * is down at the boots.
    */
   PhaseBoots(age){
     const r=this.r,m=this.CircleMarks(),D=C.ija.dragAway,I=C.interrogation,drag=this.DragAway(age),ijaA=this.Ija("ijaA");
@@ -1376,7 +1384,7 @@ export class FirstLevelBunkerShow {
     let a=false;
     if(!drag.done){
       // The root is solved every frame (it only moves where the route bends, and turns in the swing): placed, not walked.
-      this.Move(ijaA,drag.root,drag.yaw,"IjaDragByForearm",50,{seconds:age});
+      this.Move(ijaA,drag.root,drag.yaw,"IjaDragByForearm",50,{seconds:drag.seconds});
       if(ijaA){ijaA.yaw=drag.yaw;ijaA.actor.root.rotation.y=drag.yaw;ijaA.openingStoryboardYaw=drag.yaw;}
     }else{
       if(this.flags.dragDone==null){
@@ -1388,14 +1396,14 @@ export class FirstLevelBunkerShow {
       // PhaseHold plays the collar hold on from its first frame.
       this.Put(ijaA,m.ijaA);this.Pose(ijaA,"IjaHoldCollarUp",{seconds:0});a=true;
     }
-    // They come running back up the SSW leg from where they waited (the interpreter's arm out: pendingWiring SB04A); the
-    // interpreter goes on round the spoil to the circle's east side (InterpreterReturn).
+    // They come running back up the SSW leg from where they waited (the interpreter's arm out: pendingWiring SB04A),
+    // straight to their marks south of the circle (InterpreterReturn keeps the interpreter east of ijaA's line).
     const Hurry=(actor,mark,clip)=>{
       if(!actor)return true;
       if(age<I.hurryAfterS)return false;
       if(actor.openingWalk?.key==="hurry"&&actor.openingWalk.done)return this.Hold(actor,mark,null,{speed:C.speed.walk});
       if(actor===this.cast.interpreter)return this.InterpreterReturn(clip);
-      if(this.Follow(actor,"hurry",[I.backOffRoute.at(-1),mark],I.hurryMps,clip,mark.yaw,{upperBody:!!clip}))actor.openingWalk.done=true;
+      if(this.Follow(actor,"hurry",[mark],I.hurryMps,clip,mark.yaw,{upperBody:!!clip}))actor.openingWalk.done=true;
       return false;
     };
     if(age<I.hurryAfterS)this.RearParty(this.RearGo());
@@ -1404,18 +1412,15 @@ export class FirstLevelBunkerShow {
     if(closed&&(a&&b&&i||age>C.timeouts.bootsS))this.Stage("Hold");
   }
   /**
-   * The interpreter's way back to the circle (rescue.interpreterReturn): up the SSW leg, round the bend south of the spoil
-   * and in from the east along the strip, running from interpreterRunFrom on. True once he is on his squat mark. The circle
-   * phases keep him on it if Boots ran out first: a straight line from the leg would cut through ijaA and the lens.
+   * The interpreter's way back to the circle (rescue.interpreterReturn): up the SSW leg from where he waited to his squat
+   * east of ijaA's line. True once he is on his squat mark. The circle phases keep him on the route if Boots ran out first.
    */
   InterpreterReturn(clip="InterpreterPoint"){
     const actor=this.cast.interpreter,R=C.rescue,mark=this.CircleMarks().interpreter;
     if(!actor)return true;
     const walk=actor.openingWalk;
     if(walk?.key==="hurry"&&walk.done)return this.Hold(actor,mark,null,{speed:C.speed.walk});
-    const route=[C.interrogation.backOffRoute.at(-1),...R.interpreterReturn,mark];
-    const running=walk?.key==="hurry"&&walk.index>R.interpreterRunFrom+1;
-    if(this.Follow(actor,"hurry",route,running?C.speed.run:C.interrogation.hurryMps,clip,mark.yaw,{upperBody:!!clip,cornerM:.03}))actor.openingWalk.done=true;
+    if(this.Follow(actor,"hurry",[...R.interpreterReturn,mark],C.interrogation.hurryMps,clip,mark.yaw,{upperBody:!!clip,cornerM:.1}))actor.openingWalk.done=true;
     return false;
   }
   /** On the squat mark for the questioning (InterpreterCrouchAsk), finishing the way round first. */
@@ -1540,8 +1545,11 @@ export class FirstLevelBunkerShow {
     const r=this.r,m=this.CircleMarks(),ijaA=this.Ija("ijaA"),ijaB=this.Ija("ijaB"),interp=this.cast.interpreter;
     this.RescueCircle(age);
     this.Put(ijaA,m.ijaA);this.Pose(ijaA,"IjaHoldCollarUp",{seconds:r.time-this.flags.holdAt});
-    this.Put(interp,m.interpreterGrab);this.Pose(interp,"InterpreterGrabCollar",{seconds:age});
-    this.GuardHold(ijaB,m.ijaBWatch,{face:C.shunzi.dragged});
+    // 「说话！」 from his squat, leaning in (rescue.interpreter: the collar grab is not played).
+    this.InterpreterSquat();
+    // ijaB turns (at turnRps) to his watch yaw, toward the east bank and away from Luo coming up behind his left: Chop
+    // puts him on it, and snapped there from facing Shunzi (88 deg) his pelvis jumped 0.16 m in one frame.
+    this.GuardHold(ijaB,m.ijaBWatch);
     this.Rescuers(r.time-this.flags.holdAt,{luoFast:age>1,heFast:age>1});
     const chop=this.ChopMarks(m),luo=this.Squad("luo");
     if(luo&&Distance(luo.position,chop.luo)<.15&&Math.abs(Wrap(luo.yaw-chop.luo.yaw))<.2)this.Stage("Chop");
@@ -1576,7 +1584,7 @@ export class FirstLevelBunkerShow {
     if(!this.phaseEntered){this.phaseEntered=true;this.flags.luoChopAt=r.time;this.PlayClip(luo,"LuoDadaoChopRear",{restart:true});this.PlayClip(ijaB,"IjaChoppedFallWall",{restart:true});}
     this.RescueCircle(age);
     this.Put(ijaA,m.ijaA);this.Pose(ijaA,"IjaHoldCollarUp",{seconds:r.time-this.flags.holdAt});
-    this.Put(interp,m.interpreterGrab);this.Pose(interp,"InterpreterGrabCollar",{seconds:r.time-this.at+2});
+    this.InterpreterSquat();
     const chop=this.ChopMarks(m);
     this.Settle(luo,chop.luo);this.Pose(luo,"LuoDadaoChopRear",{seconds:age});
     this.Put(ijaB,m.ijaBWatch);
@@ -1611,7 +1619,7 @@ export class FirstLevelBunkerShow {
     this.Corpse(this.Comrade,"CaptiveWallSlideTwitch");
     this.Put(ijaB,m.ijaBWatch);this.Corpse(ijaB,"IjaChoppedFallWall");
     this.Settle(luo,chop.luo);this.Pose(luo,"LuoDadaoChopRear",{seconds:r.time-this.flags.luoChopAt});
-    this.Put(interp,m.interpreterGrab);this.Pose(interp,"InterpreterGrabCollar",{seconds:2.9});
+    this.InterpreterSquat();
     this.LiuWalk();
     // The interpreter bolts once ijaA is turned on by He (heChopAt is forced by heArriveS).
     if(this.flags.heChopAt!=null&&r.time-this.flags.heChopAt>=.4)this.Stage("Flee");
@@ -1638,8 +1646,11 @@ export class FirstLevelBunkerShow {
     // He: finish the cut, go over the crater step to the trench edge right of the hand-back seat (SB06), plant the
     // dadao and take up his rifle.
     if(!this.flags.heSwapAt){
-      if(t<ClipLength("HeDadaoParryChop",1.5)){this.Pose(he,"HeDadaoParryChop",{seconds:t});return;}
-      const R=C.rescue;
+      const R=C.rescue,cut=ClipLength("HeDadaoParryChop",1.5);
+      if(t<cut){this.Pose(he,"HeDadaoParryChop",{seconds:t});return;}
+      // The fleeing interpreter takes the same crater step: He stands over his man until the interpreter is well
+      // ahead (09-27 circle move: they went up the step side by side, pelvises 0.16 m apart).
+      if(t<cut+R.heGiveWayMaxS&&!this.InterpreterPastStep()){this.Pose(he,"HeDadaoParryChop",{seconds:cut});return;}
       if(this.Follow(he,"heCover",[...R.heCoverRoute,R.heCover],C.speed.brisk,null,R.heCover.yaw)||t>9)this.flags.heSwapAt=r.time;
       return;
     }
@@ -1675,7 +1686,7 @@ export class FirstLevelBunkerShow {
     const r=this.r,interp=this.cast.interpreter,luo=this.Squad("luo"),m=this.CircleMarks();
     // 「他转身往前沟逃去」 (contract §2.8): turned to fleeYawDeg, InterpreterFlee carries him ENE along the strip between
     // the mouth rubble and the spoil, out of the left of the picture; the camera follows his back (fleeFollowS).
-    const root={...m.interpreterGrab,yaw:C.ija.interpreterFleeYawDeg*DEG};
+    const root={...m.interpreter,yaw:C.ija.interpreterFleeYawDeg*DEG};
     if(!this.phaseEntered){this.phaseEntered=true;this.Scene("RescueFlee",r.voice?.PlayScene("RescueFlee",{speakers:this.Speakers()}));this.PlayClip(interp,"InterpreterFlee",{restart:true});}
     this.Aftercut();this.LiuWalk();
     // The clip's 1.3 m first; then the native run (UpdateFleeing) while the camera follows him down the trench.
@@ -1684,6 +1695,13 @@ export class FirstLevelBunkerShow {
     else this.UpdateFleeing();
     this.Put(luo,this.ChopMarks(m).luo);this.Pose(luo,"LuoDadaoChopRear",{seconds:r.time-this.flags.luoChopAt});
     if(age>=C.rescue.fleeFollowS||age>C.timeouts.fleeS){this.flags.fleeAt??=r.time;this.Stage("DragCover");}
+  }
+  /** Whether the fleeing interpreter is clear of the crater step He takes to cover (or gone). */
+  InterpreterPastStep(){
+    const interp=this.cast.interpreter,flee=C.ija.interpreterFlee,R=C.rescue;
+    if(!interp||this.flags.interpreterGone)return true;
+    if(this.flags.fleeAt==null)return false;
+    return RouteProject(flee,interp.position)>=RouteProject(flee,R.heCoverRoute[1])+R.heGiveWayM;
   }
   /** The interpreter runs down the front trench and into the depth sap; removed out of sight. */
   UpdateFleeing(){

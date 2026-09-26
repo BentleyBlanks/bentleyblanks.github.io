@@ -46,15 +46,15 @@ export const SPACE_KEYFRAMES = Object.freeze([
       { name: "trench floor outside the mouth", at: SP.bunkerBend, heights: [0.6], need: 1 },
       { name: "a runner coming down the trench (J)", at: SP.bunkerJunction, heights: [1.5, 1.2], need: 2 },
     ] },
-  // 2026-09-25 storyboard round (contract §2.6, SB05): 02's circle closes in the SSW leg's north mouth
-  // (Data_OpeningStoryboards.shunzi.dragged); held up by the collar he looks south past ijaA's shoulder down the straight
-  // leg to Luo creeping up its west wall and He behind him. The eye sits in BunkerSouthRevetment until its east end is
-  // opened (pendingWiring SB04A/SB05): the rows ignore it through Data_OpeningStoryboards.wave1Allowances.revetment.
+  // 2026-09-25 storyboard round (contract §2.6, SB05): held up by the collar Shunzi looks down the straight SSW leg past
+  // ijaA's shoulder to Luo creeping up its west wall and He behind him. 2026-09-27: the circle closes 2.3 m down the leg
+  // past BunkerMouthSpoil (Data_OpeningStoryboards.shunzi.dragged; it used to close in the leg's north mouth, inside
+  // BunkerSouthRevetment and against the spoil). WAVE1_IGNORE stays for the revetment behind the eye.
   { id: "K2", label: "02 past ijaA's shoulder down the SSW leg to the leader (SB05)", state: "BunkerCollapsed",
-    camera: { x: 0.6, z: -123.9, eyeM: 0.75 }, look: { x: -3.1, z: -116.9, h: 1.0 },
+    camera: { x: -0.3, z: -121.5, eyeM: 0.75 }, look: { x: -3.1, z: -116.9, h: 1.0 },
     targets: [
       { name: "Luo creeping up the SSW leg's west wall", at: { x: -3.1, z: -116.9 }, heights: Crouch, need: 2, ignore: WAVE1_IGNORE },
-      { name: "ijaB standing guard in the leg", at: { x: 0.04, z: -119.94 }, heights: Stand, need: 2, ignore: WAVE1_IGNORE },
+      { name: "ijaB standing guard in the leg", at: { x: -1.8, z: -118.1 }, heights: Stand, need: 2, ignore: WAVE1_IGNORE },
     ] },
   // 02 hand-back seat (contract §2.9, SB06: Data_OpeningStoryboards.shunzi.cover) east of the mouth rubble: J is in view
   // (its man is down by then, Liu's shot) and so is F -- a known exposure, recorded here as a need row: from the seat F is

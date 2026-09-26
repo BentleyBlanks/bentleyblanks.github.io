@@ -100,7 +100,8 @@ const NRA_FIRE = Object.freeze({ BunkerBackdropNra0: ["junction", "fold"], Bunke
 // 02 分镜 SB05（契约 docs/Data_FirstLevelStoryboard0103Contract.md §5）：顺子从南南西沟北口往南看整条直沟，罗班长、
 // 何有田贴西壁从折角 RC 摸来；名册里站在 RC 口的还击者（-5.6,-112）正好在这条视线的尽头，读成「一群人在交火」。
 // 他挪到折角西侧后交通壕里（x ≤ -8 在 RC 门框与沟壁背后，静态视线探针实测看不见），仍朝 J / F 还击。
-const NRA_POST = Object.freeze({ BunkerBackdropNra0: Object.freeze({ x: -8.4, z: -112.0 }) });
+// 2026-09-27 救援圈南移 2.3 m 后，从新眼位往沟里看得更远，-8.4 头高 1.7 m 露出来，挪到 -9.2。
+const NRA_POST = Object.freeze({ BunkerBackdropNra0: Object.freeze({ x: -9.2, z: -112.1 }) });
 
 export const BACKDROP_SQUADS = Object.freeze({
   encounter: "bunkerBackdrop",

@@ -499,8 +499,18 @@ assert.deepEqual([...C.phases.RearTrench],["Withdraw","Corner","Collection","Sup
   assert.ok(D(seat,Place.bunker.player)<1&&seat.x<trap.x-1.5,"SB01 seat at the back of the dugout, near the dugout anchor");
   for(const id of ["BunkerBeamPinWest","BunkerBeamPinEast","BunkerRoofSag"]){const b=Block(id);
     assert.ok(Math.abs(trap.x-b.x)>b.w/2+.3||Math.abs(trap.z-b.z)>b.d/2+.3,`the in-dugout collapse ${id} no longer pins him`);}
-  // Contract §2.6: 02's circle closes in the SSW leg's north mouth (the Space's shunziDragged is K2's old eye point).
-  assert.ok(D(C.shunzi.dragged,{x:.6,z:-123.9})<.61,"ijaA drags him into the SSW leg's north mouth (contract §2.6)");
+  // Contract §2.6 had 02's circle close in the SSW leg's north mouth (0.6,-123.9). 2026-09-27 review (「左边那么大一石头
+  // 一样的东西穿模了……审问的地方改改」): the floor there is x 0.2-0.6 beside BunkerMouthSpoil and ijaA stood half inside it,
+  // so the circle closes down the leg past the spoil's south face, the spoil behind the eye (circleShot yaw).
+  {
+    const spoil=Block("BunkerMouthSpoil"),S=C.shunzi.dragged,yaw=C.rescue.circleShot.yawDeg*Math.PI/180;
+    assert.ok(S.z>spoil.z+spoil.d/2+.25&&S.z<spoil.z+spoil.d/2+1,"ijaA drags him down the SSW leg to just past the spoil's south face");
+    const fwd={x:-Math.sin(yaw),z:-Math.cos(yaw)};
+    for(const [cx,cz] of [[-1,-1],[-1,1],[1,-1],[1,1]]){
+      const c={x:spoil.x+cx*spoil.w/2,z:spoil.z+cz*spoil.d/2};
+      assert.ok((c.x-S.x)*fwd.x+(c.z-S.z)*fwd.z<0,`SB05: the spoil is behind the eye (corner ${c.x},${c.z})`);
+    }
+  }
   // SB04 / SB04A (contract §2.5, §2.7): the butt spot east of the mouth rubble; the forearm drag (IjaDragByForearm) from it
   // west along the strip between the mouth rubble and the spoil into the SSW mouth -- Shunzi on dragAway.route, ijaA the
   // clip's hold distance (holdM) from him toward dragAway.face at the same fraction -- keeps clear of the mouth's collapse
@@ -602,10 +612,10 @@ assert.deepEqual([...C.phases.RearTrench],["Withdraw","Corner","Collection","Sup
     const Stage=(stage,role,anchor)=>{const a=manifest.stages[stage].actors[role],d=Rot(anchor.yaw,a.x,a.z);return {x:anchor.x+d.x,z:anchor.z+d.z};};
     const heParry=Stage("chopParry","heyoutian",ijaA),luoChop=Stage("chopRear","luo",R.ijaBWatch);
     for(const [name,p,m] of [["ijaA's hold",ijaA,.05],["He's parry mark",heParry,.2],["Luo's chop mark",luoChop,.3],["ijaB's guard",R.ijaBGuard,.3],
-      ["ijaB's watch",R.ijaBWatch,.3],["the interpreter",R.interpreter,.02],["the interpreter's lunge root",R.interpreterGrab,.02],["He's wait",R.heWait,.3],["Liu's trench-edge post",R.liuCover,.3],
+      ["ijaB's watch",R.ijaBWatch,.3],["the interpreter",R.interpreter,.02],["He's wait",R.heWait,.3],["Liu's trench-edge post",R.liuCover,.3],
       ["He's trench-edge post",R.heCover,.3],["Luo's check kneel",R.luoCheck,.3],["the hand-back seat",C.shunzi.cover,.3],["Luo's kick spot",R.kickFrom,.2]])
       assert.ok(Clear(p,m),`02: ${name} (${p.x.toFixed(2)},${p.z.toFixed(2)}) stands clear of the mouth's collapse blocks`);
-    assert.ok(ijaA.z>S.z+.3&&Math.abs(ijaA.x-S.x)<.3,"SB05: ijaA holds him from the leg side (south), in the floor strip");
+    assert.ok(ijaA.z>S.z+.3&&Math.abs(ijaA.x-S.x)<.35,"SB05: ijaA holds him from down the leg (south)");
     // The kicked rifle slides out of the mouth past his right side (clear of the rubble, his seat and his legs east of it).
     const slide=[R.rifleMouth,R.rifleKickVia,R.rifleKicked],seat=C.shunzi.cover;
     for(let i=1;i<slide.length;i++)for(let k=0;k<=20;k++){
@@ -615,7 +625,8 @@ assert.deepEqual([...C.phases.RearTrench],["Withdraw","Corner","Collection","Sup
       assert.ok(Math.hypot(p.x-(seat.x+.9*legs),p.z-seat.z)>.3,`the kicked rifle's slide passes his body and legs at (${p.x.toFixed(2)},${p.z.toFixed(2)})`);
     }
     // SB05/SB06 cameras and the hand-back view (contract §5, §2.9).
-    assert.ok(Math.abs(R.circleShot.yawDeg-184)<=8&&R.circleShot.pitchDeg>=-5&&R.circleShot.pitchDeg<=10,"SB05: south down the leg, about level");
+    // 2026-09-27 circle move: from the new circle the leg runs away south-south-west (yaw 174 = 6 deg west of south).
+    assert.ok(Math.abs(R.circleShot.yawDeg-174)<=8&&R.circleShot.pitchDeg>=-5&&R.circleShot.pitchDeg<=10,"SB05: down the leg, about level");
     assert.ok(Math.abs(C.shunzi.cover.yaw/Deg+94)<1&&R.checkShot.kickPitchDeg>=-15&&R.checkShot.kickPitchDeg<=5,"SB06: east down the trench; the hand-back view is not at the ground");
     // The rescuers wait out of SB05's picture (the static sight probe from the circle's eye; the revetment it sits in is
     // pendingWiring SB05) and so does the RC backdrop man.
@@ -711,12 +722,13 @@ console.log(`ok opening storyboards: five original rigs, ${clipCount} rig clips 
   }
   assert.ok(C.timeouts.wakeS>=C.blackoutRecovery.fadeS&&C.blackoutRecovery.fadeS>=5,"wake cannot cut off the slow full-screen fade");
   assert.ok(Math.hypot(C.interrogation.interpreterAt.x-C.interrogation.ijaBAt.x,C.interrogation.interpreterAt.z-C.interrogation.ijaBAt.z)>1.2,"interrogation roots do not overlap");
-  const marks=show.CircleMarks(),returnPath=[C.interrogation.backOffRoute.at(-1),...C.rescue.interpreterReturn,marks.interpreter];
-  // Existing contact marks touch the revetment with the full walking capsule; the detour keeps the root out of solids.
+  // 02 circle (2026-09-27 reviews 「审问的时候穿模错位」, 「左边那么大一石头一样的东西穿模了」): the interpreter comes up the
+  // leg from where he waited to his squat without crossing the grip (Shunzi's head -> ijaA's root) or passing the eye,
+  // squats behind ijaA's right shoulder well off the lens, and nobody in the circle stands in the spoil (its skin's
+  // west-face stakes stand out 0.17 m; a body is ~0.25 m).
+  const marks=show.CircleMarks(),returnPath=[C.interrogation.backOff.interpreter,...C.rescue.interpreterReturn,marks.interpreter];
   const returnClear=RouteClearance(returnPath,{state:"BunkerCollapsed",radius:0});
   assert.deepEqual(returnClear.hits,[]);assert.deepEqual(returnClear.slopes,[]);
-  // 2026-09-27 review: the old way in went between ijaA and Shunzi, 0.36 m in front of the eye and through the collar arm.
-  // It now keeps off the eye and never crosses the grip (Shunzi's head -> ijaA's root), squat and lunge marks included.
   // ijaA's root as the director solves it with the clip's own head track (CircleMarks falls back to a stand-in track
   // when the animation library is not loaded, as here).
   const holdTrack=JSON.parse(Read("./Animation/OpeningStoryboards/Animation_TengxianIja02OpeningStoryboards.json")).clips.IjaHoldCollarUp.player.parts.head;
@@ -728,15 +740,25 @@ console.log(`ok opening storyboards: five original rigs, ${clipCount} rig clips 
   const SegSeg=(a,b,c,d)=>{let best=Infinity;for(let k=0;k<=40;k++){const p={x:a.x+(b.x-a.x)*k/40,z:a.z+(b.z-a.z)*k/40};best=Math.min(best,Near(p,c,d));}return best;};
   for(let i=1;i<returnPath.length;i++){
     const a=returnPath[i-1],b=returnPath[i];
-    assert.ok(Near(marks.ijaA,a,b)>C.rescue.interpreterClearanceM+.03,"return route passes around the collar-holder with the corner margin");
+    assert.ok(Near(marks.ijaA,a,b)>C.rescue.interpreterClearanceM+.03,"return route passes the collar-holder with the corner margin");
     assert.ok(Near(eye,a,b)>=.6,`return route keeps off the circle's eye (${a.x},${a.z})-(${b.x},${b.z})`);
     assert.ok(SegSeg(a,b,eye,marks.ijaA)>=.4,`return route does not cross between ijaA and Shunzi (${a.x},${a.z})-(${b.x},${b.z})`);
   }
-  assert.ok(C.rescue.interpreterRunFrom>=0&&C.rescue.interpreterRunFrom<C.rescue.interpreterReturn.length,"the run starts on a return waypoint");
-  for(const [name,p] of [["squat",marks.interpreter],["lunge",marks.interpreterGrab]]){
-    assert.ok(Math.hypot(p.x-eye.x,p.z-eye.z)>=.75,`the interpreter's ${name} root keeps 0.75 m off Shunzi (${p.x},${p.z})`);
-    assert.ok(Math.hypot(p.x-marks.ijaA.x,p.z-marks.ijaA.z)>=.6,`the interpreter's ${name} root keeps 0.6 m off the collar-holder's`);
-    assert.ok(p.x>eye.x+.4,`the interpreter's ${name} root is on the spoil side (east, the picture's left edge), clear of the grip`);
+  // He stays on the squat through 「说话！」 (no second hand on the collar) and bolts from there.
+  const squat=marks.interpreter;
+  assert.ok(Math.hypot(squat.x-eye.x,squat.z-eye.z)>=1.2&&squat.x>marks.ijaA.x+.2,"the interpreter squats behind ijaA's right shoulder (the left third), 1.2 m or more off the eye");
+  assert.ok(Math.hypot(squat.x-marks.ijaA.x,squat.z-marks.ijaA.z)>=.6,"the interpreter's squat keeps 0.6 m off the collar-holder's root");
+  {
+    const {MISSION_LAYOUT:Layout}=await import("./Data_FirstLevelMissionLayout.mjs");
+    const spoil=Layout.scenario.states.find(state=>state.id==="BunkerCollapsed").blocks.find(b=>b.id==="BunkerMouthSpoil");
+    const Gap=p=>Math.hypot(Math.max(0,Math.abs(p.x-spoil.x)-spoil.w/2),Math.max(0,Math.abs(p.z-spoil.z)-spoil.d/2));
+    for(const [name,p] of [["ijaA",marks.ijaA],["the interpreter",squat],["ijaB's guard",C.rescue.ijaBGuard],
+      ["ijaB's watch",C.rescue.ijaBWatch],["ijaB's kick",marks.kick]])
+      assert.ok(Gap(p)>=.45,`${name} (${p.x.toFixed(2)},${p.z.toFixed(2)}) stands 0.45 m clear of BunkerMouthSpoil (${Gap(p).toFixed(2)})`);
+    // Luo hauls him to cover over the crater step, never along the spoil's faces (the neck pinned the eye against it).
+    const haul=[C.shunzi.dragged,...C.rescue.dragCoverRoute];
+    for(let i=1;i<haul.length;i++)for(let k=0;k<=10;k++){const a=haul[i-1],b=haul[i],p={x:a.x+(b.x-a.x)*k/10,z:a.z+(b.z-a.z)*k/10};
+      assert.ok(Gap(p)>=.45,`the haul to cover keeps 0.45 m off BunkerMouthSpoil at (${p.x.toFixed(2)},${p.z.toFixed(2)})`);}
   }
   console.log("ok interpreter swept clearance, passing route and sustained blackout recovery");
 }

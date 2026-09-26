@@ -171,10 +171,12 @@ export const PROPS = Object.freeze([
   // 平的深褐方块（审查 09-25）。北面与西面（对着 SB05 镜头的两面）贴一层起伏的土皮（外鼓 ≤ 0.05 m），西面（SB05 画面左缘
   // 那条沟壁）再钉护壁木桩与两道横板（外伸 0.17 m），顶上压一层土：读成带护壁的沟壁。只是外观，贴着体块。
   // 北面不钉桩：日兵甲、翻译 SB05 站位本来就贴着它的北面，拖进遮挡的替代折线离北面 0.38 m。
+  // 2026-09-27 救援圈挪到它南边的沟里后，南面与东面也入画（罗班长拖顺子翻过弹坑台阶时就在左手边），同样贴土皮，
+  // 不再露出平的方块面。
   { id: "spoilEarthSkin", kind: "earthSkin", show: "collapsed", block: "BunkerMouthSpoil",
     box: Object.freeze({ x: 1.5, z: -122.6, w: 1.4, d: 1.4, h: 1.4 }), bulgeM: 0.05, seed: 31,
     faces: Object.freeze({
-      north: Object.freeze({}),
+      north: Object.freeze({}), south: Object.freeze({}), east: Object.freeze({}),
       west: Object.freeze({ stakes: Object.freeze({ everyM: 0.45, aboveM: 0.12, w: 0.08 }), planks: Object.freeze([0.55, 1.05]) }),
     }) },
   // 还权坐位 (2.40,-125.20) 西侧的靠背（只是外观，不进碰撞：进了会挡住拖进遮挡与撤出的路线）。
