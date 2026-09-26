@@ -19,6 +19,7 @@
 //
 //   0) TAA 抖动             Script_PostTaa.ApplyJitter
 //   1) atmosphere           Script_Atmosphere      天空视图 + 大气透视两张 LUT
+//   1b) terrainBlend        Script_TerrainBlend    soil albedo/roughness + normal/depth for stone contacts
 //   2) prepass              Script_PostPrepass     MRT：RT0 法线+视深 / RT1 速度 / DepthTexture
 //   3) hzb                  Script_PostPrepass     线性视深 max-reduce 金字塔
 //   4) ssr                  Script_PostSsr         min-Hi-Z + 随机 GGX 追踪 + 解算 + 时域
@@ -74,6 +75,7 @@ import {
   PrepassPass, MarkNoPrepass, MarkForegroundPrepass, MarkDynamicPrepass, FOREGROUND_VIEW_DEPTH,
   InvalidatePrepassSkip,
 } from "./Script_PostPrepass.mjs";
+import { TerrainBlendPass } from './Script_TerrainBlend.mjs';
 import { GtaoPass } from "./Script_PostGtao.mjs";
 import { SsrPass, SsrColorPass } from "./Script_PostSsr.mjs";
 import { VolumetricsPass } from "./Script_PostVolumetrics.mjs";
@@ -210,6 +212,7 @@ export class PostPipeline {
     this.profiler = null;
 
     // --- pass 实例 ---------------------------------------------------------
+    this.terrainBlendPass = new TerrainBlendPass(this);
     this.prepassPass = new PrepassPass(this, { destruction });
     this.ssrPass = new SsrPass(this);
     this.ssrColorPass = new SsrColorPass(this, this.ssrPass);
@@ -244,6 +247,7 @@ export class PostPipeline {
     // --- 有序帧图 ---------------------------------------------------------
     this.passes = [
       this.atmospherePass,
+      this.terrainBlendPass,
       this.prepassPass,
       {
         name: "hzb",

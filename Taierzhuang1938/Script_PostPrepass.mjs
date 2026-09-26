@@ -62,6 +62,8 @@
 import * as THREE from "three";
 import { BindDestructionUniforms, DestructionShaderGlsl } from "./Script_Destruction.mjs";
 import { MakeFullscreenMaterial, MakeRenderTarget, GLSL_COMMON } from "./Script_PostCommon.mjs";
+import { TerrainBlendUniforms, TERRAIN_BLEND_GLSL } from './Script_TerrainBlend.mjs';
+import { TRENCH_SURFACE } from './Data_TrenchSurface.mjs';
 import { HZB, VELOCITY } from "./Data_Tuning_Graphics.mjs";
 
 /**
@@ -163,6 +165,10 @@ export function MarkForegroundPrepass(root) {
 // ---------------------------------------------------------------------------
 function MakeNormalDepthMaterial(destruction = null, { velocity = false } = {}) {
   const uniforms = {
+    uTerrainBlendValid: { value: 0 },
+    uTerrainBlendNormalDepth: TerrainBlendUniforms.uTerrainBlendNormalDepth,
+    uTerrainBlendSize: TerrainBlendUniforms.uTerrainBlendSize,
+    uTerrainBlendWidth: { value: TRENCH_SURFACE.contact.blendWidthM },
     uFar: { value: 500 },
     uForegroundDepth: { value: 0 },
     uCutoutMap: { value: null },
@@ -228,6 +234,7 @@ function MakeNormalDepthMaterial(destruction = null, { velocity = false } = {}) 
       #include <morphtarget_pars_vertex>
       varying vec3 vViewNormal;
       varying float vViewDepth;
+      varying vec3 vContactViewPosition;
       uniform mat3 uCutoutTransform;
       varying vec2 vCutoutUv;
       ${velocity ? `uniform mat4 uViewProjection;
@@ -268,6 +275,7 @@ function MakeNormalDepthMaterial(destruction = null, { velocity = false } = {}) 
         #include <skinning_vertex>
         #include <project_vertex>
         vViewDepth = -mvPosition.z;
+        vContactViewPosition=-mvPosition.xyz;
         ${velocityVertex}
         ${destruction ? `
         vec4 damageWorld = vec4(transformed, 1.0);
@@ -282,6 +290,7 @@ function MakeNormalDepthMaterial(destruction = null, { velocity = false } = {}) 
     `,
     fragmentShader: /* glsl */`
       precision highp float;
+      ${TERRAIN_BLEND_GLSL}
       uniform float uFar;
       uniform float uForegroundDepth;
       uniform sampler2D uCutoutMap;
@@ -290,6 +299,7 @@ function MakeNormalDepthMaterial(destruction = null, { velocity = false } = {}) 
       varying vec2 vCutoutUv;
       varying vec3 vViewNormal;
       varying float vViewDepth;
+      varying vec3 vContactViewPosition;
       ${velocity ? `uniform float uVelocityValid;
       uniform float uVelocityClamp;
       varying vec4 vCurClip;
@@ -303,6 +313,10 @@ ${DestructionShaderGlsl(destruction.maxVolumes)}` : ""}
         ${destruction ? "ApplyDamageVolumes(vDamageWorldPos);" : ""}
         vec3 n = normalize(vViewNormal);
         if (!gl_FrontFacing) n = -n;
+        if(uTerrainBlendValid>.5 && uForegroundDepth<=0.0){
+          vec4 soil=texture(uTerrainBlendNormalDepth,gl_FragCoord.xy/uTerrainBlendSize);
+          n=normalize(mix(n,soil.xyz,TerrainBlendMask(soil,vContactViewPosition)));
+        }
         // 前景件（第一人称手/枪）写常数近景深度，不写自己的真实视深：
         // 见 MarkForegroundPrepass 的抬头。法线仍然是真的。
         float depth = uForegroundDepth > 0.0 ? uForegroundDepth : vViewDepth;
@@ -399,6 +413,8 @@ export class PrepassPass {
       const source=Array.isArray(object.material)?object.material[group?.materialIndex||0]:object.material;
       const cutout=source?.alphaTest>0 && source.map && geometry.attributes.uv;
       const uniforms=this.material.uniforms;
+      const blend=source?.userData.terrainBlendReceiver?TerrainBlendUniforms.uTerrainBlendValid.value:0;
+      if(uniforms.uTerrainBlendValid.value!==blend){uniforms.uTerrainBlendValid.value=blend;this.material.uniformsNeedUpdate=true;}
       const threshold=cutout?source.alphaTest:0,opacity=cutout?source.opacity:1,map=cutout?source.map:null;
       if(uniforms.uCutoutTest.value!==threshold || uniforms.uCutoutOpacity.value!==opacity || uniforms.uCutoutMap.value!==map) {
         uniforms.uCutoutTest.value=threshold;uniforms.uCutoutOpacity.value=opacity;uniforms.uCutoutMap.value=map;

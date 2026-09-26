@@ -293,7 +293,7 @@ server.close();
 //   · motionBlur / dof —— B6b TAAU 轮：两者在 taa **之后**（要解算干净的画面，
 //     且 TAAU 之后才是输出分辨率）、bloom **之前**（散景亮斑与拖影仍要参与泛光），
 //     并且在 ssilHistory / ssrColor **之后**（那两张喂下一帧，不能存糊过的画面）。
-const EXPECTED_ORDER = ["atmosphere", "prepass", "hzb", "ssr", "gtao", "contactShadows", "main", "wireframe", "debugOverlay",
+const EXPECTED_ORDER = ["atmosphere", "terrainBlend", "prepass", "hzb", "ssr", "gtao", "contactShadows", "main", "wireframe", "debugOverlay",
   "volumetricInject", "volumetricIntegrate", "volumetricApply",
   "taa", "exposure", "ssilHistory", "ssrColor", "motionBlur", "dof",
   "godPrepare", "bloom", "god", "lensFlare", "composite", "fxaa"];

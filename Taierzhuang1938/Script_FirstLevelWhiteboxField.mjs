@@ -188,6 +188,7 @@ export class FirstLevelWhiteboxField {
           this.materials.set("TrenchStone", CreateTerrainMaterial(this.library, this.terrainLayers,
             { quality: this.quality, name: "TrenchStone", surface: MakeTrenchSurfacePatch(this.terrainLayers,
               this.quality, this.trenchSurface, this.terrainContact, { stone: true }) }));
+          this.materials.get("TrenchStone").userData.terrainBlendReceiver=true;
           this.materials.set("TrenchDryGrass", CloneShadedMaterial(this.library.Plain("TrenchDryGrass",
             { color: TRENCH_SURFACE.grass.color, roughness: TRENCH_SURFACE.grass.roughness, side: THREE.DoubleSide })));
           const grassMaterial=this.materials.get("TrenchDryGrass");
@@ -199,6 +200,7 @@ export class FirstLevelWhiteboxField {
         this.materials.set(semantic, CreateTerrainMaterial(this.library, this.terrainLayers,
           { quality: this.quality, name: "FirstLevelMissionTerrainLayers", reflections: trench,
             surface: trench ? MakeTrenchSurfacePatch(this.terrainLayers, this.quality, this.trenchSurface, this.terrainContact) : null }));
+        if(trench)this.materials.get(semantic).userData.terrainBlendSource=true;
         const scratch = [0, 0, 0];
         this.SampleGroundSurface = this.layout.SampleGroundSurface;
         this.SampleGroundColor = (x, z, out) => this.layout.SampleGroundSurface(x, z, out, scratch);

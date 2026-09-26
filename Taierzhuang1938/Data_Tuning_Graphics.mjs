@@ -96,6 +96,7 @@
  *   motionBlur    合成 pass 里的相机运动模糊
  *   sharpen       末趟锐化强度（FXAA/TAA 之后补回边缘）
  *   taa           时域抗锯齿的**出厂默认**（运行时可经 SetTaaEnabled 热切）
+ *   terrainBlend  Soil-only material MRT before prepass; opaque stone contact channels, all tiers.
  *   velocity      预通道 MRT 的 RT1 屏幕空间速度靶
  *   hzb           预通道之后建线性视深 max-reduce mip 链（HZB）
  *   ssr           屏幕空间反射（Hi-Z 追踪 + 随机 GGX + 解算 + 时域累积）
@@ -174,7 +175,7 @@ export const QUALITY_PRESETS = {
     ssao: false, gtao: "low", ssil: false,
     bloomLevels: 4, godrays: false, msaa: 0, motionBlur: false,
     aoScale: 0.5, sharpen: 0.14, taa: false,
-    velocity: true, hzb: true, atmosphere: true,
+    velocity: true, hzb: true, atmosphere: true, terrainBlend: true,
     // TAA 关着就没有 TAAU，末趟做一次双线性放大。0.85 是 docs §17.5「自动降档」
     // 那一段为低配档写死的那个数（「集显同时把 setPixelRatio(1) 并允许 0.85×
     // 内部分辨率 + FXAA 拉回来」）。2026-09-08 分档定稿把它从 1.0 落到 0.85：
@@ -208,7 +209,7 @@ export const QUALITY_PRESETS = {
     ssao: true, gtao: "medium", ssil: false,
     bloomLevels: 5, godrays: true, msaa: 0, motionBlur: true,
     aoScale: 0.5, sharpen: 0.18, taa: true,
-    velocity: true, hzb: true, atmosphere: true,
+    velocity: true, hzb: true, atmosphere: true, terrainBlend: true,
     // medium：半分辨率 32 步，**不做空间解算**（只有中心那一条随机射线），
     // 噪声全交给时域累积压。静止画面收敛得和 high 一样干净，动起来会脏一点。
     ssr: true, ssrScale: 0.5, ssrSteps: 32, ssrResolveTaps: 0,
@@ -234,7 +235,7 @@ export const QUALITY_PRESETS = {
     ssao: true, gtao: "high", ssil: true,
     bloomLevels: 6, godrays: true, msaa: 0, motionBlur: true,
     aoScale: 0.5, sharpen: 0.22, taa: true,
-    velocity: true, hzb: true, atmosphere: true,
+    velocity: true, hzb: true, atmosphere: true, terrainBlend: true,
     // high：半分辨率 48 步 + 4 抽样 ratio estimator + 时域。这一档是性能红线所在
     //（3394×1348 实测 hiz+trace+resolve+temporal 合计见 docs §4.8）。
     ssr: true, ssrScale: 0.5, ssrSteps: 48, ssrResolveTaps: 4,
@@ -254,7 +255,7 @@ export const QUALITY_PRESETS = {
     ssao: true, gtao: "ultra", ssil: true,
     bloomLevels: 6, godrays: true, msaa: 4, motionBlur: true,
     aoScale: 1.0, sharpen: 0.22, taa: true,
-    velocity: true, hzb: true, atmosphere: true,
+    velocity: true, hzb: true, atmosphere: true, terrainBlend: true,
     // ultra：全分辨率追踪（不再有半分辨率上采样的边缘渗色）+ 64 步 + 8 抽样解算。
     ssr: true, ssrScale: 1.0, ssrSteps: 64, ssrResolveTaps: 8,
     volumetrics: true,

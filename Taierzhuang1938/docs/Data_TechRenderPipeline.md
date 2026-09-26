@@ -93,6 +93,7 @@ function generateShadowMapTypeDefine( parameters ) {
 |---|---|---|
 | `Script_Post.mjs` | **编排器**。持有有序 pass 列表、具名靶、运行时状态（TAA 开关/历史、调试视图、着色模式）。所有旧的公共 API 都还在这里。 | `PostPipeline`、`MarkNoPrepass`、`MarkForegroundPrepass`、`MarkDynamicPrepass`、`InjectDepthPull`、`FOREGROUND_VIEW_DEPTH`、`SHADING_MODES`、`POST_QUALITY_KEYS` |
 | `Script_PostCommon.mjs` | 地基：全屏 blit、`GLSL_COMMON`、靶工厂、瞬时靶池、`FrameContext`、pass 契约文档 | `Blitter`、`RenderTargetPool`、`FrameContext`、`MakeRenderTarget`、`MakeFullscreenMaterial`、`QUAD_GEOMETRY/CAMERA`、`VERT_QUAD`、`GLSL_COMMON`、`GLSL_VIEW_POS` |
+| `Script_TerrainBlend.mjs` | 地形专用材质 G-buffer，石土交界（§1.4.1） | `TerrainBlendPass`、`TerrainBlendUniforms`、`TERRAIN_BLEND_GLSL` |
 | `Script_PostPrepass.mjs` | 深度法线预通道（MRT）+ 速度缓冲 + HZB + 蒙皮上一帧骨矩阵 | `PrepassPass`、`MarkNoPrepass`、`MarkForegroundPrepass`、`MarkDynamicPrepass`、`FOREGROUND_VIEW_DEPTH` |
 | `Script_PostGtao.mjs` | **GTAO**（地平线基 AO + 弯曲法线 + SSIL 位掩码）+ 时域累积 + 双边去噪。2026-09 整个替换了旧的 `Script_PostSsao.mjs`，口径见 §5 | `GtaoPass`、`MakeAoUniforms`、`SyncAoUniforms` |
 | `Data_Tuning_Gtao.mjs` | GTAO / SSIL 的数值表（纯数据，零 three 依赖） | `GTAO`、`SSIL`、`GTAO_TIERS`、`MakeGtaoTier` |
@@ -130,6 +131,7 @@ function generateShadowMapTypeDefine( parameters ) {
 ```
  0  （不是 pass）TaaPass.ApplyJitter —— Halton(2,3) 子像素抖动写进 projectionMatrix
  1  atmosphere            刷天空视图 LUT + 大气透视 froxel LUT（天穹与材质都要采）
+ 1b terrainBlend          地形线性 albedo/roughness + mapped normal/depth，供不透明碎石交界混合
  2  prepass               MRT：RT0 法线+线性视深 / RT1 屏幕空间速度 / DepthTexture
  3  hzb                   RT0.w 的 max-reduce 金字塔（SSR / 体积雾 / 接触阴影共用）
  4  ssr                   自建 min-Hi-Z + 随机 GGX 追踪 + 解算 + 时域（在 main 之前：材质要采它）
@@ -231,6 +233,16 @@ function generateShadowMapTypeDefine( parameters ) {
 三方是在 `renderer.render()` 里做这件事的，而现在整帧只在 Begin 读一次矩阵；不先更新
 的话 `invView` / `viewProjection` 会整体落后一帧，症状是速度缓冲恒为 0、雾按上一帧的
 相机位置算。回归口：`Script_PostFrameGraphTest` 的「相机右移时街面像素速度 x 为负」。
+
+### 1.4.1 地形专用材质缓冲（2026-09-26）
+
+`Script_TerrainBlend.mjs` 的 `TerrainBlendPass` 位于 `atmosphere → terrainBlend → prepass`，吃同一台已抖动相机。四档 `terrainBlend: true`；只有当前场景存在来源地形且支持浮点靶时运行，Resize 按内部尺寸，GPU profiler 自动登记同名段。
+
+使用两张全分辨率 RGBA16F、NoColorSpace、Nearest 靶：`terrainAlbedoRoughness`（线性 albedo RGB、roughness A），`terrainNormalDepth`（视空间映射法线 XYZ、线性视深 W）。来源材质标记 `userData.terrainBlendSource`，接收材质标记 `terrainBlendReceiver`。原始材质通过表面补丁注册捕获输出，因此弹坑的后续覆盖仍生效；无光场景代理只借用原几何/材质，不接管它们的生命周期或 draw 回调。普通标准材质保留 three 自动声明的 location 0，仅额外声明 location 1；显式 GLSL3 ShaderMaterial 仍须声明全部输出。
+
+`Prepare` 收可见来源，`Render` 同步世界矩阵/替换后的几何后填靶，捕获状态在 finally 复位；材质输入经共享 uniform 对象绑定，当前 pipeline 每帧发布自己的纹理，Idle 清 validity 和纹理引用。`ctx.terrainBlend` 提供本帧靶；无来源时释放代理引用。接收者在光照前混合 albedo、normal、roughness；prepass 使用同一个深度 mask，只改 normal，不改 depth/velocity。屏幕空间深度差换算法向距离，空像素和前方表面不参与。默认过渡宽度由 `Data_TrenchSurface.contact.blendWidthM` 管理。
+
+新增两个接收材质 sampler，GI 开启的石材最高 15，地形弹坑仍 16。门禁：TerrainBlendTest、PostFrameGraphTest、SamplerBudgetTest、MotionVectorContractTest、CarriagePropVelocityTest。POM 与素材说明见 [壕沟表面](Data_TrenchSurface.md)。
 
 ### 1.5 渲染靶命名与格式
 
