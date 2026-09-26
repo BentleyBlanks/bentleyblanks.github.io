@@ -77,9 +77,9 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
           for (let strand = 0; strand < Style.rootStrands; strand++) {
             const spread = (random() - 0.5) * 0.5;
             const length = Range(random, Style.rootLengthM);
-            const a = Point(crest + 0.08, spread, 0.006);
-            const b = Point(crest - length * 0.32, spread + (random() - 0.5) * 0.16, 0.018);
-            const c = Point(crest - length * 0.68, spread + (random() - 0.5) * 0.28, 0.01);
+            const a = Point(crest + 0.08, spread, 0.035);
+            const b = Point(crest - length * 0.4, spread + (random() - 0.5) * 0.16, 0.045);
+            const c = Point(crest - length * 0.85, spread + (random() - 0.5) * 0.28, 0.02);
             RootPiece(a, b, Style.rootRadiusM * (0.6 + random() * 0.6));
             RootPiece(b, c, Style.rootRadiusM * 0.48);
             stats.roots++;

@@ -121,7 +121,7 @@ try {
       const type = child.geometry.type;
       if (type === "BufferGeometry" && index && index.count > 60) { bandMeshes += 1; triangles += tris; }
       else if (type === "CylinderGeometry" || type === "SphereGeometry") markers += 1;
-      else if (type === "BoxGeometry") boxes += 1;
+      else if (type === "BoxGeometry" && child.userData.pointIndex == null) boxes += 1;
     }
     return {
       selected: tool.selectedKey === route.key,

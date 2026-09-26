@@ -37,3 +37,7 @@ python Taierzhuang1938/_import/Script_BakeTerrainLayers.py --source <本地源�
 ## 验收入口
 
 `Script_TrenchPlanTest`、`Script_TerrainLayersTest`、`Script_FirstLevelSpaceTest`、`Script_FirstLevelMissionFortificationsTest`（新增土块/细根存在、合批预算、有限坐标与弹坑裁除接线检查），以及 TestRunner 的 changed/prepush。截图必须来自运行中的第一关，使用 07 阶段检查交通沟，再检查前沿与近壁；调试跳转仅作外观证据，不宣称完整战役通关。
+
+实测：全网新增表面细节 120,948 三角、32 个分区合批网格；42 次胶囊双向实走，188/188 路径点到达。一次沟壁炮击使该点地面下陷 0.609 米，裁掉附近 4 个细节网格的相交部分；202 个 GPU 程序全部链接，最多 14 个采样器（设备上限 16），GL 错误为 0。翻土三图共 654,276 字节，边带对比度比 0.990、边带亮度摆幅 0.005。已查看 07 交通沟、近壁、前沿和炮击后的实际截图。
+
+预推送历史失败核对：`MachineGunCutsceneAudioTest` 在本轮与未修改 c668bbd8 页面均未能建立对照对白采样源；`FirstLevelMissionFortificationsTest` 在两版均于 `TransferWireSouth` 桩位射线先命中 `whiteboxWall` 而失败。后者此前的土层、包围盒、碰撞净空、42 次双向实走及新增表面细节断言已通过。未改动这两处原断言，也不把整项报告为全绿。
