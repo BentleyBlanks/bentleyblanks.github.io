@@ -560,8 +560,10 @@ export const OPENING_STORYBOARDS = Object.freeze({
   // the named replacement and removes it; the list must then be empty (Script_OpeningStoryboardsTest).
   pendingWiring:Object.freeze([
     // SB01 (Banter / Orders)
-    {shot:"SB01", what:"the runner leans on the north post and calls in to the room",
-      now:"MessengerReport at runnerRoute's end (PhaseOrders)", wave2:"RunnerLeanPostCall holdLoop with its post contact (Anim)"},
+    // 2026-09-26 user: the runner reports to Luo, not to Shunzi -- he faces Luo (PhaseOrders). RunnerLeanPostCall is
+    // baked facing into the room (yaw 80 deg = at the camera); wiring it needs a take aimed at Luo in the mouth.
+    {shot:"SB01", what:"the runner leans on the north post and calls to Luo",
+      now:"MessengerReport at runnerRoute's end facing Luo (PhaseOrders)", wave2:"RunnerLeanPostCall holdLoop with its post contact (Anim), re-aimed at Luo"},
     {shot:"SB01", what:"Luo kneels in the mouth looking out down the trench",
       now:"LuoKneelCheck held at banter.luoKneelS (its kneel loop; the reach arm shows) in Tableau/PhaseOrders", wave2:"a native kneel (KneelHold/RifleIdle, contract §4.1): needs an Anim-owned hook -- a director request that passes kneel:1 through Script_OpeningStoryboardAnimation's Move state (now forced to 0) and is exempt from ResolveOpeningActorPose's Banter/Orders Luo substitution"},
     {shot:"SB01", what:"north-wall crate stack, foreground crate, duckboards and revetment of the front trench",

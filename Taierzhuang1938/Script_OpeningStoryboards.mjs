@@ -619,9 +619,11 @@ export class FirstLevelBunkerShow {
     for(const role of ["ijaA","ijaB","ijaC","ijaD"])this.Hide(this.Ija(role));
     this.DepthWalkers();
     const post=b.runnerRoute.at(-1),seat=C.shunzi.seat;
-    const runnerIn=this.flags.exitAt==null&&this.Follow(runner,"orders",b.runnerRoute,C.speed.run,null,seat);
+    // BunkerOrders.01 is shouted at Luo (「班长！……」), not at the camera: the runner turns to Luo's back in the mouth,
+    // Luo glances down the front trench and turns round to the room with his own line.
+    const runnerIn=this.flags.exitAt==null&&this.Follow(runner,"orders",b.runnerRoute,C.speed.run,null,b.luo);
     if(this.flags.exitAt==null){
-      if(runnerIn||Distance(runner.position,post)<.4)this.Hold(runner,{...post,yaw:Face(post,seat)},"MessengerReport");
+      if(runnerIn||Distance(runner.position,post)<.4)this.Hold(runner,{...post,yaw:Face(post,b.luo)},"MessengerReport");
       if(!this.Started("BunkerOrders")&&(runnerIn||age>C.timeouts.runnerArriveS)){
         this.Scene("BunkerOrders",r.voice?.PlayScene("BunkerOrders",{speakers:this.Speakers(),onLine:(lineId)=>{if(lineId==="BunkerOrders.02")this.flags.luoTurnAt=r.time;}}));
       }
