@@ -400,7 +400,7 @@ export function IslandLines(framesInfo, weights, { activeRmsDb, silenceDb = 30, 
 
 /**
  * 在整段母带上定切点。lines[i] = { start, end, effortBefore, effortAfter }（母带时间轴，秒）。
- * 两句之间：先找静音段（比整段有声 RMS 低 silenceDb 以上、至少 20 ms）——句前有非台词人声（笑、喘）的
+ * 两句之间：先找静音段（比整段有声 RMS 低 silenceDb 以上、至少 80 ms；2026-09-27 前是 20 ms）——句前有非台词人声（笑、喘）的
  * 切在最早那段静音、句后有的切在最晚那段、否则切在最长那段的正中；找不到静音就切在能量最低那一帧（tight）。
  * 再把每句两头多余的静音剪掉，只留 padS。返回 [{ startS, endS, gapBeforeS, tightStart, tightEnd, edgeDb:[a,b] }]。
  */
@@ -417,7 +417,10 @@ export function SliceScene(framesInfo, lines, { activeRmsDb, silenceDb = 30, pad
       if (frames[f] >= quiet) continue;
       const from = f;
       while (f + 1 <= hi && frames[f + 1] < quiet) f++;
-      if (f - from + 1 >= 2) runs.push([from, f]);
+      // 至少 80 ms：切在静音段正中时两侧各留 ≥ 40 ms 静音，门禁看切点两侧 20 ms 才稳在静音里。两句之间只有
+      // 二三十毫秒的能量凹口（上一句的尾音直接接下一句句前的笑 / 喘，2026-09-27 CaptiveInterrogation.07→08）
+      // 不算静音，当贴着切（tight，在能量最低处、10 ms 淡入淡出）。
+      if ((f - from + 1) * hopS >= 0.08 - 1e-9) runs.push([from, f]);
     }
     let cut, tight = false;
     if (runs.length) {
@@ -442,9 +445,26 @@ export function SliceScene(framesInfo, lines, { activeRmsDb, silenceDb = 30, pad
       for (let f = F(t0); f <= F(t1); f++) peak = Math.max(peak, frames[f]);
       return +(Db(peak) - activeRmsDb).toFixed(1);
     };
-    return { startS: +s.toFixed(3), endS: +e.toFixed(3), tightStart, tightEnd,
-      edgeDb: [edge(s, s + 0.02), edge(e - 0.02, e)] };
+    return { startS: s, endS: e, tightStart, tightEnd, edge };
   });
+  // 切点离下一句的第一帧有声不到 padS 时（逐字时间戳把上一句的结尾标晚了，静音段只在开口前几十毫秒里找），
+  // 句首就只剩一二十毫秒静音、一开口就是喘气。把句首 / 句尾往外补到 padS，但只用上一片 / 下一片没用到的
+  // 那段静音，片段仍按句序互不重叠（2026-09-27 CaptiveInterrogation.07 句首只留了 20 ms）。
+  slices.forEach((sl, i) => {
+    if (i + 1 >= slices.length || sl.tightEnd) return;
+    let f = F(sl.endS) - 1; while (f > F(sl.startS) && !loud(f)) f--;
+    sl.endS = Math.max(sl.endS, Math.min((f + 1) * hopS + padS, slices[i + 1].startS));
+  });
+  slices.forEach((sl, i) => {
+    if (!i || sl.tightStart) return;
+    let f = F(sl.startS); while (f < F(sl.endS) && !loud(f)) f++;
+    sl.startS = Math.min(sl.startS, Math.max(f * hopS - padS, slices[i - 1].endS));
+  });
+  for (const sl of slices) {
+    const { startS: s, endS: e, edge } = sl;
+    Object.assign(sl, { startS: +s.toFixed(3), endS: +e.toFixed(3), edgeDb: [edge(s, s + 0.02), edge(e - 0.02, e)] });
+    delete sl.edge;
+  }
   slices.forEach((sl, i) => { sl.gapBeforeS = i ? +(sl.startS - slices[i - 1].endS).toFixed(3) : 0; });
   return slices;
 }

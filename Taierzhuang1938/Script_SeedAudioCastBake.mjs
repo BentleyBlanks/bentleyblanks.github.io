@@ -39,9 +39,10 @@ export function CastFile(who) {
 }
 export function CastPrompt(who) {
   const c = FIRST_LEVEL_VOICE_CAST[who];
+  // sampleDelivery 缺省时提示词与原来逐字相同（已选定的定妆音不受影响）。
+  const delivery = c.sampleDelivery || "按这个人物自己的性格自然地说话，情绪平稳、带一点性格色彩，不要喊叫也不要耳语，语速自然";
   return `${DRY_VOICE_RULE}角色：${c.persona}。${VOICE_LANG_RULE[c.lang]}`
-    + "这是用来固定角色嗓音的定妆录音：按这个人物自己的性格自然地说话，情绪平稳、带一点性格色彩，"
-    + "不要喊叫也不要耳语，语速自然，一口气念完，不念任何说明。台词：“" + c.sample + "”";
+    + "这是用来固定角色嗓音的定妆录音：" + delivery + "，一口气念完，不念任何说明。台词：“" + c.sample + "”";
 }
 const ReadManifest = () => fs.existsSync(manifestPath)
   ? JSON.parse(fs.readFileSync(manifestPath, "utf8")) : { model: SEED_AUDIO_MODEL, cast: {} };

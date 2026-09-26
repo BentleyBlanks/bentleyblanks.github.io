@@ -15,6 +15,9 @@ export const JAPANESE_SPEECH = Object.freeze({
   // —— 2026-09-23 新稿，18 句
   "BunkerSearch.01": J("まえへ！いそげ！", "前へ！急げ！"),
   "BunkerSearch.02": J("とまるな！", "止まるな！"),
+  // 2026-09-26 用户追加：日兵乙喊翻译过来，翻译在远处应声（不在 Notion 原稿里，另记在新稿文档的追加段）。
+  "InterpreterCall.01": J("つうやく！つうやくはどこだ！さっさとこい！", "通訳！通訳はどこだ！さっさと来い！"),
+  "InterpreterCall.02": J("はい！はい！ただいま！", "はい！はい！ただいま！"),
   "CaptiveDragged.02": J("たて！", "立て！"),
   "CaptiveDragged.04": J("みぎだ！うて！", "右だ！撃て！"),
   "CaptiveInterrogation.01": J("ぶたいは、どこへひいた！きけ！", "部隊はどこへ退いた！聞け！"),

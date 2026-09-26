@@ -1,6 +1,6 @@
 {
   "about": "片段的人工转写核对（VoiceSync §0.3）。放行「只超字错率、逐字核过只差同音/近音字或四川话口语读法」的片段；needsListening 标的是 whisper 转不出来、我们没法确认的句子，要人工试听。sha256 与转写原文必须等于清单里当前那一片，重录即失效。核对人读的是 whisper 转写与台词的逐字对照，不是听音频。",
-  "reviewedAt": "2026-09-24",
+  "reviewedAt": "2026-09-27",
   "lines": {
     "BunkerBanter.01": {
       "sha256": "b35277010a3be1ec861940f3e0922ee1abfbdc0966148e6585bbd659a2aa5995",
@@ -79,13 +79,6 @@
       "transcript": "ヘヘヘヘヘ、バカ野郎",
       "cer": 0.5,
       "note": "句前「ヘヘヘヘヘ」是导演表写的怪笑（effort），字错率计算已剔除；剩下バカ野郎＝ばかやろう，只是写法不同（2026-09-26 审问重录）。"
-    },
-    "RescueFlee.01": {
-      "sha256": "50875072defa420bf6d8a579f2216909233cb921e77f67a5a487914fce4f1436",
-      "transcript": "だべきだ",
-      "cer": 0.6667,
-      "note": "てきだ→だべきだ：多出句首的「だ」、て→べ；0.78 s 惊叫。可能是 whisper 对破音短喊的误听，需要人工试听确认。",
-      "needsListening": true
     },
     "CollectionMeet.03": {
       "sha256": "0a9467415b74f23e6b103bb6e842542667ad38c38f6839ce51dfc9b5511e8804",
@@ -238,12 +231,6 @@
       "cer": 1.3333,
       "note": "催命嗦→随你所谓（cui-ming-suo/sui-ni-suo-wei），近音，含着烟的嘟囔。"
     },
-    "CaptiveInterrogation.04": {
-      "sha256": "c0b746e0b31bc31cc8ba9b79d84e1f9dd8925b382f085c075285dba7bc1f19e6",
-      "transcript": "傻子",
-      "cer": 0.5,
-      "note": "稿面「啥子」被转写为「傻子」，四川话同音近音，字数一致（2026-09-26 审问重录）。"
-    },
     "CaptiveDragged.01": {
       "sha256": "27e99dd1ed6f804896f75d5ae93ef21e0f3d38e5ede2baf13bb8cd94198bfe08",
       "transcript": "狗子嘞!你妈嘞!",
@@ -257,11 +244,18 @@
       "note": "转写仍有不确定处，已保留当前原片供试听；不得据此宣称逐字听验通过。",
       "needsListening": true
     },
-    "RescueInterrogation.02": {
-      "sha256": "da662912a1a3bd72da52f7d40dace5a40ce311cd97419a50404b532eb4e5a962",
-      "transcript": "はい!はい!",
-      "cer": 1,
-      "note": "翻译被日兵的疯劲吓到，连应了两声「はい」（稿里一声），多出的是同一个字；片段不到 1.2 秒不判念错，字幕仍是「是！」（2026-09-26 审问重录）。"
+    "CaptiveInterrogation.01": {
+      "sha256": "7050528105773083aeb304e323ece607c1078d1062189629a40cc56e90dd3e6b",
+      "transcript": "へへへへへ、舞台は、どこへ引いた?引け!",
+      "cer": 0.3636,
+      "note": "2026-09-27 合并重录（日兵癫狂腔 + 翻译汉奸腔）：句前的「へへへへへ」是导演表写的怪笑；部隊→舞台、退いた→引いた 同音异写，聞け→引け k/h 近音；字数差 1，语序一致。"
+    },
+    "CaptiveInterrogation.02": {
+      "sha256": "5053deebd26b7d3ad1f459abd3087984f4ac4240b5a921769f54e8af0609c9f4",
+      "transcript": "は、はい",
+      "cer": 0.5,
+      "note": "2026-09-27 合并重录：「はい！」念成「は、はい」——导演表写的又怕又巴结，吓得打了个磕巴；不是念错别的词。0.8 s 短句，建议试听确认口吃听起来像谄媚而不是卡顿。",
+      "needsListening": true
     }
   }
 }
