@@ -3987,6 +3987,8 @@ export class AudioEngine {
       return;
     }
     this.BuildGraph();
+    // 耳鸣的嘶声层用它。懒建的话第一次耳鸣（01 近爆那一帧）要现算 4 s 白噪声，约 3 ms。
+    this.NoiseBuffer("white");
   }
 
   BuildGraph() {
@@ -5898,7 +5900,7 @@ export class AudioEngine {
     // 曲线：[时刻, Hz, 到这一点的方式]。起音期原样放过（触发这次耳鸣的那一声先完整过去），再关门。
     const v0 = Math.max(f.value, 200);
     const recoverAt = t + holdS + seconds;
-    const points = [[t, v0, "set"], [t + holdS, v0, "set"], [t + holdS + 0.05, lowHz, "exp"], [recoverAt, lowHz, "set"]];
+    const points = [[t, v0, "set"], [t + holdS, v0, "set"], [t + holdS + (P.closeS ?? 0.05), lowHz, "exp"], [recoverAt, lowHz, "set"]];
     for (const [dt, hz] of P.recover) if (dt > 0) points.push([recoverAt + dt, Math.max(hz, lowHz), "exp"]);
     this.deafCurve = { points };
     this.ScheduleDeafCurve(true);

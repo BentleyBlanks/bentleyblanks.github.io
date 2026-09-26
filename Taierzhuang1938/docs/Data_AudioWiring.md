@@ -782,6 +782,8 @@ swell 倍率读数：5 s 0.41/0.31、15 s 0.49/0.36、30 s 0.66/0.51、40 s 0.82
 stress ≥ 0.42 开始喘（`breathHeavy` 原速原调，0.26–0.5 随 stress），≥ 0.36 开始心跳（`heartbeat`
 单拍按 84–138 bpm 排、0.16–0.46），都带滞回。优先级：受伤喘息 > 冲刺喘息 > 压制喘息；
 血量低于濒死线时由 `Script_Player` 的濒死心跳接管，这里不叠第二条。
+过场自己替玩家喘气时（`player.storyBodyHold`，01 近爆后导演掌镜期间由 `Script_FirstLevelOpening` 置位）
+这一层清零、不喘不跳（2026-09-27：原来近爆的 `Suppress(0.9)` 让它和导演那条喘息叠着响了好几秒）。
 
 ### 6. 耳鸣（`Script_Audio.Deafen`，`TINNITUS`）
 
@@ -806,6 +808,16 @@ stress ≥ 0.42 开始喘（`breathHeavy` 原速原调，0.26–0.5 随 stress�
 - **对白保底**：总线低通在耳鸣恢复段里遇到剧情台词正在说（`storyVoice.storySpeakerSpeaking`）时不低于 4.2 kHz
   （`TINNITUS.speechFloorHz`，与 `SetConcussion` 的对白保底同一条线），台词一停从曲线当时该在的位置接着往回走
   （`RefreshDeafFloor`，挂在说话状态变化的三处）。原来剧情档会让 02 枪托之后约 5 s 的审问台词压在 2 kHz 以下。
+
+【2026-09-27 用户反馈「01 被炸只有耳鸣听不到爆炸声、喘气太久太吵」】
+- 病根是时序：`BunkerBlast` 在炮弹**出膛**那一刻调 `Deafen(1.1)`，起音期 0.13 s + 关门 0.05 s，总线在 0.18 s 已压到 380 Hz；
+  炮弹飞 0.22 s 才落地。`SetConcussion` 的闷耳曲线 0.3 s 也已满。实测总输出（接在软削顶后的分析器）：爆炸那 0.35 s
+  400–2500 Hz 只有 −40 dB，与 4 kHz 耳鸣同样响，低频 −23 dB —— 听感只剩耳鸣和一声闷响。
+- 改：剧情档起音期由调用方给（`OPENING.deafenHoldS` 0.75 s，从触发算，含 0.22 s 飞行）；剧情档关门 `TINNITUS.story.closeS`
+  0.4 s 滑下去（战斗档仍 0.05 s）；闷耳曲线 `OPENING.hearing` 改成 0.75 s 起、1.1 s 满（正好接黑场）。
+  同一取样改后：爆炸那段中频 −36 dB、耳鸣 −50 dB（压在爆炸下面 15 dB），耳鸣在落地约 0.45 s 后才起来。
+- 喘息：原来近爆与枪托后各连续喘约 19 s（`breathHeavy` 0.95，每 2.4 s 续一条），外加压制那层的喘息与心跳。
+  现在各喘 3 / 2 口（`OPENING.breath`：1.5 s 起、间隔 2.6 s、0.62 起每口递减到一半），压制那层让位（见第 5 节）。
 
 ### 7. 配乐让位与标点（`Data_FirstLevelMissionMusic.FIRST_LEVEL_MUSIC_COMBAT`）
 

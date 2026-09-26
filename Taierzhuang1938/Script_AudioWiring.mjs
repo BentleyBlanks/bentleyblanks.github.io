@@ -1151,7 +1151,8 @@ export class AudioWiring {
     const player = this.Player;
     const audio = this.Audio;
     const S = SUPPRESSION_BODY;
-    if (!this.SoundscapeOn) {
+    // storyBodyHold: a cutscene that breathes for the player itself (01 near miss, Script_FirstLevelOpening).
+    if (!this.SoundscapeOn || player?.storyBodyHold) {
       this.stress = 0; this.stressBreath = false; this.stressHeart = false; this.heartNextAt = 0;
       return;
     }

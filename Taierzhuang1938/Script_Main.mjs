@@ -4593,6 +4593,8 @@ async function WarmActorShaders(phase, onStep = null) {
  *      （名册人物布料、任务视图实例表、遗体三级表、战车、担架伤员都在这一趟）。
  * 结束后把手上装备还原成任务要求的状态（车厢里是空手）。
  */
+/** WarmLevel 的收尾真帧里为 true：RenderScene 给一点景深，把 DoF 的 program 编掉（见 deathDof）。 */
+let warmLevelDof = false;
 async function WarmLevel(phase) {
   const started = performance.now();
   const report = { pool: {}, viewmodel: 0, picks: 0, ms: 0, stepMs: {} };
@@ -4729,6 +4731,11 @@ async function WarmLevel(phase) {
       scene.getObjectByName("FirstLevelMissionWhitebox")?.traverse((object) => {
         if (!object.isMesh && !object.visible) { hiddenGroups.push(object); object.visible = true; }
       });
+      // 别的系统里「之后才露面」的组自己打 userData.warmDraw（例：01 洞口塌方后的布景
+      // OpeningSet0103_Collapsed，碎石材质 3 张贴图 2026-09-27 实测在近爆那一帧现传 25 ms）。
+      scene.traverse((object) => {
+        if (object.userData?.warmDraw && !object.visible) { hiddenGroups.push(object); object.visible = true; }
+      });
       // 第一人称身体（视模的 body）要到第一次 Update 才挂进场景、才可见：它的蒙皮材质是
       // 自己克隆的一份，program 没人替它编过 —— 实测按下开始后第一帧 3.5 s 就是它。
       const body = viewmodel?.body?.root || null;
@@ -4807,6 +4814,7 @@ async function WarmLevel(phase) {
       const settleStart = performance.now();
       const wasReady = state.ready;
       state.ready = true;
+      warmLevelDof = true;
       report.settleFrames = [];
       try {
         let quiet = 0;
@@ -4823,6 +4831,7 @@ async function WarmLevel(phase) {
         }
       } finally {
         state.ready = wasReady;
+        warmLevelDof = false;
       }
       if (smokeHandle != null) vfx.RemoveSmokeSource(smokeHandle);
       // 摘掉发射器**不等于**画面干净：上面那一发爆炸、枪口焰、曳光、弹着、血雾
@@ -8653,7 +8662,8 @@ function Frame(dt, render = true) {
     // 对照表在 Data_FirstLevelMissionGates.MISSION_SCENARIO_SIGNALS，运行时用 Signalled 查。
     signalled: (name) => !!missionRuntime?.Signalled(name) || story.Signalled(name),
   });
-  if (openedScenarioGates > 0) navGrid?.Refresh(battlefield);
+  // 连通分量摊到后面几帧（Script_Navigation.Refresh 的 spread）：01 洞口塌方就在近爆那一帧换态。
+  if (openedScenarioGates > 0) navGrid?.Refresh(battlefield, { spread: true });
   profiler.E("story/scenario");
   profiler.E("story");
 
@@ -9002,7 +9012,9 @@ function RenderScene(dt) {
   const health = player ? player.health : 100;
   // 阵亡画面先在 3D 合成链里做「前景清楚、背景重度散焦」，HUD 的半透明
   // mask 与生平卡随后由浏览器叠上去。景深等到触地前后再渐入，先看清倒地动作。
-  const deathDof = player && !player.Alive ? DeathDof(player) : 0;
+  // 关卡预热（WarmLevel 的真帧）里给一点景深：DoF 的四趟 program 平时只在阵亡 / 开镜 /
+  // 01 醒来那一刻才第一次出画，2026-09-27 实测 01 睁眼那帧现编 4 个 program 约 100 ms。
+  const deathDof = warmLevelDof ? 0.25 : player && !player.Alive ? DeathDof(player) : 0;
   // 跟相机自己的 ADS 过渡而不是枪模动画走：同一趟 150 ms 收放，拉栓/装填时
   // 又会被 adsSuppress 自然摘掉。没有铁瞄的刀/手雷不属于「开镜」，不触发。
   const adsNearDof = state.running && !state.menu && !state.cutscene && player?.Alive

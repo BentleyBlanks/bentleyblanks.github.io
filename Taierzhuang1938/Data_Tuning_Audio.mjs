@@ -548,6 +548,9 @@ export const TINNITUS = Object.freeze({
     noiseHz: 4600, noiseQ: 7, noiseLevel: 0.07,
     ringS: 9.5,
     lowHz: 380,
+    // 起音期过后低通落到 lowHz 用多久（战斗档是 0.05 s 一刀）。剧情近爆（2026-09-27）：
+    // 一刀下去那声爆炸的尾巴当场被掐成闷响，听感只剩耳鸣；0.4 s 滑下去，尾巴是「被震远」的。
+    closeS: 0.4,
     recover: Object.freeze([[0.0, 380], [1.6, 700], [3.8, 1800], [6.5, 6200], [9.0, 20000]]),
   }),
   // 07 以后与其它关卡（任务侧开关 audio.firstLevelSoundscape 关着）走通用近爆耳鸣 BLAST_HEARING

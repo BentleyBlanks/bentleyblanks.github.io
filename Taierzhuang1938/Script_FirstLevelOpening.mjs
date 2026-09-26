@@ -122,7 +122,8 @@ export class FirstLevelOpening {
     this.bunker.blastAt=r.time;
     this.blastAt=r.time;
     r.player.Suppress?.(.9);
-    r.audio.Deafen?.(1.1);
+    // The shell is still in flight: hold the story tinnitus open past the impact so the blast is heard first.
+    r.audio.Deafen?.(1.1,C.deafenHoldS);
     r.Record("bunkerCollapsed",{x:A.bunker.x,z:A.bunker.z});
     r.frontShow?.bunker.Blast();
   }
@@ -231,15 +232,18 @@ export class FirstLevelOpening {
       const hearing=Math.max(Curve(C.hearing,recoveryAge),r.frontShow?.bunker?.HearingAmount?.()||0);
       if(hearing!==this.hearingAmount)r.audio.SetConcussion?.(hearing,C.hearingLowHz);
       this.hearingAmount=hearing;
-      // Heavy breathing after the near miss, and again after the butt strike (「呼吸急促」).
-      const strikeAt=r.frontShow?.bunker?.strikeAt,anchor=strikeAt!=null&&strikeAt>this.blastAt?strikeAt:this.blastAt;
-      const b=C.breath,breathAge=r.time-anchor,breathRecovery=OpeningRecoveryTime(breathAge,C.hearing.find(([,value])=>value===1)[0]);
-      if(anchor!==this.breathAnchor){this.breathAnchor=anchor;this.nextBreathAt=null;}
-      if(breathAge>=b.start&&breathRecovery<b.end&&(this.nextBreathAt==null||breathAge>=this.nextBreathAt)){
-        this.breathVoice=r.audio.Play("breathHeavy",{volume:b.volume*(1-.45*Smooth((breathRecovery-b.start)/(b.end-b.start))),priority:true});
-        this.nextBreathAt=breathAge+b.interval;
+      // A few heavy breaths after the near miss, and again after the butt strike (「呼吸急促」), fading out.
+      const strikeAt=r.frontShow?.bunker?.strikeAt,struck=strikeAt!=null&&strikeAt>this.blastAt,anchor=struck?strikeAt:this.blastAt;
+      const b=C.breath,breathAge=r.time-anchor,count=struck?b.strikeCount:b.blastCount;
+      if(anchor!==this.breathAnchor){this.breathAnchor=anchor;this.breaths=0;}
+      if(this.breaths<count&&breathAge>=b.start+this.breaths*b.interval){
+        this.breathVoice=r.audio.Play("breathHeavy",{volume:b.volume*(1-b.fade*this.breaths/Math.max(1,count-1)),priority:true});
+        this.breaths++;
       }
     }
+    // While the opening director holds the camera it owns the player's breath: the suppression
+    // breath and heartbeat (Script_AudioWiring.SuppressionBody) would otherwise pile on for seconds.
+    if(r.player)r.player.storyBodyHold=this.blastAt!=null&&r.frontShow?.bunker?.CameraActive===true;
     if(OPENING_FAILURE_STAGES.includes(stage)&&!r.Has("gunOccupied")){
       const lost=r.squad.find(a=>!a.alive&&C.requiredSquadCast.includes(a.castId));
       if(lost){r.Record("openingSquadLost",{castId:lost.castId});r.OnPlayerDown();r.MissionFailure?.(lost.castId);return;}
@@ -258,6 +262,7 @@ export class FirstLevelOpening {
   Dispose(){
     this.eyeClosure=0;this.blackout=0;this.concussion=null;
     this.r.audio.SetConcussion?.(0);
+    if(this.r.player)this.r.player.storyBodyHold=false;
     if(this.breathVoice)this.r.audio.StopVoice?.(this.breathVoice,.15);
   }
   FireWindows(){

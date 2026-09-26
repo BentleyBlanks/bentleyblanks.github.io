@@ -517,7 +517,7 @@ export class FirstLevelBunkerShow {
     this.blastFrom=this.FollowPoint();
     this.Stage("Blast");
     r.voice?.Signal?.("Blast");
-    r.combat?.FireShell(r.Point(b.shellFrom,14),r.Point(b.shellAt),{flight:.22,damage:0,radius:4,incoming:false,feedbackOnly:true});
+    r.combat?.FireShell(r.Point(b.shellFrom,14),r.Point(b.shellAt),{flight:b.blastShot.fallStartS,damage:0,radius:4,incoming:false,feedbackOnly:true});
     r.audio?.Play?.("debrisFall",{position:r.Point(C.shunzi.trap,1),volume:.9});
     const shouter=this.cast.shouter;
     if(shouter?.alive)this.Kill(shouter,"explosion");

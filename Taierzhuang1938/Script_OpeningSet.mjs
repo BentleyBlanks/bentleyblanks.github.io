@@ -444,6 +444,8 @@ export class OpeningSet {
     this.root = new THREE.Group(); this.root.name = "OpeningSet0103";
     this.collapsedRoot = new THREE.Group(); this.collapsedRoot.name = "OpeningSet0103_Collapsed"; this.collapsedRoot.visible = false;
     this.rescueRoot = new THREE.Group(); this.rescueRoot.name = "OpeningSet0103_Rescue"; this.rescueRoot.visible = false;
+    // 塌方后才显示：关卡预热照样画它一帧（Script_Main.WarmLevel 认 warmDraw），贴图别留到近爆那一帧才传。
+    this.collapsedRoot.userData.warmDraw = true; this.rescueRoot.userData.warmDraw = true;
     this.root.add(this.collapsedRoot, this.rescueRoot);
     this.ownedMaterials = []; this.ownedTextures = []; this.lights = []; this.fireHandles = [];
     const sinks = { always: new BuildSink(), collapsed: new BuildSink(), rescue: new BuildSink() };

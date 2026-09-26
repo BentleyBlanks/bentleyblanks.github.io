@@ -34,6 +34,8 @@ const NEIGHBOURS = [
   [1, 0], [-1, 0], [0, 1], [0, -1],
   [1, 1], [1, -1], [-1, 1], [-1, -1],
 ];
+const NEIGHBOUR_X = Int8Array.from(NEIGHBOURS, (n) => n[0]);
+const NEIGHBOUR_Z = Int8Array.from(NEIGHBOURS, (n) => n[1]);
 
 export class NavGrid {
   /**
@@ -71,6 +73,11 @@ export class NavGrid {
     this.pending = null;          // 正在跨帧摊的那张场：{ key, dist, head, tail }
     this.distPool = [];           // 被 LRU 挤掉的 Int16Array 回收复用（一张 460 KB）
     this.queue = new Int32Array(this.width * this.height);
+    // Refresh({ spread: true }) 的连通分量每帧最多花这么多毫秒（见 _PumpComponents）。
+    this.componentBudgetMs = 2;
+    this.componentJob = null;
+    this.componentSpare = null;
+    this.componentQueue = null;
 
     this.Refresh(battlefield);
   }
@@ -82,7 +89,7 @@ export class NavGrid {
    * 字节，重刷一次比维护局部连通分量更便宜、更可靠。破坏层会把同一次爆炸的所有
    * 盒子先批完再只调一次这里，不会一块砖跑一遍 BFS。
    */
-  Refresh(battlefield) {
+  Refresh(battlefield, { spread = false } = {}) {
     if (!battlefield) return false;
     const margin = this.margin;
     const stepOver = this.stepOver;
@@ -116,7 +123,11 @@ export class NavGrid {
     // 半路上的那张场基于旧的 blocked 位图，作废；dist 池照留（网格尺寸没变）。
     this.pending = null;
     this.pumpSpentMs = 0;
-    this._BuildComponents();
+    // spread：连通分量摊到后面几帧（BeginFrame 按 componentBudgetMs 推），摊完之前 InMain /
+    // SnapToMain 读的还是上一版分量 —— 只差塌掉那几格，几帧之内没人走得到那儿。
+    // 场景换态（01 洞口塌方）用它：整张重算要 16–19 ms，正好压在近爆那一帧上。
+    if (spread && this.component?.length === this.blocked.length) this._BeginComponents();
+    else this._BuildComponents();
     this.revisions += 1;
     return true;
   }
@@ -134,40 +145,76 @@ export class NavGrid {
    * 这在玩法上也是对的 —— 围着清真寺打，本来就是这场仗的样子。
    */
   _BuildComponents() {
+    this._BeginComponents();
+    this._PumpComponents(Infinity);
+  }
+
+  /** 开一趟连通分量（写进另一张数组，算完才换上）。见 _PumpComponents。 */
+  _BeginComponents() {
     const n = this.blocked.length;
-    this.component = new Int32Array(n).fill(-1);
-    const queue = this.queue;
-    let next = 0, bestId = -1, bestSize = 0;
-    for (let start = 0; start < n; start += 1) {
-      if (this.blocked[start] || this.component[start] >= 0) continue;
-      const id = next++;
-      let head = 0, tail = 0, size = 0;
-      this.component[start] = id;
-      queue[tail++] = start;
-      while (head < tail) {
-        const cur = queue[head++];
-        size += 1;
-        const cx = cur % this.width, cz = (cur - cx) / this.width;
-        for (const [ox, oz] of NEIGHBOURS) {
-          const nx = cx + ox, nz = cz + oz;
-          if (nx < 0 || nz < 0 || nx >= this.width || nz >= this.height) continue;
-          const ni = nz * this.width + nx;
-          if (this.blocked[ni] || this.component[ni] >= 0) continue;
-          if (ox && oz && (this.blocked[cz * this.width + nx] || this.blocked[nz * this.width + cx])) continue;
-          this.component[ni] = id;
-          queue[tail++] = ni;
-        }
+    let component = this.componentSpare;
+    this.componentSpare = null;
+    if (!component || component.length !== n || component === this.component) component = new Int32Array(n);
+    component.fill(-1);
+    if (!this.componentQueue || this.componentQueue.length !== n) this.componentQueue = new Int32Array(n);
+    this.componentJob = { component, start: 0, next: 0, bestId: -1, bestSize: 0, id: -1, head: 0, tail: 0, size: 0 };
+  }
+
+  /**
+   * 推进连通分量，超过 budgetMs 就停（每 4096 次扩展看一次表），算完才把结果换上。
+   * 扫描顺序与分量编号和一次算完完全相同。队列自用一条（componentQueue）：
+   * 距离场的跨帧 BFS 占着 this.queue。热循环里不解构邻居表（冷调用下快约三成）。
+   * @returns {boolean} 算完了没有
+   */
+  _PumpComponents(budgetMs) {
+    const job = this.componentJob;
+    if (!job) return true;
+    const t0 = performance.now();
+    const { component } = job, blocked = this.blocked, queue = this.componentQueue;
+    const width = this.width, height = this.height, n = blocked.length;
+    let { start, next, bestId, bestSize, id, head, tail, size } = job;
+    let steps = 0;
+    for (;;) {
+      if (head >= tail) {
+        if (id >= 0 && size > bestSize) { bestSize = size; bestId = id; }
+        id = -1;
+        while (start < n && (blocked[start] || component[start] >= 0)) start += 1;
+        if (start >= n) break;
+        id = next++; head = 0; tail = 0; size = 0;
+        component[start] = id;
+        queue[tail++] = start;
       }
-      if (size > bestSize) { bestSize = size; bestId = id; }
+      const cur = queue[head++];
+      size += 1;
+      const cx = cur % width, cz = (cur - cx) / width;
+      for (let k = 0; k < 8; k += 1) {
+        const ox = NEIGHBOUR_X[k], oz = NEIGHBOUR_Z[k];
+        const nx = cx + ox, nz = cz + oz;
+        if (nx < 0 || nz < 0 || nx >= width || nz >= height) continue;
+        const ni = nz * width + nx;
+        if (blocked[ni] || component[ni] >= 0) continue;
+        if (ox && oz && (blocked[cz * width + nx] || blocked[nz * width + cx])) continue;
+        component[ni] = id;
+        queue[tail++] = ni;
+      }
+      if ((++steps & 4095) === 0 && performance.now() - t0 > budgetMs) {
+        Object.assign(job, { start, next, bestId, bestSize, id, head, tail, size });
+        return false;
+      }
     }
+    this.componentSpare = this.component || null;
+    this.component = component;
     this.mainComponent = bestId;
     this.mainSize = bestSize;
     this.componentCount = next;
+    this.componentJob = null;
+    return true;
   }
 
   /** 每帧开头调一次：重置毫秒预算，并把跨帧摊的那张场推进一步。AiDirector.Update 负责调。 */
   BeginFrame() {
     this.pumpSpentMs = 0;
+    if (this.componentJob) this._PumpComponents(this.componentBudgetMs);
     if (this.pending) this._Pump(false);
   }
 

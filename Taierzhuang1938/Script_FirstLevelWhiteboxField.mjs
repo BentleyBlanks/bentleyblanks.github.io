@@ -466,6 +466,7 @@ export class FirstLevelWhiteboxField {
     yield { label: T("p012.whitebox.build.blocks"), progress: 0.62 };
     this.BuildGates();
     this.SetScenarioState(this.layout.scenario?.states[0]);
+    this.BuildScenarioWarm();
     this.BuildLegend();
     this.BuildSupplyLabels();
     yield { label: T("p012.whitebox.build.collision"), progress: 0.88 };
@@ -522,19 +523,44 @@ export class FirstLevelWhiteboxField {
       this.covers = [...(this.covers || []).filter((cover) => !was.includes(cover)), ...sink.covers];
       this.scenarioCovers = sink.covers.slice();
     }
-    this.scenarioMeshes = sink.Flush(this.scene, { Get: key => {
-      if(key==="OpeningEarth")return this.library.Get("Adobe",{color:0x777064,repeat:2});
-      if(key==="OpeningWood")return this.library.Get("WoodBeam",{color:0x706351,repeat:2});
-      if(this.layout.legend===false&&state.id!=="NightGate"&&key==="timber")return this.library.Get("WoodBeam",{color:0x766957,repeat:2});
-      if(this.layout.legend===false&&state.id!=="NightGate"&&key==="earthDark")return this.library.Get("Adobe",{color:0x777064,repeat:2});
-      return this.materials.get(key) || this.whiteMaterial;
-    }});
+    this.scenarioMeshes = sink.Flush(this.scene, { Get: key => this.ScenarioMaterial(key, state.id) });
     for (const mesh of this.scenarioMeshes) { mesh.name = `FirstLevelWhitebox_Hub_${state.id}`; mesh.castShadow = true; mesh.receiveShadow = true; this.meshes.push(mesh); }
     this.scenarioColliders = sink.colliders;
     for (const collider of this.scenarioColliders) { this.colliders.push(collider); if (this.physics) this.physics.AddSolid(collider); }
     this.scenarioState = state.id;
     this.BuildCollisionGrid();
     return true;
+  }
+
+  ScenarioMaterial(key, stateId) {
+    if(key==="OpeningEarth")return this.library.Get("Adobe",{color:0x777064,repeat:2});
+    if(key==="OpeningWood")return this.library.Get("WoodBeam",{color:0x706351,repeat:2});
+    if(this.layout.legend===false&&stateId!=="NightGate"&&key==="timber")return this.library.Get("WoodBeam",{color:0x766957,repeat:2});
+    if(this.layout.legend===false&&stateId!=="NightGate"&&key==="earthDark")return this.library.Get("Adobe",{color:0x777064,repeat:2});
+    return this.materials.get(key) || this.whiteMaterial;
+  }
+
+  /**
+   * 后面几态（01 洞口塌方、关尾北门夜景）要用的材质先各挂一粒藏起来的小盒子。
+   * 这些材质（repeat 2 的土坯 / 木梁）克隆了自己的贴图，第一次出画才上传 GPU：
+   * 2026-09-27 实测 01 近爆那一帧 texSubImage2D 占 39 ms。藏着的网格由关卡预热
+   * （Script_Main.WarmLevel 的强制出画）画一帧，上传就留在加载画面后面了。
+   */
+  BuildScenarioWarm() {
+    const states = this.layout.scenario?.states;
+    if (!states || typeof document === "undefined") return;
+    const seen = new Set(this.scenarioMeshes.flatMap(mesh => Array.isArray(mesh.material) ? mesh.material : [mesh.material]));
+    const geometry = new THREE.BoxGeometry(0.01, 0.01, 0.01);
+    for (const state of states) for (const block of state.blocks) {
+      const material = this.ScenarioMaterial(block.semantic, state.id);
+      if (!material || seen.has(material)) continue;
+      seen.add(material);
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.name = `FirstLevelWhitebox_ScenarioWarm_${state.id}_${block.semantic}`;
+      mesh.visible = false;
+      mesh.position.set(block.x, block.y, block.z);
+      this.scene.add(mesh); this.meshes.push(mesh);
+    }
   }
 
   BuildSupplyLabels() {
