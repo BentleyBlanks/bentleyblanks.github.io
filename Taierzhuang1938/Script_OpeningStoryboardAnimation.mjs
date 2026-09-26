@@ -5,6 +5,7 @@ import { Quaternion, Matrix4, Vector3 } from "three";
 import { OpeningActorPerformance, ResolveOpeningActorPose, CorrectOpeningActorGrips, SettleOpeningCaptive } from "./Script_OpeningActorPerformance.mjs";
 import { ApplyOpeningRescueReady } from "./Script_OpeningFirstPerson.mjs";
 import { OpeningPropSet, ApplyOpeningWeaponTrack, BlendWeaponFrom, OpeningHoldTime } from "./Script_OpeningProps.mjs";
+import { EnsureRelaxedGait, RelaxedGaitShown, UpdateRelaxedGaitWeapon } from "./Script_RelaxedGait.mjs";
 export { SetOpeningActorPerformance, ClearOpeningActorPerformance } from "./Script_OpeningActorPerformance.mjs";
 let library, pending;
 // Reused straight from the machine-gun captives library (contract §5.4 reuse list plus the
@@ -12,6 +13,7 @@ let library, pending;
 const CAPTIVES_REUSED = ["IjaBayonetGuard","CaptiveStandToKneel","CaptiveHandsUpWalk","CaptiveKneelPlead",
   "IjaKickPrisoner","IjaShoveForward","IjaTauntGesture","CaptiveKneelFlinch","CaptiveShovedStumble"];
 const Quat = new Quaternion(), QuatRef = new Quaternion(), QuatAdd = new Quaternion();
+const SlungLocal = new Matrix4(), SlungScale = new Vector3();
 // A clip name the director asks for that this rig was not baked with plays the native animation instead --
 // said once per rig and name (console + window.__openingMissingClips), so a dead reference cannot hide
 // behind that fallback (contract Data_FirstLevelStoryboard0103Contract.md §3).
@@ -184,8 +186,14 @@ export function InstallOpeningStoryboardAnimation(soldier){
     // Front commands can occur while moving and firing. An explicit pointing
     // clip must not replace the weapon grip before head-only speech is applied.
     if(nativeCombat&&pose?.upperBody)pose=null;
+    // A relaxed gait (rifle slung, or no weapon: Script_RelaxedGait) walks at the director's real pace
+    // (its clips are authored in metres per second; the foot contacts lock on it) with no aim layer.
+    EnsureRelaxedGait(soldier);
+    const gait=!!soldier.relaxedGait;
+    soldier.relaxedGaitPaceMps=soldier.openingStoryboardTravel??undefined;
     if(soldier.openingStoryboardTravel!=null)state={...state,moveSpeed:soldier.openingStoryboardTravel/4.2,
-      crouch:0,prone:0,kneel:0,lifePose:null,idleLife:!pose,aim:soldier.openingStoryboardAim||(!pose&&actor.weaponId ? .18 : 0)};
+      ...(gait?{moveSpeedMps:soldier.openingStoryboardTravel}:{}),
+      crouch:0,prone:0,kneel:0,lifePose:null,idleLife:!pose,aim:soldier.openingStoryboardAim||(!pose&&actor.weaponId&&!gait ? .18 : 0)};
     if(pose?.clip==="DadaoAmbush")state={...state,meleeCombat:{weapon:"Dadao",state:"attack",action:"Heavy",clip:"DadaoHeavy",
       normalized:Math.min(1,pose.seconds/C.ambushS),t:pose.seconds,weight:1}};
     if(pose?.meleeGuard)state={...state,aim:0,meleeCombat:{weapon:"Dadao",state:"idle",action:"Guard",clip:"DadaoGuard",
@@ -201,6 +209,7 @@ export function InstallOpeningStoryboardAnimation(soldier){
     }
     if(rig.openingSlungRifle)rig.openingSlungRifle.visible=false;
     if(!pose&&soldier.openingStoryboardTravel==null&&!soldier.openingActorPerformance){
+      if(rig.relaxedGaitRifle)UpdateRelaxedGaitWeapon(soldier,false);
       if(lastKey==="InterrogateCrouch"&&actor.weaponGroup)actor.weaponGroup.visible=true;
       rig.openingProps?.HideAll();
       rig.openingStoryboardState=null;lastKey=null;displayed=null;blendFrom=null;return result;
@@ -319,9 +328,17 @@ export function InstallOpeningStoryboardAnimation(soldier){
       // slung-rifle rule.
       if(weaponDropped)actor.weaponGroup.visible=false;
       else if(!clipRow?.props?.weapon)actor.weaponGroup.visible=!slung;
+      // The relaxed gait carries its rifle on the back while it owns the body (walking, standing, or a
+      // clip on its arms: pose.nativeArms); a clip with a weapon track puts the hand weapon back.
+      UpdateRelaxedGaitWeapon(soldier,!weaponDropped&&soldier.relaxedGait==="slung"&&RelaxedGaitShown(soldier)&&(!pose||pose.nativeArms));
       shownWeapon.group=actor.weaponGroup;
       (shownWeapon.p ||= actor.weaponGroup.position.clone()).copy(actor.weaponGroup.position);
       (shownWeapon.q ||= actor.weaponGroup.quaternion.clone()).copy(actor.weaponGroup.quaternion);
+      // What was seen was the rifle on his back: a clip's weapon track eases in from there, not from the hidden hands.
+      if(rig.relaxedGaitRifle?.visible&&actor.weaponGroup.parent){
+        rig.relaxedGaitRifle.updateWorldMatrix(true,false);actor.weaponGroup.parent.updateWorldMatrix(true,false);
+        SlungLocal.copy(actor.weaponGroup.parent.matrixWorld).invert().multiply(rig.relaxedGaitRifle.matrixWorld).decompose(shownWeapon.p,shownWeapon.q,SlungScale);
+      }
       if(slung&&!rig.openingSlungRifle){
         const prop=rig.openingSlungRifle=actor.weaponGroup.clone();
         actor.root.add(prop);

@@ -22,6 +22,18 @@
 
 回归口：`Script_OpeningStoryboardsTest`（回返路线离眼 ≥ 0.6 米、不穿过顺子与日兵甲之间；蹲位与揪领根离顺子 ≥ 0.75 米、离日兵甲根 ≥ 0.6 米、在弃土一侧）、`Script_OpeningSetTest`（路线离弃土土皮 ≥ 胶囊半径）、`Script_OpeningStoryboardShots`（SB04A 加 `hands.r {pose:"gripSleeve", held:"ijaA"}`，SB05 加翻译 distM 0.68–1.1）、`Script_FirstLevelMissionBrowserTest --campaign --stage-to=3`（02 全程量翻译头离镜头 ≥ 0.38 米、离日兵甲根 ≥ 0.6 米）。
 
+## 背枪走、空手走与喊翻译（2026-09-26 第二轮）
+
+用户反馈：日军、翻译从远处走来走去都是端枪的步态；日军发现川军后要有喊翻译过来的喊话。
+
+- **步态**（资产与运行时见 [RelaxedGait](../Animation/RelaxedGait/Data_RelaxedGait.md)）：
+  - 日兵甲、乙：睁眼（Wake）后按 `walkInDelayS` 起步，背枪走下连接支沟（`speed.amble` 1.65 m/s，原来是 brisk 2.3 的端枪跑）；到位后放松站姿、枪仍在背上。之后的拖人、抓领、行刑动作片段本来就是 `slungBack` 武器轨，直接接上。日兵乙在 CaptiveWall 的 `IjaReadyRifle`（`slungBack → twoHand`）、日兵甲在 Wipe 的 `IjaReadyRifle` 起改回持枪，此后的搜索、催促、看押仍端枪；释放给 AI（`ReleaseCombat`）一律改回持枪。
+  - 纵深两名日兵（`OPENING_DEPTH_IJA`）：生成即背枪走；踹旗那一脚只用 `IjaKickPrisoner` 的下身（`pose.nativeArms`），两手垂着，枪留在背上。
+  - 翻译（`unarmed`，本来就没有枪）：空手走（退下南南西沟）、空手小跑（应声入场 `speed.trot` 2.4 m/s，原来 walk 1.5；Boots 催促 2.0 仍带 `InterpreterPoint` 上身；逃跑 3.4）、站着时放松站姿，不再空手做端枪动作。
+  - 前沿交火的丙、丁（VanguardFront）与背景交火组（BackdropSquads）是边跑边打，保持端枪。
+- **喊翻译**：FrontPass 里甲、乙任一人离自己拖人站位不足 `ija.interpreterCallM`（5 m，看见被埋的伤兵）时，日兵乙朝连接支沟那头喊 `InterpreterCall.01`（「翻译！翻译呢！快给我滚过来！」），翻译在二十米外应 `InterpreterCall.02` 并从这一句开口起小跑过来（没有语音时按估算的开口时刻）。拖人（CaptiveDragged）要等两人到位且喊话结束，最多等 `timeouts.interpreterCallS`；整段 FrontPass 的兜底相应顺延。喊话场景的录音与导演表见 [配音同步](Data_FirstLevelVoiceSync20260919.md)。
+- 实测（2026-09-26 定向探针，真实流程逐帧推进）：FrontPass 9.6 s（含喊话），甲乙入场全程 `RelaxedWalk`、手枪隐藏背枪显示，站定 `RelaxedStand`；翻译应声后 `BackRifleRun`（空手）2.4 m/s、退下 `RelaxedWalk` 1.5 m/s；拐角测速尖峰引起的一两帧走/跑闪换已由 `switchFrames` 防抖消除。
+
 ## 验证入口
 
 - `Script_OpeningStoryboardsTest.mjs`：原动作库、接触和空间契约，加翻译扫掠防穿透、绕行路线净空、站位间距与渐显时长。

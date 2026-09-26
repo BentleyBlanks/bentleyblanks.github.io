@@ -16,6 +16,7 @@ import { SampleOpeningPerception } from "./Script_FirstLevelOpening.mjs";
 import { BuildSink } from "./Script_World.mjs";
 import { InCameraView } from "./Script_FirstLevelBackdropSquads.mjs";
 import { OPENING_DEPTH_WALKERS, OPENING_DEPTH_IJA } from "./Data_FirstLevelBackdropSquads.mjs";
+import { LoadRelaxedGait, SetRelaxedGait } from "./Script_RelaxedGait.mjs";
 // ===========================================================================
 // 01–02 director (2026-09-23 draft, docs/Data_FirstLevelOpeningSource20260923.md).
 // Contract docs/Data_FirstLevel0105Refactor20260923Contract.md §5.3 phases, §5.4 clips,
@@ -117,6 +118,8 @@ export class FirstLevelBunkerShow {
     this.r=runtime;this.captives=[];this.rifleProps=[];this.beats=new Set();this.phase=null;this.at=0;this.cast={};this.ready=false;this.owned=[];
     this.scenes={};this.events=[];this.flags={};
     LoadOpeningStoryboardAnimation().then(()=>this.ready=true).catch(error=>this.error=String(error));
+    // The walk with the rifle slung / with no weapon (ijaA, ijaB, the depth Japanese, the interpreter).
+    LoadRelaxedGait().catch(error=>{this.gaitError=String(error);});
   }
   Begin(){this.at=this.r.time;this.started=this.r.time;}
   get Age(){return this.r.time-this.at;}
@@ -157,6 +160,8 @@ export class FirstLevelBunkerShow {
     this.Spawn("shouter","nra",b.shouter,SpeakingCastOptions("shouter"));
     // NRA06 wears the interpreter's own plain clothes (no uniform tint to override).
     this.Spawn("interpreter","ija",C.ija.interpreterEnter[0],{unarmed:true,actorKind:"nra",...SpeakingCastOptions("interpreter")});
+    // He carries no rifle: he walks and trots with his arms free, never in the rifle-at-the-ready gait.
+    SetRelaxedGait(this.cast.interpreter,"unarmed");
     for(const actor of r.squad){InstallOpeningStoryboardAnimation(actor);if(["luo","heyoutian"].includes(actor.castId))PinOpeningScale(actor);}
     this.AdoptAssault();
     this.playerBody=r.actorFactory.Create("nra",{weapon:null,modelVariant:1,seed:101});
@@ -389,7 +394,8 @@ export class FirstLevelBunkerShow {
     if(clip){
       const age=this.PlayClip(actor,clip,{holdUntil,additive});
       actor.openingStoryboardPose={clip,seconds:seconds??age,upperBody,holdUntil:actor.openingPlay.holdUntil,additive};
-    }else actor.openingStoryboardPose=travel>.1||!actor.actor.weaponId||actor.actor.weaponId==="Dadao"?null:{clip:"IjaBayonetGuard",seconds:this.r.time};
+    // A man in the relaxed gait stands at ease (RelaxedStand) instead of on guard.
+    }else actor.openingStoryboardPose=travel>.1||!actor.actor.weaponId||actor.actor.weaponId==="Dadao"||actor.relaxedGait?null:{clip:"IjaBayonetGuard",seconds:this.r.time};
     actor.openingStoryboardAim=aim;
     actor.actor.root.rotation.y=actor.yaw;actor.openingStoryboardYaw=actor.yaw;
     InstallOpeningStoryboardAnimation(actor);
@@ -832,6 +838,8 @@ export class FirstLevelBunkerShow {
     if(!this.phaseEntered){this.phaseEntered=true;this.flags.vanguardAt??=r.time;}
     this.ComradeDazed();
     this.VanguardFront(this.flags.vanguardAt);
+    // ijaA / ijaB set off walkInDelayS after the eyes open (they are far up the link sap, rifles slung).
+    this.WalkIn(0);
     if(age>=1.0&&!this.Started("BunkerSearch"))this.Scene("BunkerSearch",r.voice?.PlayScene("BunkerSearch",{speakers:this.Speakers()}));
     // 「手指在泥里抓出一道痕」: four short furrows where his right fingertips really dragged (the
     // first-person hand's claw keys); without the arm rig, in front of the eye as before.
@@ -855,21 +863,49 @@ export class FirstLevelBunkerShow {
     const root=C.banter.comradeBlast;
     return {ijaA:this.StageRoot("captiveDrag","ijaA",root),ijaB:this.StageRoot("captiveDrag","ijaB",root)};
   }
+  /**
+   * ijaA / ijaB walk down the link sap to the buried comrade, rifles slung on their backs (relaxed gait; a late man
+   * runs after walkInS of FrontPass). Returns how many stand on their marks.
+   */
+  WalkIn(age){
+    const r=this.r,marks=this.DragMarks();let ready=0;
+    for(const role of ["ijaA","ijaB"]){
+      const actor=this.Ija(role);if(!actor)continue;
+      if(r.time-this.flags.vanguardAt<C.ija.walkInDelayS[role]){this.Hide(actor);continue;}
+      SetRelaxedGait(actor,"slung");
+      const mark=marks[role];
+      if(this.Follow(actor,"walkIn",[...C.ija.walkIn,mark],age>C.timeouts.walkInS?C.speed.run:C.speed.amble,null,mark.yaw)){
+        if(this.Hold(actor,mark,null))ready++;
+      }
+    }
+    return ready;
+  }
+  /**
+   * 「翻译！快给我滚过来！」: when the first of them has the buried man in sight (interpreterCallM from his mark), ijaB
+   * shouts back up the sap; the interpreter answers from there (InterpreterCall.02) and trots in (InterpreterIn).
+   * True once the call has ended (or timed out, or there is no one to call).
+   */
+  InterpreterCall(){
+    const r=this.r,marks=this.DragMarks();
+    if(!this.Started("InterpreterCall")){
+      const near=["ijaA","ijaB"].some(role=>{const a=this.Ija(role);return a&&!a.openingStoryboardHidden&&Distance(a.openingStoryboardLast||a.position,marks[role])<C.ija.interpreterCallM;});
+      if(!near||!this.cast.interpreter)return !this.cast.interpreter;
+      this.flags.callAt=r.time;
+      this.Scene("InterpreterCall",r.voice?.PlayScene("InterpreterCall",{speakers:this.Speakers(),
+        onLine:(lineId)=>{if(lineId==="InterpreterCall.02")this.flags.interpGo??=r.time;}}));
+    }
+    // No voice (or its line never reported): he sets off when his answer would have started.
+    if(this.flags.interpGo==null&&r.time-this.flags.callAt>=this.LineStart("InterpreterCall","InterpreterCall.02"))this.flags.interpGo=r.time;
+    if(this.flags.interpGo!=null)this.InterpreterIn();
+    return this.SceneDone("InterpreterCall")||r.time-this.flags.callAt>C.timeouts.interpreterCallS;
+  }
   PhaseFrontPass(age){
     const r=this.r,marks=this.DragMarks();
     this.ComradeDazed();
     this.VanguardFront(this.flags.vanguardAt);
-    let ready=0;
-    for(const role of ["ijaA","ijaB"]){
-      const actor=this.Ija(role);if(!actor)continue;
-      if(r.time-this.flags.vanguardAt<C.ija.walkInDelayS[role]){this.Hide(actor);continue;}
-      const mark=marks[role];
-      if(this.Follow(actor,"walkIn",[...C.ija.walkIn,mark],age>C.timeouts.walkInS?C.speed.run:C.speed.brisk,null,mark.yaw)){
-        if(this.Hold(actor,mark,null))ready++;
-      }
-    }
-    if(ready===2)this.Stage("CaptiveDragged");
-    else if(age>C.timeouts.frontPassS){
+    const ready=this.WalkIn(age),called=this.InterpreterCall();
+    if(ready===2&&called)this.Stage("CaptiveDragged");
+    else if(age>C.timeouts.frontPassS+(this.flags.callAt!=null?C.timeouts.interpreterCallS:0)){
       // Late from the spawn queue (or held up): whoever is here stands on his mark, the drag goes on.
       for(const role of ["ijaA","ijaB"]){const actor=this.Ija(role);if(actor){this.Show(actor);this.Put(actor,marks[role]);}}
       this.flags.frontPassForced=r.time;this.Stage("CaptiveDragged");
@@ -880,7 +916,8 @@ export class FirstLevelBunkerShow {
     const interp=this.cast.interpreter;if(!interp)return true;
     if(this.flags.interpIn){this.Hold(interp,m.interpreter,"InterpreterCrouchAsk");return true;}
     this.Show(interp);
-    if(this.Follow(interp,"enter",[...C.ija.interpreterEnter,m.interpreter],C.speed.walk,null,m.interpreter.yaw)){this.flags.interpIn=true;}
+    // Called over (InterpreterCall), he comes at a trot, arms free (relaxed gait, no rifle).
+    if(this.Follow(interp,"enter",[...C.ija.interpreterEnter,m.interpreter],C.speed.trot,null,m.interpreter.yaw)){this.flags.interpIn=true;}
     return !!this.flags.interpIn;
   }
   PhaseCaptiveDragged(age){
@@ -941,7 +978,8 @@ export class FirstLevelBunkerShow {
       if(this.flags["retired:"+m.id])return;
       const start={...m.start,yaw:Face(m.start,m.route[0])};
       let actor=this.cast[m.id];
-      if(!actor){actor=this.Spawn(m.id,"ija",m.start,{weapon:"Type38"});this.Put(actor,start);}
+      // Going off after the killing, rifles slung (relaxed gait), not at the ready.
+      if(!actor){actor=this.Spawn(m.id,"ija",m.start,{weapon:"Type38"});this.Put(actor,start);SetRelaxedGait(actor,"slung");}
       if(m.flagKick&&!this.KickBackdropFlag(actor,m.flagKick))return;
       if(!m.flagKick&&this.r.time<at+D.afterWipeS+i*D.staggerS){this.Hold(actor,start,null);return;}
       if(!this.Follow(actor,"depth",m.route,D.speedMps,null))return;
@@ -960,7 +998,8 @@ export class FirstLevelBunkerShow {
       this.flags.flagFallProgress=Smooth((t-spec.contactS)/spec.fallS);
       this.r.openingSet?.PoseFlag(spec.id,this.flags.flagFallProgress);
     }
-    if(t<spec.clipS){this.Hold(actor,root,"IjaKickPrisoner",{seconds:t});return false;}
+    // The kick is the legs' (IjaKickPrisoner); his arms stay at his sides, the rifle stays on his back.
+    if(t<spec.clipS){this.Hold(actor,root,"IjaKickPrisoner",{seconds:t});if(actor.openingStoryboardPose)actor.openingStoryboardPose.nativeArms=true;return false;}
     return true;
   }
   RetireDepthIja(id=null){
@@ -979,7 +1018,9 @@ export class FirstLevelBunkerShow {
   }
   PhaseCaptiveWall(age){
     const r=this.r,comrade=this.Comrade,ijaA=this.Ija("ijaA"),ijaB=this.Ija("ijaB"),interp=this.cast.interpreter,m=this.InterrogationMarks();
-    if(!this.phaseEntered){this.phaseEntered=true;this.Put(comrade,m.wall);this.Put(ijaA,m.ijaA);this.PlayClip(comrade,"CaptiveWallBrace",{restart:true});this.PlayClip(ijaA,"IjaShoveToWall",{restart:true});}
+    if(!this.phaseEntered){this.phaseEntered=true;this.Put(comrade,m.wall);this.Put(ijaA,m.ijaA);this.PlayClip(comrade,"CaptiveWallBrace",{restart:true});this.PlayClip(ijaA,"IjaShoveToWall",{restart:true});
+      // ijaB takes the rifle off his back now (IjaReadyRifle: slungBack -> twoHand) and keeps it at the ready.
+      SetRelaxedGait(ijaB,null);}
     this.VanguardFront(this.flags.vanguardAt);
     if(age<2)this.Pose(comrade,"CaptiveWallBrace");else this.Pose(comrade,"CaptiveKneelMud");
     if(age<1)this.Pose(ijaA,"IjaShoveToWall");else this.Hold(ijaA,m.ijaAHold,"CollarControl");
@@ -1059,7 +1100,7 @@ export class FirstLevelBunkerShow {
     const wipe=ClipLength("IjaWipeSheathBayonet",5.6),ready=wipe+ClipLength("IjaReadyRifle",1.1);
     if(age>=ClipLength("CaptiveWallSlideTwitch",3.2)&&!r.Has("captivesKilled"))r.Record("captivesKilled",{count:1});
     if(age<wipe)this.Pose(ijaA,"IjaWipeSheathBayonet",{seconds:age});
-    else if(age<ready)this.Pose(ijaA,"IjaReadyRifle",{seconds:age-wipe});
+    else if(age<ready){SetRelaxedGait(ijaA,null);this.Pose(ijaA,"IjaReadyRifle",{seconds:age-wipe});}
     else this.Pose(ijaA,null);
     // 「日兵乙转头看向前沟」 (he turns to the front at the far call), then the two go back down the SSW leg.
     this.RearParty(this.RearGo(),m);this.DepthIja();
@@ -1827,6 +1868,7 @@ export class FirstLevelBunkerShow {
     if(!actor?.alive||actor.openingCombatReleased)return;
     actor.openingCombatReleased=true;actor.scriptEssential=false;actor.scriptedNoncombatant=false;actor.missionDormant=false;
     actor.openingStoryboardPose=null;actor.openingStoryboardTravel=null;actor.openingStoryboardLast=null;actor.openingStoryboardContact=null;
+    SetRelaxedGait(actor,null);   // a fighting man has his rifle in his hands
     actor.tacticalRadiusM=0;
     this.r.Defend(actor,actor.position,.4,.4);
   }

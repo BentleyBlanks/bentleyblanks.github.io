@@ -76,7 +76,10 @@ export const OPENING_STORYBOARDS = Object.freeze({
   ambushS:1.1,
   // Move speeds of the director's walks along trench polylines (m/s).
   // drag: Luo's haul to cover (02; 1.25 until 09-26). (01's haul out of the mouth is IjaHaulForearmUnder's own root motion.)
-  speed:Object.freeze({ walk:1.5, brisk:2.3, creep:1.15, run:3.2, drag:1.55, flee:3.4, stroll:1.1 }),
+  // 2026-09-26 relaxed gait (Script_RelaxedGait; switch walk/run at Data_Tuning_ActorLocomotion.RELAXED_GAIT):
+  // amble: ijaA / ijaB walking in with the rifle slung (was brisk, which read as the rifle-at-the-ready run);
+  // trot: the interpreter jogging over when ijaB calls him (InterpreterCall; was walk).
+  speed:Object.freeze({ walk:1.5, brisk:2.3, creep:1.15, run:3.2, drag:1.55, flee:3.4, stroll:1.1, amble:1.65, trot:2.4 }),
   arriveM:.12,
   culledHeadM:1.4,     // head height used for an actor the AI has culled (its bones are not updated)
   shotRiseM:1.4,       // a squad rifleman's scripted shot leaves at least this high over his feet (he rises to fire)
@@ -85,7 +88,8 @@ export const OPENING_STORYBOARDS = Object.freeze({
   // missed shot is fired again by another man, a contact that did not kill is made lethal).
   timeouts:Object.freeze({
     banterExtraS:8, runnerArriveS:9, ordersExitS:9, blastEventS:3.5, blackS:3.0, wakeS:5.8,
-    frontPassS:14, walkInS:12, interrogationExtraS:10, tauntExtraS:8, reachS:3.4, foundWalkS:10,
+    // interpreterCallS: from ijaB's call (InterpreterCall) until the drag may start without it having ended.
+    frontPassS:14, walkInS:12, interpreterCallS:6, interrogationExtraS:10, tauntExtraS:8, reachS:3.4, foundWalkS:10,
     dragOutS:9, bootsS:8, holdLineS:8, glimpseGateS:2.2, luoArriveS:7, heArriveS:7, fleeS:3.2,
     longShotRetryS:4, longShotForceS:8, checkS:9, kickRifleS:3, contactKillS:.35,
     // 02 -> 03: Yaowa catches up (else the scene starts where he is), the guard's run up the sap.
@@ -313,6 +317,9 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // ijaA/ijaB come down the link sap to J, then west along the trench to the buried comrade.
     walkIn:Route([23.5,-130],[18.2,-125.6],[14,-124.6],[9,-124.8]),
     walkInDelayS:Object.freeze({ ijaA:2.2, ijaB:3.0 }),   // after the eyes open (Wake)
+    // 2026-09-26: once the first of them is this close to his mark (the buried man in sight), ijaB shouts back up
+    // the sap for the interpreter (InterpreterCall); the interpreter sets off at a trot on his answer (line .02).
+    interpreterCallM:5,
     // At the far call (CaptiveTaunt.04) ijaB turns to the front (east) where he stands, then backs off (interrogation.backOff).
     ijaBWatchYaw:-Math.PI/2,
     // SB03A (contract §5): after the wipe ijaA walks off east-south-east toward the front and is at lookBack (facing

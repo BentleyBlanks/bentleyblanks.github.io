@@ -1,0 +1,117 @@
+{
+  "schema": 1,
+  "revision": "RelaxedGaitV1",
+  "skeleton": "TengxianHumanoidV1",
+  "file": "Animation_TengxianHumanoidV1RelaxedGait.json",
+  "sourceModel": "Model/Character/Model_TengxianNra02.glb",
+  "sourceSha256": "d6b7b88112afd64e0f41a7bbcf8746a24b5919288ef76c36f345bc367ab666de",
+  "clipSha256": "73aec174661a573b1e53fddb15a401e2b532195bd50e0264ec55c2132e2de35a",
+  "gait": {
+    "revision": "RelaxedGaitV1",
+    "walk": {
+      "clip": "RelaxedWalk",
+      "fps": 60,
+      "cycleS": 1.08,
+      "speedMps": 1.35,
+      "stance": 0.61,
+      "heelStrikeM": 0.27,
+      "heelRockerEnd": 0.09,
+      "toeRockerStart": 0.4,
+      "strikePitch": -0.3,
+      "toeOffPitch": 0.95,
+      "swingLiftM": 0.075,
+      "swingLiftPeak": 0.38,
+      "pelvisDropM": 0.012,
+      "pelvisBobM": 0.016,
+      "pelvisSwayM": 0.022,
+      "pelvisTurnRad": 0.075,
+      "pelvisListRad": 0.03,
+      "pelvisTiltRad": 0.035,
+      "torsoLeanRad": 0.045,
+      "shoulderCounterRad": 0.09,
+      "armSwingRad": 0.31,
+      "armBiasRad": 0.03,
+      "armOutRad": 0.13,
+      "elbowRad": 0.22,
+      "elbowSwingRad": 0.16,
+      "footWidthM": 0.085
+    },
+    "stand": {
+      "clip": "RelaxedStand",
+      "fps": 30,
+      "cycleS": 4,
+      "kneeBendDropM": 0.012,
+      "breathRad": 0.012,
+      "swayM": 0.008,
+      "armOutRad": 0.1,
+      "elbowRad": 0.16,
+      "footWidthM": 0.1
+    },
+    "fingerCurl": [
+      0.8,
+      0.9,
+      0.55
+    ],
+    "thumbCurl": [
+      0.25,
+      0.35,
+      0.25
+    ]
+  },
+  "walk": {
+    "clip": "RelaxedWalk",
+    "duration": 1.08,
+    "referenceSpeedMps": 1.35,
+    "measuredToeSpeedMps": 1.3485,
+    "strideM": 1.458,
+    "contacts": {
+      "L": [
+        [
+          0.0462,
+          0.6308
+        ]
+      ],
+      "R": [
+        [
+          0,
+          0.1231
+        ],
+        [
+          0.5538,
+          1
+        ]
+      ]
+    },
+    "pelvisHeightM": 0.9095,
+    "legReachClampedFrames": 0,
+    "stanceSoleM": {
+      "L": [
+        0.004,
+        0.004
+      ],
+      "R": [
+        0.004,
+        0.004
+      ]
+    },
+    "swingSoleMinM": {
+      "L": 0.004,
+      "R": 0.004
+    }
+  },
+  "stand": {
+    "clip": "RelaxedStand",
+    "duration": 4,
+    "soleM": {
+      "L": [
+        0.004,
+        0.004
+      ],
+      "R": [
+        0.004,
+        0.004
+      ]
+    },
+    "legReachClampedFrames": 0
+  }
+}
