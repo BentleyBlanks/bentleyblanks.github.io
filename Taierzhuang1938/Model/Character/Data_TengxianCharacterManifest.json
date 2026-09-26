@@ -501,19 +501,19 @@
           "sourceFrames": 25,
           "sourceBones": 53,
           "pelvisHeightMeters": [
-            0.9595557993182189,
-            1.0288696473645456
+            0.9080292870057747,
+            0.9632505346089602
           ],
-          "maxGroundPenetrationMeters": 0.0005448860724038446
+          "maxGroundPenetrationMeters": 0.007935385737809553
         },
         "WoundedLimp": {
           "sourceFrames": 45,
           "sourceBones": 53,
           "pelvisHeightMeters": [
-            0.940337382565475,
-            1.0244866957503025
+            0.8770804572850466,
+            0.9504716470837593
           ],
-          "maxGroundPenetrationMeters": 0
+          "maxGroundPenetrationMeters": 0.000993302392683408
         }
       },
       "skeleton": "TengxianHumanoidV1"
@@ -1015,19 +1015,19 @@
           "sourceFrames": 25,
           "sourceBones": 53,
           "pelvisHeightMeters": [
-            0.9595571466600393,
-            1.0288697000159084
+            0.9055116325616837,
+            0.9532169904559851
           ],
-          "maxGroundPenetrationMeters": 0.0005449574712648341
+          "maxGroundPenetrationMeters": 0.008187317618770036
         },
         "WoundedLimp": {
           "sourceFrames": 45,
           "sourceBones": 53,
           "pelvisHeightMeters": [
-            0.9403373005732354,
-            1.0244998121829407
+            0.8700513751246035,
+            0.9476136565208435
           ],
-          "maxGroundPenetrationMeters": 0
+          "maxGroundPenetrationMeters": 0.000802103515044272
         }
       },
       "skeleton": "TengxianHumanoidV1"
@@ -1524,19 +1524,19 @@
           "sourceFrames": 25,
           "sourceBones": 53,
           "pelvisHeightMeters": [
-            0.9595804029023621,
-            1.0289514971772227
+            0.9054757682606578,
+            0.9531830046325922
           ],
-          "maxGroundPenetrationMeters": 0.0005433201948188818
+          "maxGroundPenetrationMeters": 0.008151289924687413
         },
         "WoundedLimp": {
           "sourceFrames": 45,
           "sourceBones": 53,
           "pelvisHeightMeters": [
-            0.940321490779144,
-            1.0243784315387514
+            0.8701343983411789,
+            0.9476437447592616
           ],
-          "maxGroundPenetrationMeters": 0
+          "maxGroundPenetrationMeters": 0.0008031246607173447
         }
       },
       "skeleton": "TengxianHumanoidV1"
@@ -2041,19 +2041,19 @@
           "sourceFrames": 25,
           "sourceBones": 53,
           "pelvisHeightMeters": [
-            0.9595571466600393,
-            1.0288697000159084
+            0.9055116325616837,
+            0.9532169904559851
           ],
-          "maxGroundPenetrationMeters": 0.0005449574712648341
+          "maxGroundPenetrationMeters": 0.008187317618770036
         },
         "WoundedLimp": {
           "sourceFrames": 45,
           "sourceBones": 53,
           "pelvisHeightMeters": [
-            0.9403373005732354,
-            1.0244998121829407
+            0.8700513751246035,
+            0.9476136565208435
           ],
-          "maxGroundPenetrationMeters": 0
+          "maxGroundPenetrationMeters": 0.000802103515044272
         }
       },
       "skeleton": "TengxianHumanoidV1"
@@ -2573,19 +2573,19 @@
           "sourceFrames": 25,
           "sourceBones": 53,
           "pelvisHeightMeters": [
-            0.9211485248840304,
-            0.9925732593126364
+            0.9193346425890923,
+            0.9791333265602589
           ],
-          "maxGroundPenetrationMeters": 0.0027957093799889365
+          "maxGroundPenetrationMeters": 0.010309332174678186
         },
         "WoundedLimp": {
           "sourceFrames": 45,
           "sourceBones": 53,
           "pelvisHeightMeters": [
-            0.9011687339341162,
-            0.9981294150080668
+            0.894709687680006,
+            0.9657294377684593
           ],
-          "maxGroundPenetrationMeters": 0
+          "maxGroundPenetrationMeters": 0.000786816491075145
         }
       },
       "skeleton": "TengxianHumanoidV1"
@@ -3094,19 +3094,19 @@
           "sourceFrames": 25,
           "sourceBones": 53,
           "pelvisHeightMeters": [
-            0.9245186816809084,
-            0.9957094939696446
+            0.9141697091981769,
+            0.971874825656414
           ],
-          "maxGroundPenetrationMeters": 0.0027346614155593363
+          "maxGroundPenetrationMeters": 0.009240544829539218
         },
         "WoundedLimp": {
           "sourceFrames": 45,
           "sourceBones": 53,
           "pelvisHeightMeters": [
-            0.9066909606321394,
-            1.0007249231033502
+            0.8852094197645783,
+            0.9577419441193342
           ],
-          "maxGroundPenetrationMeters": 0
+          "maxGroundPenetrationMeters": 0.0007583503522611695
         }
       },
       "skeleton": "TengxianHumanoidV1"
@@ -3620,19 +3620,19 @@
           "sourceFrames": 25,
           "sourceBones": 53,
           "pelvisHeightMeters": [
-            0.9211485248840304,
-            0.9925732593126364
+            0.9193346425890923,
+            0.9791333265602589
           ],
-          "maxGroundPenetrationMeters": 0.0027957093799889365
+          "maxGroundPenetrationMeters": 0.010309332174678186
         },
         "WoundedLimp": {
           "sourceFrames": 45,
           "sourceBones": 53,
           "pelvisHeightMeters": [
-            0.9011687339341162,
-            0.9981294150080668
+            0.894709687680006,
+            0.9657294377684593
           ],
-          "maxGroundPenetrationMeters": 0
+          "maxGroundPenetrationMeters": 0.000786816491075145
         }
       },
       "skeleton": "TengxianHumanoidV1"

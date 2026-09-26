@@ -200,6 +200,31 @@ for (const model of manifest.models) {
     + `${(forwardOff * 180 / Math.PI).toFixed(1)}° —— 资产朝向变了，`
     + "Script_CharacterModel 的 MODEL_FORWARD_YAW 要跟着改，否则全场军人背对自己的朝向");
 
+  // ── 脚踝闸：脚骨相对小腿拧了多少 ─────────────────────────────────────────
+  // 2026-09-27：CarryStretcherRear / WoundedLimp 的脚绕踝→趾轴翻了 180°（鞋底朝上、
+  // 脚尖插地），趾骨头位置照样对，所以上面所有量关节位置/贴地的闸都没红。人的脚踝
+  // 拧不过 90°；其余动作的脚骨转角均值都在 60° 以内。修复脚本见
+  // _import/Script_FixMocapFootRoll.mjs。
+  {
+    const glb = LoadGlb(glbPath);
+    for (const animation of glb.json.animations) {
+      for (const channel of animation.channels) {
+        const node = glb.json.nodes[channel.target.node];
+        if (channel.target.path !== "rotation" || !/ (L|R) Foot$/.test(node.name || "")) continue;
+        const rest = node.rotation || [0, 0, 0, 1];
+        const values = ReadAccessor(glb, animation.samplers[channel.sampler].output).data;
+        let sum = 0;
+        for (let k = 0; k < values.length; k += 4) {
+          const dot = Math.abs(values[k] * rest[0] + values[k + 1] * rest[1] + values[k + 2] * rest[2] + values[k + 3] * rest[3]);
+          sum += 2 * Math.acos(Math.min(1, dot)) * 180 / Math.PI;
+        }
+        const mean = sum / (values.length / 4);
+        assert.ok(mean <= 90, `${model.id}/${animation.name} ${node.name} 平均拧了 ${mean.toFixed(0)}°`
+          + "（≤ 90°）—— 脚掌翻反了，鞋底朝上；跑 _import/Script_FixMocapFootRoll.mjs");
+      }
+    }
+  }
+
   // ── 姿态闸：直接解析 GLB 走 FK 现量，不看清单自报的数 ──────────────────────
   const measured = MeasurePose(LoadGlb(glbPath), {
     pelvisName: model.boneRoles.pelvis,

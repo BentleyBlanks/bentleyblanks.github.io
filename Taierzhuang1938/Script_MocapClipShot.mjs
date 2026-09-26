@@ -39,12 +39,14 @@ try {
     floor.rotation.x = -Math.PI * 0.5; scene.add(floor);
     T.actorFactory.SetBatcher(null);
     // 三条 clip × 三个相位；人面朝 -Z，机位摆在 +X 侧看纯侧面。
+    // 机位在 +X 看向 -X 时画面右方是 -Z：z 取负号，才让 clip 顺序在画面上从左到右，
+    // 与顶上的标签对齐（2026-09-27 前是反的，左边标 Front 的其实是 WoundedLimp）。
     const clips = ["CarryStretcherFront", "CarryStretcherRear", "WoundedLimp"];
     const phases = [0.0, 0.33, 0.66];
     const shots = [];
     for (const [c, clipId] of clips.entries()) {
       for (const [p, phase] of phases.entries()) {
-        shots.push({ clipId, phase, z: (c * 3 + p - 4) * 1.15, label: p === 1 ? clipId : "" });
+        shots.push({ clipId, phase, z: -(c * 3 + p - 4) * 1.15, label: p === 1 ? clipId : "" });
       }
     }
     for (const [index, shot] of shots.entries()) {

@@ -3,6 +3,11 @@
 Run inside the task's BlenderMCP instance, with __file__ set to this file.
 Source bytes come from a pinned Git revision, never from previously baked output.
 The serializer preserves embedded textures, material properties and vertex weights.
+
+After a rebake, run `node Taierzhuang1938/_import/Script_FixMocapFootRoll.mjs`: the pinned
+sources carry CarryStretcherRear / WoundedLimp with feet rolled 180 degrees (sole up); that
+script flips them back, re-grounds both clips and rewrites their manifest audit.
+Script_CharacterModelTest fails on the flipped feet until it has run.
 """
 import bpy
 import copy

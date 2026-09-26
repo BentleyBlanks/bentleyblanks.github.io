@@ -268,8 +268,10 @@ const MODEL_FORWARD_YAW = Math.PI;
 // (NRA06 is not a boot download).
 // 2026-09-26: Tengxian shared bind, eye maps and shoulder silhouettes: version the manifest
 // and every dependent GLB together after the offline normalization bake (_import/Script_StandardizeCharacters.py).
-const MANIFEST_URL = "./Model/Character/Data_TengxianCharacterManifest.json?v=20260928HumanoidV1Storyboard";
-const ASSET_VERSION = "20260926HumanoidV1";
+// 2026-09-27: CarryStretcherRear / WoundedLimp foot tracks flipped back sole-down and re-grounded
+// in all seven model GLBs (_import/Script_FixMocapFootRoll.mjs); manifest audit rewritten with them.
+const MANIFEST_URL = "./Model/Character/Data_TengxianCharacterManifest.json?v=20260927MocapFootRoll";
+const ASSET_VERSION = "20260927MocapFootRoll";
 const DEATH_COLLAPSE_ASSET_VERSION = "20260926HumanoidV1";
 const DEATH_COLLAPSE_PLAYBACK_RATE = 1.6;
 const DEATH_COLLAPSE_BLEND_SECONDS = 0.1;
