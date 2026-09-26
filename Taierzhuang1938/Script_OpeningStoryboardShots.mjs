@@ -19,7 +19,7 @@
 // it hits; `behindOk:"<block>"` lets a wave-1 shot keep one listed blocker). People are skinned and the ray
 // skips them, so a head behind a nearer person is found apart (coveredBy: the people alone drawn flat into the
 // head's pixel after the screenshot); `coverOk:"<role>"` lets a wave-1 shot keep that one person in front.
-// hands.<l|r> judges a first-person palm on screen (pose, x, y), guardRifle ijaB's dropped rifle (x, y, distance),
+// hands.<l|r> judges a first-person palm on screen (pose, x, y, held: the partner grip is on that man), guardRifle ijaB's dropped rifle (x, y, distance),
 // pelvisM a body's pelvis height (corpse:true: a dead man on the floor, whose head needs no clear line). A
 // failed check, a missed shot or a page error exits 1. The rest of each criterion is looked at in the
 // side-by-side picture: --side-by-side=<dir with Storyboard_*.png> writes <id>_SideBySide.png
@@ -131,6 +131,9 @@ export function JudgeShot(judge, dump) {
   for (const [side, want] of Object.entries(judge.hands || {})) {
     const h = dump.hands?.[side], px = h?.px?.front ? h.px : null;
     if (want.pose) out.push({ label: `${side} hand pose`, ok: h?.pose === want.pose, value: h?.pose ?? null, range: [want.pose] });
+    // held: a partner grip actually on that man (eased in, not slipped, palm on the bone within 5 cm).
+    if (want.held) { const g = h?.partner; out.push({ label: `${side} hand holds ${want.held}`, ok: !!g && g.who === want.held && !g.missing && g.held && !(g.slip > 0) && g.gap < .05,
+      value: g ? { who: g.who, held: g.held, slip: g.slip, gap: g.gap } : null, range: null }); }
     if (want.x) out.push(Range(`${side} palm x`, px ? px.x : NaN, want.x));
     if (want.y) out.push(Range(`${side} palm y`, px ? px.y : NaN, want.y));
   }
@@ -397,7 +400,8 @@ function Dump({ warm, freeze, points }) {
   const rifle = view ? { x: R3(view.position.x), z: R3(view.position.z), yawDeg: D(view.rotation.y), visible: view.visible, px: Screen(view.position) } : null;
   const dropped = s.guardRifle?.parent ? s.guardRifle.getWorldPosition(new T.Vector3()) : null;
   const guardRifle = dropped ? { x: R3(dropped.x), z: R3(dropped.z), distM: R3(Math.hypot(dropped.x - cam.position.x, dropped.z - cam.position.z)), px: Screen(dropped) } : null;
-  const hands = Object.fromEntries(Object.entries(s.firstPersonState?.hands || {}).map(([k, h]) => [k, { pose: h.pose, px: h.palm ? Screen(new T.Vector3(...h.palm)) : null }]));
+  const hands = Object.fromEntries(Object.entries(s.firstPersonState?.hands || {}).map(([k, h]) => [k, { pose: h.pose, px: h.palm ? Screen(new T.Vector3(...h.palm)) : null,
+    partner: h.partner ? { who: h.partner.who, bone: h.partner.bone, missing: h.partner.missing, held: h.partner.held, slip: h.partner.slip, gap: h.partner.gap == null ? null : R3(h.partner.gap) } : null }]));
   const op = r.opening;
   return {
     phase: s.phase, age: R3(s.Age), stage: r.flow.stage.id, time: R3(r.time),

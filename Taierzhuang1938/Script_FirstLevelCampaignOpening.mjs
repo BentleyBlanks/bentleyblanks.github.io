@@ -175,6 +175,14 @@ async function InstallProbe(page) {
       }
       if(s.flags.flagKickedAt!=null)P.flagKicked=true;
       if(s.phase==="Glimpse"&&s.Age>.5){const i=s.cast.interpreter,m=s.CircleMarks().interpreter;P.rescueInterpreterAtMark=Math.hypot(i.position.x-m.x,i.position.z-m.z)<.2;}
+      // 02 circle (2026-09-27 review 「审问穿模」): the interpreter's head against the lens and his root against the
+      // collar-holder's, from his way back (Boots) until he bolts.
+      if(["Boots","Hold","Ask","KickShunzi","Glimpse","Collar","Chop","Parry"].includes(s.phase)&&(r.opening?.eyeClosure??0)<.5){
+        const i=s.cast.interpreter,head=i&&!i.openingStoryboardHidden?s.HeadPoint(i):null,cam=r.player.camera.getWorldPosition(Vec()),a=s.Ija("ijaA");
+        if(head){const d=head.distanceTo(cam);if(d<(P.rescueInterpreterEyeMinM??Infinity)){P.rescueInterpreterEyeMinM=d;P.rescueInterpreterEyeMinAt={phase:s.phase,age:s.Age};}}
+        if(head&&a?.alive&&["Hold","Ask","KickShunzi","Glimpse","Collar","Chop"].includes(s.phase))
+          P.rescueInterpreterIjaAMinM=Math.min(P.rescueInterpreterIjaAMinM??Infinity,Math.hypot(i.position.x-a.position.x,i.position.z-a.position.z));
+      }
       if(s.phase==="Reach")P.flagDown=r.openingSet?.flags?.get("flagTrench")?.progress;
       const shotId=C.cinematic[s.phase]?.id||"firstPerson";
       if(P.shotId!=null&&P.shotId!==shotId){
@@ -365,6 +373,9 @@ export async function DriveOpening(ctx){
   assert.ok(probe.interpreterMinM>=Storyboards.interpreterClearanceM-.025&&probe.interpreterAtMark,"interpreter passes soldiers without overlap and reaches his questioning mark");
   assert.ok(probe.flagKicked&&probe.flagDown===1,"the background soldier kicks the flag all the way down before Reach");
   assert.ok(probe.rescueInterpreterAtMark,"the interpreter returns around the collar-holder and reaches the rescue circle");
+  console.log("RESCUE_INTERPRETER",JSON.stringify({eyeMin:probe.rescueInterpreterEyeMinM,at:probe.rescueInterpreterEyeMinAt,ijaAMin:probe.rescueInterpreterIjaAMinM}));
+  assert.ok(probe.rescueInterpreterEyeMinM>=.38,`the interpreter's head keeps off the lens in 02 (${probe.rescueInterpreterEyeMinM} m at ${JSON.stringify(probe.rescueInterpreterEyeMinAt)})`);
+  assert.ok(probe.rescueInterpreterIjaAMinM>=.6,`the interpreter squats clear of the collar-holder (${probe.rescueInterpreterIjaAMinM} m)`);
   assert.deepEqual(probe.cameraCuts?.map(c=>c.to),["captiveDrag","captiveGroup","captiveCut","captiveAftermath","firstPerson"],"only the authored film edits cut the camera");
   const fadeAt=t=>probe.wakeSamples?.find(s=>s.age>=t)?.blackout;
   assert.ok(fadeAt(1)>.8&&fadeAt(2)>.5&&fadeAt(4)<.2&&fadeAt(5.3)===0,"blackout recovers gradually across more than five seconds");

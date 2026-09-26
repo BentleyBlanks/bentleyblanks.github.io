@@ -195,7 +195,9 @@ export const OPENING_STORYBOARDS = Object.freeze({
         // 「刚想撑起身体，枪托突然砸过来」: the blow lands BUTT.strikeS + BUTT.holdS after buttAt (after the pause at the
         // top); the hands let go of the push 0.18 s later.
         Butt:KC("buttAt",[-1,"flat","flat"],[0,"push","push"],[BUTT.strikeS+BUTT.holdS,"push","push"],[BUTT.strikeS+BUTT.holdS+.18,"rest","rest"]),
-        Boots:K([0,"rest","rest"]),
+        // SB04A: IjaDragByForearm takes his right forearm at 0.41 s; the right hand holds the sleeve of the arm that drags
+        // him (with it at rest ijaA's fist closed on nothing in the middle of the picture, 09-27 review).
+        Boots:K([0,"rest","rest"],[.45,"rest","gripSleeve"]),
         // 「日兵甲抓住他的前襟，把上身从泥里拽起来」: the left hand at his own collar until it is let go.
         Hold:K([0,"rest","rest"],[1,"collar","rest"]), Ask:K([0,"collar","rest"]), KickShunzi:K([0,"collar","rest"]),
         Glimpse:K([0,"collar","rest"]), Collar:K([0,"collar","rest"]), Chop:K([0,"collar","rest"]),
@@ -353,8 +355,10 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // same fraction (he stands the clip's hold distance from the eye toward it, facing him) and ends in the SSW leg.
     // swingS: before the haul the root turns about the eye from the SB04 side (north) to the drag side, eyes shut
     // (knockOut). closeS: the boots close in over that long after the haul.
+    // gripInM (2026-09-27): his root is solved that much nearer the eye than the clip's head track puts it (eased in over
+    // swingS, before the grab at 0.41 s), so Shunzi's right hand reaches the arm that drags him (firstPerson gripSleeve).
     dragAway:Object.freeze({ route:Route([1.95,-123.85],[1.0,-123.8]), face:Route([1.66,-123.8],[1.3,-123.66],[.95,-123.6],[.66,-123.3],[.55,-122.97]),
-      holdM:.93,
+      holdM:.93, gripInM:.14,
       swingS:.42, closeS:.5 }),
     // headAboveDeg: his head that far above the centre of the picture (the storyboard's face in the upper third).
     dragShot:Object.freeze({ yawOffsetDeg:-8, pitchDeg:8, maxPitchDeg:26, headAboveDeg:14, rollDeg:-8 }),
@@ -414,8 +418,24 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // the bearing, the eye keeps to the head track minus it (still pulled with him): 0.8 m, the head at x ~0.42, ijaB
     // clear (tmp/fix trial T05_s30). He's chopParry mark moves with him (0.53,-121.75), still on the leg floor.
     ijaAStandoffM:.3,
-    interpreter:P(.97,-123.42,36*Math.PI/180),   // squatting side-on at the spoil's north-west corner (left edge)
-    interpreterReturn:Route([-.1,-122.4],[.05,-123.54],[1.3,-123.54]), // around the collar-holder, then into the corner
+    // The interpreter squats against the spoil's north face east of ijaA (the left edge), facing Shunzi. 2026-09-27
+    // review (「审问的时候穿模错位」): at (0.97,-123.42) InterpreterCrouchAsk -- authored face to face, Shunzi's head 0.69 m
+    // ahead of its root -- leaned his head to 0.34 m from the eye (face bones 0.2 m, 40 % of the picture) and put his left
+    // hand on ijaA's collar fist (bones 2 cm apart). Here (browser probe, Hold..Glimpse): head 0.54 m off the eye, face
+    // bones 0.37 m, his arms 0.16 m and his feet 0.08 m from ijaA's, the head at x ~0.03 (SB05 judge, 1280x720).
+    interpreter:P(1.15,-123.35,45*Math.PI/180),
+    // 「说话！」 (Collar..Parry, InterpreterGrabCollar): the lunge's root sits back 0.1 m along the corner, so the grab still
+    // meets the collar (0.69 m off, the clip's 0.66 m) and his head stops 0.41 m from the eye (from the squat mark it came
+    // to 0.3 m; from the old mark 0.14 m, the back of his head filling the lower left). His arms stay 0.19 m off ijaA's;
+    // the 0.11 m re-root at the lunge's first frame is blended (Put keeps the shown skeleton).
+    interpreterGrab:P(1.26,-123.33,50*Math.PI/180),
+    // Back to the circle (Boots): the SSW leg's floor at the mouth (x 0.4-0.8) is filled by ijaA and Shunzi, so the old way
+    // in -- up the leg and east between them, 0.36 m in front of the eye, through the collar arm -- walked him across the
+    // lens. He comes up the leg in SB04A's picture, turns east round the bend south of the spoil (the runner's way, the
+    // crater step), and in from the east along the strip north of the spoil. From interpreterRunFrom (the turn behind the
+    // spoil, out of the picture) he runs, so he is on his mark about when he was before (4.9 s into Boots, was 4.3 s).
+    interpreterReturn:Route([.15,-121.35],[1.5,-121.2],[3.0,-121.6],[3.3,-122.6],[3.25,-123.66],[1.75,-123.68]),
+    interpreterRunFrom:1,
     interpreterClearanceM:.44, // close crouching contact; entry uses the wider standing-body margin
     ijaBGuard:P(.04,-119.94,-8*Math.PI/180),      // standing in the leg 4 m off, rifle levelled at him (SB05)
     // The kick (「日兵乙不耐烦地朝顺子踢了一脚」): up the leg's west side to kickM from him on kickBearingDeg (clear of
@@ -548,9 +568,13 @@ export const OPENING_STORYBOARDS = Object.freeze({
       judge:{ camera:{ eyeM:[.2,.4], rollDeg:[-12,-4], pitchDeg:[5,26] },
         // behindOk: BunkerSouthRevetment still stands between the pocket and the leg (pendingWiring SB04A);
         // coverOk: the upright stand-in ijaA fills the low upward view over them (pendingWiring SB04A, Anim).
-        actors:{ ijaA:{ x:[.3,.65], distM:[.4,1.1] },
+        // ijaA distM is his ROOT, which the haul's root motion keeps on the far side of the eye: dragAway.gripInM brings his
+        // body 0.14 m nearer and the root 0.14 m further (0.995 -> 1.135 m; the look up at his face rose 13.5 -> 21 deg).
+        actors:{ ijaA:{ x:[.3,.65], distM:[.4,1.2] },
           interpreter:{ x:[.5,1], distM:[1.8,6.5], behindOk:REVETMENT, coverOk:"ijaA" },
-          ijaB:{ distM:[2,8], behindOk:REVETMENT, coverOk:"ijaA" } } } }),
+          ijaB:{ distM:[2,8], behindOk:REVETMENT, coverOk:"ijaA" } },
+        // 「顺子的手抓着日兵甲拖他的那条胳膊」: the right hand is on the arm that drags him (09-27: it hung at rest).
+        hands:{ r:{ pose:"gripSleeve", held:"ijaA" } } } }),
     // (2026-09-26: no mouthPostS on the left any more -- the drag no longer comes down past the post, which ran it through
     // the roof timber's support; it comes west along the strip south of the rubble, the post behind the eye by 2.1 s.)
     // SB05: Shunzi looks up (Glimpse): ijaA's face close on the left, the interpreter at the left edge, ijaB in the leg,
@@ -559,7 +583,9 @@ export const OPENING_STORYBOARDS = Object.freeze({
       // ijaB at 2.4–3.4 m, not the contract's ~4 m: after the kick he steps back only to ijaBWatch (2.8 m), the chopRear
       // anchor -- at his guard mark (4 m) Luo's chop mark (0.5 m north of him) would be between him and Shunzi.
       judge:{ camera:{ eyeM:[.62,.9], pitchDeg:[-5,10], yawDeg:[170,192] }, perception:[0,.62],
-        actors:{ ijaA:{ x:[.3,.47], distM:[.6,1.05] }, interpreter:{ x:[0,.25] }, ijaB:{ x:[.48,.7], distM:[2.4,3.4] },
+        // interpreter distM: squatting at the spoil's corner, not in Shunzi's face (09-27: 0.53 m, his head 0.34 m off the
+        // lens and on ijaA's collar arm).
+        actors:{ ijaA:{ x:[.3,.47], distM:[.6,1.05] }, interpreter:{ x:[0,.25], distM:[.68,1.1] }, ijaB:{ x:[.48,.7], distM:[2.4,3.4] },
           luo:{ x:[.68,.88], distM:[6,9.6] } } } }),
     // SB05A: the cut (Chop 0.25–0.45 s): ijaA side-on at the left front, Luo cutting ijaB down right of centre 2.5–3.5 m,
     // He behind Luo.
@@ -647,8 +673,6 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // SB04A (Boots)
     {shot:"SB04A", what:"the interpreter hurrying up the SSW leg with one arm out",
       now:"InterpreterPoint as upperBody on the run (PhaseBoots Hurry)", wave2:"InterpreterHurryReach (Anim)"},
-    {shot:"SB04A", what:"Shunzi's hand holds ijaA's sleeve",
-      now:"rest hand keys (beats.Boots)", wave2:"EXTRA_HAND_POSES.gripSleeve on ijaA in beats.Boots (Eye)"},
     {shot:"SB04A", what:"dizzy softening, desaturation, blood edge about 0.3",
       now:"concussion blur/ghost; the story blood layer settles to strikeBlood.settle 0.3", wave2:"OpeningLens LOOKS for Boots (Eye)"},
     {shot:"SB04A", what:"plank revetment and duckboards down the SSW leg",

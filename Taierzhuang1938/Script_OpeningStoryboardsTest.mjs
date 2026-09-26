@@ -538,7 +538,7 @@ assert.deepEqual([...C.phases.RearTrench],["Withdraw","Corner","Collection","Sup
     const Stage=(stage,role,anchor)=>{const a=manifest.stages[stage].actors[role],d=Rot(anchor.yaw,a.x,a.z);return {x:anchor.x+d.x,z:anchor.z+d.z};};
     const heParry=Stage("chopParry","heyoutian",ijaA),luoChop=Stage("chopRear","luo",R.ijaBWatch);
     for(const [name,p,m] of [["ijaA's hold",ijaA,.05],["He's parry mark",heParry,.2],["Luo's chop mark",luoChop,.3],["ijaB's guard",R.ijaBGuard,.3],
-      ["ijaB's watch",R.ijaBWatch,.3],["the interpreter",R.interpreter,.02],["He's wait",R.heWait,.3],["Liu's trench-edge post",R.liuCover,.3],
+      ["ijaB's watch",R.ijaBWatch,.3],["the interpreter",R.interpreter,.02],["the interpreter's lunge root",R.interpreterGrab,.02],["He's wait",R.heWait,.3],["Liu's trench-edge post",R.liuCover,.3],
       ["He's trench-edge post",R.heCover,.3],["Luo's check kneel",R.luoCheck,.3],["the hand-back seat",C.shunzi.cover,.3],["Luo's kick spot",R.kickFrom,.2]])
       assert.ok(Clear(p,m),`02: ${name} (${p.x.toFixed(2)},${p.z.toFixed(2)}) stands clear of the mouth's collapse blocks`);
     assert.ok(ijaA.z>S.z+.3&&Math.abs(ijaA.x-S.x)<.3,"SB05: ijaA holds him from the leg side (south), in the floor strip");
@@ -651,10 +651,28 @@ console.log(`ok opening storyboards: five original rigs, ${clipCount} rig clips 
   // Existing contact marks touch the revetment with the full walking capsule; the detour keeps the root out of solids.
   const returnClear=RouteClearance(returnPath,{state:"BunkerCollapsed",radius:0});
   assert.deepEqual(returnClear.hits,[]);assert.deepEqual(returnClear.slopes,[]);
+  // 2026-09-27 review: the old way in went between ijaA and Shunzi, 0.36 m in front of the eye and through the collar arm.
+  // It now keeps off the eye and never crosses the grip (Shunzi's head -> ijaA's root), squat and lunge marks included.
+  // ijaA's root as the director solves it with the clip's own head track (CircleMarks falls back to a stand-in track
+  // when the animation library is not loaded, as here).
+  const holdTrack=JSON.parse(Read("./Animation/OpeningStoryboards/Animation_TengxianIja02OpeningStoryboards.json")).clips.IjaHoldCollarUp.player.parts.head;
+  {const S=C.shunzi.dragged,R=C.rescue,b=R.ijaAHoldBearingDeg*Math.PI/180,h={x:holdTrack[0],z:holdTrack[2]},dist=Math.hypot(h.x,h.z);
+    const approx={x:S.x+Math.sin(b)*dist,z:S.z+Math.cos(b)*dist},yaw=Math.atan2(approx.x-S.x,approx.z-S.z);
+    const o={x:h.x*Math.cos(yaw)+h.z*Math.sin(yaw),z:-h.x*Math.sin(yaw)+h.z*Math.cos(yaw)};
+    marks.ijaA={x:S.x-o.x+Math.sin(b)*R.ijaAStandoffM,z:S.z-o.z+Math.cos(b)*R.ijaAStandoffM};}
+  const eye=C.shunzi.dragged,Near=(p,a,b)=>{const dx=b.x-a.x,dz=b.z-a.z,t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.z-a.z)*dz)/(dx*dx+dz*dz||1)));return Math.hypot(a.x+t*dx-p.x,a.z+t*dz-p.z);};
+  const SegSeg=(a,b,c,d)=>{let best=Infinity;for(let k=0;k<=40;k++){const p={x:a.x+(b.x-a.x)*k/40,z:a.z+(b.z-a.z)*k/40};best=Math.min(best,Near(p,c,d));}return best;};
   for(let i=1;i<returnPath.length;i++){
-    const a=returnPath[i-1],b=returnPath[i],dx=b.x-a.x,dz=b.z-a.z,g=marks.ijaA;
-    const t=Math.max(0,Math.min(1,((g.x-a.x)*dx+(g.z-a.z)*dz)/(dx*dx+dz*dz)));
-    assert.ok(Math.hypot(a.x+t*dx-g.x,a.z+t*dz-g.z)>C.rescue.interpreterClearanceM+.03,"return route passes around the collar-holder with the corner margin");
+    const a=returnPath[i-1],b=returnPath[i];
+    assert.ok(Near(marks.ijaA,a,b)>C.rescue.interpreterClearanceM+.03,"return route passes around the collar-holder with the corner margin");
+    assert.ok(Near(eye,a,b)>=.6,`return route keeps off the circle's eye (${a.x},${a.z})-(${b.x},${b.z})`);
+    assert.ok(SegSeg(a,b,eye,marks.ijaA)>=.4,`return route does not cross between ijaA and Shunzi (${a.x},${a.z})-(${b.x},${b.z})`);
+  }
+  assert.ok(C.rescue.interpreterRunFrom>=0&&C.rescue.interpreterRunFrom<C.rescue.interpreterReturn.length,"the run starts on a return waypoint");
+  for(const [name,p] of [["squat",marks.interpreter],["lunge",marks.interpreterGrab]]){
+    assert.ok(Math.hypot(p.x-eye.x,p.z-eye.z)>=.75,`the interpreter's ${name} root keeps 0.75 m off Shunzi (${p.x},${p.z})`);
+    assert.ok(Math.hypot(p.x-marks.ijaA.x,p.z-marks.ijaA.z)>=.6,`the interpreter's ${name} root keeps 0.6 m off the collar-holder's`);
+    assert.ok(p.x>eye.x+.4,`the interpreter's ${name} root is on the spoil side (east, the picture's left edge), clear of the grip`);
   }
   console.log("ok interpreter swept clearance, passing route and sustained blackout recovery");
 }

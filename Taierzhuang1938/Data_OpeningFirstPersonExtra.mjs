@@ -75,7 +75,14 @@ export const EXTRA_HAND_POSES = Freeze({
   gripForearm: G("ijaA", "forearmL", .55, { minEyeM: .35 }),
   // SB04A: Shunzi's hand on the sleeve of the arm that drags him (ijaA's left), near the cuff; lets go at 5 cm
   // (at 9 cm the review saw the hand hover 8 cm off the sleeve and still count as holding).
-  gripSleeve: G("ijaA", "forearmL", .78, { offset: V(0, .05, 0), twistDeg: -15, slipM: .05, minEyeM: .35 }),
+  // Wired in beats.Boots 2026-09-27: IjaDragByForearm holds his forearm with its fist 0.45 m out at eye height (a
+  // dragged man's arm is stretched out over his head); from the default shoulder the cuff at .78 was 0.64 m off, out of
+  // reach, and the hand stayed at rest -- his fist closed on nothing (browser probe). Raising the shoulder to reach it
+  // put the upper arm beside the lens as the pale flat patch pressBody notes below. So ijaA hauls from ija.dragAway.gripInM
+  // nearer, the shoulder stays low (0.24 m under the eye, 0.1 m behind it: the upper arm under the frame) and the palm
+  // takes the wrist end (.9), 0.29 m from the eye (minEyeM .25): held all through the haul at a reach ratio of 0.93,
+  // the forearm coming in from the right into his fist; it lets go when he does (IjaHoldCollarUp takes the arm 1 m off).
+  gripSleeve: G("ijaA", "forearmL", .9, { offset: V(0, .05, 0), twistDeg: -15, slipM: .05, minEyeM: .25, sh: V(.16, -.24, .1) }),
   // SB05: both hands at the bottom of frame on the arm holding the collar. Browser bench 09-25 at the contract
   // camera (eye 0.75, pitch +3): his collar forearm runs from under the chin down out of frame (elbow at the
   // bottom edge), so the hands hold the arm at the elbow — the right just below it on the forearm, the left
