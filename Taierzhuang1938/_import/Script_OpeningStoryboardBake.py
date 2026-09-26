@@ -13,7 +13,7 @@ path; start/stop the instance around it). Environment:
                      OpeningStoryboards_20260926HumanoidV1 -- the 20260922/20260923/20260925
                      Lugou-rig sources stay untouched; the 0926 folder started as a copy of
                      the 0925 partner tracks, renamed to the Tengxian rig ids)
-  OPENING_VERSION    manifest version (default 20260926OpeningStoryboardsV5HumanoidV1)
+  OPENING_VERSION    manifest version (default 20260926OpeningStoryboardsV6Polish)
   OPENING_MODEL      comma list of rigs (default all five)
   OPENING_CLIPS      comma list: bake only these clips and merge into the rig's JSON. A clip's only
                      inputs from other clips are the arm-roll seeds of its `prev` clip (below): a
@@ -61,7 +61,7 @@ from mathutils import Vector, Matrix, Quaternion
 project = Path(os.environ['OPENING_PROJECT'])
 private = Path(os.environ.get('OPENING_BLEND_DIR')
                or 'C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/OpeningStoryboards_20260926HumanoidV1')
-VERSION = os.environ.get('OPENING_VERSION') or '20260926OpeningStoryboardsV5HumanoidV1'
+VERSION = os.environ.get('OPENING_VERSION') or '20260926OpeningStoryboardsV6Polish'
 committedDir = project / 'Animation/OpeningStoryboards'
 output = Path(os.environ.get('OPENING_OUTPUT') or (project.parent / 'tmp/OpeningStoryboards/Verify'
                                                    if os.environ.get('OPENING_PASS') == 'verify' else committedDir))
@@ -1017,7 +1017,11 @@ def WriteManifest(results):
     rows = {}
     if existing.exists():
         rows = {row['id']: row for row in json.loads(existing.read_text()).get('models', [])}
-    rows.update({row['id']: row for row in results})
+    # A task may use a fresh private Blender directory for a one-clip repair.
+    # Keep validation for untouched clips instead of replacing it with that partial report.
+    for result in results:
+        previous = rows.get(result['id'], {})
+        rows[result['id']] = {**previous, **result, 'clips': previous.get('clips', [])}
     for modelId in MODELS:
         file = output / ('Animation_' + modelId + 'OpeningStoryboards.json')
         if file.exists():
@@ -1038,8 +1042,10 @@ def WriteManifest(results):
                         'pelvisMaxStepM', 'floorCorrectionMin', 'floorCorrectionMax', 'root', 'finite', 'plants',
                         'kneePlants', 'kneeSlideM', 'wallContacts', 'wallContactGapM', 'wallContactDepthM',
                         'lookErrorDeg', 'headTurnDeg', 'probes')
-                row['clips'] = [dict({'clip': c['clip']}, **{k: c[k] for k in keep if k in c})
-                                for c in json.loads(report.read_text())['clips'] if c['clip'] in asset['clips']]
+                validation = {c['clip']: c for c in row.get('clips', [])}
+                validation.update({c['clip']: dict({'clip': c['clip']}, **{k: c[k] for k in keep if k in c})
+                                   for c in json.loads(report.read_text())['clips'] if c['clip'] in asset['clips']})
+                row['clips'] = [validation[name] for name in asset['clips'] if name in validation]
     manifest = {'schema': 2, 'version': VERSION, 'fps': FPS, 'actorForward': [0, 0, -1], 'blendSeconds': .12,
                 'floorClearanceM': CLEARANCE,
                 'coordinates': {

@@ -1,6 +1,6 @@
 {
  "schema": 2,
- "version": "20260926OpeningStoryboardsV5HumanoidV1",
+ "version": "20260926OpeningStoryboardsV6Polish",
  "fps": 24,
  "actorForward": [
   0,
@@ -2633,7 +2633,7 @@
   {
    "id": "TengxianNra02",
    "file": "Animation_TengxianNra02OpeningStoryboards.json",
-   "sha256": "bc9fee8ebd70d7982ecd7c9874eacc56adb48ab5c8e9248f24781280bc1873c7",
+   "sha256": "13bf9f2de446ad8ce5397b061e78a560281c01731c5b7c0aeddded3fce5d8aa7",
    "originalModelSha256": "67550199849f78d581b356580f25595f361bece70fef0c82d7bd08a954197790",
    "clipIds": [
     "SupplyReceive",
@@ -2849,7 +2849,7 @@
      ]
     }
    },
-   "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningStoryboards_20260926HumanoidV1\\Scene_TengxianNra02OpeningStoryboards.blend",
+   "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningCutscenePolish_20260926\\Scene_TengxianNra02OpeningStoryboards.blend",
    "clips": [
     {
      "clip": "SupplyReceive",

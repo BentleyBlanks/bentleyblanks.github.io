@@ -21,7 +21,7 @@ const BUTT = Object.freeze({ yawDeg:0, raiseTopS:.3, holdS:.45, strikeS:.42 });
 // Script_OpeningStoryboardsTest's sight/drag checks. Wave 2 sets wave1Allowances.revetment to null.
 const REVETMENT = "BunkerSouthRevetment";
 export const OPENING_STORYBOARDS = Object.freeze({
-  version:"20260926OpeningStoryboardsV5HumanoidV1", animationBase:"./Animation/OpeningStoryboards/",
+  version:"20260926OpeningStoryboardsV6Polish", animationBase:"./Animation/OpeningStoryboards/",
   // Contract §3/§7.2: wave 1 = each package alone (stand-ins listed in pendingWiring); wave 2 = wired. Set to 2 by the
   // wave-2 wiring: Script_OpeningStoryboardsTest then requires pendingWiring empty and no wave-1 allowance left
   // (wave1Allowances null, no behindOk / coverOk / headOptional in storyboardShots).
@@ -135,8 +135,11 @@ export const OPENING_STORYBOARDS = Object.freeze({
         brace:H("body",[.28,-.5,-.06],[.6,-.3,-.8],[0,1,0],[8,12,8]),             // 「伸手撑住地面」
         rifle:H("ground",[.2,.05,-.3],[.3,-.3,-1],[0,1,0],[46,62,40],{to:"rifle"}),// 「抓住枪」
       }),
-      // Banter / Orders / Incoming hold the loading rifle (code); Blast throws it out of his hands.
+      // Seated inspection: the charger rests in the left palm, the rifle on the thighs.
+      // Orders' exit signal hands back to the bolt/stand sequence in OpeningFirstPerson.
       beats:Object.freeze({
+        Banter:Object.freeze({keys:Object.freeze([[0,"palmClip","rest"],[1.1,"palmClipTilt","rest"],[2.5,"palmClip","rest"]]),legs:"sitForward",props:Object.freeze(["palmClipProp","loadingRifleOnLegs"])}),
+        Orders:Object.freeze({keys:Object.freeze([[0,"palmClip","rest"]]),legs:"sitForward",props:Object.freeze(["palmClipProp","loadingRifleOnLegs"])}),
         Blast:K([0,"protect","protect"],[.4,"protect","protect"],[.8,"limp","limp"]),
         Black:K([0,"limp","limp"]),
         // 「他试着撑起身体。背包带一下绷紧……又落回地面。手指在泥里抓出一道痕。」
@@ -217,7 +220,8 @@ export const OPENING_STORYBOARDS = Object.freeze({
     trap:P(.1,-125.45,-Math.PI/2),           // Wake → KickBeam: lying in the mouth, looking east down the trench
     // The lying eye (contract §2.1: Wake→Found eye (0.25–0.35,−125.2), 0.18–0.26 m over the mud), a little ahead of
     // the pinned body with the chin in the mud: SB03 holds witnessEye, the reach (SB03A) sinks to reachEye.
-    witnessEye:P(.35,-125.15), reachEye:P(.25,-125.25),
+    // Lean into the trench opening while reaching so the fallen man's face clears the timber post.
+    witnessEye:P(.35,-125.15), reachEye:P(.25,-125.05),
     seatEyeM:.95, standEyeM:1.32, lieEyeM:.26, reachEyeM:.18,
     // SB04 (contract §2.5): ijaA drags him out of the mouth to the trench edge east of the mouth rubble (where the
     // fallen lintel lies) and brings the butt down on him there. SB04A (§2.7): he drags him on by the forearm, south
@@ -314,6 +318,8 @@ export const OPENING_STORYBOARDS = Object.freeze({
     interpreterAt:P(4.75,-124.85,50*Math.PI/180), ijaBAt:P(5.0,-124.86,30*Math.PI/180),
     // SB03 camera from shunzi.witnessEye (lieEyeM): the group left of centre, the trench's depth right.
     witnessShot:Object.freeze({ yawDeg:-80, pitchDeg:5, rollDeg:4 }),
+    // Close observation of the collar jerk from Shunzi's fixed, trapped position.
+    dragShot:Object.freeze({fovDeg:28, enterS:.55, exitS:.7, headBelowM:.22, rollDeg:2}),
     // Contract §2.7: backOffAfterS into Wipe the interpreter, then ijaB (backOffStaggerS later), go back down the SSW
     // leg -- over the crater step like the withdrawal lane (the gap between the mouth rubble and the spoil is too
     // narrow to walk) -- leaving SB03's picture on the right (out of SB03A's); from the blow they come running back up
@@ -440,6 +446,8 @@ export const OPENING_STORYBOARDS = Object.freeze({
         points:{ postNBase:{ at:[1.05,.3,-127.33], x:[.3,.6], y:[.25,.75] }, lintelN:{ at:[1.05,1.75,-126.9], x:[.4,.8], y:[0,.3] } } } }),
     // SB03: the questioning seen from the mouth mud: the group left of centre with the north wall's door (Set's
     // trenchFacadeN, x 2.7–3.9) behind it, the trench's depth right, the rifle low left of centre out of reach.
+    Object.freeze({ id:"SB03_Drag", when:"s.phase==='CaptiveDragged'&&r.time-s.flags.dragStart>=2.25",
+      judge:{camera:{eyeM:[.2,.32],fovV:[27,29]},actors:{comrade:{x:[.25,.75],y:[.15,.65]}}} }),
     Object.freeze({ id:"SB03", storyboard:"Storyboard_03_ProneWitness.png", phase:"Interrogation", age:3,
       judge:{ camera:{ eyeM:[.2,.32], pitchDeg:[1,10], rollDeg:[1,8], yawDeg:[-88,-72] },
         actors:{ ijaA:{ x:[.25,.58] }, comrade:{ x:[.25,.58] }, interpreter:{ x:[.4,.75], distM:[3.5,5.5] }, ijaB:{ x:[.4,.8] } },
@@ -514,14 +522,10 @@ export const OPENING_STORYBOARDS = Object.freeze({
   // the named replacement and removes it; the list must then be empty (Script_OpeningStoryboardsTest).
   pendingWiring:Object.freeze([
     // SB01 (Banter / Orders)
-    {shot:"SB01", what:"Yaowa sits low against the north wall loading clips, side-on to the camera",
-      now:"ClipLoad (legacy kneeling load) at banter.yaowa, Tableau/Tableau2", wave2:"YaowaSitLoad (Anim, optional in contract §4.1) if built; else keep ClipLoad"},
     {shot:"SB01", what:"the runner leans on the north post and calls in to the room",
       now:"MessengerReport at runnerRoute's end (PhaseOrders)", wave2:"RunnerLeanPostCall holdLoop with its post contact (Anim)"},
     {shot:"SB01", what:"Luo kneels in the mouth looking out down the trench",
       now:"LuoKneelCheck held at banter.luoKneelS (its kneel loop; the reach arm shows) in Tableau/PhaseOrders", wave2:"a native kneel (KneelHold/RifleIdle, contract §4.1): needs an Anim-owned hook -- a director request that passes kneel:1 through Script_OpeningStoryboardAnimation's Move state (now forced to 0) and is exempt from ResolveOpeningActorPose's Banter/Orders Luo substitution"},
-    {shot:"SB01", what:"first person: clip on the left palm, rifle across the thighs, legs in view",
-      now:"supply hands holding the loading rifle across the view (Script_OpeningFirstPerson)", wave2:"EXTRA_HAND_POSES.palmClip, FP_PROPS.loadingRifleOnLegs and LEG_POSES.sitForward in beats.Banter/Orders (Eye)"},
     {shot:"SB01", what:"north-wall crate stack, foreground crate, duckboards and revetment of the front trench",
       now:"nothing (bare earth)", wave2:"OpeningSet props bunkerCrateStackN, bunkerCrateFront, duckboardsFront, revetmentFront (Set)"},
     // SB02 (Blast)

@@ -125,6 +125,38 @@ try{
     assert.equal(receipt.idleProtected,false,"an idle melee state is not an attack");
   }
   console.log("ok freely controlled Luo/Zhou aim=1: audible-line head acting preserves hands, torso and weapon; idle melee is not protected");
+  const seatedSpeech=await page.evaluate(()=>{
+    const p=window.openingActorPerformanceProbe,{T,api}=p;
+    const actor=p.g.actorFactory.Create("nra",{modelVariant:1,weapon:"HanYang",seed:407});
+    const soldier={actor,id:"yaowa",alive:true,openingStoryboardTravel:0,openingStoryboardPose:{clip:"YaowaSitLoad",seconds:0}};
+    api.InstallOpeningStoryboardAnimation(soldier);
+    const Read=()=>{
+      actor.root.updateMatrixWorld(true);const b=actor.characterRig.bones;
+      return {head:b.head.getWorldQuaternion(new T.Quaternion()).normalize(),
+        contacts:[b.chest,b.handL,b.handR,actor.weaponGroup].map(node=>({p:node.getWorldPosition(new T.Vector3()),q:node.getWorldQuaternion(new T.Quaternion()).normalize()}))};
+    };
+    const samples=[];
+    for(let frame=0;frame<180;frame++){
+      actor.characterRig.openingActorPerformance?.Restore();
+      soldier.openingActorPerformance=null;
+      soldier.openingStoryboardPose.seconds=frame/60;
+      actor.Update(1/60,{elapsed:frame/60,moveSpeed:0,aim:0});
+      const before=Read(),talking=frame<120;
+      api.SetOpeningActorPerformance(soldier,{role:"yaowa",speaker:talking?"yaowa":null,phase:"Banter",clock:frame/60,lineSeconds:frame/60,lookAt:{x:1,y:1.2,z:-3}});
+      actor.characterRig.openingActorPerformance.Apply(1/60,{aim:0,moveSpeed:0},soldier.openingStoryboardPose);
+      const after=Read();
+      samples.push({talking,head:before.head.angleTo(after.head),headOnly:actor.characterRig.openingActorPerformanceState?.headOnly,
+        contactMove:Math.max(...before.contacts.map((node,i)=>node.p.distanceTo(after.contacts[i].p))),
+        contactTurn:Math.max(...before.contacts.map((node,i)=>node.q.angleTo(after.contacts[i].q)))});
+    }
+    api.ClearOpeningActorPerformance(soldier);actor.Dispose();return samples;
+  });
+  await fs.writeFile(path.join(output,"Data_SeatedLoadingSpeech.json"),JSON.stringify(seatedSpeech,null,2));
+  assert.ok(seatedSpeech.some(row=>row.talking&&row.head>.035),"seated Yaowa visibly acknowledges his lines");
+  assert.ok(seatedSpeech.filter(row=>row.talking).every(row=>row.headOnly),"loading speech moves only the head");
+  assert.ok(seatedSpeech.filter(row=>!row.talking).every(row=>row.head<1e-5),"silent loading retains its authored head pose");
+  assert.ok(seatedSpeech.every(row=>row.contactMove<1e-5&&row.contactTurn<1e-5),"loading speech preserves both wrists, chest and rifle contacts");
+  console.log("ok seated Yaowa: speech animates the head while both wrists, torso and rifle retain their authored pose");
   const cases=[
     {role:"yaowa",phase:"Banter",kind:"nra",variant:1,clip:"SupplyReceive",freeHand:"handR",minHandM:.04},
     {role:"luo",phase:"Orders",kind:"nra",variant:4,clip:"PointBlockade",freeHand:"handL",minHandM:.07},

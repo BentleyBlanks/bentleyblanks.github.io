@@ -391,6 +391,7 @@ export async function DriveOpening(ctx){
         const at=r.Point(q.actor.position,1.3),view=at.clone().project(cam);
         return {id:q.spec.id,x:+q.actor.position.x.toFixed(2),z:+q.actor.position.z.toFixed(2),
           distance:+Math.hypot(q.actor.position.x-eye.x,q.actor.position.z-eye.z).toFixed(1),
+          waypoint:q.index,stance:q.actor.stance,goal:q.actor.goal.toArray(),detourS:q.actor.detourTime,
           seen:!r.BlocksSight(eye,at)&&Math.abs(view.x)<1&&Math.abs(view.y)<1&&view.z<1};});
       return {pursuit,time:r.time,stage:r.flow.stage.id,player:g.player.position.toArray(),eye:T.toArray()};
     });

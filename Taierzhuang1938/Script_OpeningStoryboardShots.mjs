@@ -2,7 +2,7 @@
 //
 //   node Taierzhuang1938/Script_OpeningStoryboardShots.mjs [--shots=SB01,SB02] [--quality=high|medium|low]
 //        [--size=1280x720] [--out=<dir>] [--hud] [--warm=6] [--tag=<suffix>] [--side-by-side=<storyboard dir>]
-//        [--plan=<plan.json>] [--no-stop] [--no-judge] [--stage=2]
+//        [--plan=<plan.json>] [--no-stop] [--no-judge] [--stage=2] [--baseline-root=<read-only checkout>]
 //
 // Plays 01 from its first frame in the real flow (no phase skips, no injected facts), and at each
 // shot of OPENING_STORYBOARDS.storyboardShots (a phase + age, or a `when` expression over the director
@@ -74,6 +74,7 @@ export function JudgeShot(judge, dump) {
   const cam = dump.camera;
   const J = judge.camera || {};
   if (J.eyeM) out.push(Range("eye height (m)", cam.eyeAboveGround, J.eyeM));
+  if (J.fovV) out.push(Range("vertical field of view (deg)", cam.fovV, J.fovV));
   if (J.pitchDeg) out.push(Range("pitch (deg)", cam.pitchDeg, J.pitchDeg));
   if (J.rollDeg) out.push(Range("roll (deg)", cam.rollDeg, J.rollDeg));
   if (J.absRollDeg) out.push(Range("|roll| (deg)", Math.abs(cam.rollDeg), J.absRollDeg));
@@ -160,7 +161,7 @@ async function Main() {
   if (Arg("shots")) { const want = Arg("shots").split(","); plan = plan.filter((s) => want.some((w) => s.id === w || s.id.startsWith(w + "_"))); }
   if (!plan.length) throw Error("no shots selected");
 
-  const server = await ServeRoot(path.resolve(here, ".."), 0);
+  const server = await ServeRoot(path.resolve(Arg("baseline-root", path.resolve(here, ".."))), 0);
   const browser = await LaunchBrowser();
   const page = await browser.newPage({ viewport: { width: W, height: H } });
   const errors = [];

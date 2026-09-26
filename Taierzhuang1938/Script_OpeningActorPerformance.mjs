@@ -161,8 +161,11 @@ export class OpeningActorPerformance {
     const protectedBeat=ContactClips.has(pose?.clip)||state.meleeCombat?.state==="attack";
     const meleeActive=state.meleeCombat?.state==="attack"||state.meleeCombat?.state==="bind";
     const nativeCombat=this.soldier.openingStoryboardTravel==null&&(state.firing||state.fire>0||state.aim>.6||meleeActive);
-    const headOnly=nativeCombat&&talking;
-    if(protectedBeat||nativeCombat&&!talking){this.rig.openingActorPerformanceState={role:context.role,protected:true};return;}
+    // The seated loading clip owns both hands and the rifle, but Yaowa must
+    // still acknowledge his spoken lines. Keep its body/contact pose intact.
+    const loadingSpeech=pose?.clip==="YaowaSitLoad"&&talking&&!meleeActive;
+    const headOnly=nativeCombat&&talking||loadingSpeech;
+    if(protectedBeat&&!loadingSpeech||nativeCombat&&!talking){this.rig.openingActorPerformanceState={role:context.role,protected:true};return;}
     const time=(Number.isFinite(context.clock)?context.clock:this.clock)+this.phase;
     const lineAge=Math.max(0,context.lineSeconds||0);
     const voice=Number.isFinite(context.speechLevel) ? .35+.65*Clamp(context.speechLevel) : 1;

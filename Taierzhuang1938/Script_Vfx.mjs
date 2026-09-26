@@ -1667,7 +1667,7 @@ export class VfxSystem {
       }, undefined, () => {});
     }
 
-    for (const [key, variant] of Object.entries(EXPLOSION_SPRITE_VARIANTS)) {
+    this.explosionSpritesReady = Promise.all(Object.entries(EXPLOSION_SPRITE_VARIANTS).map(([key, variant]) => new Promise(resolve => {
       textureLoader.load(new URL(variant.path, import.meta.url).href, (texture) => {
         texture.colorSpace = THREE.SRGBColorSpace;
         // 所有源图都按左上→右下排帧；沿用旧爆炸图验证过的 UV 方向。
@@ -1679,8 +1679,9 @@ export class VfxSystem {
         this.loadedExplosionSprites.add(key);
         const pool = this.pools?.[variant.pool];
         if (pool) pool.material.uniforms.uSpriteMap.value = texture;
-      }, undefined, () => {});
-    }
+        resolve(true);
+      }, undefined, () => resolve(false));
+    })));
 
     // 第 2 套 Vefects 免费火焰包；仓库只带正片实际依赖的 5 张转换纹理。
     this.vefectsTextures = new Map();

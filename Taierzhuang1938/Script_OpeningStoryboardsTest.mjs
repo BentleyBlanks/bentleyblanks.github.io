@@ -561,6 +561,13 @@ assert.deepEqual([...C.phases.RearTrench],["Withdraw","Corner","Collection","Sup
   assert.deepEqual(twice,[],"the director class has no duplicate method names");
   assert.match(source,/CornerFire\([^)]*\)\{[\s\S]*?this\.FireRifle\(/,"the corner man's loop fires a real rifle shot");
   assert.ok(Object.values(C.pursuit).every(v=>Number.isFinite(v)&&v>0),"pursuit tuning is finite");
+  const {RouteClearance}=await import("./Script_FirstLevelSpaceProbe.mjs");
+  const {MISSION_ENCOUNTERS}=await import("./Data_FirstLevelMission.mjs");
+  for(const spec of MISSION_ENCOUNTERS.bunkerPursuit)if(spec.route){
+    const clearance=RouteClearance([spec,...spec.route],{state:"BunkerCollapsed"});
+    assert.deepEqual(clearance.hits,[],`${spec.id}: the pursuit corridor clears real scene solids`);
+    assert.deepEqual(clearance.slopes,[],`${spec.id}: the pursuit corridor stays within the climb limit`);
+  }
 }
 // ---- reproducibility (optional): --rebake=<dir> holds rig files from `OPENING_PASS=verify` (the repository bake
 // script, any subset of clips); every clip in them must be the committed clip -- every bone within 0.5 deg and

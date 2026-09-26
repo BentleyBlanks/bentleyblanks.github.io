@@ -74,27 +74,6 @@
       "cer": 0.5,
       "note": "炮→跑、趴→爬，同音。"
     },
-    "CaptiveDragged.01": {
-      "sha256": "18cbd3f8834b1d42c1ecf75e24e86c6e6a8f9206149452696773ce7bf644e31e",
-      "transcript": "- 哭死人了。",
-      "cer": 1,
-      "note": "未能核对：这句按稿是神志不清的受伤川军被拖出来时含糊地骂，whisper 只转出「哭死人了」；三次生成都转不出来。字数差 2 以内，放行但需要人工试听确认。",
-      "needsListening": true
-    },
-    "CaptiveDragged.02": {
-      "sha256": "1ce4430a415688783afbe564379f02cd55d5509688a8ababd30b0486578e37ae",
-      "transcript": "",
-      "cer": 1,
-      "note": "未能核对：「たて！」只有 0.24 s 有声，whisper 转写为空；需要人工试听确认。",
-      "needsListening": true
-    },
-    "CaptiveDragged.03": {
-      "sha256": "2b43b841d650cf211bab29117a1c90be57e0e7676e28df6a18fd34aa2457e07a",
-      "transcript": "简讯。",
-      "cer": 1,
-      "note": "未能核对：「日你……先人……」按稿从牙缝里挤出来，whisper 只转出「简讯」（先人→简讯近音）；需要人工试听确认。",
-      "needsListening": true
-    },
     "CaptiveTaunt.03": {
       "sha256": "73405c74b282864f0ffc019b73000ceac1ccc20383eac13c71fcd99728205fe9",
       "transcript": "フン、バカ野郎",
@@ -258,6 +237,32 @@
       "transcript": "随你所谓。",
       "cer": 1.3333,
       "note": "催命嗦→随你所谓（cui-ming-suo/sui-ni-suo-wei），近音，含着烟的嘟囔。"
+    },
+    "CaptiveInterrogation.04": {
+      "sha256": "8d23c3fea06bf234b1b76867bcb305c496ab91e6b919568f965c540d60dbcdd9",
+      "transcript": "傻子?",
+      "cer": 0.5,
+      "note": "稿面『啥子』被转写为『傻子』，同音近音，当前补录已匹配川军本人参考音。"
+    },
+    "CaptiveInterrogation.06": {
+      "sha256": "0fe258e644e50812a811ab37b80a21d4a5798e8b7664379e3723a5c80c079b6b",
+      "transcript": "このしな野郎早く言え負け",
+      "cer": 0.4,
+      "note": "转写仍有不确定处，已保留当前原片供试听；不得据此宣称逐字听验通过。",
+      "needsListening": true
+    },
+    "CaptiveDragged.01": {
+      "sha256": "27e99dd1ed6f804896f75d5ae93ef21e0f3d38e5ede2baf13bb8cd94198bfe08",
+      "transcript": "狗子嘞!你妈嘞!",
+      "cer": 0.5,
+      "note": "稿面『狗日的……你妈的……』被识别成四川尾音『狗子嘞！你妈嘞！』；转写文本核对，未人工试听。"
+    },
+    "CaptiveDragged.03": {
+      "sha256": "2d86ed836304d10245278ad4e62c2e99b1265d490e18ab8508f9f40821ee33b4",
+      "transcript": "你 闲人?",
+      "cer": 0.5,
+      "note": "转写仍有不确定处，已保留当前原片供试听；不得据此宣称逐字听验通过。",
+      "needsListening": true
     }
   }
 }

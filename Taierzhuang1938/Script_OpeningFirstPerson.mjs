@@ -685,7 +685,8 @@ export class OpeningFirstPerson{
     // The loading rifle is in his hands until the near miss throws it out of them (Blast +0.12 s), unless the
     // director gives those phases hand keys (then the beat, e.g. palmClip with the rifle on his legs, rules).
     const legacySupply=phase=>SUPPLY_PHASES.has(phase)&&!HandKeys(HANDS.beats[phase]);
-    const supply=!override&&(legacySupply(p)||p==="Blast"&&a<.12&&legacySupply("Incoming")),body=s.playerBody.root;
+    const finishing=p==="Orders"&&s.flags?.exitAt!=null;
+    const supply=!override&&(finishing||legacySupply(p)||p==="Blast"&&a<.12&&legacySupply("Incoming")),body=s.playerBody.root;
     body.visible=s.ready;body.position.copy(cam.position);body.quaternion.copy(cam.quaternion);body.updateWorldMatrix(true,true);
     const Local=(x,y,z)=>V(x,y,z).applyQuaternion(cam.quaternion).add(cam.position);
     const Direction=(x,y,z)=>V(x,y,z).applyQuaternion(cam.quaternion).normalize();
@@ -711,6 +712,7 @@ export class OpeningFirstPerson{
     }else{
       beat=supply?null:OpeningHandBeat(s,p);
       bodyBeat=OpeningBodyBeat(s,p);
+      if(finishing)bodyBeat=null;
     }
     this.report={available:true,phase:p,pose:poseKey,age:a,beat:beat?.names||null,hands:{}};
     // Legs first: moving the pelvis moves every parent of the arms, whose shoulders are then placed in world.
@@ -719,7 +721,7 @@ export class OpeningFirstPerson{
     this.report.legs=legReport;
     // Supply overlays (Banter: dirt in the collar; Orders: the bolt pushed home).
     const flags=s.flags||{};
-    const dig=supply&&flags.dirtAt!=null?now-flags.dirtAt:null;
+    const dig=p==="Banter"&&flags.dirtAt!=null?now-flags.dirtAt:null;
     const digWeight=dig==null?0:Smooth((dig-.2)/.6)*(1-Smooth((dig-1.7)/.6));
     const bolt=supply&&p!=="Banter"&&flags.exitAt!=null?now-flags.exitAt:null;
     const boltWeight=bolt==null?0:Smooth(bolt/.25)*(1-Smooth((bolt-.75)/.3));
@@ -774,6 +776,15 @@ export class OpeningFirstPerson{
         // Never inside minEyeM of the eye, whatever the partner does (no half screen of bare arm).
         const minEye=partnerPose?.minEyeM||0;
         if(minEye>0&&target.distanceTo(cam.position)<minEye)target.sub(cam.position).setLength(minEye).add(cam.position);
+      }
+      // The seated charger pose keeps the authored dirt-in-collar gesture.
+      if(!supply&&p==="Banter"&&side==="r"&&digWeight>0){
+        const k=SampleKeys([[0,"digCollar","digCollar"],[.8,"digCollar","digCollar"],[1.3,"dig","dig"]],dig-.25);
+        const over=this.BeatPose({r:[HANDS.poses[k.a[1]],HANDS.poses[k.b[1]]],mix:k.mix},"r",frames,now);
+        target.lerp(over.target,digWeight);
+        const frame=FrameQuaternion(forward,normal).slerp(over.frame,digWeight);
+        forward=V(0,0,1).applyQuaternion(frame);normal=V(0,1,0).applyQuaternion(frame);
+        curl=curl.map((v,i)=>v+(over.curl[i]-v)*digWeight);shape=null;
       }
       let otherRig,otherSide,otherShoulder;
       if(grasp&&side==="l"){otherRig=Anatomy(DragPartner(s));otherSide="l";if(!otherRig)grasp=false;}
@@ -886,7 +897,7 @@ export class OpeningFirstPerson{
       s.clips[0].position.copy(Palm(this.rig,"r"));s.clips[0].quaternion.copy(cam.quaternion);
       s.clips[0].position.add(Direction(0,.027,0).multiplyScalar(.027));
       const yaowa=r.companion?.Handle?.("yaowa")?.actor?.characterRig?.bones?.handL;
-      s.clips[1].visible=!!yaowa&&loading;
+      s.clips[1].visible=false; // Yaowa's baked rifle/charger action owns his hands.
       if(yaowa){yaowa.getWorldPosition(s.clips[1].position);s.clips[1].position.y+=.04;}
     }
     body.updateWorldMatrix(true,true);s.firstPersonState=this.report;

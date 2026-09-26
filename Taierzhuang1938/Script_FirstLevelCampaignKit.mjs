@@ -78,6 +78,7 @@ export function ParseCampaignArgs(argv = process.argv) {
   assert.ok(/^[A-Za-z0-9_-]*$/.test(evidenceTag), "--evidence-tag is letters, digits, _ or -");
   return {
     campaign: Has("--campaign"),
+    baselineRoot: argv.find((arg) => arg.startsWith("--baseline-root="))?.slice("--baseline-root=".length) || null,
     audioCheck: Has("--audio"),
     probeFrontGun: Has("--probe-front-gun"),
     stageJumps,
@@ -106,7 +107,8 @@ export async function OpenCampaign(options) {
   const shotsTag = options.evidenceTag || process.env.CAMPAIGN_SHOTS_TAG;
   const output = path.join(here, "_shots", options.suite + (shotsTag ? "_" + shotsTag : ""));
   await fs.mkdir(output, { recursive: true });
-  const server = await ServeRoot(root, 0);
+  // Serve an unchanged checkout for failure comparison; evidence stays in this task's tree.
+  const server = await ServeRoot(options.baselineRoot ? path.resolve(options.baselineRoot) : root, 0);
   const browser = await LaunchBrowser();
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
   const errors = [];

@@ -12,8 +12,7 @@ import { VOICE_LINES as CH1_VOICES, CHAPTER as CH1_CHAPTER } from "./Data_Missio
 import { existsSync, readFileSync } from "node:fs";
 import { openingStoryBeats } from "./Data_FirstLevelP012Opening.mjs";
 import { P012SegmentClear } from "./Script_FirstLevelP012March.mjs";
-import { BLAST } from "./Data_Tuning_Combat.mjs";
-import { GrenadeTrauma } from "./Script_Combat.mjs";
+import { CombatSystem } from "./Script_Combat.mjs";
 import { HasText } from "./Script_Text.mjs";
 import {
   P012_BEATS, P012_INTERACTION_SPECS, P012_OBJECTIVE_LINES, P012_GUIDANCE_NAMES,
@@ -256,16 +255,16 @@ const points = new Map();
     distanceTo(v){return Math.hypot(this.x-v.x,this.y-v.y,this.z-v.z);}
   }
   const source=readFileSync(new URL("./Script_Combat.mjs",import.meta.url),"utf8");
-  const method=source.slice(source.indexOf("  Blast(position"),source.indexOf("  get MortarLeft"));
-  // Blast 的手感常量已经搬进 Data_Tuning_Combat.BLAST：把表注进去，不在这里抄数。
-  const blast=Function("Clamp01","BLAST","GrenadeTrauma",`return ({${method}}).Blast;`)(v=>Math.max(0,Math.min(1,v)),BLAST,GrenadeTrauma);
+  const blast=CombatSystem.prototype.Blast;
   const director=new FirstLevelP012Director({EnemyPosition:actor=>actor.alive?actor.position:null},phase.whitebox);
   director.beat=21;
   const enemies=Array.from({length:6},(_,id)=>({id,alive:true,side:"ija",suppression:0,position:new Vec(2+id,0,0),TakeHit(damage){this.health=(this.health??100)-damage;return false;}}));
   director.enemyRoutes=enemies.map(handle=>({encounterBeat:21,handle}));
   const before=director.Snapshot();
   let wall=true;
-  const host={host:{battlefield:{Raycast:()=>wall?{t:.1}:null},ai:{soldiers:enemies}},tmp:new Vec(),tmpB:new Vec()};
+  // Keep production helpers (including BlastFeedback) on the fixture prototype.
+  const host=Object.assign(Object.create(CombatSystem.prototype),{
+    host:{battlefield:{Raycast:()=>wall?{t:.1}:null},ai:{soldiers:enemies}},tmp:new Vec(),tmpB:new Vec()});
   const receipt=(target,damage,position)=>director.RecordSouthGrenadeEffect(target,damage,position);
   blast.call(host,new Vec(),4,100,"grenade","ija",true,receipt);
   assert.equal(director.State().lastSouthGrenadeEffect,null,"solid wall blocks both damage and receipt");

@@ -244,7 +244,7 @@ export class CombatSystem {
   FireShell(from, target, { flight = SHELL.flightFallbackS, kind = "Shell75",
     radius = SHELL.radiusFallbackM, damage = SHELL.damageFallback,
     OnImpact = null, byPlayer = false, sourceCollider = null,
-    incoming = true, report = false, Elapsed = null, occludedSuppression = false } = {}) {
+    incoming = true, report = false, Elapsed = null, occludedSuppression = false, feedbackOnly = false } = {}) {
     // 一发炮弹的三声里的前两声（第三声是落地，走 Blast）。**写在这儿而不是调用点**：
     // 见 SHELL.incomingCue 的抬头 —— 原来只有序章那两处自己补了啸声，
     // 第一关的军列炮击、前沿弹着点、战车主炮全程是哑的。
@@ -266,7 +266,7 @@ export class CombatSystem {
     velocity.y += GRAVITY * flight * 0.5;
     const shell = { id: ++this.shellSerial, from: from.clone(), target: target.clone(), position: from.clone(),
       velocity, initialVelocity: velocity.clone(), age: 0, flight, kind: ExplosiveIdFor(kind), radius, damage, OnImpact, byPlayer, sourceCollider, Elapsed,
-      occludedSuppression };
+      occludedSuppression, feedbackOnly };
     this.shellVisuals.Create(shell);
     this.shells.push(shell); return shell;
   }
@@ -342,7 +342,14 @@ export class CombatSystem {
         this.shellVisuals.Retire(shell); this.shells.splice(i, 1); continue;
       }
       if (!impact) continue;
-      this.Blast(impact, shell.radius, shell.damage, "shell", null, shell.byPlayer, null, shell.kind, null,
+      if(shell.feedbackOnly){
+        // Scripted collapse owns its geometry. A cinematic shell keeps impact audio,
+        // particles and shared concussion, without constructing a second terrain crater
+        // or running zero-damage injury/destruction queries on the impact frame.
+        this.host.onBlast?.({position:impact.clone(),radius:shell.radius,damage:0,kind:"shell",hurtSide:null,byPlayer:false,explosiveId:shell.kind,ownerId:null});
+        this.host.vfx?.Explosion(impact,{radius:shell.radius,kind:"shell"});
+        this.BlastFeedback(impact,shell.radius);
+      }else this.Blast(impact, shell.radius, shell.damage, "shell", null, shell.byPlayer, null, shell.kind, null,
         shell.occludedSuppression ? { occludedSuppression: true } : null);
       shell.OnImpact?.(impact); this.shellVisuals.Retire(shell); this.shells.splice(i, 1);
     }

@@ -369,7 +369,11 @@ export async function DriveFrontBattle(ctx){
     await Route(S.approach.slice(-3,-2),"RightNestApproachViaDoor",{stance:"crouch",fight:true,crawl:true,recoverAfterEvade:true});
   });
   if(clearFromDoor)await ClearNestFromDoor();
-  await Route(S.approach.slice(-2),"RightNestEntry",{stance:"crouch",fight:true,crawl:true,recoverAfterEvade:true}).catch(async error=>{
+  // A dodge can put the player outside the west wall before entry is complete.
+  // Replan through its door immediately, like ReturnToSeat, instead of waiting
+  // for the stale cross-wall route to time out while the handover lines play.
+  await Route(S.approach.slice(-2),"RightNestEntry",{stance:"crouch",fight:true,crawl:true,recoverAfterEvade:true,
+    replanAfterEvade:at=>SeatPath(at).points}).catch(async error=>{
     if(!/actual body reached route end/.test(error?.message||""))throw error;
     console.log("RightNestEntry: stalled after an evade, going round through the west door");
     await Route(S.approach.slice(-3),"RightNestEntryViaDoor",{stance:"crouch",fight:true,crawl:true,recoverAfterEvade:true});

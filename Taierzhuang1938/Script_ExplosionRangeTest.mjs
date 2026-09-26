@@ -153,6 +153,23 @@ try {
   assert.ok(result.wallImpact.impact && Math.abs(result.wallImpact.impact[0] - 2654) < 0.05, "actual boundary wall intercepts shell");
   assert.deepEqual(result.wallImpact.position, result.wallImpact.impact, "visual head stops at swept impact instead of jumping through wall");
   assert.ok(result.wallImpact.age < 0.3 && result.wallImpact.count === 1 && result.wallImpact.fading === 1 && result.wallImpact.remaining === 0);
+  result.cinematicShell = await page.evaluate(() => {
+    const t=window.Taierzhuang; t.Debug.Explosions.Reset();
+    const before=t.Debug.Explosions.State().terrain.impacts,health=t.player.health;
+    const from=t.player.position.clone().set(2600,3,2600),target=from.clone().setY(0);
+    let impacts=0,feedback=0,damageQueries=0;
+    const originalFeedback=t.combat.BlastFeedback,originalBlast=t.combat.Blast;
+    t.combat.BlastFeedback=function(...args){feedback++;return originalFeedback.apply(this,args);};
+    t.combat.Blast=function(...args){damageQueries++;return originalBlast.apply(this,args);};
+    try{
+      t.combat.FireShell(from,target,{flight:.22,radius:4,damage:120,feedbackOnly:true,incoming:false,OnImpact:()=>impacts++});
+      for(let i=0;i<30;i++)t.combat.StepShells(1/60);
+      return {impacts,feedback,damageQueries,terrainDelta:t.Debug.Explosions.State().terrain.impacts-before,healthDelta:t.player.health-health,
+        sprite:t.combat.host.vfx.lastExplosionSprite?.kind};
+    }finally{t.combat.BlastFeedback=originalFeedback;t.combat.Blast=originalBlast;}
+  });
+  assert.deepEqual(result.cinematicShell,{impacts:1,feedback:1,damageQueries:0,terrainDelta:0,healthDelta:0,sprite:"shell"},
+    "cinematic shell hits once with shared feedback and particles, without deforming terrain or querying damage");
   result.airMiss = await page.evaluate(() => {
     const t = window.Taierzhuang; t.Debug.Explosions.Reset(); let impacts = 0;
     const from = t.player.position.clone().set(2600, 100, 2600);

@@ -16,6 +16,11 @@ SR = 24000
 
 
 def FindWeights():
+    # An extracted, unmodified speaker_encoder.* safetensors subset avoids needing
+    # the unrelated multi-gigabyte speech generator on a voice-validation machine.
+    explicit = os.environ.get('VOICE_SPEAKER_WEIGHTS')
+    if explicit:
+        return explicit if os.path.isfile(explicit) else None
     root = os.path.expanduser("~/.cache/huggingface/hub/models--Qwen--Qwen3-TTS-12Hz-1.7B-Base/snapshots")
     hits = glob.glob(os.path.join(root, "*", "model.safetensors"))
     return hits[0] if hits else None

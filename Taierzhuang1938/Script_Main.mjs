@@ -4777,7 +4777,12 @@ async function WarmLevel(phase) {
           const forward = new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
           const spot = eye.clone().addScaledVector(forward, 3);
           const groundY = battlefield.GroundHeight(spot.x, spot.z);
-          vfx.Explosion(spot.clone().setY(groundY + 0.2), { radius: 4, kind: "grenade", groundY });
+          // A random grenade covers only one atlas. Warm every material/texture through
+          // the real frame so the first shell doesn't pay its upload and driver JIT cost.
+          await vfx.explosionSpritesReady;
+          report.explosionVariants = ["legacy", "compact", "fireball", "heavy"];
+          for(const spriteVariant of report.explosionVariants)
+            vfx.Explosion(spot.clone().setY(groundY + 0.2), { radius: 4, kind: "shell", groundY, spriteVariant });
           smokeHandle = vfx.SmokeSource({ x: spot.x, y: groundY + 0.5, z: spot.z }, { kind: "dust", rate: 12, radius: 0.6, rise: 0.4, life: 1.5, opacity: 0.2 });
           vfx.MuzzleFlash(eye.clone().addScaledVector(forward, 0.6), forward, { kind: "rifle" });
           vfx.Tracer(eye.clone().addScaledVector(forward, 0.6), spot.clone(), { kind: "nra" });

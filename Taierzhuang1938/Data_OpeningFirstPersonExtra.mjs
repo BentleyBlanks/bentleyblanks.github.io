@@ -62,6 +62,7 @@ export const HAND_SHAPES = Freeze({
 export const EXTRA_HAND_POSES = Freeze({
   // SB01: the LEFT palm up with a five-round clip, low centre-left (survey target screen (0.33,0.80)).
   palmClip: H("cam", [.14, -.14, -.36], [-.38, .12, -1], [.28, -1, .05], [18, 26, 16], { shape: "cradle" }),
+  palmClipTilt: H("cam", [.135, -.135, -.37], [-.32, .2, -1], [.16, -1, -.03], [18, 26, 16], { shape: "cradle" }),
   // SB02: the RIGHT hand flung open towards the mouth, ≥0.35 m from the eye (not a half-screen of skin);
   // survey target screen (0.72,0.45) in the mirrored shot. Storyboard: the back of the hand to the eye, the
   // spread fingers up and out in the picture plane (review 09-25: fingers pointing into the frame foreshortened
