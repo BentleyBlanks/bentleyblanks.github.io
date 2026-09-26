@@ -54,9 +54,30 @@ for(const {key,geometry} of batches){
   for(let i=0;i<p.count;i++){
     const gap=p.getY(i)-Ground(p.getX(i),p.getZ(i));
     assert.ok(Number.isFinite(gap));
-    if(key==='TrenchDryGrass')assert.ok(gap>.054&&gap<.131,'draped mat follows the full bank footprint');
+    if(key==='TrenchDryGrass')assert.ok(gap>.017&&gap<.049,'draped mat follows the full bank footprint');
   }
   geometry.dispose();
 }
 grass.dispose();stone.dispose();
+// A crown can stand above physics. Mats must rest on that visible surface,
+// including across triangle boundaries, instead of disappearing inside clods.
+const crown=new THREE.PlaneGeometry(20,40);crown.rotateX(-Math.PI/2);crown.translate(0,.4,8);
+crown.userData.trenchCrown=true;
+const crownBatches=[];
+const crownAssets={grass:new THREE.IcosahedronGeometry(.1,0),stone:new THREE.IcosahedronGeometry(.1,0)};
+BuildTrenchSurface({buckets:new Map([['crown',[crown]]]),SetSector(){},Add(key,geometry){crownBatches.push({key,geometry});}},
+  plan,(x)=>Math.abs(x)>1.5?2:0,crownAssets);
+for(const {key,geometry} of crownBatches)if(key==='TrenchDryGrass'){
+  const p=geometry.attributes.position;
+  for(let i=0;i<p.count;i++)if(Math.abs(p.getX(i))>1.5)assert.ok(p.getY(i)>2.017,'a buried crown never lowers grass below physics');
+}
+// Place the visible crown above the fixture's bank, then verify actual vertices.
+crown.translate(0,2,0);
+const raised=[];
+BuildTrenchSurface({buckets:new Map([['crown',[crown]]]),SetSector(){},Add(key,geometry){raised.push({key,geometry});}},
+  plan,(x)=>Math.abs(x)>1.5?2:0,crownAssets);
+const mats=raised.filter(b=>b.key==='TrenchDryGrass');assert.ok(mats.length>0);
+for(const {geometry} of mats){const p=geometry.attributes.position;for(let i=0;i<p.count;i++)assert.ok(p.getY(i)>2.417&&p.getY(i)<2.449,'mat sits on the rendered crown');}
+for(const {geometry} of [...crownBatches,...raised])geometry.dispose();
+for(const geometry of Object.values(crownAssets))geometry.dispose();crown.dispose();
 console.log('TrenchSurfaceTest: physical contact update/reset, measured grass direction, geometry and packed asset contracts passed');

@@ -1,21 +1,23 @@
 # 通用壕沟表面：参考图 07
 
-2026-09-26 第二次迭代：前版没有通过用户视觉验收。此次重做近景扫描土壤视差、碎土几何、石材覆土与坡面枯草根毯。入口是 `FirstLevelWhiteboxField.PrepareAssets / BuildWhiteBoxes`；参数在 `Data_TrenchSurface.mjs` 与 `Data_TrenchAppearance.mjs`。关卡路线、沟宽、沟深及碰撞高度保持原契约。
+2026-09-26 第三次迭代：前版再次未通过用户视觉验收。此次改为连续的碎土坡皮、沿坡面法线嵌入的细土块与石块，根毯贴合可见冠部，并重调日间明暗。入口是 `FirstLevelWhiteboxField.PrepareAssets / BuildWhiteBoxes`；参数在 `Data_TrenchSurface.mjs` 与 `Data_TrenchAppearance.mjs`。关卡路线、沟宽、沟深及碰撞高度保持原契约。
 
 ## 表面与接地
 
-- 基础泥土采用 [Poly Haven Brown Mud 02](https://polyhaven.com/a/brown_mud_02) 的成套颜色、OpenGL 法线、粗糙度、AO 和位移数据。本轮近景铺设尺度为 0.85 m；扫描高度参与八步有界 POM，颜色、法线与粗糙度使用同一偏移坐标。三向投影连续混合，两组随机平移样本减少重复；POM 在 4–14 m 渐隐。不是只让独立湿斑遮罩移动。
-- `BuildTrenchEarth` 在下半坡补可裁切的碎土表层，边缘埋入原高度场，叠加多尺度土块与沟脚细屑。其高度扰动只属于视觉装饰，不产生另一个导航或碰撞面。上半坡给根毯留出覆盖空间。
-- 四种局部泥块/浅压痕仍打包在 `Texture_TrenchMudHeightMask.png`：R 高度、G 边缘遮罩、B 积水倾向、A 缝隙 AO。额外高度层降到 1.8 cm；湿润只轻微压暗，高光集中在接近平面的凹处，陡壁保持较高粗糙度。避免前版大面积黑斑与亮团。
-- 泥层通过表面补丁在光照前修改颜色、法线、粗糙度和材质 AO；不另铺透明发亮平面。湿地表接既有 SSR，AO 仍只直接作用于间接光，直射微阴影沿用材质框架。
-- `TerrainContactField` 上传已有物理高度网格，着色器用相同的三角形对角线插值出高度和法线。碎石下缘按到地表的法向距离与噪声混入同一套泥土颜色、法线、AO 和粗糙度；接触不依赖摄像机深度。碎石缩小、加深埋入、扩大覆土带，外露部分也混入土色；整个足迹顺坡，不能只把模型中心接地。
-- 自然岩石 PBR 装入既有地形纹理数组的第 5 层，仍只占两只 array sampler；四层地形的权重和均值接口不变。高度场与泥层各增加一只 sampler；地形启用 SSR 后，最高画质 + GI + 弹坑变体为 16/16，普通湿泥/石土接触变体为 14/16。新增纹理前必须再跑 sampler 门禁。
+- 基础泥土采用 [Poly Haven Brown Mud 02](https://polyhaven.com/a/brown_mud_02) 的成套颜色、OpenGL 法线、粗糙度、AO 和位移数据。近景铺设尺度为 0.8 m；扫描高度参与八步有界 POM，颜色、法线与粗糙度使用同一偏移坐标。三向投影连续混合，两组随机平移样本使用保持方差的混合；POM 在 4–14 m 渐隐。四步高度搜索给近景土粒补直射自阴影。
+- `BuildTrenchEarth` 用相邻测站之间的连续 12×8 网格覆盖坡面，取消沿测站反复鼓起的独立块状坡皮。细土块、碎石先沿采样到的坡面法线转向，再让足迹贴合高度场，避免陡坡上垂直压扁的三角薄片。其高度扰动只属于视觉装饰，不产生另一个导航或碰撞面。
+- 湿润凹处直接取同一套扫描高度、坡度与世界噪声，不再用另一张泥块图覆盖土粒法线。旧 `Texture_TrenchMudHeightMask.png` 仍保留在资产及重建入口，但新材质不采样它。湿润只轻微压暗，高光集中在接近平面的凹处，陡壁保持较高粗糙度。
+- 泥层通过表面补丁在光照前修改颜色、法线、粗糙度和材质 AO；不另铺透明发亮平面。湿地表接既有 SSR。四方向、两段距离的世界高度遮蔽加强沟底与壁脚的间接光遮挡，使用随爆炸更新的接触高度场；扫描高度自阴影只乘直射项，AO 仍只作用于间接光。
+- `TerrainContactField` 上传已有物理高度网格，着色器用相同的三角形对角线插值出高度和法线。碎石下缘按到地表的法向距离与噪声混入同一套泥土颜色、法线、AO 和粗糙度；接触不依赖摄像机深度。覆土带缩到石脚附近，保留外露石面的矿物颜色；整个足迹顺坡，不能只把模型中心接地。细土块以可见坡皮为埋入基准，埋入量按坡面法线换算，避免被新坡皮全部盖住或在陡坡上过分突出。
+- 自然岩石 PBR 装入既有地形纹理数组的第 5 层，仍只占两只 array sampler；四层地形的权重和均值接口不变。土壤和碎石共用一只接触高度场 sampler，取消材质的独立泥块 sampler。新增纹理前必须再跑 sampler 门禁。
+
+第一关 `firstLevelBattleDay` 保留阴云、硝烟与原太阳方向，提高主光与曝光、降低均匀填充光，让土坡明暗可读；云层本身也提亮。共享模型验收日光和夜间预设不变。数值只在 `Script_Sky.mjs` 的该预设维护。
 
 这是适配现有 WebGL2 前向管线的材质内投影层与世界高度接触场，不是完整的 DBuffer 或运行时虚拟纹理系统。方法参考 [Unreal 的 decal 材质通道](https://dev.epicgames.com/documentation/unreal-engine/decal-materials-in-unreal-engine) 与 [Frostbite 的分层地形系统](https://www.ea.com/frostbite/amp/news/terrain-in-battlefield-3-a-modern-complete-and-scalable-system)。
 
 ## 模型、许可与重建
 
-`Model_TrenchStone.glb` 为 80 三角的原创破碎石块。`Model_TrenchDryGrass.glb` 改为 1040 三角、带细侧枝的根束，仅少量布设并和碎土共用分区；导出顶点云为 Y 向上、下垂方向为局部 -Z。主要覆盖使用 `Texture_TrenchRootMat.png`：内置 imagegen 单张生成、保留真实 alpha，8×6 网格逐点贴合原坡面，随机尺度与左右镜像；alphaTest 0.42，不使用半透明排序。所有网格走 BuildSink，无逐簇 Mesh。
+`Model_TrenchStone.glb` 为 80 三角的原创破碎石块。`Model_TrenchDryGrass.glb` 为 1040 三角、带细侧枝的根束，仅少量布设并和碎土共用分区；导出顶点云为 Y 向上、下垂方向为局部 -Z。主要覆盖沿用 `Texture_TrenchRootMat.png`：内置 imagegen 单张生成、保留真实 alpha，8×6 网格逐点贴合坡面，随机尺度与左右镜像；alphaTest 0.42，不使用半透明排序。构建时为冠部土块和上坡皮建立临时三角形高度索引，让两片较小根毯贴到实际可见的土层上，间隙为 1.8–4.8 cm。所有网格走 BuildSink，无逐簇 Mesh。本轮未重新生成位图或 Blender 资产。
 
 枯草根毯的完整生成提示词见 [Data_TrenchRootMatPrompt.md](Data_TrenchRootMatPrompt.md)。PNG 是运行资产，源图同时保留于生成工具的本地输出目录；不依赖外部素材站授权。
 

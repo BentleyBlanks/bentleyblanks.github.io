@@ -38,8 +38,42 @@ export async function LoadTrenchSurface() {
   } catch(error){for(const r of resources)r.dispose();throw error;}
 }
 
+// Only crown triangles enter this temporary half-metre index. Grass rests on
+// the rendered root-bound clods, not on the physical soil buried below them.
+function CrownHeightSampler(sink,groundAt) {
+  const cells=new Map(),cellM=.5;
+  for(const geometries of sink.buckets?.values()||[])for(const geometry of geometries){
+    if(!geometry.userData.trenchCrown&&!geometry.userData.trenchCrust)continue;
+    const p=geometry.attributes.position,uv=geometry.attributes.uv,index=geometry.index;
+    const count=index?.count||p.count;
+    for(let i=0;i<count;i+=3){
+      const ids=[0,1,2].map(k=>index?index.getX(i+k):i+k);
+      if(geometry.userData.trenchCrust&&Math.max(...ids.map(j=>uv.getX(j)))<.7)continue;
+      const a=ids.map(j=>[p.getX(j),p.getY(j),p.getZ(j)]);
+      const den=(a[1][2]-a[2][2])*(a[0][0]-a[2][0])+(a[2][0]-a[1][0])*(a[0][2]-a[2][2]);
+      if(Math.abs(den)<1e-8)continue;
+      const triangle={a,den};
+      const x0=Math.floor(Math.min(...a.map(v=>v[0]))/cellM),x1=Math.floor(Math.max(...a.map(v=>v[0]))/cellM);
+      const z0=Math.floor(Math.min(...a.map(v=>v[2]))/cellM),z1=Math.floor(Math.max(...a.map(v=>v[2]))/cellM);
+      for(let z=z0;z<=z1;z++)for(let x=x0;x<=x1;x++){
+        const key=x+':'+z;if(!cells.has(key))cells.set(key,[]);cells.get(key).push(triangle);
+      }
+    }
+  }
+  return (x,z)=>{
+    let height=groundAt(x,z);
+    for(const {a,den} of cells.get(Math.floor(x/cellM)+':'+Math.floor(z/cellM))||[]){
+      const u=((a[1][2]-a[2][2])*(x-a[2][0])+(a[2][0]-a[1][0])*(z-a[2][2]))/den;
+      const v=((a[2][2]-a[0][2])*(x-a[2][0])+(a[0][0]-a[2][0])*(z-a[2][2]))/den;
+      if(u>=-1e-5&&v>=-1e-5&&u+v<=1.00001)height=Math.max(height,u*a[0][1]+v*a[1][1]+(1-u-v)*a[2][1]);
+    }
+    return height;
+  };
+}
+
 export function BuildTrenchSurface(sink,plan,groundAt,assets) {
   const stats={stones:0,grass:0,triangles:0};const occupied=new Set();
+  const crownAt=CrownHeightSampler(sink,groundAt);
   const Range=(r,a)=>a[0]+r()*(a[1]-a[0]);
   const GrassMat=(x,z,scale,angle,mirror)=>{
     const positions=[],uvs=[],indices=[],cols=8,rows=6;
@@ -47,7 +81,7 @@ export function BuildTrenchSurface(sink,plan,groundAt,assets) {
     for(let row=0;row<=rows;row++)for(let col=0;col<=cols;col++) {
       const u=col/cols,v=row/rows,px=(u-.5)*C.grass.matWidthM*scale,pz=(.18-v*C.grass.matDepthM)*scale;
       const wx=x+px*c+pz*s,wz=z-px*s+pz*c;
-      positions.push(wx,groundAt(wx,wz)+.055+.075*Math.sin(v*Math.PI),wz);
+      positions.push(wx,crownAt(wx,wz)+.018+.030*Math.sin(v*Math.PI),wz);
       uvs.push(mirror?1-u:u,1-v);
     }
     for(let row=0;row<rows;row++)for(let col=0;col<cols;col++){
@@ -78,8 +112,16 @@ export function BuildTrenchSurface(sink,plan,groundAt,assets) {
     if(key==='TrenchStone') {
       // Embed the whole footprint on steep banks, not only its centre. The contact
       // shader supplies the gradual soil coat along this physically buried edge.
-      const p=geometry.attributes.position,centerHeight=groundAt(x,z);
-      for(let v=0;v<p.count;v++)p.setY(v,p.getY(v)+groundAt(p.getX(v),p.getZ(v))-centerHeight);
+      const centerHeight=groundAt(x,z),e=.08;
+      const n=new THREE.Vector3(-(groundAt(x+e,z)-groundAt(x-e,z))/(2*e),1,
+        -(groundAt(x,z+e)-groundAt(x,z-e))/(2*e)).normalize();
+      geometry.translate(-x,-centerHeight+embed,-z);
+      geometry.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0,1,0),n));
+      const p=geometry.attributes.position;
+      for(let v=0;v<p.count;v++){
+        const dx=p.getX(v),dz=p.getZ(v),plane=-(n.x*dx+n.z*dz)/Math.max(n.y,.2);
+        p.setXYZ(v,x+dx,groundAt(x+dx,z+dz)+p.getY(v)-plane-embed,z+dz);
+      }
       geometry.computeVertexNormals();
     }
     sink.SetSector(key==='TrenchRootStrands'
@@ -109,10 +151,12 @@ export function BuildTrenchSurface(sink,plan,groundAt,assets) {
         if(groundAt(x,z)-floor<.8||plan.Depth(x,z)>st.depth-.8)continue;
         const cell=`${Math.round(x*2)}:${Math.round(z*2)}`;if(occupied.has(cell))continue;occupied.add(cell);
         // glTF local -Z points down the bank towards its centre; roots are slightly buried.
-        const along=(random()-.5)*.3;
-        GrassMat(x+st.tx*along,z+st.tz*along,Range(random,C.grass.scale),Math.atan2(st.nx*side,st.nz*side)+(random()-.5)*.35,random()<.5);
-        stats.grass++;
-        if(random()<.16)Add('TrenchRootStrands',assets.grass,x,z,.48,Math.atan2(st.nx*side,st.nz*side),.035);
+        for(let tuft=0;tuft<2;tuft++){
+          const along=(tuft-.5)*.52+(random()-.5)*.18;
+          GrassMat(x+st.tx*along,z+st.tz*along,Range(random,C.grass.scale),Math.atan2(st.nx*side,st.nz*side)+(random()-.5)*.35,random()<.5);
+          stats.grass++;
+        }
+        if(random()<.08)Add('TrenchRootStrands',assets.grass,x,z,.26,Math.atan2(st.nx*side,st.nz*side),.035);
       }
     }
   }

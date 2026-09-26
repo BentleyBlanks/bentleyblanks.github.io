@@ -2,9 +2,9 @@
 // Everything samples the host heightfield; no extra colliders or walkable floors.
 import * as THREE from "three";
 import { HashString, Mulberry32, ValueNoise2 } from "./Script_Noise.mjs";
-import { TRENCH_APPEARANCE as Style } from "./Data_TrenchAppearance.mjs";
+import { TRENCH_APPEARANCE as DefaultStyle } from "./Data_TrenchAppearance.mjs";
 
-export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots = "TrenchRoots" } = {}) {
+export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots = "TrenchRoots", style: Style = DefaultStyle } = {}) {
   const stats = { clods: 0, roots: 0, triangles: 0 };
   const shape = new THREE.IcosahedronGeometry(1, 0);
   const up = new THREE.Vector3(0, 1, 0);
@@ -15,27 +15,38 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
     stats.triangles += (geometry.index?.count || geometry.attributes.position.count) / 3;
     sink.Add(key, geometry);
   };
-  const Clod = (center, radius, relief, random) => {
+  const CrustLift = (x,z,u) => {
+    if(u<=0||u>=1)return 0;
+    const ridge=ValueNoise2(x*3.7,z*3.7,71),grain=ValueNoise2(x*13.1,z*13.1,93);
+    const layer=ValueNoise2(x*8.3,z*8.3,417);
+    return Math.sin(u*Math.PI)*(.025+Style.crustReliefM*(ridge*.5+layer*.75)+.045*grain)-.008;
+  };
+  const Clod = (center, radius, relief, random, crown=false, heightAt=groundAt) => {
     const geometry = shape.clone();
+    geometry.userData.trenchCrown=crown;
     geometry.rotateY(random() * Math.PI * 2);
+    const e=.08,n=new THREE.Vector3(-(groundAt(center.x+e,center.z)-groundAt(center.x-e,center.z))/(2*e),
+      1,-(groundAt(center.x,center.z+e)-groundAt(center.x,center.z-e))/(2*e)).normalize();
+    geometry.scale(radius,relief,radius*(.7+random()*.65));
+    geometry.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(up,n));
     const p = geometry.attributes.position;
     for (let v = 0; v < p.count; v++) {
-      const x = center.x + p.getX(v) * radius;
-      const z = center.z + p.getZ(v) * radius * 1.45;
-      p.setXYZ(v, x, groundAt(x, z) + p.getY(v) * relief - relief * 0.25, z);
+      const x = center.x + p.getX(v),z = center.z + p.getZ(v);
+      const plane=-(n.x*(x-center.x)+n.z*(z-center.z))/Math.max(n.y,.2);
+      p.setXYZ(v,x,heightAt(x,z)+p.getY(v)-plane-relief*.65/Math.max(n.y,.2),z);
     }
     geometry.computeVertexNormals();
     Add(earth, geometry); stats.clods++;
   };
-  const Crust = (st, side, along) => {
-    const positions=[],uvs=[],indices=[],cols=6,rows=6;
+  const Crust = (st, next, side) => {
+    const positions=[],uvs=[],indices=[],cols=12,rows=8;
     for(let row=0;row<=rows;row++)for(let col=0;col<=cols;col++) {
       const u=col/cols,v=row/rows;
-      const lateral=st.halfFloor+st.bank*(.03+u*.58),tangent=along+(v-.5)*1.3;
-      const x=st.x+st.nx*side*lateral+st.tx*tangent,z=st.z+st.nz*side*lateral+st.tz*tangent;
-      const edge=Math.sin(u*Math.PI)*Math.sin(v*Math.PI);
-      const ridge=ValueNoise2(x*3.7,z*3.7,71),grain=ValueNoise2(x*13.1,z*13.1,93);
-      const lift=edge*(.04+Style.crustReliefM*ridge+.04*grain)-.008;
+      const half=st.halfFloor+(next.halfFloor-st.halfFloor)*v,bank=st.bank+(next.bank-st.bank)*v;
+      const lateral=half+bank*(.02+u*.98);
+      const nx=st.nx+(next.nx-st.nx)*v,nz=st.nz+(next.nz-st.nz)*v;
+      const x=st.x+(next.x-st.x)*v+nx*side*lateral,z=st.z+(next.z-st.z)*v+nz*side*lateral;
+      const lift=CrustLift(x,z,u);
       positions.push(x,groundAt(x,z)+lift,z);uvs.push(u,v);
     }
     for(let row=0;row<rows;row++)for(let col=0;col<cols;col++) {
@@ -44,6 +55,7 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
     }
     const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
     geometry.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));geometry.setIndex(indices);geometry.computeVertexNormals();
+    geometry.userData.trenchCrust=true;
     Add(earth,geometry);
   };
   const RootPiece = (a, b, radius) => {
@@ -80,16 +92,22 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
         const cell = `${Math.round(center.x * 2)}:${Math.round(center.z * 2)}`;
         if (occupied.has(cell)) continue;
         occupied.add(cell);
-        Crust(st,side,along);
+        const next=segment.stations[i+Style.stationStride];
+        if(next&&!next.junctionClear)Crust(st,next,side);
+        const dressAt=(x,z)=>{
+          const lateral=((x-st.x)*st.nx+(z-st.z)*st.nz)*side;
+          const u=(lateral-st.halfFloor-st.bank*.02)/(st.bank*.98);
+          return groundAt(x,z)+(next&&!next.junctionClear?Math.max(0,CrustLift(x,z,u)):0);
+        };
         if (random() < Style.clodChance) {
           const radius = Range(random, Style.clodRadiusM), relief = Range(random, Style.clodReliefM);
-          Clod(center, radius, relief, random);
+          Clod(center, radius, relief, random,false,dressAt);
         }
         // Several sizes of embedded aggregates give the excavation real relief.
         // Jitter across the entire bank; small crumbs collect at its foot.
         for(let n=0;n<Style.bankClods;n++) {
           const at=Point(st.halfFloor+st.bank*(.08+random()*.92),(random()-.5)*1.35);
-          Clod(at,Range(random,Style.clodRadiusM),Range(random,Style.clodReliefM),random);
+          Clod(at,Range(random,Style.clodRadiusM),Range(random,Style.clodReliefM),random,false,dressAt);
         }
         for(let n=0;n<Style.crumbs;n++) {
           const at=Point(st.halfFloor*(.55+random()*.5)+st.bank*random()*.35,(random()-.5)*1.5);
@@ -98,7 +116,7 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
         // A broken, root-bound crown interrupts the long straight heightfield edge.
         for (let n = 0; n < Style.lipClods; n++) {
           const lip = Point(st.halfFloor + st.bank * (0.85 + random() * 0.28), (random() - 0.5) * 0.9);
-          if (lip.y - floor > 0.8) Clod(lip, Range(random, Style.lipRadiusM), Range(random, Style.lipReliefM), random);
+          if (lip.y - floor > 0.8) Clod(lip, Range(random, Style.lipRadiusM), Range(random, Style.lipReliefM), random,true,dressAt);
         }
         if (roots && random() < Style.rootChance) {
           const crest = st.halfFloor + st.bank * 0.92;
