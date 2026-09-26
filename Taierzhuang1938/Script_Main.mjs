@@ -26,6 +26,7 @@ import { SkyDome, SKY_PRESETS } from "./Script_Sky.mjs";
 import { NormalizeGraphicsDetails } from "./Script_EditorSettings.mjs";
 import { LightRig } from "./Script_Light.mjs";
 import { InstallShadowSkip, ShadowSkipCount, SetShadowSkipEnabled } from "./Script_ShadowSkip.mjs";
+import { BonePrune } from "./Script_BonePrune.mjs";
 import { ProbeVolume, MakeGiUniforms, GI_QUALITY } from "./Script_Gi.mjs";
 import { PostPipeline } from "./Script_Post.mjs";
 import { MakeAoUniforms, SyncAoUniforms } from "./Script_PostGtao.mjs";
@@ -421,6 +422,9 @@ renderer.shadowMap.enabled = true;
 // 都从场景根递归走完全部节点，castShadow=false 只省 draw 不省遍历。**必须排在 Script_Csm 的
 // BakeMeter 与 Script_Profiler 的分段包装之前装**，它们各自再包一层，本模块在最里层。
 InstallShadowSkip(renderer);
+// 渲染遍历跳过「下面什么都不画」的骨头子树（Script_BonePrune 头注）：骨矩阵照算，
+// 各渲染趟不再挨个走一关里上千根骨头。出画前接线里每帧 Update 一次，结构不变是空操作。
+const bonePrune = new BonePrune();
 // r185 的 shadowMapTypeDefines 里只有 PCFShadowMap 与 VSMShadowMap；
 // 写 PCFSoftShadowMap 会掉进 SHADOWMAP_TYPE_BASIC（硬阴影 + 最近邻）。
 // 2026-09：真正的口径由 LightRig -> Script_Csm.ApplyRendererShadowSettings 定
@@ -2088,6 +2092,8 @@ async function Boot() {
     renderer, scene, camera, post, sky, lights, library, profiler,
     // 阴影烘焙子树跳过（Script_ShadowSkip）：取证脚本读登记数、同页 A/B 开关
     shadowSkip: { Count: ShadowSkipCount, SetEnabled: SetShadowSkipEnabled },
+    // 骨头子树遍历剪枝（Script_BonePrune）：同页 A/B 开关、剪掉的根数与节点数
+    bonePrune,
     // 材质着色升级那一包（POM / 细节法线 / 微阴影 / 地平线 / 皮肤）：
     // Debug Rendering 面板按它设假彩色编号，MaterialUpgradeTest 按它做 A/B。
     materialShading: shadingUniforms, RecompileAllMaterials,
@@ -9117,6 +9123,8 @@ function RenderScene(dt) {
   // 那一处；挂在玩法分支上的话，一进过场街上的火就整体错位。
   // 接在 camera.updateWorldMatrix 之后：它要的是这一帧的 matrixWorldInverse。
   lights.UpdateClusters(camera, post.width, post.height);
+  // 骨头子树剪枝：结构变了才整树重判，必须排在本帧第一次 renderer.render（阴影烘焙在那里）之前。
+  bonePrune.Update(scene);
   profiler.GpuPop();
   profiler.E("frameSetup");
   // 整帧唯一一次世界矩阵更新（见 scene.matrixWorldAutoUpdate = false 那里的账）。
