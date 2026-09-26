@@ -651,7 +651,10 @@ Hell Let Loose 的战场声。改之前查到的病根（`survey/Digest_audio.md
   （`front.sharedMaxVoices`；炮击优先，前线只拿剩下的，炮击替还没落地的那一发留的两条也算进去），满了跳过不硬挤。
   2026-09-24 审查前炮击的上限只挡新一发、不挡一发自己的五条声音，假引擎 15 分钟实测炮击峰值 5、合计 9–10；
   现在 `Script_FirstLevelBattleSoundTest` 各步骤 15 分钟量峰值断言合计 ≤ 8。「同时在响」按每一声本体的可听时长算（`cueActiveS`），不按引擎回收时刻（那要等混响尾巴与传播延迟，远处一枪常常五六秒）。节点上：前线每一声带 `selfCapped`（2026-09-25，见 3b），按整份预算进门，不再套「远 = 低优先级」的 120 × 0.62；它们仍是最先让位的那一类 —— 近处新来的声音比它们近、比它们响，`StealVoices` 照偷，所以近处的枪声与对白不受影响。场外炮击（`Script_BattleArtillery`）没改，仍按距离归档。
-- 取证：`missionRuntime.State().battleSound.front`（每个扇区打了几场、下一场几秒后、最近 12 声的距离/音量）。
+- 2026-09-26 起这本账里还有**中远处轮番轰炸**（`Script_FirstLevelAirRaid`）：本层 ≤ 5 条（引擎声算一条），
+  落弹前 3 s 到落完按 4 条留位（前线床让出），长机头一颗的爆炸与低频层走 `priority`。口径见
+  [01–06 中远处轮番轰炸](Data_FirstLevelAirRaid20260926.md)。
+- 取证：`missionRuntime.State().battleSound.front`（每个扇区打了几场、下一场几秒后、最近 12 声的距离/音量）；空袭在 `.airRaid`。
 
 ### 3a. 01 被压着时前线渐强（`front.stages.Trapped.swell`，2026-09-24 恢复）
 

@@ -693,6 +693,7 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
 - 先读：`docs/Data_EditorSuite.md`。
 
 ### VFX
+- `Data_FirstLevelAirRaid.mjs` / `Script_FirstLevelAirRaid.mjs` —— 第一关 01（先头兵经过洞口起）到 06 中远处日机轮番轰炸（编队克隆在 `Script_Aircraft.SetFormation`、声部与前线床共账）；[口径与验收](Data_FirstLevelAirRaid20260926.md)，回归口 `Script_FirstLevelAirRaidTest.mjs`，实拍取证 `Script_FirstLevelAirRaidBrowserProbe.mjs`。
 - `Data_FirstLevelDistantSmoke.mjs` / `Script_BattleSmoke.mjs` —— 第一关64处近中远硝烟，按道路随机布设、三维密度烟团与独立实例渲染；[形态、道路布设与验收](Data_FirstLevelNaturalSmoke20260926.md)，回归口 `Script_FirstLevelDistantSmokeTest.mjs` / `Script_FirstLevelDistantSmokeBrowserTest.mjs`。旧图集方案见第二轮历史说明。
 - `Script_Vfx.mjs` —— 粒子与特效（弹孔/砖粉/烟/碎砖弹跳）；三条架构约束在头注。
   先读：`docs/Data_TechRenderPipeline.md`。战车机枪的光束（`TracerBeam`，带像素下限/上限的分段条带）

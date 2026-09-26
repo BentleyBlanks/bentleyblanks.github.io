@@ -4670,6 +4670,10 @@ async function WarmLevel(phase) {
     // 两份材质全场共用。没有这一件的话第一发炮弹出现那一帧现编弹体（实测 839 ms）。
     const shellProxy = combat?.shellVisuals?.CreateWarmProxy?.() || null;
     if (shellProxy) proxy.add(shellProxy);
+    // 日机（每个已载入的机型一架缩小的克隆 + 一颗炸弹）：第一关的原机不在场景图里，
+    // 01 起的轮番轰炸（Script_FirstLevelAirRaid）与 03 横飞进视野那一帧才现编它们的材质。
+    const aircraftProxy = aircraft?.WarmProxy?.() || null;
+    if (aircraftProxy) proxy.add(aircraftProxy);
     // 人物 GLB 材质的**非蒙皮**变体：背枪 / 担架伤员 / 遗体这类刚体网格复用同一份材质，
     // program 缓存键不同（无 skinning）。实测车厢里第一次出现背枪时一个物理材质 program
     // 链接等了 2.8 s；这里用小盒子把每份材质的刚体变体先逼出来（含投影深度变体）。

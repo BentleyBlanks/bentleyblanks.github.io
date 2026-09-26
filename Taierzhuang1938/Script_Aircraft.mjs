@@ -10,6 +10,11 @@
 //
 // 本层不认识玩法：伤害、白名单、玩家窗口、story 信号全在规则层，
 // 这里只负责「那架飞机这一帧在哪儿、机头朝哪儿」。
+//
+// ── 编队层（2026-09-26，第一关 01–06 中远处轮番轰炸）──────────────────────────
+// `SetFormation(key, poses)` / `SetBombs(key, list, look)`：规则在 Script_FirstLevelAirRaid。
+// 编队机是原机的**克隆**（共用几何与材质，不另占显存），不抢原机 —— 原机一个 id 只有一架，
+// 03 开头的横飞与 13 的扫射在用（SetManualPose）。收起的克隆与炸弹一律从场景图摘下。
 
 import * as THREE from "three";
 import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
@@ -115,6 +120,8 @@ export class AircraftFlight {
   SetPhase(phase) {
     this.phase = phase;
     this.manualPoses.clear(); this.manualAlias?.clear();
+    for (const key of [...(this.formations?.keys() || [])]) this.SetFormation(key, null);
+    for (const key of [...(this.bombSets?.keys() || [])]) this.SetBombs(key, null);
     if (phase.whitebox?.p012 || phase.ambientAircraft === false) for (const { root } of this.forms) this._Show(root, false);
     this.anchor.set(
       (phase.bounds.minX + phase.bounds.maxX) * 0.5,
@@ -191,7 +198,113 @@ export class AircraftFlight {
     ApplyStrafePose(form.root, pose); this._Show(form.root, true);
   }
 
+  /**
+   * 编队层：key 这一组摆成 poses（每一项 { id, x, y, z, dirX, dirZ, climb, bank }，id 是机型）。
+   * poses 为空 = 收起这一组。模型还没载进来的那一架这一帧不画，下一帧再试。
+   */
+  SetFormation(key, poses) {
+    this.formations ??= new Map();
+    const list = this.formations.get(key) || [];
+    const want = poses?.length || 0;
+    for (let i = 0; i < want; i += 1) {
+      const pose = poses[i];
+      let slot = list[i];
+      if (!slot || slot.id !== pose.id) {
+        if (slot) this.ReleaseClone(slot);
+        const root = this.AcquireClone(pose.id);
+        list[i] = slot = root ? { id: pose.id, root } : null;
+        if (!slot) continue;
+      }
+      ApplyStrafePose(slot.root, pose);
+      this._Show(slot.root, true);
+    }
+    for (let i = want; i < list.length; i += 1) if (list[i]) this.ReleaseClone(list[i]);
+    list.length = want;
+    if (want) this.formations.set(key, list); else this.formations.delete(key);
+  }
+
+  /** 取一架 id 机型的克隆：先用收起来的，没有再从原机克隆。原机没载进来返回 null。 */
+  AcquireClone(id) {
+    this.clonePool ??= new Map();
+    const idle = this.clonePool.get(id);
+    if (idle?.length) return idle.pop();
+    const form = this.forms.find((f) => f.spec.id === id);
+    if (!form) return null;
+    const root = form.root.clone(true);
+    root.name = `${form.root.name}_Formation`;
+    return root;
+  }
+
+  ReleaseClone(slot) {
+    this._Show(slot.root, false);
+    this.clonePool ??= new Map();
+    if (!this.clonePool.has(slot.id)) this.clonePool.set(slot.id, []);
+    this.clonePool.get(slot.id).push(slot.root);
+  }
+
+  /**
+   * 在空中的炸弹：list 每一项 { x, y, z, dirX, dirZ, pitch }（pitch 为机头朝下的角）。
+   * look = { lengthM, radiusM, visualScale }，第一次用到时建一份共用几何与材质。空 list = 收起。
+   */
+  SetBombs(key, list, look = null) {
+    this.bombSets ??= new Map();
+    const meshes = this.bombSets.get(key) || [];
+    const want = list?.length || 0;
+    if (want && !this.bombGeometry) {
+      const L = look || { lengthM: 1.1, radiusM: 0.17, visualScale: 1 };
+      // 胶囊沿 Y 建，转到 Z 轴上：机头（局部 -Z）与飞机同一个约定。
+      this.bombGeometry = new THREE.CapsuleGeometry(L.radiusM, Math.max(0.01, L.lengthM - L.radiusM * 2), 2, 6);
+      this.bombGeometry.rotateX(Math.PI / 2);
+      this.bombScale = L.visualScale || 1;
+    }
+    for (let i = 0; i < want; i += 1) {
+      let mesh = meshes[i];
+      if (!mesh) {
+        mesh = meshes[i] = new THREE.Mesh(this.bombGeometry, this.BombMaterial());
+        mesh.name = `AircraftBomb_${key}_${i}`;
+        mesh.castShadow = false; mesh.receiveShadow = false;
+        mesh.scale.setScalar(this.bombScale);
+      }
+      const b = list[i];
+      mesh.position.set(b.x, b.y, b.z);
+      mesh.rotation.set(-(b.pitch || 0), Math.atan2(-b.dirX, -b.dirZ), 0, "YXZ");
+      this._Show(mesh, true);
+    }
+    for (let i = want; i < meshes.length; i += 1) this._Show(meshes[i], false);
+    this.bombSets.set(key, meshes);
+  }
+
+  BombMaterial() {
+    this.bombMaterial ??= new THREE.MeshStandardMaterial({ color: 0x2b2c28, roughness: 0.6, metalness: 0.35 });
+    return this.bombMaterial;
+  }
+
+  /**
+   * 开机预热用的代理（Script_Main.WarmLevel 挂进它的代理组、编译并画一帧、再整组摘掉）：
+   * 每个已载入的机型一架临时克隆 + 一颗炸弹。P012 的原机不在场景图里，没有这一件的话
+   * 第一轮编队 / 03 横飞进视野那一帧才现编它们的材质。模型还没载完的机型这一趟就漏掉。
+   */
+  WarmProxy() {
+    const group = new THREE.Group();
+    group.name = "AircraftWarmProxy";
+    for (const form of this.forms) {
+      const clone = form.root.clone(true);
+      clone.visible = true;
+      clone.scale.multiplyScalar(0.02);    // 缩到几十厘米：它只是来编材质的
+      group.add(clone);
+    }
+    this.warmBox ??= new THREE.BoxGeometry(0.2, 0.2, 0.6);
+    group.add(new THREE.Mesh(this.warmBox, this.BombMaterial()));
+    return group;
+  }
+
   Dispose() {
+    for (const key of [...(this.formations?.keys() || [])]) this.SetFormation(key, null);
+    this.clonePool?.clear();
+    for (const key of [...(this.bombSets?.keys() || [])]) this.SetBombs(key, null);
+    this.bombSets?.clear();
+    this.bombGeometry?.dispose(); this.bombMaterial?.dispose(); this.warmBox?.dispose();
+    this.bombGeometry = this.bombMaterial = this.warmBox = null;
     for (const { root } of this.forms) DisposeObject(root);
     this.group.removeFromParent();
     this.forms.length = 0;

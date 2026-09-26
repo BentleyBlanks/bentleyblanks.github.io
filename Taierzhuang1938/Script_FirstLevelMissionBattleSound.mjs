@@ -3,7 +3,8 @@
 // 01–06（Data_FirstLevelMissionBattleSound.front.stages 里有的步骤）走 2026-09-23 的新声景：
 //   · FrontExchange：扇区化「一方开火、另一方还击」的远处交火（300 m – 1.5 km）；
 //   · BattleArtillery：40–140 m 外无人地带的场外近落弹（先见后闻、震屏、落土）；
-//   · 防炮洞环境床：01 整段、02/撤退段按听者空间档在 firstLevelDugout ↔ firstLevelFront 之间交叉淡。
+//   · 防炮洞环境床：01 整段、02/撤退段按听者空间档在 firstLevelDugout ↔ firstLevelFront 之间交叉淡；
+//   · FirstLevelAirRaid：从 01 先头兵经过洞口起，中远处一轮接一轮的日机轰炸（Data_FirstLevelAirRaid）。
 // 07 以后仍走原来的五个固定声源循环（Legacy），一行没改。
 //
 // 宿主（第二个构造参数）是任务运行时：读 ai（避人）、battlefield（地面）、vfx（画面）、
@@ -12,9 +13,14 @@
 import { MISSION_BATTLE_SOUND as D } from './Data_FirstLevelMissionBattleSound.mjs';
 import { BATTLE_ARTILLERY } from './Data_Tuning_Audio.mjs';
 import { BattleArtillery } from './Script_BattleArtillery.mjs';
+import { FirstLevelAirRaid } from './Script_FirstLevelAirRaid.mjs';
+import { FIRST_LEVEL_AIR_RAID } from './Data_FirstLevelAirRaid.mjs';
 import { Mulberry32 } from './Script_Noise.mjs';
 
 /** panner inverse（soundField 那一档，参数见 front.fieldRefM / fieldRolloff）在 r 米处的衰减。 */
+/** 空袭编队 / 炸弹在 AircraftFlight 编队层里的键。 */
+const AIR_RAID_KEY = "firstLevelAirRaid";
+
 function FieldFalloff(r) { const F = D.front; return F.fieldRefM / (F.fieldRefM + F.fieldRolloff * Math.max(0, r - F.fieldRefM)); }
 
 export class FirstLevelMissionBattleSound {
@@ -56,18 +62,62 @@ export class FirstLevelMissionBattleSound {
       // 轻震：直接往创伤桶里加（CameraShake.Explosion 的门槛在 40 m 外一律算成 0）。
       Shake: (trauma) => host?.player?.shake?.AddTrauma?.(trauma),
       Blocked: (at) => this.ShellBlocked(at),
-      SharedRoom: (n) => this.frontVoices.length + this.artillery.Busy() + n <= D.front.sharedMaxVoices,
+      SharedRoom: (n) => this.SharedBusy() + n <= D.front.sharedMaxVoices,
     }, (this.seed ^ 0x5eed1938) >>> 0);
+    // 中远处的日机轮番轰炸：与前线、场外炮击共用 sharedMaxVoices 那一本账；飞机与炸弹画在 host.aircraft 的编队层。
+    this.airRaid = new FirstLevelAirRaid({
+      audio,
+      Listener: () => audio?.listenerPos || null,
+      Ground: (x, z) => host?.battlefield?.GroundHeight?.(x, z) ?? 0,
+      Zone: () => audio?.ListenerZone?.() || null,
+      Visual: (at, radius, d, column) => this.BombVisual(at, radius, column),
+      RemoveVisual: (handle) => host?.vfx?.RemoveSmokeSource?.(handle),
+      Shake: (trauma) => host?.player?.shake?.AddTrauma?.(trauma),
+      Blocked: (at, clearM) => this.ShellBlocked(at, clearM),
+      // 自己放声时按「别人 + 本层真在响」算：落弹留位是给前线看的，不挡空袭自己。
+      SharedRoom: (n) => this.frontVoices.length + this.artillery.Busy() + this.airRaid.Active() + n <= D.front.sharedMaxVoices,
+      Formation: (poses) => host?.aircraft?.SetFormation?.(AIR_RAID_KEY, poses),
+      Bombs: (list) => host?.aircraft?.SetBombs?.(AIR_RAID_KEY, list, FIRST_LEVEL_AIR_RAID.bomb),
+    }, (this.seed ^ 0xb0b1938) >>> 0);
   }
 
-  /** 场外炮弹不许落的地方：活人身边、在场的战车身边。 */
-  ShellBlocked(at) {
+  /** 前线 + 场外炮击 + 空袭合计占着的声部（契约 §6「场外炮击/前线床 ≤ 8」那一本账；空袭落弹前后按留位算）。 */
+  SharedBusy() { return this.frontVoices.length + this.artillery.Busy() + (this.airRaid?.Busy() ?? 0); }
+
+  /**
+   * 空袭的起点到了没有：01 要等开场导演走到 FrontPass（先头兵经过洞口）；其余步骤进来就算。
+   * 宿主没有飞机渲染层（只给 audio 的测试夹具）就不起：炸弹不能从看不见的飞机上掉下来。
+   */
+  AirRaidStarted(stage) {
+    if (typeof this.host?.aircraft?.SetFormation !== "function") return false;
+    const S = FIRST_LEVEL_AIR_RAID.start;
+    if (stage !== S.stage) return true;
+    return !!this.host?.frontShow?.bunker?.beats?.has?.(S.phase);
+  }
+
+  /** 空袭落地：火球与尘环 +（column 时）一根升得过房顶的大土柱；返回土柱烟源句柄（到点由空袭层撤源）。 */
+  BombVisual(at, radius, column = true) {
+    const vfx = this.host?.vfx;
+    if (!vfx) return null;
+    // origin 只给取证 / 测试认「这是空袭那一团」（Vfx.Explosion 不读它）。
+    vfx.Explosion?.({ x: at.x, y: at.y + 0.3, z: at.z }, { radius, kind: "shell", groundY: at.y, origin: "airRaid" });
+    const C = FIRST_LEVEL_AIR_RAID.impact.column;
+    if (!column || typeof vfx.SmokeSource !== "function") return null;
+    return vfx.SmokeSource({ x: at.x, y: at.y + 1, z: at.z }, {
+      kind: "dust", rate: C.rate, radius: C.radius, rise: C.rise, sizeStart: C.sizeStart, sizeEnd: C.sizeEnd,
+      life: C.life, opacity: C.opacity, light: false, origin: "airRaid",
+    }) ?? null;
+  }
+
+  /** 场外炮弹 / 空袭炸弹不许落的地方：活人身边、在场的战车身边（clearM 缺省按场外炮击的两个距离）。 */
+  ShellBlocked(at, clearM = null) {
     const A = BATTLE_ARTILLERY, host = this.host;
+    const soldierM = clearM ?? A.avoidSoldierM, vehicleM = clearM ?? A.avoidVehicleM;
     if ((host?.ai?.soldiers || []).some((s) => s.alive
-      && Math.hypot(s.position.x - at.x, s.position.z - at.z) < A.avoidSoldierM)) return true;
+      && Math.hypot(s.position.x - at.x, s.position.z - at.z) < soldierM)) return true;
     const tank = host?.tank;
     return !!(tank?.present && Number.isFinite(tank.x) && Number.isFinite(tank.z)
-      && Math.hypot(tank.x - at.x, tank.z - at.z) < A.avoidVehicleM);
+      && Math.hypot(tank.x - at.x, tank.z - at.z) < vehicleM);
   }
 
   /** 画面：火球与尘环（vfx.Explosion）+ 一根越得过沟沿的短命土柱（SmokeSource，emitS 后撤源）。 */
@@ -99,6 +149,9 @@ export class FirstLevelMissionBattleSound {
     // 01–06 声景的任务侧开关：接线层（Script_AudioWiring.SoundscapeOn）读它决定
     // 要不要判壕沟/防炮洞、要不要压制喘息心跳。07 以后写 false，行为回到这一轮之前。
     this.SetSoundscape(!!D.front.stages[stage]);
+    // 空袭在前线床之前推：它先占声部（近、稀、一串要响成一片），前线拿剩下的。07 以后不起新的一轮，天上那一轮飞完。
+    this.airRaid.Update(dt, stage, { started: this.AirRaidStarted(stage), speaking,
+      scripted: (this.host?.aircraft?.manualPoses?.size ?? 0) > 0 });
     if (D.front.stages[stage]) { this.UpdateFront(dt, stage, speaking); return; }
     if (this.frontStage !== null) this.LeaveFront();
     this.UpdateLegacy(dt, stage, speaking);
@@ -152,7 +205,8 @@ export class FirstLevelMissionBattleSound {
     }
     this.artillery.Update(dt, AP ? { ...AP, firstAfterS: A.firstAfterS, firstSpreadS: A.firstSpreadS } : null,
       { zones: A.zones, rateScale: speaking ? A.speechRate : 1, quiet, stage });
-    this.frontPeakShared = Math.max(this.frontPeakShared, this.frontVoices.length + this.artillery.voices.length);
+    this.frontPeakShared = Math.max(this.frontPeakShared,
+      this.frontVoices.length + this.artillery.voices.length + this.airRaid.Active());
     this.UpdateDugout(stage);
   }
 
@@ -319,7 +373,7 @@ export class FirstLevelMissionBattleSound {
     const cap = live > F.hotAbove ? Math.min(F.maxVoices, F.maxVoicesHot) : F.maxVoices;
     for (const e of due) {
       if (this.frontVoices.length >= cap
-        || this.frontVoices.length + this.artillery.Busy() >= F.sharedMaxVoices) { this.frontSkipped += 1; continue; }
+        || this.SharedBusy() >= F.sharedMaxVoices) { this.frontSkipped += 1; continue; }
       const place = this.Place(e.pos);
       const jitter = this.R(F.jitterVolume[0], F.jitterVolume[1]);
       const volume = (F.cueVolume[e.cue] ?? 0.5) * volumeScale * place.gain * jitter;
@@ -405,7 +459,7 @@ export class FirstLevelMissionBattleSound {
           nextInS:s.nextAt===null?null:+(s.nextAt-this.frontTime).toFixed(2)})),
         recent:this.frontRecent.slice(-12),dugoutSwitches:this.dugoutSwitches,peakShared:this.frontPeakShared,
         columns:this.columns.length},
-      artillery:this.artillery.State()};
+      artillery:this.artillery.State(),airRaid:this.airRaid.State()};
   }
   Dispose(){
     for(const voice of this.voices)this.audio.FreeVoice?.(voice);this.voices=[];
@@ -413,6 +467,7 @@ export class FirstLevelMissionBattleSound {
     this.frontQueue.length=0;
     this.UpdateColumns(true);
     this.artillery.Dispose();
+    this.airRaid.Dispose();
     this.SetSoundscape(false);
   }
 }
