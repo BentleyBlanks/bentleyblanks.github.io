@@ -248,6 +248,7 @@ export const testDefs = {
   AiCrowdTest: { file: "Script_AiCrowdTest.mjs", desc: "同阵营软分离：叠人推开/钉住豁免/队友占用的隐蔽位" },
   AiShootingTest: { file: "Script_AiShootingTest.mjs", desc: "射击模型：误差收敛/暴露采样/走廊/点射/压制点" },
   AiCloseRangeTest: { file: "Script_AiCloseRangeTest.mjs", desc: "近距离实弹：命中/伤害/遮挡/攻击名额" },
+  AllyCloseRangeTest: { file: "Script_AllyCloseRangeTest.mjs", timeoutMs: 300000, desc: "友军近距离实弹：贴脸打得中日军/远距离口径不变/名额接替" },
   AiTacticsTest: { file: "Script_AiTacticsTest.mjs", desc: "班组战术：令牌/侧翼点/跃进配对/投弹/撤退" },
   AiInitiativeBrowserTest: {file:"Script_AiInitiativeBrowserTest.mjs",timeoutMs:300000,desc:"战术执行：受压移动/跃进/失败掩体/刺刀接触/失去目标"},
   AiBrainGraphTest: { file: "Script_AiBrainGraphTest.mjs", desc: "敌军 AI 行为图：节点=STATE、边两端存在、表键可解析、任务=TASK（纯 Node，毫秒级）" },
@@ -441,7 +442,7 @@ export const browserTests = new Set([
   "TrainLibraryTest",
   'ActorLocomotionTest', 'BackRifleRunTest', 'MeleeAnimationTest', 'DadaoSwingTest','GrenadeThrowTest', 'InfantryAnimationTest', 'DeathCollapseTest',
   "ActorBatchTest", "ActorCrowdTest", "ActorDepthTest", "ActorPoseTest", "AdsSightTest", "AiBehaviorTest",
-  "AiCombatBrowserTest", "AiCloseRangeTest", "AiEditorTest", "AiInitiativeBrowserTest", "OrchestrationMapTest", "OrchestrationEditorTest",
+  "AiCombatBrowserTest", "AiCloseRangeTest", "AllyCloseRangeTest", "AiEditorTest", "AiInitiativeBrowserTest", "OrchestrationMapTest", "OrchestrationEditorTest",
   "AudioTest", "AudioWiringTest", "BayonetTest", "BootPropTest", "BootStallTest", "BootTest", "ColliderTest",
   "CutscenePoseTest", "DamageTest", "DeathViewTest", "DestructionEditorTest", "DestructionTest",
   "DressingProbeTest", "EastSuburbNavTest", "EditorTest", "WorldInfoEditorTest", "PlayerStateEditorTest", "FixedCenterAimTest", "FpsArmTest", "FpsHandContactTest", "FpsGripEditorTest",
@@ -560,7 +561,7 @@ export const domains = {
       "PlayerHitboxTest", "CameraShakeTest",
       // 射击模型叠在 COMBAT.aiAccuracyBase 那条链上（暴露曲线 × 误差曲线），
       // 碰伤害口径的改动要连着它一起跑（纯 Node 毫秒级）。
-      "AiShootingTest", "AiCloseRangeTest", "IncomingFireBrowserTest",
+      "AiShootingTest", "AiCloseRangeTest", "AllyCloseRangeTest", "IncomingFireBrowserTest",
       // 负重会封掉开火/开镜/冲刺三条（Player 的 carrySpeedScale + TryFire 的闸），
       // 碰这三样的改动要连着枪感串一起跑，所以它同时挂在 combat 与 interact 两个域。
       "CarryTest",
@@ -584,7 +585,7 @@ export const domains = {
     // 所以碰 AI 或撒兵的改动要连着 MissionHooksTest 一起跑。
     // 第一关敌军探针（30 min 真实驾驶）只登记在 firstLevel 域：改 Script_Ai 的包跑 ai 域时带纯 Node 的
     // FirstLevelFrontPressureTest 就够了（2026-09-24 审查）。
-    tests: ["AiBehaviorTest", "AiBrainGraphTest", "AiEditorTest", "AiCombatBrowserTest", "AiCloseRangeTest", "AiInitiativeBrowserTest", "AiPerceptionTest", "AiCoverTest", "AiCrowdTest", "AiShootingTest", "AiTacticsTest", "FirstLevelFrontPressureTest", "FirstLevelRearDoorWalkTest",
+    tests: ["AiBehaviorTest", "AiBrainGraphTest", "AiEditorTest", "AiCombatBrowserTest", "AiCloseRangeTest", "AllyCloseRangeTest", "AiInitiativeBrowserTest", "AiPerceptionTest", "AiCoverTest", "AiCrowdTest", "AiShootingTest", "AiTacticsTest", "FirstLevelFrontPressureTest", "FirstLevelRearDoorWalkTest",
       "VisibilityTest", "ActorCrowdTest", "EmplacementTest", "FlareTest", "MissionHooksTest", "MissionSetpiecesTest",
       "FirstLevelP012OpeningTest", "FirstLevelP012FamilyTest", "FirstLevelP012RestingTest", "FirstLevelP012AnimationTest", "FirstLevelP012MarchTest", "FirstLevelP012TrainColumnTest", "FirstLevelP012ArrivalTest", "FirstLevelP012VillageLifeTest", "FirstLevelP012CastTest"],
   },

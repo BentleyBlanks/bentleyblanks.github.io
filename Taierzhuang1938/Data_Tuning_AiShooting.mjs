@@ -86,6 +86,11 @@ export const CLOSE_RANGE = Freeze({
   priorityM: 25,
   priorityDistanceRatio: 2,
   priorityDistanceGapM: 3,
+  // 2026-09-27：哪一方打 **AI 目标**时也吃上面这套近距离补偿（命中率混回 accuracy、
+  // 目标半径放宽瞄准误差、贴脸时从远处射手手里接过射击名额）。只给国军：
+  // 友军站在日军面前打不中是这次要修的；日军打国军仍是远距离对射的口径，
+  // 放开它会让护送/守军在近战里成片倒下，另议。
+  aiShooterSides: Freeze(["nra"]),
 });
 
 export const AIM = Freeze({

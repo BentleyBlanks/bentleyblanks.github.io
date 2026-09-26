@@ -131,6 +131,11 @@ const BARK_LINES = Object.freeze({
   },
 });
 
+/** 这一方打 AI 目标时也吃近距离补偿（CLOSE_RANGE.aiShooterSides）。 */
+function CloseAssistSide(s) {
+  return !!CLOSE_RANGE.aiShooterSides?.includes?.(s.side);
+}
+
 function AngleDelta(from, to) {
   return Math.atan2(Math.sin(to - from), Math.cos(to - from));
 }
@@ -4541,21 +4546,26 @@ export class AiDirector {
 
   /** Visible close threats can take a distant shooter's slot, never add one. */
   AcquireFireToken(s, targetId, player) {
-    if (this.tactics.AcquireToken(targetId, s.id, s.target.isPlayer)) return true;
-    if (!s.target.isPlayer || !player
-      || s.position.distanceTo(player.position) > CLOSE_RANGE.priorityM) return false;
+    const isPlayer = !!s.target.isPlayer;
+    if (this.tactics.AcquireToken(targetId, s.id, isPlayer)) return true;
+    // 名额满了时，贴脸的人从最远的持有者手里接过名额（同时开火的人数不变）。
+    // 打玩家一直有这条；友军打日军也要有 —— 否则两个六十米外的人占着名额，
+    // 站在日军面前的那个只能打压制，一发都不会中（CLOSE_RANGE.aiShooterSides）。
+    const targetPos = isPlayer ? player?.position : s.target.ref?.position ?? s.target.position;
+    if (!targetPos || (!isPlayer && !CloseAssistSide(s))) return false;
+    const nearDistance = s.position.distanceTo(targetPos);
+    if (nearDistance > CLOSE_RANGE.priorityM) return false;
     let farthest = null;
-    const nearDistance = s.position.distanceTo(player.position);
     let distance = Math.max(nearDistance * CLOSE_RANGE.priorityDistanceRatio,
       nearDistance + CLOSE_RANGE.priorityDistanceGapM);
     for (const other of this.soldiers) {
       if (other === s || !this.tactics.HasToken(other.id, targetId)) continue;
-      const d = other.position.distanceTo(player.position);
+      const d = other.position.distanceTo(targetPos);
       if (d > distance) { distance = d; farthest = other; }
     }
     if (!farthest) return false;
     this.tactics.ReleaseToken(farthest.id);
-    return this.tactics.AcquireToken(targetId, s.id, true);
+    return this.tactics.AcquireToken(targetId, s.id, isPlayer);
   }
 
   TryFire(s, dt, player) {
@@ -4717,7 +4727,15 @@ export class AiDirector {
     // 于是原来的式子在 27 m 上算出来还是满命中（1.25 − 0.09 → 钳到 1）。
     // 实际上机械瞄具打一个会动的人：25 m 内基本能打中，100 m 打一半，200 m 靠运气。
     acc *= Clamp(1.0 - Math.max(0, dist - 25) / 175, 0.10, 1);
-    const closeWeight = toPlayer ? CloseRangeWeight(dist) : 0;
+    // 近距离补偿：打玩家一直有；友军打日军同样适用（CLOSE_RANGE.aiShooterSides）——
+    // 关卡那几档 0.16–0.28 的命中折扣描述的是远距离对射，不是准星里站着一个人。
+    const closeAssist = toPlayer || (!s.target.isPlayer && CloseAssistSide(s));
+    const closeWeight = closeAssist ? CloseRangeWeight(dist) : 0;
+    if (!s.target.isPlayer && closeWeight > 0 && acc > 0) {
+      const closeAccuracy = Math.min(CLOSE_RANGE.maxAccuracy,
+        CLOSE_RANGE.accuracy * (DIFFICULTY.aiAccuracy ?? 1));
+      acc += (Math.max(acc, closeAccuracy) - acc) * closeWeight;
+    }
     if (s.target.isPlayer && player) {
       acc *= COMBAT.player?.accuracyScale ?? 1;
       // Explicit zero accuracy still disables damage (script/debug contract).
@@ -4747,7 +4765,7 @@ export class AiDirector {
       baseAccuracy: aimed ? acc : 0,
       exposure: aimed ? exposure : 0,
       distance: dist,
-      targetRadiusM: toPlayer ? CLOSE_RANGE.targetRadiusM : 0,
+      targetRadiusM: closeAssist ? CLOSE_RANGE.targetRadiusM : 0,
       rnd: s.rnd,
     });
     const hit = shot.hit;
