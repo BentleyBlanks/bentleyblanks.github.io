@@ -53,7 +53,7 @@ export function OpeningPlayerPoint(modelId,clip,part,seconds){
 }
 
 /** A clip with a `holdLoop` window keeps sampling inside it once the playhead passes its end,
- * so a director can hold "fist in the hair" or "kneeling, hand on shoulder" for as long as
+ * so a director can hold "fist in the collar" or "kneeling, hand on shoulder" for as long as
  * the dialogue runs without freezing the body. `holdUntil` (pose.holdUntil, clip seconds on
  * the director's clock) lets go: the clip then plays on from the loop to its end (LuoKneelCheck
  * lets go of the shoulder and rises at 2.6-3.4 s only after it). See OpeningHoldTime. */

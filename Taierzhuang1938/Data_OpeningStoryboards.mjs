@@ -23,7 +23,7 @@ const BUTT = Object.freeze({ yawDeg:0, letGoS:1.05, holdS:0, strikeS:1.375, boot
 // Script_OpeningStoryboardsTest's sight/drag checks. Wave 2 sets wave1Allowances.revetment to null.
 const REVETMENT = "BunkerSouthRevetment";
 export const OPENING_STORYBOARDS = Object.freeze({
-  version:"20260927OpeningStoryboardsV9Vault", animationBase:"./Animation/OpeningStoryboards/",
+  version:"20260927OpeningStoryboardsV11ExecutionVaultRig", animationBase:"./Animation/OpeningStoryboards/",
   // Contract §3/§7.2: wave 1 = each package alone (stand-ins listed in pendingWiring); wave 2 = wired. Set to 2 by the
   // wave-2 wiring: Script_OpeningStoryboardsTest then requires pendingWiring empty and no wave-1 allowance left
   // (wave1Allowances null, no behindOk / coverOk / headOptional in storyboardShots).
@@ -57,6 +57,22 @@ export const OPENING_STORYBOARDS = Object.freeze({
       // (ija.vaultIn / ija.dragOutRoute, docs/Data_OpeningVaultHaul20260927.md).
       "IjaVaultTimberIn","IjaVaultTimberOut","IjaHaulForearmUnder"],
   },
+  // The same NRA02 actor is already badly wounded in SB01, before the shell and interrogation.
+  // Body stains are placed on the speaking rig's outer uniform in bind space and follow every
+  // authored pose; ageS staggers dark older blood and recent wet patches. The face has its
+  // own procedural streaks under the cap (CharacterFacial.SetFaceBlood).
+  comradeBlood:Object.freeze({face:1,wounds:Object.freeze([
+    Object.freeze({from:"chest",to:"chest",t:0,part:"torso",side:.9,frontM:.20,radiusM:.33,ageS:18}),
+    Object.freeze({from:"chest",to:"chest",t:0,part:"torso",side:-.9,frontM:.20,radiusM:.28,ageS:70}),
+    Object.freeze({from:"pelvis",to:"chest",t:.58,part:"torso",side:.8,frontM:.20,radiusM:.28,ageS:24}),
+    Object.freeze({from:"pelvis",to:"chest",t:.4,part:"torso",side:-.7,frontM:.20,radiusM:.26,ageS:110}),
+    Object.freeze({from:"upperArmL",to:"forearmL",t:.34,part:"arm",frontM:.12,radiusM:.19,ageS:14}),
+    Object.freeze({from:"upperArmR",to:"forearmR",t:.72,part:"arm",frontM:.12,radiusM:.18,ageS:48}),
+    Object.freeze({from:"forearmL",to:"handL",t:.56,part:"arm",frontM:.08,radiusM:.13,ageS:85}),
+    Object.freeze({from:"thighR",to:"calfR",t:.32,part:"leg",frontM:.15,radiusM:.25,ageS:8}),
+    Object.freeze({from:"thighL",to:"calfL",t:.24,part:"leg",frontM:.15,radiusM:.23,ageS:95}),
+    Object.freeze({from:"calfR",to:"footR",t:.35,part:"leg",frontM:.09,radiusM:.15,ageS:130}),
+  ])}),
   // Contract §5.3: the director's phases, in order. Each is recorded in `beats` when it really starts.
   phases:Object.freeze({
     Trapped:Object.freeze(["Banter","Orders","Incoming","Blast","Black","Wake","FrontPass","CaptiveDragged","CaptiveWall",
@@ -405,7 +421,7 @@ export const OPENING_STORYBOARDS = Object.freeze({
   // ---- 01 comrade chain ----------------------------------------------------------------
   // Offsets are the manifest stages (anchor frame +x right, -z forward). The interrogation
   // extras stand where the chain leaves room (the comrade kneels back to the north wall).
-  interrogation:Object.freeze({ ijaAHold:Object.freeze([-.04,-.28,180]),
+  interrogation:Object.freeze({ ijaAHold:Object.freeze([.20,-.53,165]),
     // SB03 (contract §5): the interpreter crouches side-on to the comrade east of the group (he no longer kneels
     // between the camera and the comrade), ijaB stands behind him; world marks (yaw radians).
     interpreterAt:P(4.9,-124.05,25*Math.PI/180), ijaBAt:P(6.05,-125.0,55*Math.PI/180),
@@ -416,8 +432,8 @@ export const OPENING_STORYBOARDS = Object.freeze({
       CaptiveDragged:{id:"captiveDrag",eye:P(1.7,-124.05),height:1.2,target:P(4.1,-125.55),targetH:.8,fov:44},
       CaptiveWall:{id:"captiveGroup",eye:P(2.1,-123.7),height:1.45,target:P(4.7,-125.2),targetH:1.0,fov:54},
       Interrogation:{id:"captiveGroup",eye:P(2.1,-123.7),height:1.45,target:P(4.7,-125.2),targetH:1.0,fov:54},
-      Slash:{id:"captiveCut",eye:P(5.6,-124.6),height:1.3,target:P(4.1,-125.65),targetH:1.05,fov:46},
-      Taunt:{id:"captiveCut",eye:P(5.6,-124.6),height:1.3,target:P(4.1,-125.65),targetH:1.05,fov:46},
+      Slash:{id:"captiveCut",eye:P(5.3,-125.85),height:1.23,target:P(4.1,-125.8),targetH:1.15,fov:52},
+      Taunt:{id:"captiveCut",eye:P(5.3,-125.85),height:1.23,target:P(4.1,-125.8),targetH:1.15,fov:52},
       Wipe:{id:"captiveAftermath",eye:P(3,-124.8),height:1.65,target:P(9.4,-122.4),targetH:2.0,fov:58},
     }),
     // Contract §2.7: backOffAfterS into Wipe the interpreter, then ijaB (backOffStaggerS later), go back down the SSW
@@ -561,7 +577,7 @@ export const OPENING_STORYBOARDS = Object.freeze({
       when:"s.phase==='Orders'&&s.flags['scene:BunkerOrders']!=null&&r.time-s.flags['scene:BunkerOrders']>1.2",
       judge:{ camera:{ eyeM:[.85,1.05], pitchDeg:[-20,-9], yawDeg:[-101,-85] }, horizonY:[.16,.34],
         points:{ mouthPostN:{ at:[1.05,1.0,-127.5], x:[.2,.4] }, mouthPostS:{ at:[1.05,1.0,-124.3], x:[.64,.84] } },
-        actors:{ yaowa:{ x:[0,.34] }, runner:{ x:[.2,.5] }, luo:{ x:[.4,.64] }, comrade:{ x:[.64,1] } },
+        actors:{ yaowa:{ x:[0,.34] }, runner:{ x:[.2,.5] }, luo:{ x:[.4,.64] }, comrade:{ x:[.64,1],woundMin:10,faceBloodMin:.9 } },
         inFrameAtLeast:[{ roles:["DepthNra"], count:2, minDistM:8 }], rifleHidden:true } }),
     // SB02: the near miss, mirrored (contract §2.2): tilted ≥ 12° head to the left, low, the north post and the
     // dugout's north wall on the left, the mouth and the blast on the right; the eyes still open.
@@ -575,9 +591,15 @@ export const OPENING_STORYBOARDS = Object.freeze({
       judge:{cinematic:true,camera:{eyeM:[1.19,1.21],fovV:[43.9,44.1],absRollDeg:[0,.1]},actors:{comrade:{x:[.25,.65],y:[.1,.55]}}}}),
     Object.freeze({id:"SB03",phase:"Interrogation",age:3,
       judge:{cinematic:true,camera:{eyeM:[1.44,1.46],fovV:[53.9,54.1],absRollDeg:[0,.1]},
-        actors:{ijaA:{x:[.15,.6]},comrade:{x:[.15,.6]},interpreter:{x:[.45,.98],distM:[2,4]},ijaB:{x:[.4,.9]}}}}),
+        actors:{ijaA:{x:[.15,.6]},comrade:{x:[.15,.6],woundMin:10,faceBloodMin:.9},interpreter:{x:[.45,.98],distM:[2,4]},ijaB:{x:[.4,.9]}}}}),
+    Object.freeze({id:"SB03_Blade",phase:"Slash",age:2.05,
+      judge:{cinematic:true,camera:{eyeM:[1.22,1.24],fovV:[51.9,52.1],absRollDeg:[0,.5]},
+        actors:{comrade:{x:[.5,.9],woundMin:10,faceBloodMin:.9},ijaA:{x:[.35,.7]}},
+        actorSeparation:{roles:["ijaA","comrade"],headXMin:.10,rootMMin:.5}}}),
     Object.freeze({id:"SB03_Slash",phase:"Slash",age:2.3,
-      judge:{cinematic:true,camera:{eyeM:[1.29,1.31],fovV:[45.9,46.1],absRollDeg:[0,.1]},actors:{comrade:{x:[.5,.85]},ijaA:{x:[.4,.8]}}}}),
+      judge:{cinematic:true,camera:{eyeM:[1.22,1.24],fovV:[51.9,52.1],absRollDeg:[0,.5]},
+        actors:{comrade:{x:[.5,.9],woundMin:10,faceBloodMin:.9},ijaA:{x:[.35,.7]}},
+        actorSeparation:{roles:["ijaA","comrade"],headXMin:.10,rootMMin:.5}}}),
     Object.freeze({id:"SB03_FlagKick",when:"s.flags.flagKickAt!=null&&r.time-s.flags.flagKickAt>=.3",
       judge:{cinematic:true,flagProgress:[0,.1],actors:{DepthIjaA:{x:[.35,.75],y:[.2,.65],clip:["IjaKickPrisoner"]}},
         points:{flagTop:{at:[10.5,2.65,-121.8],x:[.3,.7],y:[.1,.5]}}}}),
@@ -685,8 +707,6 @@ export const OPENING_STORYBOARDS = Object.freeze({
       now:"the existing concussion blur/ghost only", wave2:"OpeningLens.Evaluate LOOKS for CaptiveDragged..Wipe into Perception().lens (Eye)"},
     {shot:"SB03", what:"right hand spread in the mud at the lower right (screen about 0.62, 0.75), arm reaching forward",
       now:"flatFwd (the flat palm pushed forward and lifted 0.14 m off the mud so it is in the frame, storyboardShots SB03 hands.r) in beats.CaptiveDragged..Wipe", wave2:"Eye's sleeve/arm and legs with it (LEG_POSES.lieSide); if Eye adds a prone forward palm to EXTRA_HAND_POSES, use it in place of flatFwd and keep the SB03 hands.r check"},
-    {shot:"SB03", what:"blood on the comrade's face",
-      now:"none", wave2:"CharacterFacial.SetFaceBlood(comrade rig, ~0.8) from CaptiveDragged (Face)"},
     // SB03A (Reach -> Found)
     {shot:"SB03A", what:"ijaA stops and looks back low over his shoulder at the mouth, rifle held low, the snarl starting",
       now:"GuardTurn at ija.lookBack, root turned to lookBackOffDeg short of the eye + head lookAt the camera (LookBack, UpdatePerformances)", wave2:"IjaLookBackLow (Anim) in LookBack(), in ContactClips; expression.snarl rising (Face)"},

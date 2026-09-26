@@ -111,6 +111,16 @@ export function JudgeShot(judge, dump) {
     if (want.distM) out.push(Range(`${role} distance (m)`, a.distM, want.distM));
     if (want.clip) out.push({ label: `${role} clip`, ok: want.clip.includes(a.clip), value: a.clip, range: want.clip });
     if (want.pelvisM) out.push(Range(`${role} pelvis height (m)`, a.pelvisY, want.pelvisM));
+    if (want.woundMin != null) out.push(Range(`${role} persistent stains`, a.woundCount, [want.woundMin, null]));
+    if (want.faceBloodMin != null) out.push(Range(`${role} face blood`, a.faceBlood, [want.faceBloodMin, null]));
+  }
+  if (judge.actorSeparation) {
+    const [roleA, roleB] = judge.actorSeparation.roles;
+    const a = dump.actors.find((row) => row.role === roleA), b = dump.actors.find((row) => row.role === roleB);
+    const gap = a?.headPx?.front && b?.headPx?.front ? Math.abs(a.headPx.x - b.headPx.x) : NaN;
+    const distance = a && b ? Math.hypot(a.x - b.x, a.z - b.z) : NaN;
+    if (judge.actorSeparation.headXMin != null) out.push(Range(`${roleA}/${roleB} projected head gap`, gap, [judge.actorSeparation.headXMin, null]));
+    if (judge.actorSeparation.rootMMin != null) out.push(Range(`${roleA}/${roleB} root distance (m)`, distance, [judge.actorSeparation.rootMMin, null]));
   }
   for (const role of judge.absent || []) {
     const a = dump.actors.find((row) => row.role === role);
@@ -366,7 +376,8 @@ function Dump({ warm, freeze, points }) {
       clipS: a.openingStoryboardPose?.seconds != null ? R3(a.openingStoryboardPose.seconds) : null, distM: R3(d),
       footR: bones?.footR?.getWorldPosition(new T.Vector3()).toArray().map(R3),
       pelvisY: pelvis ? R3(pelvis.y - feet.y) : null, headPx: head ? Screen(head) : null, feetPx: Screen(feet),
-      jaw: jaw ? R3(jaw.bone.quaternion.angleTo(jaw.quaternion)) : null });
+      jaw: jaw ? R3(jaw.bone.quaternion.angleTo(jaw.quaternion)) : null,
+      woundCount: a.actor.woundBlood?.count || 0, faceBlood: R3(a.actor.characterRig?.facial?.faceBlood?.amount || 0) });
     if (head) heads.set(actors[actors.length - 1], head);
     people.add(a.actor.root); roots.set(actors[actors.length - 1], a.actor.root);
   }

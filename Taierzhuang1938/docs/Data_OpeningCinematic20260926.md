@@ -39,7 +39,7 @@
 - `Script_OpeningStoryboardsTest.mjs`：原动作库、接触和空间契约，加翻译扫掠防穿透、绕行路线净空、站位间距与渐显时长。
 - `Script_OpeningSetTest.mjs`：国军旗归属、真实网格连续旋转和地面落点、布景生命周期。
 - `Script_OpeningLensTest.mjs` / `Script_OpeningLensBrowserTest.mjs`：切入干净摄影机镜头，返回第一人称时恢复镜头层。
-- `Script_OpeningStoryboardShots.mjs`：SB03_Drag、SB03、SB03_Slash、SB03_FlagKick、SB03_FlagDown，以及原有后续分镜。新增镜头要求脸部入画且不被场景或其他人遮挡、无第一人称身体；踹旗前后检查真实旗杆旋转进度。
+- `Script_OpeningStoryboardShots.mjs`：SB03_Drag、SB03、SB03_Blade、SB03_Slash、SB03_FlagKick、SB03_FlagDown，以及原有后续分镜。行刑两帧另检查两人根距离至少 0.5 m、头部水平投影间隔至少画宽的 10%；新增镜头要求脸部入画且不被场景或其他人遮挡、无第一人称身体；踹旗前后检查真实旗杆旋转进度。
 - `Script_FirstLevelMissionBrowserTest.mjs --campaign --stage-to=3`：真实连续输入，保留击杀、还权、人物与手部连续性断言；加入翻译到位及净空、五次明确切镜、五秒以上单调退黑、踹旗完成。
 
 ## 本轮实测
@@ -58,3 +58,11 @@
 - 最终集成专项六项全过：OpeningStoryboards、OpeningFirstPerson、OpeningLensBrowser、OpeningStoryboardShots、FirstLevelOpeningCampaign、MotionVectorContract（共 586.5 秒）。
 
 截图和运行日志只留在本任务忽略目录，不提交。
+
+## 行刑近景与表演修订（2026-09-26）
+
+日兵甲由川军侧前方跨步抓前领，拔刺刀后一次横切；川军把遮住刀刃的双手降到胸前，遇刀后后仰并捂喉。行刑镜头移到两人东侧，镜头高度 1.23 m、视场角 52°，避开持枪日兵乙的前景遮挡。`SB03_Blade`（刀刃经过）与 `SB03_Slash`（后仰）分别检查画面净空；两人动作原始工程与实机验收办法见 [动作库 §8](Data_OpeningClipLibrary20260923.md)。
+
+同一川军从开场 Banter 就是重伤状态，脸部有程序化血痕，军服的领口、胸腹、双袖和裤腿带不同干湿程度的旧伤血迹。血迹按蒙皮网格的绑定空间投射，随坐姿、拖行、跪姿和倒地动作保持在衣服上；检查点重新建场时仍由同一套配置生成。实机镜头额外核对脸部血痕强度和持续的衣服血迹数量，截图目检其实际可见范围。
+
+与 [川军眩晕拖拽修订](Data_OpeningComradeStunned20260927.md) 及 [翻越与倒拖](Data_OpeningVaultHaul20260927.md) 合并后，动作 manifest 使用 `20260927OpeningStoryboardsV11ExecutionVaultRig`。受影响的川军与日兵行刑片段由 `Script_OpeningStoryboardClips.py` 在本任务的 `OpeningExecution_20260926` 源工程目录重烘；日兵甲翻越横木与拖拽片段保留另一个任务的 `OpeningVaultDrag_20260927` 源工程。两组片段在同一 IJA02 动画包中合并，接触报告和 clip 清单同时保留。后续角色 GLB 只调整鞋底网格，五套动作所读的骨骼节点及变换完全一致；同步更新五套动画记录的源 GLB 指纹，不重烘未改的动作。

@@ -76,3 +76,9 @@
 - 世界旋转的单帧突跳还剩 34 处（从 399 处降下来，多数改动前就有，例如 `BlastSlamBuried` 左上臂、`HeSwapDadaoRifle` 右前臂），没有逐个处理。
 - 几处抓握是手臂伸直够到的（臂长 1.1–1.4 倍，接触误差仍 ≤ 3 cm），画面上是锁直的胳膊；第一人称下日兵甲、乙与川军贴身穿插 5–8 cm，都在门槛内，待用户看。
 - 对顺子（第一人称，没有身体）的接触浏览器量不了，只由烘焙端对 `player` 轨检查。
+
+## 8. 洞口行刑修订（2026-09-26）
+
+`IjaHairGrabPull` 保留冻结的 clip 名，实际接触改为前领。日兵甲在川军右前方约半米处跨步抓领，随后拔刺刀、割喉、擦刀并退回持枪站姿；五段沿用同一演员根。旧正面 0.28 m 的根距离让两人胸腹重叠，旧抓发动作在拉开距离后又够不到头顶。川军的防御手势降到胸前，空出刀刃和喉部；`CaptiveHeadPulledBack`、`CaptiveThroatCut`、`CaptiveClutchThroat` 与日兵甲动作均由独立 Blender 源工程重烘。
+
+检查以正式模型和实际导演镜头为准：`Script_OpeningStoryboardsTest` 核对五段逐骨交接，`Script_OpeningClipsBrowserTest --clip=IjaHairGrabPull,IjaDrawBayonet,IjaThroatSlash,IjaWipeSheathBayonet,IjaReadyRifle,CaptiveHeadPulledBack,CaptiveThroatCut,CaptiveClutchThroat` 核对接触、脚滑和人体净空；`Script_OpeningStoryboardShots --shots=SB03_Blade,SB03_Slash` 与连续 01–03 验收实际镜头。源工程位于 OneDrive `AI/Models/Blender/Taierzhuang1938/OpeningExecution_20260926`，不入库。

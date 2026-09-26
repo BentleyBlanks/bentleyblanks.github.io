@@ -10,6 +10,8 @@ import { OpeningPropSet } from "./Script_OpeningProps.mjs";
 import { OpeningFirstPerson, TrimOpeningPlayerBody } from "./Script_OpeningFirstPerson.mjs";
 import { WEAPONS } from "./Data_Weapons.mjs";
 import { SpeakingCastOptions } from "./Data_FirstLevelSpeakingCast.mjs";
+import { CharacterFacial } from "./Script_CharacterFacialAnimation.mjs";
+import { CharacterWounds } from "./Script_CharacterWounds.mjs";
 import { MISSION_STAGE_ROUTES } from "./Data_FirstLevelMissionTopology.mjs";
 import { MissionRouteProjection, MissionRoutePoint, MissionRouteLength, MissionRouteBetween } from "./Script_FirstLevelMissionColumn.mjs";
 import { SampleOpeningPerception } from "./Script_FirstLevelOpening.mjs";
@@ -138,6 +140,28 @@ export class FirstLevelBunkerShow {
     PinOpeningScale(actor);
     this.r.MoveActor(actor,actor.position,0);InstallOpeningStoryboardAnimation(actor);return this.cast[id]=actor;
   }
+  BloodiedComrade(soldier){
+    const actor=soldier?.actor,rig=actor?.characterRig,look=C.comradeBlood;
+    if(!rig?.bones?.chest||!rig.root)return false;
+    let hasSkin=false;rig.root.traverse(object=>{if(object.isSkinnedMesh)hasSkin=true;});
+    if(!hasSkin)return false;
+    if(CharacterFacial.Of(rig))CharacterFacial.SetFaceBlood(rig,look.face);
+    actor.woundBlood ||= new CharacterWounds(rig.root);
+    rig.root.updateWorldMatrix(true,true);
+    const rotation=actor.root.getWorldQuaternion(new THREE.Quaternion());
+    const forward=new THREE.Vector3(0,0,-1).applyQuaternion(rotation);
+    const right=new THREE.Vector3(1,0,0).applyQuaternion(rotation);
+    for(const wound of look.wounds){
+      const from=rig.bones[wound.from],to=rig.bones[wound.to];
+      if(!from||!to)throw Error(`Opening comrade wound missing ${wound.from}/${wound.to}`);
+      const point=from.getWorldPosition(new THREE.Vector3()).lerp(to.getWorldPosition(new THREE.Vector3()),wound.t);
+      const direction=forward.clone().addScaledVector(right,wound.side||0).normalize();
+      point.addScaledVector(direction,wound.frontM).addScaledVector(right,wound.rightM||0);
+      if(!actor.woundBlood.Add({part:wound.part,point,direction,preferCloth:true,radiusM:wound.radiusM,ageS:wound.ageS}))
+        throw Error(`Opening comrade wound ${wound.from}/${wound.to} found no skin`);
+    }
+    return true;
+  }
   /** Bunker-assault men arrive through the generic spawner (spawn queue): adopt each once. */
   AdoptAssault(){
     for(const role of ["ijaA","ijaB","ijaC","ijaD"]){
@@ -152,9 +176,14 @@ export class FirstLevelBunkerShow {
     }
   }
   Setup(){
-    if(this.setup)return;this.setup=true;
+    if(this.setup)return;this.setup=true;this.setupAt=this.r.time;
     const r=this.r,b=C.banter,stage=r.flow.stage.id;
     this.Spawn("comrade","nra",b.comradeSeat,{...SpeakingCastOptions("comrade")});
+    // Set the authored facing before the first pose. The placement is off camera,
+    // so it should not preserve the spawner's facing.
+    this.Hide(this.cast.comrade);
+    this.Put(this.cast.comrade,b.comradeSeat);
+    this.Show(this.cast.comrade);
     this.captives=[this.cast.comrade];
     this.Spawn("runner","nra",b.runnerRoute[0],SpeakingCastOptions("runner"));
     this.Spawn("shouter","nra",b.shouter,SpeakingCastOptions("shouter"));
@@ -561,6 +590,10 @@ export class FirstLevelBunkerShow {
     }
     this.UpdatePursuit();
     this.UpdatePerformances();
+    // The actor's first animation pass follows Setup. Project the old blood onto the
+    // already posed uniform on the next frame, while the opening is still fading in.
+    if(!this.flags.comradeBloodied&&r.time-this.setupAt>=.1)
+      this.flags.comradeBloodied=this.BloodiedComrade(this.cast.comrade);
     // Outside the director's shots the AI's own cull is the frame's last word.
     if(!this.CameraActive)this.MarkNotShown();
   }
@@ -1042,7 +1075,7 @@ export class FirstLevelBunkerShow {
     this.InterpreterIn(m);
     if(this.SceneDone("CaptiveInterrogation")||age>this.interrogationLength+C.timeouts.interrogationExtraS)this.Stage("Slash");
   }
-  /** Hair grab, draw, cut (stages slashGrab/slashDraw/slashCut share the comrade's wall root). */
+  /** Collar grab, draw, cut (stages slashGrab/slashDraw/slashCut share the comrade's wall root). */
   PhaseSlash(age){
     const r=this.r,comrade=this.Comrade,ijaA=this.Ija("ijaA"),m=this.InterrogationMarks();
     const root=this.StageRoot("slashGrab","ijaA",m.wall);

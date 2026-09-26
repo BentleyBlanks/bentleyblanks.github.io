@@ -108,6 +108,8 @@ node scripts/Script_BlenderMcp.mjs status --scan
     看顺子）；第一人称 `EXTRA_HAND_POSES.gripArm.atLeft` 0.65 → 0.75。
   - 写出的骨骼顺序对齐机枪俘虏库（运行时把俘虏库 clip 拷进开场库，要求顺序一致）。
   - `Script_OpeningClipsBrowserTest` 的骨长检查跳过骨盆：新骨架里骨盆直接挂 GroundRoot，二者的距离就是根运动
+
+洞口行刑的后续修订将这组冻结名称的“抓头发”动作改为抓前领，另设侧前方站位并重新烘焙；当前接触对象和镜头验收见 [开场动作库 §8](Data_OpeningClipLibrary20260923.md)。
     （Lugou 骨架上骨盆绑在 GroundRoot 原点，被 1 cm 过滤掉了），不是骨段长度。
 - 机枪俘虏库仍是第一次规范化的重定向产物；它的烘焙脚本已改到新模型名与作者副本，重烘会得到作者化版本。
 

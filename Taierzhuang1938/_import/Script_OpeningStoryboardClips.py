@@ -1956,14 +1956,18 @@ def BuildShoveToWall(T, name):
 
 
 # =================================================================================
-# 01: hair, blade, taunt, release. Victim root R3 (as CaptiveWallBrace); ijaA's root is
-# the same spot for the whole run (square in front, a little to the victim's right).
+# 01: collar grab, blade, taunt, release. Victim root R3 (as CaptiveWallBrace); ijaA's root is
+# the same spot for the whole run (forward and to the victim's right).
 # =================================================================================
-IJA_A_AT = {'x': -.04, 'z': -.28, 'yawDeg': 180}
+# Give the camera a readable gap between the two torsos. The old 0.28 m face-to-face
+# root separation put the executioner's chest through the kneeling man's head.
+# He comes in from the captive's right, turns toward him, and reaches with the
+# left hand; all five slash stages keep this one root for seamless hand-offs.
+IJA_A_AT = {'x': .20, 'z': -.53, 'yawDeg': 165}
 STAGES['slashGrab'] = {'anchor': 'comrade', 'notes': 'IjaHairGrabPull and CaptiveHeadPulledBack start together.',
                        'actors': {'comrade': {'rig': 'TengxianNra02', 'clip': 'CaptiveHeadPulledBack', 'x': 0.0, 'z': 0.0, 'yawDeg': 0},
                                   'ijaA': dict(IJA_A_AT, rig='TengxianIja02', clip='IjaHairGrabPull')}}
-STAGES['slashDraw'] = {'anchor': 'comrade', 'notes': 'IjaDrawBayonet starts 1.0 s into CaptiveHeadPulledBack (the hair is still held).',
+STAGES['slashDraw'] = {'anchor': 'comrade', 'notes': 'IjaDrawBayonet starts 1.0 s into CaptiveHeadPulledBack (the collar is still held).',
                        'actors': {'comrade': {'rig': 'TengxianNra02', 'clip': 'CaptiveHeadPulledBack', 'x': 0.0, 'z': 0.0, 'yawDeg': 0},
                                   'ijaA': dict(IJA_A_AT, rig='TengxianIja02', clip='IjaDrawBayonet', offsetS=1.0)}}
 STAGES['slashCut'] = {'anchor': 'comrade', 'notes': 'IjaThroatSlash and CaptiveThroatCut start together; the blade crosses at 0.24 s.',
@@ -1973,53 +1977,53 @@ STAGES['slashTaunt'] = {'anchor': 'comrade', 'notes': 'CaptiveClutchThroat loops
                         'actors': {'comrade': {'rig': 'TengxianNra02', 'clip': 'CaptiveClutchThroat', 'x': 0.0, 'z': 0.0, 'yawDeg': 0, 'offsetS': 1.0},
                                    'ijaA': dict(IJA_A_AT, rig='TengxianIja02', clip='IjaThroatSlash')}}
 STAGES['slashWipe'] = {'anchor': 'comrade', 'notes': 'IjaWipeSheathBayonet and CaptiveWallSlideTwitch start together: '
-                                                     'ijaA lets go of the hair (0-0.3 s), watches him slide down and '
+                                                     'ijaA lets go of the collar (0-0.3 s), watches him slide down and '
                                                      'wipes the blade on the corpse from 3.2 s.',
                        'actors': {'comrade': {'rig': 'TengxianNra02', 'clip': 'CaptiveWallSlideTwitch', 'x': 0.0, 'z': 0.0, 'yawDeg': 0},
                                   'ijaA': dict(IJA_A_AT, rig='TengxianIja02', clip='IjaWipeSheathBayonet')}}
 PARTNER_SOURCES['TengxianNra02'].update({
-    'CaptiveHeadPulledBack': ['crown', 'hairBack', 'throat'],
-    'CaptiveThroatCut': ['crown', 'hairBack', 'throat'],
-    'CaptiveClutchThroat': ['crown', 'hairBack', 'throat'],
-    'CaptiveWallSlideTwitch': ['shoulderR', 'shoulderL', 'hairBack', 'crown', 'thighL'],
+    'CaptiveHeadPulledBack': ['collarFront', 'throat'],
+    'CaptiveThroatCut': ['collarFront', 'throat'],
+    'CaptiveClutchThroat': ['collarFront', 'throat'],
+    'CaptiveWallSlideTwitch': ['shoulderR', 'shoulderL', 'collarFront', 'thighL'],
 })
 
 Meta('CaptiveHeadPulledBack', 1.8, False, 'free', role='comrade', rig='TengxianNra02', rootMotion=False, stage='slashGrab', weaponState='dropped', weaponDropFrom='BlastSlamBuried',
      env={'wallBehindM': .49},
-     contacts=[{'t': .28, 'by': 'ijaA', 'part': 'crown', 'action': 'grab'},
+     contacts=[{'t': .28, 'by': 'ijaA', 'part': 'collarFront', 'action': 'grab'},
                {'t': 0.0, 'limb': 'shoulderBack', 'action': 'lean', 'target': 'wall', 'untilT': .28},
                {'t': .42, 'limb': 'shoulderBack', 'action': 'release', 'target': 'wall'}],
      prev=['CaptiveKneelMud', 'CaptiveWallBrace'], next=['CaptiveThroatCut'],
-     notes='Fist in the hair: he is hauled up off his heels and off the wall, the head torn back and the '
+     notes='Fist in the front collar: he is hauled up off his heels and off the wall, the head torn back and the '
            'throat opened; both hands come up by reflex and stay half-raised while the bayonet is drawn '
            '(covers IjaHairGrabPull + IjaDrawBayonet).')
-Meta('IjaHairGrabPull', 1.0, False, 'track', role='ijaA', rig='TengxianIja02', props=['weapon'], rootMotion=False,
+Meta('IjaHairGrabPull', 1.0, False, 'track', role='ijaA', rig='TengxianIja02', props=['weapon'], rootMotion=True,
      stage='slashGrab', weaponState='slungBack',
-     contacts=[{'t': .28, 'limb': 'handL', 'action': 'grab', 'partnerRole': 'comrade', 'part': 'crown', 'standoffM': .03},
+     contacts=[{'t': .28, 'limb': 'handL', 'action': 'grab', 'partnerRole': 'comrade', 'part': 'collarFront', 'standoffM': .03},
                {'t': .42, 'limb': 'handL', 'action': 'yank', 'partnerRole': 'comrade'}],
      next=['IjaDrawBayonet'],
-     notes='Half step in, left fist into the hair, yanks the head back hard. No pause before the draw.')
+     notes='Half step in, left fist into the front collar, yanks the head back hard. No pause before the draw.')
 Meta('IjaDrawBayonet', .8, False, 'track', role='ijaA', rig='TengxianIja02', props=['weapon', 'bayonet'], rootMotion=False,
      stage='slashDraw', weaponState='slungBack',
-     contacts=[{'t': 0, 'limb': 'handL', 'action': 'hold', 'partnerRole': 'comrade', 'part': 'crown', 'standoffM': .03},
+     contacts=[{'t': 0, 'limb': 'handL', 'action': 'hold', 'partnerRole': 'comrade', 'part': 'collarFront', 'standoffM': .03},
                {'t': .22, 'limb': 'handR', 'action': 'grip', 'target': 'bayonet', 'part': 'handle'},
                {'t': .30, 'limb': 'handR', 'action': 'draw', 'target': 'bayonet'}],
      events=[{'t': .30, 'kind': 'bayonetDraw', 'sound': 'bladeScrape'}],
      prev=['IjaHairGrabPull'], next=['IjaThroatSlash'],
-     notes='Left fist keeps the hair; right hand to the scabbard on the left hip, draws the short bayonet '
+     notes='Left fist keeps the collar; right hand to the scabbard on the left hip, draws the short bayonet '
            'and brings it low to the right, point toward the victim.')
 Meta('IjaThroatSlash', 4.0, False, 'track', role='ijaA', rig='TengxianIja02', props=['weapon', 'bayonet'], rootMotion=False,
      stage='slashCut', weaponState='slungBack', holdLoop=[1.0, 4.0],
      contacts=[{'t': .24, 'limb': 'bayonet', 'action': 'cut', 'partnerRole': 'comrade', 'part': 'throat'},
-               {'t': 0, 'limb': 'handL', 'action': 'hold', 'partnerRole': 'comrade', 'part': 'crown', 'standoffM': .03},
+               {'t': 0, 'limb': 'handL', 'action': 'hold', 'partnerRole': 'comrade', 'part': 'collarFront', 'standoffM': .03},
                # the taunt hold (stage slashTaunt, against CaptiveClutchThroat)
-               {'t': 1.0, 'limb': 'handL', 'action': 'hold', 'partnerRole': 'comrade', 'part': 'crown', 'standoffM': .03}],
+               {'t': 1.0, 'limb': 'handL', 'action': 'hold', 'partnerRole': 'comrade', 'part': 'collarFront', 'standoffM': .03}],
      events=[{'t': .24, 'kind': 'throatCut'}, {'t': 1.6, 'kind': 'hairShake', 'line': 'CaptiveTaunt.01'},
              {'t': 2.8, 'kind': 'hairShake', 'line': 'CaptiveTaunt.02'}],
      prev=['IjaDrawBayonet'], next=['IjaWipeSheathBayonet'],
      notes='No pause: a 0.1 s cock to the right and one hard right-to-left draw across the throat (blade at '
-           'the throat 0.24 s). Keeps the hair and leans in to taunt; 1.0-4.0 s is a seamless hold loop '
-           '(the director samples it in window until "日兵甲松手") with two hair shakes on the taunt lines.')
+           'the throat 0.24 s). Keeps the collar and leans in to taunt; 1.0-4.0 s is a seamless hold loop '
+           '(the director samples it in window until "日兵甲松手") with two collar shakes on the taunt lines.')
 Meta('CaptiveThroatCut', 1.0, False, 'free', role='comrade', rig='TengxianNra02', rootMotion=True, stage='slashCut', weaponState='dropped', weaponDropFrom='BlastSlamBuried',
      env={'wallBehindM': .49},
      contacts=[{'t': .24, 'by': 'ijaA', 'part': 'throat', 'action': 'cut'},
@@ -2028,14 +2032,14 @@ Meta('CaptiveThroatCut', 1.0, False, 'free', role='comrade', rig='TengxianNra02'
      events=[{'t': .24, 'kind': 'bloodSpray', 'at': 'throat'}, {'t': .30, 'kind': 'effort', 'what': 'chokedGurgle'}],
      prev=['CaptiveHeadPulledBack'], next=['CaptiveClutchThroat'],
      notes='The cut lands: a full-body jolt, both hands fly to the throat, the legs go and the trunk slams '
-           'back into the wall (0.52 s); the head stays up where the fist holds it.')
+           'back into the wall (0.52 s); the collar fist keeps his shoulders raised.')
 Meta('CaptiveClutchThroat', 3.0, True, 'free', role='comrade', rig='TengxianNra02', rootMotion=False, stage='slashTaunt', weaponState='dropped', weaponDropFrom='BlastSlamBuried',
      env={'wallBehindM': .49},
      contacts=[{'t': 0.0, 'limb': 'shoulderBack', 'action': 'lean', 'target': 'wall', 'untilT': 3.0}],
      events=[{'t': .30, 'kind': 'spasm'}, {'t': 1.2, 'kind': 'spasm'}, {'t': 2.2, 'kind': 'spasm'},
              {'t': .60, 'kind': 'hairShake'}, {'t': 1.80, 'kind': 'hairShake'}],
      prev=['CaptiveThroatCut'], next=['CaptiveWallSlideTwitch'],
-     notes='Hands clamped on the throat, choking spasms, head held back by the fist and shaken twice per loop '
+     notes='Hands clamped on the throat, choking spasms, collar held by the fist and shaken twice per loop '
            '(in step with IjaThroatSlash hold window).')
 Meta('CaptiveWallSlideTwitch', 3.2, False, 'free', role='comrade', rig='TengxianNra02', rootMotion=True, stage='slashWipe', weaponState='dropped', weaponDropFrom='BlastSlamBuried',
      env={'wallBehindM': .49}, terminal=True,
@@ -2048,8 +2052,8 @@ Meta('CaptiveWallSlideTwitch', 3.2, False, 'free', role='comrade', rig='Tengxian
            'the legs jerk three times and stop. Last frame is the corpse (hold it; replaces ShotCollapse).')
 WIPE_LEAD = 3.2     # IjaWipeSheathBayonet: the release and the watch while CaptiveWallSlideTwitch plays
 Meta('IjaWipeSheathBayonet', WIPE_LEAD + 2.4, False, 'track', role='ijaA', rig='TengxianIja02', props=['weapon', 'bayonet'],
-     rootMotion=False, stage='slashWipe', weaponState='slungBack',
-     contacts=[{'t': 0.0, 'limb': 'handL', 'action': 'hold', 'partnerRole': 'comrade', 'part': 'crown', 'standoffM': .03},
+     rootMotion=True, stage='slashWipe', weaponState='slungBack',
+     contacts=[{'t': 0.0, 'limb': 'handL', 'action': 'hold', 'partnerRole': 'comrade', 'part': 'collarFront', 'standoffM': .03},
                {'t': .05, 'limb': 'handL', 'action': 'release', 'partnerRole': 'comrade'},
                {'t': WIPE_LEAD + .55, 'limb': 'bayonet', 'action': 'wipe', 'partnerRole': 'comrade', 'part': 'thighL'},
                {'t': WIPE_LEAD + .85, 'limb': 'bayonet', 'action': 'lift'},
@@ -2128,7 +2132,7 @@ def SlashVictimStart(T):
 
 
 def PulledUpPelvis(T):
-    """Seat of a man hauled up by the hair: off the heels (sit .35), a little forward and up."""
+    """Seat of a man hauled up by the collar: off the heels (sit .35), a little forward and up."""
     sit, dy, dz = [float(v) for v in (__import__('os').environ.get('PULL') or '.35,-.02,-.02').split(',')]
     return Add3(KneelFlat(T, 0.0, .02, sit=sit)['pelvis'], (0, dy, dz))
 
@@ -2142,17 +2146,18 @@ def HeadPulledBackKeys(T):
     rows = [
         (0.00, {}),
         (0.26, {'head': (h[0] + .06, h[1], h[2])}),
-        # Yanked: the fist hauls him up by the hair -- the seat comes off the heels and the back
+        # Yanked: the fist hauls him up by the collar -- the seat comes off the heels and the back
         # comes off the wall (it slams back into it with the cut, CaptiveThroatCut); the head is
         # torn back and the throat opened. The knees stay where they are.
         (0.42, {'head': (-.34, .05, .10), 'neck': (-.06, 0, .04), 'bend': .16, 'shrug': .24, 'twist': -.26,
                 'pelvis': PulledUpPelvis(T), 'pelvisTilt': HAULED_TILT,
-                # Both hands fly up at the fist in his hair (forehead high), not out into ijaA's belly.
-                'handRel.R': (.07, -.06, .31), 'palmF.R': (.1, -.2, 1), 'palmN.R': (0, -1, .1), 'curl.R': .35,
-                'handRel.L': (-.05, -.05, .29), 'palmF.L': (-.1, -.2, 1), 'palmN.L': (0, -1, .1), 'curl.L': .35}),
+                # One hand tries to pry the collar fist away while the other shields the chest.
+                # The old forehead-high pair hid the blade for the entire shot.
+                'handRel.R': (.10, -.12, .08), 'palmF.R': (.1, -.2, 1), 'palmN.R': (0, -1, .1), 'curl.R': .35,
+                'handRel.L': (-.09, -.08, -.08), 'palmF.L': (-.1, -.2, 1), 'palmN.L': (0, -1, .1), 'curl.L': .35}),
         (0.62, {'head': (-.30, .08, .08), 'shrug': .20}),
-        (0.95, {'head': (-.35, .02, .12), 'handRel.R': (.09, -.07, .33), 'curl.R': .7}),
-        (1.25, {'head': (-.31, .07, .09), 'handRel.L': (-.06, -.06, .31), 'curl.L': .6}),
+        (0.95, {'head': (-.35, .02, .12), 'handRel.R': (.12, -.13, .10), 'curl.R': .7}),
+        (1.25, {'head': (-.31, .07, .09), 'handRel.L': (-.08, -.09, -.05), 'curl.L': .6}),
         (1.55, {'head': (-.34, .04, .11), 'shrug': .23}),
         (1.80, {'head': (-.33, .05, .10)}),
     ]
@@ -2361,18 +2366,18 @@ def BuildHairGrab(T, name):
         # Starts with the left foot already out beside his right knee (a square stance at this
         # spot stands on it); the half step goes forward from there.
         'ankle.L': [(0.0, Add3(base['ankle.L'], (.12, 0, 0))), (.06, Add3(base['ankle.L'], (.12, 0, 0))),
-                    (.13, Add3(base['ankle.L'], (.16, -.06, .05))), (.20, HairHoldPose(T)['ankle.L'])],
+                    (.13, Add3(base['ankle.L'], (.16, -.15, .05))), (.20, HairHoldPose(T)['ankle.L'])],
         'legPole.L': [(0.0, base['legPole.L']), (.20, HairHoldPose(T)['legPole.L'])],
-        'pelvis': [(0.0, base['pelvis']), (.20, Add3(base['pelvis'], (0, -.10, -.04))), (.30, Add3(base['pelvis'], (0, -.13, -.05))),
-                   (.44, Add3(base['pelvis'], (0, -.03, -.03))), (1.0, Add3(base['pelvis'], (0, -.05, -.03)))],
-        'bend': [(0.0, .08), (.28, .32), (.44, .18), (1.0, .20)],
+        'pelvis': [(0.0, base['pelvis']), (.20, Add3(base['pelvis'], (0, -.19, -.04))), (.30, Add3(base['pelvis'], (0, -.28, -.05))),
+                   (.44, Add3(base['pelvis'], (0, -.24, -.03))), (1.0, Add3(base['pelvis'], (0, -.25, -.03)))],
+        'bend': [(0.0, .08), (.28, .19), (.44, .13), (1.0, .14)],
         'pelvisTilt': [(0.0, (.03, 0, 0)), (.28, (.12, 0, 0)), (1.0, (.06, 0, 0))],
         'twist': [(0.0, 0.0), (.28, .12), (.44, -.05), (1.0, 0.0)],
-        'head': [(0.0, (.10, 0, 0)), (.28, (.18, 0, 0)), (.44, (.16, 0, -.05)), (1.0, (.22, 0, 0))],
+        'head': [(0.0, (.10, 0, 0)), (.28, (.08, 0, 0)), (.44, (.06, 0, -.05)), (1.0, (.10, 0, 0))],
         'handRel.R': [(0.0, base['handRel.R']), (1.0, HAIR_GRAB_HAND_R)],
         'protract.L': [(0.0, 0.0), (.28, HAIR_PROTRACT)],
     }, lag={'head': .05})
-    spec = AttackerSpec(T, 'slashGrab', 'ijaA', 'comrade', {'L': [(.28, 1.0, 'crown', .03, (0, 1, -.3), 1.1)]}, anim, 1.0)
+    spec = AttackerSpec(T, 'slashGrab', 'ijaA', 'comrade', {'L': [(.28, 1.0, 'collarFront', .03, (0, 1, -.3), 1.1)]}, anim, 1.0)
     props, review = SlungProps(T)
     spec.update({'props': props, 'plants': [('R', 0, 1.0), ('L', .20, 1.0)],
                  'reviewProps': lambda t: review(t) + spec['markers'](t),
@@ -2381,7 +2386,7 @@ def BuildHairGrab(T, name):
 
 
 def DrawBase(T):
-    """ijaA while holding the hair: planted in the half step of IjaHairGrabPull."""
+    """ijaA while holding the collar: planted in the half step of IjaHairGrabPull."""
     return HairHoldPose(T)
 
 
@@ -2390,20 +2395,20 @@ def HairHoldPose(T):
     # The half step plants the left foot beside his right knee (0.20 m out to the left, the
     # knee turned out), not
     # between his thighs: straddling, the shin clears the kneeling man.
-    # Tall over the kneeling man, looking down at him with the arm out to the hair -- stooped
+    # Tall over the kneeling man, looking down at him with the arm out to the collar -- stooped
     # (bend .38) his face ended up against the victim's.
-    base.update({'ankle.L': Add3(base['ankle.L'], (.20, -.12, 0)), 'legPole.L': Add3(base['legPole.L'], (.25, .05, 0)),
-                 'pelvis': Add3(base['pelvis'], (0, -.05, -.03)),
-                 'bend': .20, 'pelvisTilt': (.06, 0, 0), 'head': (.22, 0, 0)})
+    base.update({'ankle.L': Add3(base['ankle.L'], (.20, -.31, 0)), 'legPole.L': Add3(base['legPole.L'], (.25, -.13, 0)),
+                 'pelvis': Add3(base['pelvis'], (0, -.25, -.03)),
+                 'bend': .14, 'pelvisTilt': (.06, 0, 0), 'head': (.10, 0, 0)})
     return base
 
 
 def HairHandPose(T):
-    """HairHoldPose with the hair hand's shoulder forward (the clips that hold the hair)."""
+    """HairHoldPose with the left gripping shoulder forward (legacy function name)."""
     return dict(HairHoldPose(T), **{'protract.L': HAIR_PROTRACT})
 
 
-# TengxianHumanoidV1 (2026-09-26): the hair hand's shoulder comes forward (rad about the vertical: ~6 cm) -- the common skeleton's shoulder
+# TengxianHumanoidV1 (2026-09-26): the gripping shoulder comes forward (rad about the vertical: ~6 cm) -- the common skeleton's shoulder
 # sits ~5 cm further back and its arm is 2.4 cm shorter than IJA02's own, and leaning the trunk in instead put
 # his face into the comrade's (OpeningClipsBrowserTest stage overlap).
 HAIR_PROTRACT = GRIP_PROTRACT
@@ -2424,9 +2429,9 @@ def BuildDrawBayonet(T, name):
     readyAxis = path0[2]
     keys = [
         (0.00, {}),
-        (0.10, {'twist': .03, 'bend': .26}),
-        (0.50, {'twist': .02, 'bend': .20}),
-        (0.80, {'twist': 0.0, 'bend': .20}),
+        (0.10, {'twist': .03, 'bend': .18}),
+        (0.50, {'twist': .02, 'bend': .14}),
+        (0.80, {'twist': 0.0, 'bend': .14}),
     ]
     body = Keys(dict(base, **{'handRel.R': HAIR_GRAB_HAND_R}), keys, lag={'head': .05})
     path = [(0.0, (pel[0] - T.R(.20), pel[1] - T.R(.10), pel[2] - T.R(.08))), (.22, scabbard), (.28, scabbard),
@@ -2448,7 +2453,7 @@ def BuildDrawBayonet(T, name):
             pf, pn = KnifePalm(Unit(axes(t)))
             f['palmF.R'], f['palmN.R'], f['curl.R'] = pf, pn, 1.1
         return f
-    spec = AttackerSpec(T, 'slashDraw', 'ijaA', 'comrade', {'L': [(0.0, .8, 'crown', .03, (0, 1, -.3), 1.1)]}, BodyAt, .8)
+    spec = AttackerSpec(T, 'slashDraw', 'ijaA', 'comrade', {'L': [(0.0, .8, 'collarFront', .03, (0, 1, -.3), 1.1)]}, BodyAt, .8)
     props, review = SlungProps(T)
 
     def Props(t):
@@ -2478,7 +2483,7 @@ WIPE_STROKE = [float(v) for v in (__import__('os').environ.get('WIPESTROKE') or 
 def WIPE_BACK_L(base):
     """ijaA's left foot stepped back and out while the man slides down beside it."""
     return Add3(base['ankle.L'], (.08, .20, 0))
-TAUNT_STEP = [float(v) for v in (__import__('os').environ.get('TAUNTSTEP') or '.22,.12,.03,.32').split(',')]
+TAUNT_STEP = [float(v) for v in (__import__('os').environ.get('TAUNTSTEP') or '.22,.12,.03,.20').split(',')]
 
 
 def TauntStance(T):
@@ -2487,7 +2492,7 @@ def TauntStance(T):
     base = HairHoldPose(T)
     step, hips, sink, bend = TAUNT_STEP
     return {'ankle.R': Add3(base['ankle.R'], (0, -step, 0)), 'pelvis': Add3(base['pelvis'], (0, -hips, -sink)),
-            'bend': bend, 'head': (.25, 0, .05)}
+            'bend': bend, 'head': (.12, 0, .05)}
 
 
 def SLASH_POLE(T, pel):
@@ -2526,7 +2531,7 @@ def BuildThroatSlash(T, name):
         return hit[0] if hit else Vector((0, -T.R(.50), .75))
 
     def Taunt(t):
-        """1.0-4.0: seamless hold loop. Leans in, two hair shakes on the taunt lines."""
+        """1.0-4.0: seamless hold loop. Leans in, two collar shakes on the taunt lines."""
         u = t - 1.0
         phase = Tau * u / 3.0
         shake = Pulse(u, .60, .07) - Pulse(u, .72, .07) + Pulse(u, 1.80, .07) - Pulse(u, 1.92, .07)
@@ -2536,8 +2541,8 @@ def BuildThroatSlash(T, name):
     # He slams back into the wall with the cut: ijaA follows him in with the right foot and leans
     # over him, the fist pinning the head, for the taunt (TauntStance).
     held = TauntStance(T)
-    body = Keys(base, [(0.0, {}), (.08, {'twist': .08, 'bend': .24}), (.24, {'twist': -.08, 'bend': .30}),
-                       (.36, {'twist': -.12, 'bend': .26}),
+    body = Keys(base, [(0.0, {}), (.08, {'twist': .08, 'bend': .18}), (.24, {'twist': -.08, 'bend': .18}),
+                       (.36, {'twist': -.12, 'bend': .16}),
                        (.26, {'ankle.R': base['ankle.R'], 'pelvis': pel}),
                        (.37, {'ankle.R': Add3(Lerp3(base['ankle.R'], held['ankle.R'], .5), (0, 0, .07))}),
                        (.48, {'ankle.R': held['ankle.R'], 'pelvis': held['pelvis']}),
@@ -2556,8 +2561,8 @@ def BuildThroatSlash(T, name):
         pf, pn = KnifePalm(Unit(axes(min(t, 1.0))))
         f['palmF.R'], f['palmN.R'], f['curl.R'] = pf, pn, 1.1
         return f
-    grips = {'L': [(0.0, 1.0, 'crown', .03, (0, 1, -.3), 1.1, 'slashCut'),
-                   (1.0, 4.0, 'crown', .03, (0, 1, -.3), 1.1, 'slashTaunt')],
+    grips = {'L': [(0.0, 1.0, 'collarFront', .03, (0, 1, -.3), 1.1, 'slashCut'),
+                   (1.0, 4.0, 'collarFront', .03, (0, 1, -.3), 1.1, 'slashTaunt')],
              'R': []}
     spec = AttackerSpec(T, 'slashCut', 'ijaA', 'comrade', grips, BodyAt, 4.0)
     props, review = SlungProps(T)
@@ -2581,11 +2586,23 @@ def BuildThroatSlash(T, name):
     return AReview(spec)
 
 
+def IjaReadyBase(T):
+    """The wider guard stance after the close-range collar grab."""
+    ready = IjaABase(T)
+    ready.update({'ankle.L': Add3(ready['ankle.L'], (.20, -.12, 0)),
+                  'legPole.L': Add3(ready['legPole.L'], (.25, .05, 0)),
+                  'pelvis': Add3(ready['pelvis'], (0, -.05, -.03)),
+                  'bend': .20, 'pelvisTilt': (.06, 0, 0), 'head': (.22, 0, 0)})
+    return ready
+
+
 @Builder('IjaWipeSheathBayonet')
 def BuildWipeSheath(T, name):
     base = HairHandPose(T)
     pel = base['pelvis']
     P = T.P
+    # After wiping the blade, step back into the guard stance for the rifle hand-off.
+    ready = IjaReadyBase(T)
 
     L = WIPE_LEAD
 
@@ -2636,7 +2653,7 @@ def BuildWipeSheath(T, name):
                        (.25, {'ankle.L': base['ankle.L'], 'ankle.R': held['ankle.R'], 'pelvis': held['pelvis']}),
                        (.40, {'ankle.L': Add3(Lerp3(base['ankle.L'], WIPE_BACK_L(base), .5), (0, 0, .07))}),
                        (.50, {'bend': .18, 'twist': -.04, 'head': (.30, 0, .02)}),
-                       (.55, {'ankle.L': WIPE_BACK_L(base), 'protract.L': 0.0}),   # the hair hand's shoulder settles back
+                       (.55, {'ankle.L': WIPE_BACK_L(base), 'protract.L': 0.0}),   # the gripping shoulder settles back
                        (.62, {'ankle.R': Add3(Lerp3(held['ankle.R'], base['ankle.R'], .5), (0, 0, .07))}),
                        (.78, {'ankle.R': base['ankle.R'], 'pelvis': pel}),
                        (1.60, {'bend': .20, 'twist': -.06, 'head': (.42, 0, -.04)}),
@@ -2652,8 +2669,14 @@ def BuildWipeSheath(T, name):
                        (L + 1.52, {'ankle.L': Add3(Lerp3(base['ankle.L'], WIPE_BACK_L(base), .5), (0, 0, .07))}),
                        (L + 1.65, {'ankle.L': base['ankle.L']}),
                        (L + 1.62, {'twist': .26, 'bend': .26}),
-                       (L + 2.40, {'twist': -.05, 'bend': .12, 'head': (.05, 0, -.10), 'pelvis': pel})], lag={'head': .05})
-    ready = HairHoldPose(T)
+                       (L + 1.85, {'ankle.L': Add3(Lerp3(base['ankle.L'], ready['ankle.L'], .5), (0, 0, .06)),
+                                   'legPole.L': Lerp3(base['legPole.L'], ready['legPole.L'], .5),
+                                   'pelvis': Lerp3(pel, ready['pelvis'], .5)}),
+                       (L + 2.10, {'ankle.L': ready['ankle.L'], 'legPole.L': ready['legPole.L'],
+                                   'pelvis': ready['pelvis']}),
+                       (L + 2.40, {'twist': -.05, 'bend': .12, 'head': (.05, 0, -.10),
+                                   'ankle.L': ready['ankle.L'], 'legPole.L': ready['legPole.L'],
+                                   'pelvis': ready['pelvis']})], lag={'head': .05})
 
     def BodyAt(t):
         f = body(t)
@@ -2670,8 +2693,8 @@ def BuildWipeSheath(T, name):
         else:
             f['palmF.R'], f['palmN.R'], f['curl.R'] = barrelPalm[0], barrelPalm[1], .95
         return f
-    # The left fist is still in his hair at frame 0 and lets go at once.
-    spec = AttackerSpec(T, 'slashWipe', 'ijaA', 'comrade', {'L': [(0.0, .05, 'crown', .03, (0, 1, -.3), 1.1)]}, BodyAt, L + 2.4)
+    # The left fist still holds the front collar at frame 0 and lets go at once.
+    spec = AttackerSpec(T, 'slashWipe', 'ijaA', 'comrade', {'L': [(0.0, .05, 'collarFront', .03, (0, 1, -.3), 1.1)]}, BodyAt, L + 2.4)
     baseCheck = spec['check']
     props, review = SlungProps(T)
 
@@ -2693,7 +2716,7 @@ def BuildWipeSheath(T, name):
         return out
     spec.update({'props': Props, 'plants': [('R', 0, .55), ('R', .78, L + 2.4),
                                             ('L', 0, .25), ('L', .55, L + 1.40),
-                                            ('L', L + 1.65, L + 2.4)],
+                                            ('L', L + 2.10, L + 2.4)],
                  # The blade on the trouser leg while it wipes (L + 0.55-0.85 s): the check reads the
                  # distance from the blade (the posed knife) to the thigh patch, as a target that far
                  # from the fist.
@@ -2717,7 +2740,7 @@ def LowReady(T):
 @Builder('IjaReadyRifle')
 def BuildReadyRifle(T, name):
     H, P, SX, SZ = T.H, T.P, T.SX, T.SZ
-    base = HairHoldPose(T)
+    base = IjaReadyBase(T)
     base.update({'bend': .12, 'head': (.05, 0, -.10), 'twist': -.05})
     slung = T.Rifle((.107, .20, P + .16), Unit((-.37, .05, .93)))
     lifted = T.Rifle((-.20, .15, P + .25), Unit((-.20, -.35, .91)))
