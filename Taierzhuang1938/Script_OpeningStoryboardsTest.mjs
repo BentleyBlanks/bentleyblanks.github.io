@@ -191,6 +191,8 @@ const comrade=assets.get("TengxianNra02"),ijaA=assets.get("TengxianIja02");
 let chains=0;
 for(const [asset,a,ia,b,ib] of [[comrade,"WoundedSitRifleIdle",0,"BanterPatRifle",0],[comrade,"BanterPatRifle",-1,"WoundedSitRifleIdle",0],
   [comrade,"WoundedSitRifleIdle",0,"WoundedRiseWall",0],[comrade,"WoundedRiseWall",-1,"BlastSlamBuried",0],[comrade,"BlastSlamBuried",-1,"CaptiveDraggedFromDirt",0],
+  // Stunned in the heap between them (BlastDazedStir loops; the director lands the drag on a loop end).
+  [comrade,"BlastSlamBuried",-1,"BlastDazedStir",0],[comrade,"BlastDazedStir",-1,"CaptiveDraggedFromDirt",0],
   [comrade,"CaptiveWallBrace",-1,"CaptiveKneelMud",0],[comrade,"CaptiveKneelMud",0,"CaptiveHeadPulledBack",0],[comrade,"CaptiveHeadPulledBack",-1,"CaptiveThroatCut",0],
   [comrade,"CaptiveThroatCut",-1,"CaptiveClutchThroat",0],[comrade,"CaptiveClutchThroat",0,"CaptiveWallSlideTwitch",0],
   // ijaA's hair-grab / draw / cut / wipe / ready run on one root, frame to frame: the hold loop's

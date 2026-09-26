@@ -13,7 +13,7 @@ path; start/stop the instance around it). Environment:
                      OpeningStoryboards_20260926HumanoidV1 -- the 20260922/20260923/20260925
                      Lugou-rig sources stay untouched; the 0926 folder started as a copy of
                      the 0925 partner tracks, renamed to the Tengxian rig ids)
-  OPENING_VERSION    manifest version (default 20260926OpeningStoryboardsV7Drag)
+  OPENING_VERSION    manifest version (default 20260926OpeningStoryboardsV8Stunned)
   OPENING_MODEL      comma list of rigs (default all five)
   OPENING_CLIPS      comma list: bake only these clips and merge into the rig's JSON. A clip's only
                      inputs from other clips are the arm-roll seeds of its `prev` clip (below): a
@@ -61,7 +61,7 @@ from mathutils import Vector, Matrix, Quaternion
 project = Path(os.environ['OPENING_PROJECT'])
 private = Path(os.environ.get('OPENING_BLEND_DIR')
                or 'C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/OpeningStoryboards_20260926HumanoidV1')
-VERSION = os.environ.get('OPENING_VERSION') or '20260926OpeningStoryboardsV7Drag'
+VERSION = os.environ.get('OPENING_VERSION') or '20260926OpeningStoryboardsV8Stunned'
 committedDir = project / 'Animation/OpeningStoryboards'
 output = Path(os.environ.get('OPENING_OUTPUT') or (project.parent / 'tmp/OpeningStoryboards/Verify'
                                                    if os.environ.get('OPENING_PASS') == 'verify' else committedDir))
@@ -481,7 +481,9 @@ def BakeRig(ctx):
             if p.get('post'):
                 p['post']()
                 Update()
-        low, lowAt = ctx['LowestVertex']()
+        # `ground` (x, y, t) -> z: a clip authored on uneven ground (the comrade's bank) grounds on it.
+        ground = spec.get('ground')
+        low, lowAt = ctx['LowestVertex']((lambda x, y: ground(x, y, t)) if ground else None)
         lift = CLEARANCE - low
         solveState['lift'] = lift
         if os.environ.get('OPENING_LOWDBG'):
@@ -970,13 +972,18 @@ def RenderReview(clip, frame, t, spec, modelId):
         elif kind == 'box':
             bmesh.ops.create_cube(bm, size=1.0)
             bmesh.ops.scale(bm, vec=Vector(b), verts=bm.verts)
+        elif kind == 'poly':
+            # A flat face through the points `a` (sloped ground the clip is authored on).
+            bm.faces.new([bm.verts.new(Vector(v)) for v in a])
         else:
             bmesh.ops.create_cone(bm, cap_ends=True, segments=8, radius1=radius, radius2=radius, depth=(Vector(b) - Vector(a)).length)
         mesh = bpy.data.meshes.new('ReviewProp')
         bm.to_mesh(mesh)
         bm.free()
         o = bpy.data.objects.new('ReviewProp%d' % index, mesh)
-        if kind in ('point', 'box'):
+        if kind == 'poly':
+            pass
+        elif kind in ('point', 'box'):
             o.location = a
         else:
             o.location = (Vector(a) + Vector(b)) / 2

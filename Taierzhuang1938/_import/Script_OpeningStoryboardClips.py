@@ -318,7 +318,16 @@ Meta('BlastSlamBuried', 1.5, False, 'track', role='comrade', rig='TengxianNra02'
      prev=['WoundedRiseWall'], next=['CaptiveDraggedFromDirt'], terminalPose='buried',
      notes='Near miss from front-right: thrown back-left into the trench wall, the rifle torn out '
            'forward-right, slides down the wall into a slumped heap on his left side (dust hides him). '
-           'The last frame is exactly CaptiveDraggedFromDirt frame 0 in the same root.')
+           'The heap lies on the real bank at the foot of the planks (BANK_RAMP). '
+           'The last frame is exactly BlastDazedStir / CaptiveDraggedFromDirt frame 0 in the same root.')
+Meta('BlastDazedStir', 6.4, True, 'free', role='comrade', rig='TengxianNra02', rootMotion=False, weaponState='dropped',
+     weaponDropFrom='BlastSlamBuried', env={'wallLeftM': .55},
+     events=[{'t': 2.3, 'kind': 'effort', 'what': 'groan'}, {'t': 3.9, 'kind': 'effort', 'what': 'strain'}],
+     prev=['BlastSlamBuried'], next=['CaptiveDraggedFromDirt'],
+     notes='Stunned by the near miss, in the heap on the bank (Wake .. the drag): heavy breathing, the head '
+           'comes up and lolls, the right hand goes to the ringing head and he shakes it slowly, the left palm '
+           'pushes on the bank to sit up and the arm gives, he sags back. Frame 0 = last frame = '
+           'BlastSlamBuried last frame = CaptiveDraggedFromDirt frame 0 (the director lands the drag on a loop end).')
 
 
 # -- 01 the comrade is dragged out, shoved to the wall -----------------------------------
@@ -1292,6 +1301,84 @@ def BuriedBase(T):
     return dict(f)
 
 
+# 2026-09-26: the ground he really lands on. At banter.comradeBlast (3.6, -125.85) the north wall is
+# not a vertical face 0.55 m to his left: the trench floor ends 0.29 m to his RIGHT and the foot of the
+# wall is a 35-degree bank (the game's 0.75 m heightfield rounds the corner) rising to trenchFacadeN's
+# planks, 0.345 m to his left, which stand upright to 0.384 m and lean back 20 degrees above
+# (Data_OpeningSet0103). Authored on a flat floor, the heap sat up to 0.42 m deep in the bank with the
+# head and the left shoulder in the planks. RUNTIME metres from the root: (left distance, height over
+# the root's own ground), battlefield.GroundHeight at x 3.4-3.8 sampled 2026-09-26 (the highest row).
+BANK_RAMP = ((-.29, -.205), (.42, .30), (.80, 1.06))
+BANK_FACE = (.345, .384, math.tan(math.radians(20)))
+BANK_SHIFT = .22             # the heap lands this far (runtime m) to his right of the flat-floor authoring
+
+
+def BankHeight(T, x):
+    """Ground under source X (his left +) in source metres over the root's own ground."""
+    d, (a, b, c) = x * T.s, BANK_RAMP
+    if d <= a[0]:
+        h = a[1]
+    elif d <= b[0]:
+        h = a[1] + (d - a[0]) * (b[1] - a[1]) / (b[0] - a[0])
+    else:
+        h = b[1] + (d - b[0]) * (c[1] - b[1]) / (c[0] - b[0])
+    return h / T.s
+
+
+def OnBank(T, f, w=1.0):
+    """A flat-floor pose carried onto the bank: every world target moves BANK_SHIFT to his right and
+    up by the bank under its new place (w blends it in). Body-frame hands (handRel) ride along."""
+    out = dict(f)
+    if w <= 1e-6:
+        return out
+    dx = -T.R(BANK_SHIFT) * w
+    for key in ('pelvis', 'ankle.L', 'ankle.R', 'hand.L', 'hand.R'):
+        v = f.get(key)
+        if v is None:
+            continue
+        x = v[0] + dx
+        out[key] = (x, v[1], v[2] + w * BankHeight(T, x))
+    # Knee and elbow poles are directions from the body: they move with the pelvis (lifting them by the
+    # bank under their own far-out points cocked the left knee up into ijaA's thigh).
+    rise = w * BankHeight(T, f['pelvis'][0] + dx)
+    for key in ('legPole.L', 'legPole.R', 'armPole.L', 'armPole.R'):
+        v = f.get(key)
+        if v is not None:
+            out[key] = (v[0] + dx, v[1], v[2] + rise)
+    return out
+
+
+def BankGround(T, weight=None):
+    """The bake's grounding surface for the heap: the bank, blended in by weight(t)."""
+    return lambda x, y, t: BankHeight(T, x) * (weight(t) if weight else 1.0)
+
+
+def BankWalls(T):
+    """Ramp, flat floor and the leaning planks as wall planes (point, inward normal, edge), source metres."""
+    (a, b, _), (face, upright, lean) = BANK_RAMP, BANK_FACE
+    k, tilt = math.atan2(b[1] - a[1], b[0] - a[0]), math.atan(lean)
+    return [((T.R(a[0]), 0, T.R(a[1])), (-math.sin(k), 0, math.cos(k)), (T.R(a[0]), 0, 0), (1, 0, 0)),
+            ((T.R(a[0]), 0, T.R(a[1])), (0, 0, 1), (T.R(a[0]), 0, 0), (-1, 0, 0)),
+            ((T.R(face), 0, T.R(upright)), (-math.cos(tilt), 0, math.sin(tilt)), (0, 0, T.R(upright)), (0, 0, 1))]
+
+
+def BankReview(T):
+    """The floor, the bank and the planks for the Blender review stills."""
+    (a, b, _), (face, upright, lean) = BANK_RAMP, BANK_FACE
+    top, back = T.R(1.6), T.R(face + (1.6 - upright) * lean)
+    Y = (T.R(-1.2), T.R(1.2))
+    foot = BankHeight(T, T.R(face))
+    return [('poly', [(T.R(-.9), Y[0], T.R(a[1])), (T.R(-.9), Y[1], T.R(a[1])), (T.R(a[0]), Y[1], T.R(a[1])), (T.R(a[0]), Y[0], T.R(a[1]))], None, 0),
+            ('poly', [(T.R(a[0]), Y[0], T.R(a[1])), (T.R(a[0]), Y[1], T.R(a[1])), (T.R(face), Y[1], foot), (T.R(face), Y[0], foot)], None, 0),
+            ('poly', [(T.R(face), Y[0], foot), (T.R(face), Y[1], foot), (T.R(face), Y[1], T.R(upright)), (T.R(face), Y[0], T.R(upright))], None, 0),
+            ('poly', [(T.R(face), Y[0], T.R(upright)), (T.R(face), Y[1], T.R(upright)), (back, Y[1], top), (back, Y[0], top)], None, 0)]
+
+
+def BankHeap(T):
+    """BuriedBase on the bank: BlastSlamBuried's last frame, BlastDazedStir's and CaptiveDraggedFromDirt's first."""
+    return OnBank(T, BuriedBase(T))
+
+
 @Builder('BlastSlamBuried')
 def BuildBlastSlam(T, name):
     H, P, A, SX = T.H, T.P, T.A, T.SX
@@ -1322,6 +1409,9 @@ def BuildBlastSlam(T, name):
         (1.50, {k: buried[k] for k in buried}),
     ]
     anim = Keys(stoop, keys, lag={'head': .04, 'neck': .03})
+    # Standing he hits the planks where they lean back to ~0.6 m; sliding down he comes off them onto the
+    # bank (OnBank grows from the impact to the landing), and the grounding follows the bank the same way.
+    onBank = lambda t: Smooth((t - .30) / .55)
 
     def RifleAt(t):
         if t <= .06:
@@ -1336,7 +1426,7 @@ def BuildBlastSlam(T, name):
         return T.Rifle(o, axis)
 
     def Pose(t):
-        f = anim(t)
+        f = OnBank(T, anim(t), onBank(t))
         if t <= .05:
             r = RifleAt(t)
             f['grip.R'], f['grip.L'] = r['gripR'], T.Along(r, .80)
@@ -1344,8 +1434,8 @@ def BuildBlastSlam(T, name):
             f['grip.R'] = f['grip.L'] = None
         return T.Nest(f)
     return {'pose': Pose, 'props': lambda t: {'weapon': T.Track(RifleAt(t))},
-            'walls': [((WALL_LEFT_X, 0, 0), (-1, 0, 0))],
-            'reviewProps': lambda t: T.RifleProps(RifleAt(t)) + [('box', (WALL_LEFT_X + .03, 0, .7), (.06, 2.0, 1.4), 0)],
+            'ground': BankGround(T, onBank), 'walls': lambda t: BankWalls(T) if t >= .85 else [],
+            'reviewProps': lambda t: T.RifleProps(RifleAt(t)) + BankReview(T),
             'reviewViews': [('side', (-3.2, -.35, .8), (.2, -.1, .55)), ('q', (-2.3, -2.6, 1.6), (.2, -.1, .5)),
                             ('back', (-1.5, 2.8, 1.6), (.2, 0, .5))],
             'reviewFrames': lambda n: [0, int(n * .12), int(n * .2), int(n * .4), n - 1], 'reviewScale': 2.6}
@@ -1394,7 +1484,10 @@ def DragVictimKeys(T):
         # The grab: a groan, the head comes up a little.
         (0.30, {'head': (.24, -.05, .05), 'shrug': .08, 'neck': (.20, -.05, .05)}),
         # Hauled up by the collar and the right arm: trunk lifts, head hangs.
-        (0.60, {'pelvis': (.30, .10, .22), 'pelvisTilt': (.30, .05, .12), 'bend': .45, 'lean': .05, 'twist': -.05,
+        # (2026-09-26: off the bank the right leg comes in straight ahead as he is hauled up; fallen out to his
+        # right it swept into ijaA's planted left leg.)
+        (0.60, {'ankle.R': (.30 - H + .06, .22 - .46, A), 'legPole.R': (.30 - H, -1.2, .45),
+                'pelvis': (.30, .10, .22), 'pelvisTilt': (.30, .05, .12), 'bend': .45, 'lean': .05, 'twist': -.05,
                 'head': (.45, .05, .10), 'neck': (.25, 0, .05),
                 'hand.R': (-.101, -.196, .646), 'armPole.R': armBase,
                 'palmF.R': (0, -.7, .7), 'palmN.R': (-.5, 0, -.8), 'curl.R': .4,
@@ -1437,18 +1530,86 @@ def DragVictimKeys(T):
     return Keys(BuriedBase(T), rows, lag={'head': .06, 'neck': .03})
 
 
+# The drag starts from the heap on the bank and is hauled off it: the bank shift fades out while he is
+# dragged on his knees (1.2-2.2 s, slow enough for ijaB's planted feet), before the jerk up on "立て！"
+# (2.2 s), so the kneel at the end -- and with it ComradeWallRoot and the interrogation -- stays put.
+DRAG_OFF_BANK = lambda t: 1 - Smooth((t - 1.2) / 1.0)
+
+
 @Builder('CaptiveDraggedFromDirt')
 def BuildCaptiveDragged(T, name):
     raw = DragVictimKeys(T)
 
     def anim(t):
-        f = raw(t)
+        f = OnBank(T, raw(t), DRAG_OFF_BANK(t))
         return Turned(f, f['turn'])
-    return {'pose': lambda t: T.Nest(anim(t)), 'walls': [((WALL_LEFT_X, 0, 0), (-1, 0, 0))],
-            'reviewProps': lambda t: [('box', (WALL_LEFT_X + .03, 0, .7), (.06, 2.0, 1.4), 0)],
+    return {'pose': lambda t: T.Nest(anim(t)), 'ground': BankGround(T, DRAG_OFF_BANK),
+            'walls': lambda t: BankWalls(T) if DRAG_OFF_BANK(t) > .99 else [],
+            'reviewProps': lambda t: BankReview(T),
             'reviewViews': [('side', (-3.4, -.3, .8), (.25, -.2, .45)), ('q', (-2.4, -2.9, 1.7), (.25, -.2, .45))],
             'reviewFrames': lambda n: [0, int(n * .14), int(n * .3), int(n * .5), int(n * .62), int(n * .75), n - 1],
             'reviewScale': 2.6}
+
+
+@Builder('BlastDazedStir')
+def BuildDazedStir(T, name):
+    """Wake .. the drag: stunned in the heap on the bank. Authored on the flat heap (DragVictimKeys
+    frame 0, which is BuriedBase with the left hand ready for the body frame) and carried onto the
+    bank like BlastSlamBuried's last frame, so frame 0 = the last frame = both neighbours' seam."""
+    base = DragVictimKeys(T)(0.0)
+    x0, y0 = .30, .22
+    # Right hand to the ringing head: a body-frame wrist target at the side of the head, blended in
+    # from where it lies in the dirt (handRelW.R 0 = BuriedBase's world hand, palm and pole).
+    base.update({'handRel.R': (.05, -.07, .09), 'poleRel.R': (-.45, .05, -.20), 'handRelW.R': 0.0,
+                 'palmFw.R': base['palmF.R'], 'palmNw.R': base['palmN.R'],
+                 'palmF.R': (.05, -.10, 1), 'palmN.R': (1, 0, .10)})
+    # The left palm flat on the bank beside the hip, fingers forward-left: the push to sit up.
+    push = {'hand.L': (x0 + .24, y0 - .20, .045), 'armPole.L': (x0 + .55, y0 + .25, .45),
+            'palmF.L': (.35, -.9, -.05), 'palmN.L': (0, .05, -1), 'curl.L': .2}
+    keys = [
+        (0.00, {}),
+        (0.70, {}),
+        # The head comes up off the chest and lolls toward the bank, then the other way.
+        (1.50, {'head': (.10, .14, -.12), 'neck': (.12, 0, 0), 'bend': .56, 'shrug': .06}),
+        (2.05, {'head': (.16, -.14, .10), 'neck': (.10, 0, 0)}),
+        # The right hand to the side of the head (groan); a slow shake inside the hand.
+        (2.10, {'handRelW.R': 0.0, 'curl.R': base['curl.R']}),
+        (2.50, {'handRelW.R': 1.0, 'curl.R': .35, 'head': (.22, -.06, .04), 'bend': .58}),
+        (2.78, {'head': (.24, -.06, -.14)}),
+        (3.06, {'head': (.24, -.06, .13)}),
+        (3.34, {'head': (.27, -.06, -.06)}),
+        (3.50, {'handRelW.R': 1.0}),
+        # The hand drops back into the dirt; the left palm goes onto the bank.
+        (3.85, {'handRelW.R': 0.0, 'curl.R': base['curl.R'], 'head': (.30, -.08, .04)}),
+        (3.60, {k: base[k] for k in push}),
+        (4.00, push),
+        # He pushes himself up (strain), the trunk comes off the bank...
+        (4.50, {'bend': .34, 'lean': -.02, 'pelvisTilt': (-.10, .02, .16), 'pelvis': (x0 - .03, y0, .15),
+                'head': (.10, .02, -.04), 'neck': (.06, 0, 0), 'shrug': .10}),
+        (4.80, {'bend': .37, 'head': (.13, .04, -.02)}),
+        # ...and the arm gives: he sags back over onto the bank, the head drops.
+        (5.10, {'bend': .68, 'lean': .16, 'pelvisTilt': base['pelvisTilt'], 'pelvis': base['pelvis'],
+                'head': (.45, -.12, .12), 'neck': (.28, -.05, .05), 'shrug': .02}),
+        (5.45, dict(push, **{'hand.L': (x0 + .20, y0 - .24, .06), 'curl.L': .35})),
+        (5.95, {k: base[k] for k in ('bend', 'lean', 'head', 'neck', 'shrug', *push)}),
+        (6.40, {}),
+    ]
+    anim = Anim(base, keys, {'head': .06, 'neck': .03}, periodic=True)
+
+    def Pose(t):
+        f = anim(t)
+        breath = math.sin(Tau * t / 1.6)         # four heavy breaths a loop
+        f['bend'] += .03 * breath
+        f['shrug'] += .025 * breath
+        p = f['pelvis']
+        f['pelvis'] = (p[0], p[1], p[2] + .004 * breath)
+        f = OnBank(T, f)
+        return T.Nest(Turned(f, f['turn']))
+    return {'pose': Pose, 'ground': BankGround(T), 'walls': BankWalls(T),
+            'reviewProps': lambda t: BankReview(T),
+            'reviewViews': [('side', (-3.2, -.35, .8), (.2, -.1, .45)), ('q', (-2.3, -2.6, 1.6), (.2, -.1, .45)),
+                            ('front', (.1, -2.9, .9), (.1, -.1, .45))],
+            'reviewFrames': lambda n: [0, int(n * .3), int(n * .43), int(n * .7), int(n * .8)], 'reviewScale': 2.4}
 
 
 def Standing(T, crouch=0.0, bend=.08):
@@ -1557,7 +1718,9 @@ def BuildDragCollar(T, name):
     collar = PartnerPath(T, stage, role, 'comrade', 'collarBack', times)
     # Pelvis rides 0.52 m behind the collar (his own +Y), height by how far down he reaches;
     # 0.62 m while he jerks the man up (2.0-2.6 s) so the rising head does not meet his chest.
-    back = [(0.0, .52), (1.75, .52), (2.05, .62), (2.25, .64), (2.8, .58), (4.4, .58)]
+    # With the man on the bank (BANK_SHIFT) he stands 0.28 m further back before the grab (his legs went into
+    # the sitting man's) and 0.14 m at the grab (further, his arm reaching over the head met it).
+    back = [(0.0, .80), (.30, .66), (.75, .66), (1.20, .60), (1.75, .52), (2.05, .62), (2.25, .64), (2.8, .58), (4.4, .58)]
 
     def PelvisXY(t):
         c = Channel(collar)(t)
@@ -1571,8 +1734,8 @@ def BuildDragCollar(T, name):
     schedule = [('R', .30, .50), ('L', .50, .74), ('R', .84, 1.08), ('L', 1.10, 1.36), ('R', 1.42, 1.70),
                 ('L', 1.74, 2.00), ('R', 2.06, 2.30), ('L', 2.52, 2.76)]
     # Left foot 20 cm further out and 10 cm back, knee turned out: square, his stooping left
-    # knee went into the sitting man's raised right knee.
-    stance = {'L': (H + .26, -.02, T.A), 'R': (-(H + .04), .16, T.A)}
+    # knee went into the sitting man's raised right knee. (2026-09-26: 6 cm wider again for the man on the bank.)
+    stance = {'L': (H + .32, -.02, T.A), 'R': (-(H + .04), .16, T.A)}
     feet, plants = FollowSteps(PelvisXY, stance, schedule, 4.4)
     pelvis = [(t, (PelvisXY(t)[0], PelvisXY(t)[1], P - .04 - Channel(crouch)(t))) for t in times]
     base = Standing(T)

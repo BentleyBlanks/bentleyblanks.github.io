@@ -1,6 +1,6 @@
 {
  "schema": 2,
- "version": "20260926OpeningStoryboardsV7Drag",
+ "version": "20260926OpeningStoryboardsV8Stunned",
  "fps": 24,
  "actorForward": [
   0,
@@ -379,7 +379,42 @@
     "CaptiveDraggedFromDirt"
    ],
    "terminalPose": "buried",
-   "notes": "Near miss from front-right: thrown back-left into the trench wall, the rifle torn out forward-right, slides down the wall into a slumped heap on his left side (dust hides him). The last frame is exactly CaptiveDraggedFromDirt frame 0 in the same root.",
+   "notes": "Near miss from front-right: thrown back-left into the trench wall, the rifle torn out forward-right, slides down the wall into a slumped heap on his left side (dust hides him). The heap lies on the real bank at the foot of the planks (BANK_RAMP). The last frame is exactly BlastDazedStir / CaptiveDraggedFromDirt frame 0 in the same root.",
+   "rigs": [
+    "TengxianNra02"
+   ]
+  },
+  "BlastDazedStir": {
+   "duration": 6.4,
+   "loop": true,
+   "weaponHold": "free",
+   "role": "comrade",
+   "rig": "TengxianNra02",
+   "rootMotion": false,
+   "weaponState": "dropped",
+   "weaponDropFrom": "BlastSlamBuried",
+   "env": {
+    "wallLeftM": 0.55
+   },
+   "events": [
+    {
+     "t": 2.3,
+     "kind": "effort",
+     "what": "groan"
+    },
+    {
+     "t": 3.9,
+     "kind": "effort",
+     "what": "strain"
+    }
+   ],
+   "prev": [
+    "BlastSlamBuried"
+   ],
+   "next": [
+    "CaptiveDraggedFromDirt"
+   ],
+   "notes": "Stunned by the near miss, in the heap on the bank (Wake .. the drag): heavy breathing, the head comes up and lolls, the right hand goes to the ringing head and he shakes it slowly, the left palm pushes on the bank to sit up and the arm gives, he sags back. Frame 0 = last frame = BlastSlamBuried last frame = CaptiveDraggedFromDirt frame 0 (the director lands the drag on a loop end).",
    "rigs": [
     "TengxianNra02"
    ]
@@ -2633,7 +2668,7 @@
   {
    "id": "TengxianNra02",
    "file": "Animation_TengxianNra02OpeningStoryboards.json",
-   "sha256": "13bf9f2de446ad8ce5397b061e78a560281c01731c5b7c0aeddded3fce5d8aa7",
+   "sha256": "760117c6ec2450ffc6584d8a0ee2b31eab8d764c50e9d3ee348aa7f75194dfd4",
    "originalModelSha256": "67550199849f78d581b356580f25595f361bece70fef0c82d7bd08a954197790",
    "clipIds": [
     "SupplyReceive",
@@ -2662,6 +2697,7 @@
     "BanterPatRifle",
     "WoundedRiseWall",
     "BlastSlamBuried",
+    "BlastDazedStir",
     "CaptiveDraggedFromDirt",
     "CaptiveWallBrace",
     "CaptiveKneelMud",
@@ -2849,7 +2885,7 @@
      ]
     }
    },
-   "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningCutscenePolish_20260926\\Scene_TengxianNra02OpeningStoryboards.blend",
+   "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\ComradeStunned_20260926\\Scene_TengxianNra02OpeningStoryboards.blend",
    "clips": [
     {
      "clip": "SupplyReceive",
@@ -3650,10 +3686,10 @@
      "footSlideM": 0.0,
      "contactErrorM": 0.0,
      "gripSolveErrorM": 0.0,
-     "wallPenetrationM": 0.0108,
+     "wallPenetrationM": 0.0,
      "pelvisMaxStepM": 0.0869,
      "floorCorrectionMin": -0.02897,
-     "floorCorrectionMax": 0.0,
+     "floorCorrectionMax": 0.11635,
      "root": {
       "start": [
        -0.0,
@@ -3662,10 +3698,40 @@
        0.7231
       ],
       "end": [
-       -0.2741,
+       -0.0541,
        0.201,
        11.46,
-       0.1142
+       0.2602
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "BlastDazedStir",
+     "frames": 155,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "wallPenetrationM": 0.0,
+     "pelvisMaxStepM": 0.0104,
+     "floorCorrectionMin": 0.09029,
+     "floorCorrectionMax": 0.12284,
+     "root": {
+      "start": [
+       -0.0541,
+       0.201,
+       11.46,
+       0.2602
+      ],
+      "end": [
+       -0.0541,
+       0.201,
+       11.46,
+       0.2602
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
@@ -3681,15 +3747,15 @@
      "contactErrorM": 0.0,
      "gripSolveErrorM": 0.0,
      "wallPenetrationM": 0.0,
-     "pelvisMaxStepM": 0.0783,
-     "floorCorrectionMin": 0.0,
-     "floorCorrectionMax": 0.13811,
+     "pelvisMaxStepM": 0.1053,
+     "floorCorrectionMin": 0.01638,
+     "floorCorrectionMax": 0.25567,
      "root": {
       "start": [
-       -0.2741,
+       -0.0541,
        0.201,
        11.46,
-       0.1142
+       0.2602
       ],
       "end": [
        -0.0776,
@@ -5340,9 +5406,9 @@
   {
    "id": "TengxianIja01",
    "file": "Animation_TengxianIja01OpeningStoryboards.json",
-   "sha256": "d795f7e60a55289be566de38c8f70b14411fb44cef19375047e7ab28e97ae479",
+   "sha256": "798501253325e18e913eeae30a66af67293f45c98b497fe17661e8b5405f0b85",
    "originalModelSha256": "fc6c84ad51c9752066127b148a1f9db307da9659dea441989861265693b02c6b",
-   "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningStoryboards_20260926HumanoidV1\\Scene_TengxianIja01OpeningStoryboards.blend",
+   "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\ComradeStunned_20260926\\Scene_TengxianIja01OpeningStoryboards.blend",
    "contactPoints": {
     "hairBack": {
      "bone": "Bip001 Head",
@@ -6099,15 +6165,15 @@
      "clip": "IjaPullArm",
      "frames": 107,
      "footSlideM": 0.0,
-     "contactErrorM": 0.0129,
-     "gripSolveErrorM": 0.01286,
-     "pelvisMaxStepM": 0.1247,
+     "contactErrorM": 0.0192,
+     "gripSolveErrorM": 0.01917,
+     "pelvisMaxStepM": 0.1253,
      "floorCorrectionMin": -0.0,
      "floorCorrectionMax": 0.0,
      "root": {
       "start": [
-       -0.226,
-       0.0871,
+       -0.2454,
+       0.2969,
        0.0,
        0.7654
       ],
@@ -6480,9 +6546,9 @@
   {
    "id": "TengxianIja02",
    "file": "Animation_TengxianIja02OpeningStoryboards.json",
-   "sha256": "dba6a7a5d532870c3f4a5c97a74f0b9df1cf9afdced86c6d00dd7085ab556c9e",
+   "sha256": "9ed16a0b97644846f53eb001be94e16e3c304ba73026442c72e61c14b03e6678",
    "originalModelSha256": "fc429bafc6973e54e8d1fa72ac99c8740c81be25f895ddb1417bb47707578788",
-   "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningStoryboards_20260926HumanoidV1\\Scene_TengxianIja02OpeningStoryboards.blend",
+   "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\ComradeStunned_20260926\\Scene_TengxianIja02OpeningStoryboards.blend",
    "contactPoints": {
     "hairBack": {
      "bone": "Bip001 Head",
@@ -7240,14 +7306,14 @@
      "frames": 107,
      "footSlideM": 0.0001,
      "contactErrorM": 0.0027,
-     "gripSolveErrorM": 0.00273,
-     "pelvisMaxStepM": 0.0973,
+     "gripSolveErrorM": 0.00271,
+     "pelvisMaxStepM": 0.0941,
      "floorCorrectionMin": -5e-05,
      "floorCorrectionMax": 7e-05,
      "root": {
       "start": [
-       0.0221,
-       -0.3783,
+       -0.1487,
+       -0.0332,
        0.0,
        0.757
       ],

@@ -1334,7 +1334,9 @@ def Bake(modelId, probe=None):
 
     depsgraph = lambda: bpy.context.evaluated_depsgraph_get()
 
-    def LowestVertex():
+    def LowestVertex(ground=None):
+        """Lowest skinned vertex over the floor z = 0, or over `ground(x, y)` (a clip authored on
+        uneven ground: the height it returns is the floor under that point)."""
         dg = depsgraph()
         low = 1e9
         where = (0, 0, 0)
@@ -1344,8 +1346,9 @@ def Bake(modelId, probe=None):
             matrix = ev.matrix_world
             for v in geometry.vertices:
                 p = matrix @ v.co
-                if p.z < low:
-                    low = p.z
+                z = p.z - ground(p.x, p.y) if ground else p.z
+                if z < low:
+                    low = z
                     where = (round(p.x, 3), round(p.y, 3), round(p.z, 3))
             ev.to_mesh_clear()
         return low, where

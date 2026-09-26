@@ -23,7 +23,7 @@ const BUTT = Object.freeze({ yawDeg:0, letGoS:1.05, holdS:0, strikeS:1.375, boot
 // Script_OpeningStoryboardsTest's sight/drag checks. Wave 2 sets wave1Allowances.revetment to null.
 const REVETMENT = "BunkerSouthRevetment";
 export const OPENING_STORYBOARDS = Object.freeze({
-  version:"20260926OpeningStoryboardsV7Drag", animationBase:"./Animation/OpeningStoryboards/",
+  version:"20260926OpeningStoryboardsV8Stunned", animationBase:"./Animation/OpeningStoryboards/",
   // Contract §3/§7.2: wave 1 = each package alone (stand-ins listed in pendingWiring); wave 2 = wired. Set to 2 by the
   // wave-2 wiring: Script_OpeningStoryboardsTest then requires pendingWiring empty and no wave-1 allowance left
   // (wave1Allowances null, no behindOk / coverOk / headOptional in storyboardShots).
@@ -49,8 +49,9 @@ export const OPENING_STORYBOARDS = Object.freeze({
       // §4.1 optional, made (Anim report 2026-09-25: the kneeling ClipLoad does not read as sitting from SB01;
       // IjaChoppedFallWall reads as crumpling into the wall from Shunzi's eye, not as going over backwards in SB05A)
       "YaowaSitLoad","IjaChoppedFallBack"],
-    // Not in §5.4, added for the draft's "日兵甲把他推到沟壁上" pair (reported to the integrator).
-    added:["IjaShoveToWall"],
+    // Not in §5.4: IjaShoveToWall for the draft's "日兵甲把他推到沟壁上" pair (reported to the integrator);
+    // BlastDazedStir, the comrade stunned in the heap from the black to the drag (docs/Data_OpeningComradeStunned20260927.md).
+    added:["IjaShoveToWall","BlastDazedStir"],
   },
   // Contract §5.3: the director's phases, in order. Each is recorded in `beats` when it really starts.
   phases:Object.freeze({
@@ -293,7 +294,7 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // Everyone who leaves after the order goes out of the mouth, down the SSW leg to RC and on west.
     exitRoute:Route([2.1,-125.2],[3.4,-123.6],[3.1,-121.6],[1.2,-120.6],[-1,-118.5],[-4,-113],[-9,-111.3]),
     hide:Object.freeze({ luo:P(-12.5,-112.2), yaowa:P(-16,-112), he:P(-10.4,-111.6), liu:P(-14.6,-112.3), runner:P(-19,-111) }),
-    comradeBlast:P(3.6,-125.85,-Math.PI/2),   // R0: just outside the mouth, north wall 0.55 m on his left (BlastSlamBuried env)
+    comradeBlast:P(3.6,-125.85,-Math.PI/2),   // R0: just outside the mouth; the heap lies on the real bank below the planks (clip BANK_RAMP)
     shellFrom:P(9,-116), shellAt:P(2.8,-120.4), // near miss on the bend's inner corner = the crater step
     dirtS:2.3, lineAfterDirtS:.9,         // dirt into the collar once the fade-in (fadeInS) is up; 「妈卖批」 while he digs
   }),

@@ -770,8 +770,21 @@ export class FirstLevelBunkerShow {
     this.ExitSquad();this.DepthWalkers();
     if(age>=C.banter.blastShot.phaseS)this.Stage("Black");
   }
+  /** Stunned in the heap from the landing to the drag: BlastSlamBuried plays out, then the BlastDazedStir loop
+   *  (its frame 0 and last frame are the heap, CaptiveDraggedFromDirt frame 0). */
+  ComradeDazed(){
+    const comrade=this.Comrade;if(!comrade)return;
+    const slam=this.ClipAge(comrade,"BlastSlamBuried");
+    this.Pose(comrade,slam>=0&&slam<ClipLength("BlastSlamBuried",1.5)?"BlastSlamBuried":"BlastDazedStir");
+  }
+  /** At the cut into the drag shot: restart the loop so a loop end lands exactly on dragStart (hidden by the cut). */
+  AlignDazed(){
+    const comrade=this.Comrade,length=ClipLength("BlastDazedStir",6.4),left=this.flags.dragStart-this.r.time;
+    if(!comrade||this.ClipAge(comrade,"BlastDazedStir")<0||!(left>0))return;
+    this.PlayClip(comrade,"BlastDazedStir",{restart:true,offset:(length-left%length)%length});
+  }
   PhaseBlack(age){
-    this.Pose(this.Comrade,"BlastSlamBuried");this.ExitSquad();
+    this.ComradeDazed();this.ExitSquad();
     for(const m of OPENING_DEPTH_WALKERS.members)this.RetireWalker(m.id);
     this.beamState="pinned";this.PlaceBeam("pinned");
     for(const [id,actor] of [["luo",this.Squad("luo")],["runner",this.cast.runner],["yaowa",this.Squad("yaowa")],["he",this.Squad("heyoutian")],["liu",this.Squad("liuwencai")]])
@@ -810,7 +823,7 @@ export class FirstLevelBunkerShow {
   PhaseWake(age){
     const r=this.r;
     if(!this.phaseEntered){this.phaseEntered=true;this.flags.vanguardAt??=r.time;}
-    this.Pose(this.Comrade,"BlastSlamBuried");
+    this.ComradeDazed();
     this.VanguardFront(this.flags.vanguardAt);
     if(age>=1.0&&!this.Started("BunkerSearch"))this.Scene("BunkerSearch",r.voice?.PlayScene("BunkerSearch",{speakers:this.Speakers()}));
     // 「手指在泥里抓出一道痕」: four short furrows where his right fingertips really dragged (the
@@ -837,7 +850,7 @@ export class FirstLevelBunkerShow {
   }
   PhaseFrontPass(age){
     const r=this.r,marks=this.DragMarks();
-    this.Pose(this.Comrade,"BlastSlamBuried");
+    this.ComradeDazed();
     this.VanguardFront(this.flags.vanguardAt);
     let ready=0;
     for(const role of ["ijaA","ijaB"]){
@@ -870,11 +883,12 @@ export class FirstLevelBunkerShow {
       this.Scene("CaptiveDragged",r.voice?.PlayScene("CaptiveDragged",{speakers:this.Speakers()}));
       // The jerk-up (clip 2.2 s) lands on 「立て！」 (CaptiveDragged.02).
       this.flags.dragStart=r.time+Math.max(0,this.LineStart("CaptiveDragged","CaptiveDragged.02")-EventAt("IjaDragCollarFromDirt","jerkUp",2.2));
+      this.AlignDazed();
     }
     this.VanguardFront(this.flags.vanguardAt);
     const t=r.time-this.flags.dragStart;
     this.InterpreterIn();
-    if(t<0){this.Pose(comrade,"BlastSlamBuried");this.Hold(ijaA,marks.ijaA,null);this.Hold(ijaB,marks.ijaB,null);return;}
+    if(t<0){this.ComradeDazed();this.Hold(ijaA,marks.ijaA,null);this.Hold(ijaB,marks.ijaB,null);return;}
     this.Put(comrade,C.banter.comradeBlast);this.Pose(comrade,"CaptiveDraggedFromDirt",{seconds:t});
     this.Put(ijaA,marks.ijaA);this.Pose(ijaA,"IjaDragCollarFromDirt",{seconds:t});
     this.Put(ijaB,marks.ijaB);this.Pose(ijaB,"IjaPullArm",{seconds:t});
