@@ -4,11 +4,12 @@ import { BuildDistantSmoke, FIRST_LEVEL_DISTANT_SMOKE as smoke } from "./Data_Fi
 import { MISSION_LAYOUT as layout, MISSION_ROUTES as routes } from "./Data_FirstLevelMissionLayout.mjs";
 import { SPACE_KEYFRAMES } from "./Data_FirstLevelSpaceKeyframes.mjs";
 import { SampleMissionTerrain as Ground } from "./Data_FirstLevelMissionTerrain.mjs";
-import { Sight, Bearing, Eye } from "./Script_FirstLevelSpaceProbe.mjs";
+import { Sight, Bearing, Eye, RouteLength, RoutePoint } from "./Script_FirstLevelSpaceProbe.mjs";
 import { VfxSystem } from "./Script_Vfx.mjs";
 import { Mulberry32 } from "./Script_Noise.mjs";
 import * as THREE from "three";
 import { BattleSmoke, BuildBattleSmokeInstances } from "./Script_BattleSmoke.mjs";
+import { BATTLE_SMOKE_STYLES } from "./Data_Tuning_BattleSmoke.mjs";
 
 function DistanceToSegment(p, a, b) {
   const x=b.x-a.x,z=b.z-a.z;
@@ -24,20 +25,39 @@ for (const source of smoke) {
     // Smoke that reaches walking/head height stays outside the route corridor.
     // Higher crowns may project over the route; they are broad aerial smoke.
     for (const age of [0.1,0.3,0.5,0.7,0.9]) {
-      const t=Math.min(1,age/.85),growth=t*t*(3-2*t);
+      const t=Math.min(1,age/.85),growth=p.frame===5?Math.pow(age,.4):t*t*(3-2*t);
       const size=(p.baseWidth+(p.crownWidth-p.baseWidth)*growth)*1.24;
       const center={x:x+p.driftX*Math.pow(age,1.3),z:z+p.driftZ*Math.pow(age,1.3)};
       const routeGround=Math.max(Ground(route[i-1].x,route[i-1].z),Ground(route[i].x,route[i].z));
       const bottom=Ground(x,z)+source.heightOffset+p.height*age-size*p.aspect*0.5;
       if(bottom>routeGround+4) continue;
       const margin=source.tier==="far"?10:2.5;
-      assert.ok(DistanceToSegment(center,route[i-1],route[i])>size*0.62+p.spread*(0.15+age*age)+margin,
+      const sway=BATTLE_SMOKE_STYLES[p.frame].motion[2]*Math.hypot(1,.7);
+      assert.ok(DistanceToSegment(center,route[i-1],route[i])>size*(.5+sway)+p.spread*(0.15+age*age)+margin,
         source.id+" keeps low smoke clear of "+name+" age="+age);
     }
   }
   assert.ok(p.driftX<0&&Math.abs(p.driftZ)<12,"all plumes share the prevailing drift");
 }
-assert.equal(new Set(smoke.map(s=>s.options.backdrop.type)).size,4,"four distinct smoke silhouettes");
+assert.equal(new Set(smoke.map(s=>s.options.backdrop.type)).size,6,"all six smoke styles reach the actual level");
+for(const style of BATTLE_SMOKE_STYLES) {
+  assert.ok(smoke.filter(s=>s.tier!=="far"&&s.options.backdrop.type===style.id).length>=3,style.id+" is repeated along visible roads");
+  // Presence in the emitter list is insufficient: at least one near/middle
+  // source of each type must actually be seen from a mission walking route.
+  const seen=smoke.some(s=>{
+    const p=s.options.backdrop,age=.45;
+    if(s.tier==="far"||p.type!==style.id)return false;
+    const crown={x:s.x+p.driftX*age**1.3,z:s.z+p.driftZ*age**1.3,y:Ground(s.x,s.z)+s.heightOffset+p.height*age};
+    return Object.values(routes).some(route=>{
+      for(let d=0;d<RouteLength(route);d+=4) {
+        const eye=Eye(RoutePoint(route,d),1.65),distance=Math.hypot(eye.x-crown.x,eye.z-crown.z);
+        if(distance>8&&distance<50&&!Sight(eye,crown))return true;
+      }
+      return false;
+    });
+  });
+  assert.ok(seen,style.id+" has an unobstructed view from a real mission road");
+}
 assert.ok(smoke.length>=28,"burning districts have continuous density rather than seven isolated wisps");
 assert.ok(smoke.filter(s=>s.tier==="near").length>=20,"roads have nearby smoke throughout the map");
 assert.ok(smoke.filter(s=>s.tier==="middle").length>=6,"midground links roadside and distant smoke");

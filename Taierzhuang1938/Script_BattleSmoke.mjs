@@ -4,8 +4,9 @@ import * as THREE from "three";
 import { MarkNoPrepass } from "./Script_Post.mjs";
 import { Mulberry32 } from "./Script_Noise.mjs";
 import { MakeVolumetricNoiseTexture } from "./Script_PostVolumetrics.mjs";
+import { BATTLE_SMOKE_QUALITY, BATTLE_SMOKE_STYLES } from "./Data_Tuning_BattleSmoke.mjs";
 
-export const BATTLE_SMOKE_LOBES = Object.freeze({ low: 8, medium: 11, high: 14, ultra: 16 });
+export const BATTLE_SMOKE_LOBES = Object.freeze(Object.fromEntries(Object.entries(BATTLE_SMOKE_QUALITY).map(([id,q])=>[id,q.lobes])));
 
 export function BuildBattleSmokeInstances(sources, quality = "high") {
   const count = BATTLE_SMOKE_LOBES[quality] || BATTLE_SMOKE_LOBES.high;
@@ -14,13 +15,16 @@ export function BuildBattleSmokeInstances(sources, quality = "high") {
     const p = source.backdrop;
     if (!p) continue;
     const random = Mulberry32(p.seed);
+    const style = BATTLE_SMOKE_STYLES[p.frame] || BATTLE_SMOKE_STYLES[0];
+    const burstPhase = (p.seed % 4096) / 4096;
     for (let i = 0; i < count; i++) {
       instances.push({
         origin: [source.position.x, source.position.y, source.position.z],
         column: [p.height, p.baseWidth, p.crownWidth, p.life],
-        flow: [p.driftX, p.driftZ, (i + random() * 0.6) / count, p.spread],
-        shape: [p.aspect, p.opacity * (quality === "low" ? 1.4 : quality === "medium" ? 1.15 : 1), p.frame, random()],
+        flow: [p.driftX, p.driftZ, p.frame === 5 ? burstPhase + i / count * .18 : (i + random() * 0.6) / count, p.spread],
+        shape: [p.aspect, p.opacity * (BATTLE_SMOKE_QUALITY[quality] || BATTLE_SMOKE_QUALITY.high).opacity, p.frame, random()],
         lobe: [(random() - 0.5) * 2, (random() - 0.5) * 2, 0.72 + random() * 0.52, p.nearFade || 3],
+        tint: style.tint, motion: style.motion,
       });
     }
   }
@@ -33,6 +37,8 @@ attribute vec4 iColumn;
 attribute vec4 iFlow;
 attribute vec4 iShape;
 attribute vec4 iLobe;
+attribute vec3 iTint;
+attribute vec4 iMotion;
 uniform float uTime;
 uniform float uGlobalFade;
 uniform float uFogDensity;
@@ -52,25 +58,35 @@ varying float vRadius;
 varying vec3 vRight;
 varying vec3 vUp;
 varying vec3 vToward;
+varying vec3 vTint;
+varying vec4 vMotion;
 void main() {
   float age = fract(uTime / iColumn.w + iFlow.z);
-  float size = mix(iColumn.y, iColumn.z, smoothstep(0.0, 0.85, age)) * iLobe.z;
+  float burst = step(4.5, iShape.z);
+  float growth = mix(smoothstep(0.0, 0.85, age), pow(age, 0.4), burst);
+  float size = mix(iColumn.y, iColumn.z, growth) * iLobe.z;
   vec3 center = iOrigin + vec3(iFlow.x, 0.0, iFlow.y) * pow(age, 1.3);
   center.y += iColumn.x * age;
   center.xz += iLobe.xy * iFlow.w * (0.15 + age * age);
-  center.x += sin(age * 5.0 + iShape.w * 31.0) * size * 0.12;
-  center.z += cos(age * 4.0 + iShape.w * 19.0) * size * 0.10;
+  center.x += sin(age * 5.0 + uTime * 0.19 + iShape.w * 31.0) * size * iMotion.z;
+  center.z += cos(age * 4.0 + uTime * 0.16 + iShape.w * 19.0) * size * iMotion.z * .7;
   vec3 right = vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]);
   vec3 upv = vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]);
   vRight = right;
   vUp = upv;
   vToward = normalize(cameraPosition - center);
+  vTint = iTint;
+  vMotion = iMotion;
   vec3 world = center + right * position.x * size + upv * position.y * size * iShape.x;
   vec4 viewPos = viewMatrix * vec4(world, 1.0);
   vViewDepth = -viewPos.z;
   gl_Position = projectionMatrix * viewPos;
   vUv = position.xy * 2.0;
   float fade = smoothstep(0.0, 0.08, age) * (1.0 - smoothstep(0.62, 1.0, age));
+  // One brief expanding dust pulse followed by a clear interval. Every source
+  // has a different seeded phase; white screens continuously roll and refill.
+  fade *= mix(1.0, 1.0 - smoothstep(0.38, 0.70, age), burst);
+  fade *= 1.0 + sin(uTime * .82 + iShape.w * 13.0) * iMotion.w;
   fade *= smoothstep(iLobe.w * 0.4, iLobe.w, distance(center, cameraPosition));
   vSmoke = vec4(iShape.y * fade * uGlobalFade, iShape.z, iShape.w, age);
   vRadius = size * 0.5;
@@ -102,9 +118,16 @@ varying float vRadius;
 varying vec3 vRight;
 varying vec3 vUp;
 varying vec3 vToward;
+varying vec3 vTint;
+varying vec4 vMotion;
 out vec4 fragColor;
 float Density(vec3 p, vec3 flow) {
-  vec2 noise = texture(uDensity, p * 0.68 + flow).rg;
+  float angle = uTime * vMotion.x + vSmoke.z * 6.28;
+  vec3 curl = p;
+  curl.xz = mat2(cos(angle), -sin(angle), sin(angle), cos(angle)) * curl.xz;
+  float roll = -angle * .6 + sin(p.y * 2.4 + uTime * .43) * .22;
+  curl.xy = mat2(cos(roll), -sin(roll), sin(roll), cos(roll)) * curl.xy;
+  vec2 noise = texture(uDensity, curl * 0.68 + flow).rg;
   // Broad cavities break the contour; small eddies erode it without photograph
   // grain, hard sprite borders or the repeated silhouette of an atlas stamp.
   float body = 0.85 - dot(p, p);
@@ -116,11 +139,9 @@ void main() {
   if (r2 > 0.99 || vSmoke.x < 0.001) discard;
   float sceneDepth = uDepthValid > 0.5 ? texture(uNormalDepth, gl_FragCoord.xy / uResolution).w : 0.0;
   float halfRay = sqrt(max(0.0, 1.0 - r2));
-  vec3 flow = vec3(vSmoke.z * 7.3, vSmoke.z * 3.7 - uTime * 0.008, vSmoke.z * 9.1);
+  vec3 flow = vec3(vSmoke.z * 7.3, vSmoke.z * 3.7 - uTime * vMotion.y, vSmoke.z * 9.1);
   vec3 light = normalize(uSunDirection + vec3(0.0, 0.25, 0.0));
-  vec3 base = vSmoke.y < 0.5 ? vec3(0.105, 0.102, 0.095)
-            : vSmoke.y < 1.5 ? vec3(0.31, 0.305, 0.285)
-            : vSmoke.y < 2.5 ? vec3(0.32, 0.265, 0.19) : vec3(0.34, 0.325, 0.29);
+  vec3 base = vTint;
   vec4 sum = vec4(0.0);
   for (int i = 0; i < SMOKE_STEPS; i++) {
     float z = halfRay * (1.0 - 2.0 * (float(i) + 0.5) / float(SMOKE_STEPS));
@@ -158,7 +179,7 @@ export class BattleSmoke {
     this.material = new THREE.ShaderMaterial({
       uniforms: { ...shared, uDensity: { value: this.texture } },
       glslVersion: THREE.GLSL3,
-      defines: { SMOKE_STEPS: ({ low: 8, medium: 8, high: 10, ultra: 12 })[quality] || 10 },
+      defines: { SMOKE_STEPS: (BATTLE_SMOKE_QUALITY[quality] || BATTLE_SMOKE_QUALITY.high).steps },
       vertexShader: VERT, fragmentShader: FRAG,
       transparent: true, depthWrite: false, depthTest: true, side: THREE.DoubleSide,
       // Preserve HDR target alpha, as for other transparent world overlays.
@@ -187,7 +208,8 @@ export class BattleSmoke {
       geometry.setAttribute("position", this.geometry.getAttribute("position").clone());
       geometry.setIndex(this.geometry.index.clone());
       for (const [name, key, size] of [["iOrigin","origin",3], ["iColumn","column",4],
-        ["iFlow","flow",4], ["iShape","shape",4], ["iLobe","lobe",4]]) {
+        ["iFlow","flow",4], ["iShape","shape",4], ["iLobe","lobe",4],
+        ["iTint","tint",3], ["iMotion","motion",4]]) {
         geometry.setAttribute(name, new THREE.InstancedBufferAttribute(
           new Float32Array(instances.flatMap(instance => instance[key])), size));
       }

@@ -47,8 +47,29 @@ try {
       for(const h of handles)vfx.RemoveSmokeSource(h);vfx.Update(1/60,camera,1);Read();
       result.afterRemove=vfx.battleSmoke.geometry.instanceCount;
       const near=FIRST_LEVEL_DISTANT_SMOKE.find(s=>s.tier==="near"&&s.options.backdrop.frame===0);
-      vfx.SmokeSource({x:1,y:17,z:-9},near.options);vfx.Update(1/60,camera,10);
+      const nearHandle=vfx.SmokeSource({x:1,y:17,z:-9},near.options);vfx.Update(1/60,camera,10);
       result.nearVisible=Changed(empty,Read());
+      vfx.RemoveSmokeSource(nearHandle);
+      camera.position.set(0,4,0);camera.lookAt(0,4,-22);
+      vfx.Update(1/60,camera,1);const roadEmpty=Read();
+      result.styles=[];
+      for(let frame=0;frame<6;frame++) {
+        const source=FIRST_LEVEL_DISTANT_SMOKE.find(s=>s.tier!=="far"&&s.options.backdrop.frame===frame);
+        const profile=source.options.backdrop;
+        const handle=vfx.SmokeSource({x:0,y:0,z:-22},source.options);
+        // Sample one second of real shader time, including the coherent active
+        // part of dust eruptions. A long 14 s difference alone can hide inertia.
+        const phase=(profile.seed%4096)/4096;
+        const time=frame===5?(1.18-phase)*profile.life:5;
+        vfx.Update(1/60,camera,time);const first=Read();
+        vfx.Update(1/60,camera,time+1);const second=Read();
+        const style={type:profile.type,visible:Changed(roadEmpty,first),oneSecond:Changed(first,second)};
+        if(frame===5) {
+          vfx.Update(1/60,camera,(1.8-phase)*profile.life);
+          style.quiet=Changed(roadEmpty,Read());
+        }
+        result.styles.push(style);vfx.RemoveSmokeSource(handle);
+      }
       result.glError=gl.getError();
       vfx.Dispose();result.afterDispose=scene.getObjectByName("BattleSmokeBackdrop")===undefined;
       wall.geometry.dispose();wall.material.dispose();renderer.dispose();window.result=result;
@@ -66,6 +87,11 @@ try {
   assert.equal(r.cleared,0,"warm-up clear leaves no visible particles");
   assert.ok(r.reset>5000,"established smoke survives resetting the game clock");
   assert.ok(r.nearVisible>1000,"roadside smoke is visible inside the former 20 m dead zone");
+  for(const style of r.styles) {
+    assert.ok(style.visible>500,style.type+" is visibly rendered on its own");
+    assert.ok(style.oneSecond>150,style.type+" visibly changes within one second");
+  }
+  assert.equal(r.styles.find(s=>s.type==="burstDust").quiet,0,"dust eruptions include a quiet interval instead of a permanent column");
   assert.equal(r.combatParticles,0,"backdrop never consumes combat particle slots");
   assert.equal(r.prepassExcluded,true);
   assert.equal(r.afterRemove,0);

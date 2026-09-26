@@ -18,11 +18,39 @@ export const DISTANT_SMOKE_REGIONS = Object.freeze([
 ].map(Object.freeze));
 
 export const DISTANT_SMOKE_TYPES = Object.freeze({
-  sootColumn: Object.freeze({ frame: 0, height: 1, baseWidth: 4.5, crownWidth: 23, aspect: 1.02, opacity: 0.34, life: 39, drift: 25 }),
-  billowColumn: Object.freeze({ frame: 1, height: 0.72, baseWidth: 5, crownWidth: 26, aspect: 0.92, opacity: 0.23, life: 45, drift: 31 }),
-  dustBank: Object.freeze({ frame: 2, height: 0.16, baseWidth: 8, crownWidth: 24, aspect: 0.55, opacity: 0.09, life: 38, drift: 19 }),
-  windShear: Object.freeze({ frame: 3, height: 0.42, baseWidth: 9, crownWidth: 31, aspect: 0.55, opacity: 0.085, life: 48, drift: 35 }),
+  sootColumn: Object.freeze({ frame: 0, height: 1, baseWidth: 4.5, crownWidth: 23, aspect: 1.02, opacity: 0.30, life: 27, drift: 25 }),
+  billowColumn: Object.freeze({ frame: 1, height: 0.72, baseWidth: 5, crownWidth: 26, aspect: 0.92, opacity: 0.36, life: 19, drift: 31 }),
+  dustBank: Object.freeze({ frame: 2, height: 0.16, baseWidth: 8, crownWidth: 24, aspect: 0.55, opacity: 0.22, life: 16, drift: 19 }),
+  windShear: Object.freeze({ frame: 3, height: 0.42, baseWidth: 9, crownWidth: 31, aspect: 0.40, opacity: 0.21, life: 21, drift: 35 }),
 });
+
+const ROAD_STYLES = Object.freeze([
+  { type:"sootColumn", frame:0, height:9, width:4.6, base:.9, aspect:1.08, opacity:.23, life:18 },
+  { type:"billowColumn", frame:1, height:7, width:6.0, base:1.3, aspect:.95, opacity:.35, life:12 },
+  { type:"dustBank", frame:2, height:2.8, width:6.0, base:2.2, aspect:.45, opacity:.25, life:10 },
+  { type:"windShear", frame:3, height:3.6, width:7.0, base:2.0, aspect:.34, opacity:.25, life:11 },
+  { type:"groundScreen", frame:4, height:2.6, width:6.0, base:1.4, aspect:.62, opacity:.38, life:10 },
+  { type:"burstDust", frame:5, height:5.0, width:6.5, base:.8, aspect:.84, opacity:.43, life:11 },
+].map(Object.freeze));
+// These pockets give the opening/front views and each later road a readable
+// non-black effect, instead of hiding all the alternatives behind distant soot.
+const VARIETY_POCKETS = Object.freeze([
+  {id:"FrontWhiteBillow",x:80,z:-182,frame:1},
+  {id:"FrontDustPulse",x:19,z:-185,frame:5},
+  {id:"WestDustPulse",x:-52,z:-174,frame:5},
+  {id:"AmmoWhiteScreen",x:73,z:-126,frame:4},
+  {id:"SouthWindRibbon",x:9,z:-62,frame:3},
+  {id:"VillageWhiteScreen",x:106,z:22,frame:4},
+  {id:"BridgeDustPulse",x:114,z:115,frame:5},
+  {id:"RearWhiteBillow",x:-114,z:207,frame:1},
+]);
+function RoadProfile(style,scale,random,tier="near") {
+  const size=tier==="middle"?1.5:1;
+  return Object.freeze({type:style.type,frame:style.frame,seed:Math.floor(random()*0xffffffff),
+    height:style.height*scale*size,baseWidth:style.base*scale,crownWidth:style.width*scale*size,
+    aspect:style.aspect,opacity:style.opacity,life:style.life*(.85+random()*.3),spread:scale*.65,
+    driftX:-(style.frame===3?3.5:2.4)*scale,driftZ:-.5*scale,nearFade:2.4});
+}
 
 // Scatter alongside the actual walking/tank roads, including the village and
 // bridge approach. The seed changes the shoulder, spacing, scale and recipe.
@@ -56,6 +84,7 @@ function RoadsidePointClear(p, radius) {
 }
 function BuildRoadsideSmoke(random) {
   const result=[];
+  let corridorIndex=0;
   for(const [region,route] of ROAD_CORRIDORS) {
     let next=9+random()*11,walked=0,index=0;
     for(let j=1;j<route.length;j++) {
@@ -63,17 +92,13 @@ function BuildRoadsideSmoke(random) {
       while(next<walked+len) {
         const t=(next-walked)/len,at={x:a.x+dx*t,z:a.z+dz*t};
         const tier=index%3===2?"middle":"near",scale=.8+random()*.5;
-        const width=(tier==="near"?4.6:10)*scale;
+        const style=ROAD_STYLES[[1,2,4,0,3,5][(index+corridorIndex)%6]];
+        const width=style.width*scale*(tier==="middle"?1.5:1);
         for(let attempt=0;attempt<16;attempt++) {
-          const side=random()<.5?-1:1,offset=(tier==="near"?7+random()*8:20+random()*13)*side;
+          const side=random()<.5?-1:1,offset=(tier==="near"?10+random()*8:20+random()*13)*side;
           const p={x:at.x-dz/len*offset+(random()-.5)*4,z:at.z+dx/len*offset+(random()-.5)*4};
-          if(!RoadsidePointClear(p,width*.65+2)||result.some(s=>Math.hypot(s.x-p.x,s.z-p.z)<10)) continue;
-          const frame=index%3===0?0:index%3===1?2:1;
-          const backdrop=Object.freeze({type:frame===0?"sootColumn":frame===2?"dustBank":"billowColumn",frame,
-            seed:Math.floor(random()*0xffffffff),height:(tier==="near"?(frame===2?2.8:9):19)*scale,
-            baseWidth:(frame===2?2.8:.9)*scale,crownWidth:width,aspect:frame===2?.66:1.08,
-            opacity:frame===0?.20:frame===1?.16:.065,life:22+random()*12,spread:scale*.65,
-            driftX:-(tier==="near"?2.4:6)*scale,driftZ:-.5*scale,nearFade:2.4});
+          if(!RoadsidePointClear(p,width*.85+4.5)||result.some(s=>Math.hypot(s.x-p.x,s.z-p.z)<10)) continue;
+          const backdrop=RoadProfile(style,scale,random,tier);
           result.push(Object.freeze({id:region+"_"+index,region,reference:"roadside scatter",tier,...p,heightOffset:.2,
             options:Object.freeze({kind:"black",rate:0,fire:0,backdrop})}));
           break;
@@ -82,6 +107,15 @@ function BuildRoadsideSmoke(random) {
       }
       walked+=len;
     }
+    corridorIndex++;
+  }
+  for(const pocket of VARIETY_POCKETS) for(let attempt=0;attempt<24;attempt++) {
+    const style=ROAD_STYLES[pocket.frame],scale=1.15;
+    const p={x:pocket.x+(random()-.5)*8,z:pocket.z+(random()-.5)*8};
+    if(!RoadsidePointClear(p,style.width*scale*.85+4.5)) continue;
+    result.push(Object.freeze({id:pocket.id,region:pocket.id,reference:"visible smoke variety pocket",tier:"middle",...p,
+      heightOffset:.25,options:Object.freeze({kind:"black",rate:0,fire:0,backdrop:RoadProfile(style,scale,random)})}));
+    break;
   }
   return result;
 }
