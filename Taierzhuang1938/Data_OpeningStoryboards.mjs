@@ -455,6 +455,12 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // the spoil's east end (a trailing body swings inward on a turn), and comes up the trench floor east of the backrest
     // (rubbleMoundBack); the last short leg ends 0.55 m north of the seat, so Shunzi stops on shunzi.cover.
     dragCoverRoute:Route([1.2,-123.7],[2.8,-123.72],[2.85,-124.1],[2.58,-124.9],[2.43,-125.4],[2.4,-125.75]),
+    // DragCover camera: the eye (eyeM) stays on the line to the junction (junctionH, LongShot's height), where Flee
+    // leaves it and LongShot takes it up; Luo running up to the grab is followed at most asideDeg off that line (pitch
+    // -10..luoMaxPitchDeg, the look at the dragger in 01), from grabLookS after the grab back onto it over releaseS.
+    // 2026-09-27: it looked back down the way (away from Luo) -- with the look at Luo before the grab, the route's turn
+    // north and LongShot's junction the eye turned a full circle in 4 s (582 deg swept, 347 net).
+    dragShot:Object.freeze({ eyeM:.55, junctionH:1.2, asideDeg:35, luoMaxPitchDeg:24, grabLookS:.4, releaseS:.6 }),
     // SB06: Luo kneels at his left front, 0.9 m off, facing him (CheckRoot).
     luoCheck:P(3.12,-125.73),
     // SB06 camera from shunzi.cover: forward down the trench with Luo at the left; the kick brings the eye down to the

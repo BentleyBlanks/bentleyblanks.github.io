@@ -198,6 +198,14 @@ async function InstallProbe(page) {
         if (P.cameraRotation) {
           const turn = cam.quaternion.angleTo(cam.quaternion.clone().fromArray(P.cameraRotation)) * 180 / Math.PI;
           if (turn > P.maxCameraTurn) { P.maxCameraTurn = turn; P.maxCameraTurnPhase = s.phase; }
+          // Heading swept per phase (the sum of the per-frame turns about the vertical, and their net): small steps
+          // pass maxCameraTurn but add up (09-27: DragCover to LongShot went a full circle in 4 s, 582 deg).
+          const Heading = (q) => { const f = Vec().set(0, 0, -1).applyQuaternion(q); return Math.abs(f.y) < .97 ? Math.atan2(-f.x, -f.z) : null; };
+          const now = Heading(cam.quaternion), was = Heading(cam.quaternion.clone().fromArray(P.cameraRotation));
+          if (now != null && was != null) {
+            const d = Math.atan2(Math.sin(now - was), Math.cos(now - was)) * 180 / Math.PI, row = (P.headingSweep ??= {})[s.phase] ??= { sweep: 0, net: 0 };
+            row.sweep += Math.abs(d); row.net += d;
+          }
         }
         P.camera = cam.position.toArray(); P.cameraRotation = cam.quaternion.toArray();
         for (const side of s.CinematicActive?[]:["L", "R"]) {
@@ -362,6 +370,10 @@ export async function DriveOpening(ctx){
   assert.ok(fadeAt(1)>.8&&fadeAt(2)>.5&&fadeAt(4)<.2&&fadeAt(5.3)===0,"blackout recovers gradually across more than five seconds");
   assert.ok(probe.maxCameraStep<.14,`camera never jumps between shots (${probe.maxCameraStep})`);
   assert.ok(probe.maxCameraTurn<10,`camera turns continuously (${probe.maxCameraTurn}° in ${probe.maxCameraTurnPhase})`);
+  // Luo's haul into cover stays on the front trench (rescue.dragShot): it swept 582 deg (347 net) before 09-27.
+  const haul=["DragCover","LongShot"].map(p=>probe.headingSweep?.[p]||{sweep:0,net:0}),haulSweep=haul[0].sweep+haul[1].sweep,haulNet=haul[0].net+haul[1].net;
+  console.log("HEADING",JSON.stringify(Object.fromEntries(Object.entries(probe.headingSweep||{}).map(([k,v])=>[k,{sweep:+v.sweep.toFixed(1),net:+v.net.toFixed(1)}]))));
+  assert.ok(haulSweep>0&&haulSweep<200&&Math.abs(haulNet)<60,`the drag into cover does not turn the eye round (${haulSweep.toFixed(0)}° swept, ${haulNet.toFixed(0)}° net)`);
   assert.ok(probe.minShoulderBehind>.08,"both open sleeve roots stay behind the eye");
   assert.ok(probe.maxHandRotationStep<12,`palms never flip in one frame (${probe.maxHandRotationStep}° in ${probe.maxHandRotationPhase})`);
   assert.ok(probe.maxPartnerHandRotationStep<20,`the dragging hand approaches the collar without an orientation jump (${probe.maxPartnerHandRotationStep}° in ${probe.maxPartnerHandRotationPhase})`);

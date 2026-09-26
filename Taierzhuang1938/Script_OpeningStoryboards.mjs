@@ -2122,11 +2122,21 @@ export class FirstLevelBunkerShow {
       if(after>0){const w=Smooth(after/O.fleeLookS),E=O.fleeEye;eye={x:eye.x+(E.x-eye.x)*w,z:eye.z+(E.z-eye.z)*w};height+=(O.fleeEyeM-height)*w;}
     }
     else if(p==="DragCover"){
-      // Dragged backwards: the look goes back down the way he is pulled from, low (it was a fixed point at the start of
-      // the drag: straight up at it while the eye passed close by it, rolled over as it went behind).
-      const pt=this.PlayerPoint();eye=pt;height=.55;
-      if(this.flags.dragGrabAt==null||r.time-this.flags.dragGrabAt<.4){const h=Head(luo);target=h?this.LookClamped(eye,height,h,-10,24):At(S.dragged,1);}
-      else{const lead=luo?.openingStoryboardLast||luo?.position;target=this.Aim(eye,height,lead?Face(lead,pt):Face(pt,S.dragged)+Math.PI,-6*DEG);}
+      // 「罗班长一把抓住顺子，将他拖进旁边塌土形成的遮挡后……十几米外，一名日兵从岔口回身举枪」: the eye stays down the front
+      // trench on the junction, where Flee leaves it and LongShot takes it up. Luo running up to take the collar is
+      // followed at most dragShot.asideDeg off that line (he comes in from the right); on the drag his legs pass in the
+      // foreground, as ijaA's do in 01's DragOut. (It looked back down the way until 09-27: with Luo before the grab, the
+      // route's turn north and LongShot the eye went a full circle in 4 s.)
+      const G=C.rescue.dragShot,pt=this.PlayerPoint();eye=pt;height=G.eyeM;
+      const e=r.Point(eye,height),j=At(A.bunkerJunction,G.junctionH),Pitch=q=>Math.atan2(q.y-e.y,Math.hypot(q.x-e.x,q.z-e.z));
+      let yaw=Face(eye,j),look=Pitch(j);
+      const h=Head(luo),since=this.flags.dragGrabAt==null?-1:r.time-this.flags.dragGrabAt,w=since<0?0:Smooth((since-G.grabLookS)/G.releaseS);
+      if(h&&w<1){
+        const aside=G.asideDeg*DEG,ly=yaw+Math.max(-aside,Math.min(aside,Wrap(Face(eye,h)-yaw)));
+        const lp=Math.max(-10*DEG,Math.min(G.luoMaxPitchDeg*DEG,Pitch(h)));
+        yaw=ly+Wrap(yaw-ly)*w;look=lp+(look-lp)*w;
+      }
+      target=this.Aim(eye,height,yaw,look);
     }
     else if(p==="LongShot"){
       // Sat against the east face of the mouth rubble looking down the front trench: 「十几米外，一名日兵从岔口回身举枪」.
