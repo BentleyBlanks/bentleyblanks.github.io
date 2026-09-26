@@ -24,12 +24,14 @@ for (const source of smoke) {
     // Smoke that reaches walking/head height stays outside the route corridor.
     // Higher crowns may project over the route; they are broad aerial smoke.
     for (const age of [0.1,0.3,0.5,0.7,0.9]) {
-      const size=(p.baseWidth+(p.crownWidth-p.baseWidth)*Math.pow(age,0.7))*1.15;
+      const t=Math.min(1,age/.85),growth=t*t*(3-2*t);
+      const size=(p.baseWidth+(p.crownWidth-p.baseWidth)*growth)*1.24;
       const center={x:x+p.driftX*Math.pow(age,1.3),z:z+p.driftZ*Math.pow(age,1.3)};
       const routeGround=Math.max(Ground(route[i-1].x,route[i-1].z),Ground(route[i].x,route[i].z));
       const bottom=Ground(x,z)+source.heightOffset+p.height*age-size*p.aspect*0.5;
       if(bottom>routeGround+4) continue;
-      assert.ok(DistanceToSegment(center,route[i-1],route[i])>size*0.5+p.spread*(0.3+age)+10,
+      const margin=source.tier==="far"?10:2.5;
+      assert.ok(DistanceToSegment(center,route[i-1],route[i])>size*0.62+p.spread*(0.15+age*age)+margin,
         source.id+" keeps low smoke clear of "+name+" age="+age);
     }
   }
@@ -37,6 +39,9 @@ for (const source of smoke) {
 }
 assert.equal(new Set(smoke.map(s=>s.options.backdrop.type)).size,4,"four distinct smoke silhouettes");
 assert.ok(smoke.length>=28,"burning districts have continuous density rather than seven isolated wisps");
+assert.ok(smoke.filter(s=>s.tier==="near").length>=20,"roads have nearby smoke throughout the map");
+assert.ok(smoke.filter(s=>s.tier==="middle").length>=6,"midground links roadside and distant smoke");
+assert.ok(smoke.some(s=>s.z>180),"roadside scatter extends beyond the front into the rear map");
 for(const id of ["K6","K7","K9","K11"]) {
   const f=SPACE_KEYFRAMES.find(frame=>frame.id===id), eye=Eye(f.camera,f.camera.eyeM);
   const visible=smoke.filter(s=>{
@@ -60,7 +65,7 @@ const vfx = Object.assign(Object.create(VfxSystem.prototype), {
   random: Mulberry32(1938), wind: { x: 0.35, z: -0.15 },
   loadedVefectsMasks: new Set(["smoke", "noise"]), pools: { sourceSmoke: pool },
   bloodEffects: { Clear() {} },
-  battleSmoke: new BattleSmoke({root:new THREE.Group(),shared:{},quality:"low",loadTexture:false}),
+  battleSmoke: new BattleSmoke({root:new THREE.Group(),shared:{},quality:"low"}),
 });
 const oldSource = vfx.SmokeSource({ x: 0, y: 0, z: 0 }, { rate: 1 });
 vfx._UpdateSmokeSources(0.01);
@@ -93,9 +98,9 @@ vfx._UpdateSmokeSources(10);
 vfx.battleSmoke.Update();
 assert.equal(particles.length,0,"dense backdrop uses no combat particle slots");
 assert.equal(vfx.battleSmoke.sources.size,smoke.length,"every emitter appears in the backdrop batch");
-assert.ok(vfx.battleSmoke.geometry.instanceCount>=224&&vfx.battleSmoke.geometry.instanceCount<=320,"low quality retains a dense bounded batch");
+assert.ok(vfx.battleSmoke.geometry.instanceCount>=480&&vfx.battleSmoke.geometry.instanceCount<=600,"low quality retains roadside and far smoke in a bounded batch");
 const ultra=BuildBattleSmokeInstances(vfx.battleSmoke.sources.values(),"ultra");
-assert.ok(ultra.length<=640,"ultra remains one bounded instanced draw");
+assert.ok(ultra.length<=1200,"ultra remains one bounded instanced draw");
 for(const attribute of Object.values(vfx.battleSmoke.geometry.attributes)) {
   assert.ok(Array.from(attribute.array).every(Number.isFinite),"GPU attributes stay finite");
 }

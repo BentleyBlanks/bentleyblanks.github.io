@@ -1,4 +1,4 @@
-// The actual generated atlas and production shader: low-quality density,
+// The actual 3D density and production shader: low-quality density,
 // animation, foreground occlusion, warm-up reset and teardown on a real GPU.
 import assert from "node:assert/strict";
 import path from "node:path";
@@ -30,7 +30,7 @@ try {
       function Changed(a,b){let n=0;for(let i=0;i<a.length;i+=4)if(Math.abs(a[i]-b[i])+Math.abs(a[i+1]-b[i+1])+Math.abs(a[i+2]-b[i+2])>12)n++;return n;}
       vfx.Update(1/60,camera,10);const empty=Read();
       const handles=FIRST_LEVEL_DISTANT_SMOKE.slice(0,4).map((s,i)=>vfx.SmokeSource({x:(i-1.5)*14,y:0,z:-72},s.options));
-      await vfx.battleSmoke.ready;vfx.Update(1/60,camera,10);const smoke=Read();
+      vfx.Update(1/60,camera,10);const smoke=Read();
       const firstCalls=renderer.info.render.calls;
       vfx.Update(1/60,camera,24);const later=Read();
       const wall=new THREE.Mesh(new THREE.PlaneGeometry(100,100),new THREE.MeshBasicMaterial({color:0x885533}));
@@ -39,14 +39,17 @@ try {
       vfx.battleSmoke.mesh.visible=true;const occluded=Read();scene.remove(wall);
       vfx.ClearParticles();const cleared=Read();
       vfx.Update(1/60,camera,.1);const reset=Read();
-      vfx.battleSmoke.material.uniforms.uAtlasReady.value=0;const fallback=Read();
-      const result={loaded:vfx.battleSmoke.loaded,instances:vfx.battleSmoke.geometry.instanceCount,
+      const result={volume:vfx.battleSmoke.texture.isData3DTexture,instances:vfx.battleSmoke.geometry.instanceCount,
         firstCalls,visible:Changed(empty,smoke),animated:Changed(smoke,later),occlusion:Changed(wallOnly,occluded),
-        cleared:Changed(empty,cleared),reset:Changed(empty,reset),fallback:Changed(empty,fallback),
+        cleared:Changed(empty,cleared),reset:Changed(empty,reset),
         combatParticles:Object.values(vfx.pools).reduce((n,p)=>n+Array.from(p.deathTime).filter(t=>t>vfx.time).length,0),
         prepassExcluded:vfx.battleSmoke.mesh.userData.skipNormalDepth===true};
       for(const h of handles)vfx.RemoveSmokeSource(h);vfx.Update(1/60,camera,1);Read();
-      result.afterRemove=vfx.battleSmoke.geometry.instanceCount;result.glError=gl.getError();
+      result.afterRemove=vfx.battleSmoke.geometry.instanceCount;
+      const near=FIRST_LEVEL_DISTANT_SMOKE.find(s=>s.tier==="near"&&s.options.backdrop.frame===0);
+      vfx.SmokeSource({x:1,y:17,z:-9},near.options);vfx.Update(1/60,camera,10);
+      result.nearVisible=Changed(empty,Read());
+      result.glError=gl.getError();
       vfx.Dispose();result.afterDispose=scene.getObjectByName("BattleSmokeBackdrop")===undefined;
       wall.geometry.dispose();wall.material.dispose();renderer.dispose();window.result=result;
     </script>`}));
@@ -54,7 +57,7 @@ try {
   await page.waitForFunction(()=>window.result,null,{timeout:60000});
   const r=await page.evaluate(()=>window.result);
   assert.deepEqual(errors,[]);
-  assert.equal(r.loaded,true,"generated RGBA atlas decoded");
+  assert.equal(r.volume,true,"real 3D density texture bound");
   assert.equal(r.instances,32,"low quality keeps eight lobes per source");
   assert.equal(r.firstCalls,1,"all backdrop types are one instanced draw");
   assert.ok(r.visible>5000,"smoke visibly fills the GPU fixture");
@@ -62,7 +65,7 @@ try {
   assert.equal(r.occlusion,0,"opaque foreground fully occludes distant smoke");
   assert.equal(r.cleared,0,"warm-up clear leaves no visible particles");
   assert.ok(r.reset>5000,"established smoke survives resetting the game clock");
-  assert.ok(r.fallback>2000,"texture fallback still draws bounded smoke");
+  assert.ok(r.nearVisible>1000,"roadside smoke is visible inside the former 20 m dead zone");
   assert.equal(r.combatParticles,0,"backdrop never consumes combat particle slots");
   assert.equal(r.prepassExcluded,true);
   assert.equal(r.afterRemove,0);

@@ -1,10 +1,10 @@
-// Large, persistent battlefield smoke. One instanced draw, separate from combat
-// particle slots; all advection stays on the GPU. No collision or AI visibility.
+// Persistent roadside and distant smoke: instanced ray-marched density lobes.
+// One draw, no downloaded sprite atlas, no combat slots or collision/AI cover.
 import * as THREE from "three";
 import { MarkNoPrepass } from "./Script_Post.mjs";
 import { Mulberry32 } from "./Script_Noise.mjs";
+import { MakeVolumetricNoiseTexture } from "./Script_PostVolumetrics.mjs";
 
-export const BATTLE_SMOKE_ATLAS = "./Texture/Texture_BattleSmokeAtlas.png?v=20260926223000";
 export const BATTLE_SMOKE_LOBES = Object.freeze({ low: 8, medium: 11, high: 14, ultra: 16 });
 
 export function BuildBattleSmokeInstances(sources, quality = "high") {
@@ -19,8 +19,8 @@ export function BuildBattleSmokeInstances(sources, quality = "high") {
         origin: [source.position.x, source.position.y, source.position.z],
         column: [p.height, p.baseWidth, p.crownWidth, p.life],
         flow: [p.driftX, p.driftZ, (i + random() * 0.6) / count, p.spread],
-        shape: [p.aspect, p.opacity * (quality === "low" ? 1.35 : quality === "medium" ? 1.12 : 1), p.frame, random()],
-        lobe: [(random() - 0.5) * 2, (random() - 0.5) * 2, 0.85 + random() * 0.3, (random() - 0.5) * 0.6],
+        shape: [p.aspect, p.opacity * (quality === "low" ? 1.4 : quality === "medium" ? 1.15 : 1), p.frame, random()],
+        lobe: [(random() - 0.5) * 2, (random() - 0.5) * 2, 0.72 + random() * 0.52, p.nearFade || 3],
       });
     }
   }
@@ -48,27 +48,32 @@ varying vec2 vUv;
 varying vec4 vSmoke;
 varying float vViewDepth;
 varying vec4 vAerial;
+varying float vRadius;
+varying vec3 vRight;
+varying vec3 vUp;
+varying vec3 vToward;
 void main() {
   float age = fract(uTime / iColumn.w + iFlow.z);
-  float size = mix(iColumn.y, iColumn.z, pow(age, 0.7)) * iLobe.z;
+  float size = mix(iColumn.y, iColumn.z, smoothstep(0.0, 0.85, age)) * iLobe.z;
   vec3 center = iOrigin + vec3(iFlow.x, 0.0, iFlow.y) * pow(age, 1.3);
   center.y += iColumn.x * age;
-  center.xz += iLobe.xy * iFlow.w * (0.3 + age);
-  center.x += sin(age * 7.0 + iShape.w * 31.0) * size * 0.075;
-  center.z += cos(age * 5.0 + iShape.w * 19.0) * size * 0.055;
+  center.xz += iLobe.xy * iFlow.w * (0.15 + age * age);
+  center.x += sin(age * 5.0 + iShape.w * 31.0) * size * 0.12;
+  center.z += cos(age * 4.0 + iShape.w * 19.0) * size * 0.10;
   vec3 right = vec3(viewMatrix[0][0], viewMatrix[1][0], viewMatrix[2][0]);
   vec3 upv = vec3(viewMatrix[0][1], viewMatrix[1][1], viewMatrix[2][1]);
+  vRight = right;
+  vUp = upv;
+  vToward = normalize(cameraPosition - center);
   vec3 world = center + right * position.x * size + upv * position.y * size * iShape.x;
   vec4 viewPos = viewMatrix * vec4(world, 1.0);
   vViewDepth = -viewPos.z;
   gl_Position = projectionMatrix * viewPos;
-  // Atlas rows are authored top to bottom; texture upload keeps image row order.
-  vUv = vec2(position.x + 0.5, 0.5 - position.y);
-  float fade = smoothstep(0.0, 0.12, age) * (1.0 - smoothstep(0.72, 1.0, age));
-  // Composition is deliberately remote. Walking into a backdrop never creates
-  // a near-camera opaque wall; ground/terrain still occlude the billboards.
-  fade *= smoothstep(20.0, 45.0, distance(center, cameraPosition));
-  vSmoke = vec4(iShape.y * fade * uGlobalFade, iShape.z, iShape.w, iLobe.w);
+  vUv = position.xy * 2.0;
+  float fade = smoothstep(0.0, 0.08, age) * (1.0 - smoothstep(0.62, 1.0, age));
+  fade *= smoothstep(iLobe.w * 0.4, iLobe.w, distance(center, cameraPosition));
+  vSmoke = vec4(iShape.y * fade * uGlobalFade, iShape.z, iShape.w, age);
+  vRadius = size * 0.5;
   vAerial = vec4(0.0);
   if (uFogDensity > 0.0) {
     vec3 rayDir = normalize(world - cameraPosition);
@@ -82,59 +87,68 @@ void main() {
 `;
 
 const FRAG = /* glsl */`
-uniform sampler2D uAtlas;
-uniform float uAtlasReady;
+precision highp sampler3D;
+uniform sampler3D uDensity;
 uniform sampler2D uNormalDepth;
 uniform vec2 uResolution;
 uniform float uDepthValid;
 uniform float uTime;
+uniform vec3 uSunDirection;
 varying vec2 vUv;
 varying vec4 vSmoke;
 varying float vViewDepth;
 varying vec4 vAerial;
-float CloudNoise(vec2 p) {
-  return 0.5 + 0.25 * sin(p.x * 19.0 + sin(p.y * 13.0)) + 0.25 * cos(p.y * 23.0 + sin(p.x * 15.0));
+varying float vRadius;
+varying vec3 vRight;
+varying vec3 vUp;
+varying vec3 vToward;
+out vec4 fragColor;
+float Density(vec3 p, vec3 flow) {
+  vec2 noise = texture(uDensity, p * 0.68 + flow).rg;
+  // Broad cavities break the contour; small eddies erode it without photograph
+  // grain, hard sprite borders or the repeated silhouette of an atlas stamp.
+  float body = 0.85 - dot(p, p);
+  float field = body + (noise.r - 0.5) * 1.2 + (noise.g - 0.52) * 2.5;
+  return smoothstep(0.0, 0.56, field) * (0.75 + noise.g * 0.25);
 }
 void main() {
-  vec2 q = vUv - 0.5;
-  float angle = vSmoke.w + sin(uTime * 0.045 + vSmoke.z * 19.0) * 0.06;
-  q = mat2(cos(angle), -sin(angle), sin(angle), cos(angle)) * q + 0.5;
-  // Small slow warping gives the authored billows a rolling surface, while the
-  // world-space particles continuously rise and shear at different rates.
-  q += vec2(sin(q.y * 11.0 + uTime * 0.09 + vSmoke.z * 7.0),
-            cos(q.x * 13.0 - uTime * 0.08 + vSmoke.z * 11.0)) * 0.018;
-  vec2 edge = smoothstep(vec2(0.0), vec2(0.045), q) * (1.0 - smoothstep(vec2(0.955), vec2(1.0), q));
-  float frame = floor(vSmoke.y + 0.5);
-  vec2 cell = vec2(mod(frame, 2.0), floor(frame / 2.0));
-  vec4 cloud = texture2D(uAtlas, (cell + clamp(q, 0.001, 0.999)) * 0.5);
-  if (uAtlasReady < 0.5) {
-    float mask = smoothstep(0.5, 0.15, length(q - 0.5)) * (0.4 + 0.6 * CloudNoise(q));
-    cloud = vec4(frame < 1.5 ? vec3(0.18) : vec3(0.30, 0.25, 0.19), mask);
+  float r2 = dot(vUv, vUv);
+  if (r2 > 0.99 || vSmoke.x < 0.001) discard;
+  float sceneDepth = uDepthValid > 0.5 ? texture(uNormalDepth, gl_FragCoord.xy / uResolution).w : 0.0;
+  float halfRay = sqrt(max(0.0, 1.0 - r2));
+  vec3 flow = vec3(vSmoke.z * 7.3, vSmoke.z * 3.7 - uTime * 0.008, vSmoke.z * 9.1);
+  vec3 light = normalize(uSunDirection + vec3(0.0, 0.25, 0.0));
+  vec3 base = vSmoke.y < 0.5 ? vec3(0.105, 0.102, 0.095)
+            : vSmoke.y < 1.5 ? vec3(0.31, 0.305, 0.285)
+            : vSmoke.y < 2.5 ? vec3(0.32, 0.265, 0.19) : vec3(0.34, 0.325, 0.29);
+  vec4 sum = vec4(0.0);
+  for (int i = 0; i < SMOKE_STEPS; i++) {
+    float z = halfRay * (1.0 - 2.0 * (float(i) + 0.5) / float(SMOKE_STEPS));
+    vec3 p = vRight * vUv.x + vUp * vUv.y + vToward * z;
+    float density = Density(p, flow);
+    float sampleDepth = vViewDepth - z * vRadius;
+    if (sceneDepth > 0.001) density *= smoothstep(0.0, 0.85, sceneDepth - sampleDepth);
+    float shade = clamp((density - Density(p + light * 0.25, flow)) * 0.42 + 0.58, 0.35, 0.86);
+    vec3 lit = base * (0.64 + shade * 0.8);
+    float a = 1.0 - exp(-density * halfRay * vSmoke.x * 9.0 / float(SMOKE_STEPS));
+    sum.rgb += (1.0 - sum.a) * a * lit;
+    sum.a += (1.0 - sum.a) * a;
   }
-  float alpha = cloud.a * edge.x * edge.y * vSmoke.x;
-  if (alpha < 0.008) discard;
-  float luminance = dot(cloud.rgb, vec3(0.2126, 0.7152, 0.0722));
-  // Keep ash neutral, dust muted ochre, and reject tiny chromatic alpha fringes.
-  vec3 color = frame == 2.0 ? vec3(luminance * 1.12, luminance, luminance * 0.82)
-                            : vec3(luminance * 1.04, luminance * 1.02, luminance);
-  float sceneDepth = uDepthValid > 0.5 ? texture2D(uNormalDepth, gl_FragCoord.xy / uResolution).w : 0.0;
-  if (sceneDepth > 0.001) alpha *= smoothstep(0.0, 2.0, sceneDepth - vViewDepth);
+  if (sum.a < 0.004) discard;
+  vec3 color = sum.rgb / max(sum.a, 0.001);
   // The compositor already fogs geometry-backed pixels, but skips sky depth.
   if (sceneDepth <= 0.001) color = mix(color, vAerial.rgb, vAerial.a);
-  gl_FragColor = vec4(color, alpha);
+  fragColor = vec4(color, sum.a);
 }
 `;
 
 export class BattleSmoke {
-  constructor({ root, shared, quality = "high", loadTexture = true }) {
+  constructor({ root, shared, quality = "high" }) {
     this.quality = quality;
     this.sources = new Map();
     this.dirty = true;
     this.disposed = false;
-    this.loaded = false;
-    this.texture = null;
-    this.placeholder = new THREE.DataTexture(new Uint8Array([0, 0, 0, 0]), 1, 1);
-    this.placeholder.needsUpdate = true;
+    this.texture = MakeVolumetricNoiseTexture();
     this.geometry = new THREE.InstancedBufferGeometry();
     this.geometry.setAttribute("position", new THREE.Float32BufferAttribute([
       -0.5,-0.5,0, 0.5,-0.5,0, 0.5,0.5,0, -0.5,0.5,0,
@@ -142,7 +156,9 @@ export class BattleSmoke {
     this.geometry.setIndex([0,1,2,0,2,3]);
     this.geometry.instanceCount = 0;
     this.material = new THREE.ShaderMaterial({
-      uniforms: { ...shared, uAtlas: { value: this.placeholder }, uAtlasReady: { value: 0 } },
+      uniforms: { ...shared, uDensity: { value: this.texture } },
+      glslVersion: THREE.GLSL3,
+      defines: { SMOKE_STEPS: ({ low: 8, medium: 8, high: 10, ultra: 12 })[quality] || 10 },
       vertexShader: VERT, fragmentShader: FRAG,
       transparent: true, depthWrite: false, depthTest: true, side: THREE.DoubleSide,
       // Preserve HDR target alpha, as for other transparent world overlays.
@@ -158,20 +174,6 @@ export class BattleSmoke {
     this.mesh.matrixAutoUpdate = false;
     this.mesh.renderOrder = 5;
     root.add(this.mesh);
-    this.ready = loadTexture ? new Promise(resolve => {
-      new THREE.TextureLoader().load(new URL(BATTLE_SMOKE_ATLAS, import.meta.url).href, texture => {
-        if (this.disposed) { texture.dispose(); resolve(false); return; }
-        texture.colorSpace = THREE.SRGBColorSpace;
-        texture.flipY = false;
-        texture.wrapS = texture.wrapT = THREE.ClampToEdgeWrapping;
-        texture.needsUpdate = true;
-        this.texture = texture;
-        this.loaded = true;
-        this.material.uniforms.uAtlas.value = texture;
-        this.material.uniforms.uAtlasReady.value = 1;
-        resolve(true);
-      }, undefined, () => resolve(false));
-    }) : Promise.resolve(false);
   }
 
   Set(handle, source) { this.sources.set(handle, source); this.dirty = true; }
@@ -204,6 +206,5 @@ export class BattleSmoke {
     this.geometry.dispose();
     this.material.dispose();
     this.texture?.dispose();
-    this.placeholder.dispose();
   }
 }
