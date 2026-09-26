@@ -243,3 +243,9 @@ CC-BY-4.0 要求署名：以上作者与链接即发布署名，随本文件保�
 - 原始下载：<https://opengameart.org/sites/default/files/blood_0.png>；原样保存，没有重绘或图像生成。
 - SHA-256：`2f625d3ce46c723c54f3a78a94cd54aef808ef2480b470dd70bf7b6fdbb42c14`。
 - `Script_SurfaceDecals` 取 alpha 作为液滴／毛细渗透细节，血色与湿干状态由共享材质定义。
+
+## 2026-09-26 通用壕沟自然石材
+
+`Texture_TrenchStone{Base,Normal,Orm}.webp` 来自 [Poly Haven / Rock Boulder Dry](https://polyhaven.com/a/rock_boulder_dry)，CC0；Dimitrios Savva 摄影、Rico Cilliers 处理。重建脚本为 `Script_ImportTrenchMaterials.py`。`Model_TrenchStone.glb`、`Model_TrenchDryGrass.glb` 及泥土高度遮罩由本仓 `Script_BakeTrenchSurface.py` 原创生成；源工程位置与接入见 [壕沟表面](../docs/Data_TrenchSurface.md)。
+
+`Texture_TrenchMud{Base,Normal,Orh}.webp` 来自 [Poly Haven / Brown Mud 02](https://polyhaven.com/a/brown_mud_02)，Rob Tuytel，CC0；原始 AO / Roughness / Displacement 打包为 Orh。重建入口同 `Script_ImportTrenchMaterials.py`。

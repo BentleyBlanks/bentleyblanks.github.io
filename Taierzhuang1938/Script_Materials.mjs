@@ -670,10 +670,10 @@ export class MaterialLibrary {
   /**
    * 给一份自建材质挂「表面补丁」（反照率/法线/粗糙度/材质 AO 由补丁接管，见
    * Script_TerrainMaterial），其余 AO / GI / 簇光 / 着色升级照库里的口径接。
-   * 这类材质表面粗糙度下界都在 SSR 上限之上，一律不编 SSR。
+   * 干燥表面默认不编 SSR；湿地表通过 reflections 显式启用并检查 sampler 预算。
    */
-  InjectSurface(material, surface) {
-    return this._Inject(material, { ssr: null, surface });
+  InjectSurface(material, surface, { reflections = false } = {}) {
+    return this._Inject(material, { ssr: reflections ? undefined : null, surface });
   }
 
   /** 无贴图的纯色 PBR（玻璃、水、旗面这类）。也吃 SSAO。 */

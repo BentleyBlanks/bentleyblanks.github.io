@@ -104,10 +104,10 @@ function MakeArrayTexture(data, size, layers, srgb, anisotropy) {
  *
  * @returns {Promise<{setName, albedo, surface, albedoMean: Float32Array, surfaceMean: Float32Array, bytes: number}>}
  */
-export async function LoadTerrainLayers(setName, { anisotropy = 1, timeoutMs = 45000 } = {}) {
+export async function LoadTerrainLayers(setName, { anisotropy = 1, timeoutMs = 45000, extraLayers = [], layerOverrides = {} } = {}) {
   const set = TERRAIN_SETS[setName];
   if (!set) throw new Error(`Unknown terrain set: ${setName}`);
-  const urls = TerrainLayerUrls(setName);
+  const urls = [...TerrainLayerUrls(setName).map((url, i) => layerOverrides[i] || url), ...extraLayers];
   const layers = urls.length, size = set.textureSize, dataSize = size / 2;
   const bitmaps = await Promise.all(urls.map((u) => Promise.all([
     LoadBitmap(u.base, timeoutMs), LoadBitmap(u.normal, timeoutMs), LoadBitmap(u.orh, timeoutMs),
@@ -150,8 +150,8 @@ export async function LoadTerrainLayers(setName, { anisotropy = 1, timeoutMs = 4
     setName,
     albedo: MakeArrayTexture(albedoData, size, layers, true, anisotropy),
     surface: MakeArrayTexture(surfaceData, dataSize, layers, false, anisotropy),
-    albedoMean,
-    surfaceMean,
+    albedoMean: albedoMean.slice(0, set.layers.length * 4),
+    surfaceMean: surfaceMean.slice(0, set.layers.length * 4),
     size,
     dataSize,
     layers,
@@ -495,7 +495,7 @@ export function MakeTerrainPatch(pack, quality) {
  * 分层地形材质。**不进 MaterialLibrary 的缓存**：它的纹理属于关卡，关卡 Dispose 时一起还。
  * @param {MaterialLibrary} library 用它的注入口接 AO / GI / 簇光 / 着色升级
  */
-export function CreateTerrainMaterial(library, pack, { quality = "high", name = "TerrainLayers" } = {}) {
+export function CreateTerrainMaterial(library, pack, { quality = "high", name = "TerrainLayers", surface = null, reflections = false } = {}) {
   const tier = TerrainQualityOf(quality);
   const material = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0 });
   material.name = name;
@@ -511,6 +511,6 @@ export function CreateTerrainMaterial(library, pack, { quality = "high", name = 
   if (typeof location !== "undefined") {
     TERRAIN_DEBUG_UNIFORM.value = parseFloat(new URLSearchParams(location.search).get("terrainView") || "0") || 0;
   }
-  library.InjectSurface(material, MakeTerrainPatch(pack, tier));
+  library.InjectSurface(material, surface || MakeTerrainPatch(pack, tier), { reflections });
   return material;
 }

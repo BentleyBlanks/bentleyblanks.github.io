@@ -180,6 +180,10 @@ try {
         // 砸坑变体由 TerrainDeformationView.Warm() 在进关时预编，不必真炸一次。
         const terrain = rows.filter((row) => /terrain\d/.test(row.cacheKey));
         const crater = terrain.filter((row) => /CraterSoilV4/.test(row.cacheKey));
+        const wet = terrain.filter(row => /trenchWetHeight/.test(row.cacheKey));
+        const stone = terrain.filter(row => /trenchStoneContact/.test(row.cacheKey));
+        Report(wet.length > 0 && stone.length > 0, `${item.name} 湿泥和石土接触材质编译`,
+          `wet=${wet.length}, stone=${stone.length}`);
         Report(terrain.length > crater.length && crater.length > 0, `${item.name} 分层地形与砸坑变体都编出来了`,
           terrain.map((row) => `${row.samplers}:${row.cacheKey.split(",").pop()}`).join(" / ") || "(没有地形程序)");
       }

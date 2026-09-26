@@ -70,7 +70,7 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
           const lip = Point(st.halfFloor + st.bank * (0.85 + random() * 0.28), (random() - 0.5) * 0.9);
           if (lip.y - floor > 0.8) Clod(lip, Range(random, Style.lipRadiusM), Range(random, Style.lipReliefM), random);
         }
-        if (random() < Style.rootChance) {
+        if (roots && random() < Style.rootChance) {
           const crest = st.halfFloor + st.bank * 0.92;
           const top = Point(crest);
           if (top.y - floor < 0.75) continue;

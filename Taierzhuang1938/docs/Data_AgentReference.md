@@ -100,6 +100,7 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
   `MISSION_ANCHORS`、`MISSION_ROUTES`、`MISSION_PLACEMENT`、`bounds`。**scenario 体块不在 `blocks` 里，
   净空检查要分态单独扫。** `Data_FirstLevelMissionTerrain` 是共享高度场；室外地面不用盒体，桥面属于结构。
 - `Data_FirstLevelMissionTrenches` + `Script_TrenchPlan` / `Script_TrenchSpline`：样条壕沟（见 [壕沟样条 PCG](Data_TrenchSpline.md)）。
+- `Data_TrenchSurface` + `Script_TrenchSurfaceMaterial` / `Script_TerrainContact`：湿泥高度层、石土接触融合、碎石与枯草（见 [壕沟表面](Data_TrenchSurface.md)）。
   `Data_FirstLevelMissionFortifications` / `Script_FirstLevelMissionFortifications`：地面工事，经 `BuildSink` 分区合批
   （见 [工事布设](Data_FirstLevelFortifications.md)）。
 - 门禁：`Script_FirstLevelSpaceTest`（锚点/路线净空、人缝、夹道、桥、河、夜景、军列下线、bounds）、

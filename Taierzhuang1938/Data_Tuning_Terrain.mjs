@@ -127,6 +127,9 @@ export const TERRAIN_AO_INTENSITY = 0.72;
 
 /** 调试假彩色（`?terrainView=<号>`）。 */
 export const TERRAIN_DEBUG_VIEWS = Object.freeze({
+  wetness: 4,
+  roughness: 5,
+  terrainContact: 6,
   weights: 1,   // 高度混合后的权重：红车道 / 绿草茬 / 蓝翻土 / 灰底土
   albedo: 2,    // 宏观变化之前的混合反照率
   normal: 3,    // 世界空间法线

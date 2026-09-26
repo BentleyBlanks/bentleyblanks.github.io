@@ -527,7 +527,7 @@ export class TerrainDeformationView {
     }
     if (!reachable) return false;
     const before = source.geometry;
-    if (!CutTerrainRectangles(source, rects, options)) return false;
+    if (!CutTerrainRectangles(source, rects, options || (source.userData.trenchEarth ? { AllowTriangle: () => true } : undefined))) return false;
     if (!this.originalGeometry.has(source)) this.originalGeometry.set(source, before);
     else before.dispose();
     return true;
@@ -757,6 +757,8 @@ export class TerrainDeformationView {
         else this.debris.Update(key, tx, tz, wear, w);
       }
     }
+    this.field.terrainContact?.Update(tiles.map(t => ({ minX: t.x0, maxX: t.x0 + sizeM,
+      minZ: t.z0, maxZ: t.z0 + sizeM })), (x, z) => this.model.GroundHeight(x, z));
     if (rebuilt && this.physics) {
       // Gameplay steps the world every frame and the next Step publishes the new
       // colliders (height queries fall back to the analytic surface meanwhile).
@@ -776,6 +778,7 @@ export class TerrainDeformationView {
     for (const meshes of this.overlayTiles.values()) for (const mesh of meshes) { this.scene.remove(mesh); mesh.geometry.dispose(); }
     this.overlayTiles.clear();
     this.tileMeshes.clear(); this.model.Clear();
+    this.field.terrainContact?.Reset();
     this.maskColliders = this.field.colliders?.length ?? 0;
     this.physics?.RefreshStaticQueries();
   }

@@ -25,6 +25,11 @@ import { IsMissionSandbagBlock } from "./Data_FirstLevelMissionFortifications.mj
 import { TrenchPlanFor } from "./Data_FirstLevelMissionTerrain.mjs";
 import { BuildTrenchEarth } from "./Script_TrenchEarth.mjs";
 import { TRENCH_APPEARANCE } from "./Data_TrenchAppearance.mjs";
+import { TRENCH_SURFACE } from "./Data_TrenchSurface.mjs";
+import { LoadTrenchSurface, BuildTrenchSurface, PaintTrenchBatch } from "./Script_TrenchSurface.mjs";
+import { MakeTrenchSurfacePatch } from "./Script_TrenchSurfaceMaterial.mjs";
+import { CloneShadedMaterial } from "./Script_Materials.mjs";
+import { TerrainContactField } from "./Script_TerrainContact.mjs";
 
 export function IsP012TrainBlock(id) { return /^Station(?:Car\d|Engine|ExitStep)/.test(id); }
 /** 跟着车厢一起平移的那两扇门（SetTrainOffset 每帧改它们的 z）。 */
@@ -171,16 +176,34 @@ export class FirstLevelWhiteboxField {
       // download falls back to the single tiled soil below; the level still builds.
       try {
         const { LoadTerrainLayers, CreateTerrainMaterial } = await import("./Script_TerrainMaterial.mjs");
-        this.terrainLayers = await LoadTerrainLayers(this.layout.ground.terrainLayers, { anisotropy: this.library.anisotropy });
+        const trench = !!this.layout.terrainSpec?.trenchNetwork;
+        const VersionedLayer = layer => Object.fromEntries(Object.entries(layer)
+          .map(([key,url]) => [key, `${url}?v=${TRENCH_SURFACE.version}`]));
+        this.terrainLayers = await LoadTerrainLayers(this.layout.ground.terrainLayers,
+          { anisotropy: this.library.anisotropy, extraLayers: trench ? [VersionedLayer(TRENCH_SURFACE.stoneLayer)] : [],
+            layerOverrides: trench ? { 3: VersionedLayer(TRENCH_SURFACE.mudLayer) } : {} });
+        if (trench) {
+          this.trenchSurface = await LoadTrenchSurface();
+          this.terrainContact = new TerrainContactField(this.terrain);
+          this.materials.set("TrenchStone", CreateTerrainMaterial(this.library, this.terrainLayers,
+            { quality: this.quality, name: "TrenchStone", surface: MakeTrenchSurfacePatch(this.terrainLayers,
+              this.quality, this.trenchSurface, this.terrainContact, { stone: true }) }));
+          this.materials.set("TrenchDryGrass", CloneShadedMaterial(this.library.Plain("TrenchDryGrass",
+            { color: TRENCH_SURFACE.grass.color, roughness: TRENCH_SURFACE.grass.roughness, side: THREE.DoubleSide })));
+        }
         const semantic = this.layout.ground.semantic;
         this.materials.get(semantic)?.dispose();
         this.materials.set(semantic, CreateTerrainMaterial(this.library, this.terrainLayers,
-          { quality: this.quality, name: "FirstLevelMissionTerrainLayers" }));
+          { quality: this.quality, name: "FirstLevelMissionTerrainLayers", reflections: trench,
+            surface: trench ? MakeTrenchSurfacePatch(this.terrainLayers, this.quality, this.trenchSurface, this.terrainContact) : null }));
         const scratch = [0, 0, 0];
         this.SampleGroundSurface = this.layout.SampleGroundSurface;
         this.SampleGroundColor = (x, z, out) => this.layout.SampleGroundSurface(x, z, out, scratch);
       } catch (error) {
         console.warn("[FirstLevelWhiteboxField] terrain layers unavailable, using tiled soil", error);
+        this.terrainLayers?.albedo.dispose(); this.terrainLayers?.surface.dispose();
+        this.trenchSurface?.Dispose(); this.trenchSurface = null;
+        this.terrainContact?.Dispose(); this.terrainContact = null;
         this.terrainLayers = null;
       }
     }
@@ -250,16 +273,20 @@ export class FirstLevelWhiteboxField {
 
     if (this.layout.terrainSpec?.trenchNetwork && this.terrainLayers) {
       const dressing = new BuildSink();
-      const rootMaterial = new THREE.MeshStandardMaterial({
+      if (!this.trenchSurface) this.materials.set("TrenchRoots", new THREE.MeshStandardMaterial({
         name: "TrenchRoots", color: TRENCH_APPEARANCE.rootColor,
         roughness: TRENCH_APPEARANCE.rootRoughness, metalness: 0,
-      });
-      this.materials.set("TrenchRoots", rootMaterial);
+      }));
       this.stats.trenchEarth = BuildTrenchEarth(dressing, TrenchPlanFor(this.layout.terrainSpec),
-        (x, z) => this.TerrainHeight(x, z));
+        (x, z) => this.TerrainHeight(x, z), { roots: this.trenchSurface ? null : "TrenchRoots" });
+      if (this.trenchSurface) this.stats.trenchSurface = BuildTrenchSurface(dressing,
+        TrenchPlanFor(this.layout.terrainSpec), (x, z) => this.TerrainHeight(x, z), this.trenchSurface);
       const pieces = dressing.Flush(this.scene, { Get: key => this.materials.get(key) });
       this.stats.trenchEarth.meshes = pieces.length;
       for (const mesh of pieces) {
+        if (mesh.material === this.materials.get("TrenchStone") || mesh.material === this.materials.get("TrenchDryGrass")) {
+          PaintTrenchBatch(mesh, mesh.material === this.materials.get("TrenchDryGrass"));
+        }
         if (mesh.material === this.materials.get(ground.semantic)) {
           const count = mesh.geometry.attributes.position.count;
           const colors = new Float32Array(count * 3).fill(1), layers = new Float32Array(count * 3);
@@ -770,6 +797,8 @@ export class FirstLevelWhiteboxField {
       }
     }
     this.meshes.length = 0;
+    this.trenchSurface?.Dispose(); this.trenchSurface = null;
+    this.terrainContact?.Dispose(); this.terrainContact = null;
     this.fortificationModels=null;this.fortificationPlacements=[];this.sharedFortificationMaterials.clear();
     if (this.terrainLayers) {
       this.terrainLayers.albedo.dispose(); this.terrainLayers.surface.dispose();
