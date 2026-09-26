@@ -103,10 +103,45 @@ export const OPENING_STORYBOARDS = Object.freeze({
     headLook:Object.freeze({ maxRad:.14, returnS:.6,
       free:Object.freeze(["Wake","FrontPass","CaptiveDragged","CaptiveWall","Interrogation","Taunt","Wipe","Reach","Boots","Hold","Ask","LongShot"]) }),
     // Shot pitch (rad, + up) while a hand beat is the subject; the push-up lift of the lying eye (m).
-    look:Object.freeze({ digPitch:-.45, boltPitch:-.2, clawPitch:-.8, reachPitch:-.28, pushUpM:.13, dragRollRad:.025,
+    look:Object.freeze({ digPitch:-.45, clawPitch:-.8, reachPitch:-.28, pushUpM:.13, dragRollRad:.025,
       // Parry: the eye steps this far aside from ijaA's back so He (behind ijaA) is seen, and holds the
       // duel this long after the cut before following the interpreter.
       duelAsideM:.25, duelHoldS:.45 }),
+    // 「弹装起！往后沟撤！跟紧！」 (09-26 review: he sat on, then stood still with the rifle flat across the frame).
+    // From Luo's order (clock: flags.exitAt) through Incoming he finishes loading on his feet while following the
+    // others slowly to the mouth: stands (standS), thumbs the charger's rounds down into the magazine, closes the
+    // bolt (which throws the empty charger out), turns the rifle over once to look it over, then carries it and
+    // looks up at the men going out. Walk: shunzi.seat -> shunzi.followTo at walkMps from walkAtS (eased in over
+    // walkRampS, out over the last stopEaseM). pitch: extra look pitch (rad) while his eyes are on the rifle.
+    // rifle: [t, left palm (camera-local m), muzzle, top of the rifle (camera-local directions)]; the left hand holds
+    // it at grip (rifle-local, HanYang canonical: muzzle -z, top +y, bolt side +x). right: [t, point on the rifle,
+    // fingers, back of the hand (rifle-local), curl]. charger: the clip stands in the guide at chargerAt and goes
+    // down pressM over press (s) while the thumb works it (thumbM at thumbHz); the bolt strips it at chargerOffS.
+    followUp:Object.freeze({
+      standS:1.2, walkAtS:1.1, walkMps:.24, walkRampS:.8, stopEaseM:.25, bobM:.016, stepHz:1.6, swayRad:.01,
+      pitch:Object.freeze([[0,0],[.6,-.42],[3.9,-.42],[4.8,-.04]]),
+      grip:Object.freeze([0,-.03,-.2]),
+      rifle:Object.freeze([
+        [0,[-.13,-.18,-.35],[-1,0,0],[0,1,0]],
+        [.7,[-.15,-.07,-.36],[-.85,.35,-.25],[.05,.75,.65]],
+        [1.8,[-.15,-.07,-.36],[-.85,.35,-.25],[.05,.75,.65]],
+        [2.3,[-.15,-.09,-.35],[-.9,.25,-.2],[0,.7,.7]],
+        [2.9,[-.12,-.06,-.36],[-.75,.3,-.55],[.35,.55,.75]],
+        [3.6,[-.15,-.08,-.33],[-.9,.35,.1],[-.25,.7,.65]],
+        [4.4,[-.15,-.16,-.33],[-.8,.45,-.2],[0,.5,.85]],
+      ].map(Object.freeze)),
+      left:Object.freeze({ f:[.2,.68,.55], n:[-1,-.3,0], curl:[45,67,37] }),
+      right:Object.freeze([
+        [0,[.1,-.05,.12],[.2,.68,-.3],[-1,-.3,0],[39,51,31]],
+        [.55,[.03,.075,.06],[-.3,0,-.95],[.5,.85,0],[45,60,45]],
+        [1.75,[.03,.075,.06],[-.3,0,-.95],[.5,.85,0],[45,60,45]],
+        [1.95,[.06,.05,.03],[.3,-.2,-.9],[-.3,.9,-.1],[50,64,42]],
+        [2.1,[.06,.05,-.04],[.3,-.2,-.9],[-.3,.9,-.1],[50,64,42]],
+        [2.25,[.07,.02,-.04],[.3,-.2,-.9],[-.3,.9,-.1],[50,64,42]],
+        [2.6,[.02,-.02,.1],[0,-.3,-.95],[.9,.4,0],[55,70,45]],
+      ].map(Object.freeze)),
+      charger:Object.freeze({ at:Object.freeze([0,.085,-.027]), pressM:.036, press:Object.freeze([.6,1.75]), thumbM:.01, thumbHz:2.2, offS:2.05 }),
+    }),
     hands:Object.freeze({
       poses:Object.freeze({
         rest:H("cam",[.18,-.46,-.15],[0,-.4,-1],[.25,.65,.1],[14,24,14]),
@@ -124,12 +159,6 @@ export const OPENING_STORYBOARDS = Object.freeze({
         // face with the dirt (camera frame, so it is in view while the head is down).
         digCollar:H("cam",[.05,-.21,-.13],[-.3,.7,-.6],[0,0,-1],[50,70,45]),
         dig:H("cam",[.13,-.06,-.27],[-.2,.7,-.5],[0,-.3,1],[60,74,50]),         // raised off the rifle, dirt in the fist
-        // The bolt keeps the loading hand's orientation (fingers round the knob): only the hand travels,
-        // while the left hand brings the rifle in (boltRifle) so the knob is within the right arm's reach.
-        boltGrip:H("cam",[.04,-.11,-.29],[-.3,.68,-.2],[0,-.3,1],[50,64,42]),
-        boltPush:H("cam",[.04,-.1,-.33],[-.3,.68,-.2],[0,-.3,1],[50,64,42]),
-        boltDown:H("cam",[.06,-.14,-.32],[-.3,.68,-.2],[0,-.3,1],[50,64,42]),
-        boltRifle:H("cam",[-.02,-.2,-.3],[.55,.68,-.2],[0,-.3,1],[45,67,37]),
         protect:H("cam",[.24,-.11,-.28],[0,.7,-.6],[0,0,1],[11,23,15]),            // flung up by the blast
         limp:H("ground",[.25,.02,-.06],[.3,-.2,-1],[0,1,0],[25,35,20]),
         grasp:H("cam",[.12,-.14,-.3],[0,0,-1],[0,1,0],[44,66,42],{grasp:true}),    // on the dragging hand (left only)
@@ -141,10 +170,12 @@ export const OPENING_STORYBOARDS = Object.freeze({
         rifle:H("ground",[.2,.05,-.3],[.3,-.3,-1],[0,1,0],[46,62,40],{to:"rifle"}),// 「抓住枪」
       }),
       // Seated inspection: the charger rests in the left palm, the rifle on the thighs.
-      // Orders' exit signal hands back to the bolt/stand sequence in OpeningFirstPerson.
+      // Orders' exit signal (Luo's order) hands over to followUp's stand / load / bolt / look-over in OpeningFirstPerson.
       beats:Object.freeze({
         Banter:Object.freeze({keys:Object.freeze([[0,"palmClip","rest"],[1.1,"palmClipTilt","rest"],[2.5,"palmClip","rest"]]),legs:"sitForward",props:Object.freeze(["palmClipProp","loadingRifleOnLegs"])}),
-        Orders:Object.freeze({keys:Object.freeze([[0,"palmClip","rest"]]),legs:"sitForward",props:Object.freeze(["palmClipProp","loadingRifleOnLegs"])}),
+        // Still at it while the runner reports: the charger turned in the palm and back (not a frozen hand).
+        Orders:Object.freeze({keys:Object.freeze([[0,"palmClip","rest"],[1.3,"palmClipTilt","rest"],[2.8,"palmClip","rest"],[4.2,"palmClipTilt","rest"],[5.8,"palmClip","rest"]]),
+          legs:"sitForward",props:Object.freeze(["palmClipProp","loadingRifleOnLegs"])}),
         Blast:K([0,"protect","protect"],[.4,"protect","protect"],[.8,"limp","limp"]),
         Black:K([0,"limp","limp"]),
         // 「他试着撑起身体。背包带一下绷紧……又落回地面。手指在泥里抓出一道痕。」
@@ -216,13 +247,13 @@ export const OPENING_STORYBOARDS = Object.freeze({
   // ---- 01 marks ------------------------------------------------------------------------
   shunzi:Object.freeze({
     // 2026-09-25 storyboard round (contract §2.1): he sits at the back of the dugout for the talk and the order
-    // (SB01), stands and steps toward the mouth after the others (Incoming), is knocked down by the near miss
-    // (SB02) and wakes pinned in the mouth itself, the fallen timber on his pack (SB03–SB04). The Space's
-    // MISSION_PLACEMENT.bunker.player (-1.3,-126.2) stays the dugout's anchor (A.bunker); the director's
-    // Shunzi marks are these.
+    // (SB01), stands and follows the others slowly toward the mouth, working the rifle (after the order, through
+    // Incoming), is knocked down by the near miss (SB02) and wakes pinned in the mouth itself, the fallen timber on
+    // his pack (SB03–SB04). The Space's MISSION_PLACEMENT.bunker.player (-1.3,-126.2) stays the dugout's anchor
+    // (A.bunker); the director's Shunzi marks are these.
     seat:P(-1.95,-126.25,-93*Math.PI/180),   // SB01 eye: back of the dugout, the mouth x 0.30–0.74 of the frame
-    incomingStep:P(-1.15,-126.1),            // Incoming: stood up and a step toward the mouth when the shell lands
-    blastFall:P(-.9,-126.0),                 // SB02: where the eye has dropped to at the end of the fall
+    followTo:P(-.45,-126.02),                // after the order: he follows the others slowly this far (firstPerson.followUp)
+    blastFall:P(-.9,-126.0),                 // SB02: where the eye has dropped to at the end of the fall (thrown back)
     trap:P(.1,-125.45,-Math.PI/2),           // Wake → KickBeam: lying in the mouth, looking east down the trench
     // The lying eye (contract §2.1: Wake→Found eye (0.25–0.35,−125.2), 0.18–0.26 m over the mud), a little ahead of
     // the pinned body with the chin in the mud: SB03 holds witnessEye, the reach (SB03A) sinks to reachEye.
@@ -252,8 +283,6 @@ export const OPENING_STORYBOARDS = Object.freeze({
     luoKneelS:1.6,
     // SB01 camera (eye = shunzi.seat) and the talk's head turn toward whoever speaks (clamped, eased).
     seatShot:Object.freeze({ yawDeg:-93, pitchDeg:-15, speakerTurnRad:.14, turnRps:2 }),
-    // Incoming: standing, the step toward the mouth takes this long; the look is at the comrade outside.
-    incomingStepS:1.2,
     // SB02 mirrored (contract §2.2): the shell lands at fallStartS (FireShell flight); the eye drops to eyeM and turns
     // to yaw/pitch with the head rolled to the left by fallEndS; the eyes close at eyesCloseS; Black at phaseS.
     // pitchDeg -6 (contract -14, ±8): at -14 the lintel was above the frame and the north post's top half hung over the

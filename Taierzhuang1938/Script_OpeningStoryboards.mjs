@@ -31,6 +31,8 @@ const Face=(a,b)=>Math.atan2(a.x-b.x,a.z-b.z);
 const Distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 const Wrap=v=>Math.atan2(Math.sin(v),Math.cos(v));
 const DEG=Math.PI/180;
+/** [[t, value], …] eased key to key (smoothstep), held past either end. */
+const SampleCurve=(keys,t)=>{if(!(t>keys[0][0]))return keys[0][1];for(let i=1;i<keys.length;i++)if(t<keys[i][0])return keys[i-1][1]+(keys[i][1]-keys[i-1][1])*Smooth((t-keys[i-1][0])/(keys[i][0]-keys[i-1][0]));return keys.at(-1)[1];};
 const Rot=(yaw,x,z)=>({x:x*Math.cos(yaw)+z*Math.sin(yaw),z:-x*Math.sin(yaw)+z*Math.cos(yaw)});
 /** A point in an anchor's frame (+x right, -z forward), yaw offset in degrees (+ = turn left). */
 const Local=(anchor,x,z,dyawDeg=0)=>{const o=Rot(anchor.yaw||0,x,z);return {x:anchor.x+o.x,z:anchor.z+o.z,yaw:(anchor.yaw||0)+dyawDeg*DEG};};
@@ -512,7 +514,7 @@ export class FirstLevelBunkerShow {
   Blast(){
     if(!["Banter","Orders","Incoming"].includes(this.phase))return;
     const r=this.r,b=C.banter;
-    this.blastFrom=this.phase==="Incoming"?this.IncomingPoint():C.shunzi.seat;
+    this.blastFrom=this.FollowPoint();
     this.Stage("Blast");
     r.voice?.Signal?.("Blast");
     r.combat?.FireShell(r.Point(b.shellFrom,14),r.Point(b.shellAt),{flight:.22,damage:0,radius:4,incoming:false,feedbackOnly:true});
@@ -665,6 +667,8 @@ export class FirstLevelBunkerShow {
     const r=this.r,b=C.banter;
     if(!this.phaseEntered){
       this.phaseEntered=true;
+      // Straight into Incoming (a stage jump): he is already up and following, the rifle loaded.
+      this.flags.exitAt??=r.time-C.firstPerson.followUp.rifle.at(-1)[0];
       this.Scene("BunkerIncoming",r.voice?.PlayScene("BunkerIncoming",{speakers:this.Speakers()}));
     }
     this.Hold(this.Comrade,b.comradeBlast,null);
@@ -698,14 +702,41 @@ export class FirstLevelBunkerShow {
     const actor=this.cast[id];if(!actor)return;
     this.Hide(actor);actor.scriptEssential=false;this.r.ai.Remove(actor);delete this.cast[id];
   }
-  /** Incoming: he has stood up and steps toward the mouth after the others (seat -> incomingStep). */
-  IncomingPoint(){
-    const S=C.shunzi,w=Smooth((this.phase==="Incoming"?this.Age:0)/C.banter.incomingStepS);
-    return {x:S.seat.x+(S.incomingStep.x-S.seat.x)*w,z:S.seat.z+(S.incomingStep.z-S.seat.z)*w};
+  /** Seconds since Luo's order (flags.exitAt), the clock of firstPerson.followUp; null before it. */
+  FollowAge(){const at=this.flags.exitAt;return at==null||!["Orders","Incoming","Blast"].includes(this.phase)?null:this.r.time-at;}
+  /** 「跟紧」: from the order on he follows the others slowly (seat -> followTo), easing in and to a stop. */
+  FollowPoint(t=this.FollowAge()){
+    const S=C.shunzi,F=C.firstPerson.followUp,length=Distance(S.seat,S.followTo);
+    if(t==null)return S.seat;
+    const u=Math.max(0,t-F.walkAtS),E=F.stopEaseM;
+    let d=F.walkMps*(u<F.walkRampS?u*u/(2*F.walkRampS):u-F.walkRampS/2);
+    // The last stopEaseM: the pace falls to nothing at followTo (continuous speed, no snap).
+    const x=d-(length-E);if(x>0)d=x>=2*E?length:length-E+x-x*x/(4*E);
+    const w=d/length;
+    return {x:S.seat.x+(S.followTo.x-S.seat.x)*w,z:S.seat.z+(S.followTo.z-S.seat.z)*w};
   }
-  /** SB02: the eye knocked down from where he stood toward the mouth (shunzi.blastFall) over the fall. */
+  /** Walking pace now as a share of walkMps (0 standing, 1 full pace): the gait's bob and sway scale with it. */
+  FollowPace(t=this.FollowAge()){
+    if(t==null)return 0;
+    const a=this.FollowPoint(t),b=this.FollowPoint(t+.05);
+    return Math.min(1,Distance(a,b)/.05/C.firstPerson.followUp.walkMps);
+  }
+  /** The look while he follows: the seat's look eased to the men going out of the mouth (in Incoming the wounded
+   *  comrade squeezing out), pitched down at the rifle while he works it (followUp.pitch), with a slow walker's bob. */
+  FollowShot(){
+    const r=this.r,S=C.shunzi,b=C.banter,F=C.firstPerson.followUp,t=this.FollowAge()??0;
+    const eye=this.FollowPoint(t),pace=this.FollowPace(t),step=Math.PI*F.stepHz*Math.max(0,t-F.walkAtS);
+    let height=S.seatEyeM+(S.standEyeM-S.seatEyeM)*Smooth(t/F.standS);
+    height+=F.bobM*pace*(Math.abs(Math.sin(step))*2-1);
+    const comrade=this.Comrade,out=r.Point(b.exitRoute[0],1.1);
+    if(this.phase==="Incoming"&&comrade?.alive)out.lerp(r.Point(comrade.position,1.2),Smooth(this.Age/.8));
+    const seat=this.SeatAim(eye,height,b.seatShot.pitchDeg*DEG),w=Smooth(t/.8);
+    const k=SampleCurve(F.pitch,t);
+    return {eye,height,target:seat.lerp(out,w),pitch:k,roll:F.swayRad*pace*Math.sin(step)};
+  }
+  /** SB02: the eye knocked down from where he had followed to (blastFrom) onto shunzi.blastFall over the fall. */
   BlastPoint(){
-    const B=C.banter.blastShot,from=this.blastFrom||C.shunzi.incomingStep,to=C.shunzi.blastFall;
+    const B=C.banter.blastShot,from=this.blastFrom||C.shunzi.followTo,to=C.shunzi.blastFall;
     const f=Smooth(((this.phase==="Blast"?this.Age:B.fallEndS)-B.fallStartS)/(B.fallEndS-B.fallStartS));
     return {x:from.x+(to.x-from.x)*f,z:from.z+(to.z-from.z)*f};
   }
@@ -1960,8 +1991,8 @@ export class FirstLevelBunkerShow {
     }
     if(p==="Butt")return S.butt;
     if(p==="Boots")return this.DragAway().point;
-    if(p==="Banter"||p==="Orders")return S.seat;
-    if(p==="Incoming")return this.IncomingPoint();
+    if(p==="Banter")return S.seat;
+    if(p==="Orders"||p==="Incoming")return this.FollowPoint();
     if(p==="Blast")return this.BlastPoint();
     if(TRAPPED.has(p)&&!["Butt","Boots"].includes(p))return S.trap;
     if(["LongShot","Check","KickRifle","Released"].includes(p))return S.cover;
@@ -1985,18 +2016,12 @@ export class FirstLevelBunkerShow {
       if(this.flags.dirtAt!=null){const t=r.time-this.flags.dirtAt,w=Smooth((t-.2)/.5)*(1-Smooth((t-1.7)/.6));pitch=L.digPitch*w;height-=.04*w;}
       target=this.SeatAim(eye,height,b.seatShot.pitchDeg*DEG);
     }
-    else if(p==="Orders"){
-      // SB01 while the runner calls in; 「顺子推上枪栓，提枪起身」 lifts the eye and the look to the mouth.
-      const rise=this.flags.exitAt!=null?Smooth((r.time-this.flags.exitAt)/1.2):0;
-      eye=S.seat;height=S.seatEyeM+rise*(S.standEyeM-S.seatEyeM);
-      target=this.SeatAim(eye,height,b.seatShot.pitchDeg*DEG*(1-rise));
-      if(this.flags.exitAt!=null){const t=r.time-this.flags.exitAt;pitch=L.boltPitch*Smooth(t/.25)*(1-Smooth((t-.7)/.4));}
-    }
-    else if(p==="Incoming"){eye=this.IncomingPoint();height=S.standEyeM;target=At(b.comradeBlast,1.2);}
+    else if(p==="Orders"&&this.flags.exitAt==null){eye=S.seat;height=S.seatEyeM;target=this.SeatAim(eye,height,b.seatShot.pitchDeg*DEG);}
+    else if(p==="Orders"||p==="Incoming")({eye,height,target,pitch,roll}=this.FollowShot());   // 「弹装起！……跟紧！」
     else if(p==="Blast"){
-      // SB02 mirrored (contract §2.2): standing at the shell's landing, knocked down toward the mouth, the head rolled
+      // SB02 mirrored (contract §2.2): standing where he had followed to, knocked down onto blastFall, the head rolled
       // to the left, the north post and the dugout's north wall on the left, the mouth and the blast on the right.
-      const B=b.blastShot,from=this.blastFrom||S.incomingStep,f=Smooth((a-B.fallStartS)/(B.fallEndS-B.fallStartS));
+      const B=b.blastShot,from=this.blastFrom||S.followTo,f=Smooth((a-B.fallStartS)/(B.fallEndS-B.fallStartS));
       const yaw0=Face(from,b.comradeBlast),pitch0=Math.atan2(1.2-S.standEyeM,Distance(from,b.comradeBlast));
       eye=this.BlastPoint();height=S.standEyeM+(B.eyeM-S.standEyeM)*f;
       target=this.Aim(eye,height,yaw0+Wrap(B.yawDeg*DEG-yaw0)*f,pitch0+(B.pitchDeg*DEG-pitch0)*f);

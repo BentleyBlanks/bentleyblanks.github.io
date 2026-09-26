@@ -367,6 +367,36 @@ const SUPPLY_PHASES=new Set(["Banter","Orders","Incoming"]);
 const HAND_BLEND_S=.5;
 /** Most the solved palm may turn in one 1/60 s frame (the continuity gate is 12°). */
 const HAND_TURN_DEG=10;
+// 「弹装起！往后沟撤！跟紧！」 (Data_OpeningStoryboards.firstPerson.followUp): the rifle and both hands on it after
+// the order, keyed on the rifle (rifle-local HanYang canonical: muzzle -z, top +y, bolt side +x).
+const FOLLOW=C.firstPerson.followUp;
+/** The charger's rounds lie along the bore, stacked up (the procedural clip: rounds along y, stacked along x). */
+const CLIP_IN_RIFLE=new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().makeBasis(new THREE.Vector3(0,1,0),new THREE.Vector3(0,0,-1),new THREE.Vector3(-1,0,0)));
+/** How far the thumb has pressed the charger's rounds down into the magazine at t. */
+function ChargerDepth(t){const c=FOLLOW.charger;return c.pressM*Smooth((t-c.press[0])/(c.press[1]-c.press[0]));}
+/**
+ * The rifle at followUp clock t (seconds since the order): world quaternion, the left palm target and each hand's
+ * target / fingers / back of the hand / curl. The right hand's keys are points on the rifle, so the hand goes
+ * where the rifle goes; over the charger it rides the rounds down and the thumb works in short strokes.
+ */
+function FollowRifle(t,cam){
+  const R=SampleKeys(FOLLOW.rifle,t),Frame=key=>FrameQuaternion(V(...key[2]).normalize().negate(),V(...key[3]).normalize());
+  const q=cam.quaternion.clone().multiply(Frame(R.a).slerp(Frame(R.b),R.mix));
+  const palm=V(...R.a[1]).lerp(V(...R.b[1]),R.mix).applyQuaternion(cam.quaternion).add(cam.position);
+  const origin=palm.clone().sub(V(...FOLLOW.grip).applyQuaternion(q));
+  const At=p=>V(...p).applyQuaternion(q).add(origin),Dir=p=>V(...p).applyQuaternion(q).normalize();
+  const Hand=side=>{
+    if(side==="l"){const L=FOLLOW.left;return {target:palm.clone(),forward:Dir(L.f),normal:Dir(L.n),curl:[...L.curl]};}
+    const k=SampleKeys(FOLLOW.right,t),m=k.mix,c=FOLLOW.charger;
+    const frame=FrameQuaternion(Dir(k.a[2]),Dir(k.a[3])).slerp(FrameQuaternion(Dir(k.b[2]),Dir(k.b[3])),m);
+    const target=At(k.a[1]).lerp(At(k.b[1]),m);
+    // Over the charger (its keys are the pressed-down point): ride the rounds down, the thumb in strokes.
+    const u=(t-c.press[0])/(c.press[1]-c.press[0]),thumb=u>0&&u<1?c.thumbM*Math.max(0,Math.sin(Math.PI*2*c.thumbHz*(t-c.press[0]))):0;
+    target.addScaledVector(Dir([0,1,0]),c.pressM-ChargerDepth(t)+thumb);
+    return {target,forward:V(0,0,1).applyQuaternion(frame),normal:V(0,1,0).applyQuaternion(frame),curl:k.a[4].map((v,i)=>v+(k.b[4][i]-v)*m)};
+  };
+  return {q,palm,Hand};
+}
 function Mirror(pose,side){
   if(!pose)return null;
   if(side==="r"||!pose.p)return pose;
@@ -731,34 +761,21 @@ export class OpeningFirstPerson{
     const bodyClock=override?now-override.at:bodyBeat?.t??a;
     const legReport=this.UpdateLegs(bodyBeat,frames,frameClock);
     this.report.legs=legReport;
-    // Supply overlays (Banter: dirt in the collar; Orders: the bolt pushed home).
+    // Banter: dirt in the collar (layered on the charger beat).
     const flags=s.flags||{};
     const dig=p==="Banter"&&flags.dirtAt!=null?now-flags.dirtAt:null;
     const digWeight=dig==null?0:Smooth((dig-.2)/.6)*(1-Smooth((dig-1.7)/.6));
-    const bolt=supply&&p!=="Banter"&&flags.exitAt!=null?now-flags.exitAt:null;
-    const boltWeight=bolt==null?0:Smooth(bolt/.25)*(1-Smooth((bolt-.75)/.3));
-    const loading=p==="Banter"||p==="Orders"&&bolt==null;
+    // Supply: the rifle in his hands from Luo's order on (followUp, clock flags.exitAt; without it, loaded and carried).
+    const follow=supply?(flags.exitAt!=null?now-flags.exitAt:Infinity):null;
+    const held=supply?FollowRifle(follow,cam):null;
     for(const side of ["l","r"]){
       const sign=side==="l"?-1:1;
       let shoulder=Local(sign*fp.shoulderHalfWidthM,-fp.shoulderDropM,fp.shoulderBackM);
       let target=Local(sign*.18,-.46,-.15),forward=Direction(0,-.4,-1),normal=Direction(sign*.25,.65,.1),curl=[14,24,14],grasp=false,shape=null,partner=null,partnerPose=null,poseName=null;
       const pole=Local(sign*.43,-.51,.1);
       if(supply){
-        const cycle=loading?(Math.sin(a*2.2)+1)*.5:.5;
-        target=Local(sign*.13,side==="l"?-.18:-.11+.025*cycle,-.35);
-        if(side==="l"&&boltWeight>0)target.lerp(this.Resolve(HANDS.poses.boltRifle,"r",frames,now).target,boltWeight);
-        forward=Direction(side==="l"?.55:-.3,.68,-.2);normal=Direction(0,-.3,1);
-        curl=side==="l"?[45,67,37]:[39,51,31];
-        // 「伸手往外掏」 / 「推上枪栓」 layered on the loading hand, each with its own weight.
-        for(const [w,t,keys] of [[digWeight,dig-.25,[[0,"digCollar"],[.8,"digCollar"],[1.3,"dig"]]],[boltWeight,bolt,[[0,"boltGrip"],[.3,"boltPush"],[.5,"boltDown"]]]]){
-          if(side!=="r"||!(w>0))continue;
-          const k=SampleKeys(keys.map(([at,name])=>[at,name,name]),t);
-          const over=this.BeatPose({r:[HANDS.poses[k.a[1]],HANDS.poses[k.b[1]]],mix:k.mix},"r",frames,now);
-          target.lerp(over.target,w);
-          const frame=FrameQuaternion(forward,normal).slerp(over.frame,w);
-          forward=V(0,0,1).applyQuaternion(frame);normal=V(0,1,0).applyQuaternion(frame);
-          curl=curl.map((v,i)=>v+(over.curl[i]-v)*w);
-        }
+        const hand=held.Hand(side);
+        target=hand.target;forward=hand.forward;normal=hand.normal;curl=hand.curl;
       }else if(beat){
         const pose=this.BeatPose(beat,side,frames,now);
         target=pose.target;forward=V(0,0,1).applyQuaternion(pose.frame);normal=V(0,1,0).applyQuaternion(pose.frame);curl=pose.curl;grasp=pose.grasp;shape=pose.shape;
@@ -902,12 +919,14 @@ export class OpeningFirstPerson{
     if(r.bunkerRifle?.view)r.bunkerRifle.view.visible=!worldRifleHidden;
     this.report.worldRifleVisible=r.bunkerRifle?.view?!worldRifleHidden:null;
     if(supply){
-      s.loadingRifle.quaternion.copy(cam.quaternion).multiply(Q().setFromAxisAngle(V(0,1,0),Math.PI/2));
-      s.loadingRifle.position.copy(Palm(this.rig,"l")).sub(s.loadingRifleGrip.clone().applyQuaternion(s.loadingRifle.quaternion));
-      // The clips are loaded by the end of the orders; the right hand leaves its clip to dig at the collar.
-      s.clips[0].visible=loading&&digWeight<.05;
-      s.clips[0].position.copy(Palm(this.rig,"r"));s.clips[0].quaternion.copy(cam.quaternion);
-      s.clips[0].position.add(Direction(0,.027,0).multiplyScalar(.027));
+      // Held at the left palm as solved (followUp.grip); the charger stands in the guide until the bolt strips it.
+      s.loadingRifle.quaternion.copy(held.q);
+      s.loadingRifle.position.copy(Palm(this.rig,"l")).sub(V(...FOLLOW.grip).applyQuaternion(held.q));
+      s.loadingRifle.updateMatrixWorld(true);
+      const charger=FOLLOW.charger;
+      s.clips[0].visible=follow<charger.offS;
+      s.clips[0].position.copy(V(...charger.at).addScaledVector(V(0,-1,0),ChargerDepth(follow))).applyMatrix4(s.loadingRifle.matrixWorld);
+      s.clips[0].quaternion.copy(held.q).multiply(CLIP_IN_RIFLE);
       const yaowa=r.companion?.Handle?.("yaowa")?.actor?.characterRig?.bones?.handL;
       s.clips[1].visible=false; // Yaowa's baked rifle/charger action owns his hands.
       if(yaowa){yaowa.getWorldPosition(s.clips[1].position);s.clips[1].position.y+=.04;}

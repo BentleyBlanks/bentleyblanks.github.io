@@ -10,6 +10,7 @@ import * as THREE from "three";
 import {OpeningFirstPerson,OpeningActorAnatomy,SolveOpeningActorArm,OpeningHandBeat,OPENING_HAND_POSES,TrimOpeningPlayerBody} from "./Script_OpeningFirstPerson.mjs";
 import {OPENING_STORYBOARDS as C} from "./Data_OpeningStoryboards.mjs";
 import {EXTRA_HAND_POSES,HAND_SHAPES,LEG_POSES,FP_PROPS,SHOULDER_BEHIND_MIN_M} from "./Data_OpeningFirstPersonExtra.mjs";
+const FOLLOW=C.firstPerson.followUp;
 
 const here=path.dirname(fileURLToPath(import.meta.url));
 const manifest=JSON.parse(fs.readFileSync(path.join(here,"Model/Character/Data_TengxianCharacterManifest.json"),"utf8"));
@@ -59,7 +60,7 @@ for(const [phase,beat] of Object.entries(C.firstPerson.hands.beats)){
   for(const name of beat.props||[])assert.ok(FP_PROPS[name],`${phase} names a known first-person prop (${name})`);
 }
 for(const phase of PHASES)assert.ok(C.firstPerson.hands.beats[phase]?.keys?.length||["Banter","Orders","Incoming"].includes(phase),`${phase} has hands (or holds the loading rifle)`);
-let samples=0,maxBend=0,maxTwist=0,maxRotation=0,groundContacts=0,maxGroundError=0;
+let followSamples=0,samples=0,maxBend=0,maxTwist=0,maxRotation=0,groundContacts=0,maxGroundError=0;
 // Hands resting on the mud must really touch it: the ground under the eye is 0.42 m down here.
 const GROUND_POSES=new Set(["flat","push","clawIn","clawOut","sit","brace","limp","scrape"]);
 for(const model of ["TengxianNra05","TengxianNra02"]){
@@ -74,10 +75,18 @@ for(const model of ["TengxianNra05","TengxianNra02"]){
     const start=r.time,beat=C.firstPerson.hands.beats[phase];
     // Flag clocks start with the phase; supply overlays (dirt, bolt) likewise.
     show.flags={dirtAt:phase==="Banter"?start:null,exitAt:phase==="Orders"?start:null,buttAt:start,collarReleasedAt:start,checkLineAt:start,kickRifleAt:start};
-    // Banter covers the collar/dig overlay; Orders the bolt (the director leaves ≥3 s before Incoming).
-    const frames=Math.max(50,Math.ceil(((beat?.keys.at(-1)[0]||0)+.6)*60),phase==="Banter"?150:0,phase==="Orders"?90:0);
+    // Banter covers the collar/dig overlay; Orders (flags.exitAt at its start) the whole followUp after the order.
+    const frames=Math.max(50,Math.ceil(((beat?.keys.at(-1)[0]||0)+.6)*60),phase==="Banter"?150:0,phase==="Orders"?Math.ceil((FOLLOW.rifle.at(-1)[0]+.6)*60):0);
     for(let frame=0;frame<frames;frame++){
       show.Age=frame/60;r.time=start+frame/60;firstPerson.Update(1/60);
+      if(phase==="Orders"){
+        // 「弹装起」: both palms on the rifle once the hands have come to it; the charger stands in the guide until
+        // the bolt strips it.
+        const t=show.Age,hands=firstPerson.report.hands;
+        if(t>1)for(const side of ["l","r"])assert.ok(hands[side].contactError<.005,`${model} followUp ${side} palm on the rifle at ${t.toFixed(2)} s (${hands[side].contactError})`);
+        if(Math.abs(t-FOLLOW.charger.offS)>.02)assert.equal(show.clips[0].visible,t<FOLLOW.charger.offS,`${model} followUp charger shown only until the bolt strips it (${t.toFixed(2)} s)`);
+        followSamples++;
+      }
       if(frame===frames-1)for(const [side,hand] of Object.entries(firstPerson.report.hands))if(GROUND_POSES.has(hand.pose)){
         assert.ok(hand.contactError<.02,`${model} ${phase} ${side} ${hand.pose} palm reaches the mud (${hand.contactError})`);
         groundContacts++;maxGroundError=Math.max(maxGroundError,hand.contactError);
@@ -98,6 +107,7 @@ for(const model of ["TengxianNra05","TengxianNra02"]){
   }
 }
 assert.ok(groundContacts>=20,"ground beats were sampled at rest ("+groundContacts+")");
+assert.ok(followSamples>=500,"followUp sampled for both skins ("+followSamples+")");
 // Flag clocks: an unset flag holds the first key; the key after the flag follows it.
 {
   const show={phase:"Butt",Age:3,flags:{},r:{time:10}};
