@@ -742,7 +742,7 @@ export class ActorEditor {
         if (token !== this.cartBuildToken || !this.panel || this.previewMode !== "cart") return;
         const instance = CreateDraftCartInstance(assets, this.cartKind);
         instance.cartRoot.position.y = 1;
-        instance.animalRoot.position.z = -4.8;
+        instance.animalRoot.position.z = -instance.teamOffsetM;
         this.studio.stand.add(instance.root);
         this.cartPreview = instance;
         instance.SetMotion(0, this.cartAction === "walk");

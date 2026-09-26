@@ -33,7 +33,8 @@ try {
   const before = await page.evaluate(() => {
     const editor = window.Taierzhuang.editor.active;
     return { mode: editor.previewMode, kind: editor.cartKind,
-      leg: editor.cartPreview.animalRoot.getObjectByName("OxFrontLeftPivot").rotation.x,
+      // 肩关节藏在躯干里、幅度小；看得见的那根腿柱从肘（ElbowPivot）起摆。
+      leg: editor.cartPreview.animalRoot.getObjectByName("OxFrontLeftElbowPivot").rotation.x,
       wheel: editor.cartPreview.cartRoot.getObjectByName("WheelLeft").rotation.x };
   });
   await page.evaluate(() => window.Taierzhuang.StepFrames(15));
@@ -44,7 +45,7 @@ try {
       if (object.isMesh) meshes += 1;
       if (object.isSkinnedMesh) skinned += 1;
     });
-    return { leg: editor.cartPreview.animalRoot.getObjectByName("OxFrontLeftPivot").rotation.x,
+    return { leg: editor.cartPreview.animalRoot.getObjectByName("OxFrontLeftElbowPivot").rotation.x,
       wheel: editor.cartPreview.cartRoot.getObjectByName("WheelLeft").rotation.x,
       meshes, skinned, fact: editor.cartFacts.root.textContent };
   });
@@ -89,6 +90,18 @@ try {
     .getObjectByName("WheelLeft").rotation.x, action: window.Taierzhuang.editor.active.cartAction }));
   assert.equal(stopped.action, "idle");
   assert.ok(Math.abs(stopped.wheel - wheelAtStop) < 1e-6, "the parked cart wheel holds its last angle");
+  // 真实体型：鲁西黄牛与华北挽马肩高都在 1.4 米上下（1.7 米的人齐肩），马昂着头耳尖约 1.9 米；
+  // 旧模型肩高 2 米多、耳尖 2.7 米。合批后整匹马的皮毛是一只蒙皮网格，量它（含头耳）的最高点。
+  const horseTop = await page.evaluate(async () => {
+    const THREE = await import("three");
+    const editor = window.Taierzhuang.editor.active;
+    const mesh = editor.cartPreview.parts.draftBody;
+    mesh.updateWorldMatrix(true, false);
+    mesh.computeBoundingBox();
+    return mesh.boundingBox.clone().applyMatrix4(mesh.matrixWorld).max.y
+      - editor.cartPreview.root.getWorldPosition(new THREE.Vector3()).y;
+  });
+  assert.ok(horseTop > 1.75 && horseTop < 2.05, `horse ear tips at ${horseTop.toFixed(2)} m, want ~1.9 m`);
   const contact = await page.evaluate(() => {
     const instance = window.Taierzhuang.editor.active.cartPreview;
     const hoof = instance.animalRoot.getObjectByName("HorseFrontLeftHoofPivot");
@@ -108,7 +121,8 @@ try {
   });
   assert.ok(Math.abs(contact.first.height-contact.second.height) < .02,
     "a horse support hoof remains at road height during stance");
-  assert.ok(Math.abs(Math.abs(contact.first.forward-contact.second.forward)-.2) < .04,
+  // 1 cm：导出时间轴从 1/30 s 起那次，蹄子只退了 0.158 m（打滑）也能混过 4 cm 的旧门。
+  assert.ok(Math.abs(Math.abs(contact.first.forward-contact.second.forward)-.2) < .01,
     "a horse support hoof tracks the cart's .2 m travel");
   assert.equal(contact.parked, contact.parkedAgain, "a stationary wheel does not keep turning");
   await page.locator(".edChip").filter({ hasText: /^人物$/ }).click();

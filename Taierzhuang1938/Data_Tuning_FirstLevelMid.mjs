@@ -72,6 +72,10 @@ export const MID_TUNING = Object.freeze({
   oxBayIndices: Object.freeze([0, 2]),
   oxTrafficIndices: Object.freeze([1]),
   draft: Object.freeze({
+    // 牲口根点（躯干中心）挂在车心前方多少米。Blender 模型按这个距离贴着车辕建
+    //（_blender/Script_OxCartBake.py 的 TEAM_OFFSET_M，GLB 根节点 extras 里也带一份），
+    // 两边对不上时 Script_DraftCartModel 加载即报错 —— 改这里必须重烘模型。
+    teamOffsetM: 3.3,
     // 现有 muleBody 0.62 x 0.72 x 1.5、muleHead 0.25 x 0.56 x 0.44（Script_FirstLevelMissionView）。
     ox: Object.freeze({ bodyScale: Object.freeze([1.36, 0.86, 1.04]), headScale: Object.freeze([1.25, 0.8, 1.12]), headDrop: 0.22, horn: true }),
     horse: Object.freeze({ bodyScale: Object.freeze([0.84, 1.18, 1.06]), headScale: Object.freeze([0.86, 1.06, 1.0]), headDrop: -0.07, horn: false }),
@@ -119,12 +123,12 @@ export const MID_TUNING = Object.freeze({
   // 「碰到了尸体应该是会有碰撞/软软的上下起伏」。
   cartCorpseBump: Object.freeze({
     // 车轮几何量自 Model_WoodenEvacCart.glb：WheelLeft/Right 枢轴 x=±1.32、y=0.72
-    //（= 轮半径，枢轴在车地面原点之上）、z=0.18；车辕前端搭在牲口身上，
-    // 牲口在车前 4.8 m（MissionView 的 cart.x - sin(yaw)*4.8），辕头取 -4.7。
+    //（= 轮半径，枢轴在车地面原点之上）、z=0.18；车辕前端的铁环在车前 4.02 m，
+    // 系在牲口的牛轭 / 马套包上（_blender/Script_OxCartBake.py 的 SHAFT_EYE_Y），辕头取 -4.02。
     wheelHalfTrackM: 1.32,
     wheelRadiusM: 0.72,
     axleZ: 0.18,
-    hitchZ: -4.7,
+    hitchZ: -4.02,
     // 沿车轮前后各探一个轮半径，步长 5 cm（躯干命中胶囊半径 0.12–0.16 m，步子要小于它）。
     probeStepM: 0.05,
     // 尸体是软的：轮子压下去一截，只按顶面高度的这一成抬车。

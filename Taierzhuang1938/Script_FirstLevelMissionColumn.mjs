@@ -895,7 +895,7 @@ export class FirstLevelMissionColumn {
     const cart = this.vehicles.find((cart) => !cart.departed && !cart.riding)
       || this.vehicles.filter((cart) => !cart.riding).at(-1) || this.vehicles.at(-1);
     cart.overturned = true;
-    const team={x:cart.x-Math.sin(cart.yaw)*4.8,z:cart.z-Math.cos(cart.yaw)*4.8};
+    const team={x:cart.x-Math.sin(cart.yaw)*MID.draft.teamOffsetM,z:cart.z-Math.cos(cart.yaw)*MID.draft.teamOffsetM};
     const route=[team,{x:94,z:134},{x:119,z:169}];
     cart.boltedTeam={...team,yaw:cart.yaw,route,progress:0,length:MissionRouteLength(route)};
     for (const litter of this.litters

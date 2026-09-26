@@ -30,7 +30,7 @@ const Wrap = (radians) => Math.atan2(Math.sin(radians), Math.cos(radians));
 
 /**
  * 车体局部偏移 → 世界坐标。局部 -z 是车头（与 Script_FirstLevelMissionView.CartInstance
- * 的 Euler(0,yaw,0) 一致：牲口挂在 (0,-4.8)）。
+ * 的 Euler(0,yaw,0) 一致：牲口挂在 (0,-MID_TUNING.draft.teamOffsetM)）。
  */
 export function CartSeatPoint(cart, offset) {
   const cos = Math.cos(cart.yaw), sin = Math.sin(cart.yaw);

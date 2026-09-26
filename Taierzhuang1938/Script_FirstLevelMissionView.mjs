@@ -478,7 +478,7 @@ export class FirstLevelMissionView {
       const travel=(cart.progress||0)+(cart.approachProgress||0);
       const team=cart.boltedTeam;
       const animalYaw=team?.yaw??cart.yaw,mc=Math.cos(animalYaw),ms=Math.sin(animalYaw);
-      const mx=team?.x??cart.x-s*4.8,mz=team?.z??cart.z-c*4.8,my=this.battlefield.GroundHeight(mx,mz);
+      const offset=MID.draft.teamOffsetM,mx=team?.x??cart.x-s*offset,mz=team?.z??cart.z-c*offset,my=this.battlefield.GroundHeight(mx,mz);
       const animalVisible=!cart.overturned || !!(team&&team.progress<team.length);
       if(this.draftCartModels.ready){
         this.draftCartModels.Sync(cart,y,{x:mx,z:mz,ground:my,yaw:animalYaw,

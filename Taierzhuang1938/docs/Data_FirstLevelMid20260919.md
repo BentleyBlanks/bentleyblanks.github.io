@@ -161,6 +161,12 @@
 `loadAllowancePerThreat` = `R.transferBatchLoads`、
 `zhouCartDeparted` 用 `R.cartDepartedM`、担架步速用 `R.litterSpeedMps`。
 新车板为 2.3 × 3.5 m、离地约 1.12 m，木辐条轮直径 1.44 m；保留原车位与装载座位偏移。
+牲口按当地品种的真实体型建（2026-09-27 重做，旧版两头都有 2 m 多高）：鲁西黄牛、华北挽马肩高都约 1.40 m，
+1.7 m 的人站旁边齐肩。牲口躯干中心挂在车心前 `MID_TUNING.draft.teamOffsetM` = 3.3 m，模型按这个距离贴着车辕建，
+GLB 根节点 extras 里带 `teamOffsetM` 与 `strideM`，与数据表对不上时 `Script_DraftCartModel` 加载即报错。
+步态：每条腿在躯干里藏一个肩/髋关节，着地时的长度变化全在那里消化，看得见的腿柱着地时是直的；
+抬腿时前膝往后折、后跗关节往前折。Walk 一圈 = 一个步幅（马 1.25 m、牛 1.05 m），着地的蹄子按车速后退、不打滑。
+Blender 导出的时间轴从 1/30 s 起，加载时挪到 0（不挪的话循环长 1.033 s，蹄子比车慢 21%）。
 历史造型参考为 1930 年前后中国牛车照片及山东地方交通资料；生图概念稿只作建模参考，
 可编辑 `.blend` 保存在仓库外的 `OneDrive/AI/Models/Blender/Taierzhuang1938/OxCart`。
 参考：[1930 年中国牛车照片](https://www.bridgemanimages.com/en-US/williams-maynard-owen/chinese-peasants-with-cart-pulled-by-an-ox-pass-a-city-gate-1930-photo/photograph/asset/8777732)、
