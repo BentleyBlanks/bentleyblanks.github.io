@@ -116,8 +116,9 @@ export function BuildTrenchPreview(collector, plan, segmentId, {
       const b = a + 1;
       const c = a + SECTION_POINTS;
       const d = c + 1;
-      index[write] = a; index[write + 1] = c; index[write + 2] = b;
-      index[write + 3] = b; index[write + 4] = c; index[write + 5] = d;
+      // n = (-tz, tx): advancing across the section before along it faces up.
+      index[write] = a; index[write + 1] = b; index[write + 2] = c;
+      index[write + 3] = b; index[write + 4] = d; index[write + 5] = c;
       write += 6;
     }
   }

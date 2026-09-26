@@ -1285,6 +1285,9 @@ Script_TrenchPlan.TRENCH_PRESETS.${name}`,
         color: TRENCH_PREVIEW_COLORS[name],
         opacity: name === "trench" ? 0.86 : 0.55,
       });
+      // A deeper edited profile lies below the live terrain until rebuild.
+      // Keep the selected section readable as an editor-only overlay.
+      if (name === "trench") material.depthTest = false;
       for (const geometry of geometries) {
         const mesh = new THREE.Mesh(geometry, material);
         mesh.renderOrder = name === "trench" ? 899 : 900;
