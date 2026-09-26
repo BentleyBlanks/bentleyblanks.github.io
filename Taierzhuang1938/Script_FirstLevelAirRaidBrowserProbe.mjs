@@ -107,7 +107,9 @@ try {
         formationShown: [...(g.aircraft?.formations?.values() || [])].reduce((n, l) => n + l.filter((x) => x?.root?.parent).length, 0),
         bombsShown: [...(g.aircraft?.bombSets?.values() || [])].reduce((n, l) => n + l.filter((m) => m.parent).length, 0),
         audio: { live: g.audio?.liveNodes, budget: g.audio?.nodeBudget, drops: { ...(g.audio?.drops || {}) },
-          ctx: g.audio?.ctx?.state ?? null, droneReq: g.audio?.playRequests?.get?.("planeDrone") ?? null } };
+          ctx: g.audio?.ctx?.state ?? null, droneReq: g.audio?.playRequests?.get?.("planeDrone") ?? null },
+        // 编队首次入画有没有现编着色器：开机预热（aircraft.WarmProxy）之后这个数在一轮里不该再涨。
+        programs: g.renderer?.info?.programs?.length ?? null };
     });
     log.push({ shot: shot.name, file: path.basename(file), ...state });
     console.log(shot.name, JSON.stringify(state));
