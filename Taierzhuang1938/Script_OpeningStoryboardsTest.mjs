@@ -435,21 +435,28 @@ assert.deepEqual([...C.phases.RearTrench],["Withdraw","Corner","Collection","Sup
     assert.ok(Math.abs(trap.x-b.x)>b.w/2+.3||Math.abs(trap.z-b.z)>b.d/2+.3,`the in-dugout collapse ${id} no longer pins him`);}
   // Contract §2.6: 02's circle closes in the SSW leg's north mouth (the Space's shunziDragged is K2's old eye point).
   assert.ok(D(C.shunzi.dragged,{x:.6,z:-123.9})<.61,"ijaA drags him into the SSW leg's north mouth (contract §2.6)");
-  // SB04 / SB04A (contract §2.5, §2.7): the butt spot east of the mouth rubble; the drag from it back past the mouth and
-  // into the SSW mouth -- Shunzi and ijaA backing leadM ahead of him -- keeps clear of the mouth's collapse blocks.
+  // SB04 / SB04A (contract §2.5, §2.7): the butt spot east of the mouth rubble; the forearm drag (IjaDragByForearm) from it
+  // west along the strip between the mouth rubble and the spoil into the SSW mouth -- Shunzi on dragAway.route, ijaA the
+  // clip's hold distance (holdM) from him toward dragAway.face at the same fraction -- keeps clear of the mouth's collapse
+  // blocks, and ijaA ends south of him in the SSW leg.
   {
     const Inside=(p,b,m)=>Math.abs(p.x-b.x)<b.w/2+m&&Math.abs(p.z-b.z)<b.d/2+m;
     // BunkerSouthRevetment counts too, unless wave 1 still lists it (Data_OpeningStoryboards.wave1Allowances.revetment).
     const solid=["BunkerMouthRubbleS","BunkerMouthSpoil","BunkerMouthPostS","BunkerMouthPostN","BunkerSouthRevetment"]
       .filter(id=>id!==C.wave1Allowances?.revetment).map(Block);
-    const G=C.ija.dragAway,route=[C.shunzi.butt,...G.route,C.shunzi.dragged],last=route.length-1;
-    const dx=route[last].x-route[last-1].x,dz=route[last].z-route[last-1].z,dl=Math.hypot(dx,dz);
-    const lead=[...route,{x:route[last].x+dx/dl*G.leadM,z:route[last].z+dz/dl*G.leadM}];
-    for(let i=1;i<lead.length;i++)for(let k=0;k<=20;k++){
-      const p={x:lead[i-1].x+(lead[i].x-lead[i-1].x)*k/20,z:lead[i-1].z+(lead[i].z-lead[i-1].z)*k/20};
-      for(const b of solid)assert.ok(!Inside(p,b,.12),`the SB04A drag keeps clear of ${b.id} at (${p.x.toFixed(2)},${p.z.toFixed(2)})`);
+    const G=C.ija.dragAway,route=[C.shunzi.butt,...G.route,C.shunzi.dragged];
+    const Len=r=>r.slice(1).reduce((sum,p,i)=>sum+D(r[i],p),0);
+    const At=(r,s)=>{for(let i=1;i<r.length;i++){const a=r[i-1],b=r[i],d=D(a,b);if(s<=d||i===r.length-1){const k=Math.min(1,s/(d||1));return {x:a.x+(b.x-a.x)*k,z:a.z+(b.z-a.z)*k};}s-=d;}};
+    let ijaA=null;
+    for(let k=0;k<=40;k++){
+      const p=At(route,k/40*Len(route)),t=At(G.face,k/40*Len(G.face)),d=D(p,t);
+      ijaA={x:p.x+(t.x-p.x)/d*G.holdM,z:p.z+(t.z-p.z)/d*G.holdM};
+      for(const b of solid){
+        assert.ok(!Inside(p,b,.12),`the SB04A drag keeps Shunzi clear of ${b.id} at (${p.x.toFixed(2)},${p.z.toFixed(2)})`);
+        assert.ok(!Inside(ijaA,b,.12),`the SB04A drag keeps ijaA clear of ${b.id} at (${ijaA.x.toFixed(2)},${ijaA.z.toFixed(2)})`);
+      }
     }
-    assert.ok(lead.at(-1).z>C.shunzi.dragged.z+.4,"ijaA ends the drag south of him in the SSW leg (02's circle)");
+    assert.ok(ijaA.z>C.shunzi.dragged.z+.4,"ijaA ends the drag south of him in the SSW leg (02's circle)");
   }
   const rifleReach=D(C.rescue.rifleMouth,trap);
   assert.ok(rifleReach>.9&&rifleReach<1.6,`the rifle lies in the mouth mud just out of reach (${rifleReach.toFixed(2)} m)`);
@@ -491,8 +498,10 @@ assert.deepEqual([...C.phases.RearTrench],["Withdraw","Corner","Collection","Sup
   }
   // The butt strike (SB04): the data's strike time is the clip's, and the hand keys let go after it.
   {
-    const strike=manifest.clips.IjaButtStrike.contacts.find(c=>c.action==="strike");
-    assert.ok(Math.abs(strike.t-C.ija.butt.strikeS)<1e-6,`ija.butt.strikeS is IjaButtStrike's strike contact (${strike.t})`);
+    const strike=manifest.clips.IjaButtStrikeCollar.contacts.find(c=>c.action==="strike"),loop=manifest.clips.IjaButtStrikeCollar.holdLoop;
+    assert.ok(Math.abs(strike.t-C.ija.butt.strikeS)<1e-6,`ija.butt.strikeS is IjaButtStrikeCollar's strike contact (${strike.t})`);
+    assert.ok(C.ija.butt.letGoS>=loop[1]-1e-6&&C.ija.butt.letGoS<strike.t,"the apex loop is let go (letGoS) before the blow");
+    assert.ok(loop[1]-loop[0]+C.ija.butt.holdS>=.4,"the pause at the top holds at least 0.4 s (contract §5 SB04)");
     const push=C.firstPerson.hands.beats.Butt.keys.filter(k=>k[2]==="push").at(-1)[0];
     assert.ok(Math.abs(push-(C.ija.butt.strikeS+C.ija.butt.holdS))<1e-6,"beats.Butt pushes until the blow lands (strike + holdS)");
   }

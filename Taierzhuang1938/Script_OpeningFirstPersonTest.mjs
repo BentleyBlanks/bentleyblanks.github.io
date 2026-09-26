@@ -103,7 +103,8 @@ assert.ok(groundContacts>=20,"ground beats were sampled at rest ("+groundContact
   const show={phase:"Butt",Age:3,flags:{},r:{time:10}};
   assert.equal(OpeningHandBeat(show).names.r,"flat","before ijaA reaches his mark Shunzi lies flat");
   show.flags.buttAt=9.8;assert.equal(OpeningHandBeat(show).names.r,"push","he pushes up before the stock lands");
-  show.flags.buttAt=9;assert.equal(OpeningHandBeat(show).names.r,"rest","after the strike the arms go slack");
+  show.flags.buttAt=10-(C.ija.butt.strikeS+C.ija.butt.holdS+.3);
+  assert.equal(OpeningHandBeat(show).names.r,"rest","after the strike the arms go slack");
 }
 // A cut between phases (the camera jumps, e.g. Blast -> Wake) must not carry last frame's world shoulder
 // into the new view: the shoulder blend is camera-local (campaign probe minShoulderBehind was -0.003).

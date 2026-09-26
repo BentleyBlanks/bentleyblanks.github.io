@@ -1,6 +1,6 @@
 {
  "schema": 2,
- "version": "20260926OpeningStoryboardsV6Polish",
+ "version": "20260926OpeningStoryboardsV7Drag",
  "fps": 24,
  "actorForward": [
   0,
@@ -1252,7 +1252,7 @@
    ]
   },
   "IjaCollarDragSnag": {
-   "duration": 2.2,
+   "duration": 1.75,
    "loop": false,
    "weaponHold": "track",
    "role": "ijaA",
@@ -1265,7 +1265,7 @@
    "player": true,
    "contacts": [
     {
-     "t": 0.25,
+     "t": 0.20833333333333334,
      "limb": "handL",
      "action": "grab",
      "partnerRole": "shunzi",
@@ -1274,16 +1274,16 @@
    ],
    "events": [
     {
-     "t": 0.95,
+     "t": 0.75,
      "kind": "packSnagged",
      "target": "beam"
     },
     {
-     "t": 1.12,
+     "t": 0.86,
      "kind": "yank"
     },
     {
-     "t": 1.42,
+     "t": 1.06,
      "kind": "yank"
     }
    ],
@@ -1293,13 +1293,13 @@
    "next": [
     "IjaKickBeam"
    ],
-   "notes": "Hooks the back of the collar, backs off two steps hauling; the pack snags on the beam at 0.95 s: a dead stop that jerks him forward, two yanks, a look back at what holds.",
+   "notes": "Squats at his head, hooks the back of the collar and backs off two short steps hauling, face on him; the pack snags on the beam (packSnagged): a dead stop that jerks him forward, two yanks, a look back at what holds. 2026-09-26: hips further back and lower, trunk less folded (the face was straight above the prone eye, upside down in the picture, the jacket collar through the chin) and 1.7 s instead of 2.2 s.",
    "rigs": [
     "TengxianIja02"
    ]
   },
   "IjaKickBeam": {
-   "duration": 1.2,
+   "duration": 1.0,
    "loop": false,
    "weaponHold": "track",
    "role": "ijaA",
@@ -1320,7 +1320,7 @@
      "part": "collarBack"
     },
     {
-     "t": 0.45,
+     "t": 0.375,
      "limb": "footR",
      "action": "kick",
      "target": "beam"
@@ -1328,7 +1328,7 @@
    ],
    "events": [
     {
-     "t": 0.45,
+     "t": 0.375,
      "kind": "beamKicked"
     }
    ],
@@ -1338,7 +1338,7 @@
    "next": [
     "CollarDrag"
    ],
-   "notes": "Keeps the collar in his left fist, stamps the loose beam off the pack with the right sole; the `beam` track carries it clear (rests at 0.9 s).",
+   "notes": "Keeps the collar in his left fist, stamps the loose beam off the pack with the right sole; the beam track carries it clear (rests at 0.75 s); face back on him for the haul (1.0 s, was 1.2 s).",
    "rigs": [
     "TengxianIja02"
    ]
@@ -6480,7 +6480,7 @@
   {
    "id": "TengxianIja02",
    "file": "Animation_TengxianIja02OpeningStoryboards.json",
-   "sha256": "8b63a2a9d65572a34f90f776377b653704b94412d2a84af61798c60b59a344e8",
+   "sha256": "dba6a7a5d532870c3f4a5c97a74f0b9df1cf9afdced86c6d00dd7085ab556c9e",
    "originalModelSha256": "fc429bafc6973e54e8d1fa72ac99c8740c81be25f895ddb1417bb47707578788",
    "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningStoryboards_20260926HumanoidV1\\Scene_TengxianIja02OpeningStoryboards.blend",
    "contactPoints": {
@@ -7698,25 +7698,25 @@
     },
     {
      "clip": "IjaCollarDragSnag",
-     "frames": 54,
-     "footSlideM": 0.0139,
-     "contactErrorM": 0.0173,
-     "gripSolveErrorM": 0.01726,
-     "pelvisMaxStepM": 0.104,
-     "floorCorrectionMin": 0.0,
-     "floorCorrectionMax": 0.01532,
+     "frames": 43,
+     "footSlideM": 0.005,
+     "contactErrorM": 0.0189,
+     "gripSolveErrorM": 0.01886,
+     "pelvisMaxStepM": 0.0993,
+     "floorCorrectionMin": -1e-05,
+     "floorCorrectionMax": 0.0055,
      "root": {
       "start": [
        -0.0183,
-       -0.0365,
        0.0,
-       0.538
+       0.0,
+       0.4832
       ],
       "end": [
-       0.0586,
-       0.156,
+       0.0498,
+       0.1766,
        0.0,
-       0.4559
+       0.3828
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
@@ -7725,22 +7725,22 @@
       [
        "L",
        0.0,
-       0.66
+       0.5083
       ],
       [
        "L",
-       0.9,
-       2.2
+       0.73,
+       1.75
       ],
       [
        "R",
        0.0,
-       0.4
+       0.3083
       ],
       [
        "R",
-       0.62,
-       2.2
+       0.4883,
+       1.75
       ]
      ],
      "kneePlants": [],
@@ -7748,25 +7748,25 @@
     },
     {
      "clip": "IjaKickBeam",
-     "frames": 30,
-     "footSlideM": 0.0031,
-     "contactErrorM": 0.0233,
-     "gripSolveErrorM": 0.02331,
-     "pelvisMaxStepM": 0.0258,
-     "floorCorrectionMin": 5e-05,
-     "floorCorrectionMax": 7e-05,
+     "frames": 25,
+     "footSlideM": 0.0054,
+     "contactErrorM": 0.0028,
+     "gripSolveErrorM": 0.00285,
+     "pelvisMaxStepM": 0.0304,
+     "floorCorrectionMin": 6e-05,
+     "floorCorrectionMax": 0.0086,
      "root": {
       "start": [
-       0.0844,
-       0.1301,
+       0.0683,
+       0.145,
        0.0,
-       0.4559
+       0.3882
       ],
       "end": [
-       0.0844,
-       0.1301,
+       0.0739,
+       0.149,
        0.0,
-       0.4559
+       0.3906
       ],
       "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
      },
@@ -7775,12 +7775,12 @@
       [
        "L",
        0,
-       1.2
+       1.0
       ],
       [
        "R",
-       0.85,
-       1.2
+       0.74,
+       1.0
       ]
      ],
      "kneePlants": [],

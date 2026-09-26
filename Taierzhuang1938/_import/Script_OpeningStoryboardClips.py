@@ -2639,26 +2639,38 @@ Meta('IjaJunctionPeek', 3.2, True, 'track', role='ijaD', rig='TengxianIja02', pr
      env={'wallRightM': .32},
      notes='Right shoulder on the junction wall, rifle at high port; leans out to the right past the corner, '
            'scans, leans back and waits. The wall edge is 0.30 m to his right, its corner 0.25 m ahead.')
+# The collar drag in the mouth (IjaCollarDragSnag -> IjaKickBeam), 2026-09-26 rework; key times are whole frames.
+SNAG_T = 42 / 24               # 1.75 s (was 2.2; a whole number of 12 fps player-track frames)
+SNAG_GRAB_T = 5 / 24           # the fist in the collar
+SNAG_HIT_T = 18 / 24           # the pack catches on the beam
+KICK_T = 24 / 24               # 1.0 s (was 1.2)
+KICK_HIT_T = 9 / 24            # the sole on the beam
+SNAG_BACK = .62                # hips behind the collar (the reach of a squatting man's arm to a collar on the ground)
+SNAG_CROUCH = .40              # hips this far below standing (squatting at him with the knees bent, not stooping)
+
+
 Meta('IjaSlingRifle', .8, False, 'track', role='ijaA', rig='TengxianIja02', props=['weapon'], rootMotion=False,
      weaponState='twoHand->slungRight', endHold='slungRight',
      prev=['IjaReadyRifle', 'IjaBayonetGuard'], next=['IjaCollarDragSnag', 'CollarDrag'],
      notes='"把步枪甩到身侧": swings the rifle up and back onto the right shoulder by the sling, lets go, '
            'hands free and stooping for the collar.')
-Meta('IjaCollarDragSnag', 2.2, False, 'track', role='ijaA', rig='TengxianIja02', props=['weapon'], rootMotion=False,
+Meta('IjaCollarDragSnag', SNAG_T, False, 'track', role='ijaA', rig='TengxianIja02', props=['weapon'], rootMotion=False,
      weaponState='slungRight', player=True,
-     contacts=[{'t': .25, 'limb': 'handL', 'action': 'grab', 'partnerRole': 'shunzi', 'part': 'collarBack'}],
-     events=[{'t': .95, 'kind': 'packSnagged', 'target': 'beam'}, {'t': 1.12, 'kind': 'yank'}, {'t': 1.42, 'kind': 'yank'}],
+     contacts=[{'t': SNAG_GRAB_T, 'limb': 'handL', 'action': 'grab', 'partnerRole': 'shunzi', 'part': 'collarBack'}],
+     events=[{'t': SNAG_HIT_T, 'kind': 'packSnagged', 'target': 'beam'}, {'t': .86, 'kind': 'yank'}, {'t': 1.06, 'kind': 'yank'}],
      prev=['IjaSlingRifle'], next=['IjaKickBeam'],
-     notes='Hooks the back of the collar, backs off two steps hauling; the pack snags on the beam at 0.95 s: '
-           'a dead stop that jerks him forward, two yanks, a look back at what holds.')
-Meta('IjaKickBeam', 1.2, False, 'track', role='ijaA', rig='TengxianIja02', props=['weapon', 'beam'], rootMotion=False,
+     notes='Squats at his head, hooks the back of the collar and backs off two short steps hauling, face on him; the '
+           'pack snags on the beam (packSnagged): a dead stop that jerks him forward, two yanks, a look back at what holds. '
+           '2026-09-26: hips further back and lower, trunk less folded (the face was straight above the prone eye, '
+           'upside down in the picture, the jacket collar through the chin) and 1.7 s instead of 2.2 s.')
+Meta('IjaKickBeam', KICK_T, False, 'track', role='ijaA', rig='TengxianIja02', props=['weapon', 'beam'], rootMotion=False,
      weaponState='slungRight', player=True,
      contacts=[{'t': 0, 'limb': 'handL', 'action': 'hold', 'partnerRole': 'shunzi', 'part': 'collarBack'},
-               {'t': .45, 'limb': 'footR', 'action': 'kick', 'target': 'beam'}],
-     events=[{'t': .45, 'kind': 'beamKicked'}],
+               {'t': KICK_HIT_T, 'limb': 'footR', 'action': 'kick', 'target': 'beam'}],
+     events=[{'t': KICK_HIT_T, 'kind': 'beamKicked'}],
      prev=['IjaCollarDragSnag'], next=['CollarDrag'],
      notes='Keeps the collar in his left fist, stamps the loose beam off the pack with the right sole; the '
-           '`beam` track carries it clear (rests at 0.9 s).')
+           'beam track carries it clear (rests at 0.75 s); face back on him for the haul (1.0 s, was 1.2 s).')
 Meta('IjaButtStrike', 1.0, False, 'track', role='ijaA', rig='TengxianIja02', props=['weapon'], rootMotion=False,
      weaponState='slungRight->twoHand', endHold='twoHand', player=True,
      contacts=[{'t': .42, 'limb': 'butt', 'action': 'strike', 'partnerRole': 'shunzi', 'part': 'head'}],
@@ -2827,47 +2839,71 @@ def BuildSlingRifle(T, name):
 
 
 def PlayerCollarPath(T):
-    """Shunzi's back collar in ijaA's frame (source metres): prone under the beam, hauled 0.33 m, snagged."""
-    return Channel([(0.0, (-.02, -.62, .22)), (.25, (-.02, -.62, .22)), (.40, (-.02, -.57, .30)),
-                    (.95, (-.02, -.32, .38)), (1.00, (-.02, -.31, .38)), (1.12, (-.02, -.29, .40)),
-                    (1.25, (-.02, -.31, .38)), (1.42, (-.02, -.29, .40)), (1.55, (-.02, -.31, .38)), (2.2, (-.02, -.31, .38))])
+    """Shunzi's back collar in ijaA's frame (source metres): prone under the beam, hauled 0.30 m, snagged."""
+    g, h = SNAG_GRAB_T, SNAG_HIT_T
+    return Channel([(0.0, (-.02, -.62, .22)), (g, (-.02, -.62, .22)), (g + .12, (-.02, -.57, .29)),
+                    (h, (-.02, -.33, .37)), (h + .04, (-.02, -.32, .37)), (.86, (-.02, -.30, .39)),
+                    (.96, (-.02, -.32, .37)), (1.06, (-.02, -.30, .39)), (1.16, (-.02, -.32, .37)), (SNAG_T, (-.02, -.32, .37))])
+
+
+def PlayerEyeFromCollar(c):
+    """The prone eye a hand's breadth past the collar toward ijaA and a little over it (the runtime camera,
+    Script_OpeningStoryboards Shot for Drag/Snag/KickBeam): what the face looks at."""
+    return (c[0], c[1] + .14, c[2] + .09)
+
+
+def SnagPelvis(T, c, crouch, lurch=0.0):
+    return (c[0] + .04, c[1] + SNAG_BACK - .05 * lurch, T.P - crouch + .02 * lurch)
+
+
+SNAG_STANCE = lambda T: {'L': (T.H + .10, -.26, T.A), 'R': (-(T.H + .08), .12, T.A)}   # from the hips' ground point
+SNAG_LEG_POLES = lambda T: {'L': (T.H + .55, -1.0, .60), 'R': (-(T.H + .55), -.9, .60)}     # knees out over the toes
 
 
 @Builder('IjaCollarDragSnag')
 def BuildCollarDragSnag(T, name):
-    H, P, SX = T.H, T.P, T.SX
     collar = PlayerCollarPath(T)
     base = IjaABase(T)
+    g, h = SNAG_GRAB_T, SNAG_HIT_T
 
     def PelvisXY(t):
         c = collar(t)
-        return (c[0] + .04, c[1] + .58)
-    schedule = [('R', .40, .62), ('L', .66, .90)]
-    stance = {'L': (H + .06, -.22, T.A), 'R': (-(H + .04), .10, T.A)}
-    feet, plants = FollowSteps(PelvisXY, stance, schedule, 2.2)
-    times = [0.0, .25, .40, .66, .95, 1.00, 1.12, 1.25, 1.42, 1.55, 2.2]
-    lurch = Channel([(0.0, 0.0), (.95, 0.0), (1.00, 1.0), (1.10, .2), (1.12, .8), (1.25, .1), (1.42, .8), (1.55, 0.0), (2.2, 0.0)])
-    crouch = Channel([(0.0, .34), (.25, .38), (.40, .34), (.95, .28), (2.2, .28)])
-    pelvis = [(t, (PelvisXY(t)[0], PelvisXY(t)[1] - .05 * lurch(t), P - crouch(t) + .02 * lurch(t))) for t in times]
+        return (c[0] + .04, c[1] + SNAG_BACK)
+    schedule = [('R', g + .10, g + .28), ('L', g + .30, h - .02)]
+    feet, plants = FollowSteps(PelvisXY, SNAG_STANCE(T), schedule, SNAG_T)
+    times = [0.0, g, g + .12, g + .30, h, h + .04, .86, .96, 1.06, 1.16, SNAG_T]
+    lurch = Channel([(0.0, 0.0), (h, 0.0), (h + .04, 1.0), (.82, .2), (.86, .8), (.96, .1), (1.06, .8), (1.16, 0.0), (SNAG_T, 0.0)])
+    # (a deeper dip at the grab put the right knee on the ground: the grounding lift slid the planted feet)
+    crouch = Channel([(0.0, SNAG_CROUCH), (g, SNAG_CROUCH + .01), (g + .12, SNAG_CROUCH - .01), (h, SNAG_CROUCH - .04),
+                      (SNAG_T, SNAG_CROUCH - .04)])
+    pelvis = [(t, SnagPelvis(T, collar(t), crouch(t), lurch(t))) for t in times]
+    poles = SNAG_LEG_POLES(T)
     body = Tracks(base, dict(feet, pelvis=pelvis,
-                             bend=[(0.0, .80), (.25, .88), (.40, .82), (.95, .72), (1.00, .85), (1.55, .75), (2.2, .72)],
-                             pelvisTilt=[(0.0, (.25, 0, 0)), (.40, (.22, 0, 0)), (.95, (.18, 0, 0)), (1.0, (.28, 0, 0)), (2.2, (.20, 0, 0))],
-                             head=[(0.0, (.30, 0, 0)), (.95, (.20, 0, 0)), (1.05, (.35, 0, 0)), (1.60, (.05, .10, -.60)),
-                                   (1.95, (.05, .10, -.70)), (2.2, (.10, .05, -.55))],
-                             twist=[(0.0, 0.0), (1.6, -.20), (2.2, -.18)]),
+                             bend=[(0.0, .64), (g, .76), (g + .12, .66), (h, .56), (h + .04, .68), (1.16, .60), (SNAG_T, .58)],
+                             pelvisTilt=[(0.0, (.30, 0, 0)), (g + .12, (.26, 0, 0)), (h, (.22, 0, 0)), (h + .04, (.30, 0, 0)),
+                                         (SNAG_T, (.24, 0, 0))],
+                             head=[(0.0, (-.28, 0, 0)), (g + .12, (-.22, 0, 0)), (h + .04, (-.12, 0, 0)), (1.16, (-.24, 0, 0)), (1.36, (-.05, .10, -.60)),
+                                   (SNAG_T, (-.02, .06, -.58))],
+                             lookW=[(0.0, 0.0), (SNAG_T, 0.0)],
+                             twist=[(0.0, 0.0), (1.20, -.20), (SNAG_T, -.18)]),
                   lag={'head': .06})
 
     def Body(t):
         f = body(t)
+        f['look'] = PlayerEyeFromCollar(collar(t))
+        f['legPole.L'], f['legPole.R'] = poles['L'], poles['R']
         return f
-    grips = {'L': []}
-    spec = PlayerGripSpec(T, Body, {'L': [(.25, 2.2, collar, (0, 0, -1), 1.1)]})
+    spec = PlayerGripSpec(T, Body, {'L': [(g, SNAG_T, collar, (0, 0, -1), 1.1)]})
     props, review = SlungProps(T, 'side')
     spec.update({'props': props, 'plants': plants,
+                 'look': lambda t: PlayerEyeFromCollar(collar(t)) if body(t)['lookW'] >= .99 else None,
                  'reviewProps': lambda t: review(t) + [('point', collar(t), None, .04)] + PlayerGhost(T, collar(t)),
                  'reviewFrames': lambda n: [0, int(n * .12), int(n * .43), int(n * .5), int(n * .8), n - 1]})
     spec['player'] = lambda t: {'collar': collar(t)}
-    return AReview(spec)
+    spec = AReview(spec)
+    spec['reviewViews'].append(FirstPersonView(lambda t: PlayerEyeFromCollar(collar(t)),
+                                               lambda t: Add3(PlayerEyeFromCollar(collar(t)), (0, .9, .55))))
+    return spec
 
 
 def PlayerGripSpec(T, body, grips):
@@ -2942,37 +2978,49 @@ PROPS['beam']['poses'] = _BeamPoses()
 
 @Builder('IjaKickBeam')
 def BuildKickBeam(T, name):
-    H, P, SX = T.H, T.P, T.SX
+    H = T.H
     collar = PlayerCollarPath(T)
-    hold = collar(2.2)
+    hold = collar(SNAG_T)
     base = IjaABase(T)
-    stand = {'L': (hold[0] + .04 + H + .06, hold[1] + .58 - .22, T.A), 'R': (hold[0] + .04 - H - .04, hold[1] + .58 + .10, T.A)}
-    pel = (hold[0] + .04, hold[1] + .58, P - .28)
+    # frame 0 = IjaCollarDragSnag's last frame (same root): the feet where its steps left them, the same hips
+    st = SNAG_STANCE(T)
+    gx, gy = hold[0] + .04, hold[1] + SNAG_BACK
+    stand = {s: (gx + st[s][0], gy + st[s][1], st[s][2]) for s in LR}
+    pel = SnagPelvis(T, hold, SNAG_CROUCH - .04)
+    poles = SNAG_LEG_POLES(T)
     strike = (BEAM_PINNED[0][0] + .02, BEAM_PINNED[0][1] + .10, BEAM_PINNED[0][2] + .02)
+    k = KICK_HIT_T
     body = Tracks(base, {
         # The left fist stays on the collar through the kick: the wind-up loads the left leg and
         # rolls the hips open rather than pulling the body back off the held man.
-        'pelvis': [(0.0, pel), (.30, Add3(pel, (.03, .0, .015))), (.45, Add3(pel, (-.02, -.05, -.01))), (.70, Add3(pel, (0, .01, 0))),
-                   (1.2, pel)],
+        'pelvis': [(0.0, pel), (.25, Add3(pel, (.03, .0, .03))), (k, Add3(pel, (-.02, -.05, .02))), (.60, Add3(pel, (0, .01, 0))),
+                   (KICK_T, pel)],
         'ankle.L': [(0.0, stand['L'])],
-        'ankle.R': [(0.0, stand['R']), (.15, stand['R']), (.32, (stand['R'][0] + .06, stand['R'][1] - .30, .36)),
-                    (.45, strike), (.60, (strike[0] + .08, strike[1] + .25, .30)), (.85, stand['R']), (1.2, stand['R'])],
-        'legPole.R': [(0.0, (-(H + .20), -.95, .45)), (.20, (-(H + .30), -1.1, 1.2)), (.60, (-(H + .30), -1.1, 1.2)), (.90, (-(H + .20), -.95, .45))],
-        'foot.R': [(0.0, (0, -14, 0)), (.30, (-25, -60, 0)), (.45, (-15, -80, 0)), (.70, (-10, -40, 0)), (.90, (0, -14, 0))],
-        'bend': [(0.0, .72), (.30, .70), (.45, .78), (.70, .72), (1.2, .72)],
-        'pelvisTilt': [(0.0, (.20, 0, 0)), (.30, (.14, -.08, -.12)), (.45, (.20, -.10, -.18)), (.80, (.20, 0, 0))],
-        'head': [(0.0, (.10, .05, -.50)), (.35, (.40, 0, -.25)), (.60, (.35, 0, -.15)), (1.2, (.30, 0, 0))],
+        'ankle.R': [(0.0, stand['R']), (.10, stand['R']), (.25, (stand['R'][0] + .06, stand['R'][1] - .30, .36)),
+                    (k, strike), (.52, (strike[0] + .08, strike[1] + .25, .30)), (.74, stand['R']), (KICK_T, stand['R'])],
+        'legPole.R': [(0.0, poles['R']), (.14, (-(H + .30), -1.1, 1.2)), (.52, (-(H + .30), -1.1, 1.2)), (.78, poles['R'])],
+        'foot.R': [(0.0, (0, -14, 0)), (.22, (-25, -60, 0)), (k, (-15, -80, 0)), (.60, (-10, -40, 0)), (.78, (0, -14, 0))],
+        'bend': [(0.0, .58), (.22, .56), (k, .66), (.60, .60), (KICK_T, .58)],
+        'pelvisTilt': [(0.0, (.24, 0, 0)), (.22, (.18, -.08, -.12)), (k, (.24, -.10, -.18)), (.70, (.24, 0, 0))],
+        'head': [(0.0, (-.02, .06, -.58)), (.28, (.30, 0, -.25)), (.50, (.25, 0, -.15)), (.80, (-.24, 0, 0)), (KICK_T, (-.24, 0, 0))],
+        'lookW': [(0.0, 0.0), (KICK_T, 0.0)],
+        'twist': [(0.0, -.18), (.28, -.05), (.70, 0.0), (KICK_T, 0.0)],
     }, lag={'head': .05})
-    spec = PlayerGripSpec(T, body, {'L': [(0.0, 1.2, lambda t: hold, (0, 0, -1), 1.1)]})
-    # TengxianHumanoidV1: the stooped collar hold was 9 cm short at the default assist (a shoulder brought forward
-    # about the vertical does not help a trunk bent over this far); the planted left foot holds with 0.17 m of travel.
+    eye = PlayerEyeFromCollar(hold)
+
+    def Body(t):
+        f = body(t)
+        f['look'] = eye
+        f['legPole.L'] = poles['L']
+        return f
+    spec = PlayerGripSpec(T, Body, {'L': [(0.0, KICK_T, lambda t: hold, (0, 0, -1), 1.1)]})
     spec['reach'] = {'fraction': .86, 'sides': 'L', 'travel': .17, 'bend': .40}
     props, review = SlungProps(T, 'side')
 
     def Beam(t):
         c, a = Vector(BEAM_PINNED[0]), Vector(BEAM_PINNED[1]).normalized()
-        u = Smooth((t - .45) / .45) if t > .45 else 0.0
-        c = c + Vector((-.28, -.42, 0)) * u + Vector((0, 0, .10 * math.sin(math.pi * Clamp((t - .45) / .45))))
+        u = Smooth((t - k) / .37) if t > k else 0.0
+        c = c + Vector((-.28, -.42, 0)) * u + Vector((0, 0, .10 * math.sin(math.pi * Clamp((t - k) / .37))))
         a = Quaternion((0, 0, 1), .9 * u) @ a
         return c, a
 
@@ -2986,10 +3034,13 @@ def BuildKickBeam(T, name):
         c, a = Beam(t)
         half = a * T.R(.775)
         return review(t) + [('cyl', tuple(c - half), tuple(c + half), .06), ('point', hold, None, .04)] + PlayerGhost(T, hold)
-    spec.update({'props': Props, 'plants': [('L', 0, 1.2), ('R', .85, 1.2)], 'reviewProps': Review,
+    spec.update({'props': Props, 'plants': [('L', 0, KICK_T), ('R', .74, KICK_T)], 'reviewProps': Review,
+                 'look': lambda t: eye if body(t)['lookW'] >= .99 else None,
                  'reviewFrames': lambda n: [0, int(n * .27), int(n * .375), int(n * .55), n - 1]})
     spec['player'] = lambda t: {'collar': hold}
-    return AReview(spec)
+    spec = AReview(spec)
+    spec['reviewViews'].append(FirstPersonView(lambda t: eye, lambda t: Add3(eye, (0, .9, .55))))
+    return spec
 
 
 def PlayerHeadPath():
