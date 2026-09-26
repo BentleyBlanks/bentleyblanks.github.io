@@ -340,9 +340,16 @@ const plan = CompileTrenchNetwork(PLANNER_FIXTURE, { natural: NaturalAt });
 // --- 6. 布设 ---------------------------------------------------------------
 const GroundAt = (x, z) => NaturalAt(x, z) - plan.Depth(x, z);
 {
-  const dressing = PlanTrenchDressing(plan, { groundAt: GroundAt });
-  const again = PlanTrenchDressing(plan, { groundAt: GroundAt });
+  // Keep the explicit timber option covered; reference 07's default is bare earth.
+  const dressing = PlanTrenchDressing(plan, { groundAt: GroundAt, timber: true });
+  const again = PlanTrenchDressing(plan, { groundAt: GroundAt, timber: true });
   assert.deepEqual(again, dressing, "同种子两次布设必须逐位相同");
+  const earth = PlanTrenchDressing(plan, { groundAt: GroundAt });
+  assert.equal(earth.stats.revetments, 0, "reference 07 has no repeating wooden revetments");
+  assert.equal(earth.stats.duckboards, 0, "reference 07 has a bare compacted-earth floor");
+  assert.deepEqual(earth.blocks, dressing.blocks.filter(b => !/Revetment|Duckboard/.test(b.id)),
+    "changing the finish preserves every firing bay");
+  assert.deepEqual(earth.placements, dressing.placements, "changing the finish preserves supplies");
 
   // id 规则与统计
   const posts = dressing.blocks.filter((b) => /Revetment-?\d+_-?1Post$/.test(b.id));
@@ -420,7 +427,7 @@ const GroundAt = (x, z) => NaturalAt(x, z) - plan.Depth(x, z);
 
   // 被 avoidRoutes 穿过的件跳过：造一条横穿 FrontTraverse 的假路线
   const fake = [[{ x: -20, z: -140 }, { x: -20, z: -108 }]];
-  const cut = PlanTrenchDressing(plan, { groundAt: GroundAt, avoidRoutes: fake });
+  const cut = PlanTrenchDressing(plan, { groundAt: GroundAt, avoidRoutes: fake, timber: true });
   assert.ok(cut.stats.skipped.route > 0, "横穿的路线必须让布设让开");
   const ids = new Set(cut.blocks.map((b) => b.id));
   assert.ok([...ids].every((id) => dressing.blocks.some((b) => b.id === id)),
@@ -434,7 +441,7 @@ const GroundAt = (x, z) => NaturalAt(x, z) - plan.Depth(x, z);
 
   // keepOut：手摆体块占地外扩 0.5 m
   const box = { x: -20, z: -124, w: 10, d: 10, ry: 0 };
-  const kept = PlanTrenchDressing(plan, { groundAt: GroundAt, keepOut: [box] });
+  const kept = PlanTrenchDressing(plan, { groundAt: GroundAt, keepOut: [box], timber: true });
   assert.ok(kept.stats.skipped.keepOut > 0, "手摆体块占地必须让布设让开");
   for (const b of kept.blocks.filter((x) => x.id.startsWith("FrontTraverse"))) {
     assert.ok(Math.abs(b.x - box.x) > box.w / 2 || Math.abs(b.z - box.z) > box.d / 2,
@@ -444,6 +451,7 @@ const GroundAt = (x, z) => NaturalAt(x, z) - plan.Depth(x, z);
   // laneCuts 只对 BundleApproach
   const lane = PlanTrenchDressing(plan, {
     groundAt: GroundAt,
+    timber: true,
     laneCuts: (x, z) => z < -150 && z > -190,
   });
   assert.ok(lane.stats.skipped.lane > 0, "laneCuts 要真的删掉件");
@@ -662,7 +670,7 @@ const GroundAt = (x, z) => NaturalAt(x, z) - plan.Depth(x, z);
   const Q = (v) => typeof v === "number" ? +v.toFixed(6) : v;
   assert.deepEqual(b.map((s) => [s.s, s.x, s.z].map(Q)), a.map((s) => [s.s, s.x, s.z].map(Q)), "尾巴之前的站点逐位相同");
   const Ground = (x, z) => NaturalAt(x, z);
-  const Before = (plan) => PlanTrenchDressing(plan, { groundAt: Ground }).blocks
+  const Before = (plan) => PlanTrenchDressing(plan, { groundAt: Ground, timber: true }).blocks
     .filter((q) => q.id.startsWith("FrontCommunication") && plan.segments[0].path.ClosestS(q.x, q.z) < cut)
     .map((q) => JSON.stringify(Object.fromEntries(Object.entries(q).map(([k, v]) => [k, Q(v)]))));
   assert.deepEqual(Before(trimmed), Before(full), "尾巴之前的护壁、踏板、射击位逐位相同");

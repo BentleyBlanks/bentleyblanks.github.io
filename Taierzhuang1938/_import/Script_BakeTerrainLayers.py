@@ -51,8 +51,9 @@ LAYERS = {
                       rough=0.84, roughVar=0.06, ao=0.30),
     "DryStubble": dict(tileM=2.3, mean=(0.414, 0.369, 0.260), contrast=0.098, reliefM=0.018,
                        rough=0.94, roughVar=0.04, ao=0.55),
-    "SpoilEarth": dict(tileM=2.1, mean=(0.342, 0.284, 0.220), contrast=0.090, reliefM=0.032,
-                       rough=0.87, roughVar=0.07, ao=0.62),
+    # 2026-09-26: Notion concept 07 bare cut earth; neutral umber, compact fines and embedded stones.
+    "SpoilEarth": dict(tileM=2.1, mean=(0.380, 0.318, 0.237), contrast=0.084, reliefM=0.055,
+                       rough=0.94, roughVar=0.035, ao=0.56),
 }
 
 

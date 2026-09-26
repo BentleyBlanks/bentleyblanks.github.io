@@ -1,5 +1,7 @@
 # 分层地形材质（2026-09-17）
 
+2026-09-26：翻土层 SpoilEarth 已按[概念图 07 通用壕沟](Data_TrenchReference07.md)更新，使用新的内置 imagegen 源图与烘焙参数。其余三层、四层数组结构、采样器及高度场保持不变；下文翻土图的 Lovart 来源与旧标定值属于 2026-09-17 历史。
+
 第一关《往南的路》地面的唯一现状文档。实现：`Script_TerrainMaterial.mjs`；数值：`Data_Tuning_Terrain.mjs`；
 splat 权重：`Data_FirstLevelMissionTerrain.SampleMissionGroundSurface`；贴图烘焙：`_import/Script_BakeTerrainLayers.py`；
 离线闸门：`Script_TerrainLayersTest.mjs`。

@@ -22,6 +22,9 @@ import {
   FIRST_LEVEL_WHITEBOX_LAYOUT,
 } from "./Data_FirstLevelWhitebox.mjs";
 import { IsMissionSandbagBlock } from "./Data_FirstLevelMissionFortifications.mjs";
+import { TrenchPlanFor } from "./Data_FirstLevelMissionTerrain.mjs";
+import { BuildTrenchEarth } from "./Script_TrenchEarth.mjs";
+import { TRENCH_APPEARANCE } from "./Data_TrenchAppearance.mjs";
 
 export function IsP012TrainBlock(id) { return /^Station(?:Car\d|Engine|ExitStep)/.test(id); }
 /** 跟着车厢一起平移的那两扇门（SetTrainOffset 每帧改它们的 z）。 */
@@ -244,6 +247,33 @@ export class FirstLevelWhiteboxField {
       this.stats.groundChunks++;
     }
     sink.SetSector("FirstLevelWhitebox");
+
+    if (this.layout.terrainSpec?.trenchNetwork && this.terrainLayers) {
+      const dressing = new BuildSink();
+      const rootMaterial = new THREE.MeshStandardMaterial({
+        name: "TrenchRoots", color: TRENCH_APPEARANCE.rootColor,
+        roughness: TRENCH_APPEARANCE.rootRoughness, metalness: 0,
+      });
+      this.materials.set("TrenchRoots", rootMaterial);
+      this.stats.trenchEarth = BuildTrenchEarth(dressing, TrenchPlanFor(this.layout.terrainSpec),
+        (x, z) => this.TerrainHeight(x, z));
+      const pieces = dressing.Flush(this.scene, { Get: key => this.materials.get(key) });
+      this.stats.trenchEarth.meshes = pieces.length;
+      for (const mesh of pieces) {
+        if (mesh.material === this.materials.get(ground.semantic)) {
+          const count = mesh.geometry.attributes.position.count;
+          const colors = new Float32Array(count * 3).fill(1), layers = new Float32Array(count * 3);
+          for (let i = 0; i < count; i++) layers[i * 3 + 1] = 1;
+          mesh.geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+          mesh.geometry.setAttribute("terrainLayers", new THREE.BufferAttribute(layers, 3));
+        }
+        // The crater adapter clips these details together with the original soil.
+        // They never survive as a floating crust over a newly excavated crater.
+        mesh.userData.deformableTerrain = true;
+        mesh.userData.trenchEarth = true;
+        this.meshes.push(mesh);
+      }
+    }
 
     const defenses=this.fortificationModels
       ? AddMissionFortifications(sink,this.layout,this.fortificationModels,(x,z)=>this.GroundHeight(x,z),this.materials)

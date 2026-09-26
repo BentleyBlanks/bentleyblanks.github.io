@@ -789,6 +789,7 @@ function RouteCrosses(routes, rect, margin) {
  *
  * @param plan        CompileTrenchNetwork 的结果
  * @param groundAt    (x,z)=>烘完的地面高。**必须传宿主那一份**（沟底已经挖下去了）
+ * @param timber      显式旧式木护壁/踏板模式；默认裸土，对标概念图07
  * @param avoidRoutes [[{x,z},...],...] 任务/AI 路线；件与路线相交就跳过
  * @param keepOut     [{x,z,w,d,ry}] 手摆体块占地（外扩 0.5 m）
  * @param laneCuts    (x,z,w,d,margin)=>bool，只对 laneCutSegments 里的段生效
@@ -798,6 +799,7 @@ function RouteCrosses(routes, rect, margin) {
  */
 export function PlanTrenchDressing(plan, {
   groundAt,
+  timber = false,
   avoidRoutes = [],
   keepOut = [],
   laneCuts = null,
@@ -870,7 +872,7 @@ export function PlanTrenchDressing(plan, {
           rev.postHMin + rnd() * (rev.postHMax - rev.postHMin));
         const slats = rev.slatsMin
           + Math.floor(rnd() * (rev.slatsMax - rev.slatsMin + 1));
-        if (rnd() < rev.skipChance) continue;
+        if (rnd() < rev.skipChance || !timber) continue;
         const off = st.halfFloor + rev.insetM;
         const x = st.x + st.nx * side * off;
         const z = st.z + st.nz * side * off;
@@ -895,7 +897,7 @@ export function PlanTrenchDressing(plan, {
 
       // --- 踏板：沟底中线偏一点，长边沿切向 ---
       const duck = p.duckboard;
-      if (board() < duck.chance) {
+      if (board() < duck.chance && timber) {
         const lateral = (board() < 0.5 ? -1 : 1) * 0.3;
         const x = st.x + st.nx * lateral;
         const z = st.z + st.nz * lateral;

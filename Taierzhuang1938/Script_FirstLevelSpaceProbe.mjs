@@ -487,7 +487,11 @@ export function SouthFingerprint({ blocks, placements, bodies = [], sample, zMin
     .sort((a, e) => (a[0] < e[0] ? -1 : a[0] > e[0] ? 1 : 0));
   const grid = { minX: -200, maxX: 250, minZ: zMin, maxZ: 400, stepM: 2 }, g = [];
   for (let x = grid.minX; x <= grid.maxX; x += grid.stepM) for (let z = grid.minZ; z <= grid.maxZ; z += grid.stepM) g.push(R(sample(x, z)));
-  return { zMin, blocks: { count: b.length, sha: Sha(b) }, placements: { count: p.length, sha: Sha(p) }, bodies: { count: c.length, sha: Sha(c) }, ground: { ...grid, count: g.length, sha: Sha(g) } };
+  // 2026-09-26 common trench art replaces only these non-solid generated timbers.
+  // Keep the old all-blocks digest for historical audits, and independently freeze
+  // every other structure (including dugout framing and hand-authored wood).
+  const structural = b.filter(row => !/(?:Revetment\d+_-?1(?:Post|Slat\d+)|Duckboard\d+)$/.test(row[0]));
+  return { zMin, blocks: { count: b.length, sha: Sha(b) }, structuralBlocks: { count: structural.length, sha: Sha(structural) }, placements: { count: p.length, sha: Sha(p) }, bodies: { count: c.length, sha: Sha(c) }, ground: { ...grid, count: g.length, sha: Sha(g) } };
 }
 
 // ---------------------------------------------------------------- all

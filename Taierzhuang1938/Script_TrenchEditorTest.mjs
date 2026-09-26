@@ -28,9 +28,12 @@ await fs.mkdir(shotDir, { recursive: true });
 // **别把出厂值抄成字面量** —— 宽度表还在按史料调（2026-09-17 就动过一次 3.2→3.0），
 // 抄下来的那一刻这个测试守的就不是"还原得掉"而是"当天那个数"。
 const { MISSION_TRENCH_NETWORK } = await import("./Data_FirstLevelMissionTrenches.mjs");
-const { TRENCH_PRESETS } = await import("./Script_TrenchPlan.mjs");
+const { TRENCH_PRESETS, CompileTrenchNetwork, PlanTrenchDressing } = await import("./Script_TrenchPlan.mjs");
 const EXPECTED_SEGMENTS = MISSION_TRENCH_NETWORK.segments.length;
 const FACTORY = TRENCH_PRESETS.communication;
+const expectedDressing = PlanTrenchDressing(CompileTrenchNetwork(MISSION_TRENCH_NETWORK), { groundAt: () => 0 });
+const expectedFrontBlocks = expectedDressing.blocks.filter(b => b.id.startsWith("FrontCommunication")).length;
+const expectedFrontProps = expectedDressing.placements.filter(b => b.id.startsWith("FrontCommunication")).length;
 
 const server = await ServeRoot(rootDir, 0);
 const port = server.address().port;
@@ -137,7 +140,8 @@ try {
     (front.stats?.junctions ?? 0) >= 1 && front.markers >= 2,
     `${front.stats?.junctions} 个接口（全网 ${front.stats?.networkJunctions}）→ ${front.markers} 只标记几何`);
   Check("FrontCommunication：布设件画出来了",
-    front.boxes > 10 && (front.stats?.blocks ?? 0) > 10,
+    expectedFrontBlocks > 0 && front.stats?.blocks === expectedFrontBlocks
+    && front.stats?.placements === expectedFrontProps && front.boxes === expectedFrontBlocks + expectedFrontProps,
     `${front.stats?.blocks} 块 + ${front.stats?.placements} 件模型位`);
   Check("实测沟深落在设计值附近（1.83 m 下限之上）",
     (front.stats?.minDepth ?? 0) >= 1.83 && (front.stats?.maxDepth ?? 9) <= 2.6,

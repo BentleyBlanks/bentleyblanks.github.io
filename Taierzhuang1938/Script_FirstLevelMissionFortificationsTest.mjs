@@ -84,13 +84,22 @@ try {
       }
     const assets=Object.fromEntries([...field.fortificationModels].map(([id,m])=>[id,{size:m.size.toArray(),triangles:(()=>{let n=0;m.root.traverse(o=>{if(o.isMesh)n+=(o.geometry.index?.count||o.geometry.attributes.position.count)/3;});return n;})()}]));
     const bounds=meshes.map(m=>({name:m.name,size:new Box3().setFromObject(m).getSize(new Vector3()).toArray()}));
-    return {terrainPbr,count:field.fortificationPlacements.length,blocks:blocks.length,missing,envelopeErrors,wireGaps,cuts:cuts.slice(0,10),assets,
+    const earthMeshes=field.meshes.filter(m=>m.userData.trenchEarth);
+    const earth={...field.stats.trenchEarth, meshes:earthMeshes.length,
+      allDeform:earthMeshes.every(m=>m.userData.deformableTerrain),
+      finite:earthMeshes.every(m=>Array.from(m.geometry.attributes.position.array).every(Number.isFinite)),
+      oldTimbers:field.layout.blocks.filter(b=>/(?:Revetment\d+_-?1(?:Post|Slat\d+)|Duckboard\d+)$/.test(b.id)).length};
+    return {earth,terrainPbr,count:field.fortificationPlacements.length,blocks:blocks.length,missing,envelopeErrors,wireGaps,cuts:cuts.slice(0,10),assets,
       objectCount:MISSION_DEFENSE_OBJECTS.length,obstacles:obstacles.length,meshCount:meshes.length,
       triangles:meshes.reduce((n,m)=>n+(m.geometry.index?.count||m.geometry.attributes.position.count)/3,0),bounds};
   });
   await fs.writeFile(path.join(out,"Data_Verification.json"),JSON.stringify(report,null,2));
   console.log(JSON.stringify({count:report.count,blocks:report.blocks,obstacles:report.obstacles,meshCount:report.meshCount,triangles:report.triangles,missing:report.missing,envelopeErrors:report.envelopeErrors,cuts:report.cuts}));
   assert.ok(report.terrainPbr.chunks>0);
+  assert.ok(report.earth.clods>100 && report.earth.roots>100, "natural earth details are actually built");
+  assert.ok(report.earth.meshes>0 && report.earth.meshes<64 && report.earth.triangles<150000, "trench details stay merged and bounded");
+  assert.ok(report.earth.finite && report.earth.allDeform, "trench details follow the crater removal path");
+  assert.equal(report.earth.oldTimbers,0);
   assert.equal(report.terrainPbr.name,'FirstLevelMissionTerrainLayers');
   assert.equal(report.terrainPbr.set,'MissionPlain');
   assert.equal(report.terrainPbr.legacyMaps,0,'layered terrain must not also bind map/normalMap/roughnessMap samplers');

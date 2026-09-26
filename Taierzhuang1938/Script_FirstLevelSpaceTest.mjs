@@ -723,7 +723,8 @@ if (!rearOnly) {
 }
 
 // ---------------------------------------------------------------------------
-// 07 以后一个不动：z > −95（集结处以南）的体块、壕沟杂物与共享地面采样，逐项与基线的指纹相同
+// 07 以后结构冻结：z > −95 的体块、壕沟杂物与共享地面采样与原基线一致；
+// 2026-09-26 用户授权统一壕沟外观，只排除已移除的非实体通用木护壁/踏板（另断言其不存在）。
 //（Data_FirstLevelSpaceSouthFingerprint.json；只许从 baseline 字段那份提交重新生成）。基线原是重排前的 f581ac7dd；
 // 2026-09-24 并入 master 后换成 master 的 b3ba06096（其 c85614d43 重建了 06–18 白盒），合并后 07+ 与它逐项相同。
 // ---------------------------------------------------------------------------
@@ -731,9 +732,10 @@ if (!rearOnly) {
   const expected = JSON.parse(fs.readFileSync(new URL("./Data_FirstLevelSpaceSouthFingerprint.json", import.meta.url), "utf8"));
   const now = SouthFingerprint({ blocks: Layout.blocks, placements: MISSION_TRENCH_PLACEMENTS, bodies: MISSION_AFTERMATH,
     sample: (x, z) => Ground(x, z), zMin: expected.zMin });
-  for (const key of ["blocks", "placements", "bodies", "ground"])
+  for (const key of ["structuralBlocks", "placements", "bodies", "ground"])
     assert.deepEqual(now[key], { ...expected[key] }, `south of z=${expected.zMin} the ${key} are exactly the baseline ${expected.baseline}'s`);
-  console.log(`ok 07+ untouched: ${now.blocks.count} blocks, ${now.placements.count} trench props, ${now.bodies.count} dead, ${now.ground.count} ground samples match ${expected.baseline}`);
+  assert.equal(now.blocks.count, now.structuralBlocks.count, "reference 07 removes generic timber cladding, retaining dugout and authored structures");
+  console.log(`ok 07+ structure retained: ${now.structuralBlocks.count} blocks, ${now.placements.count} trench props, ${now.bodies.count} dead, ${now.ground.count} ground samples match ${expected.baseline}`);
 }
 
 // 16–17 are a roofed wing in the same ordinary receiving courtyard. Sample the

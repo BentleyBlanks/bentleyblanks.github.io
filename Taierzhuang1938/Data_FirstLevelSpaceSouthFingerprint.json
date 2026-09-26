@@ -23,5 +23,10 @@
   "count": 56048,
   "sha": "215c2863718678c1"
  },
- "previousBaseline": "f581ac7dd"
+ "previousBaseline": "f581ac7dd",
+ "structuralBlocks": {
+  "count": 817,
+  "sha": "f72370ea8fa8a991"
+ },
+ "trenchArtRevision": "2026-09-26 concept 07 removes only generated non-solid Revetment<n>_<side>Post/Slat and Duckboard<n>. structuralBlocks computed from the unchanged old layout after verifying all four original baseline hashes. Every other block, placement, body and ground sample remains frozen to b3ba06096."
 }

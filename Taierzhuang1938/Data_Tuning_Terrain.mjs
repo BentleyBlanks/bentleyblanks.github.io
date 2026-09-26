@@ -29,7 +29,7 @@
 export const TERRAIN_SETS = Object.freeze({
   MissionPlain: Object.freeze({
     textureSize: 1024,
-    version: "terrain20260917",
+    version: "terrain20260926earth07",
     // 整体反照率倍率（线性）。**是亮度对齐旧地面的标定，不是美术旋钮**：旧 ORM 的 AO
     // 几乎是常数 0.75（烘焙时 R 下限 190），微阴影把它变成直射光约 −30%、间接光再 −18%；
     // 新图的 AO 是真实的腔体遮蔽（均值 0.87–0.93），同样的反照率画面整体亮 9.1%
