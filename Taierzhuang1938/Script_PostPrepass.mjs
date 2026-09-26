@@ -165,6 +165,10 @@ function MakeNormalDepthMaterial(destruction = null, { velocity = false } = {}) 
   const uniforms = {
     uFar: { value: 500 },
     uForegroundDepth: { value: 0 },
+    uCutoutMap: { value: null },
+    uCutoutTransform: { value: new THREE.Matrix3() },
+    uCutoutTest: { value: 0 },
+    uCutoutOpacity: { value: 1 },
   };
   if (velocity) {
     uniforms.uViewProjection = { value: new THREE.Matrix4() };
@@ -224,6 +228,8 @@ function MakeNormalDepthMaterial(destruction = null, { velocity = false } = {}) 
       #include <morphtarget_pars_vertex>
       varying vec3 vViewNormal;
       varying float vViewDepth;
+      uniform mat3 uCutoutTransform;
+      varying vec2 vCutoutUv;
       ${velocity ? `uniform mat4 uViewProjection;
       uniform mat4 uPrevViewProjection;
       uniform mat4 uPrevModelMatrix;
@@ -247,6 +253,7 @@ function MakeNormalDepthMaterial(destruction = null, { velocity = false } = {}) 
       #endif` : ""}
       ${destruction ? "varying vec3 vDamageWorldPos;" : ""}
       void main() {
+        vCutoutUv=(uCutoutTransform*vec3(uv,1.0)).xy;
         #include <batching_vertex>
         #include <beginnormal_vertex>
         #include <morphinstance_vertex>
@@ -277,6 +284,10 @@ function MakeNormalDepthMaterial(destruction = null, { velocity = false } = {}) 
       precision highp float;
       uniform float uFar;
       uniform float uForegroundDepth;
+      uniform sampler2D uCutoutMap;
+      uniform float uCutoutTest;
+      uniform float uCutoutOpacity;
+      varying vec2 vCutoutUv;
       varying vec3 vViewNormal;
       varying float vViewDepth;
       ${velocity ? `uniform float uVelocityValid;
@@ -288,6 +299,7 @@ ${DestructionShaderGlsl(destruction.maxVolumes)}` : ""}
       layout(location = 0) out vec4 oNormalDepth;
       ${velocity ? "layout(location = 1) out vec4 oVelocity;" : ""}
       void main() {
+        if(uCutoutTest>0.0 && texture(uCutoutMap,vCutoutUv).a*uCutoutOpacity<uCutoutTest)discard;
         ${destruction ? "ApplyDamageVolumes(vDamageWorldPos);" : ""}
         vec3 n = normalize(vViewNormal);
         if (!gl_FrontFacing) n = -n;
@@ -383,7 +395,20 @@ export class PrepassPass {
     this._foregroundObjects = new WeakSet();
     this._skinWorldMatrix = new THREE.Matrix4();
     this._velocityFrame = 0;
-    this.material.onBeforeRender = (renderer, scene, camera, geometry, object) => {
+    this.material.onBeforeRender = (renderer, scene, camera, geometry, object, group) => {
+      const source=Array.isArray(object.material)?object.material[group?.materialIndex||0]:object.material;
+      const cutout=source?.alphaTest>0 && source.map && geometry.attributes.uv;
+      const uniforms=this.material.uniforms;
+      const threshold=cutout?source.alphaTest:0,opacity=cutout?source.opacity:1,map=cutout?source.map:null;
+      if(uniforms.uCutoutTest.value!==threshold || uniforms.uCutoutOpacity.value!==opacity || uniforms.uCutoutMap.value!==map) {
+        uniforms.uCutoutTest.value=threshold;uniforms.uCutoutOpacity.value=opacity;uniforms.uCutoutMap.value=map;
+        this.material.uniformsNeedUpdate=true;
+      }
+      if(cutout){if(map.matrixAutoUpdate)map.updateMatrix();
+        if(!uniforms.uCutoutTransform.value.equals(map.matrix)){
+          uniforms.uCutoutTransform.value.copy(map.matrix);this.material.uniformsNeedUpdate=true;
+        }
+      }
       const uniform = this.material.uniforms.uForegroundDepth;
       const depth = this._foregroundObjects.has(object) ? FOREGROUND_VIEW_DEPTH : 0;
       if (uniform.value !== depth) this.material.uniformsNeedUpdate = true;

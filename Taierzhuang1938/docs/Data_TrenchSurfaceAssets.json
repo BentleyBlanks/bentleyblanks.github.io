@@ -1,18 +1,18 @@
 {
-  "grassTriangles": 1320,
+  "grassTriangles": 1040,
   "stoneTriangles": 80,
   "grassBounds": [
     [
-      -0.5572952628135681,
-      0.5339240431785583
+      -0.7605041861534119,
+      0.7417312860488892
     ],
     [
-      -0.3334476947784424,
-      0.8078057765960693
+      -0.19843332469463348,
+      0.7901061773300171
     ],
     [
-      -0.6573495864868164,
-      0.32160770893096924
+      -0.6838328838348389,
+      0.5578966736793518
     ]
   ],
   "heightRange": [
@@ -20,5 +20,5 @@
     0.8813725709915161
   ],
   "packedChannels": "height, footprint, wetness, AO",
-  "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\TrenchSurface\\Scene_TrenchSurface.blend"
+  "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\TrenchSurface\\Scene_TrenchNaturalSurface.blend"
 }

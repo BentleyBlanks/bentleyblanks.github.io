@@ -1,7 +1,7 @@
 // Reference 07: broken earth banks with embedded clods and sparse hanging roots.
 // Everything samples the host heightfield; no extra colliders or walkable floors.
 import * as THREE from "three";
-import { HashString, Mulberry32 } from "./Script_Noise.mjs";
+import { HashString, Mulberry32, ValueNoise2 } from "./Script_Noise.mjs";
 import { TRENCH_APPEARANCE as Style } from "./Data_TrenchAppearance.mjs";
 
 export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots = "TrenchRoots" } = {}) {
@@ -26,6 +26,25 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
     }
     geometry.computeVertexNormals();
     Add(earth, geometry); stats.clods++;
+  };
+  const Crust = (st, side, along) => {
+    const positions=[],uvs=[],indices=[],cols=6,rows=6;
+    for(let row=0;row<=rows;row++)for(let col=0;col<=cols;col++) {
+      const u=col/cols,v=row/rows;
+      const lateral=st.halfFloor+st.bank*(.03+u*.58),tangent=along+(v-.5)*1.3;
+      const x=st.x+st.nx*side*lateral+st.tx*tangent,z=st.z+st.nz*side*lateral+st.tz*tangent;
+      const edge=Math.sin(u*Math.PI)*Math.sin(v*Math.PI);
+      const ridge=ValueNoise2(x*3.7,z*3.7,71),grain=ValueNoise2(x*13.1,z*13.1,93);
+      const lift=edge*(.04+Style.crustReliefM*ridge+.04*grain)-.008;
+      positions.push(x,groundAt(x,z)+lift,z);uvs.push(u,v);
+    }
+    for(let row=0;row<rows;row++)for(let col=0;col<cols;col++) {
+      const a=row*(cols+1)+col,b=a+cols+1;
+      if(side>0)indices.push(a,a+1,b,a+1,b+1,b);else indices.push(a,b,a+1,a+1,b,b+1);
+    }
+    const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(positions,3));
+    geometry.setAttribute('uv',new THREE.Float32BufferAttribute(uvs,2));geometry.setIndex(indices);geometry.computeVertexNormals();
+    Add(earth,geometry);
   };
   const RootPiece = (a, b, radius) => {
     dir.subVectors(b, a);
@@ -61,9 +80,20 @@ export function BuildTrenchEarth(sink, plan, groundAt, { earth = "ground", roots
         const cell = `${Math.round(center.x * 2)}:${Math.round(center.z * 2)}`;
         if (occupied.has(cell)) continue;
         occupied.add(cell);
+        Crust(st,side,along);
         if (random() < Style.clodChance) {
           const radius = Range(random, Style.clodRadiusM), relief = Range(random, Style.clodReliefM);
           Clod(center, radius, relief, random);
+        }
+        // Several sizes of embedded aggregates give the excavation real relief.
+        // Jitter across the entire bank; small crumbs collect at its foot.
+        for(let n=0;n<Style.bankClods;n++) {
+          const at=Point(st.halfFloor+st.bank*(.08+random()*.92),(random()-.5)*1.35);
+          Clod(at,Range(random,Style.clodRadiusM),Range(random,Style.clodReliefM),random);
+        }
+        for(let n=0;n<Style.crumbs;n++) {
+          const at=Point(st.halfFloor*(.55+random()*.5)+st.bank*random()*.35,(random()-.5)*1.5);
+          Clod(at,.025+random()*.065,.015+random()*.045,random);
         }
         // A broken, root-bound crown interrupts the long straight heightfield edge.
         for (let n = 0; n < Style.lipClods; n++) {

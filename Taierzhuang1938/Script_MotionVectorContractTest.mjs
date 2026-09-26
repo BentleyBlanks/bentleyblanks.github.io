@@ -131,8 +131,25 @@ try {
       scene.traverse(object=>{if(object.isMesh)object.geometry.dispose();});
       skin.skeleton.dispose();bad.skeleton.dispose();material.dispose();
     }
+    // Cutout foliage must write velocity/depth only where its colour pass exists.
+    const cutoutScene=new T.Scene(),cutoutCamera=new T.OrthographicCamera(-2,2,1.5,-1.5,.01,100);
+    cutoutCamera.position.z=2;cutoutCamera.updateMatrixWorld(true);
+    const cutoutMap=new T.DataTexture(new Uint8Array([255,255,255,0,255,255,255,255]),2,1);
+    cutoutMap.needsUpdate=true;
+    const cutoutMaterial=new T.MeshBasicMaterial({map:cutoutMap,alphaTest:.5});
+    const cutoutMesh=new T.Mesh(new T.PlaneGeometry(1,1),cutoutMaterial);cutoutMesh.position.y=-.4;cutoutScene.add(cutoutMesh);
+    const cutoutVp=new T.Matrix4().multiplyMatrices(cutoutCamera.projectionMatrix,cutoutCamera.matrixWorldInverse);
+    const CutoutDraw=hasPrev=>{cutoutScene.updateMatrixWorld(true);
+      pass.Render({renderer,scene:cutoutScene,camera:cutoutCamera,viewProjection:cutoutVp,prevViewProjection:cutoutVp,hasPrev});
+      const result=Read();pass._SnapshotSkeletons();return result;};
+    CutoutDraw(false);cutoutMesh.position.x=.1;
+    const masked=CutoutDraw(true);
+    samples.push({label:'cutout world motion',expectedBody:8,expectedAttachment:null,...masked});
+    cutoutMaterial.alphaTest=0;const opaque=CutoutDraw(true);
+    const cutout={masked:masked.body.pixels,opaque:opaque.body.pixels};
+    cutoutMesh.geometry.dispose();cutoutMaterial.dispose();cutoutMap.dispose();
     pass.Dispose();copy.dispose();target.dispose();quad.geometry.dispose();
-    return {samples,hooks:{before,after,existingForegroundHooks},glError:renderer.getContext().getError()};
+    return {samples,cutout,hooks:{before,after,existingForegroundHooks},glError:renderer.getContext().getError()};
   });
   await page.screenshot({path:path.join(output,'Scene_ContractFixture.png')});
   await fs.writeFile(path.join(output,'Data_Result.json'),JSON.stringify({result,errors,skinWarnings},null,2));
@@ -148,6 +165,8 @@ try {
   assert.ok(result.hooks.before>0);assert.equal(result.hooks.before,result.hooks.after,'existing object hooks survive');
   assert.ok(result.hooks.existingForegroundHooks,'marking an existing foreground tree is idempotent and preserves both object callbacks');
   assert.equal(result.glError,0);assert.deepEqual(errors,[]);
+  assert.ok(result.cutout.opaque>6000);
+  assert.ok(Math.abs(result.cutout.masked/result.cutout.opaque-.5)<.02,'alpha holes omit both normal/depth and velocity');
   assert.equal(skinWarnings.length,2,'each unsupported skeleton emits one diagnostic, never a silent fallback or per-frame spam');
   console.log(`PASS MotionVector contract: ${result.samples.length} GPU scenarios; attached/detached skins, new bone attachments, history lifecycle, foreground inheritance, exclusions, callbacks`);
 } finally {await browser.close();if(server)await new Promise(resolve=>server.close(resolve));}

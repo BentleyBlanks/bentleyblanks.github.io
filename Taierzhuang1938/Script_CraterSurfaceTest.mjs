@@ -81,6 +81,11 @@ try {
         t.post.Render(t.scene, t.camera, { taa: false, motionBlur: 0, grain: 0 });
       };
       const Sample = (visible) => {
+        // Each side starts with identical empty temporal history. Carrying the
+        // previous sample across the toggle left 8/70 half-float pixels on
+        // different history plateaus, even after 192 draws. This uses the real
+        // camera-cut reset and retains all effects and exact pixel assertions.
+        t.post.NotifyCameraCut();
         for (let i = 0; i < settle; i++) Draw(visible);
         const pixels = new Uint16Array(hdr.width * hdr.height * 4);
         t.renderer.readRenderTargetPixels(hdr, 0, 0, hdr.width, hdr.height, pixels);

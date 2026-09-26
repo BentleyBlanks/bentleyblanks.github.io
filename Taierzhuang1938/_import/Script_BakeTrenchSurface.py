@@ -9,7 +9,7 @@ from mathutils import Vector
 project = Path(__file__).resolve().parents[1]
 source = Path('C:/Users/Bentl/OneDrive/AI/Models/Blender/Taierzhuang1938/TrenchSurface')
 source.mkdir(parents=True, exist_ok=True)
-expected = source / 'Scene_TrenchSurface.blend'
+expected = source / 'Scene_TrenchNaturalSurface.blend'
 if bpy.data.filepath and Path(bpy.data.filepath).resolve() != expected.resolve():
     raise RuntimeError('Refusing to replace another Blender project: ' + bpy.data.filepath)
 bpy.ops.object.select_all(action='SELECT')
@@ -42,29 +42,41 @@ def Ribbon(points, width, phase):
         tangent = Vector(points[min(i + 1, len(points)-1)]) - Vector(points[max(0, i-1)])
         side = tangent.cross(Vector((.1*math.sin(phase+t*2), 0, 1))).normalized()
         w = width * max(.018, (1-t)**.7)
-        for offset in (-1, 0, 1):
+        for offset in (-1, 1):
             v = Vector(p) + side * w * offset
             if offset == 0: v.z += width * .32
             vertices.append(tuple(v))
     for i in range(len(points)-1):
-        a = start + i*3
-        faces.extend([(a,a+3,a+1),(a+1,a+3,a+4),(a+1,a+4,a+2),(a+2,a+4,a+5)])
+        a = start + i*2
+        faces.extend([(a,a+2,a+1),(a+1,a+2,a+3)])
 
-for blade in range(66):
+for blade in range(40):
     angle = rng.uniform(-math.pi, math.pi)
-    base = Vector((rng.uniform(-.26,.26),rng.uniform(-.13,.13),rng.uniform(-.018,.025)))
-    length = rng.uniform(.25,.85)
-    drape = blade < 44
-    extent = rng.uniform(.3,.68) if drape else rng.uniform(.06,.28)
-    heading = Vector((math.sin(angle)*.7, .85+math.cos(angle)*.35 if drape else math.cos(angle), 0))
+    base = Vector((rng.uniform(-.43,.43),rng.uniform(-.20,.10),rng.uniform(-.018,.025)))
+    length = rng.uniform(.35,.85)
+    drape = blade < 34
+    extent = rng.uniform(.22,.8) if drape else rng.uniform(.08,.22)
+    heading = Vector((math.sin(angle)*.55, 1 if drape else math.cos(angle), 0))
     points=[]
-    for i in range(6):
-        t=i/5
+    for i in range(8):
+        t=i/7
         p=base+heading*(extent*t)
-        p.z += length*(.30*math.sin(math.pi*t*.95) - (.85*t*t if drape else -.15*t))
-        p.x += .035*math.sin(t*5+angle)*t
+        p.z += length*(.13*math.sin(math.pi*t) - (.85*t*t if drape else -.68*t))
+        p.x += .065*math.sin(t*5+angle)*t
+        p.y += .045*math.sin(t*6+angle)*t
         points.append(tuple(p))
-    Ribbon(points, rng.uniform(.0035,.008), angle)
+    width=rng.uniform(.0018,.004)
+    Ribbon(points,width,angle)
+    # Fine lateral rootlets and broken leaf stems prevent the comb-like silhouette.
+    for branch in range(2):
+        root=Vector(points[2+branch*2])
+        direction=-1 if branch==0 else 1
+        span=rng.uniform(.08,.25)
+        twig=[]
+        for j in range(4):
+            t=j/3
+            twig.append(tuple(root+Vector((direction*span*t,.06*t+.05*math.sin(t*3),-.08*t*t))))
+        Ribbon(twig,width*.6,angle+branch)
 mesh=bpy.data.meshes.new('Mesh_TrenchDryGrass')
 mesh.from_pydata(vertices,[],faces);mesh.update()
 grass=bpy.data.objects.new('TrenchDryGrass',mesh);bpy.context.collection.objects.link(grass)

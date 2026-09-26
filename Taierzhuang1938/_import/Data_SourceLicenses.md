@@ -249,3 +249,5 @@ CC-BY-4.0 要求署名：以上作者与链接即发布署名，随本文件保�
 `Texture_TrenchStone{Base,Normal,Orm}.webp` 来自 [Poly Haven / Rock Boulder Dry](https://polyhaven.com/a/rock_boulder_dry)，CC0；Dimitrios Savva 摄影、Rico Cilliers 处理。重建脚本为 `Script_ImportTrenchMaterials.py`。`Model_TrenchStone.glb`、`Model_TrenchDryGrass.glb` 及泥土高度遮罩由本仓 `Script_BakeTrenchSurface.py` 原创生成；源工程位置与接入见 [壕沟表面](../docs/Data_TrenchSurface.md)。
 
 `Texture_TrenchMud{Base,Normal,Orh}.webp` 来自 [Poly Haven / Brown Mud 02](https://polyhaven.com/a/brown_mud_02)，Rob Tuytel，CC0；原始 AO / Roughness / Displacement 打包为 Orh。重建入口同 `Script_ImportTrenchMaterials.py`。
+
+`Texture_TrenchRootMat.png` 为 2026-09-26 通过直接内置 imagegen 单张生成的枯草根毯 RGBA，原样保留透明度；不是下载或从概念图裁切的素材。提示词与接入记录见 [生成记录](../docs/Data_TrenchRootMatPrompt.md)。

@@ -190,6 +190,9 @@ export class FirstLevelWhiteboxField {
               this.quality, this.trenchSurface, this.terrainContact, { stone: true }) }));
           this.materials.set("TrenchDryGrass", CloneShadedMaterial(this.library.Plain("TrenchDryGrass",
             { color: TRENCH_SURFACE.grass.color, roughness: TRENCH_SURFACE.grass.roughness, side: THREE.DoubleSide })));
+          const grassMaterial=this.materials.get("TrenchDryGrass");
+          grassMaterial.map=this.trenchSurface.rootMap;grassMaterial.alphaTest=TRENCH_SURFACE.grass.alphaTest;
+          grassMaterial.needsUpdate=true;
         }
         const semantic = this.layout.ground.semantic;
         this.materials.get(semantic)?.dispose();

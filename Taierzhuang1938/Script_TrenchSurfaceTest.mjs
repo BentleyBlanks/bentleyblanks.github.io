@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { TerrainContactField } from './Script_TerrainContact.mjs';
 import { TRENCH_SURFACE as C } from './Data_TrenchSurface.mjs';
+import * as THREE from 'three';
+import { BuildTrenchSurface } from './Script_TrenchSurface.mjs';
 
 // Updates must use the physical terrain's actual grid (including non-unit cells),
 // and must restore it after a blast reset; no camera-dependent screen depth cache.
@@ -37,4 +39,24 @@ assert.equal(map.readUInt32BE(16),512);assert.equal(map.readUInt32BE(20),512);
 assert.ok(C.mud.roughWet<.3&&C.mud.roughDry>.8,'separate wet/dry PBR ranges');
 for(const url of [...Object.values(C.stoneLayer),...Object.values(C.mudLayer)])
   assert.ok(fs.statSync(new URL(url,import.meta.url)).size>1000);
+// A bent bank fixture exercises footprint conformance on both sides, rather than
+// checking only the model origin. Root tips must follow the soil without floating.
+const Ground=(x,z)=>Math.abs(x)*.8+Math.sin(z*.4)*.15;
+const plan={seed:707,Depth:()=>0,segments:[{id:'Bend',path:{length:24},stations:
+  Array.from({length:18},(_,i)=>({s:i+3,x:0,z:i,nx:1,nz:0,tx:0,tz:1,halfFloor:1,bank:1,depth:2}))}]};
+const grass=new THREE.BufferGeometry();
+grass.setAttribute('position',new THREE.Float32BufferAttribute([-.3,0,0,.3,0,0,0,-.5,-.7],3));
+const stone=new THREE.IcosahedronGeometry(.4,0),batches=[];
+BuildTrenchSurface({SetSector(){},Add(key,geometry){batches.push({key,geometry});}},plan,Ground,{grass,stone});
+assert.ok(batches.some(b=>b.key==='TrenchDryGrass'));
+for(const {key,geometry} of batches){
+  const p=geometry.attributes.position;
+  for(let i=0;i<p.count;i++){
+    const gap=p.getY(i)-Ground(p.getX(i),p.getZ(i));
+    assert.ok(Number.isFinite(gap));
+    if(key==='TrenchDryGrass')assert.ok(gap>.054&&gap<.131,'draped mat follows the full bank footprint');
+  }
+  geometry.dispose();
+}
+grass.dispose();stone.dispose();
 console.log('TrenchSurfaceTest: physical contact update/reset, measured grass direction, geometry and packed asset contracts passed');

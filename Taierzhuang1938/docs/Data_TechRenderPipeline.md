@@ -1247,6 +1247,8 @@ node Taierzhuang1938/Script_PostFrameGraphTest.mjs        # 帧图顺序（atmos
 
 ### 3.1 覆盖材质（MRT 版）
 
+世界 AlphaTest + map 的 UV0 镂空材质在逐 draw 时绑定源贴图、UV 变换、opacity 与 alphaTest；同一 discard 同时裁掉 RT0/RT1 与深度。2026-09-26 壕沟根毯接入此路径，半幅镂空与运动像素门禁见 [运动矢量契约](Data_MotionVectorContract.md)。前景 AlphaTest 仍沿用排除策略；独立 alphaMap 和其它 UV 通道不在此新增支持范围内。
+
 r185 支持 MRT，所以别开两次 pass。用 `count: 2` 一次写出 法线+深度 / 速度
 （现役实装见 §1.5 的靶表：RT0 RGBA16F、RT1 RG16F，外加 `DepthTexture`）：
 
