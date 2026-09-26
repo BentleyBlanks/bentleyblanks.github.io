@@ -682,7 +682,7 @@ const changedDomainRules = [
   // 2026.09.19 第二波：被测对象从军列车厢里的腊肉/背包换成 12/13 牛马车上老周的担架与车上近景件
   // （军列开场已下线）。改牛马车的那两个模块也要拉进这个域。
   {domain:"firstLevel",pattern:/CartCorpseBump/},
-  {domain:'propVelocity',pattern:/CarriagePropVelocity|CartCorpseBump|PostPrepass|FirstLevelMissionView|FirstLevelTransferCart|FirstLevelMissionColumn|DraftCartModel|Model_(WoodenEvacCart|WorkingOx|WorkingHorse)|OxCartBake/},
+  {domain:'propVelocity',pattern:/CarriagePropVelocity|CartCorpseBump|PostPrepass|FirstLevelMissionView|FirstLevelTransferCart|FirstLevelMissionColumn|DraftCartModel|StretcherAsset|StretcherBake|Model_(WoodenEvacCart|WorkingOx|WorkingHorse|BambooStretcher)|OxCartBake/},
   { domain: "render", pattern: /DeathPose|Data_Tuning_ActorDeath/ },
   { domain: "animation", pattern: /DeathCollapse|DeathPose|ActorDeath|MotionDeath/ },
   {domain:"hud",pattern:/IncomingFire/},

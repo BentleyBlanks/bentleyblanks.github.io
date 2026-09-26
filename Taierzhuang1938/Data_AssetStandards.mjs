@@ -123,6 +123,12 @@ export const EXTERNAL_GLB_STANDARDS = Object.freeze([
     policy: "source", note: "BlenderMCP 自建外观；与 TZM 同源，具体历史批次未确证。",
   }),
   Object.freeze({
+    id: "BambooFieldStretcher", name: "竹竿布兜担架", pack: "Model_BambooStretcher.glb",
+    sourceTriangles: 2688, actualTriangles: 2688, targetTriangles: 2688,
+    sourceTexture: "无（Blender MCP 自建）", runtimeTexture: "顶点色（竹竿 / 竹节 / 绳扎 / 脏帆布与血渍）",
+    policy: "source", note: "_blender/Script_StretcherBake.py 重烘；按 1938 台儿庄民众抬担架与 LOC ds-11832 照片的竹竿布兜形制，握点契约同 P012_STRETCHER_GRIPS。",
+  }),
+  Object.freeze({
     id: "ChineseRuralHouse", name: "乡村房屋", pack: "Model_ChineseRuralHouse.glb",
     sourceTriangles: 236434, actualTriangles: 58812, targetTriangles: 58812,
     sourceTexture: "有（2 张源 BaseColor）", runtimeTexture: "源 UV + 项目房屋 BaseColor / Normal",

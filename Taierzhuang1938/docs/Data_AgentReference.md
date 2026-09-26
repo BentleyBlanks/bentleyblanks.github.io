@@ -713,6 +713,7 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
 
 ### 资产目录
 - `Model/TrainReference/` —— 参考三视图制作的独立车头/双轴敞车 GLB、ImageGen PBR 与距离驱动车轮连杆；已登记构件库「模型」分类。Blender 工程放在根约定的 OneDrive 目录；现状与接线见 `docs/Data_TrainReferenceRig.md`，导出验收 `Script_VerifyTrainExport.mjs`，构件库验收 `Script_TrainLibraryTest.mjs`。
+- `Model/Model_BambooStretcher.glb` —— 1938 竹竿布兜担架（两根带节竹竿、两端绑扎横撑、布从竿内沿下垂成兜），全游戏担架共用：`Script_StretcherAsset` 开机与手榴弹一起预载，`CreateP012StretcherGeometry()` 取其副本，读不到才退回程序化方块担架。坐标系就是 `P012_STRETCHER_GRIPS`（竿心 x=±0.29、y=0.12，竿头 z=±1.075，头朝 -Z），颜色在顶点色里（材质白 + `vertexColors`）。重烘 `_blender/Script_StretcherBake.py`（BlenderMCP 或 `blender --background --python`）；形制依据 2026-09-27 找到的两张照片 —— 抗日战争纪念网《台儿庄战役珍贵照片》里「民众帮助抬担架救伤员」、美国国会图书馆 LC-DIG-ds-11832（1938）—— 与 .blend 一起放在 OneDrive `Taierzhuang1938/Stretcher/`。验收 `Script_CarriagePropVelocityTest`（老周担架）+ AssetStandardsTest 登记行。
 - `Model/`（tzm.json 与 glb）、`Texture/`、`Audio/`（烘出的 mp3 + 清单）、`Scene/`、
   `Heightmap/`、`BgmReview/`、`_import/`（外部资产取源/烘焙）、`_blender/`（Blender 管线）、
   `_shots/`（出图产物，gitignore）、`vendor/`（three + rapier，别 grep 进去）。

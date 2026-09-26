@@ -59,15 +59,16 @@ export class FirstLevelMissionView {
       // 牛另外挂一对角。**实例桶满了是静默截断** —— 七辆车各两只角，容量按 MID.hornCapacity 给。
       ["draftHorn", new THREE.BoxGeometry(...MID.horn.size), 0xa39c86, MID.hornCapacity],
       ["spoke", new THREE.BoxGeometry(.12,.80,.07), 0x8b816d, 112],
-      // 担架帆布：0xd1d0be 在门口那片天光下会被顶成一块发光的白板，躺在上面的人整个
-      // 读成一团黑影（2026-09-16 屋内伏击出图实拍）。压到脏帆布的亮度，十副担架同一份材质。
-      ["bed", CreateP012StretcherGeometry(), 0xb6ae99, 20],
+      // 担架：1938 竹竿布兜担架（Script_StretcherAsset），颜色在顶点色里，材质取白。
+      // 布面亮度照旧压在脏帆布那一档：0xd1d0be 在门口那片天光下会被顶成一块发光的白板，
+      // 躺在上面的人整个读成一团黑影（2026-09-16 屋内伏击出图实拍）。十副担架同一份材质。
+      ["bed", CreateP012StretcherGeometry(), 0xffffff, 20],
       ["patient", new THREE.BoxGeometry(0.49, 0.19, 1.55), 0xd9d7cb, 26],
       ["medical", new THREE.BoxGeometry(0.24, 0.2, 0.12), 0xe1e2d5, 32],
       ["cart", new THREE.BoxGeometry(3, 0.38, 5.8), 0x8a7b69, 7],
       ["wheel", new THREE.CylinderGeometry(0.48, 0.48, 0.15, 10), 0x454a48, 28],
     ]) {
-      const material = new THREE.MeshStandardMaterial({ color, roughness: 0.92 });
+      const material = new THREE.MeshStandardMaterial({ color, roughness: 0.92, vertexColors: key === "bed" });
       this.materials.push(material);
       if (this.rigidParts[key]) {
         this.rigidTemplates[key] = {geometry, material, capacity: count};
