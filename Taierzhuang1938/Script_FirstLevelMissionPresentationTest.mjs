@@ -78,7 +78,7 @@ for(let i=0;i<120;i++)window.UpdateCrowdProbe(i/60);g.StepFrames(1,1/60,true);re
      let damage=0;
      const host={battlefield:{Raycast:(from,dir,len,opts)=>g.battlefield.Raycast(from,dir,len,terrain?opts:null)},ai:{soldiers:[]},
        player:{position:sample.target,Alive:true,Suppress(){},TakeHit(amount){damage+=amount;}}};
-     CombatSystem.prototype.Blast.call({host,tmp:new T.Vector3(),tmpB:new T.Vector3()},sample.source,20,85,"shell");
+     CombatSystem.prototype.Blast.call({host,tmp:new T.Vector3(),tmpB:new T.Vector3(),BlastFeedback(){}},sample.source,20,85,"shell");
      return damage;
    };
    return {source:sample.source.toArray(),target:sample.target.toArray(),covered:Damage(true),withoutEarth:Damage(false)};
