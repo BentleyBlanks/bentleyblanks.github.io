@@ -385,6 +385,17 @@ export async function DriveFrontBattle(ctx){
   });
   assert.equal(sight.player,false,"player can observe the actual breach through the rendered world");
   assert.equal(sight.gun,false,"right gun has a physical firing lane onto the breach");
+  // Capture starts the walk to cover; it does not mean Luo has already reached that post.
+  // Opening timing can change who arrives first. Wait for the physical arrival, with a bounded failure.
+  // A settled actor may shift inside the runtime's existing post-reopen margin.
+  const coverRadius=B.leaderCoverArrivalM+B.coverReopenM;
+  const coverArrival=await page.evaluate(({target,maxM})=>{
+    const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime(),luo=r.companion.Handle("luo");
+    let frames=0;
+    for(;frames<240&&g.player.alive&&Math.hypot(luo.position.x-target.x,luo.position.z-target.z)>maxM;frames++)g.StepFrames(1,1/60,false);
+    return {frames,alive:g.player.alive,distance:Math.hypot(luo.position.x-target.x,luo.position.z-target.z)};
+  },{target:S.leaderCover,maxM:coverRadius});
+  assert.ok(coverArrival.alive&&coverArrival.distance<=coverRadius,"Luo physically reaches his cover within four seconds "+JSON.stringify(coverArrival));
   const staging=await page.evaluate(async()=>{
     const g=window.Tengxian,r=g.Debug.FirstLevelMissionRuntime(),T=await import('three');
     const {FRONT_SORTIE:S}=await import('./Data_FirstLevelFrontRoute.mjs');

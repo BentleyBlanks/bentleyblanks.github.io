@@ -71,6 +71,10 @@ export function BlockAt([x, y, z], slack = .05) {
 export function JudgeShot(judge, dump) {
   const out = [];
   if (!judge) return out;
+  if(judge.cinematic){
+    out.push({label:"independent cinematic camera",ok:dump.cinematic&&!dump.firstPersonVisible,value:{cinematic:dump.cinematic,firstPersonVisible:dump.firstPersonVisible},range:null});
+  }
+  if(judge.flagProgress)out.push(Range("flag fall progress",dump.sceneFlags?.find(f=>f.id==="flagTrench")?.progress,judge.flagProgress));
   const cam = dump.camera;
   const J = judge.camera || {};
   if (J.eyeM) out.push(Range("eye height (m)", cam.eyeAboveGround, J.eyeM));
@@ -357,6 +361,7 @@ function Dump({ warm, freeze, points }) {
       hidden: !!a.openingStoryboardHidden, visible: !!a.actor.root.visible && !!a.actor.root.parent, lod: a.renderLod || null,
       x: R3(a.position.x), z: R3(a.position.z), yawDeg: D(a.yaw), clip: a.openingStoryboardPose?.clip || null,
       clipS: a.openingStoryboardPose?.seconds != null ? R3(a.openingStoryboardPose.seconds) : null, distM: R3(d),
+      footR: bones?.footR?.getWorldPosition(new T.Vector3()).toArray().map(R3),
       pelvisY: pelvis ? R3(pelvis.y - feet.y) : null, headPx: head ? Screen(head) : null, feetPx: Screen(feet),
       jaw: jaw ? R3(jaw.bone.quaternion.angleTo(jaw.quaternion)) : null });
     if (head) heads.set(actors[actors.length - 1], head);
@@ -401,7 +406,9 @@ function Dump({ warm, freeze, points }) {
       yawDeg: D(e.y), pitchDeg: D(e.x), rollDeg: D(e.z), fovV: cam.fov, aspect: R3(cam.aspect) },
     horizonY: Screen(flat).y, points: pointsOut,
     shot: window.__sbShots.lastShot, perception: s.perception ? { amount: R3(s.perception.amount), focus: R3(s.perception.focus) } : null,
-    eyeClosure: op?.eyeClosure ?? null, bloodMask: s.bloodMask ?? null,
+    eyeClosure: op?.eyeClosure ?? null, blackout:op?.blackout??null,bloodMask: s.bloodMask ?? null,
+    cinematic:!!s.CinematicActive,firstPersonVisible:!!s.playerBody?.root.visible,
+    sceneFlags:[...(r.openingSet?.flags||[])].map(([id,f])=>({id,progress:f.progress,base:f.group.position.toArray().map(R3),tip:f.group.localToWorld(new T.Vector3(0,f.spec.poleM,0)).toArray().map(R3)})),
     flags: Object.fromEntries(Object.entries(s.flags).filter(([, v]) => typeof v === "number" || typeof v === "boolean").map(([k, v]) => [k, typeof v === "number" ? R3(v) : v])),
     actors, rifle, guardRifle, hands, contextLost: !!g.renderer?.getContext?.()?.isContextLost?.(),
   };

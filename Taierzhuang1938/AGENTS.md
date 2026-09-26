@@ -6,6 +6,8 @@
 
 ## 当前入口与任务范围
 
+- **01 洞口过场 2026-09-26 现场修订**：[渐显、翻译避让、踹国军旗与独立摄影机](docs/Data_OpeningCinematic20260926.md)。CaptiveDragged→Wipe 使用独立机位，Reach 回到第一人称；这段覆盖旧 SB03 倒地旁观镜头与人物旧站位。
+
 - **06–18 场景白盒采用 Notion 2026-09-24 参考迭代**：[概念/拓扑对应与验收](docs/Data_FirstLevelWhitebox20260924.md)。三个 `Data_FirstLevelWhitebox*` 模块承载村落、接运与后方体块，Layout统一接地与合并；夜门新增体块仍仅属于NightGate。06起连续验收可用 `Script_FirstLevelMissionBrowserTest.mjs --campaign --stage-from=6`，加载时初始化06后不再跳阶段。
 
 - **03–05 当前采用稿为 Notion 2026.09.22 修订**：[正文](docs/Data_FirstLevelFrontSource20260922.md)、[白盒与连续流程](docs/Data_FirstLevelFrontTopology20260922.md)。以右侧夺点、同一撤口、同一道路战车、东南旧院取弹、原路返回攻击支路为准。导演为 `Script_FirstLevelFrontBattle`。本轮用户限定实机验收 03–06：`Script_FirstLevelMissionBrowserTest.mjs --campaign --stage-from=3 --stage-to=6`，仅加载时初始化 03，之后连续推进，不测试 07 及其他阶段。

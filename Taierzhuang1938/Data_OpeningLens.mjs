@@ -62,6 +62,7 @@ export const LOOKS = Freeze({
     radialBlur: K("impact", [[0, 0], [0.06, 0.055], [0.75, 0.032], [1.6, 0]]),
     vignette: K("impact", [[0, 0.42], [0.1, 0.8], [2.4, 0.55]]),
   }),
+  cinematic: Freeze({ blendInS: 0, vignette: 0.38, aberration: 0, mud: 0 }),
   // SB03 lying in the mud watching the group (Wake → Wipe): blood-red corners ~0.3 fading in with the
   // concussion, near depth of field 0.5 focused ~3.8 m (foreground 0.3–1 m soft), mud on the lens.
   witness: Freeze({
@@ -134,8 +135,8 @@ export const LOOKS = Freeze({
 export const PHASE_LOOKS = Freeze({
   Banter: "clean", Orders: "clean", Incoming: "clean",
   Blast: "nearMiss", Black: "nearMiss",
-  Wake: "witness", FrontPass: "witness", CaptiveDragged: "witness", CaptiveWall: "witness",
-  Interrogation: "witness", Slash: "witness", Taunt: "witness", Wipe: "witness",
+  Wake: "witness", FrontPass: "witness", CaptiveDragged: "cinematic", CaptiveWall: "cinematic",
+  Interrogation: "cinematic", Slash: "cinematic", Taunt: "cinematic", Wipe: "cinematic",
   Reach: "reach", Found: "found",
   Drag: "dragged", Snag: "dragged", KickBeam: "dragged", DragOut: "dragged",
   Butt: "butt", Boots: "boots",

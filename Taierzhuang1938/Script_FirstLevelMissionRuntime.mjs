@@ -2067,7 +2067,8 @@ export class FirstLevelMissionRuntime {
   Perception() {
     // 06 老周从坐着的活人换回担架躺姿时玩家闭一下眼（FirstLevelCollection.SeatSwapClosure）。
     const swap = this.frontShow?.collection?.SeatSwapClosure?.() || 0;
-    return { eyeClosure: Math.max(this.opening.eyeClosure || 0, swap), concussion: this.opening.concussion || null,
+    return { blackout: this.frontShow?.bunker?.CameraActive ? this.opening.blackout || 0 : 0,
+      eyeClosure: Math.max(this.opening.eyeClosure || 0, swap), concussion: this.opening.concussion || null,
       lens: this.OpeningLens() };
   }
   /**
@@ -2368,7 +2369,7 @@ export class FirstLevelMissionRuntime {
     this.opening.Update(dt);
     this.openingSet?.Update(dt, this.flow.stage.id, this.frontShow?.bunker?.phase ?? null,
       { collapsed: this.Has("bunkerCollapsed"), blastAge: this.opening.blastAt != null ? this.time - this.opening.blastAt : null, player: this.player?.position,
-        breakables: this.tankRuntime?.breakables ?? null });
+        flagFall:this.frontShow?.bunker?.flags?.flagFallProgress??0,breakables: this.tankRuntime?.breakables ?? null });
     if(this.failed){prof?.E("story/mission/other");return;}
     prof?.E("story/mission/other");
     prof?.B("story/mission/spawns");

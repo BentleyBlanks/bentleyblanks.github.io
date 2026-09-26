@@ -473,7 +473,13 @@ assert.deepEqual([...C.phases.RearTrench],["Withdraw","Corner","Collection","Sup
   const {OPENING_DEPTH_IJA:DepthIja}=await import("./Data_FirstLevelBackdropSquads.mjs");
   const Bearing=(a,b)=>Math.atan2(a.x-b.x,a.z-b.z)*180/Math.PI;
   for(const m of DepthIja.members){
-    assert.ok(Math.abs(Bearing(C.shunzi.witnessEye,m.start)-C.interrogation.witnessShot.yawDeg)>55,`${m.id} waits out of SB03's picture`);
+    if(!m.flagKick)assert.ok(Math.abs(Bearing(C.shunzi.witnessEye,m.start)-C.interrogation.witnessShot.yawDeg)>55,`${m.id} waits out of SB03's picture`);
+    if(m.flagKick){
+      const {RouteClearance}=await import("./Script_FirstLevelSpaceProbe.mjs");
+      const clearance=RouteClearance([m.start,m.flagKick.root,...m.route],{state:"BunkerCollapsed"});
+      assert.deepEqual(clearance.hits,[],"flag kicker stays clear of scene solids");
+      assert.deepEqual(clearance.slopes,[],"flag kicker does not climb the steep trench wall");
+    }
     assert.ok(m.route.every((p,i,all)=>p.x>=(i?all[i-1].x:m.start.x)),`${m.id} walks away east`);
   }
   // Storyboard shots and wave-1 stand-ins (contract §4.6).
@@ -612,3 +618,41 @@ if(rebake){
   console.log(`ok rebake: ${compared} rig clips from ${rebake} equal the committed ones (<=0.5 deg, 1 mm)`);
 }
 console.log(`ok opening storyboards: five original rigs, ${clipCount} rig clips (${NEW.length} authored 2026-09-23/25, ${paired} paired contacts cross-checked, ${chains} same-root hand-overs, ${seams} hold-loop seams), ${frames} normalized frames, director phase table and marks`);
+
+// Interpreter entry: swept bodies stop a crossing even when one frame would clear the far side.
+{
+  const {FirstLevelBunkerShow}=await import("./Script_OpeningStoryboards.mjs");
+  const show=Object.create(FirstLevelBunkerShow.prototype);
+  const actor={alive:true,position:{x:-1,y:0,z:0}},guard={alive:true,position:{x:0,y:0,z:0}};
+  show.r={enemies:new Map([["guard",guard]])};show.cast={interpreter:actor};show.flags={};
+  const to={x:1,z:0};show.AvoidInterpreterOverlap({x:-1,z:0},to,actor);
+  assert.ok(to.x<=-C.interpreterClearanceM,"a fast frame cannot tunnel through the guard");
+  const escaping={x:-1,z:0};show.AvoidInterpreterOverlap({x:-.5,z:0},escaping,actor);
+  assert.equal(escaping.x,-1,"an existing overlap can separate naturally");
+  guard.openingStoryboardHidden=true;
+  const open={x:1,z:0};show.AvoidInterpreterOverlap({x:-1,z:0},open,actor);
+  assert.equal(open.x,1,"offstage actors do not block the lane");
+  const {RouteClearance}=await import("./Script_FirstLevelSpaceProbe.mjs");
+  const path=[...C.ija.interpreterEnter,C.interrogation.interpreterAt];
+  const clear=RouteClearance(path,{state:"BunkerCollapsed"});
+  assert.deepEqual(clear.hits,[]);assert.deepEqual(clear.slopes,[]);
+  for(const guard of [{x:18.26,z:-125.65},{x:14.08,z:-124.62},C.interrogation.ijaBAt]){
+    for(let i=1;i<path.length;i++){
+      const a=path[i-1],b=path[i],dx=b.x-a.x,dz=b.z-a.z;
+      const t=Math.max(0,Math.min(1,((guard.x-a.x)*dx+(guard.z-a.z)*dz)/(dx*dx+dz*dz||1)));
+      assert.ok(Math.hypot(a.x+t*dx-guard.x,a.z+t*dz-guard.z)>=C.interpreterClearanceM+.05,"authored passing route leaves a body margin");
+    }
+  }
+  assert.ok(C.timeouts.wakeS>=C.blackoutRecovery.fadeS&&C.blackoutRecovery.fadeS>=5,"wake cannot cut off the slow full-screen fade");
+  assert.ok(Math.hypot(C.interrogation.interpreterAt.x-C.interrogation.ijaBAt.x,C.interrogation.interpreterAt.z-C.interrogation.ijaBAt.z)>1.2,"interrogation roots do not overlap");
+  const marks=show.CircleMarks(),returnPath=[C.interrogation.backOffRoute.at(-1),...C.rescue.interpreterReturn,marks.interpreter];
+  // Existing contact marks touch the revetment with the full walking capsule; the detour keeps the root out of solids.
+  const returnClear=RouteClearance(returnPath,{state:"BunkerCollapsed",radius:0});
+  assert.deepEqual(returnClear.hits,[]);assert.deepEqual(returnClear.slopes,[]);
+  for(let i=1;i<returnPath.length;i++){
+    const a=returnPath[i-1],b=returnPath[i],dx=b.x-a.x,dz=b.z-a.z,g=marks.ijaA;
+    const t=Math.max(0,Math.min(1,((g.x-a.x)*dx+(g.z-a.z)*dz)/(dx*dx+dz*dz)));
+    assert.ok(Math.hypot(a.x+t*dx-g.x,a.z+t*dz-g.z)>C.rescue.interpreterClearanceM+.03,"return route passes around the collar-holder with the corner margin");
+  }
+  console.log("ok interpreter swept clearance, passing route and sustained blackout recovery");
+}

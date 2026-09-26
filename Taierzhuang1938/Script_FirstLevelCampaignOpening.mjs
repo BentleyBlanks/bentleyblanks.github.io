@@ -162,6 +162,31 @@ async function InstallProbe(page) {
         row.headRadians = Math.max(row.headRadians, head.angleTo(head.clone().fromArray(row.head)));
         row.handMetres = Math.max(row.handMetres, hand.distanceTo(Vec().fromArray(row.hand)));
       }
+      if(["CaptiveDragged","CaptiveWall","Interrogation"].includes(s.phase)){
+        const interp=s.cast.interpreter;
+        if(interp&&!interp.openingStoryboardHidden){
+          for(const role of ["ijaA","ijaB","ijaC","ijaD"]){
+            const other=s.Ija(role);if(!other||other.openingStoryboardHidden)continue;
+            const d=Math.hypot(interp.position.x-other.position.x,interp.position.z-other.position.z);
+            if(d<(P.interpreterMinM??Infinity)){P.interpreterMinM=d;P.interpreterMinAt={phase:s.phase,role};}
+          }
+          if(s.phase==="Interrogation"&&s.Age>2)P.interpreterAtMark=Math.hypot(interp.position.x-C.interpreterAt.x,interp.position.z-C.interpreterAt.z)<.2;
+        }
+      }
+      if(s.flags.flagKickedAt!=null)P.flagKicked=true;
+      if(s.phase==="Glimpse"&&s.Age>.5){const i=s.cast.interpreter,m=s.CircleMarks().interpreter;P.rescueInterpreterAtMark=Math.hypot(i.position.x-m.x,i.position.z-m.z)<.2;}
+      if(s.phase==="Reach")P.flagDown=r.openingSet?.flags?.get("flagTrench")?.progress;
+      const shotId=C.cinematic[s.phase]?.id||"firstPerson";
+      if(P.shotId!=null&&P.shotId!==shotId){
+        (P.cameraCuts??=[]).push({from:P.shotId,to:shotId,phase:s.phase});P.camera=null;P.cameraRotation=null;
+      }
+      P.shotId=shotId;
+      if(s.CinematicActive&&(s.playerBody?.root.visible||s.supplyRoot?.visible))P.violations.push({phase:s.phase,error:"first-person body in cinematic shot"});
+      if(s.phase==="Wake"){
+        const blackout=r.Perception().blackout;
+        if(P.wakeFade!=null&&blackout>P.wakeFade+1e-6)P.violations.push({error:"blackout recovery reverses"});
+        P.wakeFade=blackout;(P.wakeSamples??=[]).push({age:s.Age,blackout});
+      }
       // Camera and the first-person arms while the director owns the view. A cut under closed eyes
       // (the fade-in, the blast's black) is not a jump anyone sees.
       if ((r.opening?.eyeClosure ?? 0) >= .5) { P.camera = null; P.cameraRotation = null; }
@@ -175,7 +200,7 @@ async function InstallProbe(page) {
           if (turn > P.maxCameraTurn) { P.maxCameraTurn = turn; P.maxCameraTurnPhase = s.phase; }
         }
         P.camera = cam.position.toArray(); P.cameraRotation = cam.quaternion.toArray();
-        for (const side of ["L", "R"]) {
+        for (const side of s.CinematicActive?[]:["L", "R"]) {
           const shoulder = s.playerBody.characterRig.bones["upperArm" + side].getWorldPosition(Vec()); cam.worldToLocal(shoulder);
           P.minShoulderBehind = Math.min(P.minShoulderBehind, shoulder.z);
         }
@@ -217,7 +242,7 @@ async function InstallProbe(page) {
         else if (r.time - row.lastTalk > C.silentAfterS) { row.silentFrames++; if (jaw > row.silentMax) { row.silentMax = jaw; row.silentMaxPhase = s.phase; row.silentMaxTime = r.time; } }
       }
     };
-  }, { vanguardIds: Storyboards.vanguardIds, silentAfterS: SILENT_AFTER_S, stepLimitM: STEP_LIMIT_M });
+  }, { interpreterAt:Storyboards.interrogation.interpreterAt,cinematic:Storyboards.interrogation.cinematic, vanguardIds: Storyboards.vanguardIds, silentAfterS: SILENT_AFTER_S, stepLimitM: STEP_LIMIT_M });
 }
 
 /**
@@ -328,6 +353,13 @@ export async function DriveOpening(ctx){
   }
   // ---- continuity ---------------------------------------------------------------------------
   assert.deepEqual(probe.violations,[],"actors move continuously (no pelvis step > STEP_LIMIT_M per frame) and nobody is released early");
+  console.log("CINEMATIC",JSON.stringify({clearance:probe.interpreterMinM,at:probe.interpreterMinAt,arrived:probe.interpreterAtMark,flagKicked:probe.flagKicked,flagDown:probe.flagDown,cuts:probe.cameraCuts}));
+  assert.ok(probe.interpreterMinM>=Storyboards.interpreterClearanceM-.025&&probe.interpreterAtMark,"interpreter passes soldiers without overlap and reaches his questioning mark");
+  assert.ok(probe.flagKicked&&probe.flagDown===1,"the background soldier kicks the flag all the way down before Reach");
+  assert.ok(probe.rescueInterpreterAtMark,"the interpreter returns around the collar-holder and reaches the rescue circle");
+  assert.deepEqual(probe.cameraCuts?.map(c=>c.to),["captiveDrag","captiveGroup","captiveCut","captiveAftermath","firstPerson"],"only the authored film edits cut the camera");
+  const fadeAt=t=>probe.wakeSamples?.find(s=>s.age>=t)?.blackout;
+  assert.ok(fadeAt(1)>.8&&fadeAt(2)>.5&&fadeAt(4)<.2&&fadeAt(5.3)===0,"blackout recovers gradually across more than five seconds");
   assert.ok(probe.maxCameraStep<.14,`camera never jumps between shots (${probe.maxCameraStep})`);
   assert.ok(probe.maxCameraTurn<10,`camera turns continuously (${probe.maxCameraTurn}° in ${probe.maxCameraTurnPhase})`);
   assert.ok(probe.minShoulderBehind>.08,"both open sleeve roots stay behind the eye");

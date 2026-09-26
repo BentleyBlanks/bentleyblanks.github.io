@@ -1,5 +1,7 @@
 # 第一关 01–02 导演（2026-09-23 新稿）
 
+当前四项现场修订（缓慢渐显、翻译绕行、国军旗被踹倒、独立过场机位）见 [过场修订](Data_OpeningCinematic20260926.md)，覆盖下文 SB03 的旧第一人称机位与旧人物站位。
+
 2026-09-26 的首次爆炸、坐姿手部、愤怒配音与拖出近景细化见 [本轮记录](Data_OpeningPolish20260926.md)。
 
 需求原文：[01–02 新稿](Data_FirstLevelOpeningSource20260923.md)。跨包口径：[01–05 重构契约](Data_FirstLevel0105Refactor20260923Contract.md) §2 第 1 条（还权门槛）、§5.1–§5.5（角色、对白场景、phase、clip、对白接口）。空间：[01–06 空间重排](Data_FirstLevelSpace0106_20260923.md) §2.1、§3、§10.2。

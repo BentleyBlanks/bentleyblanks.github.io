@@ -76,7 +76,7 @@ Check("a look stuck waiting for its event warns once (renamed / retimed director
 });
 
 Check("SB03 witness: blood corners 0.3 with the concussion, near DOF 0.5 at 3.8 m, mud", () => {
-  const full = Evaluate("Interrogation", 3, { concussion: 0.8 });
+  const full = Evaluate("FrontPass", 3, { concussion: 0.8 });
   Near(full.bloodEdge.strength, 0.3, 1e-9, "blood edge");
   const [tl, tr, bl, br] = full.bloodEdge.corners;
   assert.ok(tr >= 0.95 && tl >= 0.8 && bl >= 0.8 && br < 0.5, "upper right and left heavier, lower right light");
@@ -85,8 +85,18 @@ Check("SB03 witness: blood corners 0.3 with the concussion, near DOF 0.5 at 3.8 
   assert.equal(full.dofNear.strength, 0.5); assert.equal(full.dofNear.focusM, 3.8);
   assert.ok(full.dofNear.focusM - full.dofNear.rangeM <= 1.0 + 1e-9, "foreground 0.3–1 m inside the soft range");
   assert.ok(full.mud >= 0.8, "mud Wake→Found");
-  for (const phase of ["Wake", "FrontPass", "CaptiveDragged", "CaptiveWall", "Slash", "Taunt", "Wipe"])
+  for (const phase of ["Wake", "FrontPass"])
     assert.equal(Evaluate(phase, 1).look, "witness", phase);
+});
+
+Check("the captive film cuts immediately to a clean lens", () => {
+  const driver=new OpeningLensDriver();driver.Sample(1,"FrontPass",3,{concussion:1});
+  const cut=driver.Sample(1.016,"CaptiveDragged",0,{concussion:1});
+  for(const phase of ["CaptiveDragged","CaptiveWall","Interrogation","Slash","Taunt","Wipe"]){
+    const lens=Evaluate(phase,3,{concussion:1});
+    assert.equal(lens.look,"cinematic");assert.equal(lens.mud,0);assert.equal(lens.bloodEdge.strength,0);assert.equal(lens.radialBlur,0);
+  }
+  assert.equal(cut.mud,0);assert.equal(cut.bloodEdge.strength,0);
 });
 
 Check("SB03A reach: darker, red weaker than SB03, mud; Found's blink clears the mud", () => {
@@ -150,7 +160,7 @@ Check("driver: crossfade between looks, idempotent per frame, null the moment 01
   // A snapshot older than a frame or two (frames stepped without rendering) is not a crossfade source.
   const s = new OpeningLensDriver();
   s.Sample(1.0, "Blast", 0.3, { blastAt: 0.7 });
-  const late = s.Sample(9.0, "Interrogation", 2, { blastAt: 0.7, concussion: 1 });
+  const late = s.Sample(9.0, "FrontPass", 2, { blastAt: 0.7, concussion: 1 });
   Near(late.bloodEdge.strength, 0.3, 1e-9, "stale snapshot ignored"); Near(late.aberration, 0.0035, 1e-9, "no near-miss residue");
 });
 

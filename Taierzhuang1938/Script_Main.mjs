@@ -4040,6 +4040,7 @@ async function EnterLevel(index, { initial = false, cutscenes = !SHOT, stageJump
     profiler,
     FireVehicleBullet,
     Objective:text=>{state.storyObjective=text;},
+    NotifyCameraCut:()=>{post.NotifyCameraCut();lights.NotifyCameraCut();},
     VoiceClock:()=>MANUAL_STEP?null:audio.ctx?.currentTime,
     Inventory:()=>({ammo:state.ammo,clips:state.clips,grenades:state.grenades,bundles:state.bundles,shots:state.playerShots}),
     GiveSupply:({clips=0,grenades=0,bundles=0,bandages=0})=>{AddSupplyClips(clips);state.grenades+=grenades;state.bundles+=bundles;player.bandages+=bandages;},
@@ -9030,6 +9031,7 @@ function RenderScene(dt) {
     contrast: preset.contrast,
     grain: (skyName === "night" ? 0.020 : 0.014) * graphics.grain,
     // 眼皮与恍惚：开场出轨与屋内伏击共用同一组通道，由运行时合成成一份。
+    fade: player?.Alive ? missionRuntime?.Perception().blackout || 0 : 0,
     eyeClosure: player?.Alive ? missionRuntime?.Perception().eyeClosure || 0 : 0,
     concussion: missionRuntime?.Perception().concussion,
     vignette: (0.42 + suppression * 0.22) * graphics.vignette,

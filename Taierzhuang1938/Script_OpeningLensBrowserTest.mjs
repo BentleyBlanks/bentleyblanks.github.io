@@ -1,8 +1,7 @@
 // 01–02 storyboard lens in the real page (contract docs/Data_FirstLevelStoryboard0103Contract.md §4.4, §6;
 // review 2026-09-25). The director's own events drive the looks — no Debug.OpeningLens.Force here:
 //   - Blast: the radial blur reaches the composite (uRadialBlur > 0);
-//   - Wake → Found: mud on the lens (Perception().lens.mud > 0, HUD layer drawn), the red corners reach the
-//     composite (uBloodEdge.w > 0);
+//   - Wake / Reach → Found: player mud and red corners; independent film coverage in between is clean;
 //   - Butt: the rifle butt's white flash peaks ≥ 0.8 (the director's strikeAt really arrives);
 //   - loading phases: the world rifle stays hidden (one loading rifle on screen);
 // and once the director lets go of the view (Released, then the rifle pickup into RearTrench) nothing of the
@@ -64,13 +63,16 @@ try {
   for (const phase of ["Banter", "Blast", "Wake", "Interrogation", "Reach", "Found", "Butt", "Boots", "Hold"])
     assert.ok(P[phase]?.lensFrames > 0, `${phase}: a lens look is on (${JSON.stringify(P[phase])})`);
   assert.ok(P.Butt.maxFlash >= 0.8, `Butt: the butt strike's white flash peaks ≥ 0.8 (${P.Butt.maxFlash}) — the director's strikeAt arrives`);
-  for (const phase of ["Wake", "Interrogation", "Reach", "Found"]) assert.ok(P[phase].maxMud > 0, `${phase}: mud on the lens (${P[phase].maxMud})`);
+  for (const phase of ["Wake", "Reach", "Found"]) assert.ok(P[phase].maxMud > 0, `${phase}: mud on the lens (${P[phase].maxMud})`);
   assert.equal(P.Hold.maxMud, 0, "SB05: the lens is clean again");
+  assert.equal(P.Interrogation.maxMud, 0, "cinematic interrogation has no player mud overlay");
   assert.equal(probe.rifleShownInLoading, 0, "the loading phases never show the world rifle next to the loading rifle");
   // The rendered side: the composite and the HUD really get the lens (so the residue checks below are not vacuous).
   assert.ok(probe.drawn.Blast?.radialBlur > 0.01, `Blast: radial blur in the composite (${JSON.stringify(probe.drawn.Blast)})`);
-  assert.ok(probe.drawn.Interrogation?.bloodEdge > 0.05 && probe.drawn.Interrogation.mudOn, `SB03: red corners and mud drawn (${JSON.stringify(probe.drawn.Interrogation)})`);
-  assert.ok(probe.drawn.Reach?.mudOn, "SB03A: mud drawn");
+  const cinema=probe.drawn.Interrogation;
+  assert.ok(cinema&&cinema.bloodEdge===0&&cinema.radialBlur===0&&!cinema.mudOn&&cinema.mudOpacity===0&&!cinema.flashOn,
+    `SB03: independent camera draws no player blood, mud or concussion (${JSON.stringify(cinema)})`);
+  assert.ok(probe.drawn.Reach?.mudOn&&probe.drawn.Reach.bloodEdge>.05, "SB03A: player mud and red corners return");
   // ---- leaving 01–02: nothing remains --------------------------------------------------------------
   const Residue = () => page.evaluate(() => {
     const g = window.Tengxian, r = g.Debug.FirstLevelMissionRuntime();
@@ -95,7 +97,7 @@ try {
   Clean(after.stage, after);
   assert.deepEqual(warnings, [], "no OpeningLens event warnings (every event the looks wait for arrived)");
   ok = true;
-  console.log(`ok opening lens in the page: flash ${P.Butt.maxFlash.toFixed(2)} in Butt, mud Wake→Found, residue-free at Released and ${after.stage}`);
+  console.log(`ok opening lens in the page: flash ${P.Butt.maxFlash.toFixed(2)} in Butt, clean cinematic coverage, player mud returns at Reach, residue-free at Released and ${after.stage}`);
 } catch (error) {
   await CaptureFailure(ctx).catch(() => {});
   throw error;

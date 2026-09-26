@@ -133,7 +133,7 @@ export const PROPS = Object.freeze([
   // 日军插在南沟沿上的旗（SB03 右沿、SB03A 右上、SB04 左远）：调研写 (10.5,-122.3)，那里是南壁半坡（地面 -1.13），
   // 挪到沟沿 z -121.8、插在沙袋中间。杆 2.8 m，旗面 0.7×0.46，程序化白底红日加脏污。
   // 旗往南飘（flyYawDeg 170）：SB03/03A 从洞口朝东看，旗面正对镜头、往画面右边展开；原来朝西（70°）从洞口看是一条边（实拍只见杆）。
-  { id: "flagTrench", kind: "flag", x: 10.5, z: -121.8, poleM: 2.8, cloth: Object.freeze([0.7, 0.46]), flyYawDeg: 170 },
+  { id: "flagTrench", kind: "flag", faction: "nra", fallYawDeg: 35, x: 10.5, z: -121.8, poleM: 2.8, cloth: Object.freeze([0.7, 0.46]), flyYawDeg: 170 },
   // 北沟沿枯树（现成 Model_DeadTreeTrunkSet.glb）。
   { id: "deadTreeRim0", kind: "external", asset: "deadTreeTrunk01", x: 8.6, z: -127.7, yawDeg: 40, scale: 0.9 },
   { id: "deadTreeRim1", kind: "external", asset: "deadTreeTrunk02", x: 11.6, z: -128.25, yawDeg: -65, scale: 1.0 },
@@ -157,7 +157,7 @@ export const PROPS = Object.freeze([
       Object.freeze({ side: "east", path: Object.freeze([SswPoint(8.1, 1.86), SswPoint(10.2, 1.94)]) }),
     ]) },
   // RC 外侧沟沿上的日本旗（SB05 远处）：杆 2.5 m。
-  { id: "flagRC", kind: "flag", x: -7, z: -109, poleM: 2.5, cloth: Object.freeze([0.62, 0.41]), flyYawDeg: 100 },
+  { id: "flagRC", kind: "flag", faction: "nra", x: -7, z: -109, poleM: 2.5, cloth: Object.freeze([0.62, 0.41]), flyYawDeg: 100 },
 
   // ---------------------------------------------------------------- 洞口塌土的外观（碰撞在 MISSION_SCENARIO）
   // 塌土体块是方盒；这里各盖一个压扁的土包把方盒包进去（SB03 右侧：峰高不超过 0.4 m）。

@@ -5,7 +5,7 @@
 // 数据在 Data_OpeningSet0103.PROPS（纯数据）；这里只把它变成 three 网格：
 //   · 静态件按材质走 BuildSink 合批（AGENTS §3），分三组：01–03 常驻组、近爆之后才出现的塌方组、
 //     02 起才出现的组（show:"rescue"，还权坐位的靠背：01 里它挡 SB03 看审问组的视线）；
-//   · 会动的只有两样：门楣南段的落下（FallLintel）、马灯的点光与灯罩闪烁；
+//   · 动态件：门楣南段的落下（FallLintel）、马灯的点光与灯罩闪烁、沟沿国军旗被踹倒（PoseFlag）；
 //   · 全部挂在本模块自己的根节点下，Exit() 拆干净（几何、自有材质、贴图、灯），场景里不留一个节点。
 // 库材质（library.Get）与外部模型模板是共享的，只摘不 dispose。
 //
@@ -169,6 +169,7 @@ export class OpeningSet {
       if (want !== this.lintelProgress) this.FallLintel(want);
       this.UpdateRoofTimber(dt, stageId, phase);
     }
+    if(flags.flagFall!=null)this.PoseFlag("flagTrench",flags.flagFall);
     this.UpdateBlast(flags.blastAge, stageId);
     this.UpdateLantern(stageId, collapsed);
     if (this.smokeStage !== stageId) { this.smokeStage = stageId; this.UpdateSmoke(stageId); }
@@ -192,6 +193,7 @@ export class OpeningSet {
     if (this.skyApplied) { this.skyApplied = false; this.restoreSky?.(); }
     if (!this.root) return;
     this.DisposeRoot(this.root, this.ownedMaterials, this.ownedTextures, this.lights);
+    this.flags?.clear();
     this.root = null; this.collapsedRoot = null; this.rescueRoot = null; this.lintel = null; this.lantern = null; this.roofTimber = null;
     this.smokeStage = null;
     this.ownedMaterials = []; this.ownedTextures = []; this.lights = [];
@@ -800,6 +802,8 @@ export class OpeningSet {
   }
 
   BuildFlag(prop, sink) {
+    const moving=Number.isFinite(prop.fallYawDeg),targetSink=moving?new BuildSink():sink;
+    sink=targetSink;
     const y = this.groundAt(prop.x, prop.z) - 0.25;
     sink.Add("WoodBeam", Post(new THREE.Vector3(prop.x, y, prop.z), new THREE.Vector3(0.03, 1, 0.02).normalize(), prop.poleM + 0.25, 0.045, { round: true, seed: prop.id }));
     const [w, h] = prop.cloth, cloth = new THREE.PlaneGeometry(w, h, 10, 5), pos = cloth.attributes.position;
@@ -812,21 +816,42 @@ export class OpeningSet {
     cloth.translate(w / 2 + 0.03, 0, 0); cloth.computeVertexNormals();
     const key = `OpeningSetFlag_${prop.id}`;
     const material = this.Own(new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.95, metalness: 0, side: THREE.DoubleSide }));
-    const texture = this.FlagTexture(prop.id);
+    const texture = this.FlagTexture(prop.id,prop.faction);
     if (texture) { material.map = texture; this.ownedTextures.push(texture); } else material.color.setHex(0xd8d0bf);
     this.sinkMaterials.set(key, material);
     sink.Add(key, PlaceGeometry(cloth, { x: prop.x + 0.03 * (prop.poleM + 0.25), y: y + 0.25 + prop.poleM - h / 2 - 0.04, z: prop.z + 0.02 * (prop.poleM + 0.25), ry: (prop.flyYawDeg + 90) * DEG }));
-  }
 
-  /** 日章旗布面：脏白底、偏暗的红日、泥点与雨渍（程序化，2 KB 级，不另出贴图文件）。 */
-  FlagTexture(seed) {
+    if(moving){
+      const group=new THREE.Group();group.name=`OpeningFlag_${prop.id}`;this.root.add(group);
+      const base=new THREE.Vector3(prop.x,y+.25,prop.z);
+      const meshes=sink.Flush(group,{}, {castShadow:true,receiveShadow:true,resolve:name=>this.sinkMaterials.get(name)||this.Lib(name)});
+      for(const mesh of meshes)mesh.geometry.translate(-base.x,-base.y,-base.z);
+      group.position.copy(base);(this.flags??=new Map()).set(prop.id,{group,spec:prop,progress:0});
+    }
+  }
+  PoseFlag(id,progress){
+    const flag=this.flags?.get(id);if(!flag||flag.progress===Clamp01(progress))return;
+    const yaw=flag.spec.fallYawDeg*DEG,axis=new THREE.Vector3(Math.cos(yaw),0,-Math.sin(yaw));
+    flag.progress=Clamp01(progress);
+    flag.group.quaternion.setFromAxisAngle(axis,Math.PI*.49*flag.progress);
+    flag.group.updateMatrixWorld(true);
+  }
+  /** 国军旗：红地、蓝色旗角与十二道白日光芒，叠加泥点与雨渍。 */
+  FlagTexture(seed,faction="nra") {
     const canvas = this.makeCanvas?.(256, 168);
     const ctx = canvas?.getContext?.("2d");
     if (!ctx) return null;
     const rnd = Rng(seed), W = canvas.width, H = canvas.height;
-    ctx.fillStyle = "#d9d2c1"; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = faction==="nra"?"#a52a23":"#d9d2c1"; ctx.fillRect(0, 0, W, H);
+    if(faction==="nra"){
+      ctx.fillStyle="#193b70";ctx.fillRect(0,0,W/2,H/2);
+      const cx=W/4,cy=H/4,outer=H*.18,inner=outer*.5;
+      ctx.fillStyle="#eee6d1";ctx.beginPath();
+      for(let i=0;i<24;i++){const a=-Math.PI/2+i*Math.PI/12,r=i%2?inner:outer;const x=cx+Math.cos(a)*r,y=cy+Math.sin(a)*r;if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);}
+      ctx.closePath();ctx.fill();ctx.beginPath();ctx.arc(cx,cy,inner*.92,0,Math.PI*2);ctx.fill();
+    }
     for (let k = 0; k < 900; k++) { ctx.fillStyle = `rgba(${90 + rnd() * 40},${70 + rnd() * 30},${50 + rnd() * 20},${0.03 + rnd() * 0.06})`; ctx.fillRect(rnd() * W, rnd() * H, 2 + rnd() * 6, 1 + rnd() * 4); }
-    ctx.fillStyle = "#a3231d"; ctx.beginPath(); ctx.arc(W / 2, H / 2, H * 0.3, 0, Math.PI * 2); ctx.fill();
+    if(faction!=="nra"){ctx.fillStyle = "#a3231d"; ctx.beginPath(); ctx.arc(W / 2, H / 2, H * 0.3, 0, Math.PI * 2); ctx.fill();}
     const grad = ctx.createLinearGradient(0, H * 0.55, 0, H);
     grad.addColorStop(0, "rgba(80,60,40,0)"); grad.addColorStop(1, "rgba(80,60,40,0.45)");
     ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);

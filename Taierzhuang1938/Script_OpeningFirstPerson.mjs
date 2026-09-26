@@ -676,6 +676,13 @@ export class OpeningFirstPerson{
   }
   Update(dt=1/60){
     const s=this.show,r=s.r,p=s.phase,a=s.Age,cam=r.player.camera,fp=C.firstPerson;
+    if(s.CinematicActive){
+      if(s.playerBody?.root)s.playerBody.root.visible=false;
+      if(s.supplyRoot)s.supplyRoot.visible=false;
+      for(const prop of Object.values(this.props))if(prop?.object)prop.object.visible=false;
+      this.report=s.firstPersonState={available:true,cinematic:true,phase:p,age:a,hands:{}};
+      return;
+    }
     this.rig ||= Anatomy(s.playerBody);
     if(!this.rig){
       if(s.playerBody?.root)s.playerBody.root.visible=false;

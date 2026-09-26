@@ -117,6 +117,7 @@ export class FirstLevelBunkerShow {
   }
   Begin(){this.at=this.r.time;this.started=this.r.time;}
   get Age(){return this.r.time-this.at;}
+  get CinematicActive(){return !!C.interrogation.cinematic[this.phase];}
   get CameraActive(){return ["Trapped","BunkerRescue"].includes(this.r.flow.stage.id)&&this.phase!=="Released"&&this.phase!=null&&(TRAPPED.has(this.phase)||RESCUE.has(this.phase));}
   // ---- cast -------------------------------------------------------------------------------
   Ija(role){const actor=this.r.enemies.get(C.cast[role]);return actor||null;}
@@ -190,7 +191,7 @@ export class FirstLevelBunkerShow {
       this.Put(comrade,this.ComradeWallRoot());comrade.scriptEssential=false;
       this.PlayClip(comrade,"CaptiveWallSlideTwitch",{at:r.time-10});this.Kill(comrade);this.Corpse(comrade,"CaptiveWallSlideTwitch");
     }
-    this.flags.comradeDead=true;
+    this.flags.comradeDead=true;this.flags.flagFallProgress=1;this.r.openingSet?.PoseFlag("flagTrench",1);
     const shouter=this.cast.shouter;
     if(shouter?.alive){this.Put(shouter,{...C.banter.shouter,yaw:Face(C.banter.shouter,C.banter.shellAt)});this.Kill(shouter,"explosion");}
     this.Hide(this.cast.runner);
@@ -346,9 +347,9 @@ export class FirstLevelBunkerShow {
   }
   ClipAge(actor,clip){return actor?.openingPlay?.clip===clip?this.r.time-actor.openingPlay.at+actor.openingPlay.offset:-1;}
   /**
-   * Move a root toward `point` at `speed` (no physics: a director walk cannot jam), turn at
+   * Move a root toward `point` at `speed` along its authored route, turn at
    * turnRps toward `face` (a point, a yaw, or the direction of travel), and pose `clip`.
-   * Returns true when within arriveM.
+   * The unpaired interpreter waits at occupied body space. Returns true when within arriveM.
    */
   Move(actor,point,face,clip,speed=C.speed.walk,{seconds=null,upperBody=false,holdUntil=null,additive=null,aim=0}={}){
     if(!actor)return false;
@@ -361,6 +362,7 @@ export class FirstLevelBunkerShow {
     if(last&&Number.isFinite(actor.openingStoryboardYaw))actor.yaw=actor.openingStoryboardYaw;
     const distance=Distance(from,point),step=Math.min(distance,speed*dt);
     const to=distance>1e-5?{x:from.x+(point.x-from.x)*step/distance,z:from.z+(point.z-from.z)*step/distance}:{x:point.x,z:point.z};
+    if(actor===this.cast.interpreter&&step>0)this.AvoidInterpreterOverlap(from,to,actor);
     const travel=dt>0?Distance(from,to)/dt:0;
     actor.openingStoryboardTravel=travel;
     actor.openingStoryboardLast={...to,time:this.r.time};
@@ -384,6 +386,27 @@ export class FirstLevelBunkerShow {
     InstallOpeningStoryboardAnimation(actor);
     return Distance(to,point)<C.arriveM;
   }
+  /** Swept body clearance for the unpaired interpreter, including background soldiers.
+   * Authored routes provide the passing lane; a blocked step waits instead of tunnelling through a body. */
+  AvoidInterpreterOverlap(from,to,actor){
+    const inCircle=["Boots","Hold","Ask","KickShunzi","Glimpse","Collar","Chop","Parry"].includes(this.phase);
+    const radius=inCircle?C.rescue.interpreterClearanceM:C.interpreterClearanceM,dx=to.x-from.x,dz=to.z-from.z,len2=dx*dx+dz*dz;
+    if(len2<1e-10)return;
+    let fraction=1;
+    for(const other of new Set([...this.r.enemies.values(),...Object.values(this.cast),...(this.r.backdrop?.members||[]).map(m=>m.actor)])){
+      if(!other||other===actor||!other.alive||other.openingStoryboardHidden)continue;
+      const at=other.openingStoryboardLast||other.position;
+      if(!at||Math.abs((other.position.y||0)-(actor.position.y||0))>1.5)continue;
+      const x=from.x-at.x,z=from.z-at.z,b=x*dx+z*dz,c=x*x+z*z-radius*radius;
+      if(c<0){if(b<0)fraction=0;continue;}
+      const disc=b*b-len2*c;
+      if(disc<0||b>=0)continue;
+      const contact=(-b-Math.sqrt(disc))/len2;
+      if(contact>=0&&contact<fraction)fraction=Math.max(0,contact-.001);
+    }
+    to.x=from.x+dx*fraction;to.z=from.z+dz*fraction;
+    if(fraction<1)this.flags.interpreterBlockedFrames=(this.flags.interpreterBlockedFrames||0)+1;
+  }
   /** Stand exactly on a root (stage placements); small offsets are walked, never jumped. */
   Hold(actor,root,clip,options={}){
     const at=actor?.openingStoryboardLast||actor?.position,far=at&&Distance(at,root)>.6;
@@ -395,7 +418,7 @@ export class FirstLevelBunkerShow {
     if(!actor)return false;
     const walk=actor.openingWalk?.key===key?actor.openingWalk:(actor.openingWalk={key,index:0});
     const at=actor.openingStoryboardLast||actor.position;
-    while(walk.index<route.length-1&&Distance(at,route[walk.index])<.3)walk.index++;
+    while(walk.index<route.length-1&&Distance(at,route[walk.index])<(options.cornerM??.3))walk.index++;
     const last=walk.index===route.length-1;
     const arrived=this.Move(actor,route[walk.index],last&&Distance(at,route[walk.index])<.3?faceEnd:null,clip,speed,options);
     return last&&arrived;
@@ -865,10 +888,26 @@ export class FirstLevelBunkerShow {
       const start={...m.start,yaw:Face(m.start,m.route[0])};
       let actor=this.cast[m.id];
       if(!actor){actor=this.Spawn(m.id,"ija",m.start,{weapon:"Type38"});this.Put(actor,start);}
-      if(this.r.time<at+D.afterWipeS+i*D.staggerS){this.Hold(actor,start,null);return;}
+      if(m.flagKick&&!this.KickBackdropFlag(actor,m.flagKick))return;
+      if(!m.flagKick&&this.r.time<at+D.afterWipeS+i*D.staggerS){this.Hold(actor,start,null);return;}
       if(!this.Follow(actor,"depth",m.route,D.speedMps,null))return;
       if(!InCameraView(this.r.player.camera,this.r.Point(actor.position,1),10))this.RetireDepthIja(m.id);else this.Pose(actor,null);
     });
+  }
+  KickBackdropFlag(actor,spec){
+    const key="flagKickAt",root={...spec.root,yaw:spec.yawDeg*DEG};
+    if(this.flags[key]==null){
+      if(this.Hold(actor,root,null,{speed:OPENING_DEPTH_IJA.speedMps}))this.flags[key]=this.r.time;
+      return false;
+    }
+    const t=this.r.time-this.flags[key];
+    if(t>=spec.contactS){
+      if(this.flags.flagKickedAt==null){this.flags.flagKickedAt=this.r.time;this.r.audio?.Play?.("debrisFall",{position:this.r.Point(root,.4),volume:.65});}
+      this.flags.flagFallProgress=Smooth((t-spec.contactS)/spec.fallS);
+      this.r.openingSet?.PoseFlag(spec.id,this.flags.flagFallProgress);
+    }
+    if(t<spec.clipS){this.Hold(actor,root,"IjaKickPrisoner",{seconds:t});return false;}
+    return true;
   }
   RetireDepthIja(id=null){
     for(const m of OPENING_DEPTH_IJA.members)if(id==null||m.id===id){this.flags["retired:"+m.id]=true;this.RetireWalker(m.id);}
@@ -1156,7 +1195,8 @@ export class FirstLevelBunkerShow {
       if(!actor)return true;
       if(age<I.hurryAfterS)return false;
       if(actor.openingWalk?.key==="hurry"&&actor.openingWalk.done)return this.Hold(actor,mark,null,{speed:C.speed.walk});
-      if(this.Follow(actor,"hurry",[I.backOffRoute.at(-1),mark],I.hurryMps,clip,mark.yaw,clip?{upperBody:true}:{}))actor.openingWalk.done=true;
+      const interpreter=actor===this.cast.interpreter,route=[I.backOffRoute.at(-1),...(interpreter?C.rescue.interpreterReturn:[]),mark];
+      if(this.Follow(actor,"hurry",route,I.hurryMps,clip,mark.yaw,{upperBody:!!clip,cornerM:interpreter ? .03 : .3}))actor.openingWalk.done=true;
       return false;
     };
     if(age<I.hurryAfterS)this.RearParty(this.RearGo());
@@ -1933,7 +1973,9 @@ export class FirstLevelBunkerShow {
     const Head=actor=>this.HeadPoint(actor);
     const At=(point,h)=>r.Point(point,h);
     const ijaA=this.Ija("ijaA"),comrade=this.Comrade,luo=this.Squad("luo"),interp=this.cast.interpreter,L=C.firstPerson.look;
-    let eye=S.witnessEye,height=S.lieEyeM,target=At({x:4,z:-125.4},.9),roll=0,pitch=0,closeView=0;
+    const cinematic=C.interrogation.cinematic[p];
+    if(cinematic)return {...cinematic,cinematic:true,roll:0,pitch:0,target:At(cinematic.target,cinematic.targetH)};
+    let eye=S.witnessEye,height=S.lieEyeM,target=At({x:4,z:-125.4},.9),roll=0,pitch=0;
     if(p==="Banter"){
       // SB01: from the back of the dugout out through the mouth (the talk turns the head a little to the speaker).
       eye=S.seat;height=S.seatEyeM;
@@ -1964,22 +2006,6 @@ export class FirstLevelBunkerShow {
       if(p==="Wake"){height+=L.pushUpM*Smooth((a-1.2)/.5)*(1-Smooth((a-1.85)/.12));pitch=L.clawPitch*Smooth((a-2)/.4);}
     }
     else if(p==="FrontPass"){target=At(A.bunkerJunction,1.1);roll=-.05;}
-    else if(["CaptiveDragged","CaptiveWall","Interrogation","Slash","Taunt","Wipe"].includes(p)){
-      // SB03 (contract §5): from the mud of the mouth past the fallen lintel to the group at the north wall, left of
-      // centre, the trench's depth on the right.
-      const W=C.interrogation.witnessShot;target=this.Aim(eye,height,W.yawDeg*DEG,W.pitchDeg*DEG);roll=W.rollDeg*DEG;
-      const D=C.interrogation.dragShot;
-      closeView=p==="CaptiveDragged"?Smooth(a/D.enterS):p==="CaptiveWall"?1-Smooth(a/D.exitS):0;
-      const face=closeView>0?Head(comrade):null;
-      if(face){
-        // Keep the eye in the mud; follow the man's face and the hands hauling his collar.
-        // Interpolate directions at equal distance so the close-up doesn't snap at the blend's end.
-        face.y-=D.headBelowM;
-        const origin=At(eye,height),distance=face.distanceTo(origin);
-        target.sub(origin).normalize().multiplyScalar(distance).add(origin).lerp(face,closeView);
-        roll+=(D.rollDeg*DEG-roll)*closeView;
-      }
-    }
     else if(p==="Reach"){
       // SB03A: the eye sinks lower into the mud for the reach (reachEye), dips to the hand and the rifle, and comes up
       // at the timber's noise to ijaA turning round; 「再撑一下」 lifts the eye for a moment.
@@ -2075,7 +2101,7 @@ export class FirstLevelBunkerShow {
       const K=C.rescue.checkShot,t=this.flags.kickRifleAt!=null?r.time-this.flags.kickRifleAt:0,dip=Smooth((t-.3)/.5);
       eye=S.cover;height=K.eyeM;target=this.Aim(eye,height,K.yawDeg*DEG,(K.pitchDeg+(K.kickPitchDeg-K.pitchDeg)*dip)*DEG);
     }
-    return {eye,height,target,roll,pitch,closeView};
+    return {eye,height,target,roll,pitch};
   }
   /** The circle's eye from Luo's cut on: sunk to chopEyeM, chopAsideM to the right (west), turned to chopYawDeg. */
   ChopEye(eye){
@@ -2107,18 +2133,19 @@ export class FirstLevelBunkerShow {
     const r=this.r,p=this.phase,a=this.Age;
     if(!this.CameraActive)return false;
     const cam=r.player.camera,shot=this.Shot(),sense=this.Perceive(),head=this.HeadLook(),still=r.opening?.reducedMotion?.matches;
-    if(shot.closeView>0||this.dragBaseFov!=null){
-      this.dragBaseFov??=cam.fov;
-      cam.fov=this.dragBaseFov+(C.interrogation.dragShot.fovDeg-this.dragBaseFov)*(shot.closeView||0);
-      cam.updateProjectionMatrix();
-      if(!shot.closeView)this.dragBaseFov=null;
+    const shotId=shot.id||"firstPerson",cut=this.presentedShotId!=null&&this.presentedShotId!==shotId;
+    if(cut){this.cameraFrom=null;this.presentedCamera=null;this.previousViewPosition=null;this.previousViewQuaternion=null;this.cameraCutAt=r.time;this.cameraCutSerial=(this.cameraCutSerial||0)+1;r.NotifyCameraCut?.();}
+    this.presentedShotId=shotId;
+    if(shot.cinematic||this.cinematicBaseFov!=null){
+      this.cinematicBaseFov??=cam.fov;cam.fov=shot.fov??this.cinematicBaseFov;cam.updateProjectionMatrix();
+      if(!shot.cinematic)this.cinematicBaseFov=null;
     }
     cam.position.copy(r.Point(shot.eye,shot.height));cam.lookAt(shot.target);
-    const yaw=head.yaw+(still?0:sense.yaw);
+    const yaw=shot.cinematic?0:head.yaw+(still?0:sense.yaw);
     if(yaw)cam.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(UP,yaw));
-    cam.rotateX((shot.pitch||0)+head.pitch+(still?0:sense.pitch));
-    cam.rotateZ((shot.roll||0)+(still?0:sense.roll));
-    if(this.cameraFrom&&a<C.cameraBlendS){
+    cam.rotateX((shot.pitch||0)+(shot.cinematic?0:head.pitch+(still?0:sense.pitch)));
+    cam.rotateZ((shot.roll||0)+(shot.cinematic||still?0:sense.roll));
+    if(!shot.cinematic&&this.cameraFrom&&a<C.cameraBlendS){
       const mix=Smooth(a/C.cameraBlendS),desiredQuaternion=cam.quaternion.clone();
       cam.position.lerpVectors(this.cameraFrom.position,cam.position,mix);
       cam.quaternion.slerpQuaternions(this.cameraFrom.quaternion,desiredQuaternion,mix);
@@ -2152,10 +2179,11 @@ export class FirstLevelBunkerShow {
     // The butt knocks him out for a moment (ija.knockOut): ijaA turns round to haul him meanwhile.
     const K=C.ija.knockOut,ko=this.strikeAt!=null&&(p==="Butt"||p==="Boots")?r.time-this.strikeAt:null;
     const knocked=ko==null?0:Smooth(ko/K.closeS)*(1-Smooth((ko-K.openAtS)/K.openS));
-    opening.eyeClosure=p==="Blast"?Smooth((a-C.banter.blastShot.eyesCloseS)/.05):p==="Black"?1:p==="Wake"?1-Smooth(a/2.2)*(.7+.3*Smooth((a-1.4)/.8)):Math.max(fade,blink,knocked);
-    opening.blackout=opening.eyeClosure;
+    const recovery=C.blackoutRecovery;
+    opening.eyeClosure=p==="Blast"?Smooth((a-C.banter.blastShot.eyesCloseS)/recovery.closeS):p==="Black"?1:p==="Wake"?1-Smooth(a/recovery.eyelidS):Math.max(fade,blink,knocked);
+    opening.blackout=p==="Black"?1:p==="Wake"?1-Smooth(a/recovery.fadeS):0;
     // Blur / ghosting / imbalance follow one continuous curve (Perceive), no per-phase steps.
-    if(sense.amount>1e-3)opening.concussion={amount:sense.amount,focus:sense.focus,pitch:0,roll:0};
+    opening.concussion=shot.cinematic?null:sense.amount>1e-3?{amount:sense.amount,focus:sense.focus,pitch:0,roll:0}:null;
     if(this.playerBody)this.firstPerson.Update(this.delta||0);
     // The loading rifle leaves his hands at the blast (pendingWiring SB02 rifleSlide); the mission rifle (the same
     // gun, in the mouth afterwards) is shown only from the black on, not at the mouth while the eyes are open.
@@ -2305,7 +2333,8 @@ export class FirstLevelBunkerShow {
       headLook:this.headLook||null,meet:this.meet?{s:this.meet.s}:null};
   }
   Dispose(){
-    if(this.dragBaseFov!=null){this.r.player.camera.fov=this.dragBaseFov;this.r.player.camera.updateProjectionMatrix();this.dragBaseFov=null;}
+    if(this.cinematicBaseFov!=null){this.r.player.camera.fov=this.cinematicBaseFov;this.r.player.camera.updateProjectionMatrix();this.cinematicBaseFov=null;}
+    this.presentedShotId=null;
     this.ReleaseMeleeDormancy();
     for(const actor of this.performanceActors||[])ClearOpeningActorPerformance(actor);this.performanceActors?.clear();
     this.r.hud.SetStoryBlood?.(0);this.supplyRoot?.removeFromParent();this.playerBody?.root.removeFromParent();this.playerBody?.Dispose?.();

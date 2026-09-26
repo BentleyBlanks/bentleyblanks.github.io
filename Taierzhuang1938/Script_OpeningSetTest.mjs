@@ -405,6 +405,16 @@ const Samples = (route) => {
   assert.equal(set.Enter("Trapped"), true);
   // 前沿布景 01 进场时就建好、藏着（02→03 那一帧不现建，审查 09-25）；03 起才显示。
   assert.ok(set.front && set.front.root.parent === scene && set.front.root.visible === false && set.Stats().frontMeshes === 0, "01: the front dressing is prebuilt and hidden (no draw)");
+  const flag=set.flags.get("flagTrench");
+  assert.equal(flag.spec.faction,"nra","bunker flag belongs to the defenders");
+  const top0=flag.group.localToWorld(new THREE.Vector3(0,flag.spec.poleM,0));
+  set.PoseFlag("flagTrench",.5);
+  const topHalf=flag.group.localToWorld(new THREE.Vector3(0,flag.spec.poleM,0));
+  set.PoseFlag("flagTrench",1);
+  const topDown=flag.group.localToWorld(new THREE.Vector3(0,flag.spec.poleM,0));
+  assert.ok(topHalf.y<top0.y&&topHalf.y>topDown.y,"actual flag meshes rotate continuously");
+  assert.ok(Math.abs(topDown.y-G(topDown.x,topDown.z))<.2,"fallen flag settles on the bank");
+  set.PoseFlag("flagTrench",0);
   let stats = set.Stats();
   report.stats = stats;
   assert.ok(stats.meshes >= 8 && stats.meshes <= 40, `01 builds the set in a few batched meshes (draw-call budget 60): ${stats.meshes}`);
