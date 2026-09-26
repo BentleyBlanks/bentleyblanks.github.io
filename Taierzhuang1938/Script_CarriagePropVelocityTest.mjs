@@ -65,8 +65,12 @@ try{
       modelInstances:r.view.draftCartModels.instances.size,
       stableCartId:stableCart.id,
       stableDraft:stableCart.draft,
-      stablePartIds:stableParts.map(mesh=>mesh.userData.missionCartPart.identity).sort(),
+      // 合并网格可以承载好几个身份（车板与车栏同一只 WeatheredElm），身份全集按键数。
+      stablePartIds:[...r.view.stableCartParts.entries()]
+        .filter(([key,mesh])=>mesh.visible&&key.startsWith(`${stableCart.id}:`))
+        .map(([key])=>key.slice(stableCart.id.length+1)).sort(),
       stableMeshCount:(()=>{let count=0;r.view.draftCartModels.instances.get(stableCart.id).root.traverse(o=>{if(o.isMesh&&!o.isInstancedMesh)count++});return count;})(),
+      stableSkinnedCount:(()=>{let count=0;r.view.draftCartModels.instances.get(stableCart.id).root.traverse(o=>{if(o.isSkinnedMesh)count++});return count;})(),
       litterVisible:!!r.column.zhou.visible,
       kits:r.view.rigidParts.fieldPack.length};
     const pipeline={preset:{velocity:true,hzb:false},hdrCapable:true,hdrType:T.HalfFloatType,targets:{}};
@@ -148,7 +152,10 @@ try{
   const expected=['deck','rail','shaft','wheel','spoke','draftBody','draftHead','draftLimb'].sort();
   assert.deepEqual(result.live.stablePartIds,expected,'the reserved player cart keeps every near-view piece on stable Mesh identity');
   assert.ok(result.live.modelInstances>=result.live.carts,'every loading-bay cart uses the production Blender model');
-  assert.ok(result.live.stableMeshCount>=25,'the stable cart includes the full wooden chassis and articulated animal');
+  // 2026-09-27 起车与牲口各是一只按材质分图元的蒙皮网格：车 5 + 牛 5 / 马 4（原 59–64 个分件）。
+  assert.ok(result.live.stableMeshCount>=9&&result.live.stableMeshCount<=10,
+    `the stable cart is the batched Blender chassis and articulated animal: ${result.live.stableMeshCount}`);
+  assert.equal(result.live.stableSkinnedCount,result.live.stableMeshCount,'every cart and draft primitive rides its pivot bones');
   assert.ok(result.live.kits>0,'the litter really carries a stable-identity near-camera prop');
   for(const s of result.samples){
     assert.ok(s.coMoving.pixels>100,`${s.name}: real mesh pixels are present`);

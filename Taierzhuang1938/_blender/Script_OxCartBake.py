@@ -980,6 +980,136 @@ def Consolidate(col):
 
 for collection in (cart_col,ox_col,horse_col): Consolidate(collection)
 
+# --- Runtime draw budget (2026-09-27) ---------------------------------------
+# Consolidate still left ~60 separately-drawn pieces per cart (28 cart + 31/36
+# animal), and every piece is submitted in two shadow cascades, the prepass and
+# the main pass. Each model now exports as ONE skinned mesh whose primitives are
+# one per material: the moving pivots become bones (rigid 1.0 weights), untextured
+# paints collapse into two vertex-colour materials, and ForgedWheelTire (the same
+# ForgedIron maps as BlackenedIron) folds into BlackenedIron.  Cart 5 draws,
+# ox 5, horse 4 per pass.  Bone names are the old pivot names, so WheelLeft /
+# OxFrontLeftPivot / the Walk clip bind exactly as before.
+
+def FlatPaint(name, roughness, metallic):
+    mat = bpy.data.materials.new(name)
+    mat.use_nodes = True
+    nodes = mat.node_tree.nodes
+    shader = nodes.get('Principled BSDF')
+    paint = nodes.new('ShaderNodeVertexColor')
+    paint.layer_name = 'FlatColor'
+    mat.node_tree.links.new(paint.outputs['Color'], shader.inputs['Base Color'])
+    shader.inputs['Roughness'].default_value = roughness
+    shader.inputs['Metallic'].default_value = metallic
+    return mat
+
+flat_paint = FlatPaint('FlatPaint', .86, 0)
+flat_metal = FlatPaint('FlatPaintMetal', .68, .55)
+MATERIAL_FOLD = {'ForgedWheelTire': 'BlackenedIron'}
+
+def PivotOf(obj):
+    parent = obj.parent
+    while parent is not None and parent.type != 'EMPTY': parent = parent.parent
+    return parent
+
+def BatchForRuntime(col, prefix, clip=None):
+    scene.frame_set(1)
+    bpy.context.view_layer.update()
+    empties = [o for o in col.objects if o.type == 'EMPTY']
+    meshes = [o for o in col.objects if o.type == 'MESH']
+    # 1. Materials: textured ones stay, flat paints become a vertex colour.
+    for obj in meshes:
+        mat = obj.data.materials[0] if obj.data.materials else None
+        if mat and mat.name in MATERIAL_FOLD:
+            mat = bpy.data.materials[MATERIAL_FOLD[mat.name]]
+            obj.data.materials[0] = mat
+        textured = bool(mat) and any(node.type == 'TEX_IMAGE' for node in mat.node_tree.nodes)
+        color = (1, 1, 1, 1)
+        if mat and not textured:
+            shader = mat.node_tree.nodes.get('Principled BSDF')
+            color = tuple(shader.inputs['Base Color'].default_value)
+            obj.data.materials[0] = flat_metal if shader.inputs['Metallic'].default_value > 0 else flat_paint
+        paint = obj.data.color_attributes.new('FlatColor', 'FLOAT_COLOR', 'CORNER')
+        for item in paint.data: item.color = color
+        # 2. One UV layer that holds exactly what TEXCOORD_0 held before (textured
+        #    pieces without UVs sampled texel 0,0 — keep that look, don't re-unwrap).
+        uvs = obj.data.uv_layers
+        if len(uvs) == 0:
+            layer = uvs.new(name='UVMap')
+            for item in layer.data: item.uv = (0, 0)
+        else:
+            keep = uvs[0].name
+            for name in [layer.name for layer in uvs if layer.name != keep]: uvs.remove(uvs[name])
+            uvs[0].name = 'UVMap'
+    # 3. Armature: one bone per pivot empty, rest = the pivot's frame-1 world matrix.
+    rest = {e.name: e.matrix_world.normalized() for e in empties}
+    armature = bpy.data.armatures.new(prefix + 'Rig')
+    rig = bpy.data.objects.new(prefix + 'Rig', armature)
+    col.objects.link(rig)
+    bpy.ops.object.select_all(action='DESELECT')
+    bpy.context.view_layer.objects.active = rig
+    rig.select_set(True)
+    bpy.ops.object.mode_set(mode='EDIT')
+    bones = {}
+    for e in empties:
+        bone = armature.edit_bones.new(e.name)
+        bone.head = (0, 0, 0); bone.tail = (0, .1, 0)
+        bone.matrix = rest[e.name]
+        bones[e.name] = bone
+    for e in empties:
+        pivot = PivotOf(e)
+        if pivot is not None: bones[e.name].parent = bones[pivot.name]
+    bpy.ops.object.mode_set(mode='OBJECT')
+    # 4. Bake the pivots' walk onto the bones (same frames the NLA export sampled).
+    if clip:
+        bone_rest = {bone.name: bone.matrix_local.copy() for bone in armature.bones}
+        rig.animation_data_create()
+        action = bpy.data.actions.new(clip)
+        rig.animation_data.action = action
+        for frame in range(1, 32):
+            scene.frame_set(frame)
+            world = {e.name: e.matrix_world.normalized() for e in empties}
+            for e in empties:
+                pivot = PivotOf(e)
+                if pivot is not None:
+                    basis = (bone_rest[pivot.name].inverted() @ bone_rest[e.name]).inverted() \
+                        @ (world[pivot.name].inverted() @ world[e.name])
+                else:
+                    basis = bone_rest[e.name].inverted() @ world[e.name]
+                pose = rig.pose.bones[e.name]
+                pose.matrix_basis = basis
+                pose.keyframe_insert('location', frame=frame)
+                pose.keyframe_insert('rotation_quaternion', frame=frame)
+        track = rig.animation_data.nla_tracks.new(); track.name = clip
+        strip = track.strips.new(clip, 1, action)
+        strip.action_frame_start = 1; strip.action_frame_end = 31
+        rig.animation_data.action = None
+        scene.frame_set(1)
+        bpy.context.view_layer.update()
+    # 5. Rigid skin: every piece follows its pivot bone with weight 1.0.
+    for obj in meshes:
+        pivot = PivotOf(obj)
+        group = obj.vertex_groups.new(name=pivot.name)
+        group.add(range(len(obj.data.vertices)), 1.0, 'REPLACE')
+        world = obj.matrix_world.copy()
+        obj.parent = None
+        obj.matrix_world = world
+    bpy.ops.object.select_all(action='DESELECT')
+    for obj in meshes: obj.select_set(True)
+    bpy.context.view_layer.objects.active = meshes[0]
+    bpy.ops.object.join()
+    merged = meshes[0]
+    merged.name = prefix + 'Batch'; merged.data.name = prefix + 'BatchMesh'
+    bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+    merged.parent = rig
+    modifier = merged.modifiers.new('Armature', 'ARMATURE'); modifier.object = rig
+    # 6. The pivots now live only as bones.
+    for e in empties: bpy.data.objects.remove(e, do_unlink=True)
+    return merged
+
+BatchForRuntime(cart_col, 'Cart')
+BatchForRuntime(ox_col, 'Ox', 'OxWalk')
+BatchForRuntime(horse_col, 'Horse', 'HorseWalk')
+
 def Export(col, filename):
     bpy.ops.object.select_all(action='DESELECT')
     for obj in col.objects: obj.select_set(True)
@@ -989,9 +1119,122 @@ def Export(col, filename):
         export_animation_mode='NLA_TRACKS',export_force_sampling=True,
         export_frame_range=False,export_materials='EXPORT')
 
+def CompactGlb(path):
+    """Shrink what the rigid skin added to the download (Pages serves ~0.5 MB/s).
+
+    The exporter writes WEIGHTS_0 as float4 and COLOR_0 as float3 on every
+    primitive. Rigid weights are exactly 1/0, so they become normalized bytes;
+    the paint colour is only read by the FlatPaint primitives, so it stays there
+    as normalized shorts and is dropped elsewhere, and FlatPaint primitives drop
+    the UVs nothing samples. Everything else is copied byte for byte.
+    """
+    import json, struct
+    raw = path.read_bytes()
+    json_length = struct.unpack_from('<I', raw, 12)[0]
+    gltf = json.loads(raw[20:20 + json_length])
+    bin_offset = 20 + json_length
+    binary = raw[bin_offset + 8: bin_offset + 8 + struct.unpack_from('<I', raw, bin_offset)[0]]
+    views, accessors = gltf['bufferViews'], gltf['accessors']
+    width = {'SCALAR': 1, 'VEC2': 2, 'VEC3': 3, 'VEC4': 4}
+    def Floats(index):
+        accessor = accessors[index]
+        view = views[accessor['bufferView']]
+        assert accessor['componentType'] == 5126 and 'byteStride' not in view
+        count = accessor['count'] * width[accessor['type']]
+        start = view.get('byteOffset', 0) + accessor.get('byteOffset', 0)
+        return struct.unpack_from(f'<{count}f', binary, start), width[accessor['type']]
+    extra = []   # (accessor index, bytes)
+    def Replace(index, component, fmt, values, count, kind):
+        accessors[index] = {'componentType': component, 'normalized': True,
+                            'count': count, 'type': kind}
+        extra.append((index, struct.pack(f'<{len(values)}{fmt}', *values)))
+    for mesh in gltf['meshes']:
+        for primitive in mesh['primitives']:
+            attributes = primitive['attributes']
+            flat = gltf['materials'][primitive['material']]['name'].startswith('FlatPaint')
+            if 'WEIGHTS_0' in attributes:
+                index = attributes['WEIGHTS_0']
+                values, _ = Floats(index)
+                quantized = []
+                for i in range(0, len(values), 4):
+                    q = [round(v * 255) for v in values[i:i + 4]]
+                    q[q.index(max(q))] += 255 - sum(q)
+                    quantized.extend(q)
+                Replace(index, 5121, 'B', quantized, len(values) // 4, 'VEC4')
+            if 'COLOR_0' in attributes:
+                if flat:
+                    index = attributes['COLOR_0']
+                    values, size = Floats(index)
+                    packed = []
+                    for i in range(0, len(values), size):
+                        rgb = values[i:i + 3]
+                        packed.extend([round(max(0, min(1, v)) * 65535) for v in rgb] + [65535])
+                    Replace(index, 5123, 'H', packed, len(values) // size, 'VEC4')
+                else:
+                    del attributes['COLOR_0']
+            if flat:
+                for key in [key for key in attributes if key.startswith('TEXCOORD_')]: del attributes[key]
+    # Rebuild: keep only referenced accessors / views, pack the new data after them.
+    used = set()
+    for mesh in gltf['meshes']:
+        for primitive in mesh['primitives']:
+            used.update(primitive['attributes'].values())
+            if 'indices' in primitive: used.add(primitive['indices'])
+    for skin in gltf.get('skins', []):
+        if 'inverseBindMatrices' in skin: used.add(skin['inverseBindMatrices'])
+    for animation in gltf.get('animations', []):
+        for sampler in animation['samplers']: used.update((sampler['input'], sampler['output']))
+    replaced = dict(extra)
+    order = sorted(used)
+    remap = {old: new for new, old in enumerate(order)}
+    chunks, new_views = [], []
+    def Append(data, target=None):
+        offset = sum(len(chunk) for chunk in chunks)
+        view = {'buffer': 0, 'byteOffset': offset, 'byteLength': len(data)}
+        if target: view['target'] = target
+        chunks.append(data + b'\0' * (-len(data) % 4))
+        new_views.append(view)
+        return len(new_views) - 1
+    view_remap = {}
+    def CopyView(index):
+        if index not in view_remap:
+            view = views[index]
+            start = view.get('byteOffset', 0)
+            view_remap[index] = Append(binary[start:start + view['byteLength']], view.get('target'))
+            if 'byteStride' in view: new_views[-1]['byteStride'] = view['byteStride']
+        return view_remap[index]
+    new_accessors = []
+    for old in order:
+        accessor = dict(accessors[old])
+        if old in replaced:
+            accessor['bufferView'] = Append(replaced[old], 34962)
+        else:
+            accessor['bufferView'] = CopyView(accessor['bufferView'])
+        new_accessors.append(accessor)
+    for image in gltf.get('images', []):
+        if 'bufferView' in image: image['bufferView'] = CopyView(image['bufferView'])
+    for mesh in gltf['meshes']:
+        for primitive in mesh['primitives']:
+            primitive['attributes'] = {key: remap[value] for key, value in primitive['attributes'].items()}
+            if 'indices' in primitive: primitive['indices'] = remap[primitive['indices']]
+    for skin in gltf.get('skins', []):
+        if 'inverseBindMatrices' in skin: skin['inverseBindMatrices'] = remap[skin['inverseBindMatrices']]
+    for animation in gltf.get('animations', []):
+        for sampler in animation['samplers']:
+            sampler['input'], sampler['output'] = remap[sampler['input']], remap[sampler['output']]
+    gltf['accessors'], gltf['bufferViews'] = new_accessors, new_views
+    blob = b''.join(chunks)
+    gltf['buffers'] = [{'byteLength': len(blob)}]
+    text = json.dumps(gltf, separators=(',', ':')).encode()
+    text += b' ' * (-len(text) % 4)
+    body = struct.pack('<II', len(text), 0x4E4F534A) + text + struct.pack('<II', len(blob), 0x004E4942) + blob
+    path.write_bytes(struct.pack('<III', 0x46546C67, 2, 12 + len(body)) + body)
+
 Export(cart_col,'Model_WoodenEvacCart.glb')
 Export(ox_col,'Model_WorkingOx.glb')
 Export(horse_col,'Model_WorkingHorse.glb')
+for filename in ('Model_WoodenEvacCart.glb','Model_WorkingOx.glb','Model_WorkingHorse.glb'):
+    CompactGlb(model_dir/filename)
 scene.frame_set(1)
 for col in (cart_col,horse_col): col.hide_viewport=True
 for obj in ox_col.objects:

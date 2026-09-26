@@ -39,15 +39,21 @@ try {
   await page.evaluate(() => window.Taierzhuang.StepFrames(15));
   const after = await page.evaluate(() => {
     const editor = window.Taierzhuang.editor.active;
-    let meshes = 0;
-    editor.cartPreview.root.traverse((object) => { if (object.isMesh) meshes += 1; });
+    let meshes = 0, skinned = 0;
+    editor.cartPreview.root.traverse((object) => {
+      if (object.isMesh) meshes += 1;
+      if (object.isSkinnedMesh) skinned += 1;
+    });
     return { leg: editor.cartPreview.animalRoot.getObjectByName("OxFrontLeftPivot").rotation.x,
       wheel: editor.cartPreview.cartRoot.getObjectByName("WheelLeft").rotation.x,
-      meshes, fact: editor.cartFacts.root.textContent };
+      meshes, skinned, fact: editor.cartFacts.root.textContent };
   });
   assert.equal(before.mode, "cart");
   assert.equal(before.kind, "ox");
-  assert.ok(after.meshes >= 30, "the complete Blender cart and ox are rendered");
+  // 2026-09-27 起车与牛各是一只按材质分图元的蒙皮网格（车 5 + 牛 5），原来是 59 个分件。
+  assert.ok(after.meshes >= 9 && after.meshes <= 10,
+    `the Blender cart and ox render as one skinned primitive per material: ${after.meshes}`);
+  assert.equal(after.skinned, after.meshes, "every cart and ox primitive follows its pivot bones");
   assert.ok(Math.abs(after.leg-before.leg) > .05, "the ox gait really changes the leg pivot");
   assert.ok(Math.abs(after.wheel-before.wheel) > .1, "the cart wheel really rolls");
   assert.match(after.fact, /Blender Walk/);

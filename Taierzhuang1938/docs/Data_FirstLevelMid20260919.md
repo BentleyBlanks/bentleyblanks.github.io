@@ -76,6 +76,13 @@
      `Model_WorkingHorse.glb`；两种牲口都有 Blender `Walk` 动画，车轮按行进距离转动。
      `Script_DraftCartModel.mjs` 同时供关卡和「人物动作」编辑器使用。三件模型由
      `_blender/Script_OxCartBake.py` 重建；原白盒实例桶只在资产加载中或失败时保底。
+     **提交预算（2026-09-27）**：导出前 `BatchForRuntime` 把每件模型合成一只蒙皮网格、
+     每种材质一个图元（车 5、牛 5、马 4；原来一辆车 59–64 个分件），活动节点变成同名骨头
+     （`WheelLeft`、`OxFrontLeftPivot`…），无贴图的纯色件并成两只顶点色材质 `FlatPaint` /
+     `FlatPaintMetal`；`CompactGlb` 再把刚性权重和顶点色压成定点数。分件身份
+     （deck / rail / wheel / draftBody…）按材质映射到承载它的合并网格。车与牲口必须能被视锥剔除
+     （蒙皮网格的剔除球按绑定姿势放宽 0.45 m）——车队从 01 起停在两三百米外，
+     不剔除时每帧白画约一千个 draw。
   3. 人力担架 —— 后送队本身。
   4. 能走的伤员 —— `MidWalkingWounded()` 在接运点现场摆六个人三对（一个搀一个被搀）。
      后送队自己的 `walkingWoundedCount` 是 0（用户 2026-09-16 砍的是随队护送编制），

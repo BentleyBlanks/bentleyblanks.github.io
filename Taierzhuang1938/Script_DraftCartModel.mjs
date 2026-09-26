@@ -3,8 +3,23 @@
 import * as THREE from "three";
 import { GLTFLoader } from "./vendor/three/examples/jsm/loaders/GLTFLoader.js";
 import { AttachShadowDepth } from "./Script_ShadowDepth.mjs";
+import { CloneSkinnedRig } from "./Script_SkinnedClone.mjs";
 
-const VERSION = "20260924134448";
+const VERSION = "20260927013000";
+/**
+ * 2026-09-27 起车与牲口各是**一只蒙皮网格、按材质分图元**（_blender/Script_OxCartBake.py
+ * 的 BatchForRuntime）：车 5 个 draw、牛 5 个、马 4 个，原来是 28 + 31/36 个分件。
+ * 活动节点变成同名骨头（WheelLeft / OxFrontLeftPivot…），Walk 动画照旧按名字绑定。
+ * 下面这张表把沿用下来的分件身份映射到合并后承载它的那只网格（按材质名），
+ * 一只网格可以承载好几个身份（车板与车栏都是 WeatheredElm）。
+ */
+const CART_PART_MATERIALS = Object.freeze({
+  deck: "WeatheredElm", rail: "WeatheredElm", shaft: "WornWoodEdges",
+  wheel: "BlackenedIron", spoke: "WornWoodEdges",
+});
+const ANIMAL_COAT = Object.freeze({ ox: "OxBrownCoat", horse: "HorseBayCoat" });
+/** 蒙皮网格的剔除球按绑定姿势算，再放宽这么多：走路时腿、头、尾最多甩出这点距离。 */
+const SKIN_CULL_PAD_M = .45;
 const loader = new GLTFLoader();
 let assetsPromise = null;
 
@@ -23,10 +38,10 @@ export function LoadDraftCartAssets() {
   return assetsPromise;
 }
 
-function MeshByPrefix(root, prefix) {
+function MeshByMaterial(root, name) {
   let found = null;
   root.traverse((object) => {
-    if (!found && object.isMesh && object.name.startsWith(prefix)) found = object;
+    if (!found && object.isMesh && object.material?.name === name) found = object;
   });
   return found;
 }
@@ -37,8 +52,8 @@ export function CreateDraftCartInstance(assets, kind) {
   root.name = `DraftCart_${kind}`;
   const cartRoot = new THREE.Group();
   const animalRoot = new THREE.Group();
-  const cartModel = assets.cart.scene.clone(true);
-  const animalModel = source.scene.clone(true);
+  const cartModel = CloneSkinnedRig(assets.cart.scene);
+  const animalModel = CloneSkinnedRig(source.scene);
   cartModel.position.y = -1; // cartRoot pivots at axle/deck height for overturning.
   animalModel.position.z = 4.15; // asset torso was authored at Blender Y=4.15.
   cartRoot.add(cartModel);
@@ -48,9 +63,15 @@ export function CreateDraftCartInstance(assets, kind) {
     if (!object.isMesh) return;
     object.castShadow = true;
     object.receiveShadow = true;
-    // 视锥剔除必须开着：车队从 01 起就停在两三百米外，关掉剔除时每辆车六十来个分件
+    // 视锥剔除必须开着：车队从 01 起就停在两三百米外，关掉剔除时每辆车的每个分件
     // 在阴影两级、预通道、主场景里每帧全画，实测占全帧 draw 的 55–70%（2026-09-27）。
-    // 分件是节点动画的刚体网格，几何包围球乘 matrixWorld 就是对的，不需要特殊处理。
+    // three 给 SkinnedMesh 的剔除球是第一次剔除那一刻的姿势算的；这里预先按绑定姿势
+    // 算好并放宽，腿和头怎么甩都不会被误剔。
+    if (object.isSkinnedMesh) {
+      object.geometry.computeBoundingSphere();
+      object.boundingSphere = object.geometry.boundingSphere.clone();
+      object.boundingSphere.radius += SKIN_CULL_PAD_M;
+    }
     AttachShadowDepth(object);
   });
   const wheels = [cartModel.getObjectByName("WheelLeft"), cartModel.getObjectByName("WheelRight")];
@@ -59,15 +80,11 @@ export function CreateDraftCartInstance(assets, kind) {
   const clip = source.animations.find((entry) => entry.name === `${kind === "ox" ? "Ox" : "Horse"}Walk`);
   mixer.clipAction(clip).play();
   let lastTravelM = 0;
+  const coat = MeshByMaterial(animalModel, ANIMAL_COAT[kind === "ox" ? "ox" : "horse"]);
   const parts = {
-    deck: MeshByPrefix(cartModel, "CartDeckSurface"),
-    rail: MeshByPrefix(cartModel, "CartRailWeatheredElm"),
-    shaft: MeshByPrefix(cartModel, "CartShaftWornWoodEdges"),
-    wheel: MeshByPrefix(cartModel, "CartRimForgedWheelTire"),
-    spoke: MeshByPrefix(cartModel, "CartSpokes"),
-    draftBody: MeshByPrefix(animalModel, `${kind === "ox" ? "Ox" : "Horse"}Body`),
-    draftHead: MeshByPrefix(animalModel, kind === "ox" ? "OxHeadOxBrownCoat" : "HorseHeadHorseBayCoat"),
-    draftLimb: MeshByPrefix(animalModel, kind === "ox" ? "OxLegOxBrownCoat" : "HorseLegHorseBayCoat"),
+    ...Object.fromEntries(Object.entries(CART_PART_MATERIALS)
+      .map(([identity, material]) => [identity, MeshByMaterial(cartModel, material)])),
+    draftBody: coat, draftHead: coat, draftLimb: coat,
   };
   for (const [name, mesh] of Object.entries(parts))
     if (!mesh) throw new Error(`Draft cart is missing ${name} geometry`);
@@ -105,8 +122,9 @@ export class DraftCartModels {
       this.instances.set(cart.id, instance);
       this.root.add(instance.root);
     }
+    // 一只合并网格承载好几个身份时，userData 记它承载的第一个；身份全集看 stableParts 的键。
     if (stableParts) for (const [identity, mesh] of Object.entries(instance.parts)) {
-      mesh.userData.missionCartPart = { cartId: cart.id, identity };
+      if (mesh.userData.missionCartPart?.cartId !== cart.id) mesh.userData.missionCartPart = { cartId: cart.id, identity };
       stableParts.set(`${cart.id}:${identity}`, mesh);
     }
     instance.root.visible = true;
