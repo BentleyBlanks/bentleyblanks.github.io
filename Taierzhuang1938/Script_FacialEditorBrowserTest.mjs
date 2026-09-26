@@ -17,6 +17,26 @@ try {
   await page.waitForFunction(()=>window.Tengxian?.editor?.active?.buffer,null,{timeout:180000});
   const initial=await page.evaluate(()=>{const e=window.Tengxian.editor.active;return {id:window.Tengxian.editor.ActiveId,face:e.face.controls.length,model:e.actor.modelId,cue:e.cue.id,duration:e.Duration};});
   assert.equal(initial.id,'facial');assert.equal(initial.face,13);assert.ok(initial.duration>1); // 13 Face_ bones since the 01-06 face rigs (docs/Data_CharacterSpeech.md); the NRA05 original had 11
+  // Facial GLBs intentionally omit images: check the loaded render materials,
+  // not just matching material names in the files (which also pass for a white skin).
+  const textures=await page.evaluate(()=>{
+    const e=window.Tengxian.editor.active,rows=[];
+    for(const assets of Object.values(e.host.actorFactory.characterAssets.byFaction))for(const asset of assets){
+      if(!asset.facial)continue;
+      const base=new Map();asset.gltf.scene.traverse(n=>{if(n.isMesh)for(const m of [n.material].flat())base.set(m.name,m);});
+      asset.facial.scene.traverse(n=>{if(n.isMesh)for(const m of [n.material].flat()){
+        if(m.name==='Material_FacialOral')continue;
+        const source=base.get(m.name);rows.push({model:asset.record.id,name:m.name,
+          shared:!!source?.map&&m.map===source.map,width:m.map?.image?.width||0,height:m.map?.image?.height||0,uv:!!n.geometry.attributes.uv});
+      }});
+    }
+    const preview=[];e.actor.characterRig.root.traverse(n=>{if(n.isMesh)for(const m of [n.material].flat()){
+      if(m.name!=='Material_FacialOral')preview.push(!!m.map?.image?.width&&!!n.geometry.attributes.uv);
+    }});return {rows,preview};
+  });
+  assert.ok(textures.rows.length>0&&textures.preview.length>0);
+  for(const row of textures.rows)assert.ok(row.shared&&row.width>0&&row.height>0&&row.uv,`facial surface retains the base texture: ${JSON.stringify(row)}`);
+  assert.ok(textures.preview.every(Boolean),'editor actor retains loaded textures after cloning and uniform recoloring');
   await page.getByRole('button',{name:'播放',exact:true}).click();await page.waitForTimeout(350);
   assert.ok(await page.evaluate(()=>{const e=window.Tengxian.editor.active;return e.playing&&e.CurrentTime()>.1&&e.ctx.state==='running';}));
   await page.getByRole('button',{name:'暂停',exact:true}).click();
@@ -83,7 +103,7 @@ try {
   assert.equal(await page.evaluate(()=>window.Tengxian.editor.active.keys.length),1);
   await page.setViewportSize({width:1000,height:760});await page.screenshot({path:path.join(out,'Scene_FacialCompact.png')});
   assert.deepEqual(errors,[]);
-  await fs.writeFile(path.join(out,'Data_FacialEditor.json'),JSON.stringify({initial,speaking,paused,isolation,closed,draft,errors},null,2));
+  await fs.writeFile(path.join(out,'Data_FacialEditor.json'),JSON.stringify({initial,textures,speaking,paused,isolation,closed,draft,errors},null,2));
   console.log('ok facial editor: real audio clock/jaw, pause/step, neutral, keys, save/reopen, speaker isolation and missing rigs');
 } catch(error){console.error(errors);await page.screenshot({path:path.join(out,'Scene_Failure.png'),timeout:10000}).catch(()=>{});console.error(await page.locator('[data-facial]').innerText({timeout:2000}).catch(()=>''));throw error;}
 finally {await browser.close();if(server)await new Promise(resolve=>server.close(resolve));}
