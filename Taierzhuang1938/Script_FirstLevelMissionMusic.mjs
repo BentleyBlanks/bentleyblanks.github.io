@@ -4,7 +4,8 @@ import { FirstLevelMusicState, FIRST_LEVEL_MUSIC_COMBAT } from "./Data_FirstLeve
 // 【2026-09-23】01–05 的战斗让位读引擎的战场强度；标点事实（facts.has）第一次出现的时刻
 // 记在这里（事实表只是一个集合，不带时间）。
 export class FirstLevelMissionMusic {
-  constructor(audio) { this.audio = audio; this.current = null; this.stingerSeen = new Map(); this.stingerPrimed = false; }
+  constructor(audio) { this.audio = audio; this.current = null; this.stingerSeen = new Map(); this.stingerPrimed = false;
+    this.impactSeenAt = null; this.impactPrimed = false; }
   StingerAge(has) {
     if (typeof has !== "function") return Infinity;
     const now = this.audio.ctx?.currentTime ?? 0;
@@ -20,8 +21,21 @@ export class FirstLevelMissionMusic {
     }
     return age;
   }
+  /**
+   * 【2026-09-26】01 近爆事实（facts.shellImpact）出现了多久：开场配乐近爆后静 silenceS 秒再爬回
+   *（Data_FirstLevelMissionMusic.FIRST_LEVEL_MUSIC_OPENING）。第一次看时已经为真 = 很久以前（跳关/读档）；
+   * 事实被删掉（检查点重来）就跟着忘掉。
+   */
+  ShellImpactAge(shellImpact) {
+    const primed = this.impactPrimed;
+    this.impactPrimed = true;
+    if (!shellImpact) { this.impactSeenAt = null; return Infinity; }
+    const now = this.audio.ctx?.currentTime ?? 0;
+    this.impactSeenAt ??= primed ? now : -Infinity;
+    return now - this.impactSeenAt;
+  }
   Update(stage, facts = {}) {
-    const next = FirstLevelMusicState(stage, { ...facts,
+    const next = FirstLevelMusicState(stage, { ...facts, shellImpactAgeS: this.ShellImpactAge(!!facts.shellImpact),
       intensity: facts.intensity ?? this.audio.battleIntensity ?? 0, stingerAgeS: this.StingerAge(facts.has) });
     if (!this.current || next.cue !== this.current.cue) this.audio.Music(next.cue, {
       fadeOut: next.fadeOut, levelScale: next.scale,

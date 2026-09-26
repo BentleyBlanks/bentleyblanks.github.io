@@ -56,6 +56,8 @@ export class BattleArtillery {
     this.thinned = 0;           // 取证：对白期间按 rateScale 抽掉的几发
     this.layersDropped = 0;     // 取证：声部满了没放的附属层（落土、碎土雨、低频层）
     this.peakVoices = 0;        // 取证：本层同时在响的峰值
+    this.refused = 0;           // 取证：Play 返回空的声数（引擎预算 / 去重 / 距离闸）
+    this.selfCapped = false;    // 这一步的档标了 selfCapped：按整份预算进门（见 Update）
     this.events = [];           // 最近几发（取证）
     this.stage = null;
     this.firstOfStage = false;
@@ -93,6 +95,10 @@ export class BattleArtillery {
     this.time += Math.max(0, dt);
     // 这一步整体隔着什么（01 在洞里）：给了 airCut 的档，每一声再压一道高频。
     this.airCut = profile?.airCut || 0;
+    // 【2026-09-26】这一步的炮击按整份预算进门（与前线 DrainFront 同一个 selfCapped）：本层自己封顶
+    //（maxVoices 4、与前线合计 ≤ 8）。开场两步实测一半以上的炮弹被引擎按「45 m 外 = 低优先级」
+    // 的 0.62 天花板饿死（drops.starved），前线又比它远、比它响，偷无可偷。只在数据里标了的步骤生效。
+    this.selfCapped = !!profile?.selfCapped;
     this.zoneOverride = profile?.listenerZone || null;
     // 声部按可听时长算（until），不等引擎回收（见 FirstLevelMissionBattleSound 同一条注释）。
     this.voices = this.voices.filter((e) => this.time < e.until && this.host.audio?.pendingVoices?.has?.(e.v) !== false);
@@ -157,7 +163,7 @@ export class BattleArtillery {
       // 啸声在落点上空，比落地早 incomingLeadS 起播（引擎另按距离给它 d/340 的延迟）。
       // 它只算到落地那一刻：之后那一截是爆炸本体盖住的。
       this.Voice(this.host.audio?.Play?.("shellIncoming", {
-        position: { x: at.x, y: at.y + T.incomingHeightM, z: at.z }, volume: T.incomingVolume,
+        position: { x: at.x, y: at.y + T.incomingHeightM, z: at.z }, volume: T.incomingVolume, selfCapped: this.selfCapped,
         // 整段隔着土的步骤（01）：啸声也闷（2026-09-24 补：原来只有爆炸与低频层吃 airCut）。
         airCut: this.airCut > 0 ? this.airCut : undefined,
       }), T.incomingLeadS);
@@ -202,7 +208,7 @@ export class BattleArtillery {
     // 爆炸本体：Fire 时已留了位（留过的不再看 SharedRoom —— 前线看得见留位，不会占它）。
     if (reserved > 0 || this.Room(1)) {
       this.Voice(audio?.Play?.(cue, {
-        position: pos, volume: d < T.midM ? T.midVolume : T.farVolume, sourceSizeM: T.vfxRadiusM,
+        position: pos, volume: d < T.midM ? T.midVolume : T.farVolume, sourceSizeM: T.vfxRadiusM, selfCapped: this.selfCapped,
         airCut: cut(0),
       }));
     } else this.layersDropped += 1;
@@ -210,7 +216,7 @@ export class BattleArtillery {
     // 晚 30 ms 起：同名 cue 在 22 ms 去重窗里只活得下来一条（远档那一发本身就是 explosionFar）。
     if (reserved > 0 || this.Room(1)) {
       this.Voice(audio?.Play?.(T.thumpCue, {
-        position: pos, volume: T.thumpVolume, airCut: cut(T.thumpAirCutHz), sourceSizeM: T.vfxRadiusM,
+        position: pos, volume: T.thumpVolume, airCut: cut(T.thumpAirCutHz), sourceSizeM: T.vfxRadiusM, selfCapped: this.selfCapped,
         delay: T.thumpDelayS,
       }));
     } else this.layersDropped += 1;
@@ -228,6 +234,7 @@ export class BattleArtillery {
   }
 
   Voice(v, activeS = this.T.voiceActiveS) {
+    if (!v) this.refused += 1;   // 取证：宿主 Play 没收下（预算 / 去重 / 距离闸）
     if (v) {
       this.voices.push({ v, until: this.time + activeS });
       this.peakVoices = Math.max(this.peakVoices, this.voices.length);
@@ -257,7 +264,7 @@ export class BattleArtillery {
         this.Voice(audio?.Play?.("debrisFall", {
           position: { x: L.x + Math.sin(a) * r, y: L.y + (dugout ? T.dugoutDirtRiseM : T.wallDirtRiseM), z: L.z + Math.cos(a) * r },
           volume: dugout ? T.dugoutDirtVolume : T.wallDirtVolume,
-          airCut: dugout ? T.dugoutDirtAirCutHz : T.wallDirtAirCutHz,
+          airCut: dugout ? T.dugoutDirtAirCutHz : T.wallDirtAirCutHz, selfCapped: this.selfCapped,
         }), T.debrisActiveS);
       } else if (p.kind === "dirtRain" && L) {
         if (!this.Room(1)) { this.layersDropped += 1; continue; }
@@ -268,13 +275,14 @@ export class BattleArtillery {
         this.Voice(audio?.Play?.("debrisFall", {
           position: { x: L.x + dx / n * r, y: L.y - T.dirtRainDropM, z: L.z + dz / n * r },
           volume: T.dirtRainVolume * (T.dirtRainFarShare + (1 - T.dirtRainFarShare) * k), airCut: T.dirtRainAirCutHz,
+          selfCapped: this.selfCapped,
         }), T.debrisActiveS);
       }
     }
   }
 
   State() {
-    return { shells: this.shells, skipped: this.skipped, thinned: this.thinned, pending: this.pending.length,
+    return { shells: this.shells, skipped: this.skipped, thinned: this.thinned, refused: this.refused, pending: this.pending.length,
       voices: this.voices.length, reserved: this.reserved, peakVoices: this.peakVoices, layersDropped: this.layersDropped,
       nextInS: this.nextAt === null ? null : +(this.nextAt - this.time).toFixed(2),
       recent: this.events.slice(-6) };

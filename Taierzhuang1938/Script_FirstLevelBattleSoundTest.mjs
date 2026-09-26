@@ -10,7 +10,7 @@
 // 运行时每局换种子、配乐标点冷启动不误触发。
 // 浏览器侧（真 AudioContext、混响六档、耳鸣节点）在 Script_AudioTest / Script_AudioWiringTest。
 import assert from "node:assert/strict";
-import { MISSION_BATTLE_SOUND as D } from "./Data_FirstLevelMissionBattleSound.mjs";
+import { MISSION_BATTLE_SOUND as D, OPENING_AMBIENCE_PRESETS } from "./Data_FirstLevelMissionBattleSound.mjs";
 import { FirstLevelMissionBattleSound } from "./Script_FirstLevelMissionBattleSound.mjs";
 import { BattleArtillery } from "./Script_BattleArtillery.mjs";
 import { AudioWiring } from "./Script_AudioWiring.mjs";
@@ -72,6 +72,10 @@ const Dist = (c, L) => Math.hypot(c.position.x - L.x, c.position.z - L.z);
   const front = audio.calls.filter((c) => c.soundField && c.bus === "sfx");
   assert.ok(front.length > 20 && front.every((c) => c.selfCapped === true),
     `前线每一声都带 selfCapped：${front.filter((c) => c.selfCapped === true).length}/${front.length}`);
+  // 【2026-09-27】前线每一声都带 yieldFirst（预算紧时对更近的新声无条件让位）；别的调用方不带
+  //（空袭炸弹也是 selfCapped soundField，原来按这两个标推断会被当成头号受害者）。
+  assert.ok(front.every((c) => c.yieldFirst === true), "前线每一声都带 yieldFirst");
+  assert.ok(audio.calls.filter((c) => !front.includes(c)).every((c) => !c.yieldFirst), "前线以外的声不带 yieldFirst");
   const f = sound.State().front;
   const refusedLog = sound.frontRecent.filter((r) => !r.played).length;
   assert.ok(f.refused > 0 && f.plays + f.refused === front.length,
@@ -256,6 +260,22 @@ const Dist = (c, L) => Math.hypot(c.position.x - L.x, c.position.z - L.z);
     `屏幕上打得凶时远处让位：交火 ${calm.n}→${hot.n} 场，平均音量 ${calm.vol.toFixed(3)}→${hot.vol.toFixed(3)}`);
   assert.ok(talk.n < calm.n * 0.75, `对白期间少起新交火：${calm.n}→${talk.n}`);
   Ok(`让位：交火 ${calm.n}/${hot.n}/${talk.n} 场（静/激战/对白）`);
+  // 【2026-09-26】开场过场（02 BunkerRescue）按步骤覆盖 speechRate：台词占大半时间，远处只少起一两成。
+  // 同一套计数，只换步骤；前线与场外炮击两边都读步骤上的 speechRate。
+  const CountAt = (stage, speaking) => {
+    const audio = FakeAudio({ zone: "trench" });
+    const sound = new FirstLevelMissionBattleSound(audio, { battlefield: { GroundHeight: () => 0 } }, 0x19380926);
+    Run(sound, audio, stage, 600, { speaking });
+    return { n: sound.frontExchanges, shells: sound.artillery.shells };
+  };
+  const P2 = D.front.stages.BunkerRescue, A2 = D.artillery.stages.BunkerRescue;
+  assert.ok(P2.speechRate > D.front.speechRate && A2.speechRate > D.artillery.speechRate, "02 的对白抽稀比全局轻");
+  const oCalm = CountAt("BunkerRescue", false), oTalk = CountAt("BunkerRescue", true);
+  assert.ok(oTalk.n >= oCalm.n * (P2.speechRate - 0.15),
+    `开场对白期间前线只少起一点：${oCalm.n}→${oTalk.n} 场（speechRate ${P2.speechRate}）`);
+  assert.ok(oTalk.shells >= oCalm.shells * (A2.speechRate - 0.2),
+    `开场对白期间场外炮击只抽稀一点：${oCalm.shells}→${oTalk.shells} 发（speechRate ${A2.speechRate}）`);
+  Ok(`开场按步骤覆盖对白抽稀：前线 ${oCalm.n}→${oTalk.n} 场、炮击 ${oCalm.shells}→${oTalk.shells} 发`);
 }
 {
   // 07 以后回到旧的五个固定声源，一个都没多。
@@ -403,11 +423,16 @@ const Dist = (c, L) => Math.hypot(c.position.x - L.x, c.position.z - L.z);
     const a9 = FakeAudio({ zone: "courtyard" });
     const s9 = new FirstLevelMissionBattleSound(a9, { Has: () => false, battlefield: { GroundHeight: () => 0 } });
     Run(s9, a9, "Trapped", 240);
-    const dirt = a9.calls.filter((c) => c.cue === "debrisFall");
+    // 【2026-09-26】01 落点下限 75→55 m 之后，75 m 以内那几发另有碎土雨（dirtRainAirCutHz，落在耳朵以下、
+    // 朝爆点那一侧），与洞顶掉土分开数：洞顶那一条仍必须每次都在头顶上。
+    const allDirt = a9.calls.filter((c) => c.cue === "debrisFall");
+    const rain = allDirt.filter((c) => c.airCut === BATTLE_ARTILLERY.dirtRainAirCutHz);
+    const dirt = allDirt.filter((c) => !rain.includes(c));
     assert.ok(dirt.length > 0 && dirt.every((c) => c.position.y > a9.listenerPos.y && c.airCut === BATTLE_ARTILLERY.dugoutDirtAirCutHz),
       `01：洞顶掉土 ${dirt.length} 次，都在头顶上`);
+    assert.ok(rain.every((c) => c.position.y < a9.listenerPos.y), "01：碎土雨落在耳朵以下");
     assert.ok(s9.artillery.State().recent.every((e) => e.zone === "dugout"), "01 的每一发都按洞里算");
-    Ok(`01 洞顶掉土 ${dirt.length} 次（接线层判 courtyard 也照掉）`);
+    Ok(`01 洞顶掉土 ${dirt.length} 次（接线层判 courtyard 也照掉），近处碎土雨 ${rain.length} 次`);
   }
 
   // 进步骤那一刻起就一直在说话：头一发也不抽稀。
@@ -469,6 +494,16 @@ const Dist = (c, L) => Math.hypot(c.position.x - L.x, c.position.z - L.z);
   const inQuiet = a2.calls.slice(mark).filter((c) => !c.soundField && /explosion/.test(c.cue) && c.t > t0 + 0.8);
   assert.equal(inQuiet.length, 0, "01 近爆之后的静默窗里不落场外炮弹");
   Ok(`01：近落弹 ${trappedShells.length} 发全部闷，近爆后 ${D.artillery.stages.Trapped.quietAfter.seconds} s 静默`);
+  // 【2026-09-26】开场两步的炮击按整份预算进门（selfCapped，与前线同一个口径）；03 起不标，行为不变。
+  const shellCues = /^(explosionMid|explosionFar|shellIncoming|debrisFall)$/;
+  assert.ok(trappedShells.length > 0 && a2.calls.filter((c) => !c.soundField && shellCues.test(c.cue)).every((c) => c.selfCapped === true),
+    "01 的场外炮击每一声都带 selfCapped");
+  const a3s = FakeAudio({ zone: "trench" });
+  const bs3 = new FirstLevelMissionBattleSound(a3s, { Has: () => false, battlefield: { GroundHeight: () => 0 } });
+  Run(bs3, a3s, "Support", 120);
+  const supportShells = a3s.calls.filter((c) => !c.soundField && shellCues.test(c.cue));
+  assert.ok(supportShells.length > 0 && supportShells.every((c) => !c.selfCapped), "03 的场外炮击不带 selfCapped（不变）");
+  Ok(`开场炮击按整份预算进门，03 不变（${supportShells.length} 声）`);
 }
 
 // ---------------------------------------------------------------------------
@@ -477,13 +512,26 @@ const Dist = (c, L) => Math.hypot(c.position.x - L.x, c.position.z - L.z);
 {
   const audio = FakeAudio({ zone: "open" });
   const sound = new FirstLevelMissionBattleSound(audio, null);
+  // 【2026-09-26】开场两步（01/02）换成 dugout.presets 里那一对（远处战场床走远声组），03 起回到原来两档。
+  const opening = D.dugout.presets;
+  assert.ok(opening.Trapped && opening.BunkerRescue && !opening.RearTrench, "只有开场两步换预设");
   Run(sound, audio, "Trapped", 0.2);
-  assert.equal(audio.ambiencePreset, D.dugout.preset, "01 一进来就是防炮洞环境");
+  assert.equal(audio.ambiencePreset, opening.Trapped.preset, "01 一进来就是防炮洞环境（开场那一档）");
   assert.ok(audio.ambience[0].fadeS > 0, "切档带交叉淡");
   Run(sound, audio, "BunkerRescue", 0.5);
-  assert.equal(audio.ambiencePreset, D.dugout.preset, "02 出洞前不切（滞回）");
+  assert.equal(audio.ambiencePreset, opening.BunkerRescue.preset, "02 出洞前不切（滞回）");
   Run(sound, audio, "BunkerRescue", D.dugout.holdS + 0.2);
-  assert.equal(audio.ambiencePreset, D.dugout.outside, "02 听者出了洞 → 前线环境");
+  assert.equal(audio.ambiencePreset, opening.BunkerRescue.outside, "02 听者出了洞 → 前线环境（开场那一档）");
+  // 开场两档：远处战场那两层（shellingFar / battleFar）走远声组、不随战场强度压低；其余层仍走环境总线。
+  for (const name of [opening.Trapped.preset, opening.Trapped.outside]) {
+    const cfg = OPENING_AMBIENCE_PRESETS[name];
+    assert.ok(cfg, `${name} 在 OPENING_AMBIENCE_PRESETS 里`);
+    const battle = cfg.layers.filter((l) => l.bed === "shellingFar" || l.bed === "battleFar");
+    assert.ok(battle.length === 2 && battle.every((l) => l.bus === "far" && !l.battle && l.cut > 0),
+      `${name}：远处战场两层走远声组、带低通、不带 battle`);
+    assert.ok(cfg.layers.filter((l) => !battle.includes(l)).every((l) => !l.bus), `${name}：风仍走环境总线`);
+    assert.ok(cfg.layers.length <= 3, `${name}：层数不比原档多`);
+  }
   audio.zone = "dugout";
   Run(sound, audio, "RearTrench", D.dugout.holdS + 0.2);
   assert.equal(audio.ambiencePreset, D.dugout.preset, "钻回洞里 → 洞里环境");

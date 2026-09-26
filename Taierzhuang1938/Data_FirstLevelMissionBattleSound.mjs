@@ -60,7 +60,18 @@ export const MISSION_BATTLE_SOUND = Object.freeze({
       // 01：洞里听外面，闷（airCut）；醒来之前前线已经在打。三百米外的东西引擎的空气低通
       // 本来就压到 700 Hz，这里再往下压一档才是「隔着土」。
       // intensity / gain 是渐强的**顶**：近爆那一刻到这里，之后整段 01 就停在这里。
-      Trapped: { intensity: 0.62, gain: 0.8, airCut: 450, weights: { EastFlank: 1.6, NorthEastVillage: 1.4 },
+      // 【2026-09-26 开场过场加密】用户：「过场动画里的背景音乐和爆炸枪声略少，没有什么战场嘈杂的氛围」。
+      // 改前实测（p012 实时 260 s，拦 audio.Play + 各总线 RMS）：01 前线每分钟约 70 声，但远声组中位 −82 dBFS、
+      // 两句台词之间整条混音中位只剩 −57 dBFS —— 声数不算少，是**听不见**：880 m 外的 soundField 衰到 0.08、
+      // 再过 450 Hz 的「隔着土」，每声只剩一记闷点。单声实测（静场、880 m、airCut 450、volume 1）：
+      // rifleIjaFar 峰值 −40 dBFS、explosionFar −36、amb.cannonFar −38 —— 比 01 的台词峰值低近 30 dB。
+      // gain 0.8→10（+22 dB）：远处步枪峰值约 −28、远炮约 −17 dBFS，台词峰值 −11 上下，仍在台词下面。
+      // intensity 0.62→0.75：只加一点密度。试过 0.95：前线声部顶满 5 条、账面常年顶在预算上，
+      // 近处声音（脚步、身边的枪）被饿死从 30 % 涨到 57 %；密度不是病根，响度才是。
+      // airCut 450 不动（01 整段在洞里，MissionTest 钉着）。渐强（swell）的形状不动，起点跟着顶一起抬。
+      // speechRate 0.8：开场两步台词占七成时间，全局 0.45 会让前线在过场里一直稀着；这两步远处只少起两成
+      //（01 整段压在 450 Hz 以下，与台词的 1–4 kHz 不抢；电平另有对白侧链 −3 dB）。
+      Trapped: { intensity: 0.75, gain: 10, airCut: 450, speechRate: 0.8, weights: { EastFlank: 1.6, NorthEastVillage: 1.4 },
         // 【2026-09-24 恢复渐强（用户拍板「恢复」）】旧口径（f581ac7dd 的 profiles.Trapped：
         // startAfterS 24、rampFromGain .3、rampS 30，即头 24 s 一声没有、之后 30 s 里音量 ×0.3 → ×1，
         // 第 54 s 到顶；MissionTest 断言「后一段的远炮比前一段响」）在 09-23 换新声景时被删了，
@@ -75,7 +86,9 @@ export const MISSION_BATTLE_SOUND = Object.freeze({
         //   · gain 在分贝上线性（gainFrom .3 ≈ −10.5 dB，沿用旧 rampFromGain），intensity（起交火的
         //     频次）线性；两者都按 u^curve 走，curve > 1 = 对白那半分钟里涨得慢、传令到近爆涨得快。
         swell: { riseS: 50, curve: 1.6, intensityFrom: 0.4, gainFrom: 0.3, peakFact: "bunkerCollapsed", catchUpS: 2 } },
-      BunkerRescue: { intensity: 0.72, gain: 0.95, airCut: 620, weights: { EastFlank: 1.5, NorthEastVillage: 1.3 } },
+      // 【2026-09-26】02 开场过场（Found → Released）同一轮加密：0.72/0.95 → 0.85/7（airCut 620 比 01 少吃一点，
+      // gain 少抬 3 dB），speechRate 见 01。
+      BunkerRescue: { intensity: 0.85, gain: 7, airCut: 620, speechRate: 0.8, weights: { EastFlank: 1.5, NorthEastVillage: 1.3 } },
       RearTrench: { intensity: 0.78, gain: 1 },
       Support: { intensity: 0.85, gain: 1 },
       MachineGun: { intensity: 0.9, gain: 0.95 },
@@ -85,7 +98,9 @@ export const MISSION_BATTLE_SOUND = Object.freeze({
     /** 扇区：两端锚点（世界坐标），spreadM 每发的散布，weight 起交火的相对频率。 */
     sectors: Object.freeze([
       { id: "NorthWestBank", nra: { x: -380, z: -330 }, ija: { x: -470, z: -640 }, spreadM: 60, weight: 1 },
-      { id: "NorthRoad", nra: { x: 40, z: -470 }, ija: { x: 120, z: -820 }, spreadM: 50, weight: 1.1 },
+      // 【2026-09-26】nra z −470 → −485：原来离 01 听者（0, −150）322 m、散布 50 m，最近能落到 272 m，
+      // 与「远处前线都在 280 m 以外」（BattleSoundTest）的口径对不上，只是固定种子碰巧没抽到；开场加密换了随机序列后抽到 279 m。
+      { id: "NorthRoad", nra: { x: 40, z: -485 }, ija: { x: 120, z: -820 }, spreadM: 50, weight: 1.1 },
       { id: "NorthEastVillage", nra: { x: 420, z: -360 }, ija: { x: 700, z: -620 }, spreadM: 70, weight: 1 },
       { id: "EastFlank", nra: { x: 620, z: -60 }, ija: { x: 1050, z: -180 }, spreadM: 70, weight: 0.9 },
       { id: "FarWest", nra: { x: -900, z: -120 }, ija: { x: -1250, z: -520 }, spreadM: 90, weight: 0.6 },
@@ -159,7 +174,7 @@ export const MISSION_BATTLE_SOUND = Object.freeze({
     firstWithinS: 1.2,
     /** 场上交火让位：live 强度 1 时频次 × (1 − rateYield)、音量 × (1 − volumeYield)。 */
     rateYield: 0.5, volumeYield: 0.35,
-    /** 对白正在播时新交火的频次倍率（电平交给 Voice 包的侧链，不在这里压第二道）。 */
+    /** 对白正在播时新交火的频次倍率（电平交给 Voice 包的侧链，不在这里压第二道；stages[].speechRate 可按步骤覆盖）。 */
     speechRate: 0.45,
     jitterVolume: [0.8, 1.1],
   }),
@@ -191,16 +206,23 @@ export const MISSION_BATTLE_SOUND = Object.freeze({
     ]),
     stages: Object.freeze({
       // 01 整段在洞里：隔着土与洞口，落弹只剩闷响（airCut）与洞顶掉土。
-      Trapped: { perMin: 2.2, minM: 75, maxM: 140, airCut: 900, listenerZone: "dugout",
+      // 【2026-09-26 开场过场加密】改前实测 01 的 130 s 里场外近落弹只响了 1 发啸声 + 几发闷响（2.2 发/分，
+      // 对白期间 ×0.4 抽稀，近爆后 14 s 静默）；75 m 起落，碎土雨（dirtRainM 75 m 以内）一次都轮不到。
+      // perMin 2.2→4.5、minM 75→55（偶尔落进 75 m 以内，土块砸回来）；对白期间只抽掉两成（speechRate 0.8）。
+      // quietAfter 14 s 不动（黑屏与醒来留给剧本那一发与耳鸣）。
+      // selfCapped：改前实测开场两步的炮弹一半以上被引擎饿死（9/19 层收下；加密后 6/38）—— 它们在 45 m 外，
+      // 按低优先级套 NODE_BUDGET × 0.62 的天花板，而账面中位 75–83 早过了 74.4；能偷的前线比它远、却比它响。
+      // 本层自己封顶（maxVoices 4、与前线合计 ≤ 8），与前线 DrainFront 同一个口径按整份预算进门。03 起不标、不变。
+      Trapped: { perMin: 4.5, minM: 55, maxM: 140, airCut: 900, listenerZone: "dugout", speechRate: 0.8, selfCapped: true,
         quietAfter: { fact: "bunkerCollapsed", seconds: 14 } },
-      BunkerRescue: { perMin: 1.1, minM: 70, maxM: 130 },
+      BunkerRescue: { perMin: 3.5, minM: 55, maxM: 130, speechRate: 0.8, selfCapped: true },
       RearTrench: { perMin: 2.4, minM: 45, maxM: 120 },
       Support: { perMin: 2.2, minM: 45, maxM: 120 },
       MachineGun: { perMin: 1.6, minM: 55, maxM: 120 },
       Tank: { perMin: 1.0, minM: 60, maxM: 120 },
       Orders: { perMin: 1.0, minM: 70, maxM: 140 },
     }),
-    /** 对白播放时的频次倍率。 */
+    /** 对白播放时的频次倍率（stages[].speechRate 可按步骤覆盖）。 */
     speechRate: 0.4,
     /** 头一发最早多久落（进阶段先让前线床铺开，再来近的）。 */
     firstAfterS: 4,
@@ -215,6 +237,65 @@ export const MISSION_BATTLE_SOUND = Object.freeze({
   dugout: Object.freeze({
     preset: "firstLevelDugout", outside: "firstLevelFront",
     stages: Object.freeze({ Trapped: "forced", BunkerRescue: "zone", RearTrench: "zone" }),
+    /**
+     * 【2026-09-26】按步骤换一对预设（没写的步骤用上面的 preset / outside）。开场两步用
+     * OPENING_AMBIENCE_PRESETS 那两档（远处战场床走远声组），03 起回到原来两档、一个数不变。
+     */
+    presets: Object.freeze({
+      Trapped: Object.freeze({ preset: "firstLevelOpeningDugout", outside: "firstLevelOpeningFront" }),
+      BunkerRescue: Object.freeze({ preset: "firstLevelOpeningDugout", outside: "firstLevelOpeningFront" }),
+    }),
     holdS: 1.0, fadeS: 1.6,
+  }),
+});
+
+/**
+ * 【2026-09-26】第一关开场（01 Trapped、02 BunkerRescue，过场为主）的两档环境床。
+ * 由 Script_Audio 并进 AMBIENCE_PRESETS，形状与那里的注释一致（layers / events / space）。
+ *
+ * 为什么另起两档、不改 firstLevelDugout / firstLevelFront：那两档 03–06 的实战还在用，这一轮只改开场。
+ *
+ * 与原两档的区别只有「远处战场」那两层（shellingFar 连绵闷炮、battleFar 远处交火人群）：
+ *   · `bus: "far"`：进远声组（→ 对白侧链 −3 dB → sfx 总线），不再走环境总线。环境推子默认 10 %
+ *     （2026-09-11 用户要求「环境床默认 10%」），改前实测这两层在 01 里整体 −70 dBFS 上下，等于没有；
+ *     它们是「远处在打仗」的声音，与前线生成器同一组让路。风与洞里的吱呀/掉土仍走环境总线、仍归那个推子。
+ *   · 不带 `battle`：过场里身边没人开火，战场强度常年在 0–0.1，带 battle 的层会被压到 ×0.34；
+ *     开场要的是「外面一直在打」，与近处打不打无关。
+ *   · 低通（cut）：洞里 360 / 480 Hz 与原档相同；洞外 900 / 1500 Hz —— 让出台词的 1–4 kHz，
+ *     床只占低频与中低频，对白侧链之外再靠频段避让。
+ * gain 是 sfx 总线上的量（原档的 0.2–0.34 是环境总线 ×0.8 × 推子 0.1 之前的量，不能直接比）。
+ * 实测（p012 实时）：两层合起来 RMS 约 −44 dBFS（洞里）/ −46（洞外），台词 RMS 约 −26 —— 低 18 dB 上下。
+ * 第一版给到 0.9 / 0.7，远声组整片 −31 dBFS，只比台词低 7 dB，压回了四分之一。
+ * 节点：与原两档同样三层（每层 5–6 个常驻节点），不多一层。
+ */
+export const OPENING_AMBIENCE_PRESETS = Object.freeze({
+  firstLevelOpeningDugout: Object.freeze({
+    space: "dugout", fallbackWind: 0.03, fallbackCut: 220,
+    layers: Object.freeze([
+      Object.freeze({ bed: "shellingFar", gain: 0.17, seg: 9, cut: 360, bus: "far" }),
+      Object.freeze({ bed: "battleFar", gain: 0.14, seg: 11, cut: 480, bus: "far" }),
+      Object.freeze({ bed: "windPlain", gain: 0.08, seg: 13, cut: 260 }),
+    ]),
+    events: Object.freeze([
+      Object.freeze({ name: "amb.debris", perMin: 2.4, volume: 0.2, airCut: 2400 }),
+      Object.freeze({ name: "amb.creak", perMin: 1.3, volume: 0.18, airCut: 1600 }),
+      Object.freeze({ name: "amb.cannonFar", perMin: 2.6, volume: 0.5, airCut: 260, battle: true }),
+    ]),
+  }),
+  firstLevelOpeningFront: Object.freeze({
+    space: "open", fallbackWind: 0.045, fallbackCut: 480,
+    layers: Object.freeze([
+      Object.freeze({ bed: "windPlain", gain: 0.30, seg: 13 }),
+      Object.freeze({ bed: "battleFar", gain: 0.1, seg: 11, cut: 1500, bus: "far" }),
+      Object.freeze({ bed: "shellingFar", gain: 0.12, seg: 9, cut: 900, bus: "far" }),
+    ]),
+    events: Object.freeze([
+      Object.freeze({ name: "amb.cannonFar", perMin: 3.2, volume: 0.55, battle: true }),
+      Object.freeze({ name: "rifleNraFar", perMin: 5.5, volume: 0.10, battle: true }),
+      Object.freeze({ name: "rifleIjaFar", perMin: 5.0, volume: 0.10, battle: true }),
+      Object.freeze({ name: "zb26Far", perMin: 2.0, volume: 0.08, burst: 5, battle: true }),
+      Object.freeze({ name: "type92Far", perMin: 1.6, volume: 0.08, burst: 4, battle: true }),
+      Object.freeze({ name: "amb.crow", perMin: 0.7, volume: 0.3 }),
+    ]),
   }),
 });

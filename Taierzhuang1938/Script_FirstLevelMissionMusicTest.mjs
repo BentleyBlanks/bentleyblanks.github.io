@@ -2,7 +2,8 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import crypto from "node:crypto";
 import { MISSION_STAGES } from "./Data_FirstLevelMission.mjs";
-import { FIRST_LEVEL_MUSIC_CUES, FIRST_LEVEL_STAGE_MUSIC, FirstLevelMusicState } from "./Data_FirstLevelMissionMusic.mjs";
+import { FIRST_LEVEL_MUSIC_CUES, FIRST_LEVEL_STAGE_MUSIC, FIRST_LEVEL_MUSIC_MIX, FIRST_LEVEL_MUSIC_OPENING,
+  FirstLevelMusicState } from "./Data_FirstLevelMissionMusic.mjs";
 import { CARRIAGE_SOUND } from "./Data_FirstLevelCarriageSound.mjs";
 import { FirstLevelMissionMusic } from "./Script_FirstLevelMissionMusic.mjs";
 
@@ -26,9 +27,37 @@ for (const cue of cues) {
   assert.ok(entry.seconds > 90 && entry.seconds < 130 && entry.bytes < 2_000_000);
   assert.ok(Math.abs(entry.rmsDbfs + 27) <= 0.6 && entry.peakDbfs <= -3);
 }
-assert.equal(FirstLevelMusicState("Trapped").cue, null);
-assert.equal(FirstLevelMusicState("BunkerRescue").cue, null);
-assert.equal(FirstLevelMusicState("Trapped", { shellImpact: true }).cue, null);
+// 【2026-09-26】01/02 开场过场原来不放乐；用户要「背景音乐 + 战场嘈杂」，改成「前线压来」压在底下。
+// 近爆那一下仍是静的（黑屏、醒来、剧情档耳鸣），silenceS 之后 returnS 内一档一档爬回。
+{
+  const O = FIRST_LEVEL_MUSIC_OPENING;
+  assert.equal(FirstLevelMusicState("Trapped").cue, "firstLevelTheFrontClosesIn");
+  assert.equal(FirstLevelMusicState("BunkerRescue").cue, "firstLevelTheFrontClosesIn");
+  assert.ok(FirstLevelMusicState("Trapped").scale < 1 && FirstLevelMusicState("BunkerRescue").scale < 1, "开场配乐压在底下");
+  const talk = FirstLevelMusicState("Trapped", { speaking: true }).scale / FirstLevelMusicState("Trapped").scale;
+  assert.ok(talk < 1 && talk > FIRST_LEVEL_MUSIC_MIX.dialogueScale, "开场说话时让位，但比常规的 0.42 让得少（另有对白侧链 −6 dB）");
+  assert.equal(FirstLevelMusicState("Trapped", { shellImpact: true }).cue, null, "近爆那一刻静");
+  const quiet = FirstLevelMusicState("Trapped", { shellImpact: true, shellImpactAgeS: O.silenceS - 0.1 });
+  assert.ok(quiet.cue === null && quiet.fadeOut < 0.2, "近爆后 silenceS 内静（快淡出）");
+  const ages = [O.silenceS + 0.5, O.silenceS + O.returnS * 0.5, O.silenceS + O.returnS + 1];
+  const back = ages.map((a) => FirstLevelMusicState("Trapped", { shellImpact: true, shellImpactAgeS: a }));
+  assert.ok(back.every((s) => s.cue === "firstLevelTheFrontClosesIn") && back[0].scale < back[1].scale && back[1].scale < back[2].scale
+    && Math.abs(back[2].scale - FirstLevelMusicState("Trapped").scale) < 1e-9, `近爆后爬回：${back.map((s) => s.scale.toFixed(2)).join("→")}`);
+  assert.ok(FirstLevelMusicState("BunkerRescue", { shellImpact: true, shellImpactAgeS: 0 }).cue !== null, "近爆静默只在 01");
+  // 运行时对象：事实由假变真起算；第一次看时已经为真（跳关/读档）算很久以前。
+  let now = 0;
+  const seen = [];
+  const live = new FirstLevelMissionMusic({ ctx: { get currentTime() { return now; } },
+    Music: (cue, o) => seen.push([now, cue, o.levelScale]), SetMusicLevel: (s) => seen.push([now, "level", s]) });
+  live.Update("Trapped", { shellImpact: false });
+  now = 50; live.Update("Trapped", { shellImpact: true });
+  now = 50 + O.silenceS - 1; live.Update("Trapped", { shellImpact: true });
+  now = 50 + O.silenceS + O.returnS + 1; live.Update("Trapped", { shellImpact: true });
+  assert.deepEqual(seen.map((r) => r[1]), ["firstLevelTheFrontClosesIn", null, "firstLevelTheFrontClosesIn"], JSON.stringify(seen));
+  const cold = new FirstLevelMissionMusic({ ctx: { currentTime: 999 }, Music: (cue) => seen.push([999, cue]), SetMusicLevel() {} });
+  cold.Update("Trapped", { shellImpact: true });
+  assert.equal(seen.at(-1)[1], "firstLevelTheFrontClosesIn", "从醒来之后进 01：直接有配乐");
+}
 assert.equal(FirstLevelMusicState("South").cue, "firstLevelTheRoadSouth");
 assert.equal(FirstLevelMusicState("TransferApproach").cue, "firstLevelTheRoadSouth");
 assert.equal(FirstLevelMusicState("Death").cue, null);

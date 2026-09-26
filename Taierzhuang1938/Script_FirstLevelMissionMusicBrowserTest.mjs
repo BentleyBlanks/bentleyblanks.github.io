@@ -18,13 +18,15 @@ try {
   await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?whitebox=p012&menu=0&manual=1&quality=low&scale=small`, { waitUntil: "domcontentloaded", timeout: 180000 });
   await page.waitForFunction(() => window.Tengxian?.state?.ready, null, { timeout: 180000 });
   await page.locator("#bootStart").click();
-  await page.waitForFunction(() => window.Tengxian.audio.ctx?.state === "running" && !window.Tengxian.audio.musicLayer, null, { timeout: 60000 });
-  assert.equal(requests.length, 0, "the carriage must not load any first-level score");
+  // 【2026-09-26】01 开场过场改为放「前线压来」（原来不放乐）：开机后只拉这一段，别的不预载。
+  await page.waitForFunction(() => window.Tengxian.audio.ctx?.state === "running" && !!window.Tengxian.audio.musicLayer, null, { timeout: 60000 });
+  assert.ok(requests.length > 0 && requests.every(url => /AudioBgm_TheFrontClosesIn\.mp3/.test(url)),
+    "the opening loads only its own score: " + JSON.stringify(requests));
   await page.screenshot({ path: path.join(output, "Scene_CarriageMusic.png") });
   // 2026.09.20 第二波（End 包）：夹具按新 27 步重写。旧的 Shelter / FinalCarry / Exit
   // 三个内部步骤随采用稿下线，换成现役的 BunkerRescue / WallPath / NightMarch；
   // 15A 与 17 是静的，18 的桥头回到紧张、爆破那一步是「南路断了」。
-  const starts = [[1,null],[2,null,"BunkerRescue"],[3,"IronSiege","RearTrench"],
+  const starts = [[1,"TheFrontClosesIn"],[2,"TheFrontClosesIn","BunkerRescue"],[3,"IronSiege","RearTrench"],
     [3,"CloseQuartersPressure","Support"],[4,"CloseQuartersPressure"],[5,"CloseQuartersPressure"],
     [6,"TheFrontClosesIn"],[7,"TheRoadSouth"],[8,"IronSiege"],[9,"IronSiege"],[10,"IronSiege"],
     [11,"TheRoadSouth"],[12,"CloseQuartersPressure"],[13,"CloseQuartersPressure"],[14,"TheSouthRoadBreaks"],

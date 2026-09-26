@@ -175,7 +175,7 @@ export class FirstLevelMissionBattleSound {
     const live = Math.max(0, Math.min(1, this.audio?.battleIntensity || 0));
     if (stage !== this.frontStage) this.EnterFront(stage);
     const swell = this.UpdateSwell(P);
-    const rate = P.intensity * swell.intensity * (1 - F.rateYield * live) * (speaking ? F.speechRate : 1);
+    const rate = P.intensity * swell.intensity * (1 - F.rateYield * live) * (speaking ? (P.speechRate ?? F.speechRate) : 1);
     for (const sector of this.frontSectors) {
       // 渐强期间已经排好的等待按强度的涨幅缩短（等于「等待按当前频次走」）：
       // 否则开头按低频次排下的三四十秒空档，要到近爆之后才轮到，前线反而在顶上最稀。
@@ -204,7 +204,7 @@ export class FirstLevelMissionBattleSound {
       } else delete this.factSeenAt[fact];
     }
     this.artillery.Update(dt, AP ? { ...AP, firstAfterS: A.firstAfterS, firstSpreadS: A.firstSpreadS } : null,
-      { zones: A.zones, rateScale: speaking ? A.speechRate : 1, quiet, stage });
+      { zones: A.zones, rateScale: speaking ? (AP?.speechRate ?? A.speechRate) : 1, quiet, stage });
     this.frontPeakShared = Math.max(this.frontPeakShared,
       this.frontVoices.length + this.artillery.voices.length + this.airRaid.Active());
     this.UpdateDugout(stage);
@@ -382,6 +382,11 @@ export class FirstLevelMissionBattleSound {
         // 声部数由上面的 cap / sharedMaxVoices 管着，不再让引擎按「远 = 低优先级」再砍一道
         //（Script_Audio.Play 的 selfCapped；01 黑屏里前线整段被饿死就是这一道）。
         selfCapped: true,
+        // 预算紧时对更近的新声无条件让位（Script_Audio.StealVoices）；空袭炸弹、场外炮击不带这个标。
+        yieldFirst: true,
+        // 位置是摆出来的（placeMaxM），不加声速延迟：没有画面要对，空等的那 1–2.6 s 节点最容易被偷掉。
+        // 交火「一方开火、另一方还击」的间隔与炮弹飞行时间都已经排在队列里。
+        propagate: false,
         airCut: Math.min(place.airCut, P.airCut ?? 20000),
         burst: e.burst ?? undefined,
       });
@@ -404,8 +409,10 @@ export class FirstLevelMissionBattleSound {
     const G = D.dugout, mode = G.stages[stage];
     const audio = this.audio;
     if (!mode || typeof audio?.Ambience !== "function") { this.dugoutWant = null; return; }
-    const want = mode === "forced" ? G.preset
-      : (audio.ListenerZone?.() === "dugout" ? G.preset : G.outside);
+    // 按步骤换一对预设（dugout.presets；开场两步用远处战场床走远声组的那两档）。
+    const pair = G.presets?.[stage] || G;
+    const want = mode === "forced" ? pair.preset
+      : (audio.ListenerZone?.() === "dugout" ? pair.preset : pair.outside);
     if (audio.ambiencePreset === want) { this.dugoutWant = null; return; }
     if (this.dugoutWant !== want) { this.dugoutWant = want; this.dugoutSince = this.frontTime; }
     if (mode !== "forced" && this.frontTime - this.dugoutSince < G.holdS) return;

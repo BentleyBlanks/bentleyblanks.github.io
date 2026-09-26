@@ -1039,6 +1039,41 @@ if (selfCap.without.played || selfCap.without.starved !== 1) {
 } else Ok(`selfCapped：账面 ${selfCap.with.live}+14 / 预算 ${selfCap.with.budget}（低优先级天花板 ${selfCap.with.lowCeiling}），`
   + `不带的饿死、带的收下`);
 
+// 【2026-09-27】yieldFirst：前线生成器的声（Play 显式带 yieldFirst）预算紧时对更近的新声无条件让位，
+// 不比响度；同样 selfCapped + soundField、但不带 yieldFirst 的远声（空袭炸弹）仍按响度比，轻的新声偷不动它。
+// 已经响过 YIELD_FIRST_MIN_PLAYED_S（0.6 s）的才无条件让位；刚起的前线声仍按响度比（不然前线被掏空：
+// 第一版实测开场 79 % 的前线声被偷，中位只响出 5–14 %）。
+// 摆三条同样响的远声（响过 0.9 s 的带 yieldFirst、刚起的带 yieldFirst、响过 0.9 s 的不带），把预算压满，
+// 在 8 m 放一记很轻的近声：只许偷「响过 0.9 s、带 yieldFirst」的那条。
+const yieldFirst = await page.evaluate(async () => {
+  const a = window.Taierzhuang.audio;
+  const saved = a.nodeBudget;
+  const L = a.listenerPos;
+  const Far = (cue, x, yieldFirst) => a.Play(cue, { position: { x: L.x + x, y: L.y, z: L.z }, volume: 6, soundField: true,
+    bus: "sfx", selfCapped: true, yieldFirst, propagate: false });
+  a.nodeBudget = 1e6;
+  const bed = Far("rifleNraFar", 600, true);
+  const bomb = Far("explosionFar", -600, false);
+  await new Promise((r) => setTimeout(r, 900));
+  const fresh = Far("rifleIjaFar", 620, true);
+  const pre = { bed: !!bed?.reclaimed, bomb: !!bomb?.reclaimed, fresh: !!fresh?.reclaimed };
+  // 满：近声进门必须偷，只差一点 —— 偷一条前线声就够。近声用 rifleIja（不在 LOW_PRIORITY 里，天花板是整份预算；
+  // 采样包载入后它的进门账是 2 个节点），音量压到最轻。
+  a.nodeBudget = a.liveNodes + 1;
+  const drops = { ...a.drops };
+  const near = a.Play("rifleIja", { position: { x: L.x + 8, y: L.y, z: L.z }, volume: 0.01 });
+  const out = { bed: !!bed, bomb: !!bomb, fresh: !!fresh, near: !!near, pre, bedStolen: !!bed?.reclaimed,
+    bombStolen: !!bomb?.reclaimed, freshStolen: !!fresh?.reclaimed,
+    drops: Object.fromEntries(Object.keys(a.drops).map((k) => [k, a.drops[k] - (drops[k] || 0)]).filter(([, n]) => n)) };
+  a.nodeBudget = saved;
+  for (const v of [bed, bomb, fresh, near]) if (v && !v.reclaimed) a.StopVoice(v, 0);
+  return out;
+});
+if (!yieldFirst.bed || !yieldFirst.bomb || !yieldFirst.fresh) Fail(`yieldFirst：三条远声没起来（${JSON.stringify(yieldFirst)}）—— 这条断言没测到东西`);
+else if (!yieldFirst.near || !yieldFirst.bedStolen || yieldFirst.bombStolen || yieldFirst.freshStolen) {
+  Fail(`yieldFirst：预算满时轻的近声应当只偷响过 0.6 s 的前线声（${JSON.stringify(yieldFirst)}）`);
+} else Ok("yieldFirst：预算满时近声偷掉响过的前线声；刚起的前线声、同样响的空袭远声都不被偷");
+
 // 【2026-09-25】回收计时从起播算起：带传播延迟 / delay 的一声，节点要等它放完才断开。
 // 原来计时从调用 Play 算，380 m 的 explosionFar 晚 1.12 s 起播、最后 0.90 s 被掐掉（远处炮声没有尾巴）。
 // 量法：包一层 FreeVoice 记下断开的 ctx 时刻，与 v.t + v.life（配方声明的放完时刻）比。

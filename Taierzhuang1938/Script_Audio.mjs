@@ -45,6 +45,7 @@ import { FIRST_LEVEL_MUSIC_CUES, FIRST_LEVEL_MUSIC_MIX } from "./Data_FirstLevel
 import { HIT_DISORIENTATION } from "./Data_Tuning_Player.mjs";
 import { GUN_AUDIBILITY, BLAST_HEARING } from "./Data_Tuning_Audio.mjs";
 import { CARRIAGE_SOUND } from "./Data_FirstLevelCarriageSound.mjs";
+import { OPENING_AMBIENCE_PRESETS } from "./Data_FirstLevelMissionBattleSound.mjs";
 import { AUDIO_MIX_DEFAULTS, STORY_SPEECH, TINNITUS } from "./Data_Tuning_Audio.mjs";
 import { BuildSpeechEnvelope } from "./Script_SpeechEnvelope.mjs";
 
@@ -296,6 +297,11 @@ function BattleEventVolume(x) {
 const STEAL_FADE_S = 0.02;
 /** 一次 Play 最多偷几条。偷到第四条还不够说明预算本身设错了，不该在这儿死磕。 */
 const STEAL_MAX_PER_PLAY = 3;
+/**
+ * 带 yieldFirst 的前线声（01–06 前线生成器）响过这么久才对更近的新声无条件让位（见 StealVoices）。
+ * 远处一枪的起音与第一记回声都在头 0.6 s 里；机枪一梭 500 rpm 时是五发上下。
+ */
+const YIELD_FIRST_MIN_PLAYED_S = 0.6;
 
 /**
  * 两级动态：母线慢压缩（+ 补偿增益）+ 末端峰值限幅。
@@ -3597,6 +3603,9 @@ export const AMBIENCE_PRESETS = {
       { name: "amb.cannonFar", perMin: 1.5, volume: 0.4, battle: true },
     ],
   },
+  // 【2026-09-26】第一关开场（01–02 过场）两档：远处战场那两层走远声组（`bus: "far"`），
+  // 数在 Data_FirstLevelMissionBattleSound.OPENING_AMBIENCE_PRESETS（为什么见那里）。
+  ...OPENING_AMBIENCE_PRESETS,
 };
 
 /**
@@ -5199,16 +5208,34 @@ export class AudioEngine {
     if (!(need > 0)) return true;
     let freed = 0;
     for (let round = 0; round < STEAL_MAX_PER_PLAY && freed < need; round += 1) {
-      let victim = null;
+      let victim = null, victimFar = false, victimPlayed = 0;
       for (const v of this.activeVoices) {
         if (v.priority || v.stopping || v.reclaimed || !v.nodes || !v.nodes.length) continue;
         // 人说话不许被偷（见 IsVoiceCue 第 2 条）。台词是长音、电平低、离得远，
         // 三条排序判据全都指向它 —— 不排除的话，越是打得凶的时候越听不到口令，
         // 而那正是最需要口令的时刻。
         if (IsVoiceCue(v.name)) continue;
-        if (!(v.effectiveGain < effectiveGain)) continue;
         if (!(v.distance > distance)) continue;
-        if (!victim || v.effectiveGain < victim.effectiveGain) victim = v;
+        // 【2026-09-26】远处前线（Play 带 yieldFirst 的声，只有 01–06 前线生成器给）对任何更近的新声都让位，
+        // 不比响度：它的 effectiveGain 只算了音量 × 距离，没算自己那道 450–700 Hz 的 airCut（量下来
+        // 比 effectiveGain 暗 15 dB 上下）。开场加密把前线音量抬了 ×10 以后，按响度比它永远「比近处的脚步、
+        // 枪声还响」，一条都偷不动，实测开场近处声音被饿死从 30 % 涨到 57 %。它本来就该是最先让位的那一类
+        //（docs/Data_AudioWiring.md 二之三 §3b），挑的时候也排在别的受害者前面。
+        // 【2026-09-27 合并空袭后复核】只让「已经响过 YIELD_FIRST_MIN_PLAYED_S」的前线声无条件让位，
+        // 同类里先偷响得最久的（尾巴）。第一版不设门槛、按最轻的偷：实测开场 79 % 的前线声被偷，
+        // 中位只响出自己长度的 5–14 %（机枪一梭只剩一发、远炮只剩一记起音）—— 前线被掏空了。
+        // 没响够的前线声回到原来的规则（只有比新声轻才偷）。
+        const played = this.ctx.currentTime - (v.startAt ?? v.t);
+        // 没响够的前线声谁都不偷：它的起音就在这头 0.6 s 里，偷掉等于这一声没有（前线自己封顶 ≤ 5 条，
+        // 空出来的位置由上面这些「响过的」让出来）。
+        if (v.farField && played < YIELD_FIRST_MIN_PLAYED_S) continue;
+        const background = !!v.farField;
+        if (!background && !(v.effectiveGain < effectiveGain)) continue;
+        if (!victim || (background && !victimFar)
+          || (background && victimFar && played > victimPlayed)
+          || (!background && !victimFar && v.effectiveGain < victim.effectiveGain)) {
+          victim = v; victimFar = background; victimPlayed = played;
+        }
       }
       if (!victim) break;
       freed += victim.nodes.length;
@@ -5223,7 +5250,7 @@ export class AudioEngine {
 
   Play(name, { position = null, volume = 1, pitch = 1, delay = 0, offset = 0, maxDuration = Infinity, pan = 0, burst = null, priority = false,
     bus = "sfx", airCut = 0, soundField = false, firstPerson = false, occlusion = null,
-    weaponClass = null, sourceSizeM = 0, storySpeech = false, selfCapped = false,
+    weaponClass = null, sourceSizeM = 0, storySpeech = false, selfCapped = false, yieldFirst = false, propagate = true,
     blastRadiusM = BLAST_HEARING.referenceRadiusM, blastOccluded = false } = {}) {
     // priority：玩家自己的枪永远要响。实测 59 个兵在打时 liveNodes 峰值 118/120，
     // AI 枪声丢 40.4%，**玩家自己的枪也丢了 8.3%** —— 因为玩家和 59 个兵共用
@@ -5263,7 +5290,10 @@ export class AudioEngine {
     //     只是「碰巧对了」——一旦哪天本体也标上 priority 就整条塌掉。
     // 玩家自己那一枪照旧跟手：它带 `firstPerson`（Script_Main 的 playerGunOpts）。
     // 命中/击杀回执不带 position，distance 恒 0，本来就走不到这一条。
-    const propagation = firstPerson ? 0 : this.PropagationDelay(name, distance);
+    // 【2026-09-27】`propagate: false`：调用方的位置是摆出来的（01–06 前线把 1.5 km 外的声摆到 880 m），
+    // 没有画面要对、延迟本身也是假的，不加声速延迟。实测开场前线一声平均要先挂 1–2.6 s 的空节点等「传过来」，
+    // 预算紧时 72 % 的前线声还没响就被近处新声偷掉。
+    const propagation = firstPerson || !propagate ? 0 : this.PropagationDelay(name, distance);
     const startDelay = Math.max(0, delay) + propagation;
     const startAt = now + startDelay;
 
@@ -5341,6 +5371,10 @@ export class AudioEngine {
     v.effectiveGain = effectiveGain;
     v.baseGain = volume * mix;      // 距离系数还没乘进去的那一份，MoveVoice 按新距离重算
     v.distance = distance;
+    // 远处前线那一片：预算紧时对更近的新声无条件让位（见 StealVoices）。**调用方显式给 yieldFirst 才算**
+    //（只有前线生成器 DrainFront 给）。2026-09-27 合并空袭后复核：原来按 selfCapped && soundField 推断，
+    // 空袭的炸弹也是 selfCapped soundField，会被身边任何一声脚步当成头号受害者偷掉。
+    v.farField = !!(yieldFirst && position);
 
     // 源 gain（干声起点）。混音表在这儿乘进去，配方里不必关心整体平衡。
     const src = v.Gain(volume * mix);
@@ -5709,6 +5743,10 @@ export class AudioEngine {
   Bus(kind) {
     if (kind === "ambience") return this.ambienceBus;
     if (kind === "music") return this.musicBus;
+    // 【2026-09-26】远声组：环境床的某一层写 `bus: "far"` 就进 farGain（→ 对白侧链 dialogueFarDuck −3 dB
+    // → sfx 总线）。第一关开场的远处战场床用它（Data_FirstLevelMissionBattleSound.openingAmbience）：
+    // 它是「远处在打仗」的声音，与前线生成器同一组让路，不归「环境」推子（默认 10 %）管。
+    if (kind === "far") return this.farGain || this.sfxBus;
     return this.sfxBus;
   }
 
