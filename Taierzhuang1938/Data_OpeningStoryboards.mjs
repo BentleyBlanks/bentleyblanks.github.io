@@ -486,7 +486,9 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // the questioning starts (askAt; holdLineS at the latest): Luo creeps round RC and down the west wall, He heLagS
     // behind; Luo is at the SB05 mark (-3.1,-116.9) about when Shunzi looks up (Glimpse).
     luoStart:P(-8.2,-112.0), heStart:P(-9.3,-111.7), liuStart:P(-10.4,-111.5),
-    goAfterAskS:1.5, heLagS:1.4, liuLagS:3.2,
+    // 2026-09-27: 1.5 -> 1.75. The collaborator rebake of RescueInterrogation made .03-.05 about 0.1 s longer and
+    // put Luo 5.97 m from the eye at SB05 (storyboard floor 6 m; master had 6.05, 5 cm of room): leave a little later.
+    goAfterAskS:1.75, heLagS:1.4, liuLagS:3.2,
     luoRoute:Route([-4.2,-113.1],[-3.1,-116.9],[-1.6,-119.0]),
     // He follows along the west wall to heWait (at Luo's right-rear when the first cut lands, SB05A), and only then runs
     // round to his chopParry mark behind ijaA.
