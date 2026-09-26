@@ -26,8 +26,8 @@ const Sight = (eyeDistance, offset = V(0, 0, 0)) => Freeze({
 const FixedPose = (position, rotation) => Freeze({ mode: "fixed", position, rotation });
 const StateContacts = (right, left) => Freeze({ right, left });
 const WeaponPose = ({ family, hip, ads, sprint, right, left, adsRight = right, adsLeft = left,
-  sprintRight = right, sprintLeft = left, bodyHip, bodyAds, bodySprint, actions }) => Freeze({
-  family,
+  sprintRight = right, sprintLeft = left, bodyHip, bodyAds, bodySprint, actions }, armRig = null) => Freeze({
+  family, ...(armRig ? { armRig } : {}),
   hip: Freeze({ weapon: hip, body: bodyHip, contacts: StateContacts(right, left) }),
   ads: Freeze({ weapon: ads, body: bodyAds, contacts: StateContacts(adsRight, adsLeft) }),
   sprint: Freeze({ weapon: sprint, body: bodySprint, contacts: StateContacts(sprintRight, sprintLeft) }),
@@ -175,6 +175,46 @@ export const FPS_ARM_POSES = Freeze({
   }),
 });
 
+// 架设（接管）机枪的双臂姿势，键名是武器 id，运行时以 `<weaponId>@mounted` 取用。
+//
+// 枪架在两脚架/三脚架上、指向就是视线，所以这里的腰射与开镜都**不带旋转**：
+// hip.position / ads 解出来的位置就是「枪局部原点在相机空间里的位置」，装配层反过来
+// 用它把相机摆到枪后头（Script_Main.MountedCameraEye）—— 枪钉在工事上不动，
+// 动的是人的眼睛。武器姿态以外（接触、手指、动作）与随身那一把同一套数据。
+// armRig：借哪一把枪的手臂资产。玩家端着汉阳造/中正式走过来，上了枪位还是那双土灰袖口的手。
+export const FPS_MOUNTED_SUFFIX = "@mounted";
+// fingers：换了一双手（armRig）之后按那双手的手指粗细重新拟合的屈曲角，只替换 `fingers`，
+// 掌心接触坐标、拇指朝向、扳机指与随身那一把相同。
+const RefitFingers = (contact, fingers) => fingers
+  ? Freeze({ ...contact, fingers: Freeze(fingers.map((f) => Freeze(f))) }) : contact;
+const Mounted = (weaponId, hip, overrides = {}) => {
+  const base = FPS_ARM_POSES[weaponId];
+  const hipPose = FixedPose(hip, V(0, 0, 0));
+  return WeaponPose({
+    family: base.family, hip: hipPose, ads: overrides.ads || base.ads.weapon, sprint: hipPose,
+    right: RefitFingers(base.contacts.right, overrides.rightFingers),
+    left: RefitFingers(base.contacts.left, overrides.leftFingers),
+    bodyHip: overrides.bodyHip || base.hip.body, bodyAds: overrides.bodyAds || base.ads.body,
+    bodySprint: overrides.bodyHip || base.hip.body,
+    actions: base.actions,
+  }, overrides.armRig || "HanYang");
+};
+export const FPS_MOUNTED_ARM_POSES = Freeze({
+  // 腰射把枪放在视线右下：上插弹匣让开准心，左小臂从左下角斜着伸到弹匣座下面托住。
+  // 手指：BlenderMCP 工程 Zb26MountedGrip_20260927 按汉阳造那双（更厚的）手在机枪位姿势下逐指拟合，
+  // 同一套正向运动学（误差 3e-8 m）；除右拇指（根节随 thumbDirection）4 mm 外，九指皮肤陷入枪体 ≤1.6 mm、
+  // 指腹离枪面 ≤2 mm。右食指是扳机指，不参与拟合。
+  Zb26: Mounted("Zb26", V(0.085, -0.180, -0.380), { bodyHip: HanYangBody(), bodyAds: HanYangBody(),
+    rightFingers: [[0,-8.01,7.86],[21.3,71.4,18.59],[21.9,65.8,18.53],[9.58,79.75,3],[27.46,35.6,54.15]],
+    leftFingers: [[0,43.04,60],[30.12,91.4,12.4],[11.12,93,10.47],[9.1,77,24.94],[-4.59,65.4,4.69]] }),
+  Type92Hmg: Mounted("Type92Hmg", V(0.000, -0.190, -0.420), { bodyHip: HanYangBody(), bodyAds: HanYangBody() }),
+});
+
+/** 这支枪有没有架设姿势；有就返回 `<weaponId>@mounted`，没有返回 null。 */
+export function FpsMountedPoseKey(weaponId) {
+  return weaponId && FPS_MOUNTED_ARM_POSES[weaponId] ? `${weaponId}${FPS_MOUNTED_SUFFIX}` : null;
+}
+
 // 刀具和投掷物保留其状态接触；枪械握持坐标系固定在武器局部，
 // 腰射/ADS/冲刺只移动武器本身，不旋转手掌去抵消不合理的肘平面。
 export const FPS_ARM_STATE_ROTATIONS = Freeze({
@@ -204,11 +244,14 @@ export const FPS_ARM_LIMITS = Freeze({
 });
 
 export function FpsArmPose(weaponId) {
+  if (typeof weaponId === "string" && weaponId.endsWith(FPS_MOUNTED_SUFFIX)) {
+    return FPS_MOUNTED_ARM_POSES[weaponId.slice(0, -FPS_MOUNTED_SUFFIX.length)] || null;
+  }
   return FPS_ARM_POSES[weaponId] || null;
 }
 
 export function FpsArmStateRotation(weaponId, state, side) {
   return FPS_ARM_STATE_ROTATIONS[weaponId]?.[state]?.[side]
-    || FPS_ARM_POSES[weaponId]?.hip?.contacts?.[side]?.rotation
+    || FpsArmPose(weaponId)?.hip?.contacts?.[side]?.rotation
     || null;
 }

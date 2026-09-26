@@ -1090,6 +1090,10 @@ export class PlayerController {
       + (shake > 0 ? Math.sin(this.stepDistance * 41 + this.suppression * 90) * shake : 0)
       + (focusing ? Math.sin(melee.t * 39) * (1 - melee.progress) * .013 : 0);
 
+    // 接管机枪：装配层把眼睛挪到枪后头（Script_Main.MountedCameraEye）。排在震屏之前，
+    // 近爆的抖动照样叠在贴枪的眼位上。没接管时它是空的。
+    this.cameraMount?.(cam);
+
     // 通用震屏（Script_CameraShake）：叠在最后，不改 yaw/pitch 本体 —— 枪口不会被震歪，
     // 玩家松手后画面自己回来。
     const sh = this.shake;

@@ -599,8 +599,11 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
   `MarchBullet`，接管/补弹是 `Script_Interact` 的注册点。
   **脚本只能把枪弄坏，上/下枪位永远是玩家自己按的那一下。**
 - NPC 射手与 `Script_Ai` 共用同一道闸：战位名就是 `soldier.emplacementId`，不另建占位表。
-  键位 F 接管/离位、R 换弹板/拉枪机、左键开火、右键开镜（只收窄相机 FOV 到机枪那支枪的 `adsFovScale`、按 `FREE_AIM.adsLookScale` 压转向，
-  不进 `player.ads`，准心保留 —— 弹道收敛在准心上，照门并不精确落在屏幕正中）。
+  键位 F 接管/离位、R 换弹板/拉枪机、左键开火、右键开镜（收窄相机 FOV 到机枪那支枪的 `adsFovScale`、按 `FREE_AIM.adsLookScale` 压转向，
+  不进 `player.ads`；有架设姿势的枪眼位同时滑到照门后，照门落在屏幕正中）。
+- 第一人称：有 `FPS_MOUNTED_ARM_POSES` 的枪（捷克式、九二式）接管时视图模型换成这挺枪、双手握上去，眼睛由枪反推并滑过去，
+  世界模型让位 —— 口径在 [第一人称身体「架设机枪」](Data_FirstPersonEmbodiment.md)，回归口 `Script_EmplacementViewBrowserTest.mjs`，
+  节奏数在 `Data_Tuning_Interact.EMPLACEMENT_VIEW`。
 - 回归口 `Script_EmplacementTest.mjs`（纯 Node）；取证口 `Debug.Emplacement`，
   HUD 是 `.hudEmplacement`（热条与状态提示），弹药读数借右下 `.hudCombat`，`#hud.emplaced` 只压暗投掷物。
 

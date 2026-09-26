@@ -298,6 +298,8 @@ export const testDefs = {
   FirstPersonEmbodimentTest: { file: "Script_FirstPersonEmbodimentTest.mjs", desc: "全枪人体关节、空手摆臂与低头身体回归" },
   FpsArmTest: { file: "Script_FpsArmTest.mjs", desc: "第一人称国军 01 双手：手扣在枪上、腕袖不糊屏" },
   FpsHandContactTest: { file: "Script_FpsHandContactTest.mjs", desc: "实际指腹与扳机、枪栓、桥夹、弹匣及套筒的接触与动作可达性" },
+  EmplacementViewBrowserTest: { file: "Script_EmplacementViewBrowserTest.mjs", timeoutMs: 8 * 60 * 1000,
+    desc: "接管机枪第一人称：双手握枪（IK/指腹/涂色像素）、枪与世界模型同位、开镜居中、连发与换弹板不离座、拉机柄、离位还原" },
   FpsGripEditorTest: { file: "Script_FpsGripEditorTest.mjs", desc: "第一人称持枪检查编辑器：装备/双视角/真实挂点/骨骼残差与退出还原" },
   FpsAnimationTest: {file:"Script_FpsAnimationTest.mjs",desc:"Blender第一人称骨骼片段完整性、旋转和循环接缝"},
   SprintMeleeTest: { file: "Script_SprintMeleeTest.mjs", desc: "冲刺白刃：左键挥得出、刀在画面里" },
@@ -407,6 +409,7 @@ export const browserTests = new Set([
   "FirstLevelRearDoorWalkTest",
   "FirstLevelTankProbeTest",
   "FirstLevelMachineGunTest",
+  "EmplacementViewBrowserTest",
   "FirstLevelZhouExitBrowserTest",
   "FirstLevelMachineGunCutsceneTest",
   "MachineGunCutsceneAudioTest",
@@ -567,7 +570,7 @@ export const domains = {
       "CarryTest",
       // 架设机枪把左键整条接管过去（TryFire 的第一道闸）、还借 MarchBullet 打弹道，
       // 所以它同样同时挂在 combat 与 interact 两个域。
-      "EmplacementTest", "FirstLevelMissionTest",
+      "EmplacementTest", "EmplacementViewBrowserTest", "FirstLevelMissionTest",
       // 日机扫射自己算一条伤害链（打倒 NPC、打倒玩家），不走 MarchBullet 也不走 Blast，
       // 所以碰伤害口径的改动要连着它一起跑（毫秒级，白搭一条不亏）。
       "AircraftStrafeTest",
@@ -600,7 +603,7 @@ export const domains = {
     // 所以碰交互框架的改动要连着它一起跑。
     // 脚本检查点（倒带）改的是玩家状态的还原，与负重/机枪位共用同一批状态，
     // 所以也挂在这个域下。
-    tests: ["CarryTest", "EmplacementTest", "HudPromptTest", "HudPromptBrowserTest", "WeaponPickupTest", "TelegraphTest", "MissionHooksTest", "MissionSetpiecesTest"],
+    tests: ["CarryTest", "EmplacementTest", "EmplacementViewBrowserTest", "HudPromptTest", "HudPromptBrowserTest", "WeaponPickupTest", "TelegraphTest", "MissionHooksTest", "MissionSetpiecesTest"],
   },
   audio: { label: "音效/音乐/环境声", tests: ["BlastFeedbackTest","FirstLevelVoicePerspectiveTest","FirstLevelMissionMusicTest", "FirstLevelBattleSoundTest", "FirstLevelAirRaidTest", "FirstLevelMissionMusicBrowserTest", "AudioTest", "AudioWiringTest", "MachineGunCutsceneAudioTest", "FirstLevelAudioNodeBudgetTest"] },
   // 「声库装没装进去」与「输出端有没有电平」是两件事，后者只有 MachineGunCutsceneAudioTest
@@ -764,7 +767,7 @@ const changedDomainRules = [
   // Aircraft 挂 combat：绕圈那一层是纯视觉，但同一个文件里的扫射航线打得倒玩家。
   // Hitbox 也挂 combat：人物子弹代理改了就是改了打中哪儿。
   { domain: "combat", pattern: /(Combat|Weapon|Damage|Gun|Grenade|Blast|Aim|Reticle|Viewmodel|CameraShake|FpsArm|FpsHand|FpsAnatomy|FirstPersonBody|FirstPersonEmbodiment|FirstPersonSelfShadow|Projectile|Ballistic|Hitbox|Script_Input|Data_Meshes|_blender|Range|Melee|Carry|Emplacement|Aircraft|Strafe|ModelFacing|Model_\w+\.glb)/i },
-  { domain: "interact", pattern: /(Carry|Interact|Emplacement|Telegraph|Checkpoint|Script_Input|Hud|Prompt)/i },
+  { domain: "interact", pattern: /(Carry|Interact|Emplacement|MountedGrip|Telegraph|Checkpoint|Script_Input|Hud|Prompt)/i },
   // Flare 挂 ai：它不打人，但它改「谁看得见谁」——那是 AI 的判据。
   { domain: "ai", pattern: /(Script_Ai|Visibility|Spawn|Data_Battle|Traversal|Flare|Companion|MissionSetpieces)/i },
   { domain: "hud", pattern: /(Hud|Prompt|Reticle|Crosshair|Identify|Telegraph|Whitebox|DebugOptions|Script_Input|Style_Game|index\.html)/i },

@@ -116,8 +116,8 @@ BlenderMCP 在上述独立工程执行 `_import/Script_FpsAnimationStudio.py` �
 `Script_FpsHandContactTest` 进一步测量六把随身枪的蒙皮指腹到真实扳机、机柄、桥夹、
 弹匣和套筒表面的距离，以及五把长枪左手五个指腹到护木的距离，
 覆盖腰射、开镜、射击及完整换弹/拉栓逐帧动作。
-同时检查指腹朝向、手指骨长不变、腕部弯曲及双臂可达性。九二式属于架设武器，
-接管时隐藏随身枪视图模型；其规则与显示由 `Script_Emplacement` 和主循环负责。
+同时检查指腹朝向、手指骨长不变、腕部弯曲及双臂可达性。架设武器（接管机枪）的双手
+见下文「架设机枪」；其规则仍由 `Script_Emplacement` 负责。
 
 军用手枪 `ServicePistol` 的导入显式朝向优先于木件重心启发式；金属度分桶后的源坐标
 不能再次反转枪口。掌心和换匣路径按修正后的闭锁 A 状态测量，左手依次到握把底部、
@@ -172,3 +172,38 @@ BlenderMCP 在上述独立工程执行 `_import/Script_FpsAnimationStudio.py` �
 MotionVectorContract、ExplosionRules、ExplosionRange 通过。通用 BootTest 在 240 秒超时前
 报告第一关 `readableIjaMaterials=0`；在未修改主检出上复测同一条件仍为 0，
 这是本次之外的材质接入问题。七切片完整开机回归未完成，不能称为全量通过。
+
+### 架设机枪（2026-09-27）
+
+接管机枪不再收枪只看世界模型。对标 COD WWII / BFV 的固定机枪与两脚架：**枪钉在工事上、人贴上去**。
+
+- 视图模型换成这挺枪本身，双臂取 `Data_FpsArmPoses.FPS_MOUNTED_ARM_POSES`（运行时键 `<weaponId>@mounted`，
+  `FpsMountedPoseKey`）。枪模、照门、接触坐标、扳机指和换匣动作与随身那一把同一套；只换持枪姿态（腰射在视线右下、
+  不带旋转，开镜照 `Sight` 解到屏幕正中）、肩位（汉阳造那套）和手臂资产（`armRig: "HanYang"`：人还是那个人，
+  上枪位不换袖子）。没有架设姿势的枪维持旧行为。
+- 眼位由枪反推：`Viewmodel.MountedEyeOffsets` 给出枪局部原点在相机空间的腰射/开镜位置，
+  `Script_Main.MountedCameraEye` 挂在 `Player.SyncCamera` 尾部（`player.cameraMount`），按枪的位置与朝向把眼睛放到
+  枪后头，从按 F 那一刻的眼位用 `EMPLACEMENT_VIEW.blendInS` 滑过去，下枪位用 `blendOutS` 滑回。
+  视图模型那挺枪每帧按世界模型的位姿换算到相机空间（`Viewmodel.SetMount`），所以滑移途中枪也不动；
+  接管期间 FOV 补偿压回 1、走路晃/鼠标甩/落地/换匣整枪位移清零，只留后坐层。世界模型此刻隐藏，节点照常转，
+  弹道仍从它的 muzzle 出去。
+- 每一发 `viewmodel.TriggerFire({cameraKick:false, recoilScale})`：枪和肩一起跳、抛壳、食指扣到底、视图模型枪口出火；
+  世界那边的 `vfx.MuzzleFlash` 改走 `player:true`（只出光和烟），与步枪同口径。准心上跳仍由 `player.ApplyRecoil` 管。
+  换弹板时视图模型播这把枪的换匣，枪不离座，只有右手离开握把；卡壳时每拉一下枪机（`stats.pulls` 涨一次），
+  右手去拉一下机柄（`Viewmodel.TriggerCharge`，机柄跟着走满 `boltTravel` 再送回）。
+- 接管期间换枪、拔刀、上刺刀、掏手榴弹一律封掉（R、F 另有语义）；人倒在枪上时枪留在工事上，只让空着的双手倒下。
+
+手指：捷克式那份握姿是按另一双手拟合的，换成汉阳造那双更厚的手后右无名指、拇指与左食指陷进枪体 5–8 mm。
+BlenderMCP 独立工程
+`C:\Users\Bentl\OneDrive\AI\Models\Blender\Taierzhuang1938\Zb26MountedGrip_20260927\Animation_Zb26MountedGrip.blend`
+里逐指重拟合三节屈曲角（与运行时同一套正向运动学，误差 3e-8 m），只写进 `Zb26@mounted` 的 `fingers`，随身捷克式不动。
+取证包由 `Script_MountedGripExport.mjs` 从实机导出，`_blender/Script_MountedGripFit.py` 负责量穿插（`measure`）与拟合（`fit`），
+结果与前后近景图在工程目录（`Data_Zb26MountedFingerFit.json`、`Preview/`）。穿插判据要同时满足「最近面法线在内侧」与
+「三条斜射线奇偶多数在内」：枪模不是封闭网格（弹匣、枪机是拆开的件），单看一条会误报十几毫米。
+
+本次实测：拟合前最深陷入 7.8 mm；拟合后九指 ≤1.6 mm，右拇指 4.2 mm（根节随 `thumbDirection`，未拟合），右前臂袖口压在
+枪托上 4.7 mm；十个指腹离枪面 0.2–2.2 mm。验收：`node Taierzhuang1938/Script_EmplacementViewBrowserTest.mjs`
+（接管后双臂 IK 残差 0、指腹 ≤4 mm、双臂涂色像素占屏 3.1%（左半 2.1%）、视图模型枪口与世界模型重合、眼位误差 <5 mm、
+滑移单帧 ≤8.3 cm、开镜照门居中、五发连射枪身偏移 4 mm 且不记 cameraKick、换弹板枪不动而右手移动 31 cm、
+小卡拉枪机时机柄走满行程且右手离开握把、离位还原步枪与眼位），
+截图在 `_shots/EmplacementView/`。

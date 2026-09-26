@@ -124,6 +124,8 @@ import { FrameProfiler } from "./Script_Profiler.mjs";
 import { AutoQuality } from "./Script_AutoQuality.mjs";
 import { LENS_FLARE } from "./Data_Tuning_Camera.mjs";
 import { BREATH_HOLD, FREE_AIM } from "./Data_Tuning_Player.mjs";
+import { EMPLACEMENT_VIEW } from "./Data_Tuning_Interact.mjs";
+import { FpsMountedPoseKey } from "./Data_FpsArmPoses.mjs";
 import { AUTO_QUALITY } from "./Data_Tuning_Graphics.mjs";
 import { BootProp } from "./Script_BootProp.mjs";
 import { AddExternalProps, ClearExternalProps } from "./Script_ExternalProps.mjs";
@@ -821,6 +823,18 @@ let debugEmplacedFire = false;
 let seatStanceBefore = null;
 /** 上一帧占着哪一挺；用来认出「刚下枪位」那一个边沿。 */
 let mountedIdLast = null;
+/**
+ * 接管机枪的第一人称（手握在枪上、眼睛贴到枪后）。active＝视图模型此刻拿的是这挺枪；
+ * blend 0..1 是相机从人眼滑到枪后眼位的进度（下枪位时退回 0 才清 gunId）；
+ * fromEye 是按 F 那一刻的眼位（Seat 会把人瞬移到射手位，滑移要从真正的起点出发）；
+ * hip/ads 是枪局部原点在相机空间的位置（Viewmodel.MountedEyeOffsets），
+ * vm 是交给 Viewmodel.SetMount 的那一份位姿（每帧改写，不另分配）。
+ */
+const mountView = {
+  active: false, gunId: null, blend: 0, adsT: 0, fromEye: null,
+  hip: new THREE.Vector3(), ads: new THREE.Vector3(),
+  vm: { position: new THREE.Vector3(), quaternion: new THREE.Quaternion() },
+};
 /** 起跳声按 player.jump.count 的增量播：空格当场起跳与缓冲到落地后才起跳是同一声。 */
 let jumpSoundPlayer = null;
 let jumpSoundCount = 0;
@@ -1310,6 +1324,7 @@ async function Boot() {
   player.AttachPhysics(physics);
   player.onBulletWound = (part, direction, info) => viewmodel.AddBulletWound(part, direction, info);
   player.onWoundReset = () => viewmodel.ClearWounds();
+  player.cameraMount = (cam) => MountedCameraEye(cam);
 
   // 导航网格：一张 2 m 一格的"走不走得过去"位图 + 按目标算的下坡场。
   // 没有它，AI 在这座四合院城里就是直奔一堵院墙（见 Script_Navigation 的账）。
@@ -1731,6 +1746,7 @@ async function Boot() {
     Seat: ({ id, seat, stance }) => {
       if (!player?.Alive) return;
       seatStanceBefore = player.stance;
+      mountView.fromEye = camera.position.clone();
       const ground = battlefield ? battlefield.GroundHeight(seat.x, seat.z) : player.position.y;
       const y = emplacement.Emplacement(id)?.payload?.supportedSeat ? Math.max(ground,seat.y) : ground;
       player.position.set(seat.x, y, seat.z);
@@ -5644,9 +5660,9 @@ function WeaponVariantFor(weaponId, value = 0) {
 }
 
 function SyncMissionHands() {
-  if (!missionRuntime || !viewmodel) return;
+  if (!missionRuntime || !viewmodel || mountView.active) return;
   const weaponId = missionRuntime.EmptyHands ? null : currentWeapon;
-  if (viewmodel.weaponId !== weaponId) {
+  if (viewmodel.weaponId !== weaponId || viewmodel.armPoseKey !== weaponId) {
     viewmodel.Equip(weaponId, weaponId ? SlotWeaponVariant(state.activeSlot) : 0);
     SyncBayonet();
   }
@@ -5655,6 +5671,7 @@ function SyncMissionHands() {
 /** 换槽。主/副武器各记各的弹仓与刺刀 —— 切回来不该是满的，刺刀也不该跑到另一支枪上。 */
 function SwitchSlot(slot) {
   if(missionRuntime?.EmptyHands)return false;
+  if (emplacement?.Mounted) return false;
   if (meleeCombat && !meleeCombat.CanChangeWeapon()) return false;
   if (!player?.Alive || !SlotWeaponId(slot)) return false;
   if (slot === state.activeSlot) return false;
@@ -6603,6 +6620,9 @@ const router = new InputRouter({
     }
     if (missionRuntime?.EmptyHands && (action.startsWith("slot:") || action.startsWith("cook:")
       || ["reload","melee","bayonet","bipod","cycleSlot"].includes(action))) return;
+    // 两只手都在机枪上：换枪、拔刀、上刺刀、掏手榴弹一律等下了枪位再说（R 与 F 另有语义，见下）。
+    if (emplacement?.Mounted && (action.startsWith("slot:") || action.startsWith("cook:")
+      || ["melee","bayonet","bipod","cycleSlot","fireMode"].includes(action))) return;
     if (p012Runtime?.binocularOwned && (action.startsWith("slot:") || action.startsWith("cook:")
       || ["reload","melee","bayonet","bipod","cycleSlot"].includes(action))) return;
     switch (action) {
@@ -7847,7 +7867,10 @@ function FireEmplacedShot(shot) {
   const up = new THREE.Vector3().crossVectors(right, _empDir).normalize();
   _empDir.addScaledVector(right, disk.x * radius).addScaledVector(up, disk.y * radius).normalize();
 
-  vfx.MuzzleFlash(_empFrom, _empDir, { scale: 1.25, kind: "hmg" });
+  // 第一人称接管时照步枪的口径：世界这边只出光与烟（player），火焰由视图模型那挺枪的枪口画 ——
+  // 世界那团 1.25 倍的机枪火光离眼睛只有一米多，泛光会糊掉半个准心区。
+  const firstPersonGun = mountView.active && mountView.gunId === shot.id;
+  vfx.MuzzleFlash(_empFrom, _empDir, { scale: 1.25, kind: "hmg", player: firstPersonGun });
   _empTargets.length = 0;
   for (const s of ai.soldiers) {
     if (!s.alive || s.side === shot.side) continue;
@@ -7894,16 +7917,17 @@ function FireEmplacedShot(shot) {
     player.firearmHandling.RecordShot(mountedWeapon);
     firePunch=.48;
     if(view)view.lastShotAt=state.elapsed;
+    // 第一人称那挺（带双手）一起跳、抛壳、食指扣到底、枪口出火。
+    if(firstPersonGun)viewmodel.TriggerFire({cameraKick:false,recoilScale:EMPLACEMENT_VIEW.recoilScale});
     audio.Play("shellDrop",{volume:.32,pan:.4,delay:.16});
   }
 }
 
 /**
- * 机枪位的世界模型。**只有一件事**：把 Model/ 里那挺九二式摆到战位上、跟着射界转。
+ * 机枪位的世界模型。**只有一件事**：把 Model/ 里那挺枪摆到战位上、跟着射界转。
  *
- * 第一人称不另做一套手/枪 rig（低动画量原则）：射手位就在枪后头 0.85 m，
- * 玩家的相机本来就在这挺枪的正后方 —— 看见的就是这个模型。
- * 手臂 IK 缺席是**有意**的取舍，记在这里免得下一个 agent 当成漏做。
+ * 玩家接管时它让位给第一人称视图模型（同一个模型、同一个位姿，带双手，见 SyncMountedView）；
+ * 节点照常跟着转 —— 弹道从这里的 muzzle 出去。没有架设姿势的枪仍只看这个模型。
  */
 function SyncEmplacementViews() {
   // 绝大多数关一挺机枪都没有：不早退的话每帧白建一个 List() 数组。
@@ -7940,7 +7964,8 @@ function SyncEmplacementViews() {
     // no second one on the rest while he stands at the seat with it (Front package, 2026-09-25).
     const carried = gun.payload?.npcCarriesGun && gun.npc && gun.npc.alive !== false && gun.npc.weaponId === gun.kind.weaponId
       && Math.hypot(gun.npc.position.x - gun.seat.x, gun.npc.position.z - gun.seat.z) < 1.2;
-    view.root.visible = !carried;
+    // 玩家接管时这挺枪由第一人称视图模型画（同一个模型、同一个位置，带双手）。
+    view.root.visible = !carried && !(mountView.active && mountView.gunId === gun.id);
     view.root.position.set(gun.position.x, gun.position.y + gun.kind.sightRiseM, gun.position.z);
     view.root.rotation.set(gun.pitch, gun.yaw, 0, "YXZ");
     const recoil=gun.kind.recoil, age=state.elapsed-(view.lastShotAt??-100);
@@ -7977,6 +8002,109 @@ function AimEmplacementView(view) {
     }
     player.SyncCamera(0);
   }
+}
+
+// ---------------------------------------------------------------------------
+// 接管机枪的第一人称：双手握在枪上，眼睛贴到枪后
+// ---------------------------------------------------------------------------
+// 对标 COD WWII / BFV 的固定机枪：枪不动、人贴上去。**枪钉在工事上**（位置与朝向就是
+// 世界模型那一份），视图模型换成这挺枪、双臂按 Data_FpsArmPoses 的 `<id>@mounted`
+// 握上去；反过来由架设姿势解出眼睛该在枪后哪儿（腰射看得见双手和机匣，开镜照门落在
+// 屏幕正中），相机从按 F 时的眼位滑过去。弹道、射界、热量、卡壳一个字没动。
+const _mountOrigin = new THREE.Vector3();
+const _mountEye = new THREE.Vector3();
+const _mountOffset = new THREE.Vector3();
+const _mountEuler = new THREE.Euler(0, 0, 0, "YXZ");
+const _mountQuat = new THREE.Quaternion();
+const _mountCamInv = new THREE.Quaternion();
+const MountEase = (t) => t * t * (3 - 2 * t);
+
+/** 枪局部原点（世界模型 root，不含后坐那一下）与枪的朝向。 */
+function MountedGunFrame(gun, origin, quat) {
+  origin.set(gun.position.x, gun.position.y + gun.kind.sightRiseM, gun.position.z);
+  quat.setFromEuler(_mountEuler.set(gun.pitch, gun.yaw, 0, "YXZ"));
+}
+
+/** Player.SyncCamera 的尾巴：把眼睛从人身上滑到枪后头。blend 为 0 时什么都不做。 */
+function MountedCameraEye(cam) {
+  if (!mountView.gunId || mountView.blend <= 0) return;
+  const gun = emplacement?.Emplacement(mountView.gunId);
+  if (!gun) return;
+  MountedGunFrame(gun, _mountOrigin, _mountQuat);
+  _mountOffset.copy(mountView.hip).lerp(mountView.ads, MountEase(Clamp01(mountView.adsT)))
+    .applyQuaternion(_mountQuat);
+  _mountEye.subVectors(_mountOrigin, _mountOffset);
+  cam.position.lerpVectors(mountView.fromEye || cam.position, _mountEye, MountEase(mountView.blend));
+}
+
+/** 视图模型那挺枪在相机空间里的位姿＝世界模型的位姿换算过来（相机滑移途中枪也不跟着走）。 */
+function MountedViewPose() {
+  const gun = emplacement?.Emplacement(mountView.gunId);
+  if (!gun) return;
+  MountedGunFrame(gun, _mountOrigin, _mountQuat);
+  camera.updateMatrixWorld();
+  camera.getWorldQuaternion(_mountCamInv).invert();
+  camera.getWorldPosition(_mountEye);
+  mountView.vm.position.subVectors(_mountOrigin, _mountEye).applyQuaternion(_mountCamInv);
+  mountView.vm.quaternion.copy(_mountCamInv).multiply(_mountQuat);
+}
+
+/** 下枪位：把手上那一把还回去（空手段就空手），照常掏枪。 */
+function RestoreHandWeapon() {
+  const weaponId = missionRuntime?.EmptyHands ? null : currentWeapon;
+  viewmodel.Equip(weaponId, weaponId ? SlotWeaponVariant(state.activeSlot) : 0);
+  SyncBayonet();
+}
+
+/**
+ * 每帧跟着 Script_Emplacement 的占位状态走（排在 emplacement.Update 之后）：
+ * 上枪位那一帧把视图模型换成这挺枪；下枪位（F、人倒了、换关、战位收掉）那一帧还回步枪。
+ * 没有架设姿势的枪（FpsMountedPoseKey 为空）维持旧行为：收枪、只看世界模型。
+ */
+function SyncMountedView(dt) {
+  if (!viewmodel || !emplacement) return;
+  const id = emplacement.MountedId;
+  const gun = id ? emplacement.Emplacement(id) : null;
+  const poseKey = gun ? FpsMountedPoseKey(gun.kind.weaponId) : null;
+  const want = !!poseKey && !!player?.Alive;
+  if (want && (!mountView.active || mountView.gunId !== id)) {
+    viewmodel.Equip(gun.kind.weaponId, 0, { armPose: poseKey, instant: true });
+    viewmodel.MountedEyeOffsets(mountView.hip, mountView.ads);
+    viewmodel.SetMount(mountView.vm);
+    // 换了一挺（或刚从下枪位的滑移里又按回来）：从此刻的眼位重新滑。
+    if (mountView.gunId !== id) mountView.blend = 0;
+    mountView.fromEye = mountView.fromEye || camera.position.clone();
+    mountView.active = true;
+    mountView.gunId = id;
+    mountView.reloading = false;
+  } else if (!want && mountView.active) {
+    mountView.active = false;
+    mountView.fromEye = null;
+    viewmodel.SetMount(null);
+    // 人倒在枪上：枪留在工事上（世界模型重新露出来），只让空着的双手跟着倒下去。
+    if (player?.Alive) RestoreHandWeapon();
+    else if (viewmodel.rig) viewmodel.rig.group.visible = false;
+  } else if (!want) {
+    mountView.fromEye = null;
+  }
+  const span = mountView.active ? EMPLACEMENT_VIEW.blendInS : EMPLACEMENT_VIEW.blendOutS;
+  const gliding = !!mountView.gunId;
+  mountView.blend = Clamp01(mountView.blend + (mountView.active ? 1 : -1) * dt / span);
+  if (mountView.blend >= 1) mountView.fromEye = null;
+  if (!mountView.active && mountView.blend <= 0) mountView.gunId = null;
+  mountView.adsT = adsFovT;
+  // 这一帧的相机在 player.Update 里已经按上一帧的进度摆过了；接管那一帧（按 F 在帧外）
+  // 它还是「没接管」的眼位，下一帧才从 fromEye 起滑 —— 画面会先跳到座位上再跳回来。
+  // 重摆一次（dt=0，幂等，AimEmplacementView 也是这么用的）。
+  if (gliding && player?.Alive) player.SyncCamera(0);
+  // 换弹板：Script_Emplacement 起了 reloadT，视图模型就把这一把的换匣动作播一遍；
+  // 卡壳时每拉一下枪机（stats.pulls 涨一次），右手就去拉一下机柄。
+  if (mountView.active && gun) {
+    if (gun.reloadT > 0 && !mountView.reloading) mountView.reloading = viewmodel.TriggerReload();
+    else if (gun.reloadT <= 0) mountView.reloading = false;
+    if (emplacement.stats.pulls > (mountView.pulls ?? emplacement.stats.pulls)) viewmodel.TriggerCharge();
+  }
+  mountView.pulls = emplacement.stats.pulls;
 }
 
 // ---------------------------------------------------------------------------
@@ -8310,6 +8438,7 @@ function Frame(dt, render = true) {
     if (emplacement.Mounted && router?.Down("KeyR")) emplacement.BeginClear();
     else emplacement.EndClear();
     emplacement.Update(dt, player);
+    SyncMountedView(dt);
     SyncEmplacementViews();
     // 「刚下枪位」那一个边沿：把上枪位之前的姿态还回去。用边沿而不是在 Vacate 里做，
     // 是因为离位有四条路（玩家按 F、人倒了、换关、战位被收掉），一条条挂钩会漏。
@@ -8331,7 +8460,7 @@ function Frame(dt, render = true) {
   // 抬着东西的人被打死时负重会在同一帧卸掉，不挡住的话枪会在尸体镜头里冒出来。
   SyncMissionHands();
   const handsBusy = !!carry?.Blocking || !!p012CarryView?.rig.root.visible
-    || !!emplacement?.Blocking || !!p012Runtime?.binocularOwned;
+    || (!!emplacement?.Blocking && !mountView.active) || !!p012Runtime?.binocularOwned;
   if (viewmodel?.root && carryHidGun !== handsBusy) {
     carryHidGun = handsBusy;
     if (!state.cutscene && !state.menu && player.Alive) viewmodel.root.visible = !carryHidGun;
@@ -8460,8 +8589,10 @@ function Frame(dt, render = true) {
 
   profiler.B("viewmodel");
   if (!player.Alive && viewmodel.deathHands) UpdatePlayerDeath();
-  else viewmodel.Update(dt, {
-    wallLower: player.gunClearance.lower,
+  else {
+  if (mountView.active) MountedViewPose();
+  viewmodel.Update(dt, {
+    wallLower: mountView.active ? 0 : player.gunClearance.lower,
     playerPosition: player.position, playerYaw: player.yaw,
     carryBodyVisible: !!p012CarryView?.rig.root.visible && !state.cutscene && !state.menu && player.Alive,
     carryBodyYaw: p012CarryView?.bodyYaw,
@@ -8471,7 +8602,7 @@ function Frame(dt, render = true) {
     dt, moveSpeed: Clamp01(Math.hypot(player.velocity.x, player.velocity.z) / 3.2),
     strafe: input.strafe, grounded: player.grounded, sprint: player.sprint,
     verticalVelocity: player.velocity.y,
-    ads: player.ads, lookDeltaYaw: dYaw, lookDeltaPitch: dPitch,
+    ads: mountView.active ? (emplacedAds ? 1 : 0) : player.ads, lookDeltaYaw: dYaw, lookDeltaPitch: dPitch,
     // 自由瞄准的**绝对**偏移（不是增量）：枪要真的指到那儿去。
     // 没有这两条的话，2° 锥内推鼠标只有弹道在偏、画面一动不动 ——
     // 而本作没有准星，玩家读不到任何东西（见 docs/Data_GunFeelReview.md 末节）。
@@ -8482,6 +8613,7 @@ function Frame(dt, render = true) {
     lowAmmo: state.ammo <= 1,
     meleeCombat: meleePreview && meleeCombat?.ViewPose() ? MeleePreviewPose(player, meleeCombat.ViewPose()) : meleeCombat?.ViewPose() || null,
   });
+  }
   profiler.E("viewmodel");
 
   // 友军倒下：叙事层要靠它触发「他倒了我上，我倒了你上」那几句。

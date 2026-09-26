@@ -115,3 +115,20 @@ export const EMPLACEMENT = Object.freeze({
   /** 热条的「温」档门槛 = warnHeat × 这个数。 */
   warmHeatFrac: 0.5,
 });
+
+/**
+ * 接管机枪时的第一人称（口径：docs/Data_FirstPersonEmbodiment.md「架设机枪」）。
+ * 对标 COD WWII / BFV 的固定机枪与两脚架：视角贴到枪上的那一下是一段短滑移，
+ * 不是瞬移；双手一直在枪上；枪不跟着走路晃，但每一发都要让枪和手臂一起跳。
+ */
+export const EMPLACEMENT_VIEW = Object.freeze({
+  /** 上枪位：相机从按 F 时的眼位滑到枪后眼位。COD 系约 0.3 s。 */
+  blendInS: 0.30,
+  /** 下枪位：相机滑回人自己的眼位（步枪同时照常掏出来）。 */
+  blendOutS: 0.22,
+  /**
+   * 视图模型后坐弹簧的冲量倍率。架在两脚架/三脚架上的枪抵得实，枪身跳动约是
+   * 端着打的一半；再小就读不出连发的节奏。
+   */
+  recoilScale: 0.55,
+});

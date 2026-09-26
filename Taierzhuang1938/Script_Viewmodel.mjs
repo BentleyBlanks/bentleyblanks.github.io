@@ -1530,6 +1530,9 @@ export class Viewmodel {
     this.recoilYawSpring = SpringFromRecover(0.4);
 
     // --- 状态 ---------------------------------------------------------------
+    // 接管机枪：null，或装配层每帧写的 { position, quaternion }（枪局部原点在相机空间的
+    // 位姿，已去掉 FOV 补偿）。非空时枪钉在世界里那挺枪的位置上，见 SetMount。
+    this.mount = null;
     this.weaponId = null;
     this.weapon = null;
     this.rig = null;
@@ -1740,14 +1743,22 @@ export class Viewmodel {
   // -------------------------------------------------------------------------
 
   /** @param {string|null} weaponId Data_Weapons.WEAPONS 的 id；null = 空手 */
-  Equip(weaponId, variant = 0) {
+  /**
+   * @param {object} [opts]
+   *   armPose  双臂姿势键（默认＝weaponId）。接管机枪时传 `<weaponId>@mounted`：
+   *            枪模、材质、枪口与照门仍是这支枪的，只有持枪姿态与肩位换成架设那一套。
+   *   instant  不播掏枪（equipSpring 直接到位）—— 枪本来就架在工事上，不是从腰里拿出来的。
+   */
+  Equip(weaponId, variant = 0, { armPose = null, instant = false } = {}) {
     ResetDeathHands(this);
     // 换枪重建整棵 rig：上一帧刷好的世界矩阵指的是另一棵树。
     this._rootMatrixFresh = false;
     if(this.skeletalAnimation){this.skeletalAnimation.preview=null;this.skeletalAnimation.current=null;}
     this.armAnchor.position.set(0,0,0);this.armAnchor.quaternion.identity();this.armAnchor.scale.set(1,1,1);
     this._ClearRig();
-    this.riggedArms=this.armRigs[weaponId]||this.armRigs.default||null;
+    // 架设姿势可以借另一把枪的手臂资产（armRig）：人还是那个人，上枪位不该换一双袖子。
+    const rigKey = (armPose && FpsArmPose(armPose)?.armRig) || weaponId;
+    this.riggedArms=this.armRigs[rigKey]||this.armRigs.default||null;
     if(this.skeletalAnimation){
       this.skeletalAnimation.boneMap.clear();
       this.riggedArms?.root.traverse(object=>{if(object.isBone)this.skeletalAnimation.boneMap.set(object.name.toLowerCase().replace(/[^a-z0-9]/g,''),object);});
@@ -1756,6 +1767,7 @@ export class Viewmodel {
     this.weaponId = weaponId || null;
     this.weaponVariant = Number.isInteger(variant) && variant > 0 ? variant : 0;
     this.weapon = weaponId ? WEAPONS[weaponId] || null : null;
+    this.armPoseKey = weaponId ? armPose || weaponId : null;
     this.action = null;
     this.carryOverride = null;
     this.bayonetCarry = this.bayonetFixed && this.weapon?.bayonet ? 1 : 0;
@@ -1801,8 +1813,8 @@ export class Viewmodel {
       const builder = BUILDERS[weaponId] || BuildBoltRifle;
       this.rig = builder(this.materials, this.weapon, weaponId, this.grenadeAsset);
     }
-    this.armPose = FpsArmPose(weaponId);
-    if (!this.armPose) throw new Error(`缺少逐枪第一人称姿势数据：${weaponId}`);
+    this.armPose = FpsArmPose(this.armPoseKey);
+    if (!this.armPose) throw new Error(`缺少逐枪第一人称姿势数据：${this.armPoseKey}`);
     this.actionSpec = this.armPose.actions;
     for (const [side, contact] of Object.entries(this.armPose.contacts)) {
       this.rig.hands[side] = {
@@ -1839,7 +1851,7 @@ export class Viewmodel {
     if (this.riggedArms) {
       this.riggedArms.Attach(this.armAnchor, this.handRight.group, this.handLeft.group,
         this.gripContactRight, this.gripContactLeft,
-        [this.handRight, this.handLeft, this.sleeveRight, this.sleeveLeft], weaponId);
+        [this.handRight, this.handLeft, this.sleeveRight, this.sleeveLeft], this.armPoseKey);
       this.rigSource = `${this.rigSource}+riggedArms`;
     }
 
@@ -1889,7 +1901,7 @@ export class Viewmodel {
     this._RecomputeCompensation(60);
 
     // 掏枪动画
-    this.equipSpring.Set(0);
+    this.equipSpring.Set(instant ? 1 : 0);
     // 每次换枪都会重建整棵 rig：新建出来的网格必须重新接进前景预通道口径。
     // 漏了的后果不是“预通道多画一遍”那么轻：枪把自己 0.1—0.9 m 的真实深度
     // 写进法线深度图，SSAO 就在枪所在的那块屏幕区域算出几乎全遮蔽，
@@ -2097,7 +2109,12 @@ export class Viewmodel {
   // -------------------------------------------------------------------------
 
   /** 开火：后坐冲量 + 枪焰 + 抛壳（自动武器）。返回枪口世界位置，方便直接生成弹道。 */
-  TriggerFire() {
+  /**
+   * @param {object} [opts] 接管机枪用：cameraKick=false 不往 cameraKick 里记账（架枪的准星上跳
+   *   由 player.ApplyRecoil 管，记了没人消费会攒到换回步枪那一发一次性踢出来）；
+   *   recoilScale 乘在枪身后坐弹簧的冲量上。
+   */
+  TriggerFire({ cameraKick = true, recoilScale = 1 } = {}) {
     if (!this.weapon || !this.rig) return null;
     // 大刀和手榴弹没有"开火"。不挡住的话大刀会喷枪焰，这种 bug 一上截图就要返工
     if (this.weapon.kind === "melee" || this.weapon.kind === "throwable") return null;
@@ -2119,7 +2136,7 @@ export class Viewmodel {
     // 战地是相机小、枪大。相机侧从 0.55 收到 0.46，枪侧不动 ——
     // 改完相机/枪 ≈ 0.89，枪重新变成画面上跳得最凶的那个东西。
     const adsAim = Mix(1.0, 0.6, Clamp01(this.adsSpring.value));   // 只压准星
-    const adsGun = 1;                                              // 枪自己该跳多少就跳多少
+    const adsGun = recoilScale;                                    // 枪自己该跳多少就跳多少
 
     this.recoilKick.Impulse(recoil.kick * adsGun);
     this.recoilRise.Impulse(recoil.kick * 0.35 * adsGun);
@@ -2127,8 +2144,10 @@ export class Viewmodel {
     this.recoilYawSpring.Impulse(yawAmount * adsGun);
 
     // 相机踢动交给调用方（视图模型自己转是不够的，准星必须真的被顶上去）
-    this.cameraKick.x += recoil.pitch * DEG * 0.46 * adsAim;
-    this.cameraKick.y += yawAmount * 0.5 * adsAim;
+    if (cameraKick) {
+      this.cameraKick.x += recoil.pitch * DEG * 0.46 * adsAim;
+      this.cameraKick.y += yawAmount * 0.5 * adsAim;
+    }
 
     // 枪焰：旋转按发数派生，连发时每一发的形状不同
     this.flashTime = 0;
@@ -2172,6 +2191,16 @@ export class Viewmodel {
   _StartBolt() {
     this._StartAction("bolt", this.weapon.boltTimeS || 1.05);
     if (this.onBoltStart) this.onBoltStart(this.weapon);
+  }
+
+  /**
+   * 拉机柄（接管机枪排卡壳时的 R）：右手离开握把，抓住机柄往后一拉再送回去，回到握把。
+   * 没有可动机柄的枪、或正在换匣/拉栓时什么也不做。
+   */
+  TriggerCharge(duration = 0.6) {
+    if (!this.weapon || !this.rig?.parts.bolt || this.IsBusy()) return false;
+    this._StartAction("charge", duration);
+    return true;
   }
 
   /** 装填。按 reloadKind 分支：桥夹 / 上插弹匣 / 漏斗。 */
@@ -2518,6 +2547,23 @@ export class Viewmodel {
       this.weaponMount.rotation.set(finalPose.rx, finalPose.ry, finalPose.rz, "YXZ");
     }
 
+    // 接管机枪：枪钉在工事上，相机跟着枪摆（Script_Main.MountedCameraEye），所以
+    // 这里把走路晃、鼠标甩、落地/蹲低这几层清零，只留后坐（recoilPivot）让枪和肩一起跳。
+    // FOV 补偿压回 1：补偿是「整体等比缩到相机跟前」的假深度，枪要真的搁在沙袋上就不能缩。
+    // 换匣那一层（actionPivot / reloadPivot）同样清零：随身时绕左手把整挺枪歪过来，
+    // 架在工事上的枪不动，只剩右手离开握把去拔插弹匣（手的轨迹本来就写在枪局部）。
+    if (this.mount && this.rig) {
+      for (const pivot of [this.swayPivot, this.bobPivot, this.statePivot, this.actionPivot, this.reloadPivot]) {
+        pivot.position.set(0, 0, 0); pivot.quaternion.identity();
+      }
+      this.weaponMount.position.copy(this.mount.position);
+      this.weaponMount.quaternion.copy(this.mount.quaternion);
+      if (this.compensation.x !== 1 || this.compensation.z !== 1) {
+        this.compensation.set(1, 1, 1);
+        this.fovRig.scale.set(1, 1, 1);
+      }
+    }
+
     // Lower around the gripping hand, leaving the shoulders in place. The
     // existing hand targets/IK follow this weapon layer automatically.
     this.wallPivot.rotation.set(this.wallLower * WALL_CARRY.pitchRad, 0, 0);
@@ -2528,7 +2574,7 @@ export class Viewmodel {
     this.wallPivot.position.z += this.wallLower * WALL_CARRY.backM;
 
     // --- FOV 补偿（世界 FOV 变了要重算）-------------------------------------
-    if (Math.abs(worldFov - (this._lastWorldFov || 0)) > 0.05) {
+    if (!this.mount && Math.abs(worldFov - (this._lastWorldFov || 0)) > 0.05) {
       this._lastWorldFov = worldFov;
       if (adsInput < 0.02) this.worldFovBase = worldFov;   // 只在没开镜时校准基准
       this._RecomputeCompensation(worldFov);
@@ -2553,6 +2599,27 @@ export class Viewmodel {
       crouch: Math.max(input.crouch || 0, input.carryBodyCrouch || 0) } : input,
       parent, (this.root.visible || !!input.carryBodyVisible) && !(input.meleeCameraDrop > 0.05));
     this._UpdateSleeves();
+  }
+
+  /**
+   * 接管机枪。mount 为 null 时回到普通视图模型；否则是装配层持有、每帧改写的
+   * `{ position: Vector3, quaternion: Quaternion }`：枪局部原点在相机空间的位姿。
+   * 离开时把 FOV 补偿的缓存作废，下一帧按当前 FOV 重算。
+   */
+  SetMount(mount) {
+    if (this.mount && !mount) this._lastWorldFov = 0;
+    this.mount = mount || null;
+  }
+
+  /**
+   * 架设姿势下「枪局部原点在相机空间里的位置」：腰射与开镜各一个（开镜照门落在屏幕
+   * 正中，由 _MakeAdsPose 解出来）。装配层拿它反推眼位，所以两个都不带旋转。
+   */
+  MountedEyeOffsets(hip = new THREE.Vector3(), ads = new THREE.Vector3()) {
+    const h = this.hipPose || { px: 0, py: 0, pz: 0 }, a = this.adsPose || h;
+    hip.set(h.px, h.py, h.pz);
+    ads.set(a.px, a.py, a.pz);
+    return { hip, ads };
   }
 
   BeginDeath() { BeginDeathHands(this); }
@@ -2707,6 +2774,7 @@ export class Viewmodel {
       case "meleeWind": this._AnimMeleeWind(a.t, a.fixed); break;
       case "fixBayonet": this._AnimFixBayonet(a.t, a); break;
       case "throw": this._AnimThrow(a.t, a.power, a.offhand); break;
+      case "charge": this._AnimCharge(a.t); break;
       default: break;
     }
   }
@@ -2819,6 +2887,16 @@ export class Viewmodel {
     const load = Ease.Pulse(t);
     this.actionPivot.position.set(load * 0.012, load * 0.010, load * 0.016);
     this.actionPivot.rotation.set(load * 0.055, load * -0.10, load * 0.075, "YXZ");
+  }
+
+  /** 手先到机柄上，机柄往后拉满再送回（手跟着机柄节点走），最后回握把。 */
+  _AnimCharge(t) {
+    this.rig.parts.bolt.position.z = Ease.Pulse(Ease.Seg(t, 0.30, 0.78)) * this.rig.boltTravel;
+    const handle = this._BoltHandPoint();
+    this._WorkingHandPath("right", t, [
+      { at: 0.26, position: handle, shape: "bolt" },
+      { at: 0.80, position: handle, shape: "bolt" },
+    ]);
   }
 
   _BoltHandPoint() {
