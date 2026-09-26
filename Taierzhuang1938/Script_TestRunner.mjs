@@ -47,7 +47,8 @@ const browserLockWriteGraceMs = 10 * 1000;
 // 七章通关链不再存在）。expectedFailures 基线机制保留在 AssessResult 里，现在没有测试登记基线。
 
 export const testDefs = {
-  FirstLevelDistantSmokeTest: {file:"Script_FirstLevelDistantSmokeTest.mjs",desc:"Reference smoke: grounded persistent scatter, clear routes, visible 04–06 crowns and low-quality headroom"},
+  FirstLevelDistantSmokeTest: {file:"Script_FirstLevelDistantSmokeTest.mjs",desc:"Reference smoke districts: clear routes, layered 04–06 views, bounded density and combat particle isolation"},
+  FirstLevelDistantSmokeBrowserTest: {file:"Script_FirstLevelDistantSmokeBrowserTest.mjs",timeoutMs:120000,desc:"Smoke atlas GPU: real animation, low-quality density, occlusion, reset and one-draw budget"},
   BlastFeedbackTest: {file:"Script_BlastFeedbackTest.mjs",timeoutMs:300000,desc:"Shared grenade/shell camera response, bounded tinnitus, actual PCM, mute and reset"},
   FirstLevelWhiteboxVillageTest: {file:"Script_FirstLevelWhiteboxVillageTest.mjs",desc:"06–10 referenced village buildings, kitchen link, real alley entry and sheltered litter detour"},
   FirstLevelWhiteboxTransferTest: {file:"Script_FirstLevelWhiteboxTransferTest.mjs",desc:"11–14 loading yard, crouched cover, two fire lanes, open cart road and litter escape"},
@@ -383,6 +384,7 @@ export const testDefs = {
 };
 
 export const browserTests = new Set([
+  "FirstLevelDistantSmokeBrowserTest",
   "OpeningActorPerformanceBrowserTest", "OpeningClipsBrowserTest", "FirstLevelVoicePerspectiveTest",
   "OpeningHandbackBrowserTest", "OpeningLensBrowserTest", "FirstLevelOpeningCampaignTest",
   "OpeningHandbackBrowserTest", "FirstLevelOpeningCampaignTest", "OpeningStoryboardShotsTest",
@@ -524,7 +526,7 @@ export const tier2 = [
 ];
 
 export const domains = {
-  distantSmoke: {label:"First-level distant smoke composition",tests:["FirstLevelDistantSmokeTest"]},
+  distantSmoke: {label:"First-level distant smoke composition",tests:["FirstLevelDistantSmokeTest","FirstLevelDistantSmokeBrowserTest"]},
   openingStoryboards: {label:"01–03 storyboard reconstruction",tests:["OpeningStoryboardsTest","OpeningSetTest","OpeningClipsBrowserTest","OpeningActorPerformanceBrowserTest","OpeningFirstPersonTest","FirstLevelVoicePerspectiveTest","OpeningHandbackBrowserTest","FirstLevelOpeningCampaignTest","OpeningLensTest","OpeningLensBrowserTest","OpeningStoryboardShotsTest"]},
   facialEditor: {label:"人物面部可视化编辑器",tests:["FacialReviewTest","FacialEditorBrowserTest","ModuleGraphTest"]},
   missionGuide: {label:"Physical mission leader and HUD",tests:["FirstLevelLeaderGuideTest","FirstLevelLeaderGuideBrowserTest","FirstLevelMissionTest","FirstLevelMissionBrowserTest"]},
@@ -633,7 +635,7 @@ export const domains = {
 };
 
 const changedDomainRules = [
-  {domain:"distantSmoke",pattern:/FirstLevelDistantSmoke|Script_Vfx/},
+  {domain:"distantSmoke",pattern:/FirstLevelDistantSmoke|BattleSmoke|Script_Vfx/},
   {domain:"facialEditor",pattern:/FacialReview|EditorFacial|FacialEditor/},
   {domain:"firstLevel",pattern:/FirstLevelWhitebox(Village|Transfer|Rear)/},
   {domain:"menu",pattern:/PlayerDeath/},

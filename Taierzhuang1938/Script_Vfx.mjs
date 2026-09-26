@@ -38,6 +38,7 @@ import { MarkNoPrepass } from "./Script_Post.mjs";
 import { MUZZLE_FLASH } from "./Data_Tuning_FirearmHandling.mjs";
 import { VEHICLE_TRACER, HARD_SURFACE_SPARKS } from "./Data_Tuning_BulletVisual.mjs";
 import { BloodEffects } from "./Script_BloodEffects.mjs";
+import { BattleSmoke } from "./Script_BattleSmoke.mjs";
 
 // ---------------------------------------------------------------------------
 // 色板：全部来自 docs/Data_HistoryMaterial.md 的考据表。
@@ -1459,6 +1460,7 @@ export class VfxSystem {
     this.wind = new THREE.Vector3(0.35, 0, -0.15);     // 鲁南春季多西南风，考据里写死的
     this.groundLevel = 0;                              // 碎块/弹壳落到哪一层，见 SetGroundLevel
     this.smokeSources = new Map();
+    this.battleSmoke = null;
     this.nextSourceId = 1;
     // 运行时取证：冒烟测试确认调用方传了真实枪种、快烟与余烟两层都生成。
     this.lastMuzzleProfile = null;
@@ -1835,6 +1837,7 @@ export class VfxSystem {
     if (camera) this.eye.copy(camera.position);
 
     this._UpdateSmokeSources(step);
+    this.battleSmoke?.Update();
     this.bloodEffects.Update(step,this.time,camera);
 
     if (this.dust && camera) {
@@ -2460,6 +2463,7 @@ export class VfxSystem {
       wind: opts.wind ? { x: opts.wind.x, z: opts.wind.z } : null,
       prewarm: !!opts.prewarm,
       prewarmPending: !!opts.prewarm,
+      backdrop: opts.backdrop || null,
       fire: opts.fire ?? 0,
       fireShape: opts.fireShape === "column" ? "column" : "ground",
       colorA: opts.colorA || palette[0],
@@ -2488,6 +2492,10 @@ export class VfxSystem {
       this.AttachSourceLight(source);
     }
     this.smokeSources.set(id, source);
+    if (source.backdrop) {
+      this.battleSmoke ||= new BattleSmoke({ root: this.root, shared: this.shared, quality: this.quality });
+      this.battleSmoke.Set(id, source);
+    }
     return id;
   }
 
@@ -2523,6 +2531,7 @@ export class VfxSystem {
     const dy = position.y - source.position.y;
     const dz = position.z - source.position.z;
     source.position.set(position.x, position.y, position.z);
+    if (source.backdrop) this.battleSmoke?.Set(handle, source);
     if (source.lightProfile) {
       source.lightProfile.position.x += dx;
       source.lightProfile.position.y += dy;
@@ -2538,6 +2547,7 @@ export class VfxSystem {
     const source = this.smokeSources.get(handle);
     this.DetachSourceLight(source);
     this.smokeSources.delete(handle);
+    if (source?.backdrop) this.battleSmoke?.Remove(handle);
   }
 
   /** 按统一目录创建可序列化的场景持续特效。 */
@@ -2657,6 +2667,7 @@ export class VfxSystem {
    */
   ClearParticles() {
     for (const pool of Object.values(this.pools || {})) pool.Clear?.();
+    this.battleSmoke?.ClearParticles();
     // Warm-up clears combat bursts. Established backdrop fires rebuild on the
     // next live update, using its clock (including a checkpoint's reset clock).
     for (const source of this.smokeSources.values()) source.prewarmPending = source.prewarm;
@@ -2667,6 +2678,7 @@ export class VfxSystem {
   }
 
   Dispose() {
+    this.battleSmoke?.Dispose();
     if (this.scene.onBeforeRender === this.sceneHook) {
       this.scene.onBeforeRender = this.previousSceneHook;
     }
@@ -2801,6 +2813,7 @@ export class VfxSystem {
   _UpdateSmokeSources(dt) {
     if (dt <= 0 || this.smokeSources.size === 0) return;
     for (const source of this.smokeSources.values()) {
+      if (source.backdrop) continue;
       if (source.prewarmPending) {
         source.prewarmPending = false;
         const count = Math.ceil(source.rate * source.life * 1.25);
