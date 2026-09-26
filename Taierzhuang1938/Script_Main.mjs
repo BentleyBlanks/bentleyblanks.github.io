@@ -5139,20 +5139,32 @@ function MeleeSnapshot() {
 }
 
 /**
- * 按关挂两三根常驻烟柱。
+ * 按关挂常驻烟柱。第一关读取参考图布设的固定区域，其他关卡沿用路标选点。
  *
  * 为什么非有不可：三月十七日「集中炮击致城内起火，时而强劲的南风将烟吹得笼罩全城」
  * 是信史。没有烟柱的空街等于没打过仗，而且烟柱是这个场景里唯一能在三百米外
  * 读出来、又能把构图竖着切开的东西。
  *
- * 选点：挂在**还没走到的那几个路标**上 —— 前面在烧，那是你要去的方向。
+ * 默认选点：挂在**还没走到的那几个路标**上 —— 前面在烧，那是你要去的方向。
  * 排掉 45 m 以内的：烟柱底盘半径十几米，长在脸上就是一堵灰墙。
  * 序章（过场承载章）与靶场不挂。
  */
 function SeedSmokeColumns(phase) {
+  // Authored distant fires remain at the same world positions between objectives.
+  // Build/teardown already clears the handles; checkpoints rebuild this same seed.
+  if (phase.smokeColumns && state.smokeHandles.length === phase.smokeColumns.length
+    && state.smokeHandles.every(handle => vfx.smokeSources.has(handle))) return;
   for (const handle of state.smokeHandles) vfx.RemoveSmokeSource(handle);
   state.smokeHandles.length = 0;
-  if (phase.cutsceneOnly || phase.sandbox) return;
+  if (phase.cutsceneOnly || (phase.sandbox && !phase.smokeColumns)) return;
+
+  if (phase.smokeColumns) {
+    for (const column of phase.smokeColumns) {
+      const y = battlefield.StaticGroundHeight(column.x, column.z) + column.heightOffset;
+      state.smokeHandles.push(vfx.SmokeSource({ x: column.x, y, z: column.z }, column.options));
+    }
+    return;
+  }
 
   const px = player.position.x;
   const pz = player.position.z;

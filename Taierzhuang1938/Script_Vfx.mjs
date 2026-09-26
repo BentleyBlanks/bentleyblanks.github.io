@@ -2456,6 +2456,10 @@ export class VfxSystem {
       // 更大的黑色透明片。发烟筒仍略快一些，让贴地扩散读得出来。
       growthPower: opts.growthPower ?? (kind === "black" ? 0.82 : kind === "screen" ? 1.35 : 2.0),
       turbulence: opts.turbulence ?? (kind === "black" ? 0.28 : 0),
+      // An optional local drift leaves the shared wind and all combat FX intact.
+      wind: opts.wind ? { x: opts.wind.x, z: opts.wind.z } : null,
+      prewarm: !!opts.prewarm,
+      prewarmPending: !!opts.prewarm,
       fire: opts.fire ?? 0,
       fireShape: opts.fireShape === "column" ? "column" : "ground",
       colorA: opts.colorA || palette[0],
@@ -2653,6 +2657,9 @@ export class VfxSystem {
    */
   ClearParticles() {
     for (const pool of Object.values(this.pools || {})) pool.Clear?.();
+    // Warm-up clears combat bursts. Established backdrop fires rebuild on the
+    // next live update, using its clock (including a checkpoint's reset clock).
+    for (const source of this.smokeSources.values()) source.prewarmPending = source.prewarm;
     this.debris?.Clear?.();
     // 血源与 smokeSources 不同：它挂在一根**已经不在场上**的骨头上，清粒子那一刻
     // 那个断口八成也随着换关拆掉了，留着只会在下一关的原点冒血。
@@ -2751,50 +2758,60 @@ export class VfxSystem {
     this.pools.decal.Spawn(s, this.time);
   }
 
+  _SpawnSourceSmoke(source, birthTime = this.time) {
+    const wind = source.wind || this.wind;
+    const s = ResetSpawn();
+    const a = this.random() * 6.2831853;
+    const r = Math.sqrt(this.random()) * source.radius;
+    s.x = source.position.x + Math.cos(a) * r;
+    s.y = source.position.y + this._Range(0, 0.15);
+    s.z = source.position.z + Math.sin(a) * r;
+    s.vx = this._Signed(0.25) + wind.x * 0.4;
+    s.vy = source.rise * this._Range(0.7, 1.3);
+    s.vz = this._Signed(0.25) + wind.z * 0.4;
+    s.ax = wind.x * 0.5;
+    // 发烟筒是贴地翻滚的：浮力压到接近零，让它铺开而不是升柱
+    //
+    // 事故：升柱那一支原来是 drag 1.3 配固定浮力 0.42 —— 闭式解的终速是 a/k，
+    // 也就是 0.32 m/s，rise 给到 3.4 也没用，初速在半秒内就被阻尼吃干净。
+    // 实测九秒寿命的"烟柱"最高只爬到 6.6 m，而同一片子膨到 11 m 半径：
+    // 宽度是高度的三倍多，柱子变成一颗球，几百片叠在一起 alpha 直接饱和。
+    // 天上那个越长越大的黑球就是这么来的（另一半原因是没有大气透视）。
+    // 浮力改成跟着 rise 走（a = rise·k），终速就等于 rise，柱子才真的是柱子。
+    s.ay = source.groundHug ? 0.05 : source.rise * BUOYANT_DRAG;
+    s.az = wind.z * 0.5;
+    s.drag = source.groundHug ? 0.9 : BUOYANT_DRAG;
+    // 标准烟团不走 GROUND_BOUNCE，故 iExtra.z 可安全作为羽流摇摆幅度。
+    // 负值是 ResetSpawn 的“未启用”哨兵，别让枪烟与尘土也开始摇。
+    s.groundY = source.turbulence > 0 ? source.turbulence : -9999;
+    s.life = source.life * this._Range(0.75, 1.25);
+    s.sizeStart = source.sizeStart;
+    s.sizeEnd = source.sizeEnd * this._Range(0.8, 1.2);
+    s.stretch = source.growthPower;
+    s.opacity = source.opacity;
+    s.fadeIn = 0.18;
+    s.angle = this._Range(0, 6.283); s.spin = this._Signed(0.55);
+    s.colorA = source.colorA; s.colorB = source.colorB;
+    s.seed = this.random();
+    const useAuthoredSmoke = this.loadedVefectsMasks.has("smoke")
+      && (this.loadedVefectsMasks.has("noise") || this.loadedVefectsMasks.has("detailNoise"));
+    (useAuthoredSmoke ? this.pools.sourceSmoke : this.pools.smoke).Spawn(s, birthTime);
+  }
+
   _UpdateSmokeSources(dt) {
     if (dt <= 0 || this.smokeSources.size === 0) return;
     for (const source of this.smokeSources.values()) {
+      if (source.prewarmPending) {
+        source.prewarmPending = false;
+        const count = Math.ceil(source.rate * source.life * 1.25);
+        for (let i = count - 1; i >= 0; i -= 1) {
+          this._SpawnSourceSmoke(source, this.time - (i + 0.5) / source.rate);
+        }
+      }
       source.accumulator += source.rate * dt;
       const emit = Math.floor(source.accumulator);
       source.accumulator -= emit;
-      for (let i = 0; i < emit; i += 1) {
-        const s = ResetSpawn();
-        const a = this.random() * 6.2831853;
-        const r = Math.sqrt(this.random()) * source.radius;
-        s.x = source.position.x + Math.cos(a) * r;
-        s.y = source.position.y + this._Range(0, 0.15);
-        s.z = source.position.z + Math.sin(a) * r;
-        s.vx = this._Signed(0.25) + this.wind.x * 0.4;
-        s.vy = source.rise * this._Range(0.7, 1.3);
-        s.vz = this._Signed(0.25) + this.wind.z * 0.4;
-        s.ax = this.wind.x * 0.5;
-        // 发烟筒是贴地翻滚的：浮力压到接近零，让它铺开而不是升柱
-        //
-        // 事故：升柱那一支原来是 drag 1.3 配固定浮力 0.42 —— 闭式解的终速是 a/k，
-        // 也就是 0.32 m/s，rise 给到 3.4 也没用，初速在半秒内就被阻尼吃干净。
-        // 实测九秒寿命的"烟柱"最高只爬到 6.6 m，而同一片子膨到 11 m 半径：
-        // 宽度是高度的三倍多，柱子变成一颗球，几百片叠在一起 alpha 直接饱和。
-        // 天上那个越长越大的黑球就是这么来的（另一半原因是没有大气透视）。
-        // 浮力改成跟着 rise 走（a = rise·k），终速就等于 rise，柱子才真的是柱子。
-        s.ay = source.groundHug ? 0.05 : source.rise * BUOYANT_DRAG;
-        s.az = this.wind.z * 0.5;
-        s.drag = source.groundHug ? 0.9 : BUOYANT_DRAG;
-        // 标准烟团不走 GROUND_BOUNCE，故 iExtra.z 可安全作为羽流摇摆幅度。
-        // 负值是 ResetSpawn 的“未启用”哨兵，别让枪烟与尘土也开始摇。
-        s.groundY = source.turbulence > 0 ? source.turbulence : -9999;
-        s.life = source.life * this._Range(0.75, 1.25);
-        s.sizeStart = source.sizeStart;
-        s.sizeEnd = source.sizeEnd * this._Range(0.8, 1.2);
-        s.stretch = source.growthPower;
-        s.opacity = source.opacity;
-        s.fadeIn = 0.18;
-        s.angle = this._Range(0, 6.283); s.spin = this._Signed(0.55);
-        s.colorA = source.colorA; s.colorB = source.colorB;
-        s.seed = this.random();
-        const useAuthoredSmoke = this.loadedVefectsMasks.has("smoke")
-          && (this.loadedVefectsMasks.has("noise") || this.loadedVefectsMasks.has("detailNoise"));
-        (useAuthoredSmoke ? this.pools.sourceSmoke : this.pools.smoke).Spawn(s, this.time);
-      }
+      for (let i = 0; i < emit; i += 1) this._SpawnSourceSmoke(source);
       if (source.fire > 0) {
         source.fireAccumulator += source.fire * 22 * dt * this.spawnScale;
         const fires = Math.floor(source.fireAccumulator);

@@ -6,6 +6,7 @@ import { CHAPTER } from "./Data_MissionCh1.mjs";
 import { MISSION_LAYOUT, MISSION_ANCHORS as A, MISSION_ROUTES, MISSION_PLACEMENT as P } from "./Data_FirstLevelMissionLayout.mjs";
 export const MISSION_VERSION = MISSION_TOPOLOGY_VERSION;
 import { MISSION_TUNING } from "./Data_Tuning_FirstLevel.mjs";
+import { FIRST_LEVEL_DISTANT_SMOKE } from "./Data_FirstLevelDistantSmoke.mjs";
 export { MISSION_TUNING } from "./Data_Tuning_FirstLevel.mjs";
 // Both air passes. Ki-30 (Army Type 97 light bomber) entered combat in China in spring 1938; the Ki-43 flew
 // only in 1939 and has no texture. The documented aircraft near Tengxian were Type 88 reconnaissance biplanes,
@@ -341,6 +342,7 @@ export const FIRST_LEVEL_MISSION_PHASE = Object.freeze({
   label: "第一关 · 往南的路",
   place: "滕县外围",
   sky: "firstLevelBattleDay",
+  smokeColumns: FIRST_LEVEL_DISTANT_SMOKE,
   ambience: "smokyDay",
   music: null,
   minutes: 32,
