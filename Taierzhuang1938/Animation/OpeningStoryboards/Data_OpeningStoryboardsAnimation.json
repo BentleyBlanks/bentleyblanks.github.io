@@ -1,6 +1,6 @@
 {
  "schema": 2,
- "version": "20260926OpeningStoryboardsV8Stunned",
+ "version": "20260927OpeningStoryboardsV9Vault",
  "fps": 24,
  "actorForward": [
   0,
@@ -1371,7 +1371,7 @@
     "IjaCollarDragSnag"
    ],
    "next": [
-    "CollarDrag"
+    "IjaVaultTimberOut"
    ],
    "notes": "Keeps the collar in his left fist, stamps the loose beam off the pack with the right sole; the beam track carries it clear (rests at 0.75 s); face back on him for the haul (1.0 s, was 1.2 s).",
    "rigs": [
@@ -1872,7 +1872,7 @@
     }
    ],
    "prev": [
-    "CollarDrag",
+    "IjaHaulForearmUnder",
     "IjaKickBeam"
    ],
    "next": [
@@ -2366,6 +2366,175 @@
    "rigs": [
     "TengxianIja01"
    ]
+  },
+  "IjaVaultTimberIn": {
+   "duration": 1.8333333333333333,
+   "loop": false,
+   "weaponHold": "track",
+   "role": "ijaA",
+   "rig": "TengxianIja02",
+   "props": [
+    "weapon"
+   ],
+   "rootMotion": true,
+   "weaponState": "twoHand->highLeft->twoHand",
+   "obstacle": {
+    "kind": "roofTimberDown",
+    "nearM": 0.47,
+    "farM": 0.77,
+    "topM": 0.8
+   },
+   "contacts": [
+    {
+     "t": 0.4,
+     "limb": "handR",
+     "action": "plant",
+     "target": "timber"
+    },
+    {
+     "t": 0.72,
+     "limb": "handR",
+     "action": "release",
+     "target": "timber"
+    }
+   ],
+   "events": [
+    {
+     "t": 0.54,
+     "kind": "takeoff"
+    },
+    {
+     "t": 0.96,
+     "kind": "land"
+    }
+   ],
+   "prev": [
+    "IjaBayonetGuard"
+   ],
+   "next": [
+    "BayonetClearWood"
+   ],
+   "notes": "Found (2026-09-27): comes up to the fallen roof timber (hip high, 0.47 m ahead), turns side-on to it (facing south), lets the wrist of the stock go and puts the right palm on its top, the rifle up in the left fist; loads, hops and swings both legs over drawn up under him, the hips 0.25 m over the top and the head leaned out over the landing side, lands in the pit south-west of Shunzi's eye (0.35 m off it), takes the rifle in both hands again and steps round to the snag root facing west (the clip ends standing on it: root motion). Frames 0.55-0.92 s are off the ground (bake spec groundWeight 0).",
+   "rigs": [
+    "TengxianIja02"
+   ]
+  },
+  "IjaVaultTimberOut": {
+   "duration": 1.9166666666666667,
+   "loop": false,
+   "weaponHold": "track",
+   "role": "ijaA",
+   "rig": "TengxianIja02",
+   "props": [
+    "weapon"
+   ],
+   "rootMotion": true,
+   "weaponState": "slungRight",
+   "player": true,
+   "obstacle": {
+    "kind": "roofTimberDown",
+    "nearM": 0.144,
+    "farM": 0.444,
+    "topM": 0.8,
+    "laneM": 0.712
+   },
+   "contacts": [
+    {
+     "t": 0.0,
+     "limb": "handL",
+     "action": "hold",
+     "partnerRole": "shunzi",
+     "part": "collarBack"
+    },
+    {
+     "t": 0.04,
+     "limb": "handL",
+     "action": "release"
+    },
+    {
+     "t": 0.92,
+     "limb": "handL",
+     "action": "plant",
+     "target": "timber"
+    },
+    {
+     "t": 1.18,
+     "limb": "handL",
+     "action": "release",
+     "target": "timber"
+    }
+   ],
+   "events": [
+    {
+     "t": 1.0,
+     "kind": "takeoff"
+    },
+    {
+     "t": 1.36,
+     "kind": "land"
+    }
+   ],
+   "prev": [
+    "IjaKickBeam"
+   ],
+   "next": [
+    "IjaHaulForearmUnder"
+   ],
+   "notes": "DragOut (2026-09-27): frame 0 = IjaKickBeam's last frame (same root, the left fist in the collar). Lets go, rises and turns left to face south, walks to the lane at the south end of the timber, the left palm on its top (the rifle slung on the right), vaults it the other way (0.98-1.36 s off the ground), lands outside and turns right to face Shunzi (west-north-west): the last frame is IjaHaulForearmUnder frame 0 at that clip's root (VAULT_OUT_END in this root).",
+   "rigs": [
+    "TengxianIja02"
+   ]
+  },
+  "IjaHaulForearmUnder": {
+   "duration": 2.75,
+   "loop": false,
+   "weaponHold": "track",
+   "role": "ijaA",
+   "rig": "TengxianIja02",
+   "props": [
+    "weapon"
+   ],
+   "rootMotion": true,
+   "weaponState": "slungRight",
+   "player": true,
+   "contacts": [
+    {
+     "t": 0.375,
+     "limb": "handR",
+     "action": "grab",
+     "partnerRole": "shunzi",
+     "part": "forearmL"
+    },
+    {
+     "t": 2.54,
+     "limb": "handR",
+     "action": "release"
+    }
+   ],
+   "events": [
+    {
+     "t": 0.5,
+     "kind": "yank"
+    },
+    {
+     "t": 0.75,
+     "kind": "haulStart"
+    },
+    {
+     "t": 2.5,
+     "kind": "haulStop"
+    }
+   ],
+   "prev": [
+    "IjaVaultTimberOut"
+   ],
+   "next": [
+    "IjaButtStrikeCollar"
+   ],
+   "notes": "DragOut (2026-09-27): at the timber's east face goes down on the right knee, the chest low, reaches down with the right hand to Shunzi's left wrist stretched out from under the timber, grabs it (0.375 s), yanks it up and toward him, comes off the knee and backs off bent low, seven short hauling steps, face on Shunzi, hauling him out from under the timber 1.8 m straight back (root motion along actor +z) to the trench edge; lets go at 2.56 s. Rifle slung on the right (hanging as he bends); the left hand swings free. Player track: forearmL (the grip) and head (his eye, 0.45 m behind the wrist).",
+   "rigs": [
+    "TengxianIja02"
+   ]
   }
  },
  "stages": {
@@ -2669,7 +2838,7 @@
    "id": "TengxianNra02",
    "file": "Animation_TengxianNra02OpeningStoryboards.json",
    "sha256": "760117c6ec2450ffc6584d8a0ee2b31eab8d764c50e9d3ee348aa7f75194dfd4",
-   "originalModelSha256": "67550199849f78d581b356580f25595f361bece70fef0c82d7bd08a954197790",
+   "originalModelSha256": "d6b7b88112afd64e0f41a7bbcf8746a24b5919288ef76c36f345bc367ab666de",
    "clipIds": [
     "SupplyReceive",
     "ClipLoad",
@@ -4423,7 +4592,7 @@
    "id": "TengxianNra05",
    "file": "Animation_TengxianNra05OpeningStoryboards.json",
    "sha256": "401fc0adb2ddccf6f43b92376636ff99c37022cb8214fdd6bfdabdf86ea0c79f",
-   "originalModelSha256": "b85b90fac1843261d40fbf257470a933819a9302dff1727a591feda1a5327b55",
+   "originalModelSha256": "0c1f2b1e822be08d0a477aaae4ca27cc34f3d66e71a1d22754dff043e5966e72",
    "clipIds": [
     "SupplyReceive",
     "ClipLoad",
@@ -5407,7 +5576,7 @@
    "id": "TengxianIja01",
    "file": "Animation_TengxianIja01OpeningStoryboards.json",
    "sha256": "798501253325e18e913eeae30a66af67293f45c98b497fe17661e8b5405f0b85",
-   "originalModelSha256": "fc6c84ad51c9752066127b148a1f9db307da9659dea441989861265693b02c6b",
+   "originalModelSha256": "0acb11411d2984cf7bd9dd578141ffcc8541e9bbe8c83b0cf3dcff76f3a2d9b1",
    "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\ComradeStunned_20260926\\Scene_TengxianIja01OpeningStoryboards.blend",
    "contactPoints": {
     "hairBack": {
@@ -6546,9 +6715,9 @@
   {
    "id": "TengxianIja02",
    "file": "Animation_TengxianIja02OpeningStoryboards.json",
-   "sha256": "9ed16a0b97644846f53eb001be94e16e3c304ba73026442c72e61c14b03e6678",
-   "originalModelSha256": "fc429bafc6973e54e8d1fa72ac99c8740c81be25f895ddb1417bb47707578788",
-   "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\ComradeStunned_20260926\\Scene_TengxianIja02OpeningStoryboards.blend",
+   "sha256": "5884a85e66f4765995ae81d87e1ea38c95fdfb85d8a51de5c2971c2d745cf52d",
+   "originalModelSha256": "ab73c68de776e30c22d074fa816ac85fed3d767cf227f759188528f3bd0a0d61",
+   "blend": "C:\\Users\\Bentl\\OneDrive\\AI\\Models\\Blender\\Taierzhuang1938\\OpeningVaultDrag_20260927\\Scene_TengxianIja02OpeningStoryboards.blend",
    "contactPoints": {
     "hairBack": {
      "bone": "Bip001 Head",
@@ -8197,6 +8366,264 @@
      ],
      "kneePlants": [],
      "kneeSlideM": 0.0
+    },
+    {
+     "clip": "IjaVaultTimberIn",
+     "frames": 45,
+     "footSlideM": 0.0,
+     "contactErrorM": 0.022,
+     "gripSolveErrorM": 0.02201,
+     "pelvisMaxStepM": 0.1575,
+     "floorCorrectionMin": -0.0284,
+     "floorCorrectionMax": 8e-05,
+     "root": {
+      "start": [
+       0.0515,
+       -0.0753,
+       0.0,
+       0.7194
+      ],
+      "end": [
+       0.5335,
+       -0.9893,
+       0.0,
+       0.7093
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0.0,
+       0.04
+      ],
+      [
+       "L",
+       0.22,
+       0.49
+      ],
+      [
+       "L",
+       1.0,
+       1.1
+      ],
+      [
+       "L",
+       1.3,
+       1.5
+      ],
+      [
+       "L",
+       1.66,
+       1.8333
+      ],
+      [
+       "R",
+       0.0,
+       0.14
+      ],
+      [
+       "R",
+       0.34,
+       0.53
+      ],
+      [
+       "R",
+       0.96,
+       1.26
+      ],
+      [
+       "R",
+       1.46,
+       1.58
+      ],
+      [
+       "R",
+       1.76,
+       1.8333
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "IjaVaultTimberOut",
+     "frames": 47,
+     "footSlideM": 0.0078,
+     "contactErrorM": 0.0,
+     "gripSolveErrorM": 0.0,
+     "pelvisMaxStepM": 0.1665,
+     "floorCorrectionMin": -0.05182,
+     "floorCorrectionMax": 0.0086,
+     "root": {
+      "start": [
+       0.0739,
+       0.149,
+       0.0,
+       0.3906
+      ],
+      "end": [
+       -0.5424,
+       0.872,
+       -28.0,
+       0.8164
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0.0,
+       0.3
+      ],
+      [
+       "L",
+       0.52,
+       0.6
+      ],
+      [
+       "L",
+       0.76,
+       0.98
+      ],
+      [
+       "L",
+       1.36,
+       1.5
+      ],
+      [
+       "L",
+       1.74,
+       1.9167
+      ],
+      [
+       "R",
+       0.0,
+       0.14
+      ],
+      [
+       "R",
+       0.36,
+       0.56
+      ],
+      [
+       "R",
+       0.72,
+       0.96
+      ],
+      [
+       "R",
+       1.4,
+       1.6
+      ],
+      [
+       "R",
+       1.84,
+       1.9167
+      ]
+     ],
+     "kneePlants": [],
+     "kneeSlideM": 0.0
+    },
+    {
+     "clip": "IjaHaulForearmUnder",
+     "frames": 67,
+     "footSlideM": 0.0001,
+     "contactErrorM": 0.0187,
+     "gripSolveErrorM": 0.01872,
+     "pelvisMaxStepM": 0.1275,
+     "floorCorrectionMin": -0.03284,
+     "floorCorrectionMax": 7e-05,
+     "root": {
+      "start": [
+       0.0,
+       0.3183,
+       0.0,
+       0.8164
+      ],
+      "end": [
+       0.0,
+       2.2303,
+       0.0,
+       0.7364
+      ],
+      "note": "[x, z, yawDeg(+ = turned left), pelvisHeight] of the pelvis at the first/last frame"
+     },
+     "finite": true,
+     "plants": [
+      [
+       "L",
+       0.0,
+       0.08
+      ],
+      [
+       "L",
+       0.26,
+       0.75
+      ],
+      [
+       "L",
+       0.98,
+       1.25
+      ],
+      [
+       "L",
+       1.48,
+       1.75
+      ],
+      [
+       "L",
+       1.98,
+       2.25
+      ],
+      [
+       "L",
+       2.48,
+       2.75
+      ],
+      [
+       "R",
+       0.0,
+       0.06
+      ],
+      [
+       "R",
+       0.28,
+       0.52
+      ],
+      [
+       "R",
+       0.7,
+       1.0
+      ],
+      [
+       "R",
+       1.23,
+       1.5
+      ],
+      [
+       "R",
+       1.73,
+       2.0
+      ],
+      [
+       "R",
+       2.23,
+       2.75
+      ]
+     ],
+     "kneePlants": [
+      [
+       "R",
+       0.3,
+       0.5
+      ]
+     ],
+     "kneeSlideM": 0.0062,
+     "lookErrorDeg": 3.21,
+     "headTurnDeg": 62.0
     }
    ],
    "clipIds": [
@@ -8238,14 +8665,17 @@
     "IjaDragByForearm",
     "IjaLookBackLow",
     "IjaStartleTurn",
-    "IjaParriedChoppedFall"
+    "IjaParriedChoppedFall",
+    "IjaVaultTimberIn",
+    "IjaVaultTimberOut",
+    "IjaHaulForearmUnder"
    ]
   },
   {
    "id": "TengxianIja03",
    "file": "Animation_TengxianIja03OpeningStoryboards.json",
    "sha256": "39569a8e066f926f8578ea472efc277ae1ea5faec23f83a429bc1e832bde0fc7",
-   "originalModelSha256": "17163f830cdf91b2b8bbe9b6e197855bf739a48116464b19eb24738d921b4f74",
+   "originalModelSha256": "652df6a3e31f26257754d6e7fe5bc1e5f56af6372bc0d4df2db0e753b5d8a952",
    "clipIds": [
     "SupplyReceive",
     "ClipLoad",

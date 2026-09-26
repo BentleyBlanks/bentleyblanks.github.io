@@ -63,6 +63,7 @@
 
 ## 6. 回归口
 
+- 2026-09-27 新增 `IjaVaultTimberIn` / `IjaVaultTimberOut` / `IjaHaulForearmUnder`（只烘 IJA02）与 spec 键 `groundWeight(t)`（翻越离地、跪地那几帧不贴地），口径见 [翻越与倒拖](Data_OpeningVaultHaul20260927.md)。
 - `Script_OpeningStoryboardsTest.mjs`（纯 node）：每套骨架每个 clip 脚滑 ≤ 2 cm、接触误差 ≤ 3 cm、穿墙 ≤ 3 cm、骨盆每帧 ≤ 0.2 m、膝盖 ≤ 2 cm；
   声明了墙面接触的时段离墙、进墙都 ≤ 3 cm；同根交接逐骨 < 2°、道具跳动 ≤ 2 cm；holdLoop 接缝按世界空间 ≤ 2°、≤ 1 cm。
 - `Script_OpeningClipsBrowserTest.mjs`（浏览器，tier2，`openingStoryboards` 领域；`--shots` 出四视角审片图到 `tmp/OpeningClipsReview/`，`--clip=名,…` 只跑几条）：

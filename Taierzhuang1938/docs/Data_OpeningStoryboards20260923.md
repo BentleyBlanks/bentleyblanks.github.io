@@ -4,6 +4,8 @@
 
 2026-09-26 的首次爆炸、坐姿手部、愤怒配音与拖出近景细化见 [本轮记录](Data_OpeningPolish20260926.md)。
 
+2026-09-27：Found 日兵甲翻越塌顶木进坑、DragOut 翻出后从木头底下攥腕倒拖（取代下文 DragOut 的 `CollarDrag` 往前走），见 [翻越与倒拖](Data_OpeningVaultHaul20260927.md)。
+
 受审川军近爆后的倒地落点（贴坡、不再压进北壁木墙）与震晕循环 `BlastDazedStir` 见 [2026-09-27 记录](Data_OpeningComradeStunned20260927.md)。
 
 需求原文：[01–02 新稿](Data_FirstLevelOpeningSource20260923.md)。跨包口径：[01–05 重构契约](Data_FirstLevel0105Refactor20260923Contract.md) §2 第 1 条（还权门槛）、§5.1–§5.5（角色、对白场景、phase、clip、对白接口）。空间：[01–06 空间重排](Data_FirstLevelSpace0106_20260923.md) §2.1、§3、§10.2。

@@ -83,6 +83,10 @@ export const EXTRA_HAND_POSES = Freeze({
   // takes the wrist end (.9), 0.29 m from the eye (minEyeM .25): held all through the haul at a reach ratio of 0.93,
   // the forearm coming in from the right into his fist; it lets go when he does (IjaHoldCollarUp takes the arm 1 m off).
   gripSleeve: G("ijaA", "forearmL", .9, { offset: V(0, .05, 0), twistDeg: -15, slipM: .05, minEyeM: .25, sh: V(.16, -.24, .1) }),
+  // DragOut (2026-09-27): the LEFT hand, stretched out from under the timber after the rifle, is the one ijaA seizes by
+  // the wrist with his right (IjaHaulForearmUnder); Shunzi's fingers close round that forearm near the cuff as he is
+  // hauled. Shoulder low under the eye as for gripSleeve (a raised one put the upper arm beside the lens).
+  gripHaul: G("ijaA", "forearmR", .9, { offset: V(0, .05, 0), twistDeg: 15, slipM: .07, minEyeM: .25, fallback: "reachLeft", sh: V(.16, -.24, .1) }),
   // SB05: both hands at the bottom of frame on the arm holding the collar. Browser bench 09-25 at the contract
   // camera (eye 0.75, pitch +3): his collar forearm runs from under the chin down out of frame (elbow at the
   // bottom edge), so the hands hold the arm at the elbow — the right just below it on the forearm, the left

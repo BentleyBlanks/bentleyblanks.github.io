@@ -33,6 +33,7 @@ const Wrap=v=>Math.atan2(Math.sin(v),Math.cos(v));
 const DEG=Math.PI/180;
 /** [[t, value], …] eased key to key (smoothstep), held past either end. */
 const SampleCurve=(keys,t)=>{if(!(t>keys[0][0]))return keys[0][1];for(let i=1;i<keys.length;i++)if(t<keys[i][0])return keys[i-1][1]+(keys[i][1]-keys[i-1][1])*Smooth((t-keys[i-1][0])/(keys[i][0]-keys[i-1][0]));return keys.at(-1)[1];};
+const Window=(t,a0,a1,b0,b1)=>Smooth((t-a0)/(a1-a0))*(1-Smooth((t-b0)/(b1-b0)));
 const Rot=(yaw,x,z)=>({x:x*Math.cos(yaw)+z*Math.sin(yaw),z:-x*Math.sin(yaw)+z*Math.cos(yaw)});
 /** A point in an anchor's frame (+x right, -z forward), yaw offset in degrees (+ = turn left). */
 const Local=(anchor,x,z,dyawDeg=0)=>{const o=Rot(anchor.yaw||0,x,z);return {x:anchor.x+o.x,z:anchor.z+o.z,yaw:(anchor.yaw||0)+dyawDeg*DEG};};
@@ -77,7 +78,7 @@ const UP=new THREE.Vector3(0,1,0);
 const REAR_LANE=MISSION_STAGE_ROUTES.rearTrench,REAR_LANE_M=MissionRouteLength(REAR_LANE);
 const OPENING_MARK_STAGES=new Set(["Trapped","BunkerRescue","RearTrench","Support","MachineGun","Tank","Orders"]);
 // Player-track owners: the clips whose `player` track says where Shunzi's body is.
-const PLAYER_TRACK_CLIPS=new Set(["IjaCollarDragSnag","IjaKickBeam","IjaButtStrike","IjaButtStrikeCollar","IjaDragByForearm","IjaHoldCollarUp","LuoDragToCover","LuoKneelCheck","InterpreterCrouchAsk","InterpreterGrabCollar"]);
+const PLAYER_TRACK_CLIPS=new Set(["IjaCollarDragSnag","IjaKickBeam","IjaVaultTimberOut","IjaHaulForearmUnder","IjaButtStrike","IjaButtStrikeCollar","IjaDragByForearm","IjaHoldCollarUp","LuoDragToCover","LuoKneelCheck","InterpreterCrouchAsk","InterpreterGrabCollar"]);
 
 /** Normalize the random ±4 % body scale: paired contacts are authored at scale 1 (Anim report §3). */
 function PinOpeningScale(soldier){
@@ -227,6 +228,12 @@ export class FirstLevelBunkerShow {
     const materials=this.r.actorFactory.ActorMaterials("nra",()=>.5);
     for(const [key,geometry] of built.geometries)this.loadingRifle.add(new THREE.Mesh(geometry,materials[key]||materials.steel));
     this.supplyRoot.add(this.loadingRifle);
+  }
+  /** Where IjaCollarDragSnag's collar track puts the eye at its first frame (on the snag root): the Drag shot's start offset. */
+  SnagEye0(){
+    const root=this.SnagRoot(),p=OpeningPlayerPoint("TengxianIja02","IjaCollarDragSnag","collar",0)||{x:.02,y:.2,z:-.57},o=Rot(root.yaw,p.x,p.z);
+    const f={x:-Math.sin(C.shunzi.trap.yaw),z:-Math.cos(C.shunzi.trap.yaw)};
+    return {x:root.x+o.x+f.x*.12,z:root.z+o.z+f.z*.12,h:p.y+.08};
   }
   /** The loose beam across Shunzi's pack (manifest props.beam, IjaKickBeam root frame). */
   MakeBeam(){
@@ -1079,9 +1086,16 @@ export class FirstLevelBunkerShow {
     if(this.flags.beamShift!=null&&r.time-this.flags.beamShift<C.ija.lookBackS){this.LookBack();this.PlaceBeam("nudged",.25);return;}
     const F=C.ija.pace;
     if(this.flags.clearAt==null){
-      if(this.Follow(ijaA,"found",[...C.ija.foundRoute,root],age>C.timeouts.foundWalkS?C.speed.run:F.foundSpeed,null,root.yaw)&&this.Hold(ijaA,root,null))this.flags.clearAt=r.time;
       this.PlaceBeam("nudged",.25);
-      return;
+      // Back to the mouth and over the fallen roof timber into the pit (IjaVaultTimberIn: its root motion ends on the snag root).
+      const V=C.ija.vaultIn;
+      if(this.flags.vaultAt==null){
+        if(this.Follow(ijaA,"found",[...C.ija.foundRoute,V],age>C.timeouts.foundWalkS?C.speed.run:F.foundSpeed,null,V.yaw)&&this.Hold(ijaA,V,null))this.flags.vaultAt=r.time;
+        return;
+      }
+      const t=r.time-this.flags.vaultAt;
+      if(t<ClipLength("IjaVaultTimberIn",1.667)){this.Put(ijaA,V);this.Pose(ijaA,"IjaVaultTimberIn",{seconds:t});return;}
+      this.Put(ijaA,root,{keep:true});this.flags.clearAt=r.time;
     }
     // Clearing the wood at clearWoodRate (the beam swing keys at 0.9-1.2 s of the clip).
     // His line starts with the clearing (its recording opens on ~1.5 s of breath before the words, so the words land
@@ -1126,18 +1140,65 @@ export class FirstLevelBunkerShow {
       this.Stage("DragOut");
     }
   }
+  /**
+   * DragOut, `age` s in: ijaA lets go of the collar and vaults back out over the roof timber (IjaVaultTimberOut on the
+   * snag root) while Shunzi crawls under it after the rifle (CrawlEye); then, on HaulRoot, IjaHaulForearmUnder: he
+   * kneels at its east face, seizes the wrist and hauls him out from under it to shunzi.butt (the eye rides the
+   * clip's head track). The two clips hand over on the same displayed body (the vault's last frame is the haul's
+   * first, carried to its root), so the re-root keeps the skeleton.
+   */
   PhaseDragOut(age){
     const r=this.r,ijaA=this.Ija("ijaA");
     this.Corpse(this.Comrade,"CaptiveWallSlideTwitch");this.Aside();
-    if(!this.phaseEntered){this.phaseEntered=true;const from=this.lastPlayerPoint||C.shunzi.trap;this.flags.dragOutFromX=from.x;this.flags.dragOutFromZ=from.z;}
-    if(ijaA)ijaA.openingStoryboardContact=()=>this.CollarContact(ijaA);
-    const arrived=this.Follow(ijaA,"dragOut",C.ija.dragOutRoute,C.speed.dragOut,"CollarDrag");
-    this.dragOutProgress=Clamp(age/Math.max(.1,RouteLength(C.ija.dragOutRoute)/C.speed.dragOut));
-    if(arrived||age>C.timeouts.dragOutS){
-      if(ijaA)ijaA.openingStoryboardContact=null;
-      this.MudMarks(this.Densify([C.shunzi.trap,...C.ija.dragOutRoute].map((p,i,all)=>i===all.length-1?C.shunzi.butt:p)));
+    if(!this.phaseEntered){
+      this.phaseEntered=true;
+      const c=this.TrackPoint(ijaA,"collar"),from=c?{x:c.x+.12,z:c.z,h:c.h+.08}:{...(this.lastPlayerPoint||C.shunzi.trap),h:.42};
+      this.flags.dragOutFromX=from.x;this.flags.dragOutFromZ=from.z;this.flags.dragOutFromH=from.h;
+    }
+    const out=ClipLength("IjaVaultTimberOut",1.917),haul=ClipLength("IjaHaulForearmUnder",2.75);
+    if(age<out){this.Put(ijaA,this.SnagRoot());this.Pose(ijaA,"IjaVaultTimberOut",{seconds:age});return;}
+    if(this.flags.haulAt==null){this.flags.haulAt=r.time;this.Put(ijaA,this.HaulRoot(),{keep:true});}
+    const t=r.time-this.flags.haulAt;
+    this.Put(ijaA,this.HaulRoot());this.Pose(ijaA,"IjaHaulForearmUnder",{seconds:Math.min(t,haul)});
+    if(t>=haul||age>C.timeouts.dragOutS){
+      // The haul carried him 2.2 m off its root (root motion): the root goes under his hips before Butt walks him on
+      // (keeping the skeleton shown, so the walk blends from where he stands).
+      const pelvis=ijaA?.actor.characterRig?.bones?.pelvis?.getWorldPosition(new THREE.Vector3());
+      if(pelvis)this.Put(ijaA,{x:pelvis.x,z:pelvis.z,yaw:ijaA.yaw},{keep:true});
+      this.MudMarks(this.Densify([{x:this.flags.dragOutFromX,z:this.flags.dragOutFromZ},...C.ija.dragOutRoute]));
       this.Stage("Butt");
     }
+  }
+  /** IjaHaulForearmUnder's root: facing back along dragOutRoute (the eye's haul to shunzi.butt), where the clip's
+   *  frame-0 head track lands on its first point (Shunzi's eye under the timber). */
+  HaulRoot(){
+    const route=C.ija.dragOutRoute,eye=route[0],yaw=Face(route.at(-1),eye);
+    const head=OpeningPlayerPoint("TengxianIja02","IjaHaulForearmUnder","head",0)||{x:0,y:.3,z:-.45},o=Rot(yaw,head.x,head.z);
+    return {x:eye.x-o.x,z:eye.z-o.z,yaw};
+  }
+  /**
+   * The look at ijaA around the vaults over the roof timber (ija.vaultShot): on his hips with the pitch held under
+   * vaultShot.maxPitchDeg -- from the eye under the timber his legs come up to it, leave the ground and land -- easing
+   * up to his head (pitch capped at maxDeg) over upS once he is down on the pit side (Found) or kneels at the timber
+   * for the haul (DragOut, `outAge`: the vault out is at ages < IjaVaultTimberOut's length).
+   */
+  VaultLook(eye,height,actor,maxDeg,outAge=null){
+    const V=C.ija.vaultShot,r=this.r,head=this.HeadPoint(actor);
+    const pelvis=actor?.actor.characterRig?.bones?.pelvis?.getWorldPosition(new THREE.Vector3());
+    if(!head||!pelvis)return r.Point(C.ija.vaultIn,.6);
+    let up;
+    if(outAge!=null)up=1-Window(outAge,V.outDownS[0],V.outDownS[1],V.outUpS[0],V.outUpS[1]);
+    else if(this.flags.clearAt!=null)up=1;
+    else if(this.flags.vaultAt==null)up=1-Smooth((Distance(actor.openingStoryboardLast||actor.position,C.ija.vaultIn)-V.downFromM)/-V.downOverM);
+    else up=Smooth((r.time-this.flags.vaultAt-V.upAtS)/V.upS);
+    const low=this.LookClamped(eye,height,pelvis,-10,V.maxPitchDeg),high=this.LookClamped(eye,height,head,-10,maxDeg);
+    return low.lerp(high,Clamp(up));
+  }
+  /** Shunzi's eye while ijaA vaults out: from where the kick left it, clawing forward to dragOutRoute[0] (crawl.*). */
+  CrawlEye(age){
+    const K=C.ija.crawl,E=C.ija.dragOutRoute[0],w=Smooth((age-K.fromS)/(K.toS-K.fromS)),f=this.flags;
+    const x=f.dragOutFromX??E.x,z=f.dragOutFromZ??E.z,h=f.dragOutFromH??K.eyeM;
+    return {x:x+(E.x-x)*w,z:z+(E.z-z)*w,h:h+(K.eyeM-h)*w};
   }
   /** ijaA's butt-strike root (SB04): over Shunzi on the side ija.butt.yawDeg; the clip's `head` track point on his eye. */
   ButtRoot(){
@@ -2017,11 +2078,10 @@ export class FirstLevelBunkerShow {
   PlayerPoint(){
     const p=this.phase,S=C.shunzi,ijaA=this.Ija("ijaA"),luo=this.Squad("luo");
     if(["Drag","Snag","KickBeam"].includes(p)){const c=this.TrackPoint(ijaA,"collar");if(c)return {x:c.x-Math.sin(S.trap.yaw)*S.lieCollarBackM,z:c.z-Math.cos(S.trap.yaw)*S.lieCollarBackM};}
-    // Hauled by the collar: he trails the man along the path the man walks (not behind the man's facing, which swung
-    // the eye round him at every turn -- 180 deg at the start of DragOut, 09-26 review).
-    if(p==="DragOut"&&ijaA&&this.flags.dragOutFromX!=null){
-      const route=[{x:this.flags.dragOutFromX,z:this.flags.dragOutFromZ},this.SnagRoot(),...C.ija.dragOutRoute],gap=Distance(route[0],route[1]);
-      return RoutePointAt(route,Math.max(0,RouteProject(route,ijaA.openingStoryboardLast||ijaA.position)-gap));
+    // Crawling under the timber while ijaA vaults out, then hauled out by the wrist on the haul clip's head track.
+    if(p==="DragOut"&&this.flags.dragOutFromX!=null){
+      const h=this.flags.haulAt!=null?this.TrackPoint(ijaA,"head"):null;
+      return h?{x:h.x,z:h.z}:this.CrawlEye(this.Age);
     }
     if(p==="DragCover"&&luo&&this.flags.dragGrabAt!=null&&this.r.time-this.flags.dragGrabAt>=.4){
       const route=[S.dragged,this.DragGrabRoot(),...C.rescue.dragCoverRoute],gap=Distance(route[0],route[1]);
@@ -2082,23 +2142,37 @@ export class FirstLevelBunkerShow {
       height+=.06*Smooth((a-1.9)/.12)*(1-Smooth((a-2.05)/.1));
     }
     else if(p==="Found"){
-      // Up at ijaA as he comes back to the mouth; once he is over the eye the pitch stops at snagShot.maxPitchDeg.
-      eye=S.reachEye;height=S.reachEyeM;const h=Head(ijaA);
-      target=h?this.LookClamped(eye,height,h,-10,C.ija.snagShot.maxPitchDeg):At({x:1,z:-125.9},1.2);roll=C.ija.reachShot.rollDeg*DEG*(1-Smooth(a/1.2));
+      // Up at ijaA as he comes back to the mouth; once he is over the eye the pitch stops at snagShot.maxPitchDeg. While he
+      // comes up to the timber and vaults it the look stays under it on his hips (vaultShot): his boots come up to it and
+      // leave the ground, and he drops down into the pit (looking up at his head showed the timber's underside, black).
+      eye=S.reachEye;height=S.reachEyeM;
+      target=this.VaultLook(eye,height,ijaA,C.ija.snagShot.maxPitchDeg);roll=C.ija.reachShot.rollDeg*DEG*(1-Smooth(a/1.2));
     }
     else if(["Drag","Snag","KickBeam"].includes(p)){
+      // The eye rides the collar ijaA hauls on (IjaCollarDragSnag's player track). That track starts 0.4 m behind the eye
+      // Found left (the snag root was set for his squat, clear of the timber): taken as it stood, the grab threw the head
+      // 0.42 m back, away from him, in a frame before the haul brought it forward (2026-09-27: part of 「拖动的动作也还是
+      // 很奇怪」). Now the eye moves only with the collar and the start offset fades over snagShot.settleS of the haul.
       const c=this.TrackPoint(ijaA,"collar"),f={x:-Math.sin(S.trap.yaw),z:-Math.cos(S.trap.yaw)},G=C.ija.snagShot;
-      if(c){eye={x:c.x+f.x*.12,z:c.z+f.z*.12};height=c.h+.08;}
+      eye=S.reachEye;height=S.reachEyeM;
+      if(c){
+        const c0=this.SnagEye0(),snag=ijaA?.openingStoryboardPose?.clip==="IjaCollarDragSnag"?ijaA.openingStoryboardPose.seconds:99,k=1-Smooth(snag/G.settleS);
+        eye={x:c.x+f.x*.12+(S.reachEye.x-c0.x)*k,z:c.z+f.z*.12+(S.reachEye.z-c0.z)*k};height=c.h+.08+(S.reachEyeM-c0.h)*k;
+      }
       const h=Head(ijaA);
       target=h?this.LookClamped(eye,height,h,G.pitchDeg,G.maxPitchDeg):At({x:1.5,z:-125.9},1.3);
       if(p==="Snag")roll=.05*Math.sin(a*20)*Math.exp(-a*3);
     }
     else if(p==="DragOut"){
-      const pt=this.PlayerPoint();eye=pt;height=.34+.04*Math.sin(r.time*9);
-      // Face down the drag at ijaA's legs; passing the comrade, the eyes drift over him.
-      const corpse=comrade?.position,near=corpse&&Distance(pt,corpse)<2.2;
-      target=near?At(corpse,.45):ijaA?At(ijaA.position,.55):At(C.shunzi.dragged,.5);
-      roll=L.dragRollRad*Math.sin(r.time*4.5);   // chest and knees over the mud
+      // Up at ijaA as he vaults out over the timber (the pitch capped as over the find), then hauled out from under it on
+      // the haul clip's head track looking up at his face (the SB04A drag shot's rule: his head a little above centre).
+      const h=this.flags.haulAt!=null?this.TrackPoint(ijaA,"head"):null,head=Head(ijaA),G=C.ija.dragShot;
+      if(h){eye={x:h.x,z:h.z};height=h.h;}else{const c=this.CrawlEye(a);eye={x:c.x,z:c.z};height=c.h;}
+      if(head&&h){
+        const e=r.Point(eye,height),elev=Math.atan2(head.y-e.y,Math.hypot(head.x-e.x,head.z-e.z));
+        target=this.Aim(eye,height,Face(eye,head),Math.min(G.maxPitchDeg*DEG,Math.max(G.pitchDeg*DEG,elev-G.headAboveDeg*DEG)));
+      }else target=this.VaultLook(eye,height,ijaA,C.ija.snagShot.maxPitchDeg,a);
+      roll=L.dragRollRad*Math.sin(r.time*4.5)*(h?1:.4);   // chest and knees over the mud
     }
     else if(p==="Butt"){
       // SB04 (contract §5): up past ijaA at the north wall's door with the dead comrade right of it; the blow rolls the head.
@@ -2203,7 +2277,6 @@ export class FirstLevelBunkerShow {
     const drop=t>cut?Smooth((t-cut)/.4):0;
     return {eye:e,height:Math.max(.34,height-(height-.34)*drop),target:hh&&ha?hh.lerp(ha,.5):ha,hold:t<cut+L.duelHoldS};
   }
-  DragOutHalf(){return RouteLength(C.ija.dragOutRoute)/C.speed.dragOut*.6;}
   ApplyCamera(){
     const r=this.r,p=this.phase,a=this.Age;
     if(!this.CameraActive)return false;

@@ -484,7 +484,12 @@ def BakeRig(ctx):
         # `ground` (x, y, t) -> z: a clip authored on uneven ground (the comrade's bank) grounds on it.
         ground = spec.get('ground')
         low, lowAt = ctx['LowestVertex']((lambda x, y: ground(x, y, t)) if ground else None)
-        lift = CLEARANCE - low
+        # spec 'groundWeight'(t) -> 0..1: how much of the grounding lift this frame takes. A man in the air over an
+        # obstacle (the vaults over the fallen roof timber: both feet off the ground, his weight on the hands) has no
+        # vertex on the ground; grounding him would drop him through the timber. At 0 the frame keeps its authored
+        # height (planted feet are authored on T.A, so a frame next to one lifts by ~0 anyway).
+        weight = max(0.0, min(1.0, spec['groundWeight'](t))) if spec.get('groundWeight') else 1.0
+        lift = (CLEARANCE - low) * weight
         solveState['lift'] = lift
         if os.environ.get('OPENING_LOWDBG'):
             print('LOW t=%.2f %.4f at %s' % (t, low, lowAt), flush=True)

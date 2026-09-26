@@ -23,7 +23,7 @@ const BUTT = Object.freeze({ yawDeg:0, letGoS:1.05, holdS:0, strikeS:1.375, boot
 // Script_OpeningStoryboardsTest's sight/drag checks. Wave 2 sets wave1Allowances.revetment to null.
 const REVETMENT = "BunkerSouthRevetment";
 export const OPENING_STORYBOARDS = Object.freeze({
-  version:"20260926OpeningStoryboardsV8Stunned", animationBase:"./Animation/OpeningStoryboards/",
+  version:"20260927OpeningStoryboardsV9Vault", animationBase:"./Animation/OpeningStoryboards/",
   // Contract §3/§7.2: wave 1 = each package alone (stand-ins listed in pendingWiring); wave 2 = wired. Set to 2 by the
   // wave-2 wiring: Script_OpeningStoryboardsTest then requires pendingWiring empty and no wave-1 allowance left
   // (wave1Allowances null, no behindOk / coverOk / headOptional in storyboardShots).
@@ -51,7 +51,11 @@ export const OPENING_STORYBOARDS = Object.freeze({
       "YaowaSitLoad","IjaChoppedFallBack"],
     // Not in §5.4: IjaShoveToWall for the draft's "日兵甲把他推到沟壁上" pair (reported to the integrator);
     // BlastDazedStir, the comrade stunned in the heap from the black to the drag (docs/Data_OpeningComradeStunned20260927.md).
-    added:["IjaShoveToWall","BlastDazedStir"],
+    added:["IjaShoveToWall","BlastDazedStir",
+      // 2026-09-27 review 「日军从外面走进来怎么能直接进的，至少有个翻越动作吧。拖动的动作也还是很奇怪」: ijaA vaults the
+      // fallen roof timber into the pit and back out, and hauls Shunzi out from under it by the wrist
+      // (ija.vaultIn / ija.dragOutRoute, docs/Data_OpeningVaultHaul20260927.md).
+      "IjaVaultTimberIn","IjaVaultTimberOut","IjaHaulForearmUnder"],
   },
   // Contract §5.3: the director's phases, in order. Each is recorded in `beats` when it really starts.
   phases:Object.freeze({
@@ -71,8 +75,8 @@ export const OPENING_STORYBOARDS = Object.freeze({
   // Kept for the dadao ambush adapter in Script_OpeningStoryboardAnimation (legacy DadaoHeavy).
   ambushS:1.1,
   // Move speeds of the director's walks along trench polylines (m/s).
-  // dragOut: ijaA hauling Shunzi out of the mouth by the collar (01); drag: Luo's haul to cover (02; 1.25 until 09-26).
-  speed:Object.freeze({ walk:1.5, brisk:2.3, creep:1.15, run:3.2, drag:1.55, dragOut:1.7, flee:3.4, stroll:1.1 }),
+  // drag: Luo's haul to cover (02; 1.25 until 09-26). (01's haul out of the mouth is IjaHaulForearmUnder's own root motion.)
+  speed:Object.freeze({ walk:1.5, brisk:2.3, creep:1.15, run:3.2, drag:1.55, flee:3.4, stroll:1.1 }),
   arriveM:.12,
   culledHeadM:1.4,     // head height used for an actor the AI has culled (its bones are not updated)
   shotRiseM:1.4,       // a squad rifleman's scripted shot leaves at least this high over his feet (he rises to fire)
@@ -191,7 +195,11 @@ export const OPENING_STORYBOARDS = Object.freeze({
         // 「一只手本能地抓住勒紧的衣领，另一只手撑着泥地」 (on ijaA's hand while he pulls in place; at his own
         // collar once he walks off with it, where ijaA's grip is solved onto the same point); chest and knees on the mud.
         // (Drag: flat while he slings the rifle, the fist goes to his hand as it takes the collar.)
-        Drag:K([0,"flat","flat"],[.45,"flat","push"],[.8,"grasp","push"]), Snag:K([0,"grasp","push"]), KickBeam:K([0,"grasp","push"]), DragOut:K([0,"collar","scrape"]),
+        Drag:K([0,"flat","flat"],[.45,"flat","push"],[.8,"grasp","push"]), Snag:K([0,"grasp","push"]), KickBeam:K([0,"grasp","push"]),
+        // 2026-09-27: ijaA lets go and vaults out; Shunzi claws forward under the timber, the left arm out after the rifle
+        // (reachLeft), and it is that wrist ijaA seizes (IjaVaultTimberOut 1.917 s + IjaHaulForearmUnder's grab 0.375 s
+        // = haulGripS; Script_OpeningStoryboardsTest checks it): the left hand holds his right forearm as he hauls.
+        DragOut:K([0,"grasp","push"],[.3,"flat","push"],[.7,"flat","scrape"],[1.1,"reachLeft","scrape"],[2.2,"reachLeft","scrape"],[2.3,"gripHaul","scrape"]),
         // 「刚想撑起身体，枪托突然砸过来」: the blow lands BUTT.strikeS + BUTT.holdS after buttAt (after the pause at the
         // top); the hands let go of the push 0.18 s later.
         Butt:KC("buttAt",[-1,"flat","flat"],[0,"push","push"],[BUTT.strikeS+BUTT.holdS,"push","push"],[BUTT.strikeS+BUTT.holdS+.18,"rest","rest"]),
@@ -314,11 +322,21 @@ export const OPENING_STORYBOARDS = Object.freeze({
     lookBack:P(4.9,-124.45,-60*Math.PI/180), lookBackOffDeg:45, lookBackTurnS:.35, lookBackS:.6,
     reachShot:Object.freeze({ yawDeg:-82, pitchDeg:4, rollDeg:3, dipDeg:-12 }),
     // Found: ijaA's path from lookBack back to the mouth, where Shunzi lies (the snag root is inside the posts).
-    // 2026-09-26 integration (Set x Dir, Script_OpeningSetTest §2): he walks back along the south side of the trench
-    // floor and turns in at the mouth south of the broken board (Data_OpeningSet0103 brokenBoardNW hangs to 0.55 m at
-    // z -125.62) and west of the hand-back backrest's spot (rubbleMoundBack, shown from 02): the old line at z -125.3
-    // ran across both.
-    foundRoute:Route([2.9,-124.75],[1.75,-124.8],[1.42,-125.28]),
+    // 2026-09-27 (review 「日军从外面走进来怎么能直接进的，至少有个翻越动作吧」): the fallen roof timber (Data_OpeningSet0103
+    // roofTimberDown, settled in Reach: x 0.65-0.95, its top 0.80 m, ijaA's hip height) lies across the mouth 0.3 m in
+    // front of Shunzi's eye, and he used to walk through it. He now walks back along the south side of the trench floor
+    // to vaultIn and vaults it into the pit (IjaVaultTimberIn: side-on facing south, the right hand on the top, the rifle
+    // up in the left fist), on the lane z -124.95: just north of the timber's south support, so that from Shunzi's eye
+    // under the timber his boots coming up to it and landing are in view (on z -124.72 the support hid them), the
+    // fallen lintel over it ~1.4 m (the head goes out over the landing side). He lands south-west of the eye and steps
+    // round to the snag root (the clip's root motion ends on it). _import/Script_OpeningStoryboardClips.py VAULT_IN_*
+    // are this root's numbers.
+    foundRoute:Route([2.9,-124.75],[1.9,-124.74]),   // (1.9,-124.9) came within a capsule of 02's rubbleMoundBack
+    vaultIn:P(1.42,-124.95,Math.PI/2),
+    // The look around the vaults (Script_OpeningStoryboards VaultLook): on his hips under the timber, pitch <= maxPitchDeg,
+    // from downFromM out from vaultIn (over downOverM) until upAtS into the vault in, then up to his head over upS; over
+    // the vault out down during outDownS and back up to his face over outUpS (he kneels at the timber for the haul).
+    vaultShot:Object.freeze({ maxPitchDeg:12, downFromM:2.2, downOverM:1.2, upAtS:1.0, upS:.7, outDownS:Object.freeze([.35,.8]), outUpS:Object.freeze([1.55,2.1]) }),
     // Pace of the find -> drag-out chain (2026-09-26 review: 「太拖节奏」, ~21 s from the find to the circle): he comes back
     // at foundSpeed, clears the wood and slings the rifle at these clip rates, says his line (ShunziFound) from the start of
     // the clearing and starts to sling foundLeadS before its end.
@@ -326,11 +344,19 @@ export const OPENING_STORYBOARDS = Object.freeze({
     // Drag / Snag / KickBeam: the eye is at his collar and ijaA squats over his head, so looking at the face means looking
     // straight up (67-77 deg, the face upside down, 09-26 review). The look goes toward him at pitchDeg, capped at
     // maxPitchDeg: the fist at the collar, his knees and chest, the face at the top edge.
-    snagShot:Object.freeze({ pitchDeg:24, maxPitchDeg:30 }),
-    // ijaA drags Shunzi out of the mouth -- south of the broken board, clear of the fallen lintel (lateral >= 0.5 m) --
-    // then east-south-east past the mouth rubble to the trench edge. The last leg is aimed through shunzi.butt, so
-    // Shunzi, 0.62 m behind him, ends on it (2026-09-26: the old middle point (2.15,-125.0) stood on the backrest's spot).
-    dragOutRoute:Route([1.4,-125.3],[1.55,-124.8],[2.85,-124.11]),
+    // settleS (2026-09-27): the eye's offset from the collar track (Found's eye vs the track's first frame) fades over the
+    // first settleS of the haul, so the grab pulls the head toward him instead of throwing it 0.42 m back.
+    snagShot:Object.freeze({ pitchDeg:24, maxPitchDeg:30, settleS:1.2 }),
+    // DragOut (2026-09-27, review 「拖动的动作也还是很奇怪」: he walked off upright at 1.7 m/s, his back to the eye, one
+    // arm stretched behind to the collar, and out through the timber). After the kick he lets go and vaults back out
+    // (IjaVaultTimberOut, on the snag root); meanwhile Shunzi, freed, crawls toward the light under the timber (crawl:
+    // the eye from where the kick left it to dragOutRoute[0] over crawl.fromS..toS, down to crawl.eyeM) with his left
+    // arm stretched out past its east face. ijaA drops to a knee there, seizes the wrist and hauls him out from under
+    // the timber backwards, bent low, face on him (IjaHaulForearmUnder): its root faces back along dragOutRoute (the
+    // eye's haul, straight to shunzi.butt) where the clip's frame-0 head track lands on dragOutRoute[0]; the eye
+    // follows the clip's head track (Script_OpeningStoryboards HaulRoot / PlayerPoint).
+    dragOutRoute:Route([.70,-125.25],[2.3,-124.4]),
+    crawl:Object.freeze({ fromS:.35, toS:1.75, eyeM:.30 }),
     // SB04 (contract §5): ijaA stands over his head on the side yawDeg (yaw convention: 0 = north of him), coming
     // round the east side (approach). The camera (buttShot) looks up past him at the north wall's timber door with
     // the dead comrade right of it. Wave 1 plays the existing IjaButtStrike (it stands straight) with its clip time

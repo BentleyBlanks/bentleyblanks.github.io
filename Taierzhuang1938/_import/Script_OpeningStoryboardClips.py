@@ -2831,7 +2831,7 @@ Meta('IjaKickBeam', KICK_T, False, 'track', role='ijaA', rig='TengxianIja02', pr
      contacts=[{'t': 0, 'limb': 'handL', 'action': 'hold', 'partnerRole': 'shunzi', 'part': 'collarBack'},
                {'t': KICK_HIT_T, 'limb': 'footR', 'action': 'kick', 'target': 'beam'}],
      events=[{'t': KICK_HIT_T, 'kind': 'beamKicked'}],
-     prev=['IjaCollarDragSnag'], next=['CollarDrag'],
+     prev=['IjaCollarDragSnag'], next=['IjaVaultTimberOut'],
      notes='Keeps the collar in his left fist, stamps the loose beam off the pack with the right sole; the '
            'beam track carries it clear (rests at 0.75 s); face back on him for the haul (1.0 s, was 1.2 s).')
 Meta('IjaButtStrike', 1.0, False, 'track', role='ijaA', rig='TengxianIja02', props=['weapon'], rootMotion=False,
@@ -3139,8 +3139,52 @@ def _BeamPoses(scale=.9128):
 PROPS['beam']['poses'] = _BeamPoses()
 
 
+KICK_REACH = {'fraction': .86, 'sides': 'L', 'travel': .17, 'bend': .40}
+
+
 @Builder('IjaKickBeam')
 def BuildKickBeam(T, name):
+    parts = KickBeamParts(T)
+    body, hold, eye, poles, k = parts['body'], parts['hold'], parts['eye'], parts['poles'], KICK_HIT_T
+
+    def Body(t):
+        f = body(t)
+        f['look'] = eye
+        f['legPole.L'] = poles['L']
+        return f
+    spec = PlayerGripSpec(T, Body, {'L': [(0.0, KICK_T, lambda t: hold, (0, 0, -1), 1.1)]})
+    spec['reach'] = dict(KICK_REACH)
+    props, review = SlungProps(T, 'side')
+
+    def Beam(t):
+        c, a = Vector(BEAM_PINNED[0]), Vector(BEAM_PINNED[1]).normalized()
+        u = Smooth((t - k) / .37) if t > k else 0.0
+        c = c + Vector((-.28, -.42, 0)) * u + Vector((0, 0, .10 * math.sin(math.pi * Clamp((t - k) / .37))))
+        a = Quaternion((0, 0, 1), .9 * u) @ a
+        return c, a
+
+    def Props(t):
+        out = props(t)
+        c, a = Beam(t)
+        out['beam'] = (tuple(c), tuple(a), (0, 0, 1), True)
+        return out
+
+    def Review(t):
+        c, a = Beam(t)
+        half = a * T.R(.775)
+        return review(t) + [('cyl', tuple(c - half), tuple(c + half), .06), ('point', hold, None, .04)] + PlayerGhost(T, hold)
+    spec.update({'props': Props, 'plants': [('L', 0, KICK_T), ('R', .74, KICK_T)], 'reviewProps': Review,
+                 'look': lambda t: eye if body(t)['lookW'] >= .99 else None,
+                 'reviewFrames': lambda n: [0, int(n * .27), int(n * .375), int(n * .55), n - 1]})
+    spec['player'] = lambda t: {'collar': hold}
+    spec = AReview(spec)
+    spec['reviewViews'].append(FirstPersonView(lambda t: eye, lambda t: Add3(eye, (0, .9, .55))))
+    return spec
+
+
+def KickBeamParts(T):
+    """IjaKickBeam's body keys (the collar held in the left fist, the right sole on the beam); its last frame is
+    also IjaVaultTimberOut's first (same root, same inputs, same reach assist)."""
     H = T.H
     collar = PlayerCollarPath(T)
     hold = collar(SNAG_T)
@@ -3169,41 +3213,7 @@ def BuildKickBeam(T, name):
         'lookW': [(0.0, 0.0), (KICK_T, 0.0)],
         'twist': [(0.0, -.18), (.28, -.05), (.70, 0.0), (KICK_T, 0.0)],
     }, lag={'head': .05})
-    eye = PlayerEyeFromCollar(hold)
-
-    def Body(t):
-        f = body(t)
-        f['look'] = eye
-        f['legPole.L'] = poles['L']
-        return f
-    spec = PlayerGripSpec(T, Body, {'L': [(0.0, KICK_T, lambda t: hold, (0, 0, -1), 1.1)]})
-    spec['reach'] = {'fraction': .86, 'sides': 'L', 'travel': .17, 'bend': .40}
-    props, review = SlungProps(T, 'side')
-
-    def Beam(t):
-        c, a = Vector(BEAM_PINNED[0]), Vector(BEAM_PINNED[1]).normalized()
-        u = Smooth((t - k) / .37) if t > k else 0.0
-        c = c + Vector((-.28, -.42, 0)) * u + Vector((0, 0, .10 * math.sin(math.pi * Clamp((t - k) / .37))))
-        a = Quaternion((0, 0, 1), .9 * u) @ a
-        return c, a
-
-    def Props(t):
-        out = props(t)
-        c, a = Beam(t)
-        out['beam'] = (tuple(c), tuple(a), (0, 0, 1), True)
-        return out
-
-    def Review(t):
-        c, a = Beam(t)
-        half = a * T.R(.775)
-        return review(t) + [('cyl', tuple(c - half), tuple(c + half), .06), ('point', hold, None, .04)] + PlayerGhost(T, hold)
-    spec.update({'props': Props, 'plants': [('L', 0, KICK_T), ('R', .74, KICK_T)], 'reviewProps': Review,
-                 'look': lambda t: eye if body(t)['lookW'] >= .99 else None,
-                 'reviewFrames': lambda n: [0, int(n * .27), int(n * .375), int(n * .55), n - 1]})
-    spec['player'] = lambda t: {'collar': hold}
-    spec = AReview(spec)
-    spec['reviewViews'].append(FirstPersonView(lambda t: eye, lambda t: Add3(eye, (0, .9, .55))))
-    return spec
+    return {'body': body, 'hold': hold, 'eye': PlayerEyeFromCollar(hold), 'poles': poles}
 
 
 def PlayerHeadPath():
@@ -4206,7 +4216,7 @@ Meta('IjaButtStrikeCollar', BUTT_T, False, 'track', role='ijaA', rig='TengxianIj
                 'playerOffsetM': [0.0, .064, .046]}],
      events=[{'t': .55, 'kind': 'apex'}, {'t': 1.125, 'kind': 'windUp'},
              {'t': BUTT_HIT_T, 'kind': 'buttHit', 'fact': 'playerStruck'}],
-     prev=['CollarDrag', 'IjaKickBeam'], next=['IjaDragByForearm'],
+     prev=['IjaHaulForearmUnder', 'IjaKickBeam'], next=['IjaDragByForearm'],
      notes='SB04: squats astride Shunzi\'s legs, left fist in his collar (player collar), and swings the rifle up one-handed, '
            'butt first over the top, sliding his fist from the handguard up to the wrist of the stock (0.42 m from the butt '
            'plate): fist high over his right shoulder, butt aimed down at Shunzi\'s face, barrel up behind him (apex 0.55 s; '
@@ -5013,6 +5023,565 @@ def BuildChoppedFallBack(T, name):
     spec = AReview(spec)
     # SB05A camera: Shunzi half-lying 3 m in front of ijaB, eye 0.67 m up, looking a little up the trench
     spec['reviewViews'].append(('sb', (-.315, -3.02, .673), (-.52, -.03, .99), 65.0, 0.0))
+    return spec
+
+
+# =================================================================================
+# 01 Found / DragOut over the fallen roof timber (2026-09-27 review: 「日军从外面走进来怎么能直接进的，至少有个翻越
+# 动作吧。拖动的动作也还是很奇怪」). The roof timber (Data_OpeningSet0103 roofTimberDown, settled in Reach) lies across
+# the dugout mouth 0.3 m in front of Shunzi's eye, its top 0.80 m over the floor -- ijaA's hip height. ijaA used to walk
+# through it into the pit and walk back out through it with Shunzi trailing off one arm stretched behind him. Now he
+# side-vaults it into the pit (IjaVaultTimberIn: the left hand on the timber, the rifle up in the right fist), and after
+# the kick lets go, vaults back out (IjaVaultTimberOut: both hands, the rifle slung), drops to a knee at its east face,
+# seizes the left wrist Shunzi has stretched out from under it after the rifle and hauls him out backwards, bent low,
+# face on him, to the trench edge where the butt comes down (IjaHaulForearmUnder): 「顺子的身体从断木下面被拖出来」.
+# Both vaults cross on the lane z -124.72, where the fallen lintel over the timber is highest (underside ~1.5 m); the head
+# goes out over the landing side, never under the lintel's low north end. The numbers below are RUNTIME metres in each
+# clip's root frame: d ahead (actor -z), l to his left, h up (Data_OpeningStoryboards.ija.vault / haul place the roots;
+# Script_OpeningStoryboardsTest checks the two agree).
+# =================================================================================
+REACH_ASSIST_DEFAULT = .92          # the bake's REACH_FRACTION (Script_OpeningStoryboardBake)
+VAULT_TOP = .80                     # the timber's top over the floor (roofTimberDown settled: lift .65 + half its .28)
+# IjaVaultTimberIn crosses on the lane z -124.95, just north of the timber's south support: from Shunzi's eye under the
+# timber the approach and the landing are in view (on z -124.72 the support hid them); the lintel over it ~1.4 m
+VAULT_IN_NEAR, VAULT_IN_FAR = .47, .77   # its east / west face ahead of IjaVaultTimberIn's root (1.42,-124.95) facing west
+VAULT_IN_END = (.914, -.482)        # the snag root (0.506,-125.432) in that frame: the clip ends standing on it, facing west
+VAULT_IN_EYE = (1.17, -.10, .18)    # Shunzi's reach eye (0.25,-125.05) in that frame
+VAULT_OUT_NEAR, VAULT_OUT_FAR = .144, .444   # the timber's west / east face BEHIND the snag root (IjaVaultTimberOut's root)
+VAULT_OUT_LANE = .712               # the lane (z -124.72) to the left of the snag root
+# IjaHaulForearmUnder's root in the snag frame (d, l, turn rad, + = left): Data_OpeningStoryboards.ija.haul puts the root
+# where the clip's frame-0 head track lands on haul.eye facing back along haul.eye -> shunzi.butt (1.097,-125.039, yaw 62.0 deg)
+VAULT_OUT_END = (-.591, .393, -.4887)
+HAUL_WRIST = (0.0, 0.0, .12)        # Shunzi's left wrist, stretched out 0.22 m past the timber's east face (d, l, h)
+HAUL_EYE = (.45, 0.0, .30)          # his eye under the timber, 0.45 m behind the wrist (the arm out after the rifle), 0.3 m up
+HAUL_TRAVEL = 1.812                 # the eye's haul: from under the timber (0.70,-125.25) to shunzi.butt (2.3,-124.4)
+VIN_T = 44 / 24
+VOUT_T = 46 / 24
+HAUL_T = 66 / 24
+HAUL_GRAB_T = 9 / 24
+
+
+def RootPoint(T, d, l, h=None):
+    """(d ahead, l left[, h up]) runtime metres in a clip root frame -> source metres (Blender: +X left, -Y ahead)."""
+    return (T.R(l), -T.R(d)) if h is None else (T.R(l), -T.R(d), T.R(h))
+
+
+def BodyPoint(pel, psi, left, back, z):
+    """A point given in the body frame (x left, y back, source metres) of a body whose pelvis ground point is
+    `pel` and which is turned psi (rad, + = left) -- in the clip root frame."""
+    x, y = _Rot(left, back, psi)
+    return (pel[0] + x, pel[1] + y, z)
+
+
+def BodyRifle(T, pel, psi, rest, dz=0.0):
+    """A rifle given in the body frame (T.Rifle origin/axis at rest) carried by that body."""
+    o, a = rest['origin'], rest['axis']
+    ax, ay = _Rot(a[0], a[1], psi)
+    return T.Rifle(BodyPoint(pel, psi, o[0], o[1], o[2] + dz), Unit((ax, ay, a[2])))
+
+
+def BlendRifle(T, a, b, w):
+    return T.Rifle(Lerp3(a['origin'], b['origin'], w), Unit(Lerp3(a['axis'], b['axis'], w)))
+
+
+def Ramp(t, t0, t1):
+    return Smooth((t - t0) / max(1e-6, t1 - t0))
+
+
+def Window(t, a0, a1, b0, b1):
+    """0 before a0, up to 1 by a1, 1 until b0, down to 0 by b1."""
+    return Ramp(t, a0, a1) * (1 - Ramp(t, b0, b1))
+
+
+def Swing(points, lift=.07):
+    """Ankle keys from [(t, (x, y, z), planted)]: a step between two planted keys arcs `lift` over the ground."""
+    rows = []
+    for i, (t, p, planted) in enumerate(points):
+        if i and planted and points[i - 1][2] and p != points[i - 1][1]:
+            t0, p0 = points[i - 1][0], points[i - 1][1]
+            rows.append(((t0 + t) / 2, ((p0[0] + p[0]) / 2, (p0[1] + p[1]) / 2, max(p0[2], p[2]) + lift)))
+        rows.append((t, p))
+    return rows
+
+
+def VaultFeetPlants(rows):
+    """Plant windows from Swing input rows [(t, p, planted)]: between consecutive planted keys at the same point."""
+    out = []
+    for (t0, p0, a), (t1, p1, b) in zip(rows, rows[1:]):
+        if a and b and p0 == p1 and t1 - t0 > .02:
+            out.append((t0, t1))
+    return out
+
+
+def PlantedFeet(f, t, turn, plants):
+    """A foot planted while the body turns keeps the heading it landed with: the rest foot follows the frame's yaw
+    (OrientFoot), so the yaw it gained since the plant began is taken back off (else the toe swings round a
+    planted heel: 5-12 cm of slide in the first bake)."""
+    for s in LR:
+        for a, b in plants[s]:
+            if a <= t <= b:
+                p, y, r = f.get('foot.' + s) or (0, 0, 0)
+                f['foot.' + s] = (p, y + math.degrees(turn(a) - turn(t)), r)
+                break
+    return f
+
+
+def TimberPalm(across):
+    """A palm flat on the timber's top, fingers pointing `across` it (source axes)."""
+    return Grab((0, 0, 1), across, .75)
+
+
+def VaultPoles(T, pel, psi, tuck):
+    """Knee poles in front of the body; tucked (1) they rise to chest height and close in (the knees drawn up
+    together, not splayed) for the legs coming over the timber."""
+    out = {}
+    for s, sign in (('L', 1), ('R', -1)):
+        out[s] = BodyPoint(pel, psi, sign * (T.H + .20 - .16 * tuck), -(.95 + .15 * tuck), .45 + .75 * tuck)
+    return out
+
+
+def SlungHang(T, hang):
+    """SlungRifle(T, 'side') whose muzzle swings back toward the vertical as he bends (hang 0..1): slung on the
+    right shoulder a bent-over man's rifle hangs from it, it does not stick out ahead of his face."""
+    rifle, up = SlungRifle(T, 'side')
+    if hang <= 1e-4:
+        return rifle, up
+    axis = Unit(Lerp3(rifle['axis'], (0, 0, 1), hang))
+    top = Vector(rifle['origin']) + Vector(rifle['axis']) * T.R(.55)     # the sling's shoulder end stays put
+    return T.Rifle(tuple(top - Vector(axis) * T.R(.55)), axis), up
+
+
+def SlungHangProps(T, hang):
+    def Props(t):
+        rifle, up = SlungHang(T, hang(t))
+        return {'weapon': (rifle['origin'], rifle['axis'], up, True)}
+
+    def Review(t):
+        return T.RifleProps(SlungHang(T, hang(t))[0])
+    return Props, Review
+
+
+HAUL_STAND_BACK = .30               # where he stands before he goes down: 0.3 m behind the wrist (not on the hand)
+
+
+def HaulStart(T):
+    """IjaHaulForearmUnder frame 0 (and IjaVaultTimberOut's last frame, carried into the snag frame): standing
+    HAUL_STAND_BACK behind Shunzi's wrist (0.5 m off the timber's east face) facing him, rifle slung on the right,
+    both hands hanging, the eyes on his."""
+    f = IjaABase(T)
+    f.update({'bend': .18, 'head': (.12, 0, 0), 'lookW': 1.0, 'turn': 0.0,
+              'handRel.L': (.08, -.14, -.44), 'handRel.R': (-.08, -.12, -.46)})
+    back = T.R(HAUL_STAND_BACK)
+    for key, v in list(f.items()):
+        if v is not None and (key == 'pelvis' or key.startswith(POSITION_CHANNELS)):
+            f[key] = (v[0], v[1] + back, v[2])
+    f['look'] = RootPoint(T, *HAUL_EYE)
+    return f
+
+
+def PlacedPose(f, origin, psi):
+    """A flat pose authored in its own root carried into another root: positions rotated by psi about that root and
+    moved to `origin` (source x, y), the body turned psi (IjaVaultTimberOut's last frame = HaulStart at the haul root)."""
+    g = dict(f)
+    for key, v in f.items():
+        if v is None or not (key == 'pelvis' or key.startswith(POSITION_CHANNELS) or key == 'look'):
+            continue
+        x, y = _Rot(v[0], v[1], psi)
+        g[key] = (x + origin[0], y + origin[1], v[2])
+    g['turn'] = psi
+    return g
+
+
+Meta('IjaVaultTimberIn', VIN_T, False, 'track', role='ijaA', rig='TengxianIja02', props=['weapon'], rootMotion=True,
+     weaponState='twoHand->highLeft->twoHand',
+     obstacle={'kind': 'roofTimberDown', 'nearM': VAULT_IN_NEAR, 'farM': VAULT_IN_FAR, 'topM': VAULT_TOP},
+     contacts=[{'t': .40, 'limb': 'handR', 'action': 'plant', 'target': 'timber'},
+               {'t': .72, 'limb': 'handR', 'action': 'release', 'target': 'timber'}],
+     events=[{'t': .54, 'kind': 'takeoff'}, {'t': .96, 'kind': 'land'}],
+     prev=['IjaBayonetGuard'], next=['BayonetClearWood'],
+     notes='Found (2026-09-27): comes up to the fallen roof timber (hip high, 0.47 m ahead), turns side-on to it (facing '
+           'south), lets the wrist of the stock go and puts the right palm on its top, the rifle up in the left fist; '
+           'loads, hops and swings both legs over drawn up under him, the hips 0.25 m over the top and the head leaned '
+           'out over the landing side, lands in the pit south-west of Shunzi\'s eye (0.35 m off it), takes the rifle in '
+           'both hands again and steps round to the snag root facing west (the clip ends standing on it: root motion). '
+           'Frames 0.55-0.92 s are off the ground (bake spec groundWeight 0).')
+Meta('IjaVaultTimberOut', VOUT_T, False, 'track', role='ijaA', rig='TengxianIja02', props=['weapon'], rootMotion=True,
+     weaponState='slungRight', player=True,
+     obstacle={'kind': 'roofTimberDown', 'nearM': VAULT_OUT_NEAR, 'farM': VAULT_OUT_FAR, 'topM': VAULT_TOP, 'laneM': VAULT_OUT_LANE},
+     contacts=[{'t': 0.0, 'limb': 'handL', 'action': 'hold', 'partnerRole': 'shunzi', 'part': 'collarBack'},
+               {'t': .04, 'limb': 'handL', 'action': 'release'},   # the fist opens at once (the arm eases off over 0.45 s)
+               {'t': .92, 'limb': 'handL', 'action': 'plant', 'target': 'timber'},
+               {'t': 1.18, 'limb': 'handL', 'action': 'release', 'target': 'timber'}],
+     events=[{'t': 1.00, 'kind': 'takeoff'}, {'t': 1.36, 'kind': 'land'}],
+     prev=['IjaKickBeam'], next=['IjaHaulForearmUnder'],
+     notes='DragOut (2026-09-27): frame 0 = IjaKickBeam\'s last frame (same root, the left fist in the collar). Lets go, '
+           'rises and turns left to face south, walks to the lane at the south end of the timber, the left palm on its '
+           'top (the rifle slung on the right), vaults it the other way (0.98-1.36 s off the ground), lands outside and turns '
+           'right to face Shunzi (west-north-west): the last frame is IjaHaulForearmUnder frame 0 at that clip\'s root '
+           '(VAULT_OUT_END in this root).')
+Meta('IjaHaulForearmUnder', HAUL_T, False, 'track', role='ijaA', rig='TengxianIja02', props=['weapon'], rootMotion=True,
+     weaponState='slungRight', player=True,
+     contacts=[{'t': HAUL_GRAB_T, 'limb': 'handR', 'action': 'grab', 'partnerRole': 'shunzi', 'part': 'forearmL'},
+               {'t': 2.54, 'limb': 'handR', 'action': 'release'}],
+     events=[{'t': .50, 'kind': 'yank'}, {'t': .75, 'kind': 'haulStart'}, {'t': 2.50, 'kind': 'haulStop'}],
+     prev=['IjaVaultTimberOut'], next=['IjaButtStrikeCollar'],
+     notes='DragOut (2026-09-27): at the timber\'s east face goes down on the right knee, the chest low, reaches down with '
+           'the right hand to Shunzi\'s left wrist stretched out from under the timber, grabs it (0.375 s), yanks it up '
+           'and toward him, comes off the knee and backs off bent low, seven short hauling steps, face on Shunzi, hauling '
+           'him out from under the timber 1.8 m straight back (root motion along actor +z) to the trench edge; lets go '
+           'at 2.56 s. Rifle slung on the right (hanging as he bends); the left hand swings free. Player track: forearmL '
+           '(the grip) and head (his eye, 0.45 m behind the wrist).')
+
+
+@Builder('IjaVaultTimberIn')
+def BuildVaultTimberIn(T, name):
+    H, P, A, SX = T.H, T.P, T.A, T.SX
+    stand = P - .035
+    R = T.R
+    Q = lambda d, l: RootPoint(T, d, l)
+    near, far = VAULT_IN_NEAR, VAULT_IN_FAR
+    mid = (near + far) / 2
+    endD, endL = VAULT_IN_END
+    S = math.pi / 2                                    # side-on to the timber: facing south, turned left a quarter
+    turn = Channel([(0.0, 0.0), (.06, 0.0), (.34, S), (1.14, S), (1.44, S * .40), (1.66, 0.0), (VIN_T, 0.0)])
+    # pelvis ground point (d, l) and its height over standing (runtime m): up over the timber (top 0.80, the hips'
+    # standing height 0.785), 0.25 over it at the top of the hop; the legs come over in front of him (south), and he
+    # lands south-west of Shunzi's eye, clear of it, then steps round to the snag root
+    pelKeys = [(0.0, (0.0, 0.0, 0.0)), (.18, (.12, -.01, -.02)), (.34, (.23, .02, -.06)), (.46, (.27, .02, -.13)),
+               (.54, (.31, .02, .02)), (.62, (.43, .04, .24)), (.70, (.55, .06, .27)), (.78, (.68, .09, .28)),
+               (.86, (.82, .12, .16)), (.95, (.93, .16, -.10)), (1.08, (.95, .14, -.08)), (1.40, (.93, -.12, -.03)),
+               (1.64, (.92, -.36, -.02)), (1.80, (endD, endL, -.01)), (VIN_T, (endD, endL, -.01))]
+    pelCh = Channel(pelKeys)
+
+    def Pel(t):
+        d, l, dz = pelCh(t)
+        x, y = Q(d, l)
+        return (x, y, stand + R(dz))
+    # feet (runtime d, l; planted on the ground, or in the air at h): side-on the RIGHT foot is the timber side; in the
+    # air both are drawn up under the hips, the soles over the top (0.80) while they are over the timber (d .47-.77)
+    G = lambda d, l: (Q(d, l)[0], Q(d, l)[1], A)
+    U = lambda d, l, h: (Q(d, l)[0], Q(d, l)[1], R(h))
+    footR = [(0.0, G(.06, -.10), True), (.14, G(.06, -.10), True), (.34, G(.31, .02), True), (.53, G(.31, .02), True),
+             (.62, U(.42, .12, .70), False), (.70, U(.54, .14, .98), False), (.78, U(.70, .13, 1.00), False),
+             (.86, U(.88, .12, .78), False), (.92, U(1.00, .16, .30), False), (.96, G(1.00, .20), True), (1.26, G(1.00, .20), True),
+             (1.46, G(.98, -.28), True), (1.58, G(.98, -.28), True), (1.76, G(.97, -.58), True), (VIN_T, G(.97, -.58), True)]
+    footL = [(0.0, G(-.02, .09), True), (.04, G(-.02, .09), True), (.22, G(.16, -.07), True), (.49, G(.16, -.07), True),
+             (.62, U(.34, .08, .66), False), (.70, U(.46, .10, .92), False), (.78, U(.62, .10, .97), False),
+             (.86, U(.84, .10, .95), False), (.94, U(.88, .12, .40), False), (1.00, G(.88, .14), True), (1.10, G(.88, .14), True),
+             (1.30, G(.87, -.14), True), (1.50, G(.87, -.14), True), (1.66, G(.89, -.39), True), (VIN_T, G(.89, -.39), True)]
+    ankles = {'L': Channel(Swing(footL)), 'R': Channel(Swing(footR))}
+    plantWin = {'L': VaultFeetPlants(footL), 'R': VaultFeetPlants(footR)}
+    plants = [(s, a, b) for s in LR for a, b in plantWin[s]]
+    # the body: loads, the chest over the timber, leans far out over the landing side (his right) in the air
+    base = IjaABase(T)
+    body = Tracks(base, {
+        'bend': [(0.0, .10), (.34, .18), (.46, .42), (.62, .45), (.78, .40), (.95, .45), (1.10, .25), (1.40, .12), (VIN_T, .10)],
+        'lean': [(0.0, 0.0), (.46, -.12), (.62, -.55), (.74, -.85), (.86, -.60), (.98, -.12), (1.12, 0.0)],
+        'pelvisTilt': [(0.0, (.05, 0, 0)), (.46, (.28, -.05, 0)), (.70, (.18, -.30, 0)), (.86, (.15, -.15, 0)), (.98, (.30, 0, 0)),
+                       (1.20, (.08, 0, 0)), (VIN_T, (.05, 0, 0))],
+        'twist': [(0.0, 0.0), (.46, .10), (.72, .22), (.95, .08), (1.20, 0.0)],
+        'head': [(0.0, (.10, 0, 0)), (.34, (.28, 0, -.10)), (.60, (.10, 0, -.20)), (.95, (.05, 0, 0)), (VIN_T, (.05, 0, 0))],
+        'shrug': [(0.0, 0.0), (.46, .10), (.78, .18), (.95, .04), (1.20, 0.0)],
+        'lookW': [(0.0, 0.0), (.66, 0.0), (.98, .95), (1.40, .80), (VIN_T, .70)],
+        # in the air the toes are pulled up (a pointed toe hung 5 cm into the timber's top)
+        'foot.R': [(0.0, (0, -14, 0)), (.53, (0, -14, 0)), (.70, (-18, 0, 0)), (.86, (-8, 0, 0)), (.96, (0, -14, 0))],
+        'foot.L': [(0.0, (0, 8, 0)), (.49, (0, 8, 0)), (.70, (-18, 0, 0)), (.86, (-8, 0, 0)), (1.00, (0, 8, 0))],
+    }, lag={'head': .05})
+    tuck = lambda t: Window(t, .50, .62, .86, .96)
+    carry = lambda t: Window(t, .12, .30, 1.02, 1.30)      # 1 = the rifle up in the left fist alone
+    low = LowReady(T)
+    lifted = Unit((.08, -.20, .98))
+    fist = Vector((SX + .08, -.04, P + .24))
+    high = T.Rifle(tuple(fist - Vector(lifted) * T.R(WEAPONS[T.gun]['gripL'])), lifted)   # the left fist on the handguard
+    hand = RootPoint(T, mid + .04, -.03, VAULT_TOP + .015)  # right palm on the top, just behind his right hip
+    palmF, palmN, _ = TimberPalm((0, -1, 0))
+    wood = lambda t: Window(t, .26, .40, .60, .72)          # pushes off as the hips go over the top
+    gun = lambda t: 1 - Window(t, .18, .30, 1.10, 1.30)
+
+    def RifleAt(t):
+        pel, psi = Pel(t), turn(t)
+        return BodyRifle(T, pel, psi, BlendRifle(T, low, high, carry(t)), pel[2] - stand)
+
+    def Pose(t):
+        f = body(t)
+        pel, psi = Pel(t), turn(t)
+        f['pelvis'] = pel
+        f['ankle.L'], f['ankle.R'] = ankles['L'](t), ankles['R'](t)
+        PlantedFeet(f, t, turn, plantWin)
+        poles = VaultPoles(T, pel, psi, tuck(t))
+        f['legPole.L'], f['legPole.R'] = poles['L'], poles['R']
+        f['look'] = RootPoint(T, *VAULT_IN_EYE)
+        rifle = RifleAt(t)
+        palms = T.Palms(rifle['axis'])
+        f['grip.L'] = rifle['gripL']
+        f['palmF.L'], f['palmN.L'], f['curl.L'] = palms['L'][0], palms['L'][1], .9
+        f['armPole.L'] = BodyPoint(pel, psi, SX + .45, .25, P + .10)
+        f['handRel.L'] = None
+        w, g = wood(t), gun(t)
+        if w > 0:
+            f['grip.R'], f['gripW.R'] = hand, w
+            f['palmF.R'], f['palmN.R'], f['curl.R'] = palmF, palmN, .55
+            f['armPole.R'] = BodyPoint(pel, psi, -(SX + .45), .35, P + .05)
+        elif g > 0:
+            f['grip.R'], f['gripW.R'] = rifle['gripR'], g
+            f['palmF.R'], f['palmN.R'], f['curl.R'] = palms['R'][0], palms['R'][1], .95
+            f['armPole.R'] = BodyPoint(pel, psi, -(SX + .45), .20, P + .10)
+        return T.Nest(Turned(f, psi))
+
+    def Check(t):
+        rifle = RifleAt(t)
+        return {'L': rifle['gripL'], 'R': hand if wood(t) >= .999 else rifle['gripR'] if gun(t) >= .999 else None}
+    timber = [('box', RootPoint(T, mid, 0.0, VAULT_TOP - .14), (T.R(2.0), T.R(far - near), T.R(.28)), 0)]
+    spec = {'pose': Pose, 'check': Check, 'plants': plants, 'props': lambda t: {'weapon': T.Track(RifleAt(t))},
+            'groundWeight': lambda t: 1 - Window(t, .50, .55, .92, .97),
+            'reviewProps': lambda t: T.RifleProps(RifleAt(t)) + timber,
+            'reviewFrames': lambda n: [0, int(n * .2), int(n * .28), int(n * .36), int(n * .41), int(n * .46), int(n * .52), int(n * .75), n - 1]}
+    spec = AReview(spec)
+    spec['reviewViews'] = [('side', (-3.4, -.9, 1.1), (0, -.6, .75)), ('q', (-2.2, 1.4, 1.9), (0, -.6, .7)),
+                           ('front', (0, -3.6, 1.0), (0, -.6, .75))]
+    return spec
+
+
+@Builder('IjaVaultTimberOut')
+def BuildVaultTimberOut(T, name):
+    H, P, A, SX = T.H, T.P, T.A, T.SX
+    stand = P - .035
+    R = T.R
+    Q = lambda d, l: RootPoint(T, d, l)
+    kick = KickBeamParts(T)
+    k0 = kick['body'](KICK_T)
+    near, far, lane = VAULT_OUT_NEAR, VAULT_OUT_FAR, VAULT_OUT_LANE
+    mid = (near + far) / 2
+    endD, endL, endPsi = VAULT_OUT_END
+    last = PlacedPose(HaulStart(T), Q(endD, endL), endPsi)
+    S = math.pi / 2                                    # side-on to the timber the other way: facing south, turned left
+    turn = Channel([(0.0, 0.0), (.14, 0.0), (.50, S * .75), (.72, S), (1.40, S), (1.60, S * .35), (1.80, endPsi), (VOUT_T, endPsi)])
+    p0, pe = k0['pelvis'], last['pelvis']
+    toSrc = lambda d, l, dz: (Q(d, l)[0], Q(d, l)[1], stand + R(dz))
+    # against (not in) the timber's west face (d -.144), then 0.25 m over its top in the hop
+    pelKeys = [(0.0, p0), (.12, p0), (.46, toSrc(.02, .30, -.03)), (.72, toSrc(.03, lane - .06, -.05)), (.86, toSrc(.03, lane - .06, -.12)),
+               (.96, toSrc(-.04, lane - .05, -.04)), (1.02, toSrc(-.12, lane - .05, .14)), (1.08, toSrc(-.22, lane - .05, .25)),
+               (1.16, toSrc(-.34, lane - .05, .28)), (1.24, toSrc(-.47, lane - .05, .24)), (1.32, toSrc(-.60, lane - .06, .06)),
+               (1.40, toSrc(-.68, lane - .07, -.10)), (1.56, toSrc(-.68, lane - .12, -.05)), (1.80, pe), (VOUT_T, pe)]
+    pelCh = Channel(pelKeys)
+    G = lambda d, l: (Q(d, l)[0], Q(d, l)[1], A)
+    U = lambda d, l, h: (Q(d, l)[0], Q(d, l)[1], R(h))
+    kl, kr = k0['ankle.L'], k0['ankle.R']
+    # side-on facing south the LEFT foot is the timber (east) side; drawn up under the hips over the top
+    footL = [(0.0, kl, True), (.30, kl, True), (.52, G(-.02, .42), True), (.60, G(-.02, .42), True), (.76, G(-.06, lane - .02), True),
+             (.98, G(-.06, lane - .02), True), (1.04, U(-.09, lane + .06, .64), False), (1.08, U(-.17, lane + .10, .92), False),
+             (1.14, U(-.30, lane + .12, .98), False),
+             (1.22, U(-.46, lane + .11, .96), False), (1.30, U(-.62, lane + .08, .60), False), (1.36, G(-.76, lane + .02), True),
+             (1.50, G(-.76, lane + .02), True), (1.74, last['ankle.L'], True), (VOUT_T, last['ankle.L'], True)]
+    footR = [(0.0, kr, True), (.14, kr, True), (.36, G(.08, .18), True), (.56, G(.08, .18), True), (.72, G(.07, lane - .12), True),
+             (.96, G(.07, lane - .12), True), (1.06, U(-.04, lane + .08, .70), False), (1.14, U(-.18, lane + .10, .97), False),
+             (1.22, U(-.36, lane + .10, .97), False), (1.30, U(-.52, lane + .07, .70), False), (1.40, G(-.62, lane + .08), True),
+             (1.60, G(-.62, lane + .08), True), (1.84, last['ankle.R'], True), (VOUT_T, last['ankle.R'], True)]
+    ankles = {'L': Channel(Swing(footL)), 'R': Channel(Swing(footR))}
+    plantWin = {'L': VaultFeetPlants(footL), 'R': VaultFeetPlants(footR)}
+    plants = [(s, a, b) for s in LR for a, b in plantWin[s]]
+
+    def Key(name, rows):
+        return [(0.0, k0[name])] + rows + [(VOUT_T, last[name])]
+    body = Tracks(k0, {
+        'bend': Key('bend', [(.14, k0['bend']), (.50, .22), (.80, .30), (.90, .42), (1.10, .45), (1.30, .40), (1.42, .45), (1.70, .22)]),
+        'lean': Key('lean', [(.80, 0.0), (.92, .12), (1.06, .55), (1.18, .85), (1.30, .55), (1.42, .10), (1.62, 0.0)]),
+        'pelvisTilt': Key('pelvisTilt', [(.14, k0['pelvisTilt']), (.50, (.08, 0, 0)), (.90, (.26, .05, 0)), (1.14, (.16, .30, 0)),
+                                         (1.30, (.14, .15, 0)), (1.42, (.30, 0, 0)), (1.70, (.08, 0, 0))]),
+        'twist': Key('twist', [(.30, 0.0), (.92, -.10), (1.14, -.20), (1.40, -.06), (1.66, 0.0)]),
+        'head': Key('head', [(.14, k0['head']), (.50, (.10, 0, 0)), (.90, (.30, 0, .15)), (1.14, (.10, 0, .20)), (1.42, (.10, 0, 0))]),
+        'shrug': [(0.0, 0.0), (.90, .10), (1.14, .18), (1.42, .04), (1.70, 0.0), (VOUT_T, 0.0)],
+        'lookW': [(0.0, 0.0), (1.40, 0.0), (1.80, 1.0), (VOUT_T, 1.0)],
+        'foot.L': [(0.0, k0.get('foot.L') or (0, 8, 0)), (.98, (0, 8, 0)), (1.14, (-18, 0, 0)), (1.30, (-8, 0, 0)), (1.36, (0, 8, 0)),
+                   (VOUT_T, last['foot.L'])],
+        'foot.R': [(0.0, k0['foot.R']), (.20, (0, -14, 0)), (.96, (0, -14, 0)), (1.14, (-18, 0, 0)), (1.30, (-8, 0, 0)), (1.40, (0, -14, 0)),
+                   (VOUT_T, last['foot.R'])],
+    }, lag={'head': .05})
+    tuck = lambda t: Window(t, .98, 1.08, 1.28, 1.38)
+    # one hand, as over the way in: the left palm (his timber side) on the far half, just behind his left hip
+    hands = {'L': RootPoint(T, -(mid + .06), lane - .12, VAULT_TOP + .015)}
+    palmF, palmN, _ = TimberPalm((0, 1, 0))           # fingers across the top toward its far (east) side
+    woods = {'L': lambda t: Window(t, .80, .92, 1.08, 1.18), 'R': lambda t: 0.0}
+    wood = woods['L']
+    kickPoles = kick['poles']
+    hang = lambda t: .55 * Window(t, .80, 1.00, 1.30, 1.50)
+
+    def Pose(t):
+        f = body(t)
+        pel, psi = pelCh(t), turn(t)
+        f['pelvis'] = pel
+        f['ankle.L'], f['ankle.R'] = ankles['L'](t), ankles['R'](t)
+        PlantedFeet(f, t, turn, plantWin)
+        stood = Ramp(t, .12, .46)
+        poles = VaultPoles(T, pel, psi, tuck(t))
+        for s in LR:
+            # from IjaKickBeam's knee poles to the vault's, and onto HaulStart's (placed) at the hand-over
+            f['legPole.' + s] = Lerp3(Lerp3(kickPoles[s], poles[s], stood), last['legPole.' + s], Ramp(t, 1.62, 1.84))
+        f['look'] = kick['eye'] if t < .60 else last['look']
+        f['lookW'] = f['lookW'] if t >= .60 else 0.0
+        for s in LR:
+            w = woods[s](t)
+            f['handRel.' + s] = HaulStart(T)['handRel.' + s]
+            if w > 0:
+                f['grip.' + s], f['gripW.' + s] = hands[s], w
+                f['palmF.' + s], f['palmN.' + s], f['curl.' + s] = palmF, palmN, .55
+                f['armPole.' + s] = BodyPoint(pel, psi, (SX + .45) * (1 if s == 'L' else -1), .30, P + .05)
+        if t < .46:
+            # frame 0 = IjaKickBeam's last frame: the fist in the collar, let go over 0.45 s (the reach assist that
+            # pulled his hips 0.15 m toward it fades with the grip: a quick release made the hips jump 0.21 m in a frame)
+            hold = kick['hold']
+            gw = 1.0 - Ramp(t, 0.0, .45)
+            f['handRel.L'] = k0['handRel.L']
+            if gw > 0:
+                palmF0, palmN0, _ = Grab((0, .6, .8), (0, 0, -1))
+                f['grip.L'], f['gripW.L'] = tuple(hold), gw
+                f['palmF.L'], f['palmN.L'], f['curl.L'] = palmF0, palmN0, 1.1
+        return T.Nest(Turned(f, psi))
+
+    def Check(t):
+        out = {s: hands[s] for s in hands if woods[s](t) >= .999}
+        if t <= 0:
+            out['L'] = kick['hold']
+        return out
+    props, review = SlungHangProps(T, hang)
+    timber = [('box', RootPoint(T, -mid, lane, VAULT_TOP - .14), (T.R(2.0), T.R(far - near), T.R(.28)), 0)]
+    # IjaKickBeam's reach assist, for frame 0 to be its last frame, only while the fist leaves the collar: on the
+    # palms on the timber it pulled the hips toward them and let go with them (0.23 m in a frame at 1.17 s)
+    # ... and a short one (the default's) on the palm on the timber
+    on = lambda t: KICK_REACH['fraction'] if t < .46 else REACH_ASSIST_DEFAULT if .80 <= t <= 1.20 else 5.0
+    reach = dict(KICK_REACH, fraction=on, fractionBySide={'L': on, 'R': lambda t: 5.0},
+                 travel=lambda t: KICK_REACH['travel'] if t < .46 else .08)
+    spec = {'pose': Pose, 'check': Check, 'plants': plants, 'props': props, 'reach': reach,
+            'groundWeight': lambda t: 1 - Window(t, .96, 1.01, 1.34, 1.39),
+            'player': lambda t: {'collar': kick['hold']},
+            'reviewProps': lambda t: review(t) + timber + PlayerGhost(T, kick['hold']),
+            'reviewFrames': lambda n: [0, int(n * .2), int(n * .38), int(n * .5), int(n * .54), int(n * .58), int(n * .62), int(n * .72), n - 1]}
+    spec = AReview(spec)
+    spec['reviewViews'] = [('side', (3.4, .6, 1.2), (0, .5, .75)), ('q', (-2.4, 2.8, 2.0), (0, .5, .7)),
+                           ('back', (-.6, -3.2, 1.1), (0, .4, .75))]
+    return spec
+
+
+def HaulPaths():
+    """Shunzi's left wrist and eye in IjaHaulForearmUnder's root (runtime d, l, h): the wrist waits out past the
+    timber's east face, is yanked 0.22 m and lifted (his arm pulled up by the fist), then hauled back a pull per step;
+    the eye trails 0.45 m behind it (the arm straight), the head hanging, bumping over the mud."""
+    yank = .22
+    steps = 7
+    t0, t1 = .75, 2.50
+    per = (HAUL_TRAVEL - yank) / steps
+
+    def Travel(t):
+        if t <= .50:
+            return 0.0
+        if t <= t0:
+            return yank * Smooth((t - .50) / (t0 - .50))
+        if t >= t1:
+            return HAUL_TRAVEL
+        u = (t - t0) / (t1 - t0) * steps
+        k = min(steps - 1, int(u))
+        return yank + per * (k + Smooth(u - k))       # a pull per step: the body lurches, then rests
+    wx, wl, wh = HAUL_WRIST
+    ex, el, eh = HAUL_EYE
+
+    def Wrist(t):
+        return (wx - Travel(t), wl, wh + .26 * Window(t, .50, .80, 2.54, 2.72))
+
+    def Eye(t):
+        u = (t - t0) / (t1 - t0) * steps
+        bob = .025 * math.sin(math.pi * (u % 1.0)) if t0 < t < t1 else 0.0
+        return (ex - Travel(t), el, eh - .03 * Window(t, .50, .80, 2.40, 2.70) + bob)
+    return Travel, Wrist, Eye
+
+
+@Builder('IjaHaulForearmUnder')
+def BuildHaulForearmUnder(T, name):
+    H, P, A, SX = T.H, T.P, T.A, T.SX
+    stand = P - .035
+    R = T.R
+    Q = lambda d, l: RootPoint(T, d, l)
+    start = HaulStart(T)
+    Travel, Wrist, Eye = HaulPaths()
+    W = lambda t: RootPoint(T, *Wrist(t))
+    E = lambda t: RootPoint(T, *Eye(t))
+    s0 = start['pelvis']
+    G = lambda d, l: (Q(d, l)[0], Q(d, l)[1], A)
+    # the pelvis ground point rides `off` behind the wrist: down on the right knee 0.45 m back for the grab (the chest
+    # low, the arm straight down to the wrist), then 0.40 m behind it for the haul (the arm bent, the fist at his knee)
+    off = Channel([(0.0, -HAUL_STAND_BACK), (.30, -.45), (.50, -.45), (.75, -.40), (HAUL_T, -.40)])
+    PelD = lambda t: HAUL_WRIST[0] - Travel(t) + off(t)
+    low = Channel([(0.0, 0.0), (.14, -.16), (.30, -.34), (.50, -.34), (.66, -.26), (.80, -.23), (2.50, -.23), (2.64, -.12), (HAUL_T, -.08)])
+    steps, t0, t1 = 7, .75, 2.50
+
+    def Pel(t):
+        u = (t - t0) / (t1 - t0) * steps
+        bob = -.012 * math.sin(math.pi * (u % 1.0)) if t0 < t < t1 else 0.0
+        return (s0[0], s0[1] + R(-(PelD(t) - PelD(0.0))), stand + R(low(t) + bob))
+    # the right foot back and its knee down for the grab (the shin on the ground, toes tucked), the left foot forward;
+    # off the knee on the yank, then seven backward steps, alternating
+    footL = [(0.0, start['ankle.L'], True), (.08, start['ankle.L'], True), (.26, G(-.18, .14), True)]
+    kneel = (Q(-.86, -.12)[0], Q(-.86, -.12)[1], R(.10))
+    footR = [(0.0, start['ankle.R'], True), (.06, start['ankle.R'], True), (.28, kneel, True), (.52, kneel, True),
+             (.70, G(-.84, -.12), True)]
+    at = {'L': (-.18, .14), 'R': (-.84, -.12)}
+    rows = {'L': list(footL), 'R': list(footR)}
+    for i in range(steps):
+        side = 'L' if i % 2 == 0 else 'R'
+        ta = t0 + .25 * i
+        tb = ta + .23
+        rows[side].append((ta, G(*at[side]), True))
+        d1 = PelD(min(t1, tb + .02)) + (.14 if side == 'L' else -.12)     # PelD is from the root, as G is
+        at[side] = (d1, at[side][1])
+        rows[side].append((tb, G(*at[side]), True))
+    for side in LR:
+        rows[side].append((HAUL_T, G(*at[side]), True))
+    ankles = {s: Channel(Swing(rows[s], lift=.06)) for s in LR}
+    plants = [(s, a, b) for s in LR for a, b in VaultFeetPlants(rows[s])]
+    body = Tracks(start, {
+        'bend': [(0.0, start['bend']), (.30, 1.20), (.50, 1.20), (.70, .92), (.85, .85), (2.50, .85), (2.70, .42), (HAUL_T, .35)],
+        'pelvisTilt': [(0.0, start['pelvisTilt']), (.30, (.45, 0, 0)), (.50, (.45, 0, 0)), (.75, (.34, 0, 0)), (2.50, (.34, 0, 0)),
+                       (HAUL_T, (.12, 0, 0))],
+        'twist': [(0.0, 0.0), (.30, .14), (.50, .14), (.80, .06), (2.50, .06), (HAUL_T, 0.0)],
+        'shrug': [(0.0, 0.0), (.30, .16), (2.50, .10), (HAUL_T, 0.0)],
+        'lookW': [(0.0, 1.0), (HAUL_T, 1.0)],
+        'foot.R': [(0.0, start['foot.R']), (.08, start['foot.R']), (.28, (-60, -8, 0)), (.52, (-60, -8, 0)), (.70, (0, -10, 0))],
+        'legPole.R': [(0.0, start['legPole.R']), (.10, start['legPole.R']), (.28, (-(H + .16), -1.3, -.20)), (.52, (-(H + .16), -1.3, -.20)),
+                      (.72, start['legPole.R'])],
+    }, lag={'head': .05})
+    hang = lambda t: .6 * Window(t, .10, .30, 2.50, 2.75)
+
+    def Pose(t):
+        f = body(t)
+        f['pelvis'] = Pel(t)
+        f['ankle.L'], f['ankle.R'] = ankles['L'](t), ankles['R'](t)
+        f['look'] = E(t)
+        f['handRel.L'] = start['handRel.L'] if t < .20 else (.18, -.24, -.30)
+        gw = Window(t, .14, HAUL_GRAB_T, 2.40, 2.54)
+        if gw > 0:
+            palmF, palmN, _ = Grab((0, 0, 1), (0, -1, 0))
+            f['grip.R'], f['gripW.R'] = W(t), gw
+            f['palmF.R'], f['palmN.R'], f['curl.R'] = palmF, palmN, 1.0
+            f['armPole.R'] = BodyPoint(f['pelvis'], 0.0, -(SX + .40), .10, P - .10)
+        return T.Nest(f)
+
+    def Check(t):
+        return {'R': W(t) if HAUL_GRAB_T <= t <= 2.40 else None}
+    props, review = SlungHangProps(T, hang)
+    face = .2167                                                     # the timber's east face ahead of this root (l 0)
+    timber = [('box', RootPoint(T, face + .15, 0.0, VAULT_TOP - .14), (T.R(2.0), T.R(.30), T.R(.28)), 0)]
+    spec = {'pose': Pose, 'check': Check, 'plants': plants, 'props': props,
+            'kneePlants': [('R', .30, .50)],
+            # on the knee the solved kneecap sits a few cm into the mud: grounding it lifted the whole body 6 cm and the
+            # planted left foot with it (7.6 cm of slide, and the fist 5 cm short of the wrist), so the kneel is not grounded
+            'groundWeight': lambda t: 1 - Window(t, .12, .22, .58, .70),
+            'reach': {'fraction': .86, 'sides': 'R', 'travel': .12, 'bend': .30},
+            'player': lambda t: {'forearmL': W(t), 'head': E(t)},
+            'look': E,
+            'reviewProps': lambda t: review(t) + timber + [('point', W(t), None, .03), ('point', E(t), None, .05)],
+            'reviewFrames': lambda n: [0, int(n * .1), int(n * .14), int(n * .2), int(n * .3), int(n * .5), int(n * .75), n - 1]}
+    spec = AReview(spec)
+    spec['reviewViews'] = [('side', (-3.6, .2, 1.1), (0, .4, .6)), ('q', (-2.4, -2.6, 1.9), (0, .3, .6)),
+                           ('front', (0, -3.4, .9), (0, .3, .55))]
     return spec
 
 

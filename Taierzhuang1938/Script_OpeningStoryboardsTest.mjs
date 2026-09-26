@@ -308,6 +308,70 @@ const SB0925=["IjaButtStrikeCollar","IjaDragByForearm","IjaLookBackLow","IjaStar
     chains++;
   }
 }
+// ---- 2026-09-27 (review 「日军从外面走进来怎么能直接进的，至少有个翻越动作吧。拖动的动作也还是很奇怪」): ijaA vaults the
+// fallen roof timber into the pit and back out, and hauls Shunzi out from under it by the wrist. The clips are authored
+// against the timber (Data_OpeningSet0103 roofTimberDown) at the director's roots; no foot, toe or hip ever goes into it,
+// and the haul lands the eye on the butt spot (docs/Data_OpeningVaultHaul20260927.md). ----------------------------------
+{
+  const {PROPS:SetProps}=await import("./Data_OpeningSet0103.mjs");
+  const reportOf=id=>manifest.models.find(m=>m.id==="TengxianIja02").clips.find(c=>c.clip===id);
+  const D=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z),R=(y,x,z)=>({x:x*Math.cos(y)+z*Math.sin(y),z:-x*Math.sin(y)+z*Math.cos(y)});
+  const At=(pose,part,i)=>({x:pose.player.parts[part][i*3],y:pose.player.parts[part][i*3+1],z:pose.player.parts[part][i*3+2]});
+  const timber=SetProps.find(p=>p.id==="roofTimberDown"),east=timber.a.x+timber.w/2,west=timber.a.x-timber.w/2;
+  // the snag root as the director derives it (Script_OpeningStoryboards SnagRoot)
+  const T0=C.shunzi.trap,collar={x:T0.x+Math.sin(T0.yaw)*C.shunzi.lieCollarBackM,z:T0.z+Math.cos(T0.yaw)*C.shunzi.lieCollarBackM};
+  const c0=At(ijaA.clips.IjaCollarDragSnag,"collar",0),o0=R(Math.PI/2,c0.x,c0.z),snagRoot={x:collar.x-o0.x,z:collar.z-o0.z,yaw:Math.PI/2};
+  const vin=manifest.clips.IjaVaultTimberIn,vout=manifest.clips.IjaVaultTimberOut,haul=manifest.clips.IjaHaulForearmUnder,V=C.ija.vaultIn;
+  assert.ok(Math.abs(V.yaw-Math.PI/2)<1e-6&&Math.abs(snagRoot.yaw-Math.PI/2)<1e-6,"both vaults are authored on roots facing west, across the timber");
+  assert.ok(Math.abs(V.x-east-vin.obstacle.nearM)<.01&&Math.abs(V.x-west-vin.obstacle.farM)<.01,"IjaVaultTimberIn's timber faces are the Set's, ahead of ija.vaultIn");
+  assert.ok(Math.abs(west-snagRoot.x-vout.obstacle.nearM)<.01&&Math.abs(east-snagRoot.x-vout.obstacle.farM)<.01,"IjaVaultTimberOut's timber faces are the Set's, behind the snag root");
+  assert.ok(V.z>Math.min(timber.a.z,timber.b.z)&&V.z<timber.supports.reduce((z,s)=>Math.max(z,s.z),-Infinity)-timber.supports[0].d/2,"the vault lane crosses between the timber's supports");
+  // where the vault in ends (its root motion) is the snag root, the reach assist's few cm aside
+  const vinEnd=reportOf("IjaVaultTimberIn").root.end,ve=R(V.yaw,vinEnd[0],vinEnd[1]);
+  assert.ok(D({x:V.x+ve.x,z:V.z+ve.z},snagRoot)<.12,`IjaVaultTimberIn ends on the snag root (${(V.x+ve.x).toFixed(2)},${(V.z+ve.z).toFixed(2)})`);
+  // no foot, toe or hip inside the timber (ahead of the vault in's root, behind the vault out's), over or under it
+  for(const [id,sign] of [["IjaVaultTimberIn",1],["IjaVaultTimberOut",-1]]){
+    const clip=ijaA.clips[id],spec=manifest.clips[id],top=spec.obstacle.topM,bottom=top-timber.h,report=reportOf(id);
+    const bone=name=>ijaA.bones.findIndex(n=>n.endsWith(name)),pelvis=bone(" Pelvis");
+    const k=report.root.start[3]/WorldPose("TengxianIja02",ijaA,id,0)[pelvis].p[1];   // glTF scene -> runtime metres
+    const inside=[];
+    for(let f=0;f<clip.frameCount;f++){
+      const t=f*clip.duration/(clip.frameCount-1),w=WorldPose("TengxianIja02",ijaA,id,t);
+      for(const [name,margin] of [[" Pelvis",.10],[" L Foot",.05],[" R Foot",.05],[" L Toe0",.02],[" R Toe0",.02]]){
+        const p=w[bone(name)].p,d=p[2]*k*sign,h=p[1]*k;   // the rig's glTF forward is +z
+        if(d>=spec.obstacle.nearM&&d<=spec.obstacle.farM&&h>bottom-margin&&h<top+margin)inside.push(`${name.trim()}@${t.toFixed(2)} ${h.toFixed(2)} m`);
+      }
+    }
+    assert.deepEqual(inside,[],`${id}: over or under the timber, never in it`);
+  }
+  // frame 0 of the vault out is the kick's last frame (same root, the fist still in the collar)
+  {
+    const {angle,offset}=HandOver(ijaA,"IjaKickBeam",-1,"IjaVaultTimberOut",0);
+    assert.ok(angle<2&&offset<.01&&PropJump(ijaA,"IjaKickBeam",-1,"IjaVaultTimberOut",0)<=.02,`IjaKickBeam hands over to IjaVaultTimberOut (${angle.toFixed(2)} deg)`);
+  }
+  // the haul: its root faces back along ija.dragOutRoute from where the frame-0 head track lands on its first point;
+  // the eye ends on the butt spot, passes under the timber clear of it, and the vault out ends where the haul starts
+  const route=C.ija.dragOutRoute,eye=route[0],yaw=Math.atan2(route.at(-1).x-eye.x,route.at(-1).z-eye.z);
+  const hp=ijaA.clips.IjaHaulForearmUnder.player,n=hp.parts.head.length/3,h0=At({player:hp},"head",0);
+  const o=R(yaw,h0.x,h0.z),root={x:eye.x-o.x,z:eye.z-o.z},he=At({player:hp},"head",n-1),end={x:root.x+R(yaw,he.x,he.z).x,z:root.z+R(yaw,he.x,he.z).z};
+  assert.ok(D(route.at(-1),C.shunzi.butt)<1e-6&&D(end,C.shunzi.butt)<.05,`the haul brings the eye to the butt spot (${end.x.toFixed(2)},${end.z.toFixed(2)})`);
+  for(let i=0;i<n;i++){
+    const p=At({player:hp},"head",i),q=R(yaw,p.x,p.z),x=root.x+q.x;
+    if(x>west-.05&&x<east+.05)assert.ok(p.y<=vin.obstacle.topM-timber.h-.15,`the eye goes under the timber, clear of it (${p.y.toFixed(2)} m at x ${x.toFixed(2)})`);
+  }
+  const haulTravel=Math.hypot(...[0,1].map(i=>reportOf("IjaHaulForearmUnder").root.end[i]-reportOf("IjaHaulForearmUnder").root.start[i]));
+  assert.ok(haulTravel>=1.6&&haulTravel<=2.4&&reportOf("IjaHaulForearmUnder").root.end[1]>reportOf("IjaHaulForearmUnder").root.start[1],`IjaHaulForearmUnder hauls ${haulTravel.toFixed(2)} m backwards`);
+  const grab=haul.contacts.find(c=>c.action==="grab");
+  assert.ok(grab&&grab.part==="forearmL"&&grab.partnerRole==="shunzi"&&grab.limb==="handR","IjaHaulForearmUnder grabs Shunzi's left forearm with the right hand");
+  const parts=id=>Object.keys(ijaA.clips[id].player?.parts||{}).sort().join(",");
+  assert.equal(parts("IjaHaulForearmUnder"),"forearmL,head");assert.equal(parts("IjaVaultTimberOut"),"collar");
+  const vs=reportOf("IjaVaultTimberOut").root.end,vw=R(snagRoot.yaw,vs[0],vs[1]),hs=reportOf("IjaHaulForearmUnder").root.start,hw=R(yaw,hs[0],hs[1]);
+  assert.ok(D({x:snagRoot.x+vw.x,z:snagRoot.z+vw.z},{x:root.x+hw.x,z:root.z+hw.z})<.03&&Math.abs((snagRoot.yaw+vs[2]*Math.PI/180)-yaw)<.03,
+    "IjaVaultTimberOut's last frame stands where IjaHaulForearmUnder's first does (the director re-roots with the skeleton kept)");
+  // the first-person left hand takes his forearm when he grabs the wrist
+  const gripKey=C.firstPerson.hands.beats.DragOut.keys.find(k=>k[1]==="gripHaul");
+  assert.ok(gripKey&&Math.abs(gripKey[0]-(vout.duration+grab.t))<.05,`beats.DragOut takes his forearm at the grab (${gripKey?.[0]} s)`);
+}
 // ---- 2026-09-25 storyboard clips on the NRA rigs (§4.1: SB01 runner/Yaowa, SB04A interpreter, SB06 Luo) ----------
 {
   const SB0925_NRA={LuoKneelReach:"TengxianNra05",RunnerLeanPostCall:"TengxianNra02",InterpreterHurryReach:"TengxianNra02",YaowaSitLoad:"TengxianNra02"};

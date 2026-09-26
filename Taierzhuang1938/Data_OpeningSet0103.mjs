@@ -421,8 +421,10 @@ export const FRONT_PROPS = Object.freeze([
  * Data_OpeningStoryboards 里被豁免的标记路径（`shunzi.trap` 这种写法）及原因。
  */
 export const DESIGNED_CONTACTS = Object.freeze({
-  fallenLintel: Object.freeze({ marks: Object.freeze(["shunzi.trap", "SB02.trap", "SB03.eye", "SB03A.eye"]), why: "塌下的门楣就落在受困的顺子身边（SB02/SB03A）" }),
-  roofTimberDown: Object.freeze({ marks: Object.freeze(["shunzi.trap", "SB02.trap", "SB03.eye", "SB03A.eye"]), why: "SB03A：顺子压在塌顶木下伸手够枪" }),
+  fallenLintel: Object.freeze({ marks: Object.freeze(["shunzi.trap", "SB02.trap", "SB03.eye", "SB03A.eye", "ija.dragOutRoute"]),
+    why: "塌下的门楣就落在受困的顺子身边（SB02/SB03A）；DragOut 顺子趴着从塌顶木和门楣底下被拖出来（ija.dragOutRoute 是他眼睛那条线，离地 0.3 m，不是站立胶囊）" }),
+  roofTimberDown: Object.freeze({ marks: Object.freeze(["shunzi.trap", "SB02.trap", "SB03.eye", "SB03A.eye", "ija.dragOutRoute"]),
+    why: "SB03A：顺子压在塌顶木下伸手够枪；DragOut 从它底下被拖出来（日兵甲翻越它的两条动作见 Script_OpeningStoryboardsTest 的不穿木断言）" }),
   rubbleMoundBack: Object.freeze({ marks: Object.freeze(["shunzi.cover", "SB06.seat", "SB06.dragCoverSet", "withdraw.playerSet"]),
     why: "SB06：顺子坐着背靠塌土（拖进遮挡的终点、撤出的起点都是坐位）" }),
   bunkerCrateStackN: Object.freeze({ marks: Object.freeze(["SB01.yaowa"]), why: "SB01：幺娃靠着北壁坐，身后就是弹药箱" }),
