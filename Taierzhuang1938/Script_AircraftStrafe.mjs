@@ -698,7 +698,7 @@ export class AircraftStrafeDirector {
     if (this.stats.impacts % 3 === 0) this.Sfx("dirt", { position: { x, y, z }, volume: 0.7 });
   }
 
-  /** 从机腹拉一条曳光到弹着点。日方是冷白（Script_Vfx 的 kind:"ija"）。 */
+  /** 从机腹拉一条曳光到弹着点。日方是橙黄（Script_Vfx 的 kind:"ija"）。 */
   EmitTracer() {
     const run = this.run;
     const a = run.air;

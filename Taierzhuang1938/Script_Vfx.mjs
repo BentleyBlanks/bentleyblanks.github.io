@@ -88,10 +88,10 @@ export const VFX_PALETTE = {
   muzzleCore: LinearOf(0xFFF0CC, 8.0),
   muzzleEdge: LinearOf(0xFF9A3A, 3.2),
   tracerNra: LinearOf(0xFFE3B0, 5.5),    // 中方：偏暖白
-  tracerIja: LinearOf(0xCFE6FF, 5.0),    // 日方：偏冷白/淡青
+  tracerIja: LinearOf(0xFFB028, 5.0),    // 日方：橙黄 —— 比中方的暖白更饱和、更偏橙，靠饱和度分敌我
   // 光束的余辉：比弹头暗一档、色相更饱和，弹头掠过之后留下的那条线（TracerBeam）
   tracerTrailNra: LinearOf(0xFFB45E, 3.2),
-  tracerTrailIja: LinearOf(0x9CC4FF, 3.2),
+  tracerTrailIja: LinearOf(0xFF8A12, 2.8),
   sparkHot: LinearOf(0xFFE2B0, 6.5),
   sparkCool: LinearOf(0xD05A16, 2.0),
   // 砖墙/铁件上的弹着火星（_HardSurfaceSparks）：比铁板那档更偏橙，一眼读成「火」
@@ -2018,7 +2018,7 @@ export class VfxSystem {
   }
 
   /**
-   * 曳光/弹道。中方偏暖白、日方偏冷白 —— 这是玩家分辨"谁在朝我打"的唯一线索。
+   * 曳光/弹道。中方偏暖白、日方橙黄 —— 这是玩家分辨"谁在朝我打"的唯一线索。
    * 拉伸长度按速度给：帧间位移约 8 m，streak 短了就变成一串虚线。
    */
   Tracer(from, to, { speed = 480, kind = "nra" } = {}) {
@@ -2048,7 +2048,7 @@ export class VfxSystem {
    * 与 Tracer 的区别：Tracer 是一小段跟着速度跑的亮条，迎面打来会沿视线塌成一个点，
    * 远处又细到不足一个像素。这里是**一整条从枪口到弹着点的线**：弹头按表现速度飞过去，
    * 掠过的那一段留余辉慢慢暗下去；线宽带像素保底，四十米外仍读得出一条线。
-   * 颜色沿用曳光的敌我约定（中方暖、日方冷），参数见 Data_Tuning_BulletVisual。
+   * 颜色沿用曳光的敌我约定（中方暖白、日方橙黄），参数见 Data_Tuning_BulletVisual。
    */
   TracerBeam(from, to, { kind = "ija", speed = VEHICLE_TRACER.speedMps } = {}) {
     TMP_A.copy(to).sub(from);
