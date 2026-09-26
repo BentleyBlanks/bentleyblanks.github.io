@@ -340,7 +340,7 @@ export const FIRST_LEVEL_MISSION_PHASE = Object.freeze({
   date: "一九三八年三月",
   label: "第一关 · 往南的路",
   place: "滕县外围",
-  sky: "testSceneDay",
+  sky: "firstLevelBattleDay",
   ambience: "smokyDay",
   music: null,
   minutes: 32,

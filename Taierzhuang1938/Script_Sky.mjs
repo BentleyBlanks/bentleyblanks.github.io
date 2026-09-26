@@ -62,6 +62,9 @@ uniform float uGlowSpread;
 uniform float uSmoke;        // 战场烟尘的总量
 uniform vec3 uSmokeColor;
 uniform float uSmokeHeight;
+// Scale, low/high density thresholds, and minimum cloud cover. Defaults retain
+// the existing skies; the first-level cloud deck also fills the gaps between billows.
+uniform vec4 uCloudShape;
 uniform float uStars;
 uniform float uTime;
 // 物理天空之上的美术层强度：LUT 里已经有真的前向散射，这一层只补"辉光多亮"。
@@ -160,8 +163,9 @@ vec3 SkyRadiance(vec3 dir, float sunDiskGain) {
     // 实际集中在 0.48 ± 0.08，0.86 这个上限相当于 +4.7σ —— 云项恒等于 0，
     // 白天四张的天全是一块 sRGB 234 的死白。频率提到 5.5 才有云团大小的团块，
     // 阈值窗口收到 0.445—0.615 才真的落在分布里被触发。
-    float cloud = Fbm3(p * 5.5 + vec3(uTime * 0.006, 0.0, uTime * 0.004));
-    cloud = smoothstep(0.445, 0.615, cloud) * smoothstep(-0.02, 0.22, up);
+    float cloud = Fbm3(p * uCloudShape.x + vec3(uTime * 0.006, 0.0, uTime * 0.004));
+    cloud = mix(uCloudShape.w, 1.0, smoothstep(uCloudShape.y, uCloudShape.z, cloud))
+      * smoothstep(-0.02, 0.22, up);
     // 烟被太阳打透的那一侧要亮：这一笔没有的话烟就是一块贴纸
     vec3 lit = mix(uSmokeColor, uSmokeColor * 2.4 + uSunColor * 0.25, pow(max(sunDot, 0.0), 3.0));
     sky = mix(sky, lit, clamp(cloud * uSmoke, 0.0, 0.94));
@@ -248,6 +252,25 @@ export const TEST_SCENE_DAY = {
 
 export const SKY_PRESETS = {
   testSceneDay: TEST_SCENE_DAY,
+  // Notion "游戏概念参考图", 06 / 06_B (2026-09-26): pale cloud cover,
+  // warm gray smoke and a veiled sun. Only the playable first level uses this;
+  // shared model/range daylight and the final night transition stay independent.
+  firstLevelBattleDay: {
+    sunElevation: 52, sunAzimuth: 35,
+    zenith: [0.90, 0.94, 0.98], horizon: [1.30, 1.30, 1.28], ground: [0.30, 0.28, 0.25],
+    sunColor: [1.0, 0.97, 0.91], sunIntensity: 1.2, sunSize: 0.000012, glow: 0.12, glowSpread: 10,
+    smoke: 1.0, smokeColor: [0.62, 0.59, 0.54], smokeHeight: 0.18, stars: 0,
+    cloudShape: [3.2, 0.30, 0.68, 0.35],
+    lightColor: 0xfff2df, lightIntensity: 1.8,
+    envIntensity: 0.70, shProbeIntensity: 0.85, ambientColor: 0xe5e2dc, ambientIntensity: 0.65,
+    fog: { density: 0.0032, falloff: 45, max: 0.72,
+      sky: [0.60, 0.60, 0.59], ground: [0.45, 0.43, 0.40], sunGain: 0.08,
+      desat: 0.16, flatten: 0.03 },
+    exposure: 0.62, godStrength: 0, bloom: 0.04, lensFlare: 0, saturation: 0.94, contrast: 1.02,
+    atmosphere: { mie: 8, rayleigh: 0.30, groundAlbedo: 0.2, sunIrradiance: 12,
+      skyTint: [1.0, 0.92, 0.84], skyFloor: [0.62, 0.62, 0.60],
+      aerialBlend: 0.5, aerialGain: 0.4, artGlow: 0.15 },
+  },
   // Keep saved editor/debug preset names on the same calibration.
   weaponRangeDay: TEST_SCENE_DAY,
   p012WhiteboxDay: TEST_SCENE_DAY,
@@ -763,6 +786,7 @@ export class SkyDome {
       uSmoke: { value: 0.6 },
       uSmokeColor: { value: new THREE.Vector3(0.45, 0.4, 0.36) },
       uSmokeHeight: { value: 0.25 },
+      uCloudShape: { value: new THREE.Vector4(5.5, 0.445, 0.615, 0) },
       uStars: { value: 0 },
       uTime: { value: 0 },
       uArtGlow: { value: 0.35 },
@@ -838,6 +862,7 @@ export class SkyDome {
     U.uSmoke.value = preset.smoke;
     U.uSmokeColor.value.copy(Vec3(preset.smokeColor));
     U.uSmokeHeight.value = preset.smokeHeight;
+    U.uCloudShape.value.fromArray(preset.cloudShape ?? [5.5, 0.445, 0.615, 0]);
     U.uStars.value = preset.stars;
 
     const atmo = MakeAtmospherePreset(preset.atmosphere);

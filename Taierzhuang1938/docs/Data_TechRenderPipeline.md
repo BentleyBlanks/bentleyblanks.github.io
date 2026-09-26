@@ -754,6 +754,16 @@ LUT 参数化沿用 Bruneton & Neyret 2008 / Bruneton 2017 的标准值。
 ——`?skyLegacy=1` 要用它们做 A/B，水面（`Script_Water`）也仍借
 `uZenith/uHorizon/uGround` 当反射底色。
 
+#### 第一关概念图 06 的天气（2026-09-26）
+
+正式第一关《往南的路》日间使用 `firstLevelBattleDay`，依据[游戏概念参考图](https://app.notion.com/p/3e460335331c80799ad5f4faf4f837a9)的 06 主图和补充镜头：灰白云幕、褐灰硝烟、被遮住的太阳和远景烟霾，仍保持日间人物可读。此前误用了无云无雾的 `testSceneDay`。测试场、武器场与旧 P012 夹具继续使用自己的基准；关尾 `NightMarch` 仍切换到 `night`。
+
+`Script_Sky` 的可选 `cloudShape` 四项依次是噪声频率、密度低阈值、高阈值、最小覆盖率；缺省 `[5.5, 0.445, 0.615, 0]` 保留其他预设。沿用同一五倍频噪声与 `SkyRadiance`，因此天穹、PMREM 和 GI 漏空射线读取同一片云，不增加贴图或渲染 pass。第一关另外校准直射、环境补光与远景雾，数值以预设为准。参考图和同机位验收截图只存本地。
+
+阴云预设的 `lensFlare: 0` 经 `Script_Main` 接入原镜头光晕强度，避免厚云后仍出现太阳十字星芒；其他预设缺省为 1。验收实拍高、低画质、打包入口、旧解析天空，以及 `night` → 日间恢复，页面异常与 GL 错误均为 0；ModuleGraph、MotionVectorContract、Atmosphere 与打包构建通过。共享测试场的直射/环境/曝光及四向灰卡检查通过，旧白盒灯光夹具入口统一为 `p012-archive`。
+
+全套并非全绿：quick 通过 72 项后停在旧 `FirstLevelP012FlowTest` 缺 `BlastFeedback` 的测试替身；七关 Boot 的六处日军辨识材质 `count=0`、TestSceneLighting 的角色型号数 `7 !== 10` 仍失败。旧流程、Boot 第一处与角色型号数已在未修改的 `c668bbd8` 上分别复现，未放宽这些断言。Boot 初次受 runner 四分钟超时中止，单独运行完成七关后仅有上述既有材质失败。
+
 ### 2.3 与 GI / IBL 的接线（零改动那一侧）
 
 - **探针体 GI**：`Script_Gi.BuildPasses` 把 `sky.uniforms` 整表拷进 trace 材质，

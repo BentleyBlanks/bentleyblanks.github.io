@@ -123,7 +123,9 @@ try {
   await page.evaluate(() => { for (const actor of window.lightingCast) { window.Taierzhuang.scene.remove(actor.root); actor.Dispose(); } });
   if (process.argv.includes("--scenes")) {
     evidence.scenes = [];
-    for (const query of ["movement=1", "range=1", "explosions=1", "melee=1", "whitebox=p012"]) {
+    // The playable p012 mission has its own weather; the archived whitebox
+    // remains the shared daylight fixture imported in phases above.
+    for (const query of ["movement=1", "range=1", "explosions=1", "melee=1", "whitebox=p012-archive"]) {
       await page.goto(`http://127.0.0.1:${server.address().port}/Taierzhuang1938/?${query}&shot=1&manual=1&quality=medium&scale=small`);
       await page.waitForFunction(() => window.Taierzhuang?.state?.ready, null, { timeout: 180000 });
       const result = await page.evaluate(() => {
