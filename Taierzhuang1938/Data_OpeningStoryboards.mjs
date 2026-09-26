@@ -85,6 +85,12 @@ export const OPENING_STORYBOARDS = Object.freeze({
   blackoutRecovery:Object.freeze({ fadeS:5.2, eyelidS:4.2, closeS:.16 }),
   interpreterClearanceM:.72,
   walkMps:2.3, turnRps:4.5, poseBlendS:.28, cameraBlendS:.65, cameraTurnRps:3.5,
+  // Eye closure at and over which the view is not eased or rate-limited but put on the shot (unseen).
+  cameraShutSnap:.95,
+  // The look up at a man over the lying eye (01 Found to DragOut, LookAtBody): the bearing is his hips', his head's
+  // counting up to headWeight (against the hips' 1) as it comes down into the picture from headInDeg of elevation over
+  // fadeDeg. 2026-09-27: on the head alone a few cm of it right over the eye swung the view 30-60 deg back and forth.
+  bodyLook:Object.freeze({ headWeight:.5, headInDeg:60, fadeDeg:20 }),
   // The eye travels at most this fast (m/s): ijaA's yank at the collar peaks at 8.7 m/s on the 12 fps
   // player track (09-24 probe, 0.145 m in one frame); capped, the drag reads as a pull, not a cut.
   cameraMoveMps:7.5,

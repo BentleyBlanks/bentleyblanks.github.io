@@ -791,6 +791,20 @@ export class FirstLevelBunkerShow {
     const e=this.r.Point(eye,height),elev=Math.atan2(point.y-e.y,Math.hypot(point.x-e.x,point.z-e.z));
     return this.Aim(eye,height,Face(eye,point),Math.min(maxDeg*DEG,Math.max(minDeg*DEG,elev)));
   }
+  /**
+   * LookClamped at `actor`'s head, the bearing taken from his hips with the head counting only as it comes into the
+   * picture's height (bodyLook). Crouched over the lying eye his head is right above it, where a few cm swing its
+   * bearing through tens of degrees (09-27: 30-60 deg shakes over Found's landing and the collar drag; standing up to
+   * vault out his head passed 3 cm over the eye and flipped the bearing 150 deg in two frames). The hips stay 0.3 m and
+   * more off the eye and turn smoothly.
+   */
+  LookAtBody(eye,height,actor,minDeg,maxDeg){
+    const head=this.HeadPoint(actor);if(!head)return null;
+    const pelvis=(!actor.renderLod||actor.renderLod==="detail")&&actor.actor?.characterRig?.bones?.pelvis?.getWorldPosition(new THREE.Vector3());
+    const B=C.bodyLook,e=this.r.Point(eye,height),elev=Math.atan2(head.y-e.y,Math.hypot(head.x-e.x,head.z-e.z));
+    const w=pelvis?B.headWeight*Clamp((B.headInDeg-elev/DEG)/B.fadeDeg):1,hips=pelvis?Face(eye,pelvis):Face(eye,head);
+    return this.Aim(eye,height,hips+Wrap(Face(eye,head)-hips)*w/(1+w),Math.min(maxDeg*DEG,Math.max(minDeg*DEG,elev)));
+  }
   /** A look target from an eye at yaw / pitch (radians, three.js: yaw 0 north, -PI/2 east; pitch + up). */
   Aim(eye,height,yaw,pitch){
     return this.r.Point(eye,height).add(new THREE.Vector3(-Math.sin(yaw)*Math.cos(pitch),Math.sin(pitch),-Math.cos(yaw)*Math.cos(pitch)));
@@ -1265,7 +1279,7 @@ export class FirstLevelBunkerShow {
     else if(this.flags.clearAt!=null)up=1;
     else if(this.flags.vaultAt==null)up=1-Smooth((Distance(actor.openingStoryboardLast||actor.position,C.ija.vaultIn)-V.downFromM)/-V.downOverM);
     else up=Smooth((r.time-this.flags.vaultAt-V.upAtS)/V.upS);
-    const low=this.LookClamped(eye,height,pelvis,-10,V.maxPitchDeg),high=this.LookClamped(eye,height,head,-10,maxDeg);
+    const low=this.LookClamped(eye,height,pelvis,-10,V.maxPitchDeg),high=this.LookAtBody(eye,height,actor,-10,maxDeg);
     return low.lerp(high,Clamp(up));
   }
   /** Shunzi's eye while ijaA vaults out: from where the kick left it, clawing forward to dragOutRoute[0] (crawl.*). */
@@ -2234,8 +2248,7 @@ export class FirstLevelBunkerShow {
         const c0=this.SnagEye0(),snag=ijaA?.openingStoryboardPose?.clip==="IjaCollarDragSnag"?ijaA.openingStoryboardPose.seconds:99,k=1-Smooth(snag/G.settleS);
         eye={x:c.x+f.x*.12+(S.reachEye.x-c0.x)*k,z:c.z+f.z*.12+(S.reachEye.z-c0.z)*k};height=c.h+.08+(S.reachEyeM-c0.h)*k;
       }
-      const h=Head(ijaA);
-      target=h?this.LookClamped(eye,height,h,G.pitchDeg,G.maxPitchDeg):At({x:1.5,z:-125.9},1.3);
+      target=this.LookAtBody(eye,height,ijaA,G.pitchDeg,G.maxPitchDeg)||At({x:1.5,z:-125.9},1.3);
       if(p==="Snag")roll=.05*Math.sin(a*20)*Math.exp(-a*3);
     }
     else if(p==="DragOut"){
@@ -2352,6 +2365,18 @@ export class FirstLevelBunkerShow {
     const drop=t>cut?Smooth((t-cut)/.4):0;
     return {eye:e,height:Math.max(.34,height-(height-.34)*drop),target:hh&&ha?hh.lerp(ha,.5):ha,hold:t<cut+L.duelHoldS};
   }
+  /**
+   * The phase-start ease (`mix` 0..1) from the view the phase began on to this frame's shot, along the way the shot has
+   * turned since: its heading is unwrapped frame to frame. A slerp from the first view takes the shortest arc, which
+   * changes side once the shot has turned past 180 deg from it (09-27, DragOut: ijaA vaulted out round the eye's right,
+   * the shot went 180 deg right and the eye spun 220 deg left).
+   */
+  BlendFromPhaseStart(desired,mix){
+    const from=this.cameraFrom,E=new THREE.Euler().setFromQuaternion(desired,"YXZ");
+    const f=from.euler??=new THREE.Euler().setFromQuaternion(from.quaternion,"YXZ");
+    from.heading=from.heading==null?f.y+Wrap(E.y-f.y):from.heading+Wrap(E.y-from.heading);
+    return new THREE.Quaternion().setFromEuler(new THREE.Euler(f.x+(E.x-f.x)*mix,f.y+(from.heading-f.y)*mix,f.z+Wrap(E.z-f.z)*mix,"YXZ"));
+  }
   ApplyCamera(){
     const r=this.r,p=this.phase,a=this.Age;
     if(!this.CameraActive)return false;
@@ -2368,12 +2393,18 @@ export class FirstLevelBunkerShow {
     if(yaw)cam.quaternion.premultiply(new THREE.Quaternion().setFromAxisAngle(UP,yaw));
     cam.rotateX((shot.pitch||0)+(shot.cinematic?0:head.pitch+(still?0:sense.pitch)));
     cam.rotateZ((shot.roll||0)+(shot.cinematic||still?0:sense.roll));
+    // Behind shut eyes (the blast's black, the butt's knock-out) the view goes straight to the shot: ijaA's turn round to
+    // the haul is to be unseen there (ija.knockOut), but at cameraTurnRps it was still 60 deg from done as they opened (09-27).
+    // The closure is the one this director showed last frame (r.opening's own curve is written over it before this runs).
+    const shut=(this.shownEyeClosure??0)>=C.cameraShutSnap;
+    if(shut)this.cameraFrom=null;
     if(!shot.cinematic&&this.cameraFrom&&a<C.cameraBlendS){
-      const mix=Smooth(a/C.cameraBlendS),desiredQuaternion=cam.quaternion.clone();
+      const mix=Smooth(a/C.cameraBlendS);
       cam.position.lerpVectors(this.cameraFrom.position,cam.position,mix);
-      cam.quaternion.slerpQuaternions(this.cameraFrom.quaternion,desiredQuaternion,mix);
+      cam.quaternion.copy(this.BlendFromPhaseStart(cam.quaternion,mix));
     }
     if(this.presentedAt!==r.time){this.previousViewQuaternion=this.presentedCamera?.quaternion.clone();this.previousViewPosition=this.presentedCamera?.position.clone();this.presentedAt=r.time;}
+    if(shut){this.previousViewPosition=null;this.previousViewQuaternion=null;}
     if(this.previousViewPosition&&this.delta>0){
       const travel=cam.position.distanceTo(this.previousViewPosition),most=C.cameraMoveMps*this.delta;
       if(travel>most)cam.position.lerpVectors(this.previousViewPosition,cam.position,most/travel);
@@ -2403,7 +2434,7 @@ export class FirstLevelBunkerShow {
     const K=C.ija.knockOut,ko=this.strikeAt!=null&&(p==="Butt"||p==="Boots")?r.time-this.strikeAt:null;
     const knocked=ko==null?0:Smooth(ko/K.closeS)*(1-Smooth((ko-K.openAtS)/K.openS));
     const recovery=C.blackoutRecovery;
-    opening.eyeClosure=p==="Blast"?Smooth((a-C.banter.blastShot.eyesCloseS)/recovery.closeS):p==="Black"?1:p==="Wake"?1-Smooth(a/recovery.eyelidS):Math.max(fade,blink,knocked);
+    opening.eyeClosure=this.shownEyeClosure=p==="Blast"?Smooth((a-C.banter.blastShot.eyesCloseS)/recovery.closeS):p==="Black"?1:p==="Wake"?1-Smooth(a/recovery.eyelidS):Math.max(fade,blink,knocked);
     opening.blackout=p==="Black"?1:p==="Wake"?1-Smooth(a/recovery.fadeS):0;
     // Blur / ghosting / imbalance follow one continuous curve (Perceive), no per-phase steps.
     opening.concussion=shot.cinematic?null:sense.amount>1e-3?{amount:sense.amount,focus:sense.focus,pitch:0,roll:0}:null;
@@ -2533,7 +2564,7 @@ export class FirstLevelBunkerShow {
     this.cast={};this.captives=[];this.playerBody=null;this.setup=false;this.phase=null;this.at=this.r.time;this.started=this.r.time;
     this.scenes={};this.flags={};this.events=[];this.beats.clear();this.pursuit=null;this.pursuitSpawned=false;this.pursuitMissing=0;this.withdraw=null;
     this.firstPerson=null;this.firstPersonState=null;this.presentedAt=null;this.previousViewQuaternion=null;this.previousViewPosition=null;
-    this.strikeAt=null;this.bloodMask=0;this.cameraFrom=null;this.presentedCamera=null;this.pointActor=null;this.phaseEntered=null;
+    this.strikeAt=null;this.bloodMask=0;this.cameraFrom=null;this.shownEyeClosure=null;this.presentedCamera=null;this.pointActor=null;this.phaseEntered=null;
     this.beam=null;this.leftBeam=null;this.beamState=null;
     this.perception=null;this.perceptionLevel=null;this.headFree=0;this.headLook=null;this.releaseAt=null;this.releaseLevel=null;
     this.meet=null;this.guardRoute=null;this.restRoute=null;this.clawPath=null;this.blastFrom=null;this.seatTurn=0;this.seatTurnAt=null;

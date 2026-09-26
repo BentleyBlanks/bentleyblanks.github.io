@@ -33,6 +33,9 @@ export const SPEAKING_JAW_RADIANS = .06;
 export const SILENT_AFTER_S = .6;
 /** Pelvis travel per 1/60 s frame above which a move is a jump (9 m/s: faster than any run, pelvis sway included). */
 export const STEP_LIMIT_M = .15;
+/** The director's view may turn at most HEADING_WINDOW_MAX_DEG one way within any HEADING_WINDOW_S of open-eyed frames. */
+export const HEADING_WINDOW_S = 4;
+export const HEADING_WINDOW_MAX_DEG = 200;
 /** Contract §2.9: the player takes no damage for this long after the 02 hand-back (s). */
 const HANDBACK_SAFE_S = 3;
 /** How long the withdrawal may hold at the rear corner looking back for the pursuit (s). */
@@ -213,6 +216,12 @@ async function InstallProbe(page) {
           if (now != null && was != null) {
             const d = Math.atan2(Math.sin(now - was), Math.cos(now - was)) * 180 / Math.PI, row = (P.headingSweep ??= {})[s.phase] ??= { sweep: 0, net: 0 };
             row.sweep += Math.abs(d); row.net += d;
+            // The most the eye turns one way within any HEADING_WINDOW_S of open-eyed frames (a spin, whatever phases it
+            // spans; 09-27: DragOut's vault out turned it 220 deg the wrong way, then Butt and Boots went on the same way).
+            const W = P.headingWindow ??= { q: [], sum: 0, maxNet: 0, at: null };
+            W.q.push({ t: r.time, d, phase: s.phase }); W.sum += d;
+            while (r.time - W.q[0].t > C.headingWindowS) W.sum -= W.q.shift().d;
+            if (Math.abs(W.sum) > W.maxNet) { W.maxNet = Math.abs(W.sum); W.at = { from: W.q[0].phase, to: s.phase, time: r.time }; }
           }
         }
         P.camera = cam.position.toArray(); P.cameraRotation = cam.quaternion.toArray();
@@ -258,7 +267,7 @@ async function InstallProbe(page) {
         else if (r.time - row.lastTalk > C.silentAfterS) { row.silentFrames++; if (jaw > row.silentMax) { row.silentMax = jaw; row.silentMaxPhase = s.phase; row.silentMaxTime = r.time; } }
       }
     };
-  }, { interpreterAt:Storyboards.interrogation.interpreterAt,cinematic:Storyboards.interrogation.cinematic, vanguardIds: Storyboards.vanguardIds, silentAfterS: SILENT_AFTER_S, stepLimitM: STEP_LIMIT_M });
+  }, { interpreterAt:Storyboards.interrogation.interpreterAt,cinematic:Storyboards.interrogation.cinematic, vanguardIds: Storyboards.vanguardIds, silentAfterS: SILENT_AFTER_S, stepLimitM: STEP_LIMIT_M, headingWindowS: HEADING_WINDOW_S });
 }
 
 /**
@@ -385,6 +394,10 @@ export async function DriveOpening(ctx){
   const haul=["DragCover","LongShot"].map(p=>probe.headingSweep?.[p]||{sweep:0,net:0}),haulSweep=haul[0].sweep+haul[1].sweep,haulNet=haul[0].net+haul[1].net;
   console.log("HEADING",JSON.stringify(Object.fromEntries(Object.entries(probe.headingSweep||{}).map(([k,v])=>[k,{sweep:+v.sweep.toFixed(1),net:+v.net.toFixed(1)}]))));
   assert.ok(haulSweep>0&&haulSweep<200&&Math.abs(haulNet)<60,`the drag into cover does not turn the eye round (${haulSweep.toFixed(0)}° swept, ${haulNet.toFixed(0)}° net)`);
+  // Nowhere does the eye spin: 443 deg one way in 4 s over DragCover, 232 over DragOut before 09-27.
+  const spin=probe.headingWindow||{maxNet:0};
+  console.log("HEADING_WINDOW",JSON.stringify({maxNet:+spin.maxNet.toFixed(1),at:spin.at}));
+  assert.ok(spin.maxNet<HEADING_WINDOW_MAX_DEG,`the eye never turns ${HEADING_WINDOW_MAX_DEG}° one way within ${HEADING_WINDOW_S} s (${spin.maxNet.toFixed(0)}° from ${spin.at?.from} to ${spin.at?.to})`);
   assert.ok(probe.minShoulderBehind>.08,"both open sleeve roots stay behind the eye");
   assert.ok(probe.maxHandRotationStep<12,`palms never flip in one frame (${probe.maxHandRotationStep}° in ${probe.maxHandRotationPhase})`);
   assert.ok(probe.maxPartnerHandRotationStep<20,`the dragging hand approaches the collar without an orientation jump (${probe.maxPartnerHandRotationStep}° in ${probe.maxPartnerHandRotationPhase})`);
