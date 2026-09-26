@@ -253,6 +253,29 @@ export const SHADOW_COMMON = {
   },
 };
 
+/**
+ * 阴影趟静态投影体合批（`Script_ShadowCasterBatch`，2026-09-27 第一关普查之后）。
+ *
+ * 阴影两级每帧 180–260 个 draw，其中 27–68% 是一动不动的静态网格（白盒块、战壕面、
+ * 地形块、布设）。级联框跟着视线走（转头 1° 就变），按级联框缓存深度只在镜头完全静止时
+ * 命中，所以不做时间上的缓存，而是把这些网格收进 BatchedMesh：每个成员照样用阴影相机
+ * 逐个视锥剔除（三角数不变），整批一次 multi-draw 提交。
+ */
+export const STATIC_CASTER_BATCH = {
+  enabled: true,
+  /** 连续这么多帧矩阵 / 可见性 / 几何 / 材质都没变才收进合批（半秒）。 */
+  settleFrames: 30,
+  /** 成员一变就踢回单独投影；之后至少这么多帧不再收，防止来回搬（四秒）。 */
+  cooldownFrames: 240,
+  /** 多少帧整场景扫一次找新成员。成员自己的变化是逐帧查的，不靠这个。 */
+  rescanFrames: 60,
+  /** 每帧收新成员的时间预算（毫秒）。开关后第一批一两秒内收齐。 */
+  joinBudgetMs: 1.5,
+  /** BatchedMesh 的起始容量；不够时先整理碎片，再按两倍扩。 */
+  minInstanceCapacity: 256,
+  minVertexCapacity: 65536,
+};
+
 /** 画质档名。`SHADOW_PRESETS` 缺档一律退回 high。 */
 export function MakeShadowPreset(quality) {
   const name = SHADOW_PRESETS[quality] ? quality : "high";

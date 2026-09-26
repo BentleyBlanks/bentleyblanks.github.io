@@ -18,7 +18,7 @@ import { CollectBulletNearMisses, ApplyBulletNearMisses } from "./Script_Ballist
 
 import * as THREE from "three";
 import { PrepareWoundVariants } from "./Script_CharacterWounds.mjs";
-import { MaterialLibrary } from "./Script_Materials.mjs";
+import { MaterialLibrary, CloneShadedMaterial } from "./Script_Materials.mjs";
 import {
   MakeMaterialShadingUniforms, ApplyShadingQuality, SyncShadingKnobs,
 } from "./Script_MaterialShading.mjs";
@@ -27,6 +27,7 @@ import { NormalizeGraphicsDetails } from "./Script_EditorSettings.mjs";
 import { LightRig } from "./Script_Light.mjs";
 import { InstallShadowSkip, ShadowSkipCount, SetShadowSkipEnabled } from "./Script_ShadowSkip.mjs";
 import { BonePrune } from "./Script_BonePrune.mjs";
+import { ShadowCasterBatch, InstallShadowCasterBatch } from "./Script_ShadowCasterBatch.mjs";
 import { ProbeVolume, MakeGiUniforms, GI_QUALITY } from "./Script_Gi.mjs";
 import { PostPipeline } from "./Script_Post.mjs";
 import { MakeAoUniforms, SyncAoUniforms } from "./Script_PostGtao.mjs";
@@ -630,6 +631,11 @@ const library = new MaterialLibrary(renderer, {
   destruction: destructionUniforms,
   shading: shadingUniforms,
 });
+// 阴影趟静态投影体合批（Script_ShadowCasterBatch 头注）：一动不动的普通投影网格收进 BatchedMesh，
+// 逐成员照样被阴影相机剔除、整批一次提交。深度材质按补丁克隆（破口裁切那只要带着同一份 uniform）。
+// 包装装在 ShadowSkip 外面一层；RenderScene 在场景矩阵更新之后逐帧对账。
+const shadowCasterBatch = new ShadowCasterBatch(scene, { cloneDepthMaterial: CloneShadedMaterial });
+InstallShadowCasterBatch(renderer, shadowCasterBatch);
 // 水面不能走 SSR 靶（它 skipNormalDepth，那一像素在预通道里是河床）——
 // 它自己按平面反射假设采同一条 Hi-Z，见 Script_PostSsr.SsrSurfaceGlsl。
 // 必须排在任何水面材质建出来之前（材质按预设缓存，建完就定型）。
@@ -2094,6 +2100,8 @@ async function Boot() {
     shadowSkip: { Count: ShadowSkipCount, SetEnabled: SetShadowSkipEnabled },
     // 骨头子树遍历剪枝（Script_BonePrune）：同页 A/B 开关、剪掉的根数与节点数
     bonePrune,
+    // 阴影趟静态投影体合批（Script_ShadowCasterBatch）：同页 A/B 开关、成员数与组数
+    shadowCasterBatch,
     // 材质着色升级那一包（POM / 细节法线 / 微阴影 / 地平线 / 皮肤）：
     // Debug Rendering 面板按它设假彩色编号，MaterialUpgradeTest 按它做 A/B。
     materialShading: shadingUniforms, RecompileAllMaterials,
@@ -4701,6 +4709,10 @@ async function WarmLevel(phase) {
     // 01 起的轮番轰炸（Script_FirstLevelAirRaid）与 03 横飞进视野那一帧才现编它们的材质。
     const aircraftProxy = aircraft?.WarmProxy?.() || null;
     if (aircraftProxy) proxy.add(aircraftProxy);
+    // 阴影趟静态投影体合批的批次版深度程序（共用批次深度 + BuildSink 破口裁切那只的克隆）：
+    // 只有真跑阴影趟才编，不预热的话开局半秒收满成员那一帧现编。
+    const casterBatchProxy = shadowCasterBatch.WarmProxy([library.StaticDepth()].filter(Boolean));
+    proxy.add(casterBatchProxy);
     // 人物 GLB 材质的**非蒙皮**变体：背枪 / 担架伤员 / 遗体这类刚体网格复用同一份材质，
     // program 缓存键不同（无 skinning）。实测车厢里第一次出现背枪时一个物理材质 program
     // 链接等了 2.8 s；这里用小盒子把每份材质的刚体变体先逼出来（含投影深度变体）。
@@ -4787,6 +4799,11 @@ async function WarmLevel(phase) {
       try {
         SubmitCompile(scene, "scene");
         report.forcedUnready = await WaitProgramsReady(20000);
+        // 这一帧也要真烘一次太阳阴影：投影深度变体（上面刚体代理的「含投影深度变体」、阴影静态
+        // 合批的批次版深度）只有阴影趟真跑才编，renderer.compile 不碰 customDepthMaterial。
+        // RenderScene 不做级联拟合（那在玩法帧里），不先拟合的话 ScheduleShadowUpdate 一张都不排
+        // —— 2026-09-27 实测预热全程阴影趟一次都没跑，那些变体全留到开局现编。
+        lights.UpdateShadowFrustum(camera.position, camera.getWorldDirection(new THREE.Vector3()));
         RenderScene(0);
       } finally {
         for (const object of culled) object.frustumCulled = true;
@@ -4876,6 +4893,7 @@ async function WarmLevel(phase) {
     } finally {
       scene.remove(proxy);
       if (shellProxy) combat.shellVisuals.DisposeWarmProxy(shellProxy);
+      shadowCasterBatch.DisposeWarmProxy(casterBatchProxy);
     }
   } finally {
     state.warming = wasWarming; state.menu = wasMenu;
@@ -9136,6 +9154,11 @@ function RenderScene(dt) {
   scene.updateMatrixWorld();
   profiler.GpuPop();
   profiler.E("matrix");
+  // 阴影趟静态投影体合批的逐帧对账：读的是刚更新完的 matrixWorld，必须排在它之后、
+  // 本帧第一次 renderer.render（阴影烘焙在那里）之前。
+  profiler.B("shadowBatch");
+  shadowCasterBatch.Update();
+  profiler.E("shadowBatch");
   // 从这里到出画结束，骨头不再动：骨骼矩阵按帧只算一次（见 SkeletonUpdateOncePerFrame）。
   skeletonPassStamp += 1;
   skeletonPassGuard = true;

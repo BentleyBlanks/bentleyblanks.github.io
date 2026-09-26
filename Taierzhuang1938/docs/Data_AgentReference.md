@@ -215,6 +215,8 @@ node Taierzhuang1938/Script_FirstLevelFrameProbe.mjs --cpuprofile ; --live ; --s
 | 着色器预热（进过场 / 开机 / 换人） | `Script_Main.WarmupShaders` / `WarmActorShaders` | §18 | `Script_RespawnShaderWarmTest.mjs`、`Script_BootTest.mjs`（`warm=` 只打印） |
 | 全部调试视图 | `Script_PostDebug.mjs`、`Script_EditorDebugRendering.mjs` | §1.11 三条登记路 | `Script_EditorTest.mjs` |
 | 第一人称自阴影 | `Script_FirstPersonSelfShadow.mjs` | §6.12 | `Script_EditorTest.mjs`（自阴影软化热切） |
+| 阴影静态投影体合批 | `Script_ShadowCasterBatch.mjs`、`Data_Tuning_Shadows.STATIC_CASTER_BATCH` | §6.13 | `Script_ShadowCasterBatchTest.mjs`（纯 Node）；实机看阴影段 draw 与合批开/关逐纹素 |
+| 骨头子树遍历剪枝 | `Script_BonePrune.mjs` | §17.15 | `Script_BonePruneTest.mjs`（纯 Node）＋ `Script_MotionVectorContractTest.mjs`（骨头挂件） |
 
 #### 改之前必须知道的几条
 

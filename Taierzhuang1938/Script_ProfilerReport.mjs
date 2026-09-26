@@ -35,6 +35,7 @@ export const CPU_LABELS = {
   actorBatch: "人物合批",
   matrix: "场景矩阵（updateMatrixWorld）",
   frameSetup: "出画前接线（雾/水面/听者/簇表）",
+  shadowBatch: "阴影静态合批（逐帧对账）",
   firstPersonShadow: "视模自阴影",
   gi: "GI 探针（CPU）",
   hud: "HUD",

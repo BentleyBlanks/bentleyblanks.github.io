@@ -2258,6 +2258,40 @@ define，热切不重编译视模材质；滤波半径按米给（默认 6 mm）
 
 ---
 
+### 6.13 静态投影体合批（2026-09-27）
+
+`Script_ShadowCasterBatch.mjs`（数值 `Data_Tuning_Shadows.STATIC_CASTER_BATCH`，回归口
+`Script_ShadowCasterBatchTest`）。阴影趟里一动不动的普通投影网格（白盒块、战壕面、地形块、工事、
+布设）收进 three 的 `BatchedMesh`：每个成员照样被阴影相机逐个视锥剔除（`BatchedMesh.onBeforeShadow`），
+三角数不变，整批一次 multi-draw 提交。按「深度材质 × side × shadowSide」分组，第一关通常 2–3 组。
+
+**为什么不是按级联缓存深度**：级联框沿视线前推（§6.2），实测转头、瞄准晃 1°、走路时每次烘焙框都在变，
+按级联矩阵做键的缓存只有镜头完全静止才命中。光空间分块缓存（虚拟阴影贴图那一类）可以做，但工程量大；
+而这台机器上帧卡在提交，合批省下的正是提交。用户 2026-09-27 选了合批。
+
+规矩（改之前先读模块头注）：
+
+* **不改成员任何属性**。`castShadow` 尤其不能动 —— `Actor.SetShadowEnabled` 会记原值、
+  `TerrainDeformationView` 生成弹坑地形块时照抄源网格的 `castShadow`。换人只发生在
+  `shadowMap.render` 那一刻：打开合批、藏起成员，烘完原样还原（与 `Script_ShadowSkip` 同一做法）。
+  成员必须是叶子（藏父节点会连带藏掉子节点的影子）。
+* **合批与它的根节点不许标 `skipNormalDepth`**：阴影烘焙发生在预通道那次 `renderer.render` 里面，
+  预通道在整个调用期间藏起 skipNormalDepth 的对象 —— 标了就一个深度都写不进去（逐纹素对比抓到的）。
+* **逐帧对账**：矩阵、整条父链可见性、几何对象与 position/index 版本、材质对象与版本、side、
+  shadowSide、customDepthMaterial、castShadow、是否还是叶子、是否还在场景里，任何一项一变当帧踢出
+  （`deleteInstance`），冷却 `cooldownFrames` 再考虑。弹坑把地形块改了就是这么被踢回单独投影的。
+* **只收深度程序预热过的成员**：批次版深度程序只有阴影趟真跑才编，而且按 flipSided / doubleSided
+  分变体。`WarmProxy()` 给共用批次深度与场上每只自定义深度材质（BuildSink 破口裁切那只的克隆、其它）
+  各造三种面的一实例代理；没登记进 `warmedDepth` 的一律不收，宁可少合一件也不在游戏中途现编。
+* 破口裁切：成员的 `library.StaticDepth()` 在合批里用 `CloneShadedMaterial` 克隆（同一份破口 uniform，
+  补丁已处理 `USE_BATCHING`），克隆是为了不让同一只深度材质在普通 Mesh 与 BatchedMesh 之间翻种类
+  （§17.12 那条 getProgram 风暴）。
+* 镜像件（matrixWorld 行列式 ≤ 0）不收：绕序要逐件翻，一整批只有一个 frontFace。
+
+验收：定帧下合批开/关（调试口 `Tengxian.shadowCasterBatch.bypass`，只在烘焙时绕过、不拆批次）三级
+阴影深度图逐纹素比对，差值在 1e-6 量级（偶有一两个边缘纹素 ~1e-3，浮点翻转）；实战 60 s（炸出 7–8 个
+弹坑、踢出 54–70 次）后仍一致。实测收益见 §17.15。
+
 ## 7. 主场景与材质（含材质着色升级）
 
 > 一章三层：**主渲染靶**（HDR / tonemap 归属）、**烘焙侧**（`Script_TexBake` 出的四张图）、
@@ -5431,6 +5465,12 @@ composite 的抖动都跟着帧号走，多推一帧就整屏差 ~3/255。§17.1
   预通道分类缓存每帧失效在这一版已经不存在（重建约 0.02 次/帧）。
 * **轰炸机首现卡 2.7 s**：03 的 Ki-21 首现现编 3 个物理材质程序；`e9c6b67e` 起
   `WarmLevel` 带 `aircraft.WarmProxy()`，复测 45 s 内零现编。
+* **阴影静态投影体合批**（§6.13）：阴影 draw 每帧降 26–60%（01 238→139、04 177→82、07 188→75、
+  16 181→101）。机器空闲时整趟阴影烘焙本来只有 0.9–1.9 ms，合批省 0–0.3 ms，渲染整条链的差别在
+  0.2 ms 以内 —— 普查时看着大，是因为那一轮机器被别的测试占满、每个 draw 的开销被放大了好几倍，
+  而且车队与骨头两项先把阴影趟压小了。收益小，但逐纹素无差、零现编，留着。
+* **预热帧从来没烘过阴影**（§18.5）：`WarmLevel` 的强制出画不走玩法帧，没人拟合级联，
+  `ScheduleShadowUpdate` 一张都不排；刚体代理的「投影深度变体」其实一直留到开局现编。
 
 ## 18. 预热账：进过场与开机的着色器编译
 
@@ -5652,6 +5692,15 @@ program 都没新建。涨出来的全是**卢沟桥人物 GLB 的材质**：`Jo
 测试场第一发照旧现编一次，之后不再重编。
 
 ---
+
+### 18.5 预热帧要真烘一次阴影（2026-09-27）
+
+投影深度变体（`WarmLevel` 里人物材质刚体代理的「含投影深度变体」、阴影静态合批的批次版深度）
+只有阴影趟真跑才编，`renderer.compile` 不碰 `customDepthMaterial`（见记忆条「renderer.compile
+不碰 customDepthMaterial」）。而 `WarmLevel` 的「全场强制出画一帧」直接调 `RenderScene(0)`，不走
+玩法帧，**级联没人拟合**，`ScheduleShadowUpdate` 以 `dirty` 为准一张都不排 —— 实测预热全程阴影趟
+一次都没跑。修法：强制出画之前按当前相机补一次 `lights.UpdateShadowFrustum(...)`。复测 01/02/04/07/12/16
+开局 12 s 零现编（之前 04 有一只 `SharedSkinnedShadowDepth @ 日军A` 开局现编，也随之消失）。
 
 ## 19. 坑（按被踩频率排序）
 
